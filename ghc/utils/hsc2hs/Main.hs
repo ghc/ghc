@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.12 2001/01/13 23:10:45 qrczak Exp $
+-- $Id: Main.hs,v 1.13 2001/01/15 07:33:02 qrczak Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -344,7 +344,29 @@ outTokenHs (Special pos key arg) =
         "def"               -> ""
         _ | conditional key -> outCLine pos++"#"++key++" "++arg++"\n"
         "let"               -> ""
+        "enum"              -> outCLine pos++outEnum arg
         _                   -> outCLine pos++"    hsc_"++key++" ("++arg++");\n"
+
+outEnum :: String -> String
+outEnum arg =
+    case break (== ',') arg of
+        (_, [])        -> ""
+        (t, _:afterT) -> case break (== ',') afterT of
+            (f, afterF) -> let
+                enums []    = ""
+                enums (_:s) = case break (== ',') s of
+                    (enum, rest) -> let
+                        this = case break (== '=') $ dropWhile isSpace enum of
+                            (name, []) ->
+                                "    hsc_enum ("++t++", "++f++", \
+                                \hsc_haskellize (\""++name++"\"), "++
+                                name++");\n"
+                            (hsName, _:cName) ->
+                                "    hsc_enum ("++t++", "++f++", \
+                                \printf (\"%s\", \""++hsName++"\"), "++
+                                cName++");\n"
+                        in this++enums rest
+                in enums afterF
 
 outTokenH :: (SourcePos, String, String) -> String
 outTokenH (pos, key, arg) =
@@ -361,7 +383,7 @@ outTokenH (pos, key, arg) =
                 \#endif\n"++
                 arg++"\n"
             _ -> "extern "++header++";\n"
-            where header = takeWhile (\c -> c/='{' && c/='=') arg
+            where header = takeWhile (\c -> c /= '{' && c /= '=') arg
         _ | conditional key -> outCLine pos++"#"++key++" "++arg++"\n"
         _ -> ""
 
@@ -383,7 +405,7 @@ outTokenC (pos, key, arg) =
                 body++
                 "\n#endif\n"
             _ -> outCLine pos++arg++"\n"
-            where (header, body) = span (\c -> c/='{' && c/='=') arg
+            where (header, body) = span (\c -> c /= '{' && c /= '=') arg
         _ | conditional key -> outCLine pos++"#"++key++" "++arg++"\n"
         _ -> ""
 

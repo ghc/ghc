@@ -377,6 +377,28 @@ tags:
             <literal>Ptr a -> Ptr b</literal>.</para>
 	  </listitem>
 	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>#enum type, constructor, value, value, ...</literal></term>
+	  <listitem>
+	    <para>A shortcut for multiple definitions which use
+	    <literal>#const</literal>. Each <literal>value</literal>
+	    is a name of a C integer constant, e.g. enumeration value.
+	    The name will be translated to Haskell by making each
+	    letter following an underscore uppercase, making all the rest
+	    lowercase, and removing underscores. You can supply a different
+	    translation by writing <literal>hs_name = c_value</literal>
+	    instead of a <literal>value</literal>, in which case
+	    <literal>c_value</literal> may be an arbitrary expression.
+	    The <literal>hs_name</literal> will be defined as having the
+	    specified <literal>type</literal>. Its definition is the specified
+	    <literal>constructor</literal> (which in fact may be an expression
+	    or be empty) applied to the appropriate integer value. You can
+	    have multiple <literal>#enum</literal> definitions with the same
+	    <literal>type</literal>; this construct does not emit the type
+	    definition itself.
+	  </listitem>
+	</varlistentry>
       </variablelist>
 
     </sect2>

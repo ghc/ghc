@@ -6,6 +6,8 @@
 #include <stddef.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdarg.h>
+#include <ctype.h>
 
 #ifndef offsetof
 #define offsetof(t, f) ((size_t) &((t *)0)->f)
@@ -39,7 +41,7 @@
                 printf ("\\%d%s",                                 \
                         (unsigned char) *s,                       \
                         s[1] >= '0' && s[1] <= '9' ? "\\&" : ""); \
-            s++;                                                  \
+            ++s;                                                  \
         }                                                         \
         printf ("\"");                                            \
     }
@@ -64,3 +66,34 @@
 #define hsc_ptr(t, f) \
     printf ("(\\hsc_ptr -> hsc_ptr `plusPtr` %ld)", (long) offsetof (t, f));
 
+#define hsc_enum(t, f, print_name, x)         \
+    print_name;                               \
+    printf (" :: %s\n", #t);                  \
+    print_name;                               \
+    printf (" = %s ", #f);                    \
+    if ((x) < 0)                              \
+        printf ("(%ld)\n", (long)(x));        \
+    else                                      \
+        printf ("%lu\n", (unsigned long)(x));
+
+#define hsc_haskellize(x)                                          \
+    {                                                              \
+        const char *s = (x);                                       \
+        int upper = 0;                                             \
+        if (*s != '\0')                                            \
+        {                                                          \
+            putchar (tolower (*s));                                \
+            ++s;                                                   \
+            while (*s != '\0')                                     \
+            {                                                      \
+                if (*s == '_')                                     \
+                    upper = 1;                                     \
+                else                                               \
+                {                                                  \
+                    putchar (upper ? toupper (*s) : tolower (*s)); \
+                    upper = 0;                                     \
+                }                                                  \
+                ++s;                                               \
+            }                                                      \
+        }                                                          \
+    }
