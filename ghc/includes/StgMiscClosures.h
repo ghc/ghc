@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.25 2000/12/14 16:33:18 sewardj Exp $
+ * $Id: StgMiscClosures.h,v 1.26 2000/12/19 12:58:50 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -21,15 +21,16 @@ STGFUN(stg_IND_OLDGEN_entry);
 STGFUN(stg_IND_OLDGEN_PERM_entry);
 STGFUN(stg_CAF_UNENTERED_entry);
 STGFUN(stg_CAF_ENTERED_entry);
-STGFUN(stg_CAF_BLACKHOLE_entry);
 STGFUN(stg_BLACKHOLE_entry);
+STGFUN(stg_BLACKHOLE_STATIC_entry);
 STGFUN(stg_BLACKHOLE_BQ_entry);
+STGFUN(stg_BLACKHOLE_BQ_STATIC_entry);
 #ifdef SMP
 STGFUN(stg_WHITEHOLE_entry);
 #endif
 #ifdef TICKY_TICKY
 STGFUN(stg_SE_BLACKHOLE_entry);
-STGFUN(stg_SE_CAF_BLACKHOLE_entry);
+STGFUN(stg_SE_BLACKHOLE_STATIC_entry);
 #endif
 #if defined(PAR) || defined(GRAN)
 STGFUN(stg_RBH_entry);
@@ -54,7 +55,6 @@ STGFUN(stg_END_MUT_LIST_entry);
 STGFUN(stg_dummy_ret_entry);
 
 #ifdef GHCI
-/* entry code for constructors created by the metacircular interpreter */
 STGFUN(stg_interp_constr_entry);
 STGFUN(stg_interp_constr1_entry);
 STGFUN(stg_interp_constr2_entry);
@@ -82,15 +82,16 @@ extern DLL_IMPORT_RTS const StgInfoTable stg_IND_OLDGEN_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_IND_OLDGEN_PERM_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_CAF_UNENTERED_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_CAF_ENTERED_info;
-extern DLL_IMPORT_RTS const StgInfoTable stg_CAF_BLACKHOLE_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_BLACKHOLE_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_BLACKHOLE_STATIC_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_BLACKHOLE_BQ_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_BLACKHOLE_BQ_STATIC_info;
 #ifdef SMP
 extern DLL_IMPORT_RTS const StgInfoTable stg_WHITEHOLE_info;
 #endif
 #ifdef TICKY_TICKY
 extern DLL_IMPORT_RTS const StgInfoTable stg_SE_BLACKHOLE_info;
-extern DLL_IMPORT_RTS const StgInfoTable stg_SE_CAF_BLACKHOLE_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_SE_BLACKHOLE_STATIC_info;
 #endif
 #if defined(PAR) || defined(GRAN)
 extern DLL_IMPORT_RTS const StgInfoTable stg_RBH_info;
