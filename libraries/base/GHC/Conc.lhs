@@ -573,24 +573,26 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
   fdSet wakeup readfds
   maxfd <- buildFdSets 0 readfds writefds reqs
 
-  -- check the current time and wake up any thread in threadDelay whose
-  -- timeout has expired.  Also find the timeout value for the select() call.
-  now <- getTicksOfDay
-  (delays', timeout) <- getDelay now ptimeval delays
-
   -- perform the select()
-  let do_select = do
+  let do_select delays = do
+	  -- check the current time and wake up any thread in
+	  -- threadDelay whose timeout has expired.  Also find the
+	  -- timeout value for the select() call.
+	  now <- getTicksOfDay
+	  (delays', timeout) <- getDelay now ptimeval delays
+
 	  res <- c_select ((max wakeup maxfd)+1) readfds writefds 
 			nullPtr timeout
 	  if (res == -1)
 	     then do
 		err <- getErrno
 		if err == eINTR
-			then do_select
-			else return res
+			then do_select delays'
+			else return (res,delays')
 	     else
-		return res
-  res <- do_select
+		return (res,delays')
+
+  (res,delays') <- do_select delays
   -- ToDo: check result
 
   b <- takeMVar prodding
