@@ -419,7 +419,26 @@ details.</para>
       </listitem>
     </varlistentry>
 
+    <varlistentry>
+      <term>How do I compile my program for profiling without
+      overwriting the object files and <literal>hi</literal> files
+      I've already built?</term>
+      <listitem>
+	<para>You can select alternative suffixes for object files and
+	interface files, so you can have several builds of the same
+	code coexisting in the same directory.  For example, to
+	compile with profiling, you might do this:</para>
+	
+	<screen>ghc --make -prof -o foo-prof -osuf p.o -hisuf p.hi Main</screen>
+	
+	<para>See <xref linkend="options-output"> for more details on
+	the <option>-osuf</option> and <option>-hisuf</option>
+	options.</para>
+      </listitem>
+    </varlistentry>
+
   </variablelist>
+
 </chapter>
 
 
