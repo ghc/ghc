@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.53 2001/10/01 09:40:26 simonpj Exp $
+% $Id: PrelBase.lhs,v 1.54 2001/10/02 16:15:10 simonpj Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -454,6 +454,7 @@ String equality is used when desugaring pattern-matches against strings.
 eqString :: String -> String -> Bool
 eqString []       []	   = True
 eqString (c1:cs1) (c2:cs2) = c1 == c2 && cs1 `eqString` cs2
+eqString cs1      cs2	   = False
 
 {-# RULES "eqString" (==) = eqString #-}
 \end{code}
