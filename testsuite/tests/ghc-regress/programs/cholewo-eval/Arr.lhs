@@ -185,7 +185,7 @@ trMatrix (Matrix x) = matrix ((l,l'),(u',u)) [((j,i), x!(i,j)) | j <- range (l',
 row :: (Ix a, Ix b) => a -> Array (a,b) c -> Array b c
 row i x = ixmap (l',u') (\j->(i,j)) x where ((l,l'),(u,u')) = bounds x
 
-zipArr :: (Ix a) => String -> (b -> c -> d) -> Array a b -> Array a c -> Array a d
+zipArr :: (Eq a,Ix a) => String -> (b -> c -> d) -> Array a b -> Array a c -> Array a d
 zipArr s f a b | bounds a == bounds b = array (bounds a) [(i, f (a!i) (b!i)) | i <- indices a]
                | otherwise            = error ("zipArr: " ++ s ++ ": unconformable arrays")
 \end{code}
@@ -193,7 +193,7 @@ zipArr s f a b | bounds a == bounds b = array (bounds a) [(i, f (a!i) (b!i)) | i
 Valid only for b -> c -> b functions.
 
 \begin{code}
-zipArr' :: (Ix a) => String -> (b -> c -> b) -> Array a b -> Array a c -> Array a b
+zipArr' :: (Eq a,Ix a) => String -> (b -> c -> b) -> Array a b -> Array a c -> Array a b
 zipArr' s f a b | bounds a == bounds b = accum f a (assocs b)
                 | otherwise            = error ("zipArr': " ++ s ++ ": unconformable arrays")
 \end{code}
@@ -257,7 +257,7 @@ mapindexed3 f = mapindexed (\i -> mapindexed (\j -> mapindexed (\k -> f (i, j, k
 Overload arithmetical operators to work on arrays.
 
 \begin{code}
-instance (Ix a, Show a, Num b) => Num (Array a b) where
+instance (Eq a, Ix a, Show a, Num b) => Num (Array a b) where
   (+) = zipArr "+" (+)
   (-) = zipArr "-" (-)
   negate = fmap negate
@@ -281,7 +281,7 @@ arraySize = rangeSize . bounds
 \end{code}
 
 \begin{code}
-matMult         :: (Ix a, Ix b, Ix c, Num d) =>
+matMult         :: (Eq a, Eq b, Ix a, Ix b, Ix c, Num d) =>
                    Array (a,b) d -> Array (b,c) d -> Array (a,c) d
 matMult x y     =  array resultBounds
                          [((i,j), sum [x!(i,k) * y!(k,j) | k <- range (lj,uj)])
@@ -316,7 +316,7 @@ outerVector (Vector v) (Vector w) = if (l,u) == (l',u')
 \end{code}
 
 \begin{code}
-outerArr :: (Ix a, Num b) => Array a b -> Array a b -> Array (a,a) b
+outerArr :: (Eq a, Ix a, Num b) => Array a b -> Array a b -> Array (a,a) b
 outerArr v w = if (l,u) == (l',u')
                then array ((l,l'),(u,u')) [((i,j), v!i * w!j) | i <- range (l,u), j <- range (l',u')]
                else error "nn.outer: inconformable vectors"
@@ -326,7 +326,7 @@ outerArr v w = if (l,u) == (l',u')
 Inner product of a matrix and a vector.
 
 \begin{code}
-matvec :: (Ix a, Num b) => Array (a,a) b -> Array a b -> Array a b
+matvec :: (Eq a, Ix a, Num b) => Array (a,a) b -> Array a b -> Array a b
 matvec w x | bounds x == (l',u') =
                 array (l,u) [(i, sum [w!(i,j) * x!j | j <- range (l',u')]) 
                                 | i <- range (l,u)]
