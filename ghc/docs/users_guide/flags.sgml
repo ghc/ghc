@@ -797,6 +797,14 @@
 	    </row>
 
 	    <row>
+	      <entry><option>-fno-state-hack</option></entry>
+	      <entry>Turn off the "state hack" whereby any lambda with a real-world state token
+	      as argument is considered to be single-entry.  Hence OK to inline things inside it.</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+
+	    <row>
 	      <entry><option>-fno-cpr</option></entry>
 	      <entry>Turn off CPR analysis</entry>
 	      <entry>static</entry>
