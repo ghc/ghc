@@ -42,15 +42,6 @@
     resulting code.</para>
 
     <sect2>
-      <title>Arrays</title>
-
-      <para>The types <literal>ByteArray</literal> and
-      <literal>MutableByteArray</literal> may be used as basic foreign types
-      (see FFI Addendum, Section 3.2).  In C land, they map to
-      <literal>(char *)</literal>.</para>
-    </sect2>
-
-    <sect2>
       <title>Unboxed types</title>
 
       <para>The following unboxed types may be used as basic foreign types
@@ -305,6 +296,85 @@ to be inlined across modules, use the command-line and package-configuration
 <option>-&num;include</option> mechanism.
 </para>
 
+    </sect2>
+
+    <sect2>
+      <title>Memory Allocation</title>
+
+      <para>The FFI libraries provide several ways to allocate memory
+      for use with the FFI, and it isn't always clear which way is the
+      best.  This decision may be affected by how efficient a
+      particular kind of allocation is on a given compiler/platform,
+      so this section aims to shed some light on how the different
+      kinds of allocation perform with GHC.</para>
+
+      <variablelist>
+	<varlistentry>
+	  <term><literal>alloca</literal> and friends</term>
+	  <listitem>
+	    <para>Useful for short-term allocation when the allocation
+	    is intended to scope over a given <literal>IO</literal>
+	    compuatation.  This kind of allocation is commonly used
+	    when marshalling data to and from FFI functions.</para>
+
+	    <para>In GHC, <literal>alloca</literal> is implemented
+	    using <literal>MutableByteArray#</literal>, so allocation
+	    and deallocation are fast: much faster than C's
+	    <literal>malloc/free</literal>, but not quite as fast as
+	    stack allocation in C.  Use <literal>alloca</literal>
+	    whenever you can.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>mallocForeignPtr</literal></term>
+	  <listitem>
+	    <para>Useful for longer-term allocation which requires
+	    garbage collection.  If you intend to store the pointer to
+	    the memory in a foreign data structure, then
+	    <literal>mallocForeignPtr</literal> is
+	    <emphasis>not</emphasis> a good choice, however.</para>
+
+	    <para>In GHC, <literal>mallocForeignPtr</literal> is also
+	    implemented using <literal>MutableByteArray#</literal>.
+	    Although the memory is pointed to by a
+	    <literal>ForeignPtr</literal>, there are no actual
+	    finalizers involved (unless you add one with
+	    <literal>addForeignPtrFinalizer</literal>), and the
+	    deallocation is done using GC, so
+	    <literal>mallocForeignPtr</literal> is normally very
+	    cheap.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>malloc/free</literal></term>
+	  <listitem>
+	    <para>If all else fails, then you need to resort to
+	    <literal>Foreign.malloc</literal> and
+	    <literal>Foreign.free</literal>.  These are just wrappers
+	    around the C funcitons of the same name, and their
+	    efficiency will depend ultimately on the implementations
+	    of these functions in your platform's C library.  We
+	    usually find <literal>malloc</literal> and
+	    <literal>free</literal> to be significantly slower than
+	    the other forms of allocation above.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>Foreign.Marhsal.Pool</literal></term>
+	  <listitem>
+	    <para>Pools are currently implemented using
+	    <literal>malloc/free</literal>, so while they might be a
+	    more convenient way to structure your memory allocation
+	    than using one of the other forms of allocation, they
+	    won't be any more efficient.  We do plan to provide an
+	    improved-performance implementaiton of Pools in the
+	    future, however.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
     </sect2>
   </sect1>
 </Chapter>
