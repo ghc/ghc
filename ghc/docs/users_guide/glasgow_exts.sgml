@@ -1435,14 +1435,14 @@ With the <option>-fglasgow-exts</option> GHC lifts this restriction.
 
 <sect3><title>The context of a type signature</title>
 <para>
-Unlike Haskell 1.4, constraints in types do <emphasis>not</emphasis> have to be of
-the form <emphasis>(class type-variables)</emphasis>.  Thus, these type signatures
-are perfectly OK
+Unlike Haskell 98, constraints in types do <emphasis>not</emphasis> have to be of
+the form <emphasis>(class type-variable)</emphasis> or
+<emphasis>(class (type-variable type-variable ...))</emphasis>.  Thus,
+these type signatures are perfectly OK
 <programlisting>
-  f :: Eq (m a) => [m a] -> [m a]
   g :: Eq [a] => ...
+  g :: Ord (T a ()) => ...
 </programlisting>
-This choice recovers principal types, a property that Haskell 1.4 does not have.
 </para>
 <para>
 GHC imposes the following restrictions on the constraints in a type signature.
@@ -1453,7 +1453,7 @@ Consider the type:
 </programlisting>
 
 (Here, we write the "foralls" explicitly, although the Haskell source
-language omits them; in Haskell 1.4, all the free type variables of an
+language omits them; in Haskell 98, all the free type variables of an
 explicit source-language type signature are universally quantified,
 except for the class type variables in a class declaration.  However,
 in GHC, you can give the foralls if you want.  See <xref LinkEnd="universal-quantification">).
@@ -1684,7 +1684,7 @@ change that decision, at least for <literal>Main</literal>.)
 <title>Type synonyms in the instance head</title>
 
 <para>
-<emphasis>Unlike Haskell 1.4, instance heads may use type
+<emphasis>Unlike Haskell 98, instance heads may use type
 synonyms</emphasis>.  (The instance "head" is the bit after the "=>" in an instance decl.)
 As always, using a type synonym is just shorthand for
 writing the RHS of the type synonym definition.  For example:
