@@ -323,6 +323,7 @@ SRC_HC_OPTS += -fvia-C
 # We *want* type-checking of hand-written cmm.
 SRC_HC_OPTS += -dcmm-lint 
 
+ifneq "$(BootingFromHc)" "YES"
 # .cmm files depend on all the .h files, to a first approximation.
 %.$(way_)o : %.cmm $(H_FILES)
 	$(HC_PRE_OPTS)
@@ -338,6 +339,7 @@ SRC_HC_OPTS += -dcmm-lint
 	$(HC_PRE_OPTS)
 	$(HC) $(HC_OPTS) -S $< -o $@
 	$(HC_POST_OPTS)
+endif
 
 #-----------------------------------------------------------------------------
 #
