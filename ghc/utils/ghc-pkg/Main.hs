@@ -505,6 +505,7 @@ validatePackageConfig :: InstalledPackageInfo
 		      -> Bool	-- force
 		      -> IO ()
 validatePackageConfig pkg db_stack auto_ghci_libs update force = do
+  checkPackageId pkg
   checkDuplicates db_stack pkg update
   mapM_	(checkDep db_stack force) (depends pkg)
   mapM_	(checkDir force) (importDirs pkg)
@@ -515,6 +516,17 @@ validatePackageConfig pkg db_stack auto_ghci_libs update force = do
   --	extra_libraries :: [String],
   --	c_includes      :: [String],
 
+-- When the package name and version are put together, sometimes we can
+-- end up with a package id that cannot be parsed.  This will lead to 
+-- difficulties when the user wants to refer to the package later, so
+-- we check that the package id can be parsed properly here.
+checkPackageId :: InstalledPackageInfo -> IO ()
+checkPackageId ipi =
+  let str = showPackageId (package ipi) in
+  case [ x | (x,ys) <- readP_to_S parsePackageId str, all isSpace ys ] of
+    [_] -> return ()
+    []  -> die ("invalid package identifier: " ++ str)
+    _   -> die ("ambiguous package identifier: " ++ str)
 
 checkDuplicates :: PackageDBStack -> InstalledPackageInfo -> Bool -> IO ()
 checkDuplicates db_stack pkg update = do
