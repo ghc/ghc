@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.96 2002/06/15 19:38:11 wolfgang Exp $
+ * $Id: Linker.c,v 1.97 2002/07/02 10:22:13 wolfgang Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -508,7 +508,8 @@ typedef struct _RtsSymbolVal {
       Sym(__umoddi3)							\
 	  Sym(__ashldi3)							\
 	  Sym(__ashrdi3)							\
-	  Sym(__lshrdi3)
+	  Sym(__lshrdi3)							\
+	  SymX(__eprintf)
 #else
 #define RTS_EXTRA_SYMBOLS /* nothing */
 #endif
@@ -2845,6 +2846,7 @@ static int ocVerifyImage_MachO(ObjectCode* oc)
 }
 
 static void resolveImports(
+    ObjectCode* oc,
     char *image,
     struct symtab_command *symLC,
     struct section *sect,    // ptr to lazy or non-lazy symbol pointer section
@@ -2863,6 +2865,8 @@ static void resolveImports(
 	if((symbol->n_type & N_TYPE) == N_UNDF
 	    && (symbol->n_type & N_EXT) && (symbol->n_value != 0))
 	    addr = (void*) (symbol->n_value);
+	else if((addr = lookupLocalSymbol(oc,nm)) != NULL)
+	    ;
 	else
 	    addr = lookupSymbol(nm);
 	if(!addr)
@@ -2934,7 +2938,7 @@ static void relocateSection(char *image,
 		{
 		    struct nlist *symbol = &nlist[reloc->r_symbolnum];
 		    char *nm = image + symLC->stroff + symbol->n_un.n_strx;
-		    *word = lookupSymbol(nm);
+		    *word = (unsigned long) (lookupSymbol(nm));
 		    ASSERT(*word);
 		}
 		continue;
@@ -2951,7 +2955,7 @@ static int ocGetNames_MachO(ObjectCode* oc)
     char *image = (char*) oc->image;
     struct mach_header *header = (struct mach_header*) image;
     struct load_command *lc = (struct load_command*) (image + sizeof(struct mach_header));
-    int i,curSymbol;
+    unsigned i,curSymbol;
     struct segment_command *segLC = NULL;
     struct section *sections, *la_ptrs = NULL, *nl_ptrs = NULL;
     struct symtab_command *symLC = NULL;
@@ -3030,6 +3034,20 @@ static int ocGetNames_MachO(ObjectCode* oc)
 	}
     }
     
+	// insert local symbols into lochash
+    for(i=dsymLC->ilocalsym;i<dsymLC->ilocalsym+dsymLC->nlocalsym;i++)
+    {
+	if((nlist[i].n_type & N_TYPE) == N_SECT)
+	{
+	    char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
+	    ghciInsertStrHashTable(oc->fileName, oc->lochash, nm, image + 
+		sections[nlist[i].n_sect-1].offset
+		- sections[nlist[i].n_sect-1].addr
+		+ nlist[i].n_value);
+	}
+    }
+
+    
     commonStorage = stgCallocBytes(1,commonSize,"ocGetNames_MachO(common symbols)");
     commonCounter = (unsigned long)commonStorage;
     for(i=0;i<symLC->nsyms;i++)
@@ -3042,7 +3060,7 @@ static int ocGetNames_MachO(ObjectCode* oc)
 	    
 	    nlist[i].n_value = commonCounter;
 	    
-	    ghciInsertStrHashTable(oc->fileName, symhash, nm, nlist[i].n_value);
+	    ghciInsertStrHashTable(oc->fileName, symhash, nm, (void*)commonCounter);
 	    oc->symbols[curSymbol++] = nm;
 	    
 	    commonCounter += sz;
@@ -3056,7 +3074,7 @@ static int ocResolve_MachO(ObjectCode* oc)
     char *image = (char*) oc->image;
     struct mach_header *header = (struct mach_header*) image;
     struct load_command *lc = (struct load_command*) (image + sizeof(struct mach_header));
-    int i;
+    unsigned i;
     struct segment_command *segLC = NULL;
     struct section *sections, *la_ptrs = NULL, *nl_ptrs = NULL;
     struct symtab_command *symLC = NULL;
@@ -3089,9 +3107,9 @@ static int ocResolve_MachO(ObjectCode* oc)
     indirectSyms = (unsigned long*) (image + dsymLC->indirectsymoff);
 
     if(la_ptrs)
-	resolveImports(image,symLC,la_ptrs,indirectSyms,nlist);
+	resolveImports(oc,image,symLC,la_ptrs,indirectSyms,nlist);
     if(nl_ptrs)
-	resolveImports(image,symLC,nl_ptrs,indirectSyms,nlist);
+	resolveImports(oc,image,symLC,nl_ptrs,indirectSyms,nlist);
     
     for(i=0;i<segLC->nsects;i++)
     {
