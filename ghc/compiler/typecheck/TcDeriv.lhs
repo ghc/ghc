@@ -670,7 +670,8 @@ gen_taggery_Names inst_infos
     do_tag2con acc_Names tycon
       | isDataTyCon tycon &&
          (we_are_deriving enumClassKey tycon ||
-	  we_are_deriving ixClassKey   tycon)
+	  we_are_deriving ixClassKey   tycon
+	  && isEnumerationTyCon tycon)
       = returnTc ( (tag2con_RDR tycon, tycon, GenTag2Con)
 		 : (maxtag_RDR  tycon, tycon, GenMaxTag)
 		 : acc_Names)
