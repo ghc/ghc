@@ -977,7 +977,7 @@ dumpUDs :: [CoreBinder]
 	-> (UsageDetails, CoreExpr)
 
 dumpUDs bndrs uds@(MkUDs {fvs = orig_fvs, dictBinds = orig_dbs, calls = orig_calls}) body
-  = ASSERT( isEmptyTyVarSet (tyvar_set `intersectTyVarSets` ftvs)
+  = ASSERT( isEmptyTyVarSet (tyvar_set `intersectTyVarSets` ftvs))
 	-- The tyvars shouldn't be free in any of the usage details
 	-- If it was, then we should have found a dictionary lambda first
 
