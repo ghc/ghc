@@ -17,21 +17,18 @@
 
 module Data.Generics.Twins ( 
 
-	-- * The idiom for multi-parameter traversal
-        gzipWith,
-
-	-- * Mapping combinators with an additional list
-	gzipWithT,
-	gzipWithM,
-	gzipWithQ,
-	gzipWithQl,
-	gzipWithQr,
+	-- * Generic folds and maps that also accumulate
+	gfoldlAccum,
+	gmapAccumT,
+	gmapAccumM,
+	gmapAccumQl,
+	gmapAccumQr,
+	gmapAccumQ,
 
 	-- * Mapping combinators for twin traversal
-	tmapT,
-  	tmapM,
-  	tmapQ,
-
+	gzipWithT,
+  	gzipWithM,
+  	gzipWithQ,
 
 	-- * Typical twin traversals
 	geq,
@@ -53,115 +50,99 @@ import Data.Generics.Aliases
 
 ------------------------------------------------------------------------------
 --
---	The idiom for multi-parameter traversal
+--	Generic folds and maps that also accumulate
 --
 ------------------------------------------------------------------------------
 
-{-
+{--------------------------------------------------------------
 
-gfoldl and friends so far facilitated traversal of a single term. We
-will now consider an idiom gfoldlWith to traverse two terms
-semi-simultaneously. By cascasding this idiom, we can also traverse
-more than two terms. The gfoldlWith primitive completes gfoldl in a
-way that is similar to the well-known couple map and
-zipWith. Basically, gfoldlWith takes an additional argument, namely a
-list, and this list is traversed simultaneously with the immediate
-subterms of a given term.
+A list map can be elaborated to perform accumulation.
+In the same sense, we can elaborate generic maps over terms.
 
--}
+We recall the type of map:
+map :: (a -> b) -> [a] -> [b]
 
+We recall the type of an accumulating map (see Data.List):
+mapAccumL :: (a -> b -> (a,c)) -> a -> [b] -> (a,[c])
 
--- | gfoldl with an additional list
-gzipWith :: Data a
-         => (forall a b. Data a => d -> c (a -> b) -> a -> c b)
-         -> (forall g. g -> c g)
-         -> [d]
-         -> a
-         -> c a
+Applying the same scheme we obtain an accumulating gfoldl.
 
-gzipWith k z l x = case gfoldl k' z' x of { WITH _ c -> c }
+--------------------------------------------------------------}
+
+-- | gfoldl with accumulation
+
+gfoldlAccum :: Data d
+            => (forall d r. Data d => a -> c (d -> r) -> d -> (a, c r))
+            -> (forall g. a -> g -> (a, c g))
+            -> a -> d -> (a, c d)
+
+gfoldlAccum k z a d = unA (gfoldl k' z' d) a
  where
-   k' (WITH (h:t) c) y = WITH t (k h c y)
-   k' (WITH []    _) _ = error "gzipWith"
-   z' f                = WITH l (z f)
+  k' c y = A (\a -> let (a', c') = unA c a in k a' c' y)
+  z' f   = A (\a -> z a f)
 
 
--- | A type constructor for folding over the extra list
-data WITH q c a   = WITH [q] (c a) 
+-- | A type constructor for accumulation
+newtype A a c d = A (a -> (a, c d))
+unA (A f) = f
 
 
-
-------------------------------------------------------------------------------
---
---	Mapping combinators with an additional list
---
-------------------------------------------------------------------------------
-
-
--- | gmapT with an additional list
-gzipWithT :: Data a 
-          => (forall a. Data a => b -> a -> a)
-          -> [b]
-          -> a
-          -> a
-
-gzipWithT f l = unID . gzipWith k ID l
-  where
-    k b (ID c) x = ID $ c $ f b x
+-- | gmapT with accumulation
+gmapAccumT :: Data d
+           => (forall d. Data d => a -> d -> (a,d))
+           -> a -> d -> (a, d)
+gmapAccumT f a d = let (a',d') = gfoldlAccum k z a d
+                    in (a',unID d')
+ where
+  k a (ID c) d = let (a',d') = f a d 
+                  in (a', ID (c d'))
+  z a x = (a, ID x)
 
 
--- | gmapM with an additional list
-gzipWithM :: (Data a, Monad m) 
-          => (forall a. Data a => b -> a -> m a)
-          -> [b]
-          -> a
-          -> m a
-
-gzipWithM f = gzipWith k return 
-  where
-    k b c x = do c' <- c
-                 x' <- f b x
-                 return (c' x')
+-- | gmapT with accumulation
+gmapAccumM :: (Data d, Monad m)
+           => (forall d. Data d => a -> d -> (a, m d))
+           -> a -> d -> (a, m d)
+gmapAccumM f = gfoldlAccum k z
+ where
+  k a c d = let (a',d') = f a d 
+             in (a', d' >>= \d'' -> c >>= \c' -> return (c' d''))
+  z a x = (a, return x)
 
 
--- | gmapQl with an additional list
-gzipWithQl :: Data a
-           => (r -> r -> r) 
-           -> r
-           -> (forall a. Data a => b -> a -> r)
-           -> [b]
-           -> a 
-           -> r
-
-gzipWithQl o r f l = unCONST . gzipWith k z l
-  where
-    k b (CONST c) x = CONST (c `o` f b x)
-    z _ = CONST r
-
-
--- | gmapQr with an additional list
-gzipWithQr :: Data a
-           => (r' -> r -> r) 
-           -> r
-           -> (forall a. Data a => b -> a -> r')
-           -> [b]
-           -> a 
-           -> r
-
-gzipWithQr o r f l x = unQr (gzipWith k z l x) r
-    where
-      k b (Qr c) x = Qr (\r -> c (f b x `o` r))
-      z _ = Qr id
+-- | gmapQl with accumulation
+gmapAccumQl :: Data d 
+            => (r -> r' -> r) 
+            -> r
+            -> (forall d. Data d => a -> d -> (a,r'))
+            -> a -> d -> (a, r)
+gmapAccumQl o r f a d = let (a',r) = gfoldlAccum k z a d
+                         in (a',unCONST r)
+ where
+  k a (CONST c) d = let (a',r') = f a d 
+                     in (a', CONST (c `o` r'))
+  z a _ = (a, CONST r)
 
 
--- | gmapQ with an additional list
-gzipWithQ :: Data a
-      => (forall a. Data a => b -> a -> u)
-      -> [b]  
-      -> a 
-      -> [u]
+-- | gmapQr with accumulation
+gmapAccumQr :: Data d 
+            => (r' -> r -> r) 
+            -> r
+            -> (forall d. Data d => a -> d -> (a,r'))
+            -> a -> d -> (a, r)
+gmapAccumQr o r f a d = let (a',l) = gfoldlAccum k z a d
+                         in (a',unQr l r)
+ where
+  k a (Qr c) d = let (a',r') = f a d 
+                  in (a', Qr (\r -> c (r' `o` r)))
+  z a _ = (a, Qr id)
 
-gzipWithQ f = gzipWithQr (:) [] f
+
+-- | gmapQ with accumulation
+gmapAccumQ :: Data d
+           => (forall d. Data d => a -> d -> (a,q))
+           -> a -> d -> (a, [q])
+gmapAccumQ f = gmapAccumQr (:) [] f
 
 
 
@@ -172,16 +153,15 @@ gzipWithQ f = gzipWithQr (:) [] f
 ------------------------------------------------------------------------------
 
 
-
--- | The identity type constructor needed for the definition of gzipWithT
+-- | The identity type constructor needed for the definition of gmapAccumT
 newtype ID x = ID { unID :: x }
 
 
--- | The constant type constructor needed for the definition of gzipWithQl
+-- | The constant type constructor needed for the definition of gmapAccumQl
 newtype CONST c a = CONST { unCONST :: c }
 
 
--- | The type constructor needed for the definition of gzipWithQr
+-- | The type constructor needed for the definition of gmapAccumQr
 newtype Qr r a = Qr { unQr  :: r -> r }
 
 
@@ -194,27 +174,34 @@ newtype Qr r a = Qr { unQr  :: r -> r }
 
 
 -- | Twin map for transformation 
-tmapT :: GenericQ (GenericT) -> GenericQ (GenericT)
-tmapT f x y =
-  gzipWithT unGenericT'
-            (gmapQ (\x -> GenericT' (f x)) x)
-            y
+gzipWithT :: GenericQ (GenericT) -> GenericQ (GenericT)
+gzipWithT f x y = case gmapAccumT perkid funs y of
+                    ([], c) -> c
+                    _       -> error "gzipWithT" 
+ where
+  perkid a d = (tail a, unGenericT' (head a) d)
+  funs = gmapQ (\k -> GenericT' (f k)) x
 
-
--- | Twin map for monadic transformation 
-tmapM :: Monad m => GenericQ (GenericM m) -> GenericQ (GenericM m)
-tmapM f x y =
-  gzipWithM unGenericM'
-            (gmapQ (\x -> GenericM' (f x)) x)
-            y
 
 
 -- | Twin map for monadic transformation 
-tmapQ :: GenericQ (GenericQ r) -> GenericQ (GenericQ [r])
-tmapQ f x y =
-  gzipWithQ unGenericQ'
-            (gmapQ (\x -> GenericQ' (f x)) x)
-            y
+gzipWithM :: Monad m => GenericQ (GenericM m) -> GenericQ (GenericM m)
+gzipWithM f x y = case gmapAccumM perkid funs y of
+                    ([], c) -> c
+                    _       -> error "gzipWithM" 
+ where
+  perkid a d = (tail a, unGenericM' (head a) d)
+  funs = gmapQ (\k -> GenericM' (f k)) x
+
+
+-- | Twin map for monadic transformation 
+gzipWithQ :: GenericQ (GenericQ r) -> GenericQ (GenericQ [r])
+gzipWithQ f x y = case gmapAccumQ perkid funs y of
+                   ([], r) -> r
+                   _       -> error "gzipWithQ" 
+ where
+  perkid a d = (tail a, unGenericQ' (head a) d)
+  funs = gmapQ (\k -> GenericQ' (f k)) x
 
 
 
@@ -246,18 +233,17 @@ geq x y = geq' x y
   where
     geq' :: forall a b. (Data a, Data b) => a -> b -> Bool
     geq' x y =     (toConstr x == toConstr y)
-                && and (tmapQ geq' x y)
+                && and (gzipWithQ geq' x y)
 
 
 -- | Generic zip controlled by a function with type-specific branches
 gzip :: (forall a b. (Data a, Data b) => a -> b -> Maybe b)
      -> (forall a b. (Data a, Data b) => a -> b -> Maybe b)
 
-
 -- See testsuite/.../Generics/gzip.hs for an illustration
 gzip f x y = 
   f x y
   `orElse`
   if toConstr x == toConstr y
-    then tmapM (gzip f) x y
+    then gzipWithM (gzip f) x y
     else Nothing

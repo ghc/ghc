@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Generics.Basics
--- Copyright   :  (c) The University of Glasgow, CWI 2001--2003
+-- Copyright   :  (c) The University of Glasgow, CWI 2001--2004
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
@@ -24,8 +24,9 @@ module Data.Generics.Basics (
 		gfoldl,		-- :: ... -> a -> c a
 		toConstr, 	-- :: a -> Constr
 		fromConstr,	-- :: Constr -> a
-		dataTypeOf	-- :: a -> DataType
-		
+		dataTypeOf,	-- :: a -> DataType
+		ext1,		-- type extension for unary type constructors
+		ext2		-- type extension for binary type constructors
             ),
 
 	-- * Constructor representations
@@ -68,6 +69,8 @@ import Prelude
 import Data.Typeable
 import Data.Maybe
 import Control.Monad
+
+
 
 ------------------------------------------------------------------------------
 --
@@ -123,7 +126,6 @@ fold.
   --
   gfoldl _ z = z
 
-
   -- | Obtaining the constructor from a given datum.
   -- For proper terms, this is meant to be the top-level constructor.
   -- Primitive datatypes are here viewed as potentially infinite sets of
@@ -138,6 +140,29 @@ fold.
 
   -- | Provide access to list of all constructors
   dataTypeOf  :: a -> DataType
+
+
+
+------------------------------------------------------------------------------
+--
+-- Type extension for unary and binary type constructors
+--
+------------------------------------------------------------------------------
+
+  -- | Type extension for unary type constructors
+  ext1 :: Typeable1 t
+       => c a
+       -> (forall a. Data a => c (t a))
+       -> c a
+
+  ext1 def ext = def
+
+
+  -- | Type extension for binary type constructors
+  ext2 :: Typeable2 t
+       => c a
+       -> (forall a b. (Data a, Data b) => c (t a b)) -> c a
+  ext2 def ext = def
 
 
 ------------------------------------------------------------------------------
@@ -218,10 +243,10 @@ unit.
 
   -- | A generic query that processes one child by index (zero-based)
   gmapQi :: Int -> (forall a. Data a => a -> u) -> a -> u
-  gmapQi i f x = case gfoldl k z x of { COUNT _ (Just q) -> q } 
+  gmapQi i f x = case gfoldl k z x of { Qi _ (Just q) -> q } 
     where
-      k (COUNT i' q) a = COUNT (i'+1) (if i==i' then Just (f a) else q) 
-      z f              = COUNT 0 Nothing
+      k (Qi i' q) a = Qi (i'+1) (if i==i' then Just (f a) else q) 
+      z f           = Qi 0 Nothing
 
 
   -- | A generic monadic transformation that maps over the immediate subterms
@@ -293,7 +318,7 @@ newtype CONST c a = CONST { unCONST :: c }
 
 
 -- | Type constructor for adding counters to queries
-data COUNT q a = COUNT Int (Maybe q)
+data Qi q a = Qi Int (Maybe q)
 
 
 -- | The type constructor used in definition of gmapQr
@@ -553,6 +578,8 @@ instance Data a => Data [a] where
                    1 -> []
                    2 -> undefined:undefined
   dataTypeOf _ = listDataType
+  ext1 def ext = maybe def id (cast1 ext)
+
 
 --
 -- The gmaps are given as an illustration.
@@ -584,6 +611,7 @@ instance Data a => Data (Maybe a) where
                    1 -> Nothing
                    2 -> Just undefined
   dataTypeOf _ = maybeDataType
+  ext1 def ext = maybe def id (cast1 ext)
 
 
 --
@@ -600,6 +628,7 @@ instance (Data a, Data b) => Data (a,b) where
   fromConstr c = case conIndex c of
                    1 -> (undefined,undefined)
   dataTypeOf _ = productDataType
+  ext2 def ext = maybe def id (cast2 ext)
 
 
 --
@@ -646,6 +675,7 @@ instance (Data a, Data b) => Data (Either a b) where
                    1 -> Left undefined
                    2 -> Right undefined
   dataTypeOf _ = eitherDataType
+  ext2 def ext = maybe def id (cast2 ext)
 
 
 {-
@@ -669,7 +699,8 @@ instance Data String where
 -}
 
 -- A last resort for functions
-instance (Typeable a, Typeable b) => Data (a -> b) where
+instance (Data a, Data b) => Data (a -> b) where
   toConstr _   = FunConstr
   fromConstr _ = undefined
   dataTypeOf _ = FunType
+  ext2 def ext = maybe def id (cast2 ext)

@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Generics.Aliases
--- Copyright   :  (c) The University of Glasgow, CWI 2001--2003
+-- Copyright   :  (c) The University of Glasgow, CWI 2001--2004
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
@@ -44,7 +44,13 @@ module Data.Generics.Aliases (
 
         -- * Operators for (over-appreciated) unfolding
         gunfoldB,
-        gunfoldR
+        gunfoldR,
+
+	-- * Type extension for lists
+	extListT, 
+	extListM,
+	extListQ,
+	extListR
 
   ) where
 
@@ -103,9 +109,7 @@ mkM :: ( Monad m
     => (b -> m b)
     -> a 
     -> m a
-mkM f = case castarr f of
-              Just g  -> g
-              Nothing -> return
+mkM = extM return
 
 
 {-
@@ -127,7 +131,7 @@ mkMp :: ( MonadPlus m
      => (b -> m b)
      -> a
      -> m a
-mkMp = maybe (const mzero) id . castarr
+mkMp = extM (const mzero)
 
 
 -- | Make a generic builder;
@@ -139,7 +143,12 @@ mkR :: ( MonadPlus m
        , Typeable b
        )
     => m b -> m a
-mkR = maybe mzero id . castss
+mkR f = mzero `extR` f
+
+
+-- | Flexible type extension
+ext0 :: (Typeable a, Typeable b) => c a -> c b -> c a
+ext0 def ext = maybe def id (cast0 ext)
 
 
 -- | Extend a generic transformation by a type-specific case
@@ -170,7 +179,7 @@ extM :: ( Monad m
         , Typeable b
         )
      => (a -> m a) -> (b -> m b) -> a -> m a
-extM f = maybe f id . castarr
+extM def ext = unM ((M def) `ext0` (M ext))
 
 
 -- | Extend a generic MonadPlus transformation by a type-specific case
@@ -196,7 +205,8 @@ extR :: ( Monad m
         , Typeable b
         )
      => m a -> m b -> m a
-extR f = maybe f id . castss
+extR def ext = unR ((R def) `ext0` (R ext))
+
 
 
 ------------------------------------------------------------------------------
@@ -238,7 +248,7 @@ type GenericR m = forall a. Data a => m a
 
 -- | The general scheme underlying generic functions
 --   assumed by gfoldl; there are isomorphisms such as
---   GenericT = Generic ID.
+--   GenericT = Generic T.
 --
 type Generic c = forall a. Data a => a -> c a
 
@@ -316,3 +326,64 @@ gunfoldR :: (Monad m, Data a)
          -> (forall a. Data a => m a)
          -> m a
 gunfoldR c f = gmapM (const f) $ fromConstr c
+
+
+
+------------------------------------------------------------------------------
+--
+--	Type extension for lists
+--
+------------------------------------------------------------------------------
+
+
+-- | Type extension of transformations for lists
+extListT :: Data d
+         => (forall d. Data d => d -> d)
+         -> (forall d. Data d => [d] -> [d])
+         -> d -> d
+extListT def ext = unT ((T def) `ext1` (T ext))
+
+
+-- | Type extension of monadic transformations for lists
+extListM :: (Monad m, Data d)
+         => (forall d. Data d => d -> m d)
+         -> (forall d. Data d => [d] -> m [d])
+         -> d -> m d
+extListM def ext = unM ((M def) `ext1` (M ext))
+
+
+-- | Type extension of queries for lists
+extListQ :: Data d
+         => (d -> q)
+         -> (forall d. Data d => [d] -> q)
+         -> d -> q
+extListQ def ext = unQ ((Q def) `ext1` (Q ext))
+
+
+-- | Type extension of readers for lists
+extListR :: (Monad m, Data d)
+         => m d
+         -> (forall d. Data d => m [d])
+         -> m d
+extListR def ext = unR ((R def) `ext1` (R ext))
+
+
+
+------------------------------------------------------------------------------
+--
+--	Type constructors for type-level lambdas
+--
+------------------------------------------------------------------------------
+
+
+-- | The type constructor for transformations
+newtype T x = T { unT :: x -> x }
+
+-- | The type constructor for transformations
+newtype M m x = M { unM :: x -> m x }
+
+-- | The type constructor for queries
+newtype Q q x = Q { unQ :: x -> q }
+
+-- | The type constructor for readers
+newtype R m x = R { unR :: m x }
