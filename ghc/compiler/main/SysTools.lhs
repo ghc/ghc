@@ -741,9 +741,18 @@ runSomething phase_name pgm args = do
   let real_args = filter notNull (map showOpt args)
   traceCmd phase_name (unwords (pgm:real_args)) $ do
   exit_code <- rawSystem pgm real_args
-  if (exit_code /= ExitSuccess)
-	then throwDyn (PhaseFailed phase_name exit_code)
-	else return ()
+  case exit_code of
+     ExitSuccess -> 
+	return ()
+     -- rawSystem returns (ExitFailure 127) if the exec failed for any
+     -- reason (eg. the program doesn't exist).  This is the only clue
+     -- we have, but we need to report something to the user because in
+     -- the case of a missing program there will otherwise be no output
+     -- at all.
+     ExitFailure 127 -> 
+	throwDyn (InstallationError ("could not execute: " ++ pgm))
+     ExitFailure _other ->
+	throwDyn (PhaseFailed phase_name exit_code)
 
 traceCmd :: String -> String -> IO () -> IO ()
 -- a) trace the command (at two levels of verbosity)
