@@ -878,11 +878,16 @@ specDefn subst calls (fn, rhs)
 			    mkTyApps (Var spec_f) (map mkTyVarTy poly_tyvars))
 
 		-- Add the { d1' = dx1; d2' = dx2 } usage stuff
-	   final_uds = foldr addDictBind rhs_uds (zipEqual "spec_call" rhs_dicts' call_ds)
+	   final_uds = foldr addDictBind rhs_uds (my_zipEqual "spec_call" rhs_dicts' call_ds)
 	in
         returnSM ((spec_f, spec_rhs),
 	          final_uds,
 		  spec_env_rule)
+
+      where
+	my_zipEqual doc xs ys 
+	 | length xs /= length ys = pprPanic "my_zipEqual" (ppr xs $$ ppr ys $$ (ppr fn <+> ppr call_ts) $$ ppr rhs)
+	 | otherwise		  = zipEqual doc xs ys
 \end{code}
 
 %************************************************************************

@@ -306,7 +306,8 @@ JJQC-30-Nov-1997
 gen_Ord_binds :: TyCon -> RdrNameMonoBinds
 
 gen_Ord_binds tycon
-  = defaulted `AndMonoBinds` compare
+  = compare 	-- `AndMonoBinds` compare	
+		-- The default declaration in PrelBase handles this
   where
     tycon_loc = getSrcLoc tycon
     --------------------------------------------------------------------
@@ -387,6 +388,8 @@ gen_Ord_binds tycon
 								-- Tags are equal, no args => return EQ
     --------------------------------------------------------------------
 
+{- Not necessary: the default decls in PrelBase handle these 
+
 defaulted = foldr1 AndMonoBinds [lt, le, ge, gt, max_, min_]
 
 lt = mk_easy_FunMonoBind mkGeneratedSrcLoc lt_RDR [a_Pat, b_Pat] [] (
@@ -402,6 +405,7 @@ max_ = mk_easy_FunMonoBind mkGeneratedSrcLoc max_RDR [a_Pat, b_Pat] [] (
 	    compare_Case b_Expr a_Expr a_Expr a_Expr b_Expr)
 min_ = mk_easy_FunMonoBind mkGeneratedSrcLoc min_RDR [a_Pat, b_Pat] [] (
 	    compare_Case a_Expr b_Expr b_Expr a_Expr b_Expr)
+-}
 \end{code}
 
 %************************************************************************

@@ -7,7 +7,7 @@
 module PrimOp (
 	PrimOp(..), allThePrimOps,
 	primOpType, primOpSig, primOpUsg,
-	mkPrimOpIdName, primOpRdrName,
+	mkPrimOpIdName, primOpRdrName, primOpTag,
 
 	commutableOp,
 
@@ -304,6 +304,9 @@ about using it this way?? ADR)
 Used for the Ord instance
 
 \begin{code}
+primOpTag :: PrimOp -> Int
+primOpTag op = IBOX( tagOf_PrimOp op )
+
 tagOf_PrimOp CharGtOp			      = (ILIT( 1) :: FAST_INT)
 tagOf_PrimOp CharGeOp			      = ILIT(  2)
 tagOf_PrimOp CharEqOp			      = ILIT(  3)
@@ -2138,7 +2141,7 @@ mkPrimOpIdName op id
   = mkWiredInIdName key pREL_GHC occ_name id
   where
     occ_name = primOpOcc op
-    key	     = mkPrimOpIdUnique (IBOX(tagOf_PrimOp op))
+    key	     = mkPrimOpIdUnique (primOpTag op)
 
 
 primOpRdrName :: PrimOp -> RdrName 

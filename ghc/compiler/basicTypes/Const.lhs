@@ -9,7 +9,7 @@ module Const (
 	conType, conPrimRep,
 	conOkForApp, conOkForAlt, isWHNFCon, isDataCon,
 	conIsTrivial, conIsCheap, conIsDupable, conStrictness, 
-	conOkForSpeculation,
+	conOkForSpeculation, hashCon,
 
 	DataCon, PrimOp,	-- For completeness
 
@@ -27,10 +27,11 @@ module Const (
 import TysPrim		( charPrimTy, addrPrimTy, floatPrimTy, doublePrimTy,
 			  intPrimTy, wordPrimTy, int64PrimTy, word64PrimTy
 			)
-import PrimOp		( PrimOp, primOpType, primOpIsDupable,
+import Name		( hashName )
+import PrimOp		( PrimOp, primOpType, primOpIsDupable, primOpTag,
 			  primOpIsCheap, primOpStrictness, primOpOkForSpeculation )
 import PrimRep		( PrimRep(..) )
-import DataCon		( DataCon, dataConType, dataConTyCon, isNullaryDataCon, dataConRepStrictness )
+import DataCon		( DataCon, dataConName, dataConType, dataConTyCon, isNullaryDataCon, dataConRepStrictness )
 import TyCon		( isNewTyCon )
 import Type		( Type, typePrimRep )
 import PprType		( pprParendType )
@@ -41,6 +42,8 @@ import Outputable
 import Util		( thenCmp )
 
 import Ratio 		( numerator, denominator )
+import FastString	( uniqueOfFS )
+import Char		( ord )
 \end{code}
 
 
@@ -184,7 +187,6 @@ data Literal
 			-- (currently) wired in, so we can't conjure up its type out of
 			-- thin air.    Integer is, so the type here is really redundant.
 \end{code}
-
 
 \begin{code}
 instance Outputable Literal where
@@ -374,3 +376,44 @@ pprLit lit
 						    pprFSAsString s,
 						    pprParendType ty])
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Hashing
+%*									*
+%************************************************************************
+
+Hash values should be zero or a positive integer.  No negatives please.
+(They mess up the UniqFM for some reason.)
+
+\begin{code}
+hashCon :: Con -> Int
+hashCon (DataCon dc)  = hashName (dataConName dc)
+hashCon (PrimOp op)   = primOpTag op + 500	-- Keep it out of range of common ints
+hashCon (Literal lit) = hashLiteral lit
+hashCon other	      = pprTrace "hashCon" (ppr other) 0
+
+hashLiteral :: Literal -> Int
+hashLiteral (MachChar c)    	= ord c + 1000	-- Keep it out of range of common ints
+hashLiteral (MachStr s)     	= hashFS s
+hashLiteral (MachAddr i)    	= hashInteger i
+hashLiteral (MachInt i _)   	= hashInteger i
+hashLiteral (MachInt64 i _) 	= hashInteger i
+hashLiteral (MachFloat r)   	= hashRational r
+hashLiteral (MachDouble r)  	= hashRational r
+hashLiteral (MachLitLit s _)    = hashFS s
+hashLiteral (NoRepStr s _)      = hashFS s
+hashLiteral (NoRepInteger i _)  = hashInteger i
+hashLiteral (NoRepRational r _) = hashRational r
+
+hashRational :: Rational -> Int
+hashRational r = hashInteger (numerator r)
+
+hashInteger :: Integer -> Int
+hashInteger i = abs (fromInteger (i `rem` 10000))
+
+hashFS :: FAST_STRING -> Int
+hashFS s = IBOX( uniqueOfFS s )
+\end{code}
+

@@ -35,7 +35,6 @@ module Subst (
 import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr, CoreBndr,
 			  CoreRules(..), CoreRule(..), emptyCoreRules, isEmptyCoreRules
 			)
-import CoreUnfold	( hasUnfolding, noUnfolding )
 import CoreFVs		( exprFreeVars )
 import Type		( Type(..), ThetaType, TyNote(..), 
 			  tyVarsOfType, tyVarsOfTypes, mkAppTy

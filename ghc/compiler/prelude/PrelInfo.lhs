@@ -75,7 +75,7 @@ import Var		( varUnique, Id )
 import Name		( Name, OccName, Provenance(..), 
 			  NameSpace, tcName, clsName, varName, dataName,
 			  mkKnownKeyGlobal,
-			  getName, mkGlobalName, nameRdrName, systemProvenance
+			  getName, mkGlobalName, nameRdrName
 			)
 import RdrName		( rdrNameModule, rdrNameOcc, mkSrcQual )
 import Class		( Class, classKey )

@@ -21,6 +21,7 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..),
 import CoreLint		( beginPass, endPass )
 import CoreTidy		( tidyCorePgm )
 import CoreSyn
+import CSE		( cseProgram )
 import Rules		( RuleBase, ProtoCoreRule(..), pprProtoCoreRule, prepareRuleBase, orphanRule )
 import CoreUnfold
 import PprCore		( pprCoreBindings )
@@ -121,6 +122,7 @@ doCorePasses stats us binds irs (to_do : to_dos)
 	doCorePasses (stats `plusSimplCount` stats1) us2 binds1 irs to_dos
 
 doCorePass us binds rb (CoreDoSimplify sw_chkr) = _scc_ "Simplify"      simplifyPgm rb sw_chkr us binds
+doCorePass us binds rb CoreCSE		        = _scc_ "CommonSubExpr" noStats (cseProgram binds)
 doCorePass us binds rb CoreLiberateCase	        = _scc_ "LiberateCase"  noStats (liberateCase binds)
 doCorePass us binds rb CoreDoFloatInwards       = _scc_ "FloatInwards"  noStats (floatInwards binds)
 doCorePass us binds rb CoreDoFullLaziness       = _scc_ "FloatOutwards" noStats (floatOutwards us binds)

@@ -138,8 +138,13 @@ The rest of the prelude list functions are in PrelList.
   
 \begin{code}
 foldr            :: (a -> b -> b) -> b -> [a] -> b
-foldr _ z []     =  z
-foldr f z (x:xs) =  f x (foldr f z xs)
+-- foldr _ z []     =  z
+-- foldr f z (x:xs) =  f x (foldr f z xs)
+{-# INLINE foldr #-}
+foldr k z xs = go xs
+	     where
+	       go []     = z
+	       go (x:xs) = x `k` go xs
 
 build 	:: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
 {-# INLINE build #-}
@@ -178,7 +183,8 @@ map :: (a -> b) -> [a] -> [b]
 {-# INLINE map #-}
 map f xs = build (\c n -> foldr (mapFB c f) n xs)
 
-mapFB c f xs = c (f xs)
+-- Note eta expanded
+mapFB c f x ys = c (f x) ys
 
 mapList :: (a -> b) -> [a] -> [b]
 mapList _ []     = []
@@ -284,7 +290,21 @@ data Ordering = LT | EQ | GT deriving (Eq, Ord)
 \begin{code}
 type  String = [Char]
 
-data Char = C# Char#	deriving (Eq, Ord)
+data Char = C# Char#
+
+-- We don't use deriving for Eq and Ord, because for Ord the derived
+-- instance defines only compare, which takes two primops.  Then
+-- '>' uses compare, and therefore takes two primops instead of one.
+
+instance Eq Char where
+  (C# c1) == (C# c2) = c1 `eqChar#` c2
+  (C# c1) /= (C# c2) = c1 `neChar#` c2
+
+instance Ord Char where
+  (C# c1) >  (C# c2) = c1 `gtChar#` c2
+  (C# c1) >= (C# c2) = c1 `geChar#` c2
+  (C# c1) <= (C# c2) = c1 `leChar#` c2
+  (C# c1) <  (C# c2) = c1 `ltChar#` c2
 
 chr :: Int -> Char
 chr (I# i) | i >=# 0# && i <=# 255# = C# (chr# i)

@@ -15,7 +15,7 @@ module Name (
 	mkDerivedName, mkGlobalName, mkKnownKeyGlobal,
 	mkWiredInIdName,   mkWiredInTyConName,
 	maybeWiredInIdName, maybeWiredInTyConName,
-	isWiredInName,
+	isWiredInName, hashName,
 
 	nameUnique, setNameUnique, setNameProvenance, getNameProvenance, setNameImportReason,
 	tidyTopName, 
@@ -30,7 +30,7 @@ module Name (
 	-- Provenance
 	Provenance(..), ImportReason(..), pprProvenance,
 	ExportFlag(..), PrintUnqualified,
-        pprNameProvenance, systemProvenance, hasBetterProv,
+        pprNameProvenance, hasBetterProv,
 
 	-- Class NamedThing and overloaded friends
 	NamedThing(..),
@@ -48,7 +48,7 @@ import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, rdrNameOcc, rdrNameModule )
 import CmdLineOpts	( opt_PprStyle_NoPrags, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 
 import SrcLoc		( noSrcLoc, mkBuiltinSrcLoc, SrcLoc )
-import Unique		( pprUnique, Unique, Uniquable(..) )
+import Unique		( pprUnique, Unique, Uniquable(..), u2i )
 import Outputable
 import GlaExts
 \end{code}
@@ -116,7 +116,7 @@ mkKnownKeyGlobal (rdr_name, uniq)
 
 mkSysLocalName :: Unique -> FAST_STRING -> Name
 mkSysLocalName uniq fs = Name { n_uniq = uniq, n_sort = Local, 
-				n_occ = mkSrcVarOcc fs, n_prov = SystemProv }
+				n_occ = mkSrcVarOcc fs, n_prov = systemProvenance }
 
 mkTopName :: Unique -> Module -> FAST_STRING -> Name
 	-- Make a top-level name; make it Global if top-level
@@ -375,6 +375,9 @@ isGlobalName		:: Name -> Bool
 isExternallyVisibleName :: Name -> Bool
 
 
+
+hashName :: Name -> Int
+hashName name = IBOX( u2i (nameUnique name) )
 
 nameUnique name = n_uniq name
 nameOccName name = n_occ name

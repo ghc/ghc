@@ -45,7 +45,7 @@ import CmdLineOpts      ( opt_GlasgowExts, opt_WarnMissingMethods )
 import MkId		( mkDictSelId, mkDataConId, mkDefaultMethodId )
 import DataCon		( mkDataCon, notMarkedStrict )
 import Id		( Id, setInlinePragma, getIdUnfolding, idType, idName )
-import CoreUnfold	( getUnfoldingTemplate )
+import CoreUnfold	( unfoldingTemplate )
 import IdInfo
 import Name		( Name, nameOccName, isLocallyDefined, NamedThing(..) )
 import NameSet		( emptyNameSet )
@@ -347,7 +347,7 @@ tcClassDecl2 (ClassDecl context class_name
 	(tyvars, sc_theta, sc_sel_ids, op_sel_ids, defm_ids) = classBigSig clas
 
 	-- The selector binds are already in the selector Id's unfoldings
-	sel_binds = [ CoreMonoBind sel_id (getUnfoldingTemplate (getIdUnfolding sel_id))
+	sel_binds = [ CoreMonoBind sel_id (unfoldingTemplate (getIdUnfolding sel_id))
 		    | sel_id <- sc_sel_ids ++ op_sel_ids 
 		    ]
     in

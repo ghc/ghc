@@ -713,65 +713,58 @@ sub setupOptimiseFlags {
 
 	'-fsimplify',
 	  '[', 
-	  '-finline-phase1',		# Don't inline rule Ids till specialisation has bitten
-
-#		APR 99: the stuff in this comment is now
-#		handled by -finline-phase1
-#
-# I don't understand why we want -fessential-unfoldings-only here
-# If we have it, the following nasty thing happens:
-#	f  = E
-#	g* = f
-#	...g...
-# where "*" means exported.
-# In the essential-unfoldings pass we still substitute f for g
-# but we don't substitute E for f first.  So we get
-#	f  = E
-#	g* = f
-#	...f...
-# The g=f will get reverse-substituted later, but it's untidy. --SLPJ
-#
-# SDM: Here's why it's necessary.
-#
-#   If we unfold in the first pass before the specialiser is run
-#   we miss opportunities for specialisation because eg. wrappers
-#   have been inlined for specialisable functions.  
-#
-#   This shows up in PrelArr.lhs - the specialised instance for newArray 
-#   calls the generic rangeSize, because rangeSize is strict and is
-#   replaced by its wrapper by the simplifier.
-#	  '-fessential-unfoldings-only',
-#	  '-fsimpl-uf-use-threshold0',
-
-	  '-fmax-simplifier-iterations2',
+		'-finline-phase0',	# Don't inline anything till full laziness has bitten
+					# In particular, inlining wrappers inhibits floating
+					# e.g. ...(case f x of ...)...
+					#  ==> ...(case (case x of I# x# -> fw x#) of ...)...
+					#  ==> ...(case x of I# x# -> case fw x# of ...)...
+					# and now the redex (f x) isn't floatable any more
+		'-fmax-simplifier-iterations2',
 	  ']',
 
+	# Specialisation is best done before full laziness
+	# so that overloaded functions have all their dictionary lambdas manifest
 	($Oopt_DoSpecialise) ? ( $Oopt_DoSpecialise, ) : (),
+	'-ffull-laziness',
+	'-ffloat-inwards',
+
+#	'-fsimplify',
+#	  '[', 
+#		# Run the simplifier before specialising, so that overloaded functions
+#		# look like 		f = \d -> ...
+#		# (Full laziness may lift out something hiding the \d
+#		'-finline-phase1',
+#		'-fmax-simplifier-iterations1',
+#	  ']',
+
+
+	'-fsimplify',
+	  '[', 
+	  	'-finline-phase1',
+		# Want to run with inline phase 1 after the specialiser to give
+		# maximum chance for fusion to work before we inline build/augment
+		# in phase 2.  This made a difference in 'ansi' where an overloaded
+		# function wasn't inlined till too late.
+		$Oopt_MaxSimplifierIterations,	
+	  ']',
 
         $Oopt_UsageSPInf, # infer usage information here in case we need it later.
                           # (add more of these where you need them --KSW 1999-04)
 
 	'-fsimplify',
 	  '[', 
+		# Need inline-phase2 here so that build/augment get 
+		# inlined.  I found that spectral/hartel/genfft lost some useful
+		# strictness in the function sumcode' if augment is not inlined
+		# before strictness analysis runs
+
+		'-finline-phase2',
 	  	$Oopt_MaxSimplifierIterations,	
-
-		# Still don't inline transformation rule Ids, to give the
-		# rules a good chance to fire
-		'-finline-phase1',
 	  ']',
 
-	'-ffull-laziness',
-
-	'-ffloat-inwards',
-
-	'-fsimplify',
-	  '[', 
-	  	'-finline-phase2',
-		$Oopt_MaxSimplifierIterations,	
-	  ']',
 
 	'-fstrictness',
-	# '-fcpr-analyse',
+	'-fcpr-analyse',
 	'-fworker-wrapper',
 
 	'-fsimplify',
@@ -781,6 +774,7 @@ sub setupOptimiseFlags {
 	  ']',
 
 	'-ffloat-inwards',
+	'-fcse',
 
 # Case-liberation for -O2.  This should be after
 # strictness analysis and the simplification which follows it.
@@ -794,6 +788,7 @@ sub setupOptimiseFlags {
 	'-fsimplify',
 	  '[', 
 	  	$Oopt_MaxSimplifierIterations,	
+		# No -finline-phase: allow all Ids to be inlined now
 	  ']',
 
       #	'-fstatic-args',
@@ -3058,6 +3053,7 @@ arg: while($_ = $Args[0]) {
     /^-fallow-overlapping-instances$/ && do { push(@HsC_flags, $_); next arg; };
     /^-fallow-undecidable-instances$/ && do { push(@HsC_flags, $_); next arg; };
     /^-fhistory-size.*$/ 	      && do { push(@HsC_flags, $_); next arg; };
+    /^-fdicts-strict$/ 	  	      && do { push(@HsC_flags, $_); next arg; };
     /^-fglasgow-exts$/
 		&& do { push(@HsC_flags, $_);
 

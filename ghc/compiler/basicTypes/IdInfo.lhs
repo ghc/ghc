@@ -658,10 +658,11 @@ noLBVarInfo = NoLBVarInfo
 
 -- not safe to print or parse LBVarInfo because it is not really a
 -- property of the definition, but a property of the context.
-ppLBVarInfo _ = empty
+pprLBVarInfo NoLBVarInfo     = empty
+pprLBVarInfo IsOneShotLambda = ptext SLIT("OneShot")
 
 instance Outputable LBVarInfo where
-    ppr = ppLBVarInfo
+    ppr = pprLBVarInfo
 
 instance Show LBVarInfo where
     showsPrec p c = showsPrecSDoc p (ppr c)

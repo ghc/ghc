@@ -17,8 +17,8 @@ import CoreSyn		-- All of it
 import OccurAnal	( occurAnalyseExpr, tagBinders, UsageDetails )
 import BinderInfo	( markMany )
 import CoreFVs		( exprFreeVars, idRuleVars, ruleSomeLhsFreeVars )
-import CoreUnfold	( Unfolding(..) )
-import CoreUtils	( whnfOrBottom, eqExpr )
+import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
+import CoreUtils	( eqExpr )
 import PprCore		( pprCoreRule )
 import Subst		( Subst, InScopeSet, substBndr, lookupSubst, extendSubst,
 			  mkSubst, substEnv, setSubstEnv, emptySubst, isInScope,
@@ -296,12 +296,11 @@ match e1 (Let bind e2) tpl_vars kont subst
 -- (Its occurrence information is not necessarily up to date,
 --  so we don't use it.)
 match e1 (Var v2) tpl_vars kont subst
-  = case getIdUnfolding v2 of
-	CoreUnfolding form guidance unfolding
-	   |  whnfOrBottom form
-	   -> match e1 unfolding tpl_vars kont subst
+  | isCheapUnfolding unfolding
+  = match e1 (unfoldingTemplate unfolding) tpl_vars kont subst
+  where
+    unfolding = getIdUnfolding v2
 
-	other -> match_fail
 
 -- We can't cope with lets in the template
 

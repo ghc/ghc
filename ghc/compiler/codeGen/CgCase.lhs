@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.31 1999/06/09 14:27:38 simonmar Exp $
+% $Id: CgCase.lhs,v 1.32 1999/06/22 07:59:59 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -745,7 +745,8 @@ cgPrimInlineAlts bndr ty alts deflt
 cgPrimEvalAlts bndr ty alts deflt
   = cgPrimAltsWithDefault bndr GCMayHappen (CReg reg) alts deflt [reg]
   where
-	reg = dataReturnConvPrim kind
+	reg  = WARN( case kind of { PtrRep -> True; other -> False }, text "cgPrimEE" <+> ppr bndr <+> ppr ty  )
+	       dataReturnConvPrim kind
 	kind = typePrimRep ty
 
 cgPrimAltsWithDefault bndr gc_flag scrutinee alts deflt regs

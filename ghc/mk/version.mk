@@ -47,3 +47,7 @@ CcMinorVersion=1
 # that will break compatibility with older versions, up this variable.
 # 
 HscIfaceFileVersion=5
+#	But watch out: interface file format after Simon's renamer
+#	hacking isn't the same as before, but it may not make
+#	any difference for the GHC boot files.
+#		May 1999

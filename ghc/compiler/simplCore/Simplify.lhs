@@ -43,9 +43,10 @@ import Const		( Con(..) )
 import Name		( isLocallyDefined )
 import CoreSyn
 import CoreFVs		( exprFreeVars )
-import CoreUnfold	( Unfolding(..), mkUnfolding, callSiteInline, 
-			  isEvaldUnfolding, blackListed )
-import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsWHNF, exprIsTrivial,
+import CoreUnfold	( Unfolding, mkOtherCon, mkUnfolding, otherCons,
+			  callSiteInline, blackListed
+			)
+import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsCheap, exprIsTrivial,
 			  coreExprType, coreAltsType, exprArity, exprIsValue,
 			  exprOkForSpeculation
 			)
@@ -619,8 +620,8 @@ simplRhs top_lvl float_ubx rhs_ty rhs rhs_se thing_inside
 	(floats_out, rhs'') | float_ubx = (floats, rhs')
 			    | otherwise	= splitFloats floats rhs' 
     in
-    if (isTopLevel top_lvl || exprIsWHNF rhs') && 	-- Float lets if (a) we're at the top level
-        not (null floats_out)				-- or 		 (b) it exposes a HNF
+    if (isTopLevel top_lvl || exprIsCheap rhs') && 	-- Float lets if (a) we're at the top level
+        not (null floats_out)				-- or 		 (b) it exposes a cheap (i.e. duplicatable) expression
     then
 	tickLetFloat floats_out				`thenSmpl_`
 		-- Do the float
@@ -1013,7 +1014,8 @@ rebuild scrut (Select _ bndr alts se cont)
 	-- Check that the scrutinee can be let-bound instead of case-bound
     && (   (isUnLiftedType (idType bndr) && 	-- It's unlifted and floatable
 	    exprOkForSpeculation scrut)		-- NB: scrut = an unboxed variable satisfies 
-	|| is_a_value scrut			-- It's a value
+	|| exprIsValue scrut			-- It's already evaluated
+	|| var_demanded_later scrut		-- It'll be demanded later
 
 --      || not opt_SimplPedanticBottoms)	-- Or we don't care!
 --	We used to allow improving termination by discarding cases, unless -fpedantic-bottoms was on,
@@ -1040,10 +1042,8 @@ rebuild scrut (Select _ bndr alts se cont)
     (rhs1:other_rhss)		 = [rhs | (_,_,rhs) <- alts]
     binders_unused (_, bndrs, _) = all isDeadBinder bndrs
 
-	-- Check whether or not scrut is known to be evaluted
-    is_a_value (Var v) =    isEvaldUnfolding (getIdUnfolding v)	-- It's been evaluated
-			 || isStrict (getIdDemandInfo bndr)	-- It's going to be evaluated later
-    is_a_value scrut   = exprIsValue scrut
+    var_demanded_later (Var v) = isStrict (getIdDemandInfo bndr)	-- It's going to be evaluated later
+    var_demanded_later other   = False
 \end{code}
 
 Case elimination [see the code above]
@@ -1165,9 +1165,7 @@ rebuild_case scrut case_bndr alts se cont
   where
 	-- scrut_cons tells what constructors the scrutinee can't possibly match
     scrut_cons = case scrut of
-		   Var v -> case getIdUnfolding v of
-				OtherCon cons -> cons
-				other	      -> []
+		   Var v -> otherCons (getIdUnfolding v)
 		   other -> []
 
 
@@ -1313,7 +1311,7 @@ simplAlts zap_occ_info scrut_cons case_bndr'' alts cont'
 	=	-- In the default case we record the constructors that the
 		-- case-binder *can't* be.
 		-- We take advantage of any OtherCon info in the case scrutinee
-	  modifyInScope (case_bndr'' `setIdUnfolding` OtherCon handled_cons)	$ 
+	  modifyInScope (case_bndr'' `setIdUnfolding` mkOtherCon handled_cons)	$ 
 	  simplExprC rhs cont'							`thenSmpl` \ rhs' ->
 	  returnSmpl (DEFAULT, [], rhs')
 
@@ -1346,9 +1344,9 @@ simplAlts zap_occ_info scrut_cons case_bndr'' alts cont'
 
     cat_evals [] [] = []
     cat_evals (v:vs) (str:strs)
-	| isTyVar v    = v				   : cat_evals vs (str:strs)
-	| isStrict str = (v' `setIdUnfolding` OtherCon []) : cat_evals vs strs
-	| otherwise    = v'				   : cat_evals vs strs
+	| isTyVar v    = v				     : cat_evals vs (str:strs)
+	| isStrict str = (v' `setIdUnfolding` mkOtherCon []) : cat_evals vs strs
+	| otherwise    = v'				     : cat_evals vs strs
 	where
 	  v' = zap_occ_info v
 \end{code}

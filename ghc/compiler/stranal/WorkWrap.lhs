@@ -217,24 +217,21 @@ tryWW non_rec fn_id rhs
   = returnUs [ (fn_id, rhs) ]
 
   | otherwise		-- Do w/w split
-  = let
-	(tyvars, wrap_args, body) = collectTyAndValBinders rhs
-    in
-    mkWwBodies tyvars wrap_args 
+  = mkWwBodies tyvars wrap_args 
 	       (coreExprType body)
-	       revised_wrap_args_info
+	       wrap_demands
 	       cpr_info
                                                 `thenUs` \ (wrap_fn, work_fn, work_demands) ->
     getUniqueUs					`thenUs` \ work_uniq ->
     let
 	work_rhs  = work_fn body
 	work_id   = mkWorkerId work_uniq fn_id (coreExprType work_rhs) `setIdStrictness`
-		    (if has_strictness_info then mkStrictnessInfo (work_demands, result_bot)
+		    (if has_strictness_info then mkStrictnessInfo (work_demands ++ remaining_arg_demands, result_bot)
 	                                    else noStrictnessInfo) 
 
 	wrap_rhs = wrap_fn work_id
 	wrap_id  = fn_id `setIdStrictness` 
-                         (if has_strictness_info then mkStrictnessInfo (revised_wrap_args_info, result_bot)
+                         (if has_strictness_info then mkStrictnessInfo (wrap_demands ++ remaining_arg_demands, result_bot)
 	                                         else noStrictnessInfo) 
                          `setIdWorkerInfo`	Just work_id
 			 `setIdArity`		exactArity (length wrap_args)
@@ -246,18 +243,26 @@ tryWW non_rec fn_id rhs
     returnUs ([(work_id, work_rhs), (wrap_id, wrap_rhs)])
 	-- Worker first, because wrapper mentions it
   where
+    (tyvars, wrap_args, body) = collectTyAndValBinders rhs
+    n_wrap_args		      = length wrap_args
+
     strictness_info     = getIdStrictness fn_id
     has_strictness_info = case strictness_info of
 				StrictnessInfo _ _ -> True
 				other		   -> False
 
-    StrictnessInfo wrap_args_info result_bot = strictness_info
+    StrictnessInfo arg_demands result_bot = strictness_info
 			
-    revised_wrap_args_info = if has_strictness_info 
-                               then setUnpackStrategy wrap_args_info
-                               else repeat wwLazy
+	-- NB: There maybe be more items in arg_demands than wrap_args, because
+	-- the strictness info is semantic and looks through InlineMe and Scc
+	-- Notes, whereas wrap_args does not
+    demands_for_visible_args = take n_wrap_args arg_demands
+    remaining_arg_demands    = drop n_wrap_args arg_demands
 
-    do_strict_ww = has_strictness_info && worthSplitting revised_wrap_args_info result_bot
+    wrap_demands | has_strictness_info = setUnpackStrategy demands_for_visible_args
+		 | otherwise	       = repeat wwLazy
+
+    do_strict_ww = has_strictness_info && worthSplitting wrap_demands result_bot
 
     cpr_info     = getIdCprInfo fn_id
     has_cpr_info = case cpr_info of

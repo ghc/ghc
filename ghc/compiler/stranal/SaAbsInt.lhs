@@ -17,7 +17,7 @@ module SaAbsInt (
 
 import CmdLineOpts	( opt_AllStrict, opt_NumbersStrict )
 import CoreSyn
-import CoreUnfold	( Unfolding(..) )
+import CoreUnfold	( Unfolding, maybeUnfoldingTemplate )
 import PrimOp		( primOpStrictness )
 import Id		( Id, idType, getIdStrictness, getIdUnfolding )
 import Const		( Con(..) )
@@ -350,12 +350,12 @@ evalAbsence other val = anyBot val
 				-- error's arg
 
 absId anal var env
-  = case (lookupAbsValEnv env var, getIdStrictness var, getIdUnfolding var) of
+  = case (lookupAbsValEnv env var, getIdStrictness var, maybeUnfoldingTemplate (getIdUnfolding var)) of
 
 	(Just abs_val, _, _) ->
 			abs_val	-- Bound in the environment
 
-	(Nothing, NoStrictnessInfo, CoreUnfolding _ _ unfolding) ->
+	(Nothing, NoStrictnessInfo, Just unfolding) ->
 			-- We have an unfolding for the expr
 			-- Assume the unfolding has no free variables since it
 			-- came from inside the Id

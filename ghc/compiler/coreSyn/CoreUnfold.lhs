@@ -14,10 +14,13 @@ find, unsurprisingly, a Core expression.
 
 \begin{code}
 module CoreUnfold (
-	Unfolding(..), UnfoldingGuidance, -- types
+	Unfolding, UnfoldingGuidance, -- types
 
-	noUnfolding, mkUnfolding, getUnfoldingTemplate,
-	isEvaldUnfolding, hasUnfolding,
+	noUnfolding, mkUnfolding, 
+	mkOtherCon, otherCons,
+	unfoldingTemplate, maybeUnfoldingTemplate,
+	isEvaldUnfolding, isCheapUnfolding,
+	hasUnfolding,
 
 	couldBeSmallEnoughToInline, 
 	certainlySmallEnoughToInline, 
@@ -44,17 +47,17 @@ import CoreSyn
 import PprCore		( pprCoreExpr )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import BinderInfo	( )
-import CoreUtils	( coreExprType, exprIsTrivial, mkFormSummary, whnfOrBottom,
-			  FormSummary(..) )
+import CoreUtils	( coreExprType, exprIsTrivial, exprIsValue, exprIsCheap )
 import Id		( Id, idType, idUnique, isId, 
 			  getIdSpecialisation, getInlinePragma, getIdUnfolding
 			)
 import VarSet
+import Name		( isLocallyDefined )
 import Const		( Con(..), isLitLitLit, isWHNFCon )
 import PrimOp		( PrimOp(..), primOpIsDupable )
 import IdInfo		( ArityInfo(..), InlinePragInfo(..), OccInfo(..) )
 import TyCon		( tyConFamilySize )
-import Type		( splitAlgTyConApp_maybe, splitFunTy_maybe )
+import Type		( splitAlgTyConApp_maybe, splitFunTy_maybe, isUnLiftedType )
 import Const		( isNoRepLit )
 import Unique		( Unique, buildIdKey, augmentIdKey, runSTRepIdKey )
 import Maybes		( maybeToBool )
@@ -83,34 +86,51 @@ data Unfolding
 				-- Here, f gets an OtherCon [] unfolding.
 
   | CoreUnfolding			-- An unfolding with redundant cached information
-		FormSummary		-- Tells whether the template is a WHNF or bottom
-		UnfoldingGuidance	-- Tells about the *size* of the template.
 		CoreExpr		-- Template; binder-info is correct
+		Bool			-- exprIsCheap template (cached); it won't duplicate (much) work 
+					--	if you inline this in more than one place
+		Bool			-- exprIsValue template (cached); it is ok to discard a `seq` on
+					--	this variable
+		UnfoldingGuidance	-- Tells about the *size* of the template.
 \end{code}
 
 \begin{code}
 noUnfolding = NoUnfolding
+mkOtherCon  = OtherCon
 
 mkUnfolding expr
-  = let
-     -- strictness mangling (depends on there being no CSE)
-     ufg = calcUnfoldingGuidance opt_UF_CreationThreshold expr
-     occ = occurAnalyseGlobalExpr expr
-    in
-    CoreUnfolding (mkFormSummary expr) ufg occ
+  = CoreUnfolding (occurAnalyseGlobalExpr expr)
+		  (exprIsCheap expr)
+		  (exprIsValue expr)
+		  (calcUnfoldingGuidance opt_UF_CreationThreshold expr)
 
-getUnfoldingTemplate :: Unfolding -> CoreExpr
-getUnfoldingTemplate (CoreUnfolding _ _ expr) = expr
-getUnfoldingTemplate other = panic "getUnfoldingTemplate"
+unfoldingTemplate :: Unfolding -> CoreExpr
+unfoldingTemplate (CoreUnfolding expr _ _ _) = expr
+unfoldingTemplate other = panic "getUnfoldingTemplate"
+
+maybeUnfoldingTemplate :: Unfolding -> Maybe CoreExpr
+maybeUnfoldingTemplate (CoreUnfolding expr _ _ _) = Just expr
+maybeUnfoldingTemplate other 			  = Nothing
+
+otherCons (OtherCon cons) = cons
+otherCons other		  = []
 
 isEvaldUnfolding :: Unfolding -> Bool
-isEvaldUnfolding (OtherCon _)		          = True
-isEvaldUnfolding (CoreUnfolding ValueForm _ expr) = True
-isEvaldUnfolding other			          = False
+isEvaldUnfolding (OtherCon _)		        = True
+isEvaldUnfolding (CoreUnfolding _ _ is_evald _) = is_evald
+isEvaldUnfolding other			        = False
+
+isCheapUnfolding :: Unfolding -> Bool
+isCheapUnfolding (CoreUnfolding _ is_cheap _ _) = is_cheap
+isCheapUnfolding other				= False
 
 hasUnfolding :: Unfolding -> Bool
-hasUnfolding NoUnfolding = False
-hasUnfolding other 	 = True
+hasUnfolding (CoreUnfolding _ _ _ _) = True
+hasUnfolding other 	 	     = False
+
+hasSomeUnfolding :: Unfolding -> Bool
+hasSomeUnfolding NoUnfolding = False
+hasSomeUnfolding other	     = True
 
 data UnfoldingGuidance
   = UnfoldNever
@@ -232,7 +252,9 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
     size_up (Let (NonRec binder rhs) body)
       = nukeScrutDiscount (size_up rhs)		`addSize`
 	size_up body				`addSizeN`
-	1	-- For the allocation
+	(if isUnLiftedType (idType binder) then 0 else 1)
+		-- For the allocation
+		-- If the binder has an unlifted type there is no allocation
 
     size_up (Let (Rec pairs) body)
       = nukeScrutDiscount rhs_size		`addSize`
@@ -244,10 +266,13 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
     size_up (Case scrut _ alts)
       = nukeScrutDiscount (size_up scrut)		`addSize`
 	arg_discount scrut				`addSize`
-	foldr (addSize . size_up_alt) sizeZero alts	`addSizeN`
-	case (splitAlgTyConApp_maybe (coreExprType scrut)) of
-	      	Nothing       -> 1
-	      	Just (tc,_,_) -> tyConFamilySize tc
+	foldr (addSize . size_up_alt) sizeZero alts	
+
+-- Just charge for the alts that exist, not the ones that might exist
+--	`addSizeN`
+--	case (splitAlgTyConApp_maybe (coreExprType scrut)) of
+--	      	Nothing       -> 1
+--	      	Just (tc,_,_) -> tyConFamilySize tc
 
     ------------ 
     size_up_app (App fun arg) args   = size_up_app fun (arg:args)
@@ -256,7 +281,8 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
 	-- A function application with at least one value argument
 	-- so if the function is an argument give it an arg-discount
 	-- Also behave specially if the function is a build
-    fun_discount (Var fun) | idUnique fun == buildIdKey = buildSize
+    fun_discount (Var fun) | idUnique fun == buildIdKey   = buildSize
+    			   | idUnique fun == augmentIdKey = augmentSize
     			   | fun `is_elem` args 	= scrutArg fun
     fun_discount other					= sizeZero
 
@@ -332,8 +358,12 @@ buildSize = SizeIs (-2#) emptyBag 4#
 	-- build t (\cn -> e) should cost only the cost of e (because build will be inlined later)
 	-- Indeed, we should add a result_discount becuause build is 
 	-- very like a constructor.  We don't bother to check that the
-	-- build is saturated (it usually is).  The "-2" discounts for the \c n
+	-- build is saturated (it usually is).  The "-2" discounts for the \c n, 
 	-- The "4" is rather arbitrary.
+
+augmentSize = SizeIs (-2#) emptyBag 4#
+	-- Ditto (augment t (\cn -> e) ys) should cost only the cost of
+	-- e plus ys. The -2 accounts for the \cn 
 						
 scrutArg v	= SizeIs 0# (unitBag v) 0#
 
@@ -450,7 +480,7 @@ callSiteInline black_listed inline_call id args interesting_cont
   = case getIdUnfolding id of {
 	NoUnfolding -> Nothing ;
 	OtherCon _  -> Nothing ;
-	CoreUnfolding form guidance unf_template ->
+	CoreUnfolding unf_template is_cheap _ guidance ->
 
     let
 	result | yes_or_no = Just unf_template
@@ -459,7 +489,6 @@ callSiteInline black_listed inline_call id args interesting_cont
 	inline_prag = getInlinePragma id
 	arg_infos   = map interestingArg val_args
 	val_args    = filter isValArg args
-	whnf	    = whnfOrBottom form
 
 	yes_or_no =
 	    case inline_prag of
@@ -467,22 +496,22 @@ callSiteInline black_listed inline_call id args interesting_cont
 		IMustNotBeINLINEd -> False
 		IAmALoopBreaker   -> False
 		IMustBeINLINEd    -> True	-- Overrides absolutely everything, including the black list
-		ICanSafelyBeINLINEd in_lam one_br -> consider in_lam    one_br
-		NoInlinePragInfo		  -> consider InsideLam False
+		ICanSafelyBeINLINEd in_lam one_br -> consider in_lam    True  one_br
+		NoInlinePragInfo		  -> consider InsideLam False False
 
-	consider in_lam one_branch 
+	consider in_lam once once_in_one_branch
 	  | black_listed = False
 	  | inline_call  = True
-	  | one_branch	-- Be very keen to inline something if this is its unique occurrence; that
-			-- gives a good chance of eliminating the original binding for the thing.
-			-- The only time we hold back is when substituting inside a lambda;
-			-- then if the context is totally uninteresting (not applied, not scrutinised)
-			-- there is no point in substituting because it might just increase allocation.
+	  | once_in_one_branch	-- Be very keen to inline something if this is its unique occurrence; that
+				-- gives a good chance of eliminating the original binding for the thing.
+				-- The only time we hold back is when substituting inside a lambda;
+				-- then if the context is totally uninteresting (not applied, not scrutinised)
+				-- there is no point in substituting because it might just increase allocation.
 	  = WARN( case in_lam of { NotInsideLam -> True; other -> False },
 		  text "callSiteInline:oneOcc" <+> ppr id )
 		-- If it has one occurrence, not inside a lambda, PreInlineUnconditionally
 		-- should have zapped it already
-	    whnf && (not (null args) || interesting_cont)
+	    is_cheap && (not (null args) || interesting_cont)
 
 	  | otherwise	-- Occurs (textually) more than once, so look at its size
 	  = case guidance of
@@ -494,17 +523,20 @@ callSiteInline black_listed inline_call id args interesting_cont
 			-- Size of call is n_vals_wanted (+1 for the function)
 		-> case in_lam of
 			NotInsideLam -> True
-			InsideLam    -> whnf
+			InsideLam    -> is_cheap
 
-		| not (or arg_infos || really_interesting_cont)
+		| not (or arg_infos || really_interesting_cont || once)
 			-- If it occurs more than once, there must be something interesting 
 			-- about some argument, or the result, to make it worth inlining
+			-- We also drop this case if the thing occurs once, although perhaps in 
+			-- several branches.  In this case we are keener about inlining in the hope
+			-- that we'll be able to drop the allocation for the function altogether.
 		-> False
   
 		| otherwise
 		-> case in_lam of
 			NotInsideLam -> small_enough
-			InsideLam    -> whnf && small_enough
+			InsideLam    -> is_cheap && small_enough
 
 		where
 		  n_args		  = length arg_infos
@@ -531,7 +563,7 @@ callSiteInline black_listed inline_call id args interesting_cont
 				   text "inline prag:" <+> ppr inline_prag,
 			  	   text "arg infos" <+> ppr arg_infos,
 				   text "interesting continuation" <+> ppr interesting_cont,
-				   text "whnf" <+> ppr whnf,
+				   text "is cheap" <+> ppr is_cheap,
 				   text "guidance" <+> ppr guidance,
 				   text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO",
 				   if yes_or_no then
@@ -550,7 +582,7 @@ callSiteInline black_listed inline_call id args interesting_cont
 -- There is little point in inlining f here.
 interestingArg (Type _)	         = False
 interestingArg (App fn (Type _)) = interestingArg fn
-interestingArg (Var v)	         = hasUnfolding (getIdUnfolding v)
+interestingArg (Var v)	         = hasSomeUnfolding (getIdUnfolding v)
 interestingArg other	         = True
 
 
@@ -604,9 +636,10 @@ blackListed :: IdSet 		-- Used in transformation rules
 -- inlined because of the inline phase we are in.  This is the sole
 -- place that the inline phase number is looked at.
 
--- Phase 0: used for 'no inlinings please'
+-- Phase 0: used for 'no imported inlinings please'
+-- This prevents wrappers getting inlined which in turn is bad for full laziness
 blackListed rule_vars (Just 0)
-  = \v -> True
+  = \v -> not (isLocallyDefined v)
 
 -- Phase 1: don't inline any rule-y things or things with specialisations
 blackListed rule_vars (Just 1)

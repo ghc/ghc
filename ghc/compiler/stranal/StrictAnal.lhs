@@ -324,10 +324,13 @@ addStrictnessInfoToId
 	-> Id			-- Augmented with strictness
 
 addStrictnessInfoToId str_val abs_val binder body
-  = case collectBinders body of
-	-- We could use 'collectBindersIgnoringNotes', but then the 
-	-- strictness info may have more items than the visible binders
-	-- used by WorkWrap.tryWW
+  = case collectBindersIgnoringNotes body of
+	-- It's imporant to use collectBindersIgnoringNotes, so that INLINE prags
+	-- don't inhibit strictness info.  In particular, foldr is marked INLINE,
+	-- but we still want it to be strict in its third arg, so that
+	--	foldr k z (case e of p -> build g) 
+	-- gets transformed to
+	--	case e of p -> foldr k z (build g)
 	(binders, rhs) -> binder `setIdStrictness` 
 			  mkStrictnessInfo strictness
 		where

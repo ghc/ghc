@@ -18,13 +18,14 @@ import Const		( mkMachInt, mkMachWord, Literal(..), Con(..) )
 import PrimOp		( PrimOp(..) )
 import SimplMonad
 import TysWiredIn	( trueDataCon, falseDataCon )
-import TyCon		( tyConDataCons, isEnumerationTyCon )
-import DataCon		( dataConTag, fIRST_TAG )
+import TyCon		( tyConDataCons, isEnumerationTyCon, isNewTyCon )
+import DataCon		( dataConTag, dataConTyCon, fIRST_TAG )
 import Const		( conOkForAlt )
-import CoreUnfold	( Unfolding(..), isEvaldUnfolding )
+import CoreUnfold	( maybeUnfoldingTemplate )
 import CoreUtils	( exprIsValue )
 import Type		( splitTyConApp_maybe )
 
+import Maybes		( maybeToBool )
 import Char		( ord, chr )
 import Outputable
 \end{code}
@@ -92,11 +93,8 @@ The second case must never be floated outside of the first!
 
 \begin{code}
 tryPrimOp SeqOp [Type ty, arg]
-  | is_evald arg
+  | exprIsValue arg
   = Just (Con (Literal (mkMachInt 1)) [])
-  where
-    is_evald (Var v) = isEvaldUnfolding (getIdUnfolding v)
-    is_evald arg     = exprIsValue arg
 \end{code}
 
 \begin{code}
@@ -118,18 +116,14 @@ For dataToTag#, we can reduce if either
 tryPrimOp DataToTagOp [Type ty, Con (DataCon dc) _]
   = Just (Con (Literal (mkMachInt (toInteger (dataConTag dc - fIRST_TAG)))) [])
 tryPrimOp DataToTagOp [Type ty, Var x]
-  | has_unfolding && unfolding_is_constr
-  = Just (Con (Literal (mkMachInt (toInteger (dataConTag dc - fIRST_TAG)))) [])
+  | maybeToBool maybe_constr
+  = ASSERT( not (isNewTyCon (dataConTyCon dc)) )
+    Just (Con (Literal (mkMachInt (toInteger (dataConTag dc - fIRST_TAG)))) [])
   where
-    has_unfolding = case unfolding of
-			CoreUnfolding _ _ _ -> True
-			other		    -> False
-    unfolding = getIdUnfolding x
-    CoreUnfolding form guidance unf_template = unfolding
-    unfolding_is_constr = case unf_template of
-				  Con con@(DataCon _) _ -> conOkForAlt con
-				  other	    -> False
-    Con (DataCon dc) con_args = unf_template
+    maybe_constr = case maybeUnfoldingTemplate (getIdUnfolding x) of
+			Just (Con (DataCon dc) _) -> Just dc
+			other			  -> Nothing
+    Just dc = maybe_constr
 \end{code}
 
 \begin{code}

@@ -98,7 +98,7 @@ tcIdInfo unf_env name ty info info_ins
 		-- maybe_expr doesn't get looked at if the unfolding
 		-- is never inspected; so the typecheck doesn't even happen
 		unfold_info = case maybe_expr' of
-				Nothing    -> NoUnfolding
+				Nothing    -> noUnfolding
 				Just expr' -> mkUnfolding expr' 
 		info1 = info `setUnfoldingInfo` unfold_info
 		info2 = info1 `setInlinePragInfo` inline_prag

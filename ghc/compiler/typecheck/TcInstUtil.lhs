@@ -22,10 +22,10 @@ import Inst		( InstanceMapper )
 
 import Bag		( bagToList, Bag )
 import Class		( Class )
-import Var		( TyVar, Id )
+import Var		( TyVar, Id, idName )
 import InstEnv		( InstEnv, emptyInstEnv, addToInstEnv )
 import Maybes		( MaybeErr(..), mkLookupFunDef )
-import Name		( getSrcLoc )
+import Name		( getSrcLoc, nameModule, isLocallyDefined )
 import SrcLoc		( SrcLoc )
 import Type		( ThetaType, Type )
 import PprType		( pprConstraint )
@@ -122,8 +122,8 @@ addClassInstance
   = 	-- Add the instance to the class's instance environment
     case addToInstEnv opt_AllowOverlappingInstances 
 		      class_inst_env inst_tyvars inst_tys dfun_id of
-	Failed (ty', dfun_id')    -> addErrTc (dupInstErr clas (inst_tys, src_loc) 
-							       (ty', getSrcLoc dfun_id'))
+	Failed (tys', dfun_id')    -> addErrTc (dupInstErr clas (inst_tys, dfun_id) 
+							        (tys',     dfun_id'))
 						`thenNF_Tc_`
 				     returnNF_Tc class_inst_env
 
@@ -131,10 +131,13 @@ addClassInstance
 \end{code}
 
 \begin{code}
-dupInstErr clas info1@(tys1, locn1) info2@(tys2, locn2)
+dupInstErr clas info1@(tys1, dfun1) info2@(tys2, dfun2)
 	-- Overlapping/duplicate instances for given class; msg could be more glamourous
   = hang (ptext SLIT("Duplicate or overlapping instance declarations"))
          4 (sep [ptext SLIT("for") <+> quotes (pprConstraint clas tys1),
-		 nest 4 (sep [ptext SLIT("at")  <+> ppr locn1,
-		    	      ptext SLIT("and") <+> ppr locn2])])
+		 nest 4 (sep [ppr_loc dfun1, ptext SLIT("and") <+> ppr_loc dfun2])])
+  where
+    ppr_loc dfun
+	| isLocallyDefined dfun = ptext SLIT("defined at")  	     <+> ppr (getSrcLoc dfun)
+	| otherwise		= ptext SLIT("imported from module") <+> quotes (ppr (nameModule (idName dfun)))
 \end{code}

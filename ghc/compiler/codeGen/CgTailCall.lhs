@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.21 1999/06/08 15:56:48 simonmar Exp $
+% $Id: CgTailCall.lhs,v 1.22 1999/06/22 08:00:00 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -28,6 +28,7 @@ module CgTailCall (
 
 import CgMonad
 import AbsCSyn
+import PprAbsC		( pprAmode )
 
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts, getAmodeRep )
 import CgBindery	( getArgAmodes, getCAddrMode, getCAddrModeAndInfo )
@@ -118,7 +119,8 @@ performPrimReturn :: SDoc	-- Just for debugging (sigh)
 performPrimReturn doc amode
   = let
 	kind = getAmodeRep amode
-	ret_reg = dataReturnConvPrim kind
+	ret_reg = WARN( case kind of { PtrRep -> True; other -> False }, text "primRet" <+> doc <+> pprAmode amode )
+		  dataReturnConvPrim kind
 
 	assign_possibly = case kind of
 	  VoidRep -> AbsCNop

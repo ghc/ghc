@@ -51,6 +51,7 @@ import {-# SOURCE #-} Name	( Name )
 import Unique		( Uniquable(..), Unique, u2i, mkUniqueGrimily )
 import Panic
 import GlaExts		-- Lots of Int# operations
+import Outputable
 
 #if ! OMIT_NATIVE_CODEGEN
 #define IF_NCG(a) a
@@ -198,17 +199,15 @@ data UniqFM ele
 	    (UniqFM ele)
 	    (UniqFM ele)
 
--- for debugging only :-)
 {-
-instance Text (UniqFM a) where
-	showsPrec _ (NodeUFM a b t1 t2) =
-		  showString "NodeUFM " . shows (IBOX(a))
-		. showString " " . shows (IBOX(b))
-		. showString " (" . shows t1
-		. showString ") (" . shows t2
-		. showString ")"
-	showsPrec _ (LeafUFM x a) = showString "LeafUFM " . shows (IBOX(x))
-	showsPrec _ (EmptyUFM) = id
+-- for debugging only :-)
+instance Outputable (UniqFM a) where
+	ppr(NodeUFM a b t1 t2) =
+		sep [text "NodeUFM " <+> int IBOX(a) <+> int IBOX(b),
+		     nest 1 (parens (ppr t1)),
+		     nest 1 (parens (ppr t2))]
+	ppr (LeafUFM x a) = text "LeafUFM " <+> int IBOX(x)
+	ppr (EmptyUFM)    = empty
 -}
 \end{code}
 

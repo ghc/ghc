@@ -36,7 +36,7 @@ import DataCon		( DataCon, dataConSig, mkDataCon, isNullaryDataCon,
 			)
 import MkId		( mkDataConId, mkRecordSelId, mkNewTySelId )
 import Id		( getIdUnfolding )
-import CoreUnfold	( getUnfoldingTemplate )
+import CoreUnfold	( unfoldingTemplate )
 import FieldLabel
 import Var		( Id, TyVar )
 import Name		( Name, isLocallyDefined, OccName, NamedThing(..), nameUnique )
@@ -277,7 +277,7 @@ mkDataBinds_one tycon
 	-- For the locally-defined things
 	-- we need to turn the unfoldings inside the Ids into bindings,
 	binds | isLocallyDefined tycon
-	      = [ CoreMonoBind data_id (getUnfoldingTemplate (getIdUnfolding data_id))
+	      = [ CoreMonoBind data_id (unfoldingTemplate (getIdUnfolding data_id))
 		| data_id <- data_ids, isLocallyDefined data_id
 		]
 	      | otherwise

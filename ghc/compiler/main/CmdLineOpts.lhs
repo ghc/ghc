@@ -20,6 +20,7 @@ module CmdLineOpts (
 	opt_D_dump_absC,
 	opt_D_dump_asm,
 	opt_D_dump_cpranal,
+	opt_D_dump_cse,
 	opt_D_dump_deriv,
 	opt_D_dump_ds,
 	opt_D_dump_flatC,
@@ -215,6 +216,7 @@ data CoreToDo		-- These are diff core-to-core passes,
   | CoreDoSpecialising
   | CoreDoUSPInf
   | CoreDoCPResult 
+  | CoreCSE
 \end{code}
 
 \begin{code}
@@ -314,6 +316,7 @@ opt_D_dump_stranal		= lookUp  SLIT("-ddump-stranal")
 opt_D_dump_tc			= lookUp  SLIT("-ddump-tc")
 opt_D_dump_rules		= lookUp  SLIT("-ddump-rules")
 opt_D_dump_usagesp              = lookUp  SLIT("-ddump-usagesp")
+opt_D_dump_cse 	                = lookUp  SLIT("-ddump-cse")
 opt_D_dump_worker_wrapper	= lookUp  SLIT("-ddump-workwrap")
 opt_D_show_passes		= lookUp  SLIT("-dshow-passes")
 opt_D_dump_rn_trace		= lookUp  SLIT("-ddump-rn-trace")
@@ -420,8 +423,8 @@ opt_UF_FunAppDiscount		= lookup_def_int "-funfolding-fun-discount"	   (6::Int)	-
 opt_UF_PrimArgDiscount		= lookup_def_int "-funfolding-prim-discount"	   (1::Int)
 opt_UF_KeenessFactor		= lookup_def_float "-funfolding-keeness-factor"	   (2.0::Float)
 
-opt_UF_CheapOp  = ( 1 :: Int)
-opt_UF_DearOp   = ( 8 :: Int)
+opt_UF_CheapOp  = ( 0 :: Int)	-- Only one instruction; and the args are charged for
+opt_UF_DearOp   = ( 4 :: Int)
 opt_UF_NoRepLit = ( 20 :: Int)	-- Strings can be pretty big
 			
 opt_ProduceS  			= lookup_str "-S="
@@ -468,6 +471,7 @@ classifyOpts = sep argv [] [] -- accumulators...
 	  "-ffloat-inwards"  -> CORE_TD(CoreDoFloatInwards)
 	  "-ffull-laziness"  -> CORE_TD(CoreDoFullLaziness)
 	  "-fliberate-case"  -> CORE_TD(CoreLiberateCase)
+	  "-fcse"  	     -> CORE_TD(CoreCSE)
 	  "-fprint-core"     -> CORE_TD(CoreDoPrintCore)
 	  "-fstatic-args"    -> CORE_TD(CoreDoStaticArgs)
 	  "-fstrictness"     -> CORE_TD(CoreDoStrictness)

@@ -18,9 +18,7 @@ import BinderInfo
 import CmdLineOpts	( opt_SimplDoLambdaEtaExpansion, opt_SimplCaseMerge )
 import CoreSyn
 import CoreFVs		( exprFreeVars )
-import CoreUtils	( exprIsTrivial, cheapEqExpr, coreExprType,
-			  exprIsWHNF, FormSummary(..)
-			)
+import CoreUtils	( exprIsTrivial, cheapEqExpr, coreExprType, exprIsCheap	)
 import Subst		( substBndrs, substBndr, substIds )
 import Id		( Id, idType, getIdArity, isId, idName,
 			  getInlinePragma, setInlinePragma,
@@ -182,7 +180,7 @@ mkRhsTyLam tyvars body			-- Only does something if there's a let
     worth_it (Let _ e)	     = whnf_in_middle e
     worth_it other     	     = False
     whnf_in_middle (Let _ e) = whnf_in_middle e
-    whnf_in_middle e	     = exprIsWHNF e
+    whnf_in_middle e	     = exprIsCheap e
 
     main_tyvar_set = mkVarSet tyvars
 

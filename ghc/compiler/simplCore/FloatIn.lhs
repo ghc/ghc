@@ -342,7 +342,15 @@ fiExpr to_drop (_, AnnCase scrut case_bndr alts)
     fi_alt to_drop (con, args, rhs) = (con, args, fiExpr to_drop rhs)
 
 noFloatIntoRhs (AnnNote InlineMe _) = True
-noFloatIntoRhs (AnnLam _ _)   	    = True
+noFloatIntoRhs (AnnLam b _)   	    = not (isId b && isOneShotLambda b)
+	-- IMPORTANT: don't say 'True' for a RHS with a one-shot lambda at the top.
+	-- This makes a big difference for things like
+	--	f x# = let x = I# x#
+	--	       in let j = \() -> ...x...
+	--		  in if <condition> then normal-path else j ()
+	-- If x is used only in the error case join point, j, we must float the
+	-- boxing constructor into it, else we box it every time which is very bad
+	-- news indeed.
 noFloatIntoRhs (AnnCon con _)       = isDataCon con
 noFloatIntoRhs other	            = False
 \end{code}

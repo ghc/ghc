@@ -24,7 +24,7 @@ import IdInfo		( IdInfo,
 			  arityInfo, ppArityInfo, ppFlavourInfo, flavourInfo,
 			  demandInfo, updateInfo, ppUpdateInfo, specInfo, 
 			  strictnessInfo, ppStrictnessInfo, cafInfo, ppCafInfo,
-			  cprInfo, ppCprInfo
+			  cprInfo, ppCprInfo, lbvarInfo
 			)
 import Const		( Con(..), DataCon )
 import DataCon		( isTupleCon, isUnboxedTupleCon )
@@ -332,8 +332,8 @@ pprTypedBinder binder
 	-- It's important that the type is parenthesised too, at least when
 	-- printing interfaces, because we get \ x::(a->b) y::(c->d) -> ...
 
--- When printing any Id binder in debug mode, we print its inline pragma
-pprIdBndr id = ppr id <+> ifPprDebug (ppr (getInlinePragma id) <+> ppr (getIdDemandInfo id)) 
+-- When printing any Id binder in debug mode, we print its inline pragma and one-shot-ness
+pprIdBndr id = ppr id <+> ifPprDebug (ppr (getInlinePragma id) <+> ppr (getIdDemandInfo id)) <+> ppr (lbvarInfo (idInfo id))
 \end{code}
 
 
@@ -348,6 +348,7 @@ ppIdInfo info
 	    ppr d,
 	    ppCafInfo c,
             ppCprInfo m,
+	    ppr (lbvarInfo info),
 	    pprIfaceCoreRules p
 	-- Inline pragma printed out with all binders; see PprCore.pprIdBndr
 	]

@@ -7,26 +7,28 @@
 module CoreUtils (
 	coreExprType, coreAltsType,
 
-	exprIsBottom, exprIsDupable, exprIsTrivial, exprIsWHNF, exprIsCheap, exprIsValue,
-	exprOkForSpeculation,
-	FormSummary(..), mkFormSummary, whnfOrBottom, exprArity,
+	exprIsBottom, exprIsDupable, exprIsTrivial, exprIsCheap, exprIsValue,
+	exprOkForSpeculation, exprIsBig, hashExpr,
+	exprArity,
 	cheapEqExpr, eqExpr, applyTypeToArgs
     ) where
 
 #include "HsVersions.h"
 
 
+import {-# SOURCE #-} CoreUnfold	( isEvaldUnfolding )
+
 import CoreSyn
 import PprCore		( pprCoreExpr )
 import Var		( IdOrTyVar, isId, isTyVar )
 import VarSet
 import VarEnv
-import Name		( isLocallyDefined )
+import Name		( isLocallyDefined, hashName )
 import Const		( Con, isWHNFCon, conIsTrivial, conIsCheap, conIsDupable,
-			  conType, conOkForSpeculation, conStrictness
+			  conType, conOkForSpeculation, conStrictness, hashCon
 			)
 import Id		( Id, idType, setIdType, idUnique, idAppIsBottom,
-			  getIdArity,
+			  getIdArity, idName,
 			  getIdSpecialisation, setIdSpecialisation,
 			  getInlinePragma, setInlinePragma,
 			  getIdUnfolding, setIdUnfolding, idInfo
@@ -106,71 +108,6 @@ applyTypeToArgs e op_ty (other_arg : args)
 %*									*
 %************************************************************************
 
-\begin{code}
-data FormSummary
-  = VarForm		-- Expression is a variable (or scc var, etc)
-
-  | ValueForm		-- Expression is a value: i.e. a value-lambda,constructor, or literal
-			-- 	May 1999: I'm experimenting with allowing "cheap" non-values
-			--	here.
-
-  | BottomForm		-- Expression is guaranteed to be bottom. We're more gung
-			-- ho about inlining such things, because it can't waste work
-  | OtherForm		-- Anything else
-
-instance Outputable FormSummary where
-   ppr VarForm    = ptext SLIT("Var")
-   ppr ValueForm  = ptext SLIT("Value")
-   ppr BottomForm = ptext SLIT("Bot")
-   ppr OtherForm  = ptext SLIT("Other")
-
-whnfOrBottom :: FormSummary -> Bool
-whnfOrBottom VarForm    = True
-whnfOrBottom ValueForm  = True
-whnfOrBottom BottomForm = True
-whnfOrBottom OtherForm  = False
-\end{code}
-
-\begin{code}
-mkFormSummary :: CoreExpr -> FormSummary
-	-- Used exclusively by CoreUnfold.mkUnfolding
-	-- Returns ValueForm for cheap things, not just values
-mkFormSummary expr
-  = go (0::Int) expr	-- The "n" is the number of *value* arguments so far
-  where
-    go n (Con con _) | isWHNFCon con = ValueForm
-		     | otherwise     = OtherForm
-
-    go n (Note _ e)         = go n e
-
-    go n (Let (NonRec b r) e) | exprIsCheap r = go n e	-- let f = f' alpha in (f,g) 
-							-- should be treated as a value
-    go n (Let _            e) 		      = OtherForm
-
-	-- We want selectors to look like values
-	-- e.g.  case x of { (a,b) -> a }
-	-- should give a ValueForm, so that it will be inlined vigorously
-	-- [June 99. I can't remember why this is a good idea.  It means that
-	-- all overloading selectors get inlined at their usage sites, which is
-	-- not at all necessarily a good thing.  So I'm rescinding this decision for now.]
---    go n expr@(Case _ _ _) | exprIsCheap expr = ValueForm
-
-    go n expr@(Case _ _ _)  = OtherForm
-
-    go 0 (Lam x e) | isId x    = ValueForm	-- NB: \x.bottom /= bottom!
-    		   | otherwise = go 0 e
-    go n (Lam x e) | isId x    = go (n-1) e	-- Applied lambda
-		   | otherwise = go n e
-
-    go n (App fun (Type _)) = go n fun		-- Ignore type args
-    go n (App fun arg)      = go (n+1) fun
-
-    go n (Var f) | idAppIsBottom f n = BottomForm
-    go 0 (Var f)		     = VarForm
-    go n (Var f) | n < arityLowerBound (getIdArity f) = ValueForm
-		 | otherwise			      = OtherForm
-\end{code}
-
 @exprIsTrivial@	is true of expressions we are unconditionally 
 		happy to duplicate; simple variables and constants,
 		and type applications.
@@ -190,8 +127,12 @@ exprIsTrivial other	     = False
 
 
 @exprIsDupable@	is true of expressions that can be duplicated at a modest
-		cost in space.  This will only happen in different case
+		cost in code size.  This will only happen in different case
 		branches, so there's no issue about duplicating work.
+
+		That is, exprIsDupable returns True of (f x) even if
+		f is very very expensive to call.
+
 		Its only purpose is to avoid fruitless let-binding
 		and then inlining of case join points
 
@@ -215,10 +156,13 @@ dupAppSize = 4		-- Size of application we are prepared to duplicate
 it is obviously in weak head normal form, or is cheap to get to WHNF.
 [Note that that's not the same as exprIsDupable; an expression might be
 big, and hence not dupable, but still cheap.]
-By ``cheap'' we mean a computation we're willing to push inside a lambda 
-in order to bring a couple of lambdas together.  That might mean it gets
-evaluated more than once, instead of being shared.  The main examples of things
-which aren't WHNF but are ``cheap'' are:
+
+By ``cheap'' we mean a computation we're willing to:
+	push inside a lambda, or
+	inline at more than one place
+That might mean it gets evaluated more than once, instead of being
+shared.  The main examples of things which aren't WHNF but are
+``cheap'' are:
 
   * 	case e of
 	  pi -> ei
@@ -234,6 +178,8 @@ which aren't WHNF but are ``cheap'' are:
 
 	where op is a cheap primitive operator
 
+  *	error "foo"
+
 Notice that a variable is considered 'cheap': we can push it inside a lambda,
 because sharing will make sure it is only evaluated once.
 
@@ -244,9 +190,12 @@ exprIsCheap (Var _)         	= True
 exprIsCheap (Con con args)  	= conIsCheap con && all exprIsCheap args
 exprIsCheap (Note _ e)      	= exprIsCheap e
 exprIsCheap (Lam x e)       	= if isId x then True else exprIsCheap e
-exprIsCheap (Let bind body) 	= all exprIsCheap (rhssOfBind bind) && exprIsCheap body
-exprIsCheap (Case scrut _ alts) = exprIsCheap scrut && 
-				  all (\(_,_,rhs) -> exprIsCheap rhs) alts
+
+--	I'm not at all convinced about these two!!
+--	[SLPJ June 99]
+-- exprIsCheap (Let bind body) 	= all exprIsCheap (rhssOfBind bind) && exprIsCheap body
+-- exprIsCheap (Case scrut _ alts) = exprIsCheap scrut && 
+--		  		     all (\(_,_,rhs) -> exprIsCheap rhs) alts
 
 exprIsCheap other_expr   -- look for manifest partial application
   = case collectArgs other_expr of
@@ -326,14 +275,19 @@ exprIsBottom e = go 0 e
 		 go n (Lam _ _)	   = False
 \end{code}
 
-@exprIsValue@ returns true for expressions that are evaluated.
-It does not treat variables as evaluated.
+@exprIsValue@ returns true for expressions that are certainly *already* 
+evaluated to WHNF.  This is used to decide wether it's ok to change
+	case x of _ -> e   ===>   e
+
+and to decide whether it's safe to discard a `seq`
+
+So, it does *not* treat variables as evaluated, unless they say they are
 
 \begin{code}
 exprIsValue :: CoreExpr -> Bool		-- True => Value-lambda, constructor, PAP
 exprIsValue (Type ty)	  = True	-- Types are honorary Values; we don't mind
 					-- copying them
-exprIsValue (Var v)    	  = False
+exprIsValue (Var v)    	  = isEvaldUnfolding (getIdUnfolding v)
 exprIsValue (Lam b e)  	  = isId b || exprIsValue e
 exprIsValue (Note _ e) 	  = exprIsValue e
 exprIsValue (Let _ e)     = False
@@ -343,39 +297,6 @@ exprIsValue e@(App _ _)   = case collectArgs e of
 				  (Var v, args) -> fun_arity > valArgCount args
 						where
 						   fun_arity  = arityLowerBound (getIdArity v)
-				  _	        -> False
-\end{code}
-
-exprIsWHNF reports True for head normal forms.  Note that does not necessarily
-mean *normal* forms; constructors might have non-trivial argument expressions, for
-example.  We use a let binding for WHNFs, rather than a case binding, even if it's
-used strictly.  We try to expose WHNFs by floating lets out of the RHS of lets.
-
-	We treat applications of buildId and augmentId as honorary WHNFs, 
-	because we want them to get exposed.
-	[May 99: I've disabled this because it looks jolly dangerous:
-	 we'll substitute inside lambda with potential big loss of sharing.]
-
-\begin{code}
-exprIsWHNF :: CoreExpr -> Bool	-- True => Variable, value-lambda, constructor, PAP
-exprIsWHNF (Type ty)	      = True	-- Types are honorary WHNFs; we don't mind
-					-- copying them
-exprIsWHNF (Var v)    	      = True
-exprIsWHNF (Lam b e)  	      = isId b || exprIsWHNF e
-exprIsWHNF (Note _ e) 	      = exprIsWHNF e
-exprIsWHNF (Let _ e)          = False
-exprIsWHNF (Case _ _ _)       = False
-exprIsWHNF (Con con _)        = isWHNFCon con 
-exprIsWHNF e@(App _ _)        = case collectArgs e of  
-				  (Var v, args) -> n_val_args == 0
-						|| fun_arity > n_val_args
---  [May 99: disabled. See note above]		|| v_uniq == buildIdKey
---						|| v_uniq == augmentIdKey
-						where
-						   n_val_args = valArgCount args
-						   fun_arity  = arityLowerBound (getIdArity v)
-						   v_uniq     = idUnique v
-
 				  _	        -> False
 \end{code}
 
@@ -411,6 +332,14 @@ cheapEqExpr (App f1 a1) (App f2 a2)
 cheapEqExpr (Type t1) (Type t2) = t1 == t2
 
 cheapEqExpr _ _ = False
+
+exprIsBig :: Expr b -> Bool
+-- Returns True of expressions that are too big to be compared by cheapEqExpr
+exprIsBig (Var v)      = False
+exprIsBig (Type t)     = False
+exprIsBig (App f a)    = exprIsBig f || exprIsBig a
+exprIsBig (Con _ args) = any exprIsBig args
+exprIsBig other	       = True
 \end{code}
 
 
@@ -463,3 +392,28 @@ eqExpr e1 e2
     eq_note env other1	       other2	      = False
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{Hashing}
+%*									*
+%************************************************************************
+
+\begin{code}
+hashExpr :: CoreExpr -> Int
+hashExpr (Note _ e)   		 = hashExpr e
+hashExpr (Let (NonRec b r) e)    = hashId b
+hashExpr (Let (Rec ((b,r):_)) e) = hashId b
+hashExpr (Case _ b _)		 = hashId b
+hashExpr (App f e)   		 = hashExpr f
+hashExpr (Var v)     		 = hashId v
+hashExpr (Con con args)   	 = hashArgs args (hashCon con)
+hashExpr (Lam b _)	         = hashId b
+hashExpr (Type t)	         = trace "hashExpr: type" 0		-- Shouldn't happen
+
+hashArgs []		 con = con
+hashArgs (Type t : args) con = hashArgs args con
+hashArgs (arg    : args) con = hashExpr arg
+
+hashId :: Id -> Int
+hashId id = hashName (idName id)
+\end{code}

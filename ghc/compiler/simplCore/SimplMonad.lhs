@@ -221,7 +221,8 @@ contIsInteresting (Select _ _ alts _ _)       = not (just_default alts)
 contIsInteresting (CoerceIt _ cont)           = contIsInteresting cont
 contIsInteresting (ApplyTo _ (Type _) _ cont) = contIsInteresting cont
 contIsInteresting (ApplyTo _ _	      _ _)    = True
-contIsInteresting (ArgOf _ _ _)		      = True
+
+contIsInteresting (ArgOf _ _ _)		      = False
 	-- If this call is the arg of a strict function, the context
 	-- is a bit interesting.  If we inline here, we may get useful
 	-- evaluation information to avoid repeated evals: e.g.
@@ -229,6 +230,13 @@ contIsInteresting (ArgOf _ _ _)		      = True
 	-- Here the contIsInteresting makes the '*' keener to inline,
 	-- which in turn exposes a constructor which makes the '+' inline.
 	-- Assuming that +,* aren't small enough to inline regardless.
+	--
+	-- HOWEVER, I put this back to False when I discovered that strings
+	-- were getting inlined straight back into applications of 'error'
+	-- because the latter is strict.
+	--	s = "foo"
+	--	f = \x -> ...(error s)...
+
 contIsInteresting (InlinePlease _)	      = True
 contIsInteresting other		              = False
 
