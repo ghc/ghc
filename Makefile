@@ -383,7 +383,8 @@ SRC_DIST_FILES += \
 	aclocal.m4 README Makefile install-sh \
 	mk/bootstrap.mk \
 	mk/boilerplate.mk mk/config.h.in mk/config.mk.in mk/opts.mk \
-	mk/paths.mk mk/package.mk mk/suffix.mk mk/target.mk
+	mk/paths.mk mk/package.mk mk/suffix.mk mk/target.mk \
+	mk/fptools.css
 
 dist dist-manifest dist-package :: project-check
 
