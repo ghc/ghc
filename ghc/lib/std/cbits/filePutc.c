@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: filePutc.c,v 1.4 1999/01/12 10:53:02 sewardj Exp $
+ * $Id: filePutc.c,v 1.5 1999/05/05 10:33:15 sof Exp $
  *
  * hPutChar Runtime Support
  */
@@ -9,6 +9,10 @@
 #include "Rts.h"
 #include "stgio.h"
 #include "error.h"
+
+#ifdef HAVE_WINSOCK_H
+#include <winsock.h>
+#endif
 
 #define TERMINATE_LINE(x)   ((x) == '\n')
 
@@ -74,8 +78,14 @@ StgChar c;
       return FILEOBJ_BLOCKED_WRITE;
 
     /* Unbuffered, write the character directly. */
-    while ((rc = write(fo->fd, &c, 1)) == 0 && errno == EINTR) ;
-
+    while ((rc = (
+#ifdef HAVE_WINSOCK_H
+	         fo->flags & FILEOBJ_WINSOCK ?
+		 send(fo->fd, &c, 1, 0) :
+		 write(fo->fd, &c, 1))) == 0 && errno == EINTR) ;
+#else
+		 write(fo->fd, &c, 1))) == 0 && errno == EINTR) ;
+#endif
     if (rc == 0) {
 	cvtErrno();
 	stdErrno();

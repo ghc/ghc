@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: fileObject.c,v 1.2 1998/12/02 13:27:26 simonm Exp $
+ * $Id: fileObject.c,v 1.3 1999/05/05 10:33:14 sof Exp $
  *
  * hPutStr Runtime Support
  */
@@ -9,6 +9,12 @@
 #include "Rts.h"
 #include "stgio.h"
 #include "fileObject.h"
+
+#include <stdio.h>
+
+#ifdef HAVE_WINSOCK_H
+#include <winsock.h>
+#endif
 
 void
 setBufFlags(fo, flg)
@@ -173,7 +179,15 @@ IOFileObject* fo;
   if ( fo->flags & FILEOBJ_NONBLOCKING_IO && inputReady ((StgForeignPtr)fo,0) != 1 )
      return FILEOBJ_BLOCKED_READ;
 
-  if ((count = read(fo->fd, p, len)) <= 0) {
+  if ((count = 
+         (
+#ifdef HAVE_WINSOCK_H
+	   fo->flags & FILEOBJ_WINSOCK ?
+	   recv(fo->fd, p, len, 0) :
+	   read(fo->fd, p, len))) <= 0 ) {
+#else
+	   read(fo->fd, p, len))) <= 0 ) {
+#endif    
       if (count == 0) {
          ghc_errtype = ERR_EOF;
 	 ghc_errstr = "";

@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: timezone.h,v 1.8 1999/03/03 17:17:05 simonm Exp $
+ * $Id: timezone.h,v 1.9 1999/05/05 10:33:17 sof Exp $
  *
  * Time-zone support header
  */
@@ -63,7 +63,7 @@
 #define SETZONE(x,z)     (((struct tm *)x)->tm_zone = z)
 #define GMTOFF(x)        (((struct tm *)x)->tm_gmtoff)
 #else /* ! HAVE_TM_ZONE */
-# if HAVE_TZNAME || cygwin32_TARGET_OS
+# if HAVE_TZNAME || _WIN32
 #  if cygwin32_TARGET_OS
 #   define tzname _tzname
 #  endif

@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: freeFile.c,v 1.3 1998/12/02 13:27:34 simonm Exp $
+ * $Id: freeFile.c,v 1.4 1999/05/05 10:33:15 sof Exp $
  *
  * Giving up files
  */
@@ -9,6 +9,11 @@
 #include "Rts.h"
 #include "stgio.h"
 #include "fileObject.h"
+
+#ifdef HAVE_WINSOCK_H
+#include <winsock.h>
+#endif
+
 
 /* sigh, the FILEs attached to the standard descriptors are 
    handled differently. We don't want them freed via the
@@ -63,7 +68,14 @@ StgForeignPtr ptr;
        flushFile(ptr);
     }
 
+    if ( fo->flags & FILEOBJ_WINSOCK )
+      /* Sigh - the cleanup call at the end will do this for us */
+      return;
+#ifdef HAVE_WINSOCK_H
+    rc = ( fo->flags & FILEOBJ_WINSOCK ? closesocket(fo->fd) : close(fo->fd) );
+#else
     rc = close(fo->fd);
+#endif
     /* Error or no error, we don't care.. */
 
     return;

@@ -1,13 +1,17 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: readFile.c,v 1.3 1998/12/02 13:27:45 simonm Exp $
+ * $Id: readFile.c,v 1.4 1999/05/05 10:33:16 sof Exp $
  *
  * hGetContents Runtime Support
  */
 
 #include "Rts.h"
 #include "stgio.h"
+
+#ifdef HAVE_WINSOCK_H
+#include <winsock.h>
+#endif
 
 #define EOT 4
 
@@ -72,7 +76,15 @@ StgForeignPtr ptr;
     if ( fo->flags & FILEOBJ_NONBLOCKING_IO && inputReady (ptr,0) != 1 )
       return FILEOBJ_BLOCKED_READ;
 
-    while ((count = read(fd, fo->buf, fo->bufSize)) <= 0) {
+    while ((count =
+	     (
+#ifdef HAVE_WINSOCK_H
+	       fo->flags & FILEOBJ_WINSOCK ?
+	         recv(fd, fo->buf, fo->bufSize, 0) :
+	         read(fd, fo->buf, fo->bufSize))) <= 0 ) {
+#else
+	         read(fd, fo->buf, fo->bufSize))) <= 0 ) {
+#endif
 	if ( count == 0 ) {
             FILEOBJ_SET_EOF(fo);
 	    ghc_errtype = ERR_EOF;
@@ -157,7 +169,15 @@ StgInt len;
     if ( fo->flags & FILEOBJ_NONBLOCKING_IO && inputReady (ptr,0) != 1 )
       return FILEOBJ_BLOCKED_READ;
 
-    while ((count = read(fd, p, len)) < len) {
+    while ((count =
+             (
+#ifdef HAVE_WINSOCK_H
+	       fo->flags & FILEOBJ_WINSOCK ?
+	         recv(fd, p, len, 0) :
+	         read(fd, p, len))) <= 0 ) {
+#else
+	         read(fd, p, len))) <= 0 ) {
+#endif
 	if ( count == 0 ) { /* EOF */
 	    break;
 	} else if ( count == -1 && errno == EAGAIN) {
@@ -296,7 +316,15 @@ StgForeignPtr ptr;
     if ( fo->flags & FILEOBJ_NONBLOCKING_IO && inputReady (ptr,0) != 1 )
       return FILEOBJ_BLOCKED_READ;
 
-    while ( (count = read(fo->fd, &c, 1)) <= 0 ) {
+    while ( (count = 
+	       (
+#ifdef HAVE_WINSOCK_H
+	         fo->flags & FILEOBJ_WINSOCK ?
+		 recv(fo->fd, &c, 1, 0) :
+		 read(fo->fd, &c, 1))) <= 0 ) {
+#else
+		 read(fo->fd, &c, 1))) <= 0 ) {
+#endif
 	if ( count == 0 ) {
 	    ghc_errtype = ERR_EOF;
 	    ghc_errstr = "";

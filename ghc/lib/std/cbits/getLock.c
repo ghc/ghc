@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: getLock.c,v 1.5 1999/03/01 09:11:39 sof Exp $
+ * $Id: getLock.c,v 1.6 1999/05/05 10:33:16 sof Exp $
  *
  * stdin/stout/stderr Runtime Support
  */
@@ -52,7 +52,14 @@ int exclusive;
 
     while (fstat(fd, &sb) < 0) {
 	if (errno != EINTR) {
+#ifndef _WIN32
 	    return -1;
+#else
+	    /* fstat()ing socket fd's seems to fail with CRT's fstat(),
+	       so let's just silently return and hope for the best..
+	    */
+	    return 0;
+#endif
 	}
     }
 

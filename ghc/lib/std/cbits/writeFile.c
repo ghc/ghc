@@ -1,13 +1,17 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: writeFile.c,v 1.3 1998/12/02 13:28:07 simonm Exp $
+ * $Id: writeFile.c,v 1.4 1999/05/05 10:33:17 sof Exp $
  *
  * hPutStr Runtime Support
  */
 
 #include "Rts.h"
 #include "stgio.h"
+
+#ifdef HAVE_WINSOCK_H
+#include <winsock.h>
+#endif
 
 StgInt
 writeFileObject(ptr, bytes)
@@ -48,7 +52,15 @@ StgInt bytes;
     if ( fo->flags & FILEOBJ_NONBLOCKING_IO && inputReady(ptr,0) != 1 )
        return FILEOBJ_BLOCKED_WRITE;
 
-    while ((count = write(fo->fd, fo->buf, bytes)) < bytes) {
+    while ((count = 
+	       (
+#ifdef HAVE_WINSOCK_H
+	         fo->flags & FILEOBJ_WINSOCK ?
+		 send(fo->fd, fo->buf, bytes, 0) :
+		 write(fo->fd, fo->buf, bytes))) < bytes) {
+#else
+		 write(fo->fd, fo->buf, bytes))) < bytes) {
+#endif
 	if (errno != EINTR) {
 	    cvtErrno();
 	    stdErrno();
@@ -109,7 +121,15 @@ StgInt  len;
        return FILEOBJ_BLOCKED_WRITE;
 
     /* Disallow short writes */
-    while ((count = write(fo->fd, (char *)buf, (int)len)) < len) {
+    while ((count = 
+               (
+#ifdef HAVE_WINSOCK_H
+	         fo->flags & FILEOBJ_WINSOCK ?
+		 send(fo->fd,  (char*)buf, (int)len, 0) :
+		 write(fo->fd, (char*)buf, (int)len))) < len ) {
+#else
+		 write(fo->fd, (char*)buf, (int)len))) < len ) {
+#endif
 	if (errno != EINTR) {
 	    cvtErrno();
 	    stdErrno();

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.3 1999/03/02 20:14:00 sof Exp $
+# $Id: Makefile,v 1.4 1999/05/05 10:33:13 sof Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -13,6 +13,10 @@ C_OBJS  = $(C_SRCS:.c=.o)
 LIBOBJS = $(C_OBJS)
 SRC_CC_OPTS += -O -I$(GHC_INCLUDE_DIR) $(GhcLibCcOpts)
 
+DLL_NAME = HScbits.dll
+DLL_IMPLIB_NAME = libHScbits_imp.a
+SRC_BLD_DLL_OPTS += --export-all --output-def=HScbits.def
+SRC_BLD_DLL_OPTS += -lwinmm -lwsock32 -lHSrts_imp -lgmp -L. -L../../../rts/gmp -L../../../rts
 
 #
 # Compile the files using the Haskell compiler (ghc really).

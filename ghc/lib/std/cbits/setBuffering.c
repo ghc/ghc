@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: setBuffering.c,v 1.4 1999/03/01 09:26:45 sof Exp $
+ * $Id: setBuffering.c,v 1.5 1999/05/05 10:33:16 sof Exp $
  *
  * hSetBuffering Runtime Support
  */
@@ -100,7 +100,7 @@ StgInt size;
 	break;
     case SB_BB:
 
-#if HAVE_ST_BLKSIZE
+#ifdef HAVE_ST_BLKSIZE
 	while (fstat(fo->fd, &sb) < 0) {
 	   /* not very likely.. */
 	   if ( errno != EINTR ) {

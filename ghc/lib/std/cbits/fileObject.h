@@ -1,9 +1,6 @@
 #ifndef FILEOBJECT_H
 #define FILEOBJECT_H
 
-/* a good idea? */
-#include <stdio.h>
-
 /*
   IOFileObjects are used as part of the IO.Handle
   implementation, ensuring that when handles are
@@ -52,6 +49,11 @@ typedef struct _IOFileObject {
 */
 #define FILEOBJ_RW_READ 256
 #define FILEOBJ_RW_WRITE 512
+/* 
+ * Under Win32, a file fd is not the same as a socket fd, so
+ * we need to use separate r/w calls.
+ */ 
+#define FILEOBJ_WINSOCK  1024
 
 #define FILEOBJ_IS_EOF(x)     ((x)->flags & FILEOBJ_EOF)
 #define FILEOBJ_SET_EOF(x)    ((x)->flags |= FILEOBJ_EOF)

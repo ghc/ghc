@@ -1,13 +1,17 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: closeFile.c,v 1.3 1998/12/02 13:27:14 simonm Exp $
+ * $Id: closeFile.c,v 1.4 1999/05/05 10:33:14 sof Exp $
  *
  * hClose Runtime Support
  */
 
 #include "Rts.h"
 #include "stgio.h"
+
+#ifdef HAVE_WINSOCK_H
+#include <winsock.h>
+#endif
 
 StgInt __really_close_stdfiles=1;
 
@@ -64,7 +68,15 @@ StgInt flush_buf;
 
     } else  {
       /* Regardless of success or otherwise, the fd field gets smashed. */
-      while ( (rc = close(fo->fd)) != 0 ) {
+      while ( (rc = 
+	        (
+#ifdef HAVE_WINSOCK_H
+	          fo->flags & FILEOBJ_WINSOCK ?
+		  closesocket(fo->fd) :
+                  close(fo->fd))) != 0 ) {
+#else
+                  close(fo->fd))) != 0 ) {
+#endif
          /* See above unlockFile() comment */
 	 if ( errno != EINTR && (!unlocked && errno != EBADF ) ) {
 	    cvtErrno();
