@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.41 2000/12/20 10:33:25 simonmar Exp $
+-- $Id: Main.hs,v 1.42 2001/01/02 15:30:57 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -255,11 +255,6 @@ main =
    if (mode == DoMake)        then beginMake srcs        else do
    if (mode == DoInteractive) then beginInteractive srcs else do
 
-	-- for each source file, find which phases to run
-   let lang = hscLang init_dyn_flags
-   pipelines <- mapM (genPipeline mode stop_flag True lang) srcs
-   let src_pipelines = zip srcs pipelines
-
 	-- sanity checking
    o_file <- readIORef v_Output_file
    ohi    <- readIORef v_Output_hi
@@ -269,13 +264,29 @@ main =
 
    if null srcs then throwDyn (UsageError "no input files") else do
 
-   let compileFile (src, phases) = do
+   let lang = hscLang init_dyn_flags
+
+   let compileFile src = do
 	  writeIORef v_Driver_state saved_driver_state
 	  writeIORef v_DynFlags init_dyn_flags
-	  r <- runPipeline phases src (mode==DoLink) True
+
+	  -- We compile in two stages, because the file may have an
+	  -- OPTIONS pragma that affects the compilation pipeline (eg. -fvia-C)
+
+	  -- preprocess
+	  pp <- if mode == StopBefore Hsc then return src else do
+		phases <- genPipeline (StopBefore Hsc) "none" 
+			    False{-not persistent-} defaultHscLang src
+	  	runPipeline phases src False{-no linking-} False{-no -o flag-}
+
+	  -- compile
+	  dyn_flags <- readIORef v_DynFlags
+	  phases <- genPipeline mode stop_flag True (hscLang dyn_flags) pp
+	  r <- runPipeline phases pp False{-no linking-} False{-no -o flag-}
+
 	  return r
 
-   o_files <- mapM compileFile src_pipelines
+   o_files <- mapM compileFile srcs
 
    when (mode == DoMkDependHS) endMkDependHS
    when (mode == DoLink) (doLink o_files)
