@@ -90,7 +90,7 @@ wlkQid mk_occ_name (U_noqual name)
 wlkQid mk_occ_name (U_aqual  mod name)
   = returnUgn (Qual mod (mk_occ_name name) HiFile)
 wlkQid mk_occ_name (U_gid n name)
-  = returnUgn (Qual pRELUDE (mk_occ_name name))
+  = returnUgn (Qual pRELUDE (mk_occ_name name) HiFile)
 
 rdTCId  pt = rdU_qid pt `thenUgn` \ qid -> wlkTCId qid
 rdVarId pt = rdU_qid pt `thenUgn` \ qid -> wlkVarId qid
