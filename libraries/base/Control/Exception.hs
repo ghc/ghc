@@ -25,11 +25,11 @@ module Control.Exception (
 #endif
 
 	-- * Throwing exceptions
-#ifndef __HUGS__
+#ifdef __HUGS__
+	throwIO,	-- :: Exception -> IO a
+#else
 	throw,		-- :: Exception -> a
-#endif
 	ioError,	-- :: Exception -> IO a
-#ifndef __HUGS__
 	throwTo,	-- :: ThreadId -> Exception -> a
 #endif
 
@@ -111,7 +111,6 @@ module Control.Exception (
   ) where
 
 #ifdef __GLASGOW_HASKELL__
-import Prelude 		hiding (catch)
 import GHC.Base		( assert )
 import GHC.Exception 	as ExceptionBase hiding (try, catch, bracket, bracket_)
 import GHC.Conc		( throwTo, ThreadId )
@@ -119,11 +118,11 @@ import GHC.IOBase	( IO(..) )
 #endif
 
 #ifdef __HUGS__
-import Prelude 		hiding ( catch, ioError )
 import Hugs.Exception	hiding ( evaluate )
 import qualified Hugs.Exception as ExceptionBase
 #endif
 
+import Prelude 		hiding ( catch )
 import System.IO.Error
 import Data.Dynamic
 
@@ -319,20 +318,15 @@ catchDyn m k = catchException m handle
 -- 'catchJust', 'tryJust', or 'handleJust' to select certain common
 -- classes of exceptions.
 
-ioErrors		:: Exception -> Maybe IOError
 #ifdef __GLASGOW_HASKELL__
+ioErrors		:: Exception -> Maybe IOError
 arithExceptions 	:: Exception -> Maybe ArithException
 errorCalls		:: Exception -> Maybe String
 dynExceptions		:: Exception -> Maybe Dynamic
 assertions		:: Exception -> Maybe String
 asyncExceptions 	:: Exception -> Maybe AsyncException
-#endif /* __GLASGOW_HASKELL__ */
 userErrors		:: Exception -> Maybe String
-
-#ifdef __HUGS__
-ioErrors = justIoErrors
-userErrors = justUserErrors
-#endif
+#endif /* __GLASGOW_HASKELL__ */
 
 #ifdef __GLASGOW_HASKELL__
 ioErrors e@(IOException _) = Just e
