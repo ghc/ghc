@@ -140,6 +140,13 @@ endif # BootingFromHc
 	$(HAPPY) $(HAPPY_OPTS) $<
 
 #-----------------------------------------------------------------------------
+# Alex Suffix Rules
+#
+
+%.hs : %.x
+	$(ALEX) $(ALEX_OPTS) $<
+
+#-----------------------------------------------------------------------------
 # hsc2hs Suffix Rules
 #
 ifneq "$(BootingFromHc)" "YES"

@@ -878,6 +878,16 @@ HAPPY_VERSION		= @HappyVersion@
 GHC_HAPPY_OPTS		= -agc
 
 #
+# Alex
+#
+ALEX			= @AlexCmd@
+ALEX_VERSION		= @AlexVersion@		
+#
+# Options to pass to Happy when we're going to compile the output with GHC
+#
+GHC_ALEX_OPTS		= -g
+
+#
 # Haddock
 # 
 HADDOCK			= @HaddockCmd@

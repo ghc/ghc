@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.31 2003/06/07 11:20:47 ross Exp $
+# 	$Id: opts.mk,v 1.32 2003/08/13 12:34:46 simonmar Exp $
 #
 #################################################################################
 
@@ -70,6 +70,7 @@ ILASM_OPTS         = $(SRC_ILASM_OPTS) $(WAY$(_way)_ILASM_OPTS) $($*_ILASM_OPTS)
 RUNTEST_OPTS       = $(SRC_RUNTEST_OPTS) $(WAY$(_way)_RUNTEST_OPTS) \
                      $($*_RUNTEST_OPTS) $(EXTRA_RUNTEST_OPTS)
 
+ALEX_OPTS         = $(SRC_ALEX_OPTS) $($(HcFlavour)_ALEX_OPTS) $(WAY$(_way)_ALEX_OPTS) $($*_ALEX_OPTS) $(EXTRA_ALEX_OPTS)
 AR_OPTS            = $(SRC_AR_OPTS) $(WAY$(_way)_AR_OPTS) $(EXTRA_AR_OPTS)
 AS_OPTS            = $(SRC_AS_OPTS) $(WAY$(_way)_AS_OPTS) $(EXTRA_AS_OPTS)
 BLD_DLL_OPTS       = $(SRC_BLD_DLL_OPTS) $(WAY$(_way)_BLD_DLL_OPTS) $($*_HC_OPTS) $(EXTRA_BLD_DLL_OPTS)

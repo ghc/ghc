@@ -111,6 +111,7 @@ ALL_SRCS    = $(wildcard $(patsubst ./%, %,  \
 		   $(patsubst %,%/*.lhs,  . $(ALL_DIRS)) \
 		   $(patsubst %,%/*.y,    . $(ALL_DIRS)) \
 		   $(patsubst %,%/*.ly,   . $(ALL_DIRS)) \
+		   $(patsubst %,%/*.x,    . $(ALL_DIRS)) \
 		   $(patsubst %,%/*.c,    . $(ALL_DIRS)) \
 		   $(patsubst %,%/*.hc,   . $(ALL_DIRS)) \
 		   $(patsubst %,%/*.S,    . $(ALL_DIRS)) \
@@ -136,6 +137,7 @@ HSC_SRCS      = $(filter %.hsc, $(PRE_SRCS))
 HAPPY_Y_SRCS  = $(filter %.y,   $(PRE_SRCS))
 HAPPY_LY_SRCS = $(filter %.ly,   $(PRE_SRCS))
 HAPPY_SRCS    = $(HAPPY_Y_SRCS) $(HAPPY_LY_SRCS)
+ALEX_SRCS     = $(filter %.x,   $(PRE_SRCS))
 
 DERIVED_GC_SRCS       = $(patsubst %.gc, %.hs, $(GC_SRCS)) \
 			$(patsubst %.gc, %_stub_ffi.c, $(GC_SRCS)) \
@@ -149,12 +151,15 @@ DERIVED_HSC_SRCS      = $(patsubst %.hsc, %.hs, $(HSC_SRCS)) \
 DERIVED_HAPPY_SRCS    = $(patsubst %.y,   %.hs, $(HAPPY_Y_SRCS)) \
 			$(patsubst %.ly,  %.hs, $(HAPPY_LY_SRCS))
 
+DERIVED_ALEX_SRCS     = $(patsubst %.x,   %.hs, $(ALEX_SRCS))
+
 DERIVED_HC_SRCS       = $(patsubst %.hs,  %.hc, $(PRE_HS_SRCS)) \
 			$(patsubst %.lhs, %.hc, $(PRE_LHS_SRCS))
 
 DERIVED_SRCS	      = $(DERIVED_GC_SRCS) \
 			$(DERIVED_HSC_SRCS) \
 			$(DERIVED_HAPPY_SRCS) \
+			$(DERIVED_ALEX_SRCS) \
 			$(DERIVED_HC_SRCS)
 
 # EXCLUDED_SRCS can be set in the Makefile, otherwise it defaults to empty.
@@ -163,6 +168,7 @@ EXCLUDED_HSC_SRCS      = $(filter %.hsc, $(EXCLUDED_SRCS))
 EXCLUDED_HAPPY_Y_SRCS  = $(filter %.y,   $(EXCLUDED_SRCS))
 EXCLUDED_HAPPY_LY_SRCS = $(filter %.ly,  $(EXCLUDED_SRCS))
 EXCLUDED_HAPPY_SRCS   = $(EXCLUDED_HAPPY_Y_SRCS) $(EXCLUDED_HAPPY_LY_SRCS)
+EXCLUDED_ALEX_SRCS    = $(filter %.x,   $(EXCLUDED_SRCS))
 EXCLUDED_HS_SRCS      = $(filter %.hs,  $(EXCLUDED_SRCS))
 EXCLUDED_LHS_SRCS     = $(filter %.lhs, $(EXCLUDED_SRCS))
 EXCLUDED_DERIVED_SRCS = $(patsubst %.hsc, %.hs, $(EXCLUDED_HSC_SRCS)) \
@@ -173,6 +179,7 @@ EXCLUDED_DERIVED_SRCS = $(patsubst %.hsc, %.hs, $(EXCLUDED_HSC_SRCS)) \
 			$(patsubst %.gc,  %_stub_ffi.h, $(EXCLUDED_GC_SRCS)) \
                         $(patsubst %.y,   %.hs, $(EXCLUDED_HAPPY_Y_SRCS)) \
 			$(patsubst %.ly,  %.hs, $(EXCLUDED_HAPPY_LY_SRCS)) \
+                        $(patsubst %.x,   %.hs, $(EXCLUDED_ALEX_SRCS)) \
 			$(patsubst %.hs,  %.hc, $(EXCLUDED_HS_SRCS)) \
 			$(patsubst %.lhs, %.hc, $(EXCLUDED_LHS_SRCS)) \
 			$(patsubst %.hs,  %_stub.c, $(EXCLUDED_HS_SRCS)) \
