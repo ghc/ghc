@@ -14,6 +14,7 @@ module TcIfaceSig ( tcInterfaceSigs,
 
 import HsSyn		( CoreDecl(..), TyClDecl(..), HsTupCon(..) )
 import TcHsSyn		( TypecheckedCoreBind )
+import TcRnTypes
 import TcRnMonad
 import TcMonoType	( tcIfaceType, kcHsSigType )
 import TcEnv		( RecTcGblEnv, tcExtendTyVarEnv, 
@@ -42,7 +43,7 @@ import Name		( Name )
 import UniqSupply	( initUs_ )
 import Outputable	
 import Util		( zipWithEqual, dropList, equalLength )
-import HscTypes		( TyThing(..) )
+import HscTypes		( TyThing(..), typeEnvIds )
 import CmdLineOpts	( DynFlag(..) )
 \end{code}
 
@@ -64,11 +65,7 @@ tcInterfaceSigs unf_env decls
 	      | IfaceSig {tcdName = name, tcdType = ty, 
 			  tcdIdInfo = id_infos, tcdLoc =src_loc} <- decls]
   where
-    in_scope_vars = []
---    in_scope_vars = filter (nameIsLocalOrFrom mod . idName) (tcEnvIds unf_env)
-		-- Oops: using isLocalId instead can give a black hole
-		-- because it looks at the idinfo
-
+    in_scope_vars = typeEnvIds (tcg_type_env unf_env)
 	-- When we have hi-boot files, an unfolding might refer to
 	-- something defined in this module, so we must build a
 	-- suitable in-scope set.  This thunk will only be poked
