@@ -53,7 +53,7 @@ WAY_debug_HC_OPTS=-optc-DDEBUG
 WAY_debug_p_NAME=debug profiled
 WAY_debug_p_HC_OPTS=-optc-DDEBUG -prof
 
-ifneq "$(findstring $(way), debug debug_p)" ""
+ifneq "$(findstring debug, $(way))" ""
 GhcRtsHcOpts=
 GhcRtsCcOpts=-g
 endif
