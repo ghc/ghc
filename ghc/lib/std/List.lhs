@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: List.lhs,v 1.11 2000/08/18 06:44:05 qrczak Exp $
+% $Id: List.lhs,v 1.12 2001/06/25 13:13:58 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -209,14 +209,18 @@ nubBy eq (x:xs)         =  x : nubBy eq (filter (\ y -> not (eq x y)) xs)
 nubBy eq l              = nubBy' l []
   where
     nubBy' [] _		= []
-    nubBy' (x:xs) ls
-       | elemBy eq x ls = nubBy' xs ls 
-       | otherwise	= x : nubBy' xs (x:ls)
+    nubBy' (y:ys) xs
+       | elem_by eq y xs = nubBy' ys xs 
+       | otherwise	 = y : nubBy' ys (y:xs)
 
---not exported:
-elemBy :: (a -> a -> Bool) -> a -> [a] -> Bool
-elemBy _  _ []		=  False
-elemBy eq x (y:ys)	=  x `eq` y || elemBy eq x ys
+-- Not exported:
+-- Note that we keep the call to `eq` with arguments in the
+-- same order as in the reference implementation
+-- 'xs' is the list of things we've seen so far, 
+-- 'y' is the potential new element
+elem_by :: (a -> a -> Bool) -> a -> [a] -> Bool
+elem_by _  _ []		=  False
+elem_by eq y (x:xs)	=  x `eq` y || elem_by eq y xs
 #endif
 
 
