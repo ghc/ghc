@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Printf.lhs,v 1.3 2001/08/07 11:13:46 simonmar Exp $
+-- $Id: Printf.lhs,v 1.4 2001/08/13 10:27:27 simonmar Exp $
 
 -- (c) Simon Marlow 1997-2001
 -----------------------------------------------------------------------------
@@ -43,9 +43,10 @@
 
 #else
 
->		allocaBytes bUFSIZE $ \buf -> do
->		snprintf buf (fromIntegral bUFSIZE) (packString format) num
->		peekCString buf
+>		allocaBytes bUFSIZE $ \buf ->
+>		  withCString format $ \cformat -> do
+>		    snprintf buf (fromIntegral bUFSIZE) cformat num
+>		    peekCString buf
 
 #endif
 
@@ -69,14 +70,13 @@
 > if_maybe Nothing  f = []
 > if_maybe (Just s) f = f s
 
-> type PackedString = ByteArray Int
-
 #if __GLASGOW_HASKELL__ < 500
 
+> type PackedString = ByteArray Int
 > foreign import unsafe snprintf :: Addr -> CSize -> PackedString -> Float -> IO ()
 
 #else
 
-> foreign import unsafe snprintf :: CString -> CSize -> PackedString -> Float -> IO ()
+> foreign import unsafe snprintf :: CString -> CSize -> CString -> Float -> IO ()
 
 #endif
