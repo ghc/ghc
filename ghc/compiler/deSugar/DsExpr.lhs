@@ -582,7 +582,6 @@ dsDo	:: HsStmtContext Name
 dsDo do_or_lc stmts ids result_ty
   = dsReboundNames ids		`thenDs` \ (meth_binds, ds_meths) ->
     let
-  	return_id = lookupReboundName ds_meths returnMName
 	fail_id   = lookupReboundName ds_meths failMName
 	bind_id   = lookupReboundName ds_meths bindMName
 	then_id   = lookupReboundName ds_meths thenMName
