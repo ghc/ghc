@@ -798,7 +798,7 @@ All <filename>gcc</filename>'s support files are kept in  <filename>$(libdir)/gc
 
 <listitem>
 <para> Similarly, we distribute <filename>perl</filename> and a <filename>touch</filename> 
-replacement (<filaname>touchy.exe</filename>)
+replacement (<filename>touchy.exe</filename>)
 with the Win32 distribution of GHC. </para> 
 </listitem>
 
