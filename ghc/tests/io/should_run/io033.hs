@@ -24,4 +24,4 @@ slurp [] = return ()
 slurp (x:xs) = x `seq` slurp xs
 
 main :: IO ()
-main = sequence_ (take 50 (repeat doTest))
+main = sequence_ (take 200 (repeat doTest))
