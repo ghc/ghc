@@ -56,39 +56,215 @@
 %%%\tableofcontents
 %%%\newpage
 
-
 %%-----------------------------------------------------------------%%
+\section*{Misc text looking for a home}
+
+\subsubsection*{Starting up}
+Some of the session-lifetime data structures are opaque to CM, so
+it doesn't know how to create an initial one.  Hence it relies on its
+client to supply the following:
+\begin{verbatim}
+   emptyPCS :: PCS
+   emptyOST :: OST
+\end{verbatim}
+The PCS is maintained solely by @compile@, and OST solely by
+@link@/@unlink@.  CM cannot know the representation of the latter
+since it depends on whether we're operating in interactive or batch
+mode.
+
+
+@compile@ is supplied with, and checks PIT (inside PCS) before
+reading package interfaces, so it doesn't read and add duplicate
+@ModIFace@s to PIT.
+
+
 \section{Details}
 
-\subsection{Data structures and lifetimes}
+\subsection{Outline of the design}
+\label{sec:details-intro}
 
-About lifetimes:
+The design falls into three major parts:
 \begin{itemize}
-\item {\bf Session} lifetime covers a complete run of GHCI, 
-      encompassing multiple recompilation runs.
-\item {\bf Rebuild} lifetime covers the actions needed to bring
-      the target module up to date -- a downsweep from the 
-      target to reestablish the module graph, and an upsweep to
-      bring the translations (compiled code) and global symbol
-      table back up to date.
-\item {\bf Module} lifetime: that of data needed to translate
-      a single module, but then discarded, for example Core,
-      AbstractC, Stix trees.
+\item The compilation manager (CM), which coordinates the 
+      system and supplies a HEP-like interface to clients.
+\item The module compiler (@compile@), which translates individual
+      modules to interpretable or machine code.
+\item The linker (@link@),
+      which maintains the executable image in interpreted mode.
 \end{itemize}
 
-Structures with module lifetime are well documented and understood.
-Here we're really interested in structures with session and rebuild
-lifetimes.  Most of these structures are ``owned'' by CM, since that's
+There are also three auxiliary parts: the finder, which locates
+source, object and interface files, the summariser, which quickly
+finds dependency information for modules, and the static info
+(compiler flags and package details), which is unchanged over the
+course of a session.
+
+This section continues with an overview of the session-lifetime data
+structures.  Then follows the finder (section~\ref{sec:finder}),
+summariser (section~\ref{sec:summariser}), 
+static info (section~\ref{sec:staticinfo}),
+and finally the three big sections
+(\ref{sec:manager},~\ref{sec:compiler},~\ref{sec:linker})
+on the compilation manager, compiler and linker respectively.
+
+\subsubsection*{Some terminology}
+
+Lifetimes: the phrase {\bf session lifetime} covers a complete run of
+GHCI, encompassing multiple recompilation runs.  {\bf Module lifetime}
+is a lot shorter, being that of data needed to translate a single
+module, but then discarded, for example Core, AbstractC, Stix trees.
+
+Data structures with module lifetime are well documented and understood.
+This document is mostly concerned with session-lifetime data.
+Most of these structures are ``owned'' by CM, since that's
 the only major component of GHCI which deals with session-lifetime
 issues. 
 
-Terminology: ``home'' refers to modules in this package, precisely
-the ones tracked and updated by CM.  ``Package'' refers to all other
-packages, which are assumed static.
+Modules and packages: {\bf home} refers to modules in this package,
+precisely the ones tracked and updated by the compilation manager.
+{\bf Package} refers to all other packages, which are assumed static.
 
-New data structures are:
+\subsubsection*{A summary of all session-lifetime data structures}
+
+These structures have session lifetime but not necessarily global
+visibility.  Subsequent sections elaborate who can see what.
 \begin{itemize}
+\item {\bf Home Symbol Table (HST)} (owner: CM) holds the post-renaming
+      environments created by compiling each home module.
+\item {\bf Home Interface Table (HIT)} (owner: CM) holds in-memory
+      representations of the interface file created by compiling 
+      each home module.
+\item {\bf Unlinked Images (UI)} (owner: CM) are executable but as-yet
+      unlinked translations of home modules only.
+\item {\bf Module Graph (MG)} (owner: CM) is the current module graph.
+\item {\bf Static Info (SI)} (owner: CM) is the package configuration
+      information and compiler flags.
+\item {\bf Persistent Compiler State (PCS)} (owner: @compile@)
+      is @compile@'s private cache of information about package
+      modules.
+\item {\bf Persistent Linker State (PLS)} (owner: @link@) is
+      @link@'s private information concerning the the current 
+      state of the (in-memory) executable image.
+\end{itemize}
 
+
+%%-- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --%%
+\subsection{The finder (\mbox{\tt type Finder})}
+\label{sec:finder}
+
+@Path@ could be an indication of a location in a filesystem, or it
+could be some more generic kind of resource identifier, a URL for
+example.
+\begin{verbatim}
+   data Path = ...
+\end{verbatim}
+
+And some names.  @Module@s are now used as primary keys for various
+maps, so they are given a @Unique@.
+\begin{verbatim}
+   type ModName = String      -- a module name
+   type PkgName = String      -- a package name
+   type Module  = -- contains ModName and a Unique, at least
+\end{verbatim}
+
+A @ModLocation@ says where a module is, what it's called and in what
+form it it.
+\begin{verbatim}
+   data ModLocation = SourceOnly Module Path         -- .hs
+                    | ObjectCode Module Path Path    -- .o, .hi
+                    | InPackage  Module PkgName
+                          -- examine PCI to determine package Path
+\end{verbatim}
+
+The module finder generates @ModLocation@s from @ModName@s.  We expect
+it will assume packages to be static, but we want to be able to track
+changes in home modules during the session.  Specifically, we want to
+be able to notice that a module's object and interface have been
+updated, presumably by a compile run outside of the GHCI session.
+Hence the two-stage type:
+\begin{verbatim}
+   type Finder = ModName -> IO ModLocation
+   newFinder :: [PCI] -> IO Finder
+\end{verbatim}
+@newFinder@ examines the package information right at the start, but 
+returns an @IO@-typed function which can inspect home module changes
+later in the session.
+
+
+%%-- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --%%
+\subsection{The summariser (\mbox{\tt summarise})}
+\label{sec:summariser}
+
+A @ModSummary@ records the minimum information needed to establish the
+module graph and determine whose source has changed.  @ModSummary@s
+can be created quickly.
+\begin{verbatim}
+   data ModSummary = ModSummary 
+                        ModLocation   -- location and kind
+                        Maybe (String, Fingerprint)
+                                      -- source and fingerprint if .hs
+                        [ModName]     -- imports
+
+   type Fingerprint = ...  -- file timestamp, or source checksum?
+
+   summarise :: ModLocation -> IO ModSummary
+\end{verbatim}
+
+The summary contains the location and source text, and the location
+contains the name.  We would like to remove the assumption that
+sources live on disk, but I'm not sure this is good enough yet.
+
+\ToDo{Should @ModSummary@ contain source text for interface files too?}
+\ToDo{Also say that @ModIFace@ contains its module's @ModSummary@  (why?).}
+
+
+%%-- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --%%
+\subsection{Static information (SI)}
+\label{sec:staticinfo}
+
+PCI, the package configuration information, is a list of @PkgInfo@,
+each containing at least the following:
+\begin{verbatim}
+   data PkgInfo
+      = PkgInfo PkgName    -- my name
+                Path       -- path to my base location
+                [PkgName]  -- who I depend on
+                [ModName]  -- modules I supply
+                [Unlinked] -- paths to my object files
+
+   type PCI = [PkgInfo]
+\end{verbatim}
+The @Path@s in it, including those in the @Unlinked@s, are set up
+when GHCI starts.  
+
+FLAGS is a bunch of compiler options.  We haven't figured out yet how
+to partition them into those for the whole session vs those for
+specific source files, so currently the best we can do is:
+\begin{verbatim}
+   data FLAGS = ...
+\end{verbatim}
+
+The static information (SI) is the both of these:
+\begin{verbatim}
+   data SI = SI PCI
+                FLAGS
+\end{verbatim}
+
+
+
+%%-- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --%%
+\subsection{The Compilation Manager (CM)}
+\label{sec:manager}
+
+\subsubsection{Data structures owned by CM}
+
+CM maintains two maps (HST, HIT) and a set (UI).  It's important to
+realise that CM only knows about the map/set-ness, and has no idea
+what a @ModDetails@, @ModIFace@ or @Linkable@ is.  Only @compile@ and
+@link@ know that, and CM passes these types around without
+inspecting them.
+
+\begin{itemize}
 \item
    {\bf Home Symbol Table (HST)} @:: FiniteMap Module ModDetails@
 
@@ -99,7 +275,8 @@ New data structures are:
    to other entities, regardless of module boundaries.  HST only
    holds information for home modules; the corresponding wired-up
    details for package (non-home) modules are created lazily in
-   the package rename cache (PRC).
+   the package symbol table (PST) inside the persistent compiler's state
+   (PST).
 
    CM maintains the HST, which is passed to, but not modified by,
    @compile@.  If compilation of a module is successful, @compile@
@@ -115,7 +292,7 @@ New data structures are:
    (Completely private to CM; nobody else sees this).
 
    Compilation of a module always creates a @ModIFace@, which contains
-   the unlinked symbol table entries.  CM maintains a @FiniteMap@
+   the unlinked symbol table entries.  CM maintains this @FiniteMap@
    @ModName@ @ModIFace@, with session lifetime.  CM never throws away
    @ModIFace@s, but it does update them, by passing old ones to
    @compile@ if they exist, and getting new ones back.
@@ -123,72 +300,8 @@ New data structures are:
    CM acquires @ModuleIFace@s from @compile@, which it only applies
    to modules in the home package.  As a result, HIT only contains
    @ModuleIFace@s for modules in the home package.  Those from other
-   packages reside in ...
-
-\item
-   {\bf Persistent Compiler State (PCS)} @:: known-only-to-compile@
-
-   This contains info about foreign packages only, acting as a cache,
-   which is private to @compile@.  The cache never becomes out of
-   date.  There are at least two parts to it:
-
-   \begin{itemize}
-   \item
-      {\bf Package Interface Table (PIT)} @:: FiniteMap Module ModIFace@
-
-   @compile@ reads interfaces from modules in foreign packages, and
-   caches them in the PIT.  Subsequent imports of the same module get
-   them directly out of the PIT, avoiding slow lexing/parsing phases.
-   Because foreign packages are assumed never to become out of date,
-   all contents of PIT remain valid forever.
-
-   Successful runs of @compile@ can add arbitrary numbers of new
-   interfaces to the PIT.  Failed runs could also contribute any new
-   interfaces read, but this could create inconsistencies between the
-   PIT and the unlinked images (UI).  Specifically, we don't want the
-   PIT to acquire interfaces for which UI hasn't got a corresponding
-   @Linkable@, and we don't want @Linkable@s from failed compilation
-   runs to enter UI, because we can't be sure that they are actually
-   necessary for a successful link.  So it seems simplest, albeit at a
-   small compilation speed loss, for @compile@ not to update PCS at
-   all following a failed compile.  We may revisit this
-   decision later.
-
-   \item
-      {\bf Package Rename Cache (PRC)} @:: FiniteMap Module ModDetails@
-
-   Adding an package interface to PIT doesn't make it directly usable
-   to @compile@, because it first needs to be wired (renamed +
-   typechecked) into the sphagetti of the HST.  On the other hand,
-   most modules only use a few entities from any imported interface,
-   so wiring-in the interface at PIT-entry time might be a big time
-   waster.  Also, wiring in an interface could mean reading other
-   interfaces, and we don't want to do that unnecessarily.
-
-   The PRC avoids these problems by allowing incremental wiring-in to
-   happen.  Pieces of foreign interfaces are renamed and placed in the
-   PRC, but only as @compile@ discovers it needs them.  In the process
-   of incremental renaming, @compile@ may need to read more package
-   interfaces, which are returned to CM to add to the PIT.
-
-   CM passes the PRC to @compile@ and is returned an updated version
-   on success.  On failure, @compile@ doesn't return an updated
-   version even though it might have created some updates on the way
-   to failure.  This seems necessary to retain the (thus far unstated)
-   invariant that PRC only contains renamed fragments of interfaces in
-   PIT.
-   \end{itemize}
-
-   PCS is opaque to CM; only @compile@ knows what's in it, and how to
-   update it.  Because packages are assumed static, PCS never becomes
-   out of date.  So CM only needs to be able to create an empty PCS,
-   with @emptyPCS@, and thence just passes it through @compile@ with
-   no further ado.
-
-   In return, @compile@ must promise not to store in PCS any
-   information pertaining to the home modules.  If it did so, CM would
-   need to have a way to remove this information prior to commencing a
-   rebuild, which conflicts with PCS's opaqueness to CM.
+   packages reside in the package interface table (PIT) which is a
+   component of PCS.
 
 \item
    {\bf Unlinked Images (UI)} @:: Set Linkable@
@@ -221,125 +334,124 @@ New data structures are:
    @Linkable@, if it has one, and that's returned unchanged if the
    module isn't recompiled.
 
-\end{itemize}
-
-There are also a few auxiliary structures, of somehow lesser importance:
-
-\begin{itemize}
 \item 
    {\bf Module Graph (MG)} @:: known-only-to-CM@
 
    Records, for CM's purposes, the current module graph,
    up-to-dateness and summaries.  More details when I get to them.
-
-\item
-   {\bf Package Config Info (PCI)} @:: [PkgInfo]@
-   
-   A value static over the entire session, giving, for each package,
-   its name, dependencies, linkable components and constitutent module
-   names.
-
-\item
-   {\bf Flags/options (FLAGS)} @:: dunno@
-   
-   Another session-static value, containing flags/options.  Burble.
 \end{itemize}
 
 
+\subsubsection{What CM does}
+Pretty much as before.  \ToDo{... and what was Before?}
 
-\subsection{Important datatypes}
+Plus: detect module cycles during the downsweep.  During the upsweep,
+ensure that compilation failures for modules in cycles do not leave
+any of the global structures in an inconsistent state.  
+\begin{itemize}
+\item 
+   For PCS, that's never a problem because PCS doesn't hold any
+   information pertaining to home modules.
+\item 
+   HST and HIT: CM knows that these are mappings from @Module@ to
+   whatever, and can throw away entries from failed cycles, or,
+   equivalently, not commit updates to them until cycles succeed,
+   remembering of course to synthesise appropriate HSTs during
+   compilation of a cycle.
+\item 
+   UI -- a collection of @Linkable@s, between which there are no
+   direct refererences, so CM can remove additions from failed cycles
+   with no difficulty.
+\item 
+   OST -- linking is not carried out until the upsweep has
+   succeeded, so there's no problem here.
+\end{itemize}
 
-\subsubsection*{Names, location and summarisation}
-The summary should contain the location, and the location contain the
-name.  Also it is hoped to remove the assumption that sources live on
-disk, but I'm not sure this is good enough yet.  @Module@s are now
-used as primary keys in various maps, so they are given a @Unique@.
-\begin{verbatim}
-   type ModName = String      -- a module name
-   type PkgName = String      -- a package name
+Plus: clear out the global data structures after the downsweep but
+before the upsweep.
 
-   type Module =  -- contains ModName and a Unique, at least
-\end{verbatim}
-@Path@ could be an indication of a location in a filesystem, or it
-could be some more generic kind of resource identifier, a URL for
-example.
-\begin{verbatim}
-   data Path = ...
-\end{verbatim}
-A @ModLocation@ says where a module is, what it's called and in what
-form it it.
-\begin{verbatim}
-   data ModLocation = SourceOnly Module Path         -- .hs
-                    | ObjectCode Module Path Path    -- .o, .hi
-                    | InPackage  Module PkgName
-                          -- examine PCI to determine package Path
-\end{verbatim}
-A @ModSummary@ records the minimum information needed to establish the
-module graph and determine whose source has changed.  @ModSummary@s
-can be created quickly.
-\begin{verbatim}
-   data ModSummary = ModSummary 
-                        ModLocation   -- location and kind
-                        Maybe (String, Fingerprint)
-                                      -- source and fingerprint if .hs
-                        [ModName]     -- imports
-
-   type Fingerprint = ...  -- file timestamp, or source checksum?
-\end{verbatim}
-\ToDo{Should @ModSummary@ contain source text for interface files
-      too?}
-\ToDo{Also say that @ModIFace@ contains its module's @ModSummary@.}
-
-@compile@ is supplied with, and checks PIT (inside PCS) before
-reading package interfaces, so it doesn't read and add duplicate
-@ModIFace@s to PIT.
-
-\subsection{Package Configuration}
-\label{sec:package-config}
-
-PCI, the package configuration information, is a list of @PkgInfo@,
-each containing at least the following:
-\begin{verbatim}
-   data PkgInfo
-      = PkgInfo PkgName    -- my name
-                Path       -- path to my base location
-                [PkgName]  -- who I depend on
-                [ModName]  -- modules I supply
-                [Unlinked] -- paths to my object files
-\end{verbatim}
-The @Path@s in it, including those in the @Unlinked@s, are set up
-when GHCI starts.  
-
-\subsection{Signatures}
-
-\subsubsection*{The finder}
-The module finder generates @ModLocation@s from @ModName@s.  We
-expect that it will assume packages to be static, but we want to 
-be able to track changes in home modules during the session.
-Specifically, we want to be able to notice that a module's object and
-interface have been updated, presumably by a compile run outside of 
-the GHCI session.  Hence the two-stage type:
-\begin{verbatim}
-   type Finder = ModName -> IO ModLocation
-   newFinder :: [PkgConfig] -> IO Finder
-\end{verbatim}
-@newFinder@ examines the package information right at the start, but 
-returns an @IO@-typed function which can inspect home module changes
-later in the session.
+\ToDo{CM needs to supply a way for @compile@ to know which modules in
+      HST are in its downwards closure, and which not, so it can
+      correctly construct its instance environment.}
 
 
-\subsubsection*{Starting up}
-Some of the session-lifetime data structures are opaque to CM, so
-it doesn't know how to create an initial one.  Hence it relies on its
-client to supply the following:
-\begin{verbatim}
-   emptyPCS :: PCS
-   emptyOST :: OST
-\end{verbatim}
-The PCS is maintained solely by @compile@, and OST solely by
-@link@/@unlink@.  CM cannot know the representation of the latter
-since it depends on whether we're operating in interactive or batch
-mode.
+
+%%-- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --%%
+\subsection{The compiler (\mbox{\tt compile})}
+\label{sec:compiler}
+
+\subsubsection{Data structures owned by \mbox{\tt compile}}
+
+   {\bf Persistent Compiler State (PCS)} @:: known-only-to-compile@
+
+   This contains info about foreign packages only, acting as a cache,
+   which is private to @compile@.  The cache never becomes out of
+   date.  There are at least two parts to it:
+
+   \begin{itemize}
+   \item
+      {\bf Package Interface Table (PIT)} @:: FiniteMap Module ModIFace@
+
+   @compile@ reads interfaces from modules in foreign packages, and
+   caches them in the PIT.  Subsequent imports of the same module get
+   them directly out of the PIT, avoiding slow lexing/parsing phases.
+   Because foreign packages are assumed never to become out of date,
+   all contents of PIT remain valid forever.
+
+   Successful runs of @compile@ can add arbitrary numbers of new
+   interfaces to the PIT.  Failed runs could also contribute any new
+   interfaces read, but this could create inconsistencies between the
+   PIT and the unlinked images (UI).  Specifically, we don't want the
+   PIT to acquire interfaces for which UI hasn't got a corresponding
+   @Linkable@, and we don't want @Linkable@s from failed compilation
+   runs to enter UI, because we can't be sure that they are actually
+   necessary for a successful link.  So it seems simplest, albeit at a
+   small compilation speed loss, for @compile@ not to update PCS at
+   all following a failed compile.  We may revisit this
+   decision later.
+
+   \item
+      {\bf Package Symbol Table (PST)} @:: FiniteMap Module ModDetails@
+
+   Adding an package interface to PIT doesn't make it directly usable
+   to @compile@, because it first needs to be wired (renamed +
+   typechecked) into the sphagetti of the HST.  On the other hand,
+   most modules only use a few entities from any imported interface,
+   so wiring-in the interface at PIT-entry time might be a big time
+   waster.  Also, wiring in an interface could mean reading other
+   interfaces, and we don't want to do that unnecessarily.
+
+   The PST avoids these problems by allowing incremental wiring-in to
+   happen.  Pieces of foreign interfaces are renamed and placed in the
+   PST, but only as @compile@ discovers it needs them.  In the process
+   of incremental renaming, @compile@ may need to read more package
+   interfaces, which are returned to CM to add to the PIT.
+
+   CM passes the PST to @compile@ and is returned an updated version
+   on success.  On failure, @compile@ doesn't return an updated
+   version even though it might have created some updates on the way
+   to failure.  This seems necessary to retain the (thus far unstated)
+   invariant that PST only contains renamed fragments of interfaces in
+   PIT.
+
+   \item
+      {\bf Holding Pen (HP)} @:: Ifaces@
+
+   \end{itemize}
+
+   PCS is opaque to CM; only @compile@ knows what's in it, and how to
+   update it.  Because packages are assumed static, PCS never becomes
+   out of date.  So CM only needs to be able to create an empty PCS,
+   with @emptyPCS@, and thence just passes it through @compile@ with
+   no further ado.
+
+   In return, @compile@ must promise not to store in PCS any
+   information pertaining to the home modules.  If it did so, CM would
+   need to have a way to remove this information prior to commencing a
+   rebuild, which conflicts with PCS's opaqueness to CM.
+
+
+
 
 \subsubsection*{What {\tt compile} does}
 @compile@ is necessarily somewhat complex.  We've decided to do away
@@ -371,7 +483,7 @@ a cycle.  Without further ado:
 
    data PCS
       = MkPCS PIT         -- package interfaces
-              PRC         -- rename cache/global symtab contents
+              PST         -- rename cache/global symtab contents
 \end{verbatim}
 Although @compile@ is passed three of the global structures (FLAGS,
 HST and PCS), it only modifies PCS.  The rest are modified by CM as it
@@ -399,7 +511,7 @@ What @compile@ does: \ToDo{A bit vague ... needs refining.  How does
 
 \item
    If recompilation is not needed, create a new @ModDetails@ from the
-   old @ModIFace@, looking up information in HST and PCS.PRC as necessary.
+   old @ModIFace@, looking up information in HST and PCS.PST as necessary.
    Return the new details, the old @ModIFace@ and @Linkable@, the PCS
    \ToDo{I don't think the PCS should be updated, but who knows?}, and
    an empty warning list.
@@ -410,10 +522,10 @@ What @compile@ does: \ToDo{A bit vague ... needs refining.  How does
    If the module is only available in object+interface form, read the
    interface, make up details, create a linkable pointing at the
    object code.  Does this involve reading any more interfaces?  Does
-   it involve updating PRC?
+   it involve updating PST?
    
    Otherwise, translate from source, then create and return: an
-   details, interface, linkable, updated PRC, and warnings.
+   details, interface, linkable, updated PST, and warnings.
 
    When looking for a new interface, search HST, then PCS.PIT, and only
    then read from disk.  In which case add the new interface(s) to
@@ -423,12 +535,11 @@ What @compile@ does: \ToDo{A bit vague ... needs refining.  How does
    boot interface against the inferred interface.}
 \end{itemize}
 
-
-
-\subsection{Linking}
+%%-- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --%%
+\subsection{The linker (\mbox{\tt link})}
 \label{sec:linker}
 
-\subsubsection{The linker's private data structures}
+\subsubsection{Data structures owned by the linker}
 
 In the same way that @compile@ has a persistent compiler state (PCS),
 the linker has a persistent (session-lifetime) state, LPS, the
@@ -615,47 +726,12 @@ with either a module or package:
 The order of the @Unlinked@s in the list is important, as
 they are linked in left-to-right order.  The @Unlinked@ objects for a
 particular package can be obtained from the package configuration (see
-Section \ref{sec:package-config}).
+Section \ref{sec:staticinfo}).
 
 \ToDo{When adding @Addr@s from an object module to SST, we need to
       somehow find out the @RdrName@s of the symbols exported by that
       module. 
       So we'd need to pass in the @ModDetails@ or @ModIFace@ or some such?}
-
-
-
-\subsection{What CM does}
-\label{sec:compilation-manager}
-Pretty much as before.  
-
-Plus: detect module cycles during the downsweep.  During the upsweep,
-ensure that compilation failures for modules in cycles do not leave
-any of the global structures in an inconsistent state.  
-\begin{itemize}
-\item 
-   For PCS, that's never a problem because PCS doesn't hold any
-   information pertaining to home modules.
-\item 
-   HST and HIT: CM knows that these are mappings from @Module@ to
-   whatever, and can throw away entries from failed cycles, or,
-   equivalently, not commit updates to them until cycles succeed,
-   remembering of course to synthesise appropriate HSTs during
-   compilation of a cycle.
-\item 
-   UI -- a collection of @Linkable@s, between which there are no
-   direct refererences, so CM can remove additions from failed cycles
-   with no difficulty.
-\item 
-   OST -- linking is not carried out until the upsweep has
-   succeeded, so there's no problem here.
-\end{itemize}
-
-Plus: clear out the global data structures after the downsweep but
-before the upsweep.
-
-\ToDo{CM needs to supply a way for @compile@ to know which modules in
-      HST are in its downwards closure, and which not, so it can
-      correctly construct its instance environment.}
 
 
 
