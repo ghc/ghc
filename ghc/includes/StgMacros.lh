@@ -2249,6 +2249,13 @@ extern I_ required_thread_count;
 
 The following seq# code should only be used in unoptimized code.
 Be warned: it's a potential bug-farm.
+[SOF 8/98: 
+  Yes, it completely fails to work for function values, since a PAP 
+  closure will be constructed when the arg satisfaction check fails.
+  This PAP closure will add the magic values that gets pushed on the B stack 
+  before entering the 'seqee' (new word!), as Jim is just about to tell
+  us about. Let's hear what he's got to say:
+]
 
 First we push two words on the B stack: the current value of RetReg 
 (which may or may not be live), and a continuation snatched largely out
@@ -2258,6 +2265,11 @@ closure to be evaluated, and we're off.  When the eval returns to the
 polymorphic seq return point, the two words are popped off the B stack,
 RetReg is restored, and we jump to the continuation, completing the
 primop and going on our merry way.
+
+[ To workaround the shortcoming of not being able to deal with partially
+  applied values, we explicitly prohibit this at the Haskell source level
+  (i.e., we don't define an Eval instance for (->) ). 
+]
 
 \begin{code}
 
