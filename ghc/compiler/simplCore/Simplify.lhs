@@ -294,16 +294,22 @@ simplNonRecBind env bndr rhs rhs_se cont_ty thing_inside
 
   | isStrictDmd (idNewDemandInfo bndr) || isStrictType (idType bndr)	-- A strict let
   =  	-- Don't use simplBinder because that doesn't keep 
-	-- fragile occurrence in the substitution
+	-- fragile occurrence info in the substitution
     simplLetBndr env bndr					`thenSmpl` \ (env, bndr') ->
-    simplStrictArg AnRhs env rhs rhs_se (idType bndr') cont_ty	$ \ env rhs1 ->
+    let
+	-- simplLetBndr doesn't deal with the IdInfo, so we must
+	-- do so here (c.f. simplLazyBind)
+	bndr''  = bndr' `setIdInfo` simplIdInfo (getSubst env) (idInfo bndr)
+	env1	= modifyInScope env bndr'' bndr''
+    in
+    simplStrictArg AnRhs env1 rhs rhs_se (idType bndr') cont_ty	$ \ env rhs1 ->
 
 	-- Now complete the binding and simplify the body
-    completeNonRecX env True {- strict -} bndr bndr' rhs1 thing_inside
+    completeNonRecX env True {- strict -} bndr bndr'' rhs1 thing_inside
 
   | otherwise							-- Normal, lazy case
   =  	-- Don't use simplBinder because that doesn't keep 
-	-- fragile occurrence in the substitution
+	-- fragile occurrence info in the substitution
     simplLetBndr env bndr				`thenSmpl` \ (env, bndr') ->
     simplLazyBind env NotTopLevel NonRecursive
 		  bndr bndr' rhs rhs_se 		`thenSmpl` \ (floats, env) ->
@@ -441,13 +447,12 @@ simplLazyBind env top_lvl is_rec bndr bndr' rhs rhs_se
 	--
 	-- NB: does no harm for non-recursive bindings
     let
- 	is_top_level	  = isTopLevel top_lvl
-	bndr_ty'     	  = idType bndr'
-	bndr''       	  = simplIdInfo (getSubst rhs_se) (idInfo bndr) bndr'
+	bndr''       	  = bndr' `setIdInfo` simplIdInfo (getSubst rhs_se) (idInfo bndr)
 	env1	     	  = modifyInScope env bndr'' bndr''
 	rhs_env      	  = setInScope rhs_se env1
+ 	is_top_level	  = isTopLevel top_lvl
 	ok_float_unlifted = not is_top_level && isNonRec is_rec
-	rhs_cont	  = mkStop bndr_ty' AnRhs
+	rhs_cont	  = mkStop (idType bndr') AnRhs
     in
   	-- Simplify the RHS; note the mkStop, which tells 
 	-- the simplifier that this is the RHS of a let.
