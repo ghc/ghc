@@ -28,6 +28,7 @@ module Ix
     ) where
 
 import Prelude
+import PrelArr
 
 -- This module is empty, because Ix is defined in PrelArr.
 -- Reason: it's needed internally in the Prelude.  

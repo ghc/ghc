@@ -74,6 +74,7 @@ import PrelList
 #ifndef USE_REPORT_PRELUDE
      hiding ( takeUInt_append )
 #endif
+import PrelIO
 import PrelIOBase
 import PrelException
 import PrelRead
@@ -209,63 +210,3 @@ realToFrac	:: (Real a, Fractional b) => a -> b
 realToFrac	=  fromRational . toRational
 \end{code}
 
-
-%*********************************************************
-%*							 *
-\subsection{Standard IO}
-%*							 *
-%*********************************************************
-
-The Prelude has from Day 1 provided a collection of common
-IO functions. We define these here, but let the Prelude
-export them.
-
-\begin{code}
-putChar         :: Char -> IO ()
-putChar c       =  hPutChar stdout c
-
-putStr          :: String -> IO ()
-putStr s        =  hPutStr stdout s
-
-putStrLn        :: String -> IO ()
-putStrLn s      =  do putStr s
-                      putChar '\n'
-
-print           :: Show a => a -> IO ()
-print x         =  putStrLn (show x)
-
-getChar         :: IO Char
-getChar         =  hGetChar stdin
-
-getLine         :: IO String
-getLine         =  hGetLine stdin
-            
-getContents     :: IO String
-getContents     =  hGetContents stdin
-
-interact        ::  (String -> String) -> IO ()
-interact f      =   do s <- getContents
-                       putStr (f s)
-
-readFile        :: FilePath -> IO String
-readFile name	=  openFile name ReadMode >>= hGetContents
-
-writeFile       :: FilePath -> String -> IO ()
-writeFile name str = do
-    hdl <- openFile name WriteMode
-    hPutStr hdl str
-    hClose hdl
-
-appendFile      :: FilePath -> String -> IO ()
-appendFile name str = do
-    hdl <- openFile name AppendMode
-    hPutStr hdl str
-    hClose hdl
-
-readLn          :: Read a => IO a
-readLn          =  do l <- getLine
-                      r <- readIO l
-                      return r
-
-
-\end{code}

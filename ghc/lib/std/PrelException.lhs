@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelException.lhs,v 1.14 2000/03/23 17:45:31 simonpj Exp $
+% $Id: PrelException.lhs,v 1.15 2000/04/10 13:18:13 simonpj Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -13,6 +13,7 @@ Exceptions and exception-handling functions.
 module PrelException where
 
 import PrelBase
+import PrelMaybe
 import PrelShow
 import PrelIOBase
 import PrelST 		( STret(..) )
@@ -21,8 +22,11 @@ import PrelGHC
 #endif
 \end{code}
 
------------------------------------------------------------------------------
-Exception datatype and operations.
+%*********************************************************
+%*							*
+\subsection{Exception datatype and operations}
+%*							*
+%*********************************************************
 
 \begin{code}
 data Exception
@@ -88,9 +92,16 @@ instance Show Exception where
   showsPrec _ (PutFullMVar)		 = showString "putMVar: full MVar"
   showsPrec _ (BlockedOnDeadMVar)	 = showString "thread blocked indefinitely"
   showsPrec _ (NonTermination)           = showString "<<loop>>"
+\end{code}
 
--- Primitives:
 
+%*********************************************************
+%*							*
+\subsection{Primitive catch and throw}
+%*							*
+%*********************************************************
+
+\begin{code}
 throw :: Exception -> a
 
 #ifdef __HUGS__
@@ -131,6 +142,48 @@ catchNonIO m k	=  catchException m handler
 	handler other             = k other
 \end{code}
 
+
+%*********************************************************
+%*							*
+\subsection{Try and bracket}
+%*							*
+%*********************************************************
+
+The construct @try comp@ exposes errors which occur within a
+computation, and which are not fully handled.  It always succeeds.
+
+\begin{code}
+try            :: IO a -> IO (Either IOError a)
+try f          =  catch (do r <- f
+                            return (Right r))
+                        (return . Left)
+
+bracket        :: IO a -> (a -> IO b) -> (a -> IO c) -> IO c
+bracket before after m = do
+        x  <- before
+        rs <- try (m x)
+        after x
+        case rs of
+           Right r -> return r
+           Left  e -> ioError e
+
+-- variant of the above where middle computation doesn't want x
+bracket_        :: IO a -> (a -> IO b) -> IO c -> IO c
+bracket_ before after m = do
+         x  <- before
+         rs <- try m
+         after x
+         case rs of
+            Right r -> return r
+            Left  e -> ioError e
+\end{code}
+
+
+%*********************************************************
+%*							*
+\subsection{ioError}
+%*							*
+%*********************************************************
 
 Why is this stuff here?  To avoid recursive module dependencies of
 course.
