@@ -21,7 +21,7 @@ import Bag		( emptyBag, unitBag, unionBags, unionManyBags, bagToList )
 import CoreUtils	( coreExprType )
 import CostCentre	( noCostCentre )
 import Id		( mkSysLocal, idType, isBottomingId,
-			  externallyVisibleId,
+			  externallyVisibleId, mkIdWithNewUniq,
 
 			  nullIdEnv, addOneToIdEnv, lookupIdEnv, growIdEnvList,
 			  IdEnv, GenId{-instance NamedThing-}, Id
@@ -78,6 +78,11 @@ Because we're going to come across ``boring'' bindings like
 \tr{let x = /\ tyvars -> y in ...}, we want to keep a small
 environment, so we can just replace all occurrences of \tr{x}
 with \tr{y}.
+
+March 98: We also use this environment to give all locally bound
+Names new unique ids, since the code generator assumes that binders
+are unique across a module. (Simplifier doesn't maintain this
+invariant any longer.)
 
 \begin{code}
 type StgEnv = IdEnv StgArg
@@ -144,8 +149,20 @@ coreBindToStg env (NonRec binder rhs)
 	   where
 		new_env = addOneToIdEnv env binder (StgConArg con_id)
 
-      other -> 	-- Non-trivial RHS, so don't augment envt
-		returnUs ([StgNonRec binder stg_rhs], env)
+      other ->    -- Non-trivial RHS
+           mkUniqueBinder env binder   `thenUs` \ (new_env, new_binder) ->
+           returnUs ([StgNonRec new_binder stg_rhs], new_env)
+    where
+     mkUniqueBinder env binder
+       | externallyVisibleId binder = returnUs (env, binder)
+       | otherwise = 
+           -- local binder, give it a new unique Id.
+           newUniqueLocalId binder   `thenUs` \ binder' ->
+           let
+             new_env = addOneToIdEnv env binder (StgVarArg binder')
+           in
+	   returnUs (new_env, binder')
+
 
 coreBindToStg env (Rec pairs)
   = -- NB: *** WE DO NOT CHECK FOR TRIV_BINDS in REC BIND ****
@@ -153,8 +170,9 @@ coreBindToStg env (Rec pairs)
     let
 	(binders, rhss) = unzip pairs
     in
-    mapUs (coreRhsToStg env) rhss `thenUs` \ stg_rhss ->
-    returnUs ([StgRec (binders `zip` stg_rhss)], env)
+    newLocalIds env True{-maybe externally visible-} binders   `thenUs` \ (binders', env') ->
+    mapUs (coreRhsToStg env') rhss                             `thenUs` \ stg_rhss ->
+    returnUs ([StgRec (binders' `zip` stg_rhss)], env')
 \end{code}
 
 
@@ -250,7 +268,8 @@ coreExprToStg env expr@(Lam _ _)
   = let
 	(_, binders, body) = collectBinders expr
     in
-    coreExprToStg env body		`thenUs` \ stg_body ->
+    newLocalIds env False{-all local-} binders  `thenUs` \ (binders', env') ->
+    coreExprToStg env' body                     `thenUs` \ stg_body ->
 
     if null binders then -- it was all type/usage binders; tossed
 	returnUs stg_body
@@ -262,7 +281,7 @@ coreExprToStg env expr@(Lam _ _)
 				  stgArgOcc
 				  bOGUS_FVs
 				  ReEntrant 	-- binders is non-empty
-				  binders
+				  binders'
 				  stg_body))
 	   (StgApp (StgVarArg var) [] bOGUS_LVs))
 \end{code}
@@ -412,6 +431,28 @@ newStgVar ty
  = getUnique			`thenUs` \ uniq ->
    returnUs (mkSysLocal SLIT("stg") uniq ty noSrcLoc)
 \end{code}
+
+\begin{code}
+newUniqueLocalId :: Id -> UniqSM Id
+newUniqueLocalId i =
+   getUnique			`thenUs` \ uniq ->
+   returnUs (mkIdWithNewUniq i uniq)
+
+newLocalIds :: StgEnv -> Bool -> [Id] -> UniqSM ([Id], StgEnv)
+newLocalIds env maybe_visible [] = returnUs ([], env)
+newLocalIds env maybe_visible (i:is)
+ | maybe_visible && externallyVisibleId i = 
+     newLocalIds env maybe_visible is `thenUs` \ (is', env') ->
+     returnUs (i:is', env')
+ | otherwise             =
+     newUniqueLocalId i `thenUs` \ i' ->
+     let
+      new_env = addOneToIdEnv env i (StgVarArg i')
+     in
+     newLocalIds new_env maybe_visible is `thenUs` \ (is', env') ->
+     returnUs (i':is', env')
+\end{code}
+
 
 \begin{code}
 mkStgLets ::   [StgBinding]
