@@ -415,7 +415,7 @@ hPutStr handle str = do
             Just (BlockBuffering (Just size)) ->
 	        writeBlocks (filePtr hdl) size str
             Just (BlockBuffering Nothing) ->
-	        writeBlocks (filePtr hdl) ``BUFSIZ'' str
+	        writeBlocks (filePtr hdl) (``BUFSIZ''-1) str
             _ -> -- Nothing is treated pessimistically as NoBuffering
 	        writeChars (filePtr hdl) str
 	  )
@@ -429,7 +429,7 @@ writeLines :: ForeignObj -> String -> IO Bool
 #else
 writeLines :: Addr -> String -> IO Bool
 #endif
-writeLines = writeChunks ``BUFSIZ'' True 
+writeLines = writeChunks (``BUFSIZ''-1) True 
 
 #ifndef __PARALLEL_HASKELL__
 writeBlocks :: ForeignObj -> Int -> String -> IO Bool
