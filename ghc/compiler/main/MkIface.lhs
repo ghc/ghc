@@ -39,8 +39,7 @@ import HscTypes		( VersionInfo(..), ModIface(..),
 
 import CmdLineOpts
 import Id		( idType, idInfo, isImplicitId, idCafInfo )
-import DataCon		( dataConName, dataConSig, dataConFieldLabels,
-			  dataConStrictMarks, dataConWrapId )
+import DataCon		( dataConName, dataConSig, dataConFieldLabels, dataConStrictMarks )
 import IdInfo		-- Lots
 import CoreSyn		( CoreRule(..), IdCoreRule )
 import CoreFVs		( ruleLhsFreeNames )
@@ -56,7 +55,8 @@ import TyCon		( DataConDetails(..), tyConTyVars, tyConDataCons, tyConTheta,
 			  getSynTyConDefn, tyConGenInfo, tyConDataConDetails, tyConArity )
 import Class		( classExtraBigSig, classTyCon )
 import FieldLabel	( fieldLabelType )
-import TcType		( tcSplitForAllTys, tcFunResultTy, tidyTopType, deNoteType, tyClsNamesOfDFunHead )
+import TcType		( tcSplitForAllTys, tcFunResultTy, tidyTopType, deNoteType, tyClsNamesOfDFunHead,
+			  mkSigmaTy, mkFunTys, mkTyConApp, mkTyVarTys )
 import SrcLoc		( noSrcLoc )
 import Module		( Module, ModuleName, moduleNameFS, moduleName, isHomeModule,
 			  ModLocation(..), mkSysModuleNameFS, 
@@ -336,7 +336,7 @@ ifaceTyThing (AnId id) = iface_sig
     iface_sig = IfaceSig { tcdName   = getName id, 
 			   tcdType   = toHsType id_type,
 			   tcdIdInfo = hs_idinfo,
-			   tcdLoc    =  noSrcLoc }
+			   tcdLoc    = noSrcLoc }
 
     id_type = idType id
     id_info = idInfo id
@@ -383,9 +383,21 @@ ifaceTyThing (AnId id) = iface_sig
 		  | otherwise	= Just (HsUnfold inline_prag (toUfExpr rhs))
 
 
-ifaceTyThing (ADataCon dc) = ifaceTyThing (AnId (dataConWrapId dc))
+ifaceTyThing (ADataCon dc)
 	-- This case only happens in the call to ifaceThing in InteractiveUI
 	-- Otherwise DataCons are filtered out in ifaceThing_acc
+ = IfaceSig { tcdName   = getName dc, 
+	      tcdType   = toHsType full_ty,
+	      tcdIdInfo = [],
+	      tcdLoc    = noSrcLoc }
+ where
+    (tvs, stupid_theta, ex_tvs, ex_theta, arg_tys, tycon) = dataConSig dc
+
+	-- The "stupid context" isn't part of the wrapper-Id type
+	-- (for better or worse -- see note in DataCon.lhs), so we
+	-- have to make it up here
+    full_ty = mkSigmaTy (tvs ++ ex_tvs) (stupid_theta ++ ex_theta) 
+			(mkFunTys arg_tys (mkTyConApp tycon (mkTyVarTys tvs)))
 \end{code}
 
 \begin{code}
