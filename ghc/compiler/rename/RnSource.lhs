@@ -98,8 +98,6 @@ rnSrcDecls (HsGroup { hs_valds  = MonoBind binds sigs _,
 	updGblEnv (\gbl -> gbl { tcg_fix_env = fix_env })
 		  $ do {
 
-	failIfErrsM ;	-- No point in continuing if (say) we have duplicate declarations
-
 		-- Rename other declarations
 	(rn_val_decls, src_fvs1)     <- rnTopMonoBinds binds sigs ;
 	(rn_inst_decls, src_fvs2)    <- mapFvRn rnSrcInstDecl inst_decls ;
