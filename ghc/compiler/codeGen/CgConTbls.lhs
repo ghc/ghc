@@ -21,7 +21,8 @@ import ClosureInfo	( layOutStaticClosure, layOutDynCon,
 import CostCentre	( dontCareCCS )
 import FiniteMap	( fmToList, FiniteMap )
 import DataCon		( DataCon, dataConName, dataConRepArgTys, isNullaryDataCon )
-import Name		( getOccString )
+import Name		( getOccName )
+import OccName		( occNameUserString )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import TyCon		( tyConDataCons, isEnumerationTyCon, TyCon )
 import Type		( typePrimRep, Type )
@@ -127,7 +128,7 @@ genConInfo comp_info tycon data_con
 		      body_code))
 
     entry_addr = CLbl entry_label CodePtrRep
-    con_descr  = getOccString data_con
+    con_descr  = occNameUserString (getOccName data_con)
 
     -- Don't need any dynamic closure code for zero-arity constructors
     closure_code = if zero_arity_con then 
