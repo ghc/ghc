@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.39 $
- * $Date: 2000/02/15 13:16:19 $
+ * $Revision: 1.40 $
+ * $Date: 2000/03/09 21:35:38 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -1874,7 +1874,6 @@ Text t; {
         } else {
             Printf("<unknown type>");
         }
-printf("\n");print(name(nm).type,10);printf("\n");
         if (isCfun(nm)) {
             Printf("  -- data constructor");
         } else if (isMfun(nm)) {
