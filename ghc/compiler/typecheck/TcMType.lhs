@@ -50,7 +50,7 @@ import TypeRep		( Type(..), SourceType(..), TyNote(..),	 -- Friend; can see repr
 			) 
 import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  TcTyVarSet, TcKind, TcTyVar, TyVarDetails(..),
-			  tcEqType, tcCmpPred,
+			  tcEqType, tcCmpPred, isClassPred,
 			  tcSplitPhiTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
 			  tcSplitTyConApp_maybe, tcSplitForAllTys,
 			  tcIsTyVarTy, tcSplitSigmaTy, 
@@ -908,7 +908,14 @@ checkAmbiguity forall_tyvars theta tau_tyvars
   where
     complain pred     = addErrTc (ambigErr pred)
     extended_tau_vars = grow theta tau_tyvars
-    is_ambig pred     = any ambig_var (varSetElems (tyVarsOfPred pred))
+
+	-- Only a *class* predicate can give rise to ambiguity
+	-- An *implicit parameter* cannot.  For example:
+	--	foo :: (?x :: [a]) => Int
+	--	foo = length ?x
+	-- is fine.  The call site will suppply a particular 'x'
+    is_ambig pred     = isClassPred  pred &&
+			any ambig_var (varSetElems (tyVarsOfPred pred))
 
     ambig_var ct_var  = (ct_var `elem` forall_tyvars) &&
 		        not (ct_var `elemVarSet` extended_tau_vars)
