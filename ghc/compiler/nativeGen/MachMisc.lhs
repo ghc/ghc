@@ -55,16 +55,8 @@ import CLabel           ( CLabel )
 import CmdLineOpts	( opt_SccProfilingOn )
 import Literal		( mkMachInt, Literal(..) )
 import MachRegs		( stgReg, callerSaves, RegLoc(..),
-			  Imm(..), Reg(..)
-#if __GLASGOW_HASKELL__ >= 202
-		        )
-import qualified MachRegs (Addr)
-#define MachRegsAddr MachRegs.Addr
-#else
-			, Addr(..)
+			  Imm(..), Reg(..), Address(..)
 			)
-#define MachRegsAddr Addr
-#endif
 
 import OrdList		( OrdList )
 import PrimRep		( PrimRep(..) )
@@ -457,12 +449,12 @@ data Instr
 
 -- Loads and stores.
 
-	      |	LD	      Size Reg MachRegsAddr -- size, dst, src
-	      | LDA	      Reg MachRegsAddr	    -- dst, src
-	      | LDAH	      Reg MachRegsAddr	    -- dst, src
-	      | LDGP	      Reg MachRegsAddr	    -- dst, src
-	      | LDI	      Size Reg Imm  -- size, dst, src
-	      | ST	      Size Reg MachRegsAddr -- size, src, dst
+	      |	LD	      Size Reg Address -- size, dst, src
+	      | LDA	      Reg Address      -- dst, src
+	      | LDAH	      Reg Address      -- dst, src
+	      | LDGP	      Reg Address      -- dst, src
+	      | LDI	      Size Reg Imm     -- size, dst, src
+	      | ST	      Size Reg Address -- size, src, dst
 
 -- Int Arithmetic.
 
@@ -517,9 +509,9 @@ data Instr
 	      | BI	      Cond Reg Imm
 	      | BF	      Cond Reg Imm
 	      | BR	      Imm
-	      | JMP	      Reg MachRegsAddr Int
+	      | JMP	      Reg Address Int
 	      | BSR	      Imm Int
-	      | JSR	      Reg MachRegsAddr Int
+	      | JSR	      Reg Address Int
 
 -- Alpha-specific pseudo-ops.
 
@@ -566,9 +558,9 @@ data RI
 	      | XOR	      Size Operand Operand
 	      | NOT	      Size Operand
 	      | NEGI	      Size Operand -- NEG instruction (name clash with Cond)
-	      | SHL	      Size Operand Operand -- 1st operand must be an Imm
-	      | SAR	      Size Operand Operand -- 1st operand must be an Imm
-	      | SHR	      Size Operand Operand -- 1st operand must be an Imm
+	      | SHL	      Size Operand Operand -- 1st operand must be an Imm or CL
+	      | SAR	      Size Operand Operand -- 1st operand must be an Imm or CL
+	      | SHR	      Size Operand Operand -- 1st operand must be an Imm or CL
 	      | NOP
 
 -- Float Arithmetic. -- ToDo for 386
@@ -580,25 +572,25 @@ data RI
     	      | FABS
 	      | FADD	      Size Operand -- src
 	      | FADDP
-	      | FIADD	      Size MachRegsAddr -- src
+	      | FIADD	      Size Address -- src
     	      | FCHS
     	      | FCOM	      Size Operand -- src
     	      | FCOS
 	      | FDIV	      Size Operand -- src
 	      | FDIVP
-	      | FIDIV	      Size MachRegsAddr -- src
+	      | FIDIV	      Size Address -- src
 	      | FDIVR	      Size Operand -- src
 	      | FDIVRP
-	      | FIDIVR	      Size MachRegsAddr -- src
-    	      | FICOM	      Size MachRegsAddr -- src
-    	      | FILD	      Size MachRegsAddr Reg -- src, dst
-    	      | FIST	      Size MachRegsAddr -- dst
+	      | FIDIVR	      Size Address -- src
+    	      | FICOM	      Size Address -- src
+    	      | FILD	      Size Address Reg -- src, dst
+    	      | FIST	      Size Address -- dst
     	      | FLD	      Size Operand -- src
     	      | FLD1
     	      | FLDZ
     	      | FMUL	      Size Operand -- src
     	      | FMULP
-    	      | FIMUL	      Size MachRegsAddr -- src
+    	      | FIMUL	      Size Address -- src
     	      | FRNDINT
     	      | FSIN
     	      | FSQRT
@@ -606,10 +598,10 @@ data RI
     	      | FSTP	      Size Operand -- dst
 	      | FSUB	      Size Operand -- src
 	      | FSUBP
-	      | FISUB	      Size MachRegsAddr -- src
+	      | FISUB	      Size Address -- src
 	      | FSUBR	      Size Operand -- src
 	      | FSUBRP
-	      | FISUBR	      Size MachRegsAddr -- src
+	      | FISUBR	      Size Address -- src
 	      | FTST
     	      | FCOMP	      Size Operand -- src
     	      | FUCOMPP
@@ -641,7 +633,7 @@ data RI
 data Operand
   = OpReg  Reg	        -- register
   | OpImm  Imm	        -- immediate value
-  | OpAddr MachRegsAddr	-- memory reference
+  | OpAddr Address	-- memory reference
 
 #endif {- i386_TARGET_ARCH -}
 \end{code}
@@ -653,8 +645,8 @@ data Operand
 
 -- Loads and stores.
 
-	      | LD	      Size MachRegsAddr Reg -- size, src, dst
-	      | ST	      Size Reg MachRegsAddr -- size, src, dst
+	      | LD	      Size Address Reg -- size, src, dst
+	      | ST	      Size Reg Address -- size, src, dst
 
 -- Int Arithmetic.
 
@@ -696,7 +688,7 @@ data Operand
 	      | BI	      Cond Bool Imm -- cond, annul?, target
     	      | BF  	      Cond Bool Imm -- cond, annul?, target
 
-	      | JMP	      MachRegsAddr -- target
+	      | JMP	      Address      -- target
 	      | CALL	      Imm Int Bool -- target, args, terminal
 
 data RI = RIReg Reg
