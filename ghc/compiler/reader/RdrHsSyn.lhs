@@ -127,16 +127,16 @@ extractHsTyVars ty
 
 	-- In (All a => a -> a) -> Int, there are no free tyvars
 	-- We just assume that we quantify over all type variables mentioned in the context.
-    get (HsPreForAllTy ctxt ty)  acc = filter (`notElem` locals) (get ty [])
-				       ++ acc
-				     where
-				       locals = foldr (get . snd) [] ctxt
+    get (HsPreForAllTy ctxt ty)  acc = 
+		foldr insert acc (filter (`notElem` locals) (get ty []))
+	    where
+		locals = foldr (get . snd) [] ctxt
 
-    get (HsForAllTy tvs ctxt ty) acc = (filter (`notElem` locals) $
+    get (HsForAllTy tvs ctxt ty) acc = 
+		foldr insert acc (filter (`notElem` locals) $
 				        foldr (get . snd) (get ty []) ctxt)
-				       ++ acc
-				     where
-				       locals = map getTyVarName tvs
+	     where
+	       	locals = map getTyVarName tvs
 
     insert (Qual _ _ _)	      acc = acc
     insert (Unqual (TCOcc _)) acc = acc
