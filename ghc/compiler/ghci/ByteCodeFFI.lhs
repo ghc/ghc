@@ -1,7 +1,7 @@
 %
-% (c) The University of Glasgow 2000
+% (c) The University of Glasgow 2001
 %
-\section[ByteCodeGen]{Generate bytecode from Core}
+\section[ByteCodeGen]{Generate machine-code sequences for foreign import}
 
 \begin{code}
 module ByteCodeFFI ( taggedSizeW, untaggedSizeW, mkMarshalCode ) where
@@ -11,7 +11,11 @@ module ByteCodeFFI ( taggedSizeW, untaggedSizeW, mkMarshalCode ) where
 import Outputable
 import PrimRep		( PrimRep(..), getPrimRepSize, isFollowableRep )
 import ForeignCall	( CCallConv(..) )
-import Bits		( Bits(..), shiftR )
+
+-- DON'T remove apparently unused imports here .. there is ifdeffery
+-- below
+import Bits		( Bits(..), shiftR, shiftL )
+
 import Word		( Word8, Word32 )
 import Addr		( Addr(..), writeWord8OffAddr )
 import Foreign		( Ptr(..), mallocBytes )
@@ -96,9 +100,9 @@ mkMarshalCode_wrk :: CCallConv
                   -> (Int, PrimRep) -> Int -> [(Int, PrimRep)] 
                   -> [Word8]
 
-#if i386_TARGET_ARCH
-
 mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
+
+#if i386_TARGET_ARCH
 
    = let -- Don't change this without first consulting Intel Corp :-)
          bytes_per_word = 4
@@ -112,9 +116,11 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
               [ let -- where this arg's bits start
                     a_bits_offW = a_offW + sizeOfTagW a_rep
                 in 
+                    -- reversed because x86 is little-endian
                     reverse 
                     [a_bits_offW .. a_bits_offW + untaggedSizeW a_rep - 1]
 
+                -- reversed because args are pushed L -> R onto C stack
                 | (a_offW, a_rep) <- reverse arg_offs_n_reps
               ]
 
@@ -257,7 +263,8 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
            DoubleRep -> fstpl_offesimem 4
            FloatRep  -> fstps_offesimem 4
            VoidRep   -> []
-           other     -> pprPanic "ByteCodeFFI.mkMarshalCode_wrk(x86)" (ppr r_rep)
+           other     -> pprPanic "ByteCodeFFI.mkMarshalCode_wrk(x86)" 
+                                 (ppr r_rep)
 
      {- Restore all the pushed regs and go home.
 
@@ -275,11 +282,197 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
      ++ ret
      )
 
-#else /* i386_TARGET_ARCH */
+#elif sparc_TARGET_ARCH
 
-mkMarshalCode_wrk = undefined
+   = let -- At least for sparc V8
+         bytes_per_word = 4
 
-#endif /* i386_TARGET_ARCH */
+         -- speaks for itself
+         w32_to_w8s_bigEndian :: Word32 -> [Word8]
+         w32_to_w8s_bigEndian w
+            =  [fromIntegral (0xFF .&. (w `shiftR` 24)),
+                fromIntegral (0xFF .&. (w `shiftR` 16)),
+                fromIntegral (0xFF .&. (w `shiftR` 8)),
+                fromIntegral (0xFF .&. w)]
+
+         -- addr and result bits offsetsW
+         offset_of_addr_bitsW = addr_offW + sizeOfTagW AddrRep
+         offset_of_res_bitsW  = r_offW + sizeOfTagW r_rep
+
+         offsets_to_pushW
+            = concat
+              [ let -- where this arg's bits start
+                    a_bits_offW = a_offW + sizeOfTagW a_rep
+                in 
+                    [a_bits_offW .. a_bits_offW + untaggedSizeW a_rep - 1]
+
+                | (a_offW, a_rep) <- arg_offs_n_reps
+              ]
+
+         total_argWs    = length offsets_to_pushW
+         argWs_on_stack = if total_argWs > 6 then total_argWs - 6 
+                                             else 0
+
+         -- The stack pointer must be kept 8-byte aligned, which means
+         -- we need to calculate this quantity too
+         argWs_on_stack_ROUNDED_UP
+            | odd argWs_on_stack = 1 + argWs_on_stack
+            | otherwise          = argWs_on_stack
+
+         -- some helpers to assemble sparc insns.
+         -- REGS
+         iReg, oReg, gReg, fReg :: Int -> Word32
+         iReg = fromIntegral . (+ 24)
+         oReg = fromIntegral . (+ 8)
+         gReg = fromIntegral . (+ 0)
+         fReg = fromIntegral
+
+         sp = oReg 6
+         i0 = iReg 0
+         i7 = iReg 7
+         o0 = oReg 0
+         o1 = oReg 1
+         o7 = oReg 7
+         g0 = gReg 0
+         g1 = gReg 1
+         f0 = fReg 0
+         f1 = fReg 1
+
+         -- INSN templates
+         insn_r_r_i :: Word32 -> Word32 -> Word32 -> Int -> Word32
+         insn_r_r_i op3 rs1 rd imm13
+            = (3 `shiftL` 30) 
+              .|. (rs1 `shiftL` 25)
+              .|. (op3 `shiftL` 19)
+              .|. (rd `shiftL` 14) 
+              .|. (1 `shiftL` 13) 
+              .|. mkSimm13 imm13
+
+         insn_r_i_r :: Word32 -> Word32 -> Int -> Word32 -> Word32
+         insn_r_i_r op3 rs1 imm13 rd
+            = (2 `shiftL` 30) 
+              .|. (rd `shiftL` 25)
+              .|. (op3 `shiftL` 19)
+              .|. (rs1 `shiftL` 14) 
+              .|. (1 `shiftL` 13) 
+              .|. mkSimm13 imm13
+
+         mkSimm13 :: Int -> Word32
+         mkSimm13 imm13 
+            = let imm13w = (fromIntegral imm13) :: Word32
+              in  imm13w .&. 0x1FFF             
+
+         -- REAL (non-synthetic) insns
+         -- or %rs1, %rs2, %rd
+         mkOR :: Word32 -> Word32 -> Word32 -> Word32
+         mkOR rs1 rs2 rd 
+            = (2 `shiftL` 30) 
+              .|. (rd `shiftL` 25)
+              .|. (op3_OR `shiftL` 19)
+              .|. (rs1 `shiftL` 14) 
+              .|. (0 `shiftL` 13) 
+              .|. rs2
+              where op3_OR = 2 :: Word32
+
+         -- ld(int)   [%rs + imm13], %rd
+         mkLD rs1 imm13 rd = insn_r_r_i 0x00{-op3_LD-} rd rs1 imm13
+
+         -- st(int)   %rs, [%rd + imm13]
+         mkST   = insn_r_r_i 0x04 -- op3_ST
+
+         -- st(float) %rs, [%rd + imm13]
+         mkSTF  = insn_r_r_i 0x24 -- op3_STF
+
+         -- jmpl     %rs + imm13, %rd
+         mkJMPL = insn_r_i_r 0x38 -- op3_JMPL
+
+         -- save     %rs + imm13, %rd
+         mkSAVE = insn_r_i_r 0x3C -- op3_SAVE
+
+         -- restore  %rs + imm13, %rd
+         mkRESTORE = insn_r_i_r 0x3D -- op3_RESTORE
+
+         -- SYNTHETIC insns
+         mkNOP             = mkOR g0 g0 g0
+         mkCALL reg        = mkJMPL reg 0 o7
+         mkRET             = mkJMPL i7 8 g0
+         mkRESTORE_TRIVIAL = mkRESTORE g0 0 g0
+     in
+     --trace (show (map fst arg_offs_n_reps))
+     concatMap w32_to_w8s_bigEndian (
+
+     {- On entry, %o0 is the arg passed from the interpreter.  After
+        the initial save insn, it will be in %i0.  Studying the sparc
+        docs one would have thought that the minimum frame size is 92
+        bytes, but gcc always uses at least 112, and indeed there are
+        segfaults a-plenty with 92.  So I use 112 here as well.  I
+        don't understand why, tho.  
+     -}
+     [mkSAVE sp (- ({-92-}112 + 4*argWs_on_stack_ROUNDED_UP)) sp]
+
+     {- For each arg in args_offs_n_reps, examine the associated PrimRep 
+        to determine how many payload (non-tag) words there are, and 
+        whether or not there is a tag.  This gives a bunch of offsets on 
+        the H stack.  Move the first 6 words into %o0 .. %o5 and the
+        rest on the stack, starting at [%sp+92].  Use %g1 as a temp.
+     -}
+     ++ let doArgW (offW, wordNo)
+              | wordNo < 6
+              = [mkLD i0 (bytes_per_word * offW) (oReg wordNo)]
+              | otherwise
+              = [mkLD i0 (bytes_per_word * offW) g1,
+                 mkST g1 sp (92 + bytes_per_word * (wordNo - 6))]
+        in  
+            concatMap doArgW (zip offsets_to_pushW [0 ..])
+
+     {- Get the addr to call into %g1, bearing in mind that there's 
+        an Addr# tag at the indicated location, and do the call:
+
+           ld     [4*(1 /*tag*/ +addr_offW) + %i0], %g1
+           call   %g1
+     -}
+     ++ [mkLD i0 (bytes_per_word * offset_of_addr_bitsW) g1,
+         mkCALL g1,
+         mkNOP]
+
+     {- Depending on what the return type is, get the result 
+        from %o0 or %o1:%o0 or %f0 or %f1:%f0.
+
+           st          %o0, [%i0 + 4]        -- 32 bit int
+        or
+           st          %o0, [%i0 + 4]        -- 64 bit int
+           st          %o1, [%i0 + 8]        -- or the other way round?
+        or
+           st          %f0, [%i0 + 4]        -- 32 bit float
+        or
+           st          %f0, [%i0 + 4]        -- 64 bit float
+           st          %f1, [%i0 + 8]        -- or the other way round?
+
+     -}
+     ++ let i32 = [mkST o0 i0 4]
+            i64 = [mkST o0 i0 4, mkST o1 i0 8]
+            f32 = [mkSTF f0 i0 4]
+            f64 = [mkSTF f0 i0 4, mkSTF f1 i0 8]
+        in
+            case r_rep of
+               IntRep    -> i32
+               WordRep   -> i32
+               AddrRep   -> i32
+               DoubleRep -> f64
+               FloatRep  -> f32
+               VoidRep   -> []
+               other     -> pprPanic "ByteCodeFFI.mkMarshalCode_wrk(sparc)" 
+                                     (ppr r_rep)
+
+     ++ [mkRET,
+         mkRESTORE_TRIVIAL]  -- this is in the delay slot of the RET
+     )
+
+#else 
+
+   = undefined
+
+#endif
 
 \end{code}
 
