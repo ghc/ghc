@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelList.lhs,v 1.26 2001/08/28 15:07:58 simonmar Exp $
+% $Id: PrelList.lhs,v 1.27 2001/08/28 15:12:37 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -176,9 +176,9 @@ scanl f q ls            =  q : (case ls of
                                 []   -> []
                                 x:xs -> scanl f (f q x) xs)
 
-scanl1                  :: (a -> a -> a) -> [a] -> [a]
-scanl1 f (x:xs)         =  scanl f x xs
-scanl1 _ []             =  errorEmptyList "scanl1"
+scanl1			:: (a -> a -> a) -> [a] -> [a]
+scanl1 f (x:xs)		=  scanl f x xs
+scanl1 _ []		=  []
 
 -- foldr, foldr1, scanr, and scanr1 are the right-to-left duals of the
 -- above functions.
@@ -194,10 +194,10 @@ scanr f q0 (x:xs)       =  f x q : qs
                            where qs@(q:_) = scanr f q0 xs 
 
 scanr1                  :: (a -> a -> a) -> [a] -> [a]
-scanr1 _  [x]           =  [x]
-scanr1 f  (x:xs)        =  f x q : qs
+scanr1 f []		=  []
+scanr1 f [x]		=  [x]
+scanr1 f (x:xs)		=  f x q : qs
                            where qs@(q:_) = scanr1 f xs 
-scanr1 _ []             =  errorEmptyList "scanr1"
 
 -- iterate f x returns an infinite list of repeated applications of f to x:
 -- iterate f x == [x, f x, f (f x), ...]
