@@ -290,6 +290,8 @@ lookup key ((x,y):xys)
     | otherwise         =  lookup key xys
 
 -- sum and product compute the sum or product of a finite list of numbers.
+{-# SPECIALISE sum     :: [Int] -> Int #-}
+{-# SPECIALISE product :: [Int] -> Int #-}
 sum, product            :: (Num a) => [a] -> a
 #ifdef USE_REPORT_PRELUDE
 sum                     =  foldl (+) 0  
@@ -307,6 +309,8 @@ product	l	= prod l 1
 
 -- maximum and minimum return the maximum or minimum value from a list,
 -- which must be non-empty, finite, and of an ordered type.
+{-# SPECIALISE maximum :: [Int] -> Int #-}
+{-# SPECIALISE minimum :: [Int] -> Int #-}
 maximum, minimum        :: (Ord a) => [a] -> a
 maximum []              =  errorEmptyList "maximum"
 maximum xs              =  foldl1 max xs
