@@ -66,7 +66,7 @@ module StringBuffer
 #include "HsVersions.h"
 
 import GlaExts
-import Addr 		( Addr(..) )
+import PrelAddr 	( Addr(..) )
 import Foreign
 import ST
 import Char		( chr )
