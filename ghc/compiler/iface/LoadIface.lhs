@@ -85,7 +85,7 @@ import Directory
 \begin{code}
 loadSrcInterface :: SDoc -> ModuleName -> IsBootInterface -> RnM ModIface
 -- This is called for each 'import' declaration in the source code
--- On a failure, fail in the mnad with an error message
+-- On a failure, fail in the monad with an error message
 
 loadSrcInterface doc mod_name want_boot
   = do 	{ mb_iface <- initIfaceTcRn $ loadInterface doc mod_name 
