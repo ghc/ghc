@@ -5,6 +5,7 @@
  * (c) sof, 2002-2003.
  */
 #include "Rts.h"
+#include "RtsUtils.h"
 #include <windows.h>
 #include <stdio.h>
 #include "Schedule.h"
@@ -195,7 +196,6 @@ start:
       prev = NULL;
       for(tso = blocked_queue_hd ; tso != END_TSO_QUEUE; tso = tso->link) {
 	switch(tso->why_blocked) {
-	case BlockedOnDelay:
 	case BlockedOnRead:
 	case BlockedOnWrite:
 	case BlockedOnDoProc:
@@ -203,11 +203,9 @@ start:
 	    /* Found the thread blocked waiting on request; stodgily fill 
 	     * in its result block. 
 	     */
-	    if (tso->why_blocked != BlockedOnDelay) {
-	      tso->block_info.async_result->len = completedTable[i].len;
-	      tso->block_info.async_result->errCode = completedTable[i].errCode;
-	    }
-
+	    tso->block_info.async_result->len = completedTable[i].len;
+	    tso->block_info.async_result->errCode = completedTable[i].errCode;
+	      
 	    /* Drop the matched TSO from blocked_queue */
 	    if (prev) {
 	      prev->link = tso->link;
@@ -225,6 +223,9 @@ start:
 	  }
 	  break;
 	default:
+	  if (tso->why_blocked != NotBlocked) {
+	      barf("awaitRequests: odd thread state");
+	  }
 	  break;
 	}
 	prev = tso;
