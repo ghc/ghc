@@ -4,5 +4,5 @@ tcfail110.hs:8:
 	Expected kind: *
 	Inferred kind: * -> *
     When checking that `Foo a' is a type
-    In the type: String -> (forall a. Foo a) -> IO GHC.Base.()
+    In the type: String -> (forall a. Foo a) -> IO ()
     While checking the type signature for `bar'
