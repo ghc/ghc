@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.14 2000/01/14 11:45:21 hwloidl Exp $
+ * $Id: Schedule.h,v 1.15 2000/01/14 14:06:48 hwloidl Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -173,8 +173,10 @@ extern  StgTSO *blocked_queue_hd, *blocked_queue_tl;
 /* Needed by Hugs.
  */
 void interruptStgRts ( void );
+
 // ?? needed -- HWL
 void raiseAsync(StgTSO *tso, StgClosure *exception);
+nat  run_queue_len(void);
 
 //@node Some convenient macros, Index, Scheduler Vars and Data Types
 //@subsection Some convenient macros

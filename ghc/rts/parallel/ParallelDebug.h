@@ -1,5 +1,5 @@
 /* 
-   Time-stamp: <Mon Nov 29 1999 17:17:13 Stardate: [-30]3973.60 hwloidl>
+   Time-stamp: <Fri Jan 14 2000 13:47:43 Stardate: [-30]4202.87 hwloidl>
 
    Prototypes of all parallel debugging functions.
    */
@@ -45,5 +45,13 @@ void   PrintPacket(rtsPackBuffer *buffer);
 void   PrintGraph(StgClosure *p, int indent_level);
 
 #endif /* GRAN || PAR */
+
+#if !defined(GRAN) && !defined(PAR)
+
+void   info_hdr_type(StgClosure *closure, char *res);
+char  *info_type(StgClosure *closure);
+char  *info_type_by_ip(StgInfoTable *ip);
+
+#endif
 
 #endif /* PARALLEL_DEBUG_H */

@@ -1,5 +1,5 @@
 /*
-  Time-stamp: <Sun Dec 12 1999 20:37:00 Stardate: [-30]4039.08 software>
+  Time-stamp: <Fri Jan 14 2000 13:52:00 Stardate: [-30]4202.88 hwloidl>
 
 Various debugging routines for GranSim and GUM
 */
@@ -1386,5 +1386,27 @@ PrintGraph(StgClosure *p, int indent_level)
 #endif /* GRAN */
 
 #endif /* GRAN || PAR */
+
+#if !defined(GRAN) && !defined(PAR)
+// just dummy defs in this setup
+#include "Rts.h"
+#include "ParallelDebug.h"
+
+char *
+info_type(StgClosure *closure){ 
+  return "petaQ";
+}
+
+char *
+info_type_by_ip(StgInfoTable *ip){ 
+  return "petaQ";
+}
+
+void
+info_hdr_type(StgClosure *closure, char *res){ 
+  strcpy(res,"petaQ");
+}
+#endif /* GRAN || PAR */
+
 //@node End of File,  , Printing Packet Contents, Debugging routines for GranSim and GUM
 //@subsection End of File
