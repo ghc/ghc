@@ -5,7 +5,7 @@
 
   <para>HACKER TERRITORY. HACKER TERRITORY.  (You were warned.)</para>
 
-  <Sect2 id="dumping-output">
+  <sect2 id="dumping-output">
     <title>Dumping out compiler intermediate structures</title>
     
     <indexterm><primary>dumping GHC intermediates</primary></indexterm>
@@ -246,9 +246,9 @@
         STG-to-STG passes, respectively.  (<emphasis>Lots</emphasis>
         of output!) So: when we're really desperate:</para>
 
-	  <Screen>
+	  <screen>
 % ghc -noC -O -ddump-simpl -dverbose-simpl -dcore-lint Foo.hs
-</Screen>
+</screen>
 
 	</listitem>
       </varlistentry>
@@ -384,9 +384,9 @@
     <para>Let's do this by commenting an example.  It's from doing
     <option>-ddump-ds</option> on this code:
 
-<ProgramListing>
+<programlisting>
 skip2 m = m : skip2 (m+2)
-</ProgramListing>
+</programlisting>
 
     Before we jump in, a word about names of things.  Within GHC,
     variables, type constructors, etc., are identified by their
@@ -403,7 +403,7 @@ skip2 m = m : skip2 (m+2)
     usually printed out when debugging, in some form or another.  So
     here we go&hellip;</para>
 
-<ProgramListing>
+<programlisting>
 Desugared:
 Main.skip2{-r1L6-} :: _forall_ a$_4 =&#62;{{Num a$_4}} -&#62; a$_4 -&#62; [a$_4]
 
@@ -473,7 +473,7 @@ Main.skip2{-r1L6-} =
 
           {- end CoRec -}
         } in  skip2.t3Ja
-</ProgramListing>
+</programlisting>
 
     <para>(&ldquo;It's just a simple functional language&rdquo; is an
     unregisterised trademark of Peyton Jones Enterprises, plc.)</para>
@@ -512,7 +512,7 @@ Main.skip2{-r1L6-} =
     </variablelist>
   </sect2>
 
-</Sect1>
+</sect1>
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***

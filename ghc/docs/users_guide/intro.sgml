@@ -8,8 +8,8 @@
 
   <para>GHC has two main components: an interactive Haskell
   interpreter (also known as GHCi), described in <xref
-  linkend="ghci">, and a batch compiler, described throughout <xref
-  linkend="using-ghc">.  In fact, GHC consists of a single program
+  linkend="ghci"/>, and a batch compiler, described throughout <xref
+  linkend="using-ghc"/>.  In fact, GHC consists of a single program
   which is just run with different options to provide either the
   interactive or the batch system.</para>
 
@@ -26,7 +26,7 @@
   extensions such as multi-parameter type classes, local universal and
   existential quantification, functional dependencies, scoped type
   variables and explicit unboxed types.  These are all described in
-  <xref linkend="ghc-language-features">.</para>
+  <xref linkend="ghc-language-features"/>.</para>
 
   <para>GHC has a comprehensive optimiser, so when you want to Really
   Go For It (and you've got time to spare) GHC can produce pretty fast
@@ -37,18 +37,18 @@
   
   <para>GHC's profiling system supports &ldquo;cost centre
   stacks&rdquo;: a way of seeing the profile of a Haskell program in a
-  call-graph like structure.  See <xref linkend="profiling"> for more
+  call-graph like structure.  See <xref linkend="profiling"/> for more
   details.</para>
 
   <para>GHC comes with a large collection of libraries, with
   everything from parser combinators to networking.  The libraries are
   described in separate documentation.</para>
 
-  <Sect1 id="mailing-lists-GHC">
-    <Title>Meta-information: Web sites, mailing lists, etc.</Title>
+  <sect1 id="mailing-lists-GHC">
+    <title>Meta-information: Web sites, mailing lists, etc.</title>
 
-    <IndexTerm><Primary>mailing lists, Glasgow Haskell</Primary></IndexTerm>
-    <IndexTerm><Primary>Glasgow Haskell mailing lists</Primary></IndexTerm>
+    <indexterm><primary>mailing lists, Glasgow Haskell</primary></indexterm>
+    <indexterm><primary>Glasgow Haskell mailing lists</primary></indexterm>
 
     <para>On the World-Wide Web, there are several URLs of likely
     interest:</para>
@@ -81,7 +81,7 @@
 	<listitem>
 	  <para>This list is for GHC users to chat among themselves.
 	  If you have a specific question about GHC, please check the
-	  FAQ first (<xref linkend="faq">).</para>
+	  FAQ first (<xref linkend="faq"/>).</para>
 
 	  <variablelist>
 	    <varlistentry>
@@ -236,15 +236,15 @@
       </listitem>
       <listitem>
 	<para>Email your bug report to
-    <Email>glasgow-haskell-bugs@haskell.org</Email>. </para>
+    <email>glasgow-haskell-bugs@haskell.org</email>. </para>
       </listitem>
     </itemizedlist>
 
     <sect2>
       <title>How do I tell if I should report my bug?</title>
 
-      <para>Take a look at the FAQ (<xref linkend="faq">) and <xref
-      linkend="wrong">, which will give you some guidance as to
+      <para>Take a look at the FAQ (<xref linkend="faq"/>) and <xref
+      linkend="wrong"/>, which will give you some guidance as to
       whether the behaviour you're seeing is really a bug or
       not.</para>
 
@@ -271,13 +271,13 @@
 	<listitem>
 	  <para>What kind of machine are you running on, and exactly
           what version of the operating system are you using?
-          (on a Unix system, <Command>uname -a</Command> or <Command>cat
-          /etc/motd</Command> will show the desired information.)</para>
+          (on a Unix system, <command>uname -a</command> or <command>cat
+          /etc/motd</command> will show the desired information.)</para>
 	</listitem>
 
 	<listitem>
-	  <para> What version of GCC are you using? <Command>gcc
-	  -v</Command> will tell you.</para>
+	  <para> What version of GCC are you using? <command>gcc
+	  -v</command> will tell you.</para>
 	</listitem>
 
 	<listitem>
@@ -289,7 +289,7 @@
 
 	<listitem>
 	  <para> Be sure any Haskell compilations are run with a
-          <Option>-v</Option> (verbose) flag, so we can see exactly
+          <option>-v</option> (verbose) flag, so we can see exactly
           what was run, what versions of things you have, etc.</para>
 	</listitem>
 
@@ -335,7 +335,7 @@
 	  old libraries.</para>
 
 	  <para>The value of <literal>__GLASGOW_HASKELL__</literal>
-	  (see <xref linkend="c-pre-processor">) for a major release
+	  (see <xref linkend="c-pre-processor"/>) for a major release
 	  <literal><replaceable>x</replaceable>.<replaceable>y</replaceable>.<replaceable>z</replaceable></literal>
 	  is the integer <replaceable>xyy</replaceable> (if
 	  <replaceable>y</replaceable> is a single digit, then a leading zero
@@ -391,13 +391,13 @@
     <para>The version number of your copy of GHC can be found by
     invoking <literal>ghc</literal> with the
     <literal>&ndash;&ndash;version</literal> flag (see <xref
-    linkend="options-help">).</para>
+    linkend="options-help"/>).</para>
   </sect1>
 
 
 &relnotes;
 
-</Chapter>
+</chapter>
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***

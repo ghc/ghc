@@ -1,40 +1,40 @@
-<Chapter id="sec-installing-bin-distrib">
-  <Title>Installing GHC</Title>
-<IndexTerm><Primary>binary installations</Primary></IndexTerm>
-<IndexTerm><Primary>installation, of binaries</Primary></IndexTerm>
+<chapter id="sec-installing-bin-distrib">
+  <title>Installing GHC</title>
+<indexterm><primary>binary installations</primary></indexterm>
+<indexterm><primary>installation, of binaries</primary></indexterm>
 
-<Para>
+<para>
 Installing from binary distributions is easiest, and recommended!
 (Why binaries? Because GHC is a Haskell compiler written in Haskell,
 so you've got to bootstrap it somehow.  We provide machine-generated
 C-files-from-Haskell for this purpose, but it's really quite a pain to
 use them.  If you must build GHC from its sources, using a
 binary-distributed GHC to do so is a sensible way to proceed. For the
-other <Literal>fptools</Literal> programs, many are written in
+other <literal>fptools</literal> programs, many are written in
 Haskell, so binary distributions allow you to install them without
 having a Haskell compiler.)
-</Para>
+</para>
 
-<Para>This guide is in several parts:</para>
+<para>This guide is in several parts:</para>
 
   <itemizedlist>
     <listitem>
-      <para> Installing on Unix-a-likes (<Xref
-      LinkEnd="sec-unix-a-likes">). </para>
+      <para> Installing on Unix-a-likes (<xref
+      linkend="sec-unix-a-likes"/>). </para>
     </listitem>
     <listitem>
-      <para> Installing on Windows (<Xref
-      LinkEnd="sec-install-windows">).  </para>
+      <para> Installing on Windows (<xref
+      linkend="sec-install-windows"/>).  </para>
     </listitem>
     <listitem>
-      <para> The layout of installed files (<Xref
-      LinkEnd="sec-install-files">).  You don't need to know this to
+      <para> The layout of installed files (<xref
+      linkend="sec-install-files"/>).  You don't need to know this to
       install GHC, but it's useful if you are changing the
       implementation.</para>
     </listitem>
   </itemizedlist>
   
-  <Sect1 id="sec-unix-a-likes"><Title>Installing on Unix-a-likes</Title>
+  <sect1 id="sec-unix-a-likes"><title>Installing on Unix-a-likes</title>
 
     <sect2>
       <title>When a platform-specific package is available</title>
@@ -53,7 +53,7 @@ having a Haskell compiler.)
 	<varlistentry>
 	  <term>RedHat or SuSE Linux/x86</term>
 	  <listitem>
-	    <para>RPM source & binary packages for RedHat and SuSE
+	    <para>RPM source &amp; binary packages for RedHat and SuSE
 	    Linux (x86 only) are available for most major
 	    releases.</para>
 	  </listitem>
@@ -71,7 +71,7 @@ having a Haskell compiler.)
 	  <term>FreeBSD/x86</term>
 	  <listitem>
 	    <para>On FreeBSD/x86, GHC can be installed using either
-	    the ports tree (<literal>cd /usr/ports/lang/ghc && make
+	    the ports tree (<literal>cd /usr/ports/lang/ghc &amp;&amp; make
 	    install</literal>) or from a pre-compiled package
 	    available from your local FreeBSD mirror.</para>
 	  </listitem>
@@ -82,386 +82,386 @@ having a Haskell compiler.)
       the GHC download page for details.</para>
     </sect2>
 
-<Sect2>
-<Title>GHC binary distributions</Title>
+<sect2>
+<title>GHC binary distributions</title>
 
-<Para>
-<IndexTerm><Primary>bundles of binary stuff</Primary></IndexTerm>
-</Para>
+<para>
+<indexterm><primary>bundles of binary stuff</primary></indexterm>
+</para>
 
-<Para>
+<para>
 Binary distributions come in &ldquo;bundles,&rdquo; one bundle per file called
-<literal><replaceable>bundle</replaceable>-<replaceable>platform</replaceable>.tar.gz</Literal>.  (See the building guide for the definition of a platform.)  Suppose that you untar a binary-distribution bundle, thus:
-</Para>
+<literal><replaceable>bundle</replaceable>-<replaceable>platform</replaceable>.tar.gz</literal>.  (See the building guide for the definition of a platform.)  Suppose that you untar a binary-distribution bundle, thus:
+</para>
 
-<Para>
+<para>
 
-<Screen>
+<screen>
 % cd /your/scratch/space
-% gunzip &#60; ghc-x.xx-sun-sparc-solaris2.tar.gz | tar xvf -</Screen>
+% gunzip &#60; ghc-x.xx-sun-sparc-solaris2.tar.gz | tar xvf -</screen>
 
-</Para>
+</para>
 
-<Para>
+<para>
 Then you should find a single directory,
-<Literal>ghc-<replaceable>version</replaceable></Literal>, with the
+<literal>ghc-<replaceable>version</replaceable></literal>, with the
 following structure:
-</Para>
+</para>
 
-<Para>
-<IndexTerm><Primary>binary distribution, layout</Primary></IndexTerm>
-<IndexTerm><Primary>directory layout (binary distributions)</Primary></IndexTerm>
-<VariableList>
+<para>
+<indexterm><primary>binary distribution, layout</primary></indexterm>
+<indexterm><primary>directory layout (binary distributions)</primary></indexterm>
+<variablelist>
 
-<VarListEntry>
-<Term><Literal>Makefile.in</Literal></Term>
-<ListItem>
-<Para>
-the raw material from which the <Literal>Makefile</Literal>
-will be made (<Xref LinkEnd="sec-install">).
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>configure</Literal></Term>
-<ListItem>
-<Para>
-the configuration script (<Xref LinkEnd="sec-install">).
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>README</Literal></Term>
-<ListItem>
-<Para>
+<varlistentry>
+<term><literal>Makefile.in</literal></term>
+<listitem>
+<para>
+the raw material from which the <literal>Makefile</literal>
+will be made (<xref linkend="sec-install"/>).
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>configure</literal></term>
+<listitem>
+<para>
+the configuration script (<xref linkend="sec-install"/>).
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>README</literal></term>
+<listitem>
+<para>
 Contains this file summary.
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>INSTALL</Literal></Term>
-<ListItem>
-<Para>
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>INSTALL</literal></term>
+<listitem>
+<para>
 Contains this description of how to install
 the bundle.
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>ANNOUNCE</Literal></Term>
-<ListItem>
-<Para>
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>ANNOUNCE</literal></term>
+<listitem>
+<para>
 The announcement message for the bundle.
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>NEWS</Literal></Term>
-<ListItem>
-<Para>
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>NEWS</literal></term>
+<listitem>
+<para>
 release notes for the bundle&mdash;a longer version
-of <Literal>ANNOUNCE</Literal>.  For GHC, the release notes are contained in the User
+of <literal>ANNOUNCE</literal>.  For GHC, the release notes are contained in the User
 Guide and this file isn't present.
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-	    <Term><Literal>bin/<replaceable>platform</replaceable></Literal></Term>
-<ListItem>
-<Para>
+</para>
+</listitem></varlistentry>
+<varlistentry>
+	    <term><literal>bin/<replaceable>platform</replaceable></literal></term>
+<listitem>
+<para>
 contains platform-specific executable
 files to be invoked directly by the user.  These are the files that
 must end up in your path.
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>lib/<replaceable>platform</replaceable>/</Literal></Term>
-<ListItem>
-<Para>
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>lib/<replaceable>platform</replaceable>/</literal></term>
+<listitem>
+<para>
 contains platform-specific support
 files for the installation.  Typically there is a subdirectory for
-each <Literal>fptools</Literal> project, whose name is the name of the project with its
+each <literal>fptools</literal> project, whose name is the name of the project with its
 version number.  For example, for GHC there would be a sub-directory
-<Literal>ghc-x.xx</Literal>/ where <Literal>x.xx</Literal> is the version number of GHC in the bundle.
-</Para>
+<literal>ghc-x.xx</literal>/ where <literal>x.xx</literal> is the version number of GHC in the bundle.
+</para>
 
-<Para>
+<para>
 These sub-directories have the following general structure:
-</Para>
+</para>
 
-<Para>
-<VariableList>
+<para>
+<variablelist>
 
-<VarListEntry>
-<Term><Literal>libHSstd.a</Literal> etc:</Term>
-<ListItem>
-<Para>
+<varlistentry>
+<term><literal>libHSstd.a</literal> etc:</term>
+<listitem>
+<para>
 supporting library archives.
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>ghc-iface.prl</Literal> etc:</Term>
-<ListItem>
-<Para>
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>ghc-iface.prl</literal> etc:</term>
+<listitem>
+<para>
 support scripts.
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>import/</Literal></Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>Interface files</Primary></IndexTerm> (<Literal>.hi</Literal>) for the prelude.
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>include/</Literal></Term>
-<ListItem>
-<Para>
-A few C <Literal>&num;include</Literal> files.
-</Para>
-</ListItem></VarListEntry>
-</VariableList>
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>share/</Literal></Term>
-<ListItem>
-<Para>
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>import/</literal></term>
+<listitem>
+<para>
+<indexterm><primary>Interface files</primary></indexterm> (<literal>.hi</literal>) for the prelude.
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>include/</literal></term>
+<listitem>
+<para>
+A few C <literal>&num;include</literal> files.
+</para>
+</listitem></varlistentry>
+</variablelist>
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>share/</literal></term>
+<listitem>
+<para>
 contains platform-independent support files
 for the installation.  Again, there is a sub-directory for each
-<Literal>fptools</Literal> project.
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>html/</Literal></Term>
-<ListItem>
-<Para>
+<literal>fptools</literal> project.
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>html/</literal></term>
+<listitem>
+<para>
 contains HTML documentation files (one
 sub-directory per project).
-</Para>
-</ListItem></VarListEntry>
-</VariableList>
-</Para>
+</para>
+</listitem></varlistentry>
+</variablelist>
+</para>
 
-<Sect3 id="sec-install">
-<Title>Installing</Title>
+<sect3 id="sec-install">
+<title>Installing</title>
 
-<Para>
+<para>
 OK, so let's assume that you have unpacked your chosen bundles. What
 next? Well, you will at least need to run the
-<Literal>configure</Literal><IndexTerm><Primary>configure</Primary></IndexTerm>
+<literal>configure</literal><indexterm><primary>configure</primary></indexterm>
 script by changing directory into the top-level directory for the
-bundle and typing <Literal>./configure</Literal>.  That should convert
-<Literal>Makefile.in</Literal> to <Literal>Makefile</Literal>.
-</Para>
+bundle and typing <literal>./configure</literal>.  That should convert
+<literal>Makefile.in</literal> to <literal>Makefile</literal>.
+</para>
 
-<Para>
-<IndexTerm><Primary>installing in-place</Primary></IndexTerm>
-<IndexTerm><Primary>in-place installation</Primary></IndexTerm>
-You can now either start using the tools <Emphasis>in-situ</Emphasis> without going
-through any installation process, just type <Literal>make in-place</Literal> to set the
-tools up for this. You'll also want to add the path which <Literal>make</Literal> will
-now echo to your <Literal>PATH</Literal> environment variable. This option is useful if
+<para>
+<indexterm><primary>installing in-place</primary></indexterm>
+<indexterm><primary>in-place installation</primary></indexterm>
+You can now either start using the tools <emphasis>in-situ</emphasis> without going
+through any installation process, just type <literal>make in-place</literal> to set the
+tools up for this. You'll also want to add the path which <literal>make</literal> will
+now echo to your <literal>PATH</literal> environment variable. This option is useful if
 you simply want to try out the package and/or you don't have the
 necessary privileges (or inclination) to properly install the tools
 locally. Note that if you do decide to install the package `properly'
 at a later date, you have to go through the installation steps that
 follow.
-</Para>
+</para>
 
-<Para>
+<para>
 To install a package, you'll have to do the following:
-</Para>
+</para>
 
-<Para>
+<para>
 
-<OrderedList>
-<ListItem>
+<orderedlist>
+<listitem>
 
-<Para>
- Edit the <Literal>Makefile</Literal> and check the settings of the following variables:
+<para>
+ Edit the <literal>Makefile</literal> and check the settings of the following variables:
 
-<IndexTerm><Primary>directories, installation</Primary></IndexTerm>
-<IndexTerm><Primary>installation directories</Primary></IndexTerm>
+<indexterm><primary>directories, installation</primary></indexterm>
+<indexterm><primary>installation directories</primary></indexterm>
 
-<VariableList>
+<variablelist>
 
-<VarListEntry>
-<Term><Literal>platform</Literal></Term>
-<ListItem>
-<Para>
+<varlistentry>
+<term><literal>platform</literal></term>
+<listitem>
+<para>
 the platform you are going to install for.
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>bindir</Literal></Term>
-<ListItem>
-<Para>
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>bindir</literal></term>
+<listitem>
+<para>
 the directory in which to install user-invokable
 binaries.
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>libdir</Literal></Term>
-<ListItem>
-<Para>
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>libdir</literal></term>
+<listitem>
+<para>
 the directory in which to install
 platform-dependent support files.
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>datadir</Literal></Term>
-<ListItem>
-<Para>
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>datadir</literal></term>
+<listitem>
+<para>
 the directory in which to install
 platform-independent support files.
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>infodir</Literal></Term>
-<ListItem>
-<Para>
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>infodir</literal></term>
+<listitem>
+<para>
 the directory in which to install Emacs info
 files.
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>htmldir</Literal></Term>
-<ListItem>
-<Para>
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>htmldir</literal></term>
+<listitem>
+<para>
 the directory in which to install HTML
 documentation.
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>dvidir</Literal></Term>
-<ListItem>
-<Para>
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>dvidir</literal></term>
+<listitem>
+<para>
 the directory in which to install DVI
 documentation.
-</Para>
-</ListItem></VarListEntry>
-</VariableList>
+</para>
+</listitem></varlistentry>
+</variablelist>
 
 The values for these variables can be set through invocation of the
-<Command>configure</Command><IndexTerm><Primary>configure</Primary></IndexTerm>
+<command>configure</command><indexterm><primary>configure</primary></indexterm>
 script that comes with the distribution, but doing an optical diff to
 see if the values match your expectations is always a Good Idea.
 </para>
 
 <para>
-<Emphasis>Instead of running <Command>configure</Command>, it is
-perfectly OK to copy <Filename>Makefile.in</Filename> to
-<Filename>Makefile</Filename> and set all these variables directly
-yourself.  But do it right!</Emphasis>
-</Para>
+<emphasis>Instead of running <command>configure</command>, it is
+perfectly OK to copy <filename>Makefile.in</filename> to
+<filename>Makefile</filename> and set all these variables directly
+yourself.  But do it right!</emphasis>
+</para>
 
-</ListItem>
-<ListItem>
+</listitem>
+<listitem>
 
-<Para>
-Run <Literal>make install</Literal>.  This <Emphasis>
-should</Emphasis> work with ordinary Unix
-<Literal>make</Literal>&mdash;no need for fancy stuff like GNU
-<Literal>make</Literal>.
+<para>
+Run <literal>make install</literal>.  This <emphasis>
+should</emphasis> work with ordinary Unix
+<literal>make</literal>&mdash;no need for fancy stuff like GNU
+<literal>make</literal>.
 
-</Para>
-</ListItem>
-<ListItem>
+</para>
+</listitem>
+<listitem>
 
-<Para>
-<Literal>rehash</Literal> (t?csh or zsh users), so your shell will see the new
+<para>
+<literal>rehash</literal> (t?csh or zsh users), so your shell will see the new
 stuff in your bin directory.
 
-</Para>
-</ListItem>
-<ListItem>
+</para>
+</listitem>
+<listitem>
 
-<Para>
+<para>
  Once done, test your &ldquo;installation&rdquo; as suggested in 
-<XRef LinkEnd="sec-GHC-test">.  Be sure to use a <Literal>-v</Literal>
+<xref linkend="sec-GHC-test"/>.  Be sure to use a <literal>-v</literal>
 option, so you can see exactly what pathnames it's using.
 
 If things don't work as expected, check the list of known pitfalls in
 the building guide.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-</OrderedList>
+</orderedlist>
 
-</Para>
+</para>
 
-<Para>
-<IndexTerm><Primary>link, installed as ghc</Primary></IndexTerm>
+<para>
+<indexterm><primary>link, installed as ghc</primary></indexterm>
 When installing the user-invokable binaries, this installation
-procedure will install GHC as <Literal>ghc-x.xx</Literal> where <Literal>x.xx</Literal> is the version
+procedure will install GHC as <literal>ghc-x.xx</literal> where <literal>x.xx</literal> is the version
 number of GHC.  It will also make a link (in the binary installation
-directory) from <Literal>ghc</Literal> to <Literal>ghc-x.xx</Literal>.  If you install multiple versions
-of GHC then the last one &ldquo;wins&rdquo;, and &ldquo;<Literal>ghc</Literal>&rdquo; will invoke the last
+directory) from <literal>ghc</literal> to <literal>ghc-x.xx</literal>.  If you install multiple versions
+of GHC then the last one &ldquo;wins&rdquo;, and &ldquo;<literal>ghc</literal>&rdquo; will invoke the last
 one installed.  You can change this manually if you want.  But
-regardless, <Literal>ghc-x.xx</Literal> should always invoke GHC version <Literal>x.xx</Literal>.
-</Para>
+regardless, <literal>ghc-x.xx</literal> should always invoke GHC version <literal>x.xx</literal>.
+</para>
 
-</Sect3>
+</sect3>
 
 
-<Sect3>
-<Title>What bundles there are</Title>
+<sect3>
+<title>What bundles there are</title>
 
-<Para>
-<IndexTerm><Primary>bundles, binary</Primary></IndexTerm> There are
+<para>
+<indexterm><primary>bundles, binary</primary></indexterm> There are
 plenty of &ldquo;non-basic&rdquo; GHC bundles.  The files for them are
 called
-<Literal>ghc-x.xx-<replaceable>bundle</replaceable>-<replaceable>platform</replaceable>.tar.gz</Literal>,
+<literal>ghc-x.xx-<replaceable>bundle</replaceable>-<replaceable>platform</replaceable>.tar.gz</literal>,
 where the <replaceable>platform</replaceable> is as above, and
 <replaceable>bundle</replaceable> is one of these:
-</Para>
+</para>
 
-<Para>
-<VariableList>
+<para>
+<variablelist>
 
-<VarListEntry>
-<Term><Literal>prof</Literal>:</Term>
-<ListItem>
-<Para>
+<varlistentry>
+<term><literal>prof</literal>:</term>
+<listitem>
+<para>
 Profiling with cost-centres.  You probably want this.
-<IndexTerm><Primary>profiling bundles</Primary></IndexTerm>
-<IndexTerm><Primary>bundles, profiling</Primary></IndexTerm>
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>par</Literal>:</Term>
-<ListItem>
-<Para>
+<indexterm><primary>profiling bundles</primary></indexterm>
+<indexterm><primary>bundles, profiling</primary></indexterm>
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>par</literal>:</term>
+<listitem>
+<para>
 Parallel Haskell features (sits on top of PVM).
 You'll want this if you're into that kind of thing.
-<IndexTerm><Primary>parallel bundles</Primary></IndexTerm>
-<IndexTerm><Primary>bundles, parallel</Primary></IndexTerm>
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>gran</Literal>:</Term>
-<ListItem>
-<Para>
+<indexterm><primary>parallel bundles</primary></indexterm>
+<indexterm><primary>bundles, parallel</primary></indexterm>
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>gran</literal>:</term>
+<listitem>
+<para>
 The &ldquo;GranSim&rdquo; parallel-Haskell simulator
 (hmm&hellip; mainly for implementors).
-<IndexTerm><Primary>bundles, gransim</Primary></IndexTerm>
-<IndexTerm><Primary>gransim bundles</Primary></IndexTerm>
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>ticky</Literal>:</Term>
-<ListItem>
-<Para>
+<indexterm><primary>bundles, gransim</primary></indexterm>
+<indexterm><primary>gransim bundles</primary></indexterm>
+</para>
+</listitem></varlistentry>
+<varlistentry>
+<term><literal>ticky</literal>:</term>
+<listitem>
+<para>
 &ldquo;Ticky-ticky&rdquo; profiling; very detailed
 information about &ldquo;what happened when I ran this program&rdquo;&mdash;really
 for implementors.
-<IndexTerm><Primary>bundles, ticky-ticky</Primary></IndexTerm>
-<IndexTerm><Primary>ticky-ticky bundles</Primary></IndexTerm>
-</Para>
-</ListItem></VarListEntry>
-</VariableList>
-</Para>
+<indexterm><primary>bundles, ticky-ticky</primary></indexterm>
+<indexterm><primary>ticky-ticky bundles</primary></indexterm>
+</para>
+</listitem></varlistentry>
+</variablelist>
+</para>
 
-<Para>
-One likely scenario is that you will grab <Emphasis>two</Emphasis>
+<para>
+One likely scenario is that you will grab <emphasis>two</emphasis>
 binary bundles&mdash;basic, and profiling.  We don't usually make the
 rest, although you can build them yourself from a source distribution.
-</Para>
+</para>
 
 <para>The various GHC bundles are designed to be unpacked into the
 same directory; then installing as per the directions above will
@@ -469,85 +469,85 @@ install the whole lot in one go.  Note: you <emphasis>must</emphasis>
 at least have the basic GHC binary distribution bundle, these extra
 bundles won't install on their own.</para>
 
-</Sect3>
+</sect3>
 
-<Sect3 id="sec-GHC-test">
-<Title>Testing that GHC seems to be working
-</Title>
+<sect3 id="sec-GHC-test">
+<title>Testing that GHC seems to be working
+</title>
 
-<Para>
-<IndexTerm><Primary>testing a new GHC</Primary></IndexTerm>
-</Para>
+<para>
+<indexterm><primary>testing a new GHC</primary></indexterm>
+</para>
 
-<Para>
-The way to do this is, of course, to compile and run <Emphasis>this</Emphasis> program
-(in a file <Literal>Main.hs</Literal>):
-</Para>
+<para>
+The way to do this is, of course, to compile and run <emphasis>this</emphasis> program
+(in a file <literal>Main.hs</literal>):
+</para>
 
-<Para>
+<para>
 
-<ProgramListing>
+<programlisting>
 main = putStr "Hello, world!\n"
-</ProgramListing>
+</programlisting>
 
-</Para>
+</para>
 
-<Para>
-Compile the program, using the <Literal>-v</Literal> (verbose) flag to verify that
+<para>
+Compile the program, using the <literal>-v</literal> (verbose) flag to verify that
 libraries, etc., are being found properly:
 
-<Screen>
-% ghc -v -o hello Main.hs</Screen>
+<screen>
+% ghc -v -o hello Main.hs</screen>
 
-</Para>
+</para>
 
-<Para>
+<para>
 Now run it:
 
-<Screen>
+<screen>
 % ./hello
-Hello, world!</Screen>
+Hello, world!</screen>
 
-</Para>
+</para>
 
-<Para>
+<para>
 Some simple-but-profitable tests are to compile and run the notorious
-<Literal>nfib</Literal><IndexTerm><Primary>nfib</Primary></IndexTerm> program, using different numeric types.  Start with
-<Literal>nfib :: Int -&gt; Int</Literal>, and then try <Literal>Integer</Literal>, <Literal>Float</Literal>, <Literal>Double</Literal>,
-<Literal>Rational</Literal> and perhaps the overloaded version.  Code for this is
-distributed in <Literal>ghc/misc/examples/nfib/</Literal> in a source distribution.
-</Para>
+<literal>nfib</literal><indexterm><primary>nfib</primary></indexterm> program, using different numeric types.  Start with
+<literal>nfib :: Int -&gt; Int</literal>, and then try <literal>Integer</literal>, <literal>Float</literal>, <literal>Double</literal>,
+<literal>Rational</literal> and perhaps the overloaded version.  Code for this is
+distributed in <literal>ghc/misc/examples/nfib/</literal> in a source distribution.
+</para>
 
 <para>For more information on how to &ldquo;drive&rdquo; GHC, read
 on...</para>
 
-</Sect3>
+</sect3>
 
-</Sect2>
+</sect2>
 
-</Sect1>
+</sect1>
 
 
-<Sect1 id="sec-install-windows"><Title>Installing on Windows</Title>
+<sect1 id="sec-install-windows"><title>Installing on Windows</title>
 
 <para>
 Getting the Glasgow Haskell Compiler (post 5.02) to run on Windows platforms is
 a snap: the Installshield does everything you need.  
 </para>
 
-<Sect2><Title>Installing GHC on Windows</Title>
+<sect2><title>Installing GHC on Windows</title>
 
 <para>
 To install GHC, use the following steps:
 </para>
 <itemizedlist>
-<listitem><para>Download the Installshield <Filename>setup.exe</Filename>
+<listitem><para>Download the Installshield <filename>setup.exe</filename>
 from the GHC download page
-<ULink
-URL="http://www.haskell.org/ghc">haskell.org</ULink>.
+<ulink
+URL="http://www.haskell.org/ghc">haskell.org</ulink>.
 </para></listitem>
 
-<listitem><para>Run <Filename>setup.exe</Filename>.
+<listitem><para>Run <filename>setup.exe</filename>.
 On Windows, all of GHC's files are installed in a single directory.
 If you choose ``Custom'' from the list of install options, you will be given a 
 choice about where this directory is; otherwise it will be installed 
@@ -556,7 +556,7 @@ The executable binary for GHC will be installed in the <filename>bin/</filename>
 of the installation directory you choose.
 </para>
 <para>(If you have already installed the same version of GHC, Installshield will offer to "modify", 
-or "remove" GHC.  Choose "remove"; then run <Filename>setup.exe</Filename> a
+or "remove" GHC.  Choose "remove"; then run <filename>setup.exe</filename> a
 second time.  This time it should offer to install.)
 </para>
 <para>
@@ -584,7 +584,7 @@ if TEMP is set.</para></listitem>
 <listitem><para>Otherwise, there is a per-user default which varies
 between versions of Windows. On NT and XP-ish versions, it might 
 be:
-<Filename>c:\Documents and Settings\&lt;username&gt;\Local Settings\Temp</filename>
+<filename>c:\Documents and Settings\&lt;username&gt;\Local Settings\Temp</filename>
 </para></listitem>
 </itemizedlist>
 The main point is that if you don't do anything GHC will work fine;
@@ -593,12 +593,12 @@ setting TMP or TEMP.
 </para></listitem>
 
 <listitem>
-<Para>
+<para>
 To test the fruits of your labour, try now to compile a simple
 Haskell program:
-</Para>
+</para>
 
-<Screen>
+<screen>
 bash$ cat main.hs
 module Main(main) where
 
@@ -607,7 +607,7 @@ bash$ ghc -o main main.hs
 ..
 bash$ ./main
 Hello, world!
-bash$ </Screen>
+bash$ </screen>
 </listitem>
 </itemizedlist>
 
@@ -615,18 +615,18 @@ bash$ </Screen>
 You do <emphasis>not</emphasis> need the Cygwin toolchain, or anything
 else, to install and run GHC.
 </para>
-<Para>
+<para>
 An installation of GHC requires about 140M of disk space.
 To run GHC comfortably, your machine should have at least
 64M of memory.
-</Para>
+</para>
 </sect2>
 
-<Sect2><title>Moving GHC around</title>
-<Para>
-At the moment, GHC installs in a fixed place (<Filename>c:/ghc/ghc-x.yy</Filename>,
+<sect2><title>Moving GHC around</title>
+<para>
+At the moment, GHC installs in a fixed place (<filename>c:/ghc/ghc-x.yy</filename>,
 but once it is installed, you can freely move the entire GHC tree just by copying
-the <Filename>ghc-x.yy</Filename> directory.   (You may need to fix up 
+the <filename>ghc-x.yy</filename> directory.   (You may need to fix up 
 the links in "Start/Programs/Glasgow Haskell Compiler" if you do this.)
 </para>
 <para>
@@ -636,69 +636,70 @@ because Cygwin can get confused when this happpens.
 We havn't quite got to the bottom of this, but so far as we know it's not 
 a problem with GHC itself.  Nevertheless, just to keep life simple we usually
 put GHC in a place with a space-free path.
-</Para>
+</para>
 </sect2>
 
-<Sect2 id="winfaq"><title>Installing ghc-win32 FAQ</title>
+<sect2 id="winfaq">
+<title>Installing ghc-win32 FAQ</title>
 
-<QandASet>
+<qandaset>
 
-<QandAEntry>
+<qandaentry>
 
-<Question>
-<Para>
+<question>
+<para>
 I'm having trouble with symlinks.
-</Para>
-</Question>
+</para>
+</question>
 
-<Answer>
-<Para>
-Symlinks only work under Cygwin (<Xref LinkEnd="sec-install">), so binaries
+<answer>
+<para>
+Symlinks only work under Cygwin (<xref linkend="sec-install"/>), so binaries
 not linked to the Cygwin DLL, in particular those built for Mingwin, will not
 work with symlinks.
-</Para>
-</Answer>
+</para>
+</answer>
 
-</QandAEntry>
+</qandaentry>
 
-<QandAEntry>
+<qandaentry>
 
-<Question>
-<Para>
-I'm getting &ldquo;permission denied&rdquo; messages from the <Command>rm</Command> or
-<Command>mv</Command>.
-</Para>
-</Question>
+<question>
+<para>
+I'm getting &ldquo;permission denied&rdquo; messages from the <command>rm</command> or
+<command>mv</command>.
+</para>
+</question>
 
-<Answer>
-<Para>
+<answer>
+<para>
 This can have various causes: trying to rename a directory when an Explorer
 window is open on it tends to fail. Closing the window generally cures the
 problem, but sometimes its cause is more mysterious, and logging off and back
 on or rebooting may be the quickest cure.
-</Para>
-</Answer>
+</para>
+</answer>
 
-</QandAEntry>
+</qandaentry>
 
-</QandASet>
+</qandaset>
 
 <!-- doesn't add much value any longer; leave out [sof 7/2002].
-<Para>
-Further information on using GHC under Windows can be found in <ULink
+<para>
+Further information on using GHC under Windows can be found in <ulink
 URL="http://www.dcs.gla.ac.uk/~sof/ghc-win32.html">Sigbj&oslash;rn Finne's
-pages</ULink>. Note: ignore the installation instructions, which are rather
-out of date; the <Emphasis>Miscellaneous</Emphasis> section at the bottom of
+pages</ulink>. Note: ignore the installation instructions, which are rather
+out of date; the <emphasis>Miscellaneous</emphasis> section at the bottom of
 the page is of most interest, covering topics beyond the scope of this
 manual.
-</Para>
+</para>
 -->
-</Sect2>
+</sect2>
 
-</Sect1>
+</sect1>
 
 
-<Sect1 id="sec-install-files"><Title>The layout of installed files</Title>
+<sect1 id="sec-install-files"><title>The layout of installed files</title>
 
 <para>
 This section describes what files get installed where.  You don't need to know it
@@ -709,19 +710,19 @@ the implementation.
 <variablelist>
 <varlistentry>
 <term>Library directory,</term>
-<listitem> <para> known as <Filename>$(libdir)</Filename>, holds all the 
+<listitem> <para> known as <filename>$(libdir)</filename>, holds all the 
 support files needed to run GHC.  On Unix, this 
-directory is usually something like <Filename>/usr/lib/ghc/ghc-5.02</Filename>. </para>
+directory is usually something like <filename>/usr/lib/ghc/ghc-5.02</filename>. </para>
 </listitem>
 </varlistentry>
 <varlistentry>
 <term>Binary directory</term>
-<listitem> <para> known as <Filename>$(bindir)</Filename>, holds executables that 
+<listitem> <para> known as <filename>$(bindir)</filename>, holds executables that 
 the user is expected to invoke.
 Notably, it contains
-<Filename>ghc</Filename> and <Filename>ghci</FileName>.  On Unix, this directory
-can be anywhere, but is typically something like <Filename>/usr/local/bin</Filename>.  On Windows,
-however, this directory <emphasis>must be</emphasis> <Filename>$(libdir)/bin</Filename>.
+<filename>ghc</filename> and <filename>ghci</filename>.  On Unix, this directory
+can be anywhere, but is typically something like <filename>/usr/local/bin</filename>.  On Windows,
+however, this directory <emphasis>must be</emphasis> <filename>$(libdir)/bin</filename>.
 </para>
 </listitem>
 </varlistentry>
@@ -734,7 +735,7 @@ It finds this out in one of two ways:
 <itemizedlist>
 <listitem>
 <para>
-<Filename>$(libdir)</Filename> is passed to GHC using the <option>-B</option> flag.
+<filename>$(libdir)</filename> is passed to GHC using the <option>-B</option> flag.
 On Unix (but not Windows), the installed <filename>ghc</filename> is just a one-line 
 shell script that invokes the real GHC, passing a suitable <option>-B</option> flag. 
 [All the user-supplied flags
@@ -745,22 +746,22 @@ one wins.]
 <listitem>
 <para> On Windows (but not Unix), if no <option>-B</option> flag is given, GHC uses a system
 call to find the directory in which the running GHC executable lives, and derives 
-<Filename>$(libdir)</Filename> from that. [Unix lacks such a system call.]
-That is why <Filename>$(bindir)</Filename> must be <Filename>$(libdir)/bin</Filename>.
+<filename>$(libdir)</filename> from that. [Unix lacks such a system call.]
+That is why <filename>$(bindir)</filename> must be <filename>$(libdir)/bin</filename>.
 </para>
 </listitem>
 </itemizedlist>
 
 <sect2> <title>The binary directory</title>
 
-<para>The binary directory, <Filename>$(bindir)</Filename> contains user-visible
+<para>The binary directory, <filename>$(bindir)</filename> contains user-visible
 executables, notably <filename>ghc</filename> and <filename>ghci</filename>.
 You should add it to your <literal>$PATH</literal>
 </para>
 
 <para>On Unix, the user-invokable <filename>ghc</filename> invokes <filename>$(libdir)/ghc-<replaceable>version</replaceable></filename>,
 passing a suitable <option>-B</option> flag to tell <filename>ghc-<replaceable>version</replaceable></filename> where
-<Filename>$(libdir)</Filename> is.
+<filename>$(libdir)</filename> is.
 Similarly <filename>ghci</filename>, except the extra flag <literal>--interactive</literal> is passed.
 </para>
 
@@ -882,7 +883,7 @@ with the Win32 distribution of GHC. </para>
 
 </sect1>
 
-</Chapter>
+</chapter>
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***

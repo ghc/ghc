@@ -3,7 +3,7 @@
 %ug-ent;
 <!ENTITY ug-book SYSTEM "ug-book.sgml">
 ]>
-  
+
 <Book id="users-guide">
 &ug-book;
 </Book>

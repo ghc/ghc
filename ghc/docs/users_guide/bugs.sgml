@@ -1,4 +1,4 @@
-<Chapter id="bugs-and-infelicities">
+<chapter id="bugs-and-infelicities">
   <title>Known bugs and infelicities</title>
 
   <sect1 id="vs-Haskell-defn">
@@ -10,7 +10,7 @@
 
   <para>This section lists Glasgow Haskell infelicities in its
   implementation of Haskell&nbsp;98.  See also the &ldquo;when things
-  go wrong&rdquo; section (<XRef LinkEnd="wrong">) for information
+  go wrong&rdquo; section (<xref linkend="wrong"/>) for information
   about crashes, space leaks, and other undesirable phenomena.</para>
 
   <para>The limitations here are listed in Haskell Report order
@@ -67,7 +67,7 @@
     (let x = 42 in x == 42 == True)</programlisting>
 
           The Haskell report is arguably wrong here, but nevertheless
-          it's a difference between GHC & Haskell 98.</para>
+          it's a difference between GHC &amp; Haskell 98.</para>
 	</listitem>
       </itemizedlist>
     </sect3>
@@ -256,7 +256,7 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
     <itemizedlist>
       <listitem>
 	<para> GHC can warn about non-exhaustive or overlapping
-        patterns (see <xref linkend="options-sanity">), and usually
+        patterns (see <xref linkend="options-sanity"/>), and usually
         does so correctly.  But not always.  It gets confused by
         string patterns, and by guards, and can then emit bogus
         warnings.  The entire overlap-check code needs an overhaul

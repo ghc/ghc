@@ -1,11 +1,11 @@
 <!-- FFI docs as a chapter -->
 
-<Chapter id="ffi">
-<Title>Foreign function interface (FFI)</Title>
+<chapter id="ffi">
+<title>Foreign function interface (FFI)</title>
 
   <para>GHC (mostly) conforms to the Haskell 98 Foreign Function Interface
-  Addendum 1.0, whose definition is available from <ULink
-  URL="http://haskell.org/"><literal>http://haskell.org/</literal></ULink >.
+  Addendum 1.0, whose definition is available from <ulink
+  URL="http://haskell.org/"><literal>http://haskell.org/</literal></ulink >.
   The FFI support in GHC diverges from the Addendum in the following ways:
   </para>
 
@@ -18,7 +18,7 @@
     <listitem>
       <para>GHC implements a number of GHC-specific extensions to the FFI
       Addendum.  These extensions are described in <xref
-      linkend="sec-ffi-ghcexts">, but please note that programs using
+      linkend="sec-ffi-ghcexts"/>, but please note that programs using
       these features are not portable.  Hence, these features should be
       avoided where possible.</para>
     </listitem>
@@ -56,16 +56,15 @@
     use of the foreign function interface in GHC.</para>
 
     <sect2 id="foreign-export-ghc">
-      <title>Using <literal>foreign export</literal> and <literal>foreign
-      import ccall "wrapper"</literal> with GHC</title>
+      <title>Using <literal>foreign export</literal> and <literal>foreign import ccall "wrapper"</literal> with GHC</title>
 
       <indexterm><primary><literal>foreign export
       </literal></primary><secondary>with GHC</secondary>
       </indexterm>
 
       <para>When GHC compiles a module (say <filename>M.hs</filename>)
-      which uses <literal>foreign export</literal> or <literal>foreign
-      import "wrapper"</literal>, it generates two
+      which uses <literal>foreign export</literal> or 
+      <literal>foreign import "wrapper"</literal>, it generates two
       additional files, <filename>M_stub.c</filename> and
       <filename>M_stub.h</filename>.  GHC will automatically compile
       <filename>M_stub.c</filename> to generate
@@ -136,7 +135,7 @@ int main(int argc, char *argv[])
   hs_add_root(__stginit_Foo);
 #endif
 
-  for (i = 0; i < 5; i++) {
+  for (i = 0; i &lt; 5; i++) {
     printf("%d\n", foo(2500));
   }
 
@@ -204,8 +203,7 @@ int main(int argc, char *argv[])
       </sect3>
 
       <sect3 id="foreign-export-dynamic-ghc">
-	<title>Using <literal>foreign import ccall "wrapper"</literal> with
-	GHC</title>
+	<title>Using <literal>foreign import ccall "wrapper"</literal> with GHC</title>
 
 	<indexterm><primary><literal>foreign import
 	ccall "wrapper"</literal></primary><secondary>with GHC</secondary>
@@ -232,7 +230,7 @@ int main(int argc, char *argv[])
       <para>When generating C (using the <option>-fvia-C</option>
       directive), one can assist the C compiler in detecting type
       errors by using the <option>-&num;include</option> directive
-      (<xref linkend="options-C-compiler">) to provide
+      (<xref linkend="options-C-compiler"/>) to provide
       <filename>.h</filename> files containing function
       headers.</para>
 
@@ -269,7 +267,7 @@ from another package, you won't necessarily know what the appropriate
 <option>-&num;include</option> options are; but they should be in the package 
 configuration, which GHC knows about.  So if you are building a package, remember
 to put all those <option>-&num;include</option> options into the package configuration.
-See the <literal>c_includes</literal> field in <xref linkend="package-management">.
+See the <literal>c_includes</literal> field in <xref linkend="package-management"/>.
 </para>
 
 <para>
@@ -298,7 +296,7 @@ to be inlined across modules, use the command-line and package-configuration
 	are searched for using the C compiler's usual search path.
 	You can add directories to this search path using the
 	<option>-I</option> option (see <xref
-	linkend="c-pre-processor">).</para>
+	linkend="c-pre-processor"/>).</para>
 
 	<para>Note: header files are ignored unless compiling via C.
 	If you had been compiling your code using the native code
@@ -391,7 +389,7 @@ to be inlined across modules, use the command-line and package-configuration
       </variablelist>
     </sect2>
   </sect1>
-</Chapter>
+</chapter>
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***

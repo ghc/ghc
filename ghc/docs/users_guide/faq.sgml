@@ -95,7 +95,7 @@
       <listitem>
 	<para>If you're also using CPP, beware of the known pitfall
 	with string gaps mentioned in <xref
-	linkend="cpp-string-gaps">.</para>
+	linkend="cpp-string-gaps"/>.</para>
       </listitem>
     </varlistentry>
 
@@ -190,7 +190,7 @@
       <listitem>
 	<para>You should use the <option>-#include</option> option to
 	bring the correct prototype into scope (see <xref
-	linkend="options-C-compiler">).</para>
+	linkend="options-C-compiler"/>).</para>
       </listitem>
     </varlistentry>
 
@@ -252,7 +252,7 @@
 -auto-all</literal> (make sure you have the profiling libraries
 installed), and run it with <literal>+RTS -xc -RTS</literal> to get a
 &ldquo;stack trace&rdquo; at the point at which the exception was
-raised.  See <xref linkend="rts-options-debugging"> for more
+raised.  See <xref linkend="rts-options-debugging"/> for more
 details.</para>
       </listitem>
     </varlistentry>
@@ -261,7 +261,7 @@ details.</para>
       <term>How do I increase the heap size permanently for a given
       binary?</term>
       <listitem>
-	<para>See <xref linkend="rts-hooks">.</para>
+	<para>See <xref linkend="rts-hooks"/>.</para>
       </listitem>
     </varlistentry>
 
@@ -370,7 +370,7 @@ details.</para>
   main = do
     putStr "how are you today? "
     hFlush stdout
-    input <- hGetLine
+    input &amp;- hGetLine
     ...</programlisting>
 
 	<para>You'll probably find that the behaviour differs when
@@ -426,7 +426,7 @@ details.</para>
 	Include files named by <option>-&num;include</option> options
 	or in <literal>foreign import</literal> declarations are only
 	used in via-C compilation mode.  See <xref
-	linkend="finding-header-files"> for more details.</para>
+	linkend="finding-header-files"/> for more details.</para>
       </listitem>
     </varlistentry>
 
@@ -442,7 +442,7 @@ details.</para>
 	
 	<screen>ghc --make -prof -o foo-prof -osuf p.o -hisuf p.hi Main</screen>
 	
-	<para>See <xref linkend="options-output"> for more details on
+	<para>See <xref linkend="options-output"/> for more details on
 	the <option>-osuf</option> and <option>-hisuf</option>
 	options.</para>
       </listitem>

@@ -112,7 +112,7 @@ make-sessions running under cygwin.
 <sect2><title>Things to do</title>
 <itemizedlist>
 <listitem>
-<para> Don't use absolute paths in make, configure & co if there is any chance 
+<para> Don't use absolute paths in make, configure &amp; co if there is any chance 
   that those might be passed to GHC (or to GHC-compiled programs). Relative
   paths are fine because cygwin tools are happy with them and GHC accepts 
   '/' as path-separator. And relative paths don't depend on where cygwin's
@@ -155,38 +155,37 @@ make-sessions running under cygwin.
 
 
 <sect1 id="win32-dlls">
-<Title>Building and using Win32 DLLs
-</Title>
+<title>Building and using Win32 DLLs
+</title>
 
-<Para>
-<IndexTerm><Primary>Dynamic link libraries, Win32</Primary></IndexTerm>
-<IndexTerm><Primary>DLLs, Win32</Primary></IndexTerm>
+<para>
+<indexterm><primary>Dynamic link libraries, Win32</primary></indexterm>
+<indexterm><primary>DLLs, Win32</primary></indexterm>
 On Win32 platforms, the compiler is capable of both producing and using
 dynamic link libraries (DLLs) containing ghc-compiled code. This
 section shows you how to make use of this facility.
-</Para>
+</para>
 
-<Para>
-Until recently, <Command>strip</Command> didn't work reliably on DLLs, so you
+<para>
+Until recently, <command>strip</command> didn't work reliably on DLLs, so you
 should test your version with care, or make sure you have the latest
 binutils. Unfortunately, we don't know exactly which version of binutils
 cured the problem (it was supposedly fixed some years ago).
-</Para>
+</para>
 
 
-<Sect2 id="win32-dlls-link">
-<Title>Linking with DLLs
-</Title>
+<sect2 id="win32-dlls-link">
+<title>Linking with DLLs</title>
 
-<Para>
+<para>
 The default on Win32 platforms is to link applications in such a way
 that the executables will use the Prelude and system libraries DLLs,
 rather than contain (large chunks of) them. This is transparent at the
 command-line, so 
-</Para>
+</para>
 
-<Para>
-<Screen>
+<para>
+<screen>
 sh$ cat main.hs
 module Main where
 main = putStrLn "hello, world!"
@@ -198,199 +197,198 @@ sh$ ls -l main.exe
 sh$ ./main
 hello, world!
 sh$ 
-</Screen>
-</Para>
+</screen>
+</para>
 
-<Para>
-will give you a binary as before, but the <Filename>main.exe</Filename>
+<para>
+will give you a binary as before, but the <filename>main.exe</filename>
 generated will use the Prelude and RTS DLLs instead of linking them in
 statically.
-</Para>
+</para>
 
-<Para>
-4K for a <Literal>"hello, world"</Literal> application&mdash;not bad, huh? :-)
-</Para>
+<para>
+4K for a <literal>"hello, world"</literal> application&mdash;not bad, huh? :-)
+</para>
 
-</Sect2>
+</sect2>
 
-<Sect2 id="win32-dlls-linking-static">
-<Title>Not linking with DLLs
-<IndexTerm><Primary>-static option (Win32)</Primary></IndexTerm></Title>
+<sect2 id="win32-dlls-linking-static">
+<title>Not linking with DLLs
+<indexterm><primary>-static option (Win32)</primary></indexterm></title>
 
-<Para>
+<para>
 If you want to build an executable that doesn't depend on any
-ghc-compiled DLLs, use the <Option>-static</Option> option to link in
+ghc-compiled DLLs, use the <option>-static</option> option to link in
 the code statically.
-</Para>
+</para>
 
-<Para>
+<para>
 Notice that you cannot mix code that has been compiled with
-<Option>-static</Option> and not, so you have to use the <Option>-static</Option>
+<option>-static</option> and not, so you have to use the <option>-static</option>
 option on all the Haskell modules that make up your application.
-</Para>
+</para>
 
-</Sect2>
+</sect2>
 
-<Sect2 id="win32-dlls-create">
-<Title>Creating a DLL
-</Title>
+<sect2 id="win32-dlls-create">
+<title>Creating a DLL</title>
 
-<Para>
+<para>
 <emphasis>Making libraries into DLLs doesn't work on Windows at the
 moment (and is no longer supported); however, all the machinery is
 still there. If you're interested, contact the GHC team. Note that
 building an entire Haskell application as a DLL is still supported
 (it's just inter-DLL Haskell calls that don't work).</emphasis>
-<IndexTerm><Primary>Creating a Win32 DLL</Primary></IndexTerm>
-<IndexTerm><Primary>&ndash;&ndash;mk-dll</Primary></IndexTerm>
+<indexterm><primary>Creating a Win32 DLL</primary></indexterm>
+<indexterm><primary>&ndash;&ndash;mk-dll</primary></indexterm>
 Sealing up your Haskell library inside a DLL is straightforward;
 compile up the object files that make up the library, and then build
 the DLL by issuing a command of the form:
-</Para>
+</para>
 
-<Para>
-<Screen>
+<para>
+<screen>
 ghc &ndash;&ndash;mk-dll -o foo.dll bar.o baz.o wibble.a -lfooble
-</Screen>
-</Para>
+</screen>
+</para>
 
-<Para>
-By feeding the ghc compiler driver the option <Option>&ndash;&ndash;mk-dll</Option>, it
+<para>
+By feeding the ghc compiler driver the option <option>&ndash;&ndash;mk-dll</option>, it
 will build a DLL rather than produce an executable. The DLL will
 consist of all the object files and archives given on the command
 line.
-</Para>
+</para>
 
-<Para>
+<para>
 To create a `static' DLL, i.e. one that does not depend on the GHC DLLs,
-use the <Option>-static</Option> when compiling up your Haskell code and
+use the <option>-static</option> when compiling up your Haskell code and
 building the DLL.
-</Para>
+</para>
 
-<Para>
+<para>
 A couple of things to notice:
-</Para>
+</para>
 
-<Para>
+<para>
 
-<ItemizedList>
-<ListItem>
-<Para>
-Since DLLs correspond to packages (see <XRef LinkEnd="packages">) you need
-to use <Option>-package-name dll-name</Option> when compiling modules that
+<itemizedlist>
+<listitem>
+<para>
+Since DLLs correspond to packages (see <xref linkend="packages"/>) you need
+to use <option>-package-name dll-name</option> when compiling modules that
 belong to a DLL if you're going to call them from Haskell. Otherwise, Haskell
 code that calls entry points in that DLL will do so incorrectly, and crash.
 For similar reasons, you can only compile a single module tree into a DLL,
-as <Function>startupHaskell</Function> needs to be able to call its
-initialisation function, and only takes one such argument (see <XRef
-LinkEnd="win32-dlls-foreign">). Hence the modules
+as <function>startupHaskell</function> needs to be able to call its
+initialisation function, and only takes one such argument (see <xref
+linkend="win32-dlls-foreign"/>). Hence the modules
 you compile into a DLL must have a common root.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 By default, the entry points of all the object files will be exported from
-the DLL when using <Option>&ndash;&ndash;mk-dll</Option>. Should you want to constrain
-this, you can specify the <Emphasis>module definition file</Emphasis> to use
+the DLL when using <option>&ndash;&ndash;mk-dll</option>. Should you want to constrain
+this, you can specify the <emphasis>module definition file</emphasis> to use
 on the command line as follows:
 
-<Screen>
+<screen>
 ghc &ndash;&ndash;mk-dll -o .... -optdll--def -optdllMyDef.def
-</Screen>
+</screen>
 
 See Microsoft documentation for details, but a module definition file
 simply lists what entry points you want to export. Here's one that's
 suitable when building a Haskell COM server DLL:
 
-<ProgramListing>
+<programlisting>
 EXPORTS
  DllCanUnloadNow     = DllCanUnloadNow@0
  DllGetClassObject   = DllGetClassObject@12
  DllRegisterServer   = DllRegisterServer@0
  DllUnregisterServer = DllUnregisterServer@0
-</ProgramListing>
-</Para>
-</ListItem>
+</programlisting>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
-In addition to creating a DLL, the <Option>&ndash;&ndash;mk-dll</Option> option also
+<listitem>
+<para>
+In addition to creating a DLL, the <option>&ndash;&ndash;mk-dll</option> option also
 creates an import library. The import library name is derived from the
 name of the DLL, as follows:
 
-<ProgramListing>
+<programlisting>
 DLL: HScool.dll  ==&#62; import lib: libHScool_imp.a
-</ProgramListing>
+</programlisting>
 
 The naming scheme may look a bit weird, but it has the purpose of allowing
 the co-existence of import libraries with ordinary static libraries (e.g.,
-<Filename>libHSfoo.a</Filename> and
-<Filename>libHSfoo&lowbar;imp.a</Filename>.
+<filename>libHSfoo.a</filename> and
+<filename>libHSfoo&lowbar;imp.a</filename>.
 
 Additionally, when the compiler driver is linking in non-static mode, it
-will rewrite occurrence of <Option>-lHSfoo</Option> on the command line to
-<Option>-lHSfoo&lowbar;imp</Option>. By doing this for you, switching from
+will rewrite occurrence of <option>-lHSfoo</option> on the command line to
+<option>-lHSfoo&lowbar;imp</option>. By doing this for you, switching from
 non-static to static linking is simply a question of adding
-<Option>-static</Option> to your command line.
+<option>-static</option> to your command line.
 
-</Para>
-</ListItem>
-</ItemizedList>
-</Para>
+</para>
+</listitem>
+</itemizedlist>
+</para>
 
-</Sect2>
+</sect2>
 
 
-<Sect2 id="win32-dlls-foreign">
-<Title>Making DLLs to be called from other languages</Title>
+<sect2 id="win32-dlls-foreign">
+<title>Making DLLs to be called from other languages</title>
 
-<Para>
+<para>
 
 If you want to package up Haskell code to be called from other languages,
 such as Visual Basic or C++, there are some extra things it is useful to
-know. The dirty details are in the <Emphasis>Foreign Function
-Interface</Emphasis> definition, but it can be tricky to work out how to
+know. The dirty details are in the <emphasis>Foreign Function
+Interface</emphasis> definition, but it can be tricky to work out how to
 combine this with DLL building, so here's an example:
 
-</Para>
+</para>
 
-<ItemizedList>
+<itemizedlist>
 
-<ListItem>
-<Para>
-Use <Literal>foreign export</Literal> declarations to export the Haskell
+<listitem>
+<para>
+Use <literal>foreign export</literal> declarations to export the Haskell
 functions you want to call from the outside. For example,
 
-<ProgramListing>
+<programlisting>
 module Adder where
 
 adder :: Int -> Int -> IO Int  -- gratuitous use of IO
 adder x y = return (x+y)
 
 foreign export stdcall adder :: Int -> Int -> IO Int
-</ProgramListing>
-</Para>
-</ListItem>
+</programlisting>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 Compile it up:
 
-<Screen>
+<screen>
 ghc -c adder.hs -fglasgow-exts
-</Screen>
+</screen>
   
 This will produce two files, adder.o and adder_stub.o
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
-compile up a <Function>DllMain()</Function> that starts up the Haskell
+<listitem>
+<para>
+compile up a <function>DllMain()</function> that starts up the Haskell
 RTS-&ndash;&ndash;a possible implementation is:
 
-<ProgramListing>
+<programlisting>
 #include &lt;windows.h&gt;
 #include &lt;Rts.h&gt;
 
@@ -413,59 +411,59 @@ DllMain
   }
   return TRUE;
 }
-</ProgramListing>
+</programlisting>
 
-Here, <Literal>Adder</Literal> is the name of the root module in the module
+Here, <literal>Adder</literal> is the name of the root module in the module
 tree (as mentioned above, there must be a single root module, and hence a
 single module tree in the DLL).
 
 Compile this up:
 
-<Screen>
+<screen>
 ghc -c dllMain.c
-</Screen>
-</Para>
-</ListItem>
+</screen>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 Construct the DLL:
 
-<Screen>
+<screen>
 ghc &ndash;&ndash;mk-dll -o adder.dll adder.o adder_stub.o dllMain.o
-</Screen>
+</screen>
 
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
-Start using <Function>adder</Function> from VBA-&ndash;&ndash;here's how I would
-<Constant>Declare</Constant> it:
+<listitem>
+<para>
+Start using <function>adder</function> from VBA-&ndash;&ndash;here's how I would
+<constant>Declare</constant> it:
 
-<ProgramListing>
+<programlisting>
 Private Declare Function adder Lib "adder.dll" Alias "adder@8"
       (ByVal x As Long, ByVal y As Long) As Long
-</ProgramListing>
+</programlisting>
 
 Since this Haskell DLL depends on a couple of the DLLs that come with GHC,
 make sure that they are in scope/visible.
-</Para>
+</para>
 
-<Para>
+<para>
 Building statically linked DLLs is the same as in the previous section: it
-suffices to add <Option>-static</Option> to the commands used to compile up
+suffices to add <option>-static</option> to the commands used to compile up
 the Haskell source and build the DLL.
-</Para>
+</para>
 
-</ListItem>
+</listitem>
 
-</ItemizedList>
+</itemizedlist>
 
-</Sect2>
+</sect2>
 
 </sect1>
-</Chapter>
+</chapter>
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***

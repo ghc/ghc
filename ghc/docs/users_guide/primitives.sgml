@@ -787,7 +787,7 @@ primitive ops compile to one machine instruction or thereabouts.
 
 <para>
 We use the terms &ldquo;reading&rdquo; and &ldquo;writing&rdquo; to refer to accessing
-<emphasis>mutable</emphasis> arrays (see <xref LinkEnd="sect-mutable">), and
+<emphasis>mutable</emphasis> arrays (see <xref linkend="sect-mutable">), and
 &ldquo;indexing&rdquo; to refer to reading a value from an <emphasis>immutable</emphasis>
 array.
 </para>
@@ -835,7 +835,7 @@ objects, because the result is simply the boxed object. So presumably
 it should be entered&mdash;we never usually return an unevaluated
 object!  This is a pain: primitive ops aren't supposed to do
 complicated things like enter objects.  The current solution is to
-return a single element unboxed tuple (see <xref LinkEnd="unboxed-tuples">).
+return a single element unboxed tuple (see <xref linkend="unboxed-tuples">).
 </para>
 
 <para>

@@ -1,122 +1,121 @@
-<Sect1 id="concurrent-and-parallel">
-<Title>Concurrent and Parallel Haskell
-</Title>
+<sect1 id="concurrent-and-parallel">
+<title>Concurrent and Parallel Haskell</title>
 
-<Para>
-<IndexTerm><Primary>Concurrent Haskell</Primary></IndexTerm>
-<IndexTerm><Primary>Parallel Haskell</Primary></IndexTerm>
+<para>
+<indexterm><primary>Concurrent Haskell</primary></indexterm>
+<indexterm><primary>Parallel Haskell</primary></indexterm>
 Concurrent and Parallel Haskell are Glasgow extensions to Haskell
 which let you structure your program as a group of independent
 `threads'.
-</Para>
+</para>
 
-<Para>
+<para>
 Concurrent and Parallel Haskell have very different purposes.
-</Para>
+</para>
 
-<Para>
+<para>
 Concurrent Haskell is for applications which have an inherent
 structure of interacting, concurrent tasks (i.e. `threads').  Threads
-in such programs may be <Emphasis>required</Emphasis>.  For example, if a concurrent thread has been spawned to handle a mouse click, it isn't
+in such programs may be <emphasis>required</emphasis>.  For example, if a concurrent thread has been spawned to handle a mouse click, it isn't
 optional&mdash;the user wants something done!
-</Para>
+</para>
 
-<Para>
+<para>
 A Concurrent Haskell program implies multiple `threads' running within
 a single Unix process on a single processor.
-</Para>
+</para>
 
-<Para>
+<para>
 You will find at least one paper about Concurrent Haskell hanging off
-of <ULink URL="http://research.microsoft.com/~simonpj/">Simon Peyton
-Jones's Web page</ULink>.
-</Para>
+of <ulink URL="http://research.microsoft.com/~simonpj/">Simon Peyton
+Jones's Web page</ulink>.
+</para>
 
-<Para>
-Parallel Haskell is about <Emphasis>speed</Emphasis>&mdash;spawning
+<para>
+Parallel Haskell is about <emphasis>speed</emphasis>&mdash;spawning
 threads onto multiple processors so that your program will run faster.
-The `threads' are always <Emphasis>advisory</Emphasis>&mdash;if the
+The `threads' are always <emphasis>advisory</emphasis>&mdash;if the
 runtime system thinks it can get the job done more quickly by
 sequential execution, then fine.
-</Para>
+</para>
 
-<Para>
+<para>
 A Parallel Haskell program implies multiple processes running on
 multiple processors, under a PVM (Parallel Virtual Machine) framework.
 An MPI interface is under development but not fully functional, yet.
-</Para>
+</para>
 
-<Para>
+<para>
 Parallel Haskell is still relatively new; it is more about &ldquo;research
 fun&rdquo; than about &ldquo;speed.&rdquo; That will change.
-</Para>
+</para>
 
-<Para>
-Check the <ULink URL="http://www.cee.hw.ac.uk/~dsg/gph/">GPH Page</Ulink>
+<para>
+Check the <ulink url="http://www.cee.hw.ac.uk/~dsg/gph/">GPH Page</ulink>
 for more information on &ldquo;GPH&rdquo; (Haskell98 with extensions for
 parallel execution), the latest version of &ldquo;GUM&rdquo; (the runtime
 system to enable parallel executions) and papers on research issues.  A
 list of publications about GPH and about GUM is also available from Simon's
 Web Page.
-</Para>
+</para>
 
-<Para>
+<para>
 Some details about Parallel Haskell follow.  For more information
 about concurrent Haskell, see the module
 <literal>Control.Concurrent</literal> in the library documentation.
-</Para>
+</para>
 
-<Sect2>
-<Title>Features specific to Parallel Haskell
-<IndexTerm><Primary>Parallel Haskell&mdash;features</Primary></IndexTerm></Title>
+<sect2>
+<title>Features specific to Parallel Haskell
+<indexterm><primary>Parallel Haskell&mdash;features</primary></indexterm></title>
 
-<Sect3>
-<Title>The <Literal>Parallel</Literal> interface (recommended)
-<IndexTerm><Primary>Parallel interface</Primary></IndexTerm></Title>
+<sect3>
+<title>The <literal>Parallel</literal> interface (recommended)
+<indexterm><primary>Parallel interface</primary></indexterm></title>
 
-<Para>
+<para>
 GHC provides two functions for controlling parallel execution, through
-the <Literal>Parallel</Literal> interface:
-</Para>
+the <literal>Parallel</literal> interface:
+</para>
 
-<Para>
+<para>
 
-<ProgramListing>
+<programlisting>
 interface Parallel where
 infixr 0 `par`
 infixr 1 `seq`
 
 par :: a -&#62; b -&#62; b
 seq :: a -&#62; b -&#62; b
-</ProgramListing>
+</programlisting>
 
-</Para>
+</para>
 
-<Para>
-The expression <Literal>(x `par` y)</Literal> <Emphasis>sparks</Emphasis> the evaluation of <Literal>x</Literal>
-(to weak head normal form) and returns <Literal>y</Literal>.  Sparks are queued for
+<para>
+The expression <literal>(x `par` y)</literal> <emphasis>sparks</emphasis> the evaluation of <literal>x</literal>
+(to weak head normal form) and returns <literal>y</literal>.  Sparks are queued for
 execution in FIFO order, but are not executed immediately.  At the
 next heap allocation, the currently executing thread will yield
 control to the scheduler, and the scheduler will start a new thread
 (until reaching the active thread limit) for each spark which has not
 already been evaluated to WHNF.
-</Para>
+</para>
 
-<Para>
-The expression <Literal>(x `seq` y)</Literal> evaluates <Literal>x</Literal> to weak head normal
-form and then returns <Literal>y</Literal>.  The <Function>seq</Function> primitive can be used to
+<para>
+The expression <literal>(x `seq` y)</literal> evaluates <literal>x</literal> to weak head normal
+form and then returns <literal>y</literal>.  The <function>seq</function> primitive can be used to
 force evaluation of an expression beyond WHNF, or to impose a desired
 execution sequence for the evaluation of an expression.
-</Para>
+</para>
 
-<Para>
+<para>
 For example, consider the following parallel version of our old
-nemesis, <Function>nfib</Function>:
-</Para>
+nemesis, <function>nfib</function>:
+</para>
 
-<Para>
+<para>
 
-<ProgramListing>
+<programlisting>
 import Parallel
 
 nfib :: Int -&#62; Int
@@ -124,83 +123,83 @@ nfib n | n &#60;= 1 = 1
        | otherwise = par n1 (seq n2 (n1 + n2 + 1))
                      where n1 = nfib (n-1)
                            n2 = nfib (n-2)
-</ProgramListing>
+</programlisting>
 
-</Para>
+</para>
 
-<Para>
-For values of <VarName>n</VarName> greater than 1, we use <Function>par</Function> to spark a thread
-to evaluate <Literal>nfib (n-1)</Literal>, and then we use <Function>seq</Function> to force the
-parent thread to evaluate <Literal>nfib (n-2)</Literal> before going on to add
+<para>
+For values of <varname>n</varname> greater than 1, we use <function>par</function> to spark a thread
+to evaluate <literal>nfib (n-1)</literal>, and then we use <function>seq</function> to force the
+parent thread to evaluate <literal>nfib (n-2)</literal> before going on to add
 together these two subexpressions.  In this divide-and-conquer
 approach, we only spark a new thread for one branch of the computation
 (leaving the parent to evaluate the other branch).  Also, we must use
-<Function>seq</Function> to ensure that the parent will evaluate <VarName>n2</VarName> <Emphasis>before</Emphasis>
-<VarName>n1</VarName> in the expression <Literal>(n1 + n2 + 1)</Literal>.  It is not sufficient to
-reorder the expression as <Literal>(n2 + n1 + 1)</Literal>, because the compiler may
+<function>seq</function> to ensure that the parent will evaluate <varname>n2</varname> <emphasis>before</emphasis>
+<varname>n1</varname> in the expression <literal>(n1 + n2 + 1)</literal>.  It is not sufficient to
+reorder the expression as <literal>(n2 + n1 + 1)</literal>, because the compiler may
 not generate code to evaluate the addends from left to right.
-</Para>
+</para>
 
-</Sect3>
+</sect3>
 
-<Sect3>
-<Title>Underlying functions and primitives
-<IndexTerm><Primary>parallelism primitives</Primary></IndexTerm>
-<IndexTerm><Primary>primitives for parallelism</Primary></IndexTerm></Title>
+<sect3>
+<title>Underlying functions and primitives
+<indexterm><primary>parallelism primitives</primary></indexterm>
+<indexterm><primary>primitives for parallelism</primary></indexterm></title>
 
-<Para>
-The functions <Function>par</Function> and <Function>seq</Function> are wired into GHC, and unfold
-into uses of the <Function>par&num;</Function> and <Function>seq&num;</Function> primitives, respectively.  If
+<para>
+The functions <function>par</function> and <function>seq</function> are wired into GHC, and unfold
+into uses of the <function>par&num;</function> and <function>seq&num;</function> primitives, respectively.  If
 you'd like to see this with your very own eyes, just run GHC with the
-<Option>-ddump-simpl</Option> option.  (Anything for a good time&hellip;)
-</Para>
+<option>-ddump-simpl</option> option.  (Anything for a good time&hellip;)
+</para>
 
-</Sect3>
+</sect3>
 
-<Sect3>
-<Title>Scheduling policy for concurrent threads
-<IndexTerm><Primary>Scheduling&mdash;concurrent</Primary></IndexTerm>
-<IndexTerm><Primary>Concurrent scheduling</Primary></IndexTerm></Title>
+<sect3>
+<title>Scheduling policy for concurrent threads
+<indexterm><primary>Scheduling&mdash;concurrent</primary></indexterm>
+<indexterm><primary>Concurrent scheduling</primary></indexterm></title>
 
-<Para>
+<para>
 Runnable threads are scheduled in round-robin fashion.  Context
 switches are signalled by the generation of new sparks or by the
 expiry of a virtual timer (the timer interval is configurable with the
-<Option>-C[&lt;num&gt;]</Option><IndexTerm><Primary>-C&lt;num&gt; RTS option (concurrent,
-parallel)</Primary></IndexTerm> RTS option).  However, a context switch doesn't
+<option>-C[&lt;num&gt;]</option><indexterm><primary>-C&lt;num&gt; RTS option (concurrent,
+parallel)</primary></indexterm> RTS option).  However, a context switch doesn't
 really happen until the current heap block is full.  You can't get any
 faster context switching than this.
-</Para>
+</para>
 
-<Para>
+<para>
 When a context switch occurs, pending sparks which have not already
 been reduced to weak head normal form are turned into new threads.
 However, there is a limit to the number of active threads (runnable or
 blocked) which are allowed at any given time.  This limit can be
-adjusted with the <Option>-t&lt;num&gt;</Option><IndexTerm><Primary>-t &lt;num&gt; RTS option (concurrent, parallel)</Primary></IndexTerm>
+adjusted with the <option>-t&lt;num&gt;</option><indexterm><primary>-t &lt;num&gt; RTS option (concurrent, parallel)</primary></indexterm>
 RTS option (the default is 32).  Once the
 thread limit is reached, any remaining sparks are deferred until some
 of the currently active threads are completed.
-</Para>
+</para>
 
-</Sect3>
+</sect3>
 
-<Sect3>
-<Title>Scheduling policy for parallel threads
-<IndexTerm><Primary>Scheduling&mdash;parallel</Primary></IndexTerm>
-<IndexTerm><Primary>Parallel scheduling</Primary></IndexTerm></Title>
+<sect3>
+<title>Scheduling policy for parallel threads
+<indexterm><primary>Scheduling&mdash;parallel</primary></indexterm>
+<indexterm><primary>Parallel scheduling</primary></indexterm></title>
 
-<Para>
+<para>
 In GUM we use an unfair scheduler, which means that a thread continues to
 perform graph reduction until it blocks on a closure under evaluation, on a
 remote closure or until the thread finishes. 
-</Para>
+</para>
  
-</Sect3>
+</sect3>
 
-</Sect2>
+</sect2>
 
-</Sect1>
+</sect1>
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***

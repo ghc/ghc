@@ -11,7 +11,7 @@
 
     <para>Note that this section is written with
     <firstterm>hierarchical modules</firstterm> in mind (see <xref
-    linkend="hierarchical-modules">); hierarchical modules are an
+    linkend="hierarchical-modules"/>); hierarchical modules are an
     extension to Haskell 98 which extends the lexical syntax of
     module names to include a dot &lsquo;.&rsquo;.  Non-hierarchical
     modules are thus a special case in which none of the module names
@@ -38,7 +38,7 @@
       should be placed in the file <literal>A/B/C.hs</literal>,
       relative to some base directory.  GHC's behaviour if this rule
       is not followed is fully defined by the following section (<xref
-      linkend="output-files">).</para>
+      linkend="output-files"/>).</para>
     </sect2>
 
     <sect2 id="output-files">
@@ -64,7 +64,7 @@
       types of exported functions, definitions of data types, and so
       on.  It is stored in a binary format, so don't try to read one;
       use the <option>--show-iface</option> option instead (see <xref
-      linkend="hi-options">).</para>
+      linkend="hi-options"/>).</para>
 
       <para>You should think of the object file and the interface file as a
       pair, since the interface file is in a sense a compiler-readable
@@ -121,7 +121,7 @@
       <para>For any module that is imported, GHC requires that the
       name of the module in the import statement exactly matches the
       name of the module in the interface file (or source file) found
-      using the strategy specified in <xref linkend="search-path">.
+      using the strategy specified in <xref linkend="search-path"/>.
       This means that for most modules, the source file name should
       match the module name.</para>
 
@@ -203,7 +203,7 @@
 
       <para>This isn't the whole story: GHC also looks for modules in
       pre-compiled libraries, known as packages.  See the section on
-      packages (<xref linkend="packages">), for details.</para>
+      packages (<xref linkend="packages"/>), for details.</para>
     </sect2>
 
     <sect2 id="options-output">
@@ -260,9 +260,9 @@
 	    <para>Redirects object files to directory
 	    <replaceable>dir</replaceable>.  For example:</para>
 
-<Screen>
+<screen>
 $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
-</Screen>
+</screen>
 
 	    <para>The object files, <filename>Foo.o</filename>,
             <filename>Bar.o</filename>, and
@@ -335,7 +335,7 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 	    <para>Similarly, the <option>-hisuf</option>
             <replaceable>suffix</replaceable> will change the
             <literal>.hi</literal> file suffix for non-system
-            interface files (see <XRef LinkEnd="hi-options">).</para>
+            interface files (see <xref linkend="hi-options"/>).</para>
 
 	    <para>Finally, the option <option>-hcsuf</option>
             <replaceable>suffix</replaceable> will change the
@@ -346,11 +346,11 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
             game is particularly useful if you want to compile a
             program both with and without profiling, in the same
             directory.  You can say:
-	    <Screen>
-	      ghc ...</Screen>
+	    <screen>
+	      ghc ...</screen>
 	    to get the ordinary version, and
-	    <Screen>
-	      ghc ... -osuf prof.o -hisuf prof.hi -prof -auto-all</Screen>
+	    <screen>
+	      ghc ... -osuf prof.o -hisuf prof.hi -prof -auto-all</screen>
 	    to get the profiled version.</para>
 	  </listitem>
 	</varlistentry>
@@ -423,7 +423,7 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 	    <para>Instructs the GHC driver not to delete any of its
 	    temporary files, which it normally keeps in
 	    <literal>/tmp</literal> (or possibly elsewhere; see <xref
-	    linkend="temp-files">).  Running GHC with
+	    linkend="temp-files"/>).  Running GHC with
 	    <option>-v</option> will show you what temporary files
 	    were generated along the way.</para>
 	  </listitem>
@@ -448,30 +448,30 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
             in <filename>/tmp</filename> (or wherever your
             installation thinks temporary files should go), you may
             use the <option>-tmpdir
-            &lt;dir&gt;</option><IndexTerm><Primary>-tmpdir
-            &lt;dir&gt; option</Primary></IndexTerm> option to specify
+            &lt;dir&gt;</option><indexterm><primary>-tmpdir
+            &lt;dir&gt; option</primary></indexterm> option to specify
             an alternate directory.  For example, <option>-tmpdir
             .</option> says to put temporary files in the current
             working directory.</para>
 
-	    <para>Alternatively, use your <Constant>TMPDIR</Constant>
-            environment variable.<IndexTerm><Primary>TMPDIR
-            environment variable</Primary></IndexTerm> Set it to the
+	    <para>Alternatively, use your <constant>TMPDIR</constant>
+            environment variable.<indexterm><primary>TMPDIR
+            environment variable</primary></indexterm> Set it to the
             name of the directory where temporary files should be put.
             GCC and other programs will honour the
-            <Constant>TMPDIR</Constant> variable as well.</para>
+            <constant>TMPDIR</constant> variable as well.</para>
 
 	    <para>Even better idea: Set the
-            <Constant>DEFAULT_TMPDIR</Constant> make variable when
+            <constant>DEFAULT_TMPDIR</constant> make variable when
             building GHC, and never worry about
-            <Constant>TMPDIR</Constant> again. (see the build
+            <constant>TMPDIR</constant> again. (see the build
             documentation).</para>
 	  </listitem>
 	</varlistentry>
       </variablelist>
     </sect2>
 
-    <Sect2 id="hi-options">
+    <sect2 id="hi-options">
       <title>Other options related to interface files</title>
       <indexterm><primary>interface files, options</primary></indexterm>
 
@@ -589,8 +589,8 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
       required&rdquo;.  What a beautiful sight!</para>
 
       <para>Patrick Sansom had a workshop paper about how all this is
-      done (though the details have changed quite a bit). <ULink
-      URL="mailto:sansom@dcs.gla.ac.uk">Ask him</ULink> if you want a
+      done (though the details have changed quite a bit). <ulink
+      URL="mailto:sansom@dcs.gla.ac.uk">Ask him</ulink> if you want a
       copy.</para>
 
     </sect2>
@@ -604,7 +604,7 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
       <filename>Makefile</filename> to use with GHC, assuming you name
       your source files the same as your modules.  Thus:</para>
 
-<ProgramListing>
+<programlisting>
 HC      = ghc
 HC_OPTS = -cpp $(EXTRA_HC_OPTS)
 
@@ -630,17 +630,17 @@ cool_pgm : $(OBJS)
 # Inter-module dependencies
 Foo.o Foo.hc Foo.s    : Baz.hi          # Foo imports Baz
 Main.o Main.hc Main.s : Foo.hi Baz.hi   # Main imports Foo and Baz
-</ProgramListing>
+</programlisting>
 
       <para>(Sophisticated <command>make</command> variants may
       achieve some of the above more elegantly.  Notably,
       <command>gmake</command>'s pattern rules let you write the more
       comprehensible:</para>
 
-<ProgramListing>
+<programlisting>
 %.o : %.lhs
         $(HC) -c $&#60; $(HC_OPTS)
-</ProgramListing>
+</programlisting>
 
       <para>What we've shown should work with any
       <command>make</command>.)</para>
@@ -654,9 +654,9 @@ Main.o Main.hc Main.s : Foo.hi Baz.hi   # Main imports Foo and Baz
       <para>Note the inter-module dependencies at the end of the
       Makefile, which take the form</para>
 
-<ProgramListing>
+<programlisting>
 Foo.o Foo.hc Foo.s    : Baz.hi          # Foo imports Baz
-</ProgramListing>
+</programlisting>
 
       <para>They tell <command>make</command> that if any of
       <literal>Foo.o</literal>, <literal>Foo.hc</literal> or
@@ -677,10 +677,10 @@ Foo.o Foo.hc Foo.s    : Baz.hi          # Foo imports Baz
         automatically generating the required dependencies.  Add the
         following to your <filename>Makefile</filename>:</para>
 
-<ProgramListing>
+<programlisting>
 depend :
         ghc -M $(HC_OPTS) $(SRCS)
-</ProgramListing>
+</programlisting>
 
 	<para>Now, before you start compiling, and any time you change
         the <literal>imports</literal> in your program, do
@@ -716,7 +716,7 @@ import {-# SOURCE #-} B ...blah...
 A.o : B.hi-boot
 </programlisting>
 
-       (See <xref linkend="mutual-recursion"> for details of
+       (See <xref linkend="mutual-recursion"/> for details of
        <literal>hi-boot</literal> style interface files.)  If
        <literal>A</literal> imports multiple modules, then there will
        be multiple lines with <filename>A.o</filename> as the
@@ -873,7 +873,7 @@ ghc -M -optdep-f -optdep.depend ...
       <para>Currently, the compiler does not have proper support for
       dealing with mutually recursive modules:</para>
 
-<ProgramListing>
+<programlisting>
 module A where
 
 import B
@@ -891,7 +891,7 @@ data TB = MkTB !Int
 
 g :: TA -&#62; TB
 g (MkTA x) = MkTB x
-</ProgramListing>
+</programlisting>
 
       <para>When compiling either module A and B, the compiler will
       try (in vain) to look for the interface file of the other. So,
@@ -906,9 +906,9 @@ g (MkTA x) = MkTB x
       files</primary></indexterm> <indexterm><primary>importing,
       <literal>hi-boot</literal> files</primary></indexterm></para>
 
-<ProgramListing>
+<programlisting>
 import {-# SOURCE #-} A
-</ProgramListing>
+</programlisting>
 
       <para>The hand-written interface need only contain the bare
       minimum of information needed to get the bootstrapping process
@@ -920,10 +920,10 @@ import {-# SOURCE #-} A
       <para>For the example at hand, the boot interface file for A
       would look like the following:</para>
 
-<ProgramListing>
+<programlisting>
 module A where
 newtype TA = MkTA GHC.Base.Int
-</ProgramListing>
+</programlisting>
 
       <para>The syntax is similar to a normal Haskell source file, but
       with some important differences:</para>
@@ -956,12 +956,12 @@ newtype GHC.IOBase.IO a
 
 <listitem> <para>For <literal>data</literal> or <literal>newtype</literal> declaration, you may omit all
 the constructors, by omitting the '=' and everything that follows it:
-<ProgramListing>
+<programlisting>
 module A where
   data TA
-</ProgramListing>
+</programlisting>
 	    In a <emphasis>source</emphasis> program
-	  this would declare TA to have no constructors (a GHC extension: see <xref linkend="nullary-types">),
+	  this would declare TA to have no constructors (a GHC extension: see <xref linkend="nullary-types"/>),
 	  but in an hi-boot file it means "I don't know or care what the construtors are".
 	    This is the most common form of data type declaration, because it's easy to get right.</para>
 	  <para>
@@ -976,7 +976,7 @@ module A where
 	  <para>
 	    Regardless of whether you write the constructors, you must write all the type parameters,
 	    <emphasis>including their kinds</emphasis>
-	    if they are not '*'.  (You can give explicit kinds in source files too (<xref linkend="sec-kinding">),
+	    if they are not '*'.  (You can give explicit kinds in source files too (<xref linkend="sec-kinding"/>),
 	    but you <emphasis>must</emphasis> do so in hi-boot files.)</para>
 	</listitem>
 
@@ -987,8 +987,8 @@ operations.  We could lift this restriction if it became tiresome.</para>
 
       <para>Notice that we only put the declaration for the newtype
       <literal>TA</literal> in the <literal>hi-boot</literal> file,
-      not the signature for <Function>f</Function>, since
-      <Function>f</Function> isn't used by <literal>B</literal>.</para>
+      not the signature for <function>f</function>, since
+      <function>f</function> isn't used by <literal>B</literal>.</para>
 
     </sect2>
 
@@ -1006,21 +1006,21 @@ be a disaster in practice, so GHC tries to be clever. </para>
 <para>In particular, if an instance declaration is in the same module as the definition
 of any type or class mentioned in the head of the instance declaration, then
 GHC has to visit that interface file anyway.  Example:</para>
-<ProgramListing>
+<programlisting>
   module A where
     instance C a =&gt; D (T a) where ...
     data T a = ...
-</ProgramListing>
+</programlisting>
 <para> The instance declaration is only relevant if the type T is in use, and if
 so, GHC will have visited A's interface file to find T's definition. </para>
 
 <para> The only problem comes when a module contains an instance declaration
 and GHC has no other reason for visiting the module.  Example:
-<ProgramListing>
+<programlisting>
   module Orphan where
     instance C a =&gt; D (T a) where ...
     class C a where ...
-</ProgramListing>
+</programlisting>
 Here, neither D nor T is declared in module Orphan.
 We call such modules ``orphan modules'',
 defined thus:</para>

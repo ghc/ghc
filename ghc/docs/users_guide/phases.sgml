@@ -7,7 +7,7 @@
 
       <para>You may specify that a different program be used for one
       of the phases of the compilation system, in place of whatever
-      the <Command>ghc</Command> has wired into it.  For example, you
+      the <command>ghc</command> has wired into it.  For example, you
       might want to try a different assembler.  The following options
       allow you to change the external program used for a given
       compilation phase:</para>
@@ -128,7 +128,7 @@
 	  </indexterm>
 	  <listitem>
 	    <para>Pass <replaceable>option</replaceable> to the
-	    custom pre-processor (see <xref linkend="pre-processor">).</para>
+	    custom pre-processor (see <xref linkend="pre-processor"/>).</para>
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
@@ -182,7 +182,7 @@
       <para>GHC is itself a Haskell program, so if you need to pass
       options directly to GHC's runtime system you can enclose them in
       <literal>+RTS ... -RTS</literal> (see <xref
-      linkend="runtime-control">).</para>
+      linkend="runtime-control"/>).</para>
 
     </sect2>
 
@@ -218,7 +218,7 @@
             <option>-D</option> macros passed to the C&nbsp;compiler
             when compiling via C!  For those, use the
             <option>-optc-Dfoo</option> hack&hellip; (see <xref
-            linkend="forcing-options-through">).</para>
+            linkend="forcing-options-through"/>).</para>
 	  </listitem>
 	</varlistentry>
 
@@ -344,11 +344,11 @@
         gaps vs -cpp</primary></indexterm>.  In other words, strings
         such as the following:</para>
 
-<ProgramListing>
+<programlisting>
 strmod = "\
 \ p \
 \ "
-</ProgramListing>
+</programlisting>
 	
 	<para>don't work with <option>-cpp</option>;
         <filename>/usr/bin/cpp</filename> elides the backslash-newline
@@ -426,9 +426,9 @@ strmod = "\
       way to do this, but you can use this hack from the
       command-line:</para>
 
-<Screen>
+<screen>
 % ghc -c '-#include &lt;X/Xlib.h&gt;' Xstuff.lhs
-</Screen>
+</screen>
 
     </sect2>
 
@@ -445,7 +445,7 @@ strmod = "\
 	    fast), but may produce code that is slightly slower than
 	    compiling via C.  <option>-fasm</option> is the default
 	    when optimisation is off (see <xref
-	    linkend="options-optimise">).</para>
+	    linkend="options-optimise"/>).</para>
 	  </listitem>
 	</varlistentry>
 
@@ -543,7 +543,7 @@ strmod = "\
 	  <indexterm><primary><option>-package</option></primary></indexterm>
 	  <listitem>
 	    <para>If you are using a Haskell &ldquo;package&rdquo;
-            (see <xref linkend="packages">), don't forget to add the
+            (see <xref linkend="packages"/>), don't forget to add the
             relevant <option>-package</option> option when linking the
             program too: it will cause the appropriate libraries to be
             linked in with the program.  Forgetting the
@@ -650,7 +650,7 @@ strmod = "\
             be supplying its definition of <function>main()</function>
             at link-time, you will have to. To signal that to the
             compiler when linking, use
-            <option>-no-hs-main</option>. See also <xref linkend="using-own-main">.</para>
+            <option>-no-hs-main</option>. See also <xref linkend="using-own-main"/>.</para>
 
 	    <para>Notice that since the command-line passed to the
             linker is rather involved, you probably want to use

@@ -1,10 +1,10 @@
-<Chapter id="ghc-language-features">
-<Title>GHC Language Features</Title>
+<chapter id="ghc-language-features">
+<title>GHC Language Features</title>
 
-&glasgowexts
-&parallel
+&glasgowexts;
+&parallel;
 
-</Chapter>
+</chapter>
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***

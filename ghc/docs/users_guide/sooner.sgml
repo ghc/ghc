@@ -43,8 +43,8 @@ should go here!</para>
           default), and you have lots of memory, try increasing the
           maximum with the
           <option>-M&lt;size&gt;</option><indexterm><primary>-M&lt;size&gt;
-          option</primary></indexterm> option, e.g.: <Command>ghc -c
-          -O -M1024m Foo.hs</Command>.</para>
+          option</primary></indexterm> option, e.g.: <command>ghc -c
+          -O -M1024m Foo.hs</command>.</para>
 
 	  <para>Increasing the default allocation area size used by
           the compiler's RTS might also help: use the
@@ -61,16 +61,16 @@ should go here!</para>
 	<listitem>
 	  <para>As soon as GHC plus its &ldquo;fellow citizens&rdquo;
           (other processes on your machine) start using more than the
-          <Emphasis>real memory</Emphasis> on your machine, and the
-          machine starts &ldquo;thrashing,&rdquo; <Emphasis>the party
-          is over</Emphasis>.  Compile times will be worse than
+          <emphasis>real memory</emphasis> on your machine, and the
+          machine starts &ldquo;thrashing,&rdquo; <emphasis>the party
+          is over</emphasis>.  Compile times will be worse than
           terrible!  Use something like the csh-builtin
-          <Command>time</Command> command to get a report on how many
+          <command>time</command> command to get a report on how many
           page faults you're getting.</para>
 
 	  <para>If you don't know what virtual memory, thrashing, and
           page faults are, or you don't know the memory configuration
-          of your machine, <Emphasis>don't</Emphasis> try to be clever
+          of your machine, <emphasis>don't</emphasis> try to be clever
           about memory use: you'll just make your life a misery (and
           for other people, too, probably).</para>
 	</listitem>
@@ -84,14 +84,14 @@ should go here!</para>
           to/from a remote filesystem.</para>
 
 	  <para>It would be quite sensible to
-          <Emphasis>compile</Emphasis> on a fast machine using
-          remotely-mounted disks; then <Emphasis>link</Emphasis> on a
+          <emphasis>compile</emphasis> on a fast machine using
+          remotely-mounted disks; then <emphasis>link</emphasis> on a
           slow machine that had your disks directly mounted.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>Don't derive/use <Function>Read</Function> unnecessarily:</term>
+	<term>Don't derive/use <function>Read</function> unnecessarily:</term>
 	<listitem>
 	  <para>It's ugly and slow.</para>
 	</listitem>
@@ -135,7 +135,7 @@ should go here!</para>
           <literal>import Foo (...stuff I want...)</literal> You can
           get GHC to tell you the minimal set of required imports by
           using the <option>-ddump-minimal-imports</option> option
-          (see <xref linkend="hi-options">).</para>
+          (see <xref linkend="hi-options"/>).</para>
 
 	  <para>Truthfully, the reduction on compilation time will be
           very small.  However, judicious use of
@@ -154,20 +154,20 @@ should go here!</para>
 
     <para>The key tool to use in making your Haskell program run
     faster are GHC's profiling facilities, described separately in
-    <XRef LinkEnd="profiling">.  There is <Emphasis>no
-    substitute</Emphasis> for finding where your program's time/space
-    is <Emphasis>really</Emphasis> going, as opposed to where you
+    <xref linkend="profiling"/>.  There is <emphasis>no
+    substitute</emphasis> for finding where your program's time/space
+    is <emphasis>really</emphasis> going, as opposed to where you
     imagine it is going.</para>
 
     <para>Another point to bear in mind: By far the best way to
-    improve a program's performance <Emphasis>dramatically</Emphasis>
+    improve a program's performance <emphasis>dramatically</emphasis>
     is to use better algorithms.  Once profiling has thrown the
     spotlight on the guilty time-consumer(s), it may be better to
     re-think your program than to try all the tweaks listed below.</para>
 
     <para>Another extremely efficient way to make your program snappy
     is to use library code that has been Seriously Tuned By Someone
-    Else.  You <Emphasis>might</Emphasis> be able to write a better
+    Else.  You <emphasis>might</emphasis> be able to write a better
     quicksort than the one in <literal>Data.List</literal>, but it
     will take you much longer than typing <literal>import
     Data.List</literal>.</para>
@@ -238,8 +238,8 @@ should go here!</para>
 		<indexterm><primary>overloading, death to</primary></indexterm>
 
 		<para>Specialize the overloading on key functions in
-                your program.  See <XRef LinkEnd="specialize-pragma">
-                and <XRef LinkEnd="specialize-instance-pragma">.</para>
+                your program.  See <xref linkend="specialize-pragma"/>
+                and <xref linkend="specialize-instance-pragma"/>.</para>
 	      </listitem>
 	    </varlistentry>
 
@@ -250,7 +250,7 @@ should go here!</para>
                 files for overloaded type signatures.  You can view
                 interface files using the
                 <option>--show-iface</option> option (see <xref
-                linkend="hi-options">).
+                linkend="hi-options"/>).
 
 <programlisting>
 % ghc --show-iface Foo.hi | egrep '^[a-z].*::.*=&#62;'
@@ -335,17 +335,17 @@ f (Wibble x y)  # ugly, and proud of it
           the third field in the pragma; it should say
           <literal>&lowbar;&lowbar;S &lt;string&gt;</literal>.  The
           <literal>&lt;string&gt;</literal> gives the strictness of
-          the function's arguments.  <Function>L</Function> is lazy
-          (bad), <Function>S</Function> and <Function>E</Function> are
-          strict (good), <Function>P</Function> is
-          &ldquo;primitive&rdquo; (good), <Function>U(...)</Function>
+          the function's arguments.  <function>L</function> is lazy
+          (bad), <function>S</function> and <function>E</function> are
+          strict (good), <function>P</function> is
+          &ldquo;primitive&rdquo; (good), <function>U(...)</function>
           is strict and &ldquo;unpackable&rdquo; (very good), and
-          <Function>A</Function> is absent (very good).</para>
+          <function>A</function> is absent (very good).</para>
 
 	  <para>For an &ldquo;unpackable&rdquo;
-          <Function>U(...)</Function> argument, the info inside tells
+          <function>U(...)</function> argument, the info inside tells
           the strictness of its components.  So, if the argument is a
-          pair, and it says <Function>U(AU(LSS))</Function>, that
+          pair, and it says <function>U(AU(LSS))</function>, that
           means &ldquo;the first component of the pair isn't used; the
           second component is itself unpackable, with three components
           (lazy in the first, strict in the second \&#38;
@@ -364,7 +364,7 @@ f (Wibble x y)  # ugly, and proud of it
 	<listitem>
 	  <para>Placing <literal>INLINE</literal> pragmas on certain
           functions that are used a lot can have a dramatic effect.
-          See <XRef LinkEnd="inline-pragma">.</para>
+          See <xref linkend="inline-pragma"/>.</para>
 	</listitem>
       </varlistentry>
 
@@ -375,7 +375,7 @@ f (Wibble x y)  # ugly, and proud of it
           module, GHC must assume that everything in that module will
           be exported.  This has various pessimising effects.  For
           example, if a bit of code is actually
-          <Emphasis>unused</Emphasis> (perhaps because of unfolding
+          <emphasis>unused</emphasis> (perhaps because of unfolding
           effects), GHC will not be able to throw it away, because it
           is exported and some other module may be relying on its
           existence.</para>
@@ -413,7 +413,7 @@ f (Wibble x y)  # ugly, and proud of it
 
 	  <para>It can also help in a third way: when used with
 	  <option>-funbox-strict-fields</option> (see <xref
-	  linkend="options-f">), a strict field can be unpacked or
+	  linkend="options-f"/>), a strict field can be unpacked or
 	  unboxed in the constructor, and one or more levels of
 	  indirection may be removed.  Unpacking only happens for
 	  single-constructor datatypes (<literal>Int</literal> is a
@@ -433,9 +433,9 @@ f (Wibble x y)  # ugly, and proud of it
       <varlistentry>
 	<term>Use unboxed types (a GHC extension):</term>
 	<listitem>
-	  <para>When you are <Emphasis>really</Emphasis> desperate for
+	  <para>When you are <emphasis>really</emphasis> desperate for
           speed, and you want to get right down to the &ldquo;raw
-          bits.&rdquo; Please see <XRef LinkEnd="glasgow-unboxed"> for
+          bits.&rdquo; Please see <xref linkend="glasgow-unboxed"/> for
           some information about using unboxed types.</para>
 
 	  <para>Before resorting to explicit unboxed types, try using
@@ -452,7 +452,7 @@ f (Wibble x y)  # ugly, and proud of it
           of massively-tuned library code, and the best thing is not
           to compete with it, but link with it.</para>
 
-	  <para><XRef LinkEnd="ffi"> describes the foreign function
+	  <para><xref linkend="ffi"/> describes the foreign function
 	  interface.</para>
 	</listitem>
       </varlistentry>
@@ -474,7 +474,7 @@ f (Wibble x y)  # ugly, and proud of it
           yourself with numerical errors.</para>
 
 	  <para>One time when <literal>Float</literal> might be a good
-          idea is if you have a <Emphasis>lot</Emphasis> of them, say
+          idea is if you have a <emphasis>lot</emphasis> of them, say
           a giant array of <literal>Float</literal>s.  They take up
           half the space in the heap compared to
           <literal>Doubles</literal>.  However, this isn't true on a
@@ -506,8 +506,8 @@ f (Wibble x y)  # ugly, and proud of it
           <option>-M&lt;size&gt;</option><indexterm><primary>-M&lt;size&gt;
           RTS option</primary></indexterm> or
           <option>-A&lt;size&gt;</option><indexterm><primary>-A&lt;size&gt;
-          RTS option</primary></indexterm> RTS options (see <XRef
-          LinkEnd="rts-options-gc">).</para>
+          RTS option</primary></indexterm> RTS options (see <xref
+          linkend="rts-options-gc"/>).</para>
 
 	  <para>This is especially important if your program uses a
 	  lot of mutable arrays of pointers or mutable variables
@@ -524,7 +524,7 @@ f (Wibble x y)  # ugly, and proud of it
       </varlistentry>
     </variablelist>
 
-</Sect1>
+</sect1>
 
 <sect1 id="smaller">
 <title>Smaller: producing a program that is smaller
@@ -541,19 +541,19 @@ expressions.  Give a
 option</primary></indexterm> option for the extreme case. (&ldquo;Only unfoldings with
 zero cost should proceed.&rdquo;)  Warning: except in certain specialised
 cases (like Happy parsers) this is likely to actually
-<Emphasis>increase</Emphasis> the size of your program, because unfolding
+<emphasis>increase</emphasis> the size of your program, because unfolding
 generally enables extra simplifying optimisations to be performed.
 </para>
 
 <para>
-Avoid <Function>Read</Function>.
+Avoid <function>Read</function>.
 </para>
 
 <para>
 Use <literal>strip</literal> on your executables.
 </para>
 
-</Sect1>
+</sect1>
 
 <sect1 id="thriftier">
 <title>Thriftier: producing a program that gobbles less heap space
@@ -570,14 +570,14 @@ Use <literal>strip</literal> on your executables.
 with <option>+RTS -Sstderr</option>, and remove all doubt!  (You'll
 see the heap usage get bigger and bigger&hellip;)
 &lsqb;Hmmm&hellip;this might be even easier with the
-<option>-G1</option> RTS option; so&hellip; <Command>./a.out +RTS
--Sstderr -G1</Command>...]
+<option>-G1</option> RTS option; so&hellip; <command>./a.out +RTS
+-Sstderr -G1</command>...]
 <indexterm><primary>-G RTS option</primary></indexterm>
 <indexterm><primary>-Sstderr RTS option</primary></indexterm>
 </para>
 
 <para>
-Once again, the profiling facilities (<XRef LinkEnd="profiling">) are
+Once again, the profiling facilities (<xref linkend="profiling"/>) are
 the basic tool for demystifying the space behaviour of your program.
 </para>
 
@@ -589,9 +589,9 @@ notes to itself about how to evaluate something, should it eventually
 be required).
 </para>
 
-</Sect1>
+</sect1>
 
-</Chapter>
+</chapter>
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***

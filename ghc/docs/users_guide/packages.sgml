@@ -18,7 +18,7 @@
     from an existing GHC installation, using the supplied
     <literal>ghc-pkg</literal><indexterm><primary><literal>ghc-pkg</literal></primary>
     </indexterm> tool, described in <xref
-    linkend="package-management">.</para>
+    linkend="package-management"/>.</para>
 
     <sect2 id="using-packages">
       <title>Using a package</title>
@@ -59,7 +59,7 @@
 
       <para>There's one case where you need to use the
       <option>-package</option> option even for auto packages: when
-      linking a program in batch mode mode (<xref linkend="options-order">) 
+      linking a program in batch mode mode (<xref linkend="options-order"/>) 
       <footnote><para>This is because
       GHC can't figure out from the object files which packages are
       required; in <option>&ndash;&ndash;make</option> mode and in
@@ -75,7 +75,7 @@
     The same flag is necessary even if we compiled the modules from source, because GHC still
     reckons it's in batch mode:
 <screen>$ ghc -o myprog Foo.hs Main.hs -package network</screen>
-In <literal>--make</literal> and <literal>--interactive</literal> modes (<xref linkend="modes">), however, GHC figures out 
+In <literal>--make</literal> and <literal>--interactive</literal> modes (<xref linkend="modes"/>), however, GHC figures out 
 the auto packages required for linking without further assistance.
 </para>
 
@@ -112,7 +112,7 @@ the auto packages required for linking without further assistance.
       <quote><literal>[]</literal></quote> in it.  Packages can be
       added to the new configuration file using the
       <literal>ghc-pkg</literal> tool, described in <xref
-      linkend="package-management">.</para>
+      linkend="package-management"/>.</para>
     </sect2>
 
     <sect2 id="building-packages">
@@ -146,7 +146,7 @@ the auto packages required for linking without further assistance.
 	  make an inter-DLL call rather than an intra-DLL call
 	  (inter-DLL calls require an extra
 	  indirection). <emphasis>Building packages as DLLs doesn't
-	  work at the moment; see <XRef LinkEnd="win32-dlls-create">
+	  work at the moment; see <xref linkend="win32-dlls-create"/>
 	  for the gory details.</emphasis>
 	  </para>
 
@@ -168,7 +168,7 @@ the auto packages required for linking without further assistance.
 	  called <filename>HSfoo.o</filename> and load that.  On some
 	  systems, the <literal>ghc-pkg</literal> tool can
 	  automatically build the GHCi version of each library, see
-	  <xref linkend="package-management">.  To build these
+	  <xref linkend="package-management"/>.  To build these
 	  libraries by hand from the <literal>.a</literal> archive, it
 	  is possible to use GNU <command>ld</command> as
 	  follows:</para>
@@ -438,7 +438,7 @@ the auto packages required for linking without further assistance.
 	  <listitem>
 	    <para>Set to <literal>True</literal> if the package should
 	    be automatically available (see <xref
-	    linkend="using-packages">).  This is normally set to
+	    linkend="using-packages"/>).  This is normally set to
 	    <literal>True</literal> for packages which contain
 	    hierarchical libraries, because in that case there is no
 	    danger of polluting the module namespace.</para>
@@ -668,7 +668,7 @@ the auto packages required for linking without further assistance.
       database as follows:
       </para>
 <screen>
-  $ installdir=/usr/local/lib ghc-pkg -a < mypkg.pkg
+  $ installdir=/usr/local/lib ghc-pkg -a &lt; mypkg.pkg
 </screen>
       
       <para>

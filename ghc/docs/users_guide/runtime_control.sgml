@@ -98,7 +98,7 @@
     <variablelist>
 
       <varlistentry>
-	<term><option>-A</option><replaceable>size</replaceable></Term>
+	<term><option>-A</option><replaceable>size</replaceable></term>
 	<indexterm><primary><option>-A</option></primary><secondary>RTS option</secondary></indexterm>
 	<indexterm><primary>allocation area, size</primary></indexterm>
 	<listitem>
@@ -163,7 +163,7 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-F</option><replaceable>factor</replaceable></Term>
+	<term><option>-F</option><replaceable>factor</replaceable></term>
 	<listitem>
 	  <indexterm><primary><option>-F</option></primary><secondary>RTS option</secondary></indexterm>
 	  <indexterm><primary>heap size, factor</primary></indexterm>
@@ -190,7 +190,7 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-G</option><replaceable>generations</replaceable></Term>
+	<term><option>-G</option><replaceable>generations</replaceable></term>
 	<indexterm><primary><option>-G</option></primary><secondary>RTS option</secondary></indexterm>
 	<indexterm><primary>generations, number
 	of</primary></indexterm>
@@ -206,7 +206,7 @@
 	  <para>Specifying 1 generation with <option>+RTS -G1</option>
           gives you a simple 2-space collector, as you would expect.
           In a 2-space collector, the <option>-A</option> option (see
-          above) specifies the <Emphasis>minimum</Emphasis> allocation
+          above) specifies the <emphasis>minimum</emphasis> allocation
           area size, since the allocation area will grow with the
           amount of live data in the heap.  In a multi-generational
           collector the allocation area is a fixed size (unless you
@@ -214,7 +214,7 @@
 	</listitem>
       </varlistentry>
 
-      <VarListEntry>
+      <varlistentry>
 	<term><option>-H</option><replaceable>size</replaceable></term>
 	<indexterm><primary><option>-H</option></primary><secondary>RTS option</secondary></indexterm>
 	<indexterm><primary>heap size, suggested</primary></indexterm>
@@ -304,7 +304,7 @@
 
       <varlistentry>
 	<term><option>-s</option><replaceable>file</replaceable></term>
-	<term><option>-S</option><replaceable>file</replaceable></Term>
+	<term><option>-S</option><replaceable>file</replaceable></term>
 	<indexterm><primary><option>-S</option></primary><secondary>RTS option</secondary></indexterm>
 	<indexterm><primary><option>-s</option></primary><secondary>RTS option</secondary></indexterm>
 	<listitem>
@@ -312,7 +312,7 @@
           (<option>-S</option>) garbage-collector statistics into file
           <replaceable>file</replaceable>. The default
           <replaceable>file</replaceable> is
-          <Filename><replaceable>program</replaceable>.stat</Filename>. The
+          <filename><replaceable>program</replaceable>.stat</filename>. The
           <replaceable>file</replaceable> <constant>stderr</constant>
           is treated specially, with the output really being sent to
           <constant>stderr</constant>.</para>
@@ -336,16 +336,14 @@
 
   </sect2>
 
-<!-- ---------------------------------------------------------------------- -->
   <sect2>
     <title>RTS options for profiling and Concurrent/Parallel Haskell</title>
 
-    <para>The RTS options related to profiling are described in <XRef
-    LinkEnd="prof-rts-options">; and those for concurrent/parallel
-    stuff, in <XRef LinkEnd="parallel-rts-opts">.</para>
+    <para>The RTS options related to profiling are described in <xref
+    linkend="rts-options-heap-prof"/>; and those for concurrent/parallel
+    stuff, in <xref linkend="parallel-rts-opts"/>.</para>
   </sect2>
 
-<!-- ---------------------------------------------------------------------- -->
   <sect2 id="rts-options-debugging">
     <title>RTS options for hackers, debuggers, and over-interested
     souls</title>
@@ -408,8 +406,8 @@
           be really useful, linked with suitable system libraries.
           Not a trivial undertaking: consult the installation guide on
           how to set things up for easy &ldquo;ticky-ticky&rdquo;
-          profiling.  For more information, see <XRef
-          LinkEnd="ticky-ticky">.</para>
+          profiling.  For more information, see <xref
+          linkend="ticky-ticky"/>.</para>
 	</listitem>
       </varlistentry>
 
@@ -441,7 +439,7 @@
 </screen>
 	  <para>each <literal>cc</literal><subscript>i</subscript> is
 	  a cost centre in the program (see <xref
-	  linkend="cost-centres">), and the sequence represents the
+	  linkend="cost-centres"/>), and the sequence represents the
 	  &ldquo;call stack&rdquo; at the point the exception was
 	  raised.  The leftmost item is the innermost function in the
 	  call stack, and the rightmost item is the outermost
@@ -511,7 +509,7 @@ char *ghc_rts_opts = "-H128m -K1m";
       <varlistentry>
 	<term><function>void OutOfHeapHook (unsigned long, unsigned long)</function></term>
 	<indexterm><primary><function>OutOfHeapHook</function></primary></indexterm>
-	<ListItem>
+	<listitem>
 	  <para>The heap-overflow message.</para>
 	</listitem>
       </varlistentry>
@@ -528,7 +526,7 @@ char *ghc_rts_opts = "-H128m -K1m";
 	<term><function>void MallocFailHook (long int)</function></term>
 	<indexterm><primary><function>MallocFailHook</function></primary></indexterm>
 	<listitem>
-	  <para>The message printed if <Function>malloc</Function>
+	  <para>The message printed if <function>malloc</function>
 	  fails.</para>
 	</listitem>
       </varlistentry>

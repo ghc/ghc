@@ -1,5 +1,5 @@
 <chapter id="profiling">
-  <title>Profiling</Title>
+  <title>Profiling</title>
   <indexterm><primary>profiling</primary>
   </indexterm>
   <indexterm><primary>cost-centre profiling</primary></indexterm>
@@ -20,7 +20,7 @@
       <literal>-prof</literal> option, and probably one of the
       <literal>-auto</literal> or <literal>-auto-all</literal>
       options.  These options are described in more detail in <xref
-      linkend="prof-compiler-options"> </para>
+      linkend="prof-compiler-options"/> </para>
       <indexterm><primary><literal>-prof</literal></primary>
       </indexterm>
       <indexterm><primary><literal>-auto</literal></primary>
@@ -61,7 +61,7 @@
 
     <programlisting>
 main = print (nfib 25)
-nfib n = if n < 2 then 1 else nfib (n-1) + nfib (n-2)
+nfib n = if n &lt; 2 then 1 else nfib (n-1) + nfib (n-2)
 </programlisting>
 
     <para>Compile and run this program as follows:</para>
@@ -137,7 +137,7 @@ MAIN                     MAIN             0    0.0   0.0    100.0 100.0
 main = print (f 25 + g 25)
 f n  = nfib n
 g n  = nfib (n `div` 2)
-nfib n = if n < 2 then 1 else nfib (n-1) + nfib (n-2)
+nfib n = if n &lt; 2 then 1 else nfib (n-1) + nfib (n-2)
 </programlisting>
 
     <para>Compile and run this program as before, and take a look at
@@ -208,7 +208,7 @@ MAIN                     MAIN             0    0.0   0.0    100.0 100.0
       </varlistentry>
     </variablelist>
 
-    <para>In addition you can use the <Option>-P</Option> RTS option
+    <para>In addition you can use the <option>-P</option> RTS option
     <indexterm><primary><option>-P</option></primary></indexterm> to
     get the following additional information:</para>
 
@@ -225,13 +225,13 @@ MAIN                     MAIN             0    0.0   0.0    100.0 100.0
 
       <varlistentry>
 	<term><literal>bytes</literal></term>
-	<listItem>
+	<listitem>
 	  <para>Number of bytes allocated in the heap while in this
           cost-centre; again, this is the raw number from which we get
           the <literal>&percnt;alloc</literal> figure mentioned
           above.</para>
-	</listItem>
-      </varListEntry>
+	</listitem>
+      </varlistentry>
     </variablelist>
 
     <para>What about recursive functions, and mutually recursive
@@ -240,7 +240,7 @@ MAIN                     MAIN             0    0.0   0.0    100.0 100.0
     called each other recursively, this information isn't displayed in
     the basic time and allocation profile, instead the call-graph is
     flattened into a tree.  The XML profiling tool (described in <xref
-    linkend="prof-xml-tool">) will be able to display real loops in
+    linkend="prof-xml-tool"/>) will be able to display real loops in
     the call-graph.</para>
 
     <sect2><title>Inserting cost centres by hand</title>
@@ -294,7 +294,7 @@ MAIN                     MAIN             0    0.0   0.0    100.0 100.0
 	</listitem>
 
 	<listitem>
-	  <para>Time spent in foreign code (see <xref linkend="ffi">)
+	  <para>Time spent in foreign code (see <xref linkend="ffi"/>)
 	  is always attributed to the cost centre in force at the
 	  Haskell call-site of the foreign function.</para>
 	</listitem>
@@ -342,11 +342,11 @@ x = nfib 25
     <indexterm><primary>profiling</primary><secondary>options</secondary></indexterm>
     <indexterm><primary>options</primary><secondary>for profiling</secondary></indexterm>
 
-    <variableList>
-      <varListEntry>
-	<term><Option>-prof</Option>:</Term>
+    <variablelist>
+      <varlistentry>
+	<term><option>-prof</option>:</term>
 	<indexterm><primary><option>-prof</option></primary></indexterm>
-	<listItem>
+	<listitem>
 	  <para> To make use of the profiling system
           <emphasis>all</emphasis> modules must be compiled and linked
           with the <option>-prof</option> option. Any
@@ -357,8 +357,8 @@ x = nfib 25
           <literal>SCC</literal>s are ignored; so you can compile
           <literal>SCC</literal>-laden code without changing
           it.</para>
-	</listItem>
-      </varListEntry>
+	</listitem>
+      </varlistentry>
     </variablelist>
       
     <para>There are a few other profiling-related compilation options.
@@ -368,73 +368,73 @@ x = nfib 25
 
     <variablelist>
       <varlistentry>
-	<term><option>-auto</option>:</Term>
+	<term><option>-auto</option>:</term>
 	<indexterm><primary><option>-auto</option></primary></indexterm>
 	<indexterm><primary>cost centres</primary><secondary>automatically inserting</secondary></indexterm>
-	<listItem>
+	<listitem>
 	  <para> GHC will automatically add
-          <Function>&lowbar;scc&lowbar;</Function> constructs for all
+          <function>&lowbar;scc&lowbar;</function> constructs for all
           top-level, exported functions.</para>
-	</listItem>
-      </varListEntry>
+	</listitem>
+      </varlistentry>
       
-      <varListEntry>
-	<term><option>-auto-all</option>:</Term>
+      <varlistentry>
+	<term><option>-auto-all</option>:</term>
 	<indexterm><primary><option>-auto-all</option></primary></indexterm>
-	<listItem>
-	  <para> <Emphasis>All</Emphasis> top-level functions,
+	<listitem>
+	  <para> <emphasis>All</emphasis> top-level functions,
 	  exported or not, will be automatically
-	  <Function>&lowbar;scc&lowbar;</Function>'d.</para>
-	</listItem>
-      </varListEntry>
+	  <function>&lowbar;scc&lowbar;</function>'d.</para>
+	</listitem>
+      </varlistentry>
 
-      <varListEntry>
-	<term><option>-caf-all</option>:</Term>
+      <varlistentry>
+	<term><option>-caf-all</option>:</term>
 	<indexterm><primary><option>-caf-all</option></primary></indexterm>
-	<listItem>
+	<listitem>
 	  <para> The costs of all CAFs in a module are usually
 	  attributed to one &ldquo;big&rdquo; CAF cost-centre. With
 	  this option, all CAFs get their own cost-centre.  An
 	  &ldquo;if all else fails&rdquo; option&hellip;</para>
-	</listItem>
-      </varListEntry>
+	</listitem>
+      </varlistentry>
 
-      <varListEntry>
-	<term><option>-ignore-scc</option>:</Term>
+      <varlistentry>
+	<term><option>-ignore-scc</option>:</term>
 	<indexterm><primary><option>-ignore-scc</option></primary></indexterm>
-	<listItem>
-	  <para>Ignore any <Function>&lowbar;scc&lowbar;</Function>
+	<listitem>
+	  <para>Ignore any <function>&lowbar;scc&lowbar;</function>
           constructs, so a module which already has
-          <Function>&lowbar;scc&lowbar;</Function>s can be compiled
+          <function>&lowbar;scc&lowbar;</function>s can be compiled
           for profiling with the annotations ignored.</para>
-	</listItem>
-      </varListEntry>
+	</listitem>
+      </varlistentry>
 
-    </variableList>
+    </variablelist>
 
   </sect1>
 
   <sect1 id="prof-time-options">
-    <title>Time and allocation profiling</Title>
+    <title>Time and allocation profiling</title>
 
     <para>To generate a time and allocation profile, give one of the
     following RTS options to the compiled program when you run it (RTS
     options should be enclosed between <literal>+RTS...-RTS</literal>
     as usual):</para>
 
-    <variableList>
-      <varListEntry>
-	<term><Option>-p</Option> or <Option>-P</Option>:</Term>
+    <variablelist>
+      <varlistentry>
+	<term><option>-p</option> or <option>-P</option>:</term>
 	<indexterm><primary><option>-p</option></primary></indexterm>
 	<indexterm><primary><option>-P</option></primary></indexterm>
 	<indexterm><primary>time profile</primary></indexterm>
-	<listItem>
-	  <para>The <Option>-p</Option> option produces a standard
-          <Emphasis>time profile</Emphasis> report.  It is written
+	<listitem>
+	  <para>The <option>-p</option> option produces a standard
+          <emphasis>time profile</emphasis> report.  It is written
           into the file
-          <Filename><replaceable>program</replaceable>.prof</Filename>.</para>
+          <filename><replaceable>program</replaceable>.prof</filename>.</para>
 
-	  <para>The <Option>-P</Option> option produces a more
+	  <para>The <option>-P</option> option produces a more
           detailed report containing the actual time and allocation
           data as well.  (Not used much.)</para>
 	</listitem>
@@ -446,7 +446,7 @@ x = nfib 25
 	<listitem>
 	  <para>The <option>-px</option> option generates profiling
 	  information in the XML format understood by our new
-	  profiling tool, see <xref linkend="prof-xml-tool">.</para>
+	  profiling tool, see <xref linkend="prof-xml-tool"/>.</para>
 	</listitem>
       </varlistentry>
 
@@ -458,11 +458,11 @@ x = nfib 25
 	  <para>This option makes use of the extra information
 	  maintained by the cost-centre-stack profiler to provide
 	  useful information about the location of runtime errors.
-	  See <xref linkend="rts-options-debugging">.</para>
+	  See <xref linkend="rts-options-debugging"/>.</para>
 	</listitem>
       </varlistentry>
 
-    </variableList>
+    </variablelist>
     
   </sect1>
 
@@ -482,7 +482,7 @@ x = nfib 25
     <orderedlist>
       <listitem>
 	<para>Compile the program for profiling (<xref
-	linkend="prof-compiler-options">).</para>
+	linkend="prof-compiler-options"/>).</para>
       </listitem>
       <listitem>
 	<para>Run it with one of the heap profiling options described
@@ -495,7 +495,7 @@ x = nfib 25
 	file,
 	<filename><replaceable>prog</replaceable>.ps</filename>.  The
 	<command>hp2ps</command> utility is described in detail in
-	<xref linkend="hp2ps">.</para> 
+	<xref linkend="hp2ps"/>.</para> 
       </listitem>
       <listitem>
 	<para>Display the heap profile using a postscript viewer such
@@ -565,7 +565,7 @@ x = nfib 25
 	  <listitem>
 	    <para>Break down the graph by <firstterm>retainer
 	    set</firstterm>.  Retainer profiling is described in more
-	    detail below (<xref linkend="retainer-prof">).</para>
+	    detail below (<xref linkend="retainer-prof"/>).</para>
 	  </listitem>
 	</varlistentry>
 
@@ -577,7 +577,7 @@ x = nfib 25
 	    <para>Break down the graph by
 	    <firstterm>biography</firstterm>.  Biographical profiling
 	    is described in more detail below (<xref
-	    linkend="biography-prof">).</para>
+	    linkend="biography-prof"/>).</para>
 	  </listitem>
 	</varlistentry>
       </variablelist>
@@ -686,16 +686,16 @@ x = nfib 25
 
       <variablelist>
 	<varlistentry>
-	  <term><Option>-i<replaceable>secs</replaceable></Option>:</Term>
+	  <term><option>-i<replaceable>secs</replaceable></option>:</term>
 	  <indexterm><primary><option>-i</option></primary></indexterm>
-	  <listItem>
+	  <listitem>
 	    <para>Set the profiling (sampling) interval to
             <replaceable>secs</replaceable> seconds (the default is
             0.1&nbsp;second).  Fractions are allowed: for example
-            <Option>-i0.2</Option> will get 5 samples per second.
+            <option>-i0.2</option> will get 5 samples per second.
             This only affects heap profiling; time profiles are always
             sampled on a 1/50 second frequency.</para>
-	  </listItem>
+	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
@@ -931,7 +931,7 @@ hp2ps [flags] [&lt;file&gt;[.hp]]
     <para>The program
     <command>hp2ps</command><indexterm><primary>hp2ps
     program</primary></indexterm> converts a heap profile as produced
-    by the <Option>-h&lt;break-down&gt;</Option> runtime option into a
+    by the <option>-h&lt;break-down&gt;</option> runtime option into a
     PostScript graph of the heap profile. By convention, the file to
     be processed by <command>hp2ps</command> has a
     <filename>.hp</filename> extension. The PostScript output is
@@ -946,36 +946,36 @@ hp2ps [flags] [&lt;file&gt;[.hp]]
 
     <para>The flags are:</para>
 
-    <variableList>
+    <variablelist>
       
-      <varListEntry>
-	<term><Option>-d</Option></Term>
-	<listItem>
+      <varlistentry>
+	<term><option>-d</option></term>
+	<listitem>
 	  <para>In order to make graphs more readable,
           <command>hp2ps</command> sorts the shaded bands for each
           identifier. The default sort ordering is for the bands with
           the largest area to be stacked on top of the smaller ones.
-          The <Option>-d</Option> option causes rougher bands (those
+          The <option>-d</option> option causes rougher bands (those
           representing series of values with the largest standard
           deviations) to be stacked on top of smoother ones.</para>
-	</listItem>
-      </varListEntry>
+	</listitem>
+      </varlistentry>
 
-      <varListEntry>
-	<term><Option>-b</Option></Term>
-	<listItem>
+      <varlistentry>
+	<term><option>-b</option></term>
+	<listitem>
 	  <para>Normally, <command>hp2ps</command> puts the title of
           the graph in a small box at the top of the page. However, if
           the JOB string is too long to fit in a small box (more than
           35 characters), then <command>hp2ps</command> will choose to
-          use a big box instead.  The <Option>-b</Option> option
+          use a big box instead.  The <option>-b</option> option
           forces <command>hp2ps</command> to use a big box.</para>
-	</listItem>
-      </varListEntry>
+	</listitem>
+      </varlistentry>
 
-      <varListEntry>
-	<term><Option>-e&lt;float&gt;[in&verbar;mm&verbar;pt]</Option></Term>
-	<listItem>
+      <varlistentry>
+	<term><option>-e&lt;float&gt;[in&verbar;mm&verbar;pt]</option></term>
+	<listitem>
 	  <para>Generate encapsulated PostScript suitable for
           inclusion in LaTeX documents.  Usually, the PostScript graph
           is drawn in landscape mode in an area 9 inches wide by 6
@@ -983,112 +983,112 @@ hp2ps [flags] [&lt;file&gt;[.hp]]
           area to be approximately centred on a sheet of a4 paper.
           This format is convenient of studying the graph in detail,
           but it is unsuitable for inclusion in LaTeX documents.  The
-          <Option>-e</Option> option causes the graph to be drawn in
+          <option>-e</option> option causes the graph to be drawn in
           portrait mode, with float specifying the width in inches,
           millimetres or points (the default).  The resulting
           PostScript file conforms to the Encapsulated PostScript
           (EPS) convention, and it can be included in a LaTeX document
           using Rokicki's dvi-to-PostScript converter
           <command>dvips</command>.</para>
-	</listItem>
-      </varListEntry>
+	</listitem>
+      </varlistentry>
 
-      <varListEntry>
-	<term><Option>-g</Option></Term>
-	<listItem>
+      <varlistentry>
+	<term><option>-g</option></term>
+	<listitem>
 	  <para>Create output suitable for the <command>gs</command>
           PostScript previewer (or similar). In this case the graph is
           printed in portrait mode without scaling. The output is
           unsuitable for a laser printer.</para>
-	</listItem>
-      </varListEntry>
+	</listitem>
+      </varlistentry>
 
-      <varListEntry>
-	<term><Option>-l</Option></Term>
-	<listItem>
+      <varlistentry>
+	<term><option>-l</option></term>
+	<listitem>
 	  <para>Normally a profile is limited to 20 bands with
           additional identifiers being grouped into an
-          <literal>OTHER</literal> band. The <Option>-l</Option> flag
+          <literal>OTHER</literal> band. The <option>-l</option> flag
           removes this 20 band and limit, producing as many bands as
           necessary. No key is produced as it won't fit!. It is useful
           for creation time profiles with many bands.</para>
-	</listItem>
-      </varListEntry>
+	</listitem>
+      </varlistentry>
 
-      <varListEntry>
-	<term><Option>-m&lt;int&gt;</Option></Term>
-	<listItem>
+      <varlistentry>
+	<term><option>-m&lt;int&gt;</option></term>
+	<listitem>
 	  <para>Normally a profile is limited to 20 bands with
           additional identifiers being grouped into an
-          <literal>OTHER</literal> band. The <Option>-m</Option> flag
+          <literal>OTHER</literal> band. The <option>-m</option> flag
           specifies an alternative band limit (the maximum is
           20).</para>
 
-	  <para><Option>-m0</Option> requests the band limit to be
+	  <para><option>-m0</option> requests the band limit to be
           removed. As many bands as necessary are produced. However no
           key is produced as it won't fit! It is useful for displaying
           creation time profiles with many bands.</para>
-	</listItem>
-      </varListEntry>
+	</listitem>
+      </varlistentry>
 
-      <varListEntry>
-	<term><Option>-p</Option></Term>
-	<listItem>
+      <varlistentry>
+	<term><option>-p</option></term>
+	<listitem>
 	  <para>Use previous parameters. By default, the PostScript
           graph is automatically scaled both horizontally and
           vertically so that it fills the page.  However, when
           preparing a series of graphs for use in a presentation, it
           is often useful to draw a new graph using the same scale,
           shading and ordering as a previous one. The
-          <Option>-p</Option> flag causes the graph to be drawn using
+          <option>-p</option> flag causes the graph to be drawn using
           the parameters determined by a previous run of
           <command>hp2ps</command> on <filename>file</filename>. These
           are extracted from <filename>file@.aux</filename>.</para>
-	</listItem>
-      </varListEntry>
+	</listitem>
+      </varlistentry>
 
-      <varListEntry>
-	<term><Option>-s</Option></Term>
-	<listItem>
+      <varlistentry>
+	<term><option>-s</option></term>
+	<listitem>
 	  <para>Use a small box for the title.</para>
-	</listItem>
-      </varListEntry>
+	</listitem>
+      </varlistentry>
       
-      <varListEntry>
-	<term><Option>-t&lt;float&gt;</Option></Term>
-	<listItem>
+      <varlistentry>
+	<term><option>-t&lt;float&gt;</option></term>
+	<listitem>
 	  <para>Normally trace elements which sum to a total of less
           than 1&percnt; of the profile are removed from the
           profile. The <option>-t</option> option allows this
           percentage to be modified (maximum 5&percnt;).</para>
 
-	  <para><Option>-t0</Option> requests no trace elements to be
+	  <para><option>-t0</option> requests no trace elements to be
           removed from the profile, ensuring that all the data will be
           displayed.</para>
-	</listItem>
-      </varListEntry>
+	</listitem>
+      </varlistentry>
 
-      <varListEntry>
-	<term><Option>-c</Option></Term>
-	<listItem>
+      <varlistentry>
+	<term><option>-c</option></term>
+	<listitem>
 	  <para>Generate colour output.</para>
-	</listItem>
-      </varListEntry>
+	</listitem>
+      </varlistentry>
       
-      <varListEntry>
-	<term><Option>-y</Option></Term>
-	<listItem>
+      <varlistentry>
+	<term><option>-y</option></term>
+	<listitem>
 	  <para>Ignore marks.</para>
-	</listItem>
-      </varListEntry>
+	</listitem>
+      </varlistentry>
       
-      <varListEntry>
-	<term><Option>-?</Option></Term>
-	<listItem>
+      <varlistentry>
+	<term><option>-?</option></term>
+	<listitem>
 	  <para>Print out usage information.</para>
-	</listItem>
-      </varListEntry>
-    </variableList>
+	</listitem>
+      </varlistentry>
+    </variablelist>
 
 
     <sect2 id="manipulating-hp">
@@ -1186,7 +1186,7 @@ This can all be encapsulated in a little script:
   #!/bin/sh
   head -`fgrep -n END_SAMPLE FOO.hp | tail -1 | cut -d : -f 1` FOO.hp \
     | hp2ps > FOO.ps
-  gv -watch -seascape FOO.ps &
+  gv -watch -seascape FOO.ps &amp;
   while [ 1 ] ; do
     sleep 10 # We generate a new profile every 10 seconds.
     head -`fgrep -n END_SAMPLE FOO.hp | tail -1 | cut -d : -f 1` FOO.hp \
@@ -1202,7 +1202,7 @@ to re-read its input file:
   #!/bin/sh
   head -`fgrep -n END_SAMPLE FOO.hp | tail -1 | cut -d : -f 1` FOO.hp \
     | hp2ps > FOO.ps
-  gv FOO.ps &
+  gv FOO.ps &amp;
   gvpsnum=$!
   while [ 1 ] ; do
     sleep 10
@@ -1218,7 +1218,7 @@ to re-read its input file:
   </sect1>
 
   <sect1 id="ticky-ticky">
-    <title>Using &ldquo;ticky-ticky&rdquo; profiling (for implementors)</Title>
+    <title>Using &ldquo;ticky-ticky&rdquo; profiling (for implementors)</title>
     <indexterm><primary>ticky-ticky profiling</primary></indexterm>
 
     <para>(ToDo: document properly.)</para>
@@ -1231,7 +1231,7 @@ to re-read its input file:
     profiling</primary></indexterm> <indexterm><primary>profiling,
     ticky-ticky</primary></indexterm> because that's the sound a Sun4
     makes when it is running up all those counters
-    (<Emphasis>slowly</Emphasis>).</para>
+    (<emphasis>slowly</emphasis>).</para>
 
     <para>Ticky-ticky profiling is mainly intended for implementors;
     it is quite separate from the main &ldquo;cost-centre&rdquo;
@@ -1243,11 +1243,11 @@ to re-read its input file:
     the installation guide.</para>
 
     <para>To get your compiled program to spit out the ticky-ticky
-    numbers, use a <Option>-r</Option> RTS
+    numbers, use a <option>-r</option> RTS
     option<indexterm><primary>-r RTS option</primary></indexterm>.
-    See <XRef LinkEnd="runtime-control">.</para>
+    See <xref linkend="runtime-control"/>.</para>
 
-    <para>Compiling your program with the <Option>-ticky</Option>
+    <para>Compiling your program with the <option>-ticky</option>
     switch yields an executable that performs these counts.  Here is a
     sample ticky-ticky statistics file, generated by the invocation
     <command>foo +RTS -rfoo.ticky</command>.</para>
@@ -1336,12 +1336,12 @@ Total bytes copied during GC: 190096
 
     <para>The formatting of the information above the row of asterisks
     is subject to change, but hopefully provides a useful
-    human-readable summary.  Below the asterisks <Emphasis>all
-    counters</Emphasis> maintained by the ticky-ticky system are
+    human-readable summary.  Below the asterisks <emphasis>all
+    counters</emphasis> maintained by the ticky-ticky system are
     dumped, in a format intended to be machine-readable: zero or more
     spaces, an integer, a space, the counter name, and a newline.</para>
 
-    <para>In fact, not <Emphasis>all</Emphasis> counters are
+    <para>In fact, not <emphasis>all</emphasis> counters are
     necessarily dumped; compile- or run-time flags can render certain
     counters invalid.  In this case, either the counter will simply
     not appear, or it will appear with a modified counter name,
@@ -1350,7 +1350,7 @@ Total bytes copied during GC: 190096
     with an inserted <literal>!</literal> above).  Software analysing
     this output should always check that it has the counters it
     expects.  Also, beware: some of the counters can have
-    <Emphasis>large</Emphasis> values!</para>
+    <emphasis>large</emphasis> values!</para>
 
   </sect1>
 

@@ -1,10 +1,10 @@
-<BookInfo>
-<Title>The Glasgow Haskell Compiler User's Guide, Version 6.0</Title>
-<Author><OtherName>The GHC Team</OtherName></Author>
-<Address>
-<Email>glasgow-haskell-&lcub;bugs,users&rcub;-request@haskell.org</Email>
-</Address>
-</BookInfo>
+<bookinfo>
+<title>The Glasgow Haskell Compiler User's Guide, Version 6.0</title>
+<author><othername>The GHC Team</othername></author>
+<address>
+<email>glasgow-haskell-&lcub;bugs,users&rcub;-request@haskell.org</email>
+</address>
+</bookinfo>
 
 &license;
 &intro;

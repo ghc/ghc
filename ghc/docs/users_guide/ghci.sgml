@@ -146,7 +146,7 @@ Ok, modules loaded: Main.
     indicate that the current context for expressions typed at the
     prompt is the <literal>Main</literal> module we just loaded (we'll
     explain what the <literal>*</literal> means later in <xref
-    linkend="ghci-scope">).  So we can now type expressions involving
+    linkend="ghci-scope"/>).  So we can now type expressions involving
     the functions from <filename>Main.hs</filename>:</para>
 
 <screen>
@@ -191,13 +191,13 @@ Ok, modules loaded: Main.
 
       <para>or it can be set using the <literal>:set</literal> command
       from within GHCi (see <xref
-      linkend="ghci-cmd-line-options">)<footnote><para>Note that in
+      linkend="ghci-cmd-line-options"/>)<footnote><para>Note that in
       GHCi, and <option>&ndash;&ndash;make</option> mode, the <option>-i</option>
       option is used to specify the search path for
       <emphasis>source</emphasis> files, whereas in standard
       batch-compilation mode the <option>-i</option> option is used to
       specify the search path for interface files, see <xref
-      linkend="search-path">.</para> </footnote></para>
+      linkend="search-path"/>.</para> </footnote></para>
 
       <para>One consequence of the way that GHCi follows dependencies
       to find modules to load is that every module must have a source
@@ -220,7 +220,7 @@ Ok, modules loaded: Main.
       doing its best to avoid actually recompiling modules if their
       external dependencies haven't changed.  This is the same
       mechanism we use to avoid re-compiling modules in the batch
-      compilation setting (see <xref linkend="recomp">).</para>
+      compilation setting (see <xref linkend="recomp"/>).</para>
     </sect2>
   </sect1>
 
@@ -247,7 +247,7 @@ Ok, modules loaded: Main.
     use one in preference to interpreting the source if possible.  For
     example, suppose we have a 4-module program consisting of modules
     A, B, C, and D.  Modules B and C both import D only,
-    and A imports both B & C:</para>
+    and A imports both B &amp; C:</para>
 <screen>
       A
      / \
@@ -522,12 +522,12 @@ Prelude,IO>
 
       <para>Here's an example:</para>
 <screen>
-Prelude> x <- return 42
+Prelude> x &lt;- return 42
 Prelude> print x
 42
 Prelude>
 </screen>
-      <para>The statement <literal>x <- return 42</literal> means
+      <para>The statement <literal>x &lt;- return 42</literal> means
       &ldquo;execute <literal>return 42</literal> in the
       <literal>IO</literal> monad, and bind the result to
       <literal>x</literal>&rdquo;.  We can then use
@@ -543,7 +543,7 @@ Prelude> print x
 Prelude>
 </screen>
       <para>An important difference between the two types of binding
-      is that the monadic bind (<literal>p <- e</literal>) is
+      is that the monadic bind (<literal>p &lt;- e</literal>) is
       <emphasis>strict</emphasis> (it evaluates <literal>e</literal>),
       whereas with the <literal>let</literal> form, the expression
       isn't evaluated immediately:</para>
@@ -629,7 +629,7 @@ Wed Mar 14 12:23:13 GMT 2001
       <para>The corresponding translation for an IO-typed
       <replaceable>e</replaceable> is
 <screen>     
-             it <- <replaceable>e</replaceable>
+             it &lt;- <replaceable>e</replaceable>
 </screen>
       </para>
 
@@ -678,7 +678,7 @@ Wed Mar 14 12:23:13 GMT 2001
     instructs GHCi to load the specified modules or filenames (and all
     the modules they depend on), just as if you had said
     <literal>:load <replaceable>modules</replaceable></literal> at the
-    GHCi prompt (see <xref linkend="ghci-commands">).  For example, to
+    GHCi prompt (see <xref linkend="ghci-commands"/>).  For example, to
     start GHCi and load the program whose topmost module is in the
     file <literal>Main.hs</literal>, we could say:</para>
 
@@ -687,7 +687,7 @@ $ ghci Main.hs
 </screen>
 
     <para>Most of the command-line options accepted by GHC (see <xref
-    linkend="using-ghc">) also make sense in interactive mode.  The ones
+    linkend="using-ghc"/>) also make sense in interactive mode.  The ones
     that don't make sense are mostly obvious; for example, GHCi
     doesn't generate interface files, so options related to interface
     file generation won't have any effect.</para>
@@ -696,7 +696,7 @@ $ ghci Main.hs
       <title>Packages</title>
       <indexterm><primary>packages</primary><secondary>with GHCi</secondary></indexterm>
 
-      <para>Most packages (see <xref linkend="using-packages">) are
+      <para>Most packages (see <xref linkend="using-packages"/>) are
       available without needing to specify any extra flags at all:
       they will be automatically loaded the first time they are
       needed.</para>
@@ -744,7 +744,7 @@ Prelude> :set -package <replaceable>name</replaceable>
       the normal <literal>-l<replaceable>lib</replaceable></literal>
       option.  (The term <emphasis>library</emphasis> here refers to
       libraries of foreign object code; for using libraries of Haskell
-      source code, see <xref linkend="ghci-modules-filenames">.) For
+      source code, see <xref linkend="ghci-modules-filenames"/>.) For
       example, to load the &ldquo;m&rdquo; library:</para>
 
 <screen>
@@ -782,7 +782,7 @@ $ ghci -lm
 
       <para>Ordering of <option>-l</option> options matters: a library
       should be mentioned <emphasis>before</emphasis> the libraries it
-      depends on (see <xref linkend="options-linker">).</para>
+      depends on (see <xref linkend="options-linker"/>).</para>
     </sect2>
 
   </sect1>
@@ -875,7 +875,7 @@ $ ghci -lm
 	  <para>That's all a little confusing, so here's a few
 	  examples.  To start with, here's a new GHCi command which
 	  doesn't take any arguments or produce any results, it just
-	  outputs the current date & time:</para>
+	  outputs the current date &amp; time:</para>
 
 <screen>
 Prelude> let date _ = Time.getClockTime >>= print >> return ""
@@ -975,7 +975,7 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
 	<indexterm><primary><literal>:module</literal></primary></indexterm>
 	<listitem>
 	  <para>Sets or modifies the current context for statements
-	  typed at the prompt.  See <xref linkend="ghci-scope"> for
+	  typed at the prompt.  See <xref linkend="ghci-scope"/> for
 	  more details.</para>
 	</listitem>
       </varlistentry>
@@ -1005,7 +1005,7 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
 	<term><literal>:set</literal> <optional><replaceable>option</replaceable>...</optional></term>
 	<indexterm><primary><literal>:set</literal></primary></indexterm>
 	<listitem>
-	  <para>Sets various options.  See <xref linkend="ghci-set">
+	  <para>Sets various options.  See <xref linkend="ghci-set"/>
 	  for a list of available options.  The
 	  <literal>:set</literal> command by itself shows which
 	  options are currently set.</para>
@@ -1088,7 +1088,7 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
 	<term><literal>:unset</literal> <replaceable>option</replaceable>...</term>
 	<indexterm><primary><literal>:unset</literal></primary></indexterm>
 	<listitem>
-	  <para>Unsets certain options.  See <xref linkend="ghci-set">
+	  <para>Unsets certain options.  See <xref linkend="ghci-set"/>
 	  for a list of available options.</para>
 	</listitem>
       </varlistentry>
@@ -1192,7 +1192,7 @@ Prelude> :set -fglasgow-exts
       
       <para>Any GHC command-line option that is designated as
       <firstterm>dynamic</firstterm> (see the table in <xref
-      linkend="flag-reference">), may be set using
+      linkend="flag-reference"/>), may be set using
       <literal>:set</literal>.  To unset an option, you can set the
       reverse option:</para>
       <indexterm><primary>dynamic</primary><secondary>options</secondary></indexterm>
@@ -1201,7 +1201,7 @@ Prelude> :set -fglasgow-exts
 Prelude> :set -fno-glasgow-exts
 </screen>
 
-      <para><xref linkend="flag-reference"> lists the reverse for each
+      <para><xref linkend="flag-reference"/> lists the reverse for each
       option where applicable.</para>
 
       <para>Certain static options (<option>-package</option>,

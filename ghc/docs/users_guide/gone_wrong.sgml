@@ -1,30 +1,30 @@
 <chapter id="wrong">
   <title>What to do when something goes wrong</title>
 
-  <Indexterm><Primary>problems</Primary></Indexterm>
+  <indexterm><primary>problems</primary></indexterm>
 
   <para>If you still have a problem after consulting this section,
-  then you may have found a <Emphasis>bug</Emphasis>&mdash;please
-  report it!  See <XRef LinkEnd="bug-reporting"> for details on how to
+  then you may have found a <emphasis>bug</emphasis>&mdash;please
+  report it!  See <xref linkend="bug-reporting"/> for details on how to
   report a bug and a list of things we'd like to know about your bug.
   If in doubt, send a report&mdash;we love mail from irate users
   :-!</para>
 
-  <para>(<XRef LinkEnd="vs-Haskell-defn">, which describes Glasgow
+  <para>(<xref linkend="vs-Haskell-defn"/>, which describes Glasgow
   Haskell's shortcomings vs.&nbsp;the Haskell language definition, may
   also be of interest.)</para>
 
   <sect1 id="wrong-compiler">
     <title>When the compiler &ldquo;does the wrong thing&rdquo;</title>
 
-    <Indexterm><Primary>compiler problems</Primary></Indexterm>
-    <Indexterm><Primary>problems with the compiler</Primary></Indexterm>
+    <indexterm><primary>compiler problems</primary></indexterm>
+    <indexterm><primary>problems with the compiler</primary></indexterm>
 
     <variablelist>
       <varlistentry>
 	<term>&ldquo;Help! The compiler crashed (or `panic'd)!&rdquo;</term>
 	<listitem>
-	  <para>These events are <Emphasis>always</Emphasis> bugs in
+	  <para>These events are <emphasis>always</emphasis> bugs in
 	  the GHC system&mdash;please report them.</para>
 	</listitem>
       </varlistentry>
@@ -48,7 +48,7 @@
       </varlistentry>
 
       <varlistentry>
-	<term>Sensitivity to <Filename>.hi</Filename> interface files:</term>
+	<term>Sensitivity to <filename>.hi</filename> interface files:</term>
 	<listitem>
 	  <para>GHC is very sensitive about interface files.  For
           example, if it picks up a non-standard
@@ -107,11 +107,11 @@
   <sect1 id="wrong-compilee">
     <title>When your program &ldquo;does the wrong thing&rdquo;</title>
 
-    <Indexterm><Primary>problems running your program</Primary></Indexterm>
+    <indexterm><primary>problems running your program</primary></indexterm>
 
     <para>(For advice about overly slow or memory-hungry Haskell
-    programs, please see <XRef
-    LinkEnd="sooner-faster-quicker">).</para>
+    programs, please see <xref
+    linkend="sooner-faster-quicker"/>).</para>
 
     <variablelist>
 
@@ -134,8 +134,8 @@
 
 	  <para>For example, if an interface is lying about the type
           of an imported value then GHC may well generate duff code
-          for the importing module.  <Emphasis>This applies to pragmas
-          inside interfaces too!</Emphasis> If the pragma is lying
+          for the importing module.  <emphasis>This applies to pragmas
+          inside interfaces too!</emphasis> If the pragma is lying
           (e.g., about the &ldquo;arity&rdquo; of a value), then duff
           code may result.  Furthermore, arities may change even if
           types do not.</para>
@@ -154,7 +154,7 @@
           automatically generate the dependencies required in order to
           make sure that every module <emphasis>is</emphasis>
           up-to-date with respect to its imported interfaces.  Please
-          see <xref linkend="sec-makefile-dependencies">.</para>
+          see <xref linkend="sec-makefile-dependencies"/>.</para>
 
 	  <para>If you are down to your
           last-compile-before-a-bug-report, we would recommend that
@@ -164,12 +164,12 @@
 	  <para>So, before you report a bug because of a core dump,
 	  you should probably:</para>
 
-<Screen>
+<screen>
 % rm *.o        # scrub your object files
 % make my_prog  # re-make your program; use -hi-diffs to highlight changes;
                 # as mentioned above, use -dcore-lint to be more paranoid
 % ./my_prog ... # retry...
-</Screen>
+</screen>
 
 	  <para>Of course, if you have foreign calls in your program
           then all bets are off, because you can trash the heap, the
@@ -181,7 +181,7 @@
 	<term>&ldquo;My program entered an `absent' argument.&rdquo;</term>
 	<listitem>
 	  <para>This is definitely caused by a bug in GHC. Please
-          report it (see <xref linkend="bug-reporting">).</para>
+          report it (see <xref linkend="bug-reporting"/>).</para>
 	</listitem>
       </varlistentry>
 

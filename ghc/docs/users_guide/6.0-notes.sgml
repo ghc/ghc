@@ -7,7 +7,7 @@
       <listitem>
 	<para>Template Haskell, a new feature for compile-time
 	metaprogramming has been introduced.  See <xref
-	linkend="template-haskell">.</para>
+	linkend="template-haskell"/>.</para>
       </listitem>
       <listitem>
 	<para>INLINE pragmas on methods in class or instance
@@ -15,7 +15,7 @@
       </listitem>
       <listitem>
 	<para>Recursive do-notation (aka <literal>mdo</literal>) is
-	now supported.  See <xref linkend="mdo-notation">.</para>
+	now supported.  See <xref linkend="mdo-notation"/>.</para>
       </listitem>
       <listitem>
 	<para>There is now a native code generator for PowerPC
@@ -24,7 +24,7 @@
       <listitem>
 	<para>Profiling: the <option>-xt</option> RTS option enables
 	inclusion of thread stacks in a heap profile.  See <xref
-	linkend="rts-options-heap-prof">.</para>
+	linkend="rts-options-heap-prof"/>.</para>
       </listitem>
       <listitem>
 	<para>Non-blocking I/O is now supported on Windows.</para>
@@ -55,7 +55,7 @@
 	<para>Hierarchical libraries are now available without needing
 	to specify an explicit <option>-package</option> flag.  There
 	are some exceptions to this rule (see <xref
-	linkend="using-packages">), but if you stick to GHCi and
+	linkend="using-packages"/>), but if you stick to GHCi and
 	<option>--make</option> mode then there will normally be no
 	need to specify <option>-package</option> options at
 	all.</para>

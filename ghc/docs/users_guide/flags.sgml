@@ -3,14 +3,14 @@
 
     <para>This section is a quick-reference for GHC's command-line
     flags.  For each flag, we also list its static/dynamic status (see
-    <xref linkend="static-dynamic-flags">), and the flag's opposite
+    <xref linkend="static-dynamic-flags"/>), and the flag's opposite
     (if available).</para>
 
     <sect2>
-      <title>Help and verbosity options (<xref linkend="options-help">)</title>
+      <title>Help and verbosity options (<xref linkend="options-help"/>)</title>
 
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -74,10 +74,10 @@
 
     </sect2>
     <sect2>
-      <title>Which phases to run (<xref linkend="options-order">)</title>
+      <title>Which phases to run (<xref linkend="options-order"/>)</title>
       
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -117,10 +117,10 @@
     </sect2>
 
     <sect2>
-      <title>Redirecting output (<xref linkend="options-output">)</title>
+      <title>Redirecting output (<xref linkend="options-output"/>)</title>
       
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -178,10 +178,10 @@
     </sect2>
 
     <sect2>
-      <title>Keeping intermediate files (<xref linkend="keeping-intermediates">)</title>
+      <title>Keeping intermediate files (<xref linkend="keeping-intermediates"/>)</title>
       
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -221,10 +221,10 @@
     </sect2>
 
     <sect2>
-      <title>Temporary files (<xref linkend="temp-files">)</title>
+      <title>Temporary files (<xref linkend="temp-files"/>)</title>
       
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -246,10 +246,10 @@
     </sect2>
 
     <sect2>
-      <title>Finding imports (<xref linkend="search-path">)</title>
+      <title>Finding imports (<xref linkend="search-path"/>)</title>
 
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -279,10 +279,10 @@
     </sect2>
 
     <sect2>
-      <title>Interface file options (<xref linkend="hi-options">)</title>
+      <title>Interface file options (<xref linkend="hi-options"/>)</title>
 
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -325,10 +325,10 @@
     </sect2>
     
     <sect2>
-      <title>Recompilation checking (<xref linkend="recomp">)</title>
+      <title>Recompilation checking (<xref linkend="recomp"/>)</title>
 
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -351,10 +351,10 @@
     </sect2>
 
     <sect2>
-      <title>Interactive-mode options (<xref linkend="ghci-dot-files">)</title>
+      <title>Interactive-mode options (<xref linkend="ghci-dot-files"/>)</title>
       
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -382,9 +382,9 @@
     </sect2>
 
     <sect2>
-      <title>Packages (<xref linkend="packages">)</title>
+      <title>Packages (<xref linkend="packages"/>)</title>
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
     	    <row>
 	      <entry>Flag</entry>
@@ -418,10 +418,10 @@
     </sect2>
 
     <sect2>
-      <title>Language options (<xref linkend="options-language">)</title>
+      <title>Language options (<xref linkend="options-language"/>)</title>
 
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
     	    <row>
 	      <entry>Flag</entry>
@@ -516,10 +516,10 @@
     </sect2>
 
     <sect2>
-      <title>Warnings (<xref linkend="options-sanity">)</title>
+      <title>Warnings (<xref linkend="options-sanity"/>)</title>
       
     <informaltable>
-      <tgroup cols=3 align=left colsep=1 rowsep=1>
+      <tgroup cols="3" align="left" colsep="1" rowsep="1">
 	<thead>
 	  <row>
 	    <entry>Flag</entry>
@@ -556,7 +556,7 @@
 
 	  <row>
 	    <entry><option>-fwarn-deprecations</option></entry>
-	    <entry>warn about uses of functions & types that are deprecated</entry>
+	    <entry>warn about uses of functions &amp; types that are deprecated</entry>
 	    <entry>dynamic</entry>
 	    <entry><option>-fno-warn-deprecations</option></entry>
 	  </row>
@@ -666,10 +666,10 @@
 
     </sect2>
     <sect2>
-      <title>Optimisation levels (<xref linkend="options-optimise">)</title>
+      <title>Optimisation levels (<xref linkend="options-optimise"/>)</title>
 
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -697,10 +697,10 @@
 	      
     </sect2>
     <sect2>
-      <title>Individual optimisations (<xref linkend="options-f">)</title>
+      <title>Individual optimisations (<xref linkend="options-f"/>)</title>
 
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -893,10 +893,10 @@
     </sect2>
 
     <sect2>
-      <title>Profiling options (<xref linkend="profiling">)</title>
+      <title>Profiling options (<xref linkend="profiling"/>)</title>
 
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -950,10 +950,10 @@
     </sect2>
 
     <sect2>
-      <title>Parallelism options (<xref linkend="sec-using-parallel">)</title>
+      <title>Parallelism options (<xref linkend="sec-using-parallel"/>)</title>
 
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -987,10 +987,10 @@
     </sect2>
 
     <sect2>
-      <title>C pre-processor options (<xref linkend="c-pre-processor">)</title>
+      <title>C pre-processor options (<xref linkend="c-pre-processor"/>)</title>
 
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -1031,9 +1031,9 @@
     </sect2>
 
     <sect2>
-      <title>C compiler options (<xref linkend="options-C-compiler">)</title>
+      <title>C compiler options (<xref linkend="options-C-compiler"/>)</title>
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -1056,10 +1056,10 @@
     </sect2>
 
     <sect2>
-      <title>Code generation options (<xref linkend="options-codegen">)</title>
+      <title>Code generation options (<xref linkend="options-codegen"/>)</title>
 
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -1093,10 +1093,10 @@
     </sect2>
 
     <sect2>
-      <title>Linking options (<xref linkend="options-linker">)</title>
+      <title>Linking options (<xref linkend="options-linker"/>)</title>
 
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -1194,10 +1194,10 @@
     </sect2>
 
     <sect2>
-      <title>Replacing phases (<xref linkend="replacing-phases">)</title>
+      <title>Replacing phases (<xref linkend="replacing-phases"/>)</title>
 
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -1271,10 +1271,10 @@
     </sect2>
 
     <sect2>
-      <title>Forcing options to particular phases (<xref linkend="forcing-options-through">)</title>
+      <title>Forcing options to particular phases (<xref linkend="forcing-options-through"/>)</title>
 
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -1340,10 +1340,10 @@
     </sect2>
 
     <sect2>
-      <title>Platform-specific options (<xref linkend="options-platform">)</title>
+      <title>Platform-specific options (<xref linkend="options-platform"/>)</title>
       
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -1372,10 +1372,10 @@
 
          
     <sect2>
-      <title>External core file options (<xref linkend="ext-core">)</title>
+      <title>External core file options (<xref linkend="ext-core"/>)</title>
 
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -1398,10 +1398,10 @@
 	
 
     <sect2>
-      <title>Compiler debugging options (<xref linkend="options-debugging">)</title>
+      <title>Compiler debugging options (<xref linkend="options-debugging"/>)</title>
 
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>
@@ -1660,7 +1660,7 @@
       <title>Misc compiler options</title>
 
       <informaltable>
-	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
 	    <row>
 	      <entry>Flag</entry>

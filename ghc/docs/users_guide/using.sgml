@@ -13,7 +13,7 @@
     Options can be specified in three ways:</para>
 
     <sect2>
-      <title>Command-line arguments</title>
+      <title>command-line arguments</title>
       
       <indexterm><primary>structure, command-line</primary></indexterm>
       <indexterm><primary>command-line</primary><secondary>arguments</secondary></indexterm>
@@ -21,13 +21,13 @@
       
       <para>An invocation of GHC takes the following form:</para>
 
-<Screen>
+<screen>
 ghc [argument...]
-</Screen>
+</screen>
 
-      <para>Command-line arguments are either options or file names.</para>
+      <para>command-line arguments are either options or file names.</para>
 
-      <para>Command-line options begin with <literal>-</literal>.
+      <para>command-line options begin with <literal>-</literal>.
       They may <emphasis>not</emphasis> be grouped:
       <option>-vO</option> is different from <option>-v -O</option>.
       Options need not precede filenames: e.g., <literal>ghc *.o -o
@@ -38,8 +38,8 @@ ghc [argument...]
       <filename>Bar.hs</filename>.</para>
     </sect2>
 
-    <Sect2 id="source-file-options">
-      <title>Command line options in source files</title>
+    <sect2 id="source-file-options">
+      <title>command line options in source files</title>
     
       <indexterm><primary>source-file options</primary></indexterm>
 
@@ -53,11 +53,11 @@ ghc [argument...]
       <literal>OPTIONS</literal> pragma <indexterm><primary>OPTIONS
       pragma</primary></indexterm>:</para>
 
-<ProgramListing>
+<programlisting>
 {-# OPTIONS -fglasgow-exts #-}
 module X where
 ...
-</ProgramListing>
+</programlisting>
       
       <para><literal>OPTIONS</literal> pragmas are only looked for at
       the top of your source files, upto the first
@@ -86,7 +86,7 @@ module X where
       <title>Setting options in GHCi</title>
 
       <para>Options may also be modified from within GHCi, using the
-      <literal>:set</literal> command.  See <xref linkend="ghci-set">
+      <literal>:set</literal> command.  See <xref linkend="ghci-set"/>
       for more details.</para>
     </sect2>
   </sect1>
@@ -107,7 +107,7 @@ module X where
 
     <para>As a rule of thumb, options which relate to filenames are
     static, and the rest are dynamic. The flag reference tables (<xref
-    linkend="flag-reference">) lists the status of each flag.</para>
+    linkend="flag-reference"/>) lists the status of each flag.</para>
   </sect1>
 
   <sect1 id="file-suffixes">
@@ -193,7 +193,7 @@ module X where
     <variablelist>
       <varlistentry>
 	<term><cmdsynopsis><command>ghc</command>
-	    <arg choice=plain>&ndash;&ndash;interactive</arg>
+	    <arg choice='plain'>&ndash;&ndash;interactive</arg>
 	  </cmdsynopsis></term>
 	<indexterm><primary>interactive mode</primary>
 	</indexterm>
@@ -202,13 +202,13 @@ module X where
 	<listitem>
 	  <para>Interactive mode, which is also available as
 	  <command>ghci</command>.  Interactive mode is described in
-	  more detail in <xref linkend="ghci">.</para>
+	  more detail in <xref linkend="ghci"/>.</para>
 	</listitem>
       </varlistentry>
       
       <varlistentry>
 	<term><cmdsynopsis><command>ghc</command>
-	    <arg choice=plain>&ndash;&ndash;make</arg>
+	    <arg choice='plain'>&ndash;&ndash;make</arg>
 	  </cmdsynopsis></term>
 	<indexterm><primary>make mode</primary>
 	</indexterm>
@@ -220,13 +220,13 @@ module X where
 	  If you have a straightforward Haskell program, this is
 	  likely to be much easier, and faster, than using
 	  <command>make</command>.  Make mode is described in <xref
-	  linkend="make-mode">.</para>
+	  linkend="make-mode"/>.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
 	<term><cmdsynopsis><command>ghc</command>
-	    <arg choice=plain>&ndash;e</arg> <arg choice=plain><replaceable>expr</replaceable></arg>
+	    <arg choice='plain'>&ndash;e</arg> <arg choice='plain'><replaceable>expr</replaceable></arg>
 	</cmdsynopsis></term>
 	<indexterm><primary>eval mode</primary>
 	</indexterm>
@@ -234,7 +234,7 @@ module X where
 	  <para>Expression-evaluation mode.  This is very similar to
 	  interactive mode, except that there is a single expression
 	  to evaluate (<replaceable>expr</replaceable>) which is given
-	  on the command line.  See <xref linkend="eval-mode"> for
+	  on the command line.  See <xref linkend="eval-mode"/> for
 	  more details.</para>
 	</listitem>
       </varlistentry>
@@ -260,31 +260,31 @@ module X where
 	  there is no other mode flag specified on the command line,
 	  in which case it means that the specified files should be
 	  compiled and then linked to form a program. See <xref
-	  linkend="options-order">.</para>
+	  linkend="options-order"/>.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
 	<term><cmdsynopsis><command>ghc</command>
-	    <arg choice=plain>&ndash;M</arg></cmdsynopsis></term>
+	    <arg choice='plain'>&ndash;M</arg></cmdsynopsis></term>
 	<indexterm><primary>dependency-generation mode</primary>
 	</indexterm>
 	<listitem>
 	  <para>Dependency-generation mode.  In this mode, GHC can be
 	  used to generate dependency information suitable for use in
 	  a <literal>Makefile</literal>.  See <xref
-	  linkend="sec-makefile-dependencies">.</para>
+	  linkend="sec-makefile-dependencies"/>.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
 	<term><cmdsynopsis><command>ghc</command>
-	    <arg choice=plain>&ndash;&ndash;mk-dll</arg></cmdsynopsis></term>
+	    <arg choice='plain'>&ndash;&ndash;mk-dll</arg></cmdsynopsis></term>
 	<indexterm><primary>dependency-generation mode</primary>
 	</indexterm>
 	<listitem>
 	  <para>DLL-creation mode (Windows only).  See <xref
-	  linkend="win32-dlls-create">.</para>
+	  linkend="win32-dlls-create"/>.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
@@ -348,7 +348,7 @@ ghc &ndash;&ndash;make Main.hs
       you give on the command line will apply to all the source files
       compiled, so if you want any options to apply to a single source
       file only, you'll need to use an <literal>OPTIONS</literal>
-      pragma (see <xref linkend="source-file-options">).</para>
+      pragma (see <xref linkend="source-file-options"/>).</para>
 
       <para>If the program needs to be linked with additional objects
       (say, some auxilliary C code), then the object files can be
@@ -365,7 +365,7 @@ ghc &ndash;&ndash;make Main.hs
       <para>The source files for the program don't all need to be in
       the same directory; the <option>-i</option> option can be used
       to add directories to the search path (see <xref
-      linkend="search-path">).</para>
+      linkend="search-path"/>).</para>
     </sect2>
   
     <sect2 id="eval-mode">
@@ -415,10 +415,10 @@ olleh
       
       <informaltable>
 	<tgroup cols="4">
-	  <colspec align="left">
-	  <colspec align="left">
-	  <colspec align="left">
-	  <colspec align="left">
+	  <colspec align="left"/>
+	  <colspec align="left"/>
+	  <colspec align="left"/>
+	  <colspec align="left"/>
 	  
 	  <thead>
 	    <row>
@@ -493,15 +493,15 @@ ghc -c Foo.hs</screen>
       whether a native-code generator<indexterm><primary>native-code
       generator</primary></indexterm> is used (producing assembly
       language) or not (producing C).  See <xref
-      linkend="options-codegen"> for more details.</para>
+      linkend="options-codegen"/> for more details.</para>
 
       <para>Note: C pre-processing is optional, the
       <option>-cpp</option><indexterm><primary><option>-cpp</option></primary></indexterm>
-      flag turns it on.  See <xref linkend="c-pre-processor"> for more
+      flag turns it on.  See <xref linkend="c-pre-processor"/> for more
       details.</para>
       
-      <para>Note: The option <option>-E</option><IndexTerm><Primary>-E
-      option</Primary></IndexTerm> runs just the pre-processing passes
+      <para>Note: The option <option>-E</option><indexterm><primary>-E
+      option</primary></indexterm> runs just the pre-processing passes
       of the compiler, dumping the result in a file.  Note that this
       differs from the previous behaviour of dumping the file to
       standard output.</para>
@@ -511,8 +511,8 @@ ghc -c Foo.hs</screen>
   <sect1 id="options-help">
     <title>Help and verbosity options</title>
 
-    <IndexTerm><Primary>help options</Primary></IndexTerm>
-    <IndexTerm><Primary>verbosity options</Primary></IndexTerm>
+    <indexterm><primary>help options</primary></indexterm>
+    <indexterm><primary>verbosity options</primary></indexterm>
 
     <variablelist>
       <varlistentry>
@@ -633,7 +633,7 @@ ghc -c Foo.hs</screen>
 	  is the value of
 	  <literal>$libdir</literal><indexterm><primary><literal>libdir</literal></primary>
 	  </indexterm>in the package configuration file (see <xref
-	  linkend="packages">).</para>
+	  linkend="packages"/>).</para>
 	</listitem>
       </varlistentry>
 
@@ -662,12 +662,12 @@ ghc -c Foo.hs</screen>
     simple ways to select standard &ldquo;packages&rdquo; of warnings:
     </para>
 
-    <VariableList>
+    <variablelist>
 
       <varlistentry>
 	<term><option>-W</option>:</term>
 	<listitem>
-	  <IndexTerm><Primary>-W option</Primary></IndexTerm>
+	  <indexterm><primary>-W option</primary></indexterm>
 	  <para>Provides the standard warnings plus
 	  <option>-fwarn-incomplete-patterns</option>,
 	  <option>-fwarn-unused-matches</option>,
@@ -680,7 +680,7 @@ ghc -c Foo.hs</screen>
       <varlistentry>
 	<term><option>-w</option>:</term>
 	<listitem>
-	  <IndexTerm><Primary><option>-w</option></Primary></IndexTerm>
+	  <indexterm><primary><option>-w</option></primary></indexterm>
 	  <para>Turns off all warnings, including the standard ones.</para>
 	</listitem>
       </varlistentry>
@@ -719,7 +719,7 @@ ghc -c Foo.hs</screen>
 	  <para>Causes a warning to be emitted when a deprecated
 	  function or type is used.  Entities can be marked as
 	  deprecated using a pragma, see <xref
-	  linkend="deprecated-pragma">.</para>
+	  linkend="deprecated-pragma"/>.</para>
 	</listitem>
       </varlistentry>
 
@@ -878,7 +878,7 @@ f (_:xs) = 1
 f "2"    = 2
 </programlisting>
 
-	  <para>where the last pattern match in <Function>f</Function>
+	  <para>where the last pattern match in <function>f</function>
           won't ever be reached, as the second pattern overlaps
           it. More often than not, redundant patterns is a programmer
           mistake/error, so this option is enabled by default.</para>
@@ -900,7 +900,7 @@ f "2"    = 2
 	    the monad <literal>fail</literal> operation (monads). For example:
 	    <programlisting>
 	      f :: [Maybe a] -> [a]
-	      f xs = [y | Just y <- xs]
+	      f xs = [y | Just y &lt;- xs]
 	      </programlisting>
 	    Switching on <option>-fwarn-simple-patterns</option> will elicit warnings about
 	    these probably-innocent cases, which is why the flag is off by default. </para>
@@ -921,7 +921,7 @@ f "2"    = 2
           in. This is useful information when converting code from a
           context that assumed one default into one with another,
           e.g., the `default default' for Haskell 1.4 caused the
-          otherwise unconstrained value <Constant>1</Constant> to be
+          otherwise unconstrained value <constant>1</constant> to be
           given the type <literal>Int</literal>, whereas Haskell 98
           defaults it to <literal>Integer</literal>.  This may lead to
           differences in performance and behaviour, hence the
@@ -974,7 +974,7 @@ f "2"    = 2
 	  <para>Report all unused variables which arise from pattern
           matches, including patterns consisting of a single variable.
           For instance <literal>f x y = []</literal> would report
-          <VarName>x</VarName> and <VarName>y</VarName> as unused.  The
+          <varname>x</varname> and <varname>y</varname> as unused.  The
           warning is suppressed if the variable name begins with an underscore, thus:
 	    <programlisting>
 	       f _x = True
@@ -983,7 +983,7 @@ f "2"    = 2
 	</listitem>
       </varlistentry>
 
-    </VariableList>
+    </variablelist>
 
     <para>If you're feeling really paranoid, the
     <option>-dcore-lint</option>
@@ -1159,7 +1159,7 @@ f "2"    = 2
 	    <literal>Exception.assert</literal> in source code (in
 	    other words, rewriting <literal>Exception.assert p
 	    e</literal> to <literal>e</literal> (see <xref
-	    linkend="sec-assertions">).  This flag is turned on by
+	    linkend="sec-assertions"/>).  This flag is turned on by
 	    <option>-O</option>.
 	    </para>
 	  </listitem>
@@ -1197,7 +1197,7 @@ f "2"    = 2
             unpacked if possible.  It is equivalent to adding an
             <literal>UNPACK</literal> pragma to every strict
             constructor field (see <xref
-            linkend="unpack-pragma">).</para>
+            linkend="unpack-pragma"/>).</para>
 
 	    <para>This option is a bit of a sledgehammer: it might
 	    sometimes make things worse.  Selectively unboxing fields
@@ -1214,9 +1214,9 @@ f "2"    = 2
             Switching it on makes the compiler a little keener to
             inline a function that returns a constructor, if the
             context is that of a thunk.
-<ProgramListing>
+<programlisting>
    x = plusInt a b
-</ProgramListing>
+</programlisting>
             If we inlined plusInt we might get an opportunity to use
             update-in-place for the thunk 'x'.</para>
 	  </listitem>
@@ -1285,7 +1285,7 @@ library documentation).</para>
 
 <para>
 RTS options are provided for modifying the behaviour of the threaded
-runtime system.  See <XRef LinkEnd="parallel-rts-opts">.
+runtime system.  See <xref linkend="parallel-rts-opts"/>.
 </para>
 
 <para>
@@ -1293,92 +1293,92 @@ Concurrent Haskell is described in more detail in the documentation
 for the <literal>Control.Concurrent</literal> module.
 </para>
 
-</Sect1>
+</sect1>
 
-<Sect1 id="sec-using-parallel">
-<title>Using Parallel Haskell</title>
+<sect1 id="sec-using-parallel">
+<title>Using parallel Haskell</title>
 
 <para>
-<indexterm><primary>Parallel Haskell&mdash;use</primary></indexterm>
+<indexterm><primary>parallel Haskell&mdash;use</primary></indexterm>
 </para>
 
 <para>
 &lsqb;You won't be able to execute parallel Haskell programs unless PVM3
-(Parallel Virtual Machine, version 3) is installed at your site.&rsqb;
-</Para>
+(parallel Virtual Machine, version 3) is installed at your site.&rsqb;
+</para>
 
 <para>
 To compile a Haskell program for parallel execution under PVM, use the
-<Option>-parallel</Option> option,<IndexTerm><Primary>-parallel
-option</Primary></IndexTerm> both when compiling <Emphasis>and
-linking</Emphasis>.  You will probably want to <Literal>import
-Parallel</Literal> into your Haskell modules.
-</Para>
+<option>-parallel</option> option,<indexterm><primary>-parallel
+option</primary></indexterm> both when compiling <emphasis>and
+linking</emphasis>.  You will probably want to <literal>import
+parallel</literal> into your Haskell modules.
+</para>
 
 <para>
 To run your parallel program, once PVM is going, just invoke it
 &ldquo;as normal&rdquo;.  The main extra RTS option is
-<Option>-qp&lt;n&gt;</Option>, to say how many PVM
+<option>-qp&lt;n&gt;</option>, to say how many PVM
 &ldquo;processors&rdquo; your program to run on.  (For more details of
-all relevant RTS options, please see <XRef
-LinkEnd="parallel-rts-opts">.)
+all relevant RTS options, please see <xref
+linkend="parallel-rts-opts"/>.)
 </para>
 
 <para>
-In truth, running Parallel Haskell programs and getting information
+In truth, running parallel Haskell programs and getting information
 out of them (e.g., parallelism profiles) is a battle with the vagaries of
 PVM, detailed in the following sections.
 </para>
 
-<Sect2 id="pvm-dummies">
-<Title>Dummy's guide to using PVM</Title>
+<sect2 id="pvm-dummies">
+<title>Dummy's guide to using PVM</title>
 
 <para>
 <indexterm><primary>PVM, how to use</primary></indexterm>
-<indexterm><primary>Parallel Haskell&mdash;PVM use</primary></indexterm>
+<indexterm><primary>parallel Haskell&mdash;PVM use</primary></indexterm>
 Before you can run a parallel program under PVM, you must set the
 required environment variables (PVM's idea, not ours); something like,
 probably in your <filename>.cshrc</filename> or equivalent:
 
-<ProgramListing>
+<programlisting>
 setenv PVM_ROOT /wherever/you/put/it
 setenv PVM_ARCH `$PVM_ROOT/lib/pvmgetarch`
 setenv PVM_DPATH $PVM_ROOT/lib/pvmd
-</ProgramListing>
+</programlisting>
 
 </para>
 
 <para>
 Creating and/or controlling your &ldquo;parallel machine&rdquo; is a purely-PVM
-business; nothing specific to Parallel Haskell. The following paragraphs
+business; nothing specific to parallel Haskell. The following paragraphs
 describe how to configure your parallel machine interactively.
-</Para>
+</para>
 
-<Para>
+<para>
 If you use parallel Haskell regularly on the same machine configuration it
 is a good idea to maintain a file with all machine names and to make the
 environment variable PVM_HOST_FILE point to this file. Then you can avoid
 the interactive operations described below by just saying
-</Para>
+</para>
 
-<ProgramListing>
+<programlisting>
 pvm $PVM_HOST_FILE
-</ProgramListing>
+</programlisting>
 
-<Para>
-You use the <Command>pvm</Command><IndexTerm><Primary>pvm command</Primary></IndexTerm> command to start PVM on your
+<para>
+You use the <command>pvm</command><indexterm><primary>pvm command</primary></indexterm> command to start PVM on your
 machine.  You can then do various things to control/monitor your
 &ldquo;parallel machine;&rdquo; the most useful being:
 </para>
 
 <para>
-<InformalTable>
-<TGroup Cols=2>
-<ColSpec Align="Left">
-<TBody>
+<informaltable>
+<tgroup cols="2">
+<colspec align="left"/>
+<tbody>
 
 <row>
-<entry><KeyCombo><KeyCap>Control</KeyCap><KeyCap>D</KeyCap></KeyCombo></entry>
+<entry><keycombo><keycap>Control</keycap><keycap>D</keycap></keycombo></entry>
 <entry>exit <command>pvm</command>, leaving it running</entry>
 </row>
 
@@ -1417,9 +1417,9 @@ machine.  You can then do various things to control/monitor your
 <entry>status of a particular process</entry>
 </row>
 
-</TBody>
-</TGroup>
-</InformalTable>
+</tbody>
+</tgroup>
+</informaltable>
 </para>
 
 <para>
@@ -1428,8 +1428,8 @@ The PVM documentation can tell you much, much more about <command>pvm</command>!
 
 </sect2>
 
-<Sect2 id="par-profiles">
-<Title>Parallelism profiles</Title>
+<sect2 id="par-profiles">
+<title>parallelism profiles</title>
 
 <para>
 <indexterm><primary>parallelism profiles</primary></indexterm>
@@ -1438,29 +1438,29 @@ The PVM documentation can tell you much, much more about <command>pvm</command>!
 </para>
 
 <para>
-With Parallel Haskell programs, we usually don't care about the
+With parallel Haskell programs, we usually don't care about the
 results&mdash;only with &ldquo;how parallel&rdquo; it was!  We want pretty pictures.
 </para>
 
-<Para>
-Parallelism profiles (&agrave; la <Command>hbcpp</Command>) can be generated with the
-<Option>-qP</Option><IndexTerm><Primary>-qP RTS option (concurrent, parallel)</Primary></IndexTerm> RTS option.  The
+<para>
+parallelism profiles (&agrave; la <command>hbcpp</command>) can be generated with the
+<option>-qP</option><indexterm><primary>-qP RTS option (concurrent, parallel)</primary></indexterm> RTS option.  The
 per-processor profiling info is dumped into files named
-<Filename>&lt;full-path&gt;&lt;program&gt;.gr</Filename>.  These are then munged into a PostScript picture,
+<filename>&lt;full-path&gt;&lt;program&gt;.gr</filename>.  These are then munged into a PostScript picture,
 which you can then display.  For example, to run your program
-<Filename>a.out</Filename> on 8 processors, then view the parallelism profile, do:
-</Para>
+<filename>a.out</filename> on 8 processors, then view the parallelism profile, do:
+</para>
 
-<Para>
+<para>
 
-<Screen>
+<screen>
 <prompt>&dollar;</prompt> ./a.out +RTS -qP -qp8
 <prompt>&dollar;</prompt> grs2gr *.???.gr &#62; temp.gr # combine the 8 .gr files into one
 <prompt>&dollar;</prompt> gr2ps -O temp.gr              # cvt to .ps; output in temp.ps
 <prompt>&dollar;</prompt> ghostview -seascape temp.ps   # look at it!
-</Screen>
+</screen>
 
-</Para>
+</para>
 
 <para>
 The scripts for processing the parallelism profiles are distributed
@@ -1469,13 +1469,13 @@ in <filename>ghc/utils/parallel/</filename>.
 
 </sect2>
 
-<Sect2>
-<Title>Other useful info about running parallel programs</Title>
+<sect2>
+<title>Other useful info about running parallel programs</title>
 
-<Para>
+<para>
 The &ldquo;garbage-collection statistics&rdquo; RTS options can be useful for
 seeing what parallel programs are doing.  If you do either
-<Option>+RTS -Sstderr</Option><IndexTerm><Primary>-Sstderr RTS option</Primary></IndexTerm> or <Option>+RTS -sstderr</Option>, then
+<option>+RTS -Sstderr</option><indexterm><primary>-Sstderr RTS option</primary></indexterm> or <option>+RTS -sstderr</option>, then
 you'll get mutator, garbage-collection, etc., times on standard
 error. The standard error of all PE's other than the `main thread'
 appears in <filename>/tmp/pvml.nnn</filename>, courtesy of PVM.
@@ -1488,32 +1488,32 @@ what's happening overall is: <command>tail -f /tmp/pvml.nnn</command>.
 
 </sect2>
 
-<Sect2 id="parallel-rts-opts">
-<title>RTS options for Concurrent/Parallel Haskell
+<sect2 id="parallel-rts-opts">
+<title>RTS options for Concurrent/parallel Haskell
 </title>
 
 <para>
 <indexterm><primary>RTS options, concurrent</primary></indexterm>
 <indexterm><primary>RTS options, parallel</primary></indexterm>
 <indexterm><primary>Concurrent Haskell&mdash;RTS options</primary></indexterm>
-<indexterm><primary>Parallel Haskell&mdash;RTS options</primary></indexterm>
+<indexterm><primary>parallel Haskell&mdash;RTS options</primary></indexterm>
 </para>
 
 <para>
 Besides the usual runtime system (RTS) options
-(<XRef LinkEnd="runtime-control">), there are a few options particularly
+(<xref linkend="runtime-control"/>), there are a few options particularly
 for concurrent/parallel execution.
 </para>
 
 <para>
-<VariableList>
+<variablelist>
 
-<VarListEntry>
-<Term><Option>-qp&lt;N&gt;</Option>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-qp&lt;N&gt; RTS option</Primary></IndexTerm>
-(PARALLEL ONLY) Use <Literal>&lt;N&gt;</Literal> PVM processors to run this program;
+<varlistentry>
+<Term><option>-qp&lt;N&gt;</option>:</Term>
+<listitem>
+<para>
+<indexterm><primary>-qp&lt;N&gt; RTS option</primary></indexterm>
+(paraLLEL ONLY) Use <literal>&lt;N&gt;</literal> PVM processors to run this program;
 the default is 2.
 </para>
 </listitem>
@@ -1540,93 +1540,93 @@ is the maximum granularity available for timed context switches.
 <listitem>
 <para>
 <indexterm><primary>-q RTS option</primary></indexterm>
-(PARALLEL ONLY) Produce a quasi-parallel profile of thread activity,
-in the file <FIlename>&lt;program&gt;.qp</FIlename>.  In the style of <command>hbcpp</command>, this profile
+(paraLLEL ONLY) Produce a quasi-parallel profile of thread activity,
+in the file <filename>&lt;program&gt;.qp</filename>.  In the style of <command>hbcpp</command>, this profile
 records the movement of threads between the green (runnable) and red
 (blocked) queues.  If you specify the verbose suboption (<option>-qv</option>), the
 green queue is split into green (for the currently running thread
 only) and amber (for other runnable threads).  We do not recommend
 that you use the verbose suboption if you are planning to use the
-<Command>hbcpp</Command> profiling tools or if you are context switching at every heap
-check (with <Option>-C</Option>).
+<command>hbcpp</command> profiling tools or if you are context switching at every heap
+check (with <option>-C</option>).
 -->
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-qt&lt;num&gt;</Option>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-qt&lt;num&gt; RTS option</Primary></IndexTerm>
-(PARALLEL ONLY) Limit the thread pool size, i.e. the number of concurrent
-threads per processor to <Literal>&lt;num&gt;</Literal>.  The default is
-32.  Each thread requires slightly over 1K <Emphasis>words</Emphasis> in
+</para>
+</listitem>
+</varlistentry>
+<varlistentry>
+<Term><option>-qt&lt;num&gt;</option>:</Term>
+<listitem>
+<para>
+<indexterm><primary>-qt&lt;num&gt; RTS option</primary></indexterm>
+(paraLLEL ONLY) Limit the thread pool size, i.e. the number of concurrent
+threads per processor to <literal>&lt;num&gt;</literal>.  The default is
+32.  Each thread requires slightly over 1K <emphasis>words</emphasis> in
 the heap for thread state and stack objects.  (For 32-bit machines, this
 translates to 4K bytes, and for 64-bit machines, 8K bytes.)
-</Para>
-</ListItem>
-</VarListEntry>
+</para>
+</listitem>
+</varlistentry>
 <!-- no more -HWL
-<VarListEntry>
-<Term><Option>-d</Option>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-d RTS option (parallel)</Primary></IndexTerm>
-(PARALLEL ONLY) Turn on debugging.  It pops up one xterm (or GDB, or
-something&hellip;) per PVM processor.  We use the standard <Command>debugger</Command>
+<varlistentry>
+<Term><option>-d</option>:</Term>
+<listitem>
+<para>
+<indexterm><primary>-d RTS option (parallel)</primary></indexterm>
+(paraLLEL ONLY) Turn on debugging.  It pops up one xterm (or GDB, or
+something&hellip;) per PVM processor.  We use the standard <command>debugger</command>
 script that comes with PVM3, but we sometimes meddle with the
-<Command>debugger2</Command> script.  We include ours in the GHC distribution,
-in <Filename>ghc/utils/pvm/</Filename>.
-</Para>
-</ListItem>
-</VarListEntry>
+<command>debugger2</command> script.  We include ours in the GHC distribution,
+in <filename>ghc/utils/pvm/</filename>.
+</para>
+</listitem>
+</varlistentry>
 -->
-<VarListEntry>
-<Term><Option>-qe&lt;num&gt;</Option>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-qe&lt;num&gt; RTS option
-(parallel)</Primary></IndexTerm> (PARALLEL ONLY) Limit the spark pool size
+<varlistentry>
+<Term><option>-qe&lt;num&gt;</option>:</Term>
+<listitem>
+<para>
+<indexterm><primary>-qe&lt;num&gt; RTS option
+(parallel)</primary></indexterm> (paraLLEL ONLY) Limit the spark pool size
 i.e. the number of pending sparks per processor to
-<Literal>&lt;num&gt;</Literal>. The default is 100. A larger number may be
+<literal>&lt;num&gt;</literal>. The default is 100. A larger number may be
 appropriate if your program generates large amounts of parallelism
 initially.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-qQ&lt;num&gt;</Option>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-qQ&lt;num&gt; RTS option (parallel)</Primary></IndexTerm>
-(PARALLEL ONLY) Set the size of packets transmitted between processors
-to <Literal>&lt;num&gt;</Literal>. The default is 1024 words. A larger number may be
+</para>
+</listitem>
+</varlistentry>
+<varlistentry>
+<Term><option>-qQ&lt;num&gt;</option>:</Term>
+<listitem>
+<para>
+<indexterm><primary>-qQ&lt;num&gt; RTS option (parallel)</primary></indexterm>
+(paraLLEL ONLY) Set the size of packets transmitted between processors
+to <literal>&lt;num&gt;</literal>. The default is 1024 words. A larger number may be
 appropriate if your machine has a high communication cost relative to
 computation speed.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-qh&lt;num&gt;</Option>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-qh&lt;num&gt; RTS option (parallel)</Primary></IndexTerm>
-(PARALLEL ONLY) Select a packing scheme. Set the number of non-root thunks to pack in one packet to
+</para>
+</listitem>
+</varlistentry>
+<varlistentry>
+<Term><option>-qh&lt;num&gt;</option>:</Term>
+<listitem>
+<para>
+<indexterm><primary>-qh&lt;num&gt; RTS option (parallel)</primary></indexterm>
+(paraLLEL ONLY) Select a packing scheme. Set the number of non-root thunks to pack in one packet to
 &lt;num&gt;-1 (0 means infinity). By default GUM uses full-subgraph
 packing, i.e. the entire subgraph with the requested closure as root is
 transmitted (provided it fits into one packet). Choosing a smaller value
 reduces the amount of pre-fetching of work done in GUM. This can be
 advantageous for improving data locality but it can also worsen the balance
 of the load in the system. 
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term><Option>-qg&lt;num&gt;</Option>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-qg&lt;num&gt; RTS option
-(parallel)</Primary></IndexTerm> (PARALLEL ONLY) Select a globalisation
+</para>
+</listitem>
+</varlistentry>
+<varlistentry>
+<Term><option>-qg&lt;num&gt;</option>:</Term>
+<listitem>
+<para>
+<indexterm><primary>-qg&lt;num&gt; RTS option
+(parallel)</primary></indexterm> (paraLLEL ONLY) Select a globalisation
 scheme. This option affects the
 generation of global addresses when transferring data. Global addresses are
 globally unique identifiers required to maintain sharing in the distributed
@@ -1636,15 +1636,15 @@ is transmitted. With &lt;num&gt;=1 a thunk-only globalisation scheme is
 used, which generated global address only for thunks. The latter case may
 lose sharing of data but has a reduced overhead in packing graph structures
 and maintaining internal tables of global addresses.
-</Para>
-</ListItem>
-</VarListEntry>
-</VariableList>
+</para>
+</listitem>
+</varlistentry>
+</variablelist>
 </para>
 
 </sect2>
 
-</Sect1>
+</sect1>
 
   <sect1 id="options-platform">
     <title>Platform-specific Flags</title>
@@ -1680,11 +1680,11 @@ and maintaining internal tables of global addresses.
           compiling some modules with four stolen registers, it will
           crash, probably saying:
 
-<Screen>
+<screen>
 Foo.hc:533: fixed or forbidden register was spilled.
 This may be due to a compiler bug or to impossible asm
 statements or clauses.
-</Screen>
+</screen>
 
           Just give some registers back with
           <option>-monly-N-regs</option>.  Try `3' first, then `2'.
@@ -1705,18 +1705,18 @@ statements or clauses.
   <para>GHC can dump its optimized intermediate code (said to be in &ldquo;Core&rdquo; format) 
   to a file as a side-effect of compilation. Core files, which are given the suffix
   <filename>.hcr</filename>, can be read and processed by non-GHC back-end
-  tools.  The Core format is formally described in <ulink url="http://www.haskell.org/ghc/docs/papers/core.ps.gz"
+  tools.  The Core format is formally described in <ulink url="http://www.haskell.org/ghc/docs/papers/core.ps.gz">
   <citetitle>An External Representation for the GHC Core Language</citetitle></ulink>, 
   and sample tools (in Haskell)
   for manipulating Core files are available in the GHC source distribution 
   directory <literal>/fptools/ghc/utils/ext-core</literal>.  
   Note that the format of <literal>.hcr</literal> 
   files is <emphasis>different</emphasis> (though similar) to the Core output format generated 
-  for debugging purposes (<xref linkend="options-debugging">).</para>
+  for debugging purposes (<xref linkend="options-debugging"/>).</para>
 
   <para>The Core format natively supports notes which you can add to
   your source code using the <literal>CORE</literal> pragma (see <xref
-  linkend="pragmas">).</para>
+  linkend="pragmas"/>).</para>
 
     <variablelist>
 
@@ -1741,7 +1741,7 @@ ordinary Haskell 98, when translated to External Core, uses things like rank-2 t
 &debug;
 &flags;
 
-</Chapter>
+</chapter>
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***

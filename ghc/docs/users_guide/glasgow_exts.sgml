@@ -77,7 +77,7 @@ documentation</ulink> describes all the libraries that come with GHC.
 	<listitem>
 	  <para>This simultaneously enables all of the extensions to
           Haskell 98 described in <xref
-          linkend="ghc-language-features">, except where otherwise
+          linkend="ghc-language-features"/>, except where otherwise
           noted. </para>
 
 	  <para>New reserved words: <literal>forall</literal> (only in
@@ -128,7 +128,7 @@ documentation</ulink> describes all the libraries that come with GHC.
 	<indexterm><primary><option>-fallow-undecidable-instances</option></primary></indexterm>
 	<indexterm><primary><option>-fcontext-stack</option></primary></indexterm>
 	<listitem>
-	  <para> See <xref LinkEnd="instance-decls">.  Only relevant
+	  <para> See <xref linkend="instance-decls"/>.  Only relevant
           if you also use <option>-fglasgow-exts</option>.</para>
 	</listitem>
       </varlistentry>
@@ -137,7 +137,7 @@ documentation</ulink> describes all the libraries that come with GHC.
 	<term><option>-finline-phase</option></term>
 	<indexterm><primary><option>-finline-phase</option></primary></indexterm>
 	<listitem>
-	  <para>See <xref LinkEnd="rewrite-rules">.  Only relevant if
+	  <para>See <xref linkend="rewrite-rules"/>.  Only relevant if
           you also use <option>-fglasgow-exts</option>.</para>
 	</listitem>
       </varlistentry>
@@ -146,7 +146,7 @@ documentation</ulink> describes all the libraries that come with GHC.
 	<term><option>-farrows</option></term>
 	<indexterm><primary><option>-farrows</option></primary></indexterm>
 	<listitem>
-	  <para>See <xref LinkEnd="arrow-notation">.  Independent of
+	  <para>See <xref linkend="arrow-notation"/>.  Independent of
           <option>-fglasgow-exts</option>.</para>
 
 	  <para>New reserved words/symbols: <literal>rec</literal>,
@@ -163,7 +163,7 @@ documentation</ulink> describes all the libraries that come with GHC.
 	<term><option>-fgenerics</option></term>
 	<indexterm><primary><option>-fgenerics</option></primary></indexterm>
 	<listitem>
-	  <para>See <xref LinkEnd="generic-classes">.  Independent of
+	  <para>See <xref linkend="generic-classes"/>.  Independent of
           <option>-fglasgow-exts</option>.</para>
 	</listitem>
       </varlistentry>
@@ -192,7 +192,7 @@ documentation</ulink> describes all the libraries that come with GHC.
 
 	  <para>However, <option>-fno-implicit-prelude</option> does
 	  change the handling of certain built-in syntax: see <xref
-	  LinkEnd="rebindable-syntax">.</para>
+	  linkend="rebindable-syntax"/>.</para>
 	</listitem>
       </varlistentry>
 
@@ -200,7 +200,7 @@ documentation</ulink> describes all the libraries that come with GHC.
 	<term><option>-fth</option></term>
 	<listitem>
 	  <para>Enables Template Haskell (see <xref
-	  linkend="template-haskell">).  Currently also implied by
+	  linkend="template-haskell"/>).  Currently also implied by
 	  <option>-fglasgow-exts</option>.</para>
 
 	  <para>Syntax stolen: <literal>[|</literal>,
@@ -215,7 +215,7 @@ documentation</ulink> describes all the libraries that come with GHC.
 	<term><option>-fimplicit-params</option></term>
 	<listitem>
 	  <para>Enables implicit parameters (see <xref
-	  linkend="implicit-parameters">).  Currently also implied by 
+	  linkend="implicit-parameters"/>).  Currently also implied by 
 	  <option>-fglasgow-exts</option>.</para>
 
 	  <para>Syntax stolen:
@@ -485,7 +485,7 @@ import qualified Control.Monad.ST.Strict as ST
 
       <para>For details on how GHC searches for source and interface
       files in the presence of hierarchical modules, see <xref
-      linkend="search-path">.</para>
+      linkend="search-path"/>.</para>
 
       <para>GHC comes with a large collection of libraries arranged
       hierarchically; see the accompanying library documentation.
@@ -505,7 +505,7 @@ import qualified Control.Monad.ST.Strict as ST
 
 <para>
 <indexterm><primary>Pattern guards (Glasgow extension)</primary></indexterm>
-The discussion that follows is an abbreviated version of Simon Peyton Jones's original <ULink URL="http://research.microsoft.com/~simonpj/Haskell/guards.html">proposal</ULink>. (Note that the proposal was written before pattern guards were implemented, so refers to them as unimplemented.)
+The discussion that follows is an abbreviated version of Simon Peyton Jones's original <ulink URL="http://research.microsoft.com/~simonpj/Haskell/guards.html">proposal</ulink>. (Note that the proposal was written before pattern guards were implemented, so refers to them as unimplemented.)
 </para>
 
 <para>
@@ -517,11 +517,11 @@ lookup :: FiniteMap -> Int -> Maybe Int
 </programlisting>
 
 The lookup returns <function>Nothing</function> if the supplied key is not in the domain of the mapping, and <function>(Just v)</function> otherwise,
-where <VarName>v</VarName> is the value that the key maps to.  Now consider the following definition:
+where <varname>v</varname> is the value that the key maps to.  Now consider the following definition:
 </para>
 
 <programlisting>
-clunky env var1 var2 | ok1 && ok2 = val1 + val2
+clunky env var1 var2 | ok1 &amp;&amp; ok2 = val1 + val2
 | otherwise  = var1 + var2
 where
   m1 = lookup env var1
@@ -547,12 +547,12 @@ expectJust Nothing  = error "Unexpected Nothing"
 </programlisting>
 
 <para>
-What is <function>clunky</function> doing? The guard <literal>ok1 &&
+What is <function>clunky</function> doing? The guard <literal>ok1 &amp;&amp;
 ok2</literal> checks that both lookups succeed, using
 <function>maybeToBool</function> to convert the <function>Maybe</function>
 types to booleans. The (lazily evaluated) <function>expectJust</function>
 calls extract the values from the results of the lookups, and binds the
-returned values to <VarName>val1</VarName> and <VarName>val2</VarName>
+returned values to <varname>val1</varname> and <varname>val2</varname>
 respectively.  If either lookup fails, then clunky takes the
 <literal>otherwise</literal> case and returns the sum of its arguments.
 </para>
@@ -615,9 +615,9 @@ with among the pattern guards.  For example:
 </para>
 
 <programlisting>
-f x | [y] <- x
+f x | [y] &lt;- x
     , y > 3
-    , Just z <- h y
+    , Just z &lt;- h y
     = ...
 </programlisting>
 
@@ -651,7 +651,7 @@ Here is a simple (yet contrived) example:
 <programlisting>
 import Control.Monad.Fix
 
-justOnes = mdo xs <- Just (1:xs)
+justOnes = mdo xs &lt;- Just (1:xs)
                return xs
 </programlisting>
 <para>
@@ -731,7 +731,7 @@ This name is not supported by GHC.
     example, the following zips together two lists:</para>
 
 <programlisting>
-   [ (x, y) | x <- xs | y <- ys ] 
+   [ (x, y) | x &lt;- xs | y &lt;- ys ] 
 </programlisting>
 
     <para>The behavior of parallel list comprehensions follows that of
@@ -744,8 +744,8 @@ This name is not supported by GHC.
     <para>Given a parallel comprehension of the form: </para>
 
 <programlisting>
-   [ e | p1 <- e11, p2 <- e12, ... 
-       | q1 <- e21, q2 <- e22, ... 
+   [ e | p1 &lt;- e11, p2 &lt;- e12, ... 
+       | q1 &lt;- e21, q2 &lt;- e22, ... 
        ... 
    ] 
 </programlisting>
@@ -753,8 +753,8 @@ This name is not supported by GHC.
     <para>This will be translated to: </para>
 
 <programlisting>
-   [ e | ((p1,p2), (q1,q2), ...) <- zipN [(p1,p2) | p1 <- e11, p2 <- e12, ...] 
-                                         [(q1,q2) | q1 <- e21, q2 <- e22, ...] 
+   [ e | ((p1,p2), (q1,q2), ...) &lt;- zipN [(p1,p2) | p1 &lt;- e11, p2 &lt;- e12, ...] 
+                                         [(q1,q2) | q1 &lt;- e21, q2 &lt;- e22, ...] 
                                          ... 
    ] 
 </programlisting>
@@ -860,7 +860,7 @@ a data type with no constructors.  For example:</para>
 <para>Syntactically, the declaration lacks the "= constrs" part.  The 
 type can be parameterised over types of any kind, but if the kind is
 not <literal>*</literal> then an explicit kind annotation must be used
-(see <xref linkend="sec-kinding">).</para>
+(see <xref linkend="sec-kinding"/>).</para>
 
 <para>Such data types have only one value, namely bottom.
 Nevertheless, they can be useful when defining "phantom types".</para>
@@ -1020,7 +1020,7 @@ because GHC does not allow  unboxed tuples on the left of a function arrow.
 The idea of using existential quantification in data type declarations
 was suggested by Laufer (I believe, thought doubtless someone will
 correct me), and implemented in Hope+. It's been in Lennart
-Augustsson's <Command>hbc</Command> Haskell compiler for several years, and
+Augustsson's <command>hbc</command> Haskell compiler for several years, and
 proved very useful.  Here's the idea.  Consider the declaration:
 </para>
 
@@ -1131,7 +1131,7 @@ adding a new existential quantification construct.
 <title>Type classes</title>
 
 <para>
-An easy extension (implemented in <Command>hbc</Command>) is to allow
+An easy extension (implemented in <command>hbc</command>) is to allow
 arbitrary contexts before the constructor.  For example:
 </para>
 
@@ -1329,7 +1329,7 @@ instance Eq T where
   (MkT a) == (MkT b) = ???
 </programlisting>
 
-But <VarName>a</VarName> and <VarName>b</VarName> have distinct types, and so can't be compared.
+But <varname>a</varname> and <varname>b</varname> have distinct types, and so can't be compared.
 It's just about possible to imagine examples in which the derived instance
 would make sense, but it seems altogether simpler simply to prohibit such
 declarations.  Define your own instances!
@@ -1352,14 +1352,14 @@ declarations.  Define your own instances!
 
 <para>
 This section documents GHC's implementation of multi-parameter type
-classes.  There's lots of background in the paper <ULink
+classes.  There's lots of background in the paper <ulink
 URL="http://research.microsoft.com/~simonpj/multi.ps.gz" >Type
-classes: exploring the design space</ULink > (Simon Peyton Jones, Mark
+classes: exploring the design space</ulink > (Simon Peyton Jones, Mark
 Jones, Erik Meijer).
 </para>
 <para>
 There are the following constraints on class declarations:
-<OrderedList>
+<orderedlist>
 <listitem>
 
 <para>
@@ -1423,7 +1423,7 @@ be acyclic</emphasis>.  So these class declarations are OK:
 
 <para>
  <emphasis>All of the class type variables must be reachable (in the sense 
-mentioned in <xref linkend="type-restrictions">)
+mentioned in <xref linkend="type-restrictions"/>)
 from the free varibles of each method type
 </emphasis>.  For example:
 
@@ -1468,7 +1468,7 @@ class like this:
 </para>
 </listitem>
 
-</OrderedList>
+</orderedlist>
 </para>
 
 <sect3 id="class-method-types">
@@ -1519,12 +1519,12 @@ Consider the type:
 language omits them; in Haskell 98, all the free type variables of an
 explicit source-language type signature are universally quantified,
 except for the class type variables in a class declaration.  However,
-in GHC, you can give the foralls if you want.  See <xref LinkEnd="universal-quantification">).
+in GHC, you can give the foralls if you want.  See <xref linkend="universal-quantification"/>).
 </para>
 
 <para>
 
-<OrderedList>
+<orderedlist>
 <listitem>
 
 <para>
@@ -1557,7 +1557,7 @@ Note
 that the reachability condition is weaker than saying that <literal>a</literal> is
 functionally dependendent on a type variable free in
 <literal>type</literal> (see <xref
-linkend="functional-dependencies">).  The reason for this is there
+linkend="functional-dependencies"/>).  The reason for this is there
 might be a "hidden" dependency, in a superclass perhaps.  So
 "reachable" is a conservative approximation to "functionally dependent".
 For example, consider:
@@ -1604,7 +1604,7 @@ territory free in case we need it later.
 </para>
 </listitem>
 
-</OrderedList>
+</orderedlist>
 
 </para>
 </sect3>
@@ -1612,7 +1612,7 @@ territory free in case we need it later.
 <sect3 id="hoist">
 <title>For-all hoisting</title>
 <para>
-It is often convenient to use generalised type synonyms (see <xref linkend="type-synonyms">) at the right hand
+It is often convenient to use generalised type synonyms (see <xref linkend="type-synonyms"/>) at the right hand
 end of an arrow, thus:
 <programlisting>
   type Discard a = forall b. a -> b -> a
@@ -1844,7 +1844,7 @@ instance C Int b => Foo b where ...
 is not OK.
 </para>
 </listitem>
-</OrderedList>
+</orderedlist>
 These restrictions ensure that 
 context reduction terminates: each reduction step removes one type
 constructor.  For example, the following would make the type checker
@@ -2029,7 +2029,7 @@ For example, we define the <literal>min</literal> function by binding
 <literal>cmp</literal>.
 <programlisting>
   min :: [a] -> a
-  min  = let ?cmp = (<=) in least
+  min  = let ?cmp = (&lt;=) in least
 </programlisting>
 </para>
 <para>
@@ -2278,10 +2278,10 @@ to give the kind explicitly as (machine-checked) documentation,
 just as it is nice to give a type signature for a function.  On some occasions,
 it is essential to do so.  For example, in his paper "Restricted Data Types in Haskell" (Haskell Workshop 1999)
 John Hughes had to define the data type:
-<Screen>
+<screen>
      data Set cxt a = Set [a]
                     | Unused (cxt a -> ())
-</Screen>
+</screen>
 The only use for the <literal>Unused</literal> constructor was to force the correct
 kind for the type variable <literal>cxt</literal>.
 </para>
@@ -2290,21 +2290,21 @@ GHC now instead allows you to specify the kind of a type variable directly, wher
 a type variable is explicitly bound.  Namely:
 <itemizedlist>
 <listitem><para><literal>data</literal> declarations:
-<Screen>
+<screen>
   data Set (cxt :: * -> *) a = Set [a]
-</Screen></para></listitem>
+</screen></para></listitem>
 <listitem><para><literal>type</literal> declarations:
-<Screen>
+<screen>
   type T (f :: * -> *) = f Int
-</Screen></para></listitem>
+</screen></para></listitem>
 <listitem><para><literal>class</literal> declarations:
-<Screen>
+<screen>
   class (Eq a) => C (f :: * -> *) a where ...
-</Screen></para></listitem>
+</screen></para></listitem>
 <listitem><para><literal>forall</literal>'s in type signatures:
-<Screen>
+<screen>
   f :: forall (cxt :: * -> *). Set cxt Int
-</Screen></para></listitem>
+</screen></para></listitem>
 </itemizedlist>
 </para>
 
@@ -2318,14 +2318,14 @@ single lexeme in Haskell.
 <para>
 As part of the same extension, you can put kind annotations in types
 as well.  Thus:
-<Screen>
+<screen>
    f :: (Int :: *) -> Int
    g :: forall a. a -> (a :: *)
-</Screen>
+</screen>
 The syntax is
-<Screen>
+<screen>
    atype ::= '(' ctype '::' kind ')
-</Screen>
+</screen>
 The parentheses are required.
 </para>
 </sect2>
@@ -2386,12 +2386,12 @@ In particular, a forall-type (also called a "type scheme"),
 including an operational type class context, is legal:
 <itemizedlist>
 <listitem> <para> On the left of a function arrow </para> </listitem>
-<listitem> <para> On the right of a function arrow (see <xref linkend="hoist">) </para> </listitem>
+<listitem> <para> On the right of a function arrow (see <xref linkend="hoist"/>) </para> </listitem>
 <listitem> <para> As the argument of a constructor, or type of a field, in a data type declaration. For
 example, any of the <literal>f1,f2,f3,g1,g2</literal> above would be valid
 field type signatures.</para> </listitem>
 <listitem> <para> As the type of an implicit parameter </para> </listitem>
-<listitem> <para> In a pattern type signature (see <xref linkend="scoped-type-variables">) </para> </listitem>
+<listitem> <para> In a pattern type signature (see <xref linkend="scoped-type-variables"/>) </para> </listitem>
 </itemizedlist>
 There is one place you cannot put a <literal>forall</literal>:
 you cannot instantiate a type variable with a forall-type.  So you cannot 
@@ -2557,7 +2557,7 @@ that x's type has no foralls in it</emphasis>.
 <para>
 What does it mean to "provide" an explicit type for x?  You can do that by 
 giving a type signature for x directly, using a pattern type signature
-(<xref linkend="scoped-type-variables">), thus:
+(<xref linkend="scoped-type-variables"/>), thus:
 <programlisting>
      \ f :: (forall a. a->a) -> (f True, f 'c')
 </programlisting>
@@ -2659,23 +2659,23 @@ f (xs::[a]) = ys ++ ys
 </para>
 
 <para>
-The pattern <literal>(xs::[a])</literal> includes a type signature for <VarName>xs</VarName>.
+The pattern <literal>(xs::[a])</literal> includes a type signature for <varname>xs</varname>.
 This brings the type variable <literal>a</literal> into scope; it scopes over
 all the patterns and right hand sides for this equation for <function>f</function>.
-In particular, it is in scope at the type signature for <VarName>y</VarName>.
+In particular, it is in scope at the type signature for <varname>y</varname>.
 </para>
 
 <para>
  Pattern type signatures are completely orthogonal to ordinary, separate
 type signatures.  The two can be used independently or together.
-At ordinary type signatures, such as that for <VarName>ys</VarName>, any type variables
+At ordinary type signatures, such as that for <varname>ys</varname>, any type variables
 mentioned in the type signature <emphasis>that are not in scope</emphasis> are
 implicitly universally quantified.  (If there are no type variables in
 scope, all type variables mentioned in the signature are universally
-quantified, which is just as in Haskell 98.)  In this case, since <VarName>a</VarName>
-is in scope, it is not universally quantified, so the type of <VarName>ys</VarName> is
-the same as that of <VarName>xs</VarName>.  In Haskell 98 it is not possible to declare
-a type for <VarName>ys</VarName>; a major benefit of scoped type variables is that
+quantified, which is just as in Haskell 98.)  In this case, since <varname>a</varname>
+is in scope, it is not universally quantified, so the type of <varname>ys</varname> is
+the same as that of <varname>xs</varname>.  In Haskell 98 it is not possible to declare
+a type for <varname>ys</varname>; a major benefit of scoped type variables is that
 it becomes possible to do so.
 </para>
 
@@ -2762,9 +2762,9 @@ The type variable(s) bound by the pattern have the same scope
 as the term variable(s) bound by the pattern.  For example:
 <programlisting>
   let
-    f (x::a) = <...rhs of f...>
+    f (x::a) = &lt;...rhs of f...>
     (p::b, q::b) = (1,2)
-  in <...body of let...>
+  in &lt;...body of let...>
 </programlisting>
 Here, the type variable <literal>a</literal> scopes over the right hand side of <literal>f</literal>,
 just like <literal>x</literal> does; while the type variable <literal>b</literal> scopes over the
@@ -2804,7 +2804,7 @@ into scope (except in the type signature itself!). So this is illegal:
   f x = x::a
 </programlisting>
 
-It's illegal because <VarName>a</VarName> is not in scope in the body of <function>f</function>,
+It's illegal because <varname>a</varname> is not in scope in the body of <function>f</function>,
 so the ordinary signature <literal>x::a</literal> is equivalent to <literal>x::forall a.a</literal>;
 and that is an incorrect typing.
 
@@ -3607,7 +3607,7 @@ arr (\ x -> (x, x)) >>>
         returnA
 </screen>
 Note that variables not used later in the composition are projected out.
-After simplification using rewrite rules (see <xref linkEnd="rewrite-rules">)
+After simplification using rewrite rules (see <xref linkend="rewrite-rules"/>)
 defined in the
 <ulink url="../base/Control.Arrow.html"><literal>Control.Arrow</literal></ulink>
 module, this reduces to
@@ -3847,7 +3847,7 @@ though the results would be somewhat clumsy.
 For example, we could simulate <literal>do</literal>-notation by defining
 <programlisting>
 bind :: Arrow a => a e b -> a (e,b) c -> a e c
-u `bind` f = returnA &&& u >>> f
+u `bind` f = returnA &amp;&amp;&amp; u >>> f
 
 bind_ :: Arrow a => a e b -> a e c -> a e c
 u `bind_` f = u `bind` (arr fst >>> f)
@@ -4142,7 +4142,7 @@ key_function :: Int -> String -> (Bool, Double)
 </programlisting>
 
 	<para>See also the <literal>NOINLINE</literal> pragma (<xref
-        linkend="noinline-pragma">).</para>
+        linkend="noinline-pragma"/>).</para>
       </sect3>
 
       <sect3 id="noinline-pragma">
@@ -4231,7 +4231,7 @@ key_function :: Int -> String -> (Bool, Double)
 	</itemizedlist>
 
 	<para>The same phase-numbering control is available for RULES
-	(<xref LinkEnd="rewrite-rules">).</para>
+	(<xref linkend="rewrite-rules"/>).</para>
       </sect3>
     </sect2>
 
@@ -4265,7 +4265,7 @@ key_function :: Int -> String -> (Bool, Double)
 
       <para>The <literal>OPTIONS</literal> pragma is used to specify
       additional options that are given to the compiler when compiling
-      this source file.  See <xref linkend="source-file-options"> for
+      this source file.  See <xref linkend="source-file-options"/> for
       details.</para>
     </sect2>
 
@@ -4273,7 +4273,7 @@ key_function :: Int -> String -> (Bool, Double)
       <title>RULES pragma</title>
 
       <para>The RULES pragma lets you specify rewrite rules.  It is
-      described in <xref LinkEnd="rewrite-rules">.</para>
+      described in <xref linkend="rewrite-rules"/>.</para>
     </sect2>
 
     <sect2 id="specialize-pragma">
@@ -4305,7 +4305,7 @@ hammeredLookup :: Ord key => [(key, value)] -> key -> value
 
       <para>A <literal>SPECIALIZE</literal> has the effect of generating
       (a) a specialised version of the function and (b) a rewrite rule
-      (see <xref linkend="rewrite-rules">) that rewrites a call to the
+      (see <xref linkend="rewrite-rules"/>) that rewrites a call to the
       un-specialised function into a call to the specialised one.</para>
 
       <para>In earlier versions of GHC, it was possible to provide your own
@@ -4316,7 +4316,7 @@ hammeredLookup :: Ord key => [(key, value)] -> key -> value
 </programlisting>
 
       This feature has been removed, as it is now subsumed by the
-      <literal>RULES</literal> pragma (see <xref linkend="rule-spec">).</para>
+      <literal>RULES</literal> pragma (see <xref linkend="rule-spec"/>).</para>
 
     </sect2>
 
@@ -4355,14 +4355,14 @@ of the pragma.
       the constructor itself, removing a level of indirection.  For
       example:</para>
 
-<ProgramListing>
+<programlisting>
 data T = T {-# UNPACK #-} !Float
            {-# UNPACK #-} !Float
-</ProgramListing>
+</programlisting>
 
       <para>will create a constructor <literal>T</literal> containing
       two unboxed floats.  This may not always be an optimisation: if
-      the <Function>T</Function> constructor is scrutinised and the
+      the <function>T</function> constructor is scrutinised and the
       floats passed to a non-strict function for example, they will
       have to be reboxed (this is done automatically by the
       compiler).</para>
@@ -4372,33 +4372,33 @@ data T = T {-# UNPACK #-} !Float
       unfoldings to the compiler so the reboxing can be removed as
       often as possible.  For example:</para>
 
-<ProgramListing>
+<programlisting>
 f :: T -&#62; Float
 f (T f1 f2) = f1 + f2
-</ProgramListing>
+</programlisting>
 
-      <para>The compiler will avoid reboxing <Function>f1</Function>
-      and <Function>f2</Function> by inlining <Function>+</Function>
+      <para>The compiler will avoid reboxing <function>f1</function>
+      and <function>f2</function> by inlining <function>+</function>
       on floats, but only when <option>-O</option> is on.</para>
 
       <para>Any single-constructor data is eligible for unpacking; for
       example</para>
 
-<ProgramListing>
+<programlisting>
 data T = T {-# UNPACK #-} !(Int,Int)
-</ProgramListing>
+</programlisting>
 
       <para>will store the two <literal>Int</literal>s directly in the
-      <Function>T</Function> constructor, by flattening the pair.
+      <function>T</function> constructor, by flattening the pair.
       Multi-level unpacking is also supported:</para>
 
-<ProgramListing>
+<programlisting>
 data T = T {-# UNPACK #-} !S
 data S = S {-# UNPACK #-} !Int {-# UNPACK #-} !Int
-</ProgramListing>
+</programlisting>
 
       <para>will store two unboxed <literal>Int&num;</literal>s
-      directly in the <Function>T</Function> constructor.  The
+      directly in the <function>T</function> constructor.  The
       unpacker can see through newtypes, too.</para>
 
       <para>If a field cannot be unpacked, you will not get a warning,
@@ -4425,9 +4425,9 @@ data S = S {-# UNPACK #-} !Int {-# UNPACK #-} !Int
 <para>
 The programmer can specify rewrite rules as part of the source program
 (in a pragma).  GHC applies these rewrite rules wherever it can, provided (a) 
-the <option>-O</option> flag (<xref LinkEnd="options-optimise">) is on, 
+the <option>-O</option> flag (<xref linkend="options-optimise"/>) is on, 
 and (b) the <option>-frules-off</option> flag
-(<xref LinkEnd="options-f">) is not specified.
+(<xref linkend="options-f"/>) is not specified.
 </para>
 
 <para>
@@ -4465,7 +4465,7 @@ no significance at all.  It is only used when reporting how many times the rule 
 
 <listitem>
 <para>
-A rule may optionally have a phase-control number (see <xref LinkEnd="phase-control">),
+A rule may optionally have a phase-control number (see <xref linkend="phase-control"/>),
 immediately after the name of the rule.  Thus:
 <programlisting>
   {-# RULES
@@ -4623,7 +4623,7 @@ But not beta conversion (that's called higher-order matching).
 <para>
 Matching is carried out on GHC's intermediate language, which includes
 type abstractions and applications.  So a rule only matches if the
-types match too.  See <xref LinkEnd="rule-spec"> below.
+types match too.  See <xref linkend="rule-spec"/> below.
 </para>
 </listitem>
 <listitem>
@@ -4640,8 +4640,8 @@ For example, consider:
 </programlisting>
 
 The expression <literal>s (t xs)</literal> does not match the rule <literal>"map/map"</literal>, but GHC
-will substitute for <VarName>s</VarName> and <VarName>t</VarName>, giving an expression which does match.
-If <VarName>s</VarName> or <VarName>t</VarName> was (a) used more than once, and (b) large or a redex, then it would
+will substitute for <varname>s</varname> and <varname>t</varname>, giving an expression which does match.
+If <varname>s</varname> or <varname>t</varname> was (a) used more than once, and (b) large or a redex, then it would
 not be substituted, and the rule would not fire.
 
 </para>
@@ -4982,7 +4982,7 @@ If you add <option>-dppr-debug</option> you get a more detailed listing.
 <listitem>
 
 <para>
- The defintion of (say) <function>build</function> in <FileName>GHC/Base.lhs</FileName> looks llike this:
+ The defintion of (say) <function>build</function> in <filename>GHC/Base.lhs</filename> looks llike this:
 
 <programlisting>
         build   :: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
@@ -5041,7 +5041,7 @@ g x = show x
 <para>
   However, when external for is generated (via
   <option>-fext-core</option>), there will be Notes attached to the
-  expressions <function>show</function> and <VarName>x</VarName>.
+  expressions <function>show</function> and <varname>x</varname>.
   The core function declaration for <function>f</function> is:
 </para>
 
@@ -5069,8 +5069,8 @@ r) ->
   Here, we can see that the function <function>show</function> (which
   has been expanded out to a case expression over the Show dictionary)
   has a <literal>%note</literal> attached to it, as does the
-  expression <VarName>eta</VarName> (which used to be called
-  <VarName>x</VarName>).
+  expression <varname>eta</varname> (which used to be called
+  <varname>x</varname>).
 </para>
 
 </sect2>
