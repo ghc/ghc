@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.114 2002/02/13 15:19:18 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.115 2002/02/13 15:56:18 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -163,13 +163,13 @@ interactiveUI cmstate paths cmdline_libs = do
 	_ -> panic "interactiveUI:buffering"
 
    (cmstate, maybe_hval)
-	<- cmCompileExpr cmstate dflags "IO.hFlush PrelHandle.stderr"
+	<- cmCompileExpr cmstate dflags "IO.hFlush IO.stderr"
    case maybe_hval of
 	Just hval -> writeIORef flush_stderr (unsafeCoerce# hval :: IO ())
 	_ -> panic "interactiveUI:stderr"
 
    (cmstate, maybe_hval) 
-	<- cmCompileExpr cmstate dflags "IO.hFlush PrelHandle.stdout"
+	<- cmCompileExpr cmstate dflags "IO.hFlush IO.stdout"
    case maybe_hval of
 	Just hval -> writeIORef flush_stdout (unsafeCoerce# hval :: IO ())
 	_ -> panic "interactiveUI:stdout"
