@@ -193,7 +193,6 @@ EXPORTS
 	alloc_blocks_lim @ 195 ; 
 	allocate @ 196 ; 
 	allocated_bytes @ 197 ; 
-	awaken_blocked_queue @ 198 ; 
 	barf @ 199 ;
 	base_non_committed @ 200 ; 
 	belch @ 201 ; 
@@ -244,7 +243,6 @@ EXPORTS
 	end_init @ 248 ; 
 	enlargeStablePtrTable @ 249 ; 
 	enteredCAFs @ 250 ; 
-	errorHandler @ 251 ; 
 	exitStorage @ 252 ; 
 	extra_roots @ 253 ; 
 	finalizeWeakPointersNow @ 254 ; 
@@ -334,7 +332,6 @@ EXPORTS
 	putMVarzh_fast @ 343 ; 
 	quotRemIntegerzh_fast @ 344 ; 
 	raiseAsync @ 345 ; 
-	raiseError @ 346 ; 
 	raise_entry @ 347 ; 
 	raise_info @ 348 ; 
 	raisezh_fast @ 349 ; 
@@ -492,8 +489,6 @@ EXPORTS
 	stg_wordToWord64 @ 501 ; 
 	stg_xor64 @ 502 ; 
 	stg_yield_noregs @ 503 ; 
-	stg_yield_noregs_info @ 504 ; 
-	stg_yield_noregs_ret @ 505 ; 
 	stg_yield_to_Hugs @ 506 ; 
 	symbol_hash @ 507 ; 
 	takeMVarzh_fast @ 508 ; 
@@ -504,3 +499,9 @@ EXPORTS
 	word2Integerzh_fast @ 517 ; 
 	word64ToIntegerzh_fast @ 518 ; 
 	AP_UPD_entry @ 519 ; 
+	waitWritezh_fast @ 520 ;
+	waitReadzh_fast @ 521 ;
+	delayzh_fast @ 522 ;
+	shutdownHaskellAndExit @ 523 ; 
+	
+
