@@ -110,10 +110,11 @@ outputAsm dflags filenm flat_absC
 #ifndef OMIT_NATIVE_CODEGEN
 
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
-       let (stix_final, ncg_output_d) = nativeCodeGen flat_absC ncg_uniqs
+       let (stix_final, ncg_output_d) = _scc_ "NativeCodeGen" 
+				        nativeCodeGen flat_absC ncg_uniqs
        dumpIfSet_dyn dflags Opt_D_dump_stix "Final stix code" stix_final
        dumpIfSet_dyn dflags Opt_D_dump_asm "Asm code" ncg_output_d
-       doOutput filenm ( \f -> printForAsm f ncg_output_d)
+       _scc_ "OutputAsm" doOutput filenm ( \f -> printForAsm f ncg_output_d)
   where
 
 #else /* OMIT_NATIVE_CODEGEN */
