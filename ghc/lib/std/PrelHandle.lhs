@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelHandle.lhs,v 1.63 2000/11/07 10:42:56 simonmar Exp $
+% $Id: PrelHandle.lhs,v 1.64 2001/01/10 16:28:15 qrczak Exp $
 %
 % (c) The AQUA Project, Glasgow University, 1994-2000
 %
@@ -21,7 +21,7 @@ import PrelBase
 import PrelAddr		( Addr, nullAddr )
 import PrelByteArr	( ByteArray(..) )
 import PrelRead		( Read )
-import PrelList 	( span )
+import PrelList 	( break )
 import PrelIOBase
 import PrelMaybe	( Maybe(..) )
 import PrelException
@@ -937,20 +937,23 @@ ioeGetFileName        :: IOError -> Maybe FilePath
 ioeGetErrorString     :: IOError -> String
 ioeGetHandle          :: IOError -> Maybe Handle
 
-ioeGetHandle   (IOException (IOError h _ _ _))   = h
-ioeGetHandle   _ = error "IO.ioeGetHandle: not an IO error"
+ioeGetHandle (IOException (IOError h _ _ _))   = h
+ioeGetHandle (UserError _) = Nothing
+ioeGetHandle _ = error "IO.ioeGetHandle: not an IO error"
 
 ioeGetErrorString (IOException (IOError _ iot _ str)) =
- case iot of
-   EOF -> "end of file"
-   _   -> str
-ioeGetErrorString   _ = error "IO.ioeGetErrorString: not an IO error"
+  case iot of
+    EOF -> "end of file"
+    _   -> str
+ioeGetErrorString (UserError str) = str
+ioeGetErrorString _ = error "IO.ioeGetErrorString: not an IO error"
 
 ioeGetFileName (IOException (IOError _ _  _ str)) = 
- case span (/=':') str of
-   (_,[])  -> Nothing
-   (fs,_)  -> Just fs
-ioeGetFileName   _ = error "IO.ioeGetFileName: not an IO error"
+  case break (== ':') str of
+    (_, [])      -> Nothing
+    (_, _:' ':fs)-> Just fs
+ioeGetFileName (UserError _) = Nothing
+ioeGetFileName _ = error "IO.ioeGetFileName: not an IO error"
 \end{code}
 
 'Top-level' IO actions want to catch exceptions (e.g., forkIO and 

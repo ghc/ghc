@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.29 2000/11/07 10:42:56 simonmar Exp $
+% $Id: PrelIOBase.lhs,v 1.30 2001/01/10 16:28:15 qrczak Exp $
 % 
 % (c) The University of Glasgow, 1994-2000
 %
@@ -92,7 +92,7 @@ instance  Monad IO  where
     return x	= returnIO x
 
     m >>= k     = bindIO m k
-    fail s	= error s -- not ioError?
+    fail s	= ioError (userError s)
 
 liftIO :: IO a -> State# RealWorld -> STret RealWorld a
 liftIO (IO m) = \s -> case m s of (# s', r #) -> STret s' r
@@ -679,8 +679,8 @@ constructErrorMsg call_site reason =
      ERR_RESOURCEVANISHED	 -> ResourceVanished
      ERR_SYSTEMERROR	         -> SystemError
      ERR_TIMEEXPIRED	         -> TimeExpired
-     ERR_UNSATISFIEDCONSTRAINTS -> UnsatisfiedConstraints
-     ERR_UNSUPPORTEDOPERATION   -> UnsupportedOperation
+     ERR_UNSATISFIEDCONSTRAINTS  -> UnsatisfiedConstraints
+     ERR_UNSUPPORTEDOPERATION    -> UnsupportedOperation
      ERR_EOF		         -> EOF
      _			         -> OtherError
 
@@ -691,7 +691,7 @@ constructErrorMsg call_site reason =
      _ -> "") ++
    (case reason of
       Nothing -> ""
-      Just m  -> ' ':m)
+      Just m  -> ": "++m)
  in
  return (IOError Nothing iot call_site msg)
 \end{code}
