@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.122 2003/05/21 12:38:36 simonmar Exp $
+-- $Id: Main.hs,v 1.123 2003/05/21 13:05:49 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -198,9 +198,30 @@ main =
 	-- save the "initial DynFlags" away
    saveDynFlags
 
-	-- We split out the object files (.o, .dll) and add them
-	-- to v_Ld_inputs for use by the linker
-   let (objs, srcs) = partition objish_file fileish_args
+   let
+    {-
+      We split out the object files (.o, .dll) and add them
+      to v_Ld_inputs for use by the linker.
+
+      The following things should be considered compilation manager inputs:
+
+       - haskell source files (strings ending in .hs, .lhs or other 
+         haskellish extension),
+
+       - module names (not forgetting hierarchical module names),
+
+       - and finally we consider everything not containing a '.' to be
+         a comp manager input, as shorthand for a .hs or .lhs filename.
+
+      Everything else is considered to be a linker object, and passed
+      straight through to the linker.
+    -}
+    looks_like_an_input m =  isSourceFile m 
+			  || looksLikeModuleName m
+			  || '.' `notElem` m
+
+    (srcs, objs) = partition looks_like_an_input fileish_args
+
    mapM_ (add v_Ld_inputs) objs
 
 	---------------- Display banners and configuration -----------
