@@ -2,17 +2,19 @@
 <indexterm><primary>language, GHC</primary></indexterm>
 <indexterm><primary>extensions, GHC</primary></indexterm>
 As with all known Haskell systems, GHC implements some extensions to
-the language.  To use them, you'll need to give a <option>-fglasgow-exts</option>
-<indexterm><primary>-fglasgow-exts option</primary></indexterm> option.
+the language.  They are all enabled by options; by default GHC
+understands only plain Haskell 98.
 </para>
 
 <para>
-Virtually all of the Glasgow extensions serve to give you access to
-the underlying facilities with which we implement Haskell.  Thus, you
-can get at the Raw Iron, if you are willing to write some non-standard
-code at a more primitive level.  You need not be &ldquo;stuck&rdquo; on
-performance because of the implementation costs of Haskell's
-&ldquo;high-level&rdquo; features&mdash;you can always code &ldquo;under&rdquo; them.  In an extreme case, you can write all your time-critical code in C, and then just glue it together with Haskell!
+Some of the Glasgow extensions serve to give you access to the
+underlying facilities with which we implement Haskell.  Thus, you can
+get at the Raw Iron, if you are willing to write some non-portable
+code at a more primitive level.  You need not be &ldquo;stuck&rdquo;
+on performance because of the implementation costs of Haskell's
+&ldquo;high-level&rdquo; features&mdash;you can always code
+&ldquo;under&rdquo; them.  In an extreme case, you can write all your
+time-critical code in C, and then just glue it together with Haskell!
 </para>
 
 <para>
@@ -20,8 +22,8 @@ Before you get too carried away working at the lowest level (e.g.,
 sloshing <literal>MutableByteArray&num;</literal>s around your
 program), you may wish to check if there are libraries that provide a
 &ldquo;Haskellised veneer&rdquo; over the features you want.  The
-separate libraries documentation describes all the libraries that come
-with GHC.
+separate <ulink url="../libraries/index.html">libraries
+documentation</ulink> describes all the libraries that come with GHC.
 </para>
 
 <!-- LANGUAGE OPTIONS -->
@@ -35,9 +37,37 @@ with GHC.
     <indexterm><primary>extensions</primary><secondary>options controlling</secondary>
     </indexterm>
 
-    <para> These flags control what variation of the language are
+    <para>These flags control what variation of the language are
     permitted.  Leaving out all of them gives you standard Haskell
     98.</para>
+
+    <para>NB. turning on an option that enables special syntax
+    <emphasis>might</emphasis> cause working Haskell 98 code to fail
+    to compile, perhaps because it uses a variable name which has
+    become a reserved word.  So, together with each option below, we
+    list the special syntax which is enabled by this option.  We use
+    notation and nonterminal names from the Haskell 98 lexical syntax
+    (see the Haskell 98 Report).  There are two classes of special
+    syntax:</para>
+
+    <itemizedlist>
+      <listitem>
+	<para>New reserved words and symbols: character sequences
+        which are no longer available for use as identifiers in the
+        program.</para>
+      </listitem>
+      <listitem>
+	<para>Other special syntax: sequences of characters that have
+	a different meaning when this particular option is turned
+	on.</para>
+      </listitem>
+    </itemizedlist>
+
+    <para>We are only listing syntax changes here that might affect
+    existing working programs (i.e. "stolen" syntax).  Many of these
+    extensions will also enable new context-free syntax, but in all
+    cases programs written to use the new syntax would not be
+    compilable without the option enabled.</para>
 
     <variablelist>
 
@@ -49,6 +79,19 @@ with GHC.
           Haskell 98 described in <xref
           linkend="ghc-language-features">, except where otherwise
           noted. </para>
+
+	  <para>New reserved words: <literal>forall</literal> (only in
+	  types), <literal>mdo</literal>.</para>
+
+	  <para>Other syntax stolen:
+	      <replaceable>varid</replaceable>{<literal>&num;</literal>},
+	      <replaceable>char</replaceable><literal>&num;</literal>,	    
+	      <replaceable>string</replaceable><literal>&num;</literal>,    
+	      <replaceable>integer</replaceable><literal>&num;</literal>,    
+	      <replaceable>float</replaceable><literal>&num;</literal>,    
+	      <replaceable>float</replaceable><literal>&num;&num;</literal>,    
+	      <literal>(&num;</literal>, <literal>&num;)</literal>,	    
+	      <literal>|)</literal>, <literal>{|</literal>.</para>
 	</listitem>
       </varlistentry>
 
@@ -61,6 +104,8 @@ with GHC.
 	  Haskell 98 Foreign Function Interface Addendum plus deprecated
 	  syntax of previous versions of the FFI for backwards
 	  compatibility.</para> 
+
+	  <para>New reserved words: <literal>foreign</literal>.</para>
 	</listitem>
       </varlistentry>
 
@@ -103,6 +148,14 @@ with GHC.
 	<listitem>
 	  <para>See <xref LinkEnd="arrow-notation">.  Independent of
           <option>-fglasgow-exts</option>.</para>
+
+	  <para>New reserved words/symbols: <literal>rec</literal>,
+	  <literal>proc</literal>, <literal>-&lt;</literal>,
+	  <literal>&gt;-</literal>, <literal>-&lt;&lt;</literal>,
+	  <literal>&gt;&gt;-</literal>.</para>
+
+	  <para>Other syntax stolen: <literal>(|</literal>,
+	  <literal>|)</literal>.</para>
 	</listitem>
       </varlistentry>
 
@@ -149,6 +202,12 @@ with GHC.
 	  <para>Enables Template Haskell (see <xref
 	  linkend="template-haskell">).  Currently also implied by
 	  <option>-fglasgow-exts</option>.</para>
+
+	  <para>Syntax stolen: <literal>[|</literal>,
+	  <literal>[e|</literal>, <literal>[p|</literal>,
+	  <literal>[d|</literal>, <literal>[t|</literal>,
+	  <literal>$(</literal>,
+	  <literal>$<replaceable>varid</replaceable></literal>.</para>
 	</listitem>
       </varlistentry>
 
@@ -158,6 +217,10 @@ with GHC.
 	  <para>Enables implicit parameters (see <xref
 	  linkend="implicit-parameters">).  Currently also implied by 
 	  <option>-fglasgow-exts</option>.</para>
+
+	  <para>Syntax stolen:
+	  <literal>?<replaceable>varid</replaceable></literal>,
+	  <literal>%<replaceable>varid</replaceable></literal>.</para>
 	</listitem>
       </varlistentry>
 
