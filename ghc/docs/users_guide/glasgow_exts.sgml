@@ -2950,7 +2950,7 @@ The documentation here describes the realisation in GHC.  (It's rather sketchy j
 Tim Sheard is going to expand it.)
 </para>
 
-<sect2>  <title> Using Template Haskell </title>
+<sect2>  <title> Syntax </title>
 <para>
     Template Haskell has the following new syntactic constructions.  You need to use the flag  
 	        <literal>-fglasgow-exts</literal> to switch these syntactic extensions on.
