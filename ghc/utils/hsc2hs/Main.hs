@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.38 2002/04/18 12:15:56 simonmar Exp $
+-- $Id: Main.hs,v 1.39 2002/05/29 22:32:49 sof Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -19,7 +19,7 @@ import List          (intersperse)
 
 #include "../../includes/config.h"
 
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 import Win32DLL
 #endif
 
@@ -71,7 +71,7 @@ main = do
     let header = "Usage: "++prog++" [OPTIONS] INPUT.hsc [...]"
     args <- getArgs
     let opts@(flags, files, errs) = getOpt Permute options args
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
     h <- getModuleHandle Nothing
     n <- getModuleFileName h
     let tempName = reverse (drop (length "\\bin\\hsc2hs.exe") (reverse n)) ++ "\\template-hsc.h"
@@ -106,7 +106,7 @@ processFile flags name
 ------------------------------------------------------------------------
 -- Convert paths foo/baz to foo\baz on Windows
 
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
 subst a b ls = map (\ x -> if x == a then b else x) ls
 dosifyPath xs = subst '/' '\\' xs
 #else

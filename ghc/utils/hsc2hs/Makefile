@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.32 2002/04/30 14:40:33 simonmar Exp $
+# $Id: Makefile,v 1.33 2002/05/29 22:32:50 sof Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -9,17 +9,21 @@ INCLUDE_DIR=ghc/includes
 
 INSTALLING=1
 
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 HS_PROG           = hsc2hs-bin
-else
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 HS_PROG           = hsc2hs$(exeext)
 endif
+ifeq "$(HOSTPLATFORM)" "i386-unknown-cygwinw32"
+HS_PROG           = hsc2hs$(exeext)
+endif
+
 SRC_HC_OPTS      += -package util -cpp
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 SRC_HC_OPTS      += -package win32 '-\#include <process.h>'
 endif 
 
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 INSTALLED_SCRIPT_PROG  = hsc2hs
 endif
 INPLACE_SCRIPT_PROG    = hsc2hs-inplace
@@ -45,12 +49,12 @@ endif # BIN_DIST
 else
 HSC2HS_BINDIR=$(FPTOOLS_TOP_ABS)/$(CURRENT_DIR)
 HSC2HS_DIR=$(FPTOOLS_TOP_ABS)/$(CURRENT_DIR)
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-HSC2HS_EXTRA="--cc=$(CC) --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(FPTOOLS_TOP_ABS)/$(INCLUDE_DIR)"
-else
+
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 extra_flags=$(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS)))
-HSC2HS_EXTRA="--cc=$(CC) $(extra_flags) --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(FPTOOLS_TOP_ABS)/$(INCLUDE_DIR)"
 endif
+
+HSC2HS_EXTRA="--cc=$(CC) $(extra_flags) --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(FPTOOLS_TOP_ABS)/$(INCLUDE_DIR)"
 endif
 
 $(SCRIPT_PROG) : Makefile
@@ -87,7 +91,7 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cDEFAULT_TMPDIR       = \"$(DEFAULT_TMPDIR)\"" >> $(CONFIG_HS)
 	@echo "cGCC                  = \"$(WhatGccIsCalled)\"" >> $(CONFIG_HS)
 	@echo "progNameSuffix        = \"$(exeext)\"" >> $(CONFIG_HS)
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 	@echo "pathSep               = '/'" >> $(CONFIG_HS)
 else
 	@echo "pathSep               = (toEnum 92 :: Char)" >> $(CONFIG_HS)
