@@ -1,7 +1,7 @@
 {-# OPTIONS -fglasgow-exts #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.31 2002/10/29 10:53:42 simonpj Exp $
+-- $Id: Main.hs,v 1.32 2003/03/25 16:50:18 simonmar Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -94,13 +94,13 @@ flags = [
 
 runit clis = do
   let err_msg = "missing -f option, location of package.conf unknown"
-  conf_file <- 
+  conf_filenames <- 
      case [ f | Config f <- clis ] of
-        fs@(_:_)  -> return (last fs)
+        fs@(_:_) -> return (reverse fs) -- NOTE reverse
 	[] -> do mb_dir <- getExecDir "/bin/ghc-pkg.exe"
 		 case mb_dir of
 			Nothing  -> die err_msg
-			Just dir -> return (dir ++ "/package.conf")
+			Just dir -> return [dir ++ "/package.conf"]
 
   let toField "import_dirs"     = return import_dirs
       toField "source_dirs"     = return source_dirs
@@ -119,9 +119,17 @@ runit clis = do
 
   fields <- mapM toField [ f | Field f <- clis ]
 
-  s <- readFile conf_file
-  let packages = parsePackageConfig s
-  eval_catch packages (\_ -> die "parse error in package config file")
+  let read_parse_conf filename = do
+	  str <- readFile filename
+	  let packages = parsePackageConfig str
+	  eval_catch packages
+	    (\_ -> die (filename ++ ": parse error in package config file"))
+
+  pkg_confs <- mapM read_parse_conf conf_filenames
+
+  let conf_filename = head conf_filenames
+	-- this is the file we're going to update: the last one specified
+	-- on the command-line.
 
   let auto_ghci_libs = any isAuto clis 
 	 where isAuto AutoGHCiLibs = True; isAuto _ = False
@@ -130,34 +138,40 @@ runit clis = do
       force = Force `elem` clis
 
   case [ c | c <- clis, isAction c ] of
-    [ List ]     -> listPackages packages
-    [ Add upd ]  -> addPackage packages conf_file input_file 
+    [ List ]     -> listPackages pkg_confs conf_filenames
+    [ Add upd ]  -> addPackage pkg_confs conf_filename input_file 
 			auto_ghci_libs upd force
-    [ Remove p ] -> removePackage packages conf_file p
-    [ Show p ]   -> showPackage packages conf_file p fields
+    [ Remove p ] -> removePackage pkg_confs conf_filename p
+    [ Show p ]   -> showPackage pkg_confs conf_filename p fields
     _            -> die (usageInfo usageHeader flags)
 
 
-listPackages :: [PackageConfig] -> IO ()
-listPackages packages = hPutStrLn stdout (listPkgs packages)
+listPackages :: [[PackageConfig]] -> [FilePath] -> IO ()
+listPackages pkg_confs conf_filenames = do
+  zipWithM_ show_pkgconf pkg_confs conf_filenames
+  where show_pkgconf pkg_conf filename =
+	  hPutStrLn stdout (render (vcat
+		[text (filename ++ ":"), 
+		 nest 4 (fsep (punctuate comma (map (text . name) pkg_conf)))
+		]))
 
-showPackage :: [PackageConfig]
+showPackage :: [[PackageConfig]]
 	    -> FilePath
 	    -> String
 	    -> [PackageConfig -> [String]]
 	    -> IO ()
-showPackage packages pkgconf pkg_name fields =
-  case [ p | p <- packages, name p == pkg_name ] of
+showPackage pkg_confs filename pkg_name fields =
+  case [ p | pkgs <- pkg_confs, p <- pkgs, name p == pkg_name ] of
     []    -> die ("can't find package `" ++ pkg_name ++ "'")
     [pkg] | null fields -> hPutStrLn stdout (render (dumpPkgGuts pkg))
 	  | otherwise   -> hPutStrLn stdout (render (vcat 
 				(map (vcat . map text) (map ($ pkg) fields))))
     _     -> die "showPackage: internal error"
 
-addPackage :: [PackageConfig] -> FilePath -> FilePath
+addPackage :: [[PackageConfig]] -> FilePath -> FilePath
 	 -> Bool -> Bool -> Bool -> IO ()
-addPackage packages pkgconf inputFile auto_ghci_libs updatePkg force = do
-  checkConfigAccess pkgconf
+addPackage pkg_confs filename inputFile auto_ghci_libs updatePkg force = do
+  checkConfigAccess filename
   s <-
     case inputFile of
       "-" -> do
@@ -169,62 +183,62 @@ addPackage packages pkgconf inputFile auto_ghci_libs updatePkg force = do
   let new_pkg = parseOnePackageConfig s
   eval_catch new_pkg (\_ -> die "parse error in package info")
   hPutStrLn stdout "done."
-  hPutStr stdout "Expanding embedded variables..."
+  hPutStr stdout "Expanding embedded variables... "
   new_exp_pkg <- expandEnvVars new_pkg force
   hPutStrLn stdout "done."
-  new_details <- validatePackageConfig new_exp_pkg packages 
+  new_details <- validatePackageConfig new_exp_pkg pkg_confs 
 			auto_ghci_libs updatePkg force
-  savePackageConfig pkgconf
-  maybeRestoreOldConfig pkgconf $
-    writeNewConfig pkgconf new_details
+  savePackageConfig filename
+  maybeRestoreOldConfig filename $
+    writeNewConfig filename new_details
 
-removePackage :: [PackageConfig] -> FilePath -> String -> IO ()
-removePackage packages pkgconf pkgName = do  
-  checkConfigAccess pkgconf
+removePackage :: [[PackageConfig]] -> FilePath -> String -> IO ()
+removePackage (packages : _) filename pkgName = do  
+  checkConfigAccess filename
   when (pkgName `notElem` map name packages)
-       (die ("package `" ++ pkgName ++ "' not installed"))
-  savePackageConfig pkgconf
-  maybeRestoreOldConfig pkgconf $
-    writeNewConfig pkgconf (filter ((/= pkgName) . name) packages)
+       (die (filename ++ ": package `" ++ pkgName ++ "' not found"))
+  savePackageConfig filename
+  maybeRestoreOldConfig filename $
+    writeNewConfig filename (filter ((/= pkgName) . name) packages)
 
 checkConfigAccess :: FilePath -> IO ()
-checkConfigAccess pkgconf = do
-  access <- getPermissions pkgconf
+checkConfigAccess filename = do
+  access <- getPermissions filename
   when (not (writable access))
-      (die "you don't have permission to modify the package configuration file")
+      (die (filename ++ ": you don't have permission to modify this file"))
 
-maybeRestoreOldConfig :: String -> IO () -> IO ()
-maybeRestoreOldConfig conf_file io
+maybeRestoreOldConfig :: FilePath -> IO () -> IO ()
+maybeRestoreOldConfig filename io
   = my_catch io (\e -> do
         hPutStr stdout "\nWARNING: an error was encountered while the new \n\ 
         	       \configuration was being written.  Attempting to \n\ 
         	       \restore the old configuration... "
-	renameFile (conf_file ++ ".old")  conf_file
+	renameFile (filename ++ ".old")  filename
         hPutStrLn stdout "done."
 	my_throw e
     )
 
-writeNewConfig :: String -> [PackageConfig] -> IO ()
-writeNewConfig conf_file packages = do
+writeNewConfig :: FilePath -> [PackageConfig] -> IO ()
+writeNewConfig filename packages = do
   hPutStr stdout "Writing new package config file... "
-  h <- openFile conf_file WriteMode
+  h <- openFile filename WriteMode
   hPutStrLn h (dumpPackages packages)
   hClose h
   hPutStrLn stdout "done."
 
-savePackageConfig :: String -> IO ()
-savePackageConfig conf_file = do
+savePackageConfig :: FilePath -> IO ()
+savePackageConfig filename = do
   hPutStr stdout "Saving old package config file... "
     -- mv rather than cp because we've already done an hGetContents
     -- on this file so we won't be able to open it for writing
     -- unless we move the old one out of the way...
-  let oldFile = conf_file ++ ".old"
+  let oldFile = filename ++ ".old"
   doesExist <- doesFileExist oldFile  `catch` (\ _ -> return False)
   when doesExist (removeFile oldFile `catch` (const $ return ()))
-  catch (renameFile conf_file oldFile)
+  catch (renameFile filename oldFile)
   	(\ err -> do
 		hPutStrLn stderr (unwords [ "Unable to rename "
-					  , show conf_file
+					  , show filename
 					  , " to "
 					  , show oldFile
 					  ])
@@ -236,15 +250,15 @@ savePackageConfig conf_file = do
 -- if requested.
 
 validatePackageConfig :: PackageConfig 
-		      -> [PackageConfig]
+		      -> [[PackageConfig]]
 		      -> Bool
 		      -> Bool
 		      -> Bool
 		      -> IO [PackageConfig]
-validatePackageConfig pkg pkgs auto_ghci_libs updatePkg force = do
+validatePackageConfig pkg pkg_confs@(pkgs:_) auto_ghci_libs updatePkg force = do
   when (not updatePkg && (name pkg `elem` map name pkgs))
        (die ("package `" ++ name pkg ++ "' is already installed"))
-  mapM_	(checkDep pkgs force) (package_deps pkg)
+  mapM_	(checkDep pkg_confs force) (package_deps pkg)
   mapM_	(checkDir force) (import_dirs pkg)
   mapM_	(checkDir force) (source_dirs pkg)
   mapM_	(checkDir force) (library_dirs pkg)
@@ -266,10 +280,12 @@ checkDir force d
    when (not there)
        (dieOrForce force ("`" ++ d ++ "' doesn't exist or isn't a directory"))
 
-checkDep :: [PackageConfig] -> Bool -> String -> IO ()
+checkDep :: [[PackageConfig]] -> Bool -> String -> IO ()
 checkDep pkgs force n
-  | n `elem` map name pkgs = return ()
+  | n `elem` pkg_names = return ()
   | otherwise = dieOrForce force ("dependency `" ++ n ++ "' doesn't exist")
+  where
+    pkg_names = concat (map (map name) pkgs)
 
 checkHSLib :: [String] -> Bool -> Bool -> String -> IO ()
 checkHSLib dirs auto_ghci_libs force lib = do
