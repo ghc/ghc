@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.43 2002/02/04 20:12:08 sof Exp $
+ * $Id: Stats.c,v 1.44 2002/02/06 01:21:40 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -601,7 +601,7 @@ stat_workerStop(void)
 }
 #endif
 
-#if defined(RTS_SUPPORTS_THREADS)
+#if defined(SMP)
 long int stat_getElapsedTime ()
 {
   getTimes();
