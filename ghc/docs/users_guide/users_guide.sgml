@@ -4,6 +4,6 @@
 <!ENTITY ug-book SYSTEM "ug-book.sgml">
 ]>
   
-<Book>
+<Book id="users-guide">
 &ug-book;
 </Book>
