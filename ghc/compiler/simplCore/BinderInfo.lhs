@@ -16,12 +16,15 @@ module BinderInfo (
 
 	addBinderInfo, orBinderInfo, andBinderInfo,
 
-	argOccurrence, funOccurrence, dangerousArgOcc, noBinderInfo,
+	deadOccurrence, argOccurrence, funOccurrence, dangerousArgOcc, noBinderInfo,
+
 	markMany, markDangerousToDup, markInsideSCC,
 	getBinderInfoArity,
 	setBinderInfoArityToZero,
 
-	inlineUnconditionally, isFun, isDupDanger -- for Simon Marlow deforestation
+	okToInline, isOneOcc, isOneFunOcc, isOneSafeFunOcc, isDeadOcc,
+
+	isFun, isDupDanger -- for Simon Marlow deforestation
     ) where
 
 IMP_Ubiq(){-uitous-}
@@ -104,6 +107,23 @@ noBinderInfo = ManyOcc 0	-- A non-committal value
 
 
 \begin{code}
+isOneOcc :: BinderInfo -> Bool
+isOneOcc (OneOcc _ _ _ _ _) = True
+isOneOcc other_bind 	    = False
+
+isOneFunOcc :: BinderInfo -> Bool
+isOneFunOcc (OneOcc FunOcc _ _ _ _) = True
+isOneFunOcc other_bind 	    	    = False
+
+isOneSafeFunOcc :: Bool -> BinderInfo -> Bool
+isOneSafeFunOcc ok_to_dup (OneOcc FunOcc NoDupDanger NotInsideSCC n_alts _)
+  = ok_to_dup || n_alts <= 1
+isOneSafeFunOcc ok_to_dup other_bind	    = False
+
+isDeadOcc :: BinderInfo -> Bool
+isDeadOcc DeadCode = True
+isDeadOcc other    = False
+
 isFun :: FunOrArg -> Bool
 isFun FunOcc = True
 isFun _ = False
@@ -113,26 +133,38 @@ isDupDanger DupDanger = True
 isDupDanger _ = False
 \end{code}
 
-@inlineUnconditionally@ decides whether a let-bound thing can
-definitely be inlined.
 
 \begin{code}
-inlineUnconditionally :: Bool -> BinderInfo -> Bool
+okToInline :: Bool		-- The thing is WHNF or bottom; 
+	   -> Bool		-- It's small enough to duplicate the code
+	   -> BinderInfo
+	   -> Bool		-- True <=> inline it
 
---inlineUnconditionally ok_to_dup DeadCode = True
-inlineUnconditionally ok_to_dup (OneOcc FunOcc NoDupDanger NotInsideSCC n_alt_occs _)
-  = n_alt_occs <= 1 || ok_to_dup
-	    -- We [i.e., Patrick] don't mind the code explosion,
-	    -- though.  We could have a flag to limit the
-	    -- damage, e.g., limit to M alternatives.
+-- A non-WHNF can be inlined if it doesn't occur inside a lambda,
+-- and occurs exactly once or 
+--     occurs once in each branch of a case and is small
+okToInline False small_enough (OneOcc _ NoDupDanger _ n_alts _)
+  = n_alts <= 1 || small_enough
 
-inlineUnconditionally _ _ = False
+-- If the thing isn't a redex, there's no danger of duplicating work, 
+-- so we can inline if it occurs once, or is small
+okToInline True small_enough occ_info 
+ = small_enough || one_occ
+ where
+   one_occ = case occ_info of
+		OneOcc _ _ _ n_alts _ -> n_alts <= 1
+		other		      -> False
+
+okToInline whnf_or_bot small_enough any_occ = False
 \end{code}
 
 
 Construction
 ~~~~~~~~~~~~~
 \begin{code}
+deadOccurrence :: BinderInfo
+deadOccurrence = DeadCode
+
 argOccurrence, funOccurrence :: Int -> BinderInfo
 
 funOccurrence = OneOcc FunOcc NoDupDanger NotInsideSCC 1
