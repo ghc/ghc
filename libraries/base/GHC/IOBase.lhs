@@ -391,7 +391,11 @@ data BufferMode
 -- IORefs
 
 -- |A mutable variable in the 'IO' monad
-newtype IORef a = IORef (STRef RealWorld a) deriving Eq
+newtype IORef a = IORef (STRef RealWorld a)
+
+-- explicit instance because Haddock can't figure out a derived one
+instance Eq (IORef a) where
+  IORef x == IORef y = x == y
 
 -- |Build a new 'IORef'
 newIORef    :: a -> IO (IORef a)
@@ -415,7 +419,11 @@ writeIORef (IORef var) v = stToIO (writeSTRef var v)
 --
 -- 
 
-newtype IOArray i e = IOArray (STArray RealWorld i e) deriving Eq
+newtype IOArray i e = IOArray (STArray RealWorld i e)
+
+-- explicit instance because Haddock can't figure out a derived one
+instance Eq (IOArray i e) where
+  IOArray x == IOArray y = x == y
 
 -- |Build a new 'IOArray'
 newIOArray :: Ix i => (i,i) -> e -> IO (IOArray i e)
