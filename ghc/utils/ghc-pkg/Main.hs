@@ -1,7 +1,7 @@
 {-# OPTIONS -fglasgow-exts #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.28 2002/09/13 15:01:40 simonpj Exp $
+-- $Id: Main.hs,v 1.29 2002/10/27 10:38:32 mthomas Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -34,7 +34,7 @@ import ParsePkgConfLite
 #include "../../includes/config.h"
 
 #ifdef mingw32_HOST_OS
-import CString
+import Foreign.C.String
 import Foreign
 #endif
 

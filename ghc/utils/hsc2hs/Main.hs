@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.40 2002/09/09 11:39:42 simonmar Exp $
+-- $Id: Main.hs,v 1.41 2002/10/27 10:38:33 mthomas Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -25,7 +25,23 @@ import List          (intersperse)
 #include "../../includes/config.h"
 
 #ifdef mingw32_HOST_OS
-import Win32DLL
+-- import Win32DLL
+import Foreign.C.String (CString, peekCString)
+import Foreign.C.Types
+import Foreign.Ptr (nullPtr)
+import Foreign.Marshal.Alloc (mallocBytes, free)
+
+foreign import stdcall "GetModuleHandle" c_GetModuleHandle :: CString -> IO CUInt
+foreign import stdcall "GetModuleFileName" c_GetModuleFilename :: CUInt -> CString -> CUInt -> IO CUInt
+
+ourName :: IO String
+ourName = do h <- c_GetModuleHandle nullPtr
+	     cstr <- mallocBytes cstr_len
+	     rv <- c_GetModuleFilename h cstr (CUInt (fromIntegral cstr_len))
+	     str <- peekCString cstr
+	     free cstr
+	     return str
+    where cstr_len = 512
 #endif
 
 version :: String
@@ -77,8 +93,7 @@ main = do
     args <- getArgs
     let opts@(flags, files, errs) = getOpt Permute options args
 #ifdef mingw32_HOST_OS
-    h <- getModuleHandle Nothing
-    n <- getModuleFileName h
+    n <- ourName
     let tempName = reverse (drop (length "\\bin\\hsc2hs.exe") (reverse n)) ++ "\\template-hsc.h"
     let fflags = if [t | Template t <- flags] /= [] then flags else (Template tempName) : flags
     let opts = (fflags, files, errs)
@@ -744,3 +759,4 @@ showCString = concatMap showCChar
                       intToDigit (ord c `quot` 64),
                       intToDigit (ord c `quot` 8 `mod` 8),
                       intToDigit (ord c          `mod` 8)]
+
