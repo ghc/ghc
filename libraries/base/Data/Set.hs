@@ -146,11 +146,11 @@ data Set a    = Tip
 
 type Size     = Int
 
+#if __GLASGOW_HASKELL__
+
 {--------------------------------------------------------------------
   A Data instance  
 --------------------------------------------------------------------}
-
-#if __GLASGOW_HASKELL__
 
 -- This instance preserves data abstraction at the cost of inefficiency.
 -- We omit reflection services for the sake of data abstraction.
