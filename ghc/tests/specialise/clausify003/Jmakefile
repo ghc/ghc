@@ -1,9 +1,0 @@
-SRCS_HS=Main.hs PreludeClausify.hs
-OBJS_O= Main.o  PreludeClausify.o
-
-NoFibMultiModuleCompileAndRun(clausify003,-i clausify003.stdin -o1 clausify003.stdout)
-
-NoFibHaskellCompile(clausify003,Main,hs)
-NoFibHaskellCompile(clausify003,PreludeClausify,hs)
-
-NoFibDependTarget(clausify003, $(SRCS_HS))

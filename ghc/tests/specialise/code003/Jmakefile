@@ -1,8 +1,0 @@
-SRCS_HS=PreludeNum.hs
-OBJS_O= PreludeNum.o
-
-all : $(OBJS_O)
-
-NoFibHaskellCompile(code003,PreludeNum,hs)
-
-

@@ -1,1 +1,0 @@
-NoFibOneModuleCompileAndRun(spec002,-i spec002.stdin -o1 spec002.stdout)
