@@ -3,10 +3,10 @@
 -- !!! multi-dimensional arrays
 
 module Main ( main ) where
-import GlaExts
+import ST
 import Array
 
-type TwoD s = MutableArray s Int (MutableArray s Int Int)
+type TwoD s = STArray s Int (STArray s Int Int)
 
 setup :: ST s (TwoD s)
 setup = let isz = 10
@@ -16,10 +16,10 @@ setup = let isz = 10
 	do
             -- gives : undefined reference to `IOBase_error_closure'
 --	    x <- newArray (0, omax) (error "uninitialised")
-	    dmy <- newArray (0, imax) 0      
-	    x <- newArray (0, omax) dmy
-	    as <- (sequence . replicate osz) (newArray (0, imax) 6)
-	    mapM_ (\(i,v) -> writeArray x i v) (zip [0..omax] as)
+	    dmy <- newSTArray (0, imax) 0      
+	    x <- newSTArray (0, omax) dmy
+	    as <- (sequence . replicate osz) (newSTArray (0, imax) 6)
+	    mapM_ (\(i,v) -> writeSTArray x i v) (zip [0..omax] as)
 	    return x	  
 
 main :: IO ()

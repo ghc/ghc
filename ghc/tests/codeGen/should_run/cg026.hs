@@ -5,6 +5,7 @@ module Main ( main ) where
 import PrelBase
 import ST
 import IOExts
+import ST
 import MutableArray
 import ByteArray
 import Addr
@@ -204,18 +205,18 @@ test_ptrs
 
     f size
       = runST (
-	  newArray (1, size) (3 % 5)	>>= \ arr# ->
+	  newSTArray (1, size) (3 % 5)	>>= \ arr# ->
 	  -- don't fill in the whole thing
 	  fill_in arr# 1 400		>>
-	  freezeArray arr#
+	  freezeSTArray arr#
 	)
 
-    fill_in :: MutableArray s Int (Ratio Int) -> Int -> Int -> ST s ()
+    fill_in :: STArray s Int (Ratio Int) -> Int -> Int -> ST s ()
 
     fill_in arr_in# first last
       = if (first > last)
 	then return ()
-	else writeArray arr_in# first (fromInt (first * first)) >>
+	else writeSTArray arr_in# first (fromInt (first * first)) >>
 	     fill_in  arr_in# (first + 1) last
 
     lookup_range :: Array Int (Ratio Int) -> Int -> Int -> [Ratio Int]
