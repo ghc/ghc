@@ -31,7 +31,7 @@ import Type		( typePrimRep, isUnLiftedType, splitTyConApp_maybe,
 			  isTyVarTy )
 import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon, 
                           isUnboxedTupleCon, isNullaryDataCon,
-			  dataConRepArity )
+			  dataConRepArity, dataConWorkId )
 import TyCon		( tyConFamilySize, isDataTyCon, tyConDataCons,
 			  isFunTyCon, isUnboxedTupleTyCon )
 import Class		( Class, classTyCon )
@@ -239,15 +239,15 @@ schemeTopBind :: (Id, AnnExpr Id VarSet) -> BcM (ProtoBCO Name)
 
 
 schemeTopBind (id, rhs)
-  | Just data_con <- isDataConWrapId_maybe id,
+  | Just data_con <- isDataConId_maybe id,
     isNullaryDataCon data_con
-  = 	-- Special case for the wrapper of a nullary data con.
-	-- It'll look like this:	Nil = /\a -> $wNil a
+  = 	-- Special case for the worker of a nullary data con.
+	-- It'll look like this:	$wNil = /\a -> $wNil a
 	-- If we feed it into schemeR, we'll get 
-	--	Nil = Nil
+	--	$wNil = $wNil
 	-- because mkConAppCode treats nullary constructor applications
 	-- by just re-using the single top-level definition.  So
-	-- for the wrapper itself, we must allocate it directly.
+	-- for the worker itself, we must allocate it directly.
     emitBc (mkProtoBCO (getName id) (toOL [PACK data_con 0, ENTER])
                        (Right rhs) 0 0 [{-no bitmap-}] False{-not alts-})
 
@@ -569,7 +569,7 @@ mkConAppCode :: Int -> Sequel -> BCEnv
 
 mkConAppCode orig_d s p con []	-- Nullary constructor
   = ASSERT( isNullaryDataCon con )
-    returnBc (unitOL (PUSH_G (getName con)))
+    returnBc (unitOL (PUSH_G (getName (dataConWorkId con))))
 	-- Instead of doing a PACK, which would allocate a fresh
 	-- copy of this constructor, use the single shared version.
 	-- The name of the constructor is the name of its wrapper function
@@ -1085,8 +1085,8 @@ pushAtom d p (AnnVar v)
    | Just primop <- isPrimOpId_maybe v
    = returnBc (unitOL (PUSH_PRIMOP primop), 1)
 
-   | otherwise
-   = let
+   | Just d_v <- lookupBCEnv_maybe p v  -- v is a local variable
+   = returnBc (toOL (nOfThem sz (PUSH_L (d-d_v+sz-2))), sz)
 	 -- d - d_v 		    the number of words between the TOS 
 	 --			    and the 1st slot of the object
 	 --
@@ -1097,19 +1097,13 @@ pushAtom d p (AnnVar v)
 	 --
 	 -- Having found the last slot, we proceed to copy the right number of
 	 -- slots on to the top of the stack.
-	 --
-         result
-            = case lookupBCEnv_maybe p v of
-                 Just d_v -> (toOL (nOfThem sz (PUSH_L (d-d_v+sz-2))), sz)
-                 Nothing  -> ASSERT(sz == 1) (unitOL (PUSH_G nm), sz)
 
-         nm = case isDataConId_maybe v of
-                 Just c  -> getName c
-                 Nothing -> getName v
+    | otherwise  -- v must be a global variable
+    = ASSERT(sz == 1) 
+      returnBc (unitOL (PUSH_G (getName v)), sz)
 
-         sz   = idSizeW v
-     in
-         returnBc result
+    where
+         sz = idSizeW v
 
 
 pushAtom d p (AnnLit lit)
