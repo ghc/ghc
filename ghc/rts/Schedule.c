@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.109 2001/12/07 20:57:53 sof Exp $
+ * $Id: Schedule.c,v 1.110 2001/12/18 12:33:45 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -98,7 +98,6 @@
 #ifdef PROFILING
 #include "Proftimer.h"
 #include "ProfHeap.h"
-#include "RetainerProfile.h"
 #endif
 #if defined(GRAN) || defined(PAR)
 # include "GranSimRts.h"
