@@ -14,7 +14,7 @@ import HsSyn
 	URL	{ TokURL $$ }
 	'*'	{ TokBullet }
 	'(n)'	{ TokNumber }
-	'>'	{ TokBirdTrack }
+	'>..'	{ TokBirdTrack $$ }
 	IDENT   { TokIdent $$ }
 	PARA    { TokPara }
 	STRING	{ TokString $$ }
@@ -48,8 +48,8 @@ para    :: { Doc }
 	| codepara		{ DocCodeBlock $1 }
 
 codepara :: { Doc }
-	: '>' seq codepara	{ docAppend $2 $3 }
-	| '>' seq		{ $2 }
+	: '>..' codepara	{ docAppend (DocString $1) $2 }
+	| '>..'			{ DocString $1 }
 
 seq	:: { Doc }
 	: elem seq		{ docAppend $1 $2 }
