@@ -623,7 +623,8 @@ HaveLibReadline=YES
 [
 AC_DEFINE(HAVE_LIBREADLINE,0)
 HaveLibReadline=NO
-])
+],
+-ltermcap)
 AC_SUBST(HaveLibReadline)
 
 
