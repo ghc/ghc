@@ -27,12 +27,13 @@ import RnMonad
 import RnEnv
 import RnIfaces		( lookupFixityRn )
 import CmdLineOpts	( opt_GlasgowExts, opt_IgnoreAsserts )
+import Literal		( inIntRange )
 import BasicTypes	( Fixity(..), FixityDirection(..), defaultFixity, negateFixity )
 import PrelInfo		( eqClass_RDR, 
 			  ccallableClass_RDR, creturnableClass_RDR, 
 			  monadClass_RDR, enumClass_RDR, ordClass_RDR,
 			  ratioDataCon_RDR, negate_RDR, assertErr_RDR,
-			  ioDataCon_RDR, 
+			  ioDataCon_RDR, plusInteger_RDR, timesInteger_RDR,
 			  foldr_RDR, build_RDR
 			)
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
@@ -777,31 +778,38 @@ that the types and classes they involve
 are made available.
 
 \begin{code}
-litFVs (HsChar c)       = returnRn (unitFV charTyCon_name)
-litFVs (HsCharPrim c)   = returnRn (unitFV (getName charPrimTyCon))
-litFVs (HsString s)     = returnRn (mkFVs [listTyCon_name, charTyCon_name])
-litFVs (HsStringPrim s) = returnRn (unitFV (getName addrPrimTyCon))
-litFVs (HsInt i)	= returnRn (unitFV (getName intTyCon))
-litFVs (HsInteger i)	= returnRn (unitFV (getName integerTyCon))
-litFVs (HsIntPrim i)    = returnRn (unitFV (getName intPrimTyCon))
-litFVs (HsFloatPrim f)  = returnRn (unitFV (getName floatPrimTyCon))
-litFVs (HsDoublePrim d) = returnRn (unitFV (getName doublePrimTyCon))
-litFVs (HsLitLit l bogus_ty)
-  = lookupOrigName ccallableClass_RDR	`thenRn` \ cc ->
-    returnRn (unitFV cc)
+litFVs (HsChar c)             = returnRn (unitFV charTyCon_name)
+litFVs (HsCharPrim c)         = returnRn (unitFV (getName charPrimTyCon))
+litFVs (HsString s)           = returnRn (mkFVs [listTyCon_name, charTyCon_name])
+litFVs (HsStringPrim s)       = returnRn (unitFV (getName addrPrimTyCon))
+litFVs (HsInt i)	      = returnRn (unitFV (getName intTyCon))
+litFVs (HsIntPrim i)          = returnRn (unitFV (getName intPrimTyCon))
+litFVs (HsFloatPrim f)        = returnRn (unitFV (getName floatPrimTyCon))
+litFVs (HsDoublePrim d)       = returnRn (unitFV (getName doublePrimTyCon))
+litFVs (HsLitLit l bogus_ty)  = lookupOrigName ccallableClass_RDR	`thenRn` \ cc ->   
+				returnRn (unitFV cc)
+litFVs lit		      = pprPanic "RnExpr.litFVs" (ppr lit)	-- HsInteger and HsRat only appear 
+									-- in post-typechecker translations
 
-rnOverLit (HsIntegral i n)
-  = lookupOccRn n			`thenRn` \ n' ->
-    returnRn (HsIntegral i n', unitFV n')
+rnOverLit (HsIntegral i from_integer)
+  = lookupOccRn from_integer		`thenRn` \ from_integer' ->
+    (if inIntRange i then
+	returnRn emptyFVs
+     else
+	lookupOrigNames [plusInteger_RDR, timesInteger_RDR]
+    )					`thenRn` \ ns ->
+    returnRn (HsIntegral i from_integer', ns `addOneFV` from_integer')
 
 rnOverLit (HsFractional i n)
-  = lookupOccRn n				`thenRn` \ n' ->
-    lookupOrigNames [ratioDataCon_RDR]		`thenRn` \ ns' ->
+  = lookupOccRn n							   `thenRn` \ n' ->
+    lookupOrigNames [ratioDataCon_RDR, plusInteger_RDR, timesInteger_RDR]  `thenRn` \ ns' ->
 	-- We have to make sure that the Ratio type is imported with
 	-- its constructor, because literals of type Ratio t are
 	-- built with that constructor.
 	-- The Rational type is needed too, but that will come in
 	-- when fractionalClass does.
+	-- The plus/times integer operations may be needed to construct the numerator
+	-- and denominator (see DsUtils.mkIntegerLit)
     returnRn (HsFractional i n', ns' `addOneFV` n')
 \end{code}
 
