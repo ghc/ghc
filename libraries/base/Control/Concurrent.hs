@@ -68,7 +68,8 @@ module Control.Concurrent (
 	rtsSupportsBoundThreads,
 	forkOS,
 	isCurrentThreadBound,
-	runInBoundThread
+	runInBoundThread,
+	runInUnboundThread
 #endif
 
 	-- * GHC's implementation of concurrency
