@@ -232,7 +232,7 @@ sparc-sun-solaris2*)
         exit 1
         ;;
 esac
-echo "Which we'll canonicalise into: $HostPlatform"
+echo "Canonicalised to: $HostPlatform"
 test  x"$HostPlatform" != x"$TargetPlatform" && echo "Target platform set to $TargetPlatform"
 test  x"$BuildPlatform" != x"$HostPlatform"  && echo "Build platform set to $BuildPlatform"
 
@@ -541,7 +541,7 @@ dnl ** check for tar **
 # if GNU tar is named gtar, look for it first.
 #
 AC_PATH_PROGS(TarCmd,gtar tar,tar)
-AC_SUBST(TarCmd)
+
 
 #
 dnl ** check for gzip/compress **
@@ -561,28 +561,27 @@ AC_SUBST(CompressSuffix)
 dnl ** check for installed happy binary
 #
 AC_PATH_PROG(HappyCmd,happy)
-AC_SUBST(HappyCmd)
+
 #
 #
 dnl ** check for installed lx binary
 #
 AC_PATH_PROG(LxCmd,lx)
-AC_SUBST(LxCmd)
-#
+
 #
 dnl ** check for installed green-card binary
 #
 AC_PATH_PROG(GreencardCmd,green-card)
-AC_SUBST(GreencardCmd)
-#
-#
+
 dnl ** check for full ANSI header (.h) files
 #
 AC_HEADER_STDC
+
 #
 dnl ** check for specific header (.h) files that we are interested in
 #
 AC_CHECK_HEADERS(dirent.h fcntl.h grp.h malloc.h memory.h nlist.h pwd.h siginfo.h signal.h stdlib.h string.h sys/fault.h sys/file.h sys/mman.h sys/param.h sys/procfs.h sys/resource.h sys/signal.h sys/socket.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/utsname.h sys/vadvise.h sys/wait.h termios.h time.h types.h unistd.h utime.h vfork.h readline/readline.h )
+
 #
 dnl ** check if it is safe to include both <time.h> and <sys/time.h>
 #
@@ -591,49 +590,34 @@ AC_HEADER_TIME
 dnl ** how do we get a timezone name, and UTC offset ?
 #
 AC_STRUCT_TIMEZONE
-HaveAltZone=yes
-AC_MSG_CHECKING([for altzone])
-AC_TRY_LINK([#include <time.h>], [return altzone;], AC_DEFINE(HAVE_ALTZONE),HaveAltZone=no)
-AC_MSG_RESULT($HaveAltZone)
+
 # 
-dnl ** determine the type of signal()
+dnl what's the type of timezone?
+AC_TYPE_TIMEZONE
+
 #
-AC_TYPE_SIGNAL
+dnl do we have altzone?
+AC_ALTZONE
+
 #
 dnl ** check for specific library functions that we are interested in
 #
 AC_CHECK_FUNCS(access ftime getclock getpagesize getrusage gettimeofday mktime mprotect setitimer stat sysconf timelocal times vadvise vfork)
+
+#
+# Misc
 #
 dnl ** can we get alloca?
-#
 AC_FUNC_ALLOCA
-#
 dnl ** determine whether or not const works
-#
 AC_C_CONST
+dnl ** determine the type of signal()
+AC_TYPE_SIGNAL
+
 #
 dnl ** check for leading underscores in symbol names
-# We assume that they _aren't_ there if anything goes wrong.
 #
-echo checking for a leading underscore in symbol names
-AC_TRY_RUN(
-[#ifdef HAVE_NLIST_H
-#include <nlist.h>
-struct nlist xYzzY[] = {{"_xYzzY", 0},{0}};
-#endif
-
-main(argc, argv)
-int argc;
-char **argv;
-{
-#ifdef HAVE_NLIST_H
-    if(nlist(argv[0], xYzzY) == 0 && xYzzY[0].n_value != 0)
-        exit(0);
-#endif
-    exit(1);
-}], LeadingUnderscore='YES', LeadingUnderscore='NO', LeadingUnderscore='YES')
-test -n "$verbose" && echo "    setting LeadingUnderscore to $LeadingUnderscore"
-AC_SUBST(LeadingUnderscore)
+AC_UNDERSCORE
 
 AC_OUTPUT(mk/config.mk, echo timestamp > mk/stamp-h )
 
