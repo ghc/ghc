@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Cmd.hsc,v 1.2 2001/08/17 12:50:34 simonmar Exp $
+-- $Id: Cmd.hs,v 1.1 2002/02/06 10:14:26 simonmar Exp $
 --
 -- Executing a command.
 --
@@ -26,8 +26,6 @@ import Foreign.C
 #ifdef __GLASGOW_HASKELL__
 import GHC.IOBase
 #endif
-
-#include "HsCore.h"
 
 -- ---------------------------------------------------------------------------
 -- system
