@@ -1,6 +1,6 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface PreludeErrIO where
 import PreludeBuiltin(Tuple0, Tuple2, _RealWorld(..), _State(..))
 errorIO :: (_State _RealWorld -> ((), _State _RealWorld)) -> a
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 1 X 4 _/\_ u0 -> \ (u1 :: _State _RealWorld -> ((), _State _RealWorld)) -> _LETREC_ {(u2 :: _forall_ a$z1 =>a$z1) = u2} in case _#_ errorIO# [] [u1] of { _PRIM_ (u3 :: State# _RealWorld) -> _TYAPP_  u2 { u0 } } _N_ #-}
+	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ _!_ _N_ _N_ #-}
 

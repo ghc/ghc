@@ -211,6 +211,7 @@ $Oopt_DoSpecialise		= '-fspecialise';
 $Oopt_FoldrBuild		= 1; # On by default!
 $Oopt_FB_Support		= '-fdo-new-occur-anal -fdo-arity-expand';
 #$Oopt_FoldrBuildWW		= 0; # Off by default
+$Oopt_FoldrBuildInline		= '-fdo-inline-foldr-build';
 \end{code}
 
 Things to do with C compilers/etc:
@@ -282,7 +283,7 @@ $BuildTag	= ''; # default is sequential build w/ Appel-style GC
 %BuildDescr	= ('',	    'normal sequential',
 		   '_p',    'profiling',
 		   '_t',    'ticky-ticky profiling',
-		   '_t',    'unregisterized (using portable C only)',
+		   '_u',    'unregisterized (using portable C only)',
 		   '_mc',   'concurrent',
 		   '_mr',   'profiled concurrent',
 		   '_mt',   'ticky concurrent',
@@ -961,6 +962,12 @@ arg: while($_ = $ARGV[0]) {
 
 # Now the foldr/build options, which are *on* by default (for -O).
 
+    /^-ffoldr-build$/
+		    && do { $Oopt_FoldrBuild = 1; 
+			    $Oopt_FB_Support = '-fdo-new-occur-anal -fdo-arity-expand';
+			    #print "Yes F/B\n";
+			    next arg; };
+
     /^-fno-foldr-build$/
 		    && do { $Oopt_FoldrBuild = 0; 
 			    $Oopt_FB_Support = ''; 
@@ -972,6 +979,11 @@ arg: while($_ = $ARGV[0]) {
 
     /^-fno-enable-tech$/
 		    && do { $Oopt_FB_Support = ''; 
+			    next arg; };
+
+    /^-fno-snapback-to-append$/
+		    && do { $Oopt_FoldrBuildInline .= ' -fdo-not-fold-back-append '; 
+			    #print "No Foldback of append\n";
 			    next arg; };
 
 #    /^-ffoldr-build-ww$/
@@ -1484,7 +1496,10 @@ It really really wants to be the last STG-to-STG pass that is run.
 	  '-fdo-eta-reduction',
 	  '-fdo-lambda-eta-expansion',
 	  '-freuse-con',
-  	  '-fdo-inline-foldr-build',	# foldr/build done so inline
+  	  ($Oopt_FoldrBuildInline),
+			# you need to inline foldr and build
+	  ($Oopt_FoldrBuild) ? ('-fdo-foldr-build') : (), 
+			# but do reductions if you see them!
 	  "$Oopt_PedanticBottoms",
 	  "$Oopt_MonadEtaExpansion",
 	  "$Oopt_UnfoldingUseThreshold",
@@ -1533,7 +1548,9 @@ It really really wants to be the last STG-to-STG pass that is run.
 	  '-freuse-con',
 	  '-flet-to-case',
 	  '-fignore-inline-pragma',	# **** NB!
-	  '-fdo-inline-foldr-build',	# NB
+	  $Oopt_FoldrBuildInline,	
+	  ($Oopt_FoldrBuild) ? ('-fdo-foldr-build') : (), 
+			# but still do reductions if you see them!
 	  "$Oopt_PedanticBottoms",
 	  "$Oopt_MonadEtaExpansion",
 	  "$Oopt_UnfoldingUseThreshold",
@@ -2019,7 +2036,7 @@ args: while ($a = shift(@ARGV)) {
     }
 }
 
-exec "$SysMan $debug $nprocessors @nonPVM_args";
+exec "$SysMan $debug $pvm_executable $nprocessors @nonPVM_args";
 print STDERR "Exec failed!!!: $SysMan $debug $nprocessors @nonPVM_args\n";
 exit(1); 
 EOSCRIPT2

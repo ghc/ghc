@@ -87,7 +87,7 @@ scheduleAlarm :: Int -> _State _RealWorld -> (Either IOError13 Int, _State _Real
 segmentationViolation :: Int
 	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 setEnvVar :: [Char] -> [Char] -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
-	{-# GHC_PRAGMA _A_ 3 _U_ 122 _N_ _S_ "SLL" _N_ _N_ #-}
+	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _S_ "SLL" _N_ _N_ #-}
 setEnvironment :: [([Char], [Char])] -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
 	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SU(P)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 setSignalMask :: _ByteArray () -> _State _RealWorld -> (Either IOError13 (_ByteArray ()), _State _RealWorld)

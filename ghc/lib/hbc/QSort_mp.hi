@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface QSort where
 sort :: Ord a => [a] -> [a]
 	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "LS" _N_ _N_ #-}

@@ -1,10 +1,10 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface BitSet where
 data BitSet 	{-# GHC_PRAGMA MkBS Word# #-}
 elementBS :: Int -> BitSet -> Bool
 	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 emptyBS :: BitSet
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 case _#_ int2Word# [] [0#] of { _PRIM_ (u0 :: Word#) -> _!_ _ORIG_ BitSet MkBS [] [u0] } _N_ #-}
+	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 intersectBS :: BitSet -> BitSet -> BitSet
 	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: Word#) (u1 :: Word#) -> case _#_ and# [] [u0, u1] of { _PRIM_ (u2 :: Word#) -> _!_ _ORIG_ BitSet MkBS [] [u2] } _N_} _F_ _IF_ARGS_ 0 2 CC 5 \ (u0 :: BitSet) (u1 :: BitSet) -> case u0 of { _ALG_ _ORIG_ BitSet MkBS (u2 :: Word#) -> case u1 of { _ALG_ _ORIG_ BitSet MkBS (u3 :: Word#) -> case _#_ and# [] [u2, u3] of { _PRIM_ (u4 :: Word#) -> _!_ _ORIG_ BitSet MkBS [] [u4] }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
 isEmptyBS :: BitSet -> Bool

@@ -18,7 +18,9 @@ absentErrorIdKey :: Unique
 addrDataConKey :: Unique
 addrPrimTyConKey :: Unique
 addrTyConKey :: Unique
+appendIdKey :: Unique
 arrayPrimTyConKey :: Unique
+augmentIdKey :: Unique
 binaryClassKey :: Unique
 boolTyConKey :: Unique
 buildDataConKey :: Unique
@@ -159,6 +161,7 @@ u2i :: Unique -> Int#
 uniqSupply_u :: UniqueSupply
 unpackCString2IdKey :: Unique
 unpackCStringAppendIdKey :: Unique
+unpackCStringFoldrIdKey :: Unique
 unpackCStringIdKey :: Unique
 unpkUnifiableTyVarUnique :: Unique -> Int
 voidPrimIdKey :: Unique

@@ -28,7 +28,7 @@ instance Ord ()
 instance Text ()
 	{-# GHC_PRAGMA _M_ PreludeBuiltin {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [((), [Char])]), (Int -> () -> [Char] -> [Char]), ([Char] -> [([()], [Char])]), ([()] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (()), _CONSTM_ Text showsPrec (()), _CONSTM_ Text readList (()), _CONSTM_ Text showList (())] _N_
 	 readsPrec = { _A_ 1 _U_ 02 _N_ _S_ "A" {_A_ 0 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ },
-	 showsPrec = { _A_ 3 _U_ 012 _N_ _S_ "AEL" {_A_ 2 _U_ 12 _N_ _N_ _F_ _IF_ARGS_ 0 2 CX 4 \ (u0 :: ()) (u1 :: [Char]) -> case u0 of { _ALG_ _TUP_0  -> _APP_  _TYAPP_  _ORIG_ PreludeList (++) { Char } [ _NOREP_S_ "()", u1 ]; _NO_DEFLT_ } _N_} _F_ _IF_ARGS_ 0 3 XCX 4 \ (u0 :: Int) (u1 :: ()) (u2 :: [Char]) -> case u1 of { _ALG_ _TUP_0  -> _APP_  _TYAPP_  _ORIG_ PreludeList (++) { Char } [ _NOREP_S_ "()", u2 ]; _NO_DEFLT_ } _N_ },
+	 showsPrec = { _A_ 3 _U_ 012 _N_ _S_ "AEL" {_A_ 2 _U_ 12 _N_ _N_ _F_ _IF_ARGS_ 0 2 CX 4 \ (u0 :: ()) (u1 :: [Char]) -> case u0 of { _ALG_ _TUP_0  -> _APP_  unpackAppendPS# [ "()"#, u1 ]; _NO_DEFLT_ } _N_} _F_ _ALWAYS_ \ (u0 :: Int) (u1 :: ()) (u2 :: [Char]) -> case u1 of { _ALG_ _TUP_0  -> _APP_  unpackAppendPS# [ "()"#, u2 ]; _NO_DEFLT_ } _N_ },
 	 readList = { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ },
 	 showList = { _A_ 1 _U_ 12 _N_ _N_ _N_ _N_ } #-}
 

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[CoreUtils]{Utility functions}
 
@@ -56,7 +56,7 @@ import Pretty
 
 import AbsPrel		( mkFunTy, trueDataCon, falseDataCon,
 			  eRROR_ID, pAT_ERROR_ID, aBSENT_ERROR_ID,
-			  buildId,
+			  buildId, augmentId,
 			  boolTyCon, fragilePrimOp,
 			  PrimOp(..), typeOfPrimOp,
 			  PrimKind
@@ -862,7 +862,9 @@ exprSmallEnoughToDup (CoLit lit) = not (isNoRepLit lit)
 exprSmallEnoughToDup expr  -- for now, just: <var> applied to <args>
   = case (collectArgs expr) of { (fun, args) ->
     case fun of
-      CoVar v -> v /= buildId && length args <= 6 -- or 10 or 1 or 4 or anything smallish.
+      CoVar v -> v /= buildId 
+		 && v /= augmentId
+		 && length args <= 6 -- or 10 or 1 or 4 or anything smallish.
       _       -> False
     }
 \end{code}

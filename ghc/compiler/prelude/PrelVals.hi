@@ -7,6 +7,8 @@ import TyVar(TyVar)
 import UniType(UniType)
 import Unique(Unique)
 aBSENT_ERROR_ID :: Id
+appendId :: Id
+augmentId :: Id
 buildId :: Id
 eRROR_ID :: Id
 errorTy :: UniType
@@ -32,6 +34,7 @@ seqId :: Id
 tRACE_ID :: Id
 unpackCString2Id :: Id
 unpackCStringAppendId :: Id
+unpackCStringFoldrId :: Id
 unpackCStringId :: Id
 voidPrimId :: Id
 

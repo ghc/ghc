@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface Pretty where
 import CharSeq(CSeq)
 import PreludeRatio(Ratio(..))
@@ -7,7 +7,7 @@ data Delay a 	{-# GHC_PRAGMA MkDelay a #-}
 type Pretty = Int -> Bool -> PrettyRep
 data PrettyRep   = MkPrettyRep CSeq (Delay Int) Bool Bool
 pp'SP :: Int -> Bool -> PrettyRep
-	{-# GHC_PRAGMA _A_ 2 _U_ 10 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _APP_  _ORIG_ Pretty ppStr [ _NOREP_S_ ", " ] _N_ #-}
+	{-# GHC_PRAGMA _A_ 2 _U_ 10 _N_ _N_ _N_ _N_ #-}
 ppAbove :: (Int -> Bool -> PrettyRep) -> (Int -> Bool -> PrettyRep) -> Int -> Bool -> PrettyRep
 	{-# GHC_PRAGMA _A_ 4 _U_ 1120 _N_ _S_ "SLLA" {_A_ 3 _U_ 112 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 ppAboves :: [Int -> Bool -> PrettyRep] -> Int -> Bool -> PrettyRep

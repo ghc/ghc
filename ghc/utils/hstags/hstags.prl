@@ -1,6 +1,9 @@
-$tmp	 = (( $ENV{'TMPDIR'} ) # to make tmp file names
-	   ? ($ENV{'TMPDIR'} . "/$$.eht")
-	   : "$(TMPDIR)/$$.eht" );
+if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
+    $tmp = $ENV{'TMPDIR'} . "/$$.eht";
+} else {
+    $tmp ="$(TMPDIR)/$$.eht";
+    $ENV{'TMPDIR'} = '$(TMPDIR)'; # set the env var as well
+}
 
 #------------------------------------------------------------------------
 # If you are adjusting paths by hand for a binary GHC distribution,

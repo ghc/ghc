@@ -10,7 +10,7 @@ import UTypes
 
 import Core
 import IChar
-import IInt		( Int )
+import IInt		( _rangeComplaint_Ix_Int, Int )
 import IInteger 	( __integer1, Integer )
 import List		( takeWhile, (++), foldr )
 import Prel		( (&&), (.), otherwise )

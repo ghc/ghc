@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[Unique]{The @Unique@ data type and a (monadic) supply thereof}
 
@@ -150,7 +150,13 @@ module Unique (
 	textClassKey,
 	traceIdKey,
 	trueDataConKey,
-	unpackCStringIdKey, unpackCString2IdKey, unpackCStringAppendIdKey,
+	unpackCString2IdKey,
+	unpackCStringAppendIdKey,
+	unpackCStringFoldrIdKey,
+	unpackCStringIdKey,
+	augmentIdKey,
+	appendIdKey,
+--NO:	rangeComplaintIdKey,
 	packCStringIdKey,
 	integerZeroIdKey, integerPlusOneIdKey,
 	integerPlusTwoIdKey, integerMinusOneIdKey,
@@ -611,41 +617,42 @@ mkPrimOpIdUnique op = mkUnique '5' IBOX((tagOf_PrimOp op))
 Now for other non-@DataCon@ @Ids@:
 \begin{code}
 absentErrorIdKey	= mkPreludeMiscIdUnique	 1
-buildIdKey		= mkPreludeMiscIdUnique	 2
-errorIdKey		= mkPreludeMiscIdUnique	 3
-foldlIdKey		= mkPreludeMiscIdUnique	 4
-foldrIdKey		= mkPreludeMiscIdUnique	 5
-forkIdKey   	    	= mkPreludeMiscIdUnique  6 
-int2IntegerIdKey	= mkPreludeMiscIdUnique	 7
-integerMinusOneIdKey	= mkPreludeMiscIdUnique	 8
-integerPlusOneIdKey	= mkPreludeMiscIdUnique	 9
-integerZeroIdKey	= mkPreludeMiscIdUnique	10
-integerPlusTwoIdKey	= mkPreludeMiscIdUnique	11
-packCStringIdKey	= mkPreludeMiscIdUnique	12
-parIdKey		= mkPreludeMiscIdUnique	13
-parErrorIdKey		= mkPreludeMiscIdUnique	14
-patErrorIdKey		= mkPreludeMiscIdUnique	15
---UNUSED:readParenIdKey		= mkPreludeMiscIdUnique 16
-realWorldPrimIdKey	= mkPreludeMiscIdUnique 17
-runSTIdKey		= mkPreludeMiscIdUnique 18
-seqIdKey		= mkPreludeMiscIdUnique 19
---UNUSED:showParenIdKey		= mkPreludeMiscIdUnique	20
---UNUSED:showSpaceIdKey		= mkPreludeMiscIdUnique	21
-traceIdKey		= mkPreludeMiscIdUnique	22
-unpackCStringIdKey	= mkPreludeMiscIdUnique	23
-unpackCString2IdKey	= mkPreludeMiscIdUnique	20 -- NB: NB: NB
-unpackCStringAppendIdKey= mkPreludeMiscIdUnique	21 -- NB: NB: NB
-voidPrimIdKey		= mkPreludeMiscIdUnique	24
+appendIdKey 		= mkPreludeMiscIdUnique  2
+augmentIdKey		= mkPreludeMiscIdUnique	 3  
+buildIdKey		= mkPreludeMiscIdUnique	 4
+errorIdKey		= mkPreludeMiscIdUnique	 5
+foldlIdKey		= mkPreludeMiscIdUnique	 6
+foldrIdKey		= mkPreludeMiscIdUnique	 7
+forkIdKey   	    	= mkPreludeMiscIdUnique  8 
+int2IntegerIdKey	= mkPreludeMiscIdUnique	 9
+integerMinusOneIdKey	= mkPreludeMiscIdUnique	10
+integerPlusOneIdKey	= mkPreludeMiscIdUnique	11
+integerPlusTwoIdKey	= mkPreludeMiscIdUnique	12
+integerZeroIdKey	= mkPreludeMiscIdUnique	13
+packCStringIdKey	= mkPreludeMiscIdUnique	14
+parErrorIdKey		= mkPreludeMiscIdUnique	15
+parIdKey		= mkPreludeMiscIdUnique	16
+patErrorIdKey		= mkPreludeMiscIdUnique	25
+--NO:rangeComplaintIdKey	= mkPreludeMiscIdUnique	17
+realWorldPrimIdKey	= mkPreludeMiscIdUnique 18
+runSTIdKey		= mkPreludeMiscIdUnique 19
+seqIdKey		= mkPreludeMiscIdUnique 20
+traceIdKey		= mkPreludeMiscIdUnique	21
+unpackCString2IdKey	= mkPreludeMiscIdUnique	22
+unpackCStringAppendIdKey= mkPreludeMiscIdUnique	23
+unpackCStringFoldrIdKey	= mkPreludeMiscIdUnique 24
+unpackCStringIdKey	= mkPreludeMiscIdUnique	25
+voidPrimIdKey		= mkPreludeMiscIdUnique	26
 
 #ifdef GRAN
-parLocalIdKey		= mkPreludeMiscIdUnique 25
-parGlobalIdKey		= mkPreludeMiscIdUnique 26
-noFollowIdKey		= mkPreludeMiscIdUnique 27
-copyableIdKey		= mkPreludeMiscIdUnique 28
+parLocalIdKey		= mkPreludeMiscIdUnique 27
+parGlobalIdKey		= mkPreludeMiscIdUnique 28
+noFollowIdKey		= mkPreludeMiscIdUnique 29
+copyableIdKey		= mkPreludeMiscIdUnique 30
 #endif
 
 #ifdef DPH
-podSelectorIdKey	= mkPreludeMiscIdUnique 29
+podSelectorIdKey	= mkPreludeMiscIdUnique 31
 #endif {- Data Parallel Haskell -}
 \end{code}
 

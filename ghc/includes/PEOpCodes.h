@@ -13,8 +13,8 @@
 #define REPLY_OK		0x00
 
 /*Startup + Shutdown*/
-#define	PP_INIT			0x50
-#define	PP_IO_INIT		0x51
+#define	PP_SYSMAN_TID		0x50
+#define	PP_MAIN_TASK		0x51
 #define	PP_FINISH		0x52
 #define	PP_PETIDS		0x53
 

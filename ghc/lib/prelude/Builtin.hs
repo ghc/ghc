@@ -4,7 +4,10 @@ module PreludeBuiltin (
 	absent#,
 	error,
 	patError#,
-	parError#
+	parError#,
+	unpackPS#, unpackPS2#,
+        unpackAppendPS#,
+	unpackFoldrPS#
     ) where
 
 import Cls
@@ -18,7 +21,7 @@ import PreludeDialogueIO ( appendChan# )
 #ifndef __PARALLEL_HASKELL__
 import PreludeGlaMisc	( deRefStablePtr )
 #endif
-import PS		( _PackedString, _unpackPS )
+import PS		( _PackedString, _unpackPS, _packCBytes )
 import Stdio		( _FILE )
 import Text
 import TyComplex
@@ -117,3 +120,41 @@ _trace string expr
 	returnPrimIO expr )
   where
     sTDERR = (``stderr'' :: _FILE)
+
+--------------------------------------------------------------------------
+
+unpackPS#	:: Addr#         -> [Char] -- calls injected by compiler
+unpackPS2#	:: Addr# -> Int# -> [Char] -- calls injected by compiler
+unpackAppendPS# :: Addr# -> [Char] -> [Char] -- ditto?
+unpackFoldrPS# :: Addr# -> (Char -> a -> a) -> a -> a -- ditto?
+
+unpackPS# addr -- calls injected by compiler
+  = unpack 0#
+  where
+    unpack nh
+      | ch `eqChar#` '\0'# = []
+      | True		   = C# ch : unpack (nh +# 1#)
+      where
+	ch = indexCharOffAddr# addr nh
+
+unpackAppendPS# addr rest
+  = unpack 0#
+  where
+    unpack nh
+      | ch `eqChar#` '\0'# = rest
+      | True		   = C# ch : unpack (nh +# 1#)
+      where
+	ch = indexCharOffAddr# addr nh
+
+unpackFoldrPS# addr f z 
+  = unpack 0#
+  where
+    unpack nh
+      | ch `eqChar#` '\0'# = z
+      | True		   = C# ch `f` unpack (nh +# 1#)
+      where
+	ch = indexCharOffAddr# addr nh
+
+unpackPS2# addr len -- calls injected by compiler
+  -- this one is for literal strings with NULs in them; rare.
+  = _unpackPS (_packCBytes (I# len) (A# addr))

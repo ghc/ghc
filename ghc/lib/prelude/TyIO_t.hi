@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface PreludeIO where
 import PreludeBuiltin(Bin, Char(..), Int(..), List(..))
 import PreludeCore(Bool(..))

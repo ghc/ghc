@@ -18,7 +18,6 @@ foldl			:: (a -> b -> a) -> a -> [b] -> a
 foldl f z []		=  z
 foldl f z (x:xs)	=  foldl f (f z x) xs
 
-
 -- HACK: Magic unfoldings not implemented for unboxed lists
 --	 Need to define a _build to avoid undefined symbol
 

@@ -31,7 +31,8 @@ import SimplMonad
 
 import BinderInfo
 
-import AbsPrel		( primOpIsCheap, realWorldStateTy, buildId
+import AbsPrel		( primOpIsCheap, realWorldStateTy,
+			  buildId, augmentId
 			  IF_ATTACK_PRAGMAS(COMMA realWorldTy)
 			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
@@ -79,7 +80,10 @@ floatExposesHNF float_lets float_primops ok_to_dup rhs
     --    `build g'
     -- is like a HNF,
     -- because it *will* become one.
+    -- likewise for `augment g h'
+    --
     try (CoApp (CoTyApp (CoVar bld) _) _) | bld == buildId = True
+    try (CoApp (CoApp (CoTyApp (CoVar bld) _) _) _) | bld == augmentId = True
 
     try other = manifestlyWHNF other
 	{- but *not* necessarily "manifestlyBottom other"...

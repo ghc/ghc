@@ -11,7 +11,7 @@ import NameTypes(FullName, ShortName)
 import Outputable(NamedThing, Outputable)
 import PlainCore(PlainCoreExpr(..))
 import PrelFuns(gLASGOW_MISC, gLASGOW_ST, pRELUDE, pRELUDE_BUILTIN, pRELUDE_CORE, pRELUDE_IO, pRELUDE_LIST, pRELUDE_PRIMIO, pRELUDE_PS, pRELUDE_RATIO, pRELUDE_TEXT)
-import PrelVals(aBSENT_ERROR_ID, buildId, eRROR_ID, foldlId, foldrId, integerMinusOneId, integerPlusOneId, integerPlusTwoId, integerZeroId, mkBuild, mkFoldl, mkFoldr, pAT_ERROR_ID, packStringForCId, realWorldPrimId, unpackCString2Id, unpackCStringAppendId, unpackCStringId, voidPrimId)
+import PrelVals(aBSENT_ERROR_ID, appendId, augmentId, buildId, eRROR_ID, foldlId, foldrId, integerMinusOneId, integerPlusOneId, integerPlusTwoId, integerZeroId, mkBuild, mkFoldl, mkFoldr, pAT_ERROR_ID, packStringForCId, realWorldPrimId, unpackCString2Id, unpackCStringAppendId, unpackCStringFoldrId, unpackCStringId, voidPrimId)
 import PreludePS(_PackedString)
 import Pretty(PprStyle, PrettyRep)
 import PrimKind(PrimKind)
@@ -51,6 +51,8 @@ pRELUDE_PS :: _PackedString
 pRELUDE_RATIO :: _PackedString
 pRELUDE_TEXT :: _PackedString
 aBSENT_ERROR_ID :: Id
+appendId :: Id
+augmentId :: Id
 buildId :: Id
 eRROR_ID :: Id
 foldlId :: Id
@@ -112,6 +114,7 @@ packStringForCId :: Id
 realWorldPrimId :: Id
 unpackCString2Id :: Id
 unpackCStringAppendId :: Id
+unpackCStringFoldrId :: Id
 unpackCStringId :: Id
 voidPrimId :: Id
 pprPrimOp :: PprStyle -> PrimOp -> Int -> Bool -> PrettyRep

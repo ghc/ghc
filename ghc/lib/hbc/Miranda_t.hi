@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface Miranda where
 import QSort(sort)
 cjustify :: Int -> [Char] -> [Char]

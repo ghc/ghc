@@ -30,9 +30,12 @@ if ( $OrigCpp =~ /(\S+)\s+(.*)/ ) {
     $Cpp = $OrigCpp;
 }
 
-$Tmp_prefix = (( $ENV{'TMPDIR'} ) # to make tmp file names
-		? ($ENV{'TMPDIR'} . "/mkdependHS$$")
-		: "$(TMPDIR)/mkdependHS$$" );
+if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
+    $Tmp_prefix = $ENV{'TMPDIR'} . "/mkdependHS$$";
+} else {
+    $Tmp_prefix ="$(TMPDIR)/mkdependHS$$";
+    $ENV{'TMPDIR'} = '$(TMPDIR)'; # set the env var as well
+}
 
 #------------------------------------------------------------------------
 # If you are adjusting paths by hand for a binary GHC distribution,

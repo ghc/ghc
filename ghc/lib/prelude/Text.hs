@@ -43,6 +43,7 @@ import ITup2
 import ITup3
 import List
 import Prel
+import PreludeGlaST	( _MutableArray )
 import PS		( _PackedString, _unpackPS )
 import TyComplex	-- for pragmas
  

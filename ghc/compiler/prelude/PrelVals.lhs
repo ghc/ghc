@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[PrelVals]{Prelude values the compiler ``knows about''}
 
@@ -114,28 +114,44 @@ int2IntegerId
 
 --------------------------------------------------------------------
 
+packStringForCId
+  = pcMiscPrelId packCStringIdKey{-ToDo:rename-} pRELUDE_PS SLIT("_packStringForC")
+	(UniFun stringTy byteArrayPrimTy) noIdInfo
+
+--------------------------------------------------------------------
+
 unpackCStringId
-  = pcMiscPrelId unpackCStringIdKey pRELUDE_PS SLIT("unpackPS#")
+  = pcMiscPrelId unpackCStringIdKey pRELUDE_BUILTIN SLIT("unpackPS#")
 		 (addrPrimTy{-a char *-} `UniFun` stringTy) noIdInfo
+-- Andy says:
+--	(UniFun addrPrimTy{-a char *-} stringTy) (noIdInfo `addInfo` mkArityInfo 1)
+-- but I don't like wired-in IdInfos (WDP)
 
 unpackCString2Id -- for cases when a string has a NUL in it
-  = pcMiscPrelId unpackCString2IdKey pRELUDE_PS SLIT("unpackPS2#")
+  = pcMiscPrelId unpackCString2IdKey pRELUDE_BUILTIN SLIT("unpackPS2#")
 		 (addrPrimTy{-a char *-}
 	`UniFun` (intPrimTy -- length
 	`UniFun` stringTy)) noIdInfo
 
+
 --------------------------------------------------------------------
 unpackCStringAppendId
-  = pcMiscPrelId unpackCStringAppendIdKey pRELUDE_BUILTIN SLIT("unpackCStringAppend#")
+  = pcMiscPrelId unpackCStringAppendIdKey pRELUDE_BUILTIN SLIT("unpackAppendPS#")
 				(addrPrimTy{-a "char *" pointer-} 
 		`UniFun`	(stringTy
-		`UniFun`	stringTy)) noIdInfo
+		`UniFun`	stringTy)) ((noIdInfo 
+				`addInfo_UF` mkMagicUnfolding SLIT("unpackAppendPS#"))
+				`addInfo` mkArityInfo 2)
   
---------------------------------------------------------------------
-
-packStringForCId
-  = pcMiscPrelId packCStringIdKey{-ToDo:rename-} pRELUDE_PS SLIT("_packStringForC")
-	(UniFun stringTy byteArrayPrimTy) noIdInfo
+unpackCStringFoldrId
+  = pcMiscPrelId unpackCStringFoldrIdKey pRELUDE_BUILTIN SLIT("unpackFoldrPS#")
+		(mkSigmaTy [alpha_tv] [] 
+			   (addrPrimTy{-a "char *" pointer-} 
+		`UniFun`   ((charTy `UniFun` (alpha `UniFun` alpha))
+		`UniFun`   (alpha
+		`UniFun`   alpha)))) ((noIdInfo 
+				`addInfo_UF` mkMagicUnfolding SLIT("unpackFoldrPS#"))
+				`addInfo` mkArityInfo 3)
 \end{code}
 
 OK, this is Will's idea: we should have magic values for Integers 0,
@@ -502,6 +518,7 @@ runSTId
       = noIdInfo
 	`addInfo` mkArityInfo 1
         `addInfo` mkStrictnessInfo [WwStrict] Nothing
+	`addInfo` mkArgUsageInfo [ArgUsage 1]
 	-- ABSOLUTELY NO UNFOLDING, e.g.: (mkUnfolding EssentialUnfolding run_ST_template)
 	-- see example below
 {- OUT:
@@ -569,6 +586,23 @@ realWorldPrimId
 %************************************************************************
 
 \begin{code}
+{- NO:
+rangeComplaint_Ix_IntId
+ = pcMiscPrelId rangeComplaintIdKey pRELUDE_BUILTIN SLIT("_rangeComplaint_Ix_Int") my_ty id_info
+  where
+    my_ty
+      = mkSigmaTy [alpha_tv] [] (
+			intPrimTy `UniFun` (
+			intPrimTy `UniFun` (
+			intPrimTy `UniFun` alpha)))
+    id_info
+      = noIdInfo
+	`addInfo` mkArityInfo 3
+        `addInfo` mkBottomStrictnessInfo
+-}
+\end{code}
+
+\begin{code}
 buildId
   = pcMiscPrelId buildIdKey pRELUDE_CORE SLIT("_build") buildTy
 	((((noIdInfo 
@@ -612,6 +646,26 @@ mkBuild :: UniType
 mkBuild ty tv c n g expr
  = CoLet (CoNonRec g (CoTyLam tv (mkCoLam [c,n] expr)))
 	 (CoApp (mkCoTyApp (CoVar buildId) ty) (CoVarAtom g))
+\end{code}
+
+\begin{code}
+augmentId
+  = pcMiscPrelId buildIdKey pRELUDE_CORE SLIT("_augment") augmentTy
+	(((noIdInfo 
+		`addInfo_UF` mkMagicUnfolding SLIT("augment"))
+		`addInfo` mkStrictnessInfo [WwStrict,WwLazy False] Nothing)
+		`addInfo` mkArgUsageInfo [ArgUsage 2,UnknownArgUsage])
+	-- cheating, but since _build never actually exists ...
+  where
+    -- The type of this strange object is:
+    --  \/ a . (\/ b . (a -> b -> b) -> b -> b) -> [a] -> [a]
+
+    augmentTy = mkSigmaTy [alpha_tv] [] (buildUniTy `UniFun` 
+					(mkListTy alpha `UniFun` mkListTy alpha))
+	where
+	    buildUniTy = mkSigmaTy [beta_tv] []
+		    ((alpha `UniFun` (beta `UniFun` beta))
+			    `UniFun` (beta `UniFun` beta))
 \end{code}
 
 mkFoldr ty_a ty_b [x,y...] => foldr ty_a ty_b x y ..
@@ -658,6 +712,31 @@ foldlId = pcMiscPrelId foldlIdKey pRELUDE_FB{-not "List"-} SLIT("foldl")
 mkFoldl a b f z xs = foldl CoApp
 			   (mkCoTyApps (CoVar foldlId) [a, b]) 
 			   [CoVarAtom f,CoVarAtom z,CoVarAtom xs]
+
+-- A bit of magic goes no here. We translate appendId into ++,
+-- you have to be carefull when you actually compile append:
+--	xs ++ ys = augment (\ c n -> foldr c n xs) ys
+--		 {- unfold augment -}
+--		 = foldr (:) ys xs
+--		 {- fold foldr to append -}
+--		 = ys `appendId` xs		
+--		 = ys ++ xs		-- ugg!
+-- *BUT* you want (++) and not _append in your interfaces.
+--
+-- So you have to turn *off* unfolding of foldr inside FoldrBuild.hs inside
+-- the prelude.
+--
+
+appendId
+  = pcMiscPrelId appendIdKey pRELUDE_LIST SLIT("++") appendTy idInfo
+  where
+    appendTy =
+      (mkSigmaTy [alpha_tv] []
+	    ((mkListTy alpha) `UniFun` ((mkListTy alpha) `UniFun` (mkListTy alpha))))
+    idInfo = (((noIdInfo 
+		`addInfo` mkStrictnessInfo [WwStrict,WwLazy False] Nothing)
+		`addInfo` mkArityInfo 2)
+		`addInfo` mkUpdateInfo [1,2])
 
 pRELUDE_FB = SLIT("PreludeFoldrBuild")
 \end{code}

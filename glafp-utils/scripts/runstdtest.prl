@@ -34,7 +34,12 @@ $Status = 0;
 @PgmArgs = ();
 $PgmExitStatus = 0;
 $PgmStdinFile  = '/dev/null';
-$TmpPrefix = '$(TMPDIR)';
+if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
+    $TmpPrefix = $ENV{'TMPDIR'};
+} else {
+    $TmpPrefix ="$(TMPDIR)";
+    $ENV{'TMPDIR'} = '$(TMPDIR)'; # set the env var as well
+}
 $ScriptFile = "$TmpPrefix/run_me$$";
 $DefaultStdoutFile = "$TmpPrefix/no_stdout$$"; # can't use /dev/null (e.g. Alphas)
 $DefaultStderrFile = "$TmpPrefix/no_stderr$$";

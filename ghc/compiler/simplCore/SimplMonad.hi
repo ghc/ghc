@@ -19,7 +19,7 @@ data PrimOp
 data SimplCount 
 type SmplM a = SplitUniqSupply -> SimplCount -> (a, SimplCount)
 data SplitUniqSupply 
-data TickType   = UnfoldingDone | FoldrBuild | MagicUnfold | ConReused | CaseFloatFromLet | CaseOfCase | LetFloatFromLet | LetFloatFromCase | KnownBranch | Let2Case | CaseMerge | CaseElim | CaseIdentity | AtomicRhs | EtaExpansion | CaseOfError | FoldrConsNil | Foldr_Nil | FoldrFoldr | Foldr_List | FoldrCons | FoldrInline | TyBetaReduction | BetaReduction
+data TickType   = UnfoldingDone | MagicUnfold | ConReused | CaseFloatFromLet | CaseOfCase | LetFloatFromLet | LetFloatFromCase | KnownBranch | Let2Case | CaseMerge | CaseElim | CaseIdentity | AtomicRhs | EtaExpansion | CaseOfError | TyBetaReduction | BetaReduction | FoldrBuild | FoldrAugment | Foldr_Nil | Foldr_List | FoldlBuild | FoldlAugment | Foldl_Nil | Foldl_List | Foldr_Cons_Nil | Foldr_Cons | Str_FoldrStr | Str_UnpackCons | Str_UnpackNil
 data TyVar 
 data UniType 
 cloneId :: SimplEnv -> (Id, BinderInfo) -> SplitUniqSupply -> SimplCount -> (Id, SimplCount)

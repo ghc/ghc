@@ -321,7 +321,7 @@ a distinguished info pointer.
 
 \begin{code}
 #  define FMBQ_VHS			BQ_VHS
-#  define FMBQ_HS				BQ_HS
+#  define FMBQ_HS			BQ_HS
   
 #  define FMBQ_CLOSURE_SIZE(closure)	BQ_CLOSURE_SIZE(closure)
 #  define FMBQ_CLOSURE_NoPTRS(closure)	BQ_CLOSURE_NoPTRS(closure)

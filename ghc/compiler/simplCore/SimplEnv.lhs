@@ -65,7 +65,6 @@ module SimplEnv (
 
 IMPORT_Trace
 
-import AbsPrel		( buildId )
 import AbsUniType	( applyTypeEnvToTy, getUniDataTyCon, cmpUniType )
 import Bag		( emptyBag, Bag )
 import BasicLit		( isNoRepLit, BasicLit(..), PrimKind ) -- .. for pragmas only

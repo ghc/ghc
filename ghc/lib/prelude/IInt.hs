@@ -1,4 +1,4 @@
-module PreludeCore ( Int(..), rangeComplaint_Ix_Int#{-see comment later-} ) where
+module PreludeCore ( Int(..), _rangeComplaint_Ix_Int{-see comment later-} ) where
 
 import Cls
 import Core
@@ -96,16 +96,19 @@ instance  Integral Int	where
     toInteger (I# n#) = int2Integer# n#  -- give back a full-blown Integer
     toInt x	      = x
 
-rangeComplaint_Ix_Int# i m n -- export it so it will *not* be floated inwards
-  = error ("Ix.Int.index2{PreludeCore}: Index "
+_rangeComplaint_Ix_Int i m n -- export it so it will *not* be floated inwards
+  = error ("Ix.Int.index{PreludeCore}: Index "
 	   ++ show (I# i) ++ " outside the range " 
 	   ++ show (I# m,I# n) ++ ".\n")
 
 instance  Ix Int  where
+    {-# INLINE range #-}
     range (m,n)		=  [m..n]
+    {-# INLINE index #-}
     index b@(I# m, I# n) (I# i)
 	| inRange b (I# i)  =  I# (i -# m)
-	| otherwise	    =  rangeComplaint_Ix_Int# i m n
+	| otherwise	    =  _rangeComplaint_Ix_Int i m n
+    {-# INLINE inRange #-}
     inRange (I# m, I# n) (I# i) =  m <=# i && i <=# n
 
 instance  Enum Int  where
@@ -205,10 +208,11 @@ instance  Integral Int#  where
     toInt n#	 = I# n#
 
 instance  Ix Int#  where
+    {-# INLINE range #-}
     range (m,n)		=  [m..n]
     index b@(m, n) i
 	| inRange b i   =  I# (i -# m)
-	| otherwise	=  rangeComplaint_Ix_Int# i m n
+	| otherwise	=  _rangeComplaint_Ix_Int i m n
     inRange (m, n) i    =  m <=# i && i <=# n
 
 instance  Enum Int#  where
@@ -216,12 +220,12 @@ instance  Enum Int#  where
     enumFrom x = x : enumFrom (x `plusInt#` 1)
     enumFromTo n m = takeWhile (<= m) (enumFrom n)
 #else
-    {-# INLINE enumFrom #-}
     {-# INLINE enumFromTo #-}
-    enumFrom x           = _build (\ c _ -> 
-	let g x = x `c` g (x `plusInt#` 1) in g x)
+    {-# INLINE enumFrom #-}
     enumFromTo x y	 = _build (\ c n ->
-	let g x = if x <= y then x `c` g (x `plusInt#` 1) else n in g x)
+	let g x = if x <= y then x `c` g (x +# 1) else n in g x)
+    enumFrom x           = _build (\ c _ -> 
+	let g x = x `c` g (x +# 1) in g x)
 #endif
     enumFromThen m n     =  en' m (n `minusInt#` m)
 	                    where en' m n = m : en' (m `plusInt#` n) n

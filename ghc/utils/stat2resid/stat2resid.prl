@@ -1,5 +1,5 @@
 #
-# (c) The GRASP Project, Glasgow University, 1992
+# (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 #
 # *** MSUB does some substitutions here ***
 # *** grep for $( ***
@@ -7,7 +7,13 @@
 
 $debug = 0;
 $outsuffix = ".resid.ps";	# change as appropriate
-$tmpfile = "$(TMPDIR)/$$.resid.data";
+
+if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
+    $tmpfile = $ENV{'TMPDIR'} . "/$$.resid.data";
+} else {
+    $tmpfile ="$(TMPDIR)/$$.resid.data";
+    $ENV{'TMPDIR'} = '$(TMPDIR)'; # set the env var as well
+}
 
 @INC = ( ( $(INSTALLING) ) ? '$(INSTLIBDIR_GHC)'
 			   : '$(TOP_PWD)/$(CURRENT_DIR)' );

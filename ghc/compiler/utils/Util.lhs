@@ -803,7 +803,7 @@ quite useful by itself I think it was John's idea originally though I
 believe the lazy version is due to me [surprisingly complicated].
 gamma [used to be called] is called gamma because I got inspired by
 the Gamma calculus. It is not very close to the calculus but does
-behave less sequential that both foldr and foldl. One could imagine a
+behave less sequentially than both foldr and foldl. One could imagine a
 version of gamma that took a unit element as well thereby avoiding the
 problem with empty lists.
 
@@ -812,12 +812,12 @@ I've tried this code against
    1) insertion sort - as provided by haskell
    2) the normal implementation of quick sort
    3) a deforested version of quick sort due to Jan Sparud
-   4) a super-optimized-quick-sort of Lennarts
+   4) a super-optimized-quick-sort of Lennart's
 
 If the list is partially sorted both merge sort and in particular
 natural merge sort wins. If the list is random [ average length of
 rising subsequences = approx 2 ] mergesort still wins and natural
-merge sort is marginally beeten by lennart's soqs. The space
+merge sort is marginally beaten by Lennart's soqs. The space
 consumption of merge sort is a bit worse than Lennart's quick sort
 approx a factor of 2. And a lot worse if Sparud's bug-fix [see his
 fpca article ] isn't used because of group.

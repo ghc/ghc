@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface Time where
 data Time   = Time Int Int Int Int Int Int Double Int
 dblToTime :: Double -> Time
@@ -9,21 +9,21 @@ timeToString :: Time -> [Char]
 	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(U(P)LLLLLLL)" _N_ _N_ #-}
 instance Eq Time
 	{-# GHC_PRAGMA _M_ Time {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(Time -> Time -> Bool), (Time -> Time -> Bool)] [_CONSTM_ Eq (==) (Time), _CONSTM_ Eq (/=) (Time)] _N_
-	 (==) = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)LLLLLLL)U(U(P)LLLLLLL)" _N_ _N_,
-	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)LLLLLLL)U(U(P)LLLLLLL)" _N_ _N_ #-}
+	 (==) = { _A_ 2 _U_ 11 _N_ _S_ "U(U(P)LLLLLLL)U(U(P)LLLLLLL)" _N_ _N_ },
+	 (/=) = { _A_ 2 _U_ 11 _N_ _S_ "U(U(P)LLLLLLL)U(U(P)LLLLLLL)" _N_ _N_ } #-}
 instance Ord Time
 	{-# GHC_PRAGMA _M_ Time {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq Time}}, (Time -> Time -> Bool), (Time -> Time -> Bool), (Time -> Time -> Bool), (Time -> Time -> Bool), (Time -> Time -> Time), (Time -> Time -> Time), (Time -> Time -> _CMP_TAG)] [_DFUN_ Eq (Time), _CONSTM_ Ord (<) (Time), _CONSTM_ Ord (<=) (Time), _CONSTM_ Ord (>=) (Time), _CONSTM_ Ord (>) (Time), _CONSTM_ Ord max (Time), _CONSTM_ Ord min (Time), _CONSTM_ Ord _tagCmp (Time)] _N_
-	 (<) = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)LLLLLLL)U(U(P)LLLLLLL)" _N_ _N_,
-	 (<=) = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)LLLLLLL)U(U(P)LLLLLLL)" _N_ _N_,
-	 (>=) = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)LLLLLLL)U(U(P)LLLLLLL)" _N_ _N_,
-	 (>) = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)LLLLLLL)U(U(P)LLLLLLL)" _N_ _N_,
-	 max = _A_ 2 _U_ 22 _N_ _S_ "U(U(P)LLLLLLL)U(U(P)LLLLLLL)" _N_ _N_,
-	 min = _A_ 2 _U_ 22 _N_ _S_ "U(U(P)LLLLLLL)U(U(P)LLLLLLL)" _N_ _N_,
-	 _tagCmp = _A_ 2 _U_ 11 _N_ _S_ "U(U(P)LLLLLLL)U(U(P)LLLLLLL)" _N_ _N_ #-}
+	 (<) = { _A_ 2 _U_ 11 _N_ _S_ "U(U(P)LLLLLLL)U(U(P)LLLLLLL)" _N_ _N_ },
+	 (<=) = { _A_ 2 _U_ 11 _N_ _S_ "U(U(P)LLLLLLL)U(U(P)LLLLLLL)" _N_ _N_ },
+	 (>=) = { _A_ 2 _U_ 11 _N_ _S_ "U(U(P)LLLLLLL)U(U(P)LLLLLLL)" _N_ _N_ },
+	 (>) = { _A_ 2 _U_ 11 _N_ _S_ "U(U(P)LLLLLLL)U(U(P)LLLLLLL)" _N_ _N_ },
+	 max = { _A_ 2 _U_ 22 _N_ _S_ "U(U(P)LLLLLLL)U(U(P)LLLLLLL)" _N_ _N_ },
+	 min = { _A_ 2 _U_ 22 _N_ _S_ "U(U(P)LLLLLLL)U(U(P)LLLLLLL)" _N_ _N_ },
+	 _tagCmp = { _A_ 2 _U_ 11 _N_ _S_ "U(U(P)LLLLLLL)U(U(P)LLLLLLL)" _N_ _N_ } #-}
 instance Text Time
 	{-# GHC_PRAGMA _M_ Time {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(Time, [Char])]), (Int -> Time -> [Char] -> [Char]), ([Char] -> [([Time], [Char])]), ([Time] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (Time), _CONSTM_ Text showsPrec (Time), _CONSTM_ Text readList (Time), _CONSTM_ Text showList (Time)] _N_
-	 readsPrec = _A_ 2 _U_ 12 _N_ _S_ "U(P)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
-	 showsPrec = _A_ 2 _U_ 112 _N_ _S_ "LU(LLLLLLLL)" _N_ _N_,
-	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
-	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+	 readsPrec = { _A_ 2 _U_ 12 _N_ _S_ "U(P)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ },
+	 showsPrec = { _A_ 2 _U_ 112 _N_ _S_ "LU(LLLLLLLL)" _N_ _N_ },
+	 readList = { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ },
+	 showList = { _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ } #-}
 

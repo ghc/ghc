@@ -33,12 +33,15 @@ instance (Ord a, Ord b) => Ord (a, b) where
 				    _EQ -> _tagCmp b1 b2
 
 instance (Ix a, Ix b) => Ix (a, b) where
+    {-# INLINE range #-}
     range ((l1,l2),(u1,u2))
       = [ (i1,i2) | i1 <- range (l1,u1), i2 <- range (l2,u2) ]
 
+    {-# INLINE index #-}
     index ((l1,l2),(u1,u2)) (i1,i2)
-      = index (l1,u1) i1 * (index (l2,u2) u2 + 1){-rangeSize (l2,u2)-} + index (l2,u2) i2
+      = index (l1,u1) i1 * (index (l2,u2) u2 + (I# 1#)){-rangeSize (l2,u2)-} + index (l2,u2) i2
 
+    {-# INLINE inRange #-}
     inRange ((l1,l2),(u1,u2)) (i1,i2)
       = inRange (l1,u1) i1 && inRange (l2,u2) i2
 

@@ -433,6 +433,7 @@ same, but without the saved SuA pointer.
 We store the following information concerning the stacks in a global
 structure. (sequential only).
 \begin{code}
+#ifndef CONCURRENT
 
 typedef struct {
     PP_	botA;	/* Points to bottom-most word of A stack */
@@ -440,6 +441,8 @@ typedef struct {
 } stackData;
 
 extern stackData stackInfo;
+
+#endif /* !CONCURRENT */
 \end{code}
 
 %************************************************************************

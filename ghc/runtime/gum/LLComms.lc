@@ -276,11 +276,12 @@ GLOBAL_TASK_ID who;
   rtsBool match;
 
   do {
-/*    fprintf(stderr,"WaitForPEOp: op = %x, who = %x\n",op,who); */
+    fprintf(stderr,"WaitForPEOp: op = %x, who = %x\n",op,who); 
     while((p = pvm_recv(ANY_TASK,ANY_OPCODE)) < 0)
       pvm_perror("WaitForPEOp: Waiting for PEOp");
       
     pvm_bufinfo( p, &nbytes, &opcode, &sender_id );
+    fprintf(stderr,"WaitForPEOp: received: opcode = %x, sender_id = %x\n",opcode,sender_id); 
 
     match = (op == ANY_OPCODE || op == opcode) && (who == ANY_TASK || who == sender_id);
 
@@ -346,22 +347,28 @@ unsigned nPEs;
     GLOBAL_TASK_ID *PEs
       = (GLOBAL_TASK_ID *) stgMallocBytes(sizeof(GLOBAL_TASK_ID) * nPEs, "PEStartUp (PEs)");
 
-    mytid = _my_gtid;		/* Initialise PVM and get task id into global
-				 * variable */
+    mytid = _my_gtid;		/* Initialise PVM and get task id into global var.*/
 
-/*    fprintf(stderr,"PEStartup, No. PEs = %d \n", nPEs); */
+    fprintf(stderr,"PEStartup, Task id = [%x], No. PEs = %d \n", mytid, nPEs); 
     checkComms(pvm_joingroup(PEGROUP), "PEStartup");
-/*    fprintf(stderr,"PEStartup, Joined PEGROUP\n"); */
+    fprintf(stderr,"PEStartup, Joined PEGROUP\n"); 
     checkComms(pvm_joingroup(PECTLGROUP), "PEStartup");
-/*    fprintf(stderr,"PEStartup, Joined PECTLGROUP\n"); */
-    checkComms(pvm_barrier(PECTLGROUP, nPEs + 1), "PEStartup");
-/*    fprintf(stderr,"PEStartup, Passed PECTLGROUP barrier\n"); */
+    fprintf(stderr,"PEStartup, Joined PECTLGROUP\n"); 
+    checkComms(pvm_barrier(PECTLGROUP, nPEs+1), "PEStartup");
+    fprintf(stderr,"PEStartup, Passed PECTLGROUP barrier\n"); 
 
+    addr = WaitForPEOp(PP_SYSMAN_TID, ANY_GLOBAL_TASK);
+    SysManTask = Sender_Task(addr);
+    if (IAmMainThread) {		/* Main Thread Identifies itself to SysMan */
+	pvm_initsend(PvmDataDefault);
+	pvm_send(SysManTask, PP_MAIN_TASK);
+    } 
     addr = WaitForPEOp(PP_PETIDS, ANY_GLOBAL_TASK);
     GetArgs(buffer, nPEs);
+
     for (i = 0; i < nPEs; ++i) {
 	PEs[i] = (GLOBAL_TASK_ID) buffer[i];
-	/* fprintf(stderr,"PEs[%d] = %x \n", i, PEs[i]);  */
+	fprintf(stderr,"PEs[%d] = %x \n", i, PEs[i]); 
     }
     free(buffer);
     return PEs;

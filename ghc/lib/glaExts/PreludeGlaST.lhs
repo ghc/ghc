@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994
+% (c) The AQUA Project, Glasgow University, 1994-1996
 %
 \section[PreludeGlaST]{Basic ``state transformer'' monad, mutable arrays and variables}
 
@@ -209,11 +209,12 @@ instance _CCallable (_MutableByteArray s ix)
 \end{code}
 
 \begin{code}
-newArray    :: Ix ix => (ix,ix) -> elt -> _ST s (_MutableArray s ix elt)
+newArray, _newArray
+	:: Ix ix => (ix,ix) -> elt -> _ST s (_MutableArray s ix elt)
 newCharArray, newIntArray, newAddrArray, newFloatArray, newDoubleArray
-	    :: Ix ix => (ix,ix) -> _ST s (_MutableByteArray s ix) 
+	:: Ix ix => (ix,ix) -> _ST s (_MutableByteArray s ix) 
 
-{-# SPECIALIZE newArray       :: IPr       -> elt -> _ST s (_MutableArray s Int elt),
+{-# SPECIALIZE _newArray      :: IPr       -> elt -> _ST s (_MutableArray s Int elt),
 				 (IPr,IPr) -> elt -> _ST s (_MutableArray s IPr elt)
   #-}
 {-# SPECIALIZE newCharArray   :: IPr -> _ST s (_MutableByteArray s Int) #-}
@@ -222,7 +223,9 @@ newCharArray, newIntArray, newAddrArray, newFloatArray, newDoubleArray
 {-# SPECIALIZE newFloatArray  :: IPr -> _ST s (_MutableByteArray s Int) #-}
 {-# SPECIALIZE newDoubleArray :: IPr -> _ST s (_MutableByteArray s Int) #-}
 
-newArray ixs@(ix_start, ix_end) init (S# s#)
+newArray = _newArray
+
+_newArray ixs@(ix_start, ix_end) init (S# s#)
   = let n# = case (if null (range ixs)
 		  then 0
 		  else (index ixs ix_end) + 1) of { I# x -> x }
@@ -460,19 +463,21 @@ writeDoubleArray (_MutableByteArray ixs barr#) n (D# ele) (S# s#)
 \end{code}
 
 \begin{code}
-freezeArray 	  :: Ix ix => _MutableArray s ix elt -> _ST s (Array ix elt)
+freezeArray, _freezeArray :: Ix ix => _MutableArray s ix elt -> _ST s (Array ix elt)
 freezeCharArray   :: Ix ix => _MutableByteArray s ix -> _ST s (_ByteArray ix)
 freezeIntArray    :: Ix ix => _MutableByteArray s ix -> _ST s (_ByteArray ix)
 freezeAddrArray   :: Ix ix => _MutableByteArray s ix -> _ST s (_ByteArray ix)
 freezeFloatArray  :: Ix ix => _MutableByteArray s ix -> _ST s (_ByteArray ix)
 freezeDoubleArray :: Ix ix => _MutableByteArray s ix -> _ST s (_ByteArray ix)
 
-{-# SPECIALISE freezeArray :: _MutableArray s Int elt -> _ST s (Array Int elt),
-			      _MutableArray s IPr elt -> _ST s (Array IPr elt)
+{-# SPECIALISE _freezeArray :: _MutableArray s Int elt -> _ST s (Array Int elt),
+			       _MutableArray s IPr elt -> _ST s (Array IPr elt)
   #-}
 {-# SPECIALISE freezeCharArray :: _MutableByteArray s Int -> _ST s (_ByteArray Int) #-}
 
-freezeArray (_MutableArray ixs@(ix_start, ix_end) arr#) (S# s#)
+freezeArray = _freezeArray
+
+_freezeArray (_MutableArray ixs@(ix_start, ix_end) arr#) (S# s#)
   = let n# = case (if null (range ixs)
 		  then 0
 		  else (index ixs ix_end) + 1) of { I# x -> x }
@@ -687,6 +692,49 @@ unsafeFreezeArray (_MutableArray ixs arr#) (S# s#)
 unsafeFreezeByteArray (_MutableByteArray ixs arr#) (S# s#)
   = case unsafeFreezeByteArray# arr# s# of { StateAndByteArray# s2# frozen# ->
     (_ByteArray ixs frozen#, S# s2#) }
+\end{code}
+
+This takes a immutable array, and copies it into a mutable array, in a
+hurry.
+
+\begin{code}
+{-# SPECIALISE thawArray :: Array Int elt -> _ST s (_MutableArray s Int elt),
+			    Array IPr elt -> _ST s (_MutableArray s IPr elt)
+  #-}
+
+thawArray (_Array ixs@(ix_start, ix_end) arr#) (S# s#)
+  = let n# = case (if null (range ixs)
+		  then 0
+		  else (index ixs ix_end) + 1) of { I# x -> x }
+    in
+    case thaw arr# n# s# of { StateAndMutableArray# s2# thawed# ->
+    (_MutableArray ixs thawed#, S# s2#)}
+  where
+    thaw  :: Array# ele			-- the thing
+	    -> Int#			-- size of thing to be thawed
+	    -> State# s			-- the Universe and everything
+	    -> StateAndMutableArray# s ele
+
+    thaw arr# n# s#
+      = case newArray# n# init s#	      of { StateAndMutableArray# s2# newarr1# ->
+	copy 0# n# arr# newarr1# s2# }
+      where
+	init = error "thawArr: element not copied"
+
+	copy :: Int# -> Int#
+	     -> Array# ele 
+	     -> MutableArray# s ele
+	     -> State# s
+	     -> StateAndMutableArray# s ele
+
+	copy cur# end# from# to# s#
+	  | cur# ==# end#
+	    = StateAndMutableArray# s# to#
+	  | True
+	    = case indexArray#  from# cur#       of { _Lift ele ->
+	      case writeArray# to#   cur# ele s# of { s1# ->
+	      copy (cur# +# 1#) end# from# to# s1#
+	      }}
 \end{code}
 
 \begin{code}

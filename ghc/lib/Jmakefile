@@ -1065,7 +1065,7 @@ CompilePreludishly(prelude/Cls,hs,	$(PREL_OPTS) -split-objs Cls -H24m -fmin-buil
 CompilePreludishly(prelude/Builtin,hs,	$(PREL_OPTS) -split-objs Builtin -ohi prelude/Builtin.hi)
 CompilePreludishly(prelude/Core,hs,	$(PREL_OPTS) -split-objs Core -H24m -ohi prelude/Core.hi)
 CompilePreludishly(prelude/IO,hs,	$(PREL_OPTS) -split-objs IO -ohi prelude/IO.hi)
-CompilePreludishly(prelude/List,hs,	$(PREL_OPTS) -split-objs List -H24m -ohi prelude/List.hi)
+CompilePreludishly(prelude/List,hs,	$(PREL_OPTS) -split-objs List -H24m -ohi prelude/List.hi -fno-snapback-to-append)
 CompilePreludishly(prelude/PS,lhs,	$(PREL_OPTS) -split-objs PS -ohi prelude/PS.hi -monly-2-regs)
 CompilePreludishly(prelude/Prel,hs,	$(PREL_OPTS) -split-objs Prel -H14m -ohi prelude/Prel.hi -monly-2-regs)
 CompilePreludishly(prelude/Text,hs,	$(PREL_OPTS) -split-objs Text -H30m -ohi prelude/Text.hi -monly-4-regs)

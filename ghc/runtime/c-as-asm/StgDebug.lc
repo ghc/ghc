@@ -649,7 +649,7 @@ getClosureShape( P_ node, int *vhs, int *size, int *ptrs, char **type )
 #ifdef PAR
 	*vhs = FETCHME_VHS;
 	*size = FETCHME_CLOSURE_SIZE(node);
-	*ptrs = FETCHME_CLOSURE_PTRS(node);
+	*ptrs = FETCHME_CLOSURE_NoPTRS(node);
 	*type = "FETCHME";
 #else
 	printf("Panic: found FETCHME Infotable in sequential system.\n");
@@ -660,7 +660,7 @@ getClosureShape( P_ node, int *vhs, int *size, int *ptrs, char **type )
 #ifdef PAR
 	*vhs = FMBQ_VHS;
 	*size = FMBQ_CLOSURE_SIZE(node);
-	*ptrs = FMBQ_CLOSURE_PTRS(node);
+	*ptrs = FMBQ_CLOSURE_NoPTRS(node);
 	*type = "FMBQ";
 #else
 	printf("Panic: found FMBQ Infotable in sequential system.\n");
@@ -727,23 +727,27 @@ printAddress( P_ address )
   PP_ SuA  = STKO_SuA(SAVE_StkO);
   P_  SpB  = STKO_SpB(SAVE_StkO);
   P_  SuB  = STKO_SuB(SAVE_StkO);
+  PP_ botA = 0; /* junk */
+  P_ botB  = 0;
+# define CAN_SEE_STK_BOTTOMS 0
 # else
   PP_ SpA  = SAVE_SpA;
   PP_ SuA  = SAVE_SuA;
   P_  SpB  = SAVE_SpB;
   P_  SuB  = SAVE_SuB;
+  PP_ botA = stackInfo.botA;
+  P_ botB  = stackInfo.botB;
+# define CAN_SEE_STK_BOTTOMS 1
 # endif
   P_  Hp   = SAVE_Hp;
 
-  PP_ botA = stackInfo.botA;
-  P_ botB  = stackInfo.botB;
   P_ HpBot = HP_BOT;
 
   char *name;
 
   /* ToDo: check if it's in text or data segment. */
 
-  /* The @-1@s in stack comparisions are because we sometimes use the
+  /* The @-1@s in stack comparisons are because we sometimes use the
      address of just below the stack... */
 
 #if 0
@@ -759,11 +763,17 @@ printAddress( P_ address )
     }
     if (HpBot <= address && address < Hp) {
       printf("Hp[%d]", address - HpBot);
-    } else if (SUBTRACT_A_STK((PP_)address, botA) >= -1 && SUBTRACT_A_STK(SpA, (PP_)address) >= 0) {
+    } else if ( CAN_SEE_STK_BOTTOMS
+	     && SUBTRACT_A_STK((PP_)address, botA) >= -1
+	     && SUBTRACT_A_STK(SpA, (PP_)address) >= 0) {
       printf("SpA[%d]", SUBTRACT_A_STK((PP_)address, botA));
-    } else if (SUBTRACT_B_STK(address, botB) >= -1 && SUBTRACT_B_STK(SpB, address) >= 0) {
+
+    } else if ( CAN_SEE_STK_BOTTOMS
+	     && SUBTRACT_B_STK(address, botB) >= -1
+	     && SUBTRACT_B_STK(SpB, address) >= 0) {
       /* ToDo: check if it's an update frame */
       printf("SpB[%d]", SUBTRACT_B_STK(address, botB));
+
     } else {
       printWord( (W_) address );
     }
@@ -1108,6 +1118,8 @@ ToDo:
 
 \begin{code}
 /* How many real stacks are there on SpA and SpB? */
+/* Say what?? (Will and Phil, 96/01) */
+#ifndef CONCURRENT
 static int
 numStacks( )
 {
@@ -1132,6 +1144,7 @@ numStacks( )
   }
   return depth;
 }
+#endif /* !CONCURRENT */
 
 static void
 printLocalAStack( int depth, int indentation, int weight, PP_ SpA, int size )
@@ -1215,6 +1228,9 @@ static int maxDepth = 5;
 static int
 printCases( int depth, int weight, PP_ SpA, PP_ SuA, P_ SpB, P_ SuB )
 {
+#ifdef CONCURRENT
+  printf("no printCases for CONCURRENT\n");
+#else
   int indentation;
 
   if (depth < maxDepth && SUBTRACT_B_STK(SuB, stackInfo.botB) >= 0) {
@@ -1248,6 +1264,8 @@ printCases( int depth, int weight, PP_ SpA, PP_ SuA, P_ SpB, P_ SuB )
   }
   
   return indentation;
+
+#endif /* CONCURRENT */
 }
 
 /* ToDo: pay more attention to format of vector tables in SMupdate.lh */
@@ -1290,6 +1308,9 @@ printVectorTable( int indentation, PP_ vtbl )
 static void
 printContinuations( int depth, int indentation, int weight, PP_ SpA, PP_ SuA, P_ SpB, P_ SuB )
 {
+#ifdef CONCURRENT
+  printf("no printContinuations for CONCURRENT\n");
+#else
   if (depth < maxDepth && SUBTRACT_B_STK(SuB, stackInfo.botB) >= 0) {
     PP_ nextSpA, nextSuA;
     P_  nextSpB, nextSuB;
@@ -1335,6 +1356,7 @@ printContinuations( int depth, int indentation, int weight, PP_ SpA, PP_ SuA, P_
   } else {
     printf("...\n");
   }
+#endif /* CONCURRENT */
 }
 
 void
@@ -1395,9 +1417,10 @@ DEBUG_INFO_TABLE(node)
 	  "Tag: %d; Type: %d; Size: %lu; Ptrs: %lu\n\n",
 	  INFO_TAG(info_ptr), INFO_TYPE(info_ptr),
 	  INFO_SIZE(info_ptr),INFO_NoPTRS(info_ptr));
-#if defined(PAR)
+#if defined(GRIP)
+  /* flushing is GRIP only */
   fprintf(stderr,"Enter Flush Entry: 0x%lx;\tExit Flush Entry: 0x%lx\n",INFO_FLUSHENT(info_ptr),INFO_FLUSH(info_ptr));
-#endif /* PAR */
+#endif /* GRIP */
 
 #if defined(PROFILING)
   fprintf(stderr,"Cost Centre:       0x%lx\n",INFO_CAT(info_ptr));

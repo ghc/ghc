@@ -124,59 +124,73 @@ data SimplCount
 		[(TickType, Int)]   -- assoc list of all diff kinds of ticks
 
 data TickType
-  = UnfoldingDone    {-UNUSED: | Unused -}
-  | FoldrBuild	     | MagicUnfold	| ConReused
-  | CaseFloatFromLet | CaseOfCase	{-UNUSED: | CaseFloatFromApp -}
-  | LetFloatFromLet  | LetFloatFromCase {-UNUSED: | LetFloatFromApp -}
-  | KnownBranch	     | Let2Case		{-UNUSED: | UnboxingLet2Case -}
-  | CaseMerge	     {-UNUSED: | CaseToLet-}	| CaseElim
+  = UnfoldingDone    | MagicUnfold	| ConReused
+  | CaseFloatFromLet | CaseOfCase
+  | LetFloatFromLet  | LetFloatFromCase
+  | KnownBranch	     | Let2Case
+  | CaseMerge	     | CaseElim
   | CaseIdentity
   | AtomicRhs	-- Rhs of a let-expression was an atom
-  | EtaExpansion     {-UNUSED: | ArityExpand-}
-  {-UNUSED: | ConstantFolding-}  | CaseOfError	{-UNUSED: | InlineRemoved -}
-  | FoldrConsNil
-  | Foldr_Nil
-  | FoldrFoldr
-  | Foldr_List
-  | FoldrCons
-  | FoldrInline
+  | EtaExpansion
+  | CaseOfError
   | TyBetaReduction
   | BetaReduction
+  {- BEGIN F/B ENTRIES -}
+  -- the 8 rules
+  | FoldrBuild	     	-- foldr f z (build g) ==>     
+  | FoldrAugment	-- foldr f z (augment g z) ==> 
+  | Foldr_Nil		-- foldr f z [] ==>            
+  | Foldr_List		-- foldr f z (x:...) ==>       
+
+  | FoldlBuild	        -- foldl f z (build g) ==>     
+  | FoldlAugment	-- foldl f z (augment g z) ==> 
+  | Foldl_Nil		-- foldl f z [] ==>            
+  | Foldl_List		-- foldl f z (x:...) ==>       
+
+  | Foldr_Cons_Nil	-- foldr (:) [] => id
+  | Foldr_Cons		-- foldr (:) => flip (++)
+
+  | Str_FoldrStr	-- foldr f z "hello" => unpackFoldrPS# f z "hello"
+  | Str_UnpackCons	-- unpackFoldrPS# (:) z "hello" => unpackAppendPS# z "hello"
+  | Str_UnpackNil	-- unpackAppendPS# [] "hello" => "hello"
+  {- END F/B ENTRIES -}
   deriving (Eq, Ord, Ix)
 
 instance Text TickType where
     showsPrec p UnfoldingDone	= showString "UnfoldingDone    "
---UNUSED:    showsPrec p Unused		= showString "Unused           "
-    showsPrec p FoldrBuild	= showString "FoldrBuild       "
     showsPrec p MagicUnfold	= showString "MagicUnfold      "
     showsPrec p ConReused	= showString "ConReused        "
     showsPrec p CaseFloatFromLet= showString "CaseFloatFromLet "
     showsPrec p CaseOfCase	= showString "CaseOfCase       "
---UNUSED:    showsPrec p CaseFloatFromApp= showString "CaseFloatFromApp "
     showsPrec p LetFloatFromLet	= showString "LetFloatFromLet  "
     showsPrec p LetFloatFromCase= showString "LetFloatFromCase "
---UNUSED:    showsPrec p LetFloatFromApp	= showString "LetFloatFromApp  "
     showsPrec p KnownBranch	= showString "KnownBranch      "
     showsPrec p Let2Case	= showString "Let2Case         "
---UNUSED:    showsPrec p UnboxingLet2Case= showString "UnboxingLet2Case "
     showsPrec p CaseMerge	= showString "CaseMerge        "
---UNUSED:    showsPrec p CaseToLet	= showString "CaseToLet        "
     showsPrec p CaseElim	= showString "CaseElim         "
     showsPrec p CaseIdentity	= showString "CaseIdentity     "
     showsPrec p AtomicRhs	= showString "AtomicRhs        "
     showsPrec p EtaExpansion	= showString "EtaExpansion     "
---UNUSED:    showsPrec p ArityExpand	= showString "ArityExpand      "
---UNUSED:    showsPrec p ConstantFolding	= showString "ConstantFolding  "
     showsPrec p CaseOfError	= showString "CaseOfError      "
---UNUSED:    showsPrec p InlineRemoved	= showString "InlineRemoved    "
-    showsPrec p FoldrConsNil	= showString "FoldrConsNil     "
-    showsPrec p Foldr_Nil	= showString "Foldr_Nil        "
-    showsPrec p FoldrFoldr	= showString "FoldrFoldr       "
-    showsPrec p Foldr_List	= showString "Foldr_List       "
-    showsPrec p FoldrCons	= showString "FoldrCons        "
-    showsPrec p FoldrInline	= showString "FoldrInline      "
     showsPrec p TyBetaReduction	= showString "TyBetaReduction  "
     showsPrec p BetaReduction	= showString "BetaReduction    "
+	-- Foldr/Build Stuff:
+    showsPrec p FoldrBuild	= showString "FoldrBuild       "
+    showsPrec p FoldrAugment	= showString "FoldrAugment     "
+    showsPrec p Foldr_Nil	= showString "Foldr_Nil        "
+    showsPrec p Foldr_List	= showString "Foldr_List       "
+
+    showsPrec p FoldlBuild	= showString "FoldlBuild       "
+    showsPrec p FoldlAugment	= showString "FoldlAugment     "
+    showsPrec p Foldl_Nil	= showString "Foldl_Nil        "
+    showsPrec p Foldl_List	= showString "Foldl_List       "
+
+    showsPrec p Foldr_Cons_Nil	= showString "Foldr_Cons_Nil   "
+    showsPrec p Foldr_Cons	= showString "Foldr_Cons       "
+
+    showsPrec p Str_FoldrStr	= showString "Str_FoldrStr     "
+    showsPrec p Str_UnpackCons  = showString "Str_UnpackCons   "
+    showsPrec p Str_UnpackNil   = showString "Str_UnpackNil    "
 
 showSimplCount :: SimplCount -> String
 
@@ -190,38 +204,38 @@ showSimplCount (SimplCount _ stuff)
 zeroSimplCount :: SimplCount
 zeroSimplCount
   = SimplCount ILIT(0)
-	[(UnfoldingDone, 0),
---UNUSED:	 (Unused, 0),
-	 (FoldrBuild, 0),
-	 (MagicUnfold, 0),
-	 (ConReused, 0),
-	 (CaseFloatFromLet, 0),
-	 (CaseOfCase, 0),
---UNUSED:	 (CaseFloatFromApp, 0),
-	 (LetFloatFromLet, 0),
-	 (LetFloatFromCase, 0),
---UNUSED:	 (LetFloatFromApp, 0),
-	 (KnownBranch, 0),
-	 (Let2Case, 0),
---UNUSED:	 (UnboxingLet2Case, 0),
-	 (CaseMerge, 0),
---UNUSED:	 (CaseToLet, 0),
-	 (CaseElim, 0),
-	 (CaseIdentity, 0),
-	 (AtomicRhs, 0),
-	 (EtaExpansion, 0),
---UNUSED:	 (ArityExpand,0),
---UNUSED:	 (ConstantFolding, 0),
-	 (CaseOfError, 0),
---UNUSED:	 (InlineRemoved,0),
-	 (FoldrConsNil,0),
-	 (Foldr_Nil,0),
-	 (FoldrFoldr,0),
-	 (Foldr_List,0),
-	 (FoldrCons,0),
-	 (FoldrInline,0),
-	 (TyBetaReduction,0),
-	 (BetaReduction,0) ]
+      [ (UnfoldingDone, 0),
+	(MagicUnfold, 0),
+	(ConReused, 0),
+	(CaseFloatFromLet, 0),
+	(CaseOfCase, 0),
+	(LetFloatFromLet, 0),
+	(LetFloatFromCase, 0),
+	(KnownBranch, 0),
+	(Let2Case, 0),
+	(CaseMerge, 0),
+	(CaseElim, 0),
+	(CaseIdentity, 0),
+	(AtomicRhs, 0),
+	(EtaExpansion, 0),
+	(CaseOfError, 0),
+	(TyBetaReduction,0),
+	(BetaReduction,0),
+	-- Foldr/Build Stuff:
+	(FoldrBuild, 0),
+	(FoldrAugment, 0),
+	(Foldr_Nil, 0),
+	(Foldr_List, 0),
+	(FoldlBuild, 0),
+	(FoldlAugment, 0),
+	(Foldl_Nil, 0),
+	(Foldl_List, 0),
+	(Foldr_Cons_Nil, 0),
+	(Foldr_Cons, 0),
+
+        (Str_FoldrStr, 0),
+        (Str_UnpackCons, 0),
+        (Str_UnpackNil, 0) ]
 --
 --= array (con2tag_TickType UnfoldingDone, con2tag_TickType FoldrInline) 
 --        [ i := 0 | i <- indices zeroSimplCount ]

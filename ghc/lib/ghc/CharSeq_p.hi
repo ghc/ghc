@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface CharSeq where
 data CSeq 	{-# GHC_PRAGMA CNil | CAppend CSeq CSeq | CIndent Int CSeq | CNewline | CStr [Char] | CCh Char | CInt Int #-}
 cAppend :: CSeq -> CSeq -> CSeq

@@ -670,7 +670,7 @@ BlackHoleUpdateStack(STG_NO_ARGS)
 	PtrToUpdateFrame = GRAB_SuB(PtrToUpdateFrame);
     }
 }
-#endif	/* CONCURRENT */
+#endif	/* !CONCURRENT */
 \end{code}
 
 

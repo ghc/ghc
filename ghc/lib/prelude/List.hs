@@ -63,9 +63,19 @@ tail []			=  error "tail{PreludeList}: tail []\n"
 
 {-# GENERATE_SPECS init a #-}
 init			:: [a] -> [a]
+#ifndef USE_FOLDR_BUILD
 init []			=  error "init{PreludeList}: init []\n"
 init [x]		=  []
 init (x:xs)		=  x : init xs
+#else
+init xs = _build (\ c n ->
+  let
+ 	_init []	=  error "init{PreludeList}: init []\n"
+	_init [x]	=  n
+	_init (x:xs)	=  x `c` _init xs
+  in
+        _init xs)
+#endif
 
 -- null determines if a list is empty.
 {-# GENERATE_SPECS null a #-}
@@ -89,8 +99,8 @@ xs ++ ys		=  foldr (:) ys xs
 [] ++ ys                =  ys
 (x:xs) ++ ys            =  x : (xs ++ ys)
 # else
---#ANDY?#{-# INLINE (++) #-}
-xs ++ ys		= foldr (:) ys xs
+{-# INLINE (++) #-}
+xs ++ ys		= _augment (\ c n -> foldr c n xs) ys
 # endif /* USE_FOLDR_BUILD */
 #endif /* ! USE_REPORT_PRELUDE */
 
@@ -118,8 +128,7 @@ length			:: [a] -> Int
 #ifdef USE_REPORT_PRELUDE
 length			=  genericLength
 #else
-#if 1
---#ANDY?## ifndef USE_FOLDR_BUILD
+# ifndef USE_FOLDR_BUILD
 -- stolen from HBC, then unboxified
 length l                =  len l 0#
   where
@@ -127,7 +136,7 @@ length l                =  len l 0#
     len []     a# = I# a#
     len (_:xs) a# = len xs (a# +# 1#)
 # else
---#ANDY?#{-# INLINE length #-}
+{-# INLINE length #-}
 length l = foldl (\ n _ -> n+I# 1#) (I# 0#) l
 # endif /* USE_FOLDR_BUILD */
 #endif /* ! USE_REPORT_PRELUDE */
@@ -164,7 +173,8 @@ map f []		=  []
 map f (x:xs)		=  f x : map f xs
 #else
 {-# INLINE map #-}
-map f xs		= _build (\ c n -> foldr (c.f) n xs)
+map f xs		= _build (\ c n -> 
+				    foldr (\ a b -> f a `c` b) n xs)
 #endif /* USE_FOLDR_BUILD */
 
 -- filter, applied to a predicate and a list, returns the list of those
@@ -258,9 +268,9 @@ iterate f x		=  x : iterate f (f x)
 {-# INLINE iterate #-}
 iterate f x		= _build (\ c n -> 
 	let
-	   _iterate f x = x `c` _iterate f (f x)
+	   _iterate x = x `c` _iterate (f x)
         in 
-	   _iterate f x)
+	   _iterate x)
 #endif /* USE_FOLDR_BUILD */
 
 
@@ -390,6 +400,7 @@ _take_unsafe_Integral n (x:xs) =  x : _take_unsafe_Integral (n-1) xs
 __max :: Num a => a
 __max = fromInt maxInt
 
+#ifndef USE_FOLDR_BUILD
 take n | n < __i0
        = error "take{PreludeList}: negative index"
        | n <= __max
@@ -404,6 +415,24 @@ take n | n < __i0
        where
 	 (m,r) = n `quotRem` __max
 	 i2i# (I# i#) = i#
+#else
+{-# INLINE take #-}
+take n xs = takeInt (toInt n) xs
+
+{-# INLINE takeInt #-}
+takeInt			:: Int -> [b] -> [b]
+takeInt n xs = _build (\ c0 n0 ->
+ let
+	takeInt# 0# _       = n0
+	takeInt# _  []	    = n0
+	takeInt# m# (x:xs)  = x `c0` takeInt# (m# `minusInt#` 1#) xs
+  in
+    case n of
+      I# n# -> if n# <# 0# 
+	       then error "take{PreludeList}: negative index"
+	       else takeInt# n# xs)
+
+#endif /* USE_FOLDR_BUILD */
 
 -- Test
 -- main = print (head (take (123456789123456789::Integer) [1..]))
@@ -440,7 +469,7 @@ splitAtInt (I# n#) xs
 	  where
 	    (xs', xs'') = splitAtInt# (m# `minusInt#` 1#) xs
 
-#endif {- ! USE_REPORT_PRELUDE -}
+#endif /* USE_REPORT_PRELUDE */
 
 -- takeWhile, applied to a predicate p and a list xs, returns the longest
 -- prefix (possibly empty) of xs of elements that satisfy p.  dropWhile p xs
@@ -506,10 +535,22 @@ lines s			=  let (l, s') = break (== '\n') s
 					(_:s'') -> lines s''
 
 words			:: String -> [String]
+#ifndef USE_FOLDR_BUILD
 words s			=  case dropWhile isSpace s of
 				"" -> []
 				s' -> w : words s''
 				      where (w, s'') = break isSpace s'
+#else
+{-# INLINE words #-}
+words s = _build (\ c n ->
+  let
+	words' s =  case dropWhile isSpace s of
+				"" -> n
+				s' -> w `c` words' s''
+				      where (w, s'') = break isSpace s'
+  in
+	words' s)
+#endif /* USE_FOLDR_BUILD */
 
 unlines			:: [String] -> String
 #ifdef USE_REPORT_PRELUDE
@@ -520,11 +561,11 @@ unlines			=  concat . map (++ "\n")
 -- here's a more efficient version
 unlines [] = []
 unlines (l:ls) = l ++ '\n' : unlines ls
+
 # else
 {-# INLINE unlines #-}
-unlines xs = foldr (\ l r -> l ++ '\n' : r) [] xs
--- OLD
--- unlines =  concat . map (++ "\n")
+unlines xs = _build (\ c n -> foldr (\ l r -> foldr c ('\n' `c` r) l) n xs)
+
 # endif /* USE_FOLDR_BUILD */
 #endif /* ! USE_REPORT_PRELUDE */
 
@@ -547,11 +588,21 @@ nub			:: (Eq a) => [a] -> [a]
 nub []			=  []
 nub (x:xs)		=  x : nub (filter (/= x) xs)
 #else
+# ifndef USE_FOLDR_BUILD
 -- stolen from HBC
 nub l                   = nub' l []
   where
     nub' [] _		= []
     nub' (x:xs) l	= if x `elem` l then nub' xs l else x : nub' xs (x:l)
+# else
+{-# INLINE nub #-}
+nub l                   = _build (\ c n -> 
+ let
+    nub' [] _		= n
+    nub' (x:xs) l	= if x `elem` l then nub' xs l else x `c` nub' xs (x:l)
+ in
+    nub' l [])
+# endif /* USE_FOLDR_BUILD */
 #endif /* ! USE_REPORT_PRELUDE */
 
 -- reverse xs returns the elements of xs in reverse order.  xs must be finite.
@@ -567,7 +618,7 @@ reverse l =  rev l []
     rev (x:xs) a = rev xs (x:a)
 # else
 {-# INLINE reverse #-}
-reverse	xs = _build (\ c n -> foldl (flip c) n xs)
+reverse	xs = _build (\ c n -> foldl (\ a b -> c b a) n xs)
 # endif /* USE_FOLDR_BUILD */
 #endif /* ! USE_REPORT_PRELUDE */
 
@@ -638,12 +689,19 @@ notElem	x []	=  True
 notElem x (y:ys)=  x /= y && notElem x ys
 
 # else
-{-# INLINE elem #-}
-{-# INLINE notElem #-}
--- We are prepared to lose the partial application to equality,
--- ie (x ==), and replace it with (\ y -> x == y)
-elem x ys 		=  any (\ y -> x == y) ys
-notElem	x ys		=  all (\ y -> x /= y) ys
+elem _ []	= False
+elem x (y:ys)	= x==y || elem x ys
+
+notElem	x []	=  True
+notElem x (y:ys)=  x /= y && notElem x ys
+
+-- Put back later ....
+--{-# INLINE elem #-}
+--{-# INLINE notElem #-}
+----- We are prepared to lose the partial application to equality,
+---- ie (x ==), and replace it with (\ y -> x == y)
+--elem x ys 		=  any (\ y -> x == y) ys
+--notElem	x ys		=  all (\ y -> x /= y) ys
 # endif /* USE_FOLDR_BUILD */
 #endif /* ! USE_REPORT_PRELUDE */
 
@@ -815,6 +873,10 @@ zipWith7 _ _ _ _ _ _ _ _ =  []
 
 -- unzip transforms a list of pairs into a pair of lists.  As with zip,
 -- a family of such functions up to septuplets is provided.
+
+#ifdef USE_FOLDR_BUILD
+{-# INLINE unzip #-}
+#endif
 
 {-# GENERATE_SPECS unzip a b #-}
 unzip			:: [(a,b)] -> ([a],[b])

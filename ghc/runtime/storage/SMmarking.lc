@@ -99,7 +99,9 @@ markHeapRoots(sm, cafs1, cafs2, base, lim, bit_array)
 	miniInterpret((StgFunPtr) _startMarkWorld);
     }
 #else
-    /* Note: no *external* stacks in parallel world */
+# ifndef CONCURRENT
+    /* Note: no *external* stacks in parallel/concurrent world */
+
     DEBUG_STRING("Marking A Stack:");
     if (SUBTRACT_A_STK(MAIN_SpA, stackInfo.botA) >= 0) {
 	MRoot = (P_) MAIN_SpA;
@@ -116,6 +118,7 @@ markHeapRoots(sm, cafs1, cafs2, base, lim, bit_array)
 	MStack = (P_) _PRMarking_MarkNextBStack_closure;
 	miniInterpret((StgFunPtr)_startMarkWorld);
     }
+# endif /* ! CONCURRENT */
 #endif /* PAR */
 
     DEBUG_STRING("Marking & Updating CAFs:");

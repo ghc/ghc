@@ -840,7 +840,7 @@ compile(envs/TCE,lhs,)
 compile(envs/TVE,lhs,)
 compile_rec(envs/TyVarEnv,lhs,)
 
-compile(main/CmdLineOpts,lhs,-K2m)
+compile(main/CmdLineOpts,lhs,-K2m if_ghc(-fvia-C))
 compile_rec(main/Errors,lhs,)
 compile_rec(main/ErrsTc,lhs,-H20m if_ghc26(-monly-4-regs))
 compile_rec(main/ErrsRn,lhs,)

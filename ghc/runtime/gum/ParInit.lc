@@ -156,9 +156,6 @@ SynchroniseSystem(STG_NO_ARGS)
     for (i = 0; i < nPEs; ++i)
 	registerTask(PEs[i]);
 
-    addr = WaitForPEOp(PP_INIT, ANY_GLOBAL_TASK);
-    SysManTask = Sender_Task(addr);
-
 /*  pvm_notify( PvmTaskExit, PP_FAIL, 1, &SysManTask);  /* Setup an error handler */
 
     /* Initialise the PE task array? */

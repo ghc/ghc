@@ -684,10 +684,11 @@ occAnalApp env stk args fun
 %*									*
 %************************************************************************
 
-
 Abstract, but simple rep. for stacks.
 \begin{code}
-data Context = Context Int Bool	-- if b then n > 0
+data Context = Context Int Bool	
+	-- if b then n > 0
+	-- ie. you *can't* have a linear content with *no* arguments.
 
 lamOnContext :: Context -> Int -> Context
 lamOnContext (Context n b) i = mkContext (max 0 (n - i)) b

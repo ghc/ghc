@@ -1,103 +1,103 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface Number where
 data Number 	{-# GHC_PRAGMA I Integer | F Double #-}
 isInteger :: Number -> Bool
 	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 instance Enum Number
 	{-# GHC_PRAGMA _M_ Number {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 6 _!_ _TUP_5 [{{Ord Number}}, (Number -> [Number]), (Number -> Number -> [Number]), (Number -> Number -> [Number]), (Number -> Number -> Number -> [Number])] [_DFUN_ Ord (Number), _CONSTM_ Enum enumFrom (Number), _CONSTM_ Enum enumFromThen (Number), _CONSTM_ Enum enumFromTo (Number), _CONSTM_ Enum enumFromThenTo (Number)] _N_
-	 enumFrom = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
-	 enumFromThen = _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_,
-	 enumFromTo = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 enumFromThenTo = _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ #-}
+	 enumFrom = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ },
+	 enumFromThen = { _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ },
+	 enumFromTo = { _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ },
+	 enumFromThenTo = { _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ } #-}
 instance Eq Number
 	{-# GHC_PRAGMA _M_ Number {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(Number -> Number -> Bool), (Number -> Number -> Bool)] [_CONSTM_ Eq (==) (Number), _CONSTM_ Eq (/=) (Number)] _N_
-	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (/=) = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+	 (==) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 (/=) = { _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ } #-}
 instance Floating Number
 	{-# GHC_PRAGMA _M_ Number {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 20 _!_ _TUP_19 [{{Fractional Number}}, Number, (Number -> Number), (Number -> Number), (Number -> Number), (Number -> Number -> Number), (Number -> Number -> Number), (Number -> Number), (Number -> Number), (Number -> Number), (Number -> Number), (Number -> Number), (Number -> Number), (Number -> Number), (Number -> Number), (Number -> Number), (Number -> Number), (Number -> Number), (Number -> Number)] [_DFUN_ Fractional (Number), _CONSTM_ Floating pi (Number), _CONSTM_ Floating exp (Number), _CONSTM_ Floating log (Number), _CONSTM_ Floating sqrt (Number), _CONSTM_ Floating (**) (Number), _CONSTM_ Floating logBase (Number), _CONSTM_ Floating sin (Number), _CONSTM_ Floating cos (Number), _CONSTM_ Floating tan (Number), _CONSTM_ Floating asin (Number), _CONSTM_ Floating acos (Number), _CONSTM_ Floating atan (Number), _CONSTM_ Floating sinh (Number), _CONSTM_ Floating cosh (Number), _CONSTM_ Floating tanh (Number), _CONSTM_ Floating asinh (Number), _CONSTM_ Floating acosh (Number), _CONSTM_ Floating atanh (Number)] _N_
-	 pi = _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ _ORIG_ Number F [] [_CONSTM_ Floating pi (Double)] _N_,
-	 exp = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
-	 log = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
-	 sqrt = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
-	 (**) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_,
-	 logBase = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_,
-	 sin = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
-	 cos = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
-	 tan = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
-	 asin = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
-	 acos = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
-	 atan = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
-	 sinh = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
-	 cosh = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
-	 tanh = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
-	 asinh = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
-	 acosh = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
-	 atanh = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+	 pi = { _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ _ORIG_ Number F [] [_CONSTM_ Floating pi (Double)] _N_ },
+	 exp = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ },
+	 log = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ },
+	 sqrt = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ },
+	 (**) = { _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ },
+	 logBase = { _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ },
+	 sin = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ },
+	 cos = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ },
+	 tan = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ },
+	 asin = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ },
+	 acos = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ },
+	 atan = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ },
+	 sinh = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ },
+	 cosh = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ },
+	 tanh = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ },
+	 asinh = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ },
+	 acosh = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ },
+	 atanh = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ } #-}
 instance Fractional Number
 	{-# GHC_PRAGMA _M_ Number {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [{{Num Number}}, (Number -> Number -> Number), (Number -> Number), (Ratio Integer -> Number)] [_DFUN_ Num (Number), _CONSTM_ Fractional (/) (Number), _CONSTM_ Fractional recip (Number), _CONSTM_ Fractional fromRational (Number)] _N_
-	 (/) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 recip = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
-	 fromRational = _A_ 1 _U_ 1 _N_ _S_ "U(LU(PPP))" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+	 (/) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 recip = { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ },
+	 fromRational = { _A_ 1 _U_ 1 _N_ _S_ "U(LU(PPP))" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
 instance Integral Number
 	{-# GHC_PRAGMA _M_ Number {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 13 _!_ _TUP_12 [{{Real Number}}, {{Ix Number}}, (Number -> Number -> Number), (Number -> Number -> Number), (Number -> Number -> Number), (Number -> Number -> Number), (Number -> Number -> (Number, Number)), (Number -> Number -> (Number, Number)), (Number -> Bool), (Number -> Bool), (Number -> Integer), (Number -> Int)] [_DFUN_ Real (Number), _DFUN_ Ix (Number), _CONSTM_ Integral quot (Number), _CONSTM_ Integral rem (Number), _CONSTM_ Integral div (Number), _CONSTM_ Integral mod (Number), _CONSTM_ Integral quotRem (Number), _CONSTM_ Integral divMod (Number), _CONSTM_ Integral even (Number), _CONSTM_ Integral odd (Number), _CONSTM_ Integral toInteger (Number), _CONSTM_ Integral toInt (Number)] _N_
-	 quot = _A_ 2 _U_ 22 _N_ _S_ "SL" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Number) (u1 :: Number) -> case _APP_  _CONSTM_ Integral quotRem (Number) [ u0, u1 ] of { _ALG_ _TUP_2 (u2 :: Number) (u3 :: Number) -> u2; _NO_DEFLT_ } _N_,
-	 rem = _A_ 2 _U_ 22 _N_ _S_ "SL" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Number) (u1 :: Number) -> case _APP_  _CONSTM_ Integral quotRem (Number) [ u0, u1 ] of { _ALG_ _TUP_2 (u2 :: Number) (u3 :: Number) -> u3; _NO_DEFLT_ } _N_,
-	 div = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 mod = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 quotRem = _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_,
-	 divMod = _A_ 0 _U_ 22 _N_ _N_ _N_ _N_,
-	 even = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
-	 odd = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
-	 toInteger = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
-	 toInt = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: Number) -> _APP_  _TYAPP_  patError# { (Number -> Int) } [ _NOREP_S_ "%DPreludeCore.Integral.toInt\"", u0 ] _N_ #-}
+	 quot = { _A_ 2 _U_ 22 _N_ _S_ "SL" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Number) (u1 :: Number) -> case _APP_  _CONSTM_ Integral quotRem (Number) [ u0, u1 ] of { _ALG_ _TUP_2 (u2 :: Number) (u3 :: Number) -> u2; _NO_DEFLT_ } _N_ },
+	 rem = { _A_ 2 _U_ 22 _N_ _S_ "SL" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Number) (u1 :: Number) -> case _APP_  _CONSTM_ Integral quotRem (Number) [ u0, u1 ] of { _ALG_ _TUP_2 (u2 :: Number) (u3 :: Number) -> u3; _NO_DEFLT_ } _N_ },
+	 div = { _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ },
+	 mod = { _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ },
+	 quotRem = { _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ },
+	 divMod = { _A_ 0 _U_ 22 _N_ _N_ _N_ _N_ },
+	 even = { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ },
+	 odd = { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ },
+	 toInteger = { _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 6 \ (u0 :: Number) -> case u0 of { _ALG_ _ORIG_ Number I (u1 :: Integer) -> u1; _ORIG_ Number F (u2 :: Double) -> case u2 of { _ALG_ D# (u3 :: Double#) -> _APP_  _WRKR_ _SPEC_ _CONSTM_ RealFrac round (Double) [ (Integer) ] [ u3 ]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ },
+	 toInt = { _A_ 1 _U_ 2 _N_ _S_ _!_ _N_ _N_ } #-}
 instance Ix Number
 	{-# GHC_PRAGMA _M_ Number {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [{{Ord Number}}, ((Number, Number) -> [Number]), ((Number, Number) -> Number -> Int), ((Number, Number) -> Number -> Bool)] [_DFUN_ Ord (Number), _CONSTM_ Ix range (Number), _CONSTM_ Ix index (Number), _CONSTM_ Ix inRange (Number)] _N_
-	 range = _A_ 1 _U_ 1 _N_ _S_ "U(LL)" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_,
-	 index = _A_ 2 _U_ 11 _N_ _S_ "U(SA)S" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_,
-	 inRange = _A_ 2 _U_ 12 _N_ _S_ "U(SL)S" {_A_ 3 _U_ 112 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+	 range = { _A_ 1 _U_ 1 _N_ _S_ "U(LL)" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_ },
+	 index = { _A_ 2 _U_ 11 _N_ _S_ "U(SA)S" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_ },
+	 inRange = { _A_ 2 _U_ 12 _N_ _S_ "U(SL)S" {_A_ 3 _U_ 112 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
 instance Num Number
 	{-# GHC_PRAGMA _M_ Number {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [{{Eq Number}}, {{Text Number}}, (Number -> Number -> Number), (Number -> Number -> Number), (Number -> Number -> Number), (Number -> Number), (Number -> Number), (Number -> Number), (Integer -> Number), (Int -> Number)] [_DFUN_ Eq (Number), _DFUN_ Text (Number), _CONSTM_ Num (+) (Number), _CONSTM_ Num (-) (Number), _CONSTM_ Num (*) (Number), _CONSTM_ Num negate (Number), _CONSTM_ Num abs (Number), _CONSTM_ Num signum (Number), _CONSTM_ Num fromInteger (Number), _CONSTM_ Num fromInt (Number)] _N_
-	 (+) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (-) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (*) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 negate = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
-	 abs = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
-	 signum = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
-	 fromInteger = _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Integer) -> _!_ _ORIG_ Number I [] [u0] _N_,
-	 fromInt = _A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 C 5 \ (u0 :: Int) -> let {(u2 :: Integer) = case u0 of { _ALG_ I# (u1 :: Int#) -> _#_ int2Integer# [] [u1]; _NO_DEFLT_ }} in _!_ _ORIG_ Number I [] [u2] _N_ #-}
+	 (+) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 (-) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 (*) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 negate = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ },
+	 abs = { _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ },
+	 signum = { _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ },
+	 fromInteger = { _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Integer) -> _!_ _ORIG_ Number I [] [u0] _N_ },
+	 fromInt = { _A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 C 5 \ (u0 :: Int) -> let {(u2 :: Integer) = case u0 of { _ALG_ I# (u1 :: Int#) -> _#_ int2Integer# [] [u1]; _NO_DEFLT_ }} in _!_ _ORIG_ Number I [] [u2] _N_ } #-}
 instance Ord Number
 	{-# GHC_PRAGMA _M_ Number {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq Number}}, (Number -> Number -> Bool), (Number -> Number -> Bool), (Number -> Number -> Bool), (Number -> Number -> Bool), (Number -> Number -> Number), (Number -> Number -> Number), (Number -> Number -> _CMP_TAG)] [_DFUN_ Eq (Number), _CONSTM_ Ord (<) (Number), _CONSTM_ Ord (<=) (Number), _CONSTM_ Ord (>=) (Number), _CONSTM_ Ord (>) (Number), _CONSTM_ Ord max (Number), _CONSTM_ Ord min (Number), _CONSTM_ Ord _tagCmp (Number)] _N_
-	 (<) = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: Number) (u1 :: Number) -> _APP_  _CONSTM_ Ord (<=) (Number) [ u1, u0 ] _N_,
-	 (>) = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 max = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 min = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 _tagCmp = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+	 (<) = { _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ },
+	 (<=) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 (>=) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: Number) (u1 :: Number) -> _APP_  _CONSTM_ Ord (<=) (Number) [ u1, u0 ] _N_ },
+	 (>) = { _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ },
+	 max = { _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ },
+	 min = { _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ },
+	 _tagCmp = { _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ } #-}
 instance Real Number
 	{-# GHC_PRAGMA _M_ Number {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 4 _!_ _TUP_3 [{{Num Number}}, {{Enum Number}}, (Number -> Ratio Integer)] [_DFUN_ Num (Number), _DFUN_ Enum (Number), _CONSTM_ Real toRational (Number)] _N_
-	 toRational = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+	 toRational = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ } #-}
 instance RealFloat Number
 	{-# GHC_PRAGMA _M_ Number {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [{{RealFrac Number}}, {{Floating Number}}, (Number -> Integer), (Number -> Int), (Number -> (Int, Int)), (Number -> (Integer, Int)), (Integer -> Int -> Number), (Number -> Int), (Number -> Number), (Int -> Number -> Number)] [_DFUN_ RealFrac (Number), _DFUN_ Floating (Number), _CONSTM_ RealFloat floatRadix (Number), _CONSTM_ RealFloat floatDigits (Number), _CONSTM_ RealFloat floatRange (Number), _CONSTM_ RealFloat decodeFloat (Number), _CONSTM_ RealFloat encodeFloat (Number), _CONSTM_ RealFloat exponent (Number), _CONSTM_ RealFloat significand (Number), _CONSTM_ RealFloat scaleFloat (Number)] _N_
-	 floatRadix = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _#_ int2Integer# [] [2#] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: Number) -> _#_ int2Integer# [] [2#] _N_,
-	 floatDigits = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [53#] _N_} _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Number) -> _!_ I# [] [53#] _N_,
-	 floatRange = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _N_ _N_} _N_ _N_,
-	 decodeFloat = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_,
-	 encodeFloat = _A_ 2 _U_ 11 _N_ _S_ "U(PPP)U(P)" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_,
-	 exponent = _A_ 1 _U_ 1 _N_ _N_ _N_ _N_,
-	 significand = _A_ 1 _U_ 1 _N_ _N_ _N_ _N_,
-	 scaleFloat = _A_ 2 _U_ 21 _N_ _N_ _N_ _N_ #-}
+	 floatRadix = { _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _N_ _N_} _N_ _N_ },
+	 floatDigits = { _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [53#] _N_} _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Number) -> _!_ I# [] [53#] _N_ },
+	 floatRange = { _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _N_ _N_} _N_ _N_ },
+	 decodeFloat = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ },
+	 encodeFloat = { _A_ 2 _U_ 11 _N_ _S_ "U(PPP)U(P)" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ },
+	 exponent = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ },
+	 significand = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ },
+	 scaleFloat = { _A_ 2 _U_ 11 _N_ _S_ "U(P)S" {_A_ 2 _U_ 21 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
 instance RealFrac Number
 	{-# GHC_PRAGMA _M_ Number {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 8 _!_ _TUP_7 [{{Real Number}}, {{Fractional Number}}, _forall_ a$z1 =>{{Integral a$z1}} -> (Number -> (a$z1, Number)), _forall_ a$z1 =>{{Integral a$z1}} -> (Number -> a$z1), _forall_ a$z1 =>{{Integral a$z1}} -> (Number -> a$z1), _forall_ a$z1 =>{{Integral a$z1}} -> (Number -> a$z1), _forall_ a$z1 =>{{Integral a$z1}} -> (Number -> a$z1)] [_DFUN_ Real (Number), _DFUN_ Fractional (Number), _CONSTM_ RealFrac properFraction (Number), _CONSTM_ RealFrac truncate (Number), _CONSTM_ RealFrac round (Number), _CONSTM_ RealFrac ceiling (Number), _CONSTM_ RealFrac floor (Number)] _N_
-	 properFraction = _A_ 1 _U_ 21 _N_ _N_ _N_ _N_,
-	 truncate = _A_ 1 _U_ 21 _N_ _N_ _N_ _N_,
-	 round = _A_ 1 _U_ 21 _N_ _N_ _N_ _N_,
-	 ceiling = _A_ 1 _U_ 21 _N_ _N_ _N_ _N_,
-	 floor = _A_ 1 _U_ 21 _N_ _N_ _N_ _N_ #-}
+	 properFraction = { _A_ 1 _U_ 21 _N_ _N_ _N_ _N_ },
+	 truncate = { _A_ 1 _U_ 21 _N_ _N_ _N_ _N_ },
+	 round = { _A_ 1 _U_ 21 _N_ _N_ _N_ _N_ },
+	 ceiling = { _A_ 1 _U_ 21 _N_ _N_ _N_ _N_ },
+	 floor = { _A_ 1 _U_ 21 _N_ _N_ _N_ _N_ } #-}
 instance Text Number
 	{-# GHC_PRAGMA _M_ Number {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(Number, [Char])]), (Int -> Number -> [Char] -> [Char]), ([Char] -> [([Number], [Char])]), ([Number] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (Number), _CONSTM_ Text showsPrec (Number), _CONSTM_ Text readList (Number), _CONSTM_ Text showList (Number)] _N_
-	 readsPrec = _A_ 2 _U_ 02 _N_ _S_ "AL" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_,
-	 showsPrec = _A_ 2 _U_ 212 _N_ _S_ "LS" _N_ _N_,
-	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
-	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+	 readsPrec = { _A_ 2 _U_ 02 _N_ _S_ "AL" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ },
+	 showsPrec = { _A_ 2 _U_ 212 _N_ _S_ "LS" _N_ _N_ },
+	 readList = { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ },
+	 showList = { _A_ 0 _U_ 22 _N_ _N_ _N_ _N_ } #-}
 

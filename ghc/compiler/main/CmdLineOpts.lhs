@@ -276,6 +276,17 @@ data SimplifierSwitch
   | SimplNoLetFromCase	    -- used when turning off floating entirely
   | SimplNoLetFromApp	    -- (for experimentation only) WDP 95/10
   | SimplNoLetFromStrictLet
+
+  | SimplDontFoldBackAppend
+		 	-- we fold `foldr (:)' back into flip (++),
+			-- but we *don't* want to do it when compiling
+			-- List.hs, otherwise 
+			-- xs ++ ys = foldr (:) ys xs
+			-- {- via our loopback -}
+			-- xs ++ ys = xs ++ ys
+			-- Oops!
+			-- So only use this flag inside List.hs
+			-- (Sigh, what a HACK, Andy.  WDP 96/01)
 {-
   | Extra__SimplFlag1
   | Extra__SimplFlag2
@@ -609,6 +620,7 @@ classifyOpts opts
 	  "-fdo-eta-reduction" -> GLOBAL_SIMPL_SW(SimplDoEtaReduction)
 	  "-fdo-lambda-eta-expansion" -> GLOBAL_SIMPL_SW(SimplDoLambdaEtaExpansion)
 	  "-fdo-foldr-build"  -> GLOBAL_SIMPL_SW(SimplDoFoldrBuild)
+	  "-fdo-not-fold-back-append"  -> GLOBAL_SIMPL_SW(SimplDontFoldBackAppend)
 	  "-fdo-new-occur-anal"  -> GLOBAL_SIMPL_SW(SimplDoNewOccurAnal)
 	  "-fdo-arity-expand"  -> GLOBAL_SIMPL_SW(SimplDoArityExpand)
 	  "-fdo-inline-foldr-build"  -> GLOBAL_SIMPL_SW(SimplDoInlineFoldrBuild)
@@ -790,6 +802,7 @@ tagOf_SimplSwitch KeepUnusedBindings		= ILIT(25)
 tagOf_SimplSwitch SimplNoLetFromCase		= ILIT(26)
 tagOf_SimplSwitch SimplNoLetFromApp		= ILIT(27)
 tagOf_SimplSwitch SimplNoLetFromStrictLet	= ILIT(28)
+tagOf_SimplSwitch SimplDontFoldBackAppend       = ILIT(29)
 -- If you add anything here, be sure to change lAST_SIMPL_SWITCH_TAG, too!
 
 {-
@@ -805,7 +818,7 @@ tagOf_SimplSwitch Extra__SimplFlag8		= ILIT(32)
 tagOf_SimplSwitch _ = case (panic "tagOf_SimplSwitch") of -- BUG avoidance
 			s -> tagOf_SimplSwitch s
 
-lAST_SIMPL_SWITCH_TAG = IBOX(tagOf_SimplSwitch SimplNoLetFromStrictLet)
+lAST_SIMPL_SWITCH_TAG = IBOX(tagOf_SimplSwitch SimplDontFoldBackAppend)
 \end{code}
 
 %************************************************************************

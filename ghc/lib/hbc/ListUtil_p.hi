@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface ListUtil where
 import PreludeStdIO(Maybe)
 assoc :: Eq b => (a -> c) -> c -> [(b, a)] -> b -> c
@@ -16,7 +16,7 @@ group :: Eq a => [a] -> [[a]]
 groupEq :: (a -> a -> Bool) -> [a] -> [[a]]
 	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 intersection :: Eq a => [a] -> [a] -> [a]
-	{-# GHC_PRAGMA _A_ 3 _U_ 112 _N_ _S_ "LSL" _N_ _N_ #-}
+	{-# GHC_PRAGMA _A_ 1 _U_ 212 _N_ _N_ _N_ _N_ #-}
 lookup :: Eq a => [(a, b)] -> a -> Maybe b
 	{-# GHC_PRAGMA _A_ 1 _U_ 112 _N_ _N_ _N_ _N_ #-}
 mapAccuml :: (b -> a -> (b, c)) -> b -> [a] -> (b, [c])

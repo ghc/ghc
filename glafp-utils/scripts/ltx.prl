@@ -27,11 +27,18 @@ if (-f $ARGV[0]) {
     die "$Pgm: input file $ARGV[0] doesn't exist\n";
 }
 
+if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
+    $Tmp_prefix = $ENV{'TMPDIR'} ;
+} else {
+    $Tmp_prefix ='$(TMPDIR)';
+    $ENV{'TMPDIR'} = '$(TMPDIR)'; # set the env var as well
+}
+
 sub rm_temp_files {
-    system("rm -f $(TMPDIR)/ltx-*.$$");
+    system("rm -f $Tmp_prefix/ltx-*.$$");
 }
 sub rm_temp_files_and_exit {
-    system("rm -f $(TMPDIR)/ltx-*.$$");
+    system("rm -f $Tmp_prefix/ltx-*.$$");
     exit(1);
 }
 $SIG{'INT'}  = 'rm_temp_files_and_exit';
@@ -165,8 +172,8 @@ sub something_more_needed {
         &slurp_aux_file('aux');
 	$BibTeX_run_needed = 1
 	    if $Bibliography_requested &&
-	      -f "$(TMPDIR)/ltx-aux-cite.$$" &&
-	      -s "$(TMPDIR)/ltx-aux-cite.$$";
+	      -f "$Tmp_prefix/ltx-aux-cite.$$" &&
+	      -s "$Tmp_prefix/ltx-aux-cite.$$";
 
 
     } else { # ltx had been run before (.aux-prev/.idx-prev files exist)
@@ -175,7 +182,7 @@ sub something_more_needed {
         &slurp_aux_file('aux');
         &slurp_aux_file('aux-prev');
 
-	local($tmp_pre) = "$(TMPDIR)/ltx";
+	local($tmp_pre) = "$Tmp_prefix/ltx";
 
 	if ((-s "$tmp_pre-.aux-cite.$$") # there are still \cite's in there
 	 && (system("cmp -s $tmp_pre-.aux-cite.$$ $tmp_pre-.aux-prev-cite.$$") >> 8)) {
@@ -200,12 +207,12 @@ sub something_more_needed {
 sub slurp_aux_file {
     local($ext) = @_;
 
-    # copy all citations from slurpfile into $(TMPDIR)/ltx-$ext-cite.$$
+    # copy all citations from slurpfile into $Tmp_prefix/ltx-$ext-cite.$$
 
     open(SLURPF,"< $TeX_root.$ext")
 	|| &die_gracefully("$Pgm: Can't open $TeX_root.$ext for reading\n");
-    open(CITEF,"> $(TMPDIR)/ltx-$ext-cite.$$")
-	|| &die_gracefully("$Pgm: Can't open $(TMPDIR)/ltx-$ext-cite.$$ for writing\n");
+    open(CITEF,"> $Tmp_prefix/ltx-$ext-cite.$$")
+	|| &die_gracefully("$Pgm: Can't open $Tmp_prefix/ltx-$ext-cite.$$ for writing\n");
 
     while (<SLURPF>) {
 	print CITEF $_  if /\\citation/;

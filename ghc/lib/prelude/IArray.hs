@@ -14,7 +14,10 @@ module PreludeArray (
 	elems,
 	indices,
 	ixmap,
-	listArray
+	listArray,
+	_arrEleBottom,
+	_newArray,
+	_freezeArray
     ) where
 
 import Cls
@@ -125,6 +128,23 @@ ixmap	    :: (Ix a, Ix b) => (a,a) -> (a -> b) -> Array b c -> Array a c
 
 bounds (_Array b _)  = b
 
+#ifdef USE_FOLDR_BUILD
+{-# INLINE array #-}
+#endif
+array ixs@(ix_start, ix_end) ivs =
+   _runST ( \ s ->
+	case _newArray ixs _arrEleBottom s 		of { (arr@(_MutableArray _ arr#),s) ->
+	let
+         fill_one_in (S# s#) (i := v)
+             = case index ixs  i		    	of { I# n# ->
+		case writeArray# arr# n# v s# 		of { s2# -> S# s2# }}
+	in
+	case foldl fill_one_in s ivs 			of { s@(S# _) -> 
+	_freezeArray arr s }})
+
+_arrEleBottom = error "(!){PreludeArray}: undefined array element"
+
+{- OLD:
 array ixs@(ix_start, ix_end) ivs
   = _runST (
 	newArray ixs arrEleBottom	`thenStrictlyST` \ arr# ->
@@ -133,6 +153,7 @@ array ixs@(ix_start, ix_end) ivs
     )
   where
     arrEleBottom = error "(!){PreludeArray}: undefined array element"
+-}
 
 (_Array bounds arr#) ! i
   = let n# = case (index bounds i) of { I# x -> x } -- index fails if out of range
@@ -149,6 +170,12 @@ fill_it_in arr lst s
 {- the rest ------------------------------------------------- -}
 
 listArray b vs	      = array b (zipWith (:=) (range b) vs)
+
+#ifdef USE_FOLDR_BUILD
+{-# INLINE indices #-}
+{-# INLINE elems #-}
+{-# INLINE assocs #-}
+#endif
 
 indices a	      = range (bounds a)
 
@@ -167,11 +194,12 @@ accumArray f z b      = accum f (array b [i := z | i <- range b])
 
 #else /* ! USE_REPORT_PRELUDE */
 
+-- TODO: add (//), accum, accumArray, listArray
+
 old_array // ivs
   = _runST (
 	-- copy the old array:
-	newArray (bounds old_array) bottom  `thenStrictlyST` \ arr# ->
-	fill_it_in arr# (assocs old_array)  `seqStrictlyST`
+	thawArray old_array		    `thenStrictlyST` \ arr# ->	
 	-- now write the new elements into the new array:
 	fill_it_in arr# ivs		    `seqStrictlyST`
 	freezeArray arr#

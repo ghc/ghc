@@ -286,7 +286,10 @@ occurs in an argument position.
 isLiftable :: PlainStgRhs -> Bool
 
 isLiftable (StgRhsClosure _ (StgBinderInfo arg_occ _ _ _ unapplied_occ) fvs _ args _) 
-  -- experimental evidence suggests we should lift only if we will be abstracting up to 4 fvs.
+
+  -- Experimental evidence suggests we should lift only if we will be
+  -- abstracting up to 4 fvs.
+
   = if not (null args	|| 	-- Not a function
 	 unapplied_occ	|| 	-- Has an occ with no args at all
 	 arg_occ	|| 	-- Occurs in arg position
@@ -297,13 +300,36 @@ isLiftable (StgRhsClosure _ (StgBinderInfo arg_occ _ _ _ unapplied_occ) fvs _ ar
 isLiftable other_rhs = False
 
 isLiftableRec :: PlainStgRhs -> Bool
--- this is just the same as for non-rec, except we only lift to abstract up to 1 argument
--- this avoids undoing Static Argument Transformation work
+
+-- this is just the same as for non-rec, except we only lift to
+-- abstract up to 1 argument this avoids undoing Static Argument
+-- Transformation work
+
+{- Andre's longer comment about isLiftableRec: 1996/01:
+
+A rec binding is "liftable" (according to our heuristics) if: 
+* It is a function, 
+* all occurrences have arguments, 
+* does not occur in an argument position and
+* has up to *2* free variables (including the rec binding variable
+  itself!)
+
+The point is: my experiments show that SAT is more important than LL.
+Therefore if we still want to do LL, for *recursive* functions, we do
+not want LL to undo what SAT did.  We do this by avoiding LL recursive
+functions that have more than 2 fvs, since if this recursive function
+was created by SAT (we don't know!), it would have at least 3 fvs: one
+for the rec binding itself and 2 more for the static arguments (note:
+this matches with the choice of performing SAT to have at least 2
+static arguments, if we change things there we should change things
+here).
+-}
+
 isLiftableRec (StgRhsClosure _ (StgBinderInfo arg_occ _ _ _ unapplied_occ) fvs _ args _) 
   = if not (null args	|| 	-- Not a function
 	 unapplied_occ	|| 	-- Has an occ with no args at all
 	 arg_occ	|| 	-- Occurs in arg position
-	 length fvs > 1 	-- Too many free variables
+	 length fvs > 2 	-- Too many free variables
         )
     then {-trace ("LLRec: " ++ show (length fvs))-} True
     else False
@@ -314,10 +340,10 @@ rhsFreeVars (StgRhsClosure _ _ fvs _ _ _) = mkUniqSet fvs
 rhsFreeVars other 			  = panic "rhsFreeVars"
 \end{code}
 
-dontLiftRhs is like liftExpr, except that it does not lift a top-level lambda
-abstraction.  It is used for the right-hand sides of definitions where
-we've decided *not* to lift: for example, top-level ones or mutually-recursive
-ones where not all are lambdas.
+dontLiftRhs is like liftExpr, except that it does not lift a top-level
+lambda abstraction.  It is used for the right-hand sides of
+definitions where we've decided *not* to lift: for example, top-level
+ones or mutually-recursive ones where not all are lambdas.
 
 \begin{code}
 dontLiftRhs :: PlainStgRhs -> LiftM (PlainStgRhs, LiftInfo)
@@ -328,7 +354,6 @@ dontLiftRhs (StgRhsClosure cc bi fvs upd args body)
   = liftExpr body	`thenLM` \ (body', body_info) ->
     returnLM (StgRhsClosure cc bi fvs upd args body', body_info)
 \end{code}
-
 
 \begin{code}
 mkScPieces :: IdSet 		-- Extra args for the supercombinator

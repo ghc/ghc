@@ -39,11 +39,11 @@ instance Hashable Char
 instance (RealFloat a, Hashable a) => Hashable (Complex a)
 	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 3 _U_ 22 _N_ _S_ "LSS" _N_ _N_ #-}
 instance Hashable Double
-	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 0 _N_ _N_ _N_ _N_ _N_
-	 hash = { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ } #-}
+	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 1 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Hashable hash (Double) _N_
+	 hash = { _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 4 \ (u0 :: Double#) -> case _APP_  _WRKR_ _SPEC_ _CONSTM_ RealFrac properFraction (Double) [ (Int) ] [ u0 ] of { _ALG_ _TUP_2 (u1 :: Int) (u2 :: Double) -> u1; _NO_DEFLT_ } _N_} _F_ _IF_ARGS_ 0 1 C 5 \ (u0 :: Double) -> case u0 of { _ALG_ D# (u1 :: Double#) -> case _APP_  _WRKR_ _SPEC_ _CONSTM_ RealFrac properFraction (Double) [ (Int) ] [ u1 ] of { _ALG_ _TUP_2 (u2 :: Int) (u3 :: Double) -> u2; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ } #-}
 instance Hashable Float
-	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 0 _N_ _N_ _N_ _N_ _N_
-	 hash = { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ } #-}
+	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 1 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Hashable hash (Float) _N_
+	 hash = { _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 4 \ (u0 :: Float#) -> case _APP_  _WRKR_ _SPEC_ _CONSTM_ RealFrac properFraction (Float) [ (Int) ] [ u0 ] of { _ALG_ _TUP_2 (u1 :: Int) (u2 :: Float) -> u1; _NO_DEFLT_ } _N_} _F_ _IF_ARGS_ 0 1 C 5 \ (u0 :: Float) -> case u0 of { _ALG_ F# (u1 :: Float#) -> case _APP_  _WRKR_ _SPEC_ _CONSTM_ RealFrac properFraction (Float) [ (Int) ] [ u1 ] of { _ALG_ _TUP_2 (u2 :: Int) (u3 :: Float) -> u2; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ } #-}
 instance Hashable IOError
 	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 1 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Hashable hash (IOError) _N_
 	 hash = { _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [0#] _N_} _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: IOError) -> _!_ I# [] [0#] _N_ } #-}

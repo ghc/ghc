@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface FiniteMap where
 import PreludeStdIO(Maybe)
 data FiniteMap a b 	{-# GHC_PRAGMA EmptyFM | Branch a b Int# (FiniteMap a b) (FiniteMap a b) #-}

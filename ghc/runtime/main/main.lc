@@ -99,12 +99,8 @@ char *rts_argv[MAX_RTS_ARGS];
 jmp_buf restart_main;	    /* For restarting after a signal */
 #endif
 
-#if defined(PVM)
-unsigned nPEs = 0, nIMUs = 0;
-#endif
-
 #if defined(PAR)
-int nPEs = 0;
+int nPEs = 0;		    /* Number of PEs */
 #endif
 
 int /* return type of "main" is defined by the C standard */
@@ -126,15 +122,18 @@ Manager's requirements.
 
 \begin{code}
 #ifdef PAR
+    if (*argv[0] == '-') {	/* Look to see whether we're the Main Thread */
+	IAmMainThread = rtsTrue;
+        argv++; argc--;
+	fprintf(stderr, "I am Main Thread\n");
+    }
     /* 
      * Grab the number of PEs out of the argument vector, and
      * eliminate it from further argument processing.
      */
     nPEs = atoi(argv[1]);
     argv[1] = argv[0];
-    argv++;
-    argc--;
-
+    argv++; argc--;
     SynchroniseSystem();
 #endif
 

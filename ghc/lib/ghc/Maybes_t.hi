@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface Maybes where
 import Prelude(thenMaybe)
 import PreludeStdIO(Maybe(..))

@@ -26,7 +26,6 @@ module PreludePS{-yes, a Prelude module!-} (
 	_psToByteArray,
 
 	_unpackPS,
-	unpackPS#, unpackPS2#,
 --	toCString,
 	_putPS,
 	_getPS,
@@ -72,7 +71,8 @@ import IList
 import IInt
 import Prel		( otherwise, (&&), (||), chr, ($), not, (.), isSpace, flip )
 import List		( length, (++), map, filter, foldl, foldr,
-			  lines, words, reverse, null, foldr1
+			  lines, words, reverse, null, foldr1,
+			  dropWhile, break
 			)
 import TyArray		( Array(..) )
 import TyComplex
@@ -112,8 +112,6 @@ _psToByteArray	 :: _PackedString -> _ByteArray Int
 --OLD: packToCString	:: [Char] -> _ByteArray Int -- hmmm... weird name
 
 _unpackPS	:: _PackedString -> [Char]
-unpackPS#	:: Addr#         -> [Char] -- calls injected by compiler
-unpackPS2#	:: Addr# -> Int# -> [Char] -- calls injected by compiler
 --???toCString	:: _PackedString -> ByteArray#
 _putPS		:: _FILE -> _PackedString -> PrimIO () -- ToDo: more sensible type
 \end{code}
@@ -272,14 +270,12 @@ _psToByteArray (_CPS addr len#)
 %************************************************************************
 
 \begin{code}
+{- OLD: but good? WDP 96/01
 unpackPS# addr -- calls injected by compiler
   = _unpackPS (_CPS addr len)
   where
     len = case (strlen# addr) of { I# x -> x }
-
-unpackPS2# addr len -- calls injected by compiler
-  -- this one is for literal strings with NULs in them; rare.
-  = _unpackPS (_packCBytes (I# len) (A# addr))
+-}
 
 -- OK, but this code gets *hammered*:
 -- _unpackPS ps

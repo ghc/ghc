@@ -114,8 +114,10 @@ module Prelude (
 	primIOToIO, ioToPrimIO,	-- extra, and very dodgy
 
 	-- and for foldr/build
-	_build
+	_build, _augment, 
 
+	_newArray, _freezeArray, _arrEleBottom,
+	_rangeComplaint_Ix_Int
     ) where
 
 -- few *Ty(s) imports

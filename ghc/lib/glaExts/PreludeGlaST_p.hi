@@ -18,6 +18,10 @@ data _ByteArray a   = _ByteArray (a, a) ByteArray#
 data _FILE   = _FILE Addr#
 data _MutableArray a b c   = _MutableArray (b, b) (MutableArray# a c)
 data _MutableByteArray a b   = _MutableByteArray (b, b) (MutableByteArray# a)
+_freezeArray :: Ix b => _MutableArray a b c -> _State a -> (Array b c, _State a)
+	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "U(ASLA)U(U(LL)P)U(P)" {_A_ 5 _U_ 11222 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ _N_, Int, _N_ ] 1 { _A_ 2 _U_ 11 _N_ _S_ "U(U(U(P)U(P))P)U(P)" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ }, [ _N_, (Int, Int), _N_ ] 1 { _A_ 2 _U_ 11 _N_ _S_ "U(U(SS)P)U(P)" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
+_newArray :: Ix b => (b, b) -> c -> _State a -> (_MutableArray a b c, _State a)
+	{-# GHC_PRAGMA _A_ 4 _U_ 1221 _N_ _S_ "U(ASLA)U(LL)LU(P)" {_A_ 5 _U_ 11222 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ _N_, Int, _N_ ] 1 { _A_ 3 _U_ 121 _N_ _S_ "U(U(P)U(P))LU(P)" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ }, [ _N_, (Int, Int), _N_ ] 1 { _A_ 3 _U_ 121 _N_ _S_ "U(SS)LU(P)" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
 appendChanPrimIO :: [Char] -> [Char] -> _State _RealWorld -> ((), _State _RealWorld)
 	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ #-}
 appendFilePrimIO :: [Char] -> [Char] -> _State _RealWorld -> ((), _State _RealWorld)
@@ -37,7 +41,7 @@ forkST :: (_State a -> (b, _State a)) -> _State a -> (b, _State a)
 freezeAddrArray :: Ix b => _MutableByteArray a b -> _State a -> (_ByteArray b, _State a)
 	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "U(ASLA)U(U(LL)P)U(P)" {_A_ 5 _U_ 11222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 freezeArray :: Ix b => _MutableArray a b c -> _State a -> (Array b c, _State a)
-	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "U(ASLA)U(U(LL)P)U(P)" {_A_ 5 _U_ 11222 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ _N_, Int, _N_ ] 1 { _A_ 2 _U_ 11 _N_ _S_ "U(U(U(P)U(P))P)U(P)" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ }, [ _N_, (Int, Int), _N_ ] 1 { _A_ 2 _U_ 11 _N_ _S_ "U(U(SS)P)U(P)" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
+	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ PreludeGlaST _freezeArray _N_ #-}
 freezeCharArray :: Ix b => _MutableByteArray a b -> _State a -> (_ByteArray b, _State a)
 	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "U(ASLA)U(U(LL)P)U(P)" {_A_ 5 _U_ 11222 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ _N_, Int ] 1 { _A_ 2 _U_ 11 _N_ _S_ "U(U(U(P)U(P))P)U(P)" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
 freezeDoubleArray :: Ix b => _MutableByteArray a b -> _State a -> (_ByteArray b, _State a)
@@ -83,7 +87,7 @@ mapST :: (a -> _State b -> (c, _State b)) -> [a] -> _State b -> ([c], _State b)
 newAddrArray :: Ix b => (b, b) -> _State a -> (_MutableByteArray a b, _State a)
 	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "U(ASLA)U(LL)U(P)" {_A_ 5 _U_ 11222 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ _N_, Int ] 1 { _A_ 2 _U_ 11 _N_ _S_ "U(U(P)U(P))U(P)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
 newArray :: Ix b => (b, b) -> c -> _State a -> (_MutableArray a b c, _State a)
-	{-# GHC_PRAGMA _A_ 4 _U_ 1221 _N_ _S_ "U(ASLA)U(LL)LU(P)" {_A_ 5 _U_ 11222 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ _N_, Int, _N_ ] 1 { _A_ 3 _U_ 121 _N_ _S_ "U(U(P)U(P))LU(P)" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ }, [ _N_, (Int, Int), _N_ ] 1 { _A_ 3 _U_ 121 _N_ _S_ "U(SS)LU(P)" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
+	{-# GHC_PRAGMA _A_ 4 _U_ 1221 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ PreludeGlaST _newArray _N_ #-}
 newCharArray :: Ix b => (b, b) -> _State a -> (_MutableByteArray a b, _State a)
 	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "U(ASLA)U(LL)U(P)" {_A_ 5 _U_ 11222 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ _N_, Int ] 1 { _A_ 2 _U_ 11 _N_ _S_ "U(U(P)U(P))U(P)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
 newDoubleArray :: Ix b => (b, b) -> _State a -> (_MutableByteArray a b, _State a)
@@ -97,7 +101,7 @@ newVar :: b -> _State a -> (_MutableArray a Int b, _State a)
 readAddrArray :: Ix a => _MutableByteArray b a -> a -> _State b -> (_Addr, _State b)
 	{-# GHC_PRAGMA _A_ 4 _U_ 1121 _N_ _S_ "U(AASA)U(LP)LU(P)" {_A_ 5 _U_ 12222 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ Int, _N_ ] 1 { _A_ 3 _U_ 111 _N_ _S_ "U(U(U(P)U(P))P)U(P)U(P)" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
 readArray :: Ix a => _MutableArray b a c -> a -> _State b -> (c, _State b)
-	{-# GHC_PRAGMA _A_ 4 _U_ 1121 _N_ _S_ "U(AASA)U(LP)LU(P)" {_A_ 5 _U_ 12222 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ Int, _N_, _N_ ] 1 { _A_ 3 _U_ 111 _N_ _S_ "U(U(U(P)U(P))P)U(P)U(P)" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ }, [ (Int, Int), _N_, _N_ ] 1 { _A_ 3 _U_ 111 _N_ _S_ "U(U(SS)P)U(U(P)U(P))U(P)" {_A_ 5 _U_ 22212 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
+	{-# GHC_PRAGMA _A_ 4 _U_ 1121 _N_ _S_ "U(AASA)U(LP)LU(P)" {_A_ 5 _U_ 12222 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ Int, _N_, _N_ ] 1 { _A_ 3 _U_ 111 _N_ _S_ "U(U(U(P)U(P))P)U(P)U(P)" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ }, [ (Int, Int), _N_, _N_ ] 1 { _A_ 3 _U_ 111 _N_ _S_ "U(U(SS)P)U(U(P)U(P))U(P)" {_A_ 5 _U_ 11212 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
 readChanPrimIO :: [Char] -> _State _RealWorld -> ([Char], _State _RealWorld)
 	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 readCharArray :: Ix a => _MutableByteArray b a -> a -> _State b -> (Char, _State b)
@@ -128,6 +132,8 @@ seqST :: (_State b -> (a, _State b)) -> (_State b -> (c, _State b)) -> _State b 
 	{-# GHC_PRAGMA _A_ 2 _U_ 112 _N_ _S_ "LS" _N_ _N_ #-}
 seqStrictlyST :: (_State b -> (a, _State b)) -> (_State b -> (c, _State b)) -> _State b -> (c, _State b)
 	{-# GHC_PRAGMA _A_ 3 _U_ 112 _N_ _S_ "SSL" _F_ _ALWAYS_ _/\_ u0 u1 u2 -> \ (u3 :: _State u1 -> (u0, _State u1)) (u4 :: _State u1 -> (u2, _State u1)) (u5 :: _State u1) -> case _APP_  u3 [ u5 ] of { _ALG_ _TUP_2 (u6 :: u0) (u7 :: _State u1) -> _APP_  u4 [ u7 ]; _NO_DEFLT_ } _N_ #-}
+thawArray :: Ix a => Array a b -> _State c -> (_MutableArray c a b, _State c)
+	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _N_ _N_ _SPECIALISE_ [ Int, _N_, _N_ ] 1 { _A_ 2 _U_ 11 _N_ _N_ _N_ _N_ }, [ (Int, Int), _N_, _N_ ] 1 { _A_ 2 _U_ 11 _N_ _N_ _N_ _N_ } #-}
 thenPrimIO :: (_State _RealWorld -> (a, _State _RealWorld)) -> (a -> _State _RealWorld -> (b, _State _RealWorld)) -> _State _RealWorld -> (b, _State _RealWorld)
 	{-# GHC_PRAGMA _A_ 3 _U_ 112 _N_ _S_ "SSL" _F_ _ALWAYS_ _/\_ u0 u1 -> \ (u2 :: _State _RealWorld -> (u0, _State _RealWorld)) (u3 :: u0 -> _State _RealWorld -> (u1, _State _RealWorld)) (u4 :: _State _RealWorld) -> case _APP_  u2 [ u4 ] of { _ALG_ _TUP_2 (u5 :: u0) (u6 :: _State _RealWorld) -> _APP_  u3 [ u5, u6 ]; _NO_DEFLT_ } _N_ #-}
 thenST :: (_State b -> (a, _State b)) -> (a -> _State b -> (c, _State b)) -> _State b -> (c, _State b)

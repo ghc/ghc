@@ -29,7 +29,9 @@ module AbsPrel (
 
 	-- *odd* values that need to be reached out and grabbed:
 	eRROR_ID, pAT_ERROR_ID, aBSENT_ERROR_ID,
-	unpackCStringId, unpackCString2Id, packStringForCId, unpackCStringAppendId,
+	packStringForCId,
+	unpackCStringId, unpackCString2Id,
+	unpackCStringAppendId, unpackCStringFoldrId,
 	integerZeroId, integerPlusOneId,
 	integerPlusTwoId, integerMinusOneId,
 
@@ -99,7 +101,8 @@ module AbsPrel (
 --	packedStringTyCon, packedStringTy, psDataCon, cpsDataCon,
 
 	-- for compilation of List Comprehensions and foldr
-	foldlId, foldrId, mkFoldl, mkFoldr, mkBuild, buildId,
+	foldlId, foldrId, mkFoldl, mkFoldr,
+	mkBuild, buildId, augmentId, appendId,
 
 #ifdef DPH
 	mkProcessorTy,
@@ -257,10 +260,15 @@ totally_wired_in_Ids
      (SLIT("parError#"),	WiredInVal pAR_ERROR_ID), -- ditto
      (SLIT("_trace"),		WiredInVal tRACE_ID),
 
-     -- now the build  / foldr Id, which needs to be built in
+     -- now the foldr/build Ids, which need to be built in
+     -- because they have magic unfoldings
      (SLIT("_build"),		WiredInVal buildId),
+     (SLIT("_augment"),		WiredInVal augmentId),
      (SLIT("foldl"),		WiredInVal foldlId),
      (SLIT("foldr"),		WiredInVal foldrId),
+     (SLIT("unpackAppendPS#"),	WiredInVal unpackCStringAppendId),
+     (SLIT("unpackFoldrPS#"),	WiredInVal unpackCStringFoldrId),
+
      (SLIT("_runST"),		WiredInVal runSTId),
      (SLIT("_seq_"),		WiredInVal seqId),  -- yes, used in sequential-land, too
 						    -- WDP 95/11

@@ -64,8 +64,10 @@ module Prelude (
 	strDispatch, strListDispatch, binDispatch, succDispatch,
 
 	-- and for foldr/build
-	_build
+	_build, _augment, 
 
+	_newArray, _freezeArray, _arrEleBottom,
+	_rangeComplaint_Ix_Int
     ) where
 
 -- few *Ty(s) imports
