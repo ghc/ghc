@@ -78,14 +78,14 @@ Question: Where are the stable pointer roots? (JSM)
 Answer: They're on the heap in a "Stable Pointer Table". (ADR)
 \begin{code}
 #ifndef CONCURRENT
-# define SM_MAXROOTS 8		/* 8 Vanilla Regs */
+# define SM_MAXROOTS 9		/* 8 Vanilla Regs + stable pointer table*/
 #else
 # ifndef PAR
 #   ifdef GRAN
 #    define SM_MAXROOTS (10 + (MAX_PROC*2) + 2 )
 		     /* unthreaded + hd/tl thread queues + Current/Main TSOs */
 #   else
-#     define SM_MAXROOTS 5      /* See c-as-asm/HpOverflow.lc */
+#     define SM_MAXROOTS 6      /* See c-as-asm/HpOverflow.lc */
 #   endif
 # else
 #  define SM_MAXROOTS 6         /* See c-as-asm/HpOverflow.lc */
