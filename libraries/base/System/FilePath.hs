@@ -148,7 +148,7 @@ splitFilePath p =
       (_:dir) -> dir++drive
 
 -- | The 'joinFileName' function is the opposite of 'splitFileName'. 
--- It joins directory and file names to form complete file path.
+-- It joins directory and file names to form a complete file path.
 --
 -- The general rule is:
 --
@@ -156,7 +156,7 @@ splitFilePath p =
 -- >   where
 -- >     (dir,basename) = splitFileName path
 --
--- There might be an exeptions to the rule but in any case the
+-- There might be an exceptions to the rule but in any case the
 -- reconstructed path will refer to the same object (file or directory).
 -- An example exception is that on Windows some slashes might be converted
 -- to backslashes.
@@ -169,7 +169,7 @@ joinFileName dir fname
   | otherwise                  = dir++pathSeparator:fname
 
 -- | The 'joinFileExt' function is the opposite of 'splitFileExt'.
--- It joins file name and extension to form complete file path.
+-- It joins a file name and an extension to form a complete file path.
 --
 -- The general rule is:
 --
@@ -219,8 +219,8 @@ isRootedPath (_:':':c:_) | isPathSeparator c = True  -- path with drive letter
 #endif
 isRootedPath _ = False
 
--- | Returns True if this path\'s meaning is independent of any OS
--- "working directory", False if it isn\'t.
+-- | Returns 'True' if this path\'s meaning is independent of any OS
+-- \"working directory\", or 'False' if it isn\'t.
 isAbsolutePath :: FilePath -> Bool
 #ifdef mingw32_TARGET_OS
 isAbsolutePath (_:':':c:_) | isPathSeparator c = True
@@ -244,7 +244,7 @@ dropAbsolutePrefix cs = cs
 -- | Gets this path and all its parents.
 -- The function is useful in case if you want to create 
 -- some file but you aren\'t sure whether all directories 
--- in the path exists or if you want to search upward for some file.
+-- in the path exist or if you want to search upward for some file.
 -- 
 -- Some examples:
 --
@@ -256,9 +256,6 @@ dropAbsolutePrefix cs = cs
 -- >  pathParents "dir1"       == [".", "dir1"]
 -- >  pathParents "dir1/dir2"  == [".", "dir1", "dir1/dir2"]
 --
--- In the above examples \"\/\" isn\'t included in the list 
--- because you can\'t create root directory.
---
 -- \[Windows\]
 --
 -- >  pathParents "c:"             == ["c:."]
@@ -268,7 +265,7 @@ dropAbsolutePrefix cs = cs
 -- >  pathParents "c:dir1"         == ["c:.","c:dir1"]
 -- >  pathParents "dir1\\dir2"     == [".", "dir1", "dir1\\dir2"]
 --
--- Note that if the file is relative then the the current directory (\".\") 
+-- Note that if the file is relative then the current directory (\".\") 
 -- will be explicitly listed.
 pathParents :: FilePath -> [FilePath]
 pathParents p =
