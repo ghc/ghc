@@ -3,10 +3,6 @@
 # ghc project specific make variables
 #
 
-# Override default haskell compiler if required
-#HC			= $(WithGhcHc)
-HaskellCompilerType	= $(WithGhcHcType)
-
 GCap=-optc-DGCap
 #GC2s=-optc-DGC2s
 #GC1s=-optc-DGC1s
