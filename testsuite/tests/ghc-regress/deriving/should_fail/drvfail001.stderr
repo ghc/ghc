@@ -1,4 +1,8 @@
 
+drvfail001.hs:15:
+    No instance for `Show (f (f a))'
+    When deriving the `Show' instance for type `SM'
+
 drvfail001.hs:21:
     No instance for `Show (f a)'
-    When deriving classes for `Cons'
+    When deriving the `Show' instance for type `Cons'

@@ -1,4 +1,4 @@
 
 drvfail007.hs:4:
     No instance for `Eq (Int -> Int)'
-    When deriving classes for `Foo'
+    When deriving the `Eq' instance for type `Foo'
