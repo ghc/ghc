@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: FrontPanel.c,v 1.3 2001/01/19 11:06:20 simonmar Exp $
+ * $Id: FrontPanel.c,v 1.4 2001/01/19 11:08:05 simonmar Exp $
  *
  * (c) The GHC Team 2000
  *
@@ -15,6 +15,7 @@
 #include "RtsUtils.h"
 #include "MBlock.h"
 #include "FrontPanel.h"
+#include "Storage.h"
 #include "StoragePriv.h"
 #include "Stats.h"
 #include "RtsFlags.h"
@@ -628,12 +629,9 @@ residencyCensus( void )
 		    type = Other;
 		    
 		    switch (info->type) {
-		    case BCO:
-			size = bco_sizeW((StgBCO *)p);
-			type = Other;
-			break;
-			
+
 		    case CONSTR:
+		    case BCO:
 			if (((StgClosure *)p)->header.info == &stg_DEAD_WEAK_info) {
 			    size = sizeofW(StgWeak);
 			    type = Other;
