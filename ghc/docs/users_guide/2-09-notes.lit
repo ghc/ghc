@@ -5,9 +5,9 @@ Changes made since 2.08:
 
 \item fixed overloaded-constructor-argument bug in the typechecker.
 
-\item fix off-by-one error in PackedString:filterPS.
+\item fix off-by-one error in @PackedString:filterPS@.
 
-\item fixed getCurrentDirectory.
+\item fixed @getCurrentDirectory@.
 
 \item fixed space-leak bug to do with polymorphic recursion and overloading.
 
@@ -18,21 +18,22 @@ Changes made since 2.08:
 \item unboxed the state in ST and IO, and specialised IO (it is no longer built
   on top of ST).
 
-\item reversed the sense of -fwarn-{overlapped,incomplete}-patterns.  The driver
-  now has to have the flag to provide the warning.
+\item reversed the sense of @-fwarn-{overlapped,incomplete}-patterns@.
+  The driver now has to have the flag to provide the warning.
 
-\item added -fwarn-missing-methods
+\item added @-fwarn-missing-methods@.
 
-\item added the -Wnot, -W, and -Wall options.  Set up a default set of warnings,
-  namely -fwarn-{overlapped,incomplete}-patterns.
+\item added the @-Wnot@, @-W@, and @-Wall@ options.  Set up a default
+  set of warnings, namely @-fwarn-{overlapped,incomplete}-patterns@.
 
-\item Added -fwarn-duplicate-exports warning to check for duplicates in
+\item Added @-fwarn-duplicate-exports@ warning to check for duplicates in
   export lists. Included in default warning set.
 
-\item Renamed SampleVar.{write,read}Sample to SampleVar.{write,read}SampleVar
+\item Renamed @SampleVar.{write,read}Sample@ to
+  @SampleVar.{write,read}SampleVar@.
 
-\item new mkdependHS options: -W disables warnings of duplicate interface
-  files found along the import path. --include-prelude *will* generate
+\item new @mkdependHS@ options: @-W@ disables warnings of duplicate interface
+  files found along the import path. @--include-prelude@ *will* generate
   dependencies on Prelude + any prelude/syslib .hi files used.
 
 \item removed the @PrimIO@ type.  For a limited time only, @PrimIO@
@@ -59,10 +60,10 @@ Briefly, the changes are as follows (for the definition of the new
 libraries, see the section on GHC/Hugs libraries in the User Guide).
 
 \begin{itemize}
-\item Addr moved out of Foreign and into its own module.
+\item @Addr@ moved out of @Foreign@ and into its own module.
 
-\item MutVar module disappeared, IOExts now exports IORefs and associated
-  operations.
+\item @MutVar@ module disappeared, @IOExts@ now exports @IORefs@ and
+  associated operations.
 
 \item The @CCallable@ and @CReturnable@ classes now have their own
   module, @CCall@.  You only need to import this module to provide a
