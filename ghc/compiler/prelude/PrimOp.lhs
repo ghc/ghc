@@ -933,7 +933,7 @@ primOpStrictness WriteMutVarOp	  = ([wwPrim, wwLazy, wwPrim], False)
 
 primOpStrictness PutMVarOp	  = ([wwPrim, wwLazy, wwPrim], False)
 
-primOpStrictness CatchOp	  = ([wwStrict, wwLazy, wwPrim], False)
+primOpStrictness CatchOp	  = ([wwLazy, wwLazy, wwPrim], False)
 primOpStrictness RaiseOp	  = ([wwLazy], True)	-- NB: True => result is bottom
 primOpStrictness BlockAsyncExceptionsOp    = ([wwLazy], False)
 primOpStrictness UnblockAsyncExceptionsOp  = ([wwLazy], False)
