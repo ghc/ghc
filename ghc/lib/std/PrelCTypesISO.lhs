@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCTypesISO.lhs,v 1.2 2001/01/12 15:48:09 simonmar Exp $
+% $Id: PrelCTypesISO.lhs,v 1.3 2001/01/12 17:38:27 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -50,7 +50,7 @@ INTEGRAL_TYPE(CSigAtomic,tyConCSigAtomic,"CSigAtomic",HTYPE_SIG_ATOMIC_T)
 "fromIntegral/CSigAtomic->a" fromIntegral = \(CSigAtomic x) -> fromIntegral x
  #-}
 
-NUMERIC_TYPE(CClock,tyConCClock,"CClock",HTYPE_CLOCK_T)
+INTEGRAL_TYPE(CClock,tyConCClock,"CClock",HTYPE_CLOCK_T)
 INTEGRAL_TYPE(CTime,tyConCTime,"CTime",HTYPE_TIME_T)
 
 -- TODO: Instances. But which...?  :-}
