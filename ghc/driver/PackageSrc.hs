@@ -190,7 +190,7 @@ package_details installing =
                              then []
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/data/cbits" ],
          c_includes     = [],
-         package_deps   = [ "lang" ],
+         package_deps   = [ "lang", "util" ],
          extra_ghc_opts = [],
          extra_cc_opts  = [],
          extra_ld_opts  = []
