@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.11 2000/11/22 10:56:53 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.12 2000/11/22 11:12:52 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -65,7 +65,7 @@ helpText = "\
 \   :load <filename>    load a module (and it dependents)\n\ 
 \   :module <mod>	set the context for expression evaluation to <mod>\n\ 
 \   :reload		reload the current module set\n\ 
-\   :set <opetion> ...	set options\n\ 
+\   :set <option> ...	set options\n\ 
 \   :type <expr>	show the type of <expr>\n\ 
 \   :quit		exit GHCi\n\ 
 \   :!<command>		run the shell command <command>\n\ 
@@ -146,7 +146,7 @@ specialCommand ('!':str) = shellEscape (dropWhile isSpace str)
 specialCommand str = do
   let (cmd,rest) = break isSpace str
   case [ (s,f) | (s,f) <- commands, prefixMatch cmd s ] of
-     []      -> io $ hPutStr stdout ("uknown command `:" ++ cmd ++ "'\n" 
+     []      -> io $ hPutStr stdout ("unknown command `:" ++ cmd ++ "'\n" 
 				    ++ shortHelpText)
      [(_,f)] -> f (dropWhile isSpace rest)
      cs      -> io $ hPutStrLn stdout ("prefix " ++ cmd ++ 
