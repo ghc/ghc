@@ -21,9 +21,13 @@
 
 
 #if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
-static int ocVerifyImage_ELF ( ObjectCode* oc, int verb );
-static int ocGetNames_ELF    ( ObjectCode* oc, int verb );
-static int ocResolve_ELF     ( ObjectCode* oc, int verb );
+static int ocVerifyImage_ELF    ( ObjectCode* oc, int verb );
+static int ocGetNames_ELF       ( ObjectCode* oc, int verb );
+static int ocResolve_ELF        ( ObjectCode* oc, int verb );
+#elif defined(cygwin32_TARGET_OS)
+static int ocVerifyImage_PEi386 ( ObjectCode* oc, int verb );
+static int ocGetNames_PEi386    ( ObjectCode* oc, int verb );
+static int ocResolve_PEi386     ( ObjectCode* oc, int verb );
 #endif
 
 static char* hackyAppend ( char* s1, char* s2 );
@@ -47,6 +51,8 @@ ObjectCode*  ocNew ( void  (*errMsg)(char*),
 
 #  if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
    oc->formatName = "ELF";
+#  elif defined(cygwin32_TARGET_OS)
+   oc->formatName = "PEi386";
 #  else
    free(oc);
    errMsg("ocNew: not implemented on this platform");
@@ -111,6 +117,8 @@ int ocVerifyImage ( ObjectCode* oc, int verb )
    if (verb) fprintf(stderr, "ocVerifyImage: begin\n");
 #  if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
    ret = ocVerifyImage_ELF ( oc, verb );
+#  elif defined(cygwin32_TARGET_OS)
+   ret = ocVerifyImage_PEi386 ( oc, verb );
 #  else
    oc->errMsg("ocVerifyImage: not implemented on this platform");
    return 0;
@@ -130,6 +138,8 @@ int ocGetNames ( ObjectCode* oc, int verb )
    if (verb) fprintf(stderr, "ocGetNames: begin\n");
 #  if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
    ret = ocGetNames_ELF ( oc, verb );
+#  elif defined(cygwin32_TARGET_OS)
+   ret = ocGetNames_PEi386 ( oc, verb );
 #  else
    oc->errMsg("ocGetNames: not implemented on this platform");
    return 0;
@@ -149,6 +159,8 @@ int ocResolve ( ObjectCode* oc, int verb )
    if (verb) fprintf(stderr, "ocResolve: begin\n");
 #  if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
    ret = ocResolve_ELF ( oc, verb );
+#  elif defined(cygwin32_TARGET_OS)
+   ret = ocResolve_PEi386 ( oc, verb );
 #  else
    oc->errMsg("ocResolve: not implemented on this platform");
    return 0;
@@ -383,13 +395,432 @@ static char* hackyAppend ( char* s1, char* s2 )
 }
 
 /* --------------------------------------------------------------------------
- * ELF specifics
+ * PEi386 specifics (cygwin32)
  * ------------------------------------------------------------------------*/
+
+/* The information for this linker comes from 
+      Microsoft Portable Executable 
+      and Common Object File Format Specification
+      revision 5.1 January 1998
+   which SimonM says comes from the MS Developer Network CDs.
+*/
+      
+
+#if defined(cygwin32_TARGET_OS)
 
 #define FALSE 0
 #define TRUE  1
 
+
+typedef unsigned char  UChar;
+typedef unsigned short UInt16;
+typedef unsigned int   UInt32;
+typedef          int   Int32;
+
+
+typedef 
+   struct {
+      UInt16 Machine;
+      UInt16 NumberOfSections;
+      UInt32 TimeDateStamp;
+      UInt32 PointerToSymbolTable;
+      UInt32 NumberOfSymbols;
+      UInt16 SizeOfOptionalHeader;
+      UInt16 Characteristics;
+   }
+   COFF_header;
+
+#define sizeof_COFF_header 20
+
+
+typedef 
+   struct {
+      UChar  Name[8];
+      UInt32 VirtualSize;
+      UInt32 VirtualAddress;
+      UInt32 SizeOfRawData;
+      UInt32 PointerToRawData;
+      UInt32 PointerToRelocations;
+      UInt32 PointerToLinenumbers;
+      UInt16 NumberOfRelocations;
+      UInt16 NumberOfLineNumbers;
+      UInt32 Characteristics; 
+   }
+   COFF_section;
+
+#define sizeof_COFF_section 40
+
+
+typedef
+   struct {
+      UChar  Name[8];
+      UInt32 Value;
+      UInt16 SectionNumber;
+      UInt16 Type;
+      UChar  StorageClass;
+      UChar  NumberOfAuxSymbols;
+   }
+   COFF_symbol;
+
+#define sizeof_COFF_symbol 18
+
+
+typedef
+   struct {
+      UInt32 VirtualAddress;
+      UInt32 SymbolTableIndex;
+      UInt16 Type;
+   }
+   COFF_reloc;
+
+#define sizeof_COFF_reloc 10
+
+
+/* From PE spec doc, section 3.3.2 */
+#define IMAGE_FILE_RELOCS_STRIPPED     0x0001
+#define IMAGE_FILE_EXECUTABLE_IMAGE    0x0002
+#define IMAGE_FILE_DLL                 0x2000
+#define IMAGE_FILE_SYSTEM              0x1000
+#define IMAGE_FILE_BYTES_REVERSED_HI   0x8000
+#define IMAGE_FILE_BYTES_REVERSED_LO   0x0080
+#define IMAGE_FILE_32BIT_MACHINE       0x0100
+
+/* From PE spec doc, section 5.4.2 and 5.4.4 */
+#define IMAGE_SYM_CLASS_EXTERNAL       2
+#define IMAGE_SYM_UNDEFINED            0
+
+/* From PE spec doc, section 4.1 */
+#define IMAGE_SCN_CNT_CODE             0x00000020
+#define IMAGE_SCN_CNT_INITIALIZED_DATA 0x00000040
+
+
+/* We use myindex to calculate array addresses, rather than
+   simply doing the normal subscript thing.  That's because
+   some of the above structs have sizes which are not 
+   a whole number of words.  GCC rounds their sizes up to a
+   whole number of words, which means that the address calcs
+   arising from using normal C indexing or pointer arithmetic
+   are just plain wrong.  Sigh.
+*/
+static UChar* myindex ( int scale, int index, void* base )
+{
+   return
+      ((UChar*)base) + scale * index;
+}
+
+
+static void printName ( UChar* name, UChar* strtab )
+{
+   if (name[0]==0 && name[1]==0 && name[2]==0 && name[3]==0) {
+      UInt32 strtab_offset = * (UInt32*)(name+4);
+      fprintf ( stderr, "%s", strtab + strtab_offset );
+   } else {
+      int i;
+      for (i = 0; i < 8; i++) {
+         if (name[i] == 0) break;
+         fprintf ( stderr, "%c", name[i] );
+      }
+   }
+}
+
+
+static int ocVerifyImage_PEi386 ( ObjectCode* oc, int verb )
+{
+   int i, j;
+   COFF_header*  hdr;
+   COFF_section* sectab;
+   COFF_symbol*  symtab;
+   UChar*        strtab;
+   
+   hdr = (COFF_header*)(oc->oImage);
+   sectab = (COFF_section*) (
+               ((UChar*)(oc->oImage)) 
+               + sizeof_COFF_header + hdr->SizeOfOptionalHeader
+            );
+   symtab = (COFF_symbol*) (
+               ((UChar*)(oc->oImage))
+               + hdr->PointerToSymbolTable 
+            );
+   strtab = ((UChar*)(oc->oImage))
+            + hdr->PointerToSymbolTable
+            + hdr->NumberOfSymbols * sizeof_COFF_symbol;
+
+   if (hdr->Machine != 0x14c) {
+      oc->errMsg("Not x86 PEi386");
+      return FALSE;
+   }
+   if (hdr->SizeOfOptionalHeader != 0) {
+      oc->errMsg("PEi386 with nonempty optional header");
+      return FALSE;
+   }
+   if ( (hdr->Characteristics & IMAGE_FILE_RELOCS_STRIPPED) ||
+        (hdr->Characteristics & IMAGE_FILE_EXECUTABLE_IMAGE) ||
+        (hdr->Characteristics & IMAGE_FILE_DLL) ||
+        (hdr->Characteristics & IMAGE_FILE_SYSTEM) ) {
+      oc->errMsg("Not a PEi386 object file");
+      return FALSE;
+   }
+   if ( (hdr->Characteristics & IMAGE_FILE_BYTES_REVERSED_HI) ||
+        !(hdr->Characteristics & IMAGE_FILE_BYTES_REVERSED_LO) ||
+        !(hdr->Characteristics & IMAGE_FILE_32BIT_MACHINE) ) {
+      oc->errMsg("Invalid PEi386 word size or endiannness");
+      return FALSE;
+   }
+
+   if (!verb) return TRUE;
+   /* No further verification after this point; only debug printing. */
+
+   fprintf ( stderr, 
+             "sectab offset = %d\n", ((UChar*)sectab) - ((UChar*)hdr) );
+   fprintf ( stderr, 
+             "symtab offset = %d\n", ((UChar*)symtab) - ((UChar*)hdr) );
+   fprintf ( stderr, 
+             "strtab offset = %d\n", ((UChar*)strtab) - ((UChar*)hdr) );
+
+   fprintf ( stderr, "\n" );
+   fprintf ( stderr, 
+             "Machine:           0x%x\n", (UInt32)(hdr->Machine) );
+   fprintf ( stderr, 
+             "# sections:        %d\n",   (UInt32)(hdr->NumberOfSections) );
+   fprintf ( stderr,
+             "time/date:         0x%x\n", (UInt32)(hdr->TimeDateStamp) );
+   fprintf ( stderr,
+             "symtab offset:     %d\n",   (UInt32)(hdr->PointerToSymbolTable) );
+   fprintf ( stderr, 
+             "# symbols:         %d\n",   (UInt32)(hdr->NumberOfSymbols) );
+   fprintf ( stderr, 
+             "sz of opt hdr:     %d\n",   (UInt32)(hdr->SizeOfOptionalHeader) );
+   fprintf ( stderr,
+             "characteristics:   0x%x\n", (UInt32)(hdr->Characteristics) );
+
+   fprintf ( stderr, "\n" );
+   fprintf ( stderr, "string table has size 0x%x\n", * (UInt32*)strtab );
+   fprintf ( stderr, "---START of string table---\n");
+   for (i = 4; i < *(UInt32*)strtab; i++) {
+      if (strtab[i] == 0) 
+         fprintf ( stderr, "\n"); else 
+         fprintf( stderr, "%c", strtab[i] );
+   }
+   fprintf ( stderr, "--- END  of string table---\n");
+
+   fprintf ( stderr, "\n" );
+   for (i = 0; i < hdr->NumberOfSections; i++) {
+      COFF_reloc* reltab;
+      COFF_section* sectab_i
+         = (COFF_section*)
+           myindex ( sizeof_COFF_section, i, sectab );
+      fprintf ( stderr, 
+                "\n"
+                "section %d\n"
+                "     name `",
+                i 
+              );
+      printName ( sectab_i->Name, strtab );
+      fprintf ( stderr, 
+                "'\n"
+                "    vsize %d\n"
+                "    vaddr %d\n"
+                "  data sz %d\n"
+                " data off %d\n"
+                "  num rel %d\n"
+                "  off rel %d\n",
+                sectab_i->VirtualSize,
+                sectab_i->VirtualAddress,
+                sectab_i->SizeOfRawData,
+                sectab_i->PointerToRawData,
+                sectab_i->NumberOfRelocations,
+                sectab_i->PointerToRelocations
+              );
+      reltab = (COFF_reloc*) (
+                  ((UChar*)(oc->oImage)) + sectab_i->PointerToRelocations
+               );
+      for (j = 0; j < sectab_i->NumberOfRelocations; j++) {
+         COFF_symbol* sym;
+         COFF_reloc* rel = (COFF_reloc*)
+                           myindex ( sizeof_COFF_reloc, j, reltab );
+         fprintf ( stderr, 
+                   "        type 0x%-4x   vaddr 0x%-8x   name `",
+                   (UInt32)rel->Type, 
+                   rel->VirtualAddress );
+         sym = (COFF_symbol*)
+               myindex ( sizeof_COFF_symbol, rel->SymbolTableIndex, symtab );
+         printName ( sym->Name, strtab );
+         fprintf ( stderr, "'\n" );
+      }
+      fprintf ( stderr, "\n" );
+   }
+
+
+   fprintf ( stderr, "\n" );
+   i = 0;
+   while (1) {
+      COFF_symbol* symtab_i;
+      if (i >= hdr->NumberOfSymbols) break;
+      symtab_i = (COFF_symbol*)
+                 myindex ( sizeof_COFF_symbol, i, symtab );
+      fprintf ( stderr, 
+                "symbol %d\n"
+                "     name `",
+                i 
+              );
+      printName ( symtab_i->Name, strtab );
+      fprintf ( stderr, 
+                "'\n"
+                "    value 0x%x\n"
+                "     sec# %d\n"
+                "     type 0x%x\n"
+                "   sclass 0x%x\n"
+                "     nAux %d\n",
+                symtab_i->Value,
+                (Int32)(symtab_i->SectionNumber) - 1,
+                (UInt32)symtab_i->Type,
+                (UInt32)symtab_i->StorageClass,
+                (UInt32)symtab_i->NumberOfAuxSymbols 
+              );
+      i += symtab_i->NumberOfAuxSymbols;
+      i++;
+   }
+
+   fprintf ( stderr, "\n" );
+
+   return TRUE;
+}
+
+
+static UChar* cstring_from_COFF_symbol_name ( UChar* name, 
+                                              UChar* strtab )
+{
+   UChar* newstr;
+   /* If the string is longer than 8 bytes, look in the
+      string table for it -- this will be correctly zero terminated. 
+   */
+   if (name[0]==0 && name[1]==0 && name[2]==0 && name[3]==0) {
+      UInt32 strtab_offset = * (UInt32*)(name+4);
+      return ((UChar*)strtab) + strtab_offset;
+   }
+   /* Otherwise, if shorter than 8 bytes, return the original,
+      which by defn is correctly terminated.
+   */
+   if (name[7]==0) return name;
+   /* The annoying case: 8 bytes.  Copy into a temporary
+      (which is never freed ...)
+   */
+   newstr = malloc(9);
+   if (newstr) {
+      strncpy(newstr,name,8);
+      newstr[8] = 0;
+   }
+   return newstr;
+}
+
+
+static int ocGetNames_PEi386 ( ObjectCode* oc, int verb )
+{
+   COFF_header*  hdr;
+   COFF_section* sectab;
+   COFF_symbol*  symtab;
+   UChar*        strtab;
+
+   UChar* sname;
+   void*  addr;
+   int    i;
+   
+   hdr = (COFF_header*)(oc->oImage);
+   sectab = (COFF_section*) (
+               ((UChar*)(oc->oImage)) 
+               + sizeof_COFF_header + hdr->SizeOfOptionalHeader
+            );
+   symtab = (COFF_symbol*) (
+               ((UChar*)(oc->oImage))
+               + hdr->PointerToSymbolTable 
+            );
+   strtab = ((UChar*)(oc->oImage))
+            + hdr->PointerToSymbolTable
+            + hdr->NumberOfSymbols * sizeof_COFF_symbol;
+
+   /* Copy exported symbols into the ObjectCode. */
+   i = 0;
+   while (1) {
+      COFF_symbol* symtab_i;
+      if (i >= hdr->NumberOfSymbols) break;
+      symtab_i = (COFF_symbol*)
+                 myindex ( sizeof_COFF_symbol, i, symtab );
+
+      if (symtab_i->StorageClass == IMAGE_SYM_CLASS_EXTERNAL &&
+          symtab_i->SectionNumber != IMAGE_SYM_UNDEFINED) {
+
+         /* This symbol is global and defined, viz, exported */
+         COFF_section* sectabent;
+
+         sname = cstring_from_COFF_symbol_name ( 
+                    symtab_i->Name, strtab 
+                 );
+         if (!sname) {
+            oc->errMsg("Out of memory when copying PEi386 symbol");
+            return FALSE;
+         }
+
+         /* for IMAGE_SYMCLASS_EXTERNAL 
+                && !IMAGE_SYM_UNDEFINED,
+            the address of the symbol is: 
+                address of relevant section + offset in section
+         */
+         sectabent = (COFF_section*)
+                     myindex ( sizeof_COFF_section, 
+                               symtab_i->SectionNumber-1,
+                               sectab );
+         addr = ((UChar*)(oc->oImage))
+                + sectabent->PointerToRawData
+                + symtab_i->Value;
+
+         if (!addSymbol(oc,sname,addr)) return FALSE;
+      }
+      i += symtab_i->NumberOfAuxSymbols;
+      i++;
+   }
+
+   /* Copy section information into the ObjectCode. */
+   for (i = 0; i < hdr->NumberOfSections; i++) {
+      UChar* start;
+      UChar* end;
+
+      OSectionKind kind 
+         = HUGS_SECTIONKIND_OTHER;
+      COFF_section* sectab_i
+         = (COFF_section*)
+           myindex ( sizeof_COFF_section, i, sectab );
+
+      if (sectab_i->Characteristics & IMAGE_SCN_CNT_CODE || 
+          sectab_i->Characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA)
+         kind = HUGS_SECTIONKIND_CODE_OR_RODATA;
+
+      start = ((UChar*)(oc->oImage)) 
+              + sectab_i->PointerToRawData;
+      end   = start 
+              + sectab_i->SizeOfRawData - 1;
+      addSection ( oc, start, end, kind );
+   }
+
+   return TRUE;   
+}
+
+
+static int ocResolve_PEi386 ( ObjectCode* oc, int verb )
+{
+   
+}
+
+#endif /* defined(cygwin32_TARGET_OS) */
+
+
+/* --------------------------------------------------------------------------
+ * ELF specifics (Linux, Solaris)
+ * ------------------------------------------------------------------------*/
+
 #if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
+
+#define FALSE 0
+#define TRUE  1
 
 #include <elf.h>
 
@@ -582,7 +1013,7 @@ static int ocGetNames_ELF ( ObjectCode* oc, int verb )
    char*       sh_strtab  = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
 
    if (!strtab) {
-      oc->errMsg("no strtab!");
+      oc->errMsg("ELF: no strtab!");
       return FALSE;
    }
 
@@ -631,9 +1062,9 @@ static int ocGetNames_ELF ( ObjectCode* oc, int verb )
                        ad, oc->objFileName, nm );
             if (!addSymbol ( oc, nm, ad )) return FALSE;
          }
-#if 0
-	 else fprintf(stderr, "skipping `%s'\n", strtab + stab[j].st_name );
-#endif
+	 else 
+         if (verb)
+            fprintf(stderr, "skipping `%s'\n", strtab + stab[j].st_name );
       }
    }
 
