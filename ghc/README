@@ -1,9 +1,9 @@
-This is version 2.02 of the Glorious Glasgow Haskell compilation
-system (GHC).  GHC 2.02 is a compiler for Haskell 1.4.
+This is version 2.06 of the Glorious Glasgow Haskell compilation
+system (GHC).  GHC 2.06 is a compiler for Haskell 1.4.
 
-2.02 is a full GHC release; however, as the first release of the 1.4
-compiler, it is "beta" quality; it is reliable, but it may very well
-have some bugs. The top-level file "ANNOUNCE-2.02" says more.
+2.06 is an interim source-only release, which fixes most of the bugs
+reported since 2.05.  We've done rudimentary testing on a few
+platforms, but there might be a few bugs lurking.
 
 Haskell is "the" standard lazy functional programming language.
 Haskell 1.4 is the current version of the language, released in
