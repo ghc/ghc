@@ -358,15 +358,6 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
   // We might have a capability, passed in as initialCapability.
   cap = initialCapability;
 
-  // Check whether we have re-entered the RTS from Haskell without
-  // going via suspendThread()/resumeThread (i.e. a 'safe' foreign
-  // call).
-  if (in_haskell) {
-      errorBelch("schedule: re-entered unsafely.\n"
-		 "   Perhaps a 'foreign import unsafe' should be 'safe'?");
-      stg_exit(1);
-  }
-
 #if defined(RTS_SUPPORTS_THREADS)
   //
   // in the threaded case, the capability is either passed in via the
@@ -434,6 +425,15 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 
       // We now have a capability...
 #endif
+
+    // Check whether we have re-entered the RTS from Haskell without
+    // going via suspendThread()/resumeThread (i.e. a 'safe' foreign
+    // call).
+    if (in_haskell) {
+    	  errorBelch("schedule: re-entered unsafely.\n"
+    		     "   Perhaps a 'foreign import unsafe' should be 'safe'?");
+    	  stg_exit(1);
+    }
 
     //
     // If we're interrupted (the user pressed ^C, or some other
