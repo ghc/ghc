@@ -27,13 +27,15 @@
 #define GBM_ERR (-3)
 
 StgInt
-getBufferMode(fp)
-StgForeignObj fp;
+getBufferMode(ptr)
+StgForeignObj ptr;
 {
+    IOFileObject* fo = (IOFileObject*)ptr;
     struct stat sb;
+    int fd = fo->fd;
 
     /* Try to find out the file type */
-    while (fstat(fileno((FILE *) fp), &sb) < 0) {
+    while (fstat(fd, &sb) < 0) {
 	/* highly unlikely */
 	if (errno != EINTR) {
 	    cvtErrno();
@@ -42,11 +44,14 @@ StgForeignObj fp;
 	}
     }
     /* Terminals are line-buffered by default */
-    if (S_ISCHR(sb.st_mode) && isatty(fileno((FILE *) fp)) == 1)
+    if (S_ISCHR(sb.st_mode) && isatty(fd) == 1) {
+        fo ->flags |= FILEOBJ_LB;
 	return GBM_LB;
     /* Default size block buffering for the others */
-    else
+    } else {
+        fo ->flags |= FILEOBJ_BB;
 	return GBM_BB;
+    }
 }
 
 \end{code}

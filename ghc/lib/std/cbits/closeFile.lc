@@ -8,14 +8,29 @@
 #include "rtsdefs.h"
 #include "stgio.h"
 
+StgInt __really_close_stdfiles=1;
+
 StgInt
-closeFile(fp)
-StgForeignObj fp;
+closeFile(ptr,flush_buf)
+StgForeignObj ptr;
+StgInt flush_buf;
 {
-    int rc;
+    IOFileObject* fo = (IOFileObject*)ptr;
+    int rc = 0;
     int unlocked=1;
 
-    if ( unlockFile(fileno((FILE *) fp)) ) {
+    /* Already closed, shouldn't occur. */
+    if ( fo == NULL ) {
+       return 0;
+    }
+
+    if ( flush_buf != 0 && (fo->flags & FILEOBJ_FLUSH) ) {
+       writeFileObject(ptr,fo->bufWPtr);
+    }
+
+    /* If the flush failed, we ignore this and soldier on.. */
+
+    if ( unlockFile(fo->fd) ) {
       /* If the file has already been unlocked (or an entry
          for it in the locking tables couldn't be found), could
          mean two things:
@@ -30,25 +45,36 @@ StgForeignObj fp;
 	      (file descriptors to non regular files.)
 
 	 We proceed with attempting to close the file,
-	 but don't flag the error should fclose() return
+	 but don't flag the error should close() return
 	 EBADF
       */
 	unlocked=0;
 	
     }
 
-    while ((rc = fclose((FILE *) fp)) != 0) {
-        /* See above comment */
-	if ( errno != EINTR && (!unlocked && errno != EBADF ) ) {
+    /* Closing file descriptors that refer to standard channels
+       is problematic, so we back off from doing this by default,
+       just closing them at the Handle level. If you insist on
+       closing them, setting the (global) variable 
+       __really_close_stdfiles to 0 turns off this behaviour.
+    */
+    if ( (fo->flags & FILEOBJ_STD) && __really_close_stdfiles ) {
+	;
+
+    } else  {
+      /* Regardless of success or otherwise, the fd field gets smashed. */
+      while ( (rc = close(fo->fd)) != 0 ) {
+         /* See above unlockFile() comment */
+	 if ( errno != EINTR && (!unlocked && errno != EBADF ) ) {
 	    cvtErrno();
 	    stdErrno();
+	    fo->fd = -1;
 	    return rc;
 	}
+      }
     }
+    fo->fd = -1;
     return 0;
 }
 
 \end{code}
-
-
-

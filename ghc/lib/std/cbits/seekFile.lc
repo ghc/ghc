@@ -16,15 +16,26 @@
 #include <sys/stat.h>
 #endif
 
+/* Invoked by IO.hSeek only */
 StgInt
-seekFile(fp, whence, size, d)
-StgForeignObj fp;
+seekFile(ptr, whence, size, d)
+StgForeignObj ptr;
 StgInt whence;
 StgInt size;
 StgByteArray d;
 {
+    IOFileObject* fo = (IOFileObject*)ptr;
     struct stat sb;
-    long int offset;
+    off_t offset;
+    int posn_delta =0;
+    int rc = 0;
+
+    switch (whence) {
+     case 0: whence=SEEK_SET; break;
+     case 1: whence=SEEK_CUR; break;
+     case 2: whence=SEEK_END; break;
+     default: whence=SEEK_SET; break; /* Should never happen, really */
+    }
 
     /*
      * We need to snatch the offset out of an MP_INT.  The bits are there sans sign,
@@ -48,8 +59,35 @@ StgByteArray d;
 	return -1;
     }
 
+    /* If we're doing a relative seek, see if we cannot deal 
+     * with the request without flushing the buffer..
+     *
+     * Note: the wording in the report is vague here, but 
+     * we only avoid flushing on *input* buffers and *not* output ones.
+     */
+    if ( whence == SEEK_CUR &&
+	 (FILEOBJ_READABLE(fo) && !FILEOBJ_WRITEABLE(fo) &&
+	  (fo->bufRPtr + (int)offset) < fo->bufWPtr &&
+	  (fo->bufRPtr + (int)offset) >= 0) ) { /* The input buffer case */
+       fo->bufRPtr += (int)offset;
+       return 0;
+    } else if ( whence == SEEK_CUR && (FILEOBJ_READABLE(fo) && !FILEOBJ_WRITEABLE(fo)) ) {
+         /* We're seeking outside the input buffer,
+	    record delta so that we can adjust the file position
+	    reported from the underlying fd to get
+	    at the real position we're at when we take into account
+	    buffering.
+	 */
+	posn_delta = fo->bufWPtr - fo->bufRPtr;  /* number of chars left in the buffer */
+        if (posn_delta < 0) posn_delta=0;
+    }
+
+    /* If we cannot seek within our current buffer, flush it. */
+    rc = flushBuffer(ptr);
+    if (rc < 0) return rc;
+
     /* Try to find out the file type & size for a physical file */
-    while (fstat(fileno((FILE *) fp), &sb) < 0) {
+    while (fstat(fo->fd, &sb) < 0) {
 	/* highly unlikely */
 	if (errno != EINTR) {
 	    cvtErrno();
@@ -59,14 +97,14 @@ StgByteArray d;
     }
     if (S_ISREG(sb.st_mode)) {
 	/* Verify that we are not seeking beyond end-of-file */
-	int posn;
+	off_t posn;
 
 	switch (whence) {
 	case SEEK_SET:
 	    posn = offset;
 	    break;
 	case SEEK_CUR:
-	    while ((posn = ftell((FILE *) fp)) == -1) {
+	    while ((posn = lseek(fo->fd, 0, SEEK_CUR)) == -1) {
 		/* the possibility seems awfully remote */
 		if (errno != EINTR) {
 		    cvtErrno();
@@ -74,10 +112,12 @@ StgByteArray d;
 		    return -1;
 		}
 	    }
+	    posn -= posn_delta;
 	    posn += offset;
+	    offset -= posn_delta; /* adjust the offset to include the buffer delta */
 	    break;
 	case SEEK_END:
-	    posn = sb.st_size + offset;
+	    posn = (off_t)sb.st_size + offset;
 	    break;
 	}
 	if (posn > sb.st_size) {
@@ -94,24 +134,27 @@ StgByteArray d;
         ghc_errstr = "can't seek on a device";
         return -1;
     }
-    while (fseek((FILE *) fp, offset, whence) != 0) {
+    while ( lseek(fo->fd, offset, whence) == -1) {
 	if (errno != EINTR) {
 	    cvtErrno();
 	    stdErrno();
 	    return -1;
 	}
     }
+    /* Clear EOF */
+    FILEOBJ_CLEAR_EOF(fo);
     return 0;
 }
 
 StgInt
-seekFileP(fp)
-StgForeignObj fp;
+seekFileP(ptr)
+StgForeignObj ptr;
 {
+    IOFileObject* fo = (IOFileObject*)ptr;
     struct stat sb;
 
     /* Try to find out the file type */
-    while (fstat(fileno((FILE *) fp), &sb) < 0) {
+    while (fstat(fo->fd, &sb) < 0) {
 	/* highly unlikely */
 	if (errno != EINTR) {
 	    cvtErrno();
@@ -130,6 +173,3 @@ StgForeignObj fp;
 }
 
 \end{code}
-
-
-

@@ -25,20 +25,16 @@
 #endif
 
 StgInt
-setTerminalEcho(fp, on)
-StgForeignObj fp;
+setTerminalEcho(ptr, on)
+StgForeignObj ptr;
 StgInt on;
 {
+   IOFileObject* fo = (IOFileObject*)ptr;
    struct termios tios;
    int fd, rc;
 
-   while ( (fd = fileno((FILE*)fp)) < 0) {
-	if (errno != EINTR) {
-	    cvtErrno();
-	    stdErrno();
-	    return -1;
-	}
-   }
+   fd = fo->fd;
+
    while ( (rc = tcgetattr(fd,&tios)) == -1) {
 	if (errno != EINTR) {
 	    cvtErrno();
@@ -64,19 +60,15 @@ StgInt on;
 }
 
 StgInt
-getTerminalEcho(fp)
-StgForeignObj fp;
+getTerminalEcho(ptr)
+StgForeignObj ptr;
 {
+   IOFileObject* fo = (IOFileObject*)ptr;
    struct termios tios;
    int fd, rc;
 
-   while ( (fd = fileno((FILE*)fp)) < 0) {
-	if (errno != EINTR) {
-	    cvtErrno();
-	    stdErrno();
-	    return -1;
-	}
-   }
+   fd = fo->fd;
+
    while ( (rc = tcgetattr(fd,&tios)) == -1) {
 	if (errno != EINTR) {
 	    cvtErrno();
@@ -88,19 +80,15 @@ StgForeignObj fp;
 }
 
 StgInt
-isTerminalDevice(fp)
-StgForeignObj fp;
+isTerminalDevice(ptr)
+StgForeignObj ptr;
 {
+   IOFileObject* fo = (IOFileObject*)ptr;
    struct termios tios;
    int fd, rc;
 
-   while ( (fd = fileno((FILE*)fp)) < 0) {
-	if (errno != EINTR) {
-	    cvtErrno();
-	    stdErrno();
-	    return -1;
-	}
-   }
+   fd = fo -> fd;
+
    while ( (rc = tcgetattr(fd,&tios)) == -1) {
         if (errno == ENOTTY) return 0;
 	if (errno != EINTR) {

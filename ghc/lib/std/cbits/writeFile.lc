@@ -9,19 +9,45 @@
 #include "stgio.h"
 
 StgInt
-writeFile(buf, fp, bytes)
-StgAddr buf;
-StgForeignObj fp;
+writeFileObject(ptr, bytes)
+StgForeignObj ptr;
 StgInt bytes;
 {
-    int count;
-    char *p = (char *) buf;
+    int rc=0;
+    IOFileObject* fo = (IOFileObject*)ptr;
 
-    if (bytes == 0)
-	return 0;
+    char *p = (char *) fo->buf;
+
+    /* If we've got a r/w file object in our hand, flush the
+       (input) buffer contents first.
+    */
+    if ( FILEOBJ_READABLE(fo) && FILEOBJ_JUST_READ(fo) ) {
+       fo->flags = (fo->flags & ~FILEOBJ_RW_READ) | FILEOBJ_RW_WRITE;
+       rc = flushReadBuffer(ptr);
+       if (rc < 0) return rc;
+    }
+
+    return (writeBuffer(ptr, bytes));
+}
+
+StgInt
+writeBuffer(ptr, bytes)
+StgForeignObj ptr;
+StgInt bytes;
+{
+    int count, rc=0;
+    IOFileObject* fo = (IOFileObject*)ptr;
+
+    char *p = (char *) fo->buf;
 
     /* Disallow short writes */
-    while ((count = fwrite(p, 1, bytes, (FILE *) fp)) < bytes) {
+    if (bytes == 0  || fo->buf == NULL)
+	return 0;
+
+    if ( fo->flags & FILEOBJ_NONBLOCKING_IO && inputReady(ptr,0) != 1 )
+       return FILEOBJ_BLOCKED_WRITE;
+
+    while ((count = write(fo->fd, fo->buf, bytes)) < bytes) {
 	if (errno != EINTR) {
 	    cvtErrno();
 	    stdErrno();
@@ -29,28 +55,60 @@ StgInt bytes;
 	}
 	bytes -= count;
 	p += count;
-	clearerr((FILE *) fp);
     }
-
+    /* Signal that we've emptied the buffer */
+    fo->bufWPtr=0;
     return 0;
 }
 
 
 StgInt
-writeBuf(fp, elt_sz, len, buf)
-StgForeignObj fp;
-StgWord elt_sz;
-StgInt  len;
+writeBuf(ptr, buf, len)
+StgForeignObj ptr;
 StgAddr buf;
+StgInt  len;
 {
+    IOFileObject* fo = (IOFileObject*)ptr;
     int count;
+    int rc = 0;
     char *p = (char *) buf;
 
-    if (len == 0 || elt_sz == 0)
+    if (len == 0 )
 	return 0;
 
+    /* First of all, check if we do need to flush the buffer .. */
+    /* Note - in the case of line buffering, we do not currently check
+       whether we need to flush buffer due to line terminators in the
+       buffer we're outputting */
+    if ( fo->buf != NULL  		     &&   /* buffered and */
+         (fo->bufWPtr + len < (fo->bufSize))      /* there's room */
+       ) {
+       /* Block copying is likely to be cheaper than, flush, followed by write */
+       memcpy(((char*)fo->buf + fo->bufWPtr), buf, len);
+       fo->bufWPtr += len;
+       return 0;
+    }
+    /* If we do overflow, flush current contents of the buffer and
+       directly output the chunk.
+       (no attempt at splitting up the chunk is currently made)
+    */       
+    if ( fo->buf != NULL  		     &&    /* buffered and */
+         (fo->bufWPtr + len >= (fo->bufSize))       /* there's not room */
+       ) {
+       /* Flush buffer */
+       rc = writeFileObject(ptr, fo->bufWPtr);
+       /* ToDo: undo buffer fill if we're blocking.. */
+    }
+
+    if (rc != 0) { 
+       return rc;
+    }
+
+    if ( fo->flags & FILEOBJ_NONBLOCKING_IO && inputReady(ptr,0) != 1 )
+       return FILEOBJ_BLOCKED_WRITE;
+
     /* Disallow short writes */
-    while ((count = fwrite((char *)buf, (unsigned)elt_sz, (int)len, (FILE *) fp)) < len) {
+    while ((count = write(fo->fd, (char *)buf, (int)len)) < len) {
 	if (errno != EINTR) {
 	    cvtErrno();
 	    stdErrno();
@@ -58,10 +116,17 @@ StgAddr buf;
 	}
 	len -= count;
 	p += count;
-	clearerr((FILE *) fp);
     }
 
     return 0;
 }
+
+StgInt
+writeBufBA(ptr, buf, len)
+StgForeignObj ptr;
+StgByteArray buf;
+StgInt  len;
+{ return (writeBuf(ptr,(StgAddr)buf, len)); }
+
 
 \end{code}

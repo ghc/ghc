@@ -17,13 +17,19 @@
 #endif
   
 StgInt
-fileSize(fp, result)
-StgForeignObj fp;
+fileSize(ptr, result)
+StgForeignObj ptr;
 StgByteArray result;
 {
+    IOFileObject* fo = (IOFileObject*)ptr;
     struct stat sb;
+    int rc = 0;
 
-    while (fstat(fileno((FILE *) fp), &sb) < 0) {
+    /* Flush buffer in order to get as an accurate size as poss. */
+    rc = flushFile(ptr);
+    if (rc < 0) return rc;
+
+   while (fstat(fo->fd, &sb) < 0) {
 	/* highly unlikely */
 	if (errno != EINTR) {
 	    cvtErrno();

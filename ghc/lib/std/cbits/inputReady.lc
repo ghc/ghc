@@ -35,41 +35,40 @@
 #include <sys/time.h>
 #endif
 
+/*
+ * inputReady(ptr, msecs) checks to see whether input is available
+ * on the file object 'ptr', timing out after (approx.) 'msec' milliseconds.
+ * Input meaning 'can I safely read at least a *character* from this file
+ * object without blocking?'
+ * 
+ * If the file object has a non-empty buffer, the test is trivial. If not,
+ * we select() on the (readable) file descriptor.
+ *
+ * Notice that for file descriptors connected to ttys in non-canonical mode
+ * (i.e., it's buffered), inputReady will not return true until a *complete
+ * line* can be read.
+ */
+
 StgInt
-inputReady(fp, msecs)
-StgForeignObj fp;
+inputReady(ptr, msecs)
+StgForeignObj ptr;
 StgInt msecs;
 {
-    int flags, c, fd, maxfd, ready;
+    IOFileObject* fo = (IOFileObject*)ptr;
+    int c, fd, maxfd, ready;
     fd_set rfd;
     struct timeval tv;
 
-    if (feof((FILE *) fp))
+    if ( FILEOBJ_IS_EOF(fo) )
 	return 0;
 
-    fd = fileno((FILE *)fp);
-
-    /* Get the original file status flags */
-    while ((flags = fcntl(fd, F_GETFL)) < 0) {
-	/* highly unlikely */
-	if (errno != EINTR) {
-	    cvtErrno();
-	    stdErrno();
-	    return -1;
-	}
+    if ( !FILEOBJ_BUFFER_EMPTY(fo) ) {
+	   /* Don't look any further, there's stuff in the buffer */
+	   return 1;
     }
 
-    /* If it's not already non-blocking, make it so */
-    if (!(flags & O_NONBLOCK)) {
-	while (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
-	    /* still highly unlikely */
-	    if (errno != EINTR) {
-		cvtErrno();
-		stdErrno();
-		return -1;
-	    }
-	}
-    }
+    fd = fo->fd;
+
     /* Now try to get a character */
     FD_ZERO(&rfd);
     FD_SET(fd, &rfd);
@@ -85,42 +84,10 @@ StgInt msecs;
       		break;
       }
    }
-   /*
-    while ((c = getc((FILE *) fp)) == EOF && errno == EINTR)
-	clearerr((FILE *) fp);
-   */
 
-    /* If we made it non-blocking for this, switch it back */
-    if (!(flags & O_NONBLOCK)) {
-	while (fcntl(fd, F_SETFL, flags) < 0) {
-	    /* still highly unlikely */
-	    if (errno != EINTR) {
-		cvtErrno();
-		stdErrno();
-		return -1;
-	    }
-	}
-    }
     /* 1 => Input ready, 0 => time expired  (-1 error) */
     return (ready);
 
-    /*
-    if (c == EOF) {
-	if (errno == EAGAIN || feof((FILE *) fp)) {
-	    clearerr((FILE *) fp);
-	    return 0;
-	} else {
-	    cvtErrno();
-	    stdErrno();
-	    return -1;
-	}
-    } else if (ungetc(c, (FILE *) fp) == EOF) {
-	cvtErrno();
-	stdErrno();
-	return -1;
-    } else
-	return 1;
-    */
 }
 
 \end{code}

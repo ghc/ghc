@@ -9,10 +9,15 @@
 #include "stgio.h"
 
 StgInt
-fileEOF(fp)
-StgForeignObj fp;
+fileEOF(ptr)
+StgForeignObj ptr;
 {
-    if (fileLookAhead(fp) != EOF)
+    IOFileObject* fo = (IOFileObject*)ptr;
+
+    if ( FILEOBJ_IS_EOF(fo) )
+       return 1;
+
+    if (fileLookAhead(ptr) != EOF)
 	return 0;
     else if (ghc_errtype == ERR_EOF)
 	return 1;

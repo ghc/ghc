@@ -111,11 +111,11 @@ int fd;
 }
 
 StgInt
-getLock(fp, exclusive)
-StgForeignObj fp;
+getLock(fd, exclusive)
+StgInt fd;
 StgInt exclusive;
 {
-    if (lockFile(fileno((FILE *) fp), exclusive) < 0) {
+    if (lockFile(fd, exclusive) < 0) {
 	if (errno == EBADF)
 	    return 0;
 	else {
@@ -130,7 +130,9 @@ StgInt exclusive;
 		ghc_errstr = "file is locked";
 		break;
 	    }
-	    (void) fclose((FILE *) fp);
+	    /* Not so sure we want to do this, since getLock() 
+	    is only called on the standard file descriptors.. */
+	    /*(void) close(fd); */
 	    return -1;
 	}
     }

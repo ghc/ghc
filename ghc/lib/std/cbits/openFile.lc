@@ -7,6 +7,7 @@
 
 #include "rtsdefs.h"
 #include "stgio.h"
+#include "fileObject.h"
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -24,10 +25,36 @@
 #include <fcntl.h>
 #endif
 
-StgAddr
-openFile(file, how)
+IOFileObject*
+openStdFile(fd,flags,rd)
+StgInt fd;
+StgInt flags;
+StgInt rd;
+{
+    IOFileObject* fo;
+
+    if ((fo = malloc(sizeof(IOFileObject))) == NULL)
+       return NULL;
+    fo->fd       = fd;
+    fo->buf      = NULL;
+    fo->bufWPtr  = 0;
+    fo->bufRPtr  = 0;
+    fo->flags   = flags | FILEOBJ_STD | ( rd ? FILEOBJ_READ : FILEOBJ_WRITE);
+    fo->connectedTo = NULL;
+    return fo;
+}
+
+#define OPENFILE_APPEND 0
+#define OPENFILE_WRITE 1
+#define OPENFILE_READ_ONLY 2
+#define OPENFILE_READ_WRITE 3
+
+IOFileObject*
+openFile(file, how, binary, flags)
 StgByteArray file;
-StgByteArray how;
+StgInt how;
+StgInt binary;
+StgInt flags;
 {
     FILE *fp;
     int fd;
@@ -35,51 +62,44 @@ StgByteArray how;
     int exclusive;
     int created = 0;
     struct stat sb;
+    IOFileObject* fo;
 
     /*
      * Since we aren't supposed to succeed when we're opening for writing and
-     * there's another writer, we can't just do an fopen() for "w" mode.
+     * there's another writer, we can't just do an open() with O_WRONLY.
      */
 
-    switch (how[0]) {
-    case 'a':
-	oflags = O_WRONLY | O_NOCTTY | O_APPEND;
+    switch (how) {
+      case OPENFILE_APPEND:
+        oflags = O_WRONLY | O_NOCTTY | O_APPEND; 
 	exclusive = 1;
 	break;
-    case 'w':
+      case OPENFILE_WRITE:
 	oflags = O_WRONLY | O_NOCTTY;
 	exclusive = 1;
 	break;
-    case 'r':
-#if defined(cygwin32_TARGET_OS)
-	/* With cygwin32-b19, fdopen() returns EBADF under some
-	   hard-to-reproduce situations (causing hsc's renamer
-	   to break on some ~10 modules when recompiling it.)
-	   As a temporary workaround, we open files that was requested
-	   opened as read-only instead as read-write, since fdopen()
-	   only appears to fail on RO file descriptors.
-
-	   This won't have any impact on the correctness of the Haskell IO
-	   implementation since the Handle in Haskell land will record the
-	   file as being read-only, so illegal writes will be caught.
-	   
-	   ToDo: isolate and report.
-	*/
-	oflags = how[1] == '+' ? O_RDWR | O_NOCTTY : O_RDWR | O_NOCTTY;
-#else
-	oflags = how[1] == '+' ? O_RDWR | O_NOCTTY : O_RDONLY | O_NOCTTY;
-#endif
+    case OPENFILE_READ_ONLY:
+        oflags = O_RDONLY | O_NOCTTY;
+	exclusive = 0;
+	break;
+    case OPENFILE_READ_WRITE:
+	oflags = O_RDWR | O_NOCTTY;
 	exclusive = 0;
 	break;
     default:
-	fprintf(stderr, "openFile: unknown mode `%s'\n", how);
+	fprintf(stderr, "openFile: unknown mode `%d'\n", how);
 	EXIT(EXIT_FAILURE);
     }
+
+#if HAVE_O_BINARY
+    if (binary) 
+      oflags |= O_BINARY;
+#endif
 
     /* First try to open without creating */
     while ((fd = open(file, oflags, 0666)) < 0) {
 	if (errno == ENOENT) {
-	    if (how[0] == 'r' && how[1] == '\0') {
+	    if ( how == OPENFILE_READ_ONLY ) {
 		/* For ReadMode, just bail out now */
 		ghc_errtype = ERR_NOSUCHTHING;
 		ghc_errstr = "file does not exist";
@@ -185,11 +205,11 @@ StgByteArray how;
      * ftruncate() is non-POSIX, so we truncate with a second open, which may fail.
      */
 
-    if (how[0] == 'w') {
-	int fd2;
+    if ( how == OPENFILE_WRITE ) {
+	int fd2, oflags2;
 
-	oflags |= O_TRUNC;
-	while ((fd2 = open(file, oflags, 0666)) < 0) {
+	oflags2 = oflags | O_TRUNC;
+	while ((fd2 = open(file, oflags2, 0666)) < 0) {
 	    if (errno != EINTR) {
 		cvtErrno();
 		if (created)
@@ -217,75 +237,36 @@ StgByteArray how;
 	}
 	close(fd2);
     }
-    errno = 0;			/* Just in case fdopen() is lame */
-    while ((fp = fdopen(fd, how)) == NULL) {
-	if (errno != EINTR) {
-#if defined(cygwin32_TARGET_OS) && defined(DEBUG)
-	    fprintf(stderr, "openFile %s : %s : %d : %d\n", file, how, errno, fd);
-#endif
-	    cvtErrno();
-	    if (created)
-		(void) unlink(file);
-	    (void) close(fd);
-	    return NULL;
-	}
-    }
 
-    return (StgAddr) fp;
+    /* Allocate a IOFileObject to hold the information
+       we need to record per-handle for the various C stubs.
+       This chunk of memory is wrapped up inside a foreign object,
+       so it will be finalised and freed properly when we're
+       through with the handle.
+    */
+    if ((fo = malloc(sizeof(IOFileObject))) == NULL)
+       return NULL;
+
+    fo->fd       = fd;
+    fo->buf      = NULL;
+    fo->bufWPtr  = 0;
+    fo->bufRPtr  = 0;
+    fo->flags   = flags | ( (how == OPENFILE_READ_ONLY || how == OPENFILE_READ_WRITE) ? FILEOBJ_READ  : 0)
+			| ( (how == OPENFILE_APPEND    || how == OPENFILE_READ_WRITE) ? FILEOBJ_WRITE : 0);
+    fo->connectedTo = NULL;
+    return fo;
 }
 
-/*
- fdopen() plus implement locking.
-*/
-StgAddr
-openFd(fd,how)
+/* `Lock' file descriptor and return file object. */
+IOFileObject*
+openFd(fd,oflags,flags)
 StgInt fd;
-StgByteArray how;
+StgInt oflags;
+StgInt flags;
 {
     int exclusive;
-    int oflags;
     FILE* fp;
-
-    /*
-     * Since we aren't supposed to succeed when we're opening for writing and
-     * there's another writer, we can't just do an fopen() for "w" mode.
-     */
-
-    switch (how[0]) {
-    case 'a':
-	oflags = O_WRONLY | O_NOCTTY | O_APPEND;
-	exclusive = 1;
-	break;
-    case 'w':
-	oflags = O_WRONLY | O_NOCTTY;
-	exclusive = 1;
-	break;
-    case 'r':
-#if defined(cygwin32_TARGET_OS)
-	/* With cygwin32-b19, fdopen() returns EBADF under some
-	   hard-to-reproduce situations (causing hsc's renamer
-	   to break on some ~10 modules when recompiling it.)
-	   As a temporary workaround, we open files that was requested
-	   opened as read-only instead as read-write, since fdopen()
-	   only appears to fail on RO file descriptors.
-
-	   This won't have any impact on the correctness of the Haskell IO
-	   implementation since the Handle in Haskell land will record the
-	   file as being read-only, so illegal writes will be caught.
-	   
-	   ToDo: isolate and report.
-	*/
-	oflags = how[1] == '+' ? O_RDWR | O_NOCTTY : O_RDWR | O_NOCTTY;
-#else
-	oflags = how[1] == '+' ? O_RDWR | O_NOCTTY : O_RDONLY | O_NOCTTY;
-#endif
-	exclusive = 0;
-	break;
-    default:
-	fprintf(stderr, "openFd: unknown mode `%s'\n", how);
-	EXIT(EXIT_FAILURE);
-    }
-
+    IOFileObject* fo;
 
     if (lockFile(fd, exclusive) < 0) {
 	cvtErrno();
@@ -299,21 +280,23 @@ StgByteArray how;
 	    ghc_errstr = "file is locked";
 	    break;
 	}
-	(void) close(fd);
 	return NULL;
     }
 
-    errno = 0;			/* Just in case fdopen() is lame */
-    while ((fp = fdopen(fd, how)) == NULL) {
-	if (errno != EINTR) {
-#if defined(cygwin32_TARGET_OS) && defined(DEBUG)
-	    fprintf(stderr, "openFd %s : %s : %d : %d\n", file, how, errno, fd);
-#endif
-	    cvtErrno();
-	    (void) close(fd);
-	    return NULL;
-	}
-    }
-    return (StgAddr) fp;
+    /* See openFileObject() comment */
+    if ((fo = malloc(sizeof(IOFileObject))) == NULL)
+       return NULL;
+    fo->fd      = fd;
+    fo->buf     = NULL;
+    fo->bufWPtr = 0;
+    fo->bufRPtr = 0;
+    fo->flags   = flags | ( oflags & O_RDONLY ? FILEOBJ_READ 
+    			  : oflags & O_RDWR   ? FILEOBJ_READ 
+			  : 0)
+			| ( oflags & O_WRONLY ? FILEOBJ_WRITE
+			  : oflags & O_RDWR   ? FILEOBJ_WRITE 
+			  : 0);
+    fo->connectedTo = NULL;
+    return fo;
 }
 \end{code}

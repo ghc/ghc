@@ -29,15 +29,33 @@
 #define SB_BB (-2)
 
 StgInt
-setBuffering(fp, size)
-StgForeignObj fp;
+setBuffering(ptr, size)
+StgForeignObj ptr;
 StgInt size;
 {
-    int flags;
-    int input;
+    IOFileObject* fo = (IOFileObject*)ptr;
+    int flags, rc=0;
+    int input, isaterm;
     struct termios tio;
+    struct stat sb;
+   
 
-    while ((flags = fcntl(fileno((FILE *) fp), F_GETFL)) < 0) {
+    /* First off, flush old buffer.. */
+    if ( (fo->flags & FILEOBJ_FLUSH) ) {
+       rc = flushBuffer(ptr);
+    }
+    if (rc<0) return rc;
+
+    /* Let go of old buffer, and reset buffer pointers. */
+    if ( fo->buf != NULL ) {
+       free(fo->buf);
+       fo->bufWPtr = 0;
+       fo->bufRPtr = 0;
+       fo->bufSize = 0;
+       fo->buf     = NULL;
+    }
+
+    while ((flags = fcntl(fo->fd, F_GETFL)) < 0) {
 	if (errno != EINTR) {
 	    cvtErrno();
 	    stdErrno();
@@ -47,71 +65,76 @@ StgInt size;
     flags &= O_ACCMODE;
     input = flags == O_RDONLY || flags == O_RDWR;
 
+    isaterm = input && isatty(fo->fd);
+
     switch (size) {
     case SB_NB:
-	if (setvbuf((FILE *) fp, NULL, _IONBF, 0L) != 0) {
-	    cvtErrno();
-	    stdErrno();
-	    return -1;
-	}
-	if (input && isatty(fileno((FILE *) fp))) {
+        fo->flags &= ~FILEOBJ_LB & ~FILEOBJ_BB;
 
-	    /*
-	     * Try to switch to CBREAK mode, or whatever they call it these days.
-	     */
-
-	    if (tcgetattr(fileno((FILE *) fp), &tio) < 0) {
+	if (isaterm) {
+	    /* Switch over to canonical mode. */
+	    if (tcgetattr(fo->fd, &tio) < 0) {
 		cvtErrno();
 		stdErrno();
 		return -1;
 	    }
-	    tio.c_lflag &= ~ICANON;
+	    tio.c_lflag &=  ~ICANON;
 	    tio.c_cc[VMIN] = 1;
 	    tio.c_cc[VTIME] = 0;
-	    if (tcsetattr(fileno((FILE *) fp), TCSANOW, &tio) < 0) {
+	    if (tcsetattr(fo->fd, TCSANOW, &tio) < 0) {
 		cvtErrno();
 		stdErrno();
 		return -1;
 	    }
 	}
 	return 0;
-	break;
     case SB_LB:
-	if (setvbuf((FILE *) fp, NULL, _IOLBF, BUFSIZ) != 0) {
-	    cvtErrno();
-	    stdErrno();
-	    return -1;
-	}
+        fo->flags &= ~FILEOBJ_BB;
+	fo->flags |= FILEOBJ_LB;
+        size = BUFSIZ;
 	break;
     case SB_BB:
 
-	/*
-	 * We should actually peek at the buffer size in the stat struct, if there
-	 * is one.  Something to occupy us later, when we're bored.
-	 */
+#if HAVE_ST_BLKSIZE
+	while (fstat(fo->fd, &sb) < 0) {
+	   /* not very likely.. */
+	   if ( errno != EINTR ) {
+	      cvtErrno();
+	      stdErrno();
+	      return -1;
+	   }
+        }
+	size = sb->st_blksize;
+#else
 	size = BUFSIZ;
+#endif
+        fo->flags &= ~FILEOBJ_LB;
+	fo->flags |= FILEOBJ_BB;
 	/* fall through */
     default:
-	if (setvbuf((FILE *) fp, NULL, _IOFBF, size) != 0) {
-	    cvtErrno();
-	    stdErrno();
-	    return -1;
-	}
 	break;
     }
-    if (input && isatty(fileno((FILE *) fp))) {
+  
+    if ( size > 0) {
+       fo->buf = malloc(size*sizeof(char));
+       if (fo->buf == NULL) {
+           return -1;
+       }
+       fo->bufSize = size;
+    }
+    if (isaterm) {
 
 	/*
 	 * Try to switch back to cooked mode.
 	 */
 
-	if (tcgetattr(fileno((FILE *) fp), &tio) < 0) {
+	if (tcgetattr(fo->fd, &tio) < 0) {
 	    cvtErrno();
 	    stdErrno();
 	    return -1;
 	}
 	tio.c_lflag |= ICANON;
-	if (tcsetattr(fileno((FILE *) fp), TCSANOW, &tio) < 0) {
+	if (tcsetattr(fo->fd, TCSANOW, &tio) < 0) {
 	    cvtErrno();
 	    stdErrno();
 	    return -1;

@@ -7,6 +7,7 @@
 
 #include "rtsdefs.h"
 #include "stgio.h"
+#include "fileObject.h"
 
 /* sigh, the FILEs attached to the standard descriptors are 
    handled differently. We don't want them freed via the
@@ -17,35 +18,52 @@ void freeStdFile(fp)
 StgForeignObj fp;
 { return; }
 
-void freeFile(fp)
-StgForeignObj fp;
-{
-    int rc;
+void freeStdFileObject(ptr)
+StgForeignObj ptr;
+{ 
+  IOFileObject* fo = (IOFileObject*)ptr;
 
-    if ( fp == NULL || (rc = unlockFile(fileno((FILE *)fp))) ) {
+  /* Don't close the file, just flush the buffer */
+  if (fo != NULL && fo->fd != -1) {
+    if (fo->buf != NULL && (fo->flags & FILEOBJ_FLUSH) && fo->bufWPtr > 0) {
+       /* Flush buffer contents */
+       writeBuffer((StgForeignObj)fo, fo->bufWPtr);
+    }
+  }
+}
+
+void freeFileObject(ptr)
+StgForeignObj ptr;
+{
+    /*
+     * The finaliser for the file objects embedded in Handles. The RTS
+     * assumes that the finaliser runs without problems, so all
+     * we can do here is flish buffers + close(), and hope nothing went wrong.
+     *
+     */
+
+    int rc;
+    IOFileObject* fo = (IOFileObject*)ptr;
+
+    if ( fo == NULL )
+      return;
+
+    if ( fo->fd == -1 || (rc = unlockFile(fo->fd)) ) {
 	/* If the file handle has been explicitly closed
-         * (via closeFile()) or freed, we will have given
-	 * up our process lock, so we silently return here.
+         * (via closeFile()), we will have given
+	 * up our process lock, so we break off and just return.
          */
        return;
     }
 
-    /*
-     * The finaliser for the FILEs embedded in Handles. The RTS
-     * assumes that the finaliser runs without problems, so all
-     * we can do here is fclose(), and hope nothing went wrong.
-     *
-     * Assume fclose() flushes output stream.
-     */
-
-    rc = fclose((FILE *)fp);
-    /* Error or no error, we don't care.. */
-
-    /* 
-    if ( rc == EOF ) {
-       fprintf(stderr. "Warning: file close ran into trouble\n");
+    if (fo->buf != NULL && fo->bufWPtr > 0) {
+       /* Flush buffer contents before closing underlying file */
+       fo->flags &= ~FILEOBJ_RW_WRITE | ~FILEOBJ_RW_READ;
+       flushFile(ptr);
     }
-    */
+
+    rc = close(fo->fd);
+    /* Error or no error, we don't care.. */
 
     return;
 }

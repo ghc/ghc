@@ -13,6 +13,19 @@ int ghc_errtype = 0;
 
 char *ghc_errstr = NULL;
 
+StgAddr
+getErrStr__()
+{ return ((StgAddr)ghc_errstr); }
+
+StgInt
+getErrNo__()
+{ return ((StgInt)ghc_errno); }
+
+StgInt
+getErrType__()
+{ return ((StgInt)ghc_errtype); }
+
+
 /* Collect all of the grotty #ifdef's in one place. */
 
 void cvtErrno(STG_NO_ARGS)
