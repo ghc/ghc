@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.215 2002/04/22 14:35:02 simonmar Exp $
+# $Id: Makefile,v 1.216 2002/04/22 14:54:09 simonmar Exp $
 
 TOP = ..
 
@@ -241,7 +241,7 @@ endif
 #	because it contains 'ccall strlen' and 'ccall memcmp', which gets 
 #	inlined by gcc, causing a lack of registers.
 #
-utils/PrimPacked_HC_OPTS	= -fvia-C -monly-2-regs
+utils/PrimPacked_HC_OPTS	= -fvia-C
 
 # ByteCodeItbls uses primops that the NCG doesn't support yet.
 ghci/ByteCodeItbls_HC_OPTS	= -fvia-C

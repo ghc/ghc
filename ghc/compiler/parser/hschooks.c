@@ -142,3 +142,21 @@ StackOverflowHook (I_ stack_size)    /* in bytes */
 }
 
 #endif
+
+HsInt
+ghc_strlen( HsAddr a )
+{
+    return (strlen((char *)a));
+}
+
+HsInt
+ghc_memcmp( HsAddr a1, HsAddr a2, HsInt len )
+{
+    return (memcmp((char *)a1, a2, len));
+}
+
+HsInt
+ghc_memcmp_off( HsAddr a1, HsInt i, HsAddr a2, HsInt len )
+{
+    return (memcmp((char *)a1 + i, a2, len));
+}

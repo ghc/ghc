@@ -8,7 +8,7 @@ of bytes (character strings). Used by the interface lexer input
 subsystem, mostly.
 
 \begin{code}
-{-# OPTIONS -monly-3-regs -optc-DNON_POSIX_SOURCE #-}
+{-# OPTIONS -monly-3-regs -optc-DNON_POSIX_SOURCE -#include "hschooks.h" #-}
 module PrimPacked
        (
         strLength,          -- :: _Addr -> Int
@@ -44,18 +44,6 @@ import PrelST
 import GHC.ST
 #endif
 
-\end{code} 
-
-Return the length of a @\\NUL@ terminated character string:
-
-\begin{code}
-strLength :: Addr -> Int
-strLength a =
- unsafePerformIO (
-    _ccall_ strlen a  >>= \ len@(I# _) ->
-    return len
- )
-{-# NOINLINE strLength #-}
 \end{code}
 
 Copying a char string prefix into a byte array,
@@ -169,42 +157,42 @@ Compare two equal-length strings for equality:
 \begin{code}
 eqStrPrefix :: Addr# -> ByteArray# -> Int# -> Bool
 eqStrPrefix a# barr# len# = 
-  unsafePerformIO (
-   _ccall_ memcmp (A# a#) (ByteArray bot bot barr#) (I# len#) >>= \ (I# x#) ->
-   return (x# ==# 0#))
-  where
-   bot :: Int
-   bot = error "eqStrPrefix"
+  unsafePerformIO $ do
+   x <- memcmp_ba a# barr# (I# len#)
+   return (x == 0)
 
 eqCharStrPrefix :: Addr# -> Addr# -> Int# -> Bool
 eqCharStrPrefix a1# a2# len# = 
-  unsafePerformIO (
-   _ccall_ memcmp (A# a1#) (A# a2#) (I# len#) >>= \ (I# x#) ->
-   return (x# ==# 0#))
+  unsafePerformIO $ do
+   x <- memcmp a1# a2# (I# len#)
+   return (x == 0)
 
 eqStrPrefixBA :: ByteArray# -> ByteArray# -> Int# -> Int# -> Bool
 eqStrPrefixBA b1# b2# start# len# = 
-  unsafePerformIO (
-   _casm_ ``%r=(int)memcmp((char *)%0+(int)%1,%2,%3); '' 
-	  (ByteArray bot bot b2#) 
-	  (I# start#) 
-          (ByteArray bot bot b1#) 
-          (I# len#)                  >>= \ (I# x#) ->
-   return (x# ==# 0#))
-  where
-   bot :: Int
-   bot = error "eqStrPrefixBA"
+  unsafePerformIO $ do
+    x <- memcmp_baoff_ba b2# (I# start#) b1# (I# len#)
+    return (x == 0)
 
 eqCharStrPrefixBA :: Addr# -> ByteArray# -> Int# -> Int# -> Bool
 eqCharStrPrefixBA a# b2# start# len# = 
-  unsafePerformIO (
-   _casm_ ``%r=(int)memcmp((char *)%0+(int)%1,%2,%3); '' 
-	  (ByteArray bot bot b2#) 
-	  (I# start#) 
-          (A# a#)
-          (I# len#)                  >>= \ (I# x#) ->
-   return (x# ==# 0#))
-  where
-   bot :: Int
-   bot = error "eqCharStrPrefixBA"
+  unsafePerformIO $ do
+    x <- memcmp_baoff b2# (I# start#) a# (I# len#) 
+    return (x == 0)
+\end{code}
+
+\begin{code}
+foreign import ccall "ghc_strlen" unsafe
+  strLength :: Addr -> Int
+
+foreign import ccall "ghc_memcmp" unsafe 
+  memcmp :: Addr# -> Addr# -> Int -> IO Int
+
+foreign import ccall "ghc_memcmp" unsafe 
+  memcmp_ba :: Addr# -> ByteArray# -> Int -> IO Int
+
+foreign import ccall "ghc_memcmp_off" unsafe
+  memcmp_baoff :: ByteArray# -> Int -> Addr# -> Int -> IO Int
+
+foreign import ccall "ghc_memcmp_off" unsafe
+  memcmp_baoff_ba :: ByteArray# -> Int -> ByteArray# -> Int -> IO Int
 \end{code}
