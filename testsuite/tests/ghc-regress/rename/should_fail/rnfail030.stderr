@@ -1,0 +1,2 @@
+
+rnfail030.hs:2: Variable not in scope: `List.map'

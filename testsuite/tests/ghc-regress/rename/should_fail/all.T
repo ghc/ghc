@@ -29,6 +29,7 @@ test "rnfail026" { vtcf("") }
 test "rnfail027" { vtcf("") }
 test "rnfail028" { vtcf("") }
 test "rnfail029" { vtcf("") }
+test "rnfail030" { vtcf("") }
 
 -- these two are really a multi-module tests
 test "Rn037Help" { vtc("") }
