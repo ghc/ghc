@@ -1000,6 +1000,52 @@ arbitrary; they are of the ``seem to be OK'' variety.  The `8' is the
 more critical one; it's what determines how eager GHC is about
 expanding unfoldings.
 
+<tag>@-funbox-strict-fields@:</tag>
+<nidx>-funbox-strict-fields option</nidx>
+<nidx>strict constructor fields</nidx>
+<nidx>constructor fields, strict</nidx>
+
+This option causes all constructor fields which are marked strict
+(i.e. ``!'') to be unboxed or unpacked if possible.  For example:
+
+<tscreen><verb>
+data T = T !Float !Float
+</verb></tscreen>
+
+will create a constructor @T@ containing two unboxed floats if the
+@-funbox-strict-fields@ flag is given.  This may not always be an
+optimisation: if the @T@ constructor is scrutinised and the floats
+passed to a non-strict function for example, they will have to be
+reboxed (this is done automatically by the compiler).
+
+This option should only be used in conjunction with @-O@, in order to
+expose unfoldings to the compiler so the reboxing can be removed as
+often as possible.  For example:
+
+<tscreen><verb>
+f :: T -> Float
+f (T f1 f2) = f1 + f2
+</verb></tscreen>
+
+The compiler will avoid reboxing @f1@ and @f2@ by inlining @+@ on
+floats, but only when @-O@ is on.
+
+Any single-constructor data is eligible for unpacking; for example
+
+<tscreen><verb>
+data T = T !(Int,Int)
+</verb></tscreen>
+
+will store the two @Int@s directly in the @T@ constructor, by flattening
+the pair.  Multi-level unpacking is also supported:
+
+<tscreen><verb>
+data T = T !S
+data S = S !Int !Int
+</verb></tscreen>
+
+will store two unboxed @Int#@s directly in the @T@ constructor.
+
 <tag>@-fsemi-tagging@:</tag>
 This option (which <em>does not work</em> with the native-code generator)
 tells the compiler to add extra code to test for already-evaluated

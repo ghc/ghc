@@ -17,4 +17,7 @@ computations on small integers.  The performance of <tt/Integer/ is now
 only slightly slower than <tt/Int/ for values between <tt/minBound :: Int/
 and <tt/maxBound :: Int/.
 
+<item> Added @-funbox-strict-fields@ for unboxing/unpacking strict
+constructor fields.
+
 </itemize>
