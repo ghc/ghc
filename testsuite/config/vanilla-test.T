@@ -1,11 +1,15 @@
 
-include ($confdir ++ "/" ++ $conffilename)
-
 -----------------------------------------------------------------------
 --- Stuff to do with simple single-source-file tests.  We assume    ---
---- that the name of the .T file is to be used as the basename      ---
+--- that the name of the test is to be used as the basename         ---
 --- for everything.                                                 ---
 -----------------------------------------------------------------------
+
+---------------------------------------------------------------
+--- UTILITY FNs                                             ---
+---------------------------------------------------------------
+
+include ($confdir ++ "/" ++ $conffilename)
 
 -- Gotta do some pretty basic stuff :)
 def not ( $_bool )
@@ -42,11 +46,16 @@ def rm_nofail ( $_files )
    $res = run $cmd
 }
 
+
+---------------------------------------------------------------
+--- COMPILATION                                             ---
+---------------------------------------------------------------
+
 -- Clean up prior to the test, so that we can't spuriously conclude
 -- that it passed on the basis of old run outputs.
 def pretest_cleanup()
 {
-   rm_nofail(qualify("comp.stdout"))
+   rm_nofail(qualify("comp.stderr"))
    rm_nofail(qualify("run.stderr"))
    rm_nofail(qualify("run.stdout"))
    -- simple_build_Main zaps the following:
@@ -77,11 +86,10 @@ def guess_compiler_flags()
    fi
 }
 
+-- Build Main, and return the compiler result code.  Compilation
+-- output goes into testname.comp.stderr.
 
--- Compile testname.hs into testname; comp errors -> testname.comp.stderr.
--- Used for run tests, so framefail if compilation fails.
-
-def simple_build_Main ( $_extra_args ) 
+def simple_build_Main_WRK ( $_extra_args, $compile_only ) 
 {
    $flags = guess_compiler_flags()
    $errname = qualify("comp.stderr")
@@ -90,12 +98,28 @@ def simple_build_Main ( $_extra_args )
    rm_or_fail($errname)
    rm_or_fail($exename)
    $cmd = $tool ++ " " ++ $flags ++ " " ++ $_extra_args
-          ++ " -o " ++ $exename ++ " " 
+          ++ if   $compile_only 
+             then " -c " 
+             else " -o " ++ $exename ++ " " 
+             fi
           ++ $srcname ++ " &> " ++ $errname
    $res = run $cmd
+   return $res
+}
+
+-- Compile testname.hs into testname; comp errors -> testname.comp.stderr.
+-- Used for run tests, so framefail if compilation fails.
+
+def simple_build_Main ( $_extra_args ) 
+{
+   $res = simple_build_Main_WRK ( $_extra_args, False )
    if $res /= "0" then framefail "simple_build_Main: failed" fi
 }
 
+
+---------------------------------------------------------------
+--- RUNNING, AND ASSESSING RUN RESULTS                      ---
+---------------------------------------------------------------
 
 -- Run testname.  If testname.stdin exists, route input from that, else
 -- from /dev/null.  Route output to testname.run.stdout and 
@@ -184,7 +208,12 @@ def check_stderr_ok()
 }
 
 
--- top-level actions
+---------------------------------------------------------------
+--- CONDUCTING A COMPLETE TEST                              ---
+---------------------------------------------------------------
+
+-- Compile and run (should_run) style test
+
 def vanilla-test-actions ( $extra_compile_args, 
                            $extra_run_args, 
                            $allowable_nonzero_exit_code )
@@ -201,7 +230,33 @@ def vanilla-test-actions ( $extra_compile_args,
    return $test_passed
 }
 
+
+-- Compile only (should_compile) style test.  Deemed to have
+-- succeeded if the compiler returned zero AND testname.comp.stderr
+-- is empty.
+
+def vanilla-comp-test-actions ( $extra_compile_args )
+{
+   pretest_cleanup()
+   $res = simple_build_Main_WRK ( $extra_compile_args, True )
+   if $res /= "0"
+      || contents(qualify("comp.stderr")) /= ""
+   then
+     return False
+   else
+     return True
+   fi
+}
+
+
+---------------------------------------------------------------
+--- TOP-LEVEL FNS                                           ---
+---------------------------------------------------------------
+
+--------------------------------------------------------------
 -- top-level
+-- Compile and run (should_run) style test
+
 def vt ( $extra_compile_args, 
          $extra_run_args, 
          $allowable_nonzero_exit_code )
@@ -215,3 +270,18 @@ def vt ( $extra_compile_args,
    fail when otherwise
 }
 
+
+-- Compile only (should_compile) style test
+
+def vtc ( $extra_compile_args )
+{
+   $test_passed 
+      = vanilla-comp-test-actions ( $extra_compile_args )
+   expect pass
+   pass when $test_passed
+   fail when otherwise
+}
+
+-----------------------------------------------------------------------
+--- end                                              vanilla-test.T ---
+-----------------------------------------------------------------------
