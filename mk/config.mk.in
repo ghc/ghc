@@ -164,6 +164,13 @@ GhcCompilerWays=
 #			used to compile GHC.  Useful when bootstrapping.
 GhcHcOpts=-Rghc-timing
 
+# Extra options added to specific stages of the compiler bootstrap.
+# These are placed later on the command line, and may therefore
+# override options from $(GhcHcOpts).
+GhcStage1HcOpts=
+GhcStage2HcOpts=
+GhcStage3HcOpts=
+
 # Build a compiler that will build *unregisterised* libraries and
 # binaries by default.  Unregisterised code is supposed to compile and
 # run without any support for architecture-specific assembly mangling,
