@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.162 2003/12/10 14:15:21 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.163 2004/02/01 23:43:02 dons Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -675,7 +675,7 @@ shellEscape :: String -> GHCi Bool
 shellEscape str = io (system str >> return False)
 
 -----------------------------------------------------------------------------
--- Browing a module's contents
+-- Browsing a module's contents
 
 browseCmd :: String -> GHCi ()
 browseCmd m = 
