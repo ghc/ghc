@@ -290,11 +290,11 @@ repBangTy (L _ (BangType str ty)) = do
 
 repDerivs :: Maybe [LHsType Name] -> DsM (Core [TH.Name])
 repDerivs Nothing = coreList nameTyConName []
-repDerivs (Just (L _ ctxt))
+repDerivs (Just ctxt)
   = do { strs <- mapM rep_deriv ctxt ; 
 	 coreList nameTyConName strs }
   where
-    rep_deriv :: LHsPred Name -> DsM (Core TH.Name)
+    rep_deriv :: LHsType Name -> DsM (Core TH.Name)
 	-- Deriving clauses must have the simple H98 form
     rep_deriv (L _ (HsPredTy (L _ (HsClassP cls [])))) = lookupOcc cls
     rep_deriv other		  		       = panic "rep_deriv"
