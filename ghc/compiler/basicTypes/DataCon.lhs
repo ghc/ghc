@@ -8,8 +8,8 @@ module DataCon (
 	DataCon,
 	ConTag, fIRST_TAG,
 	mkDataCon,
-	dataConType, dataConSig, dataConName, dataConTag,
-	dataConArgTys, dataConTyCon,
+	dataConType, dataConSig, dataConName, dataConTag, dataConTyCon,
+	dataConArgTys, dataConOrigArgTys,
 	dataConRawArgTys, dataConAllRawArgTys,
 	dataConFieldLabels, dataConStrictMarks, dataConSourceArity,
 	dataConNumFields, dataConNumInstArgs, dataConId, dataConRepStrictness,
@@ -312,11 +312,15 @@ dataConArgTys (MkData {dcRepArgTys = arg_tys, dcTyVars = tyvars,
 These two functions get the real argument types of the constructor,
 without substituting for any type variables.  dataConAllRawArgTys is
 like dataConRawArgTys except that the existential dictionary arguments
-are included.
+are included.  dataConOrigArgTys is the same, but returns the types
+written by the programmer.
 
 \begin{code}
+dataConOrigArgTys :: DataCon -> [Type]
+dataConOrigArgTys dc = dcOrigArgTys dc
+
 dataConRawArgTys :: DataCon -> [TauType] -- a function of convenience
-dataConRawArgTys = dcRepArgTys
+dataConRawArgTys dc = dcRepArgTys dc
 
 dataConAllRawArgTys :: DataCon -> [TauType]
 dataConAllRawArgTys con = 

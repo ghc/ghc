@@ -39,7 +39,7 @@ import BasicTypes	( RecFlag(..), Fixity(..), FixityDirection(..)
 			)
 import FieldLabel       ( fieldLabelName )
 import DataCon		( isNullaryDataCon, dataConTag,
-			  dataConRawArgTys, fIRST_TAG,
+			  dataConOrigArgTys, dataConSourceArity, fIRST_TAG,
 			  DataCon, ConTag,
 			  dataConFieldLabels )
 import Name		( getOccString, getOccName, getSrcLoc, occNameString, 
@@ -203,7 +203,7 @@ gen_Eq_binds tycon
 	    con_arity   = length tys_needed
 	    as_needed   = take con_arity as_RDRs
 	    bs_needed   = take con_arity bs_RDRs
-	    tys_needed  = dataConRawArgTys data_con
+	    tys_needed  = dataConOrigArgTys data_con
 	in
 	([con1_pat, con2_pat], nested_eq_expr tys_needed as_needed bs_needed)
       where
@@ -381,7 +381,7 @@ gen_Ord_binds tycon
 	    con_arity   = length tys_needed
 	    as_needed   = take con_arity as_RDRs
 	    bs_needed   = take con_arity bs_RDRs
-	    tys_needed  = dataConRawArgTys data_con
+	    tys_needed  = dataConOrigArgTys data_con
 
 	    nested_compare_expr [ty] [a] [b]
 	      = careful_compare_Case ty ltTag_Expr eqTag_Expr gtTag_Expr (HsVar a) (HsVar b)
@@ -565,7 +565,7 @@ gen_Bounded_binds tycon
     data_con_N_RDR = qual_orig_name data_con_N
 
     ----- single-constructor-flavored: -------------
-    arity	   = argFieldCount data_con_1
+    arity	   = dataConSourceArity data_con_1
 
     min_bound_1con = mk_easy_FunMonoBind tycon_loc minBound_RDR [] [] $
 		     mk_easy_App data_con_1_RDR (nOfThem arity minBound_RDR)
@@ -697,12 +697,12 @@ gen_Ix_binds tycon
     data_con
       =	case maybeTyConSingleCon tycon of -- just checking...
 	  Nothing -> panic "get_Ix_binds"
-	  Just dc -> if (any isUnLiftedType (dataConRawArgTys dc)) then
+	  Just dc -> if (any isUnLiftedType (dataConOrigArgTys dc)) then
 			 error ("ERROR: Can't derive Ix for a single-constructor type with primitive argument types: "++tycon_str)
 		     else
 			 dc
 
-    con_arity    = argFieldCount data_con
+    con_arity    = dataConSourceArity data_con
     data_con_RDR = qual_orig_name data_con
 
     as_needed = take con_arity as_RDRs
@@ -801,7 +801,7 @@ gen_Read_binds fixities tycon
          where
   	   data_con_RDR = qual_orig_name data_con
 	   data_con_str = occNameUserString (getOccName data_con)
-	   con_arity    = argFieldCount data_con
+	   con_arity    = dataConSourceArity data_con
 	   con_expr     = mk_easy_App data_con_RDR as_needed
 	   nullary_con  = con_arity == 0
 	   labels       = dataConFieldLabels data_con
@@ -952,7 +952,7 @@ gen_Show_binds fixs_assoc tycon
 				 (HsPar (nested_compose_Expr show_thingies)))
 	    where
 	     data_con_RDR = qual_orig_name data_con
-	     con_arity    = argFieldCount data_con
+	     con_arity    = dataConSourceArity data_con
 	     bs_needed    = take con_arity bs_RDRs
 	     con_pat      = ConPatIn data_con_RDR (map VarPatIn bs_needed)
 	     nullary_con  = con_arity == 0
@@ -1123,7 +1123,7 @@ gen_tag_n_con_monobind (rdr_name, tycon, GenCon2Tag)
     mk_stuff var
       = ([pat], HsLit (HsIntPrim (toInteger ((dataConTag var) - fIRST_TAG))))
       where
-	pat    = ConPatIn var_RDR (nOfThem (argFieldCount var) WildPatIn)
+	pat    = ConPatIn var_RDR (nOfThem (dataConSourceArity var) WildPatIn)
 	var_RDR = qual_orig_name var
 
 gen_tag_n_con_monobind (rdr_name, tycon, GenTag2Con)
@@ -1280,11 +1280,6 @@ eq_Expr ty a b
        genOpApp a relevant_eq_op b
   where
     relevant_eq_op = assoc_ty_id eq_op_tbl ty
-\end{code}
-
-\begin{code}
-argFieldCount :: DataCon -> Int	-- Works on data and newtype constructors
-argFieldCount con = length (dataConRawArgTys con)
 \end{code}
 
 \begin{code}
