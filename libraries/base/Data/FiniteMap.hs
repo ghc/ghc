@@ -142,7 +142,8 @@ addListToFM	:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> [(key,elt)] -> F
 
 -- | Adds an element to a 'FiniteMap'.  If there is already an element
 -- with the same key, then the specified combination function is used
--- to calculate the new value.
+-- to calculate the new value. The already present element is passed as
+-- the first argument and the new element to add as second.
 addToFM_C	:: (Ord key OUTPUTABLE_key) => (elt -> elt -> elt)
 			   -> FiniteMap key elt -> key -> elt
 			   -> FiniteMap key elt
