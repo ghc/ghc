@@ -141,12 +141,12 @@ showGFloat d x =  showString (formatRealFloat FFGeneric d x)
 -- ---------------------------------------------------------------------------
 -- Integer printing functions
 
-showIntAtBase :: Integral a => a -> (a -> Char) -> a -> ShowS
+showIntAtBase :: Integral a => a -> (Int -> Char) -> a -> ShowS
 showIntAtBase base toChr n r
   | n < 0  = error ("Numeric.showIntAtBase: applied to negative number " ++ show n)
   | otherwise = 
     case quotRem n base of { (n', d) ->
-    let c = toChr d in
+    let c = toChr (fromIntegral d) in
     seq c $ -- stricter than necessary
     let
 	r' = c : r
@@ -155,5 +155,5 @@ showIntAtBase base toChr n r
     }
 
 showHex, showOct :: Integral a => a -> ShowS
-showHex = showIntAtBase 16 (intToDigit.fromIntegral)
-showOct = showIntAtBase 8  (intToDigit.fromIntegral)
+showHex = showIntAtBase 16 intToDigit
+showOct = showIntAtBase 8  intToDigit
