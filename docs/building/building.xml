@@ -3727,9 +3727,9 @@ SplitObjs = NO
 GhcWithNativeCodeGen = NO
 GhcWithInterpreter = NO
 GhcStage1HcOpts = -O -fasm
-GhcStage2HcOpts = -O -fvia-C -keep-hc-files</programlisting>
+GhcStage2HcOpts = -O -fvia-C -keep-hc-files
 SRC_HC_OPTS += -H32m
-GhcBootLibs = YES
+GhcBootLibs = YES</programlisting>
 	    </listitem>
 
 	    <listitem>
@@ -3790,9 +3790,13 @@ $ make boot stage=2 &amp;&amp; make stage=2</screen>
 	    </listitem>
 
 	    <listitem>
-<screen>$ cd <replaceable>H</replaceable>/ghc/utils
+<screen>$ cd <replaceable>H</replaceable>/ghc/lib
 $ make clean
-$ make -k HC=<replaceable>H</replaceable>/ghc/compiler/stage1/ghc-inplace \
+$ make -k UseStage1=YES \
+                EXTRA_HC_OPTS='-O -fvia-C -keep-hc-files'
+$ cd <replaceable>H</replaceable>/ghc/utils
+$ make clean
+$ make -k UseStage1=YES \
 		EXTRA_HC_OPTS='-O -fvia-C -keep-hc-files'</screen>
 	    </listitem>
 	    
