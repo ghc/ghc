@@ -1123,7 +1123,8 @@ run_pipeline last_phase do_linking use_ofile orig_basename (phase, input_fn)
 	  case phase of
 		Hsc -> case lang of
 		 	    HscC   -> HCc
-			    HscAsm -> As
+			    HscAsm | split     -> SplitMangle
+				   | otherwise -> As
 
 		HCc  | mangle    -> Mangle
 		     | otherwise -> As
