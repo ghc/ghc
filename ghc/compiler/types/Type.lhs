@@ -309,7 +309,6 @@ mkTyConTy tycon = ASSERT( not (isSynTyCon tycon) )
 splitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
 splitTyConApp_maybe (TyConApp tc tys)	   = Just (tc, tys)
 splitTyConApp_maybe (FunTy arg res)	   = Just (funTyCon, [arg,res])
-splitTyConApp_maybe (NoteTy (IPNote _) ty) = Nothing
 splitTyConApp_maybe (NoteTy _ ty)	   = splitTyConApp_maybe ty
 splitTyConApp_maybe other		   = Nothing
 
