@@ -815,7 +815,7 @@ ppHsAType t = parens $ ppHsType t
 -- Names
 
 linkTarget :: HsName -> Html
-linkTarget nm = namedAnchor (hsNameStr nm) << toHtml ""
+linkTarget nm = namedAnchor (hsAnchorNameStr nm) << toHtml ""
 
 ppHsQName :: HsQName -> Html
 ppHsQName (UnQual str) = ppHsName str
@@ -832,6 +832,10 @@ isSpecial _                                      = False
 ppHsName :: HsName -> Html
 ppHsName nm = toHtml (hsNameStr nm)
 
+hsAnchorNameStr :: HsName -> String
+hsAnchorNameStr (HsTyClsName id0) = "t:" ++ ppHsIdentifier id0
+hsAnchorNameStr (HsVarName id0)   = "v:" ++ ppHsIdentifier id0
+
 hsNameStr :: HsName -> String
 hsNameStr (HsTyClsName id0) = ppHsIdentifier id0
 hsNameStr (HsVarName id0)   = ppHsIdentifier id0
@@ -842,7 +846,9 @@ ppHsIdentifier (HsSymbol str)  =  str
 ppHsIdentifier (HsSpecial str) =  str
 
 ppHsBinder :: Bool -> HsName -> Html
-ppHsBinder True nm = linkedAnchor "" (hsNameStr nm) << ppHsBinder' nm
+-- The Bool indicates whether we are generating the summary, in which case
+-- the binder will be a link to the full definition.
+ppHsBinder True nm = linkedAnchor "" (hsAnchorNameStr nm) << ppHsBinder' nm
 ppHsBinder False nm = linkTarget nm +++ bold << ppHsBinder' nm
 
 ppHsBinder' :: HsName -> Html
@@ -858,10 +864,10 @@ linkId :: Module -> Maybe HsName -> Html -> Html
 linkId (Module mdl) mbStr = linkedAnchor (moduleHtmlFile fp mdl) frag
   where frag = case mbStr of
                   Nothing  -> ""
-                  Just str -> hsNameStr str
+                  Just str -> hsAnchorNameStr str
         fp   = case lookupFM html_xrefs (Module mdl) of
 		  Nothing  -> ""
-		  Just fp0 -> fp0 
+		  Just fp0 -> fp0
 
 ppHsModule :: String -> Html
 ppHsModule mdl = anchor ! [href ((moduleHtmlFile fp modname) ++ ref)] << toHtml mdl
