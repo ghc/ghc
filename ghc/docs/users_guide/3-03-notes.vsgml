@@ -12,6 +12,17 @@ Changes made since 3.02:
 
 <item> Add Sven Panne's Haskell GetOpt library (in <tt/-syslib misc/).
 
+<item> Add Dynamic library.
+
+<item> Add foreign export/import constructs.
+
+<item> Rewritten I/O system.
+
+<item> Add MD5 library.
+
+<item> Add socket option support to the socket library.
+
+<item> Add Int64 and Word64 data types (available from the Int and
+       Word libraries respectively).
+
 </itemize>
-
-
