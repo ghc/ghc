@@ -97,9 +97,7 @@ module Data.Generics.Basics (
 
 ------------------------------------------------------------------------------
 
-#ifdef __HADDOCK__
-import Prelude
-#endif
+import Prelude -- necessary to get dependencies right
 
 import Data.Typeable
 import Data.Maybe

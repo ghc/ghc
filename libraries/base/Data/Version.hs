@@ -30,6 +30,8 @@ module Data.Version (
 	showVersion, parseVersion,
   ) where
 
+import Prelude -- necessary to get dependencies right
+
 -- These #ifdefs are necessary because this code might be compiled as
 -- part of ghc/lib/compat, and hence might be compiled by an older version
 -- of GHC.  In which case, we might need to pick up ReadP from 

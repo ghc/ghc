@@ -38,6 +38,8 @@ module System.FilePath
          , searchPathSeparator
          ) where
 
+import Prelude -- necessary to get dependencies right
+
 import Data.List(intersperse)
 
 --------------------------------------------------------------

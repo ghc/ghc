@@ -50,6 +50,8 @@ module System.Console.GetOpt (
    -- $example
 ) where
 
+import Prelude -- necessary to get dependencies right
+
 import Data.List ( isPrefixOf )
 
 -- |What to do with options following non-options

@@ -94,6 +94,8 @@ module System.Posix.Signals (
 #endif
   ) where
 
+import Prelude -- necessary to get dependencies right
+
 #ifdef __GLASGOW_HASKELL__
 #include "Signals.h"
 #else
