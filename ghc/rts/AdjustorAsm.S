@@ -124,8 +124,17 @@ adjustorCode:
 
     LOAD    r3, HPTR_OFF(r2)
 
-    LOAD    r0, WPTR_OFF(r2)
+    LOAD    r12, WPTR_OFF(r2)
+#if defined(darwin_TARGET_OS)
+    mtctr   r12
+#else
+    LOAD    r0, 0(r12)
+        /* The function we're calling will never be a nested function,
+           so we don't load r11. 
+        */
     mtctr   r0
+    LOAD    r2, WS(r12)
+#endif
     bctrl
 
     LOAD    r1, 0(r1)
