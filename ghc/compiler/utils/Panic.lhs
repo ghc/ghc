@@ -13,13 +13,7 @@ module Panic
    ( 
      GhcException(..), ghcError, progName, 
      panic, panic#, assertPanic, trace,
-     showException, showGhcException, Exception.throwDyn, tryMost,
-
-     Exception.Exception, 
-     Panic.try,	-- try :: IO a -> IO (Either Exception a)
-		-- This is Control.Exception.try in the new library story
-		--	   Exception.tryAllIO in GHC 4.08
-		-- So it usefully hides the difference
+     showException, showGhcException, tryMost,
 
 #if __GLASGOW_HASKELL__ <= 408
      catchJust, ioErrors, throwTo,
@@ -138,7 +132,7 @@ assertPanic file line =
 -- files, for example.
 
 tryMost :: IO a -> IO (Either Exception.Exception a)
-tryMost action = do r <- try action; filter r
+tryMost action = do r <- myTry action; filter r
   where
    filter (Left e@(Exception.DynException d))
 	    | Just ghc_ex <- fromDynamic d
@@ -150,9 +144,9 @@ tryMost action = do r <- try action; filter r
      = return other
 
 #if __GLASGOW_HASKELL__ <= 408
-try = Exception.tryAllIO
+myTry = Exception.tryAllIO
 #else
-try = Exception.try
+myTry = Exception.try
 #endif
 \end{code}	
 
