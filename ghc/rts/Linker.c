@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.60 2001/08/29 15:12:21 sewardj Exp $
+ * $Id: Linker.c,v 1.61 2001/08/31 11:44:12 sewardj Exp $
  *
- * (c) The GHC Team, 2000
+ * (c) The GHC Team, 2000, 2001
  *
  * RTS Object Linker
  *
@@ -1682,18 +1682,38 @@ ocGetNames_ELF ( ObjectCode* oc )
       /* make a section entry for relevant sections */
       SectionKind kind = SECTIONKIND_OTHER;
       if (!strcmp(".data",sh_strtab+shdr[i].sh_name) ||
-          !strcmp(".data1",sh_strtab+shdr[i].sh_name))
+          !strcmp(".data1",sh_strtab+shdr[i].sh_name) ||
+          !strcmp(".bss",sh_strtab+shdr[i].sh_name))
 	  kind = SECTIONKIND_RWDATA;
       if (!strcmp(".text",sh_strtab+shdr[i].sh_name) ||
           !strcmp(".rodata",sh_strtab+shdr[i].sh_name) ||
           !strcmp(".rodata1",sh_strtab+shdr[i].sh_name))
 	  kind = SECTIONKIND_CODE_OR_RODATA;
 
+      if (!strcmp(".bss",sh_strtab+shdr[i].sh_name) && shdr[i].sh_size > 0) {
+         /* This is a non-empty .bss section.  Allocate zeroed space for
+            it, and set its .sh_offset field such that 
+            ehdrC + .sh_offset == addr_of_zeroed_space.  */
+         char* zspace = stgCallocBytes(1, shdr[i].sh_size, 
+                                       "ocGetNames_ELF(anonymous bss)");
+         shdr[i].sh_offset = ((char*)zspace) - ((char*)ehdrC);
+         /* We don't prod BSS sections, hence the following isn't
+            necessary:
+               addProddableBlock(oc, zspace, shdr[i].sh_size);
+         */
+         /*
+         fprintf(stderr, "BSS section at 0x%x, size %d\n", 
+                         zspace, shdr[i].sh_size);
+         */
+      }
+
       /* fill in the section info */
       oc->sections[i].start = ehdrC + shdr[i].sh_offset;
       oc->sections[i].end   = ehdrC + shdr[i].sh_offset + shdr[i].sh_size - 1;
       oc->sections[i].kind  = kind;
-      
+      if (kind != SECTIONKIND_OTHER && shdr[i].sh_size > 0)
+         addProddableBlock(oc, ehdrC + shdr[i].sh_offset, shdr[i].sh_size);
+
       if (shdr[i].sh_type != SHT_SYMTAB) continue;
 
       /* copy stuff into this module's object symbol table */
@@ -1718,11 +1738,20 @@ ocGetNames_ELF ( ObjectCode* oc )
                 ELF32_ST_TYPE(stab[j].st_info)==STT_OBJECT ||
                 ELF32_ST_TYPE(stab[j].st_info)==STT_NOTYPE 
               )
-            ) { 
-            char* nm = strtab + stab[j].st_name;
-            char* ad = ehdrC 
-                       + shdr[ stab[j].st_shndx ].sh_offset
-                       + stab[j].st_value;
+            ) {
+            char* nm;
+            char* ad; 
+	    int secno = stab[j].st_shndx;
+	    /* Section 0 is the undefined section, hence > and not >=. */
+            ASSERT(secno > 0 && secno < ehdr->e_shnum);
+            nm = strtab + stab[j].st_name;
+            /*
+            if (shdr[secno].sh_type == SHT_NOBITS) {
+               fprintf(stderr, "bss symbol, size %d off %d name %s\n", 
+               stab[j].st_size, stab[j].st_value, nm);
+            }
+            */
+            ad = ehdrC + shdr[ secno ].sh_offset + stab[j].st_value;
             ASSERT(nm != NULL);
             ASSERT(ad != NULL);
 	    oc->symbols[j] = nm;
@@ -1812,6 +1841,7 @@ do_Elf32_Rel_relocations ( ObjectCode* oc, char* ehdrC,
       }
       IF_DEBUG(linker,belch( "Reloc: P = %p   S = %p   A = %p",
 			     (void*)P, (void*)S, (void*)A )); 
+      checkProddableBlock ( oc, pP );
       switch (ELF32_R_TYPE(info)) {
 #        ifdef i386_TARGET_ARCH
          case R_386_32:   *pP = S + A;     break;
@@ -1893,6 +1923,7 @@ do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       }
       IF_DEBUG(linker,fprintf ( stderr, "Reloc: P = %p   S = %p   A = %p\n",
                                         (void*)P, (void*)S, (void*)A )); 
+      checkProddableBlock ( oc, pP );
       switch (ELF32_R_TYPE(info)) {
 #        if defined(sparc_TARGET_ARCH)
          case R_SPARC_WDISP30: 
