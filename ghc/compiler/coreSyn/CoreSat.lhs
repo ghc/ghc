@@ -18,9 +18,9 @@ import Type
 import Demand
 import Var 	( TyVar, setTyVarUnique )
 import VarSet
-import PrimOp
 import IdInfo
 import Id
+import PrimOp
 import UniqSupply
 import Maybes
 import ErrUtils
@@ -47,7 +47,7 @@ primary goals here are:
      simplifier, but it's better done here.  It does mean that f needs
      to have its strictness info correct!.]
 
-2.  Similarly, convert any unboxed let's into cases.
+2.  Similarly, convert any unboxed lets into cases.
     [I'm experimenting with leaving 'ok-for-speculation' rhss in let-form
      right up to this point.]
 
@@ -107,9 +107,9 @@ coreSatBinds (b:bs)
 
 		   mkBinds floats rhs		`thenUs` \ new_rhs ->
 		   returnUs (NonRec bndr new_rhs : new_bs)
-					-- Keep all the floats inside...
-					-- Some might be cases etc
-					-- We might want to revisit this decision
+				-- Keep all the floats inside...
+				-- Some might be cases etc
+				-- We might want to revisit this decision
 
 	RecF prs -> returnUs (Rec prs : new_bs)
 
@@ -161,7 +161,8 @@ coreSatExprFloat :: CoreExpr -> UniqSM ([FloatingBind], CoreExpr)
 --	f (g x)	  ===>   ([v = g x], f v)
 
 coreSatExprFloat (Var v)
-  = maybeSaturate v (Var v) 0 (idType v) `thenUs` \ app ->
+  = fiddleCCall v  `thenUs` \ v ->
+    maybeSaturate v (Var v) 0 (idType v) `thenUs` \ app ->
     returnUs ([], app)
 
 coreSatExprFloat (Lit lit)
@@ -199,13 +200,18 @@ coreSatExprFloat expr@(App _ _)
 
 	-- Now deal with the function
     case head of
-      Var fn_id
-	 -> maybeSaturate fn_id app depth ty `thenUs` \ app' -> 
-	    returnUs (floats, app')
-      _other
-	 -> returnUs (floats, app)
+      Var fn_id -> maybeSaturate fn_id app depth ty `thenUs` \ app' -> 
+	    	   returnUs (floats, app')
+
+      _other    -> returnUs (floats, app)
 
   where
+
+    -- Deconstruct and rebuild the application, floating any non-atomic
+    -- arguments to the outside.  We collect the type of the expression,
+    -- the head of the applicaiton, and the number of actual value arguments,
+    -- all of which are used to possibly saturate this application if it
+    -- has a constructor or primop at the head.
 
     collect_args
 	:: CoreExpr
@@ -234,7 +240,8 @@ coreSatExprFloat expr@(App _ _)
 	  returnUs (App fun' arg', hd, res_ty, fs ++ floats, ss_rest)
 
     collect_args (Var v) depth
-	= returnUs (Var v, (Var v, depth), idType v, [], stricts)
+	= fiddleCCall v   `thenUs` \ v ->
+	  returnUs (Var v, (Var v, depth), idType v, [], stricts)
 	where
 	  stricts = case idStrictness v of
 			StrictnessInfo demands _ 
@@ -288,27 +295,17 @@ cloneTyVar tv
 -- Building the saturated syntax
 -- ---------------------------------------------------------------------------
 
+-- maybeSaturate deals with saturating primops and constructors
+-- The type is the type of the entire application
 maybeSaturate :: Id -> CoreExpr -> Int -> Type -> UniqSM CoreExpr
-	-- mkApp deals with saturating primops and constructors
-	-- The type is the type of the entire application
 maybeSaturate fn expr n_args ty
- = case idFlavour fn of
-      PrimOpId (CCallOp ccall)
-		-- Sigh...make a guaranteed unique name for a dynamic ccall
-		-- Done here, not earlier, because it's a code-gen thing
-	-> getUniqueUs	 	    	`thenUs` \ uniq ->
-           let 
-	     flavour = PrimOpId (CCallOp (setCCallUnique ccall uniq))
-	     fn' = modifyIdInfo (`setFlavourInfo` flavour) fn
-	   in
-	   saturate fn' expr n_args ty
-	   
+  = case idFlavour fn of
       PrimOpId op  -> saturate fn expr n_args ty
       DataConId dc -> saturate fn expr n_args ty
       other 	   -> returnUs expr
 
 saturate :: Id -> CoreExpr -> Int -> Type -> UniqSM CoreExpr
-	-- The type should be the type of (id args)
+	-- The type should be the type of expr.
 	-- The returned expression should also have this type
 saturate fn expr n_args ty
   = go excess_arity expr ty
@@ -341,11 +338,20 @@ saturate fn expr n_args ty
  		     returnUs expr
     	}}}
 
-    
 
------------------------------------------------------------------------------
+fiddleCCall id 
+  = case idFlavour id of
+         PrimOpId (CCallOp ccall) ->
+	    -- Make a guaranteed unique name for a dynamic ccall.
+	    getUniqueUs   	`thenUs` \ uniq ->
+	    returnUs (modifyIdInfo (`setFlavourInfo` 
+			    PrimOpId (CCallOp (setCCallUnique ccall uniq))) id)
+	 other_flavour ->
+	     returnUs id
+
+-- ---------------------------------------------------------------------------
 -- Eliminate Lam as a non-rhs (STG doesn't have such a thing)
------------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
 
 deLam (Note n e)
   = deLam e `thenUs` \ e ->
