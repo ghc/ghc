@@ -163,8 +163,11 @@ STGFUN(stg_AP_entry)
   
   Words = ap->n_args;
 
-  // Check for stack overflow.
-  STK_CHK_GEN(Words+sizeofW(StgUpdateFrame), R1_PTR, stg_AP_entry);
+  // Check for stack overflow.  IMPORTANT: use a _NP check here,
+  // because if the check fails, we might end up blackholing this very
+  // closure, in which case we must enter the blackhole on return rather
+  // than continuing to evaluate the now-defunct closure.
+  STK_CHK_NP(Words+sizeofW(StgUpdateFrame),);
 
   PUSH_UPD_FRAME(R1.p, 0);
   Sp -= sizeofW(StgUpdateFrame) + Words;
@@ -230,8 +233,11 @@ STGFUN(stg_AP_STACK_entry)
   
   Words = ap->size;
 
-  // Check for stack overflow.
-  STK_CHK_GEN(Words+sizeofW(StgUpdateFrame), R1_PTR, stg_AP_STACK_entry);
+  // Check for stack overflow.  IMPORTANT: use a _NP check here,
+  // because if the check fails, we might end up blackholing this very
+  // closure, in which case we must enter the blackhole on return rather
+  // than continuing to evaluate the now-defunct closure.
+  STK_CHK_NP(Words+sizeofW(StgUpdateFrame),);
 
   PUSH_UPD_FRAME(R1.p, 0);
   Sp -= sizeofW(StgUpdateFrame) + Words;
