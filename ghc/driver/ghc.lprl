@@ -760,6 +760,7 @@ sub setupOptimiseFlags {
 	  # See remark re: cloning in defn of minusnotO
 	  '-fclone-binds',
 
+	  '-fdo-case-elim',
 	  '-fmax-simplifier-iterations1',
 	  $Oopt_PedanticBottoms,
 	  ']',
