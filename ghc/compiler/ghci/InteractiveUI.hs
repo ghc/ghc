@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.15 2000/11/24 17:09:52 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.16 2000/11/27 11:58:55 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -108,7 +108,7 @@ interactiveUI cmstate mod = do
 
    (unGHCi uiLoop) GHCiState{ modules = mods,
 			      current_module = this_mod,
-	  	              target = Nothing,
+	  	              target = mod,
 			      cmstate = cmstate',
 			      options = [ShowTiming]}
    return ()
