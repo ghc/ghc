@@ -18,7 +18,8 @@ necessary.
 module Linker ( HValue, initLinker, showLinkerState,
 		linkLibraries, linkExpr,
 		unload, extendLinkEnv, 
-		LibrarySpec(..)
+		LibrarySpec(..),
+		linkPackages,
 	) where
 
 #include "../includes/config.h"

@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.140 2002/12/19 12:49:27 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.141 2002/12/19 15:12:01 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -23,8 +23,8 @@ import MkIface		( ifaceTyThing )
 import DriverFlags
 import DriverState
 import DriverUtil	( remove_spaces, handle )
-import Linker		( initLinker, showLinkerState, linkLibraries )
-import Finder		( flushFinderCache )
+import Linker		( initLinker, showLinkerState, linkLibraries, 
+			  linkPackages )
 import Util
 import Id		( isRecordSelector, recordSelectorFieldLabel, 
 			  isDataConWrapId, isDataConId, idName )
@@ -71,8 +71,6 @@ import Control.Monad as Monad
 
 import GHC.Exts		( unsafeCoerce# )
 
-import Foreign		( nullPtr )
-import Foreign.C.String	( CString, peekCString, withCString )
 import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
 
 import GHC.Posix	( setNonBlockingFD )
@@ -157,8 +155,13 @@ interactiveUI cmstate paths cmdline_objs = do
 
    dflags <- getDynFlags
 
-	-- packages are loaded "on-demand" now
    initLinker
+
+	-- link packages requested explicitly on the command-line
+   expl <- readIORef v_ExplicitPackages
+   linkPackages dflags expl
+
+	-- link libraries from the command-line
    linkLibraries dflags cmdline_objs
 
 	-- Initialise buffering for the *interpreted* I/O system
@@ -910,9 +913,10 @@ newPackages new_pkgs = do	-- The new packages are already in v_Packages
   dflags   <- io getDynFlags
   cmstate1 <- io (cmUnload (cmstate state) dflags)
   setGHCiState state{ cmstate = cmstate1, targets = [] }
+  io (linkPackages dflags new_pkgs)
   setContextAfterLoad []
 
------------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
 -- code for `:show'
 
 showCmd str =
