@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.101 2001/10/23 10:54:14 simonmar Exp $
+ * $Id: Schedule.c,v 1.102 2001/10/23 11:28:51 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -445,6 +445,7 @@ schedule( void )
 	  pthread_cond_broadcast(&m->wakeup);
 	  break;
 	case ThreadKilled:
+	  if (m->ret) *(m->ret) = NULL;
 	  *prev = m->link;
 	  if (was_interrupted) {
 	    m->stat = Interrupted;
@@ -477,6 +478,7 @@ schedule( void )
 	  m->stat = Success;
 	  return;
 	} else {
+	  if (m->ret) { *(m->ret) = NULL; };
 	  if (was_interrupted) {
 	    m->stat = Interrupted;
 	  } else {
