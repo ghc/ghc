@@ -7,12 +7,18 @@ Taken quite directly from the Peyton Jones/Lester paper.
 module CoreFVs (
 	isLocalVar, mustHaveLocalBinding,
 
-	exprFreeVars, exprsFreeVars,
+	exprFreeVars,	-- CoreExpr -> VarSet	-- Find all locally-defined free Ids or tyvars
+	exprsFreeVars,	-- [CoreExpr] -> VarSet
+
 	exprSomeFreeVars, exprsSomeFreeVars,
+
 	idRuleVars, idFreeVars, idFreeTyVars,
 	ruleSomeFreeVars, ruleSomeLhsFreeVars, ruleRhsFreeVars,
 
-	CoreExprWithFVs, CoreBindWithFVs, freeVars, freeVarsOf,
+	CoreExprWithFVs,	-- = AnnExpr Id VarSet
+	CoreBindWithFVs,	-- = AnnBind Id VarSet
+	freeVars,		-- CoreExpr -> CoreExprWithFVs
+	freeVarsOf		-- CoreExprWithFVs -> IdSet
     ) where
 
 #include "HsVersions.h"
