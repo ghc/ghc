@@ -33,9 +33,7 @@ import HsTypes		( HsType, pprParendHsType, pprHsTyVarBndr, toHsType,
 -- others:
 import Id		( idArity, idType, isDataConId_maybe, isPrimOpId_maybe )
 import Var		( varType, isId )
-import IdInfo		( ArityInfo, InlinePragInfo, 
-			  pprInlinePragInfo, ppArityInfo, ppStrictnessInfo
-			)
+import IdInfo		( InlinePragInfo, pprInlinePragInfo, ppStrictnessInfo )
 import Name		( Name, NamedThing(..), getName, toRdrName )
 import RdrName		( RdrName, rdrNameOcc )
 import OccName		( isTvOcc )
