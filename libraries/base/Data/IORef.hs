@@ -20,7 +20,7 @@ module Data.IORef
         readIORef,	      -- :: IORef a -> IO a
         writeIORef,	      -- :: IORef a -> a -> IO ()
 	modifyIORef,	      -- :: IORef a -> (a -> a) -> IO ()
-	atomicModifyIORef,    -- :: IORef a -> (a -> (a,b)) -> IO ()
+	atomicModifyIORef,    -- :: IORef a -> (a -> (a,b)) -> IO b
 
 #if !defined(__PARALLEL_HASKELL__) && defined(__GLASGOW_HASKELL__)
 	mkWeakIORef,          -- :: IORef a -> IO () -> IO (Weak (IORef a))
@@ -77,7 +77,14 @@ modifyIORef ref f = writeIORef ref . f =<< readIORef ref
 -- then using 'MVar' instead is a good idea.
 --
 atomicModifyIORef :: IORef a -> (a -> (a,b)) -> IO b
+#if defined(__GLASGOW_HASKELL__)
 atomicModifyIORef (IORef (STRef r#)) f = IO $ \s -> atomicModifyMutVar# r# f s
+#elif defined(__HUGS__)
+atomicModifyIORef = plainModifyIORef	-- Hugs has no preemption
+  where plainModifyIORef r f = do
+		a <- readIORef r
+		case f a of (a',b) -> writeIORef r a' >> return b
+#endif
 
 #ifndef __NHC__
 #include "Dynamic.h"
