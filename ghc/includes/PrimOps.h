@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.28 1999/05/07 15:42:49 sof Exp $
+ * $Id: PrimOps.h,v 1.29 1999/05/10 09:26:41 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -317,9 +317,9 @@ typedef union {
   (r) =                                                         \
     ( arg._mp_size == 0 ) ?                                     \
        0 :                                                      \
-       ( arg._mp_size < 0 && arg._mp_d[0] > 0x80000000 ) ?      \
-         -(I_)arg._mp_d[0] :                                    \
-	  (I_)arg._mp_d[0];                                     \
+       (( arg._mp_size < 0 && arg._mp_d[0] != 0x80000000 ) ?    \
+          -(I_)arg._mp_d[0] :                                   \
+	   (I_)arg._mp_d[0]);                                   \
 }
 
 #define integer2Wordzh(r, sa,da)				\
