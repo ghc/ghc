@@ -45,7 +45,7 @@ import CLabel
 import CmmUtils
 import MachOp		( MachRep(..), wordRep, MachOp(..),  MachHint(..),
 			  mo_wordOr, mo_wordAnd, mo_wordNe, mo_wordEq,
-			  mo_wordULt, machRepByteWidth )
+			  mo_wordULt, mo_wordUGt, machRepByteWidth )
 import ForeignCall	( CCallConv(..) )
 import Literal		( Literal(..) )
 import CLabel		( CLabel, mkStringLitLabel )
@@ -57,6 +57,7 @@ import FastString	( LitString, FastString, unpackFS )
 import Outputable
 
 import DATA_BITS
+import Maybe		( isNothing )
 
 #include "../includes/ghcconfig.h"
 	-- For WORDS_BIGENDIAN
@@ -153,7 +154,8 @@ cmmOrWord  e1 e2 = CmmMachOp mo_wordOr  [e1, e2]
 cmmAndWord e1 e2 = CmmMachOp mo_wordAnd [e1, e2]
 cmmNeWord  e1 e2 = CmmMachOp mo_wordNe  [e1, e2]
 cmmEqWord  e1 e2 = CmmMachOp mo_wordEq  [e1, e2]
-cmmULtWord e1 e2 = CmmMachOp mo_wordULt  [e1, e2]
+cmmULtWord e1 e2 = CmmMachOp mo_wordULt [e1, e2]
+cmmUGtWord e1 e2 = CmmMachOp mo_wordUGt [e1, e2]
 
 cmmNegate :: CmmExpr -> CmmExpr
 cmmNegate (CmmLit (CmmInt n rep)) = CmmLit (CmmInt (-n) rep)
@@ -408,6 +410,21 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag
 	; return (oneCgStmt switch_stmt)
 	}
 
+  -- if we can knock off a bunch of default cases with one if, then do so
+  | Just deflt <- mb_deflt, (lowest_branch - lo_tag) >= n_branches
+  = do { (assign_tag, tag_expr') <- assignTemp' tag_expr
+       ; let cond = cmmULtWord tag_expr' (CmmLit (mkIntCLit lowest_branch))
+       ; stmtC (CmmCondBranch cond deflt)
+       ; mk_switch tag_expr' branches mb_deflt lowest_branch hi_tag
+       }
+
+  | Just deflt <- mb_deflt, (hi_tag - highest_branch) >= n_branches
+  = do { (assign_tag, tag_expr') <- assignTemp' tag_expr
+       ; let cond = cmmUGtWord tag_expr' (CmmLit (mkIntCLit highest_branch))
+       ; stmtC (CmmCondBranch cond deflt)
+       ; mk_switch tag_expr' branches mb_deflt lo_tag highest_branch
+       }
+
   | otherwise	-- Use an if-tree
   = do	{ (assign_tag, tag_expr') <- assignTemp' tag_expr
 		-- To avoid duplication
@@ -420,14 +437,31 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag
 	}
   where
     use_switch 	 = ASSERT( n_branches > 1 && n_tags > 1 ) 
+		   {- pprTrace "mk_switch" (ppr tag_expr <+> text "n_tags: "
+					<+> int n_tags <+> text "dense: "
+					<+> int n_branches) $ -}
 		   n_tags > 2 && (small || dense)
 		 -- a 2-branch switch always turns into an if.
     small      	 = n_tags <= 4
     dense      	 = n_branches > (n_tags `div` 2)
     exhaustive   = n_tags == n_branches
-    n_tags     	 = hi_tag - lo_tag + 1
     n_branches   = length branches
     
+    -- ignore default slots at each end of the range if there's 
+    -- no default branch defined.
+    lowest_branch  = fst (head branches)
+    highest_branch = fst (last branches)
+
+    real_lo_tag
+	| isNothing mb_deflt = lowest_branch
+	| otherwise          = lo_tag
+
+    real_hi_tag
+	| isNothing mb_deflt = highest_branch
+	| otherwise          = hi_tag
+
+    n_tags = real_hi_tag - real_lo_tag + 1
+
 	-- INVARIANT: Provided hi_tag > lo_tag (which is true)
 	--	lo_tag <= mid_tag < hi_tag
 	--	lo_branches have tags <  mid_tag
@@ -455,6 +489,9 @@ emitLitSwitch :: CmmExpr			-- Tag to switch on
 -- Used for general literals, whose size might not be a word, 
 -- where there is always a default case, and where we don't know
 -- the range of values for certain.  For simplicity we always generate a tree.
+--
+-- ToDo: for integers we could do better here, perhaps by generalising
+-- mk_switch and using that.  --SDM 15/09/2004
 emitLitSwitch scrut [] deflt 
   = emitCgStmts deflt
 emitLitSwitch scrut branches deflt_blk
