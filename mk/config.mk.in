@@ -114,12 +114,12 @@ ifeq "$(GhcWithHscBuiltViaC)" "YES"
 # need hslibs/lang first if we're bootstrapping
 ProjectsToBuild   = glafp-utils hslibs ghc
 else
-ProjectsToBuild   = glafp-utils happy
+ProjectsToBuild   = glafp-utils ghc hslibs
 endif
 #
 # Make a distinction between building and installing
 #
-ProjectsToInstall = glafp-utils happy
+ProjectsToInstall = glafp-utils ghc hslibs
 
 #
 # Should the various project tests directories be built?
