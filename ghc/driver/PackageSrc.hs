@@ -96,7 +96,6 @@ package_details installing =
          , "PrelIOBase_stackOverflow_closure"
          , "PrelIOBase_heapOverflow_closure"
          , "PrelIOBase_NonTermination_closure"
-         , "PrelIOBase_PutFullMVar_closure"
          , "PrelIOBase_BlockedOnDeadMVar_closure"
          , "PrelWeak_runFinalizzerBatch_closure"
          , "__init_Prelude"

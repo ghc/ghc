@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.15 2001/02/14 12:59:34 simonmar Exp $
+ * $Id: Prelude.h,v 1.16 2001/03/19 10:24:03 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -22,7 +22,6 @@ extern const StgClosure PrelMain_mainIO_closure;
 
 extern DLL_IMPORT const StgClosure PrelIOBase_stackOverflow_closure;
 extern DLL_IMPORT const StgClosure PrelIOBase_heapOverflow_closure;
-extern DLL_IMPORT const StgClosure PrelIOBase_PutFullMVar_closure;
 extern DLL_IMPORT const StgClosure PrelIOBase_BlockedOnDeadMVar_closure;
 extern DLL_IMPORT const StgClosure PrelIOBase_NonTermination_closure;
 
