@@ -10,7 +10,8 @@ Definitions for: @TyDecl@ and @oCnDecl@, @ClassDecl@,
 module HsDecls (
 	HsDecl(..), TyClDecl(..), InstDecl(..), RuleDecl(..), RuleBndr(..),
 	DefaultDecl(..), 
-	ForeignDecl(..), FoImport(..), FoExport(..), FoType(..),
+	ForeignDecl(..), ForeignImport(..), ForeignExport(..),
+	CImportSpec(..), FoType(..),
 	ConDecl(..), ConDetails(..), 
 	BangType(..), getBangType, getBangStrictness, unbangedType,
 	DeprecDecl(..), DeprecTxt,
@@ -35,7 +36,8 @@ import HsCore		( UfExpr, UfBinder, HsIdInfo, pprHsIdInfo,
 			)
 import CoreSyn		( CoreRule(..), RuleName )
 import BasicTypes	( NewOrData(..), StrictnessMark(..), Activation(..) )
-import ForeignCall	( CExportSpec, CCallSpec, DNCallSpec, CCallConv )
+import ForeignCall	( CCallTarget(..), DNCallSpec, CCallConv, Safety,
+			  CExportSpec(..)) 
 
 -- others:
 import Name		( NamedThing )
@@ -87,13 +89,13 @@ data HsDecl name pat
 hsDeclName :: (NamedThing name, Outputable name, Outputable pat)
 	   => HsDecl name pat -> name
 #endif
-hsDeclName (TyClD decl)			  = tyClDeclName decl
-hsDeclName (InstD   decl)		  = instDeclName decl
-hsDeclName (ForD    decl)		  = forDeclName decl
-hsDeclName (FixD    (FixitySig name _ _)) = name
+hsDeclName (TyClD decl)			= tyClDeclName     decl
+hsDeclName (InstD decl)		        = instDeclName     decl
+hsDeclName (ForD  decl)		        = foreignDeclName decl
+hsDeclName (FixD  (FixitySig name _ _)) = name
 -- Others don't make sense
 #ifdef DEBUG
-hsDeclName x				      = pprPanic "HsDecls.hsDeclName" (ppr x)
+hsDeclName x				= pprPanic "HsDecls.hsDeclName" (ppr x)
 #endif
 
 
@@ -719,43 +721,110 @@ instance (Outputable name)
 %************************************************************************
 
 \begin{code}
+
+-- foreign declarations are distinguished as to whether they define or use a
+-- Haskell name
+--
+-- * the Boolean value indicates whether the pre-standard deprecated syntax
+--   has been used
+--
 data ForeignDecl name
-  = ForeignImport name (HsType name) FoImport 	  SrcLoc
-  | ForeignExport name (HsType name) FoExport 	  SrcLoc
+  = ForeignImport name (HsType name) ForeignImport Bool SrcLoc  -- defines name
+  | ForeignExport name (HsType name) ForeignExport Bool SrcLoc  -- uses name
 
-forDeclName (ForeignImport n _ _ _) = n
-forDeclName (ForeignExport n _ _ _) = n
+-- yield the Haskell name defined or used in a foreign declaration
+--
+foreignDeclName                           :: ForeignDecl name -> name
+foreignDeclName (ForeignImport n _ _ _ _)  = n
+foreignDeclName (ForeignExport n _ _ _ _)  = n
 
-data FoImport 
-  = LblImport  CLabelString	-- foreign label
-  | CImport    CCallSpec	-- foreign import 
-  | CDynImport CCallConv	-- foreign export dynamic
-  | DNImport   DNCallSpec	-- foreign import dotnet
+-- specification of an imported external entity in dependence on the calling
+-- convention 
+--
+data ForeignImport = -- import of a C entity
+		     --
+                     -- * the two strings specifying a header file or library
+                     --   may be empty, which indicates the absence of a
+                     --   header or object specification (both are not used
+                     --   in the case of `CWrapper' and when `CFunction'
+                     --   has a dynamic target)
+		     --
+		     -- * the calling convention is irrelevant for code
+		     --   generation in the case of `CLabel', but is needed
+		     --   for pretty printing 
+		     --
+		     -- * `Safety' is irrelevant for `CLabel' and `CWrapper'
+		     --
+		     CImport  CCallConv	      -- ccall or stdcall
+			      Safety	      -- safe or unsafe
+			      FastString      -- name of C header
+			      FastString      -- name of library object
+			      CImportSpec     -- details of the C entity
 
-data FoExport = CExport CExportSpec
+                     -- import of a .NET function
+		     --
+		   | DNImport DNCallSpec
 
+-- details of an external C entity
+--
+data CImportSpec = CLabel    CLabelString     -- import address of a C label
+		 | CFunction CCallTarget      -- static or dynamic function
+		 | CWrapper		      -- wrapper to expose closures
+					      -- (former f.e.d.)
+
+-- specification of an externally exported entity in dependence on the calling
+-- convention
+--
+data ForeignExport = CExport  CExportSpec    -- contains the calling convention
+		   | DNExport		     -- presently unused
+
+-- abstract type imported from .NET
+--
 data FoType = DNType 		-- In due course we'll add subtype stuff
-	    deriving( Eq )	-- Used for equality instance for TyClDecl
+	    deriving (Eq)	-- Used for equality instance for TyClDecl
+
+
+-- pretty printing of foreign declarations
+--
 
 instance Outputable name => Outputable (ForeignDecl name) where
-  ppr (ForeignImport nm ty (LblImport lbl) src_loc)
-    = ptext SLIT("foreign label") <+> ppr lbl <+> ppr nm <+> dcolon <+> ppr ty
-  ppr (ForeignImport nm ty decl src_loc)
-    = ptext SLIT("foreign import") <+> ppr decl <+> ppr nm <+> dcolon <+> ppr ty
-  ppr (ForeignExport nm ty decl src_loc)
-    = ptext SLIT("foreign export") <+> ppr decl <+> ppr nm <+> dcolon <+> ppr ty
+  ppr (ForeignImport n ty fimport _ _) =
+    ptext SLIT("foreign import") <+> ppr fimport <+> 
+    ppr n <+> dcolon <+> ppr ty
+  ppr (ForeignExport n ty fexport _ _) =
+    ptext SLIT("foreign export") <+> ppr fexport <+> 
+    ppr n <+> dcolon <+> ppr ty
 
-instance Outputable FoImport where
-   ppr (CImport  d)      = ppr d
-   ppr (CDynImport conv) = text "dynamic" <+> ppr conv
-   ppr (DNImport d)   	 = ptext SLIT("dotnet") <+> ppr d
-   ppr (LblImport l)  	 = ptext SLIT("label") <+> ppr l
+instance Outputable ForeignImport where
+  ppr (DNImport			        spec) = 
+    ptext SLIT("dotnet") <+> ppr spec
+  ppr (CImport  cconv safety header lib spec) =
+    ppr cconv <+> ppr safety <+> 
+    char '"' <> pprCEntity header lib spec <> char '"'
+    where
+      pprCEntity header lib (CLabel lbl) = 
+        ptext SLIT("static") <+> ptext header <+> char '&' <>
+	pprLib lib <> ppr lbl
+      pprCEntity header lib (CFunction (StaticTarget lbl)) = 
+        ptext SLIT("static") <+> ptext header <+> char '&' <>
+	pprLib lib <> ppr lbl
+      pprCEntity header lib (CFunction (DynamicTarget)) = 
+        ptext SLIT("dynamic")
+      pprCEntity header lib (CFunction (CasmTarget _)) = 
+        panic "HsDecls.pprCEntity: malformed C function target"
+      pprCEntity _      _   (CWrapper) = ptext SLIT("wrapper")
+      --
+      pprLib lib | nullFastString lib = empty
+		 | otherwise	      = char '[' <> ppr lib <> char ']'
 
-instance Outputable FoExport where
-   ppr (CExport d) = ppr d
+instance Outputable ForeignExport where
+  ppr (CExport  (CExportStatic lbl cconv)) = 
+    ppr cconv <+> char '"' <> ppr lbl <> char '"'
+  ppr (DNExport                          ) = 
+    ptext SLIT("dotnet") <+> ptext SLIT("\"<unused>\"")
 
 instance Outputable FoType where
-   ppr DNType = ptext SLIT("type dotnet")
+  ppr DNType = ptext SLIT("type dotnet")
 \end{code}
 
 

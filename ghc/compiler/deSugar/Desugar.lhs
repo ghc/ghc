@@ -51,7 +51,7 @@ deSugar :: DynFlags
 	-> PersistentCompilerState -> HomeSymbolTable
 	-> Module -> PrintUnqualified
         -> TcResults
-	-> IO (ModDetails, (SDoc, SDoc, [CoreBndr]))
+	-> IO (ModDetails, (SDoc, SDoc, [FAST_STRING], [CoreBndr]))
 
 deSugar dflags pcs hst mod_name unqual
         (TcResults {tc_env   = type_env,
@@ -130,7 +130,7 @@ deSugarExpr dflags pcs hst mod_name unqual tc_expr
 
 dsProgram mod_name all_binds rules fo_decls
   = dsMonoBinds auto_scc all_binds []	`thenDs` \ core_prs ->
-    dsForeigns mod_name fo_decls	`thenDs` \ (fe_binders, foreign_binds, h_code, c_code) ->
+    dsForeigns mod_name fo_decls	`thenDs` \ (fe_binders, foreign_binds, h_code, c_code, headers) ->
     let
 	ds_binds      = [Rec (foreign_binds ++ core_prs)]
 	-- Notice that we put the whole lot in a big Rec, even the foreign binds
@@ -142,7 +142,7 @@ dsProgram mod_name all_binds rules fo_decls
 	local_binders = mkVarSet (bindersOfBinds ds_binds)
     in
     mapDs (dsRule local_binders) rules	`thenDs` \ rules' ->
-    returnDs (ds_binds, rules', (h_code, c_code, fe_binders))
+    returnDs (ds_binds, rules', (h_code, c_code, headers, fe_binders))
   where
     auto_scc | opt_SccProfilingOn = TopLevel
 	     | otherwise          = NoSccs

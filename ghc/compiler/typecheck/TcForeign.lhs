@@ -20,7 +20,8 @@ module TcForeign
 #include "HsVersions.h"
 
 import HsSyn		( HsDecl(..), ForeignDecl(..), HsExpr(..),
-			  MonoBinds(..), FoImport(..), FoExport(..)
+			  MonoBinds(..), ForeignImport(..), ForeignExport(..),
+			  CImportSpec(..)
 			)
 import RnHsSyn		( RenamedHsDecl, RenamedForeignDecl )
 
@@ -36,12 +37,15 @@ import Id		( Id, mkLocalId )
 import Name		( nameOccName )
 import PrimRep		( getPrimRepSize, isFloatingRep )
 import Type		( typePrimRep )
-import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe, tcSplitForAllTys,
+import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,
+			  tcSplitForAllTys, 
 			  isFFIArgumentTy, isFFIImportResultTy, 
 			  isFFIExportResultTy, isFFILabelTy,
-			  isFFIExternalTy, isFFIDynArgumentTy, isFFIDynResultTy
+			  isFFIExternalTy, isFFIDynArgumentTy,
+			  isFFIDynResultTy, isForeignPtrTy
 			)
-import ForeignCall	( CCallSpec(..), CExportSpec(..), CCallTarget(..), isDynamicTarget, isCasmTarget )
+import ForeignCall	( CCallSpec(..), CExportSpec(..), CCallTarget(..),
+			  isDynamicTarget, isCasmTarget ) 
 import CStrings		( CLabelString, isCLabelString )
 import PrelNames	( hasKey, ioTyConKey )
 import CmdLineOpts	( dopt_HscLang, HscLang(..) )
@@ -52,13 +56,13 @@ import Outputable
 \begin{code}
 -- Defines a binding
 isForeignImport :: ForeignDecl name -> Bool
-isForeignImport (ForeignImport _ _ _ _) = True
-isForeignImport _			= False
+isForeignImport (ForeignImport _ _ _ _ _) = True
+isForeignImport _			  = False
 
 -- Exports a binding
 isForeignExport :: ForeignDecl name -> Bool
-isForeignExport (ForeignExport _ _ _ _) = True
-isForeignExport _	  	        = False
+isForeignExport (ForeignExport _ _ _ _ _) = True
+isForeignExport _	  	          = False
 \end{code}
 
 %************************************************************************
@@ -70,10 +74,11 @@ isForeignExport _	  	        = False
 \begin{code}
 tcForeignImports :: [RenamedHsDecl] -> TcM ([Id], [TypecheckedForeignDecl])
 tcForeignImports decls = 
-   mapAndUnzipTc tcFImport [ foreign_decl | ForD foreign_decl <- decls, isForeignImport foreign_decl]
+  mapAndUnzipTc tcFImport 
+    [ foreign_decl | ForD foreign_decl <- decls, isForeignImport foreign_decl]
 
 tcFImport :: RenamedForeignDecl -> TcM (Id, TypecheckedForeignDecl)
-tcFImport fo@(ForeignImport nm hs_ty imp_decl src_loc)
+tcFImport fo@(ForeignImport nm hs_ty imp_decl isDeprec src_loc)
  = tcAddSrcLoc src_loc			$
    tcAddErrCtxt (foreignDeclCtxt fo)	$
    tcHsSigType (ForSigCtxt nm) hs_ty	`thenTc`	\ sig_ty ->
@@ -85,7 +90,7 @@ tcFImport fo@(ForeignImport nm hs_ty imp_decl src_loc)
 	id		  = mkLocalId nm sig_ty
    in
    tcCheckFIType sig_ty arg_tys res_ty imp_decl		`thenNF_Tc_` 
-   returnTc (id, ForeignImport id undefined imp_decl src_loc)
+   returnTc (id, ForeignImport id undefined imp_decl isDeprec src_loc)
 \end{code}
 
 
@@ -94,14 +99,16 @@ tcFImport fo@(ForeignImport nm hs_ty imp_decl src_loc)
 tcCheckFIType _ _ _ (DNImport _)
   = checkCg checkDotNet
 
-tcCheckFIType sig_ty arg_tys res_ty (LblImport _)
+tcCheckFIType sig_ty arg_tys res_ty (CImport _ _ _ _ (CLabel _))
   = checkCg checkCOrAsm		`thenNF_Tc_`
     check (isFFILabelTy sig_ty) (illegalForeignTyErr empty sig_ty)
 
-tcCheckFIType sig_ty arg_tys res_ty (CDynImport _)
-  = 	-- Foreign export dynamic
-   	-- The first (and only!) arg has got to be a function type
-	-- and it must return IO t; result type is IO Addr
+tcCheckFIType sig_ty arg_tys res_ty (CImport _ _ _ _ CWrapper)
+  = 	-- Foreign wrapper (former f.e.d.)
+   	-- The type must be of the form ft -> IO (FunPtr ft), where ft is a
+   	-- valid foreign type.  For legacy reasons ft -> IO (Ptr ft) as well
+   	-- as ft -> IO Addr is accepted, too.  The use of the latter two forms
+   	-- is DEPRECATED, though.
     checkCg checkCOrAsm		`thenNF_Tc_`
     case arg_tys of
 	[arg1_ty] -> checkForeignArgs isFFIExternalTy arg1_tys			`thenNF_Tc_`
@@ -112,10 +119,10 @@ tcCheckFIType sig_ty arg_tys res_ty (CDynImport _)
 		     (arg1_tys, res1_ty) = tcSplitFunTys arg1_ty
         other -> addErrTc (illegalForeignTyErr empty sig_ty)
 
-tcCheckFIType sig_ty arg_tys res_ty (CImport (CCallSpec target _ safety))
+tcCheckFIType sig_ty arg_tys res_ty (CImport _ safety _ _ (CFunction target))
   | isDynamicTarget target	-- Foreign import dynamic
   = checkCg checkCOrAsmOrInterp		`thenNF_Tc_`
-    case arg_tys of		-- The first arg must be Addr
+    case arg_tys of		-- The first arg must be Ptr, FunPtr, or Addr
       []     		-> check False (illegalForeignTyErr empty sig_ty)
       (arg1_ty:arg_tys) -> getDOptsTc							`thenNF_Tc` \ dflags ->
 			   check (isFFIDynArgumentTy arg1_ty)
@@ -187,14 +194,14 @@ checkFEDArgs arg_tys = returnNF_Tc ()
 tcForeignExports :: [RenamedHsDecl] -> TcM (LIE, TcMonoBinds, [TcForeignExportDecl])
 tcForeignExports decls = 
    foldlTc combine (emptyLIE, EmptyMonoBinds, [])
-		   [ foreign_decl | ForD foreign_decl <- decls, isForeignExport foreign_decl]
+     [foreign_decl | ForD foreign_decl <- decls, isForeignExport foreign_decl]
   where
    combine (lie, binds, fs) fe = 
        tcFExport fe `thenTc ` \ (a_lie, b, f) ->
        returnTc (lie `plusLIE` a_lie, b `AndMonoBinds` binds, f:fs)
 
 tcFExport :: RenamedForeignDecl -> TcM (LIE, TcMonoBinds, TcForeignExportDecl)
-tcFExport fo@(ForeignExport nm hs_ty spec src_loc) =
+tcFExport fo@(ForeignExport nm hs_ty spec isDeprec src_loc) =
    tcAddSrcLoc src_loc			$
    tcAddErrCtxt (foreignDeclCtxt fo)	$
 
@@ -203,8 +210,8 @@ tcFExport fo@(ForeignExport nm hs_ty spec src_loc) =
 
    tcCheckFEType sig_ty spec		`thenTc_`
 
-	  -- we're exporting a function, but at a type possibly more constrained
-	  -- than its declared/inferred type. Hence the need
+	  -- we're exporting a function, but at a type possibly more
+	  -- constrained than its declared/inferred type. Hence the need
 	  -- to create a local binding which will call the exported function
 	  -- at a particular type (and, maybe, overloading).
    newLocalName nm			`thenNF_Tc` \ id_name ->
@@ -212,7 +219,7 @@ tcFExport fo@(ForeignExport nm hs_ty spec src_loc) =
 	id   = mkLocalId id_name sig_ty
 	bind = VarMonoBind id rhs
    in
-   returnTc (lie, bind, ForeignExport id undefined spec src_loc)
+   returnTc (lie, bind, ForeignExport id undefined spec isDeprec src_loc)
 \end{code}
 
 ------------ Checking argument types for foreign export ----------------------
@@ -241,10 +248,14 @@ tcCheckFEType sig_ty (CExport (CExportStatic str _))
 ------------ Checking argument types for foreign import ----------------------
 checkForeignArgs :: (Type -> Bool) -> [Type] -> NF_TcM ()
 checkForeignArgs pred tys
-  = mapNF_Tc go tys	`thenNF_Tc_` returnNF_Tc ()
+  = mapNF_Tc go tys		`thenNF_Tc_` 
+    returnNF_Tc ()
   where
-    go ty = check (pred ty) (illegalForeignTyErr argument ty)
-
+    go ty = check (pred ty) (illegalForeignTyErr argument ty)   `thenNF_Tc_`
+	    warnTc (isForeignPtrTy ty) foreignPtrWarn
+    --
+    foreignPtrWarn = 
+      text "`ForeignPtr' as argument type in a foreign import is deprecated"
 
 ------------ Checking result types for foreign calls ----------------------
 -- Check that the type has the form 
@@ -300,11 +311,11 @@ checkCg check
  = getDOptsTc		`thenNF_Tc` \ dflags ->
    let hscLang = dopt_HscLang dflags in
    case hscLang of
-        HscNothing -> returnNF_Tc ()
-        otherwise ->
- 	  case check hscLang of
-	       Nothing  -> returnNF_Tc ()
-	       Just err -> addErrTc (text "Illegal foreign declaration:" <+> err)
+     HscNothing -> returnNF_Tc ()
+     otherwise  ->
+       case check hscLang of
+	 Nothing  -> returnNF_Tc ()
+	 Just err -> addErrTc (text "Illegal foreign declaration:" <+> err)
 \end{code} 
 			   
 Warnings

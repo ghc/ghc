@@ -118,6 +118,7 @@ data Token
   | ITexport
   | ITlabel
   | ITdynamic
+  | ITsafe
   | ITunsafe
   | ITwith
   | ITstdcallconv
@@ -292,6 +293,7 @@ isSpecial ITforall    	= True
 isSpecial ITexport    	= True
 isSpecial ITlabel     	= True
 isSpecial ITdynamic   	= True
+isSpecial ITsafe    	= True
 isSpecial ITunsafe    	= True
 isSpecial ITwith      	= True
 isSpecial ITccallconv   = True
@@ -306,6 +308,7 @@ ghcExtensionKeywordsFM = listToUFM $
 	( "export",	ITexport ),
 	( "label",	ITlabel ),
 	( "dynamic",	ITdynamic ),
+	( "safe",	ITunsafe ),
 	( "unsafe",	ITunsafe ),
 	( "with",	ITwith ),
 	( "stdcall",    ITstdcallconv),

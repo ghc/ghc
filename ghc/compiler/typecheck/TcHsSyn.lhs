@@ -743,9 +743,9 @@ zonkForeignExports :: [TcForeignExportDecl] -> NF_TcM [TypecheckedForeignDecl]
 zonkForeignExports ls = mapNF_Tc zonkForeignExport ls
 
 zonkForeignExport :: TcForeignExportDecl -> NF_TcM (TypecheckedForeignDecl)
-zonkForeignExport (ForeignExport i hs_ty spec src_loc) =
+zonkForeignExport (ForeignExport i hs_ty spec isDeprec src_loc) =
    zonkIdOcc i	`thenNF_Tc` \ i' ->
-   returnNF_Tc (ForeignExport i' undefined spec src_loc)
+   returnNF_Tc (ForeignExport i' undefined spec isDeprec src_loc)
 \end{code}
 
 \begin{code}

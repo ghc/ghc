@@ -127,20 +127,23 @@ rnSourceDecl (DefD (DefaultDecl tys src_loc))
 %*********************************************************
 
 \begin{code}
-rnHsForeignDecl (ForeignImport name ty spec src_loc)
+rnHsForeignDecl (ForeignImport name ty spec isDeprec src_loc)
   = pushSrcLocRn src_loc 		$
     lookupTopBndrRn name	        `thenRn` \ name' ->
     rnHsTypeFVs (fo_decl_msg name) ty	`thenRn` \ (ty', fvs) ->
-    returnRn (ForeignImport name' ty' spec src_loc, fvs `plusFV` extras spec)
+    returnRn (ForeignImport name' ty' spec isDeprec src_loc, 
+	      fvs `plusFV` extras spec)
   where
-    extras (CDynImport _) = mkFVs [newStablePtrName, deRefStablePtrName, bindIOName, returnIOName]
-    extras other	  = emptyFVs
+    extras (CImport _ _ _ _ CWrapper) = mkFVs [newStablePtrName,
+					       deRefStablePtrName,  
+					       bindIOName, returnIOName]
+    extras _			      = emptyFVs
 
-rnHsForeignDecl (ForeignExport name ty spec src_loc)
+rnHsForeignDecl (ForeignExport name ty spec isDeprec src_loc)
   = pushSrcLocRn src_loc 			$
     lookupOccRn name		        	`thenRn` \ name' ->
     rnHsTypeFVs (fo_decl_msg name) ty  		`thenRn` \ (ty', fvs) ->
-    returnRn (ForeignExport name' ty' spec src_loc, 
+    returnRn (ForeignExport name' ty' spec isDeprec src_loc, 
 	      mkFVs [bindIOName, returnIOName] `plusFV` fvs)
 
 fo_decl_msg name = ptext SLIT("The foreign declaration for") <+> ppr name

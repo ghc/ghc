@@ -69,6 +69,7 @@ import CodeOutput	( codeOutput )
 import Module		( ModuleName, moduleName, mkHomeModule, 
 			  moduleUserString, lookupModuleEnv )
 import CmdLineOpts
+import DriverState	( v_HCHeader )
 import ErrUtils		( dumpIfSet_dyn, showPass, printError )
 import Util		( unJust )
 import UniqSupply	( mkSplitUniqSupply )
@@ -83,7 +84,8 @@ import Name		( Name, nameModule, nameOccName, getName, isGlobalName )
 import NameEnv		( emptyNameEnv, mkNameEnv )
 import Module		( Module )
 
-import IOExts		( newIORef, readIORef, writeIORef, unsafePerformIO )
+import IOExts		( newIORef, readIORef, writeIORef, modifyIORef,
+			  unsafePerformIO )
 
 import Monad		( when )
 import Maybe		( isJust, fromJust )
@@ -334,7 +336,22 @@ hscRecomp ghci_mode dflags have_object
 	    mod_name_to_Module nm
 		 = do m <- findModule nm ; return (fst (fromJust m))
 
-	    (h_code,c_code,fe_binders) = foreign_stuff
+	    (h_code, c_code, headers, fe_binders) = foreign_stuff
+
+	    -- turn the list of headers requested in foreign import
+	    -- declarations into a string suitable for emission into generated
+	    -- C code...
+	    --
+	    foreign_headers =   
+	        unlines 
+	      . map (\fname -> "#include \"" ++ _UNPK_ fname ++ "\"")
+	      . reverse 
+	      $ headers
+
+	  -- ...and add the string to the headers requested via command line
+	  -- options 
+	  --
+	; modifyIORef v_HCHeader (++ foreign_headers)
 
         ; imported_modules <- mapM mod_name_to_Module imported_module_names
 

@@ -42,7 +42,7 @@ data ForeignCall
 -- We may need more clues to distinguish foreign calls
 -- but this simple printer will do for now
 instance Outputable ForeignCall where
-  ppr (CCall cc)      = ppr cc		
+  ppr (CCall cc)  = ppr cc		
   ppr (DNCall dn) = ppr dn
 \end{code}
 
@@ -59,7 +59,7 @@ data Safety
 	-- Show used just for Show Lex.Token, I think
 
 instance Outputable Safety where
-  ppr PlaySafe  = empty
+  ppr PlaySafe  = ptext SLIT("safe")
   ppr PlayRisky = ptext SLIT("unsafe")
 
 playSafe PlaySafe  = True
@@ -118,11 +118,11 @@ platforms.
 
 \begin{code}
 data CCallConv = CCallConv | StdCallConv
-	       deriving( Eq )
+	       deriving (Eq)
 
 instance Outputable CCallConv where
-  ppr StdCallConv = ptext SLIT("__stdcall")
-  ppr CCallConv   = ptext SLIT("_ccall")
+  ppr StdCallConv = ptext SLIT("stdcall")
+  ppr CCallConv   = ptext SLIT("ccall")
 
 defaultCCallConv :: CCallConv
 defaultCCallConv = CCallConv
@@ -170,10 +170,10 @@ instance Outputable CCallSpec where
 
 \begin{code}
 data DNCallSpec = DNCallSpec FastString
-		    deriving( Eq )
+		deriving (Eq)
 
 instance Outputable DNCallSpec where
-  ppr (DNCallSpec s) = text "DotNet" <+> ptext s
+  ppr (DNCallSpec s) = char '"' <> ptext s <> char '"'
 \end{code}
 
 

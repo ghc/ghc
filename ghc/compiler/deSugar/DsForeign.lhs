@@ -15,7 +15,8 @@ import CoreSyn
 import DsCCall		( dsCCall, mkFCall, boxResult, unboxArg, resultWrapper )
 import DsMonad
 
-import HsSyn		( ForeignDecl(..), FoExport(..), FoImport(..)  )
+import HsSyn		( ForeignDecl(..), ForeignExport(..),
+			  ForeignImport(..), CImportSpec(..) )
 import TcHsSyn		( TypecheckedForeignDecl )
 import CoreUtils	( exprType, mkInlineMe )
 import Id		( Id, idType, idName, mkVanillaGlobal, mkSysLocal,
@@ -47,6 +48,7 @@ import PrelNames	( hasKey, ioTyConKey, deRefStablePtrName, newStablePtrName,
 			  bindIOName, returnIOName
 			)
 import BasicTypes	( Activation( NeverActive ) )
+import ErrUtils         ( addShortWarnLocLine )
 import Outputable
 import Maybe 		( fromJust )
 \end{code}
@@ -77,17 +79,29 @@ dsForeigns :: Module
                                       -- "foreign exported" functions.
 		  , SDoc 	      -- C stubs to use when calling
                                       -- "foreign exported" functions.
+		  , [FAST_STRING]     -- headers that need to be included
+				      -- into C code generated for this module
 		  )
 dsForeigns mod_name fos
-  = foldlDs combine ([], [], empty, empty) fos
+  = foldlDs combine ([], [], empty, empty, []) fos
  where
-  combine (acc_feb, acc_f, acc_h, acc_c) (ForeignImport id _ spec _) 
-    = dsFImport mod_name id spec	`thenDs` \ (bs, h, c) -> 
-      returnDs (acc_feb, bs ++ acc_f, h $$ acc_h, c $$ acc_c)
+  combine (acc_feb, acc_f, acc_h, acc_c, acc_header) 
+	  (ForeignImport id _ spec depr loc)
+    = dsFImport mod_name id spec	           `thenDs` \(bs, h, c, hd) -> 
+      warnDepr depr loc				   `thenDs` \_              ->
+      returnDs (acc_feb, bs ++ acc_f, h $$ acc_h, c $$ acc_c, hd ++ acc_header)
 
-  combine (acc_feb, acc_f, acc_h, acc_c) (ForeignExport id _ (CExport (CExportStatic ext_nm cconv)) _)
-    = dsFExport mod_name id (idType id) ext_nm cconv False	`thenDs` \ (feb, b, h, c) ->
-      returnDs (feb:acc_feb, b : acc_f, h $$ acc_h, c $$ acc_c)
+  combine (acc_feb, acc_f, acc_h, acc_c, acc_header) 
+	  (ForeignExport id _ (CExport (CExportStatic ext_nm cconv)) depr loc)
+    = dsFExport mod_name id (idType id) 
+		ext_nm cconv False                 `thenDs` \(feb, b, h, c) ->
+      warnDepr depr loc				   `thenDs` \_              ->
+      returnDs (feb:acc_feb, b : acc_f, h $$ acc_h, c $$ acc_c, acc_header)
+
+  warnDepr False _   = returnDs ()
+  warnDepr True  loc = dsWarn (addShortWarnLocLine loc msg)
+   where
+    msg = ptext SLIT("foreign declaration uses deprecated non-standard syntax")
 \end{code}
 
 
@@ -114,23 +128,38 @@ However, we create a worker/wrapper pair, thus:
 The strictness/CPR analyser won't do this automatically because it doesn't look
 inside returned tuples; but inlining this wrapper is a Really Good Idea 
 because it exposes the boxing to the call site.
-			
 
 \begin{code}
 dsFImport :: Module
 	  -> Id
-	  -> FoImport
-	  -> DsM ([Binding], SDoc, SDoc)
-dsFImport mod_name lbl_id (LblImport ext_nm) 
- = ASSERT(fromJust res_ty `eqType` addrPrimTy) -- typechecker ensures this
-   returnDs ([(lbl_id, rhs)], empty, empty)
- where
-   (res_ty, fo_rhs) = resultWrapper (idType lbl_id)
-   rhs		    = fo_rhs (mkLit (MachLabel ext_nm))
+	  -> ForeignImport
+	  -> DsM ([Binding], SDoc, SDoc, [FAST_STRING])
+dsFImport modName id (CImport cconv safety header lib spec) = 
+  dsCImport modName id spec cconv safety	  `thenDs` \(ids, h, c) ->
+  returnDs (ids, h, c, if _NULL_ header then [] else [header])
+  -- FIXME: the `lib' field is needed for .NET ILX generation when invoking
+  --	    routines that are external to the .NET runtime, but GHC doesn't
+  --	    support such calls yet; if `_NULL_ lib', the value was not given
+dsFImport modName id (DNImport spec)                        = 
+  dsFCall modName id (DNCall spec)	          `thenDs` \(ids, h, c) ->
+  returnDs (ids, h, c, [])
 
-dsFImport mod_name fn_id (CImport spec)     = dsFCall mod_name fn_id (CCall spec)
-dsFImport mod_name fn_id (DNImport spec)    = dsFCall mod_name fn_id (DNCall spec)
-dsFImport mod_name fn_id (CDynImport cconv) = dsFExportDynamic mod_name fn_id cconv
+dsCImport :: Module
+	  -> Id
+	  -> CImportSpec
+	  -> CCallConv
+	  -> Safety
+	  -> DsM ([Binding], SDoc, SDoc)
+dsCImport modName id (CLabel cid)       _     _      =
+ ASSERT(fromJust res_ty `eqType` addrPrimTy)    -- typechecker ensures this
+ returnDs ([(id, rhs)], empty, empty)
+ where
+   (resTy, foRhs) = resultWrapper (idType id)
+   rhs		  = foRhs (mkLit (MachLabel cid))
+dsCImport modName id (CFunction target) cconv safety =
+  dsFCall modName id (CCall (CCallSpec target cconv safety))
+dsCImport modName id CWrapper           cconv _      =
+  dsFExportDynamic modName id cconv
 \end{code}
 
 

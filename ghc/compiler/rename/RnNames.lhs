@@ -243,7 +243,7 @@ getLocalDeclBinders mod (ValD binds)
     new (rdr_name, loc) = newTopBinder mod rdr_name loc 	`thenRn` \ name ->
 			  returnRn (Avail name)
 
-getLocalDeclBinders mod (ForD (ForeignImport nm _ _ loc))
+getLocalDeclBinders mod (ForD (ForeignImport nm _ _ _ loc))
   = newTopBinder mod nm loc	    `thenRn` \ name ->
     returnRn [Avail name]
 getLocalDeclBinders mod (ForD _)

@@ -5,34 +5,48 @@
 
 \begin{code}
 module ParseUtil (
-	  parseError		-- String -> Pa
+	  parseError	      -- String -> Pa
 	, mkVanillaCon, mkRecCon,
 
-	, mkRecConstrOrUpdate	-- HsExp -> [HsFieldUpdate] -> P HsExp
+	, mkRecConstrOrUpdate -- HsExp -> [HsFieldUpdate] -> P HsExp
 	, groupBindings
 	
-	, mkExtName             -- RdrName -> ExtName
-
-	, checkPrec 		-- String -> P String
-	, checkContext		-- HsType -> P HsContext
-	, checkInstType		-- HsType -> P HsType
-	, checkDataHeader	-- HsQualType -> P (HsContext,HsName,[HsName])
-	, checkPattern		-- HsExp -> P HsPat
-	, checkPatterns		-- SrcLoc -> [HsExp] -> P [HsPat]
-	, checkDo		-- [Stmt] -> P [Stmt]
-	, checkValDef		-- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
-	, checkValSig		-- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
+	, CallConv(..)
+	, mkImport            -- CallConv -> Safety 
+			      -- -> (FAST_STRING, RdrName, RdrNameHsType)
+			      -- -> SrcLoc 
+			      -- -> P RdrNameHsDecl
+	, mkExport            -- CallConv
+			      -- -> (FAST_STRING, RdrName, RdrNameHsType)
+			      -- -> SrcLoc 
+			      -- -> P RdrNameHsDecl
+	, mkExtName           -- RdrName -> CLabelString
+			      
+	, checkPrec 	      -- String -> P String
+	, checkContext	      -- HsType -> P HsContext
+	, checkInstType	      -- HsType -> P HsType
+	, checkDataHeader     -- HsQualType -> P (HsContext,HsName,[HsName])
+	, checkPattern	      -- HsExp -> P HsPat
+	, checkPatterns	      -- SrcLoc -> [HsExp] -> P [HsPat]
+	, checkDo	      -- [Stmt] -> P [Stmt]
+	, checkValDef	      -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
+	, checkValSig	      -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
  ) where
 
 #include "HsVersions.h"
 
+import List		( isSuffixOf )
+
 import Lex
 import HsSyn		-- Lots of it
+import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
+			  DNCallSpec(..))
 import SrcLoc
 import RdrHsSyn		( RdrBinding(..),
 			  RdrNameHsType, RdrNameBangType, RdrNameContext,
-			  RdrNameHsTyVar, RdrNamePat, RdrNameHsExpr, RdrNameGRHSs,
-			  RdrNameHsRecordBinds, RdrNameMonoBinds, RdrNameConDetails,
+			  RdrNameHsTyVar, RdrNamePat, RdrNameHsExpr,
+			  RdrNameGRHSs, RdrNameHsRecordBinds,
+			  RdrNameMonoBinds, RdrNameConDetails, RdrNameHsDecl,
 			  mkNPlusKPat
 			)
 import RdrName
@@ -40,7 +54,7 @@ import PrelNames	( unitTyCon_RDR )
 import OccName  	( dataName, varName, tcClsName,
 			  occNameSpace, setOccNameSpace, occNameUserString )
 import CStrings		( CLabelString )
-import FastString	( unpackFS )
+import FastString	( nullFastString )
 import Outputable
 
 -----------------------------------------------------------------------------
@@ -298,13 +312,105 @@ mkRecConstrOrUpdate exp fs@(_:_)
 mkRecConstrOrUpdate _ _
   = parseError "Empty record update"
 
--- Supplying the ext_name in a foreign decl is optional ; if it
+-----------------------------------------------------------------------------
+-- utilities for foreign declarations
+
+-- supported calling conventions
+--
+data CallConv = CCall  CCallConv	-- ccall or stdcall
+	      | DNCall			-- .NET
+
+-- construct a foreign import declaration
+--
+mkImport :: CallConv 
+	 -> Safety 
+	 -> (FAST_STRING, RdrName, RdrNameHsType) 
+	 -> SrcLoc 
+	 -> P RdrNameHsDecl
+mkImport (CCall  cconv) safety (entity, v, ty) loc =
+  parseCImport entity cconv safety v			 `thenP` \importSpec ->
+  returnP $ ForD (ForeignImport v ty importSpec                     False loc)
+mkImport (DNCall      ) _      (entity, v, ty) loc =
+  returnP $ ForD (ForeignImport v ty (DNImport (DNCallSpec entity)) False loc)
+
+-- parse the entity string of a foreign import declaration for the `ccall' or
+-- `stdcall' calling convention'
+--
+parseCImport :: FAST_STRING 
+	     -> CCallConv 
+	     -> Safety 
+	     -> RdrName 
+	     -> P ForeignImport
+parseCImport entity cconv safety v
+  -- FIXME: we should allow white space around `dynamic' and `wrapper' -=chak
+  | entity == SLIT ("dynamic") = 
+    returnP $ CImport cconv safety _NIL_ _NIL_ (CFunction DynamicTarget)
+  | entity == SLIT ("wrapper") =
+    returnP $ CImport cconv safety _NIL_ _NIL_ CWrapper
+  | otherwise		       = parse0 (_UNPK_ entity)
+    where
+      -- using the static keyword?
+      parse0 (' ':                    rest) = parse0 rest
+      parse0 ('s':'t':'a':'t':'i':'c':rest) = parse1 rest
+      parse0                          rest  = parse1 rest
+      -- check for header file name
+      parse1     ""               = parse4 ""    _NIL_        False _NIL_
+      parse1     (' ':rest)       = parse1 rest
+      parse1 str@('&':_   )       = parse2 str   _NIL_
+      parse1 str@('[':_   )       = parse3 str   _NIL_        False
+      parse1 str
+	| ".h" `isSuffixOf` first = parse2 rest  (_PK_ first)
+        | otherwise               = parse4 str   _NIL_        False _NIL_
+        where
+	  (first, rest) = break (\c -> c == ' ' || c == '&' || c == '[') str
+      -- check for address operator (indicating a label import)
+      parse2     ""         header = parse4 ""   header False _NIL_
+      parse2     (' ':rest) header = parse2 rest header
+      parse2     ('&':rest) header = parse3 rest header True
+      parse2 str@('[':_   ) header = parse3 str	 header False
+      parse2 str	    header = parse4 str	 header False _NIL_
+      -- check for library object name
+      parse3 (' ':rest) header isLbl = parse3 rest header isLbl
+      parse3 ('[':rest) header isLbl = 
+        case break (== ']') rest of 
+	  (lib, ']':rest)           -> parse4 rest header isLbl (_PK_ lib)
+	  _			    -> parseError "Missing ']' in entity"
+      parse3 str	header isLbl = parse4 str  header isLbl _NIL_
+      -- check for name of C function
+      parse4 ""         header isLbl lib = build (mkExtName v) header isLbl lib
+      parse4 (' ':rest) header isLbl lib = parse4 rest         header isLbl lib
+      parse4 str	header isLbl lib
+        | all (== ' ') rest              = build (_PK_ first)  header isLbl lib
+	| otherwise			 = parseError "Malformed entity string"
+        where
+	  (first, rest) = break (== ' ') str
+      --
+      build cid header False lib = returnP $
+        CImport cconv safety header lib (CFunction (StaticTarget cid))
+      build cid header True  lib = returnP $
+        CImport cconv safety header lib (CLabel                  cid )
+
+-- construct a foreign export declaration
+--
+mkExport :: CallConv
+         -> (FAST_STRING, RdrName, RdrNameHsType) 
+	 -> SrcLoc 
+	 -> P RdrNameHsDecl
+mkExport (CCall  cconv) (entity, v, ty) loc = returnP $ 
+  ForD (ForeignExport v ty (CExport (CExportStatic entity' cconv)) False loc)
+  where
+    entity' | nullFastString entity = mkExtName v
+	    | otherwise		    = entity
+mkExport DNCall (entity, v, ty) loc =
+  parseError "Foreign export is not yet supported for .NET"
+
+-- Supplying the ext_name in a foreign decl is optional; if it
 -- isn't there, the Haskell name is assumed. Note that no transformation
 -- of the Haskell name is then performed, so if you foreign export (++),
 -- it's external name will be "++". Too bad; it's important because we don't
 -- want z-encoding (e.g. names with z's in them shouldn't be doubled)
 -- (This is why we use occNameUserString.)
-
+--
 mkExtName :: RdrName -> CLabelString
 mkExtName rdrNm = _PK_ (occNameUserString (rdrNameOcc rdrNm))
 
