@@ -54,10 +54,15 @@ import GlaExts
 import PrelArr (ByteArray(..)) -- see internals
 import PrelIOBase
 import IO
+import Addr	( nullAddr )
 
 import PosixErr
 import PosixUtil
+import CString   ( strcpy, allocWords, freeze, allocChars )
 
+\end{code}
+
+\begin{code}
 getProcessID :: IO ProcessID
 getProcessID = _ccall_ getpid
 
@@ -76,7 +81,7 @@ setUserID uid = nonzero_error (_ccall_ setuid uid) "setUserID"
 getLoginName :: IO String
 getLoginName =  do
     str <- _ccall_ getlogin
-    if str == ``NULL''
+    if str == nullAddr
        then syserr "getLoginName"
        else strcpy str
 
@@ -94,7 +99,7 @@ setGroupID gid = nonzero_error (_ccall_ setgid gid) "setGroupID"
 #if !defined(cygwin32_TARGET_OS)
 getGroups :: IO [GroupID]
 getGroups = do
-    ngroups <- _ccall_ getgroups 0 (``NULL''::Addr)
+    ngroups <- _ccall_ getgroups 0 nullAddr
     words   <- allocWords ngroups
     ngroups <- _casm_ ``%r = getgroups(%0,(gid_t *)%1);'' ngroups words
     if ngroups /= -1
@@ -118,8 +123,8 @@ getEffectiveUserName = do
     strcpy str   
 
 {- OLD:
-    str <- _ccall_ cuserid (``NULL''::Addr)
-    if str == ``NULL''
+    str <- _ccall_ cuserid nullAddr
+    if str == nullAddr
        then syserr "getEffectiveUserName"
        else strcpy str
 -}
@@ -149,7 +154,7 @@ createSession = do
        then return pgid
        else syserr "createSession"
 
-type SystemID = ByteArray ()
+type SystemID = ByteArray Int
 
 systemName :: SystemID -> String
 systemName sid =  unsafePerformIO $ do
@@ -186,14 +191,14 @@ getSystemID = do
 
 epochTime :: IO EpochTime
 epochTime = do
-    secs <- _ccall_ time (``NULL''::Addr)
+    secs <- _ccall_ time nullAddr
     if secs /= -1
        then return secs
        else syserr "epochTime"
 
 -- All times in clock ticks (see getClockTick)
 
-type ProcessTimes = (ClockTick, ByteArray ())
+type ProcessTimes = (ClockTick, ByteArray Int)
 
 elapsedTime :: ProcessTimes -> ClockTick
 elapsedTime (realtime, _) = realtime
@@ -228,8 +233,8 @@ getProcessTimes = do
 #if !defined(cygwin32_TARGET_OS)
 getControllingTerminalName :: IO FilePath
 getControllingTerminalName = do
-    str <- _ccall_ ctermid (``NULL''::Addr)
-    if str == ``NULL''
+    str <- _ccall_ ctermid nullAddr
+    if str == nullAddr
        then fail (IOError Nothing NoSuchThing "getControllingTerminalName" "no controlling terminal")
        else strcpy str
 #endif
@@ -237,7 +242,7 @@ getControllingTerminalName = do
 getTerminalName :: Fd -> IO FilePath
 getTerminalName fd = do
     str <- _ccall_ ttyname fd
-    if str == ``NULL''
+    if str == nullAddr
        then do
         err <- try (queryTerminal fd)
         either (\err -> syserr "getTerminalName")

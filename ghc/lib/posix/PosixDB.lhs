@@ -17,12 +17,15 @@ module PosixDB (
     ) where
 
 import ST
-import PackedString (psToByteArrayST)
 import PrelIOBase
 import Addr
 import IO
 import PosixUtil
-import Util ( unvectorize )
+import CString ( unvectorize, strcpy, packStringIO )
+\end{code}
+
+
+\begin{code}
 
 data GroupEntry =
  GroupEntry {
@@ -42,41 +45,41 @@ data UserEntry =
 
 
 getGroupEntryForID :: GroupID -> IO GroupEntry
-getGroupEntryForID gid =
-    _ccall_ getgrgid gid  >>= \ ptr ->
-    if ptr == (``NULL'' :: Addr) then
+getGroupEntryForID gid = do
+    ptr <- _ccall_ getgrgid gid
+    if ptr == nullAddr then
 	fail (IOError Nothing NoSuchThing
 	     "getGroupEntryForID" "no such group entry")
-    else
+     else
 	unpackGroupEntry ptr
 
 getGroupEntryForName :: String -> IO GroupEntry
-getGroupEntryForName name =
-    stToIO (psToByteArrayST name)	>>= \ gname ->
-    _ccall_ getgrnam gname		>>= \ ptr ->
-    if ptr == (``NULL'' :: Addr) then
+getGroupEntryForName name = do
+    gname <- packStringIO name
+    ptr <- _ccall_ getgrnam gname
+    if ptr == nullAddr then
 	fail (IOError Nothing NoSuchThing
 	     "getGroupEntryForName" "no such group entry")
-    else
+     else
 	unpackGroupEntry ptr
 
 getUserEntryForID :: UserID -> IO UserEntry
-getUserEntryForID uid =
-    _ccall_ getpwuid uid		>>= \ ptr ->
-    if ptr == ``NULL'' then
+getUserEntryForID uid = do
+    ptr <- _ccall_ getpwuid uid
+    if ptr == nullAddr then
 	fail (IOError Nothing NoSuchThing
 	     "getUserEntryForID" "no such user entry")
-    else
+     else
 	unpackUserEntry ptr
 
 getUserEntryForName :: String -> IO UserEntry
-getUserEntryForName name =
-    stToIO (psToByteArrayST name)	>>= \ uname ->
-    _ccall_ getpwnam uname		>>= \ ptr ->
-    if ptr == ``NULL'' then
+getUserEntryForName name = do
+    uname <- packStringIO name
+    ptr   <- _ccall_ getpwnam uname
+    if ptr == nullAddr then
 	fail (IOError Nothing NoSuchThing
 	     "getUserEntryForName" "no such user entry")
-    else
+     else
 	unpackUserEntry ptr
 \end{code}
 

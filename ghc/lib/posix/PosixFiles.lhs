@@ -71,8 +71,10 @@ import PrelST
 import ST
 import PrelIOBase
 import IO
-import IOExts	    (unsafePerformIO)
-import PackedString (psToByteArrayST)
+import IOExts	    ( unsafePerformIO )
+import CString      ( packStringIO, allocChars,
+		      freeze, strcpy
+		    )
 import Addr
 import CCall
 import PrelBase
@@ -110,9 +112,9 @@ instance CReturnable DirStream
 
 openDirStream :: FilePath -> IO DirStream
 openDirStream name =
-    psToByteArrayIO name >>= \dir ->
+    packStringIO name >>= \dir ->
     _ccall_ opendir dir >>= \dirp@(A# dirp#) ->
-    if dirp /= (``NULL''::Addr)
+    if dirp /= nullAddr
        then return (DirStream# dirp#)
        else syserr "openDirStream"
 
@@ -120,7 +122,7 @@ readDirStream :: DirStream -> IO String
 readDirStream dirp = do
     setErrorCode noError
     dirent <- _ccall_ readdir dirp
-    if dirent /= (``NULL''::Addr)
+    if dirent /= nullAddr
        then do
 	    str <- _casm_ ``%r = ((struct dirent *)%0)->d_name;'' dirent
 	    name <- strcpy str
@@ -271,7 +273,7 @@ openFd :: FilePath
        -> OpenFileFlags
        -> IO Fd
 openFd name how maybe_mode (OpenFileFlags append exclusive noctty nonBlock truncate) =
-    psToByteArrayIO name >>= \file ->
+    packStringIO name >>= \file ->
     _ccall_ open file flags mode_w >>= \fd@(I# fd#) ->
     if fd /= -1
        then return (FD# fd#)
@@ -306,7 +308,7 @@ openFd name how maybe_mode (OpenFileFlags append exclusive noctty nonBlock trunc
 
 createFile :: FilePath -> FileMode -> IO Fd
 createFile name mode =
-    psToByteArrayIO name >>= \file ->
+    packStringIO name >>= \file ->
     _ccall_ creat file mode >>= \fd@(I# fd#) ->
     if fd /= -1
        then return (FD# fd#)
@@ -317,8 +319,8 @@ setFileCreationMask mask =  _ccall_ umask mask
 
 createLink :: FilePath -> FilePath -> IO ()
 createLink name1 name2 = do
-    path1 <- psToByteArrayIO name1
-    path2 <- psToByteArrayIO name2
+    path1 <- packStringIO name1
+    path2 <- packStringIO name2
     rc <- _ccall_ link path1 path2
     if rc == 0
        then return ()
@@ -326,7 +328,7 @@ createLink name1 name2 = do
 
 createDirectory :: FilePath -> FileMode -> IO ()
 createDirectory name mode = do -- NB: diff signature from LibDirectory one!
-    dir <- psToByteArrayIO name
+    dir <- packStringIO name
     rc  <- _ccall_ mkdir dir mode
     if rc == 0
        then return ()
@@ -334,7 +336,7 @@ createDirectory name mode = do -- NB: diff signature from LibDirectory one!
 
 createNamedPipe :: FilePath -> FileMode -> IO ()
 createNamedPipe name mode = do
-    pipe <- psToByteArrayIO name
+    pipe <- packStringIO name
     rc   <-_ccall_ mkfifo pipe mode
     if rc == 0
        then return ()
@@ -342,7 +344,7 @@ createNamedPipe name mode = do
 
 removeLink :: FilePath -> IO ()
 removeLink name = do
-    path <- psToByteArrayIO name
+    path <- packStringIO name
     rc   <-_ccall_ unlink path
     if rc == 0
        then return ()
@@ -350,14 +352,14 @@ removeLink name = do
 
 rename :: FilePath -> FilePath -> IO ()
 rename name1 name2 = do
-    path1 <- psToByteArrayIO name1
-    path2 <- psToByteArrayIO name2
+    path1 <- packStringIO name1
+    path2 <- packStringIO name2
     rc    <- _ccall_ rename path1 path2
     if rc == 0
        then return ()
        else syserr "rename"
 
-type FileStatus = ByteArray ()
+type FileStatus = ByteArray Int
 type FileID = Int
 type DeviceID = Int
 
@@ -428,7 +430,7 @@ isNamedPipe stat = unsafePerformIO $
 
 getFileStatus :: FilePath -> IO FileStatus
 getFileStatus name = do
-    path  <- psToByteArrayIO name
+    path  <- packStringIO name
     bytes <- allocChars ``sizeof(struct stat)''
     rc    <- _casm_ ``%r = stat(%0,(struct stat *)%1);'' path bytes
     if rc == 0
@@ -449,7 +451,7 @@ getFdStatus fd = do
 
 fileAccess :: FilePath -> Bool -> Bool -> Bool -> IO Bool
 fileAccess name read write exec = do
-    path <- psToByteArrayIO name
+    path <- packStringIO name
     rc   <- _ccall_ access path flags
     return (rc == 0)
   where
@@ -460,13 +462,13 @@ fileAccess name read write exec = do
 
 fileExist :: FilePath -> IO Bool
 fileExist name = do
-    path <- psToByteArrayIO name
+    path <- packStringIO name
     rc   <- _ccall_ access path (``F_OK''::Int)
     return (rc == 0)
 
 setFileMode :: FilePath -> FileMode -> IO ()
 setFileMode name mode = do
-    path <- psToByteArrayIO name
+    path <- packStringIO name
     rc   <- _ccall_ chmod path mode
     if rc == 0
        then return ()
@@ -474,7 +476,7 @@ setFileMode name mode = do
 
 setOwnerAndGroup :: FilePath -> UserID -> GroupID -> IO ()
 setOwnerAndGroup name uid gid = do
-    path <- psToByteArrayIO name
+    path <- packStringIO name
     rc   <- _ccall_ chown path uid gid
     if rc == 0
        then return ()
@@ -482,7 +484,7 @@ setOwnerAndGroup name uid gid = do
 
 setFileTimes :: FilePath -> EpochTime -> EpochTime -> IO ()
 setFileTimes name atime mtime = do
-    path <- psToByteArrayIO name
+    path <- packStringIO name
     rc   <- _casm_ ``do {struct utimbuf ub; ub.actime = (time_t) %0;
 		         ub.modtime = (time_t) %1;
 		         %r = utime(%2, &ub);} while(0);'' atime mtime path
@@ -493,8 +495,8 @@ setFileTimes name atime mtime = do
 {- Set access and modification time to current time -}
 touchFile :: FilePath -> IO ()
 touchFile name = do
-    path <- psToByteArrayIO name
-    rc   <- _ccall_ utime path (``NULL''::Addr)
+    path <- packStringIO name
+    rc   <- _ccall_ utime path nullAddr
     if rc == 0
        then return ()
        else syserr "touchFile"
@@ -522,7 +524,7 @@ getPathVar v name =
 
 pathconf :: Int -> FilePath -> IO Limit
 pathconf n name = do
-  path <- psToByteArrayIO name
+  path <- packStringIO name
   rc   <- _ccall_ pathconf path n
   if rc /= -1
      then return rc

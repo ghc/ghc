@@ -30,13 +30,12 @@ module PosixIO (
     ) where
 
 import GlaExts
-import ST
 import PrelIOBase
 import PrelHandle (readHandle, writeHandle, newHandle, getBMode__, getHandleFd )
 import IO
-import PackedString ( unpackPS, unsafeByteArrayToPS, psToByteArrayST )
 import Addr
 import Foreign
+import CString ( freeze, allocChars, packStringIO, unpackNBytesBAIO )
 
 import PosixUtil
 import PosixFiles ( stdInput, stdOutput, stdError )
@@ -136,7 +135,8 @@ fdRead fd nbytes = do
       0  -> fail (IOError Nothing EOF "fdRead" "EOF")
       n | n == nbytes -> do
 	    buf <- freeze bytes
-	    return (unpackPS (unsafeByteArrayToPS buf n), n)
+	    s   <- unpackNBytesBAIO buf n
+	    return (s, n)
         | otherwise -> do
 	    -- Let go of the excessively long ByteArray# by copying to a
 	    -- shorter one.  Maybe we need a new primitive, shrinkCharArray#?
@@ -144,11 +144,12 @@ fdRead fd nbytes = do
 	    _casm_ ``do {I_ i; for(i = 0; i < %2; i++) ((B_)%0)[i] = ((B_)%1)[i];
                       } while(0);'' bytes' bytes n
             buf <- freeze bytes'
-	    return (unpackPS (unsafeByteArrayToPS buf n), n)
+	    s   <- unpackNBytesBAIO buf n
+	    return (s, n)
 
 fdWrite :: Fd -> String -> IO ByteCount
 fdWrite fd str = do
-    buf <- stToIO (psToByteArrayST str)
+    buf <- packStringIO str
     rc  <- _ccall_ write fd buf (length str)
     if rc /= -1
        then return rc
@@ -269,7 +270,7 @@ lockRequest2Int kind =
   WriteLock -> ``F_WRLCK''
   Unlock    -> ``F_UNLCK''
 
-lock2Bytes :: FileLock -> IO (MutableByteArray RealWorld ())
+lock2Bytes :: FileLock -> IO (MutableByteArray RealWorld Int)
 lock2Bytes (kind, mode, start, len) = do
     bytes <- allocChars ``sizeof(struct flock)''
     _casm_ ``do { struct flock *fl = (struct flock *)%0;
@@ -282,7 +283,7 @@ lock2Bytes (kind, mode, start, len) = do
     return bytes
 --  where
 
-bytes2ProcessIDAndLock :: MutableByteArray s () -> IO (ProcessID, FileLock)
+bytes2ProcessIDAndLock :: MutableByteArray s Int -> IO (ProcessID, FileLock)
 bytes2ProcessIDAndLock bytes = do
     ltype   <- _casm_ ``%r = ((struct flock *)%0)->l_type;'' bytes
     lwhence <- _casm_ ``%r = ((struct flock *)%0)->l_whence;'' bytes

@@ -98,11 +98,15 @@ module PosixProcPrim (
 import GlaExts
 import IO
 import PrelIOBase
-import PackedString (psToByteArrayST)
-import Foreign  -- stable pointers
+import Foreign	    ( makeStablePtr, StablePtr, deRefStablePtr )
+import Addr	    ( nullAddr )
+
 import PosixErr
 import PosixUtil
-import Util ( unvectorize )
+import CString ( unvectorize, packStringIO,
+		 allocChars, freeze, vectorize,
+		 allocWords, strcpy
+	       )
 
 import System(ExitCode(..))
 import PosixProcEnv (getProcessID)
@@ -121,7 +125,7 @@ executeFile :: FilePath			    -- Command
             -> Maybe [(String, String)]	    -- Environment
             -> IO ()
 executeFile path search args Nothing = do
-    prog <- psToByteArrayIO path
+    prog <- packStringIO path
     argv <- vectorize (basename path:args)
     (if search then
         _casm_ ``execvp(%0,(char **)%1);'' prog argv
@@ -131,7 +135,7 @@ executeFile path search args Nothing = do
     syserr "executeFile"
 
 executeFile path search args (Just env) = do
-    prog <- psToByteArrayIO path
+    prog <- packStringIO path
     argv <- vectorize (basename path:args)
     envp <- vectorize (map (\ (name, val) -> name ++ ('=' : val)) env)
     (if search then
@@ -208,21 +212,21 @@ setEnvironment pairs = do
 
 getEnvVar :: String -> IO String
 getEnvVar name = do
-    str <- psToByteArrayIO name
+    str <- packStringIO name
     str <- _ccall_ getenv str
-    if str == ``NULL''
+    if str == nullAddr
        then fail (IOError Nothing NoSuchThing
 		 "getEnvVar" "no such environment variable")
        else strcpy str
 
 setEnvVar :: String -> String -> IO ()
 setEnvVar name value = do
-    str <- psToByteArrayIO (name ++ ('=' : value))
+    str <- packStringIO (name ++ ('=' : value))
     nonzero_error (_casm_ ``%r = _setenv(%0);'' str) "setEnvVar"
 
 removeEnvVar :: String -> IO ()
 removeEnvVar name = do
-    str <- psToByteArrayIO name
+    str <- packStringIO name
     nonzero_error (_ccall_ delenv str) "removeEnvVar"
 
 type Signal = Int
@@ -334,7 +338,7 @@ data Handler = Default
              | Ignore
              | Catch (IO ())
 
-type SignalSet = ByteArray ()
+type SignalSet = ByteArray Int
 
 sigSetSize :: Int
 sigSetSize = ``sizeof(sigset_t)''

@@ -46,8 +46,12 @@ import Foreign
 
 import PosixUtil
 import PosixErr
+import CString  ( freeze, allocChars )
 
-type TerminalAttributes = ByteArray ()
+\end{code}
+
+\begin{code}
+type TerminalAttributes = ByteArray Int
 
 data TerminalMode = InterruptOnBreak
                   | MapCRtoLF

@@ -6,25 +6,8 @@
 \begin{code}
 module PosixUtil where
 
-import ST
-import PrelST   -- ST representation
+import GlaExts
 import PrelIOBase  -- IOError representation
-import Addr
-import Foreign
-import CCall
-import PrelAddr
-import PrelBase ( Int(..), Int#, (==#)
-                , newIntArray#, unsafeFreezeByteArray#, newCharArray#
-		, RealWorld
-		)
-
-import MutableArray
-import ByteArray
-import Array
-import PackedString	( unpackCStringIO, packCBytesST, psToByteArrayST )
-import Ix
-import PrelArr          (StateAndMutableByteArray#(..), StateAndByteArray#(..))
-import Util		( unvectorize )
 
 \end{code}
 
@@ -72,64 +55,6 @@ syserr str = fail (IOError Nothing     -- ToDo: better
 			   str
 			   "")
 
--- Allocate a mutable array of characters with no indices.
-
-allocChars :: Int -> IO (MutableByteArray RealWorld ())
-allocChars (I# size#) = IO $ \ s# ->
-    case newCharArray# size# s# of
-      StateAndMutableByteArray# s2# barr# ->
-	IOok s2# (MutableByteArray bot barr#)
-  where
-    bot = error "PosixUtil.allocChars"
-
--- Allocate a mutable array of words with no indices
-
-allocWords :: Int -> IO (MutableByteArray RealWorld ())
-allocWords (I# size#) = IO $ \ s# ->
-    case newIntArray# size# s# of
-      StateAndMutableByteArray# s2# barr# ->
-	IOok s2# (MutableByteArray bot barr#)
-  where
-    bot = error "PosixUtil.allocWords"
-
--- Freeze these index-free mutable arrays
-
-freeze :: MutableByteArray RealWorld () -> IO (ByteArray ())
-freeze (MutableByteArray ixs arr#) = IO $ \ s# ->
-    case unsafeFreezeByteArray# arr# s# of
-      StateAndByteArray# s2# frozen# ->
-	IOok s2# (ByteArray ixs frozen#)
-
--- Copy a null-terminated string from outside the heap to
--- Haskellized nonsense inside the heap
-
-strcpy :: Addr -> IO String
-strcpy str = unpackCStringIO str
-
--- Turn a string list into a NULL-terminated vector of null-terminated
--- strings No indices...I hate indices.  Death to Ix.
-
-vectorize :: [String] -> IO (ByteArray ())
-vectorize xs = do
-  arr <- allocWords (len + 1)
-  fill arr 0 xs
-  freeze arr
- where
-    len :: Int
-    len = length xs
-
-    fill :: MutableByteArray RealWorld () -> Int -> [String] -> IO ()
-    fill arr n [] =
-	_casm_ ``((PP_)%0)[%1] = NULL;'' arr n
-    fill arr n (x:xs) =
-	stToIO (psToByteArrayST x)	    >>= \ barr ->
-        _casm_ ``((PP_)%0)[%1] = (P_)%2;'' arr n barr
-					    >>= \ () ->
-	fill arr (n+1) xs
-
--- Turn a NULL-terminated vector of null-terminated strings into a string list
--- unvectorize ... (now in misc/Util.lhs)
-
 -- common templates for system calls
 
 nonzero_error :: IO Int -> String -> IO ()
@@ -145,9 +70,5 @@ minusone_error io err = do
     if rc /= -1
        then return ()
        else syserr err
-
--- IO versions of a few ST functions.
-
-psToByteArrayIO = stToIO . psToByteArrayST
 
 \end{code}
