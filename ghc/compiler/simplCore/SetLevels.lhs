@@ -32,16 +32,16 @@ import FreeVars		-- all of it
 import Id		( idType, mkSysLocal, 
 			  nullIdEnv, addOneToIdEnv, growIdEnvList,
 			  unionManyIdSets, minusIdSet, mkIdSet,
-			  idSetToList,
+			  idSetToList, SYN_IE(Id),
 			  lookupIdEnv, SYN_IE(IdEnv)
 			)
-import Pretty		( ppPStr, ppBesides, ppChar, ppInt )
+import Pretty		( ptext, hcat, char, int )
 import SrcLoc		( noSrcLoc )
-import Type		( isPrimType, mkTyVarTys, mkForAllTys )
+import Type		( isPrimType, mkTyVarTys, mkForAllTys, SYN_IE(Type) )
 import TyVar		( nullTyVarEnv, addOneToTyVarEnv,
 			  growTyVarEnvList, lookupTyVarEnv,
 			  tyVarSetToList,
-			  SYN_IE(TyVarEnv),
+			  SYN_IE(TyVarEnv), SYN_IE(TyVar),
 			  unionManyTyVarSets
 			)
 import UniqSupply	( thenUs, returnUs, mapUs, mapAndUnzipUs,
@@ -50,6 +50,9 @@ import UniqSupply	( thenUs, returnUs, mapUs, mapAndUnzipUs,
 			)
 import Usage		( SYN_IE(UVar) )
 import Util		( mapAccumL, zipWithEqual, zipEqual, panic, assertPanic )
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable       ( Outputable(..) )
+#endif
 
 isLeakFreeType x y = False -- safe option; ToDo
 \end{code}
@@ -143,8 +146,8 @@ unTopify Top = Level 0 0
 unTopify lvl = lvl
 
 instance Outputable Level where
-  ppr sty Top		  = ppPStr SLIT("<Top>")
-  ppr sty (Level maj min) = ppBesides [ ppChar '<', ppInt maj, ppChar ',', ppInt min, ppChar '>' ]
+  ppr sty Top		  = ptext SLIT("<Top>")
+  ppr sty (Level maj min) = hcat [ char '<', int maj, char ',', int min, char '>' ]
 \end{code}
 
 %************************************************************************
