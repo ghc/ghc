@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.126 2002/06/12 22:04:25 wolfgang Exp $
+-- $Id: InteractiveUI.hs,v 1.127 2002/07/02 10:16:35 wolfgang Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -1082,6 +1082,10 @@ linkPackage dflags pkg
         let dirs      =  library_dirs pkg
         let libs      =  hs_libraries pkg ++ extra_libraries pkg
         classifieds   <- mapM (locateOneObj dirs) libs
+#ifdef darwin_TARGET_OS
+        let fwDirs    =  framework_dirs pkg
+        let frameworks=  extra_frameworks pkg
+#endif
 
         -- Complication: all the .so's must be loaded before any of the .o's.  
 	let dlls = [ dll | DLL dll <- classifieds ]
@@ -1092,7 +1096,10 @@ linkPackage dflags pkg
 	-- If this package is already part of the GHCi binary, we'll already
 	-- have the right DLLs for this package loaded, so don't try to
 	-- load them again.
-	when (name pkg `notElem` loaded_in_ghci) $
+	when (name pkg `notElem` loaded_in_ghci) $ do
+#ifdef darwin_TARGET_OS
+	    loadFrameworks fwDirs frameworks
+#endif
 	    loadDynamics dirs dlls
 	
 	-- After loading all the DLLs, we can load the static objects.
@@ -1110,6 +1117,15 @@ loadDynamics dirs (dll:dlls) = do
     Nothing  -> loadDynamics dirs dlls
     Just err -> throwDyn (CmdLineError ("can't load .so/.DLL for: " 
                                        ++ dll ++ " (" ++ err ++ ")" ))
+#ifdef darwin_TARGET_OS
+loadFrameworks dirs [] = return ()
+loadFrameworks dirs (fw:fws) = do
+  r <- loadFramework dirs fw
+  case r of
+    Nothing  -> loadFrameworks dirs fws
+    Just err -> throwDyn (CmdLineError ("can't load framework: " 
+                                       ++ fw ++ " (" ++ err ++ ")" ))
+#endif
 
 -- Try to find an object file for a given library in the given paths.
 -- If it isn't present, we assume it's a dynamic library.
@@ -1142,8 +1158,32 @@ loadDynamic [] rootname = do
 	-- own builtin paths now.
    addDLL (mkSOName rootname)
 
+#ifdef darwin_TARGET_OS
+mkSOName root = "lib" ++ root ++ ".dylib"
+#else
 mkSOName root = "lib" ++ root ++ ".so"
+#endif
 
+#endif
+
+-- Darwin / MacOS X only: load a framework
+-- a framework is a dynamic library packaged inside a directory of the same
+-- name. They are searched for in different paths than normal libraries.
+#ifdef darwin_TARGET_OS
+loadFramework extraPaths rootname
+   = loadFramework' (extraPaths ++ defaultFrameworkPaths) where
+   defaultFrameworkPaths = ["/Library/Frameworks", "/System/Library/Frameworks"]
+
+   loadFramework' (path:paths) = do
+      let dll = path ++ '/' : rootname ++ ".framework/" ++ rootname
+      b <- doesFileExist dll
+      if not b
+         then loadFramework' paths
+         else addDLL dll
+   loadFramework' [] = do
+	-- tried all our known library paths, but dlopen()
+	-- has no built-in paths for frameworks: give up
+      return $ Just $ "not found"
 #endif
 
 addDLL :: String -> IO (Maybe String)
