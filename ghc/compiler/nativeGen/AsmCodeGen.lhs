@@ -98,7 +98,7 @@ nativeCodeGen absC us
          insn_sdoc         = my_vcat insn_sdocs
          stix_sdoc         = vcat stix_sdocs
 
-#        ifdef NCG_DEBUG */
+#        ifdef NCG_DEBUG
          my_trace m x = trace m x
          my_vcat sds = Pretty.vcat (
                           intersperse (
