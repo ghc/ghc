@@ -840,7 +840,7 @@ HAPPY_VERSION		= @HappyVersion@
 #
 # Options to pass to Happy when we're going to compile the output with GHC
 #
-GHC_HAPPY_OPTS		= @HappyOpts@
+GHC_HAPPY_OPTS		= -agc
 
 #
 # Stuff from fptools/literate
