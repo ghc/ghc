@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
-$Id: HsParser.ly,v 1.17 2002/07/19 09:13:10 simonmar Exp $
+$Id: HsParser.ly,v 1.18 2002/07/19 10:00:16 simonmar Exp $
 
 (c) Simon Marlow, Sven Panne 1997-2002
 
@@ -150,10 +150,10 @@ Module Header
 > module :: { HsModule }
 > 	: optdoc 'module' modid maybeexports 'where' body
 >	    { case $1 of { (opts,info,doc) ->
->	      HsModule $3 $4 (reverse (fst $6)) (reverse (snd $6)) 
+>	      HsModule $3 $4 (reverse (fst $6)) (snd $6)
 >		opts info doc } }
 >	| body
->	    { HsModule main_mod Nothing (reverse (fst $1)) (reverse (snd $1))
+>	    { HsModule main_mod Nothing (reverse (fst $1)) (snd $1)
 >		Nothing Nothing Nothing }
 
 > optdoc :: { (Maybe String, Maybe ModuleInfo, Maybe Doc) }
@@ -168,10 +168,9 @@ Module Header
 > 	|      layout_on  bodyaux close			{ $2 }
 
 > bodyaux :: { ([HsImportDecl],[HsDecl]) }
->	: impdecls ';' topdecls optsemi			{ ($1, $3) }
->	|              topdecls optsemi			{ ([], $1) }
->	| impdecls              optsemi			{ ($1, []) }
->	| {- empty -}					{ ([], []) }
+>	: impdecls ';' topdecls				{ ($1, $3) }
+>	|              topdecls				{ ([], $1) }
+>	| impdecls             				{ ($1, []) }
 
 > optsemi :: { () }
 >	: ';'						{ () }
@@ -297,12 +296,12 @@ Fixity Declarations
 -----------------------------------------------------------------------------
 Top-Level Declarations
 
-Note: The report allows topdecls to be empty. This would result in another
-shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
-
 > topdecls :: { [HsDecl] }
->	: topdecls ';' topdecl		{ $3 : $1 }
+>	: topdecl ';' topdecls		{ $1 : $3 }
+> 	| ';' topdecls			{ $2 }
+>	| docdecl topdecls		{ $1 : $2 }
 >	| topdecl			{ [$1] }
+>	| {- empty -}			{ [] }
 
 > topdecl :: { HsDecl }
 >	: 'type' simpletype srcloc '=' ctype
@@ -330,8 +329,9 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >	| {- empty -}			{ [] }
 
 > decls :: { [HsDecl] }
->	: decls ';' decl		{ $3 : $1 }
->	| decls ';'			{ $1 }
+>	: decl ';' decls		{ $1 : $3 }
+> 	| docdecl decls			{ $1 : $2 }
+>	| ';' decls			{ $2 }
 >	| decl				{ [$1] }
 >	| {- empty -}			{ [] }
 
@@ -339,7 +339,9 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >	: signdecl		{ $1 }
 >	| fixdecl		{ $1 }
 >	| valdef		{ $1 }
->	| srcloc docnext	{ HsDocCommentNext $1 $2 }
+
+> docdecl :: { HsDecl }
+>	: srcloc docnext	{ HsDocCommentNext $1 $2 }
 >	| srcloc docprev	{ HsDocCommentPrev $1 $2 }
 >	| srcloc docnamed	{ case $2 of { (n,s) -> 
 >					HsDocCommentNamed $1 n s } }
