@@ -122,7 +122,6 @@ install ::
 	done
 
 install-docs ::
-ifneq "$(SGMLDocWays)" ""
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(filter-out $(ProjectsDontInstall), $(SUBDIRS)); do \
 	   if [ -d $$i ]; then \
@@ -130,7 +129,6 @@ ifneq "$(SGMLDocWays)" ""
 	      if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
 	      fi; \
 	done
-endif
 
 # -----------------------------------------------------------------------------
 # Making a binary distribution
@@ -259,11 +257,9 @@ binary-dist::
 # Which documentation to build/install is hardcoded below.
 #
 
-ifneq "$(SGMLDocWays)" ""
 BINDIST_DOC_WAYS = html ps
-else
-BINDIST_DOC_WAYS =
-endif
+# BINDIST_DOC_WAYS =
+
 binary-dist ::
 	@for i in $(BIN_DIST_DIRS); do 		 	 	\
 	  if test -d "$$i"; then 			 	\
