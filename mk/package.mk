@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.12 2002/06/24 14:38:06 simonmar Exp $
+# $Id: package.mk,v 1.13 2002/06/24 14:50:59 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -151,10 +151,10 @@ $(HTML_DOC) : $(HS_PPS) $(HADDOCK_INPLACE)
 		   --read-interface=../$(pkg),../$(pkg)/$(pkg).haddock)
 
 %.raw-hs : %.lhs
-	$(GHC) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
+	$(GHC_INPLACE) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
 
 %.raw-hs : %.hs
-	$(GHC) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
+	$(GHC_INPLACE) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
 
 install-docs :: $(HTML_DOC)
 	@$(INSTALL_DIR) $(datadir)/html/$(PACKAGE)
