@@ -2,7 +2,7 @@ module Main where
 
 import Prelude hiding (catch)
 import Exception
-import IO hiding (try)
+import IO hiding (try, catch)
 
 main = do
   ioTest
@@ -18,27 +18,28 @@ ioTest = catchIO (fail (userError "wibble"))
 				     else error "help!")
 
 errorTest :: IO ()
-errorTest = case getExceptions (1 + error "call to 'error'") of
-		Left exceptions -> putStr "error call caught\n"
-		Right val	-> error "help!"
+errorTest = getException (1 + error "call to 'error'") >>= \r ->
+	    case r of
+		Just exception -> putStr "error call caught\n"
+		Nothing        -> error "help!"
 
 instance (Show a, Eq a) => Num (Maybe a) where {}
 
 noMethodTest :: IO ()
-noMethodTest = catch (case Just () + Just () of Nothing -> return ())
-  (\exs -> case unsafePromiseSingleton exs of
-		NoMethodError err -> putStr "no method error\n"
-		other             -> error "help!")
+noMethodTest = getException (Just () + Just ()) >>= \ r ->
+	case r of
+		Just (NoMethodError err) -> putStr "no method error\n"
+		other                    -> error "help!"
 
 patMatchTest :: IO ()
-patMatchTest = catchOne (case test1 [1..10] of () -> return ())
+patMatchTest = catch (case test1 [1..10] of () -> return ())
   (\ex -> case ex of
 		PatternMatchFail err -> putStr err
 		other 		     -> error "help!")
 		  
 test1 [] = ()
 
-guardTest = catchOne (case test2 of () -> return ())
+guardTest = catch (case test2 of () -> return ())
   (\ex -> case ex of
 		NonExhaustiveGuards err -> putStr err
 		other 		     -> error "help!")

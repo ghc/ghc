@@ -1,0 +1,6 @@
+io exception caught
+error call caught
+no method error
+exceptions001.hs:40: Non-exhaustive patterns in function test1
+exceptions001.hs:47: Non-exhaustive guards in 
+43
