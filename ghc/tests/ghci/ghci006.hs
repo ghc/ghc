@@ -1,4 +1,6 @@
 
+module Ghci006 where
+
 data Q = forall x . Show x => Q x
 showQ (Q x) = show x
 

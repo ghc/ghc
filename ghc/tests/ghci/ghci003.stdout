@@ -1,10 +1,12 @@
    ___         ___ _
   / _ \ /\  /\/ __(_)
- / /_\// /_/ / /  | |      GHC Interactive, version 4.11, For Haskell 98.
+ / /_\// /_/ / /  | |      GHC Interactive, version 5.01, for Haskell 98.
 / /_\\/ __  / /___| |      http://www.haskell.org/ghc/
 \____/\/ /_/\____/|_|      Type :? for help.
 
 Loading package std ... linking ... done.
+*** WARNING: . is writable by someone else, IGNORING!
+*** WARNING: ./.ghci is writable by someone else, IGNORING!
 Prelude> -- check that 'it' works
 Prelude> 1
 1
