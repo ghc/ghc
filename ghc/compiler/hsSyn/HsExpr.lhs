@@ -811,10 +811,11 @@ pprComp brack stmts = brack $
 %************************************************************************
 
 \begin{code}
-data HsBracket id = ExpBr (HsExpr id)
-		  | PatBr (Pat id)
-		  | DecBr (HsGroup id)
-		  | TypBr (HsType id)
+data HsBracket id = ExpBr (HsExpr id)		-- [|  expr  |]
+		  | PatBr (Pat id)		-- [p| pat   |]
+		  | DecBr (HsGroup id)		-- [d| decls |]
+		  | TypBr (HsType id)		-- [t| type  |]
+		  | VarBr id			-- 'x, ''T
 
 instance OutputableBndr id => Outputable (HsBracket id) where
   ppr = pprHsBracket
@@ -824,7 +825,11 @@ pprHsBracket (ExpBr e) = thBrackets empty (ppr e)
 pprHsBracket (PatBr p) = thBrackets (char 'p') (ppr p)
 pprHsBracket (DecBr d) = thBrackets (char 'd') (ppr d)
 pprHsBracket (TypBr t) = thBrackets (char 't') (ppr t)
-
+pprHsBracket (VarBr n) = char '\'' <> ppr n
+	-- Infelicity: can't show ' vs '', because
+	-- we can't ask n what its OccName is, because the 
+	-- pretty-printer for HsExpr doesn't ask for NamedThings
+	-- But the pretty-printer for names will show the OccName class
 
 thBrackets pp_kind pp_body = char '[' <> pp_kind <> char '|' <+> 
 			     pp_body <+> ptext SLIT("|]")

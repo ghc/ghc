@@ -96,6 +96,11 @@ tcBracket brack res_ty
     }
 
 tc_bracket :: HsBracket Name -> TcM TcType
+tc_bracket (ExpBr v) 
+  = panic "tc_bracket" 
+--    tcMetaTy varTyConName
+	-- Result type is Var (not Q-monadic)
+
 tc_bracket (ExpBr expr) 
   = newTyVarTy openTypeKind	`thenM` \ any_ty ->
     tcCheckRho expr any_ty	`thenM_`
