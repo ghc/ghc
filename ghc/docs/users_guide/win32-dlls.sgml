@@ -54,11 +54,14 @@ Some of the standard Haskell libraries behave slightly differently on Windows.
 
 <itemizedlist>
 <listitem> <para>
-On Windows, the '<literal>^Z</literal>' character is interpreted as end-of-file, so
-if you read a file containing this character the file will appear to end just before it.
-To subvert this behaviour, you can put the file into Binary
-mode using <literal>GHC.Handle.hSetBinaryMode</literal>. (unfortunately this
-function isn't available form anywhere more stable, yet).
+On Windows, the '<literal>^Z</literal>' character is interpreted as an
+end-of-file character, so if you read a file containing this character
+the file will appear to end just before it. To avoid this,
+use <literal>IOExts.openFileEx</literal> to open a file in binary
+(untranslated) mode or change an already opened file handle into
+binary mode using <literal>IOExts.hSetBinaryMode</literal>. The
+<literal>IOExts</literal> module is part of the
+<literal>lang</literal> package.
 </para>
 </listitem>
 </itemizedlist>
