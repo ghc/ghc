@@ -9,7 +9,7 @@ import RnBinds		( rnBinds )
 import RnMonad		( RnMS(..), FreeVars )
 import RnSource		( rnHsSigType )
 import UniqSet		( UniqSet(..) )
-import PprStyle		( PprStyle )
+import Outputable	( PprStyle )
 import Pretty		( Doc )
 import Name		( Name )
 
