@@ -48,7 +48,7 @@ Haskell home page at <http://www.haskell.org/>.
 %package prof
 Summary: Profiling libraries for GHC
 Group: Development/Libraries
-Requires: ghc = %{PACKAGE_VERSION}
+Requires: ghc = %{PACKAGE_VERSION}-%{release}
 
 %description prof
 Profiling libraries for Glorious Glasgow Haskell Compilation System (GHC).
