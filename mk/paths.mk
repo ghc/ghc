@@ -131,6 +131,16 @@ MKDEPENDHS_SRCS=$(HS_SRCS)
 MKDEPENDC_SRCS=$(C_SRCS)
 
 #------------------------------------------------------------------
+#
+# make TAGS defaults
+#
+# The default set of files for the dependency generators to work on
+# is just their source equivalents.
+# 
+TAGS_HS_SRCS=$(HS_SRCS)
+TAGS_C_SRCS=$(C_SRCS)
+
+#------------------------------------------------------------------
 # Clean file make-variables.
 #
 # The following three variables are used to control
