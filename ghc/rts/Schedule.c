@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.169 2003/05/14 09:11:49 simonmar Exp $
+ * $Id: Schedule.c,v 1.170 2003/06/19 10:35:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1495,8 +1495,9 @@ run_thread:
  * Singleton fork(). Do not copy any running threads.
  * ------------------------------------------------------------------------- */
 
-StgInt forkProcess(StgTSO* tso) {
-
+StgInt
+forkProcess(StgTSO* tso)
+{
 #ifndef mingw32_TARGET_OS
   pid_t pid;
   StgTSO* t,*next;
@@ -1572,7 +1573,8 @@ StgInt forkProcess(StgTSO* tso) {
  * Locks: sched_mutex held.
  * ------------------------------------------------------------------------- */
    
-void deleteAllThreads ( void )
+void
+deleteAllThreads ( void )
 {
   StgTSO* t, *next;
   IF_DEBUG(scheduler,sched_belch("deleting all threads"));
