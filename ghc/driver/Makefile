@@ -26,7 +26,7 @@ PKGCONF_OPTS = "$(TARGETPLATFORM)"		\
 
 SRC_HC_OPTS += -fglasgow-exts -cpp 
 
-ghc_407_at_least = $(shell if (test $(GhcCanonVersion) -ge 4070); then echo YES; else echo NO; fi)
+ghc_407_at_least = $(shell if (test $(GhcCanonVersion) -ge 407); then echo YES; else echo NO; fi)
 
 ifeq "$(ghc_407_at_least)" "YES"
 SRC_HC_OPTS += -package concurrent -package text

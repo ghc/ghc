@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.201 2001/11/09 18:17:48 sof Exp $
+# $Id: Makefile,v 1.202 2001/11/09 21:25:56 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -113,9 +113,9 @@ ifeq "$(BootingFromHc)" "YES"
 bootstrapped = YES
 compiling_with_4xx=NO
 else
-bootstrapped = $(shell if (test $(GhcCanonVersion) -ge $(ProjectVersionInt)0); then echo YES; else echo NO; fi)
-compiling_with_4xx = $(shell if (test $(GhcCanonVersion) -lt 5000); then echo YES; else echo NO; fi)
-ghc_502_at_least = $(shell if (test $(GhcCanonVersion) -ge 5020); then echo YES; else echo NO; fi)
+bootstrapped = $(shell if (test $(GhcCanonVersion) -ge $(ProjectVersionInt)); then echo YES; else echo NO; fi)
+compiling_with_4xx = $(shell if (test $(GhcCanonVersion) -lt 500); then echo YES; else echo NO; fi)
+ghc_502_at_least = $(shell if (test $(GhcCanonVersion) -ge 502); then echo YES; else echo NO; fi)
 endif
 
 # Only include GHCi if we're bootstrapping with at least version 411
