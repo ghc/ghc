@@ -1,4 +1,31 @@
 
+tcfail067.hs:12:
+    Could not deduce (Ord a) from the context ()
+    Probable fix:
+	Add (Ord a) to the type signature(s) for `subRangeValue'
+    arising from the pattern `SubRange (lower, upper) value' at tcfail067.hs:12
+    When checking the pattern: SubRange (lower, upper) value
+    In the definition of `subRangeValue':
+	subRangeValue (SubRange (lower, upper) value) = value
+
+tcfail067.hs:15:
+    Could not deduce (Ord a) from the context ()
+    Probable fix:
+	Add (Ord a) to the type signature(s) for `subRange'
+    arising from the pattern `SubRange r value' at tcfail067.hs:15
+    When checking the pattern: SubRange r value
+    In the definition of `subRange': subRange (SubRange r value) = r
+
+tcfail067.hs:47:
+    Could not deduce (Ord a) from the context (Show a)
+    Probable fix:
+	Add (Ord a) to the type signature(s) for `showRange'
+    arising from the pattern `SubRange (lower, upper) value' at tcfail067.hs:47
+    When checking the pattern: SubRange (lower, upper) value
+    In the definition of `showRange':
+	showRange (SubRange (lower, upper) value)
+		    = (show value) ++ (" :" ++ ((show lower) ++ (".." ++ (...))))
+
 tcfail067.hs:60:
     Could not deduce (Show (SubRange a)) from the context (Num a)
     Probable fix:
