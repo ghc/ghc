@@ -683,6 +683,13 @@ INLINE int __hsposix_SIGXFSZ()   { return SIGXFSZ; }
 INLINE int __hsposix_SIG_BLOCK()   { return SIG_BLOCK; }
 INLINE int __hsposix_SIG_UNBLOCK() { return SIG_UNBLOCK; }
 INLINE int __hsposix_SIG_SETMASK() { return SIG_SETMASK; }
+
+#if HAVE_SIGINFO
+INLINE int __hsposix_SIGINFO()	{ return SIGINFO; }
+#endif
+#if HAVE_SIGWINCH
+INLINE int __hsposix_SIGWINCH()	{ return SIGWINCH; }
+#endif
 #endif /* mingw32_TARGET_OS */
 
 // These are wrapped because on some OSs (eg. Linux) they are

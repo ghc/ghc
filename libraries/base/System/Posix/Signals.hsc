@@ -51,6 +51,12 @@ module System.Posix.Signals (
   virtualTimerExpired, sigVTALRM,
   cpuTimeLimitExceeded, sigXCPU,
   fileSizeLimitExceeded, sigXFSZ,
+#if HAVE_SIGINFO
+  infoEvent, sigINFO,
+#endif
+#if HAVE_SIGWINCH
+  windowChange, sigWINCH,
+#endif
 
   -- * Sending signals
   raiseSignal,
@@ -148,6 +154,12 @@ sigURG    = (#const SIGURG)    :: CInt
 sigVTALRM = (#const SIGVTALRM) :: CInt
 sigXCPU   = (#const SIGXCPU)   :: CInt
 sigXFSZ   = (#const SIGXFSZ)   :: CInt
+#if HAVE_SIGINFO
+sigINFO   = (#const SIGINFO)   :: CInt
+#endif
+#if HAVE_SIGWINCH
+sigWINCH  = (#const SIGWINCH)  :: CInt
+#endif
 #else
 foreign import ccall unsafe "__hsposix_SIGABRT"   sigABRT   :: CInt
 foreign import ccall unsafe "__hsposix_SIGALRM"   sigALRM   :: CInt
@@ -179,6 +191,12 @@ foreign import ccall unsafe "__hsposix_SIGURG"    sigURG    :: CInt
 foreign import ccall unsafe "__hsposix_SIGVTALRM" sigVTALRM :: CInt
 foreign import ccall unsafe "__hsposix_SIGXCPU"   sigXCPU   :: CInt
 foreign import ccall unsafe "__hsposix_SIGXFSZ"   sigXFSZ   :: CInt
+#if HAVE_SIGINFO
+foreign import ccall unsafe "__hsposix_SIGINFO"   sigINFO   :: CInt
+#endif
+#if HAVE_SIGWINCH
+foreign import ccall unsafe "__hsposix_SIGWINCH"   sigWINCH   :: CInt
+#endif
 #endif /* __HUGS__ */
 
 internalAbort ::Signal
@@ -266,6 +284,16 @@ cpuTimeLimitExceeded = sigXCPU
 
 fileSizeLimitExceeded :: Signal
 fileSizeLimitExceeded = sigXFSZ
+
+#if HAVE_SIGINFO
+infoEvent :: Signal
+infoEvent = sigINFO
+#endif
+
+#if HAVE_SIGWINCH
+windowChange :: Signal
+windowChange = sigWINCH
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Signal-related functions
