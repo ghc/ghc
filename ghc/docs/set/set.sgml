@@ -8,11 +8,11 @@
 ]>
 <Set>
   
-<book>
+<book id="book-users-guide">
 &ug-book;
 </book>
 
-<book>
+<book id="book-hslibs">
 &hslibs-book;
 </book>
 
