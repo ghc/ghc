@@ -22,7 +22,8 @@ import TcHsSyn		( TcId, TcDictBinds, zonkId, mkHsLet )
 
 import TcRnMonad
 import Inst		( InstOrigin(..), newDictsAtLoc, newIPDict, instToId )
-import TcEnv		( tcExtendIdEnv, tcExtendIdEnv2, tcExtendTyVarEnv2, newLocalName, tcLookupLocalIds )
+import TcEnv		( tcExtendIdEnv, tcExtendIdEnv2, tcExtendTyVarEnv2, 
+			  newLocalName, tcLookupLocalIds, pprBinders )
 import TcUnify		( Expected(..), tcInfer, checkSigTyVars, sigCtxt )
 import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyRestricted, 
 			  tcSimplifyToDicts, tcSimplifyIPs )
@@ -291,7 +292,7 @@ tcBindWithSigs top_lvl mbind sigs is_rec = do
 		-- TODO: location a bit awkward, but the mbinds have been
 		--	 dependency analysed and may no longer be adjacent
 	   addErrCtxt (genCtxt (bndrNames mono_bind_infos)) $
-	   generalise is_unres mono_bind_infos tc_ty_sigs lie_req
+	   generalise top_lvl is_unres mono_bind_infos tc_ty_sigs lie_req
 
 	-- FINALISE THE QUANTIFIED TYPE VARIABLES
 	-- The quantified type variables often include meta type variables
@@ -634,9 +635,9 @@ checkSigCtxt sig1 sig@(TcSigInfo { sig_tvs = tvs, sig_theta = theta, sig_tau = t
 \end{code}
 
 \begin{code}
-generalise :: Bool -> [MonoBindInfo] -> [TcSigInfo] -> [Inst]
+generalise :: TopLevelFlag -> Bool -> [MonoBindInfo] -> [TcSigInfo] -> [Inst]
 	   -> TcM ([TcTyVar], TcDictBinds, [TcId])
-generalise is_unrestricted mono_infos sigs lie_req
+generalise top_lvl is_unrestricted mono_infos sigs lie_req
   | not is_unrestricted	-- RESTRICTED CASE
   = 	-- Check signature contexts are empty 
     do	{ checkTc (all is_mono_sig sigs)
@@ -644,7 +645,8 @@ generalise is_unrestricted mono_infos sigs lie_req
 
 	-- Now simplify with exactly that set of tyvars
 	-- We have to squash those Methods
-	; (qtvs, binds) <- tcSimplifyRestricted doc tau_tvs lie_req
+	; (qtvs, binds) <- tcSimplifyRestricted doc top_lvl bndr_names 
+						tau_tvs lie_req
 
    	-- Check that signature type variables are OK
 	; final_qtvs <- checkSigsTyVars qtvs sigs
@@ -890,9 +892,4 @@ restrictedBindCtxtErr binder_names
 
 genCtxt binder_names
   = ptext SLIT("When generalising the type(s) for") <+> pprBinders binder_names
-
--- Used in error messages
--- Use quotes for a single one; they look a bit "busy" for several
-pprBinders [bndr] = quotes (ppr bndr)
-pprBinders bndrs  = pprWithCommas ppr bndrs
 \end{code}

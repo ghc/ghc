@@ -20,7 +20,7 @@ module TcRnTypes(
 	WhereFrom(..), mkModDeps,
 
 	-- Typechecker types
-	TcTyThing(..), GadtRefinement,
+	TcTyThing(..), pprTcTyThingCategory, GadtRefinement,
 
 	-- Template Haskell
 	ThStage(..), topStage, topSpliceStage,
@@ -48,7 +48,7 @@ import HscTypes		( FixityEnv,
 			  GenAvailInfo(..), AvailInfo, HscSource(..),
 			  availName, IsBootInterface, Deprecations )
 import Packages		( PackageId )
-import Type		( Type, TvSubstEnv, pprParendType )
+import Type		( Type, TvSubstEnv, pprParendType, pprTyThingCategory )
 import TcType		( TcTyVarSet, TcType, TcTauType, TcThetaType, SkolemInfo,
 			  TcPredType, TcKind, tcCmpPred, tcCmpType, tcCmpTypes )
 import InstEnv		( DFunId, InstEnv )
@@ -414,6 +414,12 @@ instance Outputable TcTyThing where	-- Debugging only
 			  ifPprDebug (brackets (ppr g <> comma <> ppr tl <> comma <> ppr pl))
    ppr (ATyVar tv ty)   = text "Type variable" <+> quotes (ppr tv) <+> pprParendType ty
    ppr (AThing k)       = text "AThing" <+> ppr k
+
+pprTcTyThingCategory :: TcTyThing -> SDoc
+pprTcTyThingCategory (AGlobal thing) = pprTyThingCategory thing
+pprTcTyThingCategory (ATyVar _ _)    = ptext SLIT("Type variable")
+pprTcTyThingCategory (ATcId _ _ _)   = ptext SLIT("Local identifier")
+pprTcTyThingCategory (AThing _)	     = ptext SLIT("Kinded thing")
 \end{code}
 
 \begin{code}

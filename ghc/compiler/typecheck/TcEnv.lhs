@@ -22,7 +22,7 @@ module TcEnv(
 	tcLookup, tcLookupLocated, tcLookupLocalIds,
 	tcLookupId, tcLookupTyVar,
 	lclEnvElts, getInLocalScope, findGlobals, 
-	wrongThingErr,
+	wrongThingErr, pprBinders,
 
 	tcExtendRecEnv,    	-- For knot-tying
 
@@ -47,12 +47,13 @@ module TcEnv(
 
 import HsSyn		( LRuleDecl, LHsBinds, LSig, pprLHsBinds )
 import TcIface		( tcImportDecl )
+import TcRnTypes	( pprTcTyThingCategory )
 import TcRnMonad
 import TcMType		( zonkTcType, zonkTcTyVarsAndFV )
 import TcType		( Type, TcKind, TcTyVar, TcTyVarSet, TcType,
 			  tyVarsOfType, tyVarsOfTypes, tcSplitDFunTy, mkGenTyConApp,
 			  getDFunTyKey, tcTyConAppTyCon, tcGetTyVar, mkTyVarTy,
-			  tidyOpenType, pprTyThingCategory
+			  tidyOpenType 
 			)
 import qualified Type	( getTyVar_maybe )
 import Id		( idName, isLocalId )
@@ -591,15 +592,17 @@ simpleInstInfoTyCon inst = tcTyConAppTyCon (simpleInstInfoTy inst)
 %************************************************************************
 
 \begin{code}
+pprBinders :: [Name] -> SDoc
+-- Used in error messages
+-- Use quotes for a single one; they look a bit "busy" for several
+pprBinders [bndr] = quotes (ppr bndr)
+pprBinders bndrs  = pprWithCommas ppr bndrs
+
 notFound name 
   = failWithTc (ptext SLIT("GHC internal error:") <+> quotes (ppr name) <+> 
 		ptext SLIT("is not in scope"))
 
 wrongThingErr expected thing name
-  = failWithTc (pp_thing thing <+> quotes (ppr name) <+> 
+  = failWithTc (pprTcTyThingCategory thing <+> quotes (ppr name) <+> 
 		ptext SLIT("used as a") <+> text expected)
-  where
-    pp_thing (AGlobal thing) = pprTyThingCategory thing
-    pp_thing (ATyVar _ _)    = ptext SLIT("Type variable")
-    pp_thing (ATcId _ _ _)   = ptext SLIT("Local identifier")
 \end{code}

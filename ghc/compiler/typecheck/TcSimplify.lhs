@@ -38,7 +38,7 @@ import Inst		( lookupInst, LookupInstResult(..),
 			  Inst, pprInsts, pprDictsInFull, pprInstInFull, tcGetInstEnvs,
 			  isInheritableInst, pprDFuns, pprDictsTheta
 			)
-import TcEnv		( tcGetGlobalTyVars, tcLookupId, findGlobals )
+import TcEnv		( tcGetGlobalTyVars, tcLookupId, findGlobals, pprBinders )
 import InstEnv		( lookupInstEnv, classInstances )
 import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, checkAmbiguity )
 import TcType		( TcTyVar, TcTyVarSet, ThetaType, 
@@ -47,7 +47,7 @@ import TcType		( TcTyVar, TcTyVarSet, ThetaType,
 			  tyVarsOfPred, tcEqType, pprPred )
 import Id		( idType, mkUserLocal )
 import Var		( TyVar )
-import Name		( getOccName, getSrcLoc )
+import Name		( Name, getOccName, getSrcLoc )
 import NameSet		( NameSet, mkNameSet, elemNameSet )
 import Class		( classBigSig, classKey )
 import FunDeps		( oclose, grow, improve, pprEquationDoc )
@@ -57,6 +57,7 @@ import PrelNames	( splitName, fstName, sndName, integerTyConName,
 import Type		( zipTopTvSubst, substTheta, substTy )
 import TysWiredIn	( pairTyCon, doubleTy )
 import ErrUtils		( Message )
+import BasicTypes	( TopLevelFlag, isNotTopLevel )
 import VarSet
 import VarEnv		( TidyEnv )
 import FiniteMap
@@ -508,6 +509,21 @@ you might not expect the addition to be done twice --- but it will if
 we follow the argument of Question 2 and generalise over ?y.
 
 
+Question 4: top level
+~~~~~~~~~~~~~~~~~~~~~
+At the top level, monomorhism makes no sense at all.
+
+    module Main where
+	main = let ?x = 5 in print foo
+
+	foo = woggle 3
+
+	woggle :: (?x :: Int) => Int -> Int
+	woggle y = ?x + y
+
+We definitely don't want (foo :: Int) with a top-level implicit parameter
+(?x::Int) becuase there is no way to bind it.  
+
 
 Possible choices
 ~~~~~~~~~~~~~~~~
@@ -955,6 +971,8 @@ Plan D (a variant of plan B)
 tcSimplifyRestricted 	-- Used for restricted binding groups
 			-- i.e. ones subject to the monomorphism restriction
 	:: SDoc
+	-> TopLevelFlag
+	-> [Name]		-- Things bound in this group
 	-> TcTyVarSet		-- Free in the type of the RHSs
 	-> [Inst]		-- Free in the RHSs
 	-> TcM ([TcTyVar],	-- Tyvars to quantify (zonked)
@@ -963,7 +981,7 @@ tcSimplifyRestricted 	-- Used for restricted binding groups
 	-- quantify over; by definition there are none.
 	-- They are all thrown back in the LIE
 
-tcSimplifyRestricted doc tau_tvs wanteds
+tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- Zonk everything in sight
   = mappM zonkInst wanteds			`thenM` \ wanteds' ->
     zonkTcTyVarsAndFV (varSetElems tau_tvs)	`thenM` \ tau_tvs' ->
@@ -984,8 +1002,6 @@ tcSimplifyRestricted doc tau_tvs wanteds
 	constrained_tvs = tyVarsOfInsts constrained_dicts
 	qtvs = (tau_tvs' `minusVarSet` oclose (fdPredsOfInsts constrained_dicts) gbl_tvs')
 			 `minusVarSet` constrained_tvs
-        try_me inst | isFreeWrtTyVars qtvs inst = Free
-	            | otherwise                 = ReduceMe
     in
     traceTc (text "tcSimplifyRestricted" <+> vcat [
 		pprInsts wanteds, pprInsts _frees, pprInsts constrained_dicts,
@@ -1005,11 +1021,30 @@ tcSimplifyRestricted doc tau_tvs wanteds
 	-- Remember that we may need to do *some* simplification, to
 	-- (for example) squash {Monad (ST s)} into {}.  It's not enough
 	-- just to float all constraints
+	--
+	-- At top level, we *do* squash methods becuase we want to 
+	-- expose implicit parameters to the test that follows
+    let
+	is_nested_group = isNotTopLevel top_lvl
+        try_me inst | isFreeWrtTyVars qtvs inst,
+		      (is_nested_group || isDict inst) = Free
+	            | otherwise  		       = ReduceMe
+    in
     reduceContextWithoutImprovement 
 	doc try_me wanteds' 		`thenM` \ (frees, binds, irreds) ->
     ASSERT( null irreds )
-    extendLIEs frees			`thenM_`
-    returnM (varSetElems qtvs, binds)
+
+	-- See "Notes on implicit parameters, Question 4: top level"
+    if is_nested_group then
+	extendLIEs frees	`thenM_`
+        returnM (varSetElems qtvs, binds)
+    else
+	let
+    	    (non_ips, bad_ips) = partition isClassDict frees
+	in    
+	addTopIPErrs bndrs bad_ips	`thenM_`
+	extendLIEs non_ips		`thenM_`
+        returnM (varSetElems qtvs, binds)
 \end{code}
 
 
@@ -1946,7 +1981,7 @@ tc_simplify_top is_interactive wanteds
 
 	-- Report definite errors
     groupErrs (addNoInstanceErrs Nothing []) no_insts	`thenM_`
-    addTopIPErrs bad_ips				`thenM_`
+    strangeTopIPErrs bad_ips				`thenM_`
 
 	-- Deal with ambiguity errors, but only if
 	-- if there has not been an error so far; errors often
@@ -2244,7 +2279,21 @@ addInstLoc insts msg = msg $$ nest 2 (pprInstLoc (instLoc (head insts)))
 plural [x] = empty
 plural xs  = char 's'
 
-addTopIPErrs dicts
+addTopIPErrs :: [Name] -> [Inst] -> TcM ()
+addTopIPErrs bndrs [] 
+  = return ()
+addTopIPErrs bndrs ips
+  = addErrTcM (tidy_env, mk_msg tidy_ips)
+  where
+    (tidy_env, tidy_ips) = tidyInsts ips
+    mk_msg ips = vcat [sep [ptext SLIT("Implicit parameters escape from the monomorphic top-level binding(s) of"),
+			    pprBinders bndrs <> colon],
+		       nest 2 (vcat (map ppr_ip ips)),
+		       ptext SLIT("Probably fix: add type signatures for the top-level binding(s)")]
+    ppr_ip ip = pprPred (dictPred ip) <+> pprInstLoc (instLoc ip)
+
+strangeTopIPErrs :: [Inst] -> TcM ()
+strangeTopIPErrs dicts	-- Strange, becuase addTopIPErrs should have caught them all
   = groupErrs report tidy_dicts
   where
     (tidy_env, tidy_dicts) = tidyInsts dicts
