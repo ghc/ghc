@@ -69,7 +69,8 @@ pprParendKind = pprParendType
 
 pprPred :: PredType -> SDoc
 pprPred (Class clas tys) = pprConstraint clas tys
-pprPred (IParam n ty)    = hsep [ppr n, ptext SLIT("::"), ppr ty]
+pprPred (IParam n ty)    = hsep [ptext SLIT("?") <> ppr n,
+				 ptext SLIT("::"), ppr ty]
 
 pprConstraint :: Class -> [Type] -> SDoc
 pprConstraint clas tys = ppr clas <+> hsep (map pprParendType tys)
@@ -177,12 +178,9 @@ ppr_ty env ctxt_prec ty@(ForAllTy _ _)
     pp_tyvars = hsep (map (pBndr env LambdaBind) tyvars)
     
     ppr_theta []	= empty
-    ppr_theta theta     = parens (hsep (punctuate comma (map ppr_pred theta))) 
+    ppr_theta theta     = parens (hsep (punctuate comma (map (ppr_pred env) theta))) 
 			  <+> ptext SLIT("=>")
 
-    ppr_pred (Class clas tys) = ppr clas <+> hsep (map (ppr_ty env tYCON_PREC) tys)
-    ppr_pred (IParam n ty)    = hsep [{- char '?' <> -} ppr n, text "::",
-				      ppr_ty env tYCON_PREC ty]
 
 ppr_ty env ctxt_prec (FunTy ty1 ty2)
   = maybeParen ctxt_prec fUN_PREC (sep (ppr_ty env fUN_PREC ty1 : pp_rest ty2))

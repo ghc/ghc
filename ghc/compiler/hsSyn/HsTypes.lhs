@@ -156,7 +156,7 @@ instance (Outputable name) => Outputable (HsTyVarBndr name) where
 
 instance Outputable name => Outputable (HsPred name) where
     ppr (HsPClass clas tys) = ppr clas <+> hsep (map pprParendHsType tys)
-    ppr (HsPIParam n ty)    = hsep [{- char '?' <> -} ppr n, text "::", ppr ty]
+    ppr (HsPIParam n ty)    = hsep [char '?' <> ppr n, text "::", ppr ty]
 
 pprHsTyVarBndr :: Outputable name => name -> Kind -> SDoc
 pprHsTyVarBndr name kind | kind == boxedTypeKind = ppr name
