@@ -8,6 +8,7 @@ tc019_HC_OPTS = -fglasgow-exts
 tc065_HC_OPTS = -syslib misc
 tc089_HC_OPTS = -H12m
 tc097_HC_OPTS = -fglasgow-exts
+tc100_HC_OPTS = -O
 
 # mkdependHS doesn't understand OPTIONS pragmas...
 SRC_MKDEPENDHS_OPTS += -fglasgow-exts -syslib misc
