@@ -591,8 +591,9 @@ findNamedDoc str decls =
 	where search [] = Nothing
 	      search (HsDocCommentNamed str : rest) = 
 		case matchRegexAll docNameRE str of
-		   Nothing -> search rest
-		   Just (_, _, after, _, _) -> Just after
+		   Just (_, _, after, _, name':_)
+			| name == name' -> Just after
+		   _otherwise -> search rest
 	      search (_other_decl : rest) = search rest
      _other -> Nothing
 
