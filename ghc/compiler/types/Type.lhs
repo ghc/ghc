@@ -79,14 +79,6 @@ import Util	( thenCmp, zipEqual, assoc,
 		  panic, panic#, assertPanic, pprPanic,
 		  Ord3(..){-instances-}
 		)
--- ToDo:rm all these
---import	{-mumble-}
---	Pretty
---import  {-mumble-}
---	PprStyle
---import	{-mumble-}
---	PprType --(pprType )
---import PprEnv
 \end{code}
 
 Data types
@@ -159,40 +151,6 @@ not			           ([a], a -> a)
 The reason is that we then get better (shorter) type signatures in 
 interfaces.  Notably this plays a role in tcTySigs in TcBinds.lhs.
 
-
-Expand abbreviations
-~~~~~~~~~~~~~~~~~~~~
-Removes just the top level of any abbreviations.
-
-\begin{code}
-expandTy :: Type -> Type	-- Restricted to Type due to Dict expansion
-
-expandTy (FunTy t1 t2 u) = AppTy (AppTy (TyConTy mkFunTyCon u) t1) t2
-expandTy (SynTy _  _  t) = expandTy t
-expandTy (DictTy clas ty u)
-  = case all_arg_tys of
-
-	[]	 -> voidTy		-- Empty dictionary represented by Void
-
-	[arg_ty] -> expandTy arg_ty	-- just the <whatever> itself
-
-		-- The extra expandTy is to make sure that
-		-- the result isn't still a dict, which it might be
-		-- if the original guy was a dict with one superdict and
-		-- no methods!
-
-	other -> ASSERT(not (null all_arg_tys))
-	    	foldl AppTy (TyConTy (tupleTyCon (length all_arg_tys)) u) all_arg_tys
-
-		-- A tuple of 'em
-		-- Note: length of all_arg_tys can be 0 if the class is
-		--       CCallable, CReturnable (and anything else
-		--       *really weird* that the user writes).
-  where
-    all_arg_tys  = classDictArgTys clas ty
-
-expandTy ty = ty
-\end{code}
 
 Simple construction and analysis functions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -751,6 +709,39 @@ instantiateUsage
 instantiateUsage = panic "instantiateUsage: not implemented"
 \end{code}
 
+Expand abbreviations
+~~~~~~~~~~~~~~~~~~~~
+Removes just the top level of any abbreviations.
+
+\begin{code}
+expandTy :: Type -> Type	-- Restricted to Type due to Dict expansion
+
+expandTy (FunTy t1 t2 u) = AppTy (AppTy (TyConTy mkFunTyCon u) t1) t2
+expandTy (SynTy _  _  t) = expandTy t
+expandTy (DictTy clas ty u)
+  = case all_arg_tys of
+
+	[]	 -> voidTy		-- Empty dictionary represented by Void
+
+	[arg_ty] -> expandTy arg_ty	-- just the <whatever> itself
+
+		-- The extra expandTy is to make sure that
+		-- the result isn't still a dict, which it might be
+		-- if the original guy was a dict with one superdict and
+		-- no methods!
+
+	other -> ASSERT(not (null all_arg_tys))
+	    	foldl AppTy (TyConTy (tupleTyCon (length all_arg_tys)) u) all_arg_tys
+
+		-- A tuple of 'em
+		-- Note: length of all_arg_tys can be 0 if the class is
+		--       CCallable, CReturnable (and anything else
+		--       *really weird* that the user writes).
+  where
+    all_arg_tys  = classDictArgTys clas ty
+
+expandTy ty = ty
+\end{code}
 
 At present there are no unboxed non-primitive types, so
 isUnboxedType is the same as isPrimType.
