@@ -23,6 +23,7 @@ module Foreign.ForeignPtr
 #ifdef __HUGS__
 	, FinalizerEnvPtr
 #endif
+	-- ** Basic operations
         , newForeignPtr
         , newForeignPtr_
         , addForeignPtrFinalizer
@@ -31,10 +32,13 @@ module Foreign.ForeignPtr
 	, addForeignPtrFinalizerEnv
 #endif
 	, withForeignPtr
+
+	-- ** Low-level operations
 	, unsafeForeignPtrToPtr
 	, touchForeignPtr
 	, castForeignPtr
 
+	-- ** Allocating managed memory
 	, mallocForeignPtr
 	, mallocForeignPtrBytes
 	, mallocForeignPtrArray
@@ -157,13 +161,21 @@ mallocForeignPtrBytes :: Int -> IO (ForeignPtr a)
 mallocForeignPtrBytes n = do
   r <- mallocBytes n
   newForeignPtr finalizerFree r
-#endif /* __HUGS__ || __NHC__ */
+#endif /* !__GLASGOW_HASKELL__ */
 
+-- | This function is similar to 'Foreign.Marshal.Array.mallocArray',
+-- but yields a memory area that has a finalizer attached that releases
+-- the memory area.  As with 'mallocForeignPtr', it is not guaranteed that
+-- the block of memory was allocated by 'Foreign.Marshal.Alloc.malloc'.
 mallocForeignPtrArray :: Storable a => Int -> IO (ForeignPtr a)
 mallocForeignPtrArray  = doMalloc undefined
   where
     doMalloc            :: Storable a => a -> Int -> IO (ForeignPtr a)
     doMalloc dummy size  = mallocForeignPtrBytes (size * sizeOf dummy)
 
+-- | This function is similar to 'Foreign.Marshal.Array.mallocArray0',
+-- but yields a memory area that has a finalizer attached that releases
+-- the memory area.  As with 'mallocForeignPtr', it is not guaranteed that
+-- the block of memory was allocated by 'Foreign.Marshal.Alloc.malloc'.
 mallocForeignPtrArray0      :: Storable a => Int -> IO (ForeignPtr a)
 mallocForeignPtrArray0 size  = mallocForeignPtrArray (size + 1)

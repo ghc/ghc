@@ -97,16 +97,16 @@ newConcForeignPtr p finalizer
        return fObj
 
 mallocForeignPtr :: Storable a => IO (ForeignPtr a)
--- ^ allocates some memory and returns a ForeignPtr to it.  The memory
--- will be released automatically when the ForeignPtr is discarded.
+-- ^ Allocate some memory and return a 'ForeignPtr' to it.  The memory
+-- will be released automatically when the 'ForeignPtr' is discarded.
 --
--- @mallocForeignPtr@ is equivalent to
+-- 'mallocForeignPtr' is equivalent to
 --
--- >    do { p <- malloc; newForeignPtr p free }
+-- >    do { p <- malloc; newForeignPtr finalizerFree p }
 -- 
--- although it may be implemented differently internally.  You may not
+-- although it may be implemented differently internally: you may not
 -- assume that the memory returned by 'mallocForeignPtr' has been
--- allocated with C's @malloc()@.
+-- allocated with 'Foreign.Marshal.Alloc.malloc'.
 mallocForeignPtr = doMalloc undefined
   where doMalloc :: Storable a => a -> IO (ForeignPtr a)
         doMalloc a = do
@@ -117,8 +117,8 @@ mallocForeignPtr = doMalloc undefined
             }
 	    where (I# size) = sizeOf a
 
--- | similar to 'mallocForeignPtr', except that the size of the memory required
--- is given explicitly as a number of bytes.
+-- | This function is similar to 'mallocForeignPtr', except that the
+-- size of the memory required is given explicitly as a number of bytes.
 mallocForeignPtrBytes :: Int -> IO (ForeignPtr a)
 mallocForeignPtrBytes (I# size) = do 
   r <- newIORef []
