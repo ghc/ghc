@@ -138,6 +138,7 @@ rm -rf ${RPM_BUILD_ROOT}
 %{prefix}/bin/hp2ps
 %{prefix}/bin/hsc2hs
 %{prefix}/bin/runghc
+%{prefix}/bin/runhaskell
 %{prefix}/bin/stat2resid
 
 %files prof -f rpm-prof-lib-files
