@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.6 1999/05/05 10:48:06 sof Exp $
+# $Id: Makefile,v 1.7 1999/09/17 10:43:51 sof Exp $
 #
 # Makefile for concurrent libraries.
 #
@@ -47,7 +47,7 @@ SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR)
 DLL_NAME = HSconc.dll
 DLL_IMPLIB_NAME = libHSconcurrent_imp.a
 SRC_BLD_DLL_OPTS += --export-all --output-def=HSconc.def
-SRC_BLD_DLL_OPTS += -lwinmm -lHSrts_imp -lHS_cbits_imp -lHS_imp -lgmp -L. -L../../rts/gmp -L../../rts -L../std -L../std/cbits
+SRC_BLD_DLL_OPTS += -lwinmm -lHSrts_imp -lHScbits_imp -lHS_imp -lgmp -L. -L../../rts/gmp -L../../rts -L../std -L../std/cbits
 
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries
@@ -65,6 +65,11 @@ override datadir:=$(libdir)/imports/concurrent
 # 
 INSTALL_LIBS  += $(LIBRARY)
 INSTALL_DATAS += $(HS_IFACES)
+ifeq "$(EnableWin32DLLs)" "YES"
+INSTALL_PROGS += $(DLL_NAME)
+INSTALL_LIBS  += $(patsubst %.a, %_imp.a, $(LIBRARY))
+INSTALL_DATAS += dLL_ifs.hi
+endif
 
 include $(TOP)/mk/target.mk
 

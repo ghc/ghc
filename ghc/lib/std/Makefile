@@ -84,13 +84,37 @@ boot :: PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
 DLL_NAME = HSprel.dll
 DLL_IMPLIB_NAME = libHS_imp.a
 SRC_BLD_DLL_OPTS += --export-all --output-def=HSprel.def
-SRC_BLD_DLL_OPTS += -lwinmm -lHSrts_imp -lHS_cbits_imp -lgmp -L. -L../../rts/gmp -L../../rts -Lcbits
+SRC_BLD_DLL_OPTS += -lwinmm -lHSrts_imp -lHScbits_imp -lgmp -L. -L../../rts/gmp -L../../rts -Lcbits
 
 
 ifeq "$(way)" "dll"
 HS_SRCS := $(filter-out PrelMain.lhs, $(HS_SRCS))
 endif
 
+# PrelMain.dll_o isn't to be included in the final .a
+ifeq "$(way)" "dll"
+all :: PrelMain.dll_o
+endif
+
+#
+# Building PrelMain.dll_o is, unfortunately, somewhat tricky
+# with the current DLL setup. PrelMain.dll_o should refer to
+# all its imports bar Main.main_closure as residing in DLLs.
+# But, since the .hi's of PrelBase et al. is in the same
+# directory as PrelMain, the compiler will assume that they
+# reside in the same DLL as PrelMain & generate code accordingly.
+# 
+# So, we copy out PrelMain.lhs to ".." and build it there &
+# copy the gen'ed object file back in again.
+# 
+ifeq "$(way)" "dll"
+PrelMain.dll_o : PrelMain.lhs
+	$(RM) ../PrelMain.lhs
+	$(CP) PrelMain.lhs ../
+	$(MAKE) -C .. PrelMain.dll_o way=dll HC_OPTS="$(filter-out -fcompiling-prelude, $(HC_OPTS))"
+	$(MV) ../PrelMain.dll_o .
+	$(RM) ../PrelMain.lhs ../PrelMain.dll_hi
+endif
 
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries
@@ -109,7 +133,7 @@ override datadir:=$(libdir)/imports/std
 INSTALL_LIBS  += $(LIBRARY)
 ifeq "$(EnableWin32DLLs)" "YES"
 INSTALL_PROGS += $(DLL_NAME)
-INSTALL_LIBS  += $(patsubst %.a, %_imp.a, $(LIBRARY)) PrelMain.o
+INSTALL_LIBS  += $(patsubst %.a, %_imp.a, $(LIBRARY)) PrelMain.dll_o
 INSTALL_DATAS += dLL_ifs.hi
 endif
 INSTALL_DATAS += $(HS_IFACES)

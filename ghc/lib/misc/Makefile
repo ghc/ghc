@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.17 1999/08/06 10:55:26 simonmar Exp $
+# $Id: Makefile,v 1.18 1999/09/17 10:43:52 sof Exp $
 #
 # Makefile for miscellaneous libraries.
 #
@@ -19,7 +19,10 @@ endif
 #
 
 LIBRARY = libHSmisc$(_way).a
-HS_SRCS	= $(wildcard *.lhs)
+
+ifeq "$(EnableWin32DLLs)" "YES"
+  HS_SRCS := $(filter-out Select.lhs,$(HS_SRCS))
+endif
 
 # Remove Readline.lhs if readline.h isn't available.
 ifneq "$(GhcLibsWithReadline)" "YES"
@@ -79,7 +82,7 @@ SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR)
 DLL_NAME = HSmisc.dll
 DLL_IMPLIB_NAME = libHSmisc_imp.a
 SRC_BLD_DLL_OPTS += --export-all --output-def=HSmisc.def
-SRC_BLD_DLL_OPTS += -lwinmm -lwsock32 -lHSrts_imp -lHS_cbits_imp -lHSmisc_cbits_imp -lHS_imp -lHSexts_imp -lgmp -L. -L../../rts/gmp -L../../rts -L../std -L../std/cbits -L../exts -Lcbits
+SRC_BLD_DLL_OPTS += -lwinmm -lwsock32 -lHSrts_imp -lHScbits_imp -lHSmisc_cbits_imp -lHS_imp -lHSexts_imp -lgmp -L. -L../../rts/gmp -L../../rts -L../std -L../std/cbits -L../exts -Lcbits
 
 
 #-----------------------------------------------------------------------------
@@ -98,6 +101,12 @@ override datadir:=$(libdir)/imports/misc
 # 
 INSTALL_LIBS  += $(LIBRARY)
 INSTALL_DATAS += $(HS_IFACES)
+
+ifeq "$(EnableWin32DLLs)" "YES"
+INSTALL_PROGS += $(DLL_NAME)
+INSTALL_LIBS  += $(patsubst %.a, %_imp.a, $(LIBRARY))
+INSTALL_DATAS += dLL_ifs.hi
+endif
 
 include $(TOP)/mk/target.mk
 

@@ -62,7 +62,7 @@ SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR) -optdep--include-prelude -optdep-w $
 DLL_NAME = HSexts.dll
 DLL_IMPLIB_NAME = libHSexts_imp.a
 SRC_BLD_DLL_OPTS += --export-all --output-def=HSexts.def
-SRC_BLD_DLL_OPTS += -lwinmm -lHSrts_imp -lHS_cbits_imp -lHS_imp -lgmp -L. -L../../rts/gmp -L../../rts -L../std -L../std/cbits
+SRC_BLD_DLL_OPTS += -lwinmm -lHSrts_imp -lHScbits_imp -lHS_imp -lgmp -L. -L../../rts/gmp -L../../rts -L../std -L../std/cbits
 
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries
@@ -80,5 +80,11 @@ override datadir:=$(libdir)/imports/exts
 # 
 INSTALL_LIBS  += $(LIBRARY)
 INSTALL_DATAS += $(HS_IFACES)
+
+ifeq "$(EnableWin32DLLs)" "YES"
+INSTALL_PROGS += $(DLL_NAME)
+INSTALL_LIBS  += $(patsubst %.a, %_imp.a, $(LIBRARY)) 
+INSTALL_DATAS += dLL_ifs.hi
+endif
 
 include $(TOP)/mk/target.mk
