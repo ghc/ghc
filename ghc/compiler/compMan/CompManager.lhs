@@ -224,14 +224,23 @@ cmLoadModule cmstate1 rootname
         -- 2.  A valid linkable exists for each module in ms
 
         stable_mods
-           <- preUpsweep valid_linkables mg2unsorted_names [] mg2_with_srcimps
+           <- preUpsweep valid_linkables ui1 mg2unsorted_names
+		 [] mg2_with_srcimps
 
         let stable_summaries
                = concatMap (findInSummaries mg2unsorted) stable_mods
 
+	    stable_linkables
+	       = filter (\m -> linkableModName m `elem` stable_mods) 
+		    valid_linkables
+
         when (verb >= 2) $
            putStrLn (showSDoc (text "STABLE MODULES:" 
                                <+> sep (map (text.moduleNameUserString) stable_mods)))
+
+	-- unload any modules which aren't going to be re-linked this
+	-- time around.
+	pls2 <- unload ghci_mode dflags stable_linkables pls1
 
         -- We could at this point detect cycles which aren't broken by
         -- a source-import, and complain immediately, but it seems better
@@ -284,7 +293,7 @@ cmLoadModule cmstate1 rootname
            do when (verb >= 2) $ 
 		 hPutStrLn stderr "Upsweep completely successful."
               linkresult 
-                 <- link ghci_mode dflags a_root_is_Main ui3 pls1
+                 <- link ghci_mode dflags a_root_is_Main ui3 pls2
               case linkresult of
                  LinkErrs _ _
                     -> panic "cmLoadModule: link failed (1)"
@@ -403,20 +412,18 @@ maybe_getFileLinkable mod_name obj_fn
 
 -----------------------------------------------------------------------------
 -- Do a pre-upsweep without use of "compile", to establish a 
--- (downward-closed) set of stable modules which can be retained
--- in the top-level environments.  Also return linkables for those 
--- modules determined to be stable, since (in Batch mode, at least)
--- there's no other way for them to get into UI.
+-- (downward-closed) set of stable modules for which we won't call compile.
 
-preUpsweep :: [Linkable]	-- valid linkables
+preUpsweep :: [Linkable]	-- new valid linkables
+	   -> [Linkable]	-- old linkables
            -> [ModuleName]      -- names of all mods encountered in downsweep
            -> [ModuleName]      -- accumulating stable modules
            -> [SCC ModSummary]  -- scc-ified mod graph, including src imps
            -> IO [ModuleName]	-- stable modules
 
-preUpsweep valid_lis all_home_mods stable [] 
+preUpsweep valid_lis old_lis all_home_mods stable [] 
    = return stable
-preUpsweep valid_lis all_home_mods stable (scc0:sccs)
+preUpsweep valid_lis old_lis all_home_mods stable (scc0:sccs)
    = do let scc = flattenSCC scc0
             scc_allhomeimps :: [ModuleName]
             scc_allhomeimps 
@@ -429,18 +436,29 @@ preUpsweep valid_lis all_home_mods stable (scc0:sccs)
                = --trace (showSDoc (text "ISOS" <+> ppr m <+> ppr scc_names <+> ppr stable)) (
                  m `elem` scc_names || m `elem` stable
                  --)
-        all_scc_stable
-           <- if   not all_imports_in_scc_or_stable
-               then do --putStrLn ("PART1 fail " ++ showSDoc (ppr scc_allhomeimps <+> ppr (filter (not.in_stable_or_scc) scc_allhomeimps)))
-                       return False
-               else do --when (not (and bools)) (putStrLn ("PART2 fail: " ++ showSDoc (ppr scc_names)))
-                       return (all is_stable scc)
-        if not all_scc_stable
-         then preUpsweep valid_lis all_home_mods stable sccs
-         else preUpsweep valid_lis all_home_mods (scc_names++stable) sccs
 
-   where is_stable new_summary
-   	    = isJust (findModuleLinkable_maybe valid_lis (name_of_summary new_summary))
+	    -- now we check for valid linkables: each module in the SCC must 
+	    -- have a valid linkable (see getValidLinkables above), and the
+	    -- newest linkable must be the same as the previous linkable for
+	    -- this module (if one exists).
+	    has_valid_linkable new_summary
+   	      = case findModuleLinkable_maybe valid_lis modname of
+		   Nothing -> False
+		   Just l  -> case findModuleLinkable_maybe old_lis modname of
+				Nothing -> True
+				Just m  -> linkableTime l == linkableTime m
+	       where modname = name_of_summary new_summary
+
+	    scc_is_stable = all_imports_in_scc_or_stable
+			  && all has_valid_linkable scc
+
+        if scc_is_stable
+         then preUpsweep valid_lis old_lis all_home_mods 
+		(scc_names++stable) sccs
+         else preUpsweep valid_lis old_lis all_home_mods 
+		stable sccs
+
+   where 
 
 
 -- Helper for preUpsweep.  Assuming that new_summary's imports are all
@@ -480,8 +498,8 @@ add_to_ui ui lis
      where
         not_in :: [Linkable] -> Linkable -> Bool
         not_in lis li
-           = all (\l -> modname_of_linkable l /= mod) lis
-           where mod = modname_of_linkable li
+           = all (\l -> linkableModName l /= mod) lis
+           where mod = linkableModName li
                                   
 
 data CmThreaded  -- stuff threaded through individual module compilations

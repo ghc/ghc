@@ -6,7 +6,7 @@
 \begin{code}
 module CmTypes ( 
    Unlinked(..),  isObject, nameOfObject, isInterpretable,
-   Linkable(..), linkableTime,
+   Linkable(..),
    ModSummary(..), ms_allimps, name_of_summary, pprSummaryTime
   ) where
 
@@ -44,20 +44,16 @@ nameOfObject (DotDLL fn) = fn
 isInterpretable (BCOs _ _) = True
 isInterpretable _          = False
 
-data Linkable
-   = LM ClockTime ModuleName [Unlinked]
-   | LP PackageName
+data Linkable = LM {
+  linkableTime :: ClockTime,
+  linkableModName ::  ModuleName,
+  linkableUnlinked ::  [Unlinked]
+ }
 
 instance Outputable Linkable where
    ppr (LM when_made mod_nm unlinkeds)
       = text "LinkableM" <+> parens (text (show when_made)) <+> ppr mod_nm 
                          <+> ppr unlinkeds
-   ppr (LP package_nm)
-      = text "LinkableP" <+> ptext package_nm
-
-linkableTime (LM when_made mod_nm unlinkeds) = when_made
-linkableTime (LP package_nm)                 = panic "linkableTime"
-
 
 -- The ModuleLocation contains both the original source filename and the
 -- filename of the cleaned-up source file after all preprocessing has been

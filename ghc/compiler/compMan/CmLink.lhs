@@ -7,7 +7,6 @@
 module CmLink ( Linkable(..),  Unlinked(..),
 		filterModuleLinkables, 
 		findModuleLinkable_maybe,
-		modname_of_linkable, is_package_linkable,
 		LinkResult(..),
                 link, 
 		unload,
@@ -32,6 +31,7 @@ import CmdLineOpts	( DynFlags(..) )
 import Panic		( panic, GhcException(..) )
 
 import Exception
+import List
 import Monad
 import IO
 
@@ -55,8 +55,9 @@ data PersistentLinkerState
         itbl_env    :: ItblEnv,
 
 	-- list of objects we've loaded (we'll need to unload them again
-	-- before re-loading the same module).
-	objects_loaded :: [FilePath]
+	-- before re-loading the same module), together with the ClockTime
+	-- of the linkable they were loaded from.
+	objects_loaded :: [Linkable]
 
 	-- notionally here, but really lives in the C part of the linker:
 	--            object_symtab :: FiniteMap String Addr
@@ -86,13 +87,58 @@ emptyPLS = return (PersistentLinkerState { closure_env = emptyFM,
 #else
 emptyPLS = return (PersistentLinkerState {})
 #endif
-\end{code}
 
-\begin{code}
+-----------------------------------------------------------------------------
+-- Unloading old objects ready for a new compilation sweep.
+--
+-- The compilation manager provides us with a list of linkables that it
+-- considers "stable", i.e. won't be recompiled this time around.  For
+-- each of the modules current linked in memory,
+--
+--	* if the linkable is stable (and it's the same one - the
+--	  user may have recompiled the module on the side), we keep it,
+--
+--	* otherwise, we unload it.
+--
+
+unload :: GhciMode
+       -> DynFlags
+       -> [Linkable]		-- stable linkables
+       -> PersistentLinkerState
+       -> IO PersistentLinkerState 
+
+unload Batch       dflags linkables pls = return pls
+unload Interactive dflags linkables pls
+  = do new_loaded <- filterM maybeUnload (objects_loaded pls)
+       let mods_retained = map linkableModName new_loaded
+	   itbl_env'     = filterNameMap mods_retained (itbl_env pls)
+           closure_env'  = filterNameMap mods_retained (closure_env pls)
+
+       let verb = verbosity dflags
+       when (verb >= 3) $ do
+	    hPutStrLn stderr (showSDoc 
+		(text "CmLink.unload: retaining" <+> ppr mods_retained))
+
+       return pls{ objects_loaded = new_loaded,
+		   itbl_env = itbl_env',
+	           closure_env = closure_env' }
+  where
+	maybeUnload :: Linkable -> IO Bool
+	maybeUnload (LM time mod objs) = do
+	  case findModuleLinkable_maybe linkables mod of
+		Nothing -> do unloadObjs; return False
+		Just l | linkableTime l /= time -> do unloadObjs; return False
+		       | otherwise              -> return True
+	  where
+	     unloadObjs = mapM unloadObj [ f | DotO f <- objs ]
+
+-----------------------------------------------------------------------------
+-- Linking
+
 link :: GhciMode		-- interactive or batch
      -> DynFlags		-- dynamic flags
      -> Bool			-- attempt linking in batch mode?
-     -> [Linkable] 		-- only contains LMs, not LPs
+     -> [Linkable]
      -> PersistentLinkerState 
      -> IO LinkResult
 
@@ -141,32 +187,21 @@ link' Batch dflags batch_attempt_linking linkables pls1
         return (LinkOK pls1)
    where
       verb = verbosity dflags
-      getOfiles (LP _)    = panic "CmLink.link(getOfiles): found package linkable"
       getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
 
-link' Interactive dflags batch_attempt_linking linkables pls1
+link' Interactive dflags batch_attempt_linking linkables pls
     = do showPass dflags "Linking"
-	 pls2 <- unload pls1
-	 linkObjs linkables [] pls2
-	 	-- reverse the linkables, to get the leaves of the tree first.
+	 let (objs, bcos) = partition (isObject.head.linkableUnlinked) linkables
+	 linkObjs (objs ++ bcos) pls
+	   -- get the objects first
 
 ppLinkableSCC :: SCC Linkable -> SDoc
 ppLinkableSCC = ppr . flattenSCC
 
-
-modname_of_linkable (LM _ nm _) = nm
-modname_of_linkable (LP _)      = panic "modname_of_linkable: package"
-
-is_package_linkable (LP _)     = True
-is_package_linkable (LM _ _ _) = False
-
-filterModuleLinkables :: (ModuleName -> Bool) 
-                      -> [Linkable] 
-                      -> [Linkable]
+filterModuleLinkables :: (ModuleName -> Bool) -> [Linkable] -> [Linkable]
 filterModuleLinkables p [] = []
 filterModuleLinkables p (li:lis)
    = case li of
-        LP _         -> retain
         LM _ modnm _ -> if p modnm then retain else dump
      where
         dump   = filterModuleLinkables p lis
@@ -180,55 +215,47 @@ linkObjs      = panic "CmLink.linkObjs: no interpreter"
 unload        = panic "CmLink.unload: no interpreter"
 lookupClosure = panic "CmLink.lookupClosure: no interpreter"
 #else
-linkObjs [] mods pls = linkFinish pls [] []
-linkObjs (l@(LM _ m uls) : ls) mods pls
+linkObjs [] pls = linkFinish pls []
+linkObjs (l@(LM _ m uls) : ls) pls
    | all isObject uls = do
+	if isLoaded l pls then linkObjs ls pls else do
 	let objs = [ file | DotO file <- uls ] 
 	mapM_ loadObj objs
-	linkObjs ls (m:mods) pls{objects_loaded = objs++objects_loaded pls}
-   | all isInterpretable uls  = linkInterpretedCode (l:ls) mods [] pls
+	linkObjs ls pls{objects_loaded = l : objects_loaded pls}
+   | all isInterpretable uls  = linkInterpretedCode (l:ls) [] pls
    | otherwise                = invalidLinkable
-linkObjs _ _ _ = 
-   panic "CmLink.linkObjs: found package linkable"
 
+isLoaded :: Linkable -> PersistentLinkerState -> Bool
+isLoaded l pls = 
+  case findModuleLinkable_maybe (objects_loaded pls) (linkableModName l) of
+	Nothing -> False
+	Just m  -> linkableTime l == linkableTime m
  
-linkInterpretedCode [] mods ul_trees pls = linkFinish pls mods ul_trees
-linkInterpretedCode (LM _ m uls : ls) mods ul_trees pls
+linkInterpretedCode [] ul_trees pls = linkFinish pls ul_trees
+linkInterpretedCode (LM _ m uls : ls) ul_trees pls
    | all isInterpretable uls = 
-	linkInterpretedCode ls (m:mods) (uls++ul_trees) pls
+	linkInterpretedCode ls (uls++ul_trees) pls
    | any isObject uls
         = throwDyn (OtherError 
 	     "can't link object code that depends on interpreted code")
    | otherwise = invalidLinkable
-linkInterpretedCode _ _ _ pls = 
-   panic "CmLink.linkInterpretedCode: found package linkable"
 
 invalidLinkable = panic "CmLink: linkable doesn't contain entirely objects or interpreted code"
 
 
--- link all the interpreted code in one go.  We first remove from the
--- various environments any previous versions of these modules.
-linkFinish pls mods ul_bcos = do
+-- link all the interpreted code in one go.
+linkFinish pls ul_bcos = do
    resolveObjs
-   let itbl_env'    = filterNameMap mods (itbl_env pls)
-       closure_env' = filterNameMap mods (closure_env pls)
-       stuff        = [ (bcos,itbls) | BCOs bcos itbls <- ul_bcos ]
+
+   let stuff = [ (bcos,itbls) | BCOs bcos itbls <- ul_bcos ]
 
    (ibinds, new_itbl_env, new_closure_env) <-
-	linkIModules itbl_env' closure_env' stuff
+	linkIModules (itbl_env pls) (closure_env pls) stuff
 
    let new_pls = pls { closure_env = new_closure_env,
 		       itbl_env    = new_itbl_env
 		     }
    return (LinkOK new_pls)
-
--- purge the current "linked image"
-unload :: PersistentLinkerState -> IO PersistentLinkerState
-unload pls = do
-   mapM unloadObj (objects_loaded pls)
-   return pls{ closure_env = emptyFM, 
-	       itbl_env = emptyFM,
-	       objects_loaded = [] }
 
 linkExpr :: PersistentLinkerState -> UnlinkedBCOExpr -> IO HValue
 linkExpr PersistentLinkerState{ itbl_env = ie, closure_env = ce } bcos
