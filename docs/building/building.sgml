@@ -2666,48 +2666,6 @@ this you get very weird messages when you type <Command>make</Command>, such as:
 
 <ListItem>
 <para>
-On a Win2k machine, open up a bash and do 
-</para>
-
-<Screen>
-foo$ cd /etc
-foo$ mkpasswd -l > passwd
-</Screen>
-
-<para>
-Check that your login entry is on the first line
-of that file. If not, move it to the top.  It's OK
-for 'Administrator' to be the first entry, assuming you are one.
-</para>
-
-<para>
-However, Win9x doesn't support the calls that <Command>mkpasswd</Command> relies on
-(e.g., <Function>NetUserEnum</Function>). If you run <Command>mkpasswd</Command> you
-get errors like:
-</para>
-
-<Screen>
-linked to missing export netapi32.dll:NetUserEnum
-</Screen>
-
-<para>
-The passwd file is used
-by ssh in a fairly rudimentary manner, so I'd simply 
-synthesise/copy an existing Unix <filename>/etc/passwd</filename>, i.e., create
-an <filename>/etc/passwd</filename> file containing the line
-</para>
-
-<Screen>
-&lt;login&gt;::500:513:::/bin/sh
-</Screen>
-
-<para>
-where <Literal>&lt;login&gt;</Literal> is your login id.
-</para>
-</ListItem>
-
-<ListItem>
-<para>
 Generate a key, by running <filename>c:/user/local/bin/ssh-keygen1</filename>.
   This generates a public key in <filename>.ssh/identity.pub</filename>, and a
   private key in <filename>.ssh/identity</filename>
