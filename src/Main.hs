@@ -13,6 +13,7 @@ import HaddockDB
 import HaddockHtml
 import HaddockTypes
 import HaddockUtil
+import Digraph
 
 import HsLexer hiding (Token)
 import HsParser
@@ -109,15 +110,21 @@ run flags files = do
   writeIORef saved_flags flags
   parsed_mods <- sequence (map parse_file files)
 
-  let ifaces = [ runWriter (mkInterface module_map file parsed)
-	       | (file,parsed) <- zip files parsed_mods ]
+  sorted_mods <- sortModules parsed_mods
+	-- emits an error message if there are recursive modules
 
-      mod_ifaces = [ (m,i) | ((m,i),msgs) <- ifaces ]
-      all_msgs = concat (map snd ifaces)
-	
-      module_map = listToFM mod_ifaces
+  -- process the modules in sorted order, building up a mapping from
+  -- modules to interfaces.
+  let 
+	loop ifaces [] _ = return ifaces
+	loop ifaces (hsmod:hsmods) (file:files) = do 
+	   let ((mod,iface),msgs) = runWriter (mkInterface ifaces file hsmod)
+	       new_ifaces = addToFM ifaces mod iface
+	   mapM (hPutStrLn stderr) msgs
+	   loop new_ifaces hsmods files    
 
-  mapM (hPutStrLn stderr) all_msgs
+  module_map <- loop emptyFM sorted_mods files
+  let mod_ifaces = fmToList module_map
 
   when (Flag_DocBook `elem` flags) $
     putStr (ppDocBook odir mod_ifaces)
@@ -256,7 +263,7 @@ mkInterface mod_map filename
       name_strings = nub (map show missing_names ++ missing_names_doc)
 
   when (not (null name_strings)) $
-	  tell ["Warning: in module " ++ (case mod of Module m -> m) ++ 
+	  tell ["Warning: in module " ++ show mod ++ 
 		", the following names could not be resolved:\n\ 
 		\   " ++ concat (map (' ':) name_strings)
 		]
@@ -678,6 +685,25 @@ parseOption "hide" = return (Just OptHide)
 parseOption "prune" = return (Just OptPrune)
 parseOption "ignore-exports" = return (Just OptIgnoreExports)
 parseOption other = do tell ["Unrecognised option: " ++ other]; return Nothing
+
+-- -----------------------------------------------------------------------------
+-- Topologically sort the modules
+
+sortModules :: [HsModule] -> IO [HsModule]
+sortModules hsmodules = mapM for_each_scc sccs
+  where
+	sccs = stronglyConnComp edges
+
+	edges :: [(HsModule, Module, [Module])]
+	edges = [ (hsmod, mod, [ imp | HsImportDecl _ imp _ _ _ <- impdecls ]) 
+		| hsmod@(HsModule mod _ impdecls _ _ _) <- hsmodules
+		]
+
+	for_each_scc (AcyclicSCC hsmodule) = return hsmodule
+	for_each_scc (CyclicSCC  hsmodules) = 
+	   dieMsg ("modules are recursive: " ++ 
+		   unwords (map show [ mod | HsModule mod _ _ _ _ _ 
+						<- hsmodules ]))
 
 -- -----------------------------------------------------------------------------
 -- A monad which collects error messages
