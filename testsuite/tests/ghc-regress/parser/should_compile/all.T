@@ -40,3 +40,4 @@ test "read030" { vtc("") }
 test "read031" { vtc("") }
 test "read032" { vtc("") }
 test "read033" { vtc("") }
+test "read034" { vtc("") }
