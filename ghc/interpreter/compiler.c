@@ -11,8 +11,8 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.18 $
- * $Date: 2000/02/08 15:32:29 $
+ * $Revision: 1.19 $
+ * $Date: 2000/02/09 14:50:19 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -188,7 +188,8 @@ Cell e; {
                                              nv));
                           }
 
-        default         : fprintf(stderr, "stuff=%d\n",whatIs(e));internal("translate");
+        default         : fprintf(stderr, "stuff=%d\n",whatIs(e));
+                          internal("translate");
     }
     return e;
 }

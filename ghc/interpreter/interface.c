@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.29 $
- * $Date: 2000/02/08 17:50:46 $
+ * $Revision: 1.30 $
+ * $Date: 2000/02/09 14:50:20 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -138,6 +138,8 @@ static Void finishGHCImports    Args((ConId,List));
 
 static Void startGHCExports     Args((ConId,List));
 static Void finishGHCExports    Args((ConId,List));
+
+static Void finishGHCFixdecl    ( Cell prec, Cell assoc, ConVarId name );
 
 static Void finishGHCModule     Args((Cell));
 static Void startGHCModule      Args((Text, Int, Text));
@@ -767,7 +769,7 @@ Bool processInterfaces ( void )
                 if (!allTypesKnown(zfst(hd(t)),aktys,mod)) allKnown = FALSE;
              for (t = constrs; nonNull(t); t=tl(t))
                 for (u = zsnd(hd(t)); nonNull(u); u=tl(u))
-                    if (!allTypesKnown(zfst3(hd(u)),aktys,mod)) allKnown = FALSE;          
+                    if (!allTypesKnown(zfst3(hd(u)),aktys,mod)) allKnown = FALSE;
           }
           else if (whatIs(ent)==I_NEWTYPE) {
              Cell  newty  = unap(I_NEWTYPE,ent);
@@ -994,6 +996,8 @@ fprintf(stderr, "abstractify newtype %s\n", textToStr(textOf(getIEntityName(ent)
                 break;
              }
              case I_FIXDECL: {
+                Cell fixdecl = unap(I_FIXDECL,decl);
+                finishGHCFixdecl ( zfst3(fixdecl), zsnd3(fixdecl), zthd3(fixdecl) );
                 break;
              }
              case I_INSTANCE: {
@@ -1369,6 +1373,20 @@ static Void finishGHCImports ( ConId nm, List syms )
    printf("finishGHCImports %s\n", textToStr(textOf(nm)) );
 #  endif
   /* Nothing to do. */
+}
+
+
+/* --------------------------------------------------------------------------
+ * Fixity decls
+ * ------------------------------------------------------------------------*/
+
+static Void finishGHCFixdecl ( Cell prec, Cell assoc, ConVarId name )
+{
+   Int  p = intOf(prec);
+   Int  a = intOf(assoc);
+   Name n = findName(textOf(name));
+   assert (nonNull(n));
+   name(n).syntax = mkSyntax ( a, p );
 }
 
 
@@ -1886,13 +1904,8 @@ List  mems0; {    /* [((VarId, Type))]     */
         cclass(nw).instances  = NIL;
         cclass(nw).numSupers  = length(ctxt);
 
-
-
         /* Kludge to map the single tyvar in the context to Offset 0.
            Need to do something better for multiparam type classes.
-
-        cclass(nw).supers     = tvsToOffsets(line,ctxt,
-                                             singleton(pair(tv,STAR)));
         */
         cclass(nw).supers     = tvsToOffsets(line,ctxt,
                                              singleton(kinded_tv));
@@ -1919,10 +1932,18 @@ List  mems0; {    /* [((VarId, Type))]     */
            tvsInT = ifTyvarsIn(memT);
            /* tvsInT :: [VarId] */
 
-           /* ToDo: maximally bogus */
-           for (tvs=tvsInT; nonNull(tvs); tvs=tl(tvs))
-              hd(tvs) = zpair(hd(tvs),STAR);
-           /* tvsIntT :: [((VarId,STAR))] */
+           /* ToDo: maximally bogus.  We allow the class tyvar to
+              have the kind as supplied by the parser, but we just
+              assume that all others have kind *.  It's a kludge.
+           */
+           for (tvs=tvsInT; nonNull(tvs); tvs=tl(tvs)) {
+              Kind k;
+              if (textOf(hd(tvs)) == textOf(zfst(kinded_tv)))
+                 k = zsnd(kinded_tv); else
+                 k = STAR;
+              hd(tvs) = zpair(hd(tvs),k);
+           }
+           /* tvsIntT :: [((VarId,Kind))] */
 
            memT = mkPolyType(tvsToKind(tvsInT),memT);
            memT = tvsToOffsets(line,memT,tvsInT);
@@ -1945,11 +1966,6 @@ List  mems0; {    /* [((VarId, Type))]     */
 
         cclass(nw).members    = mems0;
         cclass(nw).numMembers = length(mems0);
-
-        /* (ADR) ToDo: 
-         * cclass(nw).dsels    = ?;
-         * cclass(nm).defaults = ?;
-         */
 
         ns = NIL;
         for (mno=0; mno<cclass(nw).numSupers; mno++) {
@@ -2421,6 +2437,8 @@ Type type; {
       Sym(__ap_4_upd_info)           \
       Sym(__ap_5_upd_info)           \
       Sym(__ap_6_upd_info)           \
+      Sym(__ap_7_upd_info)           \
+      Sym(__ap_8_upd_info)           \
       Sym(__sel_0_upd_info)          \
       Sym(__sel_1_upd_info)          \
       Sym(__sel_2_upd_info)          \
@@ -2548,6 +2566,8 @@ Type type; {
       Sym(timezone)                  \
       Sym(mktime)                    \
       Sym(gmtime)                    \
+      SymX(getenv)                   \
+      Sym(shutdownHaskellAndExit)    \
 
 
 /* AJG Hack */

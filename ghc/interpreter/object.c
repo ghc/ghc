@@ -631,7 +631,9 @@ static int ocGetNames_ELF ( ObjectCode* oc, int verb )
                        ad, oc->objFileName, nm );
             if (!addSymbol ( oc, nm, ad )) return FALSE;
          }
+#if 0
 	 else fprintf(stderr, "skipping `%s'\n", strtab + stab[j].st_name );
+#endif
       }
    }
 

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.41 $
- * $Date: 2000/02/08 17:50:46 $
+ * $Revision: 1.42 $
+ * $Date: 2000/02/09 14:50:20 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -515,6 +515,7 @@ Int what; {
                        break;
 
         case POSTPREL: {
+           Name nm;
            Module modulePrelBase = findModule(findText("PrelBase"));
            assert(nonNull(modulePrelBase));
 	   fprintf(stderr, "linkControl(POSTPREL)\n");
@@ -543,9 +544,9 @@ assert(nonNull(namePMFail));
 
                /* deriving                              */
                xyzzy(nameApp,            "++");
-               xyzzy(nameReadField,      "readField");
+               xyzzy(nameReadField,      "hugsprimReadField");
                xyzzy(nameReadParen,      "readParen");
-               xyzzy(nameShowField,      "showField");
+               xyzzy(nameShowField,      "hugsprimShowField");
                xyzzy(nameShowParen,      "showParen");
                xyzzy(nameLex,            "lex");
                xyzzy(nameComp,           ".");
@@ -564,6 +565,44 @@ assert(nonNull(namePMFail));
            ifLinkConstrItbl ( nameTrue );
            ifLinkConstrItbl ( nameNil );
            ifLinkConstrItbl ( nameCons );
+
+           /* PrelErr.hi doesn't give a type for error, alas.  
+              So error never appears in any symbol table.
+              So we fake it by copying the table entry for
+              hugsprimError -- which is just a call to error.
+              Although we put it on the Prelude export list, we
+              have to claim internally that it lives in PrelErr, 
+              so that the correct symbol (PrelErr_error_closure)
+              is referred to.
+              Big Big Sigh.
+           */
+           nm            = newName ( findText("error"), NIL );
+           name(nm)      = name(nameError);
+           name(nm).mod  = findModule(findText("PrelErr"));
+           name(nm).text = findText("error");
+           setCurrModule(modulePrelude);
+           module(modulePrelude).exports
+              = cons ( nm, module(modulePrelude).exports );
+
+           /* Make nameListMonad be the builder fn for instance Monad [].
+              Standalone hugs does this with a disgusting hack in 
+              checkInstDefn() in static.c.  We have a slightly different
+              disgusting hack for the combined case.
+           */
+           {
+           Class cm;   /* :: Class   */
+           List  is;   /* :: [Inst]  */
+           cm = findClassInAnyModule(findText("Monad"));
+           assert(nonNull(cm));
+           is = cclass(cm).instances;
+           assert(nonNull(is));
+           while (nonNull(is) && snd(inst(hd(is)).head) != typeList)
+              is = tl(is);
+           assert(nonNull(is));
+           nameListMonad = inst(hd(is)).builder;
+           assert(nonNull(nameListMonad));
+           }
+
            break;
         }
         case PREPREL : 
@@ -651,9 +690,9 @@ assert(nonNull(namePMFail));
 
                /* deriving                              */
                pFun(nameApp,            "++");
-               pFun(nameReadField,      "readField");
+               pFun(nameReadField,      "hugsprimReadField");
                pFun(nameReadParen,      "readParen");
-               pFun(nameShowField,      "showField");
+               pFun(nameShowField,      "hugsprimShowField");
                pFun(nameShowParen,      "showParen");
                pFun(nameLex,            "lex");
                pFun(nameComp,           ".");

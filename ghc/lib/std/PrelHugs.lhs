@@ -21,7 +21,9 @@ module PrelHugs (
    hugsprimUnpackString,
    hugsprimPmFail,
    hugsprimCompAux,
-   hugsprimError
+   hugsprimError,
+   hugsprimShowField,
+   hugsprimReadField
 )
 where
 import PrelGHC
@@ -32,7 +34,8 @@ import Prelude(fromIntegral)
 import IO(putStr,hFlush,stdout,stderr)
 import PrelException(catch)
 import PrelIOBase(IO,unsafePerformIO)
-import PrelShow(show)
+import PrelShow(show,shows,showString,showChar,Show,ShowS)
+import PrelRead(Read,ReadS,lex,reads)
 import PrelFloat(Double)
 import PrelReal(Fractional,fromRational,toRational)
 import PrelAddr(Addr)
@@ -94,6 +97,15 @@ hugsprimCompAux x y o = case compare x y of EQ -> o; LT -> LT; GT -> GT
 
 hugsprimError        :: String -> a
 hugsprimError s       = error s
+
+hugsprimShowField    :: Show a => String -> a -> ShowS
+hugsprimShowField m v = showString m . showChar '=' . shows v
+
+hugsprimReadField    :: Read a => String -> ReadS a
+hugsprimReadField m s0 = [ r | (t,  s1) <- lex s0, t == m,
+                               ("=",s2) <- lex s1,
+                               r        <- reads s2 ]
+
 
 -- used when Hugs invokes top level function
 {-

@@ -1337,8 +1337,8 @@ showString    = (++)
 showParen    :: Bool -> ShowS -> ShowS
 showParen b p = if b then showChar '(' . p . showChar ')' else p
 
-showField    :: Show a => String -> a -> ShowS
-showField m v = showString m . showChar '=' . shows v
+hugsprimShowField    :: Show a => String -> a -> ShowS
+hugsprimShowField m v = showString m . showChar '=' . shows v
 
 readParen    :: Bool -> ReadS a -> ReadS a
 readParen b g = if b then mandatory else optional
@@ -1348,10 +1348,10 @@ readParen b g = if b then mandatory else optional
 					     (")",u) <- lex t    ]
 
 
-readField    :: Read a => String -> ReadS a
-readField m s0 = [ r | (t,  s1) <- lex s0, t == m,
-                       ("=",s2) <- lex s1,
-                       r        <- reads s2 ]
+hugsprimReadField    :: Read a => String -> ReadS a
+hugsprimReadField m s0 = [ r | (t,  s1) <- lex s0, t == m,
+                               ("=",s2) <- lex s1,
+                               r        <- reads s2 ]
 
 lex                    :: ReadS String
 lex ""                  = [("","")]
