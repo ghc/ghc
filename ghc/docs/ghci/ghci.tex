@@ -180,9 +180,9 @@ can be created quickly.
 \begin{verbatim}
    data ModSummary = ModSummary 
                         ModLocation   -- location and kind
-                        Maybe (String, Fingerprint)
+                        (Maybe (String, Fingerprint))
                                       -- source and fingerprint if .hs
-                        [ModName]     -- imports
+                        (Maybe [ModName])     -- imports if .hs or .hi
 
    type Fingerprint = ...  -- file timestamp, or source checksum?
 
