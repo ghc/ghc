@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <malloc.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 int nh_stdin ( void )
 {
