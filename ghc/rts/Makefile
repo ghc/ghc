@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.33 2000/08/08 17:21:12 rrt Exp $
+# $Id: Makefile,v 1.34 2000/08/21 15:27:18 simonmar Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -129,14 +129,11 @@ endif
 
 ifneq "$(HaveLibGmp)" "YES"
 boot ::
-	if [ ! -f gmp/configure ] ; then ( cd gmp && autoconf ); fi;
-	if [ ! -f gmp/mpn/configure ] ; then ( cd gmp/mpn && autoconf ); fi;
-	if [ ! -f gmp/mpz/configure ] ; then ( cd gmp/mpz && autoconf ); fi;
-	cd gmp && ./configure --target=$(HOSTPLATFORM)
-# Slight cheatage here to past host as target, but x-compilation isn't supported by ghc.
+	cd gmp && ./configure --enable-shared=no
 
-# make sure the various configure files are included in a source dist.
-SRC_DIST_FILES += gmp/configure gmp/mpn/configure gmp/mpz/configure
+# DON'T KNOW IF WE NEED SOMETHING LIKE THIS ANYMORE:  --SDM
+#	cd gmp && ./configure --target=$(HOSTPLATFORM)
+# Slight cheatage here to past host as target, but x-compilation isn't supported by ghc.
 
 all :: gmp/libgmp.a
 
@@ -159,6 +156,8 @@ endif
 
 gmp/libgmp.a ::
 	$(MAKE) -C gmp MAKEFLAGS=
+	@$(CP) gmp/.libs/libgmp.a gmp
+	@$(STRIP) gmp/libgmp.a
 endif
 
 #-----------------------------------------------------------------------------
