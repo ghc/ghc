@@ -1108,7 +1108,9 @@ cafRefs p (Var id)
 	Just (LetBound (TopLet caf_info) _) -> fastBool (mayHaveCafRefs caf_info)
         Nothing | isGlobalId id		    -> fastBool (mayHaveCafRefs (idCafInfo id))	-- Imported
 		| otherwise		    -> fastBool False				-- Nested binder
-	_other				    -> error ("cafRefs " ++ showSDoc (ppr id))	-- No nested things in env
+	-- NOTE: The 'fastBool' below is a (temporary?) workaround for a
+	-- strange bug in GHC. It's strict in its argument, so who cares...? :-}
+	_other				    -> fastBool (error ("cafRefs " ++ showSDoc (ppr id)))	-- No nested things in env
 
 cafRefs p (Lit l) 	     = fastBool False
 cafRefs p (App f a) 	     = fastOr (cafRefs p f) (cafRefs p) a
