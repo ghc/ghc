@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: IO.lhs,v 1.43 2001/06/07 10:44:47 sewardj Exp $
+% $Id: IO.lhs,v 1.44 2001/06/09 07:06:05 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -19,7 +19,7 @@ module IO (
     BufferMode(NoBuffering,LineBuffering,BlockBuffering),
     SeekMode(AbsoluteSeek,RelativeSeek,SeekFromEnd),
 
-    stdin, stdout, stderr,   -- :: Handle
+    stdin, stdout, stderr,     -- :: Handle
 
     openFile,		       -- :: FilePath -> IOMode -> IO Handle
     hClose,		       -- :: Handle -> IO ()
@@ -31,7 +31,7 @@ module IO (
     hGetBuffering,	       -- :: Handle -> IO BufferMode
     hFlush,		       -- :: Handle -> IO ()
     hGetPosn,		       -- :: Handle -> IO HandlePosn
-    hSetPosn,		       -- :: Handle -> HandlePosn -> IO ()
+    hSetPosn,		       -- :: HandlePosn -> IO ()
     hSeek,		       -- :: Handle -> SeekMode -> Integer -> IO ()
     hWaitForInput,	       -- :: Handle -> Int -> IO Bool
     hReady,		       -- :: Handle -> IO Bool
