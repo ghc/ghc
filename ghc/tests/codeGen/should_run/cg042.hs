@@ -33,7 +33,7 @@ test_doubles
 	  fill_in arr# 0# (size# -# 1#) >>
 
 	    -- freeze the puppy:
-	  freezeDoubleArray arr#
+	  freezeByteArray arr#
 	)
 
     fill_in :: MutableByteArray s Int -> Int# -> Int# -> ST s ()
