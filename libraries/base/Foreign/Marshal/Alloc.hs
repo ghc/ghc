@@ -42,10 +42,10 @@ import GHC.Real
 import GHC.Ptr
 import GHC.Err
 import GHC.Base
-#elif defined(__HUGS__)
-import Control.Exception	( bracket )
-#else
+#elif defined(__NHC__)
 import System.IO		( bracket )
+#else
+import Control.Exception	( bracket )
 #endif
 
 
