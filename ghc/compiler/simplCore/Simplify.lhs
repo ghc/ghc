@@ -12,7 +12,7 @@ import CmdLineOpts	( dopt, DynFlag(Opt_D_dump_inlinings),
 			  SimplifierSwitch(..)
 			)
 import SimplMonad
-import SimplUtils	( mkCase, mkLam, newId,
+import SimplUtils	( mkCase, mkLam, newId, prepareAlts,
 			  simplBinder, simplBinders, simplLamBndrs, simplRecBndrs, simplLetBndr,
 			  SimplCont(..), DupFlag(..), LetRhsFlag(..), 
 			  mkStop, mkBoringStop,  pushContArgs,
@@ -22,7 +22,7 @@ import SimplUtils	( mkCase, mkLam, newId,
 import Var		( mustHaveLocalBinding )
 import VarEnv
 import Id		( Id, idType, idInfo, idArity, isDataConId, 
-			  idUnfolding, setIdUnfolding, isDeadBinder,
+			  setIdUnfolding, isDeadBinder,
 			  idNewDemandInfo, setIdInfo,
 			  setIdOccInfo, zapLamIdInfo, setOneShotLambda, 
 			)
@@ -35,11 +35,11 @@ import NewDemand	( isStrictDmd )
 import DataCon		( dataConNumInstArgs, dataConRepStrictness )
 import CoreSyn
 import PprCore		( pprParendExpr, pprCoreExpr )
-import CoreUnfold	( mkOtherCon, mkUnfolding, otherCons, callSiteInline )
+import CoreUnfold	( mkOtherCon, mkUnfolding, callSiteInline )
 import CoreUtils	( exprIsDupable, exprIsTrivial, needsCaseBinding,
 			  exprIsConApp_maybe, mkPiTypes, findAlt, 
 			  exprType, exprIsValue, 
-			  exprOkForSpeculation, exprArity, findDefault,
+			  exprOkForSpeculation, exprArity, 
 			  mkCoerce, mkSCC, mkInlineMe, mkAltExpr, applyTypeToArg
 			)
 import Rules		( lookupRule )
@@ -1230,38 +1230,22 @@ rebuildCase env scrut case_bndr alts cont
   = knownCon env (LitAlt lit) [] case_bndr alts cont
 
   | otherwise
-  = 	-- Prepare case alternatives
-	-- Filter out alternatives that can't possibly match
-    let
-        impossible_cons = case scrut of
-			    Var v -> otherCons (idUnfolding v)
-			    other -> []
-	better_alts = case impossible_cons of
-			[]    -> alts
-			other -> [alt | alt@(con,_,_) <- alts, 
-					not (con `elem` impossible_cons)]
-
-	-- "handled_cons" are handled either by the context, 
-	-- or by a branch in this case expression
-	-- Don't add DEFAULT to the handled_cons!!
-	(alts_wo_default, _) = findDefault better_alts
-	handled_cons = impossible_cons ++ [con | (con,_,_) <- alts_wo_default]
-    in
+  = prepareAlts scrut case_bndr alts		`thenSmpl` \ (better_alts, handled_cons) -> 
 
 	-- Deal with the case binder, and prepare the continuation;
 	-- The new subst_env is in place
-    prepareCaseCont env better_alts cont		`thenSmpl` \ (floats, (dup_cont, nondup_cont)) ->
-    addFloats env floats				$ \ env ->	
+    prepareCaseCont env better_alts cont	`thenSmpl` \ (floats, (dup_cont, nondup_cont)) ->
+    addFloats env floats			$ \ env ->	
 
 	-- Deal with variable scrutinee
-    simplCaseBinder env scrut case_bndr 		`thenSmpl` \ (alt_env, case_bndr', zap_occ_info) ->
+    simplCaseBinder env scrut case_bndr 	`thenSmpl` \ (alt_env, case_bndr', zap_occ_info) ->
 
 	-- Deal with the case alternatives
     simplAlts alt_env zap_occ_info handled_cons
-	      case_bndr' better_alts dup_cont		`thenSmpl` \ alts' ->
+	      case_bndr' better_alts dup_cont	`thenSmpl` \ alts' ->
 
 	-- Put the case back together
-    mkCase scrut handled_cons case_bndr' alts'		`thenSmpl` \ case_expr ->
+    mkCase scrut case_bndr' alts'		`thenSmpl` \ case_expr ->
 
 	-- Notice that rebuildDone returns the in-scope set from env, not alt_env
 	-- The case binder *not* scope over the whole returned case-expression
