@@ -28,7 +28,7 @@ OS threads may safely call Haskell functions concurrently. Section
 </ul>
 
 <!---- ***************************************  ----->
-<h2 id="callout">Calling out</h2>
+<h2 id="callout">The problem: foreign calls that block</h2>
 <p>
 When a Concurrent Haskell(CH) thread calls a 'foreign import'ed
 function, the runtime system(RTS) has to handle this in a manner
@@ -48,25 +48,45 @@ threads (pthreads) and one for the Win32 threads.
 <h3>Multi-threading the RTS</h3>
 
 <p>
-From an RTS perspective, a simple and efficient way to implement this
-is to retain the property that only one OS thread is allowed to
+A simple and efficient way to implement non-blocking foreign calls is like this:
+<ul>
+<li> Invariant: only one OS thread is allowed to
 execute code inside of the GHC runtime system. [There are alternate
 designs, but I won't go into details on their pros and cons here.]
-</p>
+We'll call the OS thread that is currently running Haskell threads
+the <em>Current Haskell Worker Thread</em>.
 <p>
-When this OS thread comes to execute a potentially blocking 'foreign
-import', it leaves the RTS, but before doing so it makes certain that
-another OS worker thread is available to take over its RTS executing
-priviledges. Consequently, the external call will be handled
-concurrently to the execution of the other Concurrent Haskell threads.
+The Current Haskell Worker Thread repeatedly grabs a Haskell thread, executes it until its
+time-slice expires or it blocks on an MVar, then grabs another, and executes
+that, and so on.
+</p>
+<li>
+<p>
+When the Current Haskell Worker comes to execute a potentially blocking 'foreign
+import', it leaves the RTS and ceases being the Current Haskell Worker, but before doing so it makes certain that
+another OS worker thread is available to become the Current Haskell Worker.
+Consequently, even if the external call blocks, the new Current Haskell Worker
+continues execution of the other Concurrent Haskell threads.
 When the external call eventually completes, the Concurrent Haskell
 thread that made the call is passed the result and made runnable
 again.
 </p>
-
 <p>
-The rest of this section describes the mechanics of implementing
-this. There's two parts to it, one that describes how a native thread
+<li>
+A pool of OS threads are constantly trying to become the Current Haskell Worker.
+Only one succeeds at any moment.   If the pool becomes empty, the RTS creates more workers.
+<p><li>
+The OS worker threads are regarded as interchangeable.  A given Haskell thread
+may, during its lifetime, be executed entirely by one OS worker thread, or by more than one.
+There's just no way to tell.
+
+<p><li>If a foreign program wants to call a Haskell function, there is always a thread switch involved.
+The foreign program uses thread-safe mechanisms to create a Haskell thread and make it runnable; and
+the current Haskell Worker Thread exectutes it. See Section <a href="#callin">Calling in</a>.
+</ul>
+<p>
+The rest of this section describes the mechanics of implementing all
+this. There's two parts to it, one that describes how a native (OS) thread
 leaves the RTS to service the external call, the other how the same
 thread handles returning the result of the external call back to the
 Haskell thread.
