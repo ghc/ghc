@@ -70,13 +70,13 @@ pprPred = pprSourceType
 pprSourceType :: SourceType -> SDoc
 pprSourceType (ClassP clas tys) = pprClassPred clas tys
 pprSourceType (IParam n ty)     = hsep [ppr n, dcolon, ppr ty]
-pprSourceType (NType tc tys)    = ppr tc <+> hsep (map pprParendType tys)
+pprSourceType (NType tc tys)    = ppr tc <+> sep (map pprParendType tys)
 
 pprClassPred :: Class -> [Type] -> SDoc
-pprClassPred clas tys = ppr clas <+> hsep (map pprParendType tys)
+pprClassPred clas tys = ppr clas <+> sep (map pprParendType tys)
 
 pprTheta :: ThetaType -> SDoc
-pprTheta theta = parens (hsep (punctuate comma (map pprPred theta)))
+pprTheta theta = parens (sep (punctuate comma (map pprPred theta)))
 
 instance Outputable Type where
     ppr ty = pprType ty

@@ -61,7 +61,7 @@ import Class	( Class )
 import Id	( Id, idName, idType, mkUserLocal, mkSysLocal, mkLocalId, setIdUnique )
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
 import Name	( Name, mkMethodOcc, getOccName )
-import PprType	( pprPred )	
+import PprType	( pprPred, pprParendType )	
 import Subst	( emptyInScopeSet, mkSubst, 
 		  substTy, substTyWith, substTheta, mkTyVarSubst, mkTopTyVarSubst
 		)
@@ -551,7 +551,7 @@ pprInst (Dict u pred loc) = pprPred pred <+> show_uniq u
 
 pprInst m@(Method u id tys theta tau loc)
   = hsep [ppr id, ptext SLIT("at"), 
-	  brackets (interppSP tys) {- ,
+	  brackets (sep (map pprParendType tys)) {- ,
 	  ptext SLIT("theta"), ppr theta,
 	  ptext SLIT("tau"), ppr tau
 	  show_uniq u,

@@ -1059,7 +1059,7 @@ data Avail
 			--	is turned into an LinRhss
 	[TcExpr]	-- A supply of suitable RHSs
 
-pprAvails avails = vcat [ppr inst <+> equals <+> pprAvail avail
+pprAvails avails = vcat [sep [ppr inst, nest 2 (equals <+> pprAvail avail)]
 			| (inst,avail) <- fmToList avails ]
 
 instance Outputable Avail where
