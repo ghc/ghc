@@ -1315,6 +1315,22 @@ incompatibly-compiled programs; e.g., if one @.o@ file was compiled
 for a parallel machine and the others weren't.)  You may turn off this
 check with @-no-link-chk@.  You can turn it (back) on with
 @-link-chk@ (the default).
+
+<tag><tt>-no-hs-main</tt>:</tag>
+<nidx>-no-hs-main option</nidx>
+<nidx>linking Haskell libraries with foreign code</nidx>
+
+In the event you want to include ghc-compiled code as part of another
+(non-Haskell) program, the RTS will not be supplying its definition of
+<tt/main()/ at link-time, you will have to. To signal that to the
+driver script when linking, use <tt/-no-hs-main/.
+
+Notice that since the command-line passed to the linker is rather
+involved, you probably want to use the ghc driver script to do the
+final link of your `mixed-language' application. This is not a
+requirement though, just try linking once with <tt/-v/ on to see what
+options the driver passes through to the linker.
+
 </descrip>
 
 %************************************************************************
