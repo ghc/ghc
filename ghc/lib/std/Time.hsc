@@ -3,7 +3,7 @@
 -- to compile on sparc-solaris.  Blargh.
 
 -- -----------------------------------------------------------------------------
--- $Id: Time.hsc,v 1.10 2001/02/28 00:01:03 qrczak Exp $
+-- $Id: Time.hsc,v 1.11 2001/04/07 14:58:44 lewie Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -100,7 +100,9 @@ module Time
 #  define POSIX_4D9 1
 #  include <sys/timers.h>
 # endif
-#elif defined(HAVE_TIME_H)
+#endif
+
+#if defined(HAVE_TIME_H)
 # include <time.h>
 #endif
 
