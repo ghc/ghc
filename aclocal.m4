@@ -330,48 +330,65 @@ AC_SUBST(AlexVersion)
 ])
 
 
-dnl
-dnl Check whether ld supports -x
-dnl
-AC_DEFUN(FPTOOLS_LD_X,
-[AC_CACHE_CHECK([whether ld understands -x], fptools_cv_ld_x,
-[
-echo 'foo() {}' > conftest.c
-${CC-cc} -c conftest.c
-if ${LdCmd} -r -x -o foo.o conftest.o; then
-   fptools_cv_ld_x=yes
-else
-   fptools_cv_ld_x=no
+# FP_PROG_LD
+# ----------
+# Sets the output variable LdCmd to the (non-Cygwin version of the) full path
+# of ld. Exits if no ld can be found
+AC_DEFUN([FP_PROG_LD],
+[AC_PATH_PROG([fp_prog_ld_raw], [ld])
+if test -z "$fp_prog_ld_raw"; then
+  AC_MSG_ERROR([cannot find ld in your PATH, no idea how to link])
 fi
-rm -rf conftest.c conftest.o foo.o
-])
-if test "$fptools_cv_ld_x" = yes; then
-	LdXFlag=-x
-else
-	LdXFlag=
-fi
-AC_SUBST(LdXFlag)
-])
+LdCmd=$fp_prog_ld_raw
+case $HostPlatform in
+  *mingw32) if test x${OSTYPE} != xmsys; then
+ 	      LdCmd="`cygpath -w ${fp_prog_ld_raw} | sed -e 's@\\\\@/@g'`"
+              AC_MSG_NOTICE([normalized ld command to $LdCmd])
+            fi
+            ;;
+esac
+AC_SUBST([LdCmd])
+])# FP_PROG_LD
 
-dnl
-dnl Check for GNU ld
-dnl
-AC_DEFUN(FPTOOLS_GNU_LD,
-[AC_CACHE_CHECK([whether ld is GNU ld], fptools_cv_gnu_ld,
-[
-if ${LdCmd} -v | grep GNU 2>&1 >/dev/null; then
-   fptools_cv_gnu_ld=yes
+
+# FP_PROG_LD_X
+# ------------
+# Sets the output variable LdXFlag to -x if ld supports this flag, otherwise the
+# variable's value is empty.
+AC_DEFUN([FP_PROG_LD_X],
+[AC_REQUIRE([FP_PROG_LD])
+AC_CACHE_CHECK([whether ld understands -x], [fp_cv_ld_x],
+[echo 'foo() {}' > conftest.c
+${CC-cc} -c conftest.c
+if ${LdCmd} -r -x -o conftest2.o conftest.o; then
+   fp_cv_ld_x=yes
 else
-   fptools_cv_gnu_ld=no
+   fp_cv_ld_x=no
 fi
-])
-if test "$fptools_cv_gnu_ld" = yes; then
-	LdIsGNULd=YES
+rm -rf conftest*])
+if test "$fp_cv_ld_x" = yes; then
+  LdXFlag=-x
 else
-	LdIsGNULd=NO
+  LdXFlag=
 fi
-AC_SUBST(LdIsGNULd)
-])
+AC_SUBST([LdXFlag])
+])# FP_PROG_LD_X
+
+
+# FP_PROG_LD_IS_GNU
+# -----------------
+# Sets the output variable LdIsGNULd to YES or NO, depending on whether it is
+# GNU ld or not.
+AC_DEFUN([FP_PROG_LD_IS_GNU],
+[AC_REQUIRE([FP_PROG_LD])
+AC_CACHE_CHECK([whether ld is GNU ld], [fp_cv_gnu_ld],
+[if ${LdCmd} --version 2> /dev/null | grep "GNU" > /dev/null 2>&1; then
+  fp_cv_gnu_ld=yes
+else
+  fp_cv_gnu_ld=no
+fi])
+AC_SUBST([LdIsGNULd], [`echo $fp_cv_gnu_ld | sed 'y/yesno/YESNO/'`])
+])# FP_PROG_LD_IS_GNU
 
 
 # FP_PROG_AR

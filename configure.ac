@@ -1241,23 +1241,9 @@ AC_C_BIGENDIAN
 dnl ** check for leading underscores in symbol names
 FP_LEADING_UNDERSCORE
 
-dnl ** check for ld, and whether ld has -x option
-AC_PATH_PROG(LdCmdRaw, ld)
-case $HostOS_CPP in
- mingw32) 
-        if test "${OSTYPE}" == "msys"
-	   then
-             LdCmd=${LdCmdRaw}
-	   else
-             LdCmd=`cygpath -w ${LdCmdRaw} | sed -e 's@\\\\@/@g' `
-	fi
- 	   ;;
- *) LdCmd=${LdCmdRaw}
-    ;;
-esac
-AC_SUBST(LdCmd)
-FPTOOLS_LD_X
-FPTOOLS_GNU_LD
+dnl ** check for ld, whether it has an -x option, and if it is GNU ld
+FP_PROG_LD_X
+FP_PROG_LD_IS_GNU
 
 AC_CONFIG_FILES([mk/config.mk])
 AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])
