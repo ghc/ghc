@@ -299,7 +299,7 @@ loadDecl mod (version_map, decls_map) (version, decl)
 
 	new_version_map = extendNameEnv version_map main_name version
     in
-    traceRn (text "Loading" <+> ppr full_avail) `thenM_`
+--    traceRn (text "Loading" <+> ppr full_avail) `thenM_`
     returnM (new_version_map, new_decls_map)
 
 
@@ -417,7 +417,7 @@ loadInstDecl mod insts decl@(InstDecl inst_ty _ _ _ _)
 	-- (Note that we do let the inst decl in if it mentions 
 	--  no tycons at all.  Hence the null free_ty_names.)
     in
-    traceRn ((text "Load instance for" <+> ppr inst_ty') $$ ppr free_tcs)	`thenM_`
+--    traceRn ((text "Load instance for" <+> ppr inst_ty') $$ ppr free_tcs)	`thenM_`
     returnM ((gate_fn, (mod, decl)) `consBag` insts)
 
 
@@ -456,7 +456,7 @@ loadDeprecs (Just (Right prs)) = foldlM loadDeprec emptyNameEnv prs	`thenM` \ en
 				 returnM (DeprecSome env)
 loadDeprec deprec_env (n, txt)
   = lookupGlobalOccRn n 	`thenM` \ name ->
-    traceRn (text "Loaded deprecation(s) for" <+> ppr name <> colon <+> ppr txt) `thenM_`
+--    traceRn (text "Loaded deprecation(s) for" <+> ppr name <> colon <+> ppr txt) `thenM_`
     returnM (extendNameEnv deprec_env name (name,txt))
 \end{code}
 
