@@ -122,16 +122,16 @@ binary-dist::
 #
 
 BINDIST_DOCS = $($(Project)BinDistDocs)
-BINDIST_DOCS_WAYS = html info dvi
+BINDIST_DOCS_WAYS = html ps
 
 binary-dist ::
 	@for way in $(BINDIST_DOCS_WAYS); do \
-	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way/$(ProjectNameShort)-$(ProjectVersion); \
+	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way; \
 	   for dir in $(BINDIST_DOCS); do \
 	     echo Making $$way documentation in $$dir && \
 	     $(MAKE) -C $$dir --no-print-directory $(MFLAGS) $$way && \
-	     echo cp -f $$dir/*.$$way $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way/$(ProjectNameShort)-$(ProjectVersion) && \
-	     cp -f $$dir/*.$$way $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way/$(ProjectNameShort)-$(ProjectVersion) && \
+	     echo cp -f $$dir/*.$$way $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way && \
+	     cp -f $$dir/*.$$way $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way && \
 	     echo "Done."; \
 	   done; \
 	done
