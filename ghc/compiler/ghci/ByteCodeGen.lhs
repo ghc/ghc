@@ -68,8 +68,10 @@ data BCInstr
    -- Messing with the stack
    = ARGCHECK  Int
    | PUSH_L    Int{-offset-}
+   | PUSH_LL   Int Int{-2 offsets-}
+   | PUSH_LLL  Int Int Int{-3 offsets-}
    | PUSH_G    Name
-   | PUSH_AS   Name
+   | PUSH_AS   Name	-- push alts and BCO_ptr_ret_info
    | PUSHT_I   Int
    | PUSHT_F   Float
    | PUSHT_D   Double
@@ -98,10 +100,15 @@ data BCInstr
    | CASEFAIL
    -- To Infinity And Beyond
    | ENTER
+   | RETURN	-- unboxed value on TOS.  Use tag to find underlying ret itbl
+		-- and return as per that.
+
 
 instance Outputable BCInstr where
    ppr (ARGCHECK n)          = text "ARGCHECK" <+> int n
    ppr (PUSH_L offset)       = text "PUSH_L  " <+> int offset
+   ppr (PUSH_LL o1 o2)       = text "PUSH_LL " <+> int o1 <+> int o2
+   ppr (PUSH_LLL o1 o2 o3)   = text "PUSH_LLL" <+> int o1 <+> int o2 <+> int o3
    ppr (PUSH_G nm)           = text "PUSH_G  " <+> ppr nm
    ppr (PUSH_AS nm)          = text "PUSH_AS " <+> ppr nm
    ppr (PUSHT_I i)           = text "PUSHT_I " <+> int i
@@ -124,6 +131,7 @@ instance Outputable BCInstr where
    ppr (TESTEQ_P  i lab)     = text "TESTEQ_P" <+> int i <+> text "__" <> int lab
    ppr CASEFAIL              = text "CASEFAIL"
    ppr ENTER                 = text "ENTER"
+   ppr RETURN                = text "RETURN"
 
 pprAltCode discrs_n_codes
    = vcat (map f discrs_n_codes)
@@ -132,7 +140,7 @@ pprAltCode discrs_n_codes
 instance Outputable a => Outputable (ProtoBCO a) where
    ppr (ProtoBCO name instrs origin)
       = (text "ProtoBCO" <+> ppr name <> colon)
-        $$ nest 6 (vcat (map ppr (fromOL instrs)))
+        $$ nest 6 (vcat (map ppr instrs))
         $$ case origin of
               Left alts -> vcat (map (pprCoreAlt.deAnnAlt) alts)
               Right rhs -> pprCoreExpr (deAnnotate rhs)
@@ -150,7 +158,7 @@ type BCInstrList = OrdList BCInstr
 
 data ProtoBCO a 
    = ProtoBCO a 			-- name, in some sense
-              BCInstrList 		-- instrs
+              [BCInstr] 		-- instrs
 					-- what the BCO came from
               (Either [AnnAlt Id VarSet]
                       (AnnExpr Id VarSet))
@@ -162,6 +170,20 @@ type Sequel = Int	-- back off to this depth before ENTER
 -- to mess with it after each push/pop.
 type BCEnv = FiniteMap Id Int	-- To find vars on the stack
 
+
+-- Create a BCO and do a spot of peephole optimisation on the insns
+-- at the same time.
+mkProtoBCO nm instrs_ordlist origin
+   = ProtoBCO nm (peep (fromOL instrs_ordlist)) origin
+     where
+        peep (PUSH_L off1 : PUSH_L off2 : PUSH_L off3 : rest)
+           = PUSH_LLL off1 (off2-1) (off3-2) : peep rest
+        peep (PUSH_L off1 : PUSH_L off2 : rest)
+           = PUSH_LL off1 off2 : peep rest
+        peep (i:rest)
+           = i : peep rest
+        peep []
+           = []
 
 
 -- Compile code for the right hand side of a let binding.
@@ -185,7 +207,7 @@ schemeR_wrk original_body nm (args, body)
          argcheck  = if null args then nilOL else unitOL (ARGCHECK szw_args)
      in
      schemeE szw_args 0 p_init body 		`thenBc` \ body_code ->
-     emitBc (ProtoBCO (getName nm) (appOL argcheck body_code) (Right original_body))
+     emitBc (mkProtoBCO (getName nm) (appOL argcheck body_code) (Right original_body))
 
 -- Let szsw be the sizes in words of some items pushed onto the stack,
 -- which has initial depth d'.  Return the values which the stack environment
@@ -202,7 +224,20 @@ schemeE :: Int -> Sequel -> BCEnv -> AnnExpr Id VarSet -> BcM BCInstrList
 schemeE d s p e@(fvs, AnnApp f a) 
    = returnBc (schemeT (should_args_be_tagged e) d s 0 p (fvs, AnnApp f a))
 schemeE d s p e@(fvs, AnnVar v)
+   | isFollowableRep (typePrimRep (idType v))
    = returnBc (schemeT (should_args_be_tagged e) d s 0 p (fvs, AnnVar v))
+   | otherwise
+   = -- returning an unboxed value.  Heave it on the stack, SLIDE, and RETURN.
+     let (push, szw) = pushAtom True d p (AnnVar v)
+     in  returnBc (push 			-- value onto stack
+                   `snocOL` SLIDE szw (d-s) 	-- clear to sequel
+                   `snocOL` RETURN)		-- go
+
+schemeE d s p (fvs, AnnLit literal)
+   = let (push, szw) = pushAtom True d p (AnnLit literal)
+     in  returnBc (push 			-- value onto stack
+                   `snocOL` SLIDE szw (d-s) 	-- clear to sequel
+                   `snocOL` RETURN)		-- go
 
 schemeE d s p (fvs, AnnLet binds b)
    = let (xs,rhss) = case binds of AnnNonRec x rhs  -> ([x],[rhs])
@@ -295,7 +330,7 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
      mkMultiBranch maybe_ncons alt_stuff		`thenBc` \ alt_final ->
      let 
          alt_bco_name = getName bndr
-         alt_bco      = ProtoBCO alt_bco_name alt_final (Left alts)
+         alt_bco      = mkProtoBCO alt_bco_name alt_final (Left alts)
      in
      schemeE (d + ret_frame_sizeW) 
              (d + ret_frame_sizeW) p scrut		`thenBc` \ scrut_code ->
@@ -394,6 +429,7 @@ mkUnpackCode off (r:rs)
 -- 5 and not to 4.  Stack locations are numbered from zero, so a depth
 -- 6 stack has valid words 0 .. 5.
 
+pushAtom :: Bool -> Int -> BCEnv -> AnnExpr' Id VarSet -> (BCInstrList, Int)
 pushAtom tagged d p (AnnVar v) 
    = let str = "\npushAtom " ++ showSDocDebug (ppr v) ++ ", depth = " ++ show d
                ++ ", env =\n" ++ 
@@ -427,6 +463,9 @@ pushAtom False d p (AnnLit lit)
         MachInt i    -> (unitOL (PUSHU_I (fromInteger i)),  untaggedSizeW IntRep)
         MachFloat r  -> (unitOL (PUSHU_F (fromRational r)), untaggedSizeW FloatRep)
         MachDouble r -> (unitOL (PUSHU_D (fromRational r)), untaggedSizeW DoubleRep)
+
+pushAtom tagged d p (AnnApp f (_, AnnType _))
+   = pushAtom tagged d p (snd f)
 
 pushAtom tagged d p other
    = pprPanic "ByteCodeGen.pushAtom" 
@@ -666,10 +705,9 @@ data BCO a = BCO [Word16] 	-- instructions
 
 -- Top level assembler fn.
 assembleBCO :: ProtoBCO Name -> BCO Name
-assembleBCO (ProtoBCO nm instrs_ordlist origin)
+assembleBCO (ProtoBCO nm instrs origin)
    = let
          -- pass 1: collect up the offsets of the local labels
-         instrs = fromOL instrs_ordlist
          label_env = mkLabelEnv emptyFM 0 instrs
 
          mkLabelEnv env i_offset [] = env
@@ -701,31 +739,34 @@ mkBits findLabel r_is n_is r_lits n_lits r_ptrs n_ptrs []
    = (reverse r_is, reverse r_lits, reverse r_ptrs)
 mkBits findLabel r_is n_is r_lits n_lits r_ptrs n_ptrs (instr:instrs)
    = case instr of
-        ARGCHECK  n    -> boring2 i_ARGCHECK n
-        PUSH_L    off  -> boring2 i_PUSH_L off
-        PUSH_G    nm   -> exciting2_P i_PUSH_G n_ptrs nm
-        PUSHT_I   i    -> exciting2_I i_PUSHT_I n_lits i
-        PUSHT_F   f    -> exciting2_F i_PUSHT_F n_lits f
-        PUSHT_D   d    -> exciting2_D i_PUSHT_D n_lits d
-        PUSHU_I   i    -> exciting2_I i_PUSHU_I n_lits i
-        PUSHU_F   f    -> exciting2_F i_PUSHU_F n_lits f
-        PUSHU_D   d    -> exciting2_D i_PUSHU_D n_lits d
-        SLIDE     n by -> boring3 i_SLIDE n by
-        ALLOC     n    -> boring2 i_ALLOC n
-        MKAP      off sz -> boring3 i_MKAP off sz
-        UNPACK    n    -> boring2 i_UNPACK n
-        PACK      dcon sz -> exciting3_A i_PACK sz n_lits nullAddr {-findItbl dcon-}
-        LABEL     lab  -> nop
-        TESTLT_I  i l  -> exciting3_I i_TESTLT_I n_lits (findLabel l) i
-        TESTEQ_I  i l  -> exciting3_I i_TESTEQ_I n_lits (findLabel l) i
-        TESTLT_F  f l  -> exciting3_F i_TESTLT_F n_lits (findLabel l) f
-        TESTEQ_F  f l  -> exciting3_F i_TESTEQ_F n_lits (findLabel l) f
-        TESTLT_D  d l  -> exciting3_D i_TESTLT_D n_lits (findLabel l) d
-        TESTEQ_D  d l  -> exciting3_D i_TESTEQ_D n_lits (findLabel l) d
-        TESTLT_P  i l  -> exciting3_I i_TESTLT_P n_lits (findLabel l) i
-        TESTEQ_P  i l  -> exciting3_I i_TESTEQ_P n_lits (findLabel l) i
-        CASEFAIL       -> boring1 i_CASEFAIL
-        ENTER          -> boring1 i_ENTER
+        ARGCHECK  n        -> boring2 i_ARGCHECK n
+        PUSH_L    off      -> boring2 i_PUSH_L off
+        PUSH_LL   o1 o2    -> boring3 i_PUSH_LL o1 o2
+        PUSH_LLL  o1 o2 o3 -> boring4 i_PUSH_LLL o1 o2 o3
+        PUSH_G    nm       -> exciting2_P i_PUSH_G n_ptrs nm
+        PUSHT_I   i        -> exciting2_I i_PUSHT_I n_lits i
+        PUSHT_F   f        -> exciting2_F i_PUSHT_F n_lits f
+        PUSHT_D   d        -> exciting2_D i_PUSHT_D n_lits d
+        PUSHU_I   i        -> exciting2_I i_PUSHU_I n_lits i
+        PUSHU_F   f        -> exciting2_F i_PUSHU_F n_lits f
+        PUSHU_D   d        -> exciting2_D i_PUSHU_D n_lits d
+        SLIDE     n by     -> boring3 i_SLIDE n by
+        ALLOC     n        -> boring2 i_ALLOC n
+        MKAP      off sz   -> boring3 i_MKAP off sz
+        UNPACK    n        -> boring2 i_UNPACK n
+        PACK      dcon sz  -> exciting3_A i_PACK sz n_lits nullAddr {-findItbl dcon-}
+        LABEL     lab      -> nop
+        TESTLT_I  i l      -> exciting3_I i_TESTLT_I n_lits (findLabel l) i
+        TESTEQ_I  i l      -> exciting3_I i_TESTEQ_I n_lits (findLabel l) i
+        TESTLT_F  f l      -> exciting3_F i_TESTLT_F n_lits (findLabel l) f
+        TESTEQ_F  f l      -> exciting3_F i_TESTEQ_F n_lits (findLabel l) f
+        TESTLT_D  d l      -> exciting3_D i_TESTLT_D n_lits (findLabel l) d
+        TESTEQ_D  d l      -> exciting3_D i_TESTEQ_D n_lits (findLabel l) d
+        TESTLT_P  i l      -> exciting3_I i_TESTLT_P n_lits (findLabel l) i
+        TESTEQ_P  i l      -> exciting3_I i_TESTEQ_P n_lits (findLabel l) i
+        CASEFAIL           -> boring1 i_CASEFAIL
+        ENTER              -> boring1 i_ENTER
+        RETURN             -> boring1 i_RETURN
      where
         r_mkILit = reverse . mkILit
         r_mkFLit = reverse . mkFLit
@@ -745,6 +786,9 @@ mkBits findLabel r_is n_is r_lits n_lits r_ptrs n_ptrs (instr:instrs)
                     r_lits n_lits r_ptrs n_ptrs instrs
         boring3 i1 i2 i3
            = mkBits findLabel (mkw i3 : mkw i2 : mkw i1 : r_is) (n_is+3) 
+                    r_lits n_lits r_ptrs n_ptrs instrs
+        boring4 i1 i2 i3 i4
+           = mkBits findLabel (mkw i4 : mkw i3 : mkw i2 : mkw i1 : r_is) (n_is+4) 
                     r_lits n_lits r_ptrs n_ptrs instrs
 
         exciting2_P i1 i2 p
@@ -791,31 +835,34 @@ mkBits findLabel r_is n_is r_lits n_lits r_ptrs n_ptrs (instr:instrs)
 instrSizeB :: BCInstr -> Int
 instrSizeB instr
    = case instr of
-        ARGCHECK _   -> 4
-        PUSH_L   _   -> 4
-        PUSH_G   _   -> 4
-        PUSHT_I  _   -> 4
-        PUSHT_F  _   -> 4
-        PUSHT_D  _   -> 4
-        PUSHU_I  _   -> 4
-        PUSHU_F  _   -> 4
-        PUSHU_D  _   -> 4
-        SLIDE    _ _ -> 6
-        ALLOC    _   -> 4
-        MKAP     _ _ -> 6
-        UNPACK   _   -> 4
-        PACK     _ _ -> 6
-        LABEL    _   -> 4
-        TESTLT_I _ _ -> 6
-        TESTEQ_I _ _ -> 6
-        TESTLT_F _ _ -> 6
-        TESTEQ_F _ _ -> 6
-        TESTLT_D _ _ -> 6
-        TESTEQ_D _ _ -> 6
-        TESTLT_P _ _ -> 6
-        TESTEQ_P _ _ -> 6
-        CASEFAIL     -> 2
-        ENTER        -> 2
+        ARGCHECK _     -> 4
+        PUSH_L   _     -> 4
+        PUSH_LL  _ _   -> 6
+        PUSH_LLL _ _ _ -> 8
+        PUSH_G   _     -> 4
+        PUSHT_I  _     -> 4
+        PUSHT_F  _     -> 4
+        PUSHT_D  _     -> 4
+        PUSHU_I  _     -> 4
+        PUSHU_F  _     -> 4
+        PUSHU_D  _     -> 4
+        SLIDE    _ _   -> 6
+        ALLOC    _     -> 4
+        MKAP     _ _   -> 6
+        UNPACK   _     -> 4
+        PACK     _ _   -> 6
+        LABEL    _     -> 4
+        TESTLT_I _ _   -> 6
+        TESTEQ_I _ _   -> 6
+        TESTLT_F _ _   -> 6
+        TESTEQ_F _ _   -> 6
+        TESTLT_D _ _   -> 6
+        TESTEQ_D _ _   -> 6
+        TESTLT_P _ _   -> 6
+        TESTEQ_P _ _   -> 6
+        CASEFAIL       -> 2
+        ENTER          -> 2
+        RETURN         -> 2
 
 
 -- Sizes of Int, Float and Double literals, in units of 32-bitses
@@ -890,6 +937,8 @@ mkALit a
 
 i_ARGCHECK = (bci_ARGCHECK :: Int)
 i_PUSH_L   = (bci_PUSH_L   :: Int)
+i_PUSH_LL  = (bci_PUSH_LL  :: Int)
+i_PUSH_LLL = (bci_PUSH_LLL :: Int)
 i_PUSH_G   = (bci_PUSH_G   :: Int)
 i_PUSH_AS  = (bci_PUSH_AS  :: Int)
 i_PUSHT_I  = (bci_PUSHT_I  :: Int)
@@ -914,5 +963,6 @@ i_TESTLT_P = (bci_TESTLT_P :: Int)
 i_TESTEQ_P = (bci_TESTEQ_P :: Int)
 i_CASEFAIL = (bci_CASEFAIL :: Int)
 i_ENTER    = (bci_ENTER    :: Int)
+i_RETURN   = (bci_RETURN   :: Int)
 
 \end{code}
