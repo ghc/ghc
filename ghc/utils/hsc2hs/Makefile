@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.33 2002/05/29 22:32:50 sof Exp $
+# $Id: Makefile,v 1.34 2002/09/09 11:39:43 simonmar Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -17,7 +17,13 @@ ifeq "$(HOSTPLATFORM)" "i386-unknown-cygwinw32"
 HS_PROG           = hsc2hs$(exeext)
 endif
 
-SRC_HC_OPTS      += -package util -cpp
+ghc_ge_504 = $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
+
+ifeq "$(ghc_ge_504)" "NO"
+SRC_HC_OPTS +=  -package util
+endif
+
+SRC_HC_OPTS      += -cpp
 
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 SRC_HC_OPTS      += -package win32 '-\#include <process.h>'

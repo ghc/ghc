@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.39 2002/05/29 22:32:49 sof Exp $
+-- $Id: Main.hs,v 1.40 2002/09/09 11:39:42 simonmar Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -9,7 +9,12 @@
 --
 -- See the documentation in the Users' Guide for more details.
 
+#if __GLASGOW_HASKELL__ >= 504
+import System.Console.GetOpt
+#else
 import GetOpt
+#endif
+
 import Config
 import System        (getProgName, getArgs, ExitCode(..), exitWith, exitFailure, system)
 import Directory     (removeFile)
