@@ -406,25 +406,6 @@ package_details installing
          extra_ghc_opts = [],
          extra_cc_opts  = [],
          extra_ld_opts  = []
-        },
-
-         Package {
-         name           = "com",
-         import_dirs    = if installing
-                             then [ "$libdir/imports/com" ]
-                             else [ "$libdir/hdirect/lib" ],
-         source_dirs    = [],
-         library_dirs   = if installing
-                             then [ "$libdir" ]
-                             else [ "$libdir/hdirect/lib" ],
-         hs_libraries      = [ "HScom" ],
-	 extra_libraries   = [ "user32",  "ole32",  "oleaut32", "advapi32" ],
-         include_dirs   = [],
-         c_includes     = [],           -- ???
-         package_deps   = [ "lang" ],
-         extra_ghc_opts = [],
-         extra_cc_opts  = [],
-         extra_ld_opts  = []
         }
 #endif
 
