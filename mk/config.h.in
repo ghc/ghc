@@ -457,3 +457,6 @@
 
 /* Define if you have the iberty library (-liberty).  */
 #undef HAVE_LIBIBERTY
+
+/* Define if you have the readline library (-lreadline).  */
+#undef HAVE_LIBREADLINE

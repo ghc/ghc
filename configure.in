@@ -614,6 +614,9 @@ dnl    the order of these tests matters: bfd needs liberty
 AC_CHECK_LIB(iberty, xmalloc)
 AC_CHECK_LIB(bfd,    bfd_init)
 
+dnl ** check for readline, for Hugs
+AC_CHECK_LIB(readline, readline)
+
 dnl ################################################################
 dnl Check for libraries
 dnl ################################################################
