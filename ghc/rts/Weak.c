@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.20 2001/11/26 16:54:22 simonmar Exp $
+ * $Id: Weak.c,v 1.21 2002/02/18 13:26:13 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -56,6 +56,8 @@ finalizeWeakPointersNow(void)
  * The weak pointer object itself may not be alive - i.e. we may be
  * looking at either an object in from-space or one in to-space.  It
  * doesn't really matter either way.
+ *
+ * Pre-condition: sched_mutex _not_ held.
  */
 
 void

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.130 2002/02/16 00:30:05 sof Exp $
+ * $Id: Schedule.c,v 1.131 2002/02/18 13:26:13 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -595,9 +595,7 @@ schedule( void )
 	/* and SMP mode ..? */
 	releaseCapability(cap);
 #endif
-	RELEASE_LOCK(&sched_mutex);
 	GarbageCollect(GetRoots,rtsTrue);
-	ACQUIRE_LOCK(&sched_mutex);
 	if (   EMPTY_QUEUE(blocked_queue_hd)
 	    && EMPTY_RUN_QUEUE()
 	    && EMPTY_QUEUE(sleeping_queue) ) {
@@ -1344,9 +1342,7 @@ schedule( void )
 #if defined(RTS_SUPPORTS_THREADS)
       IF_DEBUG(scheduler,sched_belch("doing GC"));
 #endif
-      RELEASE_LOCK(&sched_mutex);
       GarbageCollect(GetRoots,rtsFalse);
-      ACQUIRE_LOCK(&sched_mutex);
       ready_to_gc = rtsFalse;
 #ifdef SMP
       broadcastCondition(&gc_pending_cond);
@@ -2320,13 +2316,18 @@ void (*extra_roots)(evac_fn);
 void
 performGC(void)
 {
+  /* Obligated to hold this lock upon entry */
+  ACQUIRE_LOCK(&sched_mutex);
   GarbageCollect(GetRoots,rtsFalse);
+  RELEASE_LOCK(&sched_mutex);
 }
 
 void
 performMajorGC(void)
 {
+  ACQUIRE_LOCK(&sched_mutex);
   GarbageCollect(GetRoots,rtsTrue);
+  RELEASE_LOCK(&sched_mutex);
 }
 
 static void
@@ -2339,8 +2340,10 @@ AllRoots(evac_fn evac)
 void
 performGCWithRoots(void (*get_roots)(evac_fn))
 {
+  ACQUIRE_LOCK(&sched_mutex);
   extra_roots = get_roots;
   GarbageCollect(AllRoots,rtsFalse);
+  RELEASE_LOCK(&sched_mutex);
 }
 
 /* -----------------------------------------------------------------------------

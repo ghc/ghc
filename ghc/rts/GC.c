@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.129 2001/11/28 15:42:05 simonmar Exp $
+ * $Id: GC.c,v 1.130 2002/02/18 13:26:12 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -217,6 +217,8 @@ pop_mark_stack(void)
        being collected until no more objects can be evacuated.
       
      - free from-space in each step, and set from-space = to-space.
+
+   Locks held: sched_mutex
 
    -------------------------------------------------------------------------- */
 
@@ -958,11 +960,16 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   // Reset the nursery
   resetNurseries();
 
+  // let go of lock (so that it can be re-grabbed below).
+  RELEASE_LOCK(&sched_mutex);
+  
   // start any pending finalizers 
   scheduleFinalizers(old_weak_ptr_list);
   
   // send exceptions to any threads which were about to die 
   resurrectThreads(resurrected_threads);
+
+  ACQUIRE_LOCK(&sched_mutex);
 
   // Update the stable pointer hash table.
   updateStablePtrTable(major_gc);
