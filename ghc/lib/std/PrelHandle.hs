@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hs,v 1.1 2001/11/07 18:25:35 sof Exp $
+-- $Id: PrelHandle.hs,v 1.2 2001/11/07 19:36:11 sof Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -45,7 +45,7 @@ module PrelHandle (
 import Monad
 
 import PrelBits
-import PrelPosix hiding ( o_BINARY )
+import PrelPosix
 import PrelMarshalUtils
 import PrelCString
 import PrelCTypes
@@ -616,7 +616,7 @@ openFile' filepath ex_mode =
 	       | otherwise	   = False
 
       binary_flags
-	  | binary    = o_BINARY -- is '0' if not supported.
+	  | binary    = PrelHandle.o_BINARY -- is '0' if not supported.
 	  | otherwise = 0
 
       oflags = oflags1 .|. binary_flags
