@@ -25,7 +25,7 @@ import Subst		( substTyWith )
 import Name		( getSrcLoc )
 import PprCore
 import ErrUtils		( dumpIfSet_core, ghcExit, Message, showPass,
-			  mkLocMessage )
+			  mkLocMessage, debugTraceMsg )
 import SrcLoc		( SrcLoc, noSrcLoc, mkSrcSpan )
 import Type		( Type, tyVarsOfType, eqType,
 			  splitFunTy_maybe, mkTyVarTy,
@@ -44,7 +44,6 @@ import Util             ( notNull )
 #endif
 
 import Maybe
-import IO		( hPutStrLn, stderr )
 
 infixr 9 `thenL`, `seqL`
 \end{code}
@@ -65,10 +64,8 @@ endPass dflags pass_name dump_flag binds
   = do 
 	-- Report result size if required
 	-- This has the side effect of forcing the intermediate to be evaluated
-	if verbosity dflags >= 2 then
-	   hPutStrLn stderr ("    Result size = " ++ show (coreBindsSize binds))
-	 else
-	   return ()
+	debugTraceMsg dflags $
+		"    Result size = " ++ show (coreBindsSize binds)
 
 	-- Report verbosely, if required
 	dumpIfSet_core dflags dump_flag pass_name (pprCoreBindings binds)

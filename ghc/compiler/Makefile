@@ -562,7 +562,7 @@ ifeq "$(BuildPackageGHC)" "YES"
 
 PACKAGE = ghc
 STANDALONE_PACKAGE = YES
-PACKAGE_DEPS = base haskell98
+PACKAGE_DEPS =
 
 endif
 

@@ -16,14 +16,21 @@ module ErrUtils (
 	ghcExit,
 	doIfSet, doIfSet_dyn, 
 	dumpIfSet, dumpIfSet_core, dumpIfSet_dyn, dumpIfSet_dyn_or, mkDumpDoc,
-	showPass
+	showPass,
+
+	-- * Messages during compilation
+	setMsgHandler,
+	putMsg,
+	compilationProgressMsg,
+	debugTraceMsg,
+	errorMsg,
     ) where
 
 #include "HsVersions.h"
 
 import Bag		( Bag, bagToList, isEmptyBag, emptyBag )
 import SrcLoc		( SrcSpan )
-import Util		( sortLe )
+import Util		( sortLe, global )
 import Outputable
 import qualified Pretty
 import SrcLoc		( srcSpanStart )
@@ -32,6 +39,7 @@ import CmdLineOpts	( DynFlags(..), DynFlag(..), dopt,
 
 import List             ( replicate, sortBy )
 import System		( ExitCode(..), exitWith )
+import DATA_IOREF
 import IO		( hPutStr, stderr, stdout )
 
 
@@ -146,7 +154,7 @@ pprBagOfWarnings bag_of_warns = pprBagOfErrors bag_of_warns
 ghcExit :: Int -> IO ()
 ghcExit val
   | val == 0  = exitWith ExitSuccess
-  | otherwise = do hPutStr stderr "\nCompilation had errors\n\n"
+  | otherwise = do errorMsg "\nCompilation had errors\n\n"
 	           exitWith (ExitFailure val)
 \end{code}
 
@@ -162,9 +170,7 @@ doIfSet_dyn dflags flag action | dopt flag dflags = action
 
 \begin{code}
 showPass :: DynFlags -> String -> IO ()
-showPass dflags what
-  | verbosity dflags >= 2 = hPutStr stderr ("*** "++what++":\n")
-  | otherwise		  = return ()
+showPass dflags what = compilationPassMsg dflags ("*** "++what++":\n")
 
 dumpIfSet :: Bool -> String -> SDoc -> IO ()
 dumpIfSet flag hdr doc
@@ -199,4 +205,40 @@ mkDumpDoc hdr doc
 	   text ""]
      where 
         line = text (replicate 20 '=')
+
+-- -----------------------------------------------------------------------------
+-- Outputting messages from the compiler
+
+-- We want all messages to go through one place, so that we can
+-- redirect them if necessary.  For example, when GHC is used as a
+-- library we might want to catch all messages that GHC tries to
+-- output and do something else with them.
+
+ifVerbose :: DynFlags -> Int -> IO () -> IO ()
+ifVerbose dflags val act
+  | verbosity dflags >= val = act
+  | otherwise               = return ()
+
+errorMsg :: String -> IO ()
+errorMsg = putMsg
+
+compilationProgressMsg :: DynFlags -> String -> IO ()
+compilationProgressMsg dflags msg
+  = ifVerbose dflags 1 (putMsg msg)
+
+compilationPassMsg :: DynFlags -> String -> IO ()
+compilationPassMsg dflags msg
+  = ifVerbose dflags 2 (putMsg msg)
+
+debugTraceMsg :: DynFlags -> String -> IO ()
+debugTraceMsg dflags msg
+  = ifVerbose dflags 2 (putMsg msg)
+
+GLOBAL_VAR(msgHandler, hPutStr stderr, (String -> IO ()))
+
+setMsgHandler :: (String -> IO ()) -> IO ()
+setMsgHandler handle_msg = writeIORef msgHandler handle_msg
+
+putMsg :: String -> IO ()
+putMsg msg = do h <- readIORef msgHandler; h msg
 \end{code}

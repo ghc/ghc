@@ -26,12 +26,11 @@ import TidyPgm		( tidyCoreExpr )
 import CorePrep		( corePrepExpr )
 import Flattening	( flattenExpr )
 import TcRnDriver	( tcRnStmt, tcRnExpr, tcRnGetInfo, tcRnType ) 
-import RdrName		( RdrName, rdrNameOcc )
+import RdrName		( rdrNameOcc )
 import OccName		( occNameUserString )
 import Type		( Type )
 import PrelNames	( iNTERACTIVE )
 import StringBuffer	( stringToStringBuffer )
-import SrcLoc		( SrcLoc, noSrcLoc, Located(..) )
 import Kind		( Kind )
 import Var		( Id )
 import CoreLint		( lintUnfolding )
@@ -39,6 +38,9 @@ import DsMeta		( templateHaskellNames )
 import BasicTypes	( Fixity )
 #endif
 
+import RdrName		( RdrName )
+import HsSyn		( HsModule )
+import SrcLoc		( SrcLoc, noSrcLoc, Located(..) )
 import StringBuffer	( hGetStringBuffer )
 import Parser
 import Lexer		( P(..), ParseResult(..), mkPState )
@@ -127,7 +129,7 @@ data HscResult
    = HscFail
 
    -- In IDE mode: we just do the static/dynamic checks
-   | HscChecked
+   | HscChecked (Located (HsModule RdrName))
 
    -- Concluded that it wasn't necessary
    | HscNoRecomp ModDetails  	         -- new details (HomeSymbolTable additions)
@@ -181,8 +183,8 @@ hscNoRecomp hsc_env msg_act have_object
 	    mod location (Just old_iface)
  | isOneShot (hsc_mode hsc_env)
  = do {
-      when (verbosity (hsc_dflags hsc_env) > 0) $
-	  hPutStrLn stderr "compilation IS NOT required";
+      compilationProgressMsg (hsc_dflags hsc_env) $
+	"compilation IS NOT required";
       dumpIfaceStats hsc_env ;
 
       let { bomb = panic "hscNoRecomp:OneShot" };
@@ -190,9 +192,8 @@ hscNoRecomp hsc_env msg_act have_object
       }
  | otherwise
  = do {
-      when (verbosity (hsc_dflags hsc_env) >= 1) $
-		hPutStrLn stderr ("Skipping  " ++ 
-			showModMsg have_object mod location);
+      compilationProgressMsg (hsc_dflags hsc_env) $
+	("Skipping  " ++ showModMsg have_object mod location);
 
       new_details <- _scc_ "tcRnIface"
 		     typecheckIface hsc_env old_iface ;
@@ -211,9 +212,9 @@ hscRecomp hsc_env msg_act have_object
 	; let toCore    = isJust (ml_hs_file location) &&
 			  isExtCoreFilename (fromJust (ml_hs_file location))
 
-      	; when (not one_shot && verbosity dflags >= 1) $
-		hPutStrLn stderr ("Compiling " ++ 
-			showModMsg (not toInterp) mod location);
+      	; when (not one_shot) $
+		compilationProgressMsg dflags $
+		  ("Compiling " ++ showModMsg (not toInterp) mod location);
 			
 	; front_res <- if toCore then 
 			  hscCoreFrontEnd hsc_env msg_act location
@@ -328,7 +329,7 @@ hscCoreFrontEnd hsc_env msg_act location = do {
  	    -------------------
 	; inp <- readFile (expectJust "hscCoreFrontEnd:hspp" (ml_hspp_file location))
 	; case parseCore inp 1 of
-	    FailP s        -> hPutStrLn stderr s >> return (Left HscFail)
+	    FailP s        -> putMsg s{-ToDo: wrong-} >> return (Left HscFail)
 	    OkP rdr_module -> do {
     
  	    -------------------
@@ -365,6 +366,7 @@ hscFileFrontEnd hsc_env msg_act location = do {
 hscBufferFrontEnd :: HscEnv -> StringBuffer -> MessageAction -> IO HscResult
 hscBufferFrontEnd hsc_env buffer msg_act = do
 	let loc  = mkSrcLoc (mkFastString "*edit*") 1 0
+        showPass (hsc_dflags hsc_env) "Parser"
 	case unP parseModule (mkPState buffer loc (hsc_dflags hsc_env)) of
 		PFailed span err -> do
 			msg_act (emptyBag, unitBag (mkPlainErrMsg span err))
@@ -373,8 +375,8 @@ hscBufferFrontEnd hsc_env buffer msg_act = do
 			r <- hscFrontEnd hsc_env msg_act rdr_module
 			case r of
 			   Left r -> return r
-			   Right _ -> return HscChecked
-		
+			   Right _ -> return (HscChecked rdr_module)
+
 
 
 hscFrontEnd hsc_env msg_act rdr_module  = do {
@@ -576,7 +578,7 @@ hscTcExpr hsc_env icontext expr
 	     Nothing      -> return Nothing ;	-- Parse error
 	     Just (Just (L _ (ExprStmt expr _)))
 			-> tcRnExpr hsc_env icontext expr ;
-	     Just other -> do { hPutStrLn stderr ("not an expression: `" ++ expr ++ "'") ;
+	     Just other -> do { errorMsg ("not an expression: `" ++ expr ++ "'") ;
 			        return Nothing } ;
       	     } }
 
@@ -590,7 +592,7 @@ hscKcType hsc_env icontext str
   = do	{ maybe_type <- hscParseType (hsc_dflags hsc_env) str
 	; case maybe_type of {
 	     Just ty	-> tcRnType hsc_env icontext ty ;
-	     Just other -> do { hPutStrLn stderr ("not an type: `" ++ str ++ "'") ;
+	     Just other -> do { errorMsg ("not an type: `" ++ str ++ "'") ;
 			        return Nothing } ;
       	     Nothing    -> return Nothing } }
 \end{code}
