@@ -82,7 +82,7 @@ emptyPLS = return (PersistentLinkerState { closure_env = emptyFM,
                                            itbl_env    = emptyFM,
 					   bcos_loaded = [] })
 #else
-emptyPLS = return (PersistentLinkerState {})
+emptyPLS = return (PersistentLinkerState {dummy=()})
 #endif
 
 -- We also keep track of which object modules are currently loaded
