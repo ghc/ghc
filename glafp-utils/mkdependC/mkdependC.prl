@@ -21,6 +21,7 @@ $Include_dirs = '';
 $Makefile = '';
 @Src_files = ();
 @File_suffix = ();
+$baseName='';
 
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $Tmp_prefix = $ENV{'TMPDIR'} . "/mkdependC$$";
@@ -51,7 +52,6 @@ if ( ! $Makefile && -f 'makefile' ) {
 }
 
 @Depend_lines = ();
-%Depend_seen = ();
 
 print STDERR "Include_dirs=$Include_dirs\n" if $Verbose;
 
@@ -61,7 +61,7 @@ foreach $sf (@Src_files) {
     # a de-commenter (not implemented);
     # builds up @Depend_lines
     print STDERR "Here we go for source file: $sf\n" if $Verbose;
-    ($bf = $sf) =~ s/\.(c|hc)$//;
+    ($baseName = $sf) =~ s/\.(c|hc)$//;
 
     &slurp_file($sf, 'fh00');
 }
@@ -151,65 +151,46 @@ sub grab_arg_arg {
 
 sub slurp_file { # follows an example in the `open' item in perl man page
     local($fname,$fhandle) = @_;
-    local($depend); # tmp
+    local($depend,$dep); # tmp
+    local(@Deps);
+
     $fhandle++; # a string increment
 
     $fname = &tidy_dir_names($fname);
 
-    $tempfile = "$Tmp_prefix.i";
+    ($tempfile = $fname) =~ s/\.[^\.]*$/\.d/;
+    $tempfile =~ s|.*/([^/]+)$|$1|g;
 
     # ${CPP} better be 'gcc -E', or the -x option will fail...
-    $result = system("${CPP} $Include_dirs @Defines -x c $fname -o $tempfile");
+    # ..and the -MM & -MMD.
+    $result = system("${CPP} -MM -MMD $Include_dirs @Defines -x c $fname");
     if ($result != 0) {
 	unlink($tempfile);
 	exit($result);
     };
 
+    local($dep_contents)='';
+    local($deps)='';
     open($fhandle, $tempfile) || die "$Pgm: Can't open $tempfile: $!\n";
 
-    line: while (<$fhandle>) {
-	next line if ! /^#/;
-	next line if /^#(ident|pragma)/;
-	chop; # rm trailing newline
-
-	$_ = &tidy_dir_names($_);
-
-	# strip junk off the front and back
-	$_ =~ s/^#\s+\d+\s+//;
-	$_ =~ s/[ 0-9]*$//;
-	
-	# a little bit of ad-hoc fiddling now:
-	# don't bother w/ dependencies on /usr/include stuff
-	# don't bother if it looks like a GCC built-in hdr file
-	# don't bother with funny yacc-ish files
-	# don't let a file depend on itself
-	next line if /^\/usr\/include/;
-	# Hack - the cygwin32 dir structupre is odd!
-	next line if /H-i386-cygwin32\/i386-cygwin32/;
-	next line if /H-i386-cygwin32\/lib\/gcc-lib\/i386-cygwin32/;
-	next line if /\/gcc-lib\/[^\/\n]+\/[\.0-9]+\/include\//;
-	next line if /\/gnu\/[^-\/]+-[^-\/]+-[^-\/]+\/include\//;
-	next line if /\/yaccpar/;
-    	next line if /\/bison\.(simple|hairy)/;
-	next line if $_ eq $fname;
-
-	print STDERR "$fname :: $_\n" if $Verbose;
-
-	# ToDo: some sanity checks that we still have something reasonable?
-
-	$int_file = $_;
-	$depend = "$bf.$Obj_suffix ";
-	foreach $suff (@File_suffix) {
-	   $depend .= "$bf.${suff}_$Obj_suffix ";
-        }
-	$depend .= " : $int_file\n";
-
-	next line if $Depend_seen{$depend};  # already seen this one...
-	# OK, it's a new one.
-	$Depend_seen{$depend} = 1;
-
-	push (@Depend_lines, $depend);
+    while (<$fhandle>) {
+       chop;
+       $dep_contents .= $_;
     }
+    ($deps = $dep_contents) =~ s|^[^:]+:(.*)$|$1|g;
+    $deps =~ s|\\| |g;
+    
+    @Deps = split(/ +/, $deps);
+    
+    $depend = "$baseName.$Obj_suffix";
+    foreach $suff (@File_suffix) {
+	 $depend .= " $baseName.${suff}_$Obj_suffix";
+    }
+    
+    foreach $dep (@Deps) {
+    	push(@Depend_lines, "$depend: $dep\n") if $dep ne '';
+    }
+
     close($fhandle);
     unlink($tempfile);
     $tempfile = '';  # for quit_upon_signal
