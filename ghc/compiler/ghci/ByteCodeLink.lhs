@@ -578,7 +578,8 @@ lookupCE ce (Left nm)
    = case lookupFM ce nm of
         Just aa -> return aa
         Nothing 
-           -> do let sym_to_find = nameToCLabel nm "closure"
+           -> ASSERT2(isGlobalName nm, ppr nm)
+	      do let sym_to_find = nameToCLabel nm "closure"
                  m <- lookupSymbol sym_to_find
                  case m of
                     Just (Ptr addr) -> case addrToHValue# addr of
