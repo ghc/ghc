@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.67 2001/02/17 19:52:56 sebc Exp $
+dnl $Id: aclocal.m4,v 1.68 2001/03/13 14:59:56 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -175,9 +175,10 @@ else
    fptools_cv_happy_version="";
 fi;
 changequote([, ])dnl
-if ( test `echo "$fptools_cv_happy_version" | sed -e "s/\(.*\)\..*/\1/g"` "-eq" "1" &&
-     test `echo "$fptools_cv_happy_version" | sed -e "s/.*\.\(.*\)/\1/g"` "-lt" "9" ); then
-   if test -d $srcdir/ghc; then
+if test -d $srcdir/ghc; then
+  if ( test "$fptools_cv_happy_version" = "" || (
+       test `echo "$fptools_cv_happy_version" | sed -e "s/\(.*\)\..*/\1/g"` "-eq" "1" &&
+       test `echo "$fptools_cv_happy_version" | sed -e "s/.*\.\(.*\)/\1/g"` "-lt" "9" )); then
      echo
      echo "Happy version 1.9 or later is required to compile GHC."
      exit 1;
@@ -861,7 +862,7 @@ dnl The variable LIBM (which is not an output variable by default) is
 dnl set to a value which is suitable for use in a Makefile (for example,
 dnl in make's LOADLIBES macro) provided you AC_SUBST it first.
 dnl
-dnl @version 0.01 $Id: aclocal.m4,v 1.67 2001/02/17 19:52:56 sebc Exp $
+dnl @version 0.01 $Id: aclocal.m4,v 1.68 2001/03/13 14:59:56 simonmar Exp $
 dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
 
 # FPTOOLS_CHECK_LIBM - check for math library
@@ -949,7 +950,7 @@ dnl Please note that as the ac_opengl macro and the toy example evolves,
 dnl the version number increases, so you may have to adjust the above
 dnl URL accordingly.
 dnl
-dnl @version 0.01 $Id: aclocal.m4,v 1.67 2001/02/17 19:52:56 sebc Exp $
+dnl @version 0.01 $Id: aclocal.m4,v 1.68 2001/03/13 14:59:56 simonmar Exp $
 dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
 
 AC_DEFUN(FPTOOLS_HAVE_OPENGL,
