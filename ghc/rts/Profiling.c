@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.27 2001/11/26 16:54:21 simonmar Exp $
+ * $Id: Profiling.c,v 1.28 2001/11/28 15:42:26 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -241,12 +241,9 @@ initProfilingLogFile(void)
     if ((prof_file = fopen(prof_filename, "w")) == NULL) {
 	fprintf(stderr, "Can't open profiling report file %s\n", prof_filename);
 	RtsFlags.CcFlags.doCostCentres = 0;
-        // @retainer profiling
-        // @LDV profiling
         // The following line was added by Sung; retainer/LDV profiling may need
         // two output files, i.e., <program>.prof/hp.
-        if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER ||
-            RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV)
+        if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER)
             RtsFlags.ProfFlags.doHeapProfile = 0;
 	return;
     }
