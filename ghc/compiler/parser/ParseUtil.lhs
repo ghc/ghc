@@ -49,7 +49,7 @@ import SrcLoc
 import RdrHsSyn
 import RdrName
 import PrelNames	( unitTyCon_RDR )
-import OccName  	( dataName, varName, tcClsName,
+import OccName  	( dataName, varName, tcClsName, isDataOcc,
 			  occNameSpace, setOccNameSpace, occNameUserString )
 import CStrings		( CLabelString )
 import FastString	( nullFastString )
@@ -212,7 +212,8 @@ checkPat e [] = case e of
 	OpApp l op fix r   -> checkPat l [] `thenP` \l ->
 			      checkPat r [] `thenP` \r ->
 			      case op of
-			   	 HsVar c -> returnP (ConOpPatIn l c fix r)
+			   	 HsVar c | isDataOcc (rdrNameOcc c)
+					-> returnP (ConOpPatIn l c fix r)
 			   	 _ -> patFail
 
 	HsPar e		   -> checkPat e [] `thenP` (returnP . ParPatIn)
