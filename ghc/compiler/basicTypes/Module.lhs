@@ -11,11 +11,11 @@ the keys.
 \begin{code}
 module Module 
     (
-      Module, 		   	-- Abstract, instance of Eq, Ord, Outputable
+      Module 		   	-- Abstract, instance of Eq, Ord, Outputable
     , pprModule			-- :: ModuleName -> SDoc
 
-    , ModLocation(..),
-    , addBootSuffix, addBootSuffix_maybe, addBootSuffixLocn,
+    , ModLocation(..)
+    , addBootSuffix, addBootSuffix_maybe, addBootSuffixLocn
 
     , moduleString		-- :: ModuleName -> EncodedString
     , moduleUserString		-- :: ModuleName -> UserString
@@ -25,12 +25,12 @@ module Module
     , mkModuleFS		-- :: UserFS    -> ModuleName
     , mkSysModuleFS		-- :: EncodedFS -> ModuleName
  
-    , ModuleEnv,
+    , ModuleEnv
     , elemModuleEnv, extendModuleEnv, extendModuleEnvList, plusModuleEnv_C
     , delModuleEnvList, delModuleEnv, plusModuleEnv, lookupModuleEnv
     , lookupWithDefaultModuleEnv, mapModuleEnv, mkModuleEnv, emptyModuleEnv
     , moduleEnvElts, unitModuleEnv, isEmptyModuleEnv, foldModuleEnv
-    , extendModuleEnv_C, filterModuleEnv,
+    , extendModuleEnv_C, filterModuleEnv
 
     , ModuleSet, emptyModuleSet, mkModuleSet, moduleSetElts, extendModuleSet, elemModuleSet
 
