@@ -182,29 +182,35 @@ getThing name
 
   | otherwise = do	-- The normal case, not wired in
   {	-- Get the decl from the pool
-    decl <- updateEps (\ eps ->
-	    let 
-	        (decls', decl) = selectDecl (eps_decls eps) name
-	    in
-	    (eps { eps_decls = decls' }, decl))
+    mb_decl <- updateEps (\ eps -> selectDecl eps name)
 
-    -- Typecheck it
-    -- Side-effects EPS by faulting in any needed decls
-    -- (via nested calls to tcImportDecl)
-  ; initIfaceLcl (nameModuleName name) (tcIfaceDecl decl) }
+    ; case mb_decl of
+	Just decl -> initIfaceLcl (nameModuleName name) (tcIfaceDecl decl)
+		-- Typecheck it
+		-- Side-effects EPS by faulting in any needed decls
+		-- (via nested calls to tcImportDecl)
+		     
 
+	Nothing -> do { ioToIOEnv (printErrs (msg defaultErrStyle)); failM }
+		-- Declaration not found
+		-- No errors-var to accumulate errors in, so just
+		-- print out the error right now
+		     
+    }
+  where
+     msg = hang (ptext SLIT("Can't find interface-file declaration for") <+> ppr (nameParent name))
+	      2 (vcat [ptext SLIT("Probable cause: bug in .hi-boot file, or inconsistent .hi file"),
+		       ptext SLIT("Use -ddump-if-trace to get an idea of which file caused the error")])
 
-selectDecl :: DeclPool -> Name -> (DeclPool, IfaceDecl)
+selectDecl :: ExternalPackageState -> Name -> (ExternalPackageState, Maybe IfaceDecl)
 -- Use nameParent to get the parent name of the thing
-selectDecl (Pool decls_map n_in n_out) name
-   = (Pool decls' n_in (n_out+1), decl)
+selectDecl eps@(EPS { eps_decls = Pool decls_map n_in n_out}) name
+   = case lookupNameEnv decls_map main_name of
+	Nothing   -> (eps, Nothing)
+	Just decl -> (eps {eps_decls = Pool decls' n_in (n_out+1)}, Just decl)
    where
      main_name = nameParent name
-     decl = case lookupNameEnv decls_map main_name of
-		Nothing   -> pprPanic "selectDecl" (ppr main_name <+> ppr name) ;
-		Just decl -> decl
-
-     decls' = delFromNameEnv decls_map main_name
+     decls'    = delFromNameEnv decls_map main_name
 \end{code}
 
 %************************************************************************
