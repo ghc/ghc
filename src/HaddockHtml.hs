@@ -160,8 +160,9 @@ addToTrees :: [String] -> [ModuleTree] -> [ModuleTree]
 addToTrees [] ts = ts
 addToTrees ss [] = mkSubTree ss
 addToTrees (s1:ss) (t@(Node s2 leaf subs) : ts)
+  | s1 >  s2  = t : addToTrees (s1:ss) ts
   | s1 == s2  = Node s2 (leaf || null ss) (addToTrees ss subs) : ts
-  | otherwise = t : addToTrees (s1:ss) ts
+  | otherwise = mkSubTree (s1:ss) ++ t : ts
 
 mkSubTree [] = []
 mkSubTree (s:ss) = [Node s (null ss) (mkSubTree ss)]
