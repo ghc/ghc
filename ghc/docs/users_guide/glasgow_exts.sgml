@@ -1597,9 +1597,9 @@ declarations
   instance context2 => C type2 where ...
 </programlisting>
 
+"overlap" if <literal>type1</literal> and <literal>type2</literal> unify.
 
-"overlap" if <literal>type1</literal> and <literal>type2</literal> unify
-
+<para>
 However, if you give the command line option
 <option>-fallow-overlapping-instances</option><indexterm><primary>-fallow-overlapping-instances
 option</primary></indexterm> then overlapping instance declarations are permitted.
@@ -3105,16 +3105,23 @@ where
   <literal>S</literal> is a type constructor, 
 </para></listitem>
 <listitem><para>
-  <literal>t1...tk</literal> are types,
+  The <literal>t1...tk</literal> are types,
 </para></listitem>
 <listitem><para>
-  <literal>vk+1...vn</literal> are type variables which do not occur in any of
+  The <literal>vk+1...vn</literal> are type variables which do not occur in any of
   the <literal>ti</literal>, and
 </para></listitem>
 <listitem><para>
-  the <literal>ci</literal> are partial applications of
+  The <literal>ci</literal> are partial applications of
   classes of the form <literal>C t1'...tj'</literal>, where the arity of <literal>C</literal>
   is exactly <literal>j+1</literal>.  That is, <literal>C</literal> lacks exactly one type argument.
+</para></listitem>
+<listitem><para>
+  None of the <literal>ci</literal> is <literal>Read</literal>, <literal>Show</literal>, 
+		<literal>Typeable</literal>, or <literal>Data</literal>.  These classes
+		should not "look through" the type or its constructor.  You can still
+		derive these classes for a newtype, but it happens in the usual way, not 
+		via this new mechanism.  
 </para></listitem>
 </itemizedlist>
 Then, for each <literal>ci</literal>, the derived instance
