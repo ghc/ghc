@@ -1,18 +1,26 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.2 1996/11/21 16:49:13 simonm Exp $
+# $Id: Makefile,v 1.3 1997/03/13 09:02:20 sof Exp $
 
-TOP=../../..
-FlexSuffixRules = YES
-YaccSuffixRules = YES
-include $(TOP)/ghc/mk/ghc.mk
+TOP=../..
+include $(TOP)/mk/boilerplate.mk
+WAYS=
 
-YFLAGS = -d
-SRCS = syntax.tab.c lex.c id.c tree.c yyerror.c gen.c main.c
-PROG = ugen
+YACC_OPTS += -d
+C_SRCS = syntax.tab.c lex.c id.c tree.c yyerror.c gen.c main.c
+C_PROG = ugen
 LIBS = $(FLEX_LIB)
-DESTDIR = $(INSTBINDIR)
 
-clean ::
-	$(RM) lex.c syntax.tab.c syntax.tab.h
+CLEAN_FILES += syntax.tab.c syntax.tab.h
 
-include $(TOP)/mk/Cprog.mk
+#
+# Include flex & bison output in the source distribution.
+#
+SRC_DIST_FILES+= lex.c syntax.tab.c syntax.tab.h
+
+include $(TOP)/mk/target.mk
+
+#
+# Needed quite early in the booting of the compiler, so
+# build it right away.
+#
+boot :: all

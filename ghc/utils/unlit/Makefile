@@ -1,8 +1,16 @@
-TOP=../../..
-include $(TOP)/ghc/mk/ghc.mk
+TOP=../..
+include $(TOP)/mk/boilerplate.mk
+WAYS=
 
-SRCS=unlit.c
-PROG=unlit
-DESTDIR=$(INSTLIBDIR_GHC)
+C_SRCS=unlit.c
+C_PROG=unlit
 
-include $(TOP)/mk/Cprog.mk
+# Get it over with!
+boot :: all
+
+#
+# Install until in lib/.*
+#
+INSTALL_LIBEXECS += $(C_PROG)
+
+include $(TOP)/mk/target.mk
