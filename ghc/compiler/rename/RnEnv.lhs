@@ -57,8 +57,77 @@ import Maybes		( mapMaybe )
 %*********************************************************
 
 \begin{code}
-newImportedGlobalName :: ModuleName -> OccName -> Module -> RnM d Name
-newImportedGlobalName mod_name occ mod
+newLocalTopBinder :: Module -> OccName 
+	       -> (Name -> ExportFlag) -> SrcLoc
+	       -> RnM d Name
+newLocalTopBinder mod occ rec_exp_fn loc
+  = newTopBinder mod occ (\name -> LocalDef loc (rec_exp_fn name))
+	-- We must set the provenance of the thing in the cache
+	-- correctly, particularly whether or not it is locally defined.
+	--
+	-- Since newLocalTopBinder is used only
+	-- at binding occurrences, we may as well get the provenance
+	-- dead right first time; hence the rec_exp_fn passed in
+
+newImportedBinder :: Module -> RdrName -> RnM d Name
+newImportedBinder mod rdr_name
+  = ASSERT2( isUnqual rdr_name, ppr rdr_name )
+    newTopBinder mod (rdrNameOcc rdr_name) (\name -> implicitImportProvenance)
+
+implicitImportProvenance = NonLocalDef ImplicitImport False
+
+newTopBinder :: Module -> OccName -> (Name -> Provenance) -> RnM d Name
+newTopBinder mod occ mk_prov
+  = 	-- First check the cache
+    getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
+    let 
+	key          = (moduleName mod, occ)
+    in
+    case lookupFM cache key of
+
+	-- A hit in the cache!  Re-use the unique (which may be widely known)
+	-- But otherwise build a new name, thereby
+	-- overwriting whatever module details and provenance is in the cache already; 
+	-- This updates WiredIn things and known-key things, which are there from the start.
+	--
+	-- It also means that if there are two defns for the same thing
+	-- in a module, then each gets a separate SrcLoc
+
+	Just name -> let 
+			new_name  = mkGlobalName (nameUnique name) mod occ (mk_prov new_name)
+			new_cache = addToFM cache key new_name
+		     in
+		     setNameSupplyRn (us, inst_ns, new_cache, ipcache)	`thenRn_`
+		     returnRn new_name
+		     
+	-- Miss in the cache!
+	-- Build a completely new Name, and put it in the cache
+	Nothing -> let
+			(us', us1) = splitUniqSupply us
+			uniq   	   = uniqFromSupply us1
+			new_name   = mkGlobalName uniq mod occ (mk_prov new_name)
+			new_cache  = addToFM cache key new_name
+		   in
+		   setNameSupplyRn (us', inst_ns, new_cache, ipcache)	`thenRn_`
+		   returnRn new_name
+
+
+mkImportedGlobalName :: ModuleName -> OccName -> RnM d Name
+  -- Used for *occurrences*.  We make a place-holder Name, really just
+  -- to agree on its unique, which gets overwritten when we read in
+  -- the binding occurence later (newImportedBinder)
+  -- The place-holder Name doesn't have the right Provenance, and its
+  -- Module won't have the right Package either
+  --
+  -- This means that a renamed program may have incorrect info
+  -- on implicitly-imported occurrences, but the correct info on the 
+  -- *binding* declaration. It's the type checker that propagates the 
+  -- correct information to all the occurrences.
+  -- Since implicitly-imported names never occur in error messages,
+  -- it doesn't matter that we get the correct info in place till later,
+  -- (but since it affects DLL-ery it does matter that we get it right
+  --  in the end).
+mkImportedGlobalName mod_name occ
   = getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
     let
 	key = (mod_name, occ)
@@ -70,7 +139,8 @@ newImportedGlobalName mod_name occ mod
 		  where
 		     (us', us1) = splitUniqSupply us
 		     uniq   	= uniqFromSupply us1
-		     name       = mkGlobalName uniq mod occ (NonLocalDef ImplicitImport False)
+		     mod        = mkVanillaModule mod_name
+		     name       = mkGlobalName uniq mod occ implicitImportProvenance
 		     new_cache  = addToFM cache key name
 
 updateProvenances :: [Name] -> RnM d ()
@@ -84,16 +154,7 @@ updateProvenances names
  			      where
 				key = (moduleName (nameModule name), nameOccName name)
 
-newImportedBinder :: Module -> RdrName -> RnM d Name
-newImportedBinder mod rdr_name
-  = ASSERT2( isUnqual rdr_name, ppr rdr_name )
-    newImportedGlobalName (moduleName mod) (rdrNameOcc rdr_name) mod
 
--- Make an imported global name, checking first to see if it's in the cache
-mkImportedGlobalName :: ModuleName -> OccName -> RnM d Name
-mkImportedGlobalName mod_name occ
-  = newImportedGlobalName mod_name occ (mkVanillaModule mod_name)
-	
 mkImportedGlobalFromRdrName :: RdrName -> RnM d Name 
 mkImportedGlobalFromRdrName rdr_name
   | isQual rdr_name
@@ -106,49 +167,6 @@ mkImportedGlobalFromRdrName rdr_name
     getModuleRn 			`thenRn ` \ mod_name ->
     mkImportedGlobalName mod_name (rdrNameOcc rdr_name)
 
-
-newLocalTopBinder :: Module -> OccName 
-	       -> (Name -> ExportFlag) -> SrcLoc
-	       -> RnM d Name
-newLocalTopBinder mod occ rec_exp_fn loc
-  = 	-- First check the cache
-    getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
-    let 
-	key          = (moduleName mod,occ)
-	mk_prov name = LocalDef loc (rec_exp_fn name)
-	-- We must set the provenance of the thing in the cache
-	-- correctly, particularly whether or not it is locally defined.
-	--
-	-- Since newLocallyDefinedGlobalName is used only
-	-- at binding occurrences, we may as well get the provenance
-	-- dead right first time; hence the rec_exp_fn passed in
-    in
-    case lookupFM cache key of
-
-	-- A hit in the cache!
-	-- Overwrite whatever provenance is in the cache already; 
-	-- this updates WiredIn things and known-key things, 
-	-- which are there from the start, to LocalDef.
-	--
-	-- It also means that if there are two defns for the same thing
-	-- in a module, then each gets a separate SrcLoc
-	Just name -> let 
-			new_name = setNameProvenance name (mk_prov new_name)
-			new_cache = addToFM cache key new_name
-		     in
-		     setNameSupplyRn (us, inst_ns, new_cache, ipcache)	`thenRn_`
-		     returnRn new_name
-		     
-	-- Miss in the cache!
-	-- Build a new original name, and put it in the cache
-	Nothing -> let
-			(us', us1) = splitUniqSupply us
-			uniq   	   = uniqFromSupply us1
-			new_name   = mkGlobalName uniq mod occ (mk_prov new_name)
-			new_cache  = addToFM cache key new_name
-		   in
-		   setNameSupplyRn (us', inst_ns, new_cache, ipcache)	`thenRn_`
-		   returnRn new_name
 
 getIPName rdr_name
   = getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->

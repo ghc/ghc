@@ -85,7 +85,8 @@ preludePackage :: PackageName
 preludePackage = SLIT("std")
 
 instance Show PackageInfo where	-- Just used in debug prints of lex tokens
-  showsPrec n ThisPackage s = s
+				-- and in debug modde
+  showsPrec n ThisPackage        s = "<THIS>"   ++ s
   showsPrec n (AnotherPackage p) s = (_UNPK_ p) ++ s
 \end{code}
 
@@ -181,9 +182,12 @@ instance Ord Module where
 
 \begin{code}
 pprModule :: Module -> SDoc
-pprModule (Module mod _) = getPprStyle $ \ sty ->
+pprModule (Module mod p) = getPprStyle $ \ sty ->
 			   if userStyle sty then
 				text (moduleNameUserString mod)				
+			   else if debugStyle sty then
+				-- Print the package too
+				text (show p) <> dot <> pprModuleName mod
 			   else
 				pprModuleName mod
 \end{code}
@@ -200,7 +204,7 @@ mkModule mod_nm pack_name
 	      | otherwise		   = AnotherPackage pack_name
 
 mkVanillaModule :: ModuleName -> Module
-mkVanillaModule name = Module name (pprTrace "mkVanillaModule" (ppr name) ThisPackage)
+mkVanillaModule name = Module name ThisPackage
 	-- Used temporarily when we first come across Foo.x in an interface
 	-- file, but before we've opened Foo.hi.
 	-- (Until we've opened Foo.hi we don't know what the PackageInfo is.)
