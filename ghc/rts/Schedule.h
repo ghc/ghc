@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.31 2002/03/12 13:57:12 simonmar Exp $
+ * $Id: Schedule.h,v 1.32 2002/04/10 11:43:46 stolz Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -135,6 +135,7 @@ extern nat         rts_n_waiting_workers;
 extern nat         rts_n_waiting_tasks;
 #endif
 
+StgInt forkProcess(StgTSO *tso);
 
 /* Sigh, RTS-internal versions of waitThread(), scheduleThread(), and
    rts_evalIO() for the use by main() only. ToDo: better. */

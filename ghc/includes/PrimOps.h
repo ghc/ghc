@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.92 2002/03/19 11:24:51 simonmar Exp $
+ * $Id: PrimOps.h,v 1.93 2002/04/10 11:43:43 stolz Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -267,15 +267,18 @@ EXTFUN_RTS(deRefStablePtrzh_fast);
    -------------------------------------------------------------------------- */
 
 EXTFUN_RTS(forkzh_fast);
+EXTFUN_RTS(forkProcesszh_fast);
 EXTFUN_RTS(yieldzh_fast);
 EXTFUN_RTS(killThreadzh_fast);
 EXTFUN_RTS(seqzh_fast);
 EXTFUN_RTS(blockAsyncExceptionszh_fast);
 EXTFUN_RTS(unblockAsyncExceptionszh_fast);
 EXTFUN_RTS(myThreadIdzh_fast);
+EXTFUN_RTS(labelThreadzh_fast);
 
 extern int cmp_thread(const StgTSO *tso1, const StgTSO *tso2);
 extern int rts_getThreadId(const StgTSO *tso);
+extern void labelThread(StgTSO *tso, char *label);
 
 
 /* -----------------------------------------------------------------------------

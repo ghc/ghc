@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.17 2002/03/27 12:35:44 simonmar Exp $
+-- $Id: primops.txt.pp,v 1.18 2002/04/10 11:43:43 stolz Exp $
 --
 -- Primitive Operations
 --
@@ -1417,6 +1417,12 @@ primop  ForkOp "fork#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
+primop ForkProcessOp "forkProcess#" GenPrimOp
+   State# RealWorld -> (# State# RealWorld, Int#  #)
+   with
+   has_side_effects = True
+   out_of_line      = True
+
 primop  KillThreadOp "killThread#"  GenPrimOp
    ThreadId# -> a -> State# RealWorld -> State# RealWorld
    with
@@ -1434,6 +1440,12 @@ primop  MyThreadIdOp "myThreadId#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, ThreadId# #)
    with
    out_of_line = True
+
+primop LabelThreadOp "labelThread#" GenPrimOp
+   Addr# -> State# RealWorld -> State# RealWorld
+   with
+   has_side_effects = True
+   out_of_line      = True
 
 ------------------------------------------------------------------------
 section "Weak pointers"

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.135 2002/04/01 11:18:19 panne Exp $
+ * $Id: Schedule.c,v 1.136 2002/04/10 11:43:45 stolz Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -113,6 +113,13 @@
 #include "Capability.h"
 #include "OSThreads.h"
 #include  "Task.h"
+
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 
 #include <stdarg.h>
 
@@ -429,6 +436,9 @@ schedule( void )
 	  *prev = m->link;
 	  m->stat = Success;
 	  broadcastCondition(&m->wakeup);
+#ifdef DEBUG
+	  free(m->tso->label);
+#endif
 	  break;
 	case ThreadKilled:
 	  if (m->ret) *(m->ret) = NULL;
@@ -439,6 +449,9 @@ schedule( void )
 	    m->stat = Killed;
 	  }
 	  broadcastCondition(&m->wakeup);
+#ifdef DEBUG
+	  free(m->tso->label);
+#endif
 	  break;
 	default:
 	  break;
@@ -458,6 +471,9 @@ schedule( void )
       StgMainThread *m = main_threads;
       if (m->tso->what_next == ThreadComplete
 	  || m->tso->what_next == ThreadKilled) {
+#ifdef DEBUG
+	free(m->tso->label);
+#endif
 	main_threads = main_threads->link;
 	if (m->tso->what_next == ThreadComplete) {
 	  /* we finished successfully, fill in the return value */
@@ -1377,6 +1393,46 @@ schedule( void )
 }
 
 /* ---------------------------------------------------------------------------
+ * Singleton fork(). Do not copy any running threads.
+ * ------------------------------------------------------------------------- */
+
+StgInt forkProcess(StgTSO* tso) {
+
+#ifndef mingw32_TARGET_OS
+  pid_t pid;
+  StgTSO* t,*next;
+
+  IF_DEBUG(scheduler,sched_belch("forking!"));
+
+  pid = fork();
+  if (pid) { /* parent */
+
+  /* just return the pid */
+    
+  } else { /* child */
+  /* wipe all other threads */
+  run_queue_hd = tso;
+  tso->link = END_TSO_QUEUE;
+
+  /* DO NOT TOUCH THE QUEUES directly because most of the code around
+     us is picky about finding the threat still in its queue when
+     handling the deleteThread() */
+
+  for (t = all_threads; t != END_TSO_QUEUE; t = next) {
+    next = t->link;
+    if (t->id != tso->id) {
+      deleteThread(t);
+    }
+  }
+  }
+  return pid;
+#else /* mingw32 */
+  barf("forkProcess#: primop not implemented for mingw32, sorry!");
+  return -1;
+#endif /* mingw32 */
+}
+
+/* ---------------------------------------------------------------------------
  * deleteAllThreads():  kill all the live threads.
  *
  * This is used when we catch a user interrupt (^C), before performing
@@ -1550,6 +1606,24 @@ int rts_getThreadId(const StgTSO *tso)
   return tso->id;
 }
 
+#ifdef DEBUG
+void labelThread(StgTSO *tso, char *label)
+{
+  int len;
+  void *buf;
+
+  /* Caveat: Once set, you can only set the thread name to "" */
+  len = strlen(label)+1;
+  buf = realloc(tso->label,len);
+  if (buf == NULL) {
+    fprintf(stderr,"insufficient memory for labelThread!\n");
+    free(tso->label);
+  } else
+    strncpy(buf,label,len);
+  tso->label = buf;
+}
+#endif /* DEBUG */
+
 /* ---------------------------------------------------------------------------
    Create a new thread.
 
@@ -1623,6 +1697,10 @@ createThread_(nat size, rtsBool have_lock)
   SET_GRAN_HDR(tso, ThisPE);
 #endif
   tso->what_next     = ThreadEnterGHC;
+
+#ifdef DEBUG
+  tso->label = NULL;
+#endif
 
   /* tso->id needs to be unique.  For now we use a heavyweight mutex to
    * protect the increment operation on next_thread_id.
@@ -3436,6 +3514,7 @@ printAllThreads(void)
 
   for (t = all_threads; t != END_TSO_QUEUE; t = t->global_link) {
     fprintf(stderr, "\tthread %d ", t->id);
+    if (t->label) fprintf(stderr,"[\"%s\"] ",t->label);
     printThreadStatus(t);
     fprintf(stderr,"\n");
   }

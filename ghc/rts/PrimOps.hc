@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.94 2002/03/02 17:40:24 sof Exp $
+ * $Id: PrimOps.hc,v 1.95 2002/04/10 11:43:45 stolz Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1009,6 +1009,21 @@ FN_(forkzh_fast)
   FE_
 }
 
+FN_(forkProcesszh_fast)
+{
+  pid_t pid;
+
+  FB_
+  /* args: none */
+  /* result: Pid */
+
+  R1.i = RET_STGCALL1(StgInt, forkProcess, CurrentTSO);
+
+  JMP_(ENTRY_CODE(Sp[0]));
+
+  FE_
+}
+
 FN_(yieldzh_fast)
 {
   FB_
@@ -1024,7 +1039,15 @@ FN_(myThreadIdzh_fast)
   FE_
 }
 
-
+FN_(labelThreadzh_fast)
+{
+  FB_
+  /* args: R1.p = Addr# */
+#ifdef DEBUG
+  STGCALL2(labelThread,CurrentTSO,(char *)R1.p);
+#endif
+  FE_
+}
 
 
 /* -----------------------------------------------------------------------------
