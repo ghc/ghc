@@ -216,7 +216,7 @@ stdout = unsafePerformIO (do
     case (rc::Int) of
        0 -> newHandle (mkClosedHandle__)
        1 -> do
-#ifndef __CONCURRENT_HASKELL__
+#if !defined(__CONCURRENT_HASKELL__) || defined(mingw32_TARGET_OS)
  	    fo <- CCALL(openStdFile) (1::Int) 
 				     (1::Int){-flush on close-}
 				     (0::Int){-writeable-}  -- ConcHask: SAFE, won't block
@@ -250,7 +250,7 @@ stdin = unsafePerformIO (do
     case (rc::Int) of
        0 -> newHandle (mkClosedHandle__)
        1 -> do
-#ifndef __CONCURRENT_HASKELL__
+#if !defined(__CONCURRENT_HASKELL__) || defined(mingw32_TARGET_OS)
 	    fo <- CCALL(openStdFile) (0::Int)
 				     (0::Int){-don't flush on close -}
 				     (1::Int){-readable-}  -- ConcHask: SAFE, won't block
@@ -282,7 +282,7 @@ stderr = unsafePerformIO (do
     case (rc::Int) of
        0 -> newHandle (mkClosedHandle__)
        1 -> do
-#ifndef __CONCURRENT_HASKELL__
+#if !defined(__CONCURRENT_HASKELL__) || defined(mingw32_TARGET_OS)
  	    fo <- CCALL(openStdFile) (2::Int)
 				     (1::Int){-flush on close-}
 				     (0::Int){-writeable-} -- ConcHask: SAFE, won't block

@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: openFile.c,v 1.7 1999/09/16 13:14:43 simonmar Exp $
+ * $Id: openFile.c,v 1.8 1999/09/17 09:38:35 sof Exp $
  *
  * openFile Runtime Support
  */
@@ -51,9 +51,15 @@ StgInt rd;
     fo->flags   = flags | FILEOBJ_STD | ( rd ? FILEOBJ_READ : FILEOBJ_WRITE);
     fo->connectedTo = NULL;
  
+    /* MS Win32 CRT doesn't support fcntl() -- the workaround is to
+       start using 'completion ports', but I'm punting on implementing
+       support for using those.
+    */
+#if !defined(_WIN32) || defined(__CYGWIN__) || defined(__CYGWIN32__)
     /* set the non-blocking flag on this file descriptor */
     fd_flags = fcntl(fd, F_GETFL);
     fcntl(fd, F_SETFL, fd_flags | O_NONBLOCK);
+#endif
 
    return fo;
 }
@@ -77,6 +83,10 @@ StgInt flags;
     int created = 0;
     struct stat sb;
     IOFileObject* fo;
+
+#if defined(_WIN32) && !(defined(__CYGWIN__) || defined(__CYGWIN32__))
+#define O_NONBLOCK 0
+#endif
 
     /*
      * Since we aren't supposed to succeed when we're opening for writing and

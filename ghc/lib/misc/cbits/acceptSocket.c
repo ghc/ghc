@@ -55,8 +55,10 @@ acceptSocket(I_ sockfd, A_ peer, A_ addrlen)
     }
 
     /* set the non-blocking flag on this file descriptor */
+#if !defined(_WIN32) || defined(__CYGWIN__) || defined(__CYGWIN32__)
     flags = fcntl(fd, F_GETFL);
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+#endif
 
     return fd;
 }
