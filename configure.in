@@ -92,6 +92,24 @@ alpha-dec-osf[[34]]*)
         HostVendor_CPP='dec'
         HostOS_CPP='osf3'
         ;;
+alpha-unknown-linux)
+	HostPlatform=alpha-unknown-linux
+	TargetPlatform=alpha-unknown-linux
+	BuildPlatform=alpha-unknown-linux
+        HostPlatform_CPP='alpha_unknown_linux'
+        HostArch_CPP='alpha'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='linux'
+        ;;
+alpha-unknown-freebsd*)
+	HostPlatform=alpha-unknown-freebsd
+	TargetPlatform=alpha-unknown-freebsd
+	BuildPlatform=alpha-unknown-freebsd
+        HostPlatform_CPP='alpha_unknown_freebsd'
+        HostArch_CPP='alpha'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='freebsd'
+        ;;
 hppa1.1-hp-hpux*)
 	HostPlatform=hppa1.1-hp-hpux  # canonicalise for our purposes (hack)
 	TargetPlatform=hppa1.1-hp-hpux
@@ -119,14 +137,14 @@ i[[3456]]86-*-linux*)
         HostVendor_CPP='unknown'
         HostOS_CPP='linux'
         ;;
-i[[3456]]86-*-freebsd3*) # FreeBSD 3.0+ uses ELF
-	HostPlatform=i386-unknown-freebsd3 # hack again
-	TargetPlatform=i386-unknown-freebsd3
-	BuildPlatform=i386-unknown-freebsd3
-        HostPlatform_CPP='i386_unknown_freebsd3'
+i[[3456]]86-*-freebsd[[^0-2]]*) # FreeBSD 3.0+ uses ELF
+	HostPlatform=i386-unknown-freebsd # hack again
+	TargetPlatform=i386-unknown-freebsd
+	BuildPlatform=i386-unknown-freebsd
+        HostPlatform_CPP='i386_unknown_freebsd'
         HostArch_CPP='i386'
         HostVendor_CPP='unknown'
-        HostOS_CPP='freebsd3'
+        HostOS_CPP='freebsd'
         ;;
 i[[3456]]86-*-freebsd2*) # Older FreeBSDs are a.out
 	HostPlatform=i386-unknown-freebsd2 # hack again
