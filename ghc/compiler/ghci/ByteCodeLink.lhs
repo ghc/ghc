@@ -32,11 +32,13 @@ import ByteCodeItbls	( ItblEnv, ItblPtr )
 
 import Monad		( foldM )
 import ST		( runST )
+import IArray		( array )
 import MArray		( castSTUArray, 
 			  newFloatArray, writeFloatArray,
 			  newDoubleArray, writeDoubleArray,
 			  newIntArray, writeIntArray,
-			  newAddrArray, writeAddrArray )
+			  newAddrArray, writeAddrArray,
+			  readWordArray )
 import Foreign		( Word16, Ptr(..) )
 import Addr 		( Word, Addr, nullAddr )
 import FiniteMap
@@ -45,8 +47,8 @@ import PrelBase		( Int(..) )
 import PrelGHC		( BCO#, newBCO#, unsafeCoerce#, 
 			  ByteArray#, Array#, addrToHValue#, mkApUpd0# )
 import IOExts		( fixIO )
-import ArrayBase	
 import PrelArr		( Array(..) )
+import ArrayBase	( UArray(..) )
 import PrelIOBase	( IO(..) )
 
 \end{code}
@@ -448,8 +450,8 @@ mkLitA a
 \begin{code}
 
 {- 
-data BCO# = BCO# ByteArray# 		-- instrs   :: array Word16#
-                 ByteArray# 		-- literals :: array Word32#
+data BCO# = BCO# ByteArray# 		-- instrs   :: Array Word16#
+                 ByteArray# 		-- literals :: Array Word32#
                  PtrArray# 		-- ptrs     :: Array HValue
                  ByteArray#		-- itbls    :: Array Addr#
 -}
