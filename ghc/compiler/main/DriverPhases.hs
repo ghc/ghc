@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.33 2005/01/28 12:55:33 simonmar Exp $
+-- $Id: DriverPhases.hs,v 1.34 2005/01/31 16:59:37 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -10,7 +10,7 @@
 module DriverPhases (
    HscSource(..), isHsBoot, hscSourceString,
    HscTarget(..), Phase(..),
-   happensBefore, eqPhase, anyHsc, isStopPhase,
+   happensBefore, eqPhase, anyHsc, isStopLn,
    startPhase,		-- :: String -> Phase
    phaseInputExt, 	-- :: Phase -> String
 
@@ -93,12 +93,13 @@ data Phase
 anyHsc :: Phase
 anyHsc = Hsc (panic "anyHsc")
 
-isStopPhase :: Phase -> Bool
-isStopPhase StopLn = True
-isStopPhase other  = False
+isStopLn :: Phase -> Bool
+isStopLn StopLn = True
+isStopLn other  = False
 
 eqPhase :: Phase -> Phase -> Bool
 -- Equality of constructors, ignoring the HscSource field
+-- NB: the HscSource field can be 'bot'; see anyHsc above
 eqPhase (Unlit _)   (Unlit _) 	= True
 eqPhase (Cpp   _)   (Cpp   _) 	= True
 eqPhase (HsPp  _)   (HsPp  _) 	= True

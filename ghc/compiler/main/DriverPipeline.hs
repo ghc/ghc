@@ -71,7 +71,7 @@ import Maybe
 preprocess :: DynFlags -> FilePath -> IO (DynFlags, FilePath)
 preprocess dflags filename =
   ASSERT2(isHaskellSrcFilename filename, text filename) 
-  runPipeline (StopBefore anyHsc) dflags ("preprocess") 
+  runPipeline (StopBefore anyHsc) ("preprocess")  dflags
 	False{-temporary output file-}
 	Nothing{-no specific output file-}
 	filename
@@ -92,11 +92,11 @@ compileFile mode dflags src = do
    no_link <- readIORef v_NoLink	-- Set by -c or -no-link
 	-- When linking, the -o argument refers to the linker's output.	
 	-- otherwise, we use it as the name for the pipeline's output.
-   let maybe_o_file | no_link   = o_file
-		    | otherwise = Nothing
+   let maybe_o_file | isLinkMode mode && not no_link = Nothing
+		    | otherwise		   	     = o_file
 
-   stop_flag <- readIORef v_GhcModeFlag
-   (_, out_file) <- runPipeline mode dflags stop_flag True maybe_o_file
+   mode_flag_string <- readIORef v_GhcModeFlag
+   (_, out_file) <- runPipeline mode mode_flag_string dflags True maybe_o_file
 				src Nothing{-no ModLocation-}
    return out_file
 
@@ -173,8 +173,7 @@ compile hsc_env mod_summary
    later (writeIORef v_Include_paths old_paths) $ do
 
    -- Figure out what lang we're generating
-   todo     <- readIORef v_GhcMode
-   hsc_lang <- hscMaybeAdjustTarget todo src_flavour (hscTarget dyn_flags)
+   hsc_lang <- hscMaybeAdjustTarget StopLn src_flavour (hscTarget dyn_flags)
    -- ... and what the next phase should be
    next_phase <- hscNextPhase src_flavour hsc_lang
    -- ... and what file to generate the output into
@@ -237,7 +236,7 @@ compile hsc_env mod_summary
 		_other -> do
 		   let object_filename = ml_obj_file location
 
-		   runPipeline DoLink dyn_flags ""
+		   runPipeline DoLink "" dyn_flags
 			       True Nothing output_fn (Just location)
 			-- the object filename comes from the ModLocation
 
@@ -257,7 +256,7 @@ compileStub dflags stub_c_exists
   | stub_c_exists = do
 	-- compile the _stub.c file w/ gcc
 	let stub_c = hscStubCOutName dflags
-	(_, stub_o) <- runPipeline DoLink dflags "stub-compile"
+	(_, stub_o) <- runPipeline DoLink "stub-compile" dflags
 			    True{-persistent output-} 
 			    Nothing{-no specific output file-}
 			    stub_c
@@ -342,15 +341,15 @@ link Batch dflags batch_attempt_linking hpt
 
 runPipeline
   :: GhcMode		-- when to stop
-  -> DynFlags		-- dynamic flags
   -> String		-- "stop after" flag
+  -> DynFlags		-- dynamic flags
   -> Bool		-- final output is persistent?
   -> Maybe FilePath	-- where to put the output, optionally
   -> FilePath 		-- input filename
   -> Maybe ModLocation  -- a ModLocation for this module, if we have one
   -> IO (DynFlags, FilePath)	-- (final flags, output filename)
 
-runPipeline todo dflags stop_flag keep_output 
+runPipeline todo mode_flag_string dflags keep_output 
   maybe_output_filename input_fn maybe_loc
   = do
   split <- readIORef v_Split_object_files
@@ -374,7 +373,7 @@ runPipeline todo dflags stop_flag keep_output
 
   when (not (start_phase `happensBefore` stop_phase)) $
 	throwDyn (UsageError 
-		    ("flag `" ++ stop_flag
+		    ("flag `" ++ mode_flag_string
 		     ++ "' is incompatible with source file `"
 		     ++ input_fn ++ "'"))
 
@@ -384,7 +383,7 @@ runPipeline todo dflags stop_flag keep_output
 					 maybe_output_filename basename
 
   -- Execute the pipeline...
-  (dflags', output_fn, maybe_loc) <- pipeLoop todo' dflags start_phase stop_phase input_fn 
+  (dflags', output_fn, maybe_loc) <- pipeLoop dflags start_phase stop_phase input_fn 
 				  	      basename suffix get_output_fn maybe_loc
 
   -- Sometimes, a compilation phase doesn't actually generate any output
@@ -401,13 +400,13 @@ runPipeline todo dflags stop_flag keep_output
 	        return (dflags', output_fn)
 
 
-pipeLoop :: GhcMode -> DynFlags -> Phase -> Phase 
+pipeLoop :: DynFlags -> Phase -> Phase 
 	 -> FilePath  -> String -> Suffix
 	 -> (Phase -> Maybe ModLocation -> IO FilePath)
 	 -> Maybe ModLocation
 	 -> IO (DynFlags, FilePath, Maybe ModLocation)
 
-pipeLoop orig_todo dflags phase stop_phase 
+pipeLoop dflags phase stop_phase 
 	 input_fn orig_basename orig_suff 
 	 orig_get_output_fn maybe_loc
 
@@ -424,9 +423,9 @@ pipeLoop orig_todo dflags phase stop_phase
 
   | otherwise 
   = do	{ (next_phase, dflags', maybe_loc, output_fn)
-		<- runPhase phase orig_todo dflags orig_basename 
+		<- runPhase phase stop_phase dflags orig_basename 
 			    orig_suff input_fn orig_get_output_fn maybe_loc
-	; pipeLoop orig_todo dflags' next_phase stop_phase output_fn
+	; pipeLoop dflags' next_phase stop_phase output_fn
 		   orig_basename orig_suff orig_get_output_fn maybe_loc }
 
 genOutputFilenameFunc :: Phase -> Bool -> Maybe FilePath -> String
@@ -493,8 +492,8 @@ genOutputFilenameFunc stop_phase keep_final_output maybe_output_filename basenam
 -- of a source file can change the latter stages of the pipeline from
 -- taking the via-C route to using the native code generator.
 
-runPhase :: Phase
-	 -> GhcMode
+runPhase :: Phase	-- Do this phase first
+	 -> Phase	-- Stop just before this phase
 	 -> DynFlags
 	 -> String	-- basename of original input source
 	 -> String	-- its extension
@@ -514,7 +513,7 @@ runPhase :: Phase
 -------------------------------------------------------------------------------
 -- Unlit phase 
 
-runPhase (Unlit sf) _todo dflags _basename _suff input_fn get_output_fn maybe_loc
+runPhase (Unlit sf) _stop dflags _basename _suff input_fn get_output_fn maybe_loc
   = do let unlit_flags = getOpts dflags opt_L
        -- The -h option passes the file name for unlit to put in a #line directive
        output_fn <- get_output_fn (Cpp sf) maybe_loc
@@ -533,7 +532,7 @@ runPhase (Unlit sf) _todo dflags _basename _suff input_fn get_output_fn maybe_lo
 -- Cpp phase : (a) gets OPTIONS out of file
 --	       (b) runs cpp if necessary
 
-runPhase (Cpp sf) _todo dflags basename suff input_fn get_output_fn maybe_loc
+runPhase (Cpp sf) _stop dflags basename suff input_fn get_output_fn maybe_loc
   = do src_opts <- getOptionsFromSource input_fn
        (dflags,unhandled_flags) <- processDynamicFlags src_opts dflags
        checkProcessArgsResult unhandled_flags (basename++'.':suff)
@@ -550,7 +549,7 @@ runPhase (Cpp sf) _todo dflags basename suff input_fn get_output_fn maybe_loc
 -------------------------------------------------------------------------------
 -- HsPp phase 
 
-runPhase (HsPp sf) _todo dflags basename suff input_fn get_output_fn maybe_loc
+runPhase (HsPp sf) _stop dflags basename suff input_fn get_output_fn maybe_loc
   = do if not (ppFlag dflags) then
            -- no need to preprocess, just pass input file along
 	   -- to the next phase of the pipeline.
@@ -575,7 +574,7 @@ runPhase (HsPp sf) _todo dflags basename suff input_fn get_output_fn maybe_loc
 
 -- Compilation of a single module, in "legacy" mode (_not_ under
 -- the direction of the compilation manager).
-runPhase (Hsc src_flavour) todo dflags basename suff input_fn get_output_fn _maybe_loc 
+runPhase (Hsc src_flavour) stop dflags basename suff input_fn get_output_fn _maybe_loc 
  = do	-- normal Hsc mode, not mkdependHS
 
   -- we add the current directory (i.e. the directory in which
@@ -649,8 +648,6 @@ runPhase (Hsc src_flavour) todo dflags basename suff input_fn get_output_fn _may
 
 
   -- Figure out if the source has changed, for recompilation avoidance.
-  -- only do this if we're eventually going to generate a .o file.
-  -- (ToDo: do when generating .hc files too?)
   --
   -- Setting source_unchanged to True means that M.o seems
   -- to be up to date wrt M.hs; so no need to recompile unless imports have
@@ -659,8 +656,12 @@ runPhase (Hsc src_flavour) todo dflags basename suff input_fn get_output_fn _may
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
 	let do_recomp = recompFlag dflags
 	source_unchanged <- 
-          if not (do_recomp && case todo of { DoLink -> True; other -> False })
-	     then return False
+          if not do_recomp || isStopLn stop
+		-- Set source_unchanged to False unconditionally if
+		--	(a) recompilation checker is off, or
+		-- 	(b) we aren't going all the way to .o file (e.g. ghc -S),
+	     then return False	
+		-- Otherwise look at file modification dates
 	     else do o_file_exists <- doesFileExist o_file
 		     if not o_file_exists
 		        then return False	-- Need to recompile
@@ -670,7 +671,7 @@ runPhase (Hsc src_flavour) todo dflags basename suff input_fn get_output_fn _may
 				  else return False
 
   -- get the DynFlags
-	hsc_lang   <- hscMaybeAdjustTarget todo src_flavour (hscTarget dflags)
+	hsc_lang   <- hscMaybeAdjustTarget stop src_flavour (hscTarget dflags)
 	next_phase <- hscNextPhase src_flavour hsc_lang
 	output_fn  <- get_output_fn next_phase (Just location4)
 
@@ -717,15 +718,15 @@ runPhase (Hsc src_flavour) todo dflags basename suff input_fn get_output_fn _may
 -----------------------------------------------------------------------------
 -- Cmm phase
 
-runPhase CmmCpp todo dflags basename suff input_fn get_output_fn maybe_loc
+runPhase CmmCpp stop dflags basename suff input_fn get_output_fn maybe_loc
   = do
        output_fn <- get_output_fn Cmm maybe_loc
        doCpp dflags False{-not raw-} True{-include CC opts-} input_fn output_fn	
        return (Cmm, dflags, maybe_loc, output_fn)
 
-runPhase Cmm todo dflags basename suff input_fn get_output_fn maybe_loc
+runPhase Cmm stop dflags basename suff input_fn get_output_fn maybe_loc
   = do
-	hsc_lang <- hscMaybeAdjustTarget todo HsSrcFile (hscTarget dflags)
+	hsc_lang <- hscMaybeAdjustTarget stop HsSrcFile (hscTarget dflags)
 	next_phase <- hscNextPhase HsSrcFile hsc_lang
 	output_fn <- get_output_fn next_phase maybe_loc
 
@@ -747,7 +748,7 @@ runPhase Cmm todo dflags basename suff input_fn get_output_fn maybe_loc
 -- we don't support preprocessing .c files (with -E) now.  Doing so introduces
 -- way too many hacks, and I can't say I've ever used it anyway.
 
-runPhase cc_phase todo dflags basename suff input_fn get_output_fn maybe_loc
+runPhase cc_phase stop dflags basename suff input_fn get_output_fn maybe_loc
    | cc_phase `eqPhase` Cc || cc_phase `eqPhase` HCc
    = do	let cc_opts = getOpts dflags opt_c
 	    hcc = cc_phase `eqPhase` HCc
@@ -816,7 +817,7 @@ runPhase cc_phase todo dflags basename suff input_fn get_output_fn maybe_loc
 -----------------------------------------------------------------------------
 -- Mangle phase
 
-runPhase Mangle todo dflags _basename _suff input_fn get_output_fn maybe_loc
+runPhase Mangle stop dflags _basename _suff input_fn get_output_fn maybe_loc
    = do let mangler_opts = getOpts dflags opt_m
 
 #if i386_TARGET_ARCH
@@ -842,7 +843,7 @@ runPhase Mangle todo dflags _basename _suff input_fn get_output_fn maybe_loc
 -----------------------------------------------------------------------------
 -- Splitting phase
 
-runPhase SplitMangle todo dflags _basename _suff input_fn get_output_fn maybe_loc
+runPhase SplitMangle stop dflags _basename _suff input_fn get_output_fn maybe_loc
   = do  -- tmp_pfx is the prefix used for the split .s files
 	-- We also use it as the file to contain the no. of split .s files (sigh)
 	split_s_prefix <- SysTools.newTempName "split"
@@ -869,7 +870,7 @@ runPhase SplitMangle todo dflags _basename _suff input_fn get_output_fn maybe_lo
 -----------------------------------------------------------------------------
 -- As phase
 
-runPhase As todo dflags _basename _suff input_fn get_output_fn maybe_loc
+runPhase As stop dflags _basename _suff input_fn get_output_fn maybe_loc
   = do	let as_opts =  getOpts dflags opt_a
         cmdline_include_paths <- readIORef v_Include_paths
 
@@ -891,7 +892,7 @@ runPhase As todo dflags _basename _suff input_fn get_output_fn maybe_loc
 	return (StopLn, dflags, maybe_loc, output_fn)
 
 
-runPhase SplitAs todo dflags basename _suff _input_fn get_output_fn maybe_loc
+runPhase SplitAs stop dflags basename _suff _input_fn get_output_fn maybe_loc
   = do  let as_opts = getOpts dflags opt_a
 
 	(split_s_prefix, n) <- readIORef v_Split_info
@@ -925,7 +926,7 @@ runPhase SplitAs todo dflags basename _suff _input_fn get_output_fn maybe_loc
 -- Ilx2Il phase
 -- Run ilx2il over the ILX output, getting an IL file
 
-runPhase Ilx2Il todo dflags _basename _suff input_fn get_output_fn maybe_loc
+runPhase Ilx2Il stop dflags _basename _suff input_fn get_output_fn maybe_loc
   = do	let ilx2il_opts = getOpts dflags opt_I
         SysTools.runIlx2il (map SysTools.Option ilx2il_opts
                            ++ [ SysTools.Option "--no-add-suffix-to-assembly",
@@ -939,7 +940,7 @@ runPhase Ilx2Il todo dflags _basename _suff input_fn get_output_fn maybe_loc
 -- Ilasm phase
 -- Run ilasm over the IL, getting a DLL
 
-runPhase Ilasm todo dflags _basename _suff input_fn get_output_fn maybe_loc
+runPhase Ilasm stop dflags _basename _suff input_fn get_output_fn maybe_loc
   = do	let ilasm_opts = getOpts dflags opt_i
         SysTools.runIlasm (map SysTools.Option ilasm_opts
 		           ++ [ SysTools.Option "/QUIET",
@@ -1303,18 +1304,18 @@ hscNextPhase other hsc_lang = do
 		_other         -> StopLn
 	)
 
-hscMaybeAdjustTarget :: GhcMode -> HscSource -> HscTarget -> IO HscTarget
-hscMaybeAdjustTarget todo HsBootFile current_hsc_lang 
+hscMaybeAdjustTarget :: Phase -> HscSource -> HscTarget -> IO HscTarget
+hscMaybeAdjustTarget stop HsBootFile current_hsc_lang 
   = return HscNothing		-- No output (other than Foo.hi-boot) for hs-boot files
-hscMaybeAdjustTarget todo other current_hsc_lang 
+hscMaybeAdjustTarget stop other current_hsc_lang 
   = do	{ keep_hc <- readIORef v_Keep_hc_files
 	; let hsc_lang
 		-- don't change the lang if we're interpreting
 		 | current_hsc_lang == HscInterpreted = current_hsc_lang
 
 		-- force -fvia-C if we are being asked for a .hc file
-		 | StopBefore HCc <- todo = HscC
-		 | keep_hc 		  = HscC
+		 | HCc <- stop = HscC
+		 | keep_hc     = HscC
 		-- otherwise, stick to the plan
 		 | otherwise = current_hsc_lang
 	; return hsc_lang }
