@@ -300,44 +300,14 @@ cloneTyVar tv
 maybeSaturate :: Id -> CoreExpr -> Int -> Type -> UniqSM CoreExpr
 maybeSaturate fn expr n_args ty
   = case idFlavour fn of
-      PrimOpId op  -> saturate fn expr n_args ty
-      DataConId dc -> saturate fn expr n_args ty
+      PrimOpId op  -> saturate_it
+      DataConId dc -> saturate_it
       other 	   -> returnUs expr
-
-saturate :: Id -> CoreExpr -> Int -> Type -> UniqSM CoreExpr
-	-- The type should be the type of expr.
-	-- The returned expression should also have this type
-saturate fn expr n_args ty
-  = go excess_arity expr ty
   where
     fn_arity	 = idArity fn
     excess_arity = fn_arity - n_args
-
-    go n expr ty
-      | n == 0	-- Saturated, so nothing to do
-      = returnUs expr
-
-      | otherwise	-- An unsaturated constructor or primop; eta expand it
-      = case splitForAllTy_maybe ty of { 
- 	  Just (tv,ty') -> go n (App expr (Type (mkTyVarTy tv))) ty' `thenUs` \ expr' ->
- 			   returnUs (Lam tv expr') ;
- 	  Nothing ->
-  
-    	case splitFunTy_maybe ty of {
- 	  Just (arg_ty, res_ty) 
-		-> newVar arg_ty				`thenUs` \ arg' ->
- 		   go (n-1) (App expr (Var arg')) res_ty	`thenUs` \ expr' ->
- 		   returnUs (Lam arg' expr') ;
-	  Nothing -> 
-  
-    	case splitNewType_maybe ty of {
- 	  Just ty' -> go n (mkCoerce ty' ty expr) ty'	`thenUs` \ expr' ->
- 		      returnUs (mkCoerce ty ty' expr') ;
-  
- 	  Nothing -> pprTrace "Bad saturate" ((ppr fn <+> ppr expr) $$ ppr ty)
- 		     returnUs expr
-    	}}}
-
+    saturate_it  = getUs 	`thenUs` \ us ->
+		   returnUs (etaExpand excess_arity us expr ty)
 
 fiddleCCall id 
   = case idFlavour id of

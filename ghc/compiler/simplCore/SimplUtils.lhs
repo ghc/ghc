@@ -6,7 +6,7 @@
 \begin{code}
 module SimplUtils (
 	simplBinder, simplBinders, simplIds,
-	transformRhs,
+	tryRhsTyLam, tryEtaExpansion,
 	mkCase, findAlt, findDefault,
 
 	-- The continuation type
@@ -23,19 +23,19 @@ import CmdLineOpts	( switchIsOn, SimplifierSwitch(..),
 			  opt_UF_UpdateInPlace
 			)
 import CoreSyn
-import CoreUtils	( exprIsTrivial, cheapEqExpr, exprType, exprIsCheap, exprEtaExpandArity, bindNonRec )
+import CoreUtils	( exprIsTrivial, cheapEqExpr, exprType, exprIsCheap, etaExpand, exprEtaExpandArity, bindNonRec )
 import Subst		( InScopeSet, mkSubst, substBndrs, substBndr, substIds, substExpr )
 import Id		( idType, idName, 
 			  idUnfolding, idStrictness,
 			  mkVanillaId, idInfo
 			)
-import IdInfo		( StrictnessInfo(..), ArityInfo, atLeastArity )
+import IdInfo		( StrictnessInfo(..) )
 import Maybes		( maybeToBool, catMaybes )
 import Name		( setNameUnique )
 import Demand		( isStrict )
 import SimplMonad
 import Type		( Type, mkForAllTys, seqType, repType,
-			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys, splitFunTys, 
+			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys,
 			  isDictTy, isDataType, isUnLiftedType,
 			  splitRepFunTys
 			)
@@ -464,26 +464,6 @@ seqBndr b | isTyVar b = b `seq` ()
 
 %************************************************************************
 %*									*
-\subsection{Transform a RHS}
-%*									*
-%************************************************************************
-
-Try (a) eta expansion
-    (b) type-lambda swizzling
-
-\begin{code}
-transformRhs :: OutExpr 
-	     -> (ArityInfo -> OutExpr -> SimplM (OutStuff a))
-	     -> SimplM (OutStuff a)
-
-transformRhs rhs thing_inside 
-  = tryRhsTyLam rhs			$ \ rhs1 ->
-    tryEtaExpansion rhs1 thing_inside
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection{Local tyvar-lifting}
 %*									*
 %************************************************************************
@@ -553,12 +533,15 @@ as we would normally do.
 
 
 \begin{code}
-tryRhsTyLam rhs thing_inside		-- Only does something if there's a let
+tryRhsTyLam :: OutExpr -> SimplM ([OutBind], OutExpr)
+
+tryRhsTyLam rhs 			-- Only does something if there's a let
   | null tyvars || not (worth_it body)	-- inside a type lambda, and a WHNF inside that
-  = thing_inside rhs
+  = returnSmpl ([], rhs)
+
   | otherwise
-  = go (\x -> x) body		$ \ body' ->
-    thing_inside (mkLams tyvars body')
+  = go (\x -> x) body		`thenSmpl` \ (binds, body') ->
+    returnSmpl (binds,  mkLams tyvars body')
 
   where
     (tyvars, body) = collectTyBinders rhs
@@ -568,15 +551,14 @@ tryRhsTyLam rhs thing_inside		-- Only does something if there's a let
     whnf_in_middle (Let _ e) = whnf_in_middle e
     whnf_in_middle e	     = exprIsCheap e
 
-
-    go fn (Let bind@(NonRec var rhs) body) thing_inside
+    go fn (Let bind@(NonRec var rhs) body)
       | exprIsTrivial rhs
-      = go (fn . Let bind) body thing_inside
+      = go (fn . Let bind) body
 
-    go fn (Let bind@(NonRec var rhs) body) thing_inside
-      = mk_poly tyvars_here var						`thenSmpl` \ (var', rhs') ->
-	addAuxiliaryBind (NonRec var' (mkLams tyvars_here (fn rhs))) 	$
-	go (fn . Let (mk_silly_bind var rhs')) body thing_inside
+    go fn (Let (NonRec var rhs) body)
+      = mk_poly tyvars_here var				`thenSmpl` \ (var', rhs') ->
+	go (fn . Let (mk_silly_bind var rhs')) body 	`thenSmpl` \ (binds, body') ->
+	returnSmpl (NonRec var' (mkLams tyvars_here (fn rhs)) : binds, body')
 
       where
 	tyvars_here = tyvars
@@ -599,13 +581,14 @@ tryRhsTyLam rhs thing_inside		-- Only does something if there's a let
 		-- abstracting wrt *all* the tyvars.  We'll see if that
 		-- gives rise to problems.   SLPJ June 98
 
-    go fn (Let (Rec prs) body) thing_inside
+    go fn (Let (Rec prs) body)
        = mapAndUnzipSmpl (mk_poly tyvars_here) vars	`thenSmpl` \ (vars', rhss') ->
 	 let
-	    gn body = fn (foldr Let body (zipWith mk_silly_bind vars rhss'))
+	    gn body  = fn (foldr Let body (zipWith mk_silly_bind vars rhss'))
+	    new_bind = Rec (vars' `zip` [mkLams tyvars_here (gn rhs) | rhs <- rhss])
 	 in
-	 addAuxiliaryBind (Rec (vars' `zip` [mkLams tyvars_here (gn rhs) | rhs <- rhss]))	$
-	 go gn body thing_inside
+	 go gn body 				`thenSmpl` \ (binds, body') -> 
+	 returnSmpl (new_bind : binds, body')
        where
 	 (vars,rhss) = unzip prs
 	 tyvars_here = tyvars
@@ -613,8 +596,7 @@ tryRhsTyLam rhs thing_inside		-- Only does something if there's a let
 		-- 	 var_tys     = map idType vars
 		-- See notes with tyvars_here above
 
-
-    go fn body thing_inside = thing_inside (fn body)
+    go fn body = returnSmpl ([], fn body)
 
     mk_poly tyvars_here var
       = getUniqueSmpl		`thenSmpl` \ uniq ->
@@ -694,81 +676,39 @@ that would leave use with some lets sandwiched between lambdas; that's
 what the final test in the first equation is for.
 
 \begin{code}
-tryEtaExpansion :: OutExpr 
-		-> (ArityInfo -> OutExpr -> SimplM (OutStuff a))
-		-> SimplM (OutStuff a)
-tryEtaExpansion rhs thing_inside
-  |  not opt_SimplDoLambdaEtaExpansion
-  || null y_tys				-- No useful expansion
-  || not (is_case1 || is_case2)		-- Neither case matches
-  = thing_inside final_arity rhs	-- So, no eta expansion, but
-					-- return a good arity
+tryEtaExpansion :: OutExpr -> OutType -> SimplM ([OutBind], OutExpr)
+tryEtaExpansion rhs rhs_ty
+  |  not opt_SimplDoLambdaEtaExpansion 		-- Not if switched off
+  || exprIsTrivial rhs				-- Not if RHS is trivial
+  || final_arity == 0				-- Not if arity is zero
+  = returnSmpl ([], rhs)
 
-  | is_case1
-  = make_y_bndrs			$ \ y_bndrs ->
-    thing_inside final_arity
-		 (mkLams x_bndrs $ mkLams y_bndrs $
-		  mkApps body (map Var y_bndrs))
+  | n_val_args == 0 && not arity_is_manifest
+  = 	-- Some lambdas but not enough: case 1
+    getUniqSupplySmpl 				`thenSmpl` \ us ->
+    returnSmpl ([], etaExpand final_arity us rhs rhs_ty)
 
-  | otherwise	-- Must be case 2
-  = mapAndUnzipSmpl bind_z_arg arg_infos		`thenSmpl` \ (maybe_z_binds, z_args) ->
-    addAuxiliaryBinds (catMaybes maybe_z_binds)		$
-    make_y_bndrs					$  \ y_bndrs ->
-    thing_inside final_arity
-	         (mkLams y_bndrs $
-		  mkApps (mkApps fun z_args) (map Var y_bndrs))
+  | n_val_args > 0 && not (any cant_bind arg_infos)
+  = 	-- Partial application: case 2
+    mapAndUnzipSmpl bind_z_arg arg_infos	`thenSmpl` \ (maybe_z_binds, z_args) ->
+    getUniqSupplySmpl				`thenSmpl` \ us ->
+    returnSmpl (catMaybes maybe_z_binds, 
+		etaExpand final_arity us (mkApps fun z_args) rhs_ty)
+
+  | otherwise
+  = returnSmpl ([], rhs)
   where
-    all_trivial_args = all is_trivial arg_infos
-    is_case1	     = all_trivial_args
-    is_case2	     = null x_bndrs && not (any unlifted_non_trivial arg_infos)
-
-    (x_bndrs, body)  = collectBinders rhs	-- NB: x_bndrs can include type variables
-    x_arity	     = valBndrCount x_bndrs
-
-    (fun, args)	     = collectArgs body
-    arg_infos        = [(arg, exprType arg, exprIsTrivial arg) | arg <- args]
-
-    is_trivial		 (_, _,  triv) = triv
-    unlifted_non_trivial (_, ty, triv) = not triv && isUnLiftedType ty
-
-    fun_arity	     = exprEtaExpandArity fun
-
-    final_arity | all_trivial_args = atLeastArity (x_arity + extra_args_wanted)
-	        | otherwise	   = atLeastArity x_arity
-	-- Arity can be more than the number of lambdas
-	-- because of coerces. E.g.  \x -> coerce t (\y -> e) 
-	-- will have arity at least 2
-	-- The worker/wrapper pass will bring the coerce out to the top
+    (fun, args)			   = collectArgs rhs
+    n_val_args			   = valArgCount args
+    (fun_arity, arity_is_manifest) = exprEtaExpandArity fun
+    final_arity			   = 0 `max` (fun_arity - n_val_args)
+    arg_infos    		   = [(arg, exprType arg, exprIsTrivial arg) | arg <- args]
+    cant_bind (_, ty, triv)	   = not triv && isUnLiftedType ty
 
     bind_z_arg (arg, arg_ty, trivial_arg) 
 	| trivial_arg = returnSmpl (Nothing, arg)
         | otherwise   = newId SLIT("z") arg_ty	$ \ z ->
 			returnSmpl (Just (NonRec z arg), Var z)
-
-    make_y_bndrs thing_inside 
-	= ASSERT( not (exprIsTrivial rhs) )
-    	  newIds SLIT("y") y_tys			$ \ y_bndrs ->
-	  tick (EtaExpansion (head y_bndrs))		`thenSmpl_`
-	  thing_inside y_bndrs
-
-    (potential_extra_arg_tys, _) = splitFunTys (exprType body)
-	
-    y_tys :: [InType]
-    y_tys  = take extra_args_wanted potential_extra_arg_tys
-	
-    extra_args_wanted :: Int	-- Number of extra args we want
-    extra_args_wanted = 0 `max` (fun_arity - valArgCount args)
-
-	-- We used to expand the arity to the previous arity fo the
-	-- function; but this is pretty dangerous.  Consdier
-	--	f = \xy -> e
-	-- so that f has arity 2.  Now float something into f's RHS:
-	--	f = let z = BIG in \xy -> e
-	-- The last thing we want to do now is to put some lambdas
-	-- outside, to get
-	--	f = \xy -> let z = BIG in e
-	--
-	-- (bndr_arity - no_of_xs)		`max`
 \end{code}
 
 

@@ -13,7 +13,7 @@ import CmdLineOpts	( switchIsOn, opt_SimplDoEtaReduction,
 			  SimplifierSwitch(..)
 			)
 import SimplMonad
-import SimplUtils	( mkCase, transformRhs, findAlt, 
+import SimplUtils	( mkCase, tryRhsTyLam, tryEtaExpansion, findAlt, 
 			  simplBinder, simplBinders, simplIds, findDefault,
 			  SimplCont(..), DupFlag(..), mkStop, mkRhsStop,
 			  contResultType, discardInline, countArgs, contIsDupable,
@@ -29,8 +29,8 @@ import Id		( Id, idType, idInfo, isDataConId,
 			  zapLamIdInfo, setOneShotLambda, 
 			)
 import IdInfo		( OccInfo(..), isDeadOcc, isLoopBreaker,
-			  setArityInfo, unknownArity,
-			  setUnfoldingInfo,
+			  setArityInfo, 
+			  setUnfoldingInfo, atLeastArity,
 			  occInfo
 			)
 import Demand		( isStrict )
@@ -44,8 +44,8 @@ import CoreUnfold	( mkOtherCon, mkUnfolding, otherCons,
 			)
 import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsTrivial, 
 			  exprIsConApp_maybe, mkPiType,
-			  exprType, coreAltsType, exprIsValue, idAppIsCheap,
-			  exprOkForSpeculation, 
+			  exprType, coreAltsType, exprIsValue, 
+			  exprOkForSpeculation, exprArity, exprIsCheap,
 			  mkCoerce, mkSCC, mkInlineMe, mkAltExpr
 			)
 import Rules		( lookupRule )
@@ -60,6 +60,7 @@ import Subst		( mkSubst, substTy,
 import TyCon		( isDataTyCon, tyConDataConsIfAvailable	)
 import TysPrim		( realWorldStatePrimTy )
 import PrelInfo		( realWorldPrimId )
+import OrdList
 import Maybes		( maybeToBool )
 import Util		( zipWithEqual )
 import Outputable
@@ -97,12 +98,12 @@ simplTopBinds binds
     simplIds (bindersOfBinds binds)	$ \ bndrs' -> 
     simpl_binds binds bndrs'		`thenSmpl` \ (binds', _) ->
     freeTick SimplifierDone		`thenSmpl_`
-    returnSmpl binds'
+    returnSmpl (fromOL binds')
   where
 
 	-- We need to track the zapped top-level binders, because
 	-- they should have their fragile IdInfo zapped (notably occurrence info)
-    simpl_binds []			  bs     = ASSERT( null bs ) returnSmpl ([], panic "simplTopBinds corner")
+    simpl_binds []			  bs     = ASSERT( null bs ) returnSmpl (nilOL, panic "simplTopBinds corner")
     simpl_binds (NonRec bndr rhs : binds) (b:bs) = simplLazyBind True bndr  b rhs	(simpl_binds binds bs)
     simpl_binds (Rec pairs       : binds) bs     = simplRecBind  True pairs (take n bs) (simpl_binds binds (drop n bs))
 					         where 
@@ -111,11 +112,11 @@ simplTopBinds binds
 simplRecBind :: Bool -> [(InId, InExpr)] -> [OutId]
 	     -> SimplM (OutStuff a) -> SimplM (OutStuff a)
 simplRecBind top_lvl pairs bndrs' thing_inside
-  = go pairs bndrs'		`thenSmpl` \ (binds', (binds'', res)) ->
-    returnSmpl (Rec (flattenBinds binds') : binds'', res)
+  = go pairs bndrs'		`thenSmpl` \ (binds', (_, (binds'', res))) ->
+    returnSmpl (unitOL (Rec (flattenBinds (fromOL binds'))) `appOL` binds'', res)
   where
     go [] _ = thing_inside 	`thenSmpl` \ stuff ->
-	      returnSmpl ([], stuff)
+	      returnOutStuff stuff
 	
     go ((bndr, rhs) : pairs) (bndr' : bndrs')
 	= simplLazyBind top_lvl bndr bndr' rhs (go pairs bndrs')
@@ -181,7 +182,7 @@ simplExprC :: CoreExpr -> SimplCont -> SimplM CoreExpr
 	-- Simplify an expression, given a continuation
 
 simplExprC expr cont = simplExprF expr cont	`thenSmpl` \ (floats, (_, body)) ->
-  		       returnSmpl (mkLets floats body)
+  		       returnSmpl (wrapFloats floats body)
 
 simplExprF :: InExpr -> SimplCont -> SimplM OutExprStuff
 	-- Simplify an expression, returning floated binds
@@ -511,7 +512,7 @@ completeBinding old_bndr new_bndr top_lvl black_listed new_rhs thing_inside
 				-- create the (dead) let-binding  let x = (a,b) in ...
   =  thing_inside
 
-  | exprIsTrivial new_rhs
+  | trivial_rhs && not must_keep_binding
 	-- We're looking at a binding with a trivial RHS, so
 	-- perhaps we can discard it altogether!
 	--
@@ -535,20 +536,15 @@ completeBinding old_bndr new_bndr top_lvl black_listed new_rhs thing_inside
 	-- NB: Even NOINLINEis ignored here: if the rhs is trivial
 	-- it's best to inline it anyway.  We often get a=E; b=a
 	-- from desugaring, with both a and b marked NOINLINE.
-  = if  must_keep_binding then	-- Keep the binding
-	finally_bind_it	unknownArity new_rhs
-		-- Arity doesn't really matter because for a trivial RHS
-		-- we will inline like crazy at call sites
-		-- If this turns out be false, we can easily compute arity
-    else 			-- Drop the binding
-	extendSubst old_bndr (DoneEx new_rhs)	$
+  = 		-- Drop the binding
+    extendSubst old_bndr (DoneEx new_rhs)	$
 		-- Use the substitution to make quite, quite sure that the substitution
 		-- will happen, since we are going to discard the binding
-	tick (PostInlineUnconditionally old_bndr)	`thenSmpl_`
-	thing_inside
+    tick (PostInlineUnconditionally old_bndr)	`thenSmpl_`
+    thing_inside
 
-  | Note coercion@(Coerce _ inner_ty) inner_rhs <- new_rhs
-	-- 	[NB inner_rhs is guaranteed non-trivial by now]
+  | Note coercion@(Coerce _ inner_ty) inner_rhs <- new_rhs,
+    not trivial_rhs
 	-- x = coerce t e  ==>  c = e; x = inline_me (coerce t c)
 	-- Now x can get inlined, which moves the coercion
 	-- to the usage site.  This is a bit like worker/wrapper stuff,
@@ -571,40 +567,38 @@ completeBinding old_bndr new_bndr top_lvl black_listed new_rhs thing_inside
 		    (Note InlineMe (Note coercion (Var c_id)))	$
     thing_inside
 
-
   |  otherwise
-  = transformRhs new_rhs finally_bind_it
-
-  where
-    old_info          = idInfo old_bndr
-    occ_info          = occInfo old_info
-    loop_breaker      = isLoopBreaker occ_info
-    must_keep_binding = black_listed || loop_breaker || isExportedId old_bndr
-
-    finally_bind_it arity_info new_rhs
-      = getSubst			`thenSmpl` \ subst ->
-        let
+  = getSubst			`thenSmpl` \ subst ->
+    let
 		-- We make new IdInfo for the new binder by starting from the old binder, 
 		-- doing appropriate substitutions.
 		-- Then we add arity and unfolding info to get the new binder
-  	    new_bndr_info = substIdInfo subst old_info (idInfo new_bndr)
-		            `setArityInfo` arity_info
+  	new_bndr_info = substIdInfo subst old_info (idInfo new_bndr)
+		        `setArityInfo` arity_info
 
 		-- Add the unfolding *only* for non-loop-breakers
 		-- Making loop breakers not have an unfolding at all 
 		-- means that we can avoid tests in exprIsConApp, for example.
 		-- This is important: if exprIsConApp says 'yes' for a recursive
 		-- thing, then we can get into an infinite loop
-	    info_w_unf | loop_breaker = new_bndr_info
-		       | otherwise    = new_bndr_info `setUnfoldingInfo` mkUnfolding top_lvl new_rhs
+        info_w_unf | loop_breaker = new_bndr_info
+		   | otherwise    = new_bndr_info `setUnfoldingInfo` mkUnfolding top_lvl new_rhs
 
-	    final_id = new_bndr `setIdInfo` info_w_unf
-	in
+	final_id = new_bndr `setIdInfo` info_w_unf
+    in
 		-- These seqs forces the Id, and hence its IdInfo,
 		-- and hence any inner substitutions
-	final_id				`seq`
-	addLetBind (NonRec final_id new_rhs) 	$
-	modifyInScope new_bndr final_id thing_inside
+    final_id				`seq`
+    addLetBind (NonRec final_id new_rhs) 	$
+    modifyInScope new_bndr final_id thing_inside
+
+  where
+    old_info          = idInfo old_bndr
+    occ_info          = occInfo old_info
+    loop_breaker      = isLoopBreaker occ_info
+    trivial_rhs	      = exprIsTrivial new_rhs
+    must_keep_binding = black_listed || loop_breaker || isExportedId old_bndr
+    arity_info	      = atLeastArity (exprArity new_rhs)
 \end{code}    
 
 
@@ -661,46 +655,51 @@ simplLazyBind top_lvl bndr bndr' rhs thing_inside
 \begin{code}
 simplRhs :: Bool		-- True <=> Top level
 	 -> Bool		-- True <=> OK to float unboxed (speculative) bindings
-				--		False for (a) recursive and (b) top-level bindings
+				--	    False for (a) recursive and (b) top-level bindings
 	 -> OutType 		-- Type of RHS; used only occasionally
 	 -> InExpr -> SubstEnv
 	 -> (OutExpr -> SimplM (OutStuff a))
 	 -> SimplM (OutStuff a)
 simplRhs top_lvl float_ubx rhs_ty rhs rhs_se thing_inside
   =	-- Simplify it
-    setSubstEnv rhs_se (simplExprF rhs (mkRhsStop rhs_ty))	`thenSmpl` \ (floats, (in_scope', rhs')) ->
-
-	-- Float lets out of RHS
+    setSubstEnv rhs_se (simplExprF rhs (mkRhsStop rhs_ty))	`thenSmpl` \ (floats1, (rhs_in_scope, rhs1)) ->
     let
-	(floats_out, rhs'') = splitFloats float_ubx floats rhs'
+	(floats2, rhs2) = splitFloats float_ubx floats1 rhs1
     in
-    if (top_lvl || wantToExpose 0 rhs') && 	-- Float lets if (a) we're at the top level
-        not (null floats_out)			-- or 		 (b) the resulting RHS is one we'd like to expose
-    then
-	tickLetFloat floats_out				`thenSmpl_`
-		-- Do the float
-		-- 
 		-- There's a subtlety here.  There may be a binding (x* = e) in the
 		-- floats, where the '*' means 'will be demanded'.  So is it safe
 		-- to float it out?  Answer no, but it won't matter because
 		-- we only float if arg' is a WHNF,
 		-- and so there can't be any 'will be demanded' bindings in the floats.
 		-- Hence the assert
-	WARN( any demanded_float floats_out, ppr floats_out )
-	addLetBinds floats_out 	$
-	setInScope in_scope'	$
-	thing_inside rhs''
-		-- in_scope' may be excessive, but that's OK;
-		-- it's a superset of what's in scope
+    WARN( any demanded_float (fromOL floats2), ppr (fromOL floats2) )
+
+	-- 			Transform the RHS
+	-- It's important that we do eta expansion on function *arguments* (which are
+	-- simplified with simplRhs), as well as let-bound right-hand sides.  
+	-- Otherwise we find that things like
+	--	f (\x -> case x of I# x' -> coerce T (\ y -> ...))
+	-- get right through to the code generator as two separate lambdas, 
+	-- which is a Bad Thing
+    tryRhsTyLam rhs2		`thenSmpl` \ (floats3, rhs3) ->
+    tryEtaExpansion rhs3 rhs_ty	`thenSmpl` \ (floats4, rhs4) ->
+
+ 	-- Float lets if (a) we're at the top level
+	-- or 		 (b) the resulting RHS is one we'd like to expose
+    if (top_lvl || exprIsCheap rhs4) then
+	(if (isNilOL floats2 && null floats3 && null floats4) then
+		returnSmpl ()
+	 else
+		tick LetFloatFromLet)			`thenSmpl_`
+
+	addFloats floats2 rhs_in_scope	$
+	addAuxiliaryBinds floats3 	$
+	addAuxiliaryBinds floats4 	$
+	thing_inside rhs4
     else	
 		-- Don't do the float
-	thing_inside (mkLets floats rhs')
+	thing_inside (wrapFloats floats1 rhs1)
 
--- In a let-from-let float, we just tick once, arbitrarily
--- choosing the first floated binder to identify it
-tickLetFloat (NonRec b r      : fs) = tick (LetFloatFromLet b)
-tickLetFloat (Rec ((b,r):prs) : fs) = tick (LetFloatFromLet b)
-	
 demanded_float (NonRec b r) = isStrict (idDemandInfo b) && not (isUnLiftedType (idType b))
 		-- Unlifted-type (cheap-eagerness) lets may well have a demanded flag on them
 demanded_float (Rec _)	    = False
@@ -715,42 +714,15 @@ demanded_float (Rec _)	    = False
 -- can tolerate them.
 splitFloats float_ubx floats rhs
   | float_ubx = (floats, rhs)		-- Float them all
-  | otherwise = go floats
+  | otherwise = go (fromOL floats)
   where
-    go []		    = ([], rhs)
-    go (f:fs) | must_stay f = ([], mkLets (f:fs) rhs)
+    go []		    = (nilOL, rhs)
+    go (f:fs) | must_stay f = (nilOL, mkLets (f:fs) rhs)
 	      | otherwise   = case go fs of
-				   (out, rhs') -> (f:out, rhs')
+				   (out, rhs') -> (f `consOL` out, rhs')
 
     must_stay (Rec prs)    = False	-- No unlifted bindings in here
     must_stay (NonRec b r) = isUnLiftedType (idType b)
-
-wantToExpose :: Int -> CoreExpr -> Bool
--- True for expressions that we'd like to expose at the
--- top level of an RHS.  This includes partial applications
--- even if the args aren't cheap; the next pass will let-bind the
--- args and eta expand the partial application.  So exprIsCheap won't do.
--- Here's the motivating example:
---	z = letrec g = \x y -> ...g... in g E
--- Even though E is a redex we'd like to float the letrec to give
---	g = \x y -> ...g...
---	z = g E
--- Now the next use of SimplUtils.tryEtaExpansion will give
---	g = \x y -> ...g...
---	z = let v = E in \w -> g v w
--- And now we'll float the v to give
---	g = \x y -> ...g...
---	v = E
---	z = \w -> g v w
--- Which is what we want; chances are z will be inlined now.
-
-wantToExpose n (Var v)		= idAppIsCheap v n
-wantToExpose n (Lit l)		= True
-wantToExpose n (Lam _ e)	= True
-wantToExpose n (Note _ e)	= wantToExpose n e
-wantToExpose n (App f (Type _))	= wantToExpose n f
-wantToExpose n (App f a)	= wantToExpose (n+1) f
-wantToExpose n other		= False			-- There won't be any lets
 \end{code}
 
 
@@ -999,9 +971,7 @@ preInlineUnconditionally black_listed bndr
 \begin{code}
 -------------------------------------------------------------------
 -- Finish rebuilding
-rebuild_done expr
-  = getInScope			`thenSmpl` \ in_scope ->
-    returnSmpl ([], (in_scope, expr))
+rebuild_done expr = returnOutStuff expr
 
 ---------------------------------------------------------
 rebuild :: OutExpr -> SimplCont -> SimplM OutExprStuff
@@ -1439,8 +1409,8 @@ mkDupableCont ty (InlinePlease cont) thing_inside
 mkDupableCont join_arg_ty (ArgOf _ cont_ty cont_fn) thing_inside
   = 	-- Build the RHS of the join point
     newId SLIT("a") join_arg_ty				( \ arg_id ->
-	cont_fn (Var arg_id)				`thenSmpl` \ (binds, (_, rhs)) ->
-	returnSmpl (Lam (setOneShotLambda arg_id) (mkLets binds rhs))
+	cont_fn (Var arg_id)				`thenSmpl` \ (floats, (_, rhs)) ->
+	returnSmpl (Lam (setOneShotLambda arg_id) (wrapFloats floats rhs))
     )							`thenSmpl` \ join_rhs ->
    
 	-- Build the join Id and continuation
@@ -1487,11 +1457,11 @@ mkDupableCont ty (Select _ case_bndr alts se cont) thing_inside
     setSubstEnv se (
 	simplBinder case_bndr						$ \ case_bndr' ->
 	prepareCaseCont alts cont					$ \ cont' ->
-	mapAndUnzipSmpl (mkDupableAlt case_bndr case_bndr' cont') alts	`thenSmpl` \ (alt_binds_s, alts') ->
-	returnSmpl (concat alt_binds_s, alts')
-    )					`thenSmpl` \ (alt_binds, alts') ->
+	mkDupableAlts case_bndr case_bndr' cont' alts			$ \ alts' ->
+	returnOutStuff alts'
+    )					`thenSmpl` \ (alt_binds, (in_scope, alts')) ->
 
-    addAuxiliaryBinds alt_binds 				$
+    addFloats alt_binds in_scope 		$
 
 	-- NB that the new alternatives, alts', are still InAlts, using the original
 	-- binders.  That means we can keep the case_bndr intact. This is important
@@ -1502,8 +1472,17 @@ mkDupableCont ty (Select _ case_bndr alts se cont) thing_inside
 	-- arg of unboxed tuple type, and indeed such a case_bndr is always dead
     thing_inside (Select OkToDup case_bndr alts' se (mkStop (contResultType cont)))
 
-mkDupableAlt :: InId -> OutId -> SimplCont -> InAlt -> SimplM (OutStuff InAlt)
-mkDupableAlt case_bndr case_bndr' cont alt@(con, bndrs, rhs)
+mkDupableAlts :: InId -> OutId -> SimplCont -> [InAlt] 
+	     -> ([InAlt] -> SimplM (OutStuff a))
+	     -> SimplM (OutStuff a)
+mkDupableAlts case_bndr case_bndr' cont [] thing_inside
+  = thing_inside []
+mkDupableAlts case_bndr case_bndr' cont (alt:alts) thing_inside
+  = mkDupableAlt  case_bndr case_bndr' cont alt		$ \ alt' -> 
+    mkDupableAlts case_bndr case_bndr' cont alts	$ \ alts' ->
+    thing_inside (alt' : alts')
+
+mkDupableAlt case_bndr case_bndr' cont alt@(con, bndrs, rhs) thing_inside
   = simplBinders bndrs					$ \ bndrs' ->
     simplExprC rhs cont					`thenSmpl` \ rhs' ->
 
@@ -1525,7 +1504,7 @@ mkDupableAlt case_bndr case_bndr' cont alt@(con, bndrs, rhs)
 	-- because otherwise we'd need to pair it up with an empty subst-env.
 	-- (Remember we must zap the subst-env before re-simplifying something).
 	-- Rather than do this we simply agree to re-simplify the original (small) thing later.
-	returnSmpl ([], alt)
+	thing_inside alt
 
     else
     let
@@ -1596,6 +1575,6 @@ mkDupableAlt case_bndr case_bndr' cont alt@(con, bndrs, rhs)
 	one_shot v | isId v    = setOneShotLambda v
 		   | otherwise = v
     in
-    returnSmpl ([NonRec join_bndr (mkLams really_final_bndrs rhs')],
-		(con, bndrs, mkApps (Var join_bndr) final_args))
+    addLetBind (NonRec join_bndr (mkLams really_final_bndrs rhs'))	$
+    thing_inside (con, bndrs, mkApps (Var join_bndr) final_args)
 \end{code}

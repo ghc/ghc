@@ -7,7 +7,7 @@
 module SimplMonad (
 	InId, InBind, InExpr, InAlt, InArg, InType, InBinder,
 	OutId, OutBind, OutExpr, OutAlt, OutArg, OutType, OutBinder,
-	OutExprStuff, OutStuff,
+	OutExprStuff, OutStuff, returnOutStuff,
 
 	-- The monad
 	SimplM,
@@ -19,7 +19,7 @@ module SimplMonad (
 	setBlackList, getBlackList, noInlineBlackList,
 
         -- Unique supply
-        getUniqueSmpl, getUniquesSmpl,
+        getUniqueSmpl, getUniquesSmpl, getUniqSupplySmpl,
 	newId, newIds,
 
 	-- Counting
@@ -44,7 +44,7 @@ module SimplMonad (
 
 	-- Adding bindings
 	addLetBind, addLetBinds, addAuxiliaryBind, addAuxiliaryBinds,
-	addCaseBind, needsCaseBinding, addNonRecBind
+	addCaseBind, needsCaseBinding, addNonRecBind, wrapFloats, addFloats
     ) where
 
 #include "HsVersions.h"
@@ -58,6 +58,7 @@ import CostCentre	( CostCentreStack, subsumedCCS )
 import OccName		( UserFS )
 import VarEnv
 import VarSet
+import OrdList
 import qualified Subst
 import Subst		( Subst, mkSubst, substEnv, 
 			  InScopeSet, mkInScopeSet, substInScope
@@ -105,23 +106,35 @@ type OutArg	= CoreArg
 
 type SwitchChecker = SimplifierSwitch -> SwitchResult
 
-type OutExprStuff = OutStuff (InScopeSet, OutExpr)
-type OutStuff a   = ([OutBind], a)
+type OutExprStuff = OutStuff OutExpr
+type OutStuff a   = (OrdList OutBind, (InScopeSet, a))
 	-- We return something equivalent to (let b in e), but
 	-- in pieces to avoid the quadratic blowup when floating 
 	-- incrementally.  Comments just before simplExprB in Simplify.lhs
 \end{code}
 
 \begin{code}
+wrapFloats :: OrdList CoreBind -> CoreExpr -> CoreExpr
+wrapFloats binds body = foldOL Let body binds
+
+returnOutStuff :: a -> SimplM (OutStuff a)
+returnOutStuff x = getInScope 	`thenSmpl` \ in_scope ->
+		   returnSmpl (nilOL, (in_scope, x))
+
+addFloats :: OrdList CoreBind -> InScopeSet -> SimplM (OutStuff a) -> SimplM (OutStuff a)
+addFloats floats in_scope thing_inside
+  = setInScope in_scope thing_inside	`thenSmpl` \ (binds, res) ->
+    returnSmpl (floats `appOL` binds, res)
+ 
 addLetBind :: CoreBind -> SimplM (OutStuff a) -> SimplM (OutStuff a)
 addLetBind bind thing_inside
   = thing_inside	`thenSmpl` \ (binds, res) ->
-    returnSmpl (bind : binds, res)
+    returnSmpl (bind `consOL` binds, res)
 
 addLetBinds :: [CoreBind] -> SimplM (OutStuff a) -> SimplM (OutStuff a)
 addLetBinds binds1 thing_inside
   = thing_inside	`thenSmpl` \ (binds2, res) ->
-    returnSmpl (binds1 ++ binds2, res)
+    returnSmpl (toOL binds1 `appOL` binds2, res)
 
 addAuxiliaryBinds :: [CoreBind] -> SimplM (OutStuff a) -> SimplM (OutStuff a)
 	-- Extends the in-scope environment as well as wrapping the bindings
@@ -141,9 +154,8 @@ needsCaseBinding ty rhs = isUnLiftedType ty && not (exprOkForSpeculation rhs)
 	-- or from beta reductions: (\x.e) (x +# y)
 
 addCaseBind bndr rhs thing_inside
-  = getInScope 			`thenSmpl` \ in_scope ->
-    thing_inside		`thenSmpl` \ (floats, (_, body)) ->
-    returnSmpl ([], (in_scope, Case rhs bndr [(DEFAULT, [], mkLets floats body)]))
+  = thing_inside		`thenSmpl` \ (floats, (_, body)) ->
+    returnOutStuff (Case rhs bndr [(DEFAULT, [], wrapFloats floats body)])
 
 addNonRecBind bndr rhs thing_inside
 	-- Checks for needing a case binding
@@ -261,6 +273,11 @@ mapAccumLSmpl f acc (x:xs) = f acc x	`thenSmpl` \ (acc', x') ->
 %************************************************************************
 
 \begin{code}
+getUniqSupplySmpl :: SimplM UniqSupply
+getUniqSupplySmpl dflags env us sc 
+   = case splitUniqSupply us of
+        (us1, us2) -> (us1, us2, sc)
+
 getUniqueSmpl :: SimplM Unique
 getUniqueSmpl dflags env us sc 
    = case splitUniqSupply us of
@@ -429,7 +446,7 @@ data Tick
   | UnfoldingDone    		Id
   | RuleFired			FAST_STRING	-- Rule name
 
-  | LetFloatFromLet		Id	-- Thing floated out
+  | LetFloatFromLet
   | EtaExpansion		Id	-- LHS binder
   | EtaReduction		Id	-- Binder on outer lambda
   | BetaReduction		Id	-- Lambda binder
@@ -462,7 +479,7 @@ tickToTag (PreInlineUnconditionally _)	= 0
 tickToTag (PostInlineUnconditionally _)	= 1
 tickToTag (UnfoldingDone _)		= 2
 tickToTag (RuleFired _)			= 3
-tickToTag (LetFloatFromLet _)		= 4
+tickToTag LetFloatFromLet		= 4
 tickToTag (EtaExpansion _)		= 5
 tickToTag (EtaReduction _)		= 6
 tickToTag (BetaReduction _)		= 7
@@ -480,7 +497,7 @@ tickString (PreInlineUnconditionally _)	= "PreInlineUnconditionally"
 tickString (PostInlineUnconditionally _)= "PostInlineUnconditionally"
 tickString (UnfoldingDone _)		= "UnfoldingDone"
 tickString (RuleFired _)		= "RuleFired"
-tickString (LetFloatFromLet _)		= "LetFloatFromLet"
+tickString LetFloatFromLet		= "LetFloatFromLet"
 tickString (EtaExpansion _)		= "EtaExpansion"
 tickString (EtaReduction _)		= "EtaReduction"
 tickString (BetaReduction _)		= "BetaReduction"
@@ -498,7 +515,7 @@ pprTickCts (PreInlineUnconditionally v)	= ppr v
 pprTickCts (PostInlineUnconditionally v)= ppr v
 pprTickCts (UnfoldingDone v)		= ppr v
 pprTickCts (RuleFired v)		= ppr v
-pprTickCts (LetFloatFromLet v)		= ppr v
+pprTickCts LetFloatFromLet		= empty
 pprTickCts (EtaExpansion v)		= ppr v
 pprTickCts (EtaReduction v)		= ppr v
 pprTickCts (BetaReduction v)		= ppr v
@@ -524,7 +541,6 @@ cmpEqTick (PreInlineUnconditionally a)	(PreInlineUnconditionally b)	= a `compare
 cmpEqTick (PostInlineUnconditionally a)	(PostInlineUnconditionally b)	= a `compare` b
 cmpEqTick (UnfoldingDone a)		(UnfoldingDone b)		= a `compare` b
 cmpEqTick (RuleFired a)			(RuleFired b)			= a `compare` b
-cmpEqTick (LetFloatFromLet a)		(LetFloatFromLet b)		= a `compare` b
 cmpEqTick (EtaExpansion a)		(EtaExpansion b)		= a `compare` b
 cmpEqTick (EtaReduction a)		(EtaReduction b)		= a `compare` b
 cmpEqTick (BetaReduction a)		(BetaReduction b)		= a `compare` b

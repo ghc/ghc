@@ -19,8 +19,8 @@ module CoreUtils (
 	exprArity,
 
 	-- Expr transformation
-	etaReduce, exprEtaExpandArity, 
--- etaExpandExpr,
+	etaReduce, etaExpand,
+	exprArity, exprEtaExpandArity, 
 
 	-- Size
 	coreBindsSize,
@@ -50,17 +50,19 @@ import PrimOp		( primOpOkForSpeculation, primOpIsCheap,
 			  primOpIsDupable )
 import Id		( Id, idType, idFlavour, idStrictness, idLBVarInfo, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo, 
-			  isDataConId_maybe, isPrimOpId_maybe
+			  isDataConId_maybe, isPrimOpId_maybe, mkSysLocal
 			)
 import IdInfo		( LBVarInfo(..),  
 			  IdFlavour(..),
 			  megaSeqIdInfo )
 import Demand		( appIsBottom )
 import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe, 
-			  applyTys, isUnLiftedType, seqType, mkUTy
+			  applyTys, isUnLiftedType, seqType, mkUTy, mkTyVarTy,
+			  splitForAllTy_maybe, splitNewType_maybe
 			)
 import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
 import CostCentre	( CostCentre )
+import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply )
 import Maybes		( maybeToBool )
 import Outputable
 import TysPrim		( alphaTy )	-- Debugging only
@@ -509,6 +511,7 @@ exprArity (Note _ e)
 exprArity _ = 0
 \end{code}
 
+
 %************************************************************************
 %*									*
 \subsection{Eta reduction and expansion}
@@ -550,8 +553,13 @@ etaReduce expr = expr		-- The common case
 	
 
 \begin{code}
-exprEtaExpandArity :: CoreExpr -> Int 	-- The number of args the thing can be applied to
-					-- without doing much work
+exprEtaExpandArity :: CoreExpr -> (Int, Bool) 	
+-- The Int is number of value args the thing can be 
+-- 	applied to without doing much work
+-- The Bool is True iff there are enough explicit value lambdas
+--	at the top to make this arity apparent
+-- 	(but ignore it when arity==0)
+
 -- This is used when eta expanding
 --	e  ==>  \xy -> e x y
 --
@@ -562,20 +570,27 @@ exprEtaExpandArity :: CoreExpr -> Int 	-- The number of args the thing can be ap
 -- Hence "generous" arity
 
 exprEtaExpandArity e
-  = go e `max` 0	-- Never go -ve!
+  = go 0 e
   where
-    go (Var v)         			= idArity v
-    go (App f (Type _))			= go f
-    go (App f a)  | exprIsCheap a	= go f - 1
-    go (Lam x e)  | isId x    		= go e + 1
-		  | otherwise 		= go e
-    go (Note n e) | ok_note n		= go e
-    go (Case scrut _ alts)
-      | exprIsCheap scrut		= min_zero [go rhs | (_,_,rhs) <- alts]
-    go (Let b e) 	
-      | all exprIsCheap (rhssOfBind b)	= go e
+    go ar (Lam x e)  | isId x   	= go (ar+1) e
+		     | otherwise 	= go ar e
+    go ar (Note n e) | ok_note n	= go ar e
+    go ar other 	     		= (ar + ar', ar' == 0)
+					where
+					  ar' = go1 other `max` 0
+
+    go1 (Var v)				= idArity v
+    go1 (Lam x e)  | isId x   		= go1 e + 1
+		   | otherwise 		= go1 e
+    go1 (Note n e) | ok_note n		= go1 e
+    go1 (App f (Type _))			= go1 f
+    go1 (App f a)  | exprIsCheap a	= go1 f - 1
+    go1 (Case scrut _ alts)
+      | exprIsCheap scrut		= min_zero [go1 rhs | (_,_,rhs) <- alts]
+    go1 (Let b e) 	
+      | all exprIsCheap (rhssOfBind b)	= go1 e
     
-    go other 				= 0
+    go1 other 				= 0
     
     ok_note (Coerce _ _) = True
     ok_note InlineCall   = True
@@ -601,11 +616,13 @@ min_zero (x:xs) = go x xs
 \end{code}
 
 
-\begin{pseudocode}
+\begin{code}
 etaExpand :: Int	  	-- Add this number of value args
-	  -> UniquSupply
+	  -> UniqSupply
 	  -> CoreExpr -> Type	-- Expression and its type
-	  -> CoreEpxr
+	  -> CoreExpr
+-- (etaExpand n us e ty) returns an expression with 
+-- the same meaning as 'e', but with arity 'n'.  
 
 -- Given e' = etaExpand n us e ty
 -- We should have
@@ -629,23 +646,23 @@ etaExpand n us expr ty
   = case splitForAllTy_maybe ty of { 
  	  Just (tv,ty') -> Lam tv (etaExpand n us (App expr (Type (mkTyVarTy tv))) ty')
 
- 	  Nothing ->
+ 	; Nothing ->
   
     	case splitFunTy_maybe ty of {
- 	  Just (arg_ty, res_ty) -> Lam arg' (etaExpand (n-1) us2 (App expr (Var arg')) res_ty)
+ 	  Just (arg_ty, res_ty) -> Lam arg1 (etaExpand (n-1) us2 (App expr (Var arg1)) res_ty)
 				where
-				   arg'	      = mkSysLocal SLIT("eta") uniq arg_ty
- 				   (us1, us2) = splitUnqiSupply us
-				   uniq	      = uniqFromSupply us1
+				   arg1	      = mkSysLocal SLIT("eta") uniq arg_ty
+ 				   (us1, us2) = splitUniqSupply us
+				   uniq	      = uniqFromSupply us1 
 				   
-	  Nothing -> 
+	; Nothing -> 
   
     	case splitNewType_maybe ty of {
- 	  Just ty' -> mkCoerce ty ty' (etaExpand n us (mkCoerce ty' ty expr) ty')
+ 	  Just ty' -> mkCoerce ty ty' (etaExpand n us (mkCoerce ty' ty expr) ty') ;
   
  	  Nothing -> pprTrace "Bad eta expand" (ppr expr $$ ppr ty) expr
     	}}}
-\end{pseudocode}
+\end{code}
 
 
 %************************************************************************

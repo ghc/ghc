@@ -8,7 +8,7 @@ module Specialise ( specProgram ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
+import CmdLineOpts	( DynFlags, DynFlag(..) )
 import Id		( Id, idName, idType, mkUserLocal,
 			  idSpecialisation, modifyIdInfo
 			)
@@ -35,7 +35,7 @@ import Rules		( addIdSpecialisations, lookupRule )
 
 import UniqSupply	( UniqSupply,
 			  UniqSM, initUs_, thenUs, thenUs_, returnUs, getUniqueUs, 
-			  getUs, setUs, mapUs
+			  withUs, mapUs
 			)
 import Name		( nameOccName, mkSpecOcc, getSrcLoc )
 import FiniteMap
@@ -1107,29 +1107,25 @@ cloneBindSM :: Subst -> CoreBind -> SpecM (Subst, Subst, CoreBind)
 -- Clone the binders of the bind; return new bind with the cloned binders
 -- Return the substitution to use for RHSs, and the one to use for the body
 cloneBindSM subst (NonRec bndr rhs)
-  = getUs	`thenUs` \ us ->
+  = withUs 	$ \ us ->
     let
 	(subst', us', bndr') = substAndCloneId subst us bndr
     in
-    setUs us'	`thenUs_`
-    returnUs (subst, subst', NonRec bndr' rhs)
+    ((subst, subst', NonRec bndr' rhs), us')
 
 cloneBindSM subst (Rec pairs)
-  = getUs	`thenUs` \ us ->
+  = withUs	$ \ us ->
     let
 	(subst', us', bndrs') = substAndCloneIds subst us (map fst pairs)
     in
-    setUs us'	`thenUs_`
-    returnUs (subst', subst', Rec (bndrs' `zip` map snd pairs))
+    ((subst', subst', Rec (bndrs' `zip` map snd pairs)), us')
 
 cloneBinders subst bndrs
-  = getUs	`thenUs` \ us ->
+  = withUs	$ \ us -> 
     let
 	(subst', us', bndrs') = substAndCloneIds subst us bndrs
     in
-    setUs us'	`thenUs_`
-    returnUs (subst', bndrs')
-
+    ((subst', bndrs'), us')
 
 newIdSM old_id new_ty
   = getUniqSM		`thenSM` \ uniq ->

@@ -11,7 +11,7 @@ module UniqSupply (
 	uniqFromSupply, uniqsFromSupply,	-- basic ops
 
 	UniqSM,		-- type: unique supply monad
-	initUs, initUs_, thenUs, thenUs_, returnUs, fixUs, getUs, setUs,
+	initUs, initUs_, thenUs, thenUs_, returnUs, fixUs, getUs, withUs,
 	getUniqueUs, getUniquesUs,
 	mapUs, mapAndUnzipUs, mapAndUnzip3Us,
 	thenMaybeUs, mapAccumLUs,
@@ -24,8 +24,6 @@ module UniqSupply (
 #include "HsVersions.h"
 
 import Unique
-import Panic	( panic )
-
 import GlaExts
 
 #if __GLASGOW_HASKELL__ < 301
@@ -149,11 +147,11 @@ thenUs_ expr cont us
 returnUs :: a -> UniqSM a
 returnUs result us = (result, us)
 
+withUs :: (UniqSupply -> (a, UniqSupply)) -> UniqSM a
+withUs f us = f us	-- Ha ha!
+		
 getUs :: UniqSM UniqSupply
-getUs us = (us, panic "getUs: bad supply")
-
-setUs :: UniqSupply -> UniqSM ()
-setUs us old_us = ((), us)
+getUs us = splitUniqSupply us
 
 getUniqueUs :: UniqSM Unique
 getUniqueUs us = case splitUniqSupply us of
