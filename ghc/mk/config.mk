@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: config.mk,v 1.13 2001/03/26 16:56:55 simonmar Exp $
+# $Id: config.mk,v 1.14 2001/03/29 10:44:29 simonmar Exp $
 #
 # GHC project configuration
 #
@@ -11,9 +11,10 @@
 GhcMainDir = ghc
 GhcBinDistDirs = ghc hslibs
 GhcBinDistDocs = ghc/docs/set
-GhcBinDistShScripts = ghc ghci
+GhcBinDistShScripts = ghc-$(ProjectVersion) ghci-$(ProjectVersion) ghc-pkg-$(ProjectVersion)
 GhcBinDistPrlScripts = 
 GhcBinDistLibPrlScripts = ghc-asm ghc-split
-GhcBinDistBins = hp2ps
+GhcBinDistBins = hp2ps ghcprof hsc2hs DrIFT DtdToHaskell Xtract
+GhcBinDistLinks = ghc ghci ghci-pkg
 
 include $(GhcMainDir)/mk/version.mk
