@@ -1,0 +1,35 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1994
+%
+\subsection[closeFile.lc]{hClose Runtime Support}
+
+\begin{code}
+
+#include "rtsdefs.h"
+#include "stgio.h"
+
+StgInt
+closeFile(fp)
+StgForeignObj fp;
+{
+    int rc;
+
+    if (unlockFile(fileno((FILE *) fp))) {
+       /* If it has been unlocked, don't bother fclose()ing */
+       return 0;
+    }
+
+    while ((rc = fclose((FILE *) fp)) != 0) {
+	if (errno != EINTR) {
+	    cvtErrno();
+	    stdErrno();
+	    return rc;
+	}
+    }
+    return 0;
+}
+
+\end{code}
+
+
+

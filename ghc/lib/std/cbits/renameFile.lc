@@ -1,0 +1,132 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1995
+%
+\subsection[renameFile.lc]{renameFile Runtime Support}
+
+\begin{code}
+
+#include "rtsdefs.h"
+#include "stgio.h"
+
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif
+
+#ifdef HAVE_FCNTL_H
+#include <fcntl.h>
+#endif
+
+StgInt
+renameFile(opath, npath)
+StgByteArray opath;
+StgByteArray npath;
+{
+    struct stat sb;
+    int fd;
+    int created = 0;
+
+    /* Check for a non-directory source */
+    while (stat(opath, &sb) != 0) {
+	if (errno != EINTR) {
+	    cvtErrno();
+	    stdErrno();
+	    return -1;
+	}
+    }
+    if (S_ISDIR(sb.st_mode)) {
+	ghc_errtype = ERR_INAPPROPRIATETYPE;
+	ghc_errstr = "file is a directory";
+	return -1;
+    }
+
+    /* Ensure a non-directory destination */
+
+    /* First try to open without creating */
+    while ((fd = open(npath, O_RDONLY | O_NOCTTY, 0)) < 0) {
+	if (errno == ENOENT) {
+	    /* Now try to create it */
+	    while ((fd = open(npath, O_RDONLY | O_NOCTTY | O_CREAT | O_EXCL, 0)) < 0) {
+		if (errno == EEXIST) {
+		    /* Race detected; go back and open without creating it */
+		    break;
+		} else if (errno != EINTR) {
+		    cvtErrno();
+		    switch (ghc_errno) {
+		    default:
+			stdErrno();
+			break;
+		    case GHC_ENOENT:
+		    case GHC_ENOTDIR:
+			ghc_errtype = ERR_NOSUCHTHING;
+			ghc_errstr = "no path to file";
+			break;
+		    case GHC_EINVAL:
+			ghc_errtype = ERR_PERMISSIONDENIED;
+			ghc_errstr = "unsupported owner or group";
+			break;
+		    }
+		    return -1;
+		}
+	    }
+	    if (fd >= 0) {
+		created = 1;
+		break;
+	    }
+	} else if (errno != EINTR) {
+	    cvtErrno();
+	    switch (ghc_errno) {
+	    default:
+		stdErrno();
+		break;
+	    case GHC_ENOTDIR:
+		ghc_errtype = ERR_NOSUCHTHING;
+		ghc_errstr = "no path to file";
+		break;
+	    case GHC_EINVAL:
+		ghc_errtype = ERR_PERMISSIONDENIED;
+		ghc_errstr = "unsupported owner or group";
+		break;
+	    }
+	    return -1;
+	}
+    }
+
+    /* Make sure that we aren't looking at a directory */
+
+    while (fstat(fd, &sb) < 0) {
+	/* highly unlikely */
+	if (errno != EINTR) {
+	    cvtErrno();
+	    if (created)
+		(void) unlink(npath);
+	    (void) close(fd);
+	    return -1;
+	}
+    }
+    if (S_ISDIR(sb.st_mode)) {
+	ghc_errtype = ERR_INAPPROPRIATETYPE;
+	ghc_errstr = "destination is a directory";
+	/* We can't have created it in this case. */
+	(void) close(fd);
+	return -1;
+    }
+
+    while(rename(opath, npath) != 0) {
+	if (errno != EINTR) {
+	    cvtErrno();
+	    stdErrno();
+	    if (created)
+		(void) unlink(npath);
+	    (void) close(fd);
+	    return -1;
+	}
+    }
+
+    close(fd);    
+    return 0;
+}
+\end{code}
