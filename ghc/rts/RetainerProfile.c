@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerProfile.c,v 1.9 2003/04/23 08:54:45 simonmar Exp $
+ * $Id: RetainerProfile.c,v 1.10 2003/05/16 14:39:29 simonmar Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -9,6 +9,13 @@
  * ---------------------------------------------------------------------------*/
 
 #ifdef PROFILING
+
+// Turn off inlining when debugging - it obfuscates things
+#ifdef DEBUG
+#define INLINE
+#else
+#define INLINE inline
+#endif
 
 #include <stdio.h>
 
@@ -104,6 +111,7 @@ typedef enum {
     posTypeStep,
     posTypePtrs,
     posTypeSRT,
+    posTypeLargeSRT,
 } nextPosType;
 
 typedef union {
@@ -126,8 +134,15 @@ typedef union {
     // SRT
     struct {
 	StgClosure **srt;
-	StgClosure **srt_end;
+	StgWord    srt_bitmap;
     } srt;
+
+    // Large SRT
+    struct {
+	StgLargeSRT *srt;
+	StgWord offset;
+    } large_srt;
+	
 } nextPos;
 
 typedef struct {
@@ -194,7 +209,7 @@ static int stackSize, maxStackSize;
  * Invariants:
  *  currentStack->link == s.
  * -------------------------------------------------------------------------- */
-static inline void
+static INLINE void
 newStackBlock( bdescr *bd )
 {
     currentStack = bd;
@@ -209,7 +224,7 @@ newStackBlock( bdescr *bd )
  * Invariants:
  *   s->link == currentStack.
  * -------------------------------------------------------------------------- */
-static inline void
+static INLINE void
 returnToOldStack( bdescr *bd )
 {
     currentStack = bd;
@@ -251,7 +266,7 @@ closeTraverseStack( void )
 /* -----------------------------------------------------------------------------
  * Returns rtsTrue if the whole stack is empty.
  * -------------------------------------------------------------------------- */
-static inline rtsBool
+static INLINE rtsBool
 isEmptyRetainerStack( void )
 {
     return (firstStack == currentStack) && stackTop == stackLimit;
@@ -260,8 +275,9 @@ isEmptyRetainerStack( void )
 /* -----------------------------------------------------------------------------
  * Returns size of stack
  * -------------------------------------------------------------------------- */
+#ifdef DEBUG
 lnat
-retainerStackBlocks()
+retainerStackBlocks( void )
 {
     bdescr* bd;
     lnat res = 0;
@@ -271,12 +287,13 @@ retainerStackBlocks()
 
     return res;
 }
+#endif
 
 /* -----------------------------------------------------------------------------
  * Returns rtsTrue if stackTop is at the stack boundary of the current stack,
  * i.e., if the current stack chunk is empty.
  * -------------------------------------------------------------------------- */
-static inline rtsBool
+static INLINE rtsBool
 isOnBoundary( void )
 {
     return stackTop == currentStackBoundary;
@@ -287,7 +304,7 @@ isOnBoundary( void )
  * Invariants:
  *   payload[] begins with ptrs pointers followed by non-pointers.
  * -------------------------------------------------------------------------- */
-static inline void
+static INLINE void
 init_ptrs( stackPos *info, nat ptrs, StgPtr payload )
 {
     info->type              = posTypePtrs;
@@ -299,7 +316,7 @@ init_ptrs( stackPos *info, nat ptrs, StgPtr payload )
 /* -----------------------------------------------------------------------------
  * Find the next object from *info.
  * -------------------------------------------------------------------------- */
-static inline StgClosure *
+static INLINE StgClosure *
 find_ptrs( stackPos *info )
 {
     if (info->next.ptrs.pos < info->next.ptrs.ptrs) {
@@ -312,43 +329,92 @@ find_ptrs( stackPos *info )
 /* -----------------------------------------------------------------------------
  *  Initializes *info from SRT information stored in *infoTable.
  * -------------------------------------------------------------------------- */
-static inline void
+static INLINE void
 init_srt_fun( stackPos *info, StgFunInfoTable *infoTable )
 {
-    info->type = posTypeSRT;
-    info->next.srt.srt = (StgClosure **)(infoTable->srt);
-    info->next.srt.srt_end = info->next.srt.srt + infoTable->i.srt_len;
+    if (infoTable->i.srt_bitmap == (StgHalfWord)(-1)) {
+	info->type = posTypeLargeSRT;
+	info->next.large_srt.srt = (StgLargeSRT *)infoTable->srt;
+	info->next.large_srt.offset = 0;
+    } else {
+	info->type = posTypeSRT;
+	info->next.srt.srt = (StgClosure **)(infoTable->srt);
+	info->next.srt.srt_bitmap = infoTable->i.srt_bitmap;
+    }
 }
 
-static inline void
+static INLINE void
 init_srt_thunk( stackPos *info, StgThunkInfoTable *infoTable )
 {
-    info->type = posTypeSRT;
-    info->next.srt.srt = (StgClosure **)(infoTable->srt);
-    info->next.srt.srt_end = info->next.srt.srt + infoTable->i.srt_len;
+    if (infoTable->i.srt_bitmap == (StgHalfWord)(-1)) {
+	info->type = posTypeLargeSRT;
+	info->next.large_srt.srt = (StgLargeSRT *)infoTable->srt;
+	info->next.large_srt.offset = 0;
+    } else {
+	info->type = posTypeSRT;
+	info->next.srt.srt = (StgClosure **)(infoTable->srt);
+	info->next.srt.srt_bitmap = infoTable->i.srt_bitmap;
+    }
 }
 
 /* -----------------------------------------------------------------------------
  * Find the next object from *info.
  * -------------------------------------------------------------------------- */
-static inline StgClosure *
+static INLINE StgClosure *
 find_srt( stackPos *info )
 {
     StgClosure *c;
+    StgWord bitmap;
 
-    if (info->next.srt.srt < info->next.srt.srt_end) {
-	// See scavenge_srt() in GC.c for details.
+    if (info->type == posTypeSRT) {
+	// Small SRT bitmap
+	bitmap = info->next.srt.srt_bitmap;
+	while (bitmap != 0) {
+	    if ((bitmap & 1) != 0) {
 #ifdef ENABLE_WIN32_DLL_SUPPORT
-	if ((unsigned long)(*(info->next.srt.srt)) & 0x1)
-	    c = (* (StgClosure **)((unsigned long)*(info->next.srt.srt)) & ~0x1);
-	else
-	    c = *(info->next.srt.srt);
+		
+		if ((unsigned long)(*(info->next.srt.srt)) & 0x1)
+		    c = (* (StgClosure **)((unsigned long)*(info->next.srt.srt)) & ~0x1);
+		else
+		    c = *(info->next.srt.srt);
 #else
-	c = *(info->next.srt.srt);
+		c = *(info->next.srt.srt);
 #endif
-	info->next.srt.srt++;
-	return c;
-    } else {
+		bitmap = bitmap >> 1;
+		info->next.srt.srt++;
+		info->next.srt.srt_bitmap = bitmap;
+		return c;
+	    }
+	    bitmap = bitmap >> 1;
+	    info->next.srt.srt++;
+	}
+	// bitmap is now zero...
+	return NULL;
+    }
+    else {
+	// Large SRT bitmap
+	nat i = info->next.large_srt.offset;
+	StgWord bitmap;
+
+	// Follow the pattern from GC.c:scavenge_large_srt_bitmap().
+	bitmap = info->next.large_srt.srt->l.bitmap[i / BITS_IN(W_)];
+	bitmap = bitmap >> (i % BITS_IN(StgWord));
+	while (i < info->next.large_srt.srt->l.size) {
+	    if ((bitmap & 1) != 0) {
+		c = ((StgClosure **)info->next.large_srt.srt->srt)[i];
+		i++;
+		info->next.large_srt.offset = i;
+		return c;
+	    }
+	    i++;
+	    if (i % BITS_IN(W_) == 0) {
+		bitmap = info->next.large_srt.srt->l.bitmap[i / BITS_IN(W_)];
+	    } else {
+		bitmap = bitmap >> 1;
+	    }
+	}
+	// reached the end of this bitmap.
+	info->next.large_srt.offset = i;
 	return NULL;
     }
 }
@@ -368,7 +434,7 @@ find_srt( stackPos *info )
  *        there cannot be any stack objects.
  *  Note: SRTs are considered to  be children as well.
  * -------------------------------------------------------------------------- */
-static inline void
+static INLINE void
 push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 {
     stackElement se;
@@ -511,7 +577,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 	break;
 
     case FUN_STATIC:      // *c is a heap object.
-	ASSERT(get_itbl(c)->srt_len != 0);
+	ASSERT(get_itbl(c)->srt_bitmap != 0);
     case FUN_0_1:
     case FUN_0_2:
     fun_srt_only:
@@ -523,7 +589,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 
     // SRT only
     case THUNK_STATIC:
-	ASSERT(get_itbl(c)->srt_len != 0);
+	ASSERT(get_itbl(c)->srt_bitmap != 0);
     case THUNK_0_1:
     case THUNK_0_2:
     thunk_srt_only:
@@ -611,7 +677,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
  *    executed at the end of popOff() in necessary. Since popOff() is
  *    likely to be executed quite often while popOffReal() is not, we
  *    separate popOffReal() from popOff(), which is declared as an
- *    inline function (for the sake of execution speed).  popOffReal()
+ *    INLINE function (for the sake of execution speed).  popOffReal()
  *    is called only within popOff() and nowhere else.
  * -------------------------------------------------------------------------- */
 static void
@@ -661,7 +727,7 @@ popOffReal(void)
 #endif
 }
 
-static inline void
+static INLINE void
 popOff(void) {
 #ifdef DEBUG_RETAINER
     // fprintf(stderr, "\tpopOff(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", stackTop, currentStackBoundary);
@@ -703,7 +769,7 @@ popOff(void) {
  *    It is okay to call this function even when the current stack chunk
  *    is empty.
  * -------------------------------------------------------------------------- */
-static inline void
+static INLINE void
 pop( StgClosure **c, StgClosure **cp, retainer *r )
 {
     stackElement *se;
@@ -912,7 +978,7 @@ endRetainerProfiling( void )
  *    We have to perform an XOR (^) operation each time a closure is examined.
  *    The reason is that we do not know when a closure is visited last.
  * -------------------------------------------------------------------------- */
-static inline void
+static INLINE void
 maybeInitRetainerSet( StgClosure *c )
 {
     if (!isRetainerSetFieldValid(c)) {
@@ -923,7 +989,7 @@ maybeInitRetainerSet( StgClosure *c )
 /* -----------------------------------------------------------------------------
  * Returns rtsTrue if *c is a retainer.
  * -------------------------------------------------------------------------- */
-static inline rtsBool
+static INLINE rtsBool
 isRetainer( StgClosure *c )
 {
     switch (get_itbl(c)->type) {
@@ -1049,7 +1115,7 @@ isRetainer( StgClosure *c )
  *    re-initialize the hash table.
  *    See refreshAllRetainerSet() in RetainerSet.c.
  * -------------------------------------------------------------------------- */
-static inline retainer
+static INLINE retainer
 getRetainerFrom( StgClosure *c )
 {
     ASSERT(isRetainer(c));
@@ -1073,46 +1139,12 @@ getRetainerFrom( StgClosure *c )
  *    c != NULL
  *    s != NULL
  * -------------------------------------------------------------------------- */
-static inline void
+static INLINE void
 associate( StgClosure *c, RetainerSet *s )
 {
     // StgWord has the same size as pointers, so the following type
     // casting is okay.
     RSET(c) = (RetainerSet *)((StgWord)s | flip);
-}
-
-/* -----------------------------------------------------------------------------
- * Call retainClosure for each of the closures in an SRT.
- * ------------------------------------------------------------------------- */
-
-static inline void
-retainSRT (StgClosure **srt, nat srt_len, StgClosure *c, retainer c_child_r)
-{
-  StgClosure **srt_end;
-
-  srt_end = srt + srt_len;
-
-  for (; srt < srt_end; srt++) {
-    /* Special-case to handle references to closures hiding out in DLLs, since
-       double indirections required to get at those. The code generator knows
-       which is which when generating the SRT, so it stores the (indirect)
-       reference to the DLL closure in the table by first adding one to it.
-       We check for this here, and undo the addition before evacuating it.
-
-       If the SRT entry hasn't got bit 0 set, the SRT entry points to a
-       closure that's fixed at link-time, and no extra magic is required.
-    */
-#ifdef ENABLE_WIN32_DLL_SUPPORT
-    if ( (unsigned long)(*srt) & 0x1 ) {
-       retainClosure(*stgCast(StgClosure**,(stgCast(unsigned long, *srt) & ~0x1)), 
-		     c, c_child_r);
-    } else {
-       retainClosure(*srt,c,c_child_r);
-    }
-#else
-    retainClosure(*srt,c,c_child_r);
-#endif
-  }
 }
 
 /* -----------------------------------------------------------------------------
@@ -1143,7 +1175,7 @@ retain_large_bitmap (StgPtr p, StgLargeBitmap *large_bitmap, nat size,
     }
 }
 
-static inline StgPtr
+static INLINE StgPtr
 retain_small_bitmap (StgPtr p, nat size, StgWord bitmap,
 		     StgClosure *c, retainer c_child_r)
 {
@@ -1156,6 +1188,68 @@ retain_small_bitmap (StgPtr p, nat size, StgWord bitmap,
 	size--;
     }
     return p;
+}
+
+/* -----------------------------------------------------------------------------
+ * Call retainClosure for each of the closures in an SRT.
+ * ------------------------------------------------------------------------- */
+
+static void
+retain_large_srt_bitmap (StgLargeSRT *srt, StgClosure *c, retainer c_child_r)
+{
+    nat i, b, size;
+    StgWord bitmap;
+    StgClosure **p;
+    
+    b = 0;
+    p = (StgClosure **)srt->srt;
+    size   = srt->l.size;
+    bitmap = srt->l.bitmap[b];
+    for (i = 0; i < size; ) {
+	if ((bitmap & 1) != 0) {
+	    retainClosure((StgClosure *)*p, c, c_child_r);
+	}
+	i++;
+	p++;
+	if (i % BITS_IN(W_) == 0) {
+	    b++;
+	    bitmap = srt->l.bitmap[b];
+	} else {
+	    bitmap = bitmap >> 1;
+	}
+    }
+}
+
+static INLINE void
+retainSRT (StgClosure **srt, nat srt_bitmap, StgClosure *c, retainer c_child_r)
+{
+  nat bitmap;
+  StgClosure **p;
+
+  bitmap = srt_bitmap;
+  p = srt;
+
+  if (bitmap == (StgHalfWord)(-1)) {  
+      retain_large_srt_bitmap( (StgLargeSRT *)srt, c, c_child_r );
+      return;
+  }
+
+  while (bitmap != 0) {
+      if ((bitmap & 1) != 0) {
+#ifdef ENABLE_WIN32_DLL_SUPPORT
+	  if ( (unsigned long)(*srt) & 0x1 ) {
+	      retainClosure(*stgCast(StgClosure**,(stgCast(unsigned long, *srt) & ~0x1)), 
+			    c, c_child_r);
+	  } else {
+	      retainClosure(*srt,c,c_child_r);
+	  }
+#else
+	  retainClosure(*srt,c,c_child_r);
+#endif
+      }
+      p++;
+      bitmap = bitmap >> 1;
+  }
 }
 
 /* -----------------------------------------------------------------------------
@@ -1230,7 +1324,7 @@ retainStack( StgClosure *c, retainer c_child_r,
 	    p = retain_small_bitmap(p, size, bitmap, c, c_child_r);
 
 	follow_srt:
-	    retainSRT((StgClosure **)info->srt, info->i.srt_len, c, c_child_r);
+	    retainSRT((StgClosure **)info->srt, info->i.srt_bitmap, c, c_child_r);
 	    continue;
 
 	case RET_BCO: {
@@ -1329,7 +1423,7 @@ retainStack( StgClosure *c, retainer c_child_r,
  * Call retainClosure for each of the children of a PAP/AP
  * ------------------------------------------------------------------------- */
 
-static inline StgPtr
+static INLINE StgPtr
 retain_PAP (StgPAP *pap, retainer c_child_r)
 {
     StgPtr p;
@@ -1494,7 +1588,7 @@ inner_loop:
 	goto loop;
     case THUNK_STATIC:
     case FUN_STATIC:
-	if (get_itbl(c)->srt_len == 0) {
+	if (get_itbl(c)->srt_bitmap == 0) {
 	    // No need to compute the retainer set; no dynamic objects
 	    // are reachable from *c.
 	    //
