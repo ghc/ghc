@@ -18,7 +18,6 @@ module Numeric
 	 readInt,
 
 	 readDec, readOct, readHex,
-         showDec, showOct, showHex,
 
 	 showEFloat, 
 	 showFFloat, 
@@ -81,37 +80,6 @@ showInt n r
     in
     if n' == 0 then r' else showInt n' r'
     }}
-
-showIntAtBase :: Integral a => a -> (a -> Char) -> a -> ShowS
-showIntAtBase base toChr n r
-  = case quotRem n base of { (n', d) ->
-    case toChr d        of { C# c# -> -- stricter than necessary
-    let
-	r' = C# c# : r
-    in
-    if n' == 0 then r' else showIntAtBase base toChr n' r'
-    }}
-
-showDec :: Integral a => a -> ShowS
-showDec n r = 
- showIntAtBase 10 
-               (\ d -> chr (ord_0 + fromIntegral d)) 
-	       n r
-
-showHex :: Integral a => a -> ShowS
-showHex n r = 
- showString "0x" $
- showIntAtBase 16 (toChrHex) n r
- where  
-  toChrHex d
-    | d < 10    = chr (ord_0   + fromIntegral d)
-    | otherwise = chr (ord 'a' + fromIntegral (d - 10))
-
-showOct :: Integral a => a -> ShowS
-showOct n r = 
- showString "0o" $
- showIntAtBase 8 (toChrOct) n r
- where toChrOct d = chr (ord_0   + fromIntegral d)
 
 \end{code}
 
