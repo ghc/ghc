@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.29 $
- * $Date: 2000/02/25 10:53:54 $
+ * $Revision: 1.30 $
+ * $Date: 2000/03/02 10:10:33 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -547,7 +547,7 @@ extern void* lookupOExtraTabName ( char* sym );
 
 #define isPrelude(m) (m==modulePrelude)
 
-#define N_PRELUDE_SCRIPTS (combined ? 30 : 1)
+#define N_PRELUDE_SCRIPTS (combined ? 32 : 1)
 
 /* --------------------------------------------------------------------------
  * Type constructor names:

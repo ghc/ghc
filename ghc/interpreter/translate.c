@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.24 $
- * $Date: 1999/12/10 15:59:56 $
+ * $Revision: 1.25 $
+ * $Date: 2000/03/02 10:10:33 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -899,17 +899,15 @@ Void implementForeignImport ( Name n )
        descriptor->arg_tys++;
        descriptor->num_args--;
     }
-
-    
 }
 
 
 /* Generate code:
  *
- * \ fun s0 ->
+ * \ fun ->
      let e1 = A# "...."
          e3 = C# 'c' -- (ccall), or 's' (stdcall)
-     in  primMkAdjThunk fun e1 e3 s0
+     in  primMkAdjThunk fun e1 e3
 
    we require, and check that,
      fun :: prim_arg* -> IO prim_result
@@ -942,7 +940,7 @@ Void implementForeignExport ( Name n )
         assert(length(resultTys) == 1);
         resultTys = hd(resultTys);
     } else {
-        ERRMSG(name(n).line) "foreign export doesn't return an IO type" ETHEN
+        ERRMSG(name(n).line) "function to be exported doesn't return an IO type: " ETHEN
         ERRTEXT " \"" ETHEN ERRTYPE(t);
         ERRTEXT "\""
         EEND;        
@@ -966,7 +964,6 @@ Void implementForeignExport ( Name n )
     else
        internal ( "implementForeignExport: unknown calling convention");
 
-
     {
     List     tdList;
     Text     tdText;
@@ -979,7 +976,7 @@ Void implementForeignExport ( Name n )
        tdList = cons(foreignOutboundTy(resultTys),tdList);
 
     tdText = findText(charListToString ( tdList ));
-    args   = makeArgs(2);
+    args   = makeArgs(1);
     e1     = mkStgVar(
                 mkStgCon(nameMkA,singleton(ap(STRCELL,tdText))),
                 NIL
@@ -998,7 +995,7 @@ Void implementForeignExport ( Name n )
                    tripleton(e1,e2,e3),
                    mkStgApp(
                       nameCreateAdjThunk,
-                      cons(hd(args),cons(e2,cons(e3,cons(hd(tl(args)),NIL))))
+                      cons(hd(args),cons(e2,cons(e3,NIL)))
                    )
                 )
              );

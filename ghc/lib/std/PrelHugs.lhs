@@ -38,9 +38,11 @@ import PrelShow(show,shows,showString,showChar,Show,ShowS)
 import PrelRead(Read,ReadS,lex,reads)
 import PrelFloat(Double)
 import PrelReal(Fractional,fromRational,toRational)
-import PrelAddr(Addr)
+import PrelAddr(Addr(..),nullAddr)
+import PrelStable(StablePtr,makeStablePtr)
 import PrelErr(error)
 import PrelPack(unpackCString)
+import List(length)
 
 -- Stuff needed by Hugs for desugaring.  Do not mess with these!
 -- They need to correspond exactly to versions written in 
@@ -73,10 +75,42 @@ connectWorlds hrealworld
 
 
 
+-- StgAddr createAdjThunk ( StgStablePtr stableptr,
+--                          StgAddr      typestr,
+--                          StgChar      callconv )
 
+foreign import "createAdjThunk" hugsCreateAdjThunk 
+        :: StablePtr (a -> b) -> Addr{-mallocville String-} -> Char -> IO Addr
+foreign import "malloc" malloc 
+        :: Int -> IO Addr
 hugsprimCreateAdjThunk :: (a -> b) -> String -> Char -> IO Addr
 hugsprimCreateAdjThunk fun typestr callconv
-   = error "hugsprimCreateAdjThunk in combined mode: unimplemented"
+   = do sp <- makeStablePtr fun
+        p  <- copy_String_to_cstring typestr  -- is never freed
+        a  <- hugsCreateAdjThunk sp p callconv
+        return a
+     where
+        copy_String_to_cstring :: String -> IO Addr
+        copy_String_to_cstring s
+           = malloc (1 + length s) >>= \ptr0 -> 
+             let loop off []     = writeCharOffAddr ptr0 off (chr 0) 
+                                   >> return ptr0
+                 loop off (c:cs) = writeCharOffAddr ptr0 off c       
+                                   >> loop (off+1) cs
+             in
+                 if   isNullAddr ptr0
+                 then error "copy_String_to_cstring: malloc failed"
+                 else loop 0 s
+
+        isNullAddr a = a == nullAddr
+
+        writeCharOffAddr :: Addr -> Int -> Char -> IO ()
+        writeCharOffAddr (A# buf#) (I# n#) (C# c#)
+           = IO ( \ s# ->
+                  case (writeCharOffAddr# buf# n# c# s#) of 
+                     s2# -> (# s2#, () #) )
+
+
 
 fromDouble :: Fractional a => Double -> a
 fromDouble n = fromRational (toRational n)

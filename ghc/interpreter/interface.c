@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.32 $
- * $Date: 2000/02/24 12:34:18 $
+ * $Revision: 1.33 $
+ * $Date: 2000/03/02 10:10:33 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2519,6 +2519,9 @@ Type type; {
       Sym(prog_argv)                 \
       Sym(prog_argc)                 \
       Sym(resetNonBlockingFd)        \
+      Sym(getStablePtr)              \
+      Sym(stable_ptr_table)          \
+      Sym(createAdjThunk)            \
                                      \
       /* needed by libHS_cbits */    \
       SymX(malloc)                   \

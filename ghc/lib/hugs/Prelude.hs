@@ -1560,6 +1560,11 @@ hugsprimPmFail       :: a
 hugsprimPmFail        = error "Pattern Match Failure"
 
 -- used in desugaring Foreign functions
+-- Note: hugsprimMkIO is used as a wrapper to translate a Hugs-created
+-- bit of code of type   RealWorld -> (a,RealWorld)   into a proper IO value.
+-- What follows is the version for standalone mode.  ghc/lib/std/PrelHugs.lhs
+-- contains a version used in combined mode.  That version takes care of
+-- switching between the GHC and Hugs IO representations, which are different.
 hugsprimMkIO :: (RealWorld -> (a,RealWorld)) -> IO a
 hugsprimMkIO = ST
 

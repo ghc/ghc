@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: ForeignCall.c,v 1.11 1999/11/08 15:30:37 sewardj Exp $
+ * $Id: ForeignCall.c,v 1.12 2000/03/02 10:10:34 sewardj Exp $
  *
  * (c) The GHC Team 1994-1999.
  *
@@ -386,7 +386,7 @@ int ccall ( CFunDescriptor*  d,
    for a given function by name.  Useful but a hack.  Sigh.
  */
 extern void* getHugs_AsmObject_for ( char* s );
-
+extern int /*Bool*/ combined;
 
 /* ----------------------------------------------------------------*
  * The implementation for x86_ccall and x86_stdcall.
@@ -464,12 +464,16 @@ unpackArgsAndCallHaskell_x86_nocallconv_wrk ( StgStablePtr stableptr,
       }
       argp++;
    }
-
-   node = rts_apply ( 
-             asmClosureOfObject(getHugs_AsmObject_for("primRunST")), 
-             node );
-
-   sstat = rts_eval ( node, &nodeOut );
+fprintf(stderr,"before rts_evalIO\n");
+   if (combined) {
+      sstat = rts_evalIO ( node, &nodeOut );
+   } else {
+      node = rts_apply ( 
+                asmClosureOfObject(getHugs_AsmObject_for("primRunST")), 
+                node );
+      sstat = rts_eval ( node, &nodeOut );
+   }
+fprintf(stderr, "after rts_evalIO\n");
    if (sstat != Success)
       barf ("unpackArgsAndCallHaskell_x86_nocallconv: eval failed");
 
@@ -519,10 +523,10 @@ unpackArgsAndCallHaskell_x86_nocallconv_INTISH (
       StgStablePtr stableptr, char* tydesc, char* args
    )
 {
-   HaskellObj nodeOut
-      = unpackArgsAndCallHaskell_x86_nocallconv_wrk ( 
-           stableptr, tydesc, args 
-        );
+   HaskellObj nodeOut;
+   nodeOut = unpackArgsAndCallHaskell_x86_nocallconv_wrk ( 
+                stableptr, tydesc, args 
+             );
    /* A complete hack.  We know that all these returns will be
       put into %eax (and %edx, if it is a 64-bit return), and
       the adjustor thunk will then itself return to the original
