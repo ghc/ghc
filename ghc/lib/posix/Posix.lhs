@@ -14,7 +14,6 @@ module Posix  (
     module PosixTTY,
 
     runProcess,
-    exec,
 
     ByteCount,
     Fd, intToFd,
