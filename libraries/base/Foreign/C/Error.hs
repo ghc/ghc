@@ -119,7 +119,8 @@ import GHC.IOBase
 import GHC.Num
 import GHC.Base
 #else
-import System.IO		( IOError, Handle, ioError )
+import System.IO		( Handle )
+import System.IO.Error		( IOError, ioError )
 import System.IO.Unsafe		( unsafePerformIO )
 #endif
 
