@@ -472,7 +472,13 @@ dropForAlls ty = snd (splitForAllTys ty)
 
 -- (mkPiType now in CoreUtils)
 
-Applying a for-all to its arguments.  Lift usage annotation as required.
+applyTy, applyTys
+~~~~~~~~~~~~~~~~~
+Instantiate a for-all type with one or more type arguments.
+Used when we have a polymorphic function applied to type args:
+	f t1 t2
+Then we use (applyTys type-of-f [t1,t2]) to compute the type of
+the expression. 
 
 \begin{code}
 applyTy :: Type -> Type -> Type
@@ -482,18 +488,32 @@ applyTy (ForAllTy tv ty) arg = substTyWith [tv] [arg] ty
 applyTy other		 arg = panic "applyTy"
 
 applyTys :: Type -> [Type] -> Type
-applyTys orig_fun_ty arg_tys
- = substTyWith tvs arg_tys ty
- where
-   (tvs, ty) = split orig_fun_ty arg_tys
-   
-   split fun_ty               []         = ([], fun_ty)
-   split (NoteTy _ fun_ty)    args       = split fun_ty args
-   split (SourceTy p)	      args       = split (sourceTypeRep p) args
-   split (ForAllTy tv fun_ty) (arg:args) = case split fun_ty args of
-						  (tvs, ty) -> (tv:tvs, ty)
-   split other_ty             args       = panic "applyTys"
-	-- No show instance for Type yet
+-- This function is interesting because 
+--	a) the function may have more for-alls than there are args
+--	b) less obviously, it may have fewer for-alls
+-- For case (b) think of 
+--	applyTys (forall a.a) [forall b.b, Int]
+-- This really can happen, via dressing up polymorphic types with newtype
+-- clothing.  Here's an example:
+--	newtype R = R (forall a. a->a)
+--	foo = case undefined :: R of
+--		R f -> f ()
+
+applyTys orig_fun_ty []      = orig_fun_ty
+applyTys orig_fun_ty arg_tys 
+  | n_tvs == n_args 	-- The vastly common case
+  = substTyWith tvs arg_tys rho_ty
+  | n_tvs > n_args 	-- Too many for-alls
+  = substTyWith (take n_args tvs) arg_tys 
+		(mkForAllTys (drop n_args tvs) rho_ty)
+  | otherwise		-- Too many type args
+  = ASSERT2( n_tvs > 0, pprType orig_fun_ty )	-- Zero case gives infnite loop!
+    applyTys (substTyWith tvs (take n_tvs arg_tys) rho_ty)
+	     (drop n_tvs arg_tys)
+  where
+    (tvs, rho_ty) = splitForAllTys orig_fun_ty 
+    n_tvs = length tvs
+    n_args = length arg_tys     
 \end{code}
 
 
