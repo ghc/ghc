@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.45 $
- * $Date: 2000/02/29 12:27:35 $
+ * $Revision: 1.46 $
+ * $Date: 2000/03/07 06:24:23 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -411,6 +411,7 @@ Void linkPreludeCM(void) {              /* Hook to cfuns and mfuns in      */
         nameFromInteger  = linkName("fromInteger");
         nameReturn       = linkName("return");
         nameBind         = linkName(">>=");
+	nameMFail        = linkName("fail");
         nameLe           = linkName("<=");
         nameGt           = linkName(">");
         nameShowsPrec    = linkName("showsPrec");
