@@ -760,7 +760,7 @@ linkPackage dflags pkg
    = do 
         let dirs      =  Packages.libraryDirs pkg
         let libs      =  Packages.hsLibraries pkg ++ Packages.extraLibraries pkg
-				++ [ lib | '-':'l':lib <- Packages.extraLdOpts pkg ]
+				++ [ lib | '-':'l':lib <- Packages.ldOptions pkg ]
         classifieds   <- mapM (locateOneObj dirs) libs
 
         -- Complication: all the .so's must be loaded before any of the .o's.  
