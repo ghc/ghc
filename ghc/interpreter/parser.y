@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.21 $
- * $Date: 2000/01/05 18:05:34 $
+ * $Revision: 1.22 $
+ * $Date: 2000/02/08 15:32:30 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -380,7 +380,7 @@ ifKindedTyvar /* ((VarId,Kind)) */
           | ifTyvar COCO ifAKind        { $$ = gc3(zpair($1,$3));   }
           ; 
 ifKind    : ifAKind                     { $$ = gc1($1);        }
-          | ifAKind ARROW ifKind        { $$ = gc3(fn($1,$3)); }
+          | ifAKind ARROW ifKind        { $$ = gc3(ap($1,$3)); }
           ;
 ifAKind   : VAROP                       { $$ = gc1(STAR); } 
                                             /* should be '*' */

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.15 $
- * $Date: 2000/01/12 16:32:41 $
+ * $Revision: 1.16 $
+ * $Date: 2000/02/08 15:32:29 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -161,7 +161,8 @@ print(e,10);printf("\n");
 	       pushVar(bco,name(e).stgVar);
             } else {
                Cell /*CPtr*/ addr = cptrFromName(e);
-               fprintf ( stderr, "nativeAtom: name %s\n", nameFromOPtr(cptrOf(addr)) );
+               fprintf ( stderr, "nativeAtom: name %s\n", 
+                                 nameFromOPtr(cptrOf(addr)) );
 	       pushVar(bco,addr);
             }
             break;
@@ -191,7 +192,7 @@ print(e,10);printf("\n");
             asmConstAddr(bco,ptrOf(e));
             break;
     default: 
-            fprintf(stderr,"\nYoiks: "); printExp(stderr,e);
+            fprintf(stderr,"\nYoiks1: "); printExp(stderr,e);
             internal("pushAtom");
     }
 }
@@ -453,7 +454,7 @@ static Void cgExpr( AsmBCO bco, AsmSp root, StgExpr e )
             break;
         }
     default:
-            fprintf(stderr,"\nYoiks: "); printExp(stderr,e);
+            fprintf(stderr,"\nYoiks2: "); printExp(stderr,e);
             internal("cgExpr");
     }
 }
@@ -470,6 +471,9 @@ static Void alloc( AsmBCO bco, StgVar v )
 {
     StgRhs rhs = stgVarBody(v);
     assert(isStgVar(v));
+#if 0
+    printf("alloc: ");ppStgExpr(v);
+#endif
     switch (whatIs(rhs)) {
     case STGCON:
         {
@@ -591,7 +595,10 @@ static Void build( AsmBCO bco, StgVar v )
      * of this except "let x = x in ..."
      */
     case NAME:
-            rhs = name(rhs).stgVar;
+        if (nonNull(name(rhs).stgVar))
+           rhs = name(rhs).stgVar; else
+           rhs = cptrFromName(rhs);
+        /* fall thru */
     case STGVAR:
         {
             AsmSp  start = asmBeginMkAP(bco);

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.40 $
- * $Date: 2000/01/12 14:52:53 $
+ * $Revision: 1.41 $
+ * $Date: 2000/02/08 15:32:30 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -871,6 +871,7 @@ Tycon addWiredInEnumTycon ( String modNm, String typeNm,
       Name con         = newName(conT,t);
       name(con).number = cfunNo(i);
       name(con).type   = t;
+      name(con).parent = t;
       tycon(t).defn    = cons(con, tycon(t).defn);      
    }
    return t;
@@ -1300,6 +1301,21 @@ List getAllKnownTyconsAndClasses ( void )
    return xs;
 }
 
+/* Purely for debugging. */
+void locateSymbolByName ( Text t )
+{
+   Int i;
+   for (i = NAMEMIN; i < nameHw; i++)
+      if (name(i).text == t)
+         fprintf ( stderr, "name(%d)\n", i-NAMEMIN);
+   for (i = TYCMIN; i < tyconHw; i++)
+      if (tycon(i).text == t)
+         fprintf ( stderr, "tycon(%d)\n", i-TYCMIN);
+   for (i = CLASSMIN; i < classHw; i++)
+      if (cclass(i).text == t)
+         fprintf ( stderr, "class(%d)\n", i-CLASSMIN);
+}
+
 /* --------------------------------------------------------------------------
  * Control stack:
  *
@@ -1496,7 +1512,9 @@ char* nameFromOPtr ( void* p )
 
 void* lookupOTabName ( Module m, char* sym )
 {
-   return ocLookupSym ( module(m).object, sym );
+   if (module(m).object)
+      return ocLookupSym ( module(m).object, sym );
+   return NULL;
 }
 
 
@@ -2411,8 +2429,7 @@ Cell c; {
 
 Int intOf(c)                           /* find integer value of cell?      */
 Cell c; {
-  if (!isInt(c)) {
-    assert(isInt(c)); }
+    assert(isInt(c));
     return isPair(c) ? (Int)(snd(c)) : (Int)(c-INTZERO);
 }
 
@@ -2904,6 +2921,132 @@ List args; {
         args      = temp;
     }
     return f;
+}
+
+/* --------------------------------------------------------------------------
+ * debugging support
+ * ------------------------------------------------------------------------*/
+
+static String maybeModuleStr ( Module m )
+{
+   if (isModule(m)) return textToStr(module(m).text); else return "??";
+}
+
+static String maybeNameStr ( Name n )
+{
+   if (isName(n)) return textToStr(name(n).text); else return "??";
+}
+
+static String maybeTyconStr ( Tycon t )
+{
+   if (isTycon(t)) return textToStr(tycon(t).text); else return "??";
+}
+
+static String maybeText ( Text t )
+{
+   if (isNull(t)) return "(nil)";
+   return textToStr(t);
+}
+
+static void print100 ( Int x )
+{
+   print ( x, 100); printf("\n");
+}
+
+void dumpTycon ( Int t )
+{
+   if (isTycon(TYCMIN+t) && !isTycon(t)) t += TYCMIN;
+   if (!isTycon(t)) {
+      printf ( "dumpTycon %d: not a tycon\n", t);
+      return;
+   }
+   printf ( "{\n" );
+   printf ( "    text: %s\n",     textToStr(tycon(t).text) );
+   printf ( "    line: %d\n",     tycon(t).line );
+   printf ( "     mod: %d %s\n",  tycon(t).mod, 
+                                  maybeModuleStr(tycon(t).mod));
+   printf ( "   tuple: %d\n",     tycon(t).tuple);
+   printf ( "   arity: %d\n",     tycon(t).arity);
+   printf ( "    kind: ");        print100(tycon(t).kind);
+   printf ( "    what: %d\n",     tycon(t).what);
+   printf ( "    defn: ");        print100(tycon(t).defn);
+   printf ( "    cToT: %d %s\n",  tycon(t).conToTag, 
+                                  maybeNameStr(tycon(t).conToTag));
+   printf ( "    tToC: %d %s\n",  tycon(t).tagToCon, 
+                                  maybeNameStr(tycon(t).tagToCon));
+   printf ( "    itbl: %p\n",     tycon(t).itbl);
+   printf ( "  nextTH: %d %s\n",  tycon(t).nextTyconHash,
+                                  maybeTyconStr(tycon(t).nextTyconHash));
+   printf ( "}\n" );
+}
+
+void dumpName ( Int n )
+{
+   if (isName(NAMEMIN+n) && !isName(n)) n += NAMEMIN;
+   if (!isName(n)) {
+      printf ( "dumpName %d: not a name\n", n);
+      return;
+   }
+   printf ( "{\n" );
+   printf ( "    text: %s\n",     textToStr(name(n).text) );
+   printf ( "    line: %d\n",     name(n).line );
+   printf ( "     mod: %d %s\n",  name(n).mod, 
+                                  maybeModuleStr(name(n).mod));
+   printf ( "  syntax: %d\n",     name(n).syntax );
+   printf ( "  parent: %d\n",     name(n).parent );
+   printf ( "   arity: %d\n",     name(n).arity );
+   printf ( "  number: %d\n",     name(n).number );
+   printf ( "    type: ");        print100(name(n).type);
+   printf ( "    defn: %d\n",     name(n).defn );
+   printf ( "  stgVar: ");        print100(name(n).stgVar);
+   printf ( "   cconv: %d\n",     name(n).callconv );
+   printf ( "  primop: %p\n",     name(n).primop );
+   printf ( "    itbl: %p\n",     name(n).itbl );
+   printf ( "  nextNH: %d\n",     name(n).nextNameHash );
+   printf ( "}\n" );
+}
+
+
+void dumpClass ( Int c )
+{
+   if (isClass(CLASSMIN+c) && !isClass(c)) c += CLASSMIN;
+   if (!isClass(c)) {
+      printf ( "dumpClass %d: not a class\n", c);
+      return;
+   }
+   printf ( "{\n" );
+   printf ( "    text: %s\n",     textToStr(cclass(c).text) );
+   printf ( "    line: %d\n",     cclass(c).line );
+   printf ( "     mod: %d %s\n",  cclass(c).mod, 
+                                  maybeModuleStr(cclass(c).mod));
+   printf ( "   arity: %d\n",     cclass(c).arity );
+   printf ( "   level: %d\n",     cclass(c).level );
+   printf ( "   kinds: ");        print100( cclass(c).kinds );
+   printf ( "     fds: %d\n",     cclass(c).fds );
+   printf ( "    xfds: %d\n",     cclass(c).xfds );
+   printf ( "    head: ");        print100( cclass(c).head );
+   printf ( "    dcon: ");        print100( cclass(c).dcon );
+   printf ( "  supers: ");        print100( cclass(c).supers );
+   printf ( " #supers: %d\n",     cclass(c).numSupers );
+   printf ( "   dsels: ");        print100( cclass(c).dsels );
+   printf ( " members: ");        print100( cclass(c).members );
+   printf ( "#members: %d\n",     cclass(c).numMembers );
+   printf ( "defaults: ");        print100( cclass(c).defaults );
+   printf ( "   insts: ");        print100( cclass(c).instances );
+   printf ( "}\n" );
+}
+
+
+void dumpInst ( Int i )
+{
+   if (isInst(INSTMIN+i) && !isInst(i)) i += INSTMIN;
+   if (!isInst(i)) {
+      printf ( "dumpInst %d: not an instance\n", i);
+      return;
+   }
+   printf ( "{\n" );
+//   printf ( "    text: %s\n",     textToStr(cclass(c)).text) );
+   printf ( "}\n" );
 }
 
 

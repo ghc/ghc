@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.39 $
- * $Date: 2000/02/03 13:55:21 $
+ * $Revision: 1.40 $
+ * $Date: 2000/02/08 15:32:30 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -525,15 +525,12 @@ Int what; {
 
            nameUnpackString = linkName("hugsprimUnpackString");
            namePMFail       = linkName("hugsprimPmFail");
-
+assert(nonNull(namePMFail));
 #define xyzzy(aaa,bbb) aaa = linkName(bbb)
 
 
                /* pmc                                   */
                xyzzy(nameSel,            "_SEL");
-
-               /* newtype and USE_NEWTYPE_FOR_DICTS     */
-               xyzzy(nameId,             "id");
 
                /* strict constructors                   */
                xyzzy(nameFlip,           "flip"     );
@@ -553,20 +550,26 @@ Int what; {
                xyzzy(nameLex,            "lex");
                xyzzy(nameComp,           ".");
                xyzzy(nameAnd,            "&&");
-               xyzzy(nameCompAux,        "primCompAux");
+               xyzzy(nameCompAux,        "hugsprimCompAux");
                xyzzy(nameMap,            "map");
 
                /* implementTagToCon                     */
-               xyzzy(nameError,          "error");
+               xyzzy(nameError,          "hugsprimError");
 
            typeStable = linkTycon("Stable");
            typeRef    = linkTycon("IORef");
            // {Prim,PrimByte,PrimMutable,PrimMutableByte}Array ?
+
+           ifLinkConstrItbl ( nameFalse );
+           ifLinkConstrItbl ( nameTrue );
+           ifLinkConstrItbl ( nameNil );
+           ifLinkConstrItbl ( nameCons );
            break;
         }
         case PREPREL : 
 
            if (combined) {
+               Module modulePrelBase;
 
                modulePrelude = findFakeModule(textPrelude);
                module(modulePrelude).objectExtraNames 
@@ -602,6 +605,16 @@ Int what; {
                /* desugaring                            */
                pFun(nameInd,            "_indirect");
                name(nameInd).number = DFUNNAME;
+
+               /* newtype and USE_NEWTYPE_FOR_DICTS     */
+               /* make a name entry for PrelBase.id _before_ loading Prelude
+                  since ifSetClassDefaultsAndDCon() may need to refer to
+                  nameId. 
+               */
+               modulePrelBase = findModule(findText("PrelBase"));
+               setCurrModule(modulePrelBase);
+               pFun(nameId,             "id");
+               setCurrModule(modulePrelude);
 
            } else {
 
@@ -645,7 +658,7 @@ Int what; {
                pFun(nameLex,            "lex");
                pFun(nameComp,           ".");
                pFun(nameAnd,            "&&");
-               pFun(nameCompAux,        "primCompAux");
+               pFun(nameCompAux,        "hugsprimCompAux");
                pFun(nameMap,            "map");
 
                /* implementTagToCon                     */

@@ -112,7 +112,7 @@ module Prelude (
 
     -- This lot really shouldn't be exported, but are needed to
     -- implement various libs.
-    ,primCompAux,PrimArray,primRunST,primNewArray,primWriteArray
+    ,hugsprimCompAux,PrimArray,primRunST,primNewArray,primWriteArray
     ,primUnsafeFreezeArray,primIndexArray,primGetRawArgs,primGetEnv
     ,nh_stdin,nh_stdout,nh_stderr,copy_String_to_cstring,nh_open
     ,nh_free,nh_close,nh_errno,nh_flush,nh_read,primIntToChar
@@ -632,7 +632,7 @@ instance Ord a => Ord [a] where
     compare []     (_:_)  = LT
     compare []     []     = EQ
     compare (_:_)  []     = GT
-    compare (x:xs) (y:ys) = primCompAux x y (compare xs ys)
+    compare (x:xs) (y:ys) = hugsprimCompAux x y (compare xs ys)
 
 instance Functor [] where
     fmap = map
@@ -1545,8 +1545,8 @@ readFloat r    = [(fromRational ((n%1)*10^^(k-d)),t) | (n,d,s) <- readFix r,
 -- Hooks for primitives: -----------------------------------------------------
 -- Do not mess with these!
 
-primCompAux      :: Ord a => a -> a -> Ordering -> Ordering
-primCompAux x y o = case compare x y of EQ -> o; LT -> LT; GT -> GT
+hugsprimCompAux      :: Ord a => a -> a -> Ordering -> Ordering
+hugsprimCompAux x y o = case compare x y of EQ -> o; LT -> LT; GT -> GT
 
 hugsprimEqChar       :: Char -> Char -> Bool
 hugsprimEqChar c1 c2  = primEqChar c1 c2

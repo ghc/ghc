@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.27 $
- * $Date: 2000/02/04 13:41:00 $
+ * $Revision: 1.28 $
+ * $Date: 2000/02/08 15:32:30 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -143,7 +143,7 @@ static Void finishGHCModule     Args((Cell));
 static Void startGHCModule      Args((Text, Int, Text));
 
 static Void startGHCDataDecl    Args((Int,List,Cell,List,List));
-static Void finishGHCDataDecl   ( ConId tyc );
+static List finishGHCDataDecl   ( ConId tyc );
 
 static Void startGHCNewType     Args((Int,List,Cell,List,Cell));
 static Void finishGHCNewType    ( ConId tyc );
@@ -177,7 +177,7 @@ static void*      lookupObjName ( char* );
  * ------------------------------------------------------------------------*/
 
 /* getIEntityName :: I_IMPORT..I_VALUE -> ConVarId | NIL */
-ConVarId getIEntityName ( Cell c )
+static ConVarId getIEntityName ( Cell c )
 {
    switch (whatIs(c)) {
       case I_IMPORT:     return NIL;
@@ -203,10 +203,10 @@ ConVarId getIEntityName ( Cell c )
    When a named entity is deleted, filterInterface also deletes the name
    in the export lists.
 */
-Cell filterInterface ( Cell root, 
-                       Bool (*pred)(Cell,Cell), 
-                       Cell extraArgs,
-                       Void (*dumpAction)(Cell) )
+static Cell filterInterface ( Cell root, 
+                              Bool (*pred)(Cell,Cell), 
+                              Cell extraArgs,
+                              Void (*dumpAction)(Cell) )
 {
    List tops;
    Cell iface       = unap(I_INTERFACE,root);
@@ -281,20 +281,33 @@ static List getExportDeclsInIFace ( Cell root )
 }
 
 
+/* Does t start with "$dm" ? */
+static Bool isIfaceDefaultMethodName ( Text t )
+{
+   String s = textToStr(t);
+   return (s && s[0]=='$' && s[1]=='d' && s[2]=='m' && s[3]);
+}
+      
 
 static Bool isExportedIFaceEntity ( Cell ife, List exlist_list )
 {
    /* ife         :: I_IMPORT..I_VALUE                      */
    /* exlist_list :: [[ ConVarId | ((ConId, [ConVarId])) ]] */
-   Text  tnm;
-   List  exlist;
-   List  t;
+   Text   tnm;
+   List   exlist;
+   List   t;
+   String s;
 
    ConVarId ife_id = getIEntityName ( ife );
 
    if (isNull(ife_id)) return TRUE;
 
    tnm = textOf(ife_id);
+
+   /* Don't junk default methods, even tho the export list doesn't
+      mention them.
+   */
+   if (isIfaceDefaultMethodName(tnm)) goto retain;
 
    /* for each export list ... */
    for (; nonNull(exlist_list); exlist_list=tl(exlist_list)) {
@@ -385,7 +398,7 @@ static Cell deleteUnexportedIFaceEntities ( Cell root )
 
 
 /* addTyconsAndClassesFromIFace :: I_INTERFACE -> [QualId] -> [QualId] */
-List addTyconsAndClassesFromIFace ( Cell root, List aktys )
+static List addTyconsAndClassesFromIFace ( Cell root, List aktys )
 {
    Cell iface = unap(I_INTERFACE,root);
    Text mname = textOf(zfst(iface));
@@ -404,7 +417,7 @@ List addTyconsAndClassesFromIFace ( Cell root, List aktys )
 }
 
 
-Void ifentityAllTypesKnown_dumpmsg ( Cell entity )
+static Void ifentityAllTypesKnown_dumpmsg ( Cell entity )
 {
    ConVarId id = getIEntityName ( entity );
    fprintf ( stderr, 
@@ -412,12 +425,13 @@ Void ifentityAllTypesKnown_dumpmsg ( Cell entity )
              isNull(id) ? "(nameless entity?!)" : textToStr(textOf(id)) );
 }
 
+
 /* ifentityAllTypesKnown :: I_IMPORT..I_VALUE -> (([QualId], ConId)) -> Bool */
 /* mod is the current module being processed -- so we can qualify unqual'd
    names.  Strange calling convention for aktys and mod is so we can call this
    from filterInterface.
 */
-Bool ifentityAllTypesKnown ( Cell entity, ZPair aktys_mod )
+static Bool ifentityAllTypesKnown ( Cell entity, ZPair aktys_mod )
 {
    List  t, u;
    List  aktys = zfst ( aktys_mod );
@@ -483,7 +497,7 @@ Bool ifentityAllTypesKnown ( Cell entity, ZPair aktys_mod )
    names.  Strange calling convention for aktys and mod is so we can call this
    from filterInterface.
 */
-Bool ifTypeDoesntRefUnknownTycon ( Cell entity, ZPair aktys_mod )
+static Bool ifTypeDoesntRefUnknownTycon ( Cell entity, ZPair aktys_mod )
 {
    List  t, u;
    List  aktys = zfst ( aktys_mod );
@@ -495,7 +509,8 @@ Bool ifTypeDoesntRefUnknownTycon ( Cell entity, ZPair aktys_mod )
    }
 }
 
-Void ifTypeDoesntRefUnknownTycon_dumpmsg ( Cell entity )
+
+static Void ifTypeDoesntRefUnknownTycon_dumpmsg ( Cell entity )
 {
    ConVarId id = getIEntityName ( entity );
    assert (whatIs(entity)==I_TYPE);
@@ -508,7 +523,7 @@ Void ifTypeDoesntRefUnknownTycon_dumpmsg ( Cell entity )
 
 /* abstractifyExport :: I_EXPORT -> ConId -> I_EXPORT
 */
-List abstractifyExDecl ( Cell root, ConId toabs )
+static List abstractifyExDecl ( Cell root, ConId toabs )
 {
    ZPair exdecl = unap(I_EXPORT,root);
    List  exlist = zsnd(exdecl);
@@ -526,11 +541,120 @@ List abstractifyExDecl ( Cell root, ConId toabs )
 }
 
 
-Void ppModule ( Text modt )
+static Void ppModule ( Text modt )
 {
    fflush(stderr); fflush(stdout);
    fprintf(stderr, "---------------- MODULE %s ----------------\n", 
                    textToStr(modt) );
+}
+
+
+static void* ifFindItblFor ( Name n )
+{
+   /* n is a constructor for which we want to find the GHC info table.
+      First look for a _con_info symbol.  If that doesn't exist, _and_
+      this is a nullary constructor, then it's safe to look for the
+      _static_info symbol instead.
+   */
+   void* p;
+   char  buf[1000];
+   Text  t;
+
+   sprintf ( buf, "%s_%s_con_info", 
+                  textToStr( module(name(n).mod).text ),
+                  textToStr( name(n).text ) );
+   t = enZcodeThenFindText(buf);
+   p = lookupOTabName ( name(n).mod, textToStr(t) );
+
+if (p) fprintf(stderr, "FOUND `%s'\n",textToStr(t));
+   if (p) return p;
+
+   if (name(n).arity == 0) {
+      sprintf ( buf, "%s_%s_static_info", 
+                     textToStr( module(name(n).mod).text ),
+                     textToStr( name(n).text ) );
+      t = enZcodeThenFindText(buf);
+      p = lookupOTabName ( name(n).mod, textToStr(t) );
+if (p) fprintf(stderr, "FOUND `%s'\n",textToStr(t));
+      if (p) return p;
+   }
+
+   ERRMSG(0) "Can't find info table %s", textToStr(t)
+   EEND;
+}
+
+
+void ifLinkConstrItbl ( Name n )
+{
+   /* name(n) is either a constructor or a field name.  
+      If the latter, ignore it.  Otherwise, find its info table
+      in the object code.
+   */
+   if (!islower(textToStr(name(n).text)[0]))
+      name(n).itbl = ifFindItblFor(n);
+}
+
+
+static void ifSetClassDefaultsAndDCon ( Class c )
+{
+   char   buf[100];
+   char   buf2[1000];
+   String s;
+   Name   n;
+   Text   t;
+   void*  p;
+   List   defs;   /* :: [Name] */
+   List   mems;   /* :: [Name] */
+   Module m;
+   assert(isNull(cclass(c).defaults));
+
+   /* Create the defaults list by more-or-less cloning the members list. */   
+   defs = NIL;
+   for (mems=cclass(c).members; nonNull(mems); mems=tl(mems)) {
+      strcpy(buf, "$dm");
+      s = textToStr( name(hd(mems)).text );
+      assert(strlen(s) < 95);
+      strcat(buf, s);
+      n = findNameInAnyModule(findText(buf));
+      assert (nonNull(n));
+      defs = cons(n,defs);
+   }
+   defs = rev(defs);
+   cclass(c).defaults = defs;
+
+   /* Create a name table entry for the dictionary datacon.
+      Interface files don't mention them, so it had better not
+      already be present.
+   */
+   strcpy(buf, ":D");
+   s = textToStr( cclass(c).text );
+   assert( strlen(s) < 96 );
+   strcat(buf, s);
+   t = findText(buf);
+   n = findNameInAnyModule(t);
+   assert(isNull(n));
+
+   m = cclass(c).mod;
+   n = newName(t,NIL);
+   name(n).mod    = m;
+   name(n).arity  = cclass(c).numSupers + cclass(c).numMembers;
+   name(n).number = cfunNo(0);
+   cclass(c).dcon = n;
+
+   /* And finally ... set name(n).itbl to Mod_:DClass_con_info.
+      Because this happens right at the end of loading, we know
+      that we should actually be able to find the symbol in this
+      module's object symbol table.  Except that if the dictionary
+      has arity 1, we don't bother, since it will be represented as
+      a newtype and not as a data, so its itbl can remain NULL.
+   */ 
+   if (name(n).arity == 1) {
+      name(n).itbl = NULL;
+      name(n).defn = nameId;
+   } else {
+      p = ifFindItblFor ( n );
+      name(n).itbl = p;
+   }
 }
 
 
@@ -554,7 +678,8 @@ Bool processInterfaces ( void )
     List    all_known_types;
     Int     num_known_types;
     Bool    didPrelude;
-    List    cls_list;
+    List    cls_list;         /* :: List Class */
+    List    constructor_list; /* :: List Name */
 
     List ifaces       = NIL;  /* :: List I_INTERFACE */
     List iface_sizes  = NIL;  /* :: List Int         */
@@ -845,8 +970,9 @@ fprintf(stderr, "abstractify newtype %s\n", textToStr(textOf(getIEntityName(ent)
        calling the finishGHC* functions.  But don't process
        the export lists; those must wait for later.
     */
-    didPrelude = FALSE;
-    cls_list   = NIL;
+    didPrelude       = FALSE;
+    cls_list         = NIL;
+    constructor_list = NIL;
     for (xs = ifaces; nonNull(xs); xs = tl(xs)) {
        iface   = unap(I_INTERFACE,hd(xs));
        mname   = textOf(zfst(iface));
@@ -880,8 +1006,9 @@ fprintf(stderr, "abstractify newtype %s\n", textToStr(textOf(getIEntityName(ent)
                 break;
              }
              case I_DATA: {
-                Cell ddecl = unap(I_DATA,decl);
-                finishGHCDataDecl ( zsel35(ddecl) );
+                Cell ddecl   = unap(I_DATA,decl);
+                List constrs = finishGHCDataDecl ( zsel35(ddecl) );
+                constructor_list = appendOnto ( constrs, constructor_list );
                 break;
              }
              case I_NEWTYPE: {
@@ -917,6 +1044,8 @@ fprintf(stderr, "abstractify newtype %s\n", textToStr(textOf(getIEntityName(ent)
        finishGHCModule(hd(xs));
 
     mapProc(visitClass,cls_list);
+    mapProc(ifSetClassDefaultsAndDCon,cls_list);
+    mapProc(ifLinkConstrItbl,constructor_list);
 
     /* Finished! */
     ifaces_outstanding = NIL;
@@ -929,18 +1058,18 @@ fprintf(stderr, "abstractify newtype %s\n", textToStr(textOf(getIEntityName(ent)
  * Modules
  * ------------------------------------------------------------------------*/
 
-void startGHCModule_errMsg ( char* msg )
+static void startGHCModule_errMsg ( char* msg )
 {
    fprintf ( stderr, "object error: %s\n", msg );
 }
 
-void* startGHCModule_clientLookup ( char* sym )
+static void* startGHCModule_clientLookup ( char* sym )
 {
    /* fprintf ( stderr, "CLIENTLOOKUP %s\n", sym ); */
    return lookupObjName ( sym );
 }
 
-ObjectCode* startGHCModule_partial_load ( String objNm, Int objSz )
+static ObjectCode* startGHCModule_partial_load ( String objNm, Int objSz )
 {
    ObjectCode* oc
       = ocNew ( startGHCModule_errMsg,
@@ -966,7 +1095,7 @@ ObjectCode* startGHCModule_partial_load ( String objNm, Int objSz )
     return oc;
 }
 
-Void startGHCModule ( Text mname, Int sizeObj, Text nameObj )
+static Void startGHCModule ( Text mname, Int sizeObj, Text nameObj )
 {
    List   xts;
    Module m = findModule(mname);
@@ -1032,7 +1161,7 @@ Void startGHCModule ( Text mname, Int sizeObj, Text nameObj )
 */
 
 
-Void finishGHCModule ( Cell root ) 
+static Void finishGHCModule ( Cell root ) 
 {
    /* root :: I_INTERFACE */
    Cell        iface       = unap(I_INTERFACE,root);
@@ -1199,7 +1328,7 @@ Void finishGHCModule ( Cell root )
  * Exports
  * ------------------------------------------------------------------------*/
 
-Void startGHCExports ( ConId mn, List exlist )
+static Void startGHCExports ( ConId mn, List exlist )
 {
 #   ifdef DEBUG_IFACE
     printf("startGHCExports %s\n", textToStr(textOf(mn)) );
@@ -1207,7 +1336,7 @@ Void startGHCExports ( ConId mn, List exlist )
    /* Nothing to do. */
 }
 
-Void finishGHCExports ( ConId mn, List exlist )
+static Void finishGHCExports ( ConId mn, List exlist )
 {
 #   ifdef DEBUG_IFACE
     printf("finishGHCExports %s\n", textToStr(textOf(mn)) );
@@ -1220,7 +1349,7 @@ Void finishGHCExports ( ConId mn, List exlist )
  * Imports
  * ------------------------------------------------------------------------*/
 
-Void startGHCImports ( ConId mn, List syms )
+static Void startGHCImports ( ConId mn, List syms )
 /* nm     the module to import from */
 /* syms   [ConId | VarId] -- the names to import */
 {
@@ -1231,7 +1360,7 @@ Void startGHCImports ( ConId mn, List syms )
 }
 
 
-Void finishGHCImports ( ConId nm, List syms )
+static Void finishGHCImports ( ConId nm, List syms )
 /* nm     the module to import from */
 /* syms   [ConId | VarId] -- the names to import */
 {
@@ -1292,7 +1421,7 @@ static Type dictapsToQualtype ( Type ty )
 
 
 
-void startGHCValue ( Int line, VarId vid, Type ty )
+static void startGHCValue ( Int line, VarId vid, Type ty )
 {
     Name   n;
     List   tmp, tvs;
@@ -1302,12 +1431,13 @@ void startGHCValue ( Int line, VarId vid, Type ty )
     printf("begin startGHCValue %s\n", textToStr(v));
 #   endif
 
+    line = intOf(line);
     n = findName(v);
-    if (nonNull(n)) {
-        ERRMSG(0) "Attempt to redefine variable \"%s\"", textToStr(v)
+    if (nonNull(n) && name(n).defn != PREDEFINED) {
+        ERRMSG(line) "Attempt to redefine variable \"%s\"", textToStr(v)
         EEND;
     }
-    n = newName(v,NIL);
+    if (isNull(n)) n = newName(v,NIL);
 
     ty = dictapsToQualtype(ty);
 
@@ -1321,10 +1451,11 @@ void startGHCValue ( Int line, VarId vid, Type ty )
     name(n).type  = ty;
     name(n).arity = arityInclDictParams(ty);
     name(n).line  = line;
+    name(n).defn  = NIL;
 }
 
 
-void finishGHCValue ( VarId vid )
+static void finishGHCValue ( VarId vid )
 {
     Name n    = findName ( textOf(vid) );
     Int  line = name(n).line;
@@ -1333,6 +1464,24 @@ void finishGHCValue ( VarId vid )
 #   endif
     assert(currentModule == name(n).mod);
     name(n).type = conidcellsToTycons(line,name(n).type);
+
+    if (isIfaceDefaultMethodName(name(n).text)) {
+       /* ... we need to set .parent to point to the class 
+          ... once we figure out what the class actually is :-)
+       */
+       Type t = name(n).type;
+       assert(isPolyType(t));
+       if (isPolyType(t)) t = monotypeOf(t);
+       assert(isQualType(t));
+       t = fst(snd(t));       /* t :: [(Class,Offset)] */
+       assert(nonNull(t));
+       assert(nonNull(hd(t)));
+       assert(isPair(hd(t)));
+       t = fst(hd(t));        /* t :: Class */
+       assert(isClass(t));
+       
+       name(n).parent = t;    /* phew! */
+    }
 }
 
 
@@ -1340,7 +1489,7 @@ void finishGHCValue ( VarId vid )
  * Type synonyms
  * ------------------------------------------------------------------------*/
 
-Void startGHCSynonym ( Int line, ConId tycon, List tvs, Type ty )
+static Void startGHCSynonym ( Int line, ConId tycon, List tvs, Type ty )
 {
     /* tycon :: ConId             */
     /* tvs   ::  [((VarId,Kind))] */
@@ -1349,6 +1498,7 @@ Void startGHCSynonym ( Int line, ConId tycon, List tvs, Type ty )
 #   ifdef DEBUG_IFACE
     fprintf(stderr, "begin startGHCSynonym %s\n", textToStr(t) );
 #   endif
+    line = intOf(line);
     if (nonNull(findTycon(t))) {
         ERRMSG(line) "Repeated definition of type constructor \"%s\"",
                      textToStr(t)
@@ -1390,7 +1540,7 @@ static Void  finishGHCSynonym ( ConId tyc )
  * Data declarations
  * ------------------------------------------------------------------------*/
 
-Void startGHCDataDecl(line,ctx0,tycon,ktyvars,constrs0)
+static Void startGHCDataDecl(line,ctx0,tycon,ktyvars,constrs0)
 Int   line;
 List  ctx0;      /* [((QConId,VarId))]                */
 Cell  tycon;     /* ConId                             */
@@ -1416,6 +1566,7 @@ List  constrs0;  /* [((ConId,[((Type,VarId,Int))]))]  */
     fprintf(stderr, "begin startGHCDataDecl %s\n",textToStr(t));
 #   endif
 
+    line = intOf(line);
     if (nonNull(findTycon(t))) {
         ERRMSG(line) "Repeated definition of type constructor \"%s\"",
                      textToStr(t)
@@ -1575,7 +1726,7 @@ static Name startGHCConstr ( Int line, Int conNo, ZTriple constr )
 }
 
 
-static Void finishGHCDataDecl ( ConId tyc )
+static List finishGHCDataDecl ( ConId tyc )
 {
     List  nms;
     Tycon tc = findTycon(textOf(tyc));
@@ -1588,8 +1739,11 @@ static Void finishGHCDataDecl ( ConId tyc )
        Name n    = hd(nms);
        Int  line = name(n).line;
        assert(currentModule == name(n).mod);
-       name(n).type = conidcellsToTycons(line,name(n).type);
+       name(n).type   = conidcellsToTycons(line,name(n).type);
+       name(n).parent = tc; //---????
     }
+
+    return tycon(tc).defn;
 }
 
 
@@ -1597,8 +1751,8 @@ static Void finishGHCDataDecl ( ConId tyc )
  * Newtype decls
  * ------------------------------------------------------------------------*/
 
-Void startGHCNewType ( Int line, List ctx0, 
-                       ConId tycon, List tvs, Cell constr )
+static Void startGHCNewType ( Int line, List ctx0, 
+                              ConId tycon, List tvs, Cell constr )
 {
     /* ctx0   :: [((QConId,VarId))]                */
     /* tycon  :: ConId                             */
@@ -1610,6 +1764,9 @@ Void startGHCNewType ( Int line, List ctx0,
 #   ifdef DEBUG_IFACE
     fprintf(stderr, "begin startGHCNewType %s\n", textToStr(t) );
 #   endif
+
+    line = intOf(line);
+
     if (nonNull(findTycon(t))) {
         ERRMSG(line) "Repeated definition of type constructor \"%s\"",
                      textToStr(t)
@@ -1684,7 +1841,7 @@ static Void finishGHCNewType ( ConId tyc )
  * Class declarations
  * ------------------------------------------------------------------------*/
 
-Void startGHCClass(line,ctxt,tc_name,kinded_tvs,mems0)
+static Void startGHCClass(line,ctxt,tc_name,kinded_tvs,mems0)
 Int   line;
 List  ctxt;       /* [((QConId, VarId))]   */ 
 ConId tc_name;    /* ConId                 */
@@ -1704,6 +1861,7 @@ List  mems0; {    /* [((VarId, Type))]     */
     printf ( "begin startGHCClass %s\n", textToStr(ct) );
 #   endif
 
+    line = intOf(line);
     if (length(kinded_tvs) != 1) {
         ERRMSG(line) "Cannot presently handle multiparam type classes in ifaces"
         EEND;
@@ -1723,9 +1881,11 @@ List  mems0; {    /* [((VarId, Type))]     */
         cclass(nw).line       = line;
         cclass(nw).arity      = 1;
         cclass(nw).head       = ap(nw,mkOffset(0));
-        cclass(nw).kinds      = singleton(STAR); /* absolutely no idea at all */
-        cclass(nw).instances  = NIL;             /* what the kind should be   */
+        cclass(nw).kinds      = singleton( zsnd(kinded_tv) );
+        cclass(nw).instances  = NIL;
         cclass(nw).numSupers  = length(ctxt);
+
+
 
         /* Kludge to map the single tyvar in the context to Offset 0.
            Need to do something better for multiparam type classes.
@@ -1814,7 +1974,7 @@ static Class finishGHCClass ( Tycon cls_tyc )
     ctr  = - length(cclass(nw).members);
     assert (currentModule == cclass(nw).mod);
 
-    cclass(nw).level   = 0;  /* (ADR) ToDo: 1 + max (map level supers) */
+    cclass(nw).level   = 0;
     cclass(nw).head    = conidcellsToTycons(line,cclass(nw).head);
     cclass(nw).supers  = conidcellsToTycons(line,cclass(nw).supers);
     cclass(nw).members = conidcellsToTycons(line,cclass(nw).members);
@@ -1825,10 +1985,13 @@ static Class finishGHCClass ( Tycon cls_tyc )
        Type ty  = snd(mem);
        Name n   = findName(txt);
        assert(nonNull(n));
+       name(n).text   = txt;
+fprintf(stderr, "TEXT IS `%s'\n", textToStr(name(n).text));
        name(n).line   = cclass(nw).line;
        name(n).type   = ty;
        name(n).number = ctr++;
        name(n).arity  = arityInclDictParams(name(n).type);
+       name(n).parent = nw;
        hd(mems) = n;
     }
 
@@ -1840,7 +2003,7 @@ static Class finishGHCClass ( Tycon cls_tyc )
  * Instances
  * ------------------------------------------------------------------------*/
 
-Inst startGHCInstance (line,ktyvars,cls,var)
+static Inst startGHCInstance (line,ktyvars,cls,var)
 Int   line;
 List  ktyvars; /* [((VarId,Kind))] */
 Type  cls;     /* Type  */
@@ -1854,6 +2017,8 @@ VarId var; {   /* VarId */
 #   ifdef DEBUG_IFACE
     printf ( "begin startGHCInstance\n" );
 #   endif
+
+    line = intOf(line);
 
     tvs = ifTyvarsIn(cls);  /* :: [VarId] */
     /* tvs :: [VarId].
@@ -1898,9 +2063,11 @@ VarId var; {   /* VarId */
 
     {
         Name b         = newName( /*inventText()*/ textOf(var),NIL);
+fprintf(stderr, "DICTIONARY NAME `%s'\n", textToStr(textOf(var)) );
         name(b).line   = line;
         name(b).arity  = length(spec); /* unused? */ /* and surely wrong */
         name(b).number = DFUNNAME;
+        name(b).parent = in;
         inst(in).builder = b;
         /* bindNameToClosure(b, lookupGHCClosure(inst(in).mod,var)); */
     }
@@ -2407,7 +2574,7 @@ OSym rtsTab[]
 #undef Sym
 #undef SymX
 
-void* lookupObjName ( char* nm )
+static void* lookupObjName ( char* nm )
 {
    int    k;
    char*  pp;

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.37 $
- * $Date: 2000/02/03 13:55:21 $
+ * $Revision: 1.38 $
+ * $Date: 2000/02/08 15:32:29 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -39,6 +39,8 @@ Bool showInstRes = FALSE;
 #if MULTI_INST
 Bool multiInstRes = FALSE;
 #endif
+
+#define N_PRELUDE_SCRIPTS (combined ? 30 : 1)
 
 /* --------------------------------------------------------------------------
  * Local function prototypes:
@@ -847,7 +849,7 @@ String s; {
     currProject = s;
     projInput(currProject);
     scriptFile = currProject;
-    forgetScriptsFrom(1);
+    forgetScriptsFrom(N_PRELUDE_SCRIPTS);
     while ((s=readFilename())!=0)
         addStackEntry(s);
     if (namesUpto<=1) {
@@ -1124,7 +1126,7 @@ static Void local load() {           /* read filenames from command line   */
                                      /* to be read                         */
     while ((s=readFilename())!=0)
         addStackEntry(s);
-    readScripts(1);
+    readScripts(N_PRELUDE_SCRIPTS);
 }
 
 static Void local project() {          /* read list of script names from   */
@@ -1145,7 +1147,7 @@ static Void local project() {          /* read list of script names from   */
         EEND;
     }
     loadProject(s);
-    readScripts(1);
+    readScripts(N_PRELUDE_SCRIPTS);
 }
 
 static Void local readScripts(n)        /* Reread current list of scripts, */
@@ -1330,11 +1332,11 @@ ToDo: Fix!
         startNewScript(0);
         if (nonNull(c=findTycon(t=findText(nm)))) {
             if (startEdit(tycon(c).line,scriptName[scriptThisTycon(c)])) {
-                readScripts(1);
+                readScripts(N_PRELUDE_SCRIPTS);
             }
         } else if (nonNull(c=findName(t))) {
             if (startEdit(name(c).line,scriptName[scriptThisName(c)])) {
-                readScripts(1);
+                readScripts(N_PRELUDE_SCRIPTS);
             }
         } else {
             ERRMSG(0) "No current definition for name \"%s\"", nm
@@ -1346,7 +1348,7 @@ ToDo: Fix!
 
 static Void local runEditor() {         /* run editor on script lastEdit   */
     if (startEdit(lastEdLine,lastEdit)) /* at line lastEdLine              */
-        readScripts(1);
+        readScripts(N_PRELUDE_SCRIPTS);
 }
 
 static Void local setLastEdit(fname,line)/* keep name of last file to edit */
@@ -1624,6 +1626,48 @@ Cell   c; {
 
 extern Name nameHw;
 
+static Void dumpStg ( void )
+{
+   String s;
+   Int i;
+   setCurrModule(findEvalModule());
+   startNewScript(0);
+   s = readFilename();
+
+   /* request to locate a symbol by name */
+   if (s && (*s == '?')) {
+      Text t = findText(s+1);
+      locateSymbolByName(t);
+      return;
+   }
+
+   /* request to dump a bit of the heap */
+   if (s && (*s == '-' || isdigit(*s))) {
+      int i = atoi(s);
+      print(i,100);
+      printf("\n");
+      return;
+   }
+
+   /* request to dump a symbol table entry */
+   if (!s 
+       || !(*s == 't' || *s == 'n' || *s == 'c' || *s == 'i')
+       || !isdigit(s[1])) {
+      fprintf(stderr, ":d -- bad request `%s'\n", s );
+      return;
+   }
+   i = atoi(s+1);
+   switch (*s) {
+      case 't': dumpTycon(i); break;
+      case 'n': dumpName(i); break;
+      case 'c': dumpClass(i); break;
+      case 'i': dumpInst(i); break;
+      default: fprintf(stderr, ":d -- `%c' not implemented\n", *s );
+   }
+}
+
+
+#if 0
 static Void local dumpStg( void ) {       /* print STG stuff                 */
     String s;
     Text   t;
@@ -1671,6 +1715,7 @@ static Void local dumpStg( void ) {       /* print STG stuff                 */
         }
     }
 }
+#endif
 
 static Void local info() {              /* describe objects                */
     Int    count = 0;                   /* or give menu of commands        */
@@ -1992,14 +2037,14 @@ String argv[]; {
             case FIND   : find();
                           break;
             case LOAD   : clearProject();
-                          forgetScriptsFrom(1);
+                          forgetScriptsFrom(N_PRELUDE_SCRIPTS);
                           load();
                           break;
             case ALSO   : clearProject();
                           forgetScriptsFrom(numScripts);
                           load();
                           break;
-            case RELOAD : readScripts(1);
+            case RELOAD : readScripts(N_PRELUDE_SCRIPTS);
                           break;
             case PROJECT: project();
                           break;

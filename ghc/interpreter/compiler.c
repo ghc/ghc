@@ -11,8 +11,8 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.17 $
- * $Date: 2000/01/13 10:47:05 $
+ * $Revision: 1.18 $
+ * $Date: 2000/02/08 15:32:29 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -208,6 +208,9 @@ Triple tr; {                           /* triple of expressions.           */
 
 static Void local transAlt(e)          /* Translate alt:                   */
 Cell e; {                              /* ([Pat], Rhs) ==> ([Pat], Rhs')   */
+#if 0
+    printf ( "transAlt:  " );print(snd(e),100);printf("\n");
+#endif
     snd(e) = transRhs(snd(e));
 }
 
@@ -1620,6 +1623,9 @@ static Void local compileGenFunction(n) /* Produce code for internally     */
 Name n; {                               /* generated function              */
     List defs  = name(n).defn;
     Int  arity = length(fst(hd(defs)));
+#if 0
+    printf ( "compGenFn: " );print(defs,100);printf("\n");
+#endif
     compiler(RESET);
     currentName = n;
     mapProc(transAlt,defs);
