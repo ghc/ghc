@@ -82,6 +82,14 @@ sparc-sun-sunos4*)
 	TargetPlatform=sparc-sun-sunos4;;
 sparc-sun-solaris2*)
 	TargetPlatform=sparc-sun-solaris2;;
+x86_64-*-linux*)
+        TargetPlatform=x86_64-unknown-linux;;
+x86_64-*-freebsd*)
+	TargetPlatform=x86_64-unknown-freebsd;;
+x86_64-*-openbsd*)
+	TargetPlatform=x86_64-unknown-openbsd;;
+x86_64-*-netbsd*)
+	TargetPlatform=x86_64-unknown-netbsd;;
 *)
         echo "Unrecognised platform: $TargetPlatform"
         exit 1
