@@ -522,10 +522,10 @@ cmLoadModules cmstate1 dflags mg2unsorted
 
 	-- Find out if we have a Main module
         let a_root_is_Main 
-               = any ((=="Main").moduleNameUserString.name_of_summary) 
+               = any ((=="Main").moduleNameUserString.modSummaryName) 
                      mg2unsorted
 
-        let mg2unsorted_names = map name_of_summary mg2unsorted
+        let mg2unsorted_names = map modSummaryName mg2unsorted
 
         -- reachable_from follows source as well as normal imports
         let reachable_from :: ModuleName -> [ModuleName]
@@ -541,9 +541,15 @@ cmLoadModules cmstate1 dflags mg2unsorted
 
 	-- Sort out which linkables we wish to keep in the unlinked image.
 	-- See getValidLinkables below for details.
-	valid_linkables <- getValidLinkables ui1 mg2unsorted_names 
-				mg2_with_srcimps
-	-- when (verb >= 2) $
+	(valid_old_linkables, new_linkables)
+	    <- getValidLinkables ui1 mg2unsorted_names mg2_with_srcimps
+
+	-- putStrLn (showSDoc (vcat [ppr valid_old_linkables, ppr new_linkables]))
+
+		-- uniq of ModuleName is the same as Module, fortunately...
+	let hit2 = delListFromUFM hit1 (map linkableModName new_linkables)
+
+	-- When (verb >= 2) $
         --    putStrLn (showSDoc (text "Valid linkables:" 
         -- 			 <+> ppr valid_linkables))
 
@@ -555,9 +561,9 @@ cmLoadModules cmstate1 dflags mg2unsorted
         -- Travel upwards, over the sccified graph.  For each scc
         -- of modules ms, add ms to S only if:
         -- 1.  All home imports of ms are either in ms or S
-        -- 2.  A valid linkable exists for each module in ms
+        -- 2.  A valid old linkable exists for each module in ms
 
-        stable_mods <- preUpsweep valid_linkables hit1 
+        stable_mods <- preUpsweep valid_old_linkables
 		 		  mg2unsorted_names [] mg2_with_srcimps
 
         let stable_summaries
@@ -565,15 +571,18 @@ cmLoadModules cmstate1 dflags mg2unsorted
 
 	    stable_linkables
 	       = filter (\m -> linkableModName m `elem` stable_mods) 
-		    valid_linkables
+		    valid_old_linkables
 
         when (verb >= 2) $
            putStrLn (showSDoc (text "Stable modules:" 
                                <+> sep (map (text.moduleNameUserString) stable_mods)))
 
-	-- unload any modules which aren't going to be re-linked this
+	-- unload any modules which are going to be re-linked this
 	-- time around.
 	pls2 <- CmLink.unload ghci_mode dflags stable_linkables pls1
+
+	-- we can now glom together our linkable sets
+	let valid_linkables = valid_old_linkables ++ new_linkables
 
         -- We could at this point detect cycles which aren't broken by
         -- a source-import, and complain immediately, but it seems better
@@ -581,7 +590,7 @@ cmLoadModules cmstate1 dflags mg2unsorted
         -- done before the upsweep is abandoned.
         let upsweep_these
                = filter (\scc -> any (`notElem` stable_mods) 
-                                     (map name_of_summary (flattenSCC scc)))
+                                     (map modSummaryName (flattenSCC scc)))
                         mg2
 
         --hPutStrLn stderr "after tsort:\n"
@@ -595,7 +604,7 @@ cmLoadModules cmstate1 dflags mg2unsorted
         -- Now do the upsweep, calling compile for each module in
         -- turn.  Final result is version 3 of everything.
 
-        let threaded2 = CmThreaded pcs1 hst1 hit1
+        let threaded2 = CmThreaded pcs1 hst1 hit2
 
 	-- clean up between compilations
 	let cleanup = cleanTempFilesExcept verb 
@@ -654,16 +663,16 @@ cmLoadModules cmstate1 dflags mg2unsorted
 		hPutStrLn stderr "Upsweep partially successful."
 
               let modsDone_names
-                     = map name_of_summary modsDone
+                     = map modSummaryName modsDone
               let mods_to_zap_names 
                      = findPartiallyCompletedCycles modsDone_names 
 			  mg2_with_srcimps
               let mods_to_keep
-                     = filter ((`notElem` mods_to_zap_names).name_of_summary) 
+                     = filter ((`notElem` mods_to_zap_names).modSummaryName) 
 			  modsDone
 
               let (hst4, hit4, ui4)
-                     = retainInTopLevelEnvs (map name_of_summary mods_to_keep) 
+                     = retainInTopLevelEnvs (map modSummaryName mods_to_keep) 
                                             (hst3,hit3,ui3)
 
 	      -- clean up after ourselves
@@ -691,7 +700,7 @@ cmLoadFinish ok (LinkOK pls) hst hit ui mods ghci_mode pcs
   = do let new_cmstate = CmState{ hst=hst, hit=hit, ui=ui, mg=mods,
                                   gmode=ghci_mode, pcs=pcs, pls=pls,
 				  ic = emptyInteractiveContext }
-           mods_loaded = map (moduleNameUserString.name_of_summary) mods
+           mods_loaded = map (moduleNameUserString.modSummaryName) mods
 
        return (new_cmstate, ok, mods_loaded)
 
@@ -709,7 +718,7 @@ ppFilesFromSummaries summaries
 
 
 -----------------------------------------------------------------------------
--- getValidLinkables
+-- getValidLin
 
 -- For each module (or SCC of modules), we take:
 --
@@ -732,93 +741,112 @@ getValidLinkables
 	:: [Linkable]		-- old linkables
 	-> [ModuleName]		-- all home modules
 	-> [SCC ModSummary]	-- all modules in the program, dependency order
-	-> IO [Linkable]	-- still-valid linkables 
+	-> IO ( [Linkable],	-- still-valid linkables 
+		[Linkable] 	-- new linkables we just found
+	      )
 
-getValidLinkables old_linkables all_home_mods module_graph
-  = foldM (getValidLinkablesSCC old_linkables all_home_mods) [] module_graph
+getValidLinkables old_linkables all_home_mods module_graph = do
+  ls <- foldM (getValidLinkablesSCC old_linkables all_home_mods) 
+		[] module_graph
+  return (partition_it ls [] [])
+ where
+  partition_it []         valid new = (valid,new)
+  partition_it ((l,b):ls) valid new 
+	| b         = partition_it ls valid (l:new)
+	| otherwise = partition_it ls (l:valid) new
+
 
 getValidLinkablesSCC old_linkables all_home_mods new_linkables scc0
    = let 
 	  scc             = flattenSCC scc0
-          scc_names       = map name_of_summary scc
+          scc_names       = map modSummaryName scc
 	  home_module m   = m `elem` all_home_mods && m `notElem` scc_names
           scc_allhomeimps = nub (filter home_module (concatMap ms_imps scc))
-		-- NOTE: ms_imps, not ms_allimps above.  We don't want to
+		-- NB. ms_imps, not ms_allimps above.  We don't want to
 		-- force a module's SOURCE imports to be already compiled for
 		-- its object linkable to be valid.
 
-	  has_object m = case findModuleLinkable_maybe new_linkables m of
-			    Nothing -> False
-			    Just l  -> isObjectLinkable l
+	  has_object m = 
+		case findModuleLinkable_maybe (map fst new_linkables) m of
+		    Nothing -> False
+		    Just l  -> isObjectLinkable l
 
           objects_allowed = all has_object scc_allhomeimps
      in do
 
-     these_linkables 
+     new_linkables'
 	<- foldM (getValidLinkable old_linkables objects_allowed) [] scc
 
 	-- since an scc can contain only all objects or no objects at all,
 	-- we have to check whether we got all objects or not, and re-do
 	-- the linkable check if not.
-     adjusted_linkables 
-	<- if objects_allowed && not (all isObjectLinkable these_linkables)
-	      then foldM (getValidLinkable old_linkables False) [] scc
-	      else return these_linkables
+     new_linkables' <- 
+        if objects_allowed
+	     && not (all isObjectLinkable (map fst new_linkables'))
+	  then foldM (getValidLinkable old_linkables False) [] scc
+	  else return new_linkables'
 
-     return (adjusted_linkables ++ new_linkables)
+     return (new_linkables ++ new_linkables')
 
 
-getValidLinkable :: [Linkable] -> Bool -> [Linkable] -> ModSummary 
-	-> IO [Linkable]
+getValidLinkable :: [Linkable] -> Bool -> [(Linkable,Bool)] -> ModSummary 
+	-> IO [(Linkable,Bool)]
+	-- True <=> linkable is new
 getValidLinkable old_linkables objects_allowed new_linkables summary 
-  = do let mod_name = name_of_summary summary
+   = do let mod_name = modSummaryName summary
 
-       maybe_disk_linkable
+	maybe_disk_linkable
           <- if (not objects_allowed)
 		then return Nothing
+
 		else case ml_obj_file (ms_location summary) of
                  	Just obj_fn -> maybe_getFileLinkable mod_name obj_fn
-                 	Nothing -> return Nothing
+                 	Nothing     -> return Nothing
 
-       let old_linkable = findModuleLinkable_maybe old_linkables mod_name
-	   maybe_old_linkable =
-	  	case old_linkable of
-		    Just l | not (isObjectLinkable l) || stillThere l 
-				-> old_linkable
-				-- ToDo: emit a warning if not (stillThere l)
-                    other -> Nothing
+	let old_linkable = findModuleLinkable_maybe old_linkables mod_name
 
-	   -- make sure that if we had an old disk linkable around, that it's
-	   -- still there on the disk (in case we need to re-link it).
-	   stillThere l = 
-		case maybe_disk_linkable of
-		   Nothing    -> False
-		   Just l_disk -> linkableTime l == linkableTime l_disk
+	    new_linkables' = 
+	     case (old_linkable, maybe_disk_linkable) of
+		(Nothing, Nothing)			-> []
 
-    	   -- we only look for objects on disk the first time around;
-    	   -- if the user compiles a module on the side during a GHCi session,
-    	   -- it won't be picked up until the next ":load".  This is what the
-    	   -- "null old_linkables" test below is.
-           linkable | null old_linkables = maybeToList maybe_disk_linkable
-		    | otherwise          = maybeToList maybe_old_linkable
+		-- new object linkable just appeared
+		(Nothing, Just l)			-> up_to_date l True
 
-           -- only linkables newer than the source code are valid
-           src_date = ms_hs_date summary
+		(Just l,  Nothing)
+		  | isObjectLinkable l			-> []
+		    -- object linkable disappeared!  In case we need to
+		    -- relink the module, disregard the old linkable and
+		    -- just interpret the module from now on.
+		  | otherwise				-> up_to_date l False
+		    -- old byte code linkable
 
-	   valid_linkable
-	      =  filter (\l -> linkableTime l >= src_date) linkable
-		-- why '>=' rather than '>' above?  If the filesystem stores
+		(Just l, Just l') 
+		  | not (isObjectLinkable l)		-> up_to_date l  False
+		    -- if the previous linkable was interpreted, then we
+		    -- ignore a newly compiled version, because the version
+		    -- numbers in the interface file will be out-of-sync with
+		    -- our internal ones.
+		  | linkableTime l' >  linkableTime l   -> up_to_date l' True
+		  | linkableTime l' == linkableTime l   -> up_to_date l  False
+		  | otherwise			        -> []
+		    -- on-disk linkable has been replaced by an older one!
+		    -- again, disregard the previous one.
+
+	    up_to_date l b
+		| linkableTime l < ms_hs_date summary = []
+		| otherwise = [(l,b)]
+		-- why '<' rather than '<=' above?  If the filesystem stores
 		-- times to the nearset second, we may occasionally find that
 		-- the object & source have the same modification time, 
 		-- especially if the source was automatically generated
 		-- and compiled.  Using >= is slightly unsafe, but it matches
 		-- make's behaviour.
 
-       return (valid_linkable ++ new_linkables)
+	return (new_linkables' ++ new_linkables)
 
 
 maybe_getFileLinkable :: ModuleName -> FilePath -> IO (Maybe Linkable)
-maybe_getFileLinkable mod_name obj_fn
+maybe_getFileLinkable mod obj_fn
    = do obj_exist <- doesFileExist obj_fn
         if not obj_exist 
          then return Nothing 
@@ -828,8 +856,8 @@ maybe_getFileLinkable mod_name obj_fn
             stub_exist <- doesFileExist stub_fn
             obj_time <- getModificationTime obj_fn
             if stub_exist
-             then return (Just (LM obj_time mod_name [DotO obj_fn, DotO stub_fn]))
-             else return (Just (LM obj_time mod_name [DotO obj_fn]))
+             then return (Just (LM obj_time mod [DotO obj_fn, DotO stub_fn]))
+             else return (Just (LM obj_time mod [DotO obj_fn]))
 
 
 -----------------------------------------------------------------------------
@@ -842,14 +870,13 @@ maybe_getFileLinkable mod_name obj_fn
 --	* has an interface in the HIT (interactive mode only)
 
 preUpsweep :: [Linkable]	-- new valid linkables
-	   -> HomeIfaceTable
-           -> [ModuleName]      -- names of all mods encountered in downsweep
-           -> [ModuleName]      -- accumulating stable modules
+           -> [ModuleName]	-- names of all mods encountered in downsweep
+           -> [ModuleName]	-- accumulating stable modules
            -> [SCC ModSummary]  -- scc-ified mod graph, including src imps
            -> IO [ModuleName]	-- stable modules
 
-preUpsweep valid_lis hit all_home_mods stable []  = return stable
-preUpsweep valid_lis hit all_home_mods stable (scc0:sccs)
+preUpsweep valid_lis all_home_mods stable []  = return stable
+preUpsweep valid_lis all_home_mods stable (scc0:sccs)
    = do let scc = flattenSCC scc0
             scc_allhomeimps :: [ModuleName]
             scc_allhomeimps 
@@ -857,7 +884,7 @@ preUpsweep valid_lis hit all_home_mods stable (scc0:sccs)
             all_imports_in_scc_or_stable
                = all in_stable_or_scc scc_allhomeimps
             scc_names
-               = map name_of_summary scc
+		= map modSummaryName scc
             in_stable_or_scc m
                = m `elem` scc_names || m `elem` stable
 
@@ -865,17 +892,14 @@ preUpsweep valid_lis hit all_home_mods stable (scc0:sccs)
 	    -- have a valid linkable (see getValidLinkables above).
 	    has_valid_linkable new_summary
    	      = isJust (findModuleLinkable_maybe valid_lis modname)
-	       where modname = name_of_summary new_summary
-
-	    has_interface summary = ms_mod summary `elemUFM` hit
+	       where modname = modSummaryName new_summary
 
 	    scc_is_stable = all_imports_in_scc_or_stable
 			  && all has_valid_linkable scc
-			  && all has_interface scc
 
         if scc_is_stable
-         then preUpsweep valid_lis hit all_home_mods (scc_names++stable) sccs
-         else preUpsweep valid_lis hit all_home_mods stable sccs
+         then preUpsweep valid_lis all_home_mods (scc_names++stable) sccs
+         else preUpsweep valid_lis all_home_mods stable sccs
 
 
 -- Helper for preUpsweep.  Assuming that new_summary's imports are all
@@ -883,7 +907,7 @@ preUpsweep valid_lis hit all_home_mods stable (scc0:sccs)
 -- stable, and, if so, in batch mode, return its linkable.
 findInSummaries :: [ModSummary] -> ModuleName -> [ModSummary]
 findInSummaries old_summaries mod_name
-   = [s | s <- old_summaries, name_of_summary s == mod_name]
+   = [s | s <- old_summaries, modSummaryName s == mod_name]
 
 findModInSummaries :: [ModSummary] -> Module -> Maybe ModSummary
 findModInSummaries old_summaries mod
@@ -900,7 +924,7 @@ findPartiallyCompletedCycles modsDone theGraph
         chew [] = []
         chew ((AcyclicSCC v):rest) = chew rest    -- acyclic?  not interesting.
         chew ((CyclicSCC vs):rest)
-           = let names_in_this_cycle = nub (map name_of_summary vs)
+           = let names_in_this_cycle = nub (map modSummaryName vs)
                  mods_in_this_cycle  
                     = nub ([done | done <- modsDone, 
                                    done `elem` names_in_this_cycle])
@@ -950,7 +974,7 @@ upsweep_mods ghci_mode dflags oldUI reachable_from threaded cleanup
 upsweep_mods ghci_mode dflags oldUI reachable_from threaded cleanup
      ((CyclicSCC ms):_)
    = do hPutStrLn stderr ("Module imports form a cycle for modules:\n\t" ++
-                          unwords (map (moduleNameUserString.name_of_summary) ms))
+                          unwords (map (moduleNameUserString.modSummaryName) ms))
         return (False, threaded, [], [])
 
 upsweep_mods ghci_mode dflags oldUI reachable_from threaded cleanup
@@ -961,7 +985,7 @@ upsweep_mods ghci_mode dflags oldUI reachable_from threaded cleanup
 
         (threaded1, maybe_linkable) 
            <- upsweep_mod ghci_mode dflags oldUI threaded mod 
-                          (reachable_from (name_of_summary mod))
+                          (reachable_from (modSummaryName mod))
 
 	-- remove unwanted tmp files between compilations
 	cleanup
@@ -989,7 +1013,7 @@ upsweep_mod :: GhciMode
 
 upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_inc_me
    = do 
-        let mod_name = name_of_summary summary1
+        let mod_name = modSummaryName summary1
 
         let (CmThreaded pcs1 hst1 hit1) = threaded1
         let old_iface = lookupUFM hit1 mod_name
@@ -998,7 +1022,7 @@ upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_inc_me
 
             source_unchanged = isJust maybe_old_linkable
 
-	    reachable_only = filter (/= (name_of_summary summary1)) 
+	    reachable_only = filter (/= (modSummaryName summary1)) 
 				reachable_inc_me
 
 	   -- in interactive mode, all home modules below us *must* have an
@@ -1059,10 +1083,10 @@ retainInTopLevelEnvs keep_these (hst, hit, ui)
 downwards_closure_of_module :: [ModSummary] -> ModuleName -> [ModuleName]
 downwards_closure_of_module summaries root
    = let toEdge :: ModSummary -> (ModuleName,[ModuleName])
-         toEdge summ = (name_of_summary summ, 
+         toEdge summ = (modSummaryName summ, 
 			filter (`elem` all_mods) (ms_allimps summ))
 
-	 all_mods = map name_of_summary summaries
+	 all_mods = map modSummaryName summaries
 
          res = simple_transitive_closure (map toEdge summaries) [root]
      in
@@ -1088,7 +1112,7 @@ topological_sort include_source_imports summaries
    = let 
          toEdge :: ModSummary -> (ModSummary,ModuleName,[ModuleName])
          toEdge summ
-             = (summ, name_of_summary summ, 
+             = (summ, modSummaryName summ, 
                       (if include_source_imports 
                        then ms_srcimps summ else []) ++ ms_imps summ)
         

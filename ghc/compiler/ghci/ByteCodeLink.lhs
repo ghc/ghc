@@ -149,8 +149,8 @@ data HValue     = HValue  -- dummy type, actually a pointer to some Real Code.
 -- the command line).
 filterNameMap :: [ModuleName] -> FiniteMap Name a -> FiniteMap Name a
 filterNameMap mods env 
-   = filterFM (\n _ -> isGlobalName n && 
-			moduleName (nameModule n) `elem` mods) env
+   = filterFM (\n _ -> isGlobalName n 
+			&& moduleName (nameModule n) `elem` mods) env
 \end{code}
 
 %************************************************************************

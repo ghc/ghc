@@ -7,7 +7,7 @@
 module CmTypes ( 
    Unlinked(..),  isObject, nameOfObject, isInterpretable,
    Linkable(..), isObjectLinkable, 
-   ModSummary(..), ms_allimps, name_of_summary, pprSummaryTime
+   ModSummary(..), ms_allimps, pprSummaryTime, modSummaryName,
   ) where
 
 import Interpreter
@@ -44,17 +44,17 @@ isInterpretable (BCOs _ _) = True
 isInterpretable _          = False
 
 data Linkable = LM {
-  linkableTime :: ClockTime,
-  linkableModName ::  ModuleName,
-  linkableUnlinked ::  [Unlinked]
+  linkableTime     :: ClockTime,
+  linkableModName  :: ModuleName,	-- should be Module, but see below
+  linkableUnlinked :: [Unlinked]
  }
 
 isObjectLinkable :: Linkable -> Bool
 isObjectLinkable l = all isObject (linkableUnlinked l)
 
 instance Outputable Linkable where
-   ppr (LM when_made mod_nm unlinkeds)
-      = (text "LinkableM" <+> parens (text (show when_made)) <+> ppr mod_nm)
+   ppr (LM when_made mod unlinkeds)
+      = (text "LinkableM" <+> parens (text (show when_made)) <+> ppr mod)
         $$ nest 3 (ppr unlinkeds)
 
 -- The ModuleLocation contains both the original source filename and the
@@ -65,14 +65,12 @@ instance Outputable Linkable where
 -- and let @compile@ read from that file on the way back up.
 data ModSummary
    = ModSummary {
-        ms_mod      :: Module,               -- name, package
-        ms_location :: ModuleLocation,       -- location
-        ms_srcimps  :: [ModuleName],         -- source imports
-        ms_imps     :: [ModuleName],         -- non-source imports
-        ms_hs_date  :: ClockTime      	     -- timestamp of summarised file
+        ms_mod      :: Module,			-- name, package
+        ms_location :: ModuleLocation,		-- location
+        ms_srcimps  :: [ModuleName],		-- source imports
+        ms_imps     :: [ModuleName],		-- non-source imports
+        ms_hs_date  :: ClockTime		-- timestamp of summarised file
      }
-
--- ToDo: shouldn't ms_srcimps and ms_imps be [Module]?  --SDM
 
 instance Outputable ModSummary where
    ppr ms
@@ -90,6 +88,6 @@ pprSummaryTime ms
 ms_allimps ms 
    = ms_srcimps ms ++ ms_imps ms
 
-name_of_summary :: ModSummary -> ModuleName
-name_of_summary = moduleName . ms_mod
+modSummaryName :: ModSummary -> ModuleName
+modSummaryName = moduleName . ms_mod
 \end{code}

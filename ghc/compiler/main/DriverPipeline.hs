@@ -1044,7 +1044,7 @@ compile ghci_mode summary source_unchanged have_object
 
 
    showPass dyn_flags 
-	(showSDoc (text "Compiling" <+> ppr (name_of_summary summary)))
+	(showSDoc (text "Compiling" <+> ppr (modSummaryName summary)))
 
    let verb	  = verbosity dyn_flags
    let location   = ms_location summary
@@ -1149,7 +1149,7 @@ compile ghci_mode summary source_unchanged have_object
                              o_time <- getModificationTime o_file
 			     return ([DotO o_file], o_time)
 
-	   let linkable = LM unlinked_time (moduleName (ms_mod summary)) 
+	   let linkable = LM unlinked_time (modSummaryName summary)
 			     (hs_unlinked ++ stub_unlinked)
 
 	   return (CompOK pcs details iface (Just linkable))
