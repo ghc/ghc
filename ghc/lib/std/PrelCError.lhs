@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCError.lhs,v 1.10 2001/07/13 11:11:34 rrt Exp $
+% $Id: PrelCError.lhs,v 1.11 2001/09/26 10:38:02 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -456,7 +456,7 @@ errnoToIOError loc errno maybeHdl maybeName = unsafePerformIO $ do
         | errno == eNFILE          = ResourceExhausted
         | errno == eNOBUFS         = ResourceExhausted
         | errno == eNODATA         = NoSuchThing
-        | errno == eNODEV          = NoSuchThing
+        | errno == eNODEV          = UnsupportedOperation
         | errno == eNOENT          = NoSuchThing
         | errno == eNOEXEC         = InvalidArgument
         | errno == eNOLCK          = ResourceExhausted
