@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.9 $
- * $Date: 1999/10/11 12:15:13 $
+ * $Revision: 1.10 $
+ * $Date: 1999/10/11 12:22:58 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
