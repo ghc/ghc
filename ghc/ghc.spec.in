@@ -54,6 +54,9 @@ They should be installed when GHC's profiling subsystem is needed.
 
 %changelog
 
+* Thu Jun 22 2000 Sven Panne
+- removed explicit usage of hslibs/docs, it belongs to ghc/docs/set
+
 * Sun Apr 23 2000 Manuel Chakravarty
 - revised for ghc 4.07; added suggestions from Pixel <pixel@mandrakesoft.com>
 - added profiling package
@@ -102,12 +105,11 @@ make -C glafp-utils sgmlverb
 make all
 make -C docs ps html
 make -C ghc/docs ps html
-make -C hslibs/doc ps html
 
 %install
 # compress the non-html docs
 #
-for j in docs ghc/docs hslibs/doc; do
+for j in docs ghc/docs; do
   dir=`pwd`
   cd $j
   for i in ps dvi sgml vsgml verb idx; do
@@ -143,7 +145,6 @@ rm -rf $RPM_BUILD_ROOT
 %files -f rpm-noprof-lib-files
 %doc docs/
 %doc ghc/ANNOUNCE ghc/README ghc/docs/
-%doc hslibs/doc/
 %{prefix}/bin/*
 
 %files prof
