@@ -1,12 +1,12 @@
-# $Id: aclocal.m4,v 1.20 1998/03/03 19:04:48 reid Exp $
-#
-# Extra autoconf macros for the Glasgow fptools
-#
+dnl $Id: aclocal.m4,v 1.21 1998/04/07 21:24:55 sof Exp $
+dnl 
+dnl Extra autoconf macros for the Glasgow fptools
+dnl
 
-#
-# Are we running under the GNU libc?  Need -D_GNU_SOURCE to get 
-# caddr_t and such.
-#
+dnl 
+dnl Are we running under the GNU libc?  Need -D_GNU_SOURCE to get 
+dnl caddr_t and such.
+dnl 
 AC_DEFUN(AC_GNU_LIBC,
 [AC_CACHE_CHECK([GNU libc], ac_cv_gnu_libc,
 [AC_EGREP_CPP(yes,
@@ -20,10 +20,10 @@ if test "$ac_cv_gnu_libc" = yes; then
 fi
 ])
 
-#
-# Has timezone the type time_t or long (HP-UX 10.20 apparently
-# has `long'..)
-#
+dnl
+dnl Has timezone the type time_t or long (HP-UX 10.20 apparently
+dnl has `long'..)
+dnl 
 AC_DEFUN(AC_TYPE_TIMEZONE,
 [AC_CACHE_CHECK([type of timezone], ac_cv_type_timezone,
 [AC_TRY_COMPILE([#if TIME_WITH_SYS_TIME
@@ -43,9 +43,8 @@ extern time_t timezone;
 AC_DEFINE_UNQUOTED(TYPE_TIMEZONE, $ac_cv_type_timezone)
 ])
 
-#
-# Is altzone available?
-#
+dnl *** Is altzone available? ***
+dnl 
 AC_DEFUN(AC_ALTZONE,
 [AC_CACHE_CHECK([altzone], ac_cv_altzone,
 [AC_TRY_LINK([#if TIME_WITH_SYS_TIME
@@ -65,21 +64,21 @@ if test "$ac_cv_altzone" = yes; then
 fi
 ])
 
-#
 dnl ** check for leading underscores in symbol names
-#
-# Test for determining whether symbol names have a leading
-# underscore.
-#
-# We assume that they _haven't_ if anything goes wrong.
-#
+dnl 
+dnl Test for determining whether symbol names have a leading
+dnl underscore.
+dnl 
+dnl We assume that they _haven't_ if anything goes wrong.
+dnl
 AC_DEFUN(AC_UNDERSCORE,
 [AC_CHECK_LIB(elf, nlist, LIBS="-lelf $LIBS")dnl
 AC_CACHE_CHECK([leading underscore in symbol names], ac_cv_lead_uscore,
-#
-# Hack!: nlist() under Digital UNIX insist on there being an _,
-# but symbol table listings show none. What is going on here?!?
-#
+
+dnl
+dnl Hack!: nlist() under Digital UNIX insist on there being an _,
+dnl but symbol table listings show none. What is going on here?!?
+dnl
 changequote(<<, >>)dnl
 <<
 case $HostPlatform in
@@ -110,9 +109,9 @@ LeadingUnderscore=`echo $ac_cv_lead_uscore | sed 'y/yesno/YESNO/'`
 AC_SUBST(LeadingUnderscore)
 ])
 
-#
-# Check for Happy and version.
-#
+dnl
+dnl Check for Happy and version.
+dnl
 AC_DEFUN(AC_HAPPY,
 [AC_PATH_PROG(HappyCmd,happy)
 AC_CACHE_CHECK([for version of happy], ac_cv_happy_version,
@@ -134,11 +133,11 @@ HappyVersion=$ac_cv_happy_version;
 AC_SUBST(HappyVersion)
 ])
 
-#
-# What's the best way of doing context diffs?
-#
-# (NB: NeXTStep thinks diff'ing a file against itself is "trouble")
-#
+dnl
+dnl What's the best way of doing context diffs?
+dnl
+dnl (NB: NeXTStep thinks diff'ing a file against itself is "trouble")
+dnl
 AC_DEFUN(AC_PROG_DIFF,
 [AC_CACHE_CHECK([for ok way to do context diffs], ac_cv_context_diffs,
 [echo foo > conftest1
@@ -160,9 +159,9 @@ ContextDiffCmd=$ac_cv_context_diffs
 AC_SUBST(ContextDiffCmd)
 ])
 
-#
-# Finding the Right Yacc
-#
+dnl
+dnl Finding the Right Yacc
+dnl
 AC_DEFUN(AC_PROG_YACCY,
 [AC_PROG_YACC
 if test "$YACC" = "yacc"; then
@@ -194,10 +193,10 @@ YaccCmd=$ac_cv_prog_yacc
 AC_SUBST(YaccCmd)
 ])
 
-dnl Checking for ar and its arguments + whether we need ranlib.
-#
-# ArCmd and RANLIB are AC_SUBST'ed
-#
+dnl *** Checking for ar and its arguments + whether we need ranlib.
+dnl
+dnl ArCmd and RANLIB are AC_SUBST'ed
+dnl 
 AC_DEFUN(AC_PROG_AR_AND_RANLIB,
 [AC_PATH_PROG(ArCmd,ar)
 if test -z "$ArCmd"; then
@@ -235,9 +234,9 @@ else
 fi
 ])
 
-#
+dnl
 dnl AC_SHEBANG_PERL - can we she-bang perl?
-#
+dnl
 AC_DEFUN(AC_SHEBANG_PERL,
 [AC_CACHE_CHECK([if your perl works in shell scripts], ac_cv_shebang_perl,
 [echo "#!$PerlCmd"'
@@ -253,10 +252,10 @@ fi
 rm -f conftest
 ])])
 
-#
-# Extra testing of the result AC_PROG_CC, testing the gcc version no.
-# *Must* be called after AC_PROG_CC
-#
+dnl
+dnl Extra testing of the result AC_PROG_CC, testing the gcc version no.
+dnl *Must* be called after AC_PROG_CC
+dnl
 AC_DEFUN(AC_HAVE_GCC,
 [AC_CACHE_CHECK([whether you have an ok gcc], ac_cv_have_gcc,
 [if test -z "$GCC"; then
@@ -280,12 +279,12 @@ HaveGcc=`echo $ac_cv_have_gcc | sed 'y/yesno/YESNO/'`
 AC_SUBST(HaveGcc)
 ])
 
-#
-# AC_PROG_GNUCPP gathers the path to the cpp that the
-# gcc driver calls upon.
-#
-# Substitutes: GNUCPP and RAWCPP (latter is 'GNUCPP -traditional')
-#
+dnl
+dnl AC_PROG_GNUCPP gathers the path to the cpp that the
+dnl gcc driver calls upon.
+dnl
+dnl Substitutes: GNUCPP and RAWCPP (latter is 'GNUCPP -traditional')
+dnl
 AC_DEFUN(AC_PROG_GNUCPP,
 [AC_CACHE_CHECK([how to invoke GNU cpp directly], ac_cv_gnu_cpp,
 [if test "$HaveGcc" = "YES"; then
@@ -310,10 +309,9 @@ AC_SUBST(GNUCPP)
 AC_SUBST(RAWCPP)
 ])
 
-#
-# Small feature test for perl version. Assumes PerlCmd
-# contains path to perl binary
-#
+dnl Small feature test for perl version. Assumes PerlCmd
+dnl contains path to perl binary
+dnl
 AC_DEFUN(AC_CHECK_PERL_VERSION,
 [$PerlCmd -v >conftest.out 2>&1
 if grep "version 4" conftest.out >/dev/null 2>&1; then
@@ -341,8 +339,7 @@ fi
 rm -fr conftest*
 ])
 
-dnl ** figure out whether types can be word-aligned
-dnl    (test based on test in smalltalk-1.1.5 configuration)
+dnl ** figure out the alignment restriction of a type
 dnl    (required SIZEOF test but AC_CHECK_SIZEOF doesn't call PROVIDE
 dnl     so we can't call REQUIRE)
 
@@ -359,19 +356,22 @@ changequote([, ])dnl
 AC_MSG_CHECKING(alignment of $1)
 AC_CACHE_VAL(AC_CV_NAME,
 [AC_TRY_RUN([
+#include <stdio.h>
+#if HAVE_STDDEF_H
+#include <stddef.h>
+#endif
+#ifndef offsetof
+#define offsetof(ty,field) ((size_t)((char *)&((ty *)0)->field - (char *)(ty *)0))
+#endif
+int
 main()
 {
-    unsigned int vec[3];
-    $1 test, *testptr;
-
-    test = *($1 *)&vec[1];
-    testptr = ($1 *)&vec[1];
-    *testptr = test;
-
-    exit(0);
-}
-],
-AC_CV_NAME=$ac_cv_sizeof_unsigned_int,
+  FILE *f=fopen("conftestval", "w");
+  if (!f) exit(1);
+  fprintf(f, "%d\n", offsetof(struct { char c; $1 ty;},ty));
+  exit(0);
+}],
+AC_CV_NAME=`cat conftestval`,
 AC_CV_NAME=$AC_CV_SIZEOF_NAME,
 AC_CV_NAME=$AC_CV_SIZEOF_NAME)])
 AC_MSG_RESULT($AC_CV_NAME)
