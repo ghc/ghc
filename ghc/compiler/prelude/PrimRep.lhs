@@ -221,7 +221,7 @@ getPrimRepArrayElemSize Int32Rep      = 4
 getPrimRepArrayElemSize Int64Rep      = 8
 getPrimRepArrayElemSize FloatRep      = 4
 getPrimRepArrayElemSize DoubleRep     = 8
-getPrimRepArrayElemSize other         = pprPanic "getPrimRepSizeArrayElemSize" (ppr other)
+getPrimRepArrayElemSize other         = pprPanic "getPrimRepArrayElemSize" (ppr other)
 
 \end{code}
 
