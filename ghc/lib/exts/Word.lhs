@@ -233,6 +233,7 @@ instance Num Word8 where
       x' = word2Int# x
   abs x         = x
   signum        = signumReal
+  fromInteger (S# i#)    = W8# (wordToWord8# (int2Word# i#))
   fromInteger (J# s# d#) = W8# (wordToWord8# (integer2Word# s# d#))
   fromInt       = intToWord8
 
@@ -413,6 +414,7 @@ instance Num Word16 where
         x' = word2Int# x
   abs x         = x
   signum        = signumReal
+  fromInteger (S# i#)    = W16# (wordToWord16# (int2Word# i#))
   fromInteger (J# s# d#) = W16# (wordToWord16# (integer2Word# s# d#))
   fromInt       = intToWord16
 
@@ -570,7 +572,8 @@ instance Num Word32 where
 #endif
   abs x           = x
   signum          = signumReal
-  fromInteger (J# s# d#) = W32# (integer2Word# s# d#)
+  fromInteger (S# i#)    = W32# (intToWord32# i#)
+  fromInteger (J# s# d#) = W32# (wordToWord32# (integer2Word# s# d#))
   fromInt (I# x)  = W32# (intToWord32# x)
     -- ToDo: restrict fromInt{eger} range.
 
@@ -801,6 +804,7 @@ instance Num Word64 where
       x' = word2Int# x
   abs x         = x
   signum        = signumReal
+  fromInteger (S# i#)    = W64# (int2Word# i#)
   fromInteger (J# s# d#) = W64# (integer2Word# s# d#)
   fromInt       = intToWord64
 
