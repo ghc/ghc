@@ -114,8 +114,11 @@ ppHH2Files odir package ifaces = do
                 text "<File Url=\"index.html\"/>" $$
                 text "<File Url=\"doc-index.html\"/>" $$
                 ppIndexFiles chars $$
-                text "<File Url=\""<>text iconFile<>text "\"/>" $$
-                text "<File Url=\""<>text cssFile<>text "\"/>") $$
+                text "<File Url=\""<>text cssFile  <>text "\"/>") $$
+                text "<File Url=\""<>text iconFile <>text "\"/>" $$
+                text "<File Url=\""<>text jsFile   <>text "\"/>" $$
+                text "<File Url=\""<>text plusFile <>text "\"/>" $$
+                text "<File Url=\""<>text minusFile<>text "\"/>" $$
         text "</HelpFileList>"
   writeFile (odir ++ pathSeparator:filesHH2File) (render doc)
   where
