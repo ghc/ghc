@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.25 2001/10/23 16:31:05 rrt Exp $
+# $Id: Makefile,v 1.26 2001/11/03 00:29:13 sof Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -16,7 +16,7 @@ HS_PROG           = hsc2hs
 endif
 SRC_HC_OPTS      += -package util -cpp
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-SRC_HC_OPTS      += -package win32
+SRC_HC_OPTS      += -package win32 '-\#include <process.h>'
 endif 
 
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
