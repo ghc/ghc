@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.33 2001/03/22 03:51:10 hwloidl Exp $
+ * $Id: Linker.c,v 1.34 2001/03/28 16:40:48 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -180,6 +180,7 @@ typedef struct _RtsSymbolVal {
       SymX(prog_argv)				\
       SymX(prog_argc)				\
       SymX(resetNonBlockingFd)			\
+      SymX(performGC)				\
       SymX(getStablePtr)			\
       SymX(stable_ptr_table)			\
       SymX(shutdownHaskellAndExit)		\
