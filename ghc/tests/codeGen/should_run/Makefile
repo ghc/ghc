@@ -20,5 +20,6 @@ cg042_HC_OPTS = -fglasgow-exts
 cg016_RUNTEST_OPTS = -x 1	# should override the -x 0 above.
 cg021_RUNTEST_OPTS = +RTS -K2m
 cg025_RUNTEST_OPTS = -x 1 cg025.hs
+cg045_RUNTEST_OPTS = -x 1
 
 include $(TOP)/mk/target.mk
