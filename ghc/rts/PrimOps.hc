@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.88 2002/01/25 12:22:27 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.89 2002/01/26 18:04:48 rje Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1019,12 +1019,12 @@ FN_(newMVarzh_fast)
 
 #define PerformTake(tso, value) ({			\
     (tso)->sp[1] = (W_)value;				\
-    (tso)->sp[0] = (W_)&stg_gc_unpt_r1_ret_info;	\
+    (tso)->sp[0] = (W_)&stg_gc_unpt_r1_info;	\
   })
 
 #define PerformPut(tso) ({				\
     StgClosure *val = (StgClosure *)(tso)->sp[2];	\
-    (tso)->sp[2] = (W_)&stg_gc_noregs_ret_info;		\
+    (tso)->sp[2] = (W_)&stg_gc_noregs_info;		\
     (tso)->sp += 2;					\
     val;						\
   })
