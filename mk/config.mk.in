@@ -676,7 +676,7 @@ COMPRESS_SUFFIX         = @CompressSuffix@
 
 CONTEXT_DIFF		= @ContextDiffCmd@
 CP			= cp
-CPP			= @CPP@
+CPP			= @CPP@ @CPPFLAGS@
 CTAGS 			= $(ETAGS)
 #
 # RAWCPP_FLAGS are the flags to give to cpp (viz, gcc -E) to persuade it to
