@@ -682,7 +682,9 @@ When the FiniteMap module is used in GHC, we specialise it for
 \tr{Uniques}, for dastardly efficiency reasons.
 
 \begin{code}
-#if __GLASGOW_HASKELL__ && !defined(REALLY_HASKELL_1_3)
+#if 0
+
+#if __GLASGOW_HASKELL__
 
 {-# SPECIALIZE addListToFM
 		:: FiniteMap (FAST_STRING, FAST_STRING) elt -> [((FAST_STRING, FAST_STRING),elt)] -> FiniteMap (FAST_STRING, FAST_STRING) elt
@@ -744,4 +746,6 @@ When the FiniteMap module is used in GHC, we specialise it for
     #-}
 
 #endif {- compiling with ghc and have specialiser -}
+
+#endif {- 0 -}
 \end{code}
