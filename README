@@ -7,10 +7,11 @@ effort.  The tools are:
     hslibs	collection of Haskell libraries
     haggis	the Haggis GUI toolkit
     happy	the Happy Haskell parser generator
+    green-card	a foreign function interface pre-processor for Haskell.
     nofib	the NoFib Haskell benchmarking suite
     literate	the Glasgow "literate programming" system
     glafp-utils shared utility programs
-    mk	        GNU make setup used by all the fptools
+    mk	        GNU make setup used by all of fptools
     docs        documentation on the installing and using
                 the fptools suite.
 
