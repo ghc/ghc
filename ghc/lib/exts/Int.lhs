@@ -53,6 +53,20 @@ module Int
 	, sizeofInt32
 	, sizeofInt64
 	
+	-- The "official" place to get these from is Foreign
+	, indexInt8OffForeignObj
+	, indexInt16OffForeignObj
+	, indexInt32OffForeignObj
+	, indexInt64OffForeignObj
+	, readInt8OffForeignObj
+	, readInt16OffForeignObj
+	, readInt32OffForeignObj
+	, readInt64OffForeignObj
+	, writeInt8OffForeignObj
+	, writeInt16OffForeignObj
+	, writeInt32OffForeignObj
+	, writeInt64OffForeignObj
+	
 	-- non-standard, GHC specific
 	, intToWord
 
@@ -65,6 +79,7 @@ import PrelGHC
 import CCall
 import Numeric ( readDec )
 import Word    ( Word32 )
+import PrelForeign
 
 -----------------------------------------------------------------------------
 -- The "official" coercion functions
@@ -157,14 +172,12 @@ instance Integral Int8 where
        if x > 0 && y < 0	then quotInt8 (x-y-1) y
        else if x < 0 && y > 0	then quotInt8 (x-y+1) y
        else quotInt8 x y
-    quot x@(I8# _) y@(I8# y#) =
-       if y# /=# 0#
-       then x `quotInt8` y
-       else error "Integral.Int8.quot: divide by 0\n"
-    rem x@(I8# _) y@(I8# y#) =
-       if y# /=# 0#
-       then x `remInt8` y
-       else error "Integral.Int8.rem: divide by 0\n"
+    quot x@(I8# _) y@(I8# y#)
+       | y# /=# 0# = x `quotInt8` y
+       | otherwise = error "Integral.Int8.quot: divide by 0\n"
+    rem x@(I8# _) y@(I8# y#)
+       | y# /=# 0#  = x `remInt8` y
+       | otherwise  = error "Integral.Int8.rem: divide by 0\n"
     mod x@(I8# x#) y@(I8# y#) =
        if x > 0 && y < 0 || x < 0 && y > 0 then
 	  if r/=0 then r+y else 0
@@ -237,6 +250,9 @@ instance Bits Int8 where
 pow2# :: Int# -> Int#
 pow2# x# = iShiftL# 1# x#
 
+pow2_64# :: Int# -> Int64#
+pow2_64# x# = word64ToInt64# (shiftL64# (wordToWord64# (int2Word# 1#)) x#)
+
 sizeofInt8 :: Word32
 sizeofInt8 = 1
 \end{code}
@@ -289,14 +305,12 @@ instance Integral Int16 where
        if x > 0 && y < 0	then quotInt16 (x-y-1) y
        else if x < 0 && y > 0	then quotInt16 (x-y+1) y
        else quotInt16 x y
-    quot x@(I16# _) y@(I16# y#) =
-       if y# /=# 0#
-       then x `quotInt16` y
-       else error "Integral.Int16.quot: divide by 0\n"
-    rem x@(I16# _) y@(I16# y#) =
-       if y# /=# 0#
-       then x `remInt16` y
-       else error "Integral.Int16.rem: divide by 0\n"
+    quot x@(I16# _) y@(I16# y#)
+       | y# /=# 0#      = x `quotInt16` y
+       | otherwise      = error "Integral.Int16.quot: divide by 0\n"
+    rem x@(I16# _) y@(I16# y#)
+       | y# /=# 0#      = x `remInt16` y
+       | otherwise      = error "Integral.Int16.rem: divide by 0\n"
     mod x@(I16# x#) y@(I16# y#) =
        if x > 0 && y < 0 || x < 0 && y > 0 then
 	  if r/=0 then r+y else 0
@@ -321,8 +335,8 @@ instance Ix Int16 where
     inRange (m,n) i      = m <= i && i <= n
 
 instance Enum Int16 where
-    toEnum         = intToInt16
-    fromEnum       = int16ToInt
+    toEnum           = intToInt16
+    fromEnum         = int16ToInt
     enumFrom c       = map toEnum [fromEnum c .. fromEnum (maxBound::Int16)]
     enumFromThen c d = map toEnum [fromEnum c, fromEnum d .. fromEnum (last::Int16)]
 			  where last = if d < c then minBound else maxBound
@@ -437,14 +451,12 @@ instance Integral Int32 where
        if x > 0 && y < 0	then quotInt32 (x-y-1) y
        else if x < 0 && y > 0	then quotInt32 (x-y+1) y
        else quotInt32 x y
-    quot x@(I32# _) y@(I32# y#) =
-       if y# /=# 0#
-       then x `quotInt32` y
-       else error "Integral.Int32.quot: divide by 0\n"
-    rem x@(I32# _) y@(I32# y#) =
-       if y# /=# 0#
-       then x `remInt32` y
-       else error "Integral.Int32.rem: divide by 0\n"
+    quot x@(I32# _) y@(I32# y#)
+       | y# /=# 0#  = x `quotInt32` y
+       | otherwise  = error "Integral.Int32.quot: divide by 0\n"
+    rem x@(I32# _) y@(I32# y#)
+       | y# /=# 0#  = x `remInt32` y
+       | otherwise  = error "Integral.Int32.rem: divide by 0\n"
     mod x@(I32# x#) y@(I32# y#) =
        if x > 0 && y < 0 || x < 0 && y > 0 then
 	  if r/=0 then r+y else 0
@@ -526,26 +538,425 @@ sizeofInt32 = 4
 
 
 \begin{code}
-data Int64 = I64 {lo,hi::Int32} deriving (Eq, Ord, Bounded)
+#if WORD_SIZE_IN_BYTES == 8
+data Int64 = I64# Int#
+
+int32ToInt64 :: Int32 -> Int64
+int32ToInt64 (I32# i#) = I64# i#
+
+intToInt32# :: Int# -> Int#
+intToInt32# i# = word2Int# ((int2Word# i#) `and#` (case (maxBound::Word32) of W# x# -> x#))
+
+int64ToInt32 :: Int64 -> Int32
+int64ToInt32 (I64# i#) = I32# (intToInt32# w#)
+
+instance Eq  Int64     where 
+  (I64# x) == (I64# y) = x `eqInt#` y
+  (I64# x) /= (I64# y) = x `neInt#` y
+
+instance Ord Int32    where
+  compare (I64# x#) (I64# y#) = compareInt# x# y#
+
+instance Num Int64 where
+  (I64# x) + (I64# y) = I64# (x +# y)
+  (I64# x) - (I64# y) = I64# (x -# y)
+  (I64# x) * (I64# y) = I64# (x *# y)
+  negate w@(I64# x)   = I64# (negateInt# x)
+  abs x               = absReal
+  signum              = signumReal
+  fromInteger (J# a# s# d#) = case (integer2Int# a# s# d#) of { i# -> I64# i# }
+  fromInt       = intToInt64
+
+instance Bounded Int64 where
+  minBound = integerToInt64 (-0x8000000000000000)
+  maxBound = integerToInt64 0x7fffffffffffffff
+
+instance Real Int64 where
+  toRational x = toInteger x % 1
+
+instance Integral Int64 where
+    div x@(I64# x#) y@(I64# y#)
+      | x > 0 && y < 0	= quotInt64 (x-y-1) y
+      | x < 0 && y > 0	= quotInt64 (x-y+1) y
+      | otherwise       = quotInt64 x y
+
+    quot x@(I64# _) y@(I64# y#)
+       | y# /=# 0# = x `quotInt64` y
+       | otherwise = error "Integral.Int64.quot: divide by 0\n"
+
+    rem x@(I64# _) y@(I64# y#)
+       | y# /=# 0# = x `remInt64` y
+       | otherwise = error "Integral.Int32.rem: divide by 0\n"
+
+    mod x@(I64# x#) y@(I64# y#)
+       | x > 0 && y < 0 || x < 0 && y > 0 = if r/=0 then r+y else 0
+       | otherwise = r
+	where r = remInt64 x y
+
+    a@(I64# _) `quotRem` b@(I64# _) = (a `quotInt64` b, a `remInt64` b)
+    toInteger (I64# i#) = toInteger (I# i#)
+    toInt     (I64# i#) = I# i#
+
+instance Enum Int64 where
+    toEnum    (I# i)   = I64# i#
+    fromEnum  (I64# i) = I64# i#
+    enumFrom c         = map toEnum [fromEnum c .. fromEnum (maxBound::Int64)] -- a long list!
+    enumFromThen c d   = map toEnum [fromEnum c, fromEnum d .. fromEnum (last::Int64)]
+		       where last = if d < c then minBound else maxBound
+
+
+instance Read Int64 where
+    readsPrec p s = [ (intToInt64 x,r) | (x,r) <- readsPrec p s ]
+
+instance Show Int64 where
+    showsPrec p i64 = showsPrec p (int64ToInt i64)
+
+instance Bits Int64 where
+  (I64# x) .&. (I64# y)   = I64# (word2Int# ((int2Word# x) `and#` (int2Word# y)))
+  (I64# x) .|. (I64# y)   = I64# (word2Int# ((int2Word# x) `or#`  (int2Word# y)))
+  (I64# x) `xor` (I64# y) = I64# (word2Int# ((int2Word# x) `xor#` (int2Word# y)))
+  complement (I64# x)     = I64# (negateInt# x)
+  shift (I64# x) i@(I# i#)
+	| i > 0     = I64# (iShiftL# x  i#)
+	| otherwise = I64# (iShiftRA# x (negateInt# i#))
+  i64@(I64# x)  `rotate` (I# i)
+        | i ==# 0#    = i64
+	| i ># 0#     = 
+             -- ( (x<<i') | ((x&(0x10000000000000000-2^i2))>>i2) )
+	     I64# (word2Int# (
+	            (int2Word# (iShiftL# x i')) 
+		          `or#`
+                    (int2Word# (iShiftRA# (word2Int# (
+		                              (int2Word# x) 
+					          `and#` 
+			                       (int2Word# (maxBound# -# pow2# i2 +# 1#))))
+			                  i2))))
+	| otherwise = rotate i64 (I# (64# +# i))
+          where
+           i' = word2Int# (int2Word# i `and#` int2Word# 63#)
+           i2 = 64# -# i'
+           (I64# maxBound#) = maxBound
+  bit i        	= shift 1 i
+  setBit x i    = x .|. bit i
+  clearBit x i  = x .&. complement (bit i)
+  complementBit x i = x `xor` bit i
+  testBit x i   = (x .&. bit i) /= 0
+  bitSize  _    = 64
+  isSigned _    = True
+
+
+
+remInt64  (I64# x) (I64# y) = I64# (x `remInt#` y)
+quotInt64 (I64# x) (I64# y) = I64# (x `quotInt#` y)
 
 int64ToInteger :: Int64 -> Integer
-int64ToInteger I64{lo,hi} = toInteger lo + 0x100000000 * toInteger hi 
+int64ToInteger (I64# i#) = toInteger (I# i#)
 
 integerToInt64 :: Integer -> Int64
-integerToInt64 x = case x `quotRem` 0x100000000 of 
-                 (h,l) -> I64{lo=fromInteger l, hi=fromInteger h}
+integerToInt64 i = case fromInteger i of { I# i# -> I64# i# }
 
 intToInt64 :: Int -> Int64
-intToInt64 x =  I64{lo=intToInt32 x, hi=0}
+intToInt64 (I# i#) = I64# i#
 
 int64ToInt :: Int64 -> Int
-int64ToInt (I64 lo _) = int32ToInt lo
+int64ToInt (I64# i#) = I# i#
+
+#else
+--assume: support for long-longs
+--data Int64 = I64 Int64# deriving (Eq, Ord, Bounded)
+
+int32ToInt64 :: Int32 -> Int64
+int32ToInt64 (I32# i#) = I64# (intToInt64# i#)
+
+int64ToInt32 :: Int64 -> Int32
+int64ToInt32 (I64# i#) = I32# (int64ToInt# i#)
+
+int64ToInteger :: Int64 -> Integer
+int64ToInteger (I64# x#) = int64ToInteger# x#
+
+integerToInt64 :: Integer -> Int64
+integerToInt64 (J# a# s# d#) = I64# (integerToInt64# a# s# d#)
 
 instance Show Int64 where
   showsPrec p x = showsPrec p (int64ToInteger x)
 
 instance Read Int64 where
   readsPrec p s = [ (integerToInt64 x,r) | (x,r) <- readDec s ]
+
+instance Eq  Int64     where 
+  (I64# x) == (I64# y) = x `eqInt64#` y
+  (I64# x) /= (I64# y) = x `neInt64#` y
+
+instance Ord Int64     where 
+  compare (I64# x) (I64# y)   = compareInt64# x y
+  (<)  (I64# x) (I64# y)      = x `ltInt64#` y
+  (<=) (I64# x) (I64# y)      = x `leInt64#` y
+  (>=) (I64# x) (I64# y)      = x `geInt64#` y
+  (>)  (I64# x) (I64# y)      = x `gtInt64#` y
+  max x@(I64# x#) y@(I64# y#) = 
+     case (compareInt64# x# y#) of { LT -> y ; EQ -> x ; GT -> x }
+  min x@(I64# x#) y@(I64# y#) =
+     case (compareInt64# x# y#) of { LT -> x ; EQ -> x ; GT -> y }
+
+instance Num Int64 where
+  (I64# x) + (I64# y) = I64# (x `plusInt64#`  y)
+  (I64# x) - (I64# y) = I64# (x `minusInt64#` y)
+  (I64# x) * (I64# y) = I64# (x `timesInt64#` y)
+  negate (I64# x)     = I64# (negateInt64# x)
+  abs x               = absReal x
+  signum              = signumReal
+  fromInteger i       = integerToInt64 i
+  fromInt     i       = intToInt64 i
+
+compareInt64# i# j# 
+ | i# `ltInt64#` j# = LT
+ | i# `eqInt64#` j# = EQ
+ | otherwise	    = GT
+
+instance Bounded Int64 where
+  minBound = integerToInt64 (-0x8000000000000000)
+  maxBound = integerToInt64 0x7fffffffffffffff
+
+instance Real Int64 where
+  toRational x = toInteger x % 1
+
+instance Integral Int64 where
+    div x@(I64# x#) y@(I64# y#)
+      | x > 0 && y < 0	= quotInt64 (x-y-1) y
+      | x < 0 && y > 0	= quotInt64 (x-y+1) y
+      | otherwise       = quotInt64 x y
+
+    quot x@(I64# _) y@(I64# y#)
+       | y# `neInt64#` (intToInt64# 0#) = x `quotInt64` y
+       | otherwise = error "Integral.Int64.quot: divide by 0\n"
+
+    rem x@(I64# _) y@(I64# y#)
+       | y# `neInt64#` (intToInt64# 0#) = x `remInt64` y
+       | otherwise = error "Integral.Int32.rem: divide by 0\n"
+
+    mod x@(I64# x#) y@(I64# y#)
+       | x > 0 && y < 0 || x < 0 && y > 0 = if r/=0 then r+y else 0
+       | otherwise = r
+	where r = remInt64 x y
+
+    a@(I64# _) `quotRem` b@(I64# _) = (a `quotInt64` b, a `remInt64` b)
+    toInteger i         = int64ToInteger i
+    toInt     i         = int64ToInt i
+
+instance Enum Int64 where
+    toEnum    (I# i)   = I64# (intToInt64# i)
+    fromEnum  (I64# w) = I# (int64ToInt# w)
+    enumFrom i              = eft64 i 1
+    enumFromTo   i1 i2      = eftt64 i1 1 (> i2)
+    enumFromThen i1 i2      = eftt64 i1 (i2 - i1) (>last)
+        where 
+	 last
+	  | i1 < i2   = maxBound::Int64
+	  | otherwise = minBound
+
+
+instance Bits Int64 where
+  (I64# x) .&. (I64# y)   = I64# (word64ToInt64# ((int64ToWord64# x) `and64#` (int64ToWord64# y)))
+  (I64# x) .|. (I64# y)   = I64# (word64ToInt64# ((int64ToWord64# x) `or64#`  (int64ToWord64# y)))
+  (I64# x) `xor` (I64# y) = I64# (word64ToInt64# ((int64ToWord64# x) `xor64#` (int64ToWord64# y)))
+  complement (I64# x)     = I64# (negateInt64# x)
+  shift (I64# x) i@(I# i#)
+	| i > 0     = I64# (iShiftL64# x  i#)
+	| otherwise = I64# (iShiftRA64# x (negateInt# i#))
+  i64@(I64# x)  `rotate` (I# i)
+        | i ==# 0#    = i64
+	| i ># 0#     = 
+             -- ( (x<<i') | ((x&(0x10000000000000000-2^i2))>>i2) )
+	     I64# (word64ToInt64# (
+	            (int64ToWord64# (iShiftL64# x i'))		          `or64#`
+                    (int64ToWord64# (iShiftRA64# (word64ToInt64# ((int64ToWord64# x)     `and64#` 
+			                         (int64ToWord64# (maxBound# `minusInt64#` (pow2_64# i2 `plusInt64#` (intToInt64# 1#))))))
+			                        i2))))
+	| otherwise = rotate i64 (I# (64# +# i))
+          where
+           i' = word2Int# (int2Word# i `and#` int2Word# 63#)
+           i2 = 64# -# i'
+           (I64# maxBound#) = maxBound
+  bit i        	= shift 1 i
+  setBit x i    = x .|. bit i
+  clearBit x i  = x .&. complement (bit i)
+  complementBit x i = x `xor` bit i
+  testBit x i   = (x .&. bit i) /= 0
+  bitSize  _    = 64
+  isSigned _    = True
+
+remInt64  (I64# x) (I64# y) = I64# (x `remInt64#` y)
+quotInt64 (I64# x) (I64# y) = I64# (x `quotInt64#` y)
+
+intToInt64 :: Int -> Int64
+intToInt64 (I# i#) = I64# (intToInt64# i#)
+
+int64ToInt :: Int64 -> Int
+int64ToInt (I64# i#) = I# (int64ToInt# i#)
+
+-- Enum Int64 helper funs:
+
+eftt64 :: Int64 -> Int64 -> (Int64->Bool) -> [Int64]
+eftt64 now step done = go now
+  where
+   go now
+     | done now  = []
+     | otherwise = now : go (now+step)
+
+eft64 :: Int64 -> Int64 -> [Int64]
+eft64 now step = go now
+  where 
+   go x
+    | x == maxBound = [x]
+    | otherwise     = x:go (x+step)
+
+
+-- Word64# primop wrappers:
+
+ltInt64# :: Int64# -> Int64# -> Bool
+ltInt64# x# y# =  unsafePerformIO $ do
+	v <- _ccall_ stg_ltInt64 x# y# 
+	case (v::Int) of
+	  0 -> return False
+	  _ -> return True
+      
+leInt64# :: Int64# -> Int64# -> Bool
+leInt64# x# y# =  unsafePerformIO $ do
+	v <- _ccall_ stg_leInt64 x# y# 
+	case (v::Int) of
+	  0 -> return False
+	  _ -> return True
+      
+eqInt64# :: Int64# -> Int64# -> Bool
+eqInt64# x# y# =  unsafePerformIO $ do
+	v <- _ccall_ stg_eqInt64 x# y# 
+	case (v::Int) of
+	  0 -> return False
+	  _ -> return True
+      
+neInt64# :: Int64# -> Int64# -> Bool
+neInt64# x# y# =  unsafePerformIO $ do
+	v <- _ccall_ stg_neInt64 x# y# 
+	case (v::Int) of
+	  0 -> return False
+	  _ -> return True
+      
+geInt64# :: Int64# -> Int64# -> Bool
+geInt64# x# y# =  unsafePerformIO $ do
+	v <- _ccall_ stg_geInt64 x# y# 
+	case (v::Int) of
+	  0 -> return False
+	  _ -> return True
+      
+gtInt64# :: Int64# -> Int64# -> Bool
+gtInt64# x# y# =  unsafePerformIO $ do
+	v <- _ccall_ stg_gtInt64 x# y# 
+	case (v::Int) of
+	  0 -> return False
+	  _ -> return True
+
+plusInt64# :: Int64# -> Int64# -> Int64#
+plusInt64# a# b# = 
+  case (unsafePerformIO (_ccall_ stg_plusInt64 a# b#)) of
+    I64# i# -> i#
+
+minusInt64# :: Int64# -> Int64# -> Int64#
+minusInt64# a# b# =
+  case (unsafePerformIO (_ccall_ stg_minusInt64 a# b#)) of
+    I64# i# -> i#
+
+timesInt64# :: Int64# -> Int64# -> Int64#
+timesInt64# a# b# =
+  case (unsafePerformIO (_ccall_ stg_timesInt64 a# b#)) of
+    I64# i# -> i#
+
+quotInt64# :: Int64# -> Int64# -> Int64#
+quotInt64# a# b# =
+  case (unsafePerformIO (_ccall_ stg_quotInt64 a# b#)) of
+    I64# i# -> i#
+
+remInt64# :: Int64# -> Int64# -> Int64#
+remInt64# a# b# =
+  case (unsafePerformIO (_ccall_ stg_remInt64 a# b#)) of
+    I64# i# -> i#
+
+negateInt64# :: Int64# -> Int64#
+negateInt64# a# =
+  case (unsafePerformIO (_ccall_ stg_negateInt64 a#)) of
+    I64# i# -> i#
+
+and64# :: Word64# -> Word64# -> Word64#
+and64# a# b# =
+  case (unsafePerformIO (_ccall_ stg_and64 a# b#)) of
+    W64# w# -> w#
+
+or64# :: Word64# -> Word64# -> Word64#
+or64# a# b# =
+  case (unsafePerformIO (_ccall_ stg_or64 a# b#)) of
+    W64# w# -> w#
+
+xor64# :: Word64# -> Word64# -> Word64#
+xor64# a# b# = 
+  case (unsafePerformIO (_ccall_ stg_xor64 a# b#)) of
+    W64# w# -> w#
+
+not64# :: Word64# -> Word64#
+not64# a# = 
+  case (unsafePerformIO (_ccall_ stg_not64 a#)) of
+    W64# w# -> w#
+
+shiftL64# :: Word64# -> Int# -> Word64#
+shiftL64# a# b# =
+  case (unsafePerformIO (_ccall_ stg_shiftL64 a# b#)) of
+    W64# w# -> w#
+
+iShiftL64# :: Int64# -> Int# -> Int64#
+iShiftL64# a# b# =
+  case (unsafePerformIO (_ccall_ stg_iShiftL64 a# b#)) of
+    I64# i# -> i#
+
+iShiftRL64# :: Int64# -> Int# -> Int64#
+iShiftRL64# a# b# =
+  case (unsafePerformIO (_ccall_ stg_iShiftRL64 a# b#)) of
+    I64# i# -> i#
+
+iShiftRA64# :: Int64# -> Int# -> Int64#
+iShiftRA64# a# b# =
+  case (unsafePerformIO (_ccall_ stg_iShiftRA64 a# b#)) of
+    I64# i# -> i#
+
+shiftRL64# :: Word64# -> Int# -> Word64#
+shiftRL64# a# b# =
+  case (unsafePerformIO (_ccall_ stg_shifRtL64 a# b#)) of
+    W64# w# -> w#
+
+int64ToInt# :: Int64# -> Int#
+int64ToInt# i# =
+  case (unsafePerformIO (_ccall_ stg_int64ToInt i#)) of
+    I# i# -> i#
+
+wordToWord64# :: Word# -> Word64#
+wordToWord64# w# =
+  case (unsafePerformIO (_ccall_ stg_wordToWord64 w#)) of
+    W64# w# -> w#
+
+word64ToInt64# :: Word64# -> Int64#
+word64ToInt64# w# =
+  case (unsafePerformIO (_ccall_ stg_word64ToInt64 w#)) of
+    I64# i# -> i#
+
+int64ToWord64# :: Int64# -> Word64#
+int64ToWord64# w# =
+  case (unsafePerformIO (_ccall_ stg_int64ToWord64 w#)) of
+    W64# w# -> w#
+
+intToInt64# :: Int# -> Int64#
+intToInt64# i# =
+  case (unsafePerformIO (_ccall_ stg_intToInt64 i#)) of
+    I64# i# -> i#
+      
+
+#endif
 
 sizeofInt64 :: Word32
 sizeofInt64 = 8
@@ -572,6 +983,9 @@ signumReal x | x == 0    =  0
 indexInt8OffAddr  :: Addr -> Int -> Int8
 indexInt8OffAddr (A# a#) (I# i#) = intToInt8 (I# (ord# (indexCharOffAddr# a# i#)))
 
+indexInt8OffForeignObj  :: ForeignObj -> Int -> Int8
+indexInt8OffForeignObj (ForeignObj fo#) (I# i#) = intToInt8 (I# (ord# (indexCharOffForeignObj# fo# i#)))
+
 indexInt16OffAddr :: Addr -> Int -> Int16
 indexInt16OffAddr a i =
 #ifdef WORDS_BIGENDIAN
@@ -584,6 +998,18 @@ indexInt16OffAddr a i =
    l = indexInt8OffAddr a byte_idx
    h = indexInt8OffAddr a (byte_idx+1)
 
+indexInt16OffForeignObj :: ForeignObj -> Int -> Int16
+indexInt16OffForeignObj fo i =
+#ifdef WORDS_BIGENDIAN
+  intToInt16 ( int8ToInt l + (int8ToInt maxBound) * int8ToInt h)
+#else
+  intToInt16 ( int8ToInt h + (int8ToInt maxBound) * int8ToInt l)
+#endif
+ where
+   byte_idx = i * 2
+   l = indexInt8OffForeignObj fo byte_idx
+   h = indexInt8OffForeignObj fo (byte_idx+1)
+
 indexInt32OffAddr :: Addr -> Int -> Int32
 indexInt32OffAddr (A# a#) i = intToInt32 (I# (indexIntOffAddr# a# i'#))
  where
@@ -595,12 +1021,31 @@ indexInt32OffAddr (A# a#) i = intToInt32 (I# (indexIntOffAddr# a# i'#))
    = i
 #endif
 
+indexInt32OffForeignObj :: ForeignObj -> Int -> Int32
+indexInt32OffForeignObj (ForeignObj fo#) i = intToInt32 (I# (indexIntOffForeignObj# fo# i'#))
+ where
+   -- adjust index to be in Int units, not Int32 ones.
+  (I# i'#) 
+#if WORD_SIZE_IN_BYTES==8
+   = i `div` 2
+#else
+   = i
+#endif
+
 indexInt64OffAddr :: Addr -> Int -> Int64
-indexInt64OffAddr (A# i#)
+indexInt64OffAddr (A# a#) (I# i#)
 #if WORD_SIZE_IN_BYTES==8
  = I64# (indexIntOffAddr# a# i#)
 #else
- = error "Int.indexInt64OffAddr: not implemented yet"
+ = I64# (indexInt64OffAddr# a# i#)
+#endif
+
+indexInt64OffForeignObj :: ForeignObj -> Int -> Int64
+indexInt64OffForeignObj (ForeignObj fo#) (I# i#)
+#if WORD_SIZE_IN_BYTES==8
+ = I64# (indexIntOffForeignObj# fo# i#)
+#else
+ = I64# (indexInt64OffForeignObj# fo# i#)
 #endif
 
 \end{code}
@@ -611,17 +1056,33 @@ Read words out of mutable memory:
 readInt8OffAddr :: Addr -> Int -> IO Int8
 readInt8OffAddr a i = _casm_ `` %r=(StgInt8)(((StgInt8*)%0)[(StgInt)%1]); '' a i
 
+readInt8OffForeignObj :: ForeignObj -> Int -> IO Int8
+readInt8OffForeignObj fo i = _casm_ `` %r=(StgInt8)(((StgInt8*)%0)[(StgInt)%1]); '' fo i
+
 readInt16OffAddr  :: Addr -> Int -> IO Int16
 readInt16OffAddr a i = _casm_ `` %r=(StgInt16)(((StgInt16*)%0)[(StgInt)%1]); '' a i
 
+readInt16OffForeignObj  :: ForeignObj -> Int -> IO Int16
+readInt16OffForeignObj fo i = _casm_ `` %r=(StgInt16)(((StgInt16*)%0)[(StgInt)%1]); '' fo i
+
 readInt32OffAddr  :: Addr -> Int -> IO Int32
 readInt32OffAddr a i = _casm_ `` %r=(StgInt32)(((StgInt32*)%0)[(StgInt)%1]); '' a i
+
+readInt32OffForeignObj  :: ForeignObj -> Int -> IO Int32
+readInt32OffForeignObj fo i = _casm_ `` %r=(StgInt32)(((StgInt32*)%0)[(StgInt)%1]); '' fo i
 
 readInt64OffAddr  :: Addr -> Int -> IO Int64
 #if WORD_SIZE_IN_BYTES==8
 readInt64OffAddr a i = _casm_ `` %r=(StgInt)(((StgInt*)%0)[(StgInt)%1]); '' a i
 #else
-readInt64OffAddr a i = error "Int.readInt64OffAddr: not implemented yet"
+readInt64OffAddr a i = _casm_ `` %r=(StgInt64)(((StgInt64*)%0)[(StgInt)%1]); '' a i
+#endif
+
+readInt64OffForeignObj  :: ForeignObj -> Int -> IO Int64
+#if WORD_SIZE_IN_BYTES==8
+readInt64OffForeignObj fo i = _casm_ `` %r=(StgInt)(((StgInt*)%0)[(StgInt)%1]); '' fo i
+#else
+readInt64OffForeignObj fo i = _casm_ `` %r=(StgInt64)(((StgInt64*)%0)[(StgInt)%1]); '' fo i
 #endif
 \end{code}
 
@@ -629,17 +1090,33 @@ readInt64OffAddr a i = error "Int.readInt64OffAddr: not implemented yet"
 writeInt8OffAddr  :: Addr -> Int -> Int8  -> IO ()
 writeInt8OffAddr a i e = _casm_ `` (((StgInt8*)%0)[(StgInt)%1])=(StgInt8)%2; '' a i e
 
+writeInt8OffForeignObj  :: ForeignObj -> Int -> Int8  -> IO ()
+writeInt8OffForeignObj fo i e = _casm_ `` (((StgInt8*)%0)[(StgInt)%1])=(StgInt8)%2; '' fo i e
+
 writeInt16OffAddr :: Addr -> Int -> Int16 -> IO ()
 writeInt16OffAddr a i e = _casm_ `` (((StgInt16*)%0)[(StgInt)%1])=(StgInt16)%2; '' a i e
 
+writeInt16OffForeignObj :: ForeignObj -> Int -> Int16 -> IO ()
+writeInt16OffForeignObj fo i e = _casm_ `` (((StgInt16*)%0)[(StgInt)%1])=(StgInt16)%2; '' fo i e
+
 writeInt32OffAddr :: Addr -> Int -> Int32 -> IO ()
 writeInt32OffAddr a i e = _casm_ `` (((StgInt32*)%0)[(StgInt)%1])=(StgInt32)%2; '' a i e
+
+writeInt32OffForeignObj :: ForeignObj -> Int -> Int32 -> IO ()
+writeInt32OffForeignObj fo i e = _casm_ `` (((StgInt32*)%0)[(StgInt)%1])=(StgInt32)%2; '' fo i e
 
 writeInt64OffAddr :: Addr -> Int -> Int64 -> IO ()
 #if WORD_SIZE_IN_BYTES==8
 writeInt64OffAddr a i e = _casm_ `` (((StgInt*)%0)[(StgInt)%1])=(StgInt)%2; '' a i e
 #else
-writeInt64OffAddr = error "Int.writeInt64OffAddr: not implemented yet"
+writeInt64OffAddr a i e = _casm_ `` (((StgInt64*)%0)[(StgInt)%1])=(StgInt64)%2; '' a i e
+#endif
+
+writeInt64OffForeignObj :: ForeignObj -> Int -> Int64 -> IO ()
+#if WORD_SIZE_IN_BYTES==8
+writeInt64OffForeignObj fo i e = _casm_ `` (((StgInt*)%0)[(StgInt)%1])=(StgInt)%2; '' fo i e
+#else
+writeInt64OffForeignObj fo i e = _casm_ `` (((StgInt64*)%0)[(StgInt)%1])=(StgInt64)%2; '' fo i e
 #endif
 
 \end{code}
