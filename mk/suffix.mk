@@ -228,6 +228,8 @@ endif
 #	$(JADE) -t sgml -V html-index -d $(SGMLSTYLESHEET) -c $(DOCBOOK_CATALOG) $<
 #	$(PERL) $(COLLATEINDEX) -N -o index.sgml
 	$(SGML2HTML) $(SGML2HTML_OPTS) $<
+# touch the .html file so that it is seen to be built
+	@touch $@
 
 %.html : %.tex
 	@$(RM) $@
