@@ -24,7 +24,7 @@ import RnHsSyn		( RenamedTyClDecl, RenamedSig,
 import RnEnv		( lookupSysName )
 import TcHsSyn		( TcMonoBinds )
 
-import Inst		( Inst, InstOrigin(..), instToId, newDicts, tcInstClassOp )
+import Inst		( Inst, InstOrigin(..), instToId, newDicts, newMethod )
 import TcEnv		( TyThingDetails(..), 
 			  tcLookupClass, tcExtendTyVarEnv2, 
 			  tcExtendTyVarEnv
@@ -36,7 +36,8 @@ import TcUnify		( checkSigTyVars, sigCtxt )
 import TcMType		( tcInstTyVars )
 import TcType		( Type, TyVarDetails(..), TcType, TcThetaType, TcTyVar, 
 			  mkTyVarTys, mkPredTys, mkClassPred, tcSplitSigmaTy, tcSplitFunTys,
-			  tcIsTyVarTy, tcSplitTyConApp_maybe
+			  tcIsTyVarTy, tcSplitTyConApp_maybe, tcSplitForAllTys, tcSplitPhiTy,
+			  getClassPredTys_maybe, mkPhiTy
 			)
 import TcRnMonad
 import Generics		( mkGenericRhs )
@@ -44,9 +45,10 @@ import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
 import Class		( classTyVars, classBigSig, classTyCon, 
 			  Class, ClassOpItem, DefMeth (..) )
 import TyCon		( tyConGenInfo )
+import Subst		( substTyWith )
 import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
 import DataCon		( mkDataCon )
-import Id		( Id, idType, idName, setIdLocalExported, setInlinePragma )
+import Id		( Id, idType, idName, mkUserLocal, setIdLocalExported, setInlinePragma )
 import Name		( Name, NamedThing(..) )
 import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, plusNameEnv )
 import NameSet		( emptyNameSet, unitNameSet )
@@ -57,7 +59,7 @@ import Var		( TyVar )
 import CmdLineOpts
 import UnicodeUtil	( stringToUtf8 )
 import ErrUtils		( dumpIfSet )
-import Util		( count, lengthIs )
+import Util		( count, lengthIs, isSingleton )
 import Maybes		( seqMaybe )
 import Maybe		( isJust )
 import FastString
@@ -391,7 +393,7 @@ tcDefMeth clas tyvars binds_in prags op_item@(sel_id, DefMeth dm_name)
     in
     newDicts origin theta 				`thenM` \ [this_dict] ->
 
-    mkMethodBind origin clas inst_tys binds_in op_item	`thenM` \ (dm_inst, meth_info) ->
+    mkMethodBind origin clas inst_tys binds_in op_item	`thenM` \ (_, meth_info) ->
     getLIE (tcMethodBind xtve clas_tyvars theta 
 			 [this_dict] prags meth_info)	`thenM` \ (defm_bind, insts_needed) ->
     
@@ -408,10 +410,11 @@ tcDefMeth clas tyvars binds_in prags op_item@(sel_id, DefMeth dm_name)
     checkSigTyVars clas_tyvars		`thenM` \ clas_tyvars' ->
     
     let
+	(_,dm_inst_id,_) = meth_info
         full_bind = AbsBinds
     		    clas_tyvars'
     		    [instToId this_dict]
-    		    [(clas_tyvars', local_dm_id, instToId dm_inst)]
+    		    [(clas_tyvars', local_dm_id, dm_inst_id)]
     		    emptyNameSet	-- No inlines (yet)
     		    (dict_binds `andMonoBinds` defm_bind)
     in
@@ -435,7 +438,7 @@ tyvar sets.
 
 \begin{code}
 type MethodSpec = (Id, 			-- Global selector Id
-		   TcSigInfo, 		-- Signature 
+		   Id, 			-- Local Id (class tyvars instantiated)
 		   RenamedMonoBinds)	-- Binding for the method
 
 tcMethodBind 
@@ -453,9 +456,11 @@ tcMethodBind
 	-> TcM TcMonoBinds
 
 tcMethodBind xtve inst_tyvars inst_theta avail_insts prags
-	     (sel_id, meth_sig, meth_bind)
+	     (sel_id, meth_id, meth_bind)
   =  	-- Check the bindings; first adding inst_tyvars to the envt
 	-- so that we don't quantify over them in nested places
+    mkTcSig meth_id 				`thenM` \ meth_sig ->
+
      tcExtendTyVarEnv2 xtve (
 	addErrCtxt (methodCtxt sel_id)		$
 	getLIE (tcMonoBinds meth_bind [meth_sig] NonRecursive)
@@ -510,17 +515,14 @@ mkMethodBind :: InstOrigin
 	     -> Class -> [TcType]	-- Class and instance types
 	     -> RenamedMonoBinds	-- Method binding (pick the right one from in here)
 	     -> ClassOpItem
-	     -> TcM (Inst,		-- Method inst
+	     -> TcM (Maybe Inst,		-- Method inst
 		     MethodSpec)
 -- Find the binding for the specified method, or make
 -- up a suitable default method if it isn't there
 
 mkMethodBind origin clas inst_tys meth_binds (sel_id, dm_info)
-  = getInstLoc origin				`thenM` \ inst_loc ->
-    tcInstClassOp inst_loc sel_id inst_tys	`thenM` \ meth_inst ->
-	-- Do not dump anything into the LIE
+  = mkMethId origin clas sel_id inst_tys		`thenM` \ (mb_inst, meth_id) ->
     let
-	meth_id	   = instToId meth_inst
 	meth_name  = idName meth_id
     in
 	-- Figure out what method binding to use
@@ -530,13 +532,53 @@ mkMethodBind origin clas inst_tys meth_binds (sel_id, dm_info)
 	Just user_bind -> returnM user_bind 
 	Nothing	       -> mkDefMethRhs origin clas inst_tys sel_id loc dm_info	`thenM` \ rhs ->
 			  returnM (FunMonoBind meth_name False	-- Not infix decl
-				                [mkSimpleMatch [] rhs placeHolderType loc] loc)
+				               [mkSimpleMatch [] rhs placeHolderType loc] loc)
     )								`thenM` \ meth_bind ->
 
-    mkTcSig meth_id loc			`thenM` \ meth_sig ->
+    returnM (mb_inst, (sel_id, meth_id, meth_bind))
 
-    returnM (meth_inst, (sel_id, meth_sig, meth_bind))
-    
+mkMethId :: InstOrigin -> Class 
+	 -> Id -> [TcType]	-- Selector, and instance types
+	 -> TcM (Maybe Inst, Id)
+	     
+-- mkMethId instantiates the selector Id at the specified types
+-- THe 
+mkMethId origin clas sel_id inst_tys
+  = let
+	(tyvars,rho) = tcSplitForAllTys (idType sel_id)
+	rho_ty	     = ASSERT( length tyvars == length inst_tys )
+		       substTyWith tyvars inst_tys rho
+	(preds,tau)  = tcSplitPhiTy rho_ty
+        first_pred   = head preds
+    in
+	-- The first predicate should be of form (C a b)
+	-- where C is the class in question
+    ASSERT( not (null preds) && 
+	    case getClassPredTys_maybe first_pred of
+		{ Just (clas1,tys) -> clas == clas1 ; Nothing -> False }
+    )
+    if isSingleton preds then
+	-- If it's the only one, make a 'method'
+	getInstLoc origin				`thenM` \ inst_loc ->
+    	newMethod inst_loc sel_id inst_tys preds tau	`thenM` \ meth_inst ->
+	returnM (Just meth_inst, instToId meth_inst)
+    else
+	-- If it's not the only one we need to be careful
+	-- For example, given 'op' defined thus:
+	--	class Foo a where
+	--	  op :: (?x :: String) => a -> a
+	-- (mkMethId op T) should return an Inst with type
+	--	(?x :: String) => T -> T
+	-- That is, the class-op's context is still there.  
+	-- BUT: it can't be a Method any more, because it breaks
+	-- 	INVARIANT 2 of methods.  (See the data decl for Inst.)
+	newUnique			`thenM` \ uniq ->
+	getSrcLocM			`thenM` \ loc ->
+	let 
+	    real_tau = mkPhiTy (tail preds) tau
+	    meth_id  = mkUserLocal (getOccName sel_id) uniq real_tau loc
+	in
+	returnM (Nothing, meth_id)
 
      -- The user didn't supply a method binding, 
      -- so we have to make up a default binding

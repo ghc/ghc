@@ -323,23 +323,14 @@ newMethodWithGivenTy orig id tys theta tau
 -- to simplify Insts
 
 tcInstClassOp :: InstLoc -> Id -> [TcType] -> TcM Inst
-  -- Instantiate the specified class op, but *only* with the main
-  -- class dictionary. For example, given 'op' defined thus:
-  --	class Foo a where
-  --	  op :: (?x :: String) => a -> a
-  -- (tcInstClassOp op T) should return an Inst with type
-  --	(?x :: String) => T -> T
-  -- That is, the class-op's context is still there.  
-  -- This is really important in the use of tcInstClassOp in TcClassDcls.mkMethodBind
 tcInstClassOp inst_loc sel_id tys
   = let
 	(tyvars,rho) = tcSplitForAllTys (idType sel_id)
-	rho_ty	     = substTyWith tyvars tys rho
-	(pred,tau)   = tcSplitMethodTy rho_ty
-		-- Split off exactly one predicate (see the example above)
+	rho_ty	     = ASSERT( length tyvars == length tys )
+		       substTyWith tyvars tys rho
+	(preds,tau)  = tcSplitPhiTy rho_ty
     in
-    ASSERT( isClassPred pred )
-    newMethod inst_loc sel_id tys [pred] tau
+    newMethod inst_loc sel_id tys preds tau
 
 ---------------------------
 newMethod inst_loc id tys theta tau
@@ -480,7 +471,7 @@ pprInsts insts  = parens (sep (punctuate comma (map pprInst insts)))
 pprInstsInFull insts
   = vcat (map go insts)
   where
-    go inst = quotes (ppr inst) <+> pprInstLoc (instLoc inst)
+    go inst = sep [quotes (ppr inst), nest 2 (pprInstLoc (instLoc inst))]
 
 pprInst (LitInst u lit ty loc)
   = hsep [ppr lit, ptext SLIT("at"), ppr ty, show_uniq u]

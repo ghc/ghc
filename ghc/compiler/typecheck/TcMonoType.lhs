@@ -654,13 +654,13 @@ maybeSig (sig@(TySigInfo sig_id _ _ _ _ _ _) : sigs) name
 tcTySig :: RenamedSig -> TcM TcSigInfo
 
 tcTySig (Sig v ty src_loc)
- = addSrcLoc src_loc				$ 
-   tcHsSigType (FunSigCtxt v) ty		`thenM` \ sigma_tc_ty ->
-   mkTcSig (mkLocalId v sigma_tc_ty) src_loc	`thenM` \ sig -> 
+ = addSrcLoc src_loc			$ 
+   tcHsSigType (FunSigCtxt v) ty	`thenM` \ sigma_tc_ty ->
+   mkTcSig (mkLocalId v sigma_tc_ty) 	`thenM` \ sig -> 
    returnM sig
 
-mkTcSig :: TcId -> SrcLoc -> TcM TcSigInfo
-mkTcSig poly_id src_loc
+mkTcSig :: TcId -> TcM TcSigInfo
+mkTcSig poly_id
   = 	-- Instantiate this type
 	-- It's important to do this even though in the error-free case
 	-- we could just split the sigma_tc_ty (since the tyvars don't
@@ -677,6 +677,7 @@ mkTcSig poly_id src_loc
 	-- We make a Method even if it's not overloaded; no harm
 	-- But do not extend the LIE!  We're just making an Id.
 	
+   getSrcLocM					`thenM` \ src_loc ->
    returnM (TySigInfo poly_id tyvars' theta' tau' 
 			  (instToId inst) [inst] src_loc)
 \end{code}

@@ -610,7 +610,7 @@ tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys'
     let
 	mk_method_bind = mkMethodBind InstanceDeclOrigin clas inst_tys' monobinds
     in
-    mapAndUnzipM mk_method_bind  op_items 	`thenM` \ (meth_insts, meth_infos) ->
+    mapAndUnzipM mk_method_bind op_items 	`thenM` \ (meth_insts, meth_infos) ->
 
 	-- And type check them
 	-- It's really worth making meth_insts available to the tcMethodBind
@@ -630,13 +630,14 @@ tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys'
 	-- Solution: make meth_insts available, so that 'then' refers directly
 	-- 	     to the local 'bind' rather than going via the dictionary.
     let
-	all_insts      = avail_insts ++ meth_insts
+	all_insts      = avail_insts ++ catMaybes meth_insts
 	xtve	       = inst_tyvars `zip` inst_tyvars'
 	tc_method_bind = tcMethodBind xtve inst_tyvars' dfun_theta' all_insts uprags 
     in
     mapM tc_method_bind meth_infos		`thenM` \ meth_binds_s ->
    
-    returnM (map instToId meth_insts, andMonoBindList meth_binds_s)
+    returnM ([meth_id | (_,meth_id,_) <- meth_infos], 
+	     andMonoBindList meth_binds_s)
 
 
 -- Derived newtype instances
