@@ -629,7 +629,7 @@ foreign import "stg_shiftRL64"     unsafe shiftRL64#     :: Word64# -> Int# -> W
 
 #else
 
-data Word32 = W64# Word# deriving (Eq, Ord)
+data Word64 = W64# Word# deriving (Eq, Ord)
 
 instance Num Word64 where
     (W64# x#) + (W64# y#)  = W64# (x# `plusWord#` y#)
