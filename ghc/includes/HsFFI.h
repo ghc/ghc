@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsFFI.h,v 1.2 2000/04/06 13:40:15 panne Exp $
+ * $Id: HsFFI.h,v 1.3 2000/04/13 15:37:11 panne Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -60,7 +60,7 @@ typedef StgDouble		HsDouble;
 typedef StgBool			HsBool;
 typedef void*			HsAddr;         /* this should better match StgAddr */
 typedef void*			HsForeignObj;   /* ... and this StgForeignPtr       */
-typedef void*			HsStablePtr;    /* NOTE: THIS IS CURRENTLY WRONG!!! */
+typedef void*			HsStablePtr;
 
 /* this should correspond to the type of StgChar in StgTypes.h */
 #define HS_CHAR_MIN		(0)

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.51 2000/04/12 17:12:23 simonmar Exp $
+ * $Id: PrimOps.h,v 1.52 2000/04/13 15:37:11 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -700,12 +700,12 @@ EF_(makeStableNamezh_fast);
    r = RET_STGCALL1(StgStablePtr,getStablePtr,a)
 
 #define deRefStablePtrzh(r,sp) do {		\
-  ASSERT(stable_ptr_table[sp & ~STABLEPTR_WEIGHT_MASK].weight > 0);	\
-  r = stable_ptr_table[sp & ~STABLEPTR_WEIGHT_MASK].addr; \
+  ASSERT(stable_ptr_table[stgCast(StgWord,sp) & ~STABLEPTR_WEIGHT_MASK].weight > 0);	\
+  r = stable_ptr_table[stgCast(StgWord,sp) & ~STABLEPTR_WEIGHT_MASK].addr; \
 } while (0);
 
 #define eqStablePtrzh(r,sp1,sp2) \
-    (r = ((sp1 & ~STABLEPTR_WEIGHT_MASK) == (sp2 & ~STABLEPTR_WEIGHT_MASK)))
+    (r = ((stgCast(StgWord,sp1) & ~STABLEPTR_WEIGHT_MASK) == (stgCast(StgWord,sp2) & ~STABLEPTR_WEIGHT_MASK)))
 
 #endif
 

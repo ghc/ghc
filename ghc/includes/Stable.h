@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.h,v 1.4 1999/03/02 19:44:16 sof Exp $
+ * $Id: Stable.h,v 1.5 2000/04/13 15:37:11 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -35,28 +35,28 @@ extern DLL_IMPORT_RTS unsigned int SPT_size;
 extern inline StgPtr
 deRefStablePtr(StgStablePtr sp)
 {
-  ASSERT(stable_ptr_table[sp & ~STABLEPTR_WEIGHT_MASK].weight > 0);
-  return stable_ptr_table[sp & ~STABLEPTR_WEIGHT_MASK].addr;
+  ASSERT(stable_ptr_table[stgCast(StgWord,sp) & ~STABLEPTR_WEIGHT_MASK].weight > 0);
+  return stable_ptr_table[stgCast(StgWord,sp) & ~STABLEPTR_WEIGHT_MASK].addr;
 }
 
 extern inline void
 freeStablePtr(StgStablePtr sp)
 {
-  StgWord sn = sp & ~STABLEPTR_WEIGHT_MASK;
+  StgWord sn = stgCast(StgWord,sp) & ~STABLEPTR_WEIGHT_MASK;
   
   ASSERT(sn < SPT_size
 	 && stable_ptr_table[sn].addr != NULL
 	 && stable_ptr_table[sn].weight > 0);
   
-  stable_ptr_table[sn].weight += (sp & STABLEPTR_WEIGHT_MASK) >> STABLEPTR_WEIGHT_SHIFT;
+  stable_ptr_table[sn].weight += (stgCast(StgWord,sp) & STABLEPTR_WEIGHT_MASK) >> STABLEPTR_WEIGHT_SHIFT;
 }
 
 extern inline StgStablePtr
 splitStablePtr(StgStablePtr sp)
 {
   /* doesn't need access to the stable pointer table */
-  StgWord weight = (sp & STABLEPTR_WEIGHT_MASK) / 2;
-  return (sp & ~STABLEPTR_WEIGHT_MASK) + weight;
+  StgWord weight = (stgCast(StgWord,sp) & STABLEPTR_WEIGHT_MASK) / 2;
+  return stgCast(StgStablePtr,(stgCast(StgWord,sp) & ~STABLEPTR_WEIGHT_MASK) + weight);
 }
 
 /* No deRefStableName, because the existence of a stable name doesn't

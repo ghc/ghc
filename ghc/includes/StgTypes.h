@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgTypes.h,v 1.10 2000/04/06 13:41:16 panne Exp $
+ * $Id: StgTypes.h,v 1.11 2000/04/13 15:37:11 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -112,7 +112,7 @@ typedef StgWord            StgOffset;        /* byte offset within closure */
                            
 typedef struct StgTSO_*    StgTSOPtr;
 
-typedef void *             StgForeignPtr;
+typedef void*              StgForeignPtr;
 
 typedef StgInt             StgStackOffset;   /* offset in words! */
 
@@ -130,8 +130,12 @@ typedef StgWord64	       LW_;
 /* Stable Pointers:  A stable pointer is represented as an index into
  * the stable pointer table in the low 24 bits with a weight in the
  * upper 8 bits.
+ * SUP: StgStablePtr used to be a synonym for StgWord, but stable pointers
+ * are guaranteed to be void* on the C-side, so we have to do some occasional
+ * casting. Size is not a matter, because StgWord is always the same size as
+ * a void*.
  */
-typedef StgWord            StgStablePtr;
+typedef void*		   StgStablePtr;
 
 #define STABLEPTR_WEIGHT_MASK   ((StgWord)0xff << ((sizeof(StgWord)-1) * BITS_PER_BYTE))
 #define STABLEPTR_WEIGHT_SHIFT  (BITS_IN(StgWord) - 8)
