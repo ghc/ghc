@@ -1,3 +1,0 @@
-__export ShouldSucceed G H;
-1 type G = (H, PrelBase.Char) ;
-1 type H = [PrelBase.Bool] ;

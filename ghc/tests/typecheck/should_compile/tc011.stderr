@@ -1,2 +1,0 @@
-__export ShouldSucceed x;
-1 x :: __forall [t] => t ;

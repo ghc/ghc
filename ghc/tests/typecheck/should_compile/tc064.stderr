@@ -1,3 +1,0 @@
-__export ShouldSucceed Boolean{FF TT} idb;
-1 data Boolean = FF |  TT ;
-1 idb :: Boolean -> Boolean ;

@@ -1,2 +1,0 @@
-__export ShouldSucceed g;
-1 g :: __forall [t t1] => {PrelNum.Num t1} -> ([t1], t) -> t1 ;

@@ -1,4 +1,0 @@
-__export ShouldSucceed AList{ANull ANode} IntList g;
-1 data AList a = ANull |  ANode a (AList a) ;
-1 g :: __forall [t] => {PrelNum.Num t} -> AList PrelBase.Bool -> t ;
-1 type IntList = AList PrelBase.Int ;

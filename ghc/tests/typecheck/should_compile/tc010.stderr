@@ -1,2 +1,0 @@
-__export ShouldSucceed p;
-1 p :: [(PrelNum.Integer, PrelBase.Bool)] ;

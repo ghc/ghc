@@ -1,2 +1,0 @@
-__export ShouldSucceed f;
-1 f :: PrelBase.Bool -> PrelBase.Bool ;

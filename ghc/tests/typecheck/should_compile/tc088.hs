@@ -1,7 +1,6 @@
 -- Check that "->" is an instance of Eval
 
 module ShouldSucceed where
-import Int( Num(fromInt) )
 
 instance Show (a->b)
 
@@ -18,4 +17,3 @@ instance (Num b) => Num (a -> b) where
     abs f                     =  \a -> abs (f a)
     signum f                  =  \a -> signum (f a)
     fromInteger n             =  \a -> fromInteger n
-    fromInt n                 =  \a -> fromInt n

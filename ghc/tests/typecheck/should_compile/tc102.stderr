@@ -1,2 +1,0 @@
-__export ShouldCompile p;
-1 p :: __forall [a] => a -> a ;

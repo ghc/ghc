@@ -1,4 +1,2 @@
 
 tcfail030.hs:3: Variable not in scope: `main'
-
-tcfail030.hs:3: Module `Main' must include a definition for `main'

@@ -1,3 +1,0 @@
-__export ShouldSucceed A{op1};
-1 class {PrelBase.Eq a}  => A a where {op1 :: a -> a} ;
-1 zddmop1 :: __forall [a] => {A a} -> a -> a ;

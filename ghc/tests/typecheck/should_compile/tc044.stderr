@@ -1,2 +1,0 @@
-__export ShouldSucceed f;
-1 f :: __forall [t] => t -> PrelBase.Z0T ;

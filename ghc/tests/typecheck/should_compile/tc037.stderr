@@ -1,5 +1,0 @@
-__export ShouldSucceed Eqzq{deq};
-instance __forall [a] => {Eqzq a} -> {Eqzq [a]} = zdfEqzqZMZN;
-1 class Eqzq a where {deq :: a -> a -> PrelBase.Bool} ;
-1 zddmdeq :: __forall [a] => {Eqzq a} -> a -> a -> PrelBase.Bool ;
-1 zdfEqzqZMZN :: __forall [a] => {Eqzq a} -> {Eqzq [a]} ;

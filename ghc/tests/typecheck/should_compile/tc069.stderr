@@ -1,4 +1,0 @@
-__export ShouldSucceed x y ys;
-1 x :: PrelBase.Char ;
-1 y :: PrelBase.Char ;
-1 ys :: [PrelBase.Char] ;

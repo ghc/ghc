@@ -1,4 +1,0 @@
-__export ShouldSucceed a f x;
-1 a :: __forall [t t1] => (t, t1) ;
-1 f :: __forall [t t1 t2] => t -> (t1, t2) ;
-1 x :: __forall [t] => t ;

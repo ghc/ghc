@@ -1,2 +1,0 @@
-__export ShouldSucceed n;
-1 n :: __forall [t] => {PrelNum.Num t} -> PrelBase.Bool -> t ;

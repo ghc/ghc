@@ -1,4 +1,0 @@
-
-tc109.hs:11:
-    Illegal instance declaration for `P b'
-	(There must be at least one non-type-variable in the instance head)

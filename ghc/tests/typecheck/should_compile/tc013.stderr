@@ -1,3 +1,0 @@
-__export ShouldSucceed r s;
-1 r :: PrelNum.Integer ;
-1 s :: PrelBase.Char ;

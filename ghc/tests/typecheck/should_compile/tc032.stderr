@@ -1,2 +1,0 @@
-__export ShouldSucceed AList{Node Other};
-1 data AList b = Node b [b] |  Other (b, PrelBase.Char) ;

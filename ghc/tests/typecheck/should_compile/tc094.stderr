@@ -1,2 +1,0 @@
-__export ShouldSucceed foo;
-1 foo :: __forall [t] => t -> (PrelNum.Integer, PrelNum.Integer) ;

@@ -9,5 +9,4 @@ tcfail076.hs:18:
     Type to generalise: (b -> m res1) -> m res1
     When checking an expression type signature
     In the first argument of `KContT', namely `(\ cont' -> cont a)'
-    In the right-hand side of a lambda abstraction:
-	KContT (\ cont' -> cont a)
+    in a lambda abstraction: KContT (\ cont' -> cont a)

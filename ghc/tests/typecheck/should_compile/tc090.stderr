@@ -1,3 +1,0 @@
-__export ShouldSucceed a b;
-1 a :: __forall [f] => {PrelBase.Ord f} -> f ;
-1 b :: __forall [f] => {PrelBase.Ord f} -> f ;

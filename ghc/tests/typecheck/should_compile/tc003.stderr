@@ -1,4 +1,0 @@
-__export ShouldSucceed c d e;
-1 c :: (PrelNum.Integer, PrelNum.Integer) ;
-1 d :: PrelNum.Integer ;
-1 e :: PrelNum.Integer ;

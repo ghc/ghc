@@ -1,8 +1,0 @@
-__export ShouldSucceed Foo{op1 op2};
-instance {Foo PrelBase.Int} = zdfFooInt;
-instance __forall [a] => {Foo a} -> {Foo [a]} = zdfFooZMZN;
-1 class Foo a where {op1 = :: a -> PrelBase.Bool; op2 = :: __forall [b] => {PrelBase.Ord b} -> a -> b -> b -> b} ;
-1 zddmop1 :: __forall [a] => {Foo a} -> a -> PrelBase.Bool ;
-1 zddmop2 :: __forall [a] => {Foo a} -> (__forall [b] => {PrelBase.Ord b} -> a -> b -> b -> b) ;
-1 zdfFooInt :: {Foo PrelBase.Int} ;
-1 zdfFooZMZN :: __forall [a] => {Foo a} -> {Foo [a]} ;

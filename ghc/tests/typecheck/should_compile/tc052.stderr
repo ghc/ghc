@@ -1,4 +1,0 @@
-__export ShouldSucceed A B C;
-1 type A a = B   a ;
-1 type B c = C ;
-1 type C = PrelBase.Int ;

@@ -1,2 +1,0 @@
-__export ShouldSucceed h;
-1 h :: [PrelNum.Integer] ;

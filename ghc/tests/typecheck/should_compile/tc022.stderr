@@ -1,3 +1,0 @@
-__export ShouldSucceed iD main;
-1 iD :: __forall [t] => t -> t ;
-1 main :: __forall [t] => t -> t ;
