@@ -204,7 +204,7 @@ tryWW is_rec fn_id rhs
 	-- inside its __inline wrapper.  Death!  Disaster!
   = returnUs [ (fn_id', rhs) ]
 
-  | is_thunk && worthSplittingThunk fn_dmd res_info
+  | is_thunk && worthSplittingThunk maybe_fn_dmd res_info
   = ASSERT( isNonRec is_rec )	-- The thunk must be non-recursive
     splitThunk fn_id' rhs
 
@@ -215,11 +215,11 @@ tryWW is_rec fn_id rhs
   = returnUs [ (fn_id', rhs) ]
 
   where
-    fn_info   	= idInfo fn_id
-    fn_dmd    	= newDemandInfo fn_info
-    unfolding 	= unfoldingInfo fn_info
-    inline_prag = inlinePragInfo fn_info
-    maybe_sig   = newStrictnessInfo fn_info
+    fn_info   	 = idInfo fn_id
+    maybe_fn_dmd = newDemandInfo fn_info
+    unfolding 	 = unfoldingInfo fn_info
+    inline_prag  = inlinePragInfo fn_info
+    maybe_sig    = newStrictnessInfo fn_info
 
 	-- In practice it always will have a strictness 
 	-- signature, even if it's a uninformative one
@@ -360,15 +360,15 @@ worthSplittingFun ds res
     worth_it (Eval (Prod ds)) = True	-- Product arg to evaluate
     worth_it other	      = False
 
-worthSplittingThunk :: Demand		-- Demand on the thunk
+worthSplittingThunk :: Maybe Demand	-- Demand on the thunk
 		    -> DmdResult	-- CPR info for the thunk
 		    -> Bool
-worthSplittingThunk dmd res
-  = worth_it dmd || returnsCPR res
+worthSplittingThunk maybe_dmd res
+  = worth_it maybe_dmd || returnsCPR res
   where
 	-- Split if the thing is unpacked
-    worth_it (Eval (Prod ds)) = not (all isAbsent ds)
-    worth_it other	      = False
+    worth_it (Just (Eval (Prod ds))) = not (all isAbsent ds)
+    worth_it other	   	     = False
 \end{code}
 
 

@@ -27,6 +27,7 @@ import Id		( Id, idType, idInlinePragma,
 #endif
 			  idNewStrictness, idNewStrictness_maybe,
 			  setIdNewStrictness, idNewDemandInfo,
+			  idNewDemandInfo_maybe,
 			  setIdNewDemandInfo, idName 
 			)
 #ifdef OLD_STRICTNESS
@@ -68,6 +69,7 @@ dmdAnalPgm dflags binds
   = do {
 	showPass dflags "Demand analysis" ;
 	let { binds_plus_dmds = do_prog binds } ;
+
 	endPass dflags "Demand analysis" 
 	 	Opt_D_dump_stranal binds_plus_dmds ;
 #ifdef OLD_STRICTNESS
@@ -90,7 +92,8 @@ dmdAnalTopBind sigs (NonRec id rhs)
 	(    _, _, (_,   rhs1)) = dmdAnalRhs TopLevel sigs (id, rhs)
 	(sigs2, _, (id2, rhs2)) = dmdAnalRhs TopLevel sigs (id, rhs1)
 		-- Do two passes to improve CPR information
-		-- See the comments with mkSigTy.ignore_cpr_info below
+		-- See comments with ignore_cpr_info in mk_sig_ty
+		-- and with extendSigsWithLam
     in
     (sigs2, NonRec id2 rhs2)    
 
@@ -98,6 +101,7 @@ dmdAnalTopBind sigs (Rec pairs)
   = let
 	(sigs', _, pairs')  = dmdFix TopLevel sigs pairs
 		-- We get two iterations automatically
+		-- c.f. the NonRec case above
     in
     (sigs', Rec pairs')
 \end{code}
@@ -188,7 +192,8 @@ dmdAnal sigs dmd (Lam var body)
 
   | Call body_dmd <- dmd	-- A call demand: good!
   = let	
-	(body_ty, body') = dmdAnal sigs body_dmd body
+	sigs'		 = extendSigsWithLam sigs var
+	(body_ty, body') = dmdAnal sigs' body_dmd body
 	(lam_ty, var')   = annotateLamIdBndr body_ty var
     in
     (lam_ty, Lam var' body')
@@ -209,7 +214,7 @@ dmdAnal sigs dmd (Case scrut case_bndr [alt@(DataAlt dc,bndrs,rhs)])
 	(alt_ty, alt')	      = dmdAnalAlt sigs_alt dmd alt
 	(alt_ty1, case_bndr') = annotateBndr alt_ty case_bndr
 	(_, bndrs', _)	      = alt'
-	case_bndr_sig	      = StrictSig (mkDmdType emptyVarEnv [] RetCPR)
+	case_bndr_sig	      = cprSig
 		-- Inside the alternative, the case binder has the CPR property.
 		-- Meaning that a case on it will successfully cancel.
 		-- Example:
@@ -321,7 +326,7 @@ dmdFix top_lvl sigs orig_pairs
   = loop 1 initial_sigs orig_pairs
   where
     bndrs        = map fst orig_pairs
-    initial_sigs = extendSigEnvList sigs [(id, (initial_sig id, top_lvl)) | id <- bndrs]
+    initial_sigs = extendSigEnvList sigs [(id, (initialSig id, top_lvl)) | id <- bndrs]
     
     loop :: Int
 	 -> SigEnv			-- Already contains the current sigs
@@ -358,16 +363,16 @@ dmdFix top_lvl sigs orig_pairs
 	  -- old_sig   		   = lookup sigs id
 	  -- new_sig  	   	   = lookup sigs' id
 	   
+    same_sig sigs sigs' var = lookup sigs var == lookup sigs' var
+    lookup sigs var = case lookupVarEnv sigs var of
+			Just (sig,_) -> sig
+
 	-- Get an initial strictness signature from the Id
 	-- itself.  That way we make use of earlier iterations
 	-- of the fixpoint algorithm.  (Cunning plan.)
 	-- Note that the cunning plan extends to the DmdEnv too,
 	-- since it is part of the strictness signature
-    initial_sig id = idNewStrictness_maybe id `orElse` botSig
-
-    same_sig sigs sigs' var = lookup sigs var == lookup sigs' var
-    lookup sigs var = case lookupVarEnv sigs var of
-			Just (sig,_) -> sig
+initialSig id = idNewStrictness_maybe id `orElse` botSig
 
 dmdAnalRhs :: TopLevelFlag 
 	-> SigEnv -> (Id, CoreExpr)
@@ -401,10 +406,85 @@ mkTopSigTy rhs dmd_ty = snd (mk_sig_ty False False rhs dmd_ty)
 
 mkSigTy :: Id -> CoreExpr -> DmdType -> (DmdEnv, StrictSig)
 mkSigTy id rhs dmd_ty = mk_sig_ty (isNeverActive (idInlinePragma id))
-				  (isStrictDmd (idNewDemandInfo id))
+				  ok_to_keep_cpr_info
 				  rhs dmd_ty
+  where
+    ok_to_keep_cpr_info = case idNewDemandInfo_maybe id of
+			    Nothing  -> True	-- Is the case the first time round
+			    Just dmd -> isStrictDmd dmd
+\end{code}
 
-mk_sig_ty never_inline strictly_demanded rhs (DmdType fv dmds res) 
+The ok_to_keep_cpr_info stuff [CPR-AND-STRICTNESS]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If the rhs is a thunk, we usually forget the CPR info, because
+it is presumably shared (else it would have been inlined, and 
+so we'd lose sharing if w/w'd it into a function.
+
+However, if the strictness analyser has figured out (in a previous 
+iteration) that it's strict, then we DON'T need to forget the CPR info.
+Instead we can retain the CPR info and do the thunk-splitting transform 
+(see WorkWrap.splitThunk).
+
+This made a big difference to PrelBase.modInt, which had something like
+	modInt = \ x -> let r = ... -> I# v in
+			...body strict in r...
+r's RHS isn't a value yet; but modInt returns r in various branches, so
+if r doesn't have the CPR property then neither does modInt
+Another case I found in practice (in Complex.magnitude), looks like this:
+		let k = if ... then I# a else I# b
+		in ... body strict in k ....
+(For this example, it doesn't matter whether k is returned as part of
+the overall result; but it does matter that k's RHS has the CPR property.)  
+Left to itself, the simplifier will make a join point thus:
+		let $j k = ...body strict in k...
+		if ... then $j (I# a) else $j (I# b)
+With thunk-splitting, we get instead
+		let $j x = let k = I#x in ...body strict in k...
+		in if ... then $j a else $j b
+This is much better; there's a good chance the I# won't get allocated.
+
+The difficulty with this is that we need the strictness type to
+look at the body... but we now need the body to calculate the demand
+on the variable, so we can decide whether its strictness type should
+have a CPR in it or not.  Simple solution: 
+	a) use strictness info from the previous iteration
+	b) make sure we do at least 2 iterations, by doing a second
+	   round for top-level non-recs.  Top level recs will get at
+	   least 2 iterations except for totally-bottom functions
+	   which aren't very interesting anyway.
+
+NB: strictly_demanded is never true of a top-level Id, or of a recursive Id.
+
+The Nothing case in ok_to_keep_cpr_info [CPR-AND-STRICTNESS]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Demand info now has a 'Nothing' state, just like strictness info.
+The analysis works from 'dangerous' towards a 'safe' state; so we 
+start with botSig for 'Nothing' strictness infos, and we start with
+"yes, it's demanded" for 'Nothing' in the demand info.  The
+fixpoint iteration will sort it all out.
+
+We can't start with 'not-demanded' because then consider
+	f x = let 
+		  t = ... I# x
+	      in
+	      if ... then t else I# y else f x'
+
+In the first iteration we'd have no demand info for x, so assume
+not-demanded; then we'd get TopRes for f's CPR info.  Next iteration
+we'd see that t was demanded, and so give it the CPR property, but
+by now f has TopRes, so it will stay TopRes.  
+
+Instead, with the Nothing setting the first time round, we say
+'yes t is demanded' the first time.  
+
+However, this does mean that for non-recursive bindings we must
+iterate twice to be sure of not getting over-optimistic CPR info,
+in the case where t turns out to be not-demanded.  This is handled
+by dmdAnalTopBind.
+
+
+\begin{code}
+mk_sig_ty never_inline ok_to_keep_cpr_info rhs (DmdType fv dmds res) 
   | never_inline && not (isBotRes res)
 	-- 			HACK ALERT
 	-- Don't strictness-analyse NOINLINE things.  Why not?  Because
@@ -475,41 +555,7 @@ mk_sig_ty never_inline strictly_demanded rhs (DmdType fv dmds res)
     res' = case res of
 		RetCPR | ignore_cpr_info -> TopRes
 		other	 		 -> res
-    ignore_cpr_info = is_thunk && not strictly_demanded
-    is_thunk	    = not (exprIsValue rhs)
-	-- If the rhs is a thunk, we forget the CPR info, because
-	-- it is presumably shared (else it would have been inlined, and 
-	-- so we'd lose sharing if w/w'd it into a function.
-	--
-	-- Also, if the strictness analyser has figured out (in a previous iteration)
-	-- that it's strict, the let-to-case transformation will happen, so again 
-	-- it's good.
-	-- This made a big difference to PrelBase.modInt, which had something like
-	--	modInt = \ x -> let r = ... -> I# v in
-	--			...body strict in r...
-	-- r's RHS isn't a value yet; but modInt returns r in various branches, so
-	-- if r doesn't have the CPR property then neither does modInt
-	-- Another case I found in practice (in Complex.magnitude), looks like this:
-	-- 		let k = if ... then I# a else I# b
-	--		in ... body strict in k ....
-	-- (For this example, it doesn't matter whether k is returned as part of
-	-- the overall result.)  Left to itself, the simplifier will make a join
-	-- point thus:
-	--		let $j k = ...body strict in k...
-	--		if ... then $j (I# a) else $j (I# b)
-	-- 
-	--
-	-- The difficulty with this is that we need the strictness type to
-	-- look at the body... but we now need the body to calculate the demand
-	-- on the variable, so we can decide whether its strictness type should
-	-- have a CPR in it or not.  Simple solution: 
-	--	a) use strictness info from the previous iteration
-	--	b) make sure we do at least 2 iterations, by doing a second
-	--	   round for top-level non-recs.  Top level recs will get at
-	--	   least 2 iterations except for totally-bottom functions
-	--	   which aren't very interesting anyway.
-	--
-	-- NB: strictly_demanded is never true of a top-level Id, or of a recursive Id.
+    ignore_cpr_info = not (exprIsValue rhs || ok_to_keep_cpr_info)
 \end{code}
 
 The unpack strategy determines whether we'll *really* unpack the argument,
@@ -664,6 +710,24 @@ extendSigEnv :: TopLevelFlag -> SigEnv -> Id -> StrictSig -> SigEnv
 extendSigEnv top_lvl env var sig = extendVarEnv env var (sig, top_lvl)
 
 extendSigEnvList = extendVarEnvList
+
+extendSigsWithLam :: SigEnv -> Id -> SigEnv
+-- Extend the SigEnv when we meet a lambda binder
+-- If the binder is marked demanded with a product demand, 
+-- then give it a CPR signature, because in the likely event
+-- that this is a lambda on a fn defn [we only use this when
+-- the lambda is being consumed with a call demand],
+-- it'll be w/w'd and so it will be CPR-ish
+-- NOTE: see notes [CPR-AND-STRICTNESS]
+extendSigsWithLam sigs id
+  = case idNewDemandInfo_maybe id of
+	Nothing	       -> pprTrace "Yes (bot)" (ppr id) $ extendVarEnv sigs id (cprSig, NotTopLevel)
+	Just (Eval ds) -> pprTrace "Yes" (ppr id) $ extendVarEnv sigs id (cprSig, NotTopLevel)
+	other          -> pprTrace "No" (ppr id $$ ppr (idNewDemandInfo id)) $ sigs
+
+cprSig :: StrictSig
+cprSig = StrictSig (mkDmdType emptyVarEnv [] RetCPR)
+	
 
 dmdTransform :: SigEnv		-- The strictness environment
 	     -> Id		-- The function

@@ -105,6 +105,7 @@ import qualified Demand
 import NewDemand
 import Outputable	
 import Util		( seqList, listLengthCmp )
+import Maybe		( isJust )
 import List		( replicate )
 
 -- infixl so you can say (id `set` a `set` b)
@@ -215,6 +216,12 @@ oldDemand (Call _)         = WwStrict
 \end{code}
 
 
+\begin{code}
+seqNewDemandInfo Nothing    = ()
+seqNewDemandInfo (Just dmd) = seqDemand dmd
+\end{code}
+
+
 %************************************************************************
 %*									*
 \subsection{GlobalIdDetails
@@ -296,7 +303,10 @@ data IdInfo
 						-- know whether whether this is the first visit,
 						-- so it can assign botSig.  Other customers want
 						-- topSig.  So Nothing is good.
-	newDemandInfo	  :: Demand
+
+	newDemandInfo	  :: Maybe Demand	-- Similarly we want to know if there's no
+						-- known demand yet, for when we are looking for
+						-- CPR info
     }
 
 seqIdInfo :: IdInfo -> ()
@@ -312,7 +322,7 @@ megaSeqIdInfo info
 -- some unfoldings are not calculated at all
 --    seqUnfolding (unfoldingInfo info)		`seq`
 
-    seqDemand (newDemandInfo info)		`seq`
+    seqNewDemandInfo (newDemandInfo info)	`seq`
     seqNewStrictnessInfo (newStrictnessInfo info) `seq`
 
 #ifdef OLD_STRICTNESS
@@ -352,7 +362,7 @@ setUnfoldingInfo  info uf
 	--	let x = (a,b) in h a b x
 	-- and now x is not demanded (I'm assuming h is lazy)
 	-- This really happens.  The solution here is a bit ad hoc...
-  = info { unfoldingInfo = uf, newDemandInfo = Top }
+  = info { unfoldingInfo = uf, newDemandInfo = Nothing }
 
   | otherwise
 	-- We do *not* seq on the unfolding info, For some reason, doing so 
@@ -392,7 +402,7 @@ vanillaIdInfo
 	    lbvarInfo		= NoLBVarInfo,
 	    inlinePragInfo 	= AlwaysActive,
 	    occInfo		= NoOccInfo,
-	    newDemandInfo	= topDmd,
+	    newDemandInfo	= Nothing,
 	    newStrictnessInfo   = Nothing
 	   }
 
@@ -765,28 +775,29 @@ part of an unsaturated lambda
 \begin{code}
 zapLamInfo :: IdInfo -> Maybe IdInfo
 zapLamInfo info@(IdInfo {occInfo = occ, newDemandInfo = demand})
-  | is_safe_occ && not (isStrictDmd demand)
+  | is_safe_occ occ && is_safe_dmd demand
   = Nothing
   | otherwise
-  = Just (info {occInfo = safe_occ,
-		newDemandInfo = Top})
+  = Just (info {occInfo = safe_occ, newDemandInfo = Nothing})
   where
 	-- The "unsafe" occ info is the ones that say I'm not in a lambda
 	-- because that might not be true for an unsaturated lambda
-    is_safe_occ = case occ of
-		 	OneOcc in_lam once -> in_lam
-			other	  	   -> True
+    is_safe_occ (OneOcc in_lam once) = in_lam
+    is_safe_occ other		     = True
 
     safe_occ = case occ of
 		 OneOcc _ once -> OneOcc insideLam once
 		 other	       -> occ
+
+    is_safe_dmd Nothing    = True
+    is_safe_dmd (Just dmd) = not (isStrictDmd dmd)
 \end{code}
 
 \begin{code}
 zapDemandInfo :: IdInfo -> Maybe IdInfo
-zapDemandInfo info@(IdInfo {newDemandInfo = demand})
-  | not (isStrictDmd demand) = Nothing
-  | otherwise		     = Just (info {newDemandInfo = Top})
+zapDemandInfo info@(IdInfo {newDemandInfo = dmd})
+  | isJust dmd = Just (info {newDemandInfo = Nothing})
+  | otherwise  = Nothing
 \end{code}
 
 

@@ -62,7 +62,7 @@ module Id (
 #endif
 
 	idArity, 
-	idNewDemandInfo,
+	idNewDemandInfo, idNewDemandInfo_maybe,
 	idNewStrictness, idNewStrictness_maybe, 
         idTyGenInfo,
 	idWorkerInfo,
@@ -99,12 +99,12 @@ import Type		( Type, typePrimRep, addFreeTyVars,
 import IdInfo 
 
 import qualified Demand	( Demand )
-import NewDemand	( Demand, StrictSig, topSig, isBottomingSig )
+import NewDemand	( Demand, StrictSig, topDmd, topSig, isBottomingSig )
 import Name	 	( Name, OccName,
 			  mkSystemName, mkInternalName,
 			  getOccName, getSrcLoc
 			) 
-import OccName		( EncodedFS, UserFS, mkWorkerOcc )
+import OccName		( EncodedFS, mkWorkerOcc )
 import PrimRep		( PrimRep )
 import TysPrim		( statePrimTyCon )
 import FieldLabel	( FieldLabel )
@@ -383,11 +383,14 @@ setIdDemandInfo :: Id -> Demand.Demand -> Id
 setIdDemandInfo id demand_info = modifyIdInfo (`setDemandInfo` demand_info) id
 #endif
 
-idNewDemandInfo :: Id -> NewDemand.Demand
-idNewDemandInfo id = newDemandInfo (idInfo id)
+idNewDemandInfo_maybe :: Id -> Maybe NewDemand.Demand
+idNewDemandInfo       :: Id -> NewDemand.Demand
+
+idNewDemandInfo_maybe id = newDemandInfo (idInfo id)
+idNewDemandInfo       id = newDemandInfo (idInfo id) `orElse` NewDemand.topDmd
 
 setIdNewDemandInfo :: Id -> NewDemand.Demand -> Id
-setIdNewDemandInfo id dmd = modifyIdInfo (`setNewDemandInfo` dmd) id
+setIdNewDemandInfo id dmd = modifyIdInfo (`setNewDemandInfo` Just dmd) id
 
 	---------------------------------
 	-- SPECIALISATION
