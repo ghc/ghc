@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.c,v 1.14 2002/07/17 09:21:49 simonmar Exp $
+ * $Id: BlockAlloc.c,v 1.15 2003/01/28 17:04:58 simonmar Exp $
  *
  * (c) The GHC Team 1998-2000
  * 
@@ -29,7 +29,7 @@ static void    initMBlock(void *mblock);
 static bdescr *allocMegaGroup(nat mblocks);
 static void    freeMegaGroup(bdescr *bd);
 
-static bdescr *free_list;
+static bdescr *free_list = NULL;
 
 /* -----------------------------------------------------------------------------
    Initialisation
@@ -37,7 +37,7 @@ static bdescr *free_list;
 
 void initBlockAllocator(void)
 {
-  free_list = NULL;
+    // The free list starts off NULL
 }
 
 /* -----------------------------------------------------------------------------
