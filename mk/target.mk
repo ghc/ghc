@@ -451,6 +451,8 @@ endef
 ifneq "$(HS_SRCS)" ""
 ifeq "$(SplitObjs)" "YES"
 
+SRC_HC_OPTS += -split-objs
+
 define BUILD_LIB
 $(RM) $@
 TMPDIR=$(TMPDIR); export TMPDIR; $(FIND) $(patsubst %.$(way_)o,%,$(LIBOBJS)) -name '*.$(way_)o' -print | xargs ar q $@
@@ -464,16 +466,21 @@ HC_SPLIT_PRE= \
  $(FIND) $(basename $@) -name '*.$(way_)o' -print | xargs $(RM) __rm_food ; fi
 HC_SPLIT_POST  = touch $@
 
-ifeq "$(SplitObjs)" "YES"
-HC_PRE__  = $(HC_SPLIT_PRE) ;
-HC_POST__ = $(HC_SPLIT_POST) ;
-endif
+SRC_HC_PRE_OPTS  += $(HC_SPLIT_PRE) ;
+SRC_HC_POST_OPTS += $(HC_SPLIT_POST) ;
 
-SRC_HC_POST_OPTS += $(HC_POST__)
-SRC_HC_PRE_OPTS  += $(HC_PRE__)
+#
+# If (Haskell) object files are split, cleaning up 
+# consist of descending into the directories where
+# the myriads of object files have been put.
+#
+
+clean ::
+	$(FIND) $(patsubst %.$(way_)o,%,$(HS_OBJS)) -name '*.$(way_)o' -print | xargs $(RM) __rm_food
+	-rmdir $(patsubst %.$(way_)o,%,$(HS_OBJS)) > /dev/null 2>&1
 
 endif # $(SplitObjs)
-endif
+endif # $(HS_SRCS)
 
 #
 # Remove local symbols from library objects if requested.
@@ -1092,21 +1099,6 @@ maintainer-clean:: mostlyclean clean distclean
 	@echo 'deletes files that may need special tools to rebuild.'
 	rm -f $(MAINTAINER_CLEAN_FILES)
 endif
-
-#
-# If (Haskell) object files are split, cleaning up 
-# consist of descending into the directories where
-# the myriads of object files have been put.
-#
-
-ifneq "$(HS_OBJS)" ""
-ifneq "$(filter -split-objs,$(HC_OPTS))" ""
-clean ::
-	$(FIND) $(patsubst %.$(way_)o,%,$(HS_OBJS)) -name '*.$(way_)o' -print | xargs $(RM) __rm_food
-	-rmdir $(patsubst %.$(way_)o,%,$(HS_OBJS)) > /dev/null 2>&1
-endif
-endif
-
 
 #################################################################################
 #
