@@ -365,6 +365,74 @@ $(DLL_NAME) :: $(LIBRARY)
 	touch dLL_ifs.hi
 endif
 
+#
+# Version information is baked into a DLL by having the DLL include DllVersionInfo.o.
+# The version info contains two user tweakables: DLL_VERSION and DLL_VERSION_NAME.
+# (both are given sensible defaults though.)
+#
+# Note: this will not work as expected with Cygwin B20.1; you need a more recent
+#       snapshot of binutils (to pick up windres bugfixes.)
+
+ifndef DLL_VERSION
+DLL_VERSION=$(ProjectVersion)
+endif
+
+ifndef DLL_VERSION_NAME
+DLL_VERSION_NAME="http://www.haskell.org/ghc"
+endif
+
+ifndef DLL_DESCRIPTION
+DLL_DESCRIPTION="A GHC-compiled DLL"
+endif
+
+ifndef EXE_VERSION
+EXE_VERSION=$(ProjectVersion)
+endif
+
+ifndef EXE_VERSION_NAME
+EXE_VERSION_NAME="http://www.haskell.org/ghc"
+endif
+
+ifndef EXE_DESCRIPTION
+EXE_DESCRIPTION="A GHC-compiled binary"
+endif
+
+#
+# Little bit of lo-fi mangling to get at the right set of settings depending
+# on whether we're generating the VERSIONINFO for a DLL or EXE
+# 
+DLL_OR_EXE=$(subst VersionInfo.rc,,$@)
+VERSION_FT=$(subst Dll, 0x2L, $(subst Exe, 0x1L, $(DLL_OR_EXE)))
+VERSION_RES_NAME=$(subst Exe,$(EXE_VERSION_NAME), $(subst Dll, $(DLL_VERSION_NAME),$(DLL_OR_EXE)))
+VERSION_RES=$(subst Exe,$(EXE_VERSION), $(subst Dll, $(DLL_VERSION),$(DLL_OR_EXE)))
+VERSION_DESC=$(subst Exe,$(EXE_DESCRIPTION), $(subst Dll, $(DLL_DESCRIPTION),$(DLL_OR_EXE)))
+
+DllVersionInfo.rc ExeVersionInfo.rc:
+	$(RM) DllVersionInfo.rc
+	echo "1 VERSIONINFO"  		    > $@
+	echo "FILEVERSION 1,0,0,1"         >> $@
+	echo "PRODUCTVERSION 1,0,0,1"      >> $@
+	echo "FILEFLAGSMASK 0x3fL"         >> $@
+	echo "FILEOS 0x4L"                 >> $@
+	echo "FILETYPE $(VERSION_FT)"      >> $@
+	echo "FILESUBTYPE 0x0L"            >> $@
+	echo "BEGIN"                       >> $@
+	echo " BLOCK \"StringFileInfo\""   >> $@
+	echo " BEGIN"                      >> $@
+	echo "  BLOCK \"040904B0\""        >> $@
+	echo "  BEGIN"                     >> $@
+	echo "   VALUE \"CompanyName\", \"$(VERSION_RES_NAME)\\0\"" >> $@
+	echo "   VALUE \"FileVersion\", \"$(VERSION_RES)\\0\"" >> $@
+	echo "   VALUE \"ProductVersion\", \"$(VERSION_RES)\\0\"" >> $@
+	echo "   VALUE \"FileDescription\", \"$(VERSION_DESC)\\0\"" >> $@
+	echo "  END" >> $@
+	echo " END" >> $@
+	echo " BLOCK \"VarFileInfo\""  >> $@
+	echo " BEGIN" >> $@
+	echo "  VALUE \"Translation\", 0x0409, 1200" >> $@
+	echo " END" >> $@
+	echo "END" >> $@
+
 #----------------------------------------
 #	Script programs
 

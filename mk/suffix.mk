@@ -250,3 +250,13 @@ SRC_HC_PRE_OPTS  += $(HC_PRE__)
 	@$(RM) $@
 	$(UNLIT) $(UNLIT_OPTS) $< $@
 	@chmod 444 $@
+
+#-----------------------------------------------------------------------------
+# Win32 resource files
+#
+# The default is to use the GNU resource compiler.
+#
+
+%.o : %.rc
+	@$(RM) $@
+	windres $< $@
