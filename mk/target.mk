@@ -446,7 +446,7 @@ SRC_HC_POST_OPTS += $(HC_SPLIT_POST) ;
 # the myriads of object files have been put.
 #
 
-clean ::
+extraclean ::
 	$(FIND) $(patsubst %.$(way_)o,%,$(HS_OBJS)) -name '*.$(way_)o' -print | xargs $(RM) __rm_food
 	-rmdir $(patsubst %.$(way_)o,%,$(HS_OBJS)) > /dev/null 2>&1
 
@@ -1030,7 +1030,7 @@ CLEAN_FILES += $(SGML_TEXT) $(SGML_TEX) $(SGML_PS) $(SGML_DVI) $(SGML_PDF) $(SGM
 # can't use $(SGML_SRCS) here, it was maybe used elsewhere
 MOSTLY_CLEAN_FILES += $(patsubst %.vsgml, %.sgml, $(VSGML_SRCS))
 
-clean ::
+extraclean ::
 	$(RM) -rf $(SGML_DOC)
 
 endif
@@ -1041,32 +1041,28 @@ endif
 #
 ###########################################
 
+# we have to be careful about recursion here; since all the clean
+# targets are recursive, we don't want to make eg. distclean depend on
+# clean because that would result in far too many recursive calls.
+
 .PHONY: mostlyclean clean distclean maintainer-clean
 
-ifneq "$(MOSTLY_CLEAN_FILES)" ""
 mostlyclean::
 	rm -f $(MOSTLY_CLEAN_FILES)
-endif
 
-clean:: mostlyclean
-ifneq "$(CLEAN_FILES)" ""
-clean::
-	rm -f $(CLEAN_FILES)
-endif
+# extraclean is used for adding actions to the clean target.
+extraclean::
 
-distclean:: clean
-ifneq "$(DIST_CLEAN_FILES)" ""
-distclean::
-	rm -f $(DIST_CLEAN_FILES)
-endif
+clean:: extraclean
+	rm -f $(MOSTLY_CLEAN_FILES) $(CLEAN_FILES)
 
-maintainer-clean:: distclean
-ifneq "$(MAINTAINER_CLEAN_FILES)" ""
-maintainer-clean:: 
+distclean:: extraclean
+	rm -f $(MOSTLY_CLEAN_FILES) $(CLEAN_FILES) $(DIST_CLEAN_FILES)
+
+maintainer-clean:: extraclean
 	@echo 'This command is intended for maintainers to use; it'
 	@echo 'deletes files that may need special tools to rebuild.'
-	rm -f $(MAINTAINER_CLEAN_FILES)
-endif
+	rm -f $(MOSTLY_CLEAN_FILES) $(CLEAN_FILES) $(MAINTAINER_CLEAN_FILES)
 
 #################################################################################
 #
