@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.117 2003/05/23 16:36:58 panne Exp $
+dnl $Id: aclocal.m4,v 1.118 2003/05/30 09:09:09 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -795,11 +795,11 @@ AC_CACHE_VAL(fptools_cv_have_o_binary,
 [
 AC_LANG_SAVE
 AC_LANG_C
-AC_TRY_COMPILE(,
+AC_TRY_COMPILE(
 [#ifdef HAVE_FCNTL_H
 #include <fcntl.h>
-#endif
-int x = O_BINARY;],
+#endif],
+[int x = O_BINARY;],
 fptools_cv_have_o_binary=yes,
 fptools_cv_have_o_binary=no)
 AC_LANG_RESTORE
