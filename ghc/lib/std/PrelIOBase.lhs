@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.41 2001/05/31 10:03:35 simonmar Exp $
+% $Id: PrelIOBase.lhs,v 1.42 2001/06/01 13:06:01 sewardj Exp $
 % 
 % (c) The University of Glasgow, 1994-2001
 %
@@ -153,6 +153,7 @@ data Handle__
   = Handle__ {
       haFD	    :: !FD,
       haType        :: HandleType,
+      haIsBin       :: Bool,
       haBufferMode  :: BufferMode,
       haFilePath    :: FilePath,
       haBuffer	    :: !(IORef Buffer),
@@ -352,6 +353,7 @@ showHandle p h =
     showHdl (haType hdl_) 
 	    (showString "loc=" . showString (haFilePath hdl_) . showChar ',' .
 	     showString "type=" . showsPrec p (haType hdl_) . showChar ',' .
+	     showString "binary=" . showsPrec p (haIsBin hdl_) . showChar ',' .
 	     showString "buffering=" . showBufMode (unsafePerformIO (readIORef (haBuffer hdl_))) (haBufferMode hdl_) . showString "}" )
    where
     showHdl :: HandleType -> ShowS -> ShowS
