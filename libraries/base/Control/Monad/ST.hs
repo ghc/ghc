@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (requires universal quantification for runST)
 --
--- $Id: ST.hs,v 1.3 2001/07/03 11:37:49 simonmar Exp $
+-- $Id: ST.hs,v 1.4 2001/07/31 13:31:44 simonmar Exp $
 --
 -- The State Transformer Monad, ST
 --
@@ -37,6 +37,9 @@ import GHC.ST
 import GHC.Prim		( unsafeCoerce#, RealWorld )
 import GHC.IOBase 	( IO(..), stToIO )
 
+-- This relies on IO and ST having the same representation modulo the
+-- constraint on the type of the state
+--
 unsafeIOToST        :: IO a -> ST s a
 unsafeIOToST (IO io) = ST $ \ s -> (unsafeCoerce# io) s
 #endif
