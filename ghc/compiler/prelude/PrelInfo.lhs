@@ -38,6 +38,7 @@ import MkId		( mkPrimOpId, wiredInIds )
 import MkId		-- All of it, for re-export
 import TysPrim		( primTyCons )
 import TysWiredIn	( wiredInTyCons )
+import HscTypes		( TyThing(..) )
 
 -- others:
 import RdrName		( RdrName )
@@ -70,7 +71,7 @@ wiredInThings
 	, map AnId wiredInIds
 
 		-- PrimOps
-	, map (AnId . mkPrimOpId)) allThePrimOps
+	, map (AnId . mkPrimOpId) allThePrimOps
     ]
 
 wiredInNames :: [Name]

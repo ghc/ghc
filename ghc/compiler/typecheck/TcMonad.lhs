@@ -109,7 +109,7 @@ type TcKind      = TcType
 
 \begin{code}
 type NF_TcM r =  TcDown -> TcEnv -> IO r	-- Can't raise UserError
-type TcM    s r =  TcDown -> TcEnv -> IO r	-- Can raise UserError
+type TcM    r =  TcDown -> TcEnv -> IO r	-- Can raise UserError
 	-- ToDo: nuke the 's' part
 	-- The difference between the two is
 	-- now for documentation purposes only
@@ -591,7 +591,7 @@ data TcDown
 	ErrCtxt			-- Error context
 	(TcRef (Bag WarnMsg, Bag ErrMsg))
 
-type ErrCtxt = [TidyEnv -> NF_TcM Unused (TidyEnv, Message)]	
+type ErrCtxt = [TidyEnv -> NF_TcM (TidyEnv, Message)]	
 			-- Innermost first.  Monadic so that we have a chance
 			-- to deal with bound type variables just before error
 			-- message construction

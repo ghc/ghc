@@ -27,9 +27,10 @@ import PrimRep		( getPrimRepSize, PrimRep(..) )
 import Unique		( Unique{-instance Eq-} )
 import UniqSupply	( uniqFromSupply, uniqsFromSupply, splitUniqSupply, 
 			  UniqSupply )
-import CmdLineOpts      ( opt_OutputLanguage, opt_EmitCExternDecls )
+import CmdLineOpts      ( opt_EmitCExternDecls )
 import PrimOp		( PrimOp(..), CCall(..), isDynamicTarget )
 import Panic		( panic )
+import FastTypes
 
 import Maybe		( isJust )
 
@@ -340,7 +341,7 @@ flatAbsC (CSwitch discrim alts deflt)
 	returnFlt ( (tag, alt_heres), alt_tops )
 
 flatAbsC stmt@(COpStmt results (CCallOp ccall@(CCall target is_asm _ _)) args vol_regs)
-  | isCandidate && opt_OutputLanguage == Just "C"	-- Urgh
+  | isCandidate
   = returnFlt (stmt, tdef)
   | otherwise
   = returnFlt (stmt, AbsCNop)
@@ -520,8 +521,7 @@ other1		  `conflictsWith` other2		= False
 
 regConflictsWithRR :: MagicId -> RegRelative -> Bool
 
-regConflictsWithRR (VanillaReg k _ILIT(1)) (NodeRel _)	= True
-
+regConflictsWithRR (VanillaReg k n) (NodeRel _)	| n ==# (_ILIT 1)    = True
 regConflictsWithRR Sp	(SpRel _)	= True
 regConflictsWithRR Hp	(HpRel _)	= True
 regConflictsWithRR _	_		= False
@@ -530,17 +530,20 @@ rrConflictsWithRR :: Int -> Int			-- Sizes of two things
 		  -> RegRelative -> RegRelative -- The two amodes
 		  -> Bool
 
-rrConflictsWithRR (I# s1) (I# s2) rr1 rr2 = rr rr1 rr2
+rrConflictsWithRR s1b s2b rr1 rr2 = rr rr1 rr2
   where
+    s1 = iUnbox s1b
+    s2 = iUnbox s2b
+
     rr (SpRel o1)    (SpRel o2)
-	| s1 ==# _ILIT(0) || s2 ==# _ILIT(0) = False -- No conflict if either is size zero
-	| s1 ==# _ILIT(1)  && s2 ==# _ILIT(1) = o1 ==# o2
+	| s1 ==# (_ILIT 0) || s2 ==# (_ILIT 0) = False -- No conflict if either is size zero
+	| s1 ==# (_ILIT 1)  && s2 ==# (_ILIT 1) = o1 ==# o2
 	| otherwise	     = (o1 +# s1) >=# o2  &&
 			       (o2 +# s2) >=# o1
 
     rr (NodeRel o1)	 (NodeRel o2)
-	| s1 ==# _ILIT(0) || s2 ==# _ILIT(0) = False -- No conflict if either is size zero
-	| s1 ==# _ILIT(1) && s2 ==# _ILIT(1) = o1 ==# o2
+	| s1 ==# (_ILIT 0) || s2 ==# (_ILIT 0) = False -- No conflict if either is size zero
+	| s1 ==# (_ILIT 1) && s2 ==# (_ILIT 1) = o1 ==# o2
 	| otherwise	     = True		-- Give up
 
     rr (HpRel _)	 (HpRel _)    = True	-- Give up (ToDo)
