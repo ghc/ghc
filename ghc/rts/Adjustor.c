@@ -366,7 +366,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 			while(n--)
 			{
 				__asm__ volatile ("dcbf 0,%0\n\tsync\n\ticbi 0,%0"
-						    : : "g" (p));
+						    : : "r" (p));
 				p++;
 			}
 			__asm__ volatile ("sync\n\tisync");
