@@ -87,6 +87,10 @@ doIt (core_cmds, stg_cmds)
 	 hPutStr stderr booter_version				>>
 	 hPutStr stderr "\n")					>>
 
+#ifdef GHCI
+    linkPrelude >>
+#endif
+
 	--------------------------  Reader  ----------------
     show_pass "Parser"	>>
     _scc_     "Parser"
