@@ -120,6 +120,20 @@ PrelMain.dll_o : PrelMain.lhs
 	$(RM) ../PrelMain.lhs ../PrelMain.dll_hi
 endif
 
+
+#
+# If we're building the unregisterised way, it may well be for Hugs.
+# In that case, remember to bind the cbits objects into a single file
+# which hugs can load as an auxiliary object file when loading the Prelude.
+#
+ifeq "$(way)" "u"
+all :: libHS_cbits.u_o
+CLEAN_FILES += libHS_cbits.u_o
+libHS_cbits.u_o:
+	$(RM) libHS_cbits.u_o
+	ld -r -o libHS_cbits.u_o cbits/*.o
+endif
+
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries
 #
