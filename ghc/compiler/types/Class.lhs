@@ -26,7 +26,14 @@ module Class (
 
 CHK_Ubiq() -- debugging consistency check
 
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(TyLoop)
+#else
+import {-# SOURCE #-} Id
+import {-# SOURCE #-} Type
+import {-# SOURCE #-} TysWiredIn
+import {-# SOURCE #-} TysPrim
+#endif
 
 #if __GLASGOW_HASKELL__ >= 202
 import Name
