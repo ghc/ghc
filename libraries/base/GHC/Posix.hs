@@ -211,13 +211,37 @@ tcSetAttr fd options p_tios = do
 
 -- bogus defns for win32
 setCooked :: Int -> Bool -> IO ()
-setCooked fd cooked = return ()
+setCooked fd cooked = do
+  x <- set_console_buffering (fromIntegral fd) (if cooked then 1 else 0)
+  if (x /= 0)
+   then ioException (ioe_unk_error "setCooked" "failed to set buffering")
+   else return ()
+
+ioe_unk_error loc msg 
+ = IOError Nothing OtherError loc msg Nothing
 
 setEcho :: Int -> Bool -> IO ()
-setEcho fd on = return ()
+setEcho fd on = do
+  x <- set_console_echo (fromIntegral fd) (if on then 1 else 0)
+  if (x /= 0)
+   then ioException (ioe_unk_error "setEcho" "failed to set echoing")
+   else return ()
 
 getEcho :: Int -> IO Bool
-getEcho fd = return False
+getEcho fd = do
+  r <- get_console_echo (fromIntegral fd)
+  if (r == (-1))
+   then ioException (ioe_unk_error "getEcho" "failed to get echoing")
+   else return (r == 1)
+
+foreign import ccall unsafe "consUtils.h set_console_buffering__"
+   set_console_buffering :: CInt -> CInt -> IO CInt
+
+foreign import ccall unsafe "consUtils.h set_console_echo__"
+   set_console_echo :: CInt -> CInt -> IO CInt
+
+foreign import ccall unsafe "consUtils.h get_console_echo__"
+   get_console_echo :: CInt -> IO CInt
 
 #endif
 
