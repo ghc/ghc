@@ -139,6 +139,6 @@ AC_OUTPUT(Makefile)
 
 echo "****************************************************"
 echo "Configuration done, ready to either 'make install'"
-echo "or 'make in-place', followed by 'make install-docs'."
+echo "or 'make in-place'."
 echo "(see README and INSTALL files for more info.)"
 echo "****************************************************"

@@ -1,3 +1,33 @@
+
+--------------------------------------------------------------------
+
+The short story (if you are installing GHC from a binary dist):
+
+- Decide where you want to install it.
+- Do    ./configure --prefix=where-i-want-to-install-it
+- Do    make install
+
+That installs everything - the compiler, interactive system,
+libraries, and documentation.  At the end of 'make install' you will
+be informed of what you need to add to your PATH, and also the
+location of the documentation.
+
+Linux users: GHCi-5.00 needs libreadline.so.3.  Newer Linuxes (SuSE
+7.1, possibly RH 7.X, possibly Mandrake 8.X) only come with
+libreadline.so.4.  If you need libreadline.so.3 and only have the .4
+version, you might be able to get things working by making a symbolic
+link from libreadline.so.4 to libreadline.so.3.  We tried this on a
+SuSE 7.1 box and it seemed to work.
+
+If something doesn't work as it should, please contact us at
+glasgow-haskell-bugs@haskell.org.
+
+JRS, 10 April 2001.
+
+--------------------------------------------------------------------
+
+The Long Story
+
 This is the INSTALL instructions for a binary distribution of one of
 the fptools projects. For more details on what on earth this package
 is up to, please consult the README and ANNOUNCE.
@@ -49,3 +79,5 @@ Bug reports/suggestions for improvement to the installation procedure/setup
 gratefully received at glasgow-haskell-bugs@haskell.org
 
 Enjoy.
+
+--------------------------------------------------------------------

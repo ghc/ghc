@@ -190,9 +190,19 @@ install-dirs ::
 	(cd lib/$(platform); find . -type d -exec sh -c '../../$(INSTALL_DIR) $$0 $(libdir)/$$0' {} \; )
 	(cd share; find . -type d -exec sh -c '../$(INSTALL_DIR) $(datadir)/$$0' {} \; )
 
-install :: config-pkgs install-dirs install-bin install-libs install-datas postinstall
+install :: config-pkgs install-dirs install-bin install-libs install-datas install-docs postinstall denounce
 
-.PHONY: install-bin install-libs install-datas postinstall
+.PHONY: install-bin install-libs install-datas postinstall denounce
+
+denounce:
+	@echo
+	@echo Installation of ghc-5.00 was successful.
+	@echo To use, add $(bindir) to your PATH.
+	@echo Docs:
+	@echo "   GHC User Guide  is $(htmldir)/set/book-users-guide.html"
+	@echo "   Libraries Guide is $(htmldir)/set/book-hslibs.html"
+	@echo "   .ps form of both is in $(htmldir)/set/set.ps"
+	@echo
 
 postinstall:
 	if test -x "./post-install-script" ; then \
@@ -239,31 +249,15 @@ show-install-setup:
 	@echo "datadir = $(datadir) (datadir = $(datadir))"
 
 #
-# Documentation targets, install-docs for the whole lot, or
-# install-{dvi,html,info}
+# Documentation targets: install-docs.
 #
 
-.PHONY: show-install-setup install-docs install-html install-info install-dirs-dvi install-dirs-html install-dirs-info
+.PHONY: show-install-setup install-docs install-dirs-docs
 
-install-docs : install-html install-dvi install-info
-
-install-dvi: install-dirs-dvi
-	$(INSTALL_DATA) dvi/* $(dvidir)
-
-install-info: install-dirs-info
-	$(INSTALL_DATA) info/* $(infodir)
-
-install-html: install-dirs-html
+install-docs : install-dirs-docs
 	$(CP) -r html/* $(htmldir)
-	$(CHMOD) -R $(LIB_PERMS) $(htmldir)
-#	$(INSTALL_DATA) html/* $(htmldir)
+	$(CP) ps/set.ps $(htmldir)/set/set.ps
 
-install-dirs-html:
+install-dirs-docs:
 	$(INSTALL_DIR) $(htmldir) 
-
-install-dirs-info:
-	$(INSTALL_DIR) $(infodir) 
-
-install-dirs-dvi:
-	$(INSTALL_DIR) $(dvidir) 
 
