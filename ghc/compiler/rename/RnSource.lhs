@@ -869,7 +869,7 @@ rnNote (UfCoerce ty)
 rnNote (UfSCC cc)   = returnM (UfSCC cc)
 rnNote UfInlineCall = returnM UfInlineCall
 rnNote UfInlineMe   = returnM UfInlineMe
-
+rnNote (UfCoreNote s) = returnM (UfCoreNote s)
 
 rnUfCon UfDefault
   = returnM UfDefault

@@ -1045,6 +1045,7 @@ eqExpr e1 e2
     eq_note env (SCC cc1)      (SCC cc2)      = cc1 == cc2
     eq_note env (Coerce t1 f1) (Coerce t2 f2) = t1 `eqType` t2 && f1 `eqType` f2
     eq_note env InlineCall     InlineCall     = True
+    eq_note env (CoreNote s1)  (CoreNote s2)  = s1 == s2
     eq_note env other1	       other2	      = False
 \end{code}
 
@@ -1075,6 +1076,7 @@ noteSize (SCC cc)       = cc `seq` 1
 noteSize (Coerce t1 t2) = seqType t1 `seq` seqType t2 `seq` 1
 noteSize InlineCall     = 1
 noteSize InlineMe       = 1
+noteSize (CoreNote s)   = s `seq` 1  -- hdaume: core annotations
 
 varSize :: Var -> Int
 varSize b  | isTyVar b = 1

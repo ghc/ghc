@@ -265,6 +265,10 @@ rnExpr (HsCCall fun args may_gc is_casm _)
 				       cReturnableClassName, 
 				       ioDataConName])
 
+rnExpr (HsCoreAnn ann expr)
+  = rnExpr expr `thenM` \ (expr', fvs_expr) ->
+    returnM (HsCoreAnn ann expr', fvs_expr)
+
 rnExpr (HsSCC lbl expr)
   = rnExpr expr	 	`thenM` \ (expr', fvs_expr) ->
     returnM (HsSCC lbl expr', fvs_expr)

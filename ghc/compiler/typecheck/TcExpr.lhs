@@ -173,7 +173,8 @@ tcMonoExpr (HsPar expr)    res_ty  = tcMonoExpr expr res_ty	`thenM` \ expr' ->
 tcMonoExpr (HsSCC lbl expr) res_ty = tcMonoExpr expr res_ty	`thenM` \ expr' ->
 				     returnM (HsSCC lbl expr')
 
-
+tcMonoExpr (HsCoreAnn lbl expr) res_ty = tcMonoExpr expr res_ty `thenM` \ expr' ->  -- hdaume: core annotation
+                                         returnM (HsCoreAnn lbl expr')
 tcMonoExpr (NegApp expr neg_name) res_ty
   = tcMonoExpr (HsApp (HsVar neg_name) expr) res_ty
 	-- ToDo: use tcSyntaxName

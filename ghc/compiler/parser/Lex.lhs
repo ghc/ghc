@@ -133,6 +133,7 @@ data Token
   | ITdeprecated_prag
   | ITline_prag
   | ITscc_prag
+  | ITcore_prag                 -- hdaume: core annotations
   | ITclose_prag
 
   | ITdotdot  			-- reserved symbols
@@ -230,6 +231,7 @@ pragmaKeywordsFM = listToUFM $
 	( "RULES",	ITrules_prag ),
 	( "RULEZ",	ITrules_prag ),	-- american spelling :-)
 	( "SCC",	ITscc_prag ),
+        ( "CORE",       ITcore_prag ),  -- hdaume: core annotation
 	( "DEPRECATED",	ITdeprecated_prag )
  	]
 

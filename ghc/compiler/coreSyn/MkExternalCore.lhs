@@ -146,6 +146,7 @@ make_exp (Case e v alts) = C.Case (make_exp e) (make_vbind v) (map make_alt alts
 make_exp (Note (SCC cc) e) = C.Note "SCC"  (make_exp e) -- temporary
 make_exp (Note (Coerce t_to t_from) e) = C.Coerce (make_ty t_to) (make_exp e)
 make_exp (Note InlineCall e) = C.Note "InlineCall" (make_exp e)
+make_exp (Note (CoreNote s) e) = C.Note s (make_exp e)  -- hdaume: core annotations
 make_exp (Note InlineMe e) = C.Note "InlineMe" (make_exp e)
 make_exp _ = error "MkExternalCore died: make_exp"
 

@@ -109,6 +109,8 @@ data Note
   | InlineMe		-- Instructs simplifer to treat the enclosed expression
 			-- as very small, and inline it at its call sites
 
+  | CoreNote String     -- A generic core annotation, propagated but not used by GHC
+
 -- NOTE: we also treat expressions wrapped in InlineMe as
 -- 'cheap' and 'dupable' (in the sense of exprIsCheap, exprIsDupable)
 -- What this means is that we obediently inline even things that don't
@@ -549,6 +551,7 @@ seqExprs [] = ()
 seqExprs (e:es) = seqExpr e `seq` seqExprs es
 
 seqNote (Coerce t1 t2) = seqType t1 `seq` seqType t2
+seqNote (CoreNote s)   = s `seq` ()
 seqNote other	       = ()
 
 seqBndr b = b `seq` ()

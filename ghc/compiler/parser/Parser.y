@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.115 2003/02/12 15:01:37 simonpj Exp $
+$Id: Parser.y,v 1.116 2003/02/20 18:33:53 simonpj Exp $
 
 Haskell grammar.
 
@@ -140,6 +140,7 @@ Conflicts: 29 shift/reduce, [SDM 19/9/2002]
  '{-# INLINE'      { ITinline_prag }
  '{-# NOINLINE'    { ITnoinline_prag }
  '{-# RULES'	   { ITrules_prag }
+ '{-# CORE'        { ITcore_prag }              -- hdaume: annotated core
  '{-# SCC'	   { ITscc_prag }
  '{-# DEPRECATED'  { ITdeprecated_prag }
  '#-}'		   { ITclose_prag }
@@ -957,6 +958,8 @@ exp10 :: { RdrNameHsExpr }
         | scc_annot exp		    		{ if opt_SccProfilingOn
 							then HsSCC $1 $2
 							else HsPar $2 }
+
+        | '{-# CORE' STRING '#-}' exp           { HsCoreAnn $2 $4 }    -- hdaume: core annotation
 
 	| reifyexp				{ HsReify $1 }
 	| fexp					{ $1 }

@@ -568,6 +568,11 @@ zonkExpr env (HsSCC lbl expr)
   = zonkExpr env expr	`thenM` \ new_expr ->
     returnM (HsSCC lbl new_expr)
 
+-- hdaume: core annotations
+zonkExpr env (HsCoreAnn lbl expr)
+  = zonkExpr env expr   `thenM` \ new_expr ->
+    returnM (HsCoreAnn lbl new_expr)
+
 zonkExpr env (TyLam tyvars expr)
   = mappM zonkTcTyVarToTyVar tyvars	`thenM` \ new_tyvars ->
 	-- No need to extend tyvar env; see AbsBinds

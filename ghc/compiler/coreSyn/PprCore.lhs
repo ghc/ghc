@@ -44,6 +44,7 @@ import PprType		( pprParendType, pprType, pprTyVarBndr )
 import BasicTypes	( tupleParens )
 import Util             ( lengthIs )
 import Outputable
+import FastString       ( mkFastString )
 \end{code}
 
 %************************************************************************
@@ -234,6 +235,11 @@ ppr_expr add_par (Note InlineCall expr)
 
 ppr_expr add_par (Note InlineMe expr)
   = add_par $ ptext SLIT("__inline_me") <+> pprParendExpr expr
+
+ppr_expr add_par (Note (CoreNote s) expr)
+  = add_par $ 
+    sep [sep [ptext SLIT("__core_note"), pprHsString (mkFastString s)],
+         pprParendExpr expr]
 
 pprCoreAlt (con, args, rhs) 
   = hang (ppr_case_pat con args) 2 (pprCoreExpr rhs)

@@ -454,10 +454,11 @@ corePrepExprFloat env expr@(App _ _)
         where
 	  ty = exprType fun
 
-    ignore_note	InlineCall = True
-    ignore_note	InlineMe   = True
-    ignore_note	_other     = False
-	-- we don't ignore SCCs, since they require some code generation
+    ignore_note	(CoreNote _) = True 
+    ignore_note	InlineCall   = True
+    ignore_note	InlineMe     = True
+    ignore_note	_other       = False
+	-- We don't ignore SCCs, since they require some code generation
 
 ------------------------------------------------------------------------------
 -- Building the saturated syntax

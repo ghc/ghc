@@ -241,6 +241,13 @@ dsExpr (HsSCC cc expr)
     getModuleDs			`thenDs` \ mod_name ->
     returnDs (Note (SCC (mkUserCC cc mod_name)) core_expr)
 
+
+-- hdaume: core annotation
+
+dsExpr (HsCoreAnn fs expr)
+  = dsExpr expr        `thenDs` \ core_expr ->
+    returnDs (Note (CoreNote $ unpackFS fs) core_expr)
+
 -- special case to handle unboxed tuple patterns.
 
 dsExpr (HsCase discrim matches src_loc)

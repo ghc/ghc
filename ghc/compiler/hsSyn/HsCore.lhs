@@ -76,6 +76,7 @@ data UfNote name = UfSCC CostCentre
 	         | UfCoerce (HsType name)
 	         | UfInlineCall
 	         | UfInlineMe
+                 | UfCoreNote String
 
 type UfAlt name = (UfConAlt name, [name], UfExpr name)
 
@@ -124,6 +125,7 @@ toUfNote (SCC cc)	= UfSCC cc
 toUfNote (Coerce t1 _)	= UfCoerce (toHsType t1)
 toUfNote InlineCall	= UfInlineCall
 toUfNote InlineMe	= UfInlineMe
+toUfNote (CoreNote s)   = UfCoreNote s
 
 ---------------------
 toUfBind (NonRec b r) = UfNonRec (toUfBndr b) (toUfExpr r)
@@ -252,6 +254,7 @@ instance Outputable name => Outputable (UfNote name) where
     ppr (UfCoerce ty) = ptext SLIT("__coerce") <+> pprParendHsType ty
     ppr UfInlineCall  = ptext SLIT("__inline_call")
     ppr UfInlineMe    = ptext SLIT("__inline_me")
+    ppr (UfCoreNote s)= ptext SLIT("__core_note") <+> pprHsString (mkFastString s)
 
 instance Outputable name => Outputable (UfConAlt name) where
     ppr UfDefault	   = text "__DEFAULT"
@@ -353,6 +356,7 @@ eq_ufExpr env (UfNote n1 r1) (UfNote n2 r2)
     eq_ufNote (UfCoerce t1) (UfCoerce t2) = eq_hsType env t1 t2
     eq_ufNote UfInlineCall  UfInlineCall  = True
     eq_ufNote UfInlineMe    UfInlineMe    = True
+    eq_ufNote (UfCoreNote s1) (UfCoreNote s2) = s1==s2
     eq_ufNote _		    _		  = False
 
 eq_ufExpr env _ _ = False

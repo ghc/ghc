@@ -536,7 +536,6 @@ mkMethId :: InstOrigin -> Class
 	 -> TcM (Maybe Inst, Id)
 	     
 -- mkMethId instantiates the selector Id at the specified types
--- THe 
 mkMethId origin clas sel_id inst_tys
   = let
 	(tyvars,rho) = tcSplitForAllTys (idType sel_id)

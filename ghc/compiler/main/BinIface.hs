@@ -940,6 +940,9 @@ instance (Binary name) => Binary (UfNote name) where
 	    putByte bh 2
     put_ bh UfInlineMe = do
 	    putByte bh 3
+    put_ bh (UfCoreNote s) = do
+            putByte bh 4
+            put_ bh s
     get bh = do
 	    h <- getByte bh
 	    case h of
@@ -948,7 +951,9 @@ instance (Binary name) => Binary (UfNote name) where
 	      1 -> do ab <- get bh
 		      return (UfCoerce ab)
 	      2 -> do return UfInlineCall
-	      _ -> do return UfInlineMe
+	      3 -> do return UfInlineMe
+              _ -> do ac <- get bh
+                      return (UfCoreNote ac)
 
 instance (Binary name) => Binary (BangType name) where
     put_ bh (BangType aa ab) = do

@@ -157,6 +157,9 @@ data HsExpr id
 
   | HsSCC	FastString	-- "set cost centre" (_scc_) annotation
 		(HsExpr id) 	-- expr whose cost is to be measured
+
+  | HsCoreAnn   FastString      -- hdaume: core annotation
+                (HsExpr id)
 		
   -- MetaHaskell Extensions
   | HsBracket    (HsBracket id) SrcLoc

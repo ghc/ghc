@@ -842,6 +842,10 @@ simplNote env InlineMe e cont
 		-- an interesting context of any kind to combine with
 		-- (even a type application -- anything except Stop)
   = simplExprF env e cont
+
+simplNote env (CoreNote s) e cont
+  = simplExpr env e    `thenSmpl` \ e' ->
+    rebuild env (Note (CoreNote s) e') cont
 \end{code}
 
 

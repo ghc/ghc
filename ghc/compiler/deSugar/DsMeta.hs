@@ -488,6 +488,7 @@ repE (ArithSeqIn aseq) =
 			     ds3 <- repE e3
 			     repFromThenTo ds1 ds2 ds3
 repE (PArrSeqOut _ aseq)  = panic "DsMeta.repE: parallel array seq.s missing"
+repE (HsCoreAnn _ _)      = panic "DsMeta.repE: Can't represent CoreAnn" -- hdaume: core annotations
 repE (HsCCall _ _ _ _ _)  = panic "DsMeta.repE: Can't represent __ccall__"
 repE (HsSCC _ _)          = panic "DsMeta.repE: Can't represent SCC"
 repE (HsBracketOut _ _)   = 
