@@ -570,7 +570,8 @@ AC_ARG_ENABLE(hopengl,
 UseQuartzOpenGL=NO
 if test x"$TargetOS_CPP" = x"darwin"; then
   if test x"$enable_hopengl" != x"x11"; then
-    AC_DEFINE(USE_QUARTZ_OPENGL)
+    AC_DEFINE([USE_QUARTZ_OPENGL], [1],
+              [Define to 1 if native OpenGL should be used on Mac OS X])
     UseQuartzOpenGL=YES
   fi
 fi
