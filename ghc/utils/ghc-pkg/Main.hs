@@ -25,7 +25,6 @@ import Compat.Directory 	( getAppUserDataDirectory, createDirectoryIfMissing )
 import Compat.RawSystem 	( rawSystem )
 import Control.Exception	( evaluate )
 import qualified Control.Exception as Exception
-import System.FilePath		( joinFileName )
 
 import Prelude
 
@@ -927,4 +926,46 @@ foreign import stdcall unsafe  "GetModuleFileNameA"
 #else
 getExecDir :: String -> IO (Maybe String) 
 getExecDir _ = return Nothing
+#endif
+
+-- -----------------------------------------------------------------------------
+-- FilePath utils
+
+-- | The 'joinFileName' function is the opposite of 'splitFileName'. 
+-- It joins directory and file names to form a complete file path.
+--
+-- The general rule is:
+--
+-- > dir `joinFileName` basename == path
+-- >   where
+-- >     (dir,basename) = splitFileName path
+--
+-- There might be an exceptions to the rule but in any case the
+-- reconstructed path will refer to the same object (file or directory).
+-- An example exception is that on Windows some slashes might be converted
+-- to backslashes.
+joinFileName :: String -> String -> FilePath
+joinFileName ""  fname = fname
+joinFileName "." fname = fname
+joinFileName dir ""    = dir
+joinFileName dir fname
+  | isPathSeparator (last dir) = dir++fname
+  | otherwise                  = dir++pathSeparator:fname
+
+-- | Checks whether the character is a valid path separator for the host
+-- platform. The valid character is a 'pathSeparator' but since the Windows
+-- operating system also accepts a slash (\"\/\") since DOS 2, the function
+-- checks for it on this platform, too.
+isPathSeparator :: Char -> Bool
+isPathSeparator ch = ch == pathSeparator || ch == '/'
+
+-- | Provides a platform-specific character used to separate directory levels in
+-- a path string that reflects a hierarchical file system organization. The
+-- separator is a slash (@\"\/\"@) on Unix and Macintosh, and a backslash
+-- (@\"\\\"@) on the Windows operating system.
+pathSeparator :: Char
+#ifdef mingw32_TARGET_OS
+pathSeparator = '\\'
+#else
+pathSeparator = '/'
 #endif
