@@ -22,7 +22,7 @@ import CoreUtils	( coreExprType, nonErrorRHSs, maybeErrorApp,
 			)
 import Id		( idType, idMustBeINLINEd, idWantsToBeINLINEd, idMustNotBeINLINEd, 
 			  addIdArity, getIdArity, getIdSpecialisation, setIdSpecialisation,
-			  getIdDemandInfo, addIdDemandInfo
+			  getIdDemandInfo, addIdDemandInfo, isSpecPragmaId
 			)
 import Name		( isExported, isLocallyDefined )
 import IdInfo		( willBeDemanded, noDemandInfo, DemandInfo, ArityInfo(..),
@@ -1085,6 +1085,7 @@ completeBind env binder@(old_id,occ_info) new_id new_rhs
   |  not (idMustNotBeINLINEd new_id)
   && atomic_rhs			-- If rhs (after eta reduction) is atomic
   && not (isExported new_id)	-- and binder isn't exported
+  && not (isSpecPragmaId new_id)	-- Don't discard spec prag Ids
 
   = 	-- Drop the binding completely
     let
