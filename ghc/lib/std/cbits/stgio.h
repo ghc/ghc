@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: stgio.h,v 1.28 2001/04/02 16:10:33 rrt Exp $
+ * $Id: stgio.h,v 1.29 2001/05/08 08:55:18 simonmar Exp $
  *
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1999
  *
@@ -108,10 +108,6 @@ StgAddr ref_freeFileObject    (void);
 
 /* getBufferMode.c */
 StgInt	getBufferMode (StgForeignPtr);
-
-/* getCPUTime.c */
-StgInt getCPUTime (StgByteArray);
-StgInt clockTicks(void);
 
 /* getLock.c */
 int     lockFile    (int, int, int);
