@@ -24,7 +24,6 @@ dnl Uncomment links to ObjectIO docs if necessary
 AC_ARG_ENABLE(objectio,
 [  --enable-objectio
         Build ObjectIO, a portable GUI library for Haskell.
-        (This option is only relevant when libraries are built.)
 ],
 [
 ObjectIOHTMLStart=""
@@ -42,8 +41,7 @@ AC_SUBST(ObjectIOHTMLEnd)
 dnl Uncomment links to HOpenGL docs if necessary
 AC_ARG_ENABLE(hopengl,
 [  --enable-hopengl
-        Build HOpenGL, a Haskell binding for OpenGL/GLUT, too.
-        (NOTE: Work in progress, currently only GLUT is supported!)
+        Build HOpenGL, a Haskell binding for OpenGL/GLUT.
 ],
 [
 HOpenGLHTMLStart=""
