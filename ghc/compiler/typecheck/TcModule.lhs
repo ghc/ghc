@@ -368,12 +368,24 @@ tcModule pcs hst get_fixity this_mod decls
 	tcForeignExports decls			`thenTc`    \ (lie_fodecls,   foe_binds, foe_decls) ->
 	tcSourceRules source_rules		`thenNF_Tc` \ (lie_rules,     more_local_rules) ->
 	
+		-- CHECK THAT main IS DEFINED WITH RIGHT TYPE, IF REQUIRED
+        traceTc (text "Tc6")			`thenNF_Tc_`
+	tcCheckMain this_mod			`thenTc_`
+
 	     -- Deal with constant or ambiguous InstIds.  How could
 	     -- there be ambiguous ones?  They can only arise if a
 	     -- top-level decl falls under the monomorphism
 	     -- restriction, and no subsequent decl instantiates its
 	     -- type.  (Usually, ambiguous type variables are resolved
 	     -- during the generalisation step.)
+	     --
+	     -- Note that we must do this *after* tcCheckMain, because of the
+	     -- following bizarre case: 
+	     --		main = return ()
+	     -- Here, we infer main :: forall a. m a, where m is a free
+	     -- type variable.  tcCheckMain will unify it with IO, and that
+	     -- must happen before tcSimplifyTop, since the latter will report
+	     -- m as ambiguous
 	let
 	    lie_alldecls = lie_valdecls	 `plusLIE`
 			   lie_instdecls `plusLIE`
@@ -381,11 +393,7 @@ tcModule pcs hst get_fixity this_mod decls
 			   lie_fodecls	 `plusLIE`
 			   lie_rules
 	in
-        traceTc (text "Tc6")				`thenNF_Tc_`
-	tcSimplifyTop lie_alldecls			`thenTc` \ const_inst_binds ->
-	
-		-- CHECK THAT main IS DEFINED WITH RIGHT TYPE, IF REQUIRED
-	tcCheckMain this_mod		`thenTc_`
+	tcSimplifyTop lie_alldecls	`thenTc` \ const_inst_binds ->
 	
 	    -- Backsubstitution.    This must be done last.
 	    -- Even tcSimplifyTop may do some unification.
@@ -482,7 +490,8 @@ typecheckIface dflags pcs hst mod_iface (syn_map, decls)
 
 	      mod_details = ModDetails { md_types = mkTypeEnv local_things,
 					 md_insts = map iDFunId local_inst_info,
-					 md_rules = [(id,rule) | IfaceRuleOut id rule <- local_rules] }
+					 md_rules = [(id,rule) | IfaceRuleOut id rule <- local_rules],
+					 md_binds = [] }
 			-- All the rules from an interface are of the IfaceRuleOut form
 	  in
           returnTc (new_pcs, mod_details)
@@ -676,7 +685,7 @@ printIfaceDump dflags (Just (_, details))
 dump_tc_iface results
   = vcat [pprModDetails (ModDetails {md_types = tc_env results, 
 				     md_insts = tc_insts results,
-				     md_rules = []}) ,
+				     md_rules = [], md_binds = []}) ,
 	  ppr_rules (tc_rules results),
 
 	  ppr_gen_tycons [tc | ATyCon tc <- nameEnvElts (tc_env results)]
