@@ -38,9 +38,11 @@ module GHC.Err
        , undefined		   -- :: a
        ) where
 
+#ifndef __HADDOCK__
 import GHC.Base
 import GHC.List     ( span )
 import GHC.Exception
+#endif
 \end{code}
 
 %*********************************************************
