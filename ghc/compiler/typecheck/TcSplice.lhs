@@ -21,14 +21,14 @@ import Convert		( convertToHsExpr, convertToHsDecls )
 import RnExpr		( rnExpr )
 import RdrHsSyn		( RdrNameHsExpr, RdrNameHsDecl )
 import RnHsSyn		( RenamedHsExpr )
-import TcExpr		( tcCheckRho )
+import TcExpr		( tcCheckRho, tcMonoExpr )
 import TcHsSyn		( TcExpr, TypecheckedHsExpr, mkHsLet, zonkTopExpr )
 import TcSimplify	( tcSimplifyTop, tcSimplifyBracket )
-import TcUnify		( unifyTauTy )
+import TcUnify		( Expected, unifyTauTy, zapExpectedTo, zapExpectedType )
 import TcType		( TcType, openTypeKind, mkAppTy )
 import TcEnv		( spliceOK, tcMetaTy, tcWithTempInstEnv, bracketOK )
 import TcRnTypes	( TopEnv(..) )
-import TcMType		( newTyVarTy, zapToType, UserTypeCtxt(ExprSigCtxt) )
+import TcMType		( newTyVarTy, UserTypeCtxt(ExprSigCtxt) )
 import TcMonoType	( tcHsSigType )
 import Name		( Name )
 import TcRnMonad
@@ -54,7 +54,7 @@ tcSpliceDecls :: RenamedHsExpr -> TcM [RdrNameHsDecl]
 
 tcSpliceExpr :: Name 
 	     -> RenamedHsExpr
-	     -> TcType
+	     -> Expected TcType
 	     -> TcM TcExpr
 
 #ifndef GHCI
@@ -70,7 +70,7 @@ tcSpliceDecls e     = pprPanic "Cant do tcSpliceDecls without GHCi" (ppr e)
 %************************************************************************
 
 \begin{code}
-tcBracket :: HsBracket Name -> TcType -> TcM TcExpr
+tcBracket :: HsBracket Name -> Expected TcType -> TcM TcExpr
 tcBracket brack res_ty
   = getStage 				`thenM` \ level ->
     case bracketOK level of {
@@ -88,7 +88,8 @@ tcBracket brack res_ty
     )					`thenM` \ (meta_ty, lie) ->
     tcSimplifyBracket lie 		`thenM_`  
 
-    unifyTauTy res_ty meta_ty		`thenM_`
+	-- Make the expected type have the right shape
+    zapExpectedTo res_ty meta_ty	`thenM_`
 
 	-- Return the original expression, not the type-decorated one
     readMutVar pending_splices		`thenM` \ pendings ->
@@ -144,7 +145,7 @@ tcSpliceExpr name expr res_ty
 	-- Here (h 4) :: Q Exp
 	-- but $(h 4) :: forall a.a 	i.e. anything!
 
-    zapToType res_ty				`thenM_`
+    zapExpectedType res_ty			`thenM_`
     tcMetaTy exprTyConName			`thenM` \ meta_exp_ty ->
     setStage (Splice next_level) (
 	setLIEVar lie_var	   $
@@ -162,7 +163,7 @@ tcSpliceExpr name expr res_ty
 -- Note that we do not decrement the level (to -1) before 
 -- typechecking the expression.  For example:
 --	f x = $( ...$(g 3) ... )
--- The recursive call to tcCheckRho will simply expand the 
+-- The recursive call to tcMonoExpr will simply expand the 
 -- inner escape before dealing with the outer one
 
 tcTopSplice expr res_ty
@@ -188,7 +189,7 @@ tcTopSplice expr res_ty
     initRn SourceMode (rnExpr expr2)		`thenM` \ (exp3, fvs) ->
     importSupportingDecls fvs			`thenM` \ env ->
 
-    setGblEnv env (tcCheckRho exp3 res_ty)
+    setGblEnv env (tcMonoExpr exp3 res_ty)
 
 
 tcTopSpliceExpr :: RenamedHsExpr -> TcType -> TcM TypecheckedHsExpr

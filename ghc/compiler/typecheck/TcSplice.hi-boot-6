@@ -2,11 +2,11 @@ module TcSplice where
 
 tcSpliceExpr :: Name.Name
 	     -> RnHsSyn.RenamedHsExpr
-	     -> TcType.TcType
+	     -> TcUnify.Expected TcType.TcType
 	     -> TcRnTypes.TcM TcHsSyn.TcExpr
 
 tcBracket :: HsExpr.HsBracket Name.Name 
-	  -> TcType.TcType
+	  -> TcUnify.Expected TcType.TcType
 	  -> TcRnTypes.TcM TcHsSyn.TcExpr
 
 tcSpliceDecls :: RnHsSyn.RenamedHsExpr 
