@@ -1100,6 +1100,21 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-framework</option> <replaceable>name</replaceable></entry>
+	      <entry>On Darwin/MacOS X only, link in the framework <replaceable>name</replaceable>.
+		This option corresponds to the <option>-framework</option> option for Apple's Linker.</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-framework-path</option> <replaceable>name</replaceable></entry>
+	      <entry>On Darwin/MacOS X only, add <replaceable>dir</replaceable> to the list of
+	        directories searched for frameworks.
+		This option corresponds to the <option>-F</option> option for Apple's Linker.</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-l</option><replaceable>lib</replaceable></entry>
 	      <entry>Link in library <replaceable>lib</replaceable></entry>
 	      <entry>static</entry>
@@ -1109,6 +1124,18 @@
 	      <entry><option>-L</option><replaceable>dir</replaceable></entry>
 	      <entry>Add <replaceable>dir</replaceable> to the list of
 	      directories searched for libraries</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-main-is</option></entry>
+	      <entry>Set main function</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-no-hs-main</option></entry>
+	      <entry>Don't asssume this program contains <literal>main</literal></entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
@@ -1125,21 +1152,6 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-framework</option> <replaceable>name</replaceable></entry>
-	      <entry>On Darwin/MacOS X only, link in the framework <replaceable>name</replaceable>.
-		This option corresponds to the <option>-framework</option> option for Apple's Linker.</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><option>-framework-path</option> <replaceable>name</replaceable></entry>
-	      <entry>On Darwin/MacOS X only, add <replaceable>dir</replaceable> to the list of
-	        directories searched for frameworks.
-		This option corresponds to the <option>-F</option> option for Apple's Linker.</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-split-objs</option></entry>
 	      <entry>Split objects (for libraries)</entry>
 	      <entry>static</entry>
@@ -1148,12 +1160,6 @@
 	    <row>
 	      <entry><option>-static</option></entry>
 	      <entry>Use static Haskell libraries</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><option>-no-hs-main</option></entry>
-	      <entry>Don't asssume this program contains <literal>main</literal></entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
