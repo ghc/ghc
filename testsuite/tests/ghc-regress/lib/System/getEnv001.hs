@@ -4,8 +4,8 @@ import IO ( isDoesNotExistError )
 
 main :: IO ()
 main = do
-    term <- getEnv "TERM"
-    putStrLn "Got $TERM"
+    term <- getEnv "PATH"
+    putStrLn "Got $PATH"
     fish <- getEnv "One fish, two fish, red fish, blue fish"  `catch` getEnv_except
     putStrLn fish
 
