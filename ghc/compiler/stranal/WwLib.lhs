@@ -11,12 +11,13 @@ module WwLib ( mkWwBodies ) where
 import CoreSyn
 import CoreUtils	( exprType )
 import Id		( Id, idType, mkSysLocal, idNewDemandInfo, setIdNewDemandInfo,
-			  isOneShotLambda, setOneShotLambda,
+			  isOneShotLambda, setOneShotLambda, setIdUnfolding,
                           setIdInfo
 			)
 import IdInfo		( vanillaIdInfo )
 import DataCon		( splitProductType_maybe, splitProductType )
-import NewDemand	( Demand(..), Keepity(..), DmdResult(..) ) 
+import NewDemand	( Demand(..), Keepity(..), DmdResult(..), isAbsentDmd ) 
+import DmdAnal		( both )
 import PrelInfo		( realWorldPrimId, aBSENT_ERROR_ID, eRROR_CSTRING_ID )
 import TysPrim		( realWorldStatePrimTy )
 import TysWiredIn	( tupleCon )
@@ -24,7 +25,7 @@ import Type		( Type, isUnLiftedType, mkFunTys,
 			  splitForAllTys, splitFunTys, splitNewType_maybe, isAlgType
 			)
 import Literal		( Literal(MachStr) )
-import BasicTypes	( Arity, Boxity(..) )
+import BasicTypes	( Boxity(..) )
 import Var              ( Var, isId )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, getUniquesUs, UniqSM )
 import Util		( zipWithEqual )
@@ -319,14 +320,28 @@ mk_ww_str (arg : ds)
 	returnUs (worker_args, wrap_fn, mk_absent_let arg . work_fn)
 
 	-- Seq and keep
-      Seq Keep _ [] ->	mk_ww_str ds		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
-			returnUs (arg : worker_args, mk_seq_case arg . wrap_fn, work_fn)
-	  		   -- Pass the arg, no need to rebox
-
-	-- Seq and discard
-      Seq Drop _ [] -> 	mk_ww_str ds		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
-		        returnUs (worker_args,  mk_seq_case arg . wrap_fn, mk_absent_let arg . work_fn)
-	  		   -- Don't pass the arg, build absent arg 
+      Seq _ _ cs 
+	| all isAbsentDmd cs
+	-> mk_ww_str ds		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
+ 	   let
+		arg_w_unf = arg `setIdUnfolding` mkOtherCon []
+		-- Tell the worker arg that it's sure to be evaluated
+		-- so that internal seqs can be dropped
+	   in
+	   returnUs (arg_w_unf : worker_args, mk_seq_case arg . wrap_fn, work_fn)
+	  	-- Pass the arg, anyway, even if it is in theory discarded
+		-- Consider
+		--	f x y = x `seq` y
+		-- x gets a (Seq Drop []) demand, but if we fail to pass it to the worker
+		-- we ABSOLUTELY MUST record that x is evaluated in the wrapper.
+		-- Something like:
+		--	f x y = x `seq` fw y
+		--	fw y = let x{Evald} = error "oops" in (x `seq` y)
+		-- If we don't pin on the "Evald" flag, the seq doesn't disappear, and
+		-- we end up evaluating the absent thunk.
+		-- But the Evald flag is pretty wierd, and I worry that it might disappear
+		-- during simplification, so for now I've just nuked this whole case
+			
 
 	-- Unpack case
       Seq keep _ cs 
@@ -335,15 +350,32 @@ mk_ww_str (arg : ds)
 	-> getUniquesUs 		`thenUs` \ uniqs ->
 	   let
 	     unpk_args	    = zipWith mk_ww_local uniqs inst_con_arg_tys
-	     unpk_args_w_ds = zipWithEqual "mk_ww_str" set_worker_arg_info unpk_args cs
+	     unpk_args_w_ds = zipWithEqual "mk_ww_str" set_worker_arg_info unpk_args cs'
 	     unbox_fn       = mk_unpk_case arg unpk_args data_con arg_tycon
 	     rebox_fn	    = mk_pk_let arg data_con tycon_arg_tys unpk_args
+
+	     cs' = case keep of
+			Keep -> map (DmdAnal.both Lazy) cs	-- Careful! Now we don't pass
+								-- the box, we must pass all the
+								-- components.   In effect
+								-- 	S(LA) -->  U(LL)
+			Drop -> cs
 	   in
 	   mk_ww_str (unpk_args_w_ds ++ ds)		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
-	   case keep of
-	     Keep -> returnUs (arg : worker_args, unbox_fn . wrap_fn, work_fn)
-	  		   -- Pass the arg, no need to rebox
-	     Drop -> returnUs (worker_args,       unbox_fn . wrap_fn, work_fn . rebox_fn)
+
+--	   case keep of
+--	     Keep -> returnUs (arg : worker_args, unbox_fn . wrap_fn, work_fn)
+--	  		   -- Pass the arg, no need to rebox
+--	     Drop -> returnUs (worker_args,       unbox_fn . wrap_fn, work_fn . rebox_fn)
+--	  		   -- Don't pass the arg, rebox instead
+-- I used to be clever here, but consider
+--	f n []     = n
+--	f n (x:xs) = f (n+x) xs
+-- Here n gets (Seq Keep [L]), but it's BAD BAD BAD to pass both n and n#
+-- Needs more thought, but the simple thing to do is to accept the reboxing
+-- stuff if there are any non-absent arguments (and that case is dealt with above):
+
+	   returnUs (worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn)
 	  		   -- Don't pass the arg, rebox instead
 
 	| otherwise -> 

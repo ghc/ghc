@@ -7,7 +7,7 @@
 			-----------------
 
 \begin{code}
-module DmdAnal ( dmdAnalPgm ) where
+module DmdAnal ( dmdAnalPgm, both {- needed by WwLib -} ) where
 
 #include "HsVersions.h"
 
@@ -174,7 +174,6 @@ dmdAnal sigs dmd (Case scrut case_bndr [alt@(DataAlt dc,bndrs,rhs)])
     isProductTyCon tycon,
     not (isRecursiveTyCon tycon)
   = let
-	bndr_ids		 = filter isId bndrs
 	(alt_ty, alt')		 = dmdAnalAlt sigs dmd alt
 	(alt_ty1, case_bndr')    = annotateBndr alt_ty case_bndr
 	(_, bndrs', _)		 = alt'
@@ -301,8 +300,8 @@ dmdFix top_lvl sigs pairs
  	where
 	  (sigs', lazy_fv1, pair') = downRhs top_lvl sigs (id,rhs)
 	  lazy_fv'		   = plusUFM_C both lazy_fv lazy_fv1   
-	  old_sig   		   = lookup sigs id
-	  new_sig  	   	   = lookup sigs' id
+	  -- old_sig   		   = lookup sigs id
+	  -- new_sig  	   	   = lookup sigs' id
 	   
 	-- Get an initial strictness signature from the Id
 	-- itself.  That way we make use of earlier iterations
@@ -785,13 +784,6 @@ both d1 d2		        = both d2 d1
 boths [] ds2  = ds2
 boths ds1 []  = ds1
 boths ds1 ds2 = ASSERT( length ds1 == length ds2 ) zipWith both ds1 ds2
-
------------------------------------
-bothRes :: DmdResult -> DmdResult -> DmdResult
--- Left-biased for CPR info
-bothRes BotRes _ = BotRes
-bothRes _ BotRes = BotRes
-bothRes r1 _     = r1
 
 -----------------------------------
 -- (t1 `bothType` t2) takes the argument/result info from t1,
