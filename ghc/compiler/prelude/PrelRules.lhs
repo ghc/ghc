@@ -15,7 +15,7 @@ module PrelRules ( primOpRule, builtinRules ) where
 import CoreSyn
 import Rules		( ProtoCoreRule(..) )
 import Id		( idUnfolding, mkWildId, isDataConId_maybe )
-import Literal		( Literal(..), mkMachInt, mkMachWord, inIntRange, literalType,
+import Literal		( Literal(..), isLitLitLit, mkMachInt, mkMachWord, inIntRange, literalType,
 			  word2IntLit, int2WordLit, int2CharLit, char2IntLit, int2FloatLit, int2DoubleLit
 			)
 import PrimOp		( PrimOp(..), primOpOcc )
@@ -141,7 +141,8 @@ why we have the catch-all Nothing case.
 \begin{code}
 --------------------------
 litCoerce :: (Literal -> Literal) -> RuleName -> Literal -> Maybe (RuleName, CoreExpr)
-litCoerce fn name lit = Just (name, Lit (fn lit))
+litCoerce fn name lit | isLitLitLit lit = Nothing
+                      | otherwise       = Just (name, Lit (fn lit))
 
 --------------------------
 cmpOp :: (Ordering -> Bool) -> FAST_STRING -> Literal -> Literal -> Maybe (RuleName, CoreExpr)
