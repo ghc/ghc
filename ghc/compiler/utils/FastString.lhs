@@ -59,9 +59,17 @@ import IOBase		( Handle__(..), IOError(..), IOErrorType(..),
 #else
 import PrelPack
 import PrelST		( StateAndPtr#(..) )
-import PrelHandle	( filePtr, readHandle, writeHandle )
+import PrelHandle	( readHandle, 
+#if __GLASGOW_HASKELL__ < 303
+			  filePtr, flushBuf,
+#endif
+			  writeHandle
+			)
 import PrelIOBase	( Handle__(..), IOError(..), IOErrorType(..),
 		  	  IOResult(..), IO(..),
+#if __GLASGOW_HASKELL__ >= 303
+			  Handle__Type(..),
+#endif
 		  	  constructError
 			)
 #endif
@@ -463,6 +471,7 @@ Outputting @FastString@s is quick, just block copying the chunk (using
 
 \begin{code}
 hPutFS :: Handle -> FastString -> IO ()
+#if __GLASGOW_HASKELL__ <= 302
 hPutFS handle (FastString _ l# ba#) =
  if l# ==# 0# then
     return ()
@@ -517,6 +526,16 @@ hPutFS handle (CharStr a# l#) =
           else
               constructError "hPutFS"   	>>= \ err ->
 	      fail err
+#else
+hPutFS handle (FastString _ l# ba#)
+  | l# ==# 0#  = return ()
+  | otherwise  = hPutBufBA handle (ByteArray bottom ba#) (I# l#)
+ where
+  bottom = error "hPutFS.ba"
 
---ToDo: avoid silly code duplic.
+hPutFS handle (CharStr a# l#)
+  | l# ==# 0#  = return ()
+  | otherwise  = hPutBuf handle (A# a#) (I# l#)
+
+#endif
 \end{code}
