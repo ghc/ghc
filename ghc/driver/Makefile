@@ -109,6 +109,10 @@ install ::
 #
 # Option vars for the special ways (that the driver has special pleading for).
 #
+# ToDo: rename -DPROFILING to -D__SCC_PROFILING (or somesuch)
+#              -DTICKY-TICKY TO __TICKY_TICKY__
+#
+#  (this is to make the naming consistent with other `standard' hscpp #defines )
 
 # Way p:
 WAY_p_NAME=profiling
@@ -124,25 +128,25 @@ WAY_u_HC_OPTS=
 
 # Way `mc': concurrent
 WAY_mc_NAME=concurrent
-WAY_mc_HC_OPTS+=-fstack-check -fconcurrent -D__CONCURRENT_HASKELL__ -DCONCURRENT -optcpp-D__CONCURRENT_HASKELL__ -optcpp-DCONCURRENT
+WAY_mc_HC_OPTS+=-fstack-check -fconcurrent -D__CONCURRENT_HASKELL__ -optc-DCONCURRENT
 
 # Way `mr': 
 WAY_mr_NAME=profiled concurrent
-WAY_mr_HC_OPTS+=-fstack-check -fconcurrent -fscc-profiling -D__CONCURRENT_HASKELL__ -DCONCURRENT -DPROFILING -optcpp-D__CONCURRENT_HASKELL__ -optcpp-DCONCURRENT -optcpp-DPROFILING
+WAY_mr_HC_OPTS+=-fstack-check -fconcurrent -fscc-profiling -D__CONCURRENT_HASKELL__ -DPROFILING -optc-DCONCURRENT -optc-DPROFILING
 
 # Way `mt': 
 WAY_mt_NAME=ticky-ticky concurrent
-WAY_mt_HC_OPTS+=-fstack-check -fconcurrent -fticky-ticky -D__CONCURRENT_HASKELL__ -DCONCURRENT -DTICKY-TICKY -optc-D__CONCURRENT_HASKELL__ -optc-DCONCURRENT -optc-DTICKY_TICKY
+WAY_mt_HC_OPTS+=-fstack-check -fconcurrent -fticky-ticky -D__CONCURRENT_HASKELL__ -DTICKY-TICKY -optc-DCONCURRENT -optc-DTICKY_TICKY
 
 # Way `mp': 
 WAY_mp_NAME=parallel
-WAY_mp_HC_OPTS+=-fstack-check -fconcurrent -D__PARALLEL_HASKELL__ -DPAR -optcpp-D__PARALLEL_HASKELL__ -optc-DPAR -optc-DCONCURRENT
+WAY_mp_HC_OPTS+=-fstack-check -fconcurrent -D__PARALLEL_HASKELL__ -optc-DPAR -optc-DCONCURRENT
 
 #
 # Way `mg': 
-#  Q: is passing -D__GRANSIM__ and -DGRAN to hscpp needed?
+#  Q: is passing -D__GRANSIM__ and -DGRAN to hscpp needed? No, just -D__GRANSIM__
 WAY_mg_NAME=GranSim
-WAY_mg_HC_OPTS+=-fstack-check -fconcurrent -fgransim -D__GRANSIM__ -DGRAN -optcpp-D__GRANSIM__ -optc-DGRAN -optc-D__CONCURRENT_HASKELL__ -optc-DCONCURRENT
+WAY_mg_HC_OPTS+=-fstack-check -fconcurrent -fgransim -D__GRANSIM__ -D__CONCURRENT_HASKELL__ -optc-DCONCURRENT -optc-DGRAN
 
 #
 # Ways for different garbage collectors
