@@ -1,11 +1,15 @@
-if [ -z "$SGML_CATALOG_FILES"]
-then
-  if [ ! -f "$FPTOOLS_CATALOG_FILE" ]
-  then
-    echo "CATALOG file not set up; see installation guide for details."
-    exit 1
-  fi
-  SGML_CATALOG_FILES=$FPTOOLS_CATALOG_FILE
+if [ -z "$SGML_CATALOG_FILES" ] ; then
+  for i in "$FPTOOLS_CATALOG_FILE" /usr/share/sgml/CATALOG.docbkdsl ; do
+    if [ -n "$i" -a -r "$i" ] ;  then
+      SGML_CATALOG_FILES="$i"
+      break
+    fi
+  done
+fi
+
+if [ -z "$SGML_CATALOG_FILES" ] ; then
+  echo "CATALOG file not set up; see installation guide for details."
+  exit 1
 fi
 
 output=db2rtf.rtf
