@@ -54,11 +54,308 @@
 /* Define to alignment constraint on void pointers */
 #undef ALIGNMENT_VOID_P
 
+/* The value of E2BIG.  */
+#undef CCONST_E2BIG
+
+/* The value of EACCES.  */
+#undef CCONST_EACCES
+
+/* The value of EADDRINUSE.  */
+#undef CCONST_EADDRINUSE
+
+/* The value of EADDRNOTAVAIL.  */
+#undef CCONST_EADDRNOTAVAIL
+
+/* The value of EADV.  */
+#undef CCONST_EADV
+
+/* The value of EAFNOSUPPORT.  */
+#undef CCONST_EAFNOSUPPORT
+
+/* The value of EAGAIN.  */
+#undef CCONST_EAGAIN
+
+/* The value of EALREADY.  */
+#undef CCONST_EALREADY
+
+/* The value of EBADF.  */
+#undef CCONST_EBADF
+
+/* The value of EBADMSG.  */
+#undef CCONST_EBADMSG
+
+/* The value of EBADRPC.  */
+#undef CCONST_EBADRPC
+
+/* The value of EBUSY.  */
+#undef CCONST_EBUSY
+
+/* The value of ECHILD.  */
+#undef CCONST_ECHILD
+
+/* The value of ECOMM.  */
+#undef CCONST_ECOMM
+
+/* The value of ECONNABORTED.  */
+#undef CCONST_ECONNABORTED
+
+/* The value of ECONNREFUSED.  */
+#undef CCONST_ECONNREFUSED
+
+/* The value of ECONNRESET.  */
+#undef CCONST_ECONNRESET
+
+/* The value of EDEADLK.  */
+#undef CCONST_EDEADLK
+
+/* The value of EDESTADDRREQ.  */
+#undef CCONST_EDESTADDRREQ
+
+/* The value of EDIRTY.  */
+#undef CCONST_EDIRTY
+
+/* The value of EDOM.  */
+#undef CCONST_EDOM
+
+/* The value of EDQUOT.  */
+#undef CCONST_EDQUOT
+
+/* The value of EEXIST.  */
+#undef CCONST_EEXIST
+
+/* The value of EFAULT.  */
+#undef CCONST_EFAULT
+
+/* The value of EFBIG.  */
+#undef CCONST_EFBIG
+
+/* The value of EFTYPE.  */
+#undef CCONST_EFTYPE
+
+/* The value of EHOSTDOWN.  */
+#undef CCONST_EHOSTDOWN
+
+/* The value of EHOSTUNREACH.  */
+#undef CCONST_EHOSTUNREACH
+
+/* The value of EIDRM.  */
+#undef CCONST_EIDRM
+
+/* The value of EILSEQ.  */
+#undef CCONST_EILSEQ
+
+/* The value of EINPROGRESS.  */
+#undef CCONST_EINPROGRESS
+
+/* The value of EINTR.  */
+#undef CCONST_EINTR
+
+/* The value of EINVAL.  */
+#undef CCONST_EINVAL
+
+/* The value of EIO.  */
+#undef CCONST_EIO
+
+/* The value of EISCONN.  */
+#undef CCONST_EISCONN
+
+/* The value of EISDIR.  */
+#undef CCONST_EISDIR
+
+/* The value of ELOOP.  */
+#undef CCONST_ELOOP
+
+/* The value of EMFILE.  */
+#undef CCONST_EMFILE
+
+/* The value of EMLINK.  */
+#undef CCONST_EMLINK
+
+/* The value of EMSGSIZE.  */
+#undef CCONST_EMSGSIZE
+
+/* The value of EMULTIHOP.  */
+#undef CCONST_EMULTIHOP
+
+/* The value of ENAMETOOLONG.  */
+#undef CCONST_ENAMETOOLONG
+
+/* The value of ENETDOWN.  */
+#undef CCONST_ENETDOWN
+
+/* The value of ENETRESET.  */
+#undef CCONST_ENETRESET
+
+/* The value of ENETUNREACH.  */
+#undef CCONST_ENETUNREACH
+
+/* The value of ENFILE.  */
+#undef CCONST_ENFILE
+
+/* The value of ENOBUFS.  */
+#undef CCONST_ENOBUFS
+
+/* The value of ENODATA.  */
+#undef CCONST_ENODATA
+
+/* The value of ENODEV.  */
+#undef CCONST_ENODEV
+
+/* The value of ENOENT.  */
+#undef CCONST_ENOENT
+
+/* The value of ENOEXEC.  */
+#undef CCONST_ENOEXEC
+
+/* The value of ENOLCK.  */
+#undef CCONST_ENOLCK
+
+/* The value of ENOLINK.  */
+#undef CCONST_ENOLINK
+
+/* The value of ENOMEM.  */
+#undef CCONST_ENOMEM
+
+/* The value of ENOMSG.  */
+#undef CCONST_ENOMSG
+
+/* The value of ENONET.  */
+#undef CCONST_ENONET
+
+/* The value of ENOPROTOOPT.  */
+#undef CCONST_ENOPROTOOPT
+
+/* The value of ENOSPC.  */
+#undef CCONST_ENOSPC
+
+/* The value of ENOSR.  */
+#undef CCONST_ENOSR
+
+/* The value of ENOSTR.  */
+#undef CCONST_ENOSTR
+
+/* The value of ENOSYS.  */
+#undef CCONST_ENOSYS
+
+/* The value of ENOTBLK.  */
+#undef CCONST_ENOTBLK
+
+/* The value of ENOTCONN.  */
+#undef CCONST_ENOTCONN
+
+/* The value of ENOTDIR.  */
+#undef CCONST_ENOTDIR
+
+/* The value of ENOTEMPTY.  */
+#undef CCONST_ENOTEMPTY
+
+/* The value of ENOTSOCK.  */
+#undef CCONST_ENOTSOCK
+
+/* The value of ENOTTY.  */
+#undef CCONST_ENOTTY
+
+/* The value of ENXIO.  */
+#undef CCONST_ENXIO
+
+/* The value of EOPNOTSUPP.  */
+#undef CCONST_EOPNOTSUPP
+
+/* The value of EPERM.  */
+#undef CCONST_EPERM
+
+/* The value of EPFNOSUPPORT.  */
+#undef CCONST_EPFNOSUPPORT
+
+/* The value of EPIPE.  */
+#undef CCONST_EPIPE
+
+/* The value of EPROCLIM.  */
+#undef CCONST_EPROCLIM
+
+/* The value of EPROCUNAVAIL.  */
+#undef CCONST_EPROCUNAVAIL
+
+/* The value of EPROGMISMATCH.  */
+#undef CCONST_EPROGMISMATCH
+
+/* The value of EPROGUNAVAIL.  */
+#undef CCONST_EPROGUNAVAIL
+
+/* The value of EPROTO.  */
+#undef CCONST_EPROTO
+
+/* The value of EPROTONOSUPPORT.  */
+#undef CCONST_EPROTONOSUPPORT
+
+/* The value of EPROTOTYPE.  */
+#undef CCONST_EPROTOTYPE
+
+/* The value of ERANGE.  */
+#undef CCONST_ERANGE
+
+/* The value of EREMCHG.  */
+#undef CCONST_EREMCHG
+
+/* The value of EREMOTE.  */
+#undef CCONST_EREMOTE
+
+/* The value of EROFS.  */
+#undef CCONST_EROFS
+
+/* The value of ERPCMISMATCH.  */
+#undef CCONST_ERPCMISMATCH
+
+/* The value of ERREMOTE.  */
+#undef CCONST_ERREMOTE
+
+/* The value of ESHUTDOWN.  */
+#undef CCONST_ESHUTDOWN
+
+/* The value of ESOCKTNOSUPPORT.  */
+#undef CCONST_ESOCKTNOSUPPORT
+
+/* The value of ESPIPE.  */
+#undef CCONST_ESPIPE
+
+/* The value of ESRCH.  */
+#undef CCONST_ESRCH
+
+/* The value of ESRMNT.  */
+#undef CCONST_ESRMNT
+
+/* The value of ESTALE.  */
+#undef CCONST_ESTALE
+
+/* The value of ETIME.  */
+#undef CCONST_ETIME
+
+/* The value of ETIMEDOUT.  */
+#undef CCONST_ETIMEDOUT
+
+/* The value of ETOOMANYREFS.  */
+#undef CCONST_ETOOMANYREFS
+
+/* The value of ETXTBSY.  */
+#undef CCONST_ETXTBSY
+
+/* The value of EUSERS.  */
+#undef CCONST_EUSERS
+
+/* The value of EWOULDBLOCK.  */
+#undef CCONST_EWOULDBLOCK
+
+/* The value of EXDEV.  */
+#undef CCONST_EXDEV
+
 /* Define if code lives before data in memory */
 #undef CODE_BEFORE_DATA
 
 /* Define as the symbol which marks the end of the data section */
 #undef DATA_SECTION_END_MARKER
+
+/* Define as the symbol which marks the end of the data section */
+#undef DATA_SECTION_WIBBLE
 
 /* Define as the decl which terminates the data section */
 #undef DATA_SECTION_END_MARKER_DECL
@@ -72,8 +369,14 @@
 /* Define if you have the GetModuleFileName function.  */
 #define HAVE_GETMODULEFILENAME 0
 
+/* Define if you need -ldl to get dlopen() */
+#define HAVE_LIBDL
+
 /* Define if C compiler supports long long types */
 #undef HAVE_LONG_LONG
+
+/* Define if you have dlopen() */
+#define HAVE_DLOPEN
 
 /* Define if fcntl.h defines O_BINARY */
 #undef HAVE_O_BINARY

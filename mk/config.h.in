@@ -123,6 +123,9 @@
 /* Define if you have the GetModuleFileName function.  */
 #define HAVE_GETMODULEFILENAME 0
 
+/* Define if you need -ldl to get dlopen() */
+#define HAVE_LIBDL
+
 /* Define if C compiler supports long long types */
 #undef HAVE_LONG_LONG
 
@@ -620,6 +623,9 @@
 
 /* Define if you have the access function.  */
 #undef HAVE_ACCESS
+
+/* Define if you have the dlopen function.  */
+#undef HAVE_DLOPEN
 
 /* Define if you have the farcalloc function.  */
 #undef HAVE_FARCALLOC

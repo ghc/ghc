@@ -846,8 +846,16 @@ dnl ################################################################
 dnl Check for libraries
 dnl ################################################################
 
-FPTOOLS_CHECK_LIB_NOWARN(dl, dlopen)
-FPTOOLS_CHECK_LIB_NOWARN(dld, shl_load)
+AC_CHECK_LIB(dl, dlopen, [
+	HaveLibDL=YES
+	AC_DEFINE(HAVE_LIBDL)], [HaveLibDL=NO])
+if test x$HaveLibDL = xYES; then
+   AC_DEFINE(HAVE_DLOPEN)
+else
+   AC_CHECK_FUNCS(dlopen)
+fi
+AC_SUBST(HaveLibDL)
+
 FPTOOLS_CHECK_LIB_NOWARN(m, atan)
 
 dnl --------------------------------------------------
