@@ -44,9 +44,9 @@ where	*    [LiftedTypeKind]   means boxed type
 
 In particular:
 
-	error :: forall a:<any>. String -> a
+	error :: forall a:?. String -> a
 	(->)  :: ?? -> ? -> *
-	(\(x::t) -> ...)	Here t::<any> (i.e. not unboxed tuple)
+	(\(x::t) -> ...)	Here t::?? (i.e. not unboxed tuple)
 
 \begin{code}
 data Kind 
