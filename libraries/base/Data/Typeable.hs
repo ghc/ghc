@@ -28,7 +28,7 @@ module Data.Typeable
 
 	-- * Type-safe cast
 	cast,			-- :: (Typeable a, Typeable b) => a -> Maybe b
-	gcast,			-- a flexible variation on cast
+	gcast,			-- a generalisation of cast
 
 	-- * Type representations
 	TypeRep,	-- abstract, instance of: Eq, Show, Typeable
@@ -39,15 +39,21 @@ module Data.Typeable
 	mkAppTy,	-- :: TyCon   -> [TypeRep] -> TypeRep
 	mkFunTy,	-- :: TypeRep -> TypeRep   -> TypeRep
 	applyTy,	-- :: TypeRep -> TypeRep   -> Maybe TypeRep
+	popStarTy,	-- :: TypeRep -> TypeRep   -> TypeRep
 
 	-- * Observation of type representations
 	typerepTyCon,	-- :: TypeRep -> TyCon
 	typerepArgs,	-- :: TypeRep -> [TypeRep]
 	tyconString,	-- :: TyCon   -> String
 
-	-- * The Typeable1 class
-	Typeable1( typeOf1 ),	-- :: t a -> TyCon
-	Typeable2( typeOf2 ),	-- :: t a b -> TyCon
+	-- * The other Typeable classes
+	Typeable1( typeOf1 ),	-- :: t a -> TypeRep
+	Typeable2( typeOf2 ),	-- :: t a b -> TypeRep
+	Typeable3( typeOf3 ),	-- :: t a b c -> TypeRep
+	Typeable4( typeOf4 ),	-- :: t a b c d -> TypeRep
+	Typeable5( typeOf5 ),	-- :: t a b c d e -> TypeRep
+	Typeable6( typeOf6 ),	-- :: t a b c d e f -> TypeRep
+	Typeable7( typeOf7 ),	-- :: t a b c d e f g -> TypeRep
 	gcast1,			-- :: ... => c (t a) -> Maybe (c (t' a))
 	gcast2			-- :: ... => c (t a b) -> Maybe (c (t' a b))
 
@@ -69,8 +75,8 @@ import GHC.Num
 import GHC.Float
 import GHC.Real( rem, Ratio )
 import GHC.IOBase
-import GHC.Ptr		-- So we can give Typeable instance for Ptr
-import GHC.Stable	-- So we can give Typeable instance for StablePtr
+import GHC.Ptr          -- So we can give Typeable instance for Ptr
+import GHC.Stable       -- So we can give Typeable instance for StablePtr
 #endif
 
 #ifdef __HUGS__
@@ -94,6 +100,7 @@ import NHC.IOExtras (IORef,newIORef,readIORef,writeIORef,unsafePerformIO)
 
 
 #ifndef __HUGS__
+
 -------------------------------------------------------------
 --
 --		Type representations
@@ -129,6 +136,7 @@ instance Eq TyCon where
 	-- sequence of commas, e.g., (mkTyCon ",,,,") returns
 	-- the 5-tuple tycon.
 
+
 ----------------- Construction --------------------
 
 -- | Applies a type constructor to a sequence of types
@@ -138,13 +146,17 @@ mkAppTy tc@(TyCon tc_k _) args
   where
     arg_ks = [k | TypeRep k _ _ <- args]
 
+
+-- The function type constructor
 funTc :: TyCon
 funTc = mkTyCon "->"
+
 
 -- | A special case of 'mkAppTy', which applies the function 
 -- type constructor to a pair of types.
 mkFunTy  :: TypeRep -> TypeRep -> TypeRep
 mkFunTy f a = mkAppTy funTc [f,a]
+
 
 -- | Applies a type to a function type.  Returns: @'Just' u@ if the
 -- first argument represents a function of type @t -> u@ and the
@@ -154,6 +166,14 @@ applyTy :: TypeRep -> TypeRep -> Maybe TypeRep
 applyTy (TypeRep _ tc [t1,t2]) t3
   | tc == funTc && t1 == t3	= Just t2
 applyTy _ _     		= Nothing
+
+
+-- | Adds a TypeRep argument to a TypeRep.
+popStarTy :: TypeRep -> TypeRep -> TypeRep
+popStarTy (TypeRep tr_k tc trs) arg_tr
+  = let (TypeRep arg_k _ _) = arg_tr
+     in  TypeRep (appKey tr_k arg_k) tc (trs++[arg_tr])
+
 
 -- If we enforce the restriction that there is only one
 -- @TyCon@ for a type & it is shared among all its uses,
@@ -207,7 +227,9 @@ instance Show TypeRep where
       [] -> showsPrec p tycon
       [x]   | tycon == listTc -> showChar '[' . shows x . showChar ']'
       [a,r] | tycon == funTc  -> showParen (p > 8) $
-			         showsPrec 9 a . showString " -> " . showsPrec 8 r
+			         showsPrec 9 a .
+                                 showString " -> " .
+                                 showsPrec 8 r
       xs | isTupleTyCon tycon -> showTuple tycon xs
 	 | otherwise	     ->
 	    showParen (p > 9) $
@@ -221,6 +243,7 @@ instance Show TyCon where
 isTupleTyCon :: TyCon -> Bool
 isTupleTyCon (TyCon _ (',':_)) = True
 isTupleTyCon _		       = False
+
 
 -- Some (Show.TypeRep) helpers:
 
@@ -240,9 +263,10 @@ showTuple (TyCon _ str) args = showChar '(' . go str args
 
 -------------------------------------------------------------
 --
---	The Typeable class
+--	The Typeable class and friends
 --
 -------------------------------------------------------------
+
 
 -- | The class 'Typeable' allows a concrete representation of a type to
 -- be calculated.
@@ -252,6 +276,105 @@ class Typeable a where
   -- of that type.  The /value/ of the argument should be ignored by
   -- any instance of 'Typeable', so that it is safe to pass 'undefined' as
   -- the argument.
+
+
+-- | Variant for unary type constructors
+class Typeable1 t where
+  typeOf1 :: t a -> TypeRep
+
+
+-- | One Typeable instance for all Typeable1 instances
+instance (Typeable1 s, Typeable a)
+       => Typeable (s a) where
+  typeOf x = typeOf1 x `popStarTy` typeOf (argType x)
+   where
+     argType :: t x -> x
+     argType =  undefined
+
+
+-- | Variant for binary type constructors
+class Typeable2 t where
+  typeOf2 :: t a b -> TypeRep
+
+
+-- | One Typeable1 instance for all Typeable2 instances
+instance (Typeable2 s, Typeable a)
+       => Typeable1 (s a) where
+  typeOf1 x = typeOf2 x `popStarTy` typeOf (argType x)
+   where
+     argType :: t x y -> x
+     argType =  undefined
+
+
+-- | Variant for 3-ary type constructors
+class Typeable3 t where
+  typeOf3 :: t a b c -> TypeRep
+
+
+-- | One Typeable2 instance for all Typeable3 instances
+instance (Typeable3 s, Typeable a)
+       => Typeable2 (s a) where
+  typeOf2 x = typeOf3 x `popStarTy` typeOf (argType x)
+   where
+     argType :: t x y z -> x
+     argType =  undefined
+
+
+-- | Variant for 4-ary type constructors
+class Typeable4 t where
+  typeOf4 :: t a b c d -> TypeRep
+
+
+-- | One Typeable3 instance for all Typeable4 instances
+instance (Typeable4 s, Typeable a)
+       => Typeable3 (s a) where
+  typeOf3 x = typeOf4 x `popStarTy` typeOf (argType x)
+   where
+     argType :: t x y z z' -> x
+     argType =  undefined
+
+
+-- | Variant for 5-ary type constructors
+class Typeable5 t where
+  typeOf5 :: t a b c d e -> TypeRep
+
+
+-- | One Typeable4 instance for all Typeable5 instances
+instance (Typeable5 s, Typeable a)
+       => Typeable4 (s a) where
+  typeOf4 x = typeOf5 x `popStarTy` typeOf (argType x)
+   where
+     argType :: t x y z z' z'' -> x
+     argType =  undefined
+
+
+-- | Variant for 6-ary type constructors
+class Typeable6 t where
+  typeOf6 :: t a b c d e f -> TypeRep
+
+
+-- | One Typeable5 instance for all Typeable6 instances
+instance (Typeable6 s, Typeable a)
+       => Typeable5 (s a) where
+  typeOf5 x = typeOf6 x `popStarTy` typeOf (argType x)
+   where
+     argType :: t x y z z' z'' z''' -> x
+     argType =  undefined
+
+
+-- | Variant for 7-ary type constructors
+class Typeable7 t where
+  typeOf7 :: t a b c d e f g -> TypeRep
+
+
+-- | One Typeable6 instance for all Typeable7 instances
+instance (Typeable7 s, Typeable a)
+       => Typeable6 (s a) where
+  typeOf6 x = typeOf7 x `popStarTy` typeOf (argType x)
+   where
+     argType :: t x y z z' z'' z''' z'''' -> x
+     argType =  undefined
+
 
 
 -------------------------------------------------------------
@@ -281,21 +404,34 @@ gcast x = r
 
 
 
+-- | Cast for * -> *
+gcast1 :: (Typeable1 t, Typeable1 t') => c (t a) -> Maybe (c (t' a)) 
+gcast1 x = r
+ where
+  r = if typeOf1 (getArg x) == typeOf1 (getArg (fromJust r))
+       then Just $ unsafeCoerce x
+       else Nothing
+  getArg :: c x -> x 
+  getArg = undefined
+
+
+-- | Cast for * -> * -> *
+gcast2 :: (Typeable2 t, Typeable2 t') => c (t a b) -> Maybe (c (t' a b)) 
+gcast2 x = r
+ where
+  r = if typeOf2 (getArg x) == typeOf2 (getArg (fromJust r))
+       then Just $ unsafeCoerce x
+       else Nothing
+  getArg :: c x -> x 
+  getArg = undefined
+
+
+
 -------------------------------------------------------------
 --
---	Instances of the Typeable class for Prelude types
+--	Instances of the Typeable classes for Prelude types
 --
 -------------------------------------------------------------
-
-listTc :: TyCon
-listTc = mkTyCon "[]"
-
-instance Typeable a => Typeable [a] where
-  typeOf ls = mkAppTy listTc [typeOf ((undefined :: [a] -> a) ls)]
-	-- In GHC we can say
-	--	typeOf (undefined :: a)
-	-- using scoped type variables, but we use the 
-	-- more verbose form here, for compatibility with Hugs
 
 unitTc :: TyCon
 unitTc = mkTyCon "()"
@@ -303,85 +439,117 @@ unitTc = mkTyCon "()"
 instance Typeable () where
   typeOf _ = mkAppTy unitTc []
 
-tup2Tc :: TyCon
-tup2Tc = mkTyCon ","
-
-instance (Typeable a, Typeable b) => Typeable (a,b) where
-  typeOf tu = mkAppTy tup2Tc [typeOf ((undefined :: (a,b) -> a) tu),
-			      typeOf ((undefined :: (a,b) -> b) tu)]
 
 tup3Tc :: TyCon
 tup3Tc = mkTyCon ",,"
 
-instance ( Typeable a , Typeable b , Typeable c) => Typeable (a,b,c) where
-  typeOf tu = mkAppTy tup3Tc [typeOf ((undefined :: (a,b,c) -> a) tu),
-			      typeOf ((undefined :: (a,b,c) -> b) tu),
-			      typeOf ((undefined :: (a,b,c) -> c) tu)]
+instance Typeable3 (,,) where
+  typeOf3 tu = mkAppTy tup3Tc []
+
 
 tup4Tc :: TyCon
 tup4Tc = mkTyCon ",,,"
 
-instance ( Typeable a
-	 , Typeable b
-	 , Typeable c
-	 , Typeable d) => Typeable (a,b,c,d) where
-  typeOf tu = mkAppTy tup4Tc [typeOf ((undefined :: (a,b,c,d) -> a) tu),
-			      typeOf ((undefined :: (a,b,c,d) -> b) tu),
-			      typeOf ((undefined :: (a,b,c,d) -> c) tu),
-			      typeOf ((undefined :: (a,b,c,d) -> d) tu)]
+instance Typeable4 (,,,) where
+  typeOf4 tu = mkAppTy tup4Tc []
+
+
 tup5Tc :: TyCon
 tup5Tc = mkTyCon ",,,,"
 
-instance ( Typeable a
-	 , Typeable b
-	 , Typeable c
-	 , Typeable d
-	 , Typeable e) => Typeable (a,b,c,d,e) where
-  typeOf tu = mkAppTy tup5Tc [typeOf ((undefined :: (a,b,c,d,e) -> a) tu),
-			      typeOf ((undefined :: (a,b,c,d,e) -> b) tu),
-			      typeOf ((undefined :: (a,b,c,d,e) -> c) tu),
-			      typeOf ((undefined :: (a,b,c,d,e) -> d) tu),
-			      typeOf ((undefined :: (a,b,c,d,e) -> e) tu)]
+instance Typeable5 (,,,,) where
+  typeOf5 tu = mkAppTy tup5Tc []
+
 
 tup6Tc :: TyCon
-tup6Tc = mkTyCon ",,,,"
+tup6Tc = mkTyCon ",,,,,"
 
-instance ( Typeable a
-	 , Typeable b
-	 , Typeable c
-	 , Typeable d
-	 , Typeable e
-         , Typeable f) => Typeable (a,b,c,d,e,f) where
-  typeOf tu = mkAppTy tup6Tc 
-      [typeOf (         (undefined :: (a,b,c,d,e,f) -> a) tu),
-	        typeOf ((undefined :: (a,b,c,d,e,f) -> b) tu),
-		typeOf ((undefined :: (a,b,c,d,e,f) -> c) tu),
-		typeOf ((undefined :: (a,b,c,d,e,f) -> d) tu),
-		typeOf ((undefined :: (a,b,c,d,e,f) -> e) tu),
-		typeOf ((undefined :: (a,b,c,d,e,f) -> f) tu)]
+instance Typeable6 (,,,,,) where
+  typeOf6 tu = mkAppTy tup6Tc []
+
 
 tup7Tc :: TyCon
-tup7Tc = mkTyCon ",,,,"
+tup7Tc = mkTyCon ",,,,,"
 
-instance ( Typeable a
-	 , Typeable b
-	 , Typeable c
-	 , Typeable d
-	 , Typeable e
-         , Typeable f
-         , Typeable g) => Typeable (a,b,c,d,e,f,g) where
-  typeOf tu = mkAppTy tup7Tc
-      [typeOf (               (undefined :: (a,b,c,d,e,f,g) -> a) tu),
-		      typeOf ((undefined :: (a,b,c,d,e,f,g) -> b) tu),
-		      typeOf ((undefined :: (a,b,c,d,e,f,g) -> c) tu),
-		      typeOf ((undefined :: (a,b,c,d,e,f,g) -> d) tu),
-		      typeOf ((undefined :: (a,b,c,d,e,f,g) -> e) tu),
-		      typeOf ((undefined :: (a,b,c,d,e,f,g) -> f) tu),
-		      typeOf ((undefined :: (a,b,c,d,e,f,g) -> g) tu)]
+instance Typeable7 (,,,,,,) where
+  typeOf7 tu = mkAppTy tup7Tc []
 
-instance (Typeable a, Typeable b) => Typeable (a -> b) where
-  typeOf f = mkFunTy (typeOf ((undefined :: (a -> b) -> a) f))
-		     (typeOf ((undefined :: (a -> b) -> b) f))
+
+listTc :: TyCon
+listTc = mkTyCon "[]"
+
+-- | Instance for lists
+instance Typeable1 [] where
+  typeOf1 _ = mkAppTy listTc []
+
+
+maybeTc :: TyCon
+maybeTc = mkTyCon "Maybe"
+
+-- | Instance for maybes
+instance Typeable1 Maybe where
+  typeOf1 _ = mkAppTy maybeTc []
+
+
+ratioTc :: TyCon
+ratioTc = mkTyCon "Ratio"
+
+-- | Instance for ratios
+instance Typeable1 Ratio where
+  typeOf1 _ = mkAppTy ratioTc []
+
+
+pairTc :: TyCon
+pairTc = mkTyCon "(,)"
+
+-- | Instance for products
+instance Typeable2 (,) where
+  typeOf2 _ = mkAppTy pairTc []
+
+
+eitherTc :: TyCon
+eitherTc = mkTyCon "Either"
+
+-- | Instance for sums
+instance Typeable2 Either where
+  typeOf2 _ = mkAppTy eitherTc []
+
+
+-- | Instance for functions
+instance Typeable2 (->) where
+  typeOf2 _ = mkAppTy funTc []
+
+
+#ifdef __GLASGOW_HASKELL__
+
+ioTc :: TyCon
+ioTc = mkTyCon "GHC.IOBase.IO"
+
+instance Typeable1 IO where
+  typeOf1 _ = mkAppTy ioTc []
+
+
+ptrTc :: TyCon
+ptrTc = mkTyCon "GHC.Ptr.Ptr"
+
+instance Typeable1 Ptr where
+  typeOf1 _ = mkAppTy ptrTc []
+
+
+stableptrTc :: TyCon
+stableptrTc = mkTyCon "GHC.Stable.StablePtr"
+
+instance Typeable1 StablePtr where
+  typeOf1 _ = mkAppTy stableptrTc []
+
+
+iorefTc :: TyCon
+iorefTc = mkTyCon "GHC.IOBase.IORef"
+
+instance Typeable1 IORef where
+  typeOf1 _ = mkAppTy iorefTc []
+
+#endif
 
 
 
@@ -398,14 +566,8 @@ INSTANCE_TYPEABLE0(Float,floatTc,"Float")
 INSTANCE_TYPEABLE0(Double,doubleTc,"Double")
 INSTANCE_TYPEABLE0(Int,intTc,"Int")
 INSTANCE_TYPEABLE0(Integer,integerTc,"Integer")
-INSTANCE_TYPEABLE1(Ratio,ratioTc,"Ratio")
-INSTANCE_TYPEABLE2(Either,eitherTc,"Either")
-INSTANCE_TYPEABLE1(IO,ioTc,"IO")
-INSTANCE_TYPEABLE1(Maybe,maybeTc,"Maybe")
 INSTANCE_TYPEABLE0(Ordering,orderingTc,"Ordering")
 INSTANCE_TYPEABLE0(Handle,handleTc,"Handle")
-INSTANCE_TYPEABLE1(Ptr,ptrTc,"Ptr")
-INSTANCE_TYPEABLE1(StablePtr,stablePtrTc,"StablePtr")
 
 INSTANCE_TYPEABLE0(Int8,int8Tc,"Int8")
 INSTANCE_TYPEABLE0(Int16,int16Tc,"Int16")
@@ -419,8 +581,6 @@ INSTANCE_TYPEABLE0(Word64,word64Tc,"Word64")
 
 INSTANCE_TYPEABLE0(TyCon,tyconTc,"TyCon")
 INSTANCE_TYPEABLE0(TypeRep,typeRepTc,"TypeRep")
-
-INSTANCE_TYPEABLE1(IORef,ioRefTc,"IORef")
 #endif
 
 #ifdef __GLASGOW_HASKELL__
@@ -508,78 +668,3 @@ appKey k1 k2
 
 appKeys :: Key -> [Key] -> Key
 appKeys k ks = foldl appKey k ks
-
-
-
-------------------------------------------------------------------------------
---
---	Typeable adopted for unary type constructors
---	This adoption is at an experimental stage.
---
-------------------------------------------------------------------------------
-
-
--- | Variant for unary type constructors
-class Typeable1 t where
-  typeOf1 :: t a -> TypeRep
-
-
--- | Variant for binary type constructors
-class Typeable2 t where
-  typeOf2 :: t a b -> TypeRep
-
-
-#ifndef __NHC__
-
--- | Instance for lists
-instance Typeable1 [] where
-  typeOf1 _ = mkAppTy (typerepTyCon (typeOf (undefined::[()]))) []
-
-
--- | Instance for maybes
-instance Typeable1 Maybe where
-  typeOf1 _ = mkAppTy (typerepTyCon (typeOf (undefined::Maybe ()))) []
-
-
--- | Instance for ratios
-instance Typeable1 Ratio where
-  typeOf1 _ = mkAppTy (typerepTyCon (typeOf (undefined::Ratio ()))) []
-
-
--- | Instance for products
-instance Typeable2 (,) where
-  typeOf2 _ = mkAppTy (typerepTyCon (typeOf (undefined::((),())))) []
-
-
--- | Instance for sums
-instance Typeable2 Either where
-  typeOf2 _ = mkAppTy (typerepTyCon (typeOf (undefined::Either () ()))) []
-
-
--- | Instance for functions
-instance Typeable2 (->) where
-  typeOf2 _ = mkAppTy (typerepTyCon (typeOf (undefined::() -> ()))) []
-
-#endif
-
-
--- | Cast for * -> *
-gcast1 :: (Typeable1 t, Typeable1 t') => c (t a) -> Maybe (c (t' a)) 
-gcast1 x = r
- where
-  r = if typeOf1 (getArg x) == typeOf1 (getArg (fromJust r))
-       then Just $ unsafeCoerce x
-       else Nothing
-  getArg :: c x -> x 
-  getArg = undefined
-
-
--- | Cast for * -> * -> *
-gcast2 :: (Typeable2 t, Typeable2 t') => c (t a b) -> Maybe (c (t' a b)) 
-gcast2 x = r
- where
-  r = if typeOf2 (getArg x) == typeOf2 (getArg (fromJust r))
-       then Just $ unsafeCoerce x
-       else Nothing
-  getArg :: c x -> x 
-  getArg = undefined

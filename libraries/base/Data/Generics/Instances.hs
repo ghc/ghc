@@ -11,10 +11,12 @@
 -- \"Scrap your boilerplate\" --- Generic programming in Haskell 
 -- See <http://www.cs.vu.nl/boilerplate/>. The present module
 -- instantiates the class Data for Prelude-like datatypes.
+-- (This module does not export anything. It really just defines instances.)
 --
 -----------------------------------------------------------------------------
 
 module Data.Generics.Instances 
+
 where
 
 
@@ -49,6 +51,7 @@ import GHC.Stable	     -- So we can give Data instance for StablePtr
 falseConstr  = mkConstr boolDataType "False" [] Prefix
 trueConstr   = mkConstr boolDataType "True"  [] Prefix
 boolDataType = mkDataType "Prelude.Bool" [falseConstr,trueConstr]
+
 
 instance Data Bool where
   toConstr False = falseConstr
@@ -258,7 +261,7 @@ instance (Data a, Integral a) => Data (Ratio a) where
 ------------------------------------------------------------------------------
 
 
-nilConstr    = mkConstr listDataType "[]"  [] Prefix
+nilConstr    = mkConstr listDataType "[]" [] Prefix
 consConstr   = mkConstr listDataType "(:)" [] Infix
 listDataType = mkDataType "Prelude.[]" [nilConstr,consConstr]
 
