@@ -26,7 +26,7 @@
 Capability MainCapability;     /* for non-SMP, we have one global capability */
 #endif
 
-static nat rts_n_free_capabilities;
+nat rts_n_free_capabilities;
 
 #if defined(RTS_SUPPORTS_THREADS)
 /* returning_worker_cond: when a worker thread returns from executing an
