@@ -10,24 +10,27 @@ its use of Coordinated Universal Time (UTC).
 
 \begin{code}
 {-# OPTIONS -#include "cbits/timezone.h" -#include "cbits/stgio.h"  #-}
-
 module Time 
        (
-        Month,
-	Day,
-        CalendarTime(CalendarTime),
-        TimeDiff(TimeDiff),
+        Month(..),
+	Day(..),
+
 	ClockTime(..), -- non-standard, lib. report gives this as abstract
-
 	getClockTime, 
-	addToClockTime, 
-	diffClockTimes,
 
+        TimeDiff(TimeDiff),
+	diffClockTimes,
+	addToClockTime,
+	timeDiffToString, -- non-standard
+	formatTimeDiff,   -- non-standard
+
+        CalendarTime(CalendarTime),
 	toCalendarTime,	
 	toUTCTime, 
 	toClockTime,
         calendarTimeToString, 
 	formatCalendarTime
+
        ) where
 
 import PrelBase
@@ -54,7 +57,7 @@ data Month
  deriving (Eq, Ord, Enum, Bounded, Ix, Read, Show)
 
 data Day 
- = Sunday | Monday | Tuesday | Wednesday
+ = Sunday  | Monday | Tuesday | Wednesday
  | Thursday | Friday | Saturday
  deriving (Eq, Ord, Enum, Bounded, Ix, Read, Show)
 
@@ -151,14 +154,14 @@ data TimeDiff
 
 \begin{code}
 getClockTime :: IO ClockTime
-getClockTime =
-    malloc1					    >>= \ i1 ->
-    malloc1					    >>= \ i2 ->
-    _ccall_ getClockTime i1 i2			    >>= \ rc ->
+getClockTime = do
+    i1 <- malloc1
+    i2 <- malloc1
+    rc <- _ccall_ getClockTime i1 i2
     if rc == 0 
-	then
-	    cvtUnsigned i1			    >>= \ sec ->
-	    cvtUnsigned i2			    >>= \ nsec ->
+	then do
+	    sec  <- cvtUnsigned i1
+	    nsec <- cvtUnsigned i2
 	    return (TOD sec (nsec * 1000))
     	else
 	    constructErrorAndFail "getClockTime"
@@ -194,18 +197,18 @@ t2} as a @TimeDiff@.
 \begin{code}
 addToClockTime  :: TimeDiff  -> ClockTime -> ClockTime
 addToClockTime (TimeDiff year mon day hour min sec psec) 
-	       (TOD c_sec c_psec) = unsafePerformIO $
-    allocWords (``sizeof(time_t)'') >>= \ res ->
-    _ccall_ toClockSec year mon day hour min sec 0 res 
-				    >>= \ ptr@(A# ptr#) ->
+	       (TOD c_sec c_psec) = unsafePerformIO $ do
+    res <- allocWords (``sizeof(time_t)'')
+    ptr <- _ccall_ toClockSec year mon day hour min sec 0 res 
+    let (A# ptr#) = ptr
     if ptr /= ``NULL'' 
-	then let
-	       diff_sec  = (int2Integer# (indexIntOffAddr# ptr# 0#))
-	       diff_psec = psec
-       	     in
-             return (TOD (c_sec + diff_sec) (c_psec + diff_psec))
-        else
-            error "Time.addToClockTime: can't perform conversion of TimeDiff"
+     then let
+	    diff_sec  = (int2Integer# (indexIntOffAddr# ptr# 0#))
+	    diff_psec = psec
+       	  in
+          return (TOD (c_sec + diff_sec) (c_psec + diff_psec))
+     else
+          error "Time.addToClockTime: can't perform conversion of TimeDiff"
 
 
 diffClockTimes  :: ClockTime -> ClockTime -> TimeDiff
@@ -232,53 +235,48 @@ ignored.
 
 \begin{code}
 toCalendarTime :: ClockTime -> CalendarTime
-toCalendarTime (TOD sec@(J# a# s# d#) psec) = unsafePerformIO $
-    allocWords (``sizeof(struct tm)''::Int)	    >>= \ res ->
-    allocChars 32				    >>= \ zoneNm ->
-    _casm_ ``SETZONE((struct tm *)%0,(char *)%1); '' res zoneNm	  >>= \ () ->
-    _ccall_ toLocalTime (I# s#) (ByteArray bottom d#) res
-						    >>= \ tm ->
+toCalendarTime (TOD sec@(J# a# s# d#) psec) = unsafePerformIO $ do
+    res    <- allocWords (``sizeof(struct tm)''::Int)
+    zoneNm <- allocChars 32
+    _casm_ ``SETZONE((struct tm *)%0,(char *)%1); '' res zoneNm
+    tm     <- _ccall_ toLocalTime (I# s#) (ByteArray bottom d#) res
     if tm == (``NULL''::Addr) 
-	then error "Time.toCalendarTime: out of range"
-        else
-	    _casm_ ``%r = ((struct tm *)%0)->tm_sec;'' tm	>>= \ sec ->
-	    _casm_ ``%r = ((struct tm *)%0)->tm_min;'' tm	>>= \ min ->
-	    _casm_ ``%r = ((struct tm *)%0)->tm_hour;'' tm	>>= \ hour ->
-	    _casm_ ``%r = ((struct tm *)%0)->tm_mday;'' tm	>>= \ mday ->
-	    _casm_ ``%r = ((struct tm *)%0)->tm_mon;'' tm	>>= \ mon ->
-	    _casm_ ``%r = ((struct tm *)%0)->tm_year;'' tm	>>= \ year ->
-	    _casm_ ``%r = ((struct tm *)%0)->tm_wday;'' tm	>>= \ wday ->
-	    _casm_ ``%r = ((struct tm *)%0)->tm_yday;'' tm	>>= \ yday ->
-	    _casm_ ``%r = ((struct tm *)%0)->tm_isdst;'' tm	>>= \ isdst ->
-	    _ccall_ ZONE tm					>>= \ zone ->
-	    _ccall_ GMTOFF tm					>>= \ tz ->
-	    let
-	     tzname = unpackCString zone
-	    in
-            return (CalendarTime (1900+year) mon mday hour min sec psec 
-            		  (toEnum wday) yday tzname tz (isdst /= 0))
+     then error "Time.toCalendarTime: out of range"
+     else do
+       sec   <-  _casm_ ``%r = ((struct tm *)%0)->tm_sec;'' tm
+       min   <-  _casm_ ``%r = ((struct tm *)%0)->tm_min;'' tm
+       hour  <-  _casm_ ``%r = ((struct tm *)%0)->tm_hour;'' tm
+       mday  <-  _casm_ ``%r = ((struct tm *)%0)->tm_mday;'' tm
+       mon   <-  _casm_ ``%r = ((struct tm *)%0)->tm_mon;'' tm
+       year  <-  _casm_ ``%r = ((struct tm *)%0)->tm_year;'' tm
+       wday  <-  _casm_ ``%r = ((struct tm *)%0)->tm_wday;'' tm
+       yday  <-  _casm_ ``%r = ((struct tm *)%0)->tm_yday;'' tm
+       isdst <-  _casm_ ``%r = ((struct tm *)%0)->tm_isdst;'' tm
+       zone  <-  _ccall_ ZONE tm
+       tz    <-  _ccall_ GMTOFF tm
+       let tzname = unpackCString zone
+       return (CalendarTime (1900+year) mon mday hour min sec psec 
+            		    (toEnum wday) yday tzname tz (isdst /= 0))
 
 toUTCTime :: ClockTime -> CalendarTime
-toUTCTime  (TOD sec@(J# a# s# d#) psec) = unsafePerformIO (
-	allocWords (``sizeof(struct tm)''::Int) 		    >>= \ res ->
-        allocChars 32			    			    >>= \ zoneNm ->
-        _casm_ ``SETZONE((struct tm *)%0,(char *)%1); '' res zoneNm >>= \ () ->
-        _ccall_ toUTCTime (I# s#) (ByteArray bottom d#) res
-						    >>= \ tm ->
-    if tm == (``NULL''::Addr) 
+toUTCTime  (TOD sec@(J# a# s# d#) psec) = unsafePerformIO $ do
+       res    <- allocWords (``sizeof(struct tm)''::Int)
+       zoneNm <- allocChars 32
+       _casm_ ``SETZONE((struct tm *)%0,(char *)%1); '' res zoneNm
+       tm     <-  _ccall_ toUTCTime (I# s#) (ByteArray bottom d#) res
+       if tm == (``NULL''::Addr) 
 	then error "Time.toUTCTime: out of range"
-        else
-	    _casm_ ``%r = ((struct tm *)%0)->tm_sec;'' tm	>>= \ sec ->
-	    _casm_ ``%r = ((struct tm *)%0)->tm_min;'' tm	>>= \ min ->
-	    _casm_ ``%r = ((struct tm *)%0)->tm_hour;'' tm	>>= \ hour ->
-	    _casm_ ``%r = ((struct tm *)%0)->tm_mday;'' tm	>>= \ mday ->
-	    _casm_ ``%r = ((struct tm *)%0)->tm_mon;'' tm	>>= \ mon ->
-	    _casm_ ``%r = ((struct tm *)%0)->tm_year;'' tm	>>= \ year ->
-	    _casm_ ``%r = ((struct tm *)%0)->tm_wday;'' tm	>>= \ wday ->
-	    _casm_ ``%r = ((struct tm *)%0)->tm_yday;'' tm	>>= \ yday ->
+        else do
+	    sec   <- _casm_ ``%r = ((struct tm *)%0)->tm_sec;'' tm
+	    min   <- _casm_ ``%r = ((struct tm *)%0)->tm_min;'' tm
+	    hour  <- _casm_ ``%r = ((struct tm *)%0)->tm_hour;'' tm
+	    mday  <- _casm_ ``%r = ((struct tm *)%0)->tm_mday;'' tm
+	    mon   <- _casm_ ``%r = ((struct tm *)%0)->tm_mon;'' tm
+	    year  <- _casm_ ``%r = ((struct tm *)%0)->tm_year;'' tm
+	    wday  <- _casm_ ``%r = ((struct tm *)%0)->tm_wday;'' tm
+	    yday  <- _casm_ ``%r = ((struct tm *)%0)->tm_yday;'' tm
             return (CalendarTime (1900+year) mon mday hour min sec psec 
             		  (toEnum wday) yday "UTC" 0 False)
-    )
 
 toClockTime :: CalendarTime -> ClockTime
 toClockTime (CalendarTime year mon mday hour min sec psec wday yday tzname tz isdst) =
@@ -287,14 +285,13 @@ toClockTime (CalendarTime year mon mday hour min sec psec wday yday tzname tz is
     else if tz < -43200 || tz > 43200 then
         error "Time.toClockTime: timezone offset out of range"
     else
-        unsafePerformIO (
-	    allocWords (``sizeof(time_t)'') >>= \ res ->
-	    _ccall_ toClockSec year mon mday hour min sec isDst res
-						    >>= \ ptr@(A# ptr#) ->
-            if ptr /= ``NULL'' then
-		return (TOD (int2Integer# (indexIntOffAddr# ptr# 0#)) psec)
-	    else
-		error "Time.toClockTime: can't perform conversion"
+        unsafePerformIO ( do
+	    res <- allocWords (``sizeof(time_t)'')
+	    ptr <- _ccall_ toClockSec year mon mday hour min sec isDst res
+            let (A# ptr#) = ptr
+            if ptr /= ``NULL''
+             then return (TOD (int2Integer# (indexIntOffAddr# ptr# 0#)) psec)
+	     else error "Time.toClockTime: can't perform conversion"
         )
     where
      isDst = if isdst then (1::Int) else 0
@@ -337,7 +334,7 @@ formatCalendarTime l fmt ct@(CalendarTime year mon day hour min sec sdec
   where doFmt ('%':c:cs) = decode c ++ doFmt cs
         doFmt (c:cs) = c : doFmt cs
         doFmt "" = ""
-        to12 h = let h' = h `mod` 12 in if h == 0 then 12 else h
+
         decode 'A' = fst (wDays l  !! fromEnum wday)
         decode 'a' = snd (wDays l  !! fromEnum wday)
         decode 'B' = fst (months l !! fromEnum mon)
@@ -392,4 +389,50 @@ show2 x = [intToDigit (x `quot` 10), intToDigit (x `rem` 10)]
 show2' x = if x < 10 then [ ' ', intToDigit x] else show2 x
 
 show3 x = intToDigit (x `quot` 100) : show2 (x `rem` 100)
+
+to12 h = let h' = h `mod` 12 in if h == 0 then 12 else h
+\end{code}
+
+\begin{code}
+timeDiffToString :: TimeDiff -> String
+timeDiffToString = formatTimeDiff defaultTimeLocale "%c"
+
+formatTimeDiff :: TimeLocale -> String -> TimeDiff -> String
+formatTimeDiff l fmt ct@(TimeDiff year month day hour min sec psec)
+ = doFmt fmt
+  where 
+   doFmt ""         = ""
+   doFmt ('%':c:cs) = decode c ++ doFmt cs
+   doFmt (c:cs)     = c : doFmt cs
+
+   decode spec =
+    case spec of
+      'B' -> fst (months l !! fromEnum month)
+      'b' -> snd (months l !! fromEnum month)
+      'h' -> snd (months l !! fromEnum month)
+      'C' -> show2 (year `quot` 100)
+      'D' -> doFmt "%m/%d/%y"
+      'd' -> show2 day
+      'e' -> show2' day
+      'H' -> show2 hour
+      'I' -> show2 (to12 hour)
+      'k' -> show2' hour
+      'l' -> show2' (to12 hour)
+      'M' -> show2 min
+      'm' -> show2 (fromEnum month + 1)
+      'n' -> "\n"
+      'p' -> (if hour < 12 then fst else snd) (amPm l)
+      'R' -> doFmt "%H:%M"
+      'r' -> doFmt (time12Fmt l)
+      'T' -> doFmt "%H:%M:%S"
+      't' -> "\t"
+      'S' -> show2 sec
+      's' -> show2 sec -- Implementation-dependent, sez the lib doc..
+      'X' -> doFmt (timeFmt l)
+      'x' -> doFmt (dateFmt l)
+      'Y' -> show year
+      'y' -> show2 (year `rem` 100)
+      '%' -> "%"
+      c   -> [c]
+
 \end{code}
