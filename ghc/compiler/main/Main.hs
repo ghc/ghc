@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.75 2001/06/27 11:14:08 simonmar Exp $
+-- $Id: Main.hs,v 1.76 2001/06/27 11:39:54 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -33,23 +33,25 @@ import DriverPipeline	( GhcMode(..), doLink, doMkDLL, genPipeline,
 			  getGhcMode, pipeLoop, v_GhcMode
 			)
 import DriverState	( buildCoreToDo, buildStgToDo, defaultHscLang,
-			  findBuildTag, getPackageInfo, unregFlags, v_Cmdline_libraries,
-			  v_Keep_tmp_files, v_Ld_inputs, v_OptLevel, v_Output_file,
-			  v_Output_hi, v_Package_details, v_Ways
+			  findBuildTag, getPackageInfo, unregFlags, 
+			  v_Cmdline_libraries, v_Keep_tmp_files, v_Ld_inputs,
+			  v_OptLevel, v_Output_file, v_Output_hi, 
+			  v_Package_details, v_Ways, getPackageExtraGhcOpts
 			)
-import DriverFlags	( dynFlag, buildStaticHscOpts, dynamic_flags, processArgs, static_flags)
+import DriverFlags	( dynFlag, buildStaticHscOpts, dynamic_flags,
+			  processArgs, static_flags)
 
 import DriverMkDepend	( beginMkDependHS, endMkDependHS )
 import DriverPhases	( Phase(Hsc, HCc), haskellish_src_file, objish_file )
 
-import DriverUtil	( add, handle, handleDyn, later, splitFilename, unknownFlagErr, my_prefix_match )
-import CmdLineOpts	( dynFlag, defaultDynFlags, restoreDynFlags, saveDynFlags, setDynFlags, 
-			  DynFlags(..), HscLang(..), 
-			  v_Static_hsc_opts
+import DriverUtil	( add, handle, handleDyn, later, splitFilename,
+			  unknownFlagErr )
+import CmdLineOpts	( dynFlag, defaultDynFlags, restoreDynFlags,
+			  saveDynFlags, setDynFlags, 
+			  DynFlags(..), HscLang(..), v_Static_hsc_opts
 			)
 
 import Outputable
-import ErrUtils		( dumpIfSet )
 import Util
 import Panic		( GhcException(..), panic )
 
@@ -180,7 +182,9 @@ main =
    way_opts <- findBuildTag
    let unreg_opts | cGhcUnregisterised == "YES" = unregFlags
 		  | otherwise = []
-   way_non_static <- processArgs static_flags (unreg_opts ++ way_opts) []
+   pkg_extra_opts <- getPackageExtraGhcOpts
+   extra_non_static <- processArgs static_flags 
+			   (unreg_opts ++ way_opts ++ pkg_extra_opts) []
 
 	-- give the static flags to hsc
    static_opts <- buildStaticHscOpts
@@ -217,7 +221,7 @@ main =
 				})
 
 	-- the rest of the arguments are "dynamic"
-   srcs <- processArgs dynamic_flags (way_non_static ++ non_static) []
+   srcs <- processArgs dynamic_flags (extra_non_static ++ non_static) []
 
 	-- save the "initial DynFlags" away
    saveDynFlags
