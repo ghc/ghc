@@ -96,19 +96,29 @@ binary-dist ::
 # Rename scripts to $i.prl and $i.sh where necessary.
 # ToDo: do this in a cleaner way...
 
+ifneq "$($(Project)BinDistPrlScripts)" ""
 binary-dist::
 	@for i in $($(Project)BinDistPrlScripts); do \
 	     echo "Renaming $$i to $$i.prl"; \
 	    $(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion)/$$i  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion)/$$i.prl; \
 	done
+endif
+
+ifneq "$($(Project)BinDistLibPrlScripts)" ""
+binary-dist::
 	@for i in $($(Project)BinDistLibPrlScripts); do \
 	     echo "Renaming $$i to $$i.prl"; \
 	    $(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion)/$$i  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion)/$$i.prl; \
 	done
+endif
+
+ifneq "$($(Project)BinDistShScripts)" ""
+binary-dist::
 	@for i in $($(Project)BinDistShScripts); do \
 	     echo "Renaming $$i to $$i.sh"; \
 	    $(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion)/$$i  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion)/$$i.sh; \
 	done
+endif
 
 dist :: dist-pre
 include $(TOP)/mk/target.mk
