@@ -56,6 +56,7 @@ module GHC.Handle (
 
 #include "ghcconfig.h"
 
+import System.Directory.Internals
 import Control.Monad
 import Data.Bits
 import Data.Maybe
@@ -63,7 +64,6 @@ import Foreign
 import Foreign.C
 import System.IO.Error
 import System.Posix.Internals
-import System.FilePath
 
 import GHC.Real
 

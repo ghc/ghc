@@ -65,8 +65,8 @@ module System.Directory
     , getModificationTime       -- :: FilePath -> IO ClockTime
    ) where
 
+import System.Directory.Internals
 import System.Environment      ( getEnv )
-import System.FilePath
 import System.IO.Error
 import Control.Monad           ( when, unless )
 
