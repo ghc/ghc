@@ -9,7 +9,7 @@
  * --------------------------------------------------------------------------*/
 #ifndef __OSTHREADS_H__
 #define __OSTHREADS_H__
-#if defined(RTS_SUPPORTS_THREADS) /*to the end */
+#if defined(RTS_SUPPORTS_THREADS) /* to the end */
 
 # if defined(HAVE_PTHREAD_H) && !defined(WANT_NATIVE_WIN32_THREADS)
 #  include <pthread.h>
@@ -33,9 +33,8 @@ typedef DWORD OSThreadId;
 #define INIT_MUTEX_VAR 0
 #define INIT_COND_VAR  0
 
-#define ACQURE_LOCK(mutex)    WaitForSingleObject(mutex,INFINITE)
-#define RELEASE_LOCK(mutex)   ReleaseMutex(handle)
-#define 
+#define ACQUIRE_LOCK(mutex)   WaitForSingleObject(mutex,INFINITE)
+#define RELEASE_LOCK(mutex)   ReleaseMutex(mutex)
 # else
 #  error "Threads not supported"
 # endif

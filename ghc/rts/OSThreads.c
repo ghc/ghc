@@ -171,7 +171,7 @@ startProcWrapper(void* pReal)
 }
 
 int
-createOSThread ( OSThreadId* pId, void (*startProc)(void*))
+createOSThread ( OSThreadId* pId, void (*startProc)(void))
 {
   
   return _beginthreadex ( NULL,  /* default security attributes */
