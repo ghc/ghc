@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.116 2003/05/17 14:49:45 reid Exp $
+dnl $Id: aclocal.m4,v 1.117 2003/05/23 16:36:58 panne Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -1036,9 +1036,7 @@ esac
 ])
 
 dnl ######################################################################
-dnl Some notes about the heavily changed OpenGL test below:
-dnl  * Caching has been completely rewritten, but is still no perfect yet.
-dnl  * Version detection for GL and GLU has been added.
+dnl Note: Caching has been completely rewritten, but is still no perfect yet.
 dnl ######################################################################
 
 dnl ########################### -*- Mode: M4 -*- #######################
@@ -1148,121 +1146,8 @@ dnl and GL_X_LIBS.
   dnl Including <GL/glut.h> instead of plain <GL/gl.h> avoids problems on
   dnl platforms like WinDoze where special headers like <windows.h> or
   dnl some macro trickery would be needed
-  FPTOOLS_SEARCH_LIBS([#include <GL/glut.h>], glEnd, $GL_search_list, have_GL=yes, have_GL=no)
-
-  dnl TODO: The tests for GL features should better be cascaded and the
-  dnl results should be cached. A new macro would be helpful here.
-
-  AC_MSG_CHECKING(glTexSubImage1D)
-  AC_TRY_LINK([#include <GL/glut.h>],
-              [glTexSubImage1D(GL_TEXTURE_1D,0,0,2,GL_INTENSITY,GL_BYTE,(void*)0)],
-              fptools_gl_texsubimage1d=yes,
-              fptools_gl_texsubimage1d=no);
-  AC_MSG_RESULT($fptools_gl_texsubimage1d)
-
-  AC_MSG_CHECKING(glDrawRangeElements)
-  AC_TRY_LINK([#include <GL/glut.h>],
-              [glDrawRangeElements(GL_QUADS,0,0,0,GL_UNSIGNED_BYTE,(void*)0)],
-              fptools_gl_drawrangeelements=yes,
-              fptools_gl_drawrangeelements=no);
-  AC_MSG_RESULT($fptools_gl_drawrangeelements)
-
-  AC_MSG_CHECKING(glActiveTexture)
-  AC_TRY_LINK([#include <GL/glut.h>],
-              [glActiveTexture(GL_TEXTURE1)],
-              fptools_gl_activetexture=yes,
-              fptools_gl_activetexture=no);
-  AC_MSG_RESULT($fptools_gl_activetexture)
-
-  AC_MSG_CHECKING(glMultiDrawArrays)
-  AC_TRY_LINK([#include <GL/glut.h>],
-              [glMultiDrawArrays(GL_TRIANGLES, (GLint*)0, (GLsizei*)0, 0)],
-              fptools_gl_multidrawarrays=yes,
-              fptools_gl_multidrawarrays=no);
-  AC_MSG_RESULT($fptools_gl_multidrawarrays)
-
-  if test x"$fptools_gl_texsubimage1d" != xyes; then
-    fptools_gl_version=1.0
-  else
-     if test x"$fptools_gl_drawrangeelements" != xyes; then
-        fptools_gl_version=1.1
-     else
-       if test x"$fptools_gl_activetexture" != xyes; then
-          fptools_gl_version=1.2
-       else
-         if test x"$fptools_gl_multidrawarrays" != xyes; then
-            fptools_gl_version=1.3
-         else
-            fptools_gl_version=1.4
-         fi
-       fi
-     fi
-  fi
-  echo "It looks like GL version ${fptools_gl_version}"
-
-  dnl TODO: Cache the results of the tests for the imaging subset.
-
-  AC_MSG_CHECKING(EXT_blend_color)
-  AC_TRY_LINK([#include <GL/glut.h>],
-              [glBlendColorEXT((GLclampf)0.0,(GLclampf)0.0,(GLclampf)0.0,(GLclampf)0.0)],
-              hopengl_EXT_blend_color=yes,
-              hopengl_EXT_blend_color=no);
-  AC_MSG_RESULT($hopengl_EXT_blend_color)
-
-  AC_MSG_CHECKING(EXT_blend_minmax)
-  AC_TRY_LINK([#include <GL/glut.h>],
-              [glBlendEquationEXT(GL_FUNC_ADD_EXT)],
-              hopengl_EXT_blend_minmax=yes,
-              hopengl_EXT_blend_minmax=no);
-  AC_MSG_RESULT($hopengl_EXT_blend_minmax)
-
-  AC_MSG_CHECKING(EXT_blend_subtract)
-  AC_TRY_LINK([#include <GL/glut.h>],
-              [glBlendEquationEXT(GL_FUNC_SUBTRACT_EXT)],
-              hopengl_EXT_blend_subtract=yes,
-              hopengl_EXT_blend_subtract=no);
-  AC_MSG_RESULT($hopengl_EXT_blend_subtract)
-
-  FPTOOLS_SEARCH_LIBS([#include <GL/glu.h>], gluNewQuadric, $GLU_search_list, have_GLU=yes,  have_GLU=no)
-
-  dnl TODO: Cascade and cache...
-
-  AC_MSG_CHECKING(gluGetString)
-  AC_TRY_LINK([#include <GL/glut.h>],
-              [gluGetString(GLU_EXTENSIONS)],
-              fptools_glu_getstring=yes,
-              fptools_glu_getstring=no);
-  AC_MSG_RESULT($fptools_glu_getstring)
-
-  AC_MSG_CHECKING(gluTessEndPolygon)
-  AC_TRY_LINK([#include <GL/glut.h>],
-              [gluTessEndPolygon((GLUtesselator*)0)],
-              fptools_glu_tessendpolygon=yes,
-              fptools_glu_tessendpolygon=no);
-  AC_MSG_RESULT($fptools_glu_tessendpolygon)
-
-  AC_MSG_CHECKING(gluUnProject4)
-  AC_TRY_LINK([#include <GL/glut.h>],
-              [gluUnProject4(0.0,0.0,0.0,0.0,(GLdouble*)0,(GLdouble*)0,(GLint*)0,0.0,0.0,(GLdouble*)0,(GLdouble*)0,(GLdouble*)0,(GLdouble*)0)],
-              fptools_glu_unproject4=yes,
-              fptools_glu_unproject4=no);
-  AC_MSG_RESULT($fptools_glu_unproject4)
-
-  if test x"$fptools_glu_getstring" != xyes; then
-    fptools_glu_version=1.0
-  else
-     if test x"$fptools_glu_tessendpolygon" != xyes; then
-        fptools_glu_version=1.1
-     else
-       if test x"$fptools_glu_unproject4" != xyes; then
-          fptools_glu_version=1.2
-       else
-            fptools_glu_version=1.3
-       fi
-     fi
-  fi
-  echo "It looks like GLU version ${fptools_glu_version}"
-
+  FPTOOLS_SEARCH_LIBS([#include <GL/glut.h>], glEnd,         $GL_search_list,  have_GL=yes,   have_GL=no)
+  FPTOOLS_SEARCH_LIBS([#include <GL/glut.h>], gluNewQuadric, $GLU_search_list, have_GLU=yes,  have_GLU=no)
   FPTOOLS_SEARCH_LIBS([#include <GL/glx.h>],  glXWaitX,      $GLX_search_list, have_GLX=yes,  have_GLX=no)
   FPTOOLS_SEARCH_LIBS([#include <GL/glut.h>], glutMainLoop,  glut32 glut,      have_glut=yes, have_glut=no)
 
