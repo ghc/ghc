@@ -35,6 +35,8 @@ import Prelude
 import Control.Monad.Fix
 import Data.Typeable
 
+#include "Typeable.h"
+
 #ifdef __HUGS__
 import Hugs.ST
 import qualified Hugs.LazyST as LazyST
@@ -65,9 +67,4 @@ instance MonadFix (ST s) where
 -- ---------------------------------------------------------------------------
 -- Typeable instance
 
-sTTc :: TyCon
-sTTc = mkTyCon "ST"
-
-instance (Typeable a, Typeable b) => Typeable (ST a b) where
-  typeOf st = mkAppTy sTTc [typeOf ((undefined :: ST a b -> a) st),
-			    typeOf ((undefined :: ST a b -> b) st)]
+INSTANCE_TYPEABLE2(ST,sTTc,"ST")

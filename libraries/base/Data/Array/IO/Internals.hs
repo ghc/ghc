@@ -41,12 +41,9 @@ import GHC.IOBase
 import GHC.Base
 #endif /* __GLASGOW_HASKELL__ */
 
-iOArrayTc :: TyCon
-iOArrayTc = mkTyCon "IOArray"
+#include "Typeable.h"
 
-instance (Typeable a, Typeable b) => Typeable (IOArray a b) where
-  typeOf a = mkAppTy iOArrayTc [typeOf ((undefined :: IOArray a b -> a) a),
-				typeOf ((undefined :: IOArray a b -> b) a)]
+INSTANCE_TYPEABLE2(IOArray,iOArrayTc,"IOArray")
 
 -----------------------------------------------------------------------------
 -- | Instance declarations for 'IOArray's
@@ -80,12 +77,7 @@ instance MArray IOArray e IO where
 --
 newtype IOUArray i e = IOUArray (STUArray RealWorld i e)
 
-iOUArrayTc :: TyCon
-iOUArrayTc = mkTyCon "IOUArray"
-
-instance (Typeable a, Typeable b) => Typeable (IOUArray a b) where
-  typeOf a = mkAppTy iOUArrayTc [typeOf ((undefined :: IOUArray a b -> a) a),
-				 typeOf ((undefined :: IOUArray a b -> b) a)]
+INSTANCE_TYPEABLE2(IOUArray,iOUArrayTc,"IOUArray")
 
 instance HasBounds IOUArray where
     {-# INLINE bounds #-}

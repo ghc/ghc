@@ -1073,13 +1073,7 @@ instance MArray (STArray s) e (ST s) where
 -----------------------------------------------------------------------------
 -- Typeable instance for STArray
 
-sTArrayTc :: TyCon
-sTArrayTc = mkTyCon "STArray"
-
-instance (Typeable a, Typeable b, Typeable c) => Typeable (STArray a b c) where
-  typeOf a = mkAppTy sTArrayTc [typeOf ((undefined :: STArray a b c -> a) a),
-				typeOf ((undefined :: STArray a b c -> b) a),
-				typeOf ((undefined :: STArray a b c -> c) a)]
+INSTANCE_TYPEABLE3(STArray,sTArrayTc,"STArray")
 
 -----------------------------------------------------------------------------
 -- Flat unboxed mutable arrays (ST monad)
