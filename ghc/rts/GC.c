@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.159 2003/08/26 12:12:49 simonmar Exp $
+ * $Id: GC.c,v 1.160 2003/09/23 15:31:02 simonmar Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -422,7 +422,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 
       // mark the large objects as not evacuated yet 
       for (bd = stp->large_objects; bd; bd = bd->link) {
-	bd->flags = BF_LARGE;
+	bd->flags &= ~BF_EVACUATED;
       }
 
       // for a compacted step, we need to allocate the bitmap
