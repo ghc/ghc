@@ -1,10 +1,12 @@
 {-# OPTIONS -fno-implicit-prelude -optc-DNON_POSIX_SOURCE #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: PrelPosix.hsc,v 1.3 2001/05/18 21:46:58 qrczak Exp $
+-- $Id: PrelPosix.hsc,v 1.4 2001/05/22 13:22:14 simonmar Exp $
 --
 -- POSIX support layer for the standard libraries
 --
+-- NON_POSIX_SOURCE needed for the following features:
+--	* S_ISSOCK (no sockets in POSIX)
 
 module PrelPosix where
 
