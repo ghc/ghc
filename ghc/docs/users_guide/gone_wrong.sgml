@@ -220,11 +220,12 @@ please see <XRef LinkEnd="sooner-faster-quicker">).
 </Para>
 
 <Para>
-If your program has no <Function>&lowbar;ccall&lowbar;</Function>s/<Function>&lowbar;casm&lowbar;</Function>s in it, then a crash is
-always a BUG in the GHC system, except in one case: If your program is
-made of several modules, each module must have been compiled after any
-modules on which it depends (unless you use <Filename>.hi-boot</Filename> files, in which
-case these <Emphasis>must</Emphasis> be correct with respect to the module source). 
+If your program has no foreign calls in it, then a crash is always a BUG in
+the GHC system, except in one case: If your program is made of several
+modules, each module must have been compiled after any modules on which it
+depends (unless you use <Filename>.hi-boot</Filename> files, in which case
+these <Emphasis>must</Emphasis> be correct with respect to the module
+source).
 </Para>
 
 <Para>
@@ -270,7 +271,7 @@ So, before you report a bug because of a core dump, you should probably:
 </Para>
 
 <Para>
-Of course, if you have <Function>&lowbar;ccall&lowbar;</Function>s/<Function>&lowbar;casm&lowbar;</Function>s in your program then all
+Of course, if you have foreign calls in your program then all
 bets are off, because you can trash the heap, the stack, or whatever.
 </Para>
 

@@ -14,3 +14,5 @@
 <!ENTITY wrong          SYSTEM "gone_wrong.sgml" >
 <!ENTITY utils          SYSTEM "utils.sgml" >
 <!ENTITY win32-dll      SYSTEM "win32-dlls.sgml">
+<!ENTITY ffi-body       SYSTEM "../../../docs/ffi.sgml">
+<!ENTITY ffi-chap       SYSTEM "ffi-chap.sgml">

@@ -1570,10 +1570,12 @@ Here are some &ldquo;dangerous&rdquo; optimisations you <Emphasis>might</Emphasi
 </Para>
 
 <Para>
-Compile via C, and don't use the native-code generator.  (There are
-many cases when GHC does this on its own.)  You might pick up a little
-bit of speed by compiling via C.  If you use <Function>&lowbar;ccall&lowbar;gc&lowbar;</Function>s or
-<Function>&lowbar;casm&lowbar;</Function>s, you probably <Emphasis>have</Emphasis> to use <Option>-fvia-C</Option>.
+Compile via C, and don't use the native-code generator.  (There are many
+cases when GHC does this on its own.) You might pick up a little bit of
+speed by compiling via C (e.g. for floating-point intensive code on Intel).
+If you use <Function>&lowbar;casm&lowbar;</Function>s (which are utterly
+deprecated), you probably <Emphasis>have</Emphasis> to use
+<Option>-fvia-C</Option>.
 </Para>
 
 <Para>
@@ -2068,7 +2070,7 @@ THIS MAY CHANGE.  Meanwhile, options so sent are:
 </Para>
 
 <Para>
-If you are compiling with lots of <Literal>ccalls</Literal>, etc., you may need to
+If you are compiling with lots of foreign calls, you may need to
 tell the C&nbsp;compiler about some <Literal>&num;include</Literal> files.  There is no real
 pretty way to do this, but you can use this hack from the
 command-line:

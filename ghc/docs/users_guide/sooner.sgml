@@ -456,7 +456,7 @@ types.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>Use <Function>&lowbar;ccall&lowbar;s</Function> (a GHC extension) to plug into fast libraries:</Term>
+<Term>Use <Literal>foreign import</Literal> (a GHC extension) to plug into fast libraries:</Term>
 <ListItem>
 <Para>
 This may take real work, but&hellip; There exist piles of
@@ -465,7 +465,7 @@ to compete with it, but link with it.
 </Para>
 
 <Para>
-<XRef LinkEnd="glasgow-ccalls"> says a little about how to use C calls.
+<XRef LinkEnd="sec-ffi"> describes the foreign calling interface.
 </Para>
 </ListItem>
 </VarListEntry>

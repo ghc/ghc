@@ -85,11 +85,11 @@ Instead of being a boolean expression, a guard is a list of qualifiers, exactly 
 </VarListEntry>
 
 <VarListEntry>
-<Term>Calling out to C:</Term>
+<Term>Foreign calling:</Term>
 <ListItem>
 <Para>
 Just what it sounds like.  We provide <Emphasis>lots</Emphasis> of rope that you
-can dangle around your neck.  Please see <XRef LinkEnd="glasgow-ccalls">.
+can dangle around your neck.  Please see <XRef LinkEnd="ffi">.
 </Para>
 </ListItem>
 </VarListEntry>
@@ -1476,151 +1476,14 @@ qualifier list has just one element, a boolean expression.
 </Para>
 </Sect1>
 
-
-<Sect1 id="glasgow-ccalls">
-<Title>Calling C directly from Haskell</Title>
-
-<Para>
-<IndexTerm><Primary>C calls (Glasgow extension)</Primary></IndexTerm>
-<IndexTerm><Primary>&lowbar;ccall&lowbar; (Glasgow extension)</Primary></IndexTerm>
-<IndexTerm><Primary>&lowbar;casm&lowbar; (Glasgow extension)</Primary></IndexTerm>
-GOOD ADVICE: Because this stuff is not Entirely Stable as far as names
-and things go, you would be well-advised to keep your C-callery
-corraled in a few modules, rather than sprinkled all over your code.
-It will then be quite easy to update later on.
-</Para>
-
-<Sect2 id="ccall-intro">
-<Title><Function>&lowbar;ccall&lowbar;</Function> and <Function>&lowbar;casm&lowbar;</Function>: an introduction
-</Title>
+<Sect1 id="sec-ffi">
+<Title>The foreign interface</Title>
 
 <Para>
-The simplest way to use a simple C function
+The foreign interface consists of language and library support. The former
+is described later in <XRef LinkEnd="ffi">; the latter is outlined below,
+and detailed in the hslibs documentation.
 </Para>
-
-<Para>
-
-<ProgramListing>
-double fooC( FILE *in, char c, int i, double d, unsigned int u )
-</ProgramListing>
-
-</Para>
-
-<Para>
-is to provide a Haskell wrapper:
-</Para>
-
-<Para>
-
-<ProgramListing>
-fooH :: Char -> Int -> Double -> Word -> IO Double
-fooH c i d w = _ccall_ fooC (&ldquo;stdin&rdquo;::Addr) c i d w
-</ProgramListing>
-
-</Para>
-
-<Para>
-The function <Function>fooH</Function> unbox all of its arguments, call the C
-function <Function>fooC</Function> and box the corresponding arguments.
-</Para>
-
-<Para>
-One of the annoyances about <Function>&lowbar;ccall&lowbar;</Function>s is when the C types don't quite
-match the Haskell compiler's ideas.  For this, the <Function>&lowbar;casm&lowbar;</Function> variant
-may be just the ticket (NB: <Emphasis>no chance</Emphasis> of such code going
-through a native-code generator):
-</Para>
-
-<Para>
-
-<ProgramListing>
-import Addr
-import CString
-
-oldGetEnv name
-  = _casm_ &ldquo;%r = getenv((char *) %0);&rdquo; name >>= \ litstring ->
-    return (
-        if (litstring == nullAddr) then
-            Left ("Fail:oldGetEnv:"++name)
-        else
-            Right (unpackCString litstring)
-    )
-</ProgramListing>
-
-</Para>
-
-<Para>
-The first literal-literal argument to a <Function>&lowbar;casm&lowbar;</Function> is like a <Function>printf</Function>
-format: <Literal>&percnt;r</Literal> is replaced with the &ldquo;result,&rdquo; <Literal>&percnt;0</Literal>&ndash;<Literal>&percnt;n-1</Literal> are
-replaced with the 1st&ndash;nth arguments.  As you can see above, it is an
-easy way to do simple C&nbsp;casting.  Everything said about <Function>&lowbar;ccall&lowbar;</Function> goes
-for <Function>&lowbar;casm&lowbar;</Function> as well.
-</Para>
-
-<Para>
-The use of <Function>&lowbar;casm&lowbar;</Function> in your code does pose a problem to the compiler
-when it comes to generating an interface file for a freshly compiled
-module. Included in an interface file is the unfolding (if any) of a
-declaration. However, if a declaration's unfolding happens to contain
-a <Function>&lowbar;casm&lowbar;</Function>, its unfolding will <Emphasis>not</Emphasis> be emitted into the interface
-file even if it qualifies by all the other criteria. The reason why
-the compiler prevents this from happening is that unfolding <Function>&lowbar;casm&lowbar;</Function>s
-into an interface file unduly constrains how code that import your
-module have to be compiled. If an imported declaration is unfolded and
-it contains a <Function>&lowbar;casm&lowbar;</Function>, you now have to be using a compiler backend
-capable of dealing with it (i.e., the C compiler backend). If you are
-using the C compiler backend, the unfolded <Function>&lowbar;casm&lowbar;</Function> may still cause you
-problems since the C code snippet it contains may mention CPP symbols
-that were in scope when compiling the original module are not when
-compiling the importing module.
-</Para>
-
-<Para>
-If you're willing to put up with the drawbacks of doing cross-module
-inlining of C code (GHC - A Better C Compiler :-), the option
-<Option>-funfold-casms-in-hi-file</Option> will turn off the default behaviour.
-<IndexTerm><Primary>-funfold-casms-in-hi-file option</Primary></IndexTerm>
-</Para>
-
-</Sect2>
-
-<Sect2 id="glasgow-literal-literals">
-<Title>Literal-literals</Title>
-
-<Para>
-<IndexTerm><Primary>Literal-literals</Primary></IndexTerm>
-The literal-literal argument to <Function>&lowbar;casm&lowbar;</Function> can be made use of separately
-from the <Function>&lowbar;casm&lowbar;</Function> construct itself. Indeed, we've already used it:
-</Para>
-
-<Para>
-
-<ProgramListing>
-fooH :: Char -> Int -> Double -> Word -> IO Double
-fooH c i d w = _ccall_ fooC (&ldquo;stdin&rdquo;::Addr) c i d w
-</ProgramListing>
-
-</Para>
-
-<Para>
-The first argument that's passed to <Function>fooC</Function> is given as a literal-literal,
-that is, a literal chunk of C code that will be inserted into the generated
-<Filename>.hc</Filename> code at the right place.
-</Para>
-
-<Para>
-A literal-literal is restricted to having a type that's an instance of
-the <Literal>CCallable</Literal> class, see <XRef LinkEnd="ccall-gotchas">
-for more information.
-</Para>
-
-<Para>
-Notice that literal-literals are by their very nature unfriendly to
-native code generators, so exercise judgement about whether or not to
-make use of them in your code.
-</Para>
-
-</Sect2>
 
 <Sect2 id="glasgow-foreign-headers">
 <Title>Using function headers
@@ -2340,7 +2203,7 @@ stuff is hairy with a capital H!
 </Title>
 
 <Para>
-This section documents GHC's implementation of multi-paramter type
+This section documents GHC's implementation of multi-parameter type
 classes.  There's lots of background in the paper <ULink
 URL="http://research.microsoft.com/~simonpj/multi.ps.gz" >Type
 classes: exploring the design space</ULink > (Simon Peyton Jones, Mark
