@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.68 2001/03/13 14:59:56 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.69 2001/03/28 14:09:41 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -157,20 +157,19 @@ dnl Check for Happy and version.  If we're building GHC, then we need
 dnl at least Happy version 1.9.  If there's no installed Happy, we look
 dnl for a happy source tree and point the build system at that instead.
 dnl
-dnl ToDo: when we reset HappyCmd to the source tree, autoconf doesn't
-dnl seems to insert it in the cache file.  sigh.
-dnl
 AC_DEFUN(FPTOOLS_HAPPY,
-[AC_PATH_PROG(HappyCmd,happy)
+[
+if test -d $srcdir/happy; then
+   SrcTreeHappyCmd=$hardtop/happy/src/happy-inplace
+fi
+AC_PATH_PROG(HappyCmd,happy,$SrcTreeHappyCmd)
 AC_CACHE_CHECK([for version of happy], fptools_cv_happy_version,
-[if test x"$HappyCmd" != x; then
-   fptools_cv_happy_version="`$HappyCmd -v |
 changequote(, )dnl
-			  grep 'Happy Version' | sed -e 's/Happy Version \([^ ]*\).*/\1/g'`" ;
-elif test -d $srcdir/happy; then
-   HappyCmd=$hardtop/happy/src/happy-inplace;
+[if test x"$HappyCmd" = x"$SrcTreeHappyCmd"; then
    fptools_cv_happy_version=`grep '^ProjectVersion[ 	]*=' $srcdir/happy/mk/version.mk | sed 's/.*\([0-9][0-9]*\.[0-9][0-9]*\).*/\1/g'`;
-   echo -n "using happy from the source tree... ";
+elif test x"$HappyCmd" != x; then
+   fptools_cv_happy_version="`$HappyCmd -v |
+			  grep 'Happy Version' | sed -e 's/Happy Version \([^ ]*\).*/\1/g'`" ;
 else
    fptools_cv_happy_version="";
 fi;
@@ -862,7 +861,7 @@ dnl The variable LIBM (which is not an output variable by default) is
 dnl set to a value which is suitable for use in a Makefile (for example,
 dnl in make's LOADLIBES macro) provided you AC_SUBST it first.
 dnl
-dnl @version 0.01 $Id: aclocal.m4,v 1.68 2001/03/13 14:59:56 simonmar Exp $
+dnl @version 0.01 $Id: aclocal.m4,v 1.69 2001/03/28 14:09:41 simonmar Exp $
 dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
 
 # FPTOOLS_CHECK_LIBM - check for math library
@@ -950,7 +949,7 @@ dnl Please note that as the ac_opengl macro and the toy example evolves,
 dnl the version number increases, so you may have to adjust the above
 dnl URL accordingly.
 dnl
-dnl @version 0.01 $Id: aclocal.m4,v 1.68 2001/03/13 14:59:56 simonmar Exp $
+dnl @version 0.01 $Id: aclocal.m4,v 1.69 2001/03/28 14:09:41 simonmar Exp $
 dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
 
 AC_DEFUN(FPTOOLS_HAVE_OPENGL,
