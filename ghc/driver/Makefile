@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.49 2000/12/11 16:15:03 simonmar Exp $
+# $Id: Makefile,v 1.50 2000/12/20 10:42:54 simonmar Exp $
 #
 
 TOP=..
@@ -21,7 +21,7 @@ else
 SRC_HC_OPTS += -fglasgow-exts -cpp -syslib concurrent -syslib posix -syslib misc
 endif
 
-SUBDIRS = mangler split stats
+SUBDIRS = mangler split
 
 # -----------------------------------------------------------------------------
 # Create compiler configuration
