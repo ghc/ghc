@@ -37,7 +37,9 @@ HSLIB = std
 # we don't want PrelMain in the GHCi library.
 GHCI_LIBOBJS = $(filter-out PrelMain.$(way_)o,$(HS_OBJS))
 
-HS_SRCS += $(patsubst %.hsc,%.hs,$(wildcard *.hsc))
+HSC_SRCS = $(wildcard *.hsc)
+HSC_HS   = $(patsubst %.hsc,%.hs, $(HSC_SRCS))
+HS_SRCS := $(HSC_HS) $(filter-out $(HSC_HS),$(HS_SRCS))
 
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options
@@ -90,6 +92,11 @@ all :: PrelMain.dll_o
 endif
 
 CLEAN_FILES += PrelPrimopWrappers.hs PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
+
+CLEAN_FILES +=  \
+	$(patsubst %.hsc, %.hs, $(HSC_SRCS)) \
+	$(patsubst %.hsc, %.hs.c, $(HSC_SRCS)) \
+	$(patsubst %.hsc, %.hs.h, $(HSC_SRCS))
 
 #
 # If we're building the unregisterised way, it may well be for Hugs.
