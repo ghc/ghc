@@ -660,13 +660,6 @@
 	  </thead>
 	  <tbody>
 	    <row>
-	      <entry><option>-fall-strict</option></entry>
-	      <entry>Make everything strict</entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-fno-all-strict</option></entry>
-	    </row>
-
-	    <row>
 	      <entry><option>-fcase-merge</option></entry>
 	      <entry>Enable case-merging</entry>
 	      <entry>static</entry>
