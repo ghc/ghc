@@ -116,6 +116,14 @@ void SaveAllStgRegs(STG_NO_ARGS)
     SAVE_Dbl2 = DblReg2;
 #endif
 
+#ifdef REG_Lng1
+    SAVE_Lng1 = LngReg1;
+#endif
+
+#ifdef REG_Lng2
+    SAVE_Lng2 = LngReg2;
+#endif
+
 #ifdef REG_Tag
     SAVE_Tag = TagReg;
 #endif
@@ -252,6 +260,14 @@ RestoreAllStgRegs (STG_NO_ARGS)
 
 #ifdef REG_Dbl2
     DblReg2 = SAVE_Dbl2;
+#endif
+
+#ifdef REG_Lng1
+    LngReg1 = SAVE_Lng1;
+#endif
+
+#ifdef REG_Lng2
+    LngReg2 = SAVE_Lng2;
 #endif
 
 #ifdef REG_Tag
