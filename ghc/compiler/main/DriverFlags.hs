@@ -279,13 +279,13 @@ static_flags =
         ------- Specific phases  --------------------------------------------
   ,  ( "pgmL"           , HasArg setPgmL )
   ,  ( "pgmP"           , HasArg setPgmP )
-  ,  ( "pgmP"           , HasArg setPgmP )
   ,  ( "pgmF"           , HasArg setPgmF )
   ,  ( "pgmc"           , HasArg setPgmc )
   ,  ( "pgmm"           , HasArg setPgmm )
   ,  ( "pgms"           , HasArg setPgms )
   ,  ( "pgma"           , HasArg setPgma )
   ,  ( "pgml"           , HasArg setPgml )
+  ,  ( "pgmdll"		, HasArg setPgmDLL )
 #ifdef ILX
   ,  ( "pgmI"           , HasArg setPgmI )
   ,  ( "pgmi"           , HasArg setPgmi )

@@ -19,6 +19,7 @@ module SysTools (
 	setPgms,
 	setPgma,
 	setPgml,
+	setPgmDLL,
 #ifdef ILX
 	setPgmI,
 	setPgmi,
@@ -434,6 +435,7 @@ setPgmm = writeIORef v_Pgm_m
 setPgms = writeIORef v_Pgm_s
 setPgma = writeIORef v_Pgm_a
 setPgml = writeIORef v_Pgm_l
+setPgmDLL = writeIORef v_Pgm_MkDLL
 #ifdef ILX
 setPgmI = writeIORef v_Pgm_I
 setPgmi = writeIORef v_Pgm_i
