@@ -853,7 +853,7 @@ getExecDir :: IO (Maybe String) = do return Nothing
 foreign import ccall "_getpid" unsafe getProcessID :: IO Int -- relies on Int == Int32 on Windows
 #elif __GLASGOW_HASKELL__ > 504
 getProcessID :: IO Int
-getProcessID = System.Posix.Internals..c_getpid >>= return . fromIntegral
+getProcessID = System.Posix.Internals.c_getpid >>= return . fromIntegral
 #else
 getProcessID :: IO Int
 getProcessID = Posix.getProcessID
