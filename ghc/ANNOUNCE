@@ -1,4 +1,4 @@
-	     The Glasgow Haskell Compiler -- version 4.01
+	     The Glasgow Haskell Compiler -- version 4.02
 	    ==============================================
 
 We are pleased to announce a new release of the Glasgow Haskell
@@ -14,19 +14,19 @@ related information is available from the Haskell home page at
 + What's new
 =============
 
-GHC 4.01 is a small increment over 4.00.  Many bugs have been fixed.
-The following features are new:
-
-	* Weak pointers,
-	* The foreign function interface is now complete.
-
-In addition, bootstrapping the compiler should now work out of the box.
+GHC 4.02 fixes several bugs in 4.01 and adds one new feature: scoped
+type variables.  Some Haskell 98 features are also now supported,
+including lazy name clash detection and scoped infix declarations.
 
 The following things have not been fixed yet:
 
 	* The native code generator is still flaky, and is turned off by
 	  default for the time being.
+
 	* The profiler is still flaky.
+
+	* The garbage collector is still a two-space copying collector.  We're
+	  working on a generational collector right now.
 
 + Mailing lists
 ================
@@ -70,7 +70,8 @@ for tar, please)!
 
 To compile up this source-only release, you need a machine with 32+MB
 memory, GNU C (`gcc'), `perl' plus a version of GHC installed (version
-2.10 at least).  This release is known to work on the following platforms:
+2.10 at least, 3.02 recommended).  This release is known to work on
+the following platforms:
 
   * i386-unknown-{linux,solaris2,freebsd,cygwin32}
   * sparc-sun-{sunos4,solaris2}

@@ -1,0 +1,35 @@
+<sect1>Release notes for version~4.02---12/98
+<label id="release-4-02">
+<p>
+
+<itemize>
+
+<item> Some Haskell 98 changes:
+	<itemize>
+	<item> Lazy name-clash detection.
+	<item> Scoped infix declarations.
+	</itemize>
+
+<item> Scoped type variables implemented.
+
+<item> Several bugs in _ccall_GC and foreign export fixed.
+
+<item> Warnings for unused variables should work now (they didn't before).
+
+<item> Simplifier improvements:
+   <itemize>
+  	<item> Much better treatment of strict arguments.
+	<item> Function arguments of unlifted type are treated as strict.
+  	<item> Better treatment of bottoming Ids.
+  	<item> No need for worker/wrapper split for fns that are merely strict.
+  	<item> Fewer iterations needed, I hope.
+   </itemize>
+
+<item> Strictness of primitive operations is now explicit and used by
+the simplifier.
+
+<item> Less gratuitous renaming in interface files and abs C.
+
+<item> <tt/OccName/ is a separate module, and is an abstract data type.
+ 
+</itemize>

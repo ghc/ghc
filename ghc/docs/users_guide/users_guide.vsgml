@@ -1,6 +1,6 @@
 <!doctype linuxdoc system [
 	<!ENTITY intro      	SYSTEM "intro.sgml" >
-	<!ENTITY relnotes 	SYSTEM "4-01-notes.sgml" >
+	<!ENTITY relnotes 	SYSTEM "4-02-notes.sgml" >
 	<!ENTITY using      	SYSTEM "using.sgml" >
 	<!ENTITY runtime  	SYSTEM "runtime_control.sgml" >
 	<!ENTITY prof   	SYSTEM "profiling.sgml" >
@@ -18,7 +18,7 @@
 ]>
 <article>
 
-<title>The Glasgow Haskell Compiler User's Guide, Version~4.01
+<title>The Glasgow Haskell Compiler User's Guide, Version~4.02
 <author>The GHC Team,
 Department of Computing Science,
 University of Glasgow,
