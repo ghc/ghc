@@ -53,6 +53,12 @@ else
 RUNTEST_OPTS += -e ghc_with_interpreter=0
 endif
 
+ifeq "$(filter thr, $(GhcRTSWays))" "thr"
+RUNTEST_OPTS += -e ghc_with_threaded_rts=1
+else
+RUNTEST_OPTS += -e ghc_with_threaded_rts=0
+endif
+
 RUNTEST_OPTS +=  \
 	--config=$(CONFIG) \
 	-e config.compiler=\"$(TEST_HC)\" \

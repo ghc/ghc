@@ -26,13 +26,17 @@ if (ghc_with_profiling == 1):
 if (ghc_with_interpreter == 1):
 	config.run_ways.append('ghci')
 
-config.way_flags = { 'normal' : [],
-		     'opt'    : ['-O'],
-		     'optasm' : ['-O -fasm'],
-	  	     'prof'   : ['-O -prof -auto-all'],
-		     'unreg'  : ['-unreg'],
-		     'ghci'   : ['--interactive', '-v0'],
-                     'extcore' : ['-fext-core'],
-		     'optextcore' : ['-O -fext-core']
+if (ghc_with_threaded_rts == 1):
+	config.run_ways.append('threaded')
+
+config.way_flags = { 'normal'     : [],
+		     'opt'        : ['-O'],
+		     'optasm'     : ['-O -fasm'],
+	  	     'prof'       : ['-O -prof -auto-all'],
+		     'unreg'      : ['-unreg'],
+		     'ghci'       : ['--interactive', '-v0'],
+                     'extcore'    : ['-fext-core'],
+		     'optextcore' : ['-O -fext-core'],
+		     'threaded'   : ['-threaded']
 		   }
 
