@@ -1,10 +1,10 @@
 _interface_ Id 1
 _exports_
-Id Id GenId StrictnessMark(MarkedStrict NotMarkedStrict) dataConArgTys idType isNullaryDataCon mkDataCon mkTupleCon nmbrId;
-_instances_
-instance {Outputable.Outputable Id} = $d1;
+Id Id GenId StrictnessMark(MarkedStrict NotMarkedStrict) dataConArgTys idType isNullaryDataCon mkDataCon mkTupleCon nmbrId pprId;
+-- _instances_
+-- instance {Outputable.Outputable Id} = $d4;
 _declarations_
-1 $d1 _:_ {Outputable.Outputable Id} ;;
+-- 1 $4 _:_ {Outputable.Outputable Id} ;;
 1 type Id = Id.GenId Type.Type ;
 1 data GenId ty ;
 1 data StrictnessMark = MarkedStrict | NotMarkedStrict ;
@@ -14,4 +14,4 @@ _declarations_
 1 mkDataCon _:_ Name.Name -> [StrictnessMark] -> [FieldLabel.FieldLabel] -> [TyVar.TyVar] -> [(Class.Class,Type.Type)] -> [TyVar.TyVar] -> [(Class.Class,Type.Type)] -> [Type.Type] -> TyCon.TyCon -> Id ;;
 1 mkTupleCon _:_ PrelBase.Int -> Name.Name -> Type.Type -> Id ;;
 1 nmbrId _:_ Id -> PprEnv.NmbrEnv -> (PprEnv.NmbrEnv, Id) ;;
-
+1 pprId _:_ _forall_ [ty] {Outputable.Outputable ty} => Outputable.PprStyle -> GenId ty -> Pretty.Doc ;;
