@@ -956,7 +956,7 @@ process_casm results args string = process results args string
   process []    _ "" = empty
   process (_:_) _ "" = error ("process_casm: non-void result not assigned while processing _casm_ \"" ++ 
 			      string ++ 
-			      "\"\n(Try changing result type to PrimIO ()\n")
+			      "\"\n(Try changing result type to IO ()\n")
 
   process ress args ('%':cs)
     = case cs of
