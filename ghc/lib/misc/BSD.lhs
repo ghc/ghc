@@ -437,7 +437,7 @@ unvectorizeHostAddrs :: Addr -> Int -> IO [Word]
 unvectorizeHostAddrs ptr n 
   | str == ``NULL'' = return []
   | otherwise = do
-	x <- _casm_ ``{ u_long tmp;
+	x <- _casm_ ``{ unsigned long tmp;
 		   if ((((struct hostent*)%0)->h_addr_list[(int)%1]) == NULL)
 		      tmp=(W_)0;
 		   else
