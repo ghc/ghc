@@ -390,13 +390,6 @@ pragma	: src_loc PRAGMA	{ parseIdInfo $2 PState{ bol = 0#, atbol = 1#,
 							loc = $1 }
 				}
 
-rules_prag :: { ParseResult ([RdrNameRuleDecl], IfaceDeprecs) }
-rules_prag : src_loc PRAGMA	{ parseRules $2 PState{ bol = 0#, atbol = 1#,
-							context = [],
-							glasgow_exts = 1#,
-							loc = $1 }
-				}
-
 -----------------------------------------------------------------------------
 
 rules_and_deprecs_part :: { ([RdrNameRuleDecl], IfaceDeprecs) }
@@ -405,6 +398,13 @@ rules_and_deprecs_part : {- empty -}	{ ([], Nothing) }
 					     POk _ rds -> rds
 					     PFailed err -> pprPanic "Rules/Deprecations parse failed" err
 					}
+
+rules_prag :: { ParseResult ([RdrNameRuleDecl], IfaceDeprecs) }
+rules_prag : src_loc PRAGMA	{ parseRules $2 PState{ bol = 0#, atbol = 1#,
+							context = [],
+							glasgow_exts = 1#,
+							loc = $1 }
+				}
 
 rules_and_deprecs :: { ([RdrNameRuleDecl], IfaceDeprecs) }
 rules_and_deprecs : rule_prag deprec_prag	{ ($1, $2) }
