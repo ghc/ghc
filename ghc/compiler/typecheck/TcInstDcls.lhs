@@ -61,9 +61,8 @@ import Unify		( unifyTauTy, unifyTauTyLists )
 import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
 			  concatBag, foldBag, bagToList, listToBag,
 			  Bag )
-import CmdLineOpts	( opt_GlasgowExts, opt_CompilingGhcInternals,
-			  opt_OmitDefaultInstanceMethods, opt_PprUserLength,
-			  opt_SpecialiseOverloaded
+import CmdLineOpts	( opt_GlasgowExts, opt_OmitDefaultInstanceMethods, 
+			  opt_PprUserLength, opt_SpecialiseOverloaded
 			)
 import Class		( GenClass,
 			  classBigSig,
