@@ -34,7 +34,7 @@ import FieldLabel	( FieldLabel, fieldLabelTyCon )
 import CostCentre	( mkUserCC )
 import Id		( Id, idType, recordSelectorFieldLabel )
 import PrelInfo		( rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID )
-import DataCon		( DataCon, dataConWrapId, dataConArgTys, dataConFieldLabels )
+import DataCon		( DataCon, dataConWrapId, dataConFieldLabels, dataConInstOrigArgTys )
 import DataCon		( isExistentialDataCon )
 import Literal		( Literal(..) )
 import TyCon		( tyConDataCons )
@@ -408,7 +408,7 @@ dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
 	      []	 -> HsVar old_arg_id
 
 	mk_alt con
-	  = newSysLocalsDs (dataConArgTys con in_inst_tys)	`thenDs` \ arg_ids ->
+	  = newSysLocalsDs (dataConInstOrigArgTys con in_inst_tys) `thenDs` \ arg_ids ->
 		-- This call to dataConArgTys won't work for existentials
 	    let 
 		val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
