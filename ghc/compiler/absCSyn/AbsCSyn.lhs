@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.24 1999/06/24 13:04:13 simonmar Exp $
+% $Id: AbsCSyn.lhs,v 1.25 1999/10/31 15:35:32 sof Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -166,7 +166,8 @@ stored in a mixed type location.)
        typedefs if needs be (i.e., when generating .hc code and
        compiling 'foreign import dynamic's)
     -}
-  | CCallTypedef        PrimOp{-CCallOp-} [CAddrMode] [CAddrMode]
+  | CCallTypedef Bool {- True => use "typedef"; False => use "extern"-}
+  		 PrimOp{-CCallOp-} [CAddrMode] [CAddrMode]
 
   -- *** the next three [or so...] are DATA (those above are CODE) ***
 

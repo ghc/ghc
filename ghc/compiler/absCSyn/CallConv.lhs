@@ -53,7 +53,7 @@ platforms.
 \begin{code}
 callConvAttribute :: CallConv -> String
 callConvAttribute cc
- | cc == stdCallConv   = "__attribute__((stdcall))"
+ | cc == stdCallConv   = "__stdcall"
  | cc == cCallConv     = ""
  | otherwise	       = panic ("callConvAttribute: cannot handle" ++ showSDoc (pprCallConv cc))
 
