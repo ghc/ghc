@@ -1,41 +1,116 @@
-TOP = ../..
-UnlitSuffixRules = YES
-include $(TOP)/ghc/mk/ghc.mk
+#
+# ghc/includes
+#
 
-# Literate header files
-HLIT = $(patsubst %.lh, %.h, $(wildcard *.lh))
+TOP = ..
+include $(TOP)/mk/boilerplate.mk
 
-# Header files built by configure
-HCONFIG = config.h platform.h
+#
+# Just to make sure, no ways stuff in here, please.
+#
+WAYS=
+
+# De-litted header files
+LH_FILES=$(wildcard *.lh)
+
+DELIT_H_FILES = $(patsubst %.lh, %.h, $(LH_FILES))
+
+#
+# Header file built from the configure script's findings
+#
+H_CONFIG = config.h
+
 
 # Everything else
-HFILES = stgdefs.h rtsdefs.h StgDirections.h StgMachDeps.h error.h \
+H_FILES = stgdefs.h rtsdefs.h StgDirections.h StgMachDeps.h error.h \
   ieee-flpt.h gmp.h LLC.h HLC.h
 
+ALL_FILES = $(DELIT_H_FILES) $(H_FILES)
 ifeq ($(GhcWithNativeCodeGen),YES)
-  ALLFILES = $(HLIT) $(HFILES) $(TARGETPLATFORM).h
-else
-  ALLFILES = $(HLIT) $(HFILES)
+ALL_FILES += $(TARGETPLATFORM).h
 endif
+
+
+#
+# The fptools configure script creates the configuration header file 
+# and puts it in fptools/mk/config.h. We copy it down to here, prepending
+# some make variables specifying cpp platform variables.
+#
+$(H_CONFIG) : $(FPTOOLS_TOP)/mk/config.h
+
+$(H_CONFIG) :
+	@echo "Creating $@..."
+	@$(RM) $@
+	@echo "#define HostPlatform_TYPE   $(HostPlatform_CPP)"  > $@
+	@echo "#define TargetPlatform_TYPE $(HostPlatform_CPP)" >> $@
+	@echo "#define BuildPlatform_TYPE  $(HostPlatform_CPP)" >> $@
+	@echo >> $@
+	@echo "#define $(HostPlatform_CPP)_HOST		1" >> $@
+	@echo "#define $(HostPlatform_CPP)_TARGET	1" >> $@
+	@echo "#define $(HostPlatform_CPP)_BUILD  	1" >> $@
+	@echo >> $@
+	@echo "#define $(HostArch_CPP)_HOST_ARCH	1" >> $@
+	@echo "#define $(HostArch_CPP)_TARGET_ARCH	1" >> $@
+	@echo "#define $(HostArch_CPP)_BUILD_ARCH  	1" >> $@
+	@echo >> $@
+	@echo "#define $(HostOS_CPP)_HOST_OS		1" >> $@
+	@echo "#define $(HostOS_CPP)_TARGET_OS		1" >> $@  
+	@echo "#define $(HostOS_CPP)_BUILD_OS 		1" >> $@
+	@echo >> $@
+	@echo "#define $(HostVendor_CPP)_HOST_VENDOR	1" >> $@
+	@echo "#define $(HostVendor_CPP)_TARGET_VENDOR  1" >> $@
+	@echo "#define $(HostVendor_CPP)_BUILD_VENDOR 	1" >> $@
+	@cat $(FPTOOLS_TOP)/mk/$@ >> $@
+	@echo "Done."
 
 $(TARGETPLATFORM).h : mkNativeHdr
 	$(RM) $@
 	./mkNativeHdr > $@ || ( rm $@ && exit 1 )
 
-mkNativeHdr : mkNativeHdr.c $(HLIT) $(HFILES)
-	$(GHC) -c mkNativeHdr.c
+#
+# Building mkNativeHdr using the Haskell compiler
+# to do it (ghc really).
+#
+mkNativeHdr : $(HLIT) $(HFILES) mkNativeHdr.c
+	$(HC) -c mkNativeHdr.c
 	$(CC) $(CFLAGS) -o mkNativeHdr mkNativeHdr.c
 
-all :: $(ALLFILES)
+all :: $(H_CONFIG) $(ALL_FILES)
 
-install :: $(ALLFILES) $(HCONFIG)
-	$(INSTALL) $(INSTDATAFLAGS) $(ALLFILES) $(INSTDATADIR_GHC)/includes
-	$(INSTALL) $(INSTDATAFLAGS) $(HCONFIG) $(INSTLIBDIR_GHC)/includes
+#
+# boot setup:
+#
+# When building the dependencies in runtime/ , lib/ we need to get
+# at the de-litted versions of includes/, hence we arrange the
+# `depend' target to depend on `all'.
+#
+boot :: all
+
+#
+# Install all header files
+#
+# Hackily set the install destination here:
+INSTALL_DATAS += $(DELIT_H_FILES) $(H_FILES) $(TARGETPLATFORM).h
+
+#
+# We want the configuration header files for the different platforms
+# to be put inside the lib/../$(HOSTPLATFORM)/ directory 
+#
+install :: $(H_CONFIG)
+	$(INSTALL_DIR) $(libdir)/includes
+	$(INSTALL_DATA) $(INSTALL_OPTS) $(H_CONFIG) $(libdir)/includes
+
+
+#
+# `make clean' settings:
+#
+CLEAN_FILES += $(DELIT_H_FILES) $(H_CONFIG) mkNativeHdr.o mkNativeHdr
 
 ifeq ($(GhcWithNativeCodeGen),YES)
-  clean ::
-	$(RM) $(HLIT) mkNativeHdr mkNativeHdr.c $(TARGETPLATFORM).h
-else
-  clean ::
-	$(RM) $(HLIT) mkNativeHdr mkNativeHdr.c
+CLEAN_FILES += $(TARGETPLATFORM).h
 endif
+
+#
+# Finally, slurp in the standard targets.
+#
+include $(TOP)/mk/target.mk
