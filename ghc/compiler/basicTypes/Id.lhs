@@ -637,12 +637,17 @@ pprId :: Outputable ty => GenId ty -> SDoc
 pprId Id {idUnique = u, idName = n, idInfo = info}
   = hcat [ppr n, pp_prags]
   where
-    pp_prags | opt_PprStyle_All = case inlinePragInfo info of
-				     IMustNotBeINLINEd -> text "{n}"
-				     IWantToBeINLINEd  -> text "{i}"
-				     IMustBeINLINEd    -> text "{I}"
-				     other	       -> empty
-	     | otherwise        = empty
+    pp_prags sty 
+      | opt_PprStyle_All && not (codeStyle sty) 
+      = (case inlinePragInfo info of
+	    IMustNotBeINLINEd -> text "{n}"
+	    IWantToBeINLINEd  -> text "{i}"
+	    IMustBeINLINEd    -> text "{I}"
+	    other	      -> empty) sty
+
+      | otherwise        
+      = empty sty
+
 \end{code}
 
 \begin{code}
