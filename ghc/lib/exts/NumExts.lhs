@@ -21,6 +21,9 @@ module NumExts
 			 -- -> (a -> Char)      -- digit to char
 			 -- -> a                -- number to show.
 			 -- -> ShowS
+       , showListWith    -- :: (a -> ShowS)
+			 -- -> [a]
+			 -- -> ShowS
        ) where
 
 import Char (ord, chr)
@@ -28,7 +31,7 @@ import Char (ord, chr)
 import PreludeBuiltin
 ord_0 = ord '0'
 #else
-import PrelBase (ord_0)
+import PrelBase (ord_0, showList__)
 import GlaExts
 #endif
 \end{code}
@@ -92,4 +95,14 @@ showBin n r =
  showString "0b" $
  showIntAtBase 2 (toChrOct) n r
  where toChrOct d = chr (ord_0 + fromIntegral d)
+\end{code}
+
+Easy enough to define by the user, but since it's
+occasionally useful (when, say, printing out a 
+list of hex values), we define and export it
+from @NumExts@.
+
+\begin{code}
+showListWith :: (a -> ShowS) -> [a] -> ShowS 
+showListWith = showList__
 \end{code}
