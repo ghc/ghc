@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: subdir.mk,v 1.2 1996/11/21 16:50:40 simonm Exp $
+# $Id: subdir.mk,v 1.3 1996/11/22 13:23:23 simonm Exp $
 
 # Rules for passing on make commands to sub-directories
 
@@ -14,15 +14,6 @@
 #	NoDependTargetForSubdirs		]
 #	NoCleanTargetForSubdirs			]
 #	NoVeryCleanTargetForSubdirs		]
-
-#	ProjectMakeVarsForAllInSubdirs		make variables to pass to
-#						Makefiles for the all target
-#						in the current project
-#	SetupMakeVarsForAllInSubdirs		same, but for the current
-#						setup
-
-#	ProjectMakeVarsForRunTestsInSubdirs	same, for project runtests
-#	SetupMakeVarsForRunTestsInSubdirs	same, for setup
 
 #-----------------------------------------------------------------------------
 # The rules...
