@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.66 2000/12/20 15:17:55 rrt Exp $
+ * $Id: PrimOps.hc,v 1.67 2001/01/15 09:55:41 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1040,6 +1040,26 @@ FN_(newBCOzh_fast)
 
   TICK_RET_UNBOXED_TUP(1);
   RET_P(bco);
+  FE_
+}
+
+FN_(mkApUpd0zh_fast)
+{
+  /* R1.p = the fn for the AP_UPD
+  */
+  StgAP_UPD* ap;
+  FB_
+  HP_CHK_GEN_TICKY(AP_sizeW(0), R1_PTR, mkApUpd0zh_fast,);
+  TICK_ALLOC_PRIM(sizeofW(StgHeader), AP_sizeW(0)-sizeofW(StgHeader), 0);
+  CCS_ALLOC(CCCS,AP_sizeW(0)); /* ccs prof */
+  ap = (StgAP_UPD *) (Hp + 1 - AP_sizeW(0));
+  SET_HDR(ap, &stg_AP_UPD_info, CCCS);
+
+  ap->n_args = 0;
+  ap->fun = R1.cl;
+
+  TICK_RET_UNBOXED_TUP(1);
+  RET_P(ap);
   FE_
 }
 #endif

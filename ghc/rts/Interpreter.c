@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.11 $
- * $Date: 2001/01/12 12:06:24 $
+ * $Revision: 1.12 $
+ * $Date: 2001/01/15 09:55:41 $
  * ---------------------------------------------------------------------------*/
 
 #ifdef GHCI
@@ -344,6 +344,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
 		 //fprintf(stderr, "---PACK p %d, np %d\n",
 		 //	 (int) itbl->layout.payload.ptrs,
 		 //	 (int) itbl->layout.payload.nptrs );
+                 ASSERT( itbl->layout.payload.ptrs + itbl->layout.payload.nptrs > 0);
                  SET_HDR(con, BCO_ITBL(o_itbl), CCS_SYSTEM/*ToDo*/);
                  for (i = 0; i < n_words; i++)
                     con->payload[i] = (StgClosure*)StackWord(i);

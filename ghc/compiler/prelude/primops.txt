@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt,v 1.13 2001/01/03 16:44:29 sewardj Exp $
+-- $Id: primops.txt,v 1.14 2001/01/15 09:55:41 sewardj Exp $
 --
 -- Primitive Operations
 --
@@ -43,12 +43,23 @@ defaults
 
 
 ------------------------------------------------------------------------
---- Support for the bytecode linker                                  ---
+--- Support for the bytecode interpreter and linker                  ---
 ------------------------------------------------------------------------
 
 -- Convert an Addr# to a followable type
 primop   AddrToHValueOp "addrToHValue#" GenPrimOp
    Addr# -> (# a #)
+
+primop   MkApUpd0_Op "mkApUpd0#" GenPrimOp
+   a -> (# a #)
+   with
+   out_of_line = True
+
+primop  NewBCOOp "newBCO#" GenPrimOp
+   ByteArr# -> ByteArr# -> Array# a -> ByteArr# -> State# s -> (# State# s, BCO# #)
+   with
+   has_side_effects = True
+   out_of_line      = True
 
 
 ------------------------------------------------------------------------
@@ -1097,16 +1108,6 @@ primop TouchOp "touch#" GenPrimOp
    o -> State# RealWorld -> State# RealWorld
    with
    strictness       = { \ arity -> StrictnessInfo [wwLazy, wwPrim] False }
-
-------------------------------------------------------------------------
---- Bytecode objects                                                 ---
-------------------------------------------------------------------------
-
-primop  NewBCOOp "newBCO#" GenPrimOp
-   ByteArr# -> ByteArr# -> Array# a -> ByteArr# -> State# s -> (# State# s, BCO# #)
-   with
-   has_side_effects = True
-   out_of_line      = True
 
 
 ------------------------------------------------------------------------
