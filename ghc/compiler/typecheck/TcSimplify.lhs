@@ -7,8 +7,8 @@
 
 \begin{code}
 module TcSimplify (
-	tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyCheck,
-	tcSimplifyRestricted,
+	tcSimplifyInfer, tcSimplifyInferCheck, 
+	tcSimplifyCheck, tcSimplifyRestricted,
 	tcSimplifyToDicts, tcSimplifyIPs, tcSimplifyTop, 
 
 	tcSimplifyThetas, tcSimplifyCheckThetas,
@@ -38,20 +38,17 @@ import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv )
 import InstEnv		( lookupInstEnv, classInstEnv, InstLookupResult(..) )
 
-import TcType		( zonkTcTyVarsAndFV, tcInstTyVars )
-import TcUnify		( unifyTauTy )
+import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, unifyTauTy )
+import TcType		( ThetaType, PredType, mkClassPred, isOverloadedTy,
+			  mkTyVarTy, tcGetTyVar, isTyVarClassPred,
+			  tyVarsOfPred, getClassPredTys_maybe, isClassPred, isIPPred,
+			  inheritablePred, predHasFDs )
 import Id		( idType )
 import NameSet		( mkNameSet )
 import Class		( classBigSig )
 import FunDeps		( oclose, grow, improve )
 import PrelInfo		( isNumericClass, isCreturnableClass, isCcallishClass )
 
-import Type		( ThetaType, PredType, mkClassPred,
-			  mkTyVarTy, getTyVar, isTyVarClassPred,
-			  splitSigmaTy, tyVarsOfPred,
-			  getClassPredTys_maybe, isClassPred, isIPPred,
-			  inheritablePred, predHasFDs
-			)
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
 import TysWiredIn	( unitTy )
 import VarSet
@@ -325,7 +322,21 @@ having to be passed at each call site.  But of course, the WHOLE
 IDEA is that ?y should be passed at each call site (that's what
 dynamic binding means) so we'd better infer the second.
 
-BOTTOM LINE: you *must* quantify over implicit parameters.
+BOTTOM LINE: you *must* quantify over implicit parameters. See
+isFreeAndInheritable.
+
+BUT WATCH OUT: for *expressions*, this isn't right.  Consider:
+
+	(?x + 1) :: Int
+
+This is perfectly reasonable.  We do not want to insist on
+
+	(?x + 1) :: (?x::Int => Int)
+
+That would be silly.  Here, the definition site *is* the occurrence site,
+so the above strictures don't apply.  Hence the difference between
+tcSimplifyCheck (which *does* allow implicit paramters to be inherited)
+and tcSimplifyCheckBind (which does not).
 
 
 Question 2: type signatures
@@ -488,7 +499,7 @@ again.
 \begin{code}
 tcSimplifyInfer
 	:: SDoc 
-	-> [TcTyVar]		-- fv(T); type vars 
+	-> TcTyVarSet		-- fv(T); type vars 
 	-> LIE			-- Wanted
 	-> TcM ([TcTyVar],	-- Tyvars to quantify (zonked)
 		LIE,		-- Free
@@ -499,7 +510,8 @@ tcSimplifyInfer
 
 \begin{code}
 tcSimplifyInfer doc tau_tvs wanted_lie
-  = inferLoop doc tau_tvs (lieToList wanted_lie)	`thenTc` \ (qtvs, frees, binds, irreds) ->
+  = inferLoop doc (varSetElems tau_tvs) 
+	      (lieToList wanted_lie)	`thenTc` \ (qtvs, frees, binds, irreds) ->
 
 	-- Check for non-generalisable insts
     mapTc_ addCantGenErr (filter (not . instCanBeGeneralised) irreds)	`thenTc_`
@@ -566,7 +578,8 @@ isFreeAndInheritable qtvs inst
   && all inheritablePred (predsOfInst inst)		-- And no implicit parameter involved
 							-- (see "Notes on implicit parameters")
 
-isFree qtvs inst = not (tyVarsOfInst inst `intersectsVarSet` qtvs)
+isFree qtvs inst 
+  = not (tyVarsOfInst inst `intersectsVarSet` qtvs)
 \end{code}
 
 
@@ -588,36 +601,90 @@ tcSimplifyCheck
 	 -> TcM (LIE,		-- Free
 		 TcDictBinds)	-- Bindings
 
+-- tcSimplifyCheck is used when checking exprssion type signatures, 
+-- class decls, instance decls etc.
+-- Note that we psss isFree (not isFreeAndInheritable) to tcSimplCheck
+-- It's important that we can float out non-inheritable predicates
+-- Example:		(?x :: Int) is ok!
 tcSimplifyCheck doc qtvs givens wanted_lie
-  = checkLoop doc qtvs givens (lieToList wanted_lie)	`thenTc` \ (frees, binds, irreds) ->
+  = tcSimplCheck doc isFree get_qtvs
+		 givens wanted_lie	`thenTc` \ (qtvs', frees, binds) ->
+    returnTc (frees, binds)
+  where
+    get_qtvs = zonkTcTyVarsAndFV qtvs
+
+
+-- tcSimplifyInferCheck is used when we know the constraints we are to simplify
+-- against, but we don't know the type variables over which we are going to quantify.
+-- This happens when we have a type signature for a mutually recursive group
+tcSimplifyInferCheck
+	 :: SDoc 
+	 -> TcTyVarSet		-- fv(T)
+	 -> [Inst]		-- Given
+	 -> LIE			-- Wanted
+	 -> TcM ([TcTyVar],	-- Variables over which to quantify
+		 LIE,		-- Free
+		 TcDictBinds)	-- Bindings
+
+tcSimplifyInferCheck doc tau_tvs givens wanted_lie
+  = tcSimplCheck doc isFreeAndInheritable get_qtvs givens wanted_lie
+  where
+	-- Figure out which type variables to quantify over
+	-- You might think it should just be the signature tyvars,
+	-- but in bizarre cases you can get extra ones
+	-- 	f :: forall a. Num a => a -> a
+	--	f x = fst (g (x, head [])) + 1
+	--	g a b = (b,a)
+	-- Here we infer g :: forall a b. a -> b -> (b,a)
+	-- We don't want g to be monomorphic in b just because
+	-- f isn't quantified over b.
+    all_tvs = varSetElems (tau_tvs `unionVarSet` tyVarsOfInsts givens)
+
+    get_qtvs = zonkTcTyVarsAndFV all_tvs	`thenNF_Tc` \ all_tvs' ->
+	       tcGetGlobalTyVars		`thenNF_Tc` \ gbl_tvs ->
+	       let
+	          qtvs = all_tvs' `minusVarSet` gbl_tvs
+			-- We could close gbl_tvs, but its not necessary for
+			-- soundness, and it'll only affect which tyvars, not which 
+			-- dictionaries, we quantify over
+	       in
+	       returnNF_Tc qtvs
+\end{code}
+
+Here is the workhorse function for all three wrappers.
+
+\begin{code}		 
+tcSimplCheck doc is_free get_qtvs givens wanted_lie
+  = check_loop givens (lieToList wanted_lie)	`thenTc` \ (qtvs, frees, binds, irreds) ->
 
 	-- Complain about any irreducible ones
     complainCheck doc givens irreds		`thenNF_Tc_`
 
 	-- Done
-    returnTc (mkLIE frees, binds)
+    returnTc (qtvs, mkLIE frees, binds)
 
-checkLoop doc qtvs givens wanteds
-  =		-- Step 1
-    zonkTcTyVarsAndFV qtvs		`thenNF_Tc` \ qtvs' ->
-    mapNF_Tc zonkInst givens		`thenNF_Tc` \ givens' ->
-    mapNF_Tc zonkInst wanteds		`thenNF_Tc` \ wanteds' ->
-
-		-- Step 2
-    let
-	-- When checking against a given signature we always reduce
-	-- until we find a match against something given, or can't reduce
-	try_me inst | isFreeAndInheritable qtvs' inst = Free
-		    | otherwise       		      = ReduceMe 
-    in
-    reduceContext doc try_me givens' wanteds'	`thenTc` \ (no_improvement, frees, binds, irreds) ->
-	
-		-- Step 3
-    if no_improvement then
-	returnTc (frees, binds, irreds)
-    else
-	checkLoop doc qtvs givens' (irreds ++ frees) 	`thenTc` \ (frees1, binds1, irreds1) ->
-	returnTc (frees1, binds `AndMonoBinds` binds1, irreds1)
+  where
+    check_loop givens wanteds
+      =		-- Step 1
+    	mapNF_Tc zonkInst givens	`thenNF_Tc` \ givens' ->
+    	mapNF_Tc zonkInst wanteds	`thenNF_Tc` \ wanteds' ->
+    	get_qtvs 			`thenNF_Tc` \ qtvs' ->   
+    
+ 		    -- Step 2
+    	let
+ 	    -- When checking against a given signature we always reduce
+ 	    -- until we find a match against something given, or can't reduce
+ 	    try_me inst | is_free qtvs' inst = Free
+ 			| otherwise          = ReduceMe 
+    	in
+    	reduceContext doc try_me givens' wanteds'	`thenTc` \ (no_improvement, frees, binds, irreds) ->
+ 	    
+ 		    -- Step 3
+    	if no_improvement then
+ 	    returnTc (varSetElems qtvs', frees, binds, irreds)
+    	else
+ 	    check_loop givens' (irreds ++ frees) 	`thenTc` \ (qtvs', frees1, binds1, irreds1) ->
+ 	    returnTc (qtvs', frees1, binds `AndMonoBinds` binds1, irreds1)
 
 complainCheck doc givens irreds
   = mapNF_Tc zonkInst given_dicts			`thenNF_Tc` \ givens' ->
@@ -638,8 +705,9 @@ complainCheck doc givens irreds
 
 \begin{code}
 tcSimplifyRestricted 	-- Used for restricted binding groups
+			-- i.e. ones subject to the monomorphism restriction
 	:: SDoc 
-	-> [TcTyVar]		-- Free in the type of the RHSs
+	-> TcTyVarSet		-- Free in the type of the RHSs
 	-> LIE			-- Free in the RHSs
 	-> TcM ([TcTyVar],	-- Tyvars to quantify (zonked)
 		LIE,		-- Free
@@ -660,8 +728,8 @@ tcSimplifyRestricted doc tau_tvs wanted_lie
     in
 
 	-- Next, figure out the tyvars we will quantify over
-    zonkTcTyVarsAndFV tau_tvs		`thenNF_Tc` \ tau_tvs' ->
-    tcGetGlobalTyVars			`thenNF_Tc` \ gbl_tvs ->
+    zonkTcTyVarsAndFV (varSetElems tau_tvs)	`thenNF_Tc` \ tau_tvs' ->
+    tcGetGlobalTyVars				`thenNF_Tc` \ gbl_tvs ->
     let
 	qtvs = (tau_tvs' `minusVarSet` oclose (predsOfInsts dicts) gbl_tvs)
 			 `minusVarSet` constrained_tvs
@@ -688,75 +756,6 @@ tcSimplifyRestricted doc tau_tvs wanted_lie
 	-- already done any improvement necessary
 
     returnTc (varSetElems qtvs, mkLIE frees, binds)
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{tcSimplifyAndCheck}
-%*									*
-%************************************************************************
-
-@tcSimplifyInferCheck@ is used when we know the constraints we are to simplify
-against, but we don't know the type variables over which we are going to quantify.
-This happens when we have a type signature for a mutually recursive
-group.
-
-\begin{code}
-tcSimplifyInferCheck
-	 :: SDoc 
-	 -> [TcTyVar]		-- fv(T)
-	 -> [Inst]		-- Given
-	 -> LIE			-- Wanted
-	 -> TcM ([TcTyVar],	-- Variables over which to quantify
-		 LIE,		-- Free
-		 TcDictBinds)	-- Bindings
-
-tcSimplifyInferCheck doc tau_tvs givens wanted
-  = inferCheckLoop doc tau_tvs givens (lieToList wanted)	`thenTc` \ (qtvs, frees, binds, irreds) ->
-
-	-- Complain about any irreducible ones
-    complainCheck doc givens irreds		`thenNF_Tc_`
-
-	-- Done
-    returnTc (qtvs, mkLIE frees, binds)
-
-inferCheckLoop doc tau_tvs givens wanteds
-  =   	-- Step 1
-    zonkTcTyVarsAndFV tau_tvs		`thenNF_Tc` \ tau_tvs' ->
-    mapNF_Tc zonkInst givens		`thenNF_Tc` \ givens' ->
-    mapNF_Tc zonkInst wanteds		`thenNF_Tc` \ wanteds' ->
-    tcGetGlobalTyVars			`thenNF_Tc` \ gbl_tvs ->
-
-    let
-  	-- Figure out what we are going to generalise over
-	-- You might think it should just be the signature tyvars,
-	-- but in bizarre cases you can get extra ones
-	-- 	f :: forall a. Num a => a -> a
-	--	f x = fst (g (x, head [])) + 1
-	--	g a b = (b,a)
-	-- Here we infer g :: forall a b. a -> b -> (b,a)
-	-- We don't want g to be monomorphic in b just because
-	-- f isn't quantified over b.
-	qtvs    = (tau_tvs' `unionVarSet` tyVarsOfInsts givens') `minusVarSet` gbl_tvs
-			-- We could close gbl_tvs, but its not necessary for
-			-- soundness, and it'll only affect which tyvars, not which 
-			-- dictionaries, we quantify over
-
-	      -- When checking against a given signature we always reduce
-	      -- until we find a match against something given, or can't reduce
-	try_me inst | isFreeAndInheritable qtvs inst  = Free
-		    | otherwise        		      = ReduceMe 
-    in
-		-- Step 2
-    reduceContext doc try_me givens' wanteds'    `thenTc` \ (no_improvement, frees, binds, irreds) ->
-	
-		-- Step 3
-    if no_improvement then
-	returnTc (varSetElems qtvs, frees, binds, irreds)
-    else
-	inferCheckLoop doc tau_tvs givens' (irreds ++ frees)	`thenTc` \ (qtvs1, frees1, binds1, irreds1) ->
-	returnTc (qtvs1, frees1, binds `AndMonoBinds` binds1, irreds1)
 \end{code}
 
 
@@ -917,8 +916,7 @@ bindInstsOfLocalFuns init_lie local_ids
     doc		     = text "bindInsts" <+> ppr local_ids
     wanteds	     = lieToList init_lie
     overloaded_ids   = filter is_overloaded local_ids
-    is_overloaded id = case splitSigmaTy (idType id) of
-			  (_, theta, _) -> not (null theta)
+    is_overloaded id = isOverloadedTy (idType id)
 
     overloaded_set = mkVarSet overloaded_ids	-- There can occasionally be a lot of them
 						-- so it's worth building a set, so that 
@@ -1435,7 +1433,7 @@ tcSimplifyTop wanted_lie
     d1 `cmp_by_tyvar` d2 = get_tv d1 `compare` get_tv d2
 
 get_tv d   = case getDictClassTys d of
-		   (clas, [ty]) -> getTyVar "tcSimplifyTop" ty
+		   (clas, [ty]) -> tcGetTyVar "tcSimplify" ty
 get_clas d = case getDictClassTys d of
 		   (clas, [ty]) -> clas
 \end{code}
@@ -1543,7 +1541,7 @@ To try to minimise the potential for surprises here, the
 defaulting mechanism is turned off in the presence of
 CCallable and CReturnable.
 
-]
+End of aside]
 
 
 %************************************************************************
