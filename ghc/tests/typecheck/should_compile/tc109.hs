@@ -8,7 +8,7 @@ module ShouldCompile where
 class P a
 class R a b | b->a
 
-instance (P a,R a b) => P b
+instance (P a,R a b) => P [b]
 
 {- GHC 4.08.1 doesn't seem to allow variables in the context that
 don't appear after the =>, but which are still ok since they are
