@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: Costs.lhs,v 1.22 2000/04/10 13:59:17 simonmar Exp $
+% $Id: Costs.lhs,v 1.23 2000/05/25 12:49:34 panne Exp $
 %
 % Only needed in a GranSim setup -- HWL
 % ---------------------------------------------------------------------------
@@ -298,8 +298,6 @@ addrModeCosts addr_mode side =
 
     CMacroExpr _ macro mode_list -> exprMacroCosts side macro mode_list
 
-    _ -> trace ("Costs.addrModeCosts") nullCosts
-
 -- ---------------------------------------------------------------------------
 
 exprMacroCosts :: Side -> CExprMacro -> [CAddrMode] -> CostRes
@@ -315,7 +313,6 @@ exprMacroCosts side macro mode_list =
     ARG_TAG -> nullCosts -- nothing
     GET_TAG -> Cost (0, 0, 1, 0, 0)  -- indirect load
     UPD_FRAME_UPDATEE -> Cost (0, 0, 1, 0, 0)  -- indirect load
-    _ -> trace ("Costs.exprMacroCosts") nullCosts
 
 -- ---------------------------------------------------------------------------
 
