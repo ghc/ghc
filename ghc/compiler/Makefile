@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.141 2001/03/06 15:59:11 simonmar Exp $
+# $Id: Makefile,v 1.142 2001/03/13 15:37:50 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -214,8 +214,7 @@ utils/Digraph_HC_OPTS		= -fglasgow-exts
 #	into the interface file and spreading the -monly-3-regs virus.
 #	We need -optC here because the driver before 3.02 didn't understand
 #	the -funfolding flags.
-
-utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs -funfolding-interface-threshold7
+utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs
 
 # ByteCodeItbls uses primops that the NCG doesn't support yet.
 ghci/ByteCodeItbls_HC_OPTS	= -fvia-C
