@@ -12,7 +12,7 @@ module CoreToStg ( coreToStg, coreExprToStg ) where
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUtils	( rhsIsStatic, manifestArity, exprType )
+import CoreUtils	( rhsIsStatic, manifestArity, exprType, findDefault )
 import StgSyn
 
 import Type
@@ -371,7 +371,7 @@ coreToStgExpr (Case scrut bndr _ alts)
 		     (getLiveVars alts_lv_info)
 		     bndr'
 		     (mkSRT alts_lv_info)
-		     (mkStgAltType (idType bndr)) 
+		     (mkStgAltType (idType bndr) alts)
 		     alts2,
       scrut_fvs `unionFVInfo` alts_fvs_wo_bndr,
       alts_escs_wo_bndr `unionVarSet` getFVSet scrut_fvs
@@ -411,15 +411,29 @@ coreToStgExpr (Let bind body)
 \end{code}
 
 \begin{code}
-mkStgAltType scrut_ty
+mkStgAltType scrut_ty alts
   = case splitTyConApp_maybe (repType scrut_ty) of
 	Just (tc,_) | isUnboxedTupleTyCon tc -> UbxTupAlt tc
 		    | isPrimTyCon tc	     -> PrimAlt tc
-		    | isHiBootTyCon tc	     -> PolyAlt	-- Algebraic, but no constructors visible
+		    | isHiBootTyCon tc	     -> look_for_better_tycon
 		    | isAlgTyCon tc 	     -> AlgAlt tc
 		    | isFunTyCon tc	     -> PolyAlt
 		    | otherwise		     -> pprPanic "mkStgAlts" (ppr tc)
 	Nothing				     -> PolyAlt
+
+  where
+   -- Sometimes, the TyCon in the type of the scrutinee is an HiBootTyCon,
+   -- which may not have any constructors inside it.  If so, then we
+   -- can get a better TyCon by grabbing the one from a constructor alternative
+   -- if one exists.
+   look_for_better_tycon
+	| ((DataAlt con, _, _) : _) <- data_alts = 
+		AlgAlt (dataConTyCon con)
+	| otherwise =
+		ASSERT(null data_alts)
+		PolyAlt
+	where
+		(data_alts, deflt) = findDefault alts
 \end{code}
 
 
