@@ -82,7 +82,7 @@ version     = 2.02
 PERL        = @PerlCmd@
 RM          = rm -f
 MV          = mv
-CP          = cp -f
+CP          = cp
 LN_S        = @LN_S@
 CHMOD       = chmod
 INSTALL	    = @INSTALL@
@@ -138,6 +138,7 @@ config-pkgs ::
 	   echo "      if $$""running_under_some_shell;"                  >> bin/$(platform)/$(package)-$(version)/$$i; \
 	   echo $$"bindir='$(bindir)';"                                   >> bin/$(platform)/$(package)-$(version)/$$i; \
 	   echo $$"libdir='$(real_libdir)';"                              >> bin/$(platform)/$(package)-$(version)/$$i; \
+	   echo $$"libexecdir='$(real_libdir)';"                              >> bin/$(platform)/$(package)-$(version)/$$i; \
 	   echo $$"datadir='$(real_datadir)';"                            >> bin/$(platform)/$(package)-$(version)/$$i; \
 	   cat bin/$(platform)/$(package)-$(version)/$$i.prl              >> bin/$(platform)/$(package)-$(version)/$$i; \
 	   $(CHMOD) $(BIN_PERMS) bin/$(platform)/$(package)-$(version)/$$i; \
@@ -151,6 +152,7 @@ config-pkgs ::
 	   echo "      if $$""running_under_some_shell;"                  >> lib/$(platform)/$(package)-$(version)/$$i; \
 	   echo $$"bindir='$(bindir)';"                                   >> lib/$(platform)/$(package)-$(version)/$$i; \
 	   echo $$"libdir='$(real_libdir)';"                              >> lib/$(platform)/$(package)-$(version)/$$i; \
+	   echo $$"libexecdir='$(real_libdir)';"                              >> lib/$(platform)/$(package)-$(version)/$$i; \
 	   echo $$"datadir='$(real_datadir)';"                            >> lib/$(platform)/$(package)-$(version)/$$i; \
 	   cat lib/$(platform)/$(package)-$(version)/$$i.prl              >> lib/$(platform)/$(package)-$(version)/$$i; \
 	   $(CHMOD) $(BIN_PERMS) lib/$(platform)/$(package)-$(version)/$$i; \

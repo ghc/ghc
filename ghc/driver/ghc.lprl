@@ -129,11 +129,13 @@ select(STDERR); $| = 1; select(STDOUT); # no STDERR buffering, please.
 
 $TargetPlatform = $TARGETPLATFORM;
 
-$TopPwd	        = "${TOP_PWD}";
-$InstBinDirGhc  = "${bindir}";
-$InstLibDirGhc  = "${libdir}";
-$InstDataDirGhc = "${datadir}";
-$InstSysLibDir  = ( $INSTALLING ) ? "${InstLibDirGhc}/hslibs" : "$TopPwd/hslibs";
+$TopPwd	           = "${TOP_PWD}";
+$InstBinDirGhc     = "${bindir}";
+$InstLibDirGhc     = "${libdir}";
+$InstLibexecDirGhc = "${libexecdir}";
+$InstDataDirGhc    = "${datadir}";
+$InstSysLibDir     = ( $INSTALLING ) ? "${InstLibDirGhc}/hslibs" : 
+			"$TopPwd/hslibs";
 
 $Status  = 0; # just used for exit() status
 $Verbose = '';
@@ -158,7 +160,7 @@ if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
 
 @Files_to_tidy = (); # files we nuke in the case of abnormal termination
 
-$Unlit = ( $INSTALLING ) ? "$InstLibDirGhc/unlit"
+$Unlit = ( $INSTALLING ) ? "$InstLibexecDirGhc/unlit"
 			 : "$TopPwd/${CURRENT_DIR}/${GHC_UNLIT}";
 
 $Cp   = $CP;
@@ -169,16 +171,16 @@ $Cmp  = 'cmp';
 $Time = '';
 
 $HsCpp	 = # but this is re-set to "cat" (after options) if -cpp not seen
-	   ( $INSTALLING ) ? "$InstLibDirGhc/hscpp"
+	   ( $INSTALLING ) ? "$InstLibexecDirGhc/hscpp"
 			   : "$TopPwd/${CURRENT_DIR}/${GHC_HSCPP}";
 
 @HsCpp_flags	= ();
 $genSPECS_flag	= '';		# See ../utils/hscpp/hscpp.prl
-$HsC	 = ( $INSTALLING ) ? "$InstLibDirGhc/hsc"
+$HsC	 = ( $INSTALLING ) ? "$InstLibexecDirGhc/hsc"
 			   : "$TopPwd/${CURRENT_DIR}/${GHC_HSC}";
 
 # For PVM fiends only
-$SysMan	 = ( $INSTALLING ) ? "$InstLibDirGhc/SysMan"
+$SysMan	 = ( $INSTALLING ) ? "$InstLibexecDirGhc/SysMan"
 			   : "$TopPwd/${CURRENT_DIR}/${GHC_SYSMAN}";
 
 @Unlit_flags	= ();
@@ -1127,7 +1129,7 @@ sub setupMachOpts {
       # we know how to *mangle* asm for X86
       unshift(@CcRegd_flags, ('-D__STG_REV_TBLS__'));
       unshift(@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) 
-      			if $StkChkByPageFaultOK;
+      			if $StkChkByPageFaultOK
 			   && $TargetPlatform !~ /nextstep/;
       # I do not know how to do STACK_CHECK_BY_PAGE_FAULT
       # on NeXTs (my fault, not theirs), so I don't.
@@ -1147,12 +1149,12 @@ sub setupMachOpts {
       # we know how to *mangle* asm for m68k
       unshift (@CcRegd_flags, ('-D__STG_REV_TBLS__'));
       unshift (@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) 
-			if $StkChkByPageFaultOK;
+			if $StkChkByPageFaultOK
 		           && $TargetPlatform !~ /nextstep/;
       # I do not know how to do STACK_CHECK_BY_PAGE_FAULT
       # on NeXTs (my fault, not theirs), so I don't.
       # CaS
-                           && 
+
       # -fno-defer-pop : for the .hc files, we want all the pushing/
       #    popping of args to routines to be explicit; if we let things
       #    be deferred 'til after an STGJUMP, imminent death is certain!

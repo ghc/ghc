@@ -453,7 +453,7 @@ ifneq "$(BIN_DIST)" "1"
 	   $(RM) $$i.tmp; \
 	   echo "eval 'exec $(PERL) -S $$$""0 $$""{1+\"$$$""@\"}'"  > $$i.tmp ; \
 	   echo "      if $$""running_under_some_shell;"           >> $$i.tmp ; \
-	   echo $$"bindir='$(bindir);'"                            >> $$i.tmp ; \
+	   echo $$"bindir='$(bindir)';"                            >> $$i.tmp ; \
 	   echo $$"libdir='$(real_libdir)';"                       >> $$i.tmp ; \
 	   echo $$"datadir='$(real_datadir)';"                     >> $$i.tmp ; \
 	   cat  $$i                                                >> $$i.tmp ; \
@@ -481,7 +481,7 @@ ifneq "$(BIN_DIST)" "1"
 	   $(RM) $$i.tmp; \
 	   echo "eval 'exec $(PERL) -S $$$""0 $$""{1+\"$$$""@\"}'"  > $$i.tmp ; \
 	   echo "      if $$""running_under_some_shell;"           >> $$i.tmp ; \
-	   echo $$"bindir='$(bindir);'"                            >> $$i.tmp ; \
+	   echo $$"bindir='$(bindir)';"                            >> $$i.tmp ; \
 	   echo $$"libdir='$(real_libdir)';"                       >> $$i.tmp ; \
 	   echo $$"datadir='$(real_datadir)';"                     >> $$i.tmp ; \
 	   cat  $$i                                                >> $$i.tmp ; \
@@ -495,8 +495,36 @@ else
 	done
 endif
 else
-	for i in $(INSTALL_SCRIPTS); do \
+	for i in $(INSTALL_LIB_SCRIPTS); do \
 		$(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(libdir); \
+	done
+endif
+endif
+
+ifneq "$(INSTALL_LIBEXEC_SCRIPTS)" ""
+install:: $(INSTALL_LIBEXEC_SCRIPTS)
+ifeq "$(INTERP)" "perl"
+ifneq "$(BIN_DIST)" "1"
+	@for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
+	   $(RM) $$i.tmp; \
+	   echo "eval 'exec $(PERL) -S $$$""0 $$""{1+\"$$$""@\"}'"  > $$i.tmp ; \
+	   echo "      if $$""running_under_some_shell;"           >> $$i.tmp ; \
+	   echo $$"bindir='$(bindir)';"                            >> $$i.tmp ; \
+	   echo $$"libdir='$(real_libdir)';"                       >> $$i.tmp ; \
+	   echo $$"datadir='$(real_datadir)';"                     >> $$i.tmp ; \
+	   cat  $$i                                                >> $$i.tmp ; \
+	   echo $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(libexecdir) ;    \
+	   $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i.tmp $(libexecdir)/$$i ; \
+	   $(RM) $$i.tmp; \
+	done
+else
+	for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
+		$(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(libexecdir); \
+	done
+endif
+else
+	for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
+		$(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(libexecdir); \
 	done
 endif
 endif
