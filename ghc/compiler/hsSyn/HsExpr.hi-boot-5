@@ -1,4 +1,4 @@
 __interface HsExpr 1 0 where
 __export HsExpr HsExpr pprExpr;
 1 data HsExpr i p ;
-1 pprExpr :: __forall [_i _p] {Name.NamedThing _i, Outputable.Outputable _i, Outputable.Outputable _p} => HsExpr.HsExpr _i _p -> Outputable.SDoc ;
+1 pprExpr :: __forall [_i _p] {Outputable.Outputable _i, Outputable.Outputable _p} => HsExpr.HsExpr _i _p -> Outputable.SDoc ;
