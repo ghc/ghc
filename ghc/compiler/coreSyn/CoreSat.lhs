@@ -28,9 +28,9 @@ import CmdLineOpts
 import Outputable
 \end{code}
 
------------------------------------------------------------------------------
-Overview
------------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
+-- Overview
+-- ---------------------------------------------------------------------------
 
 Most of the contents of this pass used to be in CoreToStg.  The
 primary goals here are:
@@ -186,8 +186,7 @@ coreSatExprFloat (Lam v e)
 coreSatExprFloat (Case scrut bndr alts)
   = coreSatExprFloat scrut		`thenUs` \ (floats, scrut) ->
     mapUs sat_alt alts			`thenUs` \ alts ->
-    mkCase scrut bndr alts		`thenUs` \ expr ->
-    returnUs (floats, expr)
+    returnUs (floats, Case scrut bndr alts)
   where
     sat_alt (con, bs, rhs)
 	  = coreSatAnExpr rhs	  	 `thenUs` \ rhs ->
@@ -425,8 +424,7 @@ mk_let bndr rhs dem floats body
 #endif
   | isUnLiftedType bndr_rep_ty
   = ASSERT( not (isUnboxedTupleType bndr_rep_ty) )
-    mkCase rhs bndr [(DEFAULT, [], body)]  `thenUs` \ expr' ->
-    mkBinds floats expr'
+    mkBinds floats (Case rhs bndr [(DEFAULT, [], body)])
 
   | is_whnf
   = if is_strict then
@@ -445,8 +443,7 @@ mk_let bndr rhs dem floats body
   | otherwise 	-- Not WHNF
   = if is_strict then
 	-- Strict let with non-WHNF rhs
-	mkCase rhs bndr [(DEFAULT, [], body)] `thenUs` \ expr' ->
-	mkBinds floats expr'
+	mkBinds floats (Case rhs bndr [(DEFAULT, [], body)])
     else
 	-- Lazy let with non-WHNF rhs, so keep the floats in the RHS
 	mkBinds floats rhs		`thenUs` \ new_rhs ->
@@ -466,56 +463,6 @@ splitFloats (f : fs) = case splitFloats fs of
 splitFloats [] = ([], [])
 
 -- -----------------------------------------------------------------------------
--- Making case expressions
--- -----------------------------------------------------------------------------
-
-mkCase scrut bndr alts = returnUs (Case scrut bndr alts) -- ToDo
-
-{-
-mkCase scrut@(App _ _) bndr alts
-  = let (f,args) = collectArgs scrut in
-    
-	
-
-mkCase scrut@(StgPrimApp ParOp _ _) bndr
-	  (StgPrimAlts tycon _ deflt@(StgBindDefault _))
-  = returnUs (StgCase scrut bOGUS_LVs bOGUS_LVs bndr noSRT (StgPrimAlts tycon [] deflt))
-
-mkStgCase (StgPrimApp SeqOp [scrut] _) bndr 
-	  (StgPrimAlts _ _ deflt@(StgBindDefault rhs))
-  = mkStgCase scrut_expr new_bndr new_alts
-  where
-    new_alts | isUnLiftedType scrut_ty = WARN( True, text "mkStgCase" ) mkStgPrimAlts scrut_ty [] deflt
-	     | otherwise	       = mkStgAlgAlts scrut_ty [] deflt
-    scrut_ty = stgArgType scrut
-    new_bndr = setIdType bndr scrut_ty
-	-- NB:  SeqOp :: forall a. a -> Int#
-	-- So bndr has type Int# 
-	-- But now we are going to scrutinise the SeqOp's argument directly,
-	-- so we must change the type of the case binder to match that
-	-- of the argument expression e.
-
-    scrut_expr = case scrut of
-		   StgVarArg v -> StgApp v []
-		   -- Others should not happen because 
-		   -- seq of a value should have disappeared
-		   StgLitArg l -> WARN( True, text "seq on" <+> ppr l ) StgLit l
-
-mkStgCase scrut bndr alts
-  = deStgLam scrut	`thenUs` \ scrut' ->
-	-- It is (just) possible to get a lambda as a srutinee here
-	-- Namely: fromDyn (toDyn ((+1)::Int->Int)) False)
-	-- gives:	case ...Bool == Int->Int... of
-	--		   True -> case coerce Bool (\x -> + 1 x) of
-	--				True -> ...
-	--				False -> ...
-	--		   False -> ...
-	-- The True branch of the outer case will never happen, of course.
-
-    returnUs (StgCase scrut' bOGUS_LVs bOGUS_LVs bndr noSRT alts)
--}
-
--------------------------------------------------------------------------
 -- Demands
 -- -----------------------------------------------------------------------------
 

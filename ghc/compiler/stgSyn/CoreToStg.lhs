@@ -362,7 +362,7 @@ coreToStgExpr (Case scrut bndr alts)
 	live_in_whole_case = live_in_alts `unionVarSet` scrut_lvs
     in
     returnLne (
-      StgCase scrut2 live_in_whole_case live_in_alts bndr' noSRT alts2,
+      mkStgCase scrut2 live_in_whole_case live_in_alts bndr' noSRT alts2,
       (scrut_fvs `unionFVInfo` alts_fvs) `minusFVBinders` [bndr],
       (alts_escs `minusVarSet` unitVarSet bndr) `unionVarSet` getFVSet scrut_fvs
 		-- You might think we should have scrut_escs, not (getFVSet scrut_fvs),
@@ -428,21 +428,6 @@ coreToStgExpr (Case scrut bndr alts)
      	   = coreToStgExpr rhs	`thenLne` \ (rhs2, rhs_fvs, rhs_escs) ->
      	     returnLne (StgBindDefault rhs2, rhs_fvs, rhs_escs)
 
-	mkStgAlgAlts ty alts deflt
-	 =  case alts of
-			-- Get the tycon from the data con
-		(dc, _, _, _) : _rest
-		    -> StgAlgAlts (Just (dataConTyCon dc)) alts deflt
-	
-			-- Otherwise just do your best
-		[] -> case splitTyConApp_maybe (repType ty) of
-			Just (tc,_) | isAlgTyCon tc 
-				-> StgAlgAlts (Just tc) alts deflt
-			other
-				-> StgAlgAlts Nothing alts deflt
-	
-	mkStgPrimAlts ty alts deflt 
-	  = StgPrimAlts (tyConAppTyCon ty) alts deflt
 \end{code}
 
 Lets not only take quite a bit of work, but this is where we convert
@@ -470,6 +455,55 @@ isForeignObjPrimTy ty
    = case splitTyConApp_maybe ty of
 	Just (tycon, _) -> tycon == foreignObjPrimTyCon
 	Nothing		-> False
+\end{code}
+
+\begin{code}
+mkStgCase scrut@(StgPrimApp ParOp _ _) lvs1 lvs2 bndr srt
+	  (StgPrimAlts tycon _ deflt@(StgBindDefault _))
+  = StgCase scrut lvs1 lvs2 bndr srt (StgPrimAlts tycon [] deflt)
+
+mkStgCase (StgPrimApp SeqOp [scrut] _) lvs1 lvs2 bndr srt
+	  (StgPrimAlts _ _ deflt@(StgBindDefault rhs))
+  = StgCase scrut_expr lvs1 lvs2 new_bndr srt new_alts
+  where
+    new_alts
+       | isUnLiftedType scrut_ty     = WARN( True, text "mkStgCase" ) 
+	       				mkStgPrimAlts scrut_ty [] deflt
+       | otherwise                   = mkStgAlgAlts scrut_ty [] deflt
+
+    scrut_ty = stgArgType scrut
+    new_bndr = setIdType bndr scrut_ty
+	-- NB:  SeqOp :: forall a. a -> Int#
+	-- So bndr has type Int# 
+	-- But now we are going to scrutinise the SeqOp's argument directly,
+	-- so we must change the type of the case binder to match that
+	-- of the argument expression e.
+
+    scrut_expr = case scrut of
+		   StgVarArg v -> StgApp v []
+		   -- Others should not happen because 
+		   -- seq of a value should have disappeared
+		   StgLitArg l -> WARN( True, text "seq on" <+> ppr l ) StgLit l
+
+mkStgCase scrut lvs1 lvs2 bndr srt alts
+    = StgCase scrut lvs1 lvs2 bndr srt alts
+
+
+mkStgAlgAlts ty alts deflt
+ =  case alts of
+		-- Get the tycon from the data con
+	(dc, _, _, _) : _rest
+	    -> StgAlgAlts (Just (dataConTyCon dc)) alts deflt
+
+		-- Otherwise just do your best
+	[] -> case splitTyConApp_maybe (repType ty) of
+		Just (tc,_) | isAlgTyCon tc 
+			-> StgAlgAlts (Just tc) alts deflt
+		other
+			-> StgAlgAlts Nothing alts deflt
+
+mkStgPrimAlts ty alts deflt 
+  = StgPrimAlts (tyConAppTyCon ty) alts deflt
 \end{code}
 
 
