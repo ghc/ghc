@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.32 $
- * $Date: 2000/04/06 14:23:55 $
+ * $Revision: 1.33 $
+ * $Date: 2000/04/06 15:05:30 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -410,7 +410,8 @@ StgExpr failExpr;
             if ( (isName(e) && isCfun(e)
                   && name(e).arity > 0 
                   && name(e).arity == length_args
-                  && !name(e).hasStrict)
+                  && !name(e).hasStrict
+                  && numQualifiers(name(e).type) == 0)
                  ||
                  (isTuple(e) && tycon(e).tuple == length_args)
                ) {

@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.46 $
- * $Date: 2000/04/05 10:25:08 $
+ * $Revision: 1.47 $
+ * $Date: 2000/04/06 15:05:30 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -1692,7 +1692,7 @@ List  constrs0;  /* [((ConId,[((Type,VarId,Int))]))]  */
            for (ctx=ctx0; nonNull(ctx); ctx=tl(ctx)) {
               ctxElem = hd(ctx);     
               /* ctxElem :: ((QConId,VarId)) */
-              if (nonNull(cellIsMember(textOf(zsnd(ctxElem)),tyvarsMentioned)))
+              if (nonNull(varIsMember(textOf(zsnd(ctxElem)),tyvarsMentioned)))
                  ctx2 = cons(ctxElem, ctx2);
            }
            if (nonNull(ctx2))

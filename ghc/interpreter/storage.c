@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.65 $
- * $Date: 2000/04/06 14:23:55 $
+ * $Revision: 1.66 $
+ * $Date: 2000/04/06 15:05:30 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -2686,6 +2686,7 @@ QualId qualidIsMember ( QualId q, List xs )
 Cell varIsMember(t,xs)                 /* Test if variable is a member of  */
 Text t;                                /* given list of variables          */
 List xs; {
+    assert(isText(t) || isInventedVar(t) || isInventedDictVar(t));
     for (; nonNull(xs); xs=tl(xs))
         if (t==textOf(hd(xs)))
             return hd(xs);
