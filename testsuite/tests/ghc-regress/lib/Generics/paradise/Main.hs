@@ -1,9 +1,13 @@
 {-# OPTIONS -fglasgow-exts #-}
 
--- This test runs the infamous PARADISE benchmark,
--- which is the HELLO WORLD example of generic programming,
--- i.e., the "increase salary" function is applied to
--- a typical company just as shown in the boilerplate paper.
+{-
+
+This test runs the infamous PARADISE benchmark,
+which is the HELLO WORLD example of generic programming,
+i.e., the "increase salary" function is applied to
+a typical company just as shown in the boilerplate paper.
+
+-}
 
 module Main where
 import Data.Generics

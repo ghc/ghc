@@ -1,2 +1,4 @@
-test('gen001',     normal, compile_and_run, [''])
-
+test('newtype',          normal, compile_and_run, [''])
+test('gmapQ-assoc',      normal, compile_and_run, [''])
+test('nested-datatypes', normal, compile,         [''])
+test('local-quantors',   normal, compile,         [''])

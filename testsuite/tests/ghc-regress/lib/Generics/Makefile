@@ -25,4 +25,8 @@ clean:
 	find . -depth -name "*.comp.*"   -exec rm -rf \{\} \;
 	find . -depth -name "*.interp.*" -exec rm -rf \{\} \;
 	find . -depth -name "*.run.*"    -exec rm -rf \{\} \;
+	rm -f paradise/paradise
+	rm -f ReadShowEq/ReadShowEq
+	rm -f gzip/gzip
+	rm -f freeNames/freeNames
 
