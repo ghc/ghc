@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.7 2000/03/23 13:13:29 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.8 2000/03/23 16:01:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -396,8 +396,6 @@ heapCensus(void)
       case FUN_1_1:
       case FUN_0_2:
       case FUN_2_0:
-      case THUNK_1_0:
-      case THUNK_0_1:
       case THUNK_1_1:
       case THUNK_0_2:
       case THUNK_2_0:
@@ -409,6 +407,8 @@ heapCensus(void)
 	size = sizeW_fromITBL(info);
 	break;
 	
+      case THUNK_1_0:		/* ToDo - shouldn't be here */
+      case THUNK_0_1:		/* "  ditto  " */
       case THUNK_SELECTOR:
 	size = sizeofW(StgHeader) + MIN_UPD_SIZE;
 	break;
