@@ -173,7 +173,9 @@ function' are not commutative.
 
 
 >	foldM f a1 [x1, x2, ..., xm ]
+
 ==  
+
 >	do
 >	  a2 <- f a1 x1
 >	  a3 <- f a2 x2
