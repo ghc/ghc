@@ -52,7 +52,7 @@ import FastString
 import StringBuffer
 import GlaExts
 import Ctype
-import Char		( ord )
+import Char		( chr, ord )
 import PrelRead 	( readRational__ ) -- Glasgow non-std
 \end{code}
 
@@ -668,11 +668,12 @@ lex_prag cont buf
 lex_string cont glaexts s buf
   = case currentChar# buf of
 	'"'#{-"-} -> 
-	   let buf' = incLexeme buf; s' = mkFastStringInt (reverse s) in
-	   case currentChar# buf' of
+	   let buf' = incLexeme buf
+               s' = mkFastStringNarrow (map chr (reverse s)) 
+           in case currentChar# buf' of
 		'#'# | flag glaexts -> if all (<= 0xFF) s
                     then cont (ITprimstring s') (incLexeme buf')
-                    else lexError "primitive string literal must contain only characters <= '\xFF'" buf'
+                    else lexError "primitive string literal must contain only characters <= \'\\xFF\'" buf'
 		_                   -> cont (ITstring s') buf'
 
 	-- ignore \& in a string, deal with string gaps

@@ -13,6 +13,7 @@ module FastString
 
          --names?
         mkFastString,       -- :: String -> FastString
+        mkFastStringNarrow, -- :: String -> FastString
         mkFastSubString,    -- :: Addr -> Int -> Int -> FastString
 
 	-- These ones hold on to the Addr after they return, and aren't hashed; 
