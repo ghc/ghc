@@ -245,7 +245,12 @@ trySlurp handle sz_i chunk =
 		buf <- readIORef ref
 		ch <- (if not (bufferEmpty buf)
 		      then hGetcBuffered fd ref buf
-		      else do new_buf <- fillReadBuffer fd True buf
+		      else do 
+#if __GLASGOW_HASKELL__ >= 503
+		              new_buf <- fillReadBuffer fd True False buf
+#else
+		              new_buf <- fillReadBuffer fd True buf
+#endif
 		              hGetcBuffered fd ref new_buf)
 		    `catch` \e -> if isEOFError e
 			then return '\xFFFF'
