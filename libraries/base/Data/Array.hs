@@ -48,8 +48,9 @@ module  Data.Array
 import Data.Dynamic
 #endif
 
-#ifdef __GLASGOW_HASKELL__
 import Data.Ix
+
+#ifdef __GLASGOW_HASKELL__
 import GHC.Arr		-- Most of the hard work is done here
 import GHC.Err		( undefined )
 #endif
@@ -60,7 +61,6 @@ import Hugs.Array
 
 #ifdef __NHC__
 import Array		-- Haskell'98 arrays
-import Data.Ix
 #endif
 
 #ifndef __NHC__

@@ -85,9 +85,7 @@ instance Show (Ptr a) where
 instance Show (FunPtr a) where
    showsPrec p = showsPrec p . castFunPtrToPtr
 #endif
-#endif
 
-#ifndef __NHC__
 foreign import ccall unsafe "freeHaskellFunctionPtr"
     freeHaskellFunPtr :: FunPtr a -> IO ()
 #endif
