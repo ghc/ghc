@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.45 2002/02/06 11:13:47 sewardj Exp $
+% $Id: AbsCSyn.lhs,v 1.46 2002/03/02 18:02:30 sof Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -269,6 +269,9 @@ data CStmtMacro
   | PUSH_SEQ_FRAME			-- push seq frame
   | UPDATE_SU_FROM_UPD_FRAME		-- pull Su out of the update frame
   | SET_TAG				-- set TagReg if it exists
+      -- dataToTag# primop -- *only* used in unregisterised builds.
+      -- (see AbsCUtils.dsCOpStmt)
+  | DATA_TO_TAGZH
 
   | REGISTER_FOREIGN_EXPORT		-- register a foreign exported fun
   | REGISTER_IMPORT			-- register an imported module

@@ -29,7 +29,7 @@ import MachOp		( MachOp(..), isDefinitelyInlineMachOp )
 import Unique		( Unique{-instance Eq-} )
 import UniqSupply	( uniqFromSupply, uniqsFromSupply, splitUniqSupply, 
 			  UniqSupply )
-import CmdLineOpts      ( opt_EmitCExternDecls )
+import CmdLineOpts      ( opt_EmitCExternDecls, opt_Unregisterised )
 import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..), Safety(..),
 			  isDynamicTarget, isCasmTarget, defaultCCallConv )
 import StgSyn		( StgOp(..) )
@@ -901,12 +901,45 @@ dscCOpStmt [res] AddrToHValueOp [arg] vols
         (CAssign res arg)
 
 -- #define dataToTagzh(r,a)  r=(GET_TAG(((StgClosure *)a)->header.info))
+-- 
+--   In the unregisterised case, we don't attempt to compute the location
+--   of the tag halfword, just a macro. For this build, fixing on layout
+--   info has only got drawbacks. [NOTE: We're faking it slightly here,
+--   info table layout is a separate issue from having an unregistered
+--   impl of the STG machine, but currently only the unregisterised build
+--   doesn't have TABLES_NEXT_TO_CODE]
+--
+--   Should this arrangement deeply offend you for some reason, code which
+--   computes the offset can be found below also.
+--      -- sof 3/02
+-- 
 dscCOpStmt [res] DataToTagOp [arg] vols
+   | opt_Unregisterised
+   = returnFlt (CMacroStmt DATA_TO_TAGZH [res,arg])
+   | otherwise
    = mkTemps [PtrRep, WordRep]		`thenFlt` \ [t_infoptr, t_theword] ->
      mkHalfWord_HIADDR res t_theword	`thenFlt` \ select_ops ->
      (returnFlt . CSequential) [
         CAssign t_infoptr (mkDerefOff PtrRep arg 0),
+	 {-
+	   Get at the tag within the info table; two cases to consider:
+	   
+	      - reversed info tables next to the entry point code;
+	        one word above the end of the info table (which is
+		what t_infoptr is really pointing to).
+	      - info tables with their entry points stored somewhere else,
+	      	which is how the unregisterised (nee TABLES_NEXT_TO_CODE)
+		world operates.
+		
+	        The t_infoptr points to the start of the info table, so add
+		the length of the info table & subtract one word.
+	 -}
         CAssign t_theword (mkDerefOff WordRep t_infoptr (-1)),
+{- UNUSED - see above comment.
+				     (if opt_Unregisterised then 
+				     	 (fixedItblSize - 1)
+				      else (-1))),
+-}
         select_ops
      ]
 
