@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.122 2003/08/13 12:34:04 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.123 2003/08/13 13:35:07 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -285,7 +285,7 @@ changequote(, )dnl
    fptools_cv_alex_version=`grep '^ProjectVersion[ 	]*=' $srcdir/alex/mk/version.mk | sed 's/.*\([0-9][0-9]*\.[0-9][0-9]*\).*/\1/g'`;
 elif test x"$AlexCmd" != x; then
    fptools_cv_alex_version="`$AlexCmd -v |
-			  grep 'Alex Version' | sed -e 's/Alex Version \([^ ]*\).*/\1/g'`" ;
+			  grep 'Alex [Vv]ersion' | sed -e 's/Alex [Vv]ersion \([0-9\.]*\).*/\1/g'`" ;
 else
    fptools_cv_alex_version="";
 fi;
