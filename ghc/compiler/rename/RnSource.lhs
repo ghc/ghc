@@ -47,7 +47,13 @@ import Name		( Name )
 import NameSet
 import NameEnv
 import ErrUtils		( dumpIfSet )
-import PrelNames	( newStablePtrName, bindIOName, returnIOName )
+import PrelNames	( newStablePtrName, bindIOName, returnIOName
+			  -- dotnet interop
+		 	, objectTyConName, 
+			, unmarshalObjectName, marshalObjectName
+			, unmarshalStringName, marshalStringName
+			, checkDotnetResName
+			)
 import List		( partition )
 import Bag		( bagToList )
 import Outputable
@@ -314,8 +320,20 @@ rnHsForeignDecl (ForeignImport name ty spec isDeprec src_loc)
     returnM (ForeignImport name' ty' spec isDeprec src_loc, 
 	      fvs `plusFV` extras spec)
   where
-    extras (CImport _ _ _ _ CWrapper) = mkFVs [newStablePtrName,
-					       bindIOName, returnIOName]
+    extras (CImport _ _ _ _ CWrapper) 
+      = mkFVs [ newStablePtrName
+	      , bindIOName
+	      , returnIOName
+	      ]
+    extras (DNImport _)               
+      = mkFVs [ bindIOName
+              , objectTyConName
+	      , unmarshalObjectName
+	      , marshalObjectName
+	      , marshalStringName
+	      , unmarshalStringName
+	      , checkDotnetResName
+	      ]
     extras _			      = emptyFVs
 
 rnHsForeignDecl (ForeignExport name ty spec isDeprec src_loc)

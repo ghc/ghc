@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.51 2003/05/23 08:28:48 simonmar Exp $
+ * $Id: Stg.h,v 1.52 2003/05/29 14:39:30 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -224,6 +224,10 @@ DLL_IMPORT_RTS extern char **prog_argv;	/* so we can get at these from Haskell *
 DLL_IMPORT_RTS extern int    prog_argc;
 
 extern void stackOverflow(void);
+
+#if defined(WANT_DOTNET_SUPPORT)
+#include "DNInvoke.h"
+#endif
 
 /* Creating and destroying an adjustor thunk.
    I cannot make myself create a separate .h file

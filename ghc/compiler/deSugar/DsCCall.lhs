@@ -31,24 +31,34 @@ import Type		( Type, isUnLiftedType, mkFunTys, mkFunTy,
 			  tyVarsOfType, mkForAllTys, mkTyConApp, 
 			  isPrimitiveType, splitTyConApp_maybe, 
 			  splitNewType_maybe, splitForAllTy_maybe,
+			  splitTyConApp,
+			  isUnboxedTupleType
 			)
 
 import PrimOp		( PrimOp(..) )
 import TysPrim		( realWorldStatePrimTy, intPrimTy,
-			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon
+			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon,
+			  addrPrimTy
 			)
-import TyCon		( TyCon, tyConDataCons )
+import TyCon		( TyCon, tyConDataCons, tyConName )
 import TysWiredIn	( unitDataConId,
 			  unboxedSingletonDataCon, unboxedPairDataCon,
 			  unboxedSingletonTyCon, unboxedPairTyCon,
 			  trueDataCon, falseDataCon, 
-			  trueDataConId, falseDataConId 
+			  trueDataConId, falseDataConId,
+			  listTyCon, charTyCon, stringTy,
+			  tupleTyCon, tupleCon
 			)
+import BasicTypes       ( Boxity(..) )
 import Literal		( mkMachInt )
 import CStrings		( CLabelString )
 import PrelNames	( Unique, hasKey, ioTyConKey, boolTyConKey, unitTyConKey,
 			  int8TyConKey, int16TyConKey, int32TyConKey,
 			  word8TyConKey, word16TyConKey, word32TyConKey
+			  -- dotnet interop
+			  , marshalStringName, unmarshalStringName
+			  , marshalObjectName, unmarshalObjectName
+			  , objectTyConName
 			)
 import VarSet		( varSetElems )
 import Constants	( wORD_SIZE)
@@ -99,9 +109,9 @@ dsCCall :: CLabelString	-- C routine to invoke
 	-> DsM CoreExpr
 
 dsCCall lbl args may_gc is_asm result_ty
-  = mapAndUnzipDs unboxArg args	`thenDs` \ (unboxed_args, arg_wrappers) ->
-    boxResult [] result_ty	`thenDs` \ (ccall_result_ty, res_wrapper) ->
-    getUniqueDs			`thenDs` \ uniq ->
+  = mapAndUnzipDs unboxArg args	       `thenDs` \ (unboxed_args, arg_wrappers) ->
+    boxResult [] id Nothing result_ty  `thenDs` \ (ccall_result_ty, res_wrapper) ->
+    getUniqueDs			       `thenDs` \ uniq ->
     let
 	target | is_asm    = CasmTarget lbl
 	       | otherwise = StaticTarget lbl
@@ -188,6 +198,41 @@ unboxArg arg
 	      \ body -> Case arg case_bndr [(DataAlt data_con,vars,body)]
     )
 
+  | Just (tc, [arg_ty]) <- splitTyConApp_maybe arg_ty,
+    tc == listTyCon,
+    Just (cc,[]) <- splitTyConApp_maybe arg_ty,
+    cc == charTyCon
+    -- String; dotnet only
+  = dsLookupGlobalId marshalStringName `thenDs` \ unpack_id ->
+    newSysLocalDs addrPrimTy	       `thenDs` \ prim_string ->
+    returnDs (Var prim_string,
+    	      \ body ->
+	        let
+		 io_ty = exprType body
+		 (Just (_,[io_arg])) = tcSplitTyConApp_maybe io_ty
+		in
+	      	mkApps (Var unpack_id)
+		       [ Type io_arg
+		       , arg
+		       , Lam prim_string body
+		       ])
+  | Just (tc, [arg_ty]) <- splitTyConApp_maybe arg_ty,
+    tyConName tc == objectTyConName
+    -- Object; dotnet only
+  = dsLookupGlobalId marshalObjectName `thenDs` \ unpack_id ->
+    newSysLocalDs addrPrimTy	       `thenDs` \ prim_obj  ->
+    returnDs (Var prim_obj,
+    	      \ body ->
+	        let
+		 io_ty = exprType body
+		 (Just (_,[io_arg])) = tcSplitTyConApp_maybe io_ty
+		in
+	      	mkApps (Var unpack_id)
+		       [ Type io_arg
+		       , arg
+		       , Lam prim_obj body
+		       ])
+
   | otherwise
   = getSrcLocDs `thenDs` \ l ->
     pprPanic "unboxArg: " (ppr l <+> ppr arg_ty)
@@ -206,7 +251,11 @@ unboxArg arg
 
 
 \begin{code}
-boxResult :: [Id] -> Type -> DsM (Type, CoreExpr -> CoreExpr)
+boxResult :: [Id]
+	  -> ((Maybe Type, CoreExpr -> CoreExpr) -> (Maybe Type, CoreExpr -> CoreExpr))
+	  -> Maybe Id
+	  -> Type
+	  -> DsM (Type, CoreExpr -> CoreExpr)
 
 -- Takes the result of the user-level ccall: 
 --	either (IO t), 
@@ -219,20 +268,33 @@ boxResult :: [Id] -> Type -> DsM (Type, CoreExpr -> CoreExpr)
 -- the result type will be 
 --	State# RealWorld -> (# State# RealWorld #)
 
-boxResult arg_ids result_ty
+boxResult arg_ids augment mbTopCon result_ty
   = case tcSplitTyConApp_maybe result_ty of
 	-- This split absolutely has to be a tcSplit, because we must
 	-- see the IO type; and it's a newtype which is transparent to splitTyConApp.
 
 	-- The result is IO t, so wrap the result in an IO constructor
 	Just (io_tycon, [io_res_ty]) | io_tycon `hasKey` ioTyConKey
-		-> mk_alt return_result 
-			  (resultWrapper io_res_ty)	`thenDs` \ (ccall_res_ty, the_alt) ->
-		   newSysLocalDs  realWorldStatePrimTy	 `thenDs` \ state_id ->
+		-> resultWrapper io_res_ty             `thenDs` \ res ->
+		   let aug_res          = augment res
+		       extra_result_tys =
+		         case aug_res of
+			   (Just ty,_) 
+			     | isUnboxedTupleType ty ->
+			        let (Just (_, ls)) = splitTyConApp_maybe ty in tail ls
+			   _ -> []
+	           in
+		   mk_alt (return_result extra_result_tys) aug_res 
+		   					`thenDs` \ (ccall_res_ty, the_alt) ->
+		   newSysLocalDs  realWorldStatePrimTy  `thenDs` \ state_id ->
 		   let
 			io_data_con = head (tyConDataCons io_tycon)
+			toIOCon = 
+			  case mbTopCon of
+			    Nothing -> dataConWrapId io_data_con
+			    Just x  -> x
 			wrap = \ the_call -> 
-				 mkApps (Var (dataConWrapId io_data_con))
+				 mkApps (Var toIOCon)
 					   [ Type io_res_ty, 
 					     Lam state_id $
 					      Case (App the_call (Var state_id))
@@ -242,14 +304,14 @@ boxResult arg_ids result_ty
 		   in
 		   returnDs (realWorldStatePrimTy `mkFunTy` ccall_res_ty, wrap)
 		where
-		   return_result state ans = mkConApp unboxedPairDataCon 
-						      [Type realWorldStatePrimTy, Type io_res_ty, 
-						       state, ans]
-
+		   return_result ts state anss 
+		     = mkConApp (tupleCon Unboxed (2 + length ts))
+			        (Type realWorldStatePrimTy : Type io_res_ty : map Type ts ++
+			         state : anss) 
 	-- It isn't, so do unsafePerformIO
 	-- It's not conveniently available, so we inline it
-	other -> mk_alt return_result
-			(resultWrapper result_ty) `thenDs` \ (ccall_res_ty, the_alt) ->
+	other -> resultWrapper result_ty            `thenDs` \ res ->
+	         mk_alt return_result (augment res) `thenDs` \ (ccall_res_ty, the_alt) ->
 		 let
 		    wrap = \ the_call -> Case (App the_call (Var realWorldPrimId)) 
 					      (mkWildId ccall_res_ty)
@@ -257,14 +319,15 @@ boxResult arg_ids result_ty
 		 in
 		 returnDs (realWorldStatePrimTy `mkFunTy` ccall_res_ty, wrap)
 	      where
-		 return_result state ans = ans
+		 return_result state [ans] = ans
+		 return_result _ _ = panic "return_result: expected single result"
   where
     mk_alt return_result (Nothing, wrap_result)
 	= 	-- The ccall returns ()
 	  newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_id ->
 	  let
 		the_rhs = return_result (Var state_id) 
-					(wrap_result (panic "boxResult"))
+					[wrap_result (panic "boxResult")]
 
 		ccall_res_ty = mkTyConApp unboxedSingletonTyCon [realWorldStatePrimTy]
 		the_alt      = (DataAlt unboxedSingletonDataCon, [state_id], the_rhs)
@@ -272,12 +335,32 @@ boxResult arg_ids result_ty
 	  returnDs (ccall_res_ty, the_alt)
 
     mk_alt return_result (Just prim_res_ty, wrap_result)
-	=	-- The ccall returns a non-() value
+    		-- The ccall returns a non-() value
+        | isUnboxedTupleType prim_res_ty
+        = let
+		(Just (_, ls@(prim_res_ty1:extras))) = splitTyConApp_maybe prim_res_ty
+		arity = 1 + length ls
+	  in
+	  mapDs newSysLocalDs ls 		`thenDs` \ args_ids@(result_id:as) ->
+	  newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_id ->
+	  let
+		the_rhs = return_result (Var state_id) 
+					(wrap_result (Var result_id) : map Var as)
+		ccall_res_ty = mkTyConApp (tupleTyCon Unboxed arity)
+					  (realWorldStatePrimTy : ls)
+		the_alt	     = ( DataAlt (tupleCon Unboxed arity)
+			       , (state_id : args_ids)
+			       , the_rhs
+			       )
+	  in
+	  returnDs (ccall_res_ty, the_alt)
+	| otherwise
+	=	
 	  newSysLocalDs prim_res_ty 		`thenDs` \ result_id ->
 	  newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_id ->
 	  let
 		the_rhs = return_result (Var state_id) 
-					(wrap_result (Var result_id))
+					[wrap_result (Var result_id)]
 
 		ccall_res_ty = mkTyConApp unboxedPairTyCon [realWorldStatePrimTy, prim_res_ty]
 		the_alt	     = (DataAlt unboxedPairDataCon, [state_id, result_id], the_rhs)
@@ -286,48 +369,60 @@ boxResult arg_ids result_ty
 
 
 resultWrapper :: Type
-   	      -> (Maybe Type,		-- Type of the expected result, if any
-		  CoreExpr -> CoreExpr)	-- Wrapper for the result 
+   	      -> DsM (Maybe Type,		-- Type of the expected result, if any
+		      CoreExpr -> CoreExpr)	-- Wrapper for the result 
 resultWrapper result_ty
   -- Base case 1: primitive types
   | isPrimitiveType result_ty
-  = (Just result_ty, \e -> e)
+  = returnDs (Just result_ty, \e -> e)
 
   -- Base case 2: the unit type ()
   | Just (tc,_) <- maybe_tc_app, tc `hasKey` unitTyConKey
-  = (Nothing, \e -> Var unitDataConId)
+  = returnDs (Nothing, \e -> Var unitDataConId)
 
   -- Base case 3: the boolean type
   | Just (tc,_) <- maybe_tc_app, tc `hasKey` boolTyConKey
-  = (Just intPrimTy, \e -> Case e (mkWildId intPrimTy)
-	                          [(DEFAULT             ,[],Var trueDataConId ),
-				   (LitAlt (mkMachInt 0),[],Var falseDataConId)])
+  = returnDs
+     (Just intPrimTy, \e -> Case e (mkWildId intPrimTy)
+	                           [(DEFAULT             ,[],Var trueDataConId ),
+				    (LitAlt (mkMachInt 0),[],Var falseDataConId)])
 
   -- Recursive newtypes
   | Just rep_ty <- splitNewType_maybe result_ty
-  = let
-        (maybe_ty, wrapper) = resultWrapper rep_ty
-    in
-    (maybe_ty, \e -> mkCoerce2 result_ty rep_ty (wrapper e))
+  = resultWrapper rep_ty `thenDs` \ (maybe_ty, wrapper) ->
+    returnDs (maybe_ty, \e -> mkCoerce2 result_ty rep_ty (wrapper e))
 
   -- The type might contain foralls (eg. for dummy type arguments,
   -- referring to 'Ptr a' is legal).
   | Just (tyvar, rest) <- splitForAllTy_maybe result_ty
-  = let
-        (maybe_ty, wrapper) = resultWrapper rest
-    in
-    (maybe_ty, \e -> Lam tyvar (wrapper e))
+  = resultWrapper rest `thenDs` \ (maybe_ty, wrapper) ->
+    returnDs (maybe_ty, \e -> Lam tyvar (wrapper e))
 
   -- Data types with a single constructor, which has a single arg
   | Just (tycon, tycon_arg_tys, data_con, data_con_arg_tys) <- splitProductType_maybe result_ty,
     dataConSourceArity data_con == 1
   = let
-        (maybe_ty, wrapper)    = resultWrapper unwrapped_res_ty
 	(unwrapped_res_ty : _) = data_con_arg_tys
 	narrow_wrapper         = maybeNarrow tycon
     in
-    (maybe_ty, \e -> mkApps (Var (dataConWrapId data_con)) 
-			    (map Type tycon_arg_tys ++ [wrapper (narrow_wrapper e)]))
+    resultWrapper unwrapped_res_ty `thenDs` \ (maybe_ty, wrapper) ->
+    returnDs
+      (maybe_ty, \e -> mkApps (Var (dataConWrapId data_con)) 
+			      (map Type tycon_arg_tys ++ [wrapper (narrow_wrapper e)]))
+
+    -- Strings; 'dotnet' only.
+  | Just (tc, [arg_ty]) <- maybe_tc_app,               tc == listTyCon,
+    Just (cc,[])        <- splitTyConApp_maybe arg_ty, cc == charTyCon
+  = dsLookupGlobalId unmarshalStringName	`thenDs` \ pack_id ->
+    returnDs (Just addrPrimTy,
+    	      \ e -> App (Var pack_id) e)
+
+    -- Objects; 'dotnet' only.
+  | Just (tc, [arg_ty]) <- maybe_tc_app, 
+    tyConName tc == objectTyConName
+  = dsLookupGlobalId unmarshalObjectName	`thenDs` \ pack_id ->
+    returnDs (Just addrPrimTy,
+    	      \ e -> App (Var pack_id) e)
 
   | otherwise
   = pprPanic "resultWrapper" (ppr result_ty)

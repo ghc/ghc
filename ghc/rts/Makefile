@@ -133,6 +133,21 @@ ifeq "$(HaveLibMingwEx)" "YES"
 PACKAGE_CPP_OPTS += -DHAVE_LIBMINGWEX
 endif
 
+ifeq "$(DotnetSupport)" "YES"
+
+# 
+# Would like to just use SUBDIRS here, but need to
+# descend into dotnet/ earlier than that.
+#
+all ::
+	$(MAKE) -C dotnet all
+
+# But use SUBDIRS for other recursive targets.
+SUBDIRS += dotnet
+
+LIBOBJS += dotnet/Invoke.o
+endif
+
 #-----------------------------------------------------------------------------
 # Include the Front panel code?
 

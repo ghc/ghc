@@ -15,15 +15,16 @@ module ForeignCall (
 	CCallTarget(..), isDynamicTarget, isCasmTarget,
 	CCallConv(..), defaultCCallConv, ccallConvToInt, ccallConvAttribute,
 
-	DNCallSpec(..),
+	DNCallSpec(..), DNKind(..), DNType(..),
+	withDNTypes,
 
 	okToExposeFCall
     ) where
 
 #include "HsVersions.h"
 
-import CStrings		( CLabelString, pprCLabelString )
-import FastString	( FastString )
+import CStrings			( CLabelString, pprCLabelString )
+import FastString		( FastString )
 import Binary
 import Outputable
 \end{code}
@@ -183,17 +184,62 @@ instance Outputable CCallSpec where
 
 %************************************************************************
 %*									*
-\subsubsection{.NET stuff}
+\subsubsection{.NET interop}
 %*									*
 %************************************************************************
 
 \begin{code}
-data DNCallSpec = DNCallSpec FastString
-  deriving (Eq)
+data DNCallSpec = 
+	DNCallSpec Bool       -- True => static method/field
+		   DNKind     -- what type of access
+		   String     -- assembly
+		   String     -- fully qualified method/field name.
+		   [DNType]   -- argument types.
+		   DNType     -- result type.
+    deriving ( Eq )
   {-! derive: Binary !-}
 
+data DNKind
+  = DNMethod
+  | DNField
+  | DNConstructor
+    deriving ( Eq )
+  {-! derive: Binary !-}
+
+data DNType
+  = DNByte
+  | DNBool
+  | DNChar
+  | DNDouble
+  | DNFloat
+  | DNInt
+  | DNInt8
+  | DNInt16
+  | DNInt32
+  | DNInt64
+  | DNWord8
+  | DNWord16
+  | DNWord32
+  | DNWord64
+  | DNPtr
+  | DNUnit
+  | DNObject
+  | DNString
+    deriving ( Eq )
+  {-! derive: Binary !-}
+
+withDNTypes :: DNCallSpec -> [DNType] -> DNType -> DNCallSpec
+withDNTypes (DNCallSpec isStatic k assem nm _ _) argTys resTy
+  = DNCallSpec isStatic k assem nm argTys resTy
+
 instance Outputable DNCallSpec where
-  ppr (DNCallSpec s) = char '"' <> ftext s <> char '"'
+  ppr (DNCallSpec isStatic kind ass nm _ _ ) 
+    = char '"' <> 
+       (if isStatic then text "static" else empty) <+>
+       (text (case kind of { DNMethod -> "method" ; DNField -> "field"; DNConstructor -> "ctor" })) <+>
+       (if null ass then char ' ' else char '[' <> text ass <> char ']') <>
+       text nm <> 
+      char '"'
 \end{code}
 
 
@@ -291,11 +337,91 @@ instance Binary CCallConv where
 	      _ -> do return StdCallConv
 
 instance Binary DNCallSpec where
-    put_ bh (DNCallSpec aa) = do
-	    put_ bh aa
+    put_ bh (DNCallSpec isStatic kind ass nm _ _) = do
+            put_ bh isStatic
+	    put_ bh kind
+	    put_ bh ass
+	    put_ bh nm
     get bh = do
-	  aa <- get bh
-	  return (DNCallSpec aa)
+          isStatic <- get bh
+	  kind     <- get bh
+	  ass      <- get bh
+	  nm       <- get bh
+	  return (DNCallSpec isStatic kind ass nm [] undefined)
+
+instance Binary DNKind where
+    put_ bh DNMethod = do
+	    putByte bh 0
+    put_ bh DNField = do
+	    putByte bh 1
+    put_ bh DNConstructor = do
+	    putByte bh 2
+    get bh = do
+	    h <- getByte bh
+	    case h of
+	      0 -> do return DNMethod
+	      1 -> do return DNField
+	      _ -> do return DNConstructor
+
+instance Binary DNType where
+    put_ bh DNByte = do
+	    putByte bh 0
+    put_ bh DNBool = do
+	    putByte bh 1
+    put_ bh DNChar = do
+	    putByte bh 2
+    put_ bh DNDouble = do
+	    putByte bh 3
+    put_ bh DNFloat = do
+	    putByte bh 4
+    put_ bh DNInt = do
+	    putByte bh 5
+    put_ bh DNInt8 = do
+	    putByte bh 6
+    put_ bh DNInt16 = do
+	    putByte bh 7
+    put_ bh DNInt32 = do
+	    putByte bh 8
+    put_ bh DNInt64 = do
+	    putByte bh 9
+    put_ bh DNWord8 = do
+	    putByte bh 10
+    put_ bh DNWord16 = do
+	    putByte bh 11
+    put_ bh DNWord32 = do
+	    putByte bh 12
+    put_ bh DNWord64 = do
+	    putByte bh 13
+    put_ bh DNPtr = do
+	    putByte bh 14
+    put_ bh DNUnit = do
+	    putByte bh 15
+    put_ bh DNObject = do
+	    putByte bh 16
+    put_ bh DNString = do
+	    putByte bh 17
+
+    get bh = do
+	    h <- getByte bh
+	    case h of
+	      0 -> return DNByte
+	      1 -> return DNBool
+	      2 -> return DNChar
+  	      3 -> return DNDouble
+  	      4 -> return DNFloat
+  	      5 -> return DNInt
+  	      6 -> return DNInt8
+  	      7 -> return DNInt16
+  	      8 -> return DNInt32
+	      9 -> return DNInt64
+	      10 -> return DNWord8
+	      11 -> return DNWord16
+	      12 -> return DNWord32
+	      13 -> return DNWord64
+	      14 -> return DNPtr
+	      15 -> return DNUnit
+	      16 -> return DNObject
+	      17 -> return DNString
 
 --  Imported from other files :-
 

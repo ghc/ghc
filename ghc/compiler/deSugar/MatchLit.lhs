@@ -65,11 +65,10 @@ dsLit (HsIntPrim i)    = returnDs (mkIntLit i)
 dsLit (HsFloatPrim f)  = returnDs (mkLit (MachFloat f))
 dsLit (HsDoublePrim d) = returnDs (mkLit (MachDouble d))
 dsLit (HsLitLit str ty)
-  = ASSERT( isJust maybe_ty )
-    returnDs (wrap_fn (mkLit (MachLitLit str rep_ty)))
-  where
-    (maybe_ty, wrap_fn) = resultWrapper ty
-    Just rep_ty 	= maybe_ty
+  = resultWrapper ty `thenDs` \ (maybe_ty, wrap_fn) ->
+    ASSERT( isJust maybe_ty )
+      let (Just rep_ty) = maybe_ty in 
+      returnDs (wrap_fn (mkLit (MachLitLit str rep_ty)))
 
 dsLit (HsRat r ty)
   = mkIntegerExpr (numerator r)		`thenDs` \ num ->

@@ -215,6 +215,10 @@ basicKnownKeyNames
 
 	-- Booleans
 	andName, orName
+	
+	-- dotnet interop
+	, objectTyConName, marshalObjectName, unmarshalObjectName
+	, marshalStringName, unmarshalStringName, checkDotnetResName
     ]
 
 monadNames :: [Name]	-- The monad ops need by a HsDo
@@ -256,7 +260,9 @@ pREL_FLOAT_Name   = mkModuleName "GHC.Float"
 pREL_TOP_HANDLER_Name = mkModuleName "GHC.TopHandler"
 sYSTEM_IO_Name	  = mkModuleName "System.IO"
 dYNAMIC_Name	  = mkModuleName "Data.Dynamic"
+tRAVERSE_Name	  = mkModuleName "Data.Traverse"
 gENERICS_Name	  = mkModuleName "Data.Generics"
+dOTNET_Name       = mkModuleName "GHC.Dotnet"
 
 rEAD_PREC_Name = mkModuleName "Text.ParserCombinators.ReadPrec"
 lEX_Name       = mkModuleName "Text.Read.Lex"
@@ -696,6 +702,15 @@ splitName          = varQual gLA_EXTS_Name FSLIT("split") splitIdKey
 
 -- Recursive-do notation
 mfixName	   = varQual mONAD_FIX_Name FSLIT("mfix") mfixIdKey
+
+-- dotnet interop
+objectTyConName	    = wTcQual  dOTNET_Name FSLIT("Object") objectTyConKey
+unmarshalObjectName = varQual  dOTNET_Name FSLIT("unmarshalObject") unmarshalObjectIdKey
+marshalObjectName   = varQual  dOTNET_Name FSLIT("marshalObject") marshalObjectIdKey
+marshalStringName   = varQual  dOTNET_Name FSLIT("marshalString") marshalStringIdKey
+unmarshalStringName = varQual  dOTNET_Name FSLIT("unmarshalString") unmarshalStringIdKey
+checkDotnetResName  = varQual  dOTNET_Name FSLIT("checkResult")     checkDotnetResNameIdKey
+
 \end{code}
 
 %************************************************************************
@@ -837,6 +852,9 @@ genUnitTyConKey				= mkPreludeTyConUnique 81
 -- Parallel array type constructor
 parrTyConKey				= mkPreludeTyConUnique 82
 
+-- dotnet interop
+objectTyConKey				= mkPreludeTyConUnique 83
+
 ---------------- Template Haskell -------------------
 --	USES TyConUniques 100-119
 -----------------------------------------------------
@@ -963,6 +981,14 @@ enumFromThenToPIdKey          = mkPreludeMiscIdUnique 90
 bpermutePIdKey		      = mkPreludeMiscIdUnique 91
 bpermuteDftPIdKey	      = mkPreludeMiscIdUnique 92
 indexOfPIdKey		      = mkPreludeMiscIdUnique 93
+
+-- dotnet interop
+unmarshalObjectIdKey          = mkPreludeMiscIdUnique 94
+marshalObjectIdKey            = mkPreludeMiscIdUnique 95
+marshalStringIdKey            = mkPreludeMiscIdUnique 96
+unmarshalStringIdKey          = mkPreludeMiscIdUnique 97
+checkDotnetResNameIdKey       = mkPreludeMiscIdUnique 98
+
 \end{code}
 
 Certain class operations from Prelude classes.  They get their own

@@ -353,6 +353,12 @@ GL_LIBS=@GL_LIBS@
 X_CFLAGS=@X_CFLAGS@
 X_LIBS=@X_LIBS@
 
+
+# 
+# .NET interop support?
+#
+DotnetSupport=@DotnetSupport@
+
 ################################################################################
 #
 #		happy project

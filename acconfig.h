@@ -590,6 +590,9 @@
  */
 #undef VOID_INT_SIGNALS
  
+/* Define if you want to include .NET interop support. */
+#undef WANT_DOTNET_SUPPORT
+ 
 
 /* Leave that blank line there!!  Autoheader needs it.
    If you're adding to this file, keep in mind:

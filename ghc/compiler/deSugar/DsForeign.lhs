@@ -30,6 +30,7 @@ import TcType		( Type, mkFunTys, mkForAllTys, mkTyConApp,
 			  tcSplitForAllTys, tcSplitFunTys, tcTyConAppArgs,
 			)
 
+import BasicTypes       ( Boxity(..) )
 import HscTypes		( ForeignStubs(..) )
 import ForeignCall	( ForeignCall(..), CCallSpec(..), 
 			  Safety(..), playSafe,
@@ -38,10 +39,11 @@ import ForeignCall	( ForeignCall(..), CCallSpec(..),
 			  ccallConvAttribute
 			)
 import CStrings		( CLabelString )
-import TysWiredIn	( unitTy, stablePtrTyCon )
+import TysWiredIn	( unitTy, stablePtrTyCon, tupleTyCon )
 import TysPrim		( addrPrimTy, mkStablePtrPrimTy, alphaTy )
 import PrimRep          ( getPrimRepSizeInBytes )
-import PrelNames	( hasKey, ioTyConKey, newStablePtrName, bindIOName )
+import PrelNames	( hasKey, ioTyConKey, newStablePtrName, bindIOName,
+			  checkDotnetResName )
 import BasicTypes	( Activation( NeverActive ) )
 import Outputable
 import Maybe 		( fromJust )
@@ -150,11 +152,10 @@ dsCImport :: Id
 	  -> Bool	-- True <=> no headers in the f.i decl
 	  -> DsM ([Binding], SDoc, SDoc)
 dsCImport id (CLabel cid) _ _ no_hdrs
- = ASSERT(fromJust resTy `eqType` addrPrimTy)    -- typechecker ensures this
-   returnDs ([(setImpInline no_hdrs id, rhs)], empty, empty)
- where
-   (resTy, foRhs) = resultWrapper (idType id)
-   rhs		  = foRhs (mkLit (MachLabel cid Nothing))
+ = resultWrapper (idType id) `thenDs` \ (resTy, foRhs) ->
+   ASSERT(fromJust resTy `eqType` addrPrimTy)    -- typechecker ensures this
+    let rhs = foRhs (mkLit (MachLabel cid Nothing)) in
+    returnDs ([(setImpInline no_hdrs id, rhs)], empty, empty)
 dsCImport id (CFunction target) cconv safety no_hdrs
   = dsFCall id (CCall (CCallSpec target cconv safety)) no_hdrs
 dsCImport id CWrapper cconv _ _
@@ -204,8 +205,34 @@ dsFCall fn_id fcall no_hdrs
 	-- ForeignObj#s live across a 'safe' foreign import).
 	maybe_arg_ids | unsafe_call fcall = work_arg_ids
 		      | otherwise	  = []
+
+	forDotnet = 
+	 case fcall of
+	   DNCall{} -> True
+	   _        -> False
+
+	topConDs
+	  | forDotnet = 
+	     dsLookupGlobalId checkDotnetResName `thenDs` \ check_id -> 
+	     return (Just check_id)
+          | otherwise = return Nothing
+	     
+	augmentResultDs
+	  | forDotnet = 
+	  	newSysLocalDs addrPrimTy `thenDs` \ err_res -> 
+		returnDs (\ (mb_res_ty, resWrap) ->
+			      case mb_res_ty of
+			  	Nothing -> (Just (mkTyConApp (tupleTyCon Unboxed 1)
+							     [ addrPrimTy ]),
+						 resWrap)
+				Just x  -> (Just (mkTyConApp (tupleTyCon Unboxed 2)
+							     [ x, addrPrimTy ]),
+						 resWrap))
+	  | otherwise = returnDs id
     in
-    boxResult maybe_arg_ids io_res_ty  		`thenDs` \ (ccall_result_ty, res_wrapper) ->
+    augmentResultDs				     `thenDs` \ augment -> 
+    topConDs					     `thenDs` \ topCon -> 
+    boxResult maybe_arg_ids augment topCon io_res_ty `thenDs` \ (ccall_result_ty, res_wrapper) ->
 
     getUniqueDs					`thenDs` \ ccall_uniq ->
     getUniqueDs					`thenDs` \ work_uniq ->

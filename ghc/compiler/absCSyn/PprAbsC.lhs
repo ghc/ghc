@@ -27,7 +27,9 @@ import AbsCUtils	( getAmodeRep, nonemptyAbsC,
 			)
 
 import ForeignCall	( CCallSpec(..), CCallTarget(..), playSafe,
-			  playThreadSafe, ccallConvAttribute )
+			  playThreadSafe, ccallConvAttribute,
+			  ForeignCall(..), Safety(..), DNCallSpec(..),
+			  DNType(..), DNKind(..) )
 import CLabel		( externallyVisibleCLabel,
 			  needsCDecl, pprCLabel, mkClosureLabel,
 			  mkReturnInfoLabel, mkReturnPtLabel, mkClosureTblLabel,
@@ -46,7 +48,6 @@ import Name		( NamedThing(..) )
 import Maybes		( catMaybes )
 import PrimOp		( primOpNeedsWrapper )
 import MachOp		( MachOp(..) )
-import ForeignCall	( ForeignCall(..) )
 import PrimRep		( isFloatingRep, PrimRep(..), getPrimRepSize )
 import Unique		( pprUnique, Unique{-instance NamedThing-} )
 import UniqSet		( emptyUniqSet, elementOfUniqSet,
@@ -832,30 +833,95 @@ Amendment to the above: if we can GC, we have to:
   that the runtime check that PerformGC is being used sensibly will work.
 
 \begin{code}
-pprFCall call@(CCall (CCallSpec target cconv safety)) uniq args results vol_regs
-  = vcat [
-      char '{',
-      declare_local_vars,   -- local var for *result*
-      vcat local_arg_decls,
-      pp_save_context,
-        process_casm local_vars pp_non_void_args call_str,
-      pp_restore_context,
-      assign_results,
-      char '}'
-    ]
+pprFCall call uniq args results vol_regs
+  = case call of
+      CCall (CCallSpec target _cconv safety) ->
+        vcat [ char '{',
+	        declare_local_vars,   -- local var for *result*
+	        vcat local_arg_decls,
+		makeCall target safety 
+			 (process_casm local_vars pp_non_void_args (call_str target)),
+	        assign_results,
+	      char '}'
+	     ]
+      DNCall (DNCallSpec isStatic kind assem nm argTys resTy) ->
+         let
+	  target    = StaticTarget (mkFastString nm)
+	  resultVar = "_ccall_result"
+	  
+	  hasAssemArg = isStatic || kind == DNConstructor
+	  invokeOp  = 
+	    case kind of
+	      DNMethod 
+	        | isStatic  -> "DN_invokeStatic"
+		| otherwise -> "DN_invokeMethod"
+	      DNField
+	        | isStatic ->
+		   if resTy == DNUnit 
+		    then "DN_setStatic"
+		    else "DN_getStatic"
+                | otherwise ->
+		   if resTy == DNUnit 
+		    then "DN_setField"
+		    else "DN_getField"
+	      DNConstructor -> "DN_createObject"
+
+	  (methArrDecl, methArrInit, methArrName, methArrLen) 
+	    | null argTys = (empty, empty, text "NULL", text "0")
+	    | otherwise   = 
+	      ( text "DotnetArg __meth_args[" <> int (length argTys) <> text "];"
+	      , vcat (zipWith3 (\ idx arg argTy -> 
+	      			 text "__meth_args[" <> int idx <> text "].arg." <> text (toDotnetArgField argTy) <> equals <> ppr_amode arg <> semi $$
+				 text "__meth_args[" <> int idx <> text "].arg_type=" <> text (toDotnetTy argTy) <> semi)
+			       [0..]
+			       non_void_args
+			       argTys)
+	      , text "__meth_args"
+	      , int (length non_void_args)
+	      )
+	 in
+         vcat [ char '{',
+	 	  declare_local_vars,
+		  vcat local_arg_decls,
+		  vcat [ methArrDecl
+		       , methArrInit
+		       , text "_ccall_result1 =" <+> text invokeOp <> parens (
+		    	  hcat (punctuate comma $
+				     (if hasAssemArg then
+				     	((if null assem then 
+					    text "NULL" 
+			  	         else 
+				            doubleQuotes (text assem)):)
+				      else
+				      	 id) $
+				     [ doubleQuotes $ text nm
+				     , methArrName
+				     , methArrLen
+				     , text (toDotnetTy resTy)
+				     , text "(void*)&" <> text resultVar 
+				     ])) <> semi
+			],
+	          assign_results,
+	        char '}'
+	       ]
   where
     (pp_saves, pp_restores) = ppr_vol_regs vol_regs
-
-    thread_macro_args = ppr_uniq_token <> comma <+> 
-    		        text "rts" <> ppr (playThreadSafe safety)
-    ppr_uniq_token = text "tok_" <> ppr uniq
-    (pp_save_context, pp_restore_context)
+    
+    makeCall target safety theCall = 
+        vcat [ pp_save_context,	theCall, pp_restore_context ]
+     where
+      (pp_save_context, pp_restore_context)
 	| playSafe safety = ( text "{ I_" <+> ppr_uniq_token <> 
 				text "; SUSPEND_THREAD" <> parens thread_macro_args <> semi
 			    , text "RESUME_THREAD" <> parens thread_macro_args <> text ";}"
 			    )
 	| otherwise = (	pp_basic_saves $$ pp_saves,
 			pp_basic_restores $$ pp_restores)
+	   where
+	    thread_macro_args = ppr_uniq_token <> comma <+> 
+    		        	text "rts" <> ppr (playThreadSafe safety)
+	    ppr_uniq_token = text "tok_" <> ppr uniq
+
 
     non_void_args = 
 	let nvas = init args
@@ -866,7 +932,7 @@ pprFCall call@(CCall (CCallSpec target cconv safety)) uniq args results vol_regs
 
     non_void_results =
 	let nvrs = grab_non_void_amodes results
-	in ASSERT (listLengthCmp nvrs 1 /= GT) nvrs
+	in ASSERT (forDotnet || listLengthCmp nvrs 1 /= GT) nvrs
     -- there will usually be two results: a (void) state which we
     -- should ignore and a (possibly void) result.
 
@@ -874,12 +940,18 @@ pprFCall call@(CCall (CCallSpec target cconv safety)) uniq args results vol_regs
       = unzip [ ppr_casm_arg a i | (a,i) <- non_void_args `zip` [1..] ]
 
     (declare_local_vars, local_vars, assign_results)
-      = ppr_casm_results non_void_results
+      = ppr_casm_results non_void_results forDotnet
 
-    call_str = case target of
-		  CasmTarget str  -> unpackFS str
-		  StaticTarget fn -> mk_ccall_str (pprCLabelString fn) ccall_args
-		  DynamicTarget   -> mk_ccall_str dyn_fun	       (tail ccall_args)
+    forDotnet
+      = case call of
+          DNCall{} -> True
+	  _ -> False
+
+    call_str tgt 
+      = case tgt of
+	  CasmTarget str  -> unpackFS str
+  	  StaticTarget fn -> mk_ccall_str (pprCLabelString fn) ccall_args
+	  DynamicTarget   -> mk_ccall_str dyn_fun	       (tail ccall_args)
 
     ccall_args = zipWith (\ _ i -> char '%' <> int i) non_void_args [0..]
     dyn_fun    = parens (parens (ptext SLIT("_ccall_fun_ty") <> ppr uniq) <> text "%0")
@@ -896,6 +968,49 @@ pprFCall call@(CCall (CCallSpec target cconv safety)) uniq args results vol_regs
 		text "));"
 	])
 
+toDotnetTy :: DNType -> String
+toDotnetTy x = 
+  case x of 
+    DNByte -> "Dotnet_Byte"
+    DNBool -> "Dotnet_Bool"
+    DNChar -> "Dotnet_Char"
+    DNDouble -> "Dotnet_Double"
+    DNFloat  -> "Dotnet_Float"
+    DNInt    -> "Dotnet_Int"
+    DNInt8   -> "Dotnet_Int8"
+    DNInt16  -> "Dotnet_Int16"
+    DNInt32  -> "Dotnet_Int32"
+    DNInt64  -> "Dotnet_Int64"
+    DNWord8  -> "Dotnet_Word8"
+    DNWord16 -> "Dotnet_Word16"
+    DNWord32 -> "Dotnet_Word32"
+    DNWord64 -> "Dotnet_Word64"
+    DNPtr    -> "Dotnet_Ptr"
+    DNUnit   -> "Dotnet_Unit"
+    DNObject -> "Dotnet_Object"
+    DNString -> "Dotnet_String"
+
+toDotnetArgField :: DNType -> String
+toDotnetArgField x = 
+  case x of 
+    DNByte -> "arg_byte"
+    DNBool -> "arg_bool"
+    DNChar -> "arg_char"
+    DNDouble -> "arg_double"
+    DNFloat  -> "arg_float"
+    DNInt    -> "arg_int"
+    DNInt8   -> "arg_int8"
+    DNInt16  -> "arg_int16"
+    DNInt32  -> "arg_int32"
+    DNInt64  -> "arg_int64"
+    DNWord8  -> "arg_word8"
+    DNWord16 -> "arg_word16"
+    DNWord32 -> "arg_word32"
+    DNWord64 -> "arg_word64"
+    DNPtr    -> "arg_ptr"
+    DNUnit   -> "arg_ptr" -- can't happen
+    DNObject -> "arg_obj"
+    DNString -> "arg_str"
 
 ppr_casm_arg :: CAddrMode -> Int -> (SDoc, SDoc)
     -- (a) decl and assignment, (b) local var to be used later
@@ -923,31 +1038,35 @@ For l-values, the critical questions are:
 \begin{code}
 ppr_casm_results
 	:: [CAddrMode]	-- list of results (length <= 1)
+	-> Bool         -- True => multiple results OK.
 	->
 	( SDoc,		-- declaration of any local vars
 	  [SDoc],	-- list of result vars (same length as results)
 	  SDoc )	-- assignment (if any) of results in local var to registers
 
-ppr_casm_results []
+ppr_casm_results [] _
   = (empty, [], empty) 	-- no results
 
-ppr_casm_results [r]
-  = let
+ppr_casm_results (r:rs) multiResultsOK
+  | not multiResultsOK && not (null rs) = panic "ppr_casm_results: ccall/casm with many results"
+  | otherwise
+  = foldr (\ (a,b,c) (as,bs,cs) -> (a $$ as, b ++ bs, c $$ cs))
+  	  (empty,[],empty)
+	  (zipWith pprRes (r:rs) ("" : map show [(1::Int)..]))
+    where
+      pprRes r suf = (declare_local_var, [local_var], assign_result)
+       where
 	result_reg = ppr_amode r
 	r_kind	   = getAmodeRep r
 
-	local_var  = ptext SLIT("_ccall_result")
+	local_var  = ptext SLIT("_ccall_result") <> text suf
 
 	(result_type, assign_result)
 	  = (pprPrimKind r_kind,
 	     hcat [ result_reg, equals, local_var, semi ])
 
 	declare_local_var = hcat [ result_type, space, local_var, semi ]
-    in
-    (declare_local_var, [local_var], assign_result)
 
-ppr_casm_results rs
-  = panic "ppr_casm_results: ccall/casm with many results"
 \end{code}
 
 

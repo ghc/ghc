@@ -539,6 +539,18 @@ AC_ARG_ENABLE(hopengl,
 )
 AC_SUBST(GhcLibsWithHOpenGL)
 
+dnl ** .NET interop support?
+dnl --------------------------------------------------------------
+AC_ARG_ENABLE(dotnet,
+[  --enable-dotnet
+        Build .NET interop layer.
+],
+[DotnetSupport=YES],
+[DotnetSupport=NO]
+)
+AC_DEFINE(WANT_DOTNET_SUPPORT)
+AC_SUBST(DotnetSupport)
+
 dnl --------------------------------------------------------------
 dnl End of configure script option section
 dnl --------------------------------------------------------------

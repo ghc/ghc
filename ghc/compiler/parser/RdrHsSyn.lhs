@@ -101,7 +101,7 @@ import Lex		( P, mapP, setSrcLocP, thenP, returnP, getSrcLocP, failMsgP )
 import HscTypes		( RdrAvailInfo, GenAvailInfo(..) )
 import TysWiredIn	( unitTyCon )
 import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
-			  DNCallSpec(..))
+			  DNCallSpec(..), DNKind(..))
 import OccName  	( srcDataName, varName, isDataOcc, isTcOcc, occNameUserString,
 			  mkDefaultMethodOcc, mkVarOcc )
 import SrcLoc
@@ -761,7 +761,8 @@ mkImport (CCall  cconv) safety (entity, v, ty) loc =
   parseCImport entity cconv safety v			 `thenP` \importSpec ->
   returnP $ ForD (ForeignImport v ty importSpec                     False loc)
 mkImport (DNCall      ) _      (entity, v, ty) loc =
-  returnP $ ForD (ForeignImport v ty (DNImport (DNCallSpec entity)) False loc)
+  parseDImport entity 					 `thenP` \ spec ->
+  returnP $ ForD (ForeignImport v ty (DNImport spec) False loc)
 
 -- parse the entity string of a foreign import declaration for the `ccall' or
 -- `stdcall' calling convention'
@@ -820,6 +821,42 @@ parseCImport entity cconv safety v
       build cid header True  lib = returnP $
         CImport cconv safety header lib (CLabel                  cid )
 
+--
+-- Unravel a dotnet spec string.
+--
+parseDImport :: FastString -> P DNCallSpec
+parseDImport entity = parse0 comps
+ where
+  comps = words (unpackFS entity)
+
+  parse0 [] = d'oh
+  parse0 (x : xs) 
+    | x == "static" = parse1 True xs
+    | otherwise     = parse1 False (x:xs)
+
+  parse1 _ [] = d'oh
+  parse1 isStatic (x:xs)
+    | x == "method" = parse2 isStatic DNMethod xs
+    | x == "field"  = parse2 isStatic DNField xs
+    | x == "ctor"   = parse2 isStatic DNConstructor xs
+  parse1 isStatic xs = parse2 isStatic DNMethod xs
+
+  parse2 _ _ [] = d'oh
+  parse2 isStatic kind (('[':x):xs) =
+     case x of
+	[] -> d'oh
+	vs | last vs == ']' -> parse3 isStatic kind (init vs) xs
+  parse2 isStatic kind xs = parse3 isStatic kind "" xs
+
+  parse3 isStatic kind assem [x] = 
+    returnP (DNCallSpec isStatic kind assem x 
+    			  -- these will be filled in once known.
+                        (error "FFI-dotnet-args")
+                        (error "FFI-dotnet-result"))
+  parse3 _ _ _ _ = d'oh
+
+  d'oh = parseError "Malformed entity string"
+  
 -- construct a foreign export declaration
 --
 mkExport :: CallConv

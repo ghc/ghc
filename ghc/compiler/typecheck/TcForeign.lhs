@@ -17,6 +17,7 @@ module TcForeign
         , tcForeignExports
 	) where
 
+#include "config.h"
 #include "HsVersions.h"
 
 import HsSyn		( ForeignDecl(..), HsExpr(..),
@@ -42,10 +43,11 @@ import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,
 			  isFFIArgumentTy, isFFIImportResultTy, 
 			  isFFIExportResultTy, isFFILabelTy,
 			  isFFIExternalTy, isFFIDynArgumentTy,
-			  isFFIDynResultTy,
+			  isFFIDynResultTy, isFFIDotnetTy, isFFIDotnetObjTy,
+			  toDNType
 			)
 import ForeignCall	( CExportSpec(..), CCallTarget(..), CCallConv(..),
-			  isDynamicTarget, isCasmTarget ) 
+			  isDynamicTarget, isCasmTarget, withDNTypes, DNKind(..), DNCallSpec(..) ) 
 import CStrings		( CLabelString, isCLabelString )
 import PrelNames	( hasKey, ioTyConKey )
 import CmdLineOpts	( dopt_HscLang, HscLang(..) )
@@ -91,56 +93,75 @@ tcFImport fo@(ForeignImport nm hs_ty imp_decl isDeprec src_loc)
 		-- things are LocalIds.  However, it does not need zonking,
 		-- (so TcHsSyn.zonkForeignExports ignores it).
    in
-   tcCheckFIType sig_ty arg_tys res_ty imp_decl		`thenM_` 
+   tcCheckFIType sig_ty arg_tys res_ty imp_decl		`thenM` \ imp_decl' -> 
    -- can't use sig_ty here because it :: Type and we need HsType Id
    -- hence the undefined
-   returnM (id, ForeignImport id undefined imp_decl isDeprec src_loc)
+   returnM (id, ForeignImport id undefined imp_decl' isDeprec src_loc)
 \end{code}
 
 
 ------------ Checking types for foreign import ----------------------
 \begin{code}
-tcCheckFIType _ _ _ (DNImport _)
-  = checkCg checkDotNet
+tcCheckFIType _ arg_tys res_ty (DNImport spec)
+  = checkCg checkDotnet  `thenM_`
+    getDOpts		 `thenM`  \ dflags ->
+    checkForeignArgs (isFFIDotnetTy dflags) arg_tys	`thenM_`
+    checkForeignRes True{-non IO ok-} (isFFIDotnetTy dflags) res_ty `thenM_`
+    let (DNCallSpec isStatic kind _ _ _ _) = spec in
+    (case kind of
+       DNMethod | not isStatic ->
+         case arg_tys of
+	   [] -> addErrTc illegalDNMethodSig
+	   _  
+	    | not (isFFIDotnetObjTy (last arg_tys)) -> addErrTc illegalDNMethodSig
+	    | otherwise -> returnM ()
+       _ -> returnM ()) `thenM_`
+    returnM (DNImport (withDNTypes spec (map toDNType arg_tys) (toDNType res_ty)))
 
-tcCheckFIType sig_ty arg_tys res_ty (CImport _ _ _ _ (CLabel _))
+tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport _ _ _ _ (CLabel _))
   = checkCg checkCOrAsm		`thenM_`
-    check (isFFILabelTy sig_ty) (illegalForeignTyErr empty sig_ty)
+    check (isFFILabelTy sig_ty) (illegalForeignTyErr empty sig_ty) `thenM_`
+    return idecl
 
-tcCheckFIType sig_ty arg_tys res_ty (CImport cconv _ _ _ CWrapper)
+tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv _ _ _ CWrapper)
   = 	-- Foreign wrapper (former f.e.d.)
    	-- The type must be of the form ft -> IO (FunPtr ft), where ft is a
    	-- valid foreign type.  For legacy reasons ft -> IO (Ptr ft) as well
    	-- as ft -> IO Addr is accepted, too.  The use of the latter two forms
    	-- is DEPRECATED, though.
     checkCg checkCOrAsmOrInterp `thenM_`
-    case arg_tys of
-	[arg1_ty] -> checkForeignArgs isFFIExternalTy arg1_tys			`thenM_`
-		     checkForeignRes nonIOok  isFFIExportResultTy res1_ty	`thenM_`
-		     checkForeignRes mustBeIO isFFIDynResultTy	  res_ty	`thenM_`
+    (case arg_tys of
+	[arg1_ty] -> checkForeignArgs isFFIExternalTy arg1_tys		     `thenM_`
+		     checkForeignRes nonIOok  isFFIExportResultTy res1_ty    `thenM_`
+		     checkForeignRes mustBeIO isFFIDynResultTy	  res_ty     `thenM_`
 		     checkFEDArgs arg1_tys
 		  where
 		     (arg1_tys, res1_ty) = tcSplitFunTys arg1_ty
-        other -> addErrTc (illegalForeignTyErr empty sig_ty)
+        other -> addErrTc (illegalForeignTyErr empty sig_ty)	)            `thenM_`
+    return idecl
 
-tcCheckFIType sig_ty arg_tys res_ty (CImport _ safety _ _ (CFunction target))
+tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport _ safety _ _ (CFunction target))
   | isDynamicTarget target	-- Foreign import dynamic
   = checkCg checkCOrAsmOrInterp		`thenM_`
     case arg_tys of		-- The first arg must be Ptr, FunPtr, or Addr
-      []     		-> check False (illegalForeignTyErr empty sig_ty)
-      (arg1_ty:arg_tys) -> getDOpts							`thenM` \ dflags ->
-			   check (isFFIDynArgumentTy arg1_ty)
-				 (illegalForeignTyErr argument arg1_ty)			`thenM_`
-			   checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys	`thenM_`
-			   checkForeignRes nonIOok (isFFIImportResultTy dflags) res_ty
-
+      []     		-> 
+      	check False (illegalForeignTyErr empty sig_ty) `thenM_`
+      	return idecl
+      (arg1_ty:arg_tys) -> 
+      	getDOpts				                     `thenM` \ dflags ->
+	check (isFFIDynArgumentTy arg1_ty)
+	      (illegalForeignTyErr argument arg1_ty)		     `thenM_`
+        checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys     `thenM_`
+	checkForeignRes nonIOok (isFFIImportResultTy dflags) res_ty  `thenM_`
+	return idecl
   | otherwise 		-- Normal foreign import
   = checkCg (if isCasmTarget target
 	     then checkC else checkCOrAsmOrDotNetOrInterp)	`thenM_`
     checkCTarget target						`thenM_`
     getDOpts							`thenM` \ dflags ->
     checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys	`thenM_`
-    checkForeignRes nonIOok (isFFIImportResultTy dflags) res_ty
+    checkForeignRes nonIOok (isFFIImportResultTy dflags) res_ty `thenM_`
+    return idecl
 
 -- This makes a convenient place to check
 -- that the C identifier is valid for C
@@ -267,8 +288,13 @@ checkForeignRes non_io_result_ok pred_res_ty ty
 \end{code}
 
 \begin{code}
-checkDotNet HscILX = Nothing
-checkDotNet other  = Just (text "requires .NET code generation (-filx)")
+checkDotnet HscILX = Nothing
+#if defined(mingw32_TARGET_OS)
+checkDotnet HscC   = Nothing
+checkDotnet _      = Just (text "requires C code generation (-fvia-C)")
+#else
+checkDotnet other  = Just (text "requires .NET support (-filx or win32)")
+#endif
 
 checkC HscC  = Nothing
 checkC other = Just (text "requires C code generation (-fvia-C)")
@@ -331,5 +357,9 @@ badCName target
 foreignDeclCtxt fo
   = hang (ptext SLIT("When checking declaration:"))
          4 (ppr fo)
+
+illegalDNMethodSig 
+  = ptext SLIT("'This pointer' expected as last argument")
+
 \end{code}
 

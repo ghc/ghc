@@ -75,6 +75,10 @@ module TcType (
   isFFIDynArgumentTy,  -- :: Type -> Bool
   isFFIDynResultTy,    -- :: Type -> Bool
   isFFILabelTy,        -- :: Type -> Bool
+  isFFIDotnetTy,       -- :: DynFlags -> Type -> Bool
+  isFFIDotnetObjTy,    -- :: Type -> Bool
+  
+  toDNType,            -- :: Type -> DNType
 
   ---------------------------------
   -- Unifier and matcher  
@@ -139,7 +143,9 @@ import DataCon		( DataCon )
 import TyCon		( TyCon, isUnLiftedTyCon )
 import Class		( classHasFDs, Class )
 import Var		( TyVar, Id, tyVarKind, isMutTyVar, mutTyVarDetails )
-import ForeignCall	( Safety, playSafe )
+import ForeignCall	( Safety, playSafe
+			  , DNType(..)
+			)
 import VarEnv
 import VarSet
 
@@ -149,7 +155,8 @@ import Name		( Name, NamedThing(..), mkInternalName, getSrcLoc )
 import OccName		( OccName, mkDictOcc )
 import NameSet
 import PrelNames	-- Lots (e.g. in isFFIArgumentTy)
-import TysWiredIn	( ptrTyCon, funPtrTyCon, addrTyCon, unitTyCon )
+import TysWiredIn	( ptrTyCon, funPtrTyCon, addrTyCon, unitTyCon,
+			  charTyCon, listTyCon )
 import BasicTypes	( IPName(..), ipNameName )
 import Unique		( Unique, Uniquable(..) )
 import SrcLoc		( SrcLoc )
@@ -836,6 +843,63 @@ isFFILabelTy :: Type -> Bool
 -- or a newtype of either.
 isFFILabelTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == funPtrTyCon || tc == addrTyCon)
 
+isFFIDotnetTy :: DynFlags -> Type -> Bool
+isFFIDotnetTy dflags ty
+  = checkRepTyCon (\ tc -> not (isByteArrayLikeTyCon tc) &&
+  			   (legalFIResultTyCon dflags tc || 
+			   isFFIDotnetObjTy ty || isStringTy ty)) ty
+
+-- Support String as an argument or result from a .NET FFI call.
+isStringTy ty = 
+  case tcSplitTyConApp_maybe (repType ty) of
+    Just (tc, [arg_ty])
+      | tc == listTyCon ->
+        case tcSplitTyConApp_maybe (repType arg_ty) of
+	  Just (cc,[]) -> cc == charTyCon
+	  _ -> False
+    _ -> False
+
+-- Support String as an argument or result from a .NET FFI call.
+isFFIDotnetObjTy ty = 
+  let
+   (_, t_ty) = tcSplitForAllTys ty
+  in
+  case tcSplitTyConApp_maybe (repType t_ty) of
+    Just (tc, [arg_ty]) | getName tc == objectTyConName -> True
+    _ -> False
+
+toDNType :: Type -> DNType
+toDNType ty
+  | isStringTy ty = DNString
+  | isFFIDotnetObjTy ty = DNObject
+  | Just (tc,argTys) <- tcSplitTyConApp_maybe ty = 
+     case lookup (getUnique tc) dn_assoc of
+       Just x  -> x
+       Nothing 
+         | tc `hasKey` ioTyConKey -> toDNType (head argTys)
+	 | otherwise -> pprPanic ("toDNType: unsupported .NET type") (pprType ty <+> parens (hcat (map pprType argTys)) <+> ppr tc)
+    where
+      dn_assoc :: [ (Unique, DNType) ]
+      dn_assoc = [ (unitTyConKey,   DNUnit)
+      		 , (intTyConKey,    DNInt)
+      	         , (int8TyConKey,   DNInt8)
+		 , (int16TyConKey,  DNInt16)
+		 , (int32TyConKey,  DNInt32)
+		 , (int64TyConKey,  DNInt64)
+		 , (wordTyConKey,   DNInt)
+		 , (word8TyConKey,  DNWord8)
+		 , (word16TyConKey, DNWord16)
+		 , (word32TyConKey, DNWord32)
+		 , (word64TyConKey, DNWord64)
+		 , (floatTyConKey,  DNFloat)
+		 , (doubleTyConKey, DNDouble)
+		 , (addrTyConKey,   DNPtr)
+		 , (ptrTyConKey,    DNPtr)
+		 , (funPtrTyConKey, DNPtr)
+		 , (charTyConKey,   DNChar)
+		 , (boolTyConKey,   DNBool)
+		 ]
+
 checkRepTyCon :: (TyCon -> Bool) -> Type -> Bool
 	-- Look through newtypes
 	-- Non-recursive ones are transparent to splitTyConApp,
@@ -855,7 +919,7 @@ legalFEArgTyCon :: TyCon -> Bool
 -- bytearrays from a _ccall_ / foreign declaration
 -- (or be passed them as arguments in foreign exported functions).
 legalFEArgTyCon tc
-  | getUnique tc `elem` [ byteArrayTyConKey, mutableByteArrayTyConKey ] 
+  | isByteArrayLikeTyCon tc
   = False
   -- It's also illegal to make foreign exports that take unboxed
   -- arguments.  The RTS API currently can't invoke such things.  --SDM 7/2000
@@ -864,22 +928,20 @@ legalFEArgTyCon tc
 
 legalFIResultTyCon :: DynFlags -> TyCon -> Bool
 legalFIResultTyCon dflags tc
-  | getUnique tc `elem`
-	[ byteArrayTyConKey, mutableByteArrayTyConKey ]  = False
-  | tc == unitTyCon = True
-  | otherwise	    = marshalableTyCon dflags tc
+  | isByteArrayLikeTyCon tc = False
+  | tc == unitTyCon         = True
+  | otherwise	            = marshalableTyCon dflags tc
 
 legalFEResultTyCon :: TyCon -> Bool
 legalFEResultTyCon tc
-  | getUnique tc `elem` 
-	[ byteArrayTyConKey, mutableByteArrayTyConKey ]  = False
-  | tc == unitTyCon = True
-  | otherwise       = boxedMarshalableTyCon tc
+  | isByteArrayLikeTyCon tc = False
+  | tc == unitTyCon         = True
+  | otherwise               = boxedMarshalableTyCon tc
 
 legalOutgoingTyCon :: DynFlags -> Safety -> TyCon -> Bool
 -- Checks validity of types going from Haskell -> external world
 legalOutgoingTyCon dflags safety tc
-  | playSafe safety && getUnique tc `elem` [byteArrayTyConKey, mutableByteArrayTyConKey]
+  | playSafe safety && isByteArrayLikeTyCon tc
   = False
   | otherwise
   = marshalableTyCon dflags tc
@@ -900,6 +962,10 @@ boxedMarshalableTyCon tc
 			 , byteArrayTyConKey, mutableByteArrayTyConKey
 			 , boolTyConKey
 			 ]
+
+isByteArrayLikeTyCon :: TyCon -> Bool
+isByteArrayLikeTyCon tc = 
+  getUnique tc `elem` [byteArrayTyConKey, mutableByteArrayTyConKey]
 \end{code}
 
 

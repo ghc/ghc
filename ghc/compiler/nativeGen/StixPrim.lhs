@@ -114,6 +114,10 @@ foreignCallCode lhs call@(CCall (CCallSpec ctarget cconv safety)) rhs
                         Int64Rep  -> Int64Rep
                         Word64Rep -> Word64Rep
                         other     -> IntRep
+
+-- a bit late to catch this here..
+foreignCallCode _ DNCall{} _
+ = panic "foreignCallCode: .NET interop not supported via NCG; compile with -fvia-C"
 \end{code}
 
 %************************************************************************
