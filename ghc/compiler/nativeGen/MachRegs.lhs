@@ -799,6 +799,9 @@ callClobberedRegs
 argRegs :: Int -> [Reg]
 
 argRegs 0 = []
+#if i386_TARGET_ARCH
+argRegs _ = panic "MachRegs.argRegs: doesn't work on I386"
+#else
 #if alpha_TARGET_ARCH
 argRegs 1 = freeMappedRegs [16, fReg 16]
 argRegs 2 = freeMappedRegs [16, 17, fReg 16, fReg 17]
@@ -807,9 +810,6 @@ argRegs 4 = freeMappedRegs [16, 17, 18, 19, fReg 16, fReg 17, fReg 18, fReg 19]
 argRegs 5 = freeMappedRegs [16, 17, 18, 19, 20, fReg 16, fReg 17, fReg 18, fReg 19, fReg 20]
 argRegs 6 = freeMappedRegs [16, 17, 18, 19, 20, 21, fReg 16, fReg 17, fReg 18, fReg 19, fReg 20, fReg 21]
 #endif {- alpha_TARGET_ARCH -}
-#if i386_TARGET_ARCH
-argRegs _ = panic "MachRegs.argRegs: doesn't work on I386"
-#endif {- i386_TARGET_ARCH -}
 #if sparc_TARGET_ARCH
 argRegs 1 = freeMappedRegs (map oReg [0])
 argRegs 2 = freeMappedRegs (map oReg [0,1])
@@ -819,6 +819,7 @@ argRegs 5 = freeMappedRegs (map oReg [0,1,2,3,4])
 argRegs 6 = freeMappedRegs (map oReg [0,1,2,3,4,5])
 #endif {- sparc_TARGET_ARCH -}
 argRegs _ = panic "MachRegs.argRegs: don't know about >6 arguments!"
+#endif {- i386_TARGET_ARCH -}
 
 -------------------------------
 
