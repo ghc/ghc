@@ -1,0 +1,6 @@
+_interface_ PprType 1
+_exports_
+PprType pprType;
+_declarations_
+1 pprType _:_ Type.Type -> Outputable.SDoc ;;
+
