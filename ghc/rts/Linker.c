@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.53 2001/07/22 03:28:25 chak Exp $
+ * $Id: Linker.c,v 1.54 2001/07/26 03:13:37 ken Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -514,6 +514,9 @@ lookupSymbol( char *lbl )
            sym = GetProcAddress(o_dll->instance, lbl);
            if (sym != NULL) return sym;
         }
+        return NULL;
+#       else
+        ASSERT(2+2 == 5);
         return NULL;
 #       endif
     } else {
