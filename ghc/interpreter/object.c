@@ -27,6 +27,7 @@ static int ocResolve_ELF     ( ObjectCode* oc, int verb );
 #endif
 
 static char* hackyAppend ( char* s1, char* s2 );
+static int   sortSymbols ( ObjectCode* oc );
 
 
 /* --------------------------------------------------------------------------
@@ -134,6 +135,7 @@ int ocGetNames ( ObjectCode* oc, int verb )
    return 0;
 #  endif
    if (verb) fprintf(stderr, "ocGetNames: done, status = %d\n", ret);
+   if (ret) ret = sortSymbols(oc);
    if (ret) oc->status = OBJECT_HAVENAMES;
    return ret;
 }
@@ -215,6 +217,58 @@ static int addSymbol ( ObjectCode* oc, char* nm, void* ad )
 }
 
 
+/* Reorder symbol table so that symbols are in alphabetical order.
+   Detects an error if, after sorting, any two symbols are the same,
+   since this would imply that the same symbol has been inserted more 
+   than once.  Returns 1 if success, 0 if error.
+*/
+static int sortSymbols ( ObjectCode* oc )
+{
+   static int incs[14] 
+      = { 1, 4, 13, 40, 121, 364, 1093, 3280,
+          9841, 29524, 88573, 265720, 797161, 2391484 };
+
+   int lo = 0;
+   int hi = oc->usedoTab-1;
+   int i, j, h, bigN, hp;
+   OSym v;
+
+   bigN = hi - lo + 1; if (bigN < 2) return 1;
+   hp = 0; while (incs[hp] < bigN) hp++; hp--;
+
+   for (; hp >= 0; hp--) {
+      h = incs[hp];
+      i = lo + h;
+      while (1) {
+         if (i > hi) break;
+         v = oc->oTab[i];
+         j = i;
+         while (strcmp(oc->oTab[j-h].nm, v.nm) > 0) {
+            oc->oTab[j] = oc->oTab[j-h];
+            j = j - h;
+            if (j <= (lo + h - 1)) break;
+         }
+         oc->oTab[j] = v;
+         i++;
+      }
+   }
+
+   for (i = 1; i < oc->usedoTab; i++) {
+      j = strcmp(oc->oTab[i-1].nm, oc->oTab[i].nm);
+      if (j  > 0) { 
+         oc->errMsg("sortSymbols: sorting failed"); 
+         return 0;
+      }
+      if (j == 0) {
+         oc->errMsg("sortSymbols: duplicate symbols in object file");
+         return 0;
+      }
+   }
+
+   return 1;
+}
+
+
 /* returns 1 if success, 0 if error */
 static int addSection ( ObjectCode* oc, void* start, void* end, OSectionKind sect )
 {
@@ -238,7 +292,7 @@ static int addSection ( ObjectCode* oc, void* start, void* end, OSectionKind sec
 
 void* ocLookupSym ( ObjectCode* oc, char* sym )
 {
-   int i;
+   int lo, hi, mid, cmp;
 
    assert(oc);
    if (oc->status != OBJECT_HAVENAMES 
@@ -247,6 +301,7 @@ void* ocLookupSym ( ObjectCode* oc, char* sym )
       return NULL;
    }
 
+   /* Originally used a sequential search; should still work
    for (i = 0; i < oc->usedoTab; i++) {
       if (0)
          fprintf ( stderr, 
@@ -255,7 +310,19 @@ void* ocLookupSym ( ObjectCode* oc, char* sym )
       if (0==strcmp(sym,oc->oTab[i].nm))
          return oc->oTab[i].ad;
    }
-   return NULL;
+   */
+
+   lo = 0; 
+   hi = oc->usedoTab-1;
+   while (1) {
+      /* Invariant: the unsearched area is oc->oTab[lo .. hi] inclusive. */
+      if (hi < lo) return NULL;
+      mid = (hi + lo) / 2;
+      cmp = strcmp(sym, oc->oTab[mid].nm);
+      if (cmp == 0) return oc->oTab[mid].ad;
+      if (cmp < 0) hi = mid-1;
+      if (cmp > 0) lo = mid+1;
+   }
 }
 
 
@@ -562,11 +629,12 @@ static int ocGetNames_ELF ( ObjectCode* oc, int verb )
             if (verb)
                fprintf(stderr, "addOTabName: %10p  %s %s\n",
                        ad, oc->objFileName, nm );
-            addSymbol ( oc, nm, ad );
+            if (!addSymbol ( oc, nm, ad )) return FALSE;
          }
 	 else fprintf(stderr, "skipping `%s'\n", strtab + stab[j].st_name );
       }
    }
+
    return TRUE;
 }
 
