@@ -1,0 +1,2 @@
+
+mod5.hs:2:9: Warning: `K1' is exported by `T(K1, K1)' and `T(K1, K1)'
