@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.30 $
- * $Date: 2000/04/12 09:43:10 $
+ * $Revision: 1.31 $
+ * $Date: 2000/05/10 16:51:52 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -628,11 +628,6 @@ Bool findFilesForModule (
       internal("moduleNameToFileNames: malloc failed(2)");
 
    augdPath[0] = 0;
-   strcat(augdPath, ".");
-   strcat(augdPath, PATHSEP_STR);
-
-   strcat(augdPath, hugsPath);
-   strcat(augdPath, PATHSEP_STR);
 
    if (combined) {
       strcat(augdPath, installDir);
@@ -646,6 +641,13 @@ Bool findFilesForModule (
 
    strcat(augdPath, installDir);
    strcat(augdPath, "lib");
+   strcat(augdPath, PATHSEP_STR);
+
+   /* these two were previously before the above `if' */
+   strcat(augdPath, ".");
+   strcat(augdPath, PATHSEP_STR);
+
+   strcat(augdPath, hugsPath);
    strcat(augdPath, PATHSEP_STR);
 
    /* fprintf ( stderr, "augdpath = `%s'\n", augdPath ); */
