@@ -22,9 +22,7 @@ import Prelude
 import System.IO.Unsafe
 
 #ifdef __GLASGOW_HASKELL__
-#ifdef mingw32_HOST_OS
 import Foreign.C.String
-#endif
 #endif
 
 -- | 'putTraceMsg' function outputs the trace message from IO monad.
