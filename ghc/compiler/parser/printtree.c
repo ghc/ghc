@@ -502,6 +502,7 @@ prbind(b)
 			  /* pid(gibindfile(b)); */
 			  pid(gibindimod(b));
 			  printf("#%lu\t",gibindqual(b)); /* 1 -- qualified */
+			  printf("#%lu\t",gibindsource(b)); /* 1 -- from source */
 			  pmaybe(pid, gibindas(b));
 			  pmaybe(pconstr, gibindspec(b));
 			  /* plist(pentid,giebindexp(b)); ??? */
@@ -692,7 +693,7 @@ ppbinding(p)
 			  break;
 	case pgdexp	: 
 			  PUTTAG('&');
-			  ptree(gpguard(p));
+			  plist(ptree, gpguard(p)); /* Experimental: pattern guards */
 			  ptree(gpexp(p));
 			  break;
 	default	        :
