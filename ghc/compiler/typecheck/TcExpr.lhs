@@ -798,12 +798,15 @@ tcId name	-- Look up the Id and instantiate its type
       Brack use_lvl ps_var lie_var
 	| use_lvl > bind_lvl && not (isExternalName name)
 	-> 	-- E.g. \x -> [| h x |]
-			-- We must behave as if the reference to x was
-			--	h $(lift x)	
-			-- We use 'x' itself as the splice proxy, used by 
-			-- the desugarer to stitch it all back together
-			-- NB: isExernalName is true of top level things, 
-			-- and false of nested bindings
+		-- We must behave as if the reference to x was
+		--	h $(lift x)	
+		-- We use 'x' itself as the splice proxy, used by 
+		-- the desugarer to stitch it all back together.
+		-- If 'x' occurs many times we may get many identical
+		-- bindings of the same splice proxy, but that doesn't
+		-- matter, although it's a mite untidy.
+		-- NB: isExernalName is true of top level things, 
+		-- and false of nested bindings
 	
 	let
 	    id_ty = idType id

@@ -19,7 +19,7 @@ module TcSimplify (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TcUnify( unifyTauTy )
-import TcEnv	-- temp
+import TcEnv		-- temp
 import HsSyn		( MonoBinds(..), HsExpr(..), andMonoBinds, andMonoBindList )
 import TcHsSyn		( TcExpr, TcId,
 			  TcMonoBinds, TcDictBinds
@@ -1609,8 +1609,8 @@ It's OK: the final zonking stage should zap y to (), which is fine.
 \begin{code}
 tcSimplifyTop :: [Inst] -> TcM TcDictBinds
 tcSimplifyTop wanteds
-  = getLclEnvElts	`thenM` \ lcl_env ->
-    traceTc (text "tcSimplifyTop" <+> ppr lcl_env) 	`thenM_`
+  = getLclEnv							`thenM` \ lcl_env ->
+    traceTc (text "tcSimplifyTop" <+> ppr (lclEnvElts lcl_env))	`thenM_`
     simpleReduceLoop (text "tcSimplTop") reduceMe wanteds	`thenM` \ (frees, binds, irreds) ->
     ASSERT( null frees )
 

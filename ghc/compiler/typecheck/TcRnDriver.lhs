@@ -261,8 +261,11 @@ tcRnStmt :: HscEnv -> PersistentCompilerState
 	 -> RdrNameStmt
 	 -> IO (PersistentCompilerState, 
 		Maybe (InteractiveContext, [Name], TypecheckedHsExpr))
-		-- The returned [Id] is the same as the input except for
+		-- The returned [Name] is the same as the input except for
 		-- ExprStmt, in which case the returned [Name] is [itName]
+		--
+		-- The returned TypecheckedHsExpr is of type IO [ () ],
+		-- a list of the bound values, coerced to ().
 
 tcRnStmt hsc_env pcs ictxt rdr_stmt
   = initTc hsc_env pcs iNTERACTIVE $ 
@@ -602,16 +605,20 @@ tcRnSrcDecls ds
 	-- Type check the decls up to, but not including, the first splice
 	(tcg_env, src_fvs1) <- tcRnGroup first_group ;
 
+	-- Bale out if errors; for example, error recovery when checking
+	-- the RHS of 'main' can mean that 'main' is not in the envt for 
+	-- the subsequent checkMain test
+	failIfErrsM ;
+
 	-- If there is no splice, we're done
-	case group_tail of
-	   Nothing -> return (tcg_env, src_fvs1)
-	   Just (SpliceDecl splice_expr splice_loc, rest_ds) -> do {
-
-	setGblEnv tcg_env $ do {
-
+	case group_tail of {
+	   Nothing -> return (tcg_env, src_fvs1) ;
+	   Just (SpliceDecl splice_expr splice_loc, rest_ds) -> 
 #ifndef GHCI
 	failWithTc (text "Can't do a top-level splice; need a bootstrapped compiler")
 #else
+	setGblEnv tcg_env $ do {
+
 	-- Rename the splice expression, and get its supporting decls
 	(rn_splice_expr, fvs) <- initRn SourceMode $
 				 addSrcLoc splice_loc $
@@ -626,9 +633,9 @@ tcRnSrcDecls ds
 	(tcg_env, src_fvs2) <- tcRnSrcDecls (spliced_decls ++ rest_ds) ;
 
 	return (tcg_env, src_fvs1 `plusFV` src_fvs2)
-    }
+    }}
 #endif /* GHCI */
-    }}}
+    }}
 \end{code}
 
 
@@ -695,15 +702,9 @@ rnTopSrcDecls group
 ------------------------------------------------
 tcTopSrcDecls :: HsGroup Name -> TcM TcGblEnv
 tcTopSrcDecls rn_decls
- = fixM (\ unf_env -> do {	
-	-- Loop back the final environment, including the fully zonked
-	-- versions of bindings from this module.  In the presence of mutual
-	-- recursion, interface type signatures may mention variables defined
-	-- in this module, which is why the knot is so big
-
-			-- Do the main work
+ = do {			-- Do the main work
 	((tcg_env, lcl_env, binds, rules, fords), lie) <- getLIE (
-		tc_src_decls unf_env rn_decls
+		tc_src_decls rn_decls
 	    ) ;
 
 	     -- tcSimplifyTop deals with constant or ambiguous InstIds.  
@@ -717,24 +718,25 @@ tcTopSrcDecls rn_decls
 		      setLclTypeEnv lcl_env $
 		      tcSimplifyTop lie ;
 		-- The setGblEnv exposes the instances to tcSimplifyTop
-		-- The steLclTypeEnv exposes the local Ids, so that
+		-- The setLclTypeEnv exposes the local Ids, so that
 		-- we get better error messages (monomorphism restriction)
 
 	    -- Backsubstitution.  This must be done last.
 	    -- Even tcSimplifyTop may do some unification.
         traceTc (text "Tc9") ;
-	(ids, binds', fords', rules') <- zonkTopDecls (binds `andMonoBinds` inst_binds)
-						      rules fords ;
+	(bind_ids, binds', fords', rules') <- zonkTopDecls (binds `andMonoBinds` inst_binds)
+							   rules fords ;
 
-	let { tcg_env' = tcg_env { tcg_type_env = extendTypeEnvWithIds (tcg_type_env tcg_env) ids,
+	let { tcg_env' = tcg_env { tcg_type_env = extendTypeEnvWithIds (tcg_type_env tcg_env) 
+								       bind_ids,
 				   tcg_binds = tcg_binds tcg_env `andMonoBinds` binds',
 				   tcg_rules = tcg_rules tcg_env ++ rules',
 				   tcg_fords = tcg_fords tcg_env ++ fords' } } ;
 	
 	return tcg_env'	
-    })
+    }
 
-tc_src_decls unf_env 
+tc_src_decls
 	(HsGroup { hs_tyclds = tycl_decls, 
 		   hs_instds = inst_decls,
 		   hs_fords  = foreign_decls,
@@ -743,7 +745,7 @@ tc_src_decls unf_env
 		   hs_valds  = val_binds })
  = do {		-- Type-check the type and class decls, and all imported decls
         traceTc (text "Tc2") ;
-	tcg_env <- tcTyClDecls unf_env tycl_decls ;
+	tcg_env <- tcTyClDecls tycl_decls ;
 	setGblEnv tcg_env	$ do {
 
 		-- Source-language instances, including derivings,
@@ -808,8 +810,7 @@ tc_src_decls unf_env
 \end{code}
 
 \begin{code}
-tcTyClDecls :: RecTcGblEnv
-	    -> [RenamedTyClDecl]
+tcTyClDecls :: [RenamedTyClDecl]
 	    -> TcM TcGblEnv
 
 -- tcTyClDecls deals with 
@@ -820,11 +821,7 @@ tcTyClDecls :: RecTcGblEnv
 -- persistent compiler state to reflect the things imported from
 -- other modules
 
-tcTyClDecls unf_env tycl_decls
-  -- (unf_env :: RecTcGblEnv) is used for type-checking interface pragmas
-  -- which is done lazily [ie failure just drops the pragma
-  -- without having any global-failure effect].
-
+tcTyClDecls tycl_decls
   = checkNoErrs $
 	-- tcTyAndClassDecls recovers internally, but if anything gave rise to
 	-- an error we'd better stop now, to avoid a cascade
@@ -832,18 +829,12 @@ tcTyClDecls unf_env tycl_decls
     traceTc (text "TyCl1")		`thenM_`
     tcTyAndClassDecls tycl_decls	`thenM` \ tycl_things ->
     tcExtendGlobalEnv tycl_things	$
-    
-	-- Interface type signatures
-	-- We tie a knot so that the Ids read out of interfaces are in scope
-	--   when we read their pragmas.
-	-- What we rely on is that pragmas are typechecked lazily; if
-	--   any type errors are found (ie there's an inconsistency)
-	--   we silently discard the pragma
-    traceTc (text "TyCl2")			`thenM_`
-    tcInterfaceSigs unf_env tycl_decls		`thenM` \ sig_ids ->
-    tcExtendGlobalValEnv sig_ids		$
-    
-    getGblEnv		-- Return the TcLocals environment
+
+    traceTc (text "TyCl2")		`thenM_`
+    tcInterfaceSigs tycl_decls		`thenM` \ tcg_env ->
+	-- Returns the extended environment
+
+    returnM tcg_env
 \end{code}    
 
 
@@ -943,7 +934,7 @@ typecheckIfaceDecls (HsGroup { hs_tyclds = tycl_decls,
 			       hs_instds = inst_decls,
 			       hs_ruleds = rule_decls })
  = do {		-- Typecheck the type, class, and interface-sig decls
-	tcg_env <- fixM (\ unf_env -> tcTyClDecls unf_env tycl_decls) ;
+	tcg_env <- tcTyClDecls tycl_decls ;
 	setGblEnv tcg_env		$ do {
 	
     	-- Typecheck the instance decls, and rules

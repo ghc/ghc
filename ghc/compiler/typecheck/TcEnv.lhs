@@ -22,8 +22,7 @@ module TcEnv(
 	tcExtendLocalValEnv, tcExtendLocalValEnv2, 
 	tcLookup, tcLookupLocalIds, tcLookup_maybe, 
 	tcLookupId, tcLookupIdLvl, 
-	getLclEnvElts, getInLocalScope,
-	findGlobals,
+	lclEnvElts, getInLocalScope, findGlobals, 
 
 	-- Instance environment
 	tcExtendLocalInstEnv, tcExtendInstEnv, 
@@ -355,9 +354,8 @@ tcLookupLocalIds ns
 		Just (ATcId id lvl1) -> ASSERT( lvl == lvl1 ) id
 		other		     -> pprPanic "tcLookupLocalIds" (ppr name)
 
-getLclEnvElts :: TcM [TcTyThing]
-getLclEnvElts = getLclEnv	`thenM` \ env ->
-		return (nameEnvElts (tcl_env env))
+lclEnvElts :: TcLclEnv -> [TcTyThing]
+lclEnvElts env = nameEnvElts (tcl_env env)
 
 getInLocalScope :: TcM (Name -> Bool)
   -- Ids only
@@ -443,8 +441,8 @@ findGlobals :: TcTyVarSet
              -> TcM (TidyEnv, [SDoc])
 
 findGlobals tvs tidy_env
-  = getLclEnvElts	`thenM` \ lcl_env ->
-    go tidy_env [] lcl_env
+  = getLclEnv		`thenM` \ lcl_env ->
+    go tidy_env [] (lclEnvElts lcl_env)
   where
     go tidy_env acc [] = returnM (tidy_env, acc)
     go tidy_env acc (thing : things)

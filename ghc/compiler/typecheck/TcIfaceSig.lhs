@@ -55,15 +55,36 @@ As always, we do not have to worry about user-pragmas in interface
 signatures.
 
 \begin{code}
-tcInterfaceSigs :: RecTcGblEnv		-- Envt to use when checking unfoldings
-		-> [RenamedTyClDecl]	-- Ignore non-sig-decls in these decls
-		-> TcM [Id]
+tcInterfaceSigs :: [RenamedTyClDecl]	-- Ignore non-sig-decls in these decls
+		-> TcM TcGblEnv
 		
+tcInterfaceSigs decls = fixM (tc_interface_sigs decls)
+	-- We tie a knot so that the Ids read out of interfaces are in scope
+	--   when we read their pragmas.
+	-- What we rely on is that pragmas are typechecked lazily; if
+	--   any type errors are found (ie there's an inconsistency)
+	--   we silently discard the pragma
+	--
+	-- We used to have a much bigger loop (in TcRnDriver), so that the 
+	-- interface pragmas could mention variables bound in this module 
+	-- (by mutual recn), but
+	--     (a) the knot is tiresomely big, and 
+	--     (b) it black-holes when we have Template Haskell
+	--
+	-- For (b) consider: f = $(...h....)
+	-- where h is imported, and calls f via an hi-boot file.  
+	-- This is bad!  But it is not seen as a staging error, because h
+	-- is indeed imported.  We don't want the type-checker to black-hole 
+	-- when simplifying and compiling the splice!
+	--
+	-- Simple solution: discard any unfolding that mentions a variable
+	-- bound in this module (and hence not yet processed).
+	-- The discarding happens when forkM finds a type error.
 
-tcInterfaceSigs unf_env decls
-  = sequenceM [ do_one name ty id_infos src_loc
-	      | IfaceSig {tcdName = name, tcdType = ty, 
-			  tcdIdInfo = id_infos, tcdLoc =src_loc} <- decls]
+tc_interface_sigs decls unf_env 
+  = sequenceM [do_one d | d@(IfaceSig {}) <- decls]	`thenM` \ sig_ids ->
+    tcExtendGlobalValEnv sig_ids getGblEnv
+	-- Return the extended environment
   where
     in_scope_vars = typeEnvIds (tcg_type_env unf_env)
 	-- When we have hi-boot files, an unfolding might refer to
@@ -71,12 +92,13 @@ tcInterfaceSigs unf_env decls
 	-- suitable in-scope set.  This thunk will only be poked
 	-- if -dcore-lint is on.
 
-    do_one name ty id_infos src_loc
-      = addSrcLoc src_loc 		 		$	
+    do_one IfaceSig {tcdName   = name,     tcdType = ty, 
+		     tcdIdInfo = id_infos, tcdLoc  = src_loc}
+      = addSrcLoc src_loc 		 	$	
 	addErrCtxt (ifaceSigCtxt name)		$
-	tcIfaceType ty					`thenM` \ sigma_ty ->
+	tcIfaceType ty				`thenM` \ sigma_ty ->
 	tcIdInfo unf_env in_scope_vars name 
-		 sigma_ty id_infos			`thenM` \ id_info ->
+		 sigma_ty id_infos		`thenM` \ id_info ->
 	returnM (mkVanillaGlobal name sigma_ty id_info)
 \end{code}
 

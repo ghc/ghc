@@ -35,6 +35,7 @@ import TysWiredIn	( mkListTy )
 import DsMeta		( exprTyConName, declTyConName, decTyConName, qTyConName )
 import ErrUtils (Message)
 import Outputable
+import Panic		( showException )
 import GHC.Base		( unsafeCoerce# )	-- Should have a better home in the module hierarchy
 import Monad (liftM)
 \end{code}
@@ -128,17 +129,21 @@ tcSpliceExpr name expr res_ty
 -- inner escape before dealing with the outer one
 
 tcTopSplice expr res_ty
-  = tcMetaTy exprTyConName		`thenM` \ meta_exp_ty ->
-    setStage topSpliceStage (
-	getLIE (tcMonoExpr expr meta_exp_ty)
-    )					`thenM` \ (expr', lie) ->
+  = checkNoErrs (
+	-- checkNoErrs: must not try to run the thing
+	--	        if the type checker fails!
+
+	tcMetaTy exprTyConName		`thenM` \ meta_exp_ty ->
+	setStage topSpliceStage (
+	  getLIE (tcMonoExpr expr meta_exp_ty)
+        )				`thenM` \ (expr', lie) ->
 
 	-- Solve the constraints
-    tcSimplifyTop lie			`thenM` \ const_binds ->
-    let 
-	q_expr = mkHsLet const_binds expr'
-    in
-    zonkTopExpr q_expr			`thenM` \ zonked_q_expr ->
+	tcSimplifyTop lie		`thenM` \ const_binds ->
+
+	-- Wrap the bindings around it and zonk
+	zonkTopExpr (mkHsLet const_binds expr')
+    )					`thenM` \ zonked_q_expr ->
 
 	-- Run the expression
     traceTc (text "About to run" <+> ppr zonked_q_expr) 	`thenM_`
@@ -216,9 +221,6 @@ runMetaD :: TypecheckedHsExpr 	-- Of type Q [Dec]
 	 -> TcM [Meta.Dec]	-- Of type [Dec]
 runMetaD e = runMeta e
 
-tcRunQ :: Meta.Q a -> TcM a
-tcRunQ thing = ioToTcRn (Meta.runQ thing)
-
 runMeta :: TypecheckedHsExpr 	-- Of type X
 	-> TcM t		-- Of type t
 runMeta expr
@@ -238,16 +240,20 @@ runMeta expr
 	type_env = tcg_type_env tcg_env
 	rdr_env  = tcg_rdr_env tcg_env
     in
-    ioToTcRn (HscMain.compileExpr 
-		hsc_env pcs this_mod 
-	        rdr_env type_env expr)	`thenM` \ hval ->
-
-    tryM (tcRunQ (unsafeCoerce# hval))	`thenM` \ either_tval ->
+	-- Wrap the compile-and-run in an exception-catcher
+	-- Compiling might fail if linking fails
+	-- Running might fail if it throws an exception
+    tryM (ioToTcRn (do
+	hval <- HscMain.compileExpr 
+		      hsc_env pcs this_mod 
+	              rdr_env type_env expr
+        Meta.runQ (unsafeCoerce# hval)		-- Coerce it to Q t, and run it
+    ))					`thenM` \ either_tval ->
 
     case either_tval of
-	  Left exn -> failWithTc (vcat [text "Exception when running compile-time code:", 
+	  Left exn -> failWithTc (vcat [text "Exception when trying to run compile-time code:", 
 				        nest 4 (vcat [text "Code:" <+> ppr expr,
-						      text ("Exn: " ++ show exn)])])
+						      text ("Exn: " ++ Panic.showException exn)])])
 	  Right v  -> returnM v
 \end{code}
 
