@@ -552,8 +552,9 @@
 	  <indexterm><primary><literal>extra_ld_opts</literal></primary>
 	    <secondary>package specification</secondary></indexterm>
 	  <listitem>
-	    <para>Extra arguments to be added to the gcc command line
-	    (for linking) when this package is being used.</para>
+	    <para>Extra arguments to be added to the
+	    <command>gcc</command> command line (for linking) when
+	    this package is being used.</para>
 	  </listitem>
 	</varlistentry>
 	
