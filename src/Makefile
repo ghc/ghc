@@ -3,7 +3,7 @@ include $(TOP)/mk/boilerplate.mk
 
 INSTALLING=1
 
-SRC_HC_OPTS += -package data -package text -package util -fglasgow-exts -cpp
+SRC_HC_OPTS += -package data -package text -package util -package net -fglasgow-exts -cpp
 HS_PROG = haddock.bin
 
 HsParser_HC_OPTS      += -Onot

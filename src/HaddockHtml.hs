@@ -20,6 +20,7 @@ import FiniteMap
 import List 	( sortBy )
 import Char	( toUpper, toLower, isAlpha, ord )
 import Monad	( when, unless )
+import URI	( escapeString, unreserved )
 
 import Html
 import qualified Html
@@ -290,10 +291,9 @@ ppHtmlIndex odir doctitle ifaces = do
   indexElt (nm, entries) = 
      td << ppHsName nm
      <-> td << (hsep [ if defining then
-			 bold << anchor ! [href (linkId (Module mdl) (Just nm))]
-			   << toHtml mdl
+			 bold << linkId (Module mdl) (Just nm) << toHtml mdl
 		       else
-			 anchor ! [href (linkId (Module mdl) Nothing)] << toHtml mdl
+			 linkId (Module mdl) Nothing << toHtml mdl
 	             | (Module mdl, defining) <- entries ])
 
   initialChars = [ 'A'..'Z' ] ++ ":!#$%&*+./<=>?@\\^|-~"
@@ -382,7 +382,7 @@ ppModuleContents exports
     | lev <= n  = ( [], items )
     | otherwise = ( html:secs, rest2 )
     where
-	html = (dterm << anchor ! [href ('#':id0)] << docToHtml doc)
+	html = (dterm << linkedAnchor "" id0 << docToHtml doc)
 		 +++ mk_subsections ssecs
 	(ssecs, rest1) = process lev rest
 	(secs,  rest2) = process n   rest1
@@ -404,7 +404,7 @@ numberSectionHeadings exports = go 1 exports
 
 processExport :: Bool -> InstMaps -> ExportItem -> HtmlTable
 processExport _ _ (ExportGroup lev id0 doc)
-  = ppDocGroup lev (anchor ! [name id0] << docToHtml doc)
+  = ppDocGroup lev (namedAnchor id0 << docToHtml doc)
 processExport summary inst_maps (ExportDecl x decl)
   = doDecl summary inst_maps x decl
 processExport _       _ (ExportDoc doc)
@@ -812,14 +812,14 @@ ppHsAType t = parens $ ppHsType t
 -- Names
 
 linkTarget :: HsName -> Html
-linkTarget nm = anchor ! [name (hsNameStr nm)] << toHtml ""
+linkTarget nm = namedAnchor (hsNameStr nm) << toHtml ""
 
 ppHsQName :: HsQName -> Html
 ppHsQName (UnQual str) = ppHsName str
 ppHsQName n@(Qual mdl str)
   | n == unit_con_name	= ppHsName str
   | isSpecial str	= ppHsName str
-  | otherwise		= anchor ! [href (linkId mdl (Just str))] << ppHsName str
+  | otherwise		= linkId mdl (Just str) << ppHsName str
 
 isSpecial :: HsName -> Bool
 isSpecial (HsTyClsName id0) | HsSpecial _ <- id0 = True
@@ -839,7 +839,7 @@ ppHsIdentifier (HsSymbol str)  =  str
 ppHsIdentifier (HsSpecial str) =  str
 
 ppHsBinder :: Bool -> HsName -> Html
-ppHsBinder True nm = anchor ! [href ('#':hsNameStr nm)] << ppHsBinder' nm
+ppHsBinder True nm = linkedAnchor "" (hsNameStr nm) << ppHsBinder' nm
 ppHsBinder False nm = linkTarget nm +++ bold << ppHsBinder' nm
 
 ppHsBinder' :: HsName -> Html
@@ -851,14 +851,14 @@ ppHsBindIdent (HsIdent str)   =  toHtml str
 ppHsBindIdent (HsSymbol str)  =  parens (toHtml str)
 ppHsBindIdent (HsSpecial str) =  toHtml str
 
-linkId :: Module -> Maybe HsName -> String
-linkId (Module mdl) mbStr = case mbStr of
-                               Nothing  -> mhf
-                               Just str -> mhf ++ '#': hsNameStr str
-  where mhf = moduleHtmlFile fp mdl
-        fp = case lookupFM html_xrefs (Module mdl) of
-		Nothing  -> ""
-		Just fp0 -> fp0 
+linkId :: Module -> Maybe HsName -> Html -> Html
+linkId (Module mdl) mbStr = linkedAnchor (moduleHtmlFile fp mdl) frag
+  where frag = case mbStr of
+                  Nothing  -> ""
+                  Just str -> hsNameStr str
+        fp   = case lookupFM html_xrefs (Module mdl) of
+		  Nothing  -> ""
+		  Just fp0 -> fp0 
 
 ppHsModule :: String -> Html
 ppHsModule mdl = anchor ! [href ((moduleHtmlFile fp modname) ++ ref)] << toHtml mdl
@@ -884,7 +884,7 @@ htmlMarkup = Markup {
   markupOrderedList   = olist . concatHtml . map (li <<),
   markupCodeBlock     = pre,
   markupURL	      = \url -> anchor ! [href url] << toHtml url,
-  markupAName	      = \aname -> anchor ! [name aname] << toHtml ""
+  markupAName	      = \aname -> namedAnchor aname << toHtml ""
   }
 
 -- If the doc is a single paragraph, don't surround it with <P> (this causes
@@ -1012,3 +1012,14 @@ darrow = toHtml "=>"
 s8, s15 :: HtmlTable
 s8  = tda [ theclass "s8" ]  << noHtml
 s15 = tda [ theclass "s15" ] << noHtml
+
+namedAnchor :: String -> Html -> Html
+namedAnchor n = anchor ! [name (escapeStr n)]
+
+linkedAnchor :: String -> String -> Html -> Html
+linkedAnchor ref frag = anchor ! [href hr]
+   where hr | null frag = ref
+            | otherwise = ref ++ '#': escapeStr frag
+
+escapeStr :: String -> String
+escapeStr = flip escapeString unreserved
