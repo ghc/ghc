@@ -24,21 +24,14 @@
 * derived instance support isn't quite right (doing it properly is 
   hard, though).
 
-* Referring to something that has a defn but no typesignature doesn't elicit
-  a useful message.
+* Referring to something that has a defn but no type signature doesn't
+  elicit a useful message.
 
 * Trying to re-export something from another package doesn't work (unless
   it's the whole module).  We should give a warning or something.
 
 -----------------------------------------------------------------------------
 -- features
-
-* quiet warnings for missing things in modules which aren't included
-  in the run (i.e. stop complaining about Prelude stuff by default).
-
-* merge the indices, adding annotations to distinguish types/classes/functions/
-  constructors as necessary.  Remove the emboldening of original entities in
-  the index.
 
 * Generating a single index from many .haddock files should be possible.
 
