@@ -50,7 +50,8 @@
         been removed.</para>
       </listitem>
       <listitem>
-	<para>Parallel list comprehensions added.</para>
+	<para>Parallel list comprehensions added.  See <xref
+	linkend="parallel-list-comprehensions">.</para>
       </listitem>
       <listitem>
 	<para>Profiling: please use 
@@ -118,13 +119,27 @@
 	linkend="sec-MVars">).</para>
       </listitem>
       <listitem>
-	<para>The <literal>Integer</literal> type now has an instance
-        of <literal>Bits</literal> (<xref linkend="sec-Bits">).</para>
+	<para>The <literal>Int</literal> and
+        <literal>Integer</literal> types now have instances of
+        <literal>Bits</literal> (<xref linkend="sec-Bits">).</para>
       </listitem>
       <listitem>
 	<para>Package <literal>hssource</literal> has been added.  It
 	contains a Haskell 98 abstract syntax, parser, lexer and pretty
 	printer.  No documentation yet.</para>
+      </listitem>
+      <listitem>
+	<para>The methods <literal>fromInt</literal> and
+	<literal>toInt</literal>, which used to be in class
+	<literal>Num</literal> but exported from module
+	<literal>Int</literal>, are no longer in class
+	<literal>Num</literal>.  They're still available from module
+	<literal>Int</literal>, however.</para> 
+
+	<para>In most cases, there should be no benefit from using
+	<literal>fromInt</literal> instead of
+	<literal>fromIntegral</literal>, which is specialised for all
+	integral types.</para>
       </listitem>
     </itemizedlist>
   </sect2>
