@@ -830,8 +830,8 @@ install-docs:: $(foreach i,$(XMLDocWays),$(INSTALL_XML_DOC)$(patsubst %.html-no-
 			$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.html-no-chunks/.html/` $(datadir); \
 		fi; \
 		if [ $$i = "html-no-chunks" ]; then \
-			echo $(CP) $(FPTOOLS_CSS) $(datadir); \
-			$(CP) $(FPTOOLS_CSS) $(datadir); \
+			echo $(CP) $(FPTOOLS_CSS_ABS) $(datadir); \
+			$(CP) $(FPTOOLS_CSS_ABS) $(datadir); \
 		fi \
 	done
 endif
@@ -1021,7 +1021,7 @@ pdf            :: $(XML_PDF)
 CLEAN_FILES += $(XML_HTML_NO_CHUNKS) $(XML_FO) $(XML_DVI) $(XML_PS) $(XML_PDF)
 
 extraclean ::
-	$(RM) -rf $(XML_DOC).out $(notdir $(FPTOOLS_CSS)) $(addsuffix -html,$(basename $(XML_DOC))) $(addsuffix -htmlhelp,$(basename $(XML_DOC)))
+	$(RM) -rf $(XML_DOC).out $(FPTOOLS_CSS) $(basename $(XML_DOC))-html $(basename $(XML_DOC))-htmlhelp
 
 validate ::
 	$(XMLLINT) --valid --noout $(XMLLINT_OPTS) $(XML_DOC).xml

@@ -352,5 +352,9 @@ SRC_DIST_NAME=$(ProjectNameShort)-$(ProjectVersion)
 DLL_PEN = $(FPTOOLS_TOP)/dll
 
 #------------------------------------------------------------------
+#
+# Stylesheet for HTML generated from DocBook XML
+#
 
-FPTOOLS_CSS = $(FPTOOLS_TOP)/mk/fptools.css
+FPTOOLS_CSS     = fptools.css
+FPTOOLS_CSS_ABS = $(FPTOOLS_TOP)/mk/$(FPTOOLS_CSS)

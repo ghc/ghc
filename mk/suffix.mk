@@ -245,33 +245,33 @@ endif
 
 %.html : %.xml
 	$(XSLTPROC) --output $@ \
-	            --stringparam toc.section.depth 3 \
-	            --stringparam section.autolabel 1 \
-	            --stringparam section.label.includes.component.label 1 \
-	            --stringparam html.stylesheet fptools.css \
-	            $(XSLTPROC_OPTS) $(DIR_DOCBOOK_XSL)/html/docbook.xsl $<
-	cp $(FPTOOLS_CSS) .
+		    --stringparam html.stylesheet $(FPTOOLS_CSS) \
+		    $(XSLTPROC_LABEL_OPTS) $(XSLTPROC_OPTS) \
+		    $(DIR_DOCBOOK_XSL)/html/docbook.xsl $<
+	cp $(FPTOOLS_CSS_ABS) .
 
 %-html/index.html : %.xml
 	$(RM) -rf $(dir $@)
 	$(XSLTPROC) --stringparam base.dir $(dir $@) \
-	            --stringparam use.id.as.filename 1 \
-	            --stringparam toc.section.depth 3 \
-	            --stringparam section.autolabel 1 \
-	            --stringparam section.label.includes.component.label 1 \
-	            --stringparam html.stylesheet fptools.css \
-	            $(XSLTPROC_OPTS) $(DIR_DOCBOOK_XSL)/html/chunk.xsl $<
-	cp $(FPTOOLS_CSS) $(dir $@)
+		    --stringparam use.id.as.filename 1 \
+		    --stringparam html.stylesheet $(FPTOOLS_CSS) \
+		    $(XSLTPROC_LABEL_OPTS) $(XSLTPROC_OPTS) \
+		    $(DIR_DOCBOOK_XSL)/html/chunk.xsl $<
+	cp $(FPTOOLS_CSS_ABS) $(dir $@)
 
+# Note: Numeric labeling seems to be uncommon for HTML Help
 %-htmlhelp/index.html : %.xml
 	$(RM) -rf $(dir $@)
 	$(XSLTPROC) --stringparam base.dir $(dir $@) \
-	            --stringparam manifest.in.base.dir 1 \
-	            $(XSLTPROC_OPTS) $(DIR_DOCBOOK_XSL)/htmlhelp/htmlhelp.xsl $<
+		    --stringparam manifest.in.base.dir 1 \
+		    --stringparam htmlhelp.chm $(basename $<).chm \
+		    $(XSLTPROC_OPTS) \
+		    $(DIR_DOCBOOK_XSL)/htmlhelp/htmlhelp.xsl $<
 
 %.fo : %.xml
 	$(XSLTPROC) --output $@ \
-	            $(XSLTPROC_OPTS) $(DIR_DOCBOOK_XSL)/fo/docbook.xsl $<
+		    $(XSLTPROC_LABEL_OPTS) $(XSLTPROC_OPTS) \
+		    $(DIR_DOCBOOK_XSL)/fo/docbook.xsl $<
 
 ifeq "$(FOP)" ""
 ifneq "$(PDFXMLTEX)" ""
