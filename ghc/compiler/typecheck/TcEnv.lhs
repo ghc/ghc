@@ -30,28 +30,31 @@ import HsTypes	( HsTyVar(..) )
 import Id	( SYN_IE(Id), GenId, idType, mkUserLocal, mkUserId, replaceIdInfo, getIdInfo )
 import PragmaInfo ( PragmaInfo(..) )
 import TcHsSyn	( SYN_IE(TcIdBndr), TcIdOcc(..) )
-import TcKind	( TcKind, newKindVars, newKindVar, tcDefaultKind, kindToTcKind )
+import TcKind	( TcKind, newKindVars, newKindVar, tcDefaultKind, kindToTcKind, Kind )
 import TcType	( SYN_IE(TcType), TcMaybe, SYN_IE(TcTyVar), SYN_IE(TcTyVarSet),
 		  newTyVarTys, tcInstTyVars, zonkTcTyVars
 		)
-import TyVar	( unionTyVarSets, emptyTyVarSet )
+import TyVar	( unionTyVarSets, emptyTyVarSet, tyVarSetToList, SYN_IE(TyVar) )
+import PprType	( GenTyVar )
 import Type	( tyVarsOfTypes, splitForAllTy )
-import TyCon	( TyCon, tyConKind, synTyConArity )
+import TyCon	( TyCon, tyConKind, synTyConArity, SYN_IE(Arity) )
 import Class	( SYN_IE(Class), GenClass, classSig )
 
 import TcMonad
 
 import IdInfo		( noIdInfo )
 import Name		( Name, OccName(..), getSrcLoc, occNameString,
-			  maybeWiredInTyConName, maybeWiredInIdName, pprSym
+			  maybeWiredInTyConName, maybeWiredInIdName,
+			  NamedThing(..)
 			)
 import PprStyle
 import Pretty
-import Unique		( pprUnique10{-, pprUnique ToDo:rm-} )
+import Unique		( pprUnique10{-, pprUnique ToDo:rm-}, Unique )
 import UniqFM	     
 import Util		( zipEqual, zipWithEqual, zipWith3Equal, zipLazy,
-			  panic, pprPanic{-, pprTrace ToDo:rm-}
+			  panic, pprPanic, pprTrace
 			)
+import Outputable
 \end{code}
 
 Data type declarations
@@ -158,8 +161,8 @@ tcLookupTyConByKey uniq
 
 tcLookupClass name
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
---  pprTrace "tcLookupClass:" (ppCat [ppStr "Uniq:", pprUnique10 (uniqueOf name), ppStr "; avail:", ppCat (map (pprUnique10 . fst) (ufmToList ce))]) $
---  pprTrace "tcLookupClass:" (ppCat [ppStr "Uniq:", pprUnique (uniqueOf name), ppStr "; avail:", ppCat (map (pprUnique . fst) (ufmToList ce))]) $
+--  pprTrace "tcLookupClass:" (hsep [text "Uniq:", pprUnique10 (uniqueOf name), text "; avail:", hsep (map (pprUnique10 . fst) (ufmToList ce))]) $
+--  pprTrace "tcLookupClass:" (hsep [text "Uniq:", pprUnique (uniqueOf name), text "; avail:", hsep (map (pprUnique . fst) (ufmToList ce))]) $
     case lookupUFM ce name of
 	Just stuff -> returnTc stuff
 	Nothing	   -> 	-- Could be that he's using a type constructor as a class
@@ -218,7 +221,7 @@ tcGetGlobalTyVars
   = tcGetEnv 				`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     tcReadMutVar gtvs			`thenNF_Tc` \ global_tvs ->
     zonkTcTyVars global_tvs		`thenNF_Tc` \ global_tvs' ->
-    tcWriteMutVar gtvs global_tvs'	`thenNF_Tc_`
+    tcWriteMutVar gtvs global_tvs'	`thenNF_Tc_` 
     returnNF_Tc global_tvs'
 
 tcExtendGlobalTyVars extra_global_tvs scope
@@ -334,8 +337,8 @@ newLocalIds names tys
 
 \begin{code}
 classAsTyConErr name sty
-  = ppBesides [ppPStr SLIT("Class used as a type constructor: "), pprSym sty name]
+  = hcat [ptext SLIT("Class used as a type constructor: "), ppr sty name]
 
 tyConAsClassErr name sty
-  = ppBesides [ppPStr SLIT("Type constructor used as a class: "), pprSym sty name]
+  = hcat [ptext SLIT("Type constructor used as a class: "), ppr sty name]
 \end{code}
