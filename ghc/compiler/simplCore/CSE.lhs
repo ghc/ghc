@@ -11,7 +11,8 @@ module CSE (
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlag(..), DynFlags )
-import Id		( Id, idType )
+import Id		( Id, idType, idWorkerInfo )
+import IdInfo		( workerExists )
 import CoreUtils	( hashExpr, cheapEqExpr, exprIsBig, mkAltExpr )
 import DataCon		( isUnboxedTupleCon )
 import Type		( tyConAppArgs )
@@ -126,12 +127,23 @@ cseBind env (Rec pairs)  = let (env', pairs') = mapAccumL do_one env pairs
 			   in (env', Rec pairs')
 			 
 
-do_one env (id, rhs) = case lookupCSEnv env rhs' of
-		    	  Just other_id -> (extendSubst env' id other_id, (id', Var other_id))
-			  Nothing       -> (addCSEnvItem env' id' rhs',   (id', rhs'))
-		     where
-			(env', id') = addBinder env id
-	 	        rhs' 	    = cseExpr env' rhs
+do_one env (id, rhs) 
+  = case lookupCSEnv env rhs' of
+	Just other_id -> (extendSubst env' id other_id, (id', Var other_id))
+	Nothing       -> (addCSEnvItem env' id' rhs',   (id', rhs'))
+  where
+    (env', id') = addBinder env id
+    rhs' | not (workerExists (idWorkerInfo id)) = cseExpr env' rhs
+
+		-- Hack alert: don't do CSE on wrapper RHSs.
+		-- Otherwise we find:
+		--	$wf = h
+		--	f = \x -> ...$wf...
+		-- ===>
+		--	f = \x -> ...h...
+		-- But the WorkerInfo for f still says $wf, which is now dead!
+	  | otherwise = rhs
+
 
 tryForCSE :: CSEnv -> CoreExpr -> CoreExpr
 tryForCSE env (Type t) = Type t
