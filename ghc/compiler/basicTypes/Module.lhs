@@ -82,7 +82,7 @@ data PackageInfo = ThisPackage 			-- A module from the same package
 type PackageName = FastString		-- No encoding at all
 
 preludePackage :: PackageName
-preludePackage = SLIT("prelude")
+preludePackage = SLIT("std")
 
 instance Show PackageInfo where	-- Just used in debug prints of lex tokens
   showsPrec n ThisPackage s = s
