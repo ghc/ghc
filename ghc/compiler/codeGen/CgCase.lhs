@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.67 2004/08/09 13:19:29 simonmar Exp $
+% $Id: CgCase.lhs,v 1.68 2004/08/10 09:02:38 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -22,7 +22,8 @@ import CgMonad
 import StgSyn
 import AbsCSyn
 
-import AbsCUtils	( mkAbstractCs, mkAbsCStmts, mkAlgAltsCSwitch, getAmodeRep )
+import AbsCUtils	( mkAbstractCs, mkAbsCStmts, mkAlgAltsCSwitch,
+			  getAmodeRep, shimFCallArg )
 import CgBindery	( getVolatileRegs, getArgAmodes,
 			  bindNewToReg, bindNewToTemp,
 			  getCAddrModeAndInfo,
@@ -155,7 +156,12 @@ cgCase (StgOpApp op args _)
        live_in_whole_case live_in_alts bndr srt alt_type alts
   | inline_primop
   =	-- Get amodes for the arguments and results
-    getArgAmodes args			`thenFC` \ arg_amodes ->
+    getArgAmodes args			`thenFC` \ arg_amodes1 ->
+    let 
+	arg_amodes
+	  | StgFCallOp{} <- op = zipWith shimFCallArg args arg_amodes1
+	  | otherwise          = arg_amodes1
+    in
     getVolatileRegs live_in_alts        `thenFC` \ vol_regs ->
 
     case alt_type of 
@@ -223,7 +229,7 @@ cgCase (StgOpApp op args _)
   where
    inline_primop = case op of
 	StgPrimOp primop  -> not (primOpOutOfLine primop)
-	StgFCallOp (CCall (CCallSpec _ _ PlayRisky)) _ -> True
+	--StgFCallOp (CCall (CCallSpec _ _ PlayRisky)) _ -> True
 		 -- unsafe foreign calls are "inline"
 	_otherwise -> False
 

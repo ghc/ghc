@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.57 2004/03/31 15:23:16 simonmar Exp $
+% $Id: CgExpr.lhs,v 1.58 2004/08/10 09:02:41 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -18,7 +18,7 @@ import Constants	( mAX_SPEC_SELECTEE_SIZE, mAX_SPEC_AP_SIZE )
 import StgSyn
 import CgMonad
 import AbsCSyn
-import AbsCUtils	( mkAbstractCs, getAmodeRep )
+import AbsCUtils	( mkAbstractCs, getAmodeRep, shimFCallArg )
 import CLabel		( mkClosureTblLabel )
 
 import SMRep		( fixedHdrSize )
@@ -41,12 +41,10 @@ import Id		( idPrimRep, Id )
 import VarSet
 import PrimOp		( primOpOutOfLine, getPrimOpResultInfo, 
 			  PrimOp(..), PrimOpResultInfo(..) )
-import TysPrim		( foreignObjPrimTyCon, arrayPrimTyCon, 
-			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon,
-			  mutableArrayPrimTyCon )
 import PrimRep		( PrimRep(..), isFollowableRep )
 import TyCon		( isUnboxedTupleTyCon, isEnumerationTyCon )
-import Type		( Type, typePrimRep, tyConAppArgs, tyConAppTyCon, repType )
+import Type		( Type, typePrimRep, tyConAppArgs, 
+			  tyConAppTyCon, repType )
 import Maybes		( maybeToBool )
 import ListSetOps	( assocMaybe )
 import Unique		( mkBuiltinUnique )
@@ -482,17 +480,4 @@ primRetUnboxedTuple op args res_ty
     in
     ccallReturnUnboxedTuple temp_amodes
 	(absC (COpStmt temp_amodes op arg_temps []))
-
-
-shimFCallArg arg amode
-  | tycon == foreignObjPrimTyCon
-	= CMacroExpr AddrRep ForeignObj_CLOSURE_DATA [amode]
-  | tycon == arrayPrimTyCon || tycon == mutableArrayPrimTyCon
-	= CMacroExpr PtrRep PTRS_ARR_CTS [amode]
-  | tycon == byteArrayPrimTyCon || tycon == mutableByteArrayPrimTyCon
-	= CMacroExpr AddrRep BYTE_ARR_CTS [amode]
-  | otherwise = amode
-  where	
-	-- should be a tycon app, since this is a foreign call
-	tycon = tyConAppTyCon (repType (stgArgType arg))
 \end{code}

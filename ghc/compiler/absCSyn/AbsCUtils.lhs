@@ -12,7 +12,8 @@ module AbsCUtils (
 	getAmodeRep,
 	mixedTypeLocn, mixedPtrLocn,
 	flattenAbsC,
-	mkAbsCStmtList
+	mkAbsCStmtList,
+	shimFCallArg
 	-- printing/forcing stuff comes from PprAbsC
     ) where
 
@@ -20,6 +21,10 @@ module AbsCUtils (
 #include "../includes/config.h"
 
 import AbsCSyn
+import Type		( tyConAppTyCon, repType )
+import TysPrim		( foreignObjPrimTyCon, arrayPrimTyCon, 
+			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon,
+			  mutableArrayPrimTyCon )
 import CLabel		( mkMAP_FROZEN_infoLabel )
 import Digraph		( stronglyConnComp, SCC(..) )
 import DataCon		( fIRST_TAG, dataConTag )
@@ -32,7 +37,7 @@ import UniqSupply	( uniqFromSupply, uniqsFromSupply, splitUniqSupply,
 			  UniqSupply )
 import CmdLineOpts      ( opt_EmitCExternDecls, opt_Unregisterised )
 import ForeignCall	( ForeignCall(..), CCallSpec(..), isDynamicTarget )
-import StgSyn		( StgOp(..) )
+import StgSyn		( StgOp(..), stgArgType )
 import CoreSyn		( AltCon(..) )
 import SMRep		( arrPtrsHdrSize, arrWordsHdrSize, fixedHdrSize )
 import Outputable
@@ -1292,5 +1297,19 @@ translateOp [r] EqForeignObj [a1,a2]  = Just (r, MO_Nat_Eq,    [a1,a2])
 translateOp [r] EqStablePtrOp [a1,a2]  = Just (r, MO_Nat_Eq,    [a1,a2])
 
 translateOp _ _ _ = Nothing
+\end{code}
 
+
+\begin{code}
+shimFCallArg arg amode
+  | tycon == foreignObjPrimTyCon
+	= CMacroExpr AddrRep ForeignObj_CLOSURE_DATA [amode]
+  | tycon == arrayPrimTyCon || tycon == mutableArrayPrimTyCon
+	= CMacroExpr PtrRep PTRS_ARR_CTS [amode]
+  | tycon == byteArrayPrimTyCon || tycon == mutableByteArrayPrimTyCon
+	= CMacroExpr AddrRep BYTE_ARR_CTS [amode]
+  | otherwise = amode
+  where	
+	-- should be a tycon app, since this is a foreign call
+	tycon = tyConAppTyCon (repType (stgArgType arg))
 \end{code}
