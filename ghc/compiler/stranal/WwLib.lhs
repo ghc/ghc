@@ -18,7 +18,7 @@ import IdInfo		( vanillaIdInfo )
 import DataCon		( splitProductType_maybe, splitProductType )
 import NewDemand	( Demand(..), Keepity(..), DmdResult(..) ) 
 import DmdAnal		( both )
-import PrelInfo		( eRROR_CSTRING_ID )
+import PrelInfo		( realWorldPrimId, eRROR_CSTRING_ID )
 import TysPrim		( realWorldStatePrimTy )
 import TysWiredIn	( tupleCon )
 import Type		( Type, isUnLiftedType, mkFunTys,
@@ -125,11 +125,11 @@ mkWwBodies fun_ty demands res_info one_shots
   = mkWWargs fun_ty demands one_shots'	`thenUs` \ (wrap_args,   wrap_fn_args, work_fn_args, res_ty) ->
     mkWWcpr res_ty res_info      	`thenUs` \ (wrap_fn_cpr, work_fn_cpr,  cpr_res_ty) ->
     mkWWstr wrap_args			`thenUs` \ (work_args,   wrap_fn_str,  work_fn_str) ->
-    hackWorkArgs work_args cpr_res_ty	`thenUs` \ work_args' ->
+    hackWorkArgs work_args cpr_res_ty	`thenUs` \ (work_lam_args, work_call_args) ->
 
     returnUs ([idNewDemandInfo v | v <- work_args, isId v],
-	      Note InlineMe . wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_args' . Var,
-	      mkLams work_args' . work_fn_str . work_fn_cpr . work_fn_args)
+	      Note InlineMe . wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var,
+	      mkLams work_lam_args . work_fn_str . work_fn_cpr . work_fn_args)
 	-- We use an INLINE unconditionally, even if the wrapper turns out to be
 	-- something trivial like
 	--	fw = ...
@@ -150,13 +150,13 @@ mkWwBodies fun_ty demands res_info one_shots
 	-- We use the state-token type which generates no code
 hackWorkArgs work_args res_ty
   | any isId work_args || not (isUnLiftedType res_ty) 
-  = returnUs work_args
+  = returnUs (work_args, work_args)
   | otherwise
   = getUniqueUs 		`thenUs` \ void_arg_uniq ->
     let
 	void_arg = mk_ww_local void_arg_uniq realWorldStatePrimTy
     in
-    returnUs (work_args ++ [void_arg])
+    returnUs (work_args ++ [void_arg], work_args ++ [realWorldPrimId])
 \end{code}
 
 
