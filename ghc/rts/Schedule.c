@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.149 2002/07/19 00:06:05 sof Exp $
+ * $Id: Schedule.c,v 1.150 2002/07/19 18:45:21 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1444,7 +1444,7 @@ StgInt forkProcess(StgTSO* tso) {
   pid_t pid;
   StgTSO* t,*next;
   StgMainThread *m;
-  rtsBool killerIsMainThread = rtsFalse;
+  rtsBool doKill;
 
   IF_DEBUG(scheduler,sched_belch("forking!"));
 
@@ -1459,62 +1459,43 @@ StgInt forkProcess(StgTSO* tso) {
   tso->link = END_TSO_QUEUE;
 
   /* When clearing out the threads, we need to ensure
-     that a 'main thread' is left behind.
-     careful about leaving a main thread behind.
+     that a 'main thread' is left behind; if there isn't,
+     the Scheduler will shutdown next time it is entered.
+     
+     ==> we don't kill a thread that's on the main_threads
+         list (nor the current thread.)
     
-     ==> if the killing thread isn't a main thread, we
-     turn it into one.
+     [ Attempts at implementing the more ambitious scheme of
+       killing the main_threads also, and then adding the
+       current thread onto the main_threads list if it wasn't
+       there already, failed -- waitThread() (for one) wasn't
+       up to it. If it proves to be desirable to also kill
+       the main threads, then this scheme will have to be
+       revisited (and fully debugged!)
+       
+       -- sof 7/2002
+     ]
   */
-  for (m = main_threads; m != NULL; m = m->link) {
-    if (m->tso->id == tso->id) {
-      killerIsMainThread=rtsTrue;
-      break;
-    }
-  }
-
   /* DO NOT TOUCH THE QUEUES directly because most of the code around
      us is picky about finding the thread still in its queue when
      handling the deleteThread() */
 
-  if (!killerIsMainThread) {
-    /* Add it to main_threads */
-    m = stgMallocBytes(sizeof(StgMainThread), "forkProcess");
-    
-    m->tso = tso;
-    m->ret = NULL; /* can't really do better */
-    m->stat = NoStatus;
-#if defined(RTS_SUPPORTS_THREADS)
-    initCondition(&m->wakeup);
-#endif
-    /* Hook it up to the main_threads list. */
-    m->link = main_threads;
-    main_threads = m;
-  }
   for (t = all_threads; t != END_TSO_QUEUE; t = next) {
     next = t->link;
     
-    /* Don't kill current thread */
+    /* Don't kill the current thread.. */
     if (t->id == tso->id) continue;
-    if (!killerIsMainThread) { 
-      deleteThread(t);
-      /* Signal the abrupt completion of a now-killed main thread. */
-      for (m = main_threads; m != NULL; m = m->link) {
+    doKill=rtsTrue;
+    /* ..or a main thread */
+    for (m = main_threads; m != NULL; m = m->link) {
 	if (m->tso->id == t->id) {
-	  m->stat = Killed;
-	  if (m->ret) { *(m->ret) = NULL; }
-#if defined(RTS_SUPPORTS_THREADS)
-	  broadcastCondition(&m->wakeup);
-#endif
-#if defined(DEBUG)
-	  removeThreadLabel((StgWord)m->tso);
-#endif
+	  doKill=rtsFalse;
 	  break;
 	}
-      }
     }
-    /* ToDo..?: kill other entries along main_threads except the
-     * killing (main) thread.
-     */
+    if (doKill) {
+      deleteThread(t);
+    }
   }
   }
   return pid;
