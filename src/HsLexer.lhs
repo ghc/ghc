@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsLexer.lhs,v 1.17 2005/01/04 16:15:51 simonmar Exp $
+-- $Id: HsLexer.lhs,v 1.18 2005/03/09 08:28:39 wolfgang Exp $
 --
 -- (c) The GHC Team, 1997-2000
 --
@@ -21,6 +21,7 @@ import HsSyn
 
 import Numeric	( readHex, readOct )
 import Char
+import List     ( isPrefixOf )
 \end{code}
 
 \begin{code}
@@ -229,6 +230,10 @@ lexer cont input (SrcLoc _ x0) y0 col =
         	tab y (nextTab x) bol s
         tab y _ _  ('\n':s) =
                 newLine cont s y
+
+        tab y _ True ('#':s)
+            | "pragma GCC set_debug_pwd" `isPrefixOf` s
+            = newLine cont (tail $ dropWhile (/= '\n') s) y
 
 	-- single-line comments
         tab y x bol s@('-':'-':' ':c:_) | doc c = 
