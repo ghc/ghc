@@ -44,8 +44,8 @@ chunk of a thread, the one that's got
 @RTSflags.ConcFlags.stkChunkSize@ words.
 
 \begin{code}
-P_ AvailableStack = Prelude_Z91Z93_closure;
-P_ AvailableTSO = Prelude_Z91Z93_closure;
+P_ AvailableStack = PrelBase_Z91Z93_closure;
+P_ AvailableTSO = PrelBase_Z91Z93_closure;
 \end{code}
 
 Macros for dealing with the new and improved GA field for simulating
@@ -117,11 +117,11 @@ TIME SparkStealTime();
 
 # else                                                            /* !GRAN */
 
-P_ RunnableThreadsHd = Prelude_Z91Z93_closure;
-P_ RunnableThreadsTl = Prelude_Z91Z93_closure;
+P_ RunnableThreadsHd = PrelBase_Z91Z93_closure;
+P_ RunnableThreadsTl = PrelBase_Z91Z93_closure;
 
-P_ WaitingThreadsHd = Prelude_Z91Z93_closure;
-P_ WaitingThreadsTl = Prelude_Z91Z93_closure;
+P_ WaitingThreadsHd = PrelBase_Z91Z93_closure;
+P_ WaitingThreadsTl = PrelBase_Z91Z93_closure;
 
 TYPE_OF_SPARK PendingSparksBase[SPARK_POOLS];
 TYPE_OF_SPARK PendingSparksLim[SPARK_POOLS];
@@ -321,12 +321,12 @@ P_ topClosure;
 #endif
 
 #ifdef PAR
-    if (PendingFetches != Prelude_Z91Z93_closure) {
+    if (PendingFetches != PrelBase_Z91Z93_closure) {
         processFetches();
     }
 
 #elif defined(GRAN)
-    if (ThreadQueueHd == Prelude_Z91Z93_closure) {
+    if (ThreadQueueHd == PrelBase_Z91Z93_closure) {
         fprintf(stderr, "Qu'vatlh! No runnable threads!\n");
         EXIT(EXIT_FAILURE);
     }
@@ -334,9 +334,9 @@ P_ topClosure;
         QP_Event1("AG", ThreadQueueHd);
     }
 #else 
-    while (RunnableThreadsHd == Prelude_Z91Z93_closure) {
+    while (RunnableThreadsHd == PrelBase_Z91Z93_closure) {
 	/* If we've no work */
-	if (WaitingThreadsHd == Prelude_Z91Z93_closure) {
+	if (WaitingThreadsHd == PrelBase_Z91Z93_closure) {
 	    fflush(stdout);
 	    fprintf(stderr, "No runnable threads!\n");
 	    EXIT(EXIT_FAILURE);
@@ -347,7 +347,7 @@ P_ topClosure;
 #endif
 
 #ifdef PAR
-    if (RunnableThreadsHd == Prelude_Z91Z93_closure) {
+    if (RunnableThreadsHd == PrelBase_Z91Z93_closure) {
 	if (advisory_thread_count < RTSflags.ConcFlags.maxThreads &&
           (PendingSparksHd[REQUIRED_POOL] < PendingSparksTl[REQUIRED_POOL] ||
 	  PendingSparksHd[ADVISORY_POOL] < PendingSparksTl[ADVISORY_POOL])) {
@@ -417,11 +417,11 @@ P_ topClosure;
               DumpGranEvent(GR_SCHEDULE,ThreadQueueHd);
         }
       /* 
-      if (TSO_LINK(ThreadQueueHd)!=Prelude_Z91Z93_closure &&
+      if (TSO_LINK(ThreadQueueHd)!=PrelBase_Z91Z93_closure &&
           (TimeOfNextEvent == 0 ||
            TSO_CLOCK(TSO_LINK(ThreadQueueHd))+1000<TimeOfNextEvent)) {
         new_event(CurrentProc,CurrentProc,TSO_CLOCK(TSO_LINK(ThreadQueueHd))+1000,
-                  CONTINUETHREAD,TSO_LINK(ThreadQueueHd),Prelude_Z91Z93_closure,NULL);
+                  CONTINUETHREAD,TSO_LINK(ThreadQueueHd),PrelBase_Z91Z93_closure,NULL);
         TimeOfNextEvent = get_time_of_next_event();
       }
       */
@@ -430,10 +430,10 @@ P_ topClosure;
 #else /* !GRAN */
     CurrentTSO = RunnableThreadsHd;
     RunnableThreadsHd = TSO_LINK(RunnableThreadsHd);
-    TSO_LINK(CurrentTSO) = Prelude_Z91Z93_closure;
+    TSO_LINK(CurrentTSO) = PrelBase_Z91Z93_closure;
     
-    if (RunnableThreadsHd == Prelude_Z91Z93_closure)
-        RunnableThreadsTl = Prelude_Z91Z93_closure;
+    if (RunnableThreadsHd == PrelBase_Z91Z93_closure)
+        RunnableThreadsTl = PrelBase_Z91Z93_closure;
 #endif
 
     /* If we're not running a timer, just leave the flag on */
@@ -441,8 +441,8 @@ P_ topClosure;
         context_switch = 0;
 
 #if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
-    if (CurrentTSO == Prelude_Z91Z93_closure) {
-        fprintf(stderr,"Qagh: Trying to execute Prelude_Z91Z93_closure on proc %d (@ %d)\n",
+    if (CurrentTSO == PrelBase_Z91Z93_closure) {
+        fprintf(stderr,"Qagh: Trying to execute PrelBase_Z91Z93_closure on proc %d (@ %d)\n",
                 CurrentProc,CurrentTime[CurrentProc]);
         EXIT(EXIT_FAILURE);
       }
@@ -533,36 +533,36 @@ int what_next;           /* Run the current thread again? */
   }      
     
   /* Run the current thread again (if there is one) */
-  if(what_next==SAME_THREAD && ThreadQueueHd != Prelude_Z91Z93_closure)
+  if(what_next==SAME_THREAD && ThreadQueueHd != PrelBase_Z91Z93_closure)
     {
       /* A bit of a hassle if the event queue is empty, but ... */
       CurrentTSO = ThreadQueueHd;
 
       resched = rtsFalse;
       if (RTSflags.GranFlags.Light &&
-          TSO_LINK(ThreadQueueHd)!=Prelude_Z91Z93_closure &&
+          TSO_LINK(ThreadQueueHd)!=PrelBase_Z91Z93_closure &&
           TSO_CLOCK(ThreadQueueHd)>TSO_CLOCK(TSO_LINK(ThreadQueueHd))) {
           if(RTSflags.GranFlags.granSimStats &&
              RTSflags.GranFlags.debug & 0x20000 )
             DumpGranEvent(GR_DESCHEDULE,ThreadQueueHd);
           resched = rtsTrue;
           ThreadQueueHd =           TSO_LINK(CurrentTSO);
-          if (ThreadQueueHd==Prelude_Z91Z93_closure)
-            ThreadQueueTl=Prelude_Z91Z93_closure;
-          TSO_LINK(CurrentTSO) =    Prelude_Z91Z93_closure;
+          if (ThreadQueueHd==PrelBase_Z91Z93_closure)
+            ThreadQueueTl=PrelBase_Z91Z93_closure;
+          TSO_LINK(CurrentTSO) =    PrelBase_Z91Z93_closure;
           InsertThread(CurrentTSO);
       }
 
       /* This code does round-Robin, if preferred. */
       if(!RTSflags.GranFlags.Light &&
          RTSflags.GranFlags.DoFairSchedule && 
-         TSO_LINK(CurrentTSO) != Prelude_Z91Z93_closure && 
+         TSO_LINK(CurrentTSO) != PrelBase_Z91Z93_closure && 
          CurrentTime[CurrentProc]>=EndOfTimeSlice)
         {
           ThreadQueueHd =           TSO_LINK(CurrentTSO);
           TSO_LINK(ThreadQueueTl) = CurrentTSO;
           ThreadQueueTl =           CurrentTSO;
-          TSO_LINK(CurrentTSO) =    Prelude_Z91Z93_closure;
+          TSO_LINK(CurrentTSO) =    PrelBase_Z91Z93_closure;
           CurrentTime[CurrentProc] += RTSflags.GranFlags.gran_threadcontextswitchtime;
           if ( RTSflags.GranFlags.granSimStats )
               DumpGranEvent(GR_SCHEDULE,ThreadQueueHd);
@@ -570,11 +570,11 @@ int what_next;           /* Run the current thread again? */
         }
 
       new_event(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
-               CONTINUETHREAD,CurrentTSO,Prelude_Z91Z93_closure,NULL);
+               CONTINUETHREAD,CurrentTSO,PrelBase_Z91Z93_closure,NULL);
     }
   /* Schedule `next thread' which is at ThreadQueueHd now i.e. thread queue */
   /* has been updated before that already. */ 
-  else if(what_next==NEW_THREAD && ThreadQueueHd != Prelude_Z91Z93_closure)
+  else if(what_next==NEW_THREAD && ThreadQueueHd != PrelBase_Z91Z93_closure)
     {
 #  if defined(GRAN_CHECK) && defined(GRAN)
       fprintf(stderr,"Qagh: ReSchedule(NEW_THREAD) shouldn't be used with DoReScheduleOnFetch!!\n");
@@ -588,7 +588,7 @@ int what_next;           /* Run the current thread again? */
 
       CurrentTSO = ThreadQueueHd;
       new_event(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
-               CONTINUETHREAD,CurrentTSO,Prelude_Z91Z93_closure,NULL);
+               CONTINUETHREAD,CurrentTSO,PrelBase_Z91Z93_closure,NULL);
       
       CurrentTime[CurrentProc] += RTSflags.GranFlags.gran_threadcontextswitchtime;
     }
@@ -605,9 +605,9 @@ int what_next;           /* Run the current thread again? */
       procStatus[CurrentProc] = Idle;
       /* That's now done in HandleIdlePEs!
       new_event(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
-               FINDWORK,Prelude_Z91Z93_closure,Prelude_Z91Z93_closure,NULL);
+               FINDWORK,PrelBase_Z91Z93_closure,PrelBase_Z91Z93_closure,NULL);
       */
-      CurrentTSO = Prelude_Z91Z93_closure;
+      CurrentTSO = PrelBase_Z91Z93_closure;
     }
 
   /* ----------------------------------------------------------------- */
@@ -707,10 +707,10 @@ int what_next;           /* Run the current thread again? */
                 continue;
               }
 #  endif
-          if(ThreadQueueHd==Prelude_Z91Z93_closure) 
+          if(ThreadQueueHd==PrelBase_Z91Z93_closure) 
             {
               new_event(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
-                       FINDWORK,Prelude_Z91Z93_closure,Prelude_Z91Z93_closure,NULL);
+                       FINDWORK,PrelBase_Z91Z93_closure,PrelBase_Z91Z93_closure,NULL);
               continue; /* Catches superfluous CONTINUEs -- should be unnecessary */
             }
           else 
@@ -770,7 +770,7 @@ int what_next;           /* Run the current thread again? */
           }
 
           if( RTSflags.GranFlags.DoAlwaysCreateThreads ||
-	      (ThreadQueueHd == Prelude_Z91Z93_closure && 
+	      (ThreadQueueHd == PrelBase_Z91Z93_closure && 
               (RTSflags.GranFlags.FetchStrategy >= 2 || 
 	       OutstandingFetches[CurrentProc] == 0)) )
 	    {
@@ -836,13 +836,13 @@ do_the_globalblock(eventq event)
 
   if (!RTSflags.GranFlags.DoReScheduleOnFetch) { /* head of queue is next thread */
     P_ tso = RunnableThreadsHd[proc];       /* awaken next thread */
-    if(tso != Prelude_Z91Z93_closure) {
+    if(tso != PrelBase_Z91Z93_closure) {
       new_event(proc,proc,CurrentTime[proc],
-	       CONTINUETHREAD,tso,Prelude_Z91Z93_closure,NULL);
+	       CONTINUETHREAD,tso,PrelBase_Z91Z93_closure,NULL);
       CurrentTime[proc] += RTSflags.GranFlags.gran_threadcontextswitchtime;
       if(RTSflags.GranFlags.granSimStats)
         DumpRawGranEvent(proc,CurrentProc,GR_SCHEDULE,tso,
-			 Prelude_Z91Z93_closure,0);
+			 PrelBase_Z91Z93_closure,0);
       MAKE_BUSY(proc);                     /* might have been fetching */
     } else {
       MAKE_IDLE(proc);                     /* no work on proc now */
@@ -878,7 +878,7 @@ do_the_unblock(eventq event)
     TSO_BLOCKTIME(tso) += CurrentTime[proc] - TSO_BLOCKEDAT(tso);
     /* No costs for contextswitch or thread queueing in this case */
     if(RTSflags.GranFlags.granSimStats)
-  	DumpRawGranEvent(proc,CurrentProc,GR_RESUME,tso, Prelude_Z91Z93_closure,0);
+  	DumpRawGranEvent(proc,CurrentProc,GR_RESUME,tso, PrelBase_Z91Z93_closure,0);
     new_event(proc,proc,CurrentTime[proc],CONTINUETHREAD,tso,node,NULL);
   } else {
     /* Reschedule on fetch causes additional costs here: */
@@ -1091,7 +1091,7 @@ do_the_movespark(eventq event){
  CurrentTime[CurrentProc] += RTSflags.GranFlags.gran_munpacktime;
           
  if (RTSflags.GranFlags.granSimStats_Sparks)
-    DumpRawGranEvent(CurrentProc,(PROC)0,SP_ACQUIRED,Prelude_Z91Z93_closure,
+    DumpRawGranEvent(CurrentProc,(PROC)0,SP_ACQUIRED,PrelBase_Z91Z93_closure,
     SPARK_NODE(spark),
     spark_queue_len(CurrentProc,ADVISORY_POOL));
 
@@ -1119,7 +1119,7 @@ do_the_movespark(eventq event){
 #if 0
  /* Now FINDWORK is created in HandleIdlePEs */
   new_event(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
-            FINDWORK,Prelude_Z91Z93_closure,Prelude_Z91Z93_closure,NULL);
+            FINDWORK,PrelBase_Z91Z93_closure,PrelBase_Z91Z93_closure,NULL);
   sparking[CurrentProc]=rtsTrue;
 #endif
 }
@@ -1145,7 +1145,7 @@ gimme_spark (rtsBool *found_res, sparkq *prev_res, sparkq *spark_res)
        if (!SHOULD_SPARK(node)) 
          {
            if(RTSflags.GranFlags.granSimStats_Sparks)
-             DumpRawGranEvent(CurrentProc,(PROC)0,SP_PRUNED,Prelude_Z91Z93_closure,
+             DumpRawGranEvent(CurrentProc,(PROC)0,SP_PRUNED,PrelBase_Z91Z93_closure,
   				 SPARK_NODE(spark),
   				 spark_queue_len(CurrentProc,ADVISORY_POOL));
   
@@ -1258,7 +1258,7 @@ munch_spark (rtsBool found, sparkq prev, sparkq spark)
                  spark, node,SPARK_NAME(spark));
 #  endif
          new_event(CurrentProc,CurrentProc,CurrentTime[CurrentProc]+1,
-                  FINDWORK,Prelude_Z91Z93_closure,Prelude_Z91Z93_closure,NULL);
+                  FINDWORK,PrelBase_Z91Z93_closure,PrelBase_Z91Z93_closure,NULL);
          ReallyPerformThreadGC(TSO_HS+TSO_CTS_SIZE,rtsFalse);
 	 SAVE_Hp -= TSO_HS+TSO_CTS_SIZE;
          spark = NULL;
@@ -1266,7 +1266,7 @@ munch_spark (rtsBool found, sparkq prev, sparkq spark)
        }
                
      if(RTSflags.GranFlags.granSimStats_Sparks)
-	  DumpRawGranEvent(CurrentProc,(PROC)0,SP_USED,Prelude_Z91Z93_closure,
+	  DumpRawGranEvent(CurrentProc,(PROC)0,SP_USED,PrelBase_Z91Z93_closure,
 			     SPARK_NODE(spark),
 			     spark_queue_len(CurrentProc,ADVISORY_POOL));
 	
@@ -1286,7 +1286,7 @@ munch_spark (rtsBool found, sparkq prev, sparkq spark)
    else /* !found  */
      /* Make the PE idle if nothing sparked and we have no threads. */
      {
-       if(ThreadQueueHd == Prelude_Z91Z93_closure)
+       if(ThreadQueueHd == PrelBase_Z91Z93_closure)
         {
            MAKE_IDLE(CurrentProc);
 #    if defined(GRAN_CHECK) && defined(GRAN)
@@ -1298,7 +1298,7 @@ munch_spark (rtsBool found, sparkq prev, sparkq spark)
         else
 	/* ut'lu'Qo' ; Don't think that's necessary any more -- HWL 
          new_event(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
-                  CONTINUETHREAD,ThreadQueueHd,Prelude_Z91Z93_closure,NULL);
+                  CONTINUETHREAD,ThreadQueueHd,PrelBase_Z91Z93_closure,NULL);
 		  */
 #endif
     }
@@ -1334,7 +1334,7 @@ int again;  	    	    	    	/* Run the current thread again? */
     sameThread = again;
 
     if (again) {
-	if (RunnableThreadsHd == Prelude_Z91Z93_closure)
+	if (RunnableThreadsHd == PrelBase_Z91Z93_closure)
 	    RunnableThreadsTl = CurrentTSO;
 	TSO_LINK(CurrentTSO) = RunnableThreadsHd;
 	RunnableThreadsHd = CurrentTSO;
@@ -1349,7 +1349,7 @@ int again;  	    	    	    	/* Run the current thread again? */
      */
     
     if (again) {
-    	if(RunnableThreadsHd == Prelude_Z91Z93_closure) {
+    	if(RunnableThreadsHd == PrelBase_Z91Z93_closure) {
             RunnableThreadsHd = CurrentTSO;
         } else {
     	    TSO_LINK(RunnableThreadsTl) = CurrentTSO;
@@ -1367,7 +1367,7 @@ int again;  	    	    	    	/* Run the current thread again? */
      * in all the time.  This makes sure that we don't access saved registers,
      * etc. in threads which are supposed to be sleeping.
      */
-    CurrentTSO = Prelude_Z91Z93_closure;
+    CurrentTSO = PrelBase_Z91Z93_closure;
     CurrentRegTable = NULL;
 #endif
 
@@ -1379,7 +1379,7 @@ int again;  	    	    	    	/* Run the current thread again? */
     	if (SHOULD_SPARK(spark)) {    	
 	    if ((tso = NewThread(spark, T_REQUIRED)) == NULL)
 	    	break;
-            if (RunnableThreadsHd == Prelude_Z91Z93_closure) {
+            if (RunnableThreadsHd == PrelBase_Z91Z93_closure) {
         	RunnableThreadsHd = tso;
 #ifdef PAR
 		if (RTSflags.ParFlags.granSimStats) {
@@ -1419,14 +1419,14 @@ int again;  	    	    	    	/* Run the current thread again? */
     /* In the parallel world, don't create advisory threads if we are 
      * about to rerun the same thread, or already have runnable threads,
      *  or the main thread has terminated */
-	      (RunnableThreadsHd != Prelude_Z91Z93_closure ||
+	      (RunnableThreadsHd != PrelBase_Z91Z93_closure ||
 	       (required_thread_count == 0 && IAmMainThread)) || 
 #endif
    	      advisory_thread_count == RTSflags.ConcFlags.maxThreads ||
 	      (tso = NewThread(spark, T_ADVISORY)) == NULL)
 	    	break;
     	    advisory_thread_count++;
-            if (RunnableThreadsHd == Prelude_Z91Z93_closure) {
+            if (RunnableThreadsHd == PrelBase_Z91Z93_closure) {
         	RunnableThreadsHd = tso;
 #ifdef PAR
 		if (RTSflags.ParFlags.granSimStats) {
@@ -1492,8 +1492,8 @@ thread_queue_len(PROC proc)
  P_ prev, next;
  I_ len;
 
- for (len = 0, prev = Prelude_Z91Z93_closure, next = RunnableThreadsHd[proc];
-      next != Prelude_Z91Z93_closure; 
+ for (len = 0, prev = PrelBase_Z91Z93_closure, next = RunnableThreadsHd[proc];
+      next != PrelBase_Z91Z93_closure; 
       len++, prev = next, next = TSO_LINK(prev))
    {}
 
@@ -1532,16 +1532,16 @@ enum gran_event_types event_type;
   tot_tq_len += thread_queue_len(CurrentProc);
 #  endif 
 
-  ASSERT(TSO_LINK(CurrentTSO)==Prelude_Z91Z93_closure);
+  ASSERT(TSO_LINK(CurrentTSO)==PrelBase_Z91Z93_closure);
 
   /* Idle proc; same for pri spark and basic version */
-  if(ThreadQueueHd==Prelude_Z91Z93_closure)
+  if(ThreadQueueHd==PrelBase_Z91Z93_closure)
     {
       CurrentTSO = ThreadQueueHd = ThreadQueueTl = tso;
 
       CurrentTime[CurrentProc] += RTSflags.GranFlags.gran_threadqueuetime;
       new_event(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
-                CONTINUETHREAD,tso,Prelude_Z91Z93_closure,NULL);
+                CONTINUETHREAD,tso,PrelBase_Z91Z93_closure,NULL);
 
       if(RTSflags.GranFlags.granSimStats &&
          !( (event_type == GR_START || event_type == GR_STARTQ) && RTSflags.GranFlags.labelling) )
@@ -1568,21 +1568,21 @@ enum gran_event_types event_type;
   */
   if(RTSflags.GranFlags.Light)
     {
-      ASSERT(ThreadQueueHd!=Prelude_Z91Z93_closure);
-      ASSERT(TSO_LINK(tso)==Prelude_Z91Z93_closure);
+      ASSERT(ThreadQueueHd!=PrelBase_Z91Z93_closure);
+      ASSERT(TSO_LINK(tso)==PrelBase_Z91Z93_closure);
 
       /* If only one thread in queue so far we emit DESCHEDULE in debug mode */
       if(RTSflags.GranFlags.granSimStats &&
          (RTSflags.GranFlags.debug & 0x20000) && 
-         TSO_LINK(ThreadQueueHd)==Prelude_Z91Z93_closure) {
+         TSO_LINK(ThreadQueueHd)==PrelBase_Z91Z93_closure) {
 	DumpRawGranEvent(CurrentProc,CurrentProc,GR_DESCHEDULE,
-			 ThreadQueueHd,Prelude_Z91Z93_closure,0);
+			 ThreadQueueHd,PrelBase_Z91Z93_closure,0);
         resched = rtsTrue;
       }
 
       if ( InsertThread(tso) ) {                        /* new head of queue */
         new_event(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
-                  CONTINUETHREAD,tso,Prelude_Z91Z93_closure,NULL);
+                  CONTINUETHREAD,tso,PrelBase_Z91Z93_closure,NULL);
 
       }
       if(RTSflags.GranFlags.granSimStats && 
@@ -1602,7 +1602,7 @@ enum gran_event_types event_type;
   if (RTSflags.GranFlags.DoPriorityScheduling && TSO_PRI(tso)!=0) 
     /* {add_to_spark_queue}vo' jInIHta'; Qu' wa'DIch yIleghQo' */
     for (prev = ThreadQueueHd, next =  TSO_LINK(ThreadQueueHd), count=0;
-	 (next != Prelude_Z91Z93_closure) && 
+	 (next != PrelBase_Z91Z93_closure) && 
 	 !(found = (TSO_PRI(tso) >= TSO_PRI(next)));
 	 prev = next, next = TSO_LINK(next), count++) 
      {}
@@ -1617,13 +1617,13 @@ enum gran_event_types event_type;
 #  endif
      /* Add tso to ThreadQueue between prev and next */
      TSO_LINK(tso) = next;
-     if ( next == Prelude_Z91Z93_closure ) {
+     if ( next == PrelBase_Z91Z93_closure ) {
        ThreadQueueTl = tso;
      } else {
        /* no back link for TSO chain */
      }
      
-     if ( prev == Prelude_Z91Z93_closure ) {
+     if ( prev == PrelBase_Z91Z93_closure ) {
        /* Never add TSO as first elem of thread queue; the first */
        /* element should be the one that is currently running -- HWL */
 #  if defined(GRAN_CHECK)
@@ -1661,12 +1661,12 @@ enum gran_event_types event_type;
     rtsBool sorted = rtsTrue;
     P_ prev, next;
 
-    if (ThreadQueueHd==Prelude_Z91Z93_closure || TSO_LINK(ThreadQueueHd)==Prelude_Z91Z93_closure) {
+    if (ThreadQueueHd==PrelBase_Z91Z93_closure || TSO_LINK(ThreadQueueHd)==PrelBase_Z91Z93_closure) {
       /* just 1 elem => ok */
     } else {
       /* Qu' wa'DIch yIleghQo' (ignore first elem)! */
       for (prev = TSO_LINK(ThreadQueueHd), next = TSO_LINK(prev);
-	   (next != Prelude_Z91Z93_closure) ;
+	   (next != PrelBase_Z91Z93_closure) ;
 	   prev = next, next = TSO_LINK(prev)) {
 	sorted = sorted && 
 	         (TSO_PRI(prev) >= TSO_PRI(next));
@@ -1711,7 +1711,7 @@ P_ tso;
 #  endif 
 
   /* Idle proc; same for pri spark and basic version */
-  if(ThreadQueueHd==Prelude_Z91Z93_closure)
+  if(ThreadQueueHd==PrelBase_Z91Z93_closure)
     {
       ThreadQueueHd = ThreadQueueTl = tso;
       /* MAKE_BUSY(CurrentProc); */
@@ -1719,7 +1719,7 @@ P_ tso;
     }
 
   for (prev = ThreadQueueHd, next =  TSO_LINK(ThreadQueueHd), count=0;
-       (next != Prelude_Z91Z93_closure) && 
+       (next != PrelBase_Z91Z93_closure) && 
        !(found = (TSO_CLOCK(tso) < TSO_CLOCK(next)));
        prev = next, next = TSO_LINK(next), count++) 
    {}
@@ -1728,13 +1728,13 @@ P_ tso;
   if (found) {
      /* Add tso to ThreadQueue between prev and next */
      TSO_LINK(tso) = next;
-     if ( next == Prelude_Z91Z93_closure ) {
+     if ( next == PrelBase_Z91Z93_closure ) {
        ThreadQueueTl = tso;
      } else {
        /* no back link for TSO chain */
      }
      
-     if ( prev == Prelude_Z91Z93_closure ) {
+     if ( prev == PrelBase_Z91Z93_closure ) {
        ThreadQueueHd = tso;
      } else {
        TSO_LINK(prev) = tso;
@@ -1744,7 +1744,7 @@ P_ tso;
     TSO_LINK(ThreadQueueTl) = tso;
     ThreadQueueTl = tso;
   }
-  return (prev == Prelude_Z91Z93_closure); 
+  return (prev == PrelBase_Z91Z93_closure); 
 }
 
 \end{code}
@@ -1775,7 +1775,7 @@ HandleIdlePEs()
         if (PendingSparksHd[proc][ADVISORY_POOL]!=NULL)
          {
           new_event(proc,proc,CurrentTime[proc],
-                    FINDWORK,Prelude_Z91Z93_closure,Prelude_Z91Z93_closure,NULL);
+                    FINDWORK,PrelBase_Z91Z93_closure,PrelBase_Z91Z93_closure,NULL);
           MAKE_SPARKING(proc);
          }
         /* Then try to get remote work! */
@@ -1903,7 +1903,7 @@ PROC proc;
               CurrentTime[p] += RTSflags.GranFlags.gran_mpacktime;
 
               if(RTSflags.GranFlags.granSimStats_Sparks)
-                DumpRawGranEvent(p,(PROC)0,SP_EXPORTED,Prelude_Z91Z93_closure,
+                DumpRawGranEvent(p,(PROC)0,SP_EXPORTED,PrelBase_Z91Z93_closure,
 				 SPARK_NODE(spark),
 				 spark_queue_len(p,ADVISORY_POOL));
 
@@ -1916,7 +1916,7 @@ PROC proc;
 
 
               new_event(proc,p /* CurrentProc */,stealtime,
-                       MOVESPARK,Prelude_Z91Z93_closure,Prelude_Z91Z93_closure,spark);
+                       MOVESPARK,PrelBase_Z91Z93_closure,PrelBase_Z91Z93_closure,spark);
 
               /* MAKE_BUSY(proc);     not yet; busy when TSO in threadq */
               stolen = rtsTrue;
@@ -1931,7 +1931,7 @@ PROC proc;
           else   /* !(SHOULD_SPARK(SPARK_NODE(spark))) */
             {
               if(RTSflags.GranFlags.granSimStats_Sparks)
-                DumpRawGranEvent(p,(PROC)0,SP_PRUNED,Prelude_Z91Z93_closure,
+                DumpRawGranEvent(p,(PROC)0,SP_PRUNED,PrelBase_Z91Z93_closure,
 				 SPARK_NODE(spark),
 				 spark_queue_len(p,ADVISORY_POOL));
               --SparksAvail;
@@ -1999,7 +1999,7 @@ PROC proc;
 
   /* times shall contain processors from which we may steal threads */ 
   for(p=0; p < RTSflags.GranFlags.proc; ++p)
-    if(proc != p && RunnableThreadsHd[p] != Prelude_Z91Z93_closure && 
+    if(proc != p && RunnableThreadsHd[p] != PrelBase_Z91Z93_closure && 
        CurrentTime[p] <= CurrentTime[CurrentProc])
       times[ntimes++] = p;
 
@@ -2048,18 +2048,18 @@ PROC proc;
       /* Steal the first exportable thread in the runnable queue after the */
       /* first one */ 
       
-      if(RunnableThreadsHd[p] != Prelude_Z91Z93_closure)
+      if(RunnableThreadsHd[p] != PrelBase_Z91Z93_closure)
         {
           for(prev = RunnableThreadsHd[p], thread = TSO_LINK(RunnableThreadsHd[p]); 
-              thread != Prelude_Z91Z93_closure && TSO_LOCKED(thread); 
+              thread != PrelBase_Z91Z93_closure && TSO_LOCKED(thread); 
               prev = thread, thread = TSO_LINK(thread))
             /* SKIP */;
 
-          if(thread != Prelude_Z91Z93_closure)   /* Take thread out of runnable queue */
+          if(thread != PrelBase_Z91Z93_closure)   /* Take thread out of runnable queue */
             {
               TSO_LINK(prev) = TSO_LINK(thread);
 
-              TSO_LINK(thread) = Prelude_Z91Z93_closure;
+              TSO_LINK(thread) = PrelBase_Z91Z93_closure;
 
               if(RunnableThreadsTl[p] == thread)
                 RunnableThreadsTl[p] = prev;
@@ -2079,7 +2079,7 @@ PROC proc;
               SET_PROCS(thread,Nowhere /* PE_NUMBER(proc) */); 
 
               /* Move from one queue to another */
-              new_event(proc,p,stealtime,MOVETHREAD,thread,Prelude_Z91Z93_closure,NULL);
+              new_event(proc,p,stealtime,MOVETHREAD,thread,PrelBase_Z91Z93_closure,NULL);
               /* MAKE_BUSY(proc);  not yet; only when thread is in threadq */
               ++OutstandingFishes[proc];
               if (IS_IDLE(proc))
@@ -2088,7 +2088,7 @@ PROC proc;
 
               if(RTSflags.GranFlags.granSimStats)
                 DumpRawGranEvent(p,proc,GR_STEALING,thread,
-				 Prelude_Z91Z93_closure,0);
+				 PrelBase_Z91Z93_closure,0);
           
               CurrentTime[p] += 5l * RTSflags.GranFlags.gran_mtidytime;
 
@@ -2221,7 +2221,7 @@ set_sparkname(P_ tso, int name) {
 
   if(0 && RTSflags.GranFlags.granSimStats)
 	DumpRawGranEvent(CurrentProc,99,GR_START,
-			 tso,Prelude_Z91Z93_closure,
+			 tso,PrelBase_Z91Z93_closure,
 	                 TSO_SPARKNAME(tso));
                          /* ^^^  SN (spark name) as optional info */
 			 /* spark_queue_len(CurrentProc,ADVISORY_POOL)); */
@@ -2402,7 +2402,7 @@ W_ type;
       EXIT(EXIT_FAILURE);
     }
 #  endif
-    if (AvailableTSO != Prelude_Z91Z93_closure) {
+    if (AvailableTSO != PrelBase_Z91Z93_closure) {
         tso = AvailableTSO;
 #if defined(GRAN)
         SET_PROCS(tso,ThisPE);  /* Allocate it locally! */
@@ -2418,11 +2418,11 @@ W_ type;
         SET_TSO_HDR(tso, TSO_info, CCC);
     }
 
-    TSO_LINK(tso) = Prelude_Z91Z93_closure;
+    TSO_LINK(tso) = PrelBase_Z91Z93_closure;
 #if defined(GRAN)
     TSO_PRI(tso) =  pri;                  /* Priority of that TSO -- HWL */
 #endif 
-#ifdef PAR
+#if defined(PROFILING) || defined(PAR)
     TSO_CCC(tso) = (CostCentre)STATIC_CC_REF(CC_MAIN);
 #endif
     TSO_NAME(tso) = (P_) INFO_PTR(topClosure); /* A string would be nicer -- JSM */
@@ -2474,7 +2474,7 @@ W_ type;
         stko = MainStkO;  
     } else {
 # endif
-        if (AvailableStack != Prelude_Z91Z93_closure) {
+        if (AvailableStack != PrelBase_Z91Z93_closure) {
             stko = AvailableStack;
 #if defined(GRAN)
             SET_PROCS(stko,ThisPE);
@@ -2492,7 +2492,7 @@ W_ type;
         STKO_SIZE(stko) = RTSflags.ConcFlags.stkChunkSize + STKO_VHS;
         STKO_SpB(stko) = STKO_SuB(stko) = STKO_BSTK_BOT(stko) + BREL(1);
         STKO_SpA(stko) = STKO_SuA(stko) = STKO_ASTK_BOT(stko) + AREL(1);
-        STKO_LINK(stko) = Prelude_Z91Z93_closure;
+        STKO_LINK(stko) = PrelBase_Z91Z93_closure;
         STKO_RETURN(stko) = NULL;
 # ifndef PAR
     }
@@ -2562,7 +2562,7 @@ EndThread(STG_NO_ARGS)
           rtsBool is_first;
           for(i=0; i < RTSflags.GranFlags.proc; ++i) {
             is_first = rtsTrue;
-            while(RunnableThreadsHd[i] != Prelude_Z91Z93_closure)
+            while(RunnableThreadsHd[i] != PrelBase_Z91Z93_closure)
               {
                 /* We schedule runnable threads before killing them to */
                 /* make the job of bookkeeping the running, runnable, */
@@ -2572,7 +2572,7 @@ EndThread(STG_NO_ARGS)
                     (!RTSflags.GranFlags.Light || RTSflags.GranFlags.debug & 0x20000) )
                   DumpRawGranEvent(i,(PROC)0,GR_SCHEDULE,
                                    RunnableThreadsHd[i],
-    				   Prelude_Z91Z93_closure,0);
+    				   PrelBase_Z91Z93_closure,0);
     		  if (!RTSflags.GranFlags.granSimStats_suppressed &&
                       TSO_TYPE(RunnableThreadsHd[i])!=T_MAIN)
     		    DumpGranInfo(i,RunnableThreadsHd[i],rtsTrue);
@@ -2581,14 +2581,14 @@ EndThread(STG_NO_ARGS)
               }
           }
     
-          ThreadQueueHd = Prelude_Z91Z93_closure;
+          ThreadQueueHd = PrelBase_Z91Z93_closure;
           /* Printing of statistics has been moved into end_gr_simulation */
         } /* ... T_MAIN */
      
       if (RTSflags.GranFlags.labelling && RTSflags.GranFlags.granSimStats &&
           !RTSflags.GranFlags.granSimStats_suppressed)
 	DumpStartEventAt(TSO_STARTEDAT(CurrentTSO),where_is(CurrentTSO),0,GR_START,
-			 CurrentTSO,Prelude_Z91Z93_closure,
+			 CurrentTSO,PrelBase_Z91Z93_closure,
 	                 TSO_SPARKNAME(CurrentTSO));
                          /* ^^^  SN (spark name) as optional info */
 			 /* spark_queue_len(CurrentProc,ADVISORY_POOL)); */
@@ -2608,7 +2608,7 @@ EndThread(STG_NO_ARGS)
         ActivateNextThread(CurrentProc);
 
       /* Note ThreadQueueHd is Nil when the main thread terminates 
-      if(ThreadQueueHd != Prelude_Z91Z93_closure)
+      if(ThreadQueueHd != PrelBase_Z91Z93_closure)
         {
           if (RTSflags.GranFlags.granSimStats && !RTSflags.GranFlags.granSimStats_suppressed &&
              (!RTSflags.GranFlags.Light || RTSflags.GranFlags.debug & 0x20000) )
@@ -2658,18 +2658,18 @@ EndThread(STG_NO_ARGS)
     }
 
     /* Reuse stack object space */
-    ASSERT(STKO_LINK(SAVE_StkO) == Prelude_Z91Z93_closure);
+    ASSERT(STKO_LINK(SAVE_StkO) == PrelBase_Z91Z93_closure);
     STKO_LINK(SAVE_StkO) = AvailableStack;
     AvailableStack = SAVE_StkO;
     /* Reuse TSO */
     TSO_LINK(CurrentTSO) = AvailableTSO;
     AvailableTSO = CurrentTSO;
-    CurrentTSO = Prelude_Z91Z93_closure;
+    CurrentTSO = PrelBase_Z91Z93_closure;
     CurrentRegTable = NULL;
 
 #if defined(GRAN)
     /* NB: Now ThreadQueueHd is either the next runnable thread on this */
-    /* proc or it's Prelude_Z91Z93_closure. In the latter case, a FINDWORK will be */
+    /* proc or it's PrelBase_Z91Z93_closure. In the latter case, a FINDWORK will be */
     /* issued by ReSchedule. */
     ReSchedule(SAME_THREAD);                /* back for more! */
 #else
@@ -2704,7 +2704,7 @@ EXTDATA_RO(BQ_info);
  * AwakenBlockingQueue awakens a list of TSOs and FBQs.
  */
 
-P_ PendingFetches = Prelude_Z91Z93_closure;
+P_ PendingFetches = PrelBase_Z91Z93_closure;
 
 void
 AwakenBlockingQueue(bqe)
@@ -2719,7 +2719,7 @@ AwakenBlockingQueue(bqe)
 # endif
 
 # ifndef PAR
-    while (bqe != Prelude_Z91Z93_closure) {
+    while (bqe != PrelBase_Z91Z93_closure) {
 # else
     while (IS_MUTABLE(INFO_PTR(bqe))) {
 	switch (INFO_TYPE(INFO_PTR(bqe))) {
@@ -2746,7 +2746,7 @@ AwakenBlockingQueue(bqe)
 	    }
 # endif
 	    if (last_tso == NULL) {
-		if (RunnableThreadsHd == Prelude_Z91Z93_closure) {
+		if (RunnableThreadsHd == PrelBase_Z91Z93_closure) {
 		    RunnableThreadsHd = bqe;
 		} else {
 		    TSO_LINK(RunnableThreadsTl) = bqe;
@@ -2776,7 +2776,7 @@ AwakenBlockingQueue(bqe)
     if (last_tso != NULL) {
 	RunnableThreadsTl = last_tso;
 # ifdef PAR
-	TSO_LINK(last_tso) = Prelude_Z91Z93_closure;
+	TSO_LINK(last_tso) = PrelBase_Z91Z93_closure;
 # endif
     }
 }
@@ -2802,7 +2802,7 @@ P_ bqe;
 
     fprintf(stderr,"\n[PE %d] @ %lu BQ: ",
 	            CurrentProc,CurrentTime[CurrentProc]);
-    if ( bqe == Prelude_Z91Z93_closure ) {
+    if ( bqe == PrelBase_Z91Z93_closure ) {
       fprintf(stderr," NIL.\n");
       return;
     }
@@ -2843,12 +2843,12 @@ P_ bqe;
 	    bqe = TSO_LINK(bqe);
 	    break;
 	  default:
-	    bqe = Prelude_Z91Z93_closure;
+	    bqe = PrelBase_Z91Z93_closure;
 	    break;
 	  }
-      /* TSO_LINK(last_tso) = Prelude_Z91Z93_closure; */
+      /* TSO_LINK(last_tso) = PrelBase_Z91Z93_closure; */
     }
-    if ( bqe == Prelude_Z91Z93_closure ) 
+    if ( bqe == PrelBase_Z91Z93_closure ) 
       fprintf(stderr," NIL.\n");
     else if ( 
 	 (INFO_PTR(bqe) == (P_) RBH_Save_0_info) || 
@@ -2969,7 +2969,7 @@ P_ bqe;
 
 #  if defined(GRAN_COUNT)
         ++nUPDs;
-        if (tso != Prelude_Z91Z93_closure) 
+        if (tso != PrelBase_Z91Z93_closure) 
           ++nUPDs_BQ;
 #  endif
 
@@ -3002,7 +3002,7 @@ P_ bqe;
 	             RTSflags.GranFlags.gran_gunblocktime;
 	CurrentTime[CurrentProc] += RTSflags.GranFlags.gran_mtidytime;
 	/* new_event(proc, CurrentProc, notifytime, 
-	            GLOBALUNBLOCK,bqe,Prelude_Z91Z93_closure,NULL); */
+	            GLOBALUNBLOCK,bqe,PrelBase_Z91Z93_closure,NULL); */
       }
       /* cost the walk over the queue */
       CurrentTime[CurrentProc] += RTSflags.GranFlags.gran_lunblocktime;
@@ -3011,7 +3011,7 @@ P_ bqe;
         TSO_CLOCK(bqe) = notifytime;
       /* and create a resume message */
       new_event(proc, CurrentProc, notifytime, 
-	       RESUMETHREAD,bqe,Prelude_Z91Z93_closure,NULL);
+	       RESUMETHREAD,bqe,PrelBase_Z91Z93_closure,NULL);
 
       if (notifytime<TimeOfNextEvent)
 	TimeOfNextEvent = notifytime;
@@ -3025,7 +3025,7 @@ P_ bqe;
 
       last = bqe;
       bqe = TSO_LINK(bqe);
-      TSO_LINK(last) = Prelude_Z91Z93_closure; 
+      TSO_LINK(last) = PrelBase_Z91Z93_closure; 
     }    /* while */
 
 #  if 0
@@ -3033,18 +3033,18 @@ P_ bqe;
     /* supported. */
     else /* Check if this is still valid for non-GrAnSim code -- HWL */
       {
-	if (ThreadQueueHd == Prelude_Z91Z93_closure)
+	if (ThreadQueueHd == PrelBase_Z91Z93_closure)
 	  ThreadQueueHd = bqe;
 	else
 	  TSO_LINK(ThreadQueueTl) = bqe;
 
-        if (RunnableThreadsHd == Prelude_Z91Z93_closure)
+        if (RunnableThreadsHd == PrelBase_Z91Z93_closure)
           RunnableThreadsHd = tso;
         else
           TSO_LINK(RunnableThreadsTl) = tso;
         
 
-        while(TSO_LINK(bqe) != Prelude_Z91Z93_closure) {
+        while(TSO_LINK(bqe) != PrelBase_Z91Z93_closure) {
           assert(TSO_INTERNAL_PTR(bqe)->rR[0].p == node);
 #    if 0
           if (DO_QP_PROF) {
@@ -3396,13 +3396,13 @@ P_ bh;                         /* closure to block on (BH, RBH, BQ) */
       TSO_BLOCKEDAT(tso) = CurrentTime[proc];
     }
 
-    ASSERT(TSO_LINK(tso)==Prelude_Z91Z93_closure);
+    ASSERT(TSO_LINK(tso)==PrelBase_Z91Z93_closure);
 
     /* Put tso into BQ */
     switch (INFO_TYPE(INFO_PTR(bh))) {
       case INFO_BH_TYPE:
       case INFO_BH_U_TYPE:
-	TSO_LINK(tso) = Prelude_Z91Z93_closure; 
+	TSO_LINK(tso) = PrelBase_Z91Z93_closure; 
 	SET_INFO_PTR(bh, BQ_info);
 	BQ_ENTRIES(bh) = (W_) tso;
 
@@ -3752,7 +3752,7 @@ I_ num_ptr_roots;
             }
           else
             {
-              SPARK_NODE(spark) = Prelude_Z91Z93_closure;
+              SPARK_NODE(spark) = PrelBase_Z91Z93_closure;
               if (prunedSparks==0) {
                 disposeQ = spark;
 		/*
@@ -3878,7 +3878,7 @@ I_ num_ptr_roots;
 	spark = curr_spark[proc][i];
 
 	if ( spark != NULL ) {
-	  SPARK_NODE(spark) = Prelude_Z91Z93_closure;
+	  SPARK_NODE(spark) = PrelBase_Z91Z93_closure;
 	  curr_spark[proc][i] = SPARK_NEXT(spark);
 	
 	  prunedSparks[proc][i]++;

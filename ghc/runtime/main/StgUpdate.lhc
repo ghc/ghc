@@ -27,7 +27,7 @@ System-wide constants need to be included:
 #endif
 #endif
 
-EXTDATA(Prelude_Z91Z93_closure);
+EXTDATA(PrelBase_Z91Z93_closure);
 
 #if defined(TICKY_TICKY)
 void PrintTickyInfo(STG_NO_ARGS);
@@ -135,7 +135,7 @@ STGFUN(BH_UPD_entry)
     STGCALL3(void,(),GranSimBlock,CurrentTSO,CurrentProc,Node);	
 # endif
 
-    TSO_LINK(CurrentTSO) = Prelude_Z91Z93_closure;
+    TSO_LINK(CurrentTSO) = PrelBase_Z91Z93_closure;
     SET_INFO_PTR(Node, BQ_info);
     BQ_ENTRIES(Node) = (W_) CurrentTSO;
 
@@ -170,7 +170,7 @@ STGFUN(BH_UPD_entry)
 # endif
 
 # if defined(GRAN)
-    /* CurrentTSO = Prelude_Z91Z93_closure; */
+    /* CurrentTSO = PrelBase_Z91Z93_closure; */
     ReSchedule(SAME_THREAD);
 # else
     ReSchedule(0);
