@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.33 2003/03/31 19:19:34 sof Exp $
+ * $Id: RtsUtils.c,v 1.34 2003/04/01 15:40:27 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -252,7 +252,9 @@ setNonBlockingFd(int fd)
   fcntl(fd, F_SETFL, fd_flags | O_NONBLOCK);
 }
 #else
-/* Don't support non-blocking FDs (yet) on mingw */
+/* Stub defns -- async / non-blocking IO is not done 
+ * via O_NONBLOCK and select() under Win32. 
+ */
 void resetNonBlockingFd(int fd STG_UNUSED) {}
 void setNonBlockingFd(int fd STG_UNUSED) {}
 #endif
