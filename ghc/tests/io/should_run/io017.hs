@@ -6,7 +6,7 @@ main =
       readLine                                          >>= \ x1 -> 
       putStr   "Enter another integer: "                >>
       readLine                                          >>= \ x2 -> 
-      putStr  ("Their sum is " ++ show (read x1+ read x2) ++ "\n")
+      putStr  ("Their sum is " ++ show (read x1 + read x2 :: Int) ++ "\n")
 
  where readLine = isEOF                                 >>= \ eof ->
                   if eof then return []
