@@ -4,9 +4,21 @@ module TopSort ( topSort ) where
 import List ( nub )
 
 
--- Pretty scummy.  Really it ought to check for circularities and
--- complain if found.
-topSort :: Ord a => [(a, [a])] -> [a]
+
+data SCC a = NonRec a | Rec [a]
+
+unNonRec (NonRec x) = x
+unRec    (Rec xs)   = xs
+
+isRec (Rec _)    = True
+isRec (NonRec _) = False
+
+
+-- Topologically sort a directed graph, given the forward
+-- mapping as a [(source, [dest])].  Detect circularities 
+-- and return a Left if they are found.
+topSort :: Ord a => [(a, [a])] -> Either [a]{-a circular group-}
+                                         [a]{-tsorted order-}
 topSort fmap
    = let vertices = nub (map fst fmap ++ concatMap snd fmap)
          f_edges  = concat [ [(src,dst) | dst <- dsts] 
@@ -19,9 +31,23 @@ topSort fmap
          doOrDie (Just xs) = xs
          doOrDie Nothing = error "TopSort.topSort: vertex lookup failed?!?"
 
-         sccs = deScc fmap_fn bmap_fn vertices
-         tsorted = concatMap unSet sccs
-     in tsorted
+         sccs       = deScc fmap_fn bmap_fn vertices
+         classified = map (classify fmap_fn . unSet) sccs
+         recs       = filter isRec classified
+         nonrecs    = filter (not.isRec) classified
+     in
+         if   null recs
+         then Right (map unNonRec nonrecs)
+         else Left (unRec (head recs))
+
+
+-- Given the forward edge map, decide whether a SCC is circular or
+-- not.
+classify :: Eq a => (a -> [a]) -> [a] -> SCC a
+classify fmap_fn (x:y:rest)
+   = Rec (x:y:rest)
+classify fmap_fn [x]
+   = if x `elem` fmap_fn x then Rec [x] else NonRec x
 
 
 -- Appallingly inefficient

@@ -1,7 +1,7 @@
 
 module CmdSyntax ( Var, MacroName, TestName, MacroDef(..),
                    TopDef(..), Stmt(..), Expr(..), freeVars,
-                   Op(..), Result(..),
+                   Op(..), Result(..), TestID(..),
                    panic, officialMsg, my_system,
                    isJust, isNothing, unJust,
                    isTInclude, isTTest, isTMacroDef, isTAssign,
@@ -49,6 +49,13 @@ type Var       = String
 type MacroName = String
 data MacroDef  = MacroDef [Var] [Stmt]
                  deriving Show
+
+data TestID = TestID FilePath{-for the .T file-} 
+                     TestName{-name within the .T file-}
+              deriving Eq
+
+instance Show TestID where
+   show (TestID tfilepath tname) = tfilepath ++ " " ++ tname
 
 ------------------
 

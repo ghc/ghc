@@ -1,7 +1,8 @@
 
 module Main where
 
-import CmdSyntax	( Var, TestName, Result(..), Expr(..), 
+import CmdSyntax	( Var, TestName, Result(..), 
+			  Expr(..), TestID(..),
 			  officialMsg, panic,
 			  isJust, isNothing, unJust,
 			  isLeft, isRight, unLeft, unRight )
@@ -118,15 +119,16 @@ main_really arg_ws0
                 putStr (unlines (map (("   "++).unLeft) parse_fails))
           )
         ; let parsed_ok = map unRight (filter isRight all_parsed)
-        -- Run all the tests in each successfully-parsed .T file.   
+        -- Run all the tests in each successfully-parsed .T file.
         ; resultss 
              <- mapM ( \ (path,topdefs) -> processParsedTFile 
+                                              path
                                               (addTVars base_genv path)
                                               topdefs) 
                      parsed_ok
         ; let results = concat resultss
         ; putStr "\n"
-        ; officialMsg ("All done.")
+        ; officialMsg ("=== All done. ===")
         -- ; putStr ("\n" ++ ((unlines . map show) results))
         ; putStr ("\n" ++ executive_summary results)
         ; putStr "\n"
@@ -140,7 +142,7 @@ addTVars some_genv tfpath
                             : some_genv
 
 -- Summarise overall outcome
-executive_summary :: [(TestName, Either String (Result, Result))] 
+executive_summary :: [(TestID, Maybe (Result, Result))] 
                   -> String
 executive_summary outcomes
    = let n_cands     = length outcomes
@@ -195,23 +197,23 @@ executive_summary outcomes
             = "\nThe following tests had framework failures:\n"
               ++ unlines (map (("   "++).show.fst) meta_fails)
 
-         ppTest (test, Right (exp,act))
+         ppTest (test, Just (exp,act))
              = "   exp:" ++ show exp ++ ", act:" ++ show act 
                ++ "    " ++ show test
 
-         is_meta_fail (_, Left _) = True
+         is_meta_fail (_, Nothing) = True
          is_meta_fail other       = False
 
-         got (f1,f2) (_, Right (r1,r2)) = f1 r1 && f2 r2
+         got (f1,f2) (_, Just (r1,r2)) = f1 r1 && f2 r2
          got (f1,f2) other             = False
 
-         is_skip (_, Right (Skipped, Skipped)) = True
-         is_skip (_, Right (r1, r2))
+         is_skip (_, Just (Skipped, Skipped)) = True
+         is_skip (_, Just (r1, r2))
             | r1 == Skipped || r2 == Skipped 
             = panic "is_skip"
          is_skip other = False
 
-         is_exp_unk (_, Right (Unknown, Unknown)) = True
+         is_exp_unk (_, Just (Unknown, Unknown)) = True
          is_exp_unk other                         = False
      in
          summary ++ unexpected_summary ++ metafail_summary

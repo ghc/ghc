@@ -51,7 +51,15 @@ getEvalEnv :: IOE EvalEnv
 getEvalEnv p = return (p, p)
 
 setEvalEnv :: EvalEnv -> IOE ()
-setEvalEnv p pnew = return (pnew, ())
+setEvalEnv pnew p = return (pnew, ())
+
+
+getLocalEnv :: IOE [(Var,String)]
+getLocalEnv p = return (p, locals p)
+
+setLocalEnv :: [(Var,String)] -> IOE ()
+setLocalEnv l_env p
+   = return (p{locals=l_env}, ())
 
 
 ---------------------------------------------------------------------
@@ -69,17 +77,20 @@ returnEV :: a -> IOE (EvalResult a)
 returnEV x p = return (p, Value x)
 
 failEV :: String -> IOE (EvalResult a)
-failEV str p = return (p, FrameFail str)
+failEV str p = return (p, FrameFail ("framework failure: " ++ str))
 
 resultsEV :: (Result, Result) -> IOE (EvalResult a)
 resultsEV (r1,r2) p = return (p, Results (r1,r2))
+
+failagainEV :: String -> IOE (EvalResult a)
+failagainEV str p = return (p, FrameFail str)
 
 thenEV :: IOEV a -> (a -> IOEV b) -> IOEV b
 thenEV x y
    = x 						`thenE` \ res_x ->
      case res_x of
         Value x_ok  -> y x_ok
-        FrameFail s -> failEV s
+        FrameFail s -> failagainEV s
         Results rs  -> resultsEV rs
 
 thenEV_ :: IOEV a -> IOEV b -> IOEV b
@@ -87,7 +98,7 @@ thenEV_ x y
    = x 						`thenE` \ res_x ->
      case res_x of
         Value x_ok  -> y
-        FrameFail s -> failEV s
+        FrameFail s -> failagainEV s
         Results rs  -> resultsEV rs
 
 mapEV :: (a -> IOEV b) -> [a] -> IOEV [b]
@@ -134,8 +145,11 @@ setResult is_actual res
      results p					`bind` \ (r_exp, r_act) ->
      (is_actual && isJust r_act)		`bind` \ dup_act ->
      ((not is_actual) && isJust r_exp)		`bind` \ dup_exp ->
-     if dup_act || dup_exp
-     then failEV "duplicate assignment of expected or actual outcome"
+     if   dup_act
+     then failEV "duplicate assignment of actual outcome"
+     else
+     if   dup_exp
+     then failEV "duplicate assignment of expected outcome"
      else
      (if is_actual then (r_exp, Just res)
                    else (Just res, r_act))	`bind` \ (new_exp, new_act) ->
@@ -146,13 +160,12 @@ setResult is_actual res
 						`thenE_`
      returnEV ()
 
-
 addLocalVarBind :: Var -> String -> IOEV ()
 addLocalVarBind v s
    = getEvalEnv					`thenE` \ p ->
      if   v `elem` map fst (globals p)
      then failEV (isGlobalVar v)
-     else setEvalEnv (p{ globals = (v,s):(globals p) })
+     else setEvalEnv (p{locals = (v,s):(locals p)})
 						`thenE_`
           returnEV ()
 
@@ -163,7 +176,10 @@ lookupVar_maybe v
 
 lookupVar :: Var -> IOEV String
 lookupVar v 
-   = lookupVar_maybe v				`thenE` \ maybe_v ->
+   = --getEvalEnv `thenE` \ p ->
+     --ioToEV (putStrLn (unlines (map show (globals p ++ locals p)))) `thenEV` \ _ ->
+
+     lookupVar_maybe v				`thenE` \ maybe_v ->
      case maybe_v of
         Just xx -> returnEV xx
         Nothing -> failEV (missingVar v)
@@ -179,44 +195,43 @@ initialEnv global_env macro_env
    = EvalEnv{ globals=global_env, mdefs=macro_env,
               locals=[], results=(Nothing,Nothing) }
 
-getLocalEnv :: IOE [(Var,String)]
-getLocalEnv
-   = getEvalEnv					`thenE` \ p ->
-     returnE (locals p)
-
-setLocalEnv :: [(Var,String)] -> IOE ()
-setLocalEnv l_env
-   = getEvalEnv 				`thenE` \ p ->
-     setEvalEnv (p{locals=l_env})
-
 
 ---------------------------------------------------------------------
 -- Run all the tests defined in a parsed .T file.
 
-processParsedTFile :: [(Var,String)]
+processParsedTFile :: FilePath
+                   -> [(Var,String)]
                    -> [TopDef]
-                   -> IO [(TestName,
-                             (Either String{-framefail-} 
-                                     (Result, Result){-outcomes-})
-                         )]
-processParsedTFile initial_global_env topdefs
-   = do let tests     = filter isTTest     topdefs
+                   -> IO [(TestID, Maybe (Result, Result))]
+
+processParsedTFile tfilepath initial_global_env topdefs
+   = do putStr "\n"   
+        officialMsg ("=== running tests in: " ++ tfilepath ++ " ===")
+        let tests     = filter isTTest     topdefs
         let macs      = filter isTMacroDef topdefs
         let incls     = filter isTInclude  topdefs -- should be []
         let topbinds  = [(var,expr) | TAssign var expr <- topdefs]
         let macro_env = map (\(TMacroDef mnm mrhs) -> (mnm,mrhs)) macs
-        maybe_global_env <- evalTopBinds initial_global_env topbinds
-        case maybe_global_env of
-           Left barfage -> 
-              return [(tname, Left barfage) | TTest tname trhs <- tests]
-           Right global_env -> 
-              do let doOne (TTest tname stmts)
-                        = do r <- doOneTest (("testname", tname):global_env)
-                                            macro_env stmts
-                             return (tname, r)
-                 all_done <- mapM doOne tests
-                 return all_done
-
+        ei_global_env <- evalTopBinds initial_global_env topbinds
+        case ei_global_env of
+           Left barfage
+              -> do officialMsg barfage
+                    return [(TestID tfilepath tname, Nothing)
+                            | TTest tname trhs <- tests]
+           Right global_env
+              -> do all_done <- mapM (doOne global_env macro_env) tests
+                    return all_done
+     where
+        doOne global_env macro_env (TTest tname stmts)
+           = do putStr "\n"
+                let test_id = TestID tfilepath tname
+                officialMsg ("=== " ++ show test_id ++ " ===")
+                r <- doOneTest (("testname", tname):global_env)
+                                macro_env stmts
+                case r of
+                   Left barfage -> do officialMsg barfage
+                                      return (test_id, Nothing)
+                   Right res -> return (test_id, Just res)
 
 
 evalTopBinds :: [(Var, String)]		-- pre-set global bindings
@@ -225,11 +240,16 @@ evalTopBinds :: [(Var, String)]		-- pre-set global bindings
                            [(Var, String)]{-augmented global binds-})
 
 evalTopBinds globals binds
-   = let f_map      = [(v, nub (freeVars e)) | (v,e) <- binds]
-         eval_order = topSort f_map
-         in_order   = [ (v, unJust (lookup v binds)) | v <- eval_order ]
+   = let f_map = [(v, nub (freeVars e)) | (v,e) <- binds]
      in 
-         loop globals in_order
+     case topSort f_map of
+        Left circular_vars
+           -> return (Left ("circular dependencies for top-level vars: " 
+                           ++ unwords (map ('$':) circular_vars)))
+        Right eval_order
+           -> let in_order = [ (v, unJust (lookup v binds)) | v <- eval_order ]
+              in
+              loop globals in_order
      where
         loop acc [] 
            = return (Right acc)
@@ -364,7 +384,7 @@ doStmt (SRun var expr)
 
 doStmt (SFFail expr)
    = evalExpr expr				`thenEV` \ res ->
-     failEV ("user-frame-fail: " ++ res)
+     failagainEV ("user-framework-fail: " ++ res)
 doStmt (SResult res expr)
    = evalExprToBool expr			`thenEV` \ b ->
      whenEV b (setResult True{-actual-} res)	`thenEV_`
@@ -385,8 +405,11 @@ doStmt (SReturn expr)
 
 runMacro :: MacroName -> [Expr] -> IOEV (Maybe String)
 runMacro mnm args
-   = lookupMacro mnm				`thenEV` \ mdef ->
+   = 
+     lookupMacro mnm				`thenEV` \ mdef ->
      case mdef of { MacroDef formals stmts ->
+     --ioToEV (putStrLn ("running macro " ++ mnm ++ " with formals " ++ show formals))
+     --    `thenEV` \ _ ->
      length formals				`bind` \ n_formals ->
      length args				`bind` \ n_args ->
      if   n_formals /= n_args
@@ -395,9 +418,12 @@ runMacro mnm args
           zip formals arg_vals			`bind`  \ new_local_env ->
           getLocalEnv				`thenE` \ our_local_env ->
           setLocalEnv new_local_env		`thenE_`
+          getLocalEnv `thenE` \ xxx ->
+          --trace ("local env = " ++ show xxx) (
           doStmts stmts				`thenEV` \ res ->
           setLocalEnv our_local_env		`thenE_`
           returnEV res
+          --)
      }
 
 
@@ -491,10 +517,12 @@ evalExpr (ECond c t maybe_f)
              Nothing -> returnEV ""
              Just f  -> evalExpr f
 evalExpr (EVar v)
-   = lookupVar v
+   = --trace (show v) (
+     lookupVar v
+     --)
 evalExpr (EFFail expr)
    = evalExpr expr				`thenEV` \ res ->
-     failEV ("user-frame-fail: " ++ res)
+     failEV ("user-framework-fail: " ++ res)
 
 evalExpr (EMacro mnm args)
    = runMacro mnm args				`thenEV` \ maybe_v ->
@@ -511,26 +539,17 @@ doesFileExistEV filename
      returnEV b
 
 
--- If filename doesn't contain any slashes, stick $testdir/ on
--- the front of it.
+-- Get the contents of a file.
 readFileEV :: String -> IOEV String
 readFileEV filename
-   = --qualify filename0 			`thenE` \ filename ->
-     ioToEV (doesFileExist filename) 		`thenEV` \ exists ->
+   = ioToEV (doesFileExist filename) 		`thenEV` \ exists ->
      if   not exists 
      then failEV (cantOpen filename)
      else ioToEV (readFile filename) 		`thenEV` \ contents ->
      returnEV contents
---     where
---        qualify fn 
---           | '/' `elem` fn 
---           = returnE fn
---           | otherwise 
---           = lookupVar p "testdir"	`thenE` \ testdir ->
---             returnE (testdir ++ "/" ++ fn)
 
 
-
+-- Run a command.
 systemEV :: String -> IOEV Int
 systemEV str
    = ioToEV (my_system str) 			`thenEV` \ ret_code ->
