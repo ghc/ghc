@@ -222,7 +222,7 @@ doGeneralAlloc all_regs reserve_regs instrs
               ++ " using " 
               ++ showSDoc (hsep (map ppr reserve_regs))
 
-#        ifdef DEBUG
+#        ifdef NCG_DEBUG
          maybetrace msg x = trace msg x
 #        else
          maybetrace msg x = x
