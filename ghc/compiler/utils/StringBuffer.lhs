@@ -75,6 +75,9 @@ import Char (isDigit)
 # if __GLASGOW_HASKELL__ == 202
 import PrelBase ( Char(..) )
 # endif
+# if __GLASGOW_HASKELL__ >= 206
+import PackBase 
+# endif
 #endif
 import PrimPacked
 import FastString
