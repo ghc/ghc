@@ -152,7 +152,7 @@ getServiceByName :: ServiceName 	-- Service Name
 getServiceByName name proto = do
  ptr <- _ccall_ getservbyname name proto
  if ptr == nullAddr
-    then fail (IOError Nothing NoSuchThing "no such service entry")
+    then fail (IOError Nothing NoSuchThing "getServiceByName" "no such service entry")
     else unpackServiceEntry ptr
 
 getServiceByPort :: PortNumber
@@ -161,7 +161,7 @@ getServiceByPort :: PortNumber
 getServiceByPort (PNum port) proto = do
     ptr <- _ccall_ getservbyport port proto
     if ptr == nullAddr
-       then fail (IOError Nothing NoSuchThing "no such service entry")
+       then fail (IOError Nothing NoSuchThing "getServiceByPort" "no such service entry")
        else unpackServiceEntry ptr
 		   
 getServicePortNumber :: ServiceName -> IO PortNumber
@@ -174,7 +174,7 @@ getServiceEntry	:: IO ServiceEntry
 getServiceEntry = do
     ptr <- _ccall_ getservent
     if ptr == nullAddr
-       then fail (IOError Nothing NoSuchThing "no such service entry")
+       then fail (IOError Nothing NoSuchThing "getServiceEntry" "no such service entry")
        else unpackServiceEntry ptr
 
 setServiceEntry	:: Bool -> IO ()
@@ -218,14 +218,14 @@ getProtocolEntries  :: Bool -> IO [ProtocolEntry]
 getProtocolByName name = do
  ptr <- _ccall_ getprotobyname name
  if ptr == nullAddr
-    then fail (IOError Nothing NoSuchThing "no such protocol entry")
+    then fail (IOError Nothing NoSuchThing "getProtocolByName" "no such protocol entry")
     else unpackProtocolEntry ptr
 
 --getProtocolByNumber :: ProtocolNumber -> IO ProtocolEntry
 getProtocolByNumber num = do
  ptr <- _ccall_ getprotobynumber num
  if ptr == nullAddr
-    then fail (IOError Nothing NoSuchThing "no such protocol entry")
+    then fail (IOError Nothing NoSuchThing "getProtocolByNumber" "no such protocol entry")
     else unpackProtocolEntry ptr
 
 --getProtocolNumber :: ProtocolName -> IO ProtocolNumber
@@ -238,7 +238,7 @@ getProtocolNumber proto = do
 getProtocolEntry = do
  ptr <- _ccall_ getprotoent
  if ptr == nullAddr
-    then fail (IOError Nothing NoSuchThing "no such protocol entry")
+    then fail (IOError Nothing NoSuchThing "getProtocolEntry" "no such protocol entry")
     else unpackProtocolEntry ptr
 
 --setProtocolEntry :: Bool -> IO ()	-- Keep DB Open ?
@@ -261,7 +261,7 @@ getHostByName :: HostName -> IO HostEntry
 getHostByName name = do
     ptr <- _ccall_ gethostbyname name
     if ptr == nullAddr
-       then fail (IOError Nothing NoSuchThing "no such host entry")
+       then fail (IOError Nothing NoSuchThing "getHostByName" "no such host entry")
        else unpackHostEntry ptr
 
 getHostByAddr :: Family -> HostAddress -> IO HostEntry
@@ -272,7 +272,7 @@ getHostByAddr family addr = do
                addr
                (packFamily family)
  if ptr == nullAddr
-    then fail (IOError Nothing NoSuchThing "no such host entry")
+    then fail (IOError Nothing NoSuchThing "getHostByAddr" "no such host entry")
     else unpackHostEntry ptr
 
 #ifndef cygwin32_TARGET_OS
@@ -280,7 +280,7 @@ getHostEntry :: IO HostEntry
 getHostEntry = do
  ptr <- _ccall_ gethostent
  if ptr == nullAddr
-    then fail (IOError Nothing NoSuchThing "unable to retrieve host entry")
+    then fail (IOError Nothing NoSuchThing "getHostEntry" "unable to retrieve host entry")
     else unpackHostEntry ptr
 
 setHostEntry :: Bool -> IO ()
@@ -324,21 +324,21 @@ getNetworkByName :: NetworkName -> IO NetworkEntry
 getNetworkByName name = do
  ptr <- _ccall_ getnetbyname name
  if ptr == nullAddr
-    then fail (IOError Nothing NoSuchThing "no such network entry")
+    then fail (IOError Nothing NoSuchThing "getNetworkByName" "no such network entry")
     else unpackNetworkEntry ptr
 
 getNetworkByAddr :: NetworkAddr -> Family -> IO NetworkEntry
 getNetworkByAddr addr family = do
  ptr <-  _ccall_ getnetbyaddr addr (packFamily family)
  if ptr == nullAddr
-    then fail (IOError Nothing NoSuchThing "no such network entry")
+    then fail (IOError Nothing NoSuchThing "getNetworkByAddr" "no such network entry")
     else unpackNetworkEntry ptr
 
 getNetworkEntry :: IO NetworkEntry
 getNetworkEntry = do
  ptr <- _ccall_ getnetent
  if ptr == nullAddr
-   then fail (IOError Nothing NoSuchThing "no more network entries")
+   then fail (IOError Nothing NoSuchThing "getNetworkEntry" "no more network entries")
    else unpackNetworkEntry ptr
 
 setNetworkEntry :: Bool -> IO ()
