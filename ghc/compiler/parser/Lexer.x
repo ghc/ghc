@@ -166,6 +166,14 @@ $white_no_nl+ 				;
    -- NOTE: accept -} at the end of a LINE pragma, for compatibility
    -- with older versions of GHC which generated these.
 
+-- We only want RULES pragmas to be picked up when -fglasgow-exts
+-- is on, because the contents of the pragma is always written using
+-- glasgow-exts syntax (using forall etc.), so if glasgow exts are not
+-- enabled, we're sure to get a parse error.
+-- (ToDo: we should really emit a warning when ignoring pragmas)
+<glaexts>
+  "{-#" $whitechar* (RULES|rules)	{ token ITrules_prag }
+
 <0,glaexts> {
   "{-#" $whitechar* (SPECIALI[SZ]E|speciali[sz]e)
   					{ token ITspecialise_prag }
@@ -173,7 +181,6 @@ $white_no_nl+ 				;
   "{-#" $whitechar* (INLINE|inline)	{ token ITinline_prag }
   "{-#" $whitechar* (NO(T?)INLINE|no(t?)inline)
   					{ token ITnoinline_prag }
-  "{-#" $whitechar* (RULES|rules)	{ token ITrules_prag }
   "{-#" $whitechar* (DEPRECATED|deprecated)
   					{ token ITdeprecated_prag }
   "{-#" $whitechar* (SCC|scc)		{ token ITscc_prag }
