@@ -3604,11 +3604,14 @@ hammeredLookup :: Ord key => [(key, value)] -> key -> value
 {-# SPECIALIZE hammeredLookup :: [(Widget, value)] -> Widget -> value #-}
 </programlisting>
 
+      <para>A <literal>SPECIALIZE</literal> pragma for a function can
+      be put anywhere its type signature could be put.</para>
+
       <para>To get very fancy, you can also specify a named function
       to use for the specialised value, as in:</para>
 
 <programlisting>
-{-# RULES hammeredLookup = blah #-}
+{-# RULES "hammeredLookup" hammeredLookup = blah #-}
 </programlisting>
 
       <para>where <literal>blah</literal> is an implementation of
@@ -3631,7 +3634,7 @@ hammeredLookup :: Ord key => [(key, value)] -> key -> value
 toDouble :: Real a => a -> Double
 toDouble = fromRational . toRational
 
-{-# SPECIALIZE toDouble :: Int -> Double = i2d #-}
+{-# RULES "toDouble/Int" toDouble = i2d #-}
 i2d (I# i) = D# (int2Double# i) -- uses Glasgow prim-op directly
 </programlisting>
 
@@ -3639,9 +3642,6 @@ i2d (I# i) = D# (int2Double# i) -- uses Glasgow prim-op directly
       instruction; the default conversion&mdash;via an intermediate
       <literal>Rational</literal>&mdash;is obscenely expensive by
       comparison.</para>
-
-      <para>A <literal>SPECIALIZE</literal> pragma for a function can
-      be put anywhere its type signature could be put.</para>
 
     </sect2>
 
