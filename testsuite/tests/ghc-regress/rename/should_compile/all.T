@@ -31,7 +31,7 @@ test('rn037', normal, compile, [''])
 # test('rn038', normal, compile, [''])
 
 test('rn039', normal, compile, [''])
-test('rn040', expect_fail, compile, [''])
+test('rn040', normal, compile, ['-fwarn-unused-binds -fwarn-unused-matches'])
 test('rn041', normal, compile, [''])
 test('rn042', normal, multimod_compile, ['rn042', '-v0'])
 test('rn043', normal, multimod_compile, ['rn042', '-v0'])
