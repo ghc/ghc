@@ -59,7 +59,7 @@ import OccName          ( mkSysOccFS,
 			  tcName, varName, ipName, dataName, clsName, tvName, uvName,
 			  EncodedFS 
 			)
-import Module           ( ModuleName, PackageName, mkSysModuleFS, mkModule )			
+import Module           ( ModuleName, PackageName, mkSysModuleNameFS, mkModule )
 import SrcLoc		( SrcLoc )
 import CmdLineOpts	( opt_InPackage )
 import Outputable
@@ -246,7 +246,7 @@ import_part :				    		  { [] }
 	    
 import_decl :: { ImportVersion OccName }
 import_decl : 'import' mod_name orphans is_boot whats_imported ';'
-			{ (mkSysModuleFS $2, $3, $4, $5) }
+			{ (mkSysModuleNameFS $2, $3, $4, $5) }
 
 orphans		    :: { WhetherHasOrphans }
 orphans		    : 						{ False }
@@ -275,7 +275,7 @@ name_version_pair   :  var_occ version			        { ($1, $2) }
 exports_part	:: { [ExportItem] }
 exports_part	:  					{ [] }
 		| '__export' mod_name entities ';'
-			exports_part 			{ (mkSysModuleFS $2, $3) : $5 }
+			exports_part 			{ (mkSysModuleNameFS $2, $3) : $5 }
 
 entities	:: { [RdrAvailInfo] }
 entities	: 					{ [] }
@@ -562,7 +562,7 @@ package		:: { PackageName }
 								-- Module loops are always within a package
 
 mod_name	:: { ModuleName }
-		:  CONID		{ mkSysModuleFS $1 }
+		:  CONID		{ mkSysModuleNameFS $1 }
 
 
 ---------------------------------------------------
