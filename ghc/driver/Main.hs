@@ -1200,7 +1200,7 @@ newTempName extn = do
 
 do_mkdependHS :: [String] -> [String] -> IO ()
 do_mkdependHS cmd_opts srcs = do
-	-- ToDo: push (@MkDependHS_flags, "-o$Osuffix") if $Osuffix;
+
     -- 	# They're not (currently) needed, but we need to quote any -#include options
     -- foreach (@Cmd_opts) {
     -- 	   s/-#include.*$/'$&'/g;
