@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.21 2000/07/04 09:33:43 simonmar Exp $
+# $Id: Makefile,v 1.22 2000/07/09 16:06:28 panne Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -51,5 +51,8 @@ ifneq "$(way)" "dll"
 INSTALL_LIBS += $(patsubst %.a, %_imp.a, $(LIBRARY))
 endif
 endif
+
+override datadir:=$(libdir)/includes
+INSTALL_DATAS += HsStd.h stgio.h stgerror.h fileObject.h
 
 include $(TOP)/mk/target.mk
