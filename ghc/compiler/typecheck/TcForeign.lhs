@@ -42,8 +42,8 @@ import Type		( splitFunTys
 			, splitForAllTys
 			)
 import TysWiredIn	( isFFIArgumentTy, isFFIResultTy, 
-			  isFFIExternalTy, isAddrTy,
-			  isFFIDynResultTy, isFFILabelTy
+			  isFFIExternalTy, isFFIDynArgumentTy, isFFIDynResultTy,
+			  isFFILabelTy
 			)
 import Type             ( Type )
 import Unique
@@ -168,7 +168,7 @@ checkForeignImport is_dynamic is_safe ty args res
    case args of
      []     -> check False (illegalForeignTyErr True{-Arg-} ty)
      (x:xs) ->
-        check (isAddrTy x) (illegalForeignTyErr True{-Arg-} ty) `thenTc_`
+        check (isFFIDynArgumentTy x) (illegalForeignTyErr True{-Arg-} ty) `thenTc_`
         mapTc (checkForeignArg (isFFIArgumentTy is_safe)) xs	`thenTc_`
 	checkForeignRes True {-NonIO ok-} isFFIResultTy res
  | otherwise =
@@ -180,7 +180,7 @@ checkForeignExport is_dynamic ty args res
  | is_dynamic = 
     -- * the first (and only!) arg has got to be a function type
     --   and it must return IO t
-    -- * result type is an Addr or IO Addr
+    -- * result type is IO Addr
    case args of
      [arg]  ->
 	case splitFunTys arg of

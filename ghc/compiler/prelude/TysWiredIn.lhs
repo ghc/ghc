@@ -62,13 +62,14 @@ module TysWiredIn (
 	wordTy,
 	wordTyCon,
 
-	isFFIArgumentTy,  -- :: Bool -> Type -> Bool
-	isFFIResultTy,    -- :: Type -> Bool
-	isFFIExternalTy,  -- :: Type -> Bool
- 	isFFIDynResultTy, -- :: Type -> Bool
- 	isFFILabelTy,     -- :: Type -> Bool
-	isAddrTy,	  -- :: Type -> Bool
-	isForeignObjTy    -- :: Type -> Bool
+	isFFIArgumentTy,    -- :: Bool -> Type -> Bool
+	isFFIResultTy,      -- :: Type -> Bool
+	isFFIExternalTy,    -- :: Type -> Bool
+        isFFIDynArgumentTy, -- :: Type -> Bool
+ 	isFFIDynResultTy,   -- :: Type -> Bool
+ 	isFFILabelTy,       -- :: Type -> Bool
+	isAddrTy,	    -- :: Type -> Bool
+	isForeignObjTy      -- :: Type -> Bool
 
     ) where
 
@@ -361,10 +362,17 @@ isFFIResultTy :: Type -> Bool
 -- But we allow () as well
 isFFIResultTy ty = checkRepTyCon (\tc -> tc == unitTyCon || legalIncomingTyCon tc) ty
 
+isFFIDynArgumentTy :: Type -> Bool
+-- The argument type of a foreign import dynamic must be either Addr, or
+-- a newtype of Addr.
+isFFIDynArgumentTy = checkRepTyCon (== addrTyCon)
+
+isFFIDynResultTy :: Type -> Bool
 -- The result type of a foreign export dynamic must be either Addr, or
 -- a newtype of Addr.
 isFFIDynResultTy = checkRepTyCon (== addrTyCon)
 
+isFFILabelTy :: Type -> Bool
 -- The type of a foreign label must be either Addr, or
 -- a newtype of Addr.
 isFFILabelTy = checkRepTyCon (== addrTyCon)
