@@ -262,7 +262,8 @@ data HscLang
   | HscJava
 
 GLOBAL_VAR(hsc_lang, if cGhcWithNativeCodeGen == "YES" && 
-			 prefixMatch "i386" cTARGETPLATFORM
+			 (prefixMatch "i386" cTARGETPLATFORM ||
+			  prefixMatch "sparc" cTARGETPLATFORM)
 			then  HscAsm
 			else  HscC, 
 	   HscLang)
