@@ -49,6 +49,7 @@
 
 \title{The STG runtime system (revised)}
 \author{Simon Peyton Jones \\ Glasgow University and Oregon Graduate Institute \and
+Simon Marlow \\ Glasgow University \and
 Alastair Reid \\ Yale University} 
 
 \maketitle
@@ -716,24 +717,24 @@ closure; a BCO can be entered just like any other closure.  Hugs
 performs lambda-lifting during compilation to byte-code, and each
 top-level combinator becomes a BCO in the heap.
 
-\subsubsection{Thunks}
+\subsubsection{Thunks and partial applications}
 
 A thunk consists of a code pointer, and values for the free variables
 of that code.  Since Hugs byte-code is lambda-lifted, free variables
 become arguments and are expected to be on the stack by the called
 function.
 
-Hugs represents thunks with an AP object.  The AP object contains one
-or more pointers to other heap objects.  When it is entered, it pushes
-an update frame followed by its payload on the stack, and enters the
-first word (which will be a pointer to a BCO).  The layout of AP
-objects is described in more detail in Section \ref{sect:AP}.
+Hugs represents thunks with an @HUGS_AP@ object.  The @HUGS_AP@ object
+contains one or more pointers to other heap objects.  When it is
+entered, it pushes an update frame followed by its payload on the
+stack, and enters the first word (which will be a pointer to a BCO).
+The layout of @HUGS_AP@ objects is described in more detail in Section
+\ref{sect:HUGS-AP}.
 
-\subsubsection{Partial Applications}
+Partial applications are represented by @HUGS_PAP@ objects, which are
+identical to @HUGS_AP@s except that they are non-updatable.
 
-Partial applications are represented by PAP objects.  A PAP object is
-exactly the same as an AP object, except that it is non-updatable.
-The layout of PAP objects is described in Section \ref{sect:PAP}.
+\ToDo{Hugs Constructors}.
 
 \subsection{Calling conventions}
 \label{sect:hugs-calling-conventions}
@@ -751,21 +752,22 @@ The object being entered must be either
 
 \begin{itemize}
 \item A BCO,
-\item An AP,
-\item A PAP,
+\item A @HUGS_AP@,
+\item A @HUGS_PAP@,
 \item A constructor,
 \item A GHC-built closure, or
 \item An indirection.
 \end{itemize}
 
 If @ENTER@ is applied to a BCO, we just begin interpreting the
-byte-code contained therein.  If the object is an AP, we push an
-update frame, push the values from the AP on the stack, and enter its
-associated object.  If the object is a PAP, we push its values on the
-stack and enter the first one.  If the object is a constructor, we
-simply return (see Section \ref{sect:hugs-return-convention}).  The
-fourth case is convered in Section \ref{sect:hugs-to-ghc-closure}.  If
-the object is an indirection, we simply enter the object it points to.
+byte-code contained therein.  If the object is an @HUGS_AP@, we push an
+update frame, push the values from the @HUGS_AP@ on the stack, and enter
+its associated object.  If the object is a @HUGS_PAP@, we push its
+values on the stack and enter the first one.  If the object is a
+constructor, we simply return (see Section
+\ref{sect:hugs-return-convention}).  The fourth case is convered in
+Section \ref{sect:hugs-to-ghc-closure}.  If the object is an
+indirection, we simply enter the object it points to.
 
 \subsection{Return convention}
 \label{sect:hugs-return-convention}
@@ -773,7 +775,7 @@ the object is an indirection, we simply enter the object it points to.
 When Hugs pushes a return address, it pushes both a pointer to the BCO
 to return to, and a pointer to a static code fragment @HUGS_RET@ (this
 will be described in Section \ref{sect:ghc-to-hugs-return}).  The
-stack layout is shown in Figure \ref{fig:hugs-return-fig}.
+stack layout is shown in Figure \ref{fig:hugs-return-stack}.
 
 \begin{figure}
 \begin{center}
@@ -799,7 +801,7 @@ the second word on the stack):
 
 \item If the return address is @HUGS_RET@, rearrange the stack so that
 it has the returned object followed by the pointer to the BCO at the
-top, then enter the BCO (Figure \ref{fig:hugsreturn2}).
+top, then enter the BCO (Figure \ref{fig:hugs-return2}).
 
 \item If the top of the stack is not @HUGS_RET@, we need to do a world
 switch as described in Section \ref{sect:hugs-to-ghc-return}.
@@ -915,13 +917,14 @@ switch happens in each situation.
 \subsection{A GHC thread enters a Hugs-built closure}
 \label{sect:ghc-to-hugs-closure}
 
-There are two possibilities: GHC has entered the BCO directly (for a
-top-level function closure), or it has entered an AP.
+There are three possibilities: GHC has entered the BCO directly (for a
+top-level function closure), it has entered a @HUGS_AP@, or it has
+entered a @HUGS_PAP@.
 
-The code for both objects is the same:
+The code for all three objects is the same:
 
 \begin{itemize}
-\item Push the address of the BCO on the stack.
+\item Push the address of the object entered on the stack.
 \item Save the current state of the thread in its TSO.
 \item Return to the scheduler, setting @whatNext@ to @EnterHugs@.
 \end{itemize}
@@ -952,8 +955,10 @@ Hugs can recognise a GHC-built closure as not being one of the
 following types of object:
 
 \begin{itemize}
-\item A BCO.
-\item An AP.
+\item A @BCO@,
+\item A @HUGS_AP@,
+\item A @HUGS_PAP@,
+\item An indirection, or
 \item A constructor.
 \end{itemize}
 
@@ -1016,19 +1021,18 @@ though GUM keeps a separate hash table).
 \item Statistics (e.g. a word to track how many times a thunk is entered.).
 
 We add a Ticky word to the fixed-header part of closures.  This is
-used to record indicate if a closure has been updated but not yet
-entered. It is set when the closure is updated and cleared when
-subsequently entered.
+used to indicate if a closure has been updated but not yet entered. It
+is set when the closure is updated and cleared when subsequently
+entered.
 
 NB: It is {\em not} an ``entry count'', it is an
 ``entries-after-update count.''  The commoning up of @CONST@,
 @CHARLIKE@ and @INTLIKE@ closures is turned off(?) if this is
 required. This has only been done for 2s collection.
 
-
-
 \end{itemize}
 \end{itemize}
+
 Most of the RTS is completely insensitive to the number of admin words.
 The total size of the fixed header is @FIXED_HS@.
 
@@ -1082,12 +1086,11 @@ successive decreasing memory addresses.
    \hline Parallelism Info 
 \\ \hline Profile Info 
 \\ \hline Debug Info 
-\\ \hline Tag/bytecode pointer
-\\ \hline Static reference table 
+\\ \hline Tag / Static reference table
 \\ \hline Storage manager layout info
 \\ \hline Closure type 
-\\ \hline entry code \ldots
-\\ \hline
+\\ \hline entry code
+\\       \vdots
 \end{tabular}
 \end{center}
 An info table has the following contents (working backwards in memory
@@ -1110,24 +1113,12 @@ are represented as high-order bits so they can be tested quickly.
 precise layout, for the benefit of the garbage collector and the code
 that stuffs graph into packets for transmission over the network.
 
-\item A one-pointer {\em Static Reference Table (SRT) pointer}, @INFO_SRT@, points to
-a table which enables the garbage collector to identify all accessible
-code and CAFs.  They are fully described in Section~\ref{sect:srt}.
-
-\item A one-pointer {\em tag/bytecode-pointer} field, @INFO_TAG@ or @INFO_BC@.  
-For data constructors this field contains the constructor tag, in the
-range $0..n-1$ where $n$ is the number of constructors.
-
-For other objects that can be entered this field points to the byte
-codes for the object.  For the constructor case you can think of the
-tag as the name of a a suitable bytecode sequence but it can also be used to
-implement semi-tagging (section~\ref{sect:semi-tagging}).
-
-One awkward question (which may not belong here) is ``how does the
-bytecode interpreter know whether to do a vectored return?''  The
-answer is it examines the @INFO_TYPE@ field of the return address:
-@RET_VEC_@$sz$ requires a vectored return and @RET_@$sz$ requires a
-direct return.
+\item A one-word {\em Tag/Static Reference Table} field, @INFO_SRT@.
+For data constructors, this field contains the constructor tag, in the
+range $0..n-1$ where $n$ is the number of constructors.  For all other
+objects it contains a pointer to a table which enables the garbage
+collector to identify all accessible code and CAFs.  They are fully
+described in Section~\ref{sect:srt}.
 
 \item {\em Profiling info\/}
 
@@ -1228,8 +1219,8 @@ Something internal to the runtime system.
 \end{itemize}
 
 
-
-\section{Kinds of Heap Object}
+%-----------------------------------------------------------------------------
+\subsection{Kinds of Heap Object}
 \label{sect:closures}
 
 Heap objects can be classified in several ways, but one useful one is
@@ -1293,42 +1284,48 @@ closure kind          & HNF & UPD & NS & STA & THU & MUT & UPT & BH & IND & Sect
 {\em Pointed} \\ 
 \hline 
 
-@CONSTR@              & 1   &     & 1  &     &     &     &     &    &     & \ref{sect:CONSTR}    \\
-@CONSTR_STATIC@       & 1   &     & 1  & 1   &     &     &     &    &     & \ref{sect:CONSTR}    \\
-@CONSTR_STATIC_NOCAF@ & 1   &     & 1  & 1   &     &     &     &    &     & \ref{sect:CONSTR}    \\
-											         
-@FUN@                 & 1   &     & ?  &     &     &     &     &    &     & \ref{sect:FUN}       \\
-@FUN_STATIC@          & 1   &     & ?  & 1   &     &     &     &    &     & \ref{sect:FUN}       \\
-											         
-@THUNK@               & 1   & 1   &    &     & 1   &     &     &    &     & \ref{sect:THUNK}     \\
-@THUNK_STATIC@        & 1   & 1   &    & 1   & 1   &     &     &    &     & \ref{sect:THUNK}     \\
-@THUNK_SELECTOR@      & 1   & 1   & 1  &     & 1   &     &     &    &     & \ref{sect:THUNK_SEL}     \\
-											         
-@PAP@                 & 1   &     & ?  &     &     &     &     &    &     & \ref{sect:PAP}       \\
-											         
-@IND@                 &     &     & 1  &     & ?   &     &     &    & 1   & \ref{sect:IND}       \\
-@IND_OLDGEN@          & 1   &     & 1  &     & ?   &     &     &    & 1   & \ref{sect:IND}       \\
-@IND_PERM@            &     &     & 1  &     & ?   &     &     &    & 1   & \ref{sect:IND}       \\
-@IND_OLDGEN_PERM@     & 1   &     & 1  &     & ?   &     &     &    & 1   & \ref{sect:IND}       \\
-@IND_STATIC@          & ?   &     & 1  & 1   & ?   &     &     &    & 1   & \ref{sect:IND}       \\
+@CONSTR@              & 1 &   & 1 &   &   &   &   &   &   & \ref{sect:CONSTR}    \\
+@CONSTR_STATIC@       & 1 &   & 1 & 1 &   &   &   &   &   & \ref{sect:CONSTR}    \\
+@CONSTR_STATIC_NOCAF@ & 1 &   & 1 & 1 &   &   &   &   &   & \ref{sect:CONSTR}    \\
 
-\hline
-{\em Unpointed} \\ 
-\hline
+@FUN@                 & 1 &   & ? &   &   &   &   &   &   & \ref{sect:FUN}       \\
+@FUN_STATIC@          & 1 &   & ? & 1 &   &   &   &   &   & \ref{sect:FUN}       \\
 
+@THUNK@               &   & 1 &   &   & 1 &   &   &   &   & \ref{sect:THUNK}     \\
+@THUNK_STATIC@        &   & 1 &   & 1 & 1 &   &   &   &   & \ref{sect:THUNK}     \\
+@THUNK_SELECTOR@      &   & 1 & 1 &   & 1 &   &   &   &   & \ref{sect:THUNK_SEL} \\
 
-@ARR_WORDS@           & 1   &     & 1  &     &     & 1   & 1   &    &     & \ref{sect:ARR_WORDS1},\ref{sect:ARR_WORDS2} \\
-@ARR_PTRS@            & 1   &     & 1  &     &     & 1   & 1   &    &     & \ref{sect:ARR_PTRS}  \\
-@MUTVAR@              & 1   &     & 1  &     &     & 1   & 1   &    &     & \ref{sect:MUTVAR}    \\
-@MUTARR_PTRS@         & 1   &     & 1  &     &     & 1   & 1   &    &     & \ref{sect:MUTARR_PTRS} \\
-@MUTARR_PTRS_FROZEN@  & 1   &     & 1  &     &     & 1   & 1   &    &     & \ref{sect:MUTARR_PTRS_FROZEN} \\
+@BCO@		      & 1 &   & 1 &   &   &   &   &   &   & \ref{sect:BCO}       \\
+@BCO_CAF@	      &   & 1 &   &   & 1 &   &   &   &   & \ref{sect:BCO}       \\
 
-@FOREIGN@             & 1   &     & 1  &     &     &     & 1   &    &     & \ref{sect:FOREIGN}   \\
+@HUGS_AP@	      &   & 1 &   &   & 1 &   &   &   &   & \ref{sect:HUGS-AP}   \\
+@HUGS_PAP@	      &   &   & 1 &   &   &   &   &   &   & \ref{sect:HUGS-AP}   \\
 
-@BH@                  & ?   & 0/1 & 1  &     & ?   & ?   &     & 1  & ?   & \ref{sect:BH}        \\
-@MVAR@ 		      &     &     &    &     &     &     &     &    &     & \ref{sect:MVAR}      \\
-@IVAR@ 		      &     &     &    &     &     &     &     &    &     & \ref{sect:IVAR}      \\
-@FETCHME@             &     &     &    &     &     &     &     &    &     & \ref{sect:FETCHME}   \\
+@PAP@                 & 1 &   & 1 &   &   &   &   &   &   & \ref{sect:PAP}       \\
+
+@IND@                 & ? &   & ? &   & ? &   &   &   & 1 & \ref{sect:IND}       \\
+@IND_OLDGEN@          & ? &   & ? &   & ? &   &   &   & 1 & \ref{sect:IND}       \\
+@IND_PERM@            & ? &   & ? &   & ? &   &   &   & 1 & \ref{sect:IND}       \\
+@IND_OLDGEN_PERM@     & ? &   & ? &   & ? &   &   &   & 1 & \ref{sect:IND}       \\
+@IND_STATIC@          & ? &   & ? & 1 & ? &   &   &   & 1 & \ref{sect:IND}       \\
+			     	     	     	      	 
+\hline			     	     	     	      	 
+{\em Unpointed} \\ 	     	     	     	      	 
+\hline			     	     	     	      	 
+			     	     	     	      	 
+			     	     	     	      	 
+@ARR_WORDS@           & 1 &   & 1 &   &   &   & 1 &   &   & \ref{sect:ARR_WORDS1},\ref{sect:ARR_WORDS2} \\
+@ARR_PTRS@            & 1 &   & 1 &   &   &   & 1 &   &   & \ref{sect:ARR_PTRS}  \\
+@MUTVAR@              & 1 &   & 1 &   &   & 1 & 1 &   &   & \ref{sect:MUTVAR}    \\
+@MUTARR_PTRS@         & 1 &   & 1 &   &   & 1 & 1 &   &   & \ref{sect:MUTARR_PTRS} \\
+@MUTARR_PTRS_FROZEN@  & 1 &   & 1 &   &   & 1 & 1 &   &   & \ref{sect:MUTARR_PTRS_FROZEN} \\
+			     	     	     	      	 
+@FOREIGN@             & 1 &   & 1 &   &   &   & 1 &   &   & \ref{sect:FOREIGN}   \\
+			     	     	     	      	 
+@BH@                  &   & 1 & 1 &   & ? & ? &   & 1 & ? & \ref{sect:BH}        \\
+@MVAR@ 		      & 1 &   & 1 &   &   &   &   &   &   & \ref{sect:MVAR}      \\
+@IVAR@ 		      & 1 &   & 1 &   &   &   &   &   &   & \ref{sect:IVAR}      \\
+@FETCHME@             & 1 &   & 1 &   &   &   &   &   &   & \ref{sect:FETCHME}   \\
 \hline
 \end{tabular}
 
@@ -1467,8 +1464,14 @@ under evaluation (BH), or by now an HNF.  Thus, indirections get NoSpark flag.
 \label{sect:BCO}
 
 A Byte-Code Object (BCO) is a container for a a chunk of byte-code,
-which can be executed by Hugs.  For a top-level function, the BCO also
-serves as the closure for the function.
+which can be executed by Hugs.  The byte-code represents a
+supercombinator in the program: when hugs compiles a module, it
+performs lambda lifting and each resulting supercombinator becomes a
+byte-code object in the heap.
+
+There are two kinds of BCO: a standard @BCO@ which has an arity of one
+or more, and a @BCO_CAF@ which takes no arguments and can be updated.
+When a @BCO_CAF@ is updated, the code is thrown away!
 
 The semantics of BCOs are described in Section
 \ref{sect:hugs-heap-objects}.  A BCO has the following structure:
@@ -1476,7 +1479,7 @@ The semantics of BCOs are described in Section
 \begin{center}
 \begin{tabular}{|l|l|l|l|l|l|}
 \hline 
-\emph{BCO} & \emph{Layout} & \emph{Offset} & \emph{Size} &
+\emph{Fixed Header} & \emph{Layout} & \emph{Offset} & \emph{Size} &
 \emph{Literals} & \emph{Byte code} \\
 \hline
 \end{tabular}
@@ -1484,7 +1487,7 @@ The semantics of BCOs are described in Section
 
 \noindent where:
 \begin{itemize}
-\item \emph{BCO} is a pointer to a static code fragment/info table that
+\item The entry code is a static code fragment/info table that
 returns to the scheduler to invoke Hugs (Section
 \ref{sect:ghc-to-hugs-closure}).
 \item \emph{Layout} contains the number of pointer literals in the
@@ -1498,16 +1501,18 @@ the byte-codes (including jump addresses), pointers first.
 code.
 \end{itemize}
 
-\subsubsection{AP objects}
-\label{sect:AP}
+\subsubsection{@HUGS_AP@ objects}
+\label{sect:HUGS-AP}
 
-Hugs uses a standard object called an AP for thunks and partial
-applications.  The layout of an AP is
+There are two kinds of @HUGS_AP@ objects: a standard @HUGS_AP@, used
+to represent thunks buit by Hugs, and a @HUGS_PAP@, used for partial
+applications.  The only difference between the two is that a
+@HUGS_PAP@ is non-updatable.
 
 \begin{center}
 \begin{tabular}{|l|l|l|l|}
 \hline
-\emph{AP} & \emph{BCO} & \emph{Layout} & \emph{Free Variables} \\
+\emph{Fixed Header} & \emph{BCO} & \emph{Layout} & \emph{Free Variables} \\
 \hline
 \end{tabular}
 \end{center}
@@ -1515,14 +1520,19 @@ applications.  The layout of an AP is
 \noindent where:
 
 \begin{itemize}
-\item \emph{AP} is a pointer to a statically-compiled code
-fragment/info table that returns to the scheduler to invoke Hugs
-(Sections \ref{sect:ghc-to-hugs-closure}, \ref{sect:ghc-to-hugs-return}).
+
+\item The entry code is a statically-compiled code fragment/info table
+that returns to the scheduler to invoke Hugs (Sections
+\ref{sect:ghc-to-hugs-closure}, \ref{sect:ghc-to-hugs-return}).
+
 \item \emph{BCO} is a pointer to the BCO for the thunk.
+
 \item \emph{Layout} contains the number of pointers and the size of
 the \emph{Free Variables} field.
+
 \item \emph{Free Variables} contains the free variables of the
 thunk/partial application/return address, pointers first.
+
 \end{itemize}
 
 \subsection{Pointed Objects}
@@ -1569,7 +1579,7 @@ layout than dynamic ones:
 {\em Fixed header}  & {\em Static object link} \\ \hline
 \end{tabular}
 \end{center}
-Static function closurs have no free variables.  (However they may refer to other 
+Static function closures have no free variables.  (However they may refer to other 
 static closures; these references are recorded in the function closure's SRT.)
 They have one field that is not present in dynamic closures, the {\em static object
 link} field.  This is used by the garbage collector in the same way that to-space
@@ -1603,9 +1613,8 @@ closures.  That is
 \end{tabular}
 \end{center}
 
-The SRT pointer in a data constructor's info table is never used --- the
-code for a constructor does not make any static references.
-\note{Use it for something else??  E.g. tag?}
+The SRT pointer in a data constructor's info table is used for the
+constructor tag, since a constructor never has any static references.
 
 There are several different sorts of constructor:
 \begin{itemize}
