@@ -4,7 +4,7 @@
 
 The <tt/Weak/ library provides a "weak pointer" abstraction, giving
 the user some control over the garbage collection of specified
-objects, and allowing objects to be "finalised" with an arbitrary
+objects, and allowing objects to be "finalized" with an arbitrary
 Haskell IO computation when they die.
 
 Weak pointers partially replace the old foreign object interface, as
@@ -18,18 +18,17 @@ module Weak (
 	Weak,	    		-- abstract
 	-- instance Eq (Weak v)  
 
-	mkWeak,      		-- :: k -> v -> IO () -> IO (Weak v)
+	mkWeak,      		-- :: k -> v -> Maybe (IO ()) -> IO (Weak v)
 	deRefWeak, 		-- :: Weak v -> IO (Maybe v)
-	finalise,		-- :: Weak v -> IO ()
+	finalize,		-- :: Weak v -> IO ()
 
 	-- Not yet implemented
-	-- replaceFinaliser	-- :: Weak v -> IO () -> IO ()
+	-- replaceFinalizer	-- :: Weak v -> IO () -> IO ()
 
-	mkWeakPtr, 		-- :: k -> IO () -> IO (Weak k)
-	mkWeakPair, 		-- :: k -> v -> IO () -> IO (Weak (k,v))
-	mkWeakNoFinaliser,	-- :: k -> v -> IO (Weak v)
-	addFinaliser, 		-- :: k -> IO () -> IO ()
-	addForeignFinaliser 	-- :: ForeignObj -> IO () -> IO ()
+	mkWeakPtr, 		-- :: k -> Maybe (IO ()) -> IO (Weak k)
+	mkWeakPair, 		-- :: k -> v -> Maybe (IO ()) -> IO (Weak (k,v))
+	addFinalizer, 		-- :: k -> IO () -> IO ()
+	addForeignFinalizer 	-- :: ForeignObj -> IO () -> IO ()
    ) where
 </verb></tscreen>
 
@@ -61,8 +60,8 @@ occasionally, by deleting entries whose keys have died.
 The weak pointers in this library
 support another approach, called <em/finalisation/.
 When the key referred to by a weak pointer dies, the storage manager
-arranges to run a programmer-specified finaliser.  In the case of memo
-tables, for example, the finaliser could remove the key/value pair
+arranges to run a programmer-specified finalizer.  In the case of memo
+tables, for example, the finalizer could remove the key/value pair
 from the memo table.  
 
 Another difficulty with the memo table is that the value of a
@@ -78,20 +77,19 @@ We describe this in more detail below.
 <p>
 
 <tscreen><verb>
-	mkWeakPtr    :: a -> IO () -> IO (Weak a)
+	mkWeakPtr    :: a -> Maybe (IO ()) -> IO (Weak a)
 	deRefWeak    :: Weak a -> IO (Maybe a)
-	addFinaliser :: a -> IO () -> IO ()
+	addFinalizer :: a -> IO () -> IO ()
 </verb></tscreen>
 
-<tt/mkWeakPtr/ takes a value of any type <tt/a/, and a finaliser of
-type <tt/IO ()/, and returns a weak pointer object referring 
-to the value, of type <tt/Weak a/.
-It is in the <tt/IO/ monad because it has the
-side effect of arranging that the finaliser will be run when the
-object dies.  In what follows, a ``weak pointer object'', or ``weak
-pointer'' for short, means precisely ``a Haskell value of
-type <tt/Weak t/'' for some type <tt/t/.
-A weak pointer (object) is a first-class Haskell value; it can be passed to
+<tt/mkWeakPtr/ takes a value of any type <tt/a/, and maybe a finalizer
+of type <tt/IO ()/, and returns a weak pointer object referring to the
+value, of type <tt/Weak a/.  It is in the <tt/IO/ monad because it has
+the side effect of arranging that the finalizer (if there is one) will
+be run when the object dies.  In what follows, a ``weak pointer
+object'', or ``weak pointer'' for short, means precisely ``a Haskell
+value of type <tt/Weak t/'' for some type <tt/t/.  A weak pointer
+(object) is a first-class Haskell value; it can be passed to
 functions, stored in data structures, and so on.
 
 <tt/deRefWeak/ dereferences a weak pointer, returning <tt/Just v/ if
@@ -100,17 +98,17 @@ the value is still alive.  If the key has already died, then
 monad - the return value of <tt/deRefWeak/ depends on when the garbage
 collector runs.
 
-<tt/addFinaliser/ is just another name for <tt/mkWeakPtr/ except that
+<tt/addFinalizer/ is just another name for <tt/mkWeakPtr/ except that
 it throws the weak pointer itself away.  (The runtime system will
-remember that the weak pointer and hence the finaliser exists even if
+remember that the weak pointer and hence the finalizer exists even if
 the program has forgotten it.)
 
 <tscreen><verb>
-  addFinaliser :: a -> IO () -> IO ()
-  addFinaliser v f = do { mkWeakPtr v f; return () }
+  addFinalizer :: a -> IO () -> IO ()
+  addFinalizer v f = do { mkWeakPtr v f; return () }
 </verb></tscreen>
 
-The effect of <tt/addFinaliser/ is simply that the finaliser runs when
+The effect of <tt/addFinalizer/ is simply that the finalizer runs when
 the referenced object dies.
 
 The following properties hold:
@@ -120,40 +118,40 @@ The following properties hold:
 that object is considered dead; it returns <tt/Nothing/
 subsequently.
 <item>
-Every finaliser will eventually be run, exactly once, either
+Every finalizer will eventually be run, exactly once, either
 soon after the object dies, or at the end of the program.
 There is no requirement for the programmer to hold onto the
 weak pointer itself; finalisation is completely unaffected by
 whether the weak pointer itself is alive.
 <item>
 There may be multiple weak pointers to a single object.
-In this case, the finalisers for each of these weak pointers will
+In this case, the finalizers for each of these weak pointers will
 all be run in some arbitrary order, or perhaps concurrently,
-when the object dies.  If the programmer specifies a finaliser that
+when the object dies.  If the programmer specifies a finalizer that
 assumes it has the only reference to an object
 (for example, a file that it wishes to close), then the programmer
-must ensure that there is only one such finaliser.
+must ensure that there is only one such finalizer.
 <item>
-The storage manager attempts to run the finaliser(s) for an
+The storage manager attempts to run the finalizer(s) for an
 object soon after the object dies, but promptness is not guaranteed.
-(What is guaranteed is that the finaliser will
+(What is guaranteed is that the finalizer will
 eventually run, exactly once.)
 <item>
-At the moment when a finaliser is run, a call to <tt/deRefWeak/
+At the moment when a finalizer is run, a call to <tt/deRefWeak/
 will return <tt/Nothing/.
 <item>
-A finaliser may contain a pointer to the object, but that pointer
+A finalizer may contain a pointer to the object, but that pointer
 will not keep the object alive.  For example:
 <tscreen><verb>
   f :: Show a => a -> IO a
-  f x = addFinaliser x (print (show x))
+  f x = addFinalizer x (print (show x))
 </verb></tscreen>
-Here the finaliser <tt/print (show x)/ contains a reference to <tt/x/
+Here the finalizer <tt/print (show x)/ contains a reference to <tt/x/
 itself, but that does not keep <tt/x/ alive.  When that is the only
-reference to <tt/x/, the finaliser is run; and the message appears
+reference to <tt/x/, the finalizer is run; and the message appears
 on the screen.
 <item>
-A finaliser may even resurrect the object, by (say) storing it in
+A finalizer may even resurrect the object, by (say) storing it in
 some global data structure.
 </itemize>
 
@@ -163,10 +161,10 @@ some global data structure.
 The <tt/Weak/ library offers a slight generalisation of 
 the simple weak pointers described so far: 
 <tscreen><verb>
-        mkWeak :: k -> v -> IO () -> IO (Weak v)
+        mkWeak :: k -> v -> Maybe (IO ()) -> IO (Weak v)
 </verb></tscreen>
 <tt/mkWeak/ takes a key of any type <tt/k/ and a value of any type
-<tt/v/, as well as a finaliser, and returns a weak pointer of type
+<tt/v/, as well as a finalizer, and returns a weak pointer of type
 <tt/Weak v/.  
 
 <tt/deRefWeak/ returns the <em/value/ only, not the key, as its 
@@ -176,45 +174,31 @@ type (given above) implies:
 </verb></tscreen>
 However, <tt/deRefWeak/ returns <tt/Nothing/ if the <em/key/, not the
 value, has died.  Furthermore, references from the value to the key
-do not keep the key alive, in the same way that the finaliser does
+do not keep the key alive, in the same way that the finalizer does
 not keep the key alive.
 
 Simple weak pointers are readily defined in terms of these more general
 weak pointers:
 <tscreen><verb>
-  mkWeakPtr :: a -> IO () -> IO (Weak a)
+  mkWeakPtr :: a -> Maybe (IO ()) -> IO (Weak a)
   mkWeakPtr v f = mkWeak v v f
 </verb></tscreen>
 
 These more general weak pointers are enough to implement memo
 tables properly.
 
-A weak pointer can be finalised early, using the <tt/finalise/ operation:
+A weak pointer can be finalized early, using the <tt/finalize/ operation:
 
 <tscreen><verb>
-finalise :: Weak v -> IO ()
+finalize :: Weak v -> IO ()
 </verb></tscreen>
-
-When you don't need a finaliser, we provide the following operation:
-
-<tscreen><verb>
-mkWeakNoFinaliser :: k -> v -> IO (Weak v)
-mkWeakNoFinaliser k v = mkWeak k v (return ())
-</verb></tscreen>
-
-Which creates a weak pointer with a null finaliser.  Lots of null
-finalisers can be expensive, because each one runs in a separate
-thread, so the intention is that <tt/mkWeakNoFinaliser> avoids all the
-extra costs by generating a special kind of weak pointer without a
-finaliser.  So although the semantics of mkWeakNoFinaliser is as given
-above, its actual implementation is somewhat different.
 
 <sect1> A precise semantics
 <p>
 The above informal specification is fine for simple situations,
 but matters can get complicated.  In particular, it needs to
 be clear exactly when a key dies, so that any weak pointers 
-that refer to it can be finalised.
+that refer to it can be finalized.
 Suppose, for example, the value of one weak pointer refers
 to the key of another...does that keep the key alive?
 
@@ -222,9 +206,9 @@ The behaviour is simply this:
 
 <itemize>
 <item> If a weak pointer (object) refers to an <em/unreachable/
-key, it may be finalised.
+key, it may be finalized.
 <item> Finalisation means (a) arrange that subsequent calls
-to <tt/deRefWeak/ return <tt/Nothing/; and (b) run the finaliser.
+to <tt/deRefWeak/ return <tt/Nothing/; and (b) run the finalizer.
 </itemize>
 
 This behaviour depends on what it means for a key to be reachable.
@@ -240,7 +224,7 @@ A heap object is reachable if:
 <item> It is directly pointed to by a reachable object, other than
 a weak pointer object.
 <item> It is a weak pointer object whose key is reachable.
-<item> It is the value or finaliser of an object whose key is
+<item> It is the value or finalizer of an object whose key is
 reachable.
 </itemize>
 
@@ -253,20 +237,20 @@ the garbage collector replaces heap-resident <tt/Char/s and small
 <tt/Int/s with pointers to static copies.
 
 Notice that a pointer to the key from its associated 
-value or finaliser does not make the key reachable.
+value or finalizer does not make the key reachable.
 However, if the key is reachable some other way, then the value
-and the finaliser are reachable, and so, therefore, are any other
+and the finalizer are reachable, and so, therefore, are any other
 keys they refer to directly or indirectly.
 
 
 <sect1>Finalisation for foreign objects
-<label id="foreign-finalisers">
+<label id="foreign-finalizers">
 <p>
 
 A foreign object is some data that lives outside the Haskell heap, for
 example some <tt/malloc/ed data in C land.  It's useful to be able to
 know when the Haskell program no longer needs the <tt/malloc/ed data,
-so it can be <tt/free/d.  We can use weak pointers and finalisers for
+so it can be <tt/free/d.  We can use weak pointers and finalizers for
 this, but we have to be careful: the foreign data is usually
 referenced by an address, ie. an <tt/Addr/ (see Section <ref
 name="Addr" id="sec:Addr">), and we must retain the invariant that
@@ -275,9 +259,9 @@ retains the <tt/Addr/ object in the heap/.  This invariant isn't
 guaranteed to hold if we use <tt/Addr/, because an <tt/Addr/ consists
 of a box around a raw address <tt/Addr#/.  If the Haskell program can
 manipulate the <tt/Addr#/ object independently of the heap-resident
-<tt/Addr/, then the foreign object could be inadvertently finalised
+<tt/Addr/, then the foreign object could be inadvertently finalized
 early, because a weak pointer to the <tt/Addr/ would find no more
-references to its key and trigger the finaliser despite the fact that
+references to its key and trigger the finalizer despite the fact that
 the program still holds the <tt/Addr#/ and intends to use it.
 
 To avoid this somewhat subtle race condition, we use another type of
