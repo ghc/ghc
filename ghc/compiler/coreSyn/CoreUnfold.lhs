@@ -58,7 +58,7 @@ import FastTypes
 import Outputable
 
 #if __GLASGOW_HASKELL__ >= 404
-import GlaExts		( fromInt, Int# )
+import GlaExts		( Int# )
 #endif
 \end{code}
 
@@ -669,7 +669,7 @@ computeDiscount n_vals_wanted arg_discounts res_discount arg_infos result_used
 			-- Discount of 1 for each arg supplied, because the 
 			-- result replaces the call
     round (opt_UF_KeenessFactor * 
-	   fromInt (arg_discount + result_discount))
+	   fromIntegral (arg_discount + result_discount))
   where
     arg_discount = sum (zipWith mk_arg_discount arg_discounts arg_infos)
 
