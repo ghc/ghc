@@ -20,11 +20,11 @@ package_details installing =
       ( "gmp",	-- GMP is at the bottom of the heap
 	Package {
 	import_dirs    = [],
-	library_dirs   = if _HaveLibGmp == "YES"
+	library_dirs   = if cHaveLibGmp == "YES"
 			     then []
 			     else if installing 
-				   then [ _libdir ]
-				   else [ ghc_src_dir _GHC_RUNTIME_DIR ++ "/gmp" ],
+				   then [ clibdir ]
+				   else [ ghc_src_dir cGHC_RUNTIME_DIR ++ "/gmp" ],
 	libraries      = [ "gmp" ],
 	include_dir    = "",
 	c_include      = "",
@@ -39,12 +39,12 @@ package_details installing =
 	Package {
 	import_dirs    = [],
 	library_dirs   = [ if installing 
-	       		      then _libdir
-	       		      else ghc_src_dir _GHC_RUNTIME_DIR ],
+	       		      then clibdir
+	       		      else ghc_src_dir cGHC_RUNTIME_DIR ],
 	libraries      = [ "HSrts" ],
 	include_dir    = if installing 
-			    then _libdir ++ "/includes"
-			    else ghc_src_dir _GHC_INCLUDE_DIR,
+			    then clibdir ++ "/includes"
+			    else ghc_src_dir cGHC_INCLUDE_DIR,
 	c_include      = "Stg.h",		-- ha!
 	package_deps   = [ "gmp" ],
 	extra_ghc_opts = "",
@@ -89,16 +89,16 @@ package_details installing =
       ( "std",	-- The Prelude & Standard Libraries
 	Package {
 	import_dirs    = [ if installing 
-	     	       	     then _libdir ++ "/imports/std"
-	     	       	     else ghc_src_dir _GHC_LIB_DIR ++ "/std" ],
+	     	       	     then clibdir ++ "/imports/std"
+	     	       	     else ghc_src_dir cGHC_LIB_DIR ++ "/std" ],
 	library_dirs   = if installing 
-	       	       	   then [ _libdir ]
-	       	       	   else [ ghc_src_dir _GHC_LIB_DIR ++ "/std"
-				, ghc_src_dir _GHC_LIB_DIR ++ "/std/cbits" ],
+	       	       	   then [ clibdir ]
+	       	       	   else [ ghc_src_dir cGHC_LIB_DIR ++ "/std"
+				, ghc_src_dir cGHC_LIB_DIR ++ "/std/cbits" ],
 	libraries      = [ "HSstd", "HSstd_cbits" ],
 	include_dir    = if installing 
 		       	   then "" 
-		       	   else ghc_src_dir _GHC_LIB_DIR ++ "/std/cbits",
+		       	   else ghc_src_dir cGHC_LIB_DIR ++ "/std/cbits",
 	c_include      = "HsStd.h",
 	package_deps   = [ "rts" ],
 	extra_ghc_opts = "",
@@ -110,17 +110,17 @@ package_details installing =
        ( "lang",
 	 Package { 
 	 import_dirs    = if installing 
-	       		   then [ _libdir ++ "/imports/lang" ]
-	       		   else [ _FPTOOLS_TOP_ABS ++ "/hslibs/lang"
-		    	        , _FPTOOLS_TOP_ABS ++ "/hslibs/lang/monads"],
+	       		   then [ clibdir ++ "/imports/lang" ]
+	       		   else [ cFPTOOLS_TOP_ABS ++ "/hslibs/lang"
+		    	        , cFPTOOLS_TOP_ABS ++ "/hslibs/lang/monads"],
 	 library_dirs   = if installing 
-	       		     then [ _libdir ]
-	       		     else [ _FPTOOLS_TOP_ABS ++ "/hslibs/lang"
-				  , _FPTOOLS_TOP_ABS ++ "/hslibs/lang/cbits" ],
+	       		     then [ clibdir ]
+	       		     else [ cFPTOOLS_TOP_ABS ++ "/hslibs/lang"
+				  , cFPTOOLS_TOP_ABS ++ "/hslibs/lang/cbits" ],
 	 libraries      = [ "HSlang", "HSlang_cbits" ],
 	 include_dir    = if installing 
 			     then "" 
-			     else _FPTOOLS_TOP_ABS ++ "/hslibs/lang/cbits",
+			     else cFPTOOLS_TOP_ABS ++ "/hslibs/lang/cbits",
 	 c_include      = "HsLang.h",
 	 package_deps   = [],
 	 extra_ghc_opts = "",
@@ -132,15 +132,15 @@ package_details installing =
        ( "concurrent",
 	 Package {
 	 import_dirs    = [ if installing 
-	       		        then _libdir ++ "/imports/concurrent"
-	       		        else _FPTOOLS_TOP_ABS ++ "/hslibs/concurrent" ],
+	       		        then clibdir ++ "/imports/concurrent"
+	       		        else cFPTOOLS_TOP_ABS ++ "/hslibs/concurrent" ],
 	 library_dirs   = [ if installing 
-	       		        then _libdir
-	       		        else _FPTOOLS_TOP_ABS ++ "/hslibs/concurrent" ],
+	       		        then clibdir
+	       		        else cFPTOOLS_TOP_ABS ++ "/hslibs/concurrent" ],
 	 libraries      = [ "HSconcurrent" ],
 	 include_dir    = if installing 
 			    then "" 
-			    else _FPTOOLS_TOP_ABS ++ "/hslibs/concurrent/cbits",
+			    else cFPTOOLS_TOP_ABS ++ "/hslibs/concurrent/cbits",
 	 c_include      = "HsConcurrent.h",
 	 package_deps   = [ "lang" ],
 	 extra_ghc_opts = "",
@@ -152,19 +152,19 @@ package_details installing =
        ( "data",
 	 Package {
 	 import_dirs    = if installing 
-	       		     then [ _libdir ++ "/imports/data" ]
-	       		     else [ _FPTOOLS_TOP_ABS ++ "/hslibs/data"
-		    	          , _FPTOOLS_TOP_ABS ++ "/hslibs/data/edison"
-		    	          , _FPTOOLS_TOP_ABS ++ "/hslibs/data/edison/Assoc"
-		    	          , _FPTOOLS_TOP_ABS ++ "/hslibs/data/edison/Coll"
-		                  , _FPTOOLS_TOP_ABS ++ "/hslibs/data/edison/Seq" ],
+	       		     then [ clibdir ++ "/imports/data" ]
+	       		     else [ cFPTOOLS_TOP_ABS ++ "/hslibs/data"
+		    	          , cFPTOOLS_TOP_ABS ++ "/hslibs/data/edison"
+		    	          , cFPTOOLS_TOP_ABS ++ "/hslibs/data/edison/Assoc"
+		    	          , cFPTOOLS_TOP_ABS ++ "/hslibs/data/edison/Coll"
+		                  , cFPTOOLS_TOP_ABS ++ "/hslibs/data/edison/Seq" ],
 	 library_dirs   = if installing 
-	       		     then [_libdir ]
-	       		     else [ _FPTOOLS_TOP_ABS ++ "/hslibs/data" ],
+	       		     then [clibdir ]
+	       		     else [ cFPTOOLS_TOP_ABS ++ "/hslibs/data" ],
 	 libraries      = [ "HSdata" ],
 	 include_dir    = if installing 
 			     then "" 
-			     else _FPTOOLS_TOP_ABS ++ "/hslibs/data/cbits",
+			     else cFPTOOLS_TOP_ABS ++ "/hslibs/data/cbits",
 	 c_include      = "HsData.h",
 	 package_deps   = [ "lang" ],
 	 extra_ghc_opts = "",
@@ -176,21 +176,21 @@ package_details installing =
        ( "net",
 	 Package {
 	 import_dirs    = if installing 
-	       		     then [ _libdir ++ "/imports/net" ]
-	       		     else [ _FPTOOLS_TOP_ABS ++ "/hslibs/net" ],
+	       		     then [ clibdir ++ "/imports/net" ]
+	       		     else [ cFPTOOLS_TOP_ABS ++ "/hslibs/net" ],
 	 library_dirs   = if installing 
-	       		     then [ _libdir ]
-	       		     else [ _FPTOOLS_TOP_ABS ++ "/hslibs/net"
-				  , _FPTOOLS_TOP_ABS ++ "/hslibs/net/cbits" ],
+	       		     then [ clibdir ]
+	       		     else [ cFPTOOLS_TOP_ABS ++ "/hslibs/net"
+				  , cFPTOOLS_TOP_ABS ++ "/hslibs/net/cbits" ],
 	 libraries      = [ "HSnet", "HSnet_cbits" ],
 	 include_dir    = if installing 
 			     then "" 
-			     else _FPTOOLS_TOP_ABS ++ "/hslibs/net/cbits",
+			     else cFPTOOLS_TOP_ABS ++ "/hslibs/net/cbits",
 	 c_include      = "HsNet.h",
 	 package_deps   = [ "lang", "text" ],
 	 extra_ghc_opts = "",
 	 extra_cc_opts  = "",
-	 extra_ld_opts  = if postfixMatch "solaris2" _TARGETPLATFORM
+	 extra_ld_opts  = if postfixMatch "solaris2" cTARGETPLATFORM
 				then "-lnsl -lsocket"
 				else ""
 	}
@@ -199,16 +199,16 @@ package_details installing =
        ( "posix",
 	 Package {
 	 import_dirs    = if installing 
-	       		     then [ _libdir ++ "/imports/posix" ]
-	       		     else [ _FPTOOLS_TOP_ABS ++ "/hslibs/posix" ],
+	       		     then [ clibdir ++ "/imports/posix" ]
+	       		     else [ cFPTOOLS_TOP_ABS ++ "/hslibs/posix" ],
 	 library_dirs   = if installing 
-	       		     then [ _libdir ]
-	       		     else [ _FPTOOLS_TOP_ABS ++ "/hslibs/posix"
-				  , _FPTOOLS_TOP_ABS ++ "/hslibs/posix/cbits" ],
+	       		     then [ clibdir ]
+	       		     else [ cFPTOOLS_TOP_ABS ++ "/hslibs/posix"
+				  , cFPTOOLS_TOP_ABS ++ "/hslibs/posix/cbits" ],
 	 libraries      = [ "HSposix", "HSposix_cbits" ],
 	 include_dir    = if installing 
 			     then "" 
-			     else _FPTOOLS_TOP_ABS ++ "/hslibs/posix/cbits",
+			     else cFPTOOLS_TOP_ABS ++ "/hslibs/posix/cbits",
 	 c_include      = "HsPosix.h",
 	 package_deps   = [ "lang" ],
 	 extra_ghc_opts = "",
@@ -220,19 +220,19 @@ package_details installing =
        ( "text",
 	 Package {
 	 import_dirs    = if installing 
-	       		     then [ _libdir ++ "/imports/text" ]
-	       		     else [ _FPTOOLS_TOP_ABS ++ "/hslibs/text" 
-			 	  , _FPTOOLS_TOP_ABS ++ "/hslibs/text/html" 
-			 	  , _FPTOOLS_TOP_ABS ++ "/hslibs/text/haxml/lib" 
-			 	  , _FPTOOLS_TOP_ABS ++ "/hslibs/text/parsec" ],
+	       		     then [ clibdir ++ "/imports/text" ]
+	       		     else [ cFPTOOLS_TOP_ABS ++ "/hslibs/text" 
+			 	  , cFPTOOLS_TOP_ABS ++ "/hslibs/text/html" 
+			 	  , cFPTOOLS_TOP_ABS ++ "/hslibs/text/haxml/lib" 
+			 	  , cFPTOOLS_TOP_ABS ++ "/hslibs/text/parsec" ],
 	 library_dirs   = if installing 
-	       		     then [ _libdir ]
-	       		     else [ _FPTOOLS_TOP_ABS ++ "/hslibs/text"
-				  , _FPTOOLS_TOP_ABS ++ "/hslibs/text/cbits" ],
+	       		     then [ clibdir ]
+	       		     else [ cFPTOOLS_TOP_ABS ++ "/hslibs/text"
+				  , cFPTOOLS_TOP_ABS ++ "/hslibs/text/cbits" ],
 	 libraries      = [ "HStext", "HStext_cbits" ],
 	 include_dir    = if installing 
 			     then "" 
-			     else _FPTOOLS_TOP_ABS ++ "/hslibs/text/cbits",
+			     else cFPTOOLS_TOP_ABS ++ "/hslibs/text/cbits",
 	 c_include      = "HsText.h",
 	 package_deps   = [ "lang", "data" ],
 	 extra_ghc_opts = "",
@@ -244,17 +244,17 @@ package_details installing =
        ( "util",
 	 Package {
 	 import_dirs    = if installing 
-	       		     then [ _libdir ++ "/imports/util" ]
-	       		     else [ _FPTOOLS_TOP_ABS ++ "/hslibs/util"
-		    	          , _FPTOOLS_TOP_ABS ++ "/hslibs/util/check" ],
+	       		     then [ clibdir ++ "/imports/util" ]
+	       		     else [ cFPTOOLS_TOP_ABS ++ "/hslibs/util"
+		    	          , cFPTOOLS_TOP_ABS ++ "/hslibs/util/check" ],
 	 library_dirs   = if installing 
-	       		     then [ _libdir ]
-	       		     else [ _FPTOOLS_TOP_ABS ++ "/hslibs/util"
-				  , _FPTOOLS_TOP_ABS ++ "/hslibs/util/cbits" ],
+	       		     then [ clibdir ]
+	       		     else [ cFPTOOLS_TOP_ABS ++ "/hslibs/util"
+				  , cFPTOOLS_TOP_ABS ++ "/hslibs/util/cbits" ],
 	 libraries      = [ "HSutil", "HSutil_cbits" ],
 	 include_dir    = if installing 
 			     then "" 
-			     else _FPTOOLS_TOP_ABS ++ "/hslibs/util/cbits",
+			     else cFPTOOLS_TOP_ABS ++ "/hslibs/util/cbits",
 	 c_include      = "HsUtil.h",
 	 package_deps   = ["lang", "concurrent", "posix"],
 	 extra_ghc_opts = "",
@@ -266,11 +266,11 @@ package_details installing =
        ( "win32",
 	 Package {
 	 import_dirs    = if installing 
-	       		     then [ _libdir ++ "/imports/win32" ]
-	       		     else [ _FPTOOLS_TOP_ABS ++ "/hslibs/win32/src" ],
+	       		     then [ clibdir ++ "/imports/win32" ]
+	       		     else [ cFPTOOLS_TOP_ABS ++ "/hslibs/win32/src" ],
 	 library_dirs   = if installing 
-	       		     then [ _libdir ]
-	       		     else [ _FPTOOLS_TOP_ABS ++ "/hslibs/win32/src" ],
+	       		     then [ clibdir ]
+	       		     else [ cFPTOOLS_TOP_ABS ++ "/hslibs/win32/src" ],
 	 libraries      = [ "HSwin32" ],
 	 include_dir    = "",
 	 c_include      = "",		-- ???
@@ -284,11 +284,11 @@ package_details installing =
        ( "com",
 	 Package {
 	 import_dirs    = if installing 
-	       		     then [ _libdir ++ "/imports/com" ]
-	       		     else [ _FPTOOLS_TOP_ABS ++ "/hdirect/lib" ],
+	       		     then [ clibdir ++ "/imports/com" ]
+	       		     else [ cFPTOOLS_TOP_ABS ++ "/hdirect/lib" ],
 	 library_dirs   = if installing 
-	       		     then [ _libdir ]
-	       		     else [ _FPTOOLS_TOP_ABS ++ "/hdirect/lib" ],
+	       		     then [ clibdir ]
+	       		     else [ cFPTOOLS_TOP_ABS ++ "/hdirect/lib" ],
 	 libraries      = [ "HScom" ],
 	 include_dir    = "",
 	 c_include      = "",		-- ???
@@ -300,7 +300,7 @@ package_details installing =
        )
    ]
 
-ghc_src_dir path = _FPTOOLS_TOP_ABS ++ '/':_CURRENT_DIR ++ '/':path
+ghc_src_dir path = cFPTOOLS_TOP_ABS ++ '/':cCURRENT_DIR ++ '/':path
 
 prefixMatch :: Eq a => [a] -> [a] -> Bool
 prefixMatch [] str = True

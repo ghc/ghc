@@ -61,7 +61,7 @@ short_usage = do
   exitWith ExitSuccess
    
 long_usage = do
-  let usage_dir = findFile "ghc-usage.txt" (_GHC_DRIVER_DIR++"/ghc-usage.txt")
+  let usage_dir = findFile "ghc-usage.txt" (cGHC_DRIVER_DIR++"/ghc-usage.txt")
   usage <- readFile (usage_dir++"/ghc-usage.txt")
   dump usage
   exitWith ExitSuccess
@@ -70,9 +70,9 @@ long_usage = do
      dump ('$':'$':s) = hPutStr stderr get_prog_name >> dump s
      dump (c:s) = hPutChar stderr c >> dump s
 
-version_str = _ProjectVersion ++ 
-		( if _ProjectPatchLevel /= "0" && _ProjectPatchLevel /= ""
-			then '.':_ProjectPatchLevel
+version_str = cProjectVersion ++ 
+		( if cProjectPatchLevel /= "0" && cProjectPatchLevel /= ""
+			then '.':cProjectPatchLevel
 			else "")
 
 -----------------------------------------------------------------------------
@@ -201,7 +201,7 @@ getStopAfter flags
 GLOBAL_VAR(cpp_flag, False, Bool)
 hs_source_cpp_opts = global
 	[ "-D__HASKELL1__="++_Haskell1Version
-	, "-D__GLASGOW_HASKELL__="++_ProjectVersionInt				
+	, "-D__GLASGOW_HASKELL__="++cProjectVersionInt				
 	, "-D__HASKELL98__"
 	, "-D__CONCURRENT_HASKELL__"
 	]
@@ -224,7 +224,7 @@ is_verbose = do v <- readIORef verbose; if v then return "-v" else return ""
 	-- Misc
 GLOBAL_VAR(dry_run, 		False,		Bool)
 GLOBAL_VAR(recomp,  		True,		Bool)
-GLOBAL_VAR(tmp_prefix, 		_TMPDIR,	String)
+GLOBAL_VAR(tmp_prefix, 		cTMPDIR,	String)
 GLOBAL_VAR(stolen_x86_regs, 	4, 		Int)
 GLOBAL_VAR(static, 		True,		Bool)  -- ToDo: not for mingw32
 GLOBAL_VAR(collect_ghc_timing, 	False,		Bool)
@@ -238,14 +238,14 @@ GLOBAL_VAR(split_prefix,	"",		String)
 GLOBAL_VAR(n_split_files,	0,		Int)
 	
 can_split :: Bool
-can_split =  prefixMatch "i386" _TARGETPLATFORM
-	  || prefixMatch "alpha" _TARGETPLATFORM
-	  || prefixMatch "hppa" _TARGETPLATFORM
-	  || prefixMatch "m68k" _TARGETPLATFORM
-	  || prefixMatch "mips" _TARGETPLATFORM
-	  || prefixMatch "powerpc" _TARGETPLATFORM
-	  || prefixMatch "rs6000" _TARGETPLATFORM
-	  || prefixMatch "sparc" _TARGETPLATFORM
+can_split =  prefixMatch "i386" cTARGETPLATFORM
+	  || prefixMatch "alpha" cTARGETPLATFORM
+	  || prefixMatch "hppa" cTARGETPLATFORM
+	  || prefixMatch "m68k" cTARGETPLATFORM
+	  || prefixMatch "mips" cTARGETPLATFORM
+	  || prefixMatch "powerpc" cTARGETPLATFORM
+	  || prefixMatch "rs6000" cTARGETPLATFORM
+	  || prefixMatch "sparc" cTARGETPLATFORM
 
 -----------------------------------------------------------------------------
 -- Compiler output options
@@ -255,8 +255,8 @@ data HscLang
   | HscAsm
   | HscJava
 
-GLOBAL_VAR(hsc_lang, if _GhcWithNativeCodeGen == "YES" && 
-			 prefixMatch "i386" _TARGETPLATFORM
+GLOBAL_VAR(hsc_lang, if cGhcWithNativeCodeGen == "YES" && 
+			 prefixMatch "i386" cTARGETPLATFORM
 			then  HscAsm
 			else  HscC, 
 	   HscLang)
@@ -753,15 +753,15 @@ way_details =
 -----------------------------------------------------------------------------
 -- Programs for particular phases
 
-GLOBAL_VAR(pgm_dep, findFile "mkdependHS" _GHC_MKDEPENDHS, String)
-GLOBAL_VAR(pgm_L,   findFile "unlit"      _GHC_UNLIT,      String)
-GLOBAL_VAR(pgm_P,   findFile "hscpp"      _GHC_HSCPP,      String)
-GLOBAL_VAR(pgm_C,   findFile "hsc"        _GHC_HSC,        String)
-GLOBAL_VAR(pgm_c,   _GCC,	      	     	      	   String)
-GLOBAL_VAR(pgm_m,   findFile "ghc-asm"    _GHC_MANGLER,    String)
-GLOBAL_VAR(pgm_s,   findFile "ghc-split"  _GHC_SPLIT,      String)
-GLOBAL_VAR(pgm_a,   _GCC,	      	     	           String)
-GLOBAL_VAR(pgm_l,   _GCC,       	     	           String)
+GLOBAL_VAR(pgm_dep, findFile "mkdependHS" cGHC_MKDEPENDHS, String)
+GLOBAL_VAR(pgm_L,   findFile "unlit"      cGHC_UNLIT,      String)
+GLOBAL_VAR(pgm_P,   findFile "hscpp"      cGHC_HSCPP,      String)
+GLOBAL_VAR(pgm_C,   findFile "hsc"        cGHC_HSC,        String)
+GLOBAL_VAR(pgm_c,   cGCC,	      	     	      	   String)
+GLOBAL_VAR(pgm_m,   findFile "ghc-asm"    cGHC_MANGLER,    String)
+GLOBAL_VAR(pgm_s,   findFile "ghc-split"  cGHC_SPLIT,      String)
+GLOBAL_VAR(pgm_a,   cGCC,	      	     	           String)
+GLOBAL_VAR(pgm_l,   cGCC,       	     	           String)
 
 -----------------------------------------------------------------------------
 -- Options for particular phases
@@ -791,15 +791,15 @@ GLOBAL_VAR(anti_opt_C, [], [String])
 --		       )
 
 machdepCCOpts 
-   | prefixMatch "alpha"   _TARGETPLATFORM  
+   | prefixMatch "alpha"   cTARGETPLATFORM  
 	= return ( ["-static"], [] )
 
-   | prefixMatch "hppa"    _TARGETPLATFORM  
+   | prefixMatch "hppa"    cTARGETPLATFORM  
         -- ___HPUX_SOURCE, not _HPUX_SOURCE, is #defined if -ansi!
         -- (very nice, but too bad the HP /usr/include files don't agree.)
 	= return ( ["-static", "-D_HPUX_SOURCE"], [] )
 
-   | prefixMatch "m68k"    _TARGETPLATFORM
+   | prefixMatch "m68k"    cTARGETPLATFORM
       -- -fno-defer-pop : for the .hc files, we want all the pushing/
       --    popping of args to routines to be explicit; if we let things
       --    be deferred 'til after an STGJUMP, imminent death is certain!
@@ -811,7 +811,7 @@ machdepCCOpts
       --     as on iX86, where we *do* steal the frame pointer [%ebp].)
 	= return ( [], ["-fno-defer-pop", "-fno-omit-frame-pointer"] )
 
-   | prefixMatch "i386"    _TARGETPLATFORM  
+   | prefixMatch "i386"    cTARGETPLATFORM  
       -- -fno-defer-pop : basically the same game as for m68k
       --
       -- -fomit-frame-pointer : *must* in .hc files; because we're stealing
@@ -823,10 +823,10 @@ machdepCCOpts
 	                "-DSTOLEN_X86_REGS="++show n_regs ]
 		    )
 
-   | prefixMatch "mips"    _TARGETPLATFORM
+   | prefixMatch "mips"    cTARGETPLATFORM
 	= return ( ["static"], [] )
 
-   | prefixMatch "powerpc" _TARGETPLATFORM || prefixMatch "rs6000" _TARGETPLATFORM
+   | prefixMatch "powerpc" cTARGETPLATFORM || prefixMatch "rs6000" cTARGETPLATFORM
 	= return ( ["static"], ["-finhibit-size-directive"] )
 
    | otherwise
@@ -869,7 +869,7 @@ build_hsc_opts = do
 	-- let-no-escape always on for now
 
   verb <- is_verbose
-  let hi_vers = "-fhi-version="++_ProjectVersionInt
+  let hi_vers = "-fhi-version="++cProjectVersionInt
   static <- (do s <- readIORef static; if s then return "-static" else return "")
 
   l <- readIORef hsc_lang
@@ -1023,7 +1023,7 @@ main =
    argv'  <- setTopDir argv
 
    -- read the package configuration
-   let conf = findFile "package.conf" (_GHC_DRIVER_DIR++"/package.conf.inplace")
+   let conf = findFile "package.conf" (cGHC_DRIVER_DIR++"/package.conf.inplace")
    contents <- readFile conf
    writeIORef package_details (read contents)
 
@@ -1328,7 +1328,7 @@ run_phase Hsc	basename input_fn output_fn
   -- Generate -Rghc-timing info
 	on (timing) (
   	    run_something "Generate timing stats"
-		(findFile "ghc-stats" _GHC_STATS ++ ' ':stat_file)
+		(findFile "ghc-stats" cGHC_STATS ++ ' ':stat_file)
 	 )
 
   -- Deal with stubs
@@ -1423,7 +1423,7 @@ run_phase cc_phase basename input_fn output_fn
 			 then md_regd_c_flags
 			 else [])
 		   ++ [ verb, "-S", "-Wimplicit", opt_flag ]
-		   ++ [ "-D__GLASGOW_HASKELL__="++_ProjectVersionInt ]
+		   ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
 		   ++ cc_opts
 		   ++ include_paths
 		   ++ pkg_extra_cc_opts
@@ -1439,7 +1439,7 @@ run_phase Mangle basename input_fn output_fn
   = do mangler <- readIORef pgm_m
        mangler_opts <- getOpts opt_m
        machdep_opts <-
-	 if (prefixMatch "i386" _TARGETPLATFORM)
+	 if (prefixMatch "i386" cTARGETPLATFORM)
 	    then do n_regs <- readIORef stolen_x86_regs
 		    return [ show n_regs ]
 	    else return []
@@ -1614,7 +1614,7 @@ opts =
   
 
       ------- version ----------------------------------------------------
-  ,  ( "-version"	 , NoArg (do hPutStrLn stderr (_ProjectName
+  ,  ( "-version"	 , NoArg (do hPutStrLn stderr (cProjectName
 				      ++ ", version " ++ version_str)
 				     exitWith ExitSuccess))
   ,  ( "-numeric-version", NoArg (do hPutStrLn stderr version_str
@@ -1874,7 +1874,7 @@ floatOpt ref str
 -----------------------------------------------------------------------------
 -- Finding files in the installation
 
-GLOBAL_VAR(topDir, _libdir, String)
+GLOBAL_VAR(topDir, clibdir, String)
 
 	-- grab the last -B option on the command line, and
 	-- set topDir to its value.
@@ -1882,14 +1882,14 @@ setTopDir :: [String] -> IO [String]
 setTopDir args = do
   let (minusbs, others) = partition (prefixMatch "-B") args
   (case minusbs of
-    []   -> writeIORef topDir _libdir
+    []   -> writeIORef topDir clibdir
     some -> writeIORef topDir (drop 2 (last some)))
   return others
 
 findFile name alt_path = unsafePerformIO (do
   top_dir <- readIORef topDir
   let installed_file = top_dir ++ '/':name
-  let inplace_file   = top_dir ++ '/':_CURRENT_DIR ++ '/':alt_path
+  let inplace_file   = top_dir ++ '/':cCURRENT_DIR ++ '/':alt_path
   b <- fileExist inplace_file
   if b  then return inplace_file
 	else return installed_file
