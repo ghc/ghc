@@ -4,6 +4,8 @@ else:
    conf = normal
 
 test('signals001',  conf, compile_and_run, ['-package unix -cpp'])
-test('signals002',  conf, compile_and_run, ['-package unix'])
+test('signals002',  compose(only_compiler_types(['ghc']), conf),
+	compile_and_run, ['-package unix'])
 test('fileexist01', conf, compile_and_run, ['-package unix'])
-test('forkprocess01', conf, compile_and_run, ['-package unix'])
+test('forkprocess01', compose(only_compiler_types(['ghc']), conf),
+	compile_and_run, ['-package unix'])
