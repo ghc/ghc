@@ -1,9 +1,9 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.3 1997/03/13 09:10:17 sof Exp $
+# $Id: Makefile,v 1.4 1997/03/19 20:44:56 simonpj Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
-
+WAYS=
 DYN_LOADABLE_BITS = \
 	parse-gcstats.prl \
 	process-gcstats.prl

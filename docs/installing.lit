@@ -584,9 +584,10 @@ tell you if you are missing something.
 for doing shell-scripty tasks that involve lots of text processing.
 It is pretty easy to install.
 
-(Perl~5 is the current version; GHC might be Perl~4 friendly, we've
-run into some trouble with our scripts on \tr{alpha-dec-osf\{1,2\}}
-using Perl~4 (patchlevel 36))
+Perl~5 is the current version; GHC should be Perl~4 friendly though.
+For Win32 platforms, Perl~5 is recommended, we even strongly suggest
+you pick up our quick-and-dirty port of Perl~5, as the common
+Hip/ActiveWare port of Perl is not Cool Enough for our purposes.
 
 Perl should be put somewhere so that it can be invoked by the \tr{#!}
 script-invoking mechanism. (I believe \tr{/usr/bin/perl} is preferred;

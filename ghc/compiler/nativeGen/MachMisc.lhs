@@ -93,20 +93,33 @@ fmtAsmLbl s
 ---------------------------
 cvtLitLit :: String -> String
 
--- ToDo: some kind of *careful* attention needed...
-
+--
+-- Rather than relying on guessing, use FILE_SIZE to compute the
+-- _iob offsets.
+--
 cvtLitLit "stdin"  = IF_ARCH_alpha("_iob+0" {-probably OK...-}
 		    ,IF_ARCH_i386("_IO_stdin_"
 		    ,IF_ARCH_sparc("__iob+0x0"{-probably OK...-}
 		    ,)))
+
+cvtLitLit "stdout" = IF_ARCH_alpha("_iob+"++show (``FILE_SIZE''::Int)
+		    ,IF_ARCH_i386("_IO_stdout_"
+		    ,IF_ARCH_sparc("__iob+"++show (``FILE_SIZE''::Int)
+		    ,)))
+cvtLitLit "stderr" = IF_ARCH_alpha("_iob+"++show (2*(``FILE_SIZE''::Int))
+		    ,IF_ARCH_i386("_IO_stderr_"
+		    ,IF_ARCH_sparc("__iob+"++show (2*(``FILE_SIZE''::Int))
+		    ,)))
+{-
 cvtLitLit "stdout" = IF_ARCH_alpha("_iob+56"{-dodgy *at best*...-}
 		    ,IF_ARCH_i386("_IO_stdout_"
-		    ,IF_ARCH_sparc("__iob+0x14"{-dodgy *at best*...-}
+		    ,IF_ARCH_sparc("__iob+0x10"{-dodgy *at best*...-}
 		    ,)))
 cvtLitLit "stderr" = IF_ARCH_alpha("_iob+112"{-dodgy *at best*...-}
 		    ,IF_ARCH_i386("_IO_stderr_"
-		    ,IF_ARCH_sparc("__iob+0x28"{-dodgy *at best*...-}
+		    ,IF_ARCH_sparc("__iob+0x20"{-dodgy *at best*...-}
 		    ,)))
+-}
 cvtLitLit s
   | isHex s   = s
   | otherwise = error ("Native code generator can't handle ``" ++ s ++ "''")

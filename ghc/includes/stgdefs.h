@@ -247,8 +247,11 @@ char   *stgMallocWords PROTO((I_, char *));
 #include <sys/types.h>
 #endif  /* HAVE_SYS_TYPES_H */
 
-#ifndef FD_SETSIZE
-#define FD_SETSIZE 1024
+/* A real hack this */
+#ifndef linux_TARGET_OS
+# ifndef FD_SETSIZE
+#  define FD_SETSIZE 1024
+# endif
 #endif
 
 #endif /* ! STGDEFS_H */

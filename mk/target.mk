@@ -835,10 +835,22 @@ ifeq "$(way)" ""
 ifneq "$(SUBDIRS)" ""
 
 all docs runtests boot TAGS clean veryclean maintainer-clean install info ::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ; do \
-	  $(MAKE) -C $$i $(MFLAGS) $@; \
+	@case '${MFLAGS}' in *[ik]*) set +e;; esac;
+	@echo "------------------------------------------------------------------------"
+	@echo "===fptools== Recursively making \`$@' in $(SUBDIRS) ..."
+	@echo "PWD = $(shell pwd)"
+	@echo "------------------------------------------------------------------------"
+	@for i in $(SUBDIRS) ; do \
+	  echo "------------------------------------------------------------------------"; \
+	  echo "==fptools== $(MAKE) $@;"; \
+	  echo " in $(shell pwd)/$$i"; \
+	  echo "------------------------------------------------------------------------"; \
+	  $(MAKE) --no-print-directory -C $$i $(MFLAGS) $@; \
 	done
+	@echo "------------------------------------------------------------------------"
+	@echo "===fptools== Finished making \`$@' in $(SUBDIRS) ..."
+	@echo "PWD = $(shell pwd)"
+	@echo "------------------------------------------------------------------------"
 
 dist ::
 	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
@@ -865,9 +877,21 @@ ifeq "$(way)" ""
 #	boot info TAGS
 # since these are way-independent
 all docs runtests TAGS clean veryclean maintainer-clean install ::
-	for i in $(WAYS) ; do \
+	@echo "------------------------------------------------------------------------"
+	@echo "===fptools== Recursively making \`$@' for ways: $(WAYS) ..."
+	@echo "PWD = $(shell pwd)"
+	@echo "------------------------------------------------------------------------"
+	@for i in $(WAYS) ; do \
+	  echo "------------------------------------------------------------------------"; \
+	  echo "==fptools== $(MAKE) way=$$i $@;"; \
+	  echo "PWD = $(shell pwd)"; \
+	  echo "------------------------------------------------------------------------"; \
 	  $(MAKE) way=$$i $(MFLAGS) $@ ; \
 	done
+	@echo "------------------------------------------------------------------------"
+	@echo "===fptools== Finished recusrively making \`$@' for ways: $(WAYS) ..."
+	@echo "PWD = $(shell pwd)"
+	@echo "------------------------------------------------------------------------"
 
 endif
 endif

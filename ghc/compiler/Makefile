@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.10 1997/03/19 05:31:31 sof Exp $
+# $Id: Makefile,v 1.11 1997/03/19 20:44:52 simonpj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -136,6 +136,7 @@ hsSyn/HsSyn_HC_OPTS 		= -fno-omit-reexported-instances
 main/Main_HC_OPTS 		= -fvia-C
 main/CmdLineOpts_HC_OPTS 	= -fvia-C
 nativeGen/PprMach_HC_OPTS 	= -K2m
+nativeGen/MachMisc_HC_OPTS 	= -K2m -fvia-C
 parser/UgenAll_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/UgenUtil_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
 parser/U_constr_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'

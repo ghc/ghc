@@ -1,11 +1,10 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.3 1997/03/14 05:11:36 sof Exp $
+# $Id: Makefile,v 1.4 1997/03/19 20:44:55 simonpj Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 # There's only one `way' for gmp, empty WAYS variable right away.
 WAYS=
-
 
 GMP_OBJS = $(MPZ_OBJS) $(MPQ_OBJS) $(MPN_OBJS) $(IMPL_OBJS) mp_bases.o
 
