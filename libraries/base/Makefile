@@ -127,7 +127,7 @@ ifeq "$(OBJECT_FILEFORMAT)" "PEi"
 HSbase.o : $(GHCI_LIBOBJS)
 	$(LD) -r $(LD_X) -o HSbase1.o $(filter     GHC/%, $(GHCI_LIBOBJS))
 	$(LD) -r $(LD_X) -o HSbase2.o $(filter     Text/%, $(GHCI_LIBOBJS))
-	$(LD) -r $(LD_X) -o HSbase3.o $(filter-out GHC/% Text/%, $(GHCI_LIBOBJS))
+	$(LD) -r $(LD_X) -o HSbase3.o $(filter-out GHC/% Text/%, $(GHCI_LIBOBJS) $(STUBOBJS))
 	@touch HSbase.o
 endif # OBJECT_FILEFORMAT = PEi
 
