@@ -1,5 +1,5 @@
 % 
-% $Id: libraries.vsgml,v 1.1 1998/01/30 17:02:32 simonm Exp $
+% $Id: libraries.vsgml,v 1.2 1998/08/25 18:07:57 sof Exp $
 %
 % GHC Prelude and Libraries.
 %
@@ -377,8 +377,8 @@ quotWord#, remWord# :: Word# -> Word# -> Word#
 
 not# :: Word# -> Word#
 
-shiftL#, shiftRA#, shiftRL# :: Word# -> Int# -> Word#
-	-- shift left, right arithmetic, right logical
+shiftL#, shiftRL# :: Word# -> Int# -> Word#
+	-- shift left, right logical
 
 int2Word#	:: Int#  -> Word# -- just a cast, really
 word2Int#	:: Word# -> Int#
@@ -391,7 +391,6 @@ word2Int#	:: Word# -> Int#
 <ncdx>quotWord#</ncdx>
 <ncdx>remWord#</ncdx>
 <ncdx>shiftL#</ncdx>
-<ncdx>shiftRA#</ncdx>
 <ncdx>shiftRL#</ncdx>
 <ncdx>int2Word#</ncdx>
 <ncdx>word2Int#</ncdx>
