@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.10 1999/02/05 16:02:23 simonm Exp $
+ * $Id: InfoTables.h,v 1.11 1999/02/15 12:12:55 simonm Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -179,8 +179,12 @@ typedef enum {
 #define _UPT (1<<6)  /* unpointed?         */
 #define _SRT (1<<7)  /* has an SRT?        */
 
-#define isSTATIC(flags)  ((flags)&_STA)
-#define isMUTABLE(flags) ((flags) &_MUT)
+#define isSTATIC(flags)    ((flags) &_STA)
+#define isMUTABLE(flags)   ((flags) &_MUT)
+#define isBITMAP(flags)    ((flags) &_BTM)
+#define isTHUNK(flags)     ((flags) &_THU)
+#define isUNPOINTED(flags) ((flags) &_UPT)
+#define hasSRT(flags)      ((flags) &_SRT)
 
 #define closure_STATIC(closure)       (  get_itbl(closure)->flags & _STA)
 #define closure_SHOULD_SPARK(closure) (!(get_itbl(closure)->flags & _NS))
