@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.84 2001/06/27 16:38:17 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.85 2001/06/29 12:58:20 rrt Exp $
 --
 -- GHC Driver
 --
@@ -334,14 +334,13 @@ run_phase Cpp basename suff input_fn output_fn
 	-- ToDo: switch away from using 'echo' altogether (but need
 	-- a faster alternative than what's done below).
 #if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
-	  else (do
+	  else do
 	    h <- openFile output_fn WriteMode
 	    hPutStrLn h ("{-# LINE 1 \"" ++ input_fn ++ "\" #-}")
 	    ls <- readFile input_fn -- inefficient, but it'll do for now.
 	    			    -- ToDo: speed up via slurping.
 	    hPutStrLn h ls
-	    hClose h) `catchAllIO`
-	    	        (\_ -> throwDyn (PhaseFailed "Ineffective C pre-processor" (ExitFailure 1)))
+	    hClose h
 #else
 	  else do
 	    SysTools.runSomething "Ineffective C pre-processor"

@@ -406,13 +406,12 @@ touch purpose arg =  do p <- readIORef v_Pgm_T
 
 copy :: String -> String -> String -> IO ()
 copy purpose from to =
-    (do
+    do
       h <- openFile to WriteMode
       ls <- readFile from -- inefficient, but it'll do for now.
 	    		      -- ToDo: speed up via slurping.
       hPutStr h ls
-      hClose h) `catchAllIO`
-		 (\_ -> throwDyn (PhaseFailed purpose (ExitFailure 1)))
+      hClose h
 \end{code}
 
 \begin{code}

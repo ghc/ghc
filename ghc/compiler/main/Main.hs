@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.76 2001/06/27 11:39:54 simonmar Exp $
+-- $Id: Main.hs,v 1.77 2001/06/29 12:58:20 rrt Exp $
 --
 -- GHC Driver program
 --
@@ -59,7 +59,7 @@ import Panic		( GhcException(..), panic )
 import IO
 import Directory	( doesFileExist )
 import IOExts		( readIORef, writeIORef )
-import Exception	( throwDyn, Exception(DynException) )
+import Exception	( throwDyn, Exception(..) )
 import System		( getArgs, exitWith, ExitCode(..) )
 import Monad
 import List
@@ -67,7 +67,7 @@ import Maybe
 
 #ifndef mingw32_TARGET_OS
 import Concurrent	( myThreadId )
-#ifdef __GLASGOW_HASKELL__ < 500
+#if __GLASGOW_HASKELL__ < 500
 import Exception        ( raiseInThread )
 #define throwTo  raiseInThread
 #else
@@ -111,9 +111,12 @@ import Dynamic		( toDyn )
 
 main =
   -- top-level exception handler: any unrecognised exception is a compiler bug.
-  handle (\exception -> do hPutStr stderr (show (Panic (show exception)))
-			   exitWith (ExitFailure 1)
-         ) $ do
+  handle (\exn -> case exn of
+	               IOException _ -> do hPutStr stderr (show exn)
+	                                   exitWith (ExitFailure 1)
+	               _             -> do hPutStr stderr (show (Panic (show exn)))
+	                                   exitWith (ExitFailure 1)
+	 ) $ do
 
   -- all error messages are propagated as exceptions
   handleDyn (\dyn -> case dyn of
