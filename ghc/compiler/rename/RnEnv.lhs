@@ -10,7 +10,6 @@ module RnEnv where		-- Export everything
 
 import {-# SOURCE #-} RnHiFiles
 
-import HscTypes		( ModIface(..) )
 import HsSyn
 import RdrHsSyn		( RdrNameIE )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
@@ -20,6 +19,7 @@ import HsTypes		( hsTyVarName, replaceTyVarName )
 import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
 			  ImportReason(..), GlobalRdrEnv, GlobalRdrElt(..), AvailEnv,
 			  AvailInfo, Avails, GenAvailInfo(..), NameSupply(..), 
+			  ModIface(..),
 			  Deprecations(..), lookupDeprec,
 			  extendLocalRdrEnv
 			)
@@ -199,6 +199,15 @@ lookupTopBndrRn rdr_name
 -- So we have to filter out the non-local ones.
 -- A separate function (importsFromLocalDecls) reports duplicate top level
 -- decls, so here it's safe just to choose an arbitrary one.
+
+  | isOrig rdr_name
+	-- This is here just to catch the PrelBase defn of (say) [] and similar
+	-- The parser reads the special syntax and returns an Orig RdrName
+	-- But the global_env contains only Qual RdrNames, so we won't
+	-- find it there; instead just get the name via the Orig route
+  = lookupOrigName rdr_name
+
+  | otherwise
   = getModeRn	`thenRn` \ mode ->
     if isInterfaceMode mode
 	then lookupIfaceName rdr_name	
@@ -216,7 +225,7 @@ lookupTopBndrRn rdr_name
 	  Just gres -> case [n | GRE n _ _ <- gres, nameIsLocalOrFrom mod n] of
 			 []     -> Nothing
 			 (n:ns) -> Just n
-
+	      
 
 -- lookupSigOccRn is used for type signatures and pragmas
 -- Is this valid?
