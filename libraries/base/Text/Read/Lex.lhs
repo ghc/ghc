@@ -176,9 +176,7 @@ lexChar =
       do s <- look
          case s of
            'o':_ -> do get; return 8
-           'O':_ -> do get; return 8
            'x':_ -> do get; return 16
-           'X':_ -> do get; return 16
            _     -> do return 10
   
   lexCntrlChar =
