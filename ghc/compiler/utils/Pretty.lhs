@@ -920,7 +920,7 @@ fullRender mode line_length ribbons_per_line txt end doc
     best_doc = best hacked_line_length ribbon_length (reduceDoc doc)
 
     hacked_line_length, ribbon_length :: Int
-    ribbon_length = round (fromInt line_length / ribbons_per_line)
+    ribbon_length = round (fromIntegral line_length / ribbons_per_line)
     hacked_line_length = case mode of { ZigZagMode -> MAXINT; other -> line_length }
 
 display mode IBOX(page_width) IBOX(ribbon_width) txt end doc
