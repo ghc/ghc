@@ -161,6 +161,7 @@ binary-dist::
 BINDIST_DOCS = $($(Project)BinDistDocs)
 BINDIST_DOCS_WAYS = html ps
 
+ifeq "$(HOSTPLATFORM)" "i386-unknown-linux"
 binary-dist ::
 	@for way in $(BINDIST_DOCS_WAYS); do \
 	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way; \
@@ -179,6 +180,7 @@ binary-dist ::
 	   done; \
 	done
 	@rm -f .doclog
+endif
 
 # Rename scripts to $i.prl and $i.sh where necessary.
 # ToDo: do this in a cleaner way...
