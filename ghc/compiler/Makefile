@@ -272,7 +272,7 @@ endif
 # Only include GHCi if we're bootstrapping with at least version 411
 ifeq "$(GhcWithInterpreter) $(bootstrapped)" "YES YES"
 # Yes, include the interpreter, readline, and Template Haskell extensions
-SRC_HC_OPTS += -DGHCI -package template-haskell -package haskell-src
+SRC_HC_OPTS += -DGHCI -package template-haskell
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 SRC_HC_OPTS += -package unix
 ifeq "$(GhcLibsWithReadline)" "YES"

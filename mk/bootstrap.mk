@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.28 2004/01/15 14:43:24 igloo Exp $
+# $Id: bootstrap.mk,v 1.29 2004/01/15 18:04:45 ross Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -88,7 +88,6 @@ DASH_L_GHC_RTS_GMP_DIR=-L$(FPTOOLS_TOP_ABS)/ghc/rts/gmp
 endif
 
 HC_BOOT_LD_OPTS =				\
-   -L$(FPTOOLS_TOP_ABS)/libraries/haskell-src	\
    -L$(FPTOOLS_TOP_ABS)/ghc/rts			\
    $(DASH_L_GHC_RTS_GMP_DIR)                    \
    -L$(FPTOOLS_TOP_ABS)/libraries/base		\
@@ -143,7 +142,7 @@ ifeq "$(GhcWithInterpreter)" "YES"
 HC_BOOT_LIBS += -lHSreadline -lHStemplate-haskell -lHSunix -lHSunix_cbits
 endif
 
-HC_BOOT_LIBS += -lHShaskell98 -lHShaskell-src -lHSbase -lHSbase_cbits -lHSrts -lgmp -lm $(EXTRA_HC_BOOT_LIBS)
+HC_BOOT_LIBS += -lHShaskell98 -lHSbase -lHSbase_cbits -lHSrts -lgmp -lm $(EXTRA_HC_BOOT_LIBS)
 
 ifeq "$(GhcLibsWithReadline)" "YES"
 HC_BOOT_LIBS += $(patsubst %, -l%, $(LibsReadline))
