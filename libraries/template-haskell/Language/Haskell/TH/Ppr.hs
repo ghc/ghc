@@ -45,6 +45,11 @@ instance Ppr Name where
 instance Ppr Info where
     ppr (ClassI d) = ppr d
     ppr (TyConI d) = ppr d
+    ppr (PrimTyConI name arity is_unlifted) 
+      = text "Primitive"
+	<+> (if is_unlifted then text "unlifted" else empty)
+	<+> text "type construtor" <+> quotes (ppr name)
+	<+> parens (text "arity" <+> int arity)
     ppr (ClassOpI v ty cls fix) 
       = text "Class op from" <+> ppr cls <> colon <+>
         vcat [ppr_sig v ty, pprFixity v fix]
