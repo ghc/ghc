@@ -9,13 +9,16 @@
 -- Stability   :  provisional
 -- Portability :  non-portable (requires POSIX)
 --
--- POSIX data types
+-- POSIX data types: Haskell equivalents of the types defined by the
+-- @\<sys/types.h>@ C header on a POSIX system.
 --
 -----------------------------------------------------------------------------
 
 #include "config.h"
 
 module System.Posix.Types (
+
+  -- * POSIX data types
   CDev(..), CIno(..), CMode(..), COff(..), CPid(..), CSsize(..),
 
 #ifndef mingw32_TARGET_OS
@@ -81,6 +84,9 @@ NUMERIC_TYPE(CSpeed,tyConCSpeed,"CSpeed",HTYPE_SPEED_T)
 INTEGRAL_TYPE(CTcflag,tyConCTcflag,"CTcflag",HTYPE_TCFLAG_T)
 INTEGRAL_TYPE(CBlkCnt,tyConBlkCnd,"CBlkCnt",HTYPE_BLKCNT_T)
 #endif
+
+-- ToDo: blksize_t, clockid_t, fsblkcnt_t, fsfilcnt_t, id_t, key_t
+-- suseconds_t, timer_t, useconds_t
 
 -- Make an Fd type rather than using CInt everywhere
 INTEGRAL_TYPE(Fd,tyConFd,"Fd",CInt)
