@@ -8,10 +8,10 @@ import HaddockTypes
 %tokentype { Token }
 
 %token 	SQUO	{ TokSpecial '\'' }
+	BQUO	{ TokSpecial '`' }
 	DQUO 	{ TokSpecial '\"' }
 	'/'	{ TokSpecial '/' }
-	'['	{ TokSpecial '[' }
-	']'	{ TokSpecial ']' }
+	'@'	{ TokSpecial '@' }
 	URL	{ TokURL $$ }
 	'*'	{ TokBullet }
 	'(n)'	{ TokNumber }
@@ -60,8 +60,21 @@ elem	:: { ParsedDoc }
 	| '/' STRING '/'	{ DocEmphasis (DocString $2) }
 	| URL			{ DocURL $1 }
 	| SQUO STRING SQUO	{ DocIdentifier $2 }
+	| BQUO STRING SQUO	{ DocIdentifier $2 }
 	| DQUO STRING DQUO	{ DocModule $2 }
-	| '[' seq ']'		{ DocMonospaced $2 }
+	| '@' seq1 '@'		{ DocMonospaced $2 }
+
+seq1	:: { ParsedDoc }
+	: elem1 seq1		{ docAppend $1 $2 }
+	| elem1			{ $1 }
+
+elem1	:: { ParsedDoc }
+	: STRING		{ DocString $1 }
+	| '/' STRING '/'	{ DocEmphasis (DocString $2) }
+	| URL			{ DocURL $1 }
+	| SQUO STRING SQUO	{ DocIdentifier $2 }
+	| BQUO STRING SQUO	{ DocIdentifier $2 }
+	| DQUO STRING DQUO	{ DocModule $2 }
 
 {
 happyError :: [Token] -> Either String a

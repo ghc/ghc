@@ -11,7 +11,7 @@ module HaddockLex (
 
 import Char
 
-special = "\'\"/[]"
+special = '`' : '\'' : '\"' : '@' : []
 
 data Token
   = TokPara
