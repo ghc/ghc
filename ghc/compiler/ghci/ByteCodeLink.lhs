@@ -191,7 +191,12 @@ assembleBCO (ProtoBCO nm instrs origin malloced)
             <- mkBits findLabel init_asm_state instrs
 
          let ul_bco = UnlinkedBCO nm final_insns final_lits final_ptrs final_itbls
-         when (not (null malloced)) (addFinalizer ul_bco (mapM_ zonk malloced))
+
+         -- 8 Aug 01: Finalisers aren't safe when attached to non-primitive
+         -- objects, since they might get run too early.  Disable this until
+         -- we figure out what to do.
+         -- when (not (null malloced)) (addFinalizer ul_bco (mapM_ zonk malloced))
+
          return ul_bco
      where
          zonk (A# a#) = do -- putStrLn ("freeing malloc'd block at " ++ show (A# a#))
