@@ -250,7 +250,7 @@ endif
 		    $(DIR_DOCBOOK_XSL)/html/docbook.xsl $<
 	cp $(FPTOOLS_CSS_ABS) .
 
-%-html/index.html : %.xml
+%/index.html : %.xml
 	$(RM) -rf $(dir $@)
 	$(XSLTPROC) --stringparam base.dir $(dir $@) \
 		    --stringparam use.id.as.filename 1 \

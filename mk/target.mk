@@ -818,13 +818,13 @@ endif
 # TODO: The following could be an entry for an Obfuscated Makefile Contest...
 ifneq "$(INSTALL_XML_DOC)" ""
 ifneq "$(XMLDocWays)" ""
-install-docs:: $(foreach i,$(XMLDocWays),$(INSTALL_XML_DOC)$(patsubst %.html-no-chunks,%.html,$(patsubst %.htmlhelp,%.chm,$(patsubst %.html,%-html/index.html,.$(i)))))
+install-docs:: $(foreach i,$(XMLDocWays),$(INSTALL_XML_DOC)$(patsubst %.html-no-chunks,%.html,$(patsubst %.htmlhelp,%.chm,$(patsubst %.html,%/index.html,.$(i)))))
 	@$(INSTALL_DIR) $(datadir)	
 	@for i in $(XMLDocWays); do \
 		if [ $$i = "html" ]; then \
 			$(INSTALL_DIR) $(datadir)/html; \
-			echo "( cd $(INSTALL_XML_DOC)-html && $(CP) * $(datadir)/html )" ; \
-			( cd $(INSTALL_XML_DOC)-html && $(CP) * $(datadir)/html ) ; \
+			echo "( cd $(INSTALL_XML_DOC) && $(CP) * $(datadir)/html )" ; \
+			( cd $(INSTALL_XML_DOC) && $(CP) * $(datadir)/html ) ; \
 		else \
 			echo $(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.htmlhelp/.chm/ | sed s/\.html-no-chunks/.html/` $(datadir); \
 			$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.htmlhelp/.chm/ | sed s/\.html-no-chunks/.html/` $(datadir); \
@@ -937,7 +937,7 @@ ifeq "$(XML_SRCS)" ""
 XML_SRCS = $(wildcard *.xml)
 endif
 
-XML_HTML           = $(addsuffix -html/index.html,$(basename $(XML_DOC)))
+XML_HTML           = $(addsuffix /index.html,$(basename $(XML_DOC)))
 XML_HTML_NO_CHUNKS = $(addsuffix .html,$(XML_DOC))
 XML_HTMLHELP       = $(addsuffix -htmlhelp/index.html,$(basename $(XML_DOC)))
 XML_FO             = $(addsuffix .fo,$(XML_DOC))
@@ -958,7 +958,7 @@ pdf            :: $(XML_PDF)
 CLEAN_FILES += $(XML_HTML_NO_CHUNKS) $(XML_FO) $(XML_DVI) $(XML_PS) $(XML_PDF)
 
 extraclean ::
-	$(RM) -rf $(XML_DOC).out $(FPTOOLS_CSS) $(basename $(XML_DOC))-html $(basename $(XML_DOC))-htmlhelp
+	$(RM) -rf $(XML_DOC).out $(FPTOOLS_CSS) $(basename $(XML_DOC)) $(basename $(XML_DOC))-htmlhelp
 
 validate ::
 	$(XMLLINT) --valid --noout $(XMLLINT_OPTS) $(XML_DOC).xml
