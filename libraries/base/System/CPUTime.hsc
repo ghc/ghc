@@ -87,6 +87,8 @@ foreign import ccall unsafe times :: Ptr CTms -> IO CClock
 #endif
 
 #else /* win32 */
+     -- NOTE: GetProcessTimes() is only supported on NT-based OSes.
+     -- The counts reported by GetProcessTimes() are in 100-ns (10^-7) units.
     allocaBytes (#const sizeof(FILETIME)) $ \ p_creationTime -> do
     allocaBytes (#const sizeof(FILETIME)) $ \ p_exitTime -> do
     allocaBytes (#const sizeof(FILETIME)) $ \ p_kernelTime -> do
@@ -96,11 +98,15 @@ foreign import ccall unsafe times :: Ptr CTms -> IO CClock
     if toBool ok then do
       ut <- ft2psecs p_userTime
       kt <- ft2psecs p_kernelTime
-      return (fromIntegral (ut + kt))
+      return (ut + kt)
      else return 0
-  where ft2psecs ft = do
+  where 
+	ft2psecs :: Ptr FILETIME -> IO Integer
+        ft2psecs ft = do
           high <- (#peek FILETIME,dwHighDateTime) ft :: IO CLong
           low <- (#peek FILETIME,dwLowDateTime) ft :: IO CLong
+	    -- Convert 100-ns units to picosecs (10^-12) 
+	    -- => multiply by 10^5.
           return (((fromIntegral high) * (2^32) + (fromIntegral low)) * 100000)
 
     -- ToDo: pin down elapsed times to just the OS thread(s) that
