@@ -25,6 +25,7 @@ module DsUtils (
 	mkStringLit, mkStringLitFS, mkIntegerExpr, 
 
 	mkSelectorBinds, mkTupleExpr, mkTupleSelector, 
+	mkTupleType, mkTupleCase, mkBigCoreTup,
 	mkCoreTup, mkCoreSel, mkCoreTupTy,
 	
 	dsReboundNames, lookupReboundName,
@@ -43,9 +44,9 @@ import CoreSyn
 import Constants	( mAX_TUPLE_SIZE )
 import DsMonad
 
-import CoreUtils	( exprType, mkIfThenElse, mkCoerce )
+import CoreUtils	( exprType, mkIfThenElse, mkCoerce, bindNonRec )
 import MkId		( iRREFUT_PAT_ERROR_ID, mkReboxingAlt, mkNewTypeBody )
-import Id		( idType, Id, mkWildId, mkTemplateLocals )
+import Id		( idType, Id, mkWildId, mkTemplateLocals, mkSysLocal )
 import Name		( Name )
 import Literal		( Literal(..), inIntRange, tARGET_MAX_INT )
 import TyCon		( isNewTyCon, tyConDataCons )
@@ -63,6 +64,7 @@ import TysWiredIn	( nilDataCon, consDataCon,
 			  stringTy, isPArrFakeCon )
 import BasicTypes	( Boxity(..) )
 import UniqSet		( mkUniqSet, minusUniqSet, isEmptyUniqSet, UniqSet )
+import UniqSupply	( splitUniqSupply, uniqFromSupply )
 import PrelNames	( unpackCStringName, unpackCStringUtf8Name, 
 			  plusIntegerName, timesIntegerName, 
 			  lengthPName, indexPName )
@@ -621,14 +623,21 @@ a 10-tuple of 2-tuples (11 objects).  So we want the leaves to be big.
 
 \begin{code}
 mkTupleExpr :: [Id] -> CoreExpr
-mkTupleExpr ids 
-  = mk_tuple_expr (chunkify (map Var ids))
+mkTupleExpr ids = mkBigCoreTup (map Var ids)
+
+-- corresponding type
+mkTupleType :: [Id] -> Type
+mkTupleType ids = mkBigTuple mkCoreTupTy (map idType ids)
+
+mkBigCoreTup :: [CoreExpr] -> CoreExpr
+mkBigCoreTup = mkBigTuple mkCoreTup
+
+mkBigTuple :: ([a] -> a) -> [a] -> a
+mkBigTuple small_tuple as = mk_big_tuple (chunkify as)
   where
-    mk_tuple_expr :: [[CoreExpr]] -> CoreExpr
 	-- Each sub-list is short enough to fit in a tuple
-    mk_tuple_expr [exprs] = mkCoreTup exprs
-    mk_tuple_expr exprs_s = mk_tuple_expr (chunkify (map mkCoreTup exprs_s))
- 
+    mk_big_tuple [as] = small_tuple as
+    mk_big_tuple as_s = mk_big_tuple (chunkify (map small_tuple as_s))
 
 chunkify :: [a] -> [[a]]
 -- The sub-lists of the result all have length <= mAX_TUPLE_SIZE
@@ -685,6 +694,64 @@ mkTupleSelector vars the_var scrut_var scrut
 					 the_var `elem` gp ]
 \end{code}
 
+A generalization of @mkTupleSelector@, allowing the body
+of the case to be an arbitrary expression.
+
+If the tuple is big, it is nested:
+
+	mkTupleCase uniqs [a,b,c,d] body v e
+	  = case e of v { (p,q) ->
+	    case p of p { (a,b) ->
+	    case q of q { (c,d) ->
+	    body }}}
+
+To avoid shadowing, we use uniqs to invent new variables p,q.
+
+ToDo: eliminate cases where none of the variables are needed.
+
+\begin{code}
+mkTupleCase
+	:: UniqSupply	-- for inventing names of intermediate variables
+	-> [Id]		-- the tuple args
+	-> CoreExpr	-- body of the case
+	-> Id		-- a variable of the same type as the scrutinee
+	-> CoreExpr	-- scrutinee
+	-> CoreExpr
+
+mkTupleCase uniqs vars body scrut_var scrut
+  = mk_tuple_case uniqs (chunkify vars) body
+  where
+    mk_tuple_case us [vars] body
+      = mkSmallTupleCase vars body scrut_var scrut
+    mk_tuple_case us vars_s body
+      = let
+	    (us', vars', body') = foldr one_tuple_case (us, [], body) vars_s
+	in
+	mk_tuple_case us' (chunkify vars') body'
+    one_tuple_case chunk_vars (us, vs, body)
+      = let
+	    (us1, us2) = splitUniqSupply us
+	    scrut_var = mkSysLocal FSLIT("ds") (uniqFromSupply us1)
+			(mkCoreTupTy (map idType chunk_vars))
+	    body' = mkSmallTupleCase chunk_vars body scrut_var (Var scrut_var)
+	in (us2, scrut_var:vs, body')
+\end{code}
+
+The same, but with a tuple small enough not to need nesting.
+
+\begin{code}
+mkSmallTupleCase
+	:: [Id]		-- the tuple args
+	-> CoreExpr	-- body of the case
+	-> Id		-- a variable of the same type as the scrutinee
+	-> CoreExpr	-- scrutinee
+	-> CoreExpr
+
+mkSmallTupleCase [var] body _scrut_var scrut
+  = bindNonRec var scrut body
+mkSmallTupleCase vars body scrut_var scrut
+  = Case scrut scrut_var [(DataAlt (tupleCon Boxed (length vars)), vars, body)]
+\end{code}
 
 %************************************************************************
 %*									*

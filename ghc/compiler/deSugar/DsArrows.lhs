@@ -11,6 +11,7 @@ module DsArrows ( dsProcExpr ) where
 import Match		( matchSimply )
 import DsUtils		( mkErrorAppDs,
 			  mkCoreTupTy, mkCoreTup, selectMatchVar,
+			  mkTupleCase, mkBigCoreTup, mkTupleType,
 			  mkTupleExpr, mkTupleSelector,
 			  dsReboundNames, lookupReboundName )
 import DsMonad
@@ -132,7 +133,7 @@ mkSndExpr a_ty b_ty
     newSysLocalDs b_ty			`thenDs` \ b_var ->
     newSysLocalDs (mkCorePairTy a_ty b_ty)	`thenDs` \ pair_var ->
     returnDs (Lam pair_var
-		  (coreCaseSmallTuple pair_var [a_var, b_var] (Var b_var)))
+		  (coreCasePair pair_var a_var b_var (Var b_var)))
 \end{code}
 
 Build case analysis of a tuple.  This cannot be done in the DsM monad,
@@ -144,23 +145,16 @@ because the list of variables is typically not yet defined.
 -- But the matching may be nested if the tuple is very big
 
 coreCaseTuple :: UniqSupply -> Id -> [Id] -> CoreExpr -> CoreExpr
-coreCaseTuple uniqs = coreCaseSmallTuple	-- TODO: do this right
+coreCaseTuple uniqs scrut_var vars body
+  = mkTupleCase uniqs vars body scrut_var (Var scrut_var)
 
--- same, but with a tuple small enough not to need nesting
-
-coreCaseSmallTuple :: Id -> [Id] -> CoreExpr -> CoreExpr
-coreCaseSmallTuple scrut_var [var] body
-  = bindNonRec var (Var scrut_var) body
-coreCaseSmallTuple scrut_var vars body
+coreCasePair :: Id -> Id -> Id -> CoreExpr -> CoreExpr
+coreCasePair scrut_var var1 var2 body
   = Case (Var scrut_var) scrut_var
-         [(DataAlt (tupleCon Boxed (length vars)), vars, body)]
+         [(DataAlt (tupleCon Boxed 2), [var1, var2], body)]
 \end{code}
 
 \begin{code}
--- Not right: doesn't handle nested tuples
-tupleType :: [Id] -> Type
-tupleType vars = mkCoreTupTy (map idType vars)
-
 mkCorePairTy :: Type -> Type -> Type
 mkCorePairTy t1 t2 = mkCoreTupTy [t1, t2]
 
@@ -179,39 +173,36 @@ with s1 being the "top", the first one to be matched with a lambda.
 
 \begin{code}
 envStackType :: [Id] -> [Type] -> Type
-envStackType ids stack_tys = foldl mkCorePairTy (tupleType ids) stack_tys
+envStackType ids stack_tys = foldl mkCorePairTy (mkTupleType ids) stack_tys
 
 ----------------------------------------------
 --		buildEnvStack
 --
---	(...((x1,...,xn),s1),...sn)
+--	(...((x1,...,xn),s1),...sk)
 
 buildEnvStack :: [Id] -> [Id] -> CoreExpr
 buildEnvStack env_ids stack_ids
-  = envStackExpr (mkTupleExpr env_ids) (map Var stack_ids)
-
-envStackExpr :: CoreExpr -> [CoreExpr] -> CoreExpr
-envStackExpr core_ids core_exprs = foldl mkCorePairExpr core_ids core_exprs
+  = foldl mkCorePairExpr (mkTupleExpr env_ids) (map Var stack_ids)
 
 ----------------------------------------------
 -- 		matchEnvStack
 --
---	\ (...((x1,...,xm),s1),...sn) -> e
+--	\ (...((x1,...,xn),s1),...sk) -> e
 --	=>
---	\ zn ->
---	case zn of (zn-1,sn) ->
+--	\ zk ->
+--	case zk of (zk-1,sk) ->
 --	...
 --	case z1 of (z0,s1) ->
---	case z0 of (x1,...,xm) ->
+--	case z0 of (x1,...,xn) ->
 --	e
 
-matchEnvStack	:: [Id] 	-- x1..xm
-		-> [Id] 	-- s1..sn
+matchEnvStack	:: [Id] 	-- x1..xn
+		-> [Id] 	-- s1..sk
 		-> CoreExpr 	-- e
 		-> DsM CoreExpr
 matchEnvStack env_ids stack_ids body
   = getUniqSupplyDs			`thenDs` \ uniqs ->
-    newSysLocalDs (tupleType env_ids)	`thenDs` \ tup_var ->
+    newSysLocalDs (mkTupleType env_ids)	`thenDs` \ tup_var ->
     matchVarStack tup_var stack_ids 
 		  (coreCaseTuple uniqs tup_var env_ids body)
 
@@ -219,27 +210,25 @@ matchEnvStack env_ids stack_ids body
 ----------------------------------------------
 -- 		matchVarStack
 --
---	\ (...(z0,s1),...sn) -> e
+--	\ (...(z0,s1),...sk) -> e
 --	=>
---	\ zn ->
---	case zn of (zn-1,sn) ->
+--	\ zk ->
+--	case zk of (zk-1,sk) ->
 --	...
 --	case z1 of (z0,s1) ->
 --	e
 
 matchVarStack :: Id 		-- z0
-	      -> [Id] 		-- s1..sn
+	      -> [Id] 		-- s1..sk
 	      -> CoreExpr 	-- e
 	      -> DsM CoreExpr
 matchVarStack env_id [] body
   = returnDs (Lam env_id body)
 matchVarStack env_id (stack_id:stack_ids) body
-  = let
-	pair_ids = [env_id, stack_id]
-    in
-    newSysLocalDs (tupleType pair_ids)	`thenDs` \ pair_id ->
+  = newSysLocalDs (mkCorePairTy (idType env_id) (idType stack_id))
+					`thenDs` \ pair_id ->
     matchVarStack pair_id stack_ids 
-		  (coreCaseSmallTuple pair_id pair_ids body)
+		  (coreCasePair pair_id env_id stack_id body)
 \end{code}
 
 \begin{code}
@@ -279,7 +268,7 @@ dsProcExpr pat (HsCmdTop cmd [] cmd_ty ids) locn
     dsfixCmd meth_ids locals [] cmd_ty cmd
 				`thenDs` \ (core_cmd, free_vars, env_ids) ->
     let
-	env_ty = tupleType env_ids
+	env_ty = mkTupleType env_ids
     in
     mkFailExpr ProcExpr env_ty		`thenDs` \ fail_expr ->
     selectMatchVar pat			`thenDs` \ var ->
@@ -322,7 +311,7 @@ dsCmd ids local_vars env_ids [] res_ty
   = let
 	(a_arg_ty, _res_ty') = tcSplitAppTy arrow_ty
         (_a_ty, arg_ty) = tcSplitAppTy a_arg_ty
-	env_ty = tupleType env_ids
+	env_ty = mkTupleType env_ids
     in
     dsExpr arrow			`thenDs` \ core_arrow ->
     dsExpr arg				`thenDs` \ core_arg ->
@@ -342,11 +331,11 @@ dsCmd ids local_vars env_ids [] res_ty
   = let
 	(a_arg_ty, _res_ty') = tcSplitAppTy arrow_ty
         (_a_ty, arg_ty) = tcSplitAppTy a_arg_ty
-	env_ty = tupleType env_ids
+	env_ty = mkTupleType env_ids
     in
     dsExpr arrow			`thenDs` \ core_arrow ->
     dsExpr arg				`thenDs` \ core_arg ->
-    matchEnvStack env_ids [] (mkCoreTup [core_arrow, core_arg])
+    matchEnvStack env_ids [] (mkCorePairExpr core_arrow core_arg)
 					`thenDs` \ core_make_pair ->
     returnDs (do_map_arrow ids env_ty (mkCorePairTy arrow_ty arg_ty) res_ty
 		core_make_pair
@@ -520,7 +509,7 @@ dsCmd ids local_vars env_ids [] res_ty (HsDo _ctxt stmts _ _ _loc)
 
 dsCmd _ids local_vars env_ids _stack _res_ty (HsArrForm op _ args _)
   = let
-	env_ty = tupleType env_ids
+	env_ty = mkTupleType env_ids
     in
     dsExpr op				`thenDs` \ core_op ->
     mapAndUnzipDs (dsTrimCmdArg local_vars env_ids) args
@@ -609,8 +598,8 @@ dsCmdDo ids local_vars env_ids res_ty (stmt:stmts)
     dsCmdStmt ids local_vars env_ids env_ids' stmt
 				`thenDs` \ (core_stmt, fv_stmt) ->
     returnDs (do_compose ids
-		(tupleType env_ids)
-		(tupleType env_ids')
+		(mkTupleType env_ids)
+		(mkTupleType env_ids')
 		res_ty
 		core_stmt
 		core_stmts,
@@ -634,9 +623,9 @@ dsCmdStmt
 		IdSet)		-- set of local vars that occur free
 
 --	A | xs1 |- c :: [] t
---	A | xs' |- do { ss } :: [] t
+--	A | xs' |- do { ss } :: [] t'
 --	------------------------------
---	A | xs |- do { c; ss } :: [] t
+--	A | xs |- do { c; ss } :: [] t'
 --
 --		---> arr (\ (xs) -> ((xs1),(xs'))) >>> first c >>>
 --			arr snd >>> ss
@@ -648,9 +637,9 @@ dsCmdStmt ids local_vars env_ids out_ids (ExprStmt cmd c_ty _loc)
 	(mkCorePairExpr (mkTupleExpr env_ids1) (mkTupleExpr out_ids))
 					`thenDs` \ core_mux ->
     let
-	in_ty = tupleType env_ids
-	in_ty1 = tupleType env_ids1
-	out_ty = tupleType out_ids
+	in_ty = mkTupleType env_ids
+	in_ty1 = mkTupleType env_ids1
+	out_ty = mkTupleType out_ids
 	before_c_ty = mkCorePairTy in_ty1 out_ty
 	after_c_ty = mkCorePairTy c_ty out_ty
     in
@@ -663,9 +652,9 @@ dsCmdStmt ids local_vars env_ids out_ids (ExprStmt cmd c_ty _loc)
   where
 
 --	A | xs1 |- c :: [] t
---	A | xs' |- do { ss } :: [] t		xs2 = xs' - defs(p)
+--	A | xs' |- do { ss } :: [] t'		xs2 = xs' - defs(p)
 --	-----------------------------------
---	A | xs |- do { p <- c; ss } :: [] t
+--	A | xs |- do { p <- c; ss } :: [] t'
 --
 --		---> arr (\ (xs) -> ((xs1),(xs2))) >>> first c >>>
 --			arr (\ (p, (xs2)) -> (xs')) >>> ss
@@ -677,8 +666,10 @@ dsCmdStmt ids local_vars env_ids out_ids (BindStmt pat cmd _loc)
   = dsfixCmd ids local_vars [] (hsPatType pat) cmd
 				`thenDs` \ (core_cmd, fv_cmd, env_ids1) ->
     let
+	pat_ty = hsPatType pat
 	pat_vars = mkVarSet (collectPatBinders pat)
 	env_ids2 = varSetElems (mkVarSet out_ids `minusVarSet` pat_vars)
+	env_ty2 = mkTupleType env_ids2
     in
 
     -- multiplexing function
@@ -692,12 +683,11 @@ dsCmdStmt ids local_vars env_ids out_ids (BindStmt pat cmd _loc)
     --		\ (p, (xs2)) -> (zs)
 
     selectMatchVar pat			`thenDs` \ pat_id ->
-    newSysLocalDs (tupleType env_ids2)	`thenDs` \ env_id ->
+    newSysLocalDs env_ty2		`thenDs` \ env_id ->
     getUniqSupplyDs			`thenDs` \ uniqs ->
     let
-	pair_ids = [pat_id, env_id]
-	after_c_ty = tupleType pair_ids
-	out_ty = tupleType out_ids
+	after_c_ty = mkCorePairTy pat_ty env_ty2
+	out_ty = mkTupleType out_ids
 	body_expr = coreCaseTuple uniqs env_id env_ids2 (mkTupleExpr out_ids)
     in
     mkFailExpr (StmtCtxt DoExpr) out_ty	`thenDs` \ fail_expr ->
@@ -705,15 +695,14 @@ dsCmdStmt ids local_vars env_ids out_ids (BindStmt pat cmd _loc)
 					`thenDs` \ match_code ->
     newSysLocalDs after_c_ty		`thenDs` \ pair_id ->
     let
-	proj_expr = Lam pair_id (coreCaseSmallTuple pair_id pair_ids match_code)
+	proj_expr = Lam pair_id (coreCasePair pair_id pat_id env_id match_code)
     in
 
-    -- put it all togther
+    -- put it all together
     let
-	pat_ty = hsPatType pat
-	in_ty = tupleType env_ids
-	in_ty1 = tupleType env_ids1
-	in_ty2 = tupleType env_ids2
+	in_ty = mkTupleType env_ids
+	in_ty1 = mkTupleType env_ids1
+	in_ty2 = mkTupleType env_ids2
 	before_c_ty = mkCorePairTy in_ty1 in_ty2
     in
     returnDs (do_map_arrow ids in_ty before_c_ty out_ty core_mux $
@@ -734,8 +723,8 @@ dsCmdStmt ids local_vars env_ids out_ids (LetStmt binds)
     -- match the old environment against the input
     matchEnvStack env_ids [] core_binds	`thenDs` \ core_map ->
     returnDs (do_arr ids
-			(tupleType env_ids)
-			(tupleType out_ids)
+			(mkTupleType env_ids)
+			(mkTupleType out_ids)
 			core_map,
 	exprFreeVars core_binds `intersectVarSet` local_vars)
 
@@ -757,7 +746,7 @@ dsCmdStmt ids local_vars env_ids out_ids (RecStmt stmts later_ids rec_ids rhss)
   = let
 	env2_id_set = mkVarSet out_ids `minusVarSet` mkVarSet later_ids
 	env2_ids = varSetElems env2_id_set
-	env2_ty = tupleType env2_ids
+	env2_ty = mkTupleType env2_ids
     in
 
     -- post_loop_fn = \((later_ids),(env2_ids)) -> (out_ids)
@@ -765,8 +754,8 @@ dsCmdStmt ids local_vars env_ids out_ids (RecStmt stmts later_ids rec_ids rhss)
     getUniqSupplyDs		`thenDs` \ uniqs ->
     newSysLocalDs env2_ty	`thenDs` \ env2_id ->
     let
-	later_ty = tupleType later_ids
-	post_pair_ty = mkCoreTupTy [later_ty, env2_ty]
+	later_ty = mkTupleType later_ids
+	post_pair_ty = mkCorePairTy later_ty env2_ty
 	post_loop_body = coreCaseTuple uniqs env2_id env2_ids (mkTupleExpr out_ids)
     in
     matchEnvStack later_ids [env2_id] post_loop_body
@@ -780,9 +769,10 @@ dsCmdStmt ids local_vars env_ids out_ids (RecStmt stmts later_ids rec_ids rhss)
     -- pre_loop_fn = \(env_ids) -> ((env1_ids),(env2_ids))
 
     let
-	env1_ty = tupleType env1_ids
-	pre_pair_ty = mkCoreTupTy [env1_ty, env2_ty]
-	pre_loop_body = mkCoreTup [mkTupleExpr env1_ids, mkTupleExpr env2_ids]
+	env1_ty = mkTupleType env1_ids
+	pre_pair_ty = mkCorePairTy env1_ty env2_ty
+	pre_loop_body = mkCorePairExpr (mkTupleExpr env1_ids)
+					(mkTupleExpr env2_ids)
 
     in
     matchEnvStack env_ids [] pre_loop_body
@@ -791,8 +781,8 @@ dsCmdStmt ids local_vars env_ids out_ids (RecStmt stmts later_ids rec_ids rhss)
     -- arr pre_loop_fn >>> first (loop (...)) >>> arr post_loop_fn
 
     let
-	env_ty = tupleType env_ids
-	out_ty = tupleType out_ids
+	env_ty = mkTupleType env_ids
+	out_ty = mkTupleType out_ids
 	core_body = do_map_arrow ids env_ty pre_pair_ty out_ty
 		pre_loop_fn
 		(do_compose ids pre_pair_ty post_pair_ty out_ty
@@ -811,7 +801,7 @@ dsRecCmd ids local_vars stmts later_ids rec_ids rhss
   = let
 	rec_id_set = mkVarSet rec_ids
 	out_ids = varSetElems (mkVarSet later_ids `unionVarSet` rec_id_set)
-	out_ty = tupleType out_ids
+	out_ty = mkTupleType out_ids
 	local_vars' = local_vars `unionVarSet` rec_id_set
     in
 
@@ -820,11 +810,11 @@ dsRecCmd ids local_vars stmts later_ids rec_ids rhss
     mapDs dsExpr rhss		`thenDs` \ core_rhss ->
     let
 	later_tuple = mkTupleExpr later_ids
-	later_ty = tupleType later_ids
-	rec_tuple = mkCoreTup core_rhss
-	rec_ty = tupleType rec_ids
-	out_pair = mkCoreTup [later_tuple, rec_tuple]
-	out_pair_ty = mkCoreTupTy [later_ty, rec_ty]
+	later_ty = mkTupleType later_ids
+	rec_tuple = mkBigCoreTup core_rhss
+	rec_ty = mkTupleType rec_ids
+	out_pair = mkCorePairExpr later_tuple rec_tuple
+	out_pair_ty = mkCorePairTy later_ty rec_ty
     in
 	matchEnvStack out_ids [] out_pair
 				`thenDs` \ mk_pair_fn ->
@@ -840,9 +830,9 @@ dsRecCmd ids local_vars stmts later_ids rec_ids rhss
     let
 	env1_id_set = fv_stmts `minusVarSet` rec_id_set
 	env1_ids = varSetElems env1_id_set
-	env1_ty = tupleType env1_ids
-	in_pair_ty = mkCoreTupTy [env1_ty, rec_ty]
-	core_body = mkCoreTup (map selectVar env_ids)
+	env1_ty = mkTupleType env1_ids
+	in_pair_ty = mkCorePairTy env1_ty rec_ty
+	core_body = mkBigCoreTup (map selectVar env_ids)
 	  where
 	    selectVar v
 		| v `elemVarSet` rec_id_set
@@ -855,7 +845,7 @@ dsRecCmd ids local_vars stmts later_ids rec_ids rhss
     -- loop (arr squash_pair_fn >>> ss >>> arr mk_pair_fn)
 
     let
-	env_ty = tupleType env_ids
+	env_ty = mkTupleType env_ids
 	core_loop = do_loop ids env1_ty later_ty rec_ty
 		(do_map_arrow ids in_pair_ty env_ty out_pair_ty
 			squash_pair_fn
@@ -907,9 +897,9 @@ dsCmdStmts ids local_vars env_ids out_ids (stmt:stmts)
     dsCmdStmt ids local_vars env_ids env_ids' stmt
 				`thenDs` \ (core_stmt, fv_stmt) ->
     returnDs (do_compose ids
-		(tupleType env_ids)
-		(tupleType env_ids')
-		(tupleType out_ids)
+		(mkTupleType env_ids)
+		(mkTupleType env_ids')
+		(mkTupleType out_ids)
 		core_stmt
 		core_stmts,
 	      fv_stmt)
