@@ -42,7 +42,7 @@ waitQSemN (QSemN sem) sz = do
   if (avail - sz) >= 0 then
        -- discharging 'sz' still leaves the semaphore
        -- in an 'unblocked' state.
-     putMVar sem (avail-sz,[])
+     putMVar sem (avail-sz,blocked)
    else do
      block <- newEmptyMVar
      putMVar sem (avail, blocked++[(sz,block)])
