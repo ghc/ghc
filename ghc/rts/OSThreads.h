@@ -31,6 +31,8 @@ typedef pthread_t       OSThreadId;
 # elif defined(HAVE_WINDOWS_H)
 #include <windows.h>
 
+#include "RtsUtils.h"
+
 typedef HANDLE Condition;
 typedef HANDLE Mutex;
 typedef DWORD OSThreadId;
