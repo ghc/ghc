@@ -17,7 +17,7 @@ import BasicTypes	( Fixity(..), FixityDirection(..) )
 import HsTypes		( HsType )
 
 -- others:
-import Name		( Name, isLexId ) 
+import Name		( Name, isLexSym ) 
 import Outputable	
 import PprType		( pprType, pprParendType )
 import Type		( Type )
@@ -211,7 +211,11 @@ pprExpr :: (Outputable id, Outputable pat)
 pprExpr e = pprDeeper (ppr_expr e)
 pprBinds b = pprDeeper (ppr b)
 
-ppr_expr (HsVar v) = ppr v
+ppr_expr (HsVar v) 
+	-- Put it in parens if it's an operator
+  | isOperator v = parens (ppr v)
+  | otherwise    = ppr v
+
 ppr_expr (HsIPVar v) = {- char '?' <> -} ppr v
 
 ppr_expr (HsLit    lit)   = ppr lit
@@ -241,13 +245,9 @@ ppr_expr (OpApp e1 op fixity e2)
     pp_infixly v
       = sep [pp_e1, hsep [pp_v_op, pp_e2]]
       where
-	pp_v = ppr v
-        pp_v_op | isLexId (_PK_ (showSDoc pp_v)) = char '`' <> pp_v <> char '`'
-	        | otherwise	       	         = pp_v 
-	-- Put it in backquotes if it's not an operator already
-	-- We use (showSDoc pp_v), rather than isSymOcc (getOccName v) simply so
-	-- that we don't need NamedThing in the context of all these funcions.
-	-- Gruesome, but simple.
+        pp_v_op | isOperator v = ppr v
+		| otherwise    = char '`' <> ppr v <> char '`'
+	        -- Put it in backquotes if it's not an operator already
 
 ppr_expr (NegApp e _)
   = char '-' <+> pprParendExpr e
@@ -388,6 +388,14 @@ pprParendExpr expr
       HsPar _		    -> pp_as_was
 
       _			    -> parens pp_as_was
+\end{code}
+
+\begin{code}
+isOperator :: Outputable a => a -> Bool
+isOperator v = isLexSym (_PK_ (showSDoc (ppr v)))
+	-- We use (showSDoc (ppr v)), rather than isSymOcc (getOccName v) simply so
+	-- that we don't need NamedThing in the context of all these functions.
+	-- Gruesome, but simple.
 \end{code}
 
 %************************************************************************
