@@ -375,8 +375,17 @@ hPrint hdl 	=  hPutStrLn hdl . show
 -- fixIO
 
 #ifdef __GLASGOW_HASKELL__
-fixIO 		:: (a -> IO a) -> IO a
-fixIO m         = stToIO (fixST (ioToST . m))
+fixIO :: (a -> IO a) -> IO a
+fixIO k = do
+    ref <- newIORef (throw NonTermination)
+    ans <- unsafeInterleaveIO (readIORef ref)
+    result <- k ans
+    writeIORef ref result
+    return result
+
+-- NOTE: we do our own explicit black holing here, because GHC's lazy
+-- blackholing isn't enough.  In an infinite loop, GHC may run the IO
+-- computation a few times before it notices the loop, which is wrong.
 #endif
 
 -- $locking
