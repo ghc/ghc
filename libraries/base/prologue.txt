@@ -1,7 +1,0 @@
-The @base@ package contains the "Prelude" and its support libraries,
-and a large collection of useful libraries ranging from data
-structures to parsing combinators and debugging utilities.
-
-The @base@ package is enabled by default; to import any of the modules
-listed here just import it by name.  Remember to give the /fully
-qualified/ name when importing a module from the hierarchy.
