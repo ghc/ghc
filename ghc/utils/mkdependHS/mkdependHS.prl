@@ -371,7 +371,7 @@ sub slurp_file_for_imports {
    		   $follow_file = "$ModuleIn{$modname}/$modname.hi";
 	    } else { # hard way
 		$follow_file
-		  = &find_in_Import_dirs($orig_src_file, $modname, $last_seen_dir );
+		  = &find_in_Import_dirs($orig_src_file, $modname, $last_seen_dir, $source );
 	    }
 	} else {
 		$follow_file
@@ -471,6 +471,12 @@ sub find_in_Import_dirs {
 	    print STDERR "trying... $name_to_check\n" if $Verbose >= 2; # very verbose
 	    return($name_to_check) if -f $name_to_check;
         }
+
+	if ( $source ) {
+	    $name_to_check = "$import_dir/$modname.hi-boot";
+	    print STDERR "trying... $name_to_check\n" if $Verbose >= 2; # very verbose
+	    return($name_to_check) if -f $name_to_check;
+	}		
     }
     if ($do_magical_check == 1) {
 	$name_to_check = "$last_seen_dir/$modname.hi";
