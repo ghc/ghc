@@ -297,7 +297,7 @@ sumP :: (Num a) => [:a:] -> a
 sumP  = foldP (+) 0
 
 productP :: (Num a) => [:a:] -> a
-productP  = foldP (*) 0
+productP  = foldP (*) 1
 
 maximumP      :: (Ord a) => [:a:] -> a
 maximumP [::]  = error "Prelude.maximumP: empty parallel array"
@@ -402,7 +402,7 @@ instance Read a => Read [:a:]  where
 -- Ideally, we would like `enumFromToP' and `enumFromThenToP' to be members of
 -- `Enum'.  On the other hand, we really do not want to change `Enum'.  Thus,
 -- for the moment, we hope that the compiler is sufficiently clever to
--- properly fuse the following definition.
+-- properly fuse the following definitions.
 
 enumFromToP	:: Enum a => a -> a -> [:a:]
 enumFromToP x y  = mapP toEnum (eftInt (fromEnum x) (fromEnum y))
@@ -414,7 +414,7 @@ enumFromThenToP x y z  =
   mapP toEnum (efttInt (fromEnum x) (fromEnum y) (fromEnum z))
   where
     efttInt x y z = scanlP (+) x $ 
-		      replicateP ((z - x + 1) `div` delta - 1) delta
+		      replicateP (abs (z - x) `div` abs delta + 1) delta
       where
        delta = y - x
 
@@ -570,7 +570,7 @@ loopFromTo from to mf start arr = runST (do
 	     -- unlike standard Haskell arrays, this value represents an
 	     -- internal error
 
--- actually loop body of `loop'
+-- actual loop body of `loop'
 --
 -- * for this to be really efficient, it has to be translated with the
 --   constructor specialisation phase "SpecConstr" switched on; as of GHC 5.03
