@@ -2051,8 +2051,15 @@ addNoInstanceErrs mb_what givens dicts
 	  | not (isClassDict dict) = (overlap_doc, dict : no_inst_dicts)
 	  | otherwise
 	  = case lookupInstEnv dflags inst_envs clas tys of
-		([], _)  -> (overlap_doc, dict : no_inst_dicts) 	-- No matches
-		inst_res -> (mk_overlap_msg dict inst_res $$ overlap_doc, no_inst_dicts)
+		res@(ms, _) 
+		  | length ms > 1 -> (mk_overlap_msg dict res $$ overlap_doc, no_inst_dicts)
+		  | otherwise     -> (overlap_doc, dict : no_inst_dicts) 	-- No match
+		-- NB: there can be exactly one match, in the case where we have
+		--	instance C a where ...
+		-- (In this case, lookupInst doesn't bother to look up, 
+		--  unless -fallow-undecidable-instances is set.)
+		-- So we report this as "no instance" rather than "overlap"; the fix is
+		-- to specify -fallow-undecidable-instances, but we leave that to the programmer!
 	  where
 	    (clas,tys) = getDictClassTys dict
     in
