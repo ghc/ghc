@@ -255,7 +255,7 @@ getLinkDeps hpt pit mods
     no_iface mod = ptext SLIT("No iface for") <+> ppr mod
 	-- This one is a GHC bug
 
-    no_obj mod = dieWith (ptext SLIT("No compiled code for for") <+> ppr mod)
+    no_obj mod = dieWith (ptext SLIT("No compiled code for") <+> ppr mod)
 	-- This one is a build-system bug
 
     get_linkable mod_name	-- A home-package module
