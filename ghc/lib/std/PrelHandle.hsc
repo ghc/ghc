@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hsc,v 1.2 2001/05/18 21:57:30 qrczak Exp $
+-- $Id: PrelHandle.hsc,v 1.3 2001/05/19 08:02:37 qrczak Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -68,12 +68,14 @@ import PrelConc
 -- -----------------------------------------------------------------------------
 -- TODO:
 
--- hWaitForInput blocks (should use a timeout).
+-- hWaitForInput blocks (should use a timeout)
 
 -- unbuffered hGetLine is a bit dodgy
 
 -- hSetBuffering: can't change buffering on a stream, 
 --	when the read buffer is non-empty? (no way to flush the buffer)
+
+-- fix locking
 
 -- ---------------------------------------------------------------------------
 -- Creating a new handle
@@ -651,11 +653,21 @@ openFd fd filepath mode = do
 	   mkFileHandle fd filepath ha_type
 
 
-foreign import "lockFile" unsafe 
+{- TODO: Implementation of locking in cbits is bogus.
+   Disable it for now.
+
+foreign import "lockFile" unsafe
   lockFile :: CInt -> CInt -> CInt -> IO CInt
 
-foreign import "unlockFile" unsafe 
+foreign import "unlockFile" unsafe
   unlockFile :: CInt -> IO CInt
+-}
+
+lockFile :: CInt -> CInt -> CInt -> IO CInt
+lockFile _ _ _ = return 0
+
+unlockFile :: CInt -> IO CInt
+unlockFile _ = return 0
 
 
 mkFileHandle :: FD -> FilePath -> HandleType -> IO Handle
