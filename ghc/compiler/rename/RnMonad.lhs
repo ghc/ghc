@@ -168,6 +168,9 @@ data RnMode	= SourceMode		-- Renaming source code
 
 isInterfaceMode InterfaceMode = True
 isInterfaceMode _ = False
+
+isCmdLineMode CmdLineMode = True
+isCmdLineMode _ = False
 \end{code}
 
 %===================================================

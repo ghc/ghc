@@ -141,6 +141,9 @@ data WhereFrom = ImportByUser		-- Ordinary user import: look for M.hi
 	       | ImportBySystem		-- Non user import.  Look for M.hi if M is in
 					-- the module this module depends on, or is a system-ish module; 
 					-- M.hi-boot otherwise
+	       | ImportByCmdLine        -- The user typed a qualified name at
+					-- the GHCi prompt, try to demand-load
+					-- the interface.
 
 instance Outputable WhereFrom where
   ppr ImportByUser       = empty

@@ -118,6 +118,7 @@ tryLoadInterface doc_str mod_name from
 			ImportByUser	   -> not (mi_boot iface)
 			ImportByUserSource -> mi_boot iface
 			ImportBySystem 	   -> True
+			ImportByCmdLine    -> True
 		   -> returnRn (iface, Nothing) ;	-- Already loaded
 			-- The not (mi_boot iface) test checks that the already-loaded
 			-- interface isn't a boot iface.  This can conceivably happen,
@@ -133,6 +134,7 @@ tryLoadInterface doc_str mod_name from
 	  = case (from, mod_info) of
 		(ImportByUser,       _)    	    -> False 	-- Not hi-boot
 		(ImportByUserSource, _)		    -> True 	-- hi-boot
+		(ImportByCmdLine,    _)		    -> False
 		(ImportBySystem, Just (_, is_boot)) -> is_boot
 		(ImportBySystem, Nothing)	    -> False
 			-- We're importing a module we know absolutely
@@ -144,6 +146,9 @@ tryLoadInterface doc_str mod_name from
 	  = case (from, mod_info) of 
 		(ImportByUserSource, Just (_,False)) -> True
 		other				     -> False
+
+	home_allowed | ImportByCmdLine <- from = True
+		     | otherwise	       = False
    in
 
 	-- Issue a warning for a redundant {- SOURCE -} import
@@ -160,7 +165,8 @@ tryLoadInterface doc_str mod_name from
 	(warnSelfImport this_mod)		`thenRn_`
 
 	-- READ THE MODULE IN
-   findAndReadIface doc_str mod_name hi_boot_file   `thenRn` \ read_result ->
+   findAndReadIface doc_str mod_name hi_boot_file home_allowed
+					    `thenRn` \ read_result ->
    case read_result of {
 	Left err -> 	-- Not found, so add an empty export env to the Ifaces map
 			-- so that we don't look again
@@ -470,18 +476,26 @@ new_top_bndrs mod names_w_locs
 findAndReadIface :: SDoc -> ModuleName 
 		 -> IsBootInterface	-- True  <=> Look for a .hi-boot file
 					-- False <=> Look for .hi file
+		 -> Bool		-- True <=> can read home interface
 		 -> RnM d (Either Message (Module, ParsedIface))
 	-- Nothing <=> file not found, or unreadable, or illegible
 	-- Just x  <=> successfully found and parsed 
 
-findAndReadIface doc_str mod_name hi_boot_file
+findAndReadIface doc_str mod_name hi_boot_file home_allowed
   = traceRn trace_msg			`thenRn_`
 
     ioToRnM (findModule mod_name)	`thenRn` \ maybe_found ->
     case maybe_found of
 
       Right (Just (wanted_mod,locn))
-        -> mkHiPath hi_boot_file locn `thenRn` \ file -> 
+        -> -- in CmdLineMode, we cannot demand-load home interfaces
+	   -- because the corresponding code won't be loaded, so we
+	   -- check for this here and emit an error message.
+	   if (home_allowed && isHomeModule wanted_mod)
+	      then returnRn (Left (notLoaded wanted_mod))
+	      else
+
+	   mkHiPath hi_boot_file locn `thenRn` \ file -> 
 	   readIface file `thenRn` \ read_result ->
 	   case read_result of
                 Left bad -> returnRn (Left bad)
@@ -617,6 +631,9 @@ hiModuleNameMismatchWarn requested_mod read_mod =
 warnRedundantSourceImport mod_name
   = ptext SLIT("Unnecessary {- SOURCE -} in the import of module")
           <+> quotes (ppr mod_name)
+
+notLoaded mod
+  = ptext SLIT("Module") <+> quotes (ppr mod) <+> ptext SLIT("is not loaded")
 
 warnSelfImport mod
   = ptext SLIT("Importing my own interface: module") <+> ppr mod
