@@ -532,26 +532,6 @@ AC_ARG_ENABLE(hopengl,
 )
 AC_SUBST(GhcLibsWithHOpenGL)
 
-dnl ** Use a specific version of the GLUT API
-dnl --------------------------------------------------------------
-AC_ARG_WITH(glut-api,
-[  --with-glut-api=<version>
-        Use a specific version of the GLUT API when building HOpenGL.
-])
-test -n "$with_glut_api"  && CPPFLAGS="$CPPFLAGS -DGLUT_API_VERSION=$with_glut_api"
-
-
-dnl ** Use a specific version of the GLUT API
-dnl --------------------------------------------------------------
-AC_ARG_WITH(glut-xlib,
-[  --with-glut-xlib=<version>
-        Use a specific version of the GLUT Xlib implementation when building HOpenGL.
-])
-test -n "$with_glut_xlib" && CPPFLAGS="$CPPFLAGS -DGLUT_XLIB_IMPLEMENTATION=$with_glut_xlib"
-
-
-
-
 dnl --------------------------------------------------------------
 dnl End of configure script option section
 dnl --------------------------------------------------------------
@@ -1048,7 +1028,10 @@ mingw32)  ;;
 *) AC_PATH_XTRA() ;;
 esac
 
+dnl ** check for OpenGL/GLUT/GLX include paths and libraries
+if test $GhcLibsWithHOpenGL = YES ; then
 FPTOOLS_HAVE_OPENGL
+fi
 
 dnl ################################################################
 dnl Check for libraries
