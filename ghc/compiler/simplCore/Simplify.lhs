@@ -480,7 +480,7 @@ simplLazyBind env top_lvl is_rec bndr bndr' rhs rhs_se
 	-- 	   y* = E; x = case (scc y) of {...}
  	-- Either we must be careful not to float demanded non-values, or
 	-- we must use exprIsValue for the test, which ensures that the
-	-- thing is non-strict.  I think.  The WARN below tests for this
+	-- thing is non-strict.  I think.  The WARN below tests for this.
     else if exprIsTrivial rhs2 || exprIsValue rhs2 then
 		-- There's a subtlety here.  There may be a binding (x* = e) in the
 		-- floats, where the '*' means 'will be demanded'.  So is it safe
