@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Err.lhs,v 1.3 2001/07/31 13:11:40 simonmar Exp $
+% $Id: Err.lhs,v 1.4 2002/04/11 12:03:43 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -23,12 +23,11 @@ module GHC.Err
        , patError
        , recSelError
        , recConError
-       , recUpdError               -- :: String -> a
+       , runtimeError              -- :: Addr#  -> a	-- Addr# points to UTF8 encoded C string
 
        , absentErr, parError       -- :: a
        , seqError                  -- :: a
 
-       , errorCString		   -- :: Addr# -> a	-- Arg is a ptr to C string 
        , error		           -- :: String -> a
        , assertError		   -- :: String -> Bool -> a -> a
        
@@ -50,9 +49,6 @@ import GHC.Exception
 -- error stops execution and displays an error message
 error :: String -> a
 error s = throw (ErrorCall s)
-
-errorCString :: Addr# -> a
-errorCString s = error (unpackCString# s)
 
 -- It is expected that compilers will recognize this and insert error
 -- messages which are more appropriate to the context in which undefined 
@@ -76,33 +72,27 @@ absentErr, parError, seqError :: a
 
 absentErr = error "Oops! The program has entered an `absent' argument!\n"
 parError  = error "Oops! Entered GHCerr.parError (a GHC bug -- please report it!)\n"
-seqError = error "Oops! Entered seqError (a GHC bug -- please report it!)\n"
-
+seqError  = error "Oops! Entered seqError (a GHC bug -- please report it!)\n"
 \end{code}
 
 \begin{code}
-irrefutPatError
-   , noMethodBindingError
-   , nonExhaustiveGuardsError
-   , patError
-   , recSelError
-   , recConError
-   , recUpdError :: String -> a
+recSelError, recConError, irrefutPatError, runtimeError,
+	     nonExhaustiveGuardsError, patError, noMethodBindingError
+	:: Addr# -> a	-- All take a UTF8-encoded C string
 
-noMethodBindingError     s = throw (NoMethodError (untangle s "No instance nor default method for class operation"))
-irrefutPatError		 s = throw (PatternMatchFail (untangle s "Irrefutable pattern failed for pattern"))
+recSelError 		 s = throw (RecSelError (unpackCStringUtf8# s))	-- No location info unfortunately
+runtimeError		 s = error (unpackCStringUtf8# s)		-- No location info unfortunately
+
 nonExhaustiveGuardsError s = throw (PatternMatchFail (untangle s "Non-exhaustive guards in"))
+irrefutPatError		 s = throw (PatternMatchFail (untangle s "Irrefutable pattern failed for pattern"))
+recConError    		 s = throw (RecConError      (untangle s "Missing field in record construction"))
+noMethodBindingError     s = throw (NoMethodError    (untangle s "No instance nor default method for class operation"))
 patError 		 s = throw (PatternMatchFail (untangle s "Non-exhaustive patterns in"))
-recSelError 		 s = throw (RecSelError (untangle s "Missing field in record selection"))
-recConError 		 s = throw (RecConError (untangle s "Missing field in record construction"))
-recUpdError 		 s = throw (RecUpdError (untangle s "Record doesn't contain field(s) to be updated"))
 
-
-assertError :: String -> Bool -> a -> a
+assertError :: Addr# -> Bool -> a -> a
 assertError str pred v 
   | pred      = v
   | otherwise = throw (AssertionFailed (untangle str "Assertion failed"))
-
 \end{code}
 
 
@@ -115,7 +105,7 @@ It prints
 	location message details
 
 \begin{code}
-untangle :: String -> String -> String
+untangle :: Addr# -> String -> String
 untangle coded message
   =  location
   ++ ": " 
@@ -123,8 +113,10 @@ untangle coded message
   ++ details
   ++ "\n"
   where
+    coded_str = unpackCStringUtf8# coded
+
     (location, details)
-      = case (span not_bar coded) of { (loc, rest) ->
+      = case (span not_bar coded_str) of { (loc, rest) ->
 	case rest of
 	  ('|':det) -> (loc, ' ' : det)
 	  _	    -> (loc, "")

@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Char.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: Char.hs,v 1.2 2002/04/11 12:03:43 simonpj Exp $
 --
 -- The Char type and associated operations.
 --
@@ -43,9 +43,10 @@ module Data.Char
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Show
-import GHC.Read (readLitChar, lexLitChar, digitToInt)
+import GHC.Read (readLitChar, lexLitChar)
 #endif
 
 #ifdef __HUGS__
 isLatin1 c = True
 #endif
+

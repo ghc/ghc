@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Show.lhs,v 1.4 2001/12/21 15:07:25 simonmar Exp $
+% $Id: Show.lhs,v 1.5 2002/04/11 12:03:44 simonpj Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -19,7 +19,7 @@ module GHC.Show
 	-- Show support code
 	shows, showChar, showString, showParen, showList__, showSpace,
 	showLitChar, protectEsc, 
-	intToDigit, showSignedInt,
+	intToDigit, digitToInt, showSignedInt,
 
 	-- Character operations
 	isAscii, isLatin1, isControl, isPrint, isSpace, isUpper,
@@ -34,6 +34,7 @@ module GHC.Show
 
 import {-# SOURCE #-} GHC.Err ( error )
 import GHC.Base
+import GHC.Enum
 import Data.Maybe
 import Data.Either
 import GHC.List	( (!!), break, dropWhile
@@ -216,18 +217,26 @@ protectEsc :: (Char -> Bool) -> ShowS -> ShowS
 protectEsc p f		   = f . cont
 			     where cont s@(c:_) | p c = "\\&" ++ s
 				   cont s	      = s
-
-intToDigit :: Int -> Char
-intToDigit (I# i)
-    | i >=# 0#  && i <=#  9# =  unsafeChr (ord '0' `plusInt` I# i)
-    | i >=# 10# && i <=# 15# =  unsafeChr (ord 'a' `minusInt` I# 10# `plusInt` I# i)
-    | otherwise		  =  error ("Char.intToDigit: not a digit " ++ show (I# i))
-
 \end{code}
 
 Code specific for Ints.
 
 \begin{code}
+intToDigit :: Int -> Char
+intToDigit (I# i)
+    | i >=# 0#  && i <=#  9# =  unsafeChr (ord '0' `plusInt` I# i)
+    | i >=# 10# && i <=# 15# =  unsafeChr (ord 'a' `minusInt` ten `plusInt` I# i)
+    | otherwise		  =  error ("Char.intToDigit: not a digit " ++ show (I# i))
+
+digitToInt :: Char -> Int
+digitToInt c
+ | isDigit c		=  ord c `minusInt` ord '0'
+ | c >= 'a' && c <= 'f' =  ord c `minusInt` ord 'a' `plusInt` ten
+ | c >= 'A' && c <= 'F' =  ord c `minusInt` ord 'A' `plusInt` ten
+ | otherwise	        =  error ("Char.digitToInt: not a digit " ++ show c) -- sigh
+
+ten = I# 10#
+
 showSignedInt :: Int -> Int -> ShowS
 showSignedInt (I# p) (I# n) r
     | n <# 0# && p ># 6# = '(' : itos n (')' : r)
@@ -249,6 +258,7 @@ itos n# cs
         | otherwise = case chr# (ord# '0'# +# (n# `remInt#` 10#)) of { c# ->
 		      itos' (n# `quotInt#` 10#) (C# c# : cs) }
 \end{code}
+
 
 %*********************************************************
 %*							*
@@ -307,7 +317,6 @@ toUpper c@(C# c#)
   = unsafeChr (ord c `minusInt` ord 'a' `plusInt` ord 'A')
   | otherwise
   = c
-
 
 
 toLower c@(C# c#)

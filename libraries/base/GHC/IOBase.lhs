@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: IOBase.lhs,v 1.7 2002/03/14 12:09:50 simonmar Exp $
+% $Id: IOBase.lhs,v 1.8 2002/04/11 12:03:44 simonpj Exp $
 % 
 % (c) The University of Glasgow, 1994-2001
 %
@@ -76,6 +76,12 @@ bindIO :: IO a -> (a -> IO b) -> IO b
 bindIO (IO m) k = IO ( \ s ->
   case m s of 
     (# new_s, a #) -> unIO (k a) new_s
+  )
+
+thenIO :: IO a -> IO b -> IO b
+thenIO (IO m) k = IO ( \ s ->
+  case m s of 
+    (# new_s, a #) -> unIO k new_s
   )
 
 returnIO :: a -> IO a

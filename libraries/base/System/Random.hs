@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Random.hs,v 1.2 2001/12/21 15:07:26 simonmar Exp $
+-- $Id: Random.hs,v 1.3 2002/04/11 12:03:44 simonpj Exp $
 --
 -- Random numbers.
 --
@@ -47,7 +47,7 @@ import Data.IORef
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Show		( showSignedInt, showSpace )
-import GHC.Read		( readDec )
+import Numeric		( readDec )
 import GHC.IOBase	( unsafePerformIO, stToIO )
 import System.Time	( getClockTime, ClockTime(..) )
 #endif

@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Numeric.hs,v 1.5 2002/02/12 10:52:18 simonmar Exp $
+-- $Id: Numeric.hs,v 1.6 2002/04/11 12:03:43 simonpj Exp $
 --
 -- Odds and ends, mostly functions for reading and showing
 -- RealFloat-like kind of values.
@@ -55,11 +55,62 @@ import GHC.Float
 import GHC.Num
 import GHC.Show
 import Data.Maybe
+import Text.ParserCombinators.ReadP( ReadP, readP_to_S, pfail )
+import qualified Text.Read.Lex as L
 #endif
 
 #ifdef __HUGS__
 import Array
 #endif
+
+
+-- *********************************************************
+-- *							   *
+-- \subsection{Reading}
+-- *							   *
+-- *********************************************************
+
+readInt :: Num a => a -> (Char -> Bool) -> (Char -> Int) -> ReadS a
+readInt base isDigit valDigit = readP_to_S (L.readIntP base isDigit valDigit)
+
+readOct, readDec, readHex :: Num a => ReadS a
+readOct = readP_to_S L.readOctP
+readDec = readP_to_S L.readDecP
+readHex = readP_to_S L.readHexP 
+
+readFloat :: RealFrac a => ReadS a
+readFloat = readP_to_S readFloatP
+
+readFloatP :: RealFrac a => ReadP a
+readFloatP =
+  do L.Number x <- L.lex
+     case L.numberToRational x of
+       Nothing -> pfail
+       Just y  -> return (fromRational y)
+
+-- It's turgid to have readSigned work using list comprehensions,
+-- but it's specified as a ReadS to ReadS transformer
+-- With a bit of luck no one will use it.
+readSigned :: (Real a) => ReadS a -> ReadS a
+readSigned readPos = readParen False read'
+		     where read' r  = read'' r ++
+				      (do
+				        ("-",s) <- lex r
+					(x,t)   <- read'' s
+					return (-x,t))
+			   read'' r = do
+			       (str,s) <- lex r
+		      	       (n,"")  <- readPos str
+			       return (n,s)
+
+
+-- *********************************************************
+-- *							   *
+-- \subsection{Showing}
+-- *							   *
+-- *********************************************************
+
+
 
 #ifdef __GLASGOW_HASKELL__
 showInt :: Integral a => a -> ShowS
