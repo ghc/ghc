@@ -436,8 +436,13 @@ sub process_stats_file {
 sub process_cacheprof_files {
 
     open(STATS, "< $CacheProfStats") || die("Can't open $CacheProfStats\n");
+
+    # the format of the info in this file is:
+    #    OTHER(intrs,reads,writes,read-misses,write-misses)
+    # where read-misses and write-misses will both be zero if we're
+    # just counting instructions.
     while (<STATS>) {
-       /OTHER\(\s*([0-9]+),\s*([0-9]+),\s*([0-9]+)\)/ && do {
+       /OTHER\(\s*([0-9]+),\s*([0-9]+),\s*([0-9]+),\s*([0-9]+),\s*([0-9]+)\)/ && do {
 	   $TotInstrs = $1;
 	   $TotReads  = $2;
 	   $TotWrites = $3;
