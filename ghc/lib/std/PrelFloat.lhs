@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelFloat.lhs,v 1.11 2001/02/28 00:01:03 qrczak Exp $
+% $Id: PrelFloat.lhs,v 1.12 2001/08/29 14:32:49 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -496,13 +496,15 @@ formatRealFloat fmt decs x
        mk0 ls = case ls of { "" -> "0" ; _ -> ls}
       in
       case decs of
-       Nothing ->
-         let
-	  f 0 s    rs  = mk0 (reverse s) ++ '.':mk0 rs
-	  f n s    ""  = f (n-1) ('0':s) ""
-	  f n s (r:rs) = f (n-1) (r:s) rs
-	 in
-	 f e "" ds
+       Nothing
+	  | e <= 0    -> "0." ++ replicate (-e) '0' ++ ds
+	  | otherwise ->
+	     let
+	  	f 0 s    rs  = mk0 (reverse s) ++ '.':mk0 rs
+	  	f n s    ""  = f (n-1) ('0':s) ""
+	  	f n s (r:rs) = f (n-1) (r:s) rs
+	     in
+	 	f e "" ds
        Just dec ->
         let dec' = max dec 0 in
 	if e >= 0 then
@@ -516,8 +518,8 @@ formatRealFloat fmt decs x
 	  (ei,is') = roundTo base dec' (replicate (-e) 0 ++ is)
 	  d:ds' = map intToDigit (if ei > 0 then is' else 0:is')
 	 in
-	 d : '.' : ds'
-	 
+	 d : (if null ds' then "" else '.':ds')
+
 
 roundTo :: Int -> Int -> [Int] -> (Int,[Int])
 roundTo base d is =
