@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.14 2000/11/22 17:51:16 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.15 2000/11/24 17:09:52 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -25,7 +25,10 @@ import Exception
 import Readline
 import IOExts
 
+import Numeric
+import List
 import System
+import CPUTime
 import Directory
 import IO
 import Char
@@ -51,12 +54,15 @@ commands = [
   ("reload",	reloadModule),
   ("set",	setOptions),
   ("type",	typeOfExpr),
+  ("unset",	unsetOptions),
   ("quit",	quit)
   ]
 
 shortHelpText = "use :? for help.\n"
 
 helpText = "\ 
+\ Commands available from the prompt:\n\ 
+\\  
 \   <expr>		evaluate <expr>\n\ 
 \   :add <filename>     add a module to the current set\n\ 
 \   :cd <dir>		change directory to <dir>\n\ 
@@ -65,13 +71,21 @@ helpText = "\
 \   :module <mod>	set the context for expression evaluation to <mod>\n\ 
 \   :reload		reload the current module set\n\ 
 \   :set <option> ...	set options\n\ 
+\   :unset <option> ...	unset options\n\ 
 \   :type <expr>	show the type of <expr>\n\ 
 \   :quit		exit GHCi\n\ 
 \   :!<command>		run the shell command <command>\n\ 
+\\ 
+\ Options for `:set' and `:unset':\n\ 
+\\ 
+\    +s                 print timing/memory stats after each evaluation\n\ 
+\    +t			print type after evaluation\n\ 
+\    -<flags>		most GHC command line flags can also be set here\n\ 
+\                         (eg. -v2, -fglasgow-exts, etc.)\n\ 
 \"
 
-interactiveUI :: CmState -> [ModuleName] -> IO ()
-interactiveUI st mods = do
+interactiveUI :: CmState -> Maybe FilePath -> IO ()
+interactiveUI cmstate mod = do
    hPutStrLn stdout ghciWelcomeMsg
    hFlush stdout
    hSetBuffering stdout NoBuffering
@@ -79,6 +93,11 @@ interactiveUI st mods = do
    -- link in the available packages
    pkgs <- getPackageInfo
    linkPackages (reverse pkgs)
+
+   (cmstate', ok, mods) <-
+   	case mod of
+	     Nothing  -> return (cmstate, True, [])
+	     Just m -> cmLoadModule cmstate m
 
 #ifndef NO_READLINE
    Readline.initialize
@@ -90,7 +109,8 @@ interactiveUI st mods = do
    (unGHCi uiLoop) GHCiState{ modules = mods,
 			      current_module = this_mod,
 	  	              target = Nothing,
-			      cmstate = st }
+			      cmstate = cmstate',
+			      options = [ShowTiming]}
    return ()
 
 uiLoop :: GHCi ()
@@ -128,15 +148,22 @@ runCommand c =
    doCommand c
 
 doCommand (':' : command) = specialCommand command
-doCommand expr
+doCommand expr            = timeIt (evalExpr expr)
+
+evalExpr expr
  = do st <- getGHCiState
       dflags <- io (getDynFlags)
-      (new_cmstate, maybe_hvalue) <- 
+      (new_cmstate, maybe_stuff) <- 
       	 io (cmGetExpr (cmstate st) dflags (current_module st) expr)
       setGHCiState st{cmstate = new_cmstate}
-      case maybe_hvalue of
+      case maybe_stuff of
       	 Nothing -> return ()
-      	 Just hv -> io (cmRunExpr hv)
+      	 Just (hv, unqual, ty)
+	   -> do io (cmRunExpr hv)
+		 b <- isOptionSet ShowType
+		 if b then io (printForUser stdout unqual (text "::" <+> ppr ty))
+		      else return ()
+	
 {-
   let (mod,'.':str) = break (=='.') expr
   case cmLookupSymbol (mkOrig varName (mkModuleName mod) (_PK_ str)) (cmstate st) of
@@ -181,12 +208,14 @@ changeDirectory :: String -> GHCi ()
 changeDirectory = io . setCurrentDirectory
 
 loadModule :: String -> GHCi ()
-loadModule path = do
+loadModule path = timeIt (loadModule' path)
+
+loadModule' path = do
   state <- getGHCiState
   cmstate1 <- io (cmUnload (cmstate state))
   (cmstate2, ok, mods) <- io (cmLoadModule cmstate1 path)
 
-  let new_state = GHCiState {
+  let new_state = state{
   			cmstate = cmstate2,
 			modules = mods,
 			current_module = case mods of 
@@ -216,41 +245,109 @@ reloadModule "" = do
             setGHCiState state{cmstate=new_cmstate}  
 reloadModule _ = noArgs ":reload"
 
--- set options in the interpreter.  Syntax is exactly the same as the
--- ghc command line, except that certain options aren't available (-C,
--- -E etc.)
---
--- This is pretty fragile: most options won't work as expected.  ToDo:
--- figure out which ones & disallow them.
-setOptions :: String -> GHCi ()
-setOptions str =
-   io (do leftovers <- processArgs static_flags (words str) []
-	  dyn_flags <- readIORef v_InitDynFlags
-	  writeIORef v_DynFlags dyn_flags
-	  leftovers <- processArgs dynamic_flags leftovers []
-	  dyn_flags <- readIORef v_DynFlags
-	  writeIORef v_InitDynFlags dyn_flags
-          if (not (null leftovers))
-		then throwDyn (OtherError ("unrecognised flags: " ++ 
-						unwords leftovers))
-		else return ()
-   )
-
 typeOfExpr :: String -> GHCi ()
 typeOfExpr str 
   = do st <- getGHCiState
        dflags <- io (getDynFlags)
-       (st, maybe_ty) <- io (cmTypeExpr (cmstate st) dflags 
+       (st, maybe_ty) <- io (cmGetExpr (cmstate st) dflags 
 				(current_module st) str)
        case maybe_ty of
 	 Nothing -> return ()
-	 Just (unqual, ty) -> io (printForUser stdout unqual (ppr ty))
+	 Just (_, unqual, ty) -> io (printForUser stdout unqual (ppr ty))
 
 quit :: String -> GHCi ()
 quit _ = exitGHCi
 
 shellEscape :: String -> GHCi ()
 shellEscape str = io (system str >> return ())
+
+----------------------------------------------------------------------------
+-- Code for `:set'
+
+-- set options in the interpreter.  Syntax is exactly the same as the
+-- ghc command line, except that certain options aren't available (-C,
+-- -E etc.)
+--
+-- This is pretty fragile: most options won't work as expected.  ToDo:
+-- figure out which ones & disallow them.
+
+setOptions :: String -> GHCi ()
+setOptions ""
+  = do st <- getGHCiState
+       let opts = options st
+       io $ putStrLn (showSDoc (
+   	      text "options currently set: " <> 
+   	      if null opts
+   		   then text "none."
+   		   else hsep (map (\o -> char '+' <> text (optToStr o)) opts)
+   	   ))
+setOptions str
+  = do -- first, deal with the GHCi opts (+s, +t, etc.)
+       let opts = words str
+	   (minus_opts, rest1) = partition isMinus opts
+	   (plus_opts, rest2)  = partition isPlus rest1
+
+       if (not (null rest2)) 
+	  then io (putStrLn ("unknown option: `" ++ head rest2 ++ "'"))
+	  else do
+
+       mapM setOpt plus_opts
+
+       -- now, the GHC flags
+       io (do leftovers <- processArgs static_flags minus_opts []
+	      dyn_flags <- readIORef v_InitDynFlags
+	      writeIORef v_DynFlags dyn_flags
+	      leftovers <- processArgs dynamic_flags leftovers []
+	      dyn_flags <- readIORef v_DynFlags
+	      writeIORef v_InitDynFlags dyn_flags
+              if (not (null leftovers))
+		 then throwDyn (OtherError ("unrecognised flags: " ++ 
+						unwords leftovers))
+		 else return ()
+         )
+
+unsetOptions :: String -> GHCi ()
+unsetOptions str
+  = do -- first, deal with the GHCi opts (+s, +t, etc.)
+       let opts = words str
+	   (minus_opts, rest1) = partition isMinus opts
+	   (plus_opts, rest2)  = partition isPlus rest1
+
+       if (not (null rest2)) 
+	  then io (putStrLn ("unknown option: `" ++ head rest2 ++ "'"))
+	  else do
+
+       mapM unsetOpt plus_opts
+ 
+       -- can't do GHC flags for now
+       if (not (null minus_opts))
+	  then throwDyn (OtherError "can't unset GHC command-line flags")
+	  else return ()
+
+isMinus ('-':s) = True
+isMinus _ = False
+
+isPlus ('+':s) = True
+isPlus _ = False
+
+setOpt ('+':str)
+  = case strToGHCiOpt str of
+	Nothing -> io (putStrLn ("unknown option: `" ++ str ++ "'"))
+	Just o  -> setOption o
+
+unsetOpt ('+':str)
+  = case strToGHCiOpt str of
+	Nothing -> io (putStrLn ("unknown option: `" ++ str ++ "'"))
+	Just o  -> unsetOption o
+
+strToGHCiOpt :: String -> (Maybe GHCiOption)
+strToGHCiOpt "s" = Just ShowTiming
+strToGHCiOpt "t" = Just ShowType
+strToGHCiOpt _   = Nothing
+
+optToStr :: GHCiOption -> String
+optToStr ShowTiming = "s"
+optToStr ShowType   = "t"
 
 -----------------------------------------------------------------------------
 -- GHCi monad
@@ -260,8 +357,11 @@ data GHCiState = GHCiState
 	modules	       :: [ModuleName],
 	current_module :: ModuleName,
 	target         :: Maybe FilePath,
-	cmstate        :: CmState
+	cmstate        :: CmState,
+	options        :: [GHCiOption]
      }
+
+data GHCiOption = ShowTiming | ShowType deriving Eq
 
 defaultCurrentModule = mkModuleName "Prelude"
 
@@ -273,6 +373,21 @@ instance Monad GHCi where
 
 getGHCiState   = GHCi $ \s -> return (s,s)
 setGHCiState s = GHCi $ \_ -> return (s,())
+
+isOptionSet :: GHCiOption -> GHCi Bool
+isOptionSet opt
+ = do st <- getGHCiState
+      return (opt `elem` options st)
+
+setOption :: GHCiOption -> GHCi ()
+setOption opt
+ = do st <- getGHCiState
+      setGHCiState (st{ options = opt : filter (/= opt) (options st) })
+
+unsetOption :: GHCiOption -> GHCi ()
+unsetOption opt
+ = do st <- getGHCiState
+      setGHCiState (st{ options = filter (/= opt) (options st) })
 
 io m = GHCi $ \s -> m >>= \a -> return (s,a)
 
@@ -308,3 +423,29 @@ findFile (d:ds) obj = do
   let path = d ++ '/':obj
   b <- doesFileExist path
   if b then return path else findFile ds obj
+
+-----------------------------------------------------------------------------
+-- timing & statistics
+
+timeIt :: GHCi a -> GHCi a
+timeIt action
+  = do b <- isOptionSet ShowTiming
+       if not b 
+	  then action 
+	  else do allocs1 <- io $ getAllocations
+		  time1   <- io $ getCPUTime
+		  a <- action
+		  allocs2 <- io $ getAllocations
+		  time2   <- io $ getCPUTime
+		  io $ printTimes (allocs2 - allocs1) (time2 - time1)
+		  return a
+
+foreign import "getAllocations" getAllocations :: IO Int
+
+printTimes :: Int -> Integer -> IO ()
+printTimes allocs psecs
+   = do let secs = (fromIntegral psecs / (10^12)) :: Float
+	    secs_str = showFFloat (Just 2) secs
+	putStrLn (showSDoc (
+		 parens (text (secs_str "") <+> text "secs" <> comma <+> 
+			 int allocs <+> text "bytes")))

@@ -9,7 +9,7 @@ module InterpSyn {- Todo: ( ... ) -} where
 #include "HsVersions.h"
 
 import Id
-import RdrName
+import Name
 import PrimOp
 import Outputable
 
@@ -232,16 +232,16 @@ showExprTag expr
 -----------------------------------------------------------------------------
 -- Instantiations of the IExpr type
 
-type UnlinkedIExpr = IExpr RdrName RdrName
+type UnlinkedIExpr = IExpr Name Name
 type LinkedIExpr   = IExpr Addr    HValue
 
-type UnlinkedIBind = IBind RdrName RdrName
+type UnlinkedIBind = IBind Name Name
 type LinkedIBind   = IBind Addr    HValue
 
-type UnlinkedAltAlg  = AltAlg  RdrName RdrName
+type UnlinkedAltAlg  = AltAlg  Name Name
 type LinkedAltAlg    = AltAlg  Addr HValue
 
-type UnlinkedAltPrim = AltPrim RdrName RdrName
+type UnlinkedAltPrim = AltPrim Name Name
 type LinkedAltPrim = AltPrim Addr HValue
 
 -----------------------------------------------------------------------------

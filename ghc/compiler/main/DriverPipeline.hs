@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.34 2000/11/21 14:34:50 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.35 2000/11/24 17:09:52 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -777,11 +777,11 @@ compile ghci_mode summary source_unchanged old_iface hst hit pcs = do
    init_driver_state <- readIORef v_InitDriverState
    writeIORef v_Driver_state init_driver_state
 
-   showPass init_dyn_flags (showSDoc (text "*** Compiling: " 
-		            <+> ppr (name_of_summary summary)))
+   showPass init_dyn_flags 
+	(showSDoc (text "Compiling" <+> ppr (name_of_summary summary)))
 
    let verb = verbosity init_dyn_flags
-   let location   = ms_location summary   
+   let location   = ms_location summary
    let input_fn   = unJust "compile:hs" (ml_hs_file location) 
    let input_fnpp = unJust "compile:hspp" (ml_hspp_file location)
 

@@ -8,8 +8,8 @@
 module StgInterp ( 
 
     ClosureEnv, ItblEnv, 
-    filterRdrNameEnv,   -- :: [ModuleName] -> FiniteMap RdrName a 
-			-- -> FiniteMap RdrName a
+    filterNameEnv,      -- :: [ModuleName] -> FiniteMap Name a 
+			-- -> FiniteMap Name a
 
     linkIModules, 	-- :: ItblEnv -> ClosureEnv
 	     		-- -> [([UnlinkedIBind], ItblEnv)]
@@ -58,19 +58,15 @@ import Literal		( Literal(..) )
 import Type		( Type, typePrimRep, deNoteType, repType, funResultTy )
 import DataCon		( DataCon, dataConTag, dataConRepArgTys )
 import ClosureInfo	( mkVirtHeapOffsets )
-import Module		( ModuleName )
-import Name		( toRdrName )
+import Module		( ModuleName, moduleName )
+import RdrName
+import Name
+import Util
 import UniqFM
 import UniqSet
 
 import {-# SOURCE #-} MCI_make_constr
 
-import IOExts		( unsafePerformIO, unsafeInterleaveIO, fixIO ) -- ToDo: remove
-import PrelGHC		--( unsafeCoerce#, dataToTag#,
-			--  indexPtrOffClosure#, indexWordOffClosure# )
-import PrelAddr 	( Addr(..) )
-import PrelFloat	( Float(..), Double(..) )
-import Bits
 import FastString
 import GlaExts		( Int(..) )
 import Module		( moduleNameFS )
@@ -79,30 +75,37 @@ import TyCon		( TyCon, isDataTyCon, tyConDataCons, tyConFamilySize )
 import Class		( Class, classTyCon )
 import InterpSyn
 import StgSyn
-import Addr
-import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isUnqual )
 import FiniteMap
-import Panic		( panic )
 import OccName		( occNameString )
 import ErrUtils		( showPass, dumpIfSet_dyn )
 import CmdLineOpts	( DynFlags, DynFlag(..) )
+import Panic		( panic )
 
+import IOExts
+import Addr
+import Bits
 import Foreign
 import CTypes
+
 import IO
+
+import PrelGHC		--( unsafeCoerce#, dataToTag#,
+			--  indexPtrOffClosure#, indexWordOffClosure# )
+import PrelAddr 	( Addr(..) )
+import PrelFloat	( Float(..), Double(..) )
 
 -- ---------------------------------------------------------------------------
 -- Environments needed by the linker
 -- ---------------------------------------------------------------------------
 
-type ItblEnv    = FiniteMap RdrName (Ptr StgInfoTable)
-type ClosureEnv = FiniteMap RdrName HValue
+type ItblEnv    = FiniteMap Name (Ptr StgInfoTable)
+type ClosureEnv = FiniteMap Name HValue
 emptyClosureEnv = emptyFM
 
 -- remove all entries for a given set of modules from the environment
-filterRdrNameEnv :: [ModuleName] -> FiniteMap RdrName a -> FiniteMap RdrName a
-filterRdrNameEnv mods env 
-   = filterFM (\n _ -> rdrNameModule n `notElem` mods) env
+filterNameEnv :: [ModuleName] -> FiniteMap Name a -> FiniteMap Name a
+filterNameEnv mods env 
+   = filterFM (\n _ -> moduleName (nameModule n) `notElem` mods) env
 
 -- ---------------------------------------------------------------------------
 -- Turn an UnlinkedIExpr into a value we can run, for the interpreter
@@ -165,7 +168,7 @@ conapp2expr :: UniqSet Id -> DataCon -> [StgArg] -> UnlinkedIExpr
 conapp2expr ie dcon args
    = mkConApp con_rdrname reps exprs
      where
-	con_rdrname = toRdrName dcon
+	con_rdrname = getName dcon
         exprs       = map (arg2expr ie) inHeapOrder
         reps        = map repOfArg inHeapOrder
         inHeapOrder = toHeapOrder args
@@ -181,7 +184,7 @@ foreign label "PrelBase_Izh_con_info" prelbase_Izh_con_info :: Addr
 
 -- Handle most common cases specially; do the rest with a generic
 -- mechanism (deferred till later :)
-mkConApp :: RdrName -> [Rep] -> [UnlinkedIExpr] -> UnlinkedIExpr
+mkConApp :: Name -> [Rep] -> [UnlinkedIExpr] -> UnlinkedIExpr
 mkConApp nm []               []         = ConApp    nm
 mkConApp nm [RepI]           [a1]       = ConAppI   nm a1
 mkConApp nm [RepP]           [a1]       = ConAppP   nm a1
@@ -403,7 +406,7 @@ mkVar ie rep var
 	   RepF -> VarF
 	   RepD -> VarD
 	   RepP -> VarP)  var
-  | otherwise = Native (toRdrName var)
+  | otherwise = Native (getName var)
 
 mkRec RepI = RecI
 mkRec RepP = RecP
@@ -430,6 +433,11 @@ id2VaaRep var = (var, repOfId var)
 -- Link interpretables into something we can run
 -- ---------------------------------------------------------------------------
 
+GLOBAL_VAR(cafTable, [], [HValue])
+
+addCAF :: HValue -> IO ()
+addCAF x = do xs <- readIORef cafTable; writeIORef cafTable (x:xs)
+
 linkIModules :: ItblEnv    -- incoming global itbl env; returned updated
 	     -> ClosureEnv -- incoming global closure env; returned updated
 	     -> [([UnlinkedIBind], ItblEnv)]
@@ -437,7 +445,7 @@ linkIModules :: ItblEnv    -- incoming global itbl env; returned updated
 linkIModules gie gce mods = do
   let (bindss, ies) = unzip mods
       binds  = concat bindss
-      top_level_binders = map (toRdrName.binder) binds
+      top_level_binders = map (getName.binder) binds
       final_gie = foldr plusFM gie ies
   
   (new_binds, new_gce) <-
@@ -614,7 +622,7 @@ lookupCon ie con =
     Just (Ptr addr) -> return addr
     Nothing   -> do
 	-- try looking up in the object files.
-        m <- lookupSymbol (rdrNameToCLabel con "con_info")
+        m <- lookupSymbol (nameToCLabel con "con_info")
 	case m of
 	    Just addr -> return addr
   	    Nothing   -> pprPanic "linkIExpr" (ppr con)
@@ -625,7 +633,7 @@ lookupNullaryCon ie con =
     Just (Ptr addr) -> return (ConApp addr)
     Nothing -> do
 	-- try looking up in the object files.
-	m <- lookupSymbol (rdrNameToCLabel con "closure")
+	m <- lookupSymbol (nameToCLabel con "closure")
 	case m of
 	    Just (A# addr) -> return (Native (unsafeCoerce# addr))
 	    Nothing   -> pprPanic "lookupNullaryCon" (ppr con)
@@ -637,29 +645,30 @@ lookupNative ce var =
     	Just e  -> return (Native e)
     	Nothing -> do
     	    -- try looking up in the object files.
-    	    let lbl = (rdrNameToCLabel var "closure")
+    	    let lbl = (nameToCLabel var "closure")
     	    m <- lookupSymbol lbl
     	    case m of
-    		Just (A# addr) -> return (Native (unsafeCoerce# addr))
+    		Just (A# addr)
+		    -> do addCAF (unsafeCoerce# addr)
+			  return (Native (unsafeCoerce# addr))
     		Nothing   -> pprPanic "linkIExpr" (ppr var)
   )
 
 -- some VarI/VarP refer to top-level interpreted functions; we change
 -- them into Natives here.
 lookupVar ce f v =
-  unsafeInterleaveIO (do
-     case lookupFM ce (toRdrName v) of
-	Nothing -> return (f v)
-	Just e  -> return (Native e)
+  unsafeInterleaveIO (
+	case lookupFM ce (getName v) of
+	    Nothing -> return (f v)
+	    Just e  -> return (Native e)
   )
 
 -- HACK!!!  ToDo: cleaner
-rdrNameToCLabel :: RdrName -> String{-suffix-} -> String
-rdrNameToCLabel rn suffix
-  | isUnqual rn = pprPanic "rdrNameToCLabel" (ppr rn)
-  | otherwise =
+nameToCLabel :: Name -> String{-suffix-} -> String
+nameToCLabel n suffix =
   _UNPK_(moduleNameFS (rdrNameModule rn)) 
   ++ '_':occNameString(rdrNameOcc rn) ++ '_':suffix
+  where rn = toRdrName n
 
 -- ---------------------------------------------------------------------------
 -- The interpreter proper
@@ -1233,7 +1242,7 @@ make_constr_itbls cons
         mk_dirret_itbl (dcon, conNo)
            = mk_itbl dcon conNo mci_constr_entry
 
-        mk_itbl :: DataCon -> Int -> Addr -> IO (RdrName,ItblPtr)
+        mk_itbl :: DataCon -> Int -> Addr -> IO (Name,ItblPtr)
         mk_itbl dcon conNo entry_addr
            = let (tot_wds, ptr_wds, _) 
                     = mkVirtHeapOffsets typePrimRep (dataConRepArgTys dcon)
@@ -1268,7 +1277,7 @@ make_constr_itbls cons
                     putStrLn ("# ptrs  of itbl is " ++ show ptrs)
                     putStrLn ("# nptrs of itbl is " ++ show nptrs)
                     poke addr itbl
-                    return (toRdrName dcon, addr `plusPtr` 8)
+                    return (getName dcon, addr `plusPtr` 8)
 
 
 byte :: Int -> Word32 -> Word32

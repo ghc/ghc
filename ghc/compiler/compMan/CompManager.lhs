@@ -6,7 +6,7 @@
 \begin{code}
 module CompManager ( cmInit, cmLoadModule, cmUnload,
 #ifdef GHCI
-                     cmGetExpr, cmTypeExpr, cmRunExpr,
+                     cmGetExpr, cmRunExpr,
 #endif
                      CmState, emptyCmState  -- abstract
                    )
@@ -39,13 +39,14 @@ import DriverPhases
 import DriverUtil	( BarfKind(..), splitFilename3 )
 import ErrUtils		( showPass )
 import Util
+import DriverUtil
 import Outputable
 import Panic		( panic )
 import CmdLineOpts	( DynFlags(..) )
 
 #ifdef GHCI
 import Interpreter	( HValue )
-import HscMain		( hscExpr, hscTypeExpr )
+import HscMain		( hscExpr )
 import RdrName
 import Type		( Type )
 import PrelGHC		( unsafeCoerce# )
@@ -74,30 +75,18 @@ cmGetExpr :: CmState
 	  -> DynFlags
           -> ModuleName
           -> String
-          -> IO (CmState, Maybe HValue)
+          -> IO (CmState, Maybe (HValue, PrintUnqualified, Type))
 cmGetExpr cmstate dflags modname expr
-   = do (new_pcs, maybe_unlinked_iexpr) <- 
+   = do (new_pcs, maybe_stuff) <- 
 	   hscExpr dflags hst hit pcs (mkHomeModule modname) expr
-        case maybe_unlinked_iexpr of
+        case maybe_stuff of
 	   Nothing     -> return (cmstate{ pcs=new_pcs }, Nothing)
-	   Just uiexpr -> do
+	   Just (uiexpr, print_unqual, ty) -> do
 		hValue <- linkExpr pls uiexpr
-	        return (cmstate{ pcs=new_pcs }, Just hValue)
+	        return (cmstate{ pcs=new_pcs }, 
+			Just (hValue, print_unqual, ty))
 
    -- ToDo: check that the module we passed in is sane/exists?
-   where
-       CmState{ pcs=pcs, pcms=pcms, pls=pls } = cmstate
-       PersistentCMState{ hst=hst, hit=hit } = pcms
-
-cmTypeExpr :: CmState
-	  -> DynFlags
-          -> ModuleName
-          -> String
-          -> IO (CmState, Maybe (PrintUnqualified, Type))
-cmTypeExpr cmstate dflags modname expr
-   = do (new_pcs, expr_type) <- 
-	   hscTypeExpr dflags hst hit pcs (mkHomeModule modname) expr
-        return (cmstate{ pcs=new_pcs }, expr_type)
    where
        CmState{ pcs=pcs, pcms=pcms, pls=pls } = cmstate
        PersistentCMState{ hst=hst, hit=hit } = pcms
@@ -208,7 +197,7 @@ cmLoadModule cmstate1 rootname
 
 	showPass dflags "Chasing dependencies"
         when (verb >= 1 && ghci_mode == Batch) $
-           hPutStrLn stderr ("ghc: chasing modules from: " ++ rootname)
+           hPutStrLn stderr (prog_name ++ ": chasing modules from: " ++ rootname)
 
         mg2unsorted <- downsweep [rootname]
 
@@ -243,7 +232,7 @@ cmLoadModule cmstate1 rootname
         let threaded2 = CmThreaded pcs1 hst2 hit2
 
         (upsweep_complete_success, threaded3, modsDone, newLis)
-           <- upsweep_mods ghci_mode ui2 reachable_from threaded2 mg2
+           <- upsweep_mods ghci_mode dflags ui2 reachable_from threaded2 mg2
 
         let ui3 = add_to_ui ui2 newLis
         let (CmThreaded pcs3 hst3 hit3) = threaded3
@@ -363,6 +352,7 @@ data CmThreaded  -- stuff threaded through individual module compilations
 -- Compile multiple modules, stopping as soon as an error appears.
 -- There better had not be any cyclic groups here -- we check for them.
 upsweep_mods :: GhciMode
+	     -> DynFlags
              -> UnlinkedImage         -- old linkables
              -> (ModuleName -> [ModuleName])  -- to construct downward closures
              -> CmThreaded            -- PCS & HST & HIT
@@ -373,26 +363,26 @@ upsweep_mods :: GhciMode
                     [ModSummary],     -- mods which succeeded
                     [Linkable])       -- new linkables
 
-upsweep_mods ghci_mode oldUI reachable_from threaded 
+upsweep_mods ghci_mode dflags oldUI reachable_from threaded 
      []
    = return (True, threaded, [], [])
 
-upsweep_mods ghci_mode oldUI reachable_from threaded 
+upsweep_mods ghci_mode dflags oldUI reachable_from threaded 
      ((CyclicSCC ms):_)
    = do hPutStrLn stderr ("Module imports form a cycle for modules:\n\t" ++
                           unwords (map (moduleNameUserString.name_of_summary) ms))
         return (False, threaded, [], [])
 
-upsweep_mods ghci_mode oldUI reachable_from threaded 
+upsweep_mods ghci_mode dflags oldUI reachable_from threaded 
      ((AcyclicSCC mod):mods)
    = do (threaded1, maybe_linkable) 
-           <- upsweep_mod ghci_mode oldUI threaded mod 
+           <- upsweep_mod ghci_mode dflags oldUI threaded mod 
                           (reachable_from (name_of_summary mod)) 
         case maybe_linkable of
            Just linkable 
               -> -- No errors; do the rest
                  do (restOK, threaded2, modOKs, linkables) 
-                       <- upsweep_mods ghci_mode oldUI reachable_from 
+                       <- upsweep_mods ghci_mode dflags oldUI reachable_from 
                                        threaded1 mods
                     return (restOK, threaded2, mod:modOKs, linkable:linkables)
            Nothing -- we got a compilation error; give up now
@@ -417,29 +407,29 @@ maybe_getFileLinkable mod_name obj_fn
 
 
 upsweep_mod :: GhciMode 
+	    -> DynFlags
             -> UnlinkedImage
             -> CmThreaded
             -> ModSummary
             -> [ModuleName]
             -> IO (CmThreaded, Maybe Linkable)
 
-upsweep_mod ghci_mode oldUI threaded1 summary1 reachable_from_here
-   = do hPutStr stderr ("ghc: module " 
-                        ++ moduleNameUserString (name_of_summary summary1) ++ ": ")
+upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_from_here
+   = do 
         let mod_name = name_of_summary summary1
-        let (CmThreaded pcs1 hst1 hit1) = threaded1
-        let old_iface = lookupUFM hit1 (name_of_summary summary1)
+	let verb = verbosity dflags
 
-        -- We *have* to compile it if we're in batch mode and we can't see
-        -- a previous linkable for it on disk.
-        compilation_mandatory 
-           <- if ghci_mode /= Batch then return False 
-              else case ml_obj_file (ms_location summary1) of
-                      Nothing     -> do --putStrLn "cmcm: object?!"
-                                        return True
-                      Just obj_fn -> do --putStrLn ("cmcm: old obj " ++ obj_fn)
-                                        b <- doesFileExist obj_fn
-                                        return (not b)
+        when (verb == 1) $
+	   if (ghci_mode == Batch)
+		then hPutStr stderr (prog_name ++ ": module " 
+                       	++ moduleNameUserString mod_name
+			++ ": ")
+		else hPutStr stderr ("Compiling "
+		       	++ moduleNameUserString mod_name
+		 	++ " ... ")
+
+        let (CmThreaded pcs1 hst1 hit1) = threaded1
+        let old_iface = lookupUFM hit1 mod_name
 
         let maybe_oldUI_linkable = findModuleLinkable_maybe oldUI mod_name
         maybe_oldDisk_linkable
@@ -483,25 +473,42 @@ upsweep_mod ghci_mode oldUI threaded1 summary1 reachable_from_here
            -- linkable, meaning that compilation wasn't needed, and the
            -- new details were manufactured from the old iface.
            CompOK pcs2 new_details new_iface Nothing
-              -> let hst2         = addToUFM hst1 mod_name new_details
-                     hit2         = addToUFM hit1 mod_name new_iface
-                     threaded2    = CmThreaded pcs2 hst2 hit2
-                 in  return (threaded2, Just old_linkable)
+              -> do let hst2         = addToUFM hst1 mod_name new_details
+                        hit2         = addToUFM hit1 mod_name new_iface
+                        threaded2    = CmThreaded pcs2 hst2 hit2
+
+		    if ghci_mode == Interactive && verb >= 1 then
+		      -- if we're using an object file, tell the user
+		      case maybe_old_linkable of
+			Just (LM _ _ objs@(DotO _:_))
+			   -> do hPutStr stderr (showSDoc (space <> 
+				   parens (hsep (text "using": 
+					punctuate comma 
+					  [ text o | DotO o <- objs ]))))
+			         when (verb > 1) $ hPutStrLn stderr ""
+			_ -> return ()
+		      else
+			return ()
+
+		    when (verb == 1) $ hPutStrLn stderr ""
+                    return (threaded2, Just old_linkable)
 
            -- Compilation really did happen, and succeeded.  A new
            -- details, iface and linkable are returned.
            CompOK pcs2 new_details new_iface (Just new_linkable)
-              -> let hst2      = addToUFM hst1 mod_name new_details
-                     hit2      = addToUFM hit1 mod_name new_iface
-                     threaded2 = CmThreaded pcs2 hst2 hit2
-                 in  return (threaded2, Just new_linkable)
+              -> do let hst2      = addToUFM hst1 mod_name new_details
+                        hit2      = addToUFM hit1 mod_name new_iface
+                        threaded2 = CmThreaded pcs2 hst2 hit2
+
+		    when (verb == 1) $ hPutStrLn stderr ""
+	            return (threaded2, Just new_linkable)
 
            -- Compilation failed.  compile may still have updated
            -- the PCS, tho.
            CompErrs pcs2
-              -> let threaded2 = CmThreaded pcs2 hst1 hit1
-                 in  return (threaded2, Nothing)
-
+	      -> do let threaded2 = CmThreaded pcs2 hst1 hit1
+		    when (verb == 1) $ hPutStrLn stderr ""
+                    return (threaded2, Nothing)
 
 -- Remove unwanted modules from the top level envs (HST, HIT, UI).
 removeFromTopLevelEnvs :: [ModuleName]

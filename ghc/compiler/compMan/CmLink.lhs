@@ -205,8 +205,8 @@ invalidLinkable = throwDyn (OtherError "linkable doesn't contain entirely object
 -- various environments any previous versions of these modules.
 linkFinish pls mods ul_trees = do
    resolveObjs
-   let itbl_env'    = filterRdrNameEnv mods (itbl_env pls)
-       closure_env' = filterRdrNameEnv mods (closure_env pls)
+   let itbl_env'    = filterNameEnv mods (itbl_env pls)
+       closure_env' = filterNameEnv mods (closure_env pls)
        stuff        = [ (trees,itbls) | Trees trees itbls <- ul_trees ]
 
    (ibinds, new_itbl_env, new_closure_env) <-

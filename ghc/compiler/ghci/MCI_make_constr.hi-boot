@@ -4,19 +4,15 @@ __export MCIzumakezuconstr
    mcizumakezuconstrI
    mcizumakezuconstr0
    mcizumakezuconstrP
-   mcizumakezuconstrPP
-   mcizumakezuconstrPPP ;
+   mcizumakezuconstrPP ;
 
 1 mcizumakezuconstr
      :: __forall [a] => PrelGHC.Addrzh -> a ;
-1 mcizumakezuconstrI 
-     :: __forall [a] => PrelGHC.Addrzh -> PrelGHC.Intzh -> a ;
 1 mcizumakezuconstr0
      :: __forall [a] => PrelGHC.Addrzh -> a ;
+1 mcizumakezuconstrI 
+     :: __forall [a] => PrelGHC.Addrzh -> PrelGHC.Intzh -> a ;
 1 mcizumakezuconstrP 
      :: __forall [a a1] => PrelGHC.Addrzh -> a1 -> a ;
 1 mcizumakezuconstrPP 
      :: __forall [a a1 a2] => PrelGHC.Addrzh -> a1 -> a2 -> a ;
-1 mcizumakezuconstrPPP 
-     :: __forall [a a1 a2 a3] => PrelGHC.Addrzh -> a1 -> a2 -> a3 -> a ;
-

@@ -6,7 +6,7 @@
 \begin{code}
 module HscMain ( HscResult(..), hscMain, 
 #ifdef GHCI
-		 hscExpr, hscTypeExpr,
+		 hscExpr,
 #endif
 		 initPersistentCompilerState ) where
 
@@ -70,7 +70,7 @@ import Module		( Module, lookupModuleEnvByName )
 
 import Monad		( when )
 import Maybe		( isJust )
-import IO		( hPutStrLn, stderr )
+import IO
 \end{code}
 
 
@@ -142,7 +142,8 @@ hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
    in  return (HscNoRecomp pcs_ch bomb bomb)
  | otherwise
  = do {
-      hPutStrLn stderr "compilation IS NOT required";
+      hPutStr stderr "compilation IS NOT required";
+      when (verbosity dflags /= 1) $ hPutStrLn stderr "";
 
       -- CLOSURE
       (pcs_cl, closure_errs, cl_hs_decls) 
@@ -171,7 +172,10 @@ hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
 hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  = do	{
       	; when (verbosity dflags >= 1) $
-		hPutStrLn stderr "compilation IS required";
+		hPutStr stderr "compilation IS required";
+	  -- mode -v1 tries to keep everything on one line
+	  when (verbosity dflags /= 1) $
+		hPutStrLn stderr "";
 
       	  -- what target are we shooting for?
       	; let toInterp = dopt_HscLang dflags == HscInterpreted
@@ -393,60 +397,11 @@ hscExpr
   -> PersistentCompilerState    -- IN: persistent compiler state
   -> Module			-- Context for compiling
   -> String			-- The expression
-  -> IO ( PersistentCompilerState, Maybe UnlinkedIExpr )
+  -> IO ( PersistentCompilerState, 
+	  Maybe (UnlinkedIExpr, PrintUnqualified, Type) )
 
 hscExpr dflags hst hit pcs0 this_module expr
    = do {
-	-- parse, rename & typecheck the expression
-        (pcs1, maybe_tc_result)
-	   <- hscExprFrontEnd dflags hst hit pcs0 this_module expr;
-
-	case maybe_tc_result of {
-	   Nothing -> return (pcs1, Nothing);
-	   Just (print_unqual, tc_expr, ty) -> do {
-
-	-- if it isn't an IO-typed expression, 
-	-- wrap "print" around it & recompile...
-	let { is_IO_type = case splitTyConApp_maybe ty of {
-	   		    Just (tycon, _) -> getUnique tycon == ioTyConKey;
-			    Nothing -> False }
-            };
-
-        if (not is_IO_type)
-		then hscExpr dflags hst hit pcs1 this_module 
-			("print (" ++ expr ++ ")")
-		else do
-
-		-- Desugar it
-	ds_expr <- deSugarExpr dflags pcs1 hst this_module
-			print_unqual tc_expr;
-	
-		-- Simplify it
-	simpl_expr <- simplifyExpr dflags pcs1 hst ds_expr;
-
-		-- Convert to STG
-	stg_expr <- coreToStgExpr dflags simpl_expr;
-
-		-- ToDo: need to do StgVarInfo?  or SRTs?
-
-		-- Convert to InterpSyn
-	unlinked_iexpr <- stgExprToInterpSyn dflags stg_expr;
-
-	return (pcs1, Just unlinked_iexpr);
-     }}}
-
-hscExprFrontEnd
-  :: DynFlags
-  -> HomeSymbolTable	
-  -> HomeIfaceTable
-  -> PersistentCompilerState    -- IN: persistent compiler state
-  -> Module			-- Context for compiling
-  -> String			-- The expression
-  -> IO ( PersistentCompilerState, 
-	  Maybe (PrintUnqualified,TypecheckedHsExpr,Type) 
-	)
-hscExprFrontEnd dflags hst hit pcs0 this_module expr
-  = do	{ 	-- Parse it
 	maybe_parsed <- hscParseExpr dflags expr;
 	case maybe_parsed of
       	     Nothing -> return (pcs0, Nothing)
@@ -462,26 +417,44 @@ hscExprFrontEnd dflags hst hit pcs0 this_module expr
 		-- Typecheck it
 	maybe_tc_return
 	   <- typecheckExpr dflags pcs1 hst print_unqual this_module rn_expr;
-	case maybe_tc_return of
-		Nothing -> return (pcs1, Nothing)
-		Just (pcs2, tc_expr, ty) -> 
-		   return (pcs2, Just (print_unqual, tc_expr, ty))
-    }}}
+	case maybe_tc_return of {
+		Nothing -> return (pcs1, Nothing);
+		Just (pcs2, tc_expr, ty) -> do
 
-hscTypeExpr
-  :: DynFlags
-  -> HomeSymbolTable	
-  -> HomeIfaceTable
-  -> PersistentCompilerState    -- IN: persistent compiler state
-  -> Module			-- Context for compiling
-  -> String			-- The expression
-  -> IO (PersistentCompilerState, Maybe (PrintUnqualified, Type))
-hscTypeExpr dflags hst hit pcs0 this_module expr
-  = do (pcs1, maybe_tc_result)
-	  <- hscExprFrontEnd dflags hst hit pcs0 this_module expr
-       case maybe_tc_result of
-	  Nothing -> return (pcs1, Nothing)
-	  Just (print_unqual,_,ty) -> return (pcs1, Just (print_unqual,ty))
+	-- if it isn't an IO-typed expression, 
+	-- wrap "print" around it & recompile...
+	let { is_IO_type = case splitTyConApp_maybe ty of {
+	   		    Just (tycon, _) -> getUnique tycon == ioTyConKey;
+			    Nothing -> False }
+            };
+
+        if (not is_IO_type)
+		then do (new_pcs, maybe_stuff)
+			  <- hscExpr dflags hst hit pcs2 this_module 
+				("print (" ++ expr ++ ")")
+		        case maybe_stuff of
+			   Nothing -> return (new_pcs, maybe_stuff)
+			   Just (expr, _, _) ->
+			      return (new_pcs, Just (expr, print_unqual, ty))
+		else do
+
+		-- Desugar it
+	ds_expr <- deSugarExpr dflags pcs2 hst this_module
+			print_unqual tc_expr;
+	
+		-- Simplify it
+	simpl_expr <- simplifyExpr dflags pcs2 hst ds_expr;
+
+		-- Convert to STG
+	stg_expr <- coreToStgExpr dflags simpl_expr;
+
+		-- ToDo: need to do StgVarInfo?  or SRTs?
+
+		-- Convert to InterpSyn
+	unlinked_iexpr <- stgExprToInterpSyn dflags stg_expr;
+
+	return (pcs2, Just (unlinked_iexpr, print_unqual, ty));
+     }}}}
 
 hscParseExpr :: DynFlags -> String -> IO (Maybe RdrNameHsExpr)
 hscParseExpr dflags str
