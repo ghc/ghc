@@ -28,3 +28,4 @@ test "read020" { vtcf("") }
 test "read021" { vtcf("") }
 test "read022" { vtcf("") }
 test "read023" { vtcf("") }
+test "read024" { $expect = "fail" vtcf("") }
