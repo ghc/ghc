@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.41 2001/12/11 02:59:17 chak Exp $
+ * $Id: StgMiscClosures.h,v 1.42 2002/01/26 18:02:05 rje Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -74,10 +74,11 @@ extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_V_info;
 
 /* Used by the interpreter to return an unboxed value on the stack to
    compiled code. */
-extern DLL_IMPORT_RTS const StgInfoTable stg_gc_unbx_r1_ret_info;
-extern DLL_IMPORT_RTS const StgInfoTable stg_gc_f1_ret_info;
-extern DLL_IMPORT_RTS const StgInfoTable stg_gc_d1_ret_info;
-extern DLL_IMPORT_RTS const StgInfoTable stg_gc_l1_ret_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_gc_unbx_r1_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_gc_f1_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_gc_d1_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_gc_l1_info;
+
 
 /* this is the NIL ptr for a TSO queue (e.g. runnable queue) */
 #define END_TSO_QUEUE  ((StgTSO *)(void*)&stg_END_TSO_QUEUE_closure)
@@ -253,28 +254,27 @@ EXTFUN(stg_gc_enter_7);
 EXTFUN(stg_gc_enter_8);
 EXTFUN(stg_gc_seq_1);
 
-EI_(stg_gc_noregs_ret_info);
+EI_(stg_gc_noregs_info);
 EF_(stg_gc_noregs);
 
-EI_(stg_gc_unpt_r1_ret_info);
+EI_(stg_gc_unpt_r1_info);
 EF_(stg_gc_unpt_r1);
 
-EI_(stg_gc_unbx_r1_ret_info);
+EI_(stg_gc_unbx_r1_info);
 EF_(stg_gc_unbx_r1);
 
-EI_(stg_gc_f1_ret_info);
+EI_(stg_gc_f1_info);
 EF_(stg_gc_f1);
 
-EI_(stg_gc_d1_ret_info);
+EI_(stg_gc_d1_info);
 EF_(stg_gc_d1);
 
-EI_(stg_gc_l1_ret_info);
+EI_(stg_gc_ut_1_0_info);
+EI_(stg_gc_l1_info);
 EF_(stg_gc_l1);
-
-EI_(stg_gc_ut_1_0_ret_info);
 EF_(stg_gc_ut_1_0);
 
-EI_(stg_gc_ut_0_1_ret_info);
+EI_(stg_gc_ut_0_1_info);
 EF_(stg_gc_ut_0_1);
 
 EXTFUN(__stg_chk_0);
