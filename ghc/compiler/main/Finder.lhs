@@ -41,26 +41,13 @@ GLOBAL_VAR(v_PkgDirCache,    Nothing,  Maybe (FiniteMap String (PackageName, Fil
 
 -- caches contents of home directories, expunged whenever we
 -- create a new finder.
-GLOBAL_VAR(v_HomeDirCache,   emptyFM,  FiniteMap String FilePath)
-
--- caches finder mapping, expunged whenever we create a new finder.
-GLOBAL_VAR(v_FinderMapCache, emptyFM, FiniteMap ModuleName Module)
+GLOBAL_VAR(v_HomeDirCache,   Nothing,  Maybe (FiniteMap String FilePath))
 
 
 newFinder :: PackageConfigInfo -> IO Finder
 newFinder (PackageConfigInfo pkgs) = do
-  -- expunge our caches
-  writeIORef v_HomeDirCache   emptyFM
-  writeIORef v_FinderMapCache emptyFM
-
-  -- populate the home dir cache, using the import path (the import path
-  -- is changed by -i flags on the command line, and defaults to ["."]).
-  home_imports <- readIORef v_Import_paths
-  let extendFM fm path = do
-	  contents <- getDirectoryContents' path
-          return (addListToFM fm (zip contents (repeat path)))
-  home_map <- foldM extendFM emptyFM home_imports
-  writeIORef v_HomeDirCache home_map
+  -- expunge our home cache
+  writeIORef v_HomeDirCache Nothing
 
   -- populate the package cache, if necessary
   pkg_cache <- readIORef v_PkgDirCache
@@ -97,15 +84,31 @@ maybeHomeModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
 maybeHomeModule mod_name = do
    home_cache <- readIORef v_HomeDirCache
 
+   home_map <- 
+     case home_cache of
+	Nothing -> do
+	   -- populate the home dir cache, using the import path (the import 
+	   -- path is changed by -i flags on the command line, and defaults 
+	   -- to ["."]).
+	   home_imports <- readIORef v_Import_paths
+	   let extendFM fm path = do
+		   contents <- getDirectoryContents' path
+		   return (addListToFM fm (zip contents (repeat path)))
+	   home_map <- foldM extendFM emptyFM home_imports
+	   writeIORef v_HomeDirCache (Just home_map)
+	   return home_map
+
+        Just home_map -> return home_map
+
    let basename = moduleNameString mod_name
        hs  = basename ++ ".hs"
        lhs = basename ++ ".lhs"
 
-   case lookupFM home_cache hs of {
+   case lookupFM home_map hs of {
 	Just path -> mkHomeModuleLocn mod_name (path ++ '/':basename) hs;
 	Nothing ->
 
-   case lookupFM home_cache lhs of {
+   case lookupFM home_map lhs of {
 	Just path ->  mkHomeModuleLocn mod_name (path ++ '/':basename) lhs;
 	Nothing -> return Nothing
 
