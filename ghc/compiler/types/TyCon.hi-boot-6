@@ -5,4 +5,3 @@ data TyCon
 isTupleTyCon :: TyCon -> GHC.Base.Bool
 isUnboxedTupleTyCon :: TyCon -> GHC.Base.Bool
 isFunTyCon :: TyCon -> GHC.Base.Bool
-setTyConName :: TyCon -> Name.Name -> TyCon
