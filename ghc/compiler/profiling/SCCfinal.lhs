@@ -43,10 +43,6 @@ infixr 9 `thenMM`, `thenMM_`
 \end{code}
 
 \begin{code}
-type CollectedCCs = ([CostCentre],	-- locally defined ones
-		     [CostCentre],	-- ones needing "extern" decls
-		     [CostCentreStack]) -- singleton stacks (for CAFs)
-
 stgMassageForProfiling
 	:: Module			-- module name
 	-> UniqSupply		    	-- unique supply

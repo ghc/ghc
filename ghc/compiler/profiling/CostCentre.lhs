@@ -9,6 +9,7 @@ module CostCentre (
 		-- All abstract except to friend: ParseIface.y
 
 	CostCentreStack,
+	CollectedCCs,
 	noCCS, subsumedCCS, currentCCS, overheadCCS, dontCareCCS,
 	noCostCentre, noCCAttached,
 	noCCSAttached, isCurrentCCS,  isSubsumedCCS, currentOrSubsumedCCS,
@@ -138,6 +139,14 @@ data IsDupdCC
 			-- "dupd".
 
 data IsCafCC = CafCC | NotCafCC
+
+-- synonym for triple which describes the cost centre info in the generated
+-- code for a module.
+type CollectedCCs
+  = ( [CostCentre]       -- local cost-centres that need to be decl'd
+    , [CostCentre]       -- "extern" cost-centres
+    , [CostCentreStack]  -- pre-defined "singleton" cost centre stacks
+    )
 \end{code}
 
 WILL: Would there be any merit to recording ``I am now using a

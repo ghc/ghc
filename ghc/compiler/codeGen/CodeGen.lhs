@@ -38,7 +38,7 @@ import CgConTbls	( genStaticConBits )
 import ClosureInfo	( mkClosureLFInfo )
 import CmdLineOpts	( DynFlags, DynFlag(..),
 			  opt_SccProfilingOn, opt_EnsureSplittableC )
-import CostCentre       ( CostCentre, CostCentreStack )
+import CostCentre       ( CollectedCCs )
 import Id               ( Id, idName, setIdName )
 import Name		( nameSrcLoc, nameOccName, nameUnique, isLocalName, mkGlobalName )
 import OccName		( mkLocalOcc )
@@ -59,9 +59,7 @@ import Outputable
 codeGen :: DynFlags
 	-> Module		-- Module name
 	-> [Module]		-- Import names
-	-> ([CostCentre],	-- Local cost-centres needing declaring/registering
-	    [CostCentre],	-- "extern" cost-centres needing declaring
-	    [CostCentreStack])  -- Pre-defined "singleton" cost centre stacks
+	-> CollectedCCs		-- (Local/global) cost-centres needing declaring/registering.
 	-> [Id]			-- foreign-exported binders
 	-> [TyCon] 		-- Local tycons, including ones from classes
 	-> [(StgBinding,[Id])]	-- Bindings to convert, with SRTs
@@ -70,30 +68,28 @@ codeGen :: DynFlags
 codeGen dflags mod_name imported_modules cost_centre_info fe_binders
 	tycons stg_binds
   = do	{ showPass dflags "CodeGen"
-
 	; fl_uniqs <- mkSplitUniqSupply 'f'
-	; let
-	    datatype_stuff = genStaticConBits cinfo data_tycons
-	    code_stuff     = initC cinfo (mapCs cgTopBinding stg_binds)
-	    init_stuff     = mkModuleInit fe_binders mod_name imported_modules 
-					  cost_centre_info
-
-	    abstractC = mkAbstractCs [ maybeSplitCode,
-				       init_stuff, 
-				       code_stuff,
-				       datatype_stuff]
-		-- Put datatype_stuff after code_stuff, because the
-		-- datatype closure table (for enumeration types)
-		-- to (say) PrelBase_True_closure, which is defined in code_stuff
-
-	    flat_abstractC = flattenAbsC fl_uniqs abstractC
-
 	; dumpIfSet_dyn dflags Opt_D_dump_absC "Abstract C" (dumpRealC abstractC)
+	; let flat_abstractC = flattenAbsC fl_uniqs abstractC
 	; return flat_abstractC
 	}
   where
-    data_tycons = filter isDataTyCon tycons
-    cinfo       = MkCompInfo mod_name
+    data_tycons    = filter isDataTyCon tycons
+    cinfo          = MkCompInfo mod_name
+
+    datatype_stuff = genStaticConBits cinfo data_tycons
+    code_stuff     = initC cinfo (mapCs cgTopBinding stg_binds)
+    init_stuff     = mkModuleInit fe_binders mod_name imported_modules 
+					  cost_centre_info
+
+    abstractC = mkAbstractCs [ maybeSplitCode,
+			       init_stuff, 
+			       code_stuff,
+			       datatype_stuff]
+	-- Put datatype_stuff after code_stuff, because the
+	-- datatype closure table (for enumeration types)
+	-- to (say) PrelBase_True_closure, which is defined in code_stuff
+
 \end{code}
 
 %************************************************************************
@@ -107,9 +103,7 @@ mkModuleInit
 	:: [Id]			-- foreign exported functions
 	-> Module		-- module name
 	-> [Module]		-- import names
-	-> ([CostCentre],	-- cost centre info
-	    [CostCentre],	
-	    [CostCentreStack])
+	-> CollectedCCs         -- cost centre info
 	-> AbstractC
 mkModuleInit fe_binders mod imps cost_centre_info
   = let

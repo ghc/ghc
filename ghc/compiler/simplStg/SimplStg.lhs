@@ -10,7 +10,7 @@ module SimplStg ( stg2stg ) where
 
 import StgSyn
 
-import CostCentre       ( CostCentre, CostCentreStack )
+import CostCentre       ( CollectedCCs )
 import SCCfinal		( stgMassageForProfiling )
 import StgLint		( lintStgBindings )
 import StgStats	        ( showStgStats )
@@ -27,14 +27,11 @@ import Outputable
 \end{code}
 
 \begin{code}
-stg2stg :: DynFlags		-- includes spec of what stg-to-stg passes to do
-	-> Module		-- module name (profiling only)
-	-> [StgBinding]		-- input...
-	-> IO
-	    ([(StgBinding,[Id])],  -- output program...
-	     ([CostCentre],	   -- local cost-centres that need to be decl'd
-	      [CostCentre],	   -- "extern" cost-centres
-	      [CostCentreStack]))  -- pre-defined "singleton" cost centre stacks
+stg2stg :: DynFlags		     -- includes spec of what stg-to-stg passes to do
+	-> Module		     -- module name (profiling only)
+	-> [StgBinding]		     -- input...
+	-> IO ( [(StgBinding,[Id])]  -- output program...
+	      , CollectedCCs)        -- cost centre information (declared and used)
 
 stg2stg dflags module_name binds
   = do	{ showPass dflags "Stg2Stg"
