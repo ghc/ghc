@@ -69,7 +69,7 @@ renameModule :: UniqSupply
 		      , [ModuleName]	  -- Imported modules; for profiling
 		      ))
 
-renameModule us this_mod@(HsModule mod_name vers exports imports local_decls loc)
+renameModule us this_mod@(HsModule mod_name vers exports imports local_decls _ loc)
   = 	-- Initialise the renamer monad
     initRn mod_name us (mkSearchPath opt_HiMap) loc
 	   (rename this_mod)				>>=
@@ -90,7 +90,7 @@ renameModule us this_mod@(HsModule mod_name vers exports imports local_decls loc
 
 
 \begin{code}
-rename this_mod@(HsModule mod_name vers _ imports local_decls loc)
+rename this_mod@(HsModule mod_name vers _ imports local_decls _ loc)
   =  	-- FIND THE GLOBAL NAME ENVIRONMENT
     getGlobalNames this_mod			`thenRn` \ maybe_stuff ->
 
@@ -146,6 +146,7 @@ rename this_mod@(HsModule mod_name vers _ imports local_decls loc)
 	renamed_module = HsModule mod_name vers 
 				  trashed_exports trashed_imports
 				  rn_all_decls
+			          Nothing
 			          loc
     in
     rnDump rn_imp_decls	rn_all_decls		`thenRn` \ dump_action ->

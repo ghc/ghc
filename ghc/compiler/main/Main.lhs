@@ -74,7 +74,7 @@ parseModule = do
 		ghcExit 1
 		return (error "parseModule") -- just to get the types right
 
-	POk _ m@(HsModule mod _ _ _ _ _) -> 
+	POk _ m@(HsModule mod _ _ _ _ _ _) -> 
 		return (mod, m)
   where
 	glaexts | opt_GlasgowExts = 1#
@@ -222,7 +222,7 @@ doIt (core_cmds, stg_cmds)
 	then \ what -> hPutStr stderr ("*** "++what++":\n")
 	else \ what -> return ()
 
-ppSourceStats short (HsModule name version exports imports decls src_loc)
+ppSourceStats short (HsModule name version exports imports decls _ src_loc)
  = (if short then hcat else vcat)
         (map pp_val
 	       [("ExportAll        ", export_all), -- 1 if no export list

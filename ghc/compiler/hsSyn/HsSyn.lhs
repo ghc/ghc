@@ -62,6 +62,7 @@ data HsModule name pat
 				-- info to TyDecls/etc; so this list is
 				-- often empty, downstream.
 	[HsDecl name pat]	-- Type, class, value, and interface signature decls
+	(Maybe DeprecTxt)	-- reason/explanation for deprecation of this module
 	SrcLoc
 \end{code}
 
@@ -70,8 +71,11 @@ instance (Outputable name, Outputable pat)
 	=> Outputable (HsModule name pat) where
 
     ppr (HsModule name iface_version exports imports
-		      decls src_loc)
+		      decls deprec src_loc)
       = vcat [
+	    case deprec of
+	      Nothing -> empty
+	      Just dt -> hsep [ptext SLIT("{-# DEPRECATED"), ppr dt, ptext SLIT("#-}")],
 	    case exports of
 	      Nothing -> hsep [ptext SLIT("module"), pprModuleName name, ptext SLIT("where")]
 	      Just es -> vcat [

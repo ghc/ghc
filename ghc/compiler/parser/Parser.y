@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.20 2000/02/09 18:32:10 lewie Exp $
+$Id: Parser.y,v 1.21 2000/02/15 22:18:34 panne Exp $
 
 Haskell grammar.
 
@@ -36,6 +36,7 @@ import GlaExts
 -----------------------------------------------------------------------------
 Conflicts: 14 shift/reduce
 	(note: it's currently 21 -- JRL, 31/1/2000)
+        (note2: it' currently 36, but not because of me -- SUP, 15/2/2000 :-)
 
 8 for abiguity in 'if x then y else z + 1'
 	(shift parses as 'if x then y else (z + 1)', as per longest-parse rule)
@@ -107,6 +108,7 @@ Conflicts: 14 shift/reduce
  '{-# INLINE'      { ITinline_prag }
  '{-# NOINLINE'    { ITnoinline_prag }
  '{-# RULES'	   { ITrules_prag }
+ '{-# DEPRECATED'  { ITdeprecated_prag }
  '#-}'		   { ITclose_prag }
 
 {-
@@ -189,7 +191,7 @@ Conflicts: 14 shift/reduce
  PRIMSTRING	{ ITprimstring $$ }
  PRIMINTEGER	{ ITprimint    $$ }
  PRIMFLOAT	{ ITprimfloat  $$ }
- PRIMDOUBLE	{ ITprimdouble  $$ }
+ PRIMDOUBLE	{ ITprimdouble $$ }
  CLITLIT	{ ITlitlit     $$ }
 
  UNKNOWN	{ ITunknown  $$ }
@@ -203,11 +205,22 @@ Conflicts: 14 shift/reduce
 -----------------------------------------------------------------------------
 -- Module Header
 
+-- The place for module deprecation is really too restrictive, but if it
+-- was allowed at its natural place just before 'module', we get an ugly
+-- s/r conflict with the second alternative. Another solution would be the
+-- introduction of a new pragma DEPRECATED_MODULE, but this is not very nice,
+-- either, and DEPRECATED is only expected to be used by people who really
+-- know what they are doing. :-)
+
 module 	:: { RdrNameHsModule }
- 	: srcloc 'module' modid maybeexports 'where' body 
-		{ HsModule $3 Nothing $4 (fst $6) (snd $6) $1 }
-	| srcloc body	
-		{ HsModule mAIN_Name Nothing Nothing (fst $2) (snd $2) $1 }
+ 	: srcloc 'module' modid maybemoddeprec maybeexports 'where' body 
+		{ HsModule $3 Nothing $5 (fst $7) (snd $7) $4 $1 }
+	| srcloc body
+		{ HsModule mAIN_Name Nothing Nothing (fst $2) (snd $2) Nothing $1 }
+
+maybemoddeprec :: { Maybe FAST_STRING }
+	: '{-# DEPRECATED' STRING '#-}' 	{ Just $2 }
+	|  {- empty -}				{ Nothing }
 
 body 	:: { ([RdrNameImportDecl], [RdrNameHsDecl]) }
 	:  '{'            top '}'		{ $2 }
@@ -379,6 +392,7 @@ decl 	:: { RdrBinding }
 	| '{-# SPECIALISE' srcloc 'instance' inst_type '#-}'
 		{ RdrSig (SpecInstSig $4 $2) }
 	| '{-# RULES' rules '#-}' 	{ $2 }
+	| '{-# DEPRECATED' deprecations '#-}' 	{ $2 }
 
 opt_phase :: { Maybe Int }
           : INTEGER                     { Just (fromInteger $1) }
@@ -456,6 +470,27 @@ rule_var_list :: { [RdrNameRuleBndr] }
 rule_var :: { RdrNameRuleBndr }
 	: varid                              	{ RuleBndr $1 }
        	| '(' varid '::' ctype ')'             	{ RuleBndrSig $2 $4 }
+
+-----------------------------------------------------------------------------
+-- Deprecations
+
+deprecations :: { RdrBinding }
+	: deprecations ';' deprecation		{ $1 `RdrAndBindings` $3 }
+	| deprecations ';'			{ $1 }
+	| deprecation				{ $1 }
+	| {- empty -}				{ RdrNullBind }
+
+deprecation :: { RdrBinding }
+	: deprecated_names STRING
+		{ foldr1 RdrAndBindings [ RdrSig (DeprecSig n $2) | n <- $1 ] }
+
+deprecated_names :: { [RdrName] }
+	: deprecated_names ',' deprecated_name	{ $3 : $1 }
+	| deprecated_name			{ [$1] }
+
+deprecated_name :: { RdrName }
+	: var					{ $1 }
+	| tycon					{ $1 }
 
 -----------------------------------------------------------------------------
 -- Foreign import/export

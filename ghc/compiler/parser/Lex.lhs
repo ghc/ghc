@@ -158,6 +158,7 @@ data Token
   | ITunfold InlinePragInfo
   | ITstrict ([Demand], Bool)
   | ITrules
+  | ITdeprecated
   | ITcprinfo (CprInfo)
   | IT__scc
   | ITsccAllCafs
@@ -167,6 +168,7 @@ data Token
   | ITinline_prag
   | ITnoinline_prag
   | ITrules_prag
+  | ITdeprecated_prag
   | ITline_prag
   | ITclose_prag
 
@@ -244,7 +246,8 @@ pragmaKeywordsFM = listToUFM $
 	( "NOTINLINE",	ITnoinline_prag ),
 	( "LINE",       ITline_prag ),
 	( "RULES",	ITrules_prag ),
-	( "RULEZ",	ITrules_prag )	-- american spelling :-)
+	( "RULEZ",	ITrules_prag ),	-- american spelling :-)
+	( "DEPRECATED",	ITdeprecated_prag )
  	]
 
 haskellKeywordsFM = listToUFM $
@@ -318,6 +321,7 @@ ghcExtensionKeywordsFM = listToUFM $
 	("__P",			ITspecialise),
 	("__C",			ITnocaf),
 	("__R",			ITrules),
+        ("__D",			ITdeprecated),
         ("__U",			ITunfold NoInlinePragInfo),
 	
         ("__ccall",		ITccall (False, False, False)),

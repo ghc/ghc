@@ -131,7 +131,7 @@ tcModule :: RnNameSupply	-- for renaming derivings
 	 -> TcM s TcResults	-- output
 
 tcModule rn_name_supply fixities
-	(HsModule mod_name verion exports imports decls src_loc)
+	(HsModule mod_name verion exports imports decls _ src_loc)
   = tcAddSrcLoc src_loc $	-- record where we're starting
 
     fixTc (\ ~(unf_env ,_) ->

@@ -69,7 +69,7 @@ getGlobalNames :: RdrNameHsModule
 			       ))
 			-- Nothing => no need to recompile
 
-getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
+getGlobalNames (HsModule this_mod _ exports imports decls _ mod_loc)
   = 	-- These two fix-loops are to get the right
 	-- provenance information into a Name
     fixRn (\ ~(rec_gbl_env, rec_exported_avails, _) ->

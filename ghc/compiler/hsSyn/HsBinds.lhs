@@ -257,8 +257,13 @@ data Sig name
 
   | FixSig	(FixitySig name)		-- Fixity declaration
 
+  | DeprecSig	name		-- DEPRECATED
+		DeprecTxt
+
 
 data FixitySig name  = FixitySig name Fixity SrcLoc
+
+type DeprecTxt = FAST_STRING	-- reason/explanation for deprecation
 \end{code}
 
 \begin{code}
@@ -273,6 +278,7 @@ sigsForMe f sigs
     sig_for_me (NoInlineSig n _   _)  	  = f n  
     sig_for_me (SpecInstSig _ _)      	  = False
     sig_for_me (FixSig (FixitySig n _ _)) = f n
+    sig_for_me (DeprecSig n _)		  = f n
 
 isFixitySig :: Sig name -> Bool
 isFixitySig (FixSig _) = True
@@ -288,6 +294,7 @@ isPragSig (SpecSig _ _ _)     = True
 isPragSig (InlineSig   _ _ _) = True
 isPragSig (NoInlineSig _ _ _) = True
 isPragSig (SpecInstSig _ _)   = True
+isPragSig (DeprecSig _ _)     = True
 isPragSig other		      = False
 \end{code}
 
@@ -311,15 +318,18 @@ ppr_sig (SpecSig var ty _)
 	]
 
 ppr_sig (InlineSig var phase _)
-        = hsep [text "{-# INLINE", ppr_phase phase, ppr var, text "#-}"]
+      = hsep [text "{-# INLINE", ppr_phase phase, ppr var, text "#-}"]
 
 ppr_sig (NoInlineSig var phase _)
-        = hsep [text "{-# NOINLINE", ppr_phase phase, ppr var, text "#-}"]
+      = hsep [text "{-# NOINLINE", ppr_phase phase, ppr var, text "#-}"]
 
 ppr_sig (SpecInstSig ty _)
       = hsep [text "{-# SPECIALIZE instance", ppr ty, text "#-}"]
 
 ppr_sig (FixSig fix_sig) = ppr fix_sig
+
+ppr_sig (DeprecSig n txt)
+      = hsep [text "{-# DEPRECATED", ppr n, ppr txt, text "#-}"]
 
 ppr_phase Nothing = empty
 ppr_phase (Just n) = int n
