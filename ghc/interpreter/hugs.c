@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.36 $
- * $Date: 2000/01/12 14:47:27 $
+ * $Revision: 1.37 $
+ * $Date: 2000/02/03 13:55:21 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -1389,7 +1389,7 @@ static Void local evaluator() {        /* evaluate expr and print value    */
                                        /* allocated during evaluation      */
     parseExp();
     checkExp();
-    defaultDefns = evalDefaults;
+    defaultDefns = combined ? stdDefaults : evalDefaults;
     type         = typeCheckExp(TRUE);
 
     if (isPolyType(type)) {

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: free.c,v $
- * $Revision: 1.7 $
- * $Date: 1999/11/01 11:07:07 $
+ * $Revision: 1.8 $
+ * $Date: 2000/02/03 13:55:21 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -92,6 +92,9 @@ static List freeVarsPrimAlt( List acc, StgPrimAlt alt )
 
 static List freeVarsExpr( List acc, StgExpr e )
 {
+#if 0
+    printf( "freeVarsExpr: " );ppStgExpr(e);printf("\n");
+#endif
     switch (whatIs(e)) {
     case LETREC:
             mapAccum(freeVarsBind,acc,stgLetBinds(e));
@@ -118,11 +121,9 @@ static List freeVarsExpr( List acc, StgExpr e )
     case NAME:
             return acc;  /* Names are never free vars */
     default:
-      /*
             printf("\n");
             ppStgExpr(e);
             printf("\n");
-      */
             internal("freeVarsExpr");
     }
 }

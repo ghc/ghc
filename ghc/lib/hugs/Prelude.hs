@@ -1561,8 +1561,8 @@ hugsprimPmDouble     :: Fractional a => Double -> a -> Bool
 hugsprimPmDouble n x  = fromDouble n == x
 
 -- ToDo: make the message more informative.
-primPmFail       :: a
-primPmFail        = error "Pattern Match Failure"
+hugsprimPmFail       :: a
+hugsprimPmFail        = error "Pattern Match Failure"
 
 -- used in desugaring Foreign functions
 hugsprimMkIO :: (RealWorld -> (a,RealWorld)) -> IO a

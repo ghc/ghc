@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.38 $
- * $Date: 2000/01/12 16:29:47 $
+ * $Revision: 1.39 $
+ * $Date: 2000/02/03 13:55:21 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -509,6 +509,7 @@ Void linkControl(what)
 Int what; {
     Int i;
     switch (what) {
+      //case EXIT : fooble();break;
         case RESET   :
         case MARK    : 
                        break;
@@ -516,9 +517,7 @@ Int what; {
         case POSTPREL: {
            Module modulePrelBase = findModule(findText("PrelBase"));
            assert(nonNull(modulePrelBase));
-#if 1
 	   fprintf(stderr, "linkControl(POSTPREL)\n");
-#if 1
            setCurrModule(modulePrelude);
            linkPreludeTC();
            linkPreludeCM();
@@ -526,8 +525,43 @@ Int what; {
 
            nameUnpackString = linkName("hugsprimUnpackString");
            namePMFail       = linkName("hugsprimPmFail");
-#endif
-#endif
+
+#define xyzzy(aaa,bbb) aaa = linkName(bbb)
+
+
+               /* pmc                                   */
+               xyzzy(nameSel,            "_SEL");
+
+               /* newtype and USE_NEWTYPE_FOR_DICTS     */
+               xyzzy(nameId,             "id");
+
+               /* strict constructors                   */
+               xyzzy(nameFlip,           "flip"     );
+
+               /* parser                                */
+               xyzzy(nameFromTo,         "enumFromTo");
+               xyzzy(nameFromThenTo,     "enumFromThenTo");
+               xyzzy(nameFrom,           "enumFrom");
+               xyzzy(nameFromThen,       "enumFromThen");
+
+               /* deriving                              */
+               xyzzy(nameApp,            "++");
+               xyzzy(nameReadField,      "readField");
+               xyzzy(nameReadParen,      "readParen");
+               xyzzy(nameShowField,      "showField");
+               xyzzy(nameShowParen,      "showParen");
+               xyzzy(nameLex,            "lex");
+               xyzzy(nameComp,           ".");
+               xyzzy(nameAnd,            "&&");
+               xyzzy(nameCompAux,        "primCompAux");
+               xyzzy(nameMap,            "map");
+
+               /* implementTagToCon                     */
+               xyzzy(nameError,          "error");
+
+           typeStable = linkTycon("Stable");
+           typeRef    = linkTycon("IORef");
+           // {Prim,PrimByte,PrimMutable,PrimMutableByte}Array ?
            break;
         }
         case PREPREL : 
@@ -565,7 +599,8 @@ Int what; {
                                         pair(STAR,pair(STAR,STAR)),
                                         2,DATATYPE,NIL);
 
-               pFun(nameInd, "_indirect");
+               /* desugaring                            */
+               pFun(nameInd,            "_indirect");
                name(nameInd).number = DFUNNAME;
 
            } else {
@@ -671,5 +706,5 @@ Int what; {
 }
 #undef pFun
 
-
+#include "fooble.c"
 /*-------------------------------------------------------------------------*/

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.22 $
- * $Date: 2000/01/12 14:52:54 $
+ * $Revision: 1.23 $
+ * $Date: 2000/02/03 13:55:22 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2807,6 +2807,7 @@ Int what; {
                nameUnit     = findQualNameWithoutConsultingExportList
                                  (mkQVar(findText("PrelBase"),
                                          findText("()")));
+               typeVarToVar = fn(aVar,aVar);
            }
            break;
 
