@@ -22,8 +22,7 @@ module PrimPacked
         eqCharStrPrefixBA,  -- :: Addr# -> ByteArray# -> Int# -> Int# -> Bool
         eqStrPrefixFO,      -- :: ForeignObj# -> ByteArray# -> Int# -> Int# -> Bool
 
-        addrOffset#,        -- :: Addr# -> Int# -> Addr# 
-        indexCharOffFO#     -- :: ForeignObj# -> Int# -> Char#
+        addrOffset#         -- :: Addr# -> Int# -> Addr# 
        ) where
 
 -- This #define suppresses the "import FastString" that
@@ -122,13 +121,9 @@ copySubStrFO (ForeignObj fo) (I# start#) len@(I# length#) =
       = write_ps_array arr_in# idx (chr# 0#) `seqStrictlyST`
 	returnStrictlyST ()
       | otherwise
-      = case (indexCharOffFO# fo (idx +# start#)) of { ch ->
+      = case (indexCharOffForeignObj# fo (idx +# start#)) of { ch ->
 	write_ps_array arr_in# idx ch `seqStrictlyST`
 	fill_in arr_in# (idx +# 1#) }
-
-{- ToDo: add FO primitives.. -}
-indexCharOffFO# :: ForeignObj# -> Int# -> Char#
-indexCharOffFO# fo i = indexCharOffForeignObj# fo i
 
 -- step on (char *) pointer by x units.
 addrOffset# :: Addr# -> Int# -> Addr# 
