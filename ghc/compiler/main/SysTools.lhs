@@ -245,7 +245,6 @@ initSysTools minusB_args
 	-- our knowledge of $(PERL) on the host system here.
 	; let split_path  = split_script
 	      mangle_path = mangle_script
-
 #endif
 
 	-- For all systems, copy and remove are provided by the host
@@ -405,13 +404,15 @@ touch purpose arg =  do p <- readIORef v_Pgm_T
 			runSomething purpose p [arg]
 
 copy :: String -> String -> String -> IO ()
-copy purpose from to =
-    do
-      h <- openFile to WriteMode
-      ls <- readFile from -- inefficient, but it'll do for now.
-	    		      -- ToDo: speed up via slurping.
-      hPutStr h ls
-      hClose h
+copy purpose from to = do
+  verb <- dynFlag verbosity
+  when (verb >= 2) $ hPutStrLn stderr ("*** " ++ purpose)
+
+  h <- openFile to WriteMode
+  ls <- readFile from -- inefficient, but it'll do for now.
+	    	      -- ToDo: speed up via slurping.
+  hPutStr h ls
+  hClose h
 \end{code}
 
 \begin{code}
