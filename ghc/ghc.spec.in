@@ -25,6 +25,7 @@ Source: http://haskell.org/ghc/dist/%{version}/ghc-%{version}-src.tar.gz
 URL: http://haskell.org/ghc/
 BuildRoot: /var/tmp/ghc-%{version}-%{release}-root
 Packager: Manuel M. T. Chakravarty <chak@is.tsukuba.ac.jp>
+Requires: gmp-devel
 Provides: haskell
 
 %description
