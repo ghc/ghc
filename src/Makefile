@@ -3,13 +3,20 @@ include $(TOP)/mk/boilerplate.mk
 
 INSTALLING=1
 
-ghc_ge_504 = $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
+ghc_ge_504 := $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
+ghc_ge_603 := $(shell if (test $(GhcCanonVersion) -ge 603); then echo YES; else echo NO; fi)
 
-# Don't use any hslibs packages in GHC >= 5.04
+SRC_HC_OPTS += -fglasgow-exts -cpp
+
+# Use hierarchical libraries for GHC >= 5.04
 ifeq "$(ghc_ge_504)" "YES"
-SRC_HC_OPTS += -package network -fglasgow-exts -cpp
+SRC_HC_OPTS += -package network
+# Monad transformers live in their own package for GHC >= 6.3
+ifeq "$(ghc_ge_603)" "YES"
+SRC_HC_OPTS += -package mtl
+endif
 else
-SRC_HC_OPTS += -package data -package text -package util -package net -fglasgow-exts -cpp
+SRC_HC_OPTS += -package data -package text -package util -package net
 endif
 
 HS_PROG = haddock.bin
