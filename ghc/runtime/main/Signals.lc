@@ -38,7 +38,6 @@ much pain.
 #if defined(linux_TARGET_OS) 
 # define NON_POSIX_SOURCE
 /* sigh, linux w/ glibc needs _BSD_SOURCE to get caddr_t... (ToDo) */
-# define _BSD_SOURCE
 #endif
 
 #if defined(osf3_TARGET_OS) || defined(osf1_TARGET_OS)
@@ -146,15 +145,15 @@ segv_handler(int sig,
     extern void StackOverflow(STG_NO_ARGS) STG_NORETURN;
 
 #  if defined(linux_TARGET_OS)  || defined(linuxaout_TARGET_OS)
-    caddr_t addr = scp.cr2;
+    unsigned long addr = scp.cr2;
     /* Magic info from Tommy Thorn! */
 #  endif
 #  if defined(aix_TARGET_OS)
     caddr_t addr = scp->sc_jmpbuf.jmp_context.o_vaddr;
     /* Magic guess by andre */
 #  endif
-    if (addr >= (caddr_t) stks_space
-      && addr < (caddr_t) (stks_space + RTSflags.GcFlags.stksSize))
+    if ( (char *)addr >= (char *)stks_space
+      && (char *)addr <  (char *)(stks_space + RTSflags.GcFlags.stksSize))
 	StackOverflow();
 
     fflush(stdout);
