@@ -34,7 +34,7 @@ import Const	        ( Con(..), Literal(..), isLitLitLit, conStrictness, isWHNFC
 import VarEnv
 import PrimOp		( PrimOp(..), primOpUsg, primOpSig )
 import Type		( isUnLiftedType, isUnboxedTupleType, Type, splitFunTy_maybe,
-                          UsageAnn(..), tyUsg, applyTy, mkUsgTy )
+                          UsageAnn(..), tyUsg, applyTy, mkUsgTy, repType )
 import TysPrim		( intPrimTy )
 import UniqSupply	-- all of it, really
 import Util		( lengthExceeds )
@@ -813,10 +813,10 @@ mkStgBind (NonRecF bndr rhs dem floats) body
 
 mk_stg_let bndr rhs dem floats body
 #endif
-  | isUnLiftedType bndr_ty			-- Use a case/PrimAlts
-  = ASSERT( not (isUnboxedTupleType bndr_ty) )
+  | isUnLiftedType bndr_rep_ty			-- Use a case/PrimAlts
+  = ASSERT( not (isUnboxedTupleType bndr_rep_ty) )
     mkStgBinds floats $
-    mkStgCase rhs bndr (StgPrimAlts bndr_ty [] (StgBindDefault body))
+    mkStgCase rhs bndr (StgPrimAlts bndr_rep_ty [] (StgBindDefault body))
 
   | is_whnf
   = if is_strict then
@@ -836,19 +836,19 @@ mk_stg_let bndr rhs dem floats body
   = if is_strict then
 	-- Strict let with non-WHNF rhs
 	mkStgBinds floats $
-	mkStgCase rhs bndr (StgAlgAlts bndr_ty [] (StgBindDefault body))
+	mkStgCase rhs bndr (StgAlgAlts bndr_rep_ty [] (StgBindDefault body))
     else
 	-- Lazy let with non-WHNF rhs, so keep the floats in the RHS
 	mkStgBinds floats rhs		`thenUs` \ new_rhs ->
 	returnUs (StgLet (StgNonRec bndr (exprToRhs dem NotTopLevel new_rhs)) body)
 	
   where
-    bndr_ty   = idType bndr
-    is_strict = isStrictDem dem
-    is_whnf   = case rhs of
-		  StgCon _ _ _ -> True
-		  StgLam _ _ _ -> True
-		  other	       -> False
+    bndr_rep_ty = repType (idType bndr)
+    is_strict   = isStrictDem dem
+    is_whnf     = case rhs of
+		    StgCon _ _ _ -> True
+		    StgLam _ _ _ -> True
+		    other	 -> False
 
 -- Split at the first strict binding
 splitFloats fs@(NonRecF _ _ dem _ : _) 

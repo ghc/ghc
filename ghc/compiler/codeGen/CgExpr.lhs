@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.28 1999/06/24 13:04:18 simonmar Exp $
+% $Id: CgExpr.lhs,v 1.29 1999/06/28 16:29:45 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -48,7 +48,7 @@ import PrimOp		( primOpOutOfLine,
 import PrimRep		( getPrimRepSize, PrimRep(..), isFollowableRep )
 import TyCon		( maybeTyConSingleCon,
 			  isUnboxedTupleTyCon, isEnumerationTyCon )
-import Type		( Type, typePrimRep, splitTyConApp_maybe, splitRepTyConApp_maybe )
+import Type		( Type, typePrimRep, splitTyConApp_maybe, repType )
 import Maybes		( assocMaybe, maybeToBool )
 import Unique		( mkBuiltinUnique )
 import BasicTypes	( TopLevelFlag(..), RecFlag(..) )
@@ -462,7 +462,7 @@ primRetUnboxedTuple op args res_ty
       allocate some temporaries for the return values.
     -}
     let
-      (tc,ty_args)      = case splitRepTyConApp_maybe res_ty of
+      (tc,ty_args)      = case splitTyConApp_maybe (repType res_ty) of
 			    Nothing -> pprPanic "primRetUnboxedTuple" (ppr res_ty)
 			    Just pr -> pr
       prim_reps          = map typePrimRep ty_args

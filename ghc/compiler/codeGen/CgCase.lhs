@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.33 1999/06/24 13:04:16 simonmar Exp $
+% $Id: CgCase.lhs,v 1.34 1999/06/28 16:29:45 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -62,7 +62,7 @@ import TyCon		( TyCon, isEnumerationTyCon, isUnboxedTupleTyCon,
 			  isNewTyCon, isAlgTyCon, isFunTyCon, isPrimTyCon,
 			  tyConDataCons, tyConFamilySize )
 import Type		( Type, typePrimRep, splitAlgTyConApp, 
-			  splitTyConApp_maybe, splitRepTyConApp_maybe )
+			  splitTyConApp_maybe, repType )
 import Unique           ( Unique, Uniquable(..), mkBuiltinUnique )
 import Maybes		( maybeToBool )
 import Util
@@ -981,7 +981,7 @@ possibleHeapCheck NoGC	_ _ tags lbl code
 \begin{code}
 getScrutineeTyCon :: Type -> Maybe TyCon
 getScrutineeTyCon ty =
-   case splitRepTyConApp_maybe ty of
+   case splitTyConApp_maybe (repType ty) of
 	Nothing -> Nothing
 	Just (tc,_) -> 
 		if isFunTyCon tc  then Nothing else     -- not interested in funs

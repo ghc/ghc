@@ -29,10 +29,10 @@ module Type (
 	zipFunTys,
 
 	mkTyConApp, mkTyConTy, splitTyConApp_maybe,
-	splitAlgTyConApp_maybe, splitAlgTyConApp, splitRepTyConApp_maybe,
+	splitAlgTyConApp_maybe, splitAlgTyConApp, 
 	mkDictTy, splitDictTy_maybe, isDictTy,
 
-	mkSynTy, isSynTy, deNoteType,
+	mkSynTy, isSynTy, deNoteType, repType,
 
         mkUsgTy, isUsgTy{- dont use -}, isNotUsgTy, splitUsgTy, unUsgTy, tyUsg,
 
@@ -529,27 +529,6 @@ isDictTy (NoteTy _ ty)	= isDictTy ty
 isDictTy other		= False
 \end{code}
 
-splitRepTyConApp_maybe is like splitTyConApp_maybe except
-that it looks through 
-	(a) for-alls, and
-	(b) newtypes
-in addition to synonyms.  It's useful in the back end where we're not
-interested in newtypes anymore.
-
-\begin{code}
-splitRepTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
-splitRepTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
-splitRepTyConApp_maybe (NoteTy _ ty)     = splitRepTyConApp_maybe ty
-splitRepTyConApp_maybe (ForAllTy _ ty)   = splitRepTyConApp_maybe ty
-splitRepTyConApp_maybe (TyConApp tc tys) 
-	| isNewTyCon tc	
-	= case splitFunTy_maybe (applyTys (dataConType (head (tyConDataCons tc))) tys) of
-		Just (rep_ty, _) -> splitRepTyConApp_maybe rep_ty
-	| otherwise
-	= Just (tc,tys)
-splitRepTyConApp_maybe other	         = Nothing
-\end{code}
-
 ---------------------------------------------------------------------
 				SynTy
 				~~~~~
@@ -590,6 +569,23 @@ not			           ([a], a -> a)
 The reason is that we then get better (shorter) type signatures in 
 interfaces.  Notably this plays a role in tcTySigs in TcBinds.lhs.
 
+
+
+repType looks through 
+	(a) for-alls, and
+	(b) newtypes
+in addition to synonyms.  It's useful in the back end where we're not
+interested in newtypes anymore.
+
+\begin{code}
+repType :: Type -> Type
+repType (NoteTy _ ty)     = repType ty
+repType (ForAllTy _ ty)   = repType ty
+repType (TyConApp tc tys) | isNewTyCon tc	
+			  = case splitFunTy_maybe (applyTys (dataConType (head (tyConDataCons tc))) tys) of
+				Just (rep_ty, _) -> repType rep_ty
+repType other_ty	  = other_ty
+\end{code}
 
 
 
