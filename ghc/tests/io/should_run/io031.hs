@@ -2,11 +2,13 @@
 module Main(main) where
 
 import IO
-import Directory ( removeFile )
+import Directory ( removeFile, doesFileExist )
+import Monad
 
-main = do 
+main = do
+  f <- doesFileExist "io031.inout" 
+  when f (removeFile "io031.inout")
   hdl <- openFile "io031.inout" ReadWriteMode
-  removeFile "io031.inout"
   hSetBuffering hdl LineBuffering
   hPutStr hdl "as"
   hSeek hdl AbsoluteSeek 0

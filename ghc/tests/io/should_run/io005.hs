@@ -1,3 +1,5 @@
+-- Not run on mingw, because of /dev/null use
+
 import System (system, ExitCode(..), exitWith)
 
 main = 

@@ -1,11 +1,19 @@
 TOP = ../..
+
 include $(TOP)/mk/boilerplate.mk
+
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+OMITTED_RUNTESTS = io005.run io033.run
+endif
+
 include $(TOP)/mk/should_run.mk
 
 HC_OPTS += -dcore-lint
 io022_HC_OPTS += -fglasgow-exts
 io010_HC_OPTS += -fglasgow-exts
 io011_HC_OPTS += -fglasgow-exts
+io018_HC_OPTS += -fglasgow-exts
+io030_HC_OPTS += -fglasgow-exts
 io032_HC_OPTS += -fglasgow-exts
 
 io004_RUNTEST_OPTS += -x 42

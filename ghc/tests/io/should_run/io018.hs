@@ -1,17 +1,20 @@
 -- !!! Testing RW handles 
 module Main(main) where
 
-
 import IO
-import Directory (removeFile)
+import IOExts
+import Directory (removeFile, doesFileExist)
+import Monad
 
 -- This test is weird, full marks to whoever dreamt it up!
 
 main :: IO ()
 main = do
    let username = "io018.inout"
+   f <- doesFileExist username
+   when f (removeFile username)
    cd <- openFile username ReadWriteMode
-   removeFile username
+   hSetBinaryMode cd True
    hSetBuffering stdin NoBuffering
    hSetBuffering stdout NoBuffering
    hSetBuffering cd NoBuffering
@@ -28,14 +31,9 @@ main = do
 speakString = "Someone wants to speak with you\n"
 
 speak cd = do
-     (do
-        ready <- hReady cd
-        if ready then 
-	   hGetChar cd >>= putChar
-	 else
-	   return ()
-        ready <- hReady stdin
-        if ready then (do { ch <- getChar; hPutChar cd ch})
-         else return ())
+     ready <- hReady cd
+     if ready then hGetChar cd >>= putChar else return ()
+     ready <- hReady stdin
+     if ready then (do { ch <- getChar; hPutChar cd ch}) else return ()
      speak cd
 

@@ -1,10 +1,11 @@
-import IO -- 1.3
+-- !!! Test getCPUTime
+
+import IO
 
 import CPUTime
 
 main = do
-    h <- openFile "/dev/null" WriteMode
-    hPrint h (nfib 30)
+    print (nfib 30)
     t <- getCPUTime
     print (length (show t)) -- printing the CPU time itself is un-cool if you want to diff the output..
 

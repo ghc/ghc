@@ -1,4 +1,4 @@
-import IO -- 1.3
+import IO
 
 main =
     openFile "io007.hs" ReadMode >>= \ hIn ->

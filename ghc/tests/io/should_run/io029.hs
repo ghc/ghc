@@ -2,7 +2,8 @@
 module Main(main) where
 
 import IO
-import Directory ( removeFile )
+import Directory ( removeFile, doesFileExist )
+import Monad
 
 main = do
   hFlush stdin `catch` \ _ -> putStrLn "No can do - flushing read-only handles isn't legal"
@@ -13,15 +14,18 @@ main = do
   hdl <- openFile "io029.hs" ReadMode
   hFlush hdl `catch` \ _ -> putStrLn "No can do - flushing read-only handles isn't legal"
   hClose hdl
+  remove
   hdl <- openFile "io029.out" WriteMode
-  removeFile "io029.out"
   hFlush hdl
   hClose hdl
+  remove
   hdl <- openFile "io029.out" AppendMode
-  removeFile "io029.out"
   hFlush hdl
   hClose hdl
+  remove
   hdl <- openFile "io029.out" ReadWriteMode
-  removeFile "io029.out"
   hFlush hdl
   hClose hdl
+ where remove = do
+         f <- doesFileExist "io029.out"
+         when f (removeFile "io029.out")

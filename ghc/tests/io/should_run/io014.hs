@@ -1,4 +1,4 @@
-import IO -- 1.3
+import IO
 
 main = 
     sequence (map hIsOpen [stdin, stdout, stderr]) >>= \ opens ->
@@ -16,7 +16,6 @@ main =
     sequence (map hIsNotBuffered [stdin, stdout, stderr]) >>= \ buffereds ->
     print buffereds
   where
-    -- these didn't make it into 1.3
     hIsBlockBuffered h = hGetBuffering h >>= \ b -> return $ case b of { BlockBuffering _ -> True; _ -> False }
     hIsLineBuffered  h = hGetBuffering h >>= \ b -> return $ case b of { LineBuffering -> True; _ -> False }
     hIsNotBuffered   h = hGetBuffering h >>= \ b -> return $ case b of { NoBuffering -> True; _ -> False }
