@@ -58,19 +58,19 @@ indices		      :: (Ix a) => Array a b -> [a]
 \begin{code}
 type IPr = (Int, Int)
 
-data Ix ix => Array ix elt		= Array     	   ix ix (Array# elt)
-data Ix ix => MutableArray     s ix elt = MutableArray     ix ix (MutableArray# s elt)
+data Ix ix => Array     ix elt = Array   ix ix (Array# elt)
+data Ix ix => STArray s ix elt = STArray ix ix (MutableArray# s elt)
 
 
-data MutableVar s a = MutableVar (MutVar# s a)
+data STRef s a = STRef (MutVar# s a)
 
-instance Eq (MutableVar s a) where
-	MutableVar v1# == MutableVar v2#
+instance Eq (STRef s a) where
+	STRef v1# == STRef v2#
 		= sameMutVar# v1# v2#
 
 -- just pointer equality on arrays:
-instance Eq (MutableArray s ix elt) where
-	MutableArray _ _ arr1# == MutableArray _ _ arr2# 
+instance Eq (STArray s ix elt) where
+	STArray _ _ arr1# == STArray _ _ arr2# 
 		= sameMutableArray# arr1# arr2#
 \end{code}
 
@@ -81,17 +81,17 @@ instance Eq (MutableArray s ix elt) where
 %*********************************************************
 
 \begin{code}
-newVar   :: a -> ST s (MutableVar s a)
-readVar  :: MutableVar s a -> ST s a
-writeVar :: MutableVar s a -> a -> ST s ()
+newSTRef   :: a -> ST s (STRef s a)
+readSTRef  :: STRef s a -> ST s a
+writeSTRef :: STRef s a -> a -> ST s ()
 
-newVar init = ST $ \ s# ->
+newSTRef init = ST $ \ s# ->
     case (newMutVar# init s#)     of { (# s2#, var# #) ->
-    (# s2#, MutableVar var# #) }
+    (# s2#, STRef var# #) }
 
-readVar (MutableVar var#) = ST $ \ s# -> readMutVar# var# s#
+readSTRef (STRef var#) = ST $ \ s# -> readMutVar# var# s#
 
-writeVar (MutableVar var#) val = ST $ \ s# ->
+writeSTRef (STRef var#) val = ST $ \ s# ->
     case writeMutVar# var# val s# of { s2# ->
     (# s2#, () #) }
 \end{code}
@@ -159,20 +159,20 @@ arrEleBottom = error "(Array.!): undefined array element"
 old_array // ivs
   = runST (do
 	-- copy the old array:
-	arr <- thawArray old_array
+	arr <- thawSTArray old_array
 	-- now write the new elements into the new array:
 	fill_it_in arr ivs
-	freezeArray arr
+	freezeSTArray arr
     )
 
-fill_it_in :: Ix ix => MutableArray s ix elt -> [(ix, elt)] -> ST s ()
+fill_it_in :: Ix ix => STArray s ix elt -> [(ix, elt)] -> ST s ()
 {-# INLINE fill_it_in #-}
 fill_it_in arr lst = foldr (fill_one_in arr) (return ()) lst
 	 -- **** STRICT **** (but that's OK...)
 
-fill_one_in arr (i, v) rst = writeArray arr i v >> rst
+fill_one_in arr (i, v) rst = writeSTArray arr i v >> rst
 
-zap_with_f :: Ix ix => (elt -> elt2 -> elt) -> MutableArray s ix elt -> [(ix,elt2)] -> ST s ()
+zap_with_f :: Ix ix => (elt -> elt2 -> elt) -> STArray s ix elt -> [(ix,elt2)] -> ST s ()
 -- zap_with_f: reads an elem out first, then uses "f" on that and the new value
 {-# INLINE zap_with_f #-}
 
@@ -180,26 +180,26 @@ zap_with_f f arr lst
   = foldr (zap_one f arr) (return ()) lst
 
 zap_one f arr (i, new_v) rst = do
-        old_v <- readArray arr i
-	writeArray arr i (f old_v new_v)
+        old_v <- readSTArray arr i
+	writeSTArray arr i (f old_v new_v)
 	rst
 
 {-# INLINE accum #-}
 accum f old_array ivs
   = runST (do
 	-- copy the old array:
-	arr <- thawArray old_array
+	arr <- thawSTArray old_array
 	-- now zap the elements in question with "f":
 	zap_with_f f arr ivs
-	freezeArray arr
+	freezeSTArray arr
     )
 
 {-# INLINE accumArray #-}
 accumArray f zero ixs ivs
   = runST (do
-	arr <- newArray ixs zero
+	arr <- newSTArray ixs zero
 	zap_with_f f arr ivs
-	freezeArray arr
+	freezeSTArray arr
     )
 \end{code}
 
@@ -247,7 +247,7 @@ instance  (Ix a, Read a, Read b) => Read (Array a b)  where
 %*********************************************************
 
 Idle ADR question: What's the tradeoff here between flattening these
-datatypes into @MutableArray ix ix (MutableArray# s elt)@ and using
+datatypes into @STArray ix ix (MutableArray# s elt)@ and using
 it as is?  As I see it, the former uses slightly less heap and
 provides faster access to the individual parts of the bounds while the
 code used has the benefit of providing a ready-made @(lo, hi)@ pair as
@@ -260,38 +260,38 @@ it frequently. Now we've got the overloading specialiser things
 might be different, though.
 
 \begin{code}
-newArray :: Ix ix => (ix,ix) -> elt -> ST s (MutableArray s ix elt)
+newSTArray :: Ix ix => (ix,ix) -> elt -> ST s (STArray s ix elt)
 
-{-# SPECIALIZE newArray      :: IPr       -> elt -> ST s (MutableArray s Int elt),
-				(IPr,IPr) -> elt -> ST s (MutableArray s IPr elt)
+{-# SPECIALIZE newSTArray :: IPr       -> elt -> ST s (STArray s Int elt),
+			     (IPr,IPr) -> elt -> ST s (STArray s IPr elt)
   #-}
-newArray (l,u) init = ST $ \ s# ->
+newSTArray (l,u) init = ST $ \ s# ->
     case rangeSize (l,u)          of { I# n# ->
     case (newArray# n# init s#)   of { (# s2#, arr# #) ->
-    (# s2#, MutableArray l u arr# #) }}
+    (# s2#, STArray l u arr# #) }}
 
 
 
-boundsOfArray     :: Ix ix => MutableArray s ix elt -> (ix, ix)  
-{-# SPECIALIZE boundsOfArray     :: MutableArray s Int elt -> IPr #-}
-boundsOfArray     (MutableArray     l u _) = (l,u)
+boundsSTArray     :: Ix ix => STArray s ix elt -> (ix, ix)  
+{-# SPECIALIZE boundsSTArray :: STArray s Int elt -> IPr #-}
+boundsSTArray     (STArray     l u _) = (l,u)
 
-readArray   	:: Ix ix => MutableArray s ix elt -> ix -> ST s elt 
-{-# SPECIALIZE readArray       :: MutableArray s Int elt -> Int -> ST s elt,
-				  MutableArray s IPr elt -> IPr -> ST s elt
+readSTArray   	:: Ix ix => STArray s ix elt -> ix -> ST s elt 
+{-# SPECIALIZE readSTArray :: STArray s Int elt -> Int -> ST s elt,
+			      STArray s IPr elt -> IPr -> ST s elt
   #-}
 
-readArray (MutableArray l u arr#) n = ST $ \ s# ->
+readSTArray (STArray l u arr#) n = ST $ \ s# ->
     case (index (l,u) n)		of { I# n# ->
     case readArray# arr# n# s#		of { (# s2#, r #) ->
     (# s2#, r #) }}
 
-writeArray  	 :: Ix ix => MutableArray s ix elt -> ix -> elt -> ST s () 
-{-# SPECIALIZE writeArray  	:: MutableArray s Int elt -> Int -> elt -> ST s (),
-				   MutableArray s IPr elt -> IPr -> elt -> ST s ()
+writeSTArray  	 :: Ix ix => STArray s ix elt -> ix -> elt -> ST s () 
+{-# SPECIALIZE writeSTArray :: STArray s Int elt -> Int -> elt -> ST s (),
+			       STArray s IPr elt -> IPr -> elt -> ST s ()
   #-}
 
-writeArray (MutableArray l u arr#) n ele = ST $ \ s# ->
+writeSTArray (STArray l u arr#) n ele = ST $ \ s# ->
     case index (l,u) n		    	    of { I# n# ->
     case writeArray# arr# n# ele s# 	    of { s2# ->
     (# s2#, () #) }}
@@ -305,12 +305,12 @@ writeArray (MutableArray l u arr#) n ele = ST $ \ s# ->
 %*********************************************************
 
 \begin{code}
-freezeArray	  :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)
-{-# SPECIALISE freezeArray :: MutableArray s Int elt -> ST s (Array Int elt),
-			      MutableArray s IPr elt -> ST s (Array IPr elt)
+freezeSTArray	  :: Ix ix => STArray s ix elt -> ST s (Array ix elt)
+{-# SPECIALISE freezeSTArray :: STArray s Int elt -> ST s (Array Int elt),
+			      STArray s IPr elt -> ST s (Array IPr elt)
   #-}
 
-freezeArray (MutableArray l u arr#) = ST $ \ s# ->
+freezeSTArray (STArray l u arr#) = ST $ \ s# ->
     case rangeSize (l,u)     of { I# n# ->
     case freeze arr# n# s# of { (# s2#, frozen# #) ->
     (# s2#, Array l u frozen# #) }}
@@ -342,23 +342,23 @@ freezeArray (MutableArray l u arr#) = ST $ \ s# ->
 	      copy (cur# +# 1#) end# from# to# s2#
 	      }}
 
-unsafeFreezeArray     :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)  
-unsafeFreezeArray (MutableArray l u arr#) = ST $ \ s# ->
+unsafeFreezeSTArray     :: Ix ix => STArray s ix elt -> ST s (Array ix elt)  
+unsafeFreezeSTArray (STArray l u arr#) = ST $ \ s# ->
     case unsafeFreezeArray# arr# s# of { (# s2#, frozen# #) ->
     (# s2#, Array l u frozen# #) }
 
 --This takes a immutable array, and copies it into a mutable array, in a
 --hurry.
 
-thawArray :: Ix ix => Array ix elt -> ST s (MutableArray s ix elt)
-{-# SPECIALISE thawArray :: Array Int elt -> ST s (MutableArray s Int elt),
-			    Array IPr elt -> ST s (MutableArray s IPr elt)
+thawSTArray :: Ix ix => Array ix elt -> ST s (STArray s ix elt)
+{-# SPECIALISE thawSTArray :: Array Int elt -> ST s (STArray s Int elt),
+			      Array IPr elt -> ST s (STArray s IPr elt)
   #-}
 
-thawArray (Array l u arr#) = ST $ \ s# ->
+thawSTArray (Array l u arr#) = ST $ \ s# ->
     case rangeSize (l,u) of { I# n# ->
     case thaw arr# n# s# of { (# s2#, thawed# #) ->
-    (# s2#, MutableArray l u thawed# #)}}
+    (# s2#, STArray l u thawed# #)}}
   where
     thaw  :: Array# ele			-- the thing
 	    -> Int#			-- size of thing to be thawed
@@ -369,7 +369,7 @@ thawArray (Array l u arr#) = ST $ \ s# ->
       = case newArray# n# init s#	      of { (# s2#, newarr1# #) ->
 	copy 0# n# arr1# newarr1# s2# }
       where
-	init = error "thawArray: element not copied"
+	init = error "thawSTArray: element not copied"
 
 	copy :: Int# -> Int#
 	     -> Array# ele 
@@ -389,8 +389,8 @@ thawArray (Array l u arr#) = ST $ \ s# ->
 -- this is a quicker version of the above, just flipping the type
 -- (& representation) of an immutable array. And placing a
 -- proof obligation on the programmer.
-unsafeThawArray :: Ix ix => Array ix elt -> ST s (MutableArray s ix elt)
-unsafeThawArray (Array l u arr#) = ST $ \ s# ->
+unsafeThawSTArray :: Ix ix => Array ix elt -> ST s (STArray s ix elt)
+unsafeThawSTArray (Array l u arr#) = ST $ \ s# ->
    case unsafeThawArray# arr# s# of
-      (# s2#, marr# #) -> (# s2#, MutableArray l u marr# #)
+      (# s2#, marr# #) -> (# s2#, STArray l u marr# #)
 \end{code}

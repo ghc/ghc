@@ -34,7 +34,7 @@ import PrelNum		( fromInt )
 import PrelShow		( showSignedInt, showSpace )
 import PrelRead		( readDec )
 import PrelIOBase	( unsafePerformIO, stToIO )
-import PrelArr		( MutableVar, newVar, readVar, writeVar )
+import PrelArr		( STRef, newSTRef, readSTRef, writeSTRef )
 import PrelReal		( toInt )
 import PrelFloat	( float2Double, double2Float )
 import Time		( getClockTime, ClockTime(..) )
@@ -284,16 +284,16 @@ theStdGen  = unsafePerformIO (newIORef (createStdGen 0))
 
 #else
 
-global_rng :: MutableVar RealWorld StdGen
+global_rng :: STRef RealWorld StdGen
 global_rng = unsafePerformIO $ do
    rng <- mkStdRNG 0
-   stToIO (newVar rng)
+   stToIO (newSTRef rng)
 
 setStdGen :: StdGen -> IO ()
-setStdGen sgen = stToIO (writeVar global_rng sgen)
+setStdGen sgen = stToIO (writeSTRef global_rng sgen)
 
 getStdGen :: IO StdGen
-getStdGen = stToIO (readVar global_rng)
+getStdGen = stToIO (readSTRef global_rng)
 
 #endif
 

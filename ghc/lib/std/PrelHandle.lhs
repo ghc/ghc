@@ -16,7 +16,6 @@ module PrelHandle where
 
 import PrelBase
 import PrelAddr		( Addr, nullAddr )
-import PrelArr		( newVar, readVar, writeVar )
 import PrelByteArr	( ByteArray(..), MutableByteArray(..) )
 import PrelRead		( Read )
 import PrelList 	( span )
@@ -34,9 +33,7 @@ import PrelWeak		( addForeignFinalizer )
 #endif
 import Ix
 
-#ifdef __CONCURRENT_HASKELL__
 import PrelConc
-#endif
 
 #ifndef __PARALLEL_HASKELL__
 import PrelForeign  ( makeForeignObj )
@@ -69,17 +66,9 @@ The @Handle@ and @Handle__@ types are defined in @IOBase@.
 {-# INLINE withHandle #-}
 newHandle     :: Handle__ -> IO Handle
 
-#if defined(__CONCURRENT_HASKELL__)
-
 -- Use MVars for concurrent Haskell
 newHandle hc  = newMVar	hc 	>>= \ h ->
 	        return (Handle h)
-#else 
-
--- Use ordinary MutableVars for non-concurrent Haskell
-newHandle hc  = stToIO (newVar	hc 	>>= \ h ->
-		        return (Handle h))
-#endif
 \end{code}
 
 %*********************************************************
@@ -109,7 +98,6 @@ orignal handle is always replaced [ this is the case at the moment,
 but we might want to revisit this in the future --SDM ].
 
 \begin{code}
-#ifdef __CONCURRENT_HASKELL__
 withHandle :: Handle -> (Handle__ -> IO (Handle__,a)) -> IO a
 withHandle (Handle h) act = do
    h_ <- takeMVar h
@@ -130,17 +118,6 @@ withHandle__ (Handle h) act = do
    h'  <- catchException (act h_) (\ ex -> putMVar h h_ >> throw ex)
    putMVar h h'
    return ()
-
-#else
-   -- of questionable value to install this exception
-   -- handler, but let's do it in the non-concurrent
-   -- case too, for now.
-withHandle (Handle h) act = do
-   h_ <- stToIO (readVar h)
-   v  <- catchException (act h_) (\ ex -> stToIO (writeVar h h_) >> throw ex)
-   return v
-
-#endif
 \end{code}
 
 nullFile__ is only used for closed handles, plugging it in as a null
