@@ -167,11 +167,22 @@ rnHsTypes doc tys = mappM (rnHsType doc) tys
 
 
 \begin{code}
+rnForAll doc exp [] [] ty = rnHsType doc ty
+	-- One reason for this case is that a type like Int#
+	-- starts of as (HsForAllTy Nothing [] Int), in case
+	-- there is some quantification.  Now that we have quantified
+	-- and discovered there are no type variables, it's nicer to turn
+	-- it into plain Int.  If it were Int# instead of Int, we'd actually
+	-- get an error, because the body of a genuine for-all is
+	-- of kind *.
+
 rnForAll doc exp forall_tyvars ctxt ty
   = bindTyVarsRn doc forall_tyvars	$ \ new_tyvars ->
     rnContext doc ctxt			`thenM` \ new_ctxt ->
     rnHsType doc ty			`thenM` \ new_ty ->
     returnM (HsForAllTy exp new_tyvars new_ctxt new_ty)
+	-- Retain the same implicit/explicit flag as before
+	-- so that we can later print it correctly
 \end{code}
 
 

@@ -8,7 +8,8 @@ module HsTypes (
 	  HsType(..), HsTyVarBndr(..), HsExplicitForAll(..),
 	, HsContext, HsPred(..)
 
-	, mkExplicitHsForAllTy, mkImplicitHsForAllTy, mkHsDictTy, mkHsIParamTy
+	, mkExplicitHsForAllTy, mkImplicitHsForAllTy, 
+	, mkHsDictTy, mkHsIParamTy
 	, hsTyVarName, hsTyVarNames, replaceTyVarName
 	, splitHsInstDeclTy
 	

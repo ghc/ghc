@@ -218,6 +218,7 @@ kcTypeType ty
 	return ty'
     else
     newOpenTypeKind				`thenM` \ type_kind ->
+    traceTc (text "kcTypeType" $$ nest 2 (ppr ty $$ ppr ty' $$ ppr kind $$ ppr type_kind)) `thenM_`
     checkExpectedKind (ppr ty) kind type_kind	`thenM_`
     returnM ty'
 
