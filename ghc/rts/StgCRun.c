@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.29 2002/02/08 14:04:29 sewardj Exp $
+ * $Id: StgCRun.c,v 1.30 2002/02/28 18:45:51 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -80,12 +80,12 @@ register double fake_f9 __asm__("$f9");
    any architecture (using miniinterpreter)
    -------------------------------------------------------------------------- */
 
-extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg)
+extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg STG_UNUSED)
 {
    while (f) {
       IF_DEBUG(evaluator,
 	       fprintf(stderr,"Jumping to ");
-	       printPtr((P_)f);
+	       printPtr((P_)f); fflush(stdout);
 	       fprintf(stderr,"\n");
 	      );
       f = (StgFunPtr) (f)();
