@@ -117,7 +117,7 @@ Pretty Printer are not friends.
  
 \begin{code}
 
-data BoxedString = BS String
+newtype BoxedString = BS String
 
 type WarningPat = InPat BoxedString --Name --String 
 type ExhaustivePat = ([WarningPat], [(BoxedString, [HsLit])])

@@ -62,7 +62,7 @@ import PrimOp		( primOpNeedsWrapper, PrimOp(..) )
 import GlaExts		( trace )
 
 -- --------------------------------------------------------------------------
-data CostRes = Cost (Int, Int, Int, Int, Int)
+newtype CostRes = Cost (Int, Int, Int, Int, Int)
 	       deriving (Text)
 
 nullCosts    = Cost (0, 0, 0, 0, 0) :: CostRes

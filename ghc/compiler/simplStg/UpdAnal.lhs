@@ -1,4 +1,4 @@
-\section{Update Avoidance Analyser}			-*-haskell-literate-*-
+\section{Update Avoidance Analyser}
 
 (c) Simon Marlow, Andre Santos 1992-1993
 (c) The AQUA Project, Glasgow University, 1995-1996
@@ -100,7 +100,7 @@ lookup_IdEnv env key = case lookupIdEnv env key of
 type Closure = (IdEnvInt, Refs, AbFun)
 
 type AbVal = IdEnvClosure -> Closure
-data AbFun = Fun (Closure -> Closure)
+newtype AbFun = Fun (Closure -> Closure)
 
 -- partain: speeding-up stuff
 

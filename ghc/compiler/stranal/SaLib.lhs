@@ -88,7 +88,7 @@ implicitly bound to @AbsTop@, the completely uninformative,
 pessimistic value---see @absEval@ of a @Var@.
 
 \begin{code}
-data AbsValEnv = AbsValEnv (IdEnv AbsVal)
+newtype AbsValEnv = AbsValEnv (IdEnv AbsVal)
 
 type StrictEnv  = AbsValEnv	-- Environment for strictness analysis
 type AbsenceEnv = AbsValEnv	-- Environment for absence analysis
