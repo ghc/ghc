@@ -49,6 +49,8 @@ module Binary
   ) where
 
 #include "HsVersions.h"
+
+-- The *host* architecture version:
 #include "MachDeps.h"
 
 import {-# SOURCE #-} Module
