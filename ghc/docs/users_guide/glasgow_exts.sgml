@@ -2923,7 +2923,7 @@ use of <Function>assert</Function> in the user's source:
 
 <ProgramListing>
 kelvinToC :: Double -> Double
-kelvinToC k = assert (k &amp;gt;= 0.0) (k+273.15)
+kelvinToC k = assert (k &gt;= 0.0) (k+273.15)
 </ProgramListing>
 
 </Para>
