@@ -50,7 +50,7 @@ import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace,
 import Outputable
 import Maybes		( isJust, isNothing, catMaybes, mapCatMaybes, seqMaybe )
 import SrcLoc		( noSrcLoc, Located(..), mkGeneralSrcSpan,
-			  unLoc, noLoc )
+			  unLoc, noLoc, srcLocSpan )
 import BasicTypes	( DeprecTxt )
 import ListSetOps	( removeDups )
 import Util		( sortLt, notNull, isSingleton )
@@ -305,7 +305,7 @@ importsFromLocalDecls group
 	-- The complaint will come out as "Multiple declarations of Foo.f" because
 	-- since 'f' is in the env twice, the unQualInScope used by the error-msg
 	-- printer returns False.  It seems awkward to fix, unfortunately.
-    mappM_ (addErr . dupDeclErr) dups		`thenM_` 
+    mappM_ addDupDeclErr dups			`thenM_` 
 
     doptM Opt_NoImplicitPrelude 		`thenM` \ implicit_prelude ->
     let
@@ -1002,11 +1002,14 @@ exportClashErr global_env name1 name2 ie1 ie2
 	     (gre:_) -> gre
 	     []	     -> pprPanic "exportClashErr" (ppr name)
 
-dupDeclErr (n:ns)
-  = vcat [ptext SLIT("Multiple declarations of") <+> quotes (ppr n),
+addDupDeclErr :: [Name] -> TcRn ()
+addDupDeclErr (n:ns)
+  = addErrAt (srcLocSpan (nameSrcLoc n)) $
+    vcat [ptext SLIT("Multiple declarations of") <+> quotes (ppr n),
+	  nest 2 (ptext SLIT("other declarations at:")),
 	  nest 4 (vcat (map ppr sorted_locs))]
   where
-    sorted_locs = sortLt occ'ed_before (map nameSrcLoc (n:ns))
+    sorted_locs = sortLt occ'ed_before (map nameSrcLoc ns)
     occ'ed_before a b = LT == compare a b
 
 dupExportWarn occ_name ie1 ie2
