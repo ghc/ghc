@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.49 2000/06/08 20:57:02 panne Exp $
+dnl $Id: aclocal.m4,v 1.50 2000/06/15 20:22:53 panne Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -377,7 +377,7 @@ undefine([AC_CV_SIZEOF_NAME])dnl
 dnl ** Map an arithmetic C type to a Haskell type.
 dnl    Based on autconf's AC_CHECK_SIZEOF.
 
-dnl FPTOOLS_CHECK_HTYPE(TYPE)
+dnl FPTOOLS_CHECK_HTYPE(TYPE [, DEFAULT_VALUE, [, VALUE-FOR-CROSS-COMPILATION])
 AC_DEFUN(FPTOOLS_CHECK_HTYPE,
 [changequote(<<, >>)dnl
 dnl The name to #define.
@@ -412,7 +412,9 @@ main() {
   }
   fclose(f);
   exit(0);
-}], AC_CV_NAME=`cat conftestval`, AC_CV_NAME=NotReallyAType, AC_CV_NAME=NotReallyAType)])dnl
+}], AC_CV_NAME=`cat conftestval`,
+ifelse([$2], , AC_CV_NAME=NotReallyAType,      AC_CV_NAME=$2),
+ifelse([$3], , AC_CV_NAME=NotReallyATypeCross, AC_CV_NAME=$3))]) dnl
 AC_MSG_RESULT($AC_CV_NAME)
 AC_DEFINE_UNQUOTED(AC_TYPE_NAME, $AC_CV_NAME)
 undefine([AC_TYPE_NAME])dnl
