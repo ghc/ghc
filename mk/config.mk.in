@@ -147,7 +147,7 @@ IncludeTestDirsInBuild=NO
 #		       	     HC_ROJEMO_NHC
 #		       	     HC_UNSPECIFIED
 
-WithGhcHc = $(HC)
+WithGhcHc = @WithHc@
 
 # Variable which is set to the version number of the $(WithGhcHc) we're using.
 # Not currently used, but might come in handy sometime soon.
@@ -281,7 +281,7 @@ HaveLibReadline=@HaveLibReadline@
 ################################################################################
 
 # The compiler you'd like to use to compile Happy
-WithHappyHc = $(HC)
+WithHappyHc = @WithHc@
 
 # HappyHcOpts gives the flags to pass to the Haskell compiler used
 # 	      to compile the Happy sources with.
@@ -502,7 +502,7 @@ GHC		= @GHC@
 HBC		= @HBC@
 NHC		= @NHC@
 
-HC		= @WithHc@
+HC	        = @WithHc@
 MKDEPENDHS	= $(GHC)
 
 # Sometimes we want to invoke ghc from the build tree in different
