@@ -368,7 +368,7 @@ tidyIdInfo env info
     info3 = noUnfolding `setUnfoldingInfo` info2
 
     tidy_item (tyvars, tys, rhs)
-	= (tyvars', tidyTypes env' tys, tidyExpr env rhs)
+	= (tyvars', tidyTypes env' tys, tidyExpr env' rhs)
 	where
 	  (env', tyvars') = tidyTyVars env tyvars
 \end{code}
