@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.8 1999/02/11 14:22:55 simonm Exp $
+ * $Id: Weak.c,v 1.9 1999/02/26 12:43:58 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -19,14 +19,19 @@ StgWeak *weak_ptr_list;
  * finalizeWeakPointersNow() is called just before the system is shut
  * down.  It runs the finalizer for each weak pointer still in the
  * system.
+ *
+ * Careful here - rts_evalIO might cause a garbage collection, which
+ * might change weak_ptr_list.  Must re-load weak_ptr_list each time
+ * around the loop.
  */
 
 void
 finalizeWeakPointersNow(void)
 {
   StgWeak *w;
-
-  for (w = weak_ptr_list; w; w = w->link) {
+  
+  while ((w = weak_ptr_list)) {
+    weak_ptr_list = w->link;
     IF_DEBUG(weak,fprintf(stderr,"Finalising weak pointer at %p -> %p\n", w, w->key));
     w->header.info = &DEAD_WEAK_info;
     if (w->finalizer != &NO_FINALIZER_closure) {
