@@ -25,7 +25,7 @@ import IdInfo		( newStrictnessInfo, setNewStrictnessInfo, mkNewStrictnessInfo,
 import Var		( Var )
 import VarEnv
 import UniqFM		( plusUFM_C, addToUFM_Directly, lookupUFM_Directly,
-			  keysUFM, minusUFM, ufmToList )
+			  keysUFM, minusUFM, ufmToList, filterUFM )
 import Type		( isUnLiftedType )
 import CoreLint		( showPass, endPass )
 import ErrUtils		( dumpIfSet_dyn )
@@ -78,13 +78,13 @@ dmdAnalTopBind sigs (NonRec id rhs)
   = (sigs, NonRec id rhs)	-- It's pre-computed in MkId.lhs
   | otherwise
   = let
-	(sigs', (id', rhs')) = downRhs TopLevel sigs (id, rhs)
+	(sigs', _, (id', rhs')) = downRhs TopLevel sigs (id, rhs)
     in
     (sigs', NonRec id' rhs')    
 
 dmdAnalTopBind sigs (Rec pairs)
   = let
-	(sigs', pairs')  = dmdFix TopLevel sigs pairs
+	(sigs', _, pairs')  = dmdFix TopLevel sigs pairs
     in
     (sigs', Rec pairs')
 \end{code}
@@ -148,16 +148,19 @@ dmdAnal sigs dmd (Lam var body)
     in
     (body_ty, Lam var body')
 
-  | otherwise
-  = let
-	body_dmd = case dmd of
-			Call dmd -> dmd
-			other	 -> Lazy	-- Conservative
-
+  | Call body_dmd <- dmd	-- A call demand: good!
+  = let	
 	(body_ty, body') = dmdAnal sigs body_dmd body
-	(lam_ty, var') = annotateLamIdBndr body_ty var
+	(lam_ty, var')   = annotateLamIdBndr body_ty var
     in
     (lam_ty, Lam var' body')
+
+  | otherwise	-- Not enough demand on the lambda; but do the body
+  = let		-- anyway to annotate it and gather free var info
+	(body_ty, body') = dmdAnal sigs Eval body
+	(lam_ty, var')   = annotateLamIdBndr body_ty var
+    in
+    (deferType lam_ty, Lam var' body')
 
 dmdAnal sigs dmd (Case scrut case_bndr [alt@(DataAlt dc,bndrs,rhs)])
   | let tycon = dataConTyCon dc,
@@ -184,37 +187,30 @@ dmdAnal sigs dmd (Case scrut case_bndr alts)
 
 dmdAnal sigs dmd (Let (NonRec id rhs) body) 
   = let
-	(sigs', (id1, rhs')) = downRhs NotTopLevel sigs (id, rhs)
-	(body_ty, body')     = dmdAnal sigs' dmd body
-	(body_ty1, id2)      = annotateBndr body_ty id1
+	(sigs', lazy_fv, (id1, rhs')) = downRhs NotTopLevel sigs (id, rhs)
+	(body_ty, body') 	      = dmdAnal sigs' dmd body
+	(body_ty1, id2)    	      = annotateBndr body_ty id1
+	body_ty2		      = addLazyFVs body_ty1 lazy_fv
     in
 --    pprTrace "dmdLet" (ppr id <+> ppr (sig,rhs_env))
-    (body_ty1, Let (NonRec id2 rhs') body')    
+    (body_ty2, Let (NonRec id2 rhs') body')    
 
 dmdAnal sigs dmd (Let (Rec pairs) body) 
   = let
-	bndrs		 = map fst pairs
-	(sigs', pairs')  = dmdFix NotTopLevel sigs pairs
-	(body_ty, body') = dmdAnal sigs' dmd body
-
-		-- I saw occasions where it was really worth using the
-		-- call demands on the Ids to propagate demand info
-		-- on the free variables.  An example is 'roll' in imaginary/wheel-sieve2
-		-- Something like this:
-		--	roll x = letrec go y = if ... then roll (x-1) else x+1
-		--		 in go ms
-		-- We want to see that this is strict in x.
-		--
-		-- This will happen because sigs' has a binding for 'go' that 
-		-- has a demand on x.
-
-	(result_ty, _) = annotateBndrs body_ty bndrs
+	bndrs			 = map fst pairs
+	(sigs', lazy_fv, pairs') = dmdFix NotTopLevel sigs pairs
+	(body_ty, body')         = dmdAnal sigs' dmd body
+	body_ty1		 = addLazyFVs body_ty lazy_fv
+    in
+    sigs' `seq` body_ty `seq`
+    let
+	(body_ty2, _) = annotateBndrs body_ty1 bndrs
 		-- Don't bother to add demand info to recursive
 		-- binders as annotateBndr does; 
 		-- being recursive, we can't treat them strictly.
 		-- But we do need to remove the binders from the result demand env
     in
-    (result_ty,  Let (Rec pairs') body')
+    (body_ty2,  Let (Rec pairs') body')
 
 
 dmdAnalAlt sigs dmd (con,bndrs,rhs) 
@@ -235,7 +231,7 @@ dmdAnalAlt sigs dmd (con,bndrs,rhs)
 dmdFix :: TopLevelFlag
        -> SigEnv 		-- Does not include bindings for this binding
        -> [(Id,CoreExpr)]
-       -> (SigEnv,
+       -> (SigEnv, DmdEnv,
 	   [(Id,CoreExpr)])	-- Binders annotated with stricness info
 
 dmdFix top_lvl sigs pairs
@@ -247,21 +243,32 @@ dmdFix top_lvl sigs pairs
     loop :: Int
 	 -> SigEnv			-- Already contains the current sigs
 	 -> [(Id,CoreExpr)] 		
-	 -> (SigEnv, [(Id,CoreExpr)])
+	 -> (SigEnv, DmdEnv, [(Id,CoreExpr)])
     loop n sigs pairs
-      | all (same_sig sigs sigs') bndrs = (sigs, pairs)
-		-- Note: use pairs, not pairs'.   Since the sigs are the same
-		-- there'll be no change, unless this is the very first visit,
-		-- and the first iteraion of that visit.  But in that case, the	
-		-- function is bottom anyway, there's no point in looking.
+      | all (same_sig sigs sigs') bndrs = (sigs', lazy_fv, pairs')
+		-- Note: use pairs', not pairs.   pairs' is the result of 
+		-- processing the RHSs with sigs (= sigs'), whereas pairs 
+		-- is the result of processing the RHSs with the *previous* 
+		-- iteration of sigs.
       | n >= 5		    = pprTrace "dmdFix" (ppr n <+> ppr pairs)   (loop (n+1) sigs' pairs')
       | otherwise	    = {- pprTrace "dmdFixLoop" (ppr id_sigs) -} (loop (n+1) sigs' pairs')
       where
 		-- Use the new signature to do the next pair
 		-- The occurrence analyser has arranged them in a good order
 		-- so this can significantly reduce the number of iterations needed
-	(sigs', pairs') = mapAccumL (downRhs top_lvl) sigs pairs
-
+	((sigs',lazy_fv), pairs') = mapAccumL (my_downRhs top_lvl) (sigs, emptyDmdEnv) pairs
+	
+    my_downRhs top_lvl (sigs,lazy_fv) (id,rhs)
+	= -- pprTrace "downRhs {" (ppr id <+> (ppr old_sig))
+	  -- (new_sig `seq` 
+	  --    pprTrace "downRhsEnd" (ppr id <+> ppr new_sig <+> char '}' ) 
+	  ((sigs', lazy_fv'), pair')
+	  --	 )
+ 	where
+	  (sigs', lazy_fv1, pair') = downRhs top_lvl sigs (id,rhs)
+	  lazy_fv'		   = plusUFM_C both lazy_fv lazy_fv1   
+	  old_sig   		   = lookup sigs id
+	  new_sig  	   	   = lookup sigs' id
 	   
 	-- Get an initial strictness signature from the Id
 	-- itself.  That way we make use of earlier iterations
@@ -276,30 +283,65 @@ dmdFix top_lvl sigs pairs
 
 downRhs :: TopLevelFlag 
 	-> SigEnv -> (Id, CoreExpr)
-	-> (SigEnv,  (Id, CoreExpr))
--- On the way down, compute a strictness signature 
--- for the function.  Keep its annotated RHS and dmd env
--- for use on the way up
--- The demand-env is that computed for a vanilla call.
+	-> (SigEnv,  DmdEnv, (Id, CoreExpr))
+-- Process the RHS of the binding, add the strictness signature
+-- to the Id, and augment the environment with the signature as well.
 
 downRhs top_lvl sigs (id, rhs)
- = (sigs', (id', rhs'))
+ = (sigs', lazy_fv, (id', rhs'))
  where
-  arity		 = exprArity rhs   -- The idArity may not be up to date
-  (rhs_ty, rhs') = dmdAnal sigs (vanillaCall arity) rhs
-  sig	  	 = mkStrictSig id arity (mkSigTy rhs rhs_ty)
-  id'		 = id `setIdNewStrictness` sig
-  sigs'		 = extendSigEnv top_lvl sigs id sig
+  arity		    = exprArity rhs   -- The idArity may not be up to date
+  (rhs_ty, rhs')    = dmdAnal sigs (vanillaCall arity) rhs
+  (lazy_fv, sig_ty) = mkSigTy rhs rhs_ty
+  sig		    = mkStrictSig id arity sig_ty
+  id'		    = id `setIdNewStrictness` sig
+  sigs'		    = extendSigEnv top_lvl sigs id sig
 
-mkSigTy rhs (DmdType fv [] RetCPR) 
-	| not (exprIsValue rhs)    = DmdType fv [] TopRes
+mkSigTy rhs (DmdType fv dmds res) 
+  = (lazy_fv, DmdType strict_fv lazified_dmds res')
+  where
+    lazy_fv   = filterUFM (not . isStrictDmd) fv
+    strict_fv = filterUFM isStrictDmd         fv
+	-- We put the strict FVs in the DmdType of the Id, so 
+	-- that at its call sites we unleash demands on its strict fvs.
+	-- An example is 'roll' in imaginary/wheel-sieve2
+	-- Something like this:
+	--	roll x = letrec 
+	--		     go y = if ... then roll (x-1) else x+1
+	--		 in 
+	--		 go ms
+	-- We want to see that roll is strict in x, which is because
+	-- go is called.   So we put the DmdEnv for x in go's DmdType.
+	--
+	-- Another example:
+	--	f :: Int -> Int -> Int
+	--	f x y = let t = x+1
+	--	    h z = if z==0 then t else 
+	--		  if z==1 then x+1 else
+	--		  x + h (z-1)
+	--	in
+	--	h y
+	-- Calling h does indeed evaluate x, but we can only see
+	-- that if we unleash a demand on x at the call site for t.
+	--
+	-- Incidentally, here's a place where lambda-lifting h would
+	-- lose the cigar --- we couldn't see the joint strictness in t/x
+	--
+	--	ON THE OTHER HAND
+	-- We don't want to put *all* the fv's from the RHS into the
+	-- DmdType, because that makes fixpointing very slow --- the 
+	-- DmdType gets full of lazy demands that are slow to converge.
+
+    lazified_dmds = map lazify dmds
+	-- Get rid of defers in the arguments
+
+    res' = case (dmds, res) of
+		([], RetCPR) | not (exprIsValue rhs) -> TopRes
+		other	 			     -> res
 	-- If the rhs is a thunk, we forget the CPR info, because
 	-- it is presumably shared (else it would have been inlined, and 
 	-- so we'd lose sharing if w/w'd it into a function.
 	--
-	-- ** But keep the demand unleashed on the free 
-	--    vars when the thing is evaluated! **
-	-- 
 	--	DONE IN OLD CPR ANALYSER, BUT NOT YET HERE
 	-- Also, if the strictness analyser has figured out that it's strict,
 	-- the let-to-case transformation will happen, so again it's good.
@@ -310,9 +352,6 @@ mkSigTy rhs (DmdType fv [] RetCPR)
 	--			...body strict in r...
 	-- r's RHS isn't a value yet; but modInt returns r in various branches, so
 	-- if r doesn't have the CPR property then neither does modInt
-
-mkSigTy rhs (DmdType fv dmds res) = DmdType fv (map lazify dmds) res
--- Get rid of defers
 \end{code}
 
 
@@ -328,6 +367,9 @@ unitVarDmd var dmd = DmdType (unitVarEnv var dmd) [] TopRes
 addVarDmd top_lvl dmd_ty@(DmdType fv ds res) var dmd
   | isTopLevel top_lvl = dmd_ty		-- Don't record top level things
   | otherwise	       = DmdType (extendVarEnv fv var dmd) ds res
+
+addLazyFVs (DmdType fv ds res) lazy_fvs
+  = DmdType (plusUFM_C both fv lazy_fvs) ds res
 
 annotateBndr :: DmdType -> Var -> (DmdType, Var)
 -- The returned env has the var deleted
@@ -432,7 +474,12 @@ dmdTransform sigs var dmd
 ------ 	LOCAL LET/REC BOUND THING
   | Just (StrictSig arity dmd_ty, top_lvl) <- lookupVarEnv sigs var
   = let
-	fn_ty = if arity <= depth then dmd_ty else topDmdType
+	fn_ty | arity <= depth = dmd_ty 
+	      | otherwise      = deferType dmd_ty
+	-- NB: it's important to use deferType, and not just return topDmdType
+	-- Consider	let { f x y = p + x } in f 1
+	-- The application isn't saturated, but we must nevertheless propagate 
+	--	a lazy demand for p!  
     in
     addVarDmd top_lvl fn_ty var dmd
 
@@ -472,8 +519,10 @@ vanillaCall 0 = Eval
 vanillaCall n = Call (vanillaCall (n-1))
 
 deferType :: DmdType -> DmdType
-deferType (DmdType fv ds _) = DmdType (mapVarEnv defer fv) ds TopRes
-	-- Check this
+deferType (DmdType fv _ _) = DmdType (mapVarEnv defer fv) [] TopRes
+	-- Notice that we throw away info about both arguments and results
+	-- For example,   f = let ... in \x -> x
+	-- We don't want to get a stricness type V->T for f.
 
 defer :: Demand -> Demand
 -- c.f. `lub` Abs
@@ -481,10 +530,19 @@ defer Abs	   = Abs
 defer (Seq k _ ds) = Seq k Defer ds
 defer other	   = Lazy
 
+isStrictDmd :: Demand -> Bool
+isStrictDmd Bot 	  = True
+isStrictDmd Err 	  = True    	   
+isStrictDmd (Seq _ Now _) = True
+isStrictDmd Eval	  = True
+isStrictDmd (Call _)	  = True
+isStrictDmd other	  = False
+
 lazify :: Demand -> Demand
 -- The 'Defer' demands are just Lazy at function boundaries
 lazify (Seq k Defer ds) = Lazy
 lazify (Seq k Now   ds) = Seq k Now (map lazify ds)
+lazify Bot		= Abs	-- Don't pass args that are consumed by bottom
 lazify d		= d
 
 betterDemand :: Demand -> Demand -> Bool
@@ -559,7 +617,14 @@ vee k1   k2   = Keep
 -----------------------------------
 both :: Demand -> Demand -> Demand
 
-both Bot d = Bot
+-- The normal one
+-- both Bot d = Bot
+
+-- The experimental one
+both Bot Bot = Bot
+both Bot Abs = Bot
+both Bot d   = d
+
 
 both Abs Bot = Bot
 both Abs d   = d
@@ -574,7 +639,8 @@ both Lazy Err 	         = Lazy
 both Lazy (Seq k Now ds) = Seq Keep Now ds
 both Lazy d	         = d
 
-both Eval Bot 	       = Bot
+-- Part of the Bot like Err experiment
+-- both Eval Bot 	       = Bot
 both Eval (Seq k l ds) = Seq Keep Now ds
 both Eval (Call d)     = Call d
 both Eval d   	       = Eval
@@ -670,7 +736,9 @@ get_changes binds = vcat (map get_changes_bind binds)
 get_changes_bind (Rec pairs) = vcat (map get_changes_pr pairs)
 get_changes_bind (NonRec id rhs) = get_changes_pr (id,rhs)
 
-get_changes_pr (id,rhs) = get_changes_var id $$ get_changes_expr rhs
+get_changes_pr (id,rhs) 
+  | isImplicitId id = empty  -- We don't look inside these
+  | otherwise	    = get_changes_var id $$ get_changes_expr rhs
 
 get_changes_var var
   | isId var  = get_changes_str var $$ get_changes_dmd var
