@@ -190,17 +190,23 @@ rename/ParseUnfolding_HC_OPTS 	= -Onot -H16m
 ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
 rename/RnMonad_HC_OPTS 		= -fvia-C -O2 -O2-for-C
 else
+ifeq "$(Ghc2_0)" "NO"
 rename/RnMonad_HC_OPTS 		= -fvia-C
+endif
 endif
 rename/RnEnv_HC_OPTS 		= -fvia-C
 rename/RnSource_HC_OPTS		= -H12m
 rename/RnIfaces_HC_OPTS		= -H8m -fvia-C
 rename/RnNames_HC_OPTS		= -H12m
+rename/RnMonad_HC_OPTS		= -fvia-C
 specialise/Specialise_HC_OPTS 	= -Onot -H12m
 stgSyn/StgSyn_HC_OPTS 		= -fno-omit-reexported-instances
 typecheck/TcGenDeriv_HC_OPTS	= -H10m
 typecheck/TcExpr_HC_OPTS	= -H10m
 typecheck/TcEnv_HC_OPTS		= -H10m
+ifeq "$(Ghc2_0)" "NO"
+typecheck/TcMonad_HC_OPTS	= -fvia-C	
+endif
 utils/Argv_HC_OPTS 		= -fvia-C
 utils/SST_HC_OPTS 		= -fvia-C
 utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs
