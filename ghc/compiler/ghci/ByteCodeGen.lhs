@@ -23,7 +23,7 @@ import FiniteMap	( FiniteMap, addListToFM, listToFM, filterFM,
 			  addToFM, lookupFM, fmToList, emptyFM, plusFM )
 import CoreSyn
 import PprCore		( pprCoreExpr, pprCoreAlt )
-import Literal		( Literal(..) )
+import Literal		( Literal(..), literalPrimRep )
 import PrimRep		( PrimRep(..) )
 import CoreFVs		( freeVars )
 import Type		( typePrimRep )
@@ -244,12 +244,18 @@ data BCInstr
    | TESTEQ_F  Float  LocalLabel
    | TESTLT_D  Double LocalLabel
    | TESTEQ_D  Double LocalLabel
+
+   -- The Int value is a constructor number and therefore
+   -- stored in the insn stream rather than as an offset into
+   -- the literal pool.
    | TESTLT_P  Int    LocalLabel
    | TESTEQ_P  Int    LocalLabel
+
    | CASEFAIL
    -- To Infinity And Beyond
    | ENTER
-   | RETURN	-- unboxed value on TOS.  Use tag to find underlying ret itbl
+   | RETURN	PrimRep
+		-- unboxed value on TOS.  Use tag to find underlying ret itbl
 		-- and return as per that.
 
 
@@ -281,7 +287,7 @@ instance Outputable BCInstr where
    ppr (TESTEQ_P  i lab)     = text "TESTEQ_P" <+> int i <+> text "__" <> int lab
    ppr CASEFAIL              = text "CASEFAIL"
    ppr ENTER                 = text "ENTER"
-   ppr RETURN                = text "RETURN"
+   ppr (RETURN pk)           = text "RETURN  " <+> ppr pk
 
 instance Outputable a => Outputable (ProtoBCO a) where
    ppr (ProtoBCO name instrs origin)
@@ -372,20 +378,23 @@ schemeE :: Int -> Sequel -> BCEnv -> AnnExpr Id VarSet -> BcM BCInstrList
 schemeE d s p e@(fvs, AnnApp f a) 
    = returnBc (schemeT (should_args_be_tagged e) d s 0 p (fvs, AnnApp f a))
 schemeE d s p e@(fvs, AnnVar v)
-   | isFollowableRep (typePrimRep (idType v))
+   | isFollowableRep v_rep
    = returnBc (schemeT (should_args_be_tagged e) d s 0 p (fvs, AnnVar v))
    | otherwise
    = -- returning an unboxed value.  Heave it on the stack, SLIDE, and RETURN.
      let (push, szw) = pushAtom True d p (AnnVar v)
      in  returnBc (push 			-- value onto stack
                    `snocOL` SLIDE szw (d-s) 	-- clear to sequel
-                   `snocOL` RETURN)		-- go
+                   `snocOL` RETURN v_rep)	-- go
+   where
+      v_rep = typePrimRep (idType v)
 
 schemeE d s p (fvs, AnnLit literal)
    = let (push, szw) = pushAtom True d p (AnnLit literal)
+         l_rep = literalPrimRep literal
      in  returnBc (push 			-- value onto stack
                    `snocOL` SLIDE szw (d-s) 	-- clear to sequel
-                   `snocOL` RETURN)		-- go
+                   `snocOL` RETURN l_rep)		-- go
 
 schemeE d s p (fvs, AnnLet binds b)
    = let (xs,rhss) = case binds of AnnNonRec x rhs  -> ([x],[rhs])
@@ -859,8 +868,10 @@ assembleBCO :: ProtoBCO Name -> IO UnlinkedBCO
 
 assembleBCO (ProtoBCO nm instrs origin)
    = let
-         -- pass 1: collect up the offsets of the local labels
-         label_env = mkLabelEnv emptyFM 0 instrs
+         -- pass 1: collect up the offsets of the local labels.
+         -- Remember that the first insn starts at offset 1 since offset 0
+         -- (eventually) will hold the total # of insns.
+         label_env = mkLabelEnv emptyFM 1 instrs
 
          mkLabelEnv env i_offset [] = env
          mkLabelEnv env i_offset (i:is)
@@ -915,7 +926,7 @@ mkBits findLabel st proto_insns
                PUSH_G    nm       -> do (p, st2) <- ptr st nm
                                         instr2 st2 i_PUSH_G p
                PUSH_AS   nm pk    -> do (p, st2)  <- ptr st nm
-                                        (np, st3) <- ret_itbl st2 pk
+                                        (np, st3) <- ctoi_itbl st2 pk
                                         instr3 st3 i_PUSH_AS p np
                PUSH_UBX  lit nws  -> do (np, st2) <- literal st lit
                                         instr3 st2 i_PUSH_UBX np nws
@@ -940,13 +951,12 @@ mkBits findLabel st proto_insns
                                         instr3 st2 i_TESTLT_D np (findLabel l)
                TESTEQ_D  d l      -> do (np, st2) <- double st d
                                         instr3 st2 i_TESTEQ_D np (findLabel l)
-               TESTLT_P  i l      -> do (np, st2) <- int st i
-                                        instr3 st2 i_TESTLT_P np (findLabel l)
-               TESTEQ_P  i l      -> do (np, st2) <- int st i
-                                        instr3 st2 i_TESTEQ_P np (findLabel l)
+               TESTLT_P  i l      -> instr3 st i_TESTLT_P i (findLabel l)
+               TESTEQ_P  i l      -> instr3 st i_TESTEQ_P i (findLabel l)
                CASEFAIL           -> instr1 st i_CASEFAIL
                ENTER              -> instr1 st i_ENTER
-               RETURN             -> instr1 st i_RETURN
+               RETURN rep         -> do (itbl_no,st2) <- itoc_itbl st rep
+                                        instr2 st2 i_RETURN itbl_no
 
        i2s :: Int -> Word16
        i2s = fromIntegral
@@ -1005,21 +1015,32 @@ mkBits findLabel st proto_insns
        literal st (MachFloat r)  = float st (fromRational r)
        literal st (MachDouble r) = double st (fromRational r)
 
-       ret_itbl st pk
+       ctoi_itbl st pk
           = addr st ret_itbl_addr
             where
-               ret_itbl_addr 
-                  = case pk of
-                       IntRep    -> stg_ctoi_ret_R1_info
-                       FloatRep  -> stg_ctoi_ret_F1_info
-                       DoubleRep -> stg_ctoi_ret_D1_info
-                    where  -- TEMP HACK
-                       stg_ctoi_ret_F1_info = nullAddr
-                       stg_ctoi_ret_D1_info = nullAddr
+               ret_itbl_addr = case pk of
+                                  IntRep    -> stg_ctoi_ret_R1_info
+                                  FloatRep  -> stg_ctoi_ret_F1_info
+                                  DoubleRep -> stg_ctoi_ret_D1_info
+                               where  -- TEMP HACK
+                                  stg_ctoi_ret_F1_info = nullAddr
+                                  stg_ctoi_ret_D1_info = nullAddr
+
+       itoc_itbl st pk
+          = addr st ret_itbl_addr
+            where
+               ret_itbl_addr = case pk of
+                                  IntRep    -> stg_gc_unbx_r1_info
+                                  FloatRep  -> stg_gc_f1_info
+                                  DoubleRep -> stg_gc_d1_info
                      
 foreign label "stg_ctoi_ret_R1_info" stg_ctoi_ret_R1_info :: Addr
 --foreign label "stg_ctoi_ret_F1_info" stg_ctoi_ret_F1_info :: Addr
 --foreign label "stg_ctoi_ret_D1_info" stg_ctoi_ret_D1_info :: Addr
+
+foreign label "stg_gc_unbx_r1_info" stg_gc_unbx_r1_info :: Addr
+foreign label "stg_gc_f1_info"      stg_gc_f1_info :: Addr
+foreign label "stg_gc_d1_info"      stg_gc_d1_info :: Addr
 
 -- The size in bytes of an instruction.
 instrSizeB :: BCInstr -> Int
@@ -1039,7 +1060,7 @@ instrSizeB instr
         UNPACK   _     -> 4
         UPK_TAG  _ _ _ -> 8
         PACK     _ _   -> 6
-        LABEL    _     -> 4
+        LABEL    _     -> 0	-- !!
         TESTLT_I _ _   -> 6
         TESTEQ_I _ _   -> 6
         TESTLT_F _ _   -> 6
@@ -1050,7 +1071,7 @@ instrSizeB instr
         TESTEQ_P _ _   -> 6
         CASEFAIL       -> 2
         ENTER          -> 2
-        RETURN         -> 2
+        RETURN   _     -> 4
 
 
 -- Make lists of host-sized words for literals, so that when the
@@ -1161,7 +1182,11 @@ linkBCO ie ce (UnlinkedBCO nm insnsSS literalsSS ptrsSS itblsSS)
                         :: UArray Int Addr
             itbls_barr = case itbls_arr of UArray lo hi barr -> barr
 
-            insns_arr = array (0, n_insns-1) (indexify insns)
+            insns_arr | n_insns > 65535
+                      = panic "linkBCO: >= 64k insns in BCO"
+                      | otherwise 
+                      = array (0, n_insns) 
+                              (indexify (fromIntegral n_insns:insns))
                         :: UArray Int Word16
             insns_barr = case insns_arr of UArray lo hi barr -> barr
 
@@ -1477,7 +1502,6 @@ i_MKAP     = (bci_MKAP :: Int)
 i_UNPACK   = (bci_UNPACK :: Int)
 i_UPK_TAG  = (bci_UPK_TAG :: Int)
 i_PACK     = (bci_PACK :: Int)
---i_LABEL    = (bci_LABEL :: Int)
 i_TESTLT_I = (bci_TESTLT_I :: Int)
 i_TESTEQ_I = (bci_TESTEQ_I :: Int)
 i_TESTLT_F = (bci_TESTLT_F :: Int)
