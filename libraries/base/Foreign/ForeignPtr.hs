@@ -20,9 +20,16 @@ module Foreign.ForeignPtr
 	-- * Finalised data pointers
 	  ForeignPtr
 	, FinalizerPtr
+#ifdef __HUGS__
+	, FinalizerEnvPtr
+#endif
         , newForeignPtr
         , newForeignPtr_
         , addForeignPtrFinalizer
+#ifdef __HUGS__
+	, newForeignPtrEnv
+	, addForeignPtrFinalizerEnv
+#endif
 	, withForeignPtr
 	, unsafeForeignPtrToPtr
 	, touchForeignPtr
@@ -126,6 +133,19 @@ withForeignPtr fo io
        touchForeignPtr fo
        return r
 #endif /* ! __NHC__ */
+
+#ifdef __HUGS__
+-- | This variant of 'newForeignPtr' adds a finalizer that expects an
+-- environment in addition to the finalized pointer.  The environment
+-- that will be passed to the finalizer is fixed by the second argument to
+-- 'newForeignPtrEnv'.
+newForeignPtrEnv ::
+    FinalizerEnvPtr env a -> Ptr env -> Ptr a -> IO (ForeignPtr a)
+newForeignPtrEnv finalizer env p
+  = do fObj <- newForeignPtr_ p
+       addForeignPtrFinalizerEnv finalizer env fObj
+       return fObj
+#endif /* __HUGS__ */
 
 #ifndef __GLASGOW_HASKELL__
 mallocForeignPtr :: Storable a => IO (ForeignPtr a)
