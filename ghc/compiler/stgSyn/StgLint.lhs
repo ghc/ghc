@@ -217,6 +217,7 @@ lintStgExpr e@(StgCase scrut _ _ bndr _ alts_type alts)
     (case scrut of
 	StgApp _ _    -> returnL ()
 	StgConApp _ _ -> returnL ()
+	StgOpApp _ _ _ -> returnL ()
 	other -> addErrL (mkCaseOfCaseMsg e))   `thenL_`
 
     addInScopeVars [bndr] (lintStgAlts alts scrut_ty)
