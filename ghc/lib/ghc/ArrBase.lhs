@@ -544,25 +544,25 @@ freezeFloatArray (MutableByteArray ixs arr#) = ST $ \ (S# s#) ->
 	    -> State# s			-- the Universe and everything
 	    -> StateAndByteArray# s
 
-    freeze arr# n# s#
-      = case (newFloatArray# n# s#)    	   of { StateAndMutableByteArray# s2# newarr1# ->
-	case copy 0# n# arr# newarr1# s2#  of { StateAndMutableByteArray# s3# newarr2# ->
+    freeze arr# end# s#
+      = case (newFloatArray# end# s#)   of { StateAndMutableByteArray# s2# newarr1# ->
+	case copy 0# arr# newarr1# s2#  of { StateAndMutableByteArray# s3# newarr2# ->
 	unsafeFreezeByteArray# newarr2# s3#
 	}}
       where
-	copy :: Int# -> Int#
+	copy :: Int#
 	     -> MutableByteArray# s -> MutableByteArray# s
 	     -> State# s
 	     -> StateAndMutableByteArray# s
 
-	copy cur# end# from# to# s#
+	copy cur# from# to# s#
 	  | cur# ==# end#
 	    = StateAndMutableByteArray# s# to#
 	  | otherwise
 	    = case (readFloatArray#  from# cur#     s#)  of { StateAndFloat# s1# ele ->
 	      case (writeFloatArray# to#   cur# ele s1#) of { s2# ->
-	      copy (cur# +# 1#) end# from# to# s2#
-	      }}
+	      copy (cur# +# 1#) from# to# s1#
+	      }
 
 freezeDoubleArray (MutableByteArray ixs arr#) = ST $ \ (S# s#) ->
     case rangeSize ixs     of { I# n# ->
@@ -591,8 +591,8 @@ freezeDoubleArray (MutableByteArray ixs arr#) = ST $ \ (S# s#) ->
 	  | otherwise
 	    = case (readDoubleArray#  from# cur#     s#)  of { StateAndDouble# s1# ele ->
 	      case (writeDoubleArray# to#   cur# ele s1#) of { s2# ->
-	      copy (cur# +# 1#) end# from# to# s2#
-	      }}
+	      copy (cur# +# 1#) end# from# to# s1#
+	      }
 
 unsafeFreezeArray     :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)  
 unsafeFreezeByteArray :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
