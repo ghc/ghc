@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.50 2001/01/17 16:54:04 simonmar Exp $
+$Id: Parser.y,v 1.51 2001/01/30 12:13:34 simonmar Exp $
 
 Haskell grammar.
 
@@ -13,7 +13,6 @@ module Parser ( parseModule, parseExpr ) where
 
 import HsSyn
 import HsTypes		( mkHsTupCon )
-import HsPat            ( InPat(..) )
 
 import RdrHsSyn
 import Lex
@@ -89,7 +88,7 @@ Conflicts: 14 shift/reduce
  'then' 	{ ITthen }
  'type' 	{ ITtype }
  'where' 	{ ITwhere }
- '_scc_'	{ ITscc }
+ '_scc_'	{ ITscc }	      -- ToDo: remove
 
  'forall'	{ ITforall }			-- GHC extension keywords
  'foreign'	{ ITforeign }
@@ -110,6 +109,7 @@ Conflicts: 14 shift/reduce
  '{-# INLINE'      { ITinline_prag }
  '{-# NOINLINE'    { ITnoinline_prag }
  '{-# RULES'	   { ITrules_prag }
+ '{-# SCC'	   { ITscc_prag }
  '{-# DEPRECATED'  { ITdeprecated_prag }
  '#-}'		   { ITclose_prag }
 
@@ -698,11 +698,15 @@ exp10 :: { RdrNameHsExpr }
 	| '_casm_'     CLITLIT aexps0		{ HsCCall $2 $3 False True  cbot }
 	| '_casm_GC_'  CLITLIT aexps0		{ HsCCall $2 $3 True  True  cbot }
 
-        | '_scc_' STRING exp    		{ if opt_SccProfilingOn
-							then HsSCC $2 $3
-							else HsPar $3 }
+        | scc_annot exp		    		{ if opt_SccProfilingOn
+							then HsSCC $1 $2
+							else HsPar $2 }
 
 	| fexp					{ $1 }
+
+scc_annot :: { FAST_STRING }
+	: '_scc_' STRING			{ $2 }
+	| '{-# SCC' STRING '#-}'		{ $2 }
 
 ccallid :: { FAST_STRING }
 	:  VARID				{ $1 }

@@ -16,7 +16,7 @@ An example that provokes the error is
 --------------------------------------------------------
 
 \begin{code}
-
+{-# OPTIONS -#include "hs_ctype.h" #-}
 module Lex (
 
 	ifaceParseErr, srcParseErr,
@@ -110,7 +110,7 @@ data Token
   | ITthen
   | ITtype
   | ITwhere
-  | ITscc
+  | ITscc			-- ToDo: remove (we use {-# SCC "..." #-} now)
 
   | ITforall			-- GHC extension keywords
   | ITforeign
@@ -164,6 +164,7 @@ data Token
   | ITrules_prag
   | ITdeprecated_prag
   | ITline_prag
+  | ITscc_prag
   | ITclose_prag
 
   | ITdotdot  			-- reserved symbols
@@ -243,6 +244,7 @@ pragmaKeywordsFM = listToUFM $
 	( "LINE",       ITline_prag ),
 	( "RULES",	ITrules_prag ),
 	( "RULEZ",	ITrules_prag ),	-- american spelling :-)
+	( "SCC",	ITscc_prag ),
 	( "DEPRECATED",	ITdeprecated_prag )
  	]
 
@@ -273,7 +275,7 @@ haskellKeywordsFM = listToUFM $
 	( "then",	ITthen ),     
 	( "type",	ITtype ),     
 	( "where",	ITwhere ),
-	( "_scc_",	ITscc )
+	( "_scc_",	ITscc )		-- ToDo: remove
      ]
 
 isSpecial :: Token -> Bool
