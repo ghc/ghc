@@ -321,6 +321,15 @@ sparc*-linux*)
         HostVendor_CPP='unknown'
         HostOS_CPP='linux'
         ;;
+sparc-*-openbsd*)
+        HostPlatform=sparc-unknown-openbsd
+        TargetPlatform=sparc-unknown-openbsd
+        BuildPlatform=sparc-unknown-openbsd
+        HostPlatform_CPP='sparc_unknown_openbsd'
+        HostArch_CPP='sparc'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='openbsd'
+        ;;
 *)
         echo "Unrecognised platform: $HostPlatform"
         exit 1
