@@ -136,7 +136,7 @@ closeFd isStream fd
   | isStream  = c_closesocket fd
   | otherwise = c_close fd
 
-foreign import ccall unsafe "closesocket"
+foreign import stdcall unsafe "closesocket"
    c_closesocket :: CInt -> IO CInt
 #endif
 
