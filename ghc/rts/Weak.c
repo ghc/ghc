@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.5 1999/02/01 18:05:35 simonm Exp $
+ * $Id: Weak.c,v 1.6 1999/02/02 14:17:45 simonm Exp $
  *
  * Weak pointers / finalisers
  *
@@ -27,7 +27,7 @@ finaliseWeakPointersNow(void)
   for (w = weak_ptr_list; w; w = w->link) {
     IF_DEBUG(weak,fprintf(stderr,"Finalising weak pointer at %p -> %p\n", w, w->key));
     w->header.info = &DEAD_WEAK_info;
-    if (w->finaliser != &NO_FINALISER_info) {
+    if (w->finaliser != &NO_FINALISER_closure) {
       rts_evalIO(w->finaliser,NULL);
     }
   }
@@ -46,7 +46,7 @@ scheduleFinalisers(StgWeak *list)
   
   for (w = list; w; w = w->link) {
     IF_DEBUG(weak,fprintf(stderr,"Finalising weak pointer at %p -> %p\n", w, w->key));
-    if (w->finaliser != &NO_FINALISER_info) {
+    if (w->finaliser != &NO_FINALISER_closure) {
 #ifdef INTERPRETER
       createGenThread(RtsFlags.GcFlags.initialStkSize, w->finaliser);
 #else
