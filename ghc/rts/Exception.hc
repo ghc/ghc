@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.7 2000/02/04 11:15:04 simonmar Exp $
+ * $Id: Exception.hc,v 1.8 2000/02/24 17:20:46 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -82,8 +82,14 @@ FN_(unblockAsyncExceptionszh_ret_entry)
     awakenBlockedQueue(CurrentTSO->blocked_exceptions);
 #endif
     CurrentTSO->blocked_exceptions = NULL;
+#ifdef REG_R1
     Sp++;
     JMP_(ENTRY_CODE(Sp[0]));
+#else
+    Sp[1] = Sp[0];
+    Sp++;
+    JMP_(ENTRY_CODE(Sp[1]));
+#endif
   FE_
 }
 
@@ -127,8 +133,14 @@ FN_(blockAsyncExceptionszh_ret_entry)
   FB_
     ASSERT(CurrentTSO->blocked_exceptions == NULL);
     CurrentTSO->blocked_exceptions = END_TSO_QUEUE;
+#ifdef REG_R1
     Sp++;
     JMP_(ENTRY_CODE(Sp[0]));
+#else
+    Sp[1] = Sp[0];
+    Sp++;
+    JMP_(ENTRY_CODE(Sp[1]));
+#endif
   FE_
 }
 
