@@ -1,8 +1,8 @@
 #ifndef SHADE_H
 #define SHADE_H
 
-extern floatish ShadeOf  PROTO((char *));
-extern void     ShadeFor PROTO((char *, floatish));
-extern void     SetPSColour PROTO((floatish));
+floatish ShadeOf  PROTO((char *));
+void     ShadeFor PROTO((char *, floatish));
+void     SetPSColour PROTO((floatish));
 
 #endif /* SHADE_H */

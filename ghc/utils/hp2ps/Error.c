@@ -5,7 +5,7 @@
 /* own stuff */
 #include "Error.h"
 
-extern void exit PROTO((int));
+void exit PROTO((int));
 
 /*VARARGS0*/
 void

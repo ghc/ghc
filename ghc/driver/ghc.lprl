@@ -408,7 +408,7 @@ require special handling.
 		    : ( "$TopPwd/$(CURRENT_DIR)/$(GHC_LIBSRC)/prelude"
 		      , "$TopPwd/$(CURRENT_DIR)/$(GHC_LIBSRC)/required" );
 
-$GhcVersionInfo  = 201; # ToDo: int ($(PROJECTVERSION) * 100);
+$GhcVersionInfo  = int ($(PROJECTVERSION) * 100);
 $Haskell1Version = 3; # i.e., Haskell 1.3
 @Cpp_define	 = ();
 
@@ -2519,7 +2519,7 @@ sub run_something {
 	    next if /from .*(stg|rts)defs\.h:/;
 	    next if /from ghc\d+.c:\d+:/;
 	    next if /from .*\.lc/;
-	    next if /from .*SMinternal\.lh/;
+	    next if /from .*SMinternal\.l?h/;
 	    next if /ANSI C does not support \`long long\'/;
 	    next if /warning:.*was declared \`extern\' and later \`static\'/;
 	    next if /warning: assignment discards \`const\' from pointer target type/;

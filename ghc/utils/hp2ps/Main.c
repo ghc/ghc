@@ -16,7 +16,7 @@
 #include "Utilities.h"
 
 #ifndef atof
-extern double atof PROTO((char *));
+double atof PROTO((char *));
 #endif
 
 boolish pflag = 0;	/* read auxiliary file			*/

@@ -16,7 +16,7 @@ extern floatish graphy0;
 extern floatish graphheight;
 extern floatish graphwidth;
 
-extern void     Dimensions PROTO((void));
-extern floatish StringSize PROTO((char *));
+void     Dimensions PROTO((void));
+floatish StringSize PROTO((char *));
 
 #endif /* DIMENSIONS_H */

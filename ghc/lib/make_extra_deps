@@ -24,7 +24,7 @@ while (<MKF>) {
 	$copy =~ s/\.hc\b/$k.hc/;
 	$copy =~ s/\.hi\b/$k.hi/;
 
-	print STDOUT "IfGhcBuild$k(", $copy, ")\n";
+	print STDOUT "IfBuild$k(", $copy, ")\n";
     }
 }
 

@@ -762,8 +762,12 @@ if echo $CPP | egrep gcc >/dev/null 2>&1; then
     echo > conftest.c
     gcc -v -E conftest.c >/dev/null 2>conftest.out
     echo '/(\S+\/cpp)/ && print "$1";' > conftest.pl
-    GNUCPP="`eval $PerlCmd -n conftest.pl conftest.out`"
+    # GNUCPP: used in jmake.c (GnuCppCmd) and in mkdependC
+    # (where we could do with the usual pre-#defines)
+    GNUCPP="gcc -E"
     test -n "$verbose" && echo "        setting GNUCPP to $GNUCPP"
+    # RAWCPP: we do not want *any* pre-#defines...
+    # (e.g., hscpp, mkdependHS)
     RAWCPP="`eval $PerlCmd -n conftest.pl conftest.out` -traditional"
     test -n "$verbose" && echo "        setting RAWCPP to $RAWCPP"
     rm -fr conftest*
@@ -830,7 +834,7 @@ AC_HEADER_STDC
 #
 dnl ** check for specific header (.h) files that we are interested in
 #
-AC_CHECK_HEADERS(dirent.h fcntl.h grp.h malloc.h memory.h nlist.h pwd.h siginfo.h signal.h stdlib.h string.h sys/fault.h sys/file.h sys/mman.h sys/param.h sys/procfs.h sys/resource.h sys/signal.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/utsname.h sys/vadvise.h sys/wait.h termios.h time.h types.h unistd.h utime.h vfork.h )
+AC_CHECK_HEADERS(dirent.h fcntl.h grp.h malloc.h memory.h nlist.h pwd.h siginfo.h signal.h stdlib.h string.h sys/fault.h sys/file.h sys/mman.h sys/param.h sys/procfs.h sys/resource.h sys/signal.h sys/socket.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/utsname.h sys/vadvise.h sys/wait.h termios.h time.h types.h unistd.h utime.h vfork.h )
 #
 dnl ** check if it is safe to include both <time.h> and <sys/time.h>
 #
@@ -878,49 +882,45 @@ char **argv;
 }], LeadingUnderscore='YES', LeadingUnderscore='NO', LeadingUnderscore='YES')
 test -n "$verbose" && echo "    setting LeadingUnderscore to $LeadingUnderscore"
 
-# -------------------------------------------------------------------------
-dnl
-dnl * `GHC' CONFIGURATION STUFF
-
-if test "xxx$DoingGHC" = 'xxxghc' ; then
-# a very big "if"!
-#
+dnl -------------------------------------------------------
 dnl ** which builds to build?
+dnl ** (applies to anything w/ libraries (ghc, hslibs, ???)
+dnl -------------------------------------------------------
 # builds: normal = sequential _ap_o ; _p = profiling (sequential);
 # _t = ticky; _u = unregisterized
-GhcBuild_normal='YES'
-GhcBuild_p='YES'
-GhcBuild_t='NO'
-GhcBuild_u='NO'
+Build_normal='YES'
+Build_p='YES'
+Build_t='NO'
+Build_u='NO'
 # _mc = concurrent; _mr = profiled concurrent; _mt = ticky concurrent
 # _mp = parallel; _mg = gransim
-GhcBuild_mc='NO'
-GhcBuild_mr='NO'
-GhcBuild_mt='NO'
-GhcBuild_mp='NO'
-GhcBuild_mg='NO'
+Build_mc='NO'
+Build_mr='NO'
+Build_mt='NO'
+Build_mp='NO'
+Build_mg='NO'
 # GC builds: _2s, _1s, _du (, _gn)
-GhcBuild_2s='NO'
-GhcBuild_1s='NO'
-GhcBuild_du='NO'
+Build_2s='NO'
+Build_1s='NO'
+Build_du='NO'
 # user builds: a...o
-GhcBuild_a='NO'
-GhcBuild_b='NO'
-GhcBuild_c='NO'
-GhcBuild_d='NO'
-GhcBuild_e='NO'
-GhcBuild_f='NO'
-GhcBuild_g='NO'
-GhcBuild_h='NO'
-GhcBuild_i='NO'
-GhcBuild_j='NO'
-GhcBuild_k='NO'
-GhcBuild_l='NO'
-GhcBuild_m='NO'
-GhcBuild_n='NO'
-GhcBuild_o='NO'
-GhcBuild_A='NO'
-GhcBuild_B='NO'
+Build_a='NO'
+Build_b='NO'
+Build_c='NO'
+Build_d='NO'
+Build_e='NO'
+Build_f='NO'
+Build_g='NO'
+Build_h='NO'
+Build_i='NO'
+Build_j='NO'
+Build_k='NO'
+Build_l='NO'
+Build_m='NO'
+Build_n='NO'
+Build_o='NO'
+Build_A='NO'
+Build_B='NO'
 # More could be added here...
 
 AC_ARG_ENABLE(normal-build,
@@ -932,9 +932,9 @@ Choose all the \`builds' of GHC that you want:
 
 --disable-normal-build do *not* build GHC for normal sequential code],
    [case "$enableval" in
-        yes) GhcBuild_normal='YES'
+        yes) Build_normal='YES'
              ;;
-        no)  GhcBuild_normal='NO'
+        no)  Build_normal='NO'
              ;;
         *)   echo "I don't understand this option: --enable-normal-build=$enableval"
              exit 1
@@ -944,9 +944,9 @@ Choose all the \`builds' of GHC that you want:
 AC_ARG_ENABLE(profiling,
    [--disable-profiling    do *not* build profiling features],
    [case "$enableval" in
-        yes) GhcBuild_p='YES'
+        yes) Build_p='YES'
              ;;
-        no)  GhcBuild_p='NO'
+        no)  Build_p='NO'
              ;;
         *)   echo "I don't understand this option: --enable-profiling=$enableval"
              exit 1
@@ -956,9 +956,9 @@ AC_ARG_ENABLE(profiling,
 AC_ARG_ENABLE(ticky,
    [--enable-ticky         build for \`ticky-ticky' profiling (for implementors)],
    [case "$enableval" in
-        yes) GhcBuild_t='YES'
+        yes) Build_t='YES'
              ;;
-        no)  GhcBuild_t='NO'
+        no)  Build_t='NO'
              ;;
         *)   echo "I don't understand this option: --enable-ticky=$enableval"
              exit 1
@@ -968,9 +968,9 @@ AC_ARG_ENABLE(ticky,
 AC_ARG_ENABLE(concurrent,
    [--enable-concurrent    turn on \`concurrent Haskell' features],
    [case "$enableval" in
-        yes) GhcBuild_mc='YES'
+        yes) Build_mc='YES'
              ;;
-        no)  GhcBuild_mc='NO'
+        no)  Build_mc='NO'
              ;;
         *)   echo "I don't understand this option: --enable-concurrent=$enableval"
              exit 1
@@ -980,9 +980,9 @@ AC_ARG_ENABLE(concurrent,
 AC_ARG_ENABLE(profiled-concurrent,
    [--enable-profiled-concurrent turn on profiling for \`concurrent Haskell'],
    [case "$enableval" in
-        yes) GhcBuild_mr='YES'
+        yes) Build_mr='YES'
              ;;
-        no)  GhcBuild_mr='NO'
+        no)  Build_mr='NO'
              ;;
         *)   echo "I don't understand this option: --enable-profiled-concurrent=$enableval"
              exit 1
@@ -992,9 +992,9 @@ AC_ARG_ENABLE(profiled-concurrent,
 AC_ARG_ENABLE(ticky-concurrent,
    [--enable-ticky-concurrent turn on \`ticky-ticky' profiling for \`concurrent Haskell'],
    [case "$enableval" in
-        yes) GhcBuild_mt='YES'
+        yes) Build_mt='YES'
              ;;
-        no)  GhcBuild_mt='NO'
+        no)  Build_mt='NO'
              ;;
         *)   echo "I don't understand this option: --enable-ticky-concurrent=$enableval"
              exit 1
@@ -1004,9 +1004,9 @@ AC_ARG_ENABLE(ticky-concurrent,
 AC_ARG_ENABLE(parallel,
    [--enable-parallel      turn on \`parallel Haskell' features],
    [case "$enableval" in
-        yes) GhcBuild_mp='YES';
+        yes) Build_mp='YES';
              ;;
-        no)  GhcBuild_mp='NO'
+        no)  Build_mp='NO'
              ;;
         *)   echo "I don't understand this option: --enable-parallel=$enableval"
              exit 1
@@ -1016,9 +1016,9 @@ AC_ARG_ENABLE(parallel,
 AC_ARG_ENABLE(gransim,
    [--enable-gransim       turn on GranSim parallel simulator],
    [case "$enableval" in
-        yes) GhcBuild_mg='YES';
+        yes) Build_mg='YES';
              ;;
-        no)  GhcBuild_mg='NO'
+        no)  Build_mg='NO'
              ;;
         *)   echo "I don't understand this option: --enable-gransim=$enableval"
              exit 1
@@ -1028,9 +1028,9 @@ AC_ARG_ENABLE(gransim,
 AC_ARG_ENABLE(gc-2s,
    [--enable-gc-2s         a build with the 2-space copying garbage collector],
    [case "$enableval" in
-        yes) GhcBuild_2s='YES'
+        yes) Build_2s='YES'
              ;;
-        no)  GhcBuild_2s='NO'
+        no)  Build_2s='NO'
              ;;
         *)   echo "I don't understand this option: --enable-gc-2s=$enableval"
              exit 1
@@ -1040,9 +1040,9 @@ AC_ARG_ENABLE(gc-2s,
 AC_ARG_ENABLE(gc-1s,
    [--enable-gc-1s         a build with the 1-space compacting garbage collector],
    [case "$enableval" in
-        yes) GhcBuild_1s='YES'
+        yes) Build_1s='YES'
              ;;
-        no)  GhcBuild_1s='NO'
+        no)  Build_1s='NO'
              ;;
         *)   echo "I don't understand this option: --enable-gc-1s=$enableval"
              exit 1
@@ -1052,9 +1052,9 @@ AC_ARG_ENABLE(gc-1s,
 AC_ARG_ENABLE(gc-du,
    [--enable-gc-du         a build with \`dual-mode' (1s/2s) garbage collector],
    [case "$enableval" in
-        yes) GhcBuild_du='YES'
+        yes) Build_du='YES'
              ;;
-        no)  GhcBuild_du='NO'
+        no)  Build_du='NO'
              ;;
         *)   echo "I don't understand this option: --enable-gc-du=$enableval"
              exit 1
@@ -1064,9 +1064,9 @@ AC_ARG_ENABLE(gc-du,
 AC_ARG_ENABLE(user-way-a,
    [--enable-user-way-a    build for \`user way a' (mostly for implementors)],
    [case "$enableval" in
-        yes) GhcBuild_a='YES'
+        yes) Build_a='YES'
              ;;
-        no)  GhcBuild_a='NO'
+        no)  Build_a='NO'
              ;;
         *)   echo "I don't understand this option: --enable-user-way-a=$enableval"
              exit 1
@@ -1076,9 +1076,9 @@ AC_ARG_ENABLE(user-way-a,
 AC_ARG_ENABLE(user-way-b,
    [--enable-user-way-b    build for \`user way b' (mostly for implementors)],
    [case "$enableval" in
-        yes) GhcBuild_b='YES'
+        yes) Build_b='YES'
              ;;
-        no)  GhcBuild_b='NO'
+        no)  Build_b='NO'
              ;;
         *)   echo "I don't understand this option: --enable-user-way-b=$enableval"
              exit 1
@@ -1088,9 +1088,9 @@ AC_ARG_ENABLE(user-way-b,
 AC_ARG_ENABLE(user-way-c,
    [--enable-user-way-c    build for \`user way c' (mostly for implementors)],
    [case "$enableval" in
-        yes) GhcBuild_c='YES'
+        yes) Build_c='YES'
              ;;
-        no)  GhcBuild_c='NO'
+        no)  Build_c='NO'
              ;;
         *)   echo "I don't understand this option: --enable-user-way-c=$enableval"
              exit 1
@@ -1100,9 +1100,9 @@ AC_ARG_ENABLE(user-way-c,
 AC_ARG_ENABLE(user-way-d,
    [--enable-user-way-d    build for \`user way d' (mostly for implementors)],
    [case "$enableval" in
-        yes) GhcBuild_d='YES'
+        yes) Build_d='YES'
              ;;
-        no)  GhcBuild_d='NO'
+        no)  Build_d='NO'
              ;;
         *)   echo "I don't understand this option: --enable-user-way-d=$enableval"
              exit 1
@@ -1112,9 +1112,9 @@ AC_ARG_ENABLE(user-way-d,
 AC_ARG_ENABLE(user-way-e,
    [--enable-user-way-e    build for \`user way e' (mostly for implementors)],
    [case "$enableval" in
-        yes) GhcBuild_e='YES'
+        yes) Build_e='YES'
              ;;
-        no)  GhcBuild_e='NO'
+        no)  Build_e='NO'
              ;;
         *)   echo "I don't understand this option: --enable-user-way-e=$enableval"
              exit 1
@@ -1124,9 +1124,9 @@ AC_ARG_ENABLE(user-way-e,
 AC_ARG_ENABLE(user-way-f,
    [--enable-user-way-f    build for \`user way f' (mostly for implementors)],
    [case "$enableval" in
-        yes) GhcBuild_f='YES'
+        yes) Build_f='YES'
              ;;
-        no)  GhcBuild_f='NO'
+        no)  Build_f='NO'
              ;;
         *)   echo "I don't understand this option: --enable-user-way-f=$enableval"
              exit 1
@@ -1136,9 +1136,9 @@ AC_ARG_ENABLE(user-way-f,
 AC_ARG_ENABLE(user-way-g,
    [--enable-user-way-g    build for \`user way g' (mostly for implementors)],
    [case "$enableval" in
-        yes) GhcBuild_g='YES'
+        yes) Build_g='YES'
              ;;
-        no)  GhcBuild_g='NO'
+        no)  Build_g='NO'
              ;;
         *)   echo "I don't understand this option: --enable-user-way-g=$enableval"
              exit 1
@@ -1148,9 +1148,9 @@ AC_ARG_ENABLE(user-way-g,
 AC_ARG_ENABLE(user-way-h,
    [--enable-user-way-h    build for \`user way h' (mostly for implementors)],
    [case "$enableval" in
-        yes) GhcBuild_h='YES'
+        yes) Build_h='YES'
              ;;
-        no)  GhcBuild_h='NO'
+        no)  Build_h='NO'
              ;;
         *)   echo "I don't understand this option: --enable-user-way-h=$enableval"
              exit 1
@@ -1160,9 +1160,9 @@ AC_ARG_ENABLE(user-way-h,
 AC_ARG_ENABLE(user-way-i,
    [--enable-user-way-i    build for \`user way i' (mostly for implementors)],
    [case "$enableval" in
-        yes) GhcBuild_i='YES'
+        yes) Build_i='YES'
              ;;
-        no)  GhcBuild_i='NO'
+        no)  Build_i='NO'
              ;;
         *)   echo "I don't understand this option: --enable-user-way-i=$enableval"
              exit 1
@@ -1172,9 +1172,9 @@ AC_ARG_ENABLE(user-way-i,
 AC_ARG_ENABLE(user-way-j,
    [--enable-user-way-j    build for \`user way j' (mostly for implementors)],
    [case "$enableval" in
-        yes) GhcBuild_j='YES'
+        yes) Build_j='YES'
              ;;
-        no)  GhcBuild_j='NO'
+        no)  Build_j='NO'
              ;;
         *)   echo "I don't understand this option: --enable-user-way-j=$enableval"
              exit 1
@@ -1184,9 +1184,9 @@ AC_ARG_ENABLE(user-way-j,
 AC_ARG_ENABLE(user-way-k,
    [--enable-user-way-k    build for \`user way k' (mostly for implementors)],
    [case "$enableval" in
-        yes) GhcBuild_k='YES'
+        yes) Build_k='YES'
              ;;
-        no)  GhcBuild_k='NO'
+        no)  Build_k='NO'
              ;;
         *)   echo "I don't understand this option: --enable-user-way-k=$enableval"
              exit 1
@@ -1196,9 +1196,9 @@ AC_ARG_ENABLE(user-way-k,
 AC_ARG_ENABLE(user-way-l,
    [--enable-user-way-l    build for \`user way l' (mostly for implementors)],
    [case "$enableval" in
-        yes) GhcBuild_l='YES'
+        yes) Build_l='YES'
              ;;
-        no)  GhcBuild_l='NO'
+        no)  Build_l='NO'
              ;;
         *)   echo "I don't understand this option: --enable-user-way-l=$enableval"
              exit 1
@@ -1208,9 +1208,9 @@ AC_ARG_ENABLE(user-way-l,
 AC_ARG_ENABLE(user-way-m,
    [--enable-user-way-m    build for \`user way m' (mostly for implementors)],
    [case "$enableval" in
-        yes) GhcBuild_m='YES'
+        yes) Build_m='YES'
              ;;
-        no)  GhcBuild_m='NO'
+        no)  Build_m='NO'
              ;;
         *)   echo "I don't understand this option: --enable-user-way-m=$enableval"
              exit 1
@@ -1220,9 +1220,9 @@ AC_ARG_ENABLE(user-way-m,
 AC_ARG_ENABLE(user-way-n,
    [--enable-user-way-n    build for \`user way n' (mostly for implementors)],
    [case "$enableval" in
-        yes) GhcBuild_n='YES'
+        yes) Build_n='YES'
              ;;
-        no)  GhcBuild_n='NO'
+        no)  Build_n='NO'
              ;;
         *)   echo "I don't understand this option: --enable-user-way-n=$enableval"
              exit 1
@@ -1232,9 +1232,9 @@ AC_ARG_ENABLE(user-way-n,
 AC_ARG_ENABLE(user-way-o,
    [--enable-user-way-o    build for \`user way o' (mostly for implementors)],
    [case "$enableval" in
-        yes) GhcBuild_o='YES'
+        yes) Build_o='YES'
              ;;
-        no)  GhcBuild_o='NO'
+        no)  Build_o='NO'
              ;;
         *)   echo "I don't understand this option: --enable-user-way-o=$enableval"
              exit 1
@@ -1244,9 +1244,9 @@ AC_ARG_ENABLE(user-way-o,
 AC_ARG_ENABLE(user-way-A,
    [--enable-user-way-A    build for \`user way A' (mostly for implementors)],
    [case "$enableval" in
-        yes) GhcBuild_A='YES'
+        yes) Build_A='YES'
              ;;
-        no)  GhcBuild_A='NO'
+        no)  Build_A='NO'
              ;;
         *)   echo "I don't understand this option: --enable-user-way-A=$enableval"
              exit 1
@@ -1256,49 +1256,26 @@ AC_ARG_ENABLE(user-way-A,
 AC_ARG_ENABLE(user-way-B,
    [--enable-user-way-B    build for \`user way B' (mostly for implementors)],
    [case "$enableval" in
-        yes) GhcBuild_B='YES'
+        yes) Build_B='YES'
              ;;
-        no)  GhcBuild_B='NO'
+        no)  Build_B='NO'
              ;;
         *)   echo "I don't understand this option: --enable-user-way-B=$enableval"
              exit 1
              ;;
     esac])
 
-dnl We do not use AC_SUBST to communicate the GhcBuild_* info,
+dnl We do not use AC_SUBST to communicate the Build_* info,
 dnl as some seds (notably OSF) only allow 99 commands (!!!).
 dnl We will do the equivalent by a HACK further down.
 
-dnl AC_SUBST(GhcBuild_normal)
-dnl AC_SUBST(GhcBuild_p)
-dnl AC_SUBST(GhcBuild_t)
-dnl AC_SUBST(GhcBuild_u)
-dnl AC_SUBST(GhcBuild_mc)
-dnl AC_SUBST(GhcBuild_mr)
-dnl AC_SUBST(GhcBuild_mt)
-dnl AC_SUBST(GhcBuild_mp)
-dnl AC_SUBST(GhcBuild_mg)
-dnl AC_SUBST(GhcBuild_2s)
-dnl AC_SUBST(GhcBuild_1s)
-dnl AC_SUBST(GhcBuild_du)
-dnl AC_SUBST(GhcBuild_a)
-dnl AC_SUBST(GhcBuild_b)
-dnl AC_SUBST(GhcBuild_c)
-dnl AC_SUBST(GhcBuild_d)
-dnl AC_SUBST(GhcBuild_e)
-dnl AC_SUBST(GhcBuild_f)
-dnl AC_SUBST(GhcBuild_g)
-dnl AC_SUBST(GhcBuild_h)
-dnl AC_SUBST(GhcBuild_i)
-dnl AC_SUBST(GhcBuild_j)
-dnl AC_SUBST(GhcBuild_k)
-dnl AC_SUBST(GhcBuild_l)
-dnl AC_SUBST(GhcBuild_m)
-dnl AC_SUBST(GhcBuild_n)
-dnl AC_SUBST(GhcBuild_o)
-dnl AC_SUBST(GhcBuild_A)
-dnl AC_SUBST(GhcBuild_B)
+# -------------------------------------------------------------------------
+dnl
+dnl * `GHC' CONFIGURATION STUFF
 
+if test "xxx$DoingGHC" = 'xxxghc' ; then
+# a very big "if"!
+#
 #---------------------------------------------------------------
 #
 dnl ** which Haskell compiler to bootstrap GHC with?
@@ -1399,9 +1376,9 @@ fi
 AC_SUBST(GhcWithRegisterised)
 
 if test $GhcWithRegisterised = 'NO'; then
-    GhcBuild_u='YES'
-    GhcBuild_normal='NO'
-    GhcBuild_p='NO'
+    Build_u='YES'
+    Build_normal='NO'
+    Build_p='NO'
 fi
 # ToDo: make sure we can do concurrent for platform/circs...
 # ToDo: make sure we can do profiling for platform/circs...
@@ -1535,22 +1512,7 @@ AC_ARG_ENABLE(sockets-library,
     esac])
 AC_SUBST(GhcWithSockets)
 
-dnl ** build the interpreter?
-BuildGHCI='NO'
-AC_ARG_ENABLE(ghci,
-   [--enable-ghci             build Glasgow Haskell interpreter (HACKERS ONLY)],
-   [case "$enableval" in
-        yes) BuildGHCI='YES'
-             ;;
-        no)  BuildGHCI='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-ghci=$enableval"
-             exit 1
-             ;;
-    esac])
-AC_SUBST(BuildGHCI)
-
-# Here, by HACK means, we dump all the GhcBuild_ info
+# Here, by HACK means, we dump all the Build_ info
 # into a file.  See comment above.
 rm -f ghc/mkworld/buildinfo.jm
 echo creating ghc/mkworld/buildinfo.jm
@@ -1560,10 +1522,10 @@ XCOMM This file is obliterated every time 'configure' is run!
 
 EOF
 for xx in normal p t u mc mr mt mp mg 2s 1s du a b c d e f g h i j k l m n o A B ; do
-    eval "yy=\$GhcBuild_$xx"
-    echo "#ifndef GhcBuild_$xx"     >> ghc/mkworld/buildinfo.jm
-    echo "#define GhcBuild_$xx $yy" >> ghc/mkworld/buildinfo.jm
-    echo "#endif"		    >> ghc/mkworld/buildinfo.jm
+    eval "yy=\$Build_$xx"
+    echo "#ifndef Build_$xx"     >> ghc/mkworld/buildinfo.jm
+    echo "#define Build_$xx $yy" >> ghc/mkworld/buildinfo.jm
+    echo "#endif"		 >> ghc/mkworld/buildinfo.jm
 done
 
 # here ends a very big if DoingGHC = 'ghc' ...
@@ -1625,7 +1587,7 @@ esac
 AC_SUBST(WithHsLibsHc)
 AC_SUBST(WithHsLibsHcType)
 
-# Here, by HACK means, we dump all the GhcBuild_ info
+# Here, by HACK means, we dump all the Build_ info
 # into a file.  See comment above.
 rm -f hslibs/mkworld/buildinfo.jm
 echo creating hslibs/mkworld/buildinfo.jm
@@ -1634,13 +1596,12 @@ XCOMM ** DO NOT EDIT! **
 XCOMM This file is obliterated every time 'configure' is run!
 
 EOF
-dnl Do not really know what to put here:
-dnl for xx in normal p t u mc mr mt mp mg 2s 1s du a b c d e f g h i j k l m n o A B ; do
-dnl     eval "yy=\$GhcBuild_$xx"
-dnl    echo "#ifndef GhcBuild_$xx"     >> ghc/mkworld/buildinfo.jm
-dnl    echo "#define GhcBuild_$xx $yy" >> ghc/mkworld/buildinfo.jm
-dnl    echo "#endif"		    >> ghc/mkworld/buildinfo.jm
-dnl done
+for xx in normal p t u mc mr mt mp mg 2s 1s du a b c d e f g h i j k l m n o A B ; do
+    eval "yy=\$Build_$xx"
+    echo "#ifndef Build_$xx"     >> hslibs/mkworld/buildinfo.jm
+    echo "#define Build_$xx $yy" >> hslibs/mkworld/buildinfo.jm
+    echo "#endif"		 >> hslibs/mkworld/buildinfo.jm
+done
 
 # here ends a very big if DoingHsLibs = 'hslibs' ...
 fi
@@ -1782,6 +1743,8 @@ case $WithHaggisHc in
 esac
 AC_SUBST(WithHaggisHc)
 AC_SUBST(WithHaggisHcType)
+
+# builds stuff?? ToDo
 
 # here ends a very big if DoingHaggis = 'haggis' ...
 fi
@@ -2069,6 +2032,22 @@ for xx in Real Spectral Imaginary GHC_ONLY Specialise PRIVATE Parallel ; do
     echo "#ifndef Include${xx}NoFibTests"     >> nofib/mkworld/buildinfo.jm
     echo "#define Include${xx}NoFibTests $yy" >> nofib/mkworld/buildinfo.jm
     echo "#endif"			      >> nofib/mkworld/buildinfo.jm
+done
+
+# Here, by HACK means, we dump all the Build_ info
+# into a file.  See comment above.
+rm -f nofib/mkworld/buildinfo.jm
+echo creating nofib/mkworld/buildinfo.jm
+cat > nofib/mkworld/buildinfo.jm <<EOF
+XCOMM ** DO NOT EDIT! **
+XCOMM This file is obliterated every time 'configure' is run!
+
+EOF
+for xx in normal p t u mc mr mt mp mg 2s 1s du a b c d e f g h i j k l m n o A B ; do
+    eval "yy=\$Build_$xx"
+    echo "#ifndef Build_$xx"     >> nofib/mkworld/buildinfo.jm
+    echo "#define Build_$xx $yy" >> nofib/mkworld/buildinfo.jm
+    echo "#endif"		 >> nofib/mkworld/buildinfo.jm
 done
 
 # here ends a very big if DoingNoFib = 'nofib' ...

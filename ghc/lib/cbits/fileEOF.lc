@@ -1,0 +1,23 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1994
+%
+\subsection[fileEOF.lc]{hIsEOF Runtime Support}
+
+\begin{code}
+
+#include "rtsdefs.h"
+#include "stgio.h"
+
+StgInt
+fileEOF(fp)
+StgAddr fp;
+{
+    if (fileLookAhead(fp) != EOF)
+	return 0;
+    else if (ghc_errtype == ERR_EOF)
+	return 1;
+    else
+	return -1;
+}
+
+\end{code}

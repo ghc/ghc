@@ -16,23 +16,19 @@ GHC_OPTS, just for fun.
 *								*
 ****************************************************************/
 
+#define IHaveSubdirs
 
 #if IncludeTestDirsInBuild == YES
-#define IHaveSubdirs
 #define __ghc_lib_tests_dir tests
 #else
 #define __ghc_lib_tests_dir /* nothing */
 #endif
 
-SUBDIRS = __ghc_lib_tests_dir
+SUBDIRS = cbits __ghc_lib_tests_dir
 
-/* only subdir is the (empty :-() test suite */
-#define NoAllTargetForSubdirs
 #define NoDocsTargetForSubdirs
-#define NoInstallTargetForSubdirs
 #define NoInstallDocsTargetForSubdirs
 #define NoDependTargetForSubdirs
-#define NoTagTargetForSubdirs
 
 GhcDriverNeededHere(depend all)
 EtagsNeededHere(tags)
@@ -54,102 +50,12 @@ PREL_OPTS=/*???-fcompiling-ghc-internals -fno-implicit-prelude*/
 
 /* per-build options: shared with RTS */
 #define rts_or_lib(r,l) l
-/*later: #include "../mkworld/GHC_OPTS" */
+#include "../mkworld/GHC_OPTS"
 
 /* this is just friendliness to "hstags" */
 HSTAGS_OPTS=-fglasgow-exts
 
 /***************************************************************/
-
-#define SrcThingVars(blob)				@@\
-CAT2(blob,_HC_norm) = $(CAT2(blob,_HS):.hs=.hc)		@@\
-CAT2(blob,_HC_p)    = $(CAT2(blob,_HS):.hs=.p_hc)	@@\
-CAT2(blob,_HC_t)    = $(CAT2(blob,_HS):.hs=.t_hc)	@@\
-CAT2(blob,_HC_u)    = $(CAT2(blob,_HS):.hs=.u_hc)	@@\
-CAT2(blob,_HC_mc)   = $(CAT2(blob,_HS):.hs=.mc_hc)	@@\
-CAT2(blob,_HC_mr)   = $(CAT2(blob,_HS):.hs=.mr_hc)	@@\
-CAT2(blob,_HC_mt)   = $(CAT2(blob,_HS):.hs=.mt_hc)	@@\
-CAT2(blob,_HC_mp)   = $(CAT2(blob,_HS):.hs=.mp_hc)	@@\
-CAT2(blob,_HC_mg)   = $(CAT2(blob,_HS):.hs=.mg_hc)	@@\
-CAT2(blob,_HC_2s)   = $(CAT2(blob,_HS):.hs=.2s_hc)	@@\
-CAT2(blob,_HC_1s)   = $(CAT2(blob,_HS):.hs=.1s_hc)	@@\
-CAT2(blob,_HC_du)   = $(CAT2(blob,_HS):.hs=.du_hc)	@@\
-CAT2(blob,_HC_a)    = $(CAT2(blob,_HS):.hs=.a_hc)	@@\
-CAT2(blob,_HC_b)    = $(CAT2(blob,_HS):.hs=.b_hc)	@@\
-CAT2(blob,_HC_c)    = $(CAT2(blob,_HS):.hs=.c_hc)	@@\
-CAT2(blob,_HC_d)    = $(CAT2(blob,_HS):.hs=.d_hc)	@@\
-CAT2(blob,_HC_e)    = $(CAT2(blob,_HS):.hs=.e_hc)	@@\
-CAT2(blob,_HC_f)    = $(CAT2(blob,_HS):.hs=.f_hc)	@@\
-CAT2(blob,_HC_g)    = $(CAT2(blob,_HS):.hs=.g_hc)	@@\
-CAT2(blob,_HC_h)    = $(CAT2(blob,_HS):.hs=.h_hc)	@@\
-CAT2(blob,_HC_i)    = $(CAT2(blob,_HS):.hs=.i_hc)	@@\
-CAT2(blob,_HC_j)    = $(CAT2(blob,_HS):.hs=.j_hc)	@@\
-CAT2(blob,_HC_k)    = $(CAT2(blob,_HS):.hs=.k_hc)	@@\
-CAT2(blob,_HC_l)    = $(CAT2(blob,_HS):.hs=.l_hc)	@@\
-CAT2(blob,_HC_m)    = $(CAT2(blob,_HS):.hs=.m_hc)	@@\
-CAT2(blob,_HC_n)    = $(CAT2(blob,_HS):.hs=.n_hc)	@@\
-CAT2(blob,_HC_o)    = $(CAT2(blob,_HS):.hs=.o_hc)	@@\
-CAT2(blob,_HC_A)    = $(CAT2(blob,_HS):.hs=.A_hc)	@@\
-CAT2(blob,_HC_B)    = $(CAT2(blob,_HS):.hs=.B_hc)	@@\
-							@@\
-CAT2(blob,_DEP_norm) = $(CAT2(blob,_HC_norm):.hc=.o)	@@\
-CAT2(blob,_DEP_p)   = $(CAT2(blob,_HC_p):.p_hc=.p_o)	@@\
-CAT2(blob,_DEP_t)   = $(CAT2(blob,_HC_t):.t_hc=.t_o)	@@\
-CAT2(blob,_DEP_u)   = $(CAT2(blob,_HC_u):.u_hc=.u_o)	@@\
-CAT2(blob,_DEP_a)   = $(CAT2(blob,_HC_a):.a_hc=.a_o)	@@\
-CAT2(blob,_DEP_b)   = $(CAT2(blob,_HC_b):.b_hc=.b_o)	@@\
-CAT2(blob,_DEP_c)   = $(CAT2(blob,_HC_c):.c_hc=.c_o)	@@\
-CAT2(blob,_DEP_d)   = $(CAT2(blob,_HC_d):.d_hc=.d_o)	@@\
-CAT2(blob,_DEP_e)   = $(CAT2(blob,_HC_e):.e_hc=.e_o)	@@\
-CAT2(blob,_DEP_f)   = $(CAT2(blob,_HC_f):.f_hc=.f_o)	@@\
-CAT2(blob,_DEP_g)   = $(CAT2(blob,_HC_g):.g_hc=.g_o)	@@\
-CAT2(blob,_DEP_h)   = $(CAT2(blob,_HC_h):.h_hc=.h_o)	@@\
-CAT2(blob,_DEP_i)   = $(CAT2(blob,_HC_i):.i_hc=.i_o)	@@\
-CAT2(blob,_DEP_j)   = $(CAT2(blob,_HC_j):.j_hc=.j_o)	@@\
-CAT2(blob,_DEP_k)   = $(CAT2(blob,_HC_k):.k_hc=.k_o)	@@\
-CAT2(blob,_DEP_l)   = $(CAT2(blob,_HC_l):.l_hc=.l_o)	@@\
-CAT2(blob,_DEP_m)   = $(CAT2(blob,_HC_m):.m_hc=.m_o)	@@\
-CAT2(blob,_DEP_n)   = $(CAT2(blob,_HC_n):.n_hc=.n_o)	@@\
-CAT2(blob,_DEP_o)   = $(CAT2(blob,_HC_o):.o_hc=.o_o)	@@\
-CAT2(blob,_DEP_A)   = $(CAT2(blob,_HC_A):.A_hc=.A_o)	@@\
-CAT2(blob,_DEP_B)   = $(CAT2(blob,_HC_B):.B_hc=.B_o)	@@\
-CAT2(blob,_DEP_mc)  = $(CAT2(blob,_HC_mc):.mc_hc=.mc_o)	@@\
-CAT2(blob,_DEP_mr)  = $(CAT2(blob,_HC_mr):.mr_hc=.mr_o)	@@\
-CAT2(blob,_DEP_mt)  = $(CAT2(blob,_HC_mt):.mt_hc=.mt_o)	@@\
-CAT2(blob,_DEP_mp)  = $(CAT2(blob,_HC_mp):.mp_hc=.mp_o)	@@\
-CAT2(blob,_DEP_mg)  = $(CAT2(blob,_HC_mg):.mg_hc=.mg_o)	@@\
-CAT2(blob,_DEP_2s)  = $(CAT2(blob,_HC_2s):.2s_hc=.2s_o)	@@\
-CAT2(blob,_DEP_1s)  = $(CAT2(blob,_HC_1s):.1s_hc=.1s_o)	@@\
-CAT2(blob,_DEP_du)  = $(CAT2(blob,_HC_du):.du_hc=.du_o)	@@\
-							@@\
-CAT2(blob,_HIs_p)   = $(CAT2(blob,_HIs):.hi=.p_hi)	@@\
-CAT2(blob,_HIs_t)   = $(CAT2(blob,_HIs):.hi=.t_hi)	@@\
-CAT2(blob,_HIs_u)   = $(CAT2(blob,_HIs):.hi=.u_hi)	@@\
-CAT2(blob,_HIs_a)   = $(CAT2(blob,_HIs):.hi=.a_hi)	@@\
-CAT2(blob,_HIs_b)   = $(CAT2(blob,_HIs):.hi=.b_hi)	@@\
-CAT2(blob,_HIs_c)   = $(CAT2(blob,_HIs):.hi=.c_hi)	@@\
-CAT2(blob,_HIs_d)   = $(CAT2(blob,_HIs):.hi=.d_hi)	@@\
-CAT2(blob,_HIs_e)   = $(CAT2(blob,_HIs):.hi=.e_hi)	@@\
-CAT2(blob,_HIs_f)   = $(CAT2(blob,_HIs):.hi=.f_hi)	@@\
-CAT2(blob,_HIs_g)   = $(CAT2(blob,_HIs):.hi=.g_hi)	@@\
-CAT2(blob,_HIs_h)   = $(CAT2(blob,_HIs):.hi=.h_hi)	@@\
-CAT2(blob,_HIs_i)   = $(CAT2(blob,_HIs):.hi=.i_hi)	@@\
-CAT2(blob,_HIs_j)   = $(CAT2(blob,_HIs):.hi=.j_hi)	@@\
-CAT2(blob,_HIs_k)   = $(CAT2(blob,_HIs):.hi=.k_hi)	@@\
-CAT2(blob,_HIs_l)   = $(CAT2(blob,_HIs):.hi=.l_hi)	@@\
-CAT2(blob,_HIs_m)   = $(CAT2(blob,_HIs):.hi=.m_hi)	@@\
-CAT2(blob,_HIs_n)   = $(CAT2(blob,_HIs):.hi=.n_hi)	@@\
-CAT2(blob,_HIs_o)   = $(CAT2(blob,_HIs):.hi=.o_hi)	@@\
-CAT2(blob,_HIs_A)   = $(CAT2(blob,_HIs):.hi=.A_hi)	@@\
-CAT2(blob,_HIs_B)   = $(CAT2(blob,_HIs):.hi=.B_hi)	@@\
-CAT2(blob,_HIs_mc)  = $(CAT2(blob,_HIs):.hi=.mc_hi)	@@\
-CAT2(blob,_HIs_mr)  = $(CAT2(blob,_HIs):.hi=.mr_hi)	@@\
-CAT2(blob,_HIs_mt)  = $(CAT2(blob,_HIs):.hi=.mt_hi)	@@\
-CAT2(blob,_HIs_mp)  = $(CAT2(blob,_HIs):.hi=.mp_hi)	@@\
-CAT2(blob,_HIs_mg)  = $(CAT2(blob,_HIs):.hi=.mg_hi)	@@\
-CAT2(blob,_HIs_2s)  = $(CAT2(blob,_HIs):.hi=.2s_hi)	@@\
-CAT2(blob,_HIs_1s)  = $(CAT2(blob,_HIs):.hi=.1s_hi)	@@\
-CAT2(blob,_HIs_du)  = $(CAT2(blob,_HIs):.hi=.du_hi)
 
 /****************************************************************
 *								*
@@ -186,10 +92,10 @@ concurrent/SampleVar.hs		\
 concurrent/Semaphore.hs		\
 concurrent/Concurrent.hs
 
-
 BASIC_OBJS_DIRS	= $(BASIC_HS:.hs=)
 
-SrcThingVars(BASIC)
+/* easy way to make many many Make variables: */
+WayThingVars(BASIC)
 
 /************************************************************************
 *									*
@@ -254,126 +160,42 @@ InstallTarget(basic_his)
 InstallMultNonExecTargets(basic_his, $(BASIC_HIs),  $(INSTDATADIR_GHC)/imports)
 #endif /* installing */
 
-IfGhcBuild_normal(BigBuildTarget(,'*.o',basic_his \
-, $(BASIC_DEP_norm),  $(BASIC_HIs)		\
-))
-
-IfGhcBuild_p(BigBuildTarget(_p,'*.p_o',his_p	\
-, $(BASIC_DEP_p),  $(BASIC_HIs_p)		\
-))
-
-IfGhcBuild_t(BigBuildTarget(_t,'*.t_o',his_t	\
-, $(BASIC_DEP_t),  $(BASIC_HIs_t)		\
-))
-
-IfGhcBuild_u(BigBuildTarget(,'*.u_o',his_u	\
-, $(BASIC_DEP_u),  $(BASIC_HIs_u)		\
-))
-
-IfGhcBuild_mc(BigBuildTarget(_mc,'*.mc_o',his_mc \
-, $(BASIC_DEP_mc),  $(BASIC_HIs_mc)		\
-))
-
-IfGhcBuild_mr(BigBuildTarget(_mr,'*.mr_o',his_mr \
-, $(BASIC_DEP_mr),  $(BASIC_HIs_mr)		\
-))
-
-IfGhcBuild_mt(BigBuildTarget(_mr,'*.mt_o',his_mt \
-, $(BASIC_DEP_mt),  $(BASIC_HIs_mt)		\
-))
-
-IfGhcBuild_mp(BigBuildTarget(_mp,'*.mp_o',his_mp \
-, $(BASIC_DEP_mp),  $(BASIC_HIs_mp)		\
-))
-
-IfGhcBuild_mg(BigBuildTarget(_mg,'*.mg_o',his_mg \
-, $(BASIC_DEP_mg),  $(BASIC_HIs_mg)		\
-))
+IfBuild_normal(BigBuildTarget(,'*.o',basic_his, $(BASIC_DEP_norm),  $(BASIC_HIs)))
+IfBuild_p(BigBuildTarget(_p,'*.p_o',his_p, $(BASIC_DEP_p),  $(BASIC_HIs_p)))
+IfBuild_t(BigBuildTarget(_t,'*.t_o',his_t, $(BASIC_DEP_t),  $(BASIC_HIs_t)))
+IfBuild_u(BigBuildTarget(,'*.u_o',his_u, $(BASIC_DEP_u),  $(BASIC_HIs_u)))
+IfBuild_mc(BigBuildTarget(_mc,'*.mc_o',his_mc, $(BASIC_DEP_mc),  $(BASIC_HIs_mc)))
+IfBuild_mr(BigBuildTarget(_mr,'*.mr_o',his_mr, $(BASIC_DEP_mr),  $(BASIC_HIs_mr)))
+IfBuild_mt(BigBuildTarget(_mr,'*.mt_o',his_mt, $(BASIC_DEP_mt),  $(BASIC_HIs_mt)))
+IfBuild_mp(BigBuildTarget(_mp,'*.mp_o',his_mp, $(BASIC_DEP_mp),  $(BASIC_HIs_mp)))
+IfBuild_mg(BigBuildTarget(_mg,'*.mg_o',his_mg, $(BASIC_DEP_mg),  $(BASIC_HIs_mg)))
 
 /* these GC ones do not *really* need separate .hi files,
    but it really makes life easier to do it this way
 */
-IfGhcBuild_2s(BigBuildTarget(_2s,'*.2s_o',his_2s \
-, $(BASIC_DEP_2s),  $(BASIC_HIs_2s)		\
-))
-
-IfGhcBuild_1s(BigBuildTarget(_1s,'*.1s_o',his_1s \
-, $(BASIC_DEP_1s),  $(BASIC_HIs_1s)		\
-))
-
-IfGhcBuild_du(BigBuildTarget(_du,'*.du_o',his_du \
-, $(BASIC_DEP_du),  $(BASIC_HIs_du)		\
-))
+IfBuild_2s(BigBuildTarget(_2s,'*.2s_o',his_2s, $(BASIC_DEP_2s),  $(BASIC_HIs_2s)))
+IfBuild_1s(BigBuildTarget(_1s,'*.1s_o',his_1s, $(BASIC_DEP_1s),  $(BASIC_HIs_1s)))
+IfBuild_du(BigBuildTarget(_du,'*.du_o',his_du, $(BASIC_DEP_du),  $(BASIC_HIs_du)))
 
 /* user ways -- yeeps! */
 
-IfGhcBuild_a(BigBuildTarget(_a,'*.a_o',his_a	\
-, $(BASIC_DEP_a),  $(BASIC_HIs_a)		\
-))
-
-IfGhcBuild_b(BigBuildTarget(_b,'*.b_o',his_b	\
-, $(BASIC_DEP_b),  $(BASIC_HIs_b)		\
-))
-
-IfGhcBuild_c(BigBuildTarget(_c,'*.c_o',his_c	\
-, $(BASIC_DEP_c),  $(BASIC_HIs_c)		\
-))
-
-IfGhcBuild_d(BigBuildTarget(_d,'*.d_o',his_d	\
-, $(BASIC_DEP_d),  $(BASIC_HIs_d)		\
-))
-
-IfGhcBuild_e(BigBuildTarget(_e,'*.e_o',his_e	\
-, $(BASIC_DEP_e),  $(BASIC_HIs_e)		\
-))
-
-IfGhcBuild_f(BigBuildTarget(_f,'*.f_o',his_f	\
-, $(BASIC_DEP_f),  $(BASIC_HIs_f)		\
-))
-
-IfGhcBuild_g(BigBuildTarget(_g,'*.g_o',his_g	\
-, $(BASIC_DEP_g),  $(BASIC_HIs_g)		\
-))
-
-IfGhcBuild_h(BigBuildTarget(_h,'*.h_o',his_h	\
-, $(BASIC_DEP_h),  $(BASIC_HIs_h)		\
-))
-
-IfGhcBuild_i(BigBuildTarget(_i,'*.i_o',his_i	\
-, $(BASIC_DEP_i),  $(BASIC_HIs_i)		\
-))
-
-IfGhcBuild_j(BigBuildTarget(_j,'*.j_o',his_j	\
-, $(BASIC_DEP_j),  $(BASIC_HIs_j)		\
-))
-
-IfGhcBuild_k(BigBuildTarget(_k,'*.k_o',his_k	\
-, $(BASIC_DEP_k),  $(BASIC_HIs_k)		\
-))
-
-IfGhcBuild_l(BigBuildTarget(_l,'*.l_o',his_l	\
-, $(BASIC_DEP_l),  $(BASIC_HIs_l)		\
-))
-
-IfGhcBuild_m(BigBuildTarget(_m,'*.m_o',his_m	\
-, $(BASIC_DEP_m),  $(BASIC_HIs_m)		\
-))
-
-IfGhcBuild_n(BigBuildTarget(_n,'*.n_o',his_n	\
-, $(BASIC_DEP_n),  $(BASIC_HIs_n)		\
-))
-
-IfGhcBuild_o(BigBuildTarget(_o,'*.o_o',his_o	\
-, $(BASIC_DEP_o),  $(BASIC_HIs_o)		\
-))
-
-IfGhcBuild_A(BigBuildTarget(_A,'*.A_o',his_A	\
-, $(BASIC_DEP_A),  $(BASIC_HIs_A)		\
-))
-
-IfGhcBuild_B(BigBuildTarget(_B,'*.B_o',his_B	\
-, $(BASIC_DEP_B),  $(BASIC_HIs_B)		\
-))
+IfBuild_a(BigBuildTarget(_a,'*.a_o',his_a, $(BASIC_DEP_a),  $(BASIC_HIs_a)))
+IfBuild_b(BigBuildTarget(_b,'*.b_o',his_b, $(BASIC_DEP_b),  $(BASIC_HIs_b)))
+IfBuild_c(BigBuildTarget(_c,'*.c_o',his_c, $(BASIC_DEP_c),  $(BASIC_HIs_c)))
+IfBuild_d(BigBuildTarget(_d,'*.d_o',his_d, $(BASIC_DEP_d),  $(BASIC_HIs_d)))
+IfBuild_e(BigBuildTarget(_e,'*.e_o',his_e, $(BASIC_DEP_e),  $(BASIC_HIs_e)))
+IfBuild_f(BigBuildTarget(_f,'*.f_o',his_f, $(BASIC_DEP_f),  $(BASIC_HIs_f)))
+IfBuild_g(BigBuildTarget(_g,'*.g_o',his_g, $(BASIC_DEP_g),  $(BASIC_HIs_g)))
+IfBuild_h(BigBuildTarget(_h,'*.h_o',his_h, $(BASIC_DEP_h),  $(BASIC_HIs_h)))
+IfBuild_i(BigBuildTarget(_i,'*.i_o',his_i, $(BASIC_DEP_i),  $(BASIC_HIs_i)))
+IfBuild_j(BigBuildTarget(_j,'*.j_o',his_j, $(BASIC_DEP_j),  $(BASIC_HIs_j)))
+IfBuild_k(BigBuildTarget(_k,'*.k_o',his_k, $(BASIC_DEP_k),  $(BASIC_HIs_k)))
+IfBuild_l(BigBuildTarget(_l,'*.l_o',his_l, $(BASIC_DEP_l),  $(BASIC_HIs_l)))
+IfBuild_m(BigBuildTarget(_m,'*.m_o',his_m, $(BASIC_DEP_m),  $(BASIC_HIs_m)))
+IfBuild_n(BigBuildTarget(_n,'*.n_o',his_n, $(BASIC_DEP_n),  $(BASIC_HIs_n)))
+IfBuild_o(BigBuildTarget(_o,'*.o_o',his_o, $(BASIC_DEP_o),  $(BASIC_HIs_o)))
+IfBuild_A(BigBuildTarget(_A,'*.A_o',his_A, $(BASIC_DEP_A),  $(BASIC_HIs_A)))
+IfBuild_B(BigBuildTarget(_B,'*.B_o',his_B, $(BASIC_DEP_B),  $(BASIC_HIs_B)))
 
 /****************************************************************
 *								*
@@ -391,95 +213,39 @@ IfGhcBuild_B(BigBuildTarget(_B,'*.B_o',his_B	\
 /* some "helpful" internal macros first... */
 
 #if GhcWithHscBuiltViaC == YES && HaskellCompilerType == HC_USE_HC_FILES
-#define CompilePreludishly__(file,isuf,way,flags)		@@\
-clean  ::							@@\
-	$(RM) CAT3(file,way,.hc)
-
-#else /* normal case */
-#define CompilePreludishly__(file,isuf,way,flags)		@@\
-CAT3(file,way,.hc) : file.isuf					@@\
-	: do not $(RM) CAT3(file,way,.hc)			@@\
-	$(GHC) -C $(GHCFLAGS) flags file.isuf -o CAT3(file,way,.hc) @@\
-clean ::							@@\
+#define CompileWayishly__(hc,file,isuf,way,flags)	@@\
+clean  ::						@@\
 	$(RM) CAT3(file,way,.hc)
 #endif
 
-#define ObjectifyPreludishly__(file,way,flags,osuff,find_pat)	@@\
-CAT3(file,way,.o) : CAT3(file,way,.hc)				@@\
-	$(RM) CAT3(file,way,.o)					@@\
-	@if [ ! -d file ] ; then mkdir file ; else exit 0 ; fi	@@\
-	@find file -name find_pat -print | xargs $(RM) __rm_food @@\
-	$(GHC) -c $(GHCFLAGS) flags CAT3(file,way,.hc) -odir file -osuf osuff @@\
-	touch CAT3(file,way,.o)					@@\
-clean ::							@@\
-	$(RM) CAT3(file,way,.o)					@@\
-	find file -name find_pat -print | xargs $(RM) __rm_food
-
-#define DoHs(file,isuf,way,flags,osuf,find_pat)			\
-CompilePreludishly__(file,isuf,way,flags)			@@\
-ObjectifyPreludishly__(file,way,flags,osuf,find_pat)
-
-/* here we go: (NB: do not make .hc files for _u [unregisterized]) */
-
-#define CompilePreludishly(file,isuf,flags)			@@\
-IfGhcBuild_normal(DoHs(file,isuf,,flags $(GHC_OPTS_norm),'o',   '*.o'))	\
-IfGhcBuild_p(DoHs(file,isuf,_p,   flags $(GHC_OPTS_p),   'p_o',  '*.p_o'))	\
-IfGhcBuild_t(DoHs(file,isuf,_t,   flags $(GHC_OPTS_t),   't_o',  '*.t_o'))	\
-IfGhcBuild_mc(DoHs(file,isuf,_mc, flags $(GHC_OPTS_mc),  'mc_o', '*.mc_o'))	\
-IfGhcBuild_mr(DoHs(file,isuf,_mr, flags $(GHC_OPTS_mr),  'mr_o', '*.mr_o'))	\
-IfGhcBuild_mt(DoHs(file,isuf,_mt, flags $(GHC_OPTS_mt),  'mt_o', '*.mt_o'))	\
-IfGhcBuild_mp(DoHs(file,isuf,_mp, flags $(GHC_OPTS_mp),  'mp_o', '*.mp_o'))	\
-IfGhcBuild_mg(DoHs(file,isuf,_mg, flags $(GHC_OPTS_mg),  'mg_o', '*.mg_o'))	\
-IfGhcBuild_2s(DoHs(file,isuf,_2s, flags $(GHC_OPTS_2s),  '2s_o', '*.2s_o'))	\
-IfGhcBuild_1s(DoHs(file,isuf,_1s, flags $(GHC_OPTS_1s),  '1s_o', '*.1s_o'))	\
-IfGhcBuild_du(DoHs(file,isuf,_du, flags $(GHC_OPTS_du),  'du_o', '*.du_o'))	\
-IfGhcBuild_a(DoHs(file,isuf,_a,   flags $(GHC_OPTS_a),   'a_o',  '*.a_o'))	\
-IfGhcBuild_b(DoHs(file,isuf,_b,   flags $(GHC_OPTS_b),   'b_o',  '*.b_o'))	\
-IfGhcBuild_c(DoHs(file,isuf,_c,   flags $(GHC_OPTS_c),   'c_o',  '*.c_o'))	\
-IfGhcBuild_d(DoHs(file,isuf,_d,   flags $(GHC_OPTS_d),   'd_o',  '*.d_o'))	\
-IfGhcBuild_e(DoHs(file,isuf,_e,   flags $(GHC_OPTS_e),   'e_o',  '*.e_o'))	\
-IfGhcBuild_f(DoHs(file,isuf,_f,   flags $(GHC_OPTS_f),   'f_o',  '*.f_o'))	\
-IfGhcBuild_g(DoHs(file,isuf,_g,   flags $(GHC_OPTS_g),   'g_o',  '*.g_o'))	\
-IfGhcBuild_h(DoHs(file,isuf,_h,   flags $(GHC_OPTS_h),   'h_o',  '*.h_o'))	\
-IfGhcBuild_i(DoHs(file,isuf,_i,   flags $(GHC_OPTS_i),   'i_o',  '*.i_o'))	\
-IfGhcBuild_j(DoHs(file,isuf,_j,   flags $(GHC_OPTS_j),   'j_o',  '*.j_o'))	\
-IfGhcBuild_k(DoHs(file,isuf,_k,   flags $(GHC_OPTS_k),   'k_o',  '*.k_o'))	\
-IfGhcBuild_l(DoHs(file,isuf,_l,   flags $(GHC_OPTS_l),   'l_o',  '*.l_o'))	\
-IfGhcBuild_m(DoHs(file,isuf,_m,   flags $(GHC_OPTS_m),   'm_o',  '*.m_o'))	\
-IfGhcBuild_n(DoHs(file,isuf,_n,   flags $(GHC_OPTS_n),   'n_o',  '*.n_o'))	\
-IfGhcBuild_o(DoHs(file,isuf,_o,   flags $(GHC_OPTS_o),   'o_o',  '*.o_o'))	\
-IfGhcBuild_A(DoHs(file,isuf,_A,   flags $(GHC_OPTS_A),   'A_o',  '*.A_o'))	\
-IfGhcBuild_B(DoHs(file,isuf,_B,   flags $(GHC_OPTS_B),   'B_o',  '*.B_o'))
-
 /* now use the macro: */
 
-CompilePreludishly(prelude/Prelude,hs,-iprelude -fglasgow-exts -fcompiling-ghc-internals Prelude -fno-implicit-prelude)
-CompilePreludishly(prelude/GHCbase,hs,-iprelude -fglasgow-exts -fcompiling-ghc-internals GHCbase)
-CompilePreludishly(prelude/GHCbase2,hs,-iprelude -fglasgow-exts -fcompiling-ghc-internals GHCbase2)
-CompilePreludishly(prelude/GHCps,hs,  -iprelude -fglasgow-exts)
-CompilePreludishly(prelude/GHCio,hs,  -iprelude -fglasgow-exts)
-CompilePreludishly(prelude/GHCmain,hs,-iprelude -fglasgow-exts)
-CompilePreludishly(prelude/PreludeGlaST,hs,-iprelude -fglasgow-exts)
+CompileWayishly(GHC,prelude/Prelude,hs,-iprelude -fglasgow-exts -fcompiling-ghc-internals Prelude -fno-implicit-prelude)
+CompileWayishly(GHC,prelude/GHCbase,hs,-iprelude -fglasgow-exts -fcompiling-ghc-internals GHCbase)
+CompileWayishly(GHC,prelude/GHCps,hs,  -iprelude -fglasgow-exts)
+CompileWayishly(GHC,prelude/GHCio,hs,  -iprelude -fglasgow-exts)
+CompileWayishly(GHC,prelude/GHCmain,hs,-iprelude -fglasgow-exts)
+CompileWayishly(GHC,prelude/PreludeGlaST,hs,-iprelude -fglasgow-exts)
 
-CompilePreludishly(required/Array,hs,-fglasgow-exts -iprelude)
-CompilePreludishly(required/Char,hs,)
-CompilePreludishly(required/Complex,hs,)
-CompilePreludishly(required/Directory,hs,-fglasgow-exts)
-CompilePreludishly(required/IO,hs,-fglasgow-exts)
-CompilePreludishly(required/Ix,hs,-fglasgow-exts)
-CompilePreludishly(required/List,hs,)
-CompilePreludishly(required/Maybe,hs,)
-CompilePreludishly(required/Monad,hs,)
-CompilePreludishly(required/Ratio,hs,)
-CompilePreludishly(required/System,hs,-fglasgow-exts)
+CompileWayishly(GHC,required/Array,hs,-fglasgow-exts -iprelude)
+CompileWayishly(GHC,required/Char,hs,)
+CompileWayishly(GHC,required/Complex,hs,)
+CompileWayishly(GHC,required/Directory,hs,-fglasgow-exts)
+CompileWayishly(GHC,required/IO,hs,-fglasgow-exts)
+CompileWayishly(GHC,required/Ix,hs,-fglasgow-exts)
+CompileWayishly(GHC,required/List,hs,)
+CompileWayishly(GHC,required/Maybe,hs,)
+CompileWayishly(GHC,required/Monad,hs,)
+CompileWayishly(GHC,required/Ratio,hs,)
+CompileWayishly(GHC,required/System,hs,-fglasgow-exts)
 
-CompilePreludishly(concurrent/Channel,hs,)
-CompilePreludishly(concurrent/ChannelVar,hs,)
-CompilePreludishly(concurrent/Merge,hs,-iconcurrent)
-CompilePreludishly(concurrent/Parallel,hs,)
-CompilePreludishly(concurrent/SampleVar,hs,)
-CompilePreludishly(concurrent/Semaphore,hs,)
-CompilePreludishly(concurrent/Concurrent,hs,-iconcurrent)
+CompileWayishly(GHC,concurrent/Channel,hs,)
+CompileWayishly(GHC,concurrent/ChannelVar,hs,)
+CompileWayishly(GHC,concurrent/Merge,hs,-iconcurrent)
+CompileWayishly(GHC,concurrent/Parallel,hs,)
+CompileWayishly(GHC,concurrent/SampleVar,hs,)
+CompileWayishly(GHC,concurrent/Semaphore,hs,)
+CompileWayishly(GHC,concurrent/Concurrent,hs,-iconcurrent)
 
 /****************************************************************
 *								*

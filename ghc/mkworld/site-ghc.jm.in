@@ -65,9 +65,6 @@
 #endif
 GHC_WITH_NATIVE_CODEGEN=GhcWithNativeCodeGen
 
-#ifndef BuildGHCI
-#define BuildGHCI @BuildGHCI@
-#endif
 #ifndef GhcWithDeforester
 #define GhcWithDeforester @GhcWithDeforester@
 #endif
@@ -86,91 +83,91 @@ GHC_WITH_NATIVE_CODEGEN=GhcWithNativeCodeGen
    do it this way, rather than AC_SUBSTing the info into this file
    because some sed's (notably OSF and maybe HP-UX) only allow
    99 commands (!!!), which is way too few if we want to do the
-   GhcBuild_ stuff as well as everything else.  WDP 96/04
+   Build_ stuff as well as everything else.  WDP 96/04
 */
 
 #include "buildinfo.jm"
 
 /* normal sequential */
-#if GhcBuild_normal == YES
-# define IfGhcBuild_normal(x) x
+#if Build_normal == YES
+# define IfBuild_normal(x) x
 GHC_BUILD_FLAG_normal = -build-normal-defined
 #else
-# define IfGhcBuild_normal(x) /**/
+# define IfBuild_normal(x) /**/
 GHC_BUILD_FLAG_normal = -build-normal-not-defined
 #endif
 
 /* profiled sequential */
-#if GhcBuild_p == YES
-# define IfGhcBuild_p(x) x
+#if Build_p == YES
+# define IfBuild_p(x) x
 GHC_BUILD_FLAG_p = -build-p-defined
 #else
-# define IfGhcBuild_p(x) /**/
+# define IfBuild_p(x) /**/
 GHC_BUILD_FLAG_p = -build-p-not-defined
 #endif
 
 /* ticky-ticky "profiling" (sequential) */
-#if GhcBuild_t == YES	
-# define IfGhcBuild_t(x) x
+#if Build_t == YES	
+# define IfBuild_t(x) x
 GHC_BUILD_FLAG_t = -build-t-defined
 #else
-# define IfGhcBuild_t(x) /**/
+# define IfBuild_t(x) /**/
 GHC_BUILD_FLAG_t = -build-t-not-defined
 #endif
 
 /* unregisterized (most basic boot) */
-#if GhcBuild_u == YES	
-# define IfGhcBuild_u(x) x
+#if Build_u == YES	
+# define IfBuild_u(x) x
 GHC_BUILD_FLAG_u = -build-u-defined
 #else
-# define IfGhcBuild_u(x) /**/
+# define IfBuild_u(x) /**/
 GHC_BUILD_FLAG_u = -build-u-not-defined
 #endif
 
 /* === builds: concurrent and parallel ============================ */
 
 /* concurrent */
-#if GhcBuild_mc == YES
-# define IfGhcBuild_mc(x) x
+#if Build_mc == YES
+# define IfBuild_mc(x) x
 GHC_BUILD_FLAG_mc = -build-mc-defined
 #else
-# define IfGhcBuild_mc(x) /**/
+# define IfBuild_mc(x) /**/
 GHC_BUILD_FLAG_mc = -build-mc-not-defined
 #endif
 
 /* profiled concurrent */
-#if GhcBuild_mr == YES
-# define IfGhcBuild_mr(x) x
+#if Build_mr == YES
+# define IfBuild_mr(x) x
 GHC_BUILD_FLAG_mr = -build-mr-defined
 #else
-# define IfGhcBuild_mr(x) /**/
+# define IfBuild_mr(x) /**/
 GHC_BUILD_FLAG_mr = -build-mr-not-defined
 #endif
 
 /* ticky concurrent */
-#if GhcBuild_mt == YES
-# define IfGhcBuild_mt(x) x
+#if Build_mt == YES
+# define IfBuild_mt(x) x
 GHC_BUILD_FLAG_mt = -build-mt-defined
 #else
-# define IfGhcBuild_mt(x) /**/
+# define IfBuild_mt(x) /**/
 GHC_BUILD_FLAG_mt = -build-mt-not-defined
 #endif
 
 /* parallel (GUM, PVM-based) */
-#if GhcBuild_mp == YES
-# define IfGhcBuild_mp(x) x
+#if Build_mp == YES
+# define IfBuild_mp(x) x
 GHC_BUILD_FLAG_mp = -build-mp-defined
 #else
-# define IfGhcBuild_mp(x) /**/
+# define IfBuild_mp(x) /**/
 GHC_BUILD_FLAG_mp = -build-mp-not-defined
 #endif
 
 /* GranSim */
-#if GhcBuild_mg == YES
-# define IfGhcBuild_mg(x) x
+#if Build_mg == YES
+# define IfBuild_mg(x) x
 GHC_BUILD_FLAG_mg = -build-mg-defined
 #else
-# define IfGhcBuild_mg(x) /**/
+# define IfBuild_mg(x) /**/
 GHC_BUILD_FLAG_mg = -build-mg-not-defined
 #endif
 
@@ -180,200 +177,200 @@ GHC_BUILD_FLAG_mg = -build-mg-not-defined
 */
 
 /* sequential -- 2-space collector */
-#if GhcBuild_2s == YES
-# define IfGhcBuild_2s(x) x
+#if Build_2s == YES
+# define IfBuild_2s(x) x
 GHC_BUILD_FLAG_2s = -gc-2s
 #else
-# define IfGhcBuild_2s(x) /**/
+# define IfBuild_2s(x) /**/
 GHC_BUILD_FLAG_2s = -build-2s-not-defined
 #endif
 
 /* sequential -- 1-space collector */
-#if GhcBuild_1s == YES
-# define IfGhcBuild_1s(x) x
+#if Build_1s == YES
+# define IfBuild_1s(x) x
 GHC_BUILD_FLAG_1s = -gc-1s
 #else
-# define IfGhcBuild_1s(x) /**/
+# define IfBuild_1s(x) /**/
 GHC_BUILD_FLAG_1s = -build-1s-not-defined
 #endif
 
 /* sequential -- dual-mode collector */
-#if GhcBuild_du == YES
-# define IfGhcBuild_du(x) x
+#if Build_du == YES
+# define IfBuild_du(x) x
 GHC_BUILD_FLAG_du = -gc-du
 #else
-# define IfGhcBuild_du(x) /**/
+# define IfBuild_du(x) /**/
 GHC_BUILD_FLAG_du = -build-du-not-defined
 #endif
 
 /* === builds: "user ways" ======================================= */
 
-#if GhcBuild_a == YES	
-# define IfGhcBuild_a(x) x
+#if Build_a == YES	
+# define IfBuild_a(x) x
 GHC_BUILD_FLAG_a = -build-a-not-defined /* >>>change here<<< if required */
 GHC_BUILD_OPTS_a = -build-a-not-defined-error
 #else
-# define IfGhcBuild_a(x) /**/
+# define IfBuild_a(x) /**/
 GHC_BUILD_FLAG_a = -build-a-not-defined
 GHC_BUILD_OPTS_a = -build-a-not-defined-error
 #endif
 
-#if GhcBuild_b == YES
-# define IfGhcBuild_b(x) x
+#if Build_b == YES
+# define IfBuild_b(x) x
 GHC_BUILD_FLAG_b = -build-b-not-defined /* >>>change here<<< if required */
 GHC_BUILD_OPTS_b = -build-b-not-defined-error
 #else
-# define IfGhcBuild_b(x) /**/
+# define IfBuild_b(x) /**/
 GHC_BUILD_FLAG_b = -build-b-not-defined
 GHC_BUILD_OPTS_b = -build-b-not-defined-error
 #endif
 
-#if GhcBuild_c == YES
-# define IfGhcBuild_c(x) x
+#if Build_c == YES
+# define IfBuild_c(x) x
 GHC_BUILD_FLAG_c = -build-c-not-defined /* >>>change here<<< if required */
 GHC_BUILD_OPTS_c = -build-c-not-defined-error
 #else
-# define IfGhcBuild_c(x) /**/
+# define IfBuild_c(x) /**/
 GHC_BUILD_FLAG_c = -build-c-not-defined
 GHC_BUILD_OPTS_c = -build-c-not-defined-error
 #endif
 
-#if GhcBuild_d == YES
-# define IfGhcBuild_d(x) x
+#if Build_d == YES
+# define IfBuild_d(x) x
 GHC_BUILD_FLAG_d = -build-d-not-defined /* >>>change here<<< if required */
 GHC_BUILD_OPTS_d = -build-d-not-defined-error
 #else
-# define IfGhcBuild_d(x) /**/
+# define IfBuild_d(x) /**/
 GHC_BUILD_FLAG_d = -build-d-not-defined
 GHC_BUILD_OPTS_d = -build-d-not-defined-error
 #endif
 
-#if GhcBuild_e == YES
-# define IfGhcBuild_e(x) x
+#if Build_e == YES
+# define IfBuild_e(x) x
 GHC_BUILD_FLAG_e = -build-e-not-defined /* >>>change here<<< if required */
 GHC_BUILD_OPTS_e = -build-e-not-defined-error
 #else
-# define IfGhcBuild_e(x) /**/
+# define IfBuild_e(x) /**/
 GHC_BUILD_FLAG_e = -build-e-not-defined
 GHC_BUILD_OPTS_e = -build-e-not-defined-error
 #endif
 
-#if GhcBuild_f == YES
-# define IfGhcBuild_f(x) x
+#if Build_f == YES
+# define IfBuild_f(x) x
 GHC_BUILD_FLAG_f = -build-f-not-defined /* >>>change here<<< if required */
 GHC_BUILD_OPTS_f = -build-f-not-defined-error
 #else
-# define IfGhcBuild_f(x) /**/
+# define IfBuild_f(x) /**/
 GHC_BUILD_FLAG_f = -build-f-not-defined
 GHC_BUILD_OPTS_f = -build-f-not-defined-error
 #endif
 
-#if GhcBuild_g == YES
-# define IfGhcBuild_g(x) x
+#if Build_g == YES
+# define IfBuild_g(x) x
 GHC_BUILD_FLAG_g = -build-g-not-defined /* >>>change here<<< if required */
 GHC_BUILD_OPTS_g = -build-g-not-defined-error
 #else
-# define IfGhcBuild_g(x) /**/
+# define IfBuild_g(x) /**/
 GHC_BUILD_FLAG_g = -build-g-not-defined
 GHC_BUILD_OPTS_g = -build-g-not-defined-error
 #endif
 
-#if GhcBuild_h == YES	
-# define IfGhcBuild_h(x) x
+#if Build_h == YES	
+# define IfBuild_h(x) x
 GHC_BUILD_FLAG_h = -build-h-not-defined /* >>>change here<<< if required */
 GHC_BUILD_OPTS_h = -build-h-not-defined-error
 #else
-# define IfGhcBuild_h(x) /**/
+# define IfBuild_h(x) /**/
 GHC_BUILD_FLAG_h = -build-h-not-defined
 GHC_BUILD_OPTS_h = -build-h-not-defined-error
 #endif
 
-#if GhcBuild_i == YES
-# define IfGhcBuild_i(x) x
+#if Build_i == YES
+# define IfBuild_i(x) x
 GHC_BUILD_FLAG_i = -build-i-not-defined /* >>>change here<<< if required */
 GHC_BUILD_OPTS_i = -build-i-not-defined-error
 #else
-# define IfGhcBuild_i(x) /**/
+# define IfBuild_i(x) /**/
 GHC_BUILD_FLAG_i = -build-i-not-defined
 GHC_BUILD_OPTS_i = -build-i-not-defined-error
 #endif
 
-#if GhcBuild_j == YES
-# define IfGhcBuild_j(x) x
+#if Build_j == YES
+# define IfBuild_j(x) x
 GHC_BUILD_FLAG_j = -build-j-not-defined /* >>>change here<<< if required */
 GHC_BUILD_OPTS_j = -build-j-not-defined-error
 #else
-# define IfGhcBuild_j(x) /**/
+# define IfBuild_j(x) /**/
 GHC_BUILD_FLAG_j = -build-j-not-defined
 GHC_BUILD_OPTS_j = -build-j-not-defined-error
 #endif
 
-#if GhcBuild_k == YES
-# define IfGhcBuild_k(x) x
+#if Build_k == YES
+# define IfBuild_k(x) x
 GHC_BUILD_FLAG_k = -build-k-not-defined /* >>>change here<<< if required */
 GHC_BUILD_OPTS_k = -build-k-not-defined-error
 #else
-# define IfGhcBuild_k(x) /**/
+# define IfBuild_k(x) /**/
 GHC_BUILD_FLAG_k = -build-k-not-defined
 GHC_BUILD_OPTS_k = -build-k-not-defined-error
 #endif
 
-#if GhcBuild_l == YES
-# define IfGhcBuild_l(x) x
+#if Build_l == YES
+# define IfBuild_l(x) x
 GHC_BUILD_FLAG_l = -build-l-not-defined /* >>>change here<<< if required */
 GHC_BUILD_OPTS_l = -build-l-not-defined-error
 #else
-# define IfGhcBuild_l(x) /**/
+# define IfBuild_l(x) /**/
 GHC_BUILD_FLAG_l = -build-l-not-defined
 GHC_BUILD_OPTS_l = -build-l-not-defined-error
 #endif
 
-#if GhcBuild_m == YES
-# define IfGhcBuild_m(x) x
+#if Build_m == YES
+# define IfBuild_m(x) x
 GHC_BUILD_FLAG_m = -build-m-not-defined /* >>>change here<<< if required */
 GHC_BUILD_OPTS_m = -build-m-not-defined-error
 #else
-# define IfGhcBuild_m(x) /**/
+# define IfBuild_m(x) /**/
 GHC_BUILD_FLAG_m = -build-m-not-defined
 GHC_BUILD_OPTS_m = -build-m-not-defined-error
 #endif
 
-#if GhcBuild_n == YES
-# define IfGhcBuild_n(x) x
+#if Build_n == YES
+# define IfBuild_n(x) x
 GHC_BUILD_FLAG_n = -build-n-not-defined /* >>>change here<<< if required */
 GHC_BUILD_OPTS_n = -build-n-not-defined-error
 #else
-# define IfGhcBuild_n(x) /**/
+# define IfBuild_n(x) /**/
 GHC_BUILD_FLAG_n = -build-n-not-defined
 GHC_BUILD_OPTS_n = -build-n-not-defined-error
 #endif
 
-#if GhcBuild_o == YES
-# define IfGhcBuild_o(x) x
+#if Build_o == YES
+# define IfBuild_o(x) x
 GHC_BUILD_FLAG_o = -build-o-not-defined /* >>>change here<<< if required */
 GHC_BUILD_OPTS_o = -build-o-not-defined-error
 #else
-# define IfGhcBuild_o(x) /**/
+# define IfBuild_o(x) /**/
 GHC_BUILD_FLAG_o = -build-o-not-defined
 GHC_BUILD_OPTS_o = -build-o-not-defined-error
 #endif
 
-#if GhcBuild_A == YES
-# define IfGhcBuild_A(x) x
+#if Build_A == YES
+# define IfBuild_A(x) x
 GHC_BUILD_FLAG_A = -build-A-not-defined /* >>>change here<<< if required */
 GHC_BUILD_OPTS_A = -build-A-not-defined-error
 #else
-# define IfGhcBuild_A(x) /**/
+# define IfBuild_A(x) /**/
 GHC_BUILD_FLAG_A = -build-A-not-defined
 GHC_BUILD_OPTS_A = -build-A-not-defined-error
 #endif
 
-#if GhcBuild_B == YES
-# define IfGhcBuild_B(x) x
+#if Build_B == YES
+# define IfBuild_B(x) x
 GHC_BUILD_FLAG_B = -build-B-not-defined /* >>>change here<<< if required */
 GHC_BUILD_OPTS_B = -build-B-not-defined-error
 #else
-# define IfGhcBuild_B(x) /**/
+# define IfBuild_B(x) /**/
 GHC_BUILD_FLAG_B = -build-B-not-defined
 GHC_BUILD_OPTS_B = -build-B-not-defined-error
 #endif

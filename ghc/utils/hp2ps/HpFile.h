@@ -52,21 +52,21 @@ extern token thetok;
 extern int linenum; 
 extern int endfile;
 
-extern char *TokenToString PROTO((token));
+char *TokenToString PROTO((token));
 
 extern struct entry** identtable;
 
 extern floatish *samplemap;
 extern floatish *markmap;
 
-extern void GetHpFile PROTO((FILE *));
-extern void StoreSample PROTO((struct entry *, intish, floatish));
-extern struct entry *MakeEntry PROTO((char *));
+void GetHpFile PROTO((FILE *));
+void StoreSample PROTO((struct entry *, intish, floatish));
+struct entry *MakeEntry PROTO((char *));
 
-extern token GetNumber PROTO((FILE *));
-extern void  GetIdent  PROTO((FILE *));
-extern void  GetString PROTO((FILE *));
-extern boolish IsIdChar PROTO((int)); /* int is a "char" from getc */
+token GetNumber PROTO((FILE *));
+void  GetIdent  PROTO((FILE *));
+void  GetString PROTO((FILE *));
+boolish IsIdChar PROTO((int)); /* int is a "char" from getc */
 
 extern char *jobstring;
 extern char *datestring;

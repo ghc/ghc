@@ -135,7 +135,7 @@ sub slurp_file { # follows an example in the `open' item in perl man page
 
     $fname = &tidy_dir_names($fname);
 
-    unless (open($fhandle, "$(RAWCPP) $Include_dirs @Defines $fname |")) {
+    unless (open($fhandle, "$(GNUCPP) $Include_dirs @Defines $fname |")) {
          die "$Pgm: Can't open $fname: $!\n";
     }
     line: while (<$fhandle>) {

@@ -9,7 +9,7 @@
 #include "Utilities.h"
 
 #ifndef atof
-extern double atof PROTO((const char *));
+double atof PROTO((const char *));
 #endif
 
 /* own stuff already included */

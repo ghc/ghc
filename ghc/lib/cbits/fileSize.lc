@@ -1,0 +1,45 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1994
+%
+\subsection[fileSize.lc]{hfileSize Runtime Support}
+
+\begin{code}
+
+#include "rtsdefs.h"
+#include "stgio.h"
+
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif
+  
+StgInt
+fileSize(fp, result)
+StgAddr fp;
+StgByteArray result;
+{
+    struct stat sb;
+
+    while (fstat(fileno((FILE *) fp), &sb) < 0) {
+	/* highly unlikely */
+	if (errno != EINTR) {
+	    cvtErrno();
+	    stdErrno();
+	    return -1;
+	}
+    }
+    if (S_ISREG(sb.st_mode)) {
+	/* result will be word aligned */
+	*(off_t *) result = sb.st_size;
+	return 0;
+    } else {
+	ghc_errtype = ERR_INAPPROPRIATETYPE;
+	ghc_errstr = "not a regular file";
+	return -1;
+    }
+}
+
+\end{code}

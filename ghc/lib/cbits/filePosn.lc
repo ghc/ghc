@@ -1,0 +1,48 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1994
+%
+\subsection[filePosn.lc]{hGetPosn and hSetPosn Runtime Support}
+
+\begin{code}
+
+#include "rtsdefs.h"
+#include "stgio.h"
+
+StgInt
+getFilePosn(fp)
+StgAddr fp;
+{
+    StgInt posn;
+
+    while ((posn = ftell((FILE *) fp)) == -1) {
+	/* the possibility seems awfully remote */
+	if (errno != EINTR) {
+	    cvtErrno();
+	    stdErrno();
+	    return -1;
+	}
+    }
+    return posn;
+}
+
+/* The following is only called with a position that we've already visited */
+
+StgInt
+setFilePosn(fp, posn)
+StgAddr fp;
+StgInt posn;
+{
+    while (fseek((FILE *) fp, posn, SEEK_SET) != 0) {
+	if (errno != EINTR) {
+	    cvtErrno();
+	    stdErrno();
+	    return -1;
+	}
+    }
+    return 0;
+}
+
+\end{code}
+
+
+

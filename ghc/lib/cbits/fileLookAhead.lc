@@ -1,0 +1,27 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1994
+%
+\subsection[fileLookAhead.lc]{hLookAhead Runtime Support}
+
+\begin{code}
+
+#include "rtsdefs.h"
+#include "stgio.h"
+
+StgInt
+fileLookAhead(fp)
+StgAddr fp;
+{
+    int c;
+
+    if ((c = fileGetc(fp)) == EOF) {
+	return c;
+    } else if (ungetc(c, (FILE *) fp) == EOF) {
+	cvtErrno();
+	stdErrno();
+	return EOF;
+    } else
+	return c;
+}
+
+\end{code}

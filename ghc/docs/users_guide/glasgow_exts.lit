@@ -249,11 +249,11 @@ For example,
 typedef unsigned long *StgMallocPtr;
 typedef long StgInt;
 
-extern void          initialiseEFS PROTO( (StgInt size) );
-extern StgInt        terminateEFS ();
-extern StgMallocPtr  emptyEFS();
-extern StgMallocPtr  updateEFS PROTO( (StgMallocPtr a, StgInt i, StgInt x) );
-extern StgInt        lookupEFS PROTO( (StgMallocPtr a, StgInt i) );
+void          initialiseEFS PROTO( (StgInt size) );
+StgInt        terminateEFS ();
+StgMallocPtr  emptyEFS();
+StgMallocPtr  updateEFS PROTO( (StgMallocPtr a, StgInt i, StgInt x) );
+StgInt        lookupEFS PROTO( (StgMallocPtr a, StgInt i) );
 \end{verbatim}
 
 You can find appropriate definitions for \tr{StgInt},

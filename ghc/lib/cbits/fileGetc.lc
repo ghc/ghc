@@ -1,0 +1,38 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1994
+%
+\subsection[fileGetc.lc]{hGetChar Runtime Support}
+
+\begin{code}
+
+#include "rtsdefs.h"
+#include "stgio.h"
+#include "error.h"
+
+StgInt
+fileGetc(fp)
+StgAddr fp;
+{
+    int c;
+
+    if (feof((FILE *) fp)) {
+	ghc_errtype = ERR_EOF;
+	ghc_errstr = "";
+	return EOF;
+    }
+
+    /* Try to read a character */
+    while ((c = getc((FILE *) fp)) == EOF && errno == EINTR)
+	clearerr((FILE *) fp);
+
+    if (feof((FILE *) fp)) {
+	ghc_errtype = ERR_EOF;
+	ghc_errstr = "";
+    } else if (c == EOF) {
+	cvtErrno();
+	stdErrno();
+    }
+    return c;
+}
+
+\end{code}

@@ -1,0 +1,32 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1994
+%
+\subsection[filePuc.lc]{hPutChar Runtime Support}
+
+\begin{code}
+
+#include "rtsdefs.h"
+#include "stgio.h"
+#include "error.h"
+
+StgInt
+filePutc(fp, c)
+StgAddr fp;
+StgInt c;
+{
+    int rc;
+
+    /* Try to read a character */
+    while ((rc = putc((int) c, (FILE *) fp)) == EOF && errno == EINTR)
+	clearerr((FILE *) fp);
+
+    if (rc == EOF) {
+	cvtErrno();
+	stdErrno();
+	return -1;
+    }
+
+    return 0;
+}
+
+\end{code}

@@ -1,5 +1,5 @@
 %
-% $Header: /srv/cvs/cvs.haskell.org/fptools/ghc/docs/install_guide/Attic/installing.lit,v 1.2 1996/06/27 15:57:32 partain Exp $
+% $Header: /srv/cvs/cvs.haskell.org/fptools/ghc/docs/install_guide/Attic/installing.lit,v 1.3 1996/06/30 16:45:00 partain Exp $
 %
 \begin{onlystandalone}
 \documentstyle[11pt,literate]{article}
@@ -1800,11 +1800,11 @@ probably best to send email to us, asking how.
 %$$ To create a ``user way'' or setup, put
 %$$ something like this somewhere (more on ``somewhere'', below):
 %$$ \begin{verbatim}
-%$$ #ifndef  GhcBuild_UserWay_a
-%$$ #define GhcBuild_UserWay_a YES
+%$$ #ifndef  Build_UserWay_a
+%$$ #define Build_UserWay_a YES
 %$$ GHC_USER_WAY_FLAG_a = -ticky
 %$$ GHC_USER_WAY_OPTS_a = -fstg-reduction-counts -O
-%$$ #endif /*  ! GhcBuild_UserWay_a */
+%$$ #endif /*  ! Build_UserWay_a */
 %$$ \end{verbatim}
 %$$ You'll be able to invoke the driver with a \tr{-ticky} option, which
 %$$ will be as if you typed in all that other stuff.  It will also arrange
