@@ -11,7 +11,7 @@ free variables.
 
 \begin{code}
 module RnExpr (
-	rnMatch, rnGRHSs, rnExpr, rnExprs, rnStmts,
+	rnMatch, rnGRHSs, rnExpr, rnStmts,
 	checkPrecMatch
    ) where
 
