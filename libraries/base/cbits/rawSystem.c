@@ -1,5 +1,5 @@
 /* 
- * (c) The University of Glasgow 1994-2003
+ * (c) The University of Glasgow 1994-2004
  *
  * shell-less system Runtime Support (see System.Cmd.rawSystem).
  */
@@ -7,7 +7,14 @@
 /* The itimer stuff in this module is non-posix */
 /* #include "PosixSource.h" */
 
+/* This ifdef is required because this source might be compiled by an
+ * external compiler.  See ghc/utils/runghc/rawSystem.c for example.
+ */
+#if __GLASGOW_HASKELL__ < 603
+#include "config.h"
+#else
 #include "ghcconfig.h"
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
