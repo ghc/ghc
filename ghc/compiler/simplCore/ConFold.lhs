@@ -23,6 +23,7 @@ import SimplUtils	( newId )
 import TysWiredIn	( trueDataCon, falseDataCon )
 
 import Char		( ord, chr )
+import Outputable
 \end{code}
 
 \begin{code}
@@ -164,9 +165,9 @@ completePrim env op args
 --  oneWordLit NotOp	    w = ??? ToDo: sort-of a pain
     oneWordLit _            _ = {-trace "oneIntLit: giving up"-} give_up
 
-    twoIntLits IntAddOp	 i1 i2		 = return_int (i1+i2)
-    twoIntLits IntSubOp	 i1 i2		 = return_int (i1-i2)
-    twoIntLits IntMulOp	 i1 i2		 = return_int (i1*i2)
+    twoIntLits IntAddOp	 i1 i2		 = checkRange (i1+i2)
+    twoIntLits IntSubOp	 i1 i2		 = checkRange (i1-i2)
+    twoIntLits IntMulOp	 i1 i2		 = checkRange (i1*i2)
     twoIntLits IntQuotOp i1 i2 | i2 /= 0 = return_int (i1 `quot` i2)
     twoIntLits IntRemOp  i1 i2 | i2 /= 0 = return_int (i1 `rem` i2)
     twoIntLits IntGtOp	 i1 i2		 = return_bool (i1 >  i2)
@@ -236,7 +237,7 @@ completePrim env op args
     twoCharLits _        _  _  = give_up
 
 	---------   Miscellaneous --------------
-    oneLit Addr2IntOp (MachAddr i) = return_int i
+    oneLit Addr2IntOp (MachAddr i) = return_int (fromInteger i)
     oneLit op         lit          = give_up
 
 	---------   Equality and inequality for Int/Char --------------
@@ -265,6 +266,17 @@ completePrim env op args
     litVar CharNeOp lit var = return_prim_case var lit falseVal trueVal
     litVar other_op lit var = give_up
 
+
+    checkRange :: Integer -> SmplM OutExpr
+    checkRange val
+     | (val > fromInt maxInt) || (val < fromInt minInt)  = 
+	-- Better tell the user that we've overflowed...
+       pprTrace "Warning:" (text "Integer overflow in expression: " <> 
+	                   ppr ((Prim op args)::CoreExpr)) $
+	-- ..not that it stops us from actually folding!
+	-- ToDo: a SrcLoc would be nice.
+       return_int val
+     | otherwise = return_int val
 
 trueVal  = Con trueDataCon  []
 falseVal = Con falseDataCon []
