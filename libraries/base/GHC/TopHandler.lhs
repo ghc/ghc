@@ -64,8 +64,8 @@ real_handler ex =
 	   safeExit 2
 
 	-- only the main thread gets ExitException exceptions
-	ExitException ExitSuccess     -> safeExit 0
-	ExitException (ExitFailure n) -> safeExit n
+	ExitException ExitSuccess     -> cleanUp >> safeExit 0
+	ExitException (ExitFailure n) -> cleanUp >> safeExit n
 
 	other -> do
 	   reportError other
