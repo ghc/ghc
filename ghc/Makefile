@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.27 2005/03/02 09:57:41 simonmar Exp $
+# $Id: Makefile,v 1.28 2005/03/02 10:00:36 simonmar Exp $
 #
 
 TOP=.
@@ -38,7 +38,9 @@ endif
 
 SRC_DIST_FILES += configure
 
-DIST_CLEAN_FILES += VERSION config.cache config.status ghc.spec
+# Clean everything created by configure:
+DIST_CLEAN_FILES += VERSION config.cache config.status ghc.spec \
+	mk/version.mk mk/config.mk docs/users_guide/ug-book.xml
 
 extraclean::
 	$(RM) -rf autom4te.cache
