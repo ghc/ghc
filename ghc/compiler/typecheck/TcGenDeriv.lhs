@@ -37,16 +37,11 @@ import DataCon		( isNullaryDataCon, dataConTag,
 			  dataConOrigArgTys, dataConSourceArity, fIRST_TAG,
 			  DataCon, dataConName,
 			  dataConFieldLabels )
-import Name		( getOccString, getOccName, getSrcLoc, occNameString, 
-			  occNameUserString, 
-			  Name, NamedThing(..), 
-			  isDataSymOcc, isSymOcc
-			)
+import Name		( getOccString, getSrcLoc, Name, NamedThing(..)	)
 
 import HscTypes		( FixityEnv, lookupFixity )
 import PrelInfo
 import PrelNames
-import TysWiredIn
 import MkId		( eRROR_ID )
 import PrimOp		( PrimOp(..) )
 import SrcLoc		( Located(..), noLoc, srcLocSpan )
@@ -56,7 +51,8 @@ import TyCon		( TyCon, isNewTyCon, tyConDataCons, isEnumerationTyCon, tyConArity
 import TcType		( isUnLiftedType, tcEqType, Type )
 import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy, floatPrimTy, doublePrimTy,
 			  intPrimTyCon )
-import TysWiredIn	( charDataCon, intDataCon, floatDataCon, doubleDataCon )
+import TysWiredIn	( charDataCon, intDataCon, floatDataCon, doubleDataCon,
+			  intDataCon_RDR, true_RDR, false_RDR )
 import Util		( zipWithEqual, isSingleton,
 			  zipWith3Equal, nOfThem, zipEqual )
 import Char		( isAlpha )

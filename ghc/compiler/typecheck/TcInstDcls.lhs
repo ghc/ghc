@@ -9,7 +9,6 @@ module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
 #include "HsVersions.h"
 
 import HsSyn
-import TcHsSyn		( mkHsConApp )
 import TcBinds		( tcSpecSigs )
 import TcClassDcl	( tcMethodBind, mkMethodBind, badMethodErr, 
 			  tcClassDecl2, getGenericInstances )
@@ -19,8 +18,7 @@ import TcMType		( tcInstType, checkValidTheta, checkValidInstHead, instTypeErr,
 import TcType		( mkClassPred, tcSplitForAllTys, tyVarsOfType,
 			  tcSplitSigmaTy, getClassPredTys, tcSplitPredTy_maybe, mkTyVarTys,
 			  TyVarDetails(..), tcSplitDFunTy, pprClassPred )
-import Inst		( InstOrigin(..), tcInstClassOp, newDicts, instToId, 
-			  showLIE, tcExtendLocalInstEnv )
+import Inst		( tcInstClassOp, newDicts, instToId, showLIE, tcExtendLocalInstEnv )
 import TcDeriv		( tcDeriving )
 import TcEnv		( tcExtendGlobalValEnv, tcExtendTyVarEnv2,
  			  InstInfo(..), InstBindings(..), 
@@ -33,11 +31,10 @@ import Subst		( mkTyVarSubst, substTheta, substTy )
 import DataCon		( classDataCon )
 import Class		( classBigSig )
 import Var		( Id, idName, idType )
-import NameSet		
 import MkId		( mkDictFunId, rUNTIME_ERROR_ID )
 import FunDeps		( checkInstFDs )
 import Name		( Name, getSrcLoc )
-import NameSet		( unitNameSet, emptyNameSet, nameSetToList )
+import NameSet		( unitNameSet, emptyNameSet, nameSetToList, unionNameSets )
 import UnicodeUtil	( stringToUtf8 )
 import Maybe		( catMaybes )
 import SrcLoc		( srcLocSpan, unLoc, noLoc, Located(..), srcSpanStart )

@@ -26,7 +26,6 @@ import TcSimplify	( tcSimplifyDeriv )
 
 import RnBinds		( rnMethodBinds, rnTopBinds )
 import RnEnv		( bindLocalNames )
-import TcRnMonad	( thenM, returnM, mapAndUnzipM )
 import HscTypes		( DFunId, FixityEnv )
 
 import Class		( className, classArity, classKey, classTyVars, classSCTheta, Class )
@@ -38,14 +37,12 @@ import Maybes		( catMaybes )
 import RdrName		( RdrName )
 import Name		( Name, getSrcLoc )
 import NameSet		( NameSet, emptyNameSet, duDefs )
-import Unique		( Unique, getUnique )
 import Kind		( splitKindFunTys )
 import TyCon		( tyConTyVars, tyConDataCons, tyConArity, tyConHasGenerics,
 			  tyConTheta, isProductTyCon, isDataTyCon, newTyConRhs,
 			  isEnumerationTyCon, isRecursiveTyCon, TyCon
 			)
-import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, 
-			  tcSplitForAllTys, tcSplitPredTy_maybe, getClassPredTys_maybe, tcTyConAppTyCon,
+import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, tcTyConAppTyCon,
 			  isUnLiftedType, mkClassPred, tyVarsOfTypes, isArgTypeKind,
 			  tcEqTypes, tcSplitAppTys, mkAppTys, tcSplitDFunTy )
 import Var		( TyVar, tyVarKind, idType, varName )
