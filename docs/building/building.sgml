@@ -3744,7 +3744,7 @@ the Cygwin installer.
 <para> Now set the following user environment variables:
 <itemizedlist>
 
-<listitem><para> Add <filename>c:/cygwin/bin</filename> to your 
+<listitem><para> Add <filename>c:/cygwin/bin</filename> and <filename>c:/cygwin/usr/bin</filename> to your 
 <constant>PATH</constant></para></listitem>
 
 <listitem>
@@ -3898,6 +3898,15 @@ configure: error: ./configure failed for ghc
 </Screen>
 </para>
 </listitem>
+
+<listitem> <para><command>autoconf</command> seems to create the file <filename>configure</filename>
+read-only.  So if you need to run autoconf again (which I sometimes do for safety's sake),
+you get
+<screen>
+/usr/bin/autoconf: cannot create configure: permission denied
+</screen>
+Solution: delete <filename>configure</filename> first.
+</para></listitem>
 
 <listitem>
 <para>
