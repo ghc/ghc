@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.119 2003/06/05 14:05:36 reid Exp $
+dnl $Id: aclocal.m4,v 1.120 2003/07/20 16:33:24 panne Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -1133,9 +1133,10 @@ dnl Check for Mesa first if we were asked to.
 dnl If we are running under X11 then add in the appropriate libraries.
   if test x"$no_x" != xyes; then
 dnl Add everything we need to compile and link X programs to GL_CFLAGS
-dnl and GL_X_LIBS.
+dnl and GL_X_LIBS/GLUT_X_LIBS.
     GL_CFLAGS="$CPPFLAGS $X_CFLAGS"
-    GL_X_LIBS="$X_PRE_LIBS $X_LIBS -lX11 -lXext -lXmu -lXt -lXi $X_EXTRA_LIBS $LIBM"
+    GL_X_LIBS="$X_LIBS $X_PRE_LIBS -lXext -lX11 $X_EXTRA_LIBS $LIBM"
+    GLUT_X_LIBS="$X_LIBS $X_PRE_LIBS -lXmu -lXt -lXi -lXext -lX11 $X_EXTRA_LIBS $LIBM"
   fi
   GL_save_CPPFLAGS="$CPPFLAGS"
   CPPFLAGS="$GL_CFLAGS"
@@ -1143,13 +1144,9 @@ dnl and GL_X_LIBS.
   GL_save_LIBS="$LIBS"
   LIBS="$GL_X_LIBS"
 
-  dnl Including <GL/glut.h> instead of plain <GL/gl.h> avoids problems on
-  dnl platforms like WinDoze where special headers like <windows.h> or
-  dnl some macro trickery would be needed
-  FPTOOLS_SEARCH_LIBS([#include <GL/glut.h>], glEnd,         $GL_search_list,  have_GL=yes,   have_GL=no)
-  FPTOOLS_SEARCH_LIBS([#include <GL/glut.h>], gluNewQuadric, $GLU_search_list, have_GLU=yes,  have_GLU=no)
+  FPTOOLS_SEARCH_LIBS([#include <GL/gl.h>],   glEnd,         $GL_search_list,  have_GL=yes,   have_GL=no)
+  FPTOOLS_SEARCH_LIBS([#include <GL/glu.h>],  gluNewQuadric, $GLU_search_list, have_GLU=yes,  have_GLU=no)
   FPTOOLS_SEARCH_LIBS([#include <GL/glx.h>],  glXWaitX,      $GLX_search_list, have_GLX=yes,  have_GLX=no)
-  FPTOOLS_SEARCH_LIBS([#include <GL/glut.h>], glutMainLoop,  glut32 glut,      have_glut=yes, have_glut=no)
 
   if test -n "$LIBS"; then
     GL_LIBS="$LDFLAGS $LIBS"
@@ -1158,16 +1155,28 @@ dnl and GL_X_LIBS.
     GL_CFLAGS=
   fi
 
+  LIBS="$GLUT_X_LIBS"
+
+  FPTOOLS_SEARCH_LIBS([#include <GL/glut.h>], glutMainLoop,  glut32 glut,      have_glut=yes, have_glut=no)
+
+  if test -n "$LIBS"; then
+    GLUT_LIBS="$LDFLAGS $LIBS"
+  fi
+
   AC_CACHE_CHECK([OpenGL flags], mdl_cv_gl_cflags, [mdl_cv_gl_cflags="$GL_CFLAGS"])
   GL_CFLAGS="$mdl_cv_gl_cflags"
   AC_SUBST(GL_CFLAGS)
   AC_CACHE_CHECK([OpenGL libs],  mdl_cv_gl_libs,   [mdl_cv_gl_libs="$GL_LIBS"])
   GL_LIBS="$mdl_cv_gl_libs"
   AC_SUBST(GL_LIBS)
+  AC_CACHE_CHECK([GLUT libs],  mdl_cv_glut_libs,   [mdl_cv_glut_libs="$GLUT_LIBS"])
+  GLUT_LIBS="$mdl_cv_glut_libs"
+  AC_SUBST(GLUT_LIBS)
 
-dnl Reset GL_X_LIBS regardless, since it was just a temporary variable
+dnl Reset GL_X_LIBS/GLUT_X_LIBS regardless, since they were just temporary variables
 dnl and we don't want to be global namespace polluters.
   GL_X_LIBS=
+  GLUT_X_LIBS=
 
   LIBS="$GL_save_LIBS"
   CPPFLAGS="$GL_save_CPPFLAGS"

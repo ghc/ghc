@@ -349,6 +349,7 @@ GhcLibsWithObjectIO=@GhcLibsWithObjectIO@
 GhcLibsWithHOpenGL=@GhcLibsWithHOpenGL@
 GL_CFLAGS=@GL_CFLAGS@
 GL_LIBS=@GL_LIBS@
+GLUT_LIBS=@GLUT_LIBS@
 
 X_CFLAGS=@X_CFLAGS@
 X_LIBS=@X_LIBS@
