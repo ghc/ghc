@@ -54,9 +54,9 @@ cvt_top d@(Fun _ _)   = Left $ ValD (cvtd d)
 cvt_top (TySyn tc tvs rhs)
   = Left $ TyClD (TySynonym (tconName tc) (cvt_tvs tvs) (cvtType rhs) loc0)
 
-cvt_top (Data tc tvs constrs derivs)
+cvt_top (Data ctxt tc tvs constrs derivs)
   = Left $ TyClD (mkTyData DataType 
-                           (noContext, tconName tc, cvt_tvs tvs)
+                           (cvt_context ctxt, tconName tc, cvt_tvs tvs)
                            (DataCons (map mk_con constrs))
                            (mk_derivs derivs) loc0)
   where
@@ -65,7 +65,7 @@ cvt_top (Data tc tvs constrs derivs)
 		  (PrefixCon (map mk_arg strtys)) loc0
     mk_con (RecConstr c varstrtys)
 	= ConDecl (cName c) noExistentials noContext
-		  (RecCon (map mk_id_arg varstrtys)) loc0
+		  (Hs.RecCon (map mk_id_arg varstrtys)) loc0
     mk_con (InfixConstr st1 c st2)
 	= ConDecl (cName c) noExistentials noContext
 		  (InfixCon (mk_arg st1) (mk_arg st2)) loc0
@@ -185,6 +185,8 @@ cvt (Infix Nothing  s (Just y)) = SectionR (cvt s) (cvt y)
 cvt (Infix (Just x) s Nothing ) = SectionL (cvt x) (cvt s)
 cvt (Infix Nothing  s Nothing ) = cvt s	-- Can I indicate this is an infix thing?
 cvt (SigExp e t)		= ExprWithTySig (cvt e) (cvtType t)
+cvt (Meta.RecCon c flds) = RecordCon (cName c) (map (\(x,y) -> (vName x, cvt y)) flds)
+cvt (RecUpd e flds) = RecordUpd (cvt e) (map (\(x,y) -> (vName x, cvt y)) flds)
 
 cvtdecs :: [Meta.Dec] -> HsBinds RdrName
 cvtdecs [] = EmptyBinds
@@ -272,6 +274,7 @@ cvtp (Pcon s ps)  = ConPatIn (cName s) (PrefixCon (map cvtp ps))
 cvtp (Ptilde p)   = LazyPat (cvtp p)
 cvtp (Paspat s p) = AsPat (vName s) (cvtp p)
 cvtp Pwild        = WildPat void
+cvtp (Prec c fs)  = ConPatIn (cName c) $ Hs.RecCon (map (\(s,p) -> (vName s,cvtp p)) fs)
 
 -----------------------------------------------------------
 --	Types and type variables

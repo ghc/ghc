@@ -200,15 +200,16 @@ in repTyClD and repC.
 
 repTyClD :: TyClDecl Name -> DsM (Maybe (Core M.Decl))
 
-repTyClD (TyData { tcdND = DataType, tcdCtxt = [], 
+repTyClD (TyData { tcdND = DataType, tcdCtxt = cxt, 
 		   tcdName = tc, tcdTyVars = tvs, 
 		   tcdCons = DataCons cons, tcdDerivs = mb_derivs }) 
  = do { tc1 <- lookupOcc tc ;		-- See note [Binders and occurrences] 
         dec <- addTyVarBinds tvs $ \bndrs -> do {
-      	       cons1   <- mapM repC cons ;
+      	       cxt1   <- repContext cxt ;
+               cons1   <- mapM repC cons ;
       	       cons2   <- coreList consTyConName cons1 ;
       	       derivs1 <- repDerivs mb_derivs ;
-      	       repData tc1 (coreList' stringTy bndrs) cons2 derivs1 } ;
+      	       repData cxt1 tc1 (coreList' stringTy bndrs) cons2 derivs1 } ;
         return $ Just dec }
 
 repTyClD (TySynonym { tcdName = tc, tcdTyVars = tvs, tcdSynRhs = ty })
@@ -469,8 +470,14 @@ repE (ExplicitPArr ty es) =
 repE (ExplicitTuple es boxed) 
   | isBoxed boxed         = do { xs <- repEs es; repTup xs }
   | otherwise		  = panic "DsMeta.repE: Can't represent unboxed tuples"
-repE (RecordConOut _ _ _) = panic "DsMeta.repE: No record construction yet"
-repE (RecordUpdOut _ _ _ _) = panic "DsMeta.repE: No record update yet"
+repE (RecordCon c flds)
+ = do { x <- lookupOcc c;
+        fs <- repFields flds;
+        repRecCon x fs }
+repE (RecordUpd e flds)
+ = do { x <- repE e;
+        fs <- repFields flds;
+        repRecUpd x fs }
 
 repE (ExprWithTySig e ty) = do { e1 <- repE e; t1 <- repTy ty; repSigExp e1 t1 }
 repE (ArithSeqIn aseq) =
@@ -539,6 +546,13 @@ repGuards other
     process (GRHS [ExprStmt e1 ty loc,ResultStmt e2 _] _)
            = do { x <- repE e1; y <- repE e2; return (x, y) }
     process other = panic "Non Haskell 98 guarded body"
+
+repFields :: [(Name,HsExpr Name)] -> DsM (Core [M.FldE])
+repFields flds = do
+        fnames <- mapM lookupOcc (map fst flds)
+        es <- mapM repE (map snd flds)
+        fs <- zipWithM (\n x -> rep2 fieldName [unC n, unC x]) fnames es
+        coreList fieldTyConName fs
 
 
 -----------------------------------------------------------------------------
@@ -717,7 +731,11 @@ repP (ConPatIn dc details)
  = do { con_str <- lookupOcc dc
       ; case details of
          PrefixCon ps   -> do { qs <- repPs ps; repPcon con_str qs }
-         RecCon pairs   -> error "No records in template haskell yet"
+         RecCon pairs -> do { vs <- sequence $ map lookupOcc (map fst pairs)
+                            ; ps <- sequence $ map repP (map snd pairs)
+                            ; fps <- zipWithM (\x y -> rep2 fieldPName [unC x,unC y]) vs ps
+                            ; fps' <- coreList fieldPTyConName fps
+                            ; repPrec con_str fps' }
          InfixCon p1 p2 -> do { qs <- repPs [p1,p2]; repPcon con_str qs }
    }
 repP (NPatIn l (Just _)) = panic "Can't cope with negative overloaded patterns yet (repP (NPatIn _ (Just _)))"
@@ -880,6 +898,9 @@ repPtup (MkC ps) = rep2 ptupName [ps]
 repPcon   :: Core String -> Core [M.Patt] -> DsM (Core M.Patt)
 repPcon (MkC s) (MkC ps) = rep2 pconName [s, ps]
 
+repPrec   :: Core String -> Core [(String,M.Patt)] -> DsM (Core M.Patt)
+repPrec (MkC c) (MkC rps) = rep2 precName [c,rps]
+
 repPtilde :: Core M.Patt -> DsM (Core M.Patt)
 repPtilde (MkC p) = rep2 ptildeName [p]
 
@@ -932,6 +953,12 @@ repListExp (MkC es) = rep2 listExpName [es]
 
 repSigExp :: Core M.Expr -> Core M.Type -> DsM (Core M.Expr)
 repSigExp (MkC e) (MkC t) = rep2 sigExpName [e,t]
+
+repRecCon :: Core String -> Core [M.FldE]-> DsM (Core M.Expr)
+repRecCon (MkC c) (MkC fs) = rep2 recConName [c,fs]
+
+repRecUpd :: Core M.Expr -> Core [M.FldE] -> DsM (Core M.Expr)
+repRecUpd (MkC e) (MkC fs) = rep2 recUpdName [e,fs]
 
 repInfixApp :: Core M.Expr -> Core M.Expr -> Core M.Expr -> DsM (Core M.Expr)
 repInfixApp (MkC x) (MkC y) (MkC z) = rep2 infixAppName [x,y,z]
@@ -986,8 +1013,8 @@ repVal (MkC p) (MkC b) (MkC ds) = rep2 valName [p, b, ds]
 repFun :: Core String -> Core [M.Clse] -> DsM (Core M.Decl)  
 repFun (MkC nm) (MkC b) = rep2 funName [nm, b]
 
-repData :: Core String -> Core [String] -> Core [M.Cons] -> Core [String] -> DsM (Core M.Decl)
-repData (MkC nm) (MkC tvs) (MkC cons) (MkC derivs) = rep2 dataDName [nm, tvs, cons, derivs]
+repData :: Core M.Ctxt -> Core String -> Core [String] -> Core [M.Cons] -> Core [String] -> DsM (Core M.Decl)
+repData (MkC cxt) (MkC nm) (MkC tvs) (MkC cons) (MkC derivs) = rep2 dataDName [cxt, nm, tvs, cons, derivs]
 
 repTySyn :: Core String -> Core [String] -> Core M.Type -> DsM (Core M.Decl)
 repTySyn (MkC nm) (MkC tvs) (MkC rhs) = rep2 tySynDName [nm, tvs, rhs]
@@ -1160,6 +1187,8 @@ templateHaskellNames
         strTypeTyConName, varStrTypeTyConName,
 		qTyConName, expTyConName, matTyConName, clsTyConName,
 		decTyConName, typTyConName, strictTypeName, varStrictTypeName,
+        recConName, recUpdName, precName,
+        fieldName, fieldTyConName, fieldPName, fieldPTyConName,
         strictName, nonstrictName ]
 
 
@@ -1184,6 +1213,7 @@ pconName       = varQual FSLIT("pcon")          pconIdKey
 ptildeName     = varQual FSLIT("ptilde")        ptildeIdKey
 paspatName     = varQual FSLIT("paspat")        paspatIdKey
 pwildName      = varQual FSLIT("pwild")         pwildIdKey
+precName       = varQual FSLIT("prec")          precIdKey
 varName        = varQual FSLIT("var")           varIdKey
 conName        = varQual FSLIT("con")           conIdKey
 litName        = varQual FSLIT("lit")           litIdKey
@@ -1201,6 +1231,8 @@ caseEName      = varQual FSLIT("caseE")         caseEIdKey
 infixAppName   = varQual FSLIT("infixApp")      infixAppIdKey
 sectionLName   = varQual FSLIT("sectionL")      sectionLIdKey
 sectionRName   = varQual FSLIT("sectionR")      sectionRIdKey
+recConName     = varQual FSLIT("recCon")        recConIdKey
+recUpdName     = varQual FSLIT("recUpd")        recUpdIdKey
 guardedName    = varQual FSLIT("guarded")       guardedIdKey
 normalName     = varQual FSLIT("normal")        normalIdKey
 bindStName     = varQual FSLIT("bindSt")        bindStIdKey
@@ -1262,7 +1294,10 @@ consTyConName  = tcQual  FSLIT("Cons")  	       consTyConKey
 typeTyConName  = tcQual  FSLIT("Type")  	       typeTyConKey
 strTypeTyConName  = tcQual  FSLIT("StrType")       strTypeTyConKey
 varStrTypeTyConName  = tcQual  FSLIT("VarStrType")       varStrTypeTyConKey
-			 
+
+fieldTyConName = tcQual FSLIT("FldE")              fieldTyConKey
+fieldPTyConName = tcQual FSLIT("FldP")             fieldPTyConKey
+
 qTyConName     = tcQual  FSLIT("Q")  	       qTyConKey
 expTyConName   = tcQual  FSLIT("Exp")  	       expTyConKey
 decTyConName   = tcQual  FSLIT("Dec")  	       decTyConKey
@@ -1274,6 +1309,9 @@ strictTypeName = varQual  FSLIT("strictType")   strictTypeKey
 varStrictTypeName = varQual  FSLIT("varStrictType")   varStrictTypeKey
 strictName     = varQual  FSLIT("strict")       strictKey
 nonstrictName  = varQual  FSLIT("nonstrict")    nonstrictKey
+
+fieldName = varQual FSLIT("field")              fieldKey
+fieldPName = varQual FSLIT("fieldP")            fieldPKey
 
 --	TyConUniques available: 100-119
 -- 	Check in PrelNames if you want to change this
@@ -1294,6 +1332,8 @@ typTyConKey  = mkPreludeTyConUnique 112
 decTyConKey  = mkPreludeTyConUnique 113
 varStrTypeTyConKey = mkPreludeTyConUnique 114
 strTypeTyConKey = mkPreludeTyConUnique 115
+fieldTyConKey = mkPreludeTyConUnique 116
+fieldPTyConKey = mkPreludeTyConUnique 117
 
 
 
@@ -1379,6 +1419,13 @@ varStrictTypeKey = mkPreludeMiscIdUnique 267
 
 recConstrIdKey	= mkPreludeMiscIdUnique 268
 infixConstrIdKey	= mkPreludeMiscIdUnique 269
+
+recConIdKey     = mkPreludeMiscIdUnique 270
+recUpdIdKey     = mkPreludeMiscIdUnique 271
+precIdKey       = mkPreludeMiscIdUnique 272
+fieldKey        = mkPreludeMiscIdUnique 273
+fieldPKey       = mkPreludeMiscIdUnique 274
+
 
 -- %************************************************************************
 -- %*									*
