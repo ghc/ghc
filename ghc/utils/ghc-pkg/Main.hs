@@ -26,6 +26,7 @@ import Compat.Directory 	( getAppUserDataDirectory )
 import Compat.RawSystem 	( rawSystem )
 import Control.Exception	( evaluate )
 import qualified Control.Exception as Exception
+import System.FilePath		( joinFileName, splitFileName )
 
 import Prelude
 
@@ -52,8 +53,6 @@ import System	( getArgs, getProgName,
 import System.IO
 import Data.List ( isPrefixOf, isSuffixOf, intersperse )
 
-#include "../../includes/ghcconfig.h"
-
 #ifdef mingw32_HOST_OS
 import Foreign
 
@@ -77,7 +76,7 @@ main = do
 	   bye (usageInfo (usageHeader prog) flags)
 	(cli,_,[]) | FlagVersion `elem` cli ->
 	   bye ourCopyright
-	(cli@(_:_),nonopts,[]) ->
+	(cli,nonopts,[]) ->
 	   runit cli nonopts
 	(_,_,errors) -> tryOldCmdLine errors args
 
@@ -936,46 +935,5 @@ getExecDir :: String -> IO (Maybe String)
 getExecDir _ = return Nothing
 #endif
 
--- -----------------------------------------------------------------------------
--- Utils from Krasimir's FilePath library, copied here for now
-
 directoryOf :: FilePath -> FilePath
 directoryOf = fst.splitFileName
-
-splitFileName :: FilePath -> (String, String)
-splitFileName p = (reverse (path2++drive), reverse fname)
-  where
-#ifdef mingw32_TARGET_OS
-    (path,drive) = break (== ':') (reverse p)
-#else
-    (path,drive) = (reverse p,"")
-#endif
-    (fname,path1) = break isPathSeparator path
-    path2 = case path1 of
-      []                           -> "."
-      [_]                          -> path1   -- don't remove the trailing slash if 
-                                              -- there is only one character
-      (c:path) | isPathSeparator c -> path
-      _                            -> path1
-
-joinFileName :: String -> String -> FilePath
-joinFileName ""  fname = fname
-joinFileName "." fname = fname
-joinFileName dir fname
-  | isPathSeparator (last dir) = dir++fname
-  | otherwise                  = dir++pathSeparator:fname
-
-isPathSeparator :: Char -> Bool
-isPathSeparator ch =
-#ifdef mingw32_TARGET_OS
-  ch == '/' || ch == '\\'
-#else
-  ch == '/'
-#endif
-
-pathSeparator :: Char
-#ifdef mingw32_TARGET_OS
-pathSeparator = '\\'
-#else
-pathSeparator = '/'
-#endif
