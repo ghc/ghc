@@ -201,7 +201,7 @@ tc_type_kind (HsUsgForAllTy uv_name ty)
       tc_type_kind ty                     `thenTc` \ (kind, tc_ty) ->
       returnTc (kind, mkUsForAllTy uv tc_ty)
 
-tc_type_kind (HsForAllTy (Just tv_names) context ty)
+tc_type_kind full_ty@(HsForAllTy (Just tv_names) context ty)
   = tcExtendTyVarScope tv_names		$ \ forall_tyvars ->
     tcContext context			`thenTc` \ theta ->
     tc_type_kind ty			`thenTc` \ (kind, tau) ->
@@ -240,8 +240,8 @@ tc_type_kind (HsForAllTy (Just tv_names) context ty)
 			      not (ct_var `elemUFM` extended_tau_vars)
 	is_free ct_var	    = not (ct_var `elem` forall_tyvars)
 
-	check_pred pred = checkTc (not any_ambig) (ambigErr pred ty) `thenTc_`
-			  checkTc (not all_free)  (freeErr  pred ty)
+	check_pred pred = checkTc (not any_ambig) (ambigErr pred full_ty) `thenTc_`
+			  checkTc (not all_free)  (freeErr  pred full_ty)
 	      where 
 		ct_vars	  = varSetElems (tyVarsOfPred pred)
 		any_ambig = is_source_polytype && any is_ambig ct_vars
