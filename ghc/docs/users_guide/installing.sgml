@@ -234,6 +234,7 @@ contains HTML documentation files (one
 sub-directory per project).
 </Para>
 </ListItem></VarListEntry>
+</VariableList>
 </Para>
 
 <Sect3 id="sec-install">
