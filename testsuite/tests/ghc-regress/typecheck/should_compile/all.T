@@ -156,3 +156,4 @@ test "tc151" { myvtc("") }
 test "tc152" { myvtc("") }
 test "tc153" { myvtc("") }
 test "tc154" { myvtc("") }
+test "tc155" { myvtc("") }
