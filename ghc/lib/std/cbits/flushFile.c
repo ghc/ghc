@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: flushFile.c,v 1.3 1998/12/02 13:27:32 simonm Exp $
+ * $Id: flushFile.c,v 1.4 1999/01/15 17:54:23 sof Exp $
  *
  * hFlush Runtime Support
  */
@@ -78,3 +78,21 @@ StgForeignPtr ptr;
     fo->bufWPtr=0;
     return 0;
 }
+
+void
+flushConnectedBuf(ptr)
+StgForeignPtr ptr;
+{
+    StgInt rc;
+    IOFileObject* fo = (IOFileObject*)ptr;
+    
+    /* if the stream is connected to an output stream, flush it. */
+    if ( fo->connectedTo != NULL && fo->connectedTo->fd != -1 &&
+         (fo->connectedTo->flags & FILEOBJ_WRITE) ) {
+       rc = flushBuffer((StgForeignPtr)fo->connectedTo);
+    }
+    /* Willfully ignore the return code for now. */
+    return;
+}
+
+  

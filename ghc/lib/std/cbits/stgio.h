@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: stgio.h,v 1.8 1998/12/02 13:27:58 simonm Exp $
+ * $Id: stgio.h,v 1.9 1999/01/15 17:54:23 sof Exp $
  *
  * Helper code for GHC's IO subsystem.
  */
@@ -117,6 +117,7 @@ StgInt	fileSize_int64 (StgForeignPtr, StgByteArray);
 StgInt	flushFile   (StgForeignPtr);
 StgInt	flushBuffer (StgForeignPtr);
 StgInt	flushReadBuffer (StgForeignPtr);
+void	flushConnectedBuf (StgForeignPtr);
 
 /* freeFile.c */
 void freeStdFile (StgForeignPtr);

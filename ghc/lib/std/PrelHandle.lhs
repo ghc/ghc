@@ -258,7 +258,13 @@ stderr = unsafePerformIO (do
             fo <- makeForeignObj fo
 	    addForeignFinaliser fo (freeStdFileObject fo)
 #endif
-            newHandle (Handle__ fo WriteHandle NoBuffering "stderr")
+            hdl <- newHandle (Handle__ fo WriteHandle NoBuffering "stderr")
+	    -- when stderr and stdout are both connected to a terminal, ensure
+	    -- that anything buffered on stdout is flushed prior to writing to
+	    -- stderr.
+	    hConnectTo stdout hdl
+	    return hdl
+
        _ -> do ioError <- constructError "stderr"
                newHandle (mkErrorHandle__ ioError)
   )
@@ -905,12 +911,20 @@ hConnectTo hW hR = hConnectHdl_ hW hR 0{-connect regardless-}
 
 hConnectHdl_ :: Handle -> Handle -> Int -> IO ()
 hConnectHdl_ hW hR is_tty = 
-  wantWriteableHandle "hConnectTo" hW $ \ hW_ -> do
-  wantReadableHandle  "hConnectTo" hR $ \ hR_ -> do
+  wantRWHandle "hConnectTo" hW $ \ hW_ -> do
+  wantRWHandle "hConnectTo" hR $ \ hR_ -> do
   CCALL(setConnectedTo) (haFO__ hR_) (haFO__ hW_) is_tty  -- ConcHask: SAFE, won't block
   writeHandle hR hR_
   writeHandle hW hW_
 
+#ifndef __PARALLEL_HASKELL__
+#define FILE_OBJECT     ForeignObj
+#else
+#define FILE_OBJECT     Addr
+#endif
+
+flushConnectedBuf :: FILE_OBJECT -> IO ()
+flushConnectedBuf fo = CCALL(flushConnectedBuf) fo
 \end{code}
 
 As an extension, we also allow characters to be pushed back.
@@ -1124,6 +1138,25 @@ wantWriteableHandle fun handle act =
 	   IOError (Just handle) IllegalOperation fun
 		   ("handle is not open for writing")
 
+wantRWHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
+wantRWHandle fun handle act = 
+    withHandle handle $ \ handle_ -> do
+    case haType__ handle_ of 
+      ErrorHandle theError -> do
+	  writeHandle handle handle_
+          ioError theError
+      ClosedHandle -> do
+	  writeHandle handle handle_
+	  ioe_closedHandle fun handle
+      SemiClosedHandle -> do
+	  writeHandle handle handle_
+	  ioe_closedHandle fun handle
+      _ -> act handle_
+  where
+   not_rw_error = 
+	   IOError (Just handle) IllegalOperation fun
+		   ("handle is not open for reading or writing")
+
 wantSeekableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantSeekableHandle fun handle act =
     withHandle handle $ \ handle_ -> do
@@ -1246,11 +1279,12 @@ foreign import ccall "libHS_cbits.so" "getWriteableBuf"       unsafe prim_getWri
 foreign import ccall "libHS_cbits.so" "getBufWPtr"            unsafe prim_getBufWPtr       :: FILE_OBJ -> IO Int
 foreign import ccall "libHS_cbits.so" "setBufWPtr"            unsafe prim_setBufWPtr       :: FILE_OBJ -> Int -> IO ()
 foreign import ccall "libHS_cbits.so" "closeFile"             unsafe prim_closeFile        :: FILE_OBJ -> Flush -> IO RC
-foreign import ccall "libHS_cbits.so" "fileEOF"               unsafe prim_fileEOF          :: FILE_OBJ -> IO RC
-foreign import ccall "libHS_cbits.so" "setBuffering"          unsafe prim_setBuffering     :: FILE_OBJ -> Int -> IO RC
-foreign import ccall "libHS_cbits.so" "flushFile"             unsafe prim_flushFile        :: FILE_OBJ -> IO RC
-foreign import ccall "libHS_cbits.so" "getBufferMode"         unsafe prim_getBufferMode    :: FILE_OBJ -> IO RC
-foreign import ccall "libHS_cbits.so" "seekFile_int64"        unsafe prim_seekFile_int64   :: FILE_OBJ -> Int -> Int64 -> IO RC
+foreign import ccall "libHS_cbits.so" "fileEOF"               unsafe prim_fileEOF           :: FILE_OBJ -> IO RC
+foreign import ccall "libHS_cbits.so" "setBuffering"          unsafe prim_setBuffering      :: FILE_OBJ -> Int -> IO RC
+foreign import ccall "libHS_cbits.so" "flushFile"             unsafe prim_flushFile         :: FILE_OBJ -> IO RC
+foreign import ccall "libHS_cbits.so" "flushConnectedBuf"     unsafe prim_flushConnectedBuf :: FILE_OBJ -> IO RC
+foreign import ccall "libHS_cbits.so" "getBufferMode"         unsafe prim_getBufferMode     :: FILE_OBJ -> IO RC
+foreign import ccall "libHS_cbits.so" "seekFile_int64"        unsafe prim_seekFile_int64    :: FILE_OBJ -> Int -> Int64 -> IO RC
 foreign import ccall "libHS_cbits.so" "seekFileP"             unsafe prim_seekFileP        :: FILE_OBJ -> IO RC
 foreign import ccall "libHS_cbits.so" "setTerminalEcho"       unsafe prim_setTerminalEcho  :: FILE_OBJ -> Int -> IO RC
 foreign import ccall "libHS_cbits.so" "getTerminalEcho"       unsafe prim_getTerminalEcho  :: FILE_OBJ -> IO RC
