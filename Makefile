@@ -288,6 +288,19 @@ dist-package-zip ::
 	       $(ZIP) $(ZIP_OPTS) -r $(SRC_DIST_NAME)-src.zip $(SRC_DIST_PATHS)
 
 # -----------------------------------------------------------------------------
+# HC file bundles
+
+hc-file-bundle : project-check
+	$(RM) $(ProjectNameShort)-$(ProjectVersion)
+	$(LN_S) . $(ProjectNameShort)-$(ProjectVersion)
+	find $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler \
+	     $(ProjectNameShort)-$(ProjectVersion)/ghc/driver \
+             $(ProjectNameShort)-$(ProjectVersion)/ghc/lib \
+             $(ProjectNameShort)-$(ProjectVersion)/hslibs \
+	  -name "*.hc" -o -name "*_hsc.[ch]" -o -name "*_stub.[ch]" > hc-files-to-go
+	tar czf $(ProjectNameShort)-$(ProjectVersion)-$(TARGETPLATFORM)-hc.tar `cat hc-files-to-go`
+
+# -----------------------------------------------------------------------------
 
 DIST_CLEAN_FILES += config.cache config.status
 
