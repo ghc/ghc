@@ -37,7 +37,7 @@ import TcSimplify	( bindInstsOfLocalFuns )
 import TcMType		( newTyVar, newTyVarTy, newHoleTyVarTy,
 			  zonkTcTyVarToTyVar, readHoleResult
 			)
-import TcType		( mkTyVarTy, mkForAllTys, mkFunTys, tyVarsOfType, 
+import TcType		( TcTyVar, mkTyVarTy, mkForAllTys, mkFunTys, tyVarsOfType, 
 			  mkPredTy, mkForAllTy, isUnLiftedType, 
 			  unliftedTypeKind, liftedTypeKind, openTypeKind, eqKind
 			)
@@ -431,16 +431,16 @@ generalise binder_names mbind tau_tvs lie_req sigs =
     tcSimplifyRestricted doc tau_tvs lie_req		`thenTc` \ (qtvs, lie_free, binds) ->
 
    	-- Check that signature type variables are OK
-    checkSigsTyVars sigs				`thenTc_`
+    checkSigsTyVars qtvs sigs				`thenTc` \ final_qtvs ->
 
-    returnTc (qtvs, lie_free, binds, [])
+    returnTc (final_qtvs, lie_free, binds, [])
 
   else if null sigs then	-- UNRESTRICTED CASE, NO TYPE SIGS
     tcSimplifyInfer doc tau_tvs lie_req
 
   else 				-- UNRESTRICTED CASE, WITH TYPE SIGS
    	-- CHECKING CASE: Unrestricted group, there are type signatures
-	-- Check signature contexts are empty 
+	-- Check signature contexts are identical
     checkSigsCtxts sigs			`thenTc` \ (sig_avails, sig_dicts) ->
     
 	-- Check that the needed dicts can be
@@ -448,9 +448,9 @@ generalise binder_names mbind tau_tvs lie_req sigs =
     tcSimplifyInferCheck doc tau_tvs sig_avails lie_req	`thenTc` \ (forall_tvs, lie_free, dict_binds) ->
 	
    	-- Check that signature type variables are OK
-    checkSigsTyVars sigs					`thenTc_`
+    checkSigsTyVars forall_tvs sigs			`thenTc` \ final_qtvs ->
 
-    returnTc (forall_tvs, lie_free, dict_binds, sig_dicts)
+    returnTc (final_qtvs, lie_free, dict_binds, sig_dicts)
 
   where
     tysig_names = map (idName . tcSigPolyId) sigs
@@ -489,7 +489,23 @@ checkSigsCtxts sigs@(TySigInfo id1 sig_tvs theta1 _ _ _ src_loc : other_sigs)
 	 checkTc (equalLength theta theta1) sigContextsErr	`thenTc_`
 	 unifyTauTyLists sig1_dict_tys (map mkPredTy theta)
 
-checkSigsTyVars sigs = mapTc_ check_one sigs
+checkSigsTyVars :: [TcTyVar] -> [TcSigInfo] -> TcM [TcTyVar]
+checkSigsTyVars qtvs sigs 
+  = mapTc check_one sigs	`thenTc` \ sig_tvs_s ->
+    let
+	-- Sigh.  Make sure that all the tyvars in the type sigs
+	-- appear in the returned ty var list, which is what we are
+	-- going to generalise over.  Reason: we occasionally get
+	-- silly types like
+	--	type T a = () -> ()
+	--	f :: T a
+	--	f () = ()
+	-- Here, 'a' won't appear in qtvs, so we have to add it
+
+ 	sig_tvs = foldr (unionVarSet . mkVarSet) emptyVarSet sig_tvs_s
+	all_tvs = mkVarSet qtvs `unionVarSet` sig_tvs
+    in
+    returnTc (varSetElems all_tvs)
   where
     check_one (TySigInfo id sig_tyvars sig_theta sig_tau _ _ src_loc)
       = tcAddSrcLoc src_loc						$
