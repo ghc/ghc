@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.16 2001/09/18 11:07:58 simonmar Exp $
+-- $Id: Main.hs,v 1.17 2001/10/10 23:17:14 sof Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -176,7 +176,17 @@ savePackageConfig conf_file = do
     -- mv rather than cp because we've already done an hGetContents
     -- on this file so we won't be able to open it for writing
     -- unless we move the old one out of the way...
-  renameFile conf_file (conf_file ++ ".old") 
+  let oldFile = conf_file ++ ".old"
+  doesExist <- doesFileExist oldFile  `catch` (\ _ -> return False)
+  when doesExist (removeFile oldFile `catch` (const $ return ()))
+  catch (renameFile conf_file oldFile)
+  	(\ err -> do
+		hPutStrLn stderr (unwords [ "Unable to rename"
+					  , show conf_file
+					  , " to "
+					  , show oldFile
+					  ])
+		ioError err)
   hPutStrLn stdout "done."
 
 -----------------------------------------------------------------------------
