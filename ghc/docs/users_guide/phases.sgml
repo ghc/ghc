@@ -299,6 +299,22 @@ strmod = "\
             come <emphasis>before</emphasis>
             <option>-l</option><replaceable>bar</replaceable> on the
             command line.</para>
+
+	    <para>There's one other gotcha to bear in mind when using
+	    external libraries: if the library contains a
+	    <literal>main()</literal> function, then this will be
+	    linked in preference to GHC's own
+	    <literal>main()</literal> function
+	    (eg. <literal>libf2c</literal> and <literal>libl</literal>
+	    have their own <literal>main()</literal>s).  This is
+	    because GHC's <literal>main()</literal> comes from the
+	    <literal>HSrts</literal> library, which is normally
+	    included <emphasis>after</emphasis> all the other
+	    libraries on the linker's command line.  To force GHC's
+	    <literal>main()</literal> to be used in preference to any
+	    other <literal>main()</literal>s from external libraries,
+	    just add the option <option>-lHSrts</option> before any
+	    other libraries on the command line.</para>
 	  </listitem>
 	</varlistentry>
 
