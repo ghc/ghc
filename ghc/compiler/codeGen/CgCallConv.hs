@@ -57,7 +57,7 @@ import Name		( Name )
 import TyCon		( TyCon, tyConFamilySize )
 import Bitmap		( Bitmap, mAX_SMALL_BITMAP_SIZE, 
 			  mkBitmap, intsToReverseBitmap )
-import Util		( isn'tIn, sortLt )
+import Util		( isn'tIn, sortLe )
 import CmdLineOpts	( opt_Unregisterised )
 import FastString	( LitString )
 import Outputable
@@ -350,7 +350,7 @@ buildContLiveness name live_slots
 		-- (subtract one for the frame-header = return address).
 	
 		rel_slots :: [WordOff]
-	 	rel_slots = sortLt (<) 
+	 	rel_slots = sortLe (<=) 
 	    	    [ start_sp - ofs  -- Get slots relative to top of frame
 	    	    | ofs <- live_slots ]
 

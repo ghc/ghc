@@ -49,7 +49,7 @@ import Var		( TyVar, tyVarKind, idType, varName )
 import VarSet		( mkVarSet, subVarSet )
 import PrelNames
 import SrcLoc		( srcLocSpan, Located(..) )
-import Util		( zipWithEqual, sortLt, notNull )
+import Util		( zipWithEqual, sortLe, notNull )
 import ListSetOps	( removeDups,  assocMaybe )
 import Outputable
 import Bag
@@ -714,7 +714,7 @@ solveDerivEqns orig_eqns
       = addSrcSpan (srcLocSpan (getSrcLoc tc))		$
 	addErrCtxt (derivCtxt (Just clas) tc)	$
 	tcSimplifyDeriv tyvars deriv_rhs	`thenM` \ theta ->
-	returnM (sortLt (<) theta)	-- Canonicalise before returning the soluction
+	returnM (sortLe (<=) theta)	-- Canonicalise before returning the soluction
 
 mk_deriv_dfun (dfun_name, clas, tycon, tyvars, _) theta
   = mkDictFunId dfun_name tyvars theta

@@ -35,7 +35,7 @@ import BasicTypes	( Activation, CompilerPhase, isActive )
 import Outputable
 import FastString
 import Maybe		( isJust, isNothing, fromMaybe )
-import Util		( sortLt )
+import Util		( sortLe )
 import Bag
 import List		( isPrefixOf )
 \end{code}
@@ -292,7 +292,7 @@ match e1 (Lam x2 e2) tpl_vars kont subst
 match (Case e1 x1 alts1) (Case e2 x2 alts2) tpl_vars kont subst
   = match e1 e2 tpl_vars case_kont subst
   where
-    case_kont subst = bind [x1] [x2] (match_alts alts1 (sortLt lt_alt alts2))
+    case_kont subst = bind [x1] [x2] (match_alts alts1 (sortLe le_alt alts2))
 				     tpl_vars kont subst
 
 match (Type ty1) (Type ty2) tpl_vars kont subst
@@ -347,7 +347,7 @@ match_alts ((c1,vs1,r1):alts1) ((c2,vs2,r2):alts2) tpl_vars kont subst
 		 subst
 match_alts alts1 alts2 tpl_vars kont subst = match_fail
 
-lt_alt (con1, _, _) (con2, _, _) = con1 < con2
+le_alt (con1, _, _) (con2, _, _) = con1 <= con2
 
 ----------------------------------------
 bind :: [CoreBndr]	-- Template binders

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgStackery.lhs,v 1.25 2004/08/13 13:06:12 simonmar Exp $
+% $Id: CgStackery.lhs,v 1.26 2004/08/17 15:23:48 simonpj Exp $
 %
 \section[CgStackery]{Stack management functions}
 
@@ -31,7 +31,7 @@ import Cmm
 import CmmUtils		( CmmStmts, mkLblExpr )
 import CLabel		( mkUpdInfoLabel )
 import Constants
-import Util		( sortLt )
+import Util		( sortLe )
 import FastString	( LitString )
 import OrdList		( toOL )
 import Outputable
@@ -312,7 +312,7 @@ Explicitly free some stack space.
 freeStackSlots :: [VirtualSpOffset] -> Code
 freeStackSlots extra_free
   = do	{ stk_usg <- getStkUsage
-	; let all_free = addFreeSlots (freeStk stk_usg) (sortLt (<) extra_free)
+	; let all_free = addFreeSlots (freeStk stk_usg) (sortLe (<=) extra_free)
 	; let (new_vsp, new_free) = trim (virtSp stk_usg) all_free
 	; setStkUsage (stk_usg { virtSp = new_vsp, freeStk = new_free }) }
 

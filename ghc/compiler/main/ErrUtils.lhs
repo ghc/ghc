@@ -23,7 +23,7 @@ module ErrUtils (
 
 import Bag		( Bag, bagToList, isEmptyBag, emptyBag )
 import SrcLoc		( SrcSpan )
-import Util		( sortLt )
+import Util		( sortLe )
 import Outputable
 import qualified Pretty
 import SrcLoc		( srcSpanStart )
@@ -130,10 +130,13 @@ pprBagOfErrors bag_of_errors
 			   errMsgContext = unqual } <- sorted_errs ]
     where
       bag_ls	  = bagToList bag_of_errors
-      sorted_errs = sortLt occ'ed_before bag_ls
+      sorted_errs = sortLe occ'ed_before bag_ls
 
       occ'ed_before err1 err2 = 
-         LT == compare (head (errMsgSpans err1)) (head (errMsgSpans err2))
+         case compare (head (errMsgSpans err1)) (head (errMsgSpans err2)) of
+		LT -> True
+		EQ -> True
+		GT -> False
 
 pprBagOfWarnings :: Bag WarnMsg -> Pretty.Doc
 pprBagOfWarnings bag_of_warns = pprBagOfErrors bag_of_warns

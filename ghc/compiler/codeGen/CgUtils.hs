@@ -51,7 +51,7 @@ import Literal		( Literal(..) )
 import CLabel		( CLabel, mkAsmTempLabel )
 import Digraph		( SCC(..), stronglyConnComp )
 import ListSetOps	( assocDefault )
-import Util		( filterOut, sortLt )
+import Util		( filterOut, sortLe )
 import Char		( ord )
 import FastString	( LitString, FastString, unpackFS )
 import Outputable
@@ -352,12 +352,12 @@ emitSwitch tag_expr branches mb_deflt lo_tag hi_tag
 		  Nothing    -> return Nothing
 		  Just stmts -> do id <- forkCgStmts stmts; return (Just id)
 
-	; stmts <- mk_switch tag_expr (sortLt lt branches) 
+	; stmts <- mk_switch tag_expr (sortLe le branches) 
 			mb_deflt_id lo_tag hi_tag
 	; emitCgStmts stmts
 	}
   where
-    (t1,_) `lt` (t2,_) = t1 < t2
+    (t1,_) `le` (t2,_) = t1 <= t2
 
 
 mk_switch :: CmmExpr -> [(ConTagZ, CgStmts)]
@@ -475,10 +475,10 @@ emitLitSwitch scrut [] deflt
 emitLitSwitch scrut branches deflt_blk
   = do	{ scrut' <- assignTemp scrut
 	; deflt_blk_id <- forkCgStmts deflt_blk
-	; blk <- mk_lit_switch scrut' deflt_blk_id (sortLt lt branches)
+	; blk <- mk_lit_switch scrut' deflt_blk_id (sortLe le branches)
 	; emitCgStmts blk }
   where
-    lt (t1,_) (t2,_) = t1 < t2
+    le (t1,_) (t2,_) = t1 <= t2
 
 mk_lit_switch :: CmmExpr -> BlockId 
  	      -> [(Literal,CgStmts)]

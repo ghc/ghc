@@ -53,7 +53,7 @@ import SrcLoc		( noSrcLoc, Located(..), mkGeneralSrcSpan,
 			  unLoc, noLoc, srcLocSpan, SrcSpan )
 import BasicTypes	( DeprecTxt )
 import ListSetOps	( removeDups )
-import Util		( sortLt, notNull, isSingleton )
+import Util		( sortLe, notNull, isSingleton )
 import List		( partition )
 import IO		( openFile, IOMode(..) )
 \end{code}
@@ -1010,8 +1010,11 @@ addDupDeclErr (n:ns)
 	  nest 2 (ptext SLIT("other declarations at:")),
 	  nest 4 (vcat (map ppr sorted_locs))]
   where
-    sorted_locs = sortLt occ'ed_before (map nameSrcLoc ns)
-    occ'ed_before a b = LT == compare a b
+    sorted_locs = sortLe occ'ed_before (map nameSrcLoc ns)
+    occ'ed_before a b = case compare a b of
+			  LT -> True
+			  EQ -> True
+			  GT -> False
 
 dupExportWarn occ_name ie1 ie2
   = hsep [quotes (ppr occ_name), 

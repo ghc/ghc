@@ -220,7 +220,7 @@ import Module		( Module, ModuleName, moduleNameFS, moduleName, isHomeModule,
 			)
 import Outputable
 import DriverUtil	( createDirectoryHierarchy, directoryOf )
-import Util		( sortLt, seqList )
+import Util		( sortLe, seqList )
 import Binary		( getBinFileWithDict )
 import BinIface		( writeBinIface, v_IgnoreHiWay )
 import Unique		( Unique, Uniquable(..) )
@@ -286,9 +286,9 @@ mkIface hsc_env location maybe_old_iface
 		; deprecs  = mkIfaceDeprec src_deprecs
 		; iface_rules 
 		     | omit_prags = []
-		     | otherwise  = sortLt lt_rule $
+		     | otherwise  = sortLe le_rule $
 				    map (coreRuleToIfaceRule this_mod_name ext_nm) rules
-		; iface_insts = sortLt lt_inst (map dfunToIfaceInst insts)
+		; iface_insts = sortLe le_inst (map dfunToIfaceInst insts)
 
 	        ; intermediate_iface = ModIface { 
 			mi_module   = this_mod,
@@ -333,8 +333,8 @@ mkIface hsc_env location maybe_old_iface
 
 	; return new_iface }
   where
-     r1 `lt_rule` r2 = ifRuleName r1 < ifRuleName r2
-     i1 `lt_inst` i2 = ifDFun     i1 < ifDFun     i2
+     r1 `le_rule` r2 = ifRuleName r1 <= ifRuleName r2
+     i1 `le_inst` i2 = ifDFun     i1 <= ifDFun     i2
 
      dflags    = hsc_dflags hsc_env
      ghci_mode = hsc_mode hsc_env
@@ -649,7 +649,7 @@ anyNothing p (x:xs) = isNothing (p x) || anyNothing p xs
 mkIfaceDeprec :: Deprecations -> IfaceDeprecs
 mkIfaceDeprec NoDeprecs        = NoDeprecs
 mkIfaceDeprec (DeprecAll t)    = DeprecAll t
-mkIfaceDeprec (DeprecSome env) = DeprecSome (sortLt (<) (nameEnvElts env))
+mkIfaceDeprec (DeprecSome env) = DeprecSome (sortLe (<=) (nameEnvElts env))
 
 ----------------------
 bump_unless :: Bool -> Version -> Version
@@ -745,7 +745,7 @@ mk_usage_info pit hpt dir_imp_mods dep_mods proto_used_names
         used_occs = lookupModuleEnv ent_map mod `orElse` []
 	ent_vers :: [(OccName,Version)]
         ent_vers = [ (occ, version_env occ `orElse` initialVersion) 
-		   | occ <- sortLt (<) used_occs]
+		   | occ <- sortLe (<=) used_occs]
 \end{code}
 
 \begin{code}

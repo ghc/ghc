@@ -21,7 +21,7 @@ module Util (
 	nTimes,
 
 	-- sorting
-	sortLt, naturalMergeSortLe,
+	sortLe,
 
 	-- transitive closures
 	transitiveClosure,
@@ -332,126 +332,6 @@ isn'tIn msg x ys
 
 %************************************************************************
 %*									*
-\subsection[Utils-sorting]{Sorting}
-%*									*
-%************************************************************************
-
-%************************************************************************
-%*									*
-\subsubsection[Utils-quicksorting]{Quicksorts}
-%*									*
-%************************************************************************
-
-\begin{code}
-#if NOT_USED
-
--- tail-recursive, etc., "quicker sort" [as per Meira thesis]
-quicksort :: (a -> a -> Bool)		-- Less-than predicate
-	  -> [a]			-- Input list
-	  -> [a]			-- Result list in increasing order
-
-quicksort lt []      = []
-quicksort lt [x]     = [x]
-quicksort lt (x:xs)  = split x [] [] xs
-  where
-    split x lo hi []		     = quicksort lt lo ++ (x : quicksort lt hi)
-    split x lo hi (y:ys) | y `lt` x  = split x (y:lo) hi ys
-			 | True      = split x lo (y:hi) ys
-#endif
-\end{code}
-
-Quicksort variant from Lennart's Haskell-library contribution.  This
-is a {\em stable} sort.
-
-\begin{code}
-sortLt :: (a -> a -> Bool) 		-- Less-than predicate
-       -> [a] 				-- Input list
-       -> [a]				-- Result list
-
-sortLt lt l = qsort lt   l []
-
--- qsort is stable and does not concatenate.
-qsort :: (a -> a -> Bool)	-- Less-than predicate
-      -> [a]			-- xs, Input list
-      -> [a]			-- r,  Concatenate this list to the sorted input list
-      -> [a]			-- Result = sort xs ++ r
-
-qsort lt []     r = r
-qsort lt [x]    r = x:r
-qsort lt (x:xs) r = qpart lt x xs [] [] r
-
--- qpart partitions and sorts the sublists
--- rlt contains things less than x,
--- rge contains the ones greater than or equal to x.
--- Both have equal elements reversed with respect to the original list.
-
-qpart lt x [] rlt rge r =
-    -- rlt and rge are in reverse order and must be sorted with an
-    -- anti-stable sorting
-    rqsort lt rlt (x : rqsort lt rge r)
-
-qpart lt x (y:ys) rlt rge r =
-    if lt y x then
-	-- y < x
-	qpart lt x ys (y:rlt) rge r
-    else
-	-- y >= x
-	qpart lt x ys rlt (y:rge) r
-
--- rqsort is as qsort but anti-stable, i.e. reverses equal elements
-rqsort lt []     r = r
-rqsort lt [x]    r = x:r
-rqsort lt (x:xs) r = rqpart lt x xs [] [] r
-
-rqpart lt x [] rle rgt r =
-    qsort lt rle (x : qsort lt rgt r)
-
-rqpart lt x (y:ys) rle rgt r =
-    if lt x y then
-	-- y > x
-	rqpart lt x ys rle (y:rgt) r
-    else
-	-- y <= x
-	rqpart lt x ys (y:rle) rgt r
-\end{code}
-
-%************************************************************************
-%*									*
-\subsubsection[Utils-dull-mergesort]{A rather dull mergesort}
-%*									*
-%************************************************************************
-
-\begin{code}
-#if NOT_USED
-mergesort :: (a -> a -> Ordering) -> [a] -> [a]
-
-mergesort cmp xs = merge_lists (split_into_runs [] xs)
-  where
-    a `le` b = case cmp a b of { LT -> True;  EQ -> True; GT -> False }
-    a `ge` b = case cmp a b of { LT -> False; EQ -> True; GT -> True  }
-
-    split_into_runs []        []	    	= []
-    split_into_runs run       []	    	= [run]
-    split_into_runs []        (x:xs)		= split_into_runs [x] xs
-    split_into_runs [r]       (x:xs) | x `ge` r = split_into_runs [r,x] xs
-    split_into_runs rl@(r:rs) (x:xs) | x `le` r = split_into_runs (x:rl) xs
-				     | True     = rl : (split_into_runs [x] xs)
-
-    merge_lists []	 = []
-    merge_lists (x:xs)   = merge x (merge_lists xs)
-
-    merge [] ys = ys
-    merge xs [] = xs
-    merge xl@(x:xs) yl@(y:ys)
-      = case cmp x y of
-	  EQ  -> x : y : (merge xs ys)
-	  LT  -> x : (merge xs yl)
-	  GT -> y : (merge xl ys)
-#endif
-\end{code}
-
-%************************************************************************
-%*									*
 \subsubsection[Utils-Carsten-mergesort]{A mergesort from Carsten}
 %*									*
 %************************************************************************
@@ -554,7 +434,8 @@ naturalMergeSort = generalNaturalMergeSort (<=)
 mergeSortLe le = generalMergeSort le
 #endif
 
-naturalMergeSortLe le = generalNaturalMergeSort le
+sortLe :: (a->a->Bool) -> [a] -> [a]
+sortLe le = generalNaturalMergeSort le
 \end{code}
 
 %************************************************************************

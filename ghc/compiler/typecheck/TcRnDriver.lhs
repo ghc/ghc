@@ -120,7 +120,7 @@ import Panic		( ghcError, GhcException(..) )
 #endif
 
 import FastString	( mkFastString )
-import Util		( sortLt )
+import Util		( sortLe )
 import Bag		( unionBags, snocBag )
 
 import Maybe		( isJust )
@@ -1135,9 +1135,9 @@ ppr_insts dfun_ids = text "INSTANCES" $$ nest 4 (ppr_sigs dfun_ids)
 ppr_sigs :: [Var] -> SDoc
 ppr_sigs ids
 	-- Print type signatures; sort by OccName 
-  = vcat (map ppr_sig (sortLt lt_sig ids))
+  = vcat (map ppr_sig (sortLe le_sig ids))
   where
-    lt_sig id1 id2 = getOccName id1 < getOccName id2
+    le_sig id1 id2 = getOccName id1 <= getOccName id2
     ppr_sig id = ppr id <+> dcolon <+> ppr (tidyTopType (idType id))
 
 ppr_rules :: [IdCoreRule] -> SDoc

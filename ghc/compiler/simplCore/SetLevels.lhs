@@ -72,7 +72,7 @@ import OccName		( occNameUserString )
 import Type		( isUnLiftedType, Type )
 import BasicTypes	( TopLevelFlag(..) )
 import UniqSupply
-import Util		( sortLt, isSingleton, count )
+import Util		( sortLe, isSingleton, count )
 import Outputable
 import FastString
 \end{code}
@@ -730,14 +730,14 @@ abstractVars :: Level -> LevelEnv -> VarSet -> [Var]
 	-- whose level is greater than the destination level
 	-- These are the ones we are going to abstract out
 abstractVars dest_lvl env fvs
-  = uniq (sortLt lt [var | fv <- varSetElems fvs, var <- absVarsOf dest_lvl env fv])
+  = uniq (sortLe le [var | fv <- varSetElems fvs, var <- absVarsOf dest_lvl env fv])
   where
 	-- Sort the variables so we don't get 
 	-- mixed-up tyvars and Ids; it's just messy
-    v1 `lt` v2 = case (isId v1, isId v2) of
+    v1 `le` v2 = case (isId v1, isId v2) of
 		   (True, False) -> False
 		   (False, True) -> True
-		   other	 -> v1 < v2	-- Same family
+		   other	 -> v1 <= v2	-- Same family
 
     uniq :: [Var] -> [Var]
 	-- Remove adjacent duplicates; the sort will have brought them together

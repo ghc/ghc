@@ -15,7 +15,7 @@ import StgSyn
 import Id        	( Id )
 import VarSet
 import VarEnv
-import Util		( sortLt )
+import Util		( sortLe )
 import Maybes		( orElse )
 import Maybes		( expectJust )
 import Bitmap		( intsToBitmap )
@@ -151,7 +151,7 @@ constructSRT table (SRTEntries entries)
   where
     ints = map (expectJust "constructSRT" . lookupVarEnv table) 
 		(varSetElems entries)
-    sorted_ints = sortLt (<) ints
+    sorted_ints = sortLe (<=) ints
     offset = head sorted_ints
     bitmap_entries = map (subtract offset) sorted_ints
     len = last bitmap_entries + 1

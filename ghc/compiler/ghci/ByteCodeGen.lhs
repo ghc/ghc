@@ -730,7 +730,7 @@ doCase d s p (_,scrut)
 	-- things that are pointers, whereas in CgBindery the code builds the
 	-- bitmap from the free slots and unboxed bindings.
 	-- (ToDo: merge?)
-	bitmap = intsToReverseBitmap d{-size-} (sortLt (<) rel_slots)
+	bitmap = intsToReverseBitmap d{-size-} (sortLe (<=) rel_slots)
 	  where
 	  binds = fmToList p
 	  rel_slots = concat (map spread binds)

@@ -32,7 +32,7 @@ module Digraph(
 ------------------------------------------------------------------------------
 
 
-import Util	( sortLt )
+import Util	( sortLe )
 
 -- Extensions
 import MONAD_ST
@@ -100,8 +100,8 @@ stronglyConnCompR [] = []  -- added to avoid creating empty array in graphFromEd
 stronglyConnCompR edges
   = map decode forest
   where
-    (graph, vertex_fn) = graphFromEdges edges
-    forest	       = scc graph
+    (graph, vertex_fn) = _scc_ "graphFromEdges" graphFromEdges edges
+    forest	       = _scc_ "Digraph.scc" scc graph
     decode (Node v []) | mentions_itself v = CyclicSCC [vertex_fn v]
 		       | otherwise	   = AcyclicSCC (vertex_fn v)
     decode other = CyclicSCC (dec other [])
@@ -163,14 +163,16 @@ graphFromEdges edges
   where
     max_v      	    = length edges - 1
     bounds          = (0,max_v) :: (Vertex, Vertex)
-    sorted_edges    = sortLt lt edges
+    sorted_edges    = let
+			 (_,k1,_) `le` (_,k2,_) = case k1 `compare` k2 of { GT -> False; other -> True }
+		      in
+			sortLe le edges
     edges1	    = zipWith (,) [0..] sorted_edges
 
     graph	    = array bounds [(,) v (mapMaybe key_vertex ks) | (,) v (_,    _, ks) <- edges1]
     key_map	    = array bounds [(,) v k			   | (,) v (_,    k, _ ) <- edges1]
     vertex_map	    = array bounds edges1
 
-    (_,k1,_) `lt` (_,k2,_) = case k1 `compare` k2 of { LT -> True; other -> False }
 
     -- key_vertex :: key -> Maybe Vertex
     -- 	returns Nothing for non-interesting vertices

@@ -23,7 +23,7 @@ module ListSetOps (
 import Outputable
 import Unique	( Unique )
 import UniqFM	( eltsUFM, emptyUFM, addToUFM_C )
-import Util	( isn'tIn, isIn, mapAccumR, sortLt )
+import Util	( isn'tIn, isIn, mapAccumR, sortLe )
 import List	( union )
 \end{code}
 
@@ -156,10 +156,10 @@ equivClasses :: (a -> a -> Ordering) 	-- Comparison
 equivClasses cmp stuff@[]     = []
 equivClasses cmp stuff@[item] = [stuff]
 equivClasses cmp items
-  = runs eq (sortLt lt items)
+  = runs eq (sortLe le items)
   where
     eq a b = case cmp a b of { EQ -> True; _ -> False }
-    lt a b = case cmp a b of { LT -> True; _ -> False }
+    le a b = case cmp a b of { LT -> True; EQ -> True; GT -> False }
 \end{code}
 
 The first cases in @equivClasses@ above are just to cut to the point
