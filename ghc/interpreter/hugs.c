@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.51 $
- * $Date: 2000/03/30 12:04:13 $
+ * $Revision: 1.52 $
+ * $Date: 2000/03/31 04:13:27 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -1682,6 +1682,8 @@ static Module allocEvalModule ( void )
    module(evalMod).names   = module(currentModule).names;
    module(evalMod).tycons  = module(currentModule).tycons;
    module(evalMod).classes = module(currentModule).classes;
+   module(evalMod).qualImports 
+     = singleton(pair(mkCon(textPrelude),modulePrelude));
    return evalMod;
 }
 

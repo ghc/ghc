@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.56 $
- * $Date: 2000/03/30 09:02:12 $
+ * $Revision: 1.57 $
+ * $Date: 2000/03/31 04:13:27 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -107,17 +107,18 @@ Cell v; {
         case CONIDCELL  :
         case CONOPCELL  : return text+textOf(v);
 
-        case QUALIDENT  : {   Text pos = textHw;
-                              Text t   = qmodOf(v);
-                              while (pos+1 < savedText && text[t]!=0) {
-                                  text[pos++] = text[t++];
+        case QUALIDENT  : {   String qmod = textToStr(qmodOf(v));
+	                      String qtext = textToStr(qtextOf(v));
+			      Text pos = textHw;
+			      
+			      while (pos+1 < savedText && *qmod!=0) {
+                                  text[pos++] = *qmod++;
                               }
                               if (pos+1 < savedText) {
                                   text[pos++] = '.';
                               }
-                              t = qtextOf(v);
-                              while (pos+1 < savedText && text[t]!=0) {
-                                  text[pos++] = text[t++];
+                              while (pos+1 < savedText && *qtext!=0) {
+                                  text[pos++] = *qtext++;
                               }
                               text[pos] = '\0';
                               return text+textHw;
@@ -1717,7 +1718,7 @@ Void setCurrModule(m)              /* set lookup tables for current module */
 Module m; {
     Int i;
     assert(isModule(m));
-    /* fprintf(stderr, "SET CURR MODULE %s\n", textToStr(module(m).text));*/
+    /* fprintf(stderr, "SET CURR MODULE %s %d\n", textToStr(module(m).text),m);*/
     {List t;
      for (t = module(m).names; nonNull(t); t=tl(t))
         assert(isName(hd(t)));

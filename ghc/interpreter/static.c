@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.32 $
- * $Date: 2000/03/23 14:54:21 $
+ * $Revision: 1.33 $
+ * $Date: 2000/03/31 04:13:27 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -470,10 +470,12 @@ Pair importSpec; {
         hidden  = resolveImportList(m, snd(impList),FALSE);
         imports = resolveImportList(m, DOTDOT,FALSE);
     } else if (isPair(impList) && STAR == fst(impList)) {
-      List privileged;
-      imports = resolveImportList(m, DOTDOT, FALSE);
-      privileged = resolveImportList(m, snd(impList),TRUE);
-      imports = dupOnto(privileged,imports);
+	// Previously, I was forcing an import Prelude,
+	// but this precluded doing things like 
+	// import Prelude hiding ( catch) 
+	// so, for now, you need to put an explicit
+	// import Prelude if you use import privileged.
+      imports = resolveImportList(m, snd(impList),TRUE);
     } else {
         imports = resolveImportList(m, impList,FALSE);
     }
@@ -4510,7 +4512,7 @@ Cell g; {                              /* expression                       */
 static Cell local depExpr(line,e)      /* find dependents of expression    */
 Int  line;
 Cell e; {
-  //    Printf( "\n\n"); print(e,100); Printf("\n");
+  //Printf( "\n\n"); print(e,100); Printf("\n");
   //printExp(stdout,e);
     switch (whatIs(e)) {
 
