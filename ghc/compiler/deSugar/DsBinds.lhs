@@ -37,9 +37,7 @@ import Type		( mkTyVarTy, isDictTy )
 import Subst		( mkTyVarSubst, substTy )
 import TysWiredIn	( voidTy )
 import Outputable
-
-import Maybe
-import IOExts (trace)
+import Maybe		( isJust )
 \end{code}
 
 %************************************************************************
