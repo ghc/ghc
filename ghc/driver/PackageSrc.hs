@@ -67,7 +67,7 @@ package_details installing
 #ifndef mingw32_TARGET_OS
 	extra_libraries   = [],
 #else
-        extra_libraries   = [ "winmm" ], -- for the threadDelay timer
+        extra_libraries   = [ "winmm", "wsock32" ], -- winmm for the threadDelay timer, wsock32 for the linker
 #endif
         include_dirs   = if installing
                             then [ "$libdir/includes" ]
