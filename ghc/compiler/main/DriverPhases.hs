@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.1 2000/10/16 15:16:59 simonmar Exp $
+-- $Id: DriverPhases.hs,v 1.2 2000/11/13 14:34:37 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -53,19 +53,20 @@ data Phase
 -- by its suffix.
 startPhase "lhs"   = Unlit
 startPhase "hs"    = Cpp
+startPhase "hspp"  = Hsc	-- not sure this will work ...
 startPhase "hc"    = HCc
 startPhase "c"     = Cc
 startPhase "raw_s" = Mangle
 startPhase "s"     = As
 startPhase "S"     = As
-startPhase "o"     = Ln     
+startPhase "o"     = Ln
 startPhase _       = Ln	   -- all unknown file types
 
 -- the output suffix for a given phase is uniquely determined by
 -- the input requirements of the next phase.
 phaseInputExt Unlit       = "lhs"
 phaseInputExt Cpp         = "lpp"	-- intermediate only
-phaseInputExt Hsc         = "cpp"	-- intermediate only
+phaseInputExt Hsc         = "hspp"	-- intermediate only
 phaseInputExt HCc         = "hc"
 phaseInputExt Cc          = "c"
 phaseInputExt Mangle      = "raw_s"

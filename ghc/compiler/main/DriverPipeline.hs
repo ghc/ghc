@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.19 2000/11/13 12:43:20 sewardj Exp $
+-- $Id: DriverPipeline.hs,v 1.20 2000/11/13 14:34:37 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -266,12 +266,6 @@ pipeLoop ((phase, keep, o_suffix):phases)
 	        ofile <- outputFileName True keep final_suffix
 		return ofile
 	else do -- carry on ...
-
-	-- sadly, ghc -E is supposed to write the file to stdout.  We
-	-- generate <file>.cpp, so we also have to cat the file here.
-     when (null phases && phase == Cpp) $
-	run_something "Dump pre-processed file to stdout"
-		      ("cat " ++ output_fn)
 
      pipeLoop phases output_fn do_linking use_ofile orig_basename orig_suffix
 
