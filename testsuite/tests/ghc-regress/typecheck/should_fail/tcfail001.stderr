@@ -1,7 +1,7 @@
 
-tcfail001.hs:9:1:
+tcfail001.hs:9:7:
     Couldn't match `[a]' against `t -> t1'
-	Expected type: [a]
-	Inferred type: t -> t1
+      Expected type: [a]
+      Inferred type: t -> t1
     In the definition of `op': op [] = []
     In the definition for method `op'
