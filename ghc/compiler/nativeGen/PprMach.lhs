@@ -386,6 +386,13 @@ pprInstr (SEGMENT DataSegment)
 	,IF_ARCH_i386(SLIT(".data\n\t.align 4")
 	,)))
 
+pprInstr (SEGMENT RoDataSegment)
+    = ptext
+	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
+	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
+	,IF_ARCH_i386(SLIT(".section .rodata\n\t.align 4")
+	,)))
+
 pprInstr (LABEL clab)
   = let
 	pp_lab = pprCLabel_asm clab

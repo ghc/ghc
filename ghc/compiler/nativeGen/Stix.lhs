@@ -158,7 +158,7 @@ pprStixTree t
        StInt i          -> paren (integer i)
        StFloat rat      -> paren (text "Float" <+> rational rat)
        StDouble	rat     -> paren (text "Double" <+> rational rat)
-       StString str     -> paren (text "Str" <+> ptext str)
+       StString str     -> paren (text "Str `" <> ptext str <> char '\'')
        StComment str    -> paren (text "Comment" <+> ptext str)
        StCLbl lbl       -> pprCLabel lbl
        StReg reg        -> ppStixReg reg
@@ -224,7 +224,7 @@ segment (or that it has no segments at all, and we can lump these
 together).
 
 \begin{code}
-data CodeSegment = DataSegment | TextSegment deriving (Eq, Show)
+data CodeSegment = DataSegment | TextSegment | RoDataSegment deriving (Eq, Show)
 ppCodeSegment = text . show
 
 type StixTreeList = [StixTree] -> [StixTree]

@@ -262,7 +262,7 @@ getRegister (StString s)
 	imm_lbl = ImmCLbl lbl
 
 	code dst = toOL [
-	    SEGMENT DataSegment,
+	    SEGMENT RoDataSegment,
 	    LABEL lbl,
 	    ASCII True (_UNPK_ s),
 	    SEGMENT TextSegment,
