@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: CPUTime.hsc,v 1.5 2001/12/21 15:07:26 simonmar Exp $
+-- $Id: CPUTime.hsc,v 1.6 2002/02/11 12:29:13 simonmar Exp $
 --
 -- The standard CPUTime library.
 --
@@ -27,7 +27,7 @@ import Foreign.C
 
 import Data.Ratio
 
-#include "HsCore.h"
+#include "HsBase.h"
 
 -- -----------------------------------------------------------------------------
 -- Computation `getCPUTime' returns the number of picoseconds CPU time

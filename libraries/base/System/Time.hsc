@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Time.hsc,v 1.7 2002/02/05 17:32:27 simonmar Exp $
+-- $Id: Time.hsc,v 1.8 2002/02/11 12:29:27 simonmar Exp $
 --
 -- The standard Time library.
 --
@@ -98,7 +98,7 @@ module System.Time
 
      ) where
 
-#include "HsCore.h"
+#include "HsBase.h"
 
 import Prelude
 
