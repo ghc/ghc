@@ -452,19 +452,19 @@ isFFIExportResultTy :: Type -> Bool
 isFFIExportResultTy ty = checkRepTyCon legalFEResultTyCon ty
 
 isFFIDynArgumentTy :: Type -> Bool
--- The argument type of a foreign import dynamic must be either Addr, or
--- a newtype of Addr.
-isFFIDynArgumentTy = checkRepTyCon (== addrTyCon)
+-- The argument type of a foreign import dynamic must be Ptr, Addr,
+-- or a newtype of either.
+isFFIDynArgumentTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == addrTyCon)
 
 isFFIDynResultTy :: Type -> Bool
--- The result type of a foreign export dynamic must be either Addr, or
--- a newtype of Addr.
-isFFIDynResultTy = checkRepTyCon (== addrTyCon)
+-- The result type of a foreign export dynamic must be Ptr, Addr,
+-- or a newtype of either.
+isFFIDynResultTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == addrTyCon)
 
 isFFILabelTy :: Type -> Bool
--- The type of a foreign label must be either Addr, or
--- a newtype of Addr.
-isFFILabelTy = checkRepTyCon (\tc -> tc == addrTyCon || tc == ptrTyCon)
+-- The type of a foreign label must be Ptr, Addr,
+-- or a newtype of either.
+isFFILabelTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == addrTyCon)
 
 checkRepTyCon :: (TyCon -> Bool) -> Type -> Bool
 	-- look through newtypes
