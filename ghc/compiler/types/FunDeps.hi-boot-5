@@ -1,7 +1,5 @@
 __interface FunDeps 1 0 where
-__export FunDeps instantiateFdClassTys instantiateFdTys instantiateFundeps oclose pprFundeps ;
+__export FunDeps instantiateFdClassTys oclose pprFundeps ;
 1 instantiateFdClassTys :: __forall [b] => Class.Class -> [b] -> [([b], [b])] ;
-1 instantiateFdTys :: Inst.Inst -> [([TypeRep.Type], [TypeRep.Type])] ;
-1 instantiateFundeps :: Inst.Inst -> [([Var.Var], [Var.Var])] ;
 1 oclose :: __forall [a] => {Unique.Uniquable a} -> [([a], [a])] -> UniqFM.UniqFM a -> UniqFM.UniqFM a ;
 1 pprFundeps :: __forall [a a1] => {Outputable.Outputable a} -> {Outputable.Outputable a1} -> [([a], [a1])] -> Outputable.PprStyle -> Pretty.Doc ;
