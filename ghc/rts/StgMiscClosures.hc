@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.41 2000/04/05 15:20:13 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.42 2000/04/18 15:06:19 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -340,7 +340,7 @@ NON_ENTERABLE_ENTRY_CODE(RBH_Save_2);
 #endif /* defined(PAR) || defined(GRAN) */
 
 /* identical to BLACKHOLEs except for the infotag */
-INFO_TABLE(CAF_BLACKHOLE_info, CAF_BLACKHOLE_entry,0,2,CAF_BLACKHOLE,,EF_,0,0);
+INFO_TABLE(CAF_BLACKHOLE_info, CAF_BLACKHOLE_entry,0,2,CAF_BLACKHOLE,,EF_,"CAF_BLACKHOLE","CAF_BLACKHOLE");
 STGFUN(CAF_BLACKHOLE_entry)
 {
   FB_
