@@ -421,18 +421,15 @@ ifeq "$(GHCI_LIBOBJS)" ""
 GHCI_LIBOBJS = $(LIBOBJS)
 endif
 
+$(GHCI_LIBRARY) :: $(GHCI_LIBOBJS)
 ifneq "$(HS_SRCS)" ""
 ifeq "$(SplitObjs)" "YES"
-$(GHCI_LIBRARY) :: $(GHCI_LIBOBJS)
-	( echo $(STUBOBJS) ; $(FIND) $(patsubst %.$(way_)o,%,$(GHCI_LIBOBJS)) -name '*.$(way_)o' -print ) | xargs ld -r -x -o $@
-else # not SplitObjs
-$(GHCI_LIBRARY) :: $(GHCI_LIBOBJS)
-	ld -r -x -o $@ $(GHCI_LIBOBJS)
+	$(foreach obj,$(GHCI_LIBOBJS), \
+	    ld -r -x -o $(obj)         \
+	    $(patsubst %.$(way_)o,%,$(obj))/*.$(way_)o &&) true
 endif
-else # no HS_SRCS
-$(GHCI_LIBRARY) :: $(GHCI_LIBOBJS)
-	ld -r -x -o $@ $(GHCI_LIBOBJS)
 endif
+	ld -r -x -o $@ $(GHCI_LIBOBJS) $(STUBOBJS)
 
 CLEAN_FILES += $(GHCI_LIBRARY)
 endif
