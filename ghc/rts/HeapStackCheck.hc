@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.11 2000/01/13 14:34:03 hwloidl Exp $
+ * $Id: HeapStackCheck.hc,v 1.12 2000/03/02 10:11:50 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -20,7 +20,7 @@
  *
  *    - If the context_switch flag is set, indicating that there are more
  *      threads waiting to run, we yield to the scheduler 
- *	(return ThreadYeilding).
+ *	(return ThreadYielding).
  *
  *    - If Hp > HpLim, we've had a heap check failure.  This means we've
  *	come to the end of the current heap block, so we try to chain
