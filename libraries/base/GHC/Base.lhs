@@ -303,6 +303,15 @@ foldr k z xs = go xs
 	       go []     = z
 	       go (y:ys) = y `k` go ys
 
+-- | A list producer that can be fused with 'foldr'.
+-- This function is merely
+--
+-- >	build g = g (:) []
+--
+-- but GHC's simplifier will transform an expression of the form
+-- @'foldr' k z ('build' g)@, which may arise after inlining, to @g k z@,
+-- which avoids producing an intermediate list.
+
 build 	:: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
 {-# INLINE [1] build #-}
 	-- The INLINE is important, even though build is tiny,
@@ -313,6 +322,15 @@ build 	:: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
 	-- The "1" says to inline in phase 1
 
 build g = g (:) []
+
+-- | A list producer that can be fused with 'foldr'.
+-- This function is merely
+--
+-- >	augment g xs = g (:) xs
+--
+-- but GHC's simplifier will transform an expression of the form
+-- @'foldr' k z ('augment' g xs)@, which may arise after inlining, to
+-- @g k ('foldr' k z xs)@, which avoids producing an intermediate list.
 
 augment :: forall a. (forall b. (a->b->b) -> b -> b) -> [a] -> [a]
 {-# INLINE [1] augment #-}
@@ -865,22 +883,33 @@ gtInt, geInt, eqInt, neInt, ltInt, leInt :: Int -> Int -> Bool
 -- Note that these wrappers still produce undefined results when the
 -- second argument (the shift amount) is negative.
 
-shiftL#, shiftRL# :: Word# -> Int# -> Word#
-
+-- | Shift the argument left by the specified number of bits
+-- (which must be non-negative).
+shiftL# :: Word# -> Int# -> Word#
 a `shiftL#` b   | b >=# WORD_SIZE_IN_BITS# = int2Word# 0#
 	        | otherwise                = a `uncheckedShiftL#` b
 
+-- | Shift the argument right by the specified number of bits
+-- (which must be non-negative).
+shiftRL# :: Word# -> Int# -> Word#
 a `shiftRL#` b  | b >=# WORD_SIZE_IN_BITS# = int2Word# 0#
 	        | otherwise                = a `uncheckedShiftRL#` b
 
-iShiftL#, iShiftRA#, iShiftRL# :: Int# -> Int# -> Int#
-
+-- | Shift the argument left by the specified number of bits
+-- (which must be non-negative).
+iShiftL# :: Int# -> Int# -> Int#
 a `iShiftL#` b  | b >=# WORD_SIZE_IN_BITS# = 0#
 	        | otherwise                = a `uncheckedIShiftL#` b
 
+-- | Shift the argument right (signed) by the specified number of bits
+-- (which must be non-negative).
+iShiftRA# :: Int# -> Int# -> Int#
 a `iShiftRA#` b | b >=# WORD_SIZE_IN_BITS# = if a <# 0# then (-1#) else 0#
 	        | otherwise                = a `uncheckedIShiftRA#` b
 
+-- | Shift the argument right (unsigned) by the specified number of bits
+-- (which must be non-negative).
+iShiftRL# :: Int# -> Int# -> Int#
 a `iShiftRL#` b | b >=# WORD_SIZE_IN_BITS# = 0#
 	        | otherwise                = a `uncheckedIShiftRL#` b
 
