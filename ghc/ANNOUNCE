@@ -64,14 +64,16 @@ For full details see the release notes:
 + Mailing lists
 ================
 
-We run mailing lists for GHC users and bug reports; to subscribe, send
-mail to majordomo@haskell.org; the msg body should be:
+We run mailing lists for GHC users and bug reports; to subscribe, use
+the web interfaces at
 
-    subscribe glasgow-haskell-{users,bugs} Your Name <you@where.soever>
+	http://www.haskell.org/mailman/listinfo/glasgow-haskell-users
+	http://www.haskell.org/mailman/listinfo/glasgow-haskell-bugs
 
-or
+There are several other haskell and ghc-related mailing lists on
+www.haskell.org; for the full list, see
 
-    subscribe cvs-ghc Your Name <you@where.soever>
+	http://www.haskell.org/mailman/listinfo/
 
 Please send bug reports about GHC to glasgow-haskell-bugs@haskell.org;
 GHC users hang out on glasgow-haskell-users@haskell.org.  Bleeding
