@@ -358,7 +358,10 @@ mkSynTy tycon tys
   | n_args == arity	-- Exactly saturated
   = mk_syn tys
   | n_args >  arity	-- Over-saturated
-  = case splitAt arity tys of { (as,bs) -> foldl AppTy (mk_syn as) bs }
+  = case splitAt arity tys of { (as,bs) -> mkAppTys (mk_syn as) bs }
+	-- Its important to use mkAppTys, rather than (foldl AppTy),
+	-- because (mk_syn as) might well return a partially-applied
+	-- type constructor; indeed, usually will!
   | otherwise		-- Un-saturated
   = TyConApp tycon tys
 	-- For the un-saturated case we build TyConApp directly
