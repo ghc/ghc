@@ -676,7 +676,6 @@ tcPolyExpr arg expected_arg_ty
     let
 	(sig_theta, sig_tau) = splitRhoTy sig_rho
     in
-    ASSERT( null sig_theta )	-- And expected_tyvars are all DontBind things
 	
 	-- Type-check the arg and unify with expected type
     tcExpr arg sig_tau				`thenTc` \ (arg', lie_arg) ->
@@ -692,23 +691,24 @@ tcPolyExpr arg expected_arg_ty
 	-- Conclusion: include the free vars of the expected arg type in the
 	-- list of "free vars" for the signature check.
 
-    tcAddErrCtxt (rank2ArgCtxt arg expected_arg_ty) (
-	tcExtendGlobalTyVars (tyVarsOfType expected_arg_ty) (
-		checkSigTyVars sig_tyvars sig_tau
-	)						`thenTc_`
+    tcAddErrCtxt (rank2ArgCtxt arg expected_arg_ty) $
+    tcExtendGlobalTyVars (tyVarsOfType expected_arg_ty) $
 
-	    -- Check that there's no overloading involved
-	    -- Even if there isn't, there may be some Insts which mention the expected_tyvars,
-	    -- but which, on simplification, don't actually need a dictionary involving
-	    -- the tyvar.  So we have to do a proper simplification right here.
-	tcSimplifyRank2 (mkTyVarSet sig_tyvars) 
-			lie_arg				`thenTc` \ (free_insts, inst_binds) ->
+    checkSigTyVars sig_tyvars sig_tau		`thenTc_`
+    newDicts Rank2Origin sig_theta		`thenNF_Tc` \ (sig_dicts, dict_ids) ->
+	-- ToDo: better origin
+    tcSimplifyAndCheck 
+		(mkTyVarSet sig_tyvars) 	-- No need to zonk the tyvars because
+						-- they won't be bound to anything
+		sig_dicts lie_arg		`thenTc` \ (lie', inst_binds) ->
 
 	    -- This HsLet binds any Insts which came out of the simplification.
 	    -- It's a bit out of place here, but using AbsBind involves inventing
 	    -- a couple of new names which seems worse.
-	returnTc (TyLam sig_tyvars (HsLet (mk_binds inst_binds) arg'), free_insts)
-    )
+     returnTc ( TyLam sig_tyvars $
+		DictLam dict_ids $
+		HsLet (mk_binds inst_binds) arg' 
+	      , lie')
   where
     mk_binds inst_binds = MonoBind inst_binds [] nonRecursive
 \end{code}

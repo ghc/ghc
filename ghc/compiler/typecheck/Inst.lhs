@@ -608,6 +608,8 @@ data InstOrigin s
   | ArithSeqOrigin	RenamedArithSeqInfo -- [x..], [x..y] etc
 
   | SignatureOrigin		-- A dict created from a type signature
+  | Rank2Origin			-- A dict created when typechecking the argument
+				-- of a rank-2 typed function
 
   | DoOrigin			-- The monad for a do expression
 
@@ -685,6 +687,8 @@ pprOrigin sty inst
 	= hsep [ptext SLIT("the arithmetic sequence:"), ppr sty seq]
     pp_orig (SignatureOrigin)
 	=  ptext SLIT("a type signature")
+    pp_orig (Rank2Origin)
+	=  ptext SLIT("a function with an overloaded argument type")
     pp_orig (DoOrigin)
 	=  ptext SLIT("a do statement")
     pp_orig (ClassDeclOrigin)
