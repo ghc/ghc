@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelFloat.lhs,v 1.8 2000/06/30 13:39:35 simonmar Exp $
+% $Id: PrelFloat.lhs,v 1.9 2000/08/29 16:37:35 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -24,7 +24,6 @@ and the classes
 
 module PrelFloat( module PrelFloat, Float#, Double# )  where
 
-import {-# SOURCE #-} PrelErr
 import PrelBase
 import PrelList
 import PrelEnum

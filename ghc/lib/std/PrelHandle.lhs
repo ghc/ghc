@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelHandle.lhs,v 1.60 2000/07/25 15:20:10 simonmar Exp $
+% $Id: PrelHandle.lhs,v 1.61 2000/08/29 16:37:35 simonpj Exp $
 %
 % (c) The AQUA Project, Glasgow University, 1994-2000
 %
@@ -1088,12 +1088,6 @@ wantSeekableHandle fun handle act =
       ClosedHandle 	   -> ioe_closedHandle fun handle
       SemiClosedHandle	   -> ioe_closedHandle fun handle
       _ 		   -> act handle_
-  where
-   not_seekable_error = 
-	   IOException (IOError (Just handle) 
-	           		IllegalOperation fun
-		   		("handle is not seekable"))
-
 \end{code}
 
 Internal function for creating an @IOError@ representing the
