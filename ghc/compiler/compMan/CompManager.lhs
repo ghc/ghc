@@ -57,7 +57,7 @@ import Directory        ( getModificationTime, doesFileExist )
 import IO
 import Monad
 import List		( nub )
-import Maybe		( catMaybes, fromMaybe, isJust )
+import Maybe		( catMaybes, fromMaybe, isJust, fromJust )
 \end{code}
 
 
@@ -170,7 +170,8 @@ cmLoadModule cmstate1 rootname
 	-- similarly, ui1 is the (complete) set of linkables from
 	-- the previous pass, if any.
         let ui1       = ui     cmstate1
-   
+   	let mg1       = mg     cmstate1
+
         let ghci_mode = gmode cmstate1 -- this never changes
 
         -- Do the downsweep to reestablish the module graph
@@ -184,7 +185,7 @@ cmLoadModule cmstate1 rootname
         when (verb >= 1 && ghci_mode == Batch) $
            hPutStrLn stderr (progName ++ ": chasing modules from: " ++ rootname)
 
-        (mg2unsorted, a_root_is_Main) <- downsweep [rootname]
+        (mg2unsorted, a_root_is_Main) <- downsweep [rootname] mg1
         let mg2unsorted_names = map name_of_summary mg2unsorted
 
         -- reachable_from follows source as well as normal imports
@@ -329,15 +330,15 @@ cmLoadModule cmstate1 rootname
                      = map (unJust "linkables_to_link" . findModuleLinkable_maybe ui4)
                            mods_to_keep_names
 
-              linkresult <- link ghci_mode dflags False linkables_to_link pls1
+              linkresult <- link ghci_mode dflags False linkables_to_link pls2
               case linkresult of
                  LinkErrs _ _
                     -> panic "cmLoadModule: link failed (2)"
-                 LinkOK pls4
+                 LinkOK pls3
                     -> do let cmstate4 
                                  = CmState { hst=hst4, hit=hit4, 
                                              ui=ui4, mg=mods_to_keep,
-                                             gmode=ghci_mode, pcs=pcs3, pls=pls4 }
+                                             gmode=ghci_mode, pcs=pcs3, pls=pls3 }
                           return (cmstate4, False, 
                                   map ms_mod mods_to_keep)
 
@@ -468,6 +469,11 @@ findInSummaries :: [ModSummary] -> ModuleName -> [ModSummary]
 findInSummaries old_summaries mod_name
    = [s | s <- old_summaries, name_of_summary s == mod_name]
 
+findModInSummaries :: [ModSummary] -> Module -> Maybe ModSummary
+findModInSummaries old_summaries mod
+   = case [s | s <- old_summaries, ms_mod s == mod] of
+	 [] -> Nothing
+	 (s:_) -> Just s
 
 -- Return (names of) all those in modsDone who are part of a cycle
 -- as defined by theGraph.
@@ -604,13 +610,12 @@ upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_from_here
 
 		    if ghci_mode == Interactive && verb >= 1 then
 		      -- if we're using an object file, tell the user
-		      case maybe_old_linkable of
-			Just (LM _ _ objs@(DotO _:_))
-			   -> do hPutStr stderr (showSDoc (space <> 
+		      case old_linkable of
+			(LM _ _ objs@(DotO _:_))
+			   -> do hPutStrLn stderr (showSDoc (space <> 
 				   parens (hsep (text "using": 
 					punctuate comma 
 					  [ text o | DotO o <- objs ]))))
-			         when (verb > 1) $ hPutStrLn stderr ""
 			_ -> return ()
 		      else
 			return ()
@@ -710,14 +715,15 @@ topological_sort include_source_imports summaries
 -- for all home modules encountered.  Only follow source-import
 -- links.  Also returns a Bool to indicate whether any of the roots
 -- are module Main.
-downsweep :: [FilePath] -> IO ([ModSummary], Bool)
-downsweep rootNm
+downsweep :: [FilePath] -> [ModSummary] -> IO ([ModSummary], Bool)
+downsweep rootNm old_summaries
    = do rootSummaries <- mapM getRootSummary rootNm
         let a_root_is_Main 
                = any ((=="Main").moduleNameUserString.name_of_summary) 
                      rootSummaries
         all_summaries
-           <- loop (filter (isHomeModule.ms_mod) rootSummaries)
+           <- loop (concat (map ms_imps rootSummaries))
+		(filter (isHomeModule.ms_mod) rootSummaries)
         return (all_summaries, a_root_is_Main)
      where
 	getRootSummary :: FilePath -> IO ModSummary
@@ -736,8 +742,8 @@ downsweep rootNm
 		 hs_file = file ++ ".hs"
 		 lhs_file = file ++ ".lhs"
 
-        getSummary :: ModuleName -> IO ModSummary
-        getSummary nm
+        getSummaries :: ModuleName -> IO ModSummary
+        getSummaries nm
            -- | trace ("getSummary: "++ showSDoc (ppr nm)) True
            = do found <- findModule nm
 		case found of
@@ -746,28 +752,37 @@ downsweep rootNm
                    -- the module names in them if name of module /= name of file,
                    -- and put the changed versions in the returned summary.
                    -- These will then conflict with the passed-in versions.
-		   Just (mod, location) -> summarise mod location
+		   Just (mod, location) -> do
+			let old_summary = findModInSummaries old_summaries mod
+			new_summary <- summarise mod location old_summary
+			case new_summary of
+			   Nothing -> return (fromJust old_summary)
+			   Just s  -> return s
+
 		   Nothing -> throwDyn (OtherError 
                                    ("can't find module `" 
                                      ++ showSDoc (ppr nm) ++ "'"))
                                  
-        -- loop invariant: homeSummaries doesn't contain package modules
-        loop :: [ModSummary] -> IO [ModSummary]
-        loop homeSummaries
-           = do let allImps :: [ModuleName]
-                    allImps = (nub . concatMap ms_imps) homeSummaries
-                let allHome   -- all modules currently in homeSummaries
-                       = map (moduleName.ms_mod) homeSummaries
-                let neededImps
-                       = filter (`notElem` allHome) allImps
-                neededSummaries
-                       <- mapM getSummary neededImps
-                let newHomeSummaries
-                       = filter (isHomeModule.ms_mod) neededSummaries
-                if null newHomeSummaries
-                 then return homeSummaries
-                 else loop (newHomeSummaries ++ homeSummaries)
+        -- loop invariant: home_summaries doesn't contain package modules
+        loop :: [ModuleName] -> [ModSummary] -> IO [ModSummary]
+	loop [] home_summaries = return home_summaries
+        loop imps home_summaries
+           = do -- all modules currently in homeSummaries
+		let all_home = map (moduleName.ms_mod) home_summaries
 
+		-- imports for modules we don't already have
+                let needed_imps = filter (`notElem` all_home) imps
+
+		-- summarise them
+                needed_summaries <- mapM getSummary needed_imps
+
+		-- get just the "home" modules
+                let new_home_summaries
+                       = filter (isHomeModule.ms_mod) needed_summaries
+
+		-- loop, checking the new imports
+		let new_imps = concat (map ms_imps new_home_summaries)
+                loop new_imps (new_home_summaries ++ home_summaries)
 
 -----------------------------------------------------------------------------
 -- Summarising modules
@@ -803,11 +818,23 @@ summariseFile file
                            srcimps imps
                            maybe_src_timestamp)
 
--- Summarise a module, and pick up source and interface timestamps.
-summarise :: Module -> ModuleLocation -> IO ModSummary
-summarise mod location
+-- Summarise a module, and pick up source and timestamp.
+summarise :: Module -> ModuleLocation -> Maybe ModSummary 
+    -> IO (Maybe ModSummary)
+summarise mod location old_summary
    | isHomeModule mod
    = do let hs_fn = unJust "summarise" (ml_hs_file location)
+
+        maybe_src_timestamp
+           <- case ml_hs_file location of 
+                 Nothing     -> return Nothing
+                 Just src_fn -> maybe_getModificationTime src_fn
+
+	-- return the cached summary if the source didn't change
+	case old_summary of {
+	   Just s | ms_hs_date s == maybe_src_timestamp -> return Nothing;
+	   _ -> do
+
         hspp_fn <- preprocess hs_fn
         modsrc <- readFile hspp_fn
         let (srcimps,imps,mod_name) = getImports modsrc
@@ -824,12 +851,13 @@ summarise mod location
 			   <+> ppr (moduleName mod) <+> text "vs" 
 			   <+> ppr mod_name)))
 
-        return (ModSummary mod location{ml_hspp_file=Just hspp_fn} 
-                               srcimps imps
-                               maybe_src_timestamp)
+        return (Just (ModSummary mod location{ml_hspp_file=Just hspp_fn} 
+                                 srcimps imps
+                                 maybe_src_timestamp))
+        }
 
    | otherwise
-   = return (ModSummary mod location [] [] Nothing)
+   = return (Just (ModSummary mod location [] [] Nothing))
 
 maybe_getModificationTime :: FilePath -> IO (Maybe ClockTime)
 maybe_getModificationTime fn
