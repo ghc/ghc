@@ -1,5 +1,5 @@
 
-tcfail012.hs:3:
+tcfail012.hs:3:7:
     Couldn't match `Bool' against `[a]'
 	Expected type: Bool
 	Inferred type: [a]

@@ -1,5 +1,5 @@
 
-mod21.hs:2:
+mod21.hs:
     Multiple declarations of `Main.T'
-	mod21.hs:2
-	mod21.hs:3
+	mod21.hs:2:5
+	mod21.hs:3:5

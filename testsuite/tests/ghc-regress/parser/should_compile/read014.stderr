@@ -1,26 +1,26 @@
 
-read014.hs:4: Warning: Definition but no type signature for `ng1'
+read014.hs:4:0: Warning: Definition but no type signature for `ng1'
 
-read014.hs:4: Warning: Defined but not used: x
+read014.hs:4:4: Warning: Defined but not used: x
 
-read014.hs:6:
+read014.hs:6:0:
     Warning: No explicit method nor default method for `*'
 	     In the instance declaration for `Num (a, b)'
 
-read014.hs:6:
+read014.hs:6:0:
     Warning: No explicit method nor default method for `+'
 	     In the instance declaration for `Num (a, b)'
 
-read014.hs:6:
+read014.hs:6:0:
     Warning: No explicit method nor default method for `signum'
 	     In the instance declaration for `Num (a, b)'
 
-read014.hs:6:
+read014.hs:6:0:
     Warning: No explicit method nor default method for `abs'
 	     In the instance declaration for `Num (a, b)'
 
-read014.hs:6:
+read014.hs:6:0:
     Warning: No explicit method nor default method for `fromInteger'
 	     In the instance declaration for `Num (a, b)'
 
-read014.hs:8: Warning: Defined but not used: x
+read014.hs:8:52: Warning: Defined but not used: x

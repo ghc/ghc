@@ -1,4 +1,4 @@
 
-mod48.hs:5:
+mod48.hs:5:2:
     Can't handle multiple methods defined by one pattern binding
 	(x, y) = error "foo"

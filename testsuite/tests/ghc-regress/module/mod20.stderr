@@ -1,5 +1,5 @@
 
-mod20.hs:2:
+mod20.hs:
     Multiple declarations of `Main.m'
-	mod20.hs:2
-	mod20.hs:3
+	mod20.hs:2:17
+	mod20.hs:3:17

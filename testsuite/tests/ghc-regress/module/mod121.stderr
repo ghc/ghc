@@ -1,2 +1,2 @@
 
-mod121.hs:5: Variable not in scope: `m2'
+mod121.hs:5:4: Variable not in scope: `m2'

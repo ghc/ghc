@@ -1,20 +1,20 @@
 
-read001.hs:25: Variable not in scope: `+#'
+read001.hs:25:10: Variable not in scope: `+#'
 
-read001.hs:38: Type constructor or class not in scope: `EqLeaf'
+read001.hs:38:47: Type constructor or class not in scope: `EqLeaf'
 
-read001.hs:38: Type constructor or class not in scope: `EqLeaf'
+read001.hs:38:58: Type constructor or class not in scope: `EqLeaf'
 
-read001.hs:87: Variable not in scope: `x'
+read001.hs:87:10: Variable not in scope: `x'
 
-read001.hs:88: Variable not in scope: `x'
+read001.hs:88:18: Variable not in scope: `x'
 
-read001.hs:94: Variable not in scope: `isSpace'
+read001.hs:94:18: Variable not in scope: `isSpace'
 
-read001.hs:95: Variable not in scope: `foo'
+read001.hs:95:12: Variable not in scope: `foo'
 
-read001.hs:107: Data constructor not in scope: `Foo'
+read001.hs:107:29: Data constructor not in scope: `Foo'
 
-read001.hs:107: Data constructor not in scope: `Bar'
+read001.hs:107:41: Data constructor not in scope: `Bar'
 
-read001.hs:112: Type constructor or class not in scope: `Foo'
+read001.hs:112:22: Type constructor or class not in scope: `Foo'

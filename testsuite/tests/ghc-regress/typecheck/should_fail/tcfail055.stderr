@@ -1,5 +1,5 @@
 
-tcfail055.hs:3:
+tcfail055.hs:3:7:
     Couldn't match `Float' against `Int'
 	Expected type: Float
 	Inferred type: Int

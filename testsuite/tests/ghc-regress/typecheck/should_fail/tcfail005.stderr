@@ -1,5 +1,5 @@
 
-tcfail005.hs:3:
+tcfail005.hs:3:8:
     Couldn't match `[a]' against `(t, t1)'
 	Expected type: [a]
 	Inferred type: (t, t1)

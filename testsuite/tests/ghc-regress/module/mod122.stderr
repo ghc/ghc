@@ -1,2 +1,2 @@
 
-mod122.hs:5: Type constructor or class not in scope: `C'
+mod122.hs:5:5: Type constructor or class not in scope: `C'

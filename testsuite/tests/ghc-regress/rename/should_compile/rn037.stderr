@@ -1,4 +1,4 @@
 
-rn037.hs:3:
+rn037.hs:
     Warning: Module `Time' is imported, but nothing from it is used
 	     (except perhaps instances visible in `Time')

@@ -1,5 +1,5 @@
 
-tcfail029.hs:6:
+tcfail029.hs:6:8:
     No instance for (Ord Foo)
-      arising from use of `>' at tcfail029.hs:6
+      arising from use of `>' at tcfail029.hs:6:8
     In the definition of `f': f x = x > Bar

@@ -1,8 +1,8 @@
 
-rnfail004.hs:6:
+rnfail004.hs:6:4:
     Conflicting definitions for `a'
     In the binding group for: a, b, c, a, d, b
 
-rnfail004.hs:7:
+rnfail004.hs:7:5:
     Conflicting definitions for `b'
     In the binding group for: a, b, c, a, d, b

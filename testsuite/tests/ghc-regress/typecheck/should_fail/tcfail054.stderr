@@ -1,3 +1,2 @@
 
-tests/ghc-regress/typecheck/should_fail/tcfail054.hs:3:
-    Data constructor not in scope: `B'
+tcfail054.hs:3:3: Data constructor not in scope: `B'

@@ -1,20 +1,20 @@
 
-tests/ghc-regress/typecheck/should_compile/tc125.hs:14:
+tc125.hs:14:0:
     Warning: No explicit method nor default method for `add'
 	     In the instance declaration for `Add Z a a'
 
-tests/ghc-regress/typecheck/should_compile/tc125.hs:15:
+tc125.hs:15:0:
     Warning: No explicit method nor default method for `add'
 	     In the instance declaration for `Add (S a) b (S c)'
 
-tests/ghc-regress/typecheck/should_compile/tc125.hs:19:
+tc125.hs:19:0:
     Warning: No explicit method nor default method for `mul'
 	     In the instance declaration for `Mul Z a Z'
 
-tests/ghc-regress/typecheck/should_compile/tc125.hs:20:
+tc125.hs:20:0:
     Warning: No explicit method nor default method for `mul'
 	     In the instance declaration for `Mul (S a) b d'
 
-tests/ghc-regress/typecheck/should_compile/tc125.hs:27:
+tc125.hs:27:0:
     Warning: No explicit method nor default method for `add'
 	     In the instance declaration for `Add (Q a b) (Q c d) (Q ad_bc bd)'

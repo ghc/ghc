@@ -1,5 +1,5 @@
 
-tcfail111.hs:7:
+tcfail111.hs:7:0:
     Ambiguous constraint `Wob a'
 	At least one of the forall'd type variables mentioned by the constraint
 	must be reachable from the type after the '=>'

@@ -1,10 +1,9 @@
 
-tcfail076.hs:18:
+tcfail076.hs:18:63:
     Inferred type is less polymorphic than expected
 	Quantified type variable `res' escapes
 	It is mentioned in the environment:
-	  cont :: a -> m res (bound at tcfail076.hs:18)
+	  cont :: a -> m res (bound at tcfail076.hs:18:36)
     In the first argument of `KContT', namely `(\ cont' -> cont a)'
     In a lambda abstraction: \ a -> KContT (\ cont' -> cont a)
-    In the first argument of `f', namely
-	`(\ a -> KContT (\ cont' -> cont a))'
+    In the first argument of `f', namely `(\ a -> KContT (\ cont' -> cont a))'

@@ -1,4 +1,4 @@
 
-rnfail007.hs:3:
+rnfail007.hs:
     The main function `main' is not defined in module `Main'
     When checking the type of the main function `main'

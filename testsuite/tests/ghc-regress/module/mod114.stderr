@@ -1,2 +1,2 @@
 
-mod114.hs:3: Type constructor or class not in scope: `Stuff'
+mod114.hs:3:15: Type constructor or class not in scope: `Stuff'

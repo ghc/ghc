@@ -1,5 +1,5 @@
 
-rnfail015.hs:1:
+rnfail015.hs:
     Multiple declarations of `ShouldFail.TokLiteral'
-	rnfail015.hs:8
-	rnfail015.hs:14
+	rnfail015.hs:8:8
+	rnfail015.hs:14:8

@@ -1,2 +1,2 @@
 
-mod102.hs:8: Variable not in scope: `methB'
+mod102.hs:8:4: Variable not in scope: `methB'

@@ -1,1 +1,1 @@
-read024.hs:5: parse error on input `h'
+read024.hs:5:1: parse error on input `h'

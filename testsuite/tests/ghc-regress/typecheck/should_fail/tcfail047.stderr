@@ -1,5 +1,5 @@
 
-tcfail047.hs:6:
+tcfail047.hs:6:0:
     Illegal instance declaration for `A (a, (b, c))'
 	(The instance type must be of form (T a b c)
 	 where T is not a synonym, and a,b,c are distinct type variables)

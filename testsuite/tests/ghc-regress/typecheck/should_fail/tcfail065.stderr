@@ -1,5 +1,5 @@
 
-tcfail065.hs:28:
+tcfail065.hs:28:0:
     Inferred type is less polymorphic than expected
 	Quantified type variable `x1' is unified with another quantified type variable `x'
     When trying to generalise the type inferred for `setX'

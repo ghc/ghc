@@ -1,5 +1,5 @@
 
-tcfail004.hs:3:
+tcfail004.hs:3:8:
     Couldn't match `(t, t1)' against `(t2, t3, t4)'
 	Expected type: (t, t1)
 	Inferred type: (t2, t3, t4)

@@ -1,1 +1,1 @@
-tcfail089.hs:10: Parse error in pattern
+tcfail089.hs:10:9: Parse error in pattern

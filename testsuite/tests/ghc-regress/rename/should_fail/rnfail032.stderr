@@ -1,2 +1,2 @@
 
-rnfail032.hs:2: Variable not in scope: `List.map'
+rnfail032.hs:2:20: Variable not in scope: `List.map'

@@ -1,5 +1,5 @@
 
-rnfail009.hs:1:
+rnfail009.hs:
     Multiple declarations of `Foo.A'
-	rnfail009.hs:3
-	rnfail009.hs:5
+	rnfail009.hs:3:9
+	rnfail009.hs:5:9

@@ -1,1 +1,1 @@
-read020.hs:3: parse error on input `}'
+read020.hs:3:15: parse error on input `}'

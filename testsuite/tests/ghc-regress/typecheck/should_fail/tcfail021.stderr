@@ -1,4 +1,4 @@
 
-tcfail021.hs:8:
+tcfail021.hs:8:4:
     Can't handle multiple methods defined by one pattern binding
 	(==, /=) = (\ x -> \ y -> ..., \ x -> \ y -> ...)

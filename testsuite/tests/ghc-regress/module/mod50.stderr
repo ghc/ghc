@@ -1,2 +1,2 @@
 
-mod50.hs:3: Type constructor or class not in scope: `Foo'
+mod50.hs:3:20: Type constructor or class not in scope: `Foo'

@@ -1,2 +1,2 @@
 
-mod77.hs:3: Variable not in scope: `$$$'
+mod77.hs:3:6: Variable not in scope: `$$$'

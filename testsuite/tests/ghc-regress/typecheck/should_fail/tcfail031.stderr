@@ -1,5 +1,5 @@
 
-tcfail031.hs:3:
+tcfail031.hs:3:9:
     Couldn't match `Bool' against `Char'
 	Expected type: Bool
 	Inferred type: Char

@@ -1,2 +1,2 @@
 
-mod101.hs:8: Data constructor not in scope: `ConB'
+mod101.hs:8:4: Data constructor not in scope: `ConB'

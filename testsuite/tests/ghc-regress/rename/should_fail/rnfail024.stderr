@@ -1,4 +1,4 @@
 
-./rnfail024.hs:3: Variable not in scope: `sig_without_a_defn'
+rnfail024.hs:3:0: Variable not in scope: `sig_without_a_defn'
 
-./rnfail024.hs:6: Variable not in scope: `sig_without_a_defn'
+rnfail024.hs:6:4: Variable not in scope: `sig_without_a_defn'

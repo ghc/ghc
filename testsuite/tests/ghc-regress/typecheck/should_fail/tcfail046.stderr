@@ -1,10 +1,8 @@
 
-tcfail046.hs:9:
-    No instance for `Eq (Pid
-			 -> Time -> Message a -> (MessList a, Continuation a))'
+tcfail046.hs:9:8:
+    No instance for `Eq (Pid -> Time -> Message a -> (MessList a, Continuation a))'
     When deriving the `Eq' instance for type `Continuation'
 
-tcfail046.hs:17:
-    No instance for `Eq (Pid
-			 -> Time -> Message a -> (MessList a, Continuation a))'
+tcfail046.hs:17:5:
+    No instance for `Eq (Pid -> Time -> Message a -> (MessList a, Continuation a))'
     When deriving the `Eq' instance for type `Message'

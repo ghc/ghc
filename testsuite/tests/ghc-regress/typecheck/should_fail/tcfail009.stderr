@@ -1,5 +1,5 @@
 
-tcfail009.hs:3:
+tcfail009.hs:3:16:
     Couldn't match `Int' against `Integer'
 	Expected type: Int
 	Inferred type: Integer

@@ -1,4 +1,4 @@
 
-tcfail057.hs:5:
+tcfail057.hs:5:6:
     Class `RealFrac' used as a type
     In the type signature: f :: (RealFrac a) -> a -> a

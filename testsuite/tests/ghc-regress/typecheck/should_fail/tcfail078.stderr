@@ -1,4 +1,4 @@
 
-tcfail078.hs:5:
+tcfail078.hs:5:5:
     Type constructor `Integer' used as a class
     In the type signature: f :: (Integer i) => i

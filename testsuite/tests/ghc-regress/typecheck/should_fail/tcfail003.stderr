@@ -1,6 +1,6 @@
 
-tcfail003.hs:3:
+tcfail003.hs:3:9:
     No instance for (Num Char)
-      arising from the literal `1' at tcfail003.hs:3
+      arising from the literal `1' at tcfail003.hs:3:9
     In the list element: 1
     In a pattern binding: (d : e) = [1, 'a']

@@ -1,4 +1,4 @@
 
-tcfail058.hs:6:
+tcfail058.hs:6:5:
     Type constructor `Array' used as a class
     In the type signature: f :: (Array a) => a -> b

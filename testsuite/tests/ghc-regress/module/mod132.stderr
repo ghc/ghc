@@ -1,2 +1,2 @@
 
-mod132.hs:6: Data constructor not in scope: `Foo'
+mod132.hs:6:6: Data constructor not in scope: `Foo'

@@ -1,2 +1,2 @@
 
-mod36.hs:5: Variable not in scope: `const'
+mod36.hs:5:4: Variable not in scope: `const'

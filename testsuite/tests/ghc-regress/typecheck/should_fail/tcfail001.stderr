@@ -1,5 +1,5 @@
 
-tests/ghc-regress/typecheck/should_fail/tcfail001.hs:9:
+tcfail001.hs:9:1:
     Couldn't match `[a]' against `t -> t1'
 	Expected type: [a]
 	Inferred type: t -> t1

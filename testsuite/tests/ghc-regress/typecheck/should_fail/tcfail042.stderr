@@ -1,7 +1,6 @@
 
-tcfail042.hs:15:
+tcfail042.hs:15:0:
     Could not deduce (Num a) from the context (Eq a, Show a)
-      arising from the instance declaration at tcfail042.hs:15
-    Probable fix:
-	Add (Num a) to the instance declaration superclass context
+      arising from the instance declaration at tcfail042.hs:15:0
+    Probable fix: Add (Num a) to the instance declaration superclass context
     In the instance declaration for `Bar [a]'

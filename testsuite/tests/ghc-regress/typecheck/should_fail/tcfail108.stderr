@@ -1,5 +1,5 @@
 
-tcfail108.hs:7:
+tcfail108.hs:7:0:
     Non-type variables in constraint: Eq (f (Rec f))
     (Use -fallow-undecidable-instances to permit this)
     In the context: (Eq (f (Rec f)))

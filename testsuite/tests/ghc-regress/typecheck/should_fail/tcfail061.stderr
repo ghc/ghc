@@ -1,12 +1,8 @@
 
-tests/ghc-regress/typecheck/should_fail/tcfail061.hs:5:
-    Type variable not in scope: `b'
+tcfail061.hs:5:16: Type variable not in scope: `b'
 
-tests/ghc-regress/typecheck/should_fail/tcfail061.hs:5:
-    Type variable not in scope: `b'
+tcfail061.hs:5:18: Type variable not in scope: `b'
 
-tests/ghc-regress/typecheck/should_fail/tcfail061.hs:11:
-    Type variable not in scope: `b'
+tcfail061.hs:11:21: Type variable not in scope: `b'
 
-tests/ghc-regress/typecheck/should_fail/tcfail061.hs:11:
-    Type variable not in scope: `b'
+tcfail061.hs:11:23: Type variable not in scope: `b'

@@ -1,17 +1,15 @@
 
-tcfail068.hs:13:
+tcfail068.hs:13:8:
     Inferred type is less polymorphic than expected
 	Quantified type variable `s' escapes
-    In the first argument of `runST', namely
-	`(newSTArray ((1, 1), n) x)'
-    In the definition of `itgen':
-	itgen n x = runST (newSTArray ((1, 1), n) x)
+    In the first argument of `runST', namely `(newSTArray ((1, 1), n) x)'
+    In the definition of `itgen': itgen n x = runST (newSTArray ((1, 1), n) x)
 
-tcfail068.hs:18:
+tcfail068.hs:18:8:
     Inferred type is less polymorphic than expected
 	Quantified type variable `s' escapes
 	It is mentioned in the environment:
-	  arr :: IndTree s a (bound at tcfail068.hs:18)
+	  arr :: IndTree s a (bound at tcfail068.hs:17:10)
     In the first argument of `runST', namely
 	`((readSTArray arr i)
 	  >>= (\ val -> (writeSTArray arr i (f val)) >> (return arr)))'
@@ -20,40 +18,32 @@ tcfail068.hs:18:
 		= runST ((readSTArray arr i)
 			 >>= (\ val -> (writeSTArray arr i (f val)) >> (return arr)))
 
-tcfail068.hs:24:
+tcfail068.hs:24:28:
     Inferred type is less polymorphic than expected
 	Quantified type variable `s' escapes
 	It is mentioned in the environment:
-	  itrapsnd :: Int -> Int -> GHC.ST.ST s (IndTree s a)
-	    (bound at tcfail068.hs:29)
-	  itrap' :: Int -> Int -> GHC.ST.ST s (IndTree s a)
-	    (bound at tcfail068.hs:26)
-	  arr :: IndTree s a (bound at tcfail068.hs:24)
+	  itrapsnd :: Int -> Int -> GHC.ST.ST s (IndTree s a) (bound at tcfail068.hs:29:8)
+	  itrap' :: Int -> Int -> GHC.ST.ST s (IndTree s a) (bound at tcfail068.hs:26:8)
+	  arr :: IndTree s a (bound at tcfail068.hs:24:22)
     In the first argument of `runST', namely `(itrap' i k)'
     In the definition of `itrap':
 	itrap ((i, k), (j, l)) f arr
 		= runST (itrap' i k)
 		where
 		    itrapsnd i k
-			       = if i > j then
-				     return arr
-				 else
-				     ((readSTArray arr (i, k)) >>= (\ val -> ...))
+			       = if i > j then return arr else ((readSTArray arr (i, k)) >>= (\ val -> ...))
 		    itrap' i k
-			     = if k > l then
-				   return arr
-			       else
-				   ((itrapsnd i k) >> (itrap' i (k + 1)))
+			     = if k > l then return arr else ((itrapsnd i k) >> (itrap' i (k + 1)))
 
-tcfail068.hs:36:
+tcfail068.hs:36:39:
     Inferred type is less polymorphic than expected
 	Quantified type variable `s' escapes
 	It is mentioned in the environment:
 	  itrapstatesnd :: Int -> Int -> c -> GHC.ST.ST s (c, IndTree s b)
-	    (bound at tcfail068.hs:41)
+	    (bound at tcfail068.hs:41:8)
 	  itrapstate' :: Int -> Int -> c -> GHC.ST.ST s (c, IndTree s b)
-	    (bound at tcfail068.hs:38)
-	  arr :: IndTree s b (bound at tcfail068.hs:36)
+	    (bound at tcfail068.hs:38:8)
+	  arr :: IndTree s b (bound at tcfail068.hs:36:33)
     In the first argument of `runST', namely `(itrapstate' i k s)'
     In the definition of `itrapstate':
 	itrapstate ((i, k), (j, l)) f c d s arr

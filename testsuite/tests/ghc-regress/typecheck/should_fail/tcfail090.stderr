@@ -1,5 +1,5 @@
 
-tcfail090.hs:8:
+tcfail090.hs:8:8:
     Couldn't match `#' against `*'
     When matching types `ByteArray#' and `a'
 	Expected type: ByteArray#

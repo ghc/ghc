@@ -1,8 +1,8 @@
 
-tcfail093.hs:14:
+tcfail093.hs:14:9:
     No instance for (Call (IO Int) h)
-      arising from use of `call' at tcfail093.hs:14
+      arising from use of `call' at tcfail093.hs:14:9-12
     Possible cause: the monomorphism restriction applied to the following:
-      dup :: () -> Int -> h (bound at tcfail093.hs:14)
+      dup :: () -> Int -> h (bound at tcfail093.hs:14:0)
     Probable fix: give these definition(s) an explicit type signature
     In the definition of `dup': dup () = call primDup

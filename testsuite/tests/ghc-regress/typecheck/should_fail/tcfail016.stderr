@@ -1,5 +1,5 @@
 
-tcfail016.hs:9:
+tcfail016.hs:9:19:
     Couldn't match `Expr a' against `AnnExpr a'
 	Expected type: Expr a
 	Inferred type: AnnExpr a

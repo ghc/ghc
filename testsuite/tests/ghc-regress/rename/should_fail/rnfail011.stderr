@@ -1,5 +1,5 @@
 
-rnfail011.hs:2:
+rnfail011.hs:
     Multiple declarations of `Main.A'
-	rnfail011.hs:2
-	rnfail011.hs:6
+	rnfail011.hs:2:5
+	rnfail011.hs:6:5

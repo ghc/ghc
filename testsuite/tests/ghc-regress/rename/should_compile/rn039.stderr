@@ -1,4 +1,4 @@
 
-rn039.hs:6:
+rn039.hs:6:15:
     Warning: This binding for `-' shadows an existing binding
 	     In the binding group for: -

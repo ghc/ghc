@@ -1,1 +1,1 @@
-read004.hs:19: lexical error in string/character literal
+read004.hs:19:1: lexical error in string/character literal

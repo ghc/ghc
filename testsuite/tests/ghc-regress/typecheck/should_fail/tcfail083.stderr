@@ -1,5 +1,5 @@
 
-tcfail083.hs:8:
+tcfail083.hs:8:22:
     Constructor `Bar' does not have field `baz'
     When checking the pattern: Bar {flag = f, baz = b}
     When checking the pattern: State {bar = Bar {flag = f, baz = b}}

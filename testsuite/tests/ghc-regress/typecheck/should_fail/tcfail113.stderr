@@ -1,12 +1,12 @@
 
-tcfail113.hs:7:
+tcfail113.hs:7:6:
     Kind error: `Maybe' is not applied to enough type arguments
     In the type signature: f :: [Maybe]
 
-tcfail113.hs:10:
+tcfail113.hs:10:7:
     Kind error: Expecting kind `* -> *', but `Int' has kind `*'
     In the type signature: g :: T Int
 
-tcfail113.hs:13:
+tcfail113.hs:13:5:
     Kind error: `Int' is applied to too many type arguments
     In the type signature: h :: Int Int

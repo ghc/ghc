@@ -1,6 +1,6 @@
 
-rnfail023.hs:7: Variable not in scope: `f'
+rnfail023.hs:7:0: Variable not in scope: `f'
 
-rnfail023.hs:8: Variable not in scope: `f'
+rnfail023.hs:8:11: Variable not in scope: `f'
 
-rnfail023.hs:14: Variable not in scope: `g'
+rnfail023.hs:14:6: Variable not in scope: `g'

@@ -1,4 +1,4 @@
 
-tests/ghc-regress/typecheck/should_compile/tc115.hs:12:
+tc115.hs:12:0:
     Warning: No explicit method nor default method for `foo'
 	     In the instance declaration for `Foo [m a] (m a)'

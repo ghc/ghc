@@ -1,5 +1,5 @@
 
-rnfail002.hs:4:
+rnfail002.hs:
     Multiple declarations of `Main.y'
-	rnfail002.hs:5
-	rnfail002.hs:6
+	rnfail002.hs:5:0
+	rnfail002.hs:6:0
