@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.90 2002/01/29 14:41:52 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.91 2002/01/29 16:24:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -787,7 +787,6 @@ FN_(gcdIntegerIntzh_fast)
   /* R1 = s1; R2 = d1; R3 = the int */
   I_ r;
   FB_
-  MAYBE_GC(R2_PTR, gcdIntegerIntzh_fast);
   r = RET_STGCALL3(I_,mpn_gcd_1,(mp_limb_t *)(BYTE_ARR_CTS(R2.p)), R1.i, R3.i);
   RET_N(r);
   FE_
@@ -796,33 +795,84 @@ FN_(gcdIntegerIntzh_fast)
 FN_(cmpIntegerIntzh_fast)
 {
   /* R1 = s1; R2 = d1; R3 = the int */
-  MP_INT arg;
-  I_ r;
+  I_ usize;
+  I_ vsize;
+  I_ v_digit;
+  mp_limb_t u_digit;
   FB_
-  MAYBE_GC(R2_PTR, cmpIntegerIntzh_fast);
-  arg._mp_size	= R1.i;
-  arg._mp_alloc = ((StgArrWords *)R2.p)->words;
-  arg._mp_d	= (mp_limb_t *) (BYTE_ARR_CTS(R2.p));
-  r = RET_STGCALL2(I_,mpz_cmp_si,&arg,R3.i);
-  RET_N(r);
+
+  usize = R1.i;
+  vsize = 0;
+  v_digit = R3.i;
+
+  // paraphrased from mpz_cmp_si() in the GMP sources
+  if (v_digit > 0) {
+      vsize = 1;
+  } else if (v_digit < 0) {
+      vsize = -1;
+      v_digit = -v_digit;
+  }
+
+  if (usize != vsize) {
+    RET_N(usize - vsize);
+  }
+
+  if (usize == 0) {
+    RET_N(0);
+  }
+
+  u_digit = *(mp_limb_t *)(BYTE_ARR_CTS(R2.p));
+
+  if (u_digit == (mp_limb_t) (unsigned long) v_digit) {
+    RET_N(0);
+  }
+
+  if (u_digit > (mp_limb_t) (unsigned long) v_digit) {
+    RET_N(usize);
+  } else {
+    RET_N(-usize);
+  }
   FE_
 }
 
 FN_(cmpIntegerzh_fast)
 {
   /* R1 = s1; R2 = d1; R3 = s2; R4 = d2 */
-  MP_INT arg1, arg2;
-  I_ r;
+  I_ usize;
+  I_ vsize;
+  I_ size;
+  StgPtr up, vp;
+  int cmp;
   FB_
-  MAYBE_GC(R2_PTR | R4_PTR, cmpIntegerzh_fast);
-  arg1._mp_size	= R1.i;
-  arg1._mp_alloc= ((StgArrWords *)R2.p)->words;
-  arg1._mp_d	= (mp_limb_t *) (BYTE_ARR_CTS(R2.p));
-  arg2._mp_size	= R3.i;
-  arg2._mp_alloc= ((StgArrWords *)R4.p)->words;
-  arg2._mp_d	= (mp_limb_t *) (BYTE_ARR_CTS(R4.p));
-  r = RET_STGCALL2(I_,mpz_cmp,&arg1,&arg2);
-  RET_N(r);
+
+  // paraphrased from mpz_cmp() in the GMP sources
+  usize = R1.i;
+  vsize = R3.i;
+
+  if (usize != vsize) {
+      RET_N(usize - vsize);
+  }
+
+  if (usize == 0) {
+      RET_N(0);
+  }
+
+  size = abs(usize);
+
+  up = BYTE_ARR_CTS(R2.p);
+  vp = BYTE_ARR_CTS(R4.p);
+
+  cmp = RET_STGCALL3(I_, mpn_cmp, (mp_limb_t *)up, (mp_limb_t *)vp, size);
+
+  if (cmp == 0) {
+      RET_N(0);
+  }
+
+  if ((cmp < 0) == (usize < 0)) {
+      RET_N(1);
+  } else {
+      RET_N(-1);
+  }
   FE_
 }
 
