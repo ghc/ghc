@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.4 2001/08/17 17:18:53 apt Exp $
+-- $Id: primops.txt.pp,v 1.5 2001/08/31 15:28:49 apt Exp $
 --
 -- Primitive Operations
 --
@@ -71,7 +71,7 @@ section "The word size story."
 	{Haskell98 specifies that signed integers (type {\tt Int}) must contain at least 30 
 	 bits. GHC always implements {\tt Int} using the primitive type {\tt Int\#}, whose
 	 size equals the {\tt MachDeps.h} constant {\tt WORD\_SIZE\_IN\_BITS}.  This
- 	 is normally set based on the {\tt config.h} parameter {\tt SIZEOF_LONG},
+ 	 is normally set based on the {\tt config.h} parameter {\tt SIZEOF\_LONG},
 	 i.e., 32 bits on 32-bit machines, 64 bits on 64-bit machines.  However, it can
 	 also be explicitly set to a smaller number, e.g., 31 bits, to allow the possibility
 	 of using  tag bits. Currently GHC itself has only 32-bit and 64-bit variants,
@@ -86,7 +86,7 @@ section "The word size story."
 	 and a range of conversions.  The 8-bit and 16-bit sizes are always represented as
 	 {\tt Int\#} and {\tt Word\#}, and the operations implemented in terms of the
 	 the primops on these types, with suitable range restrictions on the results
-	 (using the {\tt Narrow$n$Int\#} and {\tt Narrow$n$Word\#} families of primops.
+	 (using the {\tt narrow$n$Int\#} and {\tt narrow$n$Word\#} families of primops.
 	 The 32-bit sizes are represented using {\tt Int\#} and {\tt Word\#} when 
 	 {\tt WORD\_SIZE\_IN\_BITS} $\geq$ 32;
 	 otherwise, these are represented using distinct primitive types {\tt Int32\#}
