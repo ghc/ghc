@@ -16,6 +16,7 @@ module GHC.Exts
        (
         -- * Representations of some basic types
         Int(..),Word(..),Float(..),Double(..),Integer(..),Char(..),
+	Ptr(..), FunPtr(..),
 
         -- * Primitive operations
         module GHC.Prim,
@@ -36,6 +37,7 @@ import GHC.Base
 import GHC.Word
 import GHC.Num
 import GHC.Float
+import GHC.Ptr
 
 class Splittable t where
   split :: t -> (t,t)
