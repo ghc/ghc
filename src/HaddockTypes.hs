@@ -160,6 +160,8 @@ docAppend (DocOrderedList ds1) (DocOrderedList ds2)
   = DocOrderedList (ds1++ds2)
 docAppend (DocOrderedList ds1) (DocAppend (DocOrderedList ds2) d)
   = DocAppend (DocOrderedList (ds1++ds2)) d
+docAppend DocEmpty d = d
+docAppend d DocEmpty = d
 docAppend d1 d2 
   = DocAppend d1 d2
 
