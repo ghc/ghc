@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.20 2000/11/13 14:34:37 sewardj Exp $
+-- $Id: DriverPipeline.hs,v 1.21 2000/11/13 17:12:37 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -781,7 +781,7 @@ compile summary old_iface hst hit pcs = do
 
    -- run the compiler
    hsc_result <- hscMain dyn_flags{ hscOutName = output_fn } 
-			 (panic "compile:source_unchanged")
+			 False -- (panic "compile:source_unchanged")
                          location old_iface hst hit pcs
 
    case hsc_result of {
