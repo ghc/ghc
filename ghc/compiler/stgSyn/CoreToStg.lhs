@@ -38,7 +38,9 @@ import Type		( isUnLiftedType, isUnboxedTupleType, Type, splitFunTy_maybe,
 import TysPrim		( intPrimTy )
 import UniqSupply	-- all of it, really
 import Util		( lengthExceeds )
-import BasicTypes	( TopLevelFlag(..) )
+import BasicTypes	( TopLevelFlag(..), isNotTopLevel )
+import CmdLineOpts	( opt_D_verbose_stg2stg )
+import UniqSet		( emptyUniqSet )
 import Maybes
 import Outputable
 \end{code}
@@ -157,12 +159,17 @@ No free/live variable information is pinned on in this pass; it's added
 later.  For this pass
 we use @bOGUS_LVs@ and @bOGUS_FVs@ as placeholders.
 
+When printing out the Stg we need non-bottom values in these
+locations.
+
 \begin{code}
 bOGUS_LVs :: StgLiveVars
-bOGUS_LVs = panic "bOGUS_LVs" -- emptyUniqSet (used when pprTracing)
+bOGUS_LVs | opt_D_verbose_stg2stg = emptyUniqSet
+	  | otherwise =panic "bOGUS_LVs"
 
 bOGUS_FVs :: [Id]
-bOGUS_FVs = panic "bOGUS_FVs" -- [] (ditto)
+bOGUS_FVs | opt_D_verbose_stg2stg = [] 
+	  | otherwise = panic "bOGUS_FVs"
 \end{code}
 
 \begin{code}
@@ -186,7 +193,8 @@ topCoreBindsToStg us core_binds
 			    ppr b )		-- No top-level cases!
 
 		   mkStgBinds floats rhs	`thenUs` \ new_rhs ->
-		   returnUs (StgNonRec bndr (exprToRhs dem new_rhs) : new_bs)
+		   returnUs (StgNonRec bndr (exprToRhs dem TopLevel new_rhs)
+			     : new_bs)
 					-- Keep all the floats inside...
 					-- Some might be cases etc
 					-- We might want to revisit this decision
@@ -231,7 +239,7 @@ coreBindToStg top_lev env (Rec pairs)
     do_rhs env (bndr,rhs) = coreExprToStgFloat env rhs dem	`thenUs` \ (floats, stg_expr) ->
 			    mkStgBinds floats stg_expr		`thenUs` \ stg_expr' ->
 				-- NB: stg_expr' might still be a StgLam (and we want that)
-			    returnUs (exprToRhs dem stg_expr')
+			    returnUs (exprToRhs dem top_lev stg_expr')
 			  where
 			    dem = bdrDem bndr
 \end{code}
@@ -244,8 +252,8 @@ coreBindToStg top_lev env (Rec pairs)
 %************************************************************************
 
 \begin{code}
-exprToRhs :: RhsDemand -> StgExpr -> StgRhs
-exprToRhs dem (StgLam _ bndrs body)
+exprToRhs :: RhsDemand -> TopLevelFlag -> StgExpr -> StgRhs
+exprToRhs dem _ (StgLam _ bndrs body)
   = ASSERT( not (null bndrs) )
     StgRhsClosure noCCS
 		  stgArgOcc
@@ -285,9 +293,10 @@ exprToRhs dem (StgLam _ bndrs body)
   constructors (ala C++ static class constructors) which will
   then be run at load time to fix up static closures.
 -}
-exprToRhs dem (StgCon (DataCon con) args _)
-  | not is_dynamic  &&
-    all  (not.is_lit_lit) args  = StgRhsCon noCCS con args
+exprToRhs dem toplev (StgCon (DataCon con) args _)
+  | isNotTopLevel toplev ||
+    (not is_dynamic  &&
+     all  (not.is_lit_lit) args)  = StgRhsCon noCCS con args
  where
   is_dynamic = isDynCon con || any (isDynArg) args
 
@@ -297,7 +306,7 @@ exprToRhs dem (StgCon (DataCon con) args _)
        Literal l -> isLitLitLit l
        _         -> False
 
-exprToRhs dem expr
+exprToRhs dem _ expr
 	= StgRhsClosure noCCS		-- No cost centre (ToDo?)
 		        stgArgOcc	-- safe
 			noSRT		-- figure out later
@@ -813,7 +822,7 @@ mk_stg_let bndr rhs dem floats body
   = if is_strict then
 	-- Strict let with WHNF rhs
 	mkStgBinds floats $
-	StgLet (StgNonRec bndr (exprToRhs dem rhs)) body
+	StgLet (StgNonRec bndr (exprToRhs dem NotTopLevel rhs)) body
     else
 	-- Lazy let with WHNF rhs; float until we find a strict binding
 	let
@@ -821,7 +830,7 @@ mk_stg_let bndr rhs dem floats body
 	in
 	mkStgBinds floats_in rhs	`thenUs` \ new_rhs ->
 	mkStgBinds floats_out $
-	StgLet (StgNonRec bndr (exprToRhs dem new_rhs)) body
+	StgLet (StgNonRec bndr (exprToRhs dem NotTopLevel new_rhs)) body
 
   | otherwise 	-- Not WHNF
   = if is_strict then
@@ -831,7 +840,7 @@ mk_stg_let bndr rhs dem floats body
     else
 	-- Lazy let with non-WHNF rhs, so keep the floats in the RHS
 	mkStgBinds floats rhs		`thenUs` \ new_rhs ->
-	returnUs (StgLet (StgNonRec bndr (exprToRhs dem new_rhs)) body)
+	returnUs (StgLet (StgNonRec bndr (exprToRhs dem NotTopLevel new_rhs)) body)
 	
   where
     bndr_ty   = idType bndr
