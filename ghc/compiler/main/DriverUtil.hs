@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.49 2005/01/11 16:21:53 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.50 2005/01/28 12:55:37 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -19,7 +19,6 @@ module DriverUtil (
 	replaceFilenameDirectory, remove_spaces, escapeSpaces,
   ) where
 
-#include "../includes/ghcconfig.h"
 #include "HsVersions.h"
 
 import Util

@@ -1,7 +1,7 @@
 #include "../includes/ghcconfig.h"
 
-#if defined(powerpc_TARGET_ARCH) || defined(powerpc64_TARGET_ARCH)
-#if !(defined(powerpc_TARGET_ARCH) && defined(linux_TARGET_OS))
+#if defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
+#if !(defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS))
     /* The following code applies, with some differences,
        to all powerpc platforms except for powerpc32-linux,
        whose calling convention is annoyingly complex.
@@ -11,7 +11,7 @@
     /* The code is "almost" the same for
        32-bit and for 64-bit
     */
-#if defined(powerpc64_TARGET_ARCH)
+#if defined(powerpc64_HOST_ARCH)
 #define WS          8
 #define LOAD        ld
 #define STORE       std
@@ -28,9 +28,9 @@
     /* The following defines mirror struct AdjustorStub
        from Adjustor.c. Make sure to keep these in sync.
     */
-#if defined(powerpc_TARGET_ARCH) && defined(darwin_TARGET_OS)
+#if defined(powerpc_HOST_ARCH) && defined(darwin_HOST_OS)
 #define HEADER_WORDS   6
-#elif defined(powerpc64_TARGET_ARCH) && defined(darwin_TARGET_OS)
+#elif defined(powerpc64_HOST_ARCH) && defined(darwin_HOST_OS)
 #else
 #define HEADER_WORDS   3
 #endif
@@ -42,7 +42,7 @@
 
     /* Darwin insists on register names, everyone else prefers
        to use numbers. */
-#if !defined(darwin_TARGET_OS)
+#if !defined(darwin_HOST_OS)
 #define r0 0
 #define r1 1
 #define r2 2
@@ -82,7 +82,7 @@ adjustorCode:
     
         /* set up stack frame */
     LOAD    r12, FRAMESIZE_OFF(r2)
-#ifdef powerpc64_TARGET_ARCH
+#ifdef powerpc64_HOST_ARCH
     stdux   r1, r1, r12
 #else   
     stwux   r1, r1, r12
@@ -125,7 +125,7 @@ adjustorCode:
     LOAD    r3, HPTR_OFF(r2)
 
     LOAD    r12, WPTR_OFF(r2)
-#if defined(darwin_TARGET_OS)
+#if defined(darwin_HOST_OS)
     mtctr   r12
 #else
     LOAD    r0, 0(r12)

@@ -194,9 +194,6 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cProjectPatchLevel    = \"$(ProjectPatchLevel)\"" >> $(CONFIG_HS)
 	@echo "cBooterVersion        = \"$(GhcVersion)\"" >> $(CONFIG_HS)
 	@echo "cHscIfaceFileVersion  = \"$(HscIfaceFileVersion)\"" >> $(CONFIG_HS)
-	@echo "cTARGETPLATFORM       = \"$(TARGETPLATFORM)\"" >> $(CONFIG_HS)
-	@echo "cTARGETOS             = \"$(TargetOS_CPP)\"" >> $(CONFIG_HS)
-	@echo "cTARGETARCH           = \"$(TargetArch_CPP)\"" >> $(CONFIG_HS)
 	@echo "cGhcWithNativeCodeGen = \"$(GhcWithNativeCodeGen)\"" >> $(CONFIG_HS)
 	@echo "cGhcUnregisterised    = \"$(GhcUnregisterised)\"" >> $(CONFIG_HS)
 	@echo "cLeadingUnderscore    = \"$(LeadingUnderscore)\"" >> $(CONFIG_HS)
@@ -229,6 +226,112 @@ endif
 	@echo done.
 
 CLEAN_FILES += $(CONFIG_HS)
+
+# -----------------------------------------------------------------------------
+# Create platform includes
+
+# Here we generate a little header file containing CPP symbols that GHC
+# uses to determine which platform it is building on/for.  The platforms
+# can differ between stage1 and stage2 if we're cross-compiling, so we
+# need one of these header files per stage.
+
+PLATFORM_H = ghc_boot_platform.h
+
+stage1/$(PLATFORM_H) : $(FPTOOLS_TOP)/mk/config.mk Makefile
+	@echo "Creating $@..."
+	@$(RM) $@
+	@echo "#ifndef __PLATFORM_H__"  >$@
+	@echo "#define __PLATFORM_H__" >>$@
+	@echo >> $@
+	@echo "#define BuildPlatform_TYPE  $(BuildPlatform_CPP)" >> $@
+	@echo "#define HostPlatform_TYPE   $(HostPlatform_CPP)" >> $@
+	@echo "#define TargetPlatform_TYPE $(TargetPlatform_CPP)" >> $@
+	@echo >> $@
+	@echo "#define $(BuildPlatform_CPP)_BUILD  	1" >> $@
+	@echo "#define $(HostPlatform_CPP)_HOST		1" >> $@
+	@echo "#define $(TargetPlatform_CPP)_TARGET	1" >> $@
+	@echo >> $@
+	@echo "#define $(BuildArch_CPP)_BUILD_ARCH  	1" >> $@
+	@echo "#define $(HostArch_CPP)_HOST_ARCH	1" >> $@
+	@echo "#define $(TargetArch_CPP)_TARGET_ARCH	1" >> $@
+	@echo "#define BUILD_ARCH \"$(BuildArch_CPP)\"" >> $@
+	@echo "#define HOST_ARCH \"$(HostArch_CPP)\"" >> $@
+	@echo "#define TARGET_ARCH \"$(TargetArch_CPP)\"" >> $@
+	@echo >> $@
+	@echo "#define $(BuildOS_CPP)_BUILD_OS 		1" >> $@
+	@echo "#define $(HostOS_CPP)_HOST_OS		1" >> $@
+	@echo "#define $(TargetOS_CPP)_TARGET_OS	1" >> $@  
+	@echo "#define BUILD_OS \"$(BuildOS_CPP)\"" >> $@
+	@echo "#define HOST_OS \"$(HostOS_CPP)\"" >> $@
+	@echo "#define TARGET_OS \"$(TargetOS_CPP)\"" >> $@
+ifeq "$(HostOS_CPP)" "irix"
+	@echo "#ifndef $(IRIX_MAJOR)_TARGET_OS		 " >> $@  
+	@echo "#define $(IRIX_MAJOR)_TARGET_OS		1" >> $@  
+	@echo "#endif					 " >> $@  
+endif
+	@echo >> $@
+	@echo "#define $(BuildVendor_CPP)_BUILD_VENDOR 	1" >> $@
+	@echo "#define $(HostVendor_CPP)_HOST_VENDOR	1" >> $@
+	@echo "#define $(TargetVendor_CPP)_TARGET_VENDOR  1" >> $@
+	@echo "#define BUILD_VENDOR \"$(BuildVendor_CPP)\"" >> $@
+	@echo "#define HOST_VENDOR \"$(HostVendor_CPP)\"" >> $@
+	@echo "#define TARGET_VENDOR \"$(TargetVendor_CPP)\"" >> $@
+	@echo >> $@
+	@echo "#endif /* __PLATFORM_H__ */"          >> $@
+	@echo "Done."
+
+# For stage2 and above, the BUILD platform is the HOST of stage1, and
+# the HOST platform is the TARGET of stage1.  The TARGET remains the same
+# (stage1 is the cross-compiler, not stage2).
+stage2/$(PLATFORM_H) : $(FPTOOLS_TOP)/mk/config.mk Makefile
+	@echo "Creating $@..."
+	@$(RM) $@
+	@echo "#ifndef __PLATFORM_H__"  >$@
+	@echo "#define __PLATFORM_H__" >>$@
+	@echo >> $@
+	@echo "#define BuildPlatform_TYPE  $(HostPlatform_CPP)" >> $@
+	@echo "#define HostPlatform_TYPE   $(TargetPlatform_CPP)" >> $@
+	@echo "#define TargetPlatform_TYPE $(TargetPlatform_CPP)" >> $@
+	@echo >> $@
+	@echo "#define $(HostPlatform_CPP)_BUILD  	1" >> $@
+	@echo "#define $(TargetPlatform_CPP)_HOST		1" >> $@
+	@echo "#define $(TargetPlatform_CPP)_TARGET	1" >> $@
+	@echo >> $@
+	@echo "#define $(HostArch_CPP)_BUILD_ARCH  	1" >> $@
+	@echo "#define $(TargetArch_CPP)_HOST_ARCH	1" >> $@
+	@echo "#define $(TargetArch_CPP)_TARGET_ARCH	1" >> $@
+	@echo "#define BUILD_ARCH \"$(HostArch_CPP)\"" >> $@
+	@echo "#define HOST_ARCH \"$(TargetArch_CPP)\"" >> $@
+	@echo "#define TARGET_ARCH \"$(TargetArch_CPP)\"" >> $@
+	@echo >> $@
+	@echo "#define $(HostOS_CPP)_BUILD_OS 		1" >> $@
+	@echo "#define $(TargetOS_CPP)_HOST_OS		1" >> $@
+	@echo "#define $(TargetOS_CPP)_TARGET_OS	1" >> $@  
+	@echo "#define BUILD_OS \"$(HostOS_CPP)\"" >> $@
+	@echo "#define HOST_OS \"$(TargetOS_CPP)\"" >> $@
+	@echo "#define TARGET_OS \"$(TargetOS_CPP)\"" >> $@
+ifeq "$(HostOS_CPP)" "irix"
+	@echo "#ifndef $(IRIX_MAJOR)_TARGET_OS		 " >> $@  
+	@echo "#define $(IRIX_MAJOR)_TARGET_OS		1" >> $@  
+	@echo "#endif					 " >> $@  
+endif
+	@echo >> $@
+	@echo "#define $(HostVendor_CPP)_BUILD_VENDOR 	1" >> $@
+	@echo "#define $(TargetVendor_CPP)_HOST_VENDOR	1" >> $@
+	@echo "#define $(TargetVendor_CPP)_TARGET_VENDOR  1" >> $@
+	@echo "#define BUILD_VENDOR \"$(HostVendor_CPP)\"" >> $@
+	@echo "#define HOST_VENDOR \"$(TargetVendor_CPP)\"" >> $@
+	@echo "#define TARGET_VENDOR \"$(TargetVendor_CPP)\"" >> $@
+	@echo >> $@
+	@echo "#endif /* __PLATFORM_H__ */"          >> $@
+	@echo "Done."
+
+stage3/$(PLATFORM_H) : stage2/$(PLATFORM_H)
+	$(CP) stage2/$(PLATFORM_H) stage3/$(PLATFORM_H)
+
+boot :: stage$(stage)/$(PLATFORM_H)
+
+SRC_HC_OPTS += -Istage$(stage)
 
 # -----------------------------------------------------------------------------
 # Set SRCS etc.

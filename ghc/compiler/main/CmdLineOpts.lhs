@@ -348,11 +348,10 @@ data PackageFlag
   | IgnorePackage  String
 
 defaultHscTarget
-  | cGhcWithNativeCodeGen == "YES" && 
-	(prefixMatch "i386" cTARGETPLATFORM ||
-	 prefixMatch "sparc" cTARGETPLATFORM ||
-	 prefixMatch "powerpc" cTARGETPLATFORM) =  HscAsm
-  | otherwise					=  HscC
+#if defined(i386_TARGET_ARCH) || defined(sparc_TARGET_ARCH) || defined(powerpc_TARGET_ARCH)
+  | cGhcWithNativeCodeGen == "YES" 	=  HscAsm
+#endif
+  | otherwise				=  HscC
 
 defaultDynFlags = DynFlags {
   coreToDo = Nothing, stgToDo = [], 

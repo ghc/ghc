@@ -70,17 +70,55 @@
 
     </dl>
 
-    <p>More about what you're allowed to do in the way of CPP
-    directives later.
+    <h2>Platform tests</h2>
+
+    <p>There are three platforms of interest to GHC:
+ 
+    <ul>
+      <li>The <b>Build</b> platform.  This is the platform on which we
+      are building GHC.</li>
+      <li>The <b>Host</b> platform.  This is the platform on which we
+      are going to run this GHC binary, and associated tools.</li>
+      <li>The <b>Target</b> platform.  This is the platform for which
+      this GHC binary will generate code.</li>
+    </ul>
+
+    <p>At the moment, there is very limited support for having
+    different values for buil, host, and target.  In particular:</p>
+
+    <ul>
+      <li>The build platform is currently always the same as the host
+      platform.  The build process needs to use some of the tools in
+      the source tree, for example <tt>ghc-pkg</tt> and
+      <tt>hsc2hs</tt>.</li>
+      
+      <li>If the target platform differs from the host platform, then
+      this is generally for the purpose of building <tt>.hc</tt> files
+      from Haskell source for porting GHC to the target platform.
+      Full cross-compilation isn't supported (yet).</li>
+    </ul>
+
+    <p>In the compiler's source code, you may make use of the
+    following CPP symbols:</p>
+
+    <ul>
+      <li><em>xxx</em><tt>_TARGET_ARCH</tt></li>
+      <li><em>xxx</em><tt>_TARGET_VENDOR</tt></li>
+      <li><em>xxx</em><tt>_TARGET_OS</tt></li>
+      <li><em>xxx</em><tt>_HOST_ARCH</tt></li>
+      <li><em>xxx</em><tt>_HOST_VENDOR</tt></li>
+      <li><em>xxx</em><tt>_HOST_OS</tt></li>
+    </ul>
+    
+    <p>where <em>xxx</em> is the appropriate value:
+    eg. <tt>i386_TARGET_ARCH</tt>.
 
     <h2>Compiler versions</h2>
 
-    <p>GHC must be compilable by every major version of GHC from 4.08
+    <p>GHC must be compilable by every major version of GHC from 5.02
     onwards, and itself.  It isn't necessary for it to be compilable
     by every intermediate development version (that includes last
-    week's CVS sources), but we mustn't lose compatibility with 4.08
-    for the time being, because that's the only version which can be
-    easily bootstrapped from .hc files.
+    week's CVS sources).
 
     <p>To maintain compatibility, use <tt>HsVersions.h</tt> (see
     below) where possible, and try to avoid using <tt>#ifdef</tt> in

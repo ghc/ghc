@@ -20,7 +20,6 @@ module Linker ( HValue, showLinkerState,
 		linkPackages,
 	) where
 
-#include "../includes/ghcconfig.h"
 #include "HsVersions.h"
 
 import ObjLink		( loadDLL, loadObj, unloadObj, resolveObjs, initObjLinker )

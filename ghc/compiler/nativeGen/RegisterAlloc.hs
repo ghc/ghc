@@ -85,7 +85,6 @@ module RegisterAlloc (
   ) where
 
 #include "HsVersions.h"
-#include "../includes/ghcconfig.h"
 
 import PprMach
 import MachRegs

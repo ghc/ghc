@@ -50,7 +50,7 @@
  * in libc.a clobbers $s6.
  */
 #include "ghcconfig.h"
-#ifdef alpha_TARGET_ARCH
+#ifdef alpha_HOST_ARCH
 #define alpha_EXTRA_CAREFUL
 register long   fake_ra __asm__("$26");
 register long   fake_gp __asm__("$29");
@@ -112,7 +112,7 @@ StgFunPtr StgReturn(void)
    x86 architecture
    -------------------------------------------------------------------------- */
 
-#ifdef i386_TARGET_ARCH
+#ifdef i386_HOST_ARCH
 
 StgThreadReturnCode
 StgRun(StgFunPtr f, StgRegTable *basereg) {
@@ -175,7 +175,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 
    ------------------------------------------------------------------------- */
 
-#ifdef x86_64_TARGET_ARCH
+#ifdef x86_64_HOST_ARCH
 
 extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg);
 
@@ -261,7 +261,7 @@ static void StgRunIsImplementedInAssembler(void)
    Updated info (GHC 4.08.2): not saving %i7 any more (see below).
    -------------------------------------------------------------------------- */
 
-#ifdef sparc_TARGET_ARCH
+#ifdef sparc_HOST_ARCH
 
 StgThreadReturnCode
 StgRun(StgFunPtr f, StgRegTable *basereg) {
@@ -329,7 +329,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
       tru64unix.compaq.com/docs/base_doc/DOCUMENTATION/V51_PDF/ARH9MBTE.PDF
    -------------------------------------------------------------------------- */
 
-#ifdef alpha_TARGET_ARCH
+#ifdef alpha_HOST_ARCH
 
 StgThreadReturnCode
 StgRun(StgFunPtr f, StgRegTable *basereg)
@@ -425,13 +425,13 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
     return ret;
 }
 
-#endif /* alpha_TARGET_ARCH */
+#endif /* alpha_HOST_ARCH */
 
 /* -----------------------------------------------------------------------------
    HP-PA architecture
    -------------------------------------------------------------------------- */
 
-#ifdef hppa1_1_TARGET_ARCH
+#ifdef hppa1_1_HOST_ARCH
 
 StgThreadReturnCode
 StgRun(StgFunPtr f, StgRegTable *basereg)
@@ -518,7 +518,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
     return ret;
 }
 
-#endif /* hppa1_1_TARGET_ARCH */
+#endif /* hppa1_1_HOST_ARCH */
 
 /* -----------------------------------------------------------------------------
    PowerPC architecture
@@ -527,11 +527,11 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
    
    -------------------------------------------------------------------------- */
 
-#ifdef powerpc_TARGET_ARCH
+#ifdef powerpc_HOST_ARCH
 
 extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg);
 
-#ifdef darwin_TARGET_OS
+#ifdef darwin_HOST_OS
 static void StgRunIsImplementedInAssembler(void)
 {
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
@@ -644,9 +644,9 @@ static void StgRunIsImplementedInAssembler(void)
    
    -------------------------------------------------------------------------- */
 
-#ifdef powerpc64_TARGET_ARCH
+#ifdef powerpc64_HOST_ARCH
 
-#ifdef linux_TARGET_OS
+#ifdef linux_HOST_OS
 extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg);
 
 static void StgRunIsImplementedInAssembler(void)
@@ -767,7 +767,7 @@ static void StgRunIsImplementedInAssembler(void)
 			"\tblr\n"
 	: : "i"(RESERVED_C_STACK_BYTES+304 /*stack frame size*/));
 }
-#else // linux_TARGET_OS
+#else // linux_HOST_OS
 #error Only linux support for power64 right now.
 #endif
 
@@ -786,7 +786,7 @@ static void StgRunIsImplementedInAssembler(void)
            loc31: saved gp (gcc 3.3 uses this slot)
    -------------------------------------------------------------------------- */
 
-#ifdef ia64_TARGET_ARCH
+#ifdef ia64_HOST_ARCH
 
 /* the memory stack is rarely used, so 16K is excessive */
 #undef RESERVED_C_STACK_BYTES

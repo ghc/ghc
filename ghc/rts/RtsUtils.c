@@ -36,7 +36,7 @@
 #include <signal.h>
 #endif
 
-#if defined(THREADED_RTS) && defined(openbsd_TARGET_OS) && defined(HAVE_PTHREAD_H)
+#if defined(THREADED_RTS) && defined(openbsd_HOST_OS) && defined(HAVE_PTHREAD_H)
 #include <pthread.h>
 #endif
 
@@ -191,7 +191,7 @@ time_str(void)
  * clean up for us.
  * -------------------------------------------------------------------------- */
 
-#if !defined(mingw32_TARGET_OS)
+#if !defined(mingw32_HOST_OS)
 void
 resetNonBlockingFd(int fd)
 {
@@ -230,7 +230,7 @@ static ullong startTime = 0;
 ullong
 msTime(void)
 {
-# if defined(HAVE_GETCLOCK) && !defined(alpha_TARGET_ARCH) && !defined(hppa1_1_TARGET_ARCH)
+# if defined(HAVE_GETCLOCK) && !defined(alpha_HOST_ARCH) && !defined(hppa1_1_HOST_ARCH)
     struct timespec tv;
 
     if (getclock(TIMEOFDAY, &tv) != 0) {
@@ -239,7 +239,7 @@ msTime(void)
 	stg_exit(EXIT_FAILURE);
     }
     return tv.tv_sec * LL(1000) + tv.tv_nsec / LL(1000000) - startTime;
-# elif HAVE_GETTIMEOFDAY && !defined(alpha_TARGET_ARCH)
+# elif HAVE_GETTIMEOFDAY && !defined(alpha_HOST_ARCH)
     struct timeval tv;
  
     if (gettimeofday(&tv, NULL) != 0) {
@@ -304,7 +304,7 @@ heapCheckFail( void )
  * genericRaise(), rather than raise(3).
  */
 int genericRaise(int sig) {
-#if defined(THREADED_RTS) && (defined(openbsd_TARGET_OS) || defined(freebsd_TARGET_OS))
+#if defined(THREADED_RTS) && (defined(openbsd_HOST_OS) || defined(freebsd_HOST_OS))
         return pthread_kill(pthread_self(), sig);
 #else
         return raise(sig);

@@ -16,9 +16,7 @@
 
 module Compat.RawSystem (rawSystem) where
 
-#if __GLASGOW_HASKELL__ < 603
-#include "config.h"
-#endif
+#include "../../includes/ghcconfig.h"
 
 #if __GLASGOW_HASKELL__ >= 603
 
@@ -103,7 +101,7 @@ use lpCommandLine alone, which CreateProcess supports.
 
 ----------------------------------------------------------------------------- -}
 
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 
 rawSystem cmd args =
   withCString cmd $ \pcmd ->

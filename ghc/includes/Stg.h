@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.65 2005/01/13 16:07:33 simonmar Exp $
+ * $Id: Stg.h,v 1.66 2005/01/28 12:55:52 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2004
  *
@@ -195,7 +195,7 @@ INLINE_HEADER StgDouble PK_DBL    (W_ p_src[])                 { return *(StgDou
  * independently - unfortunately this code isn't writable in C, we
  * have to use inline assembler.
  */
-#if sparc_TARGET_ARCH
+#if sparc_HOST_ARCH
 
 #define ASSIGN_DBL(dst0,src) \
     { StgPtr dst = (StgPtr)(dst0); \
@@ -210,7 +210,7 @@ INLINE_HEADER StgDouble PK_DBL    (W_ p_src[])                 { return *(StgDou
 	"m" (((P_)(src))[0]), "m" (((P_)(src))[1])); d; \
     } )
 
-#else /* ! sparc_TARGET_ARCH */
+#else /* ! sparc_HOST_ARCH */
 
 INLINE_HEADER void	  ASSIGN_DBL (W_ [], StgDouble);
 INLINE_HEADER StgDouble   PK_DBL     (W_ []);
@@ -249,7 +249,7 @@ INLINE_HEADER StgDouble PK_DBL(W_ p_src[])
     return(y.d);
 }
 
-#endif /* ! sparc_TARGET_ARCH */
+#endif /* ! sparc_HOST_ARCH */
 
 #endif /* ALIGNMENT_DOUBLE > ALIGNMENT_UNSIGNED_INT */
 

@@ -9,7 +9,7 @@
 #ifndef NCG_H
 #define NCG_H
 
-#include "../includes/ghcconfig.h"
+#include "ghc_boot_platform.h"
 
 #define COMMA ,
 

@@ -12,16 +12,7 @@
 /* The itimer stuff in this module is non-posix */
 /* #include "PosixSource.h" */
 
-/* This ifdef is required because this source might be compiled by an
- * external compiler.  See ghc/utils/runghc/rawSystem.c for example.
- */
-#ifdef __GLASGOW_HASKELL__
-#if __GLASGOW_HASKELL__ < 603
-#include "config.h"
-#else
-#include "ghcconfig.h"
-#endif
-#endif
+#include "../../../includes/ghcconfig.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,7 +40,7 @@
 
 #include "HsFFI.h"
 
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
 #include <windows.h>
 #endif
 
@@ -61,7 +52,7 @@
 #define fork vfork
 #endif
 
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
 /* -------------------- WINDOWS VERSION --------------------- */
 
 HsInt

@@ -542,7 +542,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
     // ToDo: add deadlock detection in GUM (similar to SMP) -- HWL
 #endif
 
-#if defined(RTS_SUPPORTS_THREADS) || defined(mingw32_TARGET_OS)
+#if defined(RTS_SUPPORTS_THREADS) || defined(mingw32_HOST_OS)
     /* win32: might be back here due to awaitEvent() being abandoned
      * as a result of a console event having been delivered.
      */
@@ -1424,7 +1424,7 @@ isThreadBound(StgTSO* tso USED_IN_THREADED_RTS)
  * Singleton fork(). Do not copy any running threads.
  * ------------------------------------------------------------------------- */
 
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 #define FORKPROCESS_PRIMOP_SUPPORTED
 #endif
 
@@ -2762,7 +2762,7 @@ unblockThread(StgTSO *tso)
 
   case BlockedOnRead:
   case BlockedOnWrite:
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
   case BlockedOnDoProc:
 #endif
     {
@@ -2900,7 +2900,7 @@ unblockThread(StgTSO *tso)
 
   case BlockedOnRead:
   case BlockedOnWrite:
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
   case BlockedOnDoProc:
 #endif
     {
@@ -3430,7 +3430,7 @@ printThreadBlockage(StgTSO *tso)
   case BlockedOnWrite:
     debugBelch("is blocked on write to fd %d", tso->block_info.fd);
     break;
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
     case BlockedOnDoProc:
     debugBelch("is blocked on proc (request: %d)", tso->block_info.async_result->reqID);
     break;

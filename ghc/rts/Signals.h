@@ -6,7 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#if !defined(PAR) && !defined(mingw32_TARGET_OS)
+#if !defined(PAR) && !defined(mingw32_HOST_OS)
 #define RTS_USER_SIGNALS 1
 
 extern StgPtr pending_handler_buf[];
@@ -30,7 +30,7 @@ extern void initDefaultHandlers(void);
 extern void handleSignalsInThisThread(void);
 extern void handleSignalsInPrevThread(void);
 
-#elif defined(mingw32_TARGET_OS)
+#elif defined(mingw32_HOST_OS)
 #define RTS_USER_SIGNALS 1
 #include "win32/ConsoleHandler.h"
 

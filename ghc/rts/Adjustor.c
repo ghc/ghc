@@ -46,7 +46,7 @@ Haskell side.
 #include <windows.h>
 #endif
 
-#if defined(openbsd_TARGET_OS)
+#if defined(openbsd_HOST_OS)
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -55,7 +55,7 @@ Haskell side.
 typedef unsigned long my_uintptr_t;
 #endif
 
-#if defined(powerpc_TARGET_ARCH) && defined(linux_TARGET_OS)
+#if defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS)
 #include <string.h>
 #endif
 
@@ -72,7 +72,7 @@ static void*
 mallocBytesRWX(int len)
 {
   void *addr = stgMallocBytes(len, "mallocBytesRWX");
-#if defined(i386_TARGET_ARCH) && defined(_WIN32)
+#if defined(i386_HOST_ARCH) && defined(_WIN32)
   /* This could be necessary for processors which distinguish between READ and
      EXECUTE memory accesses, e.g. Itaniums. */
   DWORD dwOldProtect = 0;
@@ -80,7 +80,7 @@ mallocBytesRWX(int len)
     barf("mallocBytesRWX: failed to protect 0x%p; error=%lu; old protection: %lu\n",
          addr, (unsigned long)GetLastError(), (unsigned long)dwOldProtect);
   }
-#elif defined(openbsd_TARGET_OS)
+#elif defined(openbsd_HOST_OS)
   /* malloced memory isn't executable by default on OpenBSD */
   my_uintptr_t pageSize         = sysconf(_SC_PAGESIZE);
   my_uintptr_t mask             = ~(pageSize - 1);
@@ -94,20 +94,20 @@ mallocBytesRWX(int len)
   return addr;
 }
 
-#if defined(i386_TARGET_ARCH)
+#if defined(i386_HOST_ARCH)
 static unsigned char *obscure_ccall_ret_code;
 #endif
 
-#if defined(alpha_TARGET_ARCH)
+#if defined(alpha_HOST_ARCH)
 /* To get the definition of PAL_imb: */
-# if defined(linux_TARGET_OS)
+# if defined(linux_HOST_OS)
 #  include <asm/pal.h>
 # else
 #  include <machine/pal.h>
 # endif
 #endif
 
-#if defined(ia64_TARGET_ARCH)
+#if defined(ia64_HOST_ARCH)
 #include "Storage.h"
 
 /* Layout of a function descriptor */
@@ -138,7 +138,7 @@ stgAllocStable(size_t size_in_bytes, StgStablePtr *stable)
 }
 #endif
 
-#if defined(powerpc_TARGET_ARCH) && defined(linux_TARGET_OS)
+#if defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS)
 __asm__("obscure_ccall_ret_code:\n\t"
         "lwz 1,0(1)\n\t"
         "lwz 0,4(1)\n\t"
@@ -147,8 +147,8 @@ __asm__("obscure_ccall_ret_code:\n\t"
 extern void obscure_ccall_ret_code(void);
 #endif
 
-#if defined(powerpc_TARGET_ARCH) || defined(powerpc64_TARGET_ARCH)
-#if !(defined(powerpc_TARGET_ARCH) && defined(linux_TARGET_OS))
+#if defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
+#if !(defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS))
 
 /* !!! !!! WARNING: !!! !!!
  * This structure is accessed from AdjustorAsm.s
@@ -156,14 +156,14 @@ extern void obscure_ccall_ret_code(void);
  */
 
 typedef struct AdjustorStub {
-#if defined(powerpc_TARGET_ARCH) && defined(darwin_TARGET_OS)
+#if defined(powerpc_HOST_ARCH) && defined(darwin_HOST_OS)
     unsigned        lis;
     unsigned        ori;
     unsigned        lwz;
     unsigned        mtctr;
     unsigned        bctr;
     StgFunPtr       code;
-#elif defined(powerpc64_TARGET_ARCH) && defined(darwin_TARGET_OS)
+#elif defined(powerpc64_HOST_ARCH) && defined(darwin_HOST_OS)
         /* powerpc64-darwin: just guessing that it won't use fundescs. */
     unsigned        lis;
     unsigned        ori;
@@ -195,7 +195,7 @@ void*
 createAdjustor(int cconv, StgStablePtr hptr,
 	       StgFunPtr wptr,
 	       char *typeString
-#if !defined(powerpc_TARGET_ARCH) && !defined(powerpc64_TARGET_ARCH)
+#if !defined(powerpc_HOST_ARCH) && !defined(powerpc64_HOST_ARCH)
 	          STG_UNUSED
 #endif
               )
@@ -205,7 +205,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
   switch (cconv)
   {
   case 0: /* _stdcall */
-#if defined(i386_TARGET_ARCH)
+#if defined(i386_HOST_ARCH)
     /* Magic constant computed by inspecting the code length of
        the following assembly language snippet
        (offset and machine code prefixed):
@@ -238,7 +238,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
     break;
 
   case 1: /* _ccall */
-#if defined(i386_TARGET_ARCH)
+#if defined(i386_HOST_ARCH)
   /* Magic constant computed by inspecting the code length of
      the following assembly language snippet
      (offset and machine code prefixed):
@@ -279,7 +279,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
 	adj_code[0x0f] = (unsigned char)0xff; /* jmp *%eax */
 	adj_code[0x10] = (unsigned char)0xe0; 
     }
-#elif defined(sparc_TARGET_ARCH)
+#elif defined(sparc_HOST_ARCH)
   /* Magic constant computed by inspecting the code length of the following
      assembly language snippet (offset and machine code prefixed):
 
@@ -344,7 +344,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
         asm("nop");
         asm("nop");
     }
-#elif defined(alpha_TARGET_ARCH)
+#elif defined(alpha_HOST_ARCH)
   /* Magic constant computed by inspecting the code length of
      the following assembly language snippet
      (offset and machine code prefixed; note that the machine code
@@ -367,7 +367,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
      divided by 4, taking the lowest 14 bits.
 
      We only support passing 4 or fewer argument words, for the same
-     reason described under sparc_TARGET_ARCH above by JRS, 21 Aug 01.
+     reason described under sparc_HOST_ARCH above by JRS, 21 Aug 01.
      On the Alpha the first 6 integer arguments are in a0 through a5,
      and the rest on the stack.  Hence we want to shuffle the original
      caller's arguments by two.
@@ -402,7 +402,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 	/* Ensure that instruction cache is consistent with our new code */
 	__asm__ volatile("call_pal %0" : : "i" (PAL_imb));
     }
-#elif defined(powerpc_TARGET_ARCH) && defined(linux_TARGET_OS)
+#elif defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS)
 
 #define OP_LO(op,lo)  ((((unsigned)(op)) << 16) | (((unsigned)(lo)) & 0xFFFF))
 #define OP_HI(op,hi)  ((((unsigned)(op)) << 16) | (((unsigned)(hi)) >> 16))
@@ -611,7 +611,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
         }
     }
 
-#elif defined(powerpc_TARGET_ARCH) || defined(powerpc64_TARGET_ARCH)
+#elif defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
         
 #define OP_LO(op,lo)  ((((unsigned)(op)) << 16) | (((unsigned)(lo)) & 0xFFFF))
 #define OP_HI(op,hi)  ((((unsigned)(op)) << 16) | (((unsigned)(hi)) >> 16))
@@ -664,7 +664,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 
             // no function descriptors :-(
             // We need to do things "by hand".
-#if defined(powerpc_TARGET_ARCH)
+#if defined(powerpc_HOST_ARCH)
             // lis  r2, hi(adjustorStub)
         adjustorStub->lis = OP_HI(0x3c40, adjustorStub);
             // ori  r2, r2, lo(adjustorStub)
@@ -701,7 +701,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 
             switch(t)
             {
-#if defined(powerpc_TARGET_ARCH)
+#if defined(powerpc_HOST_ARCH)
                     // on 32-bit platforms, Double and Int64 occupy two words.
                 case 'd':
                 case 'l':
@@ -739,7 +739,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
         adjustorStub->extrawords_plus_one = extra_sz + 1;
     }
 
-#elif defined(ia64_TARGET_ARCH)
+#elif defined(ia64_HOST_ARCH)
 /*
     Up to 8 inputs are passed in registers.  We flush the last two inputs to
     the stack, initially into the 16-byte scratch region left by the caller.
@@ -836,7 +836,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 void
 freeHaskellFunctionPtr(void* ptr)
 {
-#if defined(i386_TARGET_ARCH)
+#if defined(i386_HOST_ARCH)
  if ( *(unsigned char*)ptr != 0x68 &&
       *(unsigned char*)ptr != 0x58 ) {
    errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
@@ -849,7 +849,7 @@ freeHaskellFunctionPtr(void* ptr)
  } else {
     freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x02)));
  }    
-#elif defined(sparc_TARGET_ARCH)
+#elif defined(sparc_HOST_ARCH)
  if ( *(unsigned long*)ptr != 0x9C23A008UL ) {
    errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
@@ -857,7 +857,7 @@ freeHaskellFunctionPtr(void* ptr)
 
  /* Free the stable pointer first..*/
  freeStablePtr(*((StgStablePtr*)((unsigned long*)ptr + 11)));
-#elif defined(alpha_TARGET_ARCH)
+#elif defined(alpha_HOST_ARCH)
  if ( *(StgWord64*)ptr != 0xa77b0018a61b0010L ) {
    errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
@@ -865,20 +865,20 @@ freeHaskellFunctionPtr(void* ptr)
 
  /* Free the stable pointer first..*/
  freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x10)));
-#elif defined(powerpc_TARGET_ARCH) && defined(linux_TARGET_OS)
+#elif defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS)
  if ( *(StgWord*)ptr != 0x48000008 ) {
    errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
  }
  freeStablePtr(((StgStablePtr*)ptr)[1]);
-#elif defined(powerpc_TARGET_ARCH) || defined(powerpc64_TARGET_ARCH)
+#elif defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
  extern void* adjustorCode;
  if ( ((AdjustorStub*)ptr)->code != (StgFunPtr) &adjustorCode ) {
    errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
  }
  freeStablePtr(((AdjustorStub*)ptr)->hptr);
-#elif defined(ia64_TARGET_ARCH)
+#elif defined(ia64_HOST_ARCH)
  IA64FunDesc *fdesc = (IA64FunDesc *)ptr;
  StgWord64 *code = (StgWord64 *)(fdesc+1);
 
@@ -906,7 +906,7 @@ freeHaskellFunctionPtr(void* ptr)
 void
 initAdjustor(void)
 {
-#if defined(i386_TARGET_ARCH)
+#if defined(i386_HOST_ARCH)
   /* Now here's something obscure for you:
 
   When generating an adjustor thunk that uses the C calling

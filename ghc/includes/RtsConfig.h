@@ -54,7 +54,7 @@
  *
  * UNDEFINING THIS WON'T WORK ON ITS OWN.  You have been warned.
  */
-#if !defined(USE_MINIINTERPRETER) && !defined(ia64_TARGET_ARCH) && !defined (powerpc64_TARGET_ARCH)
+#if !defined(USE_MINIINTERPRETER) && !defined(ia64_HOST_ARCH) && !defined (powerpc64_HOST_ARCH)
 #define TABLES_NEXT_TO_CODE
 #endif
 

@@ -98,7 +98,6 @@ module CLabel (
 
 
 #include "HsVersions.h"
-#include "../includes/ghcconfig.h"
 
 import CmdLineOpts      ( DynFlags, opt_Static, opt_DoTickyProfiling )
 import Packages		( isHomeModule, isDllName )

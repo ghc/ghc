@@ -860,7 +860,7 @@ stg_block_putmvar
     BLOCK_GENERIC;
 }
 
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 INFO_TABLE_RET( stg_block_async, 0/*framesize*/, 0/*bitmap*/, RET_SMALL )
 {
     W_ ares;

@@ -42,7 +42,7 @@
 #include <dlfcn.h>
 #endif
 
-#if defined(cygwin32_TARGET_OS)
+#if defined(cygwin32_HOST_OS)
 #ifdef HAVE_DIRENT_H
 #include <dirent.h>
 #endif
@@ -58,12 +58,12 @@
 #include <sys/wait.h>
 #endif
 
-#if defined(ia64_TARGET_ARCH) || defined(openbsd_TARGET_OS) || defined(linux_TARGET_OS)
+#if defined(ia64_HOST_ARCH) || defined(openbsd_HOST_OS) || defined(linux_HOST_OS)
 #define USE_MMAP
 #include <fcntl.h>
 #include <sys/mman.h>
 
-#if defined(openbsd_TARGET_OS) || defined(linux_TARGET_OS)
+#if defined(openbsd_HOST_OS) || defined(linux_HOST_OS)
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -71,13 +71,13 @@
 
 #endif
 
-#if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS) || defined(freebsd_TARGET_OS) || defined(netbsd_TARGET_OS) || defined(openbsd_TARGET_OS)
+#if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) || defined(freebsd_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS)
 #  define OBJFORMAT_ELF
-#elif defined(cygwin32_TARGET_OS) || defined (mingw32_TARGET_OS)
+#elif defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
 #  define OBJFORMAT_PEi386
 #  include <windows.h>
 #  include <math.h>
-#elif defined(darwin_TARGET_OS)
+#elif defined(darwin_HOST_OS)
 #  include <mach-o/ppc/reloc.h>
 #  define OBJFORMAT_MACHO
 #  include <mach-o/loader.h>
@@ -96,7 +96,7 @@ ObjectCode *objects = NULL;	/* initially empty */
 static int ocVerifyImage_ELF    ( ObjectCode* oc );
 static int ocGetNames_ELF       ( ObjectCode* oc );
 static int ocResolve_ELF        ( ObjectCode* oc );
-#if defined(powerpc_TARGET_ARCH)
+#if defined(powerpc_HOST_ARCH)
 static int ocAllocateJumpIslands_ELF ( ObjectCode* oc );
 #endif
 #elif defined(OBJFORMAT_PEi386)
@@ -134,13 +134,13 @@ typedef struct _RtsSymbolVal {
 #define Maybe_Stable_Names
 #endif
 
-#if !defined (mingw32_TARGET_OS)
+#if !defined (mingw32_HOST_OS)
 #define RTS_POSIX_ONLY_SYMBOLS                  \
       SymX(stg_sig_install)			\
       Sym(nocldstop)
 #endif
 
-#if defined (cygwin32_TARGET_OS)
+#if defined (cygwin32_HOST_OS)
 #define RTS_MINGW_ONLY_SYMBOLS /**/
 /* Don't have the ability to read import libs / archives, so
  * we have to stupidly list a lot of what libcygwin.a
@@ -224,10 +224,10 @@ typedef struct _RtsSymbolVal {
       SymX(utime)                               \
       SymX(waitpid)
 
-#elif !defined(mingw32_TARGET_OS)
+#elif !defined(mingw32_HOST_OS)
 #define RTS_MINGW_ONLY_SYMBOLS /**/
 #define RTS_CYGWIN_ONLY_SYMBOLS /**/
-#else /* defined(mingw32_TARGET_OS) */
+#else /* defined(mingw32_HOST_OS) */
 #define RTS_POSIX_ONLY_SYMBOLS  /**/
 #define RTS_CYGWIN_ONLY_SYMBOLS /**/
 
@@ -602,7 +602,7 @@ typedef struct _RtsSymbolVal {
       Sym(__ashrdi3)				\
       Sym(__lshrdi3)				\
       Sym(__eprintf)
-#elif defined(ia64_TARGET_ARCH)
+#elif defined(ia64_HOST_ARCH)
 #define RTS_LIBGCC_SYMBOLS			\
       Sym(__divdi3)				\
       Sym(__udivdi3)                            \
@@ -614,7 +614,7 @@ typedef struct _RtsSymbolVal {
 #define RTS_LIBGCC_SYMBOLS
 #endif
 
-#ifdef darwin_TARGET_OS
+#ifdef darwin_HOST_OS
       // Symbols that don't have a leading underscore
       // on Mac OS X. They have to receive special treatment,
       // see machoInitSymbolsWithoutUnderscore()
@@ -711,7 +711,7 @@ static void *dl_prog_handle;
 #endif
 
 /* dlopen(NULL,..) doesn't work so we grab libc explicitly */
-#if defined(openbsd_TARGET_OS)
+#if defined(openbsd_HOST_OS)
 static void *dl_libc_handle;
 #endif
 
@@ -743,7 +743,7 @@ initLinker( void )
     dl_prog_handle = RTLD_DEFAULT;
 #   else
     dl_prog_handle = dlopen(NULL, RTLD_LAZY);
-#   if defined(openbsd_TARGET_OS)
+#   if defined(openbsd_HOST_OS)
     dl_libc_handle = dlopen("libc.so", RTLD_LAZY);
 #   endif
 #   endif // RTLD_DEFAULT
@@ -876,7 +876,7 @@ lookupSymbol( char *lbl )
 
     if (val == NULL) {
 #       if defined(OBJFORMAT_ELF)
-#	if defined(openbsd_TARGET_OS)
+#	if defined(openbsd_HOST_OS)
 	val = dlsym(dl_prog_handle, lbl);
 	return (val != NULL) ? val : dlsym(dl_libc_handle,lbl);
 #	else /* not openbsd */
@@ -979,7 +979,7 @@ void ghci_enquire ( char* addr )
 }
 #endif
 
-#ifdef ia64_TARGET_ARCH
+#ifdef ia64_HOST_ARCH
 static unsigned int PLTSize(void);
 #endif
 
@@ -1062,7 +1062,7 @@ loadObj( char *path )
 
    /* On many architectures malloc'd memory isn't executable, so we need to use mmap. */
 
-#if defined(openbsd_TARGET_OS)
+#if defined(openbsd_HOST_OS)
    fd = open(path, O_RDONLY, S_IRUSR);
 #else
    fd = open(path, O_RDONLY);
@@ -1072,7 +1072,7 @@ loadObj( char *path )
 
    pagesize = getpagesize();
 
-#ifdef ia64_TARGET_ARCH
+#ifdef ia64_HOST_ARCH
    /* The PLT needs to be right before the object */
    n = ROUND_UP(PLTSize(), pagesize);
    oc->plt = mmap(NULL, n, PROT_EXEC|PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
@@ -1110,7 +1110,7 @@ loadObj( char *path )
 #  if defined(OBJFORMAT_MACHO)
    r = ocAllocateJumpIslands_MachO ( oc );
    if (!r) { return r; }
-#  elif defined(OBJFORMAT_ELF) && defined(powerpc_TARGET_ARCH)
+#  elif defined(OBJFORMAT_ELF) && defined(powerpc_HOST_ARCH)
    r = ocAllocateJumpIslands_ELF ( oc );
    if (!r) { return r; }
 #endif
@@ -1284,7 +1284,7 @@ static void addSection ( ObjectCode* oc, SectionKind kind,
  * PowerPC specifics (jump islands)
  * ------------------------------------------------------------------------*/
 
-#if defined(powerpc_TARGET_ARCH)
+#if defined(powerpc_HOST_ARCH)
 
 /*
   ocAllocateJumpIslands
@@ -2188,14 +2188,14 @@ ocResolve_PEi386 ( ObjectCode* oc )
 #define FALSE 0
 #define TRUE  1
 
-#if defined(sparc_TARGET_ARCH)
+#if defined(sparc_HOST_ARCH)
 #  define ELF_TARGET_SPARC  /* Used inside <elf.h> */
-#elif defined(i386_TARGET_ARCH)
+#elif defined(i386_HOST_ARCH)
 #  define ELF_TARGET_386    /* Used inside <elf.h> */
-#elif defined(x86_64_TARGET_ARCH)
+#elif defined(x86_64_HOST_ARCH)
 #  define ELF_TARGET_X64_64
 #  define ELF_64BIT
-#elif defined (ia64_TARGET_ARCH)
+#elif defined (ia64_HOST_ARCH)
 #  define ELF_TARGET_IA64   /* Used inside <elf.h> */
 #  define ELF_64BIT
 #  define ELF_FUNCTION_DESC /* calling convention uses function descriptors */
@@ -2203,7 +2203,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
 #  define ELF_NEED_PLT      /* needs Procedure Linkage Tables */
 #endif
 
-#if !defined(openbsd_TARGET_OS)
+#if !defined(openbsd_HOST_OS)
 #include <elf.h>
 #else
 /* openbsd elf has things in different places, with diff names */
@@ -2325,7 +2325,7 @@ copyFunctionDesc(Elf_Addr target)
 #endif
 
 #ifdef ELF_NEED_PLT
-#ifdef ia64_TARGET_ARCH
+#ifdef ia64_HOST_ARCH
 static void ia64_reloc_gprel22(Elf_Addr target, Elf_Addr value);
 static void ia64_reloc_pcrel21(Elf_Addr target, Elf_Addr value, ObjectCode *oc);
 
@@ -2406,7 +2406,7 @@ findElfSection ( void* objImage, Elf_Word sh_type )
    return ptr;
 }
 
-#if defined(ia64_TARGET_ARCH)
+#if defined(ia64_HOST_ARCH)
 static Elf_Addr
 findElfSegment ( void* objImage, Elf_Addr vaddr )
 {
@@ -2852,7 +2852,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
       value = S + A;
 
       switch (ELF_R_TYPE(info)) {
-#        ifdef i386_TARGET_ARCH
+#        ifdef i386_HOST_ARCH
          case R_386_32:   *pP = value;     break;
          case R_386_PC32: *pP = value - P; break;
 #        endif
@@ -2887,7 +2887,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
                           target_shndx, symtab_shndx ));
 
    for (j = 0; j < nent; j++) {
-#if defined(DEBUG) || defined(sparc_TARGET_ARCH) || defined(ia64_TARGET_ARCH) || defined(powerpc_TARGET_ARCH)
+#if defined(DEBUG) || defined(sparc_HOST_ARCH) || defined(ia64_HOST_ARCH) || defined(powerpc_HOST_ARCH)
       /* This #ifdef only serves to avoid unused-var warnings. */
       Elf_Addr  offset = rtab[j].r_offset;
       Elf_Addr  P      = targ + offset;
@@ -2897,13 +2897,13 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       Elf_Addr  S;
       void*     S_tmp;
       Elf_Addr  value;
-#     if defined(sparc_TARGET_ARCH)
+#     if defined(sparc_HOST_ARCH)
       Elf_Word* pP = (Elf_Word*)P;
       Elf_Word  w1, w2;
-#     elif defined(ia64_TARGET_ARCH)
+#     elif defined(ia64_HOST_ARCH)
       Elf64_Xword *pP = (Elf64_Xword *)P;
       Elf_Addr addr;
-#     elif defined(powerpc_TARGET_ARCH)
+#     elif defined(powerpc_HOST_ARCH)
       Elf_Sword delta;
 #     endif
 
@@ -2957,7 +2957,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       value = S + A;
 
       switch (ELF_R_TYPE(info)) {
-#        if defined(sparc_TARGET_ARCH)
+#        if defined(sparc_HOST_ARCH)
          case R_SPARC_WDISP30:
             w1 = *pP & 0xC0000000;
             w2 = (Elf_Word)((value - P) >> 2);
@@ -2994,7 +2994,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
             w2 = (Elf_Word)value;
             *pP = w2;
             break;
-#        elif defined(ia64_TARGET_ARCH)
+#        elif defined(ia64_HOST_ARCH)
 	 case R_IA64_DIR64LSB:
 	 case R_IA64_FPTR64LSB:
 	    *pP = value;
@@ -3022,7 +3022,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 	    /* This goes with R_IA64_LTOFF22X and points to the load to
 	     * convert into a move.  We don't implement relaxation. */
 	    break;
-#        elif defined(powerpc_TARGET_ARCH)
+#        elif defined(powerpc_HOST_ARCH)
          case R_PPC_ADDR16_LO:
             *(Elf32_Half*) P = value;
             break;
@@ -3113,7 +3113,7 @@ ocResolve_ELF ( ObjectCode* oc )
    freeHashTable(oc->lochash, NULL);
    oc->lochash = NULL;
 
-#if defined(powerpc_TARGET_ARCH)
+#if defined(powerpc_HOST_ARCH)
    ocFlushInstructionCache( oc );
 #endif
 
@@ -3127,7 +3127,7 @@ ocResolve_ELF ( ObjectCode* oc )
  * take care of the most common relocations.
  */
 
-#ifdef ia64_TARGET_ARCH
+#ifdef ia64_HOST_ARCH
 
 static Elf64_Xword
 ia64_extract_instruction(Elf64_Xword *target)
@@ -3216,7 +3216,7 @@ ia64_reloc_pcrel21(Elf_Addr target, Elf_Addr value, ObjectCode *oc)
  * PowerPC ELF specifics
  */
 
-#ifdef powerpc_TARGET_ARCH
+#ifdef powerpc_HOST_ARCH
 
 static int ocAllocateJumpIslands_ELF( ObjectCode *oc )
 {
@@ -3829,7 +3829,7 @@ static int ocResolve_MachO(ObjectCode* oc)
     freeHashTable(oc->lochash, NULL);
     oc->lochash = NULL;
 
-#if defined (powerpc_TARGET_ARCH)
+#if defined (powerpc_HOST_ARCH)
     ocFlushInstructionCache( oc );
 #endif
 

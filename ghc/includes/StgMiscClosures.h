@@ -461,7 +461,7 @@ RTS_FUN(stg_block_takemvar);
 RTS_ENTRY(stg_block_takemvar_ret);
 RTS_FUN(stg_block_putmvar);
 RTS_ENTRY(stg_block_putmvar_ret);
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 RTS_FUN(stg_block_async);
 RTS_FUN(stg_block_async_void);
 #endif
@@ -537,7 +537,7 @@ RTS_FUN(tryPutMVarzh_fast);
 RTS_FUN(waitReadzh_fast);
 RTS_FUN(waitWritezh_fast);
 RTS_FUN(delayzh_fast);
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 RTS_FUN(asyncReadzh_fast);
 RTS_FUN(asyncWritezh_fast);
 RTS_FUN(asyncDoProczh_fast);

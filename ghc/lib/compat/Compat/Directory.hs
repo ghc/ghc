@@ -21,9 +21,7 @@ module Compat.Directory (
   	createDirectoryIfMissing
   ) where
 
-#if __GLASGOW_HASKELL__ < 603
-#include "config.h"
-#endif
+#include "../../includes/ghcconfig.h"
 
 import System.Environment (getEnv)
 import System.Directory.Internals
@@ -37,7 +35,7 @@ import GHC.IOBase ( IOException(..) )
 #else
 import System.IO		( try )
 #endif
-#if __GLASGOW_HASKELL__ && defined(mingw32_TARGET_OS)
+#if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
 import Foreign.Ptr
 import Foreign.C
 #endif
@@ -45,7 +43,7 @@ import System.Directory(doesFileExist, doesDirectoryExist, getPermissions, setPe
 
 getAppUserDataDirectory :: String -> IO FilePath
 getAppUserDataDirectory appName = do
-#if __GLASGOW_HASKELL__ && defined(mingw32_TARGET_OS)
+#if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
   allocaBytes long_path_size $ \pPath -> do
      r <- c_SHGetFolderPath nullPtr csidl_APPDATA nullPtr 0 pPath
      s <- peekCString pPath
@@ -55,7 +53,7 @@ getAppUserDataDirectory appName = do
   return (path++'/':'.':appName)
 #endif
 
-#if __GLASGOW_HASKELL__ && defined(mingw32_TARGET_OS)
+#if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
 foreign import stdcall unsafe "SHGetFolderPathA"
             c_SHGetFolderPath :: Ptr () 
                               -> CInt 
@@ -103,7 +101,7 @@ findExecutable binary = do
   path <- getEnv "PATH"
   search (parseSearchPath path)
   where
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
     fileName = binary `joinFileExt` "exe"
 #else
     fileName = binary

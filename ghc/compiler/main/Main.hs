@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.143 2005/01/27 10:44:39 simonpj Exp $
+-- $Id: Main.hs,v 1.144 2005/01/28 12:55:38 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -9,13 +9,9 @@
 --
 -----------------------------------------------------------------------------
 
--- with path so that ghc -M can find config.h
-#include "../includes/ghcconfig.h"
-
 module Main (main) where
 
 #include "HsVersions.h"
-
 
 #ifdef GHCI
 import InteractiveUI( ghciWelcomeMsg, interactiveUI )

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.39 2004/11/18 09:56:22 tharris Exp $
+ * $Id: TSO.h,v 1.40 2005/01/28 12:55:53 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -85,7 +85,7 @@ typedef StgWord32 StgThreadID;
  */
 typedef unsigned int StgThreadReturnCode;
 
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
 /* results from an async I/O request + it's ID. */
 typedef struct {
   unsigned int reqID;
@@ -98,7 +98,7 @@ typedef union {
   StgClosure *closure;
   struct StgTSO_ *tso;
   StgInt fd;	// StgInt instead of int, so that it's the same size as the ptrs
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
   StgAsyncIOResult* async_result;
 #endif
   StgWord target;

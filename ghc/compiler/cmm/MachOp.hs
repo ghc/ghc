@@ -80,7 +80,6 @@ module MachOp 	(
   ) where
 
 #include "HsVersions.h"
-#include "../includes/ghcconfig.h"
 
 import Constants
 import Outputable

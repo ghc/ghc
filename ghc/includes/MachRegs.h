@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachRegs.h,v 1.20 2005/01/19 18:31:07 wolfgang Exp $
+ * $Id: MachRegs.h,v 1.21 2005/01/28 12:55:51 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -26,6 +26,36 @@
  * the stack rather than in registers.
  */
 #ifndef NO_REGS
+
+/* NOTE: when testing the platform in this file we must test either
+ * *_HOST_ARCH and *_TARGET_ARCH, depending on whether COMPILING_GHC
+ * is set.  This is because when we're compiling the RTS and HC code,
+ * the platform we're running on is the HOST, but when compiling GHC
+ * we want to know about the register mapping on the TARGET platform.
+ */
+#ifdef COMPILING_GHC
+#define alpha_REGS    alpha_TARGET_ARCH
+#define hppa1_1_REGS  hppa1_1_TARGET_ARCH
+#define i386_REGS     i386_TARGET_ARCH
+#define x86_64_REGS   x86_64_TARGET_ARCH
+#define m68k_REGS     m68k_TARGET_ARCH
+#define mips_REGS     (mipsel_TARGET_ARCH || mipseb_TARGET_ARCH)
+#define powerpc_REGS  (powerpc_TARGET_ARCH || powerpc64_TARGET_ARCH || rs6000_TARGET_ARCH)
+#define ia64_REGS     ia64_TARGET_ARCH
+#define sparc_REGS    sparc_TARGET_ARCH
+#define darwin_REGS   darwin_TARGET_OS
+#else
+#define alpha_REGS    alpha_HOST_ARCH
+#define hppa1_1_REGS  hppa1_1_HOST_ARCH
+#define i386_REGS     i386_HOST_ARCH
+#define x86_64_REGS   x86_64_HOST_ARCH
+#define m68k_REGS     m68k_HOST_ARCH
+#define mips_REGS     (mipsel_HOST_ARCH || mipseb_HOST_ARCH)
+#define powerpc_REGS  (powerpc_HOST_ARCH || powerpc64_HOST_ARCH || rs6000_HOST_ARCH)
+#define ia64_REGS     ia64_HOST_ARCH
+#define sparc_REGS    sparc_HOST_ARCH
+#define darwin_REGS   darwin_HOST_OS
+#endif
 
 /* ----------------------------------------------------------------------------
    Caller saves and callee-saves regs.
@@ -82,7 +112,7 @@
    t12	$27	NCG_reserved
    -------------------------------------------------------------------------- */
 
-#if defined(alpha_TARGET_ARCH)
+#if alpha_REGS
 # define REG(x) __asm__("$" #x)
 
 #  define CALLER_SAVES_R2
@@ -123,7 +153,7 @@
 #  define NCG_Reserved_F1 f29
 #  define NCG_Reserved_F2 f30
 
-#endif /* alpha_TARGET_ARCH */
+#endif /* alpha_REGS */
 
 /* -----------------------------------------------------------------------------
    The HP-PA register mapping
@@ -146,7 +176,7 @@
    \tr{%fr8}--\tr{%fr11} are some available caller-save fl-pt registers.
    -------------------------------------------------------------------------- */
 
-#if hppa1_1_TARGET_ARCH
+#if hppa1_1_REGS
 
 #define REG(x) __asm__("%" #x)
 
@@ -201,7 +231,7 @@
    -------------------------------------------------------------------------- */
 
 
-#if i386_TARGET_ARCH
+#if i386_REGS
 
 #define REG(x) __asm__("%" #x)
 
@@ -251,7 +281,7 @@
   %r15		YES
   --------------------------------------------------------------------------- */
 
-#if x86_64_TARGET_ARCH
+#if x86_64_REGS
 
 #define REG(x) __asm__("%" #x)
 
@@ -302,7 +332,7 @@
    \end{tabular}
    -------------------------------------------------------------------------- */
 
-#if m68k_TARGET_ARCH
+#if m68k_REGS
 
 #define REG(x) __asm__(#x)
 
@@ -344,7 +374,7 @@
    We can steal some, but we might have to save/restore around ccalls.
    -------------------------------------------------------------------------- */
 
-#if mipsel_TARGET_ARCH || mipseb_TARGET_ARCH
+#if mips_REGS
 
 #define REG(x) __asm__("$" #x)
 
@@ -414,7 +444,7 @@
    We can do the Whole Business with callee-save registers only!
    -------------------------------------------------------------------------- */
 
-#if powerpc_TARGET_ARCH || powerpc64_TARGET_ARCH || rs6000_TARGET_ARCH
+#if powerpc_REGS
 
 #define REG(x) __asm__(#x)
 
@@ -427,7 +457,7 @@
 #define REG_R7    	r20
 #define REG_R8    	r21
 
-#ifdef darwin_TARGET_OS
+#ifdef darwin_REGS
 
 #define REG_F1		f14
 #define REG_F2		f15
@@ -471,7 +501,7 @@
    \tr{f16-f32} are the callee-saved floating point registers.
    -------------------------------------------------------------------------- */
 
-#ifdef ia64_TARGET_ARCH
+#if ia64_REGS
 
 #define REG(x) __asm__(#x)
 
@@ -556,7 +586,7 @@
 
    -------------------------------------------------------------------------- */
 
-#if sparc_TARGET_ARCH
+#if sparc_REGS
 
 #define REG(x) __asm__("%" #x)
 

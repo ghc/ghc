@@ -1,5 +1,3 @@
-#include "../includes/ghcconfig.h"
-
 module PositionIndependentCode (
         cmmMakeDynamicReference,
         needImportedSymbols,

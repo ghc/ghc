@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: SMP.h,v 1.4 2002/02/04 20:10:47 sof Exp $
+ * $Id: SMP.h,v 1.5 2005/01/28 12:55:52 simonmar Exp $
  *
  * (c) The GHC Team, 1999
  *
@@ -31,7 +31,7 @@
  * (because another thread is altering it in parallel), we just jump
  * to the new entry point.
  */
-#if defined(i386_TARGET_ARCH) && defined(TABLES_NEXT_TO_CODE)
+#if defined(i386_HOST_ARCH) && defined(TABLES_NEXT_TO_CODE)
 #define CMPXCHG(p, cmp, new)			\
   __asm__ __volatile__ (  			\
 	  "lock ; cmpxchg %1, %0\n"		\

@@ -29,7 +29,7 @@
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 # ifdef HAVE_SYS_MMAN_H
 # include <sys/mman.h>
 # endif
@@ -40,7 +40,7 @@
 #if HAVE_WINDOWS_H
 #include <windows.h>
 #endif
-#if darwin_TARGET_OS
+#if darwin_HOST_OS
 #include <mach/vm_map.h>
 #endif
 
@@ -136,7 +136,7 @@ getMBlock(void)
    again using the general method.
    -------------------------------------------------------------------------- */
 
-#if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
+#if !defined(mingw32_HOST_OS) && !defined(cygwin32_HOST_OS)
 
 // A wrapper around mmap(), to abstract away from OS differences in
 // the mmap() interface.
@@ -146,16 +146,16 @@ my_mmap (void *addr, lnat size)
 {
     void *ret;
 
-#if defined(solaris2_TARGET_OS) || defined(irix_TARGET_OS)
+#if defined(solaris2_HOST_OS) || defined(irix_HOST_OS)
     { 
 	int fd = open("/dev/zero",O_RDONLY);
 	ret = mmap(addr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
 	close(fd);
     }
-#elif hpux_TARGET_OS
+#elif hpux_HOST_OS
     ret = mmap(addr, size, PROT_READ | PROT_WRITE, 
 	       MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-#elif darwin_TARGET_OS
+#elif darwin_HOST_OS
     // Without MAP_FIXED, Apple's mmap ignores addr.
     // With MAP_FIXED, it overwrites already mapped regions, whic
     // mmap(0, ... MAP_FIXED ...) is worst of all: It unmaps the program text
@@ -285,7 +285,7 @@ getMBlocks(nat n)
   return ret;
 }
 
-#else /* defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS) */
+#else /* defined(mingw32_HOST_OS) || defined(cygwin32_HOST_OS) */
 
 /*
  On Win32 platforms we make use of the two-phased virtual memory API

@@ -28,9 +28,7 @@ import qualified Control.Exception as Exception
 
 import Prelude
 
-#if __GLASGOW_HASKELL__ < 603
-#include "config.h"
-#endif
+#include "../../includes/ghcconfig.h"
 
 #if __GLASGOW_HASKELL__ >= 504
 import System.Console.GetOpt
@@ -51,7 +49,7 @@ import System	( getArgs, getProgName,
 import System.IO
 import Data.List ( isPrefixOf, isSuffixOf, intersperse )
 
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 import Foreign
 
 #if __GLASGOW_HASKELL__ >= 504
@@ -605,7 +603,7 @@ autoBuildGHCiLib dir batch_file ghci_file = do
   let ghci_lib_file  = dir ++ '/':ghci_file
       batch_lib_file = dir ++ '/':batch_file
   hPutStr stderr ("building GHCi library " ++ ghci_lib_file ++ "...")
-#if defined(darwin_TARGET_OS)
+#if defined(darwin_HOST_OS)
   r <- rawSystem "ld" ["-r","-x","-o",ghci_lib_file,"-all_load",batch_lib_file]
 #elif defined(mingw32_HOST_OS)
   execDir <- getExecDir "/bin/ghc-pkg.exe"
@@ -915,7 +913,7 @@ dieOrForce force s
 -----------------------------------------
 --	Cut and pasted from ghc/compiler/SysTools
 
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
 subst a b ls = map (\ x -> if x == a then b else x) ls
 unDosifyPath xs = subst '\\' '/' xs
 
@@ -977,7 +975,7 @@ isPathSeparator ch = ch == pathSeparator || ch == '/'
 -- separator is a slash (@\"\/\"@) on Unix and Macintosh, and a backslash
 -- (@\"\\\"@) on the Windows operating system.
 pathSeparator :: Char
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 pathSeparator = '\\'
 #else
 pathSeparator = '/'

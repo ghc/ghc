@@ -16,8 +16,8 @@
 #include "RtsUtils.h"
 #include "RtsFlags.h"
 
-#ifdef alpha_TARGET_ARCH
-# if defined(linux_TARGET_OS)
+#ifdef alpha_HOST_ARCH
+# if defined(linux_HOST_OS)
 #  include <asm/fpu.h>
 # else
 #  include <machine/fpu.h>
@@ -472,7 +472,7 @@ initDefaultHandlers()
     }
 #endif
 
-#ifdef alpha_TARGET_ARCH
+#ifdef alpha_HOST_ARCH
     ieee_set_fp_control(0);
 #endif
 }

@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.25 2004/10/08 10:16:14 ross Exp $
+# $Id: Makefile,v 1.26 2005/01/28 12:55:51 simonmar Exp $
 #
 
 TOP = ..
@@ -20,11 +20,12 @@ endif
 #
 # Header file built from the configure script's findings
 #
-H_CONFIG = ghcconfig.h
+H_CONFIG   = ghcautoconf.h
+H_PLATFORM = ghcplatform.h
 
 boot :: gmp.h
 
-all :: $(H_CONFIG)
+all :: $(H_CONFIG) $(H_PLATFORM)
 
 # gmp.h is copied from the GMP directory
 gmp.h : $(FPTOOLS_TOP)/ghc/rts/gmp/gmp.h
@@ -37,45 +38,56 @@ gmp.h : $(FPTOOLS_TOP)/ghc/rts/gmp/gmp.h
 
 $(H_CONFIG) : $(FPTOOLS_TOP)/mk/config.h $(FPTOOLS_TOP)/mk/config.mk
 
-$(H_CONFIG) :
-	@echo "Creating $@..."
-	@$(RM) $@
-	@echo "#ifndef __GHCCONFIG_H__"  >$@
-	@echo "#define __GHCCONFIG_H__" >>$@
-	@echo >> $@
-	@echo "#define HostPlatform_TYPE   $(HostPlatform_CPP)" >> $@
-	@echo "#define TargetPlatform_TYPE $(TargetPlatform_CPP)" >> $@
-	@echo "#define BuildPlatform_TYPE  $(BuildPlatform_CPP)" >> $@
-	@echo >> $@
-	@echo "#define $(HostPlatform_CPP)_HOST		1" >> $@
-	@echo "#define $(TargetPlatform_CPP)_TARGET	1" >> $@
-	@echo "#define $(BuildPlatform_CPP)_BUILD  	1" >> $@
-	@echo >> $@
-	@echo "#define $(HostArch_CPP)_HOST_ARCH	1" >> $@
-	@echo "#define $(TargetArch_CPP)_TARGET_ARCH	1" >> $@
-	@echo "#define $(BuildArch_CPP)_BUILD_ARCH  	1" >> $@
-	@echo "#define HOST_ARCH			\"$(HostArch_CPP)\"" >> $@
-	@echo "#define TARGET_ARCH			\"$(TargetArch_CPP)\"" >> $@
-	@echo "#define BUILD_ARCH			\"$(BuildArch_CPP)\"" >> $@
-	@echo >> $@
-	@echo "#define $(HostOS_CPP)_HOST_OS		1" >> $@
-	@echo "#define $(TargetOS_CPP)_TARGET_OS	1" >> $@  
-	@echo "#define $(BuildOS_CPP)_BUILD_OS 		1" >> $@
-	@echo "#define HOST_OS 				\"$(HostOS_CPP)\"" >> $@
-	@echo "#define TARGET_OS			\"$(TargetOS_CPP)\"" >> $@
-	@echo "#define BUILD_OS				\"$(BuildOS_CPP)\"" >> $@
-ifeq "$(HostOS_CPP)" "irix"
-	@echo "#ifndef $(IRIX_MAJOR)_TARGET_OS		 " >> $@  
-	@echo "#define $(IRIX_MAJOR)_TARGET_OS		1" >> $@  
-	@echo "#endif					 " >> $@  
-endif
-	@echo >> $@
-	@echo "#define $(HostVendor_CPP)_HOST_VENDOR	1" >> $@
-	@echo "#define $(TargetVendor_CPP)_TARGET_VENDOR  1" >> $@
-	@echo "#define $(BuildVendor_CPP)_BUILD_VENDOR 	1" >> $@
+$(H_CONFIG) : Makefile
+	@echo "#ifndef __GHCAUTOCONF_H__"  >$@
+	@echo "#define __GHCAUTOCONF_H__" >>$@
 #	Turn '#define PACKAGE_FOO "blah"' into '/* #undef PACKAGE_FOO */'.
 	@sed 's,^\([	 ]*\)#[	 ]*define[	 ][	 ]*\(PACKAGE_[A-Z]*\)[	 ][ 	]*".*".*$$,\1/* #undef \2 */,' $(FPTOOLS_TOP)/mk/config.h >> $@
-	@echo "#endif /* __GHCCONFIG_H__ */"          >> $@
+	@echo "#endif /* __GHCAUTOCONF_H__ */"          >> $@
+	@echo "Done."
+
+$(H_PLATFORM) : Makefile
+	@echo "Creating $@..."
+	@$(RM) $@
+	@echo "#ifndef __GHCPLATFORM_H__"  >$@
+	@echo "#define __GHCPLATFORM_H__" >>$@
+	@echo >> $@
+	@echo "#define BuildPlatform_TYPE  $(HostPlatform_CPP)" >> $@
+	@echo "#define HostPlatform_TYPE   $(TargetPlatform_CPP)" >> $@
+	@echo >> $@
+	@echo "#define $(HostPlatform_CPP)_BUILD  1" >> $@
+	@echo "#define $(TargetPlatform_CPP)_HOST  1" >> $@
+	@echo >> $@
+	@echo "#define $(HostArch_CPP)_BUILD_ARCH  1" >> $@
+	@echo "#define $(TargetArch_CPP)_HOST_ARCH  1" >> $@
+	@echo "#define BUILD_ARCH  \"$(HostArch_CPP)\"" >> $@
+	@echo "#define HOST_ARCH  \"$(TargetArch_CPP)\"" >> $@
+	@echo >> $@
+	@echo "#define $(HostOS_CPP)_BUILD_OS  1" >> $@
+	@echo "#define $(TargetOS_CPP)_HOST_OS  1" >> $@
+	@echo "#define BUILD_OS  \"$(HostOS_CPP)\"" >> $@
+	@echo "#define HOST_OS  \"$(TargetOS_CPP)\"" >> $@
+ifeq "$(HostOS_CPP)" "irix"
+	@echo "#ifndef $(IRIX_MAJOR)_HOST_OS" >> $@  
+	@echo "#define $(IRIX_MAJOR)_HOST_OS  1" >> $@  
+	@echo "#endif" >> $@  
+endif
+	@echo >> $@
+	@echo "#define $(HostVendor_CPP)_BUILD_VENDOR  1" >> $@
+	@echo "#define $(TargetVendor_CPP)_HOST_VENDOR  1" >> $@
+	@echo "#define BUILD_VENDOR  \"$(HostVendor_CPP)\"" >> $@
+	@echo "#define HOST_VENDOR  \"$(TargetVendor_CPP)\"" >> $@
+	@echo >> $@
+	@echo "/* These TARGET macros are for backwards compatibily... DO NOT USE! */" >> $@
+	@echo "#define TargetPlatform_TYPE $(TargetPlatform_CPP)" >> $@
+	@echo "#define $(TargetPlatform_CPP)_TARGET  1" >> $@
+	@echo "#define $(TargetArch_CPP)_TARGET_ARCH  1" >> $@
+	@echo "#define TARGET_ARCH  \"$(TargetArch_CPP)\"" >> $@
+	@echo "#define $(TargetOS_CPP)_TARGET_OS  1" >> $@  
+	@echo "#define TARGET_OS  \"$(TargetOS_CPP)\"" >> $@
+	@echo "#define $(TargetVendor_CPP)_TARGET_VENDOR  1" >> $@
+	@echo >> $@
+	@echo "#endif /* __GHCPLATFORM_H__ */"          >> $@
 	@echo "Done."
 
 # ---------------------------------------------------------------------------

@@ -24,7 +24,7 @@
 #include <unistd.h>
 #endif
 
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 # ifdef HAVE_SYS_TIMES_H
 #  include <sys/times.h>
 # endif
@@ -40,7 +40,7 @@
 # endif
 #endif
 
-#if ! irix_TARGET_OS && ! defined(mingw32_TARGET_OS)
+#if ! irix_HOST_OS && ! defined(mingw32_HOST_OS)
 # if defined(HAVE_SYS_RESOURCE_H)
 #  include <sys/resource.h>
 # endif
@@ -58,7 +58,7 @@
 #include <windows.h>
 #endif
 
-#if defined(PAR) || !(!defined(HAVE_GETRUSAGE) || irix_TARGET_OS || defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS))
+#if defined(PAR) || !(!defined(HAVE_GETRUSAGE) || irix_HOST_OS || defined(mingw32_HOST_OS) || defined(cygwin32_HOST_OS))
 #include <sys/resource.h>
 #endif
 
@@ -127,7 +127,7 @@ static void statsClose( void );
 
 /* elapsedtime() -- The current elapsed time in seconds */
 
-#if defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
+#if defined(mingw32_HOST_OS) || defined(cygwin32_HOST_OS)
 #define HNS_PER_SEC 10000000LL /* FILETIMES are in units of 100ns */
 /* Convert FILETIMEs into secs */
 #define FT2longlong(ll,ft)    \
@@ -137,7 +137,7 @@ static void statsClose( void );
     (ll) /= (unsigned long long) (HNS_PER_SEC / CLOCKS_PER_SEC)
 #endif
 
-#if defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
+#if defined(mingw32_HOST_OS) || defined(cygwin32_HOST_OS)
 /* cygwin32 or mingw32 version */
 static void
 getTimes(void)
@@ -264,7 +264,7 @@ pageFaults(void)
 {
   /* ToDo (on NT): better, get this via the performance data
      that's stored in the registry. */
-# if !defined(HAVE_GETRUSAGE) || irix_TARGET_OS || defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
+# if !defined(HAVE_GETRUSAGE) || irix_HOST_OS || defined(mingw32_HOST_OS) || defined(cygwin32_HOST_OS)
     return 0;
 # else
     struct rusage t;

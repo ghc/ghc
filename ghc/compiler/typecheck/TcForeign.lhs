@@ -17,7 +17,6 @@ module TcForeign
         , tcForeignExports
 	) where
 
-#include "../includes/ghcconfig.h"
 #include "HsVersions.h"
 
 import HsSyn

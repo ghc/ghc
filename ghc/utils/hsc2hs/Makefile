@@ -29,9 +29,6 @@ endif
 # for calling the C preprocessor via GHC has changed a few times, making a
 # clean solution impossible. So we revert to a hack in Main.hs...
 SRC_HC_OPTS      += -Wall
-ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-SRC_HC_OPTS      += -Dmingw32_HOST_OS=1
-endif
 
 ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 INSTALLED_SCRIPT_PROG  = hsc2hs

@@ -375,7 +375,7 @@ main(int argc, char *argv[])
     struct_field(snEntry,sn_obj);
     struct_field(snEntry,addr);
 
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
     struct_size(StgAsyncIOResult);
     struct_field(StgAsyncIOResult, reqID);
     struct_field(StgAsyncIOResult, len);

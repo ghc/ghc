@@ -1,8 +1,4 @@
-#if __GLASGOW_HASKELL__ < 603
-#include "config.h"
-#else
-#include "ghcconfig.h"
-#endif
+#include "../../../includes/ghcconfig.h"
 
 #include "HsFFI.h"
 
@@ -29,7 +25,7 @@ INLINE HsInt __compat_long_path_size() { return PATH_MAX; }
 INLINE HsInt __compat_long_path_size() { return 4096; }
 #endif
 
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
 
 /* Make sure we've got the reqd CSIDL_ constants in scope;
  * w32api header files are lagging a bit in defining the full set.

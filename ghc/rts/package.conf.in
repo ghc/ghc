@@ -16,7 +16,7 @@ import-dirs:
 
 #ifdef INSTALLING
 library-dirs:		LIB_DIR
-# ifdef mingw32_TARGET_OS
+# ifdef mingw32_HOST_OS
 			, LIB_DIR"/gcc-lib"
 			/* force the dist-provided gcc-lib/ into scope. */
 # endif
@@ -36,7 +36,7 @@ extra-libs:		"m"		/* for ldexp() */
 			      , "dl"
 #endif
 #endif
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 			      ,"wsock32"	/* for the linker */
 #endif
 #ifdef WANT_DOTNET_SUPPORT
@@ -53,7 +53,7 @@ extra-libs:		"m"		/* for ldexp() */
 
 #ifdef INSTALLING
 include-dirs:		INCLUDE_DIR
-# ifdef mingw32_TARGET_OS
+# ifdef mingw32_HOST_OS
 			, INCLUDE_DIR"/mingw"
 # endif
 #else /* !INSTALLING */

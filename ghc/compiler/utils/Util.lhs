@@ -53,7 +53,6 @@ module Util (
 	readRational,
     ) where
 
-#include "../includes/ghcconfig.h"
 #include "HsVersions.h"
 
 import Panic		( panic, trace )

@@ -1816,7 +1816,7 @@ waitWritezh_fast
 STRING(stg_delayzh_malloc_str, "delayzh_fast")
 delayzh_fast
 {
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
     W_ ares;
     CInt reqID;
 #else
@@ -1831,7 +1831,7 @@ delayzh_fast
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
     StgTSO_why_blocked(CurrentTSO) = BlockedOnDelay::I16;
 
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 
     /* could probably allocate this on the heap instead */
     "ptr" ares = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
@@ -1878,7 +1878,7 @@ while:
 }
 
 
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 STRING(stg_asyncReadzh_malloc_str, "asyncReadzh_fast")
 asyncReadzh_fast
 {

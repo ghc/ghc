@@ -60,9 +60,6 @@ import Char		( ord )
 import DATA_BITS
 import Maybe		( isNothing )
 
-#include "../includes/ghcconfig.h"
-	-- For WORDS_BIGENDIAN
-
 -------------------------------------------------------------------------
 --
 --	Random small functions

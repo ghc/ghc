@@ -503,7 +503,7 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 
     /* Remove directory from argv[0] -- default files in current directory */
     if ((last_slash = (char *) strrchr(argv[0], 
-#if !defined(mingw32_TARGET_OS)
+#if !defined(mingw32_HOST_OS)
 				       '/')
 #else
 				       '\\')

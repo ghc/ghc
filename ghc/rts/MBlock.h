@@ -14,7 +14,7 @@ extern lnat RTS_VAR(mblocks_allocated);
 extern void * getMBlock(void);
 extern void * getMBlocks(nat n);
 
-#if osf3_TARGET_OS
+#if osf3_HOST_OS
 /* ToDo: Perhaps by adjusting this value we can make linking without
  * -static work (i.e., not generate a core-dumping executable)? */
 #if SIZEOF_VOID_P == 8

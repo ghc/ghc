@@ -24,8 +24,6 @@ module CgProf (
   ) where
 
 #include "HsVersions.h"
-#include "../includes/ghcconfig.h"
-	-- Needed by Constants.h
 #include "../includes/Constants.h"
 	-- For LDV_CREATE_MASK, LDV_STATE_USE
 	-- which are StgWords

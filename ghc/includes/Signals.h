@@ -15,7 +15,7 @@
 #define STG_SIG_HAN  (-4)
 #define STG_SIG_RST  (-5)
 
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
 extern int stg_InstallConsoleEvent(int action, StgStablePtr *handler);
 #else
 extern int stg_sig_install (int, int, StgStablePtr *, void *);

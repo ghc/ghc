@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TailCalls.h,v 1.17 2004/11/21 22:25:24 desrt Exp $
+ * $Id: TailCalls.h,v 1.18 2005/01/28 12:55:54 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -28,7 +28,7 @@ extern void __DISCARD__(void);
    Tail calling on x86
    -------------------------------------------------------------------------- */
 
-#if i386_TARGET_ARCH
+#if i386_HOST_ARCH
 
 /* Note about discard: possibly there to fool GCC into clearing up
    before we do the jump eg. if there are some arguments left on the C
@@ -57,13 +57,13 @@ extern void __DISCARD__(void);
       goto *__target; 	    	    	\
     }
 
-#endif /* i386_TARGET_ARCH */
+#endif /* i386_HOST_ARCH */
 
 /* -----------------------------------------------------------------------------
    Tail calling on x86_64
    -------------------------------------------------------------------------- */
 
-#if x86_64_TARGET_ARCH
+#if x86_64_HOST_ARCH
 
 #define JMP_(cont)			\
     { 					\
@@ -72,13 +72,13 @@ extern void __DISCARD__(void);
       goto *__target; 	    	    	\
     }
 
-#endif /* x86_64_TARGET_ARCH */
+#endif /* x86_64_HOST_ARCH */
 
 /* -----------------------------------------------------------------------------
    Tail calling on Sparc
    -------------------------------------------------------------------------- */
 
-#ifdef sparc_TARGET_ARCH
+#ifdef sparc_HOST_ARCH
 
 #define JMP_(cont)	((F_) (cont))()
 	/* Oh so happily, the above turns into a "call" instruction,
@@ -90,13 +90,13 @@ extern void __DISCARD__(void);
 #define FB_
 #define FE_
 
-#endif /* sparc_TARGET_ARCH */
+#endif /* sparc_HOST_ARCH */
 
 /* -----------------------------------------------------------------------------
    Tail calling on Alpha
    -------------------------------------------------------------------------- */
 
-#ifdef alpha_TARGET_ARCH
+#ifdef alpha_HOST_ARCH
 
 #if IN_STG_CODE
 register void *_procedure __asm__("$27");
@@ -112,7 +112,7 @@ register void *_procedure __asm__("$27");
 #define FB_
 #define FE_
 
-#endif /* alpha_TARGET_ARCH */
+#endif /* alpha_HOST_ARCH */
 
 /* -----------------------------------------------------------------------------
    Tail calling on HP
@@ -173,7 +173,7 @@ but uses $$dyncall if necessary to cope, just in case you aren't.
    Tail calling on PowerPC
    -------------------------------------------------------------------------- */
 
-#ifdef powerpc_TARGET_ARCH
+#ifdef powerpc_HOST_ARCH
 
 #define JMP_(cont)			\
     { 					\
@@ -201,9 +201,9 @@ but uses $$dyncall if necessary to cope, just in case you aren't.
 	#define JMP_(cont)	((F_) (cont))()
 */
 
-#endif /* powerpc_TARGET_ARCH */
+#endif /* powerpc_HOST_ARCH */
 
-#ifdef powerpc64_TARGET_ARCH
+#ifdef powerpc64_HOST_ARCH
 #define JMP_(cont) ((F_) (cont))()
 #endif
 
@@ -211,7 +211,7 @@ but uses $$dyncall if necessary to cope, just in case you aren't.
    Tail calling on IA64
    -------------------------------------------------------------------------- */
 
-#ifdef ia64_TARGET_ARCH
+#ifdef ia64_HOST_ARCH
 
 /* The compiler can more intelligently decide how to do this.  We therefore
  * implement it as a call and optimise to a jump at mangle time. */

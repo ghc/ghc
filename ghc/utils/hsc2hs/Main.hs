@@ -1,7 +1,7 @@
 {-# OPTIONS -fffi -cpp #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.68 2005/01/27 12:38:49 ross Exp $
+-- $Id: Main.hs,v 1.69 2005/01/28 12:56:26 simonmar Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -10,6 +10,10 @@
 -- within structures, etc.
 --
 -- See the documentation in the Users' Guide for more details.
+
+#if defined(__GLASGOW_HASKELL__) && !defined(BUILD_NHC)
+#include "../../includes/ghcconfig.h"
+#endif
 
 #if __GLASGOW_HASKELL__ >= 504 || __NHC__ >= 114 || __HUGS__
 import System.Console.GetOpt

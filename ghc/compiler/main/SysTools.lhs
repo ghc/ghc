@@ -84,8 +84,6 @@ import IO		( try, catch,
 import Directory	( doesFileExist, removeFile )
 import List             ( partition )
 
-#include "../includes/ghcconfig.h"
-
 -- GHC <= 4.08 didn't have rawSystem, and runs into problems with long command
 -- lines on mingw32, so we disallow it now.
 #if __GLASGOW_HASKELL__ < 500

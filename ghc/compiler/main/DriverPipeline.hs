@@ -816,10 +816,12 @@ runPhase cc_phase todo dflags basename suff input_fn get_output_fn maybe_loc
 
 runPhase Mangle todo dflags _basename _suff input_fn get_output_fn maybe_loc
    = do let mangler_opts = getOpts dflags opt_m
-        machdep_opts <- if (prefixMatch "i386" cTARGETPLATFORM)
-			  then do let n_regs = stolen_x86_regs dflags
-			          return [ show n_regs ]
-		          else return []
+
+#if i386_TARGET_ARCH
+        machdep_opts <- return [ show (stolen_x86_regs dflags) ]
+#else
+	machdep_opts <- return []
+#endif
 
 	split <- readIORef v_Split_object_files
 	let next_phase
@@ -1253,8 +1255,12 @@ doCpp dflags raw include_cc_opts input_fn output_fn = do
 	              | otherwise = SysTools.runCc dflags (SysTools.Option "-E" : args)
 
     let target_defs = 
-	  [ "-D" ++ cTARGETOS   ++ "_TARGET_OS=1",
-	    "-D" ++ cTARGETARCH ++ "_TARGET_ARCH=1" ]
+	  [ "-D" ++ HOST_OS     ++ "BUILD_OS=1",
+	    "-D" ++ HOST_ARCH   ++ "BUILD_ARCH=1",
+	    "-D" ++ TARGET_OS   ++ "HOST_OS=1",
+	    "-D" ++ TARGET_ARCH ++ "HOST_ARCH=1" ]
+	-- remember, in code we *compile*, the HOST is the same our TARGET,
+	-- and BUILD is the same as our HOST.
 
     cpp_prog       ([SysTools.Option verb]
 		    ++ map SysTools.Option include_paths

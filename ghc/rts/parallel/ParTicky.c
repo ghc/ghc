@@ -65,7 +65,7 @@ static double start_unpack = 0.0;
 
 void
 par_ticky_Par_start (void) {
-# if !defined(HAVE_GETRUSAGE) || irix_TARGET_OS || defined(_WIN32)
+# if !defined(HAVE_GETRUSAGE) || irix_HOST_OS || defined(_WIN32)
     fprintf(stderr, "|| sorry don't have RUSAGE\n");
     return ;
 # else

@@ -21,7 +21,7 @@ interruptible(StgTSO *t)
   case BlockedOnException:
   case BlockedOnRead:
   case BlockedOnWrite:
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
   case BlockedOnDoProc:
 #endif
   case BlockedOnDelay:

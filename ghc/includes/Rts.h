@@ -34,7 +34,7 @@ extern "C" {
 #endif
 
 /* Fix for mingw stat problem (done here so it's early enough) */
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 #define __MSVCRT__ 1
 #endif
 

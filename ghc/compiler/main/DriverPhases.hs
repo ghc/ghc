@@ -1,13 +1,11 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.32 2005/01/27 10:44:27 simonpj Exp $
+-- $Id: DriverPhases.hs,v 1.33 2005/01/28 12:55:33 simonmar Exp $
 --
 -- GHC Driver
 --
 -- (c) The University of Glasgow 2002
 --
 -----------------------------------------------------------------------------
-
-#include "../includes/ghcconfig.h"
 
 module DriverPhases (
    HscSource(..), isHsBoot, hscSourceString,

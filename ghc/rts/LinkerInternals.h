@@ -39,7 +39,7 @@ typedef
 /* Jump Islands are sniplets of machine code required for relative
  * address relocations on the PowerPC.
  */
-#ifdef powerpc_TARGET_ARCH
+#ifdef powerpc_HOST_ARCH
 typedef struct {
     short lis_r12, hi_addr;
     short ori_r12_r12, lo_addr;
@@ -82,13 +82,13 @@ typedef struct _ObjectCode {
        outside one of these is an error in the linker. */
     ProddableBlock* proddables;
 
-#ifdef ia64_TARGET_ARCH
+#ifdef ia64_HOST_ARCH
     /* Procedure Linkage Table for this object */
     void *plt;
     unsigned int pltIndex;
 #endif
 
-#ifdef powerpc_TARGET_ARCH
+#ifdef powerpc_HOST_ARCH
     ppcJumpIsland   *jump_islands;
     unsigned long   island_start_symbol;
     unsigned long   n_islands;

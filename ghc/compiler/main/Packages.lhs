@@ -34,9 +34,6 @@ module Packages (
     )
 where
 
-#include "../includes/ghcconfig.h"
--- Needed for mingw32_TARGET_OS defn
-
 #include "HsVersions.h"
 
 import PackageConfig	
@@ -44,7 +41,7 @@ import DriverState	( v_Build_tag, v_RTS_Build_tag, v_Static )
 import SysTools		( getTopDir, getPackageConfigPath )
 import ParsePkgConf	( loadPackageConfig )
 import CmdLineOpts	( DynFlags(..), PackageFlag(..), opt_Static )
-import Config		( cTARGETARCH, cTARGETOS, cProjectVersion )
+import Config		( cProjectVersion )
 import Name		( Name, nameModule_maybe )
 import Module		( Module, mkModule )
 import UniqFM
@@ -206,7 +203,7 @@ readPackageConfigs dflags = do
 	-- (GHC >= 6.3).
    appdir <- getAppUserDataDirectory "ghc"
    let 
-     	 pkgconf = appdir ++ '/':cTARGETARCH ++ '-':cTARGETOS
+     	 pkgconf = appdir ++ '/':TARGET_ARCH ++ '-':TARGET_OS
 			++ '-':cProjectVersion ++ "/package.conf"
    --
    exists <- doesFileExist pkgconf

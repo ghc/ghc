@@ -35,7 +35,6 @@ module MachInstrs (
     ) where
 
 #include "HsVersions.h"
-#include "../includes/ghcconfig.h"
 
 import MachRegs
 import Cmm

@@ -18,7 +18,6 @@ module DriverFlags (
   ) where
 
 #include "HsVersions.h"
-#include "../includes/ghcconfig.h"
 
 import MkIface		( showIface )
 import DriverState
@@ -639,7 +638,7 @@ setMainIs arg
 --		       )
 
 machdepCCOpts dflags
-   | prefixMatch "alpha"   cTARGETPLATFORM  
+#if alpha_TARGET_ARCH
 	= return ( ["-w", "-mieee"
 #ifdef HAVE_THREADED_RTS_SUPPORT
 		    , "-D_REENTRANT"
@@ -649,12 +648,12 @@ machdepCCOpts dflags
 	-- register used for global register variable", we simply
 	-- disable all warnings altogether using the -w flag. Oh well.
 
-   | prefixMatch "hppa"    cTARGETPLATFORM  
+#elif hppa_TARGET_ARCH
         -- ___HPUX_SOURCE, not _HPUX_SOURCE, is #defined if -ansi!
         -- (very nice, but too bad the HP /usr/include files don't agree.)
 	= return ( ["-D_HPUX_SOURCE"], [] )
 
-   | prefixMatch "m68k"    cTARGETPLATFORM
+#elif m68k_TARGET_ARCH
       -- -fno-defer-pop : for the .hc files, we want all the pushing/
       --    popping of args to routines to be explicit; if we let things
       --    be deferred 'til after an STGJUMP, imminent death is certain!
@@ -666,7 +665,7 @@ machdepCCOpts dflags
       --     as on iX86, where we *do* steal the frame pointer [%ebp].)
 	= return ( [], ["-fno-defer-pop", "-fno-omit-frame-pointer"] )
 
-   | prefixMatch "i386"    cTARGETPLATFORM  
+#elif i386_TARGET_ARCH
       -- -fno-defer-pop : basically the same game as for m68k
       --
       -- -fomit-frame-pointer : *must* in .hc files; because we're stealing
@@ -692,22 +691,22 @@ machdepCCOpts dflags
 	                "-DSTOLEN_X86_REGS="++show n_regs ]
 		    )
 
-   | prefixMatch "ia64"    cTARGETPLATFORM  
+#elif ia64_TARGET_ARCH
 	= return ( [], ["-fomit-frame-pointer", "-G0"] )
 
-   | prefixMatch "x86_64"  cTARGETPLATFORM
+#elif x86_64_TARGET_ARCH
 	= return ( [], ["-fomit-frame-pointer"] )
 
-   | prefixMatch "mips"    cTARGETPLATFORM
+#elif mips_TARGET_ARCH
 	= return ( ["-static"], [] )
 
-   | prefixMatch "sparc"    cTARGETPLATFORM
+#elif sparc_TARGET_ARCH
 	= return ( [], ["-w"] )
 	-- For now, to suppress the gcc warning "call-clobbered
 	-- register used for global register variable", we simply
 	-- disable all warnings altogether using the -w flag. Oh well.
 
-   | prefixMatch "powerpc-apple-darwin" cTARGETPLATFORM
+#elif powerpc_apple_darwin_TARGET
       -- -no-cpp-precomp:
       --     Disable Apple's precompiling preprocessor. It's a great thing
       --     for "normal" programs, but it doesn't support register variable
@@ -724,11 +723,12 @@ machdepCCOpts dflags
             else return ( ["-no-cpp-precomp", "-mdynamic-no-pic"],
                           ["-mdynamic-no-pic"] )
 
-   | prefixMatch "powerpc" cTARGETPLATFORM && opt_PIC
+#elif powerpc_TARGET_ARCH
+   | opt_PIC
         = return ( ["-fPIC"], ["-fPIC"] )
-  
    | otherwise
 	= return ( [], [] )
+#endif
 
 -----------------------------------------------------------------------------
 -- local utils

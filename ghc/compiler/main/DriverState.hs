@@ -8,7 +8,6 @@
 
 module DriverState where
 
-#include "../includes/ghcconfig.h"
 #include "HsVersions.h"
 
 import CmdLineOpts
@@ -128,14 +127,19 @@ GLOBAL_VAR(v_Split_info,		("",0),		(String,Int))
 
 	
 can_split :: Bool
-can_split =  prefixMatch "i386"    cTARGETPLATFORM
-	  || prefixMatch "alpha"   cTARGETPLATFORM
-	  || prefixMatch "hppa"    cTARGETPLATFORM
-	  || prefixMatch "m68k"    cTARGETPLATFORM
-	  || prefixMatch "mips"    cTARGETPLATFORM
-	  || prefixMatch "powerpc" cTARGETPLATFORM
-	  || prefixMatch "rs6000"  cTARGETPLATFORM
-	  || prefixMatch "sparc"   cTARGETPLATFORM
+can_split =  
+#if    defined(i386_TARGET_ARCH)     \
+    || defined(alpha_TARGET_ARCH)    \
+    || defined(hppa_TARGET_ARCH)     \
+    || defined(m68k_TARGET_ARCH)     \
+    || defined(mips_TARGET_ARCH)     \
+    || defined(powerpc_TARGET_ARCH)  \
+    || defined(rs6000_TARGET_ARCH)   \
+    || defined(sparc_TARGET_ARCH) 
+   True
+#else
+   False
+#endif
 
 -----------------------------------------------------------------------------
 -- Compiler output options

@@ -49,7 +49,7 @@
 # include "LLC.h"
 #endif
 
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
 #include "win32/AsyncIO.h"
 #endif
 
@@ -216,7 +216,7 @@ hs_init(int *argc, char **argv[])
     initDefaultHandlers();
 #endif
  
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
     startupAsyncIO();
 #endif
 
@@ -439,7 +439,7 @@ hs_exit(void)
     if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
 #endif
 
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
     shutdownAsyncIO();
 #endif
 }

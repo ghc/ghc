@@ -12,7 +12,6 @@ module Constants (module Constants) where
 -- be in trouble.
 
 #include "HsVersions.h"
-#include "../includes/ghcconfig.h"
 #include "../includes/MachRegs.h"
 #include "../includes/Constants.h"
 #include "../includes/MachDeps.h"
