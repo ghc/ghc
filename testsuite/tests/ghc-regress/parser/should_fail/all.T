@@ -1,6 +1,6 @@
 
 test('read001', normal, compile_fail, [''])
-test('read002', expect_fail, compile_fail, [''])
+test('read002', normal, compile_fail, [''])
 test('read003', normal, compile_fail, [''])
 test('read004', normal, compile_fail, [''])
 test('read005', normal, compile_fail, [''])
@@ -29,4 +29,3 @@ test('read022', normal, compile_fail, [''])
 test('read023', normal, compile_fail, [''])
 test('read024', normal, compile_fail, [''])
 test('read025', normal, compile_fail, [''])
-test('read026', normal, compile_fail, [''])
