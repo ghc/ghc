@@ -25,7 +25,8 @@ module System.Directory
     , getCurrentDirectory       -- :: IO FilePath
     , setCurrentDirectory       -- :: FilePath -> IO ()
     , getHomeDirectory
-    , getAppUserDataDirectory 
+    , getAppUserDataDirectory
+    , getUserDocumentsDirectory
 
     -- * Actions on files
     , removeFile		-- :: FilePath -> IO ()
@@ -65,6 +66,8 @@ getHomeDirectory = getEnv "HOME"
 getAppUserDataDirectory :: String -> IO FilePath
 getAppUserDataDirectory appName = do path <- getEnv "HOME"
                                      return (path++'/':'.':appName)
+getUserDocumentsDirectory :: IO FilePath
+getUserDocumentsDirectory= getEnv "HOME"
 #elif defined(__HUGS__)
 import Hugs.Directory
 #else
@@ -686,6 +689,37 @@ getAppUserDataDirectory appName = do
   return (path++'/':'.':appName)
 #endif
 
+{- | Returns the current user's document directory.
+
+The directory returned is expected to be writable by the current user,
+but note that it isn't generally considered good practice to store
+application-specific data here; use 'getAppUserDataDirectory'
+instead.
+
+On Unix, 'getUserDocumentsDirectory' returns the value of the @HOME@
+environment variable.  On Windows, the system is queried for a
+suitable path; a typical path might be 
+@C:/Documents and Settings/user/My Documents@.
+
+The operation may fail with:
+
+* 'UnsupportedOperation'
+The operating system has no notion of document directory.
+
+* 'isDoesNotExistError'
+The document directory for the current user does not exist, or
+cannot be found.
+-}
+getUserDocumentsDirectory :: IO FilePath
+getUserDocumentsDirectory = do
+#ifdef mingw32_TARGET_OS
+  allocaBytes long_path_size $ \pPath -> do
+     r <- c_SHGetFolderPath nullPtr csidl_PERSONAL nullPtr 0 pPath
+     peekCString pPath
+#else
+  getEnv "HOME"
+#endif
+
 #ifdef mingw32_TARGET_OS
 foreign import stdcall unsafe "SHGetFolderPath" 
             c_SHGetFolderPath :: Ptr () 
@@ -694,9 +728,10 @@ foreign import stdcall unsafe "SHGetFolderPath"
                               -> CInt 
                               -> CString 
                               -> IO CInt
-foreign import ccall unsafe "__hscore_CSIDL_PROFILE" csidl_PROFILE :: Int
-foreign import ccall unsafe "__hscore_CSIDL_APPDATA" csidl_APPDATA :: Int
-foreign import ccall unsafe "__hscore_CSIDL_WINDOWS" csidl_WINDOWS :: Int
+foreign import ccall unsafe "__hscore_CSIDL_PROFILE"  csidl_PROFILE  :: CInt
+foreign import ccall unsafe "__hscore_CSIDL_APPDATA"  csidl_APPDATA  :: CInt
+foreign import ccall unsafe "__hscore_CSIDL_WINDOWS"  csidl_WINDOWS  :: CInt
+foreign import ccall unsafe "__hscore_CSIDL_PERSONAL" csidl_PERSONAL :: CInt
 #endif
 
 {- |The operation 'doesDirectoryExist' returns 'True' if the argument file

@@ -714,6 +714,7 @@ INLINE int __hscore_fstat(int fd, struct stat *buf) {
 INLINE int __hscore_CSIDL_PROFILE() { return CSIDL_PROFILE; }
 INLINE int __hscore_CSIDL_APPDATA() { return CSIDL_APPDATA; }
 INLINE int __hscore_CSIDL_WINDOWS() { return CSIDL_WINDOWS; }
+INLINE int __hscore_CSIDL_PERSONAL() { return CSIDL_PERSONAL; }
 #endif
 
 #endif /* __HSBASE_H__ */
