@@ -22,8 +22,7 @@ module CoreUtils (
 	exprArity, 
 
 	-- Expr transformation
-	etaReduce, etaExpand,
-	exprArity, exprEtaExpandArity, 
+	etaExpand, exprArity, exprEtaExpandArity, 
 
 	-- Size
 	coreBindsSize,
@@ -41,10 +40,8 @@ module CoreUtils (
 import GlaExts		-- For `xori` 
 
 import CoreSyn
-import CoreFVs		( exprFreeVars )
 import PprCore		( pprCoreExpr )
 import Var		( Var, isId, isTyVar )
-import VarSet
 import VarEnv
 import Name		( hashName )
 import Literal		( hashLiteral, literalType, litIsDupable )
@@ -61,7 +58,7 @@ import NewDemand	( appIsBottom )
 import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe, splitFunTy,
 			  applyTys, isUnLiftedType, seqType, mkUTy, mkTyVarTy,
 			  splitForAllTy_maybe, isForAllTy, splitNewType_maybe, 
-			  splitTyConApp_maybe, eqType
+			  splitTyConApp_maybe, eqType, funResultTy, applyTy
 			)
 import TyCon		( tyConArity )
 import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
@@ -647,48 +644,11 @@ exprIsConApp_maybe expr = analyse (collectArgs expr)
 %*									*
 %************************************************************************
 
-@etaReduce@ trys an eta reduction at the top level of a Core Expr.
-
-e.g.	\ x y -> f x y	===>  f
-
-But we only do this if it gets rid of a whole lambda, not part.
-The idea is that lambdas are often quite helpful: they indicate
-head normal forms, so we don't want to chuck them away lightly.
-
 \begin{code}
-etaReduce :: CoreExpr -> CoreExpr
-		-- ToDo: we should really check that we don't turn a non-bottom
-		-- lambda into a bottom variable.  Sigh
-
-etaReduce expr@(Lam bndr body)
-  = check (reverse binders) body
-  where
-    (binders, body) = collectBinders expr
-
-    check [] body
-	| not (any (`elemVarSet` body_fvs) binders)
-	= body			-- Success!
-	where
-	  body_fvs = exprFreeVars body
-
-    check (b : bs) (App fun arg)
-	|  (varToCoreExpr b `cheapEqExpr` arg)
-	= check bs fun
-
-    check _ _ = expr	-- Bale out
-
-etaReduce expr = expr		-- The common case
-\end{code}
-	
-
-\begin{code}
-exprEtaExpandArity :: CoreExpr -> (Int, Bool) 	
+exprEtaExpandArity :: CoreExpr -> Arity
 -- The Int is number of value args the thing can be 
 -- 	applied to without doing much work
--- The Bool is True iff there are enough explicit value lambdas
---	at the top to make this arity apparent
--- 	(but ignore it when arity==0)
-
+--
 -- This is used when eta expanding
 --	e  ==>  \xy -> e x y
 --
@@ -720,16 +680,7 @@ exprEtaExpandArity :: CoreExpr -> (Int, Bool)
 -- Hence the ABot/ATop in ArityType
 
 
-exprEtaExpandArity e
-  = go 0 e
-  where
-    go :: Int -> CoreExpr -> (Int,Bool)
-    go ar (Lam x e)  | isId x    = go (ar+1) e
-		     | otherwise = go ar e
-    go ar (Note n e) | ok_note n = go ar e
-    go ar other 	     	 = (ar + ar', ar' == 0)
-				 where
-				    ar' = arityDepth (arityType other)
+exprEtaExpandArity e = arityDepth (arityType e)
 
 -- A limited sort of function type
 data ArityType = AFun Bool ArityType	-- True <=> one-shot
@@ -750,9 +701,10 @@ arityType :: CoreExpr -> ArityType
 	-- means expression can be rewritten \x_b1 -> ... \x_bn -> body
 	-- where bi is True <=> the lambda is one-shot
 
-arityType (Note n e)
-  | ok_note n = arityType e
-  | otherwise = ATop
+arityType (Note n e) = arityType e
+--	Not needed any more: etaExpand is cleverer
+--  | ok_note n = arityType e
+--  | otherwise = ATop
 
 arityType (Var v) 
   = mk (idArity v)
@@ -790,6 +742,7 @@ arityType (Let b e) = case arityType e of
 
 arityType other = ATop
 
+{- NOT NEEDED ANY MORE: etaExpand is cleverer
 ok_note InlineMe = False
 ok_note other    = True
     -- Notice that we do not look through __inline_me__
@@ -801,22 +754,34 @@ ok_note other    = True
     -- giving just
     --		f = \x -> e
     -- A Bad Idea
-
+-}
 \end{code}
 
 
 \begin{code}
-etaExpand :: Int	  	-- Add this number of value args
+etaExpand :: Arity	  	-- Result should have this number of value args
 	  -> [Unique]
 	  -> CoreExpr -> Type	-- Expression and its type
 	  -> CoreExpr
 -- (etaExpand n us e ty) returns an expression with 
 -- the same meaning as 'e', but with arity 'n'.  
-
+--
 -- Given e' = etaExpand n us e ty
 -- We should have
 --	ty = exprType e = exprType e'
---
+
+etaExpand n us expr ty
+  | manifestArity expr >= n = expr		-- The no-op case
+  | otherwise 		    = eta_expand n us expr ty
+  where
+
+-- manifestArity sees how many leading value lambdas there are
+manifestArity :: CoreExpr -> Arity
+manifestArity (Lam v e) | isId v    = 1 + manifestArity e
+			| otherwise = manifestArity e
+manifestArity (Note _ e)	    = manifestArity e
+manifestArity e			    = 0
+
 -- etaExpand deals with for-alls. For example:
 --		etaExpand 1 E
 -- where  E :: forall a. a -> a
@@ -826,7 +791,7 @@ etaExpand :: Int	  	-- Add this number of value args
 -- It deals with coerces too, though they are now rare
 -- so perhaps the extra code isn't worth it
 
-etaExpand n us expr ty
+eta_expand n us expr ty
   | n == 0 && 
     -- The ILX code generator requires eta expansion for type arguments
     -- too, but alas the 'n' doesn't tell us how many of them there 
@@ -839,14 +804,29 @@ etaExpand n us expr ty
     -- Saturated, so nothing to do
   = expr
 
-  | otherwise	-- An unsaturated constructor or primop; eta expand it
+	-- Short cut for the case where there already
+	-- is a lambda; no point in gratuitously adding more
+eta_expand n us (Note note@(Coerce _ ty) e) _
+  = Note note (eta_expand n us e ty)
+
+eta_expand n us (Note note e) ty
+  = Note note (eta_expand n us e ty)
+
+eta_expand n us (Lam v body) ty
+  | isTyVar v
+  = Lam v (eta_expand n us body (applyTy ty (mkTyVarTy v)))
+
+  | otherwise
+  = Lam v (eta_expand (n-1) us body (funResultTy ty))
+
+eta_expand n us expr ty
   = case splitForAllTy_maybe ty of { 
- 	  Just (tv,ty') -> Lam tv (etaExpand n us (App expr (Type (mkTyVarTy tv))) ty')
+ 	  Just (tv,ty') -> Lam tv (eta_expand n us (App expr (Type (mkTyVarTy tv))) ty')
 
  	; Nothing ->
   
     	case splitFunTy_maybe ty of {
- 	  Just (arg_ty, res_ty) -> Lam arg1 (etaExpand (n-1) us2 (App expr (Var arg1)) res_ty)
+ 	  Just (arg_ty, res_ty) -> Lam arg1 (eta_expand (n-1) us2 (App expr (Var arg1)) res_ty)
 				where
 				   arg1	      = mkSysLocal SLIT("eta") uniq arg_ty
  				   (uniq:us2) = us
@@ -854,7 +834,7 @@ etaExpand n us expr ty
 	; Nothing ->
 
     	case splitNewType_maybe ty of {
- 	  Just ty' -> mkCoerce ty ty' (etaExpand n us (mkCoerce ty' ty expr) ty') ;
+ 	  Just ty' -> mkCoerce ty ty' (eta_expand n us (mkCoerce ty' ty expr) ty') ;
  	  Nothing  -> pprTrace "Bad eta expand" (ppr expr $$ ppr ty) expr
     	}}}
 \end{code}
@@ -884,7 +864,7 @@ But note that 	(\x y z -> f x y z)
 should have arity 3, regardless of f's arity.
 
 \begin{code}
-exprArity :: CoreExpr -> Int
+exprArity :: CoreExpr -> Arity
 exprArity e = go e
 	    where
 	      go (Var v) 	       	   = idArity v

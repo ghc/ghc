@@ -10,7 +10,7 @@ module CorePrep (
 
 #include "HsVersions.h"
 
-import CoreUtils( exprIsAtom, exprType, exprIsValue, etaExpand, exprOkForSpeculation )
+import CoreUtils( exprIsAtom, exprType, exprIsValue, etaExpand, exprArity, exprOkForSpeculation )
 import CoreFVs	( exprFreeVars )
 import CoreLint	( endPass )
 import CoreSyn
@@ -26,7 +26,6 @@ import Id	( mkSysLocal, idType, idNewDemandInfo, idArity,
 		  setIdType, isPrimOpId_maybe, isFCallId, isLocalId, 
 		  hasNoBinding, idNewStrictness
 		)
-import BasicTypes( TopLevelFlag(..), isNotTopLevel )
 import HscTypes ( ModDetails(..) )
 import UniqSupply
 import Maybes
@@ -107,14 +106,18 @@ data FloatingBind = FloatLet CoreBind
 		  | FloatCase Id CoreExpr Bool
 			-- The bool indicates "ok-for-speculation"
 
+instance Outputable FloatingBind where
+  ppr (FloatLet bind)        = text "FloatLet" <+> ppr bind
+  ppr (FloatCase b rhs spec) = text "FloatCase" <+> ppr b <+> ppr spec <+> equals <+> ppr rhs
+
 type CloneEnv = IdEnv Id	-- Clone local Ids
 
-allLazy :: TopLevelFlag -> OrdList FloatingBind -> Bool
-allLazy top_lvl floats 
+allLazy :: OrdList FloatingBind -> Bool
+allLazy floats 
   = foldrOL check True floats
   where
     check (FloatLet _)  	      y = y
-    check (FloatCase _ _ ok_for_spec) y = isNotTopLevel top_lvl && ok_for_spec && y
+    check (FloatCase _ _ ok_for_spec) y = ok_for_spec && y
 	-- The ok-for-speculation flag says that it's safe to
 	-- float this Case out of a let, and thereby do it more eagerly
 	-- We need the top-level flag because it's never ok to float
@@ -128,15 +131,45 @@ corePrepTopBinds :: CloneEnv -> [CoreBind] -> UniqSM [CoreBind]
 corePrepTopBinds env [] = returnUs []
 
 corePrepTopBinds env (bind : binds)
-  = corePrepBind TopLevel env bind	`thenUs` \ (env', floats) ->
-    ASSERT( allLazy TopLevel floats )
+  = corePrepTopBind env bind		`thenUs` \ (env', bind') ->
     corePrepTopBinds env' binds		`thenUs` \ binds' ->
-    returnUs (foldrOL add binds' floats)
+    returnUs (bind' : binds')
+
+-- From top level bindings we don't get any floats
+-- (a) it isn't necessary because the mkAtomicArgs in Simplify
+--	has already done all the floating necessary
+-- (b) floating would give rise to top-level LocaIds, generated
+-- 	by CorePrep.newVar.  That breaks the invariant that
+--	after CorePrep all top-level vars are GlobalIds
+
+corePrepTopBind :: CloneEnv -> CoreBind -> UniqSM (CloneEnv, CoreBind)
+corePrepTopBind env (NonRec bndr rhs) 
+  = corePrepRhs env (bndr, rhs)		`thenUs` \ rhs' ->
+    cloneBndr env bndr			`thenUs` \ (env', bndr') ->
+    returnUs (env', NonRec bndr' rhs')
+
+corePrepTopBind env (Rec pairs)
+  = corePrepRecPairs env pairs		`thenUs` \ (env', pairs') ->
+    returnUs (env, Rec pairs')
+
+corePrepRecPairs env pairs
+  = cloneBndrs env bndrs		`thenUs` \ (env', bndrs') ->
+    mapUs (corePrepRhs env') pairs	`thenUs` \ rhss' ->
+    returnUs (env', bndrs' `zip` rhss')
   where
-    add (FloatLet bind) binds = bind : binds
+    bndrs = map fst pairs
+
+corePrepRhs :: CloneEnv -> (Id, CoreExpr) -> UniqSM CoreExpr
+corePrepRhs env (bndr, rhs)
+-- Prepare the RHS and eta expand it. 
+-- No nonsense about floating
+  = corePrepAnExpr env rhs	`thenUs` \ rhs' ->
+    getUniquesUs		`thenUs` \ us ->
+    returnUs (etaExpand (exprArity rhs') us rhs' (idType bndr))
 
 
-corePrepBind :: TopLevelFlag -> CloneEnv -> CoreBind -> UniqSM (CloneEnv, OrdList FloatingBind)
+corePrepBind ::  CloneEnv -> CoreBind -> UniqSM (CloneEnv, OrdList FloatingBind)
+-- This one is used for *local* bindings
 -- We return a *list* of bindings, because we may start with
 --	x* = f (g y)
 -- where x is demanded, in which case we want to finish with
@@ -144,21 +177,17 @@ corePrepBind :: TopLevelFlag -> CloneEnv -> CoreBind -> UniqSM (CloneEnv, OrdLis
 --	x* = f a
 -- And then x will actually end up case-bound
 
-corePrepBind top_lvl env (NonRec bndr rhs)
+corePrepBind env (NonRec bndr rhs)
   = corePrepExprFloat env rhs				`thenUs` \ (floats, rhs') ->
     cloneBndr env bndr					`thenUs` \ (env', bndr') ->
-    mkNonRec top_lvl bndr' (bdrDem bndr') floats rhs'	`thenUs` \ floats' ->
+    mkLocalNonRec bndr' (bdrDem bndr') floats rhs'	`thenUs` \ floats' ->
     returnUs (env', floats')
 
-corePrepBind top_lvl env (Rec pairs)
+corePrepBind env (Rec pairs)
 	-- Don't bother to try to float bindings out of RHSs
 	-- (compare mkNonRec, which does try)
-  = cloneBndrs env bndrs			`thenUs` \ (env', bndrs') ->
-    mapUs (corePrepAnExpr env') rhss		`thenUs` \ rhss' ->
-    returnUs (env', unitOL (FloatLet (Rec (bndrs' `zip` rhss'))))
-  where
-    (bndrs, rhss) = unzip pairs
-
+  = corePrepRecPairs env pairs			`thenUs` \ (env', pairs') ->
+    returnUs (env', unitOL (FloatLet (Rec pairs')))
 
 -- ---------------------------------------------------------------------------
 -- Making arguments atomic (function args & constructor args)
@@ -171,8 +200,8 @@ corePrepArg env arg dem
   = corePrepExprFloat env arg		`thenUs` \ (floats, arg') ->
     if needs_binding arg'
 	then returnUs (floats, arg')
-	else newVar (exprType arg')			`thenUs` \ v ->
-	     mkNonRec NotTopLevel v dem floats arg'	`thenUs` \ floats' -> 
+	else newVar (exprType arg')		`thenUs` \ v ->
+	     mkLocalNonRec v dem floats arg'	`thenUs` \ floats' -> 
 	     returnUs (floats', Var v)
 
 needs_binding | opt_RuntimeTypes = exprIsAtom
@@ -222,8 +251,8 @@ corePrepExprFloat env expr@(Lit lit)
   = returnUs (nilOL, expr)
 
 corePrepExprFloat env (Let bind body)
-  = corePrepBind NotTopLevel env bind		`thenUs` \ (env', new_binds) ->
-    corePrepExprFloat env' body			`thenUs` \ (floats, new_body) ->
+  = corePrepBind env bind		`thenUs` \ (env', new_binds) ->
+    corePrepExprFloat env' body		`thenUs` \ (floats, new_body) ->
     returnUs (new_binds `appOL` floats, new_body)
 
 corePrepExprFloat env (Note n@(SCC _) expr)
@@ -325,9 +354,9 @@ corePrepExprFloat env expr@(App _ _)
 
 	-- non-variable fun, better let-bind it
     collect_args fun depth
-	= corePrepExprFloat env fun				`thenUs` \ (fun_floats, fun) ->
-	  newVar ty				 		`thenUs` \ fn_id ->
-          mkNonRec NotTopLevel fn_id onceDem fun_floats fun	`thenUs` \ floats ->
+	= corePrepExprFloat env fun			`thenUs` \ (fun_floats, fun) ->
+	  newVar ty			 		`thenUs` \ fn_id ->
+          mkLocalNonRec fn_id onceDem fun_floats fun	`thenUs` \ floats ->
 	  returnUs (Var fn_id, (Var fn_id, depth), ty, floats, [])
         where
 	  ty = exprType fun
@@ -346,24 +375,24 @@ corePrepExprFloat env expr@(App _ _)
 maybeSaturate :: Id -> CoreExpr -> Int -> Type -> UniqSM CoreExpr
 maybeSaturate fn expr n_args ty
   | hasNoBinding fn = saturate_it
-  | otherwise     = returnUs expr
+  | otherwise       = returnUs expr
   where
     fn_arity	 = idArity fn
     excess_arity = fn_arity - n_args
-    saturate_it  = getUs 	`thenUs` \ us ->
-		   returnUs (etaExpand excess_arity (uniqsFromSupply us) expr ty)
+    saturate_it  = getUniquesUs 		`thenUs` \ us ->
+		   returnUs (etaExpand excess_arity us expr ty)
 
 -- ---------------------------------------------------------------------------
 -- Precipitating the floating bindings
 -- ---------------------------------------------------------------------------
 
--- mkNonRec is used for both top level and local bindings
-mkNonRec :: TopLevelFlag
-	 -> Id  -> RhsDemand 			-- Lhs: id with demand
-	 -> OrdList FloatingBind -> CoreExpr	-- Rhs: let binds in body
-	 -> UniqSM (OrdList FloatingBind)
-mkNonRec top_lvl bndr dem floats rhs
-  | exprIsValue rhs && allLazy top_lvl floats		-- Notably constructor applications
+-- mkLocalNonRec is used only for local bindings
+mkLocalNonRec :: Id  -> RhsDemand 			-- Lhs: id with demand
+	      -> OrdList FloatingBind -> CoreExpr	-- Rhs: let binds in body
+	      -> UniqSM (OrdList FloatingBind)
+
+mkLocalNonRec bndr dem floats rhs
+  | exprIsValue rhs && allLazy floats 		-- Notably constructor applications
   = 	-- Why the test for allLazy? You might think that the only 
 	-- floats we can get out of a value are eta expansions 
 	-- e.g.  C $wJust ==> let s = \x -> $wJust x in C s
@@ -385,7 +414,19 @@ mkNonRec top_lvl bndr dem floats rhs
 	--	v = f (x `divInt#` y)
 	-- we don't want to float the case, even if f has arity 2,
 	-- because floating the case would make it evaluated too early
-    returnUs (floats `snocOL` FloatLet (NonRec bndr rhs))
+	--
+	-- Finally, eta-expand the RHS, for the benefit of the code gen
+	-- NB: we could refrain when the RHS is trivial (which can happen
+	--     for exported things.  This would reduce the amount of code
+	--     generated (a little) and make things a little words for
+	--     code compiled without -O.  The case in point is data constructor
+	--     wrappers.
+	--
+    getUniquesUs		`thenUs` \ us ->
+    let
+	rhs' = etaExpand (exprArity rhs) us rhs bndr_ty
+    in
+    returnUs (floats `snocOL` FloatLet (NonRec bndr rhs'))
     
   |  isUnLiftedType bndr_rep_ty	|| isStrict dem 
 	-- It's a strict let, or the binder is unlifted,
@@ -394,12 +435,13 @@ mkNonRec top_lvl bndr dem floats rhs
     returnUs (floats `snocOL` FloatCase bndr rhs (exprOkForSpeculation rhs))
 
   | otherwise
-	-- Don't float
+	-- Don't float; the RHS isn't a value
   = mkBinds floats rhs	`thenUs` \ rhs' ->
     returnUs (unitOL (FloatLet (NonRec bndr rhs')))
 
   where
-    bndr_rep_ty  = repType (idType bndr)
+    bndr_ty	 = idType bndr
+    bndr_rep_ty  = repType bndr_ty
 
 mkBinds :: OrdList FloatingBind -> CoreExpr -> UniqSM CoreExpr
 mkBinds binds body 

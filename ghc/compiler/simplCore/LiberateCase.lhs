@@ -14,7 +14,6 @@ import CoreSyn
 import CoreUnfold	( couldBeSmallEnoughToInline )
 import Var		( Id )
 import VarEnv
-import UniqFM		( ufmToList )
 import Outputable
 \end{code}
 

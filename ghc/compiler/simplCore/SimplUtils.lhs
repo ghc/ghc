@@ -6,7 +6,6 @@
 \begin{code}
 module SimplUtils (
 	simplBinder, simplBinders, simplRecIds, simplLetId, simplLamBinders,
-	tryEtaExpansion,
 	newId, mkLam, mkCase,
 
 	-- The continuation type
@@ -551,6 +550,8 @@ tryEtaReduce bndrs body
     go _        _			     = Nothing		-- Failure!
 
     ok_fun fun   = not (fun `elem` bndrs) && not (hasNoBinding fun)
+			-- Note the awkward "hasNoBinding" test
+			-- Details with exprIsTrivial
     ok_arg b arg = varToCoreExpr b `cheapEqExpr` arg
 \end{code}
 
@@ -579,14 +580,10 @@ actually computing the expansion.
 tryEtaExpansion :: OutExpr -> SimplM OutExpr
 -- There is at least one runtime binder in the binders
 tryEtaExpansion body
-  | arity_is_manifest		-- Some lambdas but not enough
-  = returnSmpl body
-
-  | otherwise
   = getUniquesSmpl 			`thenSmpl` \ us ->
     returnSmpl (etaExpand fun_arity us body (exprType body))
   where
-    (fun_arity, arity_is_manifest) = exprEtaExpandArity body
+    fun_arity = exprEtaExpandArity body
 \end{code}
 
 
