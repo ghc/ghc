@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.36 2002/12/11 15:36:26 simonmar Exp $
+% $Id: CgMonad.lhs,v 1.37 2003/01/07 14:31:20 simonmar Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -205,6 +205,14 @@ type StackUsage =
 	 [(Int,Slot)],     -- free:    List of free slots, in increasing order
 	 Int,		   -- realSp:  Virtual offset of real stack pointer
 	 Int)		   -- hwSp:    Highest value ever taken by virtSp
+
+-- ToDo (SDM, 7 Jan 2003): I'm not sure that the distinction between
+-- Free and NonPointer in the free list is needed any more.  It used
+-- to be needed because we constructed bitmaps from the free list, but
+-- now we construct bitmaps by finding all the live pointer bindings
+-- instead.  Non-pointer stack slots (i.e. saved cost centres) can
+-- just be removed from the free list instead of being recorded as a
+-- NonPointer.
 
 type HeapUsage =
 	(HeapOffset,	-- virtHp: Virtual offset of highest-allocated word

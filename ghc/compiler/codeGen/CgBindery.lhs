@@ -435,17 +435,9 @@ There are four kinds of things on the stack:
 	- free slots (recorded in the stack free list)
 	- non-pointer data slots (recorded in the stack free list)
 
-We build up a bitmap of non-pointer slots by looking down the
-environment for all the non-pointer variables, and merging this with
-the slots recorded in the stack free list.
-
-There's a bit of a hack here to do with update frames: since nothing
-is recorded in either the environment or the stack free list for an
-update frame, the code below defaults to assuming the slots taken up
-by an update frame contain pointers.  Furthermore, update frames are
-always in slots 0-2 at the bottom of the stack.  The bitmap will
-therefore end at slot 3, which is what we want (the update frame info
-pointer has its own bitmap to describe the update frame).
+We build up a bitmap of non-pointer slots by searching the environment
+for all the pointer variables, and subtracting these from a bitmap
+with initially all bits set (up to the size of the stack frame).
 
 \begin{code}
 buildLivenessMask 
