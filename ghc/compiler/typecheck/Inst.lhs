@@ -353,7 +353,13 @@ newOverloadedLit :: InstOrigin
 		 -> HsOverLit
 		 -> TcType
 		 -> TcM TcExpr
-newOverloadedLit orig lit@(HsIntegral i fi) expected_ty
+newOverloadedLit orig lit expected_ty
+  = zapToType expected_ty	`thenM_` 
+	-- The expected type might be a 'hole' type variable, 
+	-- in which case we must zap it to an ordinary type variable
+    new_over_lit orig lit expected_ty
+
+new_over_lit orig lit@(HsIntegral i fi) expected_ty
   | fi /= fromIntegerName	-- Do not generate a LitInst for rebindable
 				-- syntax.  Reason: tcSyntaxName does unification
 				-- which is very inconvenient in tcSimplify
@@ -366,7 +372,7 @@ newOverloadedLit orig lit@(HsIntegral i fi) expected_ty
   | otherwise
   = newLitInst orig lit expected_ty
 
-newOverloadedLit orig lit@(HsFractional r fr) expected_ty
+new_over_lit orig lit@(HsFractional r fr) expected_ty
   | fr /= fromRationalName	-- c.f. HsIntegral case
   = tcSyntaxName orig expected_ty fromRationalName fr	`thenM` \ (expr, _) ->
     mkRatLit r						`thenM` \ rat_lit ->
@@ -381,9 +387,6 @@ newOverloadedLit orig lit@(HsFractional r fr) expected_ty
 newLitInst orig lit expected_ty
   = getInstLoc orig		`thenM` \ loc ->
     newUnique			`thenM` \ new_uniq ->
-    zapToType expected_ty	`thenM_` 
-	-- The expected type might be a 'hole' type variable, 
-	-- in which case we must zap it to an ordinary type variable
     let
 	lit_inst = LitInst lit_id lit expected_ty loc
 	lit_id   = mkSysLocal FSLIT("lit") new_uniq expected_ty
