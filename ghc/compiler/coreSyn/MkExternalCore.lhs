@@ -38,7 +38,7 @@ emitExternalCore :: DynFlags -> ModGuts -> IO ()
 emitExternalCore dflags mod_impl
  | opt_EmitExternalCore 
  = (do handle <- openFile corename WriteMode
-       hPutStr handle (show (mkExternalCore mod_impl))      
+       hPutStrLn handle (show (mkExternalCore mod_impl))      
        hClose handle)
    `catch` (\err -> pprPanic "Failed to open or write external core output file" 
 	                     (text corename))
