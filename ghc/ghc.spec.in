@@ -26,7 +26,7 @@ URL: http://haskell.org/ghc/
 BuildRoot: /var/tmp/ghc-%{version}-%{release}-root
 Requires: gmp-devel
 Provides: haskell
-BuildRequires: happy >= 1.13, ghc >= 4.08, docbook-utils
+BuildRequires: happy >= 1.13, ghc >= 4.08, haddock, docbook-utils
 
 %description
 Haskell is the standard purely functional programming language; the
@@ -130,28 +130,17 @@ END
 %build
 ./configure --prefix=%{prefix}
 make boot
-make -C glafp-utils sgmlverb
-make all
-make -C docs ps html
-make -C ghc/docs ps html
-
+make all ps html
+ 
 %install
-# compress the non-html docs
-#
-for j in docs ghc/docs; do
-  dir=`pwd`
-  cd $j
-  for i in ps dvi sgml verb idx; do
-    find . -name '*.'$i -exec gzip -9 '{}' ';' -print
-  done
-  cd $dir
-done
 rm -rf $RPM_BUILD_ROOT
 
 # FIXME: this is necessary due to brokenness in ghc-5.00/mk/target.mk
 make prefix=$RPM_BUILD_ROOT%{prefix} install-dirs
 
 make prefix=$RPM_BUILD_ROOT%{prefix} install
+
+make prefix=$RPM_BUILD_ROOT%{prefix} datadir=$RPM_BUILD_ROOT%{prefix}/share/doc/%{version} SGMLDocWays="html ps" install-docs
 
 # generate the file list for lib/ _excluding_ all files needed for profiling
 # only
@@ -183,5 +172,4 @@ rm -rf $RPM_BUILD_ROOT
 %files prof -f rpm-prof-lib-files
 
 %files doc
-%doc docs/
-%doc ghc/docs/
+%doc %{prefix}/share/doc/ghc-%{version}
