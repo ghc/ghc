@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.26 2001/07/23 20:19:53 sof Exp $
+-- $Id: DriverUtil.hs,v 1.27 2001/08/16 11:06:10 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -61,7 +61,7 @@ optionRegex = mkRegex "\\{-#[ \t]+OPTIONS[ \t]+(.*)#-\\}"   -- -}
 
 softGetDirectoryContents d
    = IO.catch (getDirectoryContents d)
-	  (\_ -> do hPutStr stderr 
+	  (\_ -> do hPutStrLn stderr 
 		          ("WARNING: error while reading directory " ++ d)
 		    return []
 	  )
