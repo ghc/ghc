@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.10 2002/04/12 03:52:31 sof Exp $
+# $Id: package.mk,v 1.11 2002/06/20 16:03:19 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -68,23 +68,21 @@ endif
 
 # The interface files are put inside the $(libdir), since they
 # might (potentially) be platform specific..
-#
-# override is used here because for binary distributions, datadir is
-# set on the command line. sigh.
-override datadir:=$(libdir)/imports/$(PACKAGE)
+
+ifacedir = $(libdir)/imports/$(PACKAGE)
 
 # If the lib consists of a hierachy of modules, we must retain the directory
 # structure when we install the interfaces.
 ifeq "$(HIERARCHICAL_LIB)" "YES"
-INSTALL_DATAS_WITH_DIRS += $(HS_IFACES)
+INSTALL_IFACES_WITH_DIRS += $(HS_IFACES)
 ifneq "$(ALL_DIRS)" ""
 install ::
 	@for i in $(ALL_DIRS); do \
-		$(INSTALL_DIR) $(datadir)/$$i; \
+		$(INSTALL_DIR) $(ifacedir)/$$i; \
 	done
 endif
 else
-INSTALL_DATAS += $(HS_IFACES)
+INSTALL_IFACES += $(HS_IFACES)
 endif
 
 # -----------------------------------------------------------------------------
@@ -133,5 +131,36 @@ $(GHCI_LIBRARY) : $(LIBOBJS)
 endif # DONT_WANT_STD_GHCI_LIB_RULE
 endif # GhcWithInterpreter
 endif # way
+
+# -----------------------------------------------------------------------------
+# Doc building with Haddock
+
+HS_PPS = $(addsuffix .raw-hs, $(basename $(filter-out $(EXCLUDED_HADDOCK_SRCS), $(HS_SRCS))))
+
+HTML_DIR = html
+HTML_DOC = $(HTML_DIR)/index.html
+
+ifneq "$(HS_PPS)" ""
+html :: $(HTML_DOC)
+
+$(HTML_DOC) : $(HS_PPS) $(HADDOCK_INPLACE)
+	@$(INSTALL_DIR) $(HTML_DIR)
+	$(HADDOCK_INPLACE) $(HADDOCK_OPTS) -h -o $(HTML_DIR) $(HS_PPS)
+
+%.raw-hs : %.lhs
+	$(GHC) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
+
+%.raw-hs : %.hs
+	$(GHC) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
+
+install-docs :: $(HTML_DOC)
+	@$(INSTALL_DIR) $(datadir)/html/$(PACKAGE)
+	@for i in $(HTML_DIR)/*; do \
+	   $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir)/html/$(PACKAGE); \
+	done
+
+endif # HS_PPS
+
+# -----------------------------------------------------------------------------
 
 endif # $(LIBRARY) /= ""
