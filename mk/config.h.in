@@ -144,6 +144,9 @@
 /* Define if you have the vfork function.  */
 #undef HAVE_VFORK
 
+/* Define if you have the <bfd.h> header file.  */
+#undef HAVE_BFD_H
+
 /* Define if you have the <dirent.h> header file.  */
 #undef HAVE_DIRENT_H
 
@@ -251,3 +254,9 @@
 
 /* Define if you have the <vfork.h> header file.  */
 #undef HAVE_VFORK_H
+
+/* Define if you have the bfd library (-lbfd).  */
+#undef HAVE_LIBBFD
+
+/* Define if you have the iberty library (-liberty).  */
+#undef HAVE_LIBIBERTY
