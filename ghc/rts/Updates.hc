@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.18 1999/07/06 16:40:28 sewardj Exp $
+ * $Id: Updates.hc,v 1.19 1999/09/14 12:16:36 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -52,11 +52,14 @@
 	{								\
           StgClosure *updatee;						\
 	  FB_								\
-	  /* tick - ToDo: check this is right */			\
-	  TICK_UPD_EXISTING();						\
 									\
           updatee = ((StgUpdateFrame *)Sp)->updatee;			\
-						\
+									\
+	  /* Tick - it must be a con, all the paps are handled		\
+	   * in stg_upd_PAP and PAP_entry below				\
+	   */								\
+	  TICK_UPD_CON_IN_NEW(sizeW_fromITBL(get_itbl(updatee)));	\
+									\
 	  /* update the updatee with an indirection to the return value */\
 	  UPD_IND(updatee,R1.p);					\
 									\
@@ -70,31 +73,7 @@
 	  FE_								\
 	}
 
-//UPD_FRAME_ENTRY_TEMPLATE(Upd_frame_entry,ENTRY_CODE(Sp[0]));
-        STGFUN(Upd_frame_entry);							
-	STGFUN(Upd_frame_entry)							
-	{								
-          StgClosure *updatee;						
-	  FB_								
-	  /* tick - ToDo: check this is right */			
-	  TICK_UPD_EXISTING();						
-									
-          updatee = ((StgUpdateFrame *)Sp)->updatee;			
-						
-	  /* update the updatee with an indirection to the return value */
-	  UPD_IND(updatee,R1.p);					
-									
-	  /* reset Su to the next update frame */			
-	  Su = ((StgUpdateFrame *)Sp)->link;				
-									
-	  /* remove the update frame from the stack */			
-	  Sp += sizeofW(StgUpdateFrame);				
-									
-	  JMP_(ENTRY_CODE(Sp[0]));							
-	  FE_								
-	}
-
-
+UPD_FRAME_ENTRY_TEMPLATE(Upd_frame_entry,ENTRY_CODE(Sp[0]));
 UPD_FRAME_ENTRY_TEMPLATE(Upd_frame_0_entry,RET_VEC(Sp[0],0));
 UPD_FRAME_ENTRY_TEMPLATE(Upd_frame_1_entry,RET_VEC(Sp[0],1));
 UPD_FRAME_ENTRY_TEMPLATE(Upd_frame_2_entry,RET_VEC(Sp[0],2));

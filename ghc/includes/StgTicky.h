@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: StgTicky.h,v 1.5 1999/06/24 13:10:31 simonmar Exp $
+ * $Id: StgTicky.h,v 1.6 1999/09/14 12:16:39 simonmar Exp $
  *
  * (c) The AQUA project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -239,11 +239,10 @@ extern struct ent_counter *ticky_entry_ctrs;
    
    Macro				Where
    -----------------------  	--------------------------------------------
-   TICK_UPD_EXISTING		Updating with an indirection to something
-   				already in the heap
    TICK_UPD_SQUEEZED		Same as UPD_EXISTING but because
    				of stack-squeezing
    TICK_UPD_CON_IN_NEW		Allocating a new CON
+   TICK_UPD_CON_IN_PLACE	Updating with a PAP in place
    TICK_UPD_PAP_IN_NEW		Allocating a new PAP
    TICK_UPD_PAP_IN_PLACE	Updating with a PAP in place
 
@@ -254,11 +253,13 @@ extern struct ent_counter *ticky_entry_ctrs;
 	  __idx = (n);						 \
 	 UPD_##categ##_hst[((__idx > 8) ? 8 : __idx)] += 1;} 
 
-#define TICK_UPD_EXISTING()		UPD_EXISTING_ctr++
 #define TICK_UPD_SQUEEZED()		UPD_SQUEEZED_ctr++
 
 #define TICK_UPD_CON_IN_NEW(n)		UPD_CON_IN_NEW_ctr++ ; \
 					TICK_UPD_HISTO(CON_IN_NEW,n)
+
+#define TICK_UPD_CON_IN_PLACE(n)	UPD_CON_IN_PLACE_ctr++; \
+					TICK_UPD_HISTO(CON_IN_PLACE,n)
 
 #define TICK_UPD_PAP_IN_NEW(n)		UPD_PAP_IN_NEW_ctr++ ; \
 					TICK_UPD_HISTO(PAP_IN_NEW,n)
@@ -495,13 +496,18 @@ EXTERN unsigned long CATCHF_PUSHED_ctr INIT(0);
 EXTERN unsigned long UPDF_RCC_PUSHED_ctr INIT(0);
 EXTERN unsigned long UPDF_RCC_OMITTED_ctr INIT(0);
 
-EXTERN unsigned long UPD_EXISTING_ctr INIT(0);
 EXTERN unsigned long UPD_SQUEEZED_ctr INIT(0);
 EXTERN unsigned long UPD_CON_IN_NEW_ctr INIT(0);
+EXTERN unsigned long UPD_CON_IN_PLACE_ctr INIT(0);
 EXTERN unsigned long UPD_PAP_IN_NEW_ctr INIT(0);
 EXTERN unsigned long UPD_PAP_IN_PLACE_ctr INIT(0);
 
 EXTERN unsigned long UPD_CON_IN_NEW_hst[9]
+#ifdef TICKY_C
+   = {0,0,0,0,0,0,0,0,0}
+#endif
+;
+EXTERN unsigned long UPD_CON_IN_PLACE_hst[9]
 #ifdef TICKY_C
    = {0,0,0,0,0,0,0,0,0}
 #endif
@@ -583,9 +589,9 @@ EXTERN unsigned long GC_WORDS_COPIED_ctr INIT(0);
 #define TICK_UPDF_RCC_PUSHED()
 #define TICK_UPDF_RCC_OMITTED()
 
-#define TICK_UPD_EXISTING()
 #define TICK_UPD_SQUEEZED()
 #define TICK_UPD_CON_IN_NEW(n)
+#define TICK_UPD_CON_IN_PLACE(n)
 #define TICK_UPD_PAP_IN_NEW(n)
 #define TICK_UPD_PAP_IN_PLACE()
 

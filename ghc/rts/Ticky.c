@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Ticky.c,v 1.8 1999/06/24 13:10:32 simonmar Exp $
+ * $Id: Ticky.c,v 1.9 1999/09/14 12:16:36 simonmar Exp $
  *
  * (c) The AQUA project, Glasgow University, 1992-1997
  * (c) The GHC Team, 1998-1999
@@ -81,9 +81,10 @@ PrintTickyInfo(void)
 
   unsigned long tot_returns_of_new = RET_NEW_ctr;
 
+  unsigned long con_updates = UPD_CON_IN_NEW_ctr + UPD_CON_IN_PLACE_ctr;
   unsigned long pap_updates = UPD_PAP_IN_NEW_ctr + UPD_PAP_IN_PLACE_ctr;
 
-  unsigned long tot_updates = UPD_EXISTING_ctr + UPD_SQUEEZED_ctr + pap_updates;
+  unsigned long tot_updates = UPD_SQUEEZED_ctr + pap_updates + con_updates;
 
   unsigned long tot_new_updates   = UPD_NEW_IND_ctr + UPD_NEW_PERM_IND_ctr;
   unsigned long tot_old_updates   = UPD_OLD_IND_ctr + UPD_OLD_PERM_IND_ctr;
@@ -241,30 +242,33 @@ PrintTickyInfo(void)
 	UPDF_RCC_OMITTED_ctr);
 
   fprintf(tf,"\nUPDATES: %ld\n", tot_updates);
-  fprintf(tf,"%7ld (%5.1f%%) data values\n",
-	UPD_CON_IN_NEW_ctr,
-	PC(INTAVG(UPD_CON_IN_NEW_ctr,tot_updates)));
+  fprintf(tf,"%7ld (%5.1f%%) data values\n\t\t  [%ld in place, %ld allocated new space]\n",
+	con_updates,
+	PC(INTAVG(con_updates,tot_updates)),
+	UPD_CON_IN_PLACE_ctr, UPD_CON_IN_NEW_ctr);
   fprintf(tf,"%7ld (%5.1f%%) partial applications\n\t\t  [%ld in place, %ld allocated new space]\n",
 	pap_updates,
 	PC(INTAVG(pap_updates,tot_updates)),
 	UPD_PAP_IN_PLACE_ctr, UPD_PAP_IN_NEW_ctr);
-  fprintf(tf,"%7ld (%5.1f%%) updates to existing heap objects (%ld by squeezing)\n",
-	UPD_EXISTING_ctr + UPD_SQUEEZED_ctr,
-	PC(INTAVG(UPD_EXISTING_ctr + UPD_SQUEEZED_ctr, tot_updates)),
-	UPD_SQUEEZED_ctr);
+  fprintf(tf,"%7ld (%5.1f%%) updates by squeezing\n",
+	UPD_SQUEEZED_ctr,
+	PC(INTAVG(UPD_SQUEEZED_ctr, tot_updates)));
 
-  fprintf(tf, "UPD_CON_IN_NEW:   %7ld: ", UPD_CON_IN_NEW_ctr);
+  fprintf(tf, "\nUPD_CON_IN_NEW:   %7ld: ", UPD_CON_IN_NEW_ctr);
   for (i = 0; i < 9; i++) { fprintf(tf, "%7ld", UPD_CON_IN_NEW_hst[i]); }
+  fprintf(tf, "\n");
+  fprintf(tf, "UPD_CON_IN_PLACE: %7ld: ", UPD_CON_IN_PLACE_ctr);
+  for (i = 0; i < 9; i++) { fprintf(tf, "%7ld", UPD_CON_IN_PLACE_hst[i]); }
   fprintf(tf, "\n");
   fprintf(tf, "UPD_PAP_IN_NEW:   %7ld: ", UPD_PAP_IN_NEW_ctr);
   for (i = 0; i < 9; i++) { fprintf(tf, "%7ld", UPD_PAP_IN_NEW_hst[i]); }
   fprintf(tf, "\n");
 
   if (tot_gengc_updates != 0) {
-      fprintf(tf,"\nNEW GEN UPDATES: %ld (%5.1f%%)\n",
+      fprintf(tf,"\nNEW GEN UPDATES: %9ld (%5.1f%%)\n",
 	      tot_new_updates,
 	      PC(INTAVG(tot_new_updates,tot_gengc_updates)));
-      fprintf(tf,"\nOLD GEN UPDATES: %ld (%5.1f%%)\n",
+      fprintf(tf,"OLD GEN UPDATES: %9ld (%5.1f%%)\n",
 	      tot_old_updates,
 	      PC(INTAVG(tot_old_updates,tot_gengc_updates)));
   }
@@ -488,9 +492,9 @@ PrintTickyInfo(void)
   PR_CTR(UPDF_RCC_PUSHED_ctr);
   PR_CTR(UPDF_RCC_OMITTED_ctr);
 
-  PR_CTR(UPD_EXISTING_ctr);
   PR_CTR(UPD_SQUEEZED_ctr);
   PR_CTR(UPD_CON_IN_NEW_ctr);
+  PR_CTR(UPD_CON_IN_PLACE_ctr);
   PR_CTR(UPD_PAP_IN_NEW_ctr);
   PR_CTR(UPD_PAP_IN_PLACE_ctr);
 

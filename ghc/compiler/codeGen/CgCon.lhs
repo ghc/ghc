@@ -328,6 +328,10 @@ cgReturnDataCon con amodes all_zero_size_args
 		uniq = getUnique con
 	       	temp = CTemp uniq PtrRep 
 	   in
+
+	   profCtrC SLIT("TICK_UPD_CON_IN_PLACE") 
+			[mkIntCLit (length amodes)] `thenC`
+
 	   getSpRelOffset args_sp			`thenFC` \ sp_rel ->
 	   absC (CAssign temp 
 		    (CMacroExpr PtrRep UPD_FRAME_UPDATEE [CAddr sp_rel])) 
