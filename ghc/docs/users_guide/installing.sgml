@@ -538,7 +538,7 @@ To run GHC comfortably, your machine should have at least
 <Para>
 Download the latest GHC distribution (ghc-4.08 InstallShield installer, 19M)
 from <ULink
-URL="http://www.haskell.org/ghc/download.html">http://www.haskell.org/ghc/download.html</ULink>
+URL="http://www.haskell.org/ghc/download.html">haskell.org</ULink>
 It is packaged up using an installer that should be familiar-looking to
 Windows users.
 </Para>
