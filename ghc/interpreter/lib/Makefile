@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.3 1999/11/24 17:25:14 sewardj Exp $ 
+# $Id: Makefile,v 1.4 1999/12/01 10:56:25 sewardj Exp $ 
 # -------------------------------------------------------------------------- #
 
 TOP = ../..
@@ -19,6 +19,13 @@ HUGSCPP = ../../utils/hscpp/hscpp -D__HUGS__ -DUSE_REPORT_PRELUDE
 	$(HUGSCPP) -I../../includes $< > $*.lhs
 
 %.lhs :: $(GHC_LIB_DIR)/exts/%.lhs
+	$(HUGSCPP) -I../../includes $< > $*.lhs
+
+%.lhs :: $(FPTOOLS_TOP)/hslibs/text/%.lhs
+	$(HUGSCPP) -I../../includes $< > $*.lhs
+%.lhs :: $(FPTOOLS_TOP)/hslibs/util/%.lhs
+	$(HUGSCPP) -I../../includes $< > $*.lhs
+%.lhs :: $(FPTOOLS_TOP)/hslibs/lang/%.lhs
 	$(HUGSCPP) -I../../includes $< > $*.lhs
 
 CLEAN_FILES += $(LIBS)
