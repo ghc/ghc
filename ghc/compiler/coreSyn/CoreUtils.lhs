@@ -695,38 +695,62 @@ exprIsConApp_maybe expr = analyse (collectArgs expr)
 
 \begin{code}
 exprEtaExpandArity :: CoreExpr -> Arity
--- The Int is number of value args the thing can be 
--- 	applied to without doing much work
---
--- This is used when eta expanding
---	e  ==>  \xy -> e x y
---
--- It returns 1 (or more) to:
---	case x of p -> \s -> ...
--- because for I/O ish things we really want to get that \s to the top.
--- We are prepared to evaluate x each time round the loop in order to get that
+{- The Arity returned is the number of value args the 
+   thing can be applied to without doing much work
 
--- It's all a bit more subtle than it looks.  Consider one-shot lambdas
--- 		let x = expensive in \y z -> E
--- We want this to have arity 2 if the \y-abstraction is a 1-shot lambda
--- Hence the ArityType returned by arityType
+exprEtaExpandArity is used when eta expanding
+	e  ==>  \xy -> e x y
 
--- NB: this is particularly important/useful for IO state 
--- transformers, where we often get
--- 	let x = E in \ s -> ...
--- and the \s is a real-world state token abstraction.  Such 
--- abstractions are almost invariably 1-shot, so we want to
--- pull the \s out, past the let x=E.  
--- The hack is in Id.isOneShotLambda
---
--- Consider also 
---	f = \x -> error "foo"
--- Here, arity 1 is fine.  But if it is
---	f = \x -> case e of 
---			True  -> error "foo"
---			False -> \y -> x+y
--- then we want to get arity 2.
--- Hence the ABot/ATop in ArityType
+It returns 1 (or more) to:
+	case x of p -> \s -> ...
+because for I/O ish things we really want to get that \s to the top.
+We are prepared to evaluate x each time round the loop in order to get that
+
+It's all a bit more subtle than it looks:
+
+1.  One-shot lambdas
+
+Consider one-shot lambdas
+		let x = expensive in \y z -> E
+We want this to have arity 2 if the \y-abstraction is a 1-shot lambda
+Hence the ArityType returned by arityType
+
+2.  The state-transformer hack
+
+The one-shot lambda special cause is particularly important/useful for
+IO state transformers, where we often get
+	let x = E in \ s -> ...
+
+and the \s is a real-world state token abstraction.  Such abstractions
+are almost invariably 1-shot, so we want to pull the \s out, past the
+let x=E, even if E is expensive.  So we treat state-token lambdas as 
+one-shot even if they aren't really.  The hack is in Id.isOneShotLambda.
+
+3.  Dealing with bottom
+
+Consider also 
+	f = \x -> error "foo"
+Here, arity 1 is fine.  But if it is
+	f = \x -> case x of 
+			True  -> error "foo"
+			False -> \y -> x+y
+then we want to get arity 2.  Tecnically, this isn't quite right, because
+	(f True) `seq` 1
+should diverge, but it'll converge if we eta-expand f.  Nevertheless, we
+do so; it improves some programs significantly, and increasing convergence
+isn't a bad thing.  Hence the ABot/ATop in ArityType.
+
+Actually, the situation is worse.  Consider
+	f = \x -> case x of
+			True  -> \y -> x+y
+			False -> \y -> x-y
+Can we eta-expand here?  At first the answer looks like "yes of course", but
+consider
+	(f bot) `seq` 1
+This should diverge!  But if we eta-expand, it won't.   Again, we ignore this
+"problem", because being scrupulous would lose an important transformation for
+many programs.
+-}
 
 
 exprEtaExpandArity e = arityDepth (arityType e)
