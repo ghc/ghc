@@ -163,27 +163,29 @@ tagBinder usage binder =
    usage'  = usage `delOneFromIdEnv` binder
    us      = usage_of usage binder 
    cont =
-    if isNullIdEnv usage' then  -- bogus test to force evaluation.
+    if isNullIdEnv usage' then  -- Bogus test to force evaluation.
        (usage', (binder, us))
     else
        (usage', (binder, us))
  in
- case us of { DeadCode -> cont; _ -> cont }
-
---   (binder, usage_of usage binder)
+ if isDeadOcc us then		-- Ditto 
+	cont
+ else 
+	cont
 
 
 usage_of usage binder
-  | isExported binder = ManyOcc 0 -- Visible-elsewhere things count as many
+  | isExported binder = noBinderInfo	-- Visible-elsewhere things count as many
   | otherwise
   = case (lookupIdEnv usage binder) of
-      Nothing   -> DeadCode
+      Nothing   -> deadOccurrence
       Just info -> info
 
 isNeeded env usage binder
-  = case (usage_of usage binder) of
-      DeadCode  -> keepUnusedBinding env binder	-- Maybe keep it anyway
-      other     -> True
+  = if isDeadOcc (usage_of usage binder) then
+	keepUnusedBinding env binder	-- Maybe keep it anyway
+    else
+	True
 \end{code}
 
 
@@ -492,18 +494,10 @@ reOrderRec env (CyclicSCC binds)
     bad_choice ((bndr, occ_info), rhs)
 	=    var_rhs rhs 		-- Dont pick var RHS
 	  || inlineMe env bndr		-- Dont pick INLINE thing
-	  || one_occ occ_info 		-- Dont pick single-occ thing
+	  || isOneFunOcc occ_info	-- Dont pick single-occ thing
 	  || not_fun_ty (idType bndr)	-- Dont pick data-ty thing
 
-    not_fun_ty ty = not (maybeToBool (getFunTy_maybe rho_ty))
-		  where
-		    (_, rho_ty) = splitForAllTy ty
-
-	-- A variable RHS
-    var_rhs (Var v)   = True
-    var_rhs other_rhs = False
-
-	-- One textual occurrence, whether inside lambda or whatever
+	-- isOneFunOcc looks for one textual occurrence, whether inside lambda or whatever.
 	-- We stick to just FunOccs because if we're not going to be able
 	-- to inline the thing on this round it might be better to pick
 	-- this one as the loop breaker.  Real example (the Enum Ordering instance
@@ -516,8 +510,13 @@ reOrderRec env (CyclicSCC binds)
 	-- On the other hand we *could* simplify those case expressions if
 	-- we didn't stupidly choose d as the loop breaker.
 
-    one_occ (OneOcc fun_or_arg _ _ _ _) = isFun fun_or_arg
-    one_occ other_bind	       	        = False
+    not_fun_ty ty = not (maybeToBool (getFunTy_maybe rho_ty))
+		  where
+		    (_, rho_ty) = splitForAllTy ty
+
+	-- A variable RHS
+    var_rhs (Var v)   = True
+    var_rhs other_rhs = False
 \end{code}
 
 @occAnalRhs@ deals with the question of bindings where the Id is marked
