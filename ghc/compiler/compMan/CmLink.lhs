@@ -31,7 +31,7 @@ import FiniteMap
 import Outputable
 import ErrUtils		( showPass )
 import CmdLineOpts	( DynFlags(..) )
-import Panic		( panic )
+import Panic		( panic, GhcException(..) )
 
 import Exception
 import Monad
