@@ -331,11 +331,11 @@ data InlinePragInfo
 	-- exact significance of the IMustNotBeINLINEd pragma
 
 isNeverInlinePrag :: InlinePragInfo -> Bool
-isNeverInlinePrag (IMustNotBeINLINEd True Nothing) = True
-isNeverInlinePrag other				   = False
+isNeverInlinePrag (IMustNotBeINLINEd _ Nothing) = True
+isNeverInlinePrag other			        = False
 
 neverInlinePrag :: InlinePragInfo
-neverInlinePrag = IMustNotBeINLINEd True Nothing
+neverInlinePrag = IMustNotBeINLINEd True{-should be False? --SDM -} Nothing
 
 instance Outputable InlinePragInfo where
   -- This is now parsed in interface files
