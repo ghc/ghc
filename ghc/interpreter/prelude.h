@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: prelude.h,v $
- * $Revision: 1.9 $
- * $Date: 2000/03/13 11:37:16 $
+ * $Revision: 1.10 $
+ * $Date: 2000/03/13 14:10:24 $
  * ------------------------------------------------------------------------*/
 
 #define NON_POSIX_SOURCE
@@ -284,11 +284,11 @@ typedef shl_t ObjectFile;
 #endif
 
 #if !defined(HAVE_SNPRINTF)
-extern int snprintf   Args((char*, int, const char*, ...));
+extern int snprintf   ( char*, int, const char*, ... );
 #endif
 
 #if !defined(HAVE_VSNPRINTF)
-extern int vsnprintf  Args((char*, int, const char*, va_list));
+extern int vsnprintf  ( char*, int, const char*, va_list );
 #endif
 
 /*---------------------------------------------------------------------------
