@@ -51,7 +51,7 @@ import Type		( SYN_IE(Type), GenType )
 import TyVar		( SYN_IE(TyVar), GenTyVar )
 import Usage		( SYN_IE(Usage), GenUsage )
 import ErrUtils		( SYN_IE(Error), SYN_IE(Message), SYN_IE(Warning) )
-import CmdLineOpts      ( opt_PprStyle_All )
+import CmdLineOpts      ( opt_PprStyle_All, opt_PprUserLength )
 
 import SST
 import Bag		( Bag, emptyBag, isEmptyBag,
@@ -65,10 +65,8 @@ import UniqSupply	( UniqSupply, getUnique, getUniques, splitUniqSupply,
 import Unique		( Unique )
 import Util
 import Pretty
-import PprStyle		( PprStyle(..) )
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable
-#endif
+import Outputable	( PprStyle(..), Outputable(..) )
+
 
 infixr 9 `thenTc`, `thenTc_`, `thenNF_Tc`, `thenNF_Tc_` 
 \end{code}
@@ -490,7 +488,7 @@ mkTcErr :: SrcLoc 		-- Where
 	-> TcError		-- The complete error report
 
 mkTcErr locn ctxt msg sty
-  = hang (hcat [ppr PprForUser locn, ptext SLIT(": "), msg sty])
+  = hang (hcat [ppr (PprForUser opt_PprUserLength) locn, ptext SLIT(": "), msg sty])
     	 4 (vcat [msg sty | msg <- ctxt_to_use])
     where
      ctxt_to_use =
