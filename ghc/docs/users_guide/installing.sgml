@@ -234,24 +234,17 @@ contains HTML documentation files (one
 sub-directory per project).
 </Para>
 </ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>man/</Literal></Term>
-<ListItem>
-<Para>
-contains Unix manual pages.
-</Para>
-</ListItem></VarListEntry>
-</VariableList>
 </Para>
 
 <Sect3 id="sec-install">
 <Title>Installing</Title>
 
 <Para>
-OK, so let's assume that you have unpacked your chosen bundles into a
-scratch directory <Literal>fptools</Literal>. What next? Well, you will at least need
-to run the <Literal>configure</Literal><IndexTerm><Primary>configure</Primary></IndexTerm> script by changing your
-directory to <Literal>fptools</Literal> and typing <Literal>./configure</Literal>.  That should convert
+OK, so let's assume that you have unpacked your chosen bundles. What
+next? Well, you will at least need to run the
+<Literal>configure</Literal><IndexTerm><Primary>configure</Primary></IndexTerm>
+script by changing directory into the top-level directory for the
+bundle and typing <Literal>./configure</Literal>.  That should convert
 <Literal>Makefile.in</Literal> to <Literal>Makefile</Literal>.
 </Para>
 
@@ -270,7 +263,7 @@ follow.
 </Para>
 
 <Para>
-To install an <Literal>fptools</Literal> package, you'll have to do the following:
+To install a package, you'll have to do the following:
 </Para>
 
 <Para>
