@@ -50,6 +50,9 @@ module Binary
 --   getBinFileWithDict,	-- :: Binary a => FilePath -> IO a
 --   putBinFileWithDict,	-- :: Binary a => FilePath -> Module -> a -> IO ()
 
+    -- re-export for the benefit of other modules.
+   openBinaryFile 
+
   ) where
 
 #include "MachDeps.h"

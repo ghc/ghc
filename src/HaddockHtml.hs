@@ -25,9 +25,12 @@ import List 	( sortBy )
 import Char	( isUpper, toUpper )
 import Monad	( when, unless )
 
+
 import Foreign
 import Control.Exception ( handle, bracket )
-import System.IO
+
+import Binary    ( openBinaryFile )
+import System.IO ( IOMode(..), hClose, hGetBuf, hPutBuf )
 
 #if __GLASGOW_HASKELL__ < 503
 import FiniteMap
