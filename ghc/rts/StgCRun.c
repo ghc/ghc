@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.7 1999/07/27 13:29:08 simonmar Exp $
+ * $Id: StgCRun.c,v 1.8 1999/11/03 15:00:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -40,7 +40,7 @@ static jmp_buf jmp_environment;
 
 #if 0
 
-extern StgThreadReturnCode StgRun(StgFunPtr f)
+extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg)
 {
     jmp_buf save_buf;
     /* Save jmp_environment for previous call to miniInterpret  */
@@ -68,7 +68,7 @@ EXTFUN(StgReturn)
 
 #else
 
-extern StgThreadReturnCode StgRun(StgFunPtr f)
+extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg)
 {
     char* nm;
     while ( f ) {
@@ -121,7 +121,7 @@ EXTFUN(StgReturn)
 #ifdef sparc_TARGET_ARCH
 
 StgThreadReturnCode
-StgRun(StgFunPtr f) {
+StgRun(StgFunPtr f, StgRegTable *basereg) {
 
     StgChar space[RESERVED_C_STACK_BYTES+sizeof(void *)];
     register void *i7 __asm__("%i7");
@@ -143,7 +143,7 @@ StgRun(StgFunPtr f) {
 #ifdef alpha_TARGET_ARCH
 
 StgThreadReturnCode
-StgRun(StgFunPtr f) 
+StgRun(StgFunPtr f, StgRegTable *basereg) 
 {
     __asm__ volatile ("stq $9,-8($30)\n\t"
                       "stq $10,-16($30)\n\t"
@@ -200,7 +200,7 @@ StgRun(StgFunPtr f)
 #ifdef hppa1_1_TARGET_ARCH
 
 StgThreadReturnCode
-StgRun(StgFunPtr f) 
+StgRun(StgFunPtr f, StgRegTable *basereg) 
 {
     StgChar space[RESERVED_C_STACK_BYTES+16*sizeof(long)+10*sizeof(double)];
     StgThreadReturnCode ret;
