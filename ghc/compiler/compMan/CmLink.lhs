@@ -232,9 +232,11 @@ isLoaded l pls =
 	Just m  -> linkableTime l == linkableTime m
  
 linkInterpretedCode [] ul_trees pls = linkFinish pls ul_trees
-linkInterpretedCode (LM _ m uls : ls) ul_trees pls
+linkInterpretedCode (l@(LM _ m uls) : ls) ul_trees pls
    | all isInterpretable uls = 
-	linkInterpretedCode ls (uls++ul_trees) pls
+	if isLoaded l pls then linkInterpretedCode ls ul_trees pls else
+	linkInterpretedCode ls (uls++ul_trees) 
+		pls{objects_loaded = l : objects_loaded pls}
    | any isObject uls
         = throwDyn (OtherError 
 	     "can't link object code that depends on interpreted code")
