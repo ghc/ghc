@@ -29,17 +29,20 @@ import TcHsSyn		( mkHsLet, zonkTopLExpr )
 import TcSimplify	( tcSimplifyTop, tcSimplifyBracket )
 import TcUnify		( Expected, zapExpectedTo, zapExpectedType )
 import TcType		( TcType, TcKind, liftedTypeKind, mkAppTy, tcSplitSigmaTy )
-import TcEnv		( spliceOK, tcMetaTy, bracketOK, tcLookup )
+import TcEnv		( spliceOK, tcMetaTy, bracketOK )
 import TcMType		( newTyVarTy, newKindVar, UserTypeCtxt(ExprSigCtxt), zonkTcType, zonkTcTyVar )
 import TcHsType		( tcHsSigType, kcHsType )
+import TcIface		( tcImportDecl )
 import TypeRep		( Type(..), PredType(..), TyThing(..) )	-- For reification
-import Name		( Name, NamedThing(..), nameOccName, nameModule, isExternalName, mkInternalName )
+import Name		( Name, NamedThing(..), nameOccName, nameModule, isExternalName, 
+			  mkInternalName, nameIsLocalOrFrom )
+import NameEnv		( lookupNameEnv )
+import HscTypes		( lookupType, ExternalPackageState(..) )
 import OccName
 import Var		( Id, TyVar, idType )
 import Module		( moduleUserString, mkModuleName )
 import TcRnMonad
 import IfaceEnv		( lookupOrig )
-
 import Class		( Class, classBigSig )
 import TyCon		( TyCon, tyConTheta, tyConTyVars, getSynTyConDefn, isSynTyCon, isNewTyCon, tyConDataCons )
 import DataCon		( DataCon, dataConTyCon, dataConOrigArgTys, dataConStrictMarks, 
@@ -361,7 +364,7 @@ runMetaD :: LHsExpr Id 		-- Of type Q [Dec]
 	 -> TcM [TH.Dec]	-- Of type [Dec]
 runMetaD e = runMeta e
 
-runMeta :: LHsExpr Id 	-- Of type X
+runMeta :: LHsExpr Id 		-- Of type X
 	-> TcM t		-- Of type t
 runMeta expr
   = do	{ hsc_env <- getTopEnv
@@ -442,7 +445,7 @@ illegalSplice level
 reify :: TH.Name -> TcM TH.Info
 reify th_name
   = do	{ name <- lookupThName th_name
-	; thing <- tcLookup name
+	; thing <- tcLookupTh name
 		-- ToDo: this tcLookup could fail, which would give a
 		-- 	 rather unhelpful error message
 	; reifyThing thing
@@ -481,6 +484,32 @@ lookupThName (TH.Name occ (TH.NameU uniq))
     bogus_ns = OccName.varName	-- Not yet recorded in the TH name
 				-- but only the unique matters
 
+tcLookupTh :: Name -> TcM TcTyThing
+-- This is a specialised version of TcEnv.tcLookup; specialised mainly in that
+-- it gives a reify-related error message on failure, whereas in the normal
+-- tcLookup, failure is a bug.
+tcLookupTh name
+  = do	{ (gbl_env, lcl_env) <- getEnvs
+	; case lookupNameEnv (tcl_env lcl_env) name of
+		Just thing -> returnM thing
+		Nothing    -> do
+	{ if nameIsLocalOrFrom (tcg_mod gbl_env) name
+	  then	-- It's defined in this module
+	      case lookupNameEnv (tcg_type_env gbl_env) name of
+		Just thing -> return (AGlobal thing)
+		Nothing	   -> failWithTc (notInEnv name)
+	 
+	  else do 		-- It's imported
+	{ (eps,hpt) <- getEpsAndHpt
+	; case lookupType hpt (eps_PTE eps) name of 
+	    Just thing -> return (AGlobal thing)
+	    Nothing    -> do { traceIf (text "tcLookupGlobal" <+> ppr name)
+			     ; thing <- initIfaceTcRn (tcImportDecl name)
+			     ; return (AGlobal thing) }
+		-- Imported names should always be findable; 
+		-- if not, we fail hard in tcImportDecl
+    }}}
+
 mk_uniq :: Int# -> Unique
 mk_uniq u = mkUniqueGrimily (I# u)
 
@@ -488,6 +517,10 @@ notInScope :: TH.Name -> SDoc
 notInScope th_name = quotes (text (TH.pprint th_name)) <+> 
 		     ptext SLIT("is not in scope at a reify")
 	-- Ugh! Rather an indirect way to display the name
+
+notInEnv :: Name -> SDoc
+notInEnv name = quotes (ppr name) <+> 
+		     ptext SLIT("is not in the type environment at a reify")
 
 ------------------------------
 reifyThing :: TcTyThing -> TcM TH.Info

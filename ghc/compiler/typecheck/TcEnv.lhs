@@ -105,8 +105,7 @@ tcLookupGlobal name
 		Nothing	   -> notFound "tcLookupGlobal" name
 	 
 	  else do 		-- It's imported
-	{ eps <- getEps
-	; hpt <- getHpt
+	{ (eps,hpt) <- getEpsAndHpt
 	; case lookupType hpt (eps_PTE eps) name of 
 	    Just thing -> return thing 
 	    Nothing    -> do { traceIf (text "tcLookupGlobal" <+> ppr name)
@@ -184,8 +183,7 @@ getInGlobalScope :: TcM (Name -> Bool)
 -- is certainly in the envt, so we don't bother to look.
 getInGlobalScope 
   = do { mod <- getModule
-       ; eps <- getEps
-       ; hpt <- getHpt
+       ; (eps,hpt) <- getEpsAndHpt
        ; return (\n -> nameIsLocalOrFrom mod n || 
 		       isJust (lookupType hpt (eps_PTE eps) n)) }
 \end{code}

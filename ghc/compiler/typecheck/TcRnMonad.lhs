@@ -274,6 +274,10 @@ updateEps_ upd_fn = do	{ eps_var <- getEpsVar
 
 getHpt :: TcRnIf gbl lcl HomePackageTable
 getHpt = do { env <- getTopEnv; return (hsc_HPT env) }
+
+getEpsAndHpt :: TcRnIf gbl lcl (ExternalPackageState, HomePackageTable)
+getEpsAndHpt = do { env <- getTopEnv; eps <- readMutVar (hsc_EPS env)
+		  ; return (eps, hsc_HPT env) }
 \end{code}
 
 %************************************************************************

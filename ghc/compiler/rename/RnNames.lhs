@@ -728,8 +728,7 @@ check_occs ie occs names
 reportDeprecations :: TcGblEnv -> RnM ()
 reportDeprecations tcg_env
   = ifOptM Opt_WarnDeprecations	$
-    do	{ hpt <- getHpt
-	; eps <- getEps
+    do	{ (eps,hpt) <- getEpsAndHpt
 	; mapM_ (check hpt (eps_PIT eps)) all_gres }
   where
     used_names = findUses (tcg_dus tcg_env) emptyNameSet

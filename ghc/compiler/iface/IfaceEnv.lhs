@@ -259,8 +259,7 @@ initOrigNames names = foldl extendOrigNameCache emptyModuleEnv names
 \begin{code}
 tcIfaceGlobal :: Name -> IfM a TyThing
 tcIfaceGlobal name
-  = do	{ eps <- getEps
-	; hpt <- getHpt
+  = do	{ (eps,hpt) <- getEpsAndHpt
 	; case lookupType hpt (eps_PTE eps) name of {
 	    Just thing -> return thing ;
 	    Nothing    -> 
