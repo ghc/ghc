@@ -322,6 +322,9 @@ sub gather_import_dirs {
 	   local($dir);
 
            # Yuck ^ 2
+           if ( $lib eq 'lang' && ! $INSTALLING ) {
+              push(@Import_dirs, "${TopPwd}/hslibs/${lib}/monads");
+	   }
            if ( $lib eq 'text' && ! $INSTALLING ) {
               push(@Import_dirs, "${TopPwd}/hslibs/${lib}/html");
 	   }
