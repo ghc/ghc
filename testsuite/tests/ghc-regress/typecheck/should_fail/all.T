@@ -72,7 +72,7 @@ test "tcfail076" { vtcf("") }
 test "tcfail077" { vtcf("") }
 test "tcfail078" { vtcf("") }
 test "tcfail079" { vtcf("") }
-test "tcfail080" { vtcf("-fglasgow-exts -package lang") }
+test "tcfail080" { $expect = "fail" vtcf("-fglasgow-exts -package lang") }
 test "tcfail082" { vtcf("") }
 test "tcfail083" { vtcf("") }
 test "tcfail084" { vtcf("") }

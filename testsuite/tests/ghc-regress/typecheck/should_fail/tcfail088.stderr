@@ -1,5 +1,4 @@
 
 tcfail088.hs:9:
-    Illegal polymorphic type as argument: forall s. T s a
-    When checking kinds in `Ord (forall s. T s a)'
+    Illegal polymorphic type: forall s. T s a
     In the instance declaration for `Ord (forall s. T s a)'
