@@ -20,6 +20,7 @@ defaultsHook (void)
 {
 #if __GLASGOW_HASKELL__ >= 408
     RtsFlags.GcFlags.heapSizeSuggestion = 6*1024*1024 / BLOCK_SIZE;
+    RtsFlags.GcFlags.maxStkSize         = 8*1024*1024 / sizeof(W_);
 #endif
 #if __GLASGOW_HASKELL__ >= 411
     RtsFlags.GcFlags.giveStats = COLLECT_GC_STATS;
