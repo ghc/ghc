@@ -220,6 +220,18 @@ exists.
 
 --Jeff
 
+BUT NOTE [Nov 2001]: we must actually *unify* not reverse-match in
+this test.  Suppose the instance envt had
+    ..., forall a b. C a a b, ..., forall a b c. C a b c, ...
+(still most specific first)
+Now suppose we are looking for (C x y Int), where x and y are unconstrained.
+	C x y Int  doesn't match the template {a,b} C a a b
+but neither does 
+	C a a b  match the template {x,y} C x y Int
+But still x and y might subsequently be unified so they *do* match.
+
+Simple story: unify, don't match.
+
 
 %************************************************************************
 %*									*
@@ -266,14 +278,17 @@ lookupInstEnv env key_cls key_tys
     find ((tpl_tyvars, tpl, dfun_id) : rest)
       = case matchTys tpl_tyvars tpl key_tys of
 	  Nothing                 ->
-		-- Check for reverse match, so that
+		-- Check whether the things unify, so that
 		-- we bale out if a later instantiation of this
 		-- predicate might match this instance
 		-- [see notes about overlapping instances above]
-	    case matchTys key_vars key_tys tpl of
-	      Nothing             -> find rest
-	      Just (_, _)         -> NoMatch (any_match rest)
+	    case unifyTyListsX (key_vars `unionVarSet` tpl_tyvars) key_tys tpl of
+	      Nothing        -> find rest
+	      Just _         -> NoMatch (any_match rest)
 	  Just (subst, leftovers) -> ASSERT( null leftovers )
+				     pprTrace "lookupInst" (vcat [text "look:" <+> ppr key_cls <+> ppr key_tys, 
+								  text "found:" <+> ppr dfun_id,
+								  text "env:" <+> ppr (classInstEnv env key_cls)]) $
 				     FoundInst subst dfun_id
 
     any_match rest = or [ maybeToBool (matchTys tvs tpl key_tys)
