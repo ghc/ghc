@@ -139,6 +139,64 @@ program), you may wish to check if there are libraries that provide a
 <xref linkend="book-hslibs">.
 </Para>
 
+<Sect1 id="language-options">
+<Title>Language variations
+</Title>
+
+<Para> There are several flags that control what variation of the language are permitted.
+Leaving out all of them gives you standard Haskell 98.</Para>
+
+<VariableList>
+
+<VarListEntry>
+<Term><Option>-fglasgow-exts</Option>:</Term>
+<ListItem>
+<Para>This simultaneously enables all of the extensions to Haskell 98 described in this
+chapter, except where otherwise noted. </Para>
+</ListItem> </VarListEntry>
+
+<VarListEntry>
+<Term><Option>-fno-monomorphism-restriction</Option>:</Term>
+<ListItem>
+<Para> Switch off the Haskell 98 monomorphism restriction.  Independent of the <Option>-fglasgow-exts</Option>
+flag. </Para>
+</ListItem> </VarListEntry>
+
+<VarListEntry>
+<Term><Option>-fallow-overlapping-instances</Option>,
+      <Option>-fallow-undecidable-instances</Option>,  
+      <Option>-fcontext-stack</Option>:</Term>
+<ListItem>
+<Para> See <XRef LinkEnd="instance-decls">. 
+Only relevant if you also use <Option>-fglasgow-exts</Option>.
+</Para>
+</ListItem> </VarListEntry>
+
+<VarListEntry>
+<Term><Option>-fignore-asserts</Option>:</Term>
+<ListItem>
+<Para> See <XRef LinkEnd="sec-assertions">.
+Only relevant if you also use <Option>-fglasgow-exts</Option>.
+</Para>
+</ListItem> </VarListEntry>
+
+<VarListEntry>
+<Term> <Option>-finline-phase</Option>:</Term>
+<ListItem>
+<Para> See <XRef LinkEnd="rewrite-rules">.
+Only relevant if you also use <Option>-fglasgow-exts</Option>.
+</ListItem> </VarListEntry>
+
+<VarListEntry>
+<Term> <Option>-fgenerics</Option>:</Term>
+<ListItem>
+<Para> See <XRef LinkEnd="generic-classes">.
+Independent of <Option>-fglasgow-exts</Option>.
+</Para>
+</ListItem> </VarListEntry>
+
+</VariableList>
+
 <Sect1 id="primitives">
 <Title>Unboxed types and primitive operations
 </Title>
@@ -1897,7 +1955,7 @@ class like this:
 
 </Sect2>
 
-<Sect2>
+<Sect2 id="instance-decls">
 <Title>Instance declarations</Title>
 
 <Para>
@@ -4244,6 +4302,8 @@ An example will give the idea:
 </Para>
 
 <ProgramListing>
+  import Generics
+
   class Bin a where
     toBin   :: a -> [Int]
     fromBin :: [Int] -> (a, [Int])
@@ -4262,7 +4322,7 @@ An example will give the idea:
 <Para>
 This class declaration explains how <Literal>toBin</Literal> and <Literal>fromBin</Literal>
 work for arbitrary data types.  They do so by giving cases for unit, product, and sum,
-which are defined thus:
+which are defined thus in the library module <Literal>Generics</Literal>:
 </Para>
 <ProgramListing>
   data Unit    = Unit
