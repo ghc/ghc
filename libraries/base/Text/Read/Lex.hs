@@ -119,14 +119,20 @@ lexSymbol =
 -- identifiers
 
 lexId :: ReadP Lexeme
-lexId =
-  do c <- satisfy isIdsChar
-     s <- munch isIdfChar
-     return (Ident (c:s))
- where
-	-- Identifiers can start with a '_'
-  isIdsChar c = isAlpha c || c == '_'
-  isIdfChar c = isAlphaNum c || c `elem` "_'"
+lexId = lex_nan <++ lex_id
+  where
+	-- NaN and Infinity look like identifiers, so
+	-- we parse them first.  
+    lex_nan = (string "NaN"      >> return (Rat notANumber)) +++
+  	      (string "Infinity" >> return (Rat infinity))
+  
+    lex_id = do c <- satisfy isIdsChar
+  		s <- munch isIdfChar
+  		return (Ident (c:s))
+
+  	  -- Identifiers can start with a '_'
+    isIdsChar c = isAlpha c || c == '_'
+    isIdfChar c = isAlphaNum c || c `elem` "_'"
 
 -- ---------------------------------------------------------------------------
 -- Lexing character literals
@@ -171,18 +177,11 @@ lexCharE =
          _    -> pfail
   
   lexNumeric =
-    do base <- lexBase
+    do base <- lexBaseChar
        n    <- lexInteger base
        guard (n <= toInteger (ord maxBound))
        return (chr (fromInteger n))
-   where
-    lexBase =
-      do s <- look
-         case s of
-           'o':_ -> do get; return 8
-           'x':_ -> do get; return 16
-           _     -> do return 10
-  
+
   lexCntrlChar =
     do char '^'
        c <- get
@@ -223,13 +222,11 @@ lexCharE =
 
   lexAscii =
     do choice
-         [ do { string "SO" ; s <- look; 
-		case s of
-		  'H' : _ -> do { get ; return '\SOH' }
-		  other   -> return '\SO' 
-	      }
+         [ (string "SOH" >> return '\SOH') <++
+	   (string "SO"  >> return '\SO') 
 		-- \SO and \SOH need maximal-munch treatment
 		-- See the Haskell report Sect 2.6
+
          , string "NUL" >> return '\NUL'
          , string "STX" >> return '\STX'
          , string "ETX" >> return '\ETX'
@@ -302,37 +299,46 @@ showDigit n | n <= 9    = shows n
             | otherwise = showChar (chr (n + ord 'A' - 10))
 
 lexNumber :: ReadP Lexeme
-lexNumber = do { string "NaN";      return (Rat notANumber) } +++
-	    do { string "Infinity"; return (Rat infinity) } +++
-	    do { base <- lexBase ;  lexNumberBase base }
- where
-  lexBase =
-    do s <- look
-       case s of
-         '0':'o':_ -> do get; get; return 8
-         '0':'O':_ -> do get; get; return 8
-         '0':'x':_ -> do get; get; return 16
-         '0':'X':_ -> do get; get; return 16
-         _         -> do return 10
-       
-lexNumberBase :: Base -> ReadP Lexeme
-lexNumberBase base =
-  do xs    <- lexDigits base
-     mFrac <- lexFrac base
-     mExp  <- lexExp base
+lexNumber 
+  = lexHexOct  <++	-- First try for hex or octal 0x, 0o etc
+			-- If that fails, try for a decimal number
+    lexDecNumber 	-- Start with ordinary digits
+		
+lexHexOct :: ReadP Lexeme
+lexHexOct
+  = do	char '0'
+	base <- lexBaseChar
+	digits <- lexDigits base
+	return (Int (val (fromIntegral base) 0 digits))
+
+lexBaseChar :: ReadP Int
+-- Lex a single character indicating the base, 
+-- or return 10 if there isn't one
+lexBaseChar = lex_base <++ return 10
+   where
+      lex_base = do { c <- get;
+		      case c of
+		   	'o' -> return 8
+	           	'O' -> return 8
+	           	'x' -> return 16
+        	   	'X' -> return 16
+	           	_   -> pfail } 
+
+lexDecNumber :: ReadP Lexeme
+lexDecNumber =
+  do xs    <- lexDigits 10
+     mFrac <- lexFrac <++ return Nothing
+     mExp  <- lexExp  <++ return Nothing
      return (value xs mFrac mExp)
  where
-  baseInteger :: Integer
-  baseInteger = fromIntegral base
-
-  value xs mFrac mExp = valueFracExp (val baseInteger 0 xs) mFrac mExp
+  value xs mFrac mExp = valueFracExp (val 10 0 xs) mFrac mExp
   
   valueFracExp :: Integer -> Maybe Digits -> Maybe Integer 
 	       -> Lexeme
   valueFracExp a Nothing Nothing	
     = Int a						-- 43
   valueFracExp a Nothing (Just exp)
-    | exp >= 0  = Int (a * (baseInteger ^ exp))		-- 43e7
+    | exp >= 0  = Int (a * (10 ^ exp))			-- 43e7
     | otherwise = Rat (valExp (fromInteger a) exp)	-- 43e-7
   valueFracExp a (Just fs) mExp 
      = case mExp of
@@ -340,45 +346,27 @@ lexNumberBase base =
 	 Just exp -> Rat (valExp rat exp)		-- 4.3e-4
      where
 	rat :: Rational
-	rat = fromInteger a + frac (fromIntegral base) 0 1 fs
+	rat = fromInteger a + frac 10 0 1 fs
 
   valExp :: Rational -> Integer -> Rational
-  valExp rat exp = rat * (fromIntegral base ^^ exp)
+  valExp rat exp = rat * (10 ^^ exp)
 
-lexFrac :: Base -> ReadP (Maybe Digits)
-lexFrac base =
-  do s <- look
-     case s of
-       '.' : d : _ | isJust (valDig base d) ->
-	-- The lookahead checks for point and at least one
-	-- valid following digit.  For example 1..n must
-	-- lex the "1" off rather than failing.
-         do get
-            frac <- lexDigits base
-            return (Just frac)
-       
-       _ ->
-         do return Nothing
+lexFrac :: ReadP (Maybe Digits)
+-- Read the fractional part; fail if it doesn't
+-- start ".d" where d is a digit
+lexFrac = do char '.'
+	     frac <- lexDigits 10
+	     return (Just frac)
 
-lexExp :: Base -> ReadP (Maybe Integer)
-lexExp base =
-  do s <- look
-     case s of
-       e : _ | e `elem` "eE" && base == 10 ->
-         do get
-            (signedExp +++ exp)
-        where
-         signedExp =
-           do c <- char '-' +++ char '+'
-              n <- lexInteger 10
-              return (Just (if c == '-' then -n else n))
-         
-         exp =
-           do n <- lexInteger 10
-              return (Just n)
-
-       _ ->
-         do return Nothing
+lexExp :: ReadP (Maybe Integer)
+lexExp = do char 'e' +++ char 'E'
+            exp <- signedExp +++ lexInteger 10
+	    return (Just exp)
+ where
+   signedExp 
+     = do c <- char '-' +++ char '+'
+          n <- lexInteger 10
+          return (if c == '-' then -n else n)
 
 lexDigits :: Int -> ReadP Digits
 -- Lex a non-empty sequence of digits in specified base
@@ -417,14 +405,16 @@ valDig 8 c
   | '0' <= c && c <= '7' = Just (ord c - ord '0')
   | otherwise            = Nothing
 
-valDig 10 c
-  | '0' <= c && c <= '9' = Just (ord c - ord '0')
-  | otherwise            = Nothing
+valDig 10 c = valDecDig c
 
 valDig 16 c
   | '0' <= c && c <= '9' = Just (ord c - ord '0')
   | 'a' <= c && c <= 'f' = Just (ord c - ord 'a' + 10)
   | 'A' <= c && c <= 'F' = Just (ord c - ord 'A' + 10)
+  | otherwise            = Nothing
+
+valDecDig c
+  | '0' <= c && c <= '9' = Just (ord c - ord '0')
   | otherwise            = Nothing
 
 -- ----------------------------------------------------------------------
