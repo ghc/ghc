@@ -177,9 +177,9 @@ outputForeignStubs dflags c_code h_code
 -- turn out to be empty, in which case no file should be created.
 outputForeignStubs_help is_header ""      = return Nothing
 outputForeignStubs_help is_header doc_str 
-   = newTempName suffix >>= \ fname ->
-     writeFile fname (include_prefix ++ doc_str) >>
-     return (Just suffix)
+   = do fname <- newTempName suffix
+        writeFile fname (include_prefix ++ doc_str)
+        return (Just fname)
   where
     suffix
        | is_header   = "h_stub"
