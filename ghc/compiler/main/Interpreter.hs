@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Interpreter.hs,v 1.10 2000/12/18 15:18:11 simonmar Exp $
+-- $Id: Interpreter.hs,v 1.11 2000/12/19 12:36:12 sewardj Exp $
 --
 -- Interpreter subsystem wrapper
 --
@@ -51,8 +51,8 @@ data UnlinkedBCOExpr = UnlinkedBCOExpr
 instance Outputable UnlinkedBCO where
   ppr x = text "Can't output UnlinkedBCO"
 
-byteCodeGen    = error "stgBindsToInterpSyn"
+byteCodeGen    = error "byteCodeGen"
 loadObjs       = error "loadObjs"
-resolveObjs    = error "loadObjs"
+resolveObjs    = error "resolveObjs"
 interactiveUI  = error "interactiveUI"
 #endif

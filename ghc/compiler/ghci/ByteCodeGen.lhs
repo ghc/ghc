@@ -13,7 +13,9 @@ module ByteCodeGen ( UnlinkedBCO, UnlinkedBCOExpr, ItblEnv, ClosureEnv, HValue,
 #include "HsVersions.h"
 
 import Outputable
-import Name		( Name, getName, nameModule, mkSysLocalName )
+import Name		( Name, getName, nameModule, mkSysLocalName, toRdrName )
+import RdrName		( rdrNameOcc, rdrNameModule )
+import OccName		( occNameString )
 import Id		( Id, idType, isDataConId_maybe, mkVanillaId )
 import OrdList		( OrdList, consOL, snocOL, appOL, unitOL, 
 			  nilOL, toOL, concatOL, fromOL )
@@ -37,8 +39,9 @@ import Constants	( wORD_SIZE )
 import CmdLineOpts	( DynFlags, DynFlag(..) )
 import ErrUtils		( showPass, dumpIfSet_dyn )
 import ClosureInfo	( mkVirtHeapOffsets )
-import Module		( ModuleName, moduleName )
+import Module		( ModuleName, moduleName, moduleNameFS )
 import Unique		( mkPseudoUnique3 )
+import Linker		( lookupSymbol )
 
 import List		( intersperse )
 import Monad		( foldM )
@@ -122,6 +125,42 @@ coreExprToBCOs dflags expr
       root_bco <- assembleBCO root_proto_bco
 
       return (root_bco, auxiliary_bcos)
+
+
+-- Linking stuff
+linkIModules :: ItblEnv    -- incoming global itbl env; returned updated
+	     -> ClosureEnv -- incoming global closure env; returned updated
+	     -> [([UnlinkedBCO], ItblEnv)]
+	     -> IO ([HValue], ItblEnv, ClosureEnv)
+linkIModules gie gce mods = do
+  let (bcoss, ies) = unzip mods
+      bcos = concat bcoss
+      top_level_binders = map nameOfUnlinkedBCO bcos
+      final_gie = foldr plusFM gie ies
+  
+  (new_bcos, new_gce) <-
+    fixIO (\ ~(new_bcos, new_gce) -> do
+      new_bcos <- linkBCOs final_gie new_gce bcos
+      let new_gce = addListToFM gce (zip top_level_binders new_bcos)
+      return (new_bcos, new_gce))
+
+  return (new_bcos, final_gie, new_gce)
+
+
+linkIExpr :: ItblEnv -> ClosureEnv -> UnlinkedBCOExpr
+          -> IO HValue 	  -- IO BCO# really
+linkIExpr ie ce (root_ul_bco, aux_ul_bcos)
+   = do let aux_ul_binders = map nameOfUnlinkedBCO aux_ul_bcos
+        (aux_bcos, aux_ce) 
+           <- fixIO 
+                (\ ~(aux_bcos, new_ce) 
+                 -> do new_bcos <- linkBCOs ie new_ce aux_ul_bcos
+                       let new_ce = addListToFM ce (zip aux_ul_binders new_bcos)
+                       return (new_bcos, new_ce)
+                )
+        [root_bco]
+           <- linkBCOs ie aux_ce [root_ul_bco]
+        return root_bco
 
 
 
@@ -1079,12 +1118,6 @@ mkLitA a
 \begin{code}
 
 {- 
-data UnlinkedBCO
-   = UnlinkedBCO Int (IOUArray Int Word16)	-- #insns insns
-                 Int (IOUArray Int Word32)	-- #literals literals
-                 Int (IOArray Int Name)		-- #ptrs ptrs
-                 Int (IOArray Int Name)		-- #itblrefs itblrefs
-
 data BCO# = BCO# ByteArray# 		-- instrs   :: array Word16#
                  ByteArray# 		-- literals :: array Word32#
                  PtrArray# 		-- ptrs     :: Array HValue
@@ -1102,41 +1135,6 @@ GLOBAL_VAR(v_cafTable, [], [HValue])
 --	return linked_expr
 
 
-linkIModules :: ItblEnv    -- incoming global itbl env; returned updated
-	     -> ClosureEnv -- incoming global closure env; returned updated
-	     -> [([UnlinkedBCO], ItblEnv)]
-	     -> IO ([HValue], ItblEnv, ClosureEnv)
-linkIModules gie gce mods = do
-  let (bcoss, ies) = unzip mods
-      bcos = concat bcoss
-      top_level_binders = map nameOfUnlinkedBCO bcos
-      final_gie = foldr plusFM gie ies
-  
-  (new_bcos, new_gce) <-
-    fixIO (\ ~(new_bcos, new_gce) -> do
-      new_bcos <- linkBCOs final_gie new_gce bcos
-      let new_gce = addListToFM gce (zip top_level_binders new_bcos)
-      return (new_bcos, new_gce))
-
-  return (new_bcos, final_gie, new_gce)
-
-
-linkIExpr :: ItblEnv -> ClosureEnv -> UnlinkedBCOExpr
-          -> IO HValue 	  -- IO BCO# really
-linkIExpr ie ce (root_ul_bco, aux_ul_bcos)
-   = do let aux_ul_binders = map nameOfUnlinkedBCO aux_ul_bcos
-        (aux_bcos, aux_ce) 
-           <- fixIO 
-                (\ ~(aux_bcos, new_ce) 
-                 -> do new_bcos <- linkBCOs ie new_ce aux_ul_bcos
-                       let new_ce = addListToFM ce (zip aux_ul_binders new_bcos)
-                       return (new_bcos, new_ce)
-                )
-        [root_bco]
-           <- linkBCOs ie aux_ce [root_ul_bco]
-        return root_bco
-
-
 linkBCOs :: ItblEnv -> ClosureEnv -> [UnlinkedBCO] 
          -> IO [HValue]   -- IO [BCO#] really
 linkBCOs ie ce binds = mapM (linkBCO ie ce) binds
@@ -1148,7 +1146,7 @@ linkBCO ie ce (UnlinkedBCO nm insnsSS literalsSS ptrsSS itblsSS)
         itbls    <- listFromSS itblsSS
 
         let linked_ptrs  = map (lookupCE ce) ptrs
-            linked_itbls = map (lookupIE ie) itbls
+        linked_itbls <- mapM (lookupIE ie) itbls
 
         let n_insns    = sizeSS insnsSS
             n_literals = sizeSS literalsSS
@@ -1175,7 +1173,7 @@ linkBCO ie ce (UnlinkedBCO nm insnsSS literalsSS ptrsSS itblsSS)
             indexify xs = zip [0..] xs
 
         BCO bco# <- newBCO insns_barr literals_barr ptrs_parr itbls_barr
-     
+
         return (unsafeCoerce# bco#)
 
 
@@ -1192,12 +1190,23 @@ lookupCE ce nm
         Just aa -> unsafeCoerce# aa
         Nothing -> pprPanic "ByteCodeGen.lookupCE" (ppr nm)
 
-lookupIE :: ItblEnv -> Name -> Addr
-lookupIE ie nm 
-   = case lookupFM ie nm of
-        Just (Ptr a) -> a
-        Nothing      -> pprPanic "ByteCodeGen.lookupIE" (ppr nm)
+lookupIE :: ItblEnv -> Name -> IO Addr
+lookupIE ie con_nm 
+   = case lookupFM ie con_nm of
+        Just (Ptr a) -> return a
+        Nothing      
+           -> do -- try looking up in the object files.
+                 m <- lookupSymbol (nameToCLabel con_nm "con_info")
+                 case m of
+                    Just addr -> return addr
+                    Nothing   -> pprPanic "ByteCodeGen.lookupIE" (ppr con_nm)
 
+-- HACK!!!  ToDo: cleaner
+nameToCLabel :: Name -> String{-suffix-} -> String
+nameToCLabel n suffix
+   = _UNPK_(moduleNameFS (rdrNameModule rn)) 
+     ++ '_':occNameString(rdrNameOcc rn) ++ '_':suffix
+     where rn = toRdrName n
 
 
 {-
@@ -1246,13 +1255,6 @@ lookupVar ce f v =
 	    Nothing -> return (f v)
 	    Just e  -> return (Native e)
   )
-
--- HACK!!!  ToDo: cleaner
-nameToCLabel :: Name -> String{-suffix-} -> String
-nameToCLabel n suffix =
-  _UNPK_(moduleNameFS (rdrNameModule rn)) 
-  ++ '_':occNameString(rdrNameOcc rn) ++ '_':suffix
-  where rn = toRdrName n
 -}
 \end{code}
 

@@ -243,7 +243,6 @@ data DynFlag
    | Opt_D_dump_rn_stats
    | Opt_D_dump_stix
    | Opt_D_dump_simpl_stats
-   | Opt_D_dump_InterpSyn
    | Opt_D_dump_BCOs
    | Opt_D_source_stats
    | Opt_D_verbose_core2core
