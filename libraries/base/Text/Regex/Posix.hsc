@@ -19,7 +19,6 @@ module Text.Regex.Posix (
 	-- * The @Regex@ type
 	Regex,	 	-- abstract
 
-#if !defined(__HUGS__) || defined(HAVE_REGEX_H)
 	-- * Compiling a regular expression
 	regcomp, 	-- :: String -> Int -> IO Regex
 
@@ -36,12 +35,19 @@ module Text.Regex.Posix (
 	         	--		 String,     -- everything after match
 	         	-- 	 	 [String]))  -- subexpression matches
 
-#endif
   ) where
 
-#if !defined(__HUGS__) || defined(HAVE_REGEX_H)
 #include <sys/types.h>
+
+#if HAVE_REGEX_H && HAVE_REGCOMP
 #include "regex.h"
+#else
+#include "regex/regex.h"
+{-# CBITS regex/reallocf.c #-}
+{-# CBITS regex/regcomp.c #-}
+{-# CBITS regex/regerror.c #-}
+{-# CBITS regex/regexec.c #-}
+{-# CBITS regex/regfree.c #-}
 #endif
 
 import Prelude
@@ -54,8 +60,6 @@ type CRegex    = ()
 -- | A compiled regular expression
 newtype Regex = Regex (ForeignPtr CRegex)
 
-#if !defined(__HUGS__) || defined(HAVE_REGEX_H)
--- to the end
 -- -----------------------------------------------------------------------------
 -- regcomp
 
@@ -174,5 +178,3 @@ foreign import ccall  unsafe "&regfree"
 foreign import ccall unsafe "regexec"
   c_regexec :: Ptr CRegex -> CString -> CSize
 	    -> Ptr CRegMatch -> CInt -> IO CInt
-
-#endif /* HAVE_REGEX_H */

@@ -49,7 +49,7 @@ static char sccsid[] = "@(#)regcomp.c	8.5 (Berkeley) 3/20/94";
 #include <ctype.h>
 #include <limits.h>
 #include <stdlib.h>
-#include "regex.h"
+#include "regex/regex.h"
 
 // removed collate stuff --SDM
 // #include "collate.h"
