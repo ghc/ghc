@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.15 $
- * $Date: 1999/12/03 12:39:42 $
+ * $Revision: 1.16 $
+ * $Date: 1999/12/03 14:38:39 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -681,9 +681,11 @@ Bool findFilesForModule (
    strcat(augdPath, hugsPath);
    strcat(augdPath, PATHSEP_STR);
 
-   strcat(augdPath, installDir);
-   strcat(augdPath, "GhcPrel");
-   strcat(augdPath, PATHSEP_STR);
+   if (combined) {
+      strcat(augdPath, installDir);
+      strcat(augdPath, "GhcPrel");
+      strcat(augdPath, PATHSEP_STR);
+   }
 
    strcat(augdPath, installDir);
    strcat(augdPath, "lib");
