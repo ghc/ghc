@@ -6,8 +6,8 @@
 \begin{code}
 module SimplMonad (
 	InId, InBind, InExpr, InAlt, InArg, InType, InBinder,
-	OutId, OutBind, OutExpr, OutAlt, OutArg, OutType, OutBinder,
-	OutExprStuff, OutStuff, returnOutStuff,
+	OutId, OutTyVar, OutBind, OutExpr, OutAlt, OutArg, OutType, OutBinder,
+	FloatsWith, FloatsWithExpr,
 
 	-- The monad
 	SimplM,
@@ -15,12 +15,11 @@ module SimplMonad (
 	mapSmpl, mapAndUnzipSmpl, mapAccumLSmpl,
 	getDOptsSmpl,
 
-	-- The inlining black-list
-	setBlackList, getBlackList, noInlineBlackList,
+	-- The simplifier mode
+	setMode, getMode, 
 
         -- Unique supply
         getUniqueSmpl, getUniquesSmpl, getUniqSupplySmpl,
-	newId, newIds,
 
 	-- Counting
 	SimplCount, Tick(..),
@@ -29,34 +28,38 @@ module SimplMonad (
 	plusSimplCount, isZeroSimplCount,
 
 	-- Switch checker
-	SwitchChecker, getSwitchChecker, getSimplIntSwitch,
+	SwitchChecker, SwitchResult(..), getSwitchChecker, getSimplIntSwitch,
+	isAmongSimpl, intSwitchSet, switchIsOn,
 
 	-- Cost centres
 	getEnclosingCC, setEnclosingCC,
 
 	-- Environments
-	getEnv, setAllExceptInScope,
-	getSubst, setSubst,
+	SimplEnv, emptySimplEnv, getSubst, setSubst,
 	getSubstEnv, extendSubst, extendSubstList,
 	getInScope, setInScope, modifyInScope, addNewInScopeIds,
 	setSubstEnv, zapSubstEnv,
-	getSimplBinderStuff, setSimplBinderStuff,
 
-	-- Adding bindings
-	addLetBind, addLetBinds, addAuxiliaryBind, addAuxiliaryBinds,
-	addCaseBind, needsCaseBinding, addNonRecBind, wrapFloats, addFloats
+	-- Floats
+  	Floats, emptyFloats, isEmptyFloats, unitFloat, addFloats, flattenFloats,
+	allLifted, wrapFloats, floatBinds,
+	addAuxiliaryBind,
+
+	-- Inlining,
+	preInlineUnconditionally, postInlineUnconditionally, activeInline, activeRule,
+	inlineMode
     ) where
 
 #include "HsVersions.h"
 
-import Id		( Id, mkSysLocal, idType, idUnfolding, isDataConWrapId,
-			  isGlobalId )
+import Id		( Id, idType, isDataConWrapId, 
+			  idOccInfo, idInlinePragma
+			)
 import CoreSyn
-import CoreUnfold	( isCompulsoryUnfolding )
-import CoreUtils	( exprOkForSpeculation )
+import CoreUtils	( needsCaseBinding, exprIsTrivial )
 import PprCore		()	-- Instances
 import CostCentre	( CostCentreStack, subsumedCCS )
-import OccName		( UserFS )
+import Var	
 import VarEnv
 import VarSet
 import OrdList
@@ -70,15 +73,26 @@ import UniqSupply	( uniqsFromSupply, uniqFromSupply, splitUniqSupply,
 			  UniqSupply
 			)
 import FiniteMap
-import CmdLineOpts	( SimplifierSwitch(..), SwitchResult(..),
-			  DynFlags, DynFlag(..), dopt,
-			  opt_PprStyle_Debug, opt_HistorySize,
-			  intSwitchSet
+import BasicTypes	( TopLevelFlag, isTopLevel, 
+			  Activation, isActive, isAlwaysActive,
+			  OccInfo(..)
+			)
+import CmdLineOpts	( SimplifierSwitch(..), SimplifierMode(..),
+			  DynFlags, DynFlag(..), dopt, 
+			  opt_PprStyle_Debug, opt_HistorySize, opt_SimplNoPreInlining,
 			)
 import Unique		( Unique )
 import Maybes		( expectJust )
-import Util		( zipWithEqual )
 import Outputable
+import Array		( array, (//) )
+import FastTypes
+import GlaExts		( indexArray# )
+
+#if __GLASGOW_HASKELL__ < 301
+import ArrBase	( Array(..) )
+#else
+import PrelArr  ( Array(..) )
+#endif
 
 infixr 0  `thenSmpl`, `thenSmpl_`
 \end{code}
@@ -100,69 +114,88 @@ type InArg     = CoreArg
 
 type OutBinder  = CoreBndr
 type OutId	= Id			-- Cloned
+type OutTyVar	= TyVar			-- Cloned
 type OutType	= Type			-- Cloned
 type OutBind	= CoreBind
 type OutExpr	= CoreExpr
 type OutAlt	= CoreAlt
 type OutArg	= CoreArg
+\end{code}
 
-type SwitchChecker = SimplifierSwitch -> SwitchResult
+%************************************************************************
+%*									*
+\subsection{Floats}
+%*									*
+%************************************************************************
 
-type OutExprStuff = OutStuff OutExpr
-type OutStuff a   = (OrdList OutBind, (InScopeSet, a))
+\begin{code}
+type FloatsWithExpr = FloatsWith OutExpr
+type FloatsWith a   = (Floats, a)
 	-- We return something equivalent to (let b in e), but
 	-- in pieces to avoid the quadratic blowup when floating 
 	-- incrementally.  Comments just before simplExprB in Simplify.lhs
+
+data Floats = Floats (OrdList OutBind) 
+		     InScopeSet		-- Environment "inside" all the floats
+		     Bool		-- True <=> All bindings are lifted
+
+allLifted :: Floats -> Bool
+allLifted (Floats _ _ is_lifted) = is_lifted
+
+wrapFloats :: Floats -> OutExpr -> OutExpr
+wrapFloats (Floats bs _ _) body = foldrOL Let body bs
+
+isEmptyFloats :: Floats -> Bool
+isEmptyFloats (Floats bs _ _) = isNilOL bs 
+
+floatBinds :: Floats -> [OutBind]
+floatBinds (Floats bs _ _) = fromOL bs
+
+flattenFloats :: Floats -> Floats
+-- Flattens into a single Rec group
+flattenFloats (Floats bs is is_lifted) 
+  = ASSERT2( is_lifted, ppr (fromOL bs) )
+    Floats (unitOL (Rec (flattenBinds (fromOL bs)))) is is_lifted
 \end{code}
 
 \begin{code}
-wrapFloats :: OrdList CoreBind -> CoreExpr -> CoreExpr
-wrapFloats binds body = foldOL Let body binds
+emptyFloats :: SimplEnv -> Floats
+emptyFloats env = Floats nilOL (getInScope env) True
 
-returnOutStuff :: a -> SimplM (OutStuff a)
-returnOutStuff x = getInScope 	`thenSmpl` \ in_scope ->
-		   returnSmpl (nilOL, (in_scope, x))
+unitFloat :: SimplEnv -> OutId -> OutExpr -> Floats
+-- A single non-rec float; extend the in-scope set
+unitFloat env var rhs = Floats (unitOL (NonRec var rhs))
+			       (Subst.extendInScopeSet (getInScope env) var)
+			       (not (isUnLiftedType (idType var)))
 
-addFloats :: OrdList CoreBind -> InScopeSet -> SimplM (OutStuff a) -> SimplM (OutStuff a)
-addFloats floats in_scope thing_inside
-  = setInScope in_scope thing_inside	`thenSmpl` \ (binds, res) ->
-    returnSmpl (floats `appOL` binds, res)
- 
-addLetBind :: CoreBind -> SimplM (OutStuff a) -> SimplM (OutStuff a)
-addLetBind bind thing_inside
-  = thing_inside	`thenSmpl` \ (binds, res) ->
-    returnSmpl (bind `consOL` binds, res)
+addFloats :: SimplEnv -> Floats 
+	  -> (SimplEnv -> SimplM (FloatsWith a))
+	  -> SimplM (FloatsWith a)
+addFloats env (Floats b1 is1 l1) thing_inside
+  | isNilOL b1 
+  = thing_inside env
+  | otherwise
+  = thing_inside (setInScopeSet env is1)	`thenSmpl` \ (Floats b2 is2 l2, res) ->
+    returnSmpl (Floats (b1 `appOL` b2) is2 (l1 && l2), res)
 
-addLetBinds :: [CoreBind] -> SimplM (OutStuff a) -> SimplM (OutStuff a)
-addLetBinds binds1 thing_inside
-  = thing_inside	`thenSmpl` \ (binds2, res) ->
-    returnSmpl (toOL binds1 `appOL` binds2, res)
+addLetBind :: OutBind -> Floats -> Floats
+addLetBind bind (Floats binds in_scope lifted) 
+  = Floats (bind `consOL` binds) in_scope (lifted && is_lifted_bind bind)
 
-addAuxiliaryBinds :: [CoreBind] -> SimplM (OutStuff a) -> SimplM (OutStuff a)
+is_lifted_bind (Rec _)      = True
+is_lifted_bind (NonRec b r) = not (isUnLiftedType (idType b))
+
+-- addAuxiliaryBind 	* takes already-simplified things (bndr and rhs)
+--			* extends the in-scope env
+--			* assumes it's a let-bindable thing
+addAuxiliaryBind :: SimplEnv -> OutBind
+		 -> (SimplEnv -> SimplM (FloatsWith a))
+	 	 -> SimplM (FloatsWith a)
 	-- Extends the in-scope environment as well as wrapping the bindings
-addAuxiliaryBinds binds1 thing_inside
-  = addNewInScopeIds (bindersOfBinds binds1)	$
-    addLetBinds binds1 thing_inside
-
-addAuxiliaryBind :: CoreBind -> SimplM (OutStuff a) -> SimplM (OutStuff a)
-	-- Extends the in-scope environment as well as wrapping the bindings
-addAuxiliaryBind bind thing_inside
-  = addNewInScopeIds (bindersOf bind)	$
-    addLetBind bind thing_inside
-
-needsCaseBinding ty rhs = isUnLiftedType ty && not (exprOkForSpeculation rhs)
-	-- Make a case expression instead of a let
-	-- These can arise either from the desugarer,
-	-- or from beta reductions: (\x.e) (x +# y)
-
-addCaseBind bndr rhs thing_inside
-  = thing_inside		`thenSmpl` \ (floats, (_, body)) ->
-    returnOutStuff (Case rhs bndr [(DEFAULT, [], wrapFloats floats body)])
-
-addNonRecBind bndr rhs thing_inside
-	-- Checks for needing a case binding
-  | needsCaseBinding (idType bndr) rhs = addCaseBind bndr rhs thing_inside
-  | otherwise		     	       = addLetBind  (NonRec bndr rhs) thing_inside
+addAuxiliaryBind env bind thing_inside
+  = ASSERT( case bind of { NonRec b r -> not (needsCaseBinding (idType b) r) ; Rec _ -> True } )
+    thing_inside (addNewInScopeIds env (bindersOf bind))	`thenSmpl` \ (floats, x) ->
+    returnSmpl (addLetBind bind floats, x)
 \end{code}
 
 
@@ -177,51 +210,20 @@ For the simplifier monad, we want to {\em thread} a unique supply and a counter.
 
 \begin{code}
 type SimplM result
-  =  DynFlags
-  -> SimplEnv		-- We thread the unique supply because
+  =  DynFlags		-- We thread the unique supply because
   -> UniqSupply		-- constantly splitting it is rather expensive
   -> SimplCount 
   -> (result, UniqSupply, SimplCount)
-
-type BlackList = Id -> Bool	-- True =>  don't inline this Id
-
-data SimplEnv
-  = SimplEnv {
-	seChkr      :: SwitchChecker,
-	seCC        :: CostCentreStack,	-- The enclosing CCS (when profiling)
-	seBlackList :: BlackList,
-	seSubst     :: Subst		-- The current substitution
-    }
-	-- The range of the substitution is OutType and OutExpr resp
-	-- 
-	-- The substitution is idempotent
-	-- It *must* be applied; things in its domain simply aren't
-	-- bound in the result.
-	--
-	-- The substitution usually maps an Id to its clone,
-	-- but if the orig defn is a let-binding, and
-	-- the RHS of the let simplifies to an atom,
-	-- we just add the binding to the substitution and elide the let.
-
-	-- The in-scope part of Subst includes *all* in-scope TyVars and Ids
-	-- The elements of the set may have better IdInfo than the
-	-- occurrences of in-scope Ids, and (more important) they will
-	-- have a correctly-substituted type.  So we use a lookup in this
-	-- set to replace occurrences
 \end{code}
 
 \begin{code}
 initSmpl :: DynFlags
-	 -> SwitchChecker
 	 -> UniqSupply		-- No init count; set to 0
-	 -> VarSet		-- In scope (usually empty, but useful for nested calls)
-	 -> BlackList		-- Black-list function
 	 -> SimplM a
 	 -> (a, SimplCount)
 
-initSmpl dflags chkr us in_scope black_list m
-  = case m dflags (emptySimplEnv chkr in_scope black_list) us 
-	   (zeroSimplCount dflags) of 
+initSmpl dflags us m
+  = case m dflags us (zeroSimplCount dflags) of 
 	(result, _, count) -> (result, count)
 
 
@@ -230,18 +232,18 @@ initSmpl dflags chkr us in_scope black_list m
 {-# INLINE returnSmpl #-}
 
 returnSmpl :: a -> SimplM a
-returnSmpl e dflags env us sc = (e, us, sc)
+returnSmpl e dflags us sc = (e, us, sc)
 
 thenSmpl  :: SimplM a -> (a -> SimplM b) -> SimplM b
 thenSmpl_ :: SimplM a -> SimplM b -> SimplM b
 
-thenSmpl m k dflags env us0 sc0
-  = case (m dflags env us0 sc0) of 
-	(m_result, us1, sc1) -> k m_result dflags env us1 sc1
+thenSmpl m k dflags us0 sc0
+  = case (m dflags us0 sc0) of 
+	(m_result, us1, sc1) -> k m_result dflags us1 sc1
 
-thenSmpl_ m k dflags env us0 sc0
-  = case (m dflags env us0 sc0) of 
-	(_, us1, sc1) -> k dflags env us1 sc1
+thenSmpl_ m k dflags us0 sc0
+  = case (m dflags us0 sc0) of 
+	(_, us1, sc1) -> k dflags us1 sc1
 \end{code}
 
 
@@ -276,22 +278,22 @@ mapAccumLSmpl f acc (x:xs) = f acc x	`thenSmpl` \ (acc', x') ->
 
 \begin{code}
 getUniqSupplySmpl :: SimplM UniqSupply
-getUniqSupplySmpl dflags env us sc 
+getUniqSupplySmpl dflags us sc 
    = case splitUniqSupply us of
         (us1, us2) -> (us1, us2, sc)
 
 getUniqueSmpl :: SimplM Unique
-getUniqueSmpl dflags env us sc 
+getUniqueSmpl dflags us sc 
    = case splitUniqSupply us of
         (us1, us2) -> (uniqFromSupply us1, us2, sc)
 
 getUniquesSmpl :: SimplM [Unique]
-getUniquesSmpl dflags env us sc 
+getUniquesSmpl dflags us sc 
    = case splitUniqSupply us of
         (us1, us2) -> (uniqsFromSupply us1, us2, sc)
 
 getDOptsSmpl :: SimplM DynFlags
-getDOptsSmpl dflags env us sc 
+getDOptsSmpl dflags us sc 
    = (dflags, us, sc)
 \end{code}
 
@@ -304,10 +306,10 @@ getDOptsSmpl dflags env us sc
 
 \begin{code}
 getSimplCount :: SimplM SimplCount
-getSimplCount dflags env us sc = (sc, us, sc)
+getSimplCount dflags us sc = (sc, us, sc)
 
 tick :: Tick -> SimplM ()
-tick t dflags env us sc 
+tick t dflags us sc 
    = sc' `seq` ((), us, sc')
      where
         sc' = doTick t sc
@@ -315,7 +317,7 @@ tick t dflags env us sc
 freeTick :: Tick -> SimplM ()
 -- Record a tick, but don't add to the total tick count, which is
 -- used to decide when nothing further has happened
-freeTick t dflags env us sc 
+freeTick t dflags us sc 
    = sc' `seq` ((), us, sc')
         where
            sc' = doFreeTick t sc
@@ -457,6 +459,7 @@ data Tick
   | CaseOfCase			Id	-- Bndr on *inner* case
   | KnownBranch			Id	-- Case binder
   | CaseMerge			Id	-- Binder on outer case
+  | AltMerge			Id	-- Case binder
   | CaseElim			Id	-- Case binder
   | CaseIdentity		Id	-- Case binder
   | FillInCaseDefault		Id	-- Case binder
@@ -493,6 +496,7 @@ tickToTag (CaseIdentity _)		= 12
 tickToTag (FillInCaseDefault _)		= 13
 tickToTag BottomFound			= 14
 tickToTag SimplifierDone		= 16
+tickToTag (AltMerge _)			= 17
 
 tickString :: Tick -> String
 tickString (PreInlineUnconditionally _)	= "PreInlineUnconditionally"
@@ -506,6 +510,7 @@ tickString (BetaReduction _)		= "BetaReduction"
 tickString (CaseOfCase _)		= "CaseOfCase"
 tickString (KnownBranch _)		= "KnownBranch"
 tickString (CaseMerge _)		= "CaseMerge"
+tickString (AltMerge _)			= "AltMerge"
 tickString (CaseElim _)			= "CaseElim"
 tickString (CaseIdentity _)		= "CaseIdentity"
 tickString (FillInCaseDefault _)	= "FillInCaseDefault"
@@ -524,6 +529,7 @@ pprTickCts (BetaReduction v)		= ppr v
 pprTickCts (CaseOfCase v)		= ppr v
 pprTickCts (KnownBranch v)		= ppr v
 pprTickCts (CaseMerge v)		= ppr v
+pprTickCts (AltMerge v)			= ppr v
 pprTickCts (CaseElim v)			= ppr v
 pprTickCts (CaseIdentity v)		= ppr v
 pprTickCts (FillInCaseDefault v)	= ppr v
@@ -549,117 +555,13 @@ cmpEqTick (BetaReduction a)		(BetaReduction b)		= a `compare` b
 cmpEqTick (CaseOfCase a)		(CaseOfCase b)			= a `compare` b
 cmpEqTick (KnownBranch a)		(KnownBranch b)			= a `compare` b
 cmpEqTick (CaseMerge a)			(CaseMerge b)			= a `compare` b
+cmpEqTick (AltMerge a)			(AltMerge b)			= a `compare` b
 cmpEqTick (CaseElim a)			(CaseElim b)			= a `compare` b
 cmpEqTick (CaseIdentity a)		(CaseIdentity b)		= a `compare` b
 cmpEqTick (FillInCaseDefault a)		(FillInCaseDefault b)		= a `compare` b
 cmpEqTick other1			other2				= EQ
 \end{code}
 
-
-%************************************************************************
-%*									*
-\subsubsection{Command-line switches}
-%*									*
-%************************************************************************
-
-\begin{code}
-getSwitchChecker :: SimplM SwitchChecker
-getSwitchChecker dflags env us sc = (seChkr env, us, sc)
-
-getSimplIntSwitch :: SwitchChecker -> (Int-> SimplifierSwitch) -> Int
-getSimplIntSwitch chkr switch
-  = expectJust "getSimplIntSwitch" (intSwitchSet chkr switch)
-\end{code}
-
-
-@setBlackList@ is used to prepare the environment for simplifying
-the RHS of an Id that's marked with an INLINE pragma.  It is going to
-be inlined wherever they are used, and then all the inlining will take
-effect.  Meanwhile, there isn't much point in doing anything to the
-as-yet-un-INLINEd rhs.  Furthremore, it's very important to switch off
-inlining!  because
-	(a) not doing so will inline a worker straight back into its wrapper!
-
-and 	(b) Consider the following example 
-	     	let f = \pq -> BIG
-	     	in
-	     	let g = \y -> f y y
-		    {-# INLINE g #-}
-	     	in ...g...g...g...g...g...
-
-	Now, if that's the ONLY occurrence of f, it will be inlined inside g,
-	and thence copied multiple times when g is inlined.
-
-	Andy disagrees! Example:
-		all xs = foldr (&&) True xs
-		any p = all . map p  {-# INLINE any #-}
-	
-	Problem: any won't get deforested, and so if it's exported and
-	the importer doesn't use the inlining, (eg passes it as an arg)
-	then we won't get deforestation at all.
-	We havn't solved this problem yet!
-
-We prepare the envt by simply modifying the black list.
-
-6/98 update: 
-
-We *don't* prevent inlining from happening for identifiers
-that are marked as IMustBeINLINEd. An example of where
-doing this is crucial is:
-  
-   class Bar a => Foo a where
-     ...g....
-   {-# INLINE f #-}
-   f :: Foo a => a -> b
-   f x = ....Foo_sc1...
-   
-If `f' needs to peer inside Foo's superclass, Bar, it refers
-to the appropriate super class selector, which is marked as
-must-inlineable. We don't generate any code for a superclass
-selector, so failing to inline it in the RHS of `f' will
-leave a reference to a non-existent id, with bad consequences.
-
-ALSO NOTE that we do all this by modifing the black list
-not by zapping the unfolding.  The latter may still be useful for
-knowing when something is evaluated.
-
-\begin{code}
-setBlackList :: BlackList -> SimplM a -> SimplM a
-setBlackList black_list m dflags env us sc 
-   = m dflags (env { seBlackList = black_list }) us sc
-
-getBlackList :: SimplM BlackList
-getBlackList dflags env us sc = (seBlackList env, us, sc)
-
-noInlineBlackList :: SimplM BlackList
-	-- Inside inlinings, black list anything that is in scope or imported.
-	-- except for data con wrappers.  The exception is a hack, like the one in
-	-- SimplCore.simplRules, to make wrappers inline in rule LHSs.
-	-- We may as well do the same here.
-noInlineBlackList dflags env us sc = (blacklisted,us,sc)
-	where blacklisted v =
-	   	  not (isDataConWrapId v) &&
-		  (v `isInScope` (seSubst env) || isGlobalId v)
-	-- NB: An earlier version omitted the last clause; this meant 
-	-- that even inlinings *completely within* an INLINE didn't happen. 
-	-- This was cheaper, and probably adequate, but produced awful code
-        -- for some dictionary constructions.
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsubsection{The ``enclosing cost-centre''}
-%*									*
-%************************************************************************
-
-\begin{code}
-getEnclosingCC :: SimplM CostCentreStack
-getEnclosingCC dflags env us sc = (seCC env, us, sc)
-
-setEnclosingCC :: CostCentreStack -> SimplM a -> SimplM a
-setEnclosingCC cc m dflags env us sc = m dflags (env { seCC = cc }) us sc
-\end{code}
 
 
 %************************************************************************
@@ -670,89 +572,412 @@ setEnclosingCC cc m dflags env us sc = m dflags (env { seCC = cc }) us sc
 
 
 \begin{code}
-emptySimplEnv :: SwitchChecker -> VarSet -> (Id -> Bool) -> SimplEnv
+data SimplEnv
+  = SimplEnv {
+	seMode 	    :: SimplifierMode,
+	seChkr      :: SwitchChecker,
+	seCC        :: CostCentreStack,	-- The enclosing CCS (when profiling)
+	seSubst     :: Subst		-- The current substitution
+    }
+	-- The range of the substitution is OutType and OutExpr resp
+	-- 
+	-- The substitution is idempotent
+	-- It *must* be applied; things in its domain simply aren't
+	-- bound in the result.
+	--
+	-- The substitution usually maps an Id to its clone,
+	-- but if the orig defn is a let-binding, and
+	-- the RHS of the let simplifies to an atom,
+	-- we just add the binding to the substitution and elide the let.
 
-emptySimplEnv sw_chkr in_scope black_list
-  = SimplEnv { seChkr = sw_chkr, seCC = subsumedCCS,
-	       seBlackList = black_list,
+	-- The in-scope part of Subst includes *all* in-scope TyVars and Ids
+	-- The elements of the set may have better IdInfo than the
+	-- occurrences of in-scope Ids, and (more important) they will
+	-- have a correctly-substituted type.  So we use a lookup in this
+	-- set to replace occurrences
+
+emptySimplEnv :: SimplifierMode -> [SimplifierSwitch] -> VarSet -> SimplEnv
+emptySimplEnv mode switches in_scope
+  = SimplEnv { seChkr = isAmongSimpl switches, seCC = subsumedCCS, seMode = mode,
 	       seSubst = mkSubst (mkInScopeSet in_scope) emptySubstEnv }
 	-- The top level "enclosing CC" is "SUBSUMED".
 
-getEnv :: SimplM SimplEnv
-getEnv dflags env us sc = (env, us, sc)
+---------------------
+getSwitchChecker :: SimplEnv -> SwitchChecker
+getSwitchChecker env = seChkr env
 
-setAllExceptInScope :: SimplEnv -> SimplM a -> SimplM a
-setAllExceptInScope new_env@(SimplEnv {seSubst = new_subst}) m dflags
-		    	    (SimplEnv {seSubst = old_subst}) us sc 
-  = m dflags (new_env {seSubst = Subst.setInScope new_subst (substInScope old_subst)}) 
-             us sc
+---------------------
+getMode :: SimplEnv -> SimplifierMode
+getMode env = seMode env
 
-getSubst :: SimplM Subst
-getSubst dflags env us sc = (seSubst env, us, sc)
+setMode :: SimplifierMode -> SimplEnv -> SimplEnv
+setMode mode env = env { seMode = mode }
 
-setSubst :: Subst -> SimplM a -> SimplM a
-setSubst subst m dflags env us sc = m dflags (env {seSubst = subst}) us sc
+---------------------
+getEnclosingCC :: SimplEnv -> CostCentreStack
+getEnclosingCC env = seCC env
 
-getSubstEnv :: SimplM SubstEnv
-getSubstEnv dflags env us sc = (substEnv (seSubst env), us, sc)
+setEnclosingCC :: SimplEnv -> CostCentreStack -> SimplEnv
+setEnclosingCC env cc = env {seCC = cc}
 
-addNewInScopeIds :: [CoreBndr] -> SimplM a -> SimplM a
+---------------------
+getSubst :: SimplEnv -> Subst
+getSubst env = seSubst env
+
+setSubst :: SimplEnv -> Subst -> SimplEnv
+setSubst env subst = env {seSubst = subst}
+
+extendSubst :: SimplEnv -> CoreBndr -> SubstResult -> SimplEnv
+extendSubst env@(SimplEnv {seSubst = subst}) var res
+  = env {seSubst = Subst.extendSubst subst var res}
+
+extendSubstList :: SimplEnv -> [CoreBndr] -> [SubstResult] -> SimplEnv
+extendSubstList env@(SimplEnv {seSubst = subst}) vars ress
+  = env {seSubst = Subst.extendSubstList subst vars ress}
+
+---------------------
+getInScope :: SimplEnv -> InScopeSet
+getInScope env = substInScope (seSubst env)
+
+setInScope :: SimplEnv -> SimplEnv -> SimplEnv
+setInScope env env_with_in_scope = setInScopeSet env (getInScope env_with_in_scope)
+
+setInScopeSet :: SimplEnv -> InScopeSet -> SimplEnv
+setInScopeSet env@(SimplEnv {seSubst = subst}) in_scope
+  = env {seSubst = Subst.setInScope subst in_scope}
+
+addNewInScopeIds :: SimplEnv -> [CoreBndr] -> SimplEnv
 	-- The new Ids are guaranteed to be freshly allocated
-addNewInScopeIds vs m dflags env@(SimplEnv {seSubst = subst}) us sc
-  = m dflags (env {seSubst = Subst.extendNewInScopeList subst vs}) us sc
+addNewInScopeIds env@(SimplEnv {seSubst = subst}) vs
+  = env {seSubst = Subst.extendNewInScopeList subst vs}
 
-getInScope :: SimplM InScopeSet
-getInScope dflags env us sc = (substInScope (seSubst env), us, sc)
+modifyInScope :: SimplEnv -> CoreBndr -> CoreBndr -> SimplEnv
+modifyInScope env@(SimplEnv {seSubst = subst}) v v'
+  = env {seSubst = Subst.modifyInScope subst v v'}
 
-setInScope :: InScopeSet -> SimplM a -> SimplM a
-setInScope in_scope m dflags env@(SimplEnv {seSubst = subst}) us sc
-  = m dflags (env {seSubst = Subst.setInScope subst in_scope}) us sc
+---------------------
+getSubstEnv :: SimplEnv -> SubstEnv
+getSubstEnv env = substEnv (seSubst env)
 
-modifyInScope :: CoreBndr -> CoreBndr -> SimplM a -> SimplM a
-modifyInScope v v' m dflags env@(SimplEnv {seSubst = subst}) us sc 
-  = m dflags (env {seSubst = Subst.modifyInScope subst v v'}) us sc
+setSubstEnv :: SimplEnv -> SubstEnv -> SimplEnv
+setSubstEnv env@(SimplEnv {seSubst = subst}) senv
+  = env {seSubst = Subst.setSubstEnv subst senv}
 
-extendSubst :: CoreBndr -> SubstResult -> SimplM a -> SimplM a
-extendSubst var res m dflags env@(SimplEnv {seSubst = subst}) us sc
-  = m dflags (env { seSubst = Subst.extendSubst subst var res  }) us sc
+zapSubstEnv :: SimplEnv -> SimplEnv
+zapSubstEnv env@(SimplEnv {seSubst = subst})
+  = env {seSubst = Subst.zapSubstEnv subst}
+\end{code}
 
-extendSubstList :: [CoreBndr] -> [SubstResult] -> SimplM a -> SimplM a
-extendSubstList vars ress m dflags env@(SimplEnv {seSubst = subst}) us sc
-  = m dflags (env { seSubst = Subst.extendSubstList subst vars ress  }) us sc
 
-setSubstEnv :: SubstEnv -> SimplM a -> SimplM a
-setSubstEnv senv m dflags env@(SimplEnv {seSubst = subst}) us sc
-  = m dflags (env {seSubst = Subst.setSubstEnv subst senv}) us sc
+%************************************************************************
+%*									*
+\subsection{Decisions about inlining}
+%*									*
+%************************************************************************
 
-zapSubstEnv :: SimplM a -> SimplM a
-zapSubstEnv m dflags env@(SimplEnv {seSubst = subst}) us sc
-  = m dflags (env {seSubst = Subst.zapSubstEnv subst}) us sc
+Inlining is controlled partly by the SimplifierMode switch.  This has two
+settings:
 
-getSimplBinderStuff :: SimplM (Subst, UniqSupply)
-getSimplBinderStuff dflags (SimplEnv {seSubst = subst}) us sc
-  = ((subst, us), us, sc)
+	SimplGently	(a) Simplifying before specialiser/full laziness
+			(b) Simplifiying inside INLINE pragma
+			(c) Simplifying the LHS of a rule
 
-setSimplBinderStuff :: (Subst, UniqSupply) -> SimplM a -> SimplM a
-setSimplBinderStuff (subst, us) m dflags env _ sc
-  = m dflags (env {seSubst = subst}) us sc
+	SimplPhase n	Used at all other times
+
+The key thing about SimplGently is that it does no call-site inlining.
+Before full laziness we must be careful not to inline wrappers,
+because doing so inhibits floating
+    e.g. ...(case f x of ...)...
+    ==> ...(case (case x of I# x# -> fw x#) of ...)...
+    ==> ...(case x of I# x# -> case fw x# of ...)...
+and now the redex (f x) isn't floatable any more.
+
+INLINE pragmas
+~~~~~~~~~~~~~~
+SimplGently is also used as the mode to simplify inside an InlineMe note.
+
+\begin{code}
+inlineMode :: SimplifierMode
+inlineMode = SimplGently
+\end{code}
+
+It really is important to switch off inlinings inside such
+expressions.  Consider the following example 
+
+     	let f = \pq -> BIG
+     	in
+     	let g = \y -> f y y
+	    {-# INLINE g #-}
+     	in ...g...g...g...g...g...
+
+Now, if that's the ONLY occurrence of f, it will be inlined inside g,
+and thence copied multiple times when g is inlined.
+
+
+This function may be inlinined in other modules, so we
+don't want to remove (by inlining) calls to functions that have
+specialisations, or that may have transformation rules in an importing
+scope.
+
+E.g. 	{-# INLINE f #-}
+		f x = ...g...
+
+and suppose that g is strict *and* has specialisations.  If we inline
+g's wrapper, we deny f the chance of getting the specialised version
+of g when f is inlined at some call site (perhaps in some other
+module).
+
+It's also important not to inline a worker back into a wrapper.
+A wrapper looks like
+	wraper = inline_me (\x -> ...worker... )
+Normally, the inline_me prevents the worker getting inlined into
+the wrapper (initially, the worker's only call site!).  But,
+if the wrapper is sure to be called, the strictness analyser will
+mark it 'demanded', so when the RHS is simplified, it'll get an ArgOf
+continuation.  That's why the keep_inline predicate returns True for
+ArgOf continuations.  It shouldn't do any harm not to dissolve the
+inline-me note under these circumstances.
+
+Note that the result is that we do very little simplification
+inside an InlineMe.  
+
+	all xs = foldr (&&) True xs
+	any p = all . map p  {-# INLINE any #-}
+
+Problem: any won't get deforested, and so if it's exported and the
+importer doesn't use the inlining, (eg passes it as an arg) then we
+won't get deforestation at all.  We havn't solved this problem yet!
+
+
+preInlineUnconditionally
+~~~~~~~~~~~~~~~~~~~~~~~~
+@preInlineUnconditionally@ examines a bndr to see if it is used just
+once in a completely safe way, so that it is safe to discard the
+binding inline its RHS at the (unique) usage site, REGARDLESS of how
+big the RHS might be.  If this is the case we don't simplify the RHS
+first, but just inline it un-simplified.
+
+This is much better than first simplifying a perhaps-huge RHS and then
+inlining and re-simplifying it.
+
+NB: we don't even look at the RHS to see if it's trivial
+We might have
+			x = y
+where x is used many times, but this is the unique occurrence of y.
+We should NOT inline x at all its uses, because then we'd do the same
+for y -- aargh!  So we must base this pre-rhs-simplification decision
+solely on x's occurrences, not on its rhs.
+
+Evne RHSs labelled InlineMe aren't caught here, because there might be
+no benefit from inlining at the call site.
+
+[Sept 01] Don't unconditionally inline a top-level thing, because that
+can simply make a static thing into something built dynamically.  E.g.
+	x = (a,b)
+	main = \s -> h x
+
+[Remember that we treat \s as a one-shot lambda.]  No point in
+inlining x unless there is something interesting about the call site.
+
+But watch out: if you aren't careful, some useful foldr/build fusion
+can be lost (most notably in spectral/hartel/parstof) because the
+foldr didn't see the build.  Doing the dynamic allocation isn't a big
+deal, in fact, but losing the fusion can be.  But the right thing here
+seems to be to do a callSiteInline based on the fact that there is
+something interesting about the call site (it's strict).  Hmm.  That
+seems a bit fragile.
+
+\begin{code}
+preInlineUnconditionally :: SimplEnv -> TopLevelFlag -> InId -> Bool
+preInlineUnconditionally env top_lvl bndr
+--  | isTopLevel top_lvl     = False
+-- 	Top-level fusion lost if we do this for (e.g. string constants)
+  | not active 		   = False
+  | opt_SimplNoPreInlining = False
+  | otherwise = case idOccInfo bndr of
+		  IAmDead	     -> True	-- Happens in ((\x.1) v)
+	  	  OneOcc in_lam once -> not in_lam && once
+			-- Not inside a lambda, one occurrence ==> safe!
+		  other 	     -> False
+  where
+    active = case getMode env of
+		   SimplGently  -> isAlwaysActive prag
+		   SimplPhase n -> isActive n prag
+    prag = idInlinePragma bndr
+\end{code}
+
+postInlineUnconditionally
+~~~~~~~~~~~~~~~~~~~~~~~~~
+@postInlineUnconditionally@ decides whether to unconditionally inline
+a thing based on the form of its RHS; in particular if it has a
+trivial RHS.  If so, we can inline and discard the binding altogether.
+
+NB: a loop breaker has must_keep_binding = True and non-loop-breakers
+only have *forward* references Hence, it's safe to discard the binding
+	
+NOTE: This isn't our last opportunity to inline.  We're at the binding
+site right now, and we'll get another opportunity when we get to the
+ocurrence(s)
+
+Note that we do this unconditional inlining only for trival RHSs.
+Don't inline even WHNFs inside lambdas; doing so may simply increase
+allocation when the function is called. This isn't the last chance; see
+NOTE above.
+
+NB: Even inline pragmas (e.g. IMustBeINLINEd) are ignored here Why?
+Because we don't even want to inline them into the RHS of constructor
+arguments. See NOTE above
+
+NB: At one time even NOINLINE was ignored here: if the rhs is trivial
+it's best to inline it anyway.  We often get a=E; b=a from desugaring,
+with both a and b marked NOINLINE.  But that seems incompatible with
+our new view that inlining is like a RULE, so I'm sticking to the 'active'
+story for now.
+
+\begin{code}
+postInlineUnconditionally :: SimplEnv -> OutId -> Bool -> OutExpr -> Bool
+postInlineUnconditionally env bndr loop_breaker rhs 
+  =  exprIsTrivial rhs
+  && active
+  && not loop_breaker
+  && not (isExportedId bndr)
+  where
+    active = case getMode env of
+		   SimplGently  -> isAlwaysActive prag
+		   SimplPhase n -> isActive n prag
+    prag = idInlinePragma bndr
+\end{code}
+
+blackListInline tells if we must not inline at a call site because the
+Id's inline pragma says not to do so.
+
+However, blackListInline is ignored for things with with Compulsory inlinings,
+because they don't have bindings, so we must inline them no matter how
+gentle we are being.
+
+\begin{code}
+activeInline :: SimplEnv -> OutId -> Bool
+activeInline env id
+  = case getMode env of
+	SimplGently -> isDataConWrapId id
+		-- No inlining at all when doing gentle stuff,
+		-- except (hack alert) for data con wrappers
+		-- We want to inline data con wrappers even in gentle mode
+		-- because rule LHSs match better then
+	SimplPhase n -> isActive n (idInlinePragma id)
+
+activeRule :: SimplEnv -> Maybe (Activation -> Bool)
+-- Nothing => No rules at all
+activeRule env
+  = case getMode env of
+	SimplGently  -> Nothing		-- No rules in gentle mode
+	SimplPhase n -> Just (isActive n)
+\end{code}	
+
+
+%************************************************************************
+%*									*
+\subsubsection{Command-line switches}
+%*									*
+%************************************************************************
+
+\begin{code}
+getSimplIntSwitch :: SwitchChecker -> (Int-> SimplifierSwitch) -> Int
+getSimplIntSwitch chkr switch
+  = expectJust "getSimplIntSwitch" (intSwitchSet chkr switch)
+
+switchIsOn :: (switch -> SwitchResult) -> switch -> Bool
+
+switchIsOn lookup_fn switch
+  = case (lookup_fn switch) of
+      SwBool False -> False
+      _	    	   -> True
+
+intSwitchSet :: (switch -> SwitchResult)
+	     -> (Int -> switch)
+	     -> Maybe Int
+
+intSwitchSet lookup_fn switch
+  = case (lookup_fn (switch (panic "intSwitchSet"))) of
+      SwInt int -> Just int
+      _	    	-> Nothing
 \end{code}
 
 
 \begin{code}
-newId :: UserFS -> Type -> (Id -> SimplM a) -> SimplM a
-	-- Extends the in-scope-env too
-newId fs ty m dflags env@(SimplEnv {seSubst = subst}) us sc
-  =  case splitUniqSupply us of
-	(us1, us2) -> m v dflags (env {seSubst = Subst.extendNewInScope subst v}) 
-			us2 sc
-		   where
-		      v = mkSysLocal fs (uniqFromSupply us1) ty
+type SwitchChecker = SimplifierSwitch -> SwitchResult
 
-newIds :: UserFS -> [Type] -> ([Id] -> SimplM a) -> SimplM a
-newIds fs tys m dflags env@(SimplEnv {seSubst = subst}) us sc
-  =  case splitUniqSupply us of
-	(us1, us2) -> m vs dflags (env {seSubst = Subst.extendNewInScopeList subst vs}) 
-			us2 sc
-		   where
-		      vs = zipWith (mkSysLocal fs) (uniqsFromSupply us1) tys
+data SwitchResult
+  = SwBool	Bool		-- on/off
+  | SwString	FAST_STRING	-- nothing or a String
+  | SwInt	Int		-- nothing or an Int
+
+isAmongSimpl :: [SimplifierSwitch] -> SimplifierSwitch -> SwitchResult
+isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
+					-- in the list; defaults right at the end.
+  = let
+	tidied_on_switches = foldl rm_dups [] on_switches
+		-- The fold*l* ensures that we keep the latest switches;
+		-- ie the ones that occur earliest in the list.
+
+	sw_tbl :: Array Int SwitchResult
+	sw_tbl = (array	(0, lAST_SIMPL_SWITCH_TAG) -- bounds...
+			all_undefined)
+		 // defined_elems
+
+	all_undefined = [ (i, SwBool False) | i <- [0 .. lAST_SIMPL_SWITCH_TAG ] ]
+
+	defined_elems = map mk_assoc_elem tidied_on_switches
+    in
+    -- (avoid some unboxing, bounds checking, and other horrible things:)
+#if __GLASGOW_HASKELL__ < 405
+    case sw_tbl of { Array bounds_who_needs_'em stuff ->
+#else
+    case sw_tbl of { Array _ _ stuff ->
+#endif
+    \ switch ->
+	case (indexArray# stuff (tagOf_SimplSwitch switch)) of
+#if __GLASGOW_HASKELL__ < 400
+	  Lift v -> v
+#elif __GLASGOW_HASKELL__ < 403
+	  (# _, v #) -> v
+#else
+	  (# v #) -> v
+#endif
+    }
+  where
+    mk_assoc_elem k@(MaxSimplifierIterations lvl)
+	= (iBox (tagOf_SimplSwitch k), SwInt lvl)
+    mk_assoc_elem k
+	= (iBox (tagOf_SimplSwitch k), SwBool True) -- I'm here, Mom!
+
+    -- cannot have duplicates if we are going to use the array thing
+    rm_dups switches_so_far switch
+      = if switch `is_elem` switches_so_far
+    	then switches_so_far
+	else switch : switches_so_far
+      where
+	sw `is_elem` []     = False
+	sw `is_elem` (s:ss) = (tagOf_SimplSwitch sw) ==# (tagOf_SimplSwitch s)
+			    || sw `is_elem` ss
 \end{code}
+
+These things behave just like enumeration types.
+
+\begin{code}
+instance Eq SimplifierSwitch where
+    a == b = tagOf_SimplSwitch a ==# tagOf_SimplSwitch b
+
+instance Ord SimplifierSwitch where
+    a <  b  = tagOf_SimplSwitch a <# tagOf_SimplSwitch b
+    a <= b  = tagOf_SimplSwitch a <=# tagOf_SimplSwitch b
+
+
+tagOf_SimplSwitch (MaxSimplifierIterations _)	= _ILIT(1)
+tagOf_SimplSwitch NoCaseOfCase			= _ILIT(2)
+
+-- If you add anything here, be sure to change lAST_SIMPL_SWITCH_TAG, too!
+
+lAST_SIMPL_SWITCH_TAG = 2
+\end{code}
+

@@ -144,12 +144,6 @@ data LibCaseEnv
 initEnv :: Int -> LibCaseEnv
 initEnv bomb_size = LibCaseEnv bomb_size 0 emptyVarEnv emptyVarEnv []
 
-pprEnv :: LibCaseEnv -> SDoc
-pprEnv (LibCaseEnv _ lvl lvl_env _ scruts)
-  = vcat [text "LibCaseEnv" <+> int lvl,
-	  fsep (map ppr (ufmToList lvl_env)),
-	  fsep (map ppr scruts)]
-
 bombOutSize (LibCaseEnv bomb_size _ _ _ _) = bomb_size
 \end{code}
 

@@ -182,13 +182,17 @@ So we treat lambda in groups, using the following rule:
 fiExpr to_drop (_, AnnLam b body)
   = case collect [b] body of
       (bndrs, real_body)
-	| all is_ok bndrs -> mkLams bndrs (fiExpr to_drop real_body)
+--	| all is_ok bndrs -> mkLams bndrs (fiExpr to_drop real_body)
+-- [July 01: I'm experiment with getting the full laziness
+-- pass to floats bindings out past big lambdas (instead of the simplifier)
+-- so I don't want the float-in pass to just push them right back in.
+-- I'm going to try just dumping all bindings outside lambdas.]
 	| otherwise	  -> mkCoLets' to_drop (mkLams bndrs (fiExpr [] real_body))
   where
     collect bs (_, AnnLam b body) = collect (b:bs) body
     collect bs body		  = (reverse bs, body)
 
-    is_ok bndr = isTyVar bndr || isOneShotLambda bndr
+--    is_ok bndr = isTyVar bndr || isOneShotLambda bndr
 \end{code}
 
 We don't float lets inwards past an SCC.

@@ -17,10 +17,10 @@ import TcMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyInferCheck )
 import TcMType		( newTyVarTy )
 import TcType		( tyVarsOfTypes, openTypeKind )
-import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
+import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar, tcDelay )
 import TcMonoType	( kcHsSigTypes, tcHsSigType, UserTypeCtxt(..), tcScopedTyVars )
 import TcExpr		( tcExpr )
-import TcEnv		( tcExtendLocalValEnv, isLocalThing )
+import TcEnv		( RecTcEnv, tcExtendLocalValEnv, isLocalThing )
 import Rules		( extendRuleBase )
 import Inst		( LIE, plusLIEs, instToId )
 import Id		( idName, idType, mkLocalId )
@@ -30,16 +30,21 @@ import Outputable
 \end{code}
 
 \begin{code}
-tcIfaceRules :: PackageRuleBase -> Module -> [RenamedRuleDecl] 
+tcIfaceRules :: RecTcEnv -> PackageRuleBase -> Module -> [RenamedRuleDecl] 
 	     -> TcM (PackageRuleBase, [TypecheckedRuleDecl])
-tcIfaceRules pkg_rule_base mod decls 
-  = mapTc tcIfaceRule decls		`thenTc` \ new_rules ->
+tcIfaceRules unf_env pkg_rule_base mod decls 
+  = tcDelay unf_env doc [] (
+	-- We need the recursive env because the built-in rules show up as
+	-- IfaceOut rules, sot they get typechecked by tcIfaceRules 
+	mapTc tcIfaceRule decls
+    )				`thenTc` \ new_rules ->
     let
 	(local_rules, imported_rules) = partition is_local new_rules
 	new_rule_base = foldl add pkg_rule_base imported_rules
     in
     returnTc (new_rule_base, local_rules)
   where
+    doc = text "tcIfaceRules"
     add rule_base (IfaceRuleOut id rule) = extendRuleBase rule_base (id, rule)
 
 	-- When relinking this module from its interface-file decls

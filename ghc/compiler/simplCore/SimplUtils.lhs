@@ -5,46 +5,51 @@
 
 \begin{code}
 module SimplUtils (
-	simplBinder, simplBinders, simplRecIds, simplLetId, simplLamBinder,
-	tryRhsTyLam, tryEtaExpansion,
-	mkCase,
+	simplBinder, simplBinders, simplRecIds, simplLetId, simplLamBinders,
+	tryEtaExpansion,
+	newId, mkLam, mkCase,
 
 	-- The continuation type
-	SimplCont(..), DupFlag(..), contIsDupable, contResultType,
-	countValArgs, countArgs, mkRhsStop, mkStop,
+	SimplCont(..), DupFlag(..), LetRhsFlag(..), 
+	contIsDupable, contResultType,
+	countValArgs, countArgs, 
+	mkBoringStop, mkStop, contIsRhs, contIsRhsOrArg,
 	getContArgs, interestingCallContext, interestingArg, isStrictType, discardInline
 
     ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( switchIsOn, SimplifierSwitch(..),
-			  opt_SimplDoLambdaEtaExpansion, opt_SimplCaseMerge, 
-			  opt_UF_UpdateInPlace
+import CmdLineOpts	( SimplifierSwitch(..),
+			  opt_SimplDoLambdaEtaExpansion, opt_SimplDoEtaReduction,
+			  opt_SimplCaseMerge, opt_UF_UpdateInPlace
 			)
 import CoreSyn
+import CoreFVs		( exprSomeFreeVars, exprsSomeFreeVars )
 import CoreUtils	( exprIsTrivial, cheapEqExpr, exprType, exprIsCheap, 
 			  etaExpand, exprEtaExpandArity, bindNonRec, mkCoerce,
-			  findDefault
+			  findDefault, exprOkForSpeculation, exprIsValue
 			)
 import Subst		( InScopeSet, mkSubst, substExpr )
 import qualified Subst	( simplBndrs, simplBndr, simplLetId, simplLamBndr )
-import Id		( idType, idName, 
+import Id		( Id, idType, idName, 
+			  mkSysLocal, hasNoBinding, isDeadBinder, idNewDemandInfo,
 			  idUnfolding, idNewStrictness,
 			  mkLocalId, idInfo
 			)
-import Maybes		( maybeToBool, catMaybes )
 import Name		( setNameUnique )
 import NewDemand	( isStrictDmd, isBotRes, splitStrictSig )
 import SimplMonad
 import Type		( Type, mkForAllTys, seqType, 
 			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys,
-			  isUnLiftedType, isStrictType,
-			  splitRepFunTys
+			  isUnLiftedType, splitRepFunTys, isStrictType
 			)
-import TyCon		( tyConDataConsIfAvailable )
-import DataCon		( dataConRepArity )
+import OccName		( UserFS )
+import TyCon		( tyConDataConsIfAvailable, isDataTyCon )
+import DataCon		( dataConRepArity, dataConSig, dataConArgTys )
+import Var		( mkSysTyVar, tyVarKind )
 import VarEnv		( SubstEnv )
+import VarSet		( mkVarSet, varSetElems, intersectVarSet )
 import Util		( lengthExceeds, mapAccumL )
 import Outputable
 \end{code}
@@ -59,9 +64,10 @@ import Outputable
 \begin{code}
 data SimplCont		-- Strict contexts
   = Stop     OutType		-- Type of the result
-	     Bool		-- True => This is the RHS of a thunk whose type suggests
-				--	   that update-in-place would be possible
-				--	   (This makes the inliner a little keener.)
+	     LetRhsFlag
+	     Bool		-- True <=> This is the RHS of a thunk whose type suggests
+				--	    that update-in-place would be possible
+				--	    (This makes the inliner a little keener.)
 
   | CoerceIt OutType			-- The To-type, simplified
 	     SimplCont
@@ -70,27 +76,35 @@ data SimplCont		-- Strict contexts
 	     SimplCont			-- keen to inline itelf
 
   | ApplyTo  DupFlag 
-	     InExpr SubstEnv		-- The argument, as yet unsimplified, 
-	     SimplCont			-- and its subst-env
+	     InExpr SimplEnv		-- The argument, as yet unsimplified, 
+	     SimplCont			-- and its environment
 
   | Select   DupFlag 
-	     InId [InAlt] SubstEnv	-- The case binder, alts, and subst-env
+	     InId [InAlt] SimplEnv	-- The case binder, alts, and subst-env
 	     SimplCont
 
   | ArgOf    DupFlag		-- An arbitrary strict context: the argument 
   	     			-- 	of a strict function, or a primitive-arg fn
 				-- 	or a PrimOp
+	     LetRhsFlag
 	     OutType		-- cont_ty: the type of the expression being sought by the context
 				--	f (error "foo") ==> coerce t (error "foo")
 				-- when f is strict
 				-- We need to know the type t, to which to coerce.
-	     (OutExpr -> SimplM OutExprStuff)	-- What to do with the result
+	     (SimplEnv -> OutExpr -> SimplM FloatsWithExpr)	-- What to do with the result
 				-- The result expression in the OutExprStuff has type cont_ty
 
+data LetRhsFlag = AnArg		-- It's just an argument not a let RHS
+		| AnRhs 	-- It's the RHS of a let (so please float lets out of big lambdas)
+
+instance Outputable LetRhsFlag where
+  ppr AnArg = ptext SLIT("arg")
+  ppr AnRhs = ptext SLIT("rhs")
+
 instance Outputable SimplCont where
-  ppr (Stop _ _)       		     = ptext SLIT("Stop")
+  ppr (Stop _ is_rhs _)  	     = ptext SLIT("Stop") <> brackets (ppr is_rhs)
   ppr (ApplyTo dup arg se cont)      = (ptext SLIT("ApplyTo") <+> ppr dup <+> ppr arg) $$ ppr cont
-  ppr (ArgOf   dup _ _)   	     = ptext SLIT("ArgOf...") <+> ppr dup
+  ppr (ArgOf   dup _ _ _)   	     = ptext SLIT("ArgOf...") <+> ppr dup
   ppr (Select dup bndr alts se cont) = (ptext SLIT("Select") <+> ppr dup <+> ppr bndr) $$ 
 				       (nest 4 (ppr alts)) $$ ppr cont
   ppr (CoerceIt ty cont)	     = (ptext SLIT("CoerceIt") <+> ppr ty) $$ ppr cont
@@ -104,16 +118,26 @@ instance Outputable DupFlag where
 
 
 -------------------
-mkRhsStop, mkStop :: OutType -> SimplCont
-mkStop    ty = Stop ty False
-mkRhsStop ty = Stop ty (canUpdateInPlace ty)
+mkBoringStop :: OutType -> SimplCont
+mkBoringStop ty = Stop ty AnArg (canUpdateInPlace ty)
 
+mkStop :: OutType -> LetRhsFlag -> SimplCont
+mkStop ty is_rhs = Stop ty is_rhs (canUpdateInPlace ty)
+
+contIsRhs :: SimplCont -> Bool
+contIsRhs (Stop _ AnRhs _)    = True
+contIsRhs (ArgOf _ AnRhs _ _) = True
+contIsRhs other	              = False
+
+contIsRhsOrArg (Stop _ _ _)    = True
+contIsRhsOrArg (ArgOf _ _ _ _) = True
+contIsRhsOrArg other	       = False
 
 -------------------
 contIsDupable :: SimplCont -> Bool
-contIsDupable (Stop _ _)       		 = True
+contIsDupable (Stop _ _ _)     		 = True
 contIsDupable (ApplyTo  OkToDup _ _ _)   = True
-contIsDupable (ArgOf    OkToDup _ _)     = True
+contIsDupable (ArgOf    OkToDup _ _ _)   = True
 contIsDupable (Select   OkToDup _ _ _ _) = True
 contIsDupable (CoerceIt _ cont)          = contIsDupable cont
 contIsDupable (InlinePlease cont)	 = contIsDupable cont
@@ -127,7 +151,7 @@ discardInline cont		   = cont
 
 -------------------
 discardableCont :: SimplCont -> Bool
-discardableCont (Stop _ _)	    = False
+discardableCont (Stop _ _ _)	    = False
 discardableCont (CoerceIt _ cont)   = discardableCont cont
 discardableCont (InlinePlease cont) = discardableCont cont
 discardableCont other		    = True
@@ -135,15 +159,15 @@ discardableCont other		    = True
 discardCont :: SimplCont	-- A continuation, expecting
 	    -> SimplCont	-- Replace the continuation with a suitable coerce
 discardCont cont = case cont of
-		     Stop to_ty _ -> cont
-		     other        -> CoerceIt to_ty (mkStop to_ty)
+		     Stop to_ty is_rhs _ -> cont
+		     other               -> CoerceIt to_ty (mkBoringStop to_ty)
 		 where
 		   to_ty = contResultType cont
 
 -------------------
 contResultType :: SimplCont -> OutType
-contResultType (Stop to_ty _)	     = to_ty
-contResultType (ArgOf _ to_ty _)     = to_ty
+contResultType (Stop to_ty _ _)	     = to_ty
+contResultType (ArgOf _ _ to_ty _)   = to_ty
 contResultType (ApplyTo _ _ _ cont)  = contResultType cont
 contResultType (CoerceIt _ cont)     = contResultType cont
 contResultType (InlinePlease cont)   = contResultType cont
@@ -162,17 +186,17 @@ countArgs other			  = 0
 
 
 \begin{code}
-getContArgs :: OutId -> SimplCont 
-	    -> SimplM ([(InExpr, SubstEnv, Bool)],	-- Arguments; the Bool is true for strict args
-			SimplCont,			-- Remaining continuation
-			Bool)				-- Whether we came across an InlineCall
+getContArgs :: SwitchChecker
+	    -> OutId -> SimplCont 
+	    -> ([(InExpr, SimplEnv, Bool)],	-- Arguments; the Bool is true for strict args
+		SimplCont,			-- Remaining continuation
+		Bool)				-- Whether we came across an InlineCall
 -- getContArgs id k = (args, k', inl)
 -- 	args are the leading ApplyTo items in k
 --	(i.e. outermost comes first)
 --	augmented with demand info from the functionn
-getContArgs fun orig_cont
-  = getSwitchChecker 	`thenSmpl` \ chkr ->
-    let
+getContArgs chkr fun orig_cont
+  = let
 		-- Ignore strictness info if the no-case-of-case
 		-- flag is on.  Strictness changes evaluation order
 		-- and that can change full laziness
@@ -204,9 +228,8 @@ getContArgs fun orig_cont
 	--	* f (error "Hello") where f is strict
 	--	etc
     go acc ss inl cont 
-	| null ss && discardableCont cont = tick BottomFound	`thenSmpl_`
-					    returnSmpl (reverse acc, discardCont cont, inl)
-	| otherwise			  = returnSmpl (reverse acc, cont, 	       inl)
+	| null ss && discardableCont cont = (reverse acc, discardCont cont, inl)
+	| otherwise			  = (reverse acc, cont, 	    inl)
 
     ----------------------------
     vanilla_stricts, computed_stricts :: [Bool]
@@ -334,7 +357,7 @@ interestingCallContext :: Bool 		-- False <=> no args at all
 	--	s = "foo"
 	--	f = \x -> ...(error s)...
 
-	-- Fundamentally such contexts should not ecourage inlining becuase
+	-- Fundamentally such contexts should not ecourage inlining because
 	-- the context can ``see'' the unfolding of the variable (e.g. case or a RULE)
 	-- so there's no gain.
 	--
@@ -359,9 +382,9 @@ interestingCallContext some_args some_val_args cont
 						-- Perhaps True is a bit over-keen, but I've
 						-- seen (coerce f) x, where f has an INLINE prag,
 						-- So we have to give some motivaiton for inlining it
-    interesting (ArgOf _ _ _)	       = some_val_args
-    interesting (Stop ty upd_in_place) = some_val_args && upd_in_place
-    interesting (CoerceIt _ cont)      = interesting cont
+    interesting (ArgOf _ _ _ _)	         = some_val_args
+    interesting (Stop ty _ upd_in_place) = some_val_args && upd_in_place
+    interesting (CoerceIt _ cont)        = interesting cont
 	-- If this call is the arg of a strict function, the context
 	-- is a bit interesting.  If we inline here, we may get useful
 	-- evaluation information to avoid repeated evals: e.g.
@@ -408,53 +431,49 @@ canUpdateInPlace ty
 %*									*
 %************************************************************************
 
+These functions are in the monad only so that they can be made strict via seq.
+
 \begin{code}
-simplBinders :: [InBinder] -> ([OutBinder] -> SimplM a) -> SimplM a
-simplBinders bndrs thing_inside
-  = getSubst		`thenSmpl` \ subst ->
-    let
-	(subst', bndrs') = Subst.simplBndrs subst bndrs
+simplBinders :: SimplEnv -> [InBinder] -> SimplM (SimplEnv, [OutBinder])
+simplBinders env bndrs
+  = let
+	(subst', bndrs') = Subst.simplBndrs (getSubst env) bndrs
     in
     seqBndrs bndrs'	`seq`
-    setSubst subst' (thing_inside bndrs')
+    returnSmpl (setSubst env subst', bndrs')
 
-simplBinder :: InBinder -> (OutBinder -> SimplM a) -> SimplM a
-simplBinder bndr thing_inside
-  = getSubst		`thenSmpl` \ subst ->
-    let
-	(subst', bndr') = Subst.simplBndr subst bndr
+simplBinder :: SimplEnv -> InBinder -> SimplM (SimplEnv, OutBinder)
+simplBinder env bndr
+  = let
+	(subst', bndr') = Subst.simplBndr (getSubst env) bndr
     in
     seqBndr bndr'	`seq`
-    setSubst subst' (thing_inside bndr')
+    returnSmpl (setSubst env subst', bndr')
 
 
-simplLamBinder :: InBinder -> (OutBinder -> SimplM a) -> SimplM a
-simplLamBinder bndr thing_inside
-  = getSubst		`thenSmpl` \ subst ->
-    let
-	(subst', bndr') = Subst.simplLamBndr subst bndr
+simplLamBinders :: SimplEnv -> [InBinder] -> SimplM (SimplEnv, [OutBinder])
+simplLamBinders env bndrs
+  = let
+	(subst', bndrs') = mapAccumL Subst.simplLamBndr (getSubst env) bndrs
     in
-    seqBndr bndr'	`seq`
-    setSubst subst' (thing_inside bndr')
+    seqBndrs bndrs'	`seq`
+    returnSmpl (setSubst env subst', bndrs')
 
-
-simplRecIds :: [InBinder] -> ([OutBinder] -> SimplM a) -> SimplM a
-simplRecIds ids thing_inside
-  = getSubst		`thenSmpl` \ subst ->
-    let
-	(subst', ids') = mapAccumL Subst.simplLetId subst ids
+simplRecIds :: SimplEnv -> [InBinder] -> SimplM (SimplEnv, [OutBinder])
+simplRecIds env ids
+  = let
+	(subst', ids') = mapAccumL Subst.simplLetId (getSubst env) ids
     in
     seqBndrs ids'	`seq`
-    setSubst subst' (thing_inside ids')
+    returnSmpl (setSubst env subst', ids')
 
-simplLetId :: InBinder -> (OutBinder -> SimplM a) -> SimplM a
-simplLetId id thing_inside
-  = getSubst		`thenSmpl` \ subst ->
-    let
-	(subst', id') = Subst.simplLetId subst id
+simplLetId :: SimplEnv -> InBinder -> SimplM (SimplEnv, OutBinder)
+simplLetId env id
+  = let
+	(subst', id') = Subst.simplLetId (getSubst env) id
     in
-    seqBndr id'	`seq`
-    setSubst subst' (thing_inside id')
+    seqBndr id'		`seq`
+    returnSmpl (setSubst env subst', id')
 
 seqBndrs [] = ()
 seqBndrs (b:bs) = seqBndr b `seq` seqBndrs bs
@@ -466,13 +485,130 @@ seqBndr b | isTyVar b = b `seq` ()
 \end{code}
 
 
+\begin{code}
+newId :: UserFS -> Type -> SimplM Id
+newId fs ty = getUniqueSmpl 	`thenSmpl` \ uniq ->
+	      returnSmpl (mkSysLocal fs uniq ty)
+\end{code}
+
+
 %************************************************************************
 %*									*
-\subsection{Local tyvar-lifting}
+\subsection{Rebuilding a lambda}
 %*									*
 %************************************************************************
 
-mkRhsTyLam tries this transformation, when the big lambda appears as
+\begin{code}
+mkLam :: SimplEnv -> [OutBinder] -> OutExpr -> SimplCont -> SimplM FloatsWithExpr
+\end{code}
+
+Try three things
+	a) eta reduction, if that gives a trivial expression
+	b) eta expansion [only if there are some value lambdas]
+	c) floating lets out through big lambdas 
+		[only if all tyvar lambdas, and only if this lambda
+		 is the RHS of a let]
+
+\begin{code}
+mkLam env bndrs body cont
+ | opt_SimplDoEtaReduction,
+   Just etad_lam <- tryEtaReduce bndrs body
+ = tick (EtaReduction (head bndrs)) 	`thenSmpl_`
+   returnSmpl (emptyFloats env, etad_lam)
+
+ | opt_SimplDoLambdaEtaExpansion,
+   any isRuntimeVar bndrs
+ = tryEtaExpansion body		`thenSmpl` \ body' ->
+   returnSmpl (emptyFloats env, mkLams bndrs body')
+
+{-	Sept 01: I'm experimenting with getting the
+	full laziness pass to float out past big lambdsa
+ | all isTyVar bndrs,	-- Only for big lambdas
+   contIsRhs cont	-- Only try the rhs type-lambda floating
+			-- if this is indeed a right-hand side; otherwise
+			-- we end up floating the thing out, only for float-in
+			-- to float it right back in again!
+ = tryRhsTyLam env bndrs body		`thenSmpl` \ (floats, body') ->
+   returnSmpl (floats, mkLams bndrs body')
+-}
+
+ | otherwise 
+ = returnSmpl (emptyFloats env, mkLams bndrs body)
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Eta expansion and reduction}
+%*									*
+%************************************************************************
+
+We try for eta reduction here, but *only* if we get all the 
+way to an exprIsTrivial expression.    
+We don't want to remove extra lambdas unless we are going 
+to avoid allocating this thing altogether
+
+\begin{code}
+tryEtaReduce :: [OutBinder] -> OutExpr -> Maybe OutExpr
+tryEtaReduce bndrs body 
+	-- We don't use CoreUtils.etaReduce, because we can be more
+	-- efficient here:
+	--  (a) we already have the binders
+	--  (b) we can do the triviality test before computing the free vars
+	--	[in fact I take the simple path and look for just a variable]
+  = go (reverse bndrs) body
+  where
+    go (b : bs) (App fun arg) | ok_arg b arg = go bs fun	-- Loop round
+    go []       (Var fun)     | ok_fun fun   = Just (Var fun)	-- Success!
+    go _        _			     = Nothing		-- Failure!
+
+    ok_fun fun   = not (fun `elem` bndrs) && not (hasNoBinding fun)
+    ok_arg b arg = varToCoreExpr b `cheapEqExpr` arg
+\end{code}
+
+
+	Try eta expansion for RHSs
+
+We go for:
+   f = \x1..xn -> N  ==>   f = \x1..xn y1..ym -> N y1..ym
+				 (n >= 0)
+
+where (in both cases) 
+
+	* The xi can include type variables
+
+	* The yi are all value variables
+
+	* N is a NORMAL FORM (i.e. no redexes anywhere)
+	  wanting a suitable number of extra args.
+
+We may have to sandwich some coerces between the lambdas
+to make the types work.   exprEtaExpandArity looks through coerces
+when computing arity; and etaExpand adds the coerces as necessary when
+actually computing the expansion.
+
+\begin{code}
+tryEtaExpansion :: OutExpr -> SimplM OutExpr
+-- There is at least one runtime binder in the binders
+tryEtaExpansion body
+  | arity_is_manifest		-- Some lambdas but not enough
+  = returnSmpl body
+
+  | otherwise
+  = getUniquesSmpl 			`thenSmpl` \ us ->
+    returnSmpl (etaExpand fun_arity us body (exprType body))
+  where
+    (fun_arity, arity_is_manifest) = exprEtaExpandArity body
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Floating lets out of big lambdas}
+%*									*
+%************************************************************************
+
+tryRhsTyLam tries this transformation, when the big lambda appears as
 the RHS of a let(rec) binding:
 
 	/\abc -> let(rec) x = e in b
@@ -537,19 +673,20 @@ as we would normally do.
 
 
 \begin{code}
-tryRhsTyLam :: OutExpr -> SimplM ([OutBind], OutExpr)
+{-	Trying to do this in full laziness
 
-tryRhsTyLam rhs 			-- Only does something if there's a let
-  | null tyvars || not (worth_it body)	-- inside a type lambda, 
-  = returnSmpl ([], rhs)		-- and a WHNF inside that
+tryRhsTyLam :: SimplEnv -> [OutTyVar] -> OutExpr -> SimplM FloatsWithExpr
+-- Call ensures that all the binders are type variables
+
+tryRhsTyLam env tyvars body 		-- Only does something if there's a let
+  |  not (all isTyVar tyvars)
+  || not (worth_it body)		-- inside a type lambda, 
+  = returnSmpl (emptyFloats env, body)	-- and a WHNF inside that
 
   | otherwise
-  = go (\x -> x) body		`thenSmpl` \ (binds, body') ->
-    returnSmpl (binds,  mkLams tyvars body')
+  = go env (\x -> x) body
 
   where
-    (tyvars, body) = collectTyBinders rhs
-
     worth_it e@(Let _ _) = whnf_in_middle e
     worth_it e		 = False
 
@@ -557,21 +694,21 @@ tryRhsTyLam rhs 			-- Only does something if there's a let
     whnf_in_middle (Let _ e) = whnf_in_middle e
     whnf_in_middle e	     = exprIsCheap e
 
-    go fn (Let bind@(NonRec var rhs) body)
-      | exprIsTrivial rhs
-      = go (fn . Let bind) body
+    main_tyvar_set = mkVarSet tyvars
 
-    go fn (Let (NonRec var rhs) body)
-      = mk_poly tyvars_here var				`thenSmpl` \ (var', rhs') ->
-	go (fn . Let (mk_silly_bind var rhs')) body 	`thenSmpl` \ (binds, body') ->
-	returnSmpl (NonRec var' (mkLams tyvars_here (fn rhs)) : binds, body')
+    go env fn (Let bind@(NonRec var rhs) body)
+      | exprIsTrivial rhs
+      = go env (fn . Let bind) body
+
+    go env fn (Let (NonRec var rhs) body)
+      = mk_poly tyvars_here var							`thenSmpl` \ (var', rhs') ->
+	addAuxiliaryBind env (NonRec var' (mkLams tyvars_here (fn rhs)))	$ \ env -> 
+	go env (fn . Let (mk_silly_bind var rhs')) body
 
       where
-	tyvars_here = tyvars
-		--	main_tyvar_set = mkVarSet tyvars
-		--	var_ty = idType var
-		-- varSetElems (main_tyvar_set `intersectVarSet` tyVarsOfType var_ty)
-		-- tyvars_here was an attempt to reduce the number of tyvars
+
+	tyvars_here = varSetElems (main_tyvar_set `intersectVarSet` exprSomeFreeVars isTyVar rhs)
+		-- Abstract only over the type variables free in the rhs
 		-- wrt which the new binding is abstracted.  But the naive
 		-- approach of abstract wrt the tyvars free in the Id's type
 		-- fails. Consider:
@@ -587,22 +724,20 @@ tryRhsTyLam rhs 			-- Only does something if there's a let
 		-- abstracting wrt *all* the tyvars.  We'll see if that
 		-- gives rise to problems.   SLPJ June 98
 
-    go fn (Let (Rec prs) body)
+    go env fn (Let (Rec prs) body)
        = mapAndUnzipSmpl (mk_poly tyvars_here) vars	`thenSmpl` \ (vars', rhss') ->
 	 let
-	    gn body  = fn (foldr Let body (zipWith mk_silly_bind vars rhss'))
-	    new_bind = Rec (vars' `zip` [mkLams tyvars_here (gn rhs) | rhs <- rhss])
+	    gn body = fn (foldr Let body (zipWith mk_silly_bind vars rhss'))
+	    pairs   = vars' `zip` [mkLams tyvars_here (gn rhs) | rhs <- rhss]
 	 in
-	 go gn body 				`thenSmpl` \ (binds, body') -> 
-	 returnSmpl (new_bind : binds, body')
+	 addAuxiliaryBind env (Rec pairs)		$ \ env ->
+	 go env gn body 
        where
 	 (vars,rhss) = unzip prs
-	 tyvars_here = tyvars
-		-- varSetElems (main_tyvar_set `intersectVarSet` tyVarsOfTypes var_tys)
-		-- 	 var_tys     = map idType vars
+	 tyvars_here = varSetElems (main_tyvar_set `intersectVarSet` exprsSomeFreeVars isTyVar (map snd prs))
 		-- See notes with tyvars_here above
 
-    go fn body = returnSmpl ([], fn body)
+    go env fn body = returnSmpl (emptyFloats env, fn body)
 
     mk_poly tyvars_here var
       = getUniqueSmpl		`thenSmpl` \ uniq ->
@@ -646,80 +781,7 @@ tryRhsTyLam rhs 			-- Only does something if there's a let
 		-- Solution: put an INLINE note on g's RHS, so that poly_g seems
 		--	     to appear many times.  (NB: mkInlineMe eliminates
 		--	     such notes on trivial RHSs, so do it manually.)
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Eta expansion}
-%*									*
-%************************************************************************
-
-	Try eta expansion for RHSs
-
-We go for:
-   Case 1    f = \x1..xn -> N  ==>   f = \x1..xn y1..ym -> N y1..ym
-		 (n >= 0)
-     OR		
-   Case 2    f = N E1..En      ==>   z1=E1
-		 (n > 0)		 .. 
-				     zn=En
-				     f = \y1..ym -> N z1..zn y1..ym
-
-where (in both cases) 
-
-	* The xi can include type variables
-
-	* The yi are all value variables
-
-	* N is a NORMAL FORM (i.e. no redexes anywhere)
-	  wanting a suitable number of extra args.
-
-	* the Ei must not have unlifted type
-
-There is no point in looking for a combination of the two, because
-that would leave use with some lets sandwiched between lambdas; that's
-what the final test in the first equation is for.
-
-In Case 1, we may have to sandwich some coerces between the lambdas
-to make the types work.   exprEtaExpandArity looks through coerces
-when computing arity; and etaExpand adds the coerces as necessary when
-actually computing the expansion.
-
-\begin{code}
-tryEtaExpansion :: OutExpr -> OutType -> SimplM ([OutBind], OutExpr)
-tryEtaExpansion rhs rhs_ty
-  |  not opt_SimplDoLambdaEtaExpansion 		-- Not if switched off
-  || exprIsTrivial rhs				-- Not if RHS is trivial
-  || final_arity == 0				-- Not if arity is zero
-  = returnSmpl ([], rhs)
-
-  | n_val_args == 0 && not arity_is_manifest
-  = 	-- Some lambdas but not enough: case 1
-    getUniqSupplySmpl 				`thenSmpl` \ us ->
-    returnSmpl ([], etaExpand final_arity us rhs rhs_ty)
-
-  | n_val_args > 0 && not (any cant_bind arg_infos)
-  = 	-- Partial application: case 2
-    mapAndUnzipSmpl bind_z_arg arg_infos	`thenSmpl` \ (maybe_z_binds, z_args) ->
-    getUniqSupplySmpl				`thenSmpl` \ us ->
-    returnSmpl (catMaybes maybe_z_binds, 
-		etaExpand final_arity us (mkApps fun z_args) rhs_ty)
-
-  | otherwise
-  = returnSmpl ([], rhs)
-  where
-    (fun, args)			   = collectArgs rhs
-    n_val_args			   = valArgCount args
-    (fun_arity, arity_is_manifest) = exprEtaExpandArity fun
-    final_arity			   = 0 `max` (fun_arity - n_val_args)
-    arg_infos    		   = [(arg, exprType arg, exprIsTrivial arg) | arg <- args]
-    cant_bind (_, ty, triv)	   = not triv && isUnLiftedType ty
-
-    bind_z_arg (arg, arg_ty, trivial_arg) 
-	| trivial_arg = returnSmpl (Nothing, arg)
-        | otherwise   = newId SLIT("z") arg_ty	$ \ z ->
-			returnSmpl (Just (NonRec z arg), Var z)
+-}
 \end{code}
 
 
@@ -729,79 +791,319 @@ tryEtaExpansion rhs rhs_ty
 %*									*
 %************************************************************************
 
+mkCase puts a case expression back together, trying various transformations first.
+
 \begin{code}
 mkCase :: OutExpr -> OutId -> [OutAlt] -> SimplM OutExpr
+
+mkCase scrut case_bndr alts
+  = mkAlts scrut case_bndr alts	`thenSmpl` \ better_alts ->
+    mkCase1 scrut case_bndr better_alts
 \end{code}
 
-@mkCase@ tries the following transformation (if possible):
 
-case e of b {             ==>   case e of b {
-  p1 -> rhs1	                  p1 -> rhs1
-  ...	                          ...
-  pm -> rhsm                      pm -> rhsm
-  _  -> case b of b' {            pn -> rhsn[b/b'] {or (alg)  let b=b' in rhsn}
-						   {or (prim) case b of b' { _ -> rhsn}}
-	      pn -> rhsn          ...
-   	      ...                 po -> rhso[b/b']
-	      po -> rhso          _  -> rhsd[b/b'] {or let b'=b in rhsd}
-	      _  -> rhsd
-}
+mkAlts tries these things:
 
-which merges two cases in one case when -- the default alternative of
-the outer case scrutises the same variable as the outer case This
-transformation is called Case Merging.  It avoids that the same
-variable is scrutinised multiple times.
+1.  If several alternatives are identical, merge them into
+    a single DEFAULT alternative.  I've occasionally seen this 
+    making a big difference:
+
+	case e of		=====>     case e of
+	  C _ -> f x			     D v -> ....v....
+	  D v -> ....v....		     DEFAULT -> f x
+	  DEFAULT -> f x
+
+   The point is that we merge common RHSs, at least for the DEFAULT case.
+   [One could do something more elaborate but I've never seen it needed.]
+   To avoid an expensive test, we just merge branches equal to the *first*
+   alternative; this picks up the common cases
+	a) all branches equal
+	b) some branches equal to the DEFAULT (which occurs first)
+
+2.  If the DEFAULT alternative can match only one possible constructor,
+    then make that constructor explicit.
+    e.g.
+	case e of x { DEFAULT -> rhs }
+     ===>
+	case e of x { (a,b) -> rhs }
+    where the type is a single constructor type.  This gives better code
+    when rhs also scrutinises x or e.
+
+3.  Case merging:
+       case e of b {             ==>   case e of b {
+    	 p1 -> rhs1	                 p1 -> rhs1
+    	 ...	                         ...
+    	 pm -> rhsm                      pm -> rhsm
+    	 _  -> case b of b' {            pn -> let b'=b in rhsn
+ 		     pn -> rhsn          ...
+ 		     ...                 po -> let b'=b in rhso
+ 		     po -> rhso          _  -> let b'=b in rhsd
+ 		     _  -> rhsd
+       }  
+    
+    which merges two cases in one case when -- the default alternative of
+    the outer case scrutises the same variable as the outer case This
+    transformation is called Case Merging.  It avoids that the same
+    variable is scrutinised multiple times.
+
+
+The case where transformation (1) showed up was like this (lib/std/PrelCError.lhs):
+
+	x | p `is` 1 -> e1
+	  | p `is` 2 -> e2
+	...etc...
+
+where @is@ was something like
+	
+	p `is` n = p /= (-1) && p == n
+
+This gave rise to a horrible sequence of cases
+
+	case p of
+	  (-1) -> $j p
+	  1    -> e1
+	  DEFAULT -> $j p
+
+and similarly in cascade for all the join points!
+
+
 
 \begin{code}
-mkCase scrut outer_bndr outer_alts
-  |  opt_SimplCaseMerge
-  && maybeToBool maybe_case_in_default
-     
-  = tick (CaseMerge outer_bndr)		`thenSmpl_`
-    returnSmpl (Case scrut outer_bndr new_alts)
-	-- Warning: don't call mkCase recursively!
+--------------------------------------------------
+--	1. Merge identical branches
+--------------------------------------------------
+mkAlts scrut case_bndr alts@((con1,bndrs1,rhs1) : con_alts)
+  | all isDeadBinder bndrs1,			-- Remember the default 
+    length filtered_alts < length con_alts	-- alternative comes first
+  = tick (AltMerge case_bndr)			`thenSmpl_`
+    returnSmpl better_alts
+  where
+    filtered_alts	 = filter keep con_alts
+    keep (con,bndrs,rhs) = not (all isDeadBinder bndrs && rhs `cheapEqExpr` rhs1)
+    better_alts		 = (DEFAULT, [], rhs1) : filtered_alts
+
+
+--------------------------------------------------
+--	2. Fill in missing constructor
+--------------------------------------------------
+
+mkAlts scrut case_bndr alts
+  | Just (tycon, inst_tys) <- splitTyConApp_maybe (idType case_bndr),
+    isDataTyCon tycon,			-- It's a data type
+    (alts_no_deflt, Just rhs) <- findDefault alts,
+		-- There is a DEFAULT case
+    [missing_con] <- filter is_missing (tyConDataConsIfAvailable tycon)
+		-- There is just one missing constructor!
+  = tick (FillInCaseDefault case_bndr)	`thenSmpl_`
+    getUniquesSmpl 			`thenSmpl` \ tv_uniqs ->
+    getUniquesSmpl 			`thenSmpl` \ id_uniqs ->
+    let
+	(_,_,ex_tyvars,_,_,_) = dataConSig missing_con
+	ex_tyvars'  = zipWith mk tv_uniqs ex_tyvars
+	mk uniq tv  = mkSysTyVar uniq (tyVarKind tv)
+	arg_ids     = zipWith (mkSysLocal SLIT("a")) id_uniqs arg_tys
+	arg_tys     = dataConArgTys missing_con (inst_tys ++ mkTyVarTys ex_tyvars')
+	better_alts = (DataAlt missing_con, ex_tyvars' ++ arg_ids, rhs) : alts_no_deflt
+    in
+    returnSmpl better_alts
+  where
+    impossible_cons   = otherCons (idUnfolding case_bndr)
+    handled_data_cons = [data_con | DataAlt data_con         <- impossible_cons] ++
+			[data_con | (DataAlt data_con, _, _) <- alts]
+    is_missing con    = not (con `elem` handled_data_cons)
+
+--------------------------------------------------
+--	3.  Merge nested cases
+--------------------------------------------------
+
+mkAlts scrut outer_bndr outer_alts
+  | opt_SimplCaseMerge,
+    (outer_alts_without_deflt, maybe_outer_deflt)   <- findDefault outer_alts,
+    Just (Case (Var scrut_var) inner_bndr inner_alts) <- maybe_outer_deflt,
+    scruting_same_var scrut_var
+
+  = let	    --  Eliminate any inner alts which are shadowed by the outer ones
+    	outer_cons = [con | (con,_,_) <- outer_alts_without_deflt]
+    
+    	munged_inner_alts = [ (con, args, munge_rhs rhs) 
+ 			    | (con, args, rhs) <- inner_alts, 
+ 			       not (con `elem` outer_cons)	-- Eliminate shadowed inner alts
+ 			    ]
+    	munge_rhs rhs = bindCaseBndr inner_bndr (Var outer_bndr) rhs
+    
+    	(inner_con_alts, maybe_inner_default) = findDefault munged_inner_alts
+
+    	new_alts = add_default maybe_inner_default
+ 			       (outer_alts_without_deflt ++ inner_con_alts)
+    in
+    tick (CaseMerge outer_bndr)				`thenSmpl_`
+    returnSmpl new_alts
+	-- Warning: don't call mkAlts recursively!
 	-- Firstly, there's no point, because inner alts have already had
 	-- mkCase applied to them, so they won't have a case in their default
-	-- Secondly, if you do, you get an infinite loop, because the bindNonRec
-	-- in munge_rhs puts a case into the DEFAULT branch!
+	-- Secondly, if you do, you get an infinite loop, because the bindCaseBndr
+	-- in munge_rhs may put a case into the DEFAULT branch!
   where
-    new_alts = add_default maybe_inner_default
-			   (outer_alts_without_deflt ++ inner_con_alts)
-
-    maybe_case_in_default = case findDefault outer_alts of
-				(outer_alts_without_default,
-				 Just (Case (Var scrut_var) inner_bndr inner_alts))
-				   | outer_bndr == scrut_var
-				   -> Just (outer_alts_without_default, inner_bndr, inner_alts)
-				other -> Nothing
-
-    Just (outer_alts_without_deflt, inner_bndr, inner_alts) = maybe_case_in_default
-
-		--  Eliminate any inner alts which are shadowed by the outer ones
-    outer_cons = [con | (con,_,_) <- outer_alts_without_deflt]
-
-    munged_inner_alts = [ (con, args, munge_rhs rhs) 
-		        | (con, args, rhs) <- inner_alts, 
-			   not (con `elem` outer_cons)	-- Eliminate shadowed inner alts
-		        ]
-    munge_rhs rhs = bindNonRec inner_bndr (Var outer_bndr) rhs
-
-    (inner_con_alts, maybe_inner_default) = findDefault munged_inner_alts
+	-- We are scrutinising the same variable if it's
+	-- the outer case-binder, or if the outer case scrutinises a variable
+	-- (and it's the same).  Testing both allows us not to replace the
+	-- outer scrut-var with the outer case-binder (Simplify.simplCaseBinder).
+    scruting_same_var = case scrut of
+			  Var outer_scrut -> \ v -> v == outer_bndr || v == outer_scrut
+			  other		  -> \ v -> v == outer_bndr
 
     add_default (Just rhs) alts = (DEFAULT,[],rhs) : alts
     add_default Nothing    alts = alts
+
+
+--------------------------------------------------
+--	Catch-all
+--------------------------------------------------
+
+mkAlts scrut case_bndr other_alts = returnSmpl other_alts
 \end{code}
 
-Now the identity-case transformation:
+
+
+=================================================================================
+
+mkCase1 tries these things
+
+1.  Eliminate the case altogether if possible
+
+2.  Case-identity:
 
 	case e of 		===> e
 		True  -> True;
 		False -> False
 
-and similar friends.
+    and similar friends.
+
+
+Start with a simple situation:
+
+	case x# of	===>   e[x#/y#]
+	  y# -> e
+
+(when x#, y# are of primitive type, of course).  We can't (in general)
+do this for algebraic cases, because we might turn bottom into
+non-bottom!
+
+Actually, we generalise this idea to look for a case where we're
+scrutinising a variable, and we know that only the default case can
+match.  For example:
+\begin{verbatim}
+	case x of
+	  0#    -> ...
+	  other -> ...(case x of
+			 0#    -> ...
+			 other -> ...) ...
+\end{code}
+Here the inner case can be eliminated.  This really only shows up in
+eliminating error-checking code.
+
+We also make sure that we deal with this very common case:
+
+ 	case e of 
+	  x -> ...x...
+
+Here we are using the case as a strict let; if x is used only once
+then we want to inline it.  We have to be careful that this doesn't 
+make the program terminate when it would have diverged before, so we
+check that 
+	- x is used strictly, or
+	- e is already evaluated (it may so if e is a variable)
+
+Lastly, we generalise the transformation to handle this:
+
+	case e of	===> r
+	   True  -> r
+	   False -> r
+
+We only do this for very cheaply compared r's (constructors, literals
+and variables).  If pedantic bottoms is on, we only do it when the
+scrutinee is a PrimOp which can't fail.
+
+We do it *here*, looking at un-simplified alternatives, because we
+have to check that r doesn't mention the variables bound by the
+pattern in each alternative, so the binder-info is rather useful.
+
+So the case-elimination algorithm is:
+
+	1. Eliminate alternatives which can't match
+
+	2. Check whether all the remaining alternatives
+		(a) do not mention in their rhs any of the variables bound in their pattern
+	   and  (b) have equal rhss
+
+	3. Check we can safely ditch the case:
+		   * PedanticBottoms is off,
+		or * the scrutinee is an already-evaluated variable
+		or * the scrutinee is a primop which is ok for speculation
+			-- ie we want to preserve divide-by-zero errors, and
+			-- calls to error itself!
+
+		or * [Prim cases] the scrutinee is a primitive variable
+
+		or * [Alg cases] the scrutinee is a variable and
+		     either * the rhs is the same variable
+			(eg case x of C a b -> x  ===>   x)
+		     or     * there is only one alternative, the default alternative,
+				and the binder is used strictly in its scope.
+				[NB this is helped by the "use default binder where
+				 possible" transformation; see below.]
+
+
+If so, then we can replace the case with one of the rhss.
+
 
 \begin{code}
-mkCase scrut case_bndr alts
+--------------------------------------------------
+--	1. Eliminate the case altogether if poss
+--------------------------------------------------
+
+mkCase1 scrut case_bndr [(con,bndrs,rhs)]
+  -- See if we can get rid of the case altogether
+  -- See the extensive notes on case-elimination above
+  -- mkCase made sure that if all the alternatives are equal, 
+  -- then there is now only one (DEFAULT) rhs
+ |  all isDeadBinder bndrs,
+
+	-- Check that the scrutinee can be let-bound instead of case-bound
+    exprOkForSpeculation scrut
+		-- OK not to evaluate it
+		-- This includes things like (==# a# b#)::Bool
+		-- so that we simplify 
+		-- 	case ==# a# b# of { True -> x; False -> x }
+		-- to just
+		--	x
+		-- This particular example shows up in default methods for
+		-- comparision operations (e.g. in (>=) for Int.Int32)
+	|| exprIsValue scrut			-- It's already evaluated
+	|| var_demanded_later scrut		-- It'll be demanded later
+
+--      || not opt_SimplPedanticBottoms)	-- Or we don't care!
+--	We used to allow improving termination by discarding cases, unless -fpedantic-bottoms was on,
+-- 	but that breaks badly for the dataToTag# primop, which relies on a case to evaluate
+-- 	its argument:  case x of { y -> dataToTag# y }
+--	Here we must *not* discard the case, because dataToTag# just fetches the tag from
+--	the info pointer.  So we'll be pedantic all the time, and see if that gives any
+-- 	other problems
+  = tick (CaseElim case_bndr)			`thenSmpl_` 
+    returnSmpl (bindCaseBndr case_bndr scrut rhs)
+
+  where
+	-- The case binder is going to be evaluated later, 
+	-- and the scrutinee is a simple variable
+    var_demanded_later (Var v) = isStrictDmd (idNewDemandInfo case_bndr)
+    var_demanded_later other   = False
+
+
+--------------------------------------------------
+--	2. Identity case
+--------------------------------------------------
+
+mkCase1 scrut case_bndr alts	-- Identity case
   | all identity_alt alts
   = tick (CaseIdentity case_bndr)		`thenSmpl_`
     returnSmpl (re_note scrut)
@@ -826,45 +1128,21 @@ mkCase scrut case_bndr alts
     re_note scrut = case head alts of
 			(_,_,rhs1@(Note _ _)) -> mkCoerce (exprType rhs1) (idType case_bndr) scrut
 			other		      -> scrut
+
+
+--------------------------------------------------
+--	Catch-all
+--------------------------------------------------
+mkCase1 scrut bndr alts = returnSmpl (Case scrut bndr alts)
 \end{code}
 
-The catch-all case.  We do a final transformation that I've
-occasionally seen making a big difference:
 
-	case e of		=====>     case e of
-	  C _ -> f x			     D v -> ....v....
-	  D v -> ....v....		     DEFAULT -> f x
-	  DEFAULT -> f x
+When adding auxiliary bindings for the case binder, it's worth checking if
+its dead, because it often is, and occasionally these mkCase transformations
+cascade rather nicely.
 
-The point is that we merge common RHSs, at least for the DEFAULT case.
-[One could do something more elaborate but I've never seen it needed.]
-The case where this came up was like this (lib/std/PrelCError.lhs):
-
-	x | p `is` 1 -> e1
-	  | p `is` 2 -> e2
-	...etc...
-
-where @is@ was something like
-	
-	p `is` n = p /= (-1) && p == n
-
-This gave rise to a horrible sequence of cases
-
-	case p of
-	  (-1) -> $j p
-	  1    -> e1
-	  DEFAULT -> $j p
-
-and similarly in cascade for all the join points!
-	  
 \begin{code}
-mkCase other_scrut case_bndr other_alts
-  = returnSmpl (Case other_scrut case_bndr (mergeDefault other_alts))
-
-mergeDefault (deflt_alt@(DEFAULT,_,deflt_rhs) : con_alts)
-  = deflt_alt : [alt | alt@(con,_,rhs) <- con_alts, not (rhs `cheapEqExpr` deflt_rhs)]
-	-- NB: we can neglect the binders because we won't get equality if the
-	-- binders are mentioned in rhs (no shadowing)
-mergeDefault other_alts
-  = other_alts
+bindCaseBndr bndr rhs body
+  | isDeadBinder bndr = body
+  | otherwise	      = bindNonRec bndr rhs body
 \end{code}

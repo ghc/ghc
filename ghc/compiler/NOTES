@@ -30,7 +30,7 @@ simplNonRecBind:	[was simplBeta]
     else
 	completeLazyBind
 
-simplRecPair:	[binder already simplified, but not its IdInfo]
+simplLazyBind:	[binder already simplified, but not its IdInfo]
 	  	[used for both rec and top-lvl non-rec]
 		[must not be strict/unboxed; case not allowed]
   - check for PreInlineUnconditionally

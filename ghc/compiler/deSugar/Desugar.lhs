@@ -162,6 +162,9 @@ ppr_ds_rules rules
 
 \begin{code}
 dsRule :: IdSet -> TypecheckedRuleDecl -> DsM (Id, CoreRule)
+dsRule in_scope (IfaceRuleOut fun rule)	-- Built-in rules come this way
+  = returnDs (fun, rule)
+
 dsRule in_scope (HsRule name act sig_tvs vars lhs rhs loc)
   = putSrcLocDs loc		$
     ds_lhs all_vars lhs		`thenDs` \ (fn, args) ->

@@ -443,7 +443,7 @@ lvlBind top_lvl ctxt_lvl env (AnnRec pairs)
 						(mkVarApps (Var new_bndr) lam_bndrs))],
 	       poly_env)
 
-  | otherwise
+  | otherwise	-- Non-null abs_vars
   = newPolyBndrs dest_lvl env abs_vars bndrs		`thenLvl` \ (new_env, new_bndrs) ->
     mapLvl (lvlFloatRhs abs_vars dest_lvl new_env) rhss `thenLvl` \ new_rhss ->
     returnLvl (Rec ((new_bndrs `zip` repeat dest_lvl) `zip` new_rhss), new_env)
@@ -510,25 +510,6 @@ lvlLamBndrs lvl bndrs
 \end{code}
 
 \begin{code}
-abstractVars :: Level -> LevelEnv -> VarSet -> [Var]
-	-- Find the variables in fvs, free vars of the target expresion,
-	-- whose level is less than than the supplied level
-	-- These are the ones we are going to abstract out
-abstractVars dest_lvl env fvs
-  = uniq (sortLt lt [var | fv <- varSetElems fvs, var <- absVarsOf dest_lvl env fv])
-  where
-	-- Sort the variables so we don't get 
-	-- mixed-up tyvars and Ids; it's just messy
-    v1 `lt` v2 = case (isId v1, isId v2) of
-		   (True, False) -> False
-		   (False, True) -> True
-		   other	 -> v1 < v2	-- Same family
-    uniq :: [Var] -> [Var]
-	-- Remove adjacent duplicates; the sort will have brought them together
-    uniq (v1:v2:vs) | v1 == v2  = uniq (v2:vs)
-		    | otherwise = v1 : uniq (v2:vs)
-    uniq vs = vs
-
   -- Destintion level is the max Id level of the expression
   -- (We'll abstract the type variables, if any.)
 destLevel :: LevelEnv -> VarSet -> Bool -> Level
@@ -674,13 +655,33 @@ lookupVar (_, _, _, id_env) v = case lookupVarEnv id_env v of
 				       Just (_, expr) -> expr
 				       other	      -> Var v
 
+abstractVars :: Level -> LevelEnv -> VarSet -> [Var]
+	-- Find the variables in fvs, free vars of the target expresion,
+	-- whose level is greater than the destination level
+	-- These are the ones we are going to abstract out
+abstractVars dest_lvl env fvs
+  = uniq (sortLt lt [var | fv <- varSetElems fvs, var <- absVarsOf dest_lvl env fv])
+  where
+	-- Sort the variables so we don't get 
+	-- mixed-up tyvars and Ids; it's just messy
+    v1 `lt` v2 = case (isId v1, isId v2) of
+		   (True, False) -> False
+		   (False, True) -> True
+		   other	 -> v1 < v2	-- Same family
+
+    uniq :: [Var] -> [Var]
+	-- Remove adjacent duplicates; the sort will have brought them together
+    uniq (v1:v2:vs) | v1 == v2  = uniq (v2:vs)
+		    | otherwise = v1 : uniq (v2:vs)
+    uniq vs = vs
+
 absVarsOf :: Level -> LevelEnv -> Var -> [Var]
-	-- If f is free in the exression, and f maps to poly_f a b c in the
+	-- If f is free in the expression, and f maps to poly_f a b c in the
 	-- current substitution, then we must report a b c as candidate type
 	-- variables
 absVarsOf dest_lvl (_, lvl_env, _, id_env) v 
   | isId v
-  = [final_av | av <- lookup_avs v, abstract_me av, final_av <- add_tyvars av]
+  = [zap av2 | av1 <- lookup_avs v, av2 <- add_tyvars av1, abstract_me av2]
 
   | otherwise
   = if abstract_me v then [v] else []
@@ -694,15 +695,16 @@ absVarsOf dest_lvl (_, lvl_env, _, id_env) v
 			Just (abs_vars, _) -> abs_vars
 			Nothing	           -> [v]
 
-	-- We are going to lambda-abstract, so nuke any IdInfo,
-	-- and add the tyvars of the Id
-    add_tyvars v | isId v    =  zap v  : varSetElems (idFreeTyVars v)
+    add_tyvars v | isId v    = v : varSetElems (idFreeTyVars v)
 		 | otherwise = [v]
 
-    zap v = WARN( workerExists (idWorkerInfo v)
-		  || not (isEmptyCoreRules (idSpecialisation v)),
-		  text "absVarsOf: discarding info on" <+> ppr v )
-	    setIdInfo v vanillaIdInfo
+	-- We are going to lambda-abstract, so nuke any IdInfo,
+	-- and add the tyvars of the Id (if necessary)
+    zap v | isId v = WARN( workerExists (idWorkerInfo v) ||
+		           not (isEmptyCoreRules (idSpecialisation v)),
+		           text "absVarsOf: discarding info on" <+> ppr v )
+		     setIdInfo v vanillaIdInfo
+	  | otherwise = v
 \end{code}
 
 \begin{code}

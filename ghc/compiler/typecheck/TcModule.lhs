@@ -580,7 +580,7 @@ tcImports unf_env pcs hst get_fixity this_mod decls
     tcExtendGlobalValEnv sig_ids		$
     
     
-    tcIfaceRules (pcs_rules pcs) this_mod iface_rules	`thenNF_Tc` \ (new_pcs_rules, local_rules) ->
+    tcIfaceRules unf_env (pcs_rules pcs) this_mod iface_rules	`thenNF_Tc` \ (new_pcs_rules, local_rules) ->
     	-- When relinking this module from its interface-file decls
     	-- we'll have IfaceRules that are in fact local to this module
     	-- That's the reason we we get any local_rules out here

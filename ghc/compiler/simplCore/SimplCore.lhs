@@ -8,8 +8,7 @@ module SimplCore ( core2core, simplifyExpr ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..), 
-			  SwitchResult(..), intSwitchSet,
+import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..), SimplifierMode(..),
 			  DynFlags, DynFlag(..), dopt, dopt_CoreToDo
 			)
 import CoreSyn
@@ -22,7 +21,6 @@ import Rules		( RuleBase, emptyRuleBase, ruleBaseFVs, ruleBaseIds,
 			  extendRuleBaseList, addRuleBaseFVs, pprRuleBase, 
 			  ruleCheckProgram )
 import Module		( moduleEnvElts )
-import CoreUnfold
 import PprCore		( pprCoreBindings, pprCoreExpr )
 import OccurAnal	( occurAnalyseBinds, occurAnalyseGlobalExpr )
 import CoreUtils	( coreBindsSize )
@@ -33,7 +31,7 @@ import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass )
 import CoreLint		( endPass )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
-import Id		( idName, isDataConWrapId, setIdLocalExported, isImplicitId )
+import Id		( idName, setIdLocalExported, isImplicitId )
 import VarSet
 import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
@@ -111,17 +109,14 @@ simplifyExpr dflags pcs hst expr
 
 	; us <-  mkSplitUniqSupply 's'
 
-	; let (expr', _counts) = initSmpl dflags sw_chkr us emptyVarSet black_list_nothing 	
-		                          (simplExprGently expr)
+	; let env	       = emptySimplEnv (SimplPhase 0) [] emptyVarSet
+	      (expr', _counts) = initSmpl dflags us (simplExprGently env expr)
 
 	; dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
 			(pprCoreExpr expr')
 
 	; return expr'
 	}
-  where
-    sw_chkr any	         = SwBool False	-- A bit bogus
-    black_list_nothing v = False	-- Black list nothing
 
 
 doCorePasses :: DynFlags
@@ -143,8 +138,8 @@ doCorePasses dflags rb stats us binds (to_do : to_dos)
 
 	doCorePasses dflags rb (stats `plusSimplCount` stats1) us2 binds1 to_dos
 
-doCorePass dfs rb us binds (CoreDoSimplify sw_chkr) 
-   = _scc_ "Simplify"      simplifyPgm dfs rb sw_chkr us binds
+doCorePass dfs rb us binds (CoreDoSimplify mode switches) 
+   = _scc_ "Simplify"      simplifyPgm dfs rb mode switches us binds
 doCorePass dfs rb us binds CoreCSE		        
    = _scc_ "CommonSubExpr" noStats dfs (cseProgram dfs binds)
 doCorePass dfs rb us binds CoreLiberateCase	        
@@ -172,8 +167,8 @@ doCorePass dfs rb us binds CoreDoUSPInf
    = _scc_ "CoreUsageSPInf" noStats dfs (doUsageSPInf dfs us binds)
 doCorePass dfs rb us binds CoreDoGlomBinds	        
    = noStats dfs (glomBinds dfs binds)
-doCorePass dfs rb us binds (CoreDoRuleCheck pat)
-   = noStats dfs (ruleCheck dfs pat binds)
+doCorePass dfs rb us binds (CoreDoRuleCheck phase pat)
+   = noStats dfs (ruleCheck dfs phase pat binds)
 doCorePass dfs rb us binds CoreDoNothing
    = noStats dfs (return binds)
 
@@ -181,9 +176,9 @@ printCore binds = do dumpIfSet True "Print Core"
 			       (pprCoreBindings binds)
 		     return binds
 
-ruleCheck dflags pat binds = do showPass dflags "RuleCheck"
-			        printDump (ruleCheckProgram pat binds)
-			        return binds
+ruleCheck dflags phase pat binds = do showPass dflags "RuleCheck"
+				      printDump (ruleCheckProgram phase pat binds)
+				      return binds
 
 -- most passes return no stats and don't change rules
 noStats dfs thing = do { binds <- thing; return (zeroSimplCount dfs, binds) }
@@ -217,8 +212,8 @@ prepareRules :: DynFlags -> PackageRuleBase -> HomeSymbolTable
 		    IdSet) 		-- RHS free vars of all rules
 
 prepareRules dflags pkg_rule_base hst us binds local_rules
-  = do	{ let (better_rules,_) = initSmpl dflags sw_chkr us local_ids black_list_all 
-		                          (mapSmpl simplRule local_rules)
+  = do	{ let env	       = emptySimplEnv SimplGently [] local_ids 
+	      (better_rules,_) = initSmpl dflags us (mapSmpl (simplRule env) local_rules)
 
 	; let (local_rules, orphan_rules) = partition ((`elemVarSet` local_ids) . fst) better_rules
 		-- We use (`elemVarSet` local_ids) rather than isLocalId because
@@ -247,11 +242,6 @@ prepareRules dflags pkg_rule_base hst us binds local_rules
 	; return (final_rule_base, local_rule_ids, orphan_rules, rule_rhs_fvs)
     }
   where
-    sw_chkr any	     = SwBool False			-- A bit bogus
-    black_list_all v = not (isDataConWrapId v)
-		-- This stops all inlining except the
-		-- wrappers for data constructors
-
     add_rules rule_base mds = extendRuleBaseList rule_base (md_rules mds)
 
 	-- Boringly, we need to gather the in-scope set.
@@ -312,13 +302,13 @@ which without simplification looked like:
 This doesn't match unless you do eta reduction on the build argument.
 
 \begin{code}
-simplRule rule@(id, BuiltinRule _ _)
+simplRule env rule@(id, BuiltinRule _ _)
   = returnSmpl rule
-simplRule rule@(id, Rule name bndrs args rhs)
-  = simplBinders bndrs			$ \ bndrs' -> 
-    mapSmpl simplExprGently args	`thenSmpl` \ args' ->
-    simplExprGently rhs			`thenSmpl` \ rhs' ->
-    returnSmpl (id, Rule name bndrs' args' rhs')
+simplRule env rule@(id, Rule act name bndrs args rhs)
+  = simplBinders env bndrs		`thenSmpl` \ (env, bndrs') -> 
+    mapSmpl (simplExprGently env) args	`thenSmpl` \ args' ->
+    simplExprGently env rhs		`thenSmpl` \ rhs' ->
+    returnSmpl (id, Rule act name bndrs' args' rhs')
 
 -- It's important that simplExprGently does eta reduction.
 -- For example, in a rule like:
@@ -333,16 +323,16 @@ simplRule rule@(id, Rule name bndrs args rhs)
 \end{code}
 
 \begin{code}
-simplExprGently :: CoreExpr -> SimplM CoreExpr
+simplExprGently :: SimplEnv -> CoreExpr -> SimplM CoreExpr
 -- Simplifies an expression 
 -- 	does occurrence analysis, then simplification
 --	and repeats (twice currently) because one pass
 --	alone leaves tons of crud.
 -- Used (a) for user expressions typed in at the interactive prompt
 --	(b) the LHS and RHS of a RULE
-simplExprGently expr
-  = simplExpr (occurAnalyseGlobalExpr expr) 	`thenSmpl` \ expr1 ->
-    simplExpr (occurAnalyseGlobalExpr expr1)
+simplExprGently env expr
+  = simplExpr env (occurAnalyseGlobalExpr expr) 	`thenSmpl` \ expr1 ->
+    simplExpr env (occurAnalyseGlobalExpr expr1)
 \end{code}
 
 
@@ -397,13 +387,14 @@ glomBinds dflags binds
 \begin{code}
 simplifyPgm :: DynFlags 
 	    -> RuleBase
-	    -> (SimplifierSwitch -> SwitchResult)
+	    -> SimplifierMode
+	    -> [SimplifierSwitch]
 	    -> UniqSupply
 	    -> [CoreBind]		    -- Input
 	    -> IO (SimplCount, [CoreBind])  -- New bindings
 
 simplifyPgm dflags rule_base
-	    sw_chkr us binds
+	    mode switches us binds
   = do {
 	showPass dflags "Simplify";
 
@@ -422,10 +413,14 @@ simplifyPgm dflags rule_base
 	return (counts_out, binds')
     }
   where
-    max_iterations    = getSimplIntSwitch sw_chkr MaxSimplifierIterations
-    black_list_fn     = blackListed rule_lhs_fvs (intSwitchSet sw_chkr SimplInlinePhase)
+    phase_info	      = case mode of
+			  SimplGently  -> "gentle"
+			  SimplPhase n -> show n
+
     imported_rule_ids = ruleBaseIds rule_base
-    rule_lhs_fvs      = ruleBaseFVs rule_base
+    simpl_env 	      = emptySimplEnv mode switches imported_rule_ids
+    sw_chkr	      = getSwitchChecker simpl_env
+    max_iterations    = intSwitchSet sw_chkr MaxSimplifierIterations `orElse` 2
  
     iteration us iteration_no counts binds
       -- Try and force thunks off the binds; significantly reduces
@@ -449,15 +444,18 @@ simplifyPgm dflags rule_base
 		-- 	case t of {(_,counts') -> if counts'=0 then ...
 		-- So the conditional didn't force counts', because the
 		-- selection got duplicated.  Sigh!
-	   case initSmpl dflags sw_chkr us1 imported_rule_ids black_list_fn 
-			 (simplTopBinds tagged_binds)
-	  	of { (binds', counts') -> do {
+	   case initSmpl dflags us1 (simplTopBinds simpl_env tagged_binds) of {
+	  	(binds', counts') -> do {
 			-- The imported_rule_ids are used by initSmpl to initialise
 			-- the in-scope set.  That way, the simplifier will change any
 			-- occurrences of the imported id to the one in the imported_rule_ids
 			-- set, which are decorated with their rules.
 
-	   let { all_counts = counts `plusSimplCount` counts' } ;
+	   let { all_counts = counts `plusSimplCount` counts' ;
+		 herald     = "Simplifier phase " ++ phase_info ++ 
+			      ", iteration " ++ show iteration_no ++
+			      " out of " ++ show max_iterations
+	        } ;
 
 		-- Stop if nothing happened; don't dump output
 	   if isZeroSimplCount counts' then
@@ -465,15 +463,10 @@ simplifyPgm dflags rule_base
 	   else do {
 
 		-- Dump the result of this iteration
-	   dumpIfSet_dyn dflags Opt_D_dump_simpl_iterations
-		     ("Simplifier iteration " ++ show iteration_no 
-		      ++ " out of " ++ show max_iterations)
+	   dumpIfSet_dyn dflags Opt_D_dump_simpl_iterations herald
 		     (pprSimplCount counts') ;
 
-	   endPass dflags 
-                    ("Simplifier iteration " ++ show iteration_no ++ " result")
-		    Opt_D_dump_simpl_iterations
-		    binds' ;
+	   endPass dflags herald Opt_D_dump_simpl_iterations binds' ;
 
 		-- Stop if we've run out of iterations
 	   if iteration_no == max_iterations then

@@ -22,7 +22,7 @@ import CoreFVs		( idRuleVars )
 import CoreUtils	( exprIsTrivial )
 import Id		( isDataConId, isOneShotLambda, setOneShotLambda, 
 			  idOccInfo, setIdOccInfo,
-			  isExportedId, modifyIdInfo, idInfo,
+			  isExportedId, modifyIdInfo, idInfo, idArity,
 			  idSpecialisation, isLocalId,
 			  idType, idUnique, Id
 			)
@@ -52,29 +52,19 @@ import Outputable
 Here's the externally-callable interface:
 
 \begin{code}
-occurAnalyseExpr :: (Id -> Bool)	-- Tells if a variable is interesting
-		 -> CoreExpr
-		 -> (IdEnv OccInfo,	-- Occ info for interesting free vars
-		     CoreExpr)
-
-occurAnalyseExpr interesting expr
-  = occAnal initial_env expr
-  where
-    initial_env = OccEnv interesting emptyVarSet []
-
 occurAnalyseGlobalExpr :: CoreExpr -> CoreExpr
 occurAnalyseGlobalExpr expr
   = 	-- Top level expr, so no interesting free vars, and
 	-- discard occurence info returned
-    snd (occurAnalyseExpr (\_ -> False) expr)
+    snd (occAnal (initOccEnv emptyVarSet) expr)
 
 occurAnalyseRule :: CoreRule -> CoreRule
 occurAnalyseRule rule@(BuiltinRule _ _) = rule
-occurAnalyseRule (Rule str tpl_vars tpl_args rhs)
+occurAnalyseRule (Rule str act tpl_vars tpl_args rhs)
 		-- Add occ info to tpl_vars, rhs
-  = Rule str tpl_vars' tpl_args rhs'
+  = Rule str act tpl_vars' tpl_args rhs'
   where
-    (rhs_uds, rhs') = occurAnalyseExpr isLocalId rhs
+    (rhs_uds, rhs') = occAnal (initOccEnv (mkVarSet tpl_vars)) rhs
     (_, tpl_vars')  = tagBinders rhs_uds tpl_vars
 \end{code}
 
@@ -137,7 +127,7 @@ occurAnalyseBinds :: [CoreBind] -> [CoreBind]
 occurAnalyseBinds binds
   = binds'
   where
-    (_, _, binds') = go initialTopEnv binds
+    (_, _, binds') = go (initOccEnv emptyVarSet) binds
 
     go :: OccEnv -> [CoreBind]
        -> (UsageDetails, 	-- Occurrence info
@@ -173,10 +163,6 @@ occurAnalyseBinds binds
 	    other -> 	-- Ho ho! The normal case
 		     (final_usage, ind_env, new_binds ++ binds')
 		   
-initialTopEnv = OccEnv isLocalId	-- Anything local is interesting
-		       emptyVarSet
-		       []
-
 
 -- Deal with any indirections
 zapBind ind_env (NonRec bndr rhs) 
@@ -521,7 +507,7 @@ occAnalRhs :: OccEnv
 occAnalRhs env id rhs
   = (final_usage, rhs')
   where
-    (rhs_usage, rhs') = occAnal (zapCtxt env) rhs
+    (rhs_usage, rhs') = occAnal (rhsCtxt env) rhs
 
 	-- [March 98] A new wrinkle is that if the binder has specialisations inside
 	-- it then we count the specialised Ids as "extra rhs's".  That way
@@ -598,7 +584,7 @@ occAnal env (Note note body)
 
 \begin{code}
 occAnal env app@(App fun arg)
-  = occAnalApp env (collectArgs app)
+  = occAnalApp env (collectArgs app) False
 
 -- Ignore type variables altogether
 --   (a) occurrences inside type lambdas only not marked as InsideLam
@@ -619,7 +605,7 @@ occAnal env expr@(Lam x body) | isTyVar x
 -- Then, the simplifier is careful when partially applying lambdas.
 
 occAnal env expr@(Lam _ _)
-  = case occAnal (env_body `addNewCands` binders) body of { (body_usage, body') ->
+  = case occAnal env_body body of { (body_usage, body') ->
     let
         (final_usage, tagged_binders) = tagBinders body_usage binders
 	--	URGH!  Sept 99: we don't seem to be able to use binders' here, because
@@ -634,12 +620,15 @@ occAnal env expr@(Lam _ _)
     (really_final_usage,
      mkLams tagged_binders body') }
   where
-    (binders, body)       = collectBinders expr
-    (linear, env_body, _) = oneShotGroup env binders
+    (binders, body)   = collectBinders expr
+    (linear, env1, _) = oneShotGroup env binders
+    env2	      = env1 `addNewCands` binders	-- Add in-scope binders
+    env_body	      = vanillaCtxt env2			-- Body is (no longer) an RhsContext
 
 occAnal env (Case scrut bndr alts)
-  = case mapAndUnzip (occAnalAlt alt_env) alts of { (alts_usage_s, alts')   -> 
-    case occAnal (zapCtxt env) scrut	       of { (scrut_usage, scrut') ->
+  = case mapAndUnzip (occAnalAlt alt_env bndr) alts of { (alts_usage_s, alts')   -> 
+    case occAnal (vanillaCtxt env) scrut	    	    of { (scrut_usage, scrut') ->
+	-- No need for rhsCtxt
     let
 	alts_usage  = foldr1 combineAltsUsageDetails alts_usage_s
 	alts_usage' = addCaseBndrUsage alts_usage
@@ -672,7 +661,7 @@ occAnalArgs env args
   = case mapAndUnzip (occAnal arg_env) args of	{ (arg_uds_s, args') ->
     (foldr combineUsageDetails emptyDetails arg_uds_s, args')}
   where
-    arg_env = zapCtxt env
+    arg_env = vanillaCtxt env
 \end{code}
 
 Applications are dealt with specially because we want
@@ -680,7 +669,7 @@ the "build hack" to work.
 
 \begin{code}
 -- Hack for build, fold, runST
-occAnalApp env (Var fun, args)
+occAnalApp env (Var fun, args) is_rhs
   = case args_stuff of { (args_uds, args') ->
     let
 	final_uds = fun_uds `combineUsageDetails` args_uds
@@ -695,39 +684,59 @@ occAnalApp env (Var fun, args)
     args_stuff	| fun_uniq == buildIdKey    = appSpecial env 2 [True,True]  args
 		| fun_uniq == augmentIdKey  = appSpecial env 2 [True,True]  args
 		| fun_uniq == foldrIdKey    = appSpecial env 3 [False,True] args
-		| fun_uniq == runSTRepIdKey = appSpecial env 2 [True]	 args
+		| fun_uniq == runSTRepIdKey = appSpecial env 2 [True]	    args
+			-- (foldr k z xs) may call k many times, but it never
+			-- shares a partial application of k; hence [False,True]
+			-- This means we can optimise
+			--	foldr (\x -> let v = ...x... in \y -> ...v...) z xs
+			-- by floating in the v
 
-		| isDataConId fun	    = case occAnalArgs env args of
-						(arg_uds, args') -> (mapVarEnv markMany arg_uds, args')
-						   -- We mark the free vars of the argument of a constructor as "many"
-						   -- This means that nothing gets inlined into a constructor argument
-						   -- position, which is what we want.  Typically those constructor
-						   -- arguments are just variables, or trivial expressions.
+		| isRhsEnv env,
+		  isDataConId fun || valArgCount args < idArity fun
+		= case occAnalArgs env args of
+		    (arg_uds, args') -> (mapVarEnv markMany arg_uds, args')
+			-- We mark the free vars of the argument of a constructor or PAP 
+			-- as "many", if it is the RHS of a let(rec).
+			-- This means that nothing gets inlined into a constructor argument
+			-- position, which is what we want.  Typically those constructor
+			-- arguments are just variables, or trivial expressions.
 
-		| otherwise		    = occAnalArgs env args
+		| otherwise = occAnalArgs env args
 
 
-occAnalApp env (fun, args)
-  = case occAnal (zapCtxt env) fun of		{ (fun_uds, fun') ->
-    case occAnalArgs env args of		{ (args_uds, args') ->
+occAnalApp env (fun, args) is_rhs
+  = case occAnal (addAppCtxt env args) fun of	{ (fun_uds, fun') ->
+	-- The addAppCtxt is a bit cunning.  One iteration of the simplifier
+	-- often leaves behind beta redexs like
+	--	(\x y -> e) a1 a2
+	-- Here we would like to mark x,y as one-shot, and treat the whole
+	-- thing much like a let.  We do this by pushing some True items
+	-- onto the context stack.
+
+    case occAnalArgs env args of	{ (args_uds, args') ->
     let
 	final_uds = fun_uds `combineUsageDetails` args_uds
     in
     (final_uds, mkApps fun' args') }}
     
-appSpecial :: OccEnv -> Int -> CtxtTy -> [CoreExpr] -> (UsageDetails, [CoreExpr])
+appSpecial :: OccEnv 
+	   -> Int -> CtxtTy	-- Argument number, and context to use for it
+	   -> [CoreExpr]
+	   -> (UsageDetails, [CoreExpr])
 appSpecial env n ctxt args
   = go n args
   where
+    arg_env = vanillaCtxt env
+
     go n [] = (emptyDetails, [])	-- Too few args
 
     go 1 (arg:args)			-- The magic arg
-      = case occAnal (setCtxt env ctxt) arg of	{ (arg_uds, arg') ->
-	case occAnalArgs env args of		{ (args_uds, args') ->
+      = case occAnal (setCtxt arg_env ctxt) arg of	{ (arg_uds, arg') ->
+	case occAnalArgs env args of			{ (args_uds, args') ->
 	(combineUsageDetails arg_uds args_uds, arg':args') }}
     
     go n (arg:args)
-      = case occAnal env arg of		{ (arg_uds, arg') ->
+      = case occAnal arg_env arg of	{ (arg_uds, arg') ->
 	case go (n-1) args of		{ (args_uds, args') ->
 	(combineUsageDetails arg_uds args_uds, arg':args') }}
 \end{code}
@@ -735,31 +744,53 @@ appSpecial env n ctxt args
     
 Case alternatives
 ~~~~~~~~~~~~~~~~~
+If the case binder occurs at all, the other binders effectively do too.  
+For example
+	case e of x { (a,b) -> rhs }
+is rather like
+	let x = (a,b) in rhs
+If e turns out to be (e1,e2) we indeed get something like
+	let a = e1; b = e2; x = (a,b) in rhs
+
 \begin{code}
-occAnalAlt env (con, bndrs, rhs)
+occAnalAlt env case_bndr (con, bndrs, rhs)
   = case occAnal (env `addNewCands` bndrs) rhs of { (rhs_usage, rhs') ->
     let
         (final_usage, tagged_bndrs) = tagBinders rhs_usage bndrs
+	final_bndrs | case_bndr `elemVarEnv` final_usage = bndrs
+		    | otherwise				= tagged_bndrs
+		-- Leave the binders untagged if the case 
+		-- binder occurs at all; see note above
     in
-    (final_usage, (con, tagged_bndrs, rhs')) }
+    (final_usage, (con, final_bndrs, rhs')) }
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection[OccurAnal-types]{Data types}
+\subsection[OccurAnal-types]{OccEnv}
 %*									*
 %************************************************************************
 
 \begin{code}
--- We gather inforamtion for variables that are either
---	(a) in scope or
---	(b) interesting
+data OccEnv
+  = OccEnv IdSet	-- In-scope Ids; we gather info about these only
+	   OccEncl	-- Enclosing context information
+	   CtxtTy	-- Tells about linearity
 
-data OccEnv =
-  OccEnv (Id -> Bool)	-- Tells whether an Id occurrence is interesting,
-  	 IdSet		-- In-scope Ids
-	 CtxtTy		-- Tells about linearity
+-- OccEncl is used to control whether to inline into constructor arguments
+-- For example:
+--	x = (p,q)		-- Don't inline p or q
+--	y = /\a -> (p a, q a)	-- Still don't inline p or q
+--	z = f (p,q)		-- Do inline p,q; it may make a rule fire
+-- So OccEncl tells enought about the context to know what to do when
+-- we encounter a contructor application or PAP.
+
+data OccEncl
+  = OccRhs 		-- RHS of let(rec), albeit perhaps inside a type lambda
+			-- Don't inline into constructor args here
+  | OccVanilla		-- Argument of function, body of lambda, scruintee of case etc.
+			-- Do inline into constructor args here
 
 type CtxtTy = [Bool]
 	-- []	 	No info
@@ -771,19 +802,25 @@ type CtxtTy = [Bool]
 	--			be applied many times; but when it is, 
 	--			the CtxtTy inside applies
 
+initOccEnv :: VarSet -> OccEnv
+initOccEnv vars = OccEnv vars OccRhs []
+
+isRhsEnv (OccEnv _ OccRhs     _) = True
+isRhsEnv (OccEnv _ OccVanilla _) = False
+
 isCandidate :: OccEnv -> Id -> Bool
-isCandidate (OccEnv ifun cands _) id = id `elemVarSet` cands || ifun id
+isCandidate (OccEnv cands encl _) id = id `elemVarSet` cands 
 
 addNewCands :: OccEnv -> [Id] -> OccEnv
-addNewCands (OccEnv ifun cands ctxt) ids
-  = OccEnv ifun (cands `unionVarSet` mkVarSet ids) ctxt
+addNewCands (OccEnv cands encl ctxt) ids
+  = OccEnv (cands `unionVarSet` mkVarSet ids) encl ctxt
 
 addNewCand :: OccEnv -> Id -> OccEnv
-addNewCand (OccEnv ifun cands ctxt) id
-  = OccEnv ifun (extendVarSet cands id) ctxt
+addNewCand (OccEnv cands encl ctxt) id
+  = OccEnv (extendVarSet cands id) encl ctxt
 
 setCtxt :: OccEnv -> CtxtTy -> OccEnv
-setCtxt (OccEnv ifun cands _) ctxt = OccEnv ifun cands ctxt
+setCtxt (OccEnv cands encl _) ctxt = OccEnv cands encl ctxt
 
 oneShotGroup :: OccEnv -> [CoreBndr] -> (Bool, OccEnv, [CoreBndr])
 	-- True <=> this is a one-shot linear lambda group
@@ -794,9 +831,9 @@ oneShotGroup :: OccEnv -> [CoreBndr] -> (Bool, OccEnv, [CoreBndr])
 	-- linearity context knows that c,n are one-shot, and it records that fact in
 	-- the binder. This is useful to guide subsequent float-in/float-out tranformations
 
-oneShotGroup (OccEnv ifun cands ctxt) bndrs 
+oneShotGroup (OccEnv cands encl ctxt) bndrs 
   = case go ctxt bndrs [] of
-	(new_ctxt, new_bndrs) -> (all is_one_shot new_bndrs, OccEnv ifun cands new_ctxt, new_bndrs)
+	(new_ctxt, new_bndrs) -> (all is_one_shot new_bndrs, OccEnv cands encl new_ctxt, new_bndrs)
   where
     is_one_shot b = isId b && isOneShotLambda b
 
@@ -811,9 +848,20 @@ oneShotGroup (OccEnv ifun cands ctxt) bndrs
     go ctxt (bndr:bndrs) rev_bndrs = go ctxt bndrs (bndr:rev_bndrs)
 
 
-zapCtxt env@(OccEnv ifun cands []) = env
-zapCtxt     (OccEnv ifun cands _ ) = OccEnv ifun cands []
+vanillaCtxt (OccEnv cands _ _) = OccEnv cands OccVanilla []
+rhsCtxt     (OccEnv cands _ _) = OccEnv cands OccRhs     []
 
+addAppCtxt (OccEnv cands encl ctxt) args 
+  = OccEnv cands encl (replicate (valArgCount args) True ++ ctxt)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[OccurAnal-types]{OccEnv}
+%*									*
+%************************************************************************
+
+\begin{code}
 type UsageDetails = IdEnv OccInfo	-- A finite map from ids to their usage
 
 combineUsageDetails, combineAltsUsageDetails

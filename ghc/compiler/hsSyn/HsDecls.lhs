@@ -782,6 +782,7 @@ data RuleDecl name pat
 	name			-- Head of LHS
 	CoreRule
 
+isIfaceRuleDecl :: RuleDecl name pat -> Bool
 isIfaceRuleDecl (HsRule _ _ _ _ _ _ _) = False
 isIfaceRuleDecl other		       = True
 

@@ -4,7 +4,7 @@
 \section[TcIfaceSig]{Type checking of type signatures in interface files}
 
 \begin{code}
-module TcIfaceSig ( tcInterfaceSigs, tcVar, tcCoreExpr, tcCoreLamBndrs ) where
+module TcIfaceSig ( tcInterfaceSigs, tcDelay, tcVar, tcCoreExpr, tcCoreLamBndrs ) where
 
 #include "HsVersions.h"
 
@@ -138,24 +138,23 @@ an unfolding that isn't going to be looked at.
 
 \begin{code}
 tcPragExpr unf_env name in_scope_vars expr
-  = tcDelay unf_env doc $
+  = tcDelay unf_env doc Nothing $
 	tcCoreExpr expr		`thenTc` \ core_expr' ->
 
 		-- Check for type consistency in the unfolding
 	tcGetSrcLoc		`thenNF_Tc` \ src_loc -> 
 	getDOptsTc		`thenTc` \ dflags ->
 	case lintUnfolding dflags src_loc in_scope_vars core_expr' of
-	  (Nothing,_)       -> returnTc core_expr'  -- ignore warnings
+	  (Nothing,_)       -> returnTc (Just core_expr')  -- ignore warnings
 	  (Just fail_msg,_) -> failWithTc ((doc <+> text "failed Lint") $$ fail_msg)
   where
     doc = text "unfolding of" <+> ppr name
 
-tcDelay :: RecTcEnv -> SDoc -> TcM a -> NF_TcM (Maybe a)
-tcDelay unf_env doc thing_inside
+tcDelay :: RecTcEnv -> SDoc -> a -> TcM a -> NF_TcM a
+tcDelay unf_env doc bad_ans thing_inside
   = forkNF_Tc (
 	recoverNF_Tc bad_value (
-		tcSetEnv unf_env thing_inside	`thenTc` \ r ->
-		returnTc (Just r)
+		tcSetEnv unf_env thing_inside
     ))			
   where
 	-- The trace tells what wasn't available, for the benefit of
@@ -163,7 +162,7 @@ tcDelay unf_env doc thing_inside
     bad_value = getErrsTc		`thenNF_Tc` \ (warns,errs) ->
 		returnNF_Tc (pprTrace "Failed:" 
 				   	 (hang doc 4 (pprBagOfErrors errs))
-					 Nothing)
+					 bad_ans)
 \end{code}
 
 
