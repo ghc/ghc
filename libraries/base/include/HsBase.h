@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.13 2002/09/06 14:34:15 simonmar Exp $
+ * $Id: HsBase.h,v 1.14 2002/09/25 15:24:07 simonmar Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -97,7 +97,6 @@
 #endif
 #include "lockFile.h"
 #include "dirUtils.h"
-#include "errUtils.h"
 
 #if defined(__MINGW32__)
 #include <io.h>
