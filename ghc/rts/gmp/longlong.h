@@ -230,18 +230,18 @@ extern UDItype __MPN(udiv_qrnnd) _PROTO ((UDItype, UDItype, UDItype, UDItype *))
 #define UMUL_TIME 5
 #else
 #define umul_ppmm(xh, xl, a, b) \
-  __asm__ ("%@ Inlined umul_ppmm\n"
-	"mov	%|r0, %2, lsr #16\n"
-	"mov	%|r2, %3, lsr #16\n"
-	"bic	%|r1, %2, %|r0, lsl #16\n"
-	"bic	%|r2, %3, %|r2, lsl #16\n"
-	"mul	%1, %|r1, %|r2\n"
-	"mul	%|r2, %|r0, %|r2\n"
-	"mul	%|r1, %0, %|r1\n"
-	"mul	%0, %|r0, %0\n"
-	"adds	%|r1, %|r2, %|r1\n"
-	"addcs	%0, %0, #65536\n"
-	"adds	%1, %1, %|r1, lsl #16\n"
+  __asm__ ("%@ Inlined umul_ppmm\n"		\
+	"mov	%|r0, %2, lsr #16\n"		\
+	"mov	%|r2, %3, lsr #16\n"		\
+	"bic	%|r1, %2, %|r0, lsl #16\n"	\
+	"bic	%|r2, %3, %|r2, lsl #16\n"	\
+	"mul	%1, %|r1, %|r2\n"		\
+	"mul	%|r2, %|r0, %|r2\n"		\
+	"mul	%|r1, %0, %|r1\n"		\
+	"mul	%0, %|r0, %0\n"			\
+	"adds	%|r1, %|r2, %|r1\n"		\
+	"addcs	%0, %0, #65536\n"		\
+	"adds	%1, %1, %|r1, lsl #16\n"	\
 	"adc	%0, %0, %|r1, lsr #16"					\
 	   : "=&r" (xh), "=r" (xl)					\
 	   : "r" (a), "r" (b)						\
@@ -358,21 +358,21 @@ extern USItype __MPN(udiv_qrnnd) _PROTO ((USItype *, USItype, USItype, USItype))
   do {									\
     USItype __tmp;							\
     __asm__ (								\
-       "ldi		2,%0\n"
-	"extru,=		%1,15,16,%%r0		; Bits 31..16 zero?\n"
-	"extru,tr	%1,15,16,%1		; No.  Shift down, skip add.\n"
-	"ldo		16(%0),%0		; Yes.  Perform add.\n"
-	"extru,=		%1,23,8,%%r0		; Bits 15..8 zero?\n"
-	"extru,tr	%1,23,8,%1		; No.  Shift down, skip add.\n"
-	"ldo		8(%0),%0		; Yes.  Perform add.\n"
-	"extru,=		%1,27,4,%%r0		; Bits 7..4 zero?\n"
-	"extru,tr	%1,27,4,%1		; No.  Shift down, skip add.\n"
-	"ldo		4(%0),%0		; Yes.  Perform add.\n"
-	"extru,=		%1,29,2,%%r0		; Bits 3..2 zero?\n"
-	"extru,tr	%1,29,2,%1		; No.  Shift down, skip add.\n"
-	"ldo		2(%0),%0		; Yes.  Perform add.\n"
-	"extru		%1,30,1,%1		; Extract bit 1.\n"
-	"sub		%0,%1,%0		; Subtract it.\n"
+       "ldi		2,%0\n"							\
+	"extru,=		%1,15,16,%%r0		; Bits 31..16 zero?\n"	\
+	"extru,tr	%1,15,16,%1		; No.  Shift down, skip add.\n"	\
+	"ldo		16(%0),%0		; Yes.  Perform add.\n"		\
+	"extru,=		%1,23,8,%%r0		; Bits 15..8 zero?\n"	\
+	"extru,tr	%1,23,8,%1		; No.  Shift down, skip add.\n"	\
+	"ldo		8(%0),%0		; Yes.  Perform add.\n"		\
+	"extru,=		%1,27,4,%%r0		; Bits 7..4 zero?\n"	\
+	"extru,tr	%1,27,4,%1		; No.  Shift down, skip add.\n"	\
+	"ldo		4(%0),%0		; Yes.  Perform add.\n"		\
+	"extru,=		%1,29,2,%%r0		; Bits 3..2 zero?\n"	\
+	"extru,tr	%1,29,2,%1		; No.  Shift down, skip add.\n"	\
+	"ldo		2(%0),%0		; Yes.  Perform add.\n"		\
+	"extru		%1,30,1,%1		; Extract bit 1.\n"		\
+	"sub		%0,%1,%0		; Subtract it.\n"	\
 	: "=r" (count), "=r" (__tmp) : "1" (x));			\
   } while (0)
 #endif /* hppa */
@@ -527,31 +527,31 @@ extern USItype __MPN(udiv_qrnnd) _PROTO ((USItype *, USItype, USItype, USItype))
 #else /* for other 68k family members use 16x16->32 multiplication */
 #define umul_ppmm(xh, xl, a, b) \
   do { USItype __umul_tmp1, __umul_tmp2;				\
-	__asm__ ("| Inlined umul_ppmm\n"
-	"move%.l	%5,%3\n"
-	"move%.l	%2,%0\n"
-	"move%.w	%3,%1\n"
-	"swap	%3\n"
-	"swap	%0\n"
-	"mulu%.w	%2,%1\n"
-	"mulu%.w	%3,%0\n"
-	"mulu%.w	%2,%3\n"
-	"swap	%2\n"
-	"mulu%.w	%5,%2\n"
-	"add%.l	%3,%2\n"
-	"jcc	1f\n"
-	"add%.l	%#0x10000,%0\n"
-"1:	move%.l	%2,%3\n"
-	"clr%.w	%2\n"
-	"swap	%2\n"
-	"swap	%3\n"
-	"clr%.w	%3\n"
-	"add%.l	%3,%1\n"
-	"addx%.l	%2,%0\n"
-	"| End inlined umul_ppmm"					\
-	      : "=&d" ((USItype)(xh)), "=&d" ((USItype)(xl)),		\
-	        "=d" (__umul_tmp1), "=&d" (__umul_tmp2)			\
-	      : "%2" ((USItype)(a)), "d" ((USItype)(b)));		\
+	__asm__ ("| Inlined umul_ppmm\n"			\
+	"move%.l	%5,%3\n"				\
+	"move%.l	%2,%0\n"				\
+	"move%.w	%3,%1\n"				\
+	"swap	%3\n"						\
+	"swap	%0\n"						\
+	"mulu%.w	%2,%1\n"				\
+	"mulu%.w	%3,%0\n"				\
+	"mulu%.w	%2,%3\n"				\
+	"swap	%2\n"						\
+	"mulu%.w	%5,%2\n"				\
+	"add%.l	%3,%2\n"					\
+	"jcc	1f\n"						\
+	"add%.l	%#0x10000,%0\n"					\
+"1:	move%.l	%2,%3\n"					\
+	"clr%.w	%2\n"						\
+	"swap	%2\n"						\
+	"swap	%3\n"						\
+	"clr%.w	%3\n"						\
+	"add%.l	%3,%1\n"					\
+	"addx%.l	%2,%0\n"				\
+	"| End inlined umul_ppmm"				\
+	      : "=&d" ((USItype)(xh)), "=&d" ((USItype)(xl)),	\
+	        "=d" (__umul_tmp1), "=&d" (__umul_tmp2)		\
+	      : "%2" ((USItype)(a)), "d" ((USItype)(b)));	\
   } while (0)
 #define UMUL_TIME 100
 #define UDIV_TIME 400
@@ -825,29 +825,29 @@ extern USItype __MPN(udiv_qrnnd) _PROTO ((USItype *, USItype, USItype, USItype))
 	     "1" ((USItype)(al)), "r" ((USItype)(bl)))
 #define smul_ppmm(ph, pl, m0, m1) \
   __asm__ (								\
-       "s	r2,r2\n"
-	"mts r10,%2\n"
-	"m	r2,%3\n"
-	"m	r2,%3\n"
-	"m	r2,%3\n"
-	"m	r2,%3\n"
-	"m	r2,%3\n"
-	"m	r2,%3\n"
-	"m	r2,%3\n"
-	"m	r2,%3\n"
-	"m	r2,%3\n"
-	"m	r2,%3\n"
-	"m	r2,%3\n"
-	"m	r2,%3\n"
-	"m	r2,%3\n"
-	"m	r2,%3\n"
-	"m	r2,%3\n"
-	"m	r2,%3\n"
-	"cas	%0,r2,r0\n"
-	"mfs	r10,%1"							\
-	   : "=r" ((USItype)(ph)), "=r" ((USItype)(pl))			\
-	   : "%r" ((USItype)(m0)), "r" ((USItype)(m1))			\
-	   : "r2");							\
+       "s	r2,r2\n"				\
+	"mts r10,%2\n"					\
+	"m	r2,%3\n"				\
+	"m	r2,%3\n"				\
+	"m	r2,%3\n"				\
+	"m	r2,%3\n"				\
+	"m	r2,%3\n"				\
+	"m	r2,%3\n"				\
+	"m	r2,%3\n"				\
+	"m	r2,%3\n"				\
+	"m	r2,%3\n"				\
+	"m	r2,%3\n"				\
+	"m	r2,%3\n"				\
+	"m	r2,%3\n"				\
+	"m	r2,%3\n"				\
+	"m	r2,%3\n"				\
+	"m	r2,%3\n"				\
+	"m	r2,%3\n"				\
+	"cas	%0,r2,r0\n"				\
+	"mfs	r10,%1"					\
+	   : "=r" ((USItype)(ph)), "=r" ((USItype)(pl))	\
+	   : "%r" ((USItype)(m0)), "r" ((USItype)(m1))	\
+	   : "r2");					\
 #define UMUL_TIME 20
 #define UDIV_TIME 200
 #define count_leading_zeros(count, x) \
@@ -934,46 +934,46 @@ extern USItype __MPN(udiv_qrnnd) _PROTO ((USItype *, USItype, USItype, USItype))
   __asm__ ("umul %2,%3,%1;rd %%y,%0" : "=r" (w1), "=r" (w0) : "r" (u), "r" (v))
 #define UMUL_TIME 5
 #define udiv_qrnnd(q, r, n1, n0, d) \
-  __asm__ ("! Inlined udiv_qrnnd\n"
-	"wr	%%g0,%2,%%y	! Not a delayed write for sparclite\n"
-	"tst	%%g0\n"
-	"divscc	%3,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%%g1\n"
-	"divscc	%%g1,%4,%0\n"
-	"rd	%%y,%1\n"
-	"bl,a 1f\n"
-	"add	%1,%4,%1\n"
+  __asm__ ("! Inlined udiv_qrnnd\n"					\
+	"wr	%%g0,%2,%%y	! Not a delayed write for sparclite\n"	\
+	"tst	%%g0\n"							\
+	"divscc	%3,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%%g1\n"						\
+	"divscc	%%g1,%4,%0\n"						\
+	"rd	%%y,%1\n"						\
+	"bl,a 1f\n"							\
+	"add	%1,%4,%1\n"						\
 "1:	! End of inline udiv_qrnnd"					\
-	   : "=r" (q), "=r" (r) : "r" (n1), "r" (n0), "rI" (d)
+	   : "=r" (q), "=r" (r) : "r" (n1), "r" (n0), "rI" (d)		\
 	   : "%g1" __AND_CLOBBER_CC)
 #define UDIV_TIME 37
 #define count_leading_zeros(count, x) \
@@ -987,47 +987,47 @@ extern USItype __MPN(udiv_qrnnd) _PROTO ((USItype *, USItype, USItype, USItype))
 /* Default to sparc v7 versions of umul_ppmm and udiv_qrnnd.  */
 #ifndef umul_ppmm
 #define umul_ppmm(w1, w0, u, v) \
-  __asm__ ("! Inlined umul_ppmm\n"
-	"wr	%%g0,%2,%%y	! SPARC has 0-3 delay insn after a wr\n"
-	"sra	%3,31,%%g2	! Don't move this insn\n"
-	"and	%2,%%g2,%%g2	! Don't move this insn\n"
-	"andcc	%%g0,0,%%g1	! Don't move this insn\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,%3,%%g1\n"
-	"mulscc	%%g1,0,%%g1\n"
-	"add	%%g1,%%g2,%0\n"
-	"rd	%%y,%1"							\
-	   : "=r" (w1), "=r" (w0) : "%rI" (u), "r" (v)			\
+  __asm__ ("! Inlined umul_ppmm\n"						\
+	"wr	%%g0,%2,%%y	! SPARC has 0-3 delay insn after a wr\n"	\
+	"sra	%3,31,%%g2	! Don't move this insn\n"			\
+	"and	%2,%%g2,%%g2	! Don't move this insn\n"			\
+	"andcc	%%g0,0,%%g1	! Don't move this insn\n"			\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,%3,%%g1\n"							\
+	"mulscc	%%g1,0,%%g1\n"							\
+	"add	%%g1,%%g2,%0\n"							\
+	"rd	%%y,%1"								\
+	   : "=r" (w1), "=r" (w0) : "%rI" (u), "r" (v)				\
 	   : "%g1", "%g2" __AND_CLOBBER_CC)
 #define UMUL_TIME 39		/* 39 instructions */
 #endif
