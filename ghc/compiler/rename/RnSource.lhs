@@ -130,7 +130,7 @@ rnSourceDecl (DefD (DefaultDecl tys src_loc))
 \begin{code}
 rnHsForeignDecl (ForeignImport name ty spec src_loc)
   = pushSrcLocRn src_loc 		$
-    lookupOccRn name		        `thenRn` \ name' ->
+    lookupTopBndrRn name	        `thenRn` \ name' ->
     rnHsTypeFVs (fo_decl_msg name) ty	`thenRn` \ (ty', fvs1) ->
     lookupOrigNames (extras spec)	`thenRn` \ fvs2 ->
     returnRn (ForeignImport name' ty' spec src_loc, fvs1 `plusFV` fvs2)
