@@ -342,9 +342,10 @@
     <p>
     We therefore employ a second family of magic infotables, indexed,
     like the first, on the return representation, and therefore with
-    names of the form <code>stg_itoc_ret_REP_info</code>.  This is
-    pushed onto the stack (note, tagged values have their tag zapped),
-    giving:
+    names of the form <code>stg_itoc_ret_REP_info</code>.  (Note:
+    <code>itoc</code>; the previous bunch were <code>ctoi</code>).
+    This is pushed onto the stack (note, tagged values have their tag
+    zapped), giving:
     <pre>
    |        |
    +--------+
@@ -364,7 +365,37 @@
     return register, and returns to the itbl to which we were trying
     to return in the first place.  
     <p>
-    Amazingly enough, this stuff all actually works!
+    Amazingly enough, this stuff all actually works!  Well, mostly ...
+    <p>
+    <b>Unboxed tuples: a Right Royal Spanner In The Works</b>
+    <p>
+    The above scheme depends crucially on having magic infotables
+    <code>stg_{itoc,ctoi}_ret_REP_info</code> for each return
+    representation <code>REP</code>.  It unfortunately fails miserably
+    in the face of unboxed tuple returns, because the set of required
+    tables would be infinite; this despite the fact that for any given
+    unboxed tuple return type, the scheme could be made to work fine.
+    <p>
+    This is a serious problem, because it prevents interpreted
+    code from doing <code>IO</code>-typed returns, since <code>IO
+    t</code> is implemented as <code>(# t, RealWorld# #)</code> or
+    thereabouts.  This restriction in turn rules out FFI stuff in the
+    interpreter.  Not good.
+    <p>
+    Although we have no way to make general unboxed tuples work, we
+    can at least make <code>IO</code>-types work using the following
+    ultra-kludgey observation: <code>RealWorld#</code> doesn't really
+    exist and so has zero size, in compiled code.  In turn this means
+    that a type of the form <code>(# t, RealWorld# #)</code> has the
+    same representation as plain <code>t</code> does.  So the bytecode
+    generator, whilst rejecting code with general unboxed tuple
+    returns, recognises and accepts this special case.  Which means
+    that <code>IO</code>-typed stuff works in the interpreter.  Just.
+    <p>
+    If anyone asks, I will claim I was out of radio contact, on a
+    6-month walking holiday to the south pole, at the time this was
+    ... er ... dreamt up.
+
 
 <p><small>
    
