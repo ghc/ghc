@@ -1,0 +1,4 @@
+module HsPat where
+
+data Pat i
+type LPat i = SrcLoc.Located (Pat i)
