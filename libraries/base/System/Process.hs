@@ -70,9 +70,9 @@ runCommand
 runCommand string = do
   (cmd,args) <- commandToProcess string
 #if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
-  runProcess1 "runProcess" cmd args Nothing Nothing Nothing Nothing Nothing
+  runProcess1 "runCommand" cmd args Nothing Nothing Nothing Nothing Nothing
 #else
-  runProcess1 "runProcess" cmd [] Nothing Nothing Nothing Nothing Nothing args
+  runProcess1 "runCommand" cmd [] Nothing Nothing Nothing Nothing Nothing args
 #endif
 
 -- ----------------------------------------------------------------------------
