@@ -1,6 +1,6 @@
 {-# OPTIONS -cpp -fglasgow-exts #-}
 -----------------------------------------------------------------------------
--- $Id: KludgedSystem.hs,v 1.6 2001/04/02 16:10:05 rrt Exp $
+-- $Id: KludgedSystem.hs,v 1.7 2001/07/03 16:57:03 sewardj Exp $
 
 -- system that works feasibly under Windows (i.e. passes the command line to sh,
 -- because system() under Windows doesn't look at SHELL, and always uses CMD.EXE)
@@ -14,7 +14,7 @@ module KludgedSystem (system, defaultCompiler, progNameSuffix) where
 import System (system)
 
 defaultCompiler :: String
-defaultCompiler = "gcc"
+defaultCompiler = cGCC
 progNameSuffix = ""
 
 #else
@@ -35,7 +35,7 @@ system cmd = do
 foreign import "_getpid" unsafe getProcessID :: IO Int
 
 defaultCompiler :: String
-defaultCompiler = "gcc -mno-cygwin -mwin32"
+defaultCompiler = cGCC ++ " -mno-cygwin"
 progNameSuffix = ".exe"
 
 #endif /* mingw32_TARGET_OS */

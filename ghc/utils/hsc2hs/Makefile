@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.16 2001/06/27 06:18:40 sof Exp $
+# $Id: Makefile,v 1.17 2001/07/03 16:57:03 sewardj Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -66,6 +66,7 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo -n "Creating $(CONFIG_HS) ... "
 	@echo "module Config where" >>$(CONFIG_HS)
 	@echo "cDEFAULT_TMPDIR       = \"$(DEFAULT_TMPDIR)\"" >> $(CONFIG_HS)
+	@echo "cGCC                  = \"$(WhatGccIsCalled)\"" >> $(CONFIG_HS)
 	@echo done.
 
 CLEAN_FILES += $(CONFIG_HS)

@@ -386,7 +386,8 @@ AC_ARG_WITH(gcc,
 [  --with-gcc=<gcc command>
         Use a different command instead of 'gcc' for the GNU C compiler.
 ],
-[WhatGccIsCalled="$withval"],
+[WhatGccIsCalled="$withval"
+ CC="$withval"],
 [WhatGccIsCalled="gcc"]
 )
 AC_SUBST(WhatGccIsCalled)

@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.50 2001/06/06 10:35:39 rrt Exp $
+# $Id: Makefile,v 1.51 2001/07/03 16:57:03 sewardj Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -158,7 +158,7 @@ else
 # Pass --target to configure of GMP, so that building for mingwin under
 # cygwin works properly (when the host is not the same as the target)
 boot ::
-	cd gmp && ./configure --enable-shared=no --target=$(HOSTPLATFORM)
+	cd gmp && CC=$(WhatGccIsCalled) ./configure --enable-shared=no --target=$(HOSTPLATFORM)
 endif
 
 # Slight cheatage here to pass host as target, but x-compilation isn't supported by ghc.
