@@ -31,13 +31,28 @@ The GHC documentation is written using DocBook 3.1, so the DTD line should be:
 &lt;!DOCTYPE Article PUBLIC "-//OASIS//DTD DocBook V3.1//EN"&gt;
 </Screen>
 
-<Para>
-This guide is <Emphasis>not</Emphasis> meant to teach you how to write DocBook; read the <ULink URL="http://www.docbook.org/">DocBook book</ULink> for that. It is more of a reference than a tutorial, so see the <ULink URL="http://www.oasis-open.org/docbook/">DocBook home page</ULink> for other links.
-</Para>
+<Para> This guide is <Emphasis>not</Emphasis> meant to teach you how to
+write DocBook; read the <ULink URL="http://www.docbook.org/">DocBook
+book</ULink> for that. It is more of a reference than a tutorial, so see the
+<ULink URL="http://www.oasis-open.org/docbook/">DocBook home page</ULink>
+for other links. </Para>
 
-<Para>
-The rest of this section outlines the use of several tags which may not be obvious (DocBook is rather scholastic in style: it has tags for many things from C function prototypes to keyboard bindings; at the same time it has many omissions and oddities). The current scheme has many infelicities, partly because it was dreamt up in a hurry while the author was learning DocBook and converting the documentation thereto, and partly because DocBook is rather C-centric.
-</Para>
+<Para> However, by popular demand, here are some useful points: </Para>
+
+<ItemizedList>
+<ListItem>
+<Para>Remember to use <SGMLTag class="StartTag">Para</SGMLTag> inside
+<SGMLTag class="StartTag">ListItem</SGMLTag>s.
+</ListItem>
+</ItemizedList>
+
+<Para> The rest of this section outlines the use of several tags which may
+not be obvious (DocBook is rather scholastic in style: it has tags for many
+things from C function prototypes to keyboard bindings; at the same time it
+has many omissions and oddities). The current scheme has many infelicities,
+partly because it was dreamt up in a hurry while the author was learning
+DocBook and converting the documentation thereto, and partly because DocBook
+is rather C-centric. </Para>
 
 <VariableList>
 
