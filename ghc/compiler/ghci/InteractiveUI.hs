@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.96 2001/10/18 15:26:57 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.97 2001/10/22 16:16:27 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -51,6 +51,7 @@ import Readline
 #endif
 import Concurrent
 import IOExts
+import SystemExts
 
 import Numeric
 import List
@@ -87,7 +88,7 @@ builtin_commands = [
   ("load",	keepGoing loadModule),
   ("module",	keepGoing setContext),
   ("reload",	keepGoing reloadModule),
-  ("set",	keepGoing setOptions),
+  ("set",	keepGoing setCmd),
   ("type",	keepGoing typeOfExpr),
   ("unset",	keepGoing unsetOptions),
   ("undef",     keepGoing undefineMacro),
@@ -112,6 +113,8 @@ helpText = "\
 \   :module <mod>	   set the context for expression evaluation to <mod>\n\ 
 \   :reload		   reload the current module set\n\ 
 \   :set <option> ...	   set options\n\ 
+\   :set args <arg> ...	   set the arguments returned by System.getArgs\n\ 
+\   :set prog <progname>   set the value returned by System.getProgName\n\ 
 \   :undef <cmd> 	   undefine user-defined command :<cmd>\n\ 
 \   :type <expr>	   show the type of <expr>\n\ 
 \   :unset <option> ...	   unset options\n\ 
@@ -166,7 +169,9 @@ interactiveUI cmstate paths cmdline_libs = do
 	Just hval -> writeIORef flush_stdout (unsafeCoerce# hval :: IO ())
 	_ -> panic "interactiveUI:stdout"
 
-   startGHCi runGHCi GHCiState{ targets = paths,
+   startGHCi runGHCi GHCiState{ progname = "<interactive>",
+				args = [],
+				targets = paths,
 			        cmstate = cmstate,
 			        options = [] }
 
@@ -343,7 +348,9 @@ runStmt stmt
  = do st <- getGHCiState
       dflags <- io getDynFlags
       let dflags' = dopt_unset dflags Opt_WarnUnusedBinds
-      (new_cmstate, names) <- io (cmRunStmt (cmstate st) dflags' stmt)
+      (new_cmstate, names) <- 
+	io $ withProgName (progname st) $ withArgs (args st) $
+	cmRunStmt (cmstate st) dflags' stmt
       setGHCiState st{cmstate = new_cmstate}
       return (Just names)
 
@@ -594,8 +601,8 @@ shellEscape str = io (system str >> return False)
 -- This is pretty fragile: most options won't work as expected.  ToDo:
 -- figure out which ones & disallow them.
 
-setOptions :: String -> GHCi ()
-setOptions ""
+setCmd :: String -> GHCi ()
+setCmd ""
   = do st <- getGHCiState
        let opts = options st
        io $ putStrLn (showSDoc (
@@ -604,9 +611,25 @@ setOptions ""
    		   then text "none."
    		   else hsep (map (\o -> char '+' <> text (optToStr o)) opts)
    	   ))
-setOptions str
-  = do -- first, deal with the GHCi opts (+s, +t, etc.)
-      let (plus_opts, minus_opts)  = partition isPlus (words str)
+setCmd str
+  = case words str of
+	("args":args) -> setArgs args
+	("prog":prog) -> setProg prog
+	wds -> setOptions wds
+
+setArgs args = do
+  st <- getGHCiState
+  setGHCiState st{ args = args }
+
+setProg [prog] = do
+  st <- getGHCiState
+  setGHCiState st{ progname = prog }
+setProg _ = do
+  io (hPutStrLn stderr "syntax: :set prog <progname>")
+
+setOptions wds =
+   do -- first, deal with the GHCi opts (+s, +t, etc.)
+      let (plus_opts, minus_opts)  = partition isPlus wds
       mapM setOpt plus_opts
 
       -- now, the GHC flags
@@ -693,6 +716,8 @@ newPackages new_pkgs = do
 
 data GHCiState = GHCiState
      { 
+	progname       :: String,
+	args	       :: [String],
 	targets        :: [FilePath],
 	cmstate        :: CmState,
 	options        :: [GHCiOption]
