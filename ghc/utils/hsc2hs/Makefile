@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.31 2002/04/30 14:19:56 simonmar Exp $
+# $Id: Makefile,v 1.32 2002/04/30 14:40:33 simonmar Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -94,6 +94,7 @@ else
 endif
 	@echo done.
 
+# -----------------------------------------------------------------------------
 # don't recurse on 'make install'
 #
 ifeq "$(INSTALLING)" "1"
@@ -105,8 +106,3 @@ clean distclean maintainer-clean ::
 endif
 
 include $(TOP)/mk/target.mk
-
-# hsc2hs-inplace is needed to boot in ghc/lib/std...
-ifneq "$(BootingFromHc)" "YES"
-boot :: all
-endif
