@@ -439,9 +439,15 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 		  (HsLitOut (HsString msg) stringTy)
 
 	  | otherwise	-- The common case
-	  = HsCon dict_constr inst_tys' (map HsVar (sc_dict_ids ++ meth_ids))
+	  = foldl HsApp (TyApp (HsVar (RealId dict_constr)) inst_tys')
+			       (map HsVar (sc_dict_ids ++ meth_ids))
 		-- We don't produce a binding for the dict_constr; instead we
-		-- just generate the saturated constructor directly
+		-- rely on the simplifier to unfold this saturated application
+		-- We do this rather than generate an HsCon directly, because
+		-- it means that the special cases (e.g. dictionary with only one
+		-- member) are dealt with by the common MkId.mkDataConId code rather
+		-- than needing to be repeated here.
+
 	  where
 	    msg = _PK_ ("Compiler error: bad dictionary " ++ showSDoc (ppr clas))
 
