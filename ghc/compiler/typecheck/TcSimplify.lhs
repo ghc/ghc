@@ -1933,15 +1933,15 @@ tc_simplify_top is_interactive wanteds
 	bad_guys 	   = non_stds ++ concat std_bads
     	(non_ips, bad_ips) = partition isClassDict bad_guys
     	(ambigs, no_insts) = partition is_ambig non_ips
-    	is_ambig d         = not (isEmptyVarSet (tyVarsOfInst d))
+    	is_ambig d         = not (tyVarsOfInst d `subVarSet` fixed_tvs)
+	fixed_tvs	   = oclose (fdPredsOfInsts irreds) emptyVarSet
 	-- If the dict has free type variables, it's almost certainly ambiguous,
-	-- and that's the first thing to fix
+	-- and that's the first thing to fix.  
 	-- Otherwise, addNoInstanceErrs does the right thing
-	-- [ Previously, there was a different no_inst definition:
-	--	no_inst d = not (isTyVarDict d) || tyVarsOfInst d `subVarSet` fixed_tvs
-	--	fixed_tvs = oclose (fdPredsOfInsts tidy_dicts) emptyVarSet
-	--   But that seems over-elaborate to me; it only bites for class decls with
-	--   fundeps like this:		class C a b | -> b where ...]
+	-- I say "almost certain" because we might have
+	--	 class C a b | a -> B where ...
+	-- plus an Inst (C Int x).  Then the 'x' isn't ambiguous; it's just that
+	-- there's no instance decl for (C Int ...).  Hence the oclose.
     in
 
 	-- Report definite errors
