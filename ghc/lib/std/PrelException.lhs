@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelException.lhs,v 1.22 2000/07/07 11:03:58 simonmar Exp $
+% $Id: PrelException.lhs,v 1.23 2000/07/09 16:00:55 panne Exp $
 %
 % (c) The University of Glasgow, 1998-2000
 %
@@ -53,6 +53,7 @@ catchException (IO m) k =  IO $ \s -> catch# m (\ex -> unIO (k ex)) s
 catch           :: IO a -> (Exception -> IO a) -> IO a 
 catch m k	=  catchException m handler
   where handler err@(IOException _) = k err
+        handler err@(UserError   _) = k err
 	handler other               = throw other
 \end{code}
 
