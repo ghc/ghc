@@ -314,7 +314,7 @@ insert_overlapping new_item (item:items)
 	-- Keep new one
   | old_beats_new = item : items
 	-- Keep old one
-  | otherwise		  = item : insert_overlapping new_item items
+  | otherwise	  = item : insert_overlapping new_item items
 	-- Keep both
   where
     new_beats_old = new_item `beats` item
