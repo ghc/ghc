@@ -47,7 +47,11 @@ mkBS xs = foldr (unionBS . unitBS) emptyBS xs
 
 unitBS :: Int -> BitSet
 unitBS x = case x of
+#if __GLASGOW_HASKELL__ >= 503
+    I# i# -> MkBS ((int2Word# 1#) `uncheckedShiftL#` i#)
+#else
     I# i# -> MkBS ((int2Word# 1#) `shiftL#` i#)
+#endif
 
 unionBS :: BitSet -> BitSet -> BitSet
 unionBS (MkBS x#) (MkBS y#) = MkBS (x# `or#` y#)
@@ -83,7 +87,11 @@ listBS s = listify s 0
     	    	      in case word2Int# (s# `and#` (int2Word# 1#)) of
     	    	    	  0# -> more
     	    	    	  _  -> n : more
+#if __GLASGOW_HASKELL__ >= 503
+	  shiftr x y = uncheckedShiftRL# x y
+#else
 	  shiftr x y = shiftRL# x y
+#endif
 
 -- intBS is a bit naughty.
 intBS :: BitSet -> Int
