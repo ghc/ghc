@@ -4,7 +4,8 @@
 \section[CmSummarise]{Module summariser for GHCI}
 
 \begin{code}
-module CmSummarise ( ModImport(..), ModSummary(..), summarise )
+module CmSummarise ( ModImport(..), mi_name,
+                     ModSummary(..), summarise )
 where
 
 #include "HsVersions.h"
@@ -13,20 +14,26 @@ import List 		( nub )
 import Char		( ord, isAlphaNum )
 
 import CmFind	 	( ModName, ModLocation(..) )
-
+import Outputable	( pprPanic, text )
 \end{code}
 
 \begin{code}
 
 
 data ModSummary
-   = ModSummary ModLocation                    -- location and kind
-                (Maybe (String, Fingerprint))  -- source and sig if .hs
-                (Maybe [ModImport])            -- imports if .hs or .hi
+   = ModSummary {
+        ms_loc     :: ModLocation,                   -- location and kind
+        ms_source  :: (Maybe (String, Fingerprint)), -- source and sig if .hs
+        ms_imports :: (Maybe [ModImport])            -- imports if .hs or .hi
+     }
+     deriving Show
 
 data ModImport
    = MINormal ModName | MISource ModName
-     deriving Eq
+     deriving (Eq, Show)
+
+mi_name (MINormal nm) = nm
+mi_name (MISource nm) = nm
 
 type Fingerprint = Int
 
@@ -46,6 +53,8 @@ summarise loc
            -> readFile hiPath >>= \ hisrc ->
               let imps = getImports hisrc
               in  return (ModSummary loc Nothing (Just imps))
+        NotFound
+           -> pprPanic "summarise:NotFound" (text (show loc))
 
 fingerprint :: String -> Int
 fingerprint s
