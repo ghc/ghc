@@ -469,7 +469,6 @@ mod_name	:: { ModuleName }
 ---------------------------------------------------
 var_fs		:: { EncodedFS }
 		: VARID			{ $1 }
-		| VARSYM		{ $1 }
 		| '!'	  		{ SLIT("!") }
 		| 'as'			{ SLIT("as") }
 		| 'qualified'		{ SLIT("qualified") }
@@ -793,7 +792,7 @@ scc     :: { CostCentre }
 
 cc_name :: { EncodedFS }
         : CONID                 { $1 }
-        | VARID                 { $1 }
+        | var_fs                { $1 }
   
 cc_dup  :: { IsDupdCC }
 cc_dup  :                       { OriginalCC }
