@@ -35,6 +35,7 @@ import StringBuffer	( hGetStringBuffer, freeStringBuffer )
 import Parser
 import Lex		( PState(..), ParseResult(..) )
 import SrcLoc		( mkSrcLoc )
+import Finder		( findModule )
 import Rename		( checkOldIface, renameModule, closeIfaceDecls )
 import Rules		( emptyRuleBase )
 import PrelInfo		( wiredInThingEnv, wiredInThings )
@@ -76,7 +77,7 @@ import Maybes		( orElse )
 import IOExts		( newIORef, readIORef, writeIORef, unsafePerformIO )
 
 import Monad		( when )
-import Maybe		( isJust )
+import Maybe		( isJust, fromJust )
 import IO
 \end{code}
 
@@ -128,7 +129,8 @@ hscMain ghci_mode dflags mod location source_unchanged have_object
                 	++ ", hspp = " ++ show (ml_hspp_file location));
 
       (pcs_ch, errs_found, (recomp_reqd, maybe_checked_iface))
-         <- checkOldIface ghci_mode dflags hit hst pcs 
+         <- _scc_ "checkOldIface"
+	    checkOldIface ghci_mode dflags hit hst pcs 
 		(unJust "hscMain" (ml_hi_file location))
 		source_unchanged maybe_old_iface;
 
@@ -244,12 +246,26 @@ hscRecomp ghci_mode dflags have_object
              <- _scc_ "DeSugar" 
 		deSugar dflags pcs_tc hst this_mod print_unqualified tc_result
 
+	; pcs_middle
+	    <- if ghci_mode == OneShot 
+		  then do init_pcs <- initPersistentCompilerState
+			  init_prs <- initPersistentRenamerState
+		          let 
+			      rules   = pcs_rules pcs_tc	
+			      orig_tc = prsOrig (pcs_PRS pcs_tc)
+			      new_prs = init_prs{ prsOrig=orig_tc }
+
+			  orig_tc `seq` rules `seq` new_prs `seq`
+			    return init_pcs{ pcs_PRS = new_prs,
+			                     pcs_rules = rules }
+		  else return pcs_tc
+
  	    -------------------
  	    -- SIMPLIFY
  	    -------------------
 	; simpl_details
 	     <- _scc_     "Core2Core"
-		core2core dflags pcs_tc hst dont_discard ds_details
+		core2core dflags pcs_middle hst dont_discard ds_details
 
  	    -------------------
  	    -- TIDY
@@ -266,13 +282,21 @@ hscRecomp ghci_mode dflags have_object
 		-- Meanwhile, tidyCorePgm is careful not to look at cg_info!
 
 	; (pcs_simpl, tidy_details) 
-	     <- tidyCorePgm dflags this_mod pcs_tc cg_info simpl_details
+	     <- _scc_ "CoreTidy"
+	        tidyCorePgm dflags this_mod pcs_middle cg_info simpl_details
       
+	; pcs_final <- if ghci_mode == OneShot then initPersistentCompilerState
+				   	       else return pcs_simpl
+
+	-- alive at this point:  
+	--	tidy_details
+	--	new_iface		
+
  	    -------------------
  	    -- PREPARE FOR CODE GENERATION
  	    -------------------
 	      -- Do saturation and convert to A-normal form
-	; prepd_details <- corePrepPgm dflags tidy_details
+	; prepd_details <- _scc_ "CorePrep" corePrepPgm dflags tidy_details
 
  	    -------------------
  	    -- CONVERT TO STG and COMPLETE CODE GENERATION
@@ -284,19 +308,13 @@ hscRecomp ghci_mode dflags have_object
 	    local_classes    = typeEnvClasses env_tc
 
  	    imported_module_names = map ideclName (hsModuleImports rdr_module)
-	    imported_modules = map mod_name_to_Module imported_module_names
+
+	    mod_name_to_Module nm
+		 = do m <- findModule nm ; return (fst (fromJust m))
 
 	    (h_code,c_code,fe_binders) = foreign_stuff
-	
-	    pit = pcs_PIT pcs_simpl
 
-	    mod_name_to_Module :: ModuleName -> Module
-	    mod_name_to_Module nm
-	       = let str_mi = lookupModuleEnvByName hit nm `orElse`
-			      lookupModuleEnvByName pit nm `orElse`
-			      pprPanic "mod_name_to_Module: no hst or pst mapping for" 
-			       	(ppr nm)
-		 in  mi_module str_mi
+        ; imported_modules <- mapM mod_name_to_Module imported_module_names
 
 	; (stub_h_exists, stub_c_exists, maybe_bcos, final_iface )
 	   <- if toInterp
@@ -347,7 +365,7 @@ hscRecomp ghci_mode dflags have_object
 
 
       	  -- and the answer is ...
-	; return (HscRecomp pcs_simpl
+	; return (HscRecomp pcs_final
 			    final_details
 			    final_iface
                             stub_h_exists stub_c_exists
