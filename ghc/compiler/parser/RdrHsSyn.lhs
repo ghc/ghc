@@ -113,7 +113,7 @@ extract_ty (HsListTy ty)             acc = extract_lty ty acc
 extract_ty (HsPArrTy ty)             acc = extract_lty ty acc
 extract_ty (HsTupleTy _ tys)         acc = foldr extract_lty acc tys
 extract_ty (HsFunTy ty1 ty2)         acc = extract_lty ty1 (extract_lty ty2 acc)
-extract_ty (HsPredTy p)		     acc = extract_pred (unLoc p) acc
+extract_ty (HsPredTy p)		     acc = extract_pred p acc
 extract_ty (HsOpTy ty1 nam ty2)      acc = extract_lty ty1 (extract_lty ty2 acc)
 extract_ty (HsParTy ty)              acc = extract_lty ty acc
 extract_ty (HsNumTy num)             acc = acc
@@ -319,7 +319,7 @@ hsIfaceType (HsPArrTy t)       = IfaceTyConApp IfacePArrTc [hsIfaceLType t]
 hsIfaceType (HsTupleTy bx ts)  = IfaceTyConApp (IfaceTupTc bx (length ts)) (hsIfaceLTypes ts)
 hsIfaceType (HsOpTy t1 tc t2)  = hs_tc_app (HsTyVar (unLoc tc)) (hsIfaceLTypes [t1, t2])
 hsIfaceType (HsParTy t)	       = hsIfaceLType t
-hsIfaceType (HsPredTy p)       = IfacePredTy (hsIfaceLPred p)
+hsIfaceType (HsPredTy p)       = IfacePredTy (hsIfacePred p)
 hsIfaceType (HsKindSig t _)    = hsIfaceLType t
 hsIfaceType (HsNumTy n)	       = panic "hsIfaceType:HsNum"
 hsIfaceType (HsSpliceTy _)     = panic "hsIfaceType:HsSpliceTy"
@@ -620,7 +620,7 @@ checkPred :: LHsType RdrName -> P (LHsPred RdrName)
 -- Watch out.. in ...deriving( Show )... we use checkPred on 
 -- the list of partially applied predicates in the deriving,
 -- so there can be zero args.
-checkPred (L spn (HsPredTy (L _ (HsIParam n ty))) )
+checkPred (L spn (HsPredTy (HsIParam n ty)))
   = return (L spn (HsIParam n ty))
 checkPred (L spn ty)
   = check spn ty []
@@ -637,7 +637,7 @@ checkDictTy :: LHsType RdrName -> P (LHsType RdrName)
 checkDictTy (L spn ty) = check ty []
   where
   check (HsTyVar t) args | not (isRdrTyVar t) 
-  	= return (L spn (HsPredTy (L spn (HsClassP t args))))
+  	= return (L spn (HsPredTy (HsClassP t args)))
   check (HsAppTy l r) args = check (unLoc l) (r:args)
   check (HsParTy t)   args = check (unLoc t) args
   check _ _ = parseError spn "Malformed context in instance header"

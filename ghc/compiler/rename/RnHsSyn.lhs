@@ -51,7 +51,7 @@ extractHsTyNames ty
     get (HsPArrTy ty)          = unitNameSet parrTyCon_name `unionNameSets` getl ty
     get (HsTupleTy con tys)    = extractHsTyNames_s tys
     get (HsFunTy ty1 ty2)      = getl ty1 `unionNameSets` getl ty2
-    get (HsPredTy p)	       = extractHsPredTyNames (unLoc p)
+    get (HsPredTy p)	       = extractHsPredTyNames p
     get (HsOpTy ty1 op ty2)    = getl ty1 `unionNameSets` getl ty2 `unionNameSets` unitNameSet (unLoc op)
     get (HsParTy ty)           = getl ty
     get (HsNumTy n)            = emptyNameSet

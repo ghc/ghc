@@ -154,12 +154,11 @@ tcHsSigType ctxt hs_ty
 	; ty <- tcHsKindedType kinded_ty
 	; checkValidType ctxt ty	
 	; returnM ty }
-
 -- Used for the deriving(...) items
 tcHsDeriv :: LHsType Name -> TcM ([TyVar], Class, [Type])
 tcHsDeriv = addLocM (tc_hs_deriv [])
 
-tc_hs_deriv tv_names (HsPredTy (L _ (HsClassP cls_name hs_tys)))
+tc_hs_deriv tv_names (HsPredTy (HsClassP cls_name hs_tys))
   = kcHsTyVars tv_names 		$ \ tv_names' ->
     do	{ cls_kind <- kcClass cls_name
 	; (tys, res_kind) <- kcApps cls_kind (ppr cls_name) hs_tys
@@ -201,7 +200,7 @@ tcHsKindedType hs_ty
 tcHsKindedContext :: LHsContext Name -> TcM ThetaType
 -- Used when we are expecting a ClassContext (i.e. no implicit params)
 -- Does not do validity checking, like tcHsKindedType
-tcHsKindedContext hs_theta = addLocM (mappM dsHsPred) hs_theta
+tcHsKindedContext hs_theta = addLocM (mappM dsHsLPred) hs_theta
 \end{code}
 
 
@@ -352,13 +351,16 @@ kcApps fun_kind ppr_fun args
 
 ---------------------------
 kcHsContext :: LHsContext Name -> TcM (LHsContext Name)
-kcHsContext ctxt = wrapLocM (mappM kcHsPred) ctxt
+kcHsContext ctxt = wrapLocM (mappM kcHsLPred) ctxt
 
-kcHsPred (L span pred)		-- Checks that the result is of kind liftedType
-  = addSrcSpan span $
-    kc_pred pred				`thenM` \ (pred', kind) ->
+kcHsLPred :: LHsPred Name -> TcM (LHsPred Name)
+kcHsLPred = wrapLocM kcHsPred
+
+kcHsPred :: HsPred Name -> TcM (HsPred Name)
+kcHsPred pred	-- Checks that the result is of kind liftedType
+  = kc_pred pred				`thenM` \ (pred', kind) ->
     checkExpectedKind pred kind liftedTypeKind	`thenM_` 
-    returnM (L span pred')
+    returnM pred'
     
 ---------------------------
 kc_pred :: HsPred Name -> TcM (HsPred Name, TcKind)	
@@ -458,7 +460,7 @@ ds_type (HsPredTy pred)
 
 ds_type full_ty@(HsForAllTy exp tv_names ctxt ty)
   = tcTyVarBndrs tv_names		$ \ tyvars ->
-    mappM dsHsPred (unLoc ctxt)		`thenM` \ theta ->
+    mappM dsHsLPred (unLoc ctxt)	`thenM` \ theta ->
     dsHsType ty				`thenM` \ tau ->
     returnM (mkSigmaTy tyvars theta tau)
 
@@ -495,15 +497,15 @@ ds_var_app name arg_tys
 Contexts
 ~~~~~~~~
 \begin{code}
-dsHsPred :: LHsPred Name -> TcM PredType
-dsHsPred pred = ds_pred (unLoc pred)
+dsHsLPred :: LHsPred Name -> TcM PredType
+dsHsLPred pred = dsHsPred (unLoc pred)
 
-ds_pred pred@(HsClassP class_name tys)
+dsHsPred pred@(HsClassP class_name tys)
   = dsHsTypes tys			`thenM` \ arg_tys ->
     tcLookupClass class_name		`thenM` \ clas ->
     returnM (ClassP clas arg_tys)
 
-ds_pred (HsIParam name ty)
+dsHsPred (HsIParam name ty)
   = dsHsType ty					`thenM` \ arg_ty ->
     returnM (IParam name arg_ty)
 \end{code}

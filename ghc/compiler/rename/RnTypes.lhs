@@ -161,7 +161,7 @@ rnHsType doc (HsAppTy ty1 ty2)
     returnM (HsAppTy ty1' ty2')
 
 rnHsType doc (HsPredTy pred)
-  = rnLPred doc pred	`thenM` \ pred' ->
+  = rnPred doc pred	`thenM` \ pred' ->
     returnM (HsPredTy pred')
 
 rnLHsTypes doc tys = mappM (rnLHsType doc) tys

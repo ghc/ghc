@@ -128,10 +128,12 @@ data HsType name
 
   | HsNumTy             Integer		-- Generics only
 
-  | HsPredTy		(LHsPred name)  -- Only used in the type of an instance
+  | HsPredTy		(HsPred name)	-- Only used in the type of an instance
 					-- declaration, eg.  Eq [a] -> Eq a
 					--			       ^^^^
 					--                            HsPredTy
+					-- Note no need for location info on the
+					-- enclosed HsPred; the one on the type will do
 
   | HsKindSig		(LHsType name)	-- (ty :: kind)
 			Kind		-- A type with a kind signature
@@ -233,10 +235,10 @@ splitHsInstDeclTy inst_ty
 		 (cxt2, cls, tys) = split_tau inst_ty
 
   where
-    split_tau (HsFunTy (L _ (HsPredTy p)) ty) = (p:ps, cls, tys)
+    split_tau (HsFunTy (L loc (HsPredTy p)) ty) = (L loc p : ps, cls, tys)
 					where
 					  (ps, cls, tys) = split_tau (unLoc ty)
-    split_tau (HsPredTy (L _ (HsClassP cls tys))) = ([], cls, tys)
+    split_tau (HsPredTy (HsClassP cls tys)) = ([], cls, tys)
     split_tau other = pprPanic "splitHsInstDeclTy" (ppr inst_ty)
 \end{code}
 

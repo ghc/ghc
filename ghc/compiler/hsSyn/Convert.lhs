@@ -62,7 +62,7 @@ mk_con con = L loc0 $ case con of
         = (noLoc (vName i), noLoc $ BangType HsNoBang (cvtType ty))
 
 mk_derivs [] = Nothing
-mk_derivs cs = Just [noLoc $ HsPredTy $ noLoc $ HsClassP (tconName c) [] | c <- cs]
+mk_derivs cs = Just [noLoc $ HsPredTy $ HsClassP (tconName c) [] | c <- cs]
 
 cvt_ltop  :: TH.Dec -> Either (LHsDecl RdrName) Message
 cvt_ltop d = case cvt_top d of
@@ -305,12 +305,12 @@ cvt_tvs :: [TH.Name] -> [LHsTyVarBndr RdrName]
 cvt_tvs tvs = map (noLoc . UserTyVar . tName) tvs
 
 cvt_context :: Cxt -> LHsContext RdrName 
-cvt_context tys = noLoc (map cvt_pred tys)
+cvt_context tys = noLoc (map (noLoc . cvt_pred) tys)
 
-cvt_pred :: TH.Type -> LHsPred RdrName
+cvt_pred :: TH.Type -> HsPred RdrName
 cvt_pred ty = case split_ty_app ty of
-	   	(ConT tc, tys) -> noLoc (HsClassP (tconName tc) (map cvtType tys))
-	   	(VarT tv, tys) -> noLoc (HsClassP (tName tv) (map cvtType tys))
+	   	(ConT tc, tys) -> HsClassP (tconName tc) (map cvtType tys)
+	   	(VarT tv, tys) -> HsClassP (tName tv) (map cvtType tys)
 		other -> cvtPanic "Malformed predicate" (text (TH.pprint ty))
 
 convertToHsType = cvtType

@@ -296,8 +296,8 @@ repDerivs (Just ctxt)
   where
     rep_deriv :: LHsType Name -> DsM (Core TH.Name)
 	-- Deriving clauses must have the simple H98 form
-    rep_deriv (L _ (HsPredTy (L _ (HsClassP cls [])))) = lookupOcc cls
-    rep_deriv other		  		       = panic "rep_deriv"
+    rep_deriv (L _ (HsPredTy (HsClassP cls []))) = lookupOcc cls
+    rep_deriv other		  		 = panic "rep_deriv"
 
 
 -------------------------------------------------------
@@ -421,7 +421,7 @@ repTy (HsOpTy ty1 n ty2) 	  = repLTy ((nlHsTyVar (unLoc n) `nlHsAppTy` ty1)
 repTy (HsParTy t)  	       	  = repLTy t
 repTy (HsNumTy i)                 =
   panic "DsMeta.repTy: Can't represent number types (for generics)"
-repTy (HsPredTy pred)             = repLPred pred
+repTy (HsPredTy pred)             = repPred pred
 repTy (HsKindSig ty kind)	  = 
   panic "DsMeta.repTy: Can't represent explicit kind signatures yet"
 
