@@ -423,154 +423,72 @@ What @compile@ does: \ToDo{A bit vague ... needs refining.  How does
    boot interface against the inferred interface.}
 \end{itemize}
 
-\section{Linking}
 
-\subsection{External API}
 
-\begin{verbatim}
-   data LinkState  -- abstract
+\subsection{Linking}
+\label{sec:linker}
 
-   link :: [[Linkable]] -> LinkState -> IO LinkResult
+\subsubsection{The linker's private data structures}
 
-   data LinkResult = LinkOK LinkState
-                   | LinkErrs [SDoc] LinkState
-\end{verbatim}
-
-In practice, the @LinkState@ might be hidden in the I/O monad rather
-than passed around explicitly.
-
-The linker is used by the compilation manager as follows after
-repeatedly calling the compiler to compile all modules which are
-out-of-date, the linker is invoked.  The @[[Linkable]]@ argument to
-@link@ represents the list of (recursive groups of) modules which have
-been newly compiled, along with @Linkable@s representing each of the
-packages in use (the compilation manager knows which external packages
-are referenced by the home package).  The order of the list is
-important: it is sorted in such a way that linking any prefix of the
-list will result in an image with no unresolved references.  Note that
-for batch linking there may be further restrictions; for example it
-may not be possible to link recursive groups containing libraries.
-
-The linker must do the following when invoked via @link@:
+In the same way that @compile@ has a persistent compiler state (PCS),
+the linker has a persistent (session-lifetime) state, LPS, the
+Linker's Persistent State.  In batch mode LPS is entirely irrelevant,
+because there is only a single link step, and can be a unit value
+ignored by everybody.  In interactive mode LPS is composed of the
+following three parts:
 
 \begin{itemize}
-  \item Unlink any objects already in memory which correspond to
-  modules which have just been recompiled (interactive system only).
-  The objects which correspond to a module are obtained from the
-  @Linkable@ (see below).
+\item 
+\textbf{The Source Symbol Table (SST)}@ :: FiniteMap RdrName HValue@   
+  The source symbol table is used when linking interpreted code.
+  Unlinked interpreted code consists of an STG  tree where
+  the leaves are @RdrNames@.  The linker's job is to resolve these to
+  actual addresses (the alternative is to resolve these lazily when
+  the code is run, but this requires passing the full symbol table
+  through the interpreter and the repeated lookups will probably be
+  expensive).
 
-  \item Link the objects representing the newly compiled modules into
-  memory, along with any packages which haven't already been brought
-  in.  In the batch system, this just means invoking the external
-  linker to link everything in one go.
+  The source symbol table therefore maps @RdrName@s to @HValue@s, for
+  every @RdrName@ that currently \emph{has} an @HValue@, including all
+  exported functions from object code modules that are currently
+  linked in.  Linking therefore turns a @StgTree RdrName@ into an
+  @StgTree HValue@.
 
-  Note that it is the linker's responsibility to remember which
-  objects and packages have already been linked.
-\end{itemize}
+  It is important that we can prune this symbol table by throwing away
+  the mappings for an entire module, whenever we recompile/relink a
+  given module.  The representation is therefore probably a two-level
+  mapping, from module names, to function/constructor names, to
+  @HValue@s.
 
-If linking in of a group should fail for some reason, it is @link@'s
-responsibility to not modify its @LinkState@ at all.  In other words,
-linking each group is atomic; it either succeeds or fails.
+\item \textbf{The Object Symbol Table (OST)}@ :: FiniteMap String Addr@
+  This is a lower level symbol table, mapping symbol names in object
+  modules to their addresses in memory.  It is used only when
+  resolving the external references in an object module, and contains
+  only entries that are defined in object modules.
 
-\subsection{Internal Data Structures}
+  Why have two symbol tables?  Well, there is a clear distinction
+  between the two: the source symbol table maps Haskell symbols to
+  Haskell values, and the object symbol table maps object symbols to
+  addresses.  There is some overlap, in that Haskell symbols certainly
+  have addresses, and we could look up a Haskell symbol's address by
+  manufacturing the right object symbol and looking that up in the
+  object symbol table, but this is likely to be slow and would force
+  us to extend the object symbol table with all the symbols
+  ``exported'' by interpreted code.  Doing it this way enables us to
+  decouple the object management subsystem from the rest of the linker
+  with a minimal interface; something like
 
-Two important types: @Unlinked@ and @Linkable@.  The latter is a 
-higher-level representation involving multiple of the former.
-An @Unlinked@ is a reference to unlinked executable code, something
-a linker could take as input:
-
-\begin{verbatim}
-   data Unlinked = DotO   Path
-                 | DotA   Path            
-                 | DotDLL Path
-                 | Trees  [StgTree RdrName]
-\end{verbatim}
-
-\noindent The first three describe the location of a file (presumably)
-containing the code to link.  @Trees@, which only exists in
-interactive mode, gives a list of @StgTrees@, in which the unresolved
-references are @RdrNames@ -- hence it's non-linkedness.  Once linked,
-those @RdrNames@ are replaced with pointers to the machine code
-implementing them.
-
-A @Linkable@ gathers together several @Unlinked@s and associates them
-with either a module or package:
-
-\begin{verbatim}
-   data Linkable = LM Module  [Unlinked]   -- a module
-                 | LP PkgName              -- a package
-\end{verbatim}
-
-\noindent The order of the @Unlinked@s in the list is important, as
-they are linked in left-to-right order.  The @Unlinked@ objects for a
-particular package can be obtained from the package configuration (see
-Section \ref{sec:package-config}).
-
-\subsubsection{Contents of \texttt{LinkState}}
-
-The @LinkState@ is empty for batch compilation, where the linker
-doesn't need andy persistent state because there is only a single link
-step.
-
-In the interactive system, the @LinkState@ contains two symbol tables:
-
-\begin{itemize}
-\item \textbf{The Source Symbol Table}@ :: FiniteMap RdrName HValue@
-
-The source symbol table is used when linking interpreted code.
-Unlinked interpreted code consists of an abstract syntax tree where
-the leaves are @RdrNames@; the linker's job is to resolve these to
-actual addresses (the alternative is to resolve these lazily when the
-code is run, but this requires passing the full symbol table through
-the interpreter and the repeated lookups will probably be expensive).
-
-The source symbol table therefore maps @RdrName@s to @HValue@s, for
-every @RdrName@ that currently \emph{has} an @HValue@, including all
-exported functions from object code modules that are currently linked
-in.
-
-It is important that we can prune this symbol table by throwing away
-the mappings for an entire module, whenever we recompile/relink a
-given module.  The representation is therefore probably a two-level
-mapping, from module names, to function/constructor names, to
-@HValue@s.
-
-\item \textbf{The Object Symbol Table}@ :: FiniteMap String Addr@
-
-This is a lower level symbol table, mapping symbol names in object
-modules to their addresses in memory.  It is used only when resolving
-the external references in an object module, and contains only entries
-that are defined in object modules.
-\end{itemize}
-
-Why have two symbol tables?  Well, there is a clear distinction
-between the two: the source symbol table is mapping Haskell symbols to
-Haskell values, and the object symbol table is mapping object symbols
-to addresses.  There is some overlap, in that Haskell symbols
-certainly have addresses, and we could look up a Haskell symbol's
-address by manufacturing the right object symbol and looking that up
-in the object symbol table, but this is likely to be slow and would
-force us to extend the object symbol table with all the symbols
-``exported'' by interpreted code.  Doing it this way enables us to
-decouple the object management subsystem from the rest of the linker
-with a minimal interface; something like
-
-\begin{verbatim}
+  \begin{verbatim}
   loadObject   :: Unlinked -> IO Object
   unloadModule :: Unlinked -> IO ()
   lookupSymbol :: String   -> IO Addr
-\end{verbatim}
+  \end{verbatim}
 
-\noindent Rather unfortunately we need @lookupSymbol@ in order to
-populate the source symbol table when linking in a new compiled
-module.
+  Rather unfortunately we need @lookupSymbol@ in order to populate the
+  source symbol table when linking in a new compiled module.  Our
+  object management subsystem is currently written in C, so decoupling
+  this interface as much as possible is highly desirable.
 
-Our object management subsystem is currently written in C, so
-decoupling this interface as much as possible is highly desirable.
-
-The @LinkState@ also notionally contains the currently linked image:
-
-\begin{itemize}
 \item
    {\bf Linked Image (LI)} @:: no-explicit-representation@
 
@@ -609,7 +527,105 @@ The @LinkState@ also notionally contains the currently linked image:
    \ToDo{Do we need to say anything about CAFs and SRTs?  Probably ...}
 \end{itemize}
 
+
+\subsubsection{The linker's interface}
+
+In practice, the PLS might be hidden in the I/O monad rather
+than passed around explicitly.  (The same might be true for PCS).
+Anyway:
+
+\begin{verbatim}
+   data PCS -- as described above; opaque to everybody except the linker
+
+   link :: PCI -> ??? -> [[Linkable]] -> LinkState -> IO LinkResult
+
+   data LinkResult = LinkOK   LinkState
+                   | LinkErrs LinkState [SDoc]
+\end{verbatim}
+
+CM uses @link@ as follows:
+
+After repeatedly using @compile@ to compile all modules which are
+out-of-date, the @link@ is invoked.  The @[[Linkable]]@ argument to
+@link@ represents the list of (recursive groups of) home modules which
+have been newly compiled, along with @Linkable@s for each of
+the packages in use (the compilation manager knows which external
+packages are referenced by the home package).  The order of the list
+is important: it is sorted in such a way that linking any prefix of
+the list will result in an image with no unresolved references.  Note
+that for batch linking there may be further restrictions; for example
+it may not be possible to link recursive groups containing libraries.
+
+@link@ does the following:
+
+\begin{itemize}
+  \item 
+  In batch mode, do nothing.  In interactive mode,
+  examine the supplied @[[Linkable]]@ to determine which home 
+  module @Unlinked@s are new.  Remove precisely these @Linkable@s 
+  from PLS.  (In fact we really need to remove their upwards
+  transitive closure, but I think it is an invariant that CM will
+  supply an upwards transitive closure of new modules).
+  See below for descriptions of @Linkable@ and @Unlinked@.
+
+  \item 
+  Batch system: invoke the external linker to link everything in one go.
+  Interactive: bind the @Unlinked@s for the newly compiled modules,
+  plus those for any newly required packages, into PLS.
+
+  Note that it is the linker's responsibility to remember which
+  objects and packages have already been linked.  By comparing this
+  with the @Linkable@s supplied to @link@, it can determine which
+  of the linkables in LI are out of date
+\end{itemize}
+
+If linking in of a group should fail for some reason, @link@ should
+not modify its @LinkState@ at all.  In other words, linking each group
+is atomic; it either succeeds or fails.
+
+\subsubsection*{\mbox{\tt Unlinked} and \mbox{\tt Linkable}}
+
+Two important types: @Unlinked@ and @Linkable@.  The latter is a 
+higher-level representation involving multiple of the former.
+An @Unlinked@ is a reference to unlinked executable code, something
+a linker could take as input:
+
+\begin{verbatim}
+   data Unlinked = DotO   Path
+                 | DotA   Path            
+                 | DotDLL Path
+                 | Trees  [StgTree RdrName]
+\end{verbatim}
+
+The first three describe the location of a file (presumably)
+containing the code to link.  @Trees@, which only exists in
+interactive mode, gives a list of @StgTrees@, in which the unresolved
+references are @RdrNames@ -- hence it's non-linkedness.  Once linked,
+those @RdrNames@ are replaced with pointers to the machine code
+implementing them.
+
+A @Linkable@ gathers together several @Unlinked@s and associates them
+with either a module or package:
+
+\begin{verbatim}
+   data Linkable = LM Module  [Unlinked]   -- a module
+                 | LP PkgName              -- a package
+\end{verbatim}
+
+The order of the @Unlinked@s in the list is important, as
+they are linked in left-to-right order.  The @Unlinked@ objects for a
+particular package can be obtained from the package configuration (see
+Section \ref{sec:package-config}).
+
+\ToDo{When adding @Addr@s from an object module to SST, we need to
+      somehow find out the @RdrName@s of the symbols exported by that
+      module. 
+      So we'd need to pass in the @ModDetails@ or @ModIFace@ or some such?}
+
+
+
 \subsection{What CM does}
+\label{sec:compilation-manager}
 Pretty much as before.  
 
 Plus: detect module cycles during the downsweep.  During the upsweep,
