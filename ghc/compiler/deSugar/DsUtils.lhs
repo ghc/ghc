@@ -498,7 +498,25 @@ mkSelectorBinds (VarPat v) val_expr
 
 mkSelectorBinds pat val_expr
   | isSingleton binders || is_simple_pat pat
-  = newSysLocalDs (exprType val_expr)	`thenDs` \ val_var ->
+  = 	-- Given   p = e, where p binds x,y
+	-- we are going to make
+	--	v = p	(where v is fresh)
+	--	x = case v of p -> x
+	--	y = case v of p -> x
+
+	-- Make up 'v'
+	-- NB: give it the type of *pattern* p, not the type of the *rhs* e.
+	-- This does not matter after desugaring, but there's a subtle 
+	-- issue with implicit parameters. Consider
+	--	(x,y) = ?i
+	-- Then, ?i is given type {?i :: Int}, a SourceType, which is opaque
+	-- to the desugarer.  (Why opaque?  Because newtypes have to be.  Why
+	-- does it get that type?  So that when we abstract over it we get the
+	-- right top-level type  (?i::Int) => ...)
+	--
+	-- So to get the type of 'v', use the pattern not the rhs.  Often more
+	-- efficient too.
+    newSysLocalDs (hsPatType pat)	`thenDs` \ val_var ->
 
 	-- For the error message we make one error-app, to avoid duplication.
 	-- But we need it at different types... so we use coerce for that
