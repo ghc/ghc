@@ -25,7 +25,7 @@ import VarSet
 import Id		( Id, idType, idInfo, idUnique, isDataConId, isDataConId_maybe,
 			  idUnfolding, setIdUnfolding, isExportedId, isDeadBinder,
 			  idSpecialisation, setIdSpecialisation,
-			  idDemandInfo, setIdDemandInfo,
+			  idDemandInfo, 
 			  setIdInfo,
 			  idOccInfo, setIdOccInfo,
 			  zapLamIdInfo, zapFragileIdInfo,

@@ -259,7 +259,7 @@ improveAvails imp_mod iloc explicits is_unqual avails
   = map improve_avail avails
   where
     improve_avail (Avail n)      = Avail (improve n)
-    improve_avail (AvailTC n ns) = AvailTC n (map improve ns)	-- n doesn't matter
+    improve_avail (AvailTC n ns) = AvailTC (improve n) (map improve ns)
 
     improve name = setNameProvenance name 
 			(NonLocalDef (UserImport imp_mod iloc (is_explicit name)) 
