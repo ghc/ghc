@@ -9,12 +9,15 @@
 #include <malloc.h>
 #include <stdlib.h>
 #include <ctype.h>
+#ifndef _WIN32
 #include <sys/times.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <time.h>
+#endif
 #include <unistd.h>
 
+#ifndef _WIN32
 double nh_getCPUtime ( void )
 {
    double usertime;
@@ -30,10 +33,25 @@ double nh_getCPUprec ( void )
    /* or perhaps CLOCKS_PER_SEC ? */
    return 1.0 / (double)(CLK_TCK);
 }
+#else
+double nh_getCPUtime ( void )
+{
+   return 1;
+}
+
+double nh_getCPUprec ( void )
+{
+   return 1;
+}
+#endif
 
 int nh_getPID ( void )
 {
+#ifndef _WIN32
    return (int) getpid();
+#else
+   return (int) 0;
+#endif
 }
 
 void nh_exitwith ( int code )
@@ -58,10 +76,15 @@ int nh_iseof ( FILE* f )
 
 int nh_filesize ( FILE* f )
 {
+#ifndef _WIN32
    struct stat buf;
    errno = 0;
    fstat ( fileno(f), &buf );
    return buf.st_size;
+#else
+   errno = EPERM;
+   return 0;
+#endif
 }
 
 int nh_stdin ( void )
@@ -150,23 +173,3 @@ int nh_getenv ( int p )
    return (int)getenv ( (const char *)p );
 }
 
-#if 0
-int prog_argc;
-char** prog_argv;
-
-int nh_init_args ( int  argc, char *argv[] ) 
-{
-  prog_argc = argc;
-  prog_argv = argv;
-}
-
-int nh_argc ( void )
-{
-  return prog_argc;
-}
-
-int nh_argvb ( int argno, int offset )
-{
-  return prog_argv[argno][offset];
-}
-#endif
