@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.22 2000/11/21 16:43:20 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.23 2000/11/22 12:19:29 simonmar Exp $
 --
 -- Driver flags
 --
@@ -508,7 +508,7 @@ buildStaticHscOpts = do
 runSomething phase_name cmd
  = do
    verb <- dynFlag verbosity
-   when (verb >= 2) $ putStr ("*** " ++ phase_name)
+   when (verb >= 2) $ putStrLn ("*** " ++ phase_name)
    when (verb >= 3) $ putStrLn cmd
    hFlush stdout
 
