@@ -11,9 +11,9 @@ module Inst (
 	Inst, 
 	pprInst, pprInsts, pprInstsInFull, tidyInsts, tidyMoreInsts,
 
-	newDictsFromOld, newDicts, 
-	newMethod, newMethodWithGivenTy, newOverloadedLit,
-	newIPDict, tcInstId,
+	newDictsFromOld, newDicts, cloneDict,
+	newMethod, newMethodWithGivenTy, newMethodAtLoc,
+	newOverloadedLit, newIPDict, tcInstId,
 
 	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, 
 	ipNamesOfInst, ipNamesOfInsts, predsOfInst, predsOfInsts,
@@ -21,7 +21,7 @@ module Inst (
 
 	lookupInst, lookupSimpleInst, LookupInstResult(..),
 
-	isDict, isClassDict, isMethod, 
+	isDict, isClassDict, isMethod, isLinearInst, linearInstType,
 	isTyVarDict, isStdClassTyVarDict, isMethodFor, 
 	instBindingRequired, instCanBeGeneralised,
 
@@ -54,12 +54,11 @@ import TcType	( Type, TcType, TcThetaType, TcPredType, TcTauType, TcTyVarSet,
 		  isClassPred, isTyVarClassPred, 
 		  getClassPredTys, getClassPredTys_maybe, mkPredName,
 		  tidyType, tidyTypes, tidyFreeTyVars,
-		  tcCmpType, tcCmpTypes, tcCmpPred,
-		  IPName, mapIPName, ipNameName
+		  tcCmpType, tcCmpTypes, tcCmpPred
 		)
 import CoreFVs	( idFreeTyVars )
 import Class	( Class )
-import Id	( Id, idName, idType, mkUserLocal, mkSysLocal, mkLocalId )
+import Id	( Id, idName, idType, mkUserLocal, mkSysLocal, mkLocalId, setIdUnique )
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
 import Name	( Name, mkMethodOcc, getOccName )
 import PprType	( pprPred )	
@@ -72,6 +71,8 @@ import VarSet	( elemVarSet, emptyVarSet, unionVarSet )
 import TysWiredIn ( floatDataCon, doubleDataCon )
 import PrelNames( fromIntegerName, fromRationalName )
 import Util	( thenCmp, equalLength )
+import BasicTypes( IPName(..), mapIPName, ipNameName )
+
 import Bag
 import Outputable
 \end{code}
@@ -262,6 +263,22 @@ isMethodFor :: TcIdSet -> Inst -> Bool
 isMethodFor ids (Method uniq id tys _ _ loc) = id `elemVarSet` ids
 isMethodFor ids inst			     = False
 
+isLinearInst :: Inst -> Bool
+isLinearInst (Dict _ pred _) = isLinearPred pred
+isLinearInst other	     = False
+	-- We never build Method Insts that have
+	-- linear implicit paramters in them.
+	-- Hence no need to look for Methods
+	-- See Inst.tcInstId 
+
+isLinearPred :: TcPredType -> Bool
+isLinearPred (IParam (Linear n) _) = True
+isLinearPred other		   = False
+
+linearInstType :: Inst -> TcType	-- %x::t  -->  t
+linearInstType (Dict _ (IParam _ ty) _) = ty
+
+
 isStdClassTyVarDict (Dict _ pred _) = case getClassPredTys_maybe pred of
 					Just (clas, [ty]) -> isStandardClass clas && tcIsTyVarTy ty
 					other		  -> False
@@ -296,6 +313,10 @@ newDicts :: InstOrigin
 newDicts orig theta
   = tcGetInstLoc orig		`thenNF_Tc` \ loc ->
     newDictsAtLoc loc theta
+
+cloneDict :: Inst -> NF_TcM Inst
+cloneDict (Dict id ty loc) = tcGetUnique	`thenNF_Tc` \ uniq ->
+			     returnNF_Tc (Dict (setIdUnique id uniq) ty loc)
 
 newDictsFromOld :: Inst -> TcThetaType -> NF_TcM [Inst]
 newDictsFromOld (Dict _ _ loc) theta = newDictsAtLoc loc theta
@@ -360,35 +381,36 @@ This gets a bit less sharing, but
 \begin{code}
 tcInstId :: Id -> NF_TcM (TcExpr, LIE, TcType)
 tcInstId fun
-  | opt_NoMethodSharing  = loop_noshare (HsVar fun) (idType fun)
-  | otherwise		 = loop_share fun
+  = loop (HsVar fun) emptyLIE (idType fun)
   where
     orig = OccurrenceOf fun
-    loop_noshare fun fun_ty
-      = tcInstType fun_ty		`thenNF_Tc` \ (tyvars, theta, tau) ->
-	let 
-	    ty_app = mkHsTyApp fun (mkTyVarTys tyvars)
-	in
-        if null theta then 		-- Is it overloaded?
-	    returnNF_Tc (ty_app, emptyLIE, tau)
-	else
-	    newDicts orig theta						`thenNF_Tc` \ dicts ->
-	    loop_noshare (mkHsDictApp ty_app (map instToId dicts)) tau	`thenNF_Tc` \ (expr, lie, final_tau) ->
-	    returnNF_Tc (expr, mkLIE dicts `plusLIE` lie, final_tau)
+    loop fun lie fun_ty = tcInstType fun_ty		`thenNF_Tc` \ (tyvars, theta, tau) ->
+			  loop_help fun lie (mkTyVarTys tyvars) theta tau
 
-    loop_share fun
-      = tcInstType (idType fun)		`thenNF_Tc` \ (tyvars, theta, tau) ->
-	let 
-	    arg_tys = mkTyVarTys tyvars
-	in
-        if null theta then	 	-- Is it overloaded?
-	    returnNF_Tc (mkHsTyApp (HsVar fun) arg_tys, emptyLIE, tau)
-	else
-		-- Yes, it's overloaded
-	    newMethodWithGivenTy orig fun arg_tys theta tau	`thenNF_Tc` \ meth ->
-	    loop_share (instToId meth) 				`thenNF_Tc` \ (expr, lie, final_tau) ->
-	    returnNF_Tc (expr, unitLIE meth `plusLIE` lie, final_tau)
+    loop_help fun lie arg_tys [] tau	-- Not overloaded
+	= returnNF_Tc (mkHsTyApp fun arg_tys, lie, tau)
 
+    loop_help (HsVar fun_id) lie arg_tys theta tau
+	| can_share theta		-- Sharable method binding
+	= newMethodWithGivenTy orig fun_id arg_tys theta tau	`thenNF_Tc` \ meth ->
+	  loop (HsVar (instToId meth)) 
+	       (unitLIE meth `plusLIE` lie) tau
+
+    loop_help fun lie arg_tys theta tau	-- The general case
+ 	= newDicts orig theta					`thenNF_Tc` \ dicts ->
+	  loop (mkHsDictApp (mkHsTyApp fun arg_tys) (map instToId dicts)) 
+	       (mkLIE dicts `plusLIE` lie) tau
+
+    can_share theta | opt_NoMethodSharing = False
+		    | otherwise		  = not (any isLinearPred theta)
+	-- This is a slight hack.
+	-- If 	f :: (%x :: T) => Int -> Int
+	-- Then if we have two separate calls, (f 3, f 4), we cannot
+	-- make a method constraint that then gets shared, thus:
+	--	let m = f %x in (m 3, m 4)
+	-- because that loses the linearity of the constraint.
+	-- The simplest thing to do is never to construct a method constraint
+	-- in the first place that has a linear implicit parameter in it.
 
 newMethod :: InstOrigin
 	  -> TcId

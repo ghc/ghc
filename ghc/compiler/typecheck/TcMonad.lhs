@@ -44,7 +44,7 @@ import {-# SOURCE #-} TcEnv  ( TcEnv )
 
 import HsLit		( HsOverLit )
 import RnHsSyn		( RenamedPat, RenamedArithSeqInfo, RenamedHsExpr )
-import TcType		( Type, Kind, TyVarDetails, IPName )
+import TcType		( Type, Kind, TyVarDetails )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, ErrMsg, Message, WarnMsg )
 
 import Bag		( Bag, emptyBag, isEmptyBag,
@@ -57,6 +57,7 @@ import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply,
 			  splitUniqSupply, mkSplitUniqSupply,
 			  UniqSM, initUs_ )
 import SrcLoc		( SrcLoc, noSrcLoc )
+import BasicTypes	( IPName )
 import UniqFM		( emptyUFM )
 import Unique		( Unique )
 import CmdLineOpts

@@ -37,8 +37,8 @@ import DataCon		( dataConId )
 import Name		( Name, NamedThing(..) )
 import NameSet
 import PrelInfo		( derivableClassKeys )
-import PrelNames	( deRefStablePtr_RDR, newStablePtr_RDR,
-			  bindIO_RDR, returnIO_RDR
+import PrelNames	( deRefStablePtrName, newStablePtrName,
+			  bindIOName, returnIOName
 			)
 import TysWiredIn	( tupleCon )
 import List		( partition )
@@ -131,19 +131,18 @@ rnSourceDecl (DefD (DefaultDecl tys src_loc))
 rnHsForeignDecl (ForeignImport name ty spec src_loc)
   = pushSrcLocRn src_loc 		$
     lookupTopBndrRn name	        `thenRn` \ name' ->
-    rnHsTypeFVs (fo_decl_msg name) ty	`thenRn` \ (ty', fvs1) ->
-    lookupOrigNames (extras spec)	`thenRn` \ fvs2 ->
-    returnRn (ForeignImport name' ty' spec src_loc, fvs1 `plusFV` fvs2)
+    rnHsTypeFVs (fo_decl_msg name) ty	`thenRn` \ (ty', fvs) ->
+    returnRn (ForeignImport name' ty' spec src_loc, fvs `plusFV` extras spec)
   where
-    extras (CDynImport _) = [newStablePtr_RDR, deRefStablePtr_RDR, bindIO_RDR, returnIO_RDR]
-    extras other	  = []
+    extras (CDynImport _) = mkFVs [newStablePtrName, deRefStablePtrName, bindIOName, returnIOName]
+    extras other	  = emptyFVs
 
 rnHsForeignDecl (ForeignExport name ty spec src_loc)
   = pushSrcLocRn src_loc 			$
     lookupOccRn name		        	`thenRn` \ name' ->
-    rnHsTypeFVs (fo_decl_msg name) ty  		`thenRn` \ (ty', fvs1) ->
-    lookupOrigNames [bindIO_RDR, returnIO_RDR]	`thenRn` \ fvs2 ->
-    returnRn (ForeignExport name' ty' spec src_loc, fvs1 `plusFV` fvs2)
+    rnHsTypeFVs (fo_decl_msg name) ty  		`thenRn` \ (ty', fvs) ->
+    returnRn (ForeignExport name' ty' spec src_loc, 
+	      mkFVs [bindIOName, returnIOName] `plusFV` fvs)
 
 fo_decl_msg name = ptext SLIT("The foreign declaration for") <+> ppr name
 \end{code}

@@ -18,10 +18,10 @@ module PprType(
 
 -- friends:
 -- (PprType can see all the representations it's trying to print)
-import TypeRep		( Type(..), TyNote(..), IPName(..), 
+import TypeRep		( Type(..), TyNote(..), 
 			  Kind, liftedTypeKind ) -- friend
 import Type		( SourceType(..), isUTyVar, eqKind )
-import TcType		( ThetaType, PredType, ipNameName,
+import TcType		( ThetaType, PredType,
 			  tcSplitSigmaTy, isPredTy, isDictTy,
 			  tcSplitTyConApp_maybe, tcSplitFunTy_maybe
 			) 
@@ -39,7 +39,7 @@ import Name		( getOccString, getOccName )
 import Outputable
 import Unique		( Uniquable(..) )
 import Util             ( lengthIs )
-import BasicTypes	( tupleParens )
+import BasicTypes	( IPName(..), tupleParens, ipNameName )
 import PrelNames		-- quite a few *Keys
 \end{code}
 
@@ -84,8 +84,8 @@ instance Outputable SourceType where
     ppr = pprPred
 
 instance Outputable name => Outputable (IPName name) where
-    ppr (Dupable n)   = char '?' <> ppr n -- Ordinary implicit parameters
-    ppr (MustSplit n) = char '%' <> ppr n -- Splittable implicit parameters
+    ppr (Dupable n) = char '?' <> ppr n -- Ordinary implicit parameters
+    ppr (Linear  n) = char '%' <> ppr n -- Splittable implicit parameters
 \end{code}
 
 

@@ -84,8 +84,6 @@ module TcType (
   superBoxity, liftedBoxity, hasMoreBoxityInfo, defaultKind, superKind,
   isTypeKind,
 
-  IPName, ipNameName, mapIPName,
-
   Type, SourceType(..), PredType, ThetaType, 
   mkForAllTy, mkForAllTys, 
   mkFunTy, mkFunTys, zipFunTys, 
@@ -114,7 +112,7 @@ import Type		( mkUTyM, unUTy )	-- Used locally
 
 import Type		(	-- Re-exports
 			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
-			  IPName, Kind, Type, SourceType(..), PredType, ThetaType, 
+			  Kind, Type, SourceType(..), PredType, ThetaType, 
 			  unliftedTypeKind, liftedTypeKind, openTypeKind, mkArrowKind, mkArrowKinds,
 			  mkForAllTy, mkForAllTys, defaultKind, isTypeKind,
 			  mkFunTy, mkFunTys, zipFunTys, 
@@ -124,8 +122,7 @@ import Type		(	-- Re-exports
 			  splitNewType_maybe, splitTyConApp_maybe,
 			  tidyTopType, tidyType, tidyPred, tidyTypes, tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
 			  tidyTyVarBndr, tidyOpenTyVar, tidyOpenTyVars, eqKind, eqUsage,
-			  hasMoreBoxityInfo, liftedBoxity, superBoxity, typeKind, superKind,
-			  ipNameName, mapIPName
+			  hasMoreBoxityInfo, liftedBoxity, superBoxity, typeKind, superKind
 			)
 import TyCon		( TyCon, isUnLiftedTyCon )
 import Class		( classHasFDs, Class )
@@ -141,6 +138,7 @@ import OccName		( OccName, mkDictOcc )
 import NameSet
 import PrelNames	-- Lots (e.g. in isFFIArgumentTy)
 import TysWiredIn	( ptrTyCon, funPtrTyCon, addrTyCon, unitTyCon )
+import BasicTypes	( ipNameName )
 import Unique		( Unique, Uniquable(..) )
 import SrcLoc		( SrcLoc )
 import Util		( cmpList, thenCmp, equalLength )

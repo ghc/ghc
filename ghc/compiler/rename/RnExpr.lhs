@@ -28,13 +28,14 @@ import RnTypes		( rnHsTypeFVs )
 import RnHiFiles	( lookupFixityRn )
 import CmdLineOpts	( DynFlag(..), opt_IgnoreAsserts )
 import Literal		( inIntRange, inCharRange )
-import BasicTypes	( Fixity(..), FixityDirection(..), defaultFixity, negateFixity )
+import BasicTypes	( Fixity(..), FixityDirection(..), IPName(..), defaultFixity, negateFixity )
 import PrelNames	( hasKey, assertIdKey, 
-			  eqClass_RDR, foldr_RDR, build_RDR, eqString_RDR,
-			  cCallableClass_RDR, cReturnableClass_RDR, 
-			  monadClass_RDR, enumClass_RDR, ordClass_RDR,
-			  ratioDataCon_RDR, assertErr_RDR,
-			  ioDataCon_RDR, plusInteger_RDR, timesInteger_RDR,
+			  eqClassName, foldrName, buildName, eqStringName,
+			  cCallableClassName, cReturnableClassName, 
+			  monadClassName, enumClassName, ordClassName,
+			  ratioDataConName, splitIdName, fstIdName, sndIdName,
+			  ioDataConName, plusIntegerName, timesIntegerName,
+			  assertErr_RDR
 			)
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
 			  floatPrimTyCon, doublePrimTyCon
@@ -79,8 +80,7 @@ rnPat (SigPatIn pat ty)
     doc = text "a pattern type-signature"
     
 rnPat (LitPatIn s@(HsString _)) 
-  = lookupOrigName eqString_RDR		`thenRn` \ eq ->
-    returnRn (LitPatIn s, unitFV eq)
+  = returnRn (LitPatIn s, unitFV eqStringName)
 
 rnPat (LitPatIn lit) 
   = litFVs lit		`thenRn` \ fvs ->
@@ -88,15 +88,13 @@ rnPat (LitPatIn lit)
 
 rnPat (NPatIn lit) 
   = rnOverLit lit			`thenRn` \ (lit', fvs1) ->
-    lookupOrigName eqClass_RDR		`thenRn` \ eq   ->	-- Needed to find equality on pattern
-    returnRn (NPatIn lit', fvs1 `addOneFV` eq)
+    returnRn (NPatIn lit', fvs1 `addOneFV` eqClassName)	-- Needed to find equality on pattern
 
 rnPat (NPlusKPatIn name lit minus)
   = rnOverLit lit			`thenRn` \ (lit', fvs) ->
-    lookupOrigName ordClass_RDR		`thenRn` \ ord ->
     lookupBndrRn name			`thenRn` \ name' ->
     lookupSyntaxName minus		`thenRn` \ minus' ->
-    returnRn (NPlusKPatIn name' lit' minus', fvs `addOneFV` ord `addOneFV` minus')
+    returnRn (NPlusKPatIn name' lit' minus', fvs `addOneFV` ordClassName `addOneFV` minus')
 
 rnPat (LazyPatIn pat)
   = rnPat pat		`thenRn` \ (pat', fvs) ->
@@ -278,7 +276,12 @@ rnExpr (HsVar v)
 
 rnExpr (HsIPVar v)
   = newIPName v			`thenRn` \ name ->
-    returnRn (HsIPVar name, emptyFVs)
+    let 
+	fvs = case name of
+		Linear _  -> mkFVs [splitIdName, fstIdName, sndIdName]
+		Dupable _ -> emptyFVs 
+    in   
+    returnRn (HsIPVar name, fvs)
 
 rnExpr (HsLit lit) 
   = litFVs lit		`thenRn` \ fvs -> 
@@ -341,12 +344,12 @@ rnExpr section@(SectionR op expr)
 
 rnExpr (HsCCall fun args may_gc is_casm _)
 	-- Check out the comment on RnIfaces.getNonWiredDataDecl about ccalls
-  = lookupOrigNames [cCallableClass_RDR, 
-			  cReturnableClass_RDR, 
-			  ioDataCon_RDR]	`thenRn` \ implicit_fvs ->
+  = lookupOrigNames []	`thenRn` \ implicit_fvs ->
     rnExprs args				`thenRn` \ (args', fvs_args) ->
     returnRn (HsCCall fun args' may_gc is_casm placeHolderType, 
-	      fvs_args `plusFV` implicit_fvs)
+	      fvs_args `plusFV` mkFVs [cCallableClassName, 
+				       cReturnableClassName, 
+				       ioDataConName])
 
 rnExpr (HsSCC lbl expr)
   = rnExpr expr	 	`thenRn` \ (expr', fvs_expr) ->
@@ -370,7 +373,6 @@ rnExpr (HsWith expr binds)
 
 rnExpr e@(HsDo do_or_lc stmts src_loc)
   = pushSrcLocRn src_loc $
-    lookupOrigNames implicit_rdr_names	`thenRn` \ implicit_fvs ->
     rnStmts stmts			`thenRn` \ ((_, stmts'), fvs) ->
 	-- check the statement list ends in an expression
     case last stmts' of {
@@ -379,7 +381,7 @@ rnExpr e@(HsDo do_or_lc stmts src_loc)
     }					`thenRn_`
     returnRn (HsDo do_or_lc stmts' src_loc, fvs `plusFV` implicit_fvs)
   where
-    implicit_rdr_names = [foldr_RDR, build_RDR, monadClass_RDR]
+    implicit_fvs = mkFVs [foldrName, buildName, monadClassName]
 	-- Monad stuff should not be necessary for a list comprehension
 	-- but the typechecker looks up the bind and return Ids anyway
 	-- Oh well.
@@ -424,9 +426,8 @@ rnExpr (HsType a)
     doc = text "renaming a type pattern"
 
 rnExpr (ArithSeqIn seq)
-  = lookupOrigName enumClass_RDR	`thenRn` \ enum ->
-    rn_seq seq	 			`thenRn` \ (new_seq, fvs) ->
-    returnRn (ArithSeqIn new_seq, fvs `addOneFV` enum)
+  = rn_seq seq	 			`thenRn` \ (new_seq, fvs) ->
+    returnRn (ArithSeqIn new_seq, fvs `addOneFV` enumClassName)
   where
     rn_seq (From expr)
      = rnExpr expr 	`thenRn` \ (expr', fvExpr) ->
@@ -811,8 +812,7 @@ litFVs (HsInt i)	      = returnRn (unitFV (getName intTyCon))
 litFVs (HsIntPrim i)          = returnRn (unitFV (getName intPrimTyCon))
 litFVs (HsFloatPrim f)        = returnRn (unitFV (getName floatPrimTyCon))
 litFVs (HsDoublePrim d)       = returnRn (unitFV (getName doublePrimTyCon))
-litFVs (HsLitLit l bogus_ty)  = lookupOrigName cCallableClass_RDR	`thenRn` \ cc ->   
-				returnRn (unitFV cc)
+litFVs (HsLitLit l bogus_ty)  = returnRn (unitFV cCallableClassName)
 litFVs lit		      = pprPanic "RnExpr.litFVs" (ppr lit)	-- HsInteger and HsRat only appear 
 									-- in post-typechecker translations
 
@@ -820,18 +820,20 @@ rnOverLit (HsIntegral i from_integer_name)
   = lookupSyntaxName from_integer_name	`thenRn` \ from_integer_name' ->
     if inIntRange i then
 	returnRn (HsIntegral i from_integer_name', unitFV from_integer_name')
-    else
-	lookupOrigNames [plusInteger_RDR, timesInteger_RDR]	`thenRn` \ ns ->
+    else let
+	fvs = mkFVs [plusIntegerName, timesIntegerName]
 	-- Big integer literals are built, using + and *, 
 	-- out of small integers (DsUtils.mkIntegerLit)
 	-- [NB: plusInteger, timesInteger aren't rebindable... 
 	--	they are used to construct the argument to fromInteger, 
 	--	which is the rebindable one.]
-    returnRn (HsIntegral i from_integer_name', ns `addOneFV` from_integer_name')
+    in
+    returnRn (HsIntegral i from_integer_name', fvs `addOneFV` from_integer_name')
 
 rnOverLit (HsFractional i from_rat_name)
   = lookupSyntaxName from_rat_name						`thenRn` \ from_rat_name' ->
-    lookupOrigNames [ratioDataCon_RDR, plusInteger_RDR, timesInteger_RDR]	`thenRn` \ ns ->
+    let
+	fvs = mkFVs [ratioDataConName, plusIntegerName, timesIntegerName]
 	-- We have to make sure that the Ratio type is imported with
 	-- its constructor, because literals of type Ratio t are
 	-- built with that constructor.
@@ -839,7 +841,8 @@ rnOverLit (HsFractional i from_rat_name)
 	-- when fractionalClass does.
 	-- The plus/times integer operations may be needed to construct the numerator
 	-- and denominator (see DsUtils.mkIntegerLit)
-    returnRn (HsFractional i from_rat_name', ns `addOneFV` from_rat_name')
+    in
+    returnRn (HsFractional i from_rat_name', fvs `addOneFV` from_rat_name')
 \end{code}
 
 %************************************************************************

@@ -23,6 +23,8 @@ module BasicTypes(
 	Fixity(..), FixityDirection(..),
 	defaultFixity, maxPrecedence, negateFixity, negatePrecedence,
 
+	IPName(..), ipNameName, mapIPName,
+
 	NewOrData(..), 
 
 	RecFlag(..), isRec, isNonRec,
@@ -98,6 +100,33 @@ initialVersion = 1
 \end{code}
 
 
+%************************************************************************
+%*									*
+\subsection{Implicit parameter identity}
+%*									*
+%************************************************************************
+
+The @IPName@ type is here because it is used in TypeRep (i.e. very
+early in the hierarchy), but also in HsSyn.
+
+\begin{code}
+data IPName name
+  = Dupable   name	-- ?x: you can freely duplicate this implicit parameter
+  | Linear name		-- %x: you must use the splitting function to duplicate it
+  deriving( Eq, Ord )	-- Ord is used in the IP name cache finite map
+			--	(used in HscTypes.OrigIParamCache)
+
+
+ipNameName :: IPName name -> name
+ipNameName (Dupable n) = n
+ipNameName (Linear  n) = n
+
+mapIPName :: (a->b) -> IPName a -> IPName b
+mapIPName f (Dupable n) = Dupable (f n)
+mapIPName f (Linear  n) = Linear  (f n)
+\end{code}
+
+		
 %************************************************************************
 %*									*
 \subsection[Fixity]{Fixity info}

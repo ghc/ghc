@@ -27,33 +27,35 @@ import TcHsSyn		( TcExpr, TcId,
 import TcMonad
 import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  tyVarsOfInst, predsOfInsts, predsOfInst,
-			  isDict, isClassDict, 
-			  isStdClassTyVarDict, isMethodFor,
-			  instToId, tyVarsOfInsts, 
+			  isDict, isClassDict, isLinearInst, linearInstType,
+			  isStdClassTyVarDict, isMethodFor, isMethod,
+			  instToId, tyVarsOfInsts,  cloneDict,
 			  ipNamesOfInsts, ipNamesOfInst,
 			  instBindingRequired, instCanBeGeneralised,
-			  newDictsFromOld, 
+			  newDictsFromOld, newMethodAtLoc,
 			  getDictClassTys, isTyVarDict,
 			  instLoc, pprInst, zonkInst, tidyInsts, tidyMoreInsts,
 			  Inst, LIE, pprInsts, pprInstsInFull,
 			  mkLIE, lieToList
 			)
-import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv )
+import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv, tcLookupGlobalId )
 import InstEnv		( lookupInstEnv, classInstEnv, InstLookupResult(..) )
 import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars )
 import TcType		( TcTyVar, TcTyVarSet, ThetaType, PredType, 
-			  mkClassPred, isOverloadedTy,
+			  mkClassPred, isOverloadedTy, mkTyConApp,
 			  mkTyVarTy, tcGetTyVar, isTyVarClassPred,
 			  tyVarsOfPred, getClassPredTys_maybe, isClassPred, isIPPred,
 			  inheritablePred, predHasFDs )
-import Id		( idType )
+import Id		( idType, mkUserLocal )
+import Name		( getOccName, getSrcLoc )
 import NameSet		( NameSet, mkNameSet, elemNameSet )
 import Class		( classBigSig )
 import FunDeps		( oclose, grow, improve, pprEquationDoc )
-import PrelInfo		( isNumericClass, isCreturnableClass, isCcallishClass )
+import PrelInfo		( isNumericClass, isCreturnableClass, isCcallishClass, 
+			  splitIdName, fstIdName, sndIdName )
 
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
-import TysWiredIn	( unitTy )
+import TysWiredIn	( unitTy, pairTyCon )
 import VarSet
 import FiniteMap
 import Outputable
@@ -1025,17 +1027,16 @@ data WantSCs = NoSCs | AddSCs	-- Tells whether we should add the superclasses
 
 
 \begin{code}
-type RedState = (Avails,	-- What's available
-		 [Inst])	-- Insts for which try_me returned Free
-
 type Avails = FiniteMap Inst Avail
 
 data Avail
-  = Irred		-- Used for irreducible dictionaries,
+  = IsFree		-- Used for free Insts
+  | Irred		-- Used for irreducible dictionaries,
 			-- which are going to be lambda bound
 
-  | BoundTo TcId	-- Used for dictionaries for which we have a binding
+  | Given TcId 		-- Used for dictionaries for which we have a binding
 			-- e.g. those "given" in a signature
+	  Bool		-- True <=> actually consumed (splittable IPs only)
 
   | NoRhs 		-- Used for Insts like (CCallable f)
 			-- where no witness is required.
@@ -1044,16 +1045,31 @@ data Avail
 	TcExpr	 	-- The RHS
 	[Inst]		-- Insts free in the RHS; we need these too
 
+  | Linear 		-- Splittable Insts only.
+	Int		-- The Int is always 2 or more; indicates how
+			-- many copies are required
+	Inst 		-- The splitter
+	Avail		-- Where the "master copy" is
+
+  | LinRhss		-- Splittable Insts only; this is used only internally
+			-- 	by extractResults, where a Linear 
+			--	is turned into an LinRhss
+	[TcExpr]	-- A supply of suitable RHSs
+
 pprAvails avails = vcat [ppr inst <+> equals <+> pprAvail avail
 			| (inst,avail) <- fmToList avails ]
 
 instance Outputable Avail where
     ppr = pprAvail
 
-pprAvail NoRhs	      = text "<no rhs>"
-pprAvail Irred	      = text "Irred"
-pprAvail (BoundTo x)  = text "Bound to" <+> ppr x
-pprAvail (Rhs rhs bs) = ppr rhs <+> braces (ppr bs)
+pprAvail NoRhs	       	= text "<no rhs>"
+pprAvail IsFree	       	= text "Free"
+pprAvail Irred	       	= text "Irred"
+pprAvail (Given x b)   	= text "Given" <+> ppr x <+> 
+		 	  if b then text "(used)" else empty
+pprAvail (Rhs rhs bs)   = text "Rhs" <+> ppr rhs <+> braces (ppr bs)
+pprAvail (Linear n i a) = text "Linear" <+> ppr n <+> braces (ppr i) <+> ppr a
+pprAvail (LinRhss rhss) = text "LinRhss" <+> ppr rhss
 \end{code}
 
 Extracting the bindings from a bunch of Avails.
@@ -1063,42 +1079,129 @@ dependency analyser can sort them out later
 
 The loop startes
 \begin{code}
-bindsAndIrreds :: Avails
+extractResults :: Avails
 	       -> [Inst]		-- Wanted
-	       -> (TcDictBinds, 	-- Bindings
-		   [Inst])		-- Irreducible ones
+	       -> NF_TcM (TcDictBinds, 	-- Bindings
+			  [Inst],	-- Irreducible ones
+			  [Inst])	-- Free ones
 
-bindsAndIrreds avails wanteds
-  = go avails EmptyMonoBinds [] wanteds
+extractResults avails wanteds
+  = go avails EmptyMonoBinds [] [] wanteds
   where
-    go avails binds irreds [] = (binds, irreds)
+    go avails binds irreds frees [] 
+      = returnNF_Tc (binds, irreds, frees)
 
-    go avails binds irreds (w:ws)
+    go avails binds irreds frees (w:ws)
       = case lookupFM avails w of
-	  Nothing    -> -- Free guys come out here
-			-- (If we didn't do addFree we could use this as the
-			--  criterion for free-ness, and pick up the free ones here too)
-			go avails binds irreds ws
+	  Nothing    -> pprTrace "Urk: extractResults" (ppr w) $
+			go avails binds irreds frees ws
 
-	  Just NoRhs -> go avails binds irreds ws
+	  Just NoRhs  -> go avails		 binds irreds     frees     ws
+	  Just IsFree -> go (add_free avails w)  binds irreds     (w:frees) ws
+	  Just Irred  -> go (add_given avails w) binds (w:irreds) frees     ws
 
-	  Just Irred -> go (addToFM avails w (BoundTo (instToId w))) binds (w:irreds) ws
-
-	  Just (BoundTo id) -> go avails new_binds irreds ws
+	  Just (Given id _) -> go avails new_binds irreds frees ws
 			    where
-				-- For implicit parameters, all occurrences share the same
-				-- Id, so there is no need for synonym bindings
-				-- ** BUT THIS TEST IS NEEDED FOR DICTS TOO ** (not sure why)
-			       new_binds | new_id == id = binds
-					 | otherwise	= addBind binds new_id (HsVar id)
-			       new_id   = instToId w
+			       new_binds | id == instToId w = binds
+					 | otherwise        = addBind binds w (HsVar id)
+		-- The sought Id can be one of the givens, via a superclass chain
+		-- and then we definitely don't want to generate an x=x binding!
 
-	  Just (Rhs rhs ws') -> go avails' (addBind binds id rhs) irreds (ws' ++ ws)
+	  Just (Rhs rhs ws') -> go (add_given avails w) new_binds irreds frees (ws' ++ ws)
 			     where
-				id	 = instToId w
-				avails'  = addToFM avails w (BoundTo id)
+				new_binds = addBind binds w rhs
 
-addBind binds id rhs = binds `AndMonoBinds` VarMonoBind id rhs
+	  Just (LinRhss (rhs:rhss))	-- Consume one of the Rhss
+		-> go new_avails new_binds irreds frees ws
+		where		
+		   new_binds  = addBind binds w rhs
+		   new_avails = addToFM avails w (LinRhss rhss)
+
+	  Just (Linear n split_inst avail)
+	    -> split n (instToId split_inst) avail w	`thenNF_Tc` \ (binds', (rhs:rhss), irreds') ->
+	       go (addToFM avails w (LinRhss rhss))
+		  (binds `AndMonoBinds` addBind binds' w rhs)
+		  (irreds' ++ irreds) frees (split_inst:ws)
+
+
+    add_given avails w 
+	| instBindingRequired w = addToFM avails w (Given (instToId w) True)
+	| otherwise		= addToFM avails w NoRhs
+	-- NB: make sure that CCallable/CReturnable use NoRhs rather
+	--	than Given, else we end up with bogus bindings.
+
+    add_free avails w | isMethod w = avails
+		      | otherwise  = add_given avails w
+	-- NB: Hack alert!  
+	-- Do *not* replace Free by Given if it's a method.
+	-- The following situation shows why this is bad:
+	--	truncate :: forall a. RealFrac a => forall b. Integral b => a -> b
+	-- From an application (truncate f i) we get
+	--	t1 = truncate at f
+	--	t2 = t1 at i
+	-- If we have also have a second occurrence of truncate, we get
+	--	t3 = truncate at f
+	--	t4 = t3 at i
+	-- When simplifying with i,f free, we might still notice that
+	--   t1=t3; but alas, the binding for t2 (which mentions t1)
+	--   will continue to float out!
+	-- (split n i a) returns: n rhss
+	--			  auxiliary bindings
+	--			  1 or 0 insts to add to irreds
+
+
+split :: Int -> TcId -> Avail -> Inst 
+      -> NF_TcM (TcDictBinds, [TcExpr], [Inst])
+-- (split n split_id avail wanted) returns
+--	* a list of 'n' expressions, all of which witness 'avail'
+--	* a bunch of auxiliary bindings to support these expressions
+--	* one or zero insts needed to witness the whole lot
+--	  (maybe be zero if the initial Inst is a Given)
+split n split_id avail wanted
+  = go n
+  where
+    ty  = linearInstType wanted
+    pair_ty = mkTyConApp pairTyCon [ty,ty]
+    id  = instToId wanted
+    occ = getOccName id
+    loc = getSrcLoc id
+
+    go 1 = case avail of
+	     Given id _ -> returnNF_Tc (EmptyMonoBinds, [HsVar id], [])
+	     Irred      -> cloneDict wanted		`thenNF_Tc` \ w' ->
+			   returnNF_Tc (EmptyMonoBinds, [HsVar (instToId w')], [w'])
+
+    go n = go ((n+1) `div` 2)		`thenNF_Tc` \ (binds1, rhss, irred) ->
+	   expand n rhss		`thenNF_Tc` \ (binds2, rhss') ->
+	   returnNF_Tc (binds1 `AndMonoBinds` binds2, rhss', irred)
+
+	-- (expand n rhss) 
+	-- Given ((n+1)/2) rhss, make n rhss, using auxiliary bindings
+	--  e.g.  expand 3 [rhs1, rhs2]
+	--	  = ( { x = split rhs1 },
+	--	      [fst x, snd x, rhs2] )
+    expand n rhss
+	| n `rem` 2 == 0 = go rhss 	-- n is even
+	| otherwise  	 = go (tail rhss)	`thenNF_Tc` \ (binds', rhss') ->
+			   returnNF_Tc (binds', head rhss : rhss')
+	where
+	  go rhss = mapAndUnzipNF_Tc do_one rhss	`thenNF_Tc` \ (binds', rhss') ->
+		    returnNF_Tc (andMonoBindList binds', concat rhss')
+
+	  do_one rhs = tcGetUnique 			`thenNF_Tc` \ uniq -> 
+		       tcLookupGlobalId fstIdName	`thenNF_Tc` \ fst_id -> 
+		       tcLookupGlobalId sndIdName	`thenNF_Tc` \ snd_id -> 
+		       let 
+			  x = mkUserLocal occ uniq pair_ty loc
+		       in
+		       returnNF_Tc (VarMonoBind x (mk_app split_id rhs),
+				    [mk_fs_app fst_id ty x, mk_fs_app snd_id ty x])
+
+mk_fs_app id ty var = HsVar id `TyApp` [ty,ty] `HsApp` HsVar var
+
+mk_app id rhs = HsApp (HsVar id) rhs
+
+addBind binds inst rhs = binds `AndMonoBinds` VarMonoBind (instToId inst) rhs
 \end{code}
 
 
@@ -1155,14 +1258,16 @@ reduceContext doc try_me givens wanteds
 	     ]))					`thenNF_Tc_`
 
         -- Build the Avail mapping from "givens"
-    foldlNF_Tc addGiven (emptyFM, []) givens		`thenNF_Tc` \ init_state ->
+    foldlNF_Tc addGiven emptyFM givens			`thenNF_Tc` \ init_state ->
 
         -- Do the real work
-    reduceList (0,[]) try_me wanteds init_state		`thenNF_Tc` \ state@(avails, frees) ->
+    reduceList (0,[]) try_me wanteds init_state		`thenNF_Tc` \ avails ->
 
 	-- Do improvement, using everything in avails
 	-- In particular, avails includes all superclasses of everything
     tcImprove avails					`thenTc` \ no_improvement ->
+
+    extractResults avails wanteds			`thenNF_Tc` \ (binds, irreds, frees) ->
 
     traceTc (text "reduceContext end" <+> (vcat [
 	     text "----------------------",
@@ -1175,10 +1280,8 @@ reduceContext doc try_me givens wanteds
 	     text "no_improvement =" <+> ppr no_improvement,
 	     text "----------------------"
 	     ])) 					`thenNF_Tc_`
-     let
-	(binds, irreds) = bindsAndIrreds avails wanteds
-     in
-     returnTc (no_improvement, frees, binds, irreds)
+
+    returnTc (no_improvement, frees, binds, irreds)
 
 tcImprove avails
  =  tcGetInstEnv 				`thenTc` \ inst_env ->
@@ -1216,8 +1319,8 @@ reduceList :: (Int,[Inst])		-- Stack (for err msgs)
 					-- along with its depth
        	   -> (Inst -> WhatToDo)
        	   -> [Inst]
-       	   -> RedState
-       	   -> TcM RedState
+       	   -> Avails
+       	   -> TcM Avails
 \end{code}
 
 @reduce@ is passed
@@ -1227,10 +1330,10 @@ reduceList :: (Int,[Inst])		-- Stack (for err msgs)
 		  Free	       return this in "frees"
 
      wanteds:	The list of insts to reduce
-     state:	An accumulating parameter of type RedState
+     state:	An accumulating parameter of type Avails
 		that contains the state of the algorithm
 
-  It returns a RedState.
+  It returns a Avails.
 
 The (n,stack) pair is just used for error reporting.
 n is always the depth of the stack.
@@ -1258,8 +1361,12 @@ reduceList (n,stack) try_me wanteds state
     -- Base case: we're done!
 reduce stack try_me wanted state
     -- It's the same as an existing inst, or a superclass thereof
-  | isAvailable state wanted
-  = returnTc state
+  | Just avail <- isAvailable state wanted
+  = if isLinearInst wanted then
+	addLinearAvailable state avail wanted	`thenNF_Tc` \ (state', wanteds') ->
+	reduceList stack try_me wanteds' state'
+    else
+	returnTc state		-- No op for non-linear things
 
   | otherwise
   = case try_me wanted of {
@@ -1296,14 +1403,34 @@ reduce stack try_me wanted state
 
 
 \begin{code}
-isAvailable :: RedState -> Inst -> Bool
-isAvailable (avails, _) wanted = wanted `elemFM` avails
-	-- NB: the Ord instance of Inst compares by the class/type info
+-------------------------
+isAvailable :: Avails -> Inst -> Maybe Avail
+isAvailable avails wanted = lookupFM avails wanted
+	-- NB 1: the Ord instance of Inst compares by the class/type info
 	-- *not* by unique.  So
 	--	d1::C Int ==  d2::C Int
 
+addLinearAvailable :: Avails -> Avail -> Inst -> NF_TcM (Avails, [Inst])
+addLinearAvailable avails avail wanted
+  | need_split avail
+  = tcLookupGlobalId splitIdName		`thenNF_Tc` \ split_id ->
+    newMethodAtLoc (instLoc wanted) split_id 
+		   [linearInstType wanted]	`thenNF_Tc` \ (split_inst,_) ->
+    returnNF_Tc (addToFM avails wanted (Linear 2 split_inst avail), [split_inst])
+
+  | otherwise
+  = returnNF_Tc (addToFM avails wanted avail', [])
+  where
+    avail' = case avail of
+		Given id _   -> Given id True
+		Linear n i a -> Linear (n+1) i a 
+
+    need_split Irred	      = True
+    need_split (Given _ used) = used
+    need_split (Linear _ _ _) = False
+
 -------------------------
-addFree :: RedState -> Inst -> NF_TcM RedState
+addFree :: Avails -> Inst -> NF_TcM Avails
 	-- When an Inst is tossed upstairs as 'free' we nevertheless add it
 	-- to avails, so that any other equal Insts will be commoned up right
 	-- here rather than also being tossed upstairs.  This is really just
@@ -1316,33 +1443,10 @@ addFree :: RedState -> Inst -> NF_TcM RedState
 	-- but a is not bound here, then we *don't* want to derive
 	-- dn from df here lest we lose sharing.
 	--
-	-- NB2: do *not* add the Inst to avails at all if it's a method.
-	-- The following situation shows why this is bad:
-	--	truncate :: forall a. RealFrac a => forall b. Integral b => a -> b
-	-- From an application (truncate f i) we get
-	--	t1 = truncate at f
-	--	t2 = t1 at i
-	-- If we have also have a second occurrence of truncate, we get
-	--	t3 = truncate at f
-	--	t4 = t3 at i
-	-- When simplifying with i,f free, we might still notice that
-	--   t1=t3; but alas, the binding for t2 (which mentions t1)
-	--   will continue to float out!
-	-- Solution: never put methods in avail till they are captured
-	-- in which case addFree isn't used
-	--
-	-- NB3: make sure that CCallable/CReturnable use NoRhs rather
-	--	than BoundTo, else we end up with bogus bindings.
-	--	c.f. instBindingRequired in addWanted
-addFree (avails, frees) free
-  | isDict free = returnNF_Tc (addToFM avails free avail, free:frees)
-  | otherwise   = returnNF_Tc (avails,			  free:frees)
-  where
-    avail | instBindingRequired free = BoundTo (instToId free)
-	  | otherwise		     = NoRhs
+addFree avails free = returnNF_Tc (addToFM avails free IsFree)
 
-addWanted :: RedState -> Inst -> TcExpr -> [Inst] -> NF_TcM RedState
-addWanted state@(avails, frees) wanted rhs_expr wanteds
+addWanted :: Avails -> Inst -> TcExpr -> [Inst] -> NF_TcM Avails
+addWanted avails wanted rhs_expr wanteds
 -- Do *not* add superclasses as well.  Here's an example of why not
 -- 	class Eq a => Foo a b
 --	instance Eq a => Foo [a] a
@@ -1353,27 +1457,21 @@ addWanted state@(avails, frees) wanted rhs_expr wanteds
 -- 	ToDo: this isn't entirely unsatisfactory, because
 --	      we may also lose some entirely-legitimate sharing this way
 
-  = ASSERT( not (isAvailable state wanted) )
-    returnNF_Tc (addToFM avails wanted avail, frees)
+  = ASSERT( not (wanted `elemFM` avails) )
+    returnNF_Tc (addToFM avails wanted avail)
   where
     avail | instBindingRequired wanted = Rhs rhs_expr wanteds
 	  | otherwise		       = ASSERT( null wanteds ) NoRhs
 
-addGiven :: RedState -> Inst -> NF_TcM RedState
-addGiven state given = addAvailAndSCs state given (BoundTo (instToId given))
+addGiven :: Avails -> Inst -> NF_TcM Avails
+addGiven state given = addAvailAndSCs state given (Given (instToId given) False)
 
-addIrred :: WantSCs -> RedState -> Inst -> NF_TcM RedState
-addIrred NoSCs  (avails,frees) irred = returnNF_Tc (addToFM avails irred Irred, frees)
-addIrred AddSCs state	       irred = addAvailAndSCs state irred Irred
+addIrred :: WantSCs -> Avails -> Inst -> NF_TcM Avails
+addIrred NoSCs  state irred = returnNF_Tc (addToFM state irred Irred)
+addIrred AddSCs state irred = addAvailAndSCs state irred Irred
 
-addAvailAndSCs :: RedState -> Inst -> Avail -> NF_TcM RedState
-addAvailAndSCs (avails, frees) wanted avail
-  = add_avail_and_scs avails wanted avail	`thenNF_Tc` \ avails' ->
-    returnNF_Tc (avails', frees)
-
----------------------
-add_avail_and_scs :: Avails -> Inst -> Avail -> NF_TcM Avails
-add_avail_and_scs avails wanted avail
+addAvailAndSCs :: Avails -> Inst -> Avail -> NF_TcM Avails
+addAvailAndSCs avails wanted avail
   = add_scs (addToFM avails wanted avail) wanted
 
 add_scs :: Avails -> Inst -> NF_TcM Avails
@@ -1394,8 +1492,8 @@ add_scs avails dict
 
     add_sc avails (sc_dict, sc_sel)	-- Add it, and its superclasses
       = case lookupFM avails sc_dict of
-	  Just (BoundTo _) -> returnNF_Tc avails	-- See Note [SUPER] below
-	  other		   -> add_avail_and_scs avails sc_dict avail
+	  Just (Given _ _) -> returnNF_Tc avails	-- See Note [SUPER] below
+	  other		   -> addAvailAndSCs avails sc_dict avail
       where
 	sc_sel_rhs = DictApp (TyApp (HsVar sc_sel) tys) [instToId dict]
 	avail      = Rhs sc_sel_rhs [dict]
@@ -1410,7 +1508,7 @@ and want to deduce (d2:C [a]) where
 Then we'll use the instance decl to deduce C [a] and then add the
 superclasses of C [a] to avails.  But we must not overwrite the binding
 for d1:Ord a (which is given) with a superclass selection or we'll just
-build a loop!  Hence looking for BoundTo.  Crudely, BoundTo is cheaper
+build a loop!  Hence looking for Given.  Crudely, Given is cheaper
 than a selection.
 
 
@@ -1816,11 +1914,11 @@ warnDefault dicts default_ty
 		      pprInstsInFull tidy_dicts]
 
 complainCheck doc givens irreds
-  = mapNF_Tc zonkInst given_dicts			 	  `thenNF_Tc` \ givens' ->
+  = mapNF_Tc zonkInst given_dicts_and_ips		 	  `thenNF_Tc` \ givens' ->
     mapNF_Tc (addNoInstanceErrs doc givens') (groupInsts irreds)  `thenNF_Tc_`
     returnNF_Tc ()
   where
-    given_dicts = filter isDict givens
+    given_dicts_and_ips = filter (not . isMethod) givens
 	-- Filter out methods, which are only added to
 	-- the given set as an optimisation
 

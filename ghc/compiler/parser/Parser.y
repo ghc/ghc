@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.78 2001/11/26 10:30:15 simonpj Exp $
+$Id: Parser.y,v 1.79 2001/11/29 13:47:10 simonpj Exp $
 
 Haskell grammar.
 
@@ -13,7 +13,6 @@ module Parser ( parseModule, parseStmt, parseIdentifier ) where
 
 import HsSyn
 import HsTypes		( mkHsTupCon )
-import TypeRep          ( IPName(..) )
 
 import RdrHsSyn
 import Lex
@@ -29,7 +28,7 @@ import OccName		( UserFS, varName, tcName, dataName, tcClsName, tvName )
 import SrcLoc		( SrcLoc )
 import Module
 import CmdLineOpts	( opt_SccProfilingOn )
-import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), 
+import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
 			  NewOrData(..), StrictnessMark(..), Activation(..) )
 import Panic
 
@@ -972,8 +971,8 @@ qvar 	:: { RdrName }
 -- *after* we see the close paren.
 
 ipvar	:: { IPName RdrName }
-	: IPDUPVARID		{ Dupable   (mkUnqual varName $1) }
-	| IPSPLITVARID		{ MustSplit (mkUnqual varName $1) }
+	: IPDUPVARID		{ Dupable (mkUnqual varName $1) }
+	| IPSPLITVARID		{ Linear  (mkUnqual varName $1) }
 
 qcon	:: { RdrName }
 	: qconid		{ $1 }

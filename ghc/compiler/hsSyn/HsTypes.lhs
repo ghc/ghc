@@ -30,7 +30,7 @@ module HsTypes (
 #include "HsVersions.h"
 
 import Class		( FunDep )
-import TcType		( Type, Kind, ThetaType, SourceType(..), IPName,
+import TcType		( Type, Kind, ThetaType, SourceType(..), 
 			  tcSplitSigmaTy, liftedTypeKind, eqKind, tcEqType
 			)
 import TypeRep		( Type(..), TyNote(..) )	-- toHsType sees the representation
@@ -41,7 +41,7 @@ import OccName		( NameSpace, tvName )
 import Var		( TyVar, tyVarKind )
 import Subst		( substTyWith )
 import PprType		( {- instance Outputable Kind -}, pprParendKind )
-import BasicTypes	( Boxity(..), Arity, tupleParens )
+import BasicTypes	( Boxity(..), Arity, IPName, tupleParens )
 import PrelNames	( mkTupConRdrName, listTyConKey, usOnceTyConKey, usManyTyConKey, hasKey,
 			  usOnceTyConName, usManyTyConName
 			)

@@ -21,11 +21,11 @@ import Name		( Name )
 import ForeignCall	( Safety )
 import Outputable	
 import PprType		( pprParendType )
-import Type		( Type, IPName  )
+import Type		( Type  )
 import Var		( TyVar )
 import DataCon		( DataCon )
 import CStrings		( CLabelString, pprCLabelString )
-import BasicTypes	( Boxity, tupleParens )
+import BasicTypes	( IPName, Boxity, tupleParens )
 import SrcLoc		( SrcLoc )
 \end{code}
 

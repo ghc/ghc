@@ -64,12 +64,11 @@ import InstEnv		( InstEnv, ClsInstEnv, DFunId )
 import Rules		( RuleBase )
 import CoreSyn		( CoreBind )
 import Id		( Id )
-import Type		( IPName )
 import Class		( Class, classSelIds )
 import TyCon		( TyCon, isNewTyCon, tyConGenIds, tyConSelIds, tyConDataConsIfAvailable )
 import DataCon		( dataConId, dataConWrapId )
 
-import BasicTypes	( Version, initialVersion, Fixity )
+import BasicTypes	( Version, initialVersion, Fixity, IPName )
 
 import HsSyn		( DeprecTxt, tyClDeclName, ifaceRuleDeclName )
 import RdrHsSyn		( RdrNameInstDecl, RdrNameRuleDecl, RdrNameTyClDecl )

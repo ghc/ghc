@@ -95,7 +95,7 @@ knownKeyNames :: [Name]
 knownKeyNames
  =  [
 	-- Type constructors (synonyms especially)
-	ioTyConName,
+	ioTyConName, ioDataConName,
 	mainName,
 	orderingTyConName,
 	rationalTyConName,
@@ -190,7 +190,8 @@ knownKeyNames
 	eqStringName,
 	assertName,
 	runSTRepName,
-	printName
+	printName,
+	splitIdName, fstIdName, sndIdName	-- Used by splittery
     ]
 \end{code}
 
@@ -220,6 +221,7 @@ pREL_ARR_Name     = mkModuleName "PrelArr"
 pREL_BYTEARR_Name = mkModuleName "PrelByteArr"
 pREL_FOREIGN_Name = mkModuleName "PrelForeign"
 pREL_STABLE_Name  = mkModuleName "PrelStable"
+pREL_SPLIT_Name   = mkModuleName "PrelSplit"
 pREL_ADDR_Name    = mkModuleName "PrelAddr"
 pREL_PTR_Name     = mkModuleName "PrelPtr"
 pREL_ERR_Name     = mkModuleName "PrelErr"
@@ -233,6 +235,8 @@ pREL_WORD_Name	  = mkModuleName "PrelWord"
 
 fOREIGNOBJ_Name	  = mkModuleName "ForeignObj"
 aDDR_Name	  = mkModuleName "Addr"
+
+gLA_EXTS_Name   = mkModuleName "GlaExts"
 
 pREL_GHC     	= mkPrelModule pREL_GHC_Name
 pREL_BASE    	= mkPrelModule pREL_BASE_Name
@@ -357,6 +361,10 @@ trueDataConName	  = dataQual pREL_BASE_Name SLIT("True") trueDataConKey
 listTyConName	  = tcQual   pREL_BASE_Name SLIT("[]") listTyConKey
 nilDataConName 	  = dataQual pREL_BASE_Name SLIT("[]") nilDataConKey
 consDataConName	  = dataQual pREL_BASE_Name SLIT(":") consDataConKey
+
+-- PrelTup
+fstIdName	  = varQual pREL_TUP_Name SLIT("fst") fstIdKey
+sndIdName	  = varQual pREL_TUP_Name SLIT("snd") sndIdKey
 
 -- Generics
 crossTyConName     = tcQual   pREL_BASE_Name SLIT(":*:") crossTyConKey
@@ -506,6 +514,9 @@ errorName	   = varQual pREL_ERR_Name SLIT("error") errorIdKey
 assertName         = varQual pREL_GHC_Name SLIT("assert") assertIdKey
 getTagName	   = varQual pREL_GHC_Name SLIT("getTag#") getTagIdKey
 runSTRepName	   = varQual pREL_ST_Name  SLIT("runSTRep") runSTRepIdKey
+
+-- The "split" Id for splittable implicit parameters
+splitIdName = varQual pREL_SPLIT_Name SLIT("split") splitIdKey
 \end{code}
 
 %************************************************************************
@@ -848,6 +859,9 @@ failIOIdKey		      = mkPreludeMiscIdUnique 44
 unpackCStringListIdKey	      = mkPreludeMiscIdUnique 45
 nullAddrIdKey		      = mkPreludeMiscIdUnique 46
 voidArgIdKey		      = mkPreludeMiscIdUnique 47
+splitIdKey		      = mkPreludeMiscIdUnique 48
+fstIdKey		      = mkPreludeMiscIdUnique 49
+sndIdKey		      = mkPreludeMiscIdUnique 50
 \end{code}
 
 Certain class operations from Prelude classes.  They get their own

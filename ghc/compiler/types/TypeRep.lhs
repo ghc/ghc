@@ -6,7 +6,7 @@
 \begin{code}
 module TypeRep (
 	Type(..), TyNote(..), 		-- Representation visible 
-	SourceType(..), IPName(..),	-- to friends
+	SourceType(..), 		-- to friends
 	
  	Kind, PredType, ThetaType,		-- Synonyms
 	TyVarSubst,
@@ -29,13 +29,13 @@ module TypeRep (
 #include "HsVersions.h"
 
 -- friends:
-import Var	( TyVar )
-import VarEnv
-import VarSet
-
-import Name	( Name )
-import TyCon	( TyCon, KindCon, mkFunTyCon, mkKindCon, mkSuperKindCon )
-import Class	( Class )
+import Var	  ( TyVar )
+import VarEnv     ( TyVarEnv )
+import VarSet     ( TyVarSet )
+import Name	  ( Name )
+import BasicTypes ( IPName )
+import TyCon	  ( TyCon, KindCon, mkFunTyCon, mkKindCon, mkSuperKindCon )
+import Class	  ( Class )
 
 -- others
 import PrelNames	( superKindName, superBoxityName, liftedConName, 
@@ -213,13 +213,6 @@ data SourceType
   | NType TyCon [Type]		-- A *saturated*, *non-recursive* newtype application
 				-- [See notes at top about newtypes]
 
-data IPName name
-  = Dupable   name	-- ?x: you can freely duplicate this implicit parameter
-  | MustSplit name	-- %x: you must use the splitting function to duplicate it
-  deriving( Eq, Ord )	-- Ord is used in the IP name cache finite map
-			--	(used in HscTypes.OrigIParamCache)
-	-- I sometimes thisnk this type should be in BasicTypes
-		
 type PredType  = SourceType	-- A subtype for predicates
 type ThetaType = [PredType]
 \end{code}

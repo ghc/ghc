@@ -322,6 +322,7 @@ loadDecl mod (version_map, decls_map) (version, decl)
 
 	new_version_map = extendNameEnv version_map main_name version
     in
+    traceRn (text "Loading" <+> ppr full_avail) `thenRn_`
     returnRn (new_version_map, new_decls_map)
 
 -----------------------------------------------------

@@ -60,6 +60,13 @@ Executive summary of our extensions:
 	  </varlistentry>
 
 	  <varlistentry>
+	    <term>Linear implicit parameters:</term>
+	    <listitem>
+	      <para><xref LinkEnd="linear-implicit-parameters"></para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
 	    <term>Local universal quantification:</term>
 	    <listitem>
 	      <para><xref LinkEnd="universal-quantification"></para>
@@ -1209,6 +1216,133 @@ Easiest thing is to outlaw the offending types.</para>
 
 </sect1>
 
+<sect1 id="linear-implicit-parameters">
+<title>Linear implicit parameters
+</title>
+<para>
+Linear implicit parameters are an idea developed by Koen Claessen,
+Mark Shields, and Simon PJ.  They address the long-standing
+problem that monads seem over-kill for certain sorts of problem, notably:
+</para>
+<itemizedlist>
+<listitem> <para> distributing a supply of unique names </para> </listitem>
+<listitem> <para> distributing a suppply of random numbers </para> </listitem>
+<listitem> <para> distributing an oracle (as in QuickCheck) </para> </listitem>
+</itemizedlist>
+
+<para>
+Linear implicit parameters are just like ordinary implicit parameters,
+except that they are "linear" -- that is, they cannot be copied, and
+must be explicitly "split" instead.  Linear implicit parameters are
+written '<literal>%x</literal>' instead of '<literal>?x</literal>'.  
+(The '/' in the '%' suggests the split!)
+</para>
+<para>
+For example:
+<programlisting>
+    data NameSupply = ...
+    
+    splitNS :: NameSupply -> (NameSupply, NameSupply)
+    newName :: NameSupply -> Name
+
+    instance PrelSplit.Splittable NameSupply where
+	split = splitNS
+
+
+    f :: (%ns :: NameSupply) => Env -> Expr -> Expr
+    f env (Lam x e) = Lam x' (f env e)
+		    where
+		      x'   = newName %ns
+		      env' = extend env x x'
+    ...more equations for f...
+</programlisting>
+Notice that the implicit parameter %ns is consumed 
+<itemizedlist>
+<listitem> <para> once by the call to <literal>newName</literal> </para> </listitem>
+<listitem> <para> once by the recursive call to <literal>f</literal> </para></listitem>
+</itemizedlist>
+</para>
+<para>
+So the translation done by the type checker makes
+the parameter explicit:
+<programlisting>
+    f :: NameSupply -> Env -> Expr -> Expr
+    f ns env (Lam x e) = Lam x' (f ns1 env e)
+		       where
+	 		 (ns1,ns2) = splitNS ns
+			 x' = newName ns2
+			 env = extend env x x'
+</programlisting>
+Notice the call to 'split' introduced by the type checker.
+How did it know to use 'splitNS'?  Because what it really did
+was to introduce a call to the overloaded function 'split',
+defined by
+<programlisting>
+	class Splittable a where
+	  split :: a -> (a,a)
+</programlisting>
+The instance for <literal>Splittable NameSupply</literal> tells GHC how to implement
+split for name supplies.  But we can simply write
+<programlisting>
+	g x = (x, %ns, %ns)
+</programlisting>
+and GHC will infer
+<programlisting>
+	g :: (Splittable a, %ns :: a) => b -> (b,a,a)
+</programlisting>
+The <literal>Splittable</literal> class is built into GHC.  It's defined in <literal>PrelSplit</literal>,
+and exported by <literal>GlaExts</literal>.
+</para>
+<para>
+Other points:
+<itemizedlist>
+<listitem> <para> '<literal>?x</literal>' and '<literal>%x</literal>' 
+are entirely distinct implicit parameters: you 
+  can use them together and they won't intefere with each other. </para>
+</listitem>
+
+<listitem> <para> You can bind linear implicit parameters in 'with' clauses. </para> </listitem>
+
+<listitem> <para>You cannot have implicit parameters (whether linear or not)
+  in the context of a class or instance declaration. </para></listitem>
+</itemizedlist>
+</para>
+
+<sect2><title>Warnings</title>
+
+<para>
+The monomorphism restriction is even more important than usual.
+Consider the example above:
+<programlisting>
+    f :: (%ns :: NameSupply) => Env -> Expr -> Expr
+    f env (Lam x e) = Lam x' (f env e)
+		    where
+		      x'   = newName %ns
+		      env' = extend env x x'
+</programlisting>
+If we replaced the two occurrences of x' by (newName %ns), which is
+usually a harmless thing to do, we get:
+<programlisting>
+    f :: (%ns :: NameSupply) => Env -> Expr -> Expr
+    f env (Lam x e) = Lam (newName %ns) (f env e)
+		    where
+		      env' = extend env x (newName %ns)
+</programlisting>
+But now the name supply is consumed in <emphasis>three</emphasis> places
+(the two calls to newName,and the recursive call to f), so
+the result is utterly different.  Urk!  We don't even have 
+the beta rule.
+</para>
+<para>
+Well, this is an experimental change.  With implicit
+parameters we have already lost beta reduction anyway, and
+(as John Launchbury puts it) we can't sensibly reason about
+Haskell programs without knowing their typing.
+</para>
+
+</sect2>
+
+</sect1>
 
 <sect1 id="functional-dependencies">
 <title>Functional dependencies

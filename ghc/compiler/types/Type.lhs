@@ -7,7 +7,7 @@
 module Type (
         -- re-exports from TypeRep:
 	Type, PredType, ThetaType,
-	Kind, TyVarSubst, IPName,
+	Kind, TyVarSubst, 
 
 	superKind, superBoxity,				-- KX and BX respectively
 	liftedBoxity, unliftedBoxity, 			-- :: BX
@@ -50,7 +50,6 @@ module Type (
 
 	-- Source types
 	SourceType(..), sourceTypeRep, mkPredTy, mkPredTys,
-	ipNameName, mapIPName,
 
 	-- Newtypes
 	splitNewType_maybe,
@@ -660,16 +659,6 @@ splitNewType_maybe ty
 -- A local helper function (not exported)
 newTypeRep new_tycon tys = case newTyConRep new_tycon of
 			     (tvs, rep_ty) -> substTyWith tvs tys rep_ty
-\end{code}
-
-\begin{code}
-ipNameName :: IPName name -> name
-ipNameName (Dupable n)   = n
-ipNameName (MustSplit n) = n
-
-mapIPName :: (a->b) -> IPName a -> IPName b
-mapIPName f (Dupable n)   = Dupable (f n)
-mapIPName f (MustSplit n) = MustSplit (f n)
 \end{code}
 
 

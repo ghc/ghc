@@ -25,7 +25,6 @@ import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
 			  Deprecations(..), lookupDeprec,
 			  extendLocalRdrEnv
 			)
-import Type		( mapIPName )
 import RnMonad
 import Name		( Name, 
 			  getSrcLoc, nameIsLocalOrFrom,
@@ -54,6 +53,7 @@ import SrcLoc		( SrcLoc, noSrcLoc )
 import Outputable
 import ListSetOps	( removeDups, equivClasses )
 import Util		( sortLt )
+import BasicTypes	( mapIPName )
 import List		( nub )
 import UniqFM		( lookupWithDefaultUFM )
 import CmdLineOpts

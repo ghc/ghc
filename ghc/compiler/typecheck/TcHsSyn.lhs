@@ -47,8 +47,7 @@ import DataCon	( dataConWrapId )
 import TcEnv	( tcLookupGlobal_maybe, tcExtendGlobalValEnv, TcEnv, TcId )
 
 import TcMonad
-import TypeRep    ( IPName(..) )	-- For zonking
-import Type	  ( Type, ipNameName )
+import Type	  ( Type )
 import TcType	  ( TcType )
 import TcMType	  ( zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcType, zonkTcSigTyVars )
 import TysPrim	  ( charPrimTy, intPrimTy, floatPrimTy,
@@ -58,7 +57,7 @@ import TysWiredIn ( charTy, stringTy, intTy, integerTy,
 		    mkListTy, mkTupleTy, unitTy )
 import CoreSyn    ( Expr )
 import Var	  ( isId )
-import BasicTypes ( RecFlag(..), Boxity(..) )
+import BasicTypes ( RecFlag(..), Boxity(..), IPName(..), ipNameName )
 import Bag
 import Outputable
 import HscTypes	( TyThing(..) )
@@ -632,8 +631,8 @@ zonkRbinds rbinds
 
 -------------------------------------------------------------------------
 mapIPNameTc :: (a -> NF_TcM b) -> IPName a -> NF_TcM (IPName b)
-mapIPNameTc f (Dupable   n) = f n  `thenNF_Tc` \ r -> returnNF_Tc (Dupable r)
-mapIPNameTc f (MustSplit n) = f n  `thenNF_Tc` \ r -> returnNF_Tc (MustSplit r)
+mapIPNameTc f (Dupable n) = f n  `thenNF_Tc` \ r -> returnNF_Tc (Dupable r)
+mapIPNameTc f (Linear  n) = f n  `thenNF_Tc` \ r -> returnNF_Tc (Linear r)
 \end{code}
 
 
