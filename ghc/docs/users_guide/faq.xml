@@ -37,8 +37,7 @@
 	machine and compile them with <literal>gcc</literal> to get a
 	working GHC, and go from there.</para>
 
-	<para>The <ulink
-	url="http://www.haskell.org/ghc/latest/building/building-guide.html">Building
+	<para>The <ulink url="http://www.haskell.org/ghc/latest/building/building-guide.html">Building
 	Guide</ulink> has all the details on how to bootstrap GHC on a
 	new platform.</para>
 
@@ -95,8 +94,7 @@
       <term>I can't get string gaps to work</term>
       <listitem>
 	<para>If you're also using CPP, beware of the known pitfall
-	with string gaps mentioned in <xref
-	linkend="cpp-string-gaps"/>.</para>
+	with string gaps mentioned in <xref linkend="cpp-string-gaps" />.</para>
       </listitem>
     </varlistentry>
 
@@ -457,6 +455,16 @@ details.</para>
 	  Instructions for GHC 6.2.2. are <ulink url="http://www.haskell.org/pipermail/glasgow-haskell-users/2004-November/007370.html">here</ulink>.</para>
       </listitem>
     </varlistentry>
+
+    <varlistentry>
+      <term>Ctrl-C doesn't work on Windows</term>
+      <listitem>
+	<para>When running GHC under a Cygwin shell on Windows, Ctrl-C
+	  sometimes doesn't work.  The workaround is to use Ctrl-Break
+	  instead.</para>
+      <listitem>
+    <varlistentry>
+
   </variablelist>
 
 </chapter>
