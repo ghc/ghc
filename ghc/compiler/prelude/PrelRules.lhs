@@ -20,7 +20,7 @@ module PrelRules ( primOpRules, builtinRules ) where
 #include "HsVersions.h"
 
 import CoreSyn
-import Id		( mkWildId )
+import Id		( mkWildId, isPrimOpId_maybe )
 import Literal		( Literal(..), mkMachInt, mkMachWord
 			, literalType
 			, word2IntLit, int2WordLit
@@ -381,12 +381,15 @@ For dataToTag#, we can reduce if either
 	(b) the argument is a variable whose unfolding is a known constructor
 
 \begin{code}
-dataToTagRule [_, val_arg]
-  = case exprIsConApp_maybe val_arg of
-	Just (dc,_) -> ASSERT( not (isNewTyCon (dataConTyCon dc)) )
-	     	       Just (mkIntVal (toInteger (dataConTag dc - fIRST_TAG)))
+dataToTagRule [ty1, Var tag_to_enum `App` ty2 `App` tag]
+  | Just TagToEnumOp <- isPrimOpId_maybe tag_to_enum
+  , ty1 `coreEqType` ty2
+  = Just tag	-- dataToTag (tagToEnum x)   ==>   x
 
-	other	    -> Nothing
+dataToTagRule [_, val_arg]
+  | Just (dc,_) <- exprIsConApp_maybe val_arg
+  = ASSERT( not (isNewTyCon (dataConTyCon dc)) )
+    Just (mkIntVal (toInteger (dataConTag dc - fIRST_TAG)))
 
 dataToTagRule other = Nothing
 \end{code}
