@@ -27,10 +27,10 @@ import Id		( Id, idType, idInfo, idUnique,
 			  getIdArity, setIdArity, setIdInfo,
 			  getIdStrictness, 
 			  setInlinePragma, getInlinePragma, idMustBeINLINEd,
-			  setOneShotLambda
+			  setOneShotLambda, maybeModifyIdInfo
 			)
 import IdInfo		( InlinePragInfo(..), OccInfo(..), StrictnessInfo(..), 
-		 	  ArityInfo(..), atLeastArity, arityLowerBound, unknownArity,
+		 	  ArityInfo(..), atLeastArity, arityLowerBound, unknownArity, zapFragileIdInfo,
 			  specInfo, inlinePragInfo, zapLamIdInfo, setArityInfo, setInlinePragInfo, setUnfoldingInfo
 			)
 import Demand		( Demand, isStrict, wwLazy )
@@ -51,7 +51,7 @@ import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsCheap, exprIsTrivial,
 			)
 import Rules		( lookupRule )
 import CostCentre	( isSubsumedCCS, currentCCS, isEmptyCC )
-import Type		( Type, mkTyVarTy, mkTyVarTys, isUnLiftedType, 
+import Type		( Type, mkTyVarTy, mkTyVarTys, isUnLiftedType, seqType,
 			  mkFunTy, splitFunTys, splitTyConApp_maybe, splitFunTy_maybe,
 			  funResultTy, isDictTy, isDataType, applyTy, applyTys, mkFunTys
 			)
@@ -95,8 +95,11 @@ simplTopBinds binds
     top_binders	= bindersOfBinds binds
 
     simpl_binds []			  = returnSmpl ([], panic "simplTopBinds corner")
-    simpl_binds (NonRec bndr rhs : binds) = simplLazyBind TopLevel bndr  bndr rhs	 (simpl_binds binds)
-    simpl_binds (Rec pairs       : binds) = simplRecBind  TopLevel pairs (map fst pairs) (simpl_binds binds)
+    simpl_binds (NonRec bndr rhs : binds) = simplLazyBind TopLevel bndr  (zap bndr) rhs	 (simpl_binds binds)
+    simpl_binds (Rec pairs       : binds) = simplRecBind  TopLevel pairs (map (zap . fst) pairs) (simpl_binds binds)
+
+    zap id = maybeModifyIdInfo zapFragileIdInfo id
+-- TEMP
 
 
 simplRecBind :: TopLevelFlag -> [(InId, InExpr)] -> [OutId]
@@ -174,7 +177,8 @@ simplExpr expr = getSubst	`thenSmpl` \ subst ->
 		 simplExprC expr (Stop (substTy subst (coreExprType expr)))
 	-- The type in the Stop continuation is usually not used
 	-- It's only needed when discarding continuations after finding
-	-- a function that returns bottom
+	-- a function that returns bottom.
+	-- Hence the lazy substitution
 
 simplExprC :: CoreExpr -> SimplCont -> SimplM CoreExpr
 	-- Simplify an expression, given a continuation
@@ -213,13 +217,11 @@ simplExprF expr@(Con (PrimOp op) args) cont
 	  Nothing -> rebuild (Con (PrimOp op) args2) cont2
 
 simplExprF (Con con@(DataCon _) args) cont
-  = freeTick LeafVisit			`thenSmpl_`
-    simplConArgs args		( \ args' ->
+  = simplConArgs args		( \ args' ->
     rebuild (Con con args') cont)
 
 simplExprF expr@(Con con@(Literal _) args) cont
   = ASSERT( null args )
-    freeTick LeafVisit			`thenSmpl_`
     rebuild expr cont
 
 simplExprF (App fun arg) cont
@@ -247,8 +249,8 @@ simplExprF (Type ty) cont
 
 simplExprF (Note (Coerce to from) e) cont
   | to == from = simplExprF e cont
-  | otherwise  = getSubst		`thenSmpl` \ subst ->
-    		 simplExprF e (CoerceIt (substTy subst to) cont)
+  | otherwise  = simplType to		`thenSmpl` \ to' -> 
+    		 simplExprF e (CoerceIt to' cont)
 
 -- hack: we only distinguish subsumed cost centre stacks for the purposes of
 -- inlining.  All other CCCSs are mapped to currentCCS.
@@ -314,6 +316,7 @@ simplLam fun cont
 	let
 		ty' = substTy (mkSubst in_scope arg_se) ty_arg
 	in
+	seqType ty'	`seq`
 	extendSubst bndr (DoneTy ty')
 	(go body body_cont)
 
@@ -411,7 +414,11 @@ simplConArgs (arg:args) thing_inside
 simplType :: InType -> SimplM OutType
 simplType ty
   = getSubst	`thenSmpl` \ subst ->
-    returnSmpl (substTy subst ty)
+    let
+	new_ty = substTy subst ty
+    in
+    seqType new_ty `seq`  
+    returnSmpl new_ty
 \end{code}
 
 
@@ -533,24 +540,25 @@ completeBinding old_bndr new_bndr new_rhs thing_inside
      let
 	-- We make new IdInfo for the new binder by starting from the old binder, 
 	-- doing appropriate substitutions, 
-	old_bndr_info = idInfo old_bndr
-	new_bndr_info = substIdInfo subst old_bndr_info
+	new_bndr_info = substIdInfo subst (idInfo old_bndr) (idInfo new_bndr)
 		        `setArityInfo` ArityAtLeast (exprArity new_rhs)
 
-	-- At the *binding* site we want to zap the now-out-of-date inline
-	-- pragma, in case the expression is simplified a second time.  
-	-- This has already been done in new_bndr, so we get it from there
-	binding_site_id = new_bndr `setIdInfo` 
-			  (new_bndr_info `setInlinePragInfo` getInlinePragma new_bndr)
+	-- At the *binding* site we use the new binder info
+	binding_site_id = new_bndr `setIdInfo` new_bndr_info
 	
-	-- At the occurrence sites we want to know the unfolding,
-	-- We want the occurrence info of the *original*, which is already 
-	-- in new_bndr_info
+	-- At the *occurrence* sites we want to know the unfolding
+	-- We also want the occurrence info of the *original*
 	occ_site_id = new_bndr `setIdInfo`
-		      (new_bndr_info `setUnfoldingInfo` mkUnfolding new_rhs)
+		      (new_bndr_info `setUnfoldingInfo` mkUnfolding new_rhs
+			  	     `setInlinePragInfo` getInlinePragma old_bndr)
      in
-     modifyInScope occ_site_id thing_inside	`thenSmpl` \ stuff ->
-     returnSmpl (addBind (NonRec binding_site_id new_rhs) stuff)
+	-- These seqs force the Ids, and hence the IdInfos, and hence any
+	-- inner substitutions
+     binding_site_id	`seq`
+     occ_site_id	`seq`
+
+     (modifyInScope occ_site_id thing_inside	`thenSmpl` \ stuff ->
+      returnSmpl (addBind (NonRec binding_site_id new_rhs) stuff))
 \end{code}    
 
 
@@ -672,8 +680,7 @@ splitFloats floats rhs
 
 \begin{code}
 simplVar var cont
-  = freeTick LeafVisit	`thenSmpl_`
-    getSubst		`thenSmpl` \ subst ->
+  = getSubst		`thenSmpl` \ subst ->
     case lookupSubst subst var of
 	Just (DoneEx (Var v)) -> zapSubstEnv (simplVar v cont)
 	Just (DoneEx e)	      -> zapSubstEnv (simplExprF e cont)
@@ -697,12 +704,17 @@ simplVar var cont
 		   in
 		   getBlackList		`thenSmpl` \ black_list ->
 		   getInScope		`thenSmpl` \ in_scope ->
-		   completeCall black_list in_scope var' cont
+		   completeCall black_list in_scope var var' cont
 
 ---------------------------------------------------------
 --	Dealing with a call
 
-completeCall black_list_fn in_scope var cont
+completeCall black_list_fn in_scope orig_var var cont
+-- For reasons I'm not very clear about, it's important *not* to plug 'var',
+-- which is replete with an inlining in its IdInfo, into the resulting expression
+-- Doing so results in a significant space leak.
+-- Instead we pass orig_var, which has no inlinings etc.
+
 	-- Look for rules or specialisations that match
 	-- Do this *before* trying inlining because some functions
 	-- have specialisations *and* are strict; we don't want to
@@ -717,7 +729,7 @@ completeCall black_list_fn in_scope var cont
 	-- thing, but perhaps we want to inline it anyway
   | maybeToBool maybe_inline
   = tick (UnfoldingDone var)		`thenSmpl_`
-    zapSubstEnv (completeInlining var unf_template discard_inline_cont)
+    zapSubstEnv (completeInlining orig_var unf_template discard_inline_cont)
 		-- The template is already simplified, so don't re-substitute.
 		-- This is VITAL.  Consider
 		--	let x = e in
@@ -730,7 +742,7 @@ completeCall black_list_fn in_scope var cont
   | otherwise		-- Neither rule nor inlining
 			-- Use prepareArgs to use function strictness
   = prepareArgs (ppr var) (idType var) (get_str var) cont	$ \ args' cont' ->
-    rebuild (mkApps (Var var) args') cont'
+    rebuild (mkApps (Var orig_var) args') cont'
 
   where
     get_str var = case getIdStrictness var of
@@ -835,6 +847,7 @@ prepareArgs pp_fun orig_fun_ty (fun_demands, result_bot) orig_cont thing_inside
 		ty_arg' = substTy (mkSubst in_scope se) ty_arg
 		res_ty  = applyTy fun_ty ty_arg'
 	  in
+	  seqType ty_arg'	`seq`
 	  go (Type ty_arg' : acc) ds res_ty cont
 
 	-- Value argument

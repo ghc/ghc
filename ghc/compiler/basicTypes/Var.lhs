@@ -1,4 +1,4 @@
-%
+s%
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section{@Vars@: Variables}
@@ -26,14 +26,14 @@ module Var (
 	-- Ids
 	Id, DictId,
 	idName, idType, idUnique, idInfo, modifyIdInfo, maybeModifyIdInfo,
-	setIdName, setIdUnique, setIdInfo,
+	setIdName, setIdUnique, setIdInfo, lazySetIdInfo,
 	mkIdVar, isId, externallyVisibleId
     ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-}	Type( Type, Kind )
-import {-# SOURCE #-}	IdInfo( IdInfo )
+import {-# SOURCE #-}	IdInfo( IdInfo, seqIdInfo )
 
 import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey )
 import Name		( Name, OccName, NamedThing(..),
@@ -118,8 +118,9 @@ varUnique :: Var -> Unique
 varUnique (Var {realUnique = uniq}) = mkUniqueGrimily uniq
 
 setVarUnique :: Var -> Unique -> Var
-setVarUnique var uniq = var {realUnique = getKey uniq, 
-			     varName = setNameUnique (varName var) uniq}
+setVarUnique var@(Var {varName = name}) uniq 
+  = var {realUnique = getKey uniq, 
+	 varName = setNameUnique name uniq}
 
 setVarName :: Var -> Name -> Var
 setVarName var new_name
@@ -266,11 +267,18 @@ setIdUnique = setVarUnique
 setIdName :: Id -> Name -> Id
 setIdName = setVarName
 
+lazySetIdInfo :: Id -> IdInfo -> Id
+lazySetIdInfo var info = var {varInfo = info}
+
 setIdInfo :: Id -> IdInfo -> Id
-setIdInfo var info = var {varInfo = info}
+setIdInfo var info = seqIdInfo info `seq` var {varInfo = info}
+	-- Try to avoid spack leaks by seq'ing
 
 modifyIdInfo :: (IdInfo -> IdInfo) -> Id -> Id
-modifyIdInfo fn var@(Var {varInfo = info}) = var {varInfo = fn info}
+modifyIdInfo fn var@(Var {varInfo = info})
+  = seqIdInfo new_info `seq` var {varInfo = new_info}
+  where
+    new_info = fn info
 
 -- maybeModifyIdInfo tries to avoid unnecesary thrashing
 maybeModifyIdInfo :: (IdInfo -> Maybe IdInfo) -> Id -> Id

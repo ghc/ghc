@@ -26,6 +26,7 @@ import TcModule		( TcResults(..), typecheckModule )
 import Desugar		( deSugar )
 import SimplCore	( core2core )
 import CoreLint		( endPass )
+import CoreSyn		( coreBindsSize )
 import CoreTidy		( tidyCorePgm )
 import CoreToStg	( topCoreBindsToStg )
 import StgSyn		( collectFinalStgBinders, pprStgBindings )
@@ -180,6 +181,11 @@ doIt (core_cmds, stg_cmds)
     let
 	final_ids = collectFinalStgBinders (map fst stg_binds2)
     in
+    coreBindsSize tidy_binds `seq`
+--	TEMP: the above call zaps some space usage allocated by the
+--	simplifier, which for reasons I don't understand, persists
+--	thoroughout code generation
+
     ifaceDecls if_handle local_tycons local_classes 
 	       inst_info final_ids tidy_binds imp_rule_ids	>>
     endIface if_handle						>>

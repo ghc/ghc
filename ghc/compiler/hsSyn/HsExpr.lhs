@@ -154,6 +154,7 @@ data HsExpr id pat
 \end{code}
 
 These constructors only appear temporarily in the parser.
+The renamer translates them into the Right Thing.
 
 \begin{code}
   | EWildPat			-- wildcard
@@ -329,14 +330,18 @@ ppr_expr (ArithSeqIn info)
 ppr_expr (ArithSeqOut expr info)
   = brackets (ppr info)
 
+ppr_expr EWildPat = char '_'
+ppr_expr (ELazyPat e) = char '~' <> pprParendExpr e
+ppr_expr (EAsPat v e) = ppr v <> char '@' <> pprParendExpr e
+
 ppr_expr (CCall fun args _ is_asm result_ty)
   = hang (if is_asm
 	  then ptext SLIT("_casm_ ``") <> ptext fun <> ptext SLIT("''")
 	  else ptext SLIT("_ccall_") <+> ptext fun)
        4 (sep (map pprParendExpr args))
 
-ppr_expr (HsSCC label expr)
-  = sep [ ptext SLIT("_scc_") <+> doubleQuotes (ptext label), pprParendExpr expr ]
+ppr_expr (HsSCC lbl expr)
+  = sep [ ptext SLIT("_scc_") <+> doubleQuotes (ptext lbl), pprParendExpr expr ]
 
 ppr_expr (TyLam tyvars expr)
   = hang (hsep [ptext SLIT("/\\"), interppSP tyvars, ptext SLIT("->")])

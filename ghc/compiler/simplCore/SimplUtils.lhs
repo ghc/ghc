@@ -22,14 +22,14 @@ import CoreUtils	( exprIsTrivial, cheapEqExpr, coreExprType, exprIsCheap, exprGe
 import Subst		( substBndrs, substBndr, substIds )
 import Id		( Id, idType, getIdArity, isId, idName,
 			  getInlinePragma, setInlinePragma,
-			  getIdDemandInfo, mkId
+			  getIdDemandInfo, mkId, idInfo
 			)
 import IdInfo		( arityLowerBound, InlinePragInfo(..), setInlinePragInfo, vanillaIdInfo )
 import Maybes		( maybeToBool, catMaybes )
 import Const		( Con(..) )
 import Name		( isLocalName, setNameUnique )
 import SimplMonad
-import Type		( Type, tyVarsOfType, tyVarsOfTypes, mkForAllTys,
+import Type		( Type, tyVarsOfType, tyVarsOfTypes, mkForAllTys, seqType,
 			  splitTyConApp_maybe, mkTyVarTys, applyTys, splitFunTys, mkFunTys
 			)
 import TysPrim		( statePrimTyCon )
@@ -54,8 +54,8 @@ simplBinders bndrs thing_inside
     let
 	(subst', bndrs') = substBndrs subst bndrs
     in
-    setSubst subst' 	$
-    thing_inside bndrs'
+    seqBndrs bndrs'	`seq`
+    setSubst subst' (thing_inside bndrs')
 
 simplBinder :: InBinder -> (OutBinder -> SimplM a) -> SimplM a
 simplBinder bndr thing_inside
@@ -63,8 +63,8 @@ simplBinder bndr thing_inside
     let
 	(subst', bndr') = substBndr subst bndr
     in
-    setSubst subst' 	$
-    thing_inside bndr'
+    seqBndr bndr'	`seq`
+    setSubst subst' (thing_inside bndr')
 
 
 -- Same semantics as simplBinders, but a little less 
@@ -76,8 +76,16 @@ simplIds ids thing_inside
     let
 	(subst', bndrs') = substIds subst ids
     in
-    setSubst subst' 	$
-    thing_inside bndrs'
+    seqBndrs bndrs'	`seq`
+    setSubst subst' (thing_inside bndrs')
+
+seqBndrs [] = ()
+seqBndrs (b:bs) = seqBndr b `seq` seqBndrs bs
+
+seqBndr b | isTyVar b = b `seq` ()
+	  | otherwise = seqType (idType b)	`seq`
+			idInfo b		`seq`
+			()
 \end{code}
 
 

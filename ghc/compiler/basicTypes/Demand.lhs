@@ -10,7 +10,7 @@ module Demand(
 	wwLazy, wwStrict, wwUnpackData, wwUnpackNew, wwPrim, wwEnum, 
 	isStrict, isLazy, isPrim,
 
-	pprDemands
+	pprDemands, seqDemand, seqDemands
      ) where
 
 #include "HsVersions.h"
@@ -63,6 +63,14 @@ wwUnpackData xs = WwUnpack DataType False xs
 wwUnpackNew  x  = WwUnpack NewType  False [x]
 wwPrim	    = WwPrim
 wwEnum	    = WwEnum
+
+seqDemand :: Demand -> ()
+seqDemand (WwLazy a)         = a `seq` ()
+seqDemand (WwUnpack nd b ds) = nd `seq` b `seq` seqDemands ds
+seqDemand other		     = ()
+
+seqDemands [] = ()
+seqDemands (d:ds) = seqDemand d `seq` seqDemands ds
 \end{code}
 
 

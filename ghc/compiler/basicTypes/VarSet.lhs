@@ -13,7 +13,7 @@ module VarSet (
 	intersectVarSet, intersectsVarSet,
 	isEmptyVarSet, delVarSet, delVarSetByKey,
 	minusVarSet, foldVarSet, filterVarSet,
-	lookupVarSet, mapVarSet,
+	lookupVarSet, mapVarSet, sizeVarSet, seqVarSet,
 
 	uniqAway
     ) where
@@ -58,6 +58,7 @@ lookupVarSet	:: VarSet -> Var -> Maybe Var
 			-- Returns the set element, which may be
 			-- (==) to the argument, but not the same as
 mapVarSet 	:: (Var -> Var) -> VarSet -> VarSet
+sizeVarSet	:: VarSet -> Int
 filterVarSet	:: (Var -> Bool) -> VarSet -> VarSet
 subVarSet	:: VarSet -> VarSet -> Bool
 
@@ -79,9 +80,15 @@ mkVarSet	= mkUniqSet
 foldVarSet	= foldUniqSet
 lookupVarSet	= lookupUniqSet
 mapVarSet	= mapUniqSet
+sizeVarSet	= sizeUniqSet
 filterVarSet	= filterUniqSet
 a `subVarSet` b = isEmptyVarSet (a `minusVarSet` b)
 delVarSetByKey	= delFromUFM_Directly	-- Can't be bothered to add this to UniqSet
+\end{code}
+
+\begin{code}
+seqVarSet :: VarSet -> ()
+seqVarSet s = sizeVarSet s `seq` ()
 \end{code}
 
 \begin{code}

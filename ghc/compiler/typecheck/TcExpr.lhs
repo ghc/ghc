@@ -377,9 +377,9 @@ tcMonoExpr (CCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
 \end{code}
 
 \begin{code}
-tcMonoExpr (HsSCC label expr) res_ty
+tcMonoExpr (HsSCC lbl expr) res_ty
   = tcMonoExpr expr res_ty		`thenTc` \ (expr', lie) ->
-    returnTc (HsSCC label expr', lie)
+    returnTc (HsSCC lbl expr', lie)
 
 tcMonoExpr (HsLet binds expr) res_ty
   = tcBindsAndThen
@@ -982,7 +982,7 @@ Errors and contexts
 Mini-utils:
 \begin{code}
 pp_nest_hang :: String -> SDoc -> SDoc
-pp_nest_hang label stuff = nest 2 (hang (text label) 4 stuff)
+pp_nest_hang lbl stuff = nest 2 (hang (text lbl) 4 stuff)
 \end{code}
 
 Boring and alphabetical:

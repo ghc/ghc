@@ -350,9 +350,9 @@ rnExpr (CCall fun args may_gc is_casm fake_result_ty)
     returnRn (CCall fun args' may_gc is_casm fake_result_ty, 
 	      fvs_args `addOneFV` cc `addOneFV` cr `addOneFV` io)
 
-rnExpr (HsSCC label expr)
+rnExpr (HsSCC lbl expr)
   = rnExpr expr	 	`thenRn` \ (expr', fvs_expr) ->
-    returnRn (HsSCC label expr', fvs_expr)
+    returnRn (HsSCC lbl expr', fvs_expr)
 
 rnExpr (HsCase expr ms src_loc)
   = pushSrcLocRn src_loc $
@@ -428,6 +428,21 @@ rnExpr (ArithSeqIn seq)
        rnExpr expr3	`thenRn` \ (expr3', fvExpr3) ->
        returnRn (FromThenTo expr1' expr2' expr3',
 		  plusFVs [fvExpr1, fvExpr2, fvExpr3])
+\end{code}
+
+These three are pattern syntax appearing in expressions.
+Since all the symbols are reservedops we can simply reject them.
+We return a (bogus) EWildPat in each case.
+
+\begin{code}
+rnExpr e@EWildPat = addErrRn (patSynErr e)	`thenRn_`
+		    returnRn (EWildPat, emptyFVs)
+
+rnExpr e@(EAsPat _ _) = addErrRn (patSynErr e)	`thenRn_`
+		        returnRn (EWildPat, emptyFVs)
+
+rnExpr e@(ELazyPat _) = addErrRn (patSynErr e)	`thenRn_`
+		        returnRn (EWildPat, emptyFVs)
 \end{code}
 
 %************************************************************************
@@ -833,4 +848,8 @@ patSigErr ty
 	$$ nest 4 (ptext SLIT("Use -fglasgow-exts to permit it"))
 
 pp_op (op, fix) = hcat [ppr op, space, parens (ppr fix)]
+
+patSynErr e 
+  = sep [ptext SLIT("Pattern syntax in expression context:"),
+	 nest 4 (ppr e)]
 \end{code}

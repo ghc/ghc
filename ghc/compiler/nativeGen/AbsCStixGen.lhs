@@ -74,17 +74,17 @@ Here we handle top-level things, like @CCodeBlock@s and
     -> UniqSM [StixTree]
  -}
 
- gentopcode (CCodeBlock label absC)
+ gentopcode (CCodeBlock lbl absC)
   = gencode absC				`thenUs` \ code ->
-    returnUs (StSegment TextSegment : StFunBegin label : code [StFunEnd label])
+    returnUs (StSegment TextSegment : StFunBegin lbl : code [StFunEnd lbl])
 
- gentopcode stmt@(CStaticClosure label _ _ _)
+ gentopcode stmt@(CStaticClosure lbl _ _ _)
   = genCodeStaticClosure stmt			`thenUs` \ code ->
-    returnUs (StSegment DataSegment : StLabel label : code [])
+    returnUs (StSegment DataSegment : StLabel lbl : code [])
 
- gentopcode stmt@(CRetVector label _ _ _)
+ gentopcode stmt@(CRetVector lbl _ _ _)
   = genCodeVecTbl stmt				`thenUs` \ code ->
-    returnUs (StSegment TextSegment : code [StLabel label])
+    returnUs (StSegment TextSegment : code [StLabel lbl])
 
  gentopcode stmt@(CRetDirect uniq absC srt liveness)
   = gencode absC				       `thenUs` \ code ->
@@ -150,7 +150,7 @@ Here we handle top-level things, like @CCodeBlock@s and
     :: AbstractC
     -> UniqSM StixTreeList
  -}
- genCodeVecTbl (CRetVector label amodes srt liveness)
+ genCodeVecTbl (CRetVector lbl amodes srt liveness)
   = genBitmapInfoTable liveness srt closure_type True `thenUs` \itbl ->
     returnUs (\xs -> vectbl : itbl xs)
   where

@@ -212,7 +212,10 @@ slurpFileExpandTabs fname = do
 
 trySlurp :: Handle -> Int -> Addr -> IO (Addr, Int)
 trySlurp handle sz_i chunk =
-#if __GLASGOW_HASKELL__ >= 303
+#if __GLASGOW_HASKELL__ == 303
+  wantReadableHandle "hGetChar" handle >>= \ handle_ ->
+  let fo = haFO__ handle_ in
+#elif __GLASGOW_HASKELL__ > 303
   wantReadableHandle "hGetChar" handle $ \ handle_ ->
   let fo = haFO__ handle_ in
 #else
@@ -276,7 +279,7 @@ reAllocMem :: Addr -> Int -> IO Addr
 reAllocMem ptr sz = do
    chunk <- _ccall_ realloc ptr sz
    if chunk == nullAddr 
-#if __GLASGOW_HASKELL__ < 303
+#ifndef __HASKELL98__
       then fail (userError "reAllocMem")
 #else
       then fail "reAllocMem"

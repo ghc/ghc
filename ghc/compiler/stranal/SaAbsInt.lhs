@@ -21,7 +21,7 @@ import CoreUnfold	( Unfolding, maybeUnfoldingTemplate )
 import PrimOp		( primOpStrictness )
 import Id		( Id, idType, getIdStrictness, getIdUnfolding )
 import Const		( Con(..) )
-import DataCon		( dataConTyCon, dataConArgTys )
+import DataCon		( dataConTyCon, splitProductType_maybe )
 import IdInfo		( StrictnessInfo(..) )
 import Demand		( Demand(..), wwPrim, wwStrict, wwEnum, wwUnpackData, 
 			  wwUnpackNew )
@@ -714,25 +714,27 @@ findRecDemand str_fn abs_fn ty
 
     else -- It's strict (or we're pretending it is)!
 
-       case (splitAlgTyConApp_maybe ty) of
+       case splitProductType_maybe ty of
 
-	 Nothing    -> wwStrict
+	 Nothing -> wwStrict	-- Could have a test for wwEnum, but
+				-- we don't exploit it yet, so don't bother
 
-	 Just (tycon,tycon_arg_tys,[data_con]) | isProductTyCon tycon ->
-	   -- Non-recursive, single constructor case
-	   let
-	      cmpnt_tys = dataConArgTys data_con tycon_arg_tys
-	      prod_len = length cmpnt_tys
-	   in
-
-	   if isNewTyCon tycon then	-- A newtype!
-		ASSERT( null (tail cmpnt_tys) )
+	 Just (tycon,_,data_con,cmpnt_tys) 	-- Non-recursive, single constructor case
+	   | isNewTyCon tycon 			-- A newtype!
+	   ->	ASSERT( null (tail cmpnt_tys) )
 		let
 		    demand = findRecDemand str_fn abs_fn (head cmpnt_tys)
 		in
 		wwUnpackNew demand
-	   else				-- A data type!
-	   let
+
+	   | null compt_strict_infos 		-- A nullary data type
+	   ->	wwStrict
+
+	   | otherwise				-- Some other data type
+	   ->	wwUnpackData compt_strict_infos
+
+	   where
+	      prod_len = length cmpnt_tys
 	      compt_strict_infos
 		= [ findRecDemand
 			 (\ cmpnt_val ->
@@ -743,21 +745,7 @@ findRecDemand str_fn abs_fn ty
 			 )
 		     cmpnt_ty
 		  | (cmpnt_ty, i) <- cmpnt_tys `zip` [1..] ]
-	   in
-	   if null compt_strict_infos then
-		 if isEnumerationTyCon tycon then wwEnum else wwStrict
-	   else
-		 wwUnpackData compt_strict_infos
 
-	 Just (tycon,_,_) ->
-		-- Multi-constr data types, *or* an abstract data
-		-- types, *or* things we don't have a way of conveying
-		-- the info over module boundaries (class ops,
-		-- superdict sels, dfns).
-	    if isEnumerationTyCon tycon then
-		wwEnum
-	    else
-		wwStrict
   where
     is_numeric_type ty
       = case (splitAlgTyConApp_maybe ty) of -- NB: duplicates stuff done above

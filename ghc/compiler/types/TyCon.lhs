@@ -273,10 +273,10 @@ isDataTyCon other = False
 isNewTyCon (AlgTyCon {algTyConFlavour = NewType}) = True 
 isNewTyCon other			          = False
 
--- A "product" tycon is non-recursive and has one constructor,
+-- A "product" tycon is non-recursive and has one constructor, and is *not* an unboxed tuple
 -- whether DataType or NewType
 isProductTyCon (AlgTyCon {dataCons = [c], algTyConRec = NonRecursive}) = True
-isProductTyCon (TupleTyCon {}) = True
+isProductTyCon (TupleTyCon { tyConBoxed = boxed }) = boxed
 isProductTyCon other = False
 
 isSynTyCon (SynTyCon {}) = True

@@ -377,13 +377,13 @@ path g v w    = w `elem` (reachable g v)
 
 \begin{code}
 bcc :: Graph -> Forest [Vertex]
-bcc g = (concat . map bicomps . map (label g dnum)) forest
+bcc g = (concat . map bicomps . map (do_label g dnum)) forest
  where forest = dff g
        dnum   = preArr (bounds g) forest
 
-label :: Graph -> Table Int -> Tree Vertex -> Tree (Vertex,Int,Int)
-label g dnum (Node v ts) = Node (v,dnum!v,lv) us
- where us = map (label g dnum) ts
+do_label :: Graph -> Table Int -> Tree Vertex -> Tree (Vertex,Int,Int)
+do_label g dnum (Node v ts) = Node (v,dnum!v,lv) us
+ where us = map (do_label g dnum) ts
        lv = minimum ([dnum!v] ++ [dnum!w | w <- g!v]
                      ++ [lu | Node (u,du,lu) xs <- us])
 

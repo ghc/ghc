@@ -16,7 +16,7 @@ find, unsurprisingly, a Core expression.
 module CoreUnfold (
 	Unfolding, UnfoldingGuidance, -- types
 
-	noUnfolding, mkUnfolding, 
+	noUnfolding, mkUnfolding, seqUnfolding,
 	mkOtherCon, otherCons,
 	unfoldingTemplate, maybeUnfoldingTemplate,
 	isEvaldUnfolding, isCheapUnfolding,
@@ -26,7 +26,7 @@ module CoreUnfold (
 	certainlySmallEnoughToInline, 
 	okToUnfoldInHiFile,
 
-	calcUnfoldingGuidance,
+	calcUnfoldingGuidance, 
 
 	callSiteInline, blackListed
     ) where
@@ -92,6 +92,11 @@ data Unfolding
 		Bool			-- exprIsValue template (cached); it is ok to discard a `seq` on
 					--	this variable
 		UnfoldingGuidance	-- Tells about the *size* of the template.
+
+seqUnfolding :: Unfolding -> ()
+seqUnfolding (CoreUnfolding e b1 b2 g)
+  = seqExpr e `seq` b1 `seq` b2 `seq` seqGuidance g
+seqUnfolding other = ()
 \end{code}
 
 \begin{code}
@@ -151,6 +156,9 @@ data UnfoldingGuidance
 			Int	-- Scrutinee discount: the discount to substract if the thing is in
 				-- a context (case (thing args) of ...),
 				-- (where there are the right number of arguments.)
+
+seqGuidance (UnfoldIfGoodArgs n ns a b) = n `seq` sum ns `seq` a `seq` b `seq` ()
+seqGuidance other			= ()
 \end{code}
 
 \begin{code}

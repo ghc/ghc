@@ -276,9 +276,9 @@ varsExpr (StgCon con args res_ty)
     varsAtoms args		`thenLne` \ (args', args_fvs) ->
     returnLne (StgCon con args' res_ty, args_fvs, getFVSet args_fvs)
 
-varsExpr (StgSCC label expr)
+varsExpr (StgSCC cc expr)
   = varsExpr expr		`thenLne` ( \ (expr2, fvs, escs) ->
-    returnLne (StgSCC label expr2, fvs, escs) )
+    returnLne (StgSCC cc expr2, fvs, escs) )
 \end{code}
 
 Cases require a little more real work.

@@ -20,21 +20,21 @@ import StgSyn		-- output
 import CoreUtils	( coreExprType )
 import SimplUtils	( findDefault )
 import CostCentre	( noCCS )
-import Id		( Id, mkSysLocal, idType, getIdStrictness, idUnique, isExportedId,
+import Id		( Id, mkSysLocal, idType, getIdStrictness, idUnique, isExportedId, mkVanillaId,
 			  externallyVisibleId, setIdUnique, idName, getIdDemandInfo, setIdType
 			)
 import Var		( Var, varType, modifyIdInfo )
-import IdInfo		( setDemandInfo, StrictnessInfo(..) )
+import IdInfo		( setDemandInfo, StrictnessInfo(..), zapIdInfoForStg )
 import UsageSPUtils     ( primOpUsgTys )
 import DataCon		( DataCon, dataConName, dataConId )
 import Demand		( Demand, isStrict, wwStrict, wwLazy )
-import Name	        ( Name, nameModule, isLocallyDefinedName )
+import Name	        ( Name, nameModule, isLocallyDefinedName, setNameUnique )
 import Module		( isDynamicModule )
 import Const	        ( Con(..), Literal(..), isLitLitLit, conStrictness, isWHNFCon )
 import VarEnv
 import PrimOp		( PrimOp(..), primOpUsg, primOpSig )
 import Type		( isUnLiftedType, isUnboxedTupleType, Type, splitFunTy_maybe,
-                          UsageAnn(..), tyUsg, applyTy, mkUsgTy, repType )
+                          UsageAnn(..), tyUsg, applyTy, mkUsgTy, repType, seqType )
 import TysPrim		( intPrimTy )
 import UniqSupply	-- all of it, really
 import Util		( lengthExceeds )
@@ -307,14 +307,17 @@ exprToRhs dem toplev (StgCon (DataCon con) args _)
        _         -> False
 
 exprToRhs dem _ expr
-	= StgRhsClosure noCCS		-- No cost centre (ToDo?)
-		        stgArgOcc	-- safe
+  = upd `seq` 
+    StgRhsClosure	noCCS		-- No cost centre (ToDo?)
+		  	stgArgOcc	-- safe
 			noSRT		-- figure out later
 			bOGUS_FVs
-			(if isOnceDem dem then SingleEntry else Updatable)
-				-- HA!  Paydirt for "dem"
+			upd
 			[]
 			expr
+  where
+    upd = if isOnceDem dem then SingleEntry else Updatable
+				-- HA!  Paydirt for "dem"
 
 isDynCon :: DataCon -> Bool
 isDynCon con = isDynName (dataConName con)
@@ -404,7 +407,7 @@ Simple cases first
 
 \begin{code}
 coreExprToStgFloat env (Var var) dem
-  = returnUs ([], StgApp (stgLookup env var) [])
+  = returnUs ([], mkStgApp (stgLookup env var) [])
 
 coreExprToStgFloat env (Let bind body) dem
   = coreBindToStg NotTopLevel env bind	`thenUs` \ (new_bind, new_env) ->
@@ -455,11 +458,11 @@ coreExprToStgFloat env expr@(Lam _ _) dem
     case stg_body' of
       StgLam ty lam_bndrs lam_body ->
 		-- If the body reduced to a lambda too, join them up
-	  returnUs ([], StgLam expr_ty (binders' ++ lam_bndrs) lam_body)
+	  returnUs ([], mkStgLam expr_ty (binders' ++ lam_bndrs) lam_body)
 
       other ->
 		-- Body didn't reduce to a lambda, so return one
-	  returnUs ([], StgLam expr_ty binders' stg_body')
+	  returnUs ([], mkStgLam expr_ty binders' stg_body')
 \end{code}
 
 
@@ -488,7 +491,7 @@ coreExprToStgFloat env expr@(App _ _) dem
       (Var fun_id, _) -> 	-- A function Id, so do an StgApp; it's ok if
 				-- there are no arguments.
 			    returnUs (arg_floats, 
-				      StgApp (stgLookup env fun_id) stg_args)
+				      mkStgApp (stgLookup env fun_id) stg_args)
 
       (non_var_fun, []) -> 	-- No value args, so recurse into the function
 			    ASSERT( null arg_floats )
@@ -498,7 +501,7 @@ coreExprToStgFloat env expr@(App _ _) dem
 		newStgVar (coreExprType fun)		`thenUs` \ fun_id ->
                 coreExprToStgFloat env fun onceDem	`thenUs` \ (fun_floats, stg_fun) ->
 		returnUs (NonRecF fun_id stg_fun onceDem fun_floats : arg_floats,
-			  StgApp fun_id stg_args)
+			  mkStgApp fun_id stg_args)
 
   where
 	-- Collect arguments and demands (*in reverse order*)
@@ -557,6 +560,7 @@ speed.
 \begin{code}
 coreExprToStgFloat env expr@(Con con args) dem
   = let 
+	expr_ty     = coreExprType expr
         (stricts,_) = conStrictness con
         onces = case con of
                     DEFAULT   -> panic "coreExprToStgFloat: DEFAULT"
@@ -586,7 +590,7 @@ coreExprToStgFloat env expr@(Con con args) dem
        _                                -> returnUs con
     )                                                     `thenUs` \ con' ->
 
-    returnUs (arg_floats, StgCon con' stg_atoms (coreExprType expr))
+    returnUs (arg_floats, mkStgCon con' stg_atoms expr_ty)
 \end{code}
 
 
@@ -654,7 +658,7 @@ coreExprToStgFloat env
   = coreExprToStgFloat env scrut (bdrDem bndr)	`thenUs` \ (binds, scrut') ->
     newEvaldLocalId env bndr			`thenUs` \ (env', bndr') ->
     coreExprToStg env' default_rhs dem 		`thenUs` \ default_rhs' ->
-    returnUs (binds, mkStgCase scrut' bndr' (StgPrimAlts (idType bndr) [] (StgBindDefault default_rhs')))
+    returnUs (binds, mkStgCase scrut' bndr' (StgPrimAlts (idType bndr') [] (StgBindDefault default_rhs')))
   where
     (other_alts, maybe_default) = findDefault alts
     Just default_rhs		= maybe_default
@@ -676,16 +680,17 @@ coreExprToStgFloat env (Case scrut bndr alts) dem
       | prim_case
       = default_to_stg env deflt		`thenUs` \ deflt' ->
 	mapUs (prim_alt_to_stg env) alts	`thenUs` \ alts' ->
-	returnUs (StgPrimAlts scrut_ty alts' deflt')
+	returnUs (mkStgPrimAlts scrut_ty alts' deflt')
 
       | otherwise
       = default_to_stg env deflt		`thenUs` \ deflt' ->
 	mapUs (alg_alt_to_stg env) alts		`thenUs` \ alts' ->
-	returnUs (StgAlgAlts scrut_ty alts' deflt')
+	returnUs (mkStgAlgAlts scrut_ty alts' deflt')
 
     alg_alt_to_stg env (DataCon con, bs, rhs)
-	  = coreExprToStg env rhs dem   `thenUs` \ stg_rhs ->
-	    returnUs (con, filter isId bs, [ True | b <- bs ]{-bogus use mask-}, stg_rhs)
+	  = newLocalIds NotTopLevel env (filter isId bs)	`thenUs` \ (env', stg_bs) -> 
+	    coreExprToStg env' rhs dem  		 	`thenUs` \ stg_rhs ->
+	    returnUs (con, stg_bs, [ True | b <- stg_bs ]{-bogus use mask-}, stg_rhs)
 		-- NB the filter isId.  Some of the binders may be
 		-- existential type variables, which STG doesn't care about
 
@@ -726,10 +731,12 @@ Invent a fresh @Id@:
 newStgVar :: Type -> UniqSM Id
 newStgVar ty
  = getUniqueUs	 		`thenUs` \ uniq ->
+   seqType ty			`seq`
    returnUs (mkSysLocal SLIT("stg") uniq ty)
 \end{code}
 
 \begin{code}
+{- 	Now redundant, I believe
 -- we overload the demandInfo field of an Id to indicate whether the Id is definitely
 -- evaluated or not (i.e. whether it is a case binder).  This can be used to eliminate
 -- some redundant cases (c.f. dataToTag# above).
@@ -741,22 +748,35 @@ newEvaldLocalId env id
       new_env = extendVarEnv env id id'
     in
     returnUs (new_env, id')
+-}
 
+newEvaldLocalId env id = newLocalId NotTopLevel env id
 
 newLocalId TopLevel env id
-  = returnUs (env, id)
   -- Don't clone top-level binders.  MkIface relies on their
   -- uniques staying the same, so it can snaffle IdInfo off the
   -- STG ids to put in interface files.	
+  = let
+      name = idName id
+      ty   = idType id
+    in
+    name		`seq`
+    seqType ty		`seq`
+    returnUs (env, mkVanillaId name ty)
+
 
 newLocalId NotTopLevel env id
   =	-- Local binder, give it a new unique Id.
     getUniqueUs			`thenUs` \ uniq ->
     let
-      id'     = setIdUnique id uniq
-      new_env = extendVarEnv env id id'
+      name    = idName id
+      ty      = idType id
+      new_id  = mkVanillaId (setNameUnique name uniq) ty
+      new_env = extendVarEnv env id new_id
     in
-    returnUs (new_env, id')
+    name		`seq`
+    seqType ty		`seq`
+    returnUs (new_env, new_id)
 
 newLocalIds :: TopLevelFlag -> StgEnv -> [Id] -> UniqSM (StgEnv, [Id])
 newLocalIds top_lev env []
@@ -768,6 +788,23 @@ newLocalIds top_lev env (b:bs)
 \end{code}
 
 
+%************************************************************************
+%*									*
+\subsection{Building STG syn}
+%*									*
+%************************************************************************
+
+\begin{code}
+mkStgAlgAlts  ty alts deflt = seqType ty `seq` StgAlgAlts  ty alts deflt
+mkStgPrimAlts ty alts deflt = seqType ty `seq` StgPrimAlts ty alts deflt
+mkStgCon con args ty	    = seqType ty `seq` StgCon con args ty
+mkStgLam ty bndrs body	    = seqType ty `seq` StgLam ty bndrs body
+
+mkStgApp :: Id -> [StgArg] -> StgExpr
+mkStgApp fn args = fn `seq` StgApp fn args
+	-- Force the lookup
+\end{code}
+
 \begin{code}
 -- Stg doesn't have a lambda *expression*, 
 deStgLam (StgLam ty bndrs body) = mkStgLamExpr ty bndrs body
@@ -776,7 +813,7 @@ deStgLam expr		        = returnUs expr
 mkStgLamExpr ty bndrs body
   = ASSERT( not (null bndrs) )
     newStgVar ty		`thenUs` \ fn ->
-    returnUs (StgLet (StgNonRec fn lam_closure) (StgApp fn []))
+    returnUs (StgLet (StgNonRec fn lam_closure) (mkStgApp fn []))
   where
     lam_closure = StgRhsClosure noCCS
 				stgArgOcc

@@ -22,6 +22,12 @@ module CoreSyn (
 
 	isValArg, isTypeArg, valArgCount, valBndrCount,
 
+	-- Seq stuff
+	seqRules, seqExpr, seqExprs, 
+
+	-- Size
+	coreBindsSize,
+
 	-- Annotated expressions
 	AnnExpr, AnnExpr'(..), AnnBind(..), AnnAlt, deAnnotate,
 
@@ -37,9 +43,9 @@ import TysWiredIn	( boolTy, stringTy, nilDataCon )
 import CostCentre	( CostCentre, isDupdCC, noCostCentre )
 import Var		( Var, Id, TyVar, IdOrTyVar, isTyVar, isId, idType )
 import VarEnv
-import Id		( mkWildId, getInlinePragma )
-import Type		( Type, UsageAnn, mkTyVarTy, isUnLiftedType )
-import IdInfo		( InlinePragInfo(..) )
+import Id		( mkWildId, getInlinePragma, idInfo )
+import Type		( Type, UsageAnn, mkTyVarTy, isUnLiftedType, seqType )
+import IdInfo		( InlinePragInfo(..), megaSeqIdInfo )
 import Const	        ( Con(..), DataCon, Literal(NoRepStr), PrimOp )
 import TysWiredIn	( trueDataCon, falseDataCon )
 import VarSet
@@ -379,6 +385,85 @@ valArgCount :: [Arg b] -> Int
 valArgCount []		    = 0
 valArgCount (Type _ : args) = valArgCount args
 valArgCount (other  : args) = 1 + valArgCount args
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Seq stuff}
+%*									*
+%************************************************************************
+
+\begin{code}
+seqExpr :: CoreExpr -> ()
+seqExpr (Var v)       = v `seq` ()
+seqExpr (Con c as)    = seqExprs as
+seqExpr (App f a)     = seqExpr f `seq` seqExpr a
+seqExpr (Lam b e)     = seqBndr b `seq` seqExpr e
+seqExpr (Let b e)     = seqBind b `seq` seqExpr e
+seqExpr (Case e b as) = seqExpr e `seq` seqBndr b `seq` seqAlts as
+seqExpr (Note n e)    = seqNote n `seq` seqExpr e
+seqExpr (Type t)      = seqType t
+
+seqExprs [] = ()
+seqExprs (e:es) = seqExpr e `seq` seqExprs es
+
+seqNote (Coerce t1 t2) = seqType t1 `seq` seqType t2
+seqNote other	       = ()
+
+seqBndr b = b `seq` ()
+
+seqBndrs [] = ()
+seqBndrs (b:bs) = seqBndr b `seq` seqBndrs bs
+
+seqBind (NonRec b e) = seqBndr b `seq` seqExpr e
+seqBind (Rec prs)    = seqPairs prs
+
+seqPairs [] = ()
+seqPairs ((b,e):prs) = seqBndr b `seq` seqExpr e `seq` seqPairs prs
+
+seqAlts [] = ()
+seqAlts ((c,bs,e):alts) = seqBndrs bs `seq` seqExpr e `seq` seqAlts alts
+
+seqRules :: CoreRules -> ()
+seqRules (Rules rules fvs) = seq_rules rules `seq` seqVarSet fvs
+
+seq_rules [] = ()
+seq_rules (Rule fs bs es e : rules) = seqBndrs bs `seq` seqExprs (e:es) `seq` seq_rules rules
+\end{code}
+
+\begin{code}
+coreBindsSize :: [CoreBind] -> Int
+coreBindsSize bs = foldr ((+) . bindSize) 0 bs
+
+exprSize :: CoreExpr -> Int
+	-- A measure of the size of the expressions
+	-- It also forces the expression pretty drastically as a side effect
+exprSize (Var v)       = varSize v 
+exprSize (Con c as)    = c `seq` exprsSize as
+exprSize (App f a)     = exprSize f + exprSize a
+exprSize (Lam b e)     = varSize b + exprSize e
+exprSize (Let b e)     = bindSize b + exprSize e
+exprSize (Case e b as) = exprSize e + varSize b + foldr ((+) . altSize) 0  as
+exprSize (Note n e)    = exprSize e
+exprSize (Type t)      = seqType t `seq` 1
+
+exprsSize = foldr ((+) . exprSize) 0 
+
+varSize :: IdOrTyVar -> Int
+varSize b | isTyVar b = 1
+	  | otherwise = seqType (idType b)		`seq`
+			megaSeqIdInfo (idInfo b) 	`seq`
+			1
+
+varsSize = foldr ((+) . varSize) 0
+
+bindSize (NonRec b e) = varSize b + exprSize e
+bindSize (Rec prs)    = foldr ((+) . pairSize) 0 prs
+
+pairSize (b,e) = varSize b + exprSize e
+
+altSize (c,bs,e) = c `seq` varsSize bs + exprSize e
 \end{code}
 
 

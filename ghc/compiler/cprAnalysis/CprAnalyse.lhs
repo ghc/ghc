@@ -15,10 +15,9 @@ import Var		( Var, Id, TyVar, idType, varName, varType )
 import Id               ( setIdCprInfo, getIdCprInfo, getIdUnfolding )
 import IdInfo           ( CprInfo(..) )
 import VarEnv
-import Type             ( Type(..), splitFunTys, splitForAllTys, splitTyConApp_maybe,
-                          splitAlgTyConApp_maybe ) 
+import Type             ( Type(..), splitFunTys, splitForAllTys, splitNewType_maybe ) 
 import TyCon            ( isProductTyCon, isNewTyCon, isUnLiftedTyCon )
-import DataCon          ( dataConTyCon, dataConArgTys )
+import DataCon          ( dataConTyCon, splitProductType_maybe )
 import Const            ( Con(DataCon), isWHNFCon )
 import Util		( zipEqual, zipWithEqual )
 import Outputable
@@ -317,23 +316,16 @@ pinCPR v e av = case av of
 
 filterAbsTuple :: (AbsVal, Type) -> AbsVal
 filterAbsTuple (av@(Tuple args), ty) 
-    = case split_ty of
-      Nothing -> Top
-      Just (data_con, tycon, tycon_arg_tys, inst_con_arg_tys) ->
-          if isNewTyCon tycon then
-            ASSERT ( null $ tail inst_con_arg_tys )
-            filterAbsTuple (av, head inst_con_arg_tys)
-          else 
-            Tuple $ map filterAbsTuple $ zipEqual "cprFilter" args inst_con_arg_tys  
-    where
-    split_ty = case splitAlgTyConApp_maybe ty of
-      	       Just (arg_tycon, tycon_arg_tys, [data_con]) ->
-	       -- The main event: a single-constructor data type
-		   Just (data_con, arg_tycon, tycon_arg_tys, dataConArgTys data_con tycon_arg_tys)
-	       Just (_, _, data_cons) ->
-		   pprPanic "cprFilter:" (text "not one constructor" $$ ppr ty)
-	       -- hmmm, Isn't this a panic too?
-	       Nothing	->  Nothing
+  = case splitProductType_maybe ty of
+      Nothing -> WARN( True, text "filterAbsTuple" <+> ppr ty)	-- Or should it be a panic?
+		 Top		
+      Just (tycon, _, data_con, inst_con_arg_tys)
+          |  isNewTyCon tycon 
+          -> ASSERT ( null $ tail inst_con_arg_tys )
+             filterAbsTuple (av, head inst_con_arg_tys)
+          |  otherwise
+          -> Tuple $ map filterAbsTuple $ zipEqual "cprFilter" args inst_con_arg_tys  
+
 filterAbsTuple (av, _) = av
 
 absToCprInfo :: AbsVal -> CprInfo
@@ -376,23 +368,15 @@ splitTypeToFunArgAndRes ty = (tyvars, argtys, resty)
 -- Taken from splitFunTys in Type.lhs.  Modified to keep searching through newtypes
 -- Should move to Type.lhs if it is doing something sensible.
 splitFunTysIgnoringNewTypes :: Type -> ([Type], Type)
-splitFunTysIgnoringNewTypes ty = split [] ty ty
+splitFunTysIgnoringNewTypes ty = split ty
   where
-    split args orig_ty (FunTy arg res) = split (arg:args) res res
-    split args orig_ty (NoteTy _ ty)   = split args orig_ty ty
-    split args orig_ty ty 
-	= case splitAlgTyConApp_maybe ty of
-      	  Just (arg_tycon, tycon_arg_tys, [data_con]) ->
-	      let [inst_con_arg_ty] = dataConArgTys data_con tycon_arg_tys in
-		  if (isNewTyCon arg_tycon) then
-		     {- pprTrace "splitFunTysIgnoringNewTypes:" 
-		                 (ppr arg_tycon <+> text "from type" <+> ppr inst_con_arg_ty) 
-		     -}
-                          (split args orig_ty inst_con_arg_ty)
-		  else
-		     (reverse args, orig_ty)
-	  Nothing -> (reverse args, orig_ty)
-
+    split ty = case splitNewType_maybe res of
+		 Nothing     -> (args, res)
+		 Just rep_ty -> (args ++ args', res')
+			     where
+				(args', res') = split rep_ty
+	     where
+		(args, res) = splitFunTys ty
 
 -- Is this the constructor for a product type (i.e. algebraic, single constructor) 
 isConProdType :: Con -> Bool

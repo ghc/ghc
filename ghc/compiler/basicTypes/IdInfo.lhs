@@ -10,7 +10,7 @@ Haskell. [WDP 94/11])
 module IdInfo (
 	IdInfo,		-- Abstract
 
-	vanillaIdInfo, mkIdInfo,
+	vanillaIdInfo, mkIdInfo, seqIdInfo, megaSeqIdInfo,
 
 	-- Flavour
 	IdFlavour(..), flavourInfo, 
@@ -57,7 +57,7 @@ module IdInfo (
         CprInfo(..), cprInfo, setCprInfo, ppCprInfo, noCprInfo,
 
 	-- Zapping
- 	zapLamIdInfo, zapFragileIdInfo,
+ 	zapLamIdInfo, zapFragileIdInfo, zapIdInfoForStg,
 
         -- Lambda-bound variable info
         LBVarInfo(..), lbvarInfo, setLBVarInfo, noLBVarInfo
@@ -66,13 +66,13 @@ module IdInfo (
 #include "HsVersions.h"
 
 
-import {-# SOURCE #-} CoreUnfold ( Unfolding, noUnfolding, hasUnfolding )
-import {-# SOURCE #-} CoreSyn	 ( CoreExpr, CoreRules, emptyCoreRules, isEmptyCoreRules )
+import {-# SOURCE #-} CoreUnfold ( Unfolding, noUnfolding, hasUnfolding, seqUnfolding )
+import {-# SOURCE #-} CoreSyn	 ( CoreExpr, CoreRules, emptyCoreRules, isEmptyCoreRules, seqRules )
 import {-# SOURCE #-} Const	 ( Con )
 
 import Var              ( Id )
 import FieldLabel	( FieldLabel )
-import Demand		( Demand, isStrict, isLazy, wwLazy, pprDemands )
+import Demand		( Demand, isStrict, isLazy, wwLazy, pprDemands, seqDemand, seqDemands )
 import Type             ( UsageAnn )
 import Outputable	
 import Maybe            ( isJust )
@@ -121,21 +121,47 @@ data IdInfo
 	cafInfo		:: CafInfo,
 	cprInfo 	:: CprInfo,             -- Function always constructs a product result
         lbvarInfo	:: LBVarInfo,		-- Info about a lambda-bound variable
-	inlinePragInfo	:: !InlinePragInfo	-- Inline pragmas
+	inlinePragInfo	:: InlinePragInfo	-- Inline pragmas
     }
+
+seqIdInfo :: IdInfo -> ()
+seqIdInfo (IdInfo {}) = ()
+
+megaSeqIdInfo :: IdInfo -> ()
+megaSeqIdInfo info
+  = seqFlavour (flavourInfo info) 	`seq`
+    seqArity (arityInfo info)		`seq`
+    seqDemand (demandInfo info)		`seq`
+    seqRules (specInfo info)		`seq`
+    seqStrictness (strictnessInfo info)	`seq`
+    seqWorker (workerInfo info)		`seq`
+
+--    seqUnfolding (unfoldingInfo info)	`seq`
+-- Omitting this improves runtimes a little, presumably because
+-- some unfoldings are not calculated at all
+
+    seqCaf (cafInfo info)		`seq`
+    seqCpr (cprInfo info)		`seq`
+    seqLBVar (lbvarInfo info)		`seq`
+    seqInlinePrag (inlinePragInfo info) 
 \end{code}
 
 Setters
 
 \begin{code}
+setWorkerInfo     info wk = wk `seq` info { workerInfo = wk }
+setSpecInfo 	  info sp = sp `seq` info { specInfo = sp }
+setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
+setStrictnessInfo info st = st `seq` info { strictnessInfo = st }
+	-- Try to avoid spack leaks by seq'ing
+
+setUnfoldingInfo  info uf = info { unfoldingInfo = uf }
+	-- We do *not* seq on the unfolding info, For some reason, doing so 
+	-- actually increases residency significantly. 
+
 setUpdateInfo	  info ud = info { updateInfo = ud }
 setDemandInfo	  info dd = info { demandInfo = dd }
-setStrictnessInfo info st = info { strictnessInfo = st }
-setWorkerInfo     info wk = info { workerInfo = wk }
-setSpecInfo 	  info sp = info { specInfo = sp }
 setArityInfo	  info ar = info { arityInfo = ar  }
-setInlinePragInfo info pr = info { inlinePragInfo = pr }
-setUnfoldingInfo  info uf = info { unfoldingInfo = uf }
 setCafInfo        info cf = info { cafInfo = cf }
 setCprInfo        info cp = info { cprInfo = cp }
 setLBVarInfo      info lb = info { lbvarInfo = lb }
@@ -229,6 +255,9 @@ ppFlavourInfo (ConstantId _)  = ptext SLIT("[Constr]")
 ppFlavourInfo (RecordSelId _) = ptext SLIT("[RecSel]")
 ppFlavourInfo SpecPragmaId    = ptext SLIT("[SpecPrag]")
 ppFlavourInfo NoDiscardId     = ptext SLIT("[NoDiscard]")
+
+seqFlavour :: IdFlavour -> ()
+seqFlavour f = f `seq` ()
 \end{code}
 
 The @SpecPragmaId@ exists only to make Ids that are
@@ -257,6 +286,9 @@ data ArityInfo
   = UnknownArity	-- No idea
   | ArityExactly Int	-- Arity is exactly this
   | ArityAtLeast Int	-- Arity is this or greater
+
+seqArity :: ArityInfo -> ()
+seqArity a = arityLowerBound a `seq` ()
 
 exactArity   = ArityExactly
 atLeastArity = ArityAtLeast
@@ -306,6 +338,12 @@ data InlinePragInfo
 
   | IMustBeINLINEd	-- Absolutely must inline; used for PrimOps and
 			-- constructors only.
+
+seqInlinePrag :: InlinePragInfo -> ()
+seqInlinePrag (ICanSafelyBeINLINEd occ alts) 
+  = occ `seq` alts `seq` ()
+seqInlinePrag other
+  = ()
 
 instance Outputable InlinePragInfo where
   ppr NoInlinePragInfo  	= empty
@@ -367,6 +405,10 @@ data StrictnessInfo
 				-- BUT NB: f = \x y. error "urk"
 				-- 	   will have info  SI [SS] True
 				-- but still (f) and (f 2) are not bot; only (f 3 2) is bot
+
+seqStrictness :: StrictnessInfo -> ()
+seqStrictness (StrictnessInfo ds b) = b `seq` seqDemands ds
+seqStrictness other		    = ()
 \end{code}
 
 \begin{code}
@@ -413,6 +455,10 @@ type WorkerInfo = Maybe Id
 mkWorkerInfo :: Id -> WorkerInfo
 mkWorkerInfo wk_id = Just wk_id
 -}
+
+seqWorker :: WorkerInfo -> ()
+seqWorker (Just id) = id `seq` ()
+seqWorker Nothing   = ()
 
 ppWorkerInfo Nothing      = empty
 ppWorkerInfo (Just wk_id) = ptext SLIT("__P") <+> ppr wk_id
@@ -479,6 +525,8 @@ data CafInfo
 -- LATER: not sure how easy this is...
 --      | OneCafRef Id
 
+
+seqCaf c = c `seq` ()
 
 ppCafInfo NoCafRefs = ptext SLIT("__C")
 ppCafInfo MayHaveCafRefs = empty
@@ -569,6 +617,13 @@ zapLamIdInfo info@(IdInfo {inlinePragInfo = inline_prag, demandInfo = demand})
 				other -> inline_prag
 \end{code}
 
+\begin{code}
+zapIdInfoForStg :: IdInfo -> IdInfo
+	-- Return only the info needed for STG stuff
+	-- Namely, nothing, I think
+zapIdInfoForStg info = vanillaIdInfo	
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -616,6 +671,13 @@ data CprInfo
 \end{code}
 
 \begin{code}
+seqCpr :: CprInfo -> ()
+seqCpr (CPRInfo cs) = seqCprs cs
+seqCpr NoCPRInfo    = ()
+
+seqCprs [] = ()
+seqCprs (c:cs) = seqCpr c `seq` seqCprs cs
+
 
 noCprInfo       = NoCPRInfo
 
@@ -658,6 +720,8 @@ data LBVarInfo
 				-- HACK ALERT! placing this info here is a short-term hack,
 				--   but it minimises changes to the rest of the compiler.
 				--   Hack agreed by SLPJ/KSW 1999-04.
+
+seqLBVar l = l `seq` ()
 \end{code}
 
 \begin{code}

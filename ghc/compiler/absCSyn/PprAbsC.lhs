@@ -318,16 +318,16 @@ pprAbsC stmt@(CCallTypedef op@(CCallOp op_str is_asm may_gc cconv) results args)
 	let nvrs = grab_non_void_amodes results
 	in ASSERT (length nvrs <= 1) nvrs
 
-pprAbsC (CCodeBlock label abs_C) _
+pprAbsC (CCodeBlock lbl abs_C) _
   = if not (maybeToBool(nonemptyAbsC abs_C)) then
-	pprTrace "pprAbsC: curious empty code block for" (pprCLabel label) empty
+	pprTrace "pprAbsC: curious empty code block for" (pprCLabel lbl) empty
     else
     case (pprTempAndExternDecls abs_C) of { (pp_temps, pp_exts) ->
     vcat [
-	hcat [text (if (externallyVisibleCLabel label)
+	hcat [text (if (externallyVisibleCLabel lbl)
 			  then "FN_("	-- abbreviations to save on output
 			  else "IFN_("),
-		   pprCLabel label, text ") {"],
+		   pprCLabel lbl, text ") {"],
 
 	pp_exts, pp_temps,
 
@@ -498,18 +498,18 @@ pprAbsC stmt@(CRetDirect uniq code srt liveness) _
 		   LvSmall _ -> SLIT("RET_SMALL")
 		   LvLarge _ -> SLIT("RET_BIG")
 
-pprAbsC stmt@(CRetVector label amodes srt liveness) _
+pprAbsC stmt@(CRetVector lbl amodes srt liveness) _
   = case (pprTempAndExternDecls stmt) of { (_, pp_exts) ->
     vcat [
 	pp_exts,
 	hcat [
 	  ptext SLIT("VEC_INFO_") <> int size,
 	  lparen, 
-	  pprCLabel label, comma,
+	  pprCLabel lbl, comma,
 	  pp_liveness liveness, comma,	-- bitmap liveness mask
 	  pp_srt_info srt,		-- SRT
 	  ptext type_str, comma,
-	  ppLocalness label, comma
+	  ppLocalness lbl, comma
 	],
 	nest 2 (sep (punctuate comma (map ppr_item amodes))),
 	text ");"
@@ -530,8 +530,8 @@ pprAbsC (CCostCentreStackDecl ccs)    _ = pprCostCentreStackDecl ccs
 \end{code}
 
 \begin{code}
-ppLocalness label
-  = if (externallyVisibleCLabel label) 
+ppLocalness lbl
+  = if (externallyVisibleCLabel lbl) 
 		then empty 
 		else ptext SLIT("static ")
 
@@ -1137,7 +1137,7 @@ ppr_amode (CReg magic_id) = pprMagicId magic_id
 
 ppr_amode (CTemp uniq kind) = char '_' <> pprUnique uniq <> char '_'
 
-ppr_amode (CLbl label kind) = pprCLabelAddr label 
+ppr_amode (CLbl lbl kind) = pprCLabelAddr lbl 
 
 ppr_amode (CCharLike ch)
   = hcat [ptext SLIT("CHARLIKE_CLOSURE"), char '(', pprAmode ch, rparen ]
@@ -1409,11 +1409,11 @@ tempSeenTE uniq env@(seen_uniqs, seen_labels)
 	  False)
 
 labelSeenTE :: CLabel -> TeM Bool
-labelSeenTE label env@(seen_uniqs, seen_labels)
-  = if (label `elementOfCLabelSet` seen_labels)
+labelSeenTE lbl env@(seen_uniqs, seen_labels)
+  = if (lbl `elementOfCLabelSet` seen_labels)
     then (env, True)
     else ((seen_uniqs,
-	  addToCLabelSet seen_labels label),
+	  addToCLabelSet seen_labels lbl),
 	  False)
 \end{code}
 
@@ -1466,7 +1466,7 @@ ppr_decls_AbsC (CSwitch discrim alts deflt)
   where
     ppr_alt_stuff (_, absC) = ppr_decls_AbsC absC
 
-ppr_decls_AbsC (CCodeBlock label absC)
+ppr_decls_AbsC (CCodeBlock lbl absC)
   = ppr_decls_AbsC absC
 
 ppr_decls_AbsC (CInitHdr cl_info reg_rel cost_centre)
@@ -1550,13 +1550,13 @@ ppr_decls_Amode (CTemp uniq kind)
 	returnTE
 	  (if temp_seen then Nothing else Just (pprTempDecl uniq kind), Nothing)
 
-ppr_decls_Amode (CLbl label VoidRep)
+ppr_decls_Amode (CLbl lbl VoidRep)
   = returnTE (Nothing, Nothing)
 
-ppr_decls_Amode (CLbl label kind)
-  = labelSeenTE label `thenTE` \ label_seen ->
+ppr_decls_Amode (CLbl lbl kind)
+  = labelSeenTE lbl `thenTE` \ label_seen ->
     returnTE (Nothing,
-	      if label_seen then Nothing else Just (pprExternDecl False{-not in an SRT decl-} label))
+	      if label_seen then Nothing else Just (pprExternDecl False{-not in an SRT decl-} lbl))
 
 ppr_decls_Amode (CMacroExpr _ _ amodes)
   = ppr_decls_Amodes amodes

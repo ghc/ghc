@@ -19,7 +19,7 @@ import Id		( Id, idType, mkSysLocal, getIdDemandInfo, setIdDemandInfo,
 			)
 import IdInfo		( CprInfo(..), noCprInfo, vanillaIdInfo )
 import Const		( Con(..), DataCon )
-import DataCon		( dataConArgTys )
+import DataCon		( splitProductType_maybe )
 import Demand		( Demand(..) )
 import PrelInfo		( realWorldPrimId, aBSENT_ERROR_ID )
 import TysPrim		( realWorldStatePrimTy )
@@ -27,7 +27,7 @@ import TysWiredIn	( unboxedTupleCon, unboxedTupleTyCon )
 import Type		( isUnLiftedType, mkTyVarTys, mkTyVarTy, mkFunTys,
 			  splitForAllTys, splitFunTys, splitFunTysN,
 			  splitAlgTyConApp_maybe, splitAlgTyConApp,
-			  mkTyConApp, newTypeRep, isNewType,
+			  mkTyConApp, splitNewType_maybe,
 			  Type
 			)
 import TyCon            ( isNewTyCon,
@@ -312,16 +312,10 @@ where R' is the representation type for R.
 
 \begin{code}
 mkWWcoerce body_ty 
-  | not (isNewType body_ty)
-  = (id, id)
-
-  | otherwise
-  = (wrap_fn . mkNote (Coerce body_ty rep_ty),
-     mkNote (Coerce rep_ty body_ty) . work_fn)
-  where
-    (tycon, args, _)   = splitAlgTyConApp body_ty
-    rep_ty 	       = newTypeRep tycon args
-    (wrap_fn, work_fn) = mkWWcoerce rep_ty
+  = case splitNewType_maybe body_ty of
+	Nothing     -> (id, id)
+	Just rep_ty -> (mkNote (Coerce body_ty rep_ty),
+		        mkNote (Coerce rep_ty body_ty))
 \end{code}    
 
 
@@ -396,21 +390,7 @@ mk_ww (arg : ds)
 	          mk_unpk_case new_or_data arg unpk_args data_con arg_tycon . wrap_fn,
 		  work_fn . mk_pk_let new_or_data arg data_con tycon_arg_tys unpk_args)
 	where
-    	  inst_con_arg_tys = dataConArgTys data_con tycon_arg_tys
-	  (arg_tycon, tycon_arg_tys, data_con)
-	     = case (splitAlgTyConApp_maybe (idType arg)) of
-
-	     	 Just (arg_tycon, tycon_arg_tys, [data_con]) ->
-			     -- The main event: a single-constructor data type
-			     (arg_tycon, tycon_arg_tys, data_con)
-
-	    	 Just (_, _, data_cons) ->
-			pprPanic "mk_ww_arg_processing:" 
-				 (text "not one constr (interface files not consistent/up to date?)"
-				  $$ (ppr arg <+> ppr (idType arg)))
-
-	         Nothing		->
-			panic "mk_ww_arg_processing: not datatype"
+	  (arg_tycon, tycon_arg_tys, data_con, inst_con_arg_tys) = splitProductType "mk_ww" (idType arg)
 
 	-- Other cases
       other_demand ->
@@ -512,7 +492,7 @@ mk_cpr_case (ty, cpr_info@(CPRInfo ci_args))
       in
         returnUs (id_id, new_tup, new_exp_case)
     where
-      (data_con, tycon, tycon_arg_tys, inst_con_arg_tys) = splitType "mk_cpr_case" ty
+      (tycon, tycon_arg_tys, data_con, inst_con_arg_tys) = splitProductType "mk_cpr_case" ty
       from_type = head inst_con_arg_tys
       -- if coerced from a function 'look through' to find result type
       target_of_from_type = (snd.splitFunTys.snd.splitForAllTys) from_type
@@ -570,29 +550,16 @@ mk_cpr_let (ty, cpr_info@(CPRInfo ci_args))
       in
         returnUs (id_id, new_tup, new_exp)
     where
-      (data_con, tycon, tycon_arg_tys, inst_con_arg_tys) = splitType "mk_cpr_let" ty
+      (tycon, tycon_arg_tys, data_con, inst_con_arg_tys) = splitProductType "mk_cpr_let" ty
       from_type = head inst_con_arg_tys
       -- if coerced from a function 'look through' to find result type
       target_of_from_type = (snd.splitFunTys.snd.splitForAllTys) from_type
 
 
-splitType :: String -> Type -> (DataCon, TyCon, [Type], [Type])
-splitType fname ty = (data_con, tycon, tycon_arg_tys, dataConArgTys data_con tycon_arg_tys) 
-    where
-      (data_con, tycon, tycon_arg_tys)
-	  = case (splitAlgTyConApp_maybe ty) of
-      	      Just (arg_tycon, tycon_arg_tys, [data_con]) ->
-		    -- The main event: a single-constructor data type
-		   (data_con, arg_tycon, tycon_arg_tys)
-
-	      Just (_, _, data_cons) ->
-		   pprPanic (fname ++ ":") 
-			    (text "not one constr (interface files not consistent/up to date?)"
-			    $$ ppr ty)
-
-	      Nothing		->
-		   pprPanic (fname ++ ":") 
-                            (text "not a datatype" $$ ppr ty)
+splitProductType :: String -> Type -> (TyCon, [Type], DataCon, [Type])
+splitProductType fname ty = case splitProductType_maybe ty of
+				Just stuff -> stuff
+				Nothing    -> pprPanic (fname ++ ": not a product") (ppr ty)
 \end{code}
 
 

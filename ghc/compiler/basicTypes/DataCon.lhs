@@ -9,12 +9,12 @@ module DataCon (
 	ConTag, fIRST_TAG,
 	mkDataCon,
 	dataConType, dataConSig, dataConName, dataConTag,
-	dataConOrigArgTys, dataConArgTys, dataConTyCon,
+	dataConArgTys, dataConTyCon,
 	dataConRawArgTys, dataConAllRawArgTys,
 	dataConFieldLabels, dataConStrictMarks, dataConSourceArity,
 	dataConNumFields, dataConNumInstArgs, dataConId, dataConRepStrictness,
 	isNullaryDataCon, isTupleCon, isUnboxedTupleCon,
-	isExistentialDataCon,
+	isExistentialDataCon, splitProductType_maybe,
 
 	StrictnessMark(..), 	-- Representation visible to MkId only
 	markedStrict, notMarkedStrict, markedUnboxed, maybeMarkedUnboxed
@@ -32,10 +32,10 @@ import Type		( Type, ThetaType, TauType,
 			  splitAlgTyConApp_maybe
 			)
 import PprType
-import TyCon		( TyCon, tyConDataCons, isDataTyCon,
+import TyCon		( TyCon, tyConDataCons, isDataTyCon, isProductTyCon,
 			  isTupleTyCon, isUnboxedTupleTyCon )
 import Class		( classTyCon )
-import Name		( Name, NamedThing(..), nameUnique, isLocallyDefinedName )
+import Name		( Name, NamedThing(..), nameUnique, isLocallyDefined )
 import Var		( TyVar, Id )
 import FieldLabel	( FieldLabel )
 import BasicTypes	( Arity )
@@ -44,6 +44,7 @@ import Outputable
 import Unique		( Unique, Uniquable(..) )
 import CmdLineOpts	( opt_UnboxStrictFields )
 import UniqSet
+import Maybes		( maybeToBool )
 import Maybe
 import Util		( assoc )
 \end{code}
@@ -246,75 +247,7 @@ mk_dict_strict_mark (clas,tys)
 	-- Don't mark newtype things as strict!
     isDataTyCon (classTyCon clas) = MarkedStrict
   | otherwise		          = NotMarkedStrict
-
--- We attempt to unbox/unpack a strict field when either:
---   (i)  The tycon is imported, and the field is marked '! !', or
---   (ii) The tycon is defined in this module, the field is marked '!', 
---	  and the -funbox-strict-fields flag is on.
---
--- This ensures that if we compile some modules with -funbox-strict-fields and
--- some without, the compiler doesn't get confused about the constructor
--- representations.
-
-unbox_strict_arg_ty :: TyCon -> StrictnessMark -> Type -> (StrictnessMark, [Type])
-unbox_strict_arg_ty tycon NotMarkedStrict ty 
-  = (NotMarkedStrict, [ty])
-unbox_strict_arg_ty tycon MarkedStrict ty 
-  | not opt_UnboxStrictFields
-  || not (isLocallyDefinedName (getName tycon)) = (MarkedStrict, [ty])
-unbox_strict_arg_ty tycon marked_unboxed ty
-  -- MarkedUnboxed || (MarkedStrict && opt_UnboxStrictFields && not imported)
-  = case splitAlgTyConApp_maybe ty of
-	Just (tycon,_,[])
-	   -> panic (showSDoc (hcat [
-			text "unbox_strict_arg_ty: constructors for ",
-			ppr tycon,
-			text " not available."
-		     ]))
-	Just (tycon,ty_args,[con]) 
-	   -> case maybe_unpack_fields emptyUniqSet 
-		     (zip (dataConOrigArgTys con ty_args) 
-			  (dcUserStricts con))
-	      of 
-		 Nothing  -> (MarkedStrict, [ty])
-	         Just tys -> (MarkedUnboxed con tys, tys)
-	_ -> (MarkedStrict, [ty])
-
--- bail out if we encounter the same tycon twice.  This avoids problems like
---
---   data A = !B
---   data B = !A
---
--- where no useful unpacking can be done.
-
-maybe_unpack_field :: UniqSet TyCon -> Type -> StrictnessMark -> Maybe [Type]
-maybe_unpack_field set ty NotMarkedStrict
-  = Just [ty]
-maybe_unpack_field set ty MarkedStrict | not opt_UnboxStrictFields
-  = Just [ty]
-maybe_unpack_field set ty strict
-  = case splitAlgTyConApp_maybe ty of
-	Just (tycon,ty_args,[con])
-		-- loop breaker
-	   | tycon `elementOfUniqSet` set -> Nothing
-		-- don't unpack constructors with existential tyvars
-	   | not (null ex_tyvars) -> Nothing
-		-- ok, let's do it
-	   | otherwise ->
-		let set' = addOneToUniqSet set tycon in
-		maybe_unpack_fields set' 
-		    (zip (dataConOrigArgTys con ty_args)
-			 (dcUserStricts con))
-	   where (_, _, ex_tyvars, _, _, _) = dataConSig con
-	_ -> Just [ty]
-
-maybe_unpack_fields :: UniqSet TyCon -> [(Type,StrictnessMark)] -> Maybe [Type]
-maybe_unpack_fields set tys
-  | all isJust unpacked_fields = Just (concat (catMaybes unpacked_fields))
-  | otherwise = Nothing
-  where unpacked_fields = map (\(ty,str) -> maybe_unpack_field set ty str) tys
 \end{code}
-
 
 \begin{code}
 dataConName :: DataCon -> Name
@@ -363,7 +296,7 @@ dataConSig (MkData {dcTyVars = tyvars, dcTheta = theta,
 		     dcOrigArgTys = arg_tys, dcTyCon = tycon})
   = (tyvars, theta, ex_tyvars, ex_theta, arg_tys, tycon)
 
-dataConArgTys, dataConOrigArgTys :: DataCon 
+dataConArgTys :: DataCon 
 	      -> [Type] 	-- Instantiated at these types
 				-- NB: these INCLUDE the existentially quantified arg types
 	      -> [Type]		-- Needs arguments of these types
@@ -371,11 +304,6 @@ dataConArgTys, dataConOrigArgTys :: DataCon
 				--     but EXCLUDE the data-decl context which is discarded
 
 dataConArgTys (MkData {dcRepArgTys = arg_tys, dcTyVars = tyvars, 
-		       dcExTyVars = ex_tyvars, dcExTheta = ex_theta}) inst_tys
- = map (substTy (mkTyVarSubst (tyvars ++ ex_tyvars) inst_tys)) 
-       ([mkDictTy cls tys | (cls,tys) <- ex_theta] ++ arg_tys)
-
-dataConOrigArgTys (MkData {dcOrigArgTys = arg_tys, dcTyVars = tyvars, 
 		       dcExTyVars = ex_tyvars, dcExTheta = ex_theta}) inst_tys
  = map (substTy (mkTyVarSubst (tyvars ++ ex_tyvars) inst_tys)) 
        ([mkDictTy cls tys | (cls,tys) <- ex_theta] ++ arg_tys)
@@ -421,3 +349,72 @@ isUnboxedTupleCon (MkData {dcTyCon = tc}) = isUnboxedTupleTyCon tc
 isExistentialDataCon :: DataCon -> Bool
 isExistentialDataCon (MkData {dcExTyVars = tvs}) = not (null tvs)
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Splitting products}
+%*									*
+%************************************************************************
+
+\begin{code}	
+splitProductType_maybe
+	:: Type 			-- A product type, perhaps
+	-> Maybe (TyCon, 		-- The type constructor
+		  [Type],		-- Type args of the tycon
+		  DataCon,		-- The data constructor
+		  [Type])		-- Its *representation* arg types
+
+	-- Returns (Just ...) for any 
+	--	single-constructor
+	--	non-recursive type
+	--	not existentially quantified
+	-- type whether a data type or a new type
+	--
+	-- Rejecing existentials is conservative.  Maybe some things
+	-- could be made to work with them, but I'm not going to sweat
+	-- it through till someone finds it's important.
+
+splitProductType_maybe ty
+  = case splitAlgTyConApp_maybe ty of
+	Just (tycon,ty_args,[data_con]) 
+	   | isProductTyCon tycon && 		-- Checks for non-recursive
+	     not (isExistentialDataCon data_con)
+	   -> Just (tycon, ty_args, data_con, data_con_arg_tys)
+	   where
+	      data_con_arg_tys = map (substTy (mkTyVarSubst (dcTyVars data_con) ty_args)) 
+				     (dcRepArgTys data_con)
+	other -> Nothing
+
+
+-- We attempt to unbox/unpack a strict field when either:
+--   (i)  The tycon is imported, and the field is marked '! !', or
+--   (ii) The tycon is defined in this module, the field is marked '!', 
+--	  and the -funbox-strict-fields flag is on.
+--
+-- This ensures that if we compile some modules with -funbox-strict-fields and
+-- some without, the compiler doesn't get confused about the constructor
+-- representations.
+
+unbox_strict_arg_ty :: TyCon -> StrictnessMark -> Type -> (StrictnessMark, [Type])
+
+unbox_strict_arg_ty tycon strict_mark ty
+  | case strict_mark of 
+	NotMarkedStrict   -> False
+	MarkedUnboxed _ _ -> True
+	MarkedStrict      -> opt_UnboxStrictFields && 
+			     isLocallyDefined tycon &&
+			     maybeToBool maybe_product &&
+			     isDataTyCon arg_tycon
+	-- We can't look through newtypes in arguments (yet)
+  = (MarkedUnboxed con arg_tys, arg_tys)
+
+  | otherwise
+  = (strict_mark, [ty])
+
+  where
+    maybe_product = splitProductType_maybe ty
+    Just (arg_tycon, _, con, arg_tys) = maybe_product
+\end{code}
+
+

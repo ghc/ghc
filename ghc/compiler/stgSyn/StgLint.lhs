@@ -224,6 +224,7 @@ lintAlgAlt scrut_ty (con, args, _, rhs)
       Just (tycon, tys_applied, cons) ->
 	 let
 	   arg_tys = dataConArgTys con tys_applied
+		-- This almost certainly does not work for existential constructors
 	 in
 	 checkL (con `elem` cons) (mkAlgAltMsg2 scrut_ty con) `thenL_`
 	 checkL (length arg_tys == length args) (mkAlgAltMsg3 con args)

@@ -1,3 +1,5 @@
 __interface IdInfo 1 0 where
-__export IdInfo IdInfo ;
+__export IdInfo IdInfo seqIdInfo ;
 1 data IdInfo ;
+1 seqIdInfo :: IdInfo -> PrelBase.Z0T ;
+

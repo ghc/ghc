@@ -663,7 +663,7 @@ cloneVar NotTopLevel (lvl_env, subst_env) v lvl
     let
       subst	 = mkSubst emptyVarSet subst_env
       v'	 = setVarUnique v uniq
-      v''	 = modifyIdInfo (substIdInfo subst) v'
+      v''	 = modifyIdInfo (\info -> substIdInfo subst info info) v'
       subst_env' = extendSubstEnv subst_env v (DoneEx (Var v''))
       lvl_env'   = extendVarEnv lvl_env v lvl
     in
@@ -677,7 +677,7 @@ cloneVars NotTopLevel (lvl_env, subst_env) vs lvl
     let
       subst	 = mkSubst emptyVarSet subst_env'
       vs'	 = zipWith setVarUnique vs uniqs
-      vs''	 = map (modifyIdInfo (substIdInfo subst)) vs'
+      vs''	 = map (modifyIdInfo (\info -> substIdInfo subst info info)) vs'
       subst_env' = extendSubstEnvList subst_env vs [DoneEx (Var v'') | v'' <- vs'']
       lvl_env'   = extendVarEnvList lvl_env (vs `zip` repeat lvl)
     in

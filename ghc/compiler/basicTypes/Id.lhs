@@ -18,7 +18,7 @@ module Id (
 
 	-- Modifying an Id
 	setIdName, setIdUnique, setIdType, setIdNoDiscard, 
-	setIdInfo, modifyIdInfo, maybeModifyIdInfo,
+	setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
 
 	-- Predicates
 	omitIfaceSigForId,
@@ -70,11 +70,11 @@ import Var		( Id, DictId,
 			  isId, mkIdVar,
 			  idName, idType, idUnique, idInfo,
 			  setIdName, setVarType, setIdUnique, 
-			  setIdInfo, modifyIdInfo, maybeModifyIdInfo,
+			  setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
 			  externallyVisibleId
 			)
 import VarSet
-import Type		( Type, tyVarsOfType, typePrimRep, addFreeTyVars )
+import Type		( Type, tyVarsOfType, typePrimRep, addFreeTyVars, seqType )
 import IdInfo
 import Demand		( Demand, isStrict, wwLazy )
 import Name	 	( Name, OccName,
@@ -170,7 +170,7 @@ idFreeTyVars id = tyVarsOfType (idType id)
 
 setIdType :: Id -> Type -> Id
 	-- Add free tyvar info to the type
-setIdType id ty = setVarType id (addFreeTyVars ty)
+setIdType id ty = seqType ty `seq` setVarType id (addFreeTyVars ty)
 
 idPrimRep :: Id -> PrimRep
 idPrimRep id = typePrimRep (idType id)

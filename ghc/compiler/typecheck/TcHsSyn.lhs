@@ -41,7 +41,7 @@ import HsSyn	-- oodles of it
 
 -- others:
 import Id	( idName, idType, setIdType, omitIfaceSigForId, Id )
-import DataCon	( DataCon, dataConArgTys )	
+import DataCon	( DataCon, splitProductType_maybe )	
 import TcEnv	( tcLookupValueMaybe, tcExtendGlobalValEnv, tcGetValueEnv,
 		  ValueEnv, TcId, tcInstId
 		)
@@ -138,13 +138,11 @@ DsCCall.lhs.
 \begin{code}
 maybeBoxedPrimType :: Type -> Maybe (DataCon, Type)
 maybeBoxedPrimType ty
-  = case splitAlgTyConApp_maybe ty of					-- Data type,
-      Just (tycon, tys_applied, [data_con]) | isDataTyCon tycon 	-- with exactly one constructor
-        -> case (dataConArgTys data_con tys_applied) of
-	     [data_con_arg_ty]			    	-- Applied to exactly one type,
-	        | isUnLiftedType data_con_arg_ty 	-- which is primitive
-	        -> Just (data_con, data_con_arg_ty)
-	     other_cases -> Nothing
+  = case splitProductType_maybe ty of				-- Product data type
+      Just (tycon, tys_applied, data_con, [data_con_arg_ty]) 	-- constr has one arg
+         | isUnLiftedType data_con_arg_ty 			-- which is primitive
+	 -> Just (data_con, data_con_arg_ty)
+
       other_cases -> Nothing
 \end{code}
 
@@ -453,9 +451,9 @@ zonkExpr (CCall fun args may_gc is_casm result_ty)
     zonkTcTypeToType result_ty	`thenNF_Tc` \ new_result_ty ->
     returnNF_Tc (CCall fun new_args may_gc is_casm new_result_ty)
 
-zonkExpr (HsSCC label expr)
+zonkExpr (HsSCC lbl expr)
   = zonkExpr expr	`thenNF_Tc` \ new_expr ->
-    returnNF_Tc (HsSCC label new_expr)
+    returnNF_Tc (HsSCC lbl new_expr)
 
 zonkExpr (TyLam tyvars expr)
   = mapNF_Tc zonkTcTyVarToTyVar tyvars	`thenNF_Tc` \ new_tyvars ->

@@ -39,7 +39,7 @@ import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
 import CmdLineOpts	( opt_GlasgowExts, opt_AllowUndecidableInstances )
 import Class		( classBigSig, Class )
 import Var		( idName, idType, Id, TyVar )
-import DataCon		( isNullaryDataCon, dataConArgTys, dataConId )
+import DataCon		( isNullaryDataCon, splitProductType_maybe, dataConId )
 import Maybes 		( maybeToBool, catMaybes, expectJust )
 import MkId		( mkDictFunId )
 import Module		( ModuleName )
@@ -564,16 +564,13 @@ ccallable_type   ty = isUnLiftedType ty ||				-- Allow CCallable Int# etc
 		      ty == stringTy ||
 		      byte_arr_thing
   where
-    byte_arr_thing = case splitAlgTyConApp_maybe ty of
-			Just (tycon, ty_args, [data_con]) | isDataTyCon tycon -> 
-		     		length data_con_arg_tys == 2 &&
+    byte_arr_thing = case splitProductType_maybe ty of
+			Just (tycon, ty_args, data_con, [data_con_arg_ty1, data_con_arg_ty2]) ->
 				maybeToBool maybe_arg2_tycon &&
 				(arg2_tycon == byteArrayPrimTyCon ||
 				 arg2_tycon == mutableByteArrayPrimTyCon)
 			     where
-				data_con_arg_tys = dataConArgTys data_con ty_args
-				(data_con_arg_ty1 : data_con_arg_ty2 : _) = data_con_arg_tys
-				maybe_arg2_tycon = splitTyConApp_maybe data_con_arg_ty2
+				maybe_arg2_tycon    = splitTyConApp_maybe data_con_arg_ty2
 				Just (arg2_tycon,_) = maybe_arg2_tycon
 
 			other -> False

@@ -12,7 +12,7 @@ module CoreLint (
 
 #include "HsVersions.h"
 
-import IO	( hPutStr, stderr )
+import IO	( hPutStr, hPutStrLn, stderr )
 
 import CmdLineOpts      ( opt_D_show_passes, opt_DoCoreLinting, opt_PprStyle_Debug )
 import CoreSyn
@@ -60,7 +60,7 @@ and do Core Lint when necessary.
 beginPass :: String -> IO ()
 beginPass pass_name
   | opt_D_show_passes
-  = hPutStr stderr ("*** " ++ pass_name ++ "\n")
+  = hPutStrLn stderr ("*** " ++ pass_name)
   | otherwise
   = return ()
 
@@ -68,6 +68,13 @@ beginPass pass_name
 endPass :: String -> Bool -> [CoreBind] -> IO [CoreBind]
 endPass pass_name dump_flag binds
   = do 
+	-- Report result size if required
+	-- This has the side effect of forcing the intermediate to be evaluated
+	if opt_D_show_passes then
+	   hPutStrLn stderr ("    Result size = " ++ show (coreBindsSize binds))
+	 else
+	   return ()
+
 	-- Report verbosely, if required
 	dumpIfSet dump_flag pass_name
 		  (pprCoreBindings binds)

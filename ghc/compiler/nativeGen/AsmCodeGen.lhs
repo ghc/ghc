@@ -339,8 +339,8 @@ fltFix1 locs (StAssign rep dst src) = panic "fltFix1: StAssign"
 
 fltFix1 locs (StJump tree) = StJump (fltFix1 locs tree)
 
-fltFix1 locs (StCondJump label tree) =
-  StCondJump label (fltFix1 locs tree)
+fltFix1 locs (StCondJump lbl tree) =
+  StCondJump lbl (fltFix1 locs tree)
 
 fltFix1 locs (StPrim op trees) = 
   StPrim op (map (fltFix1 locs) trees)

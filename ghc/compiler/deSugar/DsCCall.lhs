@@ -27,7 +27,7 @@ import Const		( Con(..) )
 import Maybes		( maybeToBool )
 import PrelInfo		( packStringForCId )
 import PrimOp		( PrimOp(..) )
-import DataCon		( DataCon, dataConId, dataConArgTys )
+import DataCon		( DataCon, dataConId, splitProductType_maybe )
 import CallConv
 import Type		( isUnLiftedType, splitAlgTyConApp_maybe, mkFunTys,
 			  splitTyConApp_maybe, Type
@@ -84,7 +84,7 @@ dsCCall :: FAST_STRING	-- C routine to invoke
 	-> Type		-- Type of the result (a boxed-prim IO type)
 	-> DsM CoreExpr
 
-dsCCall label args may_gc is_asm result_ty
+dsCCall lbl args may_gc is_asm result_ty
   = newSysLocalDs realWorldStatePrimTy	`thenDs` \ old_s ->
 
     mapAndUnzipDs unboxArg args	`thenDs` \ (unboxed_args, arg_wrappers) ->
@@ -98,7 +98,7 @@ dsCCall label args may_gc is_asm result_ty
 	-- it at the full type, including the state argument
 	inst_ty = mkFunTys (map coreExprType val_args) final_result_ty
 
-	the_ccall_op = CCallOp (Left label) is_asm may_gc cCallConv
+	the_ccall_op = CCallOp (Left lbl) is_asm may_gc cCallConv
  	the_prim_app = mkPrimApp the_ccall_op final_args
 
 	the_body = foldr ($) (res_wrapper the_prim_app) arg_wrappers
@@ -134,12 +134,8 @@ unboxArg arg
 	      \body -> Case (App (Var packStringForCId) arg) 
 			    prim_arg [(DEFAULT,[],body)])
 
-  | null data_cons
-    -- oops: we can't see the data constructors!!!
-  = can'tSeeDataConsPanic "argument" arg_ty
-
   -- Byte-arrays, both mutable and otherwise; hack warning
-  | is_data_type &&
+  | is_product_type &&
     length data_con_arg_tys == 2 &&
     maybeToBool maybe_arg2_tycon &&
     (arg2_tycon ==  byteArrayPrimTyCon ||
@@ -148,7 +144,7 @@ unboxArg arg
   = newSysLocalDs arg_ty		`thenDs` \ case_bndr ->
     newSysLocalsDs data_con_arg_tys	`thenDs` \ vars@[ixs_var, arr_cts_var] ->
     returnDs (Var arr_cts_var,
-	      \ body -> Case arg case_bndr [(DataCon the_data_con,vars,body)]
+	      \ body -> Case arg case_bndr [(DataCon data_con,vars,body)]
     )
 
   -- Data types with a single constructor, which has a single, primitive-typed arg
@@ -168,13 +164,10 @@ unboxArg arg
     maybe_boxed_prim_arg_ty = maybeBoxedPrimType arg_ty
     (Just (box_data_con, the_prim_arg_ty)) = maybe_boxed_prim_arg_ty
 
-    maybe_data_type 			   = splitAlgTyConApp_maybe arg_ty
-    is_data_type			   = maybeToBool maybe_data_type
-    (Just (tycon, tycon_arg_tys, data_cons)) = maybe_data_type
-    (the_data_con : other_data_cons)       = data_cons
-
-    data_con_arg_tys = dataConArgTys the_data_con tycon_arg_tys
-    (data_con_arg_ty1 : data_con_arg_ty2 : _) = data_con_arg_tys
+    maybe_product_type 			   	  = splitProductType_maybe arg_ty
+    is_product_type			   	  = maybeToBool maybe_product_type
+    Just (tycon, _, data_con, data_con_arg_tys)   = maybe_product_type
+    (data_con_arg_ty1 : data_con_arg_ty2 : _)	  = data_con_arg_tys
 
     maybe_arg2_tycon = splitTyConApp_maybe data_con_arg_ty2
     Just (arg2_tycon,_) = maybe_arg2_tycon
@@ -193,13 +186,8 @@ boxResult :: Type			-- Type of desired result
 		  CoreExpr -> CoreExpr)	-- Wrapper for the ccall
 					-- to box the result
 boxResult result_ty
-  | null data_cons
-  -- oops! can't see the data constructors
-  = can'tSeeDataConsPanic "result" result_ty
-
   -- Data types with a single nullary constructor
-  | (maybeToBool maybe_data_type) &&				-- Data type
-    (null other_data_cons) &&					-- Just one constr
+  | (maybeToBool maybe_product_type) &&				-- Data type
     (null data_con_arg_tys)
   =
     newSysLocalDs realWorldStatePrimTy		`thenDs` \ prim_state_id ->
@@ -222,8 +210,7 @@ boxResult result_ty
     )
 
   -- Data types with a single constructor, which has a single, primitive-typed arg
-  | (maybeToBool maybe_data_type) &&				-- Data type
-    (null other_data_cons) &&					-- Just one constr
+  | (maybeToBool maybe_product_type) &&				-- Data type
     not (null data_con_arg_tys) && null other_args_tys	&& 	-- Just one arg
     isUnLiftedType the_prim_result_ty				-- of primitive type
   =
@@ -232,7 +219,7 @@ boxResult result_ty
     newSysLocalDs ccall_res_type 		`thenDs` \ case_bndr ->
 
     let
-	the_result = mkConApp the_data_con (map Type tycon_arg_tys ++ [Var prim_result_id])
+	the_result = mkConApp data_con (map Type tycon_arg_tys ++ [Var prim_result_id])
 	the_pair   = mkConApp unboxedPairDataCon
 				[Type realWorldStatePrimTy, Type result_ty, 
 				 Var prim_state_id, the_result]
@@ -244,52 +231,39 @@ boxResult result_ty
   | otherwise
   = pprPanic "boxResult: " (ppr result_ty)
   where
-    maybe_data_type 			   = splitAlgTyConApp_maybe result_ty
-    Just (tycon, tycon_arg_tys, data_cons) = maybe_data_type
-    (the_data_con : other_data_cons)       = data_cons
-    ccall_res_type = mkUnboxedTupleTy 2 
-			[realWorldStatePrimTy, the_prim_result_ty]
+    maybe_product_type 					    = splitProductType_maybe result_ty
+    Just (tycon, tycon_arg_tys, data_con, data_con_arg_tys) = maybe_product_type
+    (the_prim_result_ty : other_args_tys)		    = data_con_arg_tys
 
-    data_con_arg_tys		           = dataConArgTys the_data_con tycon_arg_tys
-    (the_prim_result_ty : other_args_tys)  = data_con_arg_tys
+    ccall_res_type = mkUnboxedTupleTy 2 [realWorldStatePrimTy, the_prim_result_ty]
 
 -- wrap up an unboxed value.
 wrapUnboxedValue :: Type -> DsM (Type, Id, CoreExpr)
 wrapUnboxedValue ty
-  | null data_cons
-      -- oops! can't see the data constructors
-  = can'tSeeDataConsPanic "result" ty
-    -- Data types with a single constructor, which has a single, primitive-typed arg
-  | (maybeToBool maybe_data_type) &&				-- Data type
-    (null other_data_cons) &&					-- Just one constr
+  | (maybeToBool maybe_product_type) &&				-- Data type
     not (null data_con_arg_tys) && null other_args_tys	&& 	-- Just one arg
     isUnLiftedType the_prim_result_ty				-- of primitive type
   =
     newSysLocalDs the_prim_result_ty 		         `thenDs` \ prim_result_id ->
     let
-	the_result = mkConApp the_data_con (map Type tycon_arg_tys ++ [Var prim_result_id])
+	the_result = mkConApp data_con (map Type tycon_arg_tys ++ [Var prim_result_id])
     in
     returnDs (ccall_res_type, prim_result_id, the_result)
 
   -- Data types with a single nullary constructor
-  | (maybeToBool maybe_data_type) &&				-- Data type
-    (null other_data_cons) &&					-- Just one constr
+  | (maybeToBool maybe_product_type) &&				-- Data type
     (null data_con_arg_tys)
   =
     let unit = dataConId unitDataCon
 	scrut_ty = mkUnboxedTupleTy 1 [realWorldStatePrimTy]
     in
     returnDs (scrut_ty, unit, mkConApp unitDataCon [])
+
   | otherwise
   = pprPanic "boxResult: " (ppr ty)
  where
-   maybe_data_type			  = splitAlgTyConApp_maybe ty
-   Just (tycon, tycon_arg_tys, data_cons) = maybe_data_type
-   (the_data_con : other_data_cons)       = data_cons
-   ccall_res_type = mkUnboxedTupleTy 2 
-			[realWorldStatePrimTy, the_prim_result_ty]
-
-   data_con_arg_tys		          = dataConArgTys the_data_con tycon_arg_tys
-   (the_prim_result_ty : other_args_tys)  = data_con_arg_tys
-
+   maybe_product_type		      			   = splitProductType_maybe ty
+   Just (tycon, tycon_arg_tys, data_con, data_con_arg_tys) = maybe_product_type
+   (the_prim_result_ty : other_args_tys)  		   = data_con_arg_tys
+   ccall_res_type = mkUnboxedTupleTy 2 [realWorldStatePrimTy, the_prim_result_ty]
 \end{code}

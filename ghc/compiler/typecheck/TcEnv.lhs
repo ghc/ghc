@@ -33,7 +33,7 @@ import HsTypes	( HsTyVar, getTyVarName )
 import Id	( mkUserLocal, isDataConId_maybe )
 import MkId 	( mkSpecPragmaId )
 import Var	( TyVar, Id, setVarName,
-		  idType, setIdInfo, idInfo, tyVarKind
+		  idType, lazySetIdInfo, idInfo, tyVarKind
 		)
 import TcType	( TcType, TcTyVar, TcTyVarSet, TcThetaType,
 		  tcInstTyVars, zonkTcTyVars,
@@ -396,7 +396,7 @@ tcAddImportedIdInfo unf_env id
 				-- have explicit local definitions, so we get a black hole!
   = id
   | otherwise
-  = id `setIdInfo` new_info
+  = id `lazySetIdInfo` new_info
 	-- The Id must be returned without a data dependency on maybe_id
   where
     new_info = -- pprTrace "tcAdd" (ppr id) $

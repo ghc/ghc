@@ -32,7 +32,8 @@ module Subst (
 #include "HsVersions.h"
 
 import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr, CoreBndr,
-			  CoreRules(..), CoreRule(..), emptyCoreRules, isEmptyCoreRules
+			  CoreRules(..), CoreRule(..), 
+			  emptyCoreRules, isEmptyCoreRules, seqRules
 			)
 import CoreFVs		( exprFreeVars )
 import Type		( Type(..), ThetaType, TyNote(..), 
@@ -284,6 +285,7 @@ subst_expr subst expr
     go (Var v) = case lookupSubst subst v of
 		    Just (DoneEx e')      -> e'
 		    Just (ContEx env' e') -> subst_expr (setSubstEnv subst env') e'
+--	NO!  NO!  SLPJ 14 July 99
 		    Nothing 		  -> case lookupInScope subst v of
 						Just v' -> Var v'
 						Nothing -> Var v
@@ -292,6 +294,8 @@ subst_expr subst expr
 			-- is called from the simplifier, the type inside the *occurrences*
 			-- of a variable may not be right; we should replace it with the
 			-- binder, from the in_scope set.
+
+--		    Nothing -> Var v
 
     go (Type ty)      = Type (go_ty ty)
     go (Con con args) = Con con (map go args)
@@ -392,7 +396,7 @@ substAndCloneId subst@(Subst in_scope env) us old_id
   where
     id_ty    = idType old_id
     id1 | noTypeSubst env || isEmptyVarSet (tyVarsOfType id_ty) = old_id
-        | otherwise 						  = setIdType old_id (substTy subst id_ty)
+        | otherwise 						= setIdType old_id (substTy subst id_ty)
 
     id2 	 = maybeModifyIdInfo zapFragileIdInfo id1
     new_id	 = setVarUnique id2 (uniqFromSupply us1)
@@ -407,20 +411,35 @@ substAndCloneId subst@(Subst in_scope env) us old_id
 %************************************************************************
 
 \begin{code}
-substIdInfo :: Subst -> IdInfo -> IdInfo
-substIdInfo subst info
+substIdInfo :: Subst 
+	    -> IdInfo		-- Get un-substituted ones from here
+	    -> IdInfo		-- Substitute it and add it to here
+	    -> IdInfo		-- To give this
+	-- Seq'ing on the returned IdInfo is enough to cause all the 
+	-- substitutions to happen completely
+
+substIdInfo subst old_info new_info
   = info2
   where 
-    info1 | isEmptyCoreRules old_rules = info
-	  | otherwise		       = info `setSpecInfo` substRules subst old_rules
+    info1 | isEmptyCoreRules old_rules = new_info
+	  | otherwise		       = new_info `setSpecInfo` new_rules
+			-- setSpecInfo does a seq
+	  where
+	    new_rules = substRules subst old_rules
  
     info2 | not (workerExists old_wrkr) = info1
-	  | otherwise			= info1 `setWorkerInfo` substWorker subst old_wrkr
+	  | otherwise			= info1 `setWorkerInfo` new_wrkr
+			-- setWorkerInfo does a seq
+	  where
+	    new_wrkr = substWorker subst old_wrkr
 
-    old_rules = specInfo   info
-    old_wrkr  = workerInfo info
+    old_rules = specInfo   old_info
+    old_wrkr  = workerInfo old_info
 
 substWorker :: Subst -> WorkerInfo -> WorkerInfo
+	-- Seq'ing on the returned WorkerInfo is enough to cause all the 
+	-- substitutions to happen completely
+
 substWorker subst Nothing
   = Nothing
 substWorker subst (Just w)
@@ -433,10 +452,18 @@ substWorker subst (Just w)
 				  Nothing	-- Ditto
 			
 substRules :: Subst -> CoreRules -> CoreRules
+	-- Seq'ing on the returned CoreRules is enough to cause all the 
+	-- substitutions to happen completely
+
+substRules subst rules
+ | isEmptySubst subst = rules
+
 substRules subst (Rules rules rhs_fvs)
-  = Rules (map do_subst rules)
-	  (subst_fvs (substEnv subst) rhs_fvs)
+  = seqRules new_rules `seq` new_rules
   where
+    new_rules = Rules (map do_subst rules)
+		      (subst_fvs (substEnv subst) rhs_fvs)
+
     do_subst (Rule name tpl_vars lhs_args rhs)
 	= Rule name tpl_vars' 
 	       (map (substExpr subst') lhs_args)

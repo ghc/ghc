@@ -568,7 +568,6 @@ data Tick
   | FillInCaseDefault		Id	-- Case binder
 
   | BottomFound		
-  | LeafVisit
   | SimplifierDone		-- Ticked at each iteration of the simplifier
 
 isRuleFired (RuleFired _) = True
@@ -599,7 +598,6 @@ tickToTag (CaseElim _)			= 11
 tickToTag (CaseIdentity _)		= 12
 tickToTag (FillInCaseDefault _)		= 13
 tickToTag BottomFound			= 14
-tickToTag LeafVisit			= 15
 tickToTag SimplifierDone		= 16
 
 tickString :: Tick -> String
@@ -619,7 +617,6 @@ tickString (CaseIdentity _)		= "CaseIdentity"
 tickString (FillInCaseDefault _)	= "FillInCaseDefault"
 tickString BottomFound			= "BottomFound"
 tickString SimplifierDone		= "SimplifierDone"
-tickString LeafVisit			= "LeafVisit"
 
 pprTickCts :: Tick -> SDoc
 pprTickCts (PreInlineUnconditionally v)	= ppr v

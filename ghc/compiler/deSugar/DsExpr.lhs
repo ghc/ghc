@@ -309,9 +309,9 @@ dsExpr (SectionR op expr)
     returnDs (bindNonRec y_id y_core $
 	      Lam x_id (mkApps core_op [Var x_id, Var y_id]))
 
-dsExpr (CCall label args may_gc is_asm result_ty)
+dsExpr (CCall lbl args may_gc is_asm result_ty)
   = mapDs dsExpr args		`thenDs` \ core_args ->
-    dsCCall label core_args may_gc is_asm result_ty
+    dsCCall lbl core_args may_gc is_asm result_ty
 	-- dsCCall does all the unboxification, etc.
 
 dsExpr (HsSCC cc expr)
@@ -543,6 +543,7 @@ dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
 
 	mk_alt con
 	  = newSysLocalsDs (dataConArgTys con in_inst_tys)	`thenDs` \ arg_ids ->
+		-- This call to dataConArgTys won't work for existentials
 	    let 
 		val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
 					(dataConFieldLabels con) arg_ids

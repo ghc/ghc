@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.33 1999/06/24 13:04:17 simonmar Exp $
+% $Id: CgClosure.lhs,v 1.34 1999/07/14 14:40:28 simonpj Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -538,7 +538,7 @@ argSatisfactionCheck closure_info
 
 \begin{code}
 thunkWrapper:: ClosureInfo -> CLabel -> Code -> Code
-thunkWrapper closure_info label thunk_code
+thunkWrapper closure_info lbl thunk_code
   = 	-- Stack and heap overflow checks
     nodeMustPointToIt (closureLFInfo closure_info) `thenFC` \ node_points ->
 
@@ -554,7 +554,7 @@ thunkWrapper closure_info label thunk_code
       else absC AbsCNop)                       `thenC`
 
         -- stack and/or heap checks
-    thunkChecks label node_points (
+    thunkChecks lbl node_points (
 
 	-- Overwrite with black hole if necessary
     blackHoleIt closure_info node_points	`thenC`

@@ -152,7 +152,7 @@ getAmodeRep (CVal _ kind)	    	    = kind
 getAmodeRep (CAddr _)		    	    = PtrRep
 getAmodeRep (CReg magic_id)	    	    = magicIdPrimRep magic_id
 getAmodeRep (CTemp uniq kind)	    	    = kind
-getAmodeRep (CLbl label kind)	    	    = kind
+getAmodeRep (CLbl _ kind)	    	    = kind
 getAmodeRep (CCharLike _)	    	    = PtrRep
 getAmodeRep (CIntLike _)	    	    = PtrRep
 getAmodeRep (CLit lit)		    	    = literalPrimRep lit
@@ -308,9 +308,9 @@ flatAbsC (CClosureInfoAndCode cl_info slow maybe_fast descr)
        CClosureInfoAndCode cl_info slow_heres fast_heres descr]
     )
 
-flatAbsC (CCodeBlock label abs_C)
+flatAbsC (CCodeBlock lbl abs_C)
   = flatAbsC abs_C	    `thenFlt` \ (absC_heres, absC_tops) ->
-    returnFlt (AbsCNop, absC_tops `mkAbsCStmts` CCodeBlock label absC_heres)
+    returnFlt (AbsCNop, absC_tops `mkAbsCStmts` CCodeBlock lbl absC_heres)
 
 flatAbsC (CRetDirect uniq slow_code srt liveness)
   = flatAbsC slow_code		`thenFlt` \ (heres, tops) ->

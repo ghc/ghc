@@ -374,7 +374,7 @@ regUsage instr = case instr of
     TEST sz src dst	-> usage (opToReg src ++ opToReg dst) []
     CMP  sz src dst	-> usage (opToReg src ++ opToReg dst) []
     SETCC cond op	-> usage [] (opToReg op)
-    JXX cond label	-> usage [] []
+    JXX cond lbl	-> usage [] []
     JMP op		-> usage (opToReg op) freeRegs
     CALL imm		-> usage [] callClobberedRegs
     CLTD		-> usage [eax] [edx]

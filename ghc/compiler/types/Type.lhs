@@ -33,7 +33,7 @@ module Type (
 	splitAlgTyConApp_maybe, splitAlgTyConApp, 
 	mkDictTy, splitDictTy_maybe, isDictTy,
 
-	mkSynTy, isSynTy, deNoteType, repType, newTypeRep,
+	mkSynTy, isSynTy, deNoteType, repType, splitNewType_maybe,
 
         mkUsgTy, isUsgTy{- dont use -}, isNotUsgTy, splitUsgTy, unUsgTy, tyUsg,
 
@@ -57,7 +57,11 @@ module Type (
 	tidyType,     tidyTypes,
 	tidyOpenType, tidyOpenTypes,
 	tidyTyVar,    tidyTyVars,
-	tidyTopType
+	tidyTopType,
+
+	-- Seq
+	seqType, seqTypes
+
     ) where
 
 #include "HsVersions.h"
@@ -97,7 +101,7 @@ import PrimRep		( PrimRep(..), isFollowableRep )
 import Unique		-- quite a few *Keys
 import Util		( thenCmp, mapAccumL, seqList, ($!) )
 import Outputable
-
+import UniqSet		( sizeUniqSet )		-- Should come via VarSet
 \end{code}
 
 %************************************************************************
@@ -543,6 +547,7 @@ isDictTy other		= False
 mkSynTy syn_tycon tys
   = ASSERT( isSynTyCon syn_tycon )
     ASSERT( isNotUsgTy body )
+    ASSERT( length tyvars == length tys )
     NoteTy (SynNote (TyConApp syn_tycon tys))
 	   (substTy (mkTyVarSubst tyvars tys) body)
   where
@@ -587,13 +592,24 @@ interested in newtypes anymore.
 repType :: Type -> Type
 repType (NoteTy _ ty)     		  = repType ty
 repType (ForAllTy _ ty)   		  = repType ty
-repType (TyConApp tc tys) | isNewTyCon tc = repType (newTypeRep tc tys)
+repType (TyConApp tc tys) | isNewTyCon tc = repType (new_type_rep tc tys)
 repType other_ty	  		  = other_ty
 
-newTypeRep :: TyCon -> [Type] -> Type
+splitNewType_maybe :: Type -> Maybe Type
+-- Find the representation of a newtype, if it is one
+splitNewType_maybe (NoteTy _ ty) 		     = splitNewType_maybe ty
+splitNewType_maybe (TyConApp tc tys) | isNewTyCon tc = case splitNewType_maybe rep_ty of
+								Just rep_ty' -> Just rep_ty'
+								Nothing	     -> Just rep_ty
+						     where
+						       rep_ty = new_type_rep tc tys
+
+splitNewType_maybe other 			     = Nothing						
+
+new_type_rep :: TyCon -> [Type] -> Type
 -- The representation type for (T t1 .. tn), where T is a newtype 
 -- Looks through one layer only
-newTypeRep tc tys 
+new_type_rep tc tys 
   = ASSERT( isNewTyCon tc )
     case splitFunTy_maybe (applyTys (dataConType (head (tyConDataCons tc))) tys) of
 	Just (rep_ty, _) -> rep_ty
@@ -1067,4 +1083,29 @@ cmpTy ty1 ty2
     cmps env (t1:t1s) (t2:t2s) = cmp env t1 t2 `thenCmp` cmps env t1s t2s
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Sequencing on types
+%*									*
+%************************************************************************
+
+\begin{code}
+seqType :: Type -> ()
+seqType (TyVarTy tv) 	  = tv `seq` ()
+seqType (AppTy t1 t2) 	  = seqType t1 `seq` seqType t2
+seqType (FunTy t1 t2) 	  = seqType t1 `seq` seqType t2
+seqType (NoteTy note t2)  = seqNote note `seq` seqType t2
+seqType (TyConApp tc tys) = tc `seq` seqTypes tys
+seqType (ForAllTy tv ty)  = tv `seq` seqType ty
+
+seqTypes :: [Type] -> ()
+seqTypes []       = ()
+seqTypes (ty:tys) = seqType ty `seq` seqTypes tys
+
+seqNote :: TyNote -> ()
+seqNote (SynNote ty)  = seqType ty
+seqNote (FTVNote set) = sizeUniqSet set `seq` ()
+seqNote (UsgNote usg) = usg `seq` ()
+\end{code}
 

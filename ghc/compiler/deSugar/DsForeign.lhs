@@ -137,7 +137,7 @@ dsFImport nm ty may_not_gc ext_name cconv =
     (case ext_name of
        Dynamic       -> getUniqueDs `thenDs` \ u -> 
 			returnDs (Right u)
-       ExtName fs _  -> returnDs (Left fs))	`thenDs` \ label ->
+       ExtName fs _  -> returnDs (Left fs))	`thenDs` \ lbl ->
     let
 	val_args   = Var the_state_arg : unboxed_args
 	final_args = Type inst_ty : val_args
@@ -146,7 +146,7 @@ dsFImport nm ty may_not_gc ext_name cconv =
 	-- it at the full type, including the state argument
 	inst_ty = mkFunTys (map coreExprType val_args) final_result_ty
 
-	the_ccall_op = CCallOp label False (not may_not_gc) cconv
+	the_ccall_op = CCallOp lbl False (not may_not_gc) cconv
 
  	the_prim_app = mkPrimApp the_ccall_op (final_args :: [CoreArg])
 

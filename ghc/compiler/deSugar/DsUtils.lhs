@@ -42,7 +42,7 @@ import Id		( idType, Id, mkWildId )
 import Const		( Literal(..), Con(..) )
 import TyCon		( isNewTyCon, tyConDataCons )
 import DataCon		( DataCon, StrictnessMark, maybeMarkedUnboxed, dataConStrictMarks, 
-			  dataConArgTys, dataConId
+			  dataConId, splitProductType_maybe
 			)
 import Type		( mkFunTy, isUnLiftedType, splitAlgTyConApp, unUsgTy,
 			  Type
@@ -274,18 +274,19 @@ rebuildConArgs con (arg:args) stricts body | isTyVar arg
 rebuildConArgs con (arg:args) (str:stricts) body
   = rebuildConArgs con args stricts body `thenDs` \ (body', real_args) ->
     case maybeMarkedUnboxed str of
-	Just (pack_con, tys) -> 
-	    let id_tys  = dataConArgTys pack_con ty_args in
-	    newSysLocalsDs id_tys `thenDs` \ unpacked_args ->
-	    returnDs (
-		 mkDsLet (NonRec arg (Con (DataCon pack_con) 
-				          (map Type ty_args ++
-				           map Var  unpacked_args))) body', 
-		 unpacked_args ++ real_args
-	    )
+	Just (pack_con1, _) -> 
+	    case splitProductType_maybe (idType arg) of
+		Just (_, tycon_args, pack_con, con_arg_tys) ->
+		    ASSERT( pack_con == pack_con1 )
+		    newSysLocalsDs con_arg_tys 		`thenDs` \ unpacked_args ->
+		    returnDs (
+			 mkDsLet (NonRec arg (Con (DataCon pack_con) 
+				   	          (map Type tycon_args ++
+				        	   map Var  unpacked_args))) body', 
+			 unpacked_args ++ real_args
+		    )
+		
 	_ -> returnDs (body', arg:real_args)
-
-  where ty_args = case splitAlgTyConApp (idType arg) of { (_,args,_) -> args }
 \end{code}
 
 %************************************************************************

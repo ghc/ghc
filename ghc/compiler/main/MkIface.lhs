@@ -292,7 +292,8 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 ifaceId get_idinfo needed_ids is_rec id rhs
   = Just (hsep [sig_pretty, prag_pretty, char ';'], new_needed_ids)
   where
-    idinfo         = get_idinfo id
+    core_idinfo = idInfo id
+    stg_idinfo  = get_idinfo id
 
     ty_pretty  = pprType (idType id)
     sig_pretty = hsep [ppr (getOccName id), dcolon, ty_pretty]
@@ -309,28 +310,28 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 					ptext SLIT("##-}")]
 
     ------------  Arity  --------------
-    arity_pretty  = ppArityInfo (arityInfo idinfo)
+    arity_pretty  = ppArityInfo (arityInfo stg_idinfo)
 
     ------------ Caf Info --------------
-    caf_pretty = ppCafInfo (cafInfo idinfo)
+    caf_pretty = ppCafInfo (cafInfo stg_idinfo)
 
     ------------ CPR Info --------------
-    cpr_pretty = ppCprInfo (cprInfo idinfo)
+    cpr_pretty = ppCprInfo (cprInfo core_idinfo)
 
     ------------  Strictness  --------------
-    strict_info   = strictnessInfo idinfo
+    strict_info   = strictnessInfo core_idinfo
     bottoming_fn  = isBottomingStrictness strict_info
     strict_pretty = ppStrictnessInfo strict_info
 
     ------------  Worker  --------------
-    work_info     = workerInfo idinfo
+    work_info     = workerInfo core_idinfo
     has_worker    = workerExists work_info
     wrkr_pretty   = ppWorkerInfo work_info
     Just work_id  = work_info
 
 
     ------------  Unfolding  --------------
-    inline_pragma  = inlinePragInfo idinfo
+    inline_pragma  = inlinePragInfo core_idinfo
     dont_inline	   = case inline_pragma of
 			IMustNotBeINLINEd -> True
 			IAmALoopBreaker	  -> True
@@ -348,7 +349,7 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     rhs_is_small = couldBeSmallEnoughToInline (calcUnfoldingGuidance opt_UF_HiFileThreshold rhs)
 
     ------------  Specialisations --------------
-    spec_info   = specInfo idinfo
+    spec_info   = specInfo core_idinfo
     
     ------------  Extra free Ids  --------------
     new_needed_ids | opt_OmitInterfacePragmas = emptyVarSet

@@ -28,7 +28,7 @@ import MatchCon		( matchConFamily )
 import MatchLit		( matchLiterals )
 import PrelInfo		( pAT_ERROR_ID )
 import Type		( isUnLiftedType, splitAlgTyConApp,
-			  Type
+			  mkTyVarTys, Type
 			)
 import TysPrim		( intPrimTy, charPrimTy, floatPrimTy, doublePrimTy,
 			  addrPrimTy, wordPrimTy
@@ -457,21 +457,21 @@ tidy1 v (LazyPat pat) match_result
 
 -- re-express <con-something> as (ConPat ...) [directly]
 
-tidy1 v (RecPat data_con pat_ty tvs dicts rpats) match_result
+tidy1 v (RecPat data_con pat_ty ex_tvs dicts rpats) match_result
   | null rpats
   =	-- Special case for C {}, which can be used for 
 	-- a constructor that isn't declared to have
 	-- fields at all
-    returnDs (ConPat data_con pat_ty tvs dicts (map WildPat con_arg_tys'), match_result)
+    returnDs (ConPat data_con pat_ty ex_tvs dicts (map WildPat con_arg_tys'), match_result)
 
   | otherwise
-  = returnDs (ConPat data_con pat_ty tvs dicts pats, match_result)
+  = returnDs (ConPat data_con pat_ty ex_tvs dicts pats, match_result)
   where
     pats 	     = map mk_pat tagged_arg_tys
 
 	-- Boring stuff to find the arg-tys of the constructor
     (_, inst_tys, _) = splitAlgTyConApp pat_ty
-    con_arg_tys'     = dataConArgTys data_con inst_tys 
+    con_arg_tys'     = dataConArgTys data_con (inst_tys ++ mkTyVarTys ex_tvs)
     tagged_arg_tys   = con_arg_tys' `zip` (dataConFieldLabels data_con)
 
 	-- mk_pat picks a WildPat of the appropriate type for absent fields,
