@@ -17,8 +17,7 @@ module GHCerr
 
        (
          irrefutPatError
-       , noDefaultMethodError
-       , noExplicitMethodError
+       , noMethodBindingError
        , nonExhaustiveGuardsError
        , patError
        , recConError
@@ -124,15 +123,16 @@ seqError = error "Oops! Entered seqError (a GHC bug -- please report it!)\n"
 
 \begin{code}
 irrefutPatError
- , noDefaultMethodError
- , noExplicitMethodError
+ , noMethodBindingError
+ --, noExplicitMethodError
  , nonExhaustiveGuardsError
  , patError
  , recConError
  , recUpdError :: String -> a
 
-noDefaultMethodError     s = error ("noDefaultMethodError:"++s)
-noExplicitMethodError    s = error ("No default method for class operation "++s)
+--noDefaultMethodError     s = error ("noDefaultMethodError:"++s)
+--noExplicitMethodError    s = error ("No default method for class operation "++s)
+noMethodBindingError     s = error (untangle s "No instance nor default method for class operation")
 irrefutPatError		 s = error (untangle s "Irrefutable pattern failed for pattern")
 nonExhaustiveGuardsError s = error (untangle s "Non-exhaustive guards in")
 patError 		 s = error (untangle s "Non-exhaustive patterns in")

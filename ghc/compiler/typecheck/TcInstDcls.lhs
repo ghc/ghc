@@ -67,7 +67,7 @@ import Name		( nameOccName, getSrcLoc, mkLocalName,
 			  isLocallyDefined, Module,
 			  NamedThing(..)
 			)
-import PrelVals		( nO_EXPLICIT_METHOD_ERROR_ID, nO_DEFAULT_METHOD_ERROR_ID )
+import PrelVals		( nO_METHOD_BINDING_ERROR_ID )
 import PprType		( pprParendGenType,  pprConstraint )
 import SrcLoc		( SrcLoc, noSrcLoc )
 import TyCon		( tyConDataCons, isSynTyCon, isDataTyCon, tyConDerivings )
@@ -504,19 +504,20 @@ tcInstMethodBind clas inst_tys inst_tyvars meth_binds (sel_id, maybe_dm_id)
 
     mk_default_bind local_meth_name loc
       = PatMonoBind (VarPatIn local_meth_name)
-		    (GRHSsAndBindsIn (unguardedRHS default_expr loc) EmptyBinds)
+		    (GRHSsAndBindsIn (unguardedRHS (default_expr loc) loc) EmptyBinds)
 		    loc
 
-    default_expr = case maybe_dm_id of
-			Just dm_id -> HsVar (getName dm_id)	-- There's a default method
-			Nothing    -> error_expr		-- No default method
+    default_expr loc 
+      = case maybe_dm_id of
+	  Just dm_id -> HsVar (getName dm_id)	-- There's a default method
+   	  Nothing    -> error_expr loc		-- No default method
 
-    error_expr = HsApp (HsVar (getName nO_DEFAULT_METHOD_ERROR_ID)) 
-			      (HsLit (HsString (_PK_ error_msg)))
+    error_expr loc
+      = HsApp (HsVar (getName nO_METHOD_BINDING_ERROR_ID)) 
+	             (HsLit (HsString (_PK_ (error_msg loc))))
 
-    error_msg = show (hcat [ppr (getSrcLoc sel_id), text "|", 
-			    ppr sel_id
-		])
+    error_msg loc = showSDoc (hcat [ppr loc, text "|", ppr sel_id ])
+
 \end{code}
 
 

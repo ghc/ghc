@@ -208,8 +208,7 @@ wired_in_ids
     , integerPlusTwoId
     , integerZeroId
     , nON_EXHAUSTIVE_GUARDS_ERROR_ID
-    , nO_DEFAULT_METHOD_ERROR_ID
-    , nO_EXPLICIT_METHOD_ERROR_ID
+    , nO_METHOD_BINDING_ERROR_ID
     , pAR_ERROR_ID
     , pAT_ERROR_ID
     , packStringForCId
