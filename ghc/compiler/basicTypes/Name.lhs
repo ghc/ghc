@@ -455,6 +455,8 @@ maybeUserImportedFrom other			           		   = Nothing
 isDllName :: Name -> Bool
 	-- Does this name refer to something in a different DLL?
 isDllName nm = not opt_Static &&
+	       not (isLocallyDefinedName nm) && 
+-- isLocallyDefinedName test is needed because nameModule won't work on local names
 	       not (isLocalModule (nameModule nm))
 
 nameSrcLoc name = provSrcLoc (n_prov name)
