@@ -506,7 +506,9 @@ be tuned.)
     	highest = if floating then targetMaxDouble else targetMaxInt
     in
     	(
-    	if not floating && choices > 4 && highTag - lowTag < toInteger (2 * choices) then
+    	if False && -- jump tables disabled for now until the register allocator is
+		    -- fixed to cope with them --SDM 18/8/2000
+	   not floating && choices > 4 && highTag - lowTag < toInteger (2 * choices) then
     	    mkJumpTable am' sortedAlts lowTag highTag udlbl
     	else
     	    mkBinaryTree am' floating sortedAlts choices lowest highest udlbl
