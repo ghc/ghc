@@ -18,6 +18,9 @@ import Data.FiniteMap
 
 type Map k a = FiniteMap k a
 
+instance Functor (FiniteMap k) where
+	fmap f = mapFM (const f)
+
 member :: Ord k => k -> Map k a -> Bool
 member = elemFM
 

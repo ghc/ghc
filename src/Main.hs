@@ -28,7 +28,7 @@ import Control.Monad ( when )
 import Control.Monad.Writer ( Writer, runWriter, tell )
 import Data.Char ( isSpace )
 import Data.IORef ( writeIORef )
-import Data.List ( nub, (\\), foldl' )
+import Data.List ( nub, (\\), foldl', sortBy )
 import Data.Maybe ( isJust, isNothing, maybeToList )
 --import Debug.Trace
 import System.Console.GetOpt ( getOpt, usageInfo, ArgOrder(..), OptDescr(..), ArgDescr(..) )
@@ -1199,7 +1199,7 @@ attachInstances :: [Interface] -> [Interface]
 attachInstances mod_ifaces
   = map attach mod_ifaces
   where
-  inst_map = collectInstances mod_ifaces
+  inst_map = fmap (sortImage instHead) $ collectInstances mod_ifaces
 
   attach iface = iface{ iface_orig_exports = new_exports }
    where
@@ -1229,6 +1229,38 @@ collectInstances ifaces
 		    | HsInstDecl _ ctxt (cls,args) _ <- all_instances,
 		      nm <- nub (concat (map freeTyCons args))
 		    ]
+
+-- simplified type for sorting types, ignoring qualification (not visible
+-- in Haddock output) and unifying special tycons with normal ones.
+data SimpleType = SimpleType HsName [SimpleType] deriving (Eq,Ord)
+
+-- Sort key for instances:
+--	arities of arguments, to place higher-kind instances
+--	name of class
+--	type arguments
+instHead :: (HsContext,(HsQName,[HsType])) -> ([Int],HsName,[SimpleType])
+instHead (ctxt,(cls,args))
+  = (map argCount args, nameOfQName cls, map simplify args)
+  where
+    argCount (HsTyApp t _) = argCount t + 1
+    argCount _ = 0
+
+    simplify (HsForAllType tvs ctxt t) = simplify t
+    simplify (HsTyFun t1 t2) =
+	SimpleType fun_tycon_name [simplify t1, simplify t2]
+    simplify (HsTyTuple b ts) =
+	SimpleType (tuple_tycon_name (length ts - 1)) (map simplify ts)
+    simplify (HsTyApp t1 t2) = SimpleType s (args ++ [simplify t2])
+	where (SimpleType s args) = simplify t1
+    simplify (HsTyVar v) = SimpleType v []
+    simplify (HsTyCon n) = SimpleType (nameOfQName n) []
+    simplify (HsTyDoc t _) = simplify t
+    simplify (HsTyIP n t) = simplify t
+
+-- sortImage f = sortBy (\x y -> compare (f x) (f y))
+sortImage :: Ord b => (a -> b) -> [a] -> [a]
+sortImage f xs = map snd $ sortBy cmp_fst [(f x, x) | x <- xs]
+ where cmp_fst (x,_) (y,_) = compare x y
 
 -- -----------------------------------------------------------------------------
 -- The interface file format.
