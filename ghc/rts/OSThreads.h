@@ -23,7 +23,7 @@ typedef pthread_t       OSThreadId;
 #include <windows.h>
 typedef HANDLE CondVar;
 typedef HANDLE MutexVar;
-typedef HANDLE OSThreadId;
+typedef DWORD OSThreadId;
 
 #define INIT_MUTEX_VAR 0
 #define INIT_COND_VAR  0
