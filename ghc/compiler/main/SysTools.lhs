@@ -50,7 +50,7 @@ import Util		( global )
 import CmdLineOpts	( dynFlag, verbosity )
 
 import Exception	( throwDyn, catchAllIO )
-import IO		( hPutStr, hPutChar, hPutStrLn, hFlush, stderr )
+import IO
 import Directory	( doesFileExist, removeFile )
 import IOExts		( IORef, readIORef, writeIORef )
 import Monad		( when, unless )
@@ -247,7 +247,7 @@ initSysTools minusB_args
 
 #endif
 
-	-- For all systems, copy and remove are provided by the host 
+	-- For all systems, copy and remove are provided by the host
 	-- system; architecture-specific stuff is done when building Config.hs
 	; let	cp_path = cGHC_CP
 	
@@ -404,8 +404,24 @@ touch purpose arg =  do p <- readIORef v_Pgm_T
 			runSomething purpose p [arg]
 
 copy :: String -> String -> String -> IO ()
-copy purpose from to = do p <- readIORef v_Pgm_CP
-		          runSomething purpose p [from,to]
+copy purpose from to =
+#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
+    (do
+      h <- openFile to WriteMode
+      ls <- readFile from -- inefficient, but it'll do for now.
+	    		      -- ToDo: speed up via slurping.
+      hPutStrLn h ls
+      hClose h) `catchAllIO`
+		 (\_ -> throwDyn (PhaseFailed purpose (ExitFailure 1)))
+#else
+    do
+    -- ToDo: switch away from using 'echo' altogether (but need
+    -- a faster alternative than what's done below).
+      SysTools.runSomething "Ineffective C pre-processor"
+		  ("echo '{-# LINE 1 \""  ++ input_fn ++ "\" #-}' > " 
+		  ++ output_fn ++ " && cat " ++ input_fn
+		  ++ " >> " ++ output_fn) []
+#endif
 \end{code}
 
 \begin{code}
@@ -525,7 +541,7 @@ runSomething phase_name pgm args
 	}
   where
     cmd_line = unwords (pgm : dosifyPaths args)
-	-- The pgm is already in native format
+	-- The pgm is already in native format (appropriate dir separators)
 
 traceCmd :: String -> String -> IO () -> IO ()
 -- a) trace the command (at two levels of verbosity)
