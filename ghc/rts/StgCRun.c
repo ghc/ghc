@@ -1,10 +1,35 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.12 2000/02/24 14:05:55 sewardj Exp $
+ * $Id: StgCRun.c,v 1.13 2000/03/07 11:35:36 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2000
  *
- * STG-to-C glue.  Some architectures have this code written in
- * straight assembler (see StgRun.S), some in C.
+ * STG-to-C glue.
+ *
+ * To run an STG function from C land, call
+ *
+ *		rv = StgRun(f,BaseReg);
+ *
+ * where "f" is the STG function to call, and BaseReg is the address of the
+ * RegTable for this run (we might have separate RegTables if we're running
+ * multiple threads on an SMP machine).
+ *
+ * In the end, "f" must JMP to StgReturn (defined below),
+ * passing the return-value "rv" in R1,
+ * to return to the caller of StgRun returning "rv" in
+ * the whatever way C returns a value.
+ *
+ * NOTE: StgRun/StgReturn do *NOT* load or store Hp or any
+ * other registers (other than saving the C callee-saves 
+ * registers).  Instead, the called function "f" must do that
+ * in STG land.
+ * 
+ * GCC will have assumed that pushing/popping of C-stack frames is
+ * going on when it generated its code, and used stack space
+ * accordingly.  However, we actually {\em post-process away} all
+ * such stack-framery (see \tr{ghc/driver/ghc-asm.lprl}). Things will
+ * be OK however, if we initially make sure there are
+ * @RESERVED_C_STACK_BYTES@ on the C-stack to begin with, for local
+ * variables.  
  *
  * -------------------------------------------------------------------------- */
 
@@ -179,6 +204,63 @@ EXTFUN(StgReturn)
 #define STG_RETURN "_StgReturn"
 #else
 #define STG_RETURN "StgReturn"
+#endif
+
+/* -----------------------------------------------------------------------------
+   x86 architecture
+   -------------------------------------------------------------------------- */
+	
+#ifdef i386_TARGET_ARCH
+
+StgThreadReturnCode
+StgRun(StgFunPtr f, StgRegTable *basereg) {
+
+    StgChar space[ RESERVED_C_STACK_BYTES + 4*sizeof(void *) ];
+    StgThreadReturnCode r;
+
+    __asm__ volatile (
+	/* 
+	 * save callee-saves registers on behalf of the STG code.
+	 */
+	"movl %%esp, %%eax\n\t"
+	"addl %4, %%eax\n\t"
+        "movl %%ebx,0(%%eax)\n\t"
+        "movl %%esi,4(%%eax)\n\t"
+        "movl %%edi,8(%%eax)\n\t"
+        "movl %%ebp,12(%%eax)\n\t"
+	/*
+	 * Set BaseReg
+	 */
+	"movl %3,%%ebx\n\t"
+	/*
+	 * grab the function argument from the stack, and jump to it.
+	 */
+        "movl %2,%%eax\n\t"
+        "jmp *%%eax\n\t"
+
+	".global " STG_RETURN "\n"
+       	STG_RETURN ":\n\t"
+
+	"movl %%esi, %%eax\n\t"   /* Return value in R1  */
+
+	/*
+	 * restore callee-saves registers.  (Don't stomp on %%eax!)
+	 */
+	"movl %%esp, %%edx\n\t"
+	"addl %4, %%edx\n\t"
+        "movl 0(%%edx),%%ebx\n\t"	/* restore the registers saved above */
+        "movl 4(%%edx),%%esi\n\t"
+        "movl 8(%%edx),%%edi\n\t"
+        "movl 12(%%edx),%%ebp\n\t"
+
+      : "=&a" (r), "=m" (space)
+      : "m" (f), "m" (basereg), "i" (RESERVED_C_STACK_BYTES)
+      : "edx" /* stomps on %edx */
+    );
+
+    return r;
+}
+
 #endif
 
 /* -----------------------------------------------------------------------------
