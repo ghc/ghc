@@ -1210,10 +1210,85 @@ J Lewis, MB Shields, E Meijer, J Launchbury,
 27th ACM Symposium on Principles of Programming Languages (POPL'00),
 Boston, Jan 2000.
 </para>
-
+<para>(Most of the following, stil rather incomplete, documentation is due to Jeff Lewis.)</para>
 <para>
-There should be more documentation, but there isn't (yet).  Yell if you need it.
+A variable is called <emphasis>dynamically bound</emphasis> when it is bound by the calling
+context of a function and <emphasis>statically bound</emphasis> when bound by the callee's
+context. In Haskell, all variables are statically bound. Dynamic
+binding of variables is a notion that goes back to Lisp, but was later
+discarded in more modern incarnations, such as Scheme. Dynamic binding
+can be very confusing in an untyped language, and unfortunately, typed
+languages, in particular Hindley-Milner typed languages like Haskell,
+only support static scoping of variables.
 </para>
+<para>
+However, by a simple extension to the type class system of Haskell, we
+can support dynamic binding. Basically, we express the use of a
+dynamically bound variable as a constraint on the type. These
+constraints lead to types of the form <literal>(?x::t') => t</literal>, which says "this
+function uses a dynamically-bound variable <literal>?x</literal> 
+of type <literal>t'</literal>". For
+example, the following expresses the type of a sort function,
+implicitly parameterized by a comparison function named <literal>cmp</literal>.
+<programlisting>
+  sort :: (?cmp :: a -> a -> Bool) => [a] -> [a]
+</programlisting>
+The dynamic binding constraints are just a new form of predicate in the type class system.
+</para>
+<para>
+An implicit parameter is introduced by the special form <literal>?x</literal>, 
+where <literal>x</literal> is
+any valid identifier. Use if this construct also introduces new
+dynamic binding constraints. For example, the following definition
+shows how we can define an implicitly parameterized sort function in
+terms of an explicitly parameterized <literal>sortBy</literal> function:
+<programlisting>
+  sortBy :: (a -> a -> Bool) -> [a] -> [a]
+
+  sort   :: (?cmp :: a -> a -> Bool) => [a] -> [a]
+  sort    = sortBy ?cmp
+</programlisting>
+Dynamic binding constraints behave just like other type class
+constraints in that they are automatically propagated. Thus, when a
+function is used, its implicit parameters are inherited by the
+function that called it. For example, our <literal>sort</literal> function might be used
+to pick out the least value in a list:
+<programlisting>
+  least   :: (?cmp :: a -> a -> Bool) => [a] -> a
+  least xs = fst (sort xs)
+</programlisting>
+Without lifting a finger, the <literal>?cmp</literal> parameter is
+propagated to become a parameter of <literal>least</literal> as well. With explicit
+parameters, the default is that parameters must always be explicit
+propagated. With implicit parameters, the default is to always
+propagate them.
+</para>
+<para>
+An implicit parameter differs from other type class constraints in the
+following way: All uses of a particular implicit parameter must have
+the same type. This means that the type of <literal>(?x, ?x)</literal> 
+is <literal>(?x::a) => (a,a)</literal>, and not 
+<literal>(?x::a, ?x::b) => (a, b)</literal>, as would be the case for type
+class constraints.
+</para>
+<para>
+An implicit parameter is bound using an expression of the form 
+<emphasis>expr</emphasis> <literal>with</literal> <emphasis>binds</emphasis>, 
+where <literal>with</literal> is a new keyword. This form binds the implicit
+parameters arising in the body, not the free variables as a <literal>let</literal> or
+<literal>where</literal> would do. For example, we define the <literal>min</literal> function by binding
+<literal>cmp</literal>.
+<programlisting>
+  min :: [a] -> a
+  min  = least with ?cmp = (<=)
+</programlisting>
+Syntactically, the <emphasis>binds</emphasis> part of a <literal>with</literal> construct must be a
+collection of simple bindings to variables (no function-style
+bindings, and no type signatures); these bindings are neither
+polymorphic or recursive.
+</para>
+<para>
+Note the following additional constraints:
 <itemizedlist>
 <listitem>
 <para> You can't have an implicit parameter in the context of a class or instance
@@ -1227,8 +1302,8 @@ you invoke a function. But the ``invocation'' of instance declarations is done
 behind the scenes by the compiler, so it's hard to figure out exactly where it is done.
 Easiest thing is to outlaw the offending types.</para>
 </listitem>
-
 </itemizedlist>
+</para>
 
 </sect1>
 
