@@ -73,8 +73,14 @@ parseError s =
 
 srcParseErr :: StringBuffer -> SrcLoc -> Message
 srcParseErr s l
-  = hcat [ppr l, ptext SLIT(": parse error on input "),
-          char '`', text (lexemeToString s), char '\'']
+  = hcat [ppr l, 
+	  if null token 
+	     then ptext SLIT(": parse error (possibly incorrect indentation)")
+	     else hcat [ptext SLIT(": parse error on input "),
+          	  	char '`', text token, char '\'']
+    ]
+  where 
+	token = lexemeToString s
 
 cbot = panic "CCall:result_ty"
 
