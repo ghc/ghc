@@ -17,7 +17,6 @@ module CmdLineOpts (
 	switchIsOn,
 
 	maybe_CompilingGhcInternals,
-	opt_AllDemanded,
 	opt_AllStrict,
 	opt_AutoSccsOnAllToplevs,
 	opt_AutoSccsOnExportedToplevs,
@@ -51,20 +50,16 @@ module CmdLineOpts (
 	opt_DoTickyProfiling,
 	opt_EnsureSplittableC,
 	opt_FoldrBuildOn,
-	opt_FoldrBuildTrace,
 	opt_ForConcurrent,
 	opt_GlasgowExts,
 	opt_GranMacros,
 	opt_HiMap,
 	opt_IgnoreIfacePragmas,
-	opt_IgnoreStrictnessPragmas,
-	opt_IrrefutableEverything,
 	opt_IrrefutableTuples,
 	opt_LiberateCaseThreshold,
 	opt_NoImplicitPrelude,
 	opt_NumbersStrict,
 	opt_OmitBlackHoling,
-	opt_OmitDefaultInstanceMethods,
 	opt_OmitInterfacePragmas,
 	opt_PprStyle_All,
 	opt_PprStyle_Debug,
@@ -78,7 +73,6 @@ module CmdLineOpts (
 	opt_SccGroup,
 	opt_SccProfilingOn,
 	opt_ShowImportSpecs,
-	opt_ShowPragmaNameErrs,
 	opt_SigsRequired,
 	opt_SourceUnchanged,
 	opt_SpecialiseAll,
@@ -269,7 +263,6 @@ unpacked_opts = map _UNPK_ argv
 \end{code}
 
 \begin{code}
-opt_AllDemanded			= lookUp  SLIT("-fall-demanded")
 opt_AllStrict			= lookUp  SLIT("-fall-strict")
 opt_AutoSccsOnAllToplevs	= lookUp  SLIT("-fauto-sccs-on-all-toplevs")
 opt_AutoSccsOnExportedToplevs	= lookUp  SLIT("-fauto-sccs-on-exported-toplevs")
@@ -304,20 +297,16 @@ opt_DoTickyProfiling		= lookUp  SLIT("-fticky-ticky")
 opt_DoEtaReduction		= lookUp  SLIT("-fdo-eta-reduction")
 opt_EnsureSplittableC		= lookUp  SLIT("-fglobalise-toplev-names")
 opt_FoldrBuildOn		= lookUp  SLIT("-ffoldr-build-on")
-opt_FoldrBuildTrace		= lookUp  SLIT("-ffoldr-build-trace")
 opt_ForConcurrent		= lookUp  SLIT("-fconcurrent")
 opt_GranMacros			= lookUp  SLIT("-fgransim")
 opt_GlasgowExts			= lookUp  SLIT("-fglasgow-exts")
 --UNUSED:opt_Haskell_1_3	= lookUp  SLIT("-fhaskell-1.3")
 opt_HiMap 			= lookup_str "-himap="  -- file saying where to look for .hi files
 opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
-opt_IgnoreStrictnessPragmas	= lookUp  SLIT("-fignore-strictness-pragmas")
-opt_IrrefutableEverything	= lookUp  SLIT("-firrefutable-everything")
 opt_IrrefutableTuples		= lookUp  SLIT("-firrefutable-tuples")
 opt_NoImplicitPrelude		= lookUp  SLIT("-fno-implicit-prelude")
 opt_NumbersStrict		= lookUp  SLIT("-fnumbers-strict")
 opt_OmitBlackHoling		= lookUp  SLIT("-dno-black-holing")
-opt_OmitDefaultInstanceMethods	= lookUp  SLIT("-fomit-default-instance-methods")
 opt_OmitInterfacePragmas	= lookUp  SLIT("-fomit-interface-pragmas")
 opt_PprStyle_All		= lookUp  SLIT("-dppr-all")
 opt_PprStyle_Debug		= lookUp  SLIT("-dppr-debug")
@@ -329,7 +318,6 @@ opt_ProduceHi 			= lookup_str "-hifile=" -- the one to produce this time
 opt_ReportWhyUnfoldingsDisallowed= lookUp SLIT("-freport-disallowed-unfoldings")
 opt_SccProfilingOn		= lookUp  SLIT("-fscc-profiling")
 opt_ShowImportSpecs		= lookUp  SLIT("-fshow-import-specs")
-opt_ShowPragmaNameErrs		= lookUp  SLIT("-fshow-pragma-name-errs")
 opt_SigsRequired		= lookUp  SLIT("-fsignatures-required")
 opt_SourceUnchanged		= lookUp  SLIT("-fsource-unchanged")
 opt_SpecialiseAll		= lookUp  SLIT("-fspecialise-all")
