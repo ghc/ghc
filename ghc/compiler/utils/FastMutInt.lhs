@@ -22,7 +22,8 @@ module FastMutInt(
 import GlaExts
 import PrelIOBase
 #else
-import Data.Array
+import GHC.Base
+import GHC.IOBase
 #endif
 \end{code}
 
