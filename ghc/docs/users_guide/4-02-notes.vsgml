@@ -53,4 +53,6 @@ good compared to 3.02 :-).
 <item> Ticky-ticky profiling works again (cost-centre profiling is
 still broken).
 
+<item> Better <tt/egcs-1.1.1/ support.
+
 </itemize>
