@@ -96,7 +96,7 @@ class  (MonadZero m) => MonadPlus m where
 %*********************************************************
 
 \begin{code}
-class  (Ord a) => Enum a	where
+class  Enum a	where
     toEnum              :: Int -> a
     fromEnum            :: a -> Int
     enumFrom		:: a -> [a]		-- [n..]
@@ -104,10 +104,9 @@ class  (Ord a) => Enum a	where
     enumFromTo		:: a -> a -> [a]	-- [n..m]
     enumFromThenTo	:: a -> a -> a -> [a]	-- [n,n'..m]
 
-    enumFromTo n m      =  takeWhile (<= m) (enumFrom n)
+    enumFromTo n m      =  map toEnum [fromEnum n .. fromEnum m]
     enumFromThenTo n n' m
-                        =  takeWhile (if n' >= n then (<= m) else (>= m))
-                                     (enumFromThen n n')
+                        =  map toEnum [fromEnum n, fromEnum n' .. fromEnum m]
 
 class  (Eq a, Show a, Eval a) => Num a  where
     (+), (-), (*)	:: a -> a -> a
@@ -201,7 +200,12 @@ instance  MonadZero []  where
     zero                = []
 
 instance  MonadPlus []  where
+#ifdef USE_REPORT_PRELUDE
     xs ++ ys            =  foldr (:) ys xs
+#else
+    [] ++ ys            =  ys
+    (x:xs) ++ ys        =  x : (xs ++ ys)
+#endif
 
 instance  (Show a) => Show [a]  where
     showsPrec p         = showList
@@ -237,10 +241,24 @@ dropWhile p xs@(x:xs')
 
 -- List index (subscript) operator, 0-origin
 (!!)                    :: [a] -> Int -> a
+#ifdef USE_REPORT_PRELUDE
 (x:_)  !! 0             =  x
 (_:xs) !! n | n > 0     =  xs !! (n-1)
 (_:_)  !! _             =  error "PreludeList.!!: negative index"
 []     !! _             =  error "PreludeList.!!: index too large"
+#else
+-- HBC version (stolen), then unboxified
+-- The semantics is not quite the same for error conditions
+-- in the more efficient version.
+--
+_      !! n | n < 0  =  error "(!!){PreludeList}: negative index\n"
+xs     !! n          =  sub xs (case n of { I# n# -> n# })
+                           where sub :: [a] -> Int# -> a
+                                 sub []      _ = error "(!!){PreludeList}: index too large\n"
+                                 sub (x:xs) n# = if n# ==# 0#
+						 then x
+						 else sub xs (n# -# 1#)
+#endif
 \end{code}
 
 
@@ -412,17 +430,23 @@ instance  Enum Char  where
 		    | otherwise = error ("Prelude.Enum.Char.toEnum:out of range: " ++ show (I# i))
     fromEnum (C# c)     	 =  I# (ord# c)
 
-    enumFrom (C# c)			   =  eftt (ord# c)  1# 		  255#
-    enumFromThen (C# c1) (C# c2)	   =  eftt (ord# c1) (ord# c2 -# ord# c1) 255#
-    enumFromTo (C# c1) (C# c2)             =  eftt (ord# c1) 1#                   (ord# c2)
-    enumFromThenTo (C# c1) (C# c2) (C# c3) =  eftt (ord# c1) (ord# c2 -# ord# c1) (ord# c3)
+    enumFrom   (C# c)	       =  efttCh (ord# c)  1#   (># 255#)
+    enumFromTo (C# c1) (C# c2) = efttCh (ord# c1) 1#  (># (ord# c2))
 
-eftt :: Int# -> Int# -> Int# -> [Char]
-eftt now step limit 
+    enumFromThen (C# c1) (C# c2)
+	| c1 `leChar#` c2 = efttCh (ord# c1) (ord# c2 -# ord# c1) (># 255#)
+	| otherwise       = efttCh (ord# c1) (ord# c2 -# ord# c1) (<# 0#)
+
+    enumFromThenTo (C# c1) (C# c2) (C# c3)
+	| c1 `leChar#` c2 = efttCh (ord# c1) (ord# c2 -# ord# c1) (># (ord# c3))
+	| otherwise       = efttCh (ord# c1) (ord# c2 -# ord# c1) (<# (ord# c3))
+
+efttCh :: Int# -> Int# -> (Int# -> Bool) -> [Char]
+efttCh now step done 
   = go now
   where
-    go now | now ># limit = []
-	   | otherwise    = C# (chr# now) : go (now +# step)
+    go now | done now  = []
+	   | otherwise = C# (chr# now) : go (now +# step)
 
 instance  Bounded Char  where
     minBound            =  '\0'
@@ -524,9 +548,16 @@ instance Ord Int where
 instance  Enum Int  where
     toEnum   x = x
     fromEnum x = x
+
 #ifndef USE_FOLDR_BUILD
-    enumFrom x           =  x : enumFrom (x `plusInt` 1)
-    enumFromTo n m       =  takeWhile (<= m) (enumFrom n)
+    enumFrom     (I# c)	         = eftInt c  1#
+    enumFromTo   (I# c1) (I# c2) = efttInt c1 1#  (># c2)
+    enumFromThen (I# c1) (I# c2) = eftInt c1 (c2 -# c1)
+
+    enumFromThenTo (I# c1) (I# c2) (I# c3)
+	| c1 <=# c2 = efttInt c1 (c2 -# c1) (># c3)
+	| otherwise = efttInt c1 (c2 -# c1) (<# c3)
+
 #else
     {-# INLINE enumFrom #-}
     {-# INLINE enumFromTo #-}
@@ -535,10 +566,19 @@ instance  Enum Int  where
     enumFromTo x y	 = build (\ c n ->
 	let g x = if x <= y then x `c` g (x `plusInt` 1) else n in g x)
 #endif
-    enumFromThen m n     =  en' m (n `minusInt` m)
-	                    where en' m n = m : en' (m `plusInt` n) n
-    enumFromThenTo n m p =  takeWhile (if m >= n then (<= p) else (>= p))
-				      (enumFromThen n m)
+
+efttInt :: Int# -> Int# -> (Int# -> Bool) -> [Int]
+efttInt now step done
+  = go now
+  where
+    go now | done now  = []
+	   | otherwise = I# now : go (now +# step)
+
+eftInt :: Int# -> Int# -> [Int]
+eftInt now step
+  = go now
+  where
+    go now = I# now : go (now +# step)
 
 
 instance  Bounded Int where
@@ -607,8 +647,8 @@ const x _		=  x
 -- function composition
 {-# INLINE (.) #-}
 {-# GENERATE_SPECS (.) a b c #-}
-(.)			:: (b -> c) -> (a -> b) -> a -> c
-f . g			=  \ x -> f (g x)
+(.)	  :: (b -> c) -> (a -> b) -> a -> c
+(.) f g	x = f (g x)
 
 -- flip f  takes its (first) two arguments in the reverse order of f.
 flip			:: (a -> b -> c) -> b -> a -> c
@@ -640,10 +680,6 @@ asTypeOf		=  const
 
 
 \begin{code}
-data Addr = A# Addr# 	deriving (Eq, Ord) -- Glasgow extension
-data Word = W# Word# 	deriving (Eq, Ord) -- Glasgow extension
-data ForeignObj = ForeignObj ForeignObj#   -- another one
-
 data Lift a = Lift a
 {-# GENERATE_SPECS data a :: Lift a #-}
 \end{code}
@@ -707,6 +743,13 @@ showLitChar c		   =  showString ('\\' : asciiTab!!ord c)
 protectEsc p f		   = f . cont
 			     where cont s@(c:_) | p c = "\\&" ++ s
 				   cont s	      = s
+
+intToDigit :: Int -> Char
+intToDigit i
+ | i >= 0  && i <=  9   =  toEnum (fromEnum '0' + i)
+ | i >= 10 && i <= 15   =  toEnum (fromEnum 'a' + i -10)
+ | otherwise		=  error "Char.intToDigit: not a digit" -- ....
+
 \end{code}
 
 Code specific for Ints.
