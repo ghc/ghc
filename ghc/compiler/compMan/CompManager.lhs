@@ -552,12 +552,18 @@ downsweep rootNm
 	getRootSummary :: FilePath -> IO ModSummary
 	getRootSummary file
 	   | haskellish_file file
-           = do exists <- doesFileExist file
-		if exists then summariseFile file
-			  else getSummary (mkModuleName file)
-		-- ToDo: should check import paths
-  	   | otherwise
-	   = getSummary (mkModuleName file)
+	   = do exists <- doesFileExist file
+		if exists then summariseFile file else do
+		throwDyn (OtherError ("can't find file `" ++ file ++ "'"))	
+	   | otherwise
+ 	   = do exists <- doesFileExist hs_file
+		if exists then summariseFile hs_file else do
+		exists <- doesFileExist lhs_file
+		if exists then summariseFile lhs_file else do
+		getSummary (mkModuleName file)
+           where 
+		 hs_file = file ++ ".hs"
+		 lhs_file = file ++ ".lhs"
 
         getSummary :: ModuleName -> IO ModSummary
         getSummary nm
@@ -571,7 +577,7 @@ downsweep rootNm
                    -- These will then conflict with the passed-in versions.
 		   Just (mod, location) -> summarise mod location
 		   Nothing -> throwDyn (OtherError 
-                                   ("no signs of life for module `" 
+                                   ("can't find module `" 
                                      ++ showSDoc (ppr nm) ++ "'"))
                                  
         -- loop invariant: homeSummaries doesn't contain package modules
