@@ -372,10 +372,6 @@ val_occs1	:: { [OccName] }
 		|  val_occ val_occs1	{ $1 : $2 }
 
 
-qvar_name	:: { RdrName }
-		:  QVARID		{ lexVarQual $1 }
-		|  QVARSYM		{ lexVarQual $1 }
-
 var_name	:: { RdrName }
 var_name	:  var_occ		{ Unqual $1 }
 
@@ -383,18 +379,9 @@ var_names1	:: { [RdrName] }
 var_names1	: var_name		{ [$1] }
 		| var_name var_names1	{ $1 : $2 }
 
-any_var_name	:: {RdrName}
-any_var_name	:  var_name		{ $1 }
-		|  qvar_name		{ $1 }
-
-qdata_name	:: { RdrName }
-qdata_name	:  QCONID		{ lexVarQual $1 }
-		|  QCONSYM		{ lexVarQual $1 }
-
 data_name	:: { RdrName }
 data_name	:  CONID		{ Unqual (VarOcc $1) }
 		|  CONSYM		{ Unqual (VarOcc $1) }
-
 
 tc_names1	:: { [RdrName] }
 		: tc_name			{ [$1] }
@@ -403,6 +390,7 @@ tc_names1	:: { [RdrName] }
 tc_name		:: { RdrName }
 tc_name		: tc_occ			{ Unqual $1 }
 		| QCONID			{ lexTcQual $1 }
+		| QCONSYM			{ lexTcQual $1 }
 
 tv_name		:: { RdrName }
 tv_name		:  VARID 		{ Unqual (TvOcc $1) }
