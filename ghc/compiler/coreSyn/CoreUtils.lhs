@@ -13,7 +13,8 @@ module CoreUtils (
 	
 	maybeErrorApp,
 	nonErrorRHSs,
-	squashableDictishCcExpr
+	squashableDictishCcExpr,
+	idSpecVars
     ) where
 
 #include "HsVersions.h"
@@ -22,7 +23,7 @@ import CoreSyn
 
 import CostCentre	( isDictCC, CostCentre, noCostCentre )
 import MkId		( mkSysLocal )
-import Id		( idType, isBottomingId,
+import Id		( idType, isBottomingId, getIdSpecialisation,
 			  mkIdWithNewUniq,
 			  dataConRepType,
 			  addOneToIdEnv, growIdEnvList, lookupIdEnv,
@@ -32,6 +33,7 @@ import Literal		( literalType, Literal(..) )
 import Maybes		( catMaybes, maybeToBool )
 import PprCore
 import PrimOp		( primOpType, PrimOp(..) )
+import SpecEnv	        ( specEnvValues )
 import SrcLoc		( noSrcLoc )
 import TyVar		( cloneTyVar,
 			  isEmptyTyVarEnv, addToTyVarEnv, TyVarEnv,
@@ -410,4 +412,23 @@ squashableDictishCcExpr cc expr
     squashable (App f a)
       | notValArg a	    = squashable f
     squashable other	    = False
+\end{code}
+
+
+Given an Id, idSpecVars returns all its specialisations.
+We extract these from its SpecEnv.
+This is used by the occurrence analyser and free-var finder;
+we regard an Id's specialisations as free in the Id's definition.
+
+\begin{code}
+idSpecVars :: Id -> [Id]
+idSpecVars id 
+  = map get_spec (specEnvValues (getIdSpecialisation id))
+  where
+    -- get_spec is another cheapo function like dictRhsFVs
+    -- It knows what these specialisation temlates look like,
+    -- and just goes for the jugular
+    get_spec (App f _) = get_spec f
+    get_spec (Lam _ b) = get_spec b
+    get_spec (Var v)   = v
 \end{code}

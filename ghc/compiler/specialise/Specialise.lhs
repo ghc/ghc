@@ -4,10 +4,7 @@
 \section[Specialise]{Stamping out overloading, and (optionally) polymorphism}
 
 \begin{code}
-module Specialise (
-	specProgram, 
-	idSpecVars
-    ) where
+module Specialise ( specProgram ) where
 
 #include "HsVersions.h"
 
@@ -1104,22 +1101,6 @@ addIdSpecialisations id spec_stuff
 	= case addToSpecEnv True spec_env tyvars tys template of
 		Succeeded spec_env' -> (spec_env', errs)
 		Failed err 	    -> (spec_env, err:errs)
-
--- Given an Id, isSpecVars returns all its specialisations.
--- We extract these from its SpecEnv.
--- This is used by the occurrence analyser and free-var finder;
--- we regard an Id's specialisations as free in the Id's definition.
-
-idSpecVars :: Id -> [Id]
-idSpecVars id 
-  = map get_spec (specEnvValues (getIdSpecialisation id))
-  where
-    -- get_spec is another cheapo function like dictRhsFVs
-    -- It knows what these specialisation temlates look like,
-    -- and just goes for the jugular
-    get_spec (App f _) = get_spec f
-    get_spec (Lam _ b) = get_spec b
-    get_spec (Var v)   = v
 
 ----------------------------------------
 type SpecM a = UniqSM a
