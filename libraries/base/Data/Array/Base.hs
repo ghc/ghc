@@ -546,19 +546,22 @@ instance IArray UArray Int where
     {-# INLINE unsafeAccumArray #-}
     unsafeAccumArray f init lu ies = runST (unsafeAccumArrayUArray f init lu ies)
 
-#ifdef __GLASGOW_HASKELL__
 instance IArray UArray Word where
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
+#ifdef __GLASGOW_HASKELL__
     {-# INLINE unsafeAt #-}
     unsafeAt (UArray _ _ arr#) (I# i#) = W# (indexWordArray# arr# i#)
+#endif
+#ifdef __HUGS__
+    unsafeAt = unsafeAtBArray
+#endif
     {-# INLINE unsafeReplace #-}
     unsafeReplace arr ies = runST (unsafeReplaceUArray arr ies)
     {-# INLINE unsafeAccum #-}
     unsafeAccum f arr ies = runST (unsafeAccumUArray f arr ies)
     {-# INLINE unsafeAccumArray #-}
     unsafeAccumArray f init lu ies = runST (unsafeAccumArrayUArray f init lu ies)
-#endif
 
 instance IArray UArray (Ptr a) where
     {-# INLINE unsafeArray #-}
@@ -798,10 +801,8 @@ instance Ix ix => Eq (UArray ix Char) where
 instance Ix ix => Eq (UArray ix Int) where
     (==) = eqUArray
 
-#ifdef __GLASGOW_HASKELL__
 instance Ix ix => Eq (UArray ix Word) where
     (==) = eqUArray
-#endif
 
 instance Ix ix => Eq (UArray ix (Ptr a)) where
     (==) = eqUArray
@@ -853,10 +854,8 @@ instance Ix ix => Ord (UArray ix Char) where
 instance Ix ix => Ord (UArray ix Int) where
     compare = cmpUArray
 
-#ifdef __GLASGOW_HASKELL__
 instance Ix ix => Ord (UArray ix Word) where
     compare = cmpUArray
-#endif
 
 instance Ix ix => Ord (UArray ix (Ptr a)) where
     compare = cmpUArray
@@ -903,10 +902,8 @@ instance (Ix ix, Show ix) => Show (UArray ix Char) where
 instance (Ix ix, Show ix) => Show (UArray ix Int) where
     showsPrec = showsIArray
 
-#ifdef __GLASGOW_HASKELL__
 instance (Ix ix, Show ix) => Show (UArray ix Word) where
     showsPrec = showsIArray
-#endif
 
 instance (Ix ix, Show ix) => Show (UArray ix Float) where
     showsPrec = showsIArray
@@ -1446,6 +1443,11 @@ instance MArray (STUArray s) Char (ST s) where
     unsafeWrite = unsafeWriteMBArray
 
 instance MArray (STUArray s) Int (ST s) where
+    newArray_ = newMBArray_
+    unsafeRead = unsafeReadMBArray
+    unsafeWrite = unsafeWriteMBArray
+
+instance MArray (STUArray s) Word (ST s) where
     newArray_ = newMBArray_
     unsafeRead = unsafeReadMBArray
     unsafeWrite = unsafeWriteMBArray

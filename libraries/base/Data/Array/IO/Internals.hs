@@ -119,7 +119,6 @@ instance MArray IOUArray Int IO where
     {-# INLINE unsafeWrite #-}
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
 
-#ifdef __GLASGOW_HASKELL__
 instance MArray IOUArray Word IO where
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
@@ -131,7 +130,6 @@ instance MArray IOUArray Word IO where
     unsafeRead (IOUArray marr) i = stToIO (unsafeRead marr i)
     {-# INLINE unsafeWrite #-}
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
-#endif
 
 instance MArray IOUArray (Ptr a) IO where
     {-# INLINE newArray #-}

@@ -512,6 +512,9 @@ INSTANCE_TYPEABLE0(Char,charTc,"Char")
 INSTANCE_TYPEABLE0(Float,floatTc,"Float")
 INSTANCE_TYPEABLE0(Double,doubleTc,"Double")
 INSTANCE_TYPEABLE0(Int,intTc,"Int")
+#ifndef __NHC__
+INSTANCE_TYPEABLE0(Word,wordTc,"Word" )
+#endif
 INSTANCE_TYPEABLE0(Integer,integerTc,"Integer")
 INSTANCE_TYPEABLE0(Ordering,orderingTc,"Ordering")
 INSTANCE_TYPEABLE0(Handle,handleTc,"Handle")
@@ -531,7 +534,6 @@ INSTANCE_TYPEABLE0(TypeRep,typeRepTc,"TypeRep")
 
 #ifdef __GLASGOW_HASKELL__
 INSTANCE_TYPEABLE0(RealWorld,realWorldTc,"RealWorld")
-INSTANCE_TYPEABLE0(Word,wordTc,"Word" )
 INSTANCE_TYPEABLE1(MVar,mvarTc,"MVar" )
 #endif
 
