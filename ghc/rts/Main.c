@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.27 2001/03/22 03:51:10 hwloidl Exp $
+ * $Id: Main.c,v 1.28 2001/07/26 03:20:52 ken Exp $
  *
  * (c) The GHC Team 1998-2000
  *
@@ -38,6 +38,10 @@
 # include <windows.h>
 #endif
 
+#ifdef HAVE_TIME_H
+# include <time.h>
+#endif
+
 extern void __init_PrelMain(void);
 
 /* Hack: we assume that we're building a batch-mode system unless 
@@ -49,6 +53,17 @@ int main(int argc, char *argv[])
     int exit_status;
     SchedulerStatus status;
     /* all GranSim/GUM init is done in startupHaskell; sets IAmMainThread! */
+
+    /*
+     * Believe it or not, calling tzset() at startup seems to get rid of
+     * a scheduler-related Heisenbug on alpha-dec-osf3.  The symptom of
+     * the bug is that, when the load on the machine is high or when
+     * there are many threads, the variable "Capability *cap" in the
+     * function "schedule" in the file "Schedule.c" magically becomes
+     * null before the line "t = cap->rCurrentTSO;".  Why, and why does
+     * calling tzset() here seem to fix it?  Excellent questions!
+     */
+    tzset();
 
     startupHaskell(argc,argv,__init_PrelMain);
 
