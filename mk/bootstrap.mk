@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.32 2005/01/27 11:55:37 simonmar Exp $
+# $Id: bootstrap.mk,v 1.33 2005/01/27 13:00:14 simonmar Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -61,9 +61,6 @@ endif
 
 ifeq "$(BootingFromUnregisterisedHc)" "YES"
 PLATFORM_HC_BOOT_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER
-SRC_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER
-# Add these flags to SRC_CC_OPTS too, because they need to be passed to the plain .c
-# files in ghc/rts.
 endif
 
 PLATFORM_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt) 
@@ -71,6 +68,12 @@ PLATFORM_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 HC_BOOT_CC_OPTS = $(PLATFORM_HC_BOOT_CC_OPTS) $(PLATFORM_CC_OPTS) $(CC_OPTS)
 
 SRC_CC_OPTS += -I$(FPTOOLS_TOP_ABS)/ghc/includes -I$(FPTOOLS_TOP_ABS)/libraries/base/include -I$(FPTOOLS_TOP_ABS)/libraries/unix/include -I$(FPTOOLS_TOP_ABS)/libraries/parsec/include
+
+# C code compiled with UseGhcForCc=YES assumes the existence of certain CPP
+# symbols defined by GHC (eg. __GLASGOW_HASKELL__), so we better make sure
+# they're defined.  We can't test $(UseGhcForCc) here though - it isn't defined
+# yet, so we use lazy expansion.
+SRC_CC_OPTS += $(if $(findstring YES,$(UseGhcForCc)), $(PLATFORM_HC_BOOT_CC_OPTS) $(PLATFORM_CC_OPTS))
 
 ifeq "$(GhcWithInterpreter)" "YES"
 SRC_CC_OPTS += -I$(FPTOOLS_TOP_ABS)/libraries/readline/include
