@@ -113,7 +113,7 @@ class TestOptions:
 
        # skip all ways except these ([] == do all ways)
        self.only_ways = []
-       
+
        # the result we normally expect for this test
        self.expect = 'pass';
 
@@ -217,6 +217,24 @@ def _only_ways( opts, ways ):
 
 # -----
 
+def omit_compiler_types( compiler_types ):
+   return lambda opts, c=compiler_types: _omit_compiler_types(opts, c)
+
+def _omit_compiler_types( opts, compiler_types ):
+    if config.compiler_type in compiler_types:
+	opts.skip = 1
+
+# -----
+
+def only_compiler_types( compiler_types ):
+   return lambda opts, c=compiler_types: _only_compiler_types(opts, c)
+
+def _only_compiler_types( opts, compiler_types ):
+    if config.compiler_type not in compiler_types:
+	opts.skip = 1
+
+# -----
+
 def expect_fail_if_platform( plat ):
    return lambda opts, p=plat: _expect_fail_if_platform(opts, p)
 
@@ -224,6 +242,15 @@ def _expect_fail_if_platform( opts, plat ):
     if config.platform == plat:
 	opts.expect = 'fail'
 	
+# -----
+
+def expect_fail_if_compiler_type( compiler_type ):
+   return lambda opts, c=compiler_type: _expect_fail_if_compiler_type(opts, c)
+
+def _expect_fail_if_compiler_type( opts, compiler_type ):
+    if config.compiler_type == compiler_type:
+	opts.expect = 'fail'
+
 # -----
 
 def set_stdin( file ):
@@ -911,13 +938,17 @@ def qualify( name, suff ):
     return in_testdir(add_suffix(name, suff))
 
 # "foo" -> qualify("foo-platform") if it exists, otherwise
-# try qualify("foo-ws-wordsize") or finally qualify("foo")
+# try qualify("foo-compiler_type"), qualify("foo-ws-wordsize")
+# or finally qualify("foo")
 def platform_wordsize_qualify( name, suff ):
     path = qualify(name, suff)
     platform_path = path + '-' + config.platform
+    compiler_type_path = path + '-' + config.compiler_type
     wordsize_path = path + '-ws-' + config.wordsize
     if os.path.exists(platform_path):
         return platform_path
+    elif os.path.exists(compiler_type_path):
+        return compiler_type_path
     elif os.path.exists(wordsize_path):
         return wordsize_path
     else:
