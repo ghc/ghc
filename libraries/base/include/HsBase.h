@@ -114,9 +114,6 @@
 #include "timeUtils.h"
 #endif
 
-/* in ghc_errno.c */
-int *ghcErrno(void);
-
 /* in system.c */
 HsInt systemCmd(HsAddr cmd);
 
@@ -205,6 +202,9 @@ StgWord64 stg_integerToWord64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ 
 #  define INLINE extern inline
 # endif
 #endif
+
+INLINE int __hscore_get_errno(void) { return errno; }
+INLINE int __hscore_set_errno(int e) { errno = e; }
 
 #if !defined(_MSC_VER)
 INLINE int __hscore_s_isreg(m)  { return S_ISREG(m);  }

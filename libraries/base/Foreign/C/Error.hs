@@ -123,16 +123,6 @@ import System.IO.Unsafe		( unsafePerformIO )
 -- "errno" type
 -- ------------
 
--- import of C function that gives address of errno
--- This function exists because errno is a variable on some systems, but on
--- Windows it is a macro for a function...
--- [yes, global variables and thread safety don't really go hand-in-hand. -- sof]
-#ifdef __NHC__
-foreign import ccall unsafe "errno.h &errno" _errno :: Ptr CInt
-#else
-foreign import ccall unsafe "HsBase.h ghcErrno" _errno :: Ptr CInt
-#endif
-
 -- Haskell representation for "errno" values
 --
 newtype Errno = Errno CInt
@@ -282,13 +272,29 @@ isValidErrno (Errno errno)  = errno /= -1
 -- yield the current thread's "errno" value
 --
 getErrno :: IO Errno
-getErrno  = do e <- peek _errno; return (Errno e)
+
+-- We must call a C function to get the value of errno in general.  On
+-- threaded systems, errno is hidden behind a C macro so that each OS
+-- thread gets its own copy.
+#ifdef __NHC__
+getErrno = do e <- peek _errno; return (Errno e)
+foreign import ccall unsafe "errno.h &errno" _errno :: IO (Ptr CInt)
+#else
+getErrno = do e <- get_errno; return (Errno e)
+foreign import ccall unsafe "HsBase.h __hscore_get_errno" get_errno :: IO CInt
+#endif
 
 -- set the current thread's "errno" value to 0
 --
 resetErrno :: IO ()
-resetErrno  = poke _errno 0
 
+-- Again, setting errno has to be done via a C function.
+#ifdef __NHC__
+resetErrno = poke _errno 0
+#else
+resetErrno = set_errno 0
+foreign import ccall unsafe "HsBase.h __hscore_set_errno" set_errno :: CInt -> IO ()
+#endif
 
 -- throw current "errno" value
 -- ---------------------------
