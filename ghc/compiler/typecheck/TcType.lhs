@@ -23,7 +23,7 @@ module TcType (
   tcSplitRhoTy,
 
   tcInstTyVar, tcInstTyVars,
-  tcInstSigVar,
+  tcInstSigVars,
   tcInstType,
 
   --------------------------------
@@ -171,14 +171,14 @@ tcInstTyVar tyvar
     in
     tcNewMutTyVar name (tyVarKind tyvar)
 
-tcInstSigVar tyvar	-- Very similar to tcInstTyVar
-  = tcGetUnique 	`thenNF_Tc` \ uniq ->
-    let 
-	name = setNameUnique (tyVarName tyvar) uniq
-	kind = tyVarKind tyvar
-    in
-    ASSERT( not (kind == openTypeKind) )	-- Shouldn't happen
-    tcNewSigTyVar name kind
+tcInstSigVars tyvars	-- Very similar to tcInstTyVar
+  = tcGetUniques 	`thenNF_Tc` \ uniqs ->
+    listTc [ ASSERT( not (kind == openTypeKind) )	-- Shouldn't happen
+	     tcNewSigTyVar name kind 
+	   | (tyvar, uniq) <- tyvars `zip` uniqs,
+	     let name = setNameUnique (tyVarName tyvar) uniq, 
+	     let kind = tyVarKind tyvar
+	   ]
 \end{code}
 
 @tcInstType@ instantiates the outer-level for-alls of a TcType with

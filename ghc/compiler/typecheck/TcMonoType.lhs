@@ -10,8 +10,9 @@ module TcMonoType ( tcHsType, tcHsRecType, tcIfaceType,
 
 			-- Kind checking
 		    kcHsTyVar, kcHsTyVars, mkTyClTyVars,
-		    kcHsType, kcHsSigType, kcHsLiftedSigType, kcHsContext,
-		    tcTyVars, tcHsTyVars, mkImmutTyVars,
+		    kcHsType, kcHsSigType, kcHsSigTypes, 
+		    kcHsLiftedSigType, kcHsContext,
+		    tcScopedTyVars, tcHsTyVars, mkImmutTyVars,
 
 		    TcSigInfo(..), tcTySig, mkTcSig, maybeSig,
 		    checkSigTyVars, sigCtxt, sigPatCtxt
@@ -30,7 +31,7 @@ import TcEnv		( tcExtendTyVarEnv, tcLookup, tcLookupGlobal,
 		 	  TyThing(..), TcTyThing(..), tcExtendKindEnv
 			)
 import TcType		( TcKind, TcTyVar, TcThetaType, TcTauType,
-			  newKindVar, tcInstSigVar,
+			  newKindVar, tcInstSigVars,
 			  zonkKindEnv, zonkTcType, zonkTcTyVars, zonkTcTyVar
 			)
 import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToId )
@@ -117,6 +118,10 @@ But equally valid would be
 				a::(*->*)-> *, b::*->*
 
 \begin{code}
+-- tcHsTyVars is used for type variables in type signatures
+--	e.g. forall a. a->a
+-- They are immutable, because they scope only over the signature
+-- They may or may not be explicitly-kinded
 tcHsTyVars :: [HsTyVarBndr Name] 
 	   -> TcM a				-- The kind checker
 	   -> ([TyVar] -> TcM b)
@@ -134,16 +139,22 @@ tcHsTyVars tv_names kind_check thing_inside
     in
     tcExtendTyVarEnv tyvars (thing_inside tyvars)
 
-tcTyVars :: [Name] 
-	     -> TcM a				-- The kind checker
-	     -> TcM [TyVar]
-tcTyVars [] kind_check = returnTc []
+-- tcScopedTyVars is used for scoped type variables
+--	e.g.  \ (x::a) (y::a) -> x+y
+-- They never have explicit kinds (because this is source-code only)
+-- They are mutable (because they can get bound to a more specific type)
+tcScopedTyVars :: [Name] 
+	       -> TcM a				-- The kind checker
+	       -> TcM b
+	       -> TcM b
+tcScopedTyVars [] kind_check thing_inside = thing_inside
 
-tcTyVars tv_names kind_check
+tcScopedTyVars tv_names kind_check thing_inside
   = mapNF_Tc newNamedKindVar tv_names		`thenTc` \ kind_env ->
     tcExtendKindEnv kind_env kind_check		`thenTc_`
     zonkKindEnv kind_env			`thenNF_Tc` \ tvs_w_kinds ->
-    listNF_Tc [tcNewSigTyVar name kind | (name,kind) <- tvs_w_kinds]
+    listTc [tcNewMutTyVar name kind | (name, kind) <- tvs_w_kinds]	`thenNF_Tc` \ tyvars ->
+    tcExtendTyVarEnv tyvars thing_inside
 \end{code}
     
 
@@ -178,7 +189,8 @@ kcTypeType ty
 ---------------------------
 kcHsSigType, kcHsLiftedSigType :: RenamedHsType -> TcM ()
 	-- Used for type signatures
-kcHsSigType  	 = kcTypeType
+kcHsSigType  	  = kcTypeType
+kcHsSigTypes tys  = mapTc_ kcHsSigType tys
 kcHsLiftedSigType = kcLiftedType
 
 ---------------------------
@@ -682,7 +694,7 @@ mkTcSig poly_id src_loc
    let
 	(tyvars, rho) = splitForAllTys (idType poly_id)
    in
-   mapNF_Tc tcInstSigVar tyvars		`thenNF_Tc` \ tyvars' ->
+   tcInstSigVars tyvars			`thenNF_Tc` \ tyvars' ->
 	-- Make *signature* type variables
 
    let

@@ -32,7 +32,7 @@ module TcMonad(
 
 	tcAddSrcLoc, tcGetSrcLoc, tcGetInstLoc,
 	tcAddErrCtxtM, tcSetErrCtxtM,
-	tcAddErrCtxt, tcSetErrCtxt,
+	tcAddErrCtxt, tcSetErrCtxt, tcPopErrCtxt,
 
 	tcNewMutVar, tcNewSigTyVar, tcReadMutVar, tcWriteMutVar, TcRef,
 	tcNewMutTyVar, tcReadMutTyVar, tcWriteMutTyVar,
@@ -524,6 +524,9 @@ tcSetErrCtxt, tcAddErrCtxt :: Message -> Either_TcM r -> Either_TcM r
 -- Usual thing
 tcSetErrCtxt msg m down env = m (setErrCtxt down (\env -> returnNF_Tc (env, msg))) env
 tcAddErrCtxt msg m down env = m (addErrCtxt down (\env -> returnNF_Tc (env, msg))) env
+
+tcPopErrCtxt :: Either_TcM r -> Either_TcM  r
+tcPopErrCtxt m down env = m (popErrCtxt down) env
 \end{code}
 
 
@@ -606,6 +609,10 @@ getUniqSupplyVar (TcDown{tc_us=us}) = us
 getErrCtxt (TcDown{tc_ctxt=ctxt}) = ctxt
 setErrCtxt down msg = down{tc_ctxt=[msg]}
 addErrCtxt down msg = down{tc_ctxt = msg : tc_ctxt down}
+
+popErrCtxt down = case tc_ctxt down of
+			[]     -> down
+			m : ms -> down{tc_ctxt = ms}
 
 doptsTc :: DynFlag -> TcM Bool
 doptsTc dflag (TcDown{tc_dflags=dflags}) env_down

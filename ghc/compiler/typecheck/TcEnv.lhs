@@ -19,7 +19,7 @@ module TcEnv(
 	tcLookupGlobal_maybe, tcLookupGlobal, tcLookupSyntaxId, tcLookupSyntaxName,
 
 	-- Local environment
-	tcExtendKindEnv,  tcLookupLocalIds,
+	tcExtendKindEnv,  tcLookupLocalIds, tcInLocalScope,
 	tcExtendTyVarEnv, tcExtendTyVarEnvForMeths, 
 	tcExtendLocalValEnv, tcLookup, tcLookup_maybe, tcLookupId,
 
@@ -59,7 +59,7 @@ import Name		( Name, OccName, NamedThing(..),
 			  nameOccName, getSrcLoc, mkLocalName, isLocalName,
 			  nameIsLocalOrFrom
 			)
-import NameEnv		( NameEnv, lookupNameEnv, nameEnvElts, 
+import NameEnv		( NameEnv, lookupNameEnv, nameEnvElts, elemNameEnv,
 			  extendNameEnvList, emptyNameEnv, plusNameEnv )
 import OccName		( mkDFunOcc, occNameString )
 import HscTypes		( DFunId, 
@@ -169,6 +169,9 @@ tcEnvTyVars  env = [tv | ATyVar tv <- nameEnvElts (tcLEnv env)]
 tcEnvTcIds   env = [id | ATcId  id <- nameEnvElts (tcLEnv env)]
 
 getTcGEnv (TcEnv { tcGEnv = genv }) = genv
+
+tcInLocalScope :: TcEnv -> Name -> Bool
+tcInLocalScope env v = v `elemNameEnv` (tcLEnv env)
 
 -- This data type is used to help tie the knot
 -- when type checking type and class declarations

@@ -12,7 +12,7 @@ module TcInstDcls ( tcInstDecls1, tcInstDecls2, tcAddDeclCtxt ) where
 import CmdLineOpts	( DynFlag(..), dopt )
 
 import HsSyn		( HsDecl(..), InstDecl(..), TyClDecl(..), HsType(..),
-			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..), 
+			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..), HsTyVarBndr(..),
 			  andMonoBindList, collectMonoBinders, isClassDecl, toHsType
 			)
 import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl, 
@@ -36,7 +36,7 @@ import TcEnv		( TcEnv, tcExtendGlobalValEnv,
 			  isLocalThing,
 			)
 import InstEnv		( InstEnv, extendInstEnv )
-import TcMonoType	( tcTyVars, tcHsSigType, kcHsSigType, checkSigTyVars )
+import TcMonoType	( tcHsTyVars, tcHsSigType, kcHsSigType, checkSigTyVars )
 import TcSimplify	( tcSimplifyCheck )
 import HscTypes		( HomeSymbolTable, DFunId,
 			  ModDetails(..), PackageInstEnv, PersistentRenamerState
@@ -395,9 +395,10 @@ mkGenericInstance clas loc (hs_ty, binds)
   -- For example:	instance (C a, C b) => C (a+b) where { binds }
 
   = 	-- Extract the universally quantified type variables
-    tcTyVars (nameSetToList (extractHsTyVars hs_ty)) 
-	     (kcHsSigType hs_ty)		`thenTc` \ tyvars ->
-    tcExtendTyVarEnv tyvars					$
+    let
+	sig_tvs = map UserTyVar (nameSetToList (extractHsTyVars hs_ty))
+    in
+    tcHsTyVars sig_tvs (kcHsSigType hs_ty)	$ \ tyvars ->
 
 	-- Type-check the instance type, and check its form
     tcHsSigType hs_ty				`thenTc` \ inst_ty ->

@@ -595,7 +595,7 @@ tcMonoExpr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
 
 \begin{code}
 tcMonoExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
- = tcSetErrCtxt (exprSigCtxt in_expr)	$
+ = tcAddErrCtxt (exprSigCtxt in_expr)	$
    tcHsSigType  poly_ty		`thenTc` \ sig_tc_ty ->
 
    if not (isSigmaTy sig_tc_ty) then
