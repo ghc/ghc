@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.72 $
- * $Date: 2000/05/12 13:34:06 $
+ * $Revision: 1.73 $
+ * $Date: 2000/05/12 13:41:59 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -178,7 +178,7 @@ void diet_hep_initialise ( void* cstackbase )
 
 
 static
-HMODULE LoadLibrary_wrk ( LPCSTR modname )
+DH_MODULE DH_LoadLibrary_wrk ( DH_LPCSTR modname )
 {
    Text   t;
    Module m;
@@ -188,21 +188,21 @@ HMODULE LoadLibrary_wrk ( LPCSTR modname )
    if (isModule(m)) return m; else return 0;
 }
 
-HMODULE LoadLibrary ( LPCSTR modname )
+DH_MODULE DH_LoadLibrary ( DH_LPCSTR modname )
 {
    int xxx;
-   HMODULE hdl;
+   DH_MODULE hdl;
    diet_hep_initialise ( &xxx );
-   hdl = LoadLibrary_wrk ( modname );
+   hdl = DH_LoadLibrary_wrk ( modname );
    printf ( "hdl = %d\n", hdl );
    return hdl;
 }
 
 
 static
-void* GetProcAddr_wrk ( DHCALLCONV cconv,
-                        HMODULE    hModule,
-                        LPCSTR     lpProcName )
+void* DH_GetProcAddress_wrk ( DH_CALLCONV cconv,
+                              DH_MODULE   hModule,
+                              DH_LPCSTR   lpProcName )
 {
    Name  n;
    Text  typedescr;
@@ -234,13 +234,13 @@ void* GetProcAddr_wrk ( DHCALLCONV cconv,
    return adj_thunk;
 }
 
-void* GetProcAddr ( DHCALLCONV cconv,
-                    HMODULE    hModule,
-                    LPCSTR     lpProcName )
+void* DH_GetProcAddress ( DH_CALLCONV cconv,
+                          DH_MODULE   hModule,
+                          DH_LPCSTR   lpProcName )
 {
    int xxx;
    diet_hep_initialise ( &xxx );
-   return GetProcAddr_wrk ( cconv, hModule, lpProcName );
+   return DH_GetProcAddress_wrk ( cconv, hModule, lpProcName );
 }
 
 //---------------------------------
@@ -248,10 +248,10 @@ void* GetProcAddr ( DHCALLCONV cconv,
 int main ( int argc, char** argv )
 {
    void*   proc;
-   HMODULE hdl;
-   hdl = LoadLibrary("FooBar");
+   DH_MODULE hdl;
+   hdl = DH_LoadLibrary("FooBar");
    assert(isModule(hdl));
-   proc = GetProcAddr ( dh_ccall, hdl, "wurble" );
+   proc = DH_GetProcAddress ( dh_ccall, hdl, "wurble" );
 fprintf ( stderr, "just before calling it\n");
    ((void(*)(int)) proc)  (33);
    ((void(*)(int)) proc)  (34);
