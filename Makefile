@@ -39,10 +39,10 @@ binary-dist:: binary-dist-pre
 
 BIN_DIST_TOP= distrib/Makefile-bin.in \
 	      distrib/configure-bin.in \
-	      distrib/README \
+	      README \
 	      distrib/INSTALL \
-	      distrib/ANNOUNCE \
-	      distrib/PATCHLEVEL \
+	      ANNOUNCE \
+	      ghc/PATCHLEVEL \
 	      glafp-utils/mkdirhier/mkdirhier \
 	      ghc/RELEASE \
 	      install-sh \
@@ -62,8 +62,8 @@ binary-dist::
 
 #
 # Creating and copying the documentation into the bin-dist tree.
-# (this tries to be oh-so-general about copyng docs, but isn't really
-# suited for anything else than ghc/)
+# (this tries to be oh-so-general about copying docs, but isn't really
+# suited for anything other than ghc/)
 #
 # Needless to say, the rule below could be cleaned up somewhat.
 #
