@@ -7,7 +7,6 @@ module StixPrim ( primCode, amodeToStix, amodeToStix', foreignCallCode )
   where
 
 #include "HsVersions.h"
-#include "MachDeps.h"
 
 import MachMisc
 import Stix
