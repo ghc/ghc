@@ -23,7 +23,7 @@ module UniqSupply (
 #include "HsVersions.h"
 
 import Unique
-import Util
+import Panic	( panic )
 
 import GlaExts
 

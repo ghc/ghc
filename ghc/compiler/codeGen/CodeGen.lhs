@@ -34,19 +34,19 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_EnsureSplittableC,
 					      opt_SccGroup
 			)
 import CostCentre       ( CostCentre, CostCentreStack )
-import CStrings		( modnameToC )
 import FiniteMap	( FiniteMap )
 import Id               ( Id, idName )
-import Name             ( Module )
+import Name             ( Module, moduleCString, moduleString )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import Type             ( Type )
 import TyCon            ( TyCon )
 import BasicTypes	( TopLevelFlag(..) )
 import Util
+import Panic		( assertPanic )
 \end{code}
 
 \begin{code}
-codeGen :: FAST_STRING		-- module name
+codeGen :: Module		-- module name
 	-> ([CostCentre],	-- local cost-centres needing declaring/registering
 	    [CostCentre],	-- "extern" cost-centres needing declaring
 	    [CostCentreStack])  -- pre-defined "singleton" cost centre stacks
@@ -96,7 +96,7 @@ codeGen mod_name (local_CCs, extern_CCs, singleton_CCSs)
     -----------------
     grp_name  = case opt_SccGroup of
 		  Just xx -> _PK_ xx
-		  Nothing -> mod_name	-- default: module name
+		  Nothing -> _PK_ (moduleString mod_name)	-- default: module name
 
     -----------------
     mkCcRegister ccs cc_stacks import_names
@@ -108,7 +108,7 @@ codeGen mod_name (local_CCs, extern_CCs, singleton_CCSs)
 	in
 	[
 	    CCallProfCCMacro SLIT("START_REGISTER_CCS") 
-	       [ CLitLit (modnameToC (SLIT("_reg") _APPEND_ mod_name)) AddrRep],
+	       [ CLitLit (_PK_ ("_reg" ++ moduleCString mod_name)) AddrRep],
 	    register_ccs,
 	    register_cc_stacks,
 	    register_imports,
@@ -123,7 +123,7 @@ codeGen mod_name (local_CCs, extern_CCs, singleton_CCSs)
 
 	mk_import_register import_name
 	  = CCallProfCCMacro SLIT("REGISTER_IMPORT") 
-	      [CLitLit (modnameToC (SLIT("_reg") _APPEND_ import_name)) AddrRep]
+	      [CLitLit (_PK_ ("_reg" ++ moduleCString import_name)) AddrRep]
 \end{code}
 
 %************************************************************************

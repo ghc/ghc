@@ -24,7 +24,7 @@ module HsTypes (
 import Type		( Kind )
 import PprType		( {- instance Outputable Kind -} )
 import Outputable
-import Util		( thenCmp, cmpList, panic )
+import Util		( thenCmp, cmpList )
 \end{code}
 
 This is the syntax for types as seen in type signatures.
@@ -90,7 +90,7 @@ instance (Outputable name) => Outputable (HsType name) where
 
 instance (Outputable name) => Outputable (HsTyVar name) where
     ppr (UserTyVar name)       = ppr name
-    ppr (IfaceTyVar name kind) = hsep [ppr name, ptext SLIT("::"), ppr kind]
+    ppr (IfaceTyVar name kind) = hsep [ppr name, dcolon, ppr kind]
 
 pprForAll []  = empty
 pprForAll tvs = ptext SLIT("forall") <+> interppSP tvs <> ptext SLIT(".")
@@ -101,7 +101,7 @@ pprContext context = parens (hsep (punctuate comma (map pprClassAssertion contex
 
 pprClassAssertion :: (Outputable name) => ClassAssertion name -> SDoc
 pprClassAssertion (clas, tys) 
-  = ppr clas <+> hsep (map ppr tys)
+  = ppr clas <+> hsep (map pprParendHsType tys)
 \end{code}
 
 \begin{code}

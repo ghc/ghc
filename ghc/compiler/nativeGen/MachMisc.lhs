@@ -49,7 +49,7 @@ import MachRegs		( stgReg, callerSaves, RegLoc(..),
 import PrimRep		( PrimRep(..) )
 import SMRep		( SMRep(..) )
 import Stix		( StixTree(..), StixReg(..), CodeSegment )
-import Util		( panic )
+import Panic		( panic )
 import Char		( isDigit )
 import GlaExts		( word2Int#, int2Word#, shiftRL#, and#, (/=#) )
 \end{code}

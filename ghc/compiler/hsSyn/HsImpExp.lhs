@@ -8,8 +8,8 @@ module HsImpExp where
 
 #include "HsVersions.h"
 
-import BasicTypes	( Module, IfaceFlavour(..) )
-import Name		( NamedThing )
+import BasicTypes	( IfaceFlavour(..) )
+import Name		( Module, NamedThing, pprModule )
 import Outputable
 import SrcLoc		( SrcLoc )
 \end{code}
@@ -36,7 +36,7 @@ data ImportDecl name
 instance (NamedThing name, Outputable name) => Outputable (ImportDecl name) where
     ppr (ImportDecl mod qual as_source as spec _)
       = hang (hsep [ptext SLIT("import"), pp_src as_source, 
-                    pp_qual qual, ptext mod, pp_as as])
+                    pp_qual qual, pprModule mod, pp_as as])
 	     4 (pp_spec spec)
       where
 	pp_src HiFile     = empty
@@ -46,7 +46,7 @@ instance (NamedThing name, Outputable name) => Outputable (ImportDecl name) wher
 	pp_qual True	= ptext SLIT("qualified")
 
 	pp_as Nothing   = empty
-	pp_as (Just a)  = ptext SLIT("as ") <+> ptext a
+	pp_as (Just a)  = ptext SLIT("as ") <+> pprModule a
 
 	pp_spec Nothing = empty
 	pp_spec (Just (False, spec))
@@ -86,6 +86,6 @@ instance (NamedThing name, Outputable name) => Outputable (IE name) where
     ppr (IEThingWith thing withs)
 	= ppr thing <> parens (fsep (punctuate comma (map ppr withs)))
     ppr (IEModuleContents mod)
-	= ptext SLIT("module") <+> ptext mod
+	= ptext SLIT("module") <+> pprModule mod
 \end{code}
 

@@ -16,7 +16,6 @@ types that
 module BasicTypes(
 	Version, Arity, 
 	Unused, unused,
-	Module, moduleString, pprModule,
 	Fixity(..), FixityDirection(..), StrictnessMark(..),
 	NewOrData(..), IfaceFlavour(..), TopLevelFlag(..), RecFlag(..)
    ) where
@@ -63,22 +62,6 @@ type Arity = Int
 type Version = Int
 \end{code}
 
-
-%************************************************************************
-%*									*
-\subsection[Module]{The name of a module}
-%*									*
-%************************************************************************
-
-\begin{code}
-type Module   = FAST_STRING
-
-moduleString :: Module -> String
-moduleString mod = _UNPK_ mod
-
-pprModule :: Module -> SDoc
-pprModule m = ptext m
-\end{code}
 
 %************************************************************************
 %*									*

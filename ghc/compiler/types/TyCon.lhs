@@ -5,7 +5,7 @@
 
 \begin{code}
 module TyCon(
-	TyCon, KindCon, Boxity(..),
+	TyCon, KindCon, SuperKindCon,
 
 	isFunTyCon, isUnLiftedTyCon, isBoxedTyCon, isProductTyCon,
 	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, isPrimTyCon,
@@ -17,7 +17,7 @@ module TyCon(
 	mkTupleTyCon,
 	mkSynTyCon,
 	mkKindCon,
-	superKindCon,
+	mkSuperKindCon,
 
 	tyConKind,
 	tyConUnique,
@@ -38,7 +38,7 @@ module TyCon(
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Type  ( Type, Kind )
+import {-# SOURCE #-} Type  ( Type, Kind, SuperKind )
 import {-# SOURCE #-} DataCon ( DataCon )
 
 import Class 		( Class )
@@ -46,7 +46,7 @@ import Var   		( TyVar )
 import BasicTypes	( Arity, NewOrData(..), RecFlag(..) )
 import Maybes
 import Name		( Name, nameUnique, NamedThing(getName) )
-import Unique		( Unique, Uniquable(..), superKindConKey )
+import Unique		( Unique, Uniquable(..), anyBoxConKey )
 import PrimRep		( PrimRep(..), isFollowableRep )
 import Outputable
 \end{code}
@@ -58,7 +58,8 @@ import Outputable
 %************************************************************************
 
 \begin{code}
-type KindCon = TyCon
+type KindCon      = TyCon
+type SuperKindCon = TyCon
 
 data TyCon
   = FunTyCon {
@@ -112,7 +113,7 @@ data TyCon
 	tyConName   :: Name,
 	tyConKind   :: Kind,
 	tyConArity  :: Arity,
-	tyConBoxed  :: Bool,
+	tyConBoxed  :: Bool,		-- True for boxed; False for unboxed
 	tyConTyVars :: [TyVar],
 	dataCon     :: DataCon
     }
@@ -132,17 +133,14 @@ data TyCon
   | KindCon {		-- Type constructor at the kind level
 	tyConUnique :: Unique,
 	tyConName   :: Name,
-	tyConKind   :: Kind,
-	tyConArity  :: Arity,
-	
-	kindConBoxity :: Boxity
+	tyConKind   :: SuperKind,
+	tyConArity  :: Arity
     }
 
-  | SuperKindCon	{		-- The type of kind variables,
-	tyConUnique :: Unique 		-- sometimes written as a box
+  | SuperKindCon	{		-- The type of kind variables or boxity variables,
+	tyConUnique :: Unique,
+	tyConName   :: Name
     }
-
-data Boxity = Boxed | Unboxed | Open
 \end{code}
 
 %************************************************************************
@@ -158,17 +156,22 @@ module mutual-recursion.  And they aren't called from many places.
 So we compromise, and move their Kind calculation to the call site.
 
 \begin{code}
-superKindCon = SuperKindCon superKindConKey
+mkSuperKindCon :: Name -> SuperKindCon
+mkSuperKindCon name = SuperKindCon {
+			tyConUnique = nameUnique name,
+			tyConName = name
+		      }
 
-mkKindCon name kind boxity 
+mkKindCon :: Name -> SuperKind -> KindCon
+mkKindCon name kind
   = KindCon { 
 	tyConUnique = nameUnique name,
 	tyConName = name,
 	tyConArity = 0,
-	tyConKind = kind,
-	kindConBoxity = boxity
+	tyConKind = kind
      }
 
+mkFunTyCon :: Name -> Kind -> TyCon
 mkFunTyCon name kind 
   = FunTyCon { 
 	tyConUnique = nameUnique name,
@@ -370,28 +373,15 @@ instance NamedThing TyCon where
 
 @matchesTyCon tc1 tc2@ checks whether an appliation
 (tc1 t1..tn) matches (tc2 t1..tn).  By "matches" we basically mean "equals",
-except that at the kind level tc2 might have more boxity info that tc1.
-
-E.g. It's ok to bind a type variable
-	tv :: k2
-to a type
-	t  :: k1
+except that at the kind level tc2 might have more boxity info than tc1.
 
 \begin{code}
 matchesTyCon :: TyCon	-- Expected (e.g. arg type of function)
 	     -> TyCon	-- Inferred (e.g. type of actual arg to function)
 	     -> Bool
 
-matchesTyCon (KindCon {kindConBoxity = k1}) (KindCon {kindConBoxity = k2})
-  = k2 `has_more` k1
-  where
-	-- "has_more" means has more boxity info
-    Boxed   `has_more` Open	= True
-    Boxed   `has_more` Boxed    = True
-    Unboxed `has_more` Open 	= True
-    Unboxed `has_more` Unboxed  = True
-    Open    `has_more` Open     = True
-    k1	    `has_more` k2	= False
-
-matchesTyCon tc1 tc2 = tyConUnique tc1 == tyConUnique tc2
+matchesTyCon tc1 tc2 =  uniq1 == uniq2 || uniq1 == anyBoxConKey
+		     where
+			uniq1 = tyConUnique tc1
+			uniq2 = tyConUnique tc2
 \end{code}

@@ -14,7 +14,7 @@ module SATMonad where
 
 #include "HsVersions.h"
 
-import Util		( panic )
+import Panic		( panic )
 
 junk_from_SATMonad = panic "SATMonad.junk"
 
@@ -213,7 +213,7 @@ saTransform binder rhs
 	    -- top-level or exported somehow.)
 	    -- A better fix is to use binder directly but with the TopLevel
 	    -- tag (or Exported tag) modified.
-	    fake_binder = mkSysLocal
+	    fake_binder = mkSysLocal SLIT("sat")
 			    (getUnique binder)
 			    (idType binder)
 	    rec_body = mkValLam non_static_args

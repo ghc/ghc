@@ -46,7 +46,7 @@ module FiniteMap (
 
 	, bagToFM
 	, FiniteSet, emptySet, mkSet, isEmptySet
-	, elementOf, setToList, union, minusSet
+	, elementOf, setToList, union, insert, minusSet
 
     ) where
 
@@ -105,6 +105,7 @@ addToFM		:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> key -> elt  -> Fini
 addListToFM	:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> [(key,elt)] -> FiniteMap key elt
 
 		   -- Combines with previous binding
+		   -- The combining fn goes (old -> new -> new)
 addToFM_C	:: (Ord key OUTPUTABLE_key) => (elt -> elt -> elt)
 			   -> FiniteMap key elt -> key -> elt
 			   -> FiniteMap key elt
@@ -684,6 +685,7 @@ elementOf	:: (Ord key OUTPUTABLE_key) => key -> FiniteSet key -> Bool
 minusSet	:: (Ord key OUTPUTABLE_key) => FiniteSet key -> FiniteSet key -> FiniteSet key
 setToList	:: FiniteSet key -> [key]
 union		:: (Ord key OUTPUTABLE_key) => FiniteSet key -> FiniteSet key -> FiniteSet key
+insert		:: (Ord key OUTPUTABLE_key) => FiniteSet key -> key -> FiniteSet key
 
 emptySet = emptyFM
 mkSet xs = listToFM [ (x, ()) | x <- xs]
@@ -692,7 +694,7 @@ elementOf = elemFM
 minusSet  = minusFM
 setToList = keysFM
 union = plusFM
-
+insert s v = addToFM s v ()
 \end{code}
 
 %************************************************************************

@@ -1,8 +1,8 @@
 _interface_ Type 1
 _exports_
-Type Type GenType Kind ;
+Type Type Kind SuperKind ;
 _declarations_
-1 type Type = GenType BasicTypes.Unused ;
+1 data Type ;
 1 type Kind = Type ;
-1 data GenType a ;
+1 type SuperKind = Type ;
 

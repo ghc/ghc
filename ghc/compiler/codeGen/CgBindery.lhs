@@ -53,7 +53,7 @@ import PrimRep          ( PrimRep(..) )
 import StgSyn		( StgArg, StgLiveVars, GenStgArg(..) )
 import Unique           ( Unique, Uniquable(..) )
 import UniqSet		( elementOfUniqSet )
-import Util		( zipWithEqual, panic, sortLt )
+import Util		( zipWithEqual, sortLt )
 import Outputable
 \end{code}
 

@@ -18,9 +18,9 @@ module PprEnv (
 
 import {-# SOURCE #-} Const ( Con )
 
-import Var		( GenId, GenTyVar )
+import Var		( Id, TyVar )
 import CostCentre	( CostCentre )
-import Type  		( GenType )
+import Type  		( Type )
 import Outputable
 \end{code}
 
@@ -31,16 +31,16 @@ import Outputable
 %************************************************************************
 
 \begin{code}
-data PprEnv bndr flexi
+data PprEnv bndr
   = PE	{
 	pCon :: Con        -> SDoc,
 	pSCC :: CostCentre -> SDoc,
 
-	pTyVarO :: GenTyVar flexi -> SDoc,	-- to print tyvar occurrences
-	pTy     :: GenType flexi -> SDoc,	-- to print types
+	pTyVarO :: TyVar -> SDoc,	-- to print tyvar occurrences
+	pTy     :: Type -> SDoc,	-- to print types
 
 	pBndr :: BindingSite -> bndr -> SDoc,	-- to print value binders
-	pOcc  :: GenId flexi -> SDoc		-- to print value occurrences
+	pOcc  :: Id -> SDoc		-- to print value occurrences
    }
 \end{code}
 
@@ -55,11 +55,11 @@ data BindingSite = LambdaBind | CaseBind | LetBind
 initPprEnv
 	:: Maybe (Con -> SDoc)
 	-> Maybe (CostCentre -> SDoc)
-	-> Maybe (GenTyVar flexi -> SDoc)
-	-> Maybe (GenType flexi -> SDoc)
+	-> Maybe (TyVar -> SDoc)
+	-> Maybe (Type -> SDoc)
 	-> Maybe (BindingSite -> bndr -> SDoc)
-	-> Maybe (GenId flexi -> SDoc)
-	-> PprEnv bndr flexi
+	-> Maybe (Id -> SDoc)
+	-> PprEnv bndr
 
 -- you can specify all the printers individually; if
 -- you don't specify one, you get bottom

@@ -59,7 +59,9 @@ module PrelInfo (
 	numClass_RDR, fractionalClass_RDR, eqClass_RDR, 
 	ccallableClass_RDR, creturnableClass_RDR,
 	monadZeroClass_RDR, enumClass_RDR, ordClass_RDR,
-	ioDataCon_RDR
+	ioDataCon_RDR,
+
+	mkTupConRdrName, mkUbxTupConRdrName
 
     ) where
 
@@ -80,7 +82,7 @@ import TysWiredIn
 import RdrHsSyn		( RdrName(..), varQual, tcQual, qual )
 import BasicTypes	( IfaceFlavour )
 import Var		( varUnique, Id )
-import Name		( Name, OccName(..), Provenance(..),
+import Name		( Name, OccName, Provenance(..),
 			  getName, mkGlobalName, modAndOcc
 			)
 import Class		( Class, classKey )
@@ -89,7 +91,8 @@ import Type		( funTyCon )
 import Bag
 import Unique		-- *Key stuff
 import UniqFM		( UniqFM, listToUFM, lookupWithDefaultUFM ) 
-import Util		( isIn, panic )
+import Util		( isIn )
+import Panic		( panic )
 
 import IOExts
 \end{code}
@@ -560,6 +563,15 @@ geH_RDR		= prelude_primop IntGeOp
 leH_RDR		= prelude_primop IntLeOp
 minusH_RDR	= prelude_primop IntSubOp
 \end{code}
+
+\begin{code}
+mkTupConRdrName :: Int -> RdrName 
+mkTupConRdrName arity = varQual (mkTupNameStr arity)
+
+mkUbxTupConRdrName :: Int -> RdrName
+mkUbxTupConRdrName arity = varQual (mkUbxTupNameStr arity)
+\end{code}
+
 
 %************************************************************************
 %*									*

@@ -17,11 +17,11 @@ import BasicTypes	( Fixity(..), FixityDirection(..) )
 import HsTypes		( HsType )
 
 -- others:
-import Name		( Name, NamedThing(..), isLexSym, occNameString )
+import Name		( Name, NamedThing(..), isSymOcc )
 import Outputable	
 import PprType		( pprType, pprParendType )
-import Type		( GenType )
-import Var		( GenTyVar, Id )
+import Type		( Type )
+import Var		( TyVar, Id )
 import DataCon		( DataCon )
 import SrcLoc		( SrcLoc )
 \end{code}
@@ -33,15 +33,15 @@ import SrcLoc		( SrcLoc )
 %************************************************************************
 
 \begin{code}
-data HsExpr flexi id pat
+data HsExpr id pat
   = HsVar	id				-- variable
   | HsLit	HsLit				-- literal
   | HsLitOut	HsLit				-- TRANSLATION
-		(GenType flexi)		-- (with its type)
+		Type		-- (with its type)
 
-  | HsLam	(Match  flexi id pat)	-- lambda
-  | HsApp	(HsExpr flexi id pat)	-- application
-		(HsExpr flexi id pat)
+  | HsLam	(Match  id pat)	-- lambda
+  | HsApp	(HsExpr id pat)	-- application
+		(HsExpr id pat)
 
   -- Operator applications:
   -- NB Bracketed ops such as (+) come out as Vars.
@@ -49,95 +49,95 @@ data HsExpr flexi id pat
   -- NB We need an expr for the operator in an OpApp/Section since
   -- the typechecker may need to apply the operator to a few types.
 
-  | OpApp	(HsExpr flexi id pat)	-- left operand
-		(HsExpr flexi id pat)	-- operator
+  | OpApp	(HsExpr id pat)	-- left operand
+		(HsExpr id pat)	-- operator
 		Fixity				-- Renamer adds fixity; bottom until then
-		(HsExpr flexi id pat)	-- right operand
+		(HsExpr id pat)	-- right operand
 
   -- We preserve prefix negation and parenthesis for the precedence parser.
   -- They are eventually removed by the type checker.
 
-  | NegApp	(HsExpr flexi id pat)	-- negated expr
-		(HsExpr flexi id pat)	-- the negate id (in a HsVar)
+  | NegApp	(HsExpr id pat)	-- negated expr
+		(HsExpr id pat)	-- the negate id (in a HsVar)
 
-  | HsPar	(HsExpr flexi id pat)	-- parenthesised expr
+  | HsPar	(HsExpr id pat)	-- parenthesised expr
 
-  | SectionL	(HsExpr flexi id pat)	-- operand
-		(HsExpr flexi id pat)	-- operator
-  | SectionR	(HsExpr flexi id pat)	-- operator
-		(HsExpr flexi id pat)	-- operand
+  | SectionL	(HsExpr id pat)	-- operand
+		(HsExpr id pat)	-- operator
+  | SectionR	(HsExpr id pat)	-- operator
+		(HsExpr id pat)	-- operand
 				
-  | HsCase	(HsExpr flexi id pat)
-		[Match  flexi id pat]	-- must have at least one Match
+  | HsCase	(HsExpr id pat)
+		[Match id pat]
 		SrcLoc
 
-  | HsIf	(HsExpr flexi id pat)	--  predicate
-		(HsExpr flexi id pat)	--  then part
-		(HsExpr flexi id pat)	--  else part
+  | HsIf	(HsExpr id pat)	--  predicate
+		(HsExpr id pat)	--  then part
+		(HsExpr id pat)	--  else part
 		SrcLoc
 
-  | HsLet	(HsBinds flexi id pat)	-- let(rec)
-		(HsExpr  flexi id pat)
+  | HsLet	(HsBinds id pat)	-- let(rec)
+		(HsExpr  id pat)
 
   | HsDo	StmtCtxt
-		[Stmt flexi id pat]	-- "do":one or more stmts
+		[Stmt id pat]	-- "do":one or more stmts
 		SrcLoc
 
   | HsDoOut	StmtCtxt
-		[Stmt   flexi id pat]	-- "do":one or more stmts
-		id				-- id for return
-		id				-- id for >>=
+		[Stmt id pat]	-- "do":one or more stmts
+		id		-- id for return
+		id		-- id for >>=
 		id				-- id for zero
-		(GenType flexi)		-- Type of the whole expression
+		Type		-- Type of the whole expression
 		SrcLoc
 
   | ExplicitList		-- syntactic list
-		[HsExpr flexi id pat]
+		[HsExpr id pat]
   | ExplicitListOut		-- TRANSLATION
-		(GenType flexi)	-- Gives type of components of list
-		[HsExpr flexi id pat]
+		Type	-- Gives type of components of list
+		[HsExpr id pat]
 
   | ExplicitTuple		-- tuple
-		[HsExpr flexi id pat]
+		[HsExpr id pat]
 				-- NB: Unit is ExplicitTuple []
 				-- for tuples, we can get the types
 				-- direct from the components
 		Bool		-- boxed?
 
   | HsCon DataCon		-- TRANSLATION; a saturated constructor application
-	  [GenType flexi]
-	  [HsExpr flexi id pat]
+	  [Type]
+	  [HsExpr id pat]
 
 	-- Record construction
   | RecordCon	id				-- The constructor
-		(HsRecordBinds flexi id pat)
+		(HsRecordBinds id pat)
 
   | RecordConOut DataCon
-		(HsExpr flexi id pat)		-- Data con Id applied to type args
-		(HsRecordBinds flexi id pat)
+		(HsExpr id pat)		-- Data con Id applied to type args
+		(HsRecordBinds id pat)
 
 
 	-- Record update
-  | RecordUpd	(HsExpr flexi id pat)
-		(HsRecordBinds flexi id pat)
+  | RecordUpd	(HsExpr id pat)
+		(HsRecordBinds id pat)
 
-  | RecordUpdOut (HsExpr flexi id pat)	-- TRANSLATION
-		 (GenType flexi)		-- Type of *result* record (may differ from
+  | RecordUpdOut (HsExpr id pat)	-- TRANSLATION
+		 Type		-- Type of *result* record (may differ from
 						-- type of input record)
 		 [id]				-- Dicts needed for construction
-		 (HsRecordBinds flexi id pat)
+		 (HsRecordBinds id pat)
 
-  | ExprWithTySig		-- signature binding
-		(HsExpr flexi id pat)
+  | ExprWithTySig			-- signature binding
+		(HsExpr id pat)
 		(HsType id)
-  | ArithSeqIn			-- arithmetic sequence
-		(ArithSeqInfo flexi id pat)
+  | ArithSeqIn				-- arithmetic sequence
+		(ArithSeqInfo id pat)
   | ArithSeqOut
-		(HsExpr       flexi id pat) -- (typechecked, of course)
-		(ArithSeqInfo flexi id pat)
+		(HsExpr id pat)		-- (typechecked, of course)
+		(ArithSeqInfo id pat)
 
   | CCall	FAST_STRING	-- call into the C world; string is
-		[HsExpr flexi id pat]	-- the C function; exprs are the
+		[HsExpr id pat]	-- the C function; exprs are the
 				-- arguments to pass.
 		Bool		-- True <=> might cause Haskell
 				-- garbage-collection (must generate
@@ -146,33 +146,33 @@ data HsExpr flexi id pat
 				-- NOTE: this CCall is the *boxed*
 				-- version; the desugarer will convert
 				-- it into the unboxed "ccall#".
-		(GenType flexi)	-- The result type; will be *bottom*
+		Type	-- The result type; will be *bottom*
 				-- until the typechecker gets ahold of it
 
   | HsSCC	FAST_STRING	-- "set cost centre" (_scc_) annotation
-		(HsExpr flexi id pat) -- expr whose cost is to be measured
+		(HsExpr id pat) -- expr whose cost is to be measured
 \end{code}
 
 Everything from here on appears only in typechecker output.
 
 \begin{code}
   | TyLam			-- TRANSLATION
-		[GenTyVar flexi]
-		(HsExpr flexi id pat)
+		[TyVar]
+		(HsExpr id pat)
   | TyApp			-- TRANSLATION
-		(HsExpr  flexi id pat) -- generated by Spec
-		[GenType flexi]
+		(HsExpr id pat) -- generated by Spec
+		[Type]
 
   -- DictLam and DictApp are "inverses"
   |  DictLam
 		[id]
-		(HsExpr flexi id pat)
+		(HsExpr id pat)
   |  DictApp
-		(HsExpr flexi id pat)
+		(HsExpr id pat)
 		[id]
 
-type HsRecordBinds flexi id pat
-  = [(id, HsExpr flexi id pat, Bool)]
+type HsRecordBinds id pat
+  = [(id, HsExpr id pat, Bool)]
 	-- True <=> source code used "punning",
 	-- i.e. {op1, op2} rather than {op1=e1, op2=e2}
 \end{code}
@@ -185,13 +185,13 @@ A @Dictionary@, unless of length 0 or 1, becomes a tuple.  A
 
 \begin{code}
 instance (NamedThing id, Outputable id, Outputable pat) =>
-		Outputable (HsExpr flexi id pat) where
+		Outputable (HsExpr id pat) where
     ppr expr = pprExpr expr
 \end{code}
 
 \begin{code}
 pprExpr :: (NamedThing id, Outputable id, Outputable pat)
-        => HsExpr flexi id pat -> SDoc
+        => HsExpr id pat -> SDoc
 
 pprExpr e = pprDeeper (ppr_expr e)
 pprBinds b = pprDeeper (ppr b)
@@ -202,7 +202,7 @@ ppr_expr (HsLit    lit)   = ppr lit
 ppr_expr (HsLitOut lit _) = ppr lit
 
 ppr_expr (HsLam match)
-  = hsep [char '\\', nest 2 (pprMatch True match)]
+  = hsep [char '\\', nest 2 (pprMatch (True,empty) match)]
 
 ppr_expr expr@(HsApp e1 e2)
   = let (fun, args) = collect_args expr [] in
@@ -225,8 +225,8 @@ ppr_expr (OpApp e1 op fixity e2)
     pp_infixly v
       = sep [pp_e1, hsep [pp_v, pp_e2]]
       where
-        pp_v | isLexSym (occNameString (getOccName v)) = ppr v
-	     | otherwise			       = char '`' <> ppr v <> char '`'
+        pp_v | isSymOcc (getOccName v) = ppr v
+	     | otherwise	       = char '`' <> ppr v <> char '`'
 
 ppr_expr (NegApp e _)
   = char '-' <+> pprParendExpr e
@@ -305,7 +305,7 @@ ppr_expr (RecordUpdOut aexp _ _ rbinds)
   = pp_rbinds (pprParendExpr aexp) rbinds
 
 ppr_expr (ExprWithTySig expr sig)
-  = hang (nest 2 (ppr_expr expr) <+> ptext SLIT("::"))
+  = hang (nest 2 (ppr_expr expr) <+> dcolon)
 	 4 (ppr sig)
 
 ppr_expr (ArithSeqIn info)
@@ -349,7 +349,7 @@ ppr_expr (DictApp expr dnames)
 Parenthesize unless very simple:
 \begin{code}
 pprParendExpr :: (NamedThing id, Outputable id, Outputable pat)
-	      => HsExpr flexi id pat -> SDoc
+	      => HsExpr id pat -> SDoc
 
 pprParendExpr expr
   = let
@@ -377,7 +377,7 @@ pprParendExpr expr
 \begin{code}
 pp_rbinds :: (NamedThing id, Outputable id, Outputable pat)
 	      => SDoc 
-	      -> HsRecordBinds flexi id pat -> SDoc
+	      -> HsRecordBinds id pat -> SDoc
 
 pp_rbinds thing rbinds
   = hang thing 
@@ -418,25 +418,25 @@ pprDo ListComp stmts
 \end{code}
 
 \begin{code}
-data Stmt flexi id pat
+data Stmt id pat
   = BindStmt	pat
-		(HsExpr  flexi id pat)
+		(HsExpr id pat)
 		SrcLoc
 
-  | LetStmt	(HsBinds flexi id pat)
+  | LetStmt	(HsBinds id pat)
 
-  | GuardStmt	(HsExpr  flexi id pat)		-- List comps only
+  | GuardStmt	(HsExpr id pat)		-- List comps only
 		SrcLoc
 
-  | ExprStmt	(HsExpr  flexi id pat)		-- Do stmts; and guarded things at the end
+  | ExprStmt	(HsExpr id pat)		-- Do stmts; and guarded things at the end
 		SrcLoc
 
-  | ReturnStmt	(HsExpr  flexi id pat)		-- List comps only, at the end
+  | ReturnStmt	(HsExpr id pat)		-- List comps only, at the end
 \end{code}
 
 \begin{code}
 instance (NamedThing id, Outputable id, Outputable pat) =>
-		Outputable (Stmt flexi id pat) where
+		Outputable (Stmt id pat) where
     ppr stmt = pprStmt stmt
 
 pprStmt (BindStmt pat expr _)
@@ -458,20 +458,20 @@ pprStmt (ReturnStmt expr)
 %************************************************************************
 
 \begin{code}
-data ArithSeqInfo  flexi id pat
-  = From	    (HsExpr flexi id pat)
-  | FromThen 	    (HsExpr flexi id pat)
-		    (HsExpr flexi id pat)
-  | FromTo	    (HsExpr flexi id pat)
-		    (HsExpr flexi id pat)
-  | FromThenTo	    (HsExpr flexi id pat)
-		    (HsExpr flexi id pat)
-		    (HsExpr flexi id pat)
+data ArithSeqInfo id pat
+  = From	    (HsExpr id pat)
+  | FromThen 	    (HsExpr id pat)
+		    (HsExpr id pat)
+  | FromTo	    (HsExpr id pat)
+		    (HsExpr id pat)
+  | FromThenTo	    (HsExpr id pat)
+		    (HsExpr id pat)
+		    (HsExpr id pat)
 \end{code}
 
 \begin{code}
 instance (NamedThing id, Outputable id, Outputable pat) =>
-		Outputable (ArithSeqInfo flexi id pat) where
+		Outputable (ArithSeqInfo id pat) where
     ppr (From e1)		= hcat [ppr e1, pp_dotdot]
     ppr (FromThen e1 e2)	= hcat [ppr e1, comma, space, ppr e2, pp_dotdot]
     ppr (FromTo e1 e3)	= hcat [ppr e1, pp_dotdot, ppr e3]

@@ -7,9 +7,10 @@
 module SimplMonad (
 	InId, InBind, InExpr, InAlt, InArg, InType, InBinder,
 	OutId, OutBind, OutExpr, OutAlt, OutArg, OutType, OutBinder,
+	OutExprStuff, OutStuff,
 
 	-- The continuation type
-	SimplCont(..), DupFlag(..), contIsDupable,
+	SimplCont(..), DupFlag(..), contIsDupable, contResultType,
 
 	-- The monad
 	SimplM,
@@ -46,13 +47,14 @@ module SimplMonad (
 
 import Id		( Id, mkSysLocal, idMustBeINLINEd )
 import IdInfo		( InlinePragInfo(..) )
+import Demand		( Demand )
 import CoreSyn
-import CoreUtils	( IdSubst, SubstCoreExpr )
+import CoreUtils	( IdSubst, SubstCoreExpr, coreExprType, coreAltsType )
 import CostCentre	( CostCentreStack, subsumedCCS )
 import Var		( TyVar )
 import VarEnv
 import VarSet
-import Type             ( Type, TyVarSubst )
+import Type             ( Type, TyVarSubst, funResultTy, fullSubstTy, applyTy )
 import UniqSupply	( uniqsFromSupply, uniqFromSupply, splitUniqSupply,
 			  UniqSupply
 			)
@@ -99,7 +101,13 @@ type SwitchChecker = SimplifierSwitch -> SwitchResult
 %************************************************************************
 
 \begin{code}
-data SimplCont
+type OutExprStuff = OutStuff (InScopeEnv, OutExpr)
+type OutStuff a   = ([OutBind], a)
+	-- We return something equivalent to (let b in e), but
+	-- in pieces to avoid the quadratic blowup when floating 
+	-- incrementally.  Comments just before simplExprB in Simplify.lhs
+
+data SimplCont		-- Strict contexts
   = Stop
 
   | CoerceIt DupFlag
@@ -114,9 +122,15 @@ data SimplCont
 	     InId [InAlt] SubstEnv	-- The case binder, alts, and subst-env
 	     SimplCont
 
+  | ArgOf    DupFlag				-- An arbitrary strict context: the argument 
+  	     (OutExpr -> SimplM OutExprStuff)	-- of a strict function, or a primitive-arg fn
+						-- or a PrimOp
+	     OutType				-- Type of the result of the whole thing
+
 instance Outputable SimplCont where
   ppr Stop        		     = ptext SLIT("Stop")
   ppr (ApplyTo dup arg se cont)      = (ptext SLIT("ApplyTo") <+> ppr dup <+> ppr arg) $$ ppr cont
+  ppr (ArgOf   dup cont_fn _)        = ptext SLIT("ArgOf...") <+> ppr dup
   ppr (Select dup bndr alts se cont) = (ptext SLIT("Select") <+> ppr dup <+> ppr bndr) $$ 
 				       (nest 4 (ppr alts)) $$ ppr cont
   ppr (CoerceIt dup ty se cont)	     = (ptext SLIT("CoerceIt") <+> ppr dup <+> ppr ty) $$ ppr cont
@@ -128,11 +142,25 @@ instance Outputable DupFlag where
   ppr NoDup   = ptext SLIT("nodup")
 
 contIsDupable :: SimplCont -> Bool
-contIsDupable Stop        		= True
-contIsDupable (ApplyTo OkToDup _ _ _)   = True
-contIsDupable (Select  OkToDup _ _ _ _) = True
-contIsDupable (CoerceIt OkToDup _ _ _)  = True
-contIsDupable other			= False
+contIsDupable Stop        		 = True
+contIsDupable (ApplyTo  OkToDup _ _ _)   = True
+contIsDupable (ArgOf    OkToDup _ _)     = True
+contIsDupable (Select   OkToDup _ _ _ _) = True
+contIsDupable (CoerceIt OkToDup _ _ _)   = True
+contIsDupable other			 = False
+
+contResultType :: InScopeEnv -> Type -> SimplCont -> Type
+contResultType in_scope e_ty cont
+  = go e_ty cont
+  where
+    go e_ty Stop		          = e_ty
+    go e_ty (ApplyTo _ (Type ty) se cont) = go (applyTy e_ty (simpl se ty))     cont
+    go e_ty (ApplyTo _ val_arg _ cont)    = go (funResultTy e_ty)		cont
+    go e_ty (ArgOf _ fun cont_ty)         = cont_ty
+    go e_ty (CoerceIt _ ty se cont)   	  = go (simpl se ty)	                cont
+    go e_ty (Select _ _ alts se cont) 	  = go (simpl se (coreAltsType alts))   cont
+
+    simpl (ty_subst, _) ty = fullSubstTy ty_subst in_scope ty
 \end{code}
 
 
@@ -583,13 +611,14 @@ newId ty m env@(SimplEnv {seInScope = in_scope}) us sc
   =  case splitUniqSupply us of
 	(us1, us2) -> m v (env {seInScope = extendVarSet in_scope v}) us2 sc
 		   where
-		      v = mkSysLocal (uniqFromSupply us1) ty
+		      v = mkSysLocal SLIT("s") (uniqFromSupply us1) ty
 
 newIds :: [Type] -> ([Id] -> SimplM a) -> SimplM a
 newIds tys m env@(SimplEnv {seInScope = in_scope}) us sc
   =  case splitUniqSupply us of
 	(us1, us2) -> m vs (env {seInScope = foldl extendVarSet in_scope vs}) us2 sc
 		   where
-		      vs = zipWithEqual "newIds" mkSysLocal (uniqsFromSupply (length tys) us1) tys
+		      vs = zipWithEqual "newIds" (mkSysLocal SLIT("s")) 
+					(uniqsFromSupply (length tys) us1) tys
 \end{code}
 

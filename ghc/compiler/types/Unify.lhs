@@ -12,10 +12,10 @@ module Unify ( Subst,
 	       matchTy, matchTys
   ) where 
 
-import Var	( GenTyVar, TyVar, tyVarKind )
+import Var	( TyVar, tyVarKind )
 import VarEnv
 import VarSet	( varSetElems )
-import Type	( GenType(..), funTyCon, typeKind, tyVarsOfType, hasMoreBoxityInfo,
+import Type	( Type(..), funTyCon, typeKind, tyVarsOfType,
 		  splitAppTy_maybe
 		)
 import Unique	( Uniquable(..) )
@@ -32,27 +32,27 @@ import Util	( snocView )
 Unify types with an explicit substitution and no monad.
 
 \begin{code}
-type Subst flexi_tmpl flexi_result
-   = ([GenTyVar flexi_tmpl],		-- Set of template tyvars
-      TyVarEnv (GenType flexi_result))	-- Not necessarily idempotent
+type Subst
+   = ([TyVar],		-- Set of template tyvars
+      TyVarEnv Type)	-- Not necessarily idempotent
 
-unifyTysX :: [GenTyVar flexi]		-- Template tyvars
-	  -> GenType flexi
-          -> GenType flexi
-          -> Maybe (TyVarEnv (GenType flexi))
+unifyTysX :: [TyVar]		-- Template tyvars
+	  -> Type
+          -> Type
+          -> Maybe (TyVarEnv Type)
 unifyTysX tmpl_tyvars ty1 ty2
   = uTysX ty1 ty2 (\(_,s) -> Just s) (tmpl_tyvars, emptyVarEnv)
 
-unifyTyListsX :: [GenTyVar flexi] -> [GenType flexi] -> [GenType flexi]
-              -> Maybe (TyVarEnv (GenType flexi))
+unifyTyListsX :: [TyVar] -> [Type] -> [Type]
+              -> Maybe (TyVarEnv Type)
 unifyTyListsX tmpl_tyvars tys1 tys2
   = uTyListsX tys1 tys2 (\(_,s) -> Just s) (tmpl_tyvars, emptyVarEnv)
 
 
-uTysX :: GenType flexi
-      -> GenType flexi
-      -> (Subst flexi flexi -> Maybe result)
-      -> Subst flexi flexi
+uTysX :: Type
+      -> Type
+      -> (Subst -> Maybe result)
+      -> Subst
       -> Maybe result
 
 uTysX (NoteTy _ ty1) ty2 k subst = uTysX ty1 ty2 k subst
@@ -115,7 +115,7 @@ uVarX tv1 ty2 k subst@(tmpls, env)
 		     uTysX ty1 ty2 k subst
 
       Nothing	     -- Not already bound
-	       |  typeKind ty2 `hasMoreBoxityInfo` tyVarKind tv1
+	       |  typeKind ty2 == tyVarKind tv1
 	       && occur_check_ok ty2
 	       ->     -- No kind mismatch nor occur check
 	          k (tmpls, extendVarEnv env tv1 ty2)
@@ -147,17 +147,17 @@ types.  It also fails on nested foralls.
 types.
 
 \begin{code}
-matchTy :: [GenTyVar flexi_tmpl]			-- Template tyvars
-	-> GenType flexi_tmpl 				-- Template
-	-> GenType flexi_result				-- Proposed instance of template
-	-> Maybe (TyVarEnv (GenType flexi_result))	-- Matching substitution
+matchTy :: [TyVar]			-- Template tyvars
+	-> Type  			-- Template
+	-> Type				-- Proposed instance of template
+	-> Maybe (TyVarEnv Type)	-- Matching substitution
 					
 
-matchTys :: [GenTyVar flexi_tmpl]			-- Template tyvars
-	 -> [GenType flexi_tmpl]			-- Templates
-	 -> [GenType flexi_result]			-- Proposed instance of template
-	 -> Maybe (TyVarEnv (GenType flexi_result),	-- Matching substitution
-		   [GenType flexi_result])		-- Left over instance types
+matchTys :: [TyVar]			-- Template tyvars
+	 -> [Type]			-- Templates
+	 -> [Type]			-- Proposed instance of template
+	 -> Maybe (TyVarEnv Type,	-- Matching substitution
+		   [Type])		-- Left over instance types
 
 matchTy  tmpls ty1  ty2  = match      ty1  ty2  (\(_,env)       -> Just env)
 						(tmpls, emptyVarEnv)
@@ -169,9 +169,9 @@ matchTys tmpls tys1 tys2 = match_list tys1 tys2 (\((_,env),tys) -> Just (env,tys
 @match@ is the main function.
 
 \begin{code}
-match :: GenType flexi_tmpl -> GenType flexi_result    	    -- Current match pair
-      -> (Subst flexi_tmpl flexi_result -> Maybe result)    -- Continuation
-      -> Subst flexi_tmpl flexi_result		 	    -- Current substitution
+match :: Type -> Type    	    -- Current match pair
+      -> (Subst -> Maybe result)    -- Continuation
+      -> Subst 		 	    -- Current substitution
       -> Maybe result
 
 -- When matching against a type variable, see if the variable

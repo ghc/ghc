@@ -21,12 +21,11 @@ import CoreUtils	( exprIsCheap, exprIsTrivial, exprFreeVars, cheapEqExpr,
 			  FormSummary(..),
 			  substId, substIds
 			)
-import Id		( Id, idType, isBottomingId, getIdArity, isId, idName,
+import Id		( Id, idType, getIdArity, isId, idName,
 			  getInlinePragma, setInlinePragma,
 			  getIdDemandInfo
 			)
 import IdInfo		( arityLowerBound, InlinePragInfo(..) )
-import Demand		( isStrict )
 import Maybes		( maybeToBool )
 import Const		( Con(..) )
 import Name		( isLocalName )
@@ -306,16 +305,10 @@ etaCoreExpr expr@(Lam bndr body)
 
     check (b : bs) (App fun arg)
 	|  (varToCoreExpr b `cheapEqExpr` arg)
-	&& not (is_strict_binder b)
 	= check bs fun
 
     check _ _ = expr	-- Bale out
 
-	-- We don't want to eta-abstract (\x -> f x) if x carries a "strict"
-	-- demand info.  That demand info conveys useful information to the
-	-- call site, via the let-to-case transform, so we don't want to discard it.
-    is_strict_binder b = isId b && isStrict (getIdDemandInfo b)
-	
 etaCoreExpr expr = expr		-- The common case
 \end{code}
 	
@@ -379,14 +372,8 @@ eta_fun :: CoreExpr	 -- The function
 	-> Int		 -- How many args it can safely be applied to
 
 eta_fun (App fun (Type ty)) = eta_fun fun
-
-eta_fun (Var v)
-  | isBottomingId v		-- Bottoming ids have "infinite arity"
-  = 10000			-- Blargh.  Infinite enough!
-
-eta_fun (Var v) = arityLowerBound (getIdArity v)
-
-eta_fun other = 0		-- Give up
+eta_fun (Var v) 	    = arityLowerBound (getIdArity v)
+eta_fun other 		    = 0		-- Give up
 \end{code}
 
 

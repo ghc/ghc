@@ -15,40 +15,13 @@ import U_qid
 import U_ttype
 %}}
 type binding;
-	tbind	: < gtbindc	: list;	 	/* [context entries] */
-		    gtbindid	: ttype; 	/* applied tycon */
-		    gtbindl	: list;  	/* [constr] */
-		    gtbindd	: maybe; 	/* Maybe [deriving] */
-		    gtline	: long;	>;
-	ntbind	: < gntbindc	: list;	 	/* [context entries] */
-		    gntbindid	: ttype; 	/* applied tycon */
-		    gntbindcty	: list;  	/* [constr]  (only 1 constrnew) */ 
-		    gntbindd	: maybe; 	/* Maybe [deriving] */
-		    gntline	: long;	>;
-	nbind	: < gnbindid	: ttype;
-		    gnbindas	: ttype;
-		    gnline	: long; >;
-	pbind	: < gpbindl	: list;
-		    gpline	: long; >;
-	fbind	: < gfbindl	: list;
-		    gfline	: long; >;
-	abind	: < gabindfst	: binding;
-		    gabindsnd	: binding; >;
-	ibind	: < gibindi	: ttype;
-		    gibindw	: binding;
-		    giline	: long;	>;
-	dbind	: < gdbindts	: list;
-		    gdline	: long; >;
-	cbind	: < gcbindc	: list;
-		    gcbindid	: ttype;
-		    gcbindw	: binding;
-		    gcline	: long;	>;
-	sbind	: < gsbindids	: list;
-		    gsbindid	: ttype;
-		    gsline	: long;	>;
-
 	nullbind : < >;
 
+	/* And-bind; just concat two decl blobs together */
+	abind	: < gabindfst	: binding;
+		    gabindsnd	: binding; >;
+
+	/* Import decl */
 	import	: < gibindimod	 : stringId;
 		    gibindqual	 : long;
 		    gibindas	 : maybe;
@@ -56,8 +29,64 @@ type binding;
 		    gibindsource : long;
 		    gibindline	 : long; >;
 
-        /* FFI declarations */
+	/* Fixity decl */
+	fixd	: < gfixop	: qid;
+		    gfixinfx	: long;
+		    gfixprec	: long; 
+		    gfixline    : long; >;
 
+
+	/* Class declaration */
+	cbind	: < gcbindc	: list;
+		    gcbindid	: ttype;
+		    gcbindw	: binding;
+		    gcline	: long;	>;
+
+	/* Instance declaration */
+	ibind	: < gibindi	: ttype;
+		    gibindw	: binding;
+		    giline	: long;	>;
+
+	/* data type declaration */
+	tbind	: < gtbindc	: list;	 	/* [context entries] */
+		    gtbindid	: ttype; 	/* applied tycon */
+		    gtbindl	: list;  	/* [constr] */
+		    gtbindd	: maybe; 	/* Maybe [deriving] */
+		    gtline	: long;	>;
+
+	/* newtype declaration */
+	ntbind	: < gntbindc	: list;	 	/* [context entries] */
+		    gntbindid	: ttype; 	/* applied tycon */
+		    gntbindcty	: list;  	/* [constr]  (only 1 constrnew) */ 
+		    gntbindd	: maybe; 	/* Maybe [deriving] */
+		    gntline	: long;	>;
+
+	/* type synonym declaration */
+	nbind	: < gnbindid	: ttype;
+		    gnbindas	: ttype;
+		    gnline	: long; >;
+
+	/* Pattern binding */
+	pbind	: < gpbindl	: VOID_STAR;	/* The pattern, of type tree; 
+						   we can't say 'tree' because
+						   that gives mutual recursion in the C */
+		    gpbindr	: VOID_STAR;	/* The RHS, of type grhsb; same nonsense */
+		    gpline	: long; >;
+	/* Function binding */
+	fbind	: < gfbindm	: list;		/* List of matches */
+						/* The match encodes the LHS as well as RHS */
+		    gfline	: long; >;
+
+	/* Default decl */
+	dbind	: < gdbindts	: list;
+		    gdline	: long; >;
+
+	/* Type signature */
+	sbind	: < gsbindids	: list;
+		    gsbindid	: ttype;
+		    gsline	: long;	>;
+
+        /* FFI declarations */
 	fobind  : < gfobind_id   : qid;
 		    gfobind_ty   : ttype;
 		    gfobind_ext  : maybe;

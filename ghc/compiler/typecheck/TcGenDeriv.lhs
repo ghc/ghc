@@ -27,9 +27,9 @@ module TcGenDeriv (
 #include "HsVersions.h"
 
 import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..),
-			  Match(..), GRHSsAndBinds(..), Stmt(..), HsLit(..),
+			  Match(..), GRHSs(..), Stmt(..), HsLit(..),
 			  HsBinds(..), StmtCtxt(..),
-			  unguardedRHS
+			  unguardedRHS, mkSimpleMatch
 			)
 import RdrHsSyn		( RdrName(..), varUnqual, mkOpApp,
 			  RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat
@@ -54,7 +54,8 @@ import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy,
 			  floatPrimTy, doublePrimTy
 			)
 import Util		( mapAccumL, zipEqual, zipWithEqual,
-			  zipWith3Equal, nOfThem, panic, assertPanic )
+			  zipWith3Equal, nOfThem )
+import Panic		( panic, assertPanic )
 import Maybes		( maybeToBool )
 import List		( partition, intersperse )
 \end{code}
@@ -310,7 +311,11 @@ gen_Ord_binds tycon
 		[a_Pat, b_Pat]
 		[cmp_eq]
 	    (if maybeToBool (maybeTyConSingleCon tycon) then
-		cmp_eq_Expr ltTag_Expr eqTag_Expr gtTag_Expr a_Expr b_Expr
+
+--		cmp_eq_Expr ltTag_Expr eqTag_Expr gtTag_Expr a_Expr b_Expr
+-- Wierd.  Was: case (cmp a b) of { LT -> LT; EQ -> EQ; GT -> GT }
+
+		cmp_eq_Expr a_Expr b_Expr
 	     else
 		untag_Expr tycon [(a_RDR, ah_RDR), (b_RDR, bh_RDR)]
 		  (cmp_tags_Expr eqH_Int_RDR ah_RDR bh_RDR
@@ -320,7 +325,9 @@ gen_Ord_binds tycon
 		    (if isEnumerationTyCon tycon then
 			eqTag_Expr
 		     else
-			cmp_eq_Expr ltTag_Expr eqTag_Expr gtTag_Expr a_Expr b_Expr
+--			cmp_eq_Expr ltTag_Expr eqTag_Expr gtTag_Expr a_Expr b_Expr
+-- Ditto
+			cmp_eq_Expr a_Expr b_Expr
 		    )
 			-- False case; they aren't equal
 			-- So we need to do a less-than comparison on the tags
@@ -596,12 +603,11 @@ gen_Ix_binds tycon
 	   untag_Expr tycon [(a_RDR, ah_RDR)] (
 	   untag_Expr tycon [(d_RDR, dh_RDR)] (
 	   let
-		grhs = unguardedRHS (mk_easy_App mkInt_RDR [c_RDR]) tycon_loc
+		rhs = mk_easy_App mkInt_RDR [c_RDR]
 	   in
 	   HsCase
 	     (genOpApp (HsVar dh_RDR) minusH_RDR (HsVar ah_RDR))
-	     [PatMatch (VarPatIn c_RDR)
-				(GRHSMatch (GRHSsAndBindsIn grhs EmptyBinds))]
+	     [mkSimpleMatch [VarPatIn c_RDR] rhs Nothing tycon_loc]
 	     tycon_loc
 	   ))
 	) {-else-} (
@@ -744,21 +750,21 @@ gen_Read_binds tycon
 				       -- (label, '=' and field)*n, (n-1)*',' + '{' + '}'
 		con_qual
                   = BindStmt
-		          (TuplePatIn [LitPatIn (HsString data_con_str), 
+		          (TuplePatIn [LitPatIn (mkHsString data_con_str), 
 				       d_Pat] True)
 		          (HsApp (HsVar lex_RDR) c_Expr)
 		          tycon_loc
 
 		str_qual str res draw_from
                   = BindStmt
-		       (TuplePatIn [LitPatIn (HsString str), VarPatIn res] True)
+		       (TuplePatIn [LitPatIn (mkHsString str), VarPatIn res] True)
 		       (HsApp (HsVar lex_RDR) draw_from)
 		       tycon_loc
   
 		read_label f
 		  = let nm = occNameString (getOccName (fieldLabelName f))
 		    in 
-			[str_qual nm, str_qual SLIT("=")] 
+			[str_qual nm, str_qual "="] 
 			    -- There might be spaces between the label and '='
 
 		field_quals
@@ -773,16 +779,16 @@ gen_Read_binds tycon
 		     snd $
 		     mapAccumL mk_qual d_Expr
 			(zipEqual "bs_needed"	     
-			   ((str_qual (SLIT("{")):
+			   ((str_qual "{":
 			     concat (
-			     intersperse ([str_qual (_CONS_ ',' _NIL_)]) $
+			     intersperse [str_qual ","] $
 			     zipWithEqual 
 				"field_quals"
 				(\ as b -> as ++ [b])
 				    -- The labels
 				(map read_label labels)
 				    -- The fields
-				(map mk_read_qual as_needed))) ++ [str_qual (SLIT("}"))])
+				(map mk_read_qual as_needed))) ++ [str_qual "}"])
 			    bs_needed)
 
 		mk_qual draw_from (f, str_left)
@@ -850,17 +856,17 @@ gen_Show_binds tycon
 		show_con
 		  = let nm = occNameString (getOccName data_con)
 			space_ocurly_maybe
-                          | nullary_con     = _NIL_
-			  | lab_fields == 0 = SLIT(" ")
-			  | otherwise       = SLIT("{")
+                          | nullary_con     = ""
+			  | lab_fields == 0 = " "
+			  | otherwise       = "{"
 
 		    in
-			mk_showString_app (nm _APPEND_ space_ocurly_maybe)
+			mk_showString_app (nm ++ space_ocurly_maybe)
 
 		show_all con fs
 		  = let
                         ccurly_maybe 
-                          | lab_fields > 0  = [mk_showString_app (SLIT("}"))]
+                          | lab_fields > 0  = [mk_showString_app "}"]
                           | otherwise       = []
 		    in
 			con:fs ++ ccurly_maybe
@@ -870,10 +876,10 @@ gen_Show_binds tycon
 		show_label l 
 		  = let nm = occNameString (getOccName (fieldLabelName l)) 
 		    in
-		        mk_showString_app (nm _APPEND_ SLIT("="))
+		    mk_showString_app (nm ++ "=")
 
                 mk_showString_app str = HsApp (HsVar showString_RDR)
-					      (HsLit (HsString str))
+					      (HsLit (mkHsString str))
 
 		real_show_thingies =
 		     [ HsApp (HsApp (HsVar showsPrec_RDR) (HsLit (HsInt 10))) (HsVar b)
@@ -884,7 +890,7 @@ gen_Show_binds tycon
 		 | otherwise       = --Assumption: no of fields == no of labelled fields 
 				     --            (and in same order)
 		    concat $
-		    intersperse ([mk_showString_app (_CONS_ ',' _NIL_)]) $ -- Using SLIT()s containing ,s spells trouble.
+		    intersperse ([mk_showString_app ","]) $ -- Using SLIT()s containing ,s spells trouble.
 		    zipWithEqual "gen_Show_binds"
 				 (\ a b -> [a,b])
 				 (map show_label labels) 
@@ -1006,9 +1012,8 @@ mk_FunMonoBind loc fun pats_and_exprs
 		loc
 
 mk_match loc pats expr binds
-  = foldr PatMatch
-	  (GRHSMatch (GRHSsAndBindsIn (unguardedRHS expr loc) binds))
-	  (map paren pats)
+  = Match [] (map paren pats) Nothing 
+	  (GRHSs (unguardedRHS expr loc) binds Nothing)
   where
     paren p@(VarPatIn _) = p
     paren other_p	 = ParPatIn other_p
@@ -1021,7 +1026,7 @@ mk_easy_App f xs = foldl HsApp (HsVar f) (map HsVar xs)
 ToDo: Better SrcLocs.
 
 \begin{code}
-compare_Case, cmp_eq_Expr ::
+compare_Case ::
 	  RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
 	  -> RdrNameHsExpr -> RdrNameHsExpr
 	  -> RdrNameHsExpr
@@ -1037,19 +1042,15 @@ careful_compare_Case :: -- checks for primitive types...
 	  -> RdrNameHsExpr
 
 compare_Case = compare_gen_Case compare_RDR
-cmp_eq_Expr = compare_gen_Case cmp_eq_RDR
+cmp_eq_Expr a b = HsApp (HsApp (HsVar cmp_eq_RDR) a) b
+	-- Was: compare_gen_Case cmp_eq_RDR
 
 compare_gen_Case fun lt eq gt a b
   = HsCase (HsPar (HsApp (HsApp (HsVar fun) a) b)) {-of-}
-      [PatMatch (ConPatIn ltTag_RDR [])
-	  (GRHSMatch (GRHSsAndBindsIn (unguardedRHS lt mkGeneratedSrcLoc) EmptyBinds)),
-
-       PatMatch (ConPatIn eqTag_RDR [])
-	  (GRHSMatch (GRHSsAndBindsIn (unguardedRHS eq mkGeneratedSrcLoc) EmptyBinds)),
-
-       PatMatch (ConPatIn gtTag_RDR [])
-	  (GRHSMatch (GRHSsAndBindsIn (unguardedRHS gt mkGeneratedSrcLoc) EmptyBinds))]
-       mkGeneratedSrcLoc
+      [mkSimpleMatch [ConPatIn ltTag_RDR []] lt Nothing mkGeneratedSrcLoc,
+       mkSimpleMatch [ConPatIn eqTag_RDR []] eq Nothing mkGeneratedSrcLoc,
+       mkSimpleMatch [ConPatIn gtTag_RDR []] gt Nothing mkGeneratedSrcLoc]
+      mkGeneratedSrcLoc
 
 careful_compare_Case ty lt eq gt a b
   = if not (isUnboxedType ty) then
@@ -1117,11 +1118,8 @@ untag_Expr :: TyCon -> [(RdrName, RdrName)] -> RdrNameHsExpr -> RdrNameHsExpr
 untag_Expr tycon [] expr = expr
 untag_Expr tycon ((untag_this, put_tag_here) : more) expr
   = HsCase (HsPar (HsApp (con2tag_Expr tycon) (HsVar untag_this))) {-of-}
-      [PatMatch (VarPatIn put_tag_here)
-			(GRHSMatch (GRHSsAndBindsIn grhs EmptyBinds))]
+      [mkSimpleMatch [VarPatIn put_tag_here] (untag_Expr tycon more expr) Nothing mkGeneratedSrcLoc]
       mkGeneratedSrcLoc
-  where
-    grhs = unguardedRHS (untag_Expr tycon more expr) mkGeneratedSrcLoc
 
 cmp_tags_Expr :: RdrName 		-- Comparison op
 	     -> RdrName -> RdrName	-- Things to compare
@@ -1188,6 +1186,8 @@ as_RDRs		= [ varUnqual (_PK_ ("a"++show i)) | i <- [(1::Int) .. ] ]
 bs_RDRs		= [ varUnqual (_PK_ ("b"++show i)) | i <- [(1::Int) .. ] ]
 cs_RDRs		= [ varUnqual (_PK_ ("c"++show i)) | i <- [(1::Int) .. ] ]
 
+mkHsString s = HsString (_PK_ s)
+
 a_Expr		= HsVar a_RDR
 b_Expr		= HsVar b_RDR
 c_Expr		= HsVar c_RDR
@@ -1207,7 +1207,7 @@ d_Pat		= VarPatIn d_RDR
 
 con2tag_RDR, tag2con_RDR, maxtag_RDR :: TyCon -> RdrName
 
-con2tag_RDR tycon = varUnqual (SLIT("con2tag_") _APPEND_ occNameString (getOccName tycon) _APPEND_ SLIT("#"))
-tag2con_RDR tycon = varUnqual (SLIT("tag2con_") _APPEND_ occNameString (getOccName tycon) _APPEND_ SLIT("#"))
-maxtag_RDR tycon  = varUnqual (SLIT("maxtag_")  _APPEND_ occNameString (getOccName tycon) _APPEND_ SLIT("#"))
+con2tag_RDR tycon = varUnqual (_PK_ ("con2tag_" ++ occNameString (getOccName tycon) ++ "#"))
+tag2con_RDR tycon = varUnqual (_PK_ ("tag2con_" ++ occNameString (getOccName tycon) ++ "#"))
+maxtag_RDR tycon  = varUnqual (_PK_ ("maxtag_"  ++ occNameString (getOccName tycon) ++ "#"))
 \end{code}

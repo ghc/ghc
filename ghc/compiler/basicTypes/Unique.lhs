@@ -51,7 +51,7 @@ module Unique (
 	augmentIdKey,
 	boolTyConKey,
 	boundedClassKey,
-	boxedKindConKey,
+	boxedConKey,
 	buildIdKey,
 	byteArrayPrimTyConKey,
 	cCallableClassKey,
@@ -129,7 +129,7 @@ module Unique (
 	noMethodBindingErrorIdKey,
 	nonExhaustiveGuardsErrorIdKey,
 	numClassKey,
-	openKindConKey,
+	anyBoxConKey,
 	ordClassKey,
 	orderingTyConKey,
 	otherwiseIdKey,
@@ -160,14 +160,16 @@ module Unique (
 	stateTyConKey,
 
 	statePrimTyConKey,
-	superKindConKey,
+	typeConKey,
+	kindConKey,
+	boxityConKey,
 	mVarPrimTyConKey,
 	thenMClassOpKey,
 	threadIdPrimTyConKey,
 	toEnumClassOpKey,
 	traceIdKey,
 	trueDataConKey,
-	unboxedKindConKey,
+	unboxedConKey,
 	unpackCString2IdKey,
 	unpackCStringAppendIdKey,
 	unpackCStringFoldrIdKey,
@@ -200,13 +202,12 @@ module Unique (
 
 #include "HsVersions.h"
 
-import FastString	( uniqueOfFS )
+import FastString	( FastString, uniqueOfFS )
 import GlaExts
 import ST
 import PrelBase ( Char(..), chr, ord )
 
 import Outputable
-import Util
 \end{code}
 
 %************************************************************************
@@ -534,12 +535,13 @@ word32TyConKey				= mkPreludeTyConUnique 61
 word64PrimTyConKey			= mkPreludeTyConUnique 62
 word64TyConKey				= mkPreludeTyConUnique 63
 voidTyConKey				= mkPreludeTyConUnique 64
-boxedKindConKey				= mkPreludeTyConUnique 65
-unboxedKindConKey			= mkPreludeTyConUnique 66
-openKindConKey				= mkPreludeTyConUnique 67
-superKindConKey				= mkPreludeTyConUnique 68
-threadIdPrimTyConKey			= mkPreludeTyConUnique 69
-
+boxedConKey				= mkPreludeTyConUnique 65
+unboxedConKey				= mkPreludeTyConUnique 66
+anyBoxConKey				= mkPreludeTyConUnique 67
+kindConKey				= mkPreludeTyConUnique 68
+boxityConKey				= mkPreludeTyConUnique 69
+typeConKey				= mkPreludeTyConUnique 70
+threadIdPrimTyConKey			= mkPreludeTyConUnique 71
 \end{code}
 
 %************************************************************************

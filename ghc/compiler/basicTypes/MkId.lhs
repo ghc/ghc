@@ -30,7 +30,7 @@ import {-# SOURCE #-} CoreUnfold ( mkUnfolding )
 import TysWiredIn	( boolTy )
 import Type		( Type, ThetaType,
 			  mkDictTy, mkTyConApp, mkTyVarTys, mkFunTys, mkFunTy, mkSigmaTy,
-			  isUnLiftedType, substFlexiTheta,
+			  isUnLiftedType, substTopTheta,
 			  splitSigmaTy, splitFunTy_maybe, splitAlgTyConApp,
 			  splitFunTys, splitForAllTys
 			)
@@ -39,11 +39,11 @@ import Class		( Class, classBigSig, classTyCon )
 import Var		( Id, TyVar, VarDetails(..), mkId )
 import VarEnv		( zipVarEnv )
 import Const		( Con(..) )
-import Name		( mkCompoundName, mkWiredInIdName, 
-			  mkWorkerName, mkSuperDictSelName,
+import Name		( mkDerivedName, mkWiredInIdName, 
+			  mkWorkerOcc, mkSuperDictSelOcc,
 			  Name, NamedThing(..),
 			)
-import PrimOp		( PrimOp, primOpType, primOpStr, primOpUniq )
+import PrimOp		( PrimOp, primOpType, primOpOcc, primOpUniq )
 import DataCon		( DataCon, dataConStrictMarks, dataConFieldLabels, 
 			  dataConArgTys, dataConSig
 			)
@@ -86,7 +86,7 @@ mkDefaultMethodId dm_name rec_c ty
   = mkVanillaId dm_name ty
 
 mkWorkerId uniq unwrkr ty
-  = mkVanillaId (mkCompoundName mkWorkerName uniq (getName unwrkr)) ty
+  = mkVanillaId (mkDerivedName mkWorkerOcc (getName unwrkr) uniq) ty
 \end{code}
 
 %************************************************************************
@@ -257,7 +257,7 @@ mkSuperDictSelId :: Unique -> Class -> FieldLabelTag -> Type -> Id
 mkSuperDictSelId uniq clas index ty
   = mkDictSelId name clas ty
   where
-    name   = mkCompoundName (mkSuperDictSelName index) uniq (getName clas)
+    name   = mkDerivedName (mkSuperDictSelOcc index) (getName clas) uniq
 
 	-- For method selectors the clean thing to do is
 	-- to give the method selector the same name as the class op itself.
@@ -315,7 +315,7 @@ mkPrimitiveId :: PrimOp -> Id
 mkPrimitiveId prim_op 
   = id
   where
-    occ_name = primOpStr  prim_op
+    occ_name = primOpOcc  prim_op
     key	     = primOpUniq prim_op
     ty	     = primOpType prim_op
     name    = mkWiredInIdName key pREL_GHC occ_name id
@@ -365,8 +365,7 @@ mkDictFunId dfun_name clas inst_tyvars inst_tys inst_decl_theta
   = mkVanillaId dfun_name dfun_ty
   where
     (class_tyvars, sc_theta, _, _, _) = classBigSig clas
-    sc_theta' = substFlexiTheta (zipVarEnv class_tyvars inst_tys) sc_theta
-			-- Doesn't really need to be flexi
+    sc_theta' = substTopTheta (zipVarEnv class_tyvars inst_tys) sc_theta
 
     dfun_theta = case inst_decl_theta of
 		   []    -> []	-- If inst_decl_theta is empty, then we don't

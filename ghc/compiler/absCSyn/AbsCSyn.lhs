@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.18 1998/12/02 13:17:16 simonm Exp $
+% $Id: AbsCSyn.lhs,v 1.19 1998/12/18 17:40:32 simonpj Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 

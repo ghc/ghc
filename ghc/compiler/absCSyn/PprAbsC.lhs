@@ -10,11 +10,9 @@
 \begin{code}
 module PprAbsC (
 	writeRealC,
-	dumpRealC
-#ifdef DEBUG
-	, pprAmode -- otherwise, not exported
-	, pprMagicId
-#endif
+	dumpRealC,
+	pprAmode,
+	pprMagicId
     ) where
 
 #include "HsVersions.h"
@@ -53,7 +51,7 @@ import UniqSet		( emptyUniqSet, elementOfUniqSet,
 import StgSyn		( SRT(..) )
 import BitSet		( intBS )
 import Outputable
-import Util		( nOfThem, panic, assertPanic )
+import Util		( nOfThem )
 import Addr		( Addr )
 
 import ST
@@ -320,7 +318,9 @@ pprAbsC stmt@(CCallTypedef op@(CCallOp op_str is_asm may_gc cconv) results args)
 	in ASSERT (length nvrs <= 1) nvrs
 
 pprAbsC (CCodeBlock label abs_C) _
-  = ASSERT( maybeToBool(nonemptyAbsC abs_C) )
+  = if not (maybeToBool(nonemptyAbsC abs_C)) then
+	pprTrace "pprAbsC: curious empty code block for" (pprCLabel label) empty
+    else
     case (pprTempAndExternDecls abs_C) of { (pp_temps, pp_exts) ->
     vcat [
 	hcat [text (if (externallyVisibleCLabel label)

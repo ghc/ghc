@@ -25,17 +25,17 @@ import CmdLineOpts	( opt_SccGroup,
 			  StgToDo(..)
 			)
 import Id		( Id )
+import OccName		( Module, moduleString )
 import VarEnv
 import ErrUtils		( doIfSet )
 import UniqSupply	( splitUniqSupply, UniqSupply )
-import Util		( panic, assertPanic, trace )
 import IO		( hPutStr, stderr )
 import Outputable
 \end{code}
 
 \begin{code}
 stg2stg :: [StgToDo]		-- spec of what stg-to-stg passes to do
-	-> FAST_STRING		-- module name (profiling only)
+	-> Module		-- module name (profiling only)
 	-> UniqSupply		-- a name supply
 	-> [StgBinding]		-- input...
 	-> IO
@@ -82,7 +82,7 @@ stg2stg stg_todos module_name us binds
 
     grp_name  = case (opt_SccGroup) of
 		  Just xx -> _PK_ xx
-		  Nothing -> module_name -- default: module name
+		  Nothing -> _PK_ (moduleString module_name) -- default: module name
 
     -------------
     stg_linter = if opt_DoStgLinting

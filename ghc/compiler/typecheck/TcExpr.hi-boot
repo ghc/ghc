@@ -4,6 +4,6 @@ TcExpr tcExpr ;
 _declarations_
 1 tcExpr _:_ _forall_ [s] => 
 	  RnHsSyn.RenamedHsExpr
-       -> TcMonad.TcType s 
-       -> TcMonad.TcM s (TcHsSyn.TcExpr s, Inst.LIE s) ;;
+       -> TcMonad.TcType
+       -> TcMonad.TcM s (TcHsSyn.TcExpr, Inst.LIE) ;;
 

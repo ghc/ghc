@@ -11,7 +11,7 @@ module HsBinds where
 #include "HsVersions.h"
 
 import {-# SOURCE #-} HsExpr    ( pprExpr, HsExpr )
-import {-# SOURCE #-} HsMatches ( pprMatches, Match, pprGRHSsAndBinds, GRHSsAndBinds )
+import {-# SOURCE #-} HsMatches ( pprMatches, Match, pprGRHSs, GRHSs )
 
 -- friends:
 import HsTypes		( HsType )
@@ -21,11 +21,11 @@ import PprCore		()	   -- Instances for Outputable
 --others:
 import Id		( Id )
 import Name		( OccName, NamedThing(..) )
-import BasicTypes	( RecFlag(..) )
+import BasicTypes	( RecFlag(..), Fixity )
 import Outputable	
 import Bag
 import SrcLoc		( SrcLoc )
-import Var		( GenTyVar )
+import Var		( TyVar )
 \end{code}
 
 %************************************************************************
@@ -43,19 +43,19 @@ grammar.
 Collections of bindings, created by dependency analysis and translation:
 
 \begin{code}
-data HsBinds flexi id pat		-- binders and bindees
+data HsBinds id pat		-- binders and bindees
   = EmptyBinds
 
-  | ThenBinds	(HsBinds flexi id pat)
-		(HsBinds flexi id pat)
+  | ThenBinds	(HsBinds id pat)
+		(HsBinds id pat)
 
-  | MonoBind 	(MonoBinds flexi id pat)
+  | MonoBind 	(MonoBinds id pat)
 		[Sig id]		-- Empty on typechecker output
 		RecFlag
 \end{code}
 
 \begin{code}
-nullBinds :: HsBinds flexi id pat -> Bool
+nullBinds :: HsBinds id pat -> Bool
 
 nullBinds EmptyBinds		= True
 nullBinds (ThenBinds b1 b2)	= nullBinds b1 && nullBinds b2
@@ -64,7 +64,7 @@ nullBinds (MonoBind b _ _)	= nullMonoBinds b
 
 \begin{code}
 instance (Outputable pat, NamedThing id, Outputable id) =>
-		Outputable (HsBinds flexi id pat) where
+		Outputable (HsBinds id pat) where
     ppr binds = ppr_binds binds
 
 ppr_binds EmptyBinds = empty
@@ -90,32 +90,32 @@ ppr_binds (MonoBind bind sigs is_rec)
 Global bindings (where clauses)
 
 \begin{code}
-data MonoBinds flexi id pat
+data MonoBinds id pat
   = EmptyMonoBinds
 
-  | AndMonoBinds    (MonoBinds flexi id pat)
-		    (MonoBinds flexi id pat)
+  | AndMonoBinds    (MonoBinds id pat)
+		    (MonoBinds id pat)
 
   | PatMonoBind     pat
-		    (GRHSsAndBinds flexi id pat)
+		    (GRHSs id pat)
 		    SrcLoc
 
   | FunMonoBind     id
 		    Bool			-- True => infix declaration
-		    [Match flexi id pat]	-- must have at least one Match
+		    [Match id pat]
 		    SrcLoc
 
   | VarMonoBind	    id			-- TRANSLATION
-		    (HsExpr flexi id pat)
+		    (HsExpr id pat)
 
   | CoreMonoBind    id			-- TRANSLATION
 		    CoreExpr		-- No zonking; this is a final CoreExpr with Ids and Types!
 
   | AbsBinds			-- Binds abstraction; TRANSLATION
-		[GenTyVar flexi]	  -- Type variables
+		[TyVar]	  -- Type variables
 		[id]			  -- Dicts
-		[([GenTyVar flexi], id, id)]  -- (type variables, polymorphic, momonmorphic) triples
-		(MonoBinds flexi id pat)      -- The "business end"
+		[([TyVar], id, id)]  -- (type variables, polymorphic, momonmorphic) triples
+		(MonoBinds id pat)      -- The "business end"
 
 	-- Creates bindings for *new* (polymorphic, overloaded) locals
 	-- in terms of *old* (monomorphic, non-overloaded) ones.
@@ -150,24 +150,24 @@ So the desugarer tries to do a better job:
 				      in (fm,gm)
 
 \begin{code}
-nullMonoBinds :: MonoBinds flexi id pat -> Bool
+nullMonoBinds :: MonoBinds id pat -> Bool
 
 nullMonoBinds EmptyMonoBinds	     = True
 nullMonoBinds (AndMonoBinds bs1 bs2) = nullMonoBinds bs1 && nullMonoBinds bs2
 nullMonoBinds other_monobind	     = False
 
-andMonoBinds :: MonoBinds flexi id pat -> MonoBinds flexi id pat -> MonoBinds flexi id pat
+andMonoBinds :: MonoBinds id pat -> MonoBinds id pat -> MonoBinds id pat
 andMonoBinds EmptyMonoBinds mb = mb
 andMonoBinds mb EmptyMonoBinds = mb
 andMonoBinds mb1 mb2 = AndMonoBinds mb1 mb2
 
-andMonoBindList :: [MonoBinds flexi id pat] -> MonoBinds flexi id pat
+andMonoBindList :: [MonoBinds id pat] -> MonoBinds id pat
 andMonoBindList binds = foldr AndMonoBinds EmptyMonoBinds binds
 \end{code}
 
 \begin{code}
 instance (NamedThing id, Outputable id, Outputable pat) =>
-		Outputable (MonoBinds flexi id pat) where
+		Outputable (MonoBinds id pat) where
     ppr mbind = ppr_monobind mbind
 
 
@@ -175,8 +175,8 @@ ppr_monobind EmptyMonoBinds = empty
 ppr_monobind (AndMonoBinds binds1 binds2)
       = ($$) (ppr_monobind binds1) (ppr_monobind binds2)
 
-ppr_monobind (PatMonoBind pat grhss_n_binds locn)
-      = sep [ppr pat, nest 4 (pprGRHSsAndBinds False grhss_n_binds)]
+ppr_monobind (PatMonoBind pat grhss locn)
+      = sep [ppr pat, nest 4 (pprGRHSs False grhss)]
 
 ppr_monobind (FunMonoBind fun inf matches locn)
       = pprMatches (False, ppr fun) matches
@@ -213,25 +213,30 @@ data Sig name
 		(HsType name)
 		SrcLoc
 
-  | ClassOpSig	name			-- Selector name
-		(Maybe name)		-- Default-method name (if any)
+  | ClassOpSig	name		-- Selector name
+		(Maybe name)	-- Default-method name (if any)
 		(HsType name)
 		SrcLoc
 
   | SpecSig 	name		-- specialise a function or datatype ...
-		(HsType name) -- ... to these types
+		(HsType name)	-- ... to these types
 		(Maybe name)	-- ... maybe using this as the code for it
 		SrcLoc
 
-  | InlineSig	name		  -- INLINE f
+  | InlineSig	name		-- INLINE f
 		SrcLoc
 
-  | NoInlineSig	name		  -- NOINLINE f
+  | NoInlineSig	name		-- NOINLINE f
 		SrcLoc
 
-  | SpecInstSig (HsType name)    -- (Class tys); should be a specialisation of the 
-				  -- current instance decl
+  | SpecInstSig (HsType name)	-- (Class tys); should be a specialisation of the 
+				-- current instance decl
 		SrcLoc
+
+  | FixSig	(FixitySig name)		-- Fixity declaration
+
+
+data FixitySig name  = FixitySig name Fixity SrcLoc
 \end{code}
 
 \begin{code}
@@ -239,29 +244,37 @@ sigsForMe :: (name -> Bool) -> [Sig name] -> [Sig name]
 sigsForMe f sigs
   = filter sig_for_me sigs
   where
-    sig_for_me (Sig         n _ _)    = f n
-    sig_for_me (ClassOpSig  n _ _ _)  = f n
-    sig_for_me (SpecSig     n _ _ _)  = f n
-    sig_for_me (InlineSig   n     _)  = f n  
-    sig_for_me (NoInlineSig n     _)  = f n  
-    sig_for_me (SpecInstSig _ _)      = False
+    sig_for_me (Sig         n _ _)    	  = f n
+    sig_for_me (ClassOpSig  n _ _ _)  	  = f n
+    sig_for_me (SpecSig     n _ _ _)  	  = f n
+    sig_for_me (InlineSig   n     _)  	  = f n  
+    sig_for_me (NoInlineSig n     _)  	  = f n  
+    sig_for_me (SpecInstSig _ _)      	  = False
+    sig_for_me (FixSig (FixitySig n _ _)) = f n
+
+nonFixitySigs :: [Sig name] -> [Sig name]
+nonFixitySigs sigs = filter not_fix sigs
+ 		   where
+		     not_fix (FixSig _) = False
+		     not_fix other	= True
 \end{code}
 
 \begin{code}
 instance (NamedThing name, Outputable name) => Outputable (Sig name) where
     ppr sig = ppr_sig sig
 
+instance Outputable name => Outputable (FixitySig name) where
+  ppr (FixitySig name fixity loc) = sep [ppr fixity, ppr name]
+
 
 ppr_sig (Sig var ty _)
-      = sep [ppr var <+> ptext SLIT("::"),
-	     nest 4 (ppr ty)]
+      = sep [ppr var <+> dcolon, nest 4 (ppr ty)]
 
 ppr_sig (ClassOpSig var _ ty _)
-      = sep [ppr (getOccName var) <+> ptext SLIT("::"),
-	     nest 4 (ppr ty)]
+      = sep [ppr (getOccName var) <+> dcolon, nest 4 (ppr ty)]
 
 ppr_sig (SpecSig var ty using _)
-      = sep [ hsep [text "{-# SPECIALIZE", ppr var, ptext SLIT("::")],
+      = sep [ hsep [text "{-# SPECIALIZE", ppr var, dcolon],
 	      nest 4 (hsep [ppr ty, pp_using using, text "#-}"])
 	]
       where
@@ -276,5 +289,7 @@ ppr_sig (NoInlineSig var _)
 
 ppr_sig (SpecInstSig ty _)
       = hsep [text "{-# SPECIALIZE instance", ppr ty, text "#-}"]
+
+ppr_sig (FixSig fix_sig) = ppr fix_sig
 \end{code}
 

@@ -14,14 +14,32 @@ module VarEnv (
 	lookupVarEnv, lookupVarEnv_NF,
 	mapVarEnv, zipVarEnv,
 	modifyVarEnv, modifyVarEnv_Directly,
-	isEmptyVarEnv, foldVarEnv
+	isEmptyVarEnv, foldVarEnv,
+
+	TidyEnv, emptyTidyEnv
     ) where
 
 #include "HsVersions.h"
 
-import Var	( Var, Id )
+import OccName	( TidyOccEnv, emptyTidyOccEnv )
+import Var	( Var, Id, IdOrTyVar )
 import UniqFM
 import Util	( zipEqual )
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Tidying}
+%*									*
+%************************************************************************
+
+When tidying up print names, we keep a mapping of in-scope occ-names
+(the TidyOccEnv) and a Var-to-Var of the current renamings.
+
+\begin{code}
+type TidyEnv = (TidyOccEnv, VarEnv IdOrTyVar)
+emptyTidyEnv = (emptyTidyOccEnv, emptyVarEnv)
 \end{code}
 
 
@@ -37,24 +55,24 @@ type IdEnv elt    = VarEnv elt
 type TyVarEnv elt = VarEnv elt
 
 emptyVarEnv	  :: VarEnv a
-mkVarEnv	  :: [(Var fs ft, a)] -> VarEnv a
-zipVarEnv	  :: [Var fs ft] -> [a] -> VarEnv a
-unitVarEnv	  :: Var fs ft -> a -> VarEnv a
-extendVarEnv	  :: VarEnv a -> Var fs ft -> a -> VarEnv a
+mkVarEnv	  :: [(Var, a)] -> VarEnv a
+zipVarEnv	  :: [Var] -> [a] -> VarEnv a
+unitVarEnv	  :: Var -> a -> VarEnv a
+extendVarEnv	  :: VarEnv a -> Var -> a -> VarEnv a
 plusVarEnv	  :: VarEnv a -> VarEnv a -> VarEnv a
-extendVarEnvList  :: VarEnv a -> [(Var fs ft, a)] -> VarEnv a
+extendVarEnvList  :: VarEnv a -> [(Var, a)] -> VarEnv a
 		  
-delVarEnvList     :: VarEnv a -> [Var fs ft] -> VarEnv a
-delVarEnv	  :: VarEnv a -> Var fs ft -> VarEnv a
+delVarEnvList     :: VarEnv a -> [Var] -> VarEnv a
+delVarEnv	  :: VarEnv a -> Var -> VarEnv a
 plusVarEnv_C	  :: (a -> a -> a) -> VarEnv a -> VarEnv a -> VarEnv a
 mapVarEnv	  :: (a -> b) -> VarEnv a -> VarEnv b
-modifyVarEnv	  :: (a -> a) -> VarEnv a -> Var fs ft -> VarEnv a
+modifyVarEnv	  :: (a -> a) -> VarEnv a -> Var -> VarEnv a
 rngVarEnv	  :: VarEnv a -> [a]
 		  
 isEmptyVarEnv	  :: VarEnv a -> Bool
-lookupVarEnv	  :: VarEnv a -> Var fs ft -> Maybe a
-lookupVarEnv_NF   :: VarEnv a -> Var fs ft -> a
-elemVarEnv	  :: Var fs ft -> VarEnv a -> Bool
+lookupVarEnv	  :: VarEnv a -> Var -> Maybe a
+lookupVarEnv_NF   :: VarEnv a -> Var -> a
+elemVarEnv	  :: Var -> VarEnv a -> Bool
 foldVarEnv	  :: (a -> b -> b) -> b -> VarEnv a -> b
 \end{code}
 

@@ -35,7 +35,7 @@ import Type		( isUnLiftedType, splitAlgTyConApp_maybe, mkFunTys,
 import TysPrim		( byteArrayPrimTy, realWorldStatePrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 import TysWiredIn	( unitDataCon, stringTy,
-			  mkUnboxedTupleTy, unboxedPairDataCon,
+			  unboxedPairDataCon,
 			  mkUnboxedTupleTy, unboxedTupleCon
 			)
 import Outputable

@@ -33,7 +33,6 @@ import UniqSupply	( returnUs, thenUs, mapUs, mapAndUnzipUs,
 			  mapAccumLUs, UniqSM
 			)
 import Outputable
-import GlaExts (trace) --tmp
 \end{code}
 
 Code extractor for an entire stix tree---stix statement level.
@@ -1847,8 +1846,7 @@ assignFltCode pk (StInd _ dst) src
     returnUs code__2
 
 assignFltCode pk dst src
-  = trace "assignFltCode: dodgy floating point instruction" $
-    getRegister dst	    	    	    `thenUs` \ register1 ->
+  = getRegister dst	    	    	    `thenUs` \ register1 ->
     getRegister src	    	    	    `thenUs` \ register2 ->
     --getNewRegNCG (registerRep register2)
     --	    	        	    `thenUs` \ tmp ->

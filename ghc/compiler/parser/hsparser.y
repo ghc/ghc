@@ -50,10 +50,9 @@ extern list Lnil;
 extern list reverse_list();
 extern tree root;
 
-/* For FN, PREVPATT and SAMEFN macros */
+/* For FN, SAMEFN macros */
 extern qid	fns[];
 extern BOOLEAN	samefn[];
-extern tree	prevpatt[];
 extern short	icontexts;
 
 /* Line Numbers */
@@ -85,7 +84,9 @@ BOOLEAN pat_check=TRUE;
 	ttype uttype;
 	constr uconstr;
 	binding ubinding;
-	pbinding upbinding;
+        match umatch;
+        gdexp ugdexp;
+        grhsb ugrhsb;
 	entidt uentid;
 	id uid;
 	qid uqid;
@@ -227,7 +228,7 @@ BOOLEAN pat_check=TRUE;
 **********************************************************************/
 
 
-%type <ulist>   caserest alts alt quals
+%type <ulist>   caserest alts quals
 		dorest stmts stmt
 		rbinds rbinds1 rpats rpats1 list_exps list_rest
 		qvarsk qvars_list
@@ -238,22 +239,25 @@ BOOLEAN pat_check=TRUE;
 		export_list enames
   		import_list inames
  		impdecls maybeimpdecls impdecl
-		maybefixes fixes fix ops
 		dtyclses dtycls_list
-  		gdrhs gdpat valrhs
+  		gdrhs gdpat 
   		lampats	cexps gd texps
 		tyvars1 constr_context forall
 
+%type <umatch>  alt
+
+%type <ugrhsb>  valrhs altrhs
+
 %type <umaybe>  maybeexports impspec deriving 
-		ext_name
+		ext_name opt_sig opt_asig
 
 %type <uliteral> lit_constant
 
 %type <utree>	exp oexp dexp kexp fexp aexp rbind
 		expL oexpL kexpL expLno oexpLno dexpLno kexpLno
-		vallhs funlhs qual leftexp
- 		pat cpat bpat apat apatc conpat rpat
-          		patk bpatk apatck conpatk
+		funlhs funlhs1 funlhs2 funlhs3 qual leftexp
+ 		pat dpat cpat bpat apat apatc conpat rpat
+          	patk bpatk apatck conpatk
 
 
 %type <uid>	MINUS PLUS DARROW AS LAZY
@@ -272,10 +276,8 @@ BOOLEAN pat_check=TRUE;
 
 %type <ubinding>  topdecl topdecls letdecls
 		  typed datad newtd classd instd defaultd foreignd
-		  decl decls valdef instdef instdefs
+		  decl decls fixdecl fix_op fix_ops valdef
  		  maybe_where cbody rinst type_and_maybe_id
-
-%type <upbinding> valrhs1 altrest
 
 %type <uttype>    polytype
 		  conargatype conapptype
@@ -322,9 +324,20 @@ module	:  modulekey modid maybeexports
 	   body
 	;
 
-body	:  ocurly { setstartlineno(); } interface_pragma orestm
-	|  vocurly interface_pragma vrestm
+body	:  ocurly { setstartlineno(); } main_body ccurly
+        |  vocurly                      main_body vccurly
 	;
+
+main_body  :  interface_pragma maybeimpdecls topdecls
+	       {
+		 root = mkhmodule(the_module_name, $2, module_exports,
+				  $3, source_version,modulelineno);
+	       }
+	   |  interface_pragma impdecls
+	       {
+		 root = mkhmodule(the_module_name, $2, module_exports,
+			          mknullbind(), source_version, modulelineno);
+	       }
 
 interface_pragma : /* empty */
 	| INTERFACE_UPRAGMA INTEGER END_UPRAGMA SEMI
@@ -332,28 +345,6 @@ interface_pragma : /* empty */
 		 source_version = atoi($2);
 	       }
         ;
-
-orestm  :  maybeimpdecls maybefixes topdecls ccurly
-	       {
-		 root = mkhmodule(the_module_name,$1,module_exports,
-				  $2,$3,source_version,modulelineno);
-	       }
-	|  impdecls ccurly
-	       {
-		 root = mkhmodule(the_module_name,$1,module_exports,
-			          Lnil,mknullbind(),source_version,modulelineno);
-	       }
-
-vrestm  :  maybeimpdecls maybefixes topdecls vccurly
-	       {
-		 root = mkhmodule(the_module_name,$1,module_exports,
-				  $2,$3,source_version,modulelineno);
-	       }
-	|  impdecls vccurly
-	       {
-		 root = mkhmodule(the_module_name,$1,module_exports,
-				  Lnil,mknullbind(),source_version,modulelineno);
-	       }
 
 maybeexports :	/* empty */			{ $$ = mknothing(); }
 	|  OPAREN export_list CPAREN		{ $$ = mkjust($2); }
@@ -441,32 +432,6 @@ iname   :  var					{ $$ = mknoqual($1); }
 *                                                                     *
 **********************************************************************/
 
-maybefixes:  /* empty */		{ $$ = Lnil; }
-	|  fixes SEMI			{ $$ = $1; }
-	;
-
-fixes	:  fix				{ $$ = $1; }
-	|  fixes SEMI fix		{ $$ = lconc($1,$3); }
-	;
-
-fix	:  INFIXL INTEGER	{ Precedence = checkfixity($2); Fixity = INFIXL; }
-	   ops  		{ $$ = $4; }
-	|  INFIXR INTEGER	{ Precedence = checkfixity($2); Fixity = INFIXR; }
-	   ops  		{ $$ = $4; }
-	|  INFIX  INTEGER	{ Precedence = checkfixity($2); Fixity = INFIX; }
-	   ops  		{ $$ = $4; }
-	|  INFIXL		{ Fixity = INFIXL; Precedence = 9; }
-	   ops  		{ $$ = $3; }
-	|  INFIXR		{ Fixity = INFIXR; Precedence = 9; }
-	   ops  		{ $$ = $3; }
-	|  INFIX		{ Fixity = INFIX; Precedence = 9; }
-	   ops  		{ $$ = $3; }
-	;
-
-ops	:  op		 { $$ = lsing(mkfixop(mknoqual($1),infixint(Fixity),Precedence,startlineno)); }
-	|  ops COMMA op  { $$ = lapp($1,mkfixop(mknoqual($3),infixint(Fixity),Precedence,startlineno)); }
-	;
-
 topdecls:  topdecl
 	|  topdecls SEMI topdecl
 		{
@@ -544,9 +509,9 @@ inst_type : apptype DARROW apptype		{ is_context_format( $3, 0 );   /* Check the
 	  ;
 
 
-rinst	:  /* empty */			  			{ $$ = mknullbind(); }
-	|  WHERE ocurly  instdefs ccurly  			{ $$ = $3; }
-	|  WHERE vocurly instdefs vccurly 			{ $$ = $3; }
+rinst	:  /* empty */					{ $$ = mknullbind(); }
+	|  WHERE ocurly  decls ccurly  			{ $$ = $3; }
+	|  WHERE vocurly decls vccurly 			{ $$ = $3; }
 	;
 
 defaultd:  defaultkey OPAREN tautypes CPAREN       { $$ = mkdbind($3,startlineno); }
@@ -554,10 +519,12 @@ defaultd:  defaultkey OPAREN tautypes CPAREN       { $$ = mkdbind($3,startlineno
 	;
 
 /* FFI primitive declarations - GHC/Hugs specific */
-foreignd:  foreignkey IMPORT callconv ext_name unsafe_flag qvarid DCOLON tautype { $$ = mkfobind($6,$8,$4,$5,$3,FOREIGN_IMPORT,startlineno); }
-        |  foreignkey EXPORT callconv ext_name qvarid DCOLON tautype             { $$ = mkfobind($5,$7,$4,0,$3,FOREIGN_EXPORT,startlineno); }
-	;
-        |  foreignkey LABEL ext_name qvarid DCOLON tautype                       { $$ = mkfobind($4,$6,$3,0,-1,FOREIGN_LABEL,startlineno); }
+foreignd:  foreignkey IMPORT callconv ext_name unsafe_flag qvarid DCOLON tautype
+                   { $$ = mkfobind($6,$8,$4,$5,$3,FOREIGN_IMPORT,startlineno); }
+        |  foreignkey EXPORT callconv ext_name qvarid DCOLON tautype
+                   { $$ = mkfobind($5,$7,$4,0,$3,FOREIGN_EXPORT,startlineno); }
+        |  foreignkey LABEL ext_name qvarid DCOLON tautype
+                   { $$ = mkfobind($4,$6,$3,0,-1,FOREIGN_LABEL,startlineno); }
 	;
 
 callconv: STDCALL 	{ $$ = CALLCONV_STDCALL;  }
@@ -597,9 +564,16 @@ decls	: decl
     to real mischief (ugly, but likely to work).
 */
 
-decl	: qvarsk DCOLON polytype
+decl	: fixdecl
+
+        | qvarsk DCOLON polytype
 		{ $$ = mksbind($1,$3,startlineno);
-		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
+		  FN = NULL; SAMEFN = 0;
+		}
+
+        | qvark DCOLON polytype
+		{ $$ = mksbind(lsing($1),$3,startlineno);
+		  FN = NULL; SAMEFN = 0;
 		}
 
 	/* User-specified pragmas come in as "signatures"...
@@ -612,47 +586,69 @@ decl	: qvarsk DCOLON polytype
 	|  SPECIALISE_UPRAGMA qvark DCOLON types_and_maybe_ids END_UPRAGMA
 		{
 		  $$ = mkvspec_uprag($2, $4, startlineno);
-		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
+		  FN = NULL; SAMEFN = 0;
 		}
 
 	|  SPECIALISE_UPRAGMA INSTANCE gtycon atype END_UPRAGMA
 		{
 		  $$ = mkispec_uprag($3, $4, startlineno);
-		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
+		  FN = NULL; SAMEFN = 0;
 		}
 
 	|  SPECIALISE_UPRAGMA DATA gtycon atypes END_UPRAGMA
 		{
 		  $$ = mkdspec_uprag($3, $4, startlineno);
-		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
+		  FN = NULL; SAMEFN = 0;
 		}
 
 	|  INLINE_UPRAGMA qvark END_UPRAGMA
 		{
 		  $$ = mkinline_uprag($2, startlineno);
-		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
+		  FN = NULL; SAMEFN = 0;
 		}
 
 	|  NOINLINE_UPRAGMA qvark END_UPRAGMA
 		{
 		  $$ = mknoinline_uprag($2, startlineno);
-		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
+		  FN = NULL; SAMEFN = 0;
 		}
 
 	|  MAGIC_UNFOLDING_UPRAGMA qvark vark END_UPRAGMA
 		{
 		  $$ = mkmagicuf_uprag($2, $3, startlineno);
-		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
+		  FN = NULL; SAMEFN = 0;
 		}
 
 	/* end of user-specified pragmas */
 
 	|  valdef
-	|  /* empty */ { $$ = mknullbind(); PREVPATT = NULL; FN = NULL; SAMEFN = 0; }
+	|  /* empty */ { $$ = mknullbind(); FN = NULL; SAMEFN = 0; }
   	;
 
+fixdecl	:  INFIXL INTEGER	{ Precedence = checkfixity($2); Fixity = INFIXL; }
+	   fix_ops  		{ $$ = $4; }
+	|  INFIXR INTEGER	{ Precedence = checkfixity($2); Fixity = INFIXR; }
+	   fix_ops  		{ $$ = $4; }
+	|  INFIX  INTEGER	{ Precedence = checkfixity($2); Fixity = INFIX; }
+	   fix_ops  		{ $$ = $4; }
+	|  INFIXL		{ Fixity = INFIXL; Precedence = 9; }
+	   fix_ops  		{ $$ = $3; }
+	|  INFIXR		{ Fixity = INFIXR; Precedence = 9; }
+	   fix_ops  		{ $$ = $3; }
+	|  INFIX		{ Fixity = INFIX; Precedence = 9; }
+	   fix_ops  		{ $$ = $3; }
+	;
+
+/* Grotesque global-variable hack to
+   make a separate fixity decl for each op */
+fix_ops	:  fix_op
+        |  fix_ops COMMA fix_op { $$ = mkabind($1,$3); }
+	;
+
+fix_op  : op                    { $$ = mkfixd(mknoqual($1),infixint(Fixity),Precedence,startlineno); }
+        ;
+
 qvarsk	:  qvark COMMA qvars_list		{ $$ = mklcons($1,$3); }
-	|  qvark				{ $$ = lsing($1); }
 	;
 
 qvars_list: qvar				{ $$ = lsing($1); }
@@ -762,12 +758,14 @@ commas	: COMMA					{ $$ = 1; }
 
 /* C a b c, where a,b,c are type variables */
 /* C can be a class or tycon */
+
+/* simple_con_app can have no args; simple_con_app1 must have at least one */
 simple_con_app: gtycon                          { $$ = mktname($1); }
         |  simple_con_app1                      { $$ = $1; }
 	;
    
 simple_con_app1:  gtycon tyvar			{ $$ = mktapp(mktname($1),mknamedtvar($2)); }
-	|  simple_con_app tyvar			{ $$ = mktapp($1, mknamedtvar($2)); } 
+	|  simple_con_app1 tyvar		{ $$ = mktapp($1, mknamedtvar($2)); } 
 	;
 
 simple_context	:  OPAREN simple_context_list CPAREN		{ $$ = $2; }
@@ -860,116 +858,58 @@ dtycls_list:  qtycls				{ $$ = lsing($1); }
 	|  dtycls_list COMMA qtycls		{ $$ = lapp($1,$3); }
 	;
 
-instdefs : /* empty */				{ $$ = mknullbind(); }
-	 | instdef				{ $$ = $1; }
-	 | instdefs SEMI instdef
-		{
-		  if(SAMEFN)
-		    {
-		      extendfn($1,$3);
-		      $$ = $1;
-		    }
-		  else
-		    $$ = mkabind($1,$3);
-		}
-	;
+valdef	:  funlhs opt_sig	{ checksamefn($1); }	
+	   get_line_no valrhs  	{ $$ = mkfbind( lsing(mkpmatch( lsing($1), $2, $5 )), $4); }
 
-/* instdef: same as valdef, except certain user-pragmas may appear */
-instdef :
-	   SPECIALISE_UPRAGMA qvark DCOLON types_and_maybe_ids END_UPRAGMA
-		{
-		  $$ = mkvspec_uprag($2, $4, startlineno);
-		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
-		}
+/* Special case for  f :: type = e
+   We treat it as a special kind of pattern binding */
+        |  qvark DCOLON tautype 
+           get_line_no valrhs   { $$ = mkpbind( mkrestr( mkident($1), $3 ), $5, $4 ); 
+                                  FN = NULL; SAMEFN = 0; }
 
-	|  INLINE_UPRAGMA qvark END_UPRAGMA
-		{
-		  $$ = mkinline_uprag($2, startlineno);
-		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
-		}
+        |  patk                 
+           get_line_no valrhs   { $$ = mkpbind($1, $3, $2);
+                        	  FN = NULL; SAMEFN = 0; }
 
-	|  NOINLINE_UPRAGMA qvark END_UPRAGMA
-		{
-		  $$ = mknoinline_uprag($2, startlineno);
-		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
-		}
-
-	|  MAGIC_UNFOLDING_UPRAGMA qvark vark END_UPRAGMA
-		{
-		  $$ = mkmagicuf_uprag($2, $3, startlineno);
-		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
-		}
-
-	|  valdef
-  	;
-
-
-valdef	:  vallhs
-
-		{
-		  tree fn = function($1);
-		  PREVPATT = $1;
-
-		  if(ttree(fn) == ident)
-		    {
-		      qid fun_id = gident((struct Sident *) fn);
-		      checksamefn(fun_id);
-		      FN = fun_id;
-		    }
-
-		  else if (ttree(fn) == infixap)
-		    {
-		      qid fun_id = ginffun((struct Sinfixap *) fn); 
-		      checksamefn(fun_id);
-		      FN = fun_id;
-		    }
-
-		  else if(etags)
-#if 1/*etags*/
-		    printf("%u\n",startlineno);
-#else
-		    fprintf(stderr,"%u\tvaldef\n",startlineno);
-#endif
-		}	
-
-	   get_line_no
-	   valrhs
-	  	{
-		  if ( lhs_is_patt($1) )
-		    {
-		      $$ = mkpbind($4, $3);
-		      FN = NULL;
-		      SAMEFN = 0;
-		    }
-		  else
-		    $$ = mkfbind($4, $3);
-
-		  PREVPATT = NULL;
-		}
-	;
-
-get_line_no : 					{ $$ = startlineno; }
+get_line_no : 					{ $$ = hsplineno; /* startlineno; */ }
 	    ;
+/* This grammar still isn't quite right
+   If you say
+      (x + 2) y = e
+   you should get a function binding, but actually the (x+3) will
+   parse as a pattern, and you'll get a parse error. */
 
-vallhs  : patk					{ $$ = $1; }
-	| patk qvarop pat			{ $$ = mkinfixap($2,$1,$3); }
-	| funlhs				{ $$ = $1; }
+funlhs  : patk qvarop cpat			{ $$ = mkinfixap($2,$1,$3); }
+        | funlhs1 apat                          { $$ = mkap( $1, $2 ); }
+
+funlhs1 : oparenkey funlhs2 CPAREN              { $$ = mkpar($2); }
+        | funlhs1 apat                          { $$ = mkap( $1, $2 ); }
+        | qvark                                 { $$ = mkident($1); }
+        ;
+
+funlhs2 : cpat qvarop cpat			{ $$ = mkinfixap($2,$1,$3); }
+        | funlhs3 apat                          { $$ = mkap( $1, $2 ); }
+
+funlhs3 : OPAREN funlhs2 CPAREN                 { $$ = mkpar($2); }
+        | funlhs3 apat                          { $$ = mkap( $1, $2 ); }
+        | qvar                                  { $$ = mkident($1); }
+        ;
+
+opt_sig :                                       { $$ = mknothing(); }
+        |  DCOLON tautype                       { $$ = mkjust($2); }
+        ;
+
+/* opt_asig is the same, but with a parenthesised type */
+opt_asig :                                       { $$ = mknothing(); }
+         |  DCOLON atype                         { $$ = mkjust($2); }
+         ;
+
+valrhs	:  EQUAL get_line_no exp maybe_where	{ $$ = mkpnoguards($2, $3, $4); }
+        |  gdrhs maybe_where		        { $$ = mkpguards($1, $2); }
 	;
 
-funlhs	:  qvark apat				{ $$ = mkap(mkident($1),$2); }
-	|  funlhs apat				{ $$ = mkap($1,$2); }
-	;
-
-
-valrhs	:  valrhs1 maybe_where			{ $$ = lsing(createpat($1, $2)); }
-	;
-
-valrhs1	:  gdrhs				{ $$ = mkpguards($1); }
-	|  EQUAL exp				{ $$ = mkpnoguards($2); }
-	;
-
-gdrhs	:  gd EQUAL exp				{ $$ = lsing(mkpgdexp($1,$3)); }
-	|  gd EQUAL exp gdrhs			{ $$ = mklcons(mkpgdexp($1,$3),$4); }
+gdrhs	:  gd EQUAL get_line_no exp		{ $$ = lsing(mkpgdexp($1,$3,$4)); }
+	|  gd EQUAL get_line_no exp gdrhs	{ $$ = mklcons(mkpgdexp($1,$3,$4),$5); }
 	;
 
 maybe_where:
@@ -1000,8 +940,8 @@ exp	:  oexp DCOLON polytype			{ $$ = mkrestr($1,$3); }
   Operators must be left-associative at the same precedence for
   precedence parsing to work.
 */
-	/* 8 S/R conflicts on qop -> shift */
-oexp	:  oexp qop oexp %prec MINUS		{ $$ = mkinfixap($2,$1,$3); }
+	/* 10 S/R conflicts on qop -> shift */
+oexp	:  oexp qop dexp %prec MINUS		{ $$ = mkinfixap($2,$1,$3); }
 	|  dexp
 	;
 
@@ -1050,15 +990,12 @@ kexpL	:  letdecls IN exp			{ $$ = mklet($1,$3); }
 kexpLno	:  LAMBDA
 		{ hsincindent();        /* push new context for FN = NULL;        */
 		  FN = NULL; 	        /* not actually concerned about indenting */
-		  $<ulong>$ = hsplineno; /* remember current line number           */
 		}
-	   lampats
-  		{ hsendindent();
-		}
-	   RARROW exp		        /* lambda abstraction */
-		{
-		  $$ = mklambda($3, $6, $<ulong>2);
-		}
+	   lampats opt_asig
+  		{ hsendindent(); }
+
+	   RARROW get_line_no exp	/* lambda abstraction */
+		{ $$ = mklambda( mkpmatch( $3, $4, mkpnoguards( $7, $8, mknullbind() ) ) ); }
 
 	/* If Expression */
 	|  IF {$<ulong>$ = hsplineno;}
@@ -1245,20 +1182,21 @@ qual	:  letdecls	                        { $$ = mkseqlet($1); }
 						}
 	;
 
-alts	:  alt					{ $$ = $1; }
-	|  alts SEMI alt			{ $$ = lconc($1,$3); }
+alts	:  /* empty */				{ $$ = Lnil; }
+        |  alt                		        { $$ = lsing($1); }
+	|  alt SEMI alts			{ $$ = mklcons($1,$3); }
+        |  SEMI alts                            { $$ = $2; }
 	;
 
-alt	:  pat { PREVPATT = $1; } altrest	{ $$ = lsing($3); PREVPATT = NULL; }
-	|  /* empty */				{ $$ = Lnil; }
+alt	:  dpat opt_sig altrhs	                { $$ = mkpmatch( lsing($1), $2, $3 ); }
 	;
 
-altrest	:  gdpat maybe_where	 		{ $$ = createpat(mkpguards($1), $2); }
-	|  RARROW exp maybe_where		{ $$ = createpat(mkpnoguards($2),$3); }
-	;
+altrhs	:  RARROW get_line_no exp maybe_where	{ $$ = mkpnoguards($2, $3, $4); }
+	|  gdpat maybe_where	 		{ $$ = mkpguards($1, $2); }
+	;  
 
-gdpat	:  gd RARROW exp			{ $$ = lsing(mkpgdexp($1,$3)); }
-	|  gd RARROW exp gdpat			{ $$ = mklcons(mkpgdexp($1,$3),$4);  }
+gdpat	:  gd RARROW get_line_no exp		{ $$ = lsing(mkpgdexp($1,$3,$4)); }
+	|  gd RARROW get_line_no exp gdpat	{ $$ = mklcons(mkpgdexp($1,$3,$4),$5);  }
 	;
 
 stmts	:  {pat_check = FALSE;} stmt 	      {pat_check=TRUE; $$ = $2; }
@@ -1292,7 +1230,11 @@ leftexp	:  LARROW exp				{ $$ = $2; }
 *                                                                     *
 **********************************************************************/
 
-pat	:  qvar PLUS INTEGER			{ $$ = mkplusp($1, mkinteger($3)); }
+pat     :  dpat DCOLON tautype                  { $$ = mkrestr($1,$3); }
+        |  dpat
+        ;
+
+dpat	:  qvar PLUS INTEGER			{ $$ = mkplusp($1, mkinteger($3)); }
 	|  cpat
 	;
 
@@ -1340,16 +1282,19 @@ lit_constant:
 	|  CLITLIT /* yurble yurble */		{ $$ = mkclitlit($1); }
 	;
 
+/* Sequence of apats for a lambda abstraction */
 lampats	:  apat lampats				{ $$ = mklcons($1,$2); }
 	|  apat					{ $$ = lsing($1); }
 	/* right recursion? (WDP) */
 	;
 
+/* Comma-separated sequence of pats */
 pats	:  pat COMMA pats			{ $$ = mklcons($1, $3); }
 	|  pat					{ $$ = lsing($1); }
     	/* right recursion? (WDP) */
 	;
 
+/* Comma separated sequence of record patterns, each of form 'field=pat' */
 rpats	: /* empty */				{ $$ = Lnil; }
 	| rpats1
 	;
@@ -1363,6 +1308,10 @@ rpat	:  qvar					{ $$ = mkrbind($1,mknothing()); }
 	;
 
 
+/* I can't figure out just what these ...k patterns are for.
+   It seems to have something to do with recording the line number */
+
+/* Corresponds to a cpat */
 patk	:  patk qconop bpat			{ $$ = mkinfixap($2,$1,$3); }
 	|  bpatk
 	;
@@ -1647,7 +1596,7 @@ layout	: 					{ hsindentoff(); }
 ccurly	:
 	 CCURLY
 		{
-		  FN = NULL; SAMEFN = 0; PREVPATT = NULL;
+		  FN = NULL; SAMEFN = 0;
 		  hsendindent();
 		}
 	;
@@ -1658,13 +1607,13 @@ vccurly	:  { expect_ccurly = 1; }  vccurly1  { expect_ccurly = 0; }
 vccurly1:
 	 VCCURLY
 		{
-		  FN = NULL; SAMEFN = 0; PREVPATT = NULL;
+		  FN = NULL; SAMEFN = 0;
 		  hsendindent();
 		}
 	| error
 		{
 		  yyerrok;
-		  FN = NULL; SAMEFN = 0; PREVPATT = NULL;
+		  FN = NULL; SAMEFN = 0;
 		  hsendindent();
 		}
   	;

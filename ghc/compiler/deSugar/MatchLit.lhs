@@ -23,7 +23,7 @@ import Const		( mkMachInt, Literal(..) )
 import PrimRep          ( PrimRep(IntRep) )
 import Maybes		( catMaybes )
 import Type		( Type, isUnLiftedType )
-import Util		( panic, assertPanic )
+import Panic		( panic, assertPanic )
 \end{code}
 
 \begin{code}

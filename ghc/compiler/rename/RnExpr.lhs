@@ -5,20 +5,20 @@
 
 Basically dependency analysis.
 
-Handles @Match@, @GRHSsAndBinds@, @HsExpr@, and @Qualifier@ datatypes.  In
+Handles @Match@, @GRHSs@, @HsExpr@, and @Qualifier@ datatypes.  In
 general, all of these functions return a renamed thing, and a set of
 free variables.
 
 \begin{code}
 module RnExpr (
-	rnMatch, rnGRHSsAndBinds, rnPat,
+	rnMatch, rnGRHSs, rnPat,
 	checkPrecMatch
    ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-} RnBinds  ( rnBinds ) 
-import {-# SOURCE #-} RnSource ( rnHsSigType )
+import {-# SOURCE #-} RnSource ( rnHsSigType, rnHsType )
 
 import HsSyn
 import RdrHsSyn
@@ -39,9 +39,12 @@ import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon,
 import Name		( nameUnique, isLocallyDefined, NamedThing(..) )
 import NameSet
 import UniqFM		( isNullUFM )
+import FiniteMap	( elemFM )
 import UniqSet		( emptyUniqSet, UniqSet )
 import Unique		( assertIdKey )
 import Util		( removeDups )
+import ListSetOps	( unionLists )
+import Maybes		( maybeToBool )
 import Outputable
 \end{code}
 
@@ -53,39 +56,52 @@ import Outputable
 *********************************************************
 
 \begin{code}
-rnPat :: RdrNamePat -> RnMS s RenamedPat
+rnPat :: RdrNamePat -> RnMS s (RenamedPat, FreeVars)
 
-rnPat WildPatIn = returnRn WildPatIn
+rnPat WildPatIn = returnRn (WildPatIn, emptyFVs)
 
 rnPat (VarPatIn name)
   = lookupBndrRn  name			`thenRn` \ vname ->
-    returnRn (VarPatIn vname)
+    returnRn (VarPatIn vname, emptyFVs)
 
+rnPat (SigPatIn pat ty)
+  | opt_GlasgowExts
+  = rnPat pat		`thenRn` \ (pat', fvs1) ->
+    rnHsType doc ty	`thenRn` \ (ty',  fvs2) ->
+    returnRn (SigPatIn pat' ty', fvs1 `plusFV` fvs2)
+
+  | otherwise
+  = addErrRn (patSigErr ty)	`thenRn_`
+    rnPat pat
+  where
+    doc = text "a pattern type-signature"
+    
 rnPat (LitPatIn lit) 
   = litOccurrence lit			`thenRn_`
     lookupImplicitOccRn eqClass_RDR	`thenRn_`	-- Needed to find equality on pattern
-    returnRn (LitPatIn lit)
+    returnRn (LitPatIn lit, emptyFVs)
 
 rnPat (LazyPatIn pat)
-  = rnPat pat		`thenRn` \ pat' ->
-    returnRn (LazyPatIn pat')
+  = rnPat pat		`thenRn` \ (pat', fvs) ->
+    returnRn (LazyPatIn pat', fvs)
 
 rnPat (AsPatIn name pat)
-  = rnPat pat		`thenRn` \ pat' ->
+  = rnPat pat		`thenRn` \ (pat', fvs) ->
     lookupBndrRn name	`thenRn` \ vname ->
-    returnRn (AsPatIn vname pat')
+    returnRn (AsPatIn vname pat', fvs)
 
 rnPat (ConPatIn con pats)
-  = lookupOccRn con	`thenRn` \ con' ->
-    mapRn rnPat pats  	`thenRn` \ patslist ->
-    returnRn (ConPatIn con' patslist)
+  = lookupOccRn con		`thenRn` \ con' ->
+    mapAndUnzipRn rnPat pats  	`thenRn` \ (patslist, fvs_s) ->
+    returnRn (ConPatIn con' patslist, plusFVs fvs_s `addOneFV` con')
 
 rnPat (ConOpPatIn pat1 con _ pat2)
-  = rnPat pat1		`thenRn` \ pat1' ->
+  = rnPat pat1		`thenRn` \ (pat1', fvs1) ->
     lookupOccRn con	`thenRn` \ con' ->
-    lookupFixity con	`thenRn` \ fixity ->
-    rnPat pat2		`thenRn` \ pat2' ->
-    mkConOpPatRn pat1' con' fixity pat2'
+    lookupFixity con'	`thenRn` \ fixity ->
+    rnPat pat2		`thenRn` \ (pat2', fvs2) ->
+    mkConOpPatRn pat1' con' fixity pat2'	`thenRn` \ pat' ->
+    returnRn (pat', fvs1 `plusFV` fvs2 `addOneFV` con')
 
 -- Negated patters can only be literals, and they are dealt with
 -- by negating the literal at compile time, not by using the negation
@@ -94,37 +110,37 @@ rnPat (ConOpPatIn pat1 con _ pat2)
 rnPat neg@(NegPatIn pat)
   = checkRn (valid_neg_pat pat) (negPatErr neg)
 			`thenRn_`
-    rnPat pat		`thenRn` \ pat' ->
-    returnRn (NegPatIn pat')
+    rnPat pat		`thenRn` \ (pat', fvs) ->
+    returnRn (NegPatIn pat', fvs)
   where
     valid_neg_pat (LitPatIn (HsInt  _)) = True
     valid_neg_pat (LitPatIn (HsFrac _)) = True
     valid_neg_pat _                     = False
 
 rnPat (ParPatIn pat)
-  = rnPat pat		`thenRn` \ pat' ->
-    returnRn (ParPatIn pat')
+  = rnPat pat		`thenRn` \ (pat', fvs) ->
+    returnRn (ParPatIn pat', fvs)
 
 rnPat (NPlusKPatIn name lit)
   = litOccurrence lit			`thenRn_`
     lookupImplicitOccRn ordClass_RDR	`thenRn_`
     lookupBndrRn name			`thenRn` \ name' ->
-    returnRn (NPlusKPatIn name' lit)
+    returnRn (NPlusKPatIn name' lit, emptyFVs)
 
 rnPat (ListPatIn pats)
   = addImplicitOccRn listTyCon_name	`thenRn_` 
-    mapRn rnPat pats 			`thenRn` \ patslist ->
-    returnRn (ListPatIn patslist)
+    mapAndUnzipRn rnPat pats		`thenRn` \ (patslist, fvs_s) ->
+    returnRn (ListPatIn patslist, plusFVs fvs_s)
 
 rnPat (TuplePatIn pats boxed)
   = addImplicitOccRn (tupleTyCon_name boxed (length pats)) `thenRn_`
-    mapRn rnPat pats 					`thenRn` \ patslist ->
-    returnRn (TuplePatIn patslist boxed)
+    mapAndUnzipRn rnPat pats				`thenRn` \ (patslist, fvs_s) ->
+    returnRn (TuplePatIn patslist boxed, plusFVs fvs_s)
 
 rnPat (RecPatIn con rpats)
   = lookupOccRn con 	`thenRn` \ con' ->
-    rnRpats rpats	`thenRn` \ rpats' ->
-    returnRn (RecPatIn con' rpats')
+    rnRpats rpats	`thenRn` \ (rpats', fvs) ->
+    returnRn (RecPatIn con' rpats', fvs `addOneFV` con')
 \end{code}
 
 ************************************************************************
@@ -134,71 +150,77 @@ rnPat (RecPatIn con rpats)
 ************************************************************************
 
 \begin{code}
-rnMatch, rnMatch1 :: RdrNameMatch -> RnMS s (RenamedMatch, FreeVars)
+rnMatch :: RdrNameMatch -> RnMS s (RenamedMatch, FreeVars)
 
--- The only tricky bit here is that we want to do a single
--- bindLocalsRn for all the matches together, so that we spot
--- the repeated variable in
---	f x x = 1
+rnMatch match@(Match _ pats maybe_rhs_sig grhss)
+  = pushSrcLocRn (getMatchLoc match)	$
 
-rnMatch match
-  = pushSrcLocRn (getMatchLoc match) $
-    bindLocalsRn "pattern" (get_binders	match) 	$ \ new_binders ->
-    rnMatch1 match				`thenRn` \ (match', fvs) ->
+	-- Find the universally quantified type variables
+	-- in the pattern type signatures
+    getLocalNameEnv			`thenRn` \ name_env ->
+    let
+	tyvars_in_sigs = rhs_sig_tyvars `unionLists` tyvars_in_pats
+	rhs_sig_tyvars = case maybe_rhs_sig of
+				Nothing -> []
+				Just ty -> extractHsTyVars ty
+	tyvars_in_pats = extractPatsTyVars pats
+	forall_tyvars  = filter (not . (`elemFM` name_env)) tyvars_in_sigs
+	doc            = text "a pattern type-signature"
+    in
+    bindTyVarsFVRn doc (map UserTyVar forall_tyvars)	$ \ sig_tyvars ->
+
+	-- Note that we do a single bindLocalsRn for all the
+	-- matches together, so that we spot the repeated variable in
+	--	f x x = 1
+    bindLocalsFVRn "pattern" (collectPatsBinders pats) 	$ \ new_binders ->
+
+    mapAndUnzipRn rnPat pats		`thenRn` \ (pats', pat_fvs_s) ->
+    rnGRHSs grhss			`thenRn` \ (grhss', grhss_fvs) ->
+    (case maybe_rhs_sig of
+	Nothing -> returnRn (Nothing, emptyFVs)
+	Just ty | opt_GlasgowExts -> rnHsType doc ty	`thenRn` \ (ty', ty_fvs) ->
+				     returnRn (Just ty', ty_fvs)
+		| otherwise	  -> addErrRn (patSigErr ty)	`thenRn_`
+				     returnRn (Nothing, emptyFVs)
+    )					`thenRn` \ (maybe_rhs_sig', ty_fvs) ->
+
     let
 	binder_set     = mkNameSet new_binders
-	unused_binders = binder_set `minusNameSet` fvs
-	net_fvs	       = fvs `minusNameSet` binder_set
+	unused_binders = nameSetToList (binder_set `minusNameSet` grhss_fvs)
+	all_fvs	       = grhss_fvs `plusFV` plusFVs pat_fvs_s `plusFV` ty_fvs
     in
     warnUnusedMatches unused_binders		`thenRn_`
     
-    returnRn (match', net_fvs)
- where
-    get_binders (GRHSMatch _)	     = []
-    get_binders (PatMatch pat match) = collectPatBinders pat ++ get_binders match
-
-rnMatch1 (PatMatch pat match)
-  = rnPat pat				`thenRn` \ pat' ->
-    rnMatch1 match			`thenRn` \ (match', fvs) ->
-    returnRn (PatMatch pat' match', fvs)
-
-rnMatch1 (GRHSMatch grhss_and_binds)
-  = rnGRHSsAndBinds grhss_and_binds `thenRn` \ (grhss_and_binds', fvs) ->
-    returnRn (GRHSMatch grhss_and_binds', fvs)
+    returnRn (Match sig_tyvars pats' maybe_rhs_sig' grhss', all_fvs)
+	-- The bindLocals and bindTyVars will remove the bound FVs
 \end{code}
 
 %************************************************************************
 %*									*
-\subsubsection{Guarded right-hand sides (GRHSsAndBinds)}
+\subsubsection{Guarded right-hand sides (GRHSs)}
 %*									*
 %************************************************************************
 
 \begin{code}
-rnGRHSsAndBinds :: RdrNameGRHSsAndBinds -> RnMS s (RenamedGRHSsAndBinds, FreeVars)
+rnGRHSs :: RdrNameGRHSs -> RnMS s (RenamedGRHSs, FreeVars)
 
-rnGRHSsAndBinds (GRHSsAndBindsIn grhss binds)
-  = rnBinds binds		$ \ binds' ->
-    rnGRHSs grhss		`thenRn` \ (grhss', fvGRHS) ->
-    returnRn (GRHSsAndBindsIn grhss' binds', fvGRHS)
-  where
-    rnGRHSs [] = returnRn ([], emptyNameSet)
+rnGRHSs (GRHSs grhss binds maybe_ty)
+  = ASSERT( not (maybeToBool maybe_ty) )
+    rnBinds binds		$ \ binds' ->
+    mapAndUnzipRn rnGRHS grhss	`thenRn` \ (grhss', fvGRHSs) ->
+    returnRn (GRHSs grhss' binds' Nothing, plusFVs fvGRHSs)
 
-    rnGRHSs (grhs:grhss)
-      = rnGRHS  grhs   `thenRn` \ (grhs',  fvs) ->
-	rnGRHSs grhss  `thenRn` \ (grhss', fvss) ->
-	returnRn (grhs' : grhss', fvs `unionNameSets` fvss)
-
-    rnGRHS (GRHS guarded locn)
-      = pushSrcLocRn locn $		    
-	(if not (opt_GlasgowExts || is_standard_guard guarded) then
+rnGRHS (GRHS guarded locn)
+  = pushSrcLocRn locn $		    
+    (if not (opt_GlasgowExts || is_standard_guard guarded) then
 		addWarnRn (nonStdGuardErr guarded)
-	 else
+     else
 		returnRn ()
-	)		`thenRn_`
+    )		`thenRn_`
 
-	rnStmts rnExpr guarded	`thenRn` \ (guarded', fvs) ->
-	returnRn (GRHS guarded' locn, fvs)
-
+    rnStmts rnExpr guarded	`thenRn` \ (guarded', fvs) ->
+    returnRn (GRHS guarded' locn, fvs)
+  where
 	-- Standard Haskell 1.4 guards are just a single boolean
 	-- expression, rather than a list of qualifiers as in the
 	-- Glasgow extension
@@ -224,7 +246,7 @@ rnExprs ls = rnExprs' ls emptyUniqSet
 	-- Now we do a "seq" on the free vars because typically it's small
 	-- or empty, especially in very long lists of constants
     let
-	acc' = acc `unionNameSets` fvExpr
+	acc' = acc `plusFV` fvExpr
     in
     (grubby_seqNameSet acc' rnExprs') exprs acc'	`thenRn` \ (exprs', fvExprs) ->
     returnRn (expr':exprs', fvExprs)
@@ -267,12 +289,12 @@ rnExpr (HsLam match)
 rnExpr (HsApp fun arg)
   = rnExpr fun		`thenRn` \ (fun',fvFun) ->
     rnExpr arg		`thenRn` \ (arg',fvArg) ->
-    returnRn (HsApp fun' arg', fvFun `unionNameSets` fvArg)
+    returnRn (HsApp fun' arg', fvFun `plusFV` fvArg)
 
-rnExpr (OpApp e1 op@(HsVar op_name) _ e2) 
+rnExpr (OpApp e1 op _ e2) 
   = rnExpr e1				`thenRn` \ (e1', fv_e1) ->
     rnExpr e2				`thenRn` \ (e2', fv_e2) ->
-    rnExpr op				`thenRn` \ (op', fv_op) ->
+    rnExpr op				`thenRn` \ (op'@(HsVar op_name), fv_op) ->
 
 	-- Deal with fixity
 	-- When renaming code synthesised from "deriving" declarations
@@ -281,12 +303,12 @@ rnExpr (OpApp e1 op@(HsVar op_name) _ e2)
     lookupFixity op_name		`thenRn` \ fixity ->
     getModeRn				`thenRn` \ mode -> 
     (case mode of
-	SourceMode        -> mkOpAppRn e1' op' fixity e2'
-	InterfaceMode _ _ -> returnRn (OpApp e1' op' fixity e2')
+	SourceMode      -> mkOpAppRn e1' op' fixity e2'
+	InterfaceMode _ -> returnRn (OpApp e1' op' fixity e2')
     )					`thenRn` \ final_e -> 
 
     returnRn (final_e,
-	      fv_e1 `unionNameSets` fv_op `unionNameSets` fv_e2)
+	      fv_e1 `plusFV` fv_op `plusFV` fv_e2)
 
 rnExpr (NegApp e n)
   = rnExpr e				`thenRn` \ (e', fv_e) ->
@@ -301,12 +323,12 @@ rnExpr (HsPar e)
 rnExpr (SectionL expr op)
   = rnExpr expr	 	`thenRn` \ (expr', fvs_expr) ->
     rnExpr op	 	`thenRn` \ (op', fvs_op) ->
-    returnRn (SectionL expr' op', fvs_op `unionNameSets` fvs_expr)
+    returnRn (SectionL expr' op', fvs_op `plusFV` fvs_expr)
 
 rnExpr (SectionR op expr)
   = rnExpr op	 	`thenRn` \ (op',   fvs_op) ->
     rnExpr expr	 	`thenRn` \ (expr', fvs_expr) ->
-    returnRn (SectionR op' expr', fvs_op `unionNameSets` fvs_expr)
+    returnRn (SectionR op' expr', fvs_op `plusFV` fvs_expr)
 
 rnExpr (CCall fun args may_gc is_casm fake_result_ty)
 	-- Check out the comment on RnIfaces.getNonWiredDataDecl about ccalls
@@ -324,7 +346,7 @@ rnExpr (HsCase expr ms src_loc)
   = pushSrcLocRn src_loc $
     rnExpr expr		 	`thenRn` \ (new_expr, e_fvs) ->
     mapAndUnzipRn rnMatch ms	`thenRn` \ (new_ms, ms_fvs) ->
-    returnRn (HsCase new_expr new_ms src_loc, unionManyNameSets (e_fvs : ms_fvs))
+    returnRn (HsCase new_expr new_ms src_loc, plusFVs (e_fvs : ms_fvs))
 
 rnExpr (HsLet binds expr)
   = rnBinds binds		$ \ binds' ->
@@ -355,19 +377,19 @@ rnExpr (RecordCon con_id rbinds)
 rnExpr (RecordUpd expr rbinds)
   = rnExpr expr			`thenRn` \ (expr', fvExpr) ->
     rnRbinds "update" rbinds	`thenRn` \ (rbinds', fvRbinds) ->
-    returnRn (RecordUpd expr' rbinds', fvExpr `unionNameSets` fvRbinds)
+    returnRn (RecordUpd expr' rbinds', fvExpr `plusFV` fvRbinds)
 
 rnExpr (ExprWithTySig expr pty)
   = rnExpr expr			 		`thenRn` \ (expr', fvExpr) ->
-    rnHsSigType (text "an expression") pty	`thenRn` \ pty' ->
-    returnRn (ExprWithTySig expr' pty', fvExpr)
+    rnHsSigType (text "an expression") pty	`thenRn` \ (pty', fvTy) ->
+    returnRn (ExprWithTySig expr' pty', fvExpr `plusFV` fvTy)
 
 rnExpr (HsIf p b1 b2 src_loc)
   = pushSrcLocRn src_loc $
     rnExpr p		`thenRn` \ (p', fvP) ->
     rnExpr b1		`thenRn` \ (b1', fvB1) ->
     rnExpr b2		`thenRn` \ (b2', fvB2) ->
-    returnRn (HsIf p' b1' b2' src_loc, unionManyNameSets [fvP, fvB1, fvB2])
+    returnRn (HsIf p' b1' b2' src_loc, plusFVs [fvP, fvB1, fvB2])
 
 rnExpr (ArithSeqIn seq)
   = lookupImplicitOccRn enumClass_RDR	`thenRn_`
@@ -381,19 +403,19 @@ rnExpr (ArithSeqIn seq)
     rn_seq (FromThen expr1 expr2)
      = rnExpr expr1 	`thenRn` \ (expr1', fvExpr1) ->
        rnExpr expr2	`thenRn` \ (expr2', fvExpr2) ->
-       returnRn (FromThen expr1' expr2', fvExpr1 `unionNameSets` fvExpr2)
+       returnRn (FromThen expr1' expr2', fvExpr1 `plusFV` fvExpr2)
 
     rn_seq (FromTo expr1 expr2)
      = rnExpr expr1	`thenRn` \ (expr1', fvExpr1) ->
        rnExpr expr2	`thenRn` \ (expr2', fvExpr2) ->
-       returnRn (FromTo expr1' expr2', fvExpr1 `unionNameSets` fvExpr2)
+       returnRn (FromTo expr1' expr2', fvExpr1 `plusFV` fvExpr2)
 
     rn_seq (FromThenTo expr1 expr2 expr3)
      = rnExpr expr1	`thenRn` \ (expr1', fvExpr1) ->
        rnExpr expr2	`thenRn` \ (expr2', fvExpr2) ->
        rnExpr expr3	`thenRn` \ (expr3', fvExpr3) ->
        returnRn (FromThenTo expr1' expr2' expr3',
-		  unionManyNameSets [fvExpr1, fvExpr2, fvExpr3])
+		  plusFVs [fvExpr1, fvExpr2, fvExpr3])
 \end{code}
 
 %************************************************************************
@@ -406,7 +428,7 @@ rnExpr (ArithSeqIn seq)
 rnRbinds str rbinds 
   = mapRn field_dup_err dup_fields	`thenRn_`
     mapAndUnzipRn rn_rbind rbinds	`thenRn` \ (rbinds', fvRbind_s) ->
-    returnRn (rbinds', unionManyNameSets fvRbind_s)
+    returnRn (rbinds', plusFVs fvRbind_s)
   where
     (_, dup_fields) = removeDups compare [ f | (f,_,_) <- rbinds ]
 
@@ -419,7 +441,8 @@ rnRbinds str rbinds
 
 rnRpats rpats
   = mapRn field_dup_err dup_fields 	`thenRn_`
-    mapRn rn_rpat rpats
+    mapAndUnzipRn rn_rpat rpats		`thenRn` \ (rpats', fvs_s) ->
+    returnRn (rpats', plusFVs fvs_s)
   where
     (_, dup_fields) = removeDups compare [ f | (f,_,_) <- rpats ]
 
@@ -427,8 +450,8 @@ rnRpats rpats
 
     rn_rpat (field, pat, pun)
       = lookupGlobalOccRn field	`thenRn` \ fieldname ->
-	rnPat pat		`thenRn` \ pat' ->
-	returnRn (fieldname, pat', pun)
+	rnPat pat		`thenRn` \ (pat', fvs) ->
+	returnRn ((fieldname, pat', pun), fvs)
 \end{code}
 
 %************************************************************************
@@ -468,11 +491,10 @@ rnStmt :: RnExprTy s -> RdrNameStmt
 rnStmt rn_expr (BindStmt pat expr src_loc) thing_inside
   = pushSrcLocRn src_loc $
     rn_expr expr		 			`thenRn` \ (expr', fv_expr) ->
-    bindLocalsRn "pattern in do binding" binders	$ \ new_binders ->
-    rnPat pat					 	`thenRn` \ pat' ->
-
+    bindLocalsFVRn "pattern in do binding" binders	$ \ new_binders ->
+    rnPat pat					 	`thenRn` \ (pat', fv_pat) ->
     thing_inside (BindStmt pat' expr' src_loc)		`thenRn` \ (result, fvs) -> 
-    returnRn (result, fv_expr `unionNameSets` (fvs `minusNameSet` mkNameSet new_binders))
+    returnRn (result, fv_expr `plusFV` fvs `plusFV` fv_pat)
   where
     binders = collectPatBinders pat
 
@@ -480,18 +502,18 @@ rnStmt rn_expr (ExprStmt expr src_loc) thing_inside
   = pushSrcLocRn src_loc $
     rn_expr expr 				`thenRn` \ (expr', fv_expr) ->
     thing_inside (ExprStmt expr' src_loc)	`thenRn` \ (result, fvs) ->
-    returnRn (result, fv_expr `unionNameSets` fvs)
+    returnRn (result, fv_expr `plusFV` fvs)
 
 rnStmt rn_expr (GuardStmt expr src_loc) thing_inside
   = pushSrcLocRn src_loc $
     rn_expr expr 				`thenRn` \ (expr', fv_expr) ->
     thing_inside (GuardStmt expr' src_loc)	`thenRn` \ (result, fvs) ->
-    returnRn (result, fv_expr `unionNameSets` fvs)
+    returnRn (result, fv_expr `plusFV` fvs)
 
 rnStmt rn_expr (ReturnStmt expr) thing_inside
   = rn_expr expr				`thenRn` \ (expr', fv_expr) ->
     thing_inside (ReturnStmt expr')		`thenRn` \ (result, fvs) ->
-    returnRn (result, fv_expr `unionNameSets` fvs)
+    returnRn (result, fv_expr `plusFV` fvs)
 
 rnStmt rn_expr (LetStmt binds) thing_inside
   = rnBinds binds		$ \ binds' ->
@@ -546,7 +568,8 @@ mkOpAppRn e1@(NegApp neg_arg neg_op)
 
 mkOpAppRn e1 op fix e2 			-- Default case, no rearrangment
   = ASSERT( if right_op_ok fix e2 then True
-	    else pprPanic "mkOpAppRn" (vcat [ppr e1, text "---", ppr op, text "---", ppr fix, text "---", ppr e2])
+	    else pprPanic "mkOpAppRn" (vcat [ppr e1, text "---", ppr op, 
+					     text "---", ppr fix, text "---", ppr e2])
     )
     returnRn (OpApp e1 op fix e2)
 
@@ -609,15 +632,14 @@ not_op_pat other   	        = True
 \end{code}
 
 \begin{code}
-checkPrecMatch :: Bool -> RdrName -> RdrNameMatch -> RnMS s ()
+checkPrecMatch :: Bool -> Name -> RenamedMatch -> RnMS s ()
 
 checkPrecMatch False fn match
   = returnRn ()
-checkPrecMatch True op (PatMatch p1 (PatMatch p2 (GRHSMatch _)))
+checkPrecMatch True op (Match _ [p1,p2] _ _)
   = checkPrec op p1 False	`thenRn_`
     checkPrec op p2 True
-checkPrecMatch True op _
-  = panic "checkPrecMatch"
+checkPrecMatch True op _ = panic "checkPrecMatch"
 
 checkPrec op (ConOpPatIn _ op1 _ _) right
   = lookupFixity op	`thenRn` \  op_fix@(Fixity op_prec  op_dir) ->
@@ -767,6 +789,10 @@ precParseErr op1 op2
 nonStdGuardErr guard
   = hang (ptext SLIT("accepting non-standard pattern guards (-fglasgow-exts to suppress this message)"))
       4 (ppr guard)
+
+patSigErr ty
+  = hang (ptext SLIT("Illegal signature in pattern:") <+> ppr ty)
+	 4 (ptext SLIT("Use -fglasgow-exts to permit it"))
 
 pp_op (op, fix) = hcat [ppr op, space, parens (ppr fix)]
 \end{code}

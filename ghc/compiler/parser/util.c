@@ -102,6 +102,7 @@ error(s)
 	exit(1);
 }
 
+/* lconc l1 l2 appends l2 to the end of l1 */
 list
 lconc(l1, l2)
   list l1;
@@ -117,6 +118,7 @@ lconc(l1, l2)
 	return(l1);
 }
 
+/* lapp( l, x ) appends [x] to the end of list l */
 list
 lapp(list l1, VOID_STAR l2)
 {

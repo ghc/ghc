@@ -9,7 +9,7 @@ module CoreSyn (
 	CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
 	TaggedExpr, TaggedAlt, TaggedBind, TaggedArg,
 
-	mkLets, mkLams,
+	mkLets, mkLetBinds, mkLams,
 	mkApps, mkTyApps, mkValApps,
 	mkLit, mkStringLit, mkConApp, mkPrimApp, mkNote, mkNilExpr,
 	bindNonRec, mkIfThenElse, varToCoreExpr,
@@ -29,11 +29,10 @@ module CoreSyn (
 
 import TysWiredIn	( boolTy, stringTy, nilDataCon )
 import CostCentre	( CostCentre, isDupdCC, noCostCentre )
-import Var		( Var, GenId, Id, TyVar, IdOrTyVar, isTyVar, isId, idType )
+import Var		( Var, Id, TyVar, IdOrTyVar, isTyVar, isId, idType )
 import Id		( mkWildId, getInlinePragma )
-import Type		( GenType, Type, mkTyVarTy, isUnLiftedType )
+import Type		( Type, mkTyVarTy, isUnLiftedType )
 import IdInfo		( InlinePragInfo(..) )
-import BasicTypes	( Unused )
 import Const	        ( Con(..), DataCon, Literal(NoRepStr), PrimOp )
 import TysWiredIn	( trueDataCon, falseDataCon )
 import Outputable
@@ -48,34 +47,35 @@ import Outputable
 These data types are the heart of the compiler
 
 \begin{code}
-data Expr b f	-- "b" for the type of binders, 
-		-- "f" for the flexi slot in types
-  = Var	  (GenId f)
-  | Con   Con [Arg b f]		-- Guaranteed saturated
-  | App   (Expr b f) (Arg b f)
-  | Lam   b (Expr b f)
-  | Let   (Bind b f) (Expr b f)
-  | Case  (Expr b f) b [Alt b f]  -- Binder gets bound to value of scrutinee
-				  -- DEFAULT case must be last, if it occurs at all
-  | Note  (Note f) (Expr b f)
-  | Type  (GenType f)		  -- This should only show up at the top
-				  -- level of an Arg
+data Expr b	-- "b" for the type of binders, 
+  = Var	  Id
+  | Con   Con [Arg b]		-- Guaranteed saturated
+				-- The Con can be a DataCon, Literal, PrimOP
+				-- but cannot be DEFAULT
+  | App   (Expr b) (Arg b)
+  | Lam   b (Expr b)
+  | Let   (Bind b) (Expr b)
+  | Case  (Expr b) b [Alt b]  	-- Binder gets bound to value of scrutinee
+				-- DEFAULT case must be last, if it occurs at all
+  | Note  Note (Expr b)
+  | Type  Type			-- This should only show up at the top
+				-- level of an Arg
 
-type Arg b f = Expr b f		-- Can be a Type
+type Arg b = Expr b		-- Can be a Type
 
-type Alt b f = (Con, [b], Expr b f)
+type Alt b = (Con, [b], Expr b)
 	-- (DEFAULT, [], rhs) is the default alternative
-	-- Remember, a Con can be a literal or a data constructor
+	-- The Con can be a Literal, DataCon, or DEFAULT, but cannot be PrimOp
 
-data Bind b f = NonRec b (Expr b f)
-	      | Rec [(b, (Expr b f))]
+data Bind b = NonRec b (Expr b)
+	      | Rec [(b, (Expr b))]
 
-data Note f
+data Note
   = SCC CostCentre
 
   | Coerce	
-	(GenType f)	-- The to-type:   type of whole coerce expression
-	(GenType f)	-- The from-type: type of enclosed expression
+	Type		-- The to-type:   type of whole coerce expression
+	Type		-- The from-type: type of enclosed expression
 
   | InlineCall		-- Instructs simplifier to inline
 			-- the enclosed call
@@ -92,11 +92,11 @@ The common case
 
 \begin{code}
 type CoreBndr = IdOrTyVar
-type CoreExpr = Expr CoreBndr Unused
-type CoreArg  = Arg  CoreBndr Unused
-type CoreBind = Bind CoreBndr Unused
-type CoreAlt  = Alt  CoreBndr Unused
-type CoreNote = Note Unused
+type CoreExpr = Expr CoreBndr
+type CoreArg  = Arg  CoreBndr
+type CoreBind = Bind CoreBndr
+type CoreAlt  = Alt  CoreBndr
+type CoreNote = Note
 \end{code}
 
 Binders are ``tagged'' with a \tr{t}:
@@ -104,10 +104,10 @@ Binders are ``tagged'' with a \tr{t}:
 \begin{code}
 type Tagged t = (CoreBndr, t)
 
-type TaggedBind t = Bind (Tagged t) Unused
-type TaggedExpr t = Expr (Tagged t) Unused
-type TaggedArg  t = Arg  (Tagged t) Unused
-type TaggedAlt  t = Alt  (Tagged t) Unused
+type TaggedBind t = Bind (Tagged t)
+type TaggedExpr t = Expr (Tagged t)
+type TaggedArg  t = Arg  (Tagged t)
+type TaggedAlt  t = Alt  (Tagged t)
 \end{code}
 
 
@@ -118,18 +118,18 @@ type TaggedAlt  t = Alt  (Tagged t) Unused
 %************************************************************************
 
 \begin{code}
-mkApps    :: Expr b f -> [Arg b f]    -> Expr b f
-mkTyApps  :: Expr b f -> [GenType f]  -> Expr b f
-mkValApps :: Expr b f -> [Expr b f]   -> Expr b f
+mkApps    :: Expr b -> [Arg b]  -> Expr b
+mkTyApps  :: Expr b -> [Type]   -> Expr b
+mkValApps :: Expr b -> [Expr b] -> Expr b
 
 mkApps    f args = foldl App		  	   f args
 mkTyApps  f args = foldl (\ e a -> App e (Type a)) f args
 mkValApps f args = foldl (\ e a -> App e a)	   f args
 
-mkLit       :: Literal -> Expr b f
-mkStringLit :: String  -> Expr b f
-mkConApp    :: DataCon -> [Arg b f] -> Expr b f
-mkPrimApp   :: PrimOp  -> [Arg b f] -> Expr b f
+mkLit       :: Literal -> Expr b
+mkStringLit :: String  -> Expr b
+mkConApp    :: DataCon -> [Arg b] -> Expr b
+mkPrimApp   :: PrimOp  -> [Arg b] -> Expr b
 
 mkLit lit	  = Con (Literal lit) []
 mkStringLit str	  = Con (Literal (NoRepStr (_PK_ str) stringTy)) []
@@ -144,17 +144,22 @@ varToCoreExpr v | isId v    = Var v
                 | otherwise = Type (mkTyVarTy v)
 \end{code}
 
-\end{code}
-
 \begin{code}
-mkLets :: [Bind b f] -> Expr b f -> Expr b f
-mkLets binds body = foldr Let body binds
-
-mkLams :: [b] -> Expr b f -> Expr b f
+mkLams :: [b] -> Expr b -> Expr b
 mkLams binders body = foldr Lam body binders
 \end{code}
 
 \begin{code}
+mkLets :: [Bind b] -> Expr b -> Expr b
+mkLets binds body = foldr Let body binds
+
+mkLetBinds :: [CoreBind] -> CoreExpr -> CoreExpr
+-- mkLetBinds is like mkLets, but it uses bindNonRec to 
+-- make a case binding for unlifted things
+mkLetBinds []                   body = body
+mkLetBinds (NonRec b r : binds) body = bindNonRec b r (mkLetBinds binds body)
+mkLetBinds (bind       : binds) body = Let bind (mkLetBinds binds body)
+
 bindNonRec :: Id -> CoreExpr -> CoreExpr -> CoreExpr
 -- (bindNonRec x r b) produces either
 --	let x = r in b
@@ -164,7 +169,7 @@ bindNonRec :: Id -> CoreExpr -> CoreExpr -> CoreExpr
 -- depending on whether x is unlifted or not
 bindNonRec bndr rhs body
   | isUnLiftedType (idType bndr) = Case rhs bndr [(DEFAULT,[],body)]
-  | otherwise			  = Let (NonRec bndr rhs) body
+  | otherwise			 = Let (NonRec bndr rhs) body
 
 mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
 mkIfThenElse guard then_expr else_expr
@@ -176,7 +181,7 @@ mkIfThenElse guard then_expr else_expr
 mkNote removes redundant coercions, and SCCs where possible
 
 \begin{code}
-mkNote :: Note f -> Expr b f -> Expr b f
+mkNote :: Note -> Expr b -> Expr b
 mkNote (Coerce to_ty1 from_ty1) (Note (Coerce to_ty2 from_ty2) expr)
  = ASSERT( from_ty1 == to_ty2 )
    mkNote (Coerce to_ty1 from_ty2) expr
@@ -203,15 +208,15 @@ mkNote note expr = Note note expr
 %************************************************************************
 
 \begin{code}
-bindersOf  :: Bind b f -> [b]
+bindersOf  :: Bind b -> [b]
 bindersOf (NonRec binder _) = [binder]
 bindersOf (Rec pairs)       = [binder | (binder, _) <- pairs]
 
-rhssOfBind :: Bind b f -> [Expr b f]
+rhssOfBind :: Bind b -> [Expr b]
 rhssOfBind (NonRec _ rhs) = [rhs]
 rhssOfBind (Rec pairs)    = [rhs | (_,rhs) <- pairs]
 
-rhssOfAlts :: [Alt b f] -> [Expr b f]
+rhssOfAlts :: [Alt b] -> [Expr b]
 rhssOfAlts alts = [e | (_,_,e) <- alts]
 
 isDeadBinder :: CoreBndr -> Bool
@@ -228,7 +233,7 @@ We expect (by convention) type-, and value- lambdas in that
 order.
 
 \begin{code}
-collectBinders	       :: Expr b f -> ([b],         Expr b f)
+collectBinders	       :: Expr b -> ([b],         Expr b)
 collectTyBinders       :: CoreExpr -> ([TyVar],     CoreExpr)
 collectValBinders      :: CoreExpr -> ([Id],        CoreExpr)
 collectTyAndValBinders :: CoreExpr -> ([TyVar], [Id], CoreExpr)
@@ -263,7 +268,7 @@ collectValBinders expr
 and the arguments to which it is applied.
 
 \begin{code}
-collectArgs :: Expr b f -> (Expr b f, [Arg b f])
+collectArgs :: Expr b -> (Expr b, [Arg b])
 collectArgs expr
   = go expr []
   where
@@ -275,7 +280,7 @@ coreExprCc gets the cost centre enclosing an expression, if any.
 It looks inside lambdas because (scc "foo" \x.e) = \x.scc "foo" e
 
 \begin{code}
-coreExprCc :: Expr b f -> CostCentre
+coreExprCc :: Expr b -> CostCentre
 coreExprCc (Note (SCC cc) e)   = cc
 coreExprCc (Note other_note e) = coreExprCc e
 coreExprCc (Lam _ e)           = coreExprCc e
@@ -296,7 +301,7 @@ isValArg other    = True
 isTypeArg (Type _) = True
 isTypeArg other    = False
 
-valArgCount :: [Arg b f] -> Int
+valArgCount :: [Arg b] -> Int
 valArgCount []		    = 0
 valArgCount (Type _ : args) = valArgCount args
 valArgCount (other  : args) = 1 + valArgCount args
@@ -319,7 +324,7 @@ data AnnExpr' bndr annot
   | AnnApp	(AnnExpr bndr annot) (AnnExpr bndr annot)
   | AnnCase	(AnnExpr bndr annot) bndr [AnnAlt bndr annot]
   | AnnLet	(AnnBind bndr annot) (AnnExpr bndr annot)
-  | AnnNote	(Note Unused) (AnnExpr bndr annot)
+  | AnnNote	Note (AnnExpr bndr annot)
   | AnnType	Type
 
 type AnnAlt bndr annot = (Con, [bndr], AnnExpr bndr annot)
@@ -330,7 +335,7 @@ data AnnBind bndr annot
 \end{code}
 
 \begin{code}
-deAnnotate :: AnnExpr bndr annot -> Expr bndr Unused
+deAnnotate :: AnnExpr bndr annot -> Expr bndr
 
 deAnnotate (_, AnnType	t)          = Type t
 deAnnotate (_, AnnVar	v)          = Var v

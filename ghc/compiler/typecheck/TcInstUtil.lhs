@@ -32,7 +32,8 @@ import PprType		( pprConstraint )
 import Class		( classTyCon )
 import DataCon		( DataCon )
 import TyCon		( tyConDataCons )
-import Util		( equivClasses, assertPanic )
+import Unique		( Unique, getUnique )
+import Util		( equivClassesByUniq )
 import Outputable
 \end{code}
 
@@ -81,11 +82,10 @@ buildInstanceEnvs :: Bag InstInfo
 
 buildInstanceEnvs info
   = let
-    	icmp :: InstInfo -> InstInfo -> Ordering
-    	(InstInfo c1 _ _ _ _ _ _ _) `icmp` (InstInfo c2 _ _ _ _ _ _ _)
-	  = c1 `compare` c2
+    	i_uniq :: InstInfo -> Unique
+    	i_uniq (InstInfo c _ _ _ _ _ _ _) = getUnique c
 
-	info_by_class = equivClasses icmp (bagToList info)
+	info_by_class = equivClassesByUniq i_uniq (bagToList info)
     in
     mapNF_Tc buildInstanceEnv info_by_class    `thenNF_Tc` \ inst_env_entries ->
     let

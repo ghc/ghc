@@ -8,7 +8,7 @@ ToDo:
    (i1 + i2) only if it results	in a valid Float.
 
 \begin{code}
-module ConFold	( cleverMkPrimApp ) where
+module ConFold	( tryPrimOp ) where
 
 #include "HsVersions.h"
 
@@ -24,7 +24,10 @@ import Outputable
 \end{code}
 
 \begin{code}
-cleverMkPrimApp :: PrimOp -> [CoreArg] -> CoreExpr
+tryPrimOp :: PrimOp -> [CoreArg]  -- op arg1 ... argn
+				  --   Args are already simplified
+	  -> Maybe CoreExpr	  -- Nothing => no transformation
+				  -- Just e  => transforms to e
 \end{code}
 
 In the parallel world, we use _seq_ to control the order in which
@@ -82,16 +85,16 @@ NB: If we ever do case-floating, we have an extra worry:
 The second case must never be floated outside of the first!
 
 \begin{code}p
-cleverMkPrimApp SeqOp [Type ty, Con (Literal lit) _]
-  = Con (Literal (mkMachInt 1)) []
+tryPrimOp SeqOp [Type ty, Con (Literal lit) _]
+  = Just (Con (Literal (mkMachInt 1)) [])
 
-cleverMkPrimApp SeqOp args@[Type ty, Var var]
-  | isEvaluated (getIdUnfolding var) = Con (Literal (mkMachInt 1)) [])	-- var is eval'd
-  | otherwise			     = Con (PrimOp op) args		-- var not eval'd
+tryPrimOp SeqOp args@[Type ty, Var var]
+  | isEvaluated (getIdUnfolding var) = Just (Con (Literal (mkMachInt 1)) []))	-- var is eval'd
+  | otherwise			     = Nothing 					-- var not eval'd
 \end{code}
 
 \begin{code}
-cleverMkPrimApp op args
+tryPrimOp op args
   = case args of
      [Con (Literal (MachChar char_lit))      _] -> oneCharLit   op char_lit
      [Con (Literal (MachInt int_lit signed)) _] -> (if signed then oneIntLit else oneWordLit)
@@ -123,21 +126,21 @@ cleverMkPrimApp op args
 
      other			       		-> give_up
   where
-    give_up = Con (PrimOp op) args
+    give_up = Nothing
 
-    return_char c   = Con (Literal (MachChar   c)) []
-    return_int i    = Con (Literal (mkMachInt  i)) []
-    return_word i   = Con (Literal (mkMachWord i)) []
-    return_float f  = Con (Literal (MachFloat  f)) []
-    return_double d = Con (Literal (MachDouble d)) []
-    return_lit lit  = Con (Literal lit) []
+    return_char c   = Just (Con (Literal (MachChar   c)) [])
+    return_int i    = Just (Con (Literal (mkMachInt  i)) [])
+    return_word i   = Just (Con (Literal (mkMachWord i)) [])
+    return_float f  = Just (Con (Literal (MachFloat  f)) [])
+    return_double d = Just (Con (Literal (MachDouble d)) [])
+    return_lit lit  = Just (Con (Literal lit) [])
 
-    return_bool True  = trueVal
-    return_bool False = falseVal
+    return_bool True  = Just trueVal
+    return_bool False = Just falseVal
 
     return_prim_case var lit val_if_eq val_if_neq
-      = Case (Var var) var [(Literal lit, [], val_if_eq),
-			    (DEFAULT,     [], val_if_neq)]
+      = Just (Case (Var var) var [(Literal lit, [], val_if_eq),
+			          (DEFAULT,     [], val_if_neq)])
 
 	---------   Ints --------------
     oneIntLit IntNegOp     i = return_int (-i)
@@ -256,7 +259,7 @@ cleverMkPrimApp op args
     litVar other_op lit var = give_up
 
 
-    checkRange :: Integer -> CoreExpr
+    checkRange :: Integer -> Maybe CoreExpr
     checkRange val
      | (val > fromInt maxInt) || (val < fromInt minInt)  = 
 	-- Better tell the user that we've overflowed...

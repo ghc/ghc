@@ -10,11 +10,16 @@ module TcIfaceSig ( tcInterfaceSigs ) where
 
 import HsSyn		( HsDecl(..), IfaceSig(..) )
 import TcMonad
-import TcMonoType	( tcHsType, tcHsTypeKind, tcTyVarScope )
-import TcEnv		( tcExtendTyVarEnv, tcExtendGlobalValEnv, tcSetGlobalValEnv,
-			  tcLookupTyConByKey, tcLookupGlobalValueMaybe,
-			  tcExplicitLookupGlobal, badCon, badPrimOp,
-			  GlobalValueEnv
+import TcMonoType	( tcHsType, tcHsTypeKind, 
+				-- NB: all the tyars in interface files are kinded,
+				-- so tcHsType will do the Right Thing without
+				-- having to mess about with zonking
+			  tcExtendTyVarScope
+			)
+import TcEnv		( ValueEnv, tcExtendTyVarEnv, 
+			  tcExtendGlobalValEnv, tcSetValueEnv,
+			  tcLookupTyConByKey, tcLookupValueMaybe,
+			  explicitLookupValue, badCon, badPrimOp
 			)
 import TcType		( TcKind, kindToTcKind )
 
@@ -55,7 +60,7 @@ As always, we do not have to worry about user-pragmas in interface
 signatures.
 
 \begin{code}
-tcInterfaceSigs :: GlobalValueEnv	-- Envt to use when checking unfoldings
+tcInterfaceSigs :: ValueEnv		-- Envt to use when checking unfoldings
 		-> [RenamedHsDecl]	-- Ignore non-sig-decls in these decls
 		-> TcM s [Id]
 		
@@ -104,7 +109,7 @@ tcIdInfo unf_env name ty info info_ins
 	= tcStrictness unf_env ty info strict
 
     tcPrag info (HsSpecialise tyvars tys rhs)
-	= tcTyVarScope tyvars			$ \ tyvars' ->
+	= tcExtendTyVarScope tyvars		$ \ tyvars' ->
 	  mapAndUnzipTc tcHsTypeKind tys	`thenTc` \ (kinds, tys') -> 
 		-- Assume that the kinds match the kinds of the 
 		-- type variables of the function; this is, after all, an
@@ -127,7 +132,7 @@ tcIdInfo unf_env name ty info info_ins
 \end{code}
 
 \begin{code}
-tcStrictness unf_env ty info (HsStrictnessInfo demands maybe_worker)
+tcStrictness unf_env ty info (HsStrictnessInfo (demands, bot_result) maybe_worker)
   = tcWorker unf_env maybe_worker		`thenNF_Tc` \ maybe_worker_id ->
     uniqSMToTcM (mkWrapper ty demands)		`thenNF_Tc` \ wrap_fn ->
     let
@@ -140,11 +145,7 @@ tcStrictness unf_env ty info (HsStrictnessInfo demands maybe_worker)
 
 	has_worker = maybeToBool maybe_worker_id
     in
-    returnTc (StrictnessInfo demands has_worker  `setStrictnessInfo` info')
-
--- Boring to write these out, but the result type differs from the arg type...
-tcStrictness unf_env ty info HsBottom
-  = returnTc (BottomGuaranteed `setStrictnessInfo` info)
+    returnTc (StrictnessInfo demands bot_result has_worker  `setStrictnessInfo` info')
 \end{code}
 
 \begin{code}
@@ -153,7 +154,7 @@ tcWorker unf_env Nothing = returnNF_Tc Nothing
 tcWorker unf_env (Just (worker_name,_))
   = returnNF_Tc (trace_maybe maybe_worker_id)
   where
-    maybe_worker_id = tcExplicitLookupGlobal unf_env worker_name
+    maybe_worker_id = explicitLookupValue unf_env worker_name
 
 	-- The trace is so we can see what's getting dropped
     trace_maybe Nothing  = pprTrace "tcWorker failed:" (ppr worker_name) Nothing
@@ -164,11 +165,11 @@ For unfoldings we try to do the job lazily, so that we never type check
 an unfolding that isn't going to be looked at.
 
 \begin{code}
-tcPragExpr :: GlobalValueEnv -> Name -> UfExpr Name -> NF_TcM s (Maybe CoreExpr)
+tcPragExpr :: ValueEnv -> Name -> UfExpr Name -> NF_TcM s (Maybe CoreExpr)
 tcPragExpr unf_env name core_expr
   = forkNF_Tc (
 	recoverNF_Tc no_unfolding (
-		tcSetGlobalValEnv unf_env $
+		tcSetValueEnv unf_env $
 		tcCoreExpr core_expr	`thenTc` \ core_expr' ->
 		returnTc (Just core_expr')
     ))			
@@ -190,7 +191,7 @@ Variables in unfoldings
 \begin{code}
 tcVar :: Name -> TcM s Id
 tcVar name
-  = tcLookupGlobalValueMaybe name	`thenNF_Tc` \ maybe_id ->
+  = tcLookupValueMaybe name	`thenNF_Tc` \ maybe_id ->
     case maybe_id of {
 	Just id -> returnTc id;
 	Nothing -> failWithTc (noDecl name)
@@ -264,7 +265,7 @@ tcCoreExpr (UfLet (UfRec pairs) body)
 tcCoreExpr (UfNote note expr) 
   = tcCoreExpr expr		`thenTc` \ expr' ->
     case note of
-	UfCoerce to_ty -> tcHsTypeKind to_ty	`thenTc` \ (_,to_ty') ->
+	UfCoerce to_ty -> tcHsType to_ty	`thenTc` \ to_ty' ->
 			  returnTc (Note (Coerce to_ty' (coreExprType expr')) expr')
 	UfInlineCall   -> returnTc (Note InlineCall expr')
 	UfSCC cc       -> returnTc (Note (SCC cc) expr')
@@ -328,8 +329,7 @@ tcCoreLamBndr (UfTyBinder name kind) thing_inside
   = let
 	tyvar = mkTyVar name kind
     in
-    tcExtendTyVarEnv [name] [(kindToTcKind kind, tyvar)] $
-    thing_inside tyvar
+    tcExtendTyVarEnv [tyvar] (thing_inside tyvar)
     
 tcCoreValBndr (UfValBinder name ty) thing_inside
   = tcHsType ty			`thenTc` \ ty' ->
@@ -396,10 +396,8 @@ tcCoreAlt scrut_ty (UfDataCon con_name, names, rhs)
 		= zipWithEqual "tcCoreAlts" mkUserId id_names arg_tys
     in
     ASSERT( con `elem` cons && length inst_tys == length main_tyvars )
-    tcExtendTyVarEnv (map getName ex_tyvars')
-		     [ (kindToTcKind (tyVarKind tv), tv) 
-		     | tv <- ex_tyvars']		$
-    tcExtendGlobalValEnv arg_ids 			$
+    tcExtendTyVarEnv ex_tyvars'			$
+    tcExtendGlobalValEnv arg_ids		$
     tcCoreExpr rhs					`thenTc` \ rhs' ->
     returnTc (DataCon con, ex_tyvars' ++ arg_ids, rhs')
 \end{code}

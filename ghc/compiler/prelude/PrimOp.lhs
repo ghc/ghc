@@ -8,7 +8,7 @@ module PrimOp (
 	PrimOp(..), allThePrimOps,
 	tagOf_PrimOp, -- ToDo: rm
 	primOpType,
-	primOpUniq, primOpStr,
+	primOpUniq, primOpOcc,
 
 	commutableOp,
 
@@ -27,10 +27,10 @@ import PrimRep		-- most of it
 import TysPrim
 import TysWiredIn
 
-import CStrings		( identToC )
 import Var		( TyVar )
 import CallConv		( CallConv, pprCallConv )
 import PprType		( pprParendType )
+import OccName		( OccName, pprOccName, varOcc )
 import TyCon		( TyCon )
 import Type		( mkForAllTys, mkForAllTy, mkFunTy, mkFunTys, 
 			  mkTyConApp, typePrimRep,
@@ -181,9 +181,10 @@ A special ``trap-door'' to use in making calls direct to C functions:
     | CCallOp	(Either 
 		    FAST_STRING    -- Left fn => An "unboxed" ccall# to `fn'.
 		    Unique)        -- Right u => first argument (an Addr#) is the function pointer
-				   --   (unique is used to 
+				   --   (unique is used to generate a 'typedef' to cast
+				   --    the function pointer if compiling the ccall# down to
+				   --    .hc code - can't do this inline for tedious reasons.)
 				    
-
 		Bool		    -- True <=> really a "casm"
 		Bool		    -- True <=> might invoke Haskell GC
 		CallConv	    -- calling convention to use.
@@ -792,17 +793,22 @@ We use @PrimKinds@ for the ``type'' information, because they're
 (slightly) more convenient to use than @TyCons@.
 \begin{code}
 data PrimOpInfo
-  = Dyadic	FAST_STRING	-- string :: T -> T -> T
+  = Dyadic	OccName		-- string :: T -> T -> T
 		Type
-  | Monadic	FAST_STRING	-- string :: T -> T
+  | Monadic	OccName		-- string :: T -> T
 		Type
-  | Compare	FAST_STRING	-- string :: T -> T -> Bool
+  | Compare	OccName		-- string :: T -> T -> Bool
 		Type
 
-  | GenPrimOp   FAST_STRING  	-- string :: \/a1..an . T1 -> .. -> Tk -> T
+  | GenPrimOp   OccName  	-- string :: \/a1..an . T1 -> .. -> Tk -> T
 		[TyVar] 
 		[Type] 
 		Type 
+
+mkDyadic str  ty = Dyadic  (varOcc str) ty
+mkMonadic str ty = Monadic (varOcc str) ty
+mkCompare str ty = Compare (varOcc str) ty
+mkGenPrimOp str tvs tys ty = GenPrimOp (varOcc str) tvs tys ty
 \end{code}
 
 Utility bits:
@@ -820,17 +826,17 @@ unboxedTriple    = mkUnboxedTupleTy 3
 unboxedQuadruple = mkUnboxedTupleTy 4
 unboxedSexTuple  = mkUnboxedTupleTy 6
 
-integerMonadic name = GenPrimOp name [] one_Integer_ty 
+integerMonadic name = mkGenPrimOp name [] one_Integer_ty 
 			(unboxedTriple [intPrimTy, intPrimTy, byteArrayPrimTy])
 
-integerDyadic name = GenPrimOp name [] two_Integer_tys 
+integerDyadic name = mkGenPrimOp name [] two_Integer_tys 
 			(unboxedTriple [intPrimTy, intPrimTy, byteArrayPrimTy])
 
-integerDyadic2Results name = GenPrimOp name [] two_Integer_tys 
+integerDyadic2Results name = mkGenPrimOp name [] two_Integer_tys 
     (unboxedSexTuple [intPrimTy, intPrimTy, byteArrayPrimTy, 
 	 	      intPrimTy, intPrimTy, byteArrayPrimTy])
 
-integerCompare name = GenPrimOp name [] two_Integer_tys intPrimTy
+integerCompare name = mkGenPrimOp name [] two_Integer_tys intPrimTy
 \end{code}
 
 %************************************************************************
@@ -849,47 +855,47 @@ primOpInfo :: PrimOp -> PrimOpInfo
 There's plenty of this stuff!
 
 \begin{code}
-primOpInfo CharGtOp   = Compare SLIT("gtChar#")   charPrimTy
-primOpInfo CharGeOp   = Compare SLIT("geChar#")   charPrimTy
-primOpInfo CharEqOp   = Compare SLIT("eqChar#")   charPrimTy
-primOpInfo CharNeOp   = Compare SLIT("neChar#")   charPrimTy
-primOpInfo CharLtOp   = Compare SLIT("ltChar#")   charPrimTy
-primOpInfo CharLeOp   = Compare SLIT("leChar#")   charPrimTy
+primOpInfo CharGtOp   = mkCompare SLIT("gtChar#")   charPrimTy
+primOpInfo CharGeOp   = mkCompare SLIT("geChar#")   charPrimTy
+primOpInfo CharEqOp   = mkCompare SLIT("eqChar#")   charPrimTy
+primOpInfo CharNeOp   = mkCompare SLIT("neChar#")   charPrimTy
+primOpInfo CharLtOp   = mkCompare SLIT("ltChar#")   charPrimTy
+primOpInfo CharLeOp   = mkCompare SLIT("leChar#")   charPrimTy
 
-primOpInfo IntGtOp    = Compare SLIT(">#")	   intPrimTy
-primOpInfo IntGeOp    = Compare SLIT(">=#")	   intPrimTy
-primOpInfo IntEqOp    = Compare SLIT("==#")	   intPrimTy
-primOpInfo IntNeOp    = Compare SLIT("/=#")	   intPrimTy
-primOpInfo IntLtOp    = Compare SLIT("<#")	   intPrimTy
-primOpInfo IntLeOp    = Compare SLIT("<=#")	   intPrimTy
+primOpInfo IntGtOp    = mkCompare SLIT(">#")	   intPrimTy
+primOpInfo IntGeOp    = mkCompare SLIT(">=#")	   intPrimTy
+primOpInfo IntEqOp    = mkCompare SLIT("==#")	   intPrimTy
+primOpInfo IntNeOp    = mkCompare SLIT("/=#")	   intPrimTy
+primOpInfo IntLtOp    = mkCompare SLIT("<#")	   intPrimTy
+primOpInfo IntLeOp    = mkCompare SLIT("<=#")	   intPrimTy
 
-primOpInfo WordGtOp   = Compare SLIT("gtWord#")   wordPrimTy
-primOpInfo WordGeOp   = Compare SLIT("geWord#")   wordPrimTy
-primOpInfo WordEqOp   = Compare SLIT("eqWord#")   wordPrimTy
-primOpInfo WordNeOp   = Compare SLIT("neWord#")   wordPrimTy
-primOpInfo WordLtOp   = Compare SLIT("ltWord#")   wordPrimTy
-primOpInfo WordLeOp   = Compare SLIT("leWord#")   wordPrimTy
+primOpInfo WordGtOp   = mkCompare SLIT("gtWord#")   wordPrimTy
+primOpInfo WordGeOp   = mkCompare SLIT("geWord#")   wordPrimTy
+primOpInfo WordEqOp   = mkCompare SLIT("eqWord#")   wordPrimTy
+primOpInfo WordNeOp   = mkCompare SLIT("neWord#")   wordPrimTy
+primOpInfo WordLtOp   = mkCompare SLIT("ltWord#")   wordPrimTy
+primOpInfo WordLeOp   = mkCompare SLIT("leWord#")   wordPrimTy
 
-primOpInfo AddrGtOp   = Compare SLIT("gtAddr#")   addrPrimTy
-primOpInfo AddrGeOp   = Compare SLIT("geAddr#")   addrPrimTy
-primOpInfo AddrEqOp   = Compare SLIT("eqAddr#")   addrPrimTy
-primOpInfo AddrNeOp   = Compare SLIT("neAddr#")   addrPrimTy
-primOpInfo AddrLtOp   = Compare SLIT("ltAddr#")   addrPrimTy
-primOpInfo AddrLeOp   = Compare SLIT("leAddr#")   addrPrimTy
+primOpInfo AddrGtOp   = mkCompare SLIT("gtAddr#")   addrPrimTy
+primOpInfo AddrGeOp   = mkCompare SLIT("geAddr#")   addrPrimTy
+primOpInfo AddrEqOp   = mkCompare SLIT("eqAddr#")   addrPrimTy
+primOpInfo AddrNeOp   = mkCompare SLIT("neAddr#")   addrPrimTy
+primOpInfo AddrLtOp   = mkCompare SLIT("ltAddr#")   addrPrimTy
+primOpInfo AddrLeOp   = mkCompare SLIT("leAddr#")   addrPrimTy
 
-primOpInfo FloatGtOp  = Compare SLIT("gtFloat#")  floatPrimTy
-primOpInfo FloatGeOp  = Compare SLIT("geFloat#")  floatPrimTy
-primOpInfo FloatEqOp  = Compare SLIT("eqFloat#")  floatPrimTy
-primOpInfo FloatNeOp  = Compare SLIT("neFloat#")  floatPrimTy
-primOpInfo FloatLtOp  = Compare SLIT("ltFloat#")  floatPrimTy
-primOpInfo FloatLeOp  = Compare SLIT("leFloat#")  floatPrimTy
+primOpInfo FloatGtOp  = mkCompare SLIT("gtFloat#")  floatPrimTy
+primOpInfo FloatGeOp  = mkCompare SLIT("geFloat#")  floatPrimTy
+primOpInfo FloatEqOp  = mkCompare SLIT("eqFloat#")  floatPrimTy
+primOpInfo FloatNeOp  = mkCompare SLIT("neFloat#")  floatPrimTy
+primOpInfo FloatLtOp  = mkCompare SLIT("ltFloat#")  floatPrimTy
+primOpInfo FloatLeOp  = mkCompare SLIT("leFloat#")  floatPrimTy
 
-primOpInfo DoubleGtOp = Compare SLIT(">##") doublePrimTy
-primOpInfo DoubleGeOp = Compare SLIT(">=##") doublePrimTy
-primOpInfo DoubleEqOp = Compare SLIT("==##") doublePrimTy
-primOpInfo DoubleNeOp = Compare SLIT("/=##") doublePrimTy
-primOpInfo DoubleLtOp = Compare SLIT("<##") doublePrimTy
-primOpInfo DoubleLeOp = Compare SLIT("<=##") doublePrimTy
+primOpInfo DoubleGtOp = mkCompare SLIT(">##") doublePrimTy
+primOpInfo DoubleGeOp = mkCompare SLIT(">=##") doublePrimTy
+primOpInfo DoubleEqOp = mkCompare SLIT("==##") doublePrimTy
+primOpInfo DoubleNeOp = mkCompare SLIT("/=##") doublePrimTy
+primOpInfo DoubleLtOp = mkCompare SLIT("<##") doublePrimTy
+primOpInfo DoubleLeOp = mkCompare SLIT("<=##") doublePrimTy
 
 \end{code}
 
@@ -900,8 +906,8 @@ primOpInfo DoubleLeOp = Compare SLIT("<=##") doublePrimTy
 %************************************************************************
 
 \begin{code}
-primOpInfo OrdOp = GenPrimOp SLIT("ord#") [] [charPrimTy] intPrimTy
-primOpInfo ChrOp = GenPrimOp SLIT("chr#") [] [intPrimTy]  charPrimTy
+primOpInfo OrdOp = mkGenPrimOp SLIT("ord#") [] [charPrimTy] intPrimTy
+primOpInfo ChrOp = mkGenPrimOp SLIT("chr#") [] [intPrimTy]  charPrimTy
 \end{code}
 
 %************************************************************************
@@ -911,14 +917,14 @@ primOpInfo ChrOp = GenPrimOp SLIT("chr#") [] [intPrimTy]  charPrimTy
 %************************************************************************
 
 \begin{code}
-primOpInfo IntAddOp  = Dyadic SLIT("+#")	 intPrimTy
-primOpInfo IntSubOp  = Dyadic SLIT("-#") intPrimTy
-primOpInfo IntMulOp  = Dyadic SLIT("*#") intPrimTy
-primOpInfo IntQuotOp = Dyadic SLIT("quotInt#")	 intPrimTy
-primOpInfo IntRemOp  = Dyadic SLIT("remInt#")	 intPrimTy
+primOpInfo IntAddOp  = mkDyadic SLIT("+#")	 intPrimTy
+primOpInfo IntSubOp  = mkDyadic SLIT("-#") intPrimTy
+primOpInfo IntMulOp  = mkDyadic SLIT("*#") intPrimTy
+primOpInfo IntQuotOp = mkDyadic SLIT("quotInt#")	 intPrimTy
+primOpInfo IntRemOp  = mkDyadic SLIT("remInt#")	 intPrimTy
 
-primOpInfo IntNegOp  = Monadic SLIT("negateInt#") intPrimTy
-primOpInfo IntAbsOp  = Monadic SLIT("absInt#") intPrimTy
+primOpInfo IntNegOp  = mkMonadic SLIT("negateInt#") intPrimTy
+primOpInfo IntAbsOp  = mkMonadic SLIT("absInt#") intPrimTy
 \end{code}
 
 %************************************************************************
@@ -930,28 +936,28 @@ primOpInfo IntAbsOp  = Monadic SLIT("absInt#") intPrimTy
 A @Word#@ is an unsigned @Int#@.
 
 \begin{code}
-primOpInfo WordQuotOp = Dyadic SLIT("quotWord#") wordPrimTy
-primOpInfo WordRemOp  = Dyadic SLIT("remWord#")	 wordPrimTy
+primOpInfo WordQuotOp = mkDyadic SLIT("quotWord#") wordPrimTy
+primOpInfo WordRemOp  = mkDyadic SLIT("remWord#")	 wordPrimTy
 
-primOpInfo AndOp    = Dyadic  SLIT("and#")	wordPrimTy
-primOpInfo OrOp	    = Dyadic  SLIT("or#")	wordPrimTy
-primOpInfo XorOp    = Dyadic  SLIT("xor#")	wordPrimTy
-primOpInfo NotOp    = Monadic SLIT("not#")	wordPrimTy
+primOpInfo AndOp    = mkDyadic  SLIT("and#")	wordPrimTy
+primOpInfo OrOp	    = mkDyadic  SLIT("or#")	wordPrimTy
+primOpInfo XorOp    = mkDyadic  SLIT("xor#")	wordPrimTy
+primOpInfo NotOp    = mkMonadic SLIT("not#")	wordPrimTy
 
 primOpInfo SllOp
-  = GenPrimOp SLIT("shiftL#")  [] [wordPrimTy, intPrimTy] wordPrimTy
+  = mkGenPrimOp SLIT("shiftL#")  [] [wordPrimTy, intPrimTy] wordPrimTy
 primOpInfo SrlOp
-  = GenPrimOp SLIT("shiftRL#") [] [wordPrimTy, intPrimTy] wordPrimTy
+  = mkGenPrimOp SLIT("shiftRL#") [] [wordPrimTy, intPrimTy] wordPrimTy
 
 primOpInfo ISllOp
-  = GenPrimOp SLIT("iShiftL#")  [] [intPrimTy, intPrimTy] intPrimTy
+  = mkGenPrimOp SLIT("iShiftL#")  [] [intPrimTy, intPrimTy] intPrimTy
 primOpInfo ISraOp
-  = GenPrimOp SLIT("iShiftRA#") [] [intPrimTy, intPrimTy] intPrimTy
+  = mkGenPrimOp SLIT("iShiftRA#") [] [intPrimTy, intPrimTy] intPrimTy
 primOpInfo ISrlOp
-  = GenPrimOp SLIT("iShiftRL#") [] [intPrimTy, intPrimTy] intPrimTy
+  = mkGenPrimOp SLIT("iShiftRL#") [] [intPrimTy, intPrimTy] intPrimTy
 
-primOpInfo Int2WordOp = GenPrimOp SLIT("int2Word#") [] [intPrimTy] wordPrimTy
-primOpInfo Word2IntOp = GenPrimOp SLIT("word2Int#") [] [wordPrimTy] intPrimTy
+primOpInfo Int2WordOp = mkGenPrimOp SLIT("int2Word#") [] [intPrimTy] wordPrimTy
+primOpInfo Word2IntOp = mkGenPrimOp SLIT("word2Int#") [] [wordPrimTy] intPrimTy
 \end{code}
 
 %************************************************************************
@@ -961,8 +967,8 @@ primOpInfo Word2IntOp = GenPrimOp SLIT("word2Int#") [] [wordPrimTy] intPrimTy
 %************************************************************************
 
 \begin{code}
-primOpInfo Int2AddrOp = GenPrimOp SLIT("int2Addr#") [] [intPrimTy] addrPrimTy
-primOpInfo Addr2IntOp = GenPrimOp SLIT("addr2Int#") [] [addrPrimTy] intPrimTy
+primOpInfo Int2AddrOp = mkGenPrimOp SLIT("int2Addr#") [] [intPrimTy] addrPrimTy
+primOpInfo Addr2IntOp = mkGenPrimOp SLIT("addr2Int#") [] [addrPrimTy] intPrimTy
 \end{code}
 
 
@@ -976,28 +982,28 @@ primOpInfo Addr2IntOp = GenPrimOp SLIT("addr2Int#") [] [addrPrimTy] intPrimTy
 similar).
 
 \begin{code}
-primOpInfo FloatAddOp	= Dyadic    SLIT("plusFloat#")	   floatPrimTy
-primOpInfo FloatSubOp	= Dyadic    SLIT("minusFloat#")   floatPrimTy
-primOpInfo FloatMulOp	= Dyadic    SLIT("timesFloat#")   floatPrimTy
-primOpInfo FloatDivOp	= Dyadic    SLIT("divideFloat#")  floatPrimTy
-primOpInfo FloatNegOp	= Monadic   SLIT("negateFloat#")  floatPrimTy
+primOpInfo FloatAddOp	= mkDyadic    SLIT("plusFloat#")	   floatPrimTy
+primOpInfo FloatSubOp	= mkDyadic    SLIT("minusFloat#")   floatPrimTy
+primOpInfo FloatMulOp	= mkDyadic    SLIT("timesFloat#")   floatPrimTy
+primOpInfo FloatDivOp	= mkDyadic    SLIT("divideFloat#")  floatPrimTy
+primOpInfo FloatNegOp	= mkMonadic   SLIT("negateFloat#")  floatPrimTy
 
-primOpInfo Float2IntOp	= GenPrimOp SLIT("float2Int#") [] [floatPrimTy] intPrimTy
-primOpInfo Int2FloatOp	= GenPrimOp SLIT("int2Float#") [] [intPrimTy] floatPrimTy
+primOpInfo Float2IntOp	= mkGenPrimOp SLIT("float2Int#") [] [floatPrimTy] intPrimTy
+primOpInfo Int2FloatOp	= mkGenPrimOp SLIT("int2Float#") [] [intPrimTy] floatPrimTy
 
-primOpInfo FloatExpOp	= Monadic   SLIT("expFloat#")	   floatPrimTy
-primOpInfo FloatLogOp	= Monadic   SLIT("logFloat#")	   floatPrimTy
-primOpInfo FloatSqrtOp	= Monadic   SLIT("sqrtFloat#")	   floatPrimTy
-primOpInfo FloatSinOp	= Monadic   SLIT("sinFloat#")	   floatPrimTy
-primOpInfo FloatCosOp	= Monadic   SLIT("cosFloat#")	   floatPrimTy
-primOpInfo FloatTanOp	= Monadic   SLIT("tanFloat#")	   floatPrimTy
-primOpInfo FloatAsinOp	= Monadic   SLIT("asinFloat#")	   floatPrimTy
-primOpInfo FloatAcosOp	= Monadic   SLIT("acosFloat#")	   floatPrimTy
-primOpInfo FloatAtanOp	= Monadic   SLIT("atanFloat#")	   floatPrimTy
-primOpInfo FloatSinhOp	= Monadic   SLIT("sinhFloat#")	   floatPrimTy
-primOpInfo FloatCoshOp	= Monadic   SLIT("coshFloat#")	   floatPrimTy
-primOpInfo FloatTanhOp	= Monadic   SLIT("tanhFloat#")	   floatPrimTy
-primOpInfo FloatPowerOp	= Dyadic    SLIT("powerFloat#")   floatPrimTy
+primOpInfo FloatExpOp	= mkMonadic   SLIT("expFloat#")	   floatPrimTy
+primOpInfo FloatLogOp	= mkMonadic   SLIT("logFloat#")	   floatPrimTy
+primOpInfo FloatSqrtOp	= mkMonadic   SLIT("sqrtFloat#")	   floatPrimTy
+primOpInfo FloatSinOp	= mkMonadic   SLIT("sinFloat#")	   floatPrimTy
+primOpInfo FloatCosOp	= mkMonadic   SLIT("cosFloat#")	   floatPrimTy
+primOpInfo FloatTanOp	= mkMonadic   SLIT("tanFloat#")	   floatPrimTy
+primOpInfo FloatAsinOp	= mkMonadic   SLIT("asinFloat#")	   floatPrimTy
+primOpInfo FloatAcosOp	= mkMonadic   SLIT("acosFloat#")	   floatPrimTy
+primOpInfo FloatAtanOp	= mkMonadic   SLIT("atanFloat#")	   floatPrimTy
+primOpInfo FloatSinhOp	= mkMonadic   SLIT("sinhFloat#")	   floatPrimTy
+primOpInfo FloatCoshOp	= mkMonadic   SLIT("coshFloat#")	   floatPrimTy
+primOpInfo FloatTanhOp	= mkMonadic   SLIT("tanhFloat#")	   floatPrimTy
+primOpInfo FloatPowerOp	= mkDyadic    SLIT("powerFloat#")   floatPrimTy
 \end{code}
 
 %************************************************************************
@@ -1010,31 +1016,31 @@ primOpInfo FloatPowerOp	= Dyadic    SLIT("powerFloat#")   floatPrimTy
 similar).
 
 \begin{code}
-primOpInfo DoubleAddOp	= Dyadic    SLIT("+##")   doublePrimTy
-primOpInfo DoubleSubOp	= Dyadic    SLIT("-##")  doublePrimTy
-primOpInfo DoubleMulOp	= Dyadic    SLIT("*##")  doublePrimTy
-primOpInfo DoubleDivOp	= Dyadic    SLIT("/##") doublePrimTy
-primOpInfo DoubleNegOp	= Monadic   SLIT("negateDouble#") doublePrimTy
+primOpInfo DoubleAddOp	= mkDyadic    SLIT("+##")   doublePrimTy
+primOpInfo DoubleSubOp	= mkDyadic    SLIT("-##")  doublePrimTy
+primOpInfo DoubleMulOp	= mkDyadic    SLIT("*##")  doublePrimTy
+primOpInfo DoubleDivOp	= mkDyadic    SLIT("/##") doublePrimTy
+primOpInfo DoubleNegOp	= mkMonadic   SLIT("negateDouble#") doublePrimTy
 
-primOpInfo Double2IntOp	    = GenPrimOp SLIT("double2Int#") [] [doublePrimTy] intPrimTy
-primOpInfo Int2DoubleOp	    = GenPrimOp SLIT("int2Double#") [] [intPrimTy] doublePrimTy
+primOpInfo Double2IntOp	    = mkGenPrimOp SLIT("double2Int#") [] [doublePrimTy] intPrimTy
+primOpInfo Int2DoubleOp	    = mkGenPrimOp SLIT("int2Double#") [] [intPrimTy] doublePrimTy
 
-primOpInfo Double2FloatOp   = GenPrimOp SLIT("double2Float#") [] [doublePrimTy] floatPrimTy
-primOpInfo Float2DoubleOp   = GenPrimOp SLIT("float2Double#") [] [floatPrimTy] doublePrimTy
+primOpInfo Double2FloatOp   = mkGenPrimOp SLIT("double2Float#") [] [doublePrimTy] floatPrimTy
+primOpInfo Float2DoubleOp   = mkGenPrimOp SLIT("float2Double#") [] [floatPrimTy] doublePrimTy
 
-primOpInfo DoubleExpOp	= Monadic   SLIT("expDouble#")	   doublePrimTy
-primOpInfo DoubleLogOp	= Monadic   SLIT("logDouble#")	   doublePrimTy
-primOpInfo DoubleSqrtOp	= Monadic   SLIT("sqrtDouble#")   doublePrimTy
-primOpInfo DoubleSinOp	= Monadic   SLIT("sinDouble#")	   doublePrimTy
-primOpInfo DoubleCosOp	= Monadic   SLIT("cosDouble#")	   doublePrimTy
-primOpInfo DoubleTanOp	= Monadic   SLIT("tanDouble#")	   doublePrimTy
-primOpInfo DoubleAsinOp	= Monadic   SLIT("asinDouble#")   doublePrimTy
-primOpInfo DoubleAcosOp	= Monadic   SLIT("acosDouble#")   doublePrimTy
-primOpInfo DoubleAtanOp	= Monadic   SLIT("atanDouble#")   doublePrimTy
-primOpInfo DoubleSinhOp	= Monadic   SLIT("sinhDouble#")   doublePrimTy
-primOpInfo DoubleCoshOp	= Monadic   SLIT("coshDouble#")   doublePrimTy
-primOpInfo DoubleTanhOp	= Monadic   SLIT("tanhDouble#")   doublePrimTy
-primOpInfo DoublePowerOp= Dyadic    SLIT("**##")  doublePrimTy
+primOpInfo DoubleExpOp	= mkMonadic   SLIT("expDouble#")	   doublePrimTy
+primOpInfo DoubleLogOp	= mkMonadic   SLIT("logDouble#")	   doublePrimTy
+primOpInfo DoubleSqrtOp	= mkMonadic   SLIT("sqrtDouble#")   doublePrimTy
+primOpInfo DoubleSinOp	= mkMonadic   SLIT("sinDouble#")	   doublePrimTy
+primOpInfo DoubleCosOp	= mkMonadic   SLIT("cosDouble#")	   doublePrimTy
+primOpInfo DoubleTanOp	= mkMonadic   SLIT("tanDouble#")	   doublePrimTy
+primOpInfo DoubleAsinOp	= mkMonadic   SLIT("asinDouble#")   doublePrimTy
+primOpInfo DoubleAcosOp	= mkMonadic   SLIT("acosDouble#")   doublePrimTy
+primOpInfo DoubleAtanOp	= mkMonadic   SLIT("atanDouble#")   doublePrimTy
+primOpInfo DoubleSinhOp	= mkMonadic   SLIT("sinhDouble#")   doublePrimTy
+primOpInfo DoubleCoshOp	= mkMonadic   SLIT("coshDouble#")   doublePrimTy
+primOpInfo DoubleTanhOp	= mkMonadic   SLIT("tanhDouble#")   doublePrimTy
+primOpInfo DoublePowerOp= mkDyadic    SLIT("**##")  doublePrimTy
 \end{code}
 
 %************************************************************************
@@ -1057,36 +1063,36 @@ primOpInfo IntegerQuotRemOp = integerDyadic2Results SLIT("quotRemInteger#")
 primOpInfo IntegerDivModOp  = integerDyadic2Results SLIT("divModInteger#")
 
 primOpInfo Integer2IntOp
-  = GenPrimOp SLIT("integer2Int#") [] one_Integer_ty intPrimTy
+  = mkGenPrimOp SLIT("integer2Int#") [] one_Integer_ty intPrimTy
 
 primOpInfo Integer2WordOp
-  = GenPrimOp SLIT("integer2Word#") [] one_Integer_ty wordPrimTy
+  = mkGenPrimOp SLIT("integer2Word#") [] one_Integer_ty wordPrimTy
 
 primOpInfo Int2IntegerOp
-  = GenPrimOp SLIT("int2Integer#") [] [intPrimTy] 
+  = mkGenPrimOp SLIT("int2Integer#") [] [intPrimTy] 
 			(unboxedTriple [intPrimTy, intPrimTy, byteArrayPrimTy])
 
 primOpInfo Word2IntegerOp
-  = GenPrimOp SLIT("word2Integer#") [] [wordPrimTy] 
+  = mkGenPrimOp SLIT("word2Integer#") [] [wordPrimTy] 
 			(unboxedTriple [intPrimTy, intPrimTy, byteArrayPrimTy])
 
 primOpInfo Addr2IntegerOp
-  = GenPrimOp SLIT("addr2Integer#") [] [addrPrimTy] 
+  = mkGenPrimOp SLIT("addr2Integer#") [] [addrPrimTy] 
 			(unboxedTriple [intPrimTy, intPrimTy, byteArrayPrimTy])
 
 primOpInfo IntegerToInt64Op
-  = GenPrimOp SLIT("integerToInt64#") [] one_Integer_ty int64PrimTy
+  = mkGenPrimOp SLIT("integerToInt64#") [] one_Integer_ty int64PrimTy
 
 primOpInfo Int64ToIntegerOp
-  = GenPrimOp SLIT("int64ToInteger#") [] [int64PrimTy]
+  = mkGenPrimOp SLIT("int64ToInteger#") [] [int64PrimTy]
 			(unboxedTriple [intPrimTy, intPrimTy, byteArrayPrimTy])
 
 primOpInfo Word64ToIntegerOp
-  = GenPrimOp SLIT("word64ToInteger#") [] [word64PrimTy] 
+  = mkGenPrimOp SLIT("word64ToInteger#") [] [word64PrimTy] 
 			(unboxedTriple [intPrimTy, intPrimTy, byteArrayPrimTy])
 
 primOpInfo IntegerToWord64Op
-  = GenPrimOp SLIT("integerToWord64#") [] one_Integer_ty word64PrimTy
+  = mkGenPrimOp SLIT("integerToWord64#") [] one_Integer_ty word64PrimTy
 \end{code}
 
 Encoding and decoding of floating-point numbers is sorta
@@ -1094,16 +1100,16 @@ Integer-related.
 
 \begin{code}
 primOpInfo FloatEncodeOp
-  = GenPrimOp SLIT("encodeFloat#") [] an_Integer_and_Int_tys floatPrimTy
+  = mkGenPrimOp SLIT("encodeFloat#") [] an_Integer_and_Int_tys floatPrimTy
 
 primOpInfo DoubleEncodeOp
-  = GenPrimOp SLIT("encodeDouble#") [] an_Integer_and_Int_tys doublePrimTy
+  = mkGenPrimOp SLIT("encodeDouble#") [] an_Integer_and_Int_tys doublePrimTy
 
 primOpInfo FloatDecodeOp
-  = GenPrimOp SLIT("decodeFloat#") [] [floatPrimTy] 
+  = mkGenPrimOp SLIT("decodeFloat#") [] [floatPrimTy] 
 	(unboxedQuadruple [intPrimTy, intPrimTy, intPrimTy, byteArrayPrimTy])
 primOpInfo DoubleDecodeOp
-  = GenPrimOp SLIT("decodeDouble#") [] [doublePrimTy] 
+  = mkGenPrimOp SLIT("decodeDouble#") [] [doublePrimTy] 
 	(unboxedQuadruple [intPrimTy, intPrimTy, intPrimTy, byteArrayPrimTy])
 \end{code}
 
@@ -1119,7 +1125,7 @@ primOpInfo NewArrayOp
 	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar;
 	state = mkStatePrimTy s
     } in
-    GenPrimOp SLIT("newArray#") [s_tv, elt_tv] 
+    mkGenPrimOp SLIT("newArray#") [s_tv, elt_tv] 
 	[intPrimTy, elt, state]
 	(unboxedPair [state, mkMutableArrayPrimTy s elt])
 
@@ -1130,7 +1136,7 @@ primOpInfo (NewByteArrayOp kind)
 	op_str	       = _PK_ ("new" ++ primRepString kind ++ "Array#")
 	state = mkStatePrimTy s
     in
-    GenPrimOp op_str [s_tv]
+    mkGenPrimOp op_str [s_tv]
 	[intPrimTy, state]
 	(unboxedPair [state, mkMutableByteArrayPrimTy s])
 
@@ -1141,7 +1147,7 @@ primOpInfo SameMutableArrayOp
 	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar;
 	mut_arr_ty = mkMutableArrayPrimTy s elt
     } in
-    GenPrimOp SLIT("sameMutableArray#") [s_tv, elt_tv] [mut_arr_ty, mut_arr_ty]
+    mkGenPrimOp SLIT("sameMutableArray#") [s_tv, elt_tv] [mut_arr_ty, mut_arr_ty]
 				   boolTy
 
 primOpInfo SameMutableByteArrayOp
@@ -1149,7 +1155,7 @@ primOpInfo SameMutableByteArrayOp
 	s = alphaTy; s_tv = alphaTyVar;
 	mut_arr_ty = mkMutableByteArrayPrimTy s
     } in
-    GenPrimOp SLIT("sameMutableByteArray#") [s_tv] [mut_arr_ty, mut_arr_ty]
+    mkGenPrimOp SLIT("sameMutableByteArray#") [s_tv] [mut_arr_ty, mut_arr_ty]
 				   boolTy
 
 ---------------------------------------------------------------------------
@@ -1160,7 +1166,7 @@ primOpInfo ReadArrayOp
 	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar;
 	state = mkStatePrimTy s
     } in
-    GenPrimOp SLIT("readArray#") [s_tv, elt_tv]
+    mkGenPrimOp SLIT("readArray#") [s_tv, elt_tv]
 	[mkMutableArrayPrimTy s elt, intPrimTy, state]
 	(unboxedPair [state, elt])
 
@@ -1169,13 +1175,13 @@ primOpInfo WriteArrayOp
   = let {
 	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar
     } in
-    GenPrimOp SLIT("writeArray#") [s_tv, elt_tv]
+    mkGenPrimOp SLIT("writeArray#") [s_tv, elt_tv]
 	[mkMutableArrayPrimTy s elt, intPrimTy, elt, mkStatePrimTy s]
 	(mkStatePrimTy s)
 
 primOpInfo IndexArrayOp
   = let { elt = alphaTy; elt_tv = alphaTyVar } in
-    GenPrimOp SLIT("indexArray#") [elt_tv] [mkArrayPrimTy elt, intPrimTy]
+    mkGenPrimOp SLIT("indexArray#") [elt_tv] [mkArrayPrimTy elt, intPrimTy]
 	(unboxedPair [realWorldStatePrimTy, elt])
 
 ---------------------------------------------------------------------------
@@ -1193,7 +1199,7 @@ primOpInfo (ReadByteArrayOp kind)
 	  | kind == StablePtrRep = [s_tv, betaTyVar]
 	  | otherwise	         = [s_tv]
     in
-    GenPrimOp op_str tvs
+    mkGenPrimOp op_str tvs
 	[mkMutableByteArrayPrimTy s, intPrimTy, state]
 	(unboxedPair [state, relevant_type])
   where
@@ -1218,7 +1224,7 @@ primOpInfo (WriteByteArrayOp kind)
 	  | otherwise		 = (prim_ty, [s_tv])
 
     in
-    GenPrimOp op_str tvs
+    mkGenPrimOp op_str tvs
 	[mkMutableByteArrayPrimTy s, intPrimTy, the_prim_ty, mkStatePrimTy s]
 	(mkStatePrimTy s)
 
@@ -1230,7 +1236,7 @@ primOpInfo (IndexByteArrayOp kind)
 	  | kind == StablePtrRep = ([alphaTy], [alphaTyVar])
 	  | otherwise	         = ([],[])
     in
-    GenPrimOp op_str tvs [byteArrayPrimTy, intPrimTy] 
+    mkGenPrimOp op_str tvs [byteArrayPrimTy, intPrimTy] 
 	(mkTyConApp (primRepTyCon kind) prim_tycon_args)
 
 primOpInfo (IndexOffForeignObjOp kind)
@@ -1241,7 +1247,7 @@ primOpInfo (IndexOffForeignObjOp kind)
 	  | kind == StablePtrRep = ([alphaTy], [alphaTyVar])
 	  | otherwise	         = ([], [])
     in
-    GenPrimOp op_str tvs [foreignObjPrimTy, intPrimTy] 
+    mkGenPrimOp op_str tvs [foreignObjPrimTy, intPrimTy] 
 	(mkTyConApp (primRepTyCon kind) prim_tycon_args)
 
 primOpInfo (IndexOffAddrOp kind)
@@ -1252,7 +1258,7 @@ primOpInfo (IndexOffAddrOp kind)
 	  | kind == StablePtrRep = ([alphaTy], [alphaTyVar])
 	  | otherwise	         = ([], [])
     in
-    GenPrimOp op_str tvs [addrPrimTy, intPrimTy] 
+    mkGenPrimOp op_str tvs [addrPrimTy, intPrimTy] 
 	(mkTyConApp (primRepTyCon kind) prim_tycon_args)
 
 primOpInfo (WriteOffAddrOp kind)
@@ -1261,7 +1267,7 @@ primOpInfo (WriteOffAddrOp kind)
 	op_str = _PK_ ("write" ++ primRepString kind ++ "OffAddr#")
 	prim_ty = mkTyConApp (primRepTyCon kind) []
     in
-    GenPrimOp op_str [s_tv]
+    mkGenPrimOp op_str [s_tv]
 	[addrPrimTy, intPrimTy, prim_ty, mkStatePrimTy s]
 	(mkStatePrimTy s)
 
@@ -1271,7 +1277,7 @@ primOpInfo UnsafeFreezeArrayOp
 	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar;
 	state = mkStatePrimTy s
     } in
-    GenPrimOp SLIT("unsafeFreezeArray#") [s_tv, elt_tv]
+    mkGenPrimOp SLIT("unsafeFreezeArray#") [s_tv, elt_tv]
 	[mkMutableArrayPrimTy s elt, state]
 	(unboxedPair [state, mkArrayPrimTy elt])
 
@@ -1280,20 +1286,20 @@ primOpInfo UnsafeFreezeByteArrayOp
 	s = alphaTy; s_tv = alphaTyVar;
 	state = mkStatePrimTy s
     } in
-    GenPrimOp SLIT("unsafeFreezeByteArray#") [s_tv]
+    mkGenPrimOp SLIT("unsafeFreezeByteArray#") [s_tv]
 	[mkMutableByteArrayPrimTy s, state]
 	(unboxedPair [state, byteArrayPrimTy])
 
 ---------------------------------------------------------------------------
 primOpInfo SizeofByteArrayOp
-  = GenPrimOp
+  = mkGenPrimOp
         SLIT("sizeofByteArray#") []
 	[byteArrayPrimTy]
         intPrimTy
 
 primOpInfo SizeofMutableByteArrayOp
   = let { s = alphaTy; s_tv = alphaTyVar } in
-    GenPrimOp
+    mkGenPrimOp
         SLIT("sizeofMutableByteArray#") [s_tv]
 	[mkMutableByteArrayPrimTy s]
         intPrimTy
@@ -1312,7 +1318,7 @@ primOpInfo NewMutVarOp
 	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar;
 	state = mkStatePrimTy s
     } in
-    GenPrimOp SLIT("newMutVar#") [s_tv, elt_tv] 
+    mkGenPrimOp SLIT("newMutVar#") [s_tv, elt_tv] 
 	[elt, state]
 	(unboxedPair [state, mkMutVarPrimTy s elt])
 
@@ -1321,7 +1327,7 @@ primOpInfo ReadMutVarOp
 	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar;
 	state = mkStatePrimTy s
     } in
-    GenPrimOp SLIT("readMutVar#") [s_tv, elt_tv]
+    mkGenPrimOp SLIT("readMutVar#") [s_tv, elt_tv]
 	[mkMutVarPrimTy s elt, state]
 	(unboxedPair [state, elt])
 
@@ -1330,7 +1336,7 @@ primOpInfo WriteMutVarOp
   = let {
 	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar
     } in
-    GenPrimOp SLIT("writeMutVar#") [s_tv, elt_tv]
+    mkGenPrimOp SLIT("writeMutVar#") [s_tv, elt_tv]
 	[mkMutVarPrimTy s elt, elt, mkStatePrimTy s]
 	(mkStatePrimTy s)
 
@@ -1339,7 +1345,7 @@ primOpInfo SameMutVarOp
 	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar;
 	mut_var_ty = mkMutVarPrimTy s elt
     } in
-    GenPrimOp SLIT("sameMutVar#") [s_tv, elt_tv] [mut_var_ty, mut_var_ty]
+    mkGenPrimOp SLIT("sameMutVar#") [s_tv, elt_tv] [mut_var_ty, mut_var_ty]
 				   boolTy
 \end{code}
 
@@ -1358,14 +1364,14 @@ primOpInfo CatchOp
 	a = alphaTy; a_tv = alphaTyVar;
 	b = betaTy;  b_tv = betaTyVar;
     in
-    GenPrimOp SLIT("catch#") [a_tv, b_tv] [a, mkFunTy b a] a
+    mkGenPrimOp SLIT("catch#") [a_tv, b_tv] [a, mkFunTy b a] a
 
 primOpInfo RaiseOp
   = let
 	a = alphaTy; a_tv = alphaTyVar;
 	b = betaTy;  b_tv = betaTyVar;
     in
-    GenPrimOp SLIT("raise#") [a_tv, b_tv] [a] b
+    mkGenPrimOp SLIT("raise#") [a_tv, b_tv] [a] b
 \end{code}
 
 %************************************************************************
@@ -1380,7 +1386,7 @@ primOpInfo NewMVarOp
 	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar
 	state = mkStatePrimTy s
     in
-    GenPrimOp SLIT("newMVar#") [s_tv, elt_tv] [state]
+    mkGenPrimOp SLIT("newMVar#") [s_tv, elt_tv] [state]
 	(unboxedPair [state, mkMVarPrimTy s elt])
 
 primOpInfo TakeMVarOp
@@ -1388,7 +1394,7 @@ primOpInfo TakeMVarOp
 	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar
 	state = mkStatePrimTy s
     in
-    GenPrimOp SLIT("takeMVar#") [s_tv, elt_tv]
+    mkGenPrimOp SLIT("takeMVar#") [s_tv, elt_tv]
 	[mkMVarPrimTy s elt, state]
 	(unboxedPair [state, elt])
 
@@ -1396,7 +1402,7 @@ primOpInfo PutMVarOp
   = let
 	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar
     in
-    GenPrimOp SLIT("putMVar#") [s_tv, elt_tv]
+    mkGenPrimOp SLIT("putMVar#") [s_tv, elt_tv]
 	[mkMVarPrimTy s elt, elt, mkStatePrimTy s]
 	(mkStatePrimTy s)
 
@@ -1405,7 +1411,7 @@ primOpInfo SameMVarOp
 	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar
 	mvar_ty = mkMVarPrimTy s elt
     in
-    GenPrimOp SLIT("sameMVar#") [s_tv, elt_tv] [mvar_ty, mvar_ty] boolTy
+    mkGenPrimOp SLIT("sameMVar#") [s_tv, elt_tv] [mvar_ty, mvar_ty] boolTy
 \end{code}
 
 %************************************************************************
@@ -1420,21 +1426,21 @@ primOpInfo DelayOp
   = let {
 	s = alphaTy; s_tv = alphaTyVar
     } in
-    GenPrimOp SLIT("delay#") [s_tv]
+    mkGenPrimOp SLIT("delay#") [s_tv]
 	[intPrimTy, mkStatePrimTy s] (mkStatePrimTy s)
 
 primOpInfo WaitReadOp
   = let {
 	s = alphaTy; s_tv = alphaTyVar
     } in
-    GenPrimOp SLIT("waitRead#") [s_tv]
+    mkGenPrimOp SLIT("waitRead#") [s_tv]
 	[intPrimTy, mkStatePrimTy s] (mkStatePrimTy s)
 
 primOpInfo WaitWriteOp
   = let {
 	s = alphaTy; s_tv = alphaTyVar
     } in
-    GenPrimOp SLIT("waitWrite#") [s_tv]
+    mkGenPrimOp SLIT("waitWrite#") [s_tv]
 	[intPrimTy, mkStatePrimTy s] (mkStatePrimTy s)
 \end{code}
 
@@ -1447,13 +1453,13 @@ primOpInfo WaitWriteOp
 \begin{code}
 -- fork# :: a -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
 primOpInfo ForkOp	
-  = GenPrimOp SLIT("fork#") [alphaTyVar] 
+  = mkGenPrimOp SLIT("fork#") [alphaTyVar] 
 	[alphaTy, realWorldStatePrimTy]
 	(unboxedPair [realWorldStatePrimTy, threadIdPrimTy])
 
 -- killThread# :: ThreadId# -> State# RealWorld -> State# RealWorld
 primOpInfo KillThreadOp
-  = GenPrimOp SLIT("killThread#") [] 
+  = mkGenPrimOp SLIT("killThread#") [] 
 	[threadIdPrimTy, realWorldStatePrimTy]
 	realWorldStatePrimTy
 \end{code}
@@ -1466,7 +1472,7 @@ primOpInfo KillThreadOp
 
 \begin{code}
 primOpInfo MakeForeignObjOp
-  = GenPrimOp SLIT("makeForeignObj#") [] 
+  = mkGenPrimOp SLIT("makeForeignObj#") [] 
 	[addrPrimTy, realWorldStatePrimTy] 
 	(unboxedPair [realWorldStatePrimTy, foreignObjPrimTy])
 
@@ -1474,7 +1480,7 @@ primOpInfo WriteForeignObjOp
  = let {
 	s = alphaTy; s_tv = alphaTyVar
     } in
-   GenPrimOp SLIT("writeForeignObj#") [s_tv]
+   mkGenPrimOp SLIT("writeForeignObj#") [s_tv]
 	[foreignObjPrimTy, addrPrimTy, mkStatePrimTy s] (mkStatePrimTy s)
 \end{code}
 
@@ -1496,7 +1502,7 @@ In practice, you'll use the higher-level
 
 \begin{code}
 primOpInfo MkWeakOp
-  = GenPrimOp SLIT("mkWeak#") [alphaTyVar, betaTyVar, gammaTyVar] 
+  = mkGenPrimOp SLIT("mkWeak#") [alphaTyVar, betaTyVar, gammaTyVar] 
 	[alphaTy, betaTy, gammaTy, realWorldStatePrimTy]
 	(unboxedPair [realWorldStatePrimTy, mkWeakPrimTy betaTy])
 \end{code}
@@ -1516,7 +1522,7 @@ The higher-level op is
 
 \begin{code}
 primOpInfo DeRefWeakOp
- = GenPrimOp SLIT("deRefWeak#") [alphaTyVar]
+ = mkGenPrimOp SLIT("deRefWeak#") [alphaTyVar]
 	[mkWeakPrimTy alphaTy, realWorldStatePrimTy]
 	(unboxedTriple [realWorldStatePrimTy, intPrimTy, alphaTy])
 \end{code}
@@ -1559,18 +1565,18 @@ Question: Why @_RealWorld@ - won't any instance of @_ST@ do the job? [ADR]
 
 \begin{code}
 primOpInfo MakeStablePtrOp
-  = GenPrimOp SLIT("makeStablePtr#") [alphaTyVar]
+  = mkGenPrimOp SLIT("makeStablePtr#") [alphaTyVar]
 	[alphaTy, realWorldStatePrimTy]
 	(unboxedPair [realWorldStatePrimTy, 
 			mkTyConApp stablePtrPrimTyCon [alphaTy]])
 
 primOpInfo DeRefStablePtrOp
-  = GenPrimOp SLIT("deRefStablePtr#") [alphaTyVar]
+  = mkGenPrimOp SLIT("deRefStablePtr#") [alphaTyVar]
 	[mkStablePtrPrimTy alphaTy, realWorldStatePrimTy]
 	(unboxedPair [realWorldStatePrimTy, alphaTy])
 
 primOpInfo EqStablePtrOp
-  = GenPrimOp SLIT("eqStablePtr#") [alphaTyVar, betaTyVar]
+  = mkGenPrimOp SLIT("eqStablePtr#") [alphaTyVar, betaTyVar]
 	[mkStablePtrPrimTy alphaTy, mkStablePtrPrimTy betaTy]
 	intPrimTy
 \end{code}
@@ -1616,7 +1622,7 @@ removed...)
 
 \begin{code}
 primOpInfo ReallyUnsafePtrEqualityOp
-  = GenPrimOp SLIT("reallyUnsafePtrEquality#") [alphaTyVar]
+  = mkGenPrimOp SLIT("reallyUnsafePtrEquality#") [alphaTyVar]
 	[alphaTy, alphaTy] intPrimTy
 \end{code}
 
@@ -1628,10 +1634,10 @@ primOpInfo ReallyUnsafePtrEqualityOp
 
 \begin{code}
 primOpInfo SeqOp	-- seq# :: a -> Int#
-  = GenPrimOp SLIT("seq#")	[alphaTyVar] [alphaTy] intPrimTy
+  = mkGenPrimOp SLIT("seq#")	[alphaTyVar] [alphaTy] intPrimTy
 
 primOpInfo ParOp	-- par# :: a -> Int#
-  = GenPrimOp SLIT("par#")	[alphaTyVar] [alphaTy] intPrimTy
+  = mkGenPrimOp SLIT("par#")	[alphaTyVar] [alphaTy] intPrimTy
 \end{code}
 
 \begin{code}
@@ -1640,28 +1646,28 @@ primOpInfo ParOp	-- par# :: a -> Int#
 --      Same  structure as _seq_ i.e. returns Int#
 
 primOpInfo ParGlobalOp	-- parGlobal# :: Int# -> Int# -> Int# -> Int# -> a -> b -> b
-  = GenPrimOp SLIT("parGlobal#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] intPrimTy
+  = mkGenPrimOp SLIT("parGlobal#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] intPrimTy
 
 primOpInfo ParLocalOp	-- parLocal# :: Int# -> Int# -> Int# -> Int# -> a -> b -> b
-  = GenPrimOp SLIT("parLocal#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] intPrimTy
+  = mkGenPrimOp SLIT("parLocal#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] intPrimTy
 
 primOpInfo ParAtOp	-- parAt# :: Int# -> Int# -> Int# -> Int# -> a -> b -> c -> c
-  = GenPrimOp SLIT("parAt#")	[alphaTyVar,betaTyVar,gammaTyVar] [betaTy,alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,gammaTy] intPrimTy
+  = mkGenPrimOp SLIT("parAt#")	[alphaTyVar,betaTyVar,gammaTyVar] [betaTy,alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,gammaTy] intPrimTy
 
 primOpInfo ParAtAbsOp	-- parAtAbs# :: Int# -> Int# -> Int# -> Int# -> Int# -> a -> b -> b
-  = GenPrimOp SLIT("parAtAbs#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] intPrimTy
+  = mkGenPrimOp SLIT("parAtAbs#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] intPrimTy
 
 primOpInfo ParAtRelOp	-- parAtRel# :: Int# -> Int# -> Int# -> Int# -> Int# -> a -> b -> b
-  = GenPrimOp SLIT("parAtRel#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] intPrimTy
+  = mkGenPrimOp SLIT("parAtRel#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] intPrimTy
 
 primOpInfo ParAtForNowOp	-- parAtForNow# :: Int# -> Int# -> Int# -> Int# -> a -> b -> c -> c
-  = GenPrimOp SLIT("parAtForNow#")	[alphaTyVar,betaTyVar,gammaTyVar] [betaTy,alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,gammaTy] intPrimTy
+  = mkGenPrimOp SLIT("parAtForNow#")	[alphaTyVar,betaTyVar,gammaTyVar] [betaTy,alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,gammaTy] intPrimTy
 
 primOpInfo CopyableOp	-- copyable# :: a -> a
-  = GenPrimOp SLIT("copyable#")	[alphaTyVar] [alphaTy] intPrimTy
+  = mkGenPrimOp SLIT("copyable#")	[alphaTyVar] [alphaTy] intPrimTy
 
 primOpInfo NoFollowOp	-- noFollow# :: a -> a
-  = GenPrimOp SLIT("noFollow#")	[alphaTyVar] [alphaTy] intPrimTy
+  = mkGenPrimOp SLIT("noFollow#")	[alphaTyVar] [alphaTy] intPrimTy
 \end{code}
 
 %************************************************************************
@@ -1672,11 +1678,11 @@ primOpInfo NoFollowOp	-- noFollow# :: a -> a
 
 \begin{code}
 primOpInfo (CCallOp _ _ _ _)
-     = GenPrimOp SLIT("ccall#") [alphaTyVar] [] alphaTy
+     = mkGenPrimOp SLIT("ccall#") [alphaTyVar] [] alphaTy
 
 {-
 primOpInfo (CCallOp _ _ _ _ arg_tys result_ty)
-  = GenPrimOp SLIT("ccall#") [] arg_tys result_tycon tys_applied
+  = mkGenPrimOp SLIT("ccall#") [] arg_tys result_tycon tys_applied
   where
     (result_tycon, tys_applied, _) = splitAlgTyConApp result_ty
 -}
@@ -1773,8 +1779,7 @@ primOpCanFail DoubleLogOp	= True		-- Log of zero
 primOpCanFail DoubleAsinOp	= True		-- Arg out of domain
 primOpCanFail DoubleAcosOp	= True		-- Arg out of domain
 
--- The default is "yes it's ok for speculation"
-primOpCanFail other_op		= True
+primOpCanFail other_op		= False
 \end{code}
 
 And some primops have side-effects and so, for example, must not be
@@ -1869,12 +1874,12 @@ primOpNeedsWrapper other_op 	    	= False
 \end{code}
 
 \begin{code}
-primOpStr op
+primOpOcc op
   = case (primOpInfo op) of
-      Dyadic     str _	       -> str
-      Monadic    str _	       -> str
-      Compare    str _	       -> str
-      GenPrimOp  str _ _ _     -> str
+      Dyadic     occ _	       -> occ
+      Monadic    occ _	       -> occ
+      Compare    occ _	       -> occ
+      GenPrimOp  occ _ _ _     -> occ
 \end{code}
 
 \begin{code}
@@ -1884,11 +1889,11 @@ primOpUniq op = mkPrimOpIdUnique (IBOX(tagOf_PrimOp op))
 primOpType :: PrimOp -> Type
 primOpType op
   = case (primOpInfo op) of
-      Dyadic str ty ->	    dyadic_fun_ty ty
-      Monadic str ty ->	    monadic_fun_ty ty
-      Compare str ty ->	    compare_fun_ty ty
+      Dyadic occ ty ->	    dyadic_fun_ty ty
+      Monadic occ ty ->	    monadic_fun_ty ty
+      Compare occ ty ->	    compare_fun_ty ty
 
-      GenPrimOp str tyvars arg_tys res_ty -> 
+      GenPrimOp occ tyvars arg_tys res_ty -> 
 	mkForAllTys tyvars (mkFunTys arg_tys res_ty)
 \end{code}
 
@@ -1989,12 +1994,10 @@ pprPrimOp (CCallOp fun is_casm may_gc cconv)
 
 pprPrimOp other_op
   = getPprStyle $ \ sty ->
-    if codeStyle sty then	-- For C just print the primop itself
-       identToC str
-    else if ifaceStyle sty then	-- For interfaces Print it qualified with PrelGHC.
-       ptext SLIT("PrelGHC.") <> ptext str
-    else		  	-- Unqualified is good enough
-       ptext str
+   if ifaceStyle sty then	-- For interfaces Print it qualified with PrelGHC.
+	ptext SLIT("PrelGHC.") <> pprOccName occ
+   else
+	pprOccName occ
   where
-    str = primOpStr other_op
+    occ = primOpOcc other_op
 \end{code}

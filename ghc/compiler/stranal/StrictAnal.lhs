@@ -17,7 +17,7 @@ import Id		( idType, setIdStrictness,
 			  getIdDemandInfo, setIdDemandInfo,
 			  Id
 			)
-import IdInfo		( mkStrictnessInfo, mkBottomStrictnessInfo )
+import IdInfo		( mkStrictnessInfo )
 import CoreLint		( beginPass, endPass )
 import ErrUtils		( dumpIfSet )
 import SaAbsInt
@@ -326,15 +326,9 @@ addStrictnessInfoToId
 	-> Id			-- Augmented with strictness
 
 addStrictnessInfoToId str_val abs_val binder body
-
-  | isBot str_val
-  = binder `setIdStrictness` mkBottomStrictnessInfo
-
-  | otherwise
   = case (collectTyAndValBinders body) of
-	(_, [], rhs) 	        -> binder
 	(_, lambda_bounds, rhs) -> binder `setIdStrictness` 
-				      mkStrictnessInfo strictness False
+				   mkStrictnessInfo strictness False
 		where
 		    tys        = map idType lambda_bounds
 		    strictness = findStrictness tys str_val abs_val

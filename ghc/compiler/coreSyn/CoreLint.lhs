@@ -294,6 +294,9 @@ lintCoreExpr e@(Case scrut var alts)
    returnL alt_ty)
  where
    check alt_ty1 alt_ty2 = checkTys alt_ty1 alt_ty2 (mkCaseAltMsg e)
+
+lintCoreExpr e@(Type ty)
+  = addErrL (mkStrangeTyMsg e)
 \end{code}
 
 %************************************************************************
@@ -601,7 +604,7 @@ pp_binders :: [Id] -> SDoc
 pp_binders bs = sep (punctuate comma (map pp_binder bs))
 
 pp_binder :: Id -> SDoc
-pp_binder b = hsep [ppr b, text "::", ppr (idType b)]
+pp_binder b = hsep [ppr b, dcolon, ppr (idType b)]
 \end{code}
 
 \begin{code}
@@ -669,17 +672,17 @@ mkKindErrMsg :: TyVar -> Type -> ErrMsg
 mkKindErrMsg tyvar arg_ty
   = vcat [ptext SLIT("Kinds don't match in type application:"),
 	  hang (ptext SLIT("Type variable:"))
-		 4 (ppr tyvar <+> ptext SLIT("::") <+> ppr (tyVarKind tyvar)),
+		 4 (ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar)),
 	  hang (ptext SLIT("Arg type:"))   
-	         4 (ppr arg_ty <+> ptext SLIT("::") <+> ppr (typeKind arg_ty))]
+	         4 (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))]
 
 mkTyAppMsg :: Type -> Type -> ErrMsg
 mkTyAppMsg ty arg_ty
   = vcat [text "Illegal type application:",
 	      hang (ptext SLIT("Exp type:"))
-		 4 (ppr ty <+> ptext SLIT("::") <+> ppr (typeKind ty)),
+		 4 (ppr ty <+> dcolon <+> ppr (typeKind ty)),
 	      hang (ptext SLIT("Arg type:"))   
-	         4 (ppr arg_ty <+> ptext SLIT("::") <+> ppr (typeKind arg_ty))]
+	         4 (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))]
 
 mkRhsMsg :: Id -> Type -> ErrMsg
 mkRhsMsg binder ty
@@ -706,4 +709,7 @@ mkCoerceErr from_ty expr_ty
 	  ptext SLIT("From-type:") <+> ppr from_ty,
 	  ptext SLIT("Type of enclosed expr:") <+> ppr expr_ty
     ]
+
+mkStrangeTyMsg e
+  = ptext SLIT("Type where expression expected:") <+> ppr e
 \end{code}

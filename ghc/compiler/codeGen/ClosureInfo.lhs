@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.31 1998/12/02 13:17:55 simonm Exp $
+% $Id: ClosureInfo.lhs,v 1.32 1998/12/18 17:40:54 simonpj Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 

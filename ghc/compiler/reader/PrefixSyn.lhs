@@ -23,7 +23,7 @@ module PrefixSyn (
 
 import HsSyn
 import RdrHsSyn
-import Util		( panic )
+import Panic		( panic )
 import Char		( isDigit, ord )
 
 
@@ -37,11 +37,8 @@ type SrcFun  = RdrName
 data RdrBinding
   = RdrNullBind
   | RdrAndBindings	RdrBinding RdrBinding
-
-  | RdrTyDecl		RdrNameTyDecl
-  | RdrFunctionBinding	SrcLine [RdrMatch]
-  | RdrPatternBinding	SrcLine [RdrMatch]
-  | RdrClassDecl 	RdrNameClassDecl
+  | RdrTyClDecl		RdrNameTyClDecl
+  | RdrValBinding	RdrNameMonoBinds	-- Pattern or function binding
   | RdrInstDecl 	RdrNameInstDecl
   | RdrDefaultDecl	RdrNameDefaultDecl
   | RdrForeignDecl      RdrNameForeignDecl
@@ -56,18 +53,10 @@ type SigConverter = RdrNameSig -> RdrNameSig
 
 \begin{code}
 data RdrMatch
-  = RdrMatch_NoGuard
-	     SrcLine SrcFun
-	     RdrNamePat
-	     RdrNameHsExpr
-	     RdrBinding
-
-  | RdrMatch_Guards
-	     SrcLine SrcFun
-	     RdrNamePat
-	     [([RdrNameStmt], RdrNameHsExpr)]
-	     -- (guard,         expr)
-	     RdrBinding
+  = RdrMatch
+	     [RdrNamePat]
+	     (Maybe RdrNameHsType)
+	     RdrNameGRHSs
 \end{code}
 
 Unscramble strings representing oct/dec/hex integer literals:

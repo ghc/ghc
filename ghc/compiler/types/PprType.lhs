@@ -10,35 +10,37 @@ module PprType(
 	pprConstraint, pprTheta,
 	pprTyVarBndr, pprTyVarBndrs,
 
-	getTyDescription,
-
-	nmbrType, nmbrGlobalType
+	-- Junk
+	getTyDescription, showTypeCategory
  ) where
 
 #include "HsVersions.h"
 
 -- friends:
 -- (PprType can see all the representations it's trying to print)
-import Type		( GenType(..), TyNote(..), Kind, Type, ThetaType, 
+import Type		( Type(..), TyNote(..), Kind, ThetaType, 
 			  splitFunTys, splitDictTy_maybe,
 			  splitForAllTys, splitSigmaTy, splitRhoTy,
+			  isDictTy, splitTyConApp_maybe, splitFunTy_maybe,
 			  boxedTypeKind
 			)
-import Var		( GenTyVar, TyVar, tyVarKind,
+import Var		( TyVar, tyVarKind,
 			  tyVarName, setTyVarName
 			)
 import VarEnv
-import TyCon		( TyCon, isTupleTyCon, isUnboxedTupleTyCon, tyConArity )
+import TyCon		( TyCon, isPrimTyCon, isTupleTyCon, isUnboxedTupleTyCon, 
+			  maybeTyConSingleCon, isEnumerationTyCon, 
+			  tyConArity, tyConUnique
+			)
 import Class		( Class )
 
 -- others:
 import Maybes		( maybeToBool )
-import Name		( getOccString, setNameVisibility, NamedThing(..) )
+import Name		( getOccString, NamedThing(..) )
 import Outputable
 import PprEnv
-import Unique		( Unique, Uniquable(..),
-			  incrUnique, listTyConKey, initTyVarUnique 
-			)
+import Unique		( Uniquable(..) )
+import Unique		-- quite a few *Keys
 import Util
 \end{code}
 
@@ -54,7 +56,7 @@ parens around the type, except for the atomic cases.  @pprParendType@
 works just by setting the initial context precedence very high.
 
 \begin{code}
-pprType, pprParendType :: GenType flexi -> SDoc
+pprType, pprParendType :: Type -> SDoc
 pprType       ty = ppr_ty pprTyEnv tOP_PREC   ty
 pprParendType ty = ppr_ty pprTyEnv tYCON_PREC ty
 
@@ -62,7 +64,7 @@ pprKind, pprParendKind :: Kind -> SDoc
 pprKind       = pprType
 pprParendKind = pprParendType
 
-pprConstraint :: Class -> [GenType flexi] -> SDoc
+pprConstraint :: Class -> [Type] -> SDoc
 pprConstraint clas tys = ppr clas <+> hsep (map (pprParendType) tys)
 
 pprTheta :: ThetaType -> SDoc
@@ -70,7 +72,7 @@ pprTheta theta = parens (hsep (punctuate comma (map ppr_dict theta)))
 	       where
 		 ppr_dict (c,tys) = pprConstraint c tys
 
-instance Outputable (GenType flexi) where
+instance Outputable Type where
     ppr ty = pprType ty
 \end{code}
 
@@ -103,15 +105,23 @@ maybeParen ctxt_prec inner_prec pretty
 \end{code}
 
 \begin{code}
-ppr_ty :: PprEnv (GenTyVar flexi) flexi -> Int
-       -> GenType flexi
-       -> SDoc
-
+ppr_ty :: PprEnv TyVar -> Int -> Type -> SDoc
 ppr_ty env ctxt_prec (TyVarTy tyvar)
   = pTyVarO env tyvar
 
+ppr_ty env ctxt_prec ty@(TyConApp tycon tys)
+  	-- KIND CASE; it's of the form (Type x)
+  | tycon_uniq == typeConKey && n_tys == 1
+  = 	-- For kinds, print (Type x) as just x if x is a 
+	-- 	type constructor (must be Boxed, Unboxed, AnyBox)
+	-- Otherwise print as (Type x)
+    case ty1 of
+	TyConApp bx [] -> ppr bx
+	other	       -> maybeParen ctxt_prec tYCON_PREC 
+				     (ppr tycon <+> tys_w_spaces)
+		       
+	
 	-- TUPLE CASE (boxed and unboxed)
-ppr_ty env ctxt_prec (TyConApp tycon tys)
   |  isTupleTyCon tycon
   && length tys == tyConArity tycon	-- no magic if partially applied
   = parens tys_w_commas
@@ -119,42 +129,43 @@ ppr_ty env ctxt_prec (TyConApp tycon tys)
   |  isUnboxedTupleTyCon tycon
   && length tys == tyConArity tycon	-- no magic if partially applied
   = parens (char '#' <+> tys_w_commas <+> char '#')
-  where
-    tys_w_commas = sep (punctuate comma (map (ppr_ty env tOP_PREC) tys))
 
 	-- LIST CASE
-ppr_ty env ctxt_prec (TyConApp tycon [ty])
-  |  getUnique tycon == listTyConKey
-  = brackets (ppr_ty env tOP_PREC ty)
+  | tycon_uniq == listTyConKey && n_tys == 1
+  = brackets (ppr_ty env tOP_PREC ty1)
 
 	-- DICTIONARY CASE, prints {C a}
 	-- This means that instance decls come out looking right in interfaces
 	-- and that in turn means they get "gated" correctly when being slurped in
-ppr_ty env ctxt_prec ty@(TyConApp tycon tys)
   | maybeToBool maybe_dict
   = braces (ppr_dict env tYCON_PREC ctys)
-  where
-    Just ctys = maybe_dict
-    maybe_dict = splitDictTy_maybe ty
-  
+
 	-- NO-ARGUMENT CASE (=> no parens)
-ppr_ty env ctxt_prec (TyConApp tycon [])
+  | null tys
   = ppr tycon
 
 	-- GENERAL CASE
-ppr_ty env ctxt_prec (TyConApp tycon tys)
+  | otherwise
   = maybeParen ctxt_prec tYCON_PREC (hsep [ppr tycon, tys_w_spaces])
+
   where
+    tycon_uniq = tyConUnique tycon
+    n_tys      = length tys
+    (ty1:_)    = tys
+    Just ctys  = maybe_dict
+    maybe_dict = splitDictTy_maybe ty	-- Checks class and arity
+    tys_w_commas = sep (punctuate comma (map (ppr_ty env tOP_PREC) tys))
     tys_w_spaces = hsep (map (ppr_ty env tYCON_PREC) tys)
+  
 
 
 ppr_ty env ctxt_prec ty@(ForAllTy _ _)
   = getPprStyle $ \ sty -> 
     maybeParen ctxt_prec fUN_PREC $
-    if userStyle sty then
-       sep [ ptext SLIT("forall"), pp_tyvars, ptext SLIT("."), pp_maybe_ctxt, pp_body ]
-    else
+    if ifaceStyle sty then
        sep [ ptext SLIT("__forall"), brackets pp_tyvars, pp_ctxt, pp_body ]
+    else
+       sep [ ptext SLIT("forall"), pp_tyvars <> ptext SLIT("."), pp_maybe_ctxt, pp_body ]
   where		
     (tyvars, rho_ty) = splitForAllTys ty
     (theta, body_ty) = splitRhoTy rho_ty
@@ -211,7 +222,7 @@ and when in debug mode.
 pprTyVarBndr tyvar
   = getPprStyle $ \ sty ->
     if (ifaceStyle sty || debugStyle sty) && kind /= boxedTypeKind then
-        hcat [ppr tyvar, text " :: ", pprParendKind kind]
+        hsep [ppr tyvar, dcolon, pprParendKind kind]
 		-- See comments with ppDcolon in PprCore.lhs
     else
         ppr tyvar
@@ -251,97 +262,52 @@ getTyDescription ty
 \end{code}
 
 
-%************************************************************************
-%*									*
-\subsection{Renumbering types}
-%*									*
-%************************************************************************
-
-We tend to {\em renumber} everything before printing, so that we get
-consistent Uniques on everything from run to run.
-
-
 \begin{code}
-nmbrGlobalType :: Type -> Type		-- Renumber a top-level type
-nmbrGlobalType ty = nmbrType emptyVarEnv initTyVarUnique ty
+showTypeCategory :: Type -> Char
+  {-
+	{C,I,F,D}   char, int, float, double
+	T	    tuple
+	S	    other single-constructor type
+	{c,i,f,d}   unboxed ditto
+	t	    *unpacked* tuple
+	s	    *unpacked" single-cons...
 
-nmbrType :: TyVarEnv Type 	-- Substitution
-	 -> Unique		-- This unique and its successors are not 
-				-- free in the range of the substitution
-	 -> Type
-	 -> Type
+	v	    void#
+	a	    primitive array
 
-nmbrType tyvar_env uniq ty
-  = initNmbr tyvar_env uniq (nmbrTy ty)
+	E	    enumeration type
+	+	    dictionary, unless it's a ...
+	L	    List
+	>	    function
+	M	    other (multi-constructor) data-con type
+	.	    other type
+	-	    reserved for others to mark as "uninteresting"
+    -}
+showTypeCategory ty
+  = if isDictTy ty
+    then '+'
+    else
+      case splitTyConApp_maybe ty of
+	Nothing -> if maybeToBool (splitFunTy_maybe ty)
+		   then '>'
+		   else '.'
 
-nmbrTy :: Type -> NmbrM Type
-
-nmbrTy (TyVarTy tv)
-  = lookupTyVar tv
-
-nmbrTy (AppTy t1 t2)
-  = nmbrTy t1	    `thenNmbr` \ new_t1 ->
-    nmbrTy t2	    `thenNmbr` \ new_t2 ->
-    returnNmbr (AppTy new_t1 new_t2)
-
-nmbrTy (TyConApp tc tys)
-  = mapNmbr nmbrTy tys		`thenNmbr` \ new_tys ->
-    returnNmbr (TyConApp tc new_tys)
-
-nmbrTy (NoteTy (SynNote ty1) ty2)
-  = nmbrTy ty1	    `thenNmbr` \ new_ty1 ->
-    nmbrTy ty2	    `thenNmbr` \ new_ty2 ->
-    returnNmbr (NoteTy (SynNote new_ty1) new_ty2)
-
-nmbrTy (NoteTy (FTVNote _) ty2) = nmbrTy ty2
-
-nmbrTy (ForAllTy tv ty)
-  = addTyVar tv		$ \ new_tv ->
-    nmbrTy ty		`thenNmbr` \ new_ty ->
-    returnNmbr (ForAllTy new_tv new_ty)
-
-nmbrTy (FunTy t1 t2)
-  = nmbrTy t1	    `thenNmbr` \ new_t1 ->
-    nmbrTy t2	    `thenNmbr` \ new_t2 ->
-    returnNmbr (FunTy new_t1 new_t2)
-
-
-lookupTyVar tyvar env uniq
-  = (uniq, ty)
-  where
-    ty = case lookupVarEnv env tyvar of
-		Just ty -> ty
-		Nothing -> TyVarTy tyvar
-
-addTyVar tv m env u
-  = m tv' env' u'
-  where
-    env' = extendVarEnv env tv (TyVarTy tv')
-    tv'	 = setTyVarName tv (setNameVisibility Nothing u (tyVarName tv))
-    u'   = incrUnique u
-\end{code}
-
-Monad stuff
-
-\begin{code}
-type NmbrM a = TyVarEnv Type -> Unique -> (Unique, a)		-- Unique is name supply
-
-initNmbr :: TyVarEnv Type -> Unique -> NmbrM a -> a
-initNmbr env uniq m
-  = snd (m env uniq)
-
-returnNmbr x nenv u = (u, x)
-
-thenNmbr m k nenv u
-  = let
-	(u', res) = m nenv u
-    in
-    k res nenv u'
-
-
-mapNmbr f []     = returnNmbr []
-mapNmbr f (x:xs)
-  = f x		    `thenNmbr` \ r  ->
-    mapNmbr f xs    `thenNmbr` \ rs ->
-    returnNmbr (r:rs)
+	Just (tycon, _) ->
+          let utc = getUnique tycon in
+	  if	  utc == charDataConKey    then 'C'
+	  else if utc == intDataConKey     then 'I'
+	  else if utc == floatDataConKey   then 'F'
+	  else if utc == doubleDataConKey  then 'D'
+	  else if utc == integerDataConKey then 'J'
+	  else if utc == charPrimTyConKey  then 'c'
+	  else if (utc == intPrimTyConKey || utc == wordPrimTyConKey
+		|| utc == addrPrimTyConKey)		   then 'i'
+	  else if utc  == floatPrimTyConKey		   then 'f'
+	  else if utc  == doublePrimTyConKey		   then 'd'
+	  else if isPrimTyCon tycon {- array, we hope -}   then 'A'
+	  else if isEnumerationTyCon tycon		   then 'E'
+	  else if isTupleTyCon tycon			   then 'T'
+	  else if maybeToBool (maybeTyConSingleCon tycon)  then 'S'
+	  else if utc == listTyConKey			   then 'L'
+	  else 'M' -- oh, well...
 \end{code}

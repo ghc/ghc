@@ -5,7 +5,7 @@
 
 \begin{code}
 module TcTyDecls (
-	tcTyDecl,
+	tcTyDecl, kcTyDecl, 
 	tcConDecl,
 	mkDataBinds
     ) where
@@ -13,19 +13,18 @@ module TcTyDecls (
 #include "HsVersions.h"
 
 import HsSyn		( MonoBinds(..), 
-			  TyDecl(..), ConDecl(..), ConDetails(..), BangType(..),
+			  TyClDecl(..), ConDecl(..), ConDetails(..), BangType(..),
 			  andMonoBindList
 			)
-import RnHsSyn		( RenamedTyDecl, RenamedConDecl )
+import RnHsSyn		( RenamedTyClDecl, RenamedConDecl )
 import TcHsSyn		( TcMonoBinds )
 import BasicTypes	( RecFlag(..), NewOrData(..), StrictnessMark(..) )
 
-import Inst		( InstOrigin(..) )
-import TcMonoType	( tcHsTypeKind, tcHsType, tcContext )
-import TcEnv		( TcIdOcc(..),
-			  tcLookupTyCon, tcLookupClass,
-			  tcLookupTyVarBndrs
+import TcMonoType	( tcExtendTopTyVarScope, tcExtendTyVarScope, 
+			  tcHsTypeKind, tcHsType, tcHsTopType, tcHsTopBoxedType,
+			  tcContext
 			)
+import TcEnv		( tcLookupTy, TcTyThing(..) )
 import TcMonad
 import TcUnify		( unifyKind )
 
@@ -38,12 +37,12 @@ import Id		( getIdUnfolding )
 import CoreUnfold	( getUnfoldingTemplate )
 import FieldLabel
 import Var		( Id, TyVar )
-import Name		( isLocallyDefined, OccName(..), NamedThing(..)	)
+import Name		( isLocallyDefined, OccName, NamedThing(..) )
 import Outputable
 import TyCon		( TyCon, mkSynTyCon, mkAlgTyCon, isAlgTyCon, 
 			  isSynTyCon, tyConDataCons
 			)
-import Type		( typeKind, getTyVar, tyVarsOfTypes,
+import Type		( getTyVar, tyVarsOfTypes,
 			  mkTyConApp, mkTyVarTys, mkForAllTys, mkFunTy,
 			  mkTyVarTy,
 			  mkArrowKind, mkArrowKinds, boxedTypeKind,
@@ -51,103 +50,193 @@ import Type		( typeKind, getTyVar, tyVarsOfTypes,
 			)
 import Var		( tyVarKind )
 import VarSet		( intersectVarSet, isEmptyVarSet )
-import Util		( equivClasses, panic, assertPanic )
+import Util		( equivClasses )
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{Kind checking}
+%*									*
+%************************************************************************
+
 \begin{code}
-tcTyDecl :: RecFlag -> RenamedTyDecl -> TcM s TyCon
+kcTyDecl :: RenamedTyClDecl -> TcM s ()
+
+kcTyDecl (TySynonym name tyvar_names rhs src_loc)
+  = tcLookupTy name				`thenNF_Tc` \ (kind, _, _) ->
+    tcExtendTopTyVarScope kind tyvar_names	$ \ _ result_kind ->
+    tcHsTypeKind rhs				`thenTc` \ (rhs_kind, _) ->
+    unifyKind result_kind rhs_kind
+
+kcTyDecl (TyData _ context tycon_name tyvar_names con_decls _ _ src_loc)
+  = tcLookupTy tycon_name			`thenNF_Tc` \ (kind, _, _) ->
+    tcExtendTopTyVarScope kind tyvar_names	$ \ result_kind _ ->
+    tcContext context				`thenTc_` 
+    mapTc kcConDecl con_decls			`thenTc_`
+    returnTc ()
+
+kcConDecl (ConDecl _ ex_tvs ex_ctxt details loc)
+  = tcAddSrcLoc loc			(
+    tcExtendTyVarScope ex_tvs		( \ tyvars -> 
+    tcContext ex_ctxt			`thenTc_`
+    kc_con details			`thenTc_`
+    returnTc ()
+    ))
+  where
+    kc_con (VanillaCon btys)    = mapTc kc_bty btys		`thenTc_` returnTc ()
+    kc_con (InfixCon bty1 bty2) = mapTc kc_bty [bty1,bty2]	`thenTc_` returnTc ()
+    kc_con (NewCon ty)	        = tcHsType ty			`thenTc_` returnTc ()
+    kc_con (RecCon flds)        = mapTc kc_field flds		`thenTc_` returnTc ()
+
+    kc_bty (Banged ty)   = tcHsType ty
+    kc_bty (Unbanged ty) = tcHsType ty
+
+    kc_field (_, bty)    = kc_bty bty
 \end{code}
 
-Type synonym decls
-~~~~~~~~~~~~~~~~~~
+
+%************************************************************************
+%*									*
+\subsection{Type checking}
+%*									*
+%************************************************************************
 
 \begin{code}
+tcTyDecl :: RecFlag -> RenamedTyClDecl -> TcM s TyCon
+
 tcTyDecl is_rec (TySynonym tycon_name tyvar_names rhs src_loc)
-  = tcAddSrcLoc src_loc $
-    tcAddErrCtxt (tySynCtxt tycon_name) $
-
-	-- Look up the pieces
-    tcLookupTyCon tycon_name			`thenTc` \ (tycon_kind,  _, rec_tycon) ->
-    tcLookupTyVarBndrs tyvar_names		`thenNF_Tc` \ (tyvar_kinds, rec_tyvars) ->
-
-	-- Look at the rhs
-    tcHsTypeKind rhs				`thenTc` \ (rhs_kind, rhs_ty) ->
-
-	-- Unify tycon kind with (k1->...->kn->rhs)
-    unifyKind tycon_kind (mkArrowKinds tyvar_kinds rhs_kind)	`thenTc_`
+  = tcLookupTy tycon_name				`thenNF_Tc` \ (tycon_kind, Just arity, _) ->
+    tcExtendTopTyVarScope tycon_kind tyvar_names	$ \ tyvars _ ->
+    tcHsTopType rhs					`thenTc` \ rhs_ty ->
     let
 	-- Construct the tycon
-        kind  = mkArrowKinds (map tyVarKind rec_tyvars) (typeKind rhs_ty)
-	tycon = mkSynTyCon (getName tycon_name)
-			   kind
-			   (length tyvar_names)
-			   rec_tyvars
-			   rhs_ty
+	tycon = mkSynTyCon tycon_name tycon_kind arity tyvars rhs_ty
     in
     returnTc tycon
-\end{code}
 
-Algebraic data and newtype decls
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-\begin{code}
 tcTyDecl is_rec (TyData data_or_new context tycon_name tyvar_names con_decls derivings pragmas src_loc)
-  = tcAddSrcLoc src_loc $
-    let ctxt = case data_or_new of
-		 NewType  -> tyNewCtxt tycon_name
-		 DataType -> tyDataCtxt tycon_name
-    in
-    tcAddErrCtxt ctxt $
+  = 	-- Lookup the pieces
+    tcLookupTy tycon_name				`thenNF_Tc` \ (tycon_kind, _, ATyCon rec_tycon) ->
+    tcExtendTopTyVarScope tycon_kind tyvar_names	$ \ tyvars _ ->
 
-	-- Lookup the pieces
-    tcLookupTyCon tycon_name			`thenTc` \ (tycon_kind, _, rec_tycon) ->
-    tcLookupTyVarBndrs tyvar_names		`thenNF_Tc` \ (tyvar_kinds, rec_tyvars) ->
-    tc_derivs derivings				`thenTc` \ derived_classes ->
+	-- Typecheck the pieces
+    tcContext context					`thenTc` \ ctxt ->
+    mapTc (tcConDecl rec_tycon tyvars ctxt) con_decls	`thenTc` \ data_cons ->
+    tc_derivs derivings					`thenTc` \ derived_classes ->
 
-	-- Typecheck the context
-    tcContext context				`thenTc` \ ctxt ->
-
-	-- Unify tycon kind with (k1->...->kn->Type)
-    unifyKind tycon_kind (mkArrowKinds tyvar_kinds boxedTypeKind)	`thenTc_`
-
-	-- Walk the condecls
-    mapTc (tcConDecl rec_tycon rec_tyvars ctxt) con_decls
-						`thenTc` \ data_cons ->
     let
 	-- Construct the tycon
 	real_data_or_new = case data_or_new of
 				NewType -> NewType
-				DataType -> if all isNullaryDataCon data_cons then
-						EnumType
-					    else
-						DataType
+				DataType | all isNullaryDataCon data_cons -> EnumType
+					 | otherwise			  -> DataType
 
-	kind = foldr (mkArrowKind . tyVarKind) boxedTypeKind rec_tyvars
-	tycon = mkAlgTyCon (getName tycon_name)
-			   kind
-			   rec_tyvars
-			   ctxt
+	tycon = mkAlgTyCon tycon_name tycon_kind tyvars ctxt
 			   data_cons
 			   derived_classes
 			   Nothing		-- Not a dictionary
-			   real_data_or_new
-			   is_rec
+			   real_data_or_new is_rec
     in
     returnTc tycon
+  where
+	tc_derivs Nothing   = returnTc []
+	tc_derivs (Just ds) = mapTc tc_deriv ds
 
-tc_derivs Nothing   = returnTc []
-tc_derivs (Just ds) = mapTc tc_deriv ds
-
-tc_deriv name
-  = tcLookupClass name `thenTc` \ (_, clas) ->
-    returnTc clas
+	tc_deriv name = tcLookupTy name `thenTc` \ (_, _, AClass clas) ->
+			returnTc clas
 \end{code}
 
-Generating constructor/selector bindings for data declarations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+%************************************************************************
+%*									*
+\subsection{Type check constructors}
+%*									*
+%************************************************************************
 
 \begin{code}
-mkDataBinds :: [TyCon] -> TcM s ([Id], TcMonoBinds s)
+tcConDecl :: TyCon -> [TyVar] -> ThetaType -> RenamedConDecl -> TcM s DataCon
+
+tcConDecl tycon tyvars ctxt (ConDecl name ex_tvs ex_ctxt details src_loc)
+  = tcAddSrcLoc src_loc			$
+    tcExtendTyVarScope ex_tvs		$ \ ex_tyvars -> 
+    tcContext ex_ctxt			`thenTc` \ ex_theta ->
+    tc_con_decl_help tycon tyvars ctxt name ex_tyvars ex_theta details
+
+tc_con_decl_help tycon tyvars ctxt name ex_tyvars ex_theta details
+  = case details of
+	VanillaCon btys    -> tc_datacon btys
+	InfixCon bty1 bty2 -> tc_datacon [bty1,bty2]
+	NewCon ty	   -> tc_newcon ty
+	RecCon fields	   -> tc_rec_con fields
+  where
+    tc_datacon btys
+      = let
+	    arg_stricts = map get_strictness btys
+	    tys	        = map get_pty btys
+        in
+	mapTc tcHsTopType tys `thenTc` \ arg_tys ->
+	returnTc (mk_data_con arg_stricts arg_tys [])
+
+    tc_newcon ty 
+      = tcHsTopBoxedType ty	`thenTc` \ arg_ty ->
+	    -- can't allow an unboxed type here, because we're effectively
+	    -- going to remove the constructor while coercing it to a boxed type.
+	returnTc (mk_data_con [NotMarkedStrict] [arg_ty] [])
+
+    tc_rec_con fields
+      = checkTc (null ex_tyvars) (exRecConErr name)	    `thenTc_`
+	mapTc tc_field fields	`thenTc` \ field_label_infos_s ->
+	let
+	    field_label_infos = concat field_label_infos_s
+	    arg_stricts       = [strict | (_, _, strict) <- field_label_infos]
+	    arg_tys	      = [ty     | (_, ty, _)     <- field_label_infos]
+
+	    field_labels      = [ mkFieldLabel (getName name) ty tag 
+			      | ((name, ty, _), tag) <- field_label_infos `zip` allFieldLabelTags ]
+	in
+	returnTc (mk_data_con arg_stricts arg_tys field_labels)
+
+    tc_field (field_label_names, bty)
+      = tcHsTopType (get_pty bty)	`thenTc` \ field_ty ->
+	returnTc [(name, field_ty, get_strictness bty) | name <- field_label_names]
+
+    mk_data_con arg_stricts arg_tys fields = data_con
+	where
+	   data_con = mkDataCon name arg_stricts fields
+		      	   tyvars (thinContext arg_tys ctxt)
+			   ex_tyvars ex_theta
+		      	   arg_tys
+		      	   tycon data_con_id
+	   data_con_id = mkDataConId data_con
+
+
+-- The context for a data constructor should be limited to
+-- the type variables mentioned in the arg_tys
+thinContext arg_tys ctxt
+  = filter in_arg_tys ctxt
+  where
+      arg_tyvars = tyVarsOfTypes arg_tys
+      in_arg_tys (clas,tys) = not $ isEmptyVarSet $ 
+			      tyVarsOfTypes tys `intersectVarSet` arg_tyvars
+  
+get_strictness (Banged   _) = MarkedStrict
+get_strictness (Unbanged _) = NotMarkedStrict
+
+get_pty (Banged ty)   = ty
+get_pty (Unbanged ty) = ty
+\end{code}
+
+
+
+%************************************************************************
+%*									*
+\subsection{Generating constructor/selector bindings for data declarations}
+%*									*
+%************************************************************************
+
+\begin{code}
+mkDataBinds :: [TyCon] -> TcM s ([Id], TcMonoBinds)
 mkDataBinds [] = returnTc ([], EmptyMonoBinds)
 mkDataBinds (tycon : tycons) 
   | isSynTyCon tycon = mkDataBinds tycons
@@ -163,7 +252,7 @@ mkDataBinds_one tycon
 
 	-- For the locally-defined things
 	-- we need to turn the unfoldings inside the Ids into bindings,
-	binds = [ CoreMonoBind (RealId data_id) (getUnfoldingTemplate (getIdUnfolding data_id))
+	binds = [ CoreMonoBind data_id (getUnfoldingTemplate (getIdUnfolding data_id))
 		| data_id <- data_ids, isLocallyDefined data_id
 		]
     in	
@@ -208,123 +297,12 @@ mkRecordSelector tycon fields@((first_con, first_field_label) : other_fields)
     selector_id = mkRecordSelId first_field_label selector_ty
 \end{code}
 
-Constructors
-~~~~~~~~~~~~
-\begin{code}
-tcConDecl :: TyCon -> [TyVar] -> ThetaType -> RenamedConDecl -> TcM s DataCon
-
-tcConDecl tycon tyvars ctxt (ConDecl name ex_tvs ex_ctxt details src_loc)
-  = tcAddSrcLoc src_loc	$
-    tcLookupTyVarBndrs ex_tvs		`thenNF_Tc` \ (kinds, ex_tyvars) ->
-    tcContext ex_ctxt			`thenTc`    \ ex_theta ->
-    tc_con_help tycon tyvars ctxt name ex_tyvars ex_theta details
-    
-tc_con_help tycon tyvars ctxt name ex_tyvars ex_theta (VanillaCon btys)
-  = tc_datacon_help tycon tyvars ctxt name ex_tyvars ex_theta btys
-
-tc_con_help tycon tyvars ctxt name ex_tyvars ex_theta (InfixCon bty1 bty2)
-  = tc_datacon_help tycon tyvars ctxt name ex_tyvars ex_theta [bty1,bty2]
-
-tc_con_help tycon tyvars ctxt name ex_tyvars ex_theta (NewCon ty)
-  = tcHsType ty `thenTc` \ arg_ty ->
-    -- can't allow an unboxed type here, because we're effectively
-    -- going to remove the constructor while coercing it to a boxed type.
-    checkTc (not (isUnboxedType arg_ty)) (newTypeUnboxedField ty) `thenTc_`
-    let
-      data_con = mkDataCon (getName name)
-			   [NotMarkedStrict]
-			   [{- No labelled fields -}]
-		      	   tyvars
-		      	   ctxt
-			   ex_tyvars ex_theta
-		      	   [arg_ty]
-		      	   tycon data_con_id
-      data_con_id = mkDataConId data_con
-    in
-    returnTc data_con
-
-tc_con_help tycon tyvars ctxt name ex_tyvars ex_theta (RecCon fields)
-  = checkTc (null ex_tyvars) (exRecConErr name)	    `thenTc_`
-    mapTc tcField fields	`thenTc` \ field_label_infos_s ->
-    let
-      field_label_infos = concat field_label_infos_s
-      arg_stricts       = [strict | (_, _, strict) <- field_label_infos]
-      arg_tys	        = [ty     | (_, ty, _)     <- field_label_infos]
-
-      field_labels      = [ mkFieldLabel (getName name) ty tag 
-			  | ((name, ty, _), tag) <- field_label_infos `zip` allFieldLabelTags ]
-
-      data_con = mkDataCon (getName name)
-			   arg_stricts
-			   field_labels
-		      	   tyvars
-		      	   (thinContext arg_tys ctxt)
-			   ex_tyvars ex_theta
-		      	   arg_tys
-		      	   tycon data_con_id
-      data_con_id = mkDataConId data_con
-    in
-    returnTc data_con
-
-tcField (field_label_names, bty)
-  = tcHsType (get_pty bty)	`thenTc` \ field_ty ->
-    returnTc [(name, field_ty, get_strictness bty) | name <- field_label_names]
-
-tc_datacon_help tycon tyvars ctxt name ex_tyvars ex_theta btys
-  = let
-	arg_stricts = map get_strictness btys
-	tys	    = map get_pty btys
-    in
-    mapTc tcHsType tys `thenTc` \ arg_tys ->
-    let
-      data_con = mkDataCon (getName name)
-			   arg_stricts
-			   [{- No field labels -}]
-		      	   tyvars
-		      	   (thinContext arg_tys ctxt)
-			   ex_tyvars ex_theta
-		      	   arg_tys
-		      	   tycon data_con_id
-      data_con_id = mkDataConId data_con
-    in
-    returnTc data_con
-
--- The context for a data constructor should be limited to
--- the type variables mentioned in the arg_tys
-thinContext arg_tys ctxt
-  = filter in_arg_tys ctxt
-  where
-      arg_tyvars = tyVarsOfTypes arg_tys
-      in_arg_tys (clas,tys) = not $ isEmptyVarSet $ 
-			      tyVarsOfTypes tys `intersectVarSet` arg_tyvars
-  
-get_strictness (Banged   _) = MarkedStrict
-get_strictness (Unbanged _) = NotMarkedStrict
-
-get_pty (Banged ty)   = ty
-get_pty (Unbanged ty) = ty
-\end{code}
-
-
 
 Errors and contexts
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
-tySynCtxt tycon_name
-  = hsep [ptext SLIT("In the type declaration for"), quotes (ppr tycon_name)]
-
-tyDataCtxt tycon_name
-  = hsep [ptext SLIT("In the data declaration for"), quotes (ppr tycon_name)]
-
-tyNewCtxt tycon_name
-  = hsep [ptext SLIT("In the newtype declaration for"), quotes (ppr tycon_name)]
-
 fieldTypeMisMatch field_name
   = sep [ptext SLIT("Declared types differ for field"), quotes (ppr field_name)]
-
-newTypeUnboxedField ty
-  = sep [ptext SLIT("Newtype constructor field has an unboxed type:"), 
-	 quotes (ppr ty)]
 
 exRecConErr name
   = ptext SLIT("Can't combine named fields with locally-quantified type variables")

@@ -13,7 +13,9 @@ module UgenAll (
 	module U_literal,
 	module U_maybe,
 	module U_either,
-	module U_pbinding,
+	module U_grhsb,
+	module U_gdexp,
+	module U_match,
 	module U_qid,
 	module U_tree,
 	module U_ttype
@@ -31,7 +33,9 @@ import U_list
 import U_literal
 import U_maybe
 import U_either
-import U_pbinding
+import U_gdexp
+import U_grhsb
+import U_match
 import U_qid
 import U_tree
 import U_ttype

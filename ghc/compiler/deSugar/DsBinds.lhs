@@ -24,14 +24,14 @@ import DsGRHSs		( dsGuarded )
 import DsUtils
 import Match		( matchWrapper )
 
-import BasicTypes       ( Module, RecFlag(..) )
+import BasicTypes       ( RecFlag(..) )
 import CmdLineOpts	( opt_SccProfilingOn, opt_AutoSccsOnAllToplevs, 
 			  opt_AutoSccsOnExportedToplevs
 		        )
 import CostCentre	( mkAutoCC, IsCafCC(..), mkAllDictsCC )
 import Id		( idType, Id )
 import VarEnv
-import Name		( isExported )
+import Name		( Module, isExported )
 import Type		( mkTyVarTy, isDictTy, substTy
 			)
 import TysWiredIn	( voidTy )
@@ -76,9 +76,9 @@ dsMonoBinds auto_scc (FunMonoBind fun _ matches locn) rest
   where
     error_string = "function " ++ showSDoc (ppr fun)
 
-dsMonoBinds _ (PatMonoBind pat grhss_and_binds locn) rest
+dsMonoBinds _ (PatMonoBind pat grhss locn) rest
   = putSrcLocDs locn $
-    dsGuarded grhss_and_binds		`thenDs` \ body_expr ->
+    dsGuarded grhss			`thenDs` \ body_expr ->
     mkSelectorBinds pat body_expr	`thenDs` \ sel_binds ->
     returnDs (sel_binds ++ rest)
 

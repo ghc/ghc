@@ -8,36 +8,39 @@ module Var (
 	Var, IdOrTyVar,		-- Abstract
 	VarDetails(..), 	-- Concrete
 	varName, varUnique, varDetails, varInfo, varType,
-	setVarName, setVarUnique, setVarType,
+	setVarName, setVarUnique, setVarType,  setVarOcc,
 
 
 	-- TyVars
-	TyVar, GenTyVar,
+	TyVar,
 	tyVarName, tyVarKind,
-	tyVarFlexi, setTyVarFlexi, removeTyVarFlexi, setTyVarName, setTyVarUnique,
-	mkFlexiTyVar, mkTyVar, mkSysTyVar, isTyVar, isFlexiTyVar,
+	setTyVarName, setTyVarUnique,
+	mkTyVar, mkSysTyVar, isTyVar,
+	newMutTyVar, readMutTyVar, writeMutTyVar, isMutTyVar, makeTyVarImmutable,
 
 	-- Ids
-	Id, DictId, GenId,
-	idName, idType, idUnique, idInfo, modifyIdInfo,
+	Id, DictId,
+	idDetails, idName, idType, idUnique, idInfo, modifyIdInfo,
 	setIdName, setIdUnique, setIdInfo,
 	mkId, isId, externallyVisibleId
     ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	Type( GenType, Kind )
+import {-# SOURCE #-}	Type( Type, Kind )
 import {-# SOURCE #-}	IdInfo( IdInfo )
 import {-# SOURCE #-}	Const( Con )
 
 import FieldLabel	( FieldLabel )
 import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey )
-import Name		( Name, NamedThing(..),
-			  changeUnique, nameUnique, 
+import Name		( Name, OccName, NamedThing(..),
+			  setNameUnique, setNameOcc, nameUnique, 
 			  mkSysLocalName, isExternallyVisibleName
 			)
 import BasicTypes	( Unused )
 import Outputable
+
+import IOExts		( IORef, newIORef, readIORef, writeIORef )
 \end{code}
 
 
@@ -55,46 +58,49 @@ strictness).  The essential info about different kinds of @Vars@ is
 in its @VarDetails@.
 
 \begin{code}
-type IdOrTyVar = Var Unused Unused 
+type IdOrTyVar = Var
 
-data Var flex_self flex_ty 
+data Var
   = Var {
 	varName    :: Name,
 	realUnique :: Int#,		-- Key for fast comparison
 					-- Identical to the Unique in the name,
 					-- cached here for speed
-	varType    :: GenType flex_ty,
-	varDetails :: VarDetails flex_self,
+	varType    :: Type,
+	varDetails :: VarDetails,
 	varInfo    :: IdInfo		-- Only used for Ids at the moment
     }
 
-varUnique Var{realUnique = uniq} = mkUniqueGrimily uniq
+data VarDetails
+  = VanillaId 				-- Most Ids are like this
+  | ConstantId Con			-- The Id for a constant (data constructor or primop)
+  | RecordSelId FieldLabel		-- The Id for a record selector
+  | TyVar
+  | MutTyVar (IORef (Maybe Type))	-- Used during unification
 
-data VarDetails flex_self
-  = TyVar
-  | FlexiTyVar flex_self	-- Used during unification
-  | VanillaId 			-- Most Ids are like this
-  | ConstantId Con		-- The Id for a constant (data constructor or primop)
-  | RecordSelId FieldLabel	-- The Id for a record selector
+-- For a long time I tried to keep mutable Vars statically type-distinct
+-- from immutable Vars, but I've finally given up.   It's just too painful.
+-- After type checking there are no MutTyVars left, but there's no static check
+-- of that fact.
 \end{code}
 
 \begin{code}
-instance Outputable (Var fs ft) where
+instance Outputable Var where
   ppr var = ppr (varName var)
 
-instance Show (Var fs ft) where
+instance Show Var where
   showsPrec p var = showsPrecSDoc p (ppr var)
 
-instance NamedThing (Var fs ft) where
+instance NamedThing Var where
   getName = varName
 
-instance Uniquable (Var fs ft) where
+instance Uniquable Var where
   getUnique = varUnique
 
-instance Eq (Var fs ft) where
+instance Eq Var where
     a == b = realUnique a ==# realUnique b
 
-instance Ord (Var fs ft) where
+instance Ord Var where
     a <= b = realUnique a <=# realUnique b
     a <	 b = realUnique a <#  realUnique b
     a >= b = realUnique a >=# realUnique b
@@ -104,15 +110,22 @@ instance Ord (Var fs ft) where
 
 
 \begin{code}
-setVarUnique :: Var fs ft -> Unique -> Var fs ft
-setVarUnique var uniq = var {realUnique = getKey uniq, 
-			     varName = changeUnique (varName var) uniq}
+varUnique :: Var -> Unique
+varUnique (Var {realUnique = uniq}) = mkUniqueGrimily uniq
 
-setVarName :: Var fs ft -> Name -> Var fs ft
+setVarUnique :: Var -> Unique -> Var
+setVarUnique var uniq = var {realUnique = getKey uniq, 
+			     varName = setNameUnique (varName var) uniq}
+
+setVarName :: Var -> Name -> Var
 setVarName var new_name
   = var { realUnique = getKey (getUnique new_name), varName = new_name }
 
-setVarType :: Var flex_self flex_ty1 -> GenType flex_ty2 -> Var flex_self flex_ty2
+setVarOcc :: Var -> OccName -> Var
+setVarOcc var new_occ
+  = var { varName = setNameOcc (varName var) new_occ }
+
+setVarType :: Var -> Type -> Var
 setVarType var ty = var {varType = ty}
 \end{code}
 
@@ -124,10 +137,7 @@ setVarType var ty = var {varType = ty}
 %************************************************************************
 
 \begin{code}
-type GenTyVar flex_self = Var flex_self Unused		-- Perhaps a mutable tyvar, but 
-							-- with a fixed Kind
-
-type TyVar		= GenTyVar Unused		-- NOt even mutable
+type TyVar = Var
 \end{code}
 
 \begin{code}
@@ -136,46 +146,47 @@ tyVarKind = varType
 
 setTyVarUnique = setVarUnique
 setTyVarName   = setVarName
-
-tyVarFlexi :: GenTyVar flexi -> flexi
-tyVarFlexi (Var {varDetails = FlexiTyVar flex}) = flex
-tyVarFlexi other_var        = pprPanic "tyVarFlexi" (ppr other_var)
-
-setTyVarFlexi :: GenTyVar flexi1 -> flexi2 -> GenTyVar flexi2
-setTyVarFlexi var flex = var {varDetails = FlexiTyVar flex}
-
-removeTyVarFlexi :: GenTyVar flexi1 -> GenTyVar flexi2
-removeTyVarFlexi var = var {varDetails = TyVar}
 \end{code}
 
 \begin{code}
-mkTyVar :: Name -> Kind -> GenTyVar flexi
+mkTyVar :: Name -> Kind -> TyVar
 mkTyVar name kind = Var { varName = name, realUnique = getKey (nameUnique name),
 			  varType = kind, varDetails = TyVar }
 
-mkSysTyVar :: Unique -> Kind -> GenTyVar flexi
+mkSysTyVar :: Unique -> Kind -> TyVar
 mkSysTyVar uniq kind = Var { varName = name, realUnique = getKey uniq,
 			     varType = kind, varDetails = TyVar }
 		     where
-		       name = mkSysLocalName uniq
+		       name = mkSysLocalName uniq SLIT("t")
 
-mkFlexiTyVar :: Name -> Kind -> flexi -> GenTyVar flexi
-mkFlexiTyVar name kind flex = Var { varName = name, 
-				    realUnique = getKey (nameUnique name),
-			            varType = kind, 
-				    varDetails = FlexiTyVar flex }
+newMutTyVar :: Name -> Kind -> IO TyVar
+newMutTyVar name kind = 
+  do loc <- newIORef Nothing
+     return (Var { varName = name, 
+		   realUnique = getKey (nameUnique name),
+		   varType = kind, 
+		   varDetails = MutTyVar loc })
+
+readMutTyVar :: TyVar -> IO (Maybe Type)
+readMutTyVar (Var {varDetails = MutTyVar loc}) = readIORef loc
+
+writeMutTyVar :: TyVar -> Maybe Type -> IO ()
+writeMutTyVar (Var {varDetails = MutTyVar loc}) val = writeIORef loc val
+
+makeTyVarImmutable :: TyVar -> TyVar
+makeTyVarImmutable tyvar = tyvar { varDetails = TyVar}
 \end{code}
 
 \begin{code}
-isTyVar :: Var fs ft -> Bool
+isTyVar :: Var -> Bool
 isTyVar (Var {varDetails = details}) = case details of
-					TyVar        -> True
-					FlexiTyVar _ -> True
-					other	     -> False
+					TyVar      -> True
+					MutTyVar _ -> True
+					other	   -> False
 
-isFlexiTyVar :: Var fs ft -> Bool
-isFlexiTyVar (Var {varDetails = FlexiTyVar _}) = True
-isFlexiTyVar other			       = False
+isMutTyVar :: Var -> Bool
+isMutTyVar (Var {varDetails = MutTyVar _}) = True
+isMutTyVar other			       = False
 \end{code}
 
 
@@ -188,9 +199,8 @@ isFlexiTyVar other			       = False
 	Most Id-related functions are in Id.lhs and MkId.lhs
 
 \begin{code}
-type GenId flex_ty = Var Unused flex_ty
-type Id 	   = GenId Unused
-type DictId	   = Id
+type Id     = Var
+type DictId = Id
 \end{code}
 
 \begin{code}
@@ -206,22 +216,22 @@ setIdUnique = setVarUnique
 setIdName :: Id -> Name -> Id
 setIdName = setVarName
 
-setIdInfo :: GenId flexi -> IdInfo -> GenId flexi
+setIdInfo :: Id -> IdInfo -> Id
 setIdInfo var info = var {varInfo = info}
 
-modifyIdInfo :: GenId flexi -> (IdInfo -> IdInfo) -> GenId flexi
+modifyIdInfo :: Id -> (IdInfo -> IdInfo) -> Id
 modifyIdInfo var@(Var {varInfo = info}) fn = var {varInfo = fn info}
 \end{code}
 
 \begin{code}
-mkId :: Name -> GenType flex_ty  -> VarDetails Unused -> IdInfo -> GenId flex_ty
+mkId :: Name -> Type -> VarDetails -> IdInfo -> Id
 mkId name ty details info
   = Var {varName = name, realUnique = getKey (nameUnique name), varType = ty, 
 	 varDetails = details, varInfo = info}
 \end{code}
 
 \begin{code}
-isId :: Var fs ft -> Bool
+isId :: Var -> Bool
 isId (Var {varDetails = details}) = case details of
 					VanillaId     -> True
 					ConstantId _  -> True

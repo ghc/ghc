@@ -62,10 +62,10 @@ otherwise, make one up.
 
 \begin{code}
 selectMatchVar :: TypecheckedPat -> DsM Id
-selectMatchVar (VarPat var)    = returnDs var
-selectMatchVar (AsPat var pat) = returnDs var
-selectMatchVar (LazyPat pat)   = selectMatchVar pat
-selectMatchVar other_pat       = newSysLocalDs (outPatType other_pat) -- OK, better make up one...
+selectMatchVar (VarPat var)     = returnDs var
+selectMatchVar (AsPat var pat) 	= returnDs var
+selectMatchVar (LazyPat pat)   	= selectMatchVar pat
+selectMatchVar other_pat       	= newSysLocalDs (outPatType other_pat) -- OK, better make up one...
 \end{code}
 
 

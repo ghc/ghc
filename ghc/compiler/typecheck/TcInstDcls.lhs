@@ -12,13 +12,13 @@ module TcInstDcls (
 #include "HsVersions.h"
 
 import HsSyn		( HsDecl(..), InstDecl(..),
-			  HsBinds(..), MonoBinds(..), GRHSsAndBinds(..),
+			  HsBinds(..), MonoBinds(..),
 			  HsExpr(..), InPat(..), HsLit(..), Sig(..),
 			  collectMonoBinders, andMonoBindList
 			)
 import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl )
-import TcHsSyn		( TcMonoBinds, TcIdOcc(..),
-			  maybeBoxedPrimType, tcIdType
+import TcHsSyn		( TcMonoBinds,
+			  maybeBoxedPrimType
 			)
 
 import TcBinds		( tcPragmaSigs )
@@ -28,9 +28,11 @@ import RnMonad		( RnNameSupply )
 import Inst		( Inst, InstOrigin(..),
 			  newDicts, LIE, emptyLIE, plusLIE, plusLIEs )
 import TcDeriv		( tcDeriving )
-import TcEnv		( GlobalValueEnv, tcExtendGlobalValEnv, tcAddImportedIdInfo, tcInstId )
+import TcEnv		( ValueEnv, tcExtendGlobalValEnv, tcExtendTyVarEnvForMeths,
+			  tcAddImportedIdInfo, tcInstId
+			)
 import TcInstUtil	( InstInfo(..), classDataCon )
-import TcMonoType	( tcHsType )
+import TcMonoType	( tcHsTopType )
 import TcSimplify	( tcSimplifyAndCheck )
 import TcType		( TcTyVar, zonkTcTyVarBndr )
 
@@ -39,7 +41,7 @@ import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
 			)
 import CmdLineOpts	( opt_GlasgowExts, opt_AllowUndecidableInstances )
 import Class		( classBigSig, Class )
-import Var		( setIdInfo, idName, Id, TyVar )
+import Var		( setIdInfo, idName, idType, Id, TyVar )
 import DataCon		( isNullaryDataCon, dataConArgTys, dataConId )
 import Maybes 		( maybeToBool, catMaybes, expectJust )
 import MkId		( mkDictFunId )
@@ -54,7 +56,7 @@ import Type		( Type, isUnLiftedType, mkTyVarTys,
 			  splitSigmaTy, isTyVarTy,
 			  splitTyConApp_maybe, splitDictTy_maybe,
 			  splitAlgTyConApp_maybe,
-			  tyVarsOfTypes, substFlexiTheta
+			  tyVarsOfTypes, substTopTheta
 			)
 import VarEnv		( zipVarEnv )
 import VarSet		( mkVarSet, varSetElems )
@@ -138,13 +140,12 @@ and $dbinds_super$ bind the superclass dictionaries sd1 \ldots sdm.
 \end{enumerate}
 
 \begin{code}
-tcInstDecls1 :: GlobalValueEnv		-- Contains IdInfo for dfun ids
+tcInstDecls1 :: ValueEnv		-- Contains IdInfo for dfun ids
 	     -> [RenamedHsDecl]
 	     -> Module			-- module name for deriving
 	     -> RnNameSupply			-- for renaming derivings
 	     -> TcM s (Bag InstInfo,
-		       RenamedHsBinds,
-		       SDoc)
+		       RenamedHsBinds)
 
 tcInstDecls1 unf_env decls mod_name rn_name_supply
   = 	-- Do the ordinary instance declarations
@@ -157,15 +158,15 @@ tcInstDecls1 unf_env decls mod_name rn_name_supply
 	-- for things in this module; we ignore deriving decls from
 	-- interfaces!
     tcDeriving mod_name rn_name_supply decl_inst_info
-		    	`thenTc` \ (deriv_inst_info, deriv_binds, ddump_deriv) ->
+		    	`thenTc` \ (deriv_inst_info, deriv_binds) ->
 
     let
 	full_inst_info = deriv_inst_info `unionBags` decl_inst_info
     in
-    returnTc (full_inst_info, deriv_binds, ddump_deriv)
+    returnTc (full_inst_info, deriv_binds)
 
 
-tcInstDecl1 :: GlobalValueEnv -> Module -> RenamedInstDecl -> NF_TcM s (Bag InstInfo)
+tcInstDecl1 :: ValueEnv -> Module -> RenamedInstDecl -> NF_TcM s (Bag InstInfo)
 
 tcInstDecl1 unf_env mod_name (InstDecl poly_ty binds uprags (Just dfun_name) src_loc)
   = 	-- Prime error recovery, set source location
@@ -173,7 +174,7 @@ tcInstDecl1 unf_env mod_name (InstDecl poly_ty binds uprags (Just dfun_name) src
     tcAddSrcLoc src_loc			$
 
 	-- Type-check all the stuff before the "where"
-    tcHsType poly_ty			`thenTc` \ poly_ty' ->
+    tcHsTopType poly_ty			`thenTc` \ poly_ty' ->
     let
 	(tyvars, theta, dict_ty) = splitSigmaTy poly_ty'
 	(clas, inst_tys)         = case splitDictTy_maybe dict_ty of
@@ -206,7 +207,7 @@ tcInstDecl1 unf_env mod_name (InstDecl poly_ty binds uprags (Just dfun_name) src
 
 \begin{code}
 tcInstDecls2 :: Bag InstInfo
-	     -> NF_TcM s (LIE s, TcMonoBinds s)
+	     -> NF_TcM s (LIE, TcMonoBinds)
 
 tcInstDecls2 inst_decls
   = foldBag combine tcInstDecl2 (returnNF_Tc (emptyLIE, EmptyMonoBinds)) inst_decls
@@ -285,7 +286,7 @@ is the @dfun_theta@ below.
 First comes the easy case of a non-local instance decl.
 
 \begin{code}
-tcInstDecl2 :: InstInfo -> NF_TcM s (LIE s, TcMonoBinds s)
+tcInstDecl2 :: InstInfo -> NF_TcM s (LIE, TcMonoBinds)
 
 tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 		      inst_decl_theta
@@ -322,11 +323,11 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 	 op_sel_ids, defm_ids)  = classBigSig clas
 
 	-- Instantiate the theta found in the original instance decl
-	inst_decl_theta' = substFlexiTheta (zipVarEnv inst_tyvars (mkTyVarTys inst_tyvars'))
-					   inst_decl_theta
+	inst_decl_theta' = substTopTheta (zipVarEnv inst_tyvars (mkTyVarTys inst_tyvars'))
+					 inst_decl_theta
 
          -- Instantiate the super-class context with inst_tys
-	sc_theta' = substFlexiTheta (zipVarEnv class_tyvars inst_tys') sc_theta
+	sc_theta' = substTopTheta (zipVarEnv class_tyvars inst_tys') sc_theta
     in
 	 -- Create dictionary Ids from the specified instance contexts.
     newDicts origin sc_theta'		`thenNF_Tc` \ (sc_dicts,        sc_dict_ids) ->
@@ -345,12 +346,14 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
     in
     mapNF_Tc check_from_this_class bndrs		`thenNF_Tc_`
 
-    tcExtendGlobalValEnv (catMaybes defm_ids) (
-
+    tcExtendTyVarEnvForMeths inst_tyvars inst_tyvars' (
+ 	tcExtendGlobalValEnv (catMaybes defm_ids) (
 		-- Default-method Ids may be mentioned in synthesised RHSs 
-	mapAndUnzip3Tc (tcMethodBind clas origin inst_tys' inst_tyvars' monobinds uprags True) 
+
+	mapAndUnzip3Tc (tcMethodBind clas origin inst_tyvars' inst_tys' inst_decl_theta'
+				     monobinds uprags True) 
 		       (op_sel_ids `zip` defm_ids)
-    )		 	`thenTc` \ (method_binds_s, insts_needed_s, meth_lies_w_ids) ->
+    ))		 	`thenTc` \ (method_binds_s, insts_needed_s, meth_lies_w_ids) ->
 
 	-- Deal with SPECIALISE instance pragmas
     let
@@ -429,11 +432,11 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 		-- emit an error message.  This in turn means that we don't
 		-- mention the constructor, which doesn't exist for CCallable, CReturnable
 		-- Hardly beautiful, but only three extra lines.
-	    HsApp (TyApp (HsVar (RealId eRROR_ID)) [tcIdType this_dict_id])
+	    HsApp (TyApp (HsVar eRROR_ID) [idType this_dict_id])
 		  (HsLitOut (HsString msg) stringTy)
 
 	  | otherwise	-- The common case
-	  = foldl HsApp (TyApp (HsVar (RealId (dataConId dict_constr))) inst_tys')
+	  = foldl HsApp (TyApp (HsVar (dataConId dict_constr)) inst_tys')
 			       (map HsVar (sc_dict_ids ++ meth_ids))
 		-- We don't produce a binding for the dict_constr; instead we
 		-- rely on the simplifier to unfold this saturated application
@@ -454,7 +457,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 	  = AbsBinds
 		 zonked_inst_tyvars
 		 dfun_arg_dicts_ids
-		 [(inst_tyvars', RealId final_dfun_id, this_dict_id)] 
+		 [(inst_tyvars', final_dfun_id, this_dict_id)] 
 		 (lie_binds1	`AndMonoBinds` 
 		  lie_binds2	`AndMonoBinds`
 		  method_binds	`AndMonoBinds`

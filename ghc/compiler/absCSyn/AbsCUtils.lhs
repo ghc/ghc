@@ -30,7 +30,7 @@ import UniqSupply	( uniqFromSupply, uniqsFromSupply, splitUniqSupply,
 import CmdLineOpts      ( opt_ProduceC )
 import Maybes		( maybeToBool )
 import PrimOp		( PrimOp(..) )
-import Util		( panic )
+import Panic		( panic )
 
 infixr 9 `thenFlt`
 \end{code}

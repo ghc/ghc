@@ -13,22 +13,23 @@ module TcDeriv ( tcDeriving ) where
 import HsSyn		( HsBinds(..), MonoBinds(..), collectMonoBinders )
 import RdrHsSyn		( RdrName, RdrNameMonoBinds )
 import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds )
+import CmdLineOpts	( opt_D_dump_deriv )
 
 import TcMonad
 import Inst		( InstanceMapper )
-import TcEnv		( getEnv_TyCons )
+import TcEnv		( getEnvTyCons )
 import TcGenDeriv	-- Deriv stuff
 import TcInstUtil	( InstInfo(..), buildInstanceEnvs )
 import TcSimplify	( tcSimplifyThetas )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
-import RnEnv		( newDfunName, bindLocatedLocalsRn )
+import RnEnv		( newDFunName, bindLocatedLocalsRn )
 import RnMonad		( RnNameSupply, 
 			  renameSourceCode, thenRn, mapRn, returnRn )
 
 import Bag		( Bag, emptyBag, unionBags, listToBag )
 import Class		( classKey, Class )
-import ErrUtils		( ErrMsg )
+import ErrUtils		( ErrMsg, dumpIfSet )
 import MkId		( mkDictFunId )
 import Id		( mkVanillaId )
 import DataCon		( dataConArgTys, isNullaryDataCon )
@@ -43,7 +44,7 @@ import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
 			  isEnumerationTyCon, isAlgTyCon, TyCon
 			)
-import Type		( GenType(..), TauType, mkTyVarTys, mkTyConApp,
+import Type		( TauType, mkTyVarTys, mkTyConApp,
 			  mkSigmaTy, mkDictTy, isUnboxedType,
 			  splitAlgTyConApp
 			)
@@ -186,18 +187,16 @@ tcDeriving  :: Module			-- name of module under scrutiny
 	    -> RnNameSupply		-- for "renaming" bits of generated code
 	    -> Bag InstInfo		-- What we already know about instances
 	    -> TcM s (Bag InstInfo,	-- The generated "instance decls".
-		      RenamedHsBinds,	-- Extra generated bindings
-		      SDoc)		-- Printable derived instance decls;
-				     	   -- for debugging via -ddump-derivings.
+		      RenamedHsBinds)	-- Extra generated bindings
 
 tcDeriving modname rn_name_supply inst_decl_infos_in
-  = recoverTc (returnTc (emptyBag, EmptyBinds, empty)) $
+  = recoverTc (returnTc (emptyBag, EmptyBinds)) $
 
   	-- Fish the "deriving"-related information out of the TcEnv
 	-- and make the necessary "equations".
     makeDerivEqns			    	`thenTc` \ eqns ->
     if null eqns then
-	returnTc (emptyBag, EmptyBinds, text "No derivings")
+	returnTc (emptyBag, EmptyBinds)
     else
 
 	-- Take the equation list and solve it, to deliver a list of
@@ -226,14 +225,14 @@ tcDeriving modname rn_name_supply inst_decl_infos_in
 	(dfun_names_w_method_binds, rn_extra_binds)
 		= renameSourceCode modname rn_name_supply (
 			bindLocatedLocalsRn (ptext (SLIT("deriving"))) mbinders	$ \ _ ->
-			rnTopMonoBinds extra_mbinds []		`thenRn` \ rn_extra_binds ->
+			rnTopMonoBinds extra_mbinds []		`thenRn` \ (rn_extra_binds, _) ->
 			mapRn rn_one method_binds_s		`thenRn` \ dfun_names_w_method_binds ->
 			returnRn (dfun_names_w_method_binds, rn_extra_binds)
 		  )
 	rn_one (cl_nm, tycon_nm, meth_binds) 
-	        = newDfunName cl_nm tycon_nm
+	        = newDFunName cl_nm tycon_nm
 		              Nothing mkGeneratedSrcLoc	        `thenRn` \ dfun_name ->
-		  rnMethodBinds meth_binds			`thenRn` \ rn_meth_binds ->
+		  rnMethodBinds meth_binds			`thenRn` \ (rn_meth_binds, _) ->
 		  returnRn (dfun_name, rn_meth_binds)
 
 	really_new_inst_infos = map (gen_inst_info modname)
@@ -241,20 +240,18 @@ tcDeriving modname rn_name_supply inst_decl_infos_in
 
 	ddump_deriv = ddump_deriving really_new_inst_infos rn_extra_binds
     in
-    --pprTrace "derived:\n" (ddump_deriv) $
+    ioToTc (dumpIfSet opt_D_dump_deriv "Derived instances" ddump_deriv)	`thenTc_`
 
-    returnTc (listToBag really_new_inst_infos,
-	      rn_extra_binds,
-	      ddump_deriv)
+    returnTc (listToBag really_new_inst_infos, rn_extra_binds)
   where
     ddump_deriving :: [InstInfo] -> RenamedHsBinds -> SDoc
-
     ddump_deriving inst_infos extra_binds
-      = vcat ((map pp_info inst_infos) ++ [ppr extra_binds])
+      = vcat (map pp_info inst_infos) $$ ppr extra_binds
       where
 	pp_info (InstInfo clas tvs [ty] inst_decl_theta _ mbinds _ _)
-	  = ($$) (ppr (mkSigmaTy tvs inst_decl_theta (mkDictTy clas [ty])))
-		    (ppr mbinds)
+	  = ppr (mkSigmaTy tvs inst_decl_theta (mkDictTy clas [ty]))
+	    $$
+	    ppr mbinds
 \end{code}
 
 
@@ -286,7 +283,7 @@ makeDerivEqns
   = tcGetEnv			    `thenNF_Tc` \ env ->
     let
 	local_data_tycons = filter (\tc -> isLocallyDefined tc && isAlgTyCon tc)
-				   (getEnv_TyCons env)
+				   (getEnvTyCons env)
 
 	think_about_deriving = need_deriving local_data_tycons
 	(derive_these, _)    = removeDups cmp_deriv think_about_deriving

@@ -40,8 +40,7 @@ module UniqFM (
 	lookupUFM, lookupUFM_Directly,
 	lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
 	eltsUFM, keysUFM,
-	ufmToList, 
-	FastString
+	ufmToList 
     ) where
 
 #include "HsVersions.h"
@@ -49,7 +48,7 @@ module UniqFM (
 import {-# SOURCE #-} Name	( Name )
 
 import Unique		( Uniquable(..), Unique, u2i, mkUniqueGrimily )
-import Util
+import Panic
 import GlaExts		-- Lots of Int# operations
 
 #if ! OMIT_NATIVE_CODEGEN

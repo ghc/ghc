@@ -66,6 +66,7 @@ data AbsVal
 	    [Demand]	    -- approximation to a function value.  It's an
 	    AbsVal	    -- abstract function which is strict in its
 			    -- arguments if the  Demand so indicates.
+	-- INVARIANT: the [Demand] is non-empty
 
 	-- AbsApproxFun has to take a *list* of demands, no just one,
 	-- because function spaces are now lifted.  Hence, (f bot top)
@@ -85,7 +86,7 @@ instance Outputable AbsVal where
 	       ptext SLIT("???"), -- text "}{env:", ppr (keysFM env `zip` eltsFM env),
 	       char '}' ]
     ppr (AbsApproxFun demands val)
-      = hsep [ptext SLIT("AbsApprox "), pprDemands demands, ppr val]
+      = hsep [ptext SLIT("AbsApprox "), hcat (map ppr demands), ppr val]
 \end{code}
 
 %-----------
@@ -113,10 +114,14 @@ lookupAbsValEnv (AbsValEnv idenv) y
 \begin{code}
 absValFromStrictness :: AnalysisKind -> StrictnessInfo -> AbsVal
 
-absValFromStrictness anal NoStrictnessInfo 	       = AbsTop
-
-absValFromStrictness StrAnal BottomGuaranteed 	       = AbsBot -- Guaranteed bottom
-absValFromStrictness AbsAnal BottomGuaranteed 	       = AbsTop	-- Check for poison in
-								-- arguments (if any)
-absValFromStrictness anal (StrictnessInfo args_info _) = AbsApproxFun args_info AbsTop
+absValFromStrictness anal NoStrictnessInfo = AbsTop
+absValFromStrictness anal (StrictnessInfo args_info bot_result _)
+  = case args_info of	-- Check the invariant that the arg list on 
+	[] -> res	-- AbsApproxFun is non-empty
+	_  -> AbsApproxFun args_info res
+  where
+    res | not bot_result = AbsTop
+	| otherwise      = case anal of
+				StrAnal -> AbsBot
+				AbsAnal -> AbsTop
 \end{code}

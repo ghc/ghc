@@ -33,9 +33,10 @@ import CmdLineOpts	( opt_AutoSccsOnIndividualCafs )
 import CostCentre	-- lots of things
 import Const		( Con(..) )
 import Id		( Id, mkSysLocal )
+import OccName		( Module )
 import UniqSupply	( uniqFromSupply, splitUniqSupply, UniqSupply )
 import Unique           ( Unique )
-import Util		( removeDups, assertPanic, trace )
+import Util		( removeDups )
 import Outputable	
 
 infixr 9 `thenMM`, `thenMM_`
@@ -47,7 +48,7 @@ type CollectedCCs = ([CostCentre],	-- locally defined ones
 		     [CostCentreStack]) -- singleton stacks (for CAFs)
 
 stgMassageForProfiling
-	:: FAST_STRING -> FAST_STRING	-- module name, group name
+	:: Module -> FAST_STRING	-- module name, group name
 	-> UniqSupply		    	-- unique supply
 	-> [StgBinding]		    	-- input
 	-> (CollectedCCs, [StgBinding])
@@ -295,7 +296,7 @@ boxHigherOrderArgs almost_expr args live_vars
 	    -- make a trivial let-binding for the top-level function
 	    getUniqueMM		`thenMM` \ uniq ->
 	    let
-		new_var = mkSysLocal uniq var_type
+		new_var = mkSysLocal SLIT("sf") uniq var_type
 	    in
 	    returnMM ( (new_var, old_var) : bindings, StgVarAtom new_var )
 	else
@@ -323,7 +324,7 @@ boxHigherOrderArgs almost_expr args live_vars
 
 \begin{code}
 type MassageM result
-  =  FAST_STRING	-- module name
+  =  Module		-- module name
   -> CostCentreStack	-- prevailing CostCentre
 			-- if none, subsumedCosts at top-level
 			-- useCurrentCostCentre at nested levels
@@ -333,7 +334,7 @@ type MassageM result
 
 -- the initUs function also returns the final UniqueSupply and CollectedCCs
 
-initMM :: FAST_STRING	-- module name, which we may consult
+initMM :: Module	-- module name, which we may consult
        -> UniqSupply
        -> MassageM a
        -> (CollectedCCs, a)

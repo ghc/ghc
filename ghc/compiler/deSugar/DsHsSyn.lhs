@@ -15,7 +15,7 @@ import TcHsSyn		( TypecheckedPat,
 import Id		( idType, Id )
 import Type             ( Type )
 import TysWiredIn	( mkListTy, mkTupleTy, mkUnboxedTupleTy, unitTy )
-import Util		( panic )
+import Panic		( panic )
 \end{code}
 
 Note: If @outPatType@ doesn't bear a strong resemblance to @coreExprType@,
@@ -52,11 +52,11 @@ collectTypedBinders and collectedTypedPatBinders are the exportees.
 
 \begin{code}
 collectTypedMonoBinders :: TypecheckedMonoBinds -> [Id]
-collectTypedMonoBinders EmptyMonoBinds	      = []
-collectTypedMonoBinders (PatMonoBind pat _ _) = collectTypedPatBinders pat
-collectTypedMonoBinders (FunMonoBind f _ _ _) = [f]
-collectTypedMonoBinders (VarMonoBind v _)     = [v]
-collectTypedMonoBinders (CoreMonoBind v _)     = [v]
+collectTypedMonoBinders EmptyMonoBinds	        = []
+collectTypedMonoBinders (PatMonoBind pat _ _)   = collectTypedPatBinders pat
+collectTypedMonoBinders (FunMonoBind f _ _ _)   = [f]
+collectTypedMonoBinders (VarMonoBind v _)       = [v]
+collectTypedMonoBinders (CoreMonoBind v _)      = [v]
 collectTypedMonoBinders (AndMonoBinds bs1 bs2)
  = collectTypedMonoBinders bs1 ++ collectTypedMonoBinders bs2
 collectTypedMonoBinders (AbsBinds _ _ exports _)

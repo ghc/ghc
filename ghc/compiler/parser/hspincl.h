@@ -51,9 +51,11 @@
 #include "ttype.h"
 #include "constr.h"
 #include "binding.h"
-#include "entidt.h"
+#include "grhsb.h"
+#include "match.h"
 #include "tree.h"
-#include "pbinding.h"
+#include "entidt.h"
+#include "gdexp.h"
 
 extern char *input_filename;
 extern tree hspmain();

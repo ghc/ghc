@@ -20,9 +20,10 @@ module IdInfo (
 
 	-- Strictness
 	StrictnessInfo(..),				-- Non-abstract
-	workerExists, mkStrictnessInfo, mkBottomStrictnessInfo, 
-	noStrictnessInfo, bottomIsGuaranteed, strictnessInfo, 
+	workerExists, mkStrictnessInfo,
+	noStrictnessInfo, strictnessInfo,
 	ppStrictnessInfo, setStrictnessInfo, 
+	isBottomingStrictness, appIsBottom,
 
 	-- Unfolding
 	unfoldingInfo, setUnfoldingInfo, 
@@ -302,52 +303,46 @@ it exists); i.e. its calling convention.
 data StrictnessInfo
   = NoStrictnessInfo
 
-  | BottomGuaranteed	-- This Id guarantees never to return;
-			-- it is bottom regardless of its arguments.
-			-- Useful for "error" and other disguised
-			-- variants thereof.
-
   | StrictnessInfo [Demand] 
+		   Bool		-- True <=> the function diverges regardless of its arguments
+				-- Useful for "error" and other disguised variants thereof.  
+				-- BUT NB: f = \x y. error "urk"
+				-- 	   will have info  SI [SS] True
+				-- but still (f) and (f 2) are not bot; only (f 3 2) is bot
+
 		   Bool		-- True <=> there is a worker. There might not be, even for a
 				-- strict function, because:
 				-- 	(a) the function might be small enough to inline, 
 				--	    so no need for w/w split
 				-- 	(b) the strictness info might be "SSS" or something, so no w/w split.
-
-				-- Worker's Id, if applicable, and a list of the constructors
-				-- mentioned by the wrapper.  This is necessary so that the
-				-- renamer can slurp them in.  Without this info, the renamer doesn't
-				-- know which data types to slurp in concretely.  Remember, for
-				-- strict things we don't put the unfolding in the interface file, to save space.
-				-- This constructor list allows the renamer to behave much as if the
-				-- unfolding *was* in the interface file.
 \end{code}
 
 \begin{code}
-mkStrictnessInfo :: [Demand] -> Bool -> StrictnessInfo
+mkStrictnessInfo :: ([Demand], Bool) -> Bool -> StrictnessInfo
 
-mkStrictnessInfo xs has_wrkr
-  | all isLazy xs	 = NoStrictnessInfo		-- Uninteresting
-  | otherwise		 = StrictnessInfo xs has_wrkr
+mkStrictnessInfo (xs, is_bot) has_wrkr
+  | all isLazy xs && not is_bot	= NoStrictnessInfo		-- Uninteresting
+  | otherwise		        = StrictnessInfo xs is_bot has_wrkr
 
 noStrictnessInfo       = NoStrictnessInfo
-mkBottomStrictnessInfo = BottomGuaranteed
 
-bottomIsGuaranteed BottomGuaranteed = True
-bottomIsGuaranteed other    	    = False
+isBottomingStrictness (StrictnessInfo _ bot _) = bot
+isBottomingStrictness NoStrictnessInfo         = False
+
+-- appIsBottom returns true if an application to n args would diverge
+appIsBottom (StrictnessInfo ds bot _) n = bot && (n >= length ds)
+appIsBottom  NoStrictnessInfo	      n	= False
 
 ppStrictnessInfo NoStrictnessInfo = empty
-ppStrictnessInfo BottomGuaranteed = ptext SLIT("__bot")
-
-ppStrictnessInfo (StrictnessInfo wrapper_args wrkr_maybe)
-  = hsep [ptext SLIT("__S"), pprDemands wrapper_args]
+ppStrictnessInfo (StrictnessInfo wrapper_args bot wrkr_maybe)
+  = hsep [ptext SLIT("__S"), pprDemands wrapper_args bot]
 \end{code}
 
 
 \begin{code}
 workerExists :: StrictnessInfo -> Bool
-workerExists (StrictnessInfo _ worker_exists) = worker_exists
-workerExists other			      = False
+workerExists (StrictnessInfo _ _ worker_exists) = worker_exists
+workerExists other			        = False
 \end{code}
 
 

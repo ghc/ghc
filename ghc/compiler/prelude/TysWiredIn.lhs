@@ -102,22 +102,22 @@ import TysPrim
 
 -- others:
 import Constants	( mAX_TUPLE_SIZE )
-import Name		( mkWiredInTyConName, mkWiredInIdName, mkTupNameStr,
-			  mkUbxTupNameStr )
+import Name		( Module, varOcc, mkWiredInTyConName, mkWiredInIdName )
 import DataCon		( DataCon, mkDataCon )
 import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, mkAlgTyCon, mkSynTyCon, mkTupleTyCon )
-import BasicTypes	( Module, Arity, NewOrData(..), 
+import BasicTypes	( Arity, NewOrData(..), 
 			  RecFlag(..), StrictnessMark(..) )
 import Type		( Type, mkTyConTy, mkTyConApp, mkSigmaTy, mkTyVarTys, 
 			  mkArrowKinds, boxedTypeKind, unboxedTypeKind,
 			  mkFunTy, mkFunTys, isUnLiftedType,
 			  splitTyConApp_maybe, splitAlgTyConApp_maybe,
-			  GenType(..), ThetaType, TauType )
+			  ThetaType, TauType )
 import PrimRep		( PrimRep(..) )
 import Unique
 import CmdLineOpts      ( opt_GlasgowExts )
-import Util		( assoc, panic )
+import Util		( assoc )
+import Panic		( panic )
 import Array
 
 alpha_tyvar	  = [alphaTyVar]
@@ -162,7 +162,7 @@ pcDataCon key mod str tyvars context arg_tys tycon
 		[ NotMarkedStrict | a <- arg_tys ]
 		[ {- no labelled fields -} ]
 		tyvars context [] [] arg_tys tycon id
-    name = mkWiredInIdName key mod str id
+    name = mkWiredInIdName key mod (varOcc str) id
     id   = mkDataConId data_con
 \end{code}
 
@@ -271,8 +271,10 @@ unboxedPairDataCon = unboxedTupleCon 2
 --
 -- ) It's boxed; there is only one value of this
 -- type, namely "void", whose semantics is just bottom.
+
 voidTy    = mkTyConTy voidTyCon
 voidTyCon = pcNonRecDataTyCon voidTyConKey pREL_GHC SLIT("Void") [] [{-No data cons-}]
+
 \end{code}
 
 \begin{code}
@@ -290,7 +292,7 @@ intTy = mkTyConTy intTyCon
 intTyCon = pcNonRecDataTyCon intTyConKey pREL_BASE SLIT("Int") [] [intDataCon]
 intDataCon = pcDataCon intDataConKey pREL_BASE SLIT("I#") [] [] [intPrimTy] intTyCon
 
-isIntTy :: GenType flexi -> Bool
+isIntTy :: Type -> Bool
 isIntTy ty
   = case (splitAlgTyConApp_maybe ty) of
 	Just (tycon, [], _) -> getUnique tycon == intTyConKey
@@ -352,7 +354,7 @@ addrTy = mkTyConTy addrTyCon
 addrTyCon = pcNonRecDataTyCon addrTyConKey   pREL_ADDR SLIT("Addr") [] [addrDataCon]
 addrDataCon = pcDataCon addrDataConKey pREL_ADDR SLIT("A#") [] [] [addrPrimTy] addrTyCon
 
-isAddrTy :: GenType flexi -> Bool
+isAddrTy :: Type -> Bool
 isAddrTy ty
   = case (splitAlgTyConApp_maybe ty) of
 	Just (tycon, [], _) -> getUnique tycon == addrTyConKey
@@ -366,7 +368,7 @@ floatTy	= mkTyConTy floatTyCon
 floatTyCon = pcNonRecDataTyCon floatTyConKey pREL_BASE SLIT("Float") [] [floatDataCon]
 floatDataCon = pcDataCon floatDataConKey pREL_BASE SLIT("F#") [] [] [floatPrimTy] floatTyCon
 
-isFloatTy :: GenType flexi -> Bool
+isFloatTy :: Type -> Bool
 isFloatTy ty
   = case (splitAlgTyConApp_maybe ty) of
 	Just (tycon, [], _) -> getUnique tycon == floatTyConKey
@@ -377,7 +379,7 @@ isFloatTy ty
 \begin{code}
 doubleTy = mkTyConTy doubleTyCon
 
-isDoubleTy :: GenType flexi -> Bool
+isDoubleTy :: Type -> Bool
 isDoubleTy ty
   = case (splitAlgTyConApp_maybe ty) of
 	Just (tycon, [], _) -> getUnique tycon == doubleTyConKey
@@ -425,15 +427,15 @@ foreignObjTyCon
 
 @Integer@ and its pals are not really primitive.  @Integer@ itself, first:
 \begin{code}
-integerTy :: GenType t
-integerTy    = mkTyConTy integerTyCon
+integerTy :: Type
+integerTy = mkTyConTy integerTyCon
 
 integerTyCon = pcNonRecDataTyCon integerTyConKey pREL_BASE SLIT("Integer") [] [integerDataCon]
 
 integerDataCon = pcDataCon integerDataConKey pREL_BASE SLIT("J#")
 		[] [] [intPrimTy, intPrimTy, byteArrayPrimTy] integerTyCon
 
-isIntegerTy :: GenType flexi -> Bool
+isIntegerTy :: Type -> Bool
 isIntegerTy ty
   = case (splitAlgTyConApp_maybe ty) of
 	Just (tycon, [], _) -> getUnique tycon == integerTyConKey
@@ -578,7 +580,7 @@ data (,) a b = (,,) a b
 \end{verbatim}
 
 \begin{code}
-mkListTy :: GenType t -> GenType t
+mkListTy :: Type -> Type
 mkListTy ty = mkTyConApp listTyCon [ty]
 
 alphaListTy = mkSigmaTy alpha_tyvar [] (mkTyConApp listTyCon alpha_ty)
@@ -641,10 +643,10 @@ done by enumeration\srcloc{lib/prelude/InTup?.hs}.
 \end{itemize}
 
 \begin{code}
-mkTupleTy :: Int -> [GenType t] -> GenType t
+mkTupleTy :: Int -> [Type] -> Type
 mkTupleTy arity tys = mkTyConApp (tupleTyCon arity) tys
 
-mkUnboxedTupleTy :: Int -> [GenType t] -> GenType t
+mkUnboxedTupleTy :: Int -> [Type] -> Type
 mkUnboxedTupleTy arity tys = mkTyConApp (unboxedTupleTyCon arity) tys
 
 unitTy    = mkTupleTy 0 []

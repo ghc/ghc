@@ -17,7 +17,7 @@ module DsMonad (
 	getUniqueDs,
 	dsLookupGlobalValue,
 
-	GlobalValueEnv,
+	ValueEnv,
 	dsWarn, 
 	DsWarnings,
 	DsMatchContext(..), DsMatchKind(..), pprDsWarnings
@@ -26,23 +26,22 @@ module DsMonad (
 #include "HsVersions.h"
 
 import Bag		( emptyBag, snocBag, bagToList, Bag )
-import BasicTypes       ( Module )
 import ErrUtils 	( WarnMsg )
 import HsSyn		( OutPat )
 import Id		( mkUserLocal, mkSysLocal, setIdUnique, Id )
-import Name		( Name, varOcc, maybeWiredInIdName )
+import Name		( Module, Name, maybeWiredInIdName )
 import Var		( TyVar, setTyVarUnique )
 import VarEnv
 import Outputable
 import SrcLoc		( noSrcLoc, SrcLoc )
 import TcHsSyn		( TypecheckedPat )
-import TcEnv		( GlobalValueEnv )
+import TcEnv		( ValueEnv )
 import Type             ( Type )
 import UniqSupply	( initUs, splitUniqSupply, uniqFromSupply, uniqsFromSupply,
 			  UniqSM, UniqSupply )
 import Unique		( Unique )
 import UniqFM		( lookupWithDefaultUFM )
-import Util		( zipWithEqual, panic )
+import Util		( zipWithEqual )
 
 infixr 9 `thenDs`
 \end{code}
@@ -53,7 +52,7 @@ presumably include source-file location information:
 \begin{code}
 type DsM result =
 	UniqSupply
-        -> GlobalValueEnv
+        -> ValueEnv
 	-> SrcLoc		 -- to put in pattern-matching error msgs
 	-> (Module, Group)       -- module + group name : for SCC profiling
 	-> DsWarnings
@@ -71,7 +70,7 @@ type Group = FAST_STRING
 -- initDs returns the UniqSupply out the end (not just the result)
 
 initDs  :: UniqSupply
-	-> GlobalValueEnv
+	-> ValueEnv
 	-> (Module, Group)      -- module name: for profiling; (group name: from switches)
 	-> DsM a
 	-> (a, DsWarnings)
@@ -143,13 +142,13 @@ it easier to read debugging output.
 newSysLocalDs, newFailLocalDs :: Type -> DsM Id
 newSysLocalDs ty us genv loc mod_and_grp warns
   = case uniqFromSupply us of { assigned_uniq ->
-    (mkSysLocal assigned_uniq ty, warns) }
+    (mkSysLocal SLIT("ds") assigned_uniq ty, warns) }
 
 newSysLocalsDs tys = mapDs newSysLocalDs tys
 
 newFailLocalDs ty us genv loc mod_and_grp warns
   = case uniqFromSupply us of { assigned_uniq ->
-    (mkUserLocal (varOcc SLIT("fail")) assigned_uniq ty, warns) }
+    (mkSysLocal SLIT("fail") assigned_uniq ty, warns) }
 	-- The UserLocal bit just helps make the code a little clearer
 
 getUniqueDs :: DsM Unique
@@ -198,7 +197,7 @@ dsWarn warn us genv loc mod_and_grp warns = ((), warns `snocBag` warn)
 \end{code}
 
 \begin{code}
-getModuleAndGroupDs :: DsM (FAST_STRING, FAST_STRING)
+getModuleAndGroupDs :: DsM (Module, Group)
 getModuleAndGroupDs us genv loc mod_and_grp warns
   = (mod_and_grp, warns)
 \end{code}

@@ -34,7 +34,7 @@ import CmdLineOpts	( opt_UnfoldingCreationThreshold,
 			  opt_UnfoldingUseThreshold,
 			  opt_UnfoldingConDiscount,
 			  opt_UnfoldingKeenessFactor,
-			  opt_UnfoldCasms
+			  opt_UnfoldCasms, opt_PprStyle_Debug 
 			)
 import Constants	( uNFOLDING_CHEAP_OP_COST,
 			  uNFOLDING_DEAR_OP_COST,
@@ -52,7 +52,7 @@ import TyCon		( tyConFamilySize )
 import Type		( splitAlgTyConApp_maybe )
 import Const		( isNoRepLit )
 import Unique           ( Unique )
-import Util		( isIn, panic )
+import Util		( isIn )
 import Outputable
 \end{code}
 
@@ -342,24 +342,38 @@ is computed).
 \begin{code}
 smallEnoughToInline :: Id			-- The function (trace msg only)
 		    -> [Bool]			-- Evaluated-ness of value arguments
+						-- ** May be infinite in don't care cases **
+						--    see couldBeSmallEnoughToInline etc
 		    -> Bool			-- Result is scrutinised
 		    -> UnfoldingGuidance
 		    -> Bool			-- True => unfold it
 
 smallEnoughToInline _ _ _ UnfoldAlways = True
 smallEnoughToInline _ _ _ UnfoldNever  = False
-smallEnoughToInline id arg_is_evald_s result_is_scruted
-	      (UnfoldIfGoodArgs m_tys_wanted n_vals_wanted discount_vec size scrut_discount)
-  = if enough_args n_vals_wanted arg_is_evald_s &&
-       size - discount <= opt_UnfoldingUseThreshold
-    then
-       True
+smallEnoughToInline id arg_evals result_is_scruted
+		    (UnfoldIfGoodArgs m_tys_wanted n_vals_wanted discount_vec size scrut_discount)
+  | fun_with_no_args
+  = False
+  
+  | (size - discount) > opt_UnfoldingUseThreshold
+  = if opt_PprStyle_Debug then 
+	pprTrace " too big:" stuff False
     else
-       False
-  where
+	False
 
-    enough_args n [] | n > 0 = False	-- A function with no value args => don't unfold
-    enough_args _ _	     = True	-- Otherwise it's ok to try
+  | otherwise		-- All right!
+  = if opt_PprStyle_Debug then 
+	pprTrace " small enough:" stuff True
+    else
+	True
+
+  where
+    stuff = braces (ppr id <+> ppr (take 10 arg_evals) <+> ppr result_is_scruted <+> 
+		    ppr size <+> ppr discount)
+
+    fun_with_no_args = n_vals_wanted > 0 && null arg_evals
+		-- A *function* with *no* value args => don't unfold
+		-- Otherwise it's ok to try
 
 	-- We multiple the raw discounts (args_discount and result_discount)
 	-- ty opt_UnfoldingKeenessFactor because the former have to do with
@@ -371,20 +385,22 @@ smallEnoughToInline id arg_is_evald_s result_is_scruted
 	-- reduce with the lambdas in the function (we count 1 for a lambda
  	-- in size_up).
 
+	-- NB: we never take the length of arg_evals because it might be infinite
     discount :: Int
-    discount = length (take n_vals_wanted arg_is_evald_s) +
-	       round (
-		      opt_UnfoldingKeenessFactor * 
-		      fromInt (args_discount + result_discount)
-		     )
+    discount = length (take n_vals_wanted arg_evals) +
+	       round (opt_UnfoldingKeenessFactor * 
+		      fromInt (arg_discount + result_discount))
 
-    args_discount = sum (zipWith arg_discount discount_vec arg_is_evald_s)
-    result_discount | result_is_scruted = scrut_discount
-		    | otherwise		= 0
+    arg_discount    = sum (zipWith mk_arg_discount discount_vec arg_evals)
+    result_discount = mk_result_discount (drop n_vals_wanted arg_evals)
 
-    arg_discount no_of_constrs is_evald
+    mk_arg_discount no_of_constrs is_evald
       | is_evald  = no_of_constrs * opt_UnfoldingConDiscount
       | otherwise = 0
+
+    mk_result_discount extra_args
+	| not (null extra_args) || result_is_scruted = scrut_discount	-- Over-applied, or case scrut
+        | otherwise	      			     = 0
 \end{code}
 
 We use this one to avoid exporting inlinings that we ``couldn't possibly

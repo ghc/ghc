@@ -51,7 +51,25 @@ data DataCon
 	dcName   :: Name,
 	dcUnique :: Unique, 		-- Cached from Name
 	dcTag    :: ConTag,
-	dcType   :: Type,		-- Type of the constructor (see notes below)
+
+	-- Running example:
+	--
+	--	data Eq a => T a = forall b. Ord b => MkT a [b]
+
+	dcType   :: Type,	-- Type of the constructor 
+				-- 	forall ab . Ord b => a -> [b] -> MkT a
+				-- (this is *not* of the constructor Id: 
+				--  see notes after this data type declaration)
+
+	-- The next six fields express the type of the constructor, in pieces
+	-- e.g.
+	--
+	--	dcTyVars   = [a]
+	-- 	dcTheta    = [Eq a]
+	--	dcExTyVars = [b]
+	--	dcExTheta  = [Ord b]
+	--	dcArgTys   = [a,List b]
+	--	dcTyCon    = T
 
 	dcTyVars :: [TyVar], 		-- Type vars and context for the data type decl
 	dcTheta  ::  ThetaType,
@@ -62,12 +80,18 @@ data DataCon
 	dcArgTys :: [Type],		-- Argument types
 	dcTyCon  :: TyCon,		-- Result tycon 
 
+	-- Now the strictness annotations and field labels of the constructor
 	dcStricts :: [StrictnessMark],	-- Strict args, in the same order as the argument types;
 					-- length = dataConNumFields dataCon
 
 	dcFields  :: [FieldLabel],	-- Field labels for this constructor, in the
 					-- same order as the argument types; 
 					-- length = 0 (if not a record) or dataConSourceArity.
+
+	-- Finally, the curried function that corresponds to the constructor
+	-- 	mkT :: forall a b. (Eq a, Ord b) => a -> [b] -> T a
+	--	mkT = /\ab. \deq dord p qs. Con MkT [a, b, dord, p, qs]
+	-- This unfolding is built in MkId.mkDataConId
 
 	dcId :: Id			-- The corresponding Id
   }

@@ -19,8 +19,12 @@ import PrefixToHs
 import CallConv
 
 import CmdLineOpts      ( opt_NoImplicitPrelude, opt_GlasgowExts )
-import Name		( OccName(..), Module, isLexConId )
+import Name		( OccName, srcTvOcc, srcVarOcc, srcTCOcc, 
+			  Module, mkModuleFS,
+			  isConOcc, isLexConId
+			)
 import Outputable
+import SrcLoc		( SrcLoc )
 import PrelMods		( pRELUDE )
 import FastString	( mkFastCharString )
 import PrelRead		( readRational__ )
@@ -53,12 +57,12 @@ wlkMaybe wlk_it (U_just x)
 \end{code}
 
 \begin{code}
-wlkTCId   = wlkQid TCOcc
-wlkVarId  = wlkQid VarOcc
-wlkDataId = wlkQid VarOcc
+wlkTCId   = wlkQid srcTCOcc
+wlkVarId  = wlkQid srcVarOcc
+wlkDataId = wlkQid srcVarOcc
 wlkEntId = wlkQid (\occ -> if isLexConId occ
-			   then TCOcc occ
-			   else VarOcc occ)
+			   then srcTCOcc occ
+			   else srcVarOcc occ)
 
 wlkQid	:: (FAST_STRING -> OccName) -> U_qid -> UgnM RdrName
 
@@ -77,7 +81,7 @@ wlkQid	:: (FAST_STRING -> OccName) -> U_qid -> UgnM RdrName
 wlkQid mk_occ_name (U_noqual name)
   = returnUgn (Unqual (mk_occ_name name))
 wlkQid mk_occ_name (U_aqual  mod name)
-  = returnUgn (Qual mod (mk_occ_name name) HiFile)
+  = returnUgn (Qual (mkModuleFS mod) (mk_occ_name name) HiFile)
 wlkQid mk_occ_name (U_gid n name)
   | opt_NoImplicitPrelude 
 	= returnUgn (Unqual (mk_occ_name name))
@@ -85,11 +89,11 @@ wlkQid mk_occ_name (U_gid n name)
 	= returnUgn (Qual pRELUDE (mk_occ_name name) HiFile)
 
 
-rdTCId  pt = rdU_qid pt `thenUgn` \ qid -> wlkTCId  qid
-rdVarId pt = rdU_qid pt `thenUgn` \ qid -> wlkVarId qid
+rdTCId  pt = rdU_qid pt `thenUgn` wlkTCId
+rdVarId pt = rdU_qid pt `thenUgn` wlkVarId
 
 rdTvId  pt = rdU_stringId pt `thenUgn` \ string -> wlkTvId string
-wlkTvId string = returnUgn (Unqual (TvOcc string))
+wlkTvId string = returnUgn (Unqual (srcTvOcc string))
 
 cvFlag :: U_long -> Bool
 cvFlag 0 = False
@@ -112,30 +116,29 @@ rdModule
 	srcfile  = mkFastCharString ``input_filename'' -- What A Great Hack! (TM)
     in
     initUgn 		  $
-    rdU_tree pt `thenUgn` \ (U_hmodule modname himplist hexplist hfixlist
+    rdU_tree pt `thenUgn` \ (U_hmodule mod_fs himplist hexplist
 				       hmodlist srciface_version srcline) ->
+    let
+	mod_name = mkModuleFS mod_fs
+    in
 
-    setSrcFileUgn srcfile $
-    setSrcModUgn  modname $
-    mkSrcLocUgn srcline	  $		   \ src_loc	->
+    setSrcFileUgn srcfile 		$
+    setSrcModUgn  mod_name		$
+    mkSrcLocUgn srcline			$ \ src_loc	->
 
     wlkMaybe rdEntities	hexplist `thenUgn` \ exports	->
     wlkList  rdImport   himplist `thenUgn` \ imports	->
-    wlkList  rdFixOp	hfixlist `thenUgn` \ fixities 	->
     wlkBinding		hmodlist `thenUgn` \ binding	->
 
     let
-	val_decl    = ValD (cvBinds srcfile cvValSig binding)
-	for_decls   = cvForeignDecls binding
-	other_decls = cvOtherDecls binding
+	top_decls = cvTopDecls srcfile binding
     in
-    returnUgn (modname,
-       	       HsModule modname
+    returnUgn (mod_name,
+       	       HsModule mod_name
 	      		  (case srciface_version of { 0 -> Nothing; n -> Just n })
 	      		  exports
 	      		  imports
-	      		  fixities
-			  (for_decls ++ val_decl: other_decls)
+			  top_decls
 	      		  src_loc
        		)
 \end{code}
@@ -150,8 +153,8 @@ rdModule
 rdExpr :: ParseTree -> UgnM RdrNameHsExpr
 rdPat  :: ParseTree -> UgnM RdrNamePat
 
-rdExpr pt = rdU_tree pt `thenUgn` \ tree -> wlkExpr tree
-rdPat  pt = rdU_tree pt `thenUgn` \ tree -> wlkPat  tree
+rdExpr pt = rdU_tree pt `thenUgn` wlkExpr
+rdPat  pt = rdU_tree pt `thenUgn` wlkPat
 
 wlkExpr :: U_tree -> UgnM RdrNameHsExpr
 wlkPat  :: U_tree -> UgnM RdrNamePat
@@ -186,27 +189,15 @@ wlkExpr expr
 	wlkExpr   sccexp	`thenUgn` \ expr  ->
 	returnUgn (HsSCC label expr)
 
-      U_lambda lampats lamexpr srcline -> -- lambda expression
-	mkSrcLocUgn   srcline		$ \ src_loc ->
-	wlkList rdPat lampats	`thenUgn` \ pats ->
-	wlkExpr       lamexpr	`thenUgn` \ body ->
-	returnUgn (
-	    HsLam (foldr PatMatch
-			 (GRHSMatch (GRHSsAndBindsIn
-				      (unguardedRHS body src_loc)
-				      EmptyBinds))
-			 pats)
-	)
+      U_lambda match -> -- lambda expression
+	wlkMatch match		`thenUgn` \ match' -> 
+	returnUgn (HsLam match')
 
       U_casee caseexpr casebody srcline ->	-- case expression
 	mkSrcLocUgn srcline	 	 $ \ src_loc ->
 	wlkExpr	        caseexpr `thenUgn` \ expr ->
 	wlkList rdMatch casebody `thenUgn` \ mats ->
-	getSrcFileUgn		 `thenUgn` \ sf ->
-	let
-	    matches = cvMatches sf True mats
-	in
-	returnUgn (HsCase expr matches src_loc)
+	returnUgn (HsCase expr mats src_loc)
 
       U_ife ifpred ifthen ifelse srcline ->	-- if expression
 	mkSrcLocUgn srcline	        $ \ src_loc ->
@@ -216,13 +207,9 @@ wlkExpr expr
 	returnUgn (HsIf e1 e2 e3 src_loc)
 
       U_let letvdefs letvexpr ->		-- let expression
-	wlkBinding letvdefs	`thenUgn` \ binding ->
-	wlkExpr    letvexpr	`thenUgn` \ expr    ->
-	getSrcFileUgn		`thenUgn` \ sf	    ->
-	let
-	    binds = cvBinds sf cvValSig binding
-	in
-	returnUgn (HsLet binds expr)
+	wlkLocalBinding letvdefs	`thenUgn` \ binding ->
+	wlkExpr    letvexpr		`thenUgn` \ expr    ->
+	returnUgn (HsLet binding expr)
 
       U_doe gdo srcline ->			-- do expression
 	mkSrcLocUgn srcline		$ \ src_loc ->
@@ -244,11 +231,7 @@ wlkExpr expr
 		returnUgn (BindStmt patt expr src_loc)
 
 	      U_seqlet seqlet ->
-		wlkBinding seqlet	`thenUgn` \ bs ->
-		getSrcFileUgn		`thenUgn` \ sf ->
-		let
-		    binds = cvBinds sf cvValSig bs
-		in
+		wlkLocalBinding seqlet	`thenUgn` \ binds ->
 		returnUgn (LetStmt binds)
 
       U_comprh cexp cquals -> -- list comprehension
@@ -325,7 +308,7 @@ wlkExpr expr
 	returnUgn (RecordUpd aexp recbinds)
 
 #ifdef DEBUG
-      U_hmodule _ _ _ _ _ _ _ -> error "U_hmodule"
+      U_hmodule _ _ _ _ _ _   -> error "U_hmodule"
       U_as _ _ 		      -> error "U_as"
       U_lazyp _ 	      -> error "U_lazyp"
       U_wildp 		      -> error "U_wildp"
@@ -335,7 +318,6 @@ wlkExpr expr
       U_dobind _ _ _ 	      -> error "U_dobind"
       U_doexp _ _	      -> error "U_doexp"
       U_rbind _ _	      -> error "U_rbind"
-      U_fixop _ _ _ _	      -> error "U_fixop"
 #endif
 
 rdRbind pt
@@ -369,20 +351,13 @@ wlkQuals cquals
 		  returnUgn (BindStmt pat expr loc)
 
 		U_seqlet seqlet ->
-		  wlkBinding seqlet	`thenUgn` \ bs ->
-		  getSrcFileUgn		`thenUgn` \ sf ->
-		  let
-		      binds = cvBinds sf cvValSig bs
-		  in
+		  wlkLocalBinding seqlet	`thenUgn` \ binds ->
 		  returnUgn (LetStmt binds)
+
 	        U_let letvdefs letvexpr -> 
-		    wlkBinding letvdefs	`thenUgn` \ binding ->
-		    wlkExpr    letvexpr	`thenUgn` \ expr    ->
-		    getSrcLocUgn 	`thenUgn` \ loc ->
-		    getSrcFileUgn	`thenUgn` \ sf	    ->
-		    let
-		     binds = cvBinds sf cvValSig binding
-		    in
+		    wlkLocalBinding letvdefs	`thenUgn` \ binds ->
+		    wlkExpr    letvexpr		`thenUgn` \ expr    ->
+		    getSrcLocUgn 		`thenUgn` \ loc ->
 		    returnUgn (GuardStmt (HsLet binds expr) loc)
 \end{code}
 
@@ -406,6 +381,11 @@ wlkPat pat
 	wlkPat as_pat	`thenUgn` \ pat ->
 	returnUgn (AsPatIn var pat)
 
+      U_restr pat ty ->
+	wlkPat pat	`thenUgn` \ pat' ->
+	wlkHsType ty	`thenUgn` \ ty' ->
+	returnUgn (SigPatIn pat' ty')
+
       U_lazyp lazyp -> 			-- irrefutable ("twiddle") pattern
 	wlkPat lazyp	`thenUgn` \ pat ->
 	returnUgn (LazyPatIn pat)
@@ -424,9 +404,10 @@ wlkPat pat
       U_ident nn ->			-- simple identifier
 	wlkVarId nn	`thenUgn` \ n ->
 	returnUgn (
-	  case rdrNameOcc n of
-		VarOcc occ | isLexConId occ -> ConPatIn n []
-		other     		    -> VarPatIn n
+	  if isConOcc (rdrNameOcc n) then
+		ConPatIn n []
+	  else
+		VarPatIn n
 	)
 
       U_ap l r ->	-- "application": there's a list of patterns lurking here!
@@ -522,6 +503,11 @@ wlkLiteral ulit
 %************************************************************************
 
 \begin{code}
+wlkLocalBinding bind
+  = wlkBinding bind	`thenUgn` \ bind' ->
+    getSrcFileUgn	`thenUgn` \ sf	  ->
+    returnUgn (cvBinds sf cvValSig bind')
+
 wlkBinding :: U_binding -> UgnM RdrBinding
 
 wlkBinding binding
@@ -536,6 +522,19 @@ wlkBinding binding
 	wlkBinding b    `thenUgn` \ binding2 ->
 	returnUgn (RdrAndBindings binding1 binding2)
 
+	-- fixity declaration
+      U_fixd op dir_n prec srcline ->
+	let
+	      dir = case dir_n of
+			(-1) -> InfixL
+			0    -> InfixN
+			1    -> InfixR
+	in
+	wlkVarId op 		`thenUgn` \ op ->
+	mkSrcLocUgn srcline	$ \ src_loc ->
+	returnUgn (RdrSig (FixSig (FixitySig op (Fixity prec dir) src_loc)))
+
+
 	-- "data" declaration
       U_tbind tctxt ttype tcons tderivs srcline ->
 	mkSrcLocUgn	   srcline  	    $ \ src_loc	    ->
@@ -543,7 +542,7 @@ wlkBinding binding
 	wlkConAndTyVars    ttype    `thenUgn` \ (tycon, tyvars) ->
 	wlkList rdConDecl  tcons    `thenUgn` \ cons	    ->
 	wlkDerivings	   tderivs  `thenUgn` \ derivings   ->
-	returnUgn (RdrTyDecl (TyData DataType ctxt tycon tyvars cons derivings noDataPragmas src_loc))
+	returnUgn (RdrTyClDecl (TyData DataType ctxt tycon tyvars cons derivings noDataPragmas src_loc))
 
 	-- "newtype" declaration
       U_ntbind ntctxt nttype ntcon ntderivs srcline ->
@@ -552,26 +551,27 @@ wlkBinding binding
 	wlkConAndTyVars    nttype   `thenUgn` \ (tycon, tyvars) ->
 	wlkList rdConDecl  ntcon    `thenUgn` \ cons	    ->
 	wlkDerivings	   ntderivs `thenUgn` \ derivings   ->
-	returnUgn (RdrTyDecl (TyData NewType ctxt tycon tyvars cons derivings noDataPragmas src_loc))
+	returnUgn (RdrTyClDecl (TyData NewType ctxt tycon tyvars cons derivings noDataPragmas src_loc))
 
 	-- "type" declaration
       U_nbind nbindid nbindas srcline -> 		
 	mkSrcLocUgn	  srcline 	  $ \ src_loc	    ->
 	wlkConAndTyVars   nbindid `thenUgn` \ (tycon, tyvars) ->
 	wlkHsType	  nbindas `thenUgn` \ expansion	    ->
-	returnUgn (RdrTyDecl (TySynonym tycon tyvars expansion src_loc))
+	returnUgn (RdrTyClDecl (TySynonym tycon tyvars expansion src_loc))
 
 	-- function binding
-      U_fbind fbindl srcline ->
+      U_fbind fbindm srcline ->
 	mkSrcLocUgn     srcline		$ \ src_loc ->
-	wlkList rdMatch fbindl	`thenUgn` \ matches ->
-	returnUgn (RdrFunctionBinding srcline matches)
+	wlkList rdMatch fbindm		`thenUgn` \ matches ->
+	returnUgn (RdrValBinding (mkRdrFunctionBinding matches src_loc))
 
 	-- pattern binding
-      U_pbind pbindl srcline ->
-	mkSrcLocUgn     srcline		$ \ src_loc ->
-	wlkList rdMatch pbindl	`thenUgn` \ matches ->
-	returnUgn (RdrPatternBinding srcline matches)
+      U_pbind pbindl pbindr srcline ->
+	mkSrcLocUgn srcline		$ \ src_loc ->
+	rdPat pbindl			`thenUgn` \ pat ->
+	rdGRHSs pbindr			`thenUgn` \ grhss ->
+	returnUgn (RdrValBinding (PatMonoBind pat grhss src_loc))
 
  	-- "class" declaration
       U_cbind cbindc cbindid cbindw srcline ->
@@ -583,7 +583,7 @@ wlkBinding binding
 	let
 	    (final_methods, final_sigs) = cvMonoBindsAndSigs sf cvClassOpSig binding
 	in
-	returnUgn (RdrClassDecl
+	returnUgn (RdrTyClDecl
 	  (mkClassDecl ctxt clas tyvars final_sigs final_methods noClassPragmas src_loc))
 
 	-- "instance" declaration
@@ -610,17 +610,86 @@ wlkBinding binding
 
         -- "foreign" declaration
       U_fobind id ty ext_name unsafe_flag cconv imp_exp srcline ->
-	  mkSrcLocUgn        srcline		   $ \ src_loc ->
-	  wlkVarId id				   `thenUgn` \ h_id ->
-	  wlkHsType ty				   `thenUgn` \ h_ty ->
-	  wlkExtName ext_name			   `thenUgn` \ h_ext_name ->
-	  rdCallConv cconv		           `thenUgn` \ h_cconv ->
-	  rdForKind imp_exp (cvFlag unsafe_flag)    `thenUgn` \ h_imp_exp ->
- 	  returnUgn (RdrForeignDecl (ForeignDecl h_id h_imp_exp h_ty h_ext_name h_cconv src_loc))
+	mkSrcLocUgn        srcline		   $ \ src_loc ->
+	wlkVarId id				   `thenUgn` \ h_id ->
+	wlkHsType ty				   `thenUgn` \ h_ty ->
+	wlkExtName ext_name			   `thenUgn` \ h_ext_name ->
+	rdCallConv cconv		           `thenUgn` \ h_cconv ->
+	rdForKind imp_exp (cvFlag unsafe_flag)    `thenUgn` \ h_imp_exp ->
+ 	returnUgn (RdrForeignDecl (ForeignDecl h_id h_imp_exp h_ty h_ext_name h_cconv src_loc))
 
-      a_sig_we_hope ->
-	-- signature(-like) things, including user pragmas
-	wlk_sig_thing a_sig_we_hope
+      U_sbind sbindids sbindid srcline ->
+	-- Type signature
+	mkSrcLocUgn srcline		$ \ src_loc ->
+	wlkList rdVarId	sbindids	`thenUgn` \ vars    ->
+	wlkHsSigType	sbindid		`thenUgn` \ poly_ty ->
+	returnUgn (foldr1 RdrAndBindings [RdrSig (Sig var poly_ty src_loc) | var <- vars])
+
+      U_vspec_uprag uvar vspec_tys srcline ->
+	-- value specialisation user-pragma
+	mkSrcLocUgn srcline		$ \ src_loc ->
+	wlkVarId uvar		    	`thenUgn` \ var ->
+	wlkList rd_ty_and_id vspec_tys  `thenUgn` \ tys_and_ids ->
+	returnUgn (foldr1 RdrAndBindings [ RdrSig (SpecSig var ty using_id src_loc)
+				         | (ty, using_id) <- tys_and_ids ])
+	where
+	  rd_ty_and_id :: ParseTree -> UgnM (RdrNameHsType, Maybe RdrName)
+          rd_ty_and_id pt
+	      = rdU_binding pt			`thenUgn` \ (U_vspec_ty_and_id vspec_ty vspec_id) ->
+		wlkHsSigType vspec_ty		`thenUgn` \ ty	     ->
+		wlkMaybe rdVarId vspec_id	`thenUgn` \ id_maybe ->
+		returnUgn(ty, id_maybe)
+
+      U_ispec_uprag iclas ispec_ty srcline ->
+	-- instance specialisation user-pragma
+	mkSrcLocUgn srcline		$ \ src_loc ->
+	wlkHsSigType ispec_ty		`thenUgn` \ ty	    ->
+	returnUgn (RdrSig (SpecInstSig ty src_loc))
+
+      U_inline_uprag ivar srcline ->
+	-- value inlining user-pragma
+	mkSrcLocUgn	srcline    	$ \ src_loc ->
+	wlkVarId	ivar		`thenUgn` \ var     ->
+	returnUgn (RdrSig (InlineSig var src_loc))
+
+      U_noinline_uprag ivar srcline ->
+	-- No-inline pragma
+	mkSrcLocUgn	srcline      	$ \ src_loc ->
+	wlkVarId	ivar		`thenUgn` \ var     ->
+	returnUgn (RdrSig (NoInlineSig var src_loc))
+
+
+mkRdrFunctionBinding :: [RdrNameMatch] -> SrcLoc -> RdrNameMonoBinds
+mkRdrFunctionBinding fun_matches src_loc
+  = FunMonoBind (head fns) (head infs) matches src_loc
+  where
+    (fns, infs, matches) = unzip3 (map de_fun_match fun_matches)
+
+    de_fun_match (Match _ [ConPatIn fn pats]      sig grhss) = (fn, False, Match [] pats    sig grhss)
+    de_fun_match (Match _ [ConOpPatIn p1 fn _ p2] sig grhss) = (fn, True,  Match [] [p1,p2] sig grhss)
+
+
+rdGRHSs :: ParseTree -> UgnM RdrNameGRHSs
+rdGRHSs pt = rdU_grhsb pt `thenUgn` wlkGRHSs
+
+wlkGRHSs :: U_grhsb -> UgnM RdrNameGRHSs
+wlkGRHSs (U_pguards rhss bind)
+  = wlkList rdGdExp rhss	`thenUgn` \ gdexps ->
+    wlkLocalBinding bind	`thenUgn` \ bind' ->
+    returnUgn (GRHSs gdexps bind' Nothing)
+wlkGRHSs (U_pnoguards srcline rhs bind)
+  = mkSrcLocUgn srcline  	$ \ src_loc ->
+    rdExpr rhs			`thenUgn` \ rhs' ->
+    wlkLocalBinding bind	`thenUgn` \ bind' ->
+    returnUgn (GRHSs (unguardedRHS rhs' src_loc) bind' Nothing)
+
+
+rdGdExp :: ParseTree -> UgnM RdrNameGRHS
+rdGdExp pt = rdU_gdexp pt		`thenUgn` \ (U_pgdexp guards srcline rhs) ->
+	     wlkQuals guards		`thenUgn` \ guards' ->
+	     mkSrcLocUgn srcline  	$ \ src_loc ->
+    	     wlkExpr rhs		`thenUgn` \ expr'  ->
+	     returnUgn (GRHS (guards' ++ [ExprStmt expr' src_loc]) src_loc)
 \end{code}
 
 \begin{code}
@@ -633,47 +702,6 @@ wlkDerivings (U_just pt)
     returnUgn (Just derivs)
 \end{code}
 
-\begin{code}
-	-- type signature
-wlk_sig_thing (U_sbind sbindids sbindid srcline)
-  = mkSrcLocUgn		srcline  	$ \ src_loc ->
-    wlkList rdVarId	sbindids `thenUgn` \ vars    ->
-    wlkHsSigType	sbindid  `thenUgn` \ poly_ty ->
-    returnUgn (foldr1 RdrAndBindings [RdrSig (Sig var poly_ty src_loc) | var <- vars])
-
-	-- value specialisation user-pragma
-wlk_sig_thing (U_vspec_uprag uvar vspec_tys srcline)
-  = mkSrcLocUgn	srcline		    	    $ \ src_loc ->
-    wlkVarId  uvar		    `thenUgn` \ var ->
-    wlkList rd_ty_and_id vspec_tys  `thenUgn` \ tys_and_ids ->
-    returnUgn (foldr1 RdrAndBindings [ RdrSig (SpecSig var ty using_id src_loc)
-				     | (ty, using_id) <- tys_and_ids ])
-  where
-    rd_ty_and_id :: ParseTree -> UgnM (RdrNameHsType, Maybe RdrName)
-    rd_ty_and_id pt
-      = rdU_binding pt		`thenUgn` \ (U_vspec_ty_and_id vspec_ty vspec_id) ->
-	wlkHsSigType vspec_ty	`thenUgn` \ ty	     ->
-	wlkMaybe rdVarId vspec_id	`thenUgn` \ id_maybe ->
-	returnUgn(ty, id_maybe)
-
-	-- instance specialisation user-pragma
-wlk_sig_thing (U_ispec_uprag iclas ispec_ty srcline)
-  = mkSrcLocUgn srcline		$ \ src_loc ->
-    wlkHsSigType ispec_ty	`thenUgn` \ ty	    ->
-    returnUgn (RdrSig (SpecInstSig ty src_loc))
-
-	-- value inlining user-pragma
-wlk_sig_thing (U_inline_uprag ivar srcline)
-  = mkSrcLocUgn	srcline      		$ \ src_loc ->
-    wlkVarId	ivar		`thenUgn` \ var     ->
-    returnUgn (RdrSig (InlineSig var src_loc))
-
-wlk_sig_thing (U_noinline_uprag ivar srcline)
-  = mkSrcLocUgn	srcline      		$ \ src_loc ->
-    wlkVarId	ivar		`thenUgn` \ var     ->
-    returnUgn (RdrSig (NoInlineSig var src_loc))
-\end{code}
-
 %************************************************************************
 %*									*
 \subsection[wlkTypes]{Reading in types in various forms (and data constructors)}
@@ -684,8 +712,8 @@ wlk_sig_thing (U_noinline_uprag ivar srcline)
 rdHsType :: ParseTree -> UgnM RdrNameHsType
 rdMonoType :: ParseTree -> UgnM RdrNameHsType
 
-rdHsType   pt = rdU_ttype pt `thenUgn` \ ttype -> wlkHsType ttype
-rdMonoType pt = rdU_ttype pt `thenUgn` \ ttype -> wlkHsType ttype
+rdHsType   pt = rdU_ttype pt `thenUgn` wlkHsType
+rdMonoType pt = rdU_ttype pt `thenUgn` wlkHsType
 
 wlkHsConstrArgType ttype
 	-- Used for the argument types of contructors
@@ -773,9 +801,7 @@ rdConAndTys  :: ParseTree -> UgnM (RdrName, [HsType RdrName])
 
 wlkContext list = wlkList rdConAndTys list
 
-rdConAndTys pt
-  = rdU_ttype pt `thenUgn` \ ttype -> 
-    wlkConAndTys ttype
+rdConAndTys pt = rdU_ttype pt `thenUgn` wlkConAndTys
 
 wlkConAndTys ttype
   = wlkHsType ttype	`thenUgn` \ ty ->
@@ -790,9 +816,7 @@ wlkConAndTys ttype
 
 \begin{code}
 rdConDecl :: ParseTree -> UgnM RdrNameConDecl
-rdConDecl pt
-  = rdU_constr pt    `thenUgn` \ blah ->
-    wlkConDecl blah
+rdConDecl pt = rdU_constr pt    `thenUgn` wlkConDecl
 
 wlkConDecl :: U_constr -> UgnM RdrNameConDecl
 
@@ -835,7 +859,7 @@ wlkConDecl (U_constrrec ccon cfields srcline)
 	returnUgn (vars, ty)
 
 -----------------
-rdBangType pt = rdU_ttype pt `thenUgn` \ ty -> wlkBangType ty
+rdBangType pt = rdU_ttype pt `thenUgn` wlkBangType
 
 wlkBangType :: U_ttype -> UgnM (BangType RdrName)
 
@@ -852,52 +876,15 @@ wlkBangType uty		  = wlkHsConstrArgType uty	`thenUgn` \ ty ->
 %************************************************************************
 
 \begin{code}
-rdMatch :: ParseTree -> UgnM RdrMatch
+rdMatch :: ParseTree -> UgnM RdrNameMatch
+rdMatch pt = rdU_match pt `thenUgn` wlkMatch 
 
-rdMatch pt
-  = rdU_pbinding pt `thenUgn` \ (U_pgrhs gpat gdexprs gbind gsrcfun srcline) ->
-    mkSrcLocUgn srcline			$ \ src_loc      ->
-    wlkPat	gpat		`thenUgn` \ pat     ->
-    wlkBinding	gbind		`thenUgn` \ binding ->
-    wlkVarId	gsrcfun		`thenUgn` \ srcfun  ->
-    let
-	wlk_guards (U_pnoguards exp)
-	  = wlkExpr exp `thenUgn` \ expr ->
-	    returnUgn (RdrMatch_NoGuard srcline srcfun pat expr binding)
-
-	wlk_guards (U_pguards gs)
-	  = wlkList rd_gd_expr gs   `thenUgn` \ gd_exps ->
-	    returnUgn (RdrMatch_Guards  srcline srcfun pat gd_exps binding)
-    in
-    wlk_guards gdexprs
-  where
-    rd_gd_expr pt
-      = rdU_pbinding pt `thenUgn` \ (U_pgdexp g e) ->
-	wlkQuals     g  `thenUgn` \ guard ->
-	wlkExpr	     e  `thenUgn` \ expr  ->
-	returnUgn (guard, expr)
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[rdFixOp]{Read in a fixity declaration}
-%*									*
-%************************************************************************
-
-\begin{code}
-rdFixOp :: ParseTree -> UgnM RdrNameFixityDecl
-rdFixOp pt 
-  = rdU_tree pt `thenUgn` \ fix ->
-    case fix of
-      U_fixop op dir_n prec srcline -> wlkVarId op 		`thenUgn` \ op ->
-				       mkSrcLocUgn srcline	$ \ src_loc ->
-				       returnUgn (FixityDecl op (Fixity prec dir) src_loc)
-			    where
-			      dir = case dir_n of
-					(-1) -> InfixL
-					0    -> InfixN
-					1    -> InfixR
-      _ -> error "ReadPrefix:rdFixOp"
+wlkMatch :: U_match -> UgnM RdrNameMatch
+wlkMatch (U_pmatch pats sig grhsb)
+  = wlkList rdPat pats		`thenUgn` \ pats'   ->
+    wlkMaybe rdHsType sig	`thenUgn` \ maybe_ty ->
+    wlkGRHSs grhsb		`thenUgn` \ grhss' ->
+    returnUgn (Match [] pats' maybe_ty grhss')
 \end{code}
 
 %************************************************************************
@@ -915,7 +902,11 @@ rdImport pt
     mkSrcLocUgn srcline				$ \ src_loc      ->
     wlkMaybe rdU_stringId ias		`thenUgn` \ maybe_as	->
     wlkMaybe rd_spec ispec		`thenUgn` \ maybe_spec	->
-    returnUgn (ImportDecl imod (cvFlag iqual) (cvIfaceFlavour isrc) maybe_as maybe_spec src_loc)
+    returnUgn (ImportDecl (mkModuleFS imod) 
+			  (cvFlag iqual) 
+			  (cvIfaceFlavour isrc) 
+			  (case maybe_as of { Just m -> Just (mkModuleFS m); Nothing -> Nothing })
+			  maybe_spec src_loc)
   where
     rd_spec pt = rdU_either pt 		`thenUgn` \ spec ->
       case spec of
@@ -929,9 +920,7 @@ cvIfaceFlavour 1 = HiBootFile	-- {-# SOURCE #-}
 \end{code}
 
 \begin{code}
-rdEntities pt
-  = rdU_list pt		    `thenUgn` \ list ->
-    wlkList rdEntity list
+rdEntities pt = rdU_list pt `thenUgn` wlkList rdEntity
 
 rdEntity :: ParseTree -> UgnM (IE RdrName)
 
@@ -957,7 +946,7 @@ rdEntity pt
 	returnUgn (IEThingWith thing names)
 
       U_entmod mod -> 		-- everything provided unqualified by a module
-	returnUgn (IEModuleContents mod)
+	returnUgn (IEModuleContents (mkModuleFS mod))
 \end{code}
 
 

@@ -25,8 +25,7 @@ import CoreSyn
 import CoreUtils	( coreExprType, exprIsTrivial, idFreeVars, exprIsBottom
 			)
 import FreeVars		-- all of it
-import Id		( Id, idType, mkUserLocal )
-import Name		( varOcc )
+import Id		( Id, idType, mkSysLocal )
 import Var		( IdOrTyVar )
 import VarEnv
 import VarSet
@@ -36,7 +35,7 @@ import VarEnv
 import UniqSupply	( initUs, thenUs, returnUs, mapUs, mapAndUnzipUs, getUniqueUs,
 			  mapAndUnzip3Us, UniqSM, UniqSupply )
 import Maybes		( maybeToBool )
-import Util		( zipWithEqual, zipEqual, panic, assertPanic )
+import Util		( zipWithEqual, zipEqual )
 import Outputable
 
 isLeakFreeType x y = False -- safe option; ToDo
@@ -612,5 +611,5 @@ applications, to give them a fighting chance of being floated.
 \begin{code}
 newLvlVar :: Type -> LvlM Id
 newLvlVar ty = getUniqueUs	`thenLvl` \ uniq ->
-	       returnUs (mkUserLocal (varOcc SLIT("lvl")) uniq ty)
+	       returnUs (mkSysLocal SLIT("lvl") uniq ty)
 \end{code}

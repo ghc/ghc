@@ -18,9 +18,8 @@ import DsForeign	( dsForeigns )
 import DsUtils
 import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
 				-- depends on DsExpr.hi-boot.
-
+import Name		( Module, moduleString )
 import Bag		( isEmptyBag )
-import BasicTypes       ( Module )
 import CmdLineOpts	( opt_SccGroup, opt_SccProfilingOn )
 import CoreLint		( beginPass, endPass )
 import ErrUtils		( doIfSet )
@@ -33,7 +32,7 @@ start.
 
 \begin{code}
 deSugar :: UniqSupply		-- name supply
-        -> GlobalValueEnv	-- value env
+        -> ValueEnv		-- value env
 	-> Module		-- module name
 	-> TypecheckedMonoBinds
 	-> [TypecheckedForeignDecl]
@@ -65,6 +64,6 @@ deSugar us global_val_env mod_name all_binds fo_decls = do
     module_and_group = (mod_name, grp_name)
     grp_name  = case opt_SccGroup of
 	          Just xx -> _PK_ xx
-	    	  Nothing -> mod_name	-- default: module name
+	    	  Nothing -> _PK_ (moduleString mod_name)	-- default: module name
 
 \end{code}

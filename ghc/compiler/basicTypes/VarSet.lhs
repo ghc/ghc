@@ -5,7 +5,7 @@
 
 \begin{code}
 module VarSet (
-	VarSet, IdSet, GenIdSet, TyVarSet, GenTyVarSet, IdOrTyVarSet,
+	VarSet, IdSet, TyVarSet, IdOrTyVarSet,
 	emptyVarSet, unitVarSet, mkVarSet,
 	extendVarSet,
 	elemVarSet, varSetElems,
@@ -20,7 +20,7 @@ module VarSet (
 
 #include "HsVersions.h"
 
-import Var		( Var, Id, GenId, TyVar, GenTyVar, IdOrTyVar, setVarUnique )
+import Var		( Var, Id, TyVar, IdOrTyVar, setVarUnique )
 import Unique		( Uniquable(..), incrUnique )
 import UniqSet
 import Outputable
@@ -33,32 +33,30 @@ import Outputable
 %************************************************************************
 
 \begin{code}
-type VarSet fs ft      = UniqSet (Var fs ft)
-type IdSet 	       = UniqSet Id
-type GenIdSet flexi    = UniqSet (GenId flexi)
-type TyVarSet	       = UniqSet TyVar
-type GenTyVarSet flexi = UniqSet (GenTyVar flexi)
-type IdOrTyVarSet      = UniqSet IdOrTyVar
+type VarSet       = UniqSet Var
+type IdSet 	  = UniqSet Id
+type TyVarSet	  = UniqSet TyVar
+type IdOrTyVarSet = UniqSet IdOrTyVar
 
-emptyVarSet	:: VarSet fs ft
-intersectVarSet	:: VarSet fs ft -> VarSet fs ft -> VarSet fs ft
-intersectsVarSet:: VarSet fs ft -> VarSet fs ft -> Bool 	-- True if non-empty intersection
-unionVarSet	:: VarSet fs ft -> VarSet fs ft -> VarSet fs ft
-unionVarSets	:: [VarSet fs ft] -> VarSet fs ft
-varSetElems	:: VarSet fs ft -> [Var fs ft]
-unitVarSet	:: Var fs ft -> VarSet fs ft
-extendVarSet	:: VarSet fs ft -> Var fs ft -> VarSet fs ft
-elemVarSet	:: Var fs ft -> VarSet fs ft -> Bool
-delVarSet	:: VarSet fs ft -> Var fs ft -> VarSet fs ft
-minusVarSet	:: VarSet fs ft -> VarSet fs ft -> VarSet fs ft
-isEmptyVarSet	:: VarSet fs ft -> Bool
-mkVarSet	:: [Var fs ft] -> VarSet fs ft
-foldVarSet	:: (Var fs ft -> a -> a) -> a -> VarSet fs ft -> a
-lookupVarSet	:: VarSet fs ft -> Var fs ft -> Maybe (Var fs ft)
+emptyVarSet	:: VarSet
+intersectVarSet	:: VarSet -> VarSet -> VarSet
+intersectsVarSet:: VarSet -> VarSet -> Bool 	-- True if non-empty intersection
+unionVarSet	:: VarSet -> VarSet -> VarSet
+unionVarSets	:: [VarSet] -> VarSet
+varSetElems	:: VarSet -> [Var]
+unitVarSet	:: Var -> VarSet
+extendVarSet	:: VarSet -> Var -> VarSet
+elemVarSet	:: Var -> VarSet -> Bool
+delVarSet	:: VarSet -> Var -> VarSet
+minusVarSet	:: VarSet -> VarSet -> VarSet
+isEmptyVarSet	:: VarSet -> Bool
+mkVarSet	:: [Var] -> VarSet
+foldVarSet	:: (Var -> a -> a) -> a -> VarSet -> a
+lookupVarSet	:: VarSet -> Var -> Maybe Var
 			-- Returns the set element, which may be
 			-- (==) to the argument, but not the same as
-mapVarSet 	:: (Var fs ft -> Var fs ft) -> VarSet fs ft -> VarSet fs ft
-filterVarSet	:: (Var fs ft -> Bool) -> VarSet fs ft -> VarSet fs ft
+mapVarSet 	:: (Var -> Var) -> VarSet -> VarSet
+filterVarSet	:: (Var -> Bool) -> VarSet -> VarSet
 
 emptyVarSet	= emptyUniqSet
 unitVarSet	= unitUniqSet
@@ -80,7 +78,7 @@ filterVarSet	= filterUniqSet
 \end{code}
 
 \begin{code}
-uniqAway :: VarSet fs ft -> Var fs ft -> Var fs ft
+uniqAway :: VarSet -> Var -> Var
 -- Give the Var a new unique, different to any in the VarSet
 uniqAway set var
   = try 1 (incrUnique (getUnique var))

@@ -25,8 +25,8 @@ module Outputable (
 	text, char, ptext,
 	int, integer, float, double, rational,
 	parens, brackets, braces, quotes, doubleQuotes,
-	semi, comma, colon, space, equals,
-	lparen, rparen, lbrack, rbrack, lbrace, rbrace,
+	semi, comma, colon, dcolon, space, equals, dot,
+	lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
 	(<>), (<+>), hcat, hsep, 
 	($$), ($+$), vcat, 
 	sep, cat, 
@@ -42,7 +42,7 @@ module Outputable (
 
 	-- error handling
 	pprPanic, pprPanic#, pprError, pprTrace, assertPprPanic,
-	panic, panic#, assertPanic
+	trace, panic, panic#, assertPanic
     ) where
 
 #include "HsVersions.h"
@@ -53,7 +53,7 @@ import CmdLineOpts	( opt_PprStyle_Debug, opt_PprUserLength )
 import FastString
 import qualified Pretty
 import Pretty		( Doc, Mode(..), TextDetails(..), fullRender )
-import Util		( panic, assertPanic, panic#, trace )
+import Panic
 import ST		( runST )
 import Foreign
 \end{code}
@@ -221,6 +221,9 @@ lbrack sty = Pretty.lbrack
 rbrack sty = Pretty.rbrack
 lbrace sty = Pretty.lbrace
 rbrace sty = Pretty.rbrace
+dcolon sty = Pretty.ptext SLIT("::")
+underscore = char '_'
+dot	   = char '.'
 
 nest n d sty    = Pretty.nest n (d sty)
 (<>) d1 d2 sty  = (Pretty.<>)  (d1 sty) (d2 sty)
@@ -271,6 +274,10 @@ instance (Outputable a) => Outputable [a] where
 
 instance (Outputable a, Outputable b) => Outputable (a, b) where
     ppr (x,y) = parens (sep [ppr x <> comma, ppr y])
+
+instance Outputable a => Outputable (Maybe a) where
+  ppr Nothing = text "Nothing"
+  ppr (Just x) = text "Just" <+> ppr x
 
 -- ToDo: may not be used
 instance (Outputable a, Outputable b, Outputable c) => Outputable (a, b, c) where
@@ -362,19 +369,23 @@ speakNTimes t | t == 1 	   = ptext SLIT("once")
               | otherwise  = int t <+> ptext SLIT("times")
 \end{code}
 
+
 %************************************************************************
 %*									*
-\subsection[Utils-errors]{Error handling}
+\subsection{Error handling}
 %*									*
 %************************************************************************
 
 \begin{code}
+pprPanic :: String -> SDoc -> a
 pprPanic heading pretty_msg = panic (show (doc PprDebug))
 			    where
 			      doc = text heading <+> pretty_msg
 
+pprError :: String -> SDoc -> a
 pprError heading pretty_msg = error (heading++ " " ++ (showSDoc pretty_msg))
 
+pprTrace :: String -> SDoc -> a -> a
 pprTrace heading pretty_msg = trace (show (doc PprDebug))
 			    where
 			      doc = text heading <+> pretty_msg

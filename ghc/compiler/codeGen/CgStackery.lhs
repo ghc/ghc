@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgStackery.lhs,v 1.9 1998/12/02 13:17:51 simonm Exp $
+% $Id: CgStackery.lhs,v 1.10 1998/12/18 17:40:53 simonpj Exp $
 %
 \section[CgStackery]{Stack management functions}
 
@@ -25,7 +25,7 @@ import AbsCSyn
 import CgUsages		( getRealSp )
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts, getAmodeRep )
 import PrimRep		( getPrimRepSize, PrimRep(..), isFollowableRep )
-import Util		( panic )
+import Panic		( panic )
 \end{code}
 
 %************************************************************************

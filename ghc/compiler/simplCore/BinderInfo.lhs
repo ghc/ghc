@@ -25,7 +25,6 @@ module BinderInfo (
 #include "HsVersions.h"
 
 import IdInfo		( InlinePragInfo(..), OccInfo(..) )
-import Util		( panic )
 import GlaExts		( Int(..), (+#) )
 import Outputable
 \end{code}

@@ -26,7 +26,7 @@ import IdInfo		( UpdateInfo, UpdateSpec, mkUpdateInfo, updateInfoMaybe )
 import Name		( isLocallyDefined )
 import Type		( splitFunTys, splitSigmaTy )
 import Unique		( getBuiltinUniques )
-import Util		( panic )
+import Panic		( panic )
 \end{code}
 
 
@@ -521,7 +521,7 @@ mkUpdateSpec v f = {- removeSuperfluous2s -} (map countUses ids)
 	    where
 		(c,b,_)     = foldl doApp f ids
 	      	ids         = map mkid (getBuiltinUniques arity)
-	      	mkid u      = mkSysLocal u noType
+	      	mkid u      = mkSysLocal SLIT("upd") u noType
 	      	countUses u = if u `elemRefs` b then 2 else min (lookupc c u) 2
 	      	noType      = panic "UpdAnal: no type!"
 

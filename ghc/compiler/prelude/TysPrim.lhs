@@ -93,7 +93,7 @@ pcPrimTyCon key str arity rep
   where
     name      = mkWiredInTyConName key pREL_GHC str the_tycon
     the_tycon = mkPrimTyCon name kind arity rep
-    kind      = mkArrowKinds (take arity (repeat openTypeKind)) result_kind
+    kind      = mkArrowKinds (take arity (repeat boxedTypeKind)) result_kind
     result_kind | isFollowableRep rep = boxedTypeKind	-- Represented by a GC-ish ptr
 	        | otherwise	      = unboxedTypeKind	-- Represented by a non-ptr
 

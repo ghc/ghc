@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.16 1998/12/02 13:17:52 simonm Exp $
+% $Id: CgTailCall.lhs,v 1.17 1998/12/18 17:40:53 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -53,7 +53,9 @@ import StgSyn		( StgArg, GenStgArg(..) )
 import Type		( isUnLiftedType )
 import TyCon            ( TyCon )
 import PrimOp		( PrimOp )
-import Util		( zipWithEqual, panic, assertPanic )
+import Util		( zipWithEqual )
+import Outputable
+import Panic		( panic, assertPanic )
 \end{code}
 
 %************************************************************************
@@ -94,7 +96,7 @@ Case for unboxed @Ids@ first:
 cgTailCall fun []
   | isUnLiftedType (idType fun)
   = getCAddrMode fun		`thenFC` \ amode ->
-    performPrimReturn amode
+    performPrimReturn (ppr fun) amode
 \end{code}
 
 The general case (@fun@ is boxed):
@@ -109,10 +111,11 @@ cgTailCall fun args = performTailCall fun args
 %************************************************************************
 
 \begin{code}
-performPrimReturn :: CAddrMode	-- The thing to return
+performPrimReturn :: SDoc	-- Just for debugging (sigh)
+		  -> CAddrMode	-- The thing to return
 		  -> Code
 
-performPrimReturn amode
+performPrimReturn doc amode
   = let
 	kind = getAmodeRep amode
 	ret_reg = dataReturnConvPrim kind
@@ -121,11 +124,13 @@ performPrimReturn amode
 	  VoidRep -> AbsCNop
 	  kind -> (CAssign (CReg ret_reg) amode)
     in
-    performReturn assign_possibly mkPrimReturnCode
+    performReturn assign_possibly (mkPrimReturnCode doc)
 
-mkPrimReturnCode :: Sequel -> Code
-mkPrimReturnCode UpdateCode	= panic "mkPrimReturnCode: Upd"
-mkPrimReturnCode sequel		= sequelToAmode sequel	`thenFC` \ dest_amode ->
+mkPrimReturnCode :: SDoc 		-- Debugging only
+		 -> Sequel
+		 -> Code
+mkPrimReturnCode doc UpdateCode	= pprPanic "mkPrimReturnCode: Upd" doc
+mkPrimReturnCode doc sequel	= sequelToAmode sequel	`thenFC` \ dest_amode ->
 				  absC (CReturn dest_amode DirectReturn)
 				  -- Direct, no vectoring
 

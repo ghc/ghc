@@ -203,7 +203,7 @@ worthSplitting ds = any worth_it ds
   where
     worth_it (WwLazy True)	 = True		-- Absent arg
     worth_it (WwUnpack _ True _) = True		-- Arg to unpack
-    worth_it WwStrict		 = True
+    worth_it WwStrict		 = False	-- Don't w/w just because of strictness
     worth_it other		 = False
 
 allAbsent :: [Demand] -> Bool
@@ -405,5 +405,5 @@ mk_pk_let DataType arg boxing_con con_tys unpk_args body
     con_args = map Type con_tys ++ map Var unpk_args
 
 
-mk_ww_local uniq ty = mkSysLocal uniq ty
+mk_ww_local uniq ty = mkSysLocal SLIT("ww") uniq ty
 \end{code}

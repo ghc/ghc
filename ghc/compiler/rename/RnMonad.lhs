@@ -26,13 +26,14 @@ import List		( intersperse )
 
 import HsSyn		
 import RdrHsSyn
-import BasicTypes	( Version, pprModule, IfaceFlavour(..) )
+import RnHsSyn		( RenamedFixitySig )
+import BasicTypes	( Version, IfaceFlavour(..) )
 import SrcLoc		( noSrcLoc )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine,
 			  pprBagOfErrors, ErrMsg, WarnMsg
 			)
 import Name		( Module, Name, OccName, PrintUnqualified,
-			  isLocallyDefinedName,
+			  isLocallyDefinedName, pprModule, 
 			  modAndOcc, NamedThing(..)
 			)
 import NameSet		
@@ -42,10 +43,13 @@ import TysWiredIn	( boolTyCon )
 import SrcLoc		( SrcLoc, mkGeneratedSrcLoc )
 import Unique		( Unique )
 import UniqFM		( UniqFM )
-import FiniteMap	( FiniteMap, emptyFM, bagToFM, lookupFM, addToFM, addListToFM_C, addToFM_C )
+import FiniteMap	( FiniteMap, emptyFM, bagToFM, lookupFM, addToFM, addListToFM, 
+			  addListToFM_C, addToFM_C, eltsFM
+			)
 import Bag		( Bag, mapBag, emptyBag, isEmptyBag, snocBag )
 import Maybes		( seqMaybe, mapMaybe )
 import UniqSet
+import UniqFM
 import UniqSupply
 import Util
 import Outputable
@@ -101,7 +105,7 @@ type SSTRWRef a = SSTRef RealWorld a		-- ToDo: there ought to be a standard defn
 	-- Common part
 data RnDown s = RnDown
 		  SrcLoc
-		  (SSTRef s (GenRnNameSupply s))
+		  (SSTRef s RnNameSupply)
 		  (SSTRef s (Bag WarnMsg, Bag ErrMsg))
 		  (SSTRef s ([Occurrence],[Occurrence]))	-- Occurrences: compulsory and optional resp
 
@@ -119,9 +123,15 @@ data GDown = GDown
 
 	-- For renaming source code
 data SDown s = SDown
-		  RnEnv			-- Global envt
-		  NameEnv		-- Local name envt (includes global name envt, 
-					-- but may shadow it)
+		  RnEnv			-- Global envt; the fixity component gets extended
+					--   with local fixity decls
+		  LocalRdrEnv		-- Local name envt
+					--   Does *not* includes global name envt; may shadow it
+					--   Includes both ordinary variables and type variables;
+					--   they are kept distinct because tyvar have a different
+					--   occurrence contructor (Name.TvOcc)
+					-- We still need the unsullied global name env so that
+					--   we can look up record field names
 		  Module
 		  RnSMode
 
@@ -135,7 +145,6 @@ data RnSMode	= SourceMode			-- Renaming source code
 						-- we arrange that the type signature is read 
 						-- in compulsory mode,
 						-- but the pragmas in optional mode.
-			(Name -> PrintUnqualified)	-- Tells whether the thing can be printed unqualified
 
 type SearchPath = [(String,String)]	-- List of (directory,suffix) pairs to search 
                                         -- for interface files.
@@ -143,8 +152,6 @@ type SearchPath = [(String,String)]	-- List of (directory,suffix) pairs to searc
 type ModuleHiMap = FiniteMap String String
    -- mapping from module name to the file path of its corresponding
    -- interface file.
-
-type FreeVars	= NameSet
 \end{code}
 
 ===================================================
@@ -152,51 +159,85 @@ type FreeVars	= NameSet
 ===================================================
 
 \begin{code}
-type RnNameSupply = GenRnNameSupply RealWorld
+--------------------------------
+type RdrNameEnv a = FiniteMap RdrName a
+type GlobalRdrEnv = RdrNameEnv [Name]	-- The list is because there may be name clashes
+					-- These only get reported on lookup,
+					-- not on construction
+type LocalRdrEnv  = RdrNameEnv Name
 
-type GenRnNameSupply s
+emptyRdrEnv  :: RdrNameEnv a
+lookupRdrEnv :: RdrNameEnv a -> RdrName -> Maybe a
+addListToRdrEnv :: RdrNameEnv a -> [(RdrName,a)] -> RdrNameEnv a
+
+emptyRdrEnv  = emptyFM
+lookupRdrEnv = lookupFM
+addListToRdrEnv = addListToFM
+rdrEnvElts	= eltsFM
+
+--------------------------------
+type NameEnv a = UniqFM a	-- Domain is Name
+
+emptyNameEnv   :: NameEnv a
+nameEnvElts    :: NameEnv a -> [a]
+addToNameEnv_C :: (a->a->a) -> NameEnv a -> Name -> a -> NameEnv a
+addToNameEnv   :: NameEnv a -> Name -> a -> NameEnv a
+plusNameEnv    :: NameEnv a -> NameEnv a -> NameEnv a
+extendNameEnv  :: NameEnv a -> [(Name,a)] -> NameEnv a
+lookupNameEnv  :: NameEnv a -> Name -> Maybe a
+delFromNameEnv :: NameEnv a -> Name -> NameEnv a
+elemNameEnv    :: Name -> NameEnv a -> Bool
+
+emptyNameEnv   = emptyUFM
+nameEnvElts    = eltsUFM
+addToNameEnv_C = addToUFM_C
+addToNameEnv   = addToUFM
+plusNameEnv    = plusUFM
+extendNameEnv  = addListToUFM
+lookupNameEnv  = lookupUFM
+delFromNameEnv = delFromUFM
+elemNameEnv    = elemUFM
+
+--------------------------------
+type FixityEnv = NameEnv RenamedFixitySig
+
+--------------------------------
+data RnEnv     	= RnEnv GlobalRdrEnv FixityEnv
+emptyRnEnv	= RnEnv emptyRdrEnv  emptyNameEnv
+\end{code}
+
+\begin{code}
+--------------------------------
+type RnNameSupply
  = ( UniqSupply
-   , FiniteMap FAST_STRING (SSTRef s Int)
+
+   , FiniteMap (OccName, OccName) Int
+	-- This is used as a name supply for dictionary functions
+	-- From the inst decl we derive a (class, tycon) pair;
+	-- this map then gives a unique int for each inst decl with that
+	-- (class, tycon) pair.  (In Haskell 98 there can only be one,
+	-- but not so in more extended versions.)
+	--	
+	-- We could just use one Int for all the instance decls, but this
+	-- way the uniques change less when you add an instance decl,	
+	-- hence less recompilation
+
    , FiniteMap (Module,OccName) Name
+	-- Ensures that one (module,occname) pair gets one unique
    )
-	-- Ensures that one (m,n) pair gets one unique
-	-- The finite map on FAST_STRINGS is used to give a per-class unique to each
-	-- instance declaration; it's really a separate name supply.
 
-data RnEnv     	= RnEnv GlobalNameEnv FixityEnv
-emptyRnEnv	= RnEnv emptyNameEnv  emptyFixityEnv
 
-type GlobalNameEnv = FiniteMap RdrName (Name, HowInScope)
-emptyGlobalNameEnv = emptyFM
+--------------------------------
+data ExportEnv	  = ExportEnv Avails Fixities
+type Avails	  = [AvailInfo]
+type Fixities	  = [(Name, Fixity)]
 
-data HowInScope		-- Used for error messages only
-   = FromLocalDefn SrcLoc
-   | FromImportDecl Module SrcLoc
+type ExportAvails = (FiniteMap Module Avails,	-- Used to figure out "module M" export specifiers
+						-- Includes avails only from *unqualified* imports
+						-- (see 1.4 Report Section 5.1.1)
 
-type NameEnv	= FiniteMap RdrName Name
-emptyNameEnv	= emptyFM
-
-type FixityEnv		= FiniteMap RdrName (Fixity, HowInScope)
-emptyFixityEnv	        = emptyFM
-	-- It's possible to have a different fixity for B.op than for op:
-	--
-	--	module A( op ) where		module B where
-	--	import qualified B( op )	infixr 2 op
-	--	infixl 9 `op`			op = ...
-	--	op a b = a `B.op` b
-
-data ExportEnv		= ExportEnv Avails Fixities
-type Avails		= [AvailInfo]
-type Fixities		= [(OccName, Fixity)]
-
-type ExportAvails	= (FiniteMap Module Avails,	-- Used to figure out "module M" export specifiers
-							-- Includes avails only from *unqualified* imports
-							-- (see 1.4 Report Section 5.1.1)
-
-			   UniqFM AvailInfo)		-- Used to figure out all other export specifiers.
-							-- Maps a Name to the AvailInfo that contains it
-							-- NB: Contain bindings for class ops but 
-							-- not constructors (see defn of availEntityNames)
+		     NameEnv AvailInfo)		-- Used to figure out all other export specifiers.
+						-- Maps a Name to the AvailInfo that contains it
 
 
 data GenAvailInfo name	= NotAvailable 
@@ -230,12 +271,11 @@ type LocalVersion name   = (name, Version)
 
 data ParsedIface
   = ParsedIface
-      Module		 	-- Module name
-      Version		 	-- Module version number
+      Module		 		-- Module name
+      Version		 		-- Module version number
       [ImportVersion OccName]		-- Usages
       [ExportItem]			-- Exports
       [Module]				-- Special instance modules
-      [(OccName,Fixity)]		-- Fixities
       [(Version, RdrNameHsDecl)]	-- Local definitions
       [RdrNameInstDecl]			-- Local instance declarations
 
@@ -246,42 +286,51 @@ type InterfaceDetails = (VersionInfo Name,	-- Version information for what this 
 type RdrNamePragma = ()				-- Fudge for now
 -------------------
 
-data Ifaces = Ifaces
-		Module						-- Name of this module
-		(FiniteMap Module (IfaceFlavour, 		-- Exports
-				   Version, 
-				   Avails, 
-				   [(OccName,Fixity)]))
-		DeclsMap
+data Ifaces = Ifaces {
+		iMod :: Module,				-- Name of this module
 
-		NameSet			-- All the names (whether "big" or "small", whether wired-in or not,
+		iModMap :: FiniteMap Module (IfaceFlavour, 		-- Exports
+					     Version, 
+					     Avails),
+
+		iDecls :: DeclsMap,	-- A single, global map of Names to decls
+
+		iFixes :: FixityEnv,	-- A single, global map of Names to fixities
+
+		iSlurp :: NameSet,	-- All the names (whether "big" or "small", whether wired-in or not,
 					-- whether locally defined or not) that have been slurped in so far.
 
-		[(Name,Version)]	-- All the (a) non-wired-in (b) "big" (c) non-locally-defined names that 
-					-- have been slurped in so far, with their versions. 
-					-- This is used to generate the "usage" information for this module.
-					-- Subset of the previous field.
+		iVSlurp :: [(Name,Version)],	-- All the (a) non-wired-in (b) "big" (c) non-locally-defined names that 
+						-- have been slurped in so far, with their versions. 
+						-- This is used to generate the "usage" information for this module.
+						-- Subset of the previous field.
 
-		(Bag IfaceInst, NameSet) -- The as-yet un-slurped instance decls; this bag is depleted when we
+		iDefInsts :: (Bag IfaceInst, NameSet),
+					 -- The as-yet un-slurped instance decls; this bag is depleted when we
 					 -- slurp an instance decl so that we don't slurp the same one twice.
 					 -- Together with them is the set of tycons/classes that may allow 
 					 -- the instance decls in.
 
-		(FiniteMap Name RdrNameTyDecl)
+		iDefData :: NameEnv (Module, RdrNameTyClDecl),
 					-- Deferred data type declarations; each has the following properties
 					--	* it's a data type decl
 					--	* its TyCon is needed
 					--	* the decl may or may not have been slurped, depending on whether any
 					--	  of the constrs are needed.
 
-		[Module]		-- Set of modules with "special" instance declarations
+		iInstMods :: [Module]	-- Set of modules with "special" instance declarations
 					-- Excludes this module
+	}
 
 
-type DeclsMap    = FiniteMap Name (Version, AvailInfo, RdrNameHsDecl)
-type IfaceInst   = ((Module, RdrNameInstDecl),	-- Instance decl
-		    [Name])			-- "Gate" names.  Slurp this instance decl when this
-						-- list becomes empty.  It's depleted whenever we
+type DeclsMap = NameEnv (Version, AvailInfo, RdrNameHsDecl, Bool)
+		-- A DeclsMap contains a binding for each Name in the declaration
+		-- including the constructors of a type decl etc.
+		-- The Bool is True just for the 'main' Name.
+
+type IfaceInst = ((Module, RdrNameInstDecl),	-- Instance decl
+		  NameSet)			-- "Gate" names.  Slurp this instance decl when this
+						-- set becomes empty.  It's depleted whenever we
 						-- slurp another type or class decl.
 \end{code}
 
@@ -318,13 +367,22 @@ initRn mod us dirs loc do_rn = do
 initRnMS :: RnEnv -> Module -> RnSMode -> RnMS RealWorld r -> RnMG r
 initRnMS rn_env@(RnEnv name_env _) mod_name mode m rn_down g_down
   = let
-	s_down = SDown rn_env emptyNameEnv mod_name mode
+	s_down = SDown rn_env emptyRdrEnv mod_name mode
     in
     m rn_down s_down
 
 
 emptyIfaces :: Module -> Ifaces
-emptyIfaces mod = Ifaces mod emptyFM emptyFM emptyNameSet [] (emptyBag, emptyNameSet) emptyFM []
+emptyIfaces mod = Ifaces { iMod = mod,
+			   iModMap = emptyFM,
+			   iDecls = emptyNameEnv,
+			   iFixes = emptyNameEnv,
+			   iSlurp = emptyNameSet,
+			   iVSlurp = [],
+			   iDefInsts = (emptyBag, emptyNameSet),
+			   iDefData = emptyNameEnv, 
+			   iInstMods = []
+		  }
 
 builtins :: FiniteMap (Module,OccName) Name
 builtins = bagToFM (mapBag (\ name -> (modAndOcc name, name)) builtinNames)
@@ -440,7 +498,7 @@ renameSourceCode mod_name name_supply m
 	newMutVarSST ([],[])			`thenSST` \ occs_var ->
     	let
 	    rn_down = RnDown mkGeneratedSrcLoc names_var errs_var occs_var
-	    s_down = SDown emptyRnEnv emptyNameEnv mod_name (InterfaceMode Compulsory (\_ -> False))
+	    s_down = SDown emptyRnEnv emptyRdrEnv mod_name (InterfaceMode Compulsory)
 	in
 	m rn_down s_down			`thenSST` \ result ->
 	
@@ -548,8 +606,12 @@ addErrRn :: ErrMsg -> RnM s d ()
 addErrRn err = failWithRn () err
 
 checkRn :: Bool -> ErrMsg -> RnM s d ()	-- Check that a condition is true
-checkRn False err  = addErrRn err
-checkRn True err = returnRn ()
+checkRn False err = addErrRn err
+checkRn True  err = returnRn ()
+
+warnCheckRn :: Bool -> ErrMsg -> RnM s d ()	-- Check that a condition is true
+warnCheckRn False err = addWarnRn err
+warnCheckRn True  err = returnRn ()
 
 addWarnRn :: WarnMsg -> RnM s d ()
 addWarnRn warn = warnWithRn () warn
@@ -576,34 +638,26 @@ getSrcLocRn (RnDown loc names_var errs_var occs_var) l_down
 ================  Name supply =====================
 
 \begin{code}
-getNameSupplyRn :: RnM s d (GenRnNameSupply s)
+getNameSupplyRn :: RnM s d RnNameSupply
 getNameSupplyRn (RnDown loc names_var errs_var occs_var) l_down
   = readMutVarSST names_var
 
-setNameSupplyRn :: GenRnNameSupply s -> RnM s d ()
+setNameSupplyRn :: RnNameSupply -> RnM s d ()
 setNameSupplyRn names' (RnDown loc names_var errs_var occs_var) l_down
   = writeMutVarSST names_var names'
 
--- The "instance-decl unique supply", inst, is really a map from class names
--- to unique supplies. Having per-class unique numbers for instance decls helps
--- the recompilation checker.
-newInstUniq :: FAST_STRING -> RnM s d Int
-newInstUniq cname (RnDown loc names_var errs_var occs_var) l_down
+-- See comments with RnNameSupply above.
+newInstUniq :: (OccName, OccName) -> RnM s d Int
+newInstUniq key (RnDown loc names_var errs_var occs_var) l_down
   = readMutVarSST names_var				`thenSST` \ (us, mapInst, cache) ->
-    case lookupFM mapInst cname of
-      Just class_us ->
-         readMutVarSST  class_us       `thenSST`  \ v ->
-	 writeMutVarSST class_us (v+1) `thenSST_`
-         returnSST v
-      Nothing -> -- first time caller gets to add a unique supply
-                 -- to the finite map for that class.
-        newMutVarSST 1 `thenSST` \ class_us ->
-	let 
-	  mapInst' = addToFM mapInst cname class_us
-	in
-	writeMutVarSST names_var (us, mapInst', cache)	`thenSST_` 
-        returnSST 0
-
+    let
+	uniq = case lookupFM mapInst key of
+		   Just x  -> x+1
+		   Nothing -> 0
+	mapInst' = addToFM mapInst key uniq
+    in
+    writeMutVarSST names_var (us, mapInst', cache)	`thenSST_`
+    returnSST uniq
 \end{code}
 
 ================  Occurrences =====================
@@ -680,32 +734,30 @@ popOccurrenceName mode (RnDown loc names_var errs_var occs_var) l_down
   = readMutVarSST occs_var			`thenSST` \ occs ->
     case (mode, occs) of
 		-- Find a compulsory occurrence
-	(InterfaceMode Compulsory _, (comp:comps, opts))
+	(InterfaceMode Compulsory, (comp:comps, opts))
 		-> writeMutVarSST occs_var (comps, opts)	`thenSST_`
 		   returnSST (Just comp)
 
 		-- Find an optional occurrence
 		-- We shouldn't be looking unless we've done all the compulsories
-	(InterfaceMode Optional _, (comps, opt:opts))
-		-> ASSERT( null comps )
+	(InterfaceMode Optional, (comps, opt:opts))
+		-> ASSERT2( null comps, ppr comps )
 		   writeMutVarSST occs_var (comps, opts)	`thenSST_`
 		   returnSST (Just opt)
 
 		-- No suitable occurrence
 	other -> returnSST Nothing
 
--- findOccurrencesRn does the enclosed thing with a *fresh* occurrences
--- variable, and returns the list of occurrences thus found.  It's useful
+-- discardOccurrencesRn does the enclosed thing with a *fresh* occurrences
+-- variable, and discards the list of occurrences thus found.  It's useful
 -- when loading instance decls and specialisation signatures, when we want to
 -- know the names of the things in the types, but we don't want to treat them
 -- as occurrences.
 
-findOccurrencesRn :: RnM s d a -> RnM s d [Name]
-findOccurrencesRn enclosed_thing (RnDown loc names_var errs_var occs_var) l_down
+discardOccurrencesRn :: RnM s d a -> RnM s d a
+discardOccurrencesRn enclosed_thing (RnDown loc names_var errs_var occs_var) l_down
   = newMutVarSST ([],[])						`thenSST` \ new_occs_var ->
-    enclosed_thing (RnDown loc names_var errs_var new_occs_var) l_down	`thenSST_`
-    readMutVarSST new_occs_var						`thenSST` \ (occs,_) ->
-    returnSST (map fst occs)
+    enclosed_thing (RnDown loc names_var errs_var new_occs_var) l_down
 \end{code}
 
 
@@ -718,37 +770,29 @@ findOccurrencesRn enclosed_thing (RnDown loc names_var errs_var occs_var) l_down
 ================  RnEnv  =====================
 
 \begin{code}
--- Look in global env only
-lookupGlobalNameRn :: RdrName -> RnMS s (Maybe Name)
-lookupGlobalNameRn rdr_name rn_down (SDown (RnEnv global_env fixity_env) local_env mod_name mode)
-  = case lookupFM global_env rdr_name of
-	  Just (name, _) -> returnSST (Just name)
-	  Nothing 	 -> returnSST Nothing
-  
--- Look in both local and global env
-lookupNameRn :: RdrName -> RnMS s (Maybe Name)
-lookupNameRn rdr_name rn_down (SDown (RnEnv global_env fixity_env) local_env mod_name mode)
-  = case lookupFM local_env rdr_name of
-	  Just name -> returnSST (Just name)
-	  Nothing   -> case lookupFM global_env rdr_name of
-			  Just (name, _) -> returnSST (Just name)
-			  Nothing        -> returnSST Nothing
-
-getNameEnvs :: RnMS s (GlobalNameEnv, NameEnv)
+getNameEnvs :: RnMS s (GlobalRdrEnv, LocalRdrEnv)
 getNameEnvs rn_down (SDown (RnEnv global_env fixity_env) local_env mod_name mode)
   = returnSST (global_env, local_env)
 
-getLocalNameEnv :: RnMS s NameEnv
+getLocalNameEnv :: RnMS s LocalRdrEnv
 getLocalNameEnv rn_down (SDown rn_env local_env mod_name mode)
   = returnSST local_env
 
-setLocalNameEnv :: NameEnv -> RnMS s a -> RnMS s a
+setLocalNameEnv :: LocalRdrEnv -> RnMS s a -> RnMS s a
 setLocalNameEnv local_env' m rn_down (SDown rn_env local_env mod_name mode)
   = m rn_down (SDown rn_env local_env' mod_name mode)
 
 getFixityEnv :: RnMS s FixityEnv
 getFixityEnv rn_down (SDown (RnEnv name_env fixity_env) local_env mod_name mode)
   = returnSST fixity_env
+
+extendFixityEnv :: [(Name, RenamedFixitySig)] -> RnMS s a -> RnMS s a
+extendFixityEnv fixes enclosed_scope
+	        rn_down (SDown (RnEnv name_env fixity_env) local_env mod_name mode)
+  = let
+	new_fixity_env = extendNameEnv fixity_env fixes
+    in
+    enclosed_scope rn_down (SDown (RnEnv name_env new_fixity_env) local_env mod_name mode)
 \end{code}
 
 ================  Module and Mode =====================
@@ -800,14 +844,6 @@ getModuleHiMap as_source rn_down (GDown himap hibmap iface_var)
 %************************************************************************
 
 \begin{code}
-instance Outputable HowInScope where
-  ppr (FromLocalDefn loc)      = ptext SLIT("Defined at") <+> ppr loc
-  ppr (FromImportDecl mod loc) = ptext SLIT("Imported from") <+> quotes (pprModule mod) <+>
-		  	         ptext SLIT("at") <+> ppr loc
-\end{code}
-
-
-\begin{code}
-modeToNecessity SourceMode		    = Compulsory
-modeToNecessity (InterfaceMode necessity _) = necessity
+modeToNecessity SourceMode		  = Compulsory
+modeToNecessity (InterfaceMode necessity) = necessity
 \end{code}

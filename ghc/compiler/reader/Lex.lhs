@@ -37,9 +37,9 @@ import List             ( isSuffixOf )
 
 import CostCentre	-- Pretty much all of it
 import IdInfo		( InlinePragInfo(..) )
-import Name		( mkTupNameStr, mkUbxTupNameStr, 
-			  isLowerISO, isUpperISO )
+import Name		( isLowerISO, isUpperISO, mkModule )
 
+import PrelMods		( mkTupNameStr, mkUbxTupNameStr )
 import CmdLineOpts	( opt_IgnoreIfacePragmas, opt_HiVersion, opt_NoHiCheck )
 import Demand		( Demand(..) {- instance Read -} )
 import UniqFM           ( UniqFM, listToUFM, lookupUFM)
@@ -141,7 +141,7 @@ data IfaceToken
   | ITspecialise
   | ITnocaf
   | ITunfold InlinePragInfo
-  | ITstrict [Demand] 
+  | ITstrict ([Demand], Bool)
   | ITscc CostCentre
 
   | ITdotdot  			-- reserved symbols
@@ -331,7 +331,11 @@ lex_nested_comment cont buf =
 -------------------------------------------------------------------------------
 
 lex_demand cont buf = 
- case read_em [] buf of { (ls,buf') -> cont (ITstrict ls) (stepOverLexeme buf')}
+ case read_em [] buf of { (ls,buf') -> 
+ case currentChar# buf' of
+   'B'# -> cont (ITstrict (ls, True )) (stepOverLexeme (stepOn buf'))
+   _    -> cont (ITstrict (ls, False)) (stepOverLexeme buf')
+ }
  where
    -- code snatched from Demand.lhs
   read_em acc buf = 
@@ -359,19 +363,20 @@ lex_scc cont buf =
         case prefixMatch (stepOn buf) "CAFs." of
          Just buf' ->
           case untilChar# (stepOverLexeme buf') '\"'# of
-           buf'' -> cont (ITscc (mkAllCafsCC ({-module-}lexemeToFastString buf'') _NIL_)) (stepOn (stepOverLexeme buf''))
+           buf'' -> cont (ITscc (mkAllCafsCC (mkModule (lexemeToString buf'')) _NIL_)) 
+			 (stepOn (stepOverLexeme buf''))
          Nothing ->
             case prefixMatch (stepOn buf) "DICTs." of
              Just buf' ->
               case untilChar# (stepOverLexeme buf') '\"'# of
-               buf'' -> cont (ITscc (mkAllDictsCC (lexemeToFastString buf'') _NIL_ True)) 
+               buf'' -> cont (ITscc (mkAllDictsCC (mkModule (lexemeToString buf'')) _NIL_ True)) 
                         (stepOn (stepOverLexeme buf''))
              Nothing ->
 	      let
 	       match_user_cc buf =
                 case untilChar# buf '/'# of
                  buf' -> 
-                  let mod_name = lexemeToFastString buf' in
+                  let mod_name = mkModule (lexemeToString buf') in
 --	                  case untilChar# (stepOn (stepOverLexeme buf')) '/'# of
 --	                   buf'' -> 
 --                            let grp_name = lexemeToFastString buf'' in
@@ -669,10 +674,14 @@ haskellKeywordsFM = listToUFM $
 	( "of",		ITof ),       
 	( "then",	ITthen ),     
 	( "type",	ITtype ),     
-	( "where",	ITwhere ),    
-	( "as",		ITas ),       
-	( "qualified",	ITqualified ),
-	( "hiding",	IThiding )
+	( "where",	ITwhere )
+
+--	These three aren't Haskell keywords at all
+--	and 'as' is often used as a variable name
+--	( "as",		ITas ),       
+--	( "qualified",	ITqualified ),
+--	( "hiding",	IThiding )
+
      ]
 
 haskellKeySymsFM = listToUFM $
@@ -749,7 +758,7 @@ getSrcLocIf :: IfM SrcLoc
 getSrcLocIf s l = Succeeded l
 
 happyError :: IfM a
-happyError s l = Failed (ifaceParseErr l ([]::[IfaceToken]){-Todo-})
+happyError s l = Failed (ifaceParseErr s l)
 
 
 {- 
@@ -777,9 +786,12 @@ checkVersion mb@Nothing  s l
 
 -----------------------------------------------------------------
 
-ifaceParseErr l toks
+ifaceParseErr :: StringBuffer -> SrcLoc -> ErrMsg
+ifaceParseErr s l
   = hsep [ppr l, ptext SLIT("Interface-file parse error;"),
-          ptext SLIT("toks="), text (show (take 10 toks))]
+          ptext SLIT("current input ="), text first_bit]
+  where
+    first_bit = lexemeToString (stepOnBy# s 100#) 
 
 ifaceVersionErr hi_vers l toks
   = hsep [ppr l, ptext SLIT("Interface file version error;"),

@@ -18,7 +18,8 @@ import SimplMonad	( SimplM, SimplCont )
 import Type		( mkFunTys )
 import TysWiredIn	( mkListTy )
 import Unique		( Unique{-instances-} )
-import Util		( assoc, zipWith3Equal, nOfThem, panic )
+import Util		( assoc, zipWith3Equal, nOfThem )
+import Panic		( panic )
 \end{code}
 
 %************************************************************************

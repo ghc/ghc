@@ -114,7 +114,7 @@ import Argv
 import Constants	-- Default values for some flags
 
 import Maybes		( assocMaybe, firstJust, maybeToBool )
-import Util		( startsWith, panic, panic# )
+import Panic		( panic, panic# )
 
 #if __GLASGOW_HASKELL__ < 301
 import ArrBase	( Array(..) )
@@ -596,4 +596,18 @@ intSwitchSet lookup_fn switch
   = case (lookup_fn (switch (panic "intSwitchSet"))) of
       SwInt int -> Just int
       _	    	-> Nothing
+\end{code}
+
+\begin{code}
+startsWith, endsWith :: String -> String -> Maybe String
+
+startsWith []     str = Just str
+startsWith (c:cs) (s:ss)
+  = if c /= s then Nothing else startsWith cs ss
+startsWith  _	  []  = Nothing
+
+endsWith cs ss
+  = case (startsWith (reverse cs) (reverse ss)) of
+      Nothing -> Nothing
+      Just rs -> Just (reverse rs)
 \end{code}

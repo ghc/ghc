@@ -69,13 +69,13 @@ pprIfaceEnv = initCoreEnv pprIfaceBinder
 \end{code}
 
 \begin{code}
-instance Outputable b => Outputable (Bind b f) where
+instance Outputable b => Outputable (Bind b) where
     ppr bind = ppr_bind pprGenericEnv bind
 
-instance Outputable b => Outputable (Expr b f) where
+instance Outputable b => Outputable (Expr b) where
     ppr expr = ppr_expr pprGenericEnv expr
 
-pprGenericEnv :: Outputable b => PprEnv b f
+pprGenericEnv :: Outputable b => PprEnv b
 pprGenericEnv = initCoreEnv (\site -> ppr)
 \end{code}
 
@@ -120,14 +120,14 @@ pprTopBind pe (Rec binds)
 \end{code}
 
 \begin{code}
-ppr_bind :: PprEnv b f -> Bind b f -> SDoc
+ppr_bind :: PprEnv b -> Bind b -> SDoc
 
 ppr_bind pe (NonRec val_bdr expr) = ppr_binding_pe pe (val_bdr, expr)
 ppr_bind pe (Rec binds)  	  = vcat (map pp binds)
 				  where
 				    pp bind = ppr_binding_pe pe bind <> semi
 
-ppr_binding_pe :: PprEnv b f -> (b, Expr b f) -> SDoc
+ppr_binding_pe :: PprEnv b -> (b, Expr b) -> SDoc
 ppr_binding_pe pe (val_bdr, expr)
   = sep [pBndr pe LetBind val_bdr, 
 	 nest 2 (equals <+> ppr_expr pe expr)]
@@ -146,7 +146,7 @@ ppr_parend_expr pe expr
 \end{code}
 
 \begin{code}
-ppr_expr :: PprEnv b f -> Expr b f -> SDoc
+ppr_expr :: PprEnv b -> Expr b -> SDoc
 
 ppr_expr pe (Type ty)  = ptext SLIT("TYPE") <+> ppr ty	-- Wierd
 
@@ -305,7 +305,7 @@ pprUntypedBinder binder
 
 pprTypedBinder binder
   | isTyVar binder  = ptext SLIT("__a") <+> pprTyVarBndr binder
-  | otherwise	    = pprIdBndr binder <+> ptext SLIT("::") <+> pprParendType (idType binder)
+  | otherwise	    = pprIdBndr binder <+> dcolon <+> pprParendType (idType binder)
 	-- The space before the :: is important; it helps the lexer
 	-- when reading inferfaces.  Otherwise it would lex "a::b" as one thing.
 	--

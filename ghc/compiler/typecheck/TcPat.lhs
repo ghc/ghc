@@ -4,13 +4,15 @@
 \section[TcPat]{Typechecking patterns}
 
 \begin{code}
-module TcPat ( tcPat, tcVarPat, badFieldCon ) where
+module TcPat ( tcPat, tcVarPat, badFieldCon, polyPatSig ) where
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-}	TcExpr( tcExpr )
+
 import HsSyn		( InPat(..), OutPat(..), HsLit(..), HsExpr(..), Sig(..) )
 import RnHsSyn		( RenamedPat )
-import TcHsSyn		( TcPat, TcIdBndr )
+import TcHsSyn		( TcPat, TcId )
 
 import TcMonad
 import Inst		( Inst, OverloadedLit(..), InstOrigin(..),
@@ -20,10 +22,11 @@ import Inst		( Inst, OverloadedLit(..), InstOrigin(..),
 			)
 import Name		( Name, getOccName, getSrcLoc )
 import FieldLabel	( fieldLabelName )
-import TcEnv		( TcIdOcc(..), tcLookupGlobalValue, 
-			  tcLookupGlobalValueByKey, newLocalId, badCon
+import TcEnv		( tcLookupValue, 
+			  tcLookupValueByKey, newLocalId, badCon
 			)
 import TcType 		( TcType, TcTyVar, tcInstTyVars )
+import TcMonoType	( tcHsType )
 import TcUnify 		( unifyTauTy, unifyListTy,
 			  unifyTupleTy, unifyUnboxedTupleTy
 			)
@@ -31,8 +34,8 @@ import TcUnify 		( unifyTauTy, unifyListTy,
 import Bag		( Bag )
 import CmdLineOpts	( opt_IrrefutableTuples )
 import DataCon		( DataCon, dataConSig, dataConFieldLabels, dataConSourceArity )
-import Id		( Id, idType, isDataConId_maybe )
-import Type		( Type, substFlexiTy, substFlexiTheta, mkTyConApp )
+import Id		( Id, mkUserId, idType, isDataConId_maybe )
+import Type		( Type, isTauTy, substTopTy, substTopTheta, mkTyConApp )
 import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, addrPrimTy
 			)
@@ -52,10 +55,17 @@ import Outputable
 %************************************************************************
 
 \begin{code}
-tcVarPat :: (Name -> Maybe (TcIdBndr s))	-- Info about signatures
+tcVarPat :: (Name -> Maybe TcId) -- Info about signatures; gives the *monomorphic*
+				 -- Id for variables with a type signature
          -> Name
-         -> TcType s			-- Expected type
-         -> TcM s (TcIdBndr s)		-- The monomorphic Id; this is put in the pattern itself
+
+         -> TcType		-- Expected type, derived from the context
+				--	In the case of a function with a rank-2 signature,
+				--	this type might be a forall type.
+				--	INVARIANT: if it is, the foralls will always be visible,
+				--	not hidden inside a mutable type variable
+
+         -> TcM s TcId	-- The monomorphic Id; this is put in the pattern itself
 
 tcVarPat sig_fn binder_name pat_ty
  = case sig_fn binder_name of
@@ -63,7 +73,7 @@ tcVarPat sig_fn binder_name pat_ty
 		   returnTc bndr_id
 
 	Just bndr_id -> tcAddSrcLoc (getSrcLoc binder_name) 		$
-			unifyTauTy pat_ty (idType bndr_id) 		`thenTc_`
+			unifyTauTy (idType bndr_id) pat_ty 		`thenTc_`
 			returnTc bndr_id
 \end{code}
 
@@ -75,17 +85,22 @@ tcVarPat sig_fn binder_name pat_ty
 %************************************************************************
 
 \begin{code}
-tcPat :: (Name -> Maybe (TcIdBndr s))	-- Info about signatures
+tcPat :: (Name -> Maybe TcId)	-- Info about signatures; gives the *monomorphic*
+					-- Id for variables with a type signature
       -> RenamedPat
-      -> TcType s			-- Expected type
-      -> TcM s (TcPat s, 
-		LIE s,			-- Required by n+k and literal pats
-		Bag (TcTyVar s),	-- TyVars bound by the pattern
-		Bag (Name, TcIdBndr s),	-- Ids bound by the pattern, along with the Name under
+      -> TcType			-- Expected type; see invariant in tcVarPat
+      -> TcM s (TcPat, 
+		LIE,			-- Required by n+k and literal pats
+		Bag TcTyVar,	-- TyVars bound by the pattern
+					-- 	These are just the existentially-bound ones.
+					--	Any tyvars bound by *type signatures* in the
+					-- 	patterns are brought into scope before we begin.
+		Bag (Name, TcId),	-- Ids bound by the pattern, along with the Name under
 					--	which it occurs in the pattern
 					-- 	The two aren't the same because we conjure up a new
 					-- 	local name for each variable.
-		LIE s)			-- Dicts or methods [see below] bound by the pattern
+		LIE)			-- Dicts or methods [see below] bound by the pattern
+					-- 	from existential constructor patterns
 \end{code}
 
 
@@ -98,7 +113,7 @@ tcPat :: (Name -> Maybe (TcIdBndr s))	-- Info about signatures
 \begin{code}
 tcPat sig_fn (VarPatIn name) pat_ty
   = tcVarPat sig_fn name pat_ty		`thenTc` \ bndr_id ->
-    returnTc (VarPat (TcId bndr_id), emptyLIE, emptyBag, unitBag (name, bndr_id), emptyLIE)
+    returnTc (VarPat bndr_id, emptyLIE, emptyBag, unitBag (name, bndr_id), emptyLIE)
 
 tcPat sig_fn (LazyPatIn pat) pat_ty
   = tcPat sig_fn pat pat_ty		`thenTc` \ (pat', lie_req, tvs, ids, lie_avail) ->
@@ -108,9 +123,8 @@ tcPat sig_fn pat_in@(AsPatIn name pat) pat_ty
   = tcVarPat sig_fn name pat_ty		`thenTc` \ bndr_id ->
     tcPat sig_fn pat pat_ty		`thenTc` \ (pat', lie_req, tvs, ids, lie_avail) ->
     tcAddErrCtxt (patCtxt pat_in) 	$
-    returnTc (AsPat (TcId bndr_id) pat', lie_req, 
-	      tvs, (name, bndr_id) `consBag` ids, 
-	      lie_avail)
+    returnTc (AsPat bndr_id pat', lie_req, 
+	      tvs, (name, bndr_id) `consBag` ids, lie_avail)
 
 tcPat sig_fn WildPatIn pat_ty
   = returnTc (WildPat pat_ty, emptyLIE, emptyBag, emptyBag, emptyLIE)
@@ -124,6 +138,16 @@ tcPat sig_fn (NegPatIn pat) pat_ty
 
 tcPat sig_fn (ParPatIn parend_pat) pat_ty
   = tcPat sig_fn parend_pat pat_ty
+
+tcPat sig_fn (SigPatIn pat sig) pat_ty
+  = tcHsType sig					`thenTc` \ sig_ty ->
+
+	-- Check that the signature isn't a polymorphic one, which
+	-- we don't permit (at present, anyway)
+    checkTc (isTauTy sig_ty) (polyPatSig sig_ty)	`thenTc_`
+
+    unifyTauTy pat_ty sig_ty	`thenTc_`
+    tcPat sig_fn pat sig_ty
 \end{code}
 
 %************************************************************************
@@ -222,7 +246,7 @@ tcPat sig_fn pat@(RecPatIn name rpats) pat_ty
       = ASSERT( null extras )
 	tc_fields field_tys rpats	`thenTc` \ (rpats', lie_req1, tvs1, ids1, lie_avail1) ->
 
-	tcLookupGlobalValue field_label	`thenNF_Tc` \ sel_id ->
+	tcLookupValue field_label	`thenNF_Tc` \ sel_id ->
 	tcPat sig_fn rhs_pat rhs_ty	`thenTc` \ (rhs_pat', lie_req2, tvs2, ids2, lie_avail2) ->
 
 	returnTc ((sel_id, rhs_pat', pun_flag) : rpats',
@@ -262,9 +286,8 @@ tcPat sig_fn (LitPatIn lit@(HsLitLit s))     pat_ty = tcSimpleLitPat lit intTy p
 \begin{code}
 tcPat sig_fn pat@(LitPatIn lit@(HsString str)) pat_ty
   = unifyTauTy pat_ty stringTy			`thenTc_` 
-    tcLookupGlobalValueByKey eqClassOpKey	`thenNF_Tc` \ sel_id ->
-    newMethod (PatOrigin pat) 
-	      (RealId sel_id) [stringTy]	`thenNF_Tc` \ (lie, eq_id) ->
+    tcLookupValueByKey eqClassOpKey		`thenNF_Tc` \ sel_id ->
+    newMethod (PatOrigin pat) sel_id [stringTy]	`thenNF_Tc` \ (lie, eq_id) ->
     let
 	comp_op = HsApp (HsVar eq_id) (HsLitOut lit stringTy)
     in
@@ -280,16 +303,16 @@ tcPat sig_fn pat@(LitPatIn lit@(HsFrac f)) pat_ty
 
 tcPat sig_fn pat@(NPlusKPatIn name lit@(HsInt i)) pat_ty
   = tcVarPat sig_fn name pat_ty				`thenTc` \ bndr_id ->
-    tcLookupGlobalValueByKey geClassOpKey		`thenNF_Tc` \ ge_sel_id ->
-    tcLookupGlobalValueByKey minusClassOpKey		`thenNF_Tc` \ minus_sel_id ->
+    tcLookupValueByKey geClassOpKey		`thenNF_Tc` \ ge_sel_id ->
+    tcLookupValueByKey minusClassOpKey		`thenNF_Tc` \ minus_sel_id ->
 
     newOverloadedLit origin
 		     (OverloadedIntegral i) pat_ty	`thenNF_Tc` \ (over_lit_expr, lie1) ->
 
-    newMethod origin (RealId ge_sel_id)    [pat_ty]	`thenNF_Tc` \ (lie2, ge_id) ->
-    newMethod origin (RealId minus_sel_id) [pat_ty]	`thenNF_Tc` \ (lie3, minus_id) ->
+    newMethod origin ge_sel_id    [pat_ty]	`thenNF_Tc` \ (lie2, ge_id) ->
+    newMethod origin minus_sel_id [pat_ty]	`thenNF_Tc` \ (lie3, minus_id) ->
 
-    returnTc (NPlusKPat (TcId bndr_id) lit pat_ty
+    returnTc (NPlusKPat bndr_id lit pat_ty
 			(SectionR (HsVar ge_id) over_lit_expr)
 			(SectionR (HsVar minus_id) over_lit_expr),
 	      lie1 `plusLIE` lie2 `plusLIE` lie3,
@@ -310,13 +333,13 @@ tcPat sig_fn (NPlusKPatIn pat other) pat_ty
 Helper functions
 
 \begin{code}
-tcPats :: (Name -> Maybe (TcIdBndr s))	-- Info about signatures
-       -> [RenamedPat] -> [TcType s]	-- Excess 'expected types' discarded
-       -> TcM s ([TcPat s], 
-		 LIE s,				-- Required by n+k and literal pats
-		 Bag (TcTyVar s),
-		 Bag (Name, TcIdBndr s),	-- Ids bound by the pattern
-		 LIE s)				-- Dicts bound by the pattern
+tcPats :: (Name -> Maybe TcId)	-- Info about signatures
+       -> [RenamedPat] -> [TcType]	-- Excess 'expected types' discarded
+       -> TcM s ([TcPat], 
+		 LIE,				-- Required by n+k and literal pats
+		 Bag TcTyVar,
+		 Bag (Name, TcId),	-- Ids bound by the pattern
+		 LIE)				-- Dicts bound by the pattern
 
 tcPats sig_fn [] tys = returnTc ([], emptyLIE, emptyBag, emptyBag, emptyLIE)
 
@@ -338,8 +361,8 @@ tcSimpleLitPat lit lit_ty pat_ty
 
 tcOverloadedLitPat pat lit over_lit pat_ty
   = newOverloadedLit (PatOrigin pat) over_lit pat_ty	`thenNF_Tc` \ (over_lit_expr, lie1) ->
-    tcLookupGlobalValueByKey eqClassOpKey		`thenNF_Tc` \ eq_sel_id ->
-    newMethod origin (RealId eq_sel_id) [pat_ty]	`thenNF_Tc` \ (lie2, eq_id) ->
+    tcLookupValueByKey eqClassOpKey			`thenNF_Tc` \ eq_sel_id ->
+    newMethod origin eq_sel_id [pat_ty]			`thenNF_Tc` \ (lie2, eq_id) ->
 
     returnTc (NPat lit pat_ty (HsApp (HsVar eq_id)
 				     over_lit_expr),
@@ -353,7 +376,7 @@ tcOverloadedLitPat pat lit over_lit pat_ty
 \begin{code}
 tcConstructor pat con_name pat_ty
   = 	-- Check that it's a constructor
-    tcLookupGlobalValue con_name		`thenNF_Tc` \ con_id ->
+    tcLookupValue con_name		`thenNF_Tc` \ con_id ->
     case isDataConId_maybe con_id of {
 	Nothing -> failWithTc (badCon con_id);
  	Just data_con ->
@@ -367,8 +390,8 @@ tcConstructor pat con_name pat_ty
     in
     tcInstTyVars (ex_tvs ++ tvs)	`thenNF_Tc` \ (all_tvs', ty_args', tenv) ->
     let
-	ex_theta' = substFlexiTheta tenv ex_theta
-	arg_tys'  = map (substFlexiTy tenv) arg_tys
+	ex_theta' = substTopTheta tenv ex_theta
+	arg_tys'  = map (substTopTy tenv) arg_tys
 
 	n_ex_tvs  = length ex_tvs
 	ex_tvs'   = take n_ex_tvs all_tvs'
@@ -432,5 +455,10 @@ badFieldCon :: Name -> Name -> SDoc
 badFieldCon con field
   = hsep [ptext SLIT("Constructor") <+> quotes (ppr con),
 	  ptext SLIT("does not have field"), quotes (ppr field)]
+
+polyPatSig :: TcType -> SDoc
+polyPatSig sig_ty
+  = hang (ptext SLIT("Polymorphic type signature in pattern"))
+	 4 (ppr sig_ty)
 \end{code}
 

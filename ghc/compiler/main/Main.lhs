@@ -27,6 +27,7 @@ import CodeGen		( codeGen )
 import AsmCodeGen	( dumpRealAsm, writeRealAsm )
 #endif
 
+import OccName		( Module, moduleString )
 import AbsCSyn		( absCNop )
 import AbsCUtils	( flattenAbsC )
 import CmdLineOpts
@@ -101,7 +102,7 @@ doIt (core_cmds, stg_cmds)
     case maybe_rn_stuff of {
 	Nothing -> 	-- Hurrah!  Renamer reckons that there's no need to
 			-- go any further
-			reportCompile (_UNPK_ mod_name) "Compilation NOT required!" >>
+			reportCompile mod_name "Compilation NOT required!" >>
 			return ();
 	
 	Just (rn_mod, iface_file_stuff, rn_name_supply, imported_modules) ->
@@ -126,10 +127,8 @@ doIt (core_cmds, stg_cmds)
 	Just (all_binds,
 	      local_tycons, local_classes, inst_info, 
 	      fo_decls,
-	      ddump_deriv,
 	      global_env,
 	      global_ids) ->
-
 
     -- ******* DESUGARER
     show_pass "DeSugar"					    >>
@@ -143,7 +142,7 @@ doIt (core_cmds, stg_cmds)
     let
 	local_data_tycons = filter isDataTyCon local_tycons
     in
-    core2core core_cmds mod_name
+    core2core core_cmds mod_name local_classes
 	      sm_uniqs desugared
 						>>=
 	 \ simplified ->
@@ -195,6 +194,8 @@ doIt (core_cmds, stg_cmds)
 
     	flat_abstractC = flattenAbsC fl_uniqs abstractC
     in
+    dumpIfSet opt_D_dump_absC "Abstract C" (dumpRealC abstractC) >>
+
     show_pass "CodeOutput" 			>>
     _scc_     "CodeOutput"
     -- You can have C (c_output) or assembly-language (ncg_output),
@@ -241,7 +242,7 @@ doIt (core_cmds, stg_cmds)
     dumpIfSet opt_D_dump_realC "Real C" c_output_d 	>>
     doOutput opt_ProduceC c_output_w 			>>
 
-    reportCompile (_UNPK_ mod_name) (showSDoc (ppSourceStats True rdr_module)) >>
+    reportCompile mod_name (showSDoc (ppSourceStats True rdr_module)) >>
 
     ghcExit 0
     } }
@@ -271,7 +272,7 @@ doIt (core_cmds, stg_cmds)
 	  Nothing    -> return ()
 	  Just fname -> writeFile fname ("#include \"Rts.h\"\n#include \"RtsAPI.h\"\n"++rest)
 	    where
-	     rest = "#include "++show ((_UNPK_ mod_name) ++ "_stub.h") ++ '\n':doc_str
+	     rest = "#include "++show (moduleString mod_name ++ "_stub.h") ++ '\n':doc_str
 	      
     outputHStub switch "" = return ()
     outputHStub switch doc_str
@@ -279,7 +280,7 @@ doIt (core_cmds, stg_cmds)
 	  Nothing    -> return ()
 	  Just fname -> writeFile fname ("#include \"Rts.h\"\n"++doc_str)
 
-ppSourceStats short (HsModule name version exports imports fixities decls src_loc)
+ppSourceStats short (HsModule name version exports imports decls src_loc)
  = (if short then hcat else vcat)
         (map pp_val
 	       [("ExportAll        ", export_all), -- 1 if no export list
@@ -321,15 +322,13 @@ ppSourceStats short (HsModule name version exports imports fixities decls src_lo
     
     trim ls     = takeWhile (not.isSpace) (dropWhile isSpace ls)
 
-    fixity_ds   = length fixities
-    type_decls 	= [d | TyD d@(TySynonym _ _ _ _)    <- decls]
-    data_decls 	= [d | TyD d@(TyData DataType _ _ _ _ _ _ _) <- decls]
-    newt_decls 	= [d | TyD d@(TyData NewType  _ _ _ _ _ _ _) <- decls]
-    type_ds	= length type_decls
-    data_ds	= length data_decls
-    newt_ds	= length newt_decls
-    class_decls = [d | ClD d <- decls]
-    class_ds    = length class_decls
+    fixity_ds   = length [() | FixD d <- decls]
+		-- NB: this omits fixity decls on local bindings and
+		-- in class decls.  ToDo
+
+    tycl_decls  = [d | TyClD d <- decls]
+    (class_ds, data_ds, newt_ds, type_ds) = countTyClDecls tycl_decls
+
     inst_decls  = [d | InstD d <- decls]
     inst_ds     = length inst_decls
     default_ds  = length [() | DefD _ <- decls]
@@ -347,9 +346,9 @@ ppSourceStats short (HsModule name version exports imports fixities decls src_lo
     (import_no, import_qual, import_as, import_all, import_partial, import_hiding)
 	= foldr add6 (0,0,0,0,0,0) (map import_info imports)
     (data_constrs, data_derivs)
-	= foldr add2 (0,0) (map data_info (newt_decls ++ data_decls))
+	= foldr add2 (0,0) (map data_info tycl_decls)
     (class_method_ds, default_method_ds)
-	= foldr add2 (0,0) (map class_info class_decls)
+	= foldr add2 (0,0) (map class_info tycl_decls)
     (inst_method_ds, method_specs, method_inlines)
 	= foldr add3 (0,0,0) (map inst_info inst_decls)
 
@@ -359,11 +358,11 @@ ppSourceStats short (HsModule name version exports imports fixities decls src_lo
     count_binds (MonoBind b sigs _) = case (count_monobinds b, count_sigs sigs) of
 				        ((vs,fs),(ts,_,ss,is)) -> (vs,fs,ts,ss,is)
 
-    count_monobinds EmptyMonoBinds	  = (0,0)
-    count_monobinds (AndMonoBinds b1 b2)  = count_monobinds b1 `add2` count_monobinds b2
+    count_monobinds EmptyMonoBinds	  	   = (0,0)
+    count_monobinds (AndMonoBinds b1 b2)  	   = count_monobinds b1 `add2` count_monobinds b2
     count_monobinds (PatMonoBind (VarPatIn n) r _) = (1,0)
-    count_monobinds (PatMonoBind p r _)   = (0,1)
-    count_monobinds (FunMonoBind f _ m _) = (0,1)
+    count_monobinds (PatMonoBind p r _)            = (0,1)
+    count_monobinds (FunMonoBind f _ m _)          = (0,1)
 
     count_sigs sigs = foldr add4 (0,0,0,0) (map sig_info sigs)
 
@@ -385,11 +384,13 @@ ppSourceStats short (HsModule name version exports imports fixities decls src_lo
 
     data_info (TyData _ _ _ _ constrs derivs _ _)
 	= (length constrs, case derivs of {Nothing -> 0; Just ds -> length ds})
+    data_info other = (0,0)
 
     class_info (ClassDecl _ _ _ meth_sigs def_meths _ _ _ _)
 	= case count_sigs meth_sigs of
 	    (_,classops,_,_) ->
 	       (classops, addpr (count_monobinds def_meths))
+    class_info other = (0,0)
 
     inst_info (InstDecl _ inst_meths inst_sigs _ _)
 	= case count_sigs inst_sigs of
@@ -420,14 +421,14 @@ compiler_version =
 \end{code}
 
 \begin{code}
-reportCompile :: String -> String -> IO ()
+reportCompile :: Module -> String -> IO ()
 #if REPORT_TO_MOTHERLODE && __GLASGOW_HASKELL__ >= 303
 reportCompile mod_name info
   | not opt_ReportCompile = return ()
   | otherwise = (do 
       sock <- udpSocket 0
       addr <- motherShip
-      sendTo sock (mod_name++ ';': compiler_version ++ ';': os ++ ';':arch ++ '\n':' ':info ++ "\n") addr
+      sendTo sock (moduleString mod_name ++ ';': compiler_version ++ ';': os ++ ';':arch ++ '\n':' ':info ++ "\n") addr
       return ()) `catch` (\ _ -> return ())
 
 motherShip :: IO SockAddr

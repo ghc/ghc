@@ -7,7 +7,7 @@
 module CoreUtils (
 	IdSubst, SubstCoreExpr(..),
 
-	coreExprType, exprFreeVars, exprSomeFreeVars,
+	coreExprType, coreAltsType, exprFreeVars, exprSomeFreeVars,
 
 	exprIsBottom, exprIsDupable, exprIsTrivial, exprIsWHNF, exprIsCheap,
 	FormSummary(..), mkFormSummary, whnfOrBottom,
@@ -30,7 +30,7 @@ import VarSet
 import VarEnv
 import Name		( isLocallyDefined )
 import Const		( Con(..), isWHNFCon, conIsTrivial, conIsCheap )
-import Id		( Id, idType, setIdType, idUnique, isBottomingId, 
+import Id		( Id, idType, setIdType, idUnique, idAppIsBottom,
 			  getIdArity, idFreeTyVars,
 			  getIdSpecialisation, setIdSpecialisation,
 			  getInlinePragma, setInlinePragma,
@@ -73,14 +73,12 @@ data SubstCoreExpr
 \begin{code}
 coreExprType :: CoreExpr -> Type
 
-coreExprType (Var var)		      = idType var
-coreExprType (Let _ body)	      = coreExprType body
-coreExprType (Case _ _ ((_,_,rhs):_)) = coreExprType rhs
-
+coreExprType (Var var)		    = idType var
+coreExprType (Let _ body)	    = coreExprType body
+coreExprType (Case _ _ alts)        = coreAltsType alts
 coreExprType (Note (Coerce ty _) e) = ty
 coreExprType (Note other_note e)    = coreExprType e
-
-coreExprType e@(Con con args) = applyTypeToArgs e (conType con) args
+coreExprType e@(Con con args)       = applyTypeToArgs e (conType con) args
 
 coreExprType (Lam binder expr)
   | isId binder    = idType binder `mkFunTy` coreExprType expr
@@ -91,6 +89,9 @@ coreExprType e@(App _ _)
 	(fun, args) -> applyTypeToArgs e (coreExprType fun) args
 
 coreExprType other = pprTrace "coreExprType" (ppr other) alphaTy
+
+coreAltsType :: [CoreAlt] -> Type
+coreAltsType ((_,_,rhs) : _) = coreExprType rhs
 \end{code}
 
 \begin{code}
@@ -163,8 +164,8 @@ mkFormSummary expr
     go n (App fun (Type _)) = go n fun		-- Ignore type args
     go n (App fun arg)      = go (n+1) fun
 
-    go n (Var f) | isBottomingId f = BottomForm
-    go 0 (Var f)		   = VarForm
+    go n (Var f) | idAppIsBottom f n = BottomForm
+    go 0 (Var f)		     = VarForm
     go n (Var f) | n < arityLowerBound (getIdArity f) = ValueForm
 		 | otherwise			      = OtherForm
 \end{code}
@@ -250,10 +251,11 @@ exprIsCheap (Case scrut _ alts) = exprIsCheap scrut &&
 exprIsCheap other_expr   -- look for manifest partial application
   = case collectArgs other_expr of
 
-      (Var f, _) | isBottomingId f -> True	-- Application of a function which
-					-- always gives bottom; we treat this as
-					-- a WHNF, because it certainly doesn't
-					-- need to be shared!
+      (Var f, args) |  idAppIsBottom f (length args)
+		    -> True	-- Application of a function which
+				-- always gives bottom; we treat this as
+				-- a WHNF, because it certainly doesn't
+				-- need to be shared!
 
       (Var f, args) ->
 		let
@@ -270,13 +272,16 @@ exprIsCheap other_expr   -- look for manifest partial application
 
 \begin{code}
 exprIsBottom :: CoreExpr -> Bool	-- True => definitely bottom
-exprIsBottom (Note _ e)   = exprIsBottom e
-exprIsBottom (Let _ e)    = exprIsBottom e
-exprIsBottom (Case e _ _) = exprIsBottom e	-- Just chek the scrut
-exprIsBottom (Con _ _)    = False
-exprIsBottom (App e _)    = exprIsBottom e
-exprIsBottom (Var v)      = isBottomingId v
-exprIsBottom (Lam _ _)	  = False
+exprIsBottom e = go 0 e
+	       where
+		-- n is the number of args
+		 go n (Note _ e)   = go n e
+		 go n (Let _ e)    = go n e
+		 go n (Case e _ _) = go 0 e	-- Just check the scrut
+		 go n (App e _)    = go (n+1) e
+		 go n (Var v)      = idAppIsBottom v n
+		 go n (Con _ _)    = False
+		 go n (Lam _ _)	   = False
 \end{code}
 
 exprIsWHNF reports True for head normal forms.  Note that does not necessarily
@@ -313,7 +318,7 @@ exprIsWHNF e@(App _ _)        = case collectArgs e of
 I don't like this function but I'n not confidnt enough to change it.
 
 \begin{code}
-squashableDictishCcExpr :: CostCentre -> Expr b f -> Bool
+squashableDictishCcExpr :: CostCentre -> Expr b -> Bool
 squashableDictishCcExpr cc expr
   | isDictCC cc = False		-- that was easy...
   | otherwise   = squashable expr
@@ -331,7 +336,7 @@ squashableDictishCcExpr cc expr
 	False => may or may not be equal
 
 \begin{code}
-cheapEqExpr :: Expr b f -> Expr b f -> Bool
+cheapEqExpr :: Expr b -> Expr b -> Bool
 
 cheapEqExpr (Var v1) (Var v2) = v1==v2
 cheapEqExpr (Con con1 args1) (Con con2 args2)

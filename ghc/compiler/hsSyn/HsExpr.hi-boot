@@ -2,5 +2,5 @@ _interface_ HsExpr 1
 _exports_
 HsExpr HsExpr pprExpr;
 _declarations_
-1 data HsExpr f i p;
-1 pprExpr _:_ _forall_ [i p f] {Name.NamedThing i, Outputable.Outputable i, Outputable.Outputable p} => HsExpr.HsExpr f i p -> Outputable.SDoc ;;
+1 data HsExpr i p;
+1 pprExpr _:_ _forall_ [i p] {Name.NamedThing i, Outputable.Outputable i, Outputable.Outputable p} => HsExpr.HsExpr i p -> Outputable.SDoc ;;

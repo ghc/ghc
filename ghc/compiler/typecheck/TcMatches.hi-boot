@@ -1,0 +1,16 @@
+_interface_ TcMatches 2
+_exports_
+TcMatches tcGRHSs tcMatchesFun;
+_declarations_
+2 tcGRHSs _:_ _forall_ [s] => 
+	      RnHsSyn.RenamedGRHSs
+	      -> TcMonad.TcType
+	      -> HsExpr.StmtCtxt
+	      -> TcMonad.TcM s (TcHsSyn.TcGRHSs, Inst.LIE) ;;
+3 tcMatchesFun _:_ _forall_ [s] => 
+		[(Name.Name,Var.Id)]
+	     ->	Name.Name
+	     -> TcMonad.TcType
+	     -> [RnHsSyn.RenamedMatch]
+	     -> TcMonad.TcM s ([TcHsSyn.TcMatch], Inst.LIE) ;;
+

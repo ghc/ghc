@@ -26,12 +26,14 @@ static void pid	    PROTO( (id) );
 static void plist   PROTO( (void (*)(/*NOT WORTH IT: void * */), list) );
 static void pmaybe  PROTO( (void (*)(), maybe) );
 static void pmaybe_list  PROTO( (void (*)(), maybe) );
-static void ppbinding PROTO((pbinding));
 /* static void ppragma PROTO( (hpragma) ); */
 static void pqid    PROTO( (qid) );
 static void prbind  PROTO( (binding) );
 static void pstr    PROTO( (char *) );
 static void ptree   PROTO( (tree) );
+static void ppgdexp  PROTO( (gdexp) );
+static void pgrhsb  PROTO( (grhsb) );
+static void ppmatch  PROTO( (match) );
 static void pttype  PROTO( (ttype) );
 static void plineno PROTO( (long) );
 
@@ -187,11 +189,6 @@ again:
 		      plist(prbind, ghimplist(t));
 		      pmaybe_list(pentid, ghexplist(t));
 		      break;
-      case fixop:     
-		      PUTTAG('I');
-	              pqid(gfixop(t));
-		      printf("%lu\t%lu",gfixinfx(t),gfixprec(t));
-		      break;
       case ident: 
 		      PUTTAG('i');
 		      pqid(gident(t));
@@ -218,9 +215,7 @@ again:
 		      break;
       case lambda: 
 		      PUTTAG('l');
-		      plineno(glamline(t));
-		      plist(ptree,glampats(t));
-		      ptree(glamexpr(t));
+		      ppmatch(glammatch(t));
 		      break;
 
       case let: 
@@ -232,7 +227,7 @@ again:
 		      PUTTAG('c');
 		      plineno(gcaseline(t));
 		      ptree(gcaseexpr(t));
-		      plist(ppbinding, gcasebody(t));
+		      plist(ppmatch, gcasebody(t));
 		      break;
       case ife:
 		      PUTTAG('b');
@@ -448,13 +443,14 @@ prbind(b)
 			  break;
 	case pbind	: 
 			  PUTTAG('p');
+			  ptree( gpbindl(b) );
+			  pgrhsb( gpbindr(b) );
 			  plineno(gpline(b));
-			  plist(ppbinding, gpbindl(b));
 			  break;
 	case fbind	: 
 			  PUTTAG('f');
+			  plist(ppmatch, gfbindm(b));
 			  plineno(gfline(b));
-			  plist(ppbinding, gfbindl(b));
 			  break;
 	case abind	: 
 			  PUTTAG('A');
@@ -493,6 +489,12 @@ prbind(b)
 	case nullbind	:
 			  PUTTAG('B');
 			  break;
+
+        case fixd:     
+		      PUTTAG('I');
+	              pqid(gfixop(b));
+		      printf("%lu\t%lu",gfixinfx(b),gfixprec(b));
+		      break;
 
 	case import:	  
 			  PUTTAG('e');
@@ -665,36 +667,9 @@ pentid(i)
 }
 
 
-static void
-ppbinding(p)
-  pbinding p;
-{
-	switch(tpbinding(p)) {
-	case pgrhs	: PUTTAG('W');
-  			  plineno(ggline(p));
-	  		  pqid(ggfuncname(p));
-			  ptree(ggpat(p));
-			  ppbinding(ggdexprs(p));
-	  		  prbind(ggbind(p));
-	  		  break;
-        case pnoguards  :
-			  PUTTAG('6');
-			  ptree(gpnoguard(p));
-			  break;
-	case pguards    :
-			  PUTTAG('9');
-			  plist(ptree, gpguards(p));
-			  break;
-	case pgdexp	: 
-			  PUTTAG('&');
-			  plist(ptree, gpguard(p)); /* Experimental: pattern guards */
-			  ptree(gpexp(p));
-			  break;
-	default	        :
-			  error("Bad pbinding");
-	}
-}
-
+static void ppmatch(l) match l; { fprintf( stderr, "printtree.c: ppmatch" ); }
+static void ppgdexp(l) gdexp l; { fprintf( stderr, "printtree.c: ppgdexp" ); }
+static void pgrhsb(l) grhsb l; { fprintf( stderr, "printtree.c: pgrhsb" ); }
 
 static void
 pgrhses(l)

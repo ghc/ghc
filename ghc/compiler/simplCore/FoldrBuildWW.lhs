@@ -11,7 +11,7 @@ module FoldrBuildWW ( mkFoldrBuildWW ) where
 -- Just a stub for now
 import CoreSyn		( CoreBind )
 import UniqSupply	( UniqSupply )
-import Util		( panic )
+import Panic		( panic )
 
 --import Type		( cloneTyVarFromTemplate, mkTyVarTy,
 --			  splitFunTyExpandingDicts, eqTyCon,  mkForallTy )

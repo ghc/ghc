@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.15 1998/12/02 13:17:50 simonm Exp $
+% $Id: CgMonad.lhs,v 1.16 1998/12/18 17:40:52 simonpj Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -50,6 +50,7 @@ import AbsCSyn
 import AbsCUtils	( mkAbsCStmts )
 import CmdLineOpts	( opt_SccProfilingOn, opt_DoTickyProfiling )
 import CLabel           ( CLabel, mkUpdEntryLabel )
+import OccName		( Module )
 import DataCon		( ConTag )
 import Id		( Id )
 import VarEnv
@@ -86,7 +87,7 @@ data CgInfoDownwards	-- information only passed *downwards* by the monad
 
 data CompilationInfo
   = MkCompInfo
-	FAST_STRING	-- the module name
+	Module		-- the module name
 
 data CgState
   = MkCgState
@@ -533,7 +534,7 @@ getAbsC code info_down (MkCgState absC binds usage)
 
 \begin{code}
 
-moduleName :: FCode FAST_STRING
+moduleName :: FCode Module
 moduleName (MkCgInfoDown (MkCompInfo mod_name) _ _ _) state
   = (mod_name, state)
 

@@ -123,9 +123,9 @@ module TcSimplify (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_MaxContextReductionDepth )
+import CmdLineOpts	( opt_MaxContextReductionDepth, opt_GlasgowExts )
 import HsSyn		( MonoBinds(..), HsExpr(..), andMonoBinds, andMonoBindList )
-import TcHsSyn		( TcExpr, TcIdOcc(..), TcIdBndr, 
+import TcHsSyn		( TcExpr, TcId, 
 			  TcMonoBinds, TcDictBinds
 			)
 
@@ -140,7 +140,7 @@ import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  Inst, LIE, pprInsts, pprInstsInFull, mkLIE, emptyLIE, 
 			  plusLIE, pprOrigin
 			)
-import TcEnv		( TcIdOcc(..), tcGetGlobalTyVars )
+import TcEnv		( tcGetGlobalTyVars )
 import TcType		( TcType, TcTyVarSet, typeToTcType )
 import TcUnify		( unifyTauTy )
 import Id		( idType )
@@ -151,8 +151,7 @@ import Class		( Class, ClassInstEnv, classBigSig, classInstEnv )
 import PrelInfo		( isNumericClass, isCreturnableClass )
 
 import Type		( Type, ThetaType, TauType, mkTyVarTy, getTyVar,
-			  isTyVarTy, substFlexiTheta, splitSigmaTy,
-			  tyVarsOfTypes
+			  isTyVarTy, substTopTheta, splitSigmaTy, tyVarsOfTypes
 			)
 import PprType		( pprConstraint )
 import TysWiredIn	( unitTy )
@@ -184,12 +183,12 @@ float them out if poss, after inlinings are sorted out.
 tcSimplify
 	:: SDoc 
 	-> TopLevelFlag
-	-> TcTyVarSet s			-- ``Local''  type variables
+	-> TcTyVarSet			-- ``Local''  type variables
 					-- ASSERT: this tyvar set is already zonked
-	-> LIE s			-- Wanted
-	-> TcM s (LIE s,			-- Free
-		  TcDictBinds s,		-- Bindings
-		  LIE s)			-- Remaining wanteds; no dups
+	-> LIE			-- Wanted
+	-> TcM s (LIE,			-- Free
+		  TcDictBinds,		-- Bindings
+		  LIE)			-- Remaining wanteds; no dups
 
 tcSimplify str top_lvl local_tvs wanted_lie
   | isEmptyVarSet local_tvs
@@ -251,12 +250,12 @@ some of constant insts, which have to be resolved finally at the end.
 \begin{code}
 tcSimplifyAndCheck
 	 :: SDoc 
-	 -> TcTyVarSet s		-- ``Local''  type variables
-					-- ASSERT: this tyvar set is already zonked
-	 -> LIE s			-- Given; constrain only local tyvars
-	 -> LIE s			-- Wanted
-	 -> TcM s (LIE s,		-- Free
-		   TcDictBinds s)	-- Bindings
+	 -> TcTyVarSet		-- ``Local''  type variables
+				-- ASSERT: this tyvar set is already zonked
+	 -> LIE			-- Given; constrain only local tyvars
+	 -> LIE			-- Wanted
+	 -> TcM s (LIE,		-- Free
+		   TcDictBinds)	-- Bindings
 
 tcSimplifyAndCheck str local_tvs given_lie wanted_lie
   | isEmptyVarSet local_tvs
@@ -275,6 +274,7 @@ tcSimplifyAndCheck str local_tvs given_lie wanted_lie
   where
     givens  = bagToList given_lie
     wanteds = bagToList wanted_lie
+    given_dicts = filter isDict givens
 
     try_me inst 
       -- Does not constrain a local tyvar
@@ -287,7 +287,7 @@ tcSimplifyAndCheck str local_tvs given_lie wanted_lie
       = ReduceMe AddToIrreds
 
     complain dict = mapNF_Tc zonkInst givens	`thenNF_Tc` \ givens ->
-		    addNoInstanceErr str givens dict
+		    addNoInstanceErr str given_dicts dict
 \end{code}
 
 
@@ -310,6 +310,13 @@ data WhatToDo
 
  | FreeIfTautological	  -- Return as free iff it's tautological; 
 			  -- if not, return as irreducible
+	-- The FreeIfTautological case is to allow the possibility
+	-- of generating functions with types like
+	--	f :: C Int => Int -> Int
+	-- Here, the C Int isn't a tautology presumably because Int
+	-- isn't an instance of C in this module; but perhaps it will
+	-- be at f's call site(s).  Haskell doesn't allow this at
+	-- present.
 
 data NoInstanceAction
   = Stop		-- Fail; no error message
@@ -325,26 +332,26 @@ data NoInstanceAction
 \begin{code}
 type RedState s
   = (Avails s,		-- What's available
-     [Inst s],		-- Insts for which try_me returned Free
-     [Inst s]		-- Insts for which try_me returned DontReduce
+     [Inst],		-- Insts for which try_me returned Free
+     [Inst]		-- Insts for which try_me returned DontReduce
     )
 
-type Avails s = FiniteMap (Inst s) (Avail s)
+type Avails s = FiniteMap Inst Avail
 
-data Avail s
+data Avail
   = Avail
-	(TcIdOcc s)	-- The "main Id"; that is, the Id for the Inst that 
+	TcId		-- The "main Id"; that is, the Id for the Inst that 
 			-- caused this avail to be put into the finite map in the first place
 			-- It is this Id that is bound to the RHS.
 
-	(RHS s)	        -- The RHS: an expression whose value is that Inst.
+	RHS	        -- The RHS: an expression whose value is that Inst.
 			-- The main Id should be bound to this RHS
 
-	[TcIdOcc s]	-- Extra Ids that must all be bound to the main Id.
+	[TcId]	-- Extra Ids that must all be bound to the main Id.
 			-- At the end we generate a list of bindings
 			--	 { i1 = main_id; i2 = main_id; i3 = main_id; ... }
 
-data RHS s
+data RHS
   = NoRhs		-- Used for irreducible dictionaries,
 			-- which are going to be lambda bound, or for those that are
 			-- suppplied as "given" when checking againgst a signature.
@@ -353,7 +360,7 @@ data RHS s
 			-- where no witness is required.
 
   | Rhs 		-- Used when there is a RHS 
-	(TcExpr s)	 
+	TcExpr	 
 	Bool		-- True => the RHS simply selects a superclass dictionary
 			--	   from a subclass dictionary.
 			-- False => not so.  
@@ -365,8 +372,8 @@ data RHS s
 			-- an (Ord t) dictionary; then we put an (Eq t) entry in
 			-- the finite map, with an PassiveScSel.  Then if the
 			-- the (Eq t) binding is ever *needed* we make it an Rhs
-	(TcExpr s)
-	[Inst s]	-- List of Insts that are free in the RHS.
+	TcExpr
+	[Inst]	-- List of Insts that are free in the RHS.
 			-- If the main Id is subsequently needed, we toss this list into
 			-- the needed-inst pool so that we make sure their bindings
 			-- will actually be produced.
@@ -394,12 +401,12 @@ pprRhs (PassiveScSel rhs is) = text "passive" <+> ppr rhs
 The main entry point for context reduction is @reduceContext@:
 
 \begin{code}
-reduceContext :: SDoc -> (Inst s -> WhatToDo)
-	      -> [Inst s]	-- Given
-	      -> [Inst s]	-- Wanted
-	      -> TcM s (TcDictBinds s, 
-			[Inst s],		-- Free
-			[Inst s])		-- Irreducible
+reduceContext :: SDoc -> (Inst -> WhatToDo)
+	      -> [Inst]	-- Given
+	      -> [Inst]	-- Wanted
+	      -> TcM s (TcDictBinds, 
+			[Inst],		-- Free
+			[Inst])		-- Irreducible
 
 reduceContext str try_me givens wanteds
   =     -- Zonking first
@@ -456,9 +463,10 @@ reduceContext str try_me givens wanteds
 The main context-reduction function is @reduce@.  Here's its game plan.
 
 \begin{code}
-reduceList :: (Int,[Inst s])
-       	   -> (Inst s -> WhatToDo)
-       	   -> [Inst s]
+reduceList :: (Int,[Inst])		-- Stack (for err msgs)
+					-- along with its depth
+       	   -> (Inst -> WhatToDo)
+       	   -> [Inst]
        	   -> RedState s
        	   -> TcM s (RedState s)
 \end{code}
@@ -475,6 +483,10 @@ reduceList :: (Int,[Inst s])
  
   It returns a RedState.
 
+The (n,stack) pair is just used for error reporting.  
+n is always the depth of the stack.
+The stack is the stack of Insts being reduced: to produce X
+I had to produce Y, to produce Y I had to produce Z, and so on.
 
 \begin{code}
 reduceList (n,stack) try_me wanteds state
@@ -484,7 +496,7 @@ reduceList (n,stack) try_me wanteds state
   | otherwise
   =
 #ifdef DEBUG
-   (if n > 4 then
+   (if n > 8 then
 	pprTrace "Jeepers! ReduceContext:" (reduceDepthMsg n stack)
     else (\x->x))
 #endif
@@ -496,56 +508,52 @@ reduceList (n,stack) try_me wanteds state
 
     -- Base case: we're done!
 reduce stack try_me wanted state@(avails, frees, irreds)
-
     -- It's the same as an existing inst, or a superclass thereof
   | wanted `elemFM` avails
   = returnTc (activate avails wanted, frees, irreds)
 
-    -- It should be reduced
-  | case try_me_result of { ReduceMe _ -> True; _ -> False }
-  = lookupInst wanted	      `thenNF_Tc` \ lookup_result ->
+  | otherwise
+  = case try_me wanted of {
 
-    case lookup_result of
-      GenInst wanteds' rhs -> use_instance wanteds' rhs
-      SimpleInst rhs       -> use_instance []       rhs
+    ReduceMe no_instance_action ->	-- It should be reduced
+	lookupInst wanted	      `thenNF_Tc` \ lookup_result ->
+	case lookup_result of
+	    GenInst wanteds' rhs -> use_instance wanteds' rhs
+	    SimpleInst rhs       -> use_instance []       rhs
 
-      NoInstance ->    -- No such instance! 
-		       -- Decide what to do based on the no_instance_action requested
-		 case no_instance_action of
-		   Stop        -> failTc	-- Fail
-		   AddToIrreds -> add_to_irreds	-- Add the offending insts to the irreds
+	    NoInstance ->    -- No such instance! 
+		    case no_instance_action of
+			Stop        -> failTc		
+			AddToIrreds -> add_to_irreds
+    ;
+    Free ->	-- It's free and this isn't a top-level binding, so just chuck it upstairs
+  		-- First, see if the inst can be reduced to a constant in one step
+	lookupInst wanted	  `thenNF_Tc` \ lookup_result ->
+	case lookup_result of
+	    SimpleInst rhs -> use_instance [] rhs
+	    other	   -> add_to_frees
 
-    -- It's free and this isn't a top-level binding, so just chuck it upstairs
-  | case try_me_result of { Free -> True; _ -> False }
-  =     -- First, see if the inst can be reduced to a constant in one step
-    lookupInst wanted	  `thenNF_Tc` \ lookup_result ->
-    case lookup_result of
-       SimpleInst rhs -> use_instance [] rhs
-       other	      -> add_to_frees
-
-    -- It's free and this is a top level binding, so
-    -- check whether it's a tautology or not
-  | case try_me_result of { FreeIfTautological -> True; _ -> False }
-  =     -- Try for tautology
-    tryTc 
-	  -- If tautology trial fails, add to irreds
-	  (addGiven avails wanted      `thenNF_Tc` \ avails' ->
-	   returnTc (avails', frees, wanted:irreds))
+    
+    
+    ;
+    FreeIfTautological -> -- It's free and this is a top level binding, so
+			  -- check whether it's a tautology or not
+	tryTc_
+	  add_to_irreds	  -- If tautology trial fails, add to irreds
 
 	  -- If tautology succeeds, just add to frees
-	  (reduce stack try_me_taut wanted (avails, [], [])		`thenTc_`
+	  (reduce stack try_me_taut wanted (avails, [], [])	`thenTc_`
 	   returnTc (avails, wanted:frees, irreds))
 
 
-    -- It's irreducible (or at least should not be reduced)
-  | otherwise
-  = ASSERT( case try_me_result of { DontReduce -> True; other -> False } )
+    ;
+    DontReduce ->    -- It's irreducible (or at least should not be reduced)
         -- See if the inst can be reduced to a constant in one step
-    lookupInst wanted	  `thenNF_Tc` \ lookup_result ->
-    case lookup_result of
-       SimpleInst rhs -> use_instance [] rhs
-       other          -> add_to_irreds
-
+	lookupInst wanted	  `thenNF_Tc` \ lookup_result ->
+	case lookup_result of
+	   SimpleInst rhs -> use_instance [] rhs
+	   other          -> add_to_irreds
+    }
   where
 	-- The three main actions
     add_to_frees  = let 
@@ -561,8 +569,6 @@ reduce stack try_me wanted state@(avails, frees, irreds)
     use_instance wanteds' rhs = addWanted avails wanted rhs	`thenNF_Tc` \ avails' ->
 			  	reduceList stack try_me wanteds' (avails', frees, irreds)
 
-    try_me_result	        = try_me wanted
-    ReduceMe no_instance_action = try_me_result
 
     -- The try-me to use when trying to identify tautologies
     -- It blunders on reducing as much as possible
@@ -571,7 +577,7 @@ reduce stack try_me wanted state@(avails, frees, irreds)
 
 
 \begin{code}
-activate :: Avails s -> Inst s -> Avails s
+activate :: Avails s -> Inst -> Avails s
 	 -- Activate the binding for Inst, ensuring that a binding for the
 	 -- wanted Inst will be generated.
 	 -- (Activate its parent if necessary, recursively).
@@ -613,15 +619,38 @@ addWanted avails wanted rhs_expr
     rhs | instBindingRequired wanted = Rhs rhs_expr False	-- Not superclass selection
 	| otherwise		     = NoRhs
 
-addFree :: Avails s -> Inst s -> (Avails s)
+addFree :: Avails s -> Inst -> (Avails s)
 	-- When an Inst is tossed upstairs as 'free' we nevertheless add it
 	-- to avails, so that any other equal Insts will be commoned up right
-	-- here rather than also being tossed upstairs. 
+	-- here rather than also being tossed upstairs.  This is really just
+	-- an optimisation, and perhaps it is more trouble that it is worth,
+	-- as the following comments show!
+	--
+	-- NB1: do *not* add superclasses.  If we have
+	--	df::Floating a
+	--	dn::Num a
+	-- but a is not bound here, then we *don't* want to derive 
+	-- dn from df here lest we lose sharing.
+	--
+	-- NB2: do *not* add the Inst to avails at all if it's a method.
+	-- The following situation shows why this is bad:
+	--	truncate :: forall a. RealFrac a => forall b. Integral b => a -> b
+	-- From an application (truncate f i) we get
+	--	t1 = truncate at f 
+	--	t2 = t1 at i
+	-- If we have also have a secon occurrence of truncate, we get
+	--	t3 = truncate at f
+	--	t4 = t3 at i
+	-- When simplifying with i,f free, we might still notice that
+	--   t1=t3; but alas, the binding for t2 (which mentions t1)
+	--   will continue to float out!
+	-- Solution: never put methods in avail till they are captured
+	-- in which case addFree isn't used
 addFree avails free
   | isDict free = addToFM avails free (Avail (instToId free) NoRhs [])
   | otherwise   = avails
 
-addGiven :: Avails s -> Inst s -> NF_TcM s (Avails s)
+addGiven :: Avails s -> Inst -> NF_TcM s (Avails s)
 addGiven avails given
   =	 -- ASSERT( not (given `elemFM` avails) )
 	 -- This assertion isn't necessarily true.  It's permitted
@@ -634,7 +663,7 @@ addGiven avails given
 addAvail avails wanted avail
   = addSuperClasses (addToFM avails wanted avail) wanted
 
-addSuperClasses :: Avails s -> Inst s -> NF_TcM s (Avails s)
+addSuperClasses :: Avails s -> Inst -> NF_TcM s (Avails s)
 		-- Add all the superclasses of the Inst to Avails
 		-- Invariant: the Inst is already in Avails.
 
@@ -648,13 +677,12 @@ addSuperClasses avails dict
     (clas, tys) = getDictClassTys dict
     
     (tyvars, sc_theta, sc_sels, _, _) = classBigSig clas
-    sc_theta' = substFlexiTheta (zipVarEnv tyvars tys) sc_theta
+    sc_theta' = substTopTheta (zipVarEnv tyvars tys) sc_theta
 
     add_sc avails ((super_clas, super_tys), sc_sel)
       = newDictFromOld dict super_clas super_tys	`thenNF_Tc` \ super_dict ->
         let
-	   sc_sel_rhs = DictApp (TyApp (HsVar (RealId sc_sel)) 
-				       tys)
+	   sc_sel_rhs = DictApp (TyApp (HsVar sc_sel) tys)
 				[instToId dict]
 	in
         case lookupFM avails super_dict of
@@ -701,18 +729,20 @@ instance declarations.
 \begin{code}
 tcSimplifyThetas :: (Class -> ClassInstEnv)		-- How to find the ClassInstEnv
 	       	 -> ThetaType				-- Wanted
-	       	 -> TcM s ThetaType			-- Needed; of the form C a b c
-							-- where a,b,c are type variables
+	       	 -> TcM s ThetaType			-- Needed
 
 tcSimplifyThetas inst_mapper wanteds
   = reduceSimple inst_mapper [] wanteds		`thenNF_Tc` \ irreds ->
     let
-	-- Check that the returned dictionaries are of the form (C a b c)
+	-- For multi-param Haskell, check that the returned dictionaries
+ 	-- don't have any of the form (C Int Bool) for which
+	-- we expect an instance here
+	-- For Haskell 98, check that all the constraints are of the form C a,
+	-- where a is a type variable
     	bad_guys | opt_GlasgowExts = [ct | ct@(clas,tys) <- irreds, 
 					   isEmptyVarSet (tyVarsOfTypes tys)]
 		 | otherwise       = [ct | ct@(clas,tys) <- irreds, 
 					   not (all isTyVarTy tys)]
- 
     in
     if null bad_guys then
 	returnTc irreds
@@ -792,7 +822,7 @@ addSCs givens ct@(clas,tys)
  = foldl add givens sc_theta
  where
    (tyvars, sc_theta_tmpl, _, _, _) = classBigSig clas
-   sc_theta = substFlexiTheta (zipVarEnv tyvars tys) sc_theta_tmpl
+   sc_theta = substTopTheta (zipVarEnv tyvars tys) sc_theta_tmpl
 
    add givens ct = case lookupFM givens ct of
 			   Nothing    -> -- Add it and its superclasses
@@ -832,7 +862,7 @@ For each method @Inst@ in the @init_lie@ that mentions one of the
 @LIE@), as well as the @HsBinds@ generated.
 
 \begin{code}
-bindInstsOfLocalFuns ::	LIE s -> [TcIdBndr s] -> TcM s (LIE s, TcMonoBinds s)
+bindInstsOfLocalFuns ::	LIE -> [TcId] -> TcM s (LIE, TcMonoBinds)
 
 bindInstsOfLocalFuns init_lie local_ids
   | null overloaded_ids || null lie_for_here
@@ -903,7 +933,7 @@ variable, and using @disambigOne@ to do the real business.
 all the constant and ambiguous Insts.
 
 \begin{code}
-tcSimplifyTop :: LIE s -> TcM s (TcDictBinds s)
+tcSimplifyTop :: LIE -> TcM s TcDictBinds
 tcSimplifyTop wanted_lie
   = reduceContext (text "tcSimplTop") try_me [] wanteds	`thenTc` \ (binds1, frees, irreds) ->
     ASSERT( null frees )
@@ -963,8 +993,8 @@ Since we're not using the result of @foo@, the result if (presumably)
 @void@.
 
 \begin{code}
-disambigGroup :: [Inst s]	-- All standard classes of form (C a)
-	      -> TcM s (TcDictBinds s)
+disambigGroup :: [Inst]	-- All standard classes of form (C a)
+	      -> TcM s TcDictBinds
 
 disambigGroup dicts
   |  any isNumericClass classes 	-- Guaranteed all standard classes
@@ -981,7 +1011,7 @@ disambigGroup dicts
 	= failTc
 
       try_default (default_ty : default_tys)
-	= tryTc (try_default default_tys) $	-- If default_ty fails, we try
+	= tryTc_ (try_default default_tys) $	-- If default_ty fails, we try
 						-- default_tys instead
 	  tcSimplifyCheckThetas [] thetas	`thenTc` \ _ ->
 	  returnTc default_ty
@@ -1062,10 +1092,11 @@ addNoInstanceErr str givens dict
     addErrTcM (tidy_env, 
 	       sep [sep [ptext SLIT("Could not deduce") <+> quotes (pprInst tidy_dict),
 		        nest 4 $ parens $ pprOrigin dict],
-		   nest 4 $ ptext SLIT("from the context") <+> pprInsts tidy_givens]
+		   nest 4 $ ptext SLIT("from the context:") <+> pprInsts tidy_givens]
 	      $$
 	      ptext SLIT("Probable cause:") <+> 
-	      vcat [ptext SLIT("missing") <+> quotes (pprInst tidy_dict) <+> ptext SLIT("in") <+> str,
+	      vcat [sep [ptext SLIT("missing") <+> quotes (pprInst tidy_dict),
+			 ptext SLIT("in") <+> str],
 		    if all_tyvars then empty else
 		    ptext SLIT("or missing instance declaration for") <+> quotes (pprInst tidy_dict)]
     )

@@ -14,17 +14,19 @@ import CmdLineOpts    ( opt_NoImplicitPrelude, opt_WarnDuplicateExports,
 			opt_SourceUnchanged
 		      )
 
-import HsSyn	( HsModule(..), ImportDecl(..), HsDecl(..), 
+import HsSyn	( HsModule(..), ImportDecl(..), HsDecl(..), TyClDecl(..),
 		  IE(..), ieName, 
 		  ForeignDecl(..), ExtName(..), ForKind(..),
-		  FixityDecl(..),
+		  FixitySig(..), Sig(..),
 		  collectTopBinders
 		)
 import RdrHsSyn	( RdrName(..), RdrNameIE, RdrNameImportDecl,
-		  RdrNameHsModule, RdrNameFixityDecl,
+		  RdrNameHsModule, RdrNameHsDecl,
 		  rdrNameOcc, ieOcc
 		)
-import RnIfaces	( getInterfaceExports, getDeclBinders, recordSlurp, checkUpToDate )
+import RnIfaces	( getInterfaceExports, getDeclBinders, getImportedFixities, 
+		  recordSlurp, checkUpToDate, loadHomeInterface
+		)
 import BasicTypes ( IfaceFlavour(..) )
 import RnEnv
 import RnMonad
@@ -35,9 +37,12 @@ import UniqFM	( lookupUFM )
 import Bag	( bagToList )
 import Maybes	( maybeToBool )
 import Name
-import NameSet	( elemNameSet )
+import SrcLoc	( SrcLoc )
+import NameSet	( elemNameSet, emptyNameSet )
 import Outputable
-import Util	( removeDups )
+import Unique	( getUnique )
+import Util	( removeDups, equivClassesByUniq )
+import List	( nubBy )
 \end{code}
 
 
@@ -51,28 +56,44 @@ import Util	( removeDups )
 \begin{code}
 getGlobalNames :: RdrNameHsModule
 	       -> RnMG (Maybe (ExportEnv, 
-			       RnEnv, 
-			       FiniteMap Name HowInScope, 	-- Locally defined or explicitly imported 
-			       Name -> PrintUnqualified))
+			       RnEnv,
+			       NameEnv AvailInfo	-- Maps a name to its parent AvailInfo
+							-- Just for in-scope things only
+			       ))
 			-- Nothing => no need to recompile
 
-getGlobalNames m@(HsModule this_mod _ exports imports _ _ mod_loc)
-  = fixRn (\ ~(rec_exp_fn, _) ->
+getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
+  = 	-- These two fix-loops are to get the right
+	-- provenance information into a Name
+    fixRn (\ ~(rec_exp_fn, _) ->
 
-	-- PROCESS LOCAL DECLS
-	-- Do these *first* so that the correct provenance gets
-	-- into the global name cache.
-      importsFromLocalDecls rec_exp_fn m	`thenRn` \ (local_rn_env, local_mod_avails, local_info) ->
+      fixRn (\ ~(rec_rn_env, _) ->
+	let
+	   rec_unqual_fn :: Name -> Bool	-- Is this chap in scope unqualified?
+	   rec_unqual_fn = mkPrintUnqualFn rec_rn_env
+	in
+		-- PROCESS LOCAL DECLS
+		-- Do these *first* so that the correct provenance gets
+		-- into the global name cache.
+	importsFromLocalDecls this_mod rec_exp_fn decls	`thenRn` \ (local_gbl_env, local_mod_avails) ->
 
-	-- PROCESS IMPORT DECLS
-      mapAndUnzip3Rn importsFromImportDecl all_imports
-						`thenRn` \ (imp_rn_envs, imp_avails_s, explicit_imports_s) ->
+		-- PROCESS IMPORT DECLS
+	mapAndUnzipRn (importsFromImportDecl rec_unqual_fn)
+		      all_imports			`thenRn` \ (imp_gbl_envs, imp_avails_s) ->
 
-	-- COMBINE RESULTS
-	-- We put the local env second, so that a local provenance
-	-- "wins", even if a module imports itself.
-      foldlRn plusRnEnv emptyRnEnv imp_rn_envs		`thenRn` \ imp_rn_env ->
-      plusRnEnv imp_rn_env local_rn_env	 		`thenRn` \ rn_env ->
+		-- COMBINE RESULTS
+		-- We put the local env second, so that a local provenance
+		-- "wins", even if a module imports itself.
+	let
+	    gbl_env :: GlobalRdrEnv
+	    imp_gbl_env = foldr plusGlobalRdrEnv emptyRdrEnv imp_gbl_envs
+	    gbl_env     = imp_gbl_env `plusGlobalRdrEnv` local_gbl_env
+
+	    export_avails :: ExportAvails
+	    export_avails = foldr plusExportAvails local_mod_avails imp_avails_s
+	in
+	returnRn (gbl_env, export_avails)
+      )							`thenRn` \ (gbl_env, export_avails) ->
 
 	-- TRY FOR EARLY EXIT
 	-- We can't go for an early exit before this because we have to check
@@ -89,30 +110,26 @@ getGlobalNames m@(HsModule this_mod _ exports imports _ _ mod_loc)
 	-- exit.  The early-exit code checks what's actually needed from B
 	-- to compile A, and of course that doesn't include B.f.  That's
 	-- why we wait till after the plusRnEnv stuff to do the early-exit.
-      checkEarlyExit this_mod				`thenRn` \ up_to_date ->
+      checkEarlyExit this_mod			`thenRn` \ up_to_date ->
       if up_to_date then
-	returnRn (error "early exit", Nothing)
+	returnRn (junk_exp_fn, Nothing)
       else
  
+	-- FIXITIES
+      fixitiesFromLocalDecls gbl_env decls		`thenRn` \ local_fixity_env ->
+      getImportedFixities				`thenRn` \ imp_fixity_env ->
+      let
+	fixity_env = imp_fixity_env `plusNameEnv` local_fixity_env
+	rn_env     = RnEnv gbl_env fixity_env
+	(_, global_avail_env) = export_avails
+      in
+      traceRn (text "fixity env" <+> vcat (map ppr (nameEnvElts fixity_env)))	`thenRn_`
 
 	-- PROCESS EXPORT LISTS
-      let
-	 export_avails :: ExportAvails
-	 export_avails = foldr plusExportAvails local_mod_avails imp_avails_s
+      exportsFromAvail this_mod exports export_avails rn_env	`thenRn` \ (export_fn, export_env) ->
 
-	 explicit_info :: FiniteMap Name HowInScope  -- Locally defined or explicitly imported
-	 explicit_info = foldr plusFM local_info explicit_imports_s
-      in
-      exportsFromAvail this_mod exports export_avails rn_env	
-							`thenRn` \ (export_fn, export_env) ->
-
-        -- BUILD THE "IMPORT FN".  It just tells whether a name is in
-	-- scope in an unqualified form.
-      let 
-	  print_unqual = mkImportFn imp_rn_env
-      in   
-
-      returnRn (export_fn, Just (export_env, rn_env, explicit_info, print_unqual))
+	-- DONE
+      returnRn (export_fn, Just (export_env, rn_env, global_avail_env))
     )							`thenRn` \ (_, result) ->
     returnRn result
   where
@@ -164,92 +181,161 @@ checkEarlyExit mod
 \end{code}
 	
 \begin{code}
-importsFromImportDecl :: RdrNameImportDecl
-		      -> RnMG (RnEnv, 
-			       ExportAvails, 
-			       FiniteMap Name HowInScope)  -- Records the explicitly-imported things
+importsFromImportDecl :: (Name -> Bool)		-- True => print unqualified
+		      -> RdrNameImportDecl
+		      -> RnMG (GlobalRdrEnv, 
+			       ExportAvails) 
 
-importsFromImportDecl (ImportDecl mod qual_only as_source as_mod import_spec loc)
-  = pushSrcLocRn loc $
-    getInterfaceExports mod as_source		`thenRn` \ (avails, fixities) ->
+importsFromImportDecl rec_unqual_fn (ImportDecl mod qual_only as_source as_mod import_spec iloc)
+  = pushSrcLocRn iloc $
+    getInterfaceExports mod as_source		`thenRn` \ avails ->
+
+    if null avails then
+	-- If there's an error in getInterfaceExports, (e.g. interface
+	-- file not found) then avail might be NotAvailable, so availName
+	-- in home_modules fails.  Hence the guard here.  Also we get lots
+	-- of spurious errors from 'filterImports' if we don't find the interface file
+	returnRn (emptyRdrEnv, mkEmptyExportAvails mod)
+    else
+
     filterImports mod import_spec avails	`thenRn` \ (filtered_avails, hides, explicits) ->
+
+	-- Load all the home modules for the things being
+	-- bought into scope.  This makes sure their fixities
+	-- are loaded before we grab the FixityEnv from Ifaces
     let
-	how_in_scope = FromImportDecl mod loc
-	explicit_info = listToFM [(name, how_in_scope) 
-				 | avail <- explicits,
-				   name  <- availNames avail
-				 ]
+	home_modules = [name | avail <- filtered_avails,
+				-- Doesn't take account of hiding, but that doesn't matter
+		
+			       let name = availName avail,
+			       nameModule name /= mod]
+				-- This predicate is a bit of a hack.
+				-- PrelBase imports error from PrelErr.hi-boot; but error is
+				-- wired in, so its provenance doesn't say it's from an hi-boot
+				-- file. Result: disaster when PrelErr.hi doesn't exist.
+				
+	same_module n1 n2 = nameModule n1 == nameModule n2
+	load n		  = loadHomeInterface (doc_str n) n
+	doc_str n	  = ptext SLIT("Need fixities from") <+> ppr (nameModule n) <+> parens (ppr n)
+    in
+    mapRn load (nubBy same_module home_modules)			`thenRn_`
+    
+	-- We 'improve' the provenance by setting
+	--	(a) the import-reason field, so that the Name says how it came into scope
+	--		including whether it's explicitly imported
+	--	(b) the print-unqualified field
+	-- But don't fiddle with wired-in things or we get in a twist
+    let
+	improve_prov name | isWiredInName name = name
+			  | otherwise	       = setNameProvenance name (mk_new_prov name)
+
+	is_explicit name = name `elemNameSet` explicits
+	mk_new_prov name = NonLocalDef (UserImport mod iloc (is_explicit name))
+				       as_source
+				       (rec_unqual_fn name)
     in
     qualifyImports mod 
-		   True 		-- Want qualified names
 		   (not qual_only)	-- Maybe want unqualified names
-		   as_mod
-		   hides
-		   filtered_avails (\n -> how_in_scope)
-		   [ (occ,(fixity,how_in_scope)) | (occ,fixity) <- fixities ]
-							`thenRn` \ (rn_env, mod_avails) ->
-    returnRn (rn_env, mod_avails, explicit_info)
+		   as_mod hides
+		   filtered_avails improve_prov		`thenRn` \ (rdr_name_env, mod_avails) ->
+
+    returnRn (rdr_name_env, mod_avails)
 \end{code}
 
 
 \begin{code}
-importsFromLocalDecls rec_exp_fn (HsModule mod _ _ _ fix_decls decls _)
-  = foldlRn getLocalDeclBinders [] decls		`thenRn` \ avails ->
+importsFromLocalDecls mod rec_exp_fn decls
+  = mapRn (getLocalDeclBinders newLocalName) decls	`thenRn` \ avails_s ->
+
+    let
+	avails = concat avails_s
+
+	all_names :: [Name]	-- All the defns; no dups eliminated
+	all_names = [name | avail <- avails, name <- availNames avail]
+
+	dups :: [[Name]]
+	dups = filter non_singleton (equivClassesByUniq getUnique all_names)
+	     where
+		non_singleton (x1:x2:xs) = True
+		non_singleton other      = False
+    in
+	-- Check for duplicate definitions
+    mapRn (addErrRn . dupDeclErr) dups				`thenRn_` 
 
 	-- Record that locally-defined things are available
     mapRn (recordSlurp Nothing Compulsory) avails	`thenRn_`
 
-	-- Fixities
-    mapRn fixityFromFixDecl fix_decls			`thenRn` \ fixities ->
-
-	-- Record where the available stuff came from
-    let
-	explicit_info = listToFM [(name, FromLocalDefn (getSrcLoc name))
-				 | avail <- avails,
-				   name  <- availNames avail
-				 ]
-    in
+	-- Build the environment
     qualifyImports mod 
-		   False	-- Don't want qualified names
 		   True		-- Want unqualified names
-		   Nothing	-- No "as M" part
+		   Nothing	-- no 'as M'
 		   []		-- Hide nothing
-		   avails (\n -> FromLocalDefn (getSrcLoc n))
-		   fixities
-							`thenRn` \ (rn_env, mod_avails) ->
-    returnRn (rn_env, mod_avails, explicit_info)
+		   avails
+		   (\n -> n)
+
   where
-    newLocalName rdr_name loc
-      = newLocallyDefinedGlobalName mod (rdrNameOcc rdr_name) rec_exp_fn loc
+    newLocalName rdr_name loc = newLocallyDefinedGlobalName mod (rdrNameOcc rdr_name)
+							    rec_exp_fn loc
 
-    getLocalDeclBinders avails (ValD binds)
-      = mapRn do_one (bagToList (collectTopBinders binds))	`thenRn` \ val_avails ->
-	returnRn (val_avails ++ avails)
+getLocalDeclBinders :: (RdrName -> SrcLoc -> RnMG Name)	-- New-name function
+		    -> RdrNameHsDecl
+		    -> RnMG Avails
+getLocalDeclBinders new_name (ValD binds)
+  = mapRn do_one (bagToList (collectTopBinders binds))
+  where
+    do_one (rdr_name, loc) = new_name rdr_name loc	`thenRn` \ name ->
+			     returnRn (Avail name)
 
     -- foreign import declaration
-    getLocalDeclBinders avails (ForD (ForeignDecl nm (FoImport _) _ _ _ loc))
-      = do_one (nm,loc)			    `thenRn` \ for_avail ->
-	returnRn (for_avail : avails)
+getLocalDeclBinders new_name (ForD (ForeignDecl nm kind _ _ _ loc))
+  | binds_haskell_name kind
+  = new_name nm loc		    `thenRn` \ name ->
+    returnRn [Avail name]
 
-    -- foreign import declaration
-    getLocalDeclBinders avails (ForD (ForeignDecl nm FoLabel _ _ _ loc))
-      = do_one (nm,loc)			    `thenRn` \ for_avail ->
-	returnRn (for_avail : avails)
+  | otherwise
+  = returnRn []
 
-    -- foreign export dynamic declaration
-    getLocalDeclBinders avails (ForD (ForeignDecl nm FoExport _ Dynamic _ loc))
-      = do_one (nm,loc)			    `thenRn` \ for_avail ->
-	returnRn (for_avail : avails)
+getLocalDeclBinders new_name decl
+  = getDeclBinders new_name decl	`thenRn` \ avail ->
+    case avail of
+	NotAvailable -> returnRn []		-- Instance decls and suchlike
+	other	     -> returnRn [avail]
 
-    getLocalDeclBinders avails decl
-      = getDeclBinders newLocalName decl	`thenRn` \ avail ->
-	case avail of
-	   NotAvailable -> returnRn avails		-- Instance decls and suchlike
-	   other	-> returnRn (avail : avails)
+binds_haskell_name (FoImport _) = True
+binds_haskell_name FoLabel      = True
+binds_haskell_name FoExport     = False
 
-    do_one (rdr_name, loc)
-      = newLocalName rdr_name loc 	`thenRn` \ name ->
-        returnRn (Avail name)
+fixitiesFromLocalDecls :: GlobalRdrEnv -> [RdrNameHsDecl] -> RnMG FixityEnv
+fixitiesFromLocalDecls gbl_env decls
+  = foldlRn getFixities emptyNameEnv decls
+  where
+    getFixities :: FixityEnv -> RdrNameHsDecl -> RnMG FixityEnv
+    getFixities acc (FixD fix)
+      = fix_decl acc fix
+
+    getFixities acc (TyClD (ClassDecl _ _ _ sigs _ _ _ _ _))
+      = foldlRn fix_decl acc [sig | FixSig sig <- sigs]
+		-- Get fixities from class decl sigs too
+
+    getFixities acc other_decl
+      = returnRn acc
+
+    fix_decl acc (FixitySig rdr_name fixity loc)
+	= 	-- Check for fixity decl for something not declared
+	  case lookupRdrEnv gbl_env rdr_name of {
+	    Nothing   -> pushSrcLocRn loc 				$
+			 addWarnRn (unusedFixityDecl rdr_name fixity)	`thenRn_`
+			 returnRn acc ;
+	    Just (name:_) ->
+
+		-- Check for duplicate fixity decl
+	  case lookupNameEnv acc name of {
+	    Just (FixitySig _ _ loc') -> addErrRn (dupFixityDecl rdr_name loc loc')	`thenRn_`
+					 returnRn acc ;
+
+
+	    Nothing -> returnRn (addToNameEnv acc name (FixitySig name fixity loc))
+	  }}
 \end{code}
 
 %************************************************************************
@@ -263,30 +349,35 @@ available, and filters it through the import spec (if any).
 
 \begin{code}
 filterImports :: Module
-	      -> Maybe (Bool, [RdrNameIE])		-- Import spec; True => hidin
-	      -> [AvailInfo]				-- What's available
-	      -> RnMG ([AvailInfo],			-- What's actually imported
-		       [AvailInfo],			-- What's to be hidden (the unqualified version, that is)
-		       [AvailInfo])			-- What was imported explicitly
+	      -> Maybe (Bool, [RdrNameIE])	-- Import spec; True => hiding
+	      -> [AvailInfo]			-- What's available
+	      -> RnMG ([AvailInfo],		-- What's actually imported
+		       [AvailInfo],		-- What's to be hidden (the unqualified version, that is)
+		       NameSet)			-- What was imported explicitly
 
 	-- Complains if import spec mentions things that the module doesn't export
         -- Warns/informs if import spec contains duplicates.
 filterImports mod Nothing imports
-  = returnRn (imports, [], [])
+  = returnRn (imports, [], emptyNameSet)
 
 filterImports mod (Just (want_hiding, import_items)) avails
   = mapRn check_item import_items		`thenRn` \ item_avails ->
     if want_hiding 
     then	
-	returnRn (avails, item_avails, [])	-- All imported; item_avails to be hidden
+	-- All imported; item_avails to be hidden
+	returnRn (avails, item_avails, emptyNameSet)
     else
-	returnRn (item_avails, [], item_avails)	-- Just item_avails imported; nothing to be hidden
+	-- Just item_avails imported; nothing to be hidden
+	returnRn (item_avails, [], availsToNameSet item_avails)
 
   where
     import_fm :: FiniteMap OccName AvailInfo
     import_fm = listToFM [ (nameOccName name, avail) 
 			 | avail <- avails,
-			   name  <- availEntityNames avail]
+			   name  <- availNames avail]
+	-- Even though availNames returns data constructors too,
+	-- they won't make any difference because naked entities like T
+	-- in an import list map to TCOccs, not VarOccs.
 
     check_item item@(IEModuleContents _)
       = addErrRn (badImportItemErr mod item)	`thenRn_`
@@ -331,85 +422,58 @@ right qualified names.  It also turns the @Names@ in the @ExportEnv@ into
 fully fledged @Names@.
 
 \begin{code}
-qualifyImports :: Module				-- Imported module
-	       -> Bool					-- True <=> want qualified import
-	       -> Bool					-- True <=> want unqualified import
-	       -> Maybe Module				-- Optional "as M" part 
-	       -> [AvailInfo]				-- What's to be hidden
-	       -> Avails -> (Name -> HowInScope)	-- Whats imported and how
-	       -> [(OccName, (Fixity, HowInScope))]	-- Ditto for fixities
-	       -> RnMG (RnEnv, ExportAvails)
+qualifyImports :: Module		-- Imported module
+	       -> Bool			-- True <=> want unqualified import
+	       -> Maybe Module		-- Optional "as M" part 
+	       -> [AvailInfo]		-- What's to be hidden
+	       -> Avails		-- Whats imported and how
+	       -> (Name -> Name) 	-- Improves the provenance on imported things
+	       -> RnMG (GlobalRdrEnv, ExportAvails)
+	-- NB: the Names in ExportAvails don't have the improve-provenance
+	--     function applied to them
+	-- We could fix that, but I don't think it matters
 
-qualifyImports this_mod qual_imp unqual_imp as_mod hides
-	       avails name_to_his fixities
+qualifyImports this_mod unqual_imp as_mod hides
+	       avails improve_prov
   = 
- 	-- Make the name environment.  Even though we're talking about a 
-	-- single import module there might still be name clashes, 
-	-- because it might be the module being compiled.
-    foldlRn add_avail emptyGlobalNameEnv avails	`thenRn` \ name_env1 ->
+ 	-- Make the name environment.  We're talking about a 
+	-- single module here, so there must be no name clashes.
+	-- In practice there only ever will be if it's the module
+	-- being compiled.
     let
+	-- Add the things that are available
+	name_env1 = foldl add_avail emptyRdrEnv avails
+
 	-- Delete things that are hidden
 	name_env2 = foldl del_avail name_env1 hides
-
-	-- Create the fixity env
-	fixity_env = foldl (add_fixity name_env2) emptyFixityEnv fixities
 
 	-- Create the export-availability info
 	export_avails = mkExportAvails qual_mod unqual_imp name_env2 avails
     in
-    returnRn (RnEnv name_env2 fixity_env, export_avails)
+    returnRn (name_env2, export_avails)
+
   where
     qual_mod = case as_mod of
 		  Nothing  	    -> this_mod
 		  Just another_name -> another_name
 
-    add_avail :: GlobalNameEnv -> AvailInfo -> RnMG GlobalNameEnv
-    add_avail env avail = foldlRn add_name env (availNames avail)
+    add_avail :: GlobalRdrEnv -> AvailInfo -> GlobalRdrEnv
+    add_avail env avail = foldl add_name env (availNames avail)
 
-    add_name env name   = add qual_imp   env  (Qual qual_mod occ err_hif) `thenRn` \ env1 ->
-			  add unqual_imp env1 (Unqual occ)
-			where
-			  add False env rdr_name = returnRn env
-			  add True  env rdr_name = addOneToGlobalNameEnv env rdr_name (name, name_to_his name)
-			  occ  = nameOccName name
+    add_name env name
+	| unqual_imp = env2
+	| otherwise  = env1
+	where
+	  env1 = addOneToGlobalRdrEnv env  (Qual qual_mod occ err_hif) better_name
+	  env2 = addOneToGlobalRdrEnv env1 (Unqual occ) 	       better_name
+	  occ         = nameOccName name
+	  better_name = improve_prov name
 
-    del_avail env avail = foldl delOneFromGlobalNameEnv env rdr_names
+    del_avail env avail = foldl delOneFromGlobalRdrEnv env rdr_names
 			where
 			  rdr_names = map (Unqual . nameOccName) (availNames avail)
 			
-    add_fixity name_env fix_env (occ_name, fixity)
-	= add qual $ add unqual $ fix_env
- 	where
-	  qual   = Qual qual_mod occ_name err_hif
-	  unqual = Unqual occ_name
-
-	  add rdr_name fix_env | maybeToBool (lookupFM name_env rdr_name)
-			       = addOneToFixityEnv fix_env rdr_name fixity
-			       | otherwise
-			       = fix_env
-
 err_hif = error "qualifyImports: hif"	-- Not needed in key to mapping
-\end{code}
-
-unQualify adds an Unqual binding for every existing Qual binding.
-
-\begin{code}
-unQualify :: FiniteMap RdrName elt -> FiniteMap RdrName elt
-unQualify fm = addListToFM fm [(Unqual occ, elt) | (Qual _ occ _, elt) <- fmToList fm]
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Local declarations}
-%*									*
-%************************************************************************
-
-
-\begin{code}
-fixityFromFixDecl :: RdrNameFixityDecl -> RnMG (OccName, (Fixity, HowInScope))
-
-fixityFromFixDecl (FixityDecl rdr_name fixity loc)
-  = returnRn (rdrNameOcc rdr_name, (fixity, FromLocalDefn loc))
 \end{code}
 
 
@@ -418,62 +482,6 @@ fixityFromFixDecl (FixityDecl rdr_name fixity loc)
 \subsection{Export list processing
 %*									*
 %************************************************************************
-
-The @AvailEnv@ type is just used internally in @exportsFromAvail@.
-When exporting we need to combine the availabilities for a particular
-exported thing, and we also need to check for name clashes -- that
-is: two exported things must have different @OccNames@.
-
-\begin{code}
-type AvailEnv = FiniteMap OccName (RdrNameIE, AvailInfo, Int{-no. of clashes-})
-	-- The FM maps each OccName to the RdrNameIE that gave rise to it,
-	-- for error reporting, as well as to its AvailInfo
-
-emptyAvailEnv = emptyFM
-
-{-
- Add new entry to environment. Checks for name clashes, i.e.,
- plain duplicates or exported entity pairs that have different OccNames.
- (c.f. 5.1.1 of Haskell 1.4 report.)
--}
-addAvailEnv :: Bool -> RdrNameIE -> AvailEnv -> AvailInfo -> RnM s d AvailEnv
-addAvailEnv warn_dups ie env NotAvailable   = returnRn env
-addAvailEnv warn_dups ie env (AvailTC _ []) = returnRn env
-addAvailEnv warn_dups ie env avail
-  | warn_dups = mapMaybeRn (addErrRn . availClashErr) () conflict `thenRn_`
-                returnRn (addToFM_C addAvail env key elt)
-  | otherwise = returnRn (addToFM_C addAvail env key elt)
-  where
-   occ_avail = nameOccName (availName avail)
-   occ_ie    = ieOcc ie
-   key
-    | not warn_dups || occ_ie == occ_avail = occ_avail
-    | otherwise                            = occ_ie 
-        -- export item is a class method, use export occ name instead.
-        -- (this is only needed to get more precise warnings about
-	--  duplicates.)
-   elt  = (ie,avail,reports_on)
-
-   reports_on
-    | maybeToBool dup = 1
-    | otherwise       = 0
-
-   conflict = conflictFM bad_avail env key elt
-   dup 
-    | warn_dups = conflictFM dup_avail env key elt
-    | otherwise = Nothing
-
-addListToAvailEnv :: AvailEnv -> RdrNameIE -> [AvailInfo] -> RnM s d AvailEnv
-addListToAvailEnv env ie items 
-  = foldlRn (addAvailEnv False{-don't warn about dups-} ie) env items
-
-bad_avail  (ie1,avail1,r1) (ie2,avail2,r2) 
-   = availName avail1 /= availName avail2  -- Same OccName, different Name
-dup_avail  (ie1,avail1,r1) (ie2,avail2,r2) 
-   = availName avail1 == availName avail2 -- Same OccName & avail.
-
-addAvail (ie1,a1,r1) (ie2,a2,r2) = (ie1, a1 `plusAvail` a2, r1 + r2)
-\end{code}
 
 Processing the export list.
 
@@ -485,6 +493,20 @@ compiling PrelBase, because it re-exports GHC, which includes takeMVar#, whose t
 includes ConcBase.StateAndSynchVar#, and so on...
 
 \begin{code}
+type ExportAccum	-- The type of the accumulating parameter of
+			-- the main worker function in exportsFromAvail
+     = ([Module], 		-- 'module M's seen so far
+	ExportOccMap,		-- Tracks exported occurrence names
+	NameEnv AvailInfo)	-- The accumulated exported stuff, kept in an env
+				--   so we can common-up related AvailInfos
+
+type ExportOccMap = FiniteMap OccName (Name, RdrNameIE)
+	-- Tracks what a particular exported OccName
+	--   in an export list refers to, and which item
+	--   it came from.  It's illegal to export two distinct things
+	--   that have the same occurrence name
+
+
 exportsFromAvail :: Module
 		 -> Maybe [RdrNameIE]	-- Export spec
 		 -> ExportAvails
@@ -499,126 +521,105 @@ exportsFromAvail this_mod Nothing export_avails rn_env
 exportsFromAvail this_mod (Just export_items) 
 		 (mod_avail_env, entity_avail_env)
 	         (RnEnv global_name_env fixity_env)
-  = checkForModuleExportDups export_items                 `thenRn` \ export_items' ->
-    foldlRn exports_from_item emptyAvailEnv export_items' `thenRn` \ export_avail_env ->
+  = foldlRn exports_from_item
+	    ([], emptyFM, emptyNameEnv) export_items	`thenRn` \ (_, _, export_avail_map) ->
     let
-     dup_entries = fmToList (filterFM (\ _ (_,_,clashes) -> clashes > 0) export_avail_env)
-    in
-    mapRn (addWarnRn . dupExportWarn) dup_entries         `thenRn_`
-    let
-	export_avails   = map (\ (_,a,_) -> a) (eltsFM export_avail_env)
-	export_fixities = mk_exported_fixities (availsToNameSet export_avails)
-	export_fn	= mk_export_fn export_avails
+	export_avails :: [AvailInfo]
+	export_avails   = nameEnvElts export_avail_map
+
+	export_names :: NameSet
+        export_names = availsToNameSet export_avails
+
+	-- Export only those fixities that are for names that are
+	--	(a) defined in this module
+	--	(b) exported
+	export_fixities :: [(Name,Fixity)]
+	export_fixities = [ (name,fixity) 
+			  | FixitySig name fixity _ <- nameEnvElts fixity_env,
+			    name `elemNameSet` export_names,
+			    isLocallyDefined name
+			  ]
+
+	export_fn :: Name -> ExportFlag
+	export_fn = mk_export_fn export_names
     in
     returnRn (export_fn, ExportEnv export_avails export_fixities)
 
   where
-    exports_from_item :: AvailEnv -> RdrNameIE -> RnMG AvailEnv
-    exports_from_item export_avail_env ie@(IEModuleContents mod)
-	= case lookupFM mod_avail_env mod of
-		Nothing	    -> failWithRn export_avail_env (modExportErr mod)
-		Just avails -> addListToAvailEnv export_avail_env ie avails
+    exports_from_item :: ExportAccum -> RdrNameIE -> RnMG ExportAccum
 
-    exports_from_item export_avail_env ie
+    exports_from_item acc@(mods, occs, avails) ie@(IEModuleContents mod)
+	| mod `elem` mods 	-- Duplicate export of M
+	= warnCheckRn opt_WarnDuplicateExports
+		      (dupModuleExport mod)	`thenRn_`
+	  returnRn acc
+
+	| otherwise
+	= case lookupFM mod_avail_env mod of
+		Nothing	        -> failWithRn acc (modExportErr mod)
+		Just mod_avails -> foldlRn (check_occs ie) occs mod_avails	`thenRn` \ occs' ->
+				   let
+					avails' = foldl add_avail avails mod_avails
+				   in
+				   returnRn (mod:mods, occs', avails')
+
+    exports_from_item acc@(mods, occs, avails) ie
 	| not (maybeToBool maybe_in_scope) 
-	= failWithRn export_avail_env (unknownNameErr (ieName ie))
+	= failWithRn acc (unknownNameErr (ieName ie))
+
+	| not (null dup_names)
+	= addNameClashErrRn rdr_name (name:dup_names)	`thenRn_`
+	  returnRn acc
 
 #ifdef DEBUG
 	-- I can't see why this should ever happen; if the thing is in scope
 	-- at all it ought to have some availability
 	| not (maybeToBool maybe_avail)
 	= pprTrace "exportsFromAvail: curious Nothing:" (ppr name)
-	  returnRn export_avail_env
+	  returnRn acc
 #endif
 
 	| not enough_avail
-	= failWithRn export_avail_env (exportItemErr ie export_avail)
+	= failWithRn acc (exportItemErr ie export_avail)
 
-	| otherwise	-- Phew!  It's OK!
-	= addAvailEnv opt_WarnDuplicateExports ie export_avail_env export_avail
+	| otherwise	-- Phew!  It's OK!  Now to check the occurrence stuff!
+	= check_occs ie occs export_avail	`thenRn` \ occs' ->
+	  returnRn (mods, occs', add_avail avails export_avail)
+
        where
-          maybe_in_scope  = lookupFM global_name_env (ieName ie)
-	  Just (name,_)	  = maybe_in_scope
+	  rdr_name	  = ieName ie
+          maybe_in_scope  = lookupFM global_name_env rdr_name
+	  Just (name:dup_names) = maybe_in_scope
 	  maybe_avail     = lookupUFM entity_avail_env name
 	  Just avail      = maybe_avail
  	  export_avail    = filterAvail ie avail
 	  enough_avail	  = case export_avail of {NotAvailable -> False; other -> True}
 
-	-- We export a fixity iff we export a thing with the same (qualified) RdrName
-    mk_exported_fixities :: NameSet -> [(OccName, Fixity)]
-    mk_exported_fixities exports
-	= fmToList (foldr (perhaps_add_fixity exports) 
-			  emptyFM
-			  (fmToList fixity_env))
+add_avail avails avail = addToNameEnv_C plusAvail avails (availName avail) avail
 
-    perhaps_add_fixity :: NameSet -> (RdrName, (Fixity, HowInScope))
-		       -> FiniteMap OccName Fixity
-		       -> FiniteMap OccName Fixity
-    perhaps_add_fixity exports (rdr_name, (fixity, how_in_scope)) fix_env
-      =  let
-	    do_nothing = fix_env		-- The default is to pass on the env unchanged
-	 in
-      	 	-- Step 1: check whether the rdr_name is in scope; if so find its Name
-	 case lookupFM global_name_env rdr_name of {
-	   Nothing 	        -> do_nothing;
-	   Just (fixity_name,_) -> 
-
-		-- Step 2: check whether the fixity thing is exported
-	 if not (fixity_name `elemNameSet` exports) then
-		do_nothing
-	 else
-	
-		-- Step 3: check whether we already have a fixity for the
-		-- Name's OccName in the fix_env we are building up.  This can easily
-		-- happen.  the original fixity_env might contain bindings for
-		--	M.a and N.a, if a was imported via M and N.
-		-- If this does happen, we expect the fixity to be the same either way.
-	let
-	    occ_name = rdrNameOcc rdr_name
-	in
-	case lookupFM fix_env occ_name of {
-	  Just fixity1 -> 	-- Got it already
-			   ASSERT( fixity == fixity1 )
-			   do_nothing;
-	  Nothing -> 
-
-		-- Step 3: add it to the outgoing fix_env
-	addToFM fix_env occ_name fixity
-	}}
-
-{- warn and weed out duplicate module entries from export list. -}
-checkForModuleExportDups :: [RdrNameIE] -> RnMG [RdrNameIE]
-checkForModuleExportDups ls 
-  | opt_WarnDuplicateExports = check_modules ls
-  | otherwise                = returnRn ls
+check_occs :: RdrNameIE -> ExportOccMap -> AvailInfo -> RnMG ExportOccMap
+check_occs ie occs avail 
+  = foldlRn check occs (availNames avail)
   where
-   -- NOTE: reorders the export list by moving all module-contents
-   -- exports to the end (removing duplicates in the process.)
-   check_modules ls = 
-     (case dups of
-        [] -> returnRn ()
-        ls -> mapRn (\ ds@(IEModuleContents x:_) -> 
-                       addWarnRn (dupModuleExport x (length ds))) ls `thenRn_`
-              returnRn ()) `thenRn_`
-     returnRn (ls_no_modules ++ no_module_dups)
-     where
-      (ls_no_modules,modules) = foldr split_mods ([],[]) ls
+    check occs name
+      = case lookupFM occs name_occ of
+	  Nothing	    -> returnRn (addToFM occs name_occ (name, ie))
+	  Just (name', ie') 
+	    | name == name' -> 	-- Duplicate export
+				warnCheckRn opt_WarnDuplicateExports
+					    (dupExportWarn name_occ ie ie')	`thenRn_`
+				returnRn occs
 
-      split_mods i@(IEModuleContents _) (no_ms,ms) = (no_ms,i:ms)
-      split_mods i (no_ms,ms) = (i:no_ms,ms)
-
-      (no_module_dups, dups) = removeDups cmp_mods modules
-
-      cmp_mods (IEModuleContents m1) (IEModuleContents m2) = m1 `compare` m2
-  
-mk_export_fn :: [AvailInfo] -> (Name -> ExportFlag)
-mk_export_fn avails
+	    | otherwise	    ->	-- Same occ name but different names: an error
+				failWithRn occs (exportClashErr name_occ ie ie')
+      where
+	name_occ = nameOccName name
+	
+mk_export_fn :: NameSet -> (Name -> ExportFlag)
+mk_export_fn exported_names
   = \name -> if name `elemNameSet` exported_names
 	     then Exported
 	     else NotExported
-  where
-    exported_names :: NameSet
-    exported_names = availsToNameSet avails
 \end{code}
 
 %************************************************************************
@@ -648,18 +649,32 @@ exportItemErr export_item avail
 	   4 (vcat [hsep [ptext SLIT("Wanted:   "), ppr export_item],
 		    hsep [ptext SLIT("Available:"), ppr (ieOcc export_item), pprAvail avail]])
 
-availClashErr (occ_name, ((ie1,avail1,_), (ie2,avail2,_)))
+exportClashErr occ_name ie1 ie2
   = hsep [ptext SLIT("The export items"), quotes (ppr ie1), ptext SLIT("and"), quotes (ppr ie2),
 	  ptext SLIT("create conflicting exports for"), quotes (ppr occ_name)]
 
-dupExportWarn (occ_name, (_,_,times))
+dupDeclErr (n:ns)
+  = vcat [ptext SLIT("Multiple declarations of") <+> quotes (ppr n),
+	  nest 4 (vcat (map pp (n:ns)))]
+  where
+    pp n = pprProvenance (getNameProvenance n)
+
+dupExportWarn occ_name ie1 ie2
   = hsep [quotes (ppr occ_name), 
-          ptext SLIT("mentioned"), speakNTimes (times+1),
+          ptext SLIT("is exported by"), quotes (ppr ie1),
+          ptext SLIT("and"),            quotes (ppr ie2)]
+
+dupModuleExport mod
+  = hsep [ptext SLIT("Duplicate"),
+	  quotes (ptext SLIT("Module") <+> pprModule mod), 
           ptext SLIT("in export list")]
 
-dupModuleExport mod times
-  = hsep [ptext SLIT("Module"), quotes (pprModule mod), 
-          ptext SLIT("mentioned"), speakNTimes times,
-          ptext SLIT("in export list")]
+unusedFixityDecl rdr_name fixity
+  = hsep [ptext SLIT("Unused fixity declaration for"), quotes (ppr rdr_name)]
+
+dupFixityDecl rdr_name loc1 loc2
+  = vcat [ptext SLIT("Multiple fixity declarations for") <+> quotes (ppr rdr_name),
+	  ptext SLIT("at ") <+> ppr loc1,
+	  ptext SLIT("and") <+> ppr loc2]
+
 \end{code}
-

@@ -8,7 +8,8 @@ module NameSet (
 	-- Sets of Names
 	NameSet,
 	emptyNameSet, unitNameSet, mkNameSet, unionNameSets, unionManyNameSets,
-	minusNameSet, elemNameSet, nameSetToList, addOneToNameSet, addListToNameSet, isEmptyNameSet,
+	minusNameSet, elemNameSet, nameSetToList, addOneToNameSet, addListToNameSet, 
+	delFromNameSet, delListFromNameSet, isEmptyNameSet,
     ) where
 
 #include "HsVersions.h"
@@ -26,17 +27,19 @@ import UniqSet
 
 \begin{code}
 type NameSet = UniqSet Name
-emptyNameSet	  :: NameSet
-unitNameSet	  :: Name -> NameSet
-addListToNameSet  :: NameSet -> [Name] -> NameSet
-addOneToNameSet   :: NameSet -> Name -> NameSet
-mkNameSet         :: [Name] -> NameSet
-unionNameSets	  :: NameSet -> NameSet -> NameSet
-unionManyNameSets :: [NameSet] -> NameSet
-minusNameSet 	  :: NameSet -> NameSet -> NameSet
-elemNameSet	  :: Name -> NameSet -> Bool
-nameSetToList	  :: NameSet -> [Name]
-isEmptyNameSet	  :: NameSet -> Bool
+emptyNameSet	   :: NameSet
+unitNameSet	   :: Name -> NameSet
+addListToNameSet   :: NameSet -> [Name] -> NameSet
+addOneToNameSet    :: NameSet -> Name -> NameSet
+mkNameSet          :: [Name] -> NameSet
+unionNameSets	   :: NameSet -> NameSet -> NameSet
+unionManyNameSets  :: [NameSet] -> NameSet
+minusNameSet 	   :: NameSet -> NameSet -> NameSet
+elemNameSet	   :: Name -> NameSet -> Bool
+nameSetToList	   :: NameSet -> [Name]
+isEmptyNameSet	   :: NameSet -> Bool
+delFromNameSet	   :: NameSet -> Name -> NameSet
+delListFromNameSet :: NameSet -> [Name] -> NameSet
 
 isEmptyNameSet    = isEmptyUniqSet
 emptyNameSet	  = emptyUniqSet
@@ -49,6 +52,9 @@ unionManyNameSets = unionManyUniqSets
 minusNameSet	  = minusUniqSet
 elemNameSet       = elementOfUniqSet
 nameSetToList     = uniqSetToList
+delFromNameSet    = delOneFromUniqSet
+
+delListFromNameSet set ns = foldl delFromNameSet set ns
 \end{code}
 
 

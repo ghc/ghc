@@ -19,7 +19,7 @@ import OrdList		( mkEmptyList, mkUnitList, mkSeqList, mkParList,
 			  flattenOrdList, OrdList
 			)
 import Unique		( mkBuiltinUnique )
-import Util		( mapAccumB, panic, trace )
+import Util		( mapAccumB )
 import Outputable
 \end{code}
 

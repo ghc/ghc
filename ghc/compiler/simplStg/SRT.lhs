@@ -10,7 +10,7 @@ bindings have no CAF references, and record the fact in their IdInfo.
 module SRT where
 
 import Id       ( Id, setIdCafInfo, getIdCafInfo, externallyVisibleId,
-		  isBottomingId )
+		  idAppIsBottom )
 import IdInfo 	( CafInfo(..) )
 import StgSyn
 
@@ -396,8 +396,8 @@ mk_caf_info (StgRhsCon cc con args) srt
 	| otherwise = MayHaveCafRefs	 -- otherwise, treat as a CAF
 
 isBottomingExpr (StgLet bind expr) = isBottomingExpr expr
-isBottomingExpr (StgApp f args) = isBottomingId f
-isBottomingExpr _ = False
+isBottomingExpr (StgApp f args)    = idAppIsBottom f (length args)
+isBottomingExpr _ 		   = False
 \end{code}
 
 -----------------------------------------------------------------------------

@@ -59,7 +59,7 @@ module Costs( costs,
 
 import AbsCSyn
 import PrimOp		( primOpNeedsWrapper, PrimOp(..) )
-import Util		( trace )
+import Panic		( trace )
 
 -- --------------------------------------------------------------------------
 data CostRes = Cost (Int, Int, Int, Int, Int)

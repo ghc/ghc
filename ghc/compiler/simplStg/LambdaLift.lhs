@@ -11,16 +11,15 @@ module LambdaLift ( liftProgram ) where
 import StgSyn
 
 import Bag		( Bag, emptyBag, unionBags, unitBag, snocBag, bagToList )
-import Id		( mkSysLocal, idType, setIdArity, 
-			  setIdVisibility, Id
-			)
+import Id		( mkUserId, idType, setIdArity, Id )
 import VarSet
 import VarEnv
 import IdInfo		( exactArity )
-import Name             ( Module )
+import Name             ( Module, mkTopName )
 import Type		( splitForAllTys, mkForAllTys, mkFunTys, Type )
 import UniqSupply	( uniqFromSupply, splitUniqSupply, UniqSupply )
-import Util		( zipEqual, panic, assertPanic )
+import Util		( zipEqual )
+import Panic		( panic, assertPanic )
 \end{code}
 
 This is the lambda lifter.  It turns lambda abstractions into
@@ -441,7 +440,7 @@ newSupercombinator :: Type
 		   -> LiftM Id
 
 newSupercombinator ty arity mod ci us idenv
-  = setIdVisibility (Just mod) uniq (mkSysLocal uniq ty)
+  = mkUserId (mkTopName uniq mod SLIT("_ll")) ty
     `setIdArity` exactArity arity
 	-- ToDo: rm the setIdArity?  Just let subsequent stg-saturation pass do it?
   where

@@ -17,14 +17,17 @@ import Type		( Kind, mkArrowKind, boxedTypeKind, openTypeKind )
 import IdInfo           ( ArityInfo, exactArity )
 import Lex		
 
+import RnEnv            ( ifaceUnqualTC, ifaceUnqualVar, ifaceUnqualTv, ifaceQualVar, ifaceQualTC )
 import RnMonad		( ImportVersion, LocalVersion, ParsedIface(..), WhatsImported(..),
 			  RdrNamePragma, ExportItem, RdrAvailInfo, GenAvailInfo(..)
 			) 
 import Bag		( emptyBag, unitBag, snocBag )
 import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM, FiniteMap )
-import Name		( OccName(..), isTCOcc, Provenance, Module,
-			  mkTupNameStr, mkUbxTupNameStr
+import Name		( OccName, isTCOcc, Provenance, Module,
+			  varOcc, tcOcc, mkModuleFS
 			)
+import PrelMods         ( mkTupNameStr, mkUbxTupNameStr )
+import PrelInfo         ( mkTupConRdrName, mkUbxTupConRdrName )
 import SrcLoc		( SrcLoc )
 import Maybes
 import Outputable
@@ -145,22 +148,20 @@ iface_stuff : iface		{ PIface  $1 }
 
 
 iface		:: { ParsedIface }
-iface		: '__interface' CONID INTEGER checkVersion 'where'
+iface		: '__interface' mod_name INTEGER checkVersion 'where'
                   import_part
 		  instance_import_part
 		  exports_part
-		  fixities_part
 		  instance_decl_part
 		  decls_part
 		  { ParsedIface 
-			$2 			-- Module name
+		        $2  		        -- Module name
 			(fromInteger $3) 	-- Module version
 			(reverse $6)	        -- Usages
 			(reverse $8)	        -- Exports
 			(reverse $7)	        -- Instance import modules
-			(reverse $9)	        -- Fixities
-			(reverse $11)		-- Decls
-			(reverse $10)		-- Local instances
+			(reverse $10)		-- Decls
+			(reverse $9)		-- Local instances
 		  }
 
 --------------------------------------------------------------------------
@@ -216,15 +217,11 @@ stuff_inside	:  '{' val_occs '}'			{ $2 }
 
 --------------------------------------------------------------------------
 
-fixities_part   :: { [(OccName,Fixity)] }
-fixities_part   :  					        { [] }
-		| fixities_part fixity_decl ';'			{ $2 : $1 }
-
-fixity_decl     :: { (OccName,Fixity) }
-fixity_decl	: 'infixl' mb_fix val_occ	{ ($3, Fixity $2 InfixL) }
-		| 'infixr' mb_fix val_occ	{ ($3, Fixity $2 InfixR) }
-		| 'infix'  mb_fix val_occ	{ ($3, Fixity $2 InfixN) }
-
+fixity      :: { FixityDirection }
+fixity      : 'infixl'                                  { InfixL }
+            | 'infixr'                                  { InfixR }
+            | 'infix'                                   { InfixN }
+   
 mb_fix      :: { Int }
 mb_fix	    : {-nothing-}				{ 9 }
 	    | INTEGER					{ (fromInteger $1) }
@@ -272,21 +269,24 @@ decl	:: { RdrNameHsDecl }
 decl    : src_loc var_name '::' type maybe_idinfo
   		 	 { SigD (IfaceSig $2 $4 ($5 $2) $1) }
 	| src_loc 'type' tc_name tv_bndrs '=' type 		       
-			{ TyD (TySynonym $3 $4 $6 $1) }
+			{ TyClD (TySynonym $3 $4 $6 $1) }
 	| src_loc 'data' decl_context data_fs tv_bndrs constrs 	       
-	       		{ TyD (TyData DataType $3 (Unqual (TCOcc $4)) $5 $6 Nothing noDataPragmas $1) }
+	       		{ TyClD (TyData DataType $3 (ifaceUnqualTC $4) $5 $6 Nothing noDataPragmas $1) }
 	| src_loc 'newtype' decl_context tc_name tv_bndrs newtype_constr
-			{ TyD (TyData NewType $3 $4 $5 $6 Nothing noDataPragmas $1) }
+			{ TyClD (TyData NewType $3 $4 $5 $6 Nothing noDataPragmas $1) }
 	| src_loc 'class' decl_context tc_name tv_bndrs csigs
-			{ ClD (mkClassDecl $3 $4 $5 $6 EmptyMonoBinds 
+			{ TyClD (mkClassDecl $3 $4 $5 $6 EmptyMonoBinds 
 					noClassPragmas $1) }
+        | src_loc fixity mb_fix val_occ
+                        { FixD (FixitySig (Unqual $4) (Fixity $3 $2) $1) }
+
 maybe_idinfo  :: { RdrName -> [HsIdInfo RdrName] }
 maybe_idinfo  : {- empty -} 	{ \_ -> [] }
 	      | src_loc PRAGMA	{ \x -> 
 				   case parseIface $2 $1 of
 				     Succeeded (PIdInfo id_info) -> id_info
-				     other -> pprPanic "IdInfo parse failed" 
-						(ppr x)
+				     Failed err -> pprPanic "IdInfo parse failed" 
+				                            (vcat [ppr x, err])
 				}
 
 -----------------------------------------------------------------------------
@@ -309,8 +309,8 @@ constrs1	:  constr		{ [$1] }
 		|  constr '|' constrs1	{ $1 : $3 }
 
 constr		:: { RdrNameConDecl }
-constr		:  src_loc ex_stuff data_fs batypes		{ mkConDecl (Unqual (VarOcc $3)) $2 (VanillaCon $4) $1 }
-		|  src_loc ex_stuff data_fs '{' fields1 '}'	{ mkConDecl (Unqual (VarOcc $3)) $2 (RecCon $5)     $1 }
+constr		:  src_loc ex_stuff data_fs batypes		{ mkConDecl (ifaceUnqualVar $3) $2 (VanillaCon $4) $1 }
+		|  src_loc ex_stuff data_fs '{' fields1 '}'	{ mkConDecl (ifaceUnqualVar $3) $2 (RecCon $5)     $1 }
                 -- We use "data_fs" so as to include ()
 
 newtype_constr	:: { [RdrNameConDecl] {- Empty if handwritten abstract -} }
@@ -383,7 +383,7 @@ atypes		:  					{ [] }
 ---------------------------------------------------------------------
 
 mod_name	:: { Module }
-		:  CONID		{ $1 }
+		:  CONID		{ mkModuleFS $1 }
 
 var_fs		:: { FAST_STRING }
 		: VARID			{ $1 }
@@ -404,24 +404,24 @@ commas		:: { Int }
 		| commas ','		{ $1 + 1 }
 
 val_occ		:: { OccName }
-		:  var_fs 		{ VarOcc $1 }
-                |  data_fs              { VarOcc $1 }
+		:  var_fs 		{ varOcc $1 }
+                |  data_fs              { varOcc $1 }
 
 val_occs	:: { [OccName] }
 		:  val_occ    		{ [$1] }
 		|  val_occ val_occs	{ $1 : $2 }
 
 entity_occ	:: { OccName }
-		:  var_fs		{ VarOcc $1 }
-		|  data_fs 		{ TCOcc $1 }
+		:  var_fs		{ varOcc $1 }
+		|  data_fs 		{ tcOcc $1 }
 
 var_name	:: { RdrName }
-var_name	:  var_fs		{ Unqual (VarOcc $1) }
+var_name	:  var_fs		{ ifaceUnqualVar $1 }
 
 qvar_name	:: { RdrName }
 qvar_name	:  var_name		{ $1 }
-		|  QVARID		{ lexVarQual $1 }
-		|  QVARSYM		{ lexVarQual $1 }
+		|  QVARID		{ ifaceQualVar $1 }
+		|  QVARSYM		{ ifaceQualVar $1 }
 
 var_names	:: { [RdrName] }
 var_names	: 			{ [] }
@@ -431,39 +431,39 @@ var_names1	:: { [RdrName] }
 var_names1	: var_name var_names	{ $1 : $2 }
 
 data_name	:: { RdrName }
-		:  CONID		{ Unqual (VarOcc $1) }
-		|  CONSYM		{ Unqual (VarOcc $1) }
-		|  '(' commas ')'	{ Unqual (VarOcc (snd (mkTupNameStr $2))) }
-		|  '[' ']'              { Unqual (VarOcc SLIT("[]")) }
+		:  CONID		{ ifaceUnqualVar $1 }
+		|  CONSYM		{ ifaceUnqualVar $1 }
+		|  '(' commas ')'	{ ifaceUnqualVar (snd (mkTupNameStr $2)) }
+		|  '[' ']'              { ifaceUnqualVar SLIT("[]") }
 
 qdata_name	:: { RdrName }
 qdata_name	:  data_name		{ $1 }
-		|  QCONID		{ lexVarQual $1 }
-		|  QCONSYM		{ lexVarQual $1 }
+		|  QCONID		{ ifaceQualVar $1 }
+		|  QCONSYM		{ ifaceQualVar $1 }
 				
 qdata_names	:: { [RdrName] }
 qdata_names	:				{ [] }
 		| qdata_name qdata_names	{ $1 : $2 }
 
 tc_name		:: { RdrName }
-tc_name		:  CONID		{ Unqual (TCOcc $1) }
-		|  CONSYM		{ Unqual (TCOcc $1) }
-		|  '(' '->' ')'		{ Unqual (TCOcc SLIT("->")) }
-		|  '(' commas ')'	{ Unqual (TCOcc (snd (mkTupNameStr $2))) }
-		|  '[' ']'		{ Unqual (TCOcc SLIT("[]")) }
+tc_name		:  CONID		{ ifaceUnqualTC $1 }
+		|  CONSYM		{ ifaceUnqualTC $1 }
+		|  '(' '->' ')'		{ ifaceUnqualTC SLIT("->") }
+		|  '(' commas ')'	{ ifaceUnqualTC (snd (mkTupNameStr $2)) }
+		|  '[' ']'		{ ifaceUnqualTC SLIT("[]") }
 
 qtc_name	:: { RdrName }
 qtc_name	: tc_name		{ $1 }
-		| QCONID		{ lexTcQual $1 }
-		| QCONSYM		{ lexTcQual $1 }
+		| QCONID		{ ifaceQualTC $1 }
+		| QCONSYM		{ ifaceQualTC $1 }
 
 tv_name		:: { RdrName }
-tv_name		:  VARID 		{ Unqual (TvOcc $1) }
-		|  VARSYM		{ Unqual (TvOcc $1) {- Allow t2 as a tyvar -} }
+tv_name		:  VARID 		{ ifaceUnqualTv $1 }
+		|  VARSYM		{ ifaceUnqualTv $1 {- Allow t2 as a tyvar -} }
 
 tv_bndr		:: { HsTyVar RdrName }
 tv_bndr		:  tv_name '::' akind	{ IfaceTyVar $1 $3 }
-		|  tv_name		{ UserTyVar $1 }
+		|  tv_name		{ IfaceTyVar $1 boxedTypeKind }
 
 tv_bndrs	:: { [HsTyVar RdrName] }
 		:  			{ [] }
@@ -476,7 +476,7 @@ kind		:: { Kind }
 akind		:: { Kind }
 		: VARSYM		{ if $1 == SLIT("*") then
 						boxedTypeKind
-					  else if $1 == SLIT("**") then
+					  else if $1 == SLIT("?") then
 						openTypeKind
 					  else panic "ParseInterface: akind"
 					}
@@ -491,7 +491,6 @@ id_info		: 	 			{ [] }
 id_info_item	:: { HsIdInfo RdrName }
 id_info_item	: '__A' arity_info		{ HsArity $2 }
 		| strict_info			{ HsStrictness $1 }
-		| '__bot' 			{ HsStrictness HsBottom }
 		| '__U' core_expr		{ HsUnfold $1 (Just $2) }
                 | '__U' 		 	{ HsUnfold $1 Nothing }
                 | '__P' spec_tvs

@@ -16,11 +16,10 @@ module SpecEnv (
 import Var		( TyVar )
 import VarEnv
 import VarSet
-import Type		( Type, GenType, fullSubstTy, substTyVar )
+import Type		( Type, fullSubstTy, substTyVar )
 import Unify		( unifyTyListsX, matchTys )
 import Outputable
 import Maybes
-import Util		( assertPanic )
 \end{code}
 
 
@@ -87,8 +86,8 @@ arbitrary "flexi" part.
 \begin{code}
 lookupSpecEnv :: SDoc		-- For error report
 	      -> SpecEnv value	-- The envt
-	      -> [GenType flexi]		-- Key
-	      -> Maybe (TyVarEnv (GenType flexi), value)
+	      -> [Type]		-- Key
+	      -> Maybe (TyVarEnv Type, value)
 		     
 lookupSpecEnv doc EmptySE key = Nothing
 lookupSpecEnv doc (SpecEnv alist) key

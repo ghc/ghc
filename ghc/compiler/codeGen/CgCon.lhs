@@ -50,6 +50,7 @@ import PrelInfo		( maybeCharLikeCon, maybeIntLikeCon )
 import PrimRep		( PrimRep(..) )
 import BasicTypes	( TopLevelFlag(..) )
 import Util
+import Panic		( assertPanic )
 \end{code}
 
 %************************************************************************

@@ -63,17 +63,37 @@ checkfixity(vals)
 
 
 /*
-  Check Previous Pattern usage
+  We've found a function definition.  See if it defines the
+  same function as the previous definition (at this indentation level).
+  If so, set SAMEFN.
+  Set FN to the name of the function.
 */
 
 void
-checksamefn(fn)
-  qid fn;
+checksamefn(lhs)
+  tree lhs;
 {
-  char *this = qid_to_string(fn);
-  char *was  = (FN==NULL) ? NULL : qid_to_string(FN);
+  tree fn;
+  qid  fn_id;
+  char *this, *was;
 
+  fn = function(lhs);
+
+  if (ttree(fn) == ident) {
+      fn_id = gident((struct Sident *) fn);
+  }
+  else if (ttree(fn) == infixap)  {
+      fn_id = ginffun((struct Sinfixap *) fn); 
+  }
+  else {
+    fprintf( stderr, "Wierd funlhs" );
+    return;
+  }
+
+  this   = qid_to_string(fn_id);
+  was    = (FN==NULL) ? NULL : qid_to_string(FN);
   SAMEFN = (was != NULL && strcmp(this,was) == 0);
+  FN     = fn_id;
 
   if(!SAMEFN && etags)
 #if 1/*etags*/
@@ -215,11 +235,14 @@ expORpat(int wanted, tree e)
 	}
 	break;
 
+      case restr: /* type sig */
+        expORpat(wanted, grestre(e));
+        break;
+
       case par: /* parenthesised */
 	expORpat(wanted, gpare(e));
 	break;
 
-      case restr:
       case lambda:
       case let:
       case casee:
@@ -297,6 +320,7 @@ error_if_patt_wanted(int wanted, char *msg)
 }
 
 /* ---------------------------------------------------------------------- */
+
 
 BOOLEAN /* return TRUE if LHS is a pattern */
 lhs_is_patt(tree e)
@@ -433,28 +457,15 @@ binding rule;
   if(tbinding(bind) == abind)
     bind = gabindsnd(bind);
 
-  if(tbinding(bind) == pbind)
+  /*   if(tbinding(bind) == pbind)
     gpbindl(bind) = lconc(gpbindl(bind), gpbindl(rule));
-  else if(tbinding(bind) == fbind)
-    gfbindl(bind) = lconc(gfbindl(bind), gfbindl(rule));
+  
+    else */
+
+  if(tbinding(bind) == fbind)
+    gfbindm(bind) = lconc(gfbindm(bind), gfbindm(rule));
   else
     fprintf(stderr,"bind error in decl (%d)\n",tbinding(bind));
-}
-
-
-pbinding
-createpat(guards,where)
-  pbinding guards;
-  binding where;
-{
-  qid func;
-
-  if(FN != NULL)
-    func = FN;
-  else
-    func = mknoqual(install_literal(""));
-
-  return(mkpgrhs(PREVPATT,guards,where,func,endlineno));
 }
 
 

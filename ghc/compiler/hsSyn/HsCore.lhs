@@ -122,7 +122,7 @@ instance Outputable name => Outputable (UfCon name) where
 	    after  = if is_casm then text "'' " else space
 
 instance Outputable name => Outputable (UfBinder name) where
-    ppr (UfValBinder name ty)  = hsep [ppr name, ptext SLIT("::"), ppr ty]
-    ppr (UfTyBinder name kind) = hsep [ppr name, ptext SLIT("::"), ppr kind]
+    ppr (UfValBinder name ty)  = hsep [ppr name, dcolon, ppr ty]
+    ppr (UfTyBinder name kind) = hsep [ppr name, dcolon, ppr kind]
 \end{code}
 

@@ -16,7 +16,7 @@ import PrimRep		( PrimRep(..) )
 import CgStackery	( allocUpdateFrame )
 import CgUsages		( getSpRelOffset )
 import CmdLineOpts	( opt_SccProfilingOn )
-import Util		( assertPanic )
+import Panic		( assertPanic )
 \end{code}
 
 

@@ -18,8 +18,7 @@ import IO		( Handle, hPutStr, openFile,
 import HsSyn
 import RdrHsSyn		( RdrName(..) )
 import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..), IfaceFlavour(..),
-  			  StrictnessMark(..), 
-			  pprModule
+  			  StrictnessMark(..) 
 			)
 import RnMonad
 import RnEnv		( availName, ifaceFlavour )
@@ -38,14 +37,14 @@ import IdInfo		( IdInfo, StrictnessInfo, ArityInfo, InlinePragInfo(..), inlinePr
 			  arityInfo, ppArityInfo, 
 			  strictnessInfo, ppStrictnessInfo, 
 			  cafInfo, ppCafInfo,
-			  bottomIsGuaranteed, workerExists, 
+			  workerExists, isBottomingStrictness
 			)
 import CoreSyn		( CoreExpr, CoreBind, Bind(..) )
 import CoreUtils	( exprSomeFreeVars )
 import CoreUnfold	( calcUnfoldingGuidance, UnfoldingGuidance(..), 
 			  Unfolding, okToUnfoldInHiFile )
 import Name		( isLocallyDefined, isWiredInName, modAndOcc, nameModule,
-			  OccName, occNameString, isExported,
+			  OccName, pprOccName, pprModule, isExported, moduleString,
 			  Name, NamedThing(..)
 			)
 import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
@@ -54,7 +53,7 @@ import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
 import Class		( Class, classBigSig )
 import SpecEnv		( specEnvToList )
 import FieldLabel	( fieldLabelName, fieldLabelType )
-import Type		( mkSigmaTy, splitSigmaTy, mkDictTy,
+import Type		( mkSigmaTy, splitSigmaTy, mkDictTy, tidyTopType,
 			  Type, ThetaType
 		        )
 
@@ -103,7 +102,7 @@ startIface mod
       Nothing -> return Nothing -- not producing any .hi file
       Just fn -> do
 	if_hdl <- openFile fn WriteMode
-	hPutStr if_hdl ("__interface "++ _UNPK_ mod ++ ' ':show (opt_HiVersion :: Int))
+	hPutStr if_hdl ("__interface " ++ moduleString mod ++ ' ':show (opt_HiVersion :: Int))
 	hPutStrLn if_hdl " where"
 	return (Just if_hdl)
 
@@ -149,7 +148,7 @@ ifaceImports if_hdl import_usages
   where
     upp_uses (m, hif, mv, whats_imported)
       = ptext SLIT("import ") <>
-	hsep [pprModule m, pp_hif hif, int mv, ptext SLIT("::"),
+	hsep [pprModule m, pp_hif hif, int mv, dcolon,
 	      upp_import_versions whats_imported
 	] <> semi
 
@@ -163,7 +162,7 @@ ifaceImports if_hdl import_usages
 ifaceInstanceModules if_hdl [] = return ()
 ifaceInstanceModules if_hdl imods
   = let sorted = sortLt (<) imods
-	lines = map (\m -> ptext SLIT("__instimport ") <> ptext m <>
+	lines = map (\m -> ptext SLIT("__instimport ") <> pprModule m <>
 			   ptext SLIT(" ;")) sorted
     in 
     printForIface if_hdl (vcat lines) >>
@@ -229,7 +228,7 @@ ifaceInstances if_hdl inst_infos
     pp_inst (InstInfo clas tvs tys theta dfun_id _ _ _)
       = let			 
 	    forall_ty     = mkSigmaTy tvs theta (mkDictTy clas tys)
-	    renumbered_ty = nmbrGlobalType forall_ty
+	    renumbered_ty = tidyTopType forall_ty
 	in			 
 	hcat [ptext SLIT("instance "), pprType renumbered_ty, 
 		    ptext SLIT(" = "), ppr_unqual_name dfun_id, semi]
@@ -265,8 +264,8 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     idinfo         = get_idinfo id
     inline_pragma  = inlinePragInfo idinfo
 
-    ty_pretty  = pprType (nmbrGlobalType (idType id))
-    sig_pretty = hcat [ppr (getOccName id), ptext SLIT(" :: "), ty_pretty]
+    ty_pretty  = pprType (idType id)
+    sig_pretty = hsep [ppr (getOccName id), dcolon, ty_pretty]
 
     prag_pretty 
      | opt_OmitInterfacePragmas = empty
@@ -287,6 +286,7 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     ------------  Strictness  --------------
     strict_info   = strictnessInfo idinfo
     has_worker    = workerExists strict_info
+    bottoming_fn  = isBottomingStrictness strict_info
     strict_pretty = ppStrictnessInfo strict_info <+> wrkr_pretty
 
     wrkr_pretty | not has_worker = empty
@@ -301,7 +301,8 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     unfold_pretty | show_unfold = unfold_herald <+> pprIfaceUnfolding rhs
 		  | otherwise   = empty
 
-    show_unfold = not implicit_unfolding &&	-- Not unnecessary
+    show_unfold = not has_worker	&&	-- Not unnecessary
+		  not bottoming_fn	&&	-- Not necessary
 		  unfolding_needed		-- Not dangerous
 
     unfolding_needed =  case inline_pragma of
@@ -310,8 +311,6 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 			      NoInlinePragInfo  -> rhs_is_small
 			      other	        -> False
 
-    implicit_unfolding = has_worker ||
-			 bottomIsGuaranteed strict_info
 
     unfold_herald = case inline_pragma of
 			NoInlinePragInfo -> ptext SLIT("__u")
@@ -499,7 +498,7 @@ ifaceTyCon tycon
 
     ppr_field (strict_mark, field_label)
 	= hsep [ ppr (fieldLabelName field_label),
-		  ptext SLIT("::"),
+		  dcolon,
 		  ppr_strict_mark strict_mark <> pprParendType (fieldLabelType field_label)
 		]
 
@@ -526,7 +525,7 @@ ifaceClass clas
 	= ASSERT( sel_tyvars == clas_tyvars)
 	  hsep [ppr (getOccName sel_id),
 		if maybeToBool maybe_defm then equals else empty,
-	        ptext SLIT("::"),
+	        dcolon,
 		ppr op_ty
 	  ]
 	where
@@ -552,25 +551,26 @@ When printing export lists, we print like this:
 	AvailTC C [x, y]	C!(x,y)		-- Exporting x, y but not C
 
 \begin{code}
+upp_avail :: AvailInfo -> SDoc
 upp_avail NotAvailable      = empty
-upp_avail (Avail name)      = upp_occname (getOccName name)
+upp_avail (Avail name)      = pprOccName (getOccName name)
 upp_avail (AvailTC name []) = empty
-upp_avail (AvailTC name ns) = hcat [upp_occname (getOccName name), bang, upp_export ns']
+upp_avail (AvailTC name ns) = hcat [pprOccName (getOccName name), bang, upp_export ns']
 			    where
 			      bang | name `elem` ns = empty
 				   | otherwise	    = char '|'
 			      ns' = filter (/= name) ns
 
+upp_export :: [Name] -> SDoc
 upp_export []    = empty
-upp_export names = braces (hsep (map (upp_occname . getOccName) names)) 
+upp_export names = braces (hsep (map (pprOccName . getOccName) names)) 
 
-upp_fixity (occ, fixity) = hcat [ppr fixity, space, upp_occname occ, semi]
+upp_fixity :: (Name, Fixity) -> SDoc
+upp_fixity (name, fixity) = hsep [ptext SLIT("0"), ppr fixity, ppr name, semi]
+	-- Dummy version number!
 
 ppr_unqual_name :: NamedThing a => a -> SDoc		-- Just its occurrence name
-ppr_unqual_name name = upp_occname (getOccName name)
-
-upp_occname :: OccName -> SDoc
-upp_occname occ = ptext (occNameString occ)
+ppr_unqual_name name = pprOccName (getOccName name)
 \end{code}
 
 

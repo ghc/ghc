@@ -81,7 +81,7 @@ module Constants (
 #include "../includes/MachRegs.h"
 #include "../includes/Constants.h"
 
-import Util
+-- import Util
 \end{code}
 
 All pretty arbitrary:

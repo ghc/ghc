@@ -26,12 +26,11 @@ module CostCentre (
 
 #include "HsVersions.h"
 
-import Var		( externallyVisibleId, GenId, Id )
-import CStrings		( identToC, stringToC )
-import Name		( getOccString )
+import Var		( externallyVisibleId, Id )
+import CStrings		( stringToC )
+import Name		( Module, getOccString, moduleString, identToC, pprModule )
 import Outputable	
-import BasicTypes	( moduleString )
-import Util	        ( panic, assertPanic, thenCmp )
+import Util	        ( thenCmp )
 \end{code}
 
 A Cost Centre Stack is something that can be attached to a closure.
@@ -94,24 +93,26 @@ data CostCentreStack
 A Cost Centre is the argument of an _scc_ expression.
  
 \begin{code}
+type Group = FAST_STRING	-- "Group" that this CC is in; eg directory
+
 data CostCentre
   = NoCostCentre	-- Having this constructor avoids having
 			-- to use "Maybe CostCentre" all the time.
 
-  | NormalCC	CcKind	 -- CcKind will include a cost-centre name
-		FAST_STRING	 -- Name of module defining this CC.
-		FAST_STRING   -- "Group" that this CC is in.
-		IsDupdCC -- see below
-		IsCafCC	 -- see below
+  | NormalCC	CcKind		-- CcKind will include a cost-centre name
+		Module		-- Name of module defining this CC.
+		Group	  	-- "Group" that this CC is in.
+		IsDupdCC	-- see below
+		IsCafCC		-- see below
 
-  | AllCafsCC	FAST_STRING	-- Ditto for CAFs.
-		FAST_STRING  -- We record module and group names.
+  | AllCafsCC	Module		-- Ditto for CAFs.
+		Group	 	-- We record module and group names.
 			-- Again, one "big" CAF cc per module, where all
 			-- CAF costs are attributed unless the user asked for
 			-- per-individual-CAF cost attribution.
 
-  | AllDictsCC	FAST_STRING	-- Ditto for dictionaries.
-		FAST_STRING  -- We record module and group names.
+  | AllDictsCC	Module		-- Ditto for dictionaries.
+		Group		-- We record module and group names.
 			-- Again, one "big" DICT cc per module, where all
 			-- DICT costs are attributed unless the user asked for
 			-- per-individual-DICT cost attribution.
@@ -190,13 +191,13 @@ currentOrSubsumedCCS _			= False
 Building cost centres
 
 \begin{code}
-mkUserCC :: FAST_STRING -> FAST_STRING -> FAST_STRING -> CostCentre
+mkUserCC :: FAST_STRING -> Module -> Group -> CostCentre
 
 mkUserCC cc_name module_name group_name
   = NormalCC (UserCC cc_name) module_name group_name
 	     AnOriginalCC IsNotCafCC{-might be changed-}
 
-mkDictCC, mkAutoCC :: Id -> FAST_STRING -> FAST_STRING -> IsCafCC -> CostCentre
+mkDictCC, mkAutoCC :: Id -> Module -> Group -> IsCafCC -> CostCentre
 
 mkDictCC id module_name group_name is_caf
   = NormalCC (DictCC id) module_name group_name
@@ -266,7 +267,7 @@ sccAbleCostCentre NoCostCentre  = panic "sccAbleCC:NoCostCentre"
 sccAbleCostCentre cc | isCafCC cc = False
 		     | otherwise  = True
 
-ccFromThisModule :: CostCentre -> FAST_STRING{-module name-} -> Bool
+ccFromThisModule :: CostCentre -> Module -> Bool
 
 ccFromThisModule (NormalCC _ m _ _ _) mod_name = m == mod_name
 ccFromThisModule (AllCafsCC  m _)     mod_name = m == mod_name
@@ -349,7 +350,7 @@ instance Outputable CostCentreStack where
 			getPprStyle $ \sty ->
 			if (codeStyle sty) 
 			    then ptext SLIT("CCS_") <> 
-				 identToC (_PK_ (costCentreStr cc))
+				 ptext (identToC (costCentreStr cc))
 			    else ptext SLIT("CCS.") <> text (costCentreStr cc)
 
 pprCostCentreStackDecl :: CostCentreStack -> SDoc
@@ -396,13 +397,13 @@ instance Outputable CostCentre where
 		then ppCostCentreIface cc
 		else text (costCentreStr cc)
 
-ppCostCentreLbl cc   = ptext SLIT("CC_") <> identToC (_PK_ (costCentreStr cc))
+ppCostCentreLbl cc   = ptext SLIT("CC_") <> ptext (identToC (costCentreStr cc))
 ppCostCentreIface cc = doubleQuotes (text (costCentreStr cc))
 ppCostCentreName cc  = doubleQuotes (text (stringToC (costCentreName cc)))
 
 costCentreStr (NoCostCentre)		= "NO_CC"
-costCentreStr (AllCafsCC m _) 		= "CAFs."  ++ _UNPK_ m
-costCentreStr (AllDictsCC m _ d) 	= "DICTs." ++ _UNPK_ m
+costCentreStr (AllCafsCC m _) 		= "CAFs."  ++ moduleString m
+costCentreStr (AllDictsCC m _ d) 	= "DICTs." ++ moduleString m
 costCentreStr (NormalCC kind mod_name grp_name is_dupd is_caf)
   =  case is_caf of { IsCafCC -> "CAF:";   _ -> "" }
   ++ moduleString mod_name
@@ -438,8 +439,8 @@ pprCostCentreDecl is_local cc
 	    ptext SLIT("CC_DECLARE"),char '(',
 	    cc_ident, 		  comma,
 	    ppCostCentreName cc,  comma,
-	    pp_str mod_name,      comma,
-	    pp_str grp_name,      comma,
+	    doubleQuotes (pprModule mod_name), comma,
+	    doubleQuotes (ptext grp_name),     comma,
 	    ptext is_subsumed,    comma,
 	    if externally_visible
 	       then empty 
@@ -450,15 +451,13 @@ pprCostCentreDecl is_local cc
   where
     cc_ident = ppCostCentreLbl cc
 
-    pp_str s  = doubleQuotes (ptext s)
-
     (mod_name, grp_name, is_subsumed, externally_visible)
       = get_cc_info cc
 
 
 get_cc_info :: CostCentre -> 
-	(FAST_STRING,			-- module name
-	 FAST_STRING,			-- group name
+	(Module,			-- module 
+	 Group,				-- group name
 	 FAST_STRING,			-- subsumed value
 	 Bool)				-- externally visible
 	  

@@ -26,10 +26,10 @@ import HsSyn		( HsDecl(..), ForeignDecl(..), HsExpr(..),
 import RnHsSyn		( RenamedHsDecl, RenamedForeignDecl )
 
 import TcMonad
-import TcEnv		( tcLookupClassByKey, newLocalId, tcLookupGlobalValue )
+import TcEnv		( newLocalId )
 import TcType		( tcInstTcType, typeToTcType, tcSplitRhoTy, zonkTcTypeToType )
 import TcMonoType	( tcHsType )
-import TcHsSyn		( TcMonoBinds, maybeBoxedPrimType, TypecheckedForeignDecl, TcIdOcc(..),
+import TcHsSyn		( TcMonoBinds, maybeBoxedPrimType, TypecheckedForeignDecl,
 			  TcForeignExportDecl )
 import TcExpr		( tcId, tcPolyExpr )			
 import Inst		( emptyLIE, LIE, plusLIE )
@@ -63,7 +63,7 @@ tcForeignImports :: [RenamedHsDecl] -> TcM s ([Id], [TypecheckedForeignDecl])
 tcForeignImports decls = 
    mapAndUnzipTc tcFImport [ foreign_decl | ForD foreign_decl <- decls, isForeignImport foreign_decl]
 
-tcForeignExports :: [RenamedHsDecl] -> TcM s (LIE s, TcMonoBinds s, [TcForeignExportDecl s])
+tcForeignExports :: [RenamedHsDecl] -> TcM s (LIE, TcMonoBinds, [TcForeignExportDecl])
 tcForeignExports decls = 
    foldlTc combine (emptyLIE, EmptyMonoBinds, [])
 		   [ foreign_decl | ForD foreign_decl <- decls, isForeignExport foreign_decl]
@@ -135,7 +135,7 @@ tcFImport fo@(ForeignDecl nm imp_exp hs_ty ext_nm cconv src_loc) =
 	let i = (mkUserId nm ty) in
 	returnTc (i, (ForeignDecl i imp_exp undefined ext_nm cconv src_loc))
 
-tcFExport :: RenamedForeignDecl -> TcM s (LIE s, TcMonoBinds s, TcForeignExportDecl s)
+tcFExport :: RenamedForeignDecl -> TcM s (LIE, TcMonoBinds, TcForeignExportDecl)
 tcFExport fo@(ForeignDecl nm imp_exp hs_ty ext_nm cconv src_loc) =
    tcAddSrcLoc src_loc		     $
    tcAddErrCtxt (foreignDeclCtxt fo) $
@@ -158,10 +158,9 @@ tcFExport fo@(ForeignDecl nm imp_exp hs_ty ext_nm cconv src_loc) =
 	  -- at a particular type (and, maybe, overloading).
 	newLocalId (nameOccName nm) sig_tc_ty	`thenNF_Tc` \ i ->
 	let
-	    i2    = TcId i
-	    bind  = VarMonoBind i2 rhs
+	    bind  = VarMonoBind i rhs
 	in
-	returnTc (lie, bind, ForeignDecl i2 imp_exp undefined ext_nm cconv src_loc)
+	returnTc (lie, bind, ForeignDecl i imp_exp undefined ext_nm cconv src_loc)
         --					    ^^^^^^^^^
         -- ToDo: fill the type field in with something sensible.
 

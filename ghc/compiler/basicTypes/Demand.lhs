@@ -78,9 +78,7 @@ isStrict (WwUnpack NewType _ ds) = isStrict (head ds)
 isStrict (WwUnpack other _ _)    = True
 isStrict WwStrict = True
 isStrict WwEnum	  = True
-isStrict WwPrim	  = False	-- NB: we treat only lifted types as strict.
-				-- Why is this important?  Mostly it doesn't matter
-				-- but it saves a test for lifted-ness in SimplUtils.etaCoreExpr
+isStrict WwPrim	  = True
 isStrict _	  = False
 \end{code}
 
@@ -97,7 +95,42 @@ isLazy _	      = False	-- (as they imply a worker)
 %*									*
 %************************************************************************
 
+
 \begin{code}
+pprDemands demands bot = hcat (map pprDemand demands) <> pp_bot
+		       where
+			 pp_bot | bot       = ptext SLIT("B")
+				| otherwise = empty
+
+
+pprDemand (WwLazy False)  	 = char 'L'
+pprDemand (WwLazy True)   	 = char 'A'
+pprDemand WwStrict	      	 = char 'S'
+pprDemand WwPrim	      	 = char 'P'
+pprDemand WwEnum	      	 = char 'E'
+pprDemand (WwUnpack nd wu args)  = char ch <> parens (hcat (map pprDemand args))
+				      where
+					ch = case nd of
+						DataType | wu        -> 'U'
+							 | otherwise -> 'u'
+						NewType  | wu        -> 'N'
+							 | otherwise -> 'n'
+
+instance Outputable Demand where
+    ppr (WwLazy False) = empty
+    ppr other_demand   = ptext SLIT("__D") <+> pprDemand other_demand
+
+instance Show Demand where
+    showsPrec p d = showsPrecSDoc p (ppr d)
+\end{code}
+
+
+\begin{code}
+{-	------------------- OMITTED NOW -------------------------------
+	-- Reading demands is done in Lex.lhs
+	-- Also note that the (old) code here doesn't take proper
+	-- account of the 'B' suffix for bottoming functions
+
 #ifdef REALLY_HASKELL_1_3
 
 instance Read Demand where
@@ -112,6 +145,8 @@ instance Text Demand where
     readList str  = read_em [] str
     showsPrec p d = showsPrecSDoc p (ppr d)
 #endif
+
+readDemands :: String -> 
 
 read_em acc ('L' : xs)	= read_em (WwLazy   False : acc) xs
 read_em acc ('A' : xs)	= read_em (WwLazy   True  : acc) xs
@@ -128,25 +163,8 @@ read_em acc rest	= [(reverse acc, rest)]
 do_unpack new_or_data wrapper_unpacks acc xs
 	  = case (read_em [] xs) of
 	      [(stuff, rest)] -> read_em (WwUnpack new_or_data wrapper_unpacks stuff : acc) rest
-	      _ -> pprPanic "Demand.do_unpack:" (ppr acc <+> text ("::"++xs))
+	      _ -> pprPanic "Demand.do_unpack:" (ppr acc <+> dcolon <> text xs)
 
-
-pprDemands demands = hcat (map pprDemand demands)
-
-pprDemand (WwLazy False)  	 = char 'L'
-pprDemand (WwLazy True)   	 = char 'A'
-pprDemand WwStrict	      	 = char 'S'
-pprDemand WwPrim	      	 = char 'P'
-pprDemand WwEnum	      	 = char 'E'
-pprDemand (WwUnpack nd wu args)  = char ch <> parens (pprDemands args)
-				      where
-					ch = case nd of
-						DataType | wu        -> 'U'
-							 | otherwise -> 'u'
-						NewType  | wu        -> 'N'
-							 | otherwise -> 'n'
-
-instance Outputable Demand where
-    ppr (WwLazy False) = empty
-    ppr other_demand   = ptext SLIT("__D") <+> pprDemand other_demand
+-------------------- END OF OMISSION ------------------------------  -}
 \end{code}
+

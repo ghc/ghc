@@ -11,11 +11,10 @@ module DsGRHSs ( dsGuarded, dsGRHSs ) where
 import {-# SOURCE #-} DsExpr  ( dsExpr, dsLet )
 import {-# SOURCE #-} Match   ( matchSinglePat )
 
-import HsSyn		( GRHSsAndBinds(..), Stmt(..), HsExpr(..), GRHS(..) )
-import TcHsSyn		( TypecheckedGRHSsAndBinds, TypecheckedGRHS,
-			  TypecheckedPat, TypecheckedStmt
-			)
+import HsSyn		( Stmt(..), HsExpr(..), GRHSs(..), GRHS(..) )
+import TcHsSyn		( TypecheckedGRHSs, TypecheckedPat, TypecheckedStmt )
 import CoreSyn		( CoreExpr, Bind(..) )
+import Type		( Type )
 
 import DsMonad
 import DsUtils
@@ -36,38 +35,29 @@ producing an expression with a runtime error in the corner if
 necessary.  The type argument gives the type of the ei.
 
 \begin{code}
-dsGuarded :: TypecheckedGRHSsAndBinds
-	  -> DsM CoreExpr
+dsGuarded :: TypecheckedGRHSs -> DsM CoreExpr
 
-dsGuarded (GRHSsAndBindsOut grhss binds err_ty)
-  = dsGRHSs PatBindMatch [] grhss 				`thenDs` \ match_result ->
+dsGuarded grhss
+  = dsGRHSs PatBindMatch [] grhss 				`thenDs` \ (err_ty, match_result) ->
     mkErrorAppDs nON_EXHAUSTIVE_GUARDS_ERROR_ID err_ty ""	`thenDs` \ error_expr ->
-    extractMatchResult match_result error_expr			`thenDs` \ body ->
-    dsLet binds body
+    extractMatchResult match_result error_expr
 \end{code}
 
-Desugar a list of (grhs, expr) pairs [grhs = guarded
-right-hand-side], as in:
-\begin{verbatim}
-p | g1 = e1
-  | g2 = e2
-  ...
-  | gm = em
-\end{verbatim}
-We supply a @CoreExpr@ for the case in which all of
-the guards fail.
+In contrast, @dsGRHSs@ produces a @MatchResult@.
 
 \begin{code}
 dsGRHSs :: DsMatchKind -> [TypecheckedPat]	-- These are to build a MatchContext from
-	-> [TypecheckedGRHS]			-- Guarded RHSs
-	-> DsM MatchResult
+	-> TypecheckedGRHSs			-- Guarded RHSs
+	-> DsM (Type, MatchResult)
 
-dsGRHSs kind pats [grhs] = dsGRHS kind pats grhs
-
-dsGRHSs kind pats (grhs:grhss)
-  = dsGRHS kind pats grhs	`thenDs` \ match_result1 ->
-    dsGRHSs kind pats grhss	`thenDs` \ match_result2 ->
-    returnDs (combineMatchResults match_result1 match_result2)
+dsGRHSs kind pats (GRHSs grhss binds (Just ty))
+  = mapDs (dsGRHS kind pats) grhss		`thenDs` \ match_results ->
+    let 
+	match_result1 = foldr1 combineMatchResults match_results
+	match_result2 = adjustMatchResultDs (dsLet binds) match_result1
+		-- NB: nested dsLet inside matchResult
+    in
+    returnDs (ty, match_result2)
 
 dsGRHS kind pats (GRHS guard locn)
   = matchGuard guard (DsMatchContext kind pats locn)

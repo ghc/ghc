@@ -20,10 +20,9 @@ import StgSyn		-- output
 import CoreUtils	( coreExprType )
 import SimplUtils	( findDefault )
 import CostCentre	( noCCS )
-import Id		( Id, mkUserLocal, idType,
+import Id		( Id, mkSysLocal, idType,
 			  externallyVisibleId, setIdUnique
 			)
-import Name		( varOcc )
 import VarEnv
 import Const		( Con(..), isWHNFCon, Literal(..) )
 import PrimOp		( PrimOp(..) )
@@ -406,7 +405,9 @@ coreExprToStgFloat env expr@(Case scrut bndr alts)
 
     alg_alt_to_stg env (DataCon con, bs, rhs)
 	  = coreExprToStg env rhs    `thenUs` \ stg_rhs ->
-	    returnUs (con, bs, [ True | b <- bs ]{-bogus use mask-}, stg_rhs)
+	    returnUs (con, filter isId bs, [ True | b <- bs ]{-bogus use mask-}, stg_rhs)
+		-- NB the filter isId.  Some of the binders may be
+		-- existential type variables, which STG doesn't care about
 
     prim_alt_to_stg env (Literal lit, args, rhs)
 	  = ASSERT( null args )
@@ -450,7 +451,7 @@ Invent a fresh @Id@:
 newStgVar :: Type -> UniqSM Id
 newStgVar ty
  = getUniqueUs	 		`thenUs` \ uniq ->
-   returnUs (mkUserLocal (varOcc SLIT("stg")) uniq ty)
+   returnUs (mkSysLocal SLIT("stg") uniq ty)
 \end{code}
 
 \begin{code}

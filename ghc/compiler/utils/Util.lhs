@@ -17,14 +17,14 @@ module Util (
         zipLazy, stretchZipEqual,
 	mapAndUnzip, mapAndUnzip3,
 	nOfThem, lengthExceeds, isSingleton,
-	startsWith, endsWith, snocView,
+	snocView,
 	isIn, isn'tIn,
 
 	-- association lists
 	assoc, assocUsing, assocDefault, assocDefaultUsing,
 
 	-- duplicate handling
-	hasNoDups, equivClasses, runs, removeDups,
+	hasNoDups, equivClasses, runs, removeDups, equivClassesByUniq,
 
 	-- sorting
 	IF_NOT_GHC(quicksort COMMA stableSortLt COMMA mergesort COMMA)
@@ -40,26 +40,19 @@ module Util (
 
 	-- comparisons
 	thenCmp, cmpList,
-	FastString,
 
 	-- pairs
 	IF_NOT_GHC(cfst COMMA applyToPair COMMA applyToFst COMMA)
 	IF_NOT_GHC(applyToSnd COMMA foldPair COMMA)
-	unzipWith,
-
-	-- tracing (abstract away from lib home)
-	trace,
-
-	-- error handling
-	panic, panic#, assertPanic
-
+	unzipWith
     ) where
 
 #include "HsVersions.h"
 
-import FastString	( FastString )
 import List		( zipWith4 )
-import GlaExts		( trace )
+import Panic		( panic )
+import Unique		( Unique )
+import UniqFM		( eltsUFM, emptyUFM, addToUFM_C )
 
 infixr 9 `thenCmp`
 \end{code}
@@ -205,18 +198,6 @@ isSingleton :: [a] -> Bool
 
 isSingleton [x] = True
 isSingleton  _  = False
-
-startsWith, endsWith :: String -> String -> Maybe String
-
-startsWith []     str = Just str
-startsWith (c:cs) (s:ss)
-  = if c /= s then Nothing else startsWith cs ss
-startsWith  _	  []  = Nothing
-
-endsWith cs ss
-  = case (startsWith (reverse cs) (reverse ss)) of
-      Nothing -> Nothing
-      Just rs -> Just (reverse rs)
 \end{code}
 
 \begin{code}
@@ -357,6 +338,21 @@ removeDups cmp xs
     collect_dups dups_so_far dups@(x:xs) = (dups:dups_so_far, x)
 \end{code}
 
+
+\begin{code}
+equivClassesByUniq :: (a -> Unique) -> [a] -> [[a]]
+	-- NB: it's *very* important that if we have the input list [a,b,c],
+	-- where a,b,c all have the same unique, then we get back the list
+	-- 	[a,b,c]
+	-- not
+	--	[c,b,a]
+	-- Hence the use of foldr, plus the reversed-args tack_on below
+equivClassesByUniq get_uniq xs
+  = eltsUFM (foldr add emptyUFM xs)
+  where
+    add a ufm = addToUFM_C tack_on ufm (get_uniq a) [a]
+    tack_on old new = new++old
+\end{code}
 
 %************************************************************************
 %*									*
@@ -742,25 +738,3 @@ unzipWith f pairs = map ( \ (a, b) -> f a b ) pairs
 \end{code}
 
 
-%************************************************************************
-%*									*
-\subsection[Utils-errors]{Error handling}
-%*									*
-%************************************************************************
-
-\begin{code}
-panic x = error ("panic! (the `impossible' happened):\n\t"
-	      ++ x ++ "\n\n"
-	      ++ "Please report it as a compiler bug "
-	      ++ "to glasgow-haskell-bugs@dcs.gla.ac.uk.\n\n" )
-
--- #-versions because panic can't return an unboxed int, and that's
--- what TAG_ is with GHC at the moment.  Ugh. (Simon)
--- No, man -- Too Beautiful! (Will)
-
-panic# :: String -> FAST_INT
-panic# s = case (panic s) of () -> ILIT(0)
-
-assertPanic :: String -> Int -> a
-assertPanic file line = panic ("ASSERT failed! file " ++ file ++ ", line " ++ show line)
-\end{code}

@@ -10,16 +10,14 @@ they are used somewhat later on in the compiler...)
 module RdrHsSyn (
 	RdrNameArithSeqInfo,
 	RdrNameBangType,
-	RdrNameClassDecl,
 	RdrNameClassOpSig,
 	RdrNameConDecl,
 	RdrNameContext,
 	RdrNameSpecDataSig,
 	RdrNameDefaultDecl,
 	RdrNameForeignDecl,
-	RdrNameFixityDecl,
 	RdrNameGRHS,
-	RdrNameGRHSsAndBinds,
+	RdrNameGRHSs,
 	RdrNameHsBinds,
 	RdrNameHsDecl,
 	RdrNameHsExpr,
@@ -33,69 +31,66 @@ module RdrHsSyn (
 	RdrNameHsType,
 	RdrNameSig,
 	RdrNameStmt,
-	RdrNameTyDecl,
+	RdrNameTyClDecl,
 
 	RdrNameClassOpPragmas,
 	RdrNameClassPragmas,
 	RdrNameDataPragmas,
 	RdrNameGenPragmas,
 	RdrNameInstancePragmas,
-	extractHsTyVars, extractHsCtxtTyVars,
+	extractHsTyVars, extractHsCtxtTyVars, extractPatsTyVars,
 
 	RdrName(..),
-	qual, varQual, tcQual, varUnqual, lexVarQual, lexTcQual, 
-	mkTupConRdrName, mkUbxTupConRdrName,
+	qual, varQual, tcQual, varUnqual,
 	dummyRdrVarName, dummyRdrTcName,
 	isUnqual, isQual,
 	rdrNameOcc, rdrNameModule, ieOcc,
-	cmpRdr, prefixRdrName,
-	mkOpApp, mkClassDecl, isClassDataConRdrName
+	cmpRdr,
+	mkOpApp, mkClassDecl
 
     ) where
 
 #include "HsVersions.h"
 
 import HsSyn
-import BasicTypes	( Module, IfaceFlavour(..), Unused )
-import Name		( pprModule, OccName(..), pprOccName, 
-			  mkTupNameStr, mkUbxTupNameStr,
-			  prefixOccName, NamedThing(..),
-			  mkClassTyConStr, mkClassDataConStr )
+import BasicTypes	( IfaceFlavour(..), Unused )
+import Name		( NamedThing(..), 
+			  Module, pprModule, mkModuleFS,
+			  OccName, srcTCOcc, srcVarOcc, isTvOcc,
+			  pprOccName, mkClassTyConOcc, mkClassDataConOcc
+			)
+import PrelMods		( mkTupNameStr, mkUbxTupNameStr )
 import Util		( thenCmp )
 import HsPragmas	( GenPragmas, ClassPragmas, DataPragmas, ClassOpPragmas, InstancePragmas )
 import List		( nub )
 import Outputable
-
-import Char		( isUpper )
 \end{code}
 
 \begin{code}
-type RdrNameArithSeqInfo	= ArithSeqInfo		Unused RdrName RdrNamePat
+type RdrNameArithSeqInfo	= ArithSeqInfo		RdrName RdrNamePat
 type RdrNameBangType		= BangType		RdrName
-type RdrNameClassDecl		= ClassDecl		Unused RdrName RdrNamePat
 type RdrNameClassOpSig		= Sig			RdrName
 type RdrNameConDecl		= ConDecl		RdrName
 type RdrNameContext		= Context 		RdrName
-type RdrNameHsDecl		= HsDecl		Unused RdrName RdrNamePat
+type RdrNameHsDecl		= HsDecl		RdrName RdrNamePat
 type RdrNameSpecDataSig		= SpecDataSig		RdrName
 type RdrNameDefaultDecl		= DefaultDecl		RdrName
 type RdrNameForeignDecl		= ForeignDecl		RdrName
-type RdrNameFixityDecl		= FixityDecl		RdrName
-type RdrNameGRHS		= GRHS			Unused RdrName RdrNamePat
-type RdrNameGRHSsAndBinds	= GRHSsAndBinds		Unused RdrName RdrNamePat
-type RdrNameHsBinds		= HsBinds		Unused RdrName RdrNamePat
-type RdrNameHsExpr		= HsExpr		Unused RdrName RdrNamePat
-type RdrNameHsModule		= HsModule		Unused RdrName RdrNamePat
+type RdrNameGRHS		= GRHS			RdrName RdrNamePat
+type RdrNameGRHSs		= GRHSs			RdrName RdrNamePat
+type RdrNameHsBinds		= HsBinds		RdrName RdrNamePat
+type RdrNameHsExpr		= HsExpr		RdrName RdrNamePat
+type RdrNameHsModule		= HsModule		RdrName RdrNamePat
 type RdrNameIE			= IE			RdrName
 type RdrNameImportDecl 		= ImportDecl		RdrName
-type RdrNameInstDecl		= InstDecl		Unused RdrName RdrNamePat
-type RdrNameMatch		= Match			Unused RdrName RdrNamePat
-type RdrNameMonoBinds		= MonoBinds		Unused RdrName RdrNamePat
+type RdrNameInstDecl		= InstDecl		RdrName RdrNamePat
+type RdrNameMatch		= Match			RdrName RdrNamePat
+type RdrNameMonoBinds		= MonoBinds		RdrName RdrNamePat
 type RdrNamePat			= InPat			RdrName
 type RdrNameHsType		= HsType		RdrName
 type RdrNameSig			= Sig			RdrName
-type RdrNameStmt		= Stmt			Unused RdrName RdrNamePat
-type RdrNameTyDecl		= TyDecl		RdrName
+type RdrNameStmt		= Stmt			RdrName RdrNamePat
+type RdrNameTyClDecl		= TyClDecl		RdrName RdrNamePat
 
 type RdrNameClassOpPragmas	= ClassOpPragmas	RdrName
 type RdrNameClassPragmas	= ClassPragmas		RdrName
@@ -123,16 +118,33 @@ extract_ty (MonoListTy ty)	    acc = extract_ty ty acc
 extract_ty (MonoTupleTy tys _)      acc = foldr extract_ty acc tys
 extract_ty (MonoFunTy ty1 ty2)	    acc = extract_ty ty1 (extract_ty ty2 acc)
 extract_ty (MonoDictTy cls tys)	    acc = foldr extract_ty acc tys
-extract_ty (MonoTyVar tv)           acc = insert tv acc
+extract_ty (MonoTyVar tv)           acc = insertTV tv acc
 extract_ty (HsForAllTy tvs ctxt ty) acc = acc ++
 					  (filter (`notElem` locals) $
 				           extract_ctxt ctxt (extract_ty ty []))
 				        where
 				          locals = map getTyVarName tvs
 
-insert (Qual _ _ _)	  acc = acc
-insert (Unqual (TCOcc _)) acc = acc
-insert other 	          acc = other : acc
+insertTV name@(Unqual occ) acc | isTvOcc occ = name : acc
+insertTV other 	           acc 		     = acc
+
+extractPatsTyVars :: [RdrNamePat] -> [RdrName]
+extractPatsTyVars pats = nub (foldr extract_pat [] pats)
+
+extract_pat (SigPatIn pat ty)	   acc = extract_ty ty acc
+extract_pat WildPatIn	      	   acc = acc
+extract_pat (VarPatIn var)         acc = acc
+extract_pat (LitPatIn _)	   acc = acc
+extract_pat (LazyPatIn pat)        acc = extract_pat pat acc
+extract_pat (AsPatIn a pat)        acc = extract_pat pat acc
+extract_pat (NPlusKPatIn n _)      acc = acc
+extract_pat (ConPatIn c pats)      acc = foldr extract_pat acc pats
+extract_pat (ConOpPatIn p1 c f p2) acc = extract_pat p1 (extract_pat p2 acc)
+extract_pat (NegPatIn  pat)        acc = extract_pat pat acc
+extract_pat (ParPatIn  pat)        acc = extract_pat pat acc
+extract_pat (ListPatIn pats)       acc = foldr extract_pat acc pats
+extract_pat (TuplePatIn pats _)    acc = foldr extract_pat acc pats
+extract_pat (RecPatIn c fields)    acc = foldr (\ (f,pat,_) acc -> extract_pat pat acc) acc fields
 \end{code}
 
 
@@ -150,28 +162,13 @@ by deriving them from the name of the class.
 mkClassDecl cxt cname tyvars sigs mbinds prags loc
   = ClassDecl cxt cname tyvars sigs mbinds prags tname dname loc
   where
-  -- The datacon and tycon are called ":C" where the class is C
+  -- The datacon and tycon are called "_DC" and "_TC", where the class is C
   -- This prevents name clashes with user-defined tycons or datacons C
     (dname, tname) = case cname of
-	  	       Qual m (TCOcc s) hif -> (Qual m (VarOcc s1) hif, Qual m (TCOcc s1) hif)
-					    where
-					       s1 = mkClassTyConStr s
-
-		       Unqual (TCOcc s)     -> (Unqual (VarOcc s1),     Unqual (TCOcc s1))
-					    where
-					       s1 = mkClassDataConStr s
-
--- This nasty little function tests for whether a RdrName was 
--- constructed by the above process.  It's used only for filtering
--- out duff error messages.  Maybe there's a tidier way of doing this
--- but I can't work up the energy to find it.
-
-isClassDataConRdrName rdr_name
- = case rdrNameOcc rdr_name of
-	TCOcc s -> case _UNPK_ s of
-			':' : c : _ -> isUpper c
-			other	    -> False
-	other -> False
+	  	       Qual m occ hif -> (Qual m (mkClassDataConOcc occ) hif,
+					  Qual m (mkClassTyConOcc   occ) hif)
+		       Unqual occ     -> (Unqual (mkClassDataConOcc occ),
+					  Unqual (mkClassTyConOcc   occ))
 \end{code}
 
 %************************************************************************
@@ -186,33 +183,21 @@ data RdrName
   | Qual   Module OccName IfaceFlavour	-- HiBootFile for M!.t (interface files only), 
 					-- HiFile for the common M.t
 
+-- These ones are used for making RdrNames for known-key things,
+-- Or in code constructed from derivings
 qual     (m,n) = Qual m n HiFile
-tcQual   (m,n) = Qual m (TCOcc n) HiFile
-varQual  (m,n) = Qual m (VarOcc n) HiFile
-
-mkTupConRdrName :: Int -> RdrName  -- The name for the tuple data construtor
-				   -- Hence VarOcc
-mkTupConRdrName arity = case mkTupNameStr arity of
-			   (mod, occ) -> Qual mod (VarOcc occ) HiFile
-
-mkUbxTupConRdrName :: Int -> RdrName  -- The name for the tuple data construtor
-	   			      -- Hence VarOcc
-mkUbxTupConRdrName arity = case mkUbxTupNameStr arity of
-			      (mod, occ) -> Qual mod (VarOcc occ) HiFile
-
-lexTcQual  (m,n,hif) = Qual m (TCOcc n) hif
-lexVarQual (m,n,hif) = Qual m (VarOcc n) hif
+tcQual   (m,n) = Qual m (srcTCOcc n) HiFile
+varQual  (m,n) = Qual m (srcVarOcc n) HiFile
+varUnqual n    = Unqual (srcVarOcc n)
 
 	-- This guy is used by the reader when HsSyn has a slot for
 	-- an implicit name that's going to be filled in by
 	-- the renamer.  We can't just put "error..." because
 	-- we sometimes want to print out stuff after reading but
 	-- before renaming
-dummyRdrVarName = Unqual (VarOcc SLIT("V-DUMMY"))
-dummyRdrTcName = Unqual (VarOcc SLIT("TC-DUMMY"))
+dummyRdrVarName = Unqual (srcVarOcc SLIT("V-DUMMY"))
+dummyRdrTcName  = Unqual (srcVarOcc SLIT("TC-DUMMY"))
 
-
-varUnqual n = Unqual (VarOcc n)
 
 isUnqual (Unqual _)   = True
 isUnqual (Qual _ _ _) = False
@@ -220,11 +205,6 @@ isUnqual (Qual _ _ _) = False
 isQual (Unqual _)   = False
 isQual (Qual _ _ _) = True
 
-
-	-- Used for adding a prefix to a RdrName
-prefixRdrName :: FAST_STRING -> RdrName -> RdrName
-prefixRdrName prefix (Qual m n hif) = Qual m (prefixOccName prefix n) hif
-prefixRdrName prefix (Unqual n)     = Unqual (prefixOccName prefix n)
 
 cmpRdr (Unqual  n1) (Unqual  n2)     = n1 `compare` n2
 cmpRdr (Unqual  n1) (Qual m2 n2 _)   = LT

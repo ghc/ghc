@@ -318,9 +318,9 @@ match vars@(v:vs) eqns_info
     unmix_eqns []    = []
     unmix_eqns [eqn] = [ [eqn] ]
     unmix_eqns (eq1@(EqnInfo _ _ (p1:p1s) _) : eq2@(EqnInfo _ _ (p2:p2s) _) : eqs)
-      = if (  (irrefutablePat p1 && irrefutablePat p2)
-	   || (isConPat       p1 && isConPat 	   p2)
-	   || (isLitPat       p1 && isLitPat 	   p2) ) then
+      = if (  (isWildPat p1 && isWildPat p2)
+	   || (isConPat  p1 && isConPat  p2)
+	   || (isLitPat  p1 && isLitPat  p2) ) then
 	    eq1 `tack_onto` unmixed_rest
 	else
 	    [ eq1 ] : unmixed_rest
@@ -385,6 +385,15 @@ tidyEqnInfo :: Id -> EquationInfo -> DsM EquationInfo
 	-- DsM'd because of internal call to "match".
 	-- "tidy1" does the interesting stuff, looking at
 	-- one pattern and fiddling the list of bindings.
+	--
+	-- POST CONDITION: head pattern in the EqnInfo is
+	--	WildPat
+	--	ConPat
+	--	NPat
+	--	LitPat
+	--	NPlusKPat
+	-- but no other
+
 tidyEqnInfo v (EqnInfo n ctx (pat : pats) match_result)
   = tidy1 v pat match_result	`thenDs` \ (pat', match_result') ->
     returnDs (EqnInfo n ctx (pat' : pats) match_result')
@@ -631,9 +640,10 @@ matchUnmixedEqns :: [Id]
 matchUnmixedEqns [] _ = panic "matchUnmixedEqns: no names"
 
 matchUnmixedEqns all_vars@(var:vars) eqns_info 
-  | irrefutablePat first_pat
-  = ASSERT( irrefutablePats column_1_pats )	-- Sanity check
+  | isWildPat first_pat
+  = ASSERT( all isWildPat column_1_pats )	-- Sanity check
   	-- Real true variables, just like in matchVar, SLPJ p 94
+	-- No binding to do: they'll all be wildcards by now (done in tidy)
     match vars remaining_eqns_info
 
   | isConPat first_pat
@@ -703,36 +713,6 @@ matchWrapper :: DsMatchKind			-- For shadowing warning messages
 	     -> String 				-- Error message if the match fails
 	     -> DsM ([Id], CoreExpr) 	-- Results
 \end{code}
-
- a special case for the common ...:
-	just one Match
-	lots of (all?) unfailable pats
-  e.g.,
-	f x y z = ....
- 
- This special case have been ``undone'' due to problems with the new warnings 
- messages (Check.lhs.check). We need there the name of the variables to be able to 
- print later the equation. JJQC 30-11-97
-
-\begin{old_code}
-matchWrapper kind [(PatMatch (VarPat var) match)] error_string
-  = matchWrapper kind [match] error_string `thenDs` \ (vars, core_expr) ->
-    returnDs (var:vars, core_expr)
-
-matchWrapper kind [(PatMatch (WildPat ty) match)] error_string
-  = newSysLocalDs ty		           `thenDs` \ var ->
-    matchWrapper kind [match] error_string `thenDs` \ (vars, core_expr) ->
-    returnDs (var:vars, core_expr)
-
-matchWrapper kind [(GRHSMatch
-		     (GRHSsAndBindsOut [GRHS [ExprStmt expr _]] binds _))] error_string
-  = dsExpr expr			`thenDs` \ core_expr ->
-    dsLet binds core_expr 	`thenDs` \ rhs ->
-    returnDs ([], rhs)
-\end{old_code}
-
- And all the rest... (general case)
-
 
  There is one small problem with the Lambda Patterns, when somebody
  writes something similar to:
@@ -835,31 +815,8 @@ flattenMatches kind matches
     ASSERT( all (== result_ty) result_tys )
     returnDs (result_ty, eqn_infos)
   where
-    flatten_match (match, eqn_no) = flatten_match_help [] match eqn_no
-
-    flatten_match_help :: [TypecheckedPat] 	-- Reversed list of patterns encountered so far
-		       -> TypecheckedMatch
-                       -> EqnNo
-		       -> DsM (Type, EquationInfo)
-
-    flatten_match_help pats_so_far (PatMatch pat match) n
-      = flatten_match_help (pat:pats_so_far) match n
-
-    flatten_match_help pats_so_far (GRHSMatch (GRHSsAndBindsOut grhss binds ty)) n
-      = dsGRHSs kind pats grhss 		`thenDs` \ match_result ->
+    flatten_match (Match _ pats _ grhss, n)
+      = dsGRHSs kind pats grhss 		`thenDs` \ (ty, match_result) ->
         getSrcLocDs				`thenDs` \ locn ->
-	returnDs (ty, EqnInfo n (DsMatchContext kind pats locn) pats 
-                  	        (adjustMatchResultDs (dsLet binds) match_result))
-		-- NB: nested dsLet inside matchResult
-      where
-	pats = reverse pats_so_far	-- They've accumulated in reverse order
-
-    flatten_match_help pats_so_far (SimpleMatch expr) n
-      = dsExpr expr		`thenDs` \ core_expr ->
-	getSrcLocDs		`thenDs` \ locn ->
-	returnDs (coreExprType core_expr,
-		  EqnInfo n (DsMatchContext kind pats locn) pats
-			    (cantFailMatchResult core_expr))
-        where
-	 pats = reverse pats_so_far	-- They've accumulated in reverse order
+	returnDs (ty, EqnInfo n (DsMatchContext kind pats locn) pats match_result)
 \end{code}

@@ -420,9 +420,12 @@ absEval anal (Con (Literal _) args) env
 
 absEval anal (Con (PrimOp _) args) env
   = 	-- PrimOps evaluate all their arguments
-    if any anyBot [absEval anal arg env | arg <- args]
+    if any (what_bot anal) [absEval anal arg env | arg <- args]
     then AbsBot
     else AbsTop
+  where
+    what_bot StrAnal = isBot	-- Primops are strict
+    what_bot AbsAnal = anyBot	-- Look for poison anywhere
 
 absEval anal (Con (DataCon con) args) env
   | isProductTyCon (dataConTyCon con)
@@ -613,13 +616,13 @@ unbound variables in an @AbsValEnv@ are implicitly mapped to that.
 See notes on @addStrictnessInfoToId@.
 
 \begin{code}
-findStrictness :: [Type]	-- Types of args in which strictness is wanted
-	       -> AbsVal 	-- Abstract strictness value of function
-	       -> AbsVal	-- Abstract absence value of function
-	       -> [Demand]	-- Resulting strictness annotation
+findStrictness :: [Type]		-- Types of args in which strictness is wanted
+	       -> AbsVal 		-- Abstract strictness value of function
+	       -> AbsVal		-- Abstract absence value of function
+	       -> ([Demand], Bool)	-- Resulting strictness annotation
 
 findStrictness tys str_val abs_val
-  = map find_str tys_w_index
+  = (map find_str tys_w_index, isBot (foldl (absApply StrAnal) str_val all_tops))
   where
     tys_w_index = tys `zip` [1..]
 
@@ -633,6 +636,8 @@ findStrictness tys str_val abs_val
 
     mk_arg val n (_,m) | m==n      = val
 		       | otherwise = AbsTop
+
+    all_tops = [AbsTop | _ <- tys]
 \end{code}
 
 

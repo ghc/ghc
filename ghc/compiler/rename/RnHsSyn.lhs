@@ -8,13 +8,12 @@ module RnHsSyn where
 
 #include "HsVersions.h"
 
-import RnEnv		( listTyCon_name, tupleTyCon_name )
-
 import HsSyn
 import HsPragmas	( InstancePragmas, GenPragmas, DataPragmas, ClassPragmas, ClassOpPragmas )
 
-import BasicTypes	( Unused )
-import Name		( Name )
+import TysWiredIn	( tupleTyCon, unboxedTupleTyCon, 
+			  listTyCon, charTyCon )
+import Name		( Name, getName )
 import NameSet
 import Util
 import Outputable
@@ -22,30 +21,29 @@ import Outputable
 
 
 \begin{code}
-type RenamedArithSeqInfo	= ArithSeqInfo		Unused Name RenamedPat
-type RenamedClassDecl		= ClassDecl		Unused Name RenamedPat
+type RenamedArithSeqInfo	= ArithSeqInfo		Name RenamedPat
 type RenamedClassOpSig		= Sig			Name
 type RenamedConDecl		= ConDecl		Name
 type RenamedContext		= Context 		Name
-type RenamedHsDecl		= HsDecl		Unused Name RenamedPat
+type RenamedHsDecl		= HsDecl		Name RenamedPat
+type RenamedTyClDecl		= TyClDecl		Name RenamedPat
 type RenamedSpecDataSig		= SpecDataSig		Name
 type RenamedDefaultDecl		= DefaultDecl		Name
 type RenamedForeignDecl		= ForeignDecl		Name
-type RenamedFixityDecl		= FixityDecl		Name
-type RenamedGRHS		= GRHS			Unused Name RenamedPat
-type RenamedGRHSsAndBinds	= GRHSsAndBinds		Unused Name RenamedPat
-type RenamedHsBinds		= HsBinds		Unused Name RenamedPat
-type RenamedHsExpr		= HsExpr		Unused Name RenamedPat
-type RenamedHsModule		= HsModule		Unused Name RenamedPat
-type RenamedInstDecl		= InstDecl		Unused Name RenamedPat
-type RenamedMatch		= Match			Unused Name RenamedPat
-type RenamedMonoBinds		= MonoBinds		Unused Name RenamedPat
+type RenamedGRHS		= GRHS			Name RenamedPat
+type RenamedGRHSs		= GRHSs			Name RenamedPat
+type RenamedHsBinds		= HsBinds		Name RenamedPat
+type RenamedHsExpr		= HsExpr		Name RenamedPat
+type RenamedHsModule		= HsModule		Name RenamedPat
+type RenamedInstDecl		= InstDecl		Name RenamedPat
+type RenamedMatch		= Match			Name RenamedPat
+type RenamedMonoBinds		= MonoBinds		Name RenamedPat
 type RenamedPat			= InPat			Name
 type RenamedHsType		= HsType		Name
-type RenamedRecordBinds		= HsRecordBinds		Unused Name RenamedPat
+type RenamedRecordBinds		= HsRecordBinds		Name RenamedPat
 type RenamedSig			= Sig			Name
-type RenamedStmt		= Stmt			Unused Name RenamedPat
-type RenamedTyDecl		= TyDecl		Name
+type RenamedStmt		= Stmt			Name RenamedPat
+type RenamedFixitySig		= FixitySig		Name
 
 type RenamedClassOpPragmas	= ClassOpPragmas	Name
 type RenamedClassPragmas	= ClassPragmas		Name
@@ -63,6 +61,14 @@ type RenamedInstancePragmas	= InstancePragmas	Name
 These free-variable finders returns tycons and classes too.
 
 \begin{code}
+charTyCon_name, listTyCon_name :: Name
+charTyCon_name    = getName charTyCon
+listTyCon_name    = getName listTyCon
+
+tupleTyCon_name :: Bool -> Int -> Name
+tupleTyCon_name True  n = getName (tupleTyCon n)
+tupleTyCon_name False n = getName (unboxedTupleTyCon n)
+
 extractHsTyNames   :: RenamedHsType -> NameSet
 extractHsTyNames ty
   = get ty

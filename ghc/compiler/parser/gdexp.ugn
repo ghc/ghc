@@ -1,0 +1,19 @@
+%{
+#include "hspincl.h"
+%}
+%{{
+module U_gdexp where
+
+#include "HsVersions.h"
+
+import UgenUtil
+
+import U_list
+import U_tree
+%}}
+
+type gdexp;
+	pgdexp	  : < gpguard	: list /* of quals */ ;		/* Experimental change: guards are lists of quals */
+		      gpgline	: long;				/* Line number of '=' sign */
+	              gpexp     : tree; >;
+end;

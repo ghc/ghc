@@ -9,10 +9,10 @@ module HsPat (
 	OutPat(..),
 
 	irrefutablePat, irrefutablePats,
-	failureFreePat,
+	failureFreePat, isWildPat,
 	patsAreAllCons, isConPat,
 	patsAreAllLits,	isLitPat,
-	collectPatBinders
+	collectPatBinders, collectPatsBinders
     ) where
 
 #include "HsVersions.h"
@@ -20,15 +20,16 @@ module HsPat (
 -- friends:
 import HsBasic		( HsLit )
 import HsExpr		( HsExpr )
+import HsTypes		( HsType )
 import BasicTypes	( Fixity )
 
 -- others:
-import Var		( Id, GenTyVar )
+import Var		( Id, TyVar )
 import DataCon		( DataCon, dataConTyCon )
 import Maybes		( maybeToBool )
 import Outputable	
 import TyCon		( maybeTyConSingleCon )
-import Type		( GenType )
+import Type		( Type )
 \end{code}
 
 Patterns come in distinct before- and after-typechecking flavo(u)rs.
@@ -40,6 +41,8 @@ data InPat name
   | LazyPatIn	    (InPat name)	-- lazy pattern
   | AsPatIn	    name		-- as pattern
 		    (InPat name)
+  | SigPatIn	    (InPat name)
+		    (HsType name)
   | ConPatIn	    name		-- constructed type
 		    [InPat name]
   | ConOpPatIn	    (InPat name)
@@ -62,49 +65,49 @@ data InPat name
   | RecPatIn	    name 		-- record
 		    [(name, InPat name, Bool)]	-- True <=> source used punning
 
-data OutPat flexi id
-  = WildPat	    (GenType flexi)	-- wild card
+data OutPat id
+  = WildPat	    Type	-- wild card
 
-  | VarPat	    id				-- variable (type is in the Id)
+  | VarPat	    id			-- variable (type is in the Id)
 
-  | LazyPat	    (OutPat flexi id)	-- lazy pattern
+  | LazyPat	    (OutPat id)	-- lazy pattern
 
-  | AsPat	    id				-- as pattern
-		    (OutPat flexi id)
+  | AsPat	    id			-- as pattern
+		    (OutPat id)
 
-  | ListPat		 	    		-- syntactic list
-		    (GenType flexi)	-- the type of the elements
-   	    	    [OutPat flexi id]
+  | ListPat		 	    	-- syntactic list
+		    Type	-- the type of the elements
+   	    	    [OutPat id]
 
-  | TuplePat	    [OutPat flexi id]	-- tuple
+  | TuplePat	    [OutPat id]	-- tuple
 		    Bool		-- boxed?
 						-- UnitPat is TuplePat []
 
   | ConPat	    DataCon
-		    (GenType flexi)    	-- the type of the pattern
-		    [GenTyVar flexi]	-- Existentially bound type variables
+		    Type    	-- the type of the pattern
+		    [TyVar]	-- Existentially bound type variables
 		    [id]		-- Ditto dictionaries
-		    [OutPat flexi id]
+		    [OutPat id]
 
   -- ConOpPats are only used on the input side
 
   | RecPat	    DataCon		-- record constructor
-		    (GenType flexi)    	-- the type of the pattern
-		    [GenTyVar flexi]	-- Existentially bound type variables
+		    Type    	-- the type of the pattern
+		    [TyVar]	-- Existentially bound type variables
 		    [id]		-- Ditto dictionaries
-		    [(Id, OutPat flexi id, Bool)]	-- True <=> source used punning
+		    [(Id, OutPat id, Bool)]	-- True <=> source used punning
 
   | LitPat	    -- Used for *non-overloaded* literal patterns:
 		    -- Int#, Char#, Int, Char, String, etc.
 		    HsLit
-		    (GenType flexi) 	-- type of pattern
+		    Type 	-- type of pattern
 
   | NPat	    -- Used for *overloaded* literal patterns
 		    HsLit			-- the literal is retained so that
 						-- the desugarer can readily identify
 						-- equations with identical literal-patterns
-		    (GenType flexi) 	-- type of pattern, t
-   	    	    (HsExpr flexi id (OutPat flexi id))
+		    Type 	-- type of pattern, t
+   	    	    (HsExpr id (OutPat id))
 						-- of type t -> Bool; detects match
 
   | NPlusKPat	    id
@@ -112,9 +115,9 @@ data OutPat flexi id
 						-- (This could be an Integer, but then
 						-- it's harder to partitionEqnsByLit
 						-- in the desugarer.)
-		    (GenType flexi)    	-- Type of pattern, t
-   	    	    (HsExpr flexi id (OutPat flexi id)) 	-- Of type t -> Bool; detects match
-   	    	    (HsExpr flexi id (OutPat flexi id)) 	-- Of type t -> t; subtracts k
+		    Type    	-- Type of pattern, t
+   	    	    (HsExpr id (OutPat id)) 	-- Of type t -> Bool; detects match
+   	    	    (HsExpr id (OutPat id)) 	-- Of type t -> t; subtracts k
 
   | DictPat	    -- Used when destructing Dictionaries with an explicit case
 		    [id]			-- superclass dicts
@@ -135,6 +138,7 @@ pprInPat :: (Outputable name) => InPat name -> SDoc
 pprInPat (WildPatIn)	    = char '_'
 pprInPat (VarPatIn var)	    = ppr var
 pprInPat (LitPatIn s)	    = ppr s
+pprInPat (SigPatIn pat ty)  = ppr pat <+> dcolon <+> ppr ty
 pprInPat (LazyPatIn pat)    = char '~' <> ppr pat
 pprInPat (AsPatIn name pat) = parens (hcat [ppr name, char '@', ppr pat])
 
@@ -178,7 +182,7 @@ pprInPat (RecPatIn con rpats)
 \end{code}
 
 \begin{code}
-instance (Outputable id) => Outputable (OutPat flexi id) where
+instance (Outputable id) => Outputable (OutPat id) where
     ppr = pprOutPat
 \end{code}
 
@@ -249,7 +253,7 @@ patterns are treated specially, of course.
 
 The 1.3 report defines what ``irrefutable'' and ``failure-free'' patterns are.
 \begin{code}
-irrefutablePats :: [OutPat a b] -> Bool
+irrefutablePats :: [OutPat id] -> Bool
 irrefutablePats pat_list = all irrefutablePat pat_list
 
 irrefutablePat (AsPat	_ pat)	= irrefutablePat pat
@@ -259,7 +263,7 @@ irrefutablePat (LazyPat	_)	= True
 irrefutablePat (DictPat ds ms)	= (length ds + length ms) <= 1
 irrefutablePat other		= False
 
-failureFreePat :: OutPat a b -> Bool
+failureFreePat :: OutPat id -> Bool
 
 failureFreePat (WildPat _) 		  = True
 failureFreePat (VarPat _)  		  = True
@@ -276,7 +280,10 @@ only_con con = maybeToBool (maybeTyConSingleCon (dataConTyCon con))
 \end{code}
 
 \begin{code}
-patsAreAllCons :: [OutPat a b] -> Bool
+isWildPat (WildPat _) = True
+isWildPat other	      = False
+
+patsAreAllCons :: [OutPat id] -> Bool
 patsAreAllCons pat_list = all isConPat pat_list
 
 isConPat (AsPat _ pat)		= isConPat pat
@@ -287,7 +294,7 @@ isConPat (RecPat _ _ _ _ _)	= True
 isConPat (DictPat ds ms)	= (length ds + length ms) > 1
 isConPat other			= False
 
-patsAreAllLits :: [OutPat a b] -> Bool
+patsAreAllLits :: [OutPat id] -> Bool
 patsAreAllLits pat_list = all isLitPat pat_list
 
 isLitPat (AsPat _ pat)	       = isLitPat pat
@@ -300,20 +307,26 @@ isLitPat other		       = False
 This function @collectPatBinders@ works with the ``collectBinders''
 functions for @HsBinds@, etc.  The order in which the binders are
 collected is important; see @HsBinds.lhs@.
+
 \begin{code}
 collectPatBinders :: InPat a -> [a]
+collectPatBinders pat = collect pat []
 
-collectPatBinders WildPatIn	      	 = []
-collectPatBinders (VarPatIn var)      	 = [var]
-collectPatBinders (LitPatIn _)	      	 = []
-collectPatBinders (LazyPatIn pat)     	 = collectPatBinders pat
-collectPatBinders (AsPatIn a pat)     	 = a : collectPatBinders pat
-collectPatBinders (NPlusKPatIn n _)      = [n]
-collectPatBinders (ConPatIn c pats)   	 = concat (map collectPatBinders pats)
-collectPatBinders (ConOpPatIn p1 c f p2) = collectPatBinders p1 ++ collectPatBinders p2
-collectPatBinders (NegPatIn  pat)     	 = collectPatBinders pat
-collectPatBinders (ParPatIn  pat)     	 = collectPatBinders pat
-collectPatBinders (ListPatIn pats)    	 = concat (map collectPatBinders pats)
-collectPatBinders (TuplePatIn pats _)  	 = concat (map collectPatBinders pats)
-collectPatBinders (RecPatIn c fields) 	 = concat (map (\ (f,pat,_) -> collectPatBinders pat) fields)
+collectPatsBinders :: [InPat a] -> [a]
+collectPatsBinders pats = foldr collect [] pats
+
+collect WildPatIn	      	 bndrs = bndrs
+collect (VarPatIn var)      	 bndrs = var : bndrs
+collect (LitPatIn _)	      	 bndrs = bndrs
+collect (SigPatIn pat _)	 bndrs = collect pat bndrs
+collect (LazyPatIn pat)     	 bndrs = collect pat bndrs
+collect (AsPatIn a pat)     	 bndrs = a : collect pat bndrs
+collect (NPlusKPatIn n _)        bndrs = n : bndrs
+collect (ConPatIn c pats)   	 bndrs = foldr collect bndrs pats
+collect (ConOpPatIn p1 c f p2)   bndrs = collect p1 (collect p2 bndrs)
+collect (NegPatIn  pat)     	 bndrs = collect pat bndrs
+collect (ParPatIn  pat)     	 bndrs = collect pat bndrs
+collect (ListPatIn pats)    	 bndrs = foldr collect bndrs pats
+collect (TuplePatIn pats _)  	 bndrs = foldr collect bndrs pats
+collect (RecPatIn c fields) 	 bndrs = foldr (\ (f,pat,_) bndrs -> collect pat bndrs) bndrs fields
 \end{code}

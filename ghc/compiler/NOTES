@@ -1,6 +1,20 @@
 cvs remove TcGRHSs.hi-boot TcGRHSs.hi-boot-5 TcGRHSs.lhs
 cvs remove pbinding.ugn
 cvs add grhsb.ugn gdexp.ugn
+cvs add basicTypes/OccName.lhs
+
+
+New in 4.02
+* Scoped type variables
+* Warnings for unused variables should work now (they didn't before)
+* Simplifier improvements:
+	- Much better treatment of strict arguments
+	- Better treatment of bottoming Ids
+	- No need for w/w split for fns that are merely strict
+	- Fewer iterations needed, I hope
+* Less gratuitous renaming in interface files and abs C
+* OccName is a separate module, and is an abstract data type
+
 -----------------------
 
 

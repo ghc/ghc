@@ -33,7 +33,8 @@ import StixInfo	    	( genCodeInfoTable, genBitmapInfoTable )
 import StixMacro	( macroCode, checkCode )
 import StixPrim		( primCode, amodeToStix, amodeToStix' )
 import UniqSupply	( returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
-import Util		( naturalMergeSortLe, panic )
+import Util		( naturalMergeSortLe )
+import Panic		( panic )
 import BitSet 		( intBS )
 
 #ifdef REALLY_HASKELL_1_3

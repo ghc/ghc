@@ -12,6 +12,7 @@ module DsExpr ( dsExpr, dsLet ) where
 import HsSyn		( failureFreePat,
 			  HsExpr(..), OutPat(..), HsLit(..), ArithSeqInfo(..),
 			  Stmt(..), StmtCtxt(..), Match(..), HsBinds(..), MonoBinds(..), 
+			  mkSimpleMatch
 			)
 import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds,
 			  TypecheckedStmt,
@@ -81,11 +82,11 @@ dsLet (ThenBinds b1 b2) body
     dsLet b1 body'
   
 -- Special case for bindings which bind unlifted variables
-dsLet (MonoBind (AbsBinds [] [] binder_triples bind) sigs is_rec) body
+dsLet (MonoBind (AbsBinds [] [] binder_triples (PatMonoBind pat grhss loc)) sigs is_rec) body
   | or [isUnLiftedType (idType g) | (_, g, l) <- binder_triples]
   = ASSERT (case is_rec of {NonRecursive -> True; other -> False})
-    putSrcLocDs loc							$
-    dsGuarded grhss							`thenDs` \ rhs ->
+    putSrcLocDs loc			$
+    dsGuarded grhss 			`thenDs` \ rhs ->
     let
 	body' = foldr bind body binder_triples
 	bind (tyvars, g, l) body = ASSERT( null tyvars )
@@ -94,8 +95,7 @@ dsLet (MonoBind (AbsBinds [] [] binder_triples bind) sigs is_rec) body
     mkErrorAppDs iRREFUT_PAT_ERROR_ID result_ty (showSDoc (ppr pat))	`thenDs` \ error_expr ->
     matchSimply rhs PatBindMatch pat body' error_expr
   where
-    PatMonoBind pat grhss loc = bind
-    result_ty		      = coreExprType body
+    result_ty = coreExprType body
 
 -- Ordinary case for bindings
 dsLet (MonoBind binds sigs is_rec) body
@@ -308,8 +308,7 @@ dsExpr (HsSCC cc expr)
 
 -- special case to handle unboxed tuple patterns
 
-dsExpr (HsCase discrim matches@[PatMatch (TuplePat ps boxed) (GRHSMatch rhs)]
-		src_loc)
+dsExpr (HsCase discrim matches@[Match _ [TuplePat ps boxed] _ _] src_loc)
  | all var_pat ps 
  =  putSrcLocDs src_loc $
     dsExpr discrim				`thenDs` \ core_discrim ->
@@ -626,12 +625,12 @@ dsDo do_or_lc stmts return_id then_id zero_id result_ty
 	    let
 		(_, a_ty)  = splitAppTy (coreExprType expr2)	-- Must be of form (m a)
 		zero_expr  = TyApp (HsVar zero_id) [b_ty]
-		main_match = PatMatch pat (SimpleMatch (
-			     HsDoOut do_or_lc stmts return_id then_id zero_id result_ty locn))
+		main_match = mkSimpleMatch [pat] (HsDoOut do_or_lc stmts return_id then_id zero_id result_ty locn)
+					   (Just result_ty) locn
 		the_matches
 		  = if failureFreePat pat
 		    then [main_match]
-		    else [main_match, PatMatch (WildPat a_ty) (SimpleMatch zero_expr)]
+		    else [main_match, mkSimpleMatch [WildPat a_ty] zero_expr (Just result_ty) locn]
 	    in
 	    matchWrapper DoBindMatch the_matches match_msg
 				`thenDs` \ (binders, matching_code) ->

@@ -9,9 +9,9 @@ module RnIfaces (
 	getImportedInstDecls,
 	getSpecialInstModules, getDeferredDataDecls,
 	importDecl, recordSlurp,
-	getImportVersions, getSlurpedNames, getRnStats,
+	getImportVersions, getSlurpedNames, getRnStats, getImportedFixities,
 
-	checkUpToDate,
+	checkUpToDate, loadHomeInterface,
 
 	getDeclBinders,
 	mkSearchPath
@@ -22,16 +22,17 @@ module RnIfaces (
 import CmdLineOpts	( opt_PruneTyDecls,  opt_PruneInstDecls, 
 			  opt_D_show_rn_imports, opt_IgnoreIfacePragmas
 			)
-import HsSyn		( HsDecl(..), TyDecl(..), ClassDecl(..), InstDecl(..), IfaceSig(..), 
+import HsSyn		( HsDecl(..), TyClDecl(..), InstDecl(..), IfaceSig(..), 
 			  HsType(..), ConDecl(..), IE(..), ConDetails(..), Sig(..),
-			  hsDeclName
+			  FixitySig(..),
+			  hsDeclName, countTyClDecls, isDataDecl
 			)
 import BasicTypes	( Version, NewOrData(..), IfaceFlavour(..) )
-import RdrHsSyn		( RdrNameHsDecl, RdrNameInstDecl, RdrNameTyDecl,
+import RdrHsSyn		( RdrNameHsDecl, RdrNameInstDecl, RdrNameTyClDecl,
 			  RdrName(..), rdrNameOcc
 			)
-import RnEnv		( newImportedGlobalName, addImplicitOccsRn,
-			  ifaceFlavour, availName, availNames, addAvailToNameSet
+import RnEnv		( newImportedGlobalName, addImplicitOccsRn, pprAvail,
+			  availName, availNames, addAvailToNameSet, ifaceFlavour
 			)
 import RnSource		( rnHsSigType )
 import RnMonad
@@ -42,9 +43,9 @@ import FiniteMap	( FiniteMap, sizeFM, emptyFM, delFromFM,
 			  lookupFM, addToFM, addToFM_C, addListToFM, 
 			  fmToList
 			)
-import Name		( Name {-instance NamedThing-}, OccName(..),
+import Name		( Name {-instance NamedThing-}, OccName,
 			  nameModule, moduleString, pprModule, isLocallyDefined,
-			  isWiredInName, maybeWiredInTyConName, 
+			  isWiredInName, maybeWiredInTyConName,  pprModule,
 			  maybeWiredInIdName, nameUnique, NamedThing(..)
 			 )
 import NameSet
@@ -83,31 +84,34 @@ getRnStats :: [RenamedHsDecl] -> RnMG SDoc
 getRnStats all_decls
   = getIfacesRn 		`thenRn` \ ifaces ->
     let
-	Ifaces this_mod mod_map decls_fm all_names imp_names (unslurped_insts,_) deferred_data_decls inst_mods = ifaces
-	n_mods	    = sizeFM mod_map
+	n_mods	    = sizeFM (iModMap ifaces)
 
 	decls_imported = filter is_imported_decl all_decls
-	decls_read     = [decl | (name, (_, avail, decl)) <- fmToList decls_fm,
-				 name == availName avail,
+
+	decls_read     = [decl | (_, avail, decl, True) <- nameEnvElts (iDecls ifaces),
 					-- Data, newtype, and class decls are in the decls_fm
 					-- under multiple names; the tycon/class, and each
 					-- constructor/class op too.
-				 not (isLocallyDefined name)
+					-- The 'True' selects just the 'main' decl
+				 not (isLocallyDefined (availName avail))
 			     ]
 
 	(cd_rd, dd_rd, add_rd, nd_rd, and_rd, sd_rd, vd_rd,     _) = count_decls decls_read
 	(cd_sp, dd_sp, add_sp, nd_sp, and_sp, sd_sp, vd_sp, id_sp) = count_decls decls_imported
 
+	(unslurped_insts, _)  = iDefInsts ifaces
 	inst_decls_unslurped  = length (bagToList unslurped_insts)
 	inst_decls_read	      = id_sp + inst_decls_unslurped
 
 	stats = vcat 
 		[int n_mods <> text " interfaces read",
-		 hsep [int cd_sp, text "class decls imported, out of", 
+		 hsep [ int cd_sp, text "class decls imported, out of", 
 		        int cd_rd, text "read"],
-		 hsep [int dd_sp, text "data decls imported (of which", int add_sp, text "abstractly), out of",  
+		 hsep [ int dd_sp, text "data decls imported (of which", int add_sp, 
+			text "abstractly), out of",  
 			int dd_rd, text "read"],
-		 hsep [int nd_sp, text "newtype decls imported (of which", int and_sp, text "abstractly), out of",  
+		 hsep [ int nd_sp, text "newtype decls imported (of which", int and_sp, 
+			text "abstractly), out of",  
 		        int nd_rd, text "read"],
 		 hsep [int sd_sp, text "type synonym decls imported, out of",  
 		        int sd_rd, text "read"],
@@ -138,14 +142,13 @@ count_decls decls
      val_decls, 
      inst_decls)
   where
-    class_decls   = length [() | ClD _		     	    <- decls]
-    data_decls    = length [() | TyD (TyData DataType _ _ _ _ _ _ _) <- decls]
-    newtype_decls = length [() | TyD (TyData NewType  _ _ _ _ _ _ _) <- decls]
-    abstract_data_decls    = length [() | TyD (TyData DataType _ _ _ [] _ _ _) <- decls]
-    abstract_newtype_decls = length [() | TyD (TyData NewType  _ _ _ [] _ _ _) <- decls]
-    syn_decls     = length [() | TyD (TySynonym _ _ _ _)    <- decls]
-    val_decls     = length [() | SigD _		    	    <- decls]
-    inst_decls    = length [() | InstD _		    <- decls]
+    tycl_decls = [d | TyClD d <- decls]
+    (class_decls, data_decls, newtype_decls, syn_decls) = countTyClDecls tycl_decls
+    abstract_data_decls    = length [() | TyData DataType _ _ _ [] _ _ _ <- tycl_decls]
+    abstract_newtype_decls = length [() | TyData NewType  _ _ _ [] _ _ _ <- tycl_decls]
+
+    val_decls     = length [() | SigD _	  <- decls]
+    inst_decls    = length [() | InstD _  <- decls]
 
 \end{code}    
 
@@ -156,18 +159,22 @@ count_decls decls
 %*********************************************************
 
 \begin{code}
+loadHomeInterface :: SDoc -> Name -> RnMG Ifaces
+loadHomeInterface doc_str name
+  = loadInterface doc_str (nameModule name) (ifaceFlavour name)
+
 loadInterface :: SDoc -> Module -> IfaceFlavour -> RnMG Ifaces
 loadInterface doc_str load_mod as_source
  = getIfacesRn 		`thenRn` \ ifaces ->
    let
-	Ifaces this_mod mod_map decls 
-	       all_names imp_names (insts, tycls_names) 
-	       deferred_data_decls inst_mods = ifaces
+	this_mod 	     = iMod ifaces
+	mod_map  	     = iModMap ifaces
+	(insts, tycls_names) = iDefInsts ifaces
    in
 	-- CHECK WHETHER WE HAVE IT ALREADY
    case lookupFM mod_map load_mod of {
-	Just (hif, _, _, _) | hif `as_good_as` as_source
-			    -> 	-- Already in the cache; don't re-read it
+	Just (hif, _, _) | hif `as_good_as` as_source
+			 -> 	-- Already in the cache; don't re-read it
 				returnRn ifaces ;
 	other ->
 
@@ -178,38 +185,37 @@ loadInterface doc_str load_mod as_source
 	Nothing -> 	-- Not found, so add an empty export env to the Ifaces map
 			-- so that we don't look again
 		   let
-			new_mod_map = addToFM mod_map load_mod (HiFile, 0, [],[])
-			new_ifaces = Ifaces this_mod new_mod_map
-					    decls all_names imp_names (insts, tycls_names) 
-					    deferred_data_decls inst_mods
+			new_mod_map = addToFM mod_map load_mod (HiFile, 0, [])
+			new_ifaces = ifaces { iModMap = new_mod_map }
 		   in
 		   setIfacesRn new_ifaces		`thenRn_`
 		   failWithRn new_ifaces (noIfaceErr load_mod) ;
 
 	-- Found and parsed!
-	Just (ParsedIface _ mod_vers usages exports rd_inst_mods fixs rd_decls rd_insts) ->
+	Just (ParsedIface _ mod_vers usages exports rd_inst_mods rd_decls rd_insts) ->
 
 	-- LOAD IT INTO Ifaces
 	-- NB: *first* we do loadDecl, so that the provenance of all the locally-defined
 	---    names is done correctly (notably, whether this is an .hi file or .hi-boot file).
 	--     If we do loadExport first the wrong info gets into the cache (unless we
 	-- 	explicitly tag each export which seems a bit of a bore)
-    foldlRn (loadDecl load_mod as_source) decls rd_decls `thenRn` \ new_decls ->
-    mapRn loadExport exports				 `thenRn` \ avails_s ->
-    foldlRn (loadInstDecl load_mod) insts rd_insts	 `thenRn` \ new_insts ->
+    foldlRn (loadDecl load_mod as_source)
+	    (iDecls ifaces) rd_decls			`thenRn` \ new_decls ->
+    foldlRn (loadFixDecl load_mod as_source) 
+	    (iFixes ifaces) rd_decls			`thenRn` \ new_fixities ->
+    mapRn loadExport exports				`thenRn` \ avails_s ->
+    foldlRn (loadInstDecl load_mod) insts rd_insts	`thenRn` \ new_insts ->
     let
-	 mod_details = (as_source, mod_vers, concat avails_s, fixs)
+	 mod_details = (as_source, mod_vers, concat avails_s)
 
 			-- Exclude this module from the "special-inst" modules
-	 new_inst_mods = inst_mods `unionLists` (filter (/= this_mod) rd_inst_mods)
+	 new_inst_mods = iInstMods ifaces `unionLists` (filter (/= this_mod) rd_inst_mods)
 
-	 new_ifaces = Ifaces this_mod
-			     (addToFM mod_map load_mod mod_details)
-			     new_decls
-			     all_names imp_names
-			     (new_insts, tycls_names)
-			     deferred_data_decls 
-			     new_inst_mods 
+	 new_ifaces = ifaces { iModMap   = addToFM mod_map load_mod mod_details,
+			       iDecls    = new_decls,
+			       iFixes    = new_fixities,
+			       iDefInsts = (new_insts, tycls_names),
+			       iInstMods = new_inst_mods  }
     in
     setIfacesRn new_ifaces		`thenRn_`
     returnRn new_ifaces
@@ -234,27 +240,52 @@ loadExport (mod, hif, entities)
         mapRn new_name occs 	`thenRn` \ names ->
         returnRn (AvailTC name names)
 
-loadDecl :: Module 
-         -> IfaceFlavour
-	 -> DeclsMap
+
+loadFixDecl :: Module -> IfaceFlavour -> FixityEnv 
+	    -> (Version, RdrNameHsDecl)
+	    -> RnMG FixityEnv
+loadFixDecl mod as_source fixity_env (version, FixD (FixitySig rdr_name fixity loc))
+  = 	-- Ignore the version; when the fixity changes the version of
+	-- its 'host' entity changes, so we don't need a separate version
+	-- number for fixities
+    new_implicit_name mod as_source rdr_name 	`thenRn` \ name ->
+    let
+	new_fixity_env = addToNameEnv fixity_env name (FixitySig name fixity loc)
+    in
+    returnRn new_fixity_env
+
+	-- Ignore the other sorts of decl
+loadFixDecl mod as_source fixity_env other_decl = returnRn fixity_env
+
+loadDecl :: Module -> IfaceFlavour -> DeclsMap
 	 -> (Version, RdrNameHsDecl)
 	 -> RnMG DeclsMap
+
 loadDecl mod as_source decls_map (version, decl)
-  = getDeclBinders new_implicit_name decl	`thenRn` \ avail ->
-    returnRn (addListToFM decls_map
-			  [(name,(version,avail,decl')) | name <- availNames avail]
-    )
+  = getDeclBinders new_name decl	`thenRn` \ avail ->
+    getDeclSysBinders new_name decl	`thenRn` \ sys_bndrs ->
+    let
+	main_name     = availName avail
+	new_decls_map = foldl add_decl decls_map
+				       [ (name, (version,avail,decl',name==main_name)) 
+				       | name <- sys_bndrs ++ availNames avail]
+	add_decl decls_map (name, stuff)
+	  = ASSERT2( not (name `elemNameEnv` decls_map), ppr name )
+	    addToNameEnv decls_map name stuff
+    in
+    returnRn new_decls_map
   where
+    new_name rdr_name loc = new_implicit_name mod as_source rdr_name 
     {-
-      If a signature decl is being loaded and we're ignoring interface pragmas,
-      toss away unfolding information.
+      If a signature decl is being loaded, and optIgnoreIfacePragmas is on,
+      we toss away unfolding information.
 
       Also, if the signature is loaded from a module we're importing from source,
       we do the same. This is to avoid situations when compiling a pair of mutually
       recursive modules, peering at unfolding info in the interface file of the other, 
       e.g., you compile A, it looks at B's interface file and may as a result change
-      it's interface file. Hence, B is recompiled, maybe changing it's interface file,
-      which will the ufolding info used in A to become invalid. Simple way out is to
+      its interface file. Hence, B is recompiled, maybe changing its interface file,
+      which will the unfolding info used in A to become invalid. Simple way out is to
       just ignore unfolding info.
     -}
     decl' = 
@@ -263,11 +294,12 @@ loadDecl mod as_source decls_map (version, decl)
 	    SigD (IfaceSig name tp [] loc)
        _ -> decl
 
-    new_implicit_name rdr_name loc = newImportedGlobalName mod (rdrNameOcc rdr_name) as_source
-
     from_hi_boot = case as_source of
 			HiBootFile -> True
 			other	   -> False
+
+new_implicit_name mod as_source rdr_name 
+  = newImportedGlobalName mod (rdrNameOcc rdr_name) as_source
 
 loadInstDecl :: Module
 	     -> Bag IfaceInst
@@ -290,13 +322,13 @@ loadInstDecl mod_name insts decl@(InstDecl inst_ty binds uprags dfun_name src_lo
 				other		      -> inst_ty
     in
 	-- We find the gates by renaming the instance type with in a 
-	-- and returning the occurrence pool.
+	-- and returning the free variables of the type
     initRnMS emptyRnEnv mod_name vanillaInterfaceMode (
-        findOccurrencesRn (rnHsSigType (text "an instance decl") munged_inst_ty)	
-    )						`thenRn` \ gate_names ->
+        discardOccurrencesRn (rnHsSigType (text "an instance decl") munged_inst_ty)
+    )						`thenRn` \ (_, gate_names) ->
     returnRn (((mod_name, decl), gate_names) `consBag` insts)
 
-vanillaInterfaceMode = InterfaceMode Compulsory (\_ -> False)
+vanillaInterfaceMode = InterfaceMode Compulsory
 \end{code}
 
 
@@ -318,7 +350,7 @@ checkUpToDate mod_name
 				    pprModule mod_name])	`thenRn_`
 		    returnRn False
 
-	Just (ParsedIface _ _ usages _ _ _ _ _) 
+	Just (ParsedIface _ _ usages _ _ _ _) 
 		-> 	-- Found it, so now check it
 		    checkModUsage usages
   where
@@ -330,9 +362,8 @@ checkModUsage [] = returnRn True		-- Yes!  Everything is up to date!
 checkModUsage ((mod, hif, old_mod_vers, whats_imported) : rest)
   = loadInterface doc_str mod hif	`thenRn` \ ifaces ->
     let
-	Ifaces _ mod_map decls _ _ _ _ _ = ifaces
-	maybe_new_mod_vers	         = lookupFM mod_map mod
-	Just (_, new_mod_vers, _, _)     = maybe_new_mod_vers
+	maybe_new_mod_vers	  = lookupFM (iModMap ifaces) mod
+	Just (_, new_mod_vers, _) = maybe_new_mod_vers
     in
 	-- If we can't find a version number for the old module then
 	-- bail out saying things aren't up to date
@@ -360,7 +391,7 @@ checkModUsage ((mod, hif, old_mod_vers, whats_imported) : rest)
       Specifically old_local_vers ->
 
 	-- Non-empty usage list, so check item by item
-    checkEntityUsage mod decls old_local_vers	`thenRn` \ up_to_date ->
+    checkEntityUsage mod (iDecls ifaces) old_local_vers	`thenRn` \ up_to_date ->
     if up_to_date then
 	traceRn (ptext SLIT("...but the bits I use haven't."))	`thenRn_`
 	checkModUsage rest	-- This one's ok, so check the rest
@@ -376,13 +407,13 @@ checkEntityUsage mod decls []
 
 checkEntityUsage mod decls ((occ_name,old_vers) : rest)
   = newImportedGlobalName mod occ_name HiFile	`thenRn` \ name ->
-    case lookupFM decls name of
+    case lookupNameEnv decls name of
 
 	Nothing       -> 	-- We used it before, but it ain't there now
 			  putDocRn (sep [ptext SLIT("No longer exported:"), ppr name])	`thenRn_`
 			  returnRn False
 
-	Just (new_vers,_,_) 	-- It's there, but is it up to date?
+	Just (new_vers,_,_,_) 	-- It's there, but is it up to date?
 		| new_vers == old_vers
 			-- Up to date, so check the rest
 		-> checkEntityUsage mod decls rest
@@ -415,10 +446,9 @@ importDecl (name, loc) mode
     else 
        getIfacesRn 		`thenRn` \ ifaces ->
        let
-         Ifaces this_mod _ _ _ _ _ _ _ = ifaces
          mod = nameModule name
        in
-       if mod == this_mod  then    -- Don't bring in decls from
+       if mod == iMod ifaces then    -- Don't bring in decls from
 	  addWarnRn (importDeclWarn mod name loc) `thenRn_`
 --	  pprTrace "importDecl wierdness:" (ppr name) $
 	  returnRn Nothing         -- the renamed module's own interface file
@@ -430,33 +460,29 @@ importDecl (name, loc) mode
 \begin{code}
 getNonWiredInDecl :: Name -> SrcLoc -> RnSMode -> RnMG (Maybe RdrNameHsDecl)
 getNonWiredInDecl needed_name loc mode
-  = traceRn doc_str					 `thenRn_`
-    loadInterface doc_str mod (ifaceFlavour needed_name) `thenRn` \ (Ifaces _ _ decls _ _ _ _ _) ->
-    case lookupFM decls needed_name of
+  = traceRn doc_str				`thenRn_`
+    loadHomeInterface doc_str needed_name	`thenRn` \ ifaces ->
+    case lookupNameEnv (iDecls ifaces) needed_name of
 
 	-- Special case for data/newtype type declarations
-      Just (version, avail, TyD ty_decl) | is_data_or_newtype ty_decl
-	      -> getNonWiredDataDecl needed_name version avail ty_decl	`thenRn` \ (avail', maybe_decl) ->
-		 recordSlurp (Just version) necessity avail'	`thenRn_`
-		 returnRn maybe_decl
+      Just (version, avail, TyClD tycl_decl, _) | isDataDecl tycl_decl
+	-> getNonWiredDataDecl needed_name version avail tycl_decl	`thenRn` \ (avail', maybe_decl) ->
+	   recordSlurp (Just version) necessity avail'			`thenRn_`
+	   returnRn maybe_decl
 
-      Just (version,avail,decl)
-	      -> recordSlurp (Just version) necessity avail	`thenRn_`
-		 returnRn (Just decl)
+      Just (version,avail,decl,_)
+	-> recordSlurp (Just version) necessity avail	`thenRn_`
+	   returnRn (Just decl)
 
       Nothing -> 	-- Can happen legitimately for "Optional" occurrences
 		   case necessity of { 
-				Optional -> addWarnRn (getDeclWarn needed_name loc);
-				other	 -> addErrRn  (getDeclErr  needed_name loc)
+			Optional -> addWarnRn (getDeclWarn needed_name loc);
+			other	 -> addErrRn  (getDeclErr  needed_name loc)
 		   }						`thenRn_` 
 		   returnRn Nothing
   where
      necessity = modeToNecessity mode
      doc_str = sep [ptext SLIT("need decl for"), ppr needed_name, ptext SLIT("needed at"), ppr loc]
-     mod = nameModule needed_name
-
-     is_data_or_newtype (TyData _ _ _ _ _ _ _ _) = True
-     is_data_or_newtype other		         = False
 \end{code}
 
 @getWiredInDecl@ maps a wired-in @Name@ to what it makes available.
@@ -511,16 +537,16 @@ getWiredInDecl name mode
     (if not main_is_tc || mod == pREL_GHC then
 	returnRn ()		
     else
-	loadInterface doc_str mod (ifaceFlavour main_name)	`thenRn_`
+	loadHomeInterface doc_str main_name	`thenRn_`
 	returnRn ()
-    )								`thenRn_`
+    )						`thenRn_`
 
     returnRn Nothing		-- No declaration to process further
   where
     necessity = modeToNecessity mode
     new_mode = case mode of 
-			InterfaceMode _ _ -> mode
-			SourceMode	  -> vanillaInterfaceMode
+			InterfaceMode _ -> mode
+			SourceMode	-> vanillaInterfaceMode
 
     get_wired | is_tycon			-- ... a type constructor
 	      = get_wired_tycon the_tycon
@@ -576,17 +602,17 @@ get_wired_tycon tycon
 %*********************************************************
 
 \begin{code}
-getInterfaceExports :: Module -> IfaceFlavour -> RnMG (Avails, [(OccName,Fixity)])
+getInterfaceExports :: Module -> IfaceFlavour -> RnMG Avails
 getInterfaceExports mod as_source
-  = loadInterface doc_str mod as_source	`thenRn` \ (Ifaces _ mod_map _ _ _ _ _ _) ->
-    case lookupFM mod_map mod of
+  = loadInterface doc_str mod as_source	`thenRn` \ ifaces ->
+    case lookupFM (iModMap ifaces) mod of
 	Nothing ->	-- Not there; it must be that the interface file wasn't found;
 			-- the error will have been reported already.
 			-- (Actually loadInterface should put the empty export env in there
 			--  anyway, but this does no harm.)
-		      returnRn ([],[])
+		      returnRn []
 
-	Just (_, _, avails, fixities) -> returnRn (avails, fixities)
+	Just (_, _, avails) -> returnRn avails
   where
     doc_str = sep [pprModule mod, ptext SLIT("is directly imported")]
 \end{code}
@@ -632,14 +658,12 @@ getNonWiredDataDecl needed_name
   = 	-- Need the type constructor; so put it in the deferred set for now
     getIfacesRn 		`thenRn` \ ifaces ->
     let
-	Ifaces this_mod mod_map decls_fm slurped_names imp_names 
-	       unslurped_insts deferred_data_decls inst_mods = ifaces
-
-	new_ifaces = Ifaces this_mod mod_map decls_fm slurped_names imp_names
-			    unslurped_insts new_deferred_data_decls inst_mods
+	deferred_data_decls = iDefData ifaces
+	new_ifaces          = ifaces {iDefData = new_deferred_data_decls}
 
 	no_constr_ty_decl       = TyData new_or_data [] tycon tyvars [] derivings pragmas src_loc
-	new_deferred_data_decls = addToFM deferred_data_decls tycon_name no_constr_ty_decl
+	new_deferred_data_decls = addToNameEnv deferred_data_decls tycon_name 
+					       (nameModule tycon_name, no_constr_ty_decl)
 		-- Nota bene: we nuke both the constructors and the context in the deferred decl.
 		-- If we don't nuke the context then renaming the deferred data decls can give
 		-- new unresolved names (for the classes).  This could be handled, but there's
@@ -653,24 +677,21 @@ getNonWiredDataDecl needed_name
   = 	-- Need a data constructor, so delete the data decl from the deferred set if it's there
     getIfacesRn 		`thenRn` \ ifaces ->
     let
-	Ifaces this_mod mod_map decls_fm slurped_names imp_names 
-	       unslurped_insts deferred_data_decls inst_mods = ifaces
+	deferred_data_decls = iDefData ifaces
+	new_ifaces          = ifaces {iDefData = new_deferred_data_decls}
 
-	new_ifaces = Ifaces this_mod mod_map decls_fm slurped_names imp_names 
-			    unslurped_insts new_deferred_data_decls inst_mods
-
-	new_deferred_data_decls = delFromFM deferred_data_decls tycon_name
+	new_deferred_data_decls = delFromNameEnv deferred_data_decls tycon_name
     in
     setIfacesRn new_ifaces	`thenRn_`
-    returnRn (avail, Just (TyD ty_decl))
+    returnRn (avail, Just (TyClD ty_decl))
 \end{code}
 
 \begin{code}
-getDeferredDataDecls :: RnMG [(Name, RdrNameTyDecl)]
+getDeferredDataDecls :: RnMG [(Module, RdrNameTyClDecl)]
 getDeferredDataDecls 
-  = getIfacesRn 		`thenRn` \ (Ifaces _ _ _ _ _ _ deferred_data_decls _) ->
+  = getIfacesRn 		`thenRn` \ ifaces ->
     let
-	deferred_list = fmToList deferred_data_decls
+	deferred_list = nameEnvElts (iDefData ifaces)
 	trace_msg = hang (text "Slurping abstract data/newtype decls for: ")
 			4 (ppr (map fst deferred_list))
     in
@@ -697,7 +718,7 @@ getImportedInstDecls
 	-- removing them from the bag kept in Ifaces
     getIfacesRn 	`thenRn` \ ifaces ->
     let
-	Ifaces this_mod mod_map decls slurped_names imp_names (insts, tycls_names) deferred_data_decls inst_mods = ifaces
+	(insts, tycls_names) = iDefInsts ifaces
 
 		-- An instance decl is ungated if all its gates have been slurped
         select_ungated :: IfaceInst					-- A gated inst decl
@@ -708,20 +729,18 @@ getImportedInstDecls
 			   [IfaceInst]) 				-- Still gated, but with
 									-- depeleted gates
 	select_ungated (decl,gates) (ungated_decls, gated_decls)
-	  | null remaining_gates
+	  | isEmptyNameSet remaining_gates
 	  = (decl : ungated_decls, gated_decls)
 	  | otherwise
 	  = (ungated_decls, (decl, remaining_gates) : gated_decls)
 	  where
-	    remaining_gates = filter (not . (`elemNameSet` tycls_names)) gates
+	    remaining_gates = gates `minusNameSet` tycls_names
 
 	(un_gated_insts, still_gated_insts) = foldrBag select_ungated ([], []) insts
 	
-	new_ifaces = Ifaces this_mod mod_map decls slurped_names imp_names
-			    ((listToBag still_gated_insts), tycls_names)
-				-- NB: don't throw away tycls_names; we may comre across more instance decls
-			    deferred_data_decls 
-			    inst_mods
+	new_ifaces = ifaces {iDefInsts = (listToBag still_gated_insts, tycls_names)}
+				-- NB: don't throw away tycls_names;
+				-- we may comre across more instance decls
     in
     traceRn (sep [text "getInstDecls:", fsep (map ppr (nameSetToList tycls_names))])	`thenRn_`
     setIfacesRn new_ifaces	`thenRn_`
@@ -734,10 +753,12 @@ getImportedInstDecls
 getSpecialInstModules :: RnMG [Module]
 getSpecialInstModules 
   = getIfacesRn						`thenRn` \ ifaces ->
-    let
-	 Ifaces _ _ _ _ _ _ _ inst_mods = ifaces
-    in
-    returnRn inst_mods
+    returnRn (iInstMods ifaces)
+
+getImportedFixities :: RnMG FixityEnv
+getImportedFixities
+  = getIfacesRn						`thenRn` \ ifaces ->
+    returnRn (iFixes ifaces)
 \end{code}
 
 
@@ -792,21 +813,22 @@ getImportVersions :: Module			-- Name of this module
 getImportVersions this_mod exports
   = getIfacesRn					`thenRn` \ ifaces ->
     let
-	 Ifaces _ mod_map _ _ imp_names _ _ _ = ifaces
+	mod_map   = iModMap ifaces
+	imp_names = iVSlurp ifaces
 
-	 -- mv_map groups together all the things imported from a particular module.
-	 mv_map, mv_map_mod :: FiniteMap Module (WhatsImported Name)
+	-- mv_map groups together all the things imported from a particular module.
+	mv_map, mv_map_mod :: FiniteMap Module (WhatsImported Name)
 
-	 mv_map_mod = foldl add_mod emptyFM export_mods
+	mv_map_mod = foldl add_mod emptyFM export_mods
 		-- mv_map_mod records all the modules that have a "module M"
 		-- in this module's export list with an "Everything" 
 
-	 mv_map = foldl add_mv mv_map_mod imp_names
+	mv_map = foldl add_mv mv_map_mod imp_names
 		-- mv_map adds the version numbers of things exported individually
 
-	 mk_version_info (mod, local_versions)
+	mk_version_info (mod, local_versions)
 	   = case lookupFM mod_map mod of
-		Just (hif, version, _, _) -> (mod, hif, version, local_versions)
+		Just (hif, version, _) -> (mod, hif, version, local_versions)
     in
     returnRn (map mk_version_info (fmToList mv_map))
   where
@@ -827,16 +849,13 @@ getImportVersions this_mod exports
 
 \begin{code}
 checkSlurped name
-  = getIfacesRn 	`thenRn` \ (Ifaces _ _ _ slurped_names _ _ _ _) ->
-    returnRn (name `elemNameSet` slurped_names)
+  = getIfacesRn 	`thenRn` \ ifaces ->
+    returnRn (name `elemNameSet` iSlurp ifaces)
 
 getSlurpedNames :: RnMG NameSet
 getSlurpedNames
   = getIfacesRn 	`thenRn` \ ifaces ->
-    let
-	 Ifaces _ _ _ slurped_names _ _ _ _ = ifaces
-    in
-    returnRn slurped_names
+    returnRn (iSlurp ifaces)
 
 recordSlurp maybe_version necessity avail
   = {- traceRn (hsep [text "Record slurp:", pprAvail avail, 
@@ -846,8 +865,9 @@ recordSlurp maybe_version necessity avail
     -}
     getIfacesRn 	`thenRn` \ ifaces ->
     let
-	Ifaces this_mod mod_map decls slurped_names imp_names 
-	       (insts, tycls_names) deferred_data_decls inst_mods = ifaces
+	Ifaces { iSlurp    = slurped_names,
+		 iVSlurp   = imp_names,
+		 iDefInsts = (insts, tycls_names) } = ifaces
 
 	new_slurped_names = addAvailToNameSet slurped_names avail
 
@@ -864,12 +884,9 @@ recordSlurp maybe_version necessity avail
 					      -> tycls_names `addOneToNameSet` tc
 				otherwise     -> tycls_names
 
-	new_ifaces = Ifaces this_mod mod_map decls 
-			    new_slurped_names 
-			    new_imp_names
-			    (insts, new_tycls_names)
-			    deferred_data_decls 
-			    inst_mods
+	new_ifaces = ifaces { iSlurp    = new_slurped_names,
+			      iVSlurp   = new_imp_names,
+			      iDefInsts = (insts, new_tycls_names) }
     in
     setIfacesRn new_ifaces
 \end{code}
@@ -893,31 +910,30 @@ getDeclBinders :: (RdrName -> SrcLoc -> RnMG Name)	-- New-name function
 		-> RdrNameHsDecl
 		-> RnMG AvailInfo
 
-getDeclBinders new_name (TyD (TyData _ _ tycon _ condecls _ _ src_loc))
+getDeclBinders new_name (TyClD (TyData _ _ tycon _ condecls _ _ src_loc))
   = new_name tycon src_loc			`thenRn` \ tycon_name ->
     getConFieldNames new_name condecls		`thenRn` \ sub_names ->
     returnRn (AvailTC tycon_name (tycon_name : nub sub_names))
 	-- The "nub" is because getConFieldNames can legitimately return duplicates,
 	-- when a record declaration has the same field in multiple constructors
 
-getDeclBinders new_name (TyD (TySynonym tycon _ _ src_loc))
+getDeclBinders new_name (TyClD (TySynonym tycon _ _ src_loc))
   = new_name tycon src_loc		`thenRn` \ tycon_name ->
     returnRn (AvailTC tycon_name [tycon_name])
 
-getDeclBinders new_name (ClD (ClassDecl _ cname _ sigs _ _ tname dname src_loc))
+getDeclBinders new_name (TyClD (ClassDecl _ cname _ sigs _ _ tname dname src_loc))
   = new_name cname src_loc			`thenRn` \ class_name ->
-    new_name dname src_loc		        `thenRn` \ datacon_name ->
-    new_name tname src_loc		        `thenRn` \ tycon_name ->
 
 	-- Record the names for the class ops
     mapRn (getClassOpNames new_name) sigs	`thenRn` \ sub_names ->
 
-    returnRn (AvailTC class_name (class_name : datacon_name : tycon_name : sub_names))
+    returnRn (AvailTC class_name (class_name : sub_names))
 
 getDeclBinders new_name (SigD (IfaceSig var ty prags src_loc))
   = new_name var src_loc			`thenRn` \ var_name ->
     returnRn (Avail var_name)
 
+getDeclBinders new_name (FixD _)  = returnRn NotAvailable
 getDeclBinders new_name (ForD _)  = returnRn NotAvailable
 getDeclBinders new_name (DefD _)  = returnRn NotAvailable
 getDeclBinders new_name (InstD _) = returnRn NotAvailable
@@ -940,6 +956,20 @@ getConFieldNames new_name [] = returnRn []
 getClassOpNames new_name (ClassOpSig op _ _ src_loc) = new_name op src_loc
 \end{code}
 
+@getDeclSysBinders@ gets the implicit binders introduced by a decl.
+A the moment that's just the tycon and datacon that come with a class decl.
+They aren'te returned by getDeclBinders because they aren't in scope;
+but they should be put into the DeclsMap of this module.
+
+\begin{code}
+getDeclSysBinders new_name (TyClD (ClassDecl _ cname _ sigs _ _ tname dname src_loc))
+  = new_name dname src_loc		        `thenRn` \ datacon_name ->
+    new_name tname src_loc		        `thenRn` \ tycon_name ->
+    returnRn [tycon_name, datacon_name]
+
+getDeclSysBinders new_name other_decl
+  = returnRn []
+\end{code}
 
 %*********************************************************
 %*							*
@@ -978,7 +1008,7 @@ findAndReadIface doc_str mod_name as_source
     trace_msg = sep [hsep [ptext SLIT("Reading"), 
 			   case as_source of { HiBootFile -> ptext SLIT("[boot]"); other -> empty},
 			   ptext SLIT("interface for"), 
-			   ptext mod_name <> semi],
+			   pprModule mod_name <> semi],
 		     nest 4 (ptext SLIT("reason:") <+> doc_str)]
 \end{code}
 
@@ -1051,17 +1081,17 @@ noIfaceErr filename
 
 cannaeReadFile file err
   = hcat [ptext SLIT("Failed in reading file: "), 
-           text file, 
+          text file, 
 	  ptext SLIT("; error="), 
-	   text (show err)]
+	  text (show err)]
 
 getDeclErr name loc
-  = sep [ptext SLIT("Failed to find interface decl for"), 
-         quotes (ppr name), ptext SLIT("needed at"), ppr loc]
+  = sep [ptext SLIT("Failed to find interface decl for") <+> quotes (ppr name), 
+	 ptext SLIT("needed at") <+> ppr loc]
 
 getDeclWarn name loc
-  = sep [ptext SLIT("Failed to find (optional) interface decl for"), 
-         quotes (ppr name), ptext SLIT("desired at"), ppr loc]
+  = sep [ptext SLIT("Failed to find (optional) interface decl for") <+> quotes (ppr name),
+	 ptext SLIT("desired at") <+> ppr loc]
 
 importDeclWarn mod name loc
   = sep [ptext SLIT("Compiler tried to import decl from interface file with same name as module."), 

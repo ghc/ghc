@@ -12,6 +12,8 @@ defined here so as to avod
 \begin{code}
 module PrelMods
         (
+        mkTupNameStr, mkUbxTupNameStr,
+
 	pREL_GHC, pRELUDE, mONAD, rATIO, iX, mAIN, pREL_MAIN, pREL_ERR,
 	pREL_BASE, pREL_NUM, pREL_LIST, pREL_TUP, pREL_ADDR, pREL_READ,
 	pREL_PACK, pREL_CONC, pREL_IO_BASE, pREL_ST, pREL_ARR, pREL_FOREIGN,
@@ -21,7 +23,9 @@ module PrelMods
 
 #include "HsVersions.h"
 
-import BasicTypes( Module )
+import OccName	( Module, mkModule )
+import Util	( nOfThem )
+import Panic	( panic )
 \end{code}
 
 \begin{code}
@@ -30,32 +34,58 @@ pREL_BASE, pREL_NUM, pREL_LIST, pREL_TUP, pREL_ADDR, pREL_READ      :: Module
 pREL_PACK, pREL_CONC, pREL_IO_BASE, pREL_ST, pREL_ARR, pREL_FOREIGN :: Module	
 
 
-pRELUDE	     = SLIT("Prelude")
-pREL_GHC     = SLIT("PrelGHC")	   -- Primitive types and values
-pREL_BASE    = SLIT("PrelBase")
-pREL_READ    = SLIT("PrelRead")
-pREL_NUM     = SLIT("PrelNum")
-pREL_LIST    = SLIT("PrelList")
-pREL_TUP     = SLIT("PrelTup")
-pREL_PACK    = SLIT("PrelPack")
-pREL_CONC    = SLIT("PrelConc")
-pREL_IO_BASE = SLIT("PrelIOBase")
-pREL_ST	     = SLIT("PrelST")
-pREL_ARR     = SLIT("PrelArr")
-pREL_FOREIGN = SLIT("PrelForeign")
-pREL_ADDR    = SLIT("PrelAddr")
-pREL_ERR     = SLIT("PrelErr")
+pRELUDE	     = mkModule "Prelude"
+pREL_GHC     = mkModule "PrelGHC"	   -- Primitive types and values
+pREL_BASE    = mkModule "PrelBase"
+pREL_READ    = mkModule "PrelRead"
+pREL_NUM     = mkModule "PrelNum"
+pREL_LIST    = mkModule "PrelList"
+pREL_TUP     = mkModule "PrelTup"
+pREL_PACK    = mkModule "PrelPack"
+pREL_CONC    = mkModule "PrelConc"
+pREL_IO_BASE = mkModule "PrelIOBase"
+pREL_ST	     = mkModule "PrelST"
+pREL_ARR     = mkModule "PrelArr"
+pREL_FOREIGN = mkModule "PrelForeign"
+pREL_ADDR    = mkModule "PrelAddr"
+pREL_ERR     = mkModule "PrelErr"
 
-mONAD	     = SLIT("Monad")
-rATIO	     = SLIT("Ratio")
-iX	     = SLIT("Ix")
+mONAD	     = mkModule "Monad"
+rATIO	     = mkModule "Ratio"
+iX	     = mkModule "Ix"
 
-pREL_MAIN    = SLIT("PrelMain")
-mAIN	     = SLIT("Main")
+pREL_MAIN    = mkModule "PrelMain"
+mAIN	     = mkModule "Main"
 
 iNT, wORD   :: Module
 
-iNT	     = SLIT("Int")
-wORD	     = SLIT("Word")
+iNT	     = mkModule "Int"
+wORD	     = mkModule "Word"
 
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection{Constructing the names of tuples
+%*									*
+%************************************************************************
+
+\begin{code}
+mkTupNameStr, mkUbxTupNameStr :: Int -> (Module, FAST_STRING)
+
+mkTupNameStr 0 = (pREL_BASE, SLIT("()"))
+mkTupNameStr 1 = panic "Name.mkTupNameStr: 1 ???"
+mkTupNameStr 2 = (pREL_TUP, _PK_ "(,)")   -- not strictly necessary
+mkTupNameStr 3 = (pREL_TUP, _PK_ "(,,)")  -- ditto
+mkTupNameStr 4 = (pREL_TUP, _PK_ "(,,,)") -- ditto
+mkTupNameStr n = (pREL_TUP, _PK_ ("(" ++ nOfThem (n-1) ',' ++ ")"))
+
+mkUbxTupNameStr 0 = panic "Name.mkUbxTupNameStr: 0 ???"
+mkUbxTupNameStr 1 = (pREL_GHC, _PK_ "(# #)") -- 1 and 0 both make sense!!!
+mkUbxTupNameStr 2 = (pREL_GHC, _PK_ "(#,#)")
+mkUbxTupNameStr 3 = (pREL_GHC, _PK_ "(#,,#)")
+mkUbxTupNameStr 4 = (pREL_GHC, _PK_ "(#,,,#)")
+mkUbxTupNameStr n = (pREL_GHC, _PK_ ("(#" ++ nOfThem (n-1) ',' ++ "#)"))
+\end{code}
+
+

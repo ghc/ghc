@@ -18,8 +18,8 @@ import DsUtils
 import Id		( Id )
 import CoreSyn
 import Type		( mkTyVarTys )
+import Util		( equivClassesByUniq )
 import Unique		( Uniquable(..), Unique )
-import UniqFM		-- Until equivClassesUniq moves to Util
 import Outputable
 \end{code}
 
@@ -121,21 +121,6 @@ match_con vars all_eqns@(EqnInfo n ctx (ConPat data_con _ ex_tvs ex_dicts arg_pa
     subst_it e = foldr subst_one e other_eqns
     subst_one (EqnInfo _ _ (ConPat _ _ ex_tvs' _ _ : _) _) e = mkTyApps (mkLams ex_tvs' e) ex_tys
     ex_tys = mkTyVarTys ex_tvs
-
-
--- Belongs in Util.lhs
-equivClassesByUniq :: (a -> Unique) -> [a] -> [[a]]
-	-- NB: it's *very* important that if we have the input list [a,b,c],
-	-- where a,b,c all have the same unique, then we get back the list
-	-- 	[a,b,c]
-	-- not
-	--	[c,b,a]
-	-- Hence the use of foldr, plus the reversed-args tack_on below
-equivClassesByUniq get_uniq xs
-  = eltsUFM (foldr add emptyUFM xs)
-  where
-    add a ufm = addToUFM_C tack_on ufm (get_uniq a) [a]
-    tack_on old new = new++old
 \end{code}
 
 Note on @shift_con_pats@ just above: does what the list comprehension in

@@ -22,7 +22,7 @@ import Type		( mkFunTys, splitFunTys, splitAlgTyConApp_maybe,
 			  isUnLiftedType, isTyVarTy, Type
 			)
 import TyCon		( TyCon, isDataTyCon )
-import Util		( zipEqual, trace )
+import Util		( zipEqual )
 import Outputable
 
 infixr 9 `thenL`, `thenL_`, `thenMaybeL`, `thenMaybeL_`
@@ -276,7 +276,7 @@ pp_binders bs
   = sep (punctuate comma (map pp_binder bs))
   where
     pp_binder b
-      = hsep [ppr b, ptext SLIT("::"), ppr (idType b)]
+      = hsep [ppr b, dcolon, ppr (idType b)]
 \end{code}
 
 \begin{code}

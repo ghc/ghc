@@ -22,9 +22,7 @@ import DsUtils		( EquationInfo(..),
 import Id		( idType )
 import DataCon		( DataCon, isTupleCon, isUnboxedTupleCon,
 			  dataConSourceArity )
-import Name             ( Name, occNameString,
-                          getOccName, getOccString, isLexConSym
-                        )
+import Name             ( Name, mkLocalName, getOccName, isConSymOcc, getName, varOcc )
 import Type		( Type, 
                           isUnboxedType, 
                           splitTyConApp_maybe
@@ -48,6 +46,7 @@ import TysWiredIn	( nilDataCon, consDataCon,
                           wordTy, wordDataCon,
 			  stringTy
 			)
+import Unique		( unboundKey )
 import TyCon            ( tyConDataCons )
 import UniqSet
 import Outputable
@@ -113,14 +112,14 @@ Then we need to use InPats.
    
 \begin{code}
 
-newtype BoxedString = BS String
+newtype BoxedString = BS Name
 
 type WarningPat = InPat BoxedString 
 type ExhaustivePat = ([WarningPat], [(BoxedString, [HsLit])])
 
 
 instance Outputable BoxedString where
-    ppr (BS s) = text s
+    ppr (BS n) = ppr n
 
 
 check :: [EquationInfo] -> ([ExhaustivePat],EqnSet)
@@ -163,6 +162,7 @@ untidy b (ConOpPatIn pat1 name fixity pat2) =
 untidy _ (ListPatIn pats)  = ListPatIn (map untidy_no_pars pats) 
 untidy _ (TuplePatIn pats boxed) = TuplePatIn (map untidy_no_pars pats) boxed
 
+untidy _ (SigPatIn pat ty)      = panic "Check.untidy: SigPatIn"
 untidy _ (LazyPatIn pat)        = panic "Check.untidy: LazyPatIn"
 untidy _ (AsPatIn name pat)     = panic "Check.untidy: AsPatIn"
 untidy _ (NPlusKPatIn name lit) = panic "Check.untidy: NPlusKPatIn"
@@ -393,7 +393,10 @@ remove_first_column (ConPat con _ _ _ con_pats) qs =
 make_row_vars :: [HsLit] -> EquationInfo -> ExhaustivePat
 make_row_vars used_lits (EqnInfo _ _ pats _ ) = 
    (VarPatIn new_var:take (length (tail pats)) (repeat new_wild_pat),[(new_var,used_lits)])
-  where new_var = BS "#x"   
+  where new_var = BS hash_x
+
+hash_x = mkLocalName unboundKey {- doesn't matter much -}
+		     (varOcc SLIT("#x"))
 
 make_row_vars_for_constructor :: EquationInfo -> [WarningPat]
 make_row_vars_for_constructor (EqnInfo _ _ pats _ ) = take (length (tail pats)) (repeat new_wild_pat)
@@ -515,9 +518,9 @@ not the second.
 
 \begin{code}
 
-isInfixCon con = isLexConSym (occNameString (getOccName con))
+isInfixCon con = isConSymOcc (getOccName con)
 
-is_nil (ConPatIn (BS con) []) = con == getOccString nilDataCon
+is_nil (ConPatIn (BS con) []) = con == getName nilDataCon
 is_nil _                      = False
 
 is_list (ListPatIn _) = True
@@ -533,7 +536,7 @@ make_con :: TypecheckedPat -> ExhaustivePat -> ExhaustivePat
 make_con (ConPat id _ _ _ _) (p:q:ps, constraints) 
      | return_list id q = (make_list p q : ps, constraints)
      | isInfixCon id = ((ConOpPatIn p name fixity q) : ps, constraints) 
-    where name   = BS (getOccString id)
+    where name   = BS (getName id)
           fixity = panic "Check.make_con: Guessing fixity"
 
 make_con (ConPat id _ _ _ pats) (ps,constraints) 
@@ -541,7 +544,7 @@ make_con (ConPat id _ _ _ pats) (ps,constraints)
       | isUnboxedTupleCon id = (TuplePatIn pats_con False : rest_pats, constraints)
       | otherwise     = (ConPatIn name pats_con : rest_pats, constraints)
     where num_args  = length pats
-          name      = BS (getOccString id)
+          name      = BS (getName id)
           pats_con  = take num_args ps
           rest_pats = drop num_args ps
 	  
@@ -551,7 +554,7 @@ make_whole_con con | isInfixCon con = ConOpPatIn new_wild_pat name fixity new_wi
                    | otherwise      = ConPatIn name pats
                 where 
                   fixity = panic "Check.make_whole_con: Guessing fixity"
-                  name   = BS (getOccString con)
+                  name   = BS (getName con)
                   arity  = dataConSourceArity con 
                   pats   = take arity (repeat new_wild_pat)
 
@@ -579,9 +582,8 @@ simplify_pat :: TypecheckedPat -> TypecheckedPat
 simplify_pat pat@(WildPat gt) = pat
 simplify_pat (VarPat id)      = WildPat (idType id) 
 
-simplify_pat (LazyPat p)   = simplify_pat p
-
-simplify_pat (AsPat id p)  = simplify_pat p
+simplify_pat (LazyPat p)    = simplify_pat p
+simplify_pat (AsPat id p)   = simplify_pat p
 
 simplify_pat (ConPat id ty tvs dicts ps) = ConPat id ty tvs dicts (map simplify_pat ps)
 

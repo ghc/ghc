@@ -10,7 +10,7 @@ module AnalFBWW ( analFBWW ) where
 
 -- Just a stub for now
 import CoreSyn		( CoreBind )
-import Util		( panic )
+import Panic		( panic )
 
 --import Util
 --import Id               	( addIdFBTypeInfo )

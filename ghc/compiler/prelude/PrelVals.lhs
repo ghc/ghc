@@ -20,9 +20,10 @@ import TysWiredIn
 -- others:
 import CoreSyn		-- quite a bit
 import IdInfo		-- quite a bit
-import Name		( mkWiredInIdName, Module )
+import Name		( mkWiredInIdName, varOcc, Module )
 import Type		
 import Var		( TyVar )
+import Demand		( wwStrict )
 import Unique		-- lots of *Keys
 
 import IOExts
@@ -96,7 +97,7 @@ templates, but we don't ever expect to generate code for it.
 pc_bottoming_Id key mod name ty
  = pcMiscPrelId key mod name ty bottoming_info
  where
-    bottoming_info = mkBottomStrictnessInfo `setStrictnessInfo` noCafIdInfo
+    bottoming_info = mkStrictnessInfo ([wwStrict], True) False `setStrictnessInfo` noCafIdInfo
 	-- these "bottom" out, no matter what their arguments
 
 eRROR_ID
@@ -156,9 +157,9 @@ exactArityInfo n = exactArity n `setArityInfo` noIdInfo
 
 pcMiscPrelId :: Unique{-IdKey-} -> Module -> FAST_STRING -> Type -> IdInfo -> Id
 
-pcMiscPrelId key mod occ ty info
+pcMiscPrelId key mod str ty info
   = let
-	name = mkWiredInIdName key mod occ imp
+	name = mkWiredInIdName key mod (varOcc str) imp
 	imp  = mkVanillaId name ty `setIdInfo` info -- the usual case...
     in
     imp

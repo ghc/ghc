@@ -6,13 +6,12 @@
 \begin{code}
 module TcModule (
 	typecheckModule,
-	TcResults,
-	TcDDumpDeriv
+	TcResults
     ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_D_dump_tc, opt_D_dump_deriv )
+import CmdLineOpts	( opt_D_dump_tc )
 import HsSyn		( HsModule(..), HsBinds(..), MonoBinds(..), HsDecl(..) )
 import RnHsSyn		( RenamedHsModule )
 import TcHsSyn		( TcMonoBinds, TypecheckedMonoBinds, zonkTopBinds,
@@ -24,10 +23,11 @@ import Inst		( Inst, emptyLIE, plusLIE )
 import TcBinds		( tcTopBindsAndThen )
 import TcClassDcl	( tcClassDecls2 )
 import TcDefaults	( tcDefaults )
-import TcEnv		( TcIdOcc(..), tcExtendGlobalValEnv, tcExtendTyConEnv,
-			  getEnv_TyCons, getEnv_Classes, tcLookupLocalValue,
-			  lookupGlobalByKey, tcSetGlobalValEnv,
-			  tcLookupTyCon, initEnv, GlobalValueEnv
+import TcEnv		( tcExtendGlobalValEnv, tcExtendTypeEnv,
+			  getEnvTyCons, getEnvClasses, tcLookupValueMaybe,
+			  explicitLookupValueByKey, tcSetValueEnv,
+			  tcLookupTyCon, initEnv, 
+			  ValueEnv, TcTyThing(..)
 			)
 import TcExpr		( tcId )
 import TcForeign	( tcForeignImports, tcForeignExports )
@@ -35,7 +35,7 @@ import TcIfaceSig	( tcInterfaceSigs )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
 import TcInstUtil	( buildInstanceEnvs, classDataCon, InstInfo )
 import TcSimplify	( tcSimplifyTop )
-import TcTyClsDecls	( tcTyAndClassDecls1 )
+import TcTyClsDecls	( tcTyAndClassDecls )
 import TcTyDecls	( mkDataBinds )
 import TcType		( TcType, typeToTcType,
 			  TcKind, kindToTcKind
@@ -76,12 +76,9 @@ type TcResults
      [TyCon], [Class],
      Bag InstInfo,		-- Instance declaration information
      [TypecheckedForeignDecl], -- foreign import & exports.
-     TcDDumpDeriv,
-     GlobalValueEnv,
+     ValueEnv,
      [Id]			-- The thin-air Ids
      )
-
-type TcDDumpDeriv = SDoc
 
 ---------------
 typecheckModule
@@ -91,28 +88,21 @@ typecheckModule
 	-> IO (Maybe TcResults)
 
 typecheckModule us rn_name_supply mod
-  = let
-      (maybe_result, warns, errs) = 
-		initTc us initEnv (tcModule rn_name_supply mod)
-    in
+  = initTc us initEnv (tcModule rn_name_supply mod)	>>= \ (maybe_result, warns, errs) ->
+		
     print_errs warns	>>
     print_errs errs	>>
 
-    dumpIfSet opt_D_dump_tc "Typechecked"
-	(case maybe_result of
-	    Just (binds, _, _, _, _, _, _, _) -> ppr binds
-	    Nothing 		              -> text "Typecheck failed")   >>
-
-    dumpIfSet opt_D_dump_deriv "Derived instances"
-	(case maybe_result of
-	    Just (_, _, _, _, _, dump_deriv, _, _) -> dump_deriv
-	    Nothing 		                   -> empty)		    >>
-
     -- write the thin-air Id map
     (case maybe_result of
-	Just (_, _, _, _, _, _, _, thin_air_ids) -> setThinAirIds thin_air_ids
-	Nothing 		                 -> return ()
+	Just (_, _, _, _, _, _, thin_air_ids) -> setThinAirIds thin_air_ids
+	Nothing 		              -> return ()
     ) 									>>
+
+    dumpIfSet opt_D_dump_tc "Typechecked"
+	(case maybe_result of
+	    Just (binds, _, _, _, _, _, _) -> ppr binds
+	    Nothing 		          -> text "Typecheck failed") 	>>
 
     return (if isEmptyBag errs then 
 		maybe_result 
@@ -131,7 +121,7 @@ tcModule :: RnNameSupply	-- for renaming derivings
 	 -> TcM s TcResults	-- output
 
 tcModule rn_name_supply
-	(HsModule mod_name verion exports imports fixities decls src_loc)
+	(HsModule mod_name verion exports imports decls src_loc)
   = tcAddSrcLoc src_loc $	-- record where we're starting
 
     fixTc (\ ~(unf_env ,_) ->
@@ -144,29 +134,24 @@ tcModule rn_name_supply
 
     	    -- The knot for instance information.  This isn't used at all
 	    -- till we type-check value declarations
-    	fixTc ( \ ~(rec_inst_mapper, _, _, _, _) ->
+    	fixTc ( \ ~(rec_inst_mapper, _, _, _) ->
     
 		 -- Type-check the type and class decls
-		-- trace "tcTyAndClassDecls:"	$
-		tcTyAndClassDecls1 unf_env rec_inst_mapper decls	`thenTc` \ env ->
+		tcTyAndClassDecls unf_env rec_inst_mapper decls	`thenTc` \ env ->
     
-		-- trace "tc3" $
 		    -- Typecheck the instance decls, includes deriving
 		tcSetEnv env (
-		-- trace "tcInstDecls:"	$
 		tcInstDecls1 unf_env decls mod_name rn_name_supply
-		)				`thenTc` \ (inst_info, deriv_binds, ddump_deriv) ->
+		)				`thenTc` \ (inst_info, deriv_binds) ->
     
-		-- trace "tc4" $
     		buildInstanceEnvs inst_info	`thenNF_Tc` \ inst_mapper ->
     
-		returnTc (inst_mapper, env, inst_info, deriv_binds, ddump_deriv)
+		returnTc (inst_mapper, env, inst_info, deriv_binds)
     
     	-- End of inner fix loop
-    	) `thenTc` \ (_, env, inst_info, deriv_binds, ddump_deriv) ->
+    	) `thenTc` \ (_, env, inst_info, deriv_binds) ->
     
-    	-- trace "tc5" $
-    	tcSetEnv env $
+    	tcSetEnv env 		(
     	
     	    -- Default declarations
     	tcDefaults decls		`thenTc` \ defaulting_tys ->
@@ -178,8 +163,8 @@ tcModule rn_name_supply
 	-- they are always fully applied, and the bindings are just there
 	-- to support partial applications
     	let
-    	    tycons       = getEnv_TyCons env
-    	    classes      = getEnv_Classes env
+    	    tycons       = getEnvTyCons env
+    	    classes      = getEnvClasses env
 	    local_tycons  = filter isLocallyDefined tycons
 	    local_classes = filter isLocallyDefined classes
     	in
@@ -189,7 +174,9 @@ tcModule rn_name_supply
     	--	(a) constructors
     	--	(b) record selectors
     	--	(c) class op selectors
-    	-- 	(d) default-method ids
+    	-- 	(d) default-method ids... where? I can't see where these are
+	--	    put into the envt, and I'm worried that the zonking phase
+	--	    will find they aren't there and complain.
     	tcExtendGlobalValEnv data_ids				$
     	tcExtendGlobalValEnv (concat (map classSelIds classes))	$
 
@@ -198,10 +185,10 @@ tcModule rn_name_supply
 	-- corresponding data cons.
 	--  They are mentioned in types in interface files.
     	tcExtendGlobalValEnv (map (dataConId . classDataCon) classes)		$
-        tcExtendTyConEnv [ (getName tycon, (kindToTcKind (tyConKind tycon), Nothing, tycon))
-		         | clas <- classes,
-			   let tycon = classTyCon clas
-		         ]				$
+        tcExtendTypeEnv [ (getName tycon, (kindToTcKind (tyConKind tycon), Nothing, ATyCon tycon))
+		        | clas <- classes,
+			  let tycon = classTyCon clas
+		        ]				$
 
 	    -- Interface type signatures
 	    -- We tie a knot so that the Ids read out of interfaces are in scope
@@ -218,13 +205,11 @@ tcModule rn_name_supply
 
 	-- Value declarations next.
 	-- We also typecheck any extra binds that came out of the "deriving" process
---      trace "tc6"			$
     	tcTopBindsAndThen
 	    (\ is_rec binds1 (binds2, thing) -> (binds1 `AndMonoBinds` binds2, thing))
 	    (get_val_decls decls `ThenBinds` deriv_binds)
-	    (	tcGetEnv		`thenNF_Tc` \ env ->
---		tcGetUnique	`thenNF_Tc` \ uniq ->
---		pprTrace "tc7" (ppr uniq) $
+	    (	tcGetEnv				`thenNF_Tc` \ env ->
+		tcGetUnique				`thenNF_Tc` \ uniq ->
 		returnTc ((EmptyMonoBinds, env), emptyLIE)
 	    )				`thenTc` \ ((val_binds, final_env), lie_valdecls) ->
 	tcSetEnv final_env $
@@ -234,7 +219,6 @@ tcModule rn_name_supply
 
 		-- Second pass over class and instance declarations,
 		-- to compile the bindings themselves.
---	pprTrace "tc8" emtpy $
 	tcInstDecls2  inst_info		`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
 	tcClassDecls2 decls		`thenNF_Tc` \ (lie_clasdecls, cls_binds) ->
 
@@ -267,11 +251,11 @@ tcModule rn_name_supply
 			foe_binds
 	in
 	zonkTopBinds all_binds		`thenNF_Tc` \ (all_binds', really_final_env)  ->
-	tcSetGlobalValEnv really_final_env $
+	tcSetValueEnv really_final_env	$
 	zonkForeignExports foe_decls	`thenNF_Tc` \ foe_decls' ->
 
 	let
-	   thin_air_ids = map (lookupGlobalByKey really_final_env . nameUnique) thinAirIdNames
+	   thin_air_ids = map (explicitLookupValueByKey really_final_env . nameUnique) thinAirIdNames
 		-- When looking up the thin-air names we must use
 		-- a global env that includes the zonked locally-defined Ids too
 		-- Hence using really_final_env
@@ -279,7 +263,9 @@ tcModule rn_name_supply
 	returnTc (really_final_env, 
 		  (all_binds', local_tycons, local_classes, inst_info,
 		   foi_decls ++ foe_decls',
-		   ddump_deriv, really_final_env, thin_air_ids))
+		   really_final_env,
+		   thin_air_ids))
+	)
 
     -- End of outer fix loop
     ) `thenTc` \ (final_env, stuff) ->
@@ -296,8 +282,8 @@ tcCheckMainSig mod_name
 
   | otherwise
   = 	-- Check that main is defined
-    tcLookupTyCon ioTyCon_NAME		`thenTc`    \ (_,_,ioTyCon) ->
-    tcLookupLocalValue main_NAME	`thenNF_Tc` \ maybe_main_id ->
+    tcLookupTyCon ioTyCon_NAME		`thenTc`    \ ioTyCon ->
+    tcLookupValueMaybe main_NAME	`thenNF_Tc` \ maybe_main_id ->
     case maybe_main_id of {
 	Nothing	 -> failWithTc noMainErr ;
 	Just main_id   ->
@@ -321,7 +307,7 @@ noMainErr
   = hsep [ptext SLIT("Module"), quotes (pprModule mAIN), 
 	  ptext SLIT("must include a definition for"), quotes (ppr main_NAME)]
 
-mainTyMisMatch :: TcType s -> TcType s -> ErrMsg
+mainTyMisMatch :: TcType -> TcType -> ErrMsg
 mainTyMisMatch expected actual
   = hang (hsep [ppr main_NAME, ptext SLIT("has the wrong type")])
 	 4 (vcat [

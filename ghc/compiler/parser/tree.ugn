@@ -10,6 +10,7 @@ import UgenUtil
 
 import U_constr		( U_constr )	-- interface only
 import U_binding
+import U_match
 import U_list
 import U_literal
 import U_maybe
@@ -20,14 +21,9 @@ type tree;
 	hmodule : < ghname	: stringId;
 		    ghimplist	: list;	 	/* [import] */
 		    ghexplist	: maybe;	/* Maybe [entity] */
-		    ghfixes     : list;		/* [fixop] */
 		    ghmodlist	: binding;
 		    ghversion   : long;
 		    ghmodline	: long; >;
-	fixop	: < gfixop	: qid;
-		    gfixinfx	: long;
-		    gfixprec	: long; 
-		    gfixline    : long; >;
 
 	ident	: < gident 	: qid; >;
 	lit 	: < glit	: literal; >;
@@ -39,14 +35,12 @@ type tree;
 		    ginfarg2	: tree; >;
 	negate	: < gnexp	: tree;	>;
 
-	lambda	: < glampats	: list;
-		    glamexpr	: tree;
-		    glamline	: long; >;
+	lambda	: < glammatch	: match;>;
 
 	let	: < gletvdefs   : binding;
 		    gletvexpr	: tree; >;
 	casee	: < gcaseexpr	: tree;
-		    gcasebody	: list;
+		    gcasebody	: list;		/* Of match */
 		    gcaseline 	: long;	>;
 	ife	: < gifpred	: tree;
 		    gifthen	: tree;
@@ -76,7 +70,7 @@ type tree;
 	plusp	: < gplusp	: qid; 
 		    gplusi	: literal; >;
 	wildp	: < >;
-	restr	: < grestre	: tree;
+	restr	: < grestre	: tree;		/* type signature */
 		    grestrt	: ttype; >;
 
 	tuple	: < gtuplelist	: list; >;

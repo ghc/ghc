@@ -18,15 +18,16 @@ import CmdLineOpts	( opt_HiMap, opt_D_show_rn_trace,
 		        )
 import RnMonad
 import RnNames		( getGlobalNames )
-import RnSource		( rnDecl )
+import RnSource		( rnIfaceDecl, rnSourceDecls )
 import RnIfaces		( getImportedInstDecls, importDecl, getImportVersions, getSpecialInstModules,
 			  getDeferredDataDecls,
 			  mkSearchPath, getSlurpedNames, getRnStats
 			)
-import RnEnv		( addImplicitOccsRn, availNames )
+import RnEnv		( addImplicitOccsRn, availName, availNames, availsToNameSet, warnUnusedTopNames )
 import Name		( Name, isLocallyDefined,
-			  NamedThing(..),
-			  nameModule, pprModule, pprOccName, nameOccName
+			  NamedThing(..), ImportReason(..), Provenance(..),
+			  nameModule, pprModule, pprOccName, nameOccName,
+			  getNameProvenance
 			)
 import NameSet
 import TyCon		( TyCon )
@@ -56,7 +57,7 @@ renameModule :: UniqSupply
 		      , [Module]	  -- Imported modules; for profiling
 		      ))
 
-renameModule us this_mod@(HsModule mod_name vers exports imports fixities local_decls loc)
+renameModule us this_mod@(HsModule mod_name vers exports imports local_decls loc)
   = 	-- Initialise the renamer monad
     initRn mod_name us (mkSearchPath opt_HiMap) loc
 	   (rename this_mod)				>>=
@@ -86,7 +87,7 @@ renameModule us this_mod@(HsModule mod_name vers exports imports fixities local_
 
 
 \begin{code}
-rename this_mod@(HsModule mod_name vers exports imports fixities local_decls loc)
+rename this_mod@(HsModule mod_name vers exports imports local_decls loc)
   =  	-- FIND THE GLOBAL NAME ENVIRONMENT
     getGlobalNames this_mod			`thenRn` \ maybe_stuff ->
 
@@ -97,17 +98,17 @@ rename this_mod@(HsModule mod_name vers exports imports fixities local_decls loc
 	returnRn Nothing
     else
     let
-  	Just (export_env, rn_env, explicit_info, print_unqual) = maybe_stuff
+  	Just (export_env, rn_env, global_avail_env) = maybe_stuff
     in
 
 	-- RENAME THE SOURCE
     initRnMS rn_env mod_name SourceMode (
 	addImplicits mod_name				`thenRn_`
-	mapRn rnDecl local_decls
-    )							`thenRn` \ rn_local_decls ->
+	rnSourceDecls local_decls
+    )							`thenRn` \ (rn_local_decls, fvs) ->
 
 	-- SLURP IN ALL THE NEEDED DECLARATIONS
-    slurpDecls print_unqual rn_local_decls		`thenRn` \ rn_all_decls ->
+    slurpDecls rn_local_decls		`thenRn` \ rn_all_decls ->
 
 	-- EXIT IF ERRORS FOUND
     checkErrsRn				`thenRn` \ no_errs_so_far ->
@@ -122,7 +123,9 @@ rename this_mod@(HsModule mod_name vers exports imports fixities local_decls loc
     getNameSupplyRn					`thenRn` \ name_supply ->
 
 	-- REPORT UNUSED NAMES
-    reportUnusedNames export_env explicit_info		`thenRn_`
+    reportUnusedNames rn_env global_avail_env
+		      export_env
+		      fvs				`thenRn_`
 
 	-- GENERATE THE SPECIAL-INSTANCE MODULE LIST
 	-- The "special instance" modules are those modules that contain instance
@@ -143,7 +146,7 @@ rename this_mod@(HsModule mod_name vers exports imports fixities local_decls loc
 	import_mods = [mod | ImportDecl mod _ _ _ _ _ <- imports]
 
 	renamed_module = HsModule mod_name vers 
-				  trashed_exports trashed_imports trashed_fixities
+				  trashed_exports trashed_imports
 				  rn_all_decls
 			          loc
     in
@@ -155,7 +158,6 @@ rename this_mod@(HsModule mod_name vers exports imports fixities local_decls loc
   where
     trashed_exports  = {-trace "rnSource:trashed_exports"-} Nothing
     trashed_imports  = {-trace "rnSource:trashed_imports"-} []
-    trashed_fixities = []
 \end{code}
 
 @addImplicits@ forces the renamer to slurp in some things which aren't
@@ -179,7 +181,7 @@ addImplicits mod_name
 
 
 \begin{code}
-slurpDecls print_unqual decls
+slurpDecls decls
   = 	-- First of all, get all the compulsory decls
     slurp_compulsories decls	`thenRn` \ decls1 ->
 
@@ -194,8 +196,8 @@ slurpDecls print_unqual decls
     returnRn (rn_data_decls ++ decls2)
 
   where
-    compulsory_mode = InterfaceMode Compulsory print_unqual
-    optional_mode   = InterfaceMode Optional   print_unqual
+    compulsory_mode = InterfaceMode Compulsory
+    optional_mode   = InterfaceMode Optional
 
 	-- The "slurp_compulsories" function is a loop that alternates
 	-- between slurping compulsory decls and slurping the instance
@@ -255,57 +257,61 @@ closeDecls mode decls
 		           mod_name = nameModule (fst name_w_loc)
 
 rn_iface_decl mod_name mode decl
-  = initRnMS emptyRnEnv mod_name mode (rnDecl decl)
+  = initRnMS emptyRnEnv mod_name mode (rnIfaceDecl decl)
 					
-rn_inst_decl mode (mod_name,decl)      = rn_iface_decl mod_name mode (InstD decl)
-rn_data_decl mode (tycon_name,ty_decl) = rn_iface_decl mod_name mode (TyD ty_decl)
-				       where
-					 mod_name = nameModule tycon_name
+rn_inst_decl mode (mod_name,decl)    = rn_iface_decl mod_name mode (InstD decl)
+rn_data_decl mode (mod_name,ty_decl) = rn_iface_decl mod_name mode (TyClD ty_decl)
 \end{code}
 
 \begin{code}
-reportUnusedNames (ExportEnv export_avails _) explicit_info
+reportUnusedNames (RnEnv gbl_env _) avail_env (ExportEnv export_avails _) mentioned_names
   | not (opt_WarnUnusedBinds || opt_WarnUnusedImports)
   = returnRn ()
 
   | otherwise
-  = getSlurpedNames			`thenRn` \ slurped_names ->
-    let
-	unused_info :: FiniteMap Name HowInScope
-	unused_info = foldl delListFromFM
-			    (delListFromFM explicit_info (nameSetToList slurped_names))
-			    (map availNames export_avails)
-	unused_list = fmToList unused_info
+  = let
+	used_names = mentioned_names `unionNameSets` availsToNameSet export_avails
 
-	groups = filter wanted (equivClasses cmp unused_list)
+	-- Now, a use of C implies a use of T,
+	-- if C was brought into scope by T(..) or T(C)
+	really_used_names = used_names `unionNameSets`
+			    mkNameSet [ availName avail	
+				      | sub_name <- nameSetToList used_names,
+					let avail = case lookupNameEnv avail_env sub_name of
+							Just avail -> avail
+							Nothing -> pprTrace "r.u.n" (ppr sub_name) $
+								   Avail sub_name
+				      ]
+
+	defined_names = mkNameSet (concat (rdrEnvElts gbl_env))
+	defined_but_not_used = defined_names `minusNameSet` really_used_names
+
+	-- Filter out the ones only defined implicitly
+	bad_guys = filter is_explicit (nameSetToList defined_but_not_used)
+	is_explicit n = case getNameProvenance n of
+			  LocalDef _ _ 				    -> True
+			  NonLocalDef (UserImport _ _ explicit) _ _ -> explicit
+			  other					    -> False
+
+	-- Now group by whether locally defined or imported; 
+	-- one group is the locally-defined ones, one group per import module
+	groups = equivClasses cmp bad_guys
 	       where
-		 (name1, his1) `cmp` (name2, his2) = his1 `cmph` his2
+		 name1 `cmp` name2 = getNameProvenance name1 `cmph` getNameProvenance name2
 		 
-		 (FromLocalDefn _)     `cmph` (FromImportDecl _ _)  = LT
-		 (FromLocalDefn _)     `cmph` (FromLocalDefn _)     = EQ
-		 (FromImportDecl m1 _) `cmph` (FromImportDecl m2 _) = m1 `compare` m2
-		 h1		       `cmph` h2		    = GT
+		 cmph (LocalDef _ _) (NonLocalDef _ _ _)    = LT
+		 cmph (LocalDef _ _) (LocalDef _ _)         = EQ
+		 cmph (NonLocalDef (UserImport m1 _ _) _ _)
+		      (NonLocalDef (UserImport m2 _ _) _ _)
+		      = m1 `compare` m2
+		 cmph (NonLocalDef _ _ _) (LocalDef _ _)    = GT
+			-- In-scope NonLocalDefs must have UserImport info on them
 
-	wanted ((_,FromImportDecl _ _) : _) = opt_WarnUnusedImports
-	wanted ((_,FromLocalDefn _)    : _) = opt_WarnUnusedImports
-
-	pp_imp = sep [text "Warning: the following are unused:",
-		      nest 4 (vcat (map pp_group groups))]
-
-	pp_group group = sep [msg <> char ':',
-		              nest 4 (sep (map (pprOccName . nameOccName . fst) group))]
-		       where
-			 his = case group of
-				  ((_,his) : _) -> his
-
-			 msg = case his of
-				  FromImportDecl m _ -> text "Imported from" <+> pprModule m
-				  FromLocalDefn _    -> text "Locally defined"   
-
+	-- ToDo: report somehow on T(..) things where no constructors
+	-- are imported
     in
-    if null groups
-    then returnRn ()
-    else addWarnRn pp_imp
+    mapRn warnUnusedTopNames groups	`thenRn_`
+    returnRn ()
 
 rnStats :: [RenamedHsDecl] -> RnMG ()
 rnStats all_decls

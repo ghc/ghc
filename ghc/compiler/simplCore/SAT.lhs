@@ -42,7 +42,7 @@ module SAT ( doStaticArgs ) where
 
 #include "HsVersions.h"
 
-import Util		( panic )
+import Panic	( panic )
 
 doStaticArgs = panic "SAT.doStaticArgs (ToDo)"
 

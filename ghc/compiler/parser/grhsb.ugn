@@ -1,0 +1,24 @@
+%{
+#include "hspincl.h"
+%}
+%{{
+module U_grhsb where
+
+#include "HsVersions.h"
+
+import UgenUtil
+
+import U_binding
+import U_list
+%}}
+
+/* Guarded right hand sides and bindings */
+type grhsb;
+	pguards		: < ggrhss	: list;		/* of gdexp */
+			    ggbind1	: binding; >;
+	pnoguards	: < gnogline	: long; 	/* Line number of '=' sign */
+			    grhs	: VOID_STAR;	/* The rhs, of type tree; can't say 'tree' because
+							   that leads to mutual recursion in the C */
+			    ggbind2	: binding; >;
+end;
+

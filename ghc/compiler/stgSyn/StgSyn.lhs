@@ -638,7 +638,7 @@ pprStgExpr (StgSCC cc expr)
 pprStgExpr (StgCase expr lvs_whole lvs_rhss bndr srt alts)
   = sep [sep [ptext SLIT("case"),
 	   nest 4 (hsep [pprStgExpr expr,
-	     ifPprDebug (ptext SLIT("::") <> pp_ty alts)]),
+	     ifPprDebug (dcolon <+> pp_ty alts)]),
 	   ptext SLIT("of"), ppr bndr, char '{'],
 	   ifPprDebug (
 	   nest 4 (

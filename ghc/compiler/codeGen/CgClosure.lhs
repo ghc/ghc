@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.20 1998/12/02 13:17:47 simonm Exp $
+% $Id: CgClosure.lhs,v 1.21 1998/12/18 17:40:49 simonpj Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -47,10 +47,10 @@ import ClosureInfo	-- lots and lots of stuff
 import CmdLineOpts	( opt_GranMacros, opt_SccProfilingOn )
 import CostCentre	
 import Id		( Id, idName, idType, idPrimRep )
-import Name		( Name )
+import Name		( Name, Module, pprModule )
 import ListSetOps	( minusList )
 import PrimRep		( PrimRep(..) )
-import Type             ( showTypeCategory )
+import PprType          ( showTypeCategory )
 import Util		( isIn )
 import CmdLineOpts	( opt_SccProfilingOn )
 import Outputable
@@ -663,7 +663,7 @@ Otherwise it is determind by @closureDescription@ from the let
 binding information.
 
 \begin{code}
-closureDescription :: FAST_STRING	-- Module
+closureDescription :: Module		-- Module
 		   -> Name		-- Id of closure binding
 		   -> String
 
@@ -673,7 +673,7 @@ closureDescription :: FAST_STRING	-- Module
 closureDescription mod_name name
   = showSDoc (
 	hcat [char '<',
-		   ptext mod_name,
+		   pprModule mod_name,
 		   char '.',
 		   ppr name,
 		   char '>'])

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.18 1998/12/02 13:17:46 simonm Exp $
+% $Id: CgCase.lhs,v 1.19 1998/12/18 17:40:48 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -61,7 +61,7 @@ import PrimRep		( getPrimRepSize, retPrimRepSize, PrimRep(..)
 import TyCon		( TyCon, isEnumerationTyCon, isUnboxedTupleTyCon,
 			  isNewTyCon, isAlgTyCon,
 			  tyConDataCons, tyConFamilySize )
-import Type		( GenType(..), typePrimRep, splitAlgTyConApp, Type,
+import Type		( Type, typePrimRep, splitAlgTyConApp, splitAlgTyConApp_maybe,
 			  splitFunTys, applyTys )
 import Unique           ( Unique, Uniquable(..) )
 import Maybes		( maybeToBool )
@@ -1018,16 +1018,13 @@ getScrutineeTyCon ty =
 			_ -> Just tc
 
 splitAlgTyConAppThroughNewTypes  :: Type -> Maybe (TyCon, [Type])
-splitAlgTyConAppThroughNewTypes (TyConApp tc tys) 
-	| isNewTyCon tc = 
-		case (tyConDataCons tc) of
-			[con] -> let ([ty], _) = splitFunTys 
-					      (applyTys (dataConType con) tys)
-				 in  splitAlgTyConAppThroughNewTypes ty
-			_ -> Nothing
-	| otherwise = Just (tc, tys)
+splitAlgTyConAppThroughNewTypes ty
+  = case splitAlgTyConApp_maybe ty of
+	Just (tc, tys, cons)
+	  | isNewTyCon tc ->  splitAlgTyConAppThroughNewTypes ty
+	  | otherwise     ->  Just (tc, tys)
+	  where
+	    ([ty], _) = splitFunTys (applyTys (dataConType (head cons)) tys)
 
-splitAlgTyConAppThroughNewTypes (NoteTy _ ty)    = 
-	splitAlgTyConAppThroughNewTypes ty
-splitAlgTyConAppThroughNewTypes other	     = Nothing
+	other  -> Nothing
 \end{code}

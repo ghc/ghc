@@ -9,7 +9,7 @@ module Specialise ( specProgram ) where
 #include "HsVersions.h"
 
 import CmdLineOpts	( opt_D_verbose_core2core, opt_D_dump_spec )
-import Id		( Id, idType, mkTemplateLocals, mkUserLocal,
+import Id		( Id, idName, idType, mkTemplateLocals, mkUserLocal,
 			  getIdSpecialisation, setIdSpecialisation, 
 			  isSpecPragmaId,
 			)
@@ -35,7 +35,7 @@ import UniqSupply	( UniqSupply,
 			  UniqSM, initUs, thenUs, thenUs_, returnUs, getUniqueUs, 
 			  getUs, setUs, uniqFromSupply, splitUniqSupply, mapUs
 			)
-import Name		( NamedThing(getOccName) )
+import Name		( nameOccName )
 import FiniteMap
 import Maybes		( MaybeErr(..), catMaybes )
 import Bag
@@ -1131,10 +1131,12 @@ mapAndCombineSM f (x:xs) = f x	`thenSM` \ (y, uds1) ->
 
 newIdSM old_id new_ty
   = getUniqSM		`thenSM` \ uniq ->
-    returnSM (mkUserLocal (getOccName old_id) 
-			  uniq
-			  new_ty
-    )
+    let 
+	-- Give the new Id a similar occurrence name to the old one
+	new_id = mkUserLocal (nameOccName name) uniq new_ty
+	name   = idName old_id
+    in
+    returnSM new_id
 
 newTyVarSM
   = getUniqSM		`thenSM` \ uniq ->

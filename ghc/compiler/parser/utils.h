@@ -66,7 +66,6 @@ void	 pprogram PROTO((tree));
 void	 format_string PROTO((FILE *, unsigned char *, int));
 list	 type2context PROTO((ttype));
 void     is_context_format PROTO((ttype, int));
-pbinding createpat PROTO((pbinding, binding));
 void	 process_args PROTO((int, char **));
 void	 hash_init PROTO((void));
 void	 print_hash_table PROTO((void));
@@ -92,7 +91,7 @@ void	 hsendindent PROTO((void));
 void	 hsindentoff PROTO((void));
 
 int	 checkfixity PROTO((char *));
-void	 checksamefn PROTO((qid));
+void	 checksamefn PROTO((tree));
 void	 checkinpat PROTO((void));
 
 void	 expORpat PROTO((int,tree));

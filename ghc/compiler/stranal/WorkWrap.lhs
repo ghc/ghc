@@ -191,10 +191,10 @@ tryWW non_rec fn_id rhs
     let
 	work_rhs  = work_fn body
 	work_id   = mkWorkerId work_uniq fn_id (coreExprType work_rhs) `setIdStrictness`
-		    mkStrictnessInfo work_demands False
+		    mkStrictnessInfo (work_demands, result_bot) False
 
 	wrap_rhs = wrap_fn work_id
-	wrap_id  = fn_id `setIdStrictness` mkStrictnessInfo revised_wrap_args_info True
+	wrap_id  = fn_id `setIdStrictness` mkStrictnessInfo (revised_wrap_args_info, result_bot) True
 			 `setInlinePragma` IWantToBeINLINEd
 		-- Add info to the wrapper:
 		--	(a) we want to inline it everywhere
@@ -206,11 +206,11 @@ tryWW non_rec fn_id rhs
   where
     strictness_info     = getIdStrictness fn_id
     has_strictness_info = case strictness_info of
-				StrictnessInfo _ _ -> True
-				other		   -> False
+				StrictnessInfo _ _ _ -> True
+				other		     -> False
 
-    wrap_args_info = case strictness_info of
-			StrictnessInfo args_info _ -> args_info
+    StrictnessInfo wrap_args_info result_bot _ = strictness_info
+			
     revised_wrap_args_info = setUnpackStrategy wrap_args_info
 
     unfold_guidance = calcUnfoldingGuidance opt_UnfoldingCreationThreshold rhs

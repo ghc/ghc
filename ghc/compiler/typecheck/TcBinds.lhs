@@ -9,38 +9,34 @@ module TcBinds ( tcBindsAndThen, tcTopBindsAndThen,
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TcGRHSs ( tcGRHSsAndBinds )
+import {-# SOURCE #-} TcMatches ( tcGRHSs, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcExpr )
 
 import HsSyn		( HsExpr(..), HsBinds(..), MonoBinds(..), Sig(..), InPat(..), StmtCtxt(..),
 			  collectMonoBinders, andMonoBindList, andMonoBinds
 			)
 import RnHsSyn		( RenamedHsBinds, RenamedSig, RenamedMonoBinds )
-import TcHsSyn		( TcHsBinds, TcMonoBinds,
-			  TcIdOcc(..), TcIdBndr, 
-			  tcIdType, zonkId
-			)
+import TcHsSyn		( TcHsBinds, TcMonoBinds, TcId, zonkId )
 
 import TcMonad
 import Inst		( Inst, LIE, emptyLIE, mkLIE, plusLIE, plusLIEs, InstOrigin(..),
 			  newDicts, tyVarsOfInst, instToId,
 			)
-import TcEnv		( tcExtendLocalValEnv, tcExtendEnvWithPat, 
-			  tcLookupLocalValueOK,
+import TcEnv		( tcExtendLocalValEnv,
 			  newSpecPragmaId,
 			  tcGetGlobalTyVars, tcExtendGlobalTyVars
 			)
-import TcMatches	( tcMatchesFun )
 import TcSimplify	( tcSimplify, tcSimplifyAndCheck )
-import TcMonoType	( tcHsTcType, checkSigTyVars,
+import TcMonoType	( tcHsType, checkSigTyVars,
 			  TcSigInfo(..), tcTySig, maybeSig, sigCtxt
 			)
 import TcPat		( tcVarPat, tcPat )
 import TcSimplify	( bindInstsOfLocalFuns )
 import TcType		( TcType, TcThetaType,
 			  TcTyVar,
-			  newTyVarTy, newTcTyVar, tcInstTcType,
-			  zonkTcType, zonkTcTypes, zonkTcThetaType )
+			  newTyVarTy, newTyVar, newTyVarTy_OpenKind, tcInstTcType,
+			  zonkTcType, zonkTcTypes, zonkTcThetaType, zonkTcTyVarToTyVar
+			)
 import TcUnify		( unifyTauTy, unifyTauTyLists )
 
 import Id		( mkUserId )
@@ -50,8 +46,7 @@ import Name		( Name )
 import Type		( mkTyVarTy, tyVarsOfTypes,
 			  splitSigmaTy, mkForAllTys, mkFunTys, getTyVar, 
 			  mkDictTy, splitRhoTy, mkForAllTy, isUnLiftedType, 
-			  isUnboxedType, openTypeKind, 
-			  unboxedTypeKind, boxedTypeKind
+			  isUnboxedType, unboxedTypeKind, boxedTypeKind
 			)
 import Var		( TyVar, tyVarKind )
 import VarSet
@@ -96,10 +91,10 @@ dictionaries, which we resolve at the module level.
 
 \begin{code}
 tcTopBindsAndThen, tcBindsAndThen
-	:: (RecFlag -> TcMonoBinds s -> thing -> thing)		-- Combinator
+	:: (RecFlag -> TcMonoBinds -> thing -> thing)		-- Combinator
 	-> RenamedHsBinds
-	-> TcM s (thing, LIE s)
-	-> TcM s (thing, LIE s)
+	-> TcM s (thing, LIE)
+	-> TcM s (thing, LIE)
 
 tcTopBindsAndThen = tc_binds_and_then TopLevel
 tcBindsAndThen    = tc_binds_and_then NotTopLevel
@@ -127,7 +122,7 @@ tc_binds_and_then top_lvl combiner (MonoBind bind sigs is_rec) do_next
 		     tc_ty_sigs is_rec prag_info_fn	`thenTc` \ (poly_binds, poly_lie, poly_ids) ->
   
 	  -- Extend the environment to bind the new polymorphic Ids
-      tcExtendLocalValEnv (map idName poly_ids) poly_ids $
+      tcExtendLocalValEnv [(idName poly_id, poly_id) | poly_id <- poly_ids] $
   
 	  -- Build bindings and IdInfos corresponding to user pragmas
       tcPragmaSigs sigs		`thenTc` \ (prag_info_fn, prag_binds, prag_lie) ->
@@ -192,8 +187,8 @@ examples of this, which is why I thought it worth preserving! [SLPJ]
 \begin{pseudocode}
 % tcBindsAndThen
 % 	:: RenamedHsBinds
-% 	-> TcM s (thing, LIE s, thing_ty))
-% 	-> TcM s ((TcHsBinds s, thing), LIE s, thing_ty)
+% 	-> TcM s (thing, LIE, thing_ty))
+% 	-> TcM s ((TcHsBinds, thing), LIE, thing_ty)
 % 
 % tcBindsAndThen EmptyBinds do_next
 %   = do_next 		`thenTc` \ (thing, lie, thing_ty) ->
@@ -230,17 +225,17 @@ so all the clever stuff is in here.
 tcBindWithSigs	
 	:: TopLevelFlag
 	-> RenamedMonoBinds
-	-> [TcSigInfo s]
+	-> [TcSigInfo]
 	-> RecFlag
 	-> (Name -> IdInfo)
-	-> TcM s (TcMonoBinds s, LIE s, [TcIdBndr s])
+	-> TcM s (TcMonoBinds, LIE, [TcId])
 
 tcBindWithSigs top_lvl mbind tc_ty_sigs is_rec prag_info_fn
   = recoverTc (
 	-- If typechecking the binds fails, then return with each
 	-- signature-less binder given type (forall a.a), to minimise subsequent
 	-- error messages
-	newTcTyVar boxedTypeKind		`thenNF_Tc` \ alpha_tv ->
+	newTyVar boxedTypeKind		`thenNF_Tc` \ alpha_tv ->
 	let
 	  forall_a_a    = mkForAllTy alpha_tv (mkTyVarTy alpha_tv)
           binder_names  = map fst (bagToList (collectMonoBinders mbind))
@@ -269,9 +264,13 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs is_rec prag_info_fn
 	-- restriction means we can't generalise them nevertheless
     getTyVarsToGen is_unrestricted mono_id_tys lie_req	`thenNF_Tc` \ (tyvars_not_to_gen, tyvars_to_gen) ->
 
-	-- DEAL WITH TYPE VARIABLE KINDS
-	-- **** This step can do unification => keep other zonking after this ****
-    mapTc defaultUncommittedTyVar (varSetElems tyvars_to_gen)	`thenTc` \ real_tyvars_to_gen_list ->
+	-- Finally, zonk the generalised type variables to real TyVars
+	-- This commits any unbound kind variables to boxed kind
+	-- I'm a little worried that such a kind variable might be
+	-- free in the environment, but I don't think it's possible for
+	-- this to happen when the type variable is not free in the envt
+	-- (which it isn't).		SLPJ Nov 98
+    mapTc zonkTcTyVarToTyVar (varSetElems tyvars_to_gen)	`thenTc` \ real_tyvars_to_gen_list ->
     let
 	real_tyvars_to_gen = mkVarSet real_tyvars_to_gen_list
 		-- It's important that the final list 
@@ -354,12 +353,12 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs is_rec prag_info_fn
     mapNF_Tc zonkId mono_ids		`thenNF_Tc` \ zonked_mono_ids ->
     let
 	exports  = zipWith mk_export binder_names zonked_mono_ids
-	dict_tys = map tcIdType dicts_bound
+	dict_tys = map idType dicts_bound
 
 	mk_export binder_name zonked_mono_id
 	  = (tyvars, 
-	     TcId (setIdInfo poly_id (prag_info_fn binder_name)), 
-	     TcId zonked_mono_id)
+	     setIdInfo poly_id (prag_info_fn binder_name),
+	     zonked_mono_id)
 	  where
 	    (tyvars, poly_id) = 
 		case maybeSig tc_ty_sigs binder_name of
@@ -394,7 +393,7 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs is_rec prag_info_fn
 		  exports
 		  (dict_binds `andMonoBinds` mbind'),
 	 lie_free,
-	 [poly_id | (_, TcId poly_id, _) <- exports]
+	 [poly_id | (_, poly_id, _) <- exports]
     )
   where
     tysig_names     = [name | (TySigInfo name _ _ _ _ _ _ _) <- tc_ty_sigs]
@@ -539,26 +538,12 @@ isUnRestrictedGroup :: [Name]		-- Signatures given for these
 is_elem v vs = isIn "isUnResMono" v vs
 
 isUnRestrictedGroup sigs (PatMonoBind (VarPatIn v) _ _) = v `is_elem` sigs
-isUnRestrictedGroup sigs (PatMonoBind other      _ _)	= False
+isUnRestrictedGroup sigs (PatMonoBind other        _ _) = False
 isUnRestrictedGroup sigs (VarMonoBind v _)	        = v `is_elem` sigs
 isUnRestrictedGroup sigs (FunMonoBind _ _ _ _)		= True
 isUnRestrictedGroup sigs (AndMonoBinds mb1 mb2)		= isUnRestrictedGroup sigs mb1 &&
 							  isUnRestrictedGroup sigs mb2
 isUnRestrictedGroup sigs EmptyMonoBinds			= True
-\end{code}
-
-@defaultUncommittedTyVar@ checks for generalisation over unboxed
-types, and defaults any TypeKind TyVars to BoxedTypeKind.
-
-\begin{code}
-defaultUncommittedTyVar tyvar
-  | tyVarKind tyvar == openTypeKind
-  = newTcTyVar boxedTypeKind					`thenNF_Tc` \ boxed_tyvar ->
-    unifyTauTy (mkTyVarTy tyvar) (mkTyVarTy boxed_tyvar)	`thenTc_`
-    returnTc boxed_tyvar
-
-  | otherwise
-  = returnTc tyvar
 \end{code}
 
 
@@ -573,52 +558,67 @@ The signatures have been dealt with already.
 
 \begin{code}
 tcMonoBinds :: RenamedMonoBinds 
-	    -> [TcSigInfo s]
+	    -> [TcSigInfo]
 	    -> RecFlag
-	    -> TcM s (TcMonoBinds s, 
-		      LIE s,		-- LIE required
+	    -> TcM s (TcMonoBinds, 
+		      LIE,		-- LIE required
 		      [Name],		-- Bound names
-		      [TcIdBndr s])	-- Corresponding monomorphic bound things
+		      [TcId])	-- Corresponding monomorphic bound things
 
 tcMonoBinds mbinds tc_ty_sigs is_rec
   = tc_mb_pats mbinds		`thenTc` \ (complete_it, lie_req_pat, tvs, ids, lie_avail) ->
     let
 	tv_list		  = bagToList tvs
-	(names, mono_ids) = unzip (bagToList ids)
+	id_list 	  = bagToList ids
+	(names, mono_ids) = unzip id_list
+
+		-- This last defn is the key one:
+		-- extend the val envt with bindings for the 
+		-- things bound in this group, overriding the monomorphic
+		-- ids with the polymorphic ones from the pattern
+	extra_val_env = case is_rec of
+			  Recursive    -> map mk_bind id_list
+			  NonRecursive -> []
     in
 	-- Don't know how to deal with pattern-bound existentials yet
     checkTc (isEmptyBag tvs && isEmptyBag lie_avail) 
 	    (existentialExplode mbinds)			`thenTc_` 
 
-	-- *Before* checking the RHSs, but *after* checking *all* the patterns, 
+	-- *Before* checking the RHSs, but *after* checking *all* the patterns,
 	-- extend the envt with bindings for all the bound ids;
 	--   and *then* override with the polymorphic Ids from the signatures
 	-- That is the whole point of the "complete_it" stuff.
-    tcExtendEnvWithPat ids (tcExtendEnvWithPat sig_ids 
-		complete_it
-    )						`thenTc` \ (mbinds', lie_req_rhss) ->
+	--
+	-- There's a further wrinkle: we have to delay extending the environment
+	-- until after we've dealt with any pattern-bound signature type variables
+	-- Consider  f (x::a) = ...f...
+	-- We're going to check that a isn't unified with anything in the envt, 
+	-- so f itself had better not be!  So we pass the envt binding f into
+	-- complete_it, which extends the actual envt in TcMatches.tcMatch, after
+	-- dealing with the signature tyvars
+
+    complete_it extra_val_env				`thenTc` \ (mbinds', lie_req_rhss) ->
+
     returnTc (mbinds', lie_req_pat `plusLIE` lie_req_rhss, names, mono_ids)
   where
     sig_fn name = case maybeSig tc_ty_sigs name of
 			Nothing				       -> Nothing
 			Just (TySigInfo _ _ _ _ _ mono_id _ _) -> Just mono_id
 
-    sig_ids = listToBag [(name,poly_id) | TySigInfo name poly_id _ _ _ _ _ _ <- tc_ty_sigs]
-
-    kind = case is_rec of
-	     Recursive    -> boxedTypeKind	-- Recursive, so no unboxed types
-	     NonRecursive -> openTypeKind	-- Non-recursive, so we permit unboxed types
+    mk_bind (name, mono_id) = case maybeSig tc_ty_sigs name of
+				Nothing 				  -> (name, mono_id)
+				Just (TySigInfo name poly_id _ _ _ _ _ _) -> (name, poly_id)
 
     tc_mb_pats EmptyMonoBinds
-      = returnTc (returnTc (EmptyMonoBinds, emptyLIE), emptyLIE, emptyBag, emptyBag, emptyLIE)
+      = returnTc (\ xve -> returnTc (EmptyMonoBinds, emptyLIE), emptyLIE, emptyBag, emptyBag, emptyLIE)
 
     tc_mb_pats (AndMonoBinds mb1 mb2)
       = tc_mb_pats mb1		`thenTc` \ (complete_it1, lie_req1, tvs1, ids1, lie_avail1) ->
         tc_mb_pats mb2		`thenTc` \ (complete_it2, lie_req2, tvs2, ids2, lie_avail2) ->
 	let
-	   complete_it = complete_it1	`thenTc` \ (mb1', lie1) ->
-			 complete_it2	`thenTc` \ (mb2', lie2) ->
-			 returnTc (AndMonoBinds mb1' mb2', lie1 `plusLIE` lie2)
+	   complete_it xve = complete_it1 xve	`thenTc` \ (mb1', lie1) ->
+			     complete_it2 xve	`thenTc` \ (mb2', lie2) ->
+			     returnTc (AndMonoBinds mb1' mb2', lie1 `plusLIE` lie2)
 	in
 	returnTc (complete_it,
 		  lie_req1 `plusLIE` lie_req2,
@@ -627,24 +627,42 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 		  lie_avail1 `plusLIE` lie_avail2)
 
     tc_mb_pats (FunMonoBind name inf matches locn)
-      = newTyVarTy boxedTypeKind	`thenNF_Tc` \ pat_ty ->
-	tcVarPat sig_fn name pat_ty	`thenTc` \ bndr_id ->
+      = newTyVarTy boxedTypeKind	`thenNF_Tc` \ bndr_ty ->
+	tcVarPat sig_fn name bndr_ty	`thenTc` \ bndr_id ->
 	let
-	   complete_it = tcAddSrcLoc locn			$
-			 tcMatchesFun name pat_ty matches	`thenTc` \ (matches', lie) ->
-			 returnTc (FunMonoBind (TcId bndr_id) inf matches' locn, lie)
+	   complete_it xve = tcAddSrcLoc locn				$
+			     tcMatchesFun xve name bndr_ty  matches	`thenTc` \ (matches', lie) ->
+			     returnTc (FunMonoBind bndr_id inf matches' locn, lie)
 	in
 	returnTc (complete_it, emptyLIE, emptyBag, unitBag (name, bndr_id), emptyLIE)
 
-    tc_mb_pats bind@(PatMonoBind pat grhss_and_binds locn)
+    tc_mb_pats bind@(PatMonoBind pat grhss locn)
       = tcAddSrcLoc locn	 	$
-	newTyVarTy kind			`thenNF_Tc` \ pat_ty ->
+
+		-- Figure out the appropriate kind for the pattern,
+		-- and generate a suitable type variable 
+	(case is_rec of
+	     Recursive    -> newTyVarTy boxedTypeKind	-- Recursive, so no unboxed types
+	     NonRecursive -> newTyVarTy_OpenKind 	-- Non-recursive, so we permit unboxed types
+	)					`thenNF_Tc` \ pat_ty ->
+
+		-- 	Now typecheck the pattern
+		-- We don't support binding fresh type variables in the
+		-- pattern of a pattern binding.  For example, this is illegal:
+		--	(x::a, y::b) = e
+		-- whereas this is ok
+		--	(x::Int, y::Bool) = e
+		--
+		-- We don't check explicitly for this problem.  Instead, we simply
+		-- type check the pattern with tcPat.  If the pattern mentions any
+		-- fresh tyvars we simply get an out-of-scope type variable error
 	tcPat sig_fn pat pat_ty	  	`thenTc` \ (pat', lie_req, tvs, ids, lie_avail) ->
 	let
-	   complete_it = tcAddSrcLoc locn		 		$
-			 tcAddErrCtxt (patMonoBindsCtxt bind)		$
-			 tcGRHSsAndBinds grhss_and_binds pat_ty PatBindRhs	`thenTc` \ (grhss_and_binds', lie) ->
-			 returnTc (PatMonoBind pat' grhss_and_binds' locn, lie)
+	   complete_it xve = tcAddSrcLoc locn		 		$
+			     tcAddErrCtxt (patMonoBindsCtxt bind)	$
+			     tcExtendLocalValEnv xve			$
+			     tcGRHSs grhss pat_ty PatBindRhs		`thenTc` \ (grhss', lie) ->
+			     returnTc (PatMonoBind pat' grhss' locn, lie)
 	in
 	returnTc (complete_it, lie_req, tvs, ids, lie_avail)
 \end{code}
@@ -698,10 +716,13 @@ checkSigMatch tc_ty_sigs@( sig1@(TySigInfo _ id1 _ theta1 _ _ _ _) : all_sigs_bu
 
     check_one_sig (TySigInfo _ id sig_tyvars _ sig_tau _ _ src_loc)
       = tcAddSrcLoc src_loc					$
-	tcAddErrCtxtM (sigCtxt (quotes (ppr id)) sig_tau)	$
+	tcAddErrCtxtM (sigCtxt (sig_msg id) (idType id))	$
 	checkSigTyVars sig_tyvars
 
     mk_dict_tys theta = [mkDictTy c ts | (c,ts) <- theta]
+
+    sig_msg id tidy_ty = sep [ptext SLIT("When checking the type signature"),
+			      nest 4 (ppr id <+> dcolon <+> ppr tidy_ty)]
 \end{code}
 
 
@@ -720,8 +741,8 @@ moving them into place as is done for type signatures.
 \begin{code}
 tcPragmaSigs :: [RenamedSig]		-- The pragma signatures
 	     -> TcM s (Name -> IdInfo,	-- Maps name to the appropriate IdInfo
-		       TcMonoBinds s,
-		       LIE s)
+		       TcMonoBinds,
+		       LIE)
 
 tcPragmaSigs sigs
   = mapAndUnzip3Tc tcPragmaSig sigs	`thenTc` \ (maybe_info_modifiers, binds, lies) ->
@@ -780,7 +801,7 @@ and the simplifer won't discard SpecIds for exporte things anyway, so maybe this
 a bit of overkill.
 
 \begin{code}
-tcPragmaSig :: RenamedSig -> TcM s (Maybe (Name, IdInfo -> IdInfo), TcMonoBinds s, LIE s)
+tcPragmaSig :: RenamedSig -> TcM s (Maybe (Name, IdInfo -> IdInfo), TcMonoBinds, LIE)
 tcPragmaSig (Sig _ _ _)       = returnTc (Nothing, EmptyMonoBinds, emptyLIE)
 tcPragmaSig (SpecInstSig _ _) = returnTc (Nothing, EmptyMonoBinds, emptyLIE)
 
@@ -796,7 +817,7 @@ tcPragmaSig (SpecSig name poly_ty maybe_spec_name src_loc)
     tcAddErrCtxt (valSpecSigCtxt name poly_ty)	$
 
 	-- Get and instantiate its alleged specialised type
-    tcHsTcType poly_ty				`thenTc` \ sig_ty ->
+    tcHsType poly_ty				`thenTc` \ sig_ty ->
 
 	-- Check that f has a more general type, and build a RHS for
 	-- the spec-pragma-id at the same time
@@ -807,7 +828,7 @@ tcPragmaSig (SpecSig name poly_ty maybe_spec_name src_loc)
 			-- It is the thing that makes sure we don't prematurely 
 			-- dead-code-eliminate the binding we are really interested in.
 		   newSpecPragmaId name sig_ty		`thenNF_Tc` \ spec_id ->
-		   returnTc (Nothing, VarMonoBind (TcId spec_id) spec_expr, spec_lie)
+		   returnTc (Nothing, VarMonoBind spec_id spec_expr, spec_lie)
 
 	Just g_name ->	-- Don't create a SpecPragmaId.  Instead add some suitable IdIfo
 		
@@ -822,7 +843,7 @@ tcPragmaSig (SpecSig name poly_ty maybe_spec_name src_loc)
 
 			-- Get the type of f, and find out what types
 			--  f has to be instantiated at to give the signature type
-		    tcLookupLocalValueOK "tcPragmaSig" name	`thenNF_Tc` \ f_id ->
+		    tcLookupValue name			`thenNF_Tc` \ f_id ->
 		    tcInstTcType (idType f_id)		`thenNF_Tc` \ (f_tyvars, f_rho) ->
 
 		    let
@@ -854,7 +875,7 @@ patMonoBindsCtxt bind
 -----------------------------------------------
 valSpecSigCtxt v ty
   = sep [ptext SLIT("In a SPECIALIZE pragma for a value:"),
-	 nest 4 (ppr v <+> ptext SLIT(" ::") <+> ppr ty)]
+	 nest 4 (ppr v <+> dcolon <+> ppr ty)]
 
 -----------------------------------------------
 notAsPolyAsSigErr sig_tau mono_tyvars
