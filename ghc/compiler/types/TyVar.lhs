@@ -5,7 +5,7 @@ module TyVar (
 	GenTyVar(..), SYN_IE(TyVar),
 	mkTyVar, mkSysTyVar,
 	tyVarKind,		-- TyVar -> Kind
-	cloneTyVar,
+	cloneTyVar, nameTyVar,
 
 	openAlphaTyVar,
 	alphaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
@@ -34,11 +34,11 @@ import UniqSet		-- nearly all of it
 import UniqFM		( emptyUFM, listToUFM, addToUFM, lookupUFM,
 			  plusUFM, sizeUFM, delFromUFM, UniqFM
 			)
-import Name		( mkSysLocalName, changeUnique, Name, NamedThing(..) )
+import Name		( mkSysLocalName, mkLocalName, Name, NamedThing(..), OccName )
 import Pretty		( Doc, (<>), ptext )
 import Outputable	( PprStyle(..), Outputable(..) )
 import SrcLoc		( noSrcLoc, SrcLoc )
-import Unique		( showUnique, mkAlphaTyVarUnique, Unique, Uniquable(..) )
+import Unique		( mkAlphaTyVarUnique, Unique, Uniquable(..) )
 import Util		( panic, Ord3(..) )
 \end{code}
 
@@ -75,6 +75,11 @@ tyVarKind (TyVar _ kind _ _) = kind
 
 cloneTyVar :: GenTyVar flexi -> Unique -> GenTyVar flexi
 cloneTyVar (TyVar _ k n x) u = TyVar u k n x
+	-- Dodgy: doesn't (yet) change the unique in the Name)
+
+nameTyVar :: GenTyVar flexi -> OccName -> GenTyVar flexi
+	-- Give the TyVar a print-name
+nameTyVar (TyVar u k n x) occ = TyVar u k (Just (mkLocalName u occ noSrcLoc)) x
 \end{code}
 
 
