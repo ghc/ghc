@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerProfile.c,v 1.3 2001/12/12 14:25:03 simonmar Exp $
+ * $Id: RetainerProfile.c,v 1.4 2001/12/19 15:20:27 simonmar Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -871,8 +871,6 @@ maybeInitRetainerSet( StgClosure *c )
 static inline rtsBool
 isRetainer( StgClosure *c )
 {
-    if (get_itbl(c)->prof.closure_desc != NULL && !strcmp(get_itbl(c)->prof.closure_desc,"PCS")) { return rtsTrue; }
-
     switch (get_itbl(c)->type) {
 	//
 	//  True case
