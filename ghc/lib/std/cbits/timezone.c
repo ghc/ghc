@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: timezone.c,v 1.4 1999/09/12 14:26:32 sof Exp $
+ * $Id: timezone.c,v 1.5 1999/09/19 19:22:14 sof Exp $
  *
  * Timezone Runtime Support
  */
@@ -29,7 +29,7 @@ StgInt prim_SETZONE ( StgAddr x, StgAddr y )
 
 StgInt sizeof_word      ( void ) { return (sizeof(unsigned int)); }
 StgInt sizeof_struct_tm	( void ) { return (sizeof(struct tm)); }
-StgInt sizeof_time_t    ( void ) { return (sizeof(time_t)); }
+StgInt sizeof_time_t    ( void ) { return (sizeof(time_t) / sizeof(int)); }
 
 char*
 get_ZONE (StgAddr x)
