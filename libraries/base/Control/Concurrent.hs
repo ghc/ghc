@@ -314,12 +314,8 @@ nmergeIO lss
 {- $boundthreads
 
 Support for multiple operating system threads and bound threads as described
-below is currently only available in the GHC runtime system when the runtime system
-has been compiled using a special option.
-
-When recompiling GHC, use .\/configure --enable-threaded-rts to enable this.
-To find your GHC has already been compiled that way, use
-'rtsSupportsBoundThreads' from GHCi.
+below is currently only available in the GHC runtime system if you use the
+/-threaded/ option when linking.
 
 Other Haskell systems do not currently support multiple operating system threads.
 
@@ -382,6 +378,9 @@ forkOS_entry stableAction = do
 foreign import ccall forkOS_createThread
     :: StablePtr (IO ()) -> IO CInt
 
+failNonThreaded = fail $ "RTS doesn't support multiple OS threads "
+                       ++"(use ghc -threaded when linking)"
+    
 forkOS action 
     | rtsSupportsBoundThreads = do
 	mv <- newEmptyMVar
@@ -392,7 +391,7 @@ forkOS action
 	tid <- takeMVar mv
 	freeStablePtr entry
 	return tid
-    | otherwise = fail "RTS not built to support multiple OS threads."
+    | otherwise = failNonThreaded
 
 -- | Returns 'True' if the calling thread is /bound/, that is, if it is
 -- safe to use foreign libraries that rely on thread-local state from the
@@ -429,7 +428,7 @@ runInBoundThread action
 		case resultOrException of
 		    Left exception -> Exception.throw exception
 		    Right result -> return result
-    | otherwise = fail "RTS not built to support multiple OS threads."
+    | otherwise = failNonThreaded
 
 {- | 
 Run the 'IO' computation passed as the first argument. If the calling thread
