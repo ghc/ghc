@@ -196,8 +196,33 @@ class  (Eq a) => Ord a  where
 %*********************************************************
 
 \begin{code}
+{- | The 'Functor' class is used for types that can be mapped over.
+Instances of 'Functor' should satisfy the following laws:
+
+> fmap id  ==  id
+> fmap (f . g)  ==  fmap f . fmap g
+
+The instances of 'Functor' for lists, 'Maybe' and 'IO' defined in the "Prelude"
+satisfy these laws.
+-}
+
 class  Functor f  where
     fmap        :: (a -> b) -> f a -> f b
+
+{- | The 'Monad' class defines the basic operations over a /monad/.
+Instances of 'Monad' should satisfy the following laws:
+
+> return a >>= k  ==  k a
+> m >>= return  ==  m
+> m >>= (\x -> k x >>= h)  ==  (m >>= k) >>= h
+
+Instances of both 'Monad' and 'Functor' should additionally satisfy the law:
+
+> fmap f xs  ==  xs >>= return . f
+
+The instances of 'Monad' for lists, 'Maybe' and 'IO' defined in the "Prelude"
+satisfy these laws.
+-}
 
 class  Monad m  where
     (>>=)       :: m a -> (a -> m b) -> m b

@@ -9,36 +9,36 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- The 'Monad' library defines the 'MonadPlus' class, and provides some useful operations on monads.
---
--- The functions in this library use the following naming conventions: 
---
--- * A postfix `M' always stands for a function in the Kleisli category:
--- @m@ is added to function results (modulo currying) and nowhere else. So, for example, 
--- 
--- >  filter  ::              (a ->   Bool) -> [a] ->   [a]
--- >  filterM :: (Monad m) => (a -> m Bool) -> [a] -> m [a]
--- 
--- * A postfix `_' changes the result type from @(m a)@ to @(m ())@. Thus (in the "Prelude"): 
--- 
--- >  sequence  :: Monad m => [m a] -> m [a] 
--- >  sequence_ :: Monad m => [m a] -> m () 
--- 
--- * A prefix `m' generalises an existing function to a monadic form. Thus, for example: 
--- 
--- >  sum  :: Num a       => [a]   -> a
--- >  msum :: MonadPlus m => [m a] -> m a
+-- The 'Functor', 'Monad' and 'MonadPlus' classes,
+-- with some useful operations on monads.
 
 module Control.Monad
-    ( MonadPlus (   -- class context: Monad
+    (
+    -- * Functor and monad classes
+
+      Functor(fmap)
+    , Monad((>>=), (>>), return, fail)
+
+    , MonadPlus (   -- class context: Monad
 	  mzero     -- :: (MonadPlus m) => m a
 	, mplus     -- :: (MonadPlus m) => m a -> m a -> m a
 	)
+    -- * Functions
+
+    -- ** Naming conventions
+    -- $naming
+
+    -- ** Basic functions from the "Prelude"
+
+    , mapM          -- :: (Monad m) => (a -> m b) -> [a] -> m [b]
+    , mapM_         -- :: (Monad m) => (a -> m b) -> [a] -> m ()
+    , sequence      -- :: (Monad m) => [m a] -> m [a]
+    , sequence_     -- :: (Monad m) => [m a] -> m ()
+    , (=<<)         -- :: (Monad m) => (a -> m b) -> m a -> m b
+
+    -- ** Generalisations of list functions
+
     , join          -- :: (Monad m) => m (m a) -> m a
-    , guard         -- :: (MonadPlus m) => Bool -> m ()
-    , when          -- :: (Monad m) => Bool -> m () -> m ()
-    , unless        -- :: (Monad m) => Bool -> m () -> m ()
-    , ap            -- :: (Monad m) => m (a -> b) -> m a -> m b
     , msum          -- :: (MonadPlus m) => [m a] -> m a
     , filterM       -- :: (Monad m) => (a -> m Bool) -> [a] -> m [a]
     , mapAndUnzipM  -- :: (Monad m) => (a -> m (b,c)) -> [a] -> m ([b], [c])
@@ -46,23 +46,26 @@ module Control.Monad
     , zipWithM_     -- :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m ()
     , foldM         -- :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a 
     , foldM_        -- :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m ()
-    
+    , replicateM    -- :: (Monad m) => Int -> m a -> m [a]
+    , replicateM_   -- :: (Monad m) => Int -> m a -> m ()
+
+    -- ** Conditional execution of monadic expressions
+
+    , guard         -- :: (MonadPlus m) => Bool -> m ()
+    , when          -- :: (Monad m) => Bool -> m () -> m ()
+    , unless        -- :: (Monad m) => Bool -> m () -> m ()
+
+    -- ** Monadic lifting operators
+    -- $lifting
+
     , liftM         -- :: (Monad m) => (a -> b) -> (m a -> m b)
     , liftM2        -- :: (Monad m) => (a -> b -> c) -> (m a -> m b -> m c)
     , liftM3        -- :: ...
     , liftM4        -- :: ...
     , liftM5        -- :: ...
 
-    , Monad((>>=), (>>), return, fail)
-    , Functor(fmap)
+    , ap            -- :: (Monad m) => m (a -> b) -> m a -> m b
 
-    , mapM          -- :: (Monad m) => (a -> m b) -> [a] -> m [b]
-    , mapM_         -- :: (Monad m) => (a -> m b) -> [a] -> m ()
-    , sequence      -- :: (Monad m) => [m a] -> m [a]
-    , sequence_     -- :: (Monad m) => [m a] -> m ()
-    , replicateM    -- :: (Monad m) => Int -> m a -> m [a]
-    , replicateM_   -- :: (Monad m) => Int -> m a -> m ()
-    , (=<<)         -- :: (Monad m) => (a -> m b) -> m a -> m b
     ) where
 
 import Data.Maybe
@@ -151,11 +154,11 @@ join x            =  x >>= id
 
 -- | The 'mapAndUnzipM' function maps its first argument over a list, returning
 -- the result as a pair of lists. This function is mainly used with complicated
--- data structures or a state- transforming monad.
+-- data structures or a state-transforming monad.
 mapAndUnzipM      :: (Monad m) => (a -> m (b,c)) -> [a] -> m ([b], [c])
 mapAndUnzipM f xs =  sequence (map f xs) >>= return . unzip
 
--- | The 'zipWithM' function generalises zipWith to arbitrary monads.
+-- | The 'zipWithM' function generalises 'zipWith' to arbitrary monads.
 zipWithM          :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
 zipWithM f xs ys  =  sequence (zipWith f xs ys)
 
@@ -178,27 +181,8 @@ function' are not commutative.
 >	  f am xm
 
 If right-to-left evaluation is required, the input list should be reversed.
-
-The when and unless functions provide conditional execution of monadic expressions. For example, 
-
->	when debug (putStr "Debugging\n")
-
-will output the string @Debugging\\n@ if the Boolean value @debug@ is @True@, and otherwise do nothing.
-
-The monadic lifting operators promote a function to a monad. The function arguments are scanned left to right. For example, 
-
->	liftM2 (+) [0,1] [0,2] = [0,2,1,3]
->	liftM2 (+) (Just 1) Nothing = Nothing
-
-In many situations, the 'liftM' operations can be replaced by uses of 'ap', which promotes function application. 
-
->	return f `ap` x1 `ap` ... `ap` xn
-
-is equivalent to 
-
->	liftMn f x1 x2 ... xn
-
 -}
+
 foldM             :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a
 foldM _ a []      =  return a
 foldM f a (x:xs)  =  f a x >>= \fax -> foldM f fax xs
@@ -212,14 +196,31 @@ replicateM n x    = sequence (replicate n x)
 replicateM_       :: (Monad m) => Int -> m a -> m ()
 replicateM_ n x   = sequence_ (replicate n x)
 
-unless            :: (Monad m) => Bool -> m () -> m ()
-unless p s        =  if p then return () else s
+{- | Conditional execution of monadic expressions. For example, 
+
+>	when debug (putStr "Debugging\n")
+
+will output the string @Debugging\\n@ if the Boolean value @debug@ is 'True',
+and otherwise do nothing.
+-}
 
 when              :: (Monad m) => Bool -> m () -> m ()
 when p s          =  if p then s else return ()
 
-ap                :: (Monad m) => m (a -> b) -> m a -> m b
-ap                =  liftM2 id
+-- | The reverse of 'when'.
+
+unless            :: (Monad m) => Bool -> m () -> m ()
+unless p s        =  if p then return () else s
+
+{- $lifting
+
+The monadic lifting operators promote a function to a monad.
+The function arguments are scanned left to right. For example, 
+
+>	liftM2 (+) [0,1] [0,2] = [0,2,1,3]
+>	liftM2 (+) (Just 1) Nothing = Nothing
+
+-}
 
 liftM   :: (Monad m) => (a1 -> r) -> m a1 -> m r
 liftM2  :: (Monad m) => (a1 -> a2 -> r) -> m a1 -> m a2 -> m r
@@ -232,3 +233,42 @@ liftM2 f m1 m2          = do { x1 <- m1; x2 <- m2; return (f x1 x2) }
 liftM3 f m1 m2 m3       = do { x1 <- m1; x2 <- m2; x3 <- m3; return (f x1 x2 x3) }
 liftM4 f m1 m2 m3 m4    = do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; return (f x1 x2 x3 x4) }
 liftM5 f m1 m2 m3 m4 m5 = do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; x5 <- m5; return (f x1 x2 x3 x4 x5) }
+
+{- | In many situations, the 'liftM' operations can be replaced by uses of
+'ap', which promotes function application. 
+
+>	return f `ap` x1 `ap` ... `ap` xn
+
+is equivalent to 
+
+>	liftMn f x1 x2 ... xn
+
+-}
+
+ap                :: (Monad m) => m (a -> b) -> m a -> m b
+ap                =  liftM2 id
+
+{- $naming
+
+The functions in this library use the following naming conventions: 
+
+* A postfix `M' always stands for a function in the Kleisli category:
+  @m@ is added to function results (modulo currying) and nowhere else.
+  So, for example, 
+
+>  filter  ::              (a ->   Bool) -> [a] ->   [a]
+>  filterM :: (Monad m) => (a -> m Bool) -> [a] -> m [a]
+
+* A postfix `_' changes the result type from @(m a)@ to @(m ())@.
+  Thus (in the "Prelude"): 
+
+>  sequence  :: Monad m => [m a] -> m [a] 
+>  sequence_ :: Monad m => [m a] -> m () 
+
+* A prefix `m' generalises an existing function to a monadic form.
+  Thus, for example: 
+
+>  sum  :: Num a       => [a]   -> a
+>  msum :: MonadPlus m => [m a] -> m a
+
+-}
