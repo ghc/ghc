@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.3 2000/04/18 11:31:56 panne Exp $
+# $Id: Makefile,v 1.4 2000/04/27 11:04:36 simonmar Exp $
 #
 # (c) The GHC Team, 2000
 #
@@ -35,7 +35,7 @@ endif
 # don't recurse on 'make install'
 #
 ifeq "$(INSTALLING)" "1"
-all clean veryclean maintainer-clean ::
+all clean distclean mostlyclean maintainer-clean ::
 	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
 endif
 

@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.29 2000/04/21 18:07:46 panne Exp $
+# $Id: Makefile,v 1.30 2000/04/27 11:04:37 simonmar Exp $
 
 # We create two driver scripts: 
 #	- one to run in-place in the build tree for building libraries
@@ -65,7 +65,7 @@ SCRIPT_SUBST_VARS := \
 ifeq "$(BIN_DIST)" "1"
 SCRIPT_PREFIX_FILES=prefix.txt
 else
-SCRIPT_SUBST_VARS += libdir libexecdir datadir bindir TMPDIR TOP_PWD
+SCRIPT_SUBST_VARS += libdir includedir libexecdir datadir bindir TMPDIR TOP_PWD
 endif
 
 all :: $(DYN_LOADABLE_BITS)
@@ -73,7 +73,7 @@ all :: $(DYN_LOADABLE_BITS)
 # don't recurse on 'make install'
 #
 ifeq "$(INSTALLING)" "1"
-all clean veryclean maintainer-clean ::
+all clean distclean mostlyclean maintainer-clean ::
 	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
 endif
 
