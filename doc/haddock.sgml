@@ -159,6 +159,39 @@
         OF SUCH DAMAGE.</para>
       </blockquote>
     </section>
+
+    <section>
+      <title>Acknowledgements</title>
+      
+      <para>Several documentation systems provided the inspiration for
+      Haddock, most notably:</para>
+
+      <itemizedlist>
+	<listitem>
+	  <para><ulink
+          url="http://www.cse.unsw.edu.au/~chak/haskell/idoc/">
+          IDoc</ulink></para>
+	</listitem>
+	<listitem>
+	  <para><ulink
+	  url="http://www.fmi.uni-passau.de/~groessli/hdoc/">HDoc</ulink></para>
+	</listitem>
+	<listitem>
+	  <para><ulink url="http://www.stack.nl/~dimitri/doxygen/">
+          Doxygen</ulink></para>
+	</listitem>
+      </itemizedlist>
+
+      <para>and probably several others I've forgotten.</para>
+
+      <para>Thanks to the following people for useful feedback,
+      discussion, patches, and moral support: Simon Peyton Jones, Mark
+      Shields, Manuel Chakravarty, Ross Patterson, Brett Letner, the
+      members of <email>haskelldoc@haskell.org</email>, and everyone
+      who contributed to the many libraries that Haddock makes use
+      of.</para>
+    </section>
+
   </chapter>
 
   <chapter id="invoking">
@@ -343,6 +376,7 @@ square :: Int -> Int
 square x = x * x
 </programlisting>
 
+
       <para>The <quote><literal>-- |</literal></quote> syntax begins a
       documentation annotation, which applies to the
       <emphasis>following</emphasis> declaration in the source file.
@@ -387,34 +421,142 @@ square x = x * x
       then Haddock can't tell what its type is and it won't be
       included in the documentation.</para>
       
+    </section>
+    <section>
+      <title>Documenting parts of a declaration</title>
+      
+      <para>In addition to documenting the whole declaration, in some
+      cases we can also document individual parts of the
+      declaration.</para>
+
       <section>
-	<title>Controlling the documentation structure</title>
+	<title>Class methods</title>
+	  
+	<para>Class methods are documented in the same way as top
+	level type signatures, by using either the
+	<quote><literal>--&nbsp;|</literal></quote> or
+	<quote><literal>--&nbsp;^</literal></quote>
+	annotations:</para>
+	  
+<programlisting>
+class C a where
+   -- | This is the documentation for the 'f' method
+   f :: a -> Int
+   -- | This is the documentation for the 'g' method
+   g :: Int -> a
+</programlisting>
+
+	<para>Note that in Haddock documentation annotations are
+	first-class syntactic objects that are subject to the same
+	layout rules as other syntactic objects; thus in the example
+	class declaration above the documentation annotations must
+	begin in the same column as the method signatures.  If you use
+	explicit layout, then don't forget the semi-colon after each
+	documentation comment (but don't put the semi-colon on the
+	same line as the documentation comment, because it will be
+	interpreted as part of the documentation!).</para>
+      </section>
+
+      <section>
+	<title>Constructors and record fields</title>
+
+	<para>Constructors are documented like so:</para>
+
+<programlisting>
+data T a b
+  = -- | This is the documentation for the 'C1' constructor
+    C1 a b 
+  | -- | This is the documentation for the 'C2' constructor
+    C2 a b 
+</programlisting>
+
+	<para>or like this:</para>
+
+<programlisting>
+data T a b
+  = C1 a b  -- ^ This is the documentation for the 'C1' constructor
+  | C2 a b  -- ^ This is the documentation for the 'C2' constructor
+</programlisting>
+
+	<para>Record fields are documented using one of these
+	styles:</para>
+
+<programlisting>
+data R a b = 
+  C { -- | This is the documentation for the 'a' field
+      a :: a,
+      -- | This is the documentation for the 'b' field
+      b :: b
+    }
+
+data R a b = 
+  C { a :: a,  -- ^ This is the documentation for the 'a' field
+      b :: b   -- ^ This is the documentation for the 'b' field
+    }
+</programlisting>
+      </section>
+
+      <section>
+	<title>Function arguments</title>
 	
-	<para>Haddock produces interface documentation that lists only
-        the entities actually exported by the module.  The
-        documentation for a module will include
-        <emphasis>all</emphasis> entities exported by that module,
-        even if they were re-exported by another module.  The only
-        exception is when Haddock can't see the declaration for the
-        re-exported entity, perhaps because it isn't part of the batch
-        of modules currently being processed.</para>
+	<para>Individual arguments to a function may be documented
+	like this:</para>
 
-	<para>However, to Haddock the export list has even more
-	significance than just specifying the entities to be included
-	in the documentation.  It also specifies the
-	<emphasis>order</emphasis> that entities will be listed in the
-	generated documentation.  This leaves the programmer free to
-	implement functions in any order he/she pleases, and indeed in
-	any <emphasis>module</emphasis> he/she pleases, but still
-	specify the order that the functions should be documented in
-	the export list.  Indeed, many programmers already do this:
-	the export list is often used as a kind of ad-hoc interface
-	documentation, with headings, groups of functions, type
-	signatures and declarations in comments.</para>
+<programlisting>
+f  :: Int      -- | The 'Int' argument
+   -> Float    -- | The 'Float' argument
+   -> IO ()    -- | The return value
+</programlisting>
 
-	<para>You can insert headings and sub-headings in the
-	documentation by including annotations at the appropriate
-	point in the export list.  For example:</para>
+	<para>NOTE: this feature isn't implemented in Haddock
+	1.0.</para>
+      </section>
+    </section>
+
+    <section>
+      <title>The module description</title>
+
+      <para>A module may contain a documentation comment before the
+      module header, in which case this comment is interpreted by
+      Haddock as an overall description of the module itself, and
+      placed in a section entitled <quote>Description</quote> in the
+      documentation for the module.  For example:</para>
+
+<programlisting>
+-- | This is the description for module "Foo"
+module Foo where
+...
+</programlisting>
+    </section>
+    
+    <section>
+      <title>Controlling the documentation structure</title>
+	
+      <para>Haddock produces interface documentation that lists only
+      the entities actually exported by the module.  The documentation
+      for a module will include <emphasis>all</emphasis> entities
+      exported by that module, even if they were re-exported by
+      another module.  The only exception is when Haddock can't see
+      the declaration for the re-exported entity, perhaps because it
+      isn't part of the batch of modules currently being
+      processed.</para>
+
+      <para>However, to Haddock the export list has even more
+      significance than just specifying the entities to be included in
+      the documentation.  It also specifies the
+      <emphasis>order</emphasis> that entities will be listed in the
+      generated documentation.  This leaves the programmer free to
+      implement functions in any order he/she pleases, and indeed in
+      any <emphasis>module</emphasis> he/she pleases, but still
+      specify the order that the functions should be documented in the
+      export list.  Indeed, many programmers already do this: the
+      export list is often used as a kind of ad-hoc interface
+      documentation, with headings, groups of functions, type
+      signatures and declarations in comments.</para>
+
+      <para>You can insert headings and sub-headings in the
+      documentation by including annotations at the appropriate point
+      in the export list.  For example:</para>
 
 <programlisting>
 module Foo (
@@ -430,26 +572,23 @@ module Foo (
   ) where
 </programlisting>
 
-	<para>Headings are introduced with the syntax
+      <para>Headings are introduced with the syntax
+      <quote><literal>--&nbsp;*</literal></quote>,
+      <quote><literal>--&nbsp;**</literal></quote> and so on, where
+      the number of <literal>*</literal>s indicates the level of the
+      heading (section, sub-section, sub-sub-section, etc.).</para>
 
- 	<quote><literal>-- *</literal></quote>, 
-        <quote><literal>-- **</literal></quote> 
+      <para>If you use section headings, then Haddock will generate a
+      table of contents at the top of the module documentation for
+      you.</para>
 
-        and so on, where the number of <literal>*</literal>s indicates
-        the level of the heading (section, sub-section,
-        sub-sub-section, etc.).</para>
-
-	<para>If you use section headings, then Haddock will generate
-	a table of contents at the top of the module documentation for
-	you.</para>
-
-	<section>
-	  <title>Re-exporting an entire module</title>
-
-	  <para>Haskell allows you to re-export the entire contents of
-	  a module (or at least, everything currently in scope that
-	  was imported from a given module) by listing it in the
-	  export list:</para>
+      <section>
+	<title>Re-exporting an entire module</title>
+	
+	<para>Haskell allows you to re-export the entire contents of a
+	module (or at least, everything currently in scope that was
+	imported from a given module) by listing it in the export
+	list:</para>
 
 <programlisting>
 module Foo (
@@ -458,45 +597,287 @@ module Foo (
  ) where	  
 </programlisting>
 
-	  <para>What will the Haddock-generated documentation for this
-	  module look like?  Well, Haddock simply behaves as if the
-	  export list for modules <literal>Bar</literal> and
-	  <literal>Baz</literal> had been expanded in-place in the
-	  export list for <literal>Foo</literal>, including all of
-	  their structure (section headings etc.).</para>
-	</section>
-
-	<section>
-	  <title>More about re-exported entities</title> 
-	  
-	  <para>How hyperlinks are re-targetted when an entity is
-	  re-exported.</para>
-
-	</section>
+	<para>What will the Haddock-generated documentation for this
+	module look like?  Well, Haddock simply behaves as if the
+	export list for modules <literal>Bar</literal> and
+	<literal>Baz</literal> had been expanded in-place in the
+	export list for <literal>Foo</literal>, including all of their
+	structure (section headings etc.).</para>
       </section>
+      
+      <section>
+	<title>Omitting the export list</title>
+	
+	<para>If there is no export list in the module, how does
+	Haddock generate documentation?  Well, when the export list is
+	omitted, e.g.:</para>
 
+<programlisting>module Foo where</programlisting>
+
+	<para>this is equivalent to an export list which mentions
+	every entity defined at the top level in this module, and
+	Haddock treats it in the same way.  Furthermore, the generated
+	documentation will retain the order in which entities are
+	defined in the module.  In this special case the module body
+	may also include section headings (normally they would be
+	ignored by Haddock).</para>
+      </section>
     </section>
 
-    <section>
-      <title>The module description</title>
-      <para></para>
-    </section>
-    
     <section>
       <title>Named chunks of documentation</title>
-      <para></para>
+
+      <para>Occasionally it is desirable to include a chunk of
+      documentation which is not attached to any particular Haskell
+      declaration.  There are two ways to do this:</para>
+
+      <itemizedlist>
+	<listitem>
+	  <para>The documentation can be included in the export list
+	  directly, e.g.:</para>
+
+<programlisting>
+module Foo (
+   -- * A section heading
+   -- | Some documentation not attached to a particular Haskell entity
+   ...
+ ) where
+</programlisting>
+	</listitem>
+	
+	<listitem>
+	  <para>If the documentation is large and placing it inline in
+	  the export list might bloat the export list and obscure the
+	  structure, then it can be given a name and placed out of
+	  line in the body of the module.  This is achieved with a
+	  special form of documentation annotation
+	  <quote><literal>--&nbsp;$</literal></quote>:</para>
+
+<programlisting>
+module Foo (
+   -- * A section heading
+   -- $doc
+   ...
+ ) where
+
+-- $doc 
+-- Here is a large chunk of documentation which may be referred to by
+-- the name $doc.
+</programlisting>
+
+	  <para>The documentation chunk is given a name, which is the
+	  sequence of alphanumeric characters directly after the
+	  <quote><literal>--&nbsp;$</literal></quote>, and it may be
+	  referred to by the same name in the export list.</para>
+	</listitem>
+      </itemizedlist>
     </section>
-    
+
+    <section>
+      <title>Hyperlinking and re-exported entities</title> 
+      
+      <para>When Haddock renders a type in the generated
+      documentation, it hyperlinks all the type constructors and class
+      names in that type to their respective definitions.  But for a
+      given type constructor or class there may be several modules
+      re-exporting it, and therefore several modules whose
+      documentation contains the definition of that type or class
+      (possibly including the current module!) so which one do we link
+      to?</para>
+
+      <para>Let's look at an example.  Suppose we have three modules
+      <literal>A</literal>, <literal>B</literal> and
+      <literal>C</literal> defined as follows:</para>
+
+<programlisting>
+module A (T) where
+data T a = C a
+
+module B (f) where
+import A
+f :: T Int -> Int
+f (C i) = i
+
+module C (T, f) where
+import A
+import B
+</programlisting>
+
+      <para>Module <literal>A</literal> exports a datatype
+      <literal>T</literal>.  Module <literal>B</literal> imports
+      <literal>A</literal> and exports a function <literal>f</literal>
+      whose type refers to <literal>T</literal>: the hyperlink in
+      <literal>f</literal>'s signature will point to the definition of
+      <literal>T</literal> in the documentation for module
+      <literal>A</literal>.</para>
+
+      <para>Now, module <literal>C</literal> exports both
+      <literal>T</literal> and <literal>f</literal>.  We have a choice
+      about where to point the hyperlink to <literal>T</literal> in
+      <literal>f</literal>'s type: either the definition exported by
+      module <literal>C</literal> or the definition exported by module
+      <literal>A</literal>.  Haddock takes the view that in this case
+      pointing to the definition in <literal>C</literal> is better,
+      because the programmer might not wish to expose
+      <literal>A</literal> to the programmer at all:
+      <literal>A</literal> might be a module internal to the
+      implementation of the library in which <literal>C</literal> is
+      the external interface, so linking to definitions in the current
+      module is preferrable over an imported module.</para>
+
+      <para>The general rule is this: when attempting to link an
+      instance of a type constructor or class to its definition, the
+      link is made to</para>
+      <itemizedlist>
+	<listitem>
+	  <para>the current module, if the current module exports the
+	  relevant definition, or</para>
+	</listitem>
+	<listitem>
+	  <para>the module that the entity was imported from,
+	  otherwise.  If the entity was imported via multiple routes,
+	  then Haddock picks the module listed earliest in the imports
+	  of the current module.</para>
+	</listitem>
+      </itemizedlist>
+    </section>
+
     <section>
       <title>Markup</title>
-      <para>
-	links to identifiers
-	links to modules
-	itemized lists
-	enumerated lists
-	emphasis
-	code blocks
-	URLs</para>
+
+      <para>Haddock understands certain textual queues inside
+      documentation annotations that tell it how to render the
+      documentation.  The queues (or <quote>markup</quote>) have been
+      designed to be simple and mnemonic in ASCII so that the
+      programmer doesn't have to deal with heavyweight annotations
+      when editing documentation comments.</para>
+
+      <section>
+	<title>Paragraphs</title>
+	
+	<para>One or more blank lines separates two paragraphs in a
+	documentation comment.</para>
+      </section>
+
+      <section>
+	<title>Special characters</title>
+
+	<para>The following characters have special meanings in
+	documentation comments: <literal>/</literal>,
+	<literal>'</literal>, <literal>[</literal>,
+	<literal>]</literal>, <literal>&lt;</literal>.  To insert a
+	literal occurrence of one of these special characters, precede
+	it with a backslash (<literal>\</literal>).</para>
+
+	<para>Additionally, the following characters have special
+	meanings at the beginning of a paragraph:
+	<literal>*</literal>, <literal>-</literal>.  These characters
+	can also be escaped using <literal>\</literal>.</para>
+
+      </section>
+
+      <section>
+	<title>Emphasis and Monospaced text</title>
+
+	<para>Emphasis may be added by surrounding text with
+	<literal>/.../</literal>.</para>
+
+	<para>Monospaced (or typewriter) text is indicated by
+	surrounding it with <literal>[...]</literal>.</para>
+      </section>
+
+      <section>
+	<title>Code Blocks</title>
+
+	<para>Displayed blocks of code are indicated by surrounding a
+	paragraph with <literal>[...]</literal> or by preceding each
+	line of a paragraph with <literal>&gt;</literal>.  For
+	example:</para>
+
+<programlisting>
+-- | This documentation includes two blocks of code:
+--
+-- [
+--     f x = x + x
+-- ]
+--
+-- >  g x = x * 42
+</programlisting>
+      </section>
+
+      <section>
+	<title>Hyperlinked Identifiers</title>
+
+	<para>Referring to a Haskell identifier, whether it be a type,
+	class, constructor, or function, is done by surrounding it
+	with single quotes:</para>
+
+<programlisting>
+-- | This module defines the type 'T'.
+</programlisting>
+
+	<para>If there is an entity <literal>T</literal> in scope in
+	the current module, then the documentation will hyperlink the
+	reference in the text to the definition of
+	<literal>T</literal> (if the output format supports
+	hyperlinking, of course; in a printed format it might instead
+	insert a page reference to the definition).</para>
+      </section>
+
+      <section>
+	<title>Linking to modules</title>
+
+	<para>Linking to a module is done by surrounding the module
+	name with double quotes:</para>
+
+<programlisting>
+-- | This is a reference to the "Foo" module.
+</programlisting>
+
+      </section>
+
+      <section>
+	<title>Itemized and Enumerated lists</title>
+
+	<para>A bulleted item is represented by preceding a paragraph
+	with either <quote><literal>*</literal></quote> or
+	<quote><literal>-</literal></quote>.  A sequence of bulleted
+	paragraphs is rendered as an itemized list in the generated
+	documentation, eg.:</para>
+
+<programlisting>
+-- | This is a bulleted list:
+--
+--     * first item
+--
+--     * second item
+</programlisting>
+
+	<para>An enumerated list is similar, except each paragraph
+	must be preceded by either
+	<quote><literal>(<replaceable>n</replaceable>)</literal></quote>
+	or
+	<quote><literal><replaceable>n</replaceable>.</literal></quote>
+	where <replaceable>n</replaceable> is any integer.  e.g.</para>
+
+<programlisting>
+-- | This is an enumerated list:
+--
+--     (1) first item
+--
+--     2. second item
+</programlisting>
+      </section>
+
+      <section>
+	<title>URLs</title>
+
+	<para>A URL can be included in a documentation comment by
+	surrounding it in angle brackets:
+	<literal>&lt;...&gt;</literal>.  If the output format supports
+	it, the URL will be turned into a hyperlink when
+	rendered.</para>
+      </section>
     </section>
   </chapter>
 </book>
