@@ -60,7 +60,7 @@ import StringBuffer
 import PreludeGlaST 
 #else
 import GlaExts
-#if __GLASGOW_HASKELL__ <= 209
+#if __GLASGOW_HASKELL__ < 209
 import ST ( thenST, seqST )
 #endif
 #endif
