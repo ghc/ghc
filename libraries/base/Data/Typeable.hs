@@ -39,7 +39,13 @@ module Data.Typeable
 	mkTyCon,	-- :: String  -> TyCon
 	mkAppTy,	-- :: TyCon   -> [TypeRep] -> TypeRep
 	mkFunTy,	-- :: TypeRep -> TypeRep   -> TypeRep
-	applyTy		-- :: TypeRep -> TypeRep   -> Maybe TypeRep
+	applyTy,	-- :: TypeRep -> TypeRep   -> Maybe TypeRep
+
+	-- * Observation of type representations
+	typerepTyCon,	-- :: TypeRep -> TyCon
+	typerepArgs,	-- :: TypeRep -> [TypeRep]
+	tyconString	-- :: TyCon   -> String
+
 
   ) where
 
@@ -169,6 +175,24 @@ mkTyCon :: String	-- ^ the name of the type constructor (should be unique
 	-> TyCon	-- ^ A unique 'TyCon' object
 mkTyCon str = TyCon (mkTyConKey str) str
 
+
+
+----------------- Observation ---------------------
+
+
+-- | Observe the type constructor of a type representation
+typerepTyCon :: TypeRep -> TyCon
+typerepTyCon (TypeRep _ tc _) = tc
+
+
+-- | Observe the argument types of a type representation
+typerepArgs :: TypeRep -> [TypeRep]
+typerepArgs (TypeRep _ _ args) = args
+
+
+-- | Observe string encoding of a type representation
+tyconString :: TyCon   -> String
+tyconString  (TyCon _ str) = str
 
 
 ----------------- Showing TypeReps --------------------
