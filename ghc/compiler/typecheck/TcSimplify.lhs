@@ -41,13 +41,12 @@ import InstEnv		( lookupInstEnv, classInstEnv, InstLookupResult(..) )
 import TcType		( zonkTcTyVarsAndFV, tcInstTyVars )
 import TcUnify		( unifyTauTy )
 import Id		( idType )
-import Name		( Name )
 import NameSet		( mkNameSet )
 import Class		( classBigSig )
 import FunDeps		( oclose, grow, improve )
 import PrelInfo		( isNumericClass, isCreturnableClass, isCcallishClass )
 
-import Type		( Type, ThetaType, PredType, mkClassPred,
+import Type		( ThetaType, PredType, mkClassPred,
 			  mkTyVarTy, getTyVar, isTyVarClassPred,
 			  splitSigmaTy, tyVarsOfPred,
 			  getClassPredTys_maybe, isClassPred, isIPPred,
@@ -287,56 +286,6 @@ The definitely-ambiguous can then float out, and get smashed at top level
 
 
 	--------------------------------------	
-		Notes on implicit parameters
-	--------------------------------------	
-
-Consider
-
-	f x = ...?y...
-
-Then we get an LIE like (?y::Int).  Doesn't constrain a type variable,
-but we must nevertheless infer a type like
-
-	f :: (?y::Int) => Int -> Int
-
-so that f is passed the value of y at the call site.  Is this legal?
-	
-	f :: Int -> Int
-	f x = x + ?y
-
-Should f be overloaded on "?y" ?  Or does the type signature say that it
-shouldn't be?  Our position is that it should be illegal.  Otherwise
-you can change the *dynamic* semantics by adding a type signature:
-
-	(let f x = x + ?y	-- f :: (?y::Int) => Int -> Int
- 	 in (f 3, f 3 with ?y=5))  with ?y = 6
-
-		returns (3+6, 3+5)
-vs
-	(let f :: Int -> Int 
-	    f x = x + ?y
-	 in (f 3, f 3 with ?y=5))  with ?y = 6
-
-		returns (3+6, 3+6)
-
-URK!  Let's not do this. So this is illegal:
-
-	f :: Int -> Int
-	f x = x + ?y
-
-There's a nasty corner case when the monomorphism restriction bites:
-
-	f = x + ?y
-
-The argument above suggests that we must generalise over the ?y parameter, 
-but the monomorphism restriction says that we can't.  The current 
-implementation chooses to let the monomorphism restriction 'win' in this
-case, but it's not clear what the Right Thing is.
-
-BOTTOM LINE: you *must* quantify over implicit parameters.
-
-
-	--------------------------------------	
 		Notes on principal types
 	--------------------------------------	
 
@@ -349,7 +298,156 @@ Here the principal type of f is (forall a. a->a)
 but we'll produce the non-principal type
     f :: forall a. C Int => a -> a
 
+
+	--------------------------------------	
+		Notes on implicit parameters
+	--------------------------------------	
+
+Question 1: can we "inherit" implicit parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this:
+
+	f x = (x::Int) + ?y
+
+where f is *not* a top-level binding.
+From the RHS of f we'll get the constraint (?y::Int).
+There are two types we might infer for f:
+
+	f :: Int -> Int
+
+(so we get ?y from the context of f's definition), or
+
+	f :: (?y::Int) => Int -> Int
+
+At first you might think the first was better, becuase then
+?y behaves like a free variable of the definition, rather than
+having to be passed at each call site.  But of course, the WHOLE
+IDEA is that ?y should be passed at each call site (that's what
+dynamic binding means) so we'd better infer the second.
+
+BOTTOM LINE: you *must* quantify over implicit parameters.
+
+
+Question 2: type signatures
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+OK, so it it legal to give an explicit, user type signature to f, thus:
+
+	f :: Int -> Int
+	f x = (x::Int) + ?y
+
+At first sight this seems reasonable, but it has the nasty property
+that adding a type signature changes the dynamic semantics.=20
+Consider this:
+
+	(let f x = (x::Int) + ?y
+ 	 in (f 3, f 3 with ?y=5))  with ?y = 6
+
+		returns (3+6, 3+5)
+vs
+	(let f :: Int -> Int=20
+	     f x = x + ?y
+	 in (f 3, f 3 with ?y=5))  with ?y = 6
+
+		returns (3+6, 3+6)
+
+Indeed, simply inlining f (at the Haskell source level) would change the
+dynamic semantics.
+
+Conclusion: the above type signature is illegal.  You'll get a message
+of the form "could not deduce (?y::Int) from ()".
+
+
+Question 3: monomorphism
+~~~~~~~~~~~~~~~~~~~~~~~~
+There's a nasty corner case when the monomorphism restriction bites:
+
+	z = (x::Int) + ?y
+
+The argument above suggests that we *must* generalise=20
+over the ?y parameter, to get=20
+	z :: (?y::Int) => Int,
+but the monomorphism restriction says that we *must not*, giving
+	z :: Int. =20
+Why does the momomorphism restriction say this?  Because if you have
+
+	let z = x + ?y in z+z
+
+you might not expect the addition to be done twice --- but it will if
+we follow the argument of Question 2 and generalise over ?y.
+
+
+
+Possible choices
+~~~~~~~~~~~~~~~~
+(A) Always generalise over implicit parameters
+    Bindings that fall under the monomorphism restriction can't
+	be generalised
+
+    Consequences:
+	* Inlning remains valid
+	* No unexpected loss of sharing
+	* But simple bindings like
+		z = ?y + 1
+	  will be rejected, unless you add an explicit type signature
+	  (to avoid the monomorphism restriction)
+		z :: (?y::Int) => Int
+		z = ?y + 1
+	  This seems unacceptable
+
+(B) Monomorphism restriction "wins"
+    Bindings that fall under the monomorphism restriction can't
+	be generalised
+    Always generalise over implicit parameters *except* for bindings
+	that fall under the monomorphism restriction
+
+    Consequences
+	* Inlining isn't valid in general
+	* No unexpected loss of sharing
+	* Simple bindings like
+		z = ?y + 1
+	  accepted (get value of ?y from binding site)
+
+(C) Always generalise over implicit parameters
+    Bindings that fall under the monomorphism restriction can't
+	be generalised, EXCEPT for implicit parameters
+    Consequences
+	* Inlining remains valid
+	* Unexpected loss of sharing (from the extra generalisation)
+	* Simple bindings like
+		z = ?y + 1
+	  accepted (get value of ?y from occurrence sites)
+
+
+Discussion
+~~~~~~~~~~
+None of these choices seems very satisfactory.  But at least we should
+decide which we want to do.
+
+It's really not clear what is the Right Thing To Do.  If you see
+
+	z = (x::Int) + ?y
+
+would you expect the value of ?y to be got from the *occurrence sites*
+of 'z', or from the valuue of ?y at the *definition* of 'z'?  In the
+case of function definitions, the answer is clearly the former, but
+less so in the case of non-fucntion definitions.   On the other hand,
+if we say that we get the value of ?y from the definition site of 'z',
+then inlining 'z' might change the semantics of the program.
+
+Choice (C) really says "the monomorphism restriction doesn't apply
+to implicit parameters".  Which is fine, but remember that every=20
+innocent binding 'x = ...' that mentions an implicit parameter in
+the RHS becomes a *function* of that parameter, called at each
+use of 'x'.  Now, the chances are that there are no intervening 'with'
+clauses that bind ?y, so a decent compiler should common up all=20
+those function calls.  So I think I strongly favour (C).  Indeed,
+one could make a similar argument for abolishing the monomorphism
+restriction altogether.
+
+BOTTOM LINE: we choose (B) at present.  See tcSimplifyRestricted
+
 	
+
 %************************************************************************
 %*									*
 \subsection{tcSimplifyInfer}
@@ -418,9 +516,9 @@ inferLoop doc tau_tvs wanteds
 	qtvs  = grow preds tau_tvs' `minusVarSet` oclose preds gbl_tvs
 	
 	try_me inst 	
-	  | isFree qtvs inst  = Free
-	  | isClassDict inst  = DontReduceUnlessConstant	-- Dicts
-	  | otherwise	      = ReduceMe 			-- Lits and Methods
+	  | isFreeAndInheritable qtvs inst = Free
+	  | isClassDict inst 		   = DontReduceUnlessConstant	-- Dicts
+	  | otherwise	    		   = ReduceMe 			-- Lits and Methods
     in
 		-- Step 2
     reduceContext doc try_me [] wanteds'    `thenTc` \ (no_improvement, frees, binds, irreds) ->
@@ -463,10 +561,12 @@ on both the Lte and If constraints.  What we *can't* do is start again
 with (Max Z (S x) y)!
 
 \begin{code}
-isFree qtvs inst
-  =  not (tyVarsOfInst inst `intersectsVarSet` qtvs)	-- Constrains no quantified vars
+isFreeAndInheritable qtvs inst
+  =  isFree qtvs inst					-- Constrains no quantified vars
   && all inheritablePred (predsOfInst inst)		-- And no implicit parameter involved
 							-- (see "Notes on implicit parameters")
+
+isFree qtvs inst = not (tyVarsOfInst inst `intersectsVarSet` qtvs)
 \end{code}
 
 
@@ -489,45 +589,34 @@ tcSimplifyCheck
 		 TcDictBinds)	-- Bindings
 
 tcSimplifyCheck doc qtvs givens wanted_lie
-  = checkLoop doc qtvs givens (lieToList wanted_lie) try `thenTc` \ (frees, binds, irreds) ->
+  = checkLoop doc qtvs givens (lieToList wanted_lie)	`thenTc` \ (frees, binds, irreds) ->
 
 	-- Complain about any irreducible ones
     complainCheck doc givens irreds		`thenNF_Tc_`
 
 	-- Done
     returnTc (mkLIE frees, binds)
-  where
-	-- When checking against a given signature we always reduce
-	-- until we find a match against something given, or can't reduce
-    try qtvs inst | isFree qtvs inst  = Free
-		  | otherwise         = ReduceMe 
 
-tcSimplifyRestricted doc qtvs givens wanted_lie
-  = checkLoop doc qtvs givens (lieToList wanted_lie) try `thenTc` \ (frees, binds, irreds) ->
-
-	-- Complain about any irreducible ones
-    complainCheck doc givens irreds		`thenNF_Tc_`
-
-	-- Done
-    returnTc (mkLIE frees, binds)
-  where
-    try qtvs inst | not (tyVarsOfInst inst `intersectsVarSet` qtvs) = Free
-	          | otherwise                                       = ReduceMe
-
-checkLoop doc qtvs givens wanteds try_me
+checkLoop doc qtvs givens wanteds
   =		-- Step 1
     zonkTcTyVarsAndFV qtvs		`thenNF_Tc` \ qtvs' ->
     mapNF_Tc zonkInst givens		`thenNF_Tc` \ givens' ->
     mapNF_Tc zonkInst wanteds		`thenNF_Tc` \ wanteds' ->
 
 		-- Step 2
-    reduceContext doc (try_me qtvs') givens' wanteds'		`thenTc` \ (no_improvement, frees, binds, irreds) ->
+    let
+	-- When checking against a given signature we always reduce
+	-- until we find a match against something given, or can't reduce
+	try_me inst | isFreeAndInheritable qtvs' inst = Free
+		    | otherwise       		      = ReduceMe 
+    in
+    reduceContext doc try_me givens' wanteds'	`thenTc` \ (no_improvement, frees, binds, irreds) ->
 	
 		-- Step 3
     if no_improvement then
 	returnTc (frees, binds, irreds)
     else
-	checkLoop doc qtvs givens' (irreds ++ frees) try_me	`thenTc` \ (frees1, binds1, irreds1) ->
+	checkLoop doc qtvs givens' (irreds ++ frees) 	`thenTc` \ (frees1, binds1, irreds1) ->
 	returnTc (frees1, binds `AndMonoBinds` binds1, irreds1)
 
 complainCheck doc givens irreds
@@ -541,6 +630,66 @@ complainCheck doc givens irreds
 \end{code}
 
 
+%************************************************************************
+%*									*
+\subsection{tcSimplifyRestricted}
+%*									*
+%************************************************************************
+
+\begin{code}
+tcSimplifyRestricted 	-- Used for restricted binding groups
+	:: SDoc 
+	-> [TcTyVar]		-- Free in the type of the RHSs
+	-> LIE			-- Free in the RHSs
+	-> TcM ([TcTyVar],	-- Tyvars to quantify (zonked)
+		LIE,		-- Free
+		TcDictBinds)	-- Bindings
+
+tcSimplifyRestricted doc tau_tvs wanted_lie
+  = 	-- First squash out all methods, to find the constrained tyvars
+   	-- We can't just take the free vars of wanted_lie because that'll 
+	-- have methods that may incidentally mention entirely unconstrained variables
+	--  	e.g. a call to 	f :: Eq a => a -> b -> b
+	-- Here, b is unconstrained.  A good example would be
+	--	foo = f (3::Int)
+	-- We want to infer the polymorphic type
+	--	foo :: forall b. b -> b
+    tcSimplifyToDicts wanted_lie	`thenTc` \ (dicts, _) ->
+    let
+	constrained_tvs = tyVarsOfInsts dicts
+    in
+
+	-- Next, figure out the tyvars we will quantify over
+    zonkTcTyVarsAndFV tau_tvs		`thenNF_Tc` \ tau_tvs' ->
+    tcGetGlobalTyVars			`thenNF_Tc` \ gbl_tvs ->
+    let
+	qtvs = (tau_tvs' `minusVarSet` oclose (predsOfInsts dicts) gbl_tvs)
+			 `minusVarSet` constrained_tvs
+    in
+
+	-- The first step may have squashed more methods than
+	-- necessary, so try again, this time knowing the exact
+	-- set of type variables to quantify over.
+	--
+	-- We quantify only over constraints that are captured by qtvs; 
+	-- these will just be a subset of non-dicts.  This in contrast
+	-- to normal inference (using isFreeAndInheritable) in which we quantify over 
+	-- all *non-inheritable* constraints too.  This implements choice 
+	-- (B) under "implicit parameter and monomorphism" above.
+    mapNF_Tc zonkInst (lieToList wanted_lie)	`thenNF_Tc` \ wanteds' ->
+    let
+        try_me inst | isFree qtvs inst = Free
+	            | otherwise        = ReduceMe
+    in
+    reduceContext doc try_me [] wanteds'	`thenTc` \ (no_improvement, frees, binds, irreds) ->
+    ASSERT( no_improvement )
+    ASSERT( null irreds )
+	-- No need to loop because tcSimplifyToDicts will have
+	-- already done any improvement necessary
+
+    returnTc (varSetElems qtvs, mkLIE frees, binds)
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -548,7 +697,7 @@ complainCheck doc givens irreds
 %*									*
 %************************************************************************
 
-@tcSimplifyInferCheck@ is used when we know the consraints we are to simplify
+@tcSimplifyInferCheck@ is used when we know the constraints we are to simplify
 against, but we don't know the type variables over which we are going to quantify.
 This happens when we have a type signature for a mutually recursive
 group.
@@ -596,8 +745,8 @@ inferCheckLoop doc tau_tvs givens wanteds
 
 	      -- When checking against a given signature we always reduce
 	      -- until we find a match against something given, or can't reduce
-	try_me inst | isFree qtvs inst  = Free
-		    | otherwise         = ReduceMe 
+	try_me inst | isFreeAndInheritable qtvs inst  = Free
+		    | otherwise        		      = ReduceMe 
     in
 		-- Step 2
     reduceContext doc try_me givens' wanteds'    `thenTc` \ (no_improvement, frees, binds, irreds) ->
@@ -1612,7 +1761,9 @@ addNoInstanceErr what_doc givens dict
     	fix1 = sep [ptext SLIT("Add") <+> quotes (pprInst tidy_dict),
 		    ptext SLIT("to the") <+> what_doc]
     
-    	fix2 | isTyVarDict dict || ambig_overlap
+    	fix2 | isTyVarDict dict 
+	     || not (isClassDict dict)	-- Don't suggest adding instance declarations for implicit parameters
+	     || ambig_overlap 
 	     = empty
 	     | otherwise
 	     = ptext SLIT("Or add an instance declaration for") <+> quotes (pprInst tidy_dict)

@@ -27,7 +27,7 @@ import Inst		( LIE, emptyLIE, mkLIE, plusLIE, InstOrigin(..),
 import TcEnv		( tcExtendLocalValEnv,
 			  newSpecPragmaId, newLocalId
 			)
-import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyCheck, tcSimplifyRestricted, tcSimplifyToDicts )
+import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyRestricted, tcSimplifyToDicts )
 import TcMonoType	( tcHsSigType, checkSigTyVars,
 			  TcSigInfo(..), tcTySig, maybeSig, sigCtxt
 			)
@@ -44,8 +44,7 @@ import Var		( idType, idName )
 import IdInfo		( InlinePragInfo(..) )
 import Name		( Name, getOccName, getSrcLoc )
 import NameSet
-import Type		( mkTyVarTy, tyVarsOfTypes,
-			  mkForAllTys, mkFunTys, tyVarsOfType, 
+import Type		( mkTyVarTy, mkForAllTys, mkFunTys, tyVarsOfType, 
 			  mkPredTy, mkForAllTy, isUnLiftedType, 
 			  unliftedTypeKind, liftedTypeKind, openTypeKind
 			)
@@ -53,7 +52,6 @@ import Var		( tyVarKind )
 import VarSet
 import Bag
 import Util		( isIn )
-import ListSetOps	( minusList )
 import Maybes		( maybeToBool )
 import BasicTypes	( TopLevelFlag(..), RecFlag(..), isNonRec, isNotTopLevel )
 import FiniteMap	( listToFM, lookupFM )
@@ -413,15 +411,25 @@ is doing.
 %************************************************************************
 
 \begin{code}
-generalise_help doc tau_tvs lie_req sigs
+generalise binder_names mbind tau_tvs lie_req sigs
+  | not is_unrestricted 	-- RESTRICTED CASE
+  = 	-- Check signature contexts are empty 
+    checkTc (all is_mono_sig sigs)
+	    (restrictedBindCtxtErr binder_names)	`thenTc_`
 
------------------------
-  | null sigs
-  =	-- INFERENCE CASE: Unrestricted group, no type signatures
-    tcSimplifyInfer doc tau_tvs lie_req
+	-- Now simplify with exactly that set of tyvars
+	-- We have to squash those Methods
+    tcSimplifyRestricted doc tau_tvs lie_req		`thenTc` \ (qtvs, lie_free, binds) ->
 
------------------------
-  | otherwise
+   	-- Check that signature type variables are OK
+    checkSigsTyVars sigs				`thenTc_`
+
+    returnTc (qtvs, lie_free, binds, [])
+
+  | null sigs			-- UNRESTRICTED CASE, NO TYPE SIGS
+  = tcSimplifyInfer doc tau_tvs lie_req
+
+  | otherwise			-- UNRESTRICTED CASE, WITH TYPE SIGS
   = 	-- CHECKING CASE: Unrestricted group, there are type signatures
 	-- Check signature contexts are empty 
     checkSigsCtxts sigs				`thenTc` \ (sig_avails, sig_dicts) ->
@@ -435,44 +443,12 @@ generalise_help doc tau_tvs lie_req sigs
 
     returnTc (forall_tvs, lie_free, dict_binds, sig_dicts)
 
-generalise binder_names mbind tau_tvs lie_req sigs
-  | is_unrestricted	-- UNRESTRICTED CASE
-  = generalise_help doc tau_tvs lie_req sigs
-
-  | otherwise		-- RESTRICTED CASE
-  = 	-- Do a simplification to decide what type variables
-	-- are constrained.  We can't just take the free vars
-	-- of lie_req because that'll have methods that may
-	-- incidentally mention entirely unconstrained variables
-	--  	e.g. a call to 	f :: Eq a => a -> b -> b
-	-- Here, b is unconstrained.  A good example would be
-	--	foo = f (3::Int)
-	-- We want to infer the polymorphic type
-	--	foo :: forall b. b -> b
-    generalise_help doc tau_tvs lie_req sigs	`thenTc` \ (forall_tvs, lie_free, dict_binds, dict_ids) ->
-
-	-- Check signature contexts are empty 
-    checkTc (null sigs || null dict_ids)
-	    (restrictedBindCtxtErr binder_names)	`thenTc_`
-
-	-- Identify constrained tyvars
-    let
-	constrained_tvs = varSetElems (tyVarsOfTypes (map idType dict_ids))
-				-- The dict_ids are fully zonked
-	final_forall_tvs = forall_tvs `minusList` constrained_tvs
-    in
-
-	-- Now simplify with exactly that set of tyvars
-	-- We have to squash those Methods
-    tcSimplifyRestricted doc final_forall_tvs [] lie_req	`thenTc` \ (lie_free, binds) ->
-
-    returnTc (final_forall_tvs, lie_free, binds, [])
-
   where
     is_unrestricted | opt_NoMonomorphismRestriction = True
 		    | otherwise			    = isUnRestrictedGroup tysig_names mbind
 
     tysig_names = [name | (TySigInfo name _ _ _ _ _ _ _) <- sigs]
+    is_mono_sig (TySigInfo _ _ _ theta _ _ _ _) = null theta
 
     doc = ptext SLIT("type signature(s) for") <+> pprBinders binder_names
 
