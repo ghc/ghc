@@ -164,7 +164,7 @@ gen_Eq_binds tycon
 		case maybeTyConSingleCon tycon of
 		  Just _ -> []
 		  Nothing -> -- if cons don't match, then False
-		     [([wildPat, wildPat], false_Expr)]
+		     [([nlWildPat, nlWildPat], false_Expr)]
 	    else -- calc. and compare the tags
 		 [([a_Pat, b_Pat],
 		    untag_Expr tycon [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
@@ -329,13 +329,13 @@ gen_Ord_binds tycon
 			   -- Catch this specially to avoid warnings
 			   -- about overlapping patterns from the desugarer,
 			   -- and to avoid unnecessary pattern-matching
-      = [([wildPat,wildPat], eqTag_Expr)]
+      = [([nlWildPat,nlWildPat], eqTag_Expr)]
       | otherwise
       = map pats_etc nonnullary_cons ++
 	(if single_con_type then	-- Omit wildcards when there's just one 
 	      []			-- constructor, to silence desugarer
 	else
-              [([wildPat, wildPat], default_rhs)])
+              [([nlWildPat, nlWildPat], default_rhs)])
 
       where
 	pats_etc data_con
@@ -597,7 +597,7 @@ gen_Ix_binds tycon
     enum_index
       = mk_easy_FunBind tycon_loc index_RDR 
 		[noLoc (AsPat (noLoc c_RDR) 
-			   (nlTuplePat [a_Pat, wildPat] Boxed)), 
+			   (nlTuplePat [a_Pat, nlWildPat] Boxed)), 
 				d_Pat] emptyBag (
 	nlHsIf (nlHsPar (nlHsVarApps inRange_RDR [c_RDR, d_RDR])) (
 	   untag_Expr tycon [(a_RDR, ah_RDR)] (
@@ -898,7 +898,7 @@ gen_Show_binds get_fixity tycon
 	pats_etc data_con
 	  | nullary_con =  -- skip the showParen junk...
 	     ASSERT(null bs_needed)
-	     ([wildPat, con_pat], mk_showString_app con_str)
+	     ([nlWildPat, con_pat], mk_showString_app con_str)
 	  | otherwise   =
 	     ([a_Pat, con_pat],
 		  showParen_Expr (nlHsPar (genOpApp a_Expr ge_RDR (nlHsLit (HsInt con_prec_plus_one))))
@@ -1004,7 +1004,7 @@ gen_Typeable_binds tycon
   = unitBag $
 	mk_easy_FunBind tycon_loc 
 		(mk_typeOf_RDR tycon) 	-- Name of appropriate type0f function
-		[wildPat] emptyBag
+		[nlWildPat] emptyBag
 		(nlHsApps mkTypeRep_RDR [tycon_rep, nlList []])
   where
     tycon_loc = getSrcSpan tycon
@@ -1065,6 +1065,7 @@ gen_Data_binds fix_env tycon
     tycon_loc = getSrcSpan tycon
     tycon_name = tyConName tycon
     data_cons = tyConDataCons tycon
+    n_cons    = length data_cons
 
 	------------ gfoldl
     gfoldl_bind = mk_FunBind tycon_loc gfoldl_RDR (map gfoldl_eqn data_cons)
@@ -1084,14 +1085,17 @@ gen_Data_binds fix_env tycon
     gunfold_rhs = nlHsCase (nlHsVar conIndex_RDR `nlHsApp` c_Expr) 
 			   (map gunfold_alt data_cons)
 
-    gunfold_alt dc =
-      mkSimpleHsAlt (nlConPat intDataCon_RDR
-                            [nlLitPat (HsIntPrim (toInteger (dataConTag dc)))])
-	            (foldr nlHsApp
+    gunfold_alt dc
+      = mkSimpleHsAlt (mk_tag_pat dc)
+	              (foldr nlHsApp
                            (nlHsVar z_RDR `nlHsApp` nlHsVar (getRdrName dc))
-                           (replicate (dataConSourceArity dc) (nlHsVar k_RDR))
-                    )
-
+                           (replicate (dataConSourceArity dc) (nlHsVar k_RDR)))
+    mk_tag_pat dc	-- Last one is a wild-pat, to avoid 
+			-- redundant test, and annoying warning
+      | tag-fIRST_TAG == n_cons-1 = nlWildPat	-- Last constructor
+      | otherwise = nlConPat intDataCon_RDR [nlLitPat (HsIntPrim (toInteger tag))]
+      where 
+	tag = dataConTag dc
 			  
 	------------ toConstr
     toCon_bind = mk_FunBind tycon_loc toConstr_RDR (map to_con_eqn data_cons)
@@ -1101,7 +1105,7 @@ gen_Data_binds fix_env tycon
     dataTypeOf_bind = mk_easy_FunBind
                         tycon_loc
                         dataTypeOf_RDR
-			[wildPat]
+			[nlWildPat]
                         emptyBag
                         (nlHsVar data_type_name)
 

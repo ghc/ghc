@@ -529,7 +529,7 @@ mkDefMethRhs origin clas inst_tys sel_id loc NoDefMeth
 	-- Need two splits because the  selector can have a type like
 	-- 	forall a. Foo a => forall b. Eq b => ...
     (arg_tys, _) = tcSplitFunTys tau2
-    wild_pats	 = [wildPat | ty <- arg_tys]
+    wild_pats	 = [nlWildPat | ty <- arg_tys]
 
 mkDefMethRhs origin clas inst_tys sel_id loc GenDefMeth 
   = 	-- A generic default method

@@ -173,10 +173,10 @@ nlNullaryConPat con = noLoc (ConPatIn (noLoc con) (PrefixCon []))
 
 nlWildConPat :: DataCon -> LPat RdrName
 nlWildConPat con = noLoc (ConPatIn (noLoc (getRdrName con))
-				   (PrefixCon (nOfThem (dataConSourceArity con) wildPat)))
+				   (PrefixCon (nOfThem (dataConSourceArity con) nlWildPat)))
 
 nlTuplePat pats box = noLoc (TuplePat pats box)
-wildPat  = noLoc (WildPat placeHolderType)	-- Pre-typechecking
+nlWildPat  = noLoc (WildPat placeHolderType)	-- Pre-typechecking
 
 nlHsDo :: HsStmtContext Name -> [LStmt id] -> LHsExpr id
 nlHsDo ctxt stmts = noLoc (mkHsDo ctxt stmts)

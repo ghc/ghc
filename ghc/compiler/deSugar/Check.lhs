@@ -188,7 +188,7 @@ check' :: [EquationInfo] -> ([ExhaustivePat],EqnSet)
 check' []                                              = ([([],[])],emptyUniqSet)
 
 check' [EqnInfo n ctx ps (MatchResult CanFail _)] 
-   | all_vars ps  = ([(takeList ps (repeat wildPat),[])],  unitUniqSet n)
+   | all_vars ps  = ([(takeList ps (repeat nlWildPat),[])],  unitUniqSet n)
 
 check' qs@((EqnInfo n ctx ps (MatchResult CanFail _)):rs)
    | all_vars ps  = (pats,  addOneToUniqSet indexs n)
@@ -253,7 +253,7 @@ process_literals used_lits qs
        default_eqns    = ASSERT2( okGroup qs, pprGroup qs ) 
 			 map remove_var (filter (is_var . firstPat) qs)
        (pats',indexs') = check' default_eqns 
-       pats_default    = [(wildPat:ps,constraints) | (ps,constraints) <- (pats')] ++ pats 
+       pats_default    = [(nlWildPat:ps,constraints) | (ps,constraints) <- (pats')] ++ pats 
        indexs_default  = unionUniqSets indexs' indexs
 \end{code}
 
@@ -301,7 +301,7 @@ nothing to do.
 
 \begin{code}
 first_column_only_vars :: [EquationInfo] -> ([ExhaustivePat],EqnSet)
-first_column_only_vars qs = (map (\ (xs,ys) -> (wildPat:xs,ys)) pats,indexs)
+first_column_only_vars qs = (map (\ (xs,ys) -> (nlWildPat:xs,ys)) pats,indexs)
                           where
                             (pats,indexs) = check' (map remove_var qs)
        
@@ -374,7 +374,7 @@ remove_first_column (ConPatOut con (PrefixCon con_pats) _ _ _) qs
 
 make_row_vars :: [HsLit] -> EquationInfo -> ExhaustivePat
 make_row_vars used_lits (EqnInfo _ _ pats _ ) = 
-   (nlVarPat new_var:takeList (tail pats) (repeat wildPat),[(new_var,used_lits)])
+   (nlVarPat new_var:takeList (tail pats) (repeat nlWildPat),[(new_var,used_lits)])
   where new_var = hash_x
 
 hash_x = mkInternalName unboundKey {- doesn't matter much -}
@@ -382,7 +382,7 @@ hash_x = mkInternalName unboundKey {- doesn't matter much -}
 		     noSrcLoc
 
 make_row_vars_for_constructor :: EquationInfo -> [WarningPat]
-make_row_vars_for_constructor (EqnInfo _ _ pats _ ) = takeList (tail pats) (repeat wildPat)
+make_row_vars_for_constructor (EqnInfo _ _ pats _ ) = takeList (tail pats) (repeat nlWildPat)
 
 compare_cons :: Pat Id -> Pat Id -> Bool
 compare_cons (ConPatOut id1 _ _ _ _) (ConPatOut id2 _ _ _ _) = id1 == id2  
@@ -562,11 +562,11 @@ make_con (ConPatOut id (PrefixCon pats) _ _ _) (ps, constraints)
 --   representation 
 
 make_whole_con :: DataCon -> WarningPat
-make_whole_con con | isInfixCon con = nlInfixConPat name wildPat wildPat
+make_whole_con con | isInfixCon con = nlInfixConPat name nlWildPat nlWildPat
                    | otherwise      = nlConPat name pats
                 where 
                   name   = getName con
-                  pats   = [wildPat | t <- dataConOrigArgTys con]
+                  pats   = [nlWildPat | t <- dataConOrigArgTys con]
 \end{code}
 
 This equation makes the same thing as @tidy@ in @Match.lhs@, the
@@ -650,12 +650,12 @@ simplify_pat (DictPat dicts methods)
 simplify_con con (PrefixCon ps)   = PrefixCon (map simplify_lpat ps)
 simplify_con con (InfixCon p1 p2) = PrefixCon [simplify_lpat p1, simplify_lpat p2]
 simplify_con con (RecCon fs)      
-  | null fs   = PrefixCon [wildPat | t <- dataConOrigArgTys con]
+  | null fs   = PrefixCon [nlWildPat | t <- dataConOrigArgTys con]
 		-- Special case for null patterns; maybe not a record at all
   | otherwise = PrefixCon (map (simplify_lpat.snd) all_pats)
   where
      -- pad out all the missing fields with WildPats.
-    field_pats = map (\ f -> (getName f, wildPat))
+    field_pats = map (\ f -> (getName f, nlWildPat))
 		     (dataConFieldLabels con)
     all_pats = foldr (\ (id,p) acc -> insertNm (getName (unLoc id)) p acc)
 		     field_pats fs
