@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.57 2001/12/13 11:12:27 simonmar Exp $
+% $Id: PrelBase.lhs,v 1.58 2001/12/14 12:05:15 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -685,12 +685,12 @@ gtInt, geInt, eqInt, neInt, ltInt, leInt :: Int -> Int -> Bool
 -- Note that these wrappers still produce undefined results when the
 -- second argument (the shift amount) is negative.
 
-shiftL#, shiftR# :: Word# -> Int# -> Word#
+shiftL#, shiftRL# :: Word# -> Int# -> Word#
 
 a `shiftL#` b   | b >=# WORD_SIZE_IN_BITS# = int2Word# 0#
 	        | otherwise                = a `uncheckedShiftL#` b
 
-a `shiftR#` b   | b >=# WORD_SIZE_IN_BITS# = int2Word# 0#
+a `shiftRL#` b  | b >=# WORD_SIZE_IN_BITS# = int2Word# 0#
 	        | otherwise                = a `uncheckedShiftRL#` b
 
 iShiftL#, iShiftRA#, iShiftRL# :: Int# -> Int# -> Int#
