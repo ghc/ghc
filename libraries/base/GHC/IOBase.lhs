@@ -133,9 +133,10 @@ performs side effects, then the relative order in which those side
 effects take place (relative to the main I\/O trunk, or other calls to
 'unsafePerformIO') is indeterminate.  You have to be careful when 
 writing and compiling modules that use 'unsafePerformIO':
-  * Use @{-# NOINLINE foo #-}@ as a pragma on any function @foo@
+
+  * Use @{\-\# NOINLINE foo \#-\}@ as a pragma on any function @foo@
 	that calls 'unsafePerformIO'.  If the call is inlined,
-	the I/O may be performed more than once.
+	the I\/O may be performed more than once.
 
   * Use the compiler flag @-fno-cse@ to prevent common sub-expression
 	elimination being performed on the module, which might combine
