@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.9 1999/02/05 16:02:49 simonm Exp $
+ * $Id: RtsFlags.c,v 1.10 1999/02/18 12:21:07 simonm Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -216,7 +216,8 @@ usage_text[] = {
 "  -k<size> Sets the initial thread stack size (default 1k)  Egs: -K4k   -K2m",
 "",
 "  -A<size> Sets the minimum allocation area size (default 256k) Egs: -A1m -A10k",
-"  -M<size> Sets the maximum heap size (default 64M)  Egs: -H256k -H1G",
+"  -M<size> Sets the maximum heap size (default 64M)  Egs: -M256k -M1G",
+"  -H<size> Sets the minimum heap size (default 0M)   Egs: -H24m  -H1G",
 "  -m<n>%   Minimum % of heap which must be available (default 3%)",
 "  -G<n>    Number of generations (default: 2)",
 "  -T<n>    Number of steps in younger generations (default: 2)",
