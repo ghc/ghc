@@ -93,7 +93,7 @@ The memory used by the thread will be garbage collected if it isn\'t
 referenced from anywhere.  The 'killThread' function may be defined in
 terms of 'throwTo':
 
->   killThread = throwTo (AsyncException ThreadKilled)
+>   killThread tid = throwTo tid (AsyncException ThreadKilled)
 -}
 killThread :: ThreadId -> IO ()
 killThread (ThreadId id) = IO $ \ s ->
