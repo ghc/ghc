@@ -424,19 +424,54 @@ percent in execution speed---you can give a
 %*                                                                      *
 %************************************************************************
 
-If you would like GHC to check that every top-level value has a type
-signature, use the \tr{-fsignatures-required}
-option.\index{-fsignatures-required option}
+GHC has a selection of options that select which types of non-fatal
+error messages, otherwise known as warnings, can be generated during
+compilation.  By default, you get a standard set of warnings which are
+generally likely to indicate bugs in your program.  These are:
+\tr{-fwarn-overlpapping-patterns} and \tr{-fwarn-missing-methods}.
+The following flags are simple ways to select standard ``packages'' of
+warnings:
 
-If you would like to disallow ``name shadowing,'' i.e., an inner-scope
-value has the same name as an outer-scope value, then use the
-\tr{-fwarn-name-shadowing}
-option.\index{-fwarn-name-shadowing option}
-This option catches typographical errors that turn into hard-to-find
-bugs, e.g., in the inadvertent cyclic definition \tr{let x = ... x ... in}.
+\begin{description}
+
+\item[\tr{-Wnot}:]
+\index{-Wnot option}
+
+Turns off all warnings, including the standard ones.
+
+\item[\tr{-W}:]
+\index{-W option}
+
+Provides the standard warnings plus \tr{-fwarn-incomplete-patterns}
+and \tr{-fwarn-unused-names}.
+
+\item[\tr{-Wall}:]
+\index{-Wall option}
+
+Turns on all warning options.
+
+\end{description}
+
+The full set of warning options is described below.  To turn off any
+warning, simply give the corresponding \tr{-fno-warn-...} option on
+the command line.
+
+\begin{description}
+
+\item[\tr{-fwarn-name-shadowing}:] 
+\index{-fwarn-name-shadowing option}
+
+This option causes a warning to be emitted whenever an inner-scope
+value has the same name as an outer-scope value, i.e. the inner value
+shadows the outer one.  This can catch typographical errors that turn
+into hard-to-find bugs, e.g., in the inadvertent cyclic definition
+\tr{let x = ... x ... in}.
 
 Consequently, this option does {\em not} allow cyclic recursive
 definitions.
+
+\item[\tr{-fwarn-overlapping-patterns}:]
+\index{-fwarn-overlapping-patterns option}
 
 By default, the compiler will warn you if a set of patterns are either
 incomplete (i.e., you're only matching on a subset of an algebraic
@@ -453,15 +488,32 @@ g [] = 2
 
 where the last pattern match in \tr{f} won't ever be reached, as the
 second pattern overlaps it. More often than not, redundant patterns
-is a programmer mistake/error, but if you don't want the compiler to
-``baby-sit'', use the \tr{-fno-warn-overlapping-patterns} option to
-turn these warnings off.\index{-fno-warn-overlapping-patterns option}
+is a programmer mistake/error, so this option is enabled by default.
+
+\item[\tr{-fwarn-incomplete-patterns}:]
+\index{-fwarn-incomplete-patterns option}
 
 Similarly for incomplete patterns, the function \tr{g} will fail when
-applied to non-empty lists, so the compiler will by default emit a
-warning about this. The option \tr{-fno-warn-incomplete-patterns}
-turns rhis off.\index{-fno-warn-incomplete-pattern option}
+applied to non-empty lists, so the compiler will emit a warning about
+this when this option is enabled.
 
+\item[\tr{-fwarn-missing-methods}:]
+\index{-fwarn-missing-methods option}
+
+This option is on by default, and warns you whenever an instance
+declaration is missing one or more methods, and the corresponding
+class declaration has no default declaration for them.
+
+\item[\tr{-fwarn-unused-names}:]
+\index{-fwarn-unused-names}
+Have the renamer report which locally defined names are not
+used/exported.  This option is not currently supported.
+
+\end{description}
+
+If you would like GHC to check that every top-level value has a type
+signature, use the \tr{-fsignatures-required}
+option.\index{-fsignatures-required option}
 
 If you're feeling really paranoid, the \tr{-dcore-lint}
 option\index{-dcore-lint option} is a good choice.  It turns on
@@ -1141,10 +1193,6 @@ in.
 \item[\tr{-dshow-unused-imports}:]
 \index{-dshow-unused-imports}
 Have the renamer report what imports does not contribute.
-
-\item[\tr{-fwarn-unused-names}:]
-\index{-fwarn-unused-names}
-Have the renamer report which locally defined names are not used/exported.
 
 %
 %\item[\tr{-dgc-debug}:]
