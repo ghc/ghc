@@ -629,8 +629,8 @@ tcMonoExpr (HsReify (Reify flavour name)) res_ty
     returnM (HsReify (ReifyOut flavour name))
   where
     tycon_name = case flavour of
-		   ReifyDecl -> DsMeta.declTyConName
-		   ReifyType -> DsMeta.typeTyConName
+		   ReifyDecl -> DsMeta.decQTyConName
+		   ReifyType -> DsMeta.typQTyConName
 		   ReifyFixity -> pprPanic "tcMonoExpr: cant do reifyFixity yet" (ppr name)
 #endif GHCI
 \end{code}

@@ -34,7 +34,7 @@ import Name		( Name )
 import TcRnMonad
 
 import TysWiredIn	( mkListTy )
-import DsMeta		( exprTyConName, declTyConName, typeTyConName, decTyConName, qTyConName )
+import DsMeta		( expQTyConName, decQTyConName, typQTyConName, decTyConName, qTyConName )
 import ErrUtils (Message)
 import Outputable
 import Panic		( showException )
@@ -100,12 +100,12 @@ tc_bracket :: HsBracket Name -> TcM TcType
 tc_bracket (ExpBr expr) 
   = newTyVarTy openTypeKind	`thenM` \ any_ty ->
     tcCheckRho expr any_ty	`thenM_`
-    tcMetaTy exprTyConName
+    tcMetaTy expQTyConName
 	-- Result type is Expr (= Q Exp)
 
 tc_bracket (TypBr typ) 
   = tcHsSigType ExprSigCtxt typ		`thenM_`
-    tcMetaTy typeTyConName
+    tcMetaTy typQTyConName
 	-- Result type is Type (= Q Typ)
 
 tc_bracket (DecBr decls)
@@ -146,7 +146,7 @@ tcSpliceExpr name expr res_ty
 	-- but $(h 4) :: forall a.a 	i.e. anything!
 
     zapExpectedType res_ty			`thenM_`
-    tcMetaTy exprTyConName			`thenM` \ meta_exp_ty ->
+    tcMetaTy expQTyConName			`thenM` \ meta_exp_ty ->
     setStage (Splice next_level) (
 	setLIEVar lie_var	   $
 	tcCheckRho expr meta_exp_ty
@@ -167,7 +167,7 @@ tcSpliceExpr name expr res_ty
 -- inner escape before dealing with the outer one
 
 tcTopSplice expr res_ty
-  = tcMetaTy exprTyConName		`thenM` \ meta_exp_ty ->
+  = tcMetaTy expQTyConName		`thenM` \ meta_exp_ty ->
 
 	-- Typecheck the expression
     tcTopSpliceExpr expr meta_exp_ty	`thenM` \ zonked_q_expr ->
