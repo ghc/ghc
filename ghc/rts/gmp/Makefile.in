@@ -422,6 +422,11 @@ distclean-kr:
 
 maintainer-clean-kr:
 
+gmp.dll: libgmp.a
+	dllwrap -mno-cygwin --target=i386-unknown-mingw32 \
+		--export-all --dllname gmp.dll --output-lib=libgmp_imp.a \
+		-o gmp.dll libgmp.a
+
 libgmp.la: $(libgmp_la_OBJECTS) $(libgmp_la_DEPENDENCIES)
 	$(LINK) -rpath $(libdir) $(libgmp_la_LDFLAGS) $(libgmp_la_OBJECTS) $(libgmp_la_LIBADD) $(LIBS)
 

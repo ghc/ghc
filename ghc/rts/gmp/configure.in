@@ -21,7 +21,7 @@ dnl  the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 dnl  MA 02111-1307, USA.
 
 
-AC_REVISION($Revision: 1.5 $)dnl
+AC_REVISION($Revision: 1.6 $)dnl
 AC_PREREQ(2.14)dnl
 AC_INIT(gmp-impl.h)
 
@@ -306,6 +306,10 @@ case "$target" in
     cclist="gcc vcc"
     gmp_cflags_vcc="-g"		# FIXME: flags for vcc?
     ;;
+esac
+
+case "${target}" in
+  *-*-mingw32) gmp_cflags_gcc="$gmp_cflags_gcc -mno-cygwin";;
 esac
 
 dnl  Check for programs needed by macros for finding compiler.
