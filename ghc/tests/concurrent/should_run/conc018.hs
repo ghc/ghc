@@ -1,7 +1,8 @@
 import Concurrent
+import Exception
 
 main = do
-  catch (do
+  catchAllIO (do
   	m <- newMVar ()
 	putMVar m ()
      )

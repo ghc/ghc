@@ -26,7 +26,7 @@ main = do
 	 ) `catchAllIO` (\e -> putStrLn ("caught1: " ++ show e))
 	putMVar m2 ()
 	-- blocked here, "bar" can't be delivered
-	(threadDelay 100000)
+	(sum [1..10000] `seq` return ())
 	  `catchAllIO` (\e -> putStrLn ("caught2: " ++ show e))
      )
     -- unblocked here, "bar" delivered to "caught3"

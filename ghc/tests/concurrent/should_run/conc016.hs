@@ -12,7 +12,7 @@ main = do
 	 		)
   blockAsyncExceptions (do
     putMVar m ()
-    threadDelay 500000 -- to be sure the other thread is now blocked
-    killThread sub_thread
+    sum [1..10000] `seq` -- to be sure the other thread is now blocked
+       killThread sub_thread
    )
   putStrLn "ok"

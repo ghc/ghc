@@ -22,8 +22,8 @@ main = do
   ( do
     blockAsyncExceptions (do
 	putMVar m ()
-	threadDelay 500000
-  	(unblockAsyncExceptions (threadDelay 500000))
+	sum [1..10000] `seq` -- give 'foo' a chance to be raised
+  	  (unblockAsyncExceptions (threadDelay 500000))
 		`catchAllIO` (\e -> putStrLn ("caught1: " ++ show e))
      )
     takeMVar m2
