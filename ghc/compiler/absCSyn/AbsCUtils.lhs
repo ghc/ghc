@@ -28,9 +28,10 @@ import Unique		( Unique{-instance Eq-} )
 import UniqSupply	( uniqFromSupply, uniqsFromSupply, splitUniqSupply, 
 			  UniqSupply )
 import CmdLineOpts      ( opt_OutputLanguage, opt_EmitCExternDecls )
-import Maybes		( maybeToBool )
 import PrimOp		( PrimOp(..), CCall(..), isDynamicTarget )
 import Panic		( panic )
+
+import Maybe		( isJust )
 
 infixr 9 `thenFlt`
 \end{code}
@@ -101,8 +102,16 @@ mkAbsCStmtList' other r = other : r
 mkAlgAltsCSwitch :: CAddrMode -> [(ConTag, AbstractC)] -> AbstractC -> AbstractC
 
 mkAlgAltsCSwitch scrutinee tagged_alts deflt_absc
- = CSwitch scrutinee (adjust tagged_alts) deflt_absc
+ | isJust (nonemptyAbsC deflt_absc) 
+	= CSwitch scrutinee (adjust tagged_alts) deflt_absc
+ | otherwise 
+	= CSwitch scrutinee (adjust rest) first_alt
  where
+   -- it's ok to convert one of the alts into a default if we don't already have
+   -- one, because this is an algebraic case and we're guaranteed that the tag 
+   -- will match one of the branches.
+   ((tag,first_alt):rest) = tagged_alts
+
    -- Adjust the tags in the switch to start at zero.
    -- This is the convention used by primitive ops which return algebraic
    -- data types.  Why?	 Because for two-constructor types, zero is faster
