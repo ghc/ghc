@@ -462,8 +462,8 @@ details.</para>
 	<para>When running GHC under a Cygwin shell on Windows, Ctrl-C
 	  sometimes doesn't work.  The workaround is to use Ctrl-Break
 	  instead.</para>
-      <listitem>
-    <varlistentry>
+      </listitem>
+    </varlistentry>
 
   </variablelist>
 
