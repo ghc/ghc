@@ -304,7 +304,9 @@ setNonBlockingFD fd = do
   -- An error when setting O_NONBLOCK isn't fatal: on some systems 
   -- there are certain file handles on which this will fail (eg. /dev/null
   -- on FreeBSD) so we throw away the return code from fcntl_write.
-  c_fcntl_write (fromIntegral fd) const_f_setfl (flags .|. o_NONBLOCK)
+  unless (testBit flags (fromIntegral o_NONBLOCK)) $ do
+    c_fcntl_write (fromIntegral fd) const_f_setfl (flags .|. o_NONBLOCK)
+    return ()
 #else
 
 -- bogus defns for win32
