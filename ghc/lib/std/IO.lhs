@@ -176,32 +176,13 @@ hReady h = hWaitForInput h 0
 
 --hWaitForInput :: Handle -> Int -> IO Bool 
 hWaitForInput handle nsecs = do
-    htype <- readHandle handle
-    case htype of 
-      ErrorHandle ioError -> do
-	  writeHandle handle htype
-          fail ioError
-      ClosedHandle -> do
-	  writeHandle handle htype
-	  ioe_closedHandle handle
-      SemiClosedHandle _ _ -> do
-	  writeHandle handle htype
-	  ioe_closedHandle handle
-      AppendHandle _ _ _ -> do
-	  writeHandle handle htype
-	  fail (IOError (Just handle) IllegalOperation 
-		"handle is not open for reading")
-      WriteHandle _ _ _ -> do
-	  writeHandle handle htype
-	  fail (IOError (Just handle) IllegalOperation 	
-		"handle is not open for reading")
-      other -> do
-	  rc <- _ccall_ inputReady (filePtr other) nsecs
-	  writeHandle handle (markHandle htype)
-          case rc of
-            0 -> return False
-            1 -> return True
-            _ -> constructErrorAndFail "hWaitForInput"
+    hdl   <- wantReadableHandle handle
+    rc    <- _ccall_ inputReady (filePtr hdl) nsecs
+    writeHandle handle (markHandle hdl)
+    case rc of
+      0 -> return False
+      1 -> return True
+      _ -> constructErrorAndFail "hWaitForInput"
 \end{code}
 
 Computation $hGetChar hdl$ reads the next character from handle 
@@ -211,38 +192,22 @@ Computation $hGetChar hdl$ reads the next character from handle
 --hGetChar :: Handle -> IO Char
 
 hGetChar handle = do
-    htype <- readHandle handle
-    case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
-          fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
-	  ioe_closedHandle handle
-      SemiClosedHandle _ _ ->
-	  writeHandle handle htype		    >>
-	  ioe_closedHandle handle
-      AppendHandle _ _ _ ->
-	  writeHandle handle htype		    >>
-	  fail (IOError (Just handle) IllegalOperation "handle is not open for reading")
-      WriteHandle _ _ _ ->
-	  writeHandle handle htype		    >>
-	  fail (IOError (Just handle) IllegalOperation "handle is not open for reading")
-      other -> do
-	  intc <- _ccall_ fileGetc (filePtr other)
-	  writeHandle handle (markHandle htype)
-          if intc /= ``EOF'' then
-              return (chr intc)
-           else
-              constructErrorAndFail "hGetChar"
+    hdl   <- wantReadableHandle handle
+    intc  <- _ccall_ fileGetc (filePtr hdl)
+    writeHandle handle (markHandle hdl)
+    if intc /= ``EOF''
+     then return (chr intc)
+     else constructErrorAndFail "hGetChar"
 
 hGetLine :: Handle -> IO String
-hGetLine h = 
- hGetChar h >>= \ c ->
- if c == '\n' then 
-    return "" 
- else 
-    hGetLine h >>= \ s -> return (c:s)
+hGetLine h = do
+ c <- hGetChar h
+ if c == '\n' 
+  then return "" 
+  else do
+    s <- hGetLine h
+    return (c:s)
+
 \end{code}
 
 Computation $hLookahead hdl$ returns the next character from handle
@@ -252,31 +217,14 @@ character is available.
 \begin{code}
 --hLookAhead :: Handle -> IO Char
 
-hLookAhead handle = 
-    readHandle handle				    >>= \ htype ->
-    case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
-          fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
-	  ioe_closedHandle handle
-      SemiClosedHandle _ _ ->
-	  writeHandle handle htype		    >>
-	  ioe_closedHandle handle
-      AppendHandle _ _ _ ->
-	  writeHandle handle htype		    >>
-	  fail (IOError (Just handle) IllegalOperation "handle is not open for reading")
-      WriteHandle _ _ _ ->
-	  writeHandle handle htype		    >>
-	  fail (IOError (Just handle) IllegalOperation "handle is not open for reading")
-      other -> do
-	  intc <- _ccall_ fileLookAhead (filePtr other)
-	  writeHandle handle (markHandle htype)
-          if intc /= ``EOF'' then
-              return (chr intc)
-           else
-              constructErrorAndFail "hLookAhead"
+hLookAhead handle = do
+    hdl   <- wantReadableHandle handle
+    intc  <- _ccall_ fileLookAhead (filePtr hdl)
+    writeHandle handle (markHandle hdl)
+    if intc /= ``EOF''
+     then return (chr intc)
+     else constructErrorAndFail "hLookAhead"
+
 \end{code}
 
 
@@ -293,60 +241,33 @@ corresponding to the unread portion of the channel or file managed by
 \begin{code}
 --hGetContents :: Handle -> IO String
 
-hGetContents handle =
-    readHandle handle				    >>= \ htype ->
-    case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
-          fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
-	  ioe_closedHandle handle
-      SemiClosedHandle _ _ ->
-	  writeHandle handle htype		    >>
-	  ioe_closedHandle handle
-      AppendHandle _ _ _ ->
-	  writeHandle handle htype		    >>
-	  fail (IOError (Just handle) IllegalOperation "handle is not open for reading")
-      WriteHandle _ _ _ ->
-	  writeHandle handle htype		    >>
-	  fail (IOError (Just handle) IllegalOperation "handle is not open for reading")
-      other -> 
-	  {- 
-             To avoid introducing an extra layer of buffering here,
-             we provide three lazy read methods, based on character,
-             line, and block buffering.
-          -}
-	  getBufferMode other	>>= \ other ->
-          case (bufferMode other) of
-            Just LineBuffering ->
-		allocBuf Nothing		    >>= \ buf_info ->
-	        writeHandle handle (SemiClosedHandle (filePtr other) buf_info)
-                                          	    >>
-                unsafeInterleaveIO (lazyReadLine handle)
-						    >>= \ contents ->
-	        return contents
-
-            Just (BlockBuffering size) ->
-		allocBuf size			    >>= \ buf_info ->
-	        writeHandle handle (SemiClosedHandle (filePtr other) buf_info)
-                                          	    >>
-                unsafeInterleaveIO (lazyReadBlock handle)
-						    >>= \ contents ->
-	        return contents
-            _ -> -- Nothing is treated pessimistically as NoBuffering
-	        writeHandle handle (SemiClosedHandle (filePtr other) (``NULL'', 0))
-                                          	    >>
-                unsafeInterleaveIO (lazyReadChar handle) >>= \ contents ->
-	        return contents
+hGetContents handle = do
+    hdl_ <- wantReadableHandle handle
+      {- 
+        To avoid introducing an extra layer of buffering here,
+        we provide three lazy read methods, based on character,
+        line, and block buffering.
+      -}
+    hdl_ <- getBufferMode hdl_
+    case (bufferMode hdl_) of
+     Just LineBuffering -> do
+	buf_info <- allocBuf Nothing
+        writeHandle handle (SemiClosedHandle (filePtr hdl_) buf_info)
+        unsafeInterleaveIO (lazyReadLine handle)
+     Just (BlockBuffering size) -> do
+	buf_info <- allocBuf size
+        writeHandle handle (SemiClosedHandle (filePtr hdl_) buf_info)
+        unsafeInterleaveIO (lazyReadBlock handle)
+     _ -> do -- Nothing is treated pessimistically as NoBuffering
+        writeHandle handle (SemiClosedHandle (filePtr hdl_) (``NULL'', 0))
+        unsafeInterleaveIO (lazyReadChar handle)
   where
     allocBuf :: Maybe Int -> IO (Addr, Int)
-    allocBuf msize =
-	_ccall_ malloc size		    	    >>= \ buf ->
-	if buf /= ``NULL'' then
-	    return (buf, size)
-	else
-	    fail (IOError Nothing ResourceExhausted "not enough virtual memory")
+    allocBuf msize = do
+	buf <- _ccall_ malloc size
+	if buf /= ``NULL''
+	 then return (buf, size)
+	 else fail (IOError Nothing ResourceExhausted "not enough virtual memory")
       where
         size = 
 	    case msize of
@@ -363,82 +284,84 @@ lazyReadBlock :: Handle -> IO String
 lazyReadLine  :: Handle -> IO String
 lazyReadChar  :: Handle -> IO String
 
-lazyReadBlock handle =
-    readHandle handle		                  >>= \ htype ->
+lazyReadBlock handle = do
+    htype <- readHandle handle
     case htype of 
       -- There cannae be an ErrorHandle here
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
+      ClosedHandle -> do
+	  writeHandle handle htype
 	  return ""
-      SemiClosedHandle fp (buf, size) ->
-	  _ccall_ readBlock buf fp size		    >>= \ bytes ->
-	  (if bytes <= 0
-	  then return ""
-	  else stToIO (unpackNBytesST buf bytes))   >>= \ some ->
-          if bytes < 0 then
-              _ccall_ free buf			    >>= \ () ->
-              _ccall_ closeFile fp	            >>
+      SemiClosedHandle fp (buf, size) -> do
+	  bytes <- _ccall_ readBlock buf fp size
+	  some  <- (if bytes <= 0
+	             then return ""
+	             else stToIO (unpackNBytesST buf bytes))
+          if bytes < 0
+	   then do
+              _ccall_ free buf
+              _ccall_ closeFile fp
 #ifndef __PARALLEL_HASKELL__
-	      writeForeignObj fp ``NULL''           >>
-	      writeHandle handle (SemiClosedHandle fp (``NULL'', 0)) >>
+	      writeForeignObj fp ``NULL''
+	      writeHandle handle (SemiClosedHandle fp (``NULL'', 0))
 #else
-	      writeHandle handle (SemiClosedHandle ``NULL'' (``NULL'', 0)) >>
+	      writeHandle handle (SemiClosedHandle ``NULL'' (``NULL'', 0))
 #endif
 	      return some
-	  else
-	      writeHandle handle htype	    >>
-              unsafeInterleaveIO (lazyReadBlock handle)  >>= \ more ->
+	   else do
+	      writeHandle handle htype
+              more <- unsafeInterleaveIO (lazyReadBlock handle)
 	      return (some ++ more)
 
-lazyReadLine handle =
-    readHandle handle		                    >>= \ htype ->
+lazyReadLine handle = do
+    htype <- readHandle handle
     case htype of 
       -- There cannae be an ErrorHandle here
-      ClosedHandle ->
-	  writeHandle handle htype >>
+      ClosedHandle -> do
+	  writeHandle handle htype
 	  return ""
-      SemiClosedHandle fp (buf, size) ->
-	  _ccall_ readLine buf fp size		    >>= \ bytes ->
-	  (if bytes <= 0
-	  then return ""
-	  else stToIO (unpackNBytesST buf bytes))   >>= \ some ->
-          if bytes < 0 then
-              _ccall_ free buf			    >>= \ () ->
-              _ccall_ closeFile fp	            >>
+      SemiClosedHandle fp (buf, size) -> do
+	  bytes <- _ccall_ readLine buf fp size
+	  some  <- (if bytes <= 0
+	             then return ""
+	             else stToIO (unpackNBytesST buf bytes))
+          if bytes < 0 
+	   then do
+              _ccall_ free buf
+              _ccall_ closeFile fp
 #ifndef __PARALLEL_HASKELL__
-	      writeForeignObj fp ``NULL''           >>
-	      writeHandle handle (SemiClosedHandle fp (``NULL'', 0)) >>
+	      writeForeignObj fp ``NULL''
+	      writeHandle handle (SemiClosedHandle fp (``NULL'', 0))
 #else
-	      writeHandle handle (SemiClosedHandle ``NULL'' (``NULL'', 0)) >>
+	      writeHandle handle (SemiClosedHandle ``NULL'' (``NULL'', 0))
 #endif
 	      return some
-	  else
-	      writeHandle handle htype	    >>
-              unsafeInterleaveIO (lazyReadLine handle)
-						    >>= \ more ->
+	   else do
+	      writeHandle handle htype
+              more <- unsafeInterleaveIO (lazyReadLine handle)
 	      return (some ++ more)
 
-lazyReadChar handle =
-    readHandle handle                      	    >>= \ htype ->
+lazyReadChar handle = do
+    htype <- readHandle handle
     case htype of 
       -- There cannae be an ErrorHandle here
-      ClosedHandle ->
-	  writeHandle handle htype	   	    >>
+      ClosedHandle -> do
+	  writeHandle handle htype
 	  return ""
-      SemiClosedHandle fp buf_info ->
-	  _ccall_ readChar fp			    >>= \ char ->
-          if char == ``EOF'' then
-              _ccall_ closeFile fp	            >>
+      SemiClosedHandle fp buf_info -> do
+	  char <- _ccall_ readChar fp
+          if char == ``EOF'' 
+	   then do
+              _ccall_ closeFile fp
 #ifndef __PARALLEL_HASKELL__
-	      writeForeignObj fp ``NULL''           >>
-	      writeHandle handle (SemiClosedHandle fp (``NULL'', 0)) >>
+	      writeForeignObj fp ``NULL''
+	      writeHandle handle (SemiClosedHandle fp (``NULL'', 0))
 #else
-	      writeHandle handle (SemiClosedHandle ``NULL'' (``NULL'', 0)) >>
+	      writeHandle handle (SemiClosedHandle ``NULL'' (``NULL'', 0))
 #endif
 	      return ""
-	  else
-	      writeHandle handle htype		    >>
-              unsafeInterleaveIO (lazyReadChar handle) >>= \ more ->
+	   else do
+	      writeHandle handle htype
+              more <- unsafeInterleaveIO (lazyReadChar handle)
 	      return (chr char : more)
 
 \end{code}
@@ -457,28 +380,13 @@ buffering is enabled for {\em hdl}.
 \begin{code}
 --hPutChar :: Handle -> Char -> IO ()
 
-hPutChar handle c =
-    readHandle handle				    >>= \ htype ->
-    case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
-          fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
-	  ioe_closedHandle handle
-      SemiClosedHandle _ _ ->
-	  writeHandle handle htype		    >>
-	  ioe_closedHandle handle
-      ReadHandle _ _ _ ->
-	  writeHandle handle htype		    >>
-	  fail (IOError (Just handle) IllegalOperation "handle is not open for writing")
-      other -> 
-	  _ccall_ filePutc (filePtr other) (ord c) >>= \ rc ->
-	  writeHandle handle (markHandle htype)   >>
-          if rc == 0 then
-              return ()
-          else
-              constructErrorAndFail "hPutChar"
+hPutChar handle c = do
+    hdl   <- wantWriteableHandle handle
+    rc    <- _ccall_ filePutc (filePtr hdl) (ord c)
+    writeHandle handle (markHandle hdl)
+    if rc == 0
+     then return ()
+     else constructErrorAndFail "hPutChar"
 \end{code}
 
 Computation $hPutStr hdl s$ writes the string {\em s} to the file or
@@ -487,22 +395,8 @@ channel managed by {\em hdl}.
 \begin{code}
 --hPutStr :: Handle -> String -> IO ()
 
-hPutStr handle str = 
-    readHandle handle				    >>= \ htype ->
-    case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
-          fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
-	  ioe_closedHandle handle
-      SemiClosedHandle _ _ ->
-	  writeHandle handle htype		    >>
-	  ioe_closedHandle handle
-      ReadHandle _ _ _ ->
-	  writeHandle handle htype		    >>
-	  fail (IOError (Just handle) IllegalOperation "handle is not open for writing")
-      other -> 
+hPutStr handle str = do
+    hdl <- wantWriteableHandle handle
           {-
            The code below is not correct for line-buffered terminal streams,
            as the output stream is not flushed when terminal input is requested
@@ -513,37 +407,37 @@ hPutStr handle str =
 
 	   ToDo: fix me
 	  -}
-          getBufferMode other			    >>= \ other ->
-          (case bufferMode other of
+    hdl     <- getBufferMode hdl
+    success <-
+         (case bufferMode hdl of
             Just LineBuffering ->
-	        writeChars (filePtr other) str
-		--writeLines (filePtr other) str
+	        writeChars (filePtr hdl) str
+		--writeLines (filePtr hdl) str
             Just (BlockBuffering (Just size)) ->
-	        writeBlocks (filePtr other) size str
+	        writeBlocks (filePtr hdl) size str
             Just (BlockBuffering Nothing) ->
-	        writeBlocks (filePtr other) ``BUFSIZ'' str
+	        writeBlocks (filePtr hdl) ``BUFSIZ'' str
             _ -> -- Nothing is treated pessimistically as NoBuffering
-	        writeChars (filePtr other) str
-	  )    					    >>= \ success ->
-	  writeHandle handle (markHandle other) >>
-          if success then
-              return ()
-          else
-              constructErrorAndFail "hPutStr"
-  where
-#ifndef __PARALLEL_HASKELL__
-    writeLines :: ForeignObj -> String -> IO Bool
-#else
-    writeLines :: Addr -> String -> IO Bool
-#endif
-    writeLines = writeChunks ``BUFSIZ'' True 
+	        writeChars (filePtr hdl) str
+	  )
+    writeHandle handle (markHandle hdl)
+    if success 
+     then return ()
+     else constructErrorAndFail "hPutStr"
 
 #ifndef __PARALLEL_HASKELL__
-    writeBlocks :: ForeignObj -> Int -> String -> IO Bool
+writeLines :: ForeignObj -> String -> IO Bool
 #else
-    writeBlocks :: Addr -> Int -> String -> IO Bool
+writeLines :: Addr -> String -> IO Bool
 #endif
-    writeBlocks fp size s = writeChunks size False fp s
+writeLines = writeChunks ``BUFSIZ'' True 
+
+#ifndef __PARALLEL_HASKELL__
+writeBlocks :: ForeignObj -> Int -> String -> IO Bool
+#else
+writeBlocks :: Addr -> Int -> String -> IO Bool
+#endif
+writeBlocks fp size s = writeChunks size False fp s
  
     {-
       The breaking up of output into lines along \n boundaries
@@ -558,56 +452,94 @@ hPutStr handle str =
     -}
 
 #ifndef __PARALLEL_HASKELL__
-    writeChunks :: Int -> Bool -> ForeignObj -> String -> IO Bool
+writeChunks :: Int -> Bool -> ForeignObj -> String -> IO Bool
 #else
-    writeChunks :: Int -> Bool -> Addr -> String -> IO Bool
+writeChunks :: Int -> Bool -> Addr -> String -> IO Bool
 #endif
-    writeChunks (I# bufLen) chopOnNewLine fp s =
-     stToIO (newCharArray (0,I# bufLen)) >>= \ arr@(MutableByteArray _ arr#) ->
-     let
-      write_char :: MutableByteArray# RealWorld -> Int# -> Char# -> IO ()
-      write_char arr# n x = IO $ \ s# ->
-	  case (writeCharArray# arr# n x s#) of { s1# ->
-	  IOok s1# () }
+writeChunks (I# bufLen) chopOnNewLine fp s =
+  stToIO (newCharArray (0,I# bufLen)) >>= \ arr@(MutableByteArray _ arr#) ->
+  let
+   write_char :: MutableByteArray# RealWorld -> Int# -> Char# -> IO ()
+   write_char arr# n x = IO $ \ s# ->
+      case (writeCharArray# arr# n x s#) of { s1# ->
+	IOok s1# () }
 
-      shoveString :: Int# -> [Char] -> IO Bool
-      shoveString n ls = 
-       case ls of
-         [] ->   
-	   if n ==# 0# then
-	      return True
-	   else
-             _ccall_ writeFile arr fp (I# n) >>= \rc ->
-             return (rc==0)
+   shoveString :: Int# -> [Char] -> IO Bool
+   shoveString n ls = 
+     case ls of
+      [] ->   
+        if n ==# 0# then
+          return True
+        else do
+          rc <- _ccall_ writeFile arr fp (I# n)
+          return (rc==0)
 
-         ((C# x):xs) ->
-	   write_char arr# n x	>>
+      ((C# x):xs) -> do
+        write_char arr# n x
 	   
-	   {- Flushing lines - should we bother? Yes, for line-buffered output. -}
-	   if n ==# bufLen || (chopOnNewLine && (x `eqChar#` '\n'#)) then
-	      _ccall_ writeFile arr fp (I# (n +# 1#)) >>= \ rc ->
-	      if rc == 0 then
-		 shoveString 0# xs
-	       else
-		 return False
-	    else
-	       shoveString (n +# 1#) xs
-     in
-     shoveString 0# s
+          {- Flushing lines - should we bother? Yes, for line-buffered output. -}
+	if n ==# bufLen || (chopOnNewLine && (x `eqChar#` '\n'#))
+	 then do
+	   rc <-  _ccall_ writeFile arr fp (I# (n +# 1#))
+	   if rc == 0 
+	    then shoveString 0# xs
+	    else return False
+         else
+	   shoveString (n +# 1#) xs
+  in
+  shoveString 0# s
 
 #ifndef __PARALLEL_HASKELL__
-    writeChars :: ForeignObj -> String -> IO Bool
+writeChars :: ForeignObj -> String -> IO Bool
 #else
-    writeChars :: Addr -> String -> IO Bool
+writeChars :: Addr -> String -> IO Bool
 #endif
-    writeChars fp "" = return True
-    writeChars fp (c:cs) =
-	_ccall_ filePutc fp (ord c) >>= \ rc ->
-        if rc == 0 then
-	    writeChars fp cs
-	else
-	    return False
+writeChars fp "" = return True
+writeChars fp (c:cs) = do
+  rc <- _ccall_ filePutc fp (ord c)
+  if rc == 0 
+   then writeChars fp cs
+   else return False
+
 \end{code}
+
+The @hPutBuf hdl len elt_sz buf@ action writes the buffer @buf@ to
+the file/channel managed by @hdl@
+the string {\em s} to the file or
+channel managed by {\em hdl}.
+
+begin{code}
+hPutBuf :: Handle -> Int -> Int -> ByteArray Int -> IO ()
+hPutBuf handle len el_sz buf = do
+    hdl <- wantWriteableHandle handle
+          {-
+           The code below is not correct for line-buffered terminal streams,
+           as the output stream is not flushed when terminal input is requested
+           again, just upon seeing a newline character. A temporary fix for the
+           most common line-buffered output stream, stdout, is to assume the
+           buffering it was given when created (no buffering). This is not
+           as bad as it looks, since stdio buffering sits underneath this.
+
+	   ToDo: fix me
+	  -}
+    hdl   <- getBufferMode hdl
+    success <-
+             (case bufferMode hdl of
+               Just LineBuffering ->
+	          writeChars (filePtr hdl) str
+		  --writeLines (filePtr hdl) str
+               Just (BlockBuffering (Just size)) ->
+	          writeBlocks (filePtr hdl) size str
+               Just (BlockBuffering Nothing) ->
+	          writeBlocks (filePtr hdl) ``BUFSIZ'' str
+               _ -> -- Nothing is treated pessimistically as NoBuffering
+	          writeChars (filePtr hdl) str)
+    writeHandle handle (markHandle hdl)
+    if success 
+     then return ()
+     else constructErrorAndFail "hPutBuf"
+
+end{code}
 
 Computation $hPrint hdl t$ writes the string representation of {\em t}
 given by the $shows$ function to the file or channel managed by {\em

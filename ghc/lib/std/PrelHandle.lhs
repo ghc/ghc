@@ -910,3 +910,51 @@ access of a closed file.
 ioe_closedHandle :: Handle -> IO a
 ioe_closedHandle h = fail (IOError (Just h) IllegalOperation "handle is closed")
 \end{code}
+
+A number of operations want to get at a readable or writeable handle, and fail
+if it isn't:
+
+\begin{code}
+wantReadableHandle :: Handle -> IO Handle__
+wantReadableHandle handle = do
+    htype <- readHandle handle
+    case htype of 
+      ErrorHandle ioError -> do
+	  writeHandle handle htype
+          fail ioError
+      ClosedHandle -> do
+	  writeHandle handle htype
+	  ioe_closedHandle handle
+      SemiClosedHandle _ _ -> do
+	  writeHandle handle htype
+	  ioe_closedHandle handle
+      AppendHandle _ _ _ -> do
+	  writeHandle handle htype
+	  fail (IOError (Just handle) IllegalOperation 
+		"handle is not open for reading")
+      WriteHandle _ _ _ -> do
+	  writeHandle handle htype
+	  fail (IOError (Just handle) IllegalOperation 	
+		"handle is not open for reading")
+      other -> return other
+
+wantWriteableHandle :: Handle 
+		    -> IO Handle__
+wantWriteableHandle handle = do
+    htype <- readHandle handle
+    case htype of 
+      ErrorHandle ioError -> do
+	  writeHandle handle htype
+          fail ioError
+      ClosedHandle -> do
+	  writeHandle handle htype
+	  ioe_closedHandle handle
+      SemiClosedHandle _ _ -> do
+	  writeHandle handle htype
+	  ioe_closedHandle handle
+      ReadHandle _ _ _ -> do
+	  writeHandle handle htype
+	  fail (IOError (Just handle) IllegalOperation "handle is not open for writing")
+      other -> return other
+
+\end{code}
