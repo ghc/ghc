@@ -10,6 +10,7 @@
 #define __HSBASE_H__
 
 #include "ghcconfig.h"
+#include "HsBaseConfig.h"
 #include "HsFFI.h"
 
 #include <stdio.h>
