@@ -270,7 +270,7 @@ rnBinds    :: RdrNameHsBinds -> RnM (RenamedHsBinds, DefUses)
 -- It's used only in 'mdo'
 rnBinds EmptyBinds	       = returnM (EmptyBinds, emptyDUs)
 rnBinds (MonoBind bind sigs _) = rnMonoBinds NotTopLevel bind sigs
-rnBinds b@(IPBinds bind _)     = addErr (badIpBinds b)	`thenM_` 
+rnBinds b@(IPBinds bind)       = addErr (badIpBinds b)	`thenM_` 
 			         returnM (EmptyBinds, emptyDUs)
 
 rnBindsAndThen	:: RdrNameHsBinds 
@@ -281,10 +281,9 @@ rnBindsAndThen	:: RdrNameHsBinds
 -- The parser doesn't produce ThenBinds
 rnBindsAndThen EmptyBinds	       thing_inside = thing_inside EmptyBinds
 rnBindsAndThen (MonoBind bind sigs _)  thing_inside = rnMonoBindsAndThen bind sigs thing_inside
-rnBindsAndThen (IPBinds binds is_with) thing_inside
-  = warnIf is_with withWarning			`thenM_`
-    rnIPBinds binds				`thenM` \ (binds',fv_binds) ->
-    thing_inside (IPBinds binds' is_with)	`thenM` \ (thing, fvs_thing) ->
+rnBindsAndThen (IPBinds binds) thing_inside
+  = rnIPBinds binds				`thenM` \ (binds',fv_binds) ->
+    thing_inside (IPBinds binds')		`thenM` \ (thing, fvs_thing) ->
     returnM (thing, fvs_thing `plusFV` fv_binds)
 \end{code}
 
@@ -302,7 +301,6 @@ rnIPBinds ((n, expr) : binds)
     rnExpr expr			`thenM` \ (expr',fvExpr) ->
     rnIPBinds binds		`thenM` \ (binds',fvBinds) ->
     returnM ((name, expr') : binds', fvExpr `plusFV` fvBinds)
-
 \end{code}
 
 

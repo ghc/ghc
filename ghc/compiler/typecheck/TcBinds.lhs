@@ -121,7 +121,7 @@ tc_binds_and_then top_lvl combiner (ThenBinds b1 b2) do_next
     tc_binds_and_then top_lvl combiner b2	$
     do_next
 
-tc_binds_and_then top_lvl combiner (IPBinds binds is_with) do_next
+tc_binds_and_then top_lvl combiner (IPBinds binds) do_next
   = getLIE do_next			`thenM` \ (result, expr_lie) ->
     mapAndUnzipM tc_ip_bind binds	`thenM` \ (avail_ips, binds') ->
 
@@ -129,7 +129,7 @@ tc_binds_and_then top_lvl combiner (IPBinds binds is_with) do_next
 	-- discharge any ?x constraints in expr_lie
     tcSimplifyIPs avail_ips expr_lie	`thenM` \ dict_binds ->
 
-    returnM (combiner (IPBinds binds' is_with) $
+    returnM (combiner (IPBinds binds') $
 	     combiner (mkMonoBind Recursive dict_binds) result)
   where
 	-- I wonder if we should do these one at at time

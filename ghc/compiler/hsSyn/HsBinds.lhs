@@ -58,8 +58,6 @@ data HsBinds id		-- binders and bindees
   | IPBinds			-- Implcit parameters
 				-- Not allowed at top level
 	[(IPName id, HsExpr id)]
-	Bool		-- True <=> this was a 'with' binding
-			--  (tmp, until 'with' is removed)
 \end{code}
 
 \begin{code}
@@ -68,7 +66,7 @@ nullBinds :: HsBinds id -> Bool
 nullBinds EmptyBinds		= True
 nullBinds (ThenBinds b1 b2)	= nullBinds b1 && nullBinds b2
 nullBinds (MonoBind b _ _)	= nullMonoBinds b
-nullBinds (IPBinds b _)   	= null b
+nullBinds (IPBinds b)   	= null b
 
 mkMonoBind :: RecFlag -> MonoBinds id -> HsBinds id
 mkMonoBind _      EmptyMonoBinds  = EmptyBinds
@@ -83,7 +81,7 @@ ppr_binds EmptyBinds = empty
 ppr_binds (ThenBinds binds1 binds2)
     = ppr_binds binds1 $$ ppr_binds binds2
 
-ppr_binds (IPBinds binds is_with)
+ppr_binds (IPBinds binds)
   = sep (punctuate semi (map pp_item binds))
   where
     pp_item (id,rhs) = pprBndr LetBind id <+> equals <+> pprExpr rhs

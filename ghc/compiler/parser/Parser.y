@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.124 2003/09/23 14:33:02 simonmar Exp $
+$Id: Parser.y,v 1.125 2003/09/24 13:04:51 simonmar Exp $
 
 Haskell grammar.
 
@@ -127,7 +127,6 @@ Conflicts: 29 shift/reduce, [SDM 19/9/2002]
  'safe'		{ T _ _ ITsafe }
  'threadsafe'	{ T _ _ ITthreadsafe }
  'unsafe'	{ T _ _ ITunsafe }
- 'with' 	{ T _ _ ITwith }
  'mdo'		{ T _ _ ITmdo }
  'stdcall'      { T _ _ ITstdcallconv }
  'ccall'        { T _ _ ITccallconv }
@@ -461,8 +460,8 @@ where 	:: { [RdrBinding] }	-- Reversed
 
 binds 	::  { RdrNameHsBinds }	-- May have implicit parameters
 	: decllist			{ cvBinds $1 }
-	| '{'            dbinds '}'	{ IPBinds $2 False{-not with-} }
-	|     vocurly    dbinds close	{ IPBinds $2 False{-not with-} }
+	| '{'            dbinds '}'	{ IPBinds $2 }
+	|     vocurly    dbinds close	{ IPBinds $2 }
 
 wherebinds :: { RdrNameHsBinds }	-- May have implicit parameters
 	: 'where' binds			{ $2 }
@@ -909,7 +908,6 @@ sigdecl :: { RdrBinding }
 
 exp   :: { RdrNameHsExpr }
 	: infixexp '::' sigtype		{ ExprWithTySig $1 $3 }
-	| infixexp 'with' dbinding	{ HsLet (IPBinds $3 True{-not a let-}) $1 }
 	| fexp srcloc '-<' exp		{ HsArrApp $1 $4 placeHolderType HsFirstOrderApp True $2 }
 	| fexp srcloc '>-' exp		{ HsArrApp $4 $1 placeHolderType HsFirstOrderApp False $2 }
 	| fexp srcloc '-<<' exp		{ HsArrApp $1 $4 placeHolderType HsHigherOrderApp True $2 }

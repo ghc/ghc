@@ -362,12 +362,12 @@ zonkBinds env (MonoBind bind sigs is_rec)
     )				`thenM` \ (env1, new_bind, _) ->
    returnM (env1, mkMonoBind is_rec new_bind)
 
-zonkBinds env (IPBinds binds is_with)
+zonkBinds env (IPBinds binds)
   = mappM zonk_ip_bind binds	`thenM` \ new_binds ->
     let
 	env1 = extendZonkEnv env (map (ipNameName . fst) new_binds)
     in
-    returnM (env1, IPBinds new_binds is_with)
+    returnM (env1, IPBinds new_binds)
   where
     zonk_ip_bind (n, e)
 	= mapIPNameTc (zonkIdBndr env) n	`thenM` \ n' ->

@@ -334,7 +334,6 @@ data Token__
   | ITsafe
   | ITthreadsafe
   | ITunsafe
-  | ITwith
   | ITstdcallconv
   | ITccallconv
   | ITdotnet
@@ -455,7 +454,6 @@ isSpecial ITdynamic   	= True
 isSpecial ITsafe    	= True
 isSpecial ITthreadsafe 	= True
 isSpecial ITunsafe    	= True
-isSpecial ITwith      	= True
 isSpecial ITccallconv   = True
 isSpecial ITstdcallconv = True
 isSpecial ITmdo		= True
@@ -513,8 +511,6 @@ reservedWordsFM = listToUFM $
 	( "stdcall",    ITstdcallconv,	 bit ffiBit),
 	( "ccall",      ITccallconv,	 bit ffiBit),
 	( "dotnet",     ITdotnet,	 bit ffiBit),
-
-	( "with",	ITwith,		 bit withBit),
 
 	( "rec",	ITrec,		 bit arrowsBit),
 	( "proc",	ITproc,		 bit arrowsBit)
@@ -1187,7 +1183,6 @@ glaExtsBit, ffiBit, parrBit :: Int
 glaExtsBit = 0
 ffiBit	   = 1
 parrBit	   = 2
-withBit	   = 3
 arrowsBit  = 4
 thBit	   = 5
 ipBit      = 6
@@ -1195,7 +1190,6 @@ ipBit      = 6
 glaExtsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
 glaExtsEnabled flags = testBit flags glaExtsBit
 ffiEnabled     flags = testBit flags ffiBit
-withEnabled    flags = testBit flags withBit
 parrEnabled    flags = testBit flags parrBit
 arrowsEnabled  flags = testBit flags arrowsBit
 thEnabled      flags = testBit flags thBit
@@ -1218,7 +1212,6 @@ mkPState buf loc flags  =
     where
       bitmap =     glaExtsBit `setBitIf` dopt Opt_GlasgowExts flags
 	       .|. ffiBit     `setBitIf` dopt Opt_FFI         flags
-	       .|. withBit    `setBitIf` dopt Opt_With	      flags
 	       .|. parrBit    `setBitIf` dopt Opt_PArr        flags
 	       .|. arrowsBit  `setBitIf` dopt Opt_Arrows      flags
 	       .|. thBit      `setBitIf` dopt Opt_TH          flags

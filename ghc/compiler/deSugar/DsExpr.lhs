@@ -93,7 +93,7 @@ dsLet (ThenBinds b1 b2) body
   = dsLet b2 body 	`thenDs` \ body' ->
     dsLet b1 body'
   
-dsLet (IPBinds binds is_with) body
+dsLet (IPBinds binds) body
   = foldlDs dsIPBind body binds
   where
     dsIPBind body (n, e)

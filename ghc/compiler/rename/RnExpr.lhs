@@ -717,8 +717,8 @@ rnNormalStmts ctxt (LetStmt binds : stmts)
   where
 	-- We do not allow implicit-parameter bindings in a parallel
 	-- list comprehension.  I'm not sure what it might mean.
-    ok (ParStmtCtxt _) (IPBinds _ _) = False	
-    ok _	       _	     = True
+    ok (ParStmtCtxt _) (IPBinds _) = False	
+    ok _	       _	   = True
 
 rnNormalStmts ctxt (ParStmt stmtss : stmts)
   = doptM Opt_GlasgowExts		`thenM` \ opt_GlasgowExts ->

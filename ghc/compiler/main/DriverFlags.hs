@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.125 2003/09/23 14:32:59 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.126 2003/09/24 13:04:50 simonmar Exp $
 --
 -- Driver flags
 --
@@ -452,7 +452,6 @@ fFlags = [
   ( "warn-deprecations",         	Opt_WarnDeprecations ),
   ( "fi",				Opt_FFI ),  -- support `-ffi'...
   ( "ffi",				Opt_FFI ),  -- ...and also `-fffi'
-  ( "with",				Opt_With ), -- with keyword
   ( "arrows",				Opt_Arrows ), -- arrow syntax
   ( "parr",				Opt_PArr ),
   ( "th",				Opt_TH ),

@@ -658,7 +658,7 @@ rep_binds' (MonoBind bs sigs _)
  = do { core1 <- rep_monobind' bs
       ;	core2 <- rep_sigs' sigs
       ;	return (core1 ++ core2) }
-rep_binds' (IPBinds _ _)
+rep_binds' (IPBinds _)
   = panic "DsMeta:repBinds: can't do implicit parameters"
 
 rep_monobind :: MonoBinds Name -> DsM [Core M.DecQ]
