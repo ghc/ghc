@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.82 2001/06/26 16:30:50 rrt Exp $
+-- $Id: DriverPipeline.hs,v 1.83 2001/06/27 10:35:48 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -385,6 +385,7 @@ run_phase MkDependHS basename suff input_fn _output_fn = do
    	   
    objs <- mapM odir_ify ofiles
    
+	-- Handle for file that accumulates dependencies 
    hdl <- readIORef v_Dep_tmp_hdl
 
 	-- std dependency of the object(s) on the source file
