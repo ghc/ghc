@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: system.c,v 1.8 2000/03/28 14:29:13 simonmar Exp $
+ * $Id: system.c,v 1.9 2000/07/17 15:27:15 rrt Exp $
  *
  * system Runtime Support
  */
@@ -44,16 +44,7 @@
 StgInt
 systemCmd(StgByteArray cmd)
 {
-#if defined(mingw32_TARGET_OS)
-  if (system(cmd) < 0) {
-     cvtErrno();
-     stdErrno();
-     return -1;
-  }
-  sleep(1);
-  return 0;
-#else
-#if defined(cygwin32_TARGET_OS)
+#if defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
    /* The implementation of std. fork() has its problems
       under cygwin32-b18, so we fall back on using libc's
       system() instead. (It in turn has problems, as it
@@ -119,6 +110,5 @@ systemCmd(StgByteArray cmd)
 	ghc_errstr = "internal error (process neither exited nor signalled)";
     }
     return -1;
-#endif
 #endif
 }
