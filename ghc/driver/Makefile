@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.63 2001/04/12 15:17:17 michaelw Exp $
+# $Id: Makefile,v 1.64 2001/06/12 17:07:23 simonmar Exp $
 #
 
 TOP=..
@@ -20,12 +20,10 @@ PKGCONF_OPTS = "$(TARGETPLATFORM)"		\
 	       "$(CURRENT_DIR)"			\
 	       "$(HaveLibGmp)"			\
 	       "$(LibsReadline)"		\
-	       "$(libdir)"			\
 	       "$(GHC_LIB_DIR)"			\
 	       "$(GHC_RUNTIME_DIR)"		\
 	       "$(GHC_UTILS_DIR)"		\
-	       "$(GHC_INCLUDE_DIR)"		\
-	       "$(FPTOOLS_TOP_ABS)"
+	       "$(GHC_INCLUDE_DIR)"
 
 ghc_407_at_least = $(shell expr "$(GhcVersion)" \>= 4.07)
 ifeq "$(ghc_407_at_least)" "1"
