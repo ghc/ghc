@@ -203,9 +203,24 @@ rawSystem cmd args = do
 
 translate :: String -> String
 translate str@('"':_) = str -- already escaped.
-translate str = '"' : foldr escape "\"" str
-  where escape '"'  str = '\\' : '"'  : str
-	escape c    str = c : str
+	-- ToDo: this case is wrong.  It is only here because we
+	-- abuse the system in GHC's SysTools by putting arguments into
+	-- the command name; at some point we should fix it up and remove
+	-- the case above.
+translate str = '"' : snd (foldr escape (True,"\"") str)
+  where escape '"'  (b,     str) = (True,  '\\' : '"'  : str)
+        escape '\\' (True,  str) = (True,  '\\' : '\\' : str)
+        escape '\\' (False, str) = (False, '\\' : str)
+	escape c    (b,     str) = (False, c : str)
+	-- This function attempts to invert the Microsoft C runtime's
+	-- quoting rules, which can be found here:
+	--     http://msdn.microsoft.com/library/default.asp?url=/library/en-us/vccelng/htm/progs_12.asp
+	-- (if this URL stops working, you might be able to find it by
+	-- searching for "Parsing C Command-Line Arguments" on MSDN).
+	--
+	-- The Bool passed back along the string is True iff the
+	-- rest of the string is a sequence of backslashes followed by
+	-- a double quote.
 
 foreign import ccall unsafe "rawSystem"
   c_rawSystem :: CString -> IO Int
