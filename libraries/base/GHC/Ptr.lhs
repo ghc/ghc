@@ -56,7 +56,7 @@ alignPtr addr@(Ptr a) (I# i)
 -- |Computes the offset required to get from the first to the second
 -- argument.  We have 
 --
--- > p2 == p1 \`'plusPtr'\` (p2 \`'minusPtr'\` p1)
+-- > p2 == p1 `plusPtr` (p2 `minusPtr` p1)
 minusPtr :: Ptr a -> Ptr b -> Int
 minusPtr (Ptr a1) (Ptr a2) = I# (minusAddr# a1 a2)
 
@@ -73,8 +73,8 @@ data FunPtr a = FunPtr Addr# deriving (Eq, Ord)
 -- dynamic@ should normally be declared to produce a
 -- 'FunPtr' of the correct type.  For example:
 --
--- > type Compare = 'Int' -> 'Int' -> 'Bool'
--- > foreign export dynamic mkCompare :: Compare -> 'IO' ('FunPtr' Compare)
+-- > type Compare = Int -> Int -> Bool
+-- > foreign export dynamic mkCompare :: Compare -> IO (FunPtr Compare)
 
 -- |The constant 'nullFunPtr' contains a
 -- distinguished value of 'Ptr' that is not
