@@ -10,7 +10,7 @@ module RnHsSyn where
 
 import HsSyn
 import HsCore
-import Class		( FunDep )
+import Class		( FunDep, DefMeth(..) )
 import TysWiredIn	( tupleTyCon, listTyCon, charTyCon )
 import Name		( Name, getName, isTyVarName )
 import NameSet
@@ -132,11 +132,22 @@ tyClDeclFVs (TyData {tcdCtxt = context, tcdTyVars = tyvars, tcdCons = condecls, 
 tyClDeclFVs (TySynonym {tcdTyVars = tyvars, tcdSynRhs = ty})
   = delFVs (map hsTyVarName tyvars) (extractHsTyNames ty)
 
-tyClDeclFVs (ClassDecl {tcdCtxt = context, tcdTyVars = tyvars, tcdFDs = fds, tcdSigs = sigs})
+tyClDeclFVs (ClassDecl {tcdCtxt = context, tcdTyVars = tyvars, tcdFDs = fds, 
+			tcdSigs = sigs, tcdMeths = maybe_meths})
   = delFVs (map hsTyVarName tyvars) $
     extractHsCtxtTyNames context	  `plusFV`
     plusFVs (map extractFunDepNames fds)  `plusFV`
-    hsSigsFVs sigs
+    hsSigsFVs sigs			  `plusFV`
+    dm_fvs
+  where
+    dm_fvs = case maybe_meths of
+		Nothing -> mkFVs [v | ClassOpSig _ (DefMeth v) _ _ <- sigs]
+		  -- No method bindings, so this class decl comes from an interface file, 
+		  -- So we want to treat the default-method names as free (they should
+		  -- be defined somewhere else).  [In source code this is not so; the class
+		  -- decl will bind whatever default-methods are necessary.]
+		Just _ -> emptyFVs	-- Source code, so the default methods
+					-- are *bound* not *free*
 
 ----------------
 hsSigsFVs sigs = plusFVs (map hsSigFVs sigs)
