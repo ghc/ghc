@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.121 2003/07/16 08:49:05 ross Exp $
+$Id: Parser.y,v 1.122 2003/09/08 11:52:25 simonmar Exp $
 
 Haskell grammar.
 
@@ -18,11 +18,12 @@ import HsTypes		( mkHsTupCon )
 
 import RdrHsSyn
 import HscTypes		( ParsedIface(..), IsBootInterface, noDependencies )
-import Lex
+import Lexer
 import RdrName
 import PrelNames	( mAIN_Name, funTyConName, listTyConName, 
 			  parrTyConName, consDataConName )
-import TysWiredIn	( unitTyCon, unitDataCon, tupleTyCon, tupleCon, nilDataCon )
+import TysWiredIn	( unitTyCon, unitDataCon, tupleTyCon, 
+			  tupleCon, nilDataCon )
 import ForeignCall	( Safety(..), CExportSpec(..), 
 			  CCallConv(..), CCallTarget(..), defaultCCallConv,
 			)
@@ -33,9 +34,9 @@ import SrcLoc		( SrcLoc )
 import Module
 import CmdLineOpts	( opt_SccProfilingOn, opt_InPackage )
 import Type		( Kind, mkArrowKind, liftedTypeKind )
-import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
-			  NewOrData(..), StrictnessMark(..), Activation(..),
-			  FixitySig(..) )
+import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), 
+			  IPName(..), NewOrData(..), StrictnessMark(..),
+			  Activation(..), FixitySig(..) )
 import Panic
 
 import GLAEXTS
@@ -43,6 +44,7 @@ import CStrings		( CLabelString )
 import FastString
 import Maybes		( orElse )
 import Outputable
+import Char		( ord )
 
 }
 
@@ -90,170 +92,141 @@ Conflicts: 29 shift/reduce, [SDM 19/9/2002]
 -}
 
 %token
- '_'            { ITunderscore }		-- Haskell keywords
- 'as' 		{ ITas }
- 'case' 	{ ITcase }  	
- 'class' 	{ ITclass } 
- 'data' 	{ ITdata } 
- 'default' 	{ ITdefault }
- 'deriving' 	{ ITderiving }
- 'do' 		{ ITdo }
- 'else' 	{ ITelse }
- 'hiding' 	{ IThiding }
- 'if' 		{ ITif }
- 'import' 	{ ITimport }
- 'in' 		{ ITin }
- 'infix' 	{ ITinfix }
- 'infixl' 	{ ITinfixl }
- 'infixr' 	{ ITinfixr }
- 'instance' 	{ ITinstance }
- 'let' 		{ ITlet }
- 'module' 	{ ITmodule }
- 'newtype' 	{ ITnewtype }
- 'of' 		{ ITof }
- 'qualified' 	{ ITqualified }
- 'then' 	{ ITthen }
- 'type' 	{ ITtype }
- 'where' 	{ ITwhere }
- '_scc_'	{ ITscc }	      -- ToDo: remove
+ '_'            { T _ _ ITunderscore }		-- Haskell keywords
+ 'as' 		{ T _ _ ITas }
+ 'case' 	{ T _ _ ITcase }  	
+ 'class' 	{ T _ _ ITclass } 
+ 'data' 	{ T _ _ ITdata } 
+ 'default' 	{ T _ _ ITdefault }
+ 'deriving' 	{ T _ _ ITderiving }
+ 'do' 		{ T _ _ ITdo }
+ 'else' 	{ T _ _ ITelse }
+ 'hiding' 	{ T _ _ IThiding }
+ 'if' 		{ T _ _ ITif }
+ 'import' 	{ T _ _ ITimport }
+ 'in' 		{ T _ _ ITin }
+ 'infix' 	{ T _ _ ITinfix }
+ 'infixl' 	{ T _ _ ITinfixl }
+ 'infixr' 	{ T _ _ ITinfixr }
+ 'instance' 	{ T _ _ ITinstance }
+ 'let' 		{ T _ _ ITlet }
+ 'module' 	{ T _ _ ITmodule }
+ 'newtype' 	{ T _ _ ITnewtype }
+ 'of' 		{ T _ _ ITof }
+ 'qualified' 	{ T _ _ ITqualified }
+ 'then' 	{ T _ _ ITthen }
+ 'type' 	{ T _ _ ITtype }
+ 'where' 	{ T _ _ ITwhere }
+ '_scc_'	{ T _ _ ITscc }	      -- ToDo: remove
 
- 'forall'	{ ITforall }			-- GHC extension keywords
- 'foreign'	{ ITforeign }
- 'export'	{ ITexport }
- 'label'	{ ITlabel } 
- 'dynamic'	{ ITdynamic }
- 'safe'		{ ITsafe }
- 'threadsafe'	{ ITthreadsafe }
- 'unsafe'	{ ITunsafe }
- 'with' 	{ ITwith }
- 'mdo'		{ ITmdo }
- 'stdcall'      { ITstdcallconv }
- 'ccall'        { ITccallconv }
- 'dotnet'       { ITdotnet }
- 'proc'		{ ITproc }		-- for arrow notation extension
- 'rec'		{ ITrec }		-- for arrow notation extension
- '_ccall_'	{ ITccall (False, False, PlayRisky) }
- '_ccall_GC_'	{ ITccall (False, False, PlaySafe False) }
- '_casm_'	{ ITccall (False, True,  PlayRisky) }
- '_casm_GC_'	{ ITccall (False, True,  PlaySafe False) }
+ 'forall'	{ T _ _ ITforall }			-- GHC extension keywords
+ 'foreign'	{ T _ _ ITforeign }
+ 'export'	{ T _ _ ITexport }
+ 'label'	{ T _ _ ITlabel } 
+ 'dynamic'	{ T _ _ ITdynamic }
+ 'safe'		{ T _ _ ITsafe }
+ 'threadsafe'	{ T _ _ ITthreadsafe }
+ 'unsafe'	{ T _ _ ITunsafe }
+ 'with' 	{ T _ _ ITwith }
+ 'mdo'		{ T _ _ ITmdo }
+ 'stdcall'      { T _ _ ITstdcallconv }
+ 'ccall'        { T _ _ ITccallconv }
+ 'dotnet'       { T _ _ ITdotnet }
+ 'proc'		{ T _ _ ITproc }		-- for arrow notation extension
+ 'rec'		{ T _ _ ITrec }		-- for arrow notation extension
+ '_ccall_'	{ T _ _ (ITccall (False, False, PlayRisky)) }
+ '_ccall_GC_'	{ T _ _ (ITccall (False, False, PlaySafe False)) }
+ '_casm_'	{ T _ _ (ITccall (False, True,  PlayRisky)) }
+ '_casm_GC_'	{ T _ _ (ITccall (False, True,  PlaySafe False)) }
 
- '{-# SPECIALISE'  { ITspecialise_prag }
- '{-# SOURCE'	   { ITsource_prag }
- '{-# INLINE'      { ITinline_prag }
- '{-# NOINLINE'    { ITnoinline_prag }
- '{-# RULES'	   { ITrules_prag }
- '{-# CORE'        { ITcore_prag }              -- hdaume: annotated core
- '{-# SCC'	   { ITscc_prag }
- '{-# DEPRECATED'  { ITdeprecated_prag }
- '#-}'		   { ITclose_prag }
+ '{-# SPECIALISE'  { T _ _ ITspecialise_prag }
+ '{-# SOURCE'	   { T _ _ ITsource_prag }
+ '{-# INLINE'      { T _ _ ITinline_prag }
+ '{-# NOINLINE'    { T _ _ ITnoinline_prag }
+ '{-# RULES'	   { T _ _ ITrules_prag }
+ '{-# CORE'        { T _ _ ITcore_prag }              -- hdaume: annotated core
+ '{-# SCC'	   { T _ _ ITscc_prag }
+ '{-# DEPRECATED'  { T _ _ ITdeprecated_prag }
+ '#-}'		   { T _ _ ITclose_prag }
 
-{-
- '__interface'	{ ITinterface }			-- interface keywords
- '__export'	{ IT__export }
- '__instimport'	{ ITinstimport }
- '__forall'	{ IT__forall }
- '__letrec'	{ ITletrec }
- '__coerce'	{ ITcoerce }
- '__depends'	{ ITdepends }
- '__inline'	{ ITinline }
- '__DEFAULT'	{ ITdefaultbranch }
- '__bot'	{ ITbottom }
- '__integer'	{ ITinteger_lit }
- '__float'	{ ITfloat_lit }
- '__rational'	{ ITrational_lit }
- '__addr'	{ ITaddr_lit }
- '__label'	{ ITlabel_lit }
- '__litlit'	{ ITlit_lit }
- '__string'	{ ITstring_lit }
- '__ccall'	{ ITccall $$ }
- '__scc' 	{ IT__scc }
- '__sccC'       { ITsccAllCafs }
+ '..'		{ T _ _ ITdotdot }  			-- reserved symbols
+ ':'		{ T _ _ ITcolon }
+ '::'		{ T _ _ ITdcolon }
+ '='		{ T _ _ ITequal }
+ '\\'		{ T _ _ ITlam }
+ '|'		{ T _ _ ITvbar }
+ '<-'		{ T _ _ ITlarrow }
+ '->'		{ T _ _ ITrarrow }
+ '@'		{ T _ _ ITat }
+ '~'		{ T _ _ ITtilde }
+ '=>'		{ T _ _ ITdarrow }
+ '-'		{ T _ _ ITminus }
+ '!'		{ T _ _ ITbang }
+ '*'		{ T _ _ ITstar }
+ '-<'		{ T _ _ ITlarrowtail }		-- for arrow notation
+ '>-'		{ T _ _ ITrarrowtail }		-- for arrow notation
+ '-<<'		{ T _ _ ITLarrowtail }		-- for arrow notation
+ '>>-'		{ T _ _ ITRarrowtail }		-- for arrow notation
+ '.'		{ T _ _ ITdot }
 
- '__A'		{ ITarity }
- '__P'		{ ITspecialise }
- '__C'		{ ITnocaf }
- '__U'		{ ITunfold }
- '__S'		{ ITstrict $$ }
- '__M'		{ ITcprinfo $$ }
--}
+ '{'		{ T _ _ ITocurly } 			-- special symbols
+ '}'		{ T _ _ ITccurly }
+ '{|'           { T _ _ ITocurlybar }
+ '|}'           { T _ _ ITccurlybar }
+ vocurly	{ T _ _ ITvocurly } -- virtual open curly (from layout)
+ vccurly	{ T _ _ ITvccurly } -- virtual close curly (from layout)
+ '['		{ T _ _ ITobrack }
+ ']'		{ T _ _ ITcbrack }
+ '[:'		{ T _ _ ITopabrack }
+ ':]'		{ T _ _ ITcpabrack }
+ '('		{ T _ _ IToparen }
+ ')'		{ T _ _ ITcparen }
+ '(#'		{ T _ _ IToubxparen }
+ '#)'		{ T _ _ ITcubxparen }
+ '(|'		{ T _ _ IToparenbar }
+ '|)'		{ T _ _ ITcparenbar }
+ ';'		{ T _ _ ITsemi }
+ ','		{ T _ _ ITcomma }
+ '`'		{ T _ _ ITbackquote }
 
- '..'		{ ITdotdot }  			-- reserved symbols
- ':'		{ ITcolon }
- '::'		{ ITdcolon }
- '='		{ ITequal }
- '\\'		{ ITlam }
- '|'		{ ITvbar }
- '<-'		{ ITlarrow }
- '->'		{ ITrarrow }
- '@'		{ ITat }
- '~'		{ ITtilde }
- '=>'		{ ITdarrow }
- '-'		{ ITminus }
- '!'		{ ITbang }
- '*'		{ ITstar }
- '-<'		{ ITlarrowtail }		-- for arrow notation
- '>-'		{ ITrarrowtail }		-- for arrow notation
- '-<<'		{ ITLarrowtail }		-- for arrow notation
- '>>-'		{ ITRarrowtail }		-- for arrow notation
- '.'		{ ITdot }
+ VARID   	{ T _ _ (ITvarid    $$) }		-- identifiers
+ CONID   	{ T _ _ (ITconid    $$) }
+ VARSYM  	{ T _ _ (ITvarsym   $$) }
+ CONSYM  	{ T _ _ (ITconsym   $$) }
+ QVARID  	{ T _ _ (ITqvarid   $$) }
+ QCONID  	{ T _ _ (ITqconid   $$) }
+ QVARSYM 	{ T _ _ (ITqvarsym  $$) }
+ QCONSYM 	{ T _ _ (ITqconsym  $$) }
 
- '{'		{ ITocurly } 			-- special symbols
- '}'		{ ITccurly }
- '{|'           { ITocurlybar }
- '|}'           { ITccurlybar }
- vccurly	{ ITvccurly } -- virtual close curly (from layout)
- '['		{ ITobrack }
- ']'		{ ITcbrack }
- '[:'		{ ITopabrack }
- ':]'		{ ITcpabrack }
- '('		{ IToparen }
- ')'		{ ITcparen }
- '(#'		{ IToubxparen }
- '#)'		{ ITcubxparen }
- '(|'		{ IToparenbar }
- '|)'		{ ITcparenbar }
- ';'		{ ITsemi }
- ','		{ ITcomma }
- '`'		{ ITbackquote }
+ IPDUPVARID   	{ T _ _ (ITdupipvarid   $$) }		-- GHC extension
+ IPSPLITVARID  	{ T _ _ (ITsplitipvarid $$) }		-- GHC extension
 
- VARID   	{ ITvarid    $$ }		-- identifiers
- CONID   	{ ITconid    $$ }
- VARSYM  	{ ITvarsym   $$ }
- CONSYM  	{ ITconsym   $$ }
- QVARID  	{ ITqvarid   $$ }
- QCONID  	{ ITqconid   $$ }
- QVARSYM 	{ ITqvarsym  $$ }
- QCONSYM 	{ ITqconsym  $$ }
+ CHAR		{ T _ _ (ITchar     $$) }
+ STRING		{ T _ _ (ITstring   $$) }
+ INTEGER	{ T _ _ (ITinteger  $$) }
+ RATIONAL	{ T _ _ (ITrational $$) }
 
- IPDUPVARID   	{ ITdupipvarid   $$ }		-- GHC extension
- IPSPLITVARID  	{ ITsplitipvarid $$ }		-- GHC extension
-
- CHAR		{ ITchar     $$ }
- STRING		{ ITstring   $$ }
- INTEGER	{ ITinteger  $$ }
- RATIONAL	{ ITrational $$ }
-
- PRIMCHAR	{ ITprimchar   $$ }
- PRIMSTRING	{ ITprimstring $$ }
- PRIMINTEGER	{ ITprimint    $$ }
- PRIMFLOAT	{ ITprimfloat  $$ }
- PRIMDOUBLE	{ ITprimdouble $$ }
- CLITLIT	{ ITlitlit     $$ }
+ PRIMCHAR	{ T _ _ (ITprimchar   $$) }
+ PRIMSTRING	{ T _ _ (ITprimstring $$) }
+ PRIMINTEGER	{ T _ _ (ITprimint    $$) }
+ PRIMFLOAT	{ T _ _ (ITprimfloat  $$) }
+ PRIMDOUBLE	{ T _ _ (ITprimdouble $$) }
+ CLITLIT	{ T _ _ (ITlitlit     $$) }
  
 -- Template Haskell
-'[|'            { ITopenExpQuote  }       
-'[p|'           { ITopenPatQuote  }      
-'[t|'           { ITopenTypQuote  }      
-'[d|'           { ITopenDecQuote  }      
-'|]'            { ITcloseQuote    }
-ID_SPLICE       { ITidEscape $$   }     -- $x
-'$('	        { ITparenEscape   }     -- $( exp )
-REIFY_TYPE	{ ITreifyType }	
-REIFY_DECL	{ ITreifyDecl }	
-REIFY_FIXITY	{ ITreifyFixity }
+'[|'            { T _ _ ITopenExpQuote  }       
+'[p|'           { T _ _ ITopenPatQuote  }      
+'[t|'           { T _ _ ITopenTypQuote  }      
+'[d|'           { T _ _ ITopenDecQuote  }      
+'|]'            { T _ _ ITcloseQuote    }
+ID_SPLICE       { T _ _ (ITidEscape $$) }     -- $x
+'$('	        { T _ _ ITparenEscape   }     -- $( exp )
+REIFY_TYPE	{ T _ _ ITreifyType }	
+REIFY_DECL	{ T _ _ ITreifyDecl }	
+REIFY_FIXITY	{ T _ _ ITreifyFixity }
 
-%monad { P } { thenP } { returnP }
-%lexer { lexer } { ITeof }
+%monad { P } { >>= } { return }
+%lexer { lexer } { T _ _ ITeof }
 %name parseModule module
 %name parseStmt   maybe_stmt
 %name parseIdentifier  identifier
@@ -274,8 +247,11 @@ REIFY_FIXITY	{ ITreifyFixity }
 module 	:: { RdrNameHsModule }
  	: srcloc 'module' modid maybemoddeprec maybeexports 'where' body 
 		{ HsModule (Just (mkHomeModule $3)) $5 (fst $7) (snd $7) $4 $1 }
-	| srcloc body
-		{ HsModule Nothing Nothing (fst $2) (snd $2) Nothing $1 }
+	| srcloc missing_module_keyword top close
+		{ HsModule Nothing Nothing (fst $3) (snd $3) Nothing $1 }
+
+missing_module_keyword :: { () }
+	: {- empty -}				{% pushCurrentContext }
 
 maybemoddeprec :: { Maybe DeprecTxt }
 	: '{-# DEPRECATED' STRING '#-}' 	{ Just $2 }
@@ -283,7 +259,7 @@ maybemoddeprec :: { Maybe DeprecTxt }
 
 body 	:: { ([RdrNameImportDecl], [RdrNameHsDecl]) }
 	:  '{'            top '}'		{ $2 }
- 	|      layout_on  top close		{ $2 }
+ 	|      vocurly    top close		{ $2 }
 
 top 	:: { ([RdrNameImportDecl], [RdrNameHsDecl]) }
 	: importdecls				{ (reverse $1,[]) }
@@ -316,7 +292,7 @@ iface   :: { ParsedIface }
 
 ifacebody :: { [RdrNameTyClDecl] }
 	:  '{'            ifacedecls '}'		{ $2 }
- 	|      layout_on  ifacedecls close		{ $2 }
+ 	|      vocurly    ifacedecls close		{ $2 }
 
 ifacedecls :: { [RdrNameTyClDecl] }
 	: ifacedecl ';' ifacedecls	{ $1 : $3 }
@@ -464,10 +440,10 @@ syn_hdr :: { (RdrName, [RdrNameHsTyVar]) }	-- We don't retain the syntax of an i
 --	(Eq a, Ord b) => T a b
 -- Rather a lot of inlining here, else we get reduce/reduce errors
 tycl_hdr :: { (RdrNameContext, RdrName, [RdrNameHsTyVar]) }
-	: context '=>' type		{% checkTyClHdr $3	`thenP` \ (tc,tvs) ->
-					   returnP ($1, tc, tvs) }
-	| type				{% checkTyClHdr $1	`thenP` \ (tc,tvs) ->
-					   returnP ([], tc, tvs) }
+	: context '=>' type		{% checkTyClHdr $3	>>= \ (tc,tvs) ->
+					   return ($1, tc, tvs) }
+	| type				{% checkTyClHdr $1	>>= \ (tc,tvs) ->
+					   return ([], tc, tvs) }
 
 -----------------------------------------------------------------------------
 -- Nested declarations
@@ -481,7 +457,7 @@ decls 	:: { [RdrBinding] }	-- Reversed
 
 decllist :: { [RdrBinding] }	-- Reversed
 	: '{'            decls '}'	{ $2 }
-	|     layout_on  decls close	{ $2 }
+	|     vocurly    decls close	{ $2 }
 
 where 	:: { [RdrBinding] }	-- Reversed
 				-- No implicit parameters
@@ -491,7 +467,7 @@ where 	:: { [RdrBinding] }	-- Reversed
 binds 	::  { RdrNameHsBinds }	-- May have implicit parameters
 	: decllist			{ cvBinds $1 }
 	| '{'            dbinds '}'	{ IPBinds $2 False{-not with-} }
-	|     layout_on  dbinds close	{ IPBinds $2 False{-not with-} }
+	|     vocurly    dbinds close	{ IPBinds $2 False{-not with-} }
 
 wherebinds :: { RdrNameHsBinds }	-- May have implicit parameters
 	: 'where' binds			{ $2 }
@@ -599,7 +575,7 @@ fdecl1DEPRECATED
   | 'import' callconv STRING STRING safety varid_no_unsafe '::' sigtype
     {% case $2 of
          DNCall      -> parseError "Illegal format of .NET foreign import"
-	 CCall cconv -> returnP $
+	 CCall cconv -> return $
            let
 	     imp = CFunction (StaticTarget $4)
 	   in
@@ -609,7 +585,7 @@ fdecl1DEPRECATED
   | 'import' callconv STRING 'unsafe' varid_no_unsafe '::' sigtype
     {% case $2 of
          DNCall      -> parseError "Illegal format of .NET foreign import"
-	 CCall cconv -> returnP $
+	 CCall cconv -> return $
            let
 	     imp = CFunction (StaticTarget $3)
 	   in
@@ -625,7 +601,7 @@ fdecl1DEPRECATED
   | 'import' callconv 'dynamic' safety varid_no_unsafe '::' sigtype
     {% case $2 of
          DNCall      -> parseError "Illegal format of .NET foreign import"
-	 CCall cconv -> returnP $
+	 CCall cconv -> return $
 	   ForeignImport $5 $7 (CImport cconv $4 nilFS nilFS 
 					(CFunction DynamicTarget)) }
 
@@ -640,7 +616,7 @@ fdecl1DEPRECATED
   | 'export' callconv STRING STRING varid '::' sigtype
     {% case $2 of
          DNCall      -> parseError "Illegal format of .NET foreign import"
-	 CCall cconv -> returnP $
+	 CCall cconv -> return $
            ForeignExport $5 $7 
 			 (CExport (CExportStatic $4 cconv)) }
 
@@ -654,7 +630,7 @@ fdecl1DEPRECATED
   | 'export' callconv 'dynamic' varid '::' sigtype
     {% case $2 of
          DNCall      -> parseError "Illegal format of .NET foreign import"
-	 CCall cconv -> returnP $
+	 CCall cconv -> return $
 	   ForeignImport $4 $6 (CImport cconv (PlaySafe False) nilFS nilFS CWrapper) }
 
   ----------- DEPRECATED .NET decls ------------
@@ -948,18 +924,18 @@ infixexp :: { RdrNameHsExpr }
 
 exp10 :: { RdrNameHsExpr }
 	: '\\' srcloc aexp aexps opt_asig '->' srcloc exp	
-			{% checkPatterns $2 ($3 : reverse $4) `thenP` \ ps -> 
-			   returnP (HsLam (Match ps $5 
+			{% checkPatterns $2 ($3 : reverse $4) >>= \ ps -> 
+			   return (HsLam (Match ps $5 
 					    (GRHSs (unguardedRHS $8 $7) 
 						   EmptyBinds placeHolderType))) }
   	| 'let' binds 'in' exp			{ HsLet $2 $4 }
 	| 'if' srcloc exp 'then' exp 'else' exp { HsIf $3 $5 $7 $2 }
    	| 'case' srcloc exp 'of' altslist	{ HsCase $3 $5 $2 }
 	| '-' fexp				{ mkHsNegApp $2 }
-  	| srcloc 'do' stmtlist			{% checkDo $3  `thenP` \ stmts ->
-						   returnP (mkHsDo DoExpr stmts $1) }
-  	| srcloc 'mdo' stmtlist			{% checkMDo $3  `thenP` \ stmts ->
-						   returnP (mkHsDo MDoExpr stmts $1) }
+  	| srcloc 'do' stmtlist			{% checkDo $3  >>= \ stmts ->
+						   return (mkHsDo DoExpr stmts $1) }
+  	| srcloc 'mdo' stmtlist			{% checkMDo $3  >>= \ stmts ->
+						   return (mkHsDo MDoExpr stmts $1) }
 
 	| '_ccall_'    ccallid aexps0		{ HsCCall $2 $3 PlayRisky False placeHolderType }
 	| '_ccall_GC_' ccallid aexps0		{ HsCCall $2 $3 (PlaySafe False) False placeHolderType }
@@ -971,8 +947,8 @@ exp10 :: { RdrNameHsExpr }
 							else HsPar $2 }
 
 	| 'proc' srcloc aexp '->' srcloc exp	
-			{% checkPattern $2 $3 `thenP` \ p -> 
-			   returnP (HsProc p (HsCmdTop $6 [] placeHolderType undefined) $5) }
+			{% checkPattern $2 $3 >>= \ p -> 
+			   return (HsProc p (HsCmdTop $6 [] placeHolderType undefined) $5) }
 
         | '{-# CORE' STRING '#-}' exp           { HsCoreAnn $2 $4 }    -- hdaume: core annotation
 
@@ -1022,8 +998,8 @@ aexp2	:: { RdrNameHsExpr }
 	: ipvar				{ HsIPVar $1 }
 	| qcname			{ HsVar $1 }
 	| literal			{ HsLit $1 }
-	| INTEGER			{ HsOverLit (mkHsIntegral   $1) }
-	| RATIONAL			{ HsOverLit (mkHsFractional $1) }
+	| INTEGER			{ HsOverLit $! mkHsIntegral $1 }
+	| RATIONAL			{ HsOverLit $! mkHsFractional $1 }
 	| '(' exp ')'			{ HsPar $2 }
 	| '(' exp ',' texps ')'		{ ExplicitTuple ($2 : reverse $4) Boxed}
 	| '(#' texps '#)'		{ ExplicitTuple (reverse $2)      Unboxed }
@@ -1038,8 +1014,8 @@ aexp2	:: { RdrNameHsExpr }
 	| srcloc '$(' exp ')'   	{ mkHsSplice $3 $1 }                             -- $( exp )
 	| srcloc '[|' exp '|]'          { HsBracket (ExpBr $3) $1 }                       
 	| srcloc '[t|' ctype '|]'       { HsBracket (TypBr $3) $1 }                       
-	| srcloc '[p|' infixexp '|]'    {% checkPattern $1 $3 `thenP` \p ->
-					   returnP (HsBracket (PatBr p) $1) }
+	| srcloc '[p|' infixexp '|]'    {% checkPattern $1 $3 >>= \p ->
+					   return (HsBracket (PatBr p) $1) }
 	| srcloc '[d|' cvtopbody '|]'	{ HsBracket (DecBr (mkGroup $3)) $1 }
 
 	-- arrow notation extension
@@ -1055,7 +1031,7 @@ acmd	:: { RdrNameHsCmdTop }
 
 cvtopbody :: { [RdrNameHsDecl] }
 	:  '{'            cvtopdecls '}'		{ $2 }
-	|      layout_on  cvtopdecls close		{ $2 }
+	|      vocurly    cvtopdecls close		{ $2 }
 
 texps :: { [RdrNameHsExpr] }
 	: texps ',' exp			{ $3 : $1 }
@@ -1131,7 +1107,7 @@ parr :: { RdrNameHsExpr }
 
 altslist :: { [RdrNameMatch] }
 	: '{'            alts '}'	{ reverse $2 }
-	|     layout_on  alts  close	{ reverse $2 }
+	|     vocurly    alts  close	{ reverse $2 }
 
 alts    :: { [RdrNameMatch] }
         : alts1				{ $1 }
@@ -1144,8 +1120,8 @@ alts1 	:: { [RdrNameMatch] }
 
 alt 	:: { RdrNameMatch }
 	: srcloc infixexp opt_sig ralt wherebinds
-					{% (checkPattern $1 $2 `thenP` \p ->
-				   	   returnP (Match [p] $3
+					{% (checkPattern $1 $2 >>= \p ->
+				   	   return (Match [p] $3
 					             (GRHSs $4 $5 placeHolderType))  )}
 
 ralt :: { [RdrNameGRHS] }
@@ -1163,8 +1139,8 @@ gdpat	:: { RdrNameGRHS }
 -- Statement sequences
 
 stmtlist :: { [RdrNameStmt] }
-	: '{'            	stmts '}'	{ $2 }
-	|     layout_on_for_do  stmts close	{ $2 }
+	: '{'         	stmts '}'	{ $2 }
+	|     vocurly   stmts close	{ $2 }
 
 --	do { ;; s ; s ; ; s ;; }
 -- The last Stmt should be a ResultStmt, but that's hard to enforce
@@ -1188,13 +1164,13 @@ maybe_stmt :: { Maybe RdrNameStmt }
 
 stmt  :: { RdrNameStmt }
 	: qual				{ $1 }
-	| srcloc infixexp '->' exp	{% checkPattern $1 $4 `thenP` \p ->
-					   returnP (BindStmt p $2 $1) }
+	| srcloc infixexp '->' exp	{% checkPattern $1 $4 >>= \p ->
+					   return (BindStmt p $2 $1) }
   	| srcloc 'rec' stmtlist		{ RecStmt $3 undefined undefined undefined }
 
 qual  :: { RdrNameStmt }
-	: srcloc infixexp '<-' exp	{% checkPattern $1 $2 `thenP` \p ->
-					   returnP (BindStmt p $4 $1) }
+	: srcloc infixexp '<-' exp	{% checkPattern $1 $2 >>= \p ->
+					   return (BindStmt p $4 $1) }
 	| srcloc exp			{ ExprStmt $2 placeHolderType $1 }
   	| srcloc 'let' binds		{ LetStmt $3 }
 
@@ -1215,7 +1191,7 @@ fbind	:: { (RdrName, RdrNameHsExpr) }
 
 dbinding :: { [(IPName RdrName, RdrNameHsExpr)] }
 	: '{' dbinds '}'		{ $2 }
-	| layout_on dbinds close	{ $2 }
+	| vocurly dbinds close		{ $2 }
 
 dbinds 	:: { [(IPName RdrName, RdrNameHsExpr)] }
 	: dbinds ';' dbind		{ $3 : $1 }
@@ -1438,26 +1414,23 @@ consym :: { RdrName }
 -- Literals
 
 literal :: { HsLit }
-	: CHAR 			{ HsChar       $1 }
+	: CHAR 			{ HsChar       (ord $1) } --TODO remove ord
 	| STRING		{ HsString     $1 }
 	| PRIMINTEGER		{ HsIntPrim    $1 }
-	| PRIMCHAR		{ HsCharPrim   $1 }
+	| PRIMCHAR		{ HsCharPrim   (ord $1) } --TODO remove ord
 	| PRIMSTRING		{ HsStringPrim $1 }
 	| PRIMFLOAT		{ HsFloatPrim  $1 }
 	| PRIMDOUBLE		{ HsDoublePrim $1 }
 	| CLITLIT		{ HsLitLit     $1 placeHolderType }
 
-srcloc :: { SrcLoc }	:	{% getSrcLocP }
- 
+srcloc :: { SrcLoc }	:	{% getSrcLoc }
+
 -----------------------------------------------------------------------------
 -- Layout
 
 close :: { () }
 	: vccurly		{ () } -- context popped in lexer.
 	| error			{% popContext }
-
-layout_on  	  :: { () }	: {% layoutOn True{-strict-} }
-layout_on_for_do  :: { () }	: {% layoutOn False }
 
 -----------------------------------------------------------------------------
 -- Miscellaneous (mostly renamings)
@@ -1478,5 +1451,5 @@ commas :: { Int }
 
 {
 happyError :: P a
-happyError buf PState{ loc = loc } = PFailed (srcParseErr buf loc)
+happyError = srcParseFail
 }

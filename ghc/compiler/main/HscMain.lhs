@@ -36,9 +36,10 @@ import CoreLint		( lintUnfolding )
 import HsSyn
 
 import RdrName		( nameRdrName )
-import StringBuffer	( hGetStringBuffer, freeStringBuffer )
+import StringBuffer	( hGetStringBuffer )
 import Parser
-import Lex		( ParseResult(..), ExtFlags(..), mkPState )
+import Lexer		( P(..), ParseResult(..), ExtFlags(..), 
+			  mkPState, showPFailed )
 import SrcLoc		( mkSrcLoc )
 import TcRnDriver	( checkOldIface, tcRnModule, tcRnExtCore, tcRnIface )
 import RnEnv		( extendOrigNameCache )
@@ -152,7 +153,8 @@ hscNoRecomp hsc_env pcs_ch have_object
 			showModMsg have_object mod location);
 
       -- Typecheck 
-      (pcs_tc, maybe_tc_result) <- tcRnIface hsc_env pcs_ch old_iface ;
+      (pcs_tc, maybe_tc_result) <- _scc_ "tcRnIface"
+				   tcRnIface hsc_env pcs_ch old_iface ;
 
       case maybe_tc_result of {
          Nothing -> return (HscFail pcs_tc);
@@ -387,13 +389,12 @@ myParseModule dflags src_filename
       buf <- hGetStringBuffer src_filename
 
       let exts = mkExtFlags dflags
-	  loc  = mkSrcLoc (mkFastString src_filename) 1
+	  loc  = mkSrcLoc (mkFastString src_filename) 1 0
 
-      case parseModule buf (mkPState loc exts) of {
+      case unP parseModule (mkPState buf loc exts) of {
 
-	PFailed err -> do { hPutStrLn stderr (showSDoc err);
-                            freeStringBuffer buf;
-                            return Nothing };
+	PFailed l1 l2 err -> do { hPutStrLn stderr (showPFailed l1 l2 err);
+                            	  return Nothing };
 
 	POk _ rdr_module -> do {
 
@@ -510,13 +511,12 @@ hscParseStmt dflags str
       buf <- stringToStringBuffer str
 
       let exts = mkExtFlags dflags 
-	  loc  = mkSrcLoc FSLIT("<interactive>") 1
+	  loc  = mkSrcLoc FSLIT("<interactive>") 1 0
 
-      case parseStmt buf (mkPState loc exts) of {
+      case unP parseStmt (mkPState buf loc exts) of {
 
-	PFailed err -> do { hPutStrLn stderr (showSDoc err);
---	Not yet implemented in <4.11    freeStringBuffer buf;
-                            return Nothing };
+	PFailed l1 l2 err -> do { hPutStrLn stderr (showPFailed l1 l2 err);	
+                                  return Nothing };
 
 	-- no stmt: the line consisted of just space or comments
 	POk _ Nothing -> return Nothing;
@@ -525,7 +525,6 @@ hscParseStmt dflags str
 
       --ToDo: can't free the string buffer until we've finished this
       -- compilation sweep and all the identifiers have gone away.
-      --freeStringBuffer buf;
       dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr rdr_stmt);
       return (Just rdr_stmt)
       }}
@@ -568,16 +567,14 @@ myParseIdentifier dflags str
   = do buf <- stringToStringBuffer str
  
        let exts = mkExtFlags dflags
-	   loc  = mkSrcLoc FSLIT("<interactive>") 1
+	   loc  = mkSrcLoc FSLIT("<interactive>") 1 0
 
-       case parseIdentifier buf (mkPState loc exts) of
+       case unP parseIdentifier (mkPState buf loc exts) of
 
-	  PFailed err -> do { hPutStrLn stderr (showSDoc err);
-           		      freeStringBuffer buf;
-                              return Nothing }
+	  PFailed l1 l2 err -> do { hPutStrLn stderr (showPFailed l1 l2 err);
+                                    return Nothing }
 
-	  POk _ rdr_name -> do { --should, but can't: freeStringBuffer buf;
-			         return (Just rdr_name) }
+	  POk _ rdr_name -> return (Just rdr_name)
 #endif
 \end{code}
 

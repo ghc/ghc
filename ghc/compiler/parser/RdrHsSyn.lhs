@@ -99,7 +99,7 @@ import RdrName		( RdrName, isRdrTyVar, mkRdrUnqual, mkUnqual, rdrNameOcc,
 			  setRdrNameSpace )
 import BasicTypes	( RecFlag(..), FixitySig(..), maxPrecedence )
 import Class            ( DefMeth (..) )
-import Lex		( P, mapP, setSrcLocP, thenP, returnP, getSrcLocP, failMsgP )
+import Lexer		( P, setSrcLocFor, getSrcLoc, failLocMsgP )
 import HscTypes		( RdrAvailInfo, GenAvailInfo(..) )
 import TysWiredIn	( unitTyCon )
 import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
@@ -484,19 +484,19 @@ mkPrefixCon ty tys
  = split ty tys
  where
    split (HsAppTy t u)  ts = split t (unbangedType u : ts)
-   split (HsTyVar tc)   ts = tyConToDataCon tc	`thenP` \ data_con ->
-			     returnP (data_con, PrefixCon ts)
+   split (HsTyVar tc)   ts = tyConToDataCon tc	>>= \ data_con ->
+			     return (data_con, PrefixCon ts)
    split _		 _ = parseError "Illegal data/newtype declaration"
 
 mkRecCon :: RdrName -> [([RdrName],RdrNameBangType)] -> P (RdrName, RdrNameConDetails)
 mkRecCon con fields
-  = tyConToDataCon con	`thenP` \ data_con ->
-    returnP (data_con, RecCon [ (l,t) | (ls,t) <- fields, l <- ls ])
+  = tyConToDataCon con	>>= \ data_con ->
+    return (data_con, RecCon [ (l,t) | (ls,t) <- fields, l <- ls ])
 
 tyConToDataCon :: RdrName -> P RdrName
 tyConToDataCon tc
   | isTcOcc (rdrNameOcc tc)
-  = returnP (setRdrNameSpace tc srcDataName)
+  = return (setRdrNameSpace tc srcDataName)
   | otherwise
   = parseError (showSDoc (text "Not a constructor:" <+> quotes (ppr tc)))
 
@@ -507,21 +507,21 @@ checkInstType :: RdrNameHsType -> P RdrNameHsType
 checkInstType t 
   = case t of
 	HsForAllTy tvs ctxt ty ->
-		checkDictTy ty [] `thenP` \ dict_ty ->
-	      	returnP (HsForAllTy tvs ctxt dict_ty)
+		checkDictTy ty [] >>= \ dict_ty ->
+	      	return (HsForAllTy tvs ctxt dict_ty)
 
         HsParTy ty -> checkInstType ty
 
-	ty ->   checkDictTy ty [] `thenP` \ dict_ty->
-	      	returnP (HsForAllTy Nothing [] dict_ty)
+	ty ->   checkDictTy ty [] >>= \ dict_ty->
+	      	return (HsForAllTy Nothing [] dict_ty)
 
 checkTyVars :: [RdrNameHsType] -> P [RdrNameHsTyVar]
 checkTyVars tvs 
-  = mapP chk tvs
+  = mapM chk tvs
   where
 	--  Check that the name space is correct!
-    chk (HsKindSig (HsTyVar tv) k) | isRdrTyVar tv = returnP (IfaceTyVar tv k)
-    chk (HsTyVar tv) 	           | isRdrTyVar tv = returnP (UserTyVar tv)
+    chk (HsKindSig (HsTyVar tv) k) | isRdrTyVar tv = return (IfaceTyVar tv k)
+    chk (HsTyVar tv) 	           | isRdrTyVar tv = return (UserTyVar tv)
     chk other	 		   = parseError "Type found where type variable expected"
 
 checkTyClHdr :: RdrNameHsType -> P (RdrName, [RdrNameHsTyVar])
@@ -534,46 +534,46 @@ checkTyClHdr ty
   = go ty []
   where
     go (HsTyVar tc)    acc 
-	| not (isRdrTyVar tc) = checkTyVars acc		`thenP` \ tvs ->
-				returnP (tc, tvs)
+	| not (isRdrTyVar tc) = checkTyVars acc		>>= \ tvs ->
+				return (tc, tvs)
     go (HsOpTy t1 (HsTyOp tc) t2) acc  
-			      = checkTyVars (t1:t2:acc)	`thenP` \ tvs ->
-				returnP (tc, tvs)
+			      = checkTyVars (t1:t2:acc)	>>= \ tvs ->
+				return (tc, tvs)
     go (HsParTy ty)    acc    = go ty acc
     go (HsAppTy t1 t2) acc    = go t1 (t2:acc)
     go other	       acc    = parseError "Malformed LHS to type of class declaration"
 
 checkContext :: RdrNameHsType -> P RdrNameContext
 checkContext (HsTupleTy _ ts) 	-- (Eq a, Ord b) shows up as a tuple type
-  = mapP checkPred ts
+  = mapM checkPred ts
 
 checkContext (HsParTy ty)	-- to be sure HsParTy doesn't get into the way
   = checkContext ty
 
 checkContext (HsTyVar t)	-- Empty context shows up as a unit type ()
-  | t == getRdrName unitTyCon = returnP []
+  | t == getRdrName unitTyCon = return []
 
 checkContext t 
-  = checkPred t `thenP` \p ->
-    returnP [p]
+  = checkPred t >>= \p ->
+    return [p]
 
 checkPred :: RdrNameHsType -> P (HsPred RdrName)
 -- Watch out.. in ...deriving( Show )... we use checkPred on 
 -- the list of partially applied predicates in the deriving,
 -- so there can be zero args.
-checkPred (HsPredTy (HsIParam n ty)) = returnP (HsIParam n ty)
+checkPred (HsPredTy (HsIParam n ty)) = return (HsIParam n ty)
 checkPred ty
   = go ty []
   where
     go (HsTyVar t) args   | not (isRdrTyVar t) 
-		  	  = returnP (HsClassP t args)
+		  	  = return (HsClassP t args)
     go (HsAppTy l r) args = go l (r:args)
     go (HsParTy t)   args = go t args
     go _ 	     _    = parseError "Illegal class assertion"
 
 checkDictTy :: RdrNameHsType -> [RdrNameHsType] -> P RdrNameHsType
 checkDictTy (HsTyVar t) args@(_:_) | not (isRdrTyVar t) 
-  	= returnP (mkHsDictTy t args)
+  	= return (mkHsDictTy t args)
 checkDictTy (HsAppTy l r) args = checkDictTy l (r:args)
 checkDictTy (HsParTy t)   args = checkDictTy t args
 checkDictTy _ _ = parseError "Malformed context in instance header"
@@ -591,37 +591,37 @@ checkDo	 = checkDoMDo "a " "'do'"
 checkMDo = checkDoMDo "an " "'mdo'"
 
 checkDoMDo _   nm []		   = parseError $ "Empty " ++ nm ++ " construct"
-checkDoMDo _   _  [ExprStmt e _ l] = returnP [ResultStmt e l]
+checkDoMDo _   _  [ExprStmt e _ l] = return [ResultStmt e l]
 checkDoMDo pre nm [s]		   = parseError $ "The last statement in " ++ pre ++ nm ++ " construct must be an expression"
-checkDoMDo pre nm (s:ss)	   = checkDoMDo pre nm ss	`thenP` \ ss' ->
-			   	     returnP (s:ss')
+checkDoMDo pre nm (s:ss)	   = checkDoMDo pre nm ss	>>= \ ss' ->
+			   	     return (s:ss')
 
----------------------------------------------------------------------------
+-- -------------------------------------------------------------------------
 -- Checking Patterns.
 
 -- We parse patterns as expressions and check for valid patterns below,
 -- converting the expression into a pattern at the same time.
 
 checkPattern :: SrcLoc -> RdrNameHsExpr -> P RdrNamePat
-checkPattern loc e = setSrcLocP loc (checkPat e [])
+checkPattern loc e = setSrcLocFor loc (checkPat e [])
 
 checkPatterns :: SrcLoc -> [RdrNameHsExpr] -> P [RdrNamePat]
-checkPatterns loc es = mapP (checkPattern loc) es
+checkPatterns loc es = mapM (checkPattern loc) es
 
 checkPat :: RdrNameHsExpr -> [RdrNamePat] -> P RdrNamePat
-checkPat (HsVar c) args | isRdrDataCon c = returnP (ConPatIn c (PrefixCon args))
+checkPat (HsVar c) args | isRdrDataCon c = return (ConPatIn c (PrefixCon args))
 checkPat (HsApp f x) args = 
-	checkPat x [] `thenP` \x ->
+	checkPat x [] >>= \x ->
 	checkPat f (x:args)
 checkPat e [] = case e of
-	EWildPat	    -> returnP (WildPat placeHolderType)
+	EWildPat	    -> return (WildPat placeHolderType)
 	HsVar x	| isQual x  -> parseError ("Qualified variable in pattern: " ++ showRdrName x)
-		| otherwise -> returnP (VarPat x)
-	HsLit l 	   -> returnP (LitPat l)
-	HsOverLit l	   -> returnP (NPatIn l Nothing)
-	ELazyPat e	   -> checkPat e [] `thenP` (returnP . LazyPat)
-	EAsPat n e	   -> checkPat e [] `thenP` (returnP . AsPat n)
-        ExprWithTySig e t  -> checkPat e [] `thenP` \e ->
+		| otherwise -> return (VarPat x)
+	HsLit l 	   -> return (LitPat l)
+	HsOverLit l	   -> return (NPatIn l Nothing)
+	ELazyPat e	   -> checkPat e [] >>= (return . LazyPat)
+	EAsPat n e	   -> checkPat e [] >>= (return . AsPat n)
+        ExprWithTySig e t  -> checkPat e [] >>= \e ->
 			      -- Pattern signatures are parsed as sigtypes,
 			      -- but they aren't explicit forall points.  Hence
 			      -- we have to remove the implicit forall here.
@@ -629,48 +629,48 @@ checkPat e [] = case e of
 					  HsForAllTy Nothing [] ty -> ty
 					  other -> other
 			      in
-			      returnP (SigPatIn e t')
+			      return (SigPatIn e t')
 
 	-- Translate out NegApps of literals in patterns. We negate
 	-- the Integer here, and add back the call to 'negate' when
 	-- we typecheck the pattern.
 	-- NB. Negative *primitive* literals are already handled by
 	--     RdrHsSyn.mkHsNegApp
-	NegApp (HsOverLit lit) neg -> returnP (NPatIn lit (Just neg))
+	NegApp (HsOverLit lit) neg -> return (NPatIn lit (Just neg))
 
 	OpApp (HsVar n) (HsVar plus) _ (HsOverLit lit@(HsIntegral _ _)) 
 		  	   | plus == plus_RDR
-			   -> returnP (mkNPlusKPat n lit)
+			   -> return (mkNPlusKPat n lit)
 			   where
 			      plus_RDR = mkUnqual varName FSLIT("+")	-- Hack
 
-	OpApp l op fix r   -> checkPat l [] `thenP` \l ->
-			      checkPat r [] `thenP` \r ->
+	OpApp l op fix r   -> checkPat l [] >>= \l ->
+			      checkPat r [] >>= \r ->
 			      case op of
 			   	 HsVar c | isDataOcc (rdrNameOcc c)
-					-> returnP (ConPatIn c (InfixCon l r))
+					-> return (ConPatIn c (InfixCon l r))
 			   	 _ -> patFail
 
-	HsPar e		   -> checkPat e [] `thenP` (returnP . ParPat)
-	ExplicitList _ es  -> mapP (\e -> checkPat e []) es `thenP` \ps ->
-			      returnP (ListPat ps placeHolderType)
-	ExplicitPArr _ es  -> mapP (\e -> checkPat e []) es `thenP` \ps ->
-			      returnP (PArrPat ps placeHolderType)
+	HsPar e		   -> checkPat e [] >>= (return . ParPat)
+	ExplicitList _ es  -> mapM (\e -> checkPat e []) es >>= \ps ->
+			      return (ListPat ps placeHolderType)
+	ExplicitPArr _ es  -> mapM (\e -> checkPat e []) es >>= \ps ->
+			      return (PArrPat ps placeHolderType)
 
-	ExplicitTuple es b -> mapP (\e -> checkPat e []) es `thenP` \ps ->
-			      returnP (TuplePat ps b)
+	ExplicitTuple es b -> mapM (\e -> checkPat e []) es >>= \ps ->
+			      return (TuplePat ps b)
 
-	RecordCon c fs     -> mapP checkPatField fs `thenP` \fs ->
-			      returnP (ConPatIn c (RecCon fs))
+	RecordCon c fs     -> mapM checkPatField fs >>= \fs ->
+			      return (ConPatIn c (RecCon fs))
 -- Generics 
-	HsType ty          -> returnP (TypePat ty) 
+	HsType ty          -> return (TypePat ty) 
 	_                  -> patFail
 
 checkPat _ _ = patFail
 
 checkPatField :: (RdrName, RdrNameHsExpr) -> P (RdrName, RdrNamePat)
-checkPatField (n,e) = checkPat e [] `thenP` \p ->
-		      returnP (n,p)
+checkPatField (n,e) = checkPat e [] >>= \p ->
+		      return (n,p)
 
 patFail = parseError "Parse error in pattern"
 
@@ -691,19 +691,19 @@ checkValDef lhs opt_sig grhss loc
 	     | isQual f
 	     -> parseError ("Qualified name in function definition: "  ++ showRdrName f)
 	     | otherwise
-	     -> checkPatterns loc es `thenP` \ps ->
-		returnP (RdrValBinding (FunMonoBind f inf [Match ps opt_sig grhss] loc))
+	     -> checkPatterns loc es >>= \ps ->
+		return (RdrValBinding (FunMonoBind f inf [Match ps opt_sig grhss] loc))
 
            Nothing ->
-		checkPattern loc lhs `thenP` \lhs ->
-		returnP (RdrValBinding (PatMonoBind lhs grhss loc))
+		checkPattern loc lhs >>= \lhs ->
+		return (RdrValBinding (PatMonoBind lhs grhss loc))
 
 checkValSig
 	:: RdrNameHsExpr
 	-> RdrNameHsType
 	-> SrcLoc
 	-> P RdrBinding
-checkValSig (HsVar v) ty loc | isUnqual v = returnP (RdrHsDecl (SigD (Sig v ty loc)))
+checkValSig (HsVar v) ty loc | isUnqual v = return (RdrHsDecl (SigD (Sig v ty loc)))
 checkValSig other     ty loc = parseError "Type signature given for an expression"
 
 mkSigDecls :: [Sig RdrName] -> RdrBinding
@@ -731,7 +731,7 @@ isFunLhs _ _ 			= Nothing
 -- Miscellaneous utilities
 
 checkPrecP :: Int -> P Int
-checkPrecP i | 0 <= i && i <= maxPrecedence = returnP i
+checkPrecP i | 0 <= i && i <= maxPrecedence = return i
 	     | otherwise       		    = parseError "Precedence out of range"
 
 mkRecConstrOrUpdate 
@@ -740,9 +740,9 @@ mkRecConstrOrUpdate
 	-> P RdrNameHsExpr
 
 mkRecConstrOrUpdate (HsVar c) fs | isRdrDataCon c
-  = returnP (RecordCon c fs)
+  = return (RecordCon c fs)
 mkRecConstrOrUpdate exp fs@(_:_) 
-  = returnP (RecordUpd exp fs)
+  = return (RecordUpd exp fs)
 mkRecConstrOrUpdate _ _
   = parseError "Empty record update"
 
@@ -762,11 +762,11 @@ mkImport :: CallConv
 	 -> SrcLoc 
 	 -> P RdrNameHsDecl
 mkImport (CCall  cconv) safety (entity, v, ty) loc =
-  parseCImport entity cconv safety v			 `thenP` \importSpec ->
-  returnP $ ForD (ForeignImport v ty importSpec                     False loc)
+  parseCImport entity cconv safety v			 >>= \importSpec ->
+  return $ ForD (ForeignImport v ty importSpec                     False loc)
 mkImport (DNCall      ) _      (entity, v, ty) loc =
-  parseDImport entity 					 `thenP` \ spec ->
-  returnP $ ForD (ForeignImport v ty (DNImport spec) False loc)
+  parseDImport entity 					 >>= \ spec ->
+  return $ ForD (ForeignImport v ty (DNImport spec) False loc)
 
 -- parse the entity string of a foreign import declaration for the `ccall' or
 -- `stdcall' calling convention'
@@ -779,9 +779,9 @@ parseCImport :: FastString
 parseCImport entity cconv safety v
   -- FIXME: we should allow white space around `dynamic' and `wrapper' -=chak
   | entity == FSLIT ("dynamic") = 
-    returnP $ CImport cconv safety nilFS nilFS (CFunction DynamicTarget)
+    return $ CImport cconv safety nilFS nilFS (CFunction DynamicTarget)
   | entity == FSLIT ("wrapper") =
-    returnP $ CImport cconv safety nilFS nilFS CWrapper
+    return $ CImport cconv safety nilFS nilFS CWrapper
   | otherwise		       = parse0 (unpackFS entity)
     where
       -- using the static keyword?
@@ -820,9 +820,9 @@ parseCImport entity cconv safety v
         where
 	  (first, rest) = break (== ' ') str
       --
-      build cid header False lib = returnP $
+      build cid header False lib = return $
         CImport cconv safety header lib (CFunction (StaticTarget cid))
-      build cid header True  lib = returnP $
+      build cid header True  lib = return $
         CImport cconv safety header lib (CLabel                  cid )
 
 --
@@ -853,7 +853,7 @@ parseDImport entity = parse0 comps
   parse2 isStatic kind xs = parse3 isStatic kind "" xs
 
   parse3 isStatic kind assem [x] = 
-    returnP (DNCallSpec isStatic kind assem x 
+    return (DNCallSpec isStatic kind assem x 
     			  -- these will be filled in once known.
                         (error "FFI-dotnet-args")
                         (error "FFI-dotnet-result"))
@@ -867,7 +867,7 @@ mkExport :: CallConv
          -> (FastString, RdrName, RdrNameHsType) 
 	 -> SrcLoc 
 	 -> P RdrNameHsDecl
-mkExport (CCall  cconv) (entity, v, ty) loc = returnP $ 
+mkExport (CCall  cconv) (entity, v, ty) loc = return $ 
   ForD (ForeignExport v ty (CExport (CExportStatic entity' cconv)) False loc)
   where
     entity' | nullFastString entity = mkExtName v
@@ -910,7 +910,6 @@ showRdrName r = showSDoc (ppr r)
 
 parseError :: String -> P a
 parseError s = 
-  getSrcLocP `thenP` \ loc ->
-  failMsgP (hcat [ppr loc, text ": ", text s])
+  getSrcLoc >>= \ loc ->
+  failLocMsgP loc loc s
 \end{code}
-

@@ -15,7 +15,6 @@ module Ctype
 
 import DATA_INT		( Int32 )
 import DATA_BITS	( Bits((.&.)) )
-import GLAEXTS  	( Char#, Char(..) )
 \end{code}
 
 Bit masks
@@ -36,10 +35,10 @@ at the big case below.
 
 \begin{code}
 {-# INLINE is_ctype #-}
-is_ctype :: Int -> Char# -> Bool
-is_ctype mask c = (fromIntegral (charType (C# c)) .&. fromIntegral mask) /= (0::Int32)
+is_ctype :: Int -> Char -> Bool
+is_ctype mask c = (fromIntegral (charType c) .&. fromIntegral mask) /= (0::Int32)
 
-is_ident, is_symbol, is_any, is_space, is_lower, is_upper, is_digit :: Char# -> Bool
+is_ident, is_symbol, is_any, is_space, is_lower, is_upper, is_digit :: Char -> Bool
 is_ident  = is_ctype cIdent
 is_symbol = is_ctype cSymbol
 is_any    = is_ctype cAny
@@ -65,7 +64,7 @@ charType c = case c of
    '\7'   -> 0                         -- \007
    '\8'   -> 0                         -- \010
    '\9'   -> cAny + cSpace             -- \t
-   '\10'  -> cAny + cSpace             -- \n
+   '\10'  -> cSpace	               -- \n (not allowed in strings, so !cAny)
    '\11'  -> cAny + cSpace             -- \v
    '\12'  -> cAny + cSpace             -- \f
    '\13'  -> cAny + cSpace             -- ^M

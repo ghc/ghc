@@ -13,15 +13,15 @@ module SrcLoc (
 
 	mkSrcLoc, isGoodSrcLoc,	isWiredInLoc,
 	noSrcLoc, 		-- "I'm sorry, I haven't a clue"
+	advanceSrcLoc,
 
 	importedSrcLoc,		-- Unknown place in an interface
 	wiredInSrcLoc,		-- Something wired into the compiler
 	generatedSrcLoc,	-- Code generated within the compiler
 
-	incSrcLine, replaceSrcLine,
-	
-	srcLocFile,		-- return the file name part.
-	srcLocLine		-- return the line part.
+	srcLocFile,		-- return the file name part
+	srcLocLine,		-- return the line part
+	srcLocCol,		-- return the column part
     ) where
 
 #include "HsVersions.h"
@@ -32,7 +32,7 @@ import FastString	( unpackFS )
 import FastTypes
 import FastString
 
-import GLAEXTS		( (+#) )
+import GLAEXTS		( (+#), quotInt# )
 \end{code}
 
 %************************************************************************
@@ -52,9 +52,24 @@ data SrcLoc
 			-- isWiredInName
 
   | SrcLoc	FastString	-- A precise location (file name)
-		FastInt
+		FastInt		-- line
+		FastInt		-- column
 
   | UnhelpfulSrcLoc FastString	-- Just a general indication
+
+{-
+data SrcSpan
+  = WiredInSpan
+
+	-- A precise source file span
+  | SrcSpan	FastString 	-- file name
+		FastInt		-- beginning line
+		FastInt		-- beginning column
+		FastInt		-- end line
+		FastInt		-- end column		
+
+  | UnhelpfulSrcSpan FastString	-- Just a general indication
+-}
 \end{code}
 
 Note that an entity might be imported via more than one route, and
@@ -70,30 +85,35 @@ rare case.
 
 Things to make 'em:
 \begin{code}
-mkSrcLoc x y      = SrcLoc x (iUnbox y)
+mkSrcLoc x line col = SrcLoc x (iUnbox line) (iUnbox col)
 wiredInSrcLoc	  = WiredInLoc
 noSrcLoc	  = UnhelpfulSrcLoc FSLIT("<No locn>")
 importedSrcLoc	  = UnhelpfulSrcLoc FSLIT("<imported>")
 generatedSrcLoc   = UnhelpfulSrcLoc FSLIT("<compiler-generated-code>")
 
-isGoodSrcLoc (SrcLoc _ _) = True
+isGoodSrcLoc (SrcLoc _ _ _) = True
 isGoodSrcLoc other        = False
 
 isWiredInLoc WiredInLoc = True
 isWiredInLoc other	= False
 
 srcLocFile :: SrcLoc -> FastString
-srcLocFile (SrcLoc fname _) = fname
+srcLocFile (SrcLoc fname _ _) = fname
 
-srcLocLine :: SrcLoc -> FastInt
-srcLocLine (SrcLoc _ l) = l
+srcLocLine :: SrcLoc -> Int
+srcLocLine (SrcLoc _ l c) = iBox l
 
-incSrcLine :: SrcLoc -> SrcLoc
-incSrcLine (SrcLoc s l) = SrcLoc s (l +# 1#)
-incSrcLine loc  	= loc
+srcLocCol :: SrcLoc -> Int
+srcLocCol (SrcLoc _ l c) = iBox c
 
-replaceSrcLine :: SrcLoc -> FastInt -> SrcLoc
-replaceSrcLine (SrcLoc s _) l = SrcLoc s l
+advanceSrcLoc :: SrcLoc -> Char -> SrcLoc
+advanceSrcLoc (SrcLoc f l c) '\t' = SrcLoc f  l (tab c)
+advanceSrcLoc (SrcLoc f l c) '\n' = SrcLoc f  (l +# 1#) 0#
+advanceSrcLoc (SrcLoc f l c) _    = SrcLoc f  l (c +# 1#)
+
+-- Advance to the next tab stop.  Tabs are at column positions 0, 8, 16, etc.
+tab :: FastInt -> FastInt
+tab c = (c `quotInt#` 8# +# 1#) *# 8#
 \end{code}
 
 %************************************************************************
@@ -118,19 +138,23 @@ cmpSrcLoc WiredInLoc other      = LT
 cmpSrcLoc (UnhelpfulSrcLoc s1) (UnhelpfulSrcLoc s2) = s1 `compare` s2
 cmpSrcLoc (UnhelpfulSrcLoc s1) other		    = GT
 
-cmpSrcLoc (SrcLoc s1 l1) WiredInLoc	     = GT
-cmpSrcLoc (SrcLoc s1 l1) (UnhelpfulSrcLoc _) = LT
-cmpSrcLoc (SrcLoc s1 l1) (SrcLoc s2 l2)      = (s1 `compare` s2) `thenCmp` (l1 `cmpline` l2)
-					     where
-				  		l1 `cmpline` l2 | l1 <#  l2 = LT
-								| l1 ==# l2 = EQ
-								| otherwise = GT 
+cmpSrcLoc (SrcLoc _ _ _) WiredInLoc	     = GT
+cmpSrcLoc (SrcLoc _ _ _) (UnhelpfulSrcLoc _) = LT
+cmpSrcLoc (SrcLoc s1 l1 c1) (SrcLoc s2 l2 c2)      
+  = (s1 `compare` s2) `thenCmp` (l1 `cmpline` l2) `thenCmp` (c1 `cmpline` c2)
+  where
+	l1 `cmpline` l2 | l1 <#  l2 = LT
+			| l1 ==# l2 = EQ
+			| otherwise = GT 
 					  
 instance Outputable SrcLoc where
-    ppr (SrcLoc src_path src_line)
+    ppr (SrcLoc src_path src_line src_col)
       = getPprStyle $ \ sty ->
         if userStyle sty || debugStyle sty then
-	   hcat [ ftext src_path, char ':', int (iBox src_line) ]
+	   hcat [ ftext src_path, char ':', 
+		  int (iBox src_line)
+		  {- TODO: char ':', int (iBox src_col) -} 
+		]
 	else
 	   hcat [text "{-# LINE ", int (iBox src_line), space,
 		 char '\"', ftext src_path, text " #-}"]

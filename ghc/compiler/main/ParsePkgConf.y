@@ -4,7 +4,7 @@ module ParsePkgConf( loadPackageConfig ) where
 #include "HsVersions.h"
 
 import Packages  ( PackageConfig(..), defaultPackageConfig )
-import Lex
+import Lexer
 import FastString
 import StringBuffer
 import SrcLoc
@@ -15,18 +15,18 @@ import EXCEPTION ( throwDyn )
 }
 
 %token
- '{'		{ ITocurly }
- '}'		{ ITccurly }
- '['		{ ITobrack }
- ']'		{ ITcbrack }
- ','		{ ITcomma }
- '='		{ ITequal }
- VARID   	{ ITvarid    $$ }
- CONID   	{ ITconid    $$ }
- STRING		{ ITstring   $$ }
+ '{'		{ T _ _ ITocurly }
+ '}'		{ T _ _ ITccurly }
+ '['		{ T _ _ ITobrack }
+ ']'		{ T _ _ ITcbrack }
+ ','		{ T _ _ ITcomma }
+ '='		{ T _ _ ITequal }
+ VARID   	{ T _ _ (ITvarid    $$) }
+ CONID   	{ T _ _ (ITconid    $$) }
+ STRING		{ T _ _ (ITstring   $$) }
 
-%monad { P } { thenP } { returnP }
-%lexer { lexer } { ITeof }
+%monad { P } { >>= } { return }
+%lexer { lexer } { T _ _ ITeof }
 %name parse
 %tokentype { Token }
 %%
@@ -49,7 +49,7 @@ fields  :: { PackageConfig -> PackageConfig }
 field	:: { PackageConfig -> PackageConfig }
 	: VARID '=' STRING		
                  {% case unpackFS $1 of { 
-		   "name" -> returnP (\ p -> p{name = unpackFS $3});
+		   "name" -> return (\ p -> p{name = unpackFS $3});
 		   _      -> happyError } }
 			
         | VARID '=' bool
@@ -84,29 +84,27 @@ strs	:: { [String] }
 
 bool    :: { Bool }
 	: CONID				{% case unpackFS $1 of {
-					    "True"  -> returnP True;
-					    "False" -> returnP False;
+					    "True"  -> return True;
+					    "False" -> return False;
 					    _       -> happyError } }
 
 {
 happyError :: P a
-happyError buf PState{ loc = loc } = PFailed (srcParseErr buf loc)
+happyError = srcParseFail
 
 loadPackageConfig :: FilePath -> IO [PackageConfig]
 loadPackageConfig conf_filename = do
    buf <- hGetStringBuffer conf_filename
-   let loc  = mkSrcLoc (mkFastString conf_filename) 1
+   let loc  = mkSrcLoc (mkFastString conf_filename) 1 0
        exts = ExtFlags {glasgowExtsEF = False,
 		        ffiEF	      = False,
 		        arrowsEF      = False,
 			withEF	      = False,
 			parrEF	      = False}
-   case parse buf (mkPState loc exts) of
-	PFailed err -> do
-	    freeStringBuffer buf
-            throwDyn (InstallationError (showSDoc err))
+   case unP parse (mkPState buf loc exts) of
+	PFailed l1 l2 err -> do
+            throwDyn (InstallationError (showPFailed l1 l2 err))
 
 	POk _ pkg_details -> do
-	    freeStringBuffer buf
 	    return pkg_details
 }

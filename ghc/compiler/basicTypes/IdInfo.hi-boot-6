@@ -4,5 +4,5 @@ data IdInfo
 data GlobalIdDetails
 
 notGlobalId :: GlobalIdDetails
-seqIdInfo :: IdInfo -> GHC.Base.()
+seqIdInfo :: IdInfo -> ()
 vanillaIdInfo :: IdInfo

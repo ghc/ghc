@@ -63,7 +63,7 @@ import FastString	( mkFastString )
 import ErrUtils         ( Message )
 import Finder		( findModule, findPackageModule, 
 			  hiBootExt, hiBootVerExt )
-import Lex
+import Lexer
 import FiniteMap
 import ListSetOps	( minusList )
 import Outputable
@@ -645,7 +645,7 @@ readIface mod file_path is_hi_boot_file
 read_iface mod file_path is_hi_boot_file
  | is_hi_boot_file		-- Read ascii
  = do { buffer <- hGetStringBuffer file_path ;
-        case parseIface buffer (mkPState loc exts) of
+        case unP parseIface (mkPState buffer loc exts) of
 	  POk _ iface | wanted_mod_name == actual_mod_name
 		      -> return iface
 		      | otherwise
@@ -656,7 +656,8 @@ read_iface mod file_path is_hi_boot_file
 		  actual_mod_name = pi_mod iface
 		  err = hiModuleNameMismatchWarn wanted_mod_name actual_mod_name
 
-	  PFailed err -> throwDyn (ProgramError (showSDoc err))
+	  PFailed loc1 loc2  err -> 
+		throwDyn (ProgramError (showPFailed loc1 loc2 err))
      }
 
  | otherwise		-- Read binary
@@ -668,7 +669,7 @@ read_iface mod file_path is_hi_boot_file
 		     arrowsEF	   = True,
 		     withEF	   = True,
 		     parrEF	   = True}
-    loc  = mkSrcLoc (mkFastString file_path) 1
+    loc  = mkSrcLoc (mkFastString file_path) 1 0
 \end{code}
 
 
