@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Trace.c,v 1.2 1998/12/02 13:29:16 simonm Exp $
+ * $Id: Trace.c,v 1.3 1999/01/25 12:01:21 simonm Exp $
  *
  * User-overridable RTS hooks.
  *
@@ -8,7 +8,7 @@
 #include "Rts.h"
 
 void
-PreTraceHook (long fd)
+PreTraceHook (long fd UNUSED)
 {
   /* Default is not to print anything, however this might be useful:
    *
@@ -18,7 +18,7 @@ PreTraceHook (long fd)
 }
 
 void
-PostTraceHook (long fd)
+PostTraceHook (long fd UNUSED)
 {
   /* Default is not to print anything, however this might be useful:
    *
