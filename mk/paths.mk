@@ -22,6 +22,7 @@
 #  INSTALL_LIBS     (installed in $(libdir))
 #  INSTALL_LIBEXECS (installed in $(libexecdir))
 #  INSTALL_DATAS    (installed in $(datadir))
+#  INSTALL_IFACES   (installed in $(ifacedir))
 #
 # see target.mk for more information.
 #
@@ -61,9 +62,6 @@ INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 # The install variables does not have any defaults,
 # what files to install have to be specified in the Makefiles.
 #
-#INSTALL_PROGS += $(HS_PROG) $(C_PROG)
-#INSTALL_LIBS  += $(LIBRARY)
-#INSTALL_DATAS += $(HS_IFACES)
 
 #################################################################################
 #
