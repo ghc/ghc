@@ -193,12 +193,14 @@ HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_SRCS)))
 GC_C_OBJS   = $(addsuffix _stub_ffi.$(way_)o,$(basename $(filter %.gc,$(SRCS))))
 HSC_C_OBJS  = $(addsuffix _hsc.$(way_)o,$(basename $(filter %.hsc,$(SRCS))))
 
-# Always remove $(EXCLUDED_C_SRCS) from C_SRCS
+ifeq "$(BootingFromHc)" "NO"
+# We don't want to build the _stub.c files ourselves, unless we're
+# bootstrapping from .hc files.
 EXCLUDED_C_SRCS = $(patsubst %.lhs, %_stub.c, $(HS_SRCS)) \
 		  $(patsubst %.hs,  %_stub.c, $(HS_SRCS)) \
 		  $(patsubst %.gc, %_stub_ffi.c, $(GC_SRCS)) \
 		  $(patsubst %.gc, %_stub_ffi.h, $(GC_SRCS))
-
+endif
 
 C_SRCS      = $(filter-out $(EXCLUDED_C_SRCS),$(filter %.c,$(SRCS)))
 C_OBJS      = $(addsuffix .$(way_)o,$(basename $(C_SRCS)))
