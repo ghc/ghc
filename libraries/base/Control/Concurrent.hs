@@ -20,12 +20,16 @@ module Control.Concurrent (
 
 	-- * Basic concurrency operations
 
+#ifndef __HUGS__
         ThreadId,
 	myThreadId,
+#endif
 
 	forkIO,
+#ifndef __HUGS__
 	killThread,
 	throwTo,
+#endif
 
 	-- * Scheduling
 
@@ -52,8 +56,10 @@ module Control.Concurrent (
 	module Control.Concurrent.SampleVar,
 
 	-- * Merging of streams
+#ifndef __HUGS__
 	mergeIO,		-- :: [a]   -> [a] -> IO [a]
 	nmergeIO,		-- :: [[a]] -> IO [a]
+#endif
 	-- $merge
 
 	-- * GHC's implementation of concurrency
@@ -84,8 +90,7 @@ import GHC.Base
 #endif
 
 #ifdef __HUGS__
-import IOExts ( unsafeInterleaveIO )
-import ConcBase
+import Hugs.ConcBase
 #endif
 
 import Control.Concurrent.MVar
@@ -204,7 +209,7 @@ real_handler ex =
 
 #endif /* __GLASGOW_HASKELL__ */
 
-
+#ifndef __HUGS__
 max_buff_size :: Int
 max_buff_size = 1
 
@@ -276,6 +281,7 @@ nmergeIO lss
     return val
   where
     mapIO f xs = sequence (map f xs)
+#endif /* __HUGS__ */
 
 -- ---------------------------------------------------------------------------
 -- More docs
