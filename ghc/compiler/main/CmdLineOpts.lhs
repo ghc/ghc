@@ -453,6 +453,8 @@ getVerbFlag dflags
 -----------------------------------------------------------------------------
 -- Setting the optimisation level
 
+updOptLevel :: Int -> DynFlags -> DynFlags
+-- Set dynflags appropriate to the optimisation level
 updOptLevel n dfs
   = if (n >= 1)
      then dfs2{ hscTarget = HscC, optLevel = n } -- turn on -fvia-C with -O
