@@ -290,10 +290,10 @@ to parse it in a context with a higher precedence level than k. But if
 there is one parenthesis parsed, then the required precedence level
 drops to 0 again, and parsing inside p may succeed.
 
-'appPrec' is just the precedence level of function application (maybe
-it should be called 'appPrec' instead).  So, if we are parsing
-function application, we'd better require the precedence level to be
-at least 'appPrec'. Otherwise, we have to put parentheses around it.
+'appPrec' is just the precedence level of function application.  So,
+if we are parsing function application, we'd better require the
+precedence level to be at least 'appPrec'. Otherwise, we have to put
+parentheses around it.
 
 'step' is used to increase the precedence levels inside a
 parser, and can be used to express left- or right- associativity. For
