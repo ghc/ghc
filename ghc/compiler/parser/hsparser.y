@@ -755,7 +755,8 @@ constr_after_context :
 	|  OPAREN qconsym CPAREN batypes	{ $$ = mkconstrpre($2,$4,hsplineno); }
 
 /* Con { op1 :: Int } */
-	|  gtycon OCURLY fields CCURLY		{ $$ = mkconstrrec($1,$3,hsplineno); }
+	| qtycon OCURLY fields CCURLY		{ $$ = mkconstrrec($1,$3,hsplineno); }
+	| OPAREN qconsym CPAREN OCURLY fields CCURLY { $$ = mkconstrrec($2,$5,hsplineno); }
 	;
 		/* 1 S/R conflict on OCURLY -> shift */
 
