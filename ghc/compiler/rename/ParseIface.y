@@ -51,6 +51,7 @@ import Ratio ( (%) )
 %lexer      { lexer } { ITeof }
 
 %token
+ 'as' 		{ ITas }
  'case' 	{ ITcase }  			-- Haskell keywords
  'class' 	{ ITclass } 
  'data' 	{ ITdata } 
@@ -58,6 +59,7 @@ import Ratio ( (%) )
  'deriving' 	{ ITderiving }
  'do' 		{ ITdo }
  'else' 	{ ITelse }
+ 'hiding' 	{ IThiding }
  'if' 		{ ITif }
  'import' 	{ ITimport }
  'in' 		{ ITin }
@@ -69,12 +71,11 @@ import Ratio ( (%) )
  'module' 	{ ITmodule }
  'newtype' 	{ ITnewtype }
  'of' 		{ ITof }
+ 'qualified' 	{ ITqualified }
  'then' 	{ ITthen }
  'type' 	{ ITtype }
  'where' 	{ ITwhere }
- 'as' 		{ ITas }
- 'qualified' 	{ ITqualified }
- 'hiding' 	{ IThiding }
+--???? 'scc' { ITscc } 
 
  'forall'	{ ITforall }			-- GHC extension keywords
  'foreign'	{ ITforeign }
@@ -83,15 +84,17 @@ import Ratio ( (%) )
  'dynamic'	{ ITdynamic }
  'unsafe'	{ ITunsafe }
  'with'		{ ITwith }
+ 'stdcall'      { ITstdcallconv }
+ 'ccall'        { ITccallconv }
 
  '__interface'	{ ITinterface }			-- interface keywords
  '__export'	{ IT__export }
- '__forall'	{ IT__forall }
  '__depends'	{ ITdepends }
+ '__forall'	{ IT__forall }
  '__letrec'	{ ITletrec }
  '__coerce'	{ ITcoerce }
- '__inline_call'{ ITinlineCall }
  '__inline_me'  { ITinlineMe }
+ '__inline_call'{ ITinlineCall }
  '__DEFAULT'	{ ITdefaultbranch }
  '__bot'	{ ITbottom }
  '__integer'	{ ITinteger_lit }
