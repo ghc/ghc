@@ -27,12 +27,8 @@ import Bits		( Bits(..), shiftR )
 
 import Monad		( liftM )
 
-import GlaExts		( Int(I#), addr2Int# )
-#if __GLASGOW_HASKELL__ < 503
-import Ptr		( Ptr(..) )
-#else
+import GHC.Exts		( Int(I#), addr2Int# )
 import GHC.Ptr		( Ptr(..) )
-#endif
 \end{code}
 
 %************************************************************************

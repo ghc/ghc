@@ -51,7 +51,7 @@ import Data.Int		( Int64 )
 import System.IO	( fixIO )
 import Control.Exception ( throwDyn )
 
-import GlaExts		( BCO#, newBCO#, unsafeCoerce#, 
+import GHC.Exts		( BCO#, newBCO#, unsafeCoerce#, 
 			  ByteArray#, Array#, addrToHValue#, mkApUpd0# )
 
 import GHC.Arr		( Array(..) )
