@@ -117,7 +117,10 @@ SRC_HC_PRE_OPTS  += $(HC_PRE__)
 #
 
 %.hs : %.gc
-	$(GREENCARD) $(GREENCARD_OPTS) $<
+	$(GREENCARD) $(GREENCARD_OPTS) $< -o $@
+
+%.lhs : %.gc
+	$(GREENCARD) $(GREENCARD_OPTS) $< -o $@
 
 #-----------------------------------------------------------------------------
 # C-related suffix rules
