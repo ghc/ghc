@@ -1141,7 +1141,7 @@ atomicallyzh_fast
   Sp = Sp - SIZEOF_StgAtomicallyFrame;
   frame = Sp;
 
-  SET_HDR(frame,stg_atomically_frame_info,CCCS);
+  SET_HDR(frame,stg_atomically_frame_info, W_[CCCS]);
   StgAtomicallyFrame_waiting(frame) = 0 :: CInt; // False
   StgAtomicallyFrame_code(frame) = R1;
 
@@ -1168,7 +1168,7 @@ catchSTMzh_fast
   Sp = Sp - SIZEOF_StgCatchSTMFrame;
   frame = Sp;
 
-  SET_HDR(frame, stg_catch_stm_frame_info, CCCS);
+  SET_HDR(frame, stg_catch_stm_frame_info, W_[CCCS]);
   StgCatchSTMFrame_handler(frame) = R2;
 
   /* Apply R1 to the realworld token */
@@ -1196,7 +1196,7 @@ catchRetryzh_fast
   Sp = Sp - SIZEOF_StgCatchRetryFrame;
   frame = Sp;
   
-  SET_HDR(frame, stg_catch_retry_frame_info, CCCS);
+  SET_HDR(frame, stg_catch_retry_frame_info, W_[CCCS]);
   StgCatchRetryFrame_running_alt_code(frame) = 0 :: CInt; // false;
   StgCatchRetryFrame_first_code(frame) = R1;
   StgCatchRetryFrame_alt_code(frame) = R2;
