@@ -195,7 +195,7 @@ pprStmt stmt = case stmt of
 	where
     	ppr_fn = case fn of
 		   CmmLit (CmmLabel lbl) -> pprCLabel lbl
-		   _other -> parens (cCast (pprCFunType results args) fn)
+		   _other -> parens (cCast (pprCFunType cconv results args) fn)
 			-- for a dynamic call, cast the expression to
 			-- a function of the right type (we hope).
 
@@ -218,9 +218,13 @@ pprStmt stmt = case stmt of
     CmmJump lbl _params      -> mkJMP_(pprExpr lbl) <> semi
     CmmSwitch arg ids        -> pprSwitch arg ids
 
-pprCFunType :: [(CmmReg,MachHint)] -> [(CmmExpr,MachHint)] -> SDoc
-pprCFunType ress args = 
-  res_type ress <> parens (char '*') <> parens (commafy (map arg_type args))
+pprCFunType :: CCallConv -> [(CmmReg,MachHint)] -> [(CmmExpr,MachHint)] -> SDoc
+pprCFunType cconv ress args
+  = hcat [
+	res_type ress,
+	parens (text (ccallConvAttribute cconv) <>  char '*'),
+	parens (commafy (map arg_type args))
+   ]
   where
 	res_type [] = ptext SLIT("void")
 	res_type [(one,hint)] = machRepHintCType (cmmRegRep one) hint
