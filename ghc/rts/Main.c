@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.23 2000/04/11 16:49:20 sewardj Exp $
+ * $Id: Main.c,v 1.24 2000/04/26 09:28:18 simonmar Exp $
  *
  * (c) The GHC Team 1998-2000
  *
@@ -112,7 +112,7 @@ int main(int argc, char *argv[])
       exit_status = EXIT_DEADLOCK;
       break;
     case Killed:
-      prog_belch("main thread killed");
+      prog_belch("main thread exited (uncaught exception)");
       exit_status = EXIT_KILLED;
       break;
     case Interrupted:
