@@ -746,9 +746,16 @@ specBind (Rec pairs) body_uds
 			   (body_uds `plusUDs` spec_uds)
 			-- See notes for non-rec case
 
-        new_bind = Rec (spec_defns ++ pairs')
+        new_bind = Rec (spec_defns ++ 
+			pairs'     ++ 
+			[(d,r) | (d,r,_,_) <- dict_binds])
+		-- We need to Rec together the dict_binds too, because they
+		-- can be recursive; this happens when an overloaded function
+		-- is used as a method in an instance declaration.
+		-- (The particular program that showed this up was
+		--  docon/source/auxil/DInteger.hs)
     in
-    returnSM (	new_bind : mkDictBinds dict_binds, all_uds )
+    returnSM (	[new_bind], all_uds )
     
 specDefn :: CallDetails			-- Info on how it is used in its scope
 	 -> (Id, CoreExpr)		-- The thing being bound and its un-processed RHS
