@@ -24,7 +24,7 @@
 /* memory.h and strings.h conflict on some systems.  */
 #endif /* not STDC_HEADERS and not HAVE_STRING_H */
 
-#if defined(PROFILING) || defined(PAR)
+#if defined(PROFILING) || defined(PAR) || defined(GRAN)
 /* need some "time" things */
 
 /* ToDo: This is a mess! Improve ? */
@@ -55,7 +55,7 @@ extern void checkAStack(STG_NO_ARGS);
 
 /* a real nasty Global Variable */
 /* moved to main/TopClosure(13)?.lc -- *one* of them will get linked in
-P_ TopClosure = Main_mainPrimIO_closure;
+P_ TopClosure = GHCmain_mainPrimIO_closure;
  */
 
 /* structure to carry around info about the storage manager */
@@ -71,12 +71,6 @@ extern void initParallelSystem(STG_NO_ARGS);
 extern void SynchroniseSystem(STG_NO_ARGS);
 
 extern void SetTrace PROTO((W_ address, I_ level/*?*/));
-#endif
-
-#if defined(GRAN_CHECK) && defined(GRAN)
-extern W_ debug;
-extern W_ event_trace ;
-extern W_ event_trace_all ;
 #endif
 
 extern void *stgAllocForGMP   PROTO((size_t));
@@ -106,6 +100,9 @@ int nPEs = 0;		    /* Number of PEs */
 int /* return type of "main" is defined by the C standard */
 main(int argc, char *argv[])
 {
+#ifdef GRAN
+ int i;
+#endif
 \end{code}
 
 The very first thing we do is grab the start time...just in case we're
@@ -122,7 +119,7 @@ Manager's requirements.
 
 \begin{code}
 #ifdef PAR
-    if (*argv[0] == '-') {		/* Look to see whether we're the Main Thread */
+    if (*argv[0] == '-') {     /* Look to see whether we're the Main Thread */
 	IAmMainThread = rtsTrue;
         argv++; argc--;			/* Strip off flag argument */
 /*	fprintf(stderr, "I am Main Thread\n"); */
@@ -134,10 +131,11 @@ Manager's requirements.
     nPEs = atoi(argv[1]);
     argv[1] = argv[0];
     argv++; argc--;
+    initEachPEHook();                  /* HWL: hook to be execed on each PE */
     SynchroniseSystem();
 #endif
 
-#if defined(PROFILING) || defined(PAR)
+#if defined(PROFILING) || defined(PAR) || defined(GRAN)
     /* setup string indicating time of run -- only used for profiling */
     (void) time_str();
 #endif
@@ -175,10 +173,11 @@ Manager's requirements.
     }
 #endif
 
-#if defined(CONCURRENT) && defined(GRAN)
-    if (!no_gr_profile)
+#if defined(GRAN)
+    if (!RTSflags.GranFlags.granSimStats_suppressed)
       if (init_gr_simulation(rts_argc, rts_argv, prog_argc, prog_argv) != 0) {
-	  fprintf(stderr, "init_gr_simulation failed!\n"); EXIT(EXIT_FAILURE);
+	  fprintf(stderr, "init_gr_simulation failed!\n"); 
+	  EXIT(EXIT_FAILURE);
       }
 #endif
 
@@ -228,7 +227,7 @@ Manager's requirements.
     /* Record initialization times */
     end_init();
 
-#if defined(PROFILING) || defined(CONCURRENT)
+#if defined(PROFILING) || defined(CONCURRENT) 
     /* 
      * Both the context-switcher and the cost-center profiler use 
      * a virtual timer.
@@ -264,29 +263,33 @@ Manager's requirements.
 #endif
 
 #ifdef CONCURRENT
+    AvailableStack = AvailableTSO = Prelude_Z91Z93_closure;
 # if defined(GRAN)                                                 /* HWL */
-    /* RunnableThreadsHd etc. are init in ScheduleThreads */
-    /* 
-     * I'm not sure about this.  Note that this code is for re-initializing
-     * things when a longjmp to restart_main occurs.  --JSM
-     */
-
-# else                                                             /* !GRAN */
-    AvailableStack = AvailableTSO = Nil_closure;
-    RunnableThreadsHd = RunnableThreadsTl = Nil_closure;
-    WaitingThreadsHd = WaitingThreadsTl = Nil_closure;
+    /* Moved in here from ScheduleThreads, to handle a restart_main 
+       (because of a signal) properly. */
+    for (i=0; i<RTSflags.GranFlags.proc; i++) 
+      {
+        RunnableThreadsHd[i] = RunnableThreadsTl[i] = Prelude_Z91Z93_closure;
+	WaitThreadsHd[i] = WaitThreadsTl[i] = Prelude_Z91Z93_closure;
+        PendingSparksHd[i][REQUIRED_POOL] = PendingSparksHd[i][ADVISORY_POOL] = 
+        PendingSparksTl[i][REQUIRED_POOL] = PendingSparksTl[i][ADVISORY_POOL] = 
+            NULL; 
+      }
+# else
+    RunnableThreadsHd = RunnableThreadsTl = Prelude_Z91Z93_closure;
+    WaitingThreadsHd = WaitingThreadsTl = Prelude_Z91Z93_closure;
     PendingSparksHd[REQUIRED_POOL] = 
       PendingSparksTl[REQUIRED_POOL] = PendingSparksBase[REQUIRED_POOL];
     PendingSparksHd[ADVISORY_POOL] = 
       PendingSparksTl[ADVISORY_POOL] = PendingSparksBase[ADVISORY_POOL];
 # endif
 
-    CurrentTSO = Nil_closure;
+    CurrentTSO = Prelude_Z91Z93_closure;
 
 # ifdef PAR
     RunParallelSystem(TopClosure);
 # else
-    STKO_LINK(MainStkO) = Nil_closure;
+    STKO_LINK(MainStkO) = Prelude_Z91Z93_closure;
     ScheduleThreads(TopClosure);
 # endif	/* PAR */
 
@@ -314,7 +317,13 @@ shutdownHaskell(STG_NO_ARGS)
 {
     STOP_TIME_PROFILER;
 
-    if (! exitSM(&StorageMgrInfo)) {
+#if defined(GRAN)
+    /* For some reason this must be before exitSM */
+    if (!RTSflags.GranFlags.granSimStats_suppressed)
+      end_gr_simulation();
+#endif
+
+    if (! exitSM(&StorageMgrInfo) ) {
 	fflush(stdout);
 	fprintf(stderr, "exitSM failed!\n");
 	EXIT(EXIT_FAILURE);
@@ -329,22 +338,6 @@ shutdownHaskell(STG_NO_ARGS)
 
 #if defined(TICKY_TICKY)
     if (RTSflags.TickyFlags.showTickyStats) PrintTickyInfo();
-#endif
-
-#if defined(GRAN_CHECK) && defined(GRAN)
-    if (PrintFetchMisses)
-      fprintf(stderr,"Number of fetch misses: %d\n",fetch_misses);
-
-# if defined(COUNT)
-    fprintf(stderr,"COUNT statistics:\n");
-    fprintf(stderr,"  Total number of updates: %u\n",nUPDs);
-    fprintf(stderr,"  Needed to awaken BQ: %u with avg BQ len of: %f\n",
-	    nUPDs_BQ,(float)BQ_lens/(float)nUPDs_BQ);
-    fprintf(stderr,"  Number of PAPs: %u\n",nPAPs);
-# endif
-
-    if (!no_gr_profile)
-      end_gr_simulation();
 #endif
 
     fflush(stdout);
@@ -369,7 +362,7 @@ called by @main.lc@ to initialise the string at the start of the run.
 Only used for profiling.
 
 \begin{code}
-#if defined(PROFILING) || defined(CONCURRENT)
+#if defined(PROFILING) || defined(CONCURRENT) || defined(GRAN)
 # include <time.h>
 
 char *
@@ -400,7 +393,7 @@ getErrorHandler(STG_NO_ARGS)
   return (StgInt) errorHandler;
 }
 
-#ifndef PAR
+#if !defined(PAR)
 
 void
 raiseError( handler )

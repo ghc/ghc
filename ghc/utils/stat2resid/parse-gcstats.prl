@@ -161,14 +161,16 @@ arg: while($_ = $stats[0]) {
 					$the_stats{"mut_elap_$row"} = $2 - $tot_gc_elap - $tot_mut_elap;
 					next arg; };
 
-    /GC  time\s+([\d\.]+)s\s+\(\s*([\d.]+)s elapsed\)/ && do {
+    /GC\s+time\s+([\d\.]+)s\s+\(\s*([\d.]+)s elapsed\)/ && do {
 					# $1 == $tot_gc_user || die "GCuser $1 != $tot_gc_user \n";
 					# $2 == $tot_gc_elap || die "GCelap $2 != $tot_gc_elap \n";
 					$the_stats{"gc_user_total"} = $tot_gc_user;
 					$the_stats{"gc_elap_total"} = $tot_gc_elap;
 					next arg; };
     
-    /MUT time/			&& do { next arg; };
+    /MUT\s+time/		&& do { next arg; };
+    /INIT\s+time/		&& do { next arg; };
+    /^\s*([\d,]+) bytes maximum residency/ && do { next arg; };
 
     /\%GC time/			&& do { next arg; };
     /Alloc rate/		&& do { next arg; };

@@ -389,7 +389,7 @@ stgReallocForGMP (ptr, old_size, new_size)
   size_t   old_size, new_size;
 {
     void *new_stuff_ptr = stgAllocForGMP(new_size);
-    I_ i = 0;
+    unsigned int i = 0;
     char *p = (char *) ptr;
     char *q = (char *) new_stuff_ptr;
 

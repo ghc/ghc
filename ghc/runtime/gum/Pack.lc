@@ -2,7 +2,7 @@
 % (c) The Parade/AQUA Projects, Glasgow University, 1995
 %     Kevin Hammond, February 15th. 1995
 %
-%     This is for GUM only.
+%     This is for GUM and for GrAnSim.
 %
 %************************************************************************
 %*                                                                      *
@@ -13,35 +13,77 @@
 This module defines routines for packing closures in the parallel runtime
 system (GUM).
 
+The GrAnSim version of the code defines routines for *simulating* the
+packing of closures in the same way it
+is done in the parallel runtime system. Basically GrAnSim only puts the
+addresses of the closures to be transferred into a buffer. This buffer will
+then be associated with the event of transferring the graph. When this
+event is scheduled, the @UnpackGraph@ routine is called and the buffer
+can be discarded afterwards. 
+
+Note that in GrAnSim we need many buffers, not just one per PE.
+
 \begin{code}
-#ifdef PAR /* whole file */
+#if defined(PAR) || defined(GRAN)   /* whole file */
 
 #include "rtsdefs.h"
+
+/* Which RTS flag should be used to get the size of the pack buffer ? */
+#if defined(PAR)
+#define PACK_BUFFER_SIZE   RTSflags.ParFlags.packBufferSize
+#else   /* GRAN */
+#define PACK_BUFFER_SIZE   RTSflags.GranFlags.packBufferSize
+#endif
 \end{code}
 
 Static data and code declarations.
 
 \begin{code}
-static W_ *PackBuffer = NULL; /* size: can be set via option */
+#if defined(GRAN)
+/* To be pedantic: in GrAnSim we're packing *addresses* of closures,
+   not the closures themselves.
+*/
+static P_ *PackBuffer = NULL; /* size: can be set via option */
+#else
+static W_ *PackBuffer = NULL;                /* size: can be set via option */
+#endif
 
 static W_      packlocn, clqsize, clqpos;
 static W_      unpackedsize;
-static W_      reservedPAsize;                   /*Space reserved for primitive arrays*/
+static W_      reservedPAsize;         /*Space reserved for primitive arrays*/
 static rtsBool RoomInBuffer;
 
 
 static void    InitPacking(STG_NO_ARGS), DonePacking(STG_NO_ARGS);
-static rtsBool NotYetPacking PROTO((int offset)), 
-               RoomToPack PROTO((W_ size, W_ ptrs));
+#if defined(GRAN)
+static rtsBool NotYetPacking PROTO((P_ closure));
+static void    Pack PROTO((P_ data));
+#else
+static rtsBool NotYetPacking PROTO((int offset));
+static void    Pack PROTO((W_ data));
+#endif
+static rtsBool RoomToPack PROTO((W_ size, W_ ptrs));
 static void    AmPacking PROTO((P_ closure));
 
-static void    PackClosure PROTO((P_ closure));
-static void    Pack PROTO((W_ data)),
-	       PackPLC PROTO((P_ addr)),
-	       PackOffset PROTO((int offset)),
-	       GlobaliseAndPackGA PROTO((P_ closure));
+static void    PackClosure PROTO((P_ closure))
+#if !defined(GRAN)
+               , PackPLC PROTO((P_ addr))
+	       , PackOffset PROTO((int offset))
+	       , GlobaliseAndPackGA PROTO((P_ closure))
+#endif
+               ;
 
 static int     OffsetFor PROTO((P_ closure));
+\end{code}
+
+Bit of a hack for testing if a closure is the root of the graph. This is 
+set in @PackNearbyGraph@ and tested in @PackClosure@.
+
+\begin{code}
+#if defined(GRAN)
+I_ packed_thunks = 0;
+P_ graphroot;
+#endif
 \end{code}
 
 %************************************************************************
@@ -60,36 +102,133 @@ full, closures (other than primitive arrays) are packed as FetchMes,
 and their children are not queued for packing.
 
 \begin{code}
+#  if defined(PAR)
 P_
 PackNearbyGraph(closure, packbuffersize)
 P_ closure;
 W_ *packbuffersize;
+#  else  /* GRAN */
+P_
+PackNearbyGraph(closure, tso, packbuffersize)
+P_ closure;
+P_ tso;
+W_ *packbuffersize;
+#  endif
 {
     /* Ensure enough heap for all possible RBH_Save closures */
 
-    ASSERT(RTSflags.ParFlags.packBufferSize > 0);
+    ASSERT(PACK_BUFFER_SIZE > 0);
+
+#  if defined(GRAN) && defined(GRAN_CHECK)
+    if ( RTSflags.GranFlags.debug & 0x100 ) 
+      fprintf(stderr,"Packing graph with root at 0x%lx (PE %d); demanded by TSO %#lx (%d) (PE %d)  ...\n",
+	      closure, where_is(closure), tso, TSO_ID(tso), where_is(tso) );
+#  endif   /* GRAN */
 
     if (SAVE_Hp + PACK_HEAP_REQUIRED > SAVE_HpLim)
 	return NULL;
 
     InitPacking();
+#  if defined(GRAN)
+    graphroot = closure;
+#  endif
 
     QueueClosure(closure);
     do {
 	PackClosure(DeQueueClosure());
     } while (!QueueEmpty());
 
+#  if defined(PAR)
     /* Record how much space is needed to unpack the graph */
     PackBuffer[0] = unpackedsize;
+#  else  /* GRAN */
+    /* Record how much space is needed to unpack the graph */
+    PackBuffer[PACK_FLAG_LOCN] = (P_) MAGIC_PACK_FLAG;
+    PackBuffer[PACK_TSO_LOCN] = tso;
+    PackBuffer[PACK_UNPACKED_SIZE_LOCN] = (P_) unpackedsize;
+#  endif
 
     /* Set the size parameter */
+# if defined(PAR)
     ASSERT(packlocn <= RTSflags.ParFlags.packBufferSize);
     *packbuffersize = packlocn;
+#  else  /* GRAN */
+    ASSERT(packlocn <= PackBuffer[PACK_SIZE_LOCN]);
+    /* ToDo: Print an earlier, more meaningful message */
+    if (packlocn==PACK_HDR_SIZE) {  /* i.e. packet is empty */
+      fprintf(stderr,"EMPTY PACKET! Can't transfer closure %#lx at all!!\n",
+	      closure);
+      EXIT(EXIT_FAILURE);
+    }
+    PackBuffer[PACK_SIZE_LOCN] = (P_) packlocn;
+    *packbuffersize = packlocn;
+#  endif
 
-    DonePacking();
+#  if !defined(GRAN)
+    DonePacking();                               /* {GrAnSim}vaD 'ut'Ha' */
+#  endif
 
-    return (PackBuffer);
+#  if defined(GRAN) && defined(GRAN_CHECK)
+    tot_packets++; 
+    tot_packet_size += packlocn-PACK_HDR_SIZE  ; 
+
+    if ( RTSflags.GranFlags.debug & 0x100 ) {
+      PrintPacket((P_)PackBuffer);
+    }
+#  endif   /* GRAN */
+
+    return ((P_)PackBuffer);
 }
+
+#if defined(GRAN)
+/* This version is used when the node is already local */
+
+P_
+PackOneNode(closure, tso, packbuffersize)
+P_ closure;
+P_ tso;
+W_ *packbuffersize;
+{
+    int i, clpacklocn;
+
+    InitPacking();
+
+#  if defined(GRAN) && defined(GRAN_CHECK)
+    if ( RTSflags.GranFlags.debug & 0x100 ) {
+      W_ size, ptrs, nonptrs, vhs;
+      P_ info;
+      char str[80], junk_str[80]; 
+      
+      info = get_closure_info(closure, &size, &ptrs, &nonptrs, &vhs, str);
+      fprintf(stderr,"PackOneNode: %#lx (%s)(PE %#lx) requested by TSO %#lx (%d) (PE %#lx)\n",
+	      closure, str, where_is(closure), tso, TSO_ID(tso), where_is(tso));
+    }
+#  endif
+
+    Pack(closure);
+
+    /* Record how much space is needed to unpack the graph */
+    PackBuffer[PACK_FLAG_LOCN] = (P_) MAGIC_PACK_FLAG;
+    PackBuffer[PACK_TSO_LOCN] = tso;
+    PackBuffer[PACK_UNPACKED_SIZE_LOCN] = (P_) unpackedsize;
+
+    /* Set the size parameter */
+    ASSERT(packlocn <= PACK_BUFFER_SIZE);
+    PackBuffer[PACK_SIZE_LOCN] = (P_) packlocn;
+    *packbuffersize = packlocn;
+
+#  if defined(GRAN) && defined(GRAN_CHECK)
+    tot_packets++; 
+    tot_packet_size += packlocn-PACK_HDR_SIZE  ; 
+
+    if ( RTSflags.GranFlags.debug & 0x100 ) {
+      PrintPacket(PackBuffer);
+    }
+#  endif   /* GRAN */
+
+    return ((P_)PackBuffer);
+}
+#endif  /* GRAN */
 \end{code}
 
 @PackTSO@ and @PackStkO@ are entry points for two special kinds of
@@ -99,7 +238,11 @@ normal closure layout (where all pointers occur before all non-pointers).
 Luckily, they're only needed when migrating threads between processors.
 
 \begin{code}
+#if defined(GRAN)
+P_ *
+#else
 W_ *
+#endif
 PackTSO(tso,packbuffersize)
 P_ tso;
 W_ *packbuffersize;
@@ -109,7 +252,11 @@ W_ *packbuffersize;
   return(PackBuffer);
 }
 
+#if defined(GRAN)
+P_ *
+#else
 W_ *
+#endif
 PackStkO(stko,packbuffersize)
 P_ stko;
 W_ *packbuffersize;
@@ -142,18 +289,21 @@ hence a primitive array can always be packed along with it's parent
 closure.
 
 \begin{code}
+#if defined(PAR)
+
 void
 PackClosure(closure)
 P_ closure;
 {
     W_ size, ptrs, nonptrs, vhs;
     int i, clpacklocn;
+    char str[80];
 
     while (IS_INDIRECTION(INFO_PTR(closure))) {
 	/* Don't pack indirection closures */
-#ifdef PACK_DEBUG
+#  ifdef PACK_DEBUG
 	fprintf(stderr, "Shorted an indirection at %x", closure);
-#endif
+#  endif
 	closure = (P_) IND_CLOSURE_PTR(closure);
     }
 
@@ -173,25 +323,25 @@ P_ closure;
 	switch (INFO_TYPE(INFO_PTR(closure))) {
 
 	case INFO_CHARLIKE_TYPE:
-#ifdef PACK_DEBUG
+#  ifdef PACK_DEBUG
 	    fprintf(stderr, "Packing a charlike %s\n", CHARLIKE_VALUE(closure));
-#endif
+#  endif
 	    PackPLC((P_) CHARLIKE_CLOSURE(CHARLIKE_VALUE(closure)));
 	    return;
 
 	case INFO_CONST_TYPE:
-#ifdef PACK_DEBUG
+#  ifdef PACK_DEBUG
 	    fprintf(stderr, "Packing a const %s\n", CONST_STATIC_CLOSURE(INFO_PTR(closure)));
-#endif
+#  endif
 	    PackPLC(CONST_STATIC_CLOSURE(INFO_PTR(closure)));
 	    return;
 
 	case INFO_STATIC_TYPE:
 	case INFO_CAF_TYPE:	/* For now we ship indirections to CAFs: They are
 				 * evaluated on each PE if needed */
-#ifdef PACK_DEBUG
+#  ifdef PACK_DEBUG
 	    fprintf(stderr, "Packing a PLC %x\n", closure);
-#endif
+#  endif
 	    PackPLC(closure);
 	    return;
 
@@ -200,27 +350,27 @@ P_ closure;
 		I_ val = INTLIKE_VALUE(closure);
 
 		if ((val <= MAX_INTLIKE) && (val >= MIN_INTLIKE)) {
-#ifdef PACK_DEBUG
+#  ifdef PACK_DEBUG
 		    fprintf(stderr, "Packing a small intlike %d as a PLC\n", val);
-#endif
+#  endif
 		    PackPLC(INTLIKE_CLOSURE(val));
 		    return;
 		} else {
-#ifdef PACK_DEBUG
+#  ifdef PACK_DEBUG
 		    fprintf(stderr, "Packing a big intlike %d as a normal closure\n", val);
-#endif
+#  endif
 		    break;
 		}
 	    }
 	default:
-#ifdef PACK_DEBUG
+#  ifdef PACK_DEBUG
 	    fprintf(stderr, "Not a PLC: ");
-#endif
+#  endif
 	}			/* Switch */
 
 	/* Otherwise it's not Fixed */
 
-	info = get_closure_info(closure, &size, &ptrs, &nonptrs, &vhs);
+	info = get_closure_info(closure, &size, &ptrs, &nonptrs, &vhs, str);
 
 	if (INFO_TYPE(info) == INFO_FETCHME_TYPE || IS_BLACK_HOLE(info))
 	    size = ptrs = nonptrs = vhs = 0;
@@ -234,7 +384,7 @@ P_ closure;
 	    W_ childSize, childPtrs, childNonPtrs, childVhs;
 
 	    childInfo = get_closure_info(((PP_) (closure))[i + FIXED_HS + vhs],
-	      &childSize, &childPtrs, &childNonPtrs, &childVhs);
+	      &childSize, &childPtrs, &childNonPtrs, &childVhs, str);
 	    if (IS_BIG_MOTHER(childInfo)) {
 		reservedPAsize += PACK_GA_SIZE + FIXED_HS + childVhs + childNonPtrs
 		  + childPtrs * PACK_FETCHME_SIZE;
@@ -295,11 +445,11 @@ P_ closure;
 	     */
 
 	    if (IS_THUNK(info) && IS_UPDATABLE(info)) {
-#ifdef DEBUG
+#  ifdef DEBUG
 		P_ rbh =
-#else
+#  else
 		(void)
-#endif
+#  endif
 		convertToRBH(closure);
 
 		ASSERT(rbh != NULL);
@@ -310,6 +460,160 @@ P_ closure;
     else
 	PackOffset(clpacklocn);
 }
+
+#else  /* GRAN */
+
+/* Fake the packing of a closure */
+
+void
+PackClosure(closure)
+P_ closure;
+{
+    W_ size, ptrs, nonptrs, vhs;
+    W_ childSize, childPtrs, junk;   /*size, no. ptrs etc. of a child closure*/
+    P_ childInfo;
+    P_ info;
+    int i, clpacklocn;
+    W_ PAsize = 0;           /*total size + no. ptrs of all child prim arrays*/
+    W_ PAptrs = 0;
+    char str[80], junk_str[80]; 
+    rtsBool will_be_rbh, no_more_thunks_please;
+
+    /* In GranSim we don't pack and unpack closures -- we just simulate */
+    /* that by updating the bitmask. So, the graph structure is unchanged */
+    /* i.e. we don't short out indirections here. -- HWL */
+
+    if (where_is(closure) != where_is(graphroot)) {
+      /* GUM would pack a FETCHME here; simulate that by increasing the */
+      /* unpacked size accordingly but don't pack anything -- HWL */
+      unpackedsize += FIXED_HS + FETCHME_CLOSURE_SIZE(closure);
+      return; 
+    }
+    /* clpacklocn = OffsetFor(closure); */
+
+    /* If the closure's not already being packed */
+    if (NotYetPacking(closure)) {
+	switch (INFO_TYPE(INFO_PTR(closure))) {
+	case INFO_SPEC_RBH_TYPE:
+	case INFO_GEN_RBH_TYPE:
+#  if defined(GRAN) && defined(GRAN_CHECK)
+	  if ( RTSflags.GranFlags.debug & 0x100 ) {
+	    fprintf(stderr,"************ Avoid packing RBH @ %#lx!\n", closure);
+	  }
+#  endif
+          /* Just ignore RBHs i.e. they stay where they are */
+	  return;
+
+	case INFO_CHARLIKE_TYPE:
+	case INFO_CONST_TYPE:
+	case INFO_STATIC_TYPE:
+	case INFO_CAF_TYPE:       /* For now we ship indirections to CAFs:
+				   * They are evaluated on each PE if needed */
+	  Pack(closure);
+	  return;
+
+	case INFO_INTLIKE_TYPE:
+	  {
+	    I_ val = INTLIKE_VALUE(closure);
+	    if ((val <= MAX_INTLIKE) && (val >= MIN_INTLIKE)) {
+	      Pack(closure);
+	      return;
+	    } else {
+	      break;
+	    }
+	  }
+	default:
+	  /* Just fall through to the rest of the function */
+	}     /* Switch */
+
+	/* Otherwise it's not Fixed */
+
+	info = get_closure_info(closure, &size, &ptrs, &nonptrs, &vhs, str);
+	will_be_rbh = IS_THUNK(info) && IS_UPDATABLE(info);
+	no_more_thunks_please = 
+	   (RTSflags.GranFlags.ThunksToPack>0) && 
+	   (packed_thunks>=RTSflags.GranFlags.ThunksToPack);
+
+	if (INFO_TYPE(info) == INFO_FETCHME_TYPE || IS_BLACK_HOLE(info))
+	    size = ptrs = nonptrs = vhs = 0;
+
+	/* Now peek ahead to see whether the closure has any primitive */
+	/* array children */ 
+	for (i = 0; i < ptrs; ++i) {
+	    P_ childInfo;
+	    W_ childSize, childPtrs, childNonPtrs, childVhs;
+
+	  childInfo = get_closure_info(((StgPtrPtr) (closure))[i + FIXED_HS + vhs],
+				       &childSize, &childPtrs, &childNonPtrs,
+				       &childVhs, junk_str);
+	  if (IS_BIG_MOTHER(childInfo)) {
+		reservedPAsize += PACK_GA_SIZE + FIXED_HS + 
+		                  childVhs + childNonPtrs +
+		                  childPtrs * PACK_FETCHME_SIZE;
+	    PAsize += PACK_GA_SIZE + FIXED_HS + childSize;
+	    PAptrs += childPtrs;
+	  }
+	}
+
+	/* Don't pack anything (GrAnSim) if it's a black hole, or the buffer
+	 * is full and it isn't a primitive array. N.B. Primitive arrays are
+	 * always packed (because their parents index into them directly) */
+
+	if (IS_BLACK_HOLE(info) || 
+	    !(RoomToPack(PACK_GA_SIZE + FIXED_HS + vhs + nonptrs, ptrs) 
+	      || IS_BIG_MOTHER(info))) 
+          return;
+
+	/* At last! A closure we can actually pack! */
+
+	if (IS_MUTABLE(info) && (INFO_TYPE(info) != INFO_FETCHME_TYPE))
+	    fprintf(stderr,"Warning: Replicated a Mutable closure!");
+
+#  if defined(GRAN) && defined(GRAN_CHECK)
+	if (no_more_thunks_please && will_be_rbh) {
+	  tot_cuts++;
+	  if ( RTSflags.GranFlags.debug & 0x100 ) 
+	    fprintf(stderr,"PackClosure (w/ RTSflags.GranFlags.ThunksToPack=%d): Cutting tree with root at %#lx\n",
+		      RTSflags.GranFlags.ThunksToPack, closure);
+	} else if (will_be_rbh || (closure==graphroot) ) {
+	    packed_thunks++;
+	    tot_thunks++;
+        }
+#  endif
+	if (!(no_more_thunks_please && will_be_rbh)) {
+	  Pack(closure);         /* actual PACKING done here --  HWL */
+	  for (i = 0; i < ptrs; ++i)
+	    QueueClosure(((StgPtrPtr) (closure))[i + FIXED_HS + vhs]);
+
+	  /* Turn thunk into a revertible black hole. */
+	  if (will_be_rbh)
+            { 
+	     P_ rbh;
+
+#  if defined(GRAN) && defined(GRAN_CHECK)
+	     if ( RTSflags.GranFlags.debug & 0x100 ) {
+	       fprintf(stderr,"> RBHing the following closure:\n (%#lx) ",
+	  	                closure);
+	       G_PPN(closure);                          /* see StgDebug */
+	     }
+#  endif
+	     rbh = convertToRBH(closure);
+	     ASSERT(rbh != NULL);
+	    }
+        }        
+      }
+    else /* !NotYetPacking(clpacklocn) */ 
+         /* Don't have to do anything in GrAnSim if closure is already */
+	 /* packed -- HWL */
+      {
+#  if defined(GRAN) && defined(GRAN_CHECK)
+	if ( RTSflags.GranFlags.debug & 0x100 )
+	  fprintf(stderr,"*** Closure %#lx is already packed and omitted now!\n",
+		  closure);
+#  endif
+      }
+}
+#endif  /* PAR */
 \end{code}
 
 %************************************************************************
@@ -318,10 +622,39 @@ P_ closure;
 %*									*
 %************************************************************************
 
+About  packet sizes  in GrAnSim: In  GrAnSim  we use  a  malloced block  of
+gransim_pack_buffer_size words to   simulate a  packet of  pack_buffer_size
+words.  In the simulated  PackBuffer  we only keep   the  addresses of  the
+closures that would be packed in the parallel  system (see Pack). To decide
+if a  packet overflow  occurs   pack_buffer_size must be   compared  versus
+unpackedsize (see RoomToPack).      Currently, there is    no  multi packet
+strategy implemented, so in  the case of  an overflow  we just stop  adding
+closures  to the  closure queue.  If  an  overflow of the  simulated packet
+occurs, we just realloc some more space for it and carry on as usual.  
+% -- HWL
+
+\begin{code}
+#if defined(GRAN)
+static P_ *
+InstantiatePackBuffer () {
+
+  PackBuffer = 
+    /* NB: gransim_pack_buffer_size instead of pack_buffer_size -- HWL */
+    (P_ *) stgMallocWords(RTSflags.GranFlags.packBufferSize_internal+PACK_HDR_SIZE,
+                          "InstantiatePackBuffer") ;
+
+  PackBuffer[PACK_SIZE_LOCN] = (P_)RTSflags.GranFlags.packBufferSize_internal;
+
+  return (PackBuffer);
+}
+#endif
+\end{code}
+
 @Pack@ is the basic packing routine.  It just writes a word of
 data into the pack buffer and increments the pack location.
 
 \begin{code}
+#if defined(PAR)
 static void
 Pack(data)
   W_ data;
@@ -329,12 +662,58 @@ Pack(data)
     ASSERT(packlocn < RTSflags.ParFlags.packBufferSize);
     PackBuffer[packlocn++] = data;
 }
+#else  /* GRAN */
+static void
+Pack(addr)
+P_ addr;
+{
+  W_ size, ptrs, nonptrs, vhs;
+  P_ info;
+  char str[80];
+
+  /* This checks the size of the GrAnSim internal pack buffer. The simulated
+     pack buffer is checked via RoomToPack (as in GUM) */
+  if (packlocn >= (int)PackBuffer[PACK_SIZE_LOCN]+PACK_HDR_SIZE) {
+
+# if defined(GRAN_CHECK)
+    if ( RTSflags.GranFlags.debug & 0x8000 ) {
+      fprintf(stderr, "Increasing size of PackBuffer %#lx to %d words (PE %u @ %d)\n",
+	      PackBuffer, PackBuffer[PACK_SIZE_LOCN]+REALLOC_SZ,
+	      CurrentProc, CurrentTime[CurrentProc]);
+    }
+# endif
+    PackBuffer = (P_ *) realloc(PackBuffer, 
+				sizeof(P_)*(REALLOC_SZ +
+                                            (int)PackBuffer[PACK_SIZE_LOCN] +
+                                            PACK_HDR_SIZE)) ;
+    if (PackBuffer == NULL) {
+      fprintf(stderr,"Failing to realloc %d more words for PackBuffer %#lx (PE %u @ %d)\n", 
+	      REALLOC_SZ, PackBuffer, CurrentProc, CurrentTime[CurrentProc]);
+      EXIT(EXIT_FAILURE);
+    } 
+    PackBuffer[PACK_SIZE_LOCN] += REALLOC_SZ;
+  }
+
+  ASSERT(packlocn < PackBuffer[PACK_SIZE_LOCN]+PACK_HDR_SIZE);
+
+  if (addr==NULL) 
+    fprintf(stderr,"Qagh {Pack}Daq: Trying to pack 0\n");
+  PackBuffer[packlocn++] = addr;
+  /* ASSERT: Data is a closure in GrAnSim here */
+  info = get_closure_info(addr, &size, &ptrs, &nonptrs, &vhs, str);
+  unpackedsize += FIXED_HS + (size < MIN_UPD_SIZE ? 
+				        MIN_UPD_SIZE : 
+				        size);
+}
+#endif  /* PAR */
 \end{code}
 
 If a closure is local, make it global.  Then, divide its weight for export.
 The GA is then packed into the pack buffer.
 
 \begin{code}      
+#if !defined(GRAN)
+
 static void
 GlobaliseAndPackGA(closure)
 P_ closure;
@@ -386,6 +765,7 @@ int offset;
     Pack(0L);			/* pe */
     Pack(offset);		/* slot/offset */
 }
+#endif  /* !GRAN */
 \end{code}
 
 %************************************************************************
@@ -398,6 +778,7 @@ The offset hash table is used during packing to record the location in
 the pack buffer of each closure which is packed.
 
 \begin{code}
+#if defined(PAR)
 static HashTable *offsettable;
 \end{code}
 
@@ -416,18 +797,26 @@ InitPackBuffer(STG_NO_ARGS)
       AllocClosureQueue(RTSflags.ParFlags.packBufferSize);
   }
 }
+#endif /* PAR */
 
 static void
 InitPacking(STG_NO_ARGS)
 {
-  /* InitPackBuffer();    now done in ParInit  HWL_ */
+#if defined(GRAN)
+  PackBuffer = InstantiatePackBuffer();     /* for GrAnSim only -- HWL */
+                                            /* NB: free in UnpackGraph */
+#endif
 
   packlocn = PACK_HDR_SIZE;
   unpackedsize = 0;
   reservedPAsize = 0;
   RoomInBuffer = rtsTrue;
   InitClosureQueue();
+#if defined(PAR)
   offsettable = allocHashTable();
+#else
+  packed_thunks = 0;                        
+#endif
 }
 \end{code}
 
@@ -435,6 +824,8 @@ InitPacking(STG_NO_ARGS)
 etc.
 
 \begin{code}
+#if defined(PAR)
+
 static void
 DonePacking(STG_NO_ARGS)
 {
@@ -480,6 +871,21 @@ int offset;
 {
   return(offset < PACK_HDR_SIZE);
 }
+
+#else  /* GRAN */
+
+static rtsBool
+NotYetPacking(closure)
+P_ closure;
+{ int i;
+  rtsBool found = rtsFalse;
+
+  for (i=PACK_HDR_SIZE; (i<packlocn) && !found; i++)
+    found = PackBuffer[i]==closure;
+
+  return (!found);
+}
+#endif
 \end{code}
 
 @RoomToPack@ determines whether there's room to pack the closure into
@@ -496,14 +902,28 @@ static rtsBool
 RoomToPack(size, ptrs)
 W_ size, ptrs;
 {
+#if defined(PAR)
     if (RoomInBuffer &&
       (packlocn + reservedPAsize + size +
-	((clqsize - clqpos) + ptrs) * PACK_FETCHME_SIZE >= RTSflags.ParFlags.packBufferSize)) {
+	((clqsize - clqpos) + ptrs) * PACK_FETCHME_SIZE >= PACK_BUFFER_SIZE))
+    {
 #ifdef PACK_DEBUG
 	fprintf(stderr, "Buffer full\n");
 #endif
 	RoomInBuffer = rtsFalse;
     }
+#else   /* GRAN */
+    if (RoomInBuffer &&
+        (unpackedsize + reservedPAsize + size +
+	((clqsize - clqpos) + ptrs) * PACK_FETCHME_SIZE >= PACK_BUFFER_SIZE))
+    {
+#if defined(GRAN_CHECK)
+    if ( RTSflags.GranFlags.debug & 0x100 ) 
+	fprintf(stderr, "Buffer full\n");
+#endif
+	RoomInBuffer = rtsFalse;
+    }
+#endif
     return (RoomInBuffer);
 }
 \end{code}
@@ -538,9 +958,8 @@ InitClosureQueue(STG_NO_ARGS)
 {
   clqpos = clqsize = 0;
 
-  if ( ClosureQueue == NULL ) {
-     AllocClosureQueue(RTSflags.ParFlags.packBufferSize);
-  }
+  if ( ClosureQueue == NULL ) 
+     AllocClosureQueue(PACK_BUFFER_SIZE);
 }
 \end{code}
 
@@ -562,7 +981,7 @@ void
 QueueClosure(closure)
 P_ closure;
 {
-  if(clqsize < RTSflags.ParFlags.packBufferSize)
+  if(clqsize < PACK_BUFFER_SIZE )
     ClosureQueue[clqsize++] = closure;
   else
     {
@@ -595,6 +1014,7 @@ These routines determine whether a GA is one of a number of special types
 of GA.
 
 \begin{code}
+#if defined(PAR)
 rtsBool
 isOffset(ga)
 globalAddr *ga;
@@ -608,6 +1028,7 @@ globalAddr *ga;
 {
     return (ga->weight == 0);
 }
+#endif
 \end{code}
 
 %************************************************************************
@@ -617,12 +1038,15 @@ globalAddr *ga;
 %************************************************************************
 
 \begin{code}
-#ifdef DEBUG
+#if defined(DEBUG) || defined(GRAN_CHECK)
+
+#if defined(PAR)
 void
 PrintPacket(buffer)
 P_ buffer;
 {
     W_ size, ptrs, nonptrs, vhs;
+    char str[80];
 
     globalAddr ga;
 
@@ -665,7 +1089,8 @@ P_ buffer;
 	    fprintf(stderr, "[%u]: (%x, %d, %x) ", gastart, 
               ga.loc.gc.gtid, ga.loc.gc.slot, ga.weight);
 
-	    info = get_closure_info((P_) (buffer + closurestart), &size, &ptrs, &nonptrs, &vhs);
+	    info = get_closure_info((P_) (buffer + closurestart), &size,
+	                            &ptrs, &nonptrs, &vhs, str);
 
             if (INFO_TYPE(info) == INFO_FETCHME_TYPE || IS_BLACK_HOLE(info))
 	      size = ptrs = nonptrs = vhs = 0;
@@ -718,7 +1143,8 @@ P_ buffer;
 	    if (parent == NULL)
 		break;
 	    else {
-		(void) get_closure_info(parent, &size, &pptrs, &nonptrs, &pvhs);
+		(void) get_closure_info(parent, &size, &pptrs, &nonptrs,
+		                        &pvhs, str);
 		pptr = 0;
 	    }
 	}
@@ -726,7 +1152,107 @@ P_ buffer;
 
     fprintf(stderr, "--- End ---\n\n");
 }
-#endif
+#else  /* GRAN */
+void
+PrintPacket(buffer)
+P_ buffer;
+{
+    extern char *info_hdr_type(P_ infoptr);  /* defined in Threads.lc */
+    extern char *info_type(P_ infoptr);      /* defined in Threads.lc */
+
+    char str1[80], str2[80], junk_str[80];
+
+    W_ size, ptrs, nonptrs, vhs;
+
+    /* globalAddr ga; */
+
+    W_ bufsize, unpackedsize ;
+    P_ parent;
+    W_ pptr = 0, pptrs = 0, pvhs;
+
+    W_ unpacklocn = PACK_HDR_SIZE;
+    W_ gastart = unpacklocn;
+    W_ closurestart = unpacklocn;
+
+    P_ info, tso;
+    P_ closure;
+
+    int i;
+
+    InitClosureQueue();
+
+#    if defined(GRAN) && defined(GRAN_CHECK)
+    if (buffer[PACK_FLAG_LOCN] != MAGIC_PACK_FLAG) {
+      fprintf(stderr,"Packet @ 0x%lx hs no flag : 0x%lx\n",
+	      buffer, buffer[PACK_FLAG_LOCN]);
+      EXIT(EXIT_FAILURE);
+    }
+#    endif
+
+    tso = (P_) buffer[PACK_TSO_LOCN];
+
+    /* Unpack the header */
+    unpackedsize = buffer[PACK_UNPACKED_SIZE_LOCN];
+    bufsize = buffer[PACK_SIZE_LOCN];
+
+    fprintf(stderr, "Packed Packet %#lx, size %u (unpacked size is %u); demanded by TSO %#lx (%d)(PE %d)\n--- Begin ---\n", 
+	            buffer, bufsize, unpackedsize, tso, TSO_ID(tso), where_is(tso));
+
+    do {
+	closurestart = unpacklocn;
+	closure = (P_) buffer[unpacklocn++];
+	
+	fprintf(stderr, "[%u]: (%#lx) ", closurestart, closure);
+
+	info = get_closure_info((P_) (closure), 
+				         &size, &ptrs, &nonptrs, &vhs,str1);
+	strcpy(str2,info_type(info));
+	fprintf(stderr, "(%s|%s) ", str1, str2);
+	
+        if (INFO_TYPE(info) == INFO_FETCHME_TYPE || IS_BLACK_HOLE(info))
+	  size = ptrs = nonptrs = vhs = 0;
+	
+	if (IS_THUNK(info)) {
+		if (IS_UPDATABLE(info))
+		    fputs("SHARED ", stderr);
+		else
+		    fputs("UNSHARED ", stderr);
+	} 
+        if (IS_BLACK_HOLE(info)) {
+		fputs("BLACK HOLE\n", stderr);
+	} else {
+		/* Fixed header */
+		fprintf(stderr, "FH [%#lx", closure[0]);
+		for (i = 1; i < FIXED_HS; i++)
+		    fprintf(stderr, " %#lx", closure[i]);
+	
+		/* Variable header */
+		if (vhs > 0) {
+		    fprintf(stderr, "] VH [%#lx", closure[FIXED_HS]);
+	
+		    for (i = 1; i < vhs; i++)
+			fprintf(stderr, " %#lx", closure[FIXED_HS+i]);
+		}
+	
+		fprintf(stderr, "] PTRS %u", ptrs);
+	
+		/* Non-pointers */
+		if (nonptrs > 0) {
+		    fprintf(stderr, " NPTRS [%#lx", closure[FIXED_HS+vhs]);
+		
+		    for (i = 1; i < nonptrs; i++)
+			fprintf(stderr, " %#lx", closure[FIXED_HS+vhs+i]);
+	
+		    putc(']', stderr);
+		}
+		putc('\n', stderr);
+	}
+    } while (unpacklocn<bufsize) ;  /* (parent != NULL); */
+
+    fprintf(stderr, "--- End ---\n\n");
+}
+#endif /* PAR */
+#endif /* DEBUG || GRAN_CHECK */
 \end{code}
 
 %************************************************************************
@@ -744,11 +1270,26 @@ type of closure -- see @SMInfoTables.lh@ for the legal info. types etc.
 
 \begin{code}
 P_
-get_closure_info(closure, size, ptrs, nonptrs, vhs)
+get_closure_info(closure, size, ptrs, nonptrs, vhs, type)
 P_ closure;
 W_ *size, *ptrs, *nonptrs, *vhs;
+char *type;
 {
-    P_ ip = (P_) INFO_PTR(closure);
+   P_ ip = (P_) INFO_PTR(closure);
+
+   if (closure==NULL) {
+     fprintf(stderr, "Qagh {get_closure_info}Daq: NULL closure\n");
+     *size = *ptrs = *nonptrs = *vhs = 0; 
+     strcpy(type,"ERROR in get_closure_info");
+     return;
+   } else if (closure==Prelude_Z91Z93_closure) {
+     /* fprintf(stderr, "Qagh {get_closure_info}Daq: Prelude_Z91Z93_closure closure\n"); */
+     *size = *ptrs = *nonptrs = *vhs = 0; 
+     strcpy(type,"Prelude_Z91Z93_closure");
+     return;
+   };
+
+    ip = (P_) INFO_PTR(closure);
 
     switch (INFO_TYPE(ip)) {
     case INFO_SPEC_U_TYPE:
@@ -758,6 +1299,7 @@ W_ *size, *ptrs, *nonptrs, *vhs;
 	*ptrs = SPEC_CLOSURE_NoPTRS(closure);
 	*nonptrs = SPEC_CLOSURE_NoNONPTRS(closure);
 	*vhs = 0 /*SPEC_VHS*/;
+	strcpy(type,"SPEC");
 	break;
 
     case INFO_GEN_U_TYPE:
@@ -767,6 +1309,7 @@ W_ *size, *ptrs, *nonptrs, *vhs;
 	*ptrs = GEN_CLOSURE_NoPTRS(closure);
 	*nonptrs = GEN_CLOSURE_NoNONPTRS(closure);
 	*vhs = GEN_VHS;
+	strcpy(type,"GEN");
 	break;
 
     case INFO_DYN_TYPE:
@@ -774,6 +1317,7 @@ W_ *size, *ptrs, *nonptrs, *vhs;
 	*ptrs = DYN_CLOSURE_NoPTRS(closure);
 	*nonptrs = DYN_CLOSURE_NoNONPTRS(closure);
 	*vhs = DYN_VHS;
+	strcpy(type,"DYN");
 	break;
 
     case INFO_TUPLE_TYPE:
@@ -781,6 +1325,7 @@ W_ *size, *ptrs, *nonptrs, *vhs;
 	*ptrs = TUPLE_CLOSURE_NoPTRS(closure);
 	*nonptrs = TUPLE_CLOSURE_NoNONPTRS(closure);
 	*vhs = TUPLE_VHS;
+	strcpy(type,"TUPLE");
 	break;
 
     case INFO_DATA_TYPE:
@@ -788,6 +1333,7 @@ W_ *size, *ptrs, *nonptrs, *vhs;
 	*ptrs = DATA_CLOSURE_NoPTRS(closure);
 	*nonptrs = DATA_CLOSURE_NoNONPTRS(closure);
 	*vhs = DATA_VHS;
+	strcpy(type,"DATA");
 	break;
 
     case INFO_IMMUTUPLE_TYPE:
@@ -796,6 +1342,7 @@ W_ *size, *ptrs, *nonptrs, *vhs;
 	*ptrs = MUTUPLE_CLOSURE_NoPTRS(closure);
 	*nonptrs = MUTUPLE_CLOSURE_NoNONPTRS(closure);
 	*vhs = MUTUPLE_VHS;
+	strcpy(type,"(IM)MUTUPLE");
 	break;
 
     case INFO_STATIC_TYPE:
@@ -803,6 +1350,7 @@ W_ *size, *ptrs, *nonptrs, *vhs;
 	*ptrs = STATIC_CLOSURE_NoPTRS(closure);
 	*nonptrs = STATIC_CLOSURE_NoNONPTRS(closure);
 	*vhs = STATIC_VHS;
+	strcpy(type,"STATIC");
 	break;
 
     case INFO_CAF_TYPE:
@@ -811,6 +1359,7 @@ W_ *size, *ptrs, *nonptrs, *vhs;
 	*ptrs = IND_CLOSURE_NoPTRS(closure);
 	*nonptrs = IND_CLOSURE_NoNONPTRS(closure);
 	*vhs = IND_VHS;
+	strcpy(type,"CAF|IND");
 	break;
 
     case INFO_CONST_TYPE:
@@ -818,6 +1367,7 @@ W_ *size, *ptrs, *nonptrs, *vhs;
 	*ptrs = CONST_CLOSURE_NoPTRS(closure);
 	*nonptrs = CONST_CLOSURE_NoNONPTRS(closure);
 	*vhs = CONST_VHS;
+	strcpy(type,"CONST");
 	break;
 
     case INFO_SPEC_RBH_TYPE:
@@ -830,6 +1380,7 @@ W_ *size, *ptrs, *nonptrs, *vhs;
 	} else
 	    *ptrs -= 1;
 	*vhs = SPEC_RBH_VHS;
+	strcpy(type,"SPEC_RBH");
 	break;
 
     case INFO_GEN_RBH_TYPE:
@@ -842,6 +1393,7 @@ W_ *size, *ptrs, *nonptrs, *vhs;
 	} else
 	    *ptrs -= 1;
 	*vhs = GEN_RBH_VHS;
+	strcpy(type,"GEN_RBH");
 	break;
 
     case INFO_CHARLIKE_TYPE:
@@ -849,6 +1401,7 @@ W_ *size, *ptrs, *nonptrs, *vhs;
 	*ptrs = CHARLIKE_CLOSURE_NoPTRS(closure);
 	*nonptrs = CHARLIKE_CLOSURE_NoNONPTRS(closure);
 	*vhs = CHARLIKE_VHS;
+	strcpy(type,"CHARLIKE");
 	break;
 
     case INFO_INTLIKE_TYPE:
@@ -856,13 +1409,16 @@ W_ *size, *ptrs, *nonptrs, *vhs;
 	*ptrs = INTLIKE_CLOSURE_NoPTRS(closure);
 	*nonptrs = INTLIKE_CLOSURE_NoNONPTRS(closure);
 	*vhs = INTLIKE_VHS;
+	strcpy(type,"INTLIKE");
 	break;
 
+#  if !defined(GRAN)
     case INFO_FETCHME_TYPE:
 	*size = FETCHME_CLOSURE_SIZE(closure);
         *ptrs = FETCHME_CLOSURE_NoPTRS(closure);
         *nonptrs = FETCHME_CLOSURE_NoNONPTRS(closure);
         *vhs = FETCHME_VHS;
+	strcpy(type,"FETCHME");
 	break;
 
     case INFO_FMBQ_TYPE:
@@ -870,13 +1426,16 @@ W_ *size, *ptrs, *nonptrs, *vhs;
         *ptrs = FMBQ_CLOSURE_NoPTRS(closure);
         *nonptrs = FMBQ_CLOSURE_NoNONPTRS(closure);
         *vhs = FMBQ_VHS;
+	strcpy(type,"FMBQ");
 	break;
+#  endif
 
     case INFO_BQ_TYPE:
 	*size = BQ_CLOSURE_SIZE(closure);
         *ptrs = BQ_CLOSURE_NoPTRS(closure);
         *nonptrs = BQ_CLOSURE_NoNONPTRS(closure);
         *vhs = BQ_VHS;
+	strcpy(type,"BQ");
 	break;
 
     case INFO_BH_TYPE:
@@ -884,7 +1443,24 @@ W_ *size, *ptrs, *nonptrs, *vhs;
         *ptrs = BH_CLOSURE_NoPTRS(closure);
         *nonptrs = BH_CLOSURE_NoNONPTRS(closure);
         *vhs = BH_VHS;
+	strcpy(type,"BH");
 	break;
+
+    case INFO_TSO_TYPE:
+	*size = 0; /* TSO_CLOSURE_SIZE(closure); */
+        *ptrs = 0; /* TSO_CLOSURE_NoPTRS(closure); */
+        *nonptrs = 0; /* TSO_CLOSURE_NoNONPTRS(closure); */
+        *vhs = TSO_VHS;
+	strcpy(type,"TSO");
+	break;
+
+    case INFO_STKO_TYPE:
+        *size = 0;
+    	*ptrs = 0;
+        *nonptrs = 0;
+    	*vhs = STKO_VHS;
+    	strcpy(type,"STKO");
+        break;
 
     default:
 	fprintf(stderr, "get_closure_info:  Unexpected closure type (%lu), closure %lx\n",
@@ -900,7 +1476,6 @@ W_ *size, *ptrs, *nonptrs, *vhs;
 is available, but it will not perform garbage collection.
 
 \begin{code}
-
 P_
 AllocateHeap(size)
 W_ size;
@@ -917,6 +1492,8 @@ W_ size;
     return newClosure;
 }
 
+#if defined(PAR)
+
 void
 doGlobalGC(STG_NO_ARGS)
 {
@@ -924,8 +1501,10 @@ doGlobalGC(STG_NO_ARGS)
   EXIT(EXIT_FAILURE);
   fishing = rtsFalse;
 }
+
+#endif /* PAR */
 \end{code}
 
 \begin{code}
-#endif /* PAR -- whole file */
+#endif /* PAR  || GRAN  -- whole file */
 \end{code}

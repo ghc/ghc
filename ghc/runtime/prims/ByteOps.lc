@@ -73,7 +73,7 @@ CAT3(bytes2,ctype,__)(P_ in, htype *out)	\
 	ctype i;				\
 	unsigned char cs[sizeof (ctype)];	\
     } u;					\
-    int k;					\
+    unsigned int k;				\
     unsigned char *arr = (unsigned char *) in;	\
 						\
     for (k = 0; k < sizeof(ctype); k++)		\
@@ -112,7 +112,7 @@ CAT3(bytes2,ctype,__)(P_ in, htype *out)	\
 	ctype i;				\
 	unsigned char cs[sizeof (ctype)];	\
     } u;					\
-    int k;					\
+    unsigned int k;				\
     unsigned char *arr = (unsigned char *) in;	\
 						\
     for (k = 0; k < sizeof(ctype); k++)		\

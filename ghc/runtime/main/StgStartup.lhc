@@ -106,27 +106,27 @@ IMMUTUPLE_ITBL(ImMutArrayOfPtrs_info,ImMutArrayOfPtrs_entry,UpdErr,0,INFO_OTHER_
 now - worth putting them in a file by themselves?? [ADR] */
 
 
-#ifndef PAR
+#if !defined(PAR) /* && !defined(GRAN) */
 
-/* Ditto for Malloc Pointer entry point and info tables. [ADR]
+/* Ditto for Foreign Objectr entry point and info tables. [ADR]
 
    BTW Will, I copied most of this blindly from above - what's with
    this TAG stuff? And what kind of description/ type is wanted here?
 */
 
-STATICFUN(MallocPtr_entry)
+STATICFUN(ForeignObj_entry)
 {
     FB_
     /* Don't wrap the calls; we're done with STG land */
     fflush(stdout);
-    fprintf(stderr, "Compiler bug: Entered a Malloc Pointer---this shouldn't happen!\n");
+    fprintf(stderr, "Compiler bug: Entered a ForeignObj---this shouldn't happen!\n");
     abort();
     FE_
 }
 
-MallocPtr_ITBL(MallocPtr_info,MallocPtr_entry,UpdErr,0,INFO_OTHER_TAG,,,const,EF_,MallocPtr_K,"MALLOC PTR","MallocPtr");
+ForeignObj_ITBL(ForeignObj_info,ForeignObj_entry,UpdErr,0,INFO_OTHER_TAG,,,const,EF_,ForeignObj_K,"FOREIGN OBJ","ForeignObj");
 
-/* End of MallocPtr stuff */
+/* End of ForeignObj stuff */
 
 /* Ditto for the unused Stable Pointer info table. [ADR]
 */
@@ -198,8 +198,9 @@ SET_STATIC_HDR(EmptySPTable_closure,EmptyStablePointerTable_info,CC_SUBSUMED,,ED
 /* Question: this is just an amusing hex code isn't it
    -- or does it mean something? ADR */
 P_ realWorldZh_closure = (P_) 0xbadbadbaL;
+P_ GHCbuiltins_void_closure = (P_) 0xbadbadbaL;
 
-SET_STATIC_HDR(WorldStateToken_closure,SZh_static_info,CC_SUBSUMED/*harmless*/,,ED_RO_)
+SET_STATIC_HDR(WorldStateToken_closure,GHCbase_SZh_static_info,CC_SUBSUMED/*harmless*/,,ED_RO_)
 , (W_) 0xbadbadbaL
 };
 
@@ -326,6 +327,12 @@ STGFUN(ErrorIO_innards)
 #else
     	SuA = stackInfo.botA + AREL(1);
     	SuB = stackInfo.botB + BREL(1);
+        /* HWL */
+        /* 
+        SpB = SuB = STKO_BSTK_BOT(StkOReg) + BREL(1);
+        SuA = STKO_ASTK_BOT(StkOReg) + AREL(1);
+	*/
+   
 #endif
     	break;
 
@@ -356,7 +363,7 @@ STGFUN(ErrorIO_innards)
 
     *SpA = (P_) WorldStateToken_closure;
 
-    STKO_LINK(StkOReg) = Nil_closure;
+    STKO_LINK(StkOReg) = Prelude_Z91Z93_closure;
     STKO_RETURN(StkOReg) = NULL;
 
 #ifdef TICKY_TICKY
@@ -416,7 +423,7 @@ ErrorIO_innards(STG_NO_ARGS)
 \end{code}  
 
 \begin{code}
-#ifdef PAR
+#if defined(PAR) || defined(GRAN) 
 
 STATICFUN(RBH_Save_0_entry)
 {
@@ -446,7 +453,7 @@ SPEC_N_ITBL(RBH_Save_0_info,RBH_Save_0_entry,UpdErr,0,INFO_OTHER_TAG,2,0,,IF_,IN
 SPEC_N_ITBL(RBH_Save_1_info,RBH_Save_1_entry,UpdErr,0,INFO_OTHER_TAG,2,1,,IF_,INTERNAL_KIND,"RBH-SAVE","RBH_Save_1");
 SPEC_N_ITBL(RBH_Save_2_info,RBH_Save_2_entry,UpdErr,0,INFO_OTHER_TAG,2,2,,IF_,INTERNAL_KIND,"RBH-SAVE","RBH_Save_2");
 
-#endif /* PAR */
+#endif /* PAR || GRAN */
 \end{code}
 
 
@@ -491,26 +498,6 @@ SET_STATIC_HDR(STK_STUB_closure,STK_STUB_info,CC_SUBSUMED,,EXTDATA_RO)
 };
 \end{code}
 
-\begin{code}
-#ifdef GRAN
-
-STGFUN(Event_Queue_entry) {
-    FB_
-    /* Don't wrap the calls; we're done with STG land */
-    fflush(stdout);
-    fprintf(stderr, "Entered from an event queue!\n");
-    abort();
-    JMP_(0);
-    FE_
-}
-
-GEN_N_ITBL(Event_Queue_info,Event_Queue_entry,UpdErr,0,INFO_OTHER_TAG,5,2,const,EF_,INTERNAL_KIND,"EventQ","EventQ");
-
-#endif /* GRAN */
-\end{code}
-
-
-
 %/****************************************************************
 %*								*
 %*		Some GC info tables                           *
@@ -542,7 +529,7 @@ STGFUN(Forward_Ref_New_entry) {
     /* Don't wrap the calls; we're done with STG land */
     fflush(stdout);
     fprintf(stderr,"Entered Forward_Ref_New %lx: Should never occur!\n", (W_) Node);
-    abort();
+    EXIT(EXIT_FAILURE); /* abort(); */
     FE_
 }
 FORWARDREF_ITBL(Forward_Ref_New_info,Forward_Ref_New_entry,const/*not static*/,_Evacuate_Old_Forward_Ref);
@@ -552,7 +539,7 @@ STGFUN(Forward_Ref_Old_entry) {
     /* Don't wrap the calls; we're done with STG land */
     fflush(stdout);
     fprintf(stderr,"Entered Forward_Ref_Old %lx: Should never occur!\n", (W_) Node);
-    abort();
+    EXIT(EXIT_FAILURE); /*    abort(); */
     FE_
 }
 FORWARDREF_ITBL(Forward_Ref_Old_info,Forward_Ref_Old_entry,const/*not static*/,_Evacuate_New_Forward_Ref);
@@ -562,7 +549,7 @@ STGFUN(OldRoot_Forward_Ref_entry) {
     /* Don't wrap the calls; we're done with STG land */
     fflush(stdout);
     fprintf(stderr,"Entered OldRoot_Forward_Ref %lx: Should never occur!\n", (W_) Node);
-    abort();
+    EXIT(EXIT_FAILURE); /*    abort(); */
     FE_
 }
 FORWARDREF_ITBL(OldRoot_Forward_Ref_info,OldRoot_Forward_Ref_entry,const/*not static*/,_Evacuate_OldRoot_Forward);
@@ -573,7 +560,7 @@ STGFUN(Forward_Ref_entry) {
     /* Don't wrap the calls; we're done with STG land */
     fflush(stdout);
     fprintf(stderr,"Entered Forward_Ref %lx: Should never occur!\n", (W_) Node);
-    abort();
+    EXIT(EXIT_FAILURE); /*    abort(); */
     FE_
 }
 FORWARDREF_ITBL(Forward_Ref_info,Forward_Ref_entry,const/*not static*/,_Evacuate_Forward_Ref);

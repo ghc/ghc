@@ -193,7 +193,7 @@ RegisterTable ScavRegTable;
         fprintf(stderr, "Scav StkO: 0x%lx\n", \
 		Scav)
 
-# ifdef PAR
+# if defined(PAR) || defined(GRAN)
 #  define DEBUG_SCAV_RBH(s,p) \
     if (RTSflags.GcFlags.trace & DEBUG_TRACE_CONCURRENT) \
         fprintf(stderr, "Scav RBH: 0x%lx, info 0x%lx, size %ld, ptrs %ld\n", \
@@ -223,7 +223,7 @@ RegisterTable ScavRegTable;
 # define DEBUG_SCAV_BQ
 # define DEBUG_SCAV_TSO
 # define DEBUG_SCAV_STKO
-# ifdef PAR
+# if defined(PAR) || defined(GRAN)
 #  define DEBUG_SCAV_RBH(s,p)
 #  define DEBUG_SCAV_BF
 # endif
@@ -496,7 +496,7 @@ closures.
 
 \begin{code}
 
-#ifdef PAR
+#if defined(PAR) || defined(GRAN)
 
 # if defined(GCgn)
 
@@ -588,16 +588,16 @@ SCAVENGE_SPEC_RBH_N_N(12)
 \begin{code}
 
 #ifndef PAR
-/*** Malloc POINTER -- NOTHING TO SCAVENGE ***/
+/*** Foreign Object -- NOTHING TO SCAVENGE ***/
 
-/* (The MallocPtrList is updated at the end of GC and any unevacuated
-    MallocPtrs reported to C World)  [ADR]
+/* (The ForeignObjList is updated at the end of GC and any unevacuated
+    ForeignObjs are finalised)  [ADR][SOF]
 */
 
 void
-_Scavenge_MallocPtr(STG_NO_ARGS)
+_Scavenge_ForeignObj(STG_NO_ARGS)
 {
-    I_ size = MallocPtr_SIZE;
+    I_ size = ForeignObj_SIZE;
     DEBUG_SCAV(size,0);
     PROFILE_CLOSURE(Scav,size);
     NEXT_Scav(size);
@@ -632,7 +632,7 @@ The scavenge code for revertible black holes with underlying @GEN@ closures
 
 \begin{code}
 
-#ifdef PAR
+#if defined(PAR) || defined(GRAN)
 
 void
 _Scavenge_RBH_N(STG_NO_ARGS)

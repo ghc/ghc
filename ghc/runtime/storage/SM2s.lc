@@ -138,13 +138,16 @@ collectHeap(reqsize, sm, do_full_collection)
 #ifdef PAR
     EvacuateLocalGAs(rtsTrue);
 #else
-    evacSPTable( sm );
+    /* evacSPTable( sm ); stable pointers now reachable via sm->roots */
 #endif /* PAR */
     EvacuateRoots( sm->roots, sm->rootno );
-#ifdef CONCURRENT
+#if defined(GRAN)
+    EvacuateEvents();
+#endif
+#if defined(CONCURRENT) /* && !defined(GRAN) */
     EvacuateSparks();
 #endif
-#ifndef PAR
+#if !defined(PAR) && !defined(GRAN)
     EvacuateAStack( MAIN_SpA, stackInfo.botA );
     EvacuateBStack( MAIN_SuB, stackInfo.botB, &bstk_roots );
 #endif /* !PAR */
@@ -156,7 +159,7 @@ collectHeap(reqsize, sm, do_full_collection)
 #ifdef PAR
     RebuildGAtables(rtsTrue);
 #else
-    reportDeadMallocPtrs(sm->MallocPtrList, NULL, &(sm->MallocPtrList) );
+    reportDeadForeignObjs(sm->ForeignObjList, NULL, &(sm->ForeignObjList) );
 #endif /* PAR */
 
     /* TIDY UP AND RETURN */

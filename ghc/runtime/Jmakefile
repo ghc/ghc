@@ -35,6 +35,7 @@ SUBDIRS = gmp regex
 
 GhcDriverNeededHere(depend all) /* we use its C-compiling know-how */
 EtagsNeededHere(tags)
+UnlitNeededHere(depend)
 
 /****************************************************************
 *								*
@@ -48,7 +49,7 @@ strictly speaking), it will probably work -- it is pinned onto
 GHC_OPTS, just for fun.
 */
 
-GHC_OPTS = -O2-for-C $(EXTRA_HC_OPTS)
+GHC_OPTS = $(EXTRA_HC_OPTS)
 
 /* per-build options: shared with libraries */
 #define rts_or_lib(r,l) r
@@ -144,11 +145,17 @@ CLIB_LC = 				\
 	hooks/OutOfHeap.lc		\
 	hooks/OutOfStk.lc		\
 	hooks/OutOfVM.lc		\
+	hooks/NoRunnableThrds.lc	\
 	hooks/PatErrorHdr.lc		\
 	hooks/TraceHooks.lc		\
 	hooks/SizeHooks.lc		\
+	hooks/InitEachPE.lc		\
+	io/acceptSocket.lc		\
+	io/bindSocket.lc		\
 	io/closeFile.lc			\
+	io/connectSocket.lc		\
 	io/createDirectory.lc		\
+	io/createSocket.lc		\
 	io/env.lc			\
 	io/errno.lc			\
 	io/execvpe.lc			\
@@ -165,9 +172,13 @@ CLIB_LC = 				\
 	io/getCurrentDirectory.lc	\
 	io/getDirectoryContents.lc	\
 	io/getLock.lc			\
+	io/getPeerName.lc		\
+	io/getSockName.lc		\
 	io/inputReady.lc		\
+	io/listenSocket.lc		\
 	io/openFile.lc			\
 	io/readFile.lc			\
+	io/readDescriptor.lc		\
 	io/removeDirectory.lc		\
 	io/removeFile.lc		\
 	io/renameDirectory.lc		\
@@ -176,11 +187,13 @@ CLIB_LC = 				\
 	io/setBuffering.lc		\
 	io/setCurrentDirectory.lc	\
 	io/showTime.lc			\
+	io/shutdownSocket.lc		\
 	io/system.lc			\
 	io/toClockSec.lc		\
 	io/toLocalTime.lc		\
 	io/toUTCTime.lc			\
 	io/writeFile.lc			\
+	io/writeDescriptor.lc		\
 	main/Mallocs.lc			\
 	prims/ByteOps.lc __readline_cfile
 
@@ -194,9 +207,9 @@ all depend :: $(H_FILES)
 ExtraStuffToClean ( $(C_FILES) )
 
 /* Literate-pgmming suffix rules used herein */
-LitSuffixRule(.lhc,.hc)
-LitSuffixRule(.lc,.c)
-LitSuffixRule(.lh,.h)
+UnlitSuffixRule(.lhc,.hc)
+UnlitSuffixRule(.lc,.c)
+UnlitSuffixRule(.lh,.h)
 
 /****************************************************************
 *								*
@@ -205,34 +218,34 @@ LitSuffixRule(.lh,.h)
 ****************************************************************/
 
 RTS_OBJS_norm = $(RTS_LC:.lc=.o)    $(RTS_LHC:.lhc=.o)
-RTS_OBJS_p    = $(RTS_LC:.lc=_p.o)  $(RTS_LHC:.lhc=_p.o)
-RTS_OBJS_t    = $(RTS_LC:.lc=_t.o)  $(RTS_LHC:.lhc=_t.o)
-RTS_OBJS_u    = $(RTS_LC:.lc=_u.o)  $(RTS_LHC:.lhc=_u.o)
-RTS_OBJS_mc   = $(RTS_LC:.lc=_mc.o) $(RTS_LHC:.lhc=_mc.o)
-RTS_OBJS_mr   = $(RTS_LC:.lc=_mr.o) $(RTS_LHC:.lhc=_mr.o)
-RTS_OBJS_mt   = $(RTS_LC:.lc=_mt.o) $(RTS_LHC:.lhc=_mt.o)
-RTS_OBJS_mp   = $(RTS_LC:.lc=_mp.o) $(RTS_LHC:.lhc=_mp.o)
-RTS_OBJS_mg   = $(RTS_LC:.lc=_mg.o) $(RTS_LHC:.lhc=_mg.o)
-RTS_OBJS_2s   = $(RTS_LC:.lc=_2s.o) $(RTS_LHC:.lhc=_2s.o)
-RTS_OBJS_1s   = $(RTS_LC:.lc=_1s.o) $(RTS_LHC:.lhc=_1s.o)
-RTS_OBJS_du   = $(RTS_LC:.lc=_du.o) $(RTS_LHC:.lhc=_du.o)
-RTS_OBJS_a    = $(RTS_LC:.lc=_a.o)  $(RTS_LHC:.lhc=_a.o)
-RTS_OBJS_b    = $(RTS_LC:.lc=_b.o)  $(RTS_LHC:.lhc=_b.o)
-RTS_OBJS_c    = $(RTS_LC:.lc=_c.o)  $(RTS_LHC:.lhc=_c.o)
-RTS_OBJS_d    = $(RTS_LC:.lc=_d.o)  $(RTS_LHC:.lhc=_d.o)
-RTS_OBJS_e    = $(RTS_LC:.lc=_e.o)  $(RTS_LHC:.lhc=_e.o)
-RTS_OBJS_f    = $(RTS_LC:.lc=_f.o)  $(RTS_LHC:.lhc=_f.o)
-RTS_OBJS_g    = $(RTS_LC:.lc=_g.o)  $(RTS_LHC:.lhc=_g.o)
-RTS_OBJS_h    = $(RTS_LC:.lc=_h.o)  $(RTS_LHC:.lhc=_h.o)
-RTS_OBJS_i    = $(RTS_LC:.lc=_i.o)  $(RTS_LHC:.lhc=_i.o)
-RTS_OBJS_j    = $(RTS_LC:.lc=_j.o)  $(RTS_LHC:.lhc=_j.o)
-RTS_OBJS_k    = $(RTS_LC:.lc=_k.o)  $(RTS_LHC:.lhc=_k.o)
-RTS_OBJS_l    = $(RTS_LC:.lc=_l.o)  $(RTS_LHC:.lhc=_l.o)
-RTS_OBJS_m    = $(RTS_LC:.lc=_m.o)  $(RTS_LHC:.lhc=_m.o)
-RTS_OBJS_n    = $(RTS_LC:.lc=_n.o)  $(RTS_LHC:.lhc=_n.o)
-RTS_OBJS_o    = $(RTS_LC:.lc=_o.o)  $(RTS_LHC:.lhc=_o.o)
-RTS_OBJS_A    = $(RTS_LC:.lc=_A.o)  $(RTS_LHC:.lhc=_A.o)
-RTS_OBJS_B    = $(RTS_LC:.lc=_B.o)  $(RTS_LHC:.lhc=_B.o)
+RTS_OBJS_p    = $(RTS_LC:.lc=.p_o)  $(RTS_LHC:.lhc=.p_o)
+RTS_OBJS_t    = $(RTS_LC:.lc=.t_o)  $(RTS_LHC:.lhc=.t_o)
+RTS_OBJS_u    = $(RTS_LC:.lc=.u_o)  $(RTS_LHC:.lhc=.u_o)
+RTS_OBJS_mc   = $(RTS_LC:.lc=.mc_o) $(RTS_LHC:.lhc=.mc_o)
+RTS_OBJS_mr   = $(RTS_LC:.lc=.mr_o) $(RTS_LHC:.lhc=.mr_o)
+RTS_OBJS_mt   = $(RTS_LC:.lc=.mt_o) $(RTS_LHC:.lhc=.mt_o)
+RTS_OBJS_mp   = $(RTS_LC:.lc=.mp_o) $(RTS_LHC:.lhc=.mp_o)
+RTS_OBJS_mg   = $(RTS_LC:.lc=.mg_o) $(RTS_LHC:.lhc=.mg_o)
+RTS_OBJS_2s   = $(RTS_LC:.lc=.2s_o) $(RTS_LHC:.lhc=.2s_o)
+RTS_OBJS_1s   = $(RTS_LC:.lc=.1s_o) $(RTS_LHC:.lhc=.1s_o)
+RTS_OBJS_du   = $(RTS_LC:.lc=.du_o) $(RTS_LHC:.lhc=.du_o)
+RTS_OBJS_a    = $(RTS_LC:.lc=.a_o)  $(RTS_LHC:.lhc=.a_o)
+RTS_OBJS_b    = $(RTS_LC:.lc=.b_o)  $(RTS_LHC:.lhc=.b_o)
+RTS_OBJS_c    = $(RTS_LC:.lc=.c_o)  $(RTS_LHC:.lhc=.c_o)
+RTS_OBJS_d    = $(RTS_LC:.lc=.d_o)  $(RTS_LHC:.lhc=.d_o)
+RTS_OBJS_e    = $(RTS_LC:.lc=.e_o)  $(RTS_LHC:.lhc=.e_o)
+RTS_OBJS_f    = $(RTS_LC:.lc=.f_o)  $(RTS_LHC:.lhc=.f_o)
+RTS_OBJS_g    = $(RTS_LC:.lc=.g_o)  $(RTS_LHC:.lhc=.g_o)
+RTS_OBJS_h    = $(RTS_LC:.lc=.h_o)  $(RTS_LHC:.lhc=.h_o)
+RTS_OBJS_i    = $(RTS_LC:.lc=.i_o)  $(RTS_LHC:.lhc=.i_o)
+RTS_OBJS_j    = $(RTS_LC:.lc=.j_o)  $(RTS_LHC:.lhc=.j_o)
+RTS_OBJS_k    = $(RTS_LC:.lc=.k_o)  $(RTS_LHC:.lhc=.k_o)
+RTS_OBJS_l    = $(RTS_LC:.lc=.l_o)  $(RTS_LHC:.lhc=.l_o)
+RTS_OBJS_m    = $(RTS_LC:.lc=.m_o)  $(RTS_LHC:.lhc=.m_o)
+RTS_OBJS_n    = $(RTS_LC:.lc=.n_o)  $(RTS_LHC:.lhc=.n_o)
+RTS_OBJS_o    = $(RTS_LC:.lc=.o_o)  $(RTS_LHC:.lhc=.o_o)
+RTS_OBJS_A    = $(RTS_LC:.lc=.A_o)  $(RTS_LHC:.lhc=.A_o)
+RTS_OBJS_B    = $(RTS_LC:.lc=.B_o)  $(RTS_LHC:.lhc=.B_o)
 
 CLIB_OBJS     = $(CLIB_LC:.lc=.o)
 
@@ -259,10 +272,16 @@ CompileClibishly(hooks/ErrorHdr,)
 CompileClibishly(hooks/OutOfHeap,)
 CompileClibishly(hooks/OutOfStk,)
 CompileClibishly(hooks/OutOfVM,)
+CompileClibishly(hooks/NoRunnableThrds,)
 CompileClibishly(hooks/PatErrorHdr,)
 CompileClibishly(hooks/TraceHooks,)
 CompileClibishly(hooks/SizeHooks,)
+CompileClibishly(hooks/InitEachPE,)
+CompileClibishly(io/acceptSocket,)
+CompileClibishly(io/bindSocket,)
 CompileClibishly(io/closeFile,)
+CompileClibishly(io/connectSocket,)
+CompileClibishly(io/createSocket,)
 CompileClibishly(io/createDirectory,)
 CompileClibishly(io/env,)
 CompileClibishly(io/errno,)
@@ -280,9 +299,13 @@ CompileClibishly(io/getClockTime,)
 CompileClibishly(io/getCurrentDirectory,)
 CompileClibishly(io/getDirectoryContents,)
 CompileClibishly(io/getLock,)
+CompileClibishly(io/getPeerName,)
+CompileClibishly(io/getSockName,)
 CompileClibishly(io/inputReady,)
+CompileClibishly(io/listenSocket,)
 CompileClibishly(io/openFile,)
 CompileClibishly(io/readFile,)
+CompileClibishly(io/readDescriptor,)
 CompileClibishly(io/removeDirectory,)
 CompileClibishly(io/removeFile,)
 CompileClibishly(io/renameDirectory,)
@@ -291,26 +314,26 @@ CompileClibishly(io/seekFile,)
 CompileClibishly(io/setBuffering,)
 CompileClibishly(io/setCurrentDirectory,)
 CompileClibishly(io/showTime,)
+CompileClibishly(io/shutdownSocket,)
 CompileClibishly(io/system,)
 CompileClibishly(io/toClockSec,)
 CompileClibishly(io/toLocalTime,)
 CompileClibishly(io/toUTCTime,)
+CompileClibishly(io/writeDescriptor,)
 CompileClibishly(io/writeFile,)
 CompileClibishly(main/Mallocs,)
-CompileClibishly(main/TopClosure,)	/* NB */
-CompileClibishly(main/TopClosure13,)	/* ditto */
+CompileClibishly(main/TopClosure,)
 CompileClibishly(prims/ByteOps,)
 #if GhcWithReadline == YES
 CompileClibishly(io/ghcReadline,)
 #endif
 
-ExtraStuffToClean(main/TopClosure.o main/TopClosure13.o)
+ExtraStuffToClean(main/TopClosure.o)
 
-all :: main/TopClosure.o main/TopClosure13.o
+all :: main/TopClosure.o
 
-install :: main/TopClosure.o main/TopClosure13.o
+install :: main/TopClosure.o
 	$(INSTALL) -c $(INSTLIBFLAGS) main/TopClosure.o   $(INSTLIBDIR_GHC)/TopClosure.o
-	$(INSTALL) -c $(INSTLIBFLAGS) main/TopClosure13.o $(INSTLIBDIR_GHC)/TopClosure13.o
 
 #if GhcBuild_mp == YES
 # if solaris2_TARGET_OS
@@ -453,12 +476,12 @@ IfGhcBuild_B(DoRtsFile(file,isuf,_B,   flags $(GHC_OPTS_B)))
 CompileRTSishly(c-as-asm/CallWrap_C,.c,)
 CompileRTSishly(c-as-asm/FreeMallocPtr,.c,)
 CompileRTSishly(c-as-asm/HpOverflow,.c,)
-CompileRTSishly(c-as-asm/PerformIO,.hc,-optcO-DIN_GHC_RTS=1)
+CompileRTSishly(c-as-asm/PerformIO,.hc,-optc-DIN_GHC_RTS=1)
 CompileRTSishly(c-as-asm/StablePtr,.c,)
 CompileRTSishly(c-as-asm/StablePtrOps,.c,)
 CompileRTSishly(c-as-asm/StgDebug,.c,)
 CompileRTSishly(c-as-asm/StgMiniInt,.c,)
-CompileRTSishly(gum/FetchMe,.hc,-optcO-DIN_GHC_RTS=1)
+CompileRTSishly(gum/FetchMe,.hc,-optc-DIN_GHC_RTS=1)
 CompileRTSishly(gum/GlobAddr,.c,)
 CompileRTSishly(gum/HLComms,.c,)
 CompileRTSishly(gum/Hash,.c,)
@@ -476,9 +499,9 @@ CompileRTSishly(main/SMRep,.c,)
 CompileRTSishly(main/Select,.c,)
 CompileRTSishly(main/Signals,.c,)
 CompileRTSishly(main/StgOverflow,.c,)
-CompileRTSishly(main/StgStartup,.hc,-optcO-DIN_GHC_RTS=1)
-CompileRTSishly(main/StgThreads,.hc,-optcO-DIN_GHC_RTS=1)
-CompileRTSishly(main/StgUpdate,.hc,-optcO-DIN_GHC_RTS=1)
+CompileRTSishly(main/StgStartup,.hc,-optc-DIN_GHC_RTS=1)
+CompileRTSishly(main/StgThreads,.hc,-optc-DIN_GHC_RTS=1)
+CompileRTSishly(main/StgUpdate,.hc,-optc-DIN_GHC_RTS=1)
 CompileRTSishly(main/Threads,.c,)
 CompileRTSishly(main/RtsFlags,.c,)
 CompileRTSishly(main/main,.c,)
@@ -500,7 +523,7 @@ CompileRTSishly(storage/SMevac,.c,)
 CompileRTSishly(storage/SMextn,.c,)
 CompileRTSishly(storage/SMgen,.c,)
 CompileRTSishly(storage/SMinit,.c,)
-CompileRTSishly(storage/SMmark,.hc,-optcO-DIN_GHC_RTS=1 -optc-DMARK_REG_MAP)
+CompileRTSishly(storage/SMmark,.hc,-optc-DIN_GHC_RTS=1 -optc-DMARK_REG_MAP)
 CompileRTSishly(storage/SMmarking,.c,)
 CompileRTSishly(storage/SMscan,.c,)
 CompileRTSishly(storage/SMscav,.c,)
@@ -522,8 +545,3 @@ CTagsTarget( gmp/[a-z]*.c )
 CTagsTarget( regex/[a-z]*.c )
 
 CDependTarget( $(RTS_LC) $($RTS_LHC) $(CLIB_LC) )
-
-LitStuffNeededHere(docs depend)
-InfoStuffNeededHere(docs)
-
-/*LitDocRootTargetWithNamedOutput(threadroot,lit,threadroot-standalone)*/

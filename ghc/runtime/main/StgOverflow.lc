@@ -158,7 +158,7 @@ P_ frame;
 		    /* Urgh.  Two queues.  Merge them. */
 		    P_ tso = (P_) BQ_ENTRIES(updatee_keep);
 
-		    while (TSO_LINK(tso) != Nil_closure)
+		    while (TSO_LINK(tso) != Prelude_Z91Z93_closure)
 			tso = TSO_LINK(tso);
 
 		    TSO_LINK(tso) = (P_) BQ_ENTRIES(updatee_bypass);
@@ -285,18 +285,22 @@ W_ args2;
     SET_TASK_ACTIVITY(ST_OVERHEAD);
 
 
-    /*?/
+    /*?
+    if (RTSflags.GcFlags.giveStats) {
       fprintf(stderr,"StackOverflow:liveness=%lx,a=%lx,b=%lx\n",
       liveness,words_of_a,words_of_b);
-    /?*/
+    }
+    ?*/
 
     old_stko = SAVE_StkO;
 
-    /*?/
+    /*?
+    if (RTSflags.GcFlags.giveStats) {
       fprintf(stderr, "stko: %lx SpA %lx SuA %lx SpB %lx SuB %lx\n",
       old_stko, STKO_SpA(old_stko),
       STKO_SuA(old_stko), STKO_SpB(old_stko), STKO_SuB(old_stko));
-    /?*/
+    }
+    ?*/
 
     if (RTSflags.GcFlags.squeezeUpdFrames) {
 
@@ -306,14 +310,18 @@ W_ args2;
 	STKO_SuB(old_stko) += BREL(i);
 	STKO_SpB(old_stko) += BREL(i);
 
-     /*?/ fprintf(stderr, "Just squeezed; now: SpB %lx SuB %lx retval %d\n", STKO_SpB(old_stko), STKO_SuB(old_stko), i); /?*/
+     /*? 
+     if (RTSflags.GcFlags.giveStats) 
+	fprintf(stderr, "Just squeezed; now: SpB %lx SuB %lx retval %d\n", STKO_SpB(old_stko), STKO_SuB(old_stko), i); ?*/
 
 	if ((P_) STKO_SpA(old_stko) - AREL(headroom) > STKO_SpB(old_stko)) {
 
-	    /*?/
+	    /*?
+	    if (RTSflags.GcFlags.giveStats) {
 	      fprintf(stderr, "Squeezed; now: SpA %lx SpB %lx headroom %d\n", STKO_SpA(old_stko),
 	      STKO_SpB(old_stko), headroom);
-	    /?*/
+	    }
+	    ?*/
 
 	    /* We saved enough space to continue on the old StkO */
 	    return 0;
@@ -324,7 +332,9 @@ W_ args2;
     ASSERT(sanityChk_StkO(old_stko));
 
     /* Double the stack chunk size each time we grow the stack */
-    /*?/ fprintf(stderr, "Stko %lx: about to double stk-chk size from %d...\n", old_stko, STKO_CLOSURE_CTS_SIZE(old_stko)); /?*/
+    /*? 
+    if (RTSflags.GcFlags.giveStats) {
+	fprintf(stderr, "Stko %lx: about to double stk-chk size from %d...\n", old_stko, STKO_CLOSURE_CTS_SIZE(old_stko)); } ?*/
     cts_size = STKO_CLOSURE_CTS_SIZE(old_stko) * 2;
 
     if (SAVE_Hp + STKO_HS + cts_size > SAVE_HpLim) {
@@ -337,7 +347,11 @@ W_ args2;
 	    TSO_PC2(CurrentTSO) = EnterNodeCode;
 	    really_reenter_node = 1;
 	}
-	/*?/ fprintf(stderr, "StkO %lx: stk-chk GC: size %d...\n", old_stko, STKO_HS + cts_size);/?*/
+    /*? 
+    if (RTSflags.GcFlags.giveStats) {
+	fprintf(stderr, "StkO %lx: stk-chk GC: size %d...\n", 
+		old_stko, STKO_HS + cts_size); 
+    } ?*/
 	ReallyPerformThreadGC(STKO_HS + cts_size, rtsFalse);
 	/* 
 	   now, GC semantics promise to have left SAVE_Hp with
@@ -355,7 +369,7 @@ W_ args2;
     SAVE_Hp += STKO_HS + cts_size;
     SET_STKO_HDR(new_stko, StkO_info, CCC);
 
-    /*?/ fprintf(stderr, "New StkO now %lx...\n", new_stko); /?*/
+    /*?  if (RTSflags.GcFlags.giveStats) fprintf(stderr, "New StkO now %lx...\n", new_stko); ?*/
 
     /* Initialize the StkO, as in NewThread */
     STKO_SIZE(new_stko) = cts_size + STKO_VHS;
@@ -363,7 +377,7 @@ W_ args2;
     STKO_SpA(new_stko) = STKO_SuA(new_stko) = STKO_ASTK_BOT(new_stko) + AREL(1);
     STKO_LINK(new_stko) = old_stko;
 
-    /*?/ fprintf(stderr, "New StkO SpA = %lx...\n", STKO_SpA(new_stko) ); /?*/
+    /*?     if (RTSflags.GcFlags.giveStats) fprintf(stderr, "New StkO SpA = %lx...\n", STKO_SpA(new_stko) ); ?*/
  
     STKO_RETURN(new_stko) = SAVE_Ret;
 

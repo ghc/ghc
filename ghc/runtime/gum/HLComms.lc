@@ -116,7 +116,7 @@ blockFetch(P_ bf, P_ bh)
 {
     switch (INFO_TYPE(INFO_PTR(bh))) {
     case INFO_BH_TYPE:
-	BF_LINK(bf) = Nil_closure;
+	BF_LINK(bf) = Prelude_Z91Z93_closure;
 	SET_INFO_PTR(bh, BQ_info);
 	BQ_ENTRIES(bh) = (W_) bf;
 
@@ -172,7 +172,7 @@ processFetches()
     P_ ip;
     globalAddr rga;
     
-    for (bf = PendingFetches; bf != Nil_closure; bf = next) {
+    for (bf = PendingFetches; bf != Prelude_Z91Z93_closure; bf = next) {
 	next = BF_LINK(bf);
 
 	/*
@@ -218,7 +218,7 @@ processFetches()
 	    sendResume(&rga, size, graph);
 	}
     }
-    PendingFetches = Nil_closure;
+    PendingFetches = Prelude_Z91Z93_closure;
 }
 
 \end{code}
@@ -650,11 +650,13 @@ processResume(GLOBAL_TASK_ID sender)
 
 	if (INFO_TYPE(INFO_PTR(old)) == INFO_FMBQ_TYPE) {
 	    for(tso = (P_) FMBQ_ENTRIES(old); 
-              TSO_LINK(tso) != Nil_closure; 
+              TSO_LINK(tso) != Prelude_Z91Z93_closure; 
               tso = TSO_LINK(tso))
 		;
 	}
-        DumpGranEventAndNode(GR_REPLY, tso, old, taskIDtoPE(sender));
+        /* DumpGranEventAndNode(GR_REPLY, tso, old, taskIDtoPE(sender)); */
+	DumpRawGranEvent(CURRENT_PROC,taskIDtoPE(sender),GR_REPLY,
+			 tso,old,0);
     }
 
     newGraph = UnpackGraph(packBuffer, &gagamap, &nGAs);

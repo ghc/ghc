@@ -272,7 +272,7 @@ collect2s(reqsize, sm)
 #ifdef PAR
     EvacuateLocalGAs(rtsTrue);
 #else
-    evacSPTable( sm );
+    /* evacSPTable( sm ); stable pointers now reachable via sm->roots */
 #endif /* PAR */
 
     DEBUG_STRING("Evacuate Roots:");
@@ -281,7 +281,18 @@ collect2s(reqsize, sm)
 	sm->roots[root] = EVACUATE_CLOSURE(evac);
     }
 
-#if !defined(PAR)
+#if defined(GRAN)
+    /* ToDo: Add evacuation of events and sparks here */
+#if defined(KLINGON_ERROR_MESSAGES)
+    fprintf(stderr,"no' veQ boSwI' yeq {GranSim}\n");
+    EXIT(EXIT_FAILURE);
+#else
+    fprintf(stderr,"Sorry, GranSim doesn't support generational GC yet\n");
+    EXIT(EXIT_FAILURE);
+#endif
+#endif
+
+#if !defined(PAR) /* && !defined(CONCURRENT) */ /* HWL */
 
     DEBUG_STRING("Evacuate A Stack:");
     for (stackptr = MAIN_SpA;
@@ -331,7 +342,7 @@ collect2s(reqsize, sm)
 #ifdef PAR
     RebuildGAtables(rtsTrue);
 #else
-    reportDeadMallocPtrs( sm->MallocPtrList, NULL, &(sm->MallocPtrList) );
+    reportDeadForeignObjs( sm->ForeignObjList, NULL, &(sm->ForeignObjList) );
 #endif /* PAR */
 
     /* TIDY UP AND RETURN */
@@ -467,6 +478,17 @@ collectHeap(reqsize, sm)
 	}
     }
 
+#if defined(GRAN)
+    /* ToDo: Add evacuation of events and sparks here */
+#if defined(KLINGON_ERROR_MESSAGES)
+    fprintf(stderr,"no' veQ boSwI' yeq {GranSim}\n");
+    EXIT(EXIT_FAILURE);
+#else
+    fprintf(stderr,"Sorry, GranSim doesn't support generational GC yet\n");
+    EXIT(EXIT_FAILURE);
+#endif
+#endif
+
 #if !defined(PAR)    
     DEBUG_STRING("Evacuate A Stack:");
     for (stackptr = MAIN_SpA, botA = stackInfo.botA;
@@ -526,7 +548,9 @@ collectHeap(reqsize, sm)
 #ifdef PAR
     EvacuateLocalGAs(rtsFalse);
 #else
-    evacSPTable( sm );
+    /* evacSPTable( sm ); stable pointers now reachable via sm->roots 
+       (see above) 
+    */
 #endif /* PAR */
 
     while ((newscav <= ToHp) || (oldscav <= OldHp)) {
@@ -626,10 +650,10 @@ collectHeap(reqsize, sm)
 #ifdef PAR
     RebuildGAtables(rtsFalse);
 #else
-    reportDeadMallocPtrs(sm->MallocPtrList, 
-			 sm->OldMallocPtrList, 
-			 &(sm->OldMallocPtrList));
-    sm->MallocPtrList = NULL;   /* all (new) MallocPtrs have been promoted */
+    reportDeadForeignObjs(sm->ForeignObjList, 
+			 sm->OldForeignObjList, 
+			 &(sm->OldForeignObjList));
+    sm->ForeignObjList = NULL;   /* all (new) ForeignObjs have been promoted */
 #endif /* PAR */
 
     if (RTSflags.GcFlags.giveStats) {
@@ -720,7 +744,7 @@ collectHeap(reqsize, sm)
     /* end of bracket */
 
 #ifndef PAR
-    sweepUpDeadMallocPtrs(sm->OldMallocPtrList, 
+    sweepUpDeadForeignObjs(sm->OldForeignObjList, 
 			  appelInfo.oldbase, 
 			  appelInfo.bits 
 			  );
@@ -746,8 +770,10 @@ collectHeap(reqsize, sm)
 #ifdef PAR
     fall over here until we figure out how to link GAs
 #else
+/*  stable pointer root now included in sm->roots
     DEBUG_STRING("Linking Stable Pointer Table:");
     LINK_LOCATION_TO_CLOSURE(&sm->StablePointerTable, oldlim);
+*/
     DEBUG_STRING("Linking A Stack:");
     for (stackptr = MAIN_SpA;
 	 SUBTRACT_A_STK(stackptr, stackInfo.botA) >= 0;

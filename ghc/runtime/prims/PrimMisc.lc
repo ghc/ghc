@@ -86,12 +86,11 @@ Phantom info table vectors for multiple constructor primitive types that
 might have to perform a DynamicReturn (just Bool at the moment).
 
 \begin{code}
+ED_RO_(Prelude_False_inregs_info);
+ED_RO_(Prelude_True_inregs_info);
 
-ED_RO_(False_inregs_info);
-ED_RO_(True_inregs_info);
-const W_ Bool_itblvtbl[] = {
-    (W_) False_inregs_info,
-    (W_) True_inregs_info
+const W_ Prelude_Bool_itblvtbl[] = {
+    (W_) Prelude_False_inregs_info,
+    (W_) Prelude_True_inregs_info
 };
-
 \end{code}

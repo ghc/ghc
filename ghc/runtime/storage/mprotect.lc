@@ -10,7 +10,6 @@
 Is @mprotect@ POSIX now?
 
 \begin{code}
-
 #if STACK_CHECK_BY_PAGE_FAULT
 
 /* #define STK_CHK_DEBUG */
@@ -36,13 +35,23 @@ Is @mprotect@ POSIX now?
 #  if defined(HAVE_GETPAGESIZE)
 #   define GETPAGESIZE()    getpagesize()
 #  else
-#   error getpagesize
+#   if defined(linux_TARGET_OS) || defined(linuxaout_TARGET_OS)
+#    /* it has it, but it is in BSD land; easier to just say so */
+#    define GETPAGESIZE()   getpagesize()
+#   else 
+#    error getpagesize
+#   endif
 #  endif
 # endif
 
 #if defined(sunos4_TARGET_OS)
 extern int getpagesize PROTO((void));
 extern int mprotect PROTO((caddr_t, size_t, int));
+#endif
+
+/* Needed for FreeBSD (SDM, 96/03) */
+#ifndef PROT_NONE
+#define PROT_NONE 0
 #endif
 
 void 
@@ -74,5 +83,4 @@ int size;
 }
 
 #endif /* STACK_CHECK_BY_PAGE_FAULT */
-
 \end{code}

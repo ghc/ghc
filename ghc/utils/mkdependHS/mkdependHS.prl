@@ -6,14 +6,48 @@
 # ToDo: strip out all the .h junk
 #
 ($Pgm = $0) =~ s/.*\/([^\/]+)$/\1/;
-$Usage  = "usage: $Pgm: not done yet\n";
+$Usage  = <<EOUSAGE;
+Usage: $Pgm [mkdependHS options] [-- GHC options --] srcfile1 [srcfile2 ...]
+
+Options recognised wherever they occur (mkdependHS or GHC):
+
+    -D<blah>	A cpp #define; usual meaning
+    -i<dirs>	Add <dirs> (colon-separated) to list of directories
+		to search for "import"ed modules
+    -I<dir>	Add <dir> to list of directories to search for
+		.h files (i.e., usual meaning)
+    -syslib <blah> This program uses this GHC system library; take
+		appropriate action (e.g., recognise when they are
+		"import"ing a module from that library).
+    -fhaskell1.[2-9] Deal with the oddities associated with a
+		particular version of Haskell 1.
+    -ignore <mod>
+
+mkdependHS-specific options (not between --'s):
+
+    -v		Be verbose.
+    -v -v	Be very verbose.
+    -f blah	Use "blah" as the makefile, rather than "makefile"
+		or "Makefile".
+    -o <osuf>	Use <osuf> as the "object file" suffix ( default: .o)
+    -s <suf>	Make extra dependencies for files with
+		suffix <suf><osuf>; thus, "-o .hc -s _a" will
+		make dependencies both for .hc files and for _a.hc
+		files.  (Useful in conjunction with NoFib "ways".)
+    -x <file>   Regard <file> as "stable"; i.e., eXclude it from having
+		dependencies on it.
+EOUSAGE
 
 $Status  = 0; # just used for exit() status
-$Verbose = '';
+$Verbose = 0; # 1 => verbose, 2 => very verbose
 $Dashdashes_seen = 0;
 
+# Try to guess how to run gcc's CPP directly -------------
+
 $OrigCpp = '$(RAWCPP)';
-if ( $OrigCpp =~ /(\S+)\s+(.*)/ ) {
+if ( $OrigCpp !~ /(\S+)\s+(.*)/ ) {
+    $Cpp = $OrigCpp;
+} else {
     $cmd  = $1;
     $rest = $2;
     if ( -x $cmd ) { # cool
@@ -26,8 +60,6 @@ if ( $OrigCpp =~ /(\S+)\s+(.*)/ ) {
 	    die "hscpp: don't know how to run cpp: $OrigCpp\n";
 	}
     }
-} else {
-    $Cpp = $OrigCpp;
 }
 
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
@@ -73,16 +105,26 @@ $Begin_magic_str = "# DO NOT DELETE: Beginning of Haskell dependencies\n";
 $End_magic_str = "# DO NOT DELETE: End of Haskell dependencies\n";
 $Obj_suffix = '.o';
 $ghc_version_info = $(PROJECTVERSION) * 100;
-@Defines = ('-D__HASKELL1__=2', "-D__GLASGOW_HASKELL__=$ghc_version_info");
 
 $Import_dirs = '.';
 %Syslibs = ();
-%StableLibs = ();
-%PreludeIfaces = ( 'Prelude', '1',
-		   'PreludeGlaST', '1',
-		   'PreludeGlaMisc', '1',
-		   'Concurrent', '1',
-		   'Parallel', '1');
+%IgnoreMe = ();
+%PreludeIfaces = ( 'Prelude',	    '1',
+		 , 'Array',	    '1'
+		 , 'Char',	    '1'
+		 , 'Complex',	    '1'
+		 , 'Directory',	    '1'
+		 , 'IO',   	    '1'
+		 , 'Ix',   	    '1'
+		 , 'List', 	    '1'
+		 , 'Maybe',	    '1'
+		 , 'Monad',	    '1'
+		 , 'Ratio',	    '1'
+		 , 'System',	    '1'
+		 , 'PreludeGlaST',  '1'
+		 , 'PreludeGlaMisc','1'
+		 , 'Concurrent',    '1'
+		 , 'Parallel',	    '1');
 %GhcLibIfaces = (  'Bag', '1',
 		   'BitSet', '1',
 		   # CharSeq not supposed to be used by user (I think. WDP)
@@ -121,27 +163,41 @@ $Import_dirs = '.';
 		   'LibPosix', '1',
 		   'LibTime', '1' );
 
-$Haskell_1_3 = 0; # assume Haskell 1.2, still. Changed by -fhaskell-1.3
+$Haskell_1 = 2; # assume Haskell 1.2, still. Changed by -fhaskell-1.3
 $Include_dirs = '-I.';
-$Col_width = 78; # ignored
 $Makefile = '';
 @Src_files = ();
 
 &mangle_command_line_args();
 
+if ( $Status ) {
+    print stderr $Usage;
+    exit(1);
+}
+
+push(@Defines,
+     ("-D__HASKELL1__=$Haskell_1",
+      "-D__GLASGOW_HASKELL__=$ghc_version_info"));
+
+@Import_dirs  = split(/:/,$Import_dirs);
+@Include_dirs = split(/\s+/,$Include_dirs); # still has -I's in it
+# NB: We keep the scalar-variable equivalents to use in error messages
+
 if ( ! $Makefile && -f 'makefile' ) {
     $Makefile = 'makefile';
 } elsif ( ! $Makefile && -f 'Makefile') {
     $Makefile = 'Makefile';
-} else {
+} elsif ( ! $Makefile) {
     die "$Pgm: no makefile or Makefile found\n";
 }
 
-@Depend_lines = ();
-
 print STDERR "CPP defines=@Defines\n" if $Verbose;
-print STDERR "Import_dirs=$Import_dirs\n" if $Verbose;
-print STDERR "Include_dirs=$Include_dirs\n" if $Verbose;
+print STDERR "Import_dirs=@Import_dirs\n" if $Verbose;
+print STDERR "Include_dirs=@Include_dirs\n" if $Verbose;
+
+&preprocess_import_dirs();
+
+@Depend_lines = ();
 
 foreach $sf (@Src_files) {
     # just like lit-inputter
@@ -195,7 +251,6 @@ while (<OMKF>) { # copy the rest through
 }
 close(NMKF) || exit(1);
 close(OMKF) || exit(1);
-chmod 0444, 'Makefile';
 exit 0;
 
 sub mangle_command_line_args {
@@ -213,39 +268,33 @@ sub mangle_command_line_args {
 	    $Include_dirs .= " $_";
 	} elsif ( /^-syslib$/ ) {
 	    push(@Syslibs, &grab_arg_arg($_,''));
-	} elsif ( /^-fhaskell-1\.3/ ) {
-	    $Haskell_1_3 = 1;
-	} elsif ( /^-stable$/ ) { 
-	    # user-defined syslibs that she believes are stable.
-	    push(@StableLibs, &grab_arg_arg($_,''));
-
+	} elsif ( /^-fhaskell-1\.([2-9])/ ) {
+	    $Haskell_1 = $1;
 	} elsif ($Dashdashes_seen != 1) { # not between -- ... --
 	    if ( /^-v$/ ) {
-		$Verbose	= '-v';
+		$Verbose++;
 	    } elsif ( /^-f(.*)/ ) {
 		$Makefile	= &grab_arg_arg('-f',$1);
 	    } elsif ( /^-o(.*)/ ) {
 		$Obj_suffix	= &grab_arg_arg('-o',$1);
+	    } elsif ( /^-x(.*)/ ) { 
+		local($thing) = &grab_arg_arg($_,$1);
+		$IgnoreMe{$thing} = 'y';
 	    } elsif ( /^-s(.*)/ ) {
 		local($suff)	=  &grab_arg_arg('-s',$1);
-		$File_suffix{$suff} = $suff;
-	    } elsif ( /^-bs(.*)/ ) {
-		$Begin_magic_str = &grab_arg_arg('-bs',$1) . "\n";
-	    } elsif ( /^-es(.*)/ ) {
-		$End_magic_str = &grab_arg_arg('-es',$1) . "\n";
-	    } elsif ( /^-w(.*)/ ) {
-		$Width	= &grab_arg_arg('-w',$1);
+		push(@File_suffix, $suff);
 	    } elsif ( /^-/ ) {
 		print STDERR "$Pgm: unknown option ignored: $_\n";
+		$Status++;
 	    } else {
 		push(@Src_files, $_);
 	    }
 
 	} elsif ($Dashdashes_seen == 1) { # where we ignore unknown options
-	    push(@Src_files,$_) if ! /^-/;
+	    push(@Src_files, $_) if ! /^-/;
 	}
     }
-    @File_suffix = sort (keys %File_suffix);
+    @File_suffix = sort (@File_suffix);
 }
 
 sub grab_arg_arg {
@@ -259,6 +308,29 @@ sub grab_arg_arg {
     } else {
 	print STDERR "$Pgm: no argument following $option option\n";
 	$Status++;
+    }
+}
+
+sub preprocess_import_dirs {
+    # it's probably cheaper to find out what's in all
+    # the @Import_dirs before we start processing.
+    local($d, $thing);
+    local($_);
+    %ModuleIn = ();
+
+    foreach $d ( @Import_dirs ) {
+	opendir(DIR, $d) || die "$Pgm: can't open directory $d\n";
+
+	for ($_ = readdir(DIR); $_; $_ = readdir(DIR)) {
+	    next unless /(.*)\.hi$/;
+	    $thing = $1;
+	    if ($ModuleIn{$thing} && $ModuleIn{$thing} ne $d) {
+		print STDERR "$Pgm: warning: $thing.hi appears in both $ModuleIn{$thing} and $d!\n";
+	    } else {
+		$ModuleIn{$thing} = $d;
+	    }
+	}
+	closedir(DIR); # No, don't check the error code
     }
 }
 
@@ -279,38 +351,52 @@ sub slurp_file_for_imports {
 	|| die "$Pgm: Can't open $file_to_read: $!\n";
 
     while (<SRCFILE>) {
-        if (/^>?\s*import\s+([A-Z][A-Za-z0-9_']*)/ || /^!include\s+"(\S+)"/) {
-	    $modname = $1;
-	    if (/^>?\s*import/) {
-		$follow_file = &find_in_Import_dirs($orig_src_file, $modname, $last_seen_dir);
-	    } else {
-		$follow_file = &find_in_Include_dirs($orig_src_file, $modname, $last_seen_dir);
+	next unless (/^>?\s*(import)\s+([A-Z][A-Za-z0-9_']*)/ || /^!(include)\s+"(\S+)"/);
+	$todo    = $1;
+	$modname = $2;
+
+	if ($todo eq 'import') {
+	    if ( $IgnoreMe{$modname} eq 'y' ) {
+		$follow_file = '__ignore__';
+	    } elsif ( $ModuleIn{$modname} ) {
+		$follow_file = "$ModuleIn{$modname}/$modname.hi";
+	    } else { # hard way
+		$follow_file
+		  = &find_in_Import_dirs($orig_src_file, $modname, $last_seen_dir);
 	    }
+	} else {
+	    if ( $IgnoreMe{$modname} eq 'y' ) {
+		$follow_file = '__ignore__';
+	    } else {
+		$follow_file
+		  = &find_in_Include_dirs($orig_src_file, $modname, $last_seen_dir);
+	    }
+	}
 
-            if ($follow_file) { # it found something
+	if (! $follow_file) { # it didnae find anything
+	    die "$orig_src_file: Couldn't handle: $_\n";
 
-		if ($follow_file ne '__syslib__') {
-		    local($int_file);
-		    $int_file = $follow_file;
-		    if ( $int_file !~ /\.(l?hs|hi)$/ ) {
-			push(@Depend_lines, "$bf$Obj_suffix : $int_file\n");
-			foreach $suff (@File_suffix) {
-			    push(@Depend_lines, "$bf$suff$Obj_suffix : $int_file\n");
-			}
+	} else { # it found something
+	    if ($follow_file ne '__ignore__') {
+		local($int_file);
+		$int_file = $follow_file;
 
-		    } else {
-			$int_file =~ s/\.l?hs$//;
-			$int_file =~ s/\.hi$//;
+		if ( $int_file !~ /\.(l?hs|hi)$/ ) {
+		    push(@Depend_lines, "$bf$Obj_suffix : $int_file\n");
+		    foreach $suff (@File_suffix) {
+			push(@Depend_lines, "$bf$suff$Obj_suffix : $int_file\n");
+		    }
 
-			push(@Depend_lines, "$bf$Obj_suffix : $int_file.hi\n");
-			foreach $suff (@File_suffix) {
-			    push(@Depend_lines, "$bf$suff$Obj_suffix : $int_file$suff.hi\n");
-			}
+		} else {
+		    $int_file =~ s/\.l?hs$//;
+		    $int_file =~ s/\.hi$//;
+
+		    push(@Depend_lines, "$bf$Obj_suffix : $int_file.hi\n");
+		    foreach $suff (@File_suffix) {
+			push(@Depend_lines, "$bf$suff$Obj_suffix : $int_file$suff.hi\n");
 		    }
 		}
-            } else {
-                die "$orig_src_file: Couldn't handle: $_\n";
-            }
+	    }
 	}
     }
     close(SRCFILE) || exit(1);
@@ -326,8 +412,8 @@ sub find_in_Import_dirs {
     local($do_magical_check) = 0;
     local($name_to_check);
 
-    # hop along Import_dir list
-    foreach $import_dir (split(/:/,$Import_dirs)) {
+    # do it the old hard way: hop along Import_dir list
+    foreach $import_dir (@Import_dirs) {
 	# handle . magically
 	if ($import_dir eq '.') {
 	    # record that we should do a SPECIAL try for a file in last_seen_dir (LAST)
@@ -336,7 +422,7 @@ sub find_in_Import_dirs {
 
 	$name_to_check = "$import_dir/$modname.hi";
 	if ( $FileExists{$name_to_check} ne 'n' ) { # either 'y' or nothing
-	    print STDERR "trying $name_to_check...\n" if $Verbose;
+	    print STDERR "trying $name_to_check...\n" if $Verbose >= 2; # very verbose
 	    return($name_to_check) if $FileExists{$name_to_check} eq 'y';
 	    if (-f $name_to_check) {
 		$FileExists{$name_to_check} = 'y';
@@ -347,18 +433,18 @@ sub find_in_Import_dirs {
     	}
 
 	$name_to_check = "$import_dir/$modname.hs";
-	print STDERR "trying... $name_to_check\n" if $Verbose;
+	print STDERR "trying... $name_to_check\n" if $Verbose >= 2; # very verbose
 	return($name_to_check) if -f $name_to_check;
 
 	$name_to_check = "$import_dir/$modname.lhs";
-	print STDERR "trying... $name_to_check\n" if $Verbose;
+	print STDERR "trying... $name_to_check\n" if $Verbose >= 2; # very verbose
 	return($name_to_check) if -f $name_to_check;
     }
     if ($do_magical_check == 1) {
 	$name_to_check = "$last_seen_dir/$modname.hi";
 
 	if ( $FileExists{$name_to_check} ne 'n' ) { # either 'y' or nothing
-	    print STDERR "trying $name_to_check...\n" if $Verbose;
+	    print STDERR "trying $name_to_check...\n" if $Verbose >= 2; # very verbose
 	    return($name_to_check) if $FileExists{$name_to_check} eq 'y';
 	    if (-f $name_to_check) {
 		$FileExists{$name_to_check} = 'y';
@@ -369,36 +455,31 @@ sub find_in_Import_dirs {
     	}
 
 	$name_to_check = "$last_seen_dir/$modname.lhs";
-	print STDERR "trying... $name_to_check\n" if $Verbose;
+	print STDERR "trying... $name_to_check\n" if $Verbose >= 2; # very verbose
 	return($name_to_check) if -f $name_to_check;
 
 	$name_to_check = "$last_seen_dir/$modname.hs";
-	print STDERR "trying... $name_to_check\n" if $Verbose;
+	print STDERR "trying... $name_to_check\n" if $Verbose >= 2; # very verbose
 	return($name_to_check) if -f $name_to_check;
     }
     # OK, maybe it's referring to something in a system library
     foreach $lib ( @Syslibs ) {
 	if ( $lib eq 'ghc' ) {
-	    return('__syslib__') if $GhcLibIfaces{$modname};
+	    return('__ignore__') if $GhcLibIfaces{$modname};
 	} elsif ( $lib eq 'hbc' ) {
-	    return('__syslib__') if $HbcLibIfaces{$modname};
+	    return('__ignore__') if $HbcLibIfaces{$modname};
 	} else {
 	    die "Unrecognised syslib: $lib\n";
 	}
     }
 
-    # HACK HACK: Let the user define his own "stable" modules.
-    foreach $stableLib ( @StableLibs ) {
-	return('__syslib__') if ( $stableLib eq $modname );
-    }
-
     # Might be a Haskell 1.3 Module (but only if we've said -fhaskell-1.3)
-    if ( $Haskell_1_3 == 1 ) {
-	return('__syslib__') if $IO13Ifaces{$modname};
+    if ( $Haskell_1 >= 3 ) {
+	return('__ignore__') if $IO13Ifaces{$modname};
     }
 
     # Last hope: referring to a Prelude interface
-    return('__syslib__') if $PreludeIfaces{$modname};
+    return('__ignore__') if $PreludeIfaces{$modname};
 
     die "No file `$modname.hi', `$modname.lhs' or `$modname.hs' (reqd from file `$orig_src_file')\namong import directories:\n\t$Import_dirs\n";
 }
@@ -411,7 +492,7 @@ sub find_in_Include_dirs {
     # no funny name guessing here
 
     # hop along Include_dir list
-    foreach $include_dir (split(/\s+/,$Include_dirs)) {
+    foreach $include_dir (@Include_dirs) {
 	$include_dir =~ s/^-I//;
 
 	# handle . magically
@@ -419,13 +500,13 @@ sub find_in_Include_dirs {
 	    # record that we should do a SPECIAL try for a file in last_seen_dir (LAST)
 	    $do_magical_check = 1;
 	}
-	print STDERR "trying $include_dir/$name...\n" if $Verbose;
+	print STDERR "trying $include_dir/$name...\n" if $Verbose >= 2; # very verbose
 	if (-f "$include_dir/$name") {
 	    return("$include_dir/$name");
 	}
     }
     if ($do_magical_check == 1) {
-	print STDERR "trying $last_seen_dir/$name...\n" if $Verbose;
+	print STDERR "trying $last_seen_dir/$name...\n" if $Verbose >= 2; # very verbose
 	if (-f "$last_seen_dir/$name") {
 	    return("$last_seen_dir/$name");
 	}

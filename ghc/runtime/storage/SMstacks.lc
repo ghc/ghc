@@ -7,7 +7,7 @@ Routine that allocates the A and B stack (sequential only).
 # define NULL_REG_MAP
 # include "SMinternal.h"
 
-#ifndef CONCURRENT
+#if 1 /* ndef CONCURRENT */ /* HWL */
 stackData stackInfo;
 #endif
 
@@ -35,10 +35,14 @@ initStacks(smInfo *sm)
         STKO_SIZE(MainStkO) = RTSflags.GcFlags.stksSize + STKO_VHS;
         STKO_SpB(MainStkO) = STKO_SuB(MainStkO) = STKO_BSTK_BOT(MainStkO) + BREL(1);
         STKO_SpA(MainStkO) = STKO_SuA(MainStkO) = STKO_ASTK_BOT(MainStkO) + AREL(1);
-        STKO_LINK(MainStkO) = Nil_closure;
+        STKO_LINK(MainStkO) = Prelude_Z91Z93_closure;
     	STKO_RETURN(MainStkO) = NULL;
 
 	ASSERT(sanityChk_StkO(MainStkO));
+
+    	if (RTSflags.GcFlags.trace)
+	    fprintf(stderr, "STACK init: botA, spa: 0x%lx, 0x%lx\n            botB, spb: 0x%lx, 0x%lx\n",
+	      (W_) STKO_ASTK_BOT(MainStkO), (W_) STKO_SpA(MainStkO), (W_) STKO_BSTK_BOT(MainStkO), (W_) STKO_SpB(MainStkO));
 #endif
     }
 
@@ -47,7 +51,7 @@ initStacks(smInfo *sm)
 # endif
 
     /* Initialise Stack Info and pointers */
-#ifndef CONCURRENT
+#if 1 /* ndef CONCURRENT */ /* HWL */
     stackInfo.botA = STK_A_FRAME_BASE(stks_space, RTSflags.GcFlags.stksSize);
     stackInfo.botB = STK_B_FRAME_BASE(stks_space, RTSflags.GcFlags.stksSize);
 

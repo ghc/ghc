@@ -39,10 +39,6 @@ static void BlackHoleUpdateStack(STG_NO_ARGS);
 extern smInfo StorageMgrInfo;
 extern void PrintTickyInfo(STG_NO_ARGS);
 
-#if defined(GRAN_CHECK) && defined(GRAN)
-extern W_ debug;
-#endif
-
 /* the real work is done by this function --- see wrappers at end */
 
 void
@@ -106,19 +102,17 @@ RealPerformGC(liveness, reqsize, always_reenter_node, do_full_collection)
 	}
 # endif
 # if defined(GRAN)
-    	ReSchedule(9 /*i.e. error; was SAME_THREAD*/);
+    	ReSchedule(SAME_THREAD); /* ToDo: Check HWL */
 # else
     	ReSchedule(1);
 # endif
     }
 
-    /* Don't use SET_CCC, because we don't want to bump the sub_scc_count */
 # if defined(PROFILING)
     Save_CCC = CCC;
 # endif
 # if defined(PAR)
-    CCC = (CostCentre)STATIC_CC_REF(CC_GC);
-    CCC->scc_count++;
+    SET_CCC_RTS(CC_GC,0,1);   /* without the sub_scc_count++ */
 # endif
 
     ReallyPerformThreadGC(reqsize, do_full_collection);
@@ -126,10 +120,8 @@ RealPerformGC(liveness, reqsize, always_reenter_node, do_full_collection)
 #else	/* !CONCURRENT */
 
 # if defined(PROFILING)
-    /* Don't use SET_CCC, because we don't want to bump the sub_scc_count */
     Save_CCC = CCC;
-    CCC = (CostCentre)STATIC_CC_REF(CC_GC);
-    CCC->scc_count++;
+    SET_CCC_RTS(CC_GC,0,1);   /* without the sub_scc_count++ */
 # endif
 
     /* root saving ---------------------------------- */
@@ -283,15 +275,21 @@ PerformGC(args)
 void
 PerformReschedule(liveness, always_reenter_node)
   W_ liveness;
-  W_  always_reenter_node;
+  rtsBool  always_reenter_node;
 
 {
-    I_ need_to_reschedule;
+    rtsBool need_to_reschedule;
 
     /* Reset the global NeedToReSchedule -- 
        this is used only to communicate the fact that we should schedule
        a new thread rather than the existing one following a fetch.
+    if (RTSflags.GranFlags.Light) {
+      Yield(liveness);
+    }
+
+    ASSERT(!RTSflags.GranFlags.Light);
     */
+
     need_to_reschedule = NeedToReSchedule;
     NeedToReSchedule = rtsFalse;
 
@@ -299,23 +297,33 @@ PerformReschedule(liveness, always_reenter_node)
 
     if (always_reenter_node) {
       /* Avoid infinite loops at the same context switch */
-    	if ((TSO_SWITCH(CurrentTSO) == TSO_PC2(CurrentTSO)) &&
-	    !need_to_reschedule) {
-    	    TSO_SWITCH(CurrentTSO) = NULL;
+    	if (/* (TSO_SWITCH(CurrentTSO) == TSO_PC2(CurrentTSO)) || */
+	    (!need_to_reschedule &&
+	     CurrentTime[CurrentProc]<EndOfTimeSlice &&
+	     (TimeOfNextEvent==0 || TimeOfNextEvent>=CurrentTime[CurrentProc])
+             || IgnoreEvents
+            )) {
+    	    /* TSO_SWITCH(CurrentTSO) = NULL; */
     	    return;
     	}
 
       /* Set up to re-enter Node, so as to be sure it's really there. */
       ASSERT(liveness & LIVENESS_R1);
-      TSO_SWITCH(CurrentTSO) = TSO_PC2(CurrentTSO);
+      /* TSO_SWITCH(CurrentTSO) = TSO_PC2(CurrentTSO); */
       TSO_PC2(CurrentTSO) = (void *) EnterNodeCode;
     }
 
     /* We're in a GC callWrapper, so the thread state is safe */
     TSO_ARG1(CurrentTSO) = 0;
     TSO_PC1(CurrentTSO) = EnterNodeCode;
-    ReSchedule( (need_to_reschedule && !DoReScheduleOnFetch) ? 
+    ReSchedule( (need_to_reschedule && 
+		 !RTSflags.GranFlags.DoReScheduleOnFetch &&
+	         !RTSflags.GranFlags.Light) ? 
 	        CHANGE_THREAD : SAME_THREAD );
+    /* In a block-on-fetch setup we must not use SAME_THREAD since that */
+    /* would continue the fetching TSO, which is still at the head of the */
+    /* of the threadq */
+    /* GrAnSim-Light always uses SAME_THREAD */ 
 }
 #endif
 
@@ -348,9 +356,11 @@ StgPerformGarbageCollection()
 }
 #endif /* !PAR */
 
-#ifdef CONCURRENT
+#if defined(CONCURRENT)
 
 # if defined(GRAN)
+
+#  if defined(DEPTH_FIRST_PRUNING)
 
 /* Jim's spark pools are very similar to our processors, except that
    he uses a hard-wired constant.  This would be a mistake for us,
@@ -361,65 +371,282 @@ PruneSparks(STG_NO_ARGS)
 {
     sparkq spark, prev, next;
     I_ proc, pool, prunedSparks;
+    I_ tot_sparks[MAX_PROC], total_sparks = 0, tot = 0;;
 
-    for(proc=0; proc<max_proc; ++proc) {
-    prev = NULL;
-
-    for (pool = 0; pool < SPARK_POOLS; pool++) {
-    prunedSparks=0;
-
-    for(spark = PendingSparksHd[proc][pool]; 
-	spark != NULL; 
-	spark = next) {
-        next = SPARK_NEXT(spark);
-
-	/* HACK! The first clause should actually never happen  HWL */
-
-	if ( (SPARK_NODE(spark) == NULL) || 
-	     (SPARK_NODE(spark) == Nil_closure) ) {
 #  if defined(GRAN_CHECK) && defined(GRAN)
-	      if ( debug & 0x40 ) 
-		fprintf(RTSflags.GcFlags.statsFile,"PruneSparks: Warning: spark @ 0x%lx points to NULL or Nil_closure\n", spark);
+  if ( RTSflags.GranFlags.debug & 0x40 ) 
+    fprintf(stderr,"Pruning (depth-first) spark roots for GC ...\n");
+#  endif       
+
+    for(proc=0; proc<RTSflags.GranFlags.proc; ++proc) {
+      tot_sparks[proc] = 0;
+      prev = NULL;
+
+      for (pool = 0; pool < SPARK_POOLS; pool++) {
+        prunedSparks=0;
+
+        for(spark = PendingSparksHd[proc][pool]; 
+	    spark != NULL; 
+	    spark = next) {
+          next = SPARK_NEXT(spark);
+
+          if(++total_sparks <= MAX_SPARKS || MAX_SPARKS == 0)
+            {
+	      if ( RTSflags.GcFlags.giveStats )
+		if (i==ADVISORY_POOL) { 
+		  tot_sparks[proc]++;
+		  tot++;
+		}
+
+	      /* HACK! This clause should actually never happen  HWL */
+	      if ( (SPARK_NODE(spark) == NULL) || 
+	           (SPARK_NODE(spark) == Prelude_Z91Z93_closure) ) {
+#  if defined(GRAN_CHECK) && defined(GRAN)
+	          if ( RTSflags.GcFlags.giveStats && 
+		       (RTSflags.GranFlags.debug & 0x40) ) 
+		    fprintf(RTSflags.GcFlags.statsFile,"PruneSparks: Warning: spark @ 0x%lx points to NULL or Prelude_Z91Z93_closure\n", spark);
 #  endif
-    	    if (do_qp_prof)
-    	    	QP_Event0(threadId++, SPARK_NODE(spark));
+		  /* prune it below */
+		}
+    	      else if (SHOULD_SPARK(SPARK_NODE(spark))) {
+    		/* Keep it */
+    		if (prev == NULL)
+    		    PendingSparksHd[proc][pool] = spark;
+    		else
+    		    SPARK_NEXT(prev) = spark;
+    		SPARK_PREV(spark) = prev;
+    		prev = spark;
+		continue;
+    	      } 
+	  }
 
-	    if(do_sp_profile)
-	      DumpRawGranEvent(CURRENT_PROC,SP_PRUNED,(W_) spark);
+          /* By now we know that the spark has to be pruned */
+	  if(RTSflags.GranFlags.granSimStats_Sparks)
+	      /* DumpRawGranEvent(CURRENT_PROC,SP_PRUNED,(W_) spark); */
+	      DumpRawGranEvent(CurrentProc,0,SP_PRUNED,
+			       Prelude_Z91Z93_closure,SPARK_NODE(spark),0);
 
-	    DisposeSpark(spark);
-	    prunedSparks++;
-	    }
-    	else if (SHOULD_SPARK(SPARK_NODE(spark))) {
-    	    /* Keep it */
-    	    if (prev == NULL)
-    	    	PendingSparksHd[proc][pool] = spark;
-    	    else
-    	    	SPARK_NEXT(prev) = spark;
-    	    SPARK_PREV(spark) = prev;
-    	    prev = spark;
-    	} else {
-    	    if (do_qp_prof)
-    	    	QP_Event0(threadId++, SPARK_NODE(spark));
-
-	    if(do_sp_profile)
-	      DumpRawGranEvent(CURRENT_PROC,SP_PRUNED,(W_) spark);
-
-	    DisposeSpark(spark);
-	    prunedSparks++;
-        }
+	  DisposeSpark(spark);
+	  prunedSparks++;
     }  /* forall spark ... */
     if (prev == NULL)
     	PendingSparksHd[proc][pool] = NULL;
     else
     	SPARK_NEXT(prev) = NULL;
     PendingSparksTl[proc][pool] = prev;
-    if (prunedSparks>0) 
-      fprintf(RTSflags.GcFlags.statsFile,"Pruning and disposing %lu excess sparks (> %lu) on proc %ld in PruneSparks\n",
-	      prunedSparks,(W_) MAX_SPARKS,proc);
+    if ( (RTSflags.GcFlags.giveStats) && 
+	 (RTSflags.GranFlags.debug & 0x1000) && 
+	 (prunedSparks>0) )
+	fprintf(RTSflags.GcFlags.statsFile,"Pruning and disposing %lu sparks (_NS flag!) on proc %d (pool %d) in PruneSparks\n",
+		prunedSparks,proc,pool);
    }  /* forall pool ... */
   }   /* forall proc ... */
+#  if defined(GRAN_CHECK) && defined(GRAN)
+  if ( RTSflags.GcFlags.giveStats ) {
+    fprintf(RTSflags.GcFlags.statsFile,
+            "Spark statistics (after pruning) (total sparks: %d; before pruning: %d):",
+	    tot,total_sparks);
+    for (proc=0; proc<RTSflags.GranFlags.proc; proc++) {
+      if (proc % 4 == 0) fprintf(RTSflags.GcFlags.statsFile,"\n> ");
+      fprintf(RTSflags.GcFlags.statsFile,"\tPE %d: %d ",proc,tot_sparks[proc]);
+    }
+    fprintf(RTSflags.GcFlags.statsFile,".\n");
+  }
+#  endif
 }
+
+#  else /* !DEPTH_FIRST_PRUNING */
+
+/* Auxiliary functions that are used in the GranSim version of PruneSparks  */
+
+static W_
+arr_and(W_ arr[], I_ max)
+{
+ I_ i;
+ W_ res;
+
+ /* Doesn't work with max==0; but then, many things don't work in this */
+ /* special case. */
+ for (i=1, res = arr[0]; i<max; i++) 
+   res &= arr[i];
+ 
+ return (res);
+}
+
+static W_
+arr_max(W_ arr[], I_ max)
+{
+ I_ i;
+ W_ res;
+
+ /* Doesn't work with max==0; but then, many things don't work in this */
+ /* special case. */
+ for (i=1, res = arr[0]; i<max; i++) 
+   res = (arr[i]>res) ? arr[i] : res;
+ 
+ return (res);
+}
+
+/* In case of an excessive number of sparks, depth first pruning is a Bad */
+/* Idea as we might end up with all remaining sparks on processor 0 and */
+/* none on the other processors. So, this version uses breadth first */
+/* pruning. -- HWL */
+
+void 
+PruneSparks(STG_NO_ARGS)
+{
+  sparkq spark, prev,
+         prev_spark[MAX_PROC][SPARK_POOLS],
+         curr_spark[MAX_PROC][SPARK_POOLS]; 
+  PROC proc;
+  W_ allProcs = 0, 
+     endQueues[SPARK_POOLS], finishedQueues[SPARK_POOLS];
+  I_ pool, total_sparks=0, 
+     prunedSparks[MAX_PROC][SPARK_POOLS];
+  I_ tot_sparks[MAX_PROC], tot = 0;;
+
+#  if defined(GRAN_CHECK) && defined(GRAN)
+  if ( RTSflags.GranFlags.debug & 0x40 ) 
+    fprintf(stderr,"Pruning (breadth-first) sparks for GC ...\n");
+#  endif       
+
+  /* Init */
+  for(proc = 0; proc < RTSflags.GranFlags.proc; ++proc) {
+    allProcs |= PE_NUMBER(proc);
+    tot_sparks[proc] = 0;
+    for(pool = 0; pool < SPARK_POOLS; ++pool) {
+      prev_spark[proc][pool] = NULL;
+      curr_spark[proc][pool] = PendingSparksHd[proc][pool];
+      prunedSparks[proc][pool] = 0;
+      endQueues[pool] = 0;
+      finishedQueues[pool] = 0;
+    }
+  }
+
+  /* Breadth first pruning */
+  do {
+    for(proc = 0; proc < RTSflags.GranFlags.proc; ++proc) {
+      for(pool = 0; pool < SPARK_POOLS; ++pool) {
+	spark = curr_spark[proc][pool];
+	prev = prev_spark[proc][pool];
+
+	if  (spark == NULL) {         /* at the end of the queue already? */
+	  if (! (endQueues[pool] & PE_NUMBER(proc)) ) {
+	    endQueues[pool] |= PE_NUMBER(proc);
+	    if (prev==NULL)
+	      PendingSparksHd[proc][pool] = NULL;
+	    else
+	      SPARK_NEXT(prev) = NULL;
+    	    PendingSparksTl[proc][pool] = prev;
+	  }
+	  continue;
+	}
+		
+	/* HACK! This clause should actually never happen  HWL */
+	if ( (SPARK_NODE(spark) == NULL) || 
+	     (SPARK_NODE(spark) == Prelude_Z91Z93_closure) ) {
+#  if defined(GRAN_CHECK) && defined(GRAN)
+	    if ( RTSflags.GcFlags.giveStats && 
+		 (RTSflags.GranFlags.debug & 0x40) ) 
+		fprintf(RTSflags.GcFlags.statsFile,"PruneSparks: Warning: spark @ 0x%lx points to NULL or Prelude_Z91Z93_closure\n", spark);
+#  endif
+	    /* prune it below */
+	} else if (SHOULD_SPARK(SPARK_NODE(spark))) {
+	    if(++total_sparks <= MAX_SPARKS || MAX_SPARKS == 0) {
+		if ( RTSflags.GcFlags.giveStats )
+		    if (pool==ADVISORY_POOL) { 
+			tot_sparks[proc]++;
+			tot++;
+		    }
+
+    		/* Keep it */
+    		if (prev_spark[proc][pool] == NULL)
+    		    PendingSparksHd[proc][pool] = spark;
+    		else
+    		    SPARK_NEXT(prev_spark[proc][pool]) = spark;
+    		SPARK_PREV(spark) = prev_spark[proc][pool];
+    		prev_spark[proc][pool] = spark;
+	        curr_spark[proc][pool] = SPARK_NEXT(spark);
+		continue;
+	    } else { /* total_sparks > MAX_SPARKS */
+		/* Sparkq will end before the current spark */
+		if (prev == NULL) 
+		    PendingSparksHd[proc][pool] = NULL;
+		else
+		    SPARK_NEXT(prev) = NULL;
+		PendingSparksTl[proc][pool] = prev;
+		endQueues[pool] |= PE_NUMBER(proc);
+		continue;
+	    }
+	}
+
+        /* By now we know that the spark has to be pruned */
+	if(RTSflags.GranFlags.granSimStats_Sparks)
+	    DumpRawGranEvent(CurrentProc,0,SP_PRUNED,
+			     Prelude_Z91Z93_closure,SPARK_NODE(spark),0);
+	    
+	SPARK_NODE(spark) = Prelude_Z91Z93_closure;
+	curr_spark[proc][pool] = SPARK_NEXT(spark);
+	prunedSparks[proc][pool]++;
+	DisposeSpark(spark);
+      } /* forall pool ... */ 
+    }   /* forall proc ... */
+  } while (arr_and(endQueues,SPARK_POOLS) != allProcs);
+
+  /* Prune all sparks on all processor starting with */
+  /* curr_spark[proc][pool]. */
+
+  do {
+    for(proc = 0; proc < RTSflags.GranFlags.proc; ++proc) {
+      for(pool = 0; pool < SPARK_POOLS; ++pool) {
+	spark = curr_spark[proc][pool];
+
+	if ( spark != NULL ) {
+	  if(RTSflags.GranFlags.granSimStats_Sparks)
+	    DumpRawGranEvent(CurrentProc,0,SP_PRUNED,
+			     Prelude_Z91Z93_closure,SPARK_NODE(spark),0);
+	    
+	  SPARK_NODE(spark) = Prelude_Z91Z93_closure;
+	  curr_spark[proc][pool] = SPARK_NEXT(spark);
+	
+	  prunedSparks[proc][pool]++;
+	  DisposeSpark(spark);
+	} else {
+	  finishedQueues[pool] |= PE_NUMBER(proc);
+	}
+      }  /* forall pool ... */  
+    }    /* forall proc ... */
+  } while (arr_and(finishedQueues,SPARK_POOLS) != allProcs);
+
+
+#  if defined(GRAN_CHECK) && defined(GRAN)
+  if ( RTSflags.GranFlags.debug & 0x1000) {
+    for(proc = 0; proc < RTSflags.GranFlags.proc; ++proc) {
+      for(pool = 0; pool < SPARK_POOLS; ++pool) {
+	if ( (RTSflags.GcFlags.giveStats) && (prunedSparks[proc][pool]>0)) {
+	  fprintf(RTSflags.GcFlags.statsFile,
+                  "Discarding %lu sparks on proc %d (pool %d) for GC purposes\n",
+		  prunedSparks[proc][pool],proc,pool);
+	}
+      }
+    }
+
+    if ( RTSflags.GcFlags.giveStats ) {
+      fprintf(RTSflags.GcFlags.statsFile,
+              "Spark statistics (after discarding) (total sparks = %d):",tot);
+      for (proc=0; proc<RTSflags.GranFlags.proc; proc++) {
+	if (proc % 4 == 0) 
+	  fprintf(RTSflags.GcFlags.statsFile,"\n> ");
+	fprintf(RTSflags.GcFlags.statsFile,
+                "\tPE %d: %d ",proc,tot_sparks[proc]);
+      }
+      fprintf(RTSflags.GcFlags.statsFile,".\n");
+    }
+  }
+#  endif
+}
+
+#  endif  /* !DEPTH_FIRST_PRUNING */
 
 # else  /* !GRAN */
 
@@ -440,9 +667,12 @@ PruneSparks(STG_NO_ARGS)
 	    } else {
 		if (DO_QP_PROF)
 		    QP_Event0(threadId++, *old);
-#  ifdef PAR
-	        if(do_sp_profile)
-		    DumpSparkGranEvent(SP_PRUNED, threadId++);
+#  if 0
+	    /* ToDo: Fix log entries for pruned sparks in GUM */
+	        if(RTSflags.GranFlags.granSimStats_Sparks)
+		  /* DumpSparkGranEvent(SP_PRUNED, threadId++);*/
+		  DumpGranEvent(SP_PRUNED,Prelude_Z91Z93_closure);
+		                          ^^^^^^^^^^^ should be a TSO
 #  endif
 	    }
 	}
@@ -460,6 +690,7 @@ switching or other nonsense... just set up StorageMgrInfo and perform
 a garbage collection.
 
 \begin{code}
+extern void handleTimerExpiry PROTO((rtsBool));
 
 void 
 ReallyPerformThreadGC(reqsize, do_full_collection)
@@ -488,52 +719,45 @@ rtsBool do_full_collection;
        Will & Phil 95/10
     */
 
-    for(stack = AvailableStack; stack != Nil_closure; stack = next) {
+    for(stack = AvailableStack; stack != Prelude_Z91Z93_closure; stack = next) {
 	next = STKO_LINK(stack);
 	FREEZE_MUT_HDR(stack, ImMutArrayOfPtrs_info);
 	MUTUPLE_CLOSURE_SIZE(stack) = MUTUPLE_VHS;
     }
 
-    for(tso = AvailableTSO; tso != Nil_closure; tso = next) {
+    for(tso = AvailableTSO; tso != Prelude_Z91Z93_closure; tso = next) {
 	next = TSO_LINK(tso);
 	FREEZE_MUT_HDR(tso, ImMutArrayOfPtrs_info);
 	MUTUPLE_CLOSURE_SIZE(tso) = MUTUPLE_VHS;
     }
 
-    AvailableStack = AvailableTSO = Nil_closure;
+    AvailableStack = AvailableTSO = Prelude_Z91Z93_closure;
 
     PruneSparks();
 
 # if defined(GRAN)
-    for(proc = 0; proc < max_proc; ++proc) {
-
-#  if 0
-    for(i = 0; i < SPARK_POOLS; i++) {
-      if (PendingSparksHd[proc][i] != NULL)
-        StorageMgrInfo.roots[num_ptr_roots++] = PendingSparksHd[proc][i];
-      if ( PendingSparksTl[proc][i] != NULL)
-        StorageMgrInfo.roots[num_ptr_roots++] = PendingSparksTl[proc][i];
-     }
-#  endif /* 0 */
-
+    /* Store head and tail of runnable lists as roots for GC */
+    for(proc = 0; proc < RTSflags.GranFlags.proc; ++proc) {
 #  if defined(GRAN_CHECK) && defined(GRAN)
-	      if ( debug & 0x40 ) 
-		fprintf(RTSflags.GcFlags.statsFile,"Saving RunnableThreadsHd %d (proc: %d) -- 0x%lx\n",
-			num_ptr_roots,proc,RunnableThreadsHd[proc]);
-#  endif
-
-    StorageMgrInfo.roots[num_ptr_roots++] = RunnableThreadsHd[proc];
-
-#  if defined(GRAN_CHECK) && defined(GRAN)
-	      if ( debug & 0x40 ) 
-		fprintf(RTSflags.GcFlags.statsFile,"Saving RunnableThreadsTl %d (proc: %d) -- 0x%lx\n",
-			num_ptr_roots,proc,RunnableThreadsTl[proc]);
+	if ( RTSflags.GcFlags.giveStats && (RTSflags.GranFlags.debug & 0x40) )
+	    fprintf(RTSflags.GcFlags.statsFile,"Saving RunnableThreadsHd %d (proc: %d) -- 0x%lx\n",
+		    num_ptr_roots,proc,RunnableThreadsHd[proc]);
 #  endif       
-    StorageMgrInfo.roots[num_ptr_roots++] = RunnableThreadsTl[proc];
+
+	StorageMgrInfo.roots[num_ptr_roots++] = RunnableThreadsHd[proc];
+
+#  if defined(GRAN_CHECK) && defined(GRAN)
+	if ( RTSflags.GcFlags.giveStats && (RTSflags.GranFlags.debug & 0x40) )
+	    fprintf(RTSflags.GcFlags.statsFile,"Saving RunnableThreadsTl %d (proc: %d) -- 0x%lx\n",
+		    num_ptr_roots,proc,RunnableThreadsTl[proc]);
+#  endif       
+	StorageMgrInfo.roots[num_ptr_roots++] = RunnableThreadsTl[proc];
+
     }  /* forall proc ... */
 
-    num_ptr_roots = SaveSparkRoots(num_ptr_roots);
-    num_ptr_roots = SaveEventRoots(num_ptr_roots);
+    /* This is now done as part of collectHeap (see ../storage dir) */
+    /* num_ptr_roots = SaveSparkRoots(num_ptr_roots); */
+    /* num_ptr_roots = SaveEventRoots(num_ptr_roots); */
 
 # else /* !GRAN */
 
@@ -542,10 +766,10 @@ rtsBool do_full_collection;
     StorageMgrInfo.roots[num_ptr_roots++] = WaitingThreadsHd;
     StorageMgrInfo.roots[num_ptr_roots++] = WaitingThreadsTl;
 
-# endif /* !GRAN */
+# endif /* GRAN */
 
 # if defined(GRAN_CHECK) && defined(GRAN)
-    if ( debug & 0x40 ) 
+    if ( RTSflags.GcFlags.giveStats && (RTSflags.GranFlags.debug & 0x40) ) 
       fprintf(RTSflags.GcFlags.statsFile,"Saving CurrentTSO %d -- 0x%lx\n",
 	      num_ptr_roots,CurrentTSO);
 # endif
@@ -556,10 +780,21 @@ rtsBool do_full_collection;
     StorageMgrInfo.roots[num_ptr_roots++] = PendingFetches;
 #  endif
 
+# ifndef PAR
+  StorageMgrInfo.roots[num_ptr_roots++] = StorageMgrInfo.StablePointerTable;
+# endif
+
     StorageMgrInfo.rootno = num_ptr_roots;
 
     blockUserSignals();
-    
+
+    /* For VTALRM timer ticks to be handled correctly, we need to record that
+       we are now about to enter GC, delaying the handling of timer expiry
+       for delayed threads till after the GC.
+    */
+    handleTimerExpiry(rtsFalse);
+
+    /* ====> The REAL THING happens here */    
     if (collectHeap(reqsize, &StorageMgrInfo, do_full_collection) != GC_SUCCESS) { 
 
 	OutOfHeapHook(reqsize * sizeof(W_)); /*msg*/
@@ -576,9 +811,14 @@ rtsBool do_full_collection;
     /* must do all the restoring exactly backwards to the storing! */
 
 # if defined(GRAN_CHECK) && defined(GRAN)
-	  if ( debug & 0x40 ) 
-	    fprintf(RTSflags.GcFlags.statsFile,"Restoring CurrentTSO %d -- new: 0x%lx\n",
-		    num_ptr_roots-1,StorageMgrInfo.roots[num_ptr_roots-1]);
+    if ( RTSflags.GcFlags.giveStats && (RTSflags.GranFlags.debug & 0x40) ) 
+	fprintf(RTSflags.GcFlags.statsFile,
+		"Restoring CurrentTSO %d -- new: 0x%lx\n",
+		num_ptr_roots-1,StorageMgrInfo.roots[num_ptr_roots-1]);
+# endif
+
+# ifndef PAR
+    StorageMgrInfo.StablePointerTable = StorageMgrInfo.roots[--num_ptr_roots];
 # endif
 
 # ifdef PAR
@@ -597,43 +837,40 @@ rtsBool do_full_collection;
 
 # else /* GRAN */
 
-    num_ptr_roots = RestoreEventRoots(num_ptr_roots);
-    num_ptr_roots = RestoreSparkRoots(num_ptr_roots);
+    /* num_ptr_roots = RestoreEventRoots(num_ptr_roots); */
+    /* num_ptr_roots = RestoreSparkRoots(num_ptr_roots); */
 
-    /* NB: PROC is unsigned datatype i.e. (PROC)-1 == (PROC)255  */
+    /* NB: PROC is unsigned datatype i.e. (PROC)-1 > 0 !  */
 
-    for(proc = max_proc - 1; (proc >= 0) && (proc < max_proc) ; --proc) {
-
+    for(proc = RTSflags.GranFlags.proc - 1; 
+	(proc >= 0) && (proc < RTSflags.GranFlags.proc) ; 
+	--proc) {
 #  if defined(GRAN_CHECK) && defined(GRAN)
-	  if ( debug & 0x40 ) 
-	    fprintf(RTSflags.GcFlags.statsFile,"Restoring RunnableThreadsTl %d (proc: %d) -- new: 0x%lx\n",
+	if ( RTSflags.GcFlags.giveStats && (RTSflags.GranFlags.debug & 0x40) )
+	    fprintf(RTSflags.GcFlags.statsFile,
+		    "Restoring RunnableThreadsTl %d (proc: %d) -- new: 0x%lx\n",
 		    num_ptr_roots-1,proc,StorageMgrInfo.roots[num_ptr_roots-1]);
 #  endif
 
-    RunnableThreadsTl[proc] = StorageMgrInfo.roots[--num_ptr_roots];
+	RunnableThreadsTl[proc] = StorageMgrInfo.roots[--num_ptr_roots];
 
 #  if defined(GRAN_CHECK) && defined(GRAN)
-	  if ( debug & 0x40 ) 
-	    fprintf(RTSflags.GcFlags.statsFile,"Restoring RunnableThreadsHd %d (proc: %d) -- new: 0x%lx\n",
-		    num_ptr_roots,proc,StorageMgrInfo.roots[num_ptr_roots]);
+	if ( RTSflags.GcFlags.giveStats && (RTSflags.GranFlags.debug & 0x40) )
+	    fprintf(RTSflags.GcFlags.statsFile,
+		    "Restoring RunnableThreadsHd %d (proc: %d) -- new: 0x%lx\n",
+		    num_ptr_roots-1,proc,StorageMgrInfo.roots[num_ptr_roots-1]);
 #  endif
 
-    RunnableThreadsHd[proc] = StorageMgrInfo.roots[--num_ptr_roots];
-
-#  if 0
-    for(i = SPARK_POOLS - 1; i >= 0; --i) {
-      if (PendingSparksTl[proc][i] != NULL)
-        PendingSparksTl[proc][i] =  StorageMgrInfo.roots[--num_ptr_roots];
-      if (PendingSparksHd[proc][i] != NULL)
-        PendingSparksHd[proc][i] =  StorageMgrInfo.roots[--num_ptr_roots];
-     }
-#  endif
-    }
+	RunnableThreadsHd[proc] = StorageMgrInfo.roots[--num_ptr_roots];
+    }  /* forall proc ... */
 
 # endif /* GRAN */
 
     /* Semantics of GC ensures that a block of `reqsize' is now available */
     SAVE_Hp += reqsize;
+
+    /* Activate the handling of entries on the WaitingThreads queue again */
+    handleTimerExpiry(rtsTrue);
 
     unblockUserSignals();
 }
@@ -675,7 +912,7 @@ BlackHoleUpdateStack(STG_NO_ARGS)
 
 
 \begin{code}
-#if defined(CONCURRENT) && !defined(GRAN)
+#if 0 /* defined(CONCURRENT) && !defined(GRAN) */
 void
 PerformReschedule(W_ liveness, W_ always_reenter_node)
 { }

@@ -2,7 +2,7 @@
 % (c) Parade/AQUA Projects, Glasgow University, 1995
 %     Kevin Hammond, February 15th. 1995
 %
-%     This is for GUM only.
+%     This is for GUM and GrAnSim.
 %
 %************************************************************************
 %*                                                                      *
@@ -13,10 +13,14 @@
 This module defines routines for unpacking closures in the parallel runtime
 system (GUM).
 
-\begin{code}
-#ifdef PAR /* whole file */
+In the case of GrAnSim, this module defines routines for *simulating* the 
+unpacking of closures as it is done in the parallel runtime system.
 
+\begin{code}
 #include "rtsdefs.h"
+
+#if defined(PAR) 
+
 EXTDATA_RO(FetchMe_info);
 \end{code}
 
@@ -52,7 +56,7 @@ CommonUp(P_ src, P_ dst)
 	bqe = (P_) GEN_RBH_BQ(src);
 	break;
     case INFO_FETCHME_TYPE:
-	bqe = Nil_closure;
+	bqe = Prelude_Z91Z93_closure;
 	break;
     case INFO_FMBQ_TYPE:
 	bqe = (P_) FMBQ_ENTRIES(src);
@@ -99,6 +103,7 @@ W_ *nGAs;
     W_ bufsize;
     P_ graphroot, graph, parent;
     W_ pptr = 0, pptrs = 0, pvhs;
+    char str[80];
 
     int i;
     globalAddr *gaga;
@@ -158,7 +163,7 @@ W_ *nGAs;
 	   * same way as they will be in the heap...at least up through the
 	   * end of the variable header.
 	   */
-	  ip = get_closure_info(bufptr, &size, &ptrs, &nonptrs, &vhs);
+	  ip = get_closure_info(bufptr, &size, &ptrs, &nonptrs, &vhs, str);
 	  
 	  /* Fill in the fixed header */
 	  for (i = 0; i < FIXED_HS; i++)
@@ -268,7 +273,8 @@ W_ *nGAs;
 	    if (parent == NULL)
 		break;
 	    else {
-		(void) get_closure_info(parent, &size, &pptrs, &nonptrs, &pvhs);
+		(void) get_closure_info(parent, &size, &pptrs, &nonptrs,
+					&pvhs, str);
 		pptr = 0;
 	    }
 	}
@@ -282,8 +288,104 @@ W_ *nGAs;
     /* ToDo: are we *certain* graphroot has been set??? WDP 95/07 */
     return (graphroot);
 }
+#endif  /* PAR */
 \end{code}
 
+For GrAnSim:
+In general no actual unpacking should be necessary. We just have to walk
+over the graph and set the bitmasks appropriately. -- HWL
+
 \begin{code}
-#endif /* PAR -- whole file */
+#if defined(GRAN)
+/* This code fakes the unpacking of a somewhat virtual buffer */
+P_
+UnpackGraph(buffer)
+P_ buffer;
+{
+    W_ size, ptrs, nonptrs, vhs;
+    P_ bufptr, closurestart;
+    P_ slotptr;
+    P_ closure, existing;
+    P_ ip, oldip;
+    W_ bufsize, unpackedsize;
+    P_ graphroot, graph, parent;
+    W_ pptr = 0, pptrs = 0, pvhs;
+    char str[80];
+    int i;
+    P_ tso;
+
+    bufptr = buffer + PACK_HDR_SIZE;
+    graphroot = *bufptr;
+
+#  if defined(GRAN_CHECK) && defined(GRAN)  /* Just for testing */
+    if (buffer[PACK_FLAG_LOCN] != MAGIC_PACK_FLAG) {
+      fprintf(stderr,"Qagh: no magic flag at start of packet @ 0x%lx\n", 
+                      buffer);
+      EXIT(EXIT_FAILURE);
+   }
+#  endif
+
+    tso = buffer[PACK_TSO_LOCN];
+
+    /* Unpack the header */
+    unpackedsize = buffer[PACK_UNPACKED_SIZE_LOCN];
+    bufsize = buffer[PACK_SIZE_LOCN];
+
+#  if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
+    if ( RTSflags.GranFlags.debug & 0x100 ) 
+	fprintf(stderr,"\nUnpacking buffer @ 0x%x (root @ 0x%x, PE %d,size
+= %d), demanded by TSO 0x%x (%d)(PE %d)\n",
+		buffer,graphroot,where_is(graphroot), bufsize, tso, TSO_ID(tso), where_is(tso));
+#  endif
+
+    do {
+        closurestart = bufptr; 
+	closure = *bufptr++;       /* that's all we need for GrAnSim -- HWL */
+
+	/* Actually only ip is needed; rest is useful for TESTING -- HWL */
+	ip = get_closure_info(closure, 
+			      &size, &ptrs, &nonptrs, &vhs, str);
+
+#  if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
+        if ( RTSflags.GranFlags.debug & 0x100 )
+	    fprintf(stderr,"(0x%x): Bitmask changed [%s]: 0x%x ",
+		    closure, (IS_NF(INFO_PTR(closure)) ? "NF" : "__"),
+	            PROCS(closure));
+#  endif
+
+        if ( (INFO_TYPE(ip) == INFO_SPEC_RBH_TYPE) ||
+	     (INFO_TYPE(ip) == INFO_GEN_RBH_TYPE) ) {
+	    PROCS(closure) = PE_NUMBER(CurrentProc);          /* Move node */
+#  if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
+	    if ( RTSflags.GranFlags.debug & 0x100 ) {
+		fprintf(stderr," ---> 0x%x\n", PROCS(closure));
+		fprintf(stderr,"< Converting RBH @ 0x%x into an updatable
+closure again\n",
+		      closure);
+	    }
+#  endif
+	    convertFromRBH(closure);  /* In GUM that's done by convertToFetchMe */
+	} else if (IS_BLACK_HOLE(ip)) {
+	    PROCS(closure) |= PE_NUMBER(CurrentProc);         /* Copy node */
+        } else if ( (PROCS(closure) & PE_NUMBER(CurrentProc)) == 0 ) {
+	  if (IS_NF(ip))                            /* Old: || IS_BQ(node) */
+	    PROCS(closure) |= PE_NUMBER(CurrentProc);         /* Copy node */
+	  else
+	    PROCS(closure) = PE_NUMBER(CurrentProc);          /* Move node */
+	}
+
+#  if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
+        if ( RTSflags.GranFlags.debug & 0x100 )
+	  fprintf(stderr," ---> 0x%x\n",   PROCS(closure));
+#  endif
+
+    } while (bufptr<(buffer+bufsize)) ;   /*  (parent != NULL);  */
+
+    /* In GrAnSim we allocate pack buffers dynamically! -- HWL */
+    free(buffer);
+
+    return (graphroot);
+}
+#endif  /* GRAN */
 \end{code}
+

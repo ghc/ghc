@@ -1,7 +1,7 @@
 \section[Stable-Pointers]{Creation and use of Stable Pointers}
 
 \begin{code}
-#ifndef PAR
+#if !defined(PAR)
 
 #include "rtsdefs.h"
 \end{code}

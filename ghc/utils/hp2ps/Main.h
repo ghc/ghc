@@ -51,6 +51,7 @@ extern boolish bflag;
 extern boolish sflag;
 extern int     mflag;
 extern boolish tflag;
+extern boolish cflag;
 
 extern char *programname;
 

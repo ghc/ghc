@@ -8,7 +8,7 @@
 %************************************************************************
 
 \begin{code}
-#ifdef PAR /* whole file */
+#if defined(PAR) || defined(GRAN) /* whole file */
 
 #include "rtsdefs.h"
 \end{code}
@@ -32,20 +32,21 @@ P_ closure;
     P_ infoPtr, newInfoPtr;
     W_ size, ptrs, nonptrs, vhs;
     P_	rbh_save;
-    int isSpec;
+    rtsBool isSpec;
+    char str[80];
 
     if ((rbh_save = AllocateHeap(SPEC_HS + 2)) == NULL)
 	return NULL;
 
-    infoPtr = get_closure_info(closure, &size, &ptrs, &nonptrs, &vhs);
+    infoPtr = get_closure_info(closure, &size, &ptrs, &nonptrs, &vhs, str);
     ASSERT(size >= MIN_UPD_SIZE);
 
     switch (BASE_INFO_TYPE(infoPtr)) {
     case INFO_SPEC_TYPE:
-	isSpec = 1;
+	isSpec = rtsTrue;
 	break;
     case INFO_GEN_TYPE:
-	isSpec = 0;
+	isSpec = rtsFalse;
 	break;
     default:
 	fprintf(stderr, "Panic: turn %#lx (IP %#lx) into RBH\n", (W_)closure, (W_)infoPtr);
@@ -104,7 +105,18 @@ acquired a blocking queue.  If that has happened, we first have to
 awaken the blocking queue.  What a nuisance!  Fortunately,
 @AwakenBlockingQueue@ should now know what to do.
 
+A note on GrAnSim: In GrAnSim we don't have FetchMe closures. However, we
+have to turn a RBH back to its original form when the simulated transfer
+of the closure has been finished. Therefore we need the @convertFromRBH@
+routine below. After converting the RBH back to its original form and 
+awakening all TSOs, the first TSO will reenter the closure which is now
+local and carry on merrily reducing it (the other TSO will be less merrily 
+blocked on the now local closure; we're costing the difference between
+local and global blocks in the BQ code).
+
 \begin{code}
+#if defined(PAR)
+
 EXTDATA_RO(FetchMe_info);
 
 void
@@ -152,6 +164,113 @@ globalAddr *ga;
     if (IS_MUTABLE(INFO_PTR(bqe)))
 	AwakenBlockingQueue(bqe);
 }
+#else  /* GRAN */
+/* Prototype */
+void UnlinkFromMUT(P_ closure); 
+
+void
+convertFromRBH(closure)  /* The corresponding function in GUM is: */  
+                         /* convertToFetchMe */
+P_ closure;
+{
+    P_ ip = (P_) INFO_PTR(closure);
+    P_ bqe, rbh_save = Prelude_Z91Z93_closure;
+    int isSpec;
+#if defined(GCap) || defined(GCgn)    
+    rtsBool linked = IS_MUTABLE(ip) && MUT_LINK(closure) != MUT_NOT_LINKED;
+    P_ oldLink = MUT_LINK(closure);
+#endif
+
+    switch(INFO_TYPE(ip)) {
+    case INFO_SPEC_RBH_TYPE:
+	bqe = (P_) SPEC_RBH_BQ(closure);
+	isSpec = 1;
+	break;
+    case INFO_GEN_RBH_TYPE:
+	bqe = (P_) GEN_RBH_BQ(closure);
+	isSpec = 0;
+	break;
+    default:
+#if 1
+	fprintf(stderr, "Weird...just tried to convert %#lx (IP %#lx) to FetchMe\n",
+	  closure, ip);
+#endif
+	return;
+    }
+
+#  if defined(GCap) || defined(GCgn)
+    /* If the RBH is turned back to a SPEC or GEN closure we have to take 
+       it off  the mutables list */
+
+    if (linked) {
+#  if defined(GRAN_CHECK)
+      if (RTSflags.GranFlags.debug & 0x100) {
+            fprintf(stderr,"\n**>>>> Unlinking closure %#lx from mutables list on PE %d @ %ld (next mutable=%#lx)\n",
+                           closure,
+                           where_is(closure), CurrentTime[where_is(closure)],
+                           MUT_LINK(closure));
+            GN(closure);
+          }
+#  endif
+      UnlinkFromMUT(closure);
+    }
+#  endif
+    
+    /* FETCHME_GA(closure) = ga; */
+    if (IS_MUTABLE(INFO_PTR(bqe))) {
+      PROC old_proc = CurrentProc,        /* NB: For AwakenBlockingQueue, */
+           new_proc = where_is(closure);  /*     CurentProc must be where */
+					  /*     closure lives. */
+      CurrentProc = new_proc;
+
+#  if defined(GRAN_CHECK)
+      if (RTSflags.GranFlags.debug & 0x100)
+        fprintf(stderr,"===== AwBQ of node 0x%lx (%s) [PE %2u]\n",
+	               closure, (isSpec ? "SPEC_RBH" : "GEN_RBH"), new_proc);
+#  endif
+
+      rbh_save = AwakenBlockingQueue(bqe);     /* AwakenBlockingQueue(bqe); */
+      CurrentProc = old_proc;
+    } else {
+        rbh_save = bqe;
+    }
+
+    /* Put data from special RBH save closures back into the closure */
+    if ( rbh_save == Prelude_Z91Z93_closure ) {
+      fprintf(stderr,"convertFromRBH: No RBH_Save_? closure found at end of BQ!\n");
+      EXIT(EXIT_FAILURE);
+    } else {
+      closure[isSpec ? SPEC_HS : GEN_HS] = rbh_save[SPEC_HS];
+      closure[(isSpec ? SPEC_HS : GEN_HS) + 1] = rbh_save[SPEC_HS + 1];
+    }
+
+    /* Put back old info pointer (only in GrAnSim) -- HWL */
+    SET_INFO_PTR(closure, REVERT_INFOPTR(INFO_PTR(closure)));
+
+}
+
+/* Remove closure from the mutables list */
+
+void
+UnlinkFromMUT(P_ closure) 
+{
+  P_ curr = StorageMgrInfo.OldMutables, prev = NULL;
+
+  while (curr != NULL && curr != closure) {
+    ASSERT(MUT_LINK(curr)!=MUT_NOT_LINKED);
+    prev=curr;
+    curr=MUT_LINK(curr); 
+  }
+  if (curr==closure) {   
+   if (prev==NULL) 
+     StorageMgrInfo.OldMutables = MUT_LINK(curr);
+   else   
+     MUT_LINK(prev) = MUT_LINK(curr);
+   MUT_LINK(curr) = MUT_NOT_LINKED;
+  }
+}
+
+#endif /* PAR */
 
 #endif /* PAR -- whole file */
 \end{code}

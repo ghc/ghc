@@ -36,17 +36,29 @@ EXTFUN(_PRMarking_MarkNextSpark);
 EXTDATA(_PRMarking_MarkNextSpark_closure);
 #endif
 
+#if defined(GRAN)
+EXTFUN(_PRMarking_MarkNextEvent);
+EXTDATA(_PRMarking_MarkNextEvent_closure);
+EXTFUN(_PRMarking_MarkNextClosureInFetchBuffer);
+EXTDATA(_PRMarking_MarkNextClosureInFetchBuffer_closure);
+#endif
+
 #ifdef PAR
 EXTFUN(_PRMarking_MarkNextGA);
 EXTDATA(_PRMarking_MarkNextGA_closure);
 #else
+# if 1 /* !defined(GRAN) */ /* HWL */
 EXTFUN(_PRMarking_MarkNextAStack);
 EXTFUN(_PRMarking_MarkNextBStack);
 EXTDATA(_PRMarking_MarkNextAStack_closure);
 EXTDATA(_PRMarking_MarkNextBStack_closure);
+# endif
 #endif /* not parallel */
 
 P_ sm_roots_end;
+#if defined(GRAN)
+P_ ret_MRoot, ret_Mark;
+#endif
 
 I_
 markHeapRoots(sm, cafs1, cafs2, base, lim, bit_array)
@@ -58,6 +70,12 @@ markHeapRoots(sm, cafs1, cafs2, base, lim, bit_array)
 {
 #ifdef CONCURRENT
     int pool;
+#endif
+#if defined(GRAN)
+    PROC proc;
+    eventq event;
+    sparkq spark;
+    rtsBool found = rtsFalse;
 #endif
 
     BitArray = bit_array;
@@ -74,7 +92,85 @@ markHeapRoots(sm, cafs1, cafs2, base, lim, bit_array)
 	miniInterpret((StgFunPtr)_startMarkWorld);
     }
 
-#ifdef CONCURRENT
+#if defined(GRAN)
+    DEBUG_STRING("Marking Events (GRAN): ");
+    MRoot = (P_) EventHd;
+    found = rtsFalse;
+    do { 
+      if (MRoot != NULL) {
+    	/* inlined version of MarkNextEvent */
+    	switch (EVENT_TYPE( ((eventq) MRoot) )) {
+  	  case CONTINUETHREAD:
+  	  case STARTTHREAD:
+  	  case RESUMETHREAD:
+  	  case MOVETHREAD:
+  	     EVENT_GC_INFO( ((eventq) MRoot) ) = 0;
+  	     Mark = (P_) EVENT_TSO( ((eventq) MRoot) );
+	     MStack = (P_) _PRMarking_MarkNextEvent_closure;
+	     miniInterpret((StgFunPtr)_startMarkWorld);
+    	     found = rtsTrue;
+  	     break;
+  	  case MOVESPARK:
+  	     EVENT_GC_INFO( ((eventq) MRoot) ) = 0;
+  	     Mark = (P_) SPARK_NODE(EVENT_SPARK( ((eventq) MRoot) ));
+	     MStack = (P_) _PRMarking_MarkNextEvent_closure;
+	     miniInterpret((StgFunPtr)_startMarkWorld);
+    	     found = rtsTrue;
+  	     break;
+  	  case FETCHNODE:
+  	     EVENT_GC_INFO( ((eventq) MRoot) ) = 0;
+  	     Mark = (P_) EVENT_TSO( ((eventq) MRoot) );
+	     MStack = (P_) _PRMarking_MarkNextEvent_closure;
+	     miniInterpret((StgFunPtr)_startMarkWorld);
+    	     found = rtsTrue;
+  	     break;
+  	  case FETCHREPLY:
+  	     EVENT_GC_INFO( ((eventq) MRoot) ) = 0;
+  	     Mark = (P_) EVENT_TSO( ((eventq) MRoot) );
+	     MStack = (P_) _PRMarking_MarkNextEvent_closure;
+	     miniInterpret((StgFunPtr)_startMarkWorld);
+    	     found = rtsTrue;
+  	     break;
+  	   case GLOBALBLOCK:
+  	     EVENT_GC_INFO( ((eventq) MRoot) ) = 0;
+  	     Mark = (P_) EVENT_TSO( ((eventq) MRoot) );
+	     MStack = (P_) _PRMarking_MarkNextEvent_closure;
+	     miniInterpret((StgFunPtr)_startMarkWorld);
+    	     found = rtsTrue;
+  	     break;
+  	  case UNBLOCKTHREAD:
+  	     Mark = (P_) EVENT_TSO( ((eventq) MRoot) );
+	     MStack = (P_) _PRMarking_MarkNextEvent_closure;
+	     miniInterpret((StgFunPtr)_startMarkWorld);
+    	     found = rtsTrue;
+  	     break;
+    	  case FINDWORK:
+	     MRoot = (P_) EVENT_NEXT( ((eventq) MRoot) );
+    	     found = rtsFalse;
+  	     break;
+  	  default:
+  	     fprintf(stderr,"Unknown event type %d (event @ %#x) in SMmarking_NextEvent\n",
+  			      EVENT_TYPE( ((eventq) MRoot) ), MRoot);
+  	       EXIT(EXIT_FAILURE);
+        }
+      }
+    } while (!found && MRoot != NULL);
+
+    DEBUG_STRING("Marking Sparks (GRAN):");
+    /* ToDo: Check this code */
+    for(proc = 0; proc < RTSflags.GranFlags.proc; ++proc) {
+      for(pool = 0; pool < SPARK_POOLS; pool++) {
+	 MRoot = (P_) PendingSparksHd[proc][pool];
+         if (MRoot != NULL) {
+	   Mark = (P_) SPARK_NODE( ((sparkq) MRoot) );
+	   MStack = (P_) _PRMarking_MarkNextSpark_closure;
+	   miniInterpret((StgFunPtr)_startMarkWorld);
+	 }
+      }    /* forall pool ..   */
+    }     /* forall proc ...  */
+#endif /* GRAN */
+
+#if defined(CONCURRENT) && !defined(GRAN)
     for(pool = 0; pool < SPARK_POOLS; pool++) {
 	if (PendingSparksHd[pool] < PendingSparksTl[pool]) {
 	    sm_roots_end = (P_) PendingSparksTl[pool];
@@ -99,7 +195,7 @@ markHeapRoots(sm, cafs1, cafs2, base, lim, bit_array)
 	miniInterpret((StgFunPtr) _startMarkWorld);
     }
 #else
-# ifndef CONCURRENT
+# if 1  /* !defined(GRAN) */  /* HWL */
     /* Note: no *external* stacks in parallel/concurrent world */
 
     DEBUG_STRING("Marking A Stack:");

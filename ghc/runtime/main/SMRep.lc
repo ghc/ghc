@@ -123,8 +123,8 @@ MUTUPLE_RTBL();
 IMMUTUPLE_RTBL();
 STATIC_RTBL();
 
-#ifndef PAR
-MallocPtr_RTBL();
+#if !defined(PAR) /* && !defined(GRAN) */
+ForeignObj_RTBL();
 #endif
 
 BH_RTBL(N);
@@ -152,11 +152,17 @@ DUMMY_PRRETURN_RTBL(_PRMarking_MarkNextCAF,_Dummy_PRReturn_entry);
 # ifdef CONCURRENT
 DUMMY_PRRETURN_RTBL(_PRMarking_MarkNextSpark,_Dummy_PRReturn_entry);
 # endif
+# if defined(GRAN)
+DUMMY_PRRETURN_RTBL(_PRMarking_MarkNextEvent,_Dummy_PRReturn_entry);
+DUMMY_PRRETURN_RTBL(_PRMarking_MarkNextClosureInFetchBuffer,_Dummy_PRReturn_entry);
+# endif
 # ifdef PAR
 DUMMY_PRRETURN_RTBL(_PRMarking_MarkNextGA,_Dummy_PRReturn_entry);
 # else
+#  if 1 /* !defined(CONCURRENT) */ /* HWL */
 DUMMY_PRRETURN_RTBL(_PRMarking_MarkNextAStack,_Dummy_PRReturn_entry);
 DUMMY_PRRETURN_RTBL(_PRMarking_MarkNextBStack,_Dummy_PRReturn_entry);
+#  endif
 # endif
 #endif
 
@@ -177,7 +183,7 @@ BF_RTBL();
 # endif
 #endif
 
-#ifdef PAR
+#if defined(PAR) || defined(GRAN)
 SPEC_RBH_RTBL(2,0);
 SPEC_RBH_RTBL(2,1);
 SPEC_RBH_RTBL(2,2);

@@ -13,6 +13,9 @@ stat_exit
 *********************************************************************
 
 \begin{code}
+#define NON_POSIX_SOURCE /*needed for solaris2 only?*/
+
+/* how is this to work given we have not read platform.h yet? */
 #ifdef hpux_TARGET_OS
 #define _INCLUDE_HPUX_SOURCE
 #endif
@@ -39,6 +42,11 @@ stat_exit
 
 #if defined(HAVE_SYS_RESOURCE_H) && ! irix_TARGET_OS
 #include <sys/resource.h>
+#endif
+
+/* Needed for Solaris2 */
+#if /* defined(HAVE_SYS_RUSAGE_H) && */ defined(solaris2_TARGET_OS)
+#include <sys/rusage.h>
 #endif
 
 #ifdef HAVE_SYS_TIMEB_H

@@ -1,0 +1,14 @@
+
+
+\begin{code}
+#ifdef CONCURRENT /* the whole thing! */
+#include "rtsdefs.h"
+
+void
+NoRunnableThreadsHook ()
+{
+    fprintf(stderr, "No runnable threads!\n");
+}
+#endif /* CONCURRENT */
+
+\end{code}

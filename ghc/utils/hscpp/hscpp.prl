@@ -175,14 +175,14 @@ while (<INPIPE>) {
 
             if ($#tospec >= 0) {
 	        $specty = shift(@tospec);
-	        print ($data_or_inst ? "{-# SPECIALIZE $data_inst_str $specty #-}" : "$space{-# SPECIALIZE $fun :: $specty");
+	        print ($data_or_inst ? "\{-# SPECIALIZE $data_inst_str $specty #-\}" : "$space\{-# SPECIALIZE $fun :: $specty");
 	        while ($#tospec >= 0) {
 	            $specty = shift(@tospec);
-	            print ($data_or_inst ? "; {-# SPECIALIZE $data_inst_str $specty #-}" : ", $specty");
+	            print ($data_or_inst ? "; \{-# SPECIALIZE $data_inst_str $specty #-\}" : ", $specty");
 	        }
 	        print ($data_or_inst ? "\n" : " #-}\n");
 	    } else {
-		print "{- NO_SPECS_GENERATED ", $data_or_inst ? $specty : $fun, " -}\n";
+		print "\{- NO_SPECS_GENERATED ", $data_or_inst ? $specty : $fun, " -\}\n";
 	    	print STDERR "Warning: No specs for GENERATE_SPECS pre-processing pragma:\n  $_";
 	    }
 	    print $tysig if ! $data_or_inst;

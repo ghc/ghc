@@ -26,6 +26,10 @@ much pain.
 # define NON_POSIX_SOURCE
 #endif
 
+#if defined(freebsd_TARGET_OS)
+# define NON_POSIX_SOURCE
+#endif
+
 #if defined(osf1_TARGET_OS)
     /* The include files for OSF1 do not normally define SA_SIGINFO */
 # define _OSF_SOURCE 1
@@ -45,6 +49,11 @@ much pain.
 
 #if defined(HAVE_SIGNAL_H)
 # include <signal.h>
+#endif
+
+#if defined(linux_TARGET_OS) || defined(linuxaout_TARGET_OS)
+    /* to look *inside* sigcontext... */
+# include <asm/signal.h>
 #endif
 
 #if defined(HAVE_SIGINFO_H)
@@ -78,16 +87,24 @@ to set up the handler to expect a different collection of arguments.
 Fun, eh?
 
 \begin{code}
-# if defined(sunos4_TARGET_OS)
+# if defined(sunos4_TARGET_OS) || defined(freebsd_TARGET_OS) \
+  || defined(linux_TARGET_OS)  || defined(linuxaout_TARGET_OS)
 
 static void
-segv_handler(sig, code, scp, addr)
-  int sig;
-  int code; /* NB: all except first argument are "implementation defined" */
-  struct sigcontext *scp;
-  caddr_t addr;
+segv_handler(int sig,
+    /* NB: all except first argument are "implementation defined" */
+#  if defined(sunos4_TARGET_OS) || defined(freebsd_TARGET_OS)
+	int code, struct sigcontext *scp, caddr_t addr)
+#  else /* linux */
+	struct sigcontext_struct scp)
+#  endif /* linux */
 {
     extern void StackOverflow(STG_NO_ARGS) STG_NORETURN;
+
+#  if defined(linux_TARGET_OS)  || defined(linuxaout_TARGET_OS)
+    caddr_t addr = scp.cr2;
+    /* Magic info from Tommy Thorn! */
+#  endif
 
     if (addr >= (caddr_t) stks_space
       && addr < (caddr_t) (stks_space + RTSflags.GcFlags.stksSize))
@@ -101,13 +118,20 @@ segv_handler(sig, code, scp, addr)
 int
 install_segv_handler(void)
 {
+#if freebsd_TARGET_OS
+    /* FreeBSD seems to generate SIGBUS for stack overflows */
+    if (signal(SIGBUS, segv_handler) == SIG_ERR)
+	return -1;
+    return ((int) signal(SIGSEGV, segv_handler));
+#else
     return ((int) signal(SIGSEGV, segv_handler) == SIG_ERR);
     /* I think the "== SIG_ERR" is saying "there was no
        handler for SIGSEGV before this one".  WDP 95/12
     */
+#endif
 }
 
-# else	/* Not SunOS 4 */
+# else	/* Not SunOS 4, FreeBSD, or Linux(a.out) */
 
 #  if defined(irix_TARGET_OS)
      /* certainly BOGUS (WDP 94/05) -- copied from /usr/include/sys/siginfo.h */
@@ -161,9 +185,11 @@ the non-POSIX signal under SunOS 4.1.X, we adopt the same approach
 here.
 
 \begin{code}
-#if (defined(PROFILING) || defined(CONCURRENT)) && !defined(GRAN)
+#if defined(PROFILING) || defined(CONCURRENT) /* && !defined(GRAN) */
 
 # ifdef CONCURRENT
+
+extern I_ delayTicks;
 
 #  ifdef PAR
 extern P_ CurrentTSO;
@@ -198,8 +224,27 @@ vtalrm_handler(int sig)
     }
 #  endif
 
-    if (WaitingThreadsHd != Nil_closure)
-	AwaitEvent(RTSflags.ConcFlags.ctxtSwitchTime);
+       /*
+	 Handling a tick for threads blocked waiting for file
+	 descriptor I/O or time.
+
+         This requires some care since virtual time alarm ticks
+	 can occur when we are in the GC. If that is the case,
+	 we just increment a delayed timer tick counter, but do
+         not check to see if any TSOs have been made runnable
+         as a result. (Do a bulk update of their status once
+	 the GC has completed).
+
+	 If the vtalrm does not occur within GC, we try to promote
+	 any of the waiting threads to the runnable list (see awaitEvent)
+
+         4/96 SOF
+       */
+
+    if (delayTicks != 0) /* delayTicks>0 => don't handle timer expiry (in GC) */
+       delayTicks++;
+    else if (WaitingThreadsHd != Prelude_Z91Z93_closure)
+	     AwaitEvent(RTSflags.ConcFlags.ctxtSwitchTime);
 
 #  ifdef PAR
     if (PendingSparksTl[REQUIRED_POOL] == PendingSparksLim[REQUIRED_POOL] ||
@@ -217,7 +262,7 @@ vtalrm_handler(int sig)
 
     if (CurrentTSO != NULL ||
 #  else
-    if (RunnableThreadsHd != Nil_closure ||
+    if (RunnableThreadsHd != Prelude_Z91Z93_closure ||
 #  endif
       PendingSparksHd[REQUIRED_POOL] < PendingSparksTl[REQUIRED_POOL] ||
       PendingSparksHd[ADVISORY_POOL] < PendingSparksTl[ADVISORY_POOL]) {
@@ -318,7 +363,7 @@ parallel world.  Sorry.
 
 \begin{code}
 
-#ifdef PAR
+#if defined(PAR) /* || defined(GRAN) */
 
 void
 blockUserSignals(void)

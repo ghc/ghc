@@ -109,17 +109,16 @@ static char heap_filename[STATS_FILENAME_MAXLEN]; /* heap log file name = <progr
 static FILE *heap_file = NULL;
 
 I_
-heap_profile_init(cc_select_str, mod_select_str, grp_select_str,
-		  descr_select_str, type_select_str, kind_select_str,
-		  argv) 
-    char *cc_select_str;
-    char *mod_select_str;
-    char *grp_select_str;
-    char *descr_select_str;
-    char *type_select_str;
-    char *kind_select_str;
-    char *argv[];
+heap_profile_init(argv) 
+  char *argv[];
 {
+    char *cc_select_str	    = RTSflags.ProfFlags.ccSelector;
+    char *mod_select_str    = RTSflags.ProfFlags.modSelector;
+    char *grp_select_str    = RTSflags.ProfFlags.grpSelector;
+    char *descr_select_str  = RTSflags.ProfFlags.descrSelector;
+    char *type_select_str   = RTSflags.ProfFlags.typeSelector;
+    char *kind_select_str   = RTSflags.ProfFlags.kindSelector;
+
     hash_t count, max, first;
     W_ heap_prof_style;
 
@@ -422,12 +421,6 @@ words).
 #define NON_PROF_HS (FIXED_HS - PROF_FIXED_HDR - TICKY_FIXED_HDR)
 
 void
-profile_closure_none(P_ closure, I_ size)
-{
-    return;
-}
-
-void
 profile_closure_cc(P_ closure, I_ size)
 {
     CostCentre cc = (CostCentre) CC_HDR(closure);
@@ -568,17 +561,17 @@ profile_closure_time_select(P_ closure, I_ size)
 @heap_profile_setup@ is called before garbage collection to initialise
 for the profile. It assigns the appropriate closure profiling function
 to @heap_profile_fn@ and memoises any cost centre selection. If no
-profile is required @profile_closure_none@ is assigned.
+profile is required @heap_profile_fn@ is assigned NULL.
 
 On completion of garbage collection @heap_profile_done@ is called. It
 produces a heap profile report and resets the residency counts to 0.
 
 \begin{code}
 
-void (* heap_profile_fn) PROTO((P_,I_)) = profile_closure_none;
+void (* heap_profile_fn) PROTO((P_,I_)) = NULL;
 
 void (* profiling_fns_select[]) PROTO((P_,I_)) = {
-    profile_closure_none,
+    NULL,
     profile_closure_cc_select,
     profile_closure_mod_select,
     profile_closure_grp_select,
@@ -588,7 +581,7 @@ void (* profiling_fns_select[]) PROTO((P_,I_)) = {
 };
 
 void (* profiling_fns[]) PROTO((P_,I_)) = {
-    profile_closure_none,
+    NULL,
     profile_closure_cc,
     profile_closure_mod,
     profile_closure_grp,
@@ -628,7 +621,7 @@ heap_profile_done(STG_NO_ARGS)	  /* called at end of heap profile */
 	return;
 
     heap_prof_style = RTSflags.ProfFlags.doHeapProfile;
-    heap_profile_fn = profile_closure_none;
+    heap_profile_fn = NULL;
 
     seconds = (previous_ticks + current_ticks) / (StgFloat)TICK_FREQUENCY;
     fprintf(heap_file, "BEGIN_SAMPLE %0.2f\n", seconds);

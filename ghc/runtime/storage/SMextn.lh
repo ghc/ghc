@@ -8,15 +8,15 @@ void initExtensions PROTO((smInfo *sm));
 # if defined(_INFO_COPYING)
 
 void evacSPTable PROTO((smInfo *sm));
-void reportDeadMallocPtrs PROTO((StgPtr oldMPList, StgPtr new, StgPtr *newMPLust));
+void reportDeadForeignObjs PROTO((StgPtr oldMPList, StgPtr new, StgPtr *newMPLust));
 
 # endif /* _INFO_COPYING */
 
 # if defined(_INFO_COMPACTING)
 
-void sweepUpDeadMallocPtrs PROTO((P_ MallocPtrList,
-				  P_ base,
-				  BitWord *bits
+void sweepUpDeadForeignObjs PROTO((P_ ForeignObjList,
+				   P_ base,
+				   BitWord *bits
 				));
 
 # endif /* _INFO_COMPACTING */
@@ -25,12 +25,12 @@ void TrashMem PROTO(( P_ from, P_ to ));
 
 # if defined(DEBUG)
 
-void Trash_MallocPtr_Closure PROTO((P_ mptr));
-void Validate_MallocPtrList PROTO(( P_ MallocPtrList ));
+void Trash_ForeignObj_Closure PROTO((P_ mptr));
+void Validate_ForeignObj PROTO(( P_ ForeignObjList ));
 
-void Trace_MPdies  PROTO((void));
-void Trace_MPlives PROTO((void));
-void Trace_MPforwarded PROTO(( P_ MPPtr, P_ newAddress ));
+void Trace_FOdies  PROTO((void));
+void Trace_FOlives PROTO((void));
+void Trace_FOforwarded PROTO(( P_ FOPtr, P_ newAddress ));
 
 # endif /* DEBUG */
 

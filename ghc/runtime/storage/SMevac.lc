@@ -272,10 +272,10 @@ extern P_ _Evacuate_Old_to_New();
    closure.  This is normally fine since, if we want the data, we'll
    have made a copy of it.  
 
-   But, Malloc Pointer closures are special: we have to make sure that
+   But, Foreign Object closures are special: we have to make sure that
    we don't damage either the linked list (which will include both
-   copied and uncopied Malloc ptrs) or the data (which we must report
-   to the outside world).  Malloc Ptr closures are carefully designed
+   copied and uncopied Foreign objs) or the data (which we must report
+   to the outside world).  Foreign Objects closures are carefully designed
    to have a little extra space in them that can be safely
    overwritten. [ADR] 
 */
@@ -517,7 +517,7 @@ turns you on.
 
 \begin{code}
 
-#ifdef PAR
+#if defined(PAR) || defined(GRAN)
 
 #define SPEC_RBH_EVAC_FN(n)					\
 EVAC_FN(CAT2(RBH_,n)) 						\
@@ -555,31 +555,36 @@ SPEC_RBH_EVAC_FN(12)
 #endif
 
 #ifndef PAR
-EVAC_FN(MallocPtr)
+EVAC_FN(ForeignObj)
 {
-    I_ size = MallocPtr_SIZE;
+    I_ size = ForeignObj_SIZE;
     START_ALLOC(size);
     DEBUG_EVAC(size);
 
 #if defined(DEBUG)
-    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MALLOCPTRS) {
-      printf("DEBUG: Evacuating MallocPtr(%x)=<%x,_,%x,%x>", evac, evac[0], evac[2], evac[3]);
-      printf(" Data = %x, Next = %x\n", 
-	     MallocPtr_CLOSURE_DATA(evac), MallocPtr_CLOSURE_LINK(evac) );
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_FOREIGNOBJS) {
+      printf("DEBUG: Evacuating ForeignObj(%x)=<%x,_,%x,%x>", evac, evac[0], evac[2], evac[3]);
+      printf(" Data = %x, Finaliser= %x, Next = %x\n", 
+	     ForeignObj_CLOSURE_DATA(evac), 
+	     ForeignObj_CLOSURE_FINALISER(evac), 
+	     ForeignObj_CLOSURE_LINK(evac) );
     }
 #endif
 
     COPY_FIXED_HDR;
 
     SET_FORWARD_REF(evac,ToHp);
-    MallocPtr_CLOSURE_DATA(ToHp) = MallocPtr_CLOSURE_DATA(evac);
-    MallocPtr_CLOSURE_LINK(ToHp) = MallocPtr_CLOSURE_LINK(evac);
+    ForeignObj_CLOSURE_DATA(ToHp)      = ForeignObj_CLOSURE_DATA(evac);
+    ForeignObj_CLOSURE_FINALISER(ToHp) = ForeignObj_CLOSURE_FINALISER(evac);
+    ForeignObj_CLOSURE_LINK(ToHp)      = ForeignObj_CLOSURE_LINK(evac);
 
 #if defined(DEBUG)
-    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MALLOCPTRS) {
-      printf("DEBUG: Evacuated  MallocPtr(%x)=<%x,_,%x,%x>", ToHp, ToHp[0], ToHp[2], ToHp[3]);
-      printf(" Data = %x, Next = %x\n", 
-	     MallocPtr_CLOSURE_DATA(ToHp), MallocPtr_CLOSURE_LINK(ToHp) );
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_FOREIGNOBJS) {
+      printf("DEBUG: Evacuated  ForeignObj(%x)=<%x,_,%x,%x>", ToHp, ToHp[0], ToHp[2], ToHp[3]);
+      printf(" Data = %x, Finaliser = %x, Next = %x\n", 
+	     ForeignObj_CLOSURE_DATA(ToHp), 
+	     ForeignObj_CLOSURE_FINALISER(ToHp), 
+	     ForeignObj_CLOSURE_LINK(ToHp));
     }
 #endif
 
@@ -617,7 +622,7 @@ as the underlying @GEN@ closure.
 
 \begin{code}
 
-#ifdef PAR
+#if defined(PAR) || defined(GRAN)
 EVAC_FN(RBH_S)
 {
     I_ count = GEN_RBH_HS - 1;

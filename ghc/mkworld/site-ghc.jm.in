@@ -80,9 +80,18 @@ GHC_WITH_NATIVE_CODEGEN=GhcWithNativeCodeGen
 
 /* ================================================================
    BUILDS stuff: main sequential ones
+
+   The configure script dumps all the what-builds-to-do info
+   into a file called "buildinfo.jm", in this directory.  We
+   do it this way, rather than AC_SUBSTing the info into this file
+   because some sed's (notably OSF and maybe HP-UX) only allow
+   99 commands (!!!), which is way too few if we want to do the
+   GhcBuild_ stuff as well as everything else.  WDP 96/04
 */
 
-#define GhcBuild_normal @GhcBuild_normal@ /* profiled sequential */
+#include "buildinfo.jm"
+
+/* normal sequential */
 #if GhcBuild_normal == YES
 # define IfGhcBuild_normal(x) x
 GHC_BUILD_FLAG_normal = -build-normal-defined
@@ -91,7 +100,7 @@ GHC_BUILD_FLAG_normal = -build-normal-defined
 GHC_BUILD_FLAG_normal = -build-normal-not-defined
 #endif
 
-#define GhcBuild_p @GhcBuild_p@		/* profiled sequential */
+/* profiled sequential */
 #if GhcBuild_p == YES
 # define IfGhcBuild_p(x) x
 GHC_BUILD_FLAG_p = -build-p-defined
@@ -100,7 +109,7 @@ GHC_BUILD_FLAG_p = -build-p-defined
 GHC_BUILD_FLAG_p = -build-p-not-defined
 #endif
 
-#define GhcBuild_t @GhcBuild_t@		/* ticky-ticky "profiling" */
+/* ticky-ticky "profiling" (sequential) */
 #if GhcBuild_t == YES	
 # define IfGhcBuild_t(x) x
 GHC_BUILD_FLAG_t = -build-t-defined
@@ -109,7 +118,7 @@ GHC_BUILD_FLAG_t = -build-t-defined
 GHC_BUILD_FLAG_t = -build-t-not-defined
 #endif
 
-#define GhcBuild_u @GhcBuild_u@		/* unregisterized (most basic boot) */
+/* unregisterized (most basic boot) */
 #if GhcBuild_u == YES	
 # define IfGhcBuild_u(x) x
 GHC_BUILD_FLAG_u = -build-u-defined
@@ -120,7 +129,7 @@ GHC_BUILD_FLAG_u = -build-u-not-defined
 
 /* === builds: concurrent and parallel ============================ */
 
-#define GhcBuild_mc @GhcBuild_mc@	/* concurrent */
+/* concurrent */
 #if GhcBuild_mc == YES
 # define IfGhcBuild_mc(x) x
 GHC_BUILD_FLAG_mc = -build-mc-defined
@@ -129,7 +138,7 @@ GHC_BUILD_FLAG_mc = -build-mc-defined
 GHC_BUILD_FLAG_mc = -build-mc-not-defined
 #endif
 
-#define GhcBuild_mr @GhcBuild_mr@	/* profiled concurrent */
+/* profiled concurrent */
 #if GhcBuild_mr == YES
 # define IfGhcBuild_mr(x) x
 GHC_BUILD_FLAG_mr = -build-mr-defined
@@ -138,7 +147,7 @@ GHC_BUILD_FLAG_mr = -build-mr-defined
 GHC_BUILD_FLAG_mr = -build-mr-not-defined
 #endif
 
-#define GhcBuild_mt @GhcBuild_mt@	/* ticky concurrent */
+/* ticky concurrent */
 #if GhcBuild_mt == YES
 # define IfGhcBuild_mt(x) x
 GHC_BUILD_FLAG_mt = -build-mt-defined
@@ -147,7 +156,7 @@ GHC_BUILD_FLAG_mt = -build-mt-defined
 GHC_BUILD_FLAG_mt = -build-mt-not-defined
 #endif
 
-#define GhcBuild_mp @GhcBuild_mp@	/* parallel (GUM, PVM-based) */
+/* parallel (GUM, PVM-based) */
 #if GhcBuild_mp == YES
 # define IfGhcBuild_mp(x) x
 GHC_BUILD_FLAG_mp = -build-mp-defined
@@ -156,7 +165,7 @@ GHC_BUILD_FLAG_mp = -build-mp-defined
 GHC_BUILD_FLAG_mp = -build-mp-not-defined
 #endif
 
-#define GhcBuild_mg @GhcBuild_mg@	/* GranSim */
+/* GranSim */
 #if GhcBuild_mg == YES
 # define IfGhcBuild_mg(x) x
 GHC_BUILD_FLAG_mg = -build-mg-defined
@@ -170,7 +179,7 @@ GHC_BUILD_FLAG_mg = -build-mg-not-defined
    but do not have any "fed back" options.
 */
 
-#define GhcBuild_2s @GhcBuild_2s@	/* sequential -- 2-space collector */
+/* sequential -- 2-space collector */
 #if GhcBuild_2s == YES
 # define IfGhcBuild_2s(x) x
 GHC_BUILD_FLAG_2s = -gc-2s
@@ -179,7 +188,7 @@ GHC_BUILD_FLAG_2s = -gc-2s
 GHC_BUILD_FLAG_2s = -build-2s-not-defined
 #endif
 
-#define GhcBuild_1s @GhcBuild_1s@	/* sequential -- 1-space collector */
+/* sequential -- 1-space collector */
 #if GhcBuild_1s == YES
 # define IfGhcBuild_1s(x) x
 GHC_BUILD_FLAG_1s = -gc-1s
@@ -188,7 +197,7 @@ GHC_BUILD_FLAG_1s = -gc-1s
 GHC_BUILD_FLAG_1s = -build-1s-not-defined
 #endif
 
-#define GhcBuild_du @GhcBuild_du@	/* sequential -- dual-mode collector */
+/* sequential -- dual-mode collector */
 #if GhcBuild_du == YES
 # define IfGhcBuild_du(x) x
 GHC_BUILD_FLAG_du = -gc-du
@@ -199,200 +208,146 @@ GHC_BUILD_FLAG_du = -build-du-not-defined
 
 /* === builds: "user ways" ======================================= */
 
-/* these had to be de-configure-ified because of 99-cmd-limit brain-dead seds */
-
-/* stuff for "update" paper; also use --enable-ticky */
-
-#define GhcBuild_a YES /*@GhcBuild_a@*/		/* "user way" a */
 #if GhcBuild_a == YES	
 # define IfGhcBuild_a(x) x
-GHC_BUILD_FLAG_a = -SA-noUpdA
-GHC_BUILD_OPTS_a = -fticky-ticky -optcO-DTICKY_TICKY -debug \
-		      -Ofile /local/grasp/partain-other/performance/update/Ofile.SA-noUpdA
+GHC_BUILD_FLAG_a = -build-a-not-defined /* >>>change here<<< if required */
+GHC_BUILD_OPTS_a = -build-a-not-defined-error
 #else
 # define IfGhcBuild_a(x) /**/
 GHC_BUILD_FLAG_a = -build-a-not-defined
 GHC_BUILD_OPTS_a = -build-a-not-defined-error
 #endif
 
-#define GhcBuild_b YES /*@GhcBuild_b@*/		/* "user way" b */
 #if GhcBuild_b == YES
 # define IfGhcBuild_b(x) x
-GHC_BUILD_FLAG_b = -noSA-UpdA
-GHC_BUILD_OPTS_b = -fticky-ticky -optcO-DTICKY_TICKY -debug \
-		      -Ofile /local/grasp/partain-other/performance/update/Ofile.noSA-UpdA
+GHC_BUILD_FLAG_b = -build-b-not-defined /* >>>change here<<< if required */
+GHC_BUILD_OPTS_b = -build-b-not-defined-error
 #else
 # define IfGhcBuild_b(x) /**/
 GHC_BUILD_FLAG_b = -build-b-not-defined
 GHC_BUILD_OPTS_b = -build-b-not-defined-error
 #endif
 
-#define GhcBuild_c YES /*@GhcBuild_c@*/		/* "user way" c */
 #if GhcBuild_c == YES
 # define IfGhcBuild_c(x) x
-GHC_BUILD_FLAG_c = -noSA-noUpdA
-GHC_BUILD_OPTS_c = -fticky-ticky -optcO-DTICKY_TICKY -debug \
-		      -Ofile /local/grasp/partain-other/performance/update/Ofile.noSA-noUpdA
+GHC_BUILD_FLAG_c = -build-c-not-defined /* >>>change here<<< if required */
+GHC_BUILD_OPTS_c = -build-c-not-defined-error
 #else
 # define IfGhcBuild_c(x) /**/
 GHC_BUILD_FLAG_c = -build-c-not-defined
 GHC_BUILD_OPTS_c = -build-c-not-defined-error
 #endif
 
-#define GhcBuild_d NO/*YES*/ /*@GhcBuild_d@*/		/* "user way" d */
 #if GhcBuild_d == YES
 # define IfGhcBuild_d(x) x
-GHC_BUILD_FLAG_d = -regs-avail-2
-GHC_BUILD_OPTS_d = -fticky-ticky -optcO-DTICKY_TICKY -debug \
-		      -O -freturn-in-regs-threshold2
+GHC_BUILD_FLAG_d = -build-d-not-defined /* >>>change here<<< if required */
+GHC_BUILD_OPTS_d = -build-d-not-defined-error
 #else
 # define IfGhcBuild_d(x) /**/
 GHC_BUILD_FLAG_d = -build-d-not-defined
 GHC_BUILD_OPTS_d = -build-d-not-defined-error
 #endif
 
-#define GhcBuild_e NO/*YES*/ /*@GhcBuild_e@*/		/* "user way" e */
 #if GhcBuild_e == YES
 # define IfGhcBuild_e(x) x
-GHC_BUILD_FLAG_e = -regs-avail-3
-GHC_BUILD_OPTS_e = -fticky-ticky -optcO-DTICKY_TICKY -debug \
-		      -O -freturn-in-regs-threshold3
+GHC_BUILD_FLAG_e = -build-e-not-defined /* >>>change here<<< if required */
+GHC_BUILD_OPTS_e = -build-e-not-defined-error
 #else
 # define IfGhcBuild_e(x) /**/
 GHC_BUILD_FLAG_e = -build-e-not-defined
 GHC_BUILD_OPTS_e = -build-e-not-defined-error
 #endif
 
-#define GhcBuild_f NO/*YES*/ /*@GhcBuild_f@*/		/* "user way" f */
 #if GhcBuild_f == YES
 # define IfGhcBuild_f(x) x
-GHC_BUILD_FLAG_f = -regs-avail-4
-GHC_BUILD_OPTS_f = -fticky-ticky -optcO-DTICKY_TICKY -debug \
-		      -O -freturn-in-regs-threshold4
+GHC_BUILD_FLAG_f = -build-f-not-defined /* >>>change here<<< if required */
+GHC_BUILD_OPTS_f = -build-f-not-defined-error
 #else
 # define IfGhcBuild_f(x) /**/
 GHC_BUILD_FLAG_f = -build-f-not-defined
 GHC_BUILD_OPTS_f = -build-f-not-defined-error
 #endif
 
-#define GhcBuild_g NO/*YES*/ /*@GhcBuild_g@*/		/* "user way" g */
 #if GhcBuild_g == YES
 # define IfGhcBuild_g(x) x
-GHC_BUILD_FLAG_g = -regs-avail-5
-GHC_BUILD_OPTS_g = -fticky-ticky -optcO-DTICKY_TICKY -debug \
-		      -O -freturn-in-regs-threshold5
+GHC_BUILD_FLAG_g = -build-g-not-defined /* >>>change here<<< if required */
+GHC_BUILD_OPTS_g = -build-g-not-defined-error
 #else
 # define IfGhcBuild_g(x) /**/
 GHC_BUILD_FLAG_g = -build-g-not-defined
 GHC_BUILD_OPTS_g = -build-g-not-defined-error
 #endif
 
-#define GhcBuild_h YES /*@GhcBuild_h@*/		/* "user way" a */
 #if GhcBuild_h == YES	
 # define IfGhcBuild_h(x) x
-GHC_BUILD_FLAG_h = -semi-tagged
-GHC_BUILD_OPTS_h = -fticky-ticky -optcO-DTICKY_TICKY -debug \
-		      -O -fsemi-tagging
+GHC_BUILD_FLAG_h = -build-h-not-defined /* >>>change here<<< if required */
+GHC_BUILD_OPTS_h = -build-h-not-defined-error
 #else
 # define IfGhcBuild_h(x) /**/
 GHC_BUILD_FLAG_h = -build-h-not-defined
 GHC_BUILD_OPTS_h = -build-h-not-defined-error
 #endif
 
-/* _b minus ticky */
-#define GhcBuild_i NO/*YES*/ /*@GhcBuild_i@*/		/* "user way" b */
 #if GhcBuild_i == YES
 # define IfGhcBuild_i(x) x
-GHC_BUILD_FLAG_i = -noSA-noFI2
-GHC_BUILD_OPTS_i = -Ofile /local/grasp/partain-other/performance/update/Ofile.noSA-noFI
+GHC_BUILD_FLAG_i = -build-i-not-defined /* >>>change here<<< if required */
+GHC_BUILD_OPTS_i = -build-i-not-defined-error
 #else
 # define IfGhcBuild_i(x) /**/
 GHC_BUILD_FLAG_i = -build-i-not-defined
 GHC_BUILD_OPTS_i = -build-i-not-defined-error
 #endif
 
-#define GhcBuild_j NO/*YES*/ /*@GhcBuild_j@*/		/* "user way" c */
 #if GhcBuild_j == YES
 # define IfGhcBuild_j(x) x
-GHC_BUILD_FLAG_j = -SA-noFI2
-GHC_BUILD_OPTS_j = -Ofile /local/grasp/partain-other/performance/update/Ofile.SA-noFI
+GHC_BUILD_FLAG_j = -build-j-not-defined /* >>>change here<<< if required */
+GHC_BUILD_OPTS_j = -build-j-not-defined-error
 #else
 # define IfGhcBuild_j(x) /**/
 GHC_BUILD_FLAG_j = -build-j-not-defined
 GHC_BUILD_OPTS_j = -build-j-not-defined-error
 #endif
 
-#define GhcBuild_k NO/*YES*/ /*@GhcBuild_k@*/		/* "user way" d */
 #if GhcBuild_k == YES
 # define IfGhcBuild_k(x) x
-GHC_BUILD_FLAG_k = -SA-noFL2
-GHC_BUILD_OPTS_k = -Ofile /local/grasp/partain-other/performance/update/Ofile.SA-noFL
+GHC_BUILD_FLAG_k = -build-k-not-defined /* >>>change here<<< if required */
+GHC_BUILD_OPTS_k = -build-k-not-defined-error
 #else
 # define IfGhcBuild_k(x) /**/
 GHC_BUILD_FLAG_k = -build-k-not-defined
 GHC_BUILD_OPTS_k = -build-k-not-defined-error
 #endif
 
-#define GhcBuild_l NO/*YES*/ /*@GhcBuild_l@*/		/* "user way" e */
 #if GhcBuild_l == YES
 # define IfGhcBuild_l(x) x
-GHC_BUILD_FLAG_l = -float-strict2
-GHC_BUILD_OPTS_l = -Ofile /local/grasp/partain-other/performance/update/Ofile.float-strict
+GHC_BUILD_FLAG_l = -build-l-not-defined /* >>>change here<<< if required */
+GHC_BUILD_OPTS_l = -build-l-not-defined-error
 #else
 # define IfGhcBuild_l(x) /**/
 GHC_BUILD_FLAG_l = -build-l-not-defined
 GHC_BUILD_OPTS_l = -build-l-not-defined-error
 #endif
 
-#define GhcBuild_m NO/*YES*/ /*@GhcBuild_m@*/		/* "user way" f */
 #if GhcBuild_m == YES
 # define IfGhcBuild_m(x) x
-GHC_BUILD_FLAG_m = -float-always2
-GHC_BUILD_OPTS_m = -Ofile /local/grasp/partain-other/performance/update/Ofile.float-always
+GHC_BUILD_FLAG_m = -build-m-not-defined /* >>>change here<<< if required */
+GHC_BUILD_OPTS_m = -build-m-not-defined-error
 #else
 # define IfGhcBuild_m(x) /**/
 GHC_BUILD_FLAG_m = -build-m-not-defined
 GHC_BUILD_OPTS_m = -build-m-not-defined-error
 #endif
 
-#define GhcBuild_n NO/*YES*/ /*@GhcBuild_n@*/		/* "user way" g */
 #if GhcBuild_n == YES
 # define IfGhcBuild_n(x) x
-GHC_BUILD_FLAG_n = -no-float2
-GHC_BUILD_OPTS_n = -Ofile /local/grasp/partain-other/performance/update/Ofile.no-float
+GHC_BUILD_FLAG_n = -build-n-not-defined /* >>>change here<<< if required */
+GHC_BUILD_OPTS_n = -build-n-not-defined-error
 #else
 # define IfGhcBuild_n(x) /**/
 GHC_BUILD_FLAG_n = -build-n-not-defined
 GHC_BUILD_OPTS_n = -build-n-not-defined-error
 #endif
 
-#define GhcBuild_A NO/*YES*/ /*@GhcBuild_A@*/		/* "user way" A */
-#if GhcBuild_A == YES
-# define IfGhcBuild_A(x) x
-GHC_BUILD_FLAG_A = -no-local-float
-GHC_BUILD_OPTS_A = -fticky-ticky -optcO-DTICKY_TICKY -debug \
-		-Ofile /local/grasp/partain-other/performance/update/Ofile.no-local-float
-#else
-# define IfGhcBuild_A(x) /**/
-GHC_BUILD_FLAG_A = -build-A-not-defined
-GHC_BUILD_OPTS_A = -build-A-not-defined-error
-#endif
-
-#define GhcBuild_B NO/*YES*/ /*@GhcBuild_B@*/		/* "user way" B */
-#if GhcBuild_B == YES
-# define IfGhcBuild_B(x) x
-GHC_BUILD_FLAG_B = -no-local-float2
-GHC_BUILD_OPTS_B = -Ofile /local/grasp/partain-other/performance/update/Ofile.no-local-float
-#else
-# define IfGhcBuild_B(x) /**/
-GHC_BUILD_FLAG_B = -build-B-not-defined
-GHC_BUILD_OPTS_B = -build-B-not-defined-error
-#endif
-
-
-/* end of "floating" stuff */
-
-#define GhcBuild_o NO /*@GhcBuild_o@*/		/* "user way" o */
 #if GhcBuild_o == YES
 # define IfGhcBuild_o(x) x
 GHC_BUILD_FLAG_o = -build-o-not-defined /* >>>change here<<< if required */
@@ -401,6 +356,26 @@ GHC_BUILD_OPTS_o = -build-o-not-defined-error
 # define IfGhcBuild_o(x) /**/
 GHC_BUILD_FLAG_o = -build-o-not-defined
 GHC_BUILD_OPTS_o = -build-o-not-defined-error
+#endif
+
+#if GhcBuild_A == YES
+# define IfGhcBuild_A(x) x
+GHC_BUILD_FLAG_A = -build-A-not-defined /* >>>change here<<< if required */
+GHC_BUILD_OPTS_A = -build-A-not-defined-error
+#else
+# define IfGhcBuild_A(x) /**/
+GHC_BUILD_FLAG_A = -build-A-not-defined
+GHC_BUILD_OPTS_A = -build-A-not-defined-error
+#endif
+
+#if GhcBuild_B == YES
+# define IfGhcBuild_B(x) x
+GHC_BUILD_FLAG_B = -build-B-not-defined /* >>>change here<<< if required */
+GHC_BUILD_OPTS_B = -build-B-not-defined-error
+#else
+# define IfGhcBuild_B(x) /**/
+GHC_BUILD_FLAG_B = -build-B-not-defined
+GHC_BUILD_OPTS_B = -build-B-not-defined-error
 #endif
 
 /* ======= END OF BUILD INFO ==================================== */

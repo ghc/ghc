@@ -29,6 +29,7 @@ boolish bflag = 0; 	/* use a big title box			*/
 boolish sflag = 0;	/* use a small title box		*/
 int     mflag = 0;	/* max no. of bands displayed (default 20) */
 boolish tflag = 0;	/* ignored threshold specified          */
+boolish cflag = 0;      /* colour output                        */
 
 boolish filter;		/* true when running as a filter	*/
 
@@ -117,6 +118,9 @@ char* argv[];
 		THRESHOLD_PERCENT = (floatish) atof(*argv + 1);
 		if (THRESHOLD_PERCENT < 0 || THRESHOLD_PERCENT > 5)
 		    Usage(*argv-1);
+		goto nextarg;
+	    case 'c':
+		cflag++;
 		goto nextarg;
 	    case '?':
 	    default:

@@ -19,7 +19,7 @@ BuildPgmFromCFiles(ugen,$(OBJS_C),,)
 
 YaccRunWithExpectMsg(syntax,no,no)
 
-UgenTarget(tree)
+UgenTarget(.,tree)
 
 CDependTarget( $(SRCS_C) )
 

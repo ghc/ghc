@@ -147,7 +147,7 @@ initHeap(smInfo * sm)
 
     if (appelInfo.oldbase > appelInfo.oldmax) {
 	fprintf(stderr, "Not enough heap for requested/minimum allocation area\n");
-	fprintf(stderr, "heap_space=%ld\n", heap_space);
+	fprintf(stderr, "heap_space=%ld\n", (W_) heap_space);
 	fprintf(stderr, "heapSize=%ld\n", RTSflags.GcFlags.heapSize);
 	fprintf(stderr, "newmin=%ld\n", appelInfo.newmin);
 	return rtsFalse;
@@ -239,13 +239,16 @@ collect2s(W_ reqsize, smInfo *sm)
 #ifdef PAR
     EvacuateLocalGAs(rtsTrue);
 #else
-    evacSPTable( sm );
+    /* evacSPTable( sm ); StablePointerTable now accessable in sm->roots SOF 4/96 */
 #endif /* PAR */
     EvacuateRoots( sm->roots, sm->rootno );
-#ifdef CONCURRENT
+#if defined(GRAN)
+    EvacuateEvents();
+#endif
+#if defined(CONCURRENT)  /* && !defined(GRAN) */
     EvacuateSparks();
 #endif
-#ifndef PAR
+#if !defined(PAR) /* && !defined(GRAN) */  /* HWL */
     EvacuateAStack( MAIN_SpA, stackInfo.botA );
     EvacuateBStack( MAIN_SuB, stackInfo.botB, &bstk_roots );
 #endif /* !PAR */
@@ -257,7 +260,7 @@ collect2s(W_ reqsize, smInfo *sm)
 #ifdef PAR
     RebuildGAtables(rtsTrue);
 #else
-    reportDeadMallocPtrs( sm->MallocPtrList, NULL, &(sm->MallocPtrList) );
+    reportDeadForeignObjs( sm->ForeignObjList, NULL, &(sm->ForeignObjList) );
 #endif /* PAR */
 
     /* TIDY UP AND RETURN */
@@ -286,7 +289,7 @@ collect2s(W_ reqsize, smInfo *sm)
 
     if (RTSflags.GcFlags.giveStats) {
 	char comment_str[BIG_STRING_LEN];
-#ifndef PAR
+#if !defined(PAR) /* && !defined(CONCURRENT) */  /* HWL */
 	sprintf(comment_str, "%4lu %4ld %3ld %3ld %6lu %6lu %6lu  2s",
 		(W_) (SUBTRACT_A_STK(MAIN_SpA, stackInfo.botA) + 1),
 		bstk_roots, sm->rootno,
@@ -419,7 +422,6 @@ collectHeap(reqsize, sm, do_full_collection)
     while ( mutptr ) {
 
 	/* Scavenge the OldMutable */
-	P_ orig_mutptr = mutptr;
 	P_ info = (P_) INFO_PTR(mutptr);
 	StgScavPtr scav_code = SCAV_CODE(info);
 	Scav = mutptr;
@@ -442,7 +444,7 @@ collectHeap(reqsize, sm, do_full_collection)
 #ifdef PAR
     EvacuateLocalGAs(rtsFalse);
 #else
-    evacSPTable( sm );
+    /* evacSPTable( sm ); SP table is now in sm->roots*/
 #endif /* PAR */
 
     DEBUG_STRING("Scavenge evacuated old generation roots:");
@@ -463,10 +465,13 @@ collectHeap(reqsize, sm, do_full_collection)
 
     EvacuateRoots( sm->roots, sm->rootno );
 
-#ifdef CONCURRENT
+#if defined(GRAN)
+    EvacuateEvents();
+#endif
+#if defined(CONCURRENT) /* && !defined(GRAN) */
     EvacuateSparks();
 #endif
-#ifndef PAR
+#if !defined(PAR) /* && !defined(GRAN) */ /* HWL */
     EvacuateAStack( MAIN_SpA, stackInfo.botA );
     EvacuateBStack( MAIN_SuB, stackInfo.botB, &bstk_roots );
     /* ToDo: Optimisation which squeezes out garbage update frames */
@@ -490,10 +495,10 @@ collectHeap(reqsize, sm, do_full_collection)
 #ifdef PAR
     RebuildGAtables(rtsFalse);
 #else
-    reportDeadMallocPtrs(sm->MallocPtrList, 
-			 sm->OldMallocPtrList, 
-			 &(sm->OldMallocPtrList));
-    sm->MallocPtrList = NULL;   /* all (new) MallocPtrs have been promoted */
+    reportDeadForeignObjs(sm->ForeignObjList, 
+			  sm->OldForeignObjList, 
+			  &(sm->OldForeignObjList));
+    sm->ForeignObjList = NULL;   /* all (new) ForeignObjs have been promoted */
 #endif /* PAR */
 
     resident = appelInfo.oldlim - sm->OldLim;
@@ -501,7 +506,7 @@ collectHeap(reqsize, sm, do_full_collection)
 
     if (RTSflags.GcFlags.giveStats) {
 	char minor_str[BIG_STRING_LEN];
-#ifndef PAR
+#if !defined(PAR) /* && !defined(CONCURRENT) */ /* HWL */
 	sprintf(minor_str, "%4lu %4ld %3ld %3ld  %4ld        Minor",
 	      (W_) (SUBTRACT_A_STK(MAIN_SpA, stackInfo.botA) + 1),
 	      bstk_roots, sm->rootno, caf_roots, mutable); /* oldnew_roots, old_words */
@@ -597,9 +602,9 @@ collectHeap(reqsize, sm, do_full_collection)
     /* end of bracket */
 
 #ifndef PAR
-    sweepUpDeadMallocPtrs(sm->OldMallocPtrList, 
-			  appelInfo.oldbase, 
-			  appelInfo.bits 
+    sweepUpDeadForeignObjs(sm->OldForeignObjList, 
+			   appelInfo.oldbase, 
+			   appelInfo.bits 
 			  );
 #endif /* !PAR */
 
@@ -609,16 +614,23 @@ collectHeap(reqsize, sm, do_full_collection)
     LinkCAFs(appelInfo.OldCAFlist);
 
     LinkRoots( sm->roots, sm->rootno );
-#ifdef CONCURRENT
+#if defined(GRAN)
+    LinkEvents();
+#endif
+#if defined(CONCURRENT)  /* && !defined(GRAN) */
     LinkSparks();
 #endif
 #ifdef PAR
     LinkLiveGAs(appelInfo.oldbase, appelInfo.bits);
 #else
+/*  stable pointers now included in sm->roots -- SOF
     DEBUG_STRING("Linking Stable Pointer Table:");
     LINK_LOCATION_TO_CLOSURE(&sm->StablePointerTable);
+*/
+#if 1 /* !defined(GRAN) */  /* HWL */
     LinkAStack( MAIN_SpA, stackInfo.botA );
     LinkBStack( MAIN_SuB, stackInfo.botB );
+#endif
 #endif
 
     /* Do Inplace Compaction */
@@ -630,7 +642,7 @@ collectHeap(reqsize, sm, do_full_collection)
 					  appelInfo.bits,
 					  appelInfo.bit_words
 #ifndef PAR
-					  ,&(sm->OldMallocPtrList)
+					  ,&(sm->OldForeignObjList)
 #endif
 					  ) - 1;
 
@@ -667,7 +679,7 @@ collectHeap(reqsize, sm, do_full_collection)
 
     if (RTSflags.GcFlags.giveStats) {
 	char major_str[BIG_STRING_LEN];
-#ifndef PAR
+#if !defined(PAR) /* && !defined(CONCURRENT) */  /* HWL */
 	sprintf(major_str, "%4lu %4ld %3ld %3ld  %4d %4d  *Major* %4.1f%%",
 		(W_) (SUBTRACT_A_STK(MAIN_SpA, stackInfo.botA) + 1),
 		bstk_roots, sm->rootno, appelInfo.OldCAFno,

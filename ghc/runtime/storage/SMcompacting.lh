@@ -7,6 +7,9 @@ void LinkBStack PROTO((P_ stackB, P_ botB));
 I_ CountCAFs	PROTO((P_ CAFlist));
 
 void LinkCAFs	PROTO((P_ CAFlist));
+#ifdef GRAN
+void LinkEvents(STG_NO_ARGS);
+#endif
 #ifdef CONCURRENT
 void LinkSparks(STG_NO_ARGS);
 #endif

@@ -1,4 +1,15 @@
-# line 11 "utils-ghc.ljm"
+#if 0
+%************************************************************************
+%*									*
+\section[mkworld-utils-ghc]{``Utilities'' stuff for @ghc@ project}
+%*									*
+%************************************************************************
+
+It's become sorta traditional to change the project-wide
+Haskell-compiler options with @SetupHcOpts@ (rather than
+@ProjectHcOpts@).
+\begin{code}
+#endif /* 0 */
 #if GhcWithHscOptimised == YES
 #define __hsc_opt -O
 #else
@@ -33,7 +44,7 @@
 #ifndef ProjectJmakeDefines
 #define ProjectJmakeDefines /*none*/
 #endif
-# line 48 "utils-ghc.ljm"
+
 #ifndef MkDependHSSrc
 #define MkDependHSSrc $(GHC_UTILSRC)/mkdependHS
 #endif
@@ -70,7 +81,7 @@ __SomeUtilNeededHere(target,$(GHC_UNLIT),$(GHC_UNLITSRC),unlit)
 
 GHC_UNLIT    = UnlitCmd
 GHC_UNLITSRC = $(GHC_UTILSRC)/unlit
-# line 87 "utils-ghc.ljm"
+
 #ifndef HsTagsSrc
 #define HsTagsSrc $(GHC_UTILSRC)/hstags
 #endif

@@ -97,7 +97,8 @@ STGFUN(BQ_entry)
     FB_
 
 #if defined(GRAN)
-    STGCALL0(void,(),GranSimBlock);	/* Before overwriting TSO_LINK */
+    /* Before overwriting TSO_LINK */
+    STGCALL3(void,(),GranSimBlock,CurrentTSO,CurrentProc,Node);	
 #endif
 
     TSO_LINK(CurrentTSO) = (P_) BQ_ENTRIES(Node);
@@ -122,7 +123,7 @@ STGFUN(BQ_entry)
     }
 #endif
 #if defined(GRAN)
-    ReSchedule(NEW_THREAD);
+    ReSchedule(SAME_THREAD); /* NB: GranSimBlock activated next thread */
 #else
     ReSchedule(0);
 #endif
@@ -149,15 +150,16 @@ checked, yet. -- HWL
 
 \begin{code}
 
-#ifdef PAR
+#if defined(PAR) || defined(GRAN)
 
 STGFUN(RBH_entry)
 {
     FB_
 
-#if defined(GRAN)
-    STGCALL0(void, (), GranSimBlock);	/* Before overwriting TSO_LINK */
-#endif
+#  if defined(GRAN)
+    /* Before overwriting TSO_LINK */
+    STGCALL3(void,(),GranSimBlock,CurrentTSO,CurrentProc,Node);	
+#  endif
 
     switch (INFO_TYPE(InfoPtr)) {
     case INFO_SPEC_RBH_TYPE:
@@ -182,6 +184,7 @@ STGFUN(RBH_entry)
 	QP_Event1("GR", CurrentTSO);
     }
 
+#  ifdef PAR
     if(RTSflags.ParFlags.granSimStats) {
         /* Note that CURRENT_TIME may perform an unsafe call */
 	TIME now = CURRENT_TIME;
@@ -191,12 +194,12 @@ STGFUN(RBH_entry)
         TSO_BLOCKEDAT(CurrentTSO) = now;
         DumpGranEvent(GR_BLOCK, CurrentTSO);
     }
-
-#if defined(GRAN)
-    ReSchedule(NEW_THREAD);
-#else
+#  endif
+#  if defined(GRAN)
+    ReSchedule(SAME_THREAD);  /* NB: GranSimBlock activated next thread */
+#  else
     ReSchedule(0);
-#endif
+#  endif
 
     FE_
 }
@@ -281,7 +284,6 @@ STGFUN(EnterNodeCode)
     FB_
     ENT_VIA_NODE();
     InfoPtr=(D_)(INFO_PTR(Node));
-    GRAN_EXEC(5,1,2,0,0);
     JMP_(ENTRY_CODE(InfoPtr));
     FE_
 }
@@ -468,8 +470,7 @@ IFN_(seqDirectReturn) {
     FB_
     RetReg = (StgRetAddr) SpB[BREL(0)];
     cont = (void *) SpB[BREL(1)];
-    SpB += BREL(2);
-/*  GRAN_EXEC(1,1,2,0,0); /? ToDo: RE-CHECK (WDP) */
+    /* SpB += BREL(2); */
     JMP_(cont);
     FE_
 }

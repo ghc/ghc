@@ -7,6 +7,9 @@ void EvacuateAStack	PROTO(( PP_ stackA, PP_ botA ));
 void EvacuateBStack	PROTO(( P_ stackB, P_ botB, I_ *roots ));
 void Scavenge (STG_NO_ARGS);
 
+#ifdef GRAN
+void EvacuateEvents(STG_NO_ARGS);
+#endif
 #ifdef CONCURRENT
 void EvacuateSparks(STG_NO_ARGS);
 #endif

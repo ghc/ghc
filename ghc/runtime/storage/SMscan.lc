@@ -39,15 +39,15 @@ are placed in the info tables of the appropriate closures.
 RegisterTable ScanRegTable;
 
 #ifndef PAR
-/* As we perform compaction, those CHP's which are still alive get
+/* As we perform compaction, those ForeignObjs which are still alive get
    added to this list. [ADR] */
-StgPtr NewMallocPtrList;
+StgPtr NewForeignObjList;
 #endif /* !PAR */
 
 P_
 Inplace_Compaction(base, lim, scanbase, scanlim, bit_array, bit_array_words
 #ifndef PAR
-, MallocPtrList
+, ForeignObjList
 #endif
 )
     P_  base;
@@ -57,7 +57,7 @@ Inplace_Compaction(base, lim, scanbase, scanlim, bit_array, bit_array_words
     BitWord *bit_array;
     I_  bit_array_words;
 #ifndef PAR
-    StgPtr *MallocPtrList;
+    StgPtr *ForeignObjList;
 #endif
 {
     BitWord *bit_array_ptr, *bit_array_end;
@@ -94,8 +94,8 @@ Inplace_Compaction(base, lim, scanbase, scanlim, bit_array, bit_array_words
     New = base; /* used to unwind */
 
 #ifndef PAR
-    NewMallocPtrList = NULL; /* initialise new MallocPtrList */
-             /* As we move MallocPtrs over, we'll add them to this list. */
+    NewForeignObjList = NULL; /* initialise new ForeignObjList */
+             /* As we move ForeignObjs over, we'll add them to this list. */
 #endif /* !PAR */
 
     while (bit_array_ptr < bit_array_end) {
@@ -127,7 +127,7 @@ Inplace_Compaction(base, lim, scanbase, scanlim, bit_array, bit_array_words
 
 		Scan += size;  /* skip size bits */ 
 
-		if (size >= BITS_IN(BitWord)) break;
+		if ((W_) size >= BITS_IN(BitWord)) break;
 		    /* NOTA BENE: if size >= # bits in BitWord, then the result
 			of this operation is undefined!  Hence the need for
 			this break! */
@@ -185,7 +185,7 @@ Inplace_Compaction(base, lim, scanbase, scanlim, bit_array, bit_array_words
 		New  += size;  /* set New address of next closure */
 		Scan += size;  /* skip size bits */  
 
-		if (size >= BITS_IN(BitWord)) break;
+		if ((W_) size >= BITS_IN(BitWord)) break;
 		    /* NOTA BENE: if size >= # bits in BitWord, then the result
 			of this operation is undefined!  Hence the need for
 			this break! */
@@ -203,8 +203,8 @@ Inplace_Compaction(base, lim, scanbase, scanlim, bit_array, bit_array_words
 #ifdef PAR
     RebuildLAGAtable();
 #else
-    VALIDATE_MallocPtrList( NewMallocPtrList );
-    *MallocPtrList = NewMallocPtrList;
+    VALIDATE_ForeignObjList( NewForeignObjList );
+    *ForeignObjList = NewForeignObjList;
 #endif /* PAR */
 
     return(New);
@@ -310,15 +310,16 @@ LinkLim -- The limit of the heap requiring to be linked & moved
 #define SPEC_SLIDE_WORD(n)      SLIDE_WORD((SPEC_HS-1) + (n))
 
 #ifndef PAR
-/* Don't slide the MallocPtr list link - instead link moved object into
-   @NewMallocPtrList@ */
+/* Don't slide the ForeignObj list link - instead link moved object into
+   @NewForeignObjList@ */
 
-#define MallocPtr_SLIDE_DATA \
-        MallocPtr_CLOSURE_DATA(New) = MallocPtr_CLOSURE_DATA(Scan)
-#define MallocPtr_RELINK				\
-{							\
-	MallocPtr_CLOSURE_LINK(New) = NewMallocPtrList;	\
-        NewMallocPtrList = New;	                        \
+#define ForeignObj_SLIDE_DATA \
+        ForeignObj_CLOSURE_DATA(New) = ForeignObj_CLOSURE_DATA(Scan); \
+        ForeignObj_CLOSURE_FINALISER(New) = ForeignObj_CLOSURE_FINALISER(Scan)
+#define ForeignObj_RELINK				  \
+{							  \
+	ForeignObj_CLOSURE_LINK(New) = NewForeignObjList; \
+        NewForeignObjList = New;	                  \
 }
 #endif /* !PAR */
 
@@ -578,7 +579,7 @@ Scan-linking revertible black holes with underlying @SPEC@ closures.
 
 \begin{code}
 
-#ifdef PAR
+#if defined(PAR) || defined(GRAN)
 I_ 
 _ScanLink_RBH_2_1(STG_NO_ARGS)
 {
@@ -749,15 +750,15 @@ _ScanLink_RBH_12_12(STG_NO_ARGS)
 #endif
 \end{code}
 
-Scan-linking a MallocPtr is straightforward: exactly the same as
-@_ScanLink_[MallocPtr_SIZE]_0@.
+Scan-linking a ForeignObj is straightforward: exactly the same as
+@_ScanLink_[ForeignObj_SIZE]_0@.
 
 \begin{code}
 #ifndef PAR
 I_
-_ScanLink_MallocPtr(STG_NO_ARGS) {
-    I_ size = MallocPtr_SIZE;
-    DEBUG_SCAN_LINK("MallocPtr", size, 0);
+_ScanLink_ForeignObj(STG_NO_ARGS) {
+    I_ size = ForeignObj_SIZE;
+    DEBUG_SCAN_LINK("ForeignObj", size, 0);
     return(FIXED_HS + size);
 }
 #endif /* !PAR */
@@ -941,7 +942,7 @@ _ScanMove_12(STG_NO_ARGS) {
     return(FIXED_HS + size);
 }
 
-#if defined(PAR) && defined(GC_MUT_REQUIRED)
+#if (defined(PAR) || defined(GRAN)) && defined(GC_MUT_REQUIRED)
 I_
 _ScanMove_RBH_2(STG_NO_ARGS) {
     I_ size = 2 + SPEC_RBH_VHS;
@@ -1143,35 +1144,39 @@ _ScanMove_RBH_12(STG_NO_ARGS) {
 #endif
 \end{code}
 
-Moving a Malloc Pointer is a little tricky: we want to copy the actual
-pointer unchanged (easy) but we want to link the MallocPtr into the
-new MallocPtr list.
+Moving a Foreign Object is a little tricky: we want to copy the actual
+pointer unchanged (easy) but we want to link the ForeignObj into the
+new ForeignObj list.
 
 \begin{code}
 #ifndef PAR
 I_
-_ScanMove_MallocPtr(STG_NO_ARGS) {
-    I_ size = MallocPtr_SIZE;
-    DEBUG_SCAN_MOVE("MallocPtr", size);
+_ScanMove_ForeignObj(STG_NO_ARGS) {
+    I_ size = ForeignObj_SIZE;
+    DEBUG_SCAN_MOVE("ForeignObj", size);
 
 #if defined(DEBUG)
-    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MALLOCPTRS) {
-      printf("Moving MallocPtr(%x)=<%x,%x,%x>", Scan, Scan[0], Scan[1], Scan[2]);
-      printf(" Data = %x, Next = %x\n", 
-	     MallocPtr_CLOSURE_DATA(Scan), MallocPtr_CLOSURE_LINK(Scan) );
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_FOREIGNOBJS) {
+      printf("Moving ForeignObj(%x)=<%x,%x,%x>", Scan, Scan[0], Scan[1], Scan[2]);
+      printf(" Data = %x, Finaliser = %x, Next = %x\n", 
+	     ForeignObj_CLOSURE_DATA(Scan), 
+	     ForeignObj_CLOSURE_FINALISER(Scan), 
+	     ForeignObj_CLOSURE_LINK(Scan) );
     }
 #endif
 
     SLIDE_FIXED_HDR;
-    MallocPtr_SLIDE_DATA;
-    MallocPtr_RELINK;
+    ForeignObj_SLIDE_DATA;
+    ForeignObj_RELINK;
 
 #if defined(DEBUG)
-    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MALLOCPTRS) {
-      printf("Moved MallocPtr(%x)=<%x,_,%x,%x,%x>", New, New[0], New[1], New[2], New[3]);
-      printf(" Data = %x, Next = %x", 
-	     MallocPtr_CLOSURE_DATA(New), MallocPtr_CLOSURE_LINK(New) );
-      printf(", NewMallocPtrList = %x\n", NewMallocPtrList );
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_FOREIGNOBJS) {
+      printf("Moved ForeignObj(%x)=<%x,_,%x,%x,%x>", New, New[0], New[1], New[2], New[3]);
+      printf(" Data = %x, Finaliser = %x, Next = %x", 
+	     ForeignObj_CLOSURE_DATA(New), 
+	     ForeignObj_CLOSURE_FINALISER(New), 
+	     ForeignObj_CLOSURE_LINK(New) );
+      printf(", NewForeignObjList = %x\n", NewForeignObjList );
     }
 #endif
 
@@ -1220,7 +1225,7 @@ _ScanMove_S(STG_NO_ARGS) {
 The linking code for revertible black holes with underlying @GEN@ closures.
 
 \begin{code}
-#ifdef PAR
+#if defined(PAR) || defined(GRAN)
 
 I_ 
 _ScanLink_RBH_N(STG_NO_ARGS)

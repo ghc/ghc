@@ -51,7 +51,7 @@ KeyEntry(centreline, name, colour)
     fprintf(psfp, "closepath\n");
 
     fprintf(psfp, "gsave\n"); 
-    fprintf(psfp, "%f setgray\n", colour);
+    SetPSColour(colour);
     fprintf(psfp, "fill\n");
     fprintf(psfp, "grestore\n");
     fprintf(psfp, "stroke\n");

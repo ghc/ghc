@@ -157,9 +157,9 @@ collectHeap(reqsize, sm, do_full_collection)
 	/* end of bracket */
 
 #ifndef PAR
-	sweepUpDeadMallocPtrs(sm->MallocPtrList, 
-			      dualmodeInfo.modeinfo[COMPACTING].base,
-			      dualmodeInfo.bits);
+	sweepUpDeadForeignObjs(sm->ForeignObjList, 
+			       dualmodeInfo.modeinfo[COMPACTING].base,
+			       dualmodeInfo.bits);
 #endif
 	LinkCAFs(sm->CAFlist);
 
@@ -170,10 +170,14 @@ collectHeap(reqsize, sm, do_full_collection)
 #ifdef PAR
 	LinkLiveGAs(dualmodeInfo.modeinfo[COMPACTING].base, dualmodeInfo.bits);
 #else
+/* stable pointers are now accessed via sm->roots
         DEBUG_STRING("Linking Stable Pointer Table:");
         LINK_LOCATION_TO_CLOSURE(&sm->StablePointerTable);
+*/
+#if 1 /* !defined(GRAN) */ /* HWL */
 	LinkAStack( MAIN_SpA, stackInfo.botA );
 	LinkBStack( MAIN_SuB, stackInfo.botB );
+#endif
 #endif
 
 	/* Do Inplace Compaction */
@@ -185,7 +189,7 @@ collectHeap(reqsize, sm, do_full_collection)
 				    dualmodeInfo.bits,
 				    dualmodeInfo.bit_words
 #ifndef PAR
-				    ,&(sm->MallocPtrList)
+				    ,&(sm->ForeignObjList)
 #endif
 				    ) - 1;
 
@@ -203,13 +207,13 @@ collectHeap(reqsize, sm, do_full_collection)
 #ifdef PAR
 	EvacuateLocalGAs(rtsTrue);
 #else
-	evacSPTable( sm );
+	/* evacSPTable( sm ); stable pointers now reachable via sm->roots */
 #endif /* PAR */
 	EvacuateRoots( sm->roots, sm->rootno );
-#ifdef CONCURRENT
+#if defined(CONCURRENT) && !defined(GRAN)
 	EvacuateSparks();
 #endif
-#ifndef PAR
+#if !defined(PAR) /* && !defined(GRAN) */ /* HWL */
 	EvacuateAStack( MAIN_SpA, stackInfo.botA );
 	EvacuateBStack( MAIN_SuB, stackInfo.botB, &bstk_roots );
 #endif /* !PAR */
@@ -219,7 +223,7 @@ collectHeap(reqsize, sm, do_full_collection)
 #ifdef PAR
         RebuildGAtables(rtsTrue);
 #else
-	reportDeadMallocPtrs(sm->MallocPtrList, NULL, &(sm->MallocPtrList) );
+	reportDeadForeignObjs(sm->ForeignObjList, NULL, &(sm->ForeignObjList) );
 #endif /* PAR */
 
 	sm->hp = hp_start = ToHp;  /* Last allocated word */

@@ -5,7 +5,7 @@ SMcompacting.lc?
 
 
 This is a collection of C functions use in implementing the stable
-pointer and malloc pointer extensions. 
+pointer and foreign object extensions. 
 
 The motivation for making this a separate file/section is twofold:
 
@@ -75,7 +75,7 @@ TrashMem(from, to)
 
 \begin{code}
 
-#ifndef PAR  	/* To end of the file */
+#if !defined(PAR)  	/* To end of the file */
 
 \end{code}
 
@@ -88,55 +88,54 @@ EXTDATA(EmptySPTable_closure);
 void initExtensions( sm )
   smInfo *sm;
 {
-  sm->MallocPtrList = NULL;
+  sm->ForeignObjList = NULL;
 #if defined(GCap) || defined(GCgn)
-  sm->OldMallocPtrList = NULL;
+  sm->OldForeignObjList = NULL;
 #endif
 
   sm->StablePointerTable = (P_) EmptySPTable_closure;
 }
 
-extern void FreeMallocPtr PROTO(( StgMallocPtr mp ));
 \end{code}
 
 \begin{code}
 #if defined(DEBUG)
 \end{code}
 
-When a Malloc Pointer is released, there should be absolutely no
+When a Foreign Object is released, there should be absolutely no
 references to it.  To encourage and dangling references to show
 themselves, we'll trash its contents when we're done with it.
 
 \begin{code}
-#define TRASH_MallocPtr_CLOSURE( mptr ) Trash_MallocPtr_Closure(mptr)
+#define TRASH_ForeignObj_CLOSURE( mptr ) Trash_ForeignObj_Closure(mptr)
 
 void
-Trash_MallocPtr_Closure(mptr)
+Trash_ForeignObj_Closure(mptr)
   P_ mptr;
 {
     int i;
-    for( i = 0; i < MallocPtr_SIZE + _FHS; i++ ) {
+    for( i = 0; i < ForeignObj_SIZE + _FHS; i++ ) {
       mptr[ i ] = DEALLOCATED_TRASH;
     }
 }
 \end{code}
 
-Also, every time we fiddle with the MallocPtr list, we should check it
+Also, every time we fiddle with the ForeignObj list, we should check it
 still makes sense.  This function returns @0@ if the list is sensible.
 
-(Would maintaining a separate Malloc Ptr count allow better testing?)
+(Would maintaining a separate Foreign Obj count allow better testing?)
 
 \begin{code}
 void
-Validate_MallocPtrList( MallocPtrList )
-  P_ MallocPtrList;
+Validate_ForeignObjList( ForeignObjList )
+  P_ ForeignObjList;
 {
-  P_ MPptr;
+  P_ FOptr;
 
-  for(MPptr = MallocPtrList; 
-      MPptr != NULL;
-      MPptr = MallocPtr_CLOSURE_LINK(MPptr) ) {
-    CHECK_MallocPtr_CLOSURE(MPptr);
+  for(FOptr = ForeignObjList; 
+      FOptr != NULL;
+      FOptr = ForeignObj_CLOSURE_LINK(FOptr) ) {
+    CHECK_ForeignObj_CLOSURE(FOptr);
   }
 }
 \end{code}
@@ -144,7 +143,7 @@ Validate_MallocPtrList( MallocPtrList )
 \begin{code}
 #else /* !DEBUG */
 
-#define TRASH_MallocPtr_CLOSURE( mp ) /* nothing */
+#define TRASH_ForeignObj_CLOSURE( mp ) /* nothing */
 
 #endif /* !DEBUG */  
 \end{code}
@@ -152,53 +151,55 @@ Validate_MallocPtrList( MallocPtrList )
 \begin{code}
 #ifdef DEBUG
 
-#define TRACE_MallocPtr(MPptr) Trace_MallocPtr( MPptr )
-#define TRACE_MPdies(MPptr) Trace_MPdies()
-#define TRACE_MPlives(MPptr) Trace_MPlives()
-#define TRACE_MPforwarded(MPptr, newAddress) Trace_MPforwarded( MPptr, newAddress )
+#define TRACE_ForeignObj(FOptr) Trace_ForeignObj( FOptr )
+#define TRACE_FOdies(FOptr) Trace_FOdies()
+#define TRACE_FOlives(FOptr) Trace_FOlives()
+#define TRACE_FOforwarded(FOptr, newAddress) Trace_FOforwarded( FOptr, newAddress )
 
 void
-Trace_MallocPtr( MPptr )
-  P_ MPptr;
+Trace_ForeignObj( FOptr )
+  P_ FOptr;
 {
-  if (RTSflags.GcFlags.trace & DEBUG_TRACE_MALLOCPTRS) {
-    printf("DEBUG: MallocPtr(%lx)=<%lx,_,%lx,%lx,%lx>\n", (W_) MPptr, (W_) MPptr[0], (W_) MPptr[1], (W_) MPptr[2], (W_) MPptr[3]);
-    printf(" Data = %lx, Next = %lx\n", 
-	(W_) MallocPtr_CLOSURE_DATA(MPptr), (W_) MallocPtr_CLOSURE_LINK(MPptr) );
+  if (RTSflags.GcFlags.trace & DEBUG_TRACE_FOREIGNOBJS) {
+    printf("DEBUG: ForeignObj(%lx)=<%lx,_,%lx,%lx,%lx>\n", (W_) FOptr, (W_) FOptr[0], (W_) FOptr[1], (W_) FOptr[2], (W_) FOptr[3]);
+    printf(" Data = %lx, Finaliser = %lx, Next = %lx\n", 
+	(W_) ForeignObj_CLOSURE_DATA(FOptr), 
+	(W_) ForeignObj_CLOSURE_FINALISER(FOptr), 
+	(W_) ForeignObj_CLOSURE_LINK(FOptr) );
   }
 }
 
 void
-Trace_MPdies()
+Trace_FOdies()
 {
-  if (RTSflags.GcFlags.trace & DEBUG_TRACE_MALLOCPTRS) {
+  if (RTSflags.GcFlags.trace & DEBUG_TRACE_FOREIGNOBJS) {
     printf(" dying\n");
   }
 }
 
 void
-Trace_MPlives()
+Trace_FOlives()
 {
-  if (RTSflags.GcFlags.trace & DEBUG_TRACE_MALLOCPTRS) { 
+  if (RTSflags.GcFlags.trace & DEBUG_TRACE_FOREIGNOBJS) { 
     printf(" lived to tell the tale\n"); 
   }
 }
 
 void
-Trace_MPforwarded( MPPtr, newAddress )
-  P_ MPPtr, newAddress;
+Trace_FOforwarded( FOPtr, newAddress )
+  P_ FOPtr, newAddress;
 {
-  if (RTSflags.GcFlags.trace & DEBUG_TRACE_MALLOCPTRS) {
+  if (RTSflags.GcFlags.trace & DEBUG_TRACE_FOREIGNOBJS) {
     printf(" forwarded to %lx\n", (W_) newAddress);
   }
 }
 
 #else
 
-#define TRACE_MallocPtr(MPptr) /* nothing */
-#define TRACE_MPdies(MPptr) /* nothing */
-#define TRACE_MPlives(MPptr) /* nothing */
-#define TRACE_MPforwarded(MPptr, newAddress) /* nothing */
+#define TRACE_ForeignObj(FOptr) /* nothing */
+#define TRACE_FOdies(FOptr) /* nothing */
+#define TRACE_FOlives(FOptr) /* nothing */
+#define TRACE_FOforwarded(FOptr, newAddress) /* nothing */
 
 #endif /* DEBUG */
 \end{code}
@@ -210,51 +211,51 @@ Trace_MPforwarded( MPPtr, newAddress )
 \begin{code}
 #if defined(_INFO_COMPACTING)
 
-/* Sweep up the dead MallocPtrs */
+/* Sweep up the dead ForeignObjs */
 
 /* Note that this has to happen before the linking phase trashes
-   the stable pointer table so that the FreeMallocPtr function can
+   the stable pointer table so that the finaliser functions can
    safely call freeStablePointer. 
 */
 
 void
-sweepUpDeadMallocPtrs( MallocPtrList, base, bits )
-  P_ MallocPtrList;
+sweepUpDeadForeignObjs( ForeignObjList, base, bits )
+  P_ ForeignObjList;
   P_ base;
   BitWord *bits;
 {
-    P_ MPptr, temp;
-    I_ MallocPtr_deaths = 0;
+    P_ FOptr, temp;
+    I_ ForeignObj_deaths = 0;
     long _hp_word, bit_index, bit;
 
-    /* At this point, the MallocPtrList is in an invalid state (since
+    /* At this point, the ForeignObjList is in an invalid state (since
        some info ptrs will have been mangled) so we can't validate
        it. ADR */
 
-    DEBUG_STRING("Reporting Dead Malloc Ptrs:");
-    MPptr = MallocPtrList;
-    while ( MPptr != NULL ) {
+    DEBUG_STRING("Reporting Dead Foreign objects:");
+    FOptr = ForeignObjList;
+    while ( FOptr != NULL ) {
 
-      TRACE_MallocPtr(MPptr);
+      TRACE_ForeignObj(FOptr);
 
-      _hp_word = MPptr - base;
+      _hp_word = FOptr - base;
       bit_index = _hp_word / BITS_IN(BitWord);
       bit = 1L << (_hp_word & (BITS_IN(BitWord) - 1));
       if ( !( bits[bit_index] & bit ) ) { /* dead */
 
-	TRACE_MPdies( MPptr );
-	FreeMallocPtr( MallocPtr_CLOSURE_DATA(MPptr) );
-	MallocPtr_deaths++;
+	TRACE_FOdies( FOptr );
+	(*(void (*)(StgAddr))((StgAddr)ForeignObj_CLOSURE_FINALISER(FOptr)))((StgAddr)ForeignObj_CLOSURE_DATA(FOptr));
+	ForeignObj_deaths++;
 
-	temp = MPptr;
-	MPptr = MallocPtr_CLOSURE_LINK(MPptr);
+	temp = FOptr;
+	FOptr = ForeignObj_CLOSURE_LINK(FOptr);
 	/* Now trash the closure to encourage bugs to show themselves */
-	TRASH_MallocPtr_CLOSURE( temp );
+	TRASH_ForeignObj_CLOSURE( temp );
 
       } else { 
 
-	TRACE_MPlives(MPptr);
-	MPptr = MallocPtr_CLOSURE_LINK(MPptr);
+	TRACE_FOlives(FOptr);
+	FOptr = ForeignObj_CLOSURE_LINK(FOptr);
       }
     }
 }
@@ -284,7 +285,7 @@ smInfo *sm;
 
 
 
-/* First attempt at Malloc Ptr hackery... Later versions might 
+/* First attempt at Foreign Obj hackery... Later versions might 
    do something useful with the two counters. [ADR]      */
 
 #if defined(DEBUG)
@@ -302,61 +303,61 @@ EXTDATA_RO(Forward_Ref_info);
 #endif
 
 /* 
-  Call FreeMallocPtr on any dead MPs in oldMPList, add the remainder
-  to new sticking the result into newMPList.
+  Call ForeignObj finalising routine on any dead FOs in oldFOList,
+  add the remainder to new sticking the result into newFOList.
 */
 void
-reportDeadMallocPtrs(oldMPList, new, newMPList)
-  P_ oldMPList;
+reportDeadForeignObjs(oldFOList, new, newFOList)
+  P_ oldFOList;
   P_ new;
-  P_ *newMPList;
+  P_ *newFOList;
 {
-    P_ MPptr, temp;
-    I_ MP_no = 0, MP_deaths = 0;
+    P_ FOptr, temp;
+    I_ FO_no = 0, FO_deaths = 0;
 
-    /* At this point, the MallocPtrList is in an invalid state (since
+    /* At this point, the ForeignObjList is in an invalid state (since
        some info ptrs will have been mangled) so we can't validate
        it. ADR */
 
-    DEBUG_STRING("Updating MallocPtr List and reporting casualties:");
-    MPptr = oldMPList;
-    while ( MPptr != NULL ) {
-      TRACE_MallocPtr(MPptr);
+    DEBUG_STRING("Updating Foreign Objects List and reporting casualties:");
+    FOptr = oldFOList;
+    while ( FOptr != NULL ) {
+      TRACE_ForeignObj(FOptr);
 
-      if ((P_) INFO_PTR(MPptr) == MallocPtr_info ) {
+      if ((P_) INFO_PTR(FOptr) == ForeignObj_info ) {
 	/* can't have been forwarded - must be dead */
 
-	TRACE_MPdies(MPptr);
-	FreeMallocPtr( MallocPtr_CLOSURE_DATA(MPptr) );
-	MP_deaths++;
+	TRACE_FOdies(FOptr);
+	(*(void (*)(StgAddr))(ForeignObj_CLOSURE_FINALISER(FOptr)))((StgAddr)ForeignObj_CLOSURE_DATA(FOptr));
+	FO_deaths++;
 
-	temp = MPptr;
-	MPptr = MallocPtr_CLOSURE_LINK(MPptr);
+	temp  = FOptr;
+	FOptr = ForeignObj_CLOSURE_LINK(FOptr);
 
 	/* Now trash the closure to encourage bugs to show themselves */
-	TRASH_MallocPtr_CLOSURE( temp );
+	TRASH_ForeignObj_CLOSURE( temp );
       } else { /* Must have been forwarded - so it must be live */
 
-	P_ newAddress = (P_) FORWARD_ADDRESS(MPptr);
+	P_ newAddress = (P_) FORWARD_ADDRESS(FOptr);
 
 #if defined(GCgn)
-	ASSERT( ( (P_) INFO_PTR(MPptr) == Forward_Ref_New_info ) ||
-		( (P_) INFO_PTR(MPptr) == Forward_Ref_Old_info ) ||
-		( (P_) INFO_PTR(MPptr) == OldRoot_Forward_Ref_info ) );
+	ASSERT( ( (P_) INFO_PTR(FOptr) == Forward_Ref_New_info ) ||
+		( (P_) INFO_PTR(FOptr) == Forward_Ref_Old_info ) ||
+		( (P_) INFO_PTR(FOptr) == OldRoot_Forward_Ref_info ) );
 #else
-	ASSERT( (P_) INFO_PTR(MPptr) == Forward_Ref_info );
+	ASSERT( (P_) INFO_PTR(FOptr) == Forward_Ref_info );
 #endif
 
-	TRACE_MPforwarded( MPptr, newAddress );
-	MallocPtr_CLOSURE_LINK(newAddress) = new;
+	TRACE_FOforwarded( FOptr, newAddress );
+	ForeignObj_CLOSURE_LINK(newAddress) = new;
 	new = newAddress;
-	MP_no++;
-	MPptr = MallocPtr_CLOSURE_LINK(MPptr);
+	FO_no++;
+	FOptr = ForeignObj_CLOSURE_LINK(FOptr);
       }
     }
 
-    VALIDATE_MallocPtrList( new );
-    *newMPList = new;
+    VALIDATE_ForeignObjList( new );
+    *newFOList = new;
 }
 #endif /* _INFO_COPYING */
 \end{code}

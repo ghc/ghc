@@ -80,8 +80,110 @@ EvacuateRoots(P_ roots[], I_ rootno)
 }
 \end{code}
 
+Evacuating events is necessary in GRAN since some TSOs and closures are only
+pointed at by events we have to schedule later on.
+
 \begin{code}
-#ifdef CONCURRENT
+#if defined(GRAN)
+void
+EvacuateEvents(STG_NO_ARGS)
+{
+  eventq event = EventHd;
+
+# if defined(GRAN) && defined(GRAN_CHECK)
+  if ( RTSflags.GcFlags.giveStats && (RTSflags.GranFlags.debug & 0x40) )
+    fprintf(RTSflags.GcFlags.statsFile,"Evacuating Events ...\n");
+#endif
+
+  DEBUG_STRING("Evacuate Events:");
+  while(event != NULL)
+    {
+      if(EVENT_TYPE(event) == RESUMETHREAD || 
+         EVENT_TYPE(event) == MOVETHREAD || 
+         EVENT_TYPE(event) == CONTINUETHREAD || 
+         EVENT_TYPE(event) == STARTTHREAD )
+
+       MAYBE_EVACUATE_CLOSURE( EVENT_TSO(event) );
+
+      else if(EVENT_TYPE(event) == MOVESPARK)
+
+        MAYBE_EVACUATE_CLOSURE( SPARK_NODE(EVENT_SPARK(event)) );
+
+      else if (EVENT_TYPE(event) == FETCHNODE ||
+               EVENT_TYPE(event) == FETCHREPLY )
+        {
+
+          MAYBE_EVACUATE_CLOSURE( EVENT_TSO(event) );
+
+	  /* In the case of packet fetching, EVENT_NODE(event) points to */
+	  /* the packet (currently, malloced). The packet is just a list of */
+	  /* closure addresses, with the length of the list at index 1 (the */
+	  /* structure of the packet is defined in Pack.lc). */
+	  if ( RTSflags.GranFlags.DoGUMMFetching && 
+	       (EVENT_TYPE(event)==FETCHREPLY)) {
+	    P_ buffer = (P_) EVENT_NODE(event);
+	    int size = (int) buffer[PACK_SIZE_LOCN], i;
+
+	    for (i = PACK_HDR_SIZE; i <= size-1; i++) {
+              MAYBE_EVACUATE_CLOSURE( (P_)buffer[i] );
+	    }
+	  } else 
+            MAYBE_EVACUATE_CLOSURE( EVENT_NODE(event) );
+        } 
+      else if (EVENT_TYPE(event) == GLOBALBLOCK)
+	{
+          MAYBE_EVACUATE_CLOSURE( EVENT_TSO(event) );
+          MAYBE_EVACUATE_CLOSURE( EVENT_NODE(event) );
+	}
+      else if (EVENT_TYPE(event) == UNBLOCKTHREAD) 
+	{
+          MAYBE_EVACUATE_CLOSURE( EVENT_TSO(event) );
+	}
+      event = EVENT_NEXT(event);
+    }
+}
+#endif  /* GRAN */
+\end{code}
+
+\begin{code}
+#if defined(CONCURRENT) 
+# if defined(GRAN)
+void
+EvacuateSparks(STG_NO_ARGS)
+{
+  sparkq spark;
+  PROC proc;
+  I_ pool, total_sparks=0;
+
+  /* Sparks have been pruned already at this point */
+
+# if defined(GRAN) && defined(GRAN_CHECK)
+  if ( RTSflags.GcFlags.giveStats && (RTSflags.GranFlags.debug & 0x40) )
+    fprintf(RTSflags.GcFlags.statsFile,"Evacuating Sparks ...\n");
+# endif
+
+  DEBUG_STRING("Evacuate Sparks (GRAN):");
+  for(proc = 0; proc < RTSflags.GranFlags.proc; ++proc) {
+    for(pool = 0; pool < SPARK_POOLS; ++pool) {
+      for(spark = PendingSparksHd[proc][pool]; 
+	  spark != NULL; 
+	  spark = SPARK_NEXT(spark))
+        {
+# if defined(GRAN) && defined(GRAN_CHECK)
+          if ( RTSflags.GcFlags.giveStats && 
+	       (RTSflags.GranFlags.debug & 0x40) &&
+	       !SHOULD_SPARK(SPARK_NODE(spark)) )
+             fprintf(RTSflags.GcFlags.statsFile,"Qagh {EvacuateSparks}Daq: spark @ 0x%x with node 0x%x shouldn't spark!\n",
+                     spark,SPARK_NODE(spark));
+# endif
+          MAYBE_EVACUATE_CLOSURE(SPARK_NODE(spark));
+        }  /* forall spark ... */
+    }     /* forall pool ... */
+  }      /* forall proc ... */
+}
+
+# else  /* !GRAN */
+
 void
 EvacuateSparks(STG_NO_ARGS)
 {
@@ -97,14 +199,15 @@ EvacuateSparks(STG_NO_ARGS)
 	}
     }
 }
-#endif
+# endif
+#endif  /* CONCURRENT */
 \end{code}
 
 Note: no \tr{evacuate[AB]Stack} for ``parallel'' systems, because they
 don't have a single main stack.
 
 \begin{code}
-#ifndef PAR
+#if !defined(PAR) /* && !defined(GRAN) */  /* HWL */
 void
 EvacuateAStack(PP_ stackA, PP_ botA /* botA points to bottom-most word */)
 {
@@ -132,7 +235,7 @@ EVACUATED_INFOPTR)
 Otherwise closure is live update reference to to-space address
 
 \begin{code}
-#ifndef PAR
+#if !defined(PAR)  /* && !defined(GRAN) */  /* HWL */
 void
 EvacuateBStack( stackB, botB, roots )
   P_ stackB;

@@ -5,6 +5,8 @@
 
 \begin{code}
 
+#define NON_POSIX_SOURCE
+
 #include "rtsdefs.h"
 #include "stgio.h"
 #include "libposix.h"

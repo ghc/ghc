@@ -41,7 +41,7 @@ STGFUN(FetchMe_entry)
     rGA = FETCHME_GA(Node);
     ASSERT(rGA->loc.gc.gtid != mytid);
 
-    TSO_LINK(CurrentTSO) = Nil_closure;
+    TSO_LINK(CurrentTSO) = Prelude_Z91Z93_closure;
     SET_INFO_PTR(Node, FMBQ_info);
     FMBQ_ENTRIES(Node) = (W_) CurrentTSO;
 
@@ -62,8 +62,10 @@ STGFUN(FetchMe_entry)
         TSO_FETCHCOUNT(CurrentTSO)++;
 	TSO_QUEUE(CurrentTSO) = Q_FETCHING;
         TSO_BLOCKEDAT(CurrentTSO) = now;
-        DumpGranEventAndNode(GR_FETCH, CurrentTSO, (SAVE_R1).p, 
-          taskIDtoPE(rGA->loc.gc.gtid));
+        /* DumpGranEventAndNode(GR_FETCH, CurrentTSO, (SAVE_R1).p, 
+           taskIDtoPE(rGA->loc.gc.gtid)); */
+	DumpRawGranEvent(CURRENT_PROC,taskIDtoPE(rGA->loc.gc.gtid),GR_FETCH,
+			 CurrentTSO,(SAVE_R1).p,0);
     }
 
     /* Assign a brand-new global address to the newly created FMBQ */

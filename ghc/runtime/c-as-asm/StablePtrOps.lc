@@ -14,7 +14,7 @@ change it to take/return a byte array anyway.  Code in PerformIO.lhc
 is even more dated.)
 
 \begin{code}
-#ifndef PAR
+#if !defined(PAR)
 
 #include "rtsdefs.h"
 
@@ -81,14 +81,14 @@ deRefStablePointer(stableIndex)
 }
 \end{code}
 
-Despite the file name, we have two small malloc ptr operation - not
+Despite the file name, we have a little ForeignObj operation here - not
 worth putting in a file by itself.
 
 \begin{code}
 StgInt 
-eqMallocPtr(p1, p2)
-  StgMallocPtr p1;
-  StgMallocPtr p2;
+eqForeignObj(p1, p2)
+  StgForeignObj p1;
+  StgForeignObj p2;
 {
   return (p1 == p2);
 }

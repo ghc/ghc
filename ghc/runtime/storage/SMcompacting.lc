@@ -52,8 +52,97 @@ I_ rootno;
 \end{code}
 
 \begin{code}
+#if defined(GRAN)
+void
+LinkEvents(STG_NO_ARGS)
+{
+  eventq event = EventHd;
 
-#ifdef CONCURRENT
+# if defined(GRAN) && defined(GRAN_CHECK)
+  if ( RTSflags.GcFlags.giveStats && (RTSflags.GranFlags.debug & 0x40) )
+    fprintf(RTSflags.GcFlags.statsFile,"Linking Events ...\n");
+#endif
+
+  DEBUG_STRING("Linking Events:");
+  while(event != NULL)
+    {
+      if(EVENT_TYPE(event) == RESUMETHREAD || 
+         EVENT_TYPE(event) == MOVETHREAD || 
+         EVENT_TYPE(event) == CONTINUETHREAD || 
+         EVENT_TYPE(event) == STARTTHREAD )
+
+        { LINK_LOCATION_TO_CLOSURE( &(EVENT_TSO(event)) ); }
+
+      else if(EVENT_TYPE(event) == MOVESPARK)
+
+	{ LINK_LOCATION_TO_CLOSURE( &(SPARK_NODE(EVENT_SPARK(event))) ); }
+
+      else if (EVENT_TYPE(event) == FETCHNODE ||
+               EVENT_TYPE(event) == FETCHREPLY )
+        {
+	  LINK_LOCATION_TO_CLOSURE( &(EVENT_TSO(event)) );
+
+	  /* In the case of packet fetching, EVENT_NODE(event) points to */
+	  /* the packet (currently, malloced). The packet is just a list of */
+	  /* closure addresses, with the length of the list at index 1 (the */
+	  /* structure of the packet is defined in Pack.lc). */
+	  if ( RTSflags.GranFlags.DoGUMMFetching && 
+	       (EVENT_TYPE(event)==FETCHREPLY)) {
+	    P_ buffer = (P_) EVENT_NODE(event);
+	    int size = (int) buffer[PACK_SIZE_LOCN], i;
+
+	    for (i = PACK_HDR_SIZE; i <= size-1; i++) {
+	      LINK_LOCATION_TO_CLOSURE( (buffer+i) );
+	    }
+	  } else 
+	    { LINK_LOCATION_TO_CLOSURE( &(EVENT_NODE(event)) ); } 
+        } 
+      else if (EVENT_TYPE(event) == GLOBALBLOCK)
+	{
+	  LINK_LOCATION_TO_CLOSURE( &(EVENT_TSO(event)) );
+	  LINK_LOCATION_TO_CLOSURE( &(EVENT_NODE(event)) );
+	}
+      else if (EVENT_TYPE(event) == UNBLOCKTHREAD) 
+	{
+	  LINK_LOCATION_TO_CLOSURE( &(EVENT_TSO(event)) );
+	}
+      event = EVENT_NEXT(event);
+    }
+}
+#endif  /* GRAN */
+\end{code}
+
+\begin{code}
+
+#if defined(CONCURRENT) 
+# if defined(GRAN)
+void
+LinkSparks(STG_NO_ARGS)
+{
+  sparkq spark;
+  PROC proc;
+  I_ pool, total_sparks=0;
+
+# if defined(GRAN) && defined(GRAN_CHECK)
+  if ( RTSflags.GcFlags.giveStats && (RTSflags.GranFlags.debug & 0x40) )
+    fprintf(RTSflags.GcFlags.statsFile,"Linking Sparks ...\n");
+#endif
+
+  DEBUG_STRING("Linking Sparks:");
+  for(proc = 0; proc < RTSflags.GranFlags.proc; ++proc) {
+    for(pool = 0; pool < SPARK_POOLS; ++pool) {
+      for(spark = PendingSparksHd[proc][pool]; 
+	  spark != NULL; 
+	  spark = SPARK_NEXT(spark))
+        {
+	  LINK_LOCATION_TO_CLOSURE( &(SPARK_NODE(spark)));
+        } /* forall spark ... */
+      }  /* forall pool ... */
+   }    /*forall proc .. */
+}
+
+# else /* ! GRAN */
+
 void
 LinkSparks(STG_NO_ARGS)
 {
@@ -68,7 +157,8 @@ LinkSparks(STG_NO_ARGS)
 	}
     }
 }
-#endif
+#endif   /* GRAN */
+#endif   /* CONCURRENT */
 
 \end{code}
 
@@ -140,7 +230,7 @@ LinkLiveGAs(P_ base, BitWord *bits)
     sendFreeMessages();
 }
 
-#else
+#endif
 
 \end{code}
 
@@ -148,6 +238,7 @@ Note: no \tr{Link[AB]Stack} for ``parallel'' systems, because they
 don't have a single main stack.
 
 \begin{code}
+#if !defined(PAR) /* && !defined(GRAN) */  /* HWL */
 
 void
 LinkAStack(stackA, botA)
@@ -169,7 +260,8 @@ PP_ botA;
 ToDo (Patrick?): Dont explicitly mark & compact unmarked Bstack frames
 
 \begin{code}   
-#if ! defined(PAR)
+#if !defined(PAR) /* && !defined(CONCURRENT) */ /* HWL */
+
 void
 LinkBStack(stackB, botB)
 P_ stackB;

@@ -207,10 +207,7 @@ W_ args;
     WRAPPER_RETURN(0)
 }
 
-# endif
-
-# ifdef GRAN
-
+#if defined(GRAN)
 void PerformReschedule_wrapper PROTO((W_, W_))	    WRAPPER_NAME(PerformReschedule);
 void PerformReschedule_wrapper(liveness, always_reenter_node)
   W_ liveness;
@@ -226,7 +223,73 @@ void PerformReschedule_wrapper(liveness, always_reenter_node)
     WRAPPER_RETURN(0)
 }
 
+/* Similar wrappers for all GrAnSim functions. */
+/* NB: These are normal functions, which don't call ReSchedule. So we just */
+/* have to safe/restore the registers. */
+
+void GranSimAllocate_wrapper PROTO((I_, P_, W_))  WRAPPER_NAME(GranSimAllocate);
+void GranSimAllocate_wrapper(n, node, liveness)
+I_ n;
+P_ node;
+W_ liveness;
+{
+#if i386_TARGET_ARCH
+    void *ret_addr, *ignore_me;
+    WRAPPER_SETUP(GranSimAllocate, ret_addr, ignore_me)
+#else
+    WRAPPER_SETUP(GranSimAllocate, ignore_me, ignore_me)
+#endif
+    GranSimAllocate(n, node, liveness);
+    WRAPPER_RETURN(0);
+}
+
+void GranSimUnallocate_wrapper PROTO((I_, P_, W_))  WRAPPER_NAME(GranSimUnallocate);
+void GranSimUnallocate_wrapper(n, node, liveness)
+I_ n;
+P_ node;
+W_ liveness;
+{
+#if i386_TARGET_ARCH
+    void *ret_addr, *ignore_me;
+    WRAPPER_SETUP(GranSimUnallocate, ret_addr, ignore_me)
+#else
+    WRAPPER_SETUP(GranSimUnallocate, ignore_me, ignore_me)
+#endif
+  GranSimUnallocate(n, node, liveness);
+  WRAPPER_RETURN(0);
+}
+
+void GranSimFetch_wrapper PROTO((P_))  WRAPPER_NAME(GranSimFetch);
+void GranSimFetch_wrapper(node)
+P_ node;
+{
+#if i386_TARGET_ARCH
+    void *ret_addr, *ignore_me;
+    WRAPPER_SETUP(GranSimFetch, ret_addr, ignore_me)
+#else
+    WRAPPER_SETUP(GranSimFetch, ignore_me, ignore_me)
+#endif
+    GranSimFetch(node);
+    WRAPPER_RETURN(0);
+}
+
+void GranSimExec_wrapper PROTO((W_, W_, W_, W_, W_))  WRAPPER_NAME(GranSimExec);
+void GranSimExec_wrapper(arith,branch,load,store,floats)
+W_ arith,branch,load,store,floats;
+{
+#if i386_TARGET_ARCH
+    void *ret_addr, *ignore_me;
+    WRAPPER_SETUP(GranSimExec, ret_addr, ignore_me)
+#else
+    WRAPPER_SETUP(GranSimExec, ignore_me, ignore_me)
+#endif
+    GranSimExec(arith,branch,load,store,floats); 	
+    WRAPPER_RETURN(0);
+}
+
 # endif /* GRAN */
+
+# endif /* CONCURRENT */
 
 /* 
  * In the threaded world, context switches may occur during one of these
@@ -254,14 +317,3 @@ checkInCCallGC()
 }
 \end{code}
 
-Hack for -UGRAN setup. % HWL
-
-\begin{code}
-#ifndef GRAN
-void PerformReschedule_wrapper PROTO((W_, W_));
-void PerformReschedule_wrapper(liveness, always_reenter_node)
-  W_ liveness;
-  W_  always_reenter_node;
-{ }
-#endif
-\end{code}

@@ -62,7 +62,7 @@ Older code (less fancy ==> more reliable)
   DEBUG_BSTACK(lines)		Print "lines" lines of the B Stack
   DEBUG_UPDATES(frames)		Print "frames" update frames
   DEBUG_REGS()			Print register values
-  DEBUG_MP()                    Print the MallocPtr Lists
+  DEBUG_FO()                    Print the ForeignObj Lists
   DEBUG_TSO(tso)		(CONCURRENT) Print a Thread State Object
 
 Not yet implemented:
@@ -708,7 +708,7 @@ getClosureShape( P_ node, int *vhs, int *size, int *ptrs, char **type )
 
       /* There are no others in SMInfoTables.lh 11/5/94 ADR*/
       default:
-	printf("Invalid/unknown info type %d\n", INFO_TYPE(INFO_PTR(node)));
+	printf("Invalid/unknown info type %ld\n", INFO_TYPE(INFO_PTR(node)));
 	break;
     }
 }  
@@ -901,7 +901,7 @@ printClosure( P_ closure, int indentation, int weight )
 
   case INFO_INTLIKE_TYPE:
     if (DEBUG_details > 1) printf("INTLIKE ");
-    printf("%d",INTLIKE_VALUE(closure));
+    printf("%ld",INTLIKE_VALUE(closure));
     break;
 
   case INFO_BH_TYPE:
@@ -989,7 +989,7 @@ printClosure( P_ closure, int indentation, int weight )
 
   /* There are no others in SMInfoTables.lh 11/5/94 ADR*/
   default:
-    printf("Invalid/unknown info type %d\n", INFO_TYPE(INFO_PTR(closure)));
+    printf("Invalid/unknown info type %ld\n", INFO_TYPE(INFO_PTR(closure)));
     break;
   }
 }    
@@ -1023,12 +1023,99 @@ DEBUG_PrintA( int depth, int weight )
 {
   PP_ SpA  = SAVE_SpA;
   PP_ SuA  = SAVE_SuA;
-  P_  SpB  = SAVE_SpB;
-  P_  SuB  = SAVE_SuB;
-  P_ Hp    = SAVE_Hp;
 
   int i;
   I_ size = minimum(depth, SUBTRACT_A_STK(SpA, stackInfo.botA)+1);
+     
+  printf("Dump of the Address Stack (SpA = 0x%lx, SuA = 0x%lx)\n", SpA, SuA);
+
+  for( i = 0; i < size; ++i ) {
+    printIndentation(1);
+    printf("SpA[%d] (0x%08lx):", i, SpA + AREL(i));
+    printClosure((P_)*(SpA + AREL(i)), 2, weight);
+    printf("\n");
+  }
+}
+
+void
+DEBUG_PrintB( int depth, int weight )
+{
+  PP_ SpA  = SAVE_SpA;
+  P_  SpB  = SAVE_SpB;
+  P_  SuB  = SAVE_SuB;
+  
+  I_ i;
+  I_ size = minimum(depth, SUBTRACT_B_STK(SpB, stackInfo.botB)+1);
+
+  P_ updateFramePtr;
+  I_ update_count;
+     
+  printf("Dump of the Value Stack (SpB = 0x%lx, SuB = 0x%lx)\n", SpB, SuB);
+  
+  updateFramePtr = SuB;
+  update_count = 0;
+  i = 0;
+  while (i < size) {
+    if (updateFramePtr == SpB + BREL(i)) {
+      
+      printIndentation(1);
+      printf("SpB[%ld] (0x%08lx): UpdateFrame[%d](", 
+	     i, 
+	     updateFramePtr, 
+	     update_count 
+	     );
+      printName( (P_) *(SpB + BREL(i)) );
+      printf(", UF[%d] (= SpB[%ld]), SpA[%ld], ",
+	     update_count+1, 
+	     SUBTRACT_B_STK(SpB, GRAB_SuB(updateFramePtr)),
+	     SUBTRACT_A_STK(SpA, GRAB_SuA(updateFramePtr))
+	     );
+      printAddress( GRAB_UPDATEE(updateFramePtr) );
+      printf(")\n");
+
+      printIndentation(2);
+      printClosure( GRAB_UPDATEE(updateFramePtr), 3, weight );
+      printf("\n");
+
+      updateFramePtr = GRAB_SuB(updateFramePtr);
+      update_count = update_count + 1;
+
+      /* ToDo: GhcConstants.lh reveals that there are two other sizes possible */
+      i = i + STD_UF_SIZE;
+    } else {
+      printIndentation(1);
+      printf("SpB[%ld] (0x%08lx): ", i, SpB + BREL(i) );
+      printName((P_) *(SpB + BREL(i)) );
+      printf("\n");
+      i = i + 1;
+    }
+  }
+}
+
+#else /* CONCURRENT */
+
+static int
+minimum(int a, int b)
+{
+  if (a < b) {
+    return a;
+  } else {
+    return b;
+  }
+}
+
+void
+DEBUG_PrintA( int depth, int weight )
+{
+  P_ stko = SAVE_StkO;
+  PP_ SpA  = STKO_SpA(stko);
+  PP_ SuA  = STKO_SuA(stko);
+  P_  SpB  = STKO_SpB(stko);
+  P_  SuB  = STKO_SuB(stko);
+  P_ Hp    = SAVE_Hp;
+
+  int i;
+  I_ size = minimum(depth, SUBTRACT_A_STK(SpA, STKO_ASTK_BOT(stko))+1);
      
   printf("Dump of the Address Stack (SpA = 0x%x, SuA = 0x%x)\n", SpA, SuA);
 
@@ -1043,14 +1130,15 @@ DEBUG_PrintA( int depth, int weight )
 void
 DEBUG_PrintB( int depth, int weight )
 {
-  PP_ SpA  = SAVE_SpA;
-  PP_ SuA  = SAVE_SuA;
-  P_  SpB  = SAVE_SpB;
-  P_  SuB  = SAVE_SuB;
+  P_ stko = SAVE_StkO;
+  PP_ SpA  = STKO_SpA(stko);
+  PP_ SuA  = STKO_SuA(stko);
+  P_  SpB  = STKO_SpB(stko);
+  P_  SuB  = STKO_SuB(stko);
   P_ Hp    = SAVE_Hp;
   
   I_ i;
-  I_ size = minimum(depth, SUBTRACT_B_STK(SpB, stackInfo.botB)+1);
+  I_ size = minimum(depth, SUBTRACT_B_STK(SpB, STKO_BSTK_BOT(stko))+1);
 
   P_ updateFramePtr;
   I_ update_count;
@@ -1096,6 +1184,7 @@ DEBUG_PrintB( int depth, int weight )
     }
   }
 }
+
 #endif /* not CONCURRENT */
 \end{code}
 
@@ -1129,12 +1218,8 @@ numStacks( )
   P_  SpB  = STKO_SpB(SAVE_StkO);
   P_  SuB  = STKO_SuB(SAVE_StkO);
 #else
-  PP_ SpA  = SAVE_SpA;
-  PP_ SuA  = SAVE_SuA;
-  P_  SpB  = SAVE_SpB;
   P_  SuB  = SAVE_SuB;
 #endif
-  P_  Hp   = SAVE_Hp;
   
   int depth = 1; /* There's always at least one stack */
 
@@ -1155,7 +1240,7 @@ printLocalAStack( int depth, int indentation, int weight, PP_ SpA, int size )
 
   for( i = size-1; i >= 0; --i ) {
     printIndentation( indentation );
-    printf("A[%ld][%ld]", depth, i);
+    printf("A[%ld][%d]", depth, i);
     if (DEBUG_details > 1) printf(" (0x%08lx) ", SpA + AREL(i) );
     printf("=");
     printClosure( *(SpA + AREL(i)), indentation+2, weight );
@@ -1172,7 +1257,7 @@ printLocalBStack( int depth, int indentation, int weight, P_ SpB, int size )
 
   for( i = size-1; i >= 0; --i) {
     printIndentation( indentation );
-    printf("B[%ld][%ld]", depth, i);
+    printf("B[%d][%d]", depth, i);
     if (DEBUG_details > 1) printf(" (0x%08lx) ", SpB + BREL(i) );
     printf("=");
     printAddress( (P_) *(SpB + BREL(i)) );
@@ -1414,7 +1499,7 @@ DEBUG_INFO_TABLE(node)
 	  ip_type, info_ptr,
 	  (W_) ENTRY_CODE(info_ptr), (W_) UPDATE_CODE(info_ptr));
   fprintf(stderr,
-	  "Tag: %d; Type: %d; Size: %lu; Ptrs: %lu\n\n",
+	  "Tag: %ld; Type: %ld; Size: %lu; Ptrs: %lu\n\n",
 	  INFO_TAG(info_ptr), INFO_TYPE(info_ptr),
 	  INFO_SIZE(info_ptr),INFO_NoPTRS(info_ptr));
 #if defined(GRIP)
@@ -1502,18 +1587,22 @@ DEBUG_REGS()
 #ifndef CONCURRENT
 
 void
-DEBUG_MP()
+DEBUG_FO()
 {
   StgPtr mp;
   StgInt i;
 
-  fprintf(stderr,"MallocPtrList\n\n");
+  fprintf(stderr,"ForeignObjList\n\n");
 
-  for(mp = StorageMgrInfo.MallocPtrList; 
+  for(mp = StorageMgrInfo.ForeignObjList; 
       mp != NULL; 
-      mp = MallocPtr_CLOSURE_LINK(mp)) {
+      mp = ForeignObj_CLOSURE_LINK(mp)) {
 
-    fprintf(stderr, "MallocPtr(0x%lx) = 0x%lx\n", mp, MallocPtr_CLOSURE_DATA(mp));
+    fprintf(stderr, 
+            "ForeignObjPtr(0x%lx) = 0x%lx, finaliser: 0x%lx\n", 
+	    mp, 
+	    ForeignObj_CLOSURE_DATA(mp),
+	    ForeignObj_CLOSURE_FINALISER(mp));
 
 /*
     DEBUG_PRINT_NODE(mp);
@@ -1521,13 +1610,17 @@ DEBUG_MP()
   }
 
 # if defined(GCap) || defined(GCgn)
-  fprintf(stderr,"\nOldMallocPtr List\n\n");
+  fprintf(stderr,"\nOldForeignObj List\n\n");
 
-  for(mp = StorageMgrInfo.OldMallocPtrList; 
+  for(mp = StorageMgrInfo.OldForeignObjList; 
       mp != NULL; 
-      mp = MallocPtr_CLOSURE_LINK(mp)) {
+      mp = ForeignObj_CLOSURE_LINK(mp)) {
 
-    fprintf(stderr, "  MallocPtr(0x%lx) = 0x%lx\n", mp, MallocPtr_CLOSURE_DATA(mp));
+    fprintf(stderr, 
+            "ForeignObj(0x%lx) = 0x%lx, finaliser: 0x%lx\n", 
+	    mp, 
+	    ForeignObj_CLOSURE_DATA(mp),
+	    ForeignObj_CLOSURE_FINALISER(mp));
 /*  
    DEBUG_PRINT_NODE(mp);
 */
@@ -1645,6 +1738,8 @@ DEBUG_BSTACK(lines)
       }
   fprintf(stderr, "\n");
 }
+
+
 #endif /* not concurrent */
 
 /*
@@ -1718,3 +1813,1283 @@ DEBUG_TSO(P_ tso)
 
 #endif /* concurrent */
 \end{code}
+
+%****************************************************************************
+%
+\subsection[GrAnSim-debug]{Debugging routines  for GrAnSim}
+%
+%****************************************************************************
+
+Debugging routines, mainly for GrAnSim. 
+They should really be in a separate file.
+There is some code duplication of above routines in here, I'm afraid.
+
+As a naming convention all GrAnSim debugging functions start with @G_@.
+The shorthand forms defined at the end start only with @G@.
+
+\begin{code}
+#if defined(GRAN) && defined(GRAN_CHECK)
+
+#define NULL_REG_MAP        /* Not threaded */
+/* #include "stgdefs.h" */
+
+char *
+info_hdr_type(info_ptr)
+P_ info_ptr;
+{
+#if ! defined(PAR) && !defined(GRAN)
+  switch (INFO_TAG(info_ptr))
+    {
+      case INFO_OTHER_TAG:
+        return("OTHER_TAG");
+/*    case INFO_IND_TAG:
+        return("IND_TAG");
+*/    default:
+        return("TAG<n>");
+    }
+#else /* PAR */
+  switch(BASE_INFO_TYPE(info_ptr))
+    {
+      case INFO_SPEC_TYPE:
+        return("SPEC");
+
+      case INFO_GEN_TYPE:
+        return("GEN");
+
+      case INFO_DYN_TYPE:
+        return("DYN");
+
+      case INFO_TUPLE_TYPE:
+        return("TUPLE");
+
+      case INFO_DATA_TYPE:
+        return("DATA");
+
+      case INFO_MUTUPLE_TYPE:
+        return("MUTUPLE");
+
+      case INFO_IMMUTUPLE_TYPE:
+        return("IMMUTUPLE");
+
+      case INFO_STATIC_TYPE:
+        return("STATIC");
+
+      case INFO_CONST_TYPE:
+        return("CONST");
+
+      case INFO_CHARLIKE_TYPE:
+        return("CHAR");
+
+      case INFO_INTLIKE_TYPE:
+        return("INT");
+
+      case INFO_BH_TYPE:
+        return("BHOLE");
+
+      case INFO_BQ_TYPE:
+        return("BQ");
+
+      case INFO_IND_TYPE:
+        return("IND");
+
+      case INFO_CAF_TYPE:
+        return("CAF");
+
+      case INFO_FM_TYPE:
+        return("FETCHME");
+
+      case INFO_TSO_TYPE:
+        return("TSO");
+
+      case INFO_STKO_TYPE:
+        return("STKO");
+
+      case INFO_SPEC_RBH_TYPE:
+	return("SPEC_RBH");
+
+      case INFO_GEN_RBH_TYPE:
+	return("GEN_RBH");
+
+      case INFO_BF_TYPE:
+        return("BF");
+
+      case INFO_INTERNAL_TYPE:
+        return("INTERNAL");
+
+      default:
+        fprintf(stderr,"Unknown header type %lu\n",INFO_TYPE(info_ptr));
+        return("??");
+      }
+#endif /* PAR */
+}
+
+char *
+info_type(infoptr, str)
+P_ infoptr;
+char *str;
+{ 
+  strcpy(str,"");
+  if ( IS_NF(infoptr) )
+    strcat(str,"|_NF ");
+  else if ( IS_MUTABLE(infoptr) )
+    strcat(str,"|_MU");
+  else if ( IS_STATIC(infoptr) )
+    strcat(str,"|_ST");
+  else if ( IS_UPDATABLE(infoptr) )
+    strcat(str,"|_UP");
+  else if ( IS_BIG_MOTHER(infoptr) )
+    strcat(str,"|_BM");
+  else if ( IS_BLACK_HOLE(infoptr) )
+    strcat(str,"|_BH");
+  else if ( IS_INDIRECTION(infoptr) )
+    strcat(str,"|_IN");
+  else if ( IS_THUNK(infoptr) )
+    strcat(str,"|_TH");
+
+  return(str);
+}
+
+/*
+@var_hdr_size@ computes the size of the variable header for a closure.
+*/
+
+I_
+var_hdr_size(node)
+P_ node;
+{
+  switch(INFO_TYPE(INFO_PTR(node)))
+    {
+      case INFO_SPEC_U_TYPE:    return(0);      /* by decree */
+      case INFO_SPEC_N_TYPE:    return(0);
+      case INFO_GEN_U_TYPE:     return(GEN_VHS);
+      case INFO_GEN_N_TYPE:     return(GEN_VHS);
+      case INFO_DYN_TYPE:       return(DYN_VHS);
+      /*
+      case INFO_DYN_TYPE_N:     return(DYN_VHS);
+      case INFO_DYN_TYPE_U:     return(DYN_VHS);
+      */
+      case INFO_TUPLE_TYPE:     return(TUPLE_VHS);
+      case INFO_DATA_TYPE:      return(DATA_VHS);
+      case INFO_MUTUPLE_TYPE:   return(MUTUPLE_VHS);
+      case INFO_IMMUTUPLE_TYPE: return(MUTUPLE_VHS); /* same layout */
+      case INFO_STATIC_TYPE:    return(STATIC_VHS);
+      case INFO_CONST_TYPE:     return(0);
+      case INFO_CHARLIKE_TYPE:  return(0);
+      case INFO_INTLIKE_TYPE:   return(0);
+      case INFO_BH_TYPE:        return(0);
+      case INFO_IND_TYPE:       return(0);
+      case INFO_CAF_TYPE:       return(0);
+      case INFO_FETCHME_TYPE:   return(0);
+      case INFO_BQ_TYPE:        return(0);
+      /*
+      case INFO_BQENT_TYPE:     return(0);
+      */
+      case INFO_TSO_TYPE:       return(TSO_VHS);
+      case INFO_STKO_TYPE:      return(STKO_VHS);
+      default:
+        fprintf(stderr,"Unknown info type 0x%lx (%lu)\n", INFO_PTR(node),
+          INFO_TYPE(INFO_PTR(node)));
+        return(0);
+    }
+}
+
+
+/* Determine the size and number of pointers for this kind of closure */
+void
+size_and_ptrs(node,size,ptrs)
+P_ node;
+W_ *size, *ptrs;
+{
+  switch(INFO_TYPE(INFO_PTR(node)))
+    {
+      case INFO_SPEC_U_TYPE:
+      case INFO_SPEC_N_TYPE:
+        *size = INFO_SIZE(INFO_PTR(node));          /* New for 0.24; check */
+        *ptrs = INFO_NoPTRS(INFO_PTR(node));        /* that! -- HWL */
+        /* 
+        *size = SPEC_CLOSURE_SIZE(node);
+        *ptrs = SPEC_CLOSURE_NoPTRS(node);
+	*/
+        break;
+
+      case INFO_GEN_U_TYPE:
+      case INFO_GEN_N_TYPE:
+        *size = GEN_CLOSURE_SIZE(node);
+        *ptrs = GEN_CLOSURE_NoPTRS(node);
+        break;
+
+      /* 
+      case INFO_DYN_TYPE_U:
+      case INFO_DYN_TYPE_N:
+      */
+      case INFO_DYN_TYPE:
+        *size = DYN_CLOSURE_SIZE(node);
+        *ptrs = DYN_CLOSURE_NoPTRS(node);
+        break;
+
+      case INFO_TUPLE_TYPE:
+        *size = TUPLE_CLOSURE_SIZE(node);
+        *ptrs = TUPLE_CLOSURE_NoPTRS(node);
+        break;
+
+      case INFO_DATA_TYPE:
+        *size = DATA_CLOSURE_SIZE(node);
+        *ptrs = DATA_CLOSURE_NoPTRS(node);
+        break;
+
+      case INFO_IND_TYPE:
+        *size = IND_CLOSURE_SIZE(node);
+        *ptrs = IND_CLOSURE_NoPTRS(node);
+        break;
+
+/* ToDo: more (WDP) */
+
+      /* Don't know about the others */
+      default:
+        *size = *ptrs = 0;
+        break;
+    }
+}
+
+void
+G_PRINT_NODE(node)
+P_ node;
+{
+   P_ info_ptr, bqe; /* = INFO_PTR(node); */
+   I_ size = 0, ptrs = 0, nonptrs = 0, i, vhs = 0;
+   char info_hdr_ty[80], info_ty[80];
+
+   if (node==NULL) {
+     fprintf(stderr,"NULL\n");
+     return;
+   } else if (node==Prelude_Z91Z93_closure) {
+     fprintf(stderr,"Prelude_Z91Z93_closure\n");
+     return;
+   } else if (node==MUT_NOT_LINKED) {
+     fprintf(stderr,"MUT_NOT_LINKED\n");
+     return;
+   }
+   /* size_and_ptrs(node,&size,&ptrs); */
+   info_ptr = get_closure_info(node, &size, &ptrs, &nonptrs, &vhs, info_hdr_ty);
+
+   /* vhs = var_hdr_size(node); */
+   info_type(info_ptr,info_ty);
+
+   fprintf(stderr,"Node: 0x%lx", (W_) node);
+
+#if defined(PAR)
+   fprintf(stderr," [GA: 0x%lx]",GA(node));
+#endif
+
+#if defined(USE_COST_CENTRES)
+   fprintf(stderr," [CC: 0x%lx]",CC_HDR(node));
+#endif
+
+#if defined(GRAN)
+   fprintf(stderr," [Bitmask: 0%lo]",PROCS(node));
+#endif
+
+   if (info_ptr==INFO_TSO_TYPE) 
+     fprintf(stderr," TSO: 0x%lx (%x) IP: 0x%lx (%s), type %s \n     ",
+	     node, TSO_ID(node), info_ptr, info_hdr_ty, info_ty);
+   else
+     fprintf(stderr," IP: 0x%lx (%s), type %s \n       VHS: %d, size: %ld, ptrs:%ld, nonptrs:  %ld\n     ",
+	     info_ptr,info_hdr_ty,info_ty,vhs,size,ptrs,nonptrs);
+
+   /* For now, we ignore the variable header */
+
+   fprintf(stderr," Ptrs: ");
+   for(i=0; i < ptrs; ++i)
+     {
+     if ( (i+1) % 6 == 0)
+       fprintf(stderr,"\n      ");
+     fprintf(stderr," 0x%lx[P]",*(node+_FHS+vhs+i));
+     };
+
+   fprintf(stderr," Data: ");
+   for(i=0; i < nonptrs; ++i)
+     {
+       if( (i+1) % 6 == 0)
+         fprintf(stderr,"\n      ");
+       fprintf(stderr," %lu[D]",*(node+_FHS+vhs+ptrs+i));
+     }
+   fprintf(stderr, "\n");
+
+
+   switch (INFO_TYPE(info_ptr))
+    {
+     case INFO_TSO_TYPE: 
+      fprintf(stderr,"\n TSO_LINK: %#lx", 
+	      TSO_LINK(node));
+      break;
+
+    case INFO_BH_TYPE:
+    case INFO_BQ_TYPE:
+      bqe = (P_)BQ_ENTRIES(node);
+      fprintf(stderr," BQ of %#lx: ", node);
+      PRINT_BQ(bqe);
+      break;
+    case INFO_FMBQ_TYPE:
+      printf("Panic: found FMBQ Infotable in GrAnSim system.\n");
+      break;
+    case INFO_SPEC_RBH_TYPE:
+      bqe = (P_)SPEC_RBH_BQ(node);
+      fprintf(stderr," BQ of %#lx: ", node);
+      PRINT_BQ(bqe);
+      break;
+    case INFO_GEN_RBH_TYPE:
+      bqe = (P_)GEN_RBH_BQ(node);
+      fprintf(stderr," BQ of %#lx: ", node);
+      PRINT_BQ(bqe);
+      break;
+    }
+}
+
+void
+G_PPN(node)  /* Extracted from PrintPacket in Pack.lc */
+P_ node;
+{
+   P_ info ;
+   I_ size = 0, ptrs = 0, nonptrs = 0, i, vhs = 0, locn = 0;
+   char info_type[80];
+
+   /* size_and_ptrs(node,&size,&ptrs); */
+   info = get_closure_info(node, &size, &ptrs, &nonptrs, &vhs, info_type);
+
+   if (INFO_TYPE(info) == INFO_FETCHME_TYPE || IS_BLACK_HOLE(info))
+     size = ptrs = nonptrs = vhs = 0;
+
+   if (IS_THUNK(info)) {
+     if (IS_UPDATABLE(info))
+       fputs("SHARED ", stderr);
+     else
+       fputs("UNSHARED ", stderr);
+   } 
+   if (IS_BLACK_HOLE(info)) {
+     fputs("BLACK HOLE\n", stderr);
+   } else {
+     /* Fixed header */
+     fprintf(stderr, "(%s) FH [%#lx", info_type, node[locn++]);
+     for (i = 1; i < FIXED_HS; i++)
+       fprintf(stderr, " %#lx", node[locn++]);
+     
+     /* Variable header */
+     if (vhs > 0) {
+       fprintf(stderr, "] VH [%#lx", node[locn++]);
+       
+       for (i = 1; i < vhs; i++)
+	 fprintf(stderr, " %#lx", node[locn++]);
+     }
+     
+     fprintf(stderr, "] PTRS %u", ptrs);
+     
+     /* Non-pointers */
+     if (nonptrs > 0) {
+       fprintf(stderr, " NPTRS [%#lx", node[locn++]);
+       
+       for (i = 1; i < nonptrs; i++)
+	 fprintf(stderr, " %#lx", node[locn++]);
+       
+       putc(']', stderr);
+     }
+     putc('\n', stderr);
+   }
+   
+ }
+
+#define INFO_MASK       0x80000000
+
+void
+G_MUT(node,verbose)  /* Print mutables list starting with node */
+P_ node;
+{
+  if (verbose & 0x1) { G_PRINT_NODE(node); fprintf(stderr, "\n"); }
+  else               fprintf(stderr, "0x%#lx, ", node);
+
+  if (node==NULL || node==Prelude_Z91Z93_closure || node==MUT_NOT_LINKED) {
+     return;
+  }
+  G_MUT(MUT_LINK(node), verbose);
+}
+
+
+void
+G_TREE(node)
+P_ node;
+{
+  W_ size = 0, ptrs = 0, i, vhs = 0;
+
+  /* Don't print cycles */
+  if((INFO_PTR(node) & INFO_MASK) != 0)
+    return;
+
+  size_and_ptrs(node,&size,&ptrs);
+  vhs = var_hdr_size(node);
+
+  G_PRINT_NODE(node);
+  fprintf(stderr, "\n");
+
+  /* Mark the node -- may be dangerous */
+  INFO_PTR(node) |= INFO_MASK;
+
+  for(i = 0; i < ptrs; ++i)
+    G_TREE((P_)node[i+vhs+_FHS]);
+
+  /* Unmark the node */
+  INFO_PTR(node) &= ~INFO_MASK;
+}
+
+
+void
+G_INFO_TABLE(node)
+P_ node;
+{
+  P_ info_ptr = (P_)INFO_PTR(node);
+  char *ip_type = info_hdr_type(info_ptr);
+
+  fprintf(stderr,"%s Info Ptr @0x%lx; Entry: 0x%lx; Size: %lu; Ptrs: %lu\n\n",
+                 ip_type,info_ptr,(W_) ENTRY_CODE(info_ptr),INFO_SIZE(info_ptr),INFO_NoPTRS(info_ptr));
+
+  if (IS_THUNK(info_ptr) && IS_UPDATABLE(info_ptr) ) {
+    fprintf(stderr,"  RBH InfoPtr: %#lx\n",
+	    RBH_INFOPTR(info_ptr));
+  }
+
+#if defined(PAR)
+  fprintf(stderr,"Enter Flush Entry: 0x%lx;\tExit Flush Entry: 0x%lx\n",INFO_FLUSHENT(info_ptr),INFO_FLUSH(info_ptr));
+#endif
+
+#if defined(USE_COST_CENTRES)
+  fprintf(stderr,"Cost Centre (???):       0x%lx\n",INFO_CAT(info_ptr));
+#endif
+
+#if defined(_INFO_COPYING)
+  fprintf(stderr,"Evacuate Entry:    0x%lx;\tScavenge Entry: 0x%lx\n",
+          INFO_EVAC_2S(info_ptr),INFO_SCAV_2S(info_ptr));
+#endif
+
+#if defined(_INFO_COMPACTING)
+  fprintf(stderr,"Scan Link:         0x%lx;\tScan Move:      0x%lx\n",
+          (W_) INFO_SCAN_LINK_1S(info_ptr), (W_) INFO_SCAN_MOVE_1S(info_ptr));
+  fprintf(stderr,"Mark:              0x%lx;\tMarked:         0x%lx;\t",
+          (W_) INFO_MARK_1S(info_ptr), (W_) INFO_MARKED_1S(info_ptr));
+#if 0 /* avoid INFO_TYPE */
+  if(BASE_INFO_TYPE(info_ptr)==INFO_SPEC_TYPE)
+    fprintf(stderr,"plus specialised code\n");
+  else
+    fprintf(stderr,"Marking:           0x%lx\n",(W_) INFO_MARKING_1S(info_ptr));
+#endif /* 0 */
+#endif /* _INFO_COMPACTING */
+}
+#endif /* GRAN */
+
+\end{code}
+
+The remaining debugging routines are more or less specific for GrAnSim.
+
+\begin{code}
+#if defined(GRAN) && defined(GRAN_CHECK)
+void
+G_CURR_THREADQ(verbose) 
+I_ verbose;
+{ 
+  fprintf(stderr,"Thread Queue on proc %d: ", CurrentProc);
+  G_THREADQ(ThreadQueueHd, verbose);
+}
+
+void 
+G_THREADQ(closure, verbose) 
+P_ closure;
+I_ verbose;
+{
+ P_ x;
+
+ fprintf(stderr,"Thread Queue: ");
+ for (x=closure; x!=Prelude_Z91Z93_closure; x=TSO_LINK(x))
+   if (verbose) 
+     G_TSO(x,0);
+   else
+     fprintf(stderr," %#lx",x);
+
+ if (closure==Prelude_Z91Z93_closure)
+   fprintf(stderr,"NIL\n");
+ else
+   fprintf(stderr,"\n");
+}
+
+/* Check with Threads.lh */
+static char *type_name[] = { "T_MAIN", "T_REQUIRED", "T_ADVISORY", "T_FAIL"};
+
+void 
+G_TSO(closure,verbose) 
+P_ closure;
+I_ verbose;
+{
+ 
+ if (closure==Prelude_Z91Z93_closure) {
+   fprintf(stderr,"TSO at %#lx is Prelude_Z91Z93_closure!\n");
+   return;
+ }
+
+ if ( verbose & 0x08 ) {   /* short info */
+   fprintf(stderr,"[TSO @ %#lx, PE %d]: Name: %#lx, Id: %#lx, Link: %#lx\n",
+	   closure,where_is(closure),
+	   TSO_NAME(closure),TSO_ID(closure),TSO_LINK(closure));
+   return;
+ }
+   
+ fprintf(stderr,"TSO at %#lx has the following contents:\n",
+                 closure);
+
+ fprintf(stderr,"> Name: \t%#lx",TSO_NAME(closure));
+ fprintf(stderr,"\tLink: \t%#lx\n",TSO_LINK(closure));
+ fprintf(stderr,"> Id:   \t%#lx",TSO_ID(closure));
+#if defined(GRAN_CHECK) && defined(GRAN)
+ if (RTSflags.GranFlags.debug & 0x10)
+   fprintf(stderr,"\tType: \t%s  %s\n",
+           type_name[TSO_TYPE(closure) & ~FETCH_MASK_TSO],
+           (TSO_TYPE(closure) & FETCH_MASK_TSO) ? "SLEEPING" : "");
+ else
+   fprintf(stderr,"\tType: \t%s\n",type_name[TSO_TYPE(closure)]);
+#else
+ fprintf(stderr,"\tType: \t%s\n",type_name[TSO_TYPE(closure)]);
+#endif
+ fprintf(stderr,"> PC1:  \t%#lx",TSO_PC1(closure));
+ fprintf(stderr,"\tPC2:  \t%#lx\n",TSO_PC2(closure));
+ fprintf(stderr,"> ARG1: \t%#lx",TSO_ARG1(closure));
+ /* fprintf(stderr,"\tARG2: \t%#lx\n",TSO_ARG2(closure)); */
+ fprintf(stderr,"> SWITCH: \t%#lx", TSO_SWITCH(closure));
+#if defined(GRAN_PRI_SCHED)
+ fprintf(stderr,"\tPRI: \t%#lx\n", TSO_PRI(closure));
+#else 
+ fprintf(stderr,"\n");
+#endif
+ if (verbose) {
+   fprintf(stderr,"} LOCKED: \t%#lx",TSO_LOCKED(closure));
+   fprintf(stderr,"\tSPARKNAME: \t%#lx\n", TSO_SPARKNAME(closure));
+   fprintf(stderr,"} STARTEDAT: \t%#lx", TSO_STARTEDAT(closure));
+   fprintf(stderr,"\tEXPORTED: \t%#lx\n", TSO_EXPORTED(closure));
+   fprintf(stderr,"} BASICBLOCKS: \t%#lx", TSO_BASICBLOCKS(closure));
+   fprintf(stderr,"\tALLOCS: \t%#lx\n", TSO_ALLOCS(closure));
+   fprintf(stderr,"} EXECTIME: \t%#lx", TSO_EXECTIME(closure));
+   fprintf(stderr,"\tFETCHTIME: \t%#lx\n", TSO_FETCHTIME(closure));
+   fprintf(stderr,"} FETCHCOUNT: \t%#lx", TSO_FETCHCOUNT(closure));
+   fprintf(stderr,"\tBLOCKTIME: \t%#lx\n", TSO_BLOCKTIME(closure));
+   fprintf(stderr,"} BLOCKCOUNT: \t%#lx", TSO_BLOCKCOUNT(closure));
+   fprintf(stderr,"\tBLOCKEDAT: \t%#lx\n", TSO_BLOCKEDAT(closure));
+   fprintf(stderr,"} GLOBALSPARKS:\t%#lx", TSO_GLOBALSPARKS(closure));
+   fprintf(stderr,"\tLOCALSPARKS:\t%#lx\n", TSO_LOCALSPARKS(closure));
+ }
+#if defined(GRAN_CHECK)
+ if ( verbose & 0x02 ) {
+   fprintf(stderr,"BQ that starts with this TSO: ");
+   PRINT_BQ(closure);
+ }
+#endif
+}
+
+void 
+G_EVENT(event, verbose) 
+eventq event;
+I_ verbose;
+{
+  if (verbose) {
+    print_event(event);
+  }else{
+    fprintf(stderr," %#lx",event);
+  }
+}
+
+void
+G_EVENTQ(verbose)
+I_ verbose;
+{
+ eventq x;
+
+ fprintf(stderr,"Eventq (hd @%#lx):\n",EventHd);
+ for (x=EventHd; x!=NULL; x=EVENT_NEXT(x)) {
+   G_EVENT(x,verbose);
+ }
+ if (EventHd==NULL) 
+   fprintf(stderr,"NIL\n");
+ else
+   fprintf(stderr,"\n");
+}
+
+void
+G_PE_EQ(pe,verbose)
+PROC pe;
+I_ verbose;
+{
+ eventq x;
+
+ fprintf(stderr,"Eventq (hd @%#lx):\n",EventHd);
+ for (x=EventHd; x!=NULL; x=EVENT_NEXT(x)) {
+   if (EVENT_PROC(x)==pe)
+     G_EVENT(x,verbose);
+ }
+ if (EventHd==NULL) 
+   fprintf(stderr,"NIL\n");
+ else
+   fprintf(stderr,"\n");
+}
+
+void 
+G_SPARK(spark, verbose) 
+sparkq spark;
+I_ verbose;
+{
+  if (verbose)
+    print_spark(spark);
+  else
+    fprintf(stderr," %#lx",spark);
+}
+
+void 
+G_SPARKQ(spark,verbose) 
+sparkq spark;
+I_ verbose;
+{
+ sparkq x;
+
+ fprintf(stderr,"Sparkq (hd @%#lx):\n",spark);
+ for (x=spark; x!=NULL; x=SPARK_NEXT(x)) {
+   G_SPARK(x,verbose);
+ }
+ if (spark==NULL) 
+   fprintf(stderr,"NIL\n");
+ else
+   fprintf(stderr,"\n");
+}
+
+void 
+G_CURR_SPARKQ(verbose) 
+I_ verbose;
+{
+  G_SPARKQ(SparkQueueHd,verbose);
+}
+
+void 
+G_PROC(proc,verbose)
+I_ proc;
+I_ verbose;
+{ 
+  extern char *proc_status_names[];
+
+  fprintf(stderr,"Status of proc %d at time %d (%#lx): %s (%s)\n",
+          proc,CurrentTime[proc],CurrentTime[proc],
+          (CurrentProc==proc)?"ACTIVE":"INACTIVE",
+          proc_status_names[procStatus[proc]]);
+  G_THREADQ(RunnableThreadsHd[proc],verbose & 0x2);
+  if ( (CurrentProc==proc) )
+    G_TSO(CurrentTSO,1);
+
+  if (EventHd!=NULL)
+    fprintf(stderr,"Next event (%s) is on proc %d\n",
+            event_names[EVENT_TYPE(EventHd)],EVENT_PROC(EventHd));
+
+  if (verbose & 0x1) {
+    fprintf(stderr,"\nREQUIRED sparks: ");
+    G_SPARKQ(PendingSparksHd[proc][REQUIRED_POOL],1);
+    fprintf(stderr,"\nADVISORY_sparks: ");
+    G_SPARKQ(PendingSparksHd[proc][ADVISORY_POOL],1);
+  }
+}
+
+/* Debug Processor */
+void 
+GP(proc)
+I_ proc;
+{ G_PROC(proc,1);
+}
+
+/* Debug Current Processor */
+void
+GCP(){ G_PROC(CurrentProc,2); }
+
+/* Debug TSO */
+void
+GT(P_ tso){ 
+  G_TSO(tso,1);
+}
+
+/* Debug CurrentTSO */
+void
+GCT(){ 
+  fprintf(stderr,"Current Proc: %d\n",CurrentProc);
+  G_TSO(CurrentTSO,1);
+}
+
+/* Shorthand for debugging event queue */
+void
+GEQ() { G_EVENTQ(1); }
+
+/* Shorthand for debugging thread queue of a processor */
+void 
+GTQ(PROC p) { G_THREADQ(RunnableThreadsHd[p],1); } 
+
+/* Shorthand for debugging thread queue of current processor */
+void 
+GCTQ() { G_THREADQ(RunnableThreadsHd[CurrentProc],1); } 
+
+/* Shorthand for debugging spark queue of a processor */
+void
+GSQ(PROC p) { G_SPARKQ(PendingSparksHd[p][1],1); }
+
+/* Shorthand for debugging spark queue of current processor */
+void
+GCSQ() { G_CURR_SPARKQ(1); }
+
+/* Shorthand for printing a node */
+void
+GN(P_ node) { G_PRINT_NODE(node); }
+
+/* Shorthand for printing info table */
+void
+GIT(P_ node) { G_INFO_TABLE(node); }
+
+/* Shorthand for some of ADRs debugging functions */
+
+void 
+pC(P_ closure) { printClosure(closure, 0/*indentation*/, 10/*weight*/); }
+
+/*   Print a closure on	 the heap */
+void
+DN(P_ closure) { DEBUG_NODE( closure, 1/*size*/ );} 
+
+/*      Print info-table of a closure */
+void
+DIT(P_ closure) {  DEBUG_INFO_TABLE(closure); } 
+
+/* 		(CONCURRENT) Print a Thread State Object */
+void 
+DT(P_ tso) {   DEBUG_TSO(tso); }
+
+/* Not yet implemented: */
+/* (CONCURRENT) Print a STacK Object 
+void
+DS(P_ stko) {   DEBUG_STKO(stko)		; } 
+*/
+
+#endif /* GRAN */
+
+/* --------------------------- vvvv   old  vvvvv ------------------------*/
+
+#if 0     /* ngo' ngoq! veQ yIboS! */
+
+#define NULL_REG_MAP        /* Not threaded */
+#include "stgdefs.h"
+
+char *
+info_hdr_type(info_ptr)
+W_ info_ptr;
+{
+#if ! defined(PAR) && !defined(GRAN)
+  switch (INFO_TAG(info_ptr))
+    {
+      case INFO_OTHER_TAG:
+        return("OTHER_TAG");
+/*    case INFO_IND_TAG:
+        return("IND_TAG");
+*/    default:
+        return("TAG<n>");
+    }
+#else /* PAR */
+  switch(INFO_TYPE(info_ptr))
+    {
+      case INFO_SPEC_U_TYPE:
+        return("SPECU");
+
+      case INFO_SPEC_N_TYPE:
+        return("SPECN");
+
+      case INFO_GEN_U_TYPE:
+        return("GENU");
+
+      case INFO_GEN_N_TYPE:
+        return("GENN");
+
+      case INFO_DYN_TYPE:
+        return("DYN");
+
+      /* 
+      case INFO_DYN_TYPE_N:
+        return("DYNN");
+
+      case INFO_DYN_TYPE_U:
+        return("DYNU");
+      */
+
+      case INFO_TUPLE_TYPE:
+        return("TUPLE");
+
+      case INFO_DATA_TYPE:
+        return("DATA");
+
+      case INFO_MUTUPLE_TYPE:
+        return("MUTUPLE");
+
+      case INFO_IMMUTUPLE_TYPE:
+        return("IMMUTUPLE");
+
+      case INFO_STATIC_TYPE:
+        return("STATIC");
+
+      case INFO_CONST_TYPE:
+        return("CONST");
+
+      case INFO_CHARLIKE_TYPE:
+        return("CHAR");
+
+      case INFO_INTLIKE_TYPE:
+        return("INT");
+
+      case INFO_BH_TYPE:
+        return("BHOLE");
+
+      case INFO_IND_TYPE:
+        return("IND");
+
+      case INFO_CAF_TYPE:
+        return("CAF");
+
+      case INFO_FETCHME_TYPE:
+        return("FETCHME");
+
+      case INFO_BQ_TYPE:
+        return("BQ");
+
+      /*
+      case INFO_BQENT_TYPE:
+        return("BQENT");
+      */
+
+      case INFO_TSO_TYPE:
+        return("TSO");
+
+      case INFO_STKO_TYPE:
+        return("STKO");
+
+      default:
+        fprintf(stderr,"Unknown header type %lu\n",INFO_TYPE(info_ptr));
+        return("??");
+      }
+#endif /* PAR */
+}
+        
+/*
+@var_hdr_size@ computes the size of the variable header for a closure.
+*/
+
+I_
+var_hdr_size(node)
+P_ node;
+{
+  switch(INFO_TYPE(INFO_PTR(node)))
+    {
+      case INFO_SPEC_U_TYPE:    return(0);      /* by decree */
+      case INFO_SPEC_N_TYPE:    return(0);
+      case INFO_GEN_U_TYPE:     return(GEN_VHS);
+      case INFO_GEN_N_TYPE:     return(GEN_VHS);
+      case INFO_DYN_TYPE:       return(DYN_VHS);
+      /*
+      case INFO_DYN_TYPE_N:     return(DYN_VHS);
+      case INFO_DYN_TYPE_U:     return(DYN_VHS);
+      */
+      case INFO_TUPLE_TYPE:     return(TUPLE_VHS);
+      case INFO_DATA_TYPE:      return(DATA_VHS);
+      case INFO_MUTUPLE_TYPE:   return(MUTUPLE_VHS);
+      case INFO_IMMUTUPLE_TYPE: return(MUTUPLE_VHS); /* same layout */
+      case INFO_STATIC_TYPE:    return(STATIC_VHS);
+      case INFO_CONST_TYPE:     return(0);
+      case INFO_CHARLIKE_TYPE:  return(0);
+      case INFO_INTLIKE_TYPE:   return(0);
+      case INFO_BH_TYPE:        return(0);
+      case INFO_IND_TYPE:       return(0);
+      case INFO_CAF_TYPE:       return(0);
+      case INFO_FETCHME_TYPE:   return(0);
+      case INFO_BQ_TYPE:        return(0);
+      /*
+      case INFO_BQENT_TYPE:     return(0);
+      */
+      case INFO_TSO_TYPE:       return(TSO_VHS);
+      case INFO_STKO_TYPE:      return(STKO_VHS);
+      default:
+        fprintf(stderr,"Unknown info type 0x%lx (%lu)\n", INFO_PTR(node),
+          INFO_TYPE(INFO_PTR(node)));
+        return(0);
+    }
+}
+
+
+/* Determine the size and number of pointers for this kind of closure */
+void
+size_and_ptrs(node,size,ptrs)
+P_ node;
+W_ *size, *ptrs;
+{
+  switch(INFO_TYPE(INFO_PTR(node)))
+    {
+      case INFO_SPEC_U_TYPE:
+      case INFO_SPEC_N_TYPE:
+        *size = INFO_SIZE(INFO_PTR(node));          /* New for 0.24; check */
+        *ptrs = INFO_NoPTRS(INFO_PTR(node));        /* that! -- HWL */
+        /* 
+        *size = SPEC_CLOSURE_SIZE(node);
+        *ptrs = SPEC_CLOSURE_NoPTRS(node);
+	*/
+        break;
+
+      case INFO_GEN_U_TYPE:
+      case INFO_GEN_N_TYPE:
+        *size = GEN_CLOSURE_SIZE(node);
+        *ptrs = GEN_CLOSURE_NoPTRS(node);
+        break;
+
+      /* 
+      case INFO_DYN_TYPE_U:
+      case INFO_DYN_TYPE_N:
+      */
+      case INFO_DYN_TYPE:
+        *size = DYN_CLOSURE_SIZE(node);
+        *ptrs = DYN_CLOSURE_NoPTRS(node);
+        break;
+
+      case INFO_TUPLE_TYPE:
+        *size = TUPLE_CLOSURE_SIZE(node);
+        *ptrs = TUPLE_CLOSURE_NoPTRS(node);
+        break;
+
+      case INFO_DATA_TYPE:
+        *size = DATA_CLOSURE_SIZE(node);
+        *ptrs = DATA_CLOSURE_NoPTRS(node);
+        break;
+
+      case INFO_IND_TYPE:
+        *size = IND_CLOSURE_SIZE(node);
+        *ptrs = IND_CLOSURE_NoPTRS(node);
+        break;
+
+/* ToDo: more (WDP) */
+
+      /* Don't know about the others */
+      default:
+        *size = *ptrs = 0;
+        break;
+    }
+}
+
+void
+DEBUG_PRINT_NODE(node)
+P_ node;
+{
+   W_ info_ptr = INFO_PTR(node);
+   I_ size = 0, ptrs = 0, i, vhs = 0;
+   char *info_type = info_hdr_type(info_ptr);
+
+   size_and_ptrs(node,&size,&ptrs);
+   vhs = var_hdr_size(node);
+
+   fprintf(stderr,"Node: 0x%lx", (W_) node);
+
+#if defined(PAR)
+   fprintf(stderr," [GA: 0x%lx]",GA(node));
+#endif
+
+#if defined(PROFILING)
+   fprintf(stderr," [CC: 0x%lx]",CC_HDR(node));
+#endif
+
+#if defined(GRAN)
+   fprintf(stderr," [Bitmask: 0%lo]",PROCS(node));
+#endif
+
+   fprintf(stderr," IP: 0x%lx (%s), size %ld, %ld ptrs\n",
+                  info_ptr,info_type,size,ptrs);
+
+   /* For now, we ignore the variable header */
+
+   for(i=0; i < size; ++i)
+     {
+       if(i == 0)
+         fprintf(stderr,"Data: ");
+
+       else if(i % 6 == 0)
+         fprintf(stderr,"\n      ");
+
+       if(i < ptrs)
+         fprintf(stderr," 0x%lx[P]",*(node+_FHS+vhs+i));
+       else
+         fprintf(stderr," %lu[D]",*(node+_FHS+vhs+i));
+     }
+   fprintf(stderr, "\n");
+}
+
+
+#define INFO_MASK       0x80000000
+
+void
+DEBUG_TREE(node)
+P_ node;
+{
+  W_ size = 0, ptrs = 0, i, vhs = 0;
+
+  /* Don't print cycles */
+  if((INFO_PTR(node) & INFO_MASK) != 0)
+    return;
+
+  size_and_ptrs(node,&size,&ptrs);
+  vhs = var_hdr_size(node);
+
+  DEBUG_PRINT_NODE(node);
+  fprintf(stderr, "\n");
+
+  /* Mark the node -- may be dangerous */
+  INFO_PTR(node) |= INFO_MASK;
+
+  for(i = 0; i < ptrs; ++i)
+    DEBUG_TREE((P_)node[i+vhs+_FHS]);
+
+  /* Unmark the node */
+  INFO_PTR(node) &= ~INFO_MASK;
+}
+
+
+void
+DEBUG_INFO_TABLE(node)
+P_ node;
+{
+  W_ info_ptr = INFO_PTR(node);
+  char *ip_type = info_hdr_type(info_ptr);
+
+  fprintf(stderr,"%s Info Ptr @0x%lx; Entry: 0x%lx; Size: %lu; Ptrs: %lu\n\n",
+                 ip_type,info_ptr,(W_) ENTRY_CODE(info_ptr),INFO_SIZE(info_ptr),INFO_NoPTRS(info_ptr));
+#if defined(PAR)
+  fprintf(stderr,"Enter Flush Entry: 0x%lx;\tExit Flush Entry: 0x%lx\n",INFO_FLUSHENT(info_ptr),INFO_FLUSH(info_ptr));
+#endif
+
+#if defined(PROFILING)
+  fprintf(stderr,"Cost Centre (???):       0x%lx\n",INFO_CAT(info_ptr));
+#endif
+
+#if defined(_INFO_COPYING)
+  fprintf(stderr,"Evacuate Entry:    0x%lx;\tScavenge Entry: 0x%lx\n",
+          INFO_EVAC_2S(info_ptr),INFO_SCAV_2S(info_ptr));
+#endif
+
+#if defined(_INFO_COMPACTING)
+  fprintf(stderr,"Scan Link:         0x%lx;\tScan Move:      0x%lx\n",
+          (W_) INFO_SCAN_LINK_1S(info_ptr), (W_) INFO_SCAN_MOVE_1S(info_ptr));
+  fprintf(stderr,"Mark:              0x%lx;\tMarked:         0x%lx;\t",
+          (W_) INFO_MARK_1S(info_ptr), (W_) INFO_MARKED_1S(info_ptr));
+#if 0 /* avoid INFO_TYPE */
+  if(BASE_INFO_TYPE(info_ptr)==INFO_SPEC_TYPE)
+    fprintf(stderr,"plus specialised code\n");
+  else
+    fprintf(stderr,"Marking:           0x%lx\n",(W_) INFO_MARKING_1S(info_ptr));
+#endif /* 0 */
+#endif /* _INFO_COMPACTING */
+}
+
+\end{code}
+
+The remaining debugging routines are more or less specific for GrAnSim.
+
+\begin{code}
+#if defined(GRAN) && defined(GRAN_CHECK)
+void
+DEBUG_CURR_THREADQ(verbose) 
+I_ verbose;
+{ 
+  fprintf(stderr,"Thread Queue on proc %d: ", CurrentProc);
+  DEBUG_THREADQ(ThreadQueueHd, verbose);
+}
+
+void 
+DEBUG_THREADQ(closure, verbose) 
+P_ closure;
+I_ verbose;
+{
+ P_ x;
+
+ fprintf(stderr,"Thread Queue: ");
+ for (x=closure; x!=Prelude_Z91Z93_closure; x=TSO_LINK(x))
+   if (verbose) 
+     DEBUG_TSO(x,0);
+   else
+     fprintf(stderr," 0x%x",x);
+
+ if (closure==Prelude_Z91Z93_closure)
+   fprintf(stderr,"NIL\n");
+ else
+   fprintf(stderr,"\n");
+}
+
+/* Check with Threads.lh */
+static char *type_name[] = { "T_MAIN", "T_REQUIRED", "T_ADVISORY", "T_FAIL"};
+
+void 
+DEBUG_TSO(closure,verbose) 
+P_ closure;
+I_ verbose;
+{
+ 
+ if (closure==Prelude_Z91Z93_closure) {
+   fprintf(stderr,"TSO at 0x%x is Prelude_Z91Z93_closure!\n");
+   return;
+ }
+
+ fprintf(stderr,"TSO at 0x%x has the following contents:\n",closure);
+
+ fprintf(stderr,"> Name: 0x%x",TSO_NAME(closure));
+ fprintf(stderr,"\tLink: 0x%x\n",TSO_LINK(closure));
+ fprintf(stderr,"> Id: 0x%x",TSO_ID(closure));
+#if defined(GRAN_CHECK) && defined(GRAN)
+ if (RTSflags.GranFlags.debug & 0x10)
+   fprintf(stderr,"\tType: %s  %s\n",
+           type_name[TSO_TYPE(closure) & ~FETCH_MASK_TSO],
+           (TSO_TYPE(closure) & FETCH_MASK_TSO) ? "SLEEPING" : "");
+ else
+   fprintf(stderr,"\tType: %s\n",type_name[TSO_TYPE(closure)]);
+#else
+ fprintf(stderr,"\tType: %s\n",type_name[TSO_TYPE(closure)]);
+#endif
+ fprintf(stderr,"> PC1:  0x%x",TSO_PC1(closure));
+ fprintf(stderr,"\tPC2:  0x%x\n",TSO_PC2(closure));
+ fprintf(stderr,"> ARG1: 0x%x",TSO_ARG1(closure));
+ /* fprintf(stderr,"\tARG2: 0x%x\n",TSO_ARG2(closure)); */
+ fprintf(stderr,"> SWITCH: 0x%x\n", TSO_SWITCH(closure));
+
+ if (verbose) {
+   fprintf(stderr,"} LOCKED: 0x%x",TSO_LOCKED(closure));
+   fprintf(stderr,"\tSPARKNAME: 0x%x\n", TSO_SPARKNAME(closure));
+   fprintf(stderr,"} STARTEDAT: 0x%x", TSO_STARTEDAT(closure));
+   fprintf(stderr,"\tEXPORTED: 0x%x\n", TSO_EXPORTED(closure));
+   fprintf(stderr,"} BASICBLOCKS: 0x%x", TSO_BASICBLOCKS(closure));
+   fprintf(stderr,"\tALLOCS: 0x%x\n", TSO_ALLOCS(closure));
+   fprintf(stderr,"} EXECTIME: 0x%x", TSO_EXECTIME(closure));
+   fprintf(stderr,"\tFETCHTIME: 0x%x\n", TSO_FETCHTIME(closure));
+   fprintf(stderr,"} FETCHCOUNT: 0x%x", TSO_FETCHCOUNT(closure));
+   fprintf(stderr,"\tBLOCKTIME: 0x%x\n", TSO_BLOCKTIME(closure));
+   fprintf(stderr,"} BLOCKCOUNT: 0x%x", TSO_BLOCKCOUNT(closure));
+   fprintf(stderr,"\tBLOCKEDAT: 0x%x\n", TSO_BLOCKEDAT(closure));
+   fprintf(stderr,"} GLOBALSPARKS: 0x%x", TSO_GLOBALSPARKS(closure));
+   fprintf(stderr,"\tLOCALSPARKS: 0x%x\n", TSO_LOCALSPARKS(closure));
+ }
+}
+
+void 
+DEBUG_EVENT(event, verbose) 
+eventq event;
+I_ verbose;
+{
+  if (verbose) {
+    print_event(event);
+  }else{
+    fprintf(stderr," 0x%x",event);
+  }
+}
+
+void
+DEBUG_EVENTQ(verbose)
+I_ verbose;
+{
+ eventq x;
+
+ fprintf(stderr,"Eventq (hd @0x%x):\n",EventHd);
+ for (x=EventHd; x!=NULL; x=EVENT_NEXT(x)) {
+   DEBUG_EVENT(x,verbose);
+ }
+ if (EventHd==NULL) 
+   fprintf(stderr,"NIL\n");
+ else
+   fprintf(stderr,"\n");
+}
+
+void 
+DEBUG_SPARK(spark, verbose) 
+sparkq spark;
+I_ verbose;
+{
+  if (verbose)
+    print_spark(spark);
+  else
+    fprintf(stderr," 0x%x",spark);
+}
+
+void 
+DEBUG_SPARKQ(spark,verbose) 
+sparkq spark;
+I_ verbose;
+{
+ sparkq x;
+
+ fprintf(stderr,"Sparkq (hd @0x%x):\n",spark);
+ for (x=spark; x!=NULL; x=SPARK_NEXT(x)) {
+   DEBUG_SPARK(x,verbose);
+ }
+ if (spark==NULL) 
+   fprintf(stderr,"NIL\n");
+ else
+   fprintf(stderr,"\n");
+}
+
+void 
+DEBUG_CURR_SPARKQ(verbose) 
+I_ verbose;
+{
+  DEBUG_SPARKQ(SparkQueueHd,verbose);
+}
+
+void 
+DEBUG_PROC(proc,verbose)
+I_ proc;
+I_ verbose;
+{
+  fprintf(stderr,"Status of proc %d at time %d (0x%x): %s\n",
+          proc,CurrentTime[proc],CurrentTime[proc],
+          (CurrentProc==proc)?"ACTIVE":"INACTIVE");
+  DEBUG_THREADQ(RunnableThreadsHd[proc],verbose & 0x2);
+  if ( (CurrentProc==proc) )
+    DEBUG_TSO(CurrentTSO,1);
+
+  if (EventHd!=NULL)
+    fprintf(stderr,"Next event (%s) is on proc %d\n",
+            event_names[EVENT_TYPE(EventHd)],EVENT_PROC(EventHd));
+
+  if (verbose & 0x1) {
+    fprintf(stderr,"\nREQUIRED sparks: ");
+    DEBUG_SPARKQ(PendingSparksHd[proc][REQUIRED_POOL],1);
+    fprintf(stderr,"\nADVISORY_sparks: ");
+    DEBUG_SPARKQ(PendingSparksHd[proc][ADVISORY_POOL],1);
+  }
+}
+
+/* Debug CurrentTSO */
+void
+DCT(){ 
+  fprintf(stderr,"Current Proc: %d\n",CurrentProc);
+  DEBUG_TSO(CurrentTSO,1);
+}
+
+/* Debug Current Processor */
+void
+DCP(){ DEBUG_PROC(CurrentProc,2); }
+
+/* Shorthand for debugging event queue */
+void
+DEQ() { DEBUG_EVENTQ(1); }
+
+/* Shorthand for debugging spark queue */
+void
+DSQ() { DEBUG_CURR_SPARKQ(1); }
+
+/* Shorthand for printing a node */
+void
+DN(P_ node) { DEBUG_PRINT_NODE(node); }
+
+#endif /* GRAN */
+
+#endif /* 0 */
+\end{code}
+

@@ -194,6 +194,10 @@ First the necessary forward declarations.
 /* #define MARK_REG_MAP -- Must be done on command line for threaded code */
 #include "SMinternal.h"
 #include "SMmarkDefs.h"
+
+#if defined(GRAN)
+extern P_ ret_MRoot, ret_Mark;
+#endif
 \end{code}
 
 Define appropriate variables as potential register variables.
@@ -292,7 +296,7 @@ Start code for revertible black holes with underlying @SPEC@ types.
 
 \begin{code}
 
-#ifdef PAR
+#if defined(PAR) || defined(GRAN)
 #define SPEC_RBH_PRStart_N_CODE(ptrs) 		\
 STGFUN(CAT2(_PRStart_RBH_,ptrs))    	 	\
 {						\
@@ -389,7 +393,7 @@ SPEC_PRIn_N_CODE(12)
 In code for revertible black holes with underlying @SPEC@ types.
 
 \begin{code}
-#ifdef PAR
+#if defined(PAR) || defined(GRAN)
 #define SPEC_RBH_PRIn_N_CODE(ptrs)			\
 STGFUN(CAT2(_PRIn_RBH_,ptrs))  	    	 		\
 {							\
@@ -428,19 +432,19 @@ SPEC_RBH_PRIn_N_CODE(12)
 
 \end{code}
 
-Malloc Ptrs are in the sequential world only.
+Foreign Objs are in the non-parallel world only.
 
 \begin{code}
 
 #ifndef PAR
 
-STGFUN(_PRStart_MallocPtr)
+STGFUN(_PRStart_ForeignObj)
 {
     FUNBEGIN;
     if (IS_MARK_BIT_SET(Mark)) {
 	DEBUG_PR_MARKED;
     } else
-    INIT_MARK_NODE("MallocPtr ",0);
+    INIT_MARK_NODE("ForeignObj ",0);
     JUMP_MARK_RETURN;
     FUNEND;
 }
@@ -500,7 +504,7 @@ And the start/in code for a revertible black hole with an underlying @GEN@ closu
 
 \begin{code}
 
-#ifdef PAR
+#if defined(PAR) || defined(GRAN)
 
 STGFUN(_PRStart_RBH_N)
 {
@@ -950,7 +954,9 @@ closure.
 \begin{code}
 STGFUN(_PRStart_CharLike)
 {
+#ifdef TICKY_TICKY
     I_ val;
+#endif
 
     FUNBEGIN;
 
@@ -1380,9 +1386,16 @@ INTFUN(_PRMarking_MarkNextSpark_entry)	{ FB_; JMP_(_Dummy_PRReturn_entry); FE_; 
 #ifdef PAR
 INTFUN(_PRMarking_MarkNextGA_entry)	{ FB_; JMP_(_Dummy_PRReturn_entry); FE_; }
 #endif
+#  if 1 /* !defined(CONCURRENT) */ /* HWL */
 INTFUN(_PRMarking_MarkNextAStack_entry)	{ FB_; JMP_(_Dummy_PRReturn_entry); FE_; }
 INTFUN(_PRMarking_MarkNextBStack_entry)	{ FB_; JMP_(_Dummy_PRReturn_entry); FE_; }
+#  endif
 INTFUN(_PRMarking_MarkNextCAF_entry)	{ FB_; JMP_(_Dummy_PRReturn_entry); FE_; }
+
+#if defined(GRAN)
+INTFUN(_PRMarking_MarkNextEvent_entry)	{ FB_; JMP_(_Dummy_PRReturn_entry); FE_; }
+INTFUN(_PRMarking_MarkNextClosureInFetchBuffer_entry)	{ FB_; JMP_(_Dummy_PRReturn_entry); FE_; }
+#endif
 
 /* end of various ways to call _Dummy_PRReturn_entry */
 
@@ -1396,8 +1409,10 @@ EXTFUN(_PRMarking_MarkNextSpark);
 #ifdef PAR
 EXTFUN(_PRMarking_MarkNextGA);
 #else
+#  if 1 /* !defined(CONCURRENT) */  /* HWL */
 EXTFUN(_PRMarking_MarkNextAStack);
 EXTFUN(_PRMarking_MarkNextBStack);
+#  endif
 #endif /* not parallel */
 
 CAT_DECLARE(Dummy_PrReturn,INTERNAL_KIND,"DUMMY_PRRETURN","DUMMY_PRRETURN")
@@ -1415,12 +1430,24 @@ DUMMY_PRRETURN_CLOSURE(_PRMarking_MarkNextSpark_closure,
 		       _PRMarking_MarkNextSpark_entry);
 #endif
 
+#if defined(GRAN)
+DUMMY_PRRETURN_CLOSURE(_PRMarking_MarkNextEvent_closure,
+		       _PRMarking_MarkNextEvent_info,
+		       _PRMarking_MarkNextEvent,
+		       _PRMarking_MarkNextEvent_entry);
+DUMMY_PRRETURN_CLOSURE(_PRMarking_MarkNextClosureInFetchBuffer_closure,
+		       _PRMarking_MarkNextClosureInFetchBuffer_info,
+		       _PRMarking_MarkNextClosureInFetchBuffer,
+		       _PRMarking_MarkNextClosureInFetchBuffer_entry);
+#endif
+
 #ifdef PAR
 DUMMY_PRRETURN_CLOSURE(_PRMarking_MarkNextGA_closure,
 		       _PRMarking_MarkNextGA_info,
 		       _PRMarking_MarkNextGA,
 		       _PRMarking_MarkNextGA_entry);
 #else
+#  if 1 /* !defined(CONCURRENT) */ /* HWL */
 DUMMY_PRRETURN_CLOSURE(_PRMarking_MarkNextAStack_closure,
 		       _PRMarking_MarkNextAStack_info,
 		       _PRMarking_MarkNextAStack,
@@ -1430,7 +1457,7 @@ DUMMY_PRRETURN_CLOSURE(_PRMarking_MarkNextBStack_closure,
 		       _PRMarking_MarkNextBStack_info,
 		       _PRMarking_MarkNextBStack,
 		       _PRMarking_MarkNextBStack_entry);
-
+#  endif
 #endif /* PAR */
 
 DUMMY_PRRETURN_CLOSURE(_PRMarking_MarkNextCAF_closure,
@@ -1455,7 +1482,8 @@ STGFUN(_PRMarking_MarkNextRoot)
     FUNEND;
 }
 
-#ifdef CONCURRENT
+#if defined(CONCURRENT) 
+# if !defined(GRAN)
 extern P_ sm_roots_end;	/* PendingSparksTl[pool] */
 
 STGFUN(_PRMarking_MarkNextSpark)
@@ -1469,6 +1497,221 @@ STGFUN(_PRMarking_MarkNextSpark)
 	RESUME_(miniInterpretEnd);
 
     Mark = (P_) *MRoot;
+    JUMP_MARK;
+    FUNEND;
+}
+#else  /* GRAN */
+STGFUN(_PRMarking_MarkNextSpark)
+{
+    /* This is more similar to MarkNextGA than to the MarkNextSpark in
+       concurrent-but-not-gran land 
+       NB: MRoot is a spark (with an embedded pointer to a closure) */
+    FUNBEGIN;
+    /* Update root -- may have short circuited Ind */
+    SPARK_NODE( ((sparkq) MRoot) ) = Mark;
+    MRoot = (P_) SPARK_NEXT( ((sparkq) MRoot) );
+
+    /* Is the next off the end */
+    if (MRoot == NULL)
+	RESUME_(miniInterpretEnd);
+
+    Mark = (P_) SPARK_NODE( ((sparkq) MRoot) );
+    JUMP_MARK;
+    FUNEND;
+}
+#endif /* GRAN */
+#endif /* CONCURRENT */
+\end{code}
+
+Note: Events are GranSim-only.
+Marking events is similar to marking GALA entries in parallel-land.
+The major difference is that depending on the type of the event we have 
+to mark different field of the event (possibly several fields).
+Even worse, in the case of bulk fetching
+(@RTSflags.GranFlags.DoGUMMFetching@) we find a buffer of pointers to
+closures we have to mark (similar to sparks in concurrent-but-not-gransim
+setup).
+
+\begin{code}
+#if defined(GRAN)
+STGFUN(_PRMarking_MarkNextEvent)
+{
+  rtsBool found = rtsFalse;
+
+  FUNBEGIN;
+
+  /* First update the right component of the old event */
+  switch (EVENT_TYPE( ((eventq) MRoot) )) {
+    case CONTINUETHREAD:
+    case STARTTHREAD:
+    case RESUMETHREAD:
+    case MOVETHREAD:
+       EVENT_TSO( ((eventq) MRoot) ) = (P_) Mark;
+       break;
+    case MOVESPARK:
+       SPARK_NODE(EVENT_SPARK( ((eventq) MRoot) )) = (P_) Mark;
+       break;
+    case FETCHNODE:
+       switch (EVENT_GC_INFO( ((eventq) MRoot) )) {
+        case 0: 
+          EVENT_TSO( ((eventq) MRoot) ) = (P_) Mark;
+          EVENT_GC_INFO( ((eventq) MRoot) ) = 1;
+          Mark = (P_) EVENT_NODE( ((eventq) MRoot) );
+          JUMP_MARK;
+          break;
+        case 1: 
+          EVENT_NODE( ((eventq) MRoot) ) = (P_) Mark;
+       	  EVENT_GC_INFO( ((eventq) MRoot) ) = 0;             /* reset flag */
+          break;
+        default:
+          fprintf(stderr,"PRMarking_MarkNextEvent: Illegal gc_info field of FETCHNODE event @ %#x\n",
+                          ((eventq) MRoot) );
+          EXIT(EXIT_FAILURE);
+       }
+       break;
+    case FETCHREPLY:
+       switch (EVENT_GC_INFO( ((eventq) MRoot) )) {
+        case 0: 
+          EVENT_TSO( ((eventq) MRoot) ) = (P_) Mark;
+       	  EVENT_GC_INFO( ((eventq) MRoot) ) = 1;
+       	  /* In the case of packet fetching, EVENT_NODE(event) points to */
+       	  /* the packet (currently, malloced). The packet is just a list of */
+       	  /* closure addresses, with the length of the list at index 1 (the */
+       	  /* structure of the packet is defined in Pack.lc). */
+       	  if ( RTSflags.GranFlags.DoGUMMFetching ) {
+       	    P_ buffer = (P_) EVENT_NODE( ((eventq) MRoot) );
+       	    int size = (int) buffer[PACK_SIZE_LOCN];
+   
+       	    /* was: for (i = PACK_HDR_SIZE; i <= size-1; i++) ... */
+       	    sm_roots_end = buffer + PACK_HDR_SIZE + size;
+	    MRoot = (P_) buffer + PACK_HDR_SIZE;
+       	    ret_MRoot = MRoot;
+       	    Mark = (P_) *MRoot;
+       	    ret_Mark = Mark;
+       	    MStack = (P_) _PRMarking_MarkNextClosureInFetchBuffer_closure;
+       	    JUMP_MARK;
+       	  } else {
+       	    Mark = (P_) EVENT_NODE( ((eventq) MRoot) );
+       	    JUMP_MARK;
+       	  }
+       	  break;
+        case 1: 
+          if ( RTSflags.GranFlags.DoGUMMFetching ) {
+            /* no update necessary; fetch buffers are malloced */
+          } else {
+            EVENT_NODE( ((eventq) MRoot) ) = (P_) Mark;
+          }
+       	  EVENT_GC_INFO( ((eventq) MRoot) ) = 0;             /* reset flag */
+          break;
+        default:
+          fprintf(stderr,"PRMarking_MarkNextEvent: Illegal gc_info field of FETCHREPLY event @ %#x\n",
+                          ((eventq) MRoot) );
+          EXIT(EXIT_FAILURE);
+       }
+       break;
+
+    case GLOBALBLOCK:
+       switch (EVENT_GC_INFO( ((eventq) MRoot) )) {
+        case 0: 
+          EVENT_TSO( ((eventq) MRoot) ) = (P_) Mark;
+       	  EVENT_GC_INFO( ((eventq) MRoot) ) = 1;
+       	  Mark = (P_) EVENT_NODE( ((eventq) MRoot) );
+       	  JUMP_MARK;
+       	  break;
+          break;
+        case 1: 
+          EVENT_NODE( ((eventq) MRoot) ) = (P_) Mark;
+       	  EVENT_GC_INFO( ((eventq) MRoot) ) = 0;             /* reset flag */
+          break;
+        default:
+          fprintf(stderr,"PRMarking_MarkNextEvent: Illegal gc_info field of GLOBALBLOCK event @ %#x\n",
+                          ((eventq) MRoot) );
+          EXIT(EXIT_FAILURE);
+       }
+       break;
+    case UNBLOCKTHREAD:
+       EVENT_TSO( ((eventq) MRoot) ) = (P_) Mark;
+       break;
+    case FINDWORK:
+       break;
+    default:
+       fprintf(stderr,"PRMarking_MarkNextEvent: Illegal gc_info field of FETCHNODE event @ %#x\n",
+                       ((eventq) MRoot) );
+       EXIT(EXIT_FAILURE);
+  }
+  
+  do { 
+      MRoot = (P_) EVENT_NEXT( ((eventq) MRoot) );
+      /* Is the next off the end */
+      if (MRoot == NULL)
+	    RESUME_(miniInterpretEnd);
+      
+      switch (EVENT_TYPE( ((eventq) MRoot) )) {
+  	case CONTINUETHREAD:
+  	case STARTTHREAD:
+  	case RESUMETHREAD:
+  	case MOVETHREAD:
+  	   EVENT_GC_INFO( ((eventq) MRoot) ) = 0;
+  	   Mark = (P_) EVENT_TSO( ((eventq) MRoot) );
+  	   found = rtsTrue;
+  	   break;
+  	case MOVESPARK:
+  	   EVENT_GC_INFO( ((eventq) MRoot) ) = 0;
+  	   Mark = (P_) SPARK_NODE(EVENT_SPARK( ((eventq) MRoot) ));
+  	   found = rtsTrue;
+  	   break;
+  	case FETCHNODE:
+  	   EVENT_GC_INFO( ((eventq) MRoot) ) = 0;
+  	   Mark = (P_) EVENT_TSO( ((eventq) MRoot) );
+  	   found = rtsTrue;
+  	   break;
+  	case FETCHREPLY:
+  	   EVENT_GC_INFO( ((eventq) MRoot) ) = 0;
+  	   Mark = (P_) EVENT_TSO( ((eventq) MRoot) );
+  	   found = rtsTrue;
+  	   break;
+  	 case GLOBALBLOCK:
+  	   EVENT_GC_INFO( ((eventq) MRoot) ) = 0;
+  	   Mark = (P_) EVENT_TSO( ((eventq) MRoot) );
+  	   found = rtsTrue;
+  	   break;
+  	case UNBLOCKTHREAD:
+  	   Mark = (P_) EVENT_TSO( ((eventq) MRoot) );
+  	   found = rtsTrue;
+  	   break;
+  	case FINDWORK:
+  	   found = rtsFalse;
+  	   break;
+  	default:
+  	   fprintf(stderr,"Unknown event type %d (event @ %#x) in SMmarking_NextEvent\n",
+  			  EVENT_TYPE( ((eventq) MRoot) ), MRoot);
+  	   EXIT(EXIT_FAILURE);
+  	} 
+    } while (!found && MRoot!=NULL);
+
+    JUMP_MARK;
+ 
+    FUNEND;
+}
+
+STGFUN(_PRMarking_MarkNextClosureInFetchBuffer)
+{
+    FUNBEGIN;
+    /* Update root -- may have short circuited Ind */
+    *MRoot = Mark;
+
+    /* Is the next off the end */
+    if (++MRoot >= sm_roots_end) {
+      /* We know that marking a fetch buffer is only called from within 
+         marking a FETCHREPLY event; we have saved the important
+         registers before that  */
+      MRoot = ret_MRoot;
+      Mark = ret_Mark;
+      MStack = (P_) _PRMarking_MarkNextEvent_closure;	
+      JUMP_MARK;
+    }
+
+    Mark = *MRoot;
     JUMP_MARK;
     FUNEND;
 }
@@ -1495,7 +1738,7 @@ STGFUN(_PRMarking_MarkNextGA)
 }
 
 #else
-
+#if 1 /* !defined(CONCURRENT) */ /* HWL */
 STGFUN(_PRMarking_MarkNextAStack)
 {
     FUNBEGIN;
@@ -1528,6 +1771,7 @@ STGFUN(_PRMarking_MarkNextBStack)
     JUMP_MARK;
     FUNEND;
 }
+#endif	/* !CONCURRENT */
 #endif	/* PAR */
 \end{code}
 

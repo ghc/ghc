@@ -33,6 +33,9 @@ ge_typdef(t)
 	fprintf(fh, "#define PROTO(x) /**/\n");
 	fprintf(fh, "#endif\n");
 	fprintf(fh, "#endif\n\n");
+	fprintf(fh, "#ifdef UGEN_DEBUG\n");
+	fprintf(fh, "int\tfprintf PROTO((FILE *, const char *, ...));\n");
+	fprintf(fh, "#endif /* UGEN_DEBUG */\n\n");
 	fprintf(fh, "typedef enum {\n");
 	ge_typlist(gtdeflist(t));
 	fprintf(fh, "\n} T%s;\n\n", gtid(t));

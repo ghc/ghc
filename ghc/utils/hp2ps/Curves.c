@@ -100,7 +100,7 @@ ShadeCurve(x, y, py, shade)
 
     fprintf(psfp, "gsave\n");
 
-    fprintf(psfp, "%f setgray\n", shade);
+    SetPSColour(shade);
     fprintf(psfp, "fill\n");
 
     fprintf(psfp, "grestore\n");

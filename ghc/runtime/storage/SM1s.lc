@@ -122,24 +122,36 @@ collectHeap(reqsize, sm, do_full_collection)
     /* end of bracket */
 
 #ifndef PAR
-    sweepUpDeadMallocPtrs(sm->MallocPtrList, 
-			  compactingInfo.base, 
-			  compactingInfo.bits );
+    sweepUpDeadForeignObjs(sm->ForeignObjList, 
+			   compactingInfo.base, 
+			   compactingInfo.bits );
 #endif
 
     LinkCAFs(sm->CAFlist);
 
     LinkRoots( sm->roots, sm->rootno );
-#ifdef CONCURRENT
+#if defined(GRAN)
+    LinkEvents();
+#endif
+#if defined(CONCURRENT) /* && !defined(GRAN) */
     LinkSparks();
 #endif
 #ifdef PAR
     LinkLiveGAs(compactingInfo.base, compactingInfo.bits);
 #else
+    /*
+      The stable pointer table is reachable via sm->roots,
+      (Reason: in markHeapRoots all roots have to be considered,
+      including the StablePointerTable)
+
     DEBUG_STRING("Linking Stable Pointer Table:");
     LINK_LOCATION_TO_CLOSURE(&sm->StablePointerTable);
+
+    */
+# if /* !defined(GRAN) */  /* HWL */
     LinkAStack( MAIN_SpA, stackInfo.botA );
     LinkBStack( MAIN_SuB, stackInfo.botB );
+# endif
 #endif /* parallel */
 
     /* Do Inplace Compaction */
@@ -151,7 +163,7 @@ collectHeap(reqsize, sm, do_full_collection)
 				compactingInfo.bits,
 				compactingInfo.bit_words
 #if ! defined(PAR)
-				, &(sm->MallocPtrList)
+				, &(sm->ForeignObjList)
 #endif
 				) - 1;
 

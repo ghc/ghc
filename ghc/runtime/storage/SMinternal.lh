@@ -330,6 +330,11 @@ EXTFUN(_PRMarking_MarkNextCAF);
 EXTFUN(_PRMarking_MarkNextSpark);
 #endif
 
+#if defined(GRAN)
+EXTFUN(_PRMarking_MarkNextEvent);
+EXTFUN(_PRMarking_MarkNextClosureInFetchBuffer);
+#endif
+
 #ifdef PAR
 EXTFUN(_PRMarking_MarkNextGA);
 MAYBE_DECLARE_RTBL(,_PRMarking_MarkNextGA,)
@@ -345,6 +350,11 @@ MAYBE_DECLARE_RTBL(,_PRMarking_MarkNextBStack,)
 
 #ifdef CONCURRENT
 MAYBE_DECLARE_RTBL(,_PRMarking_MarkNextSpark,)
+#endif
+
+#if defined(GRAN)
+MAYBE_DECLARE_RTBL(,_PRMarking_MarkNextEvent,)
+MAYBE_DECLARE_RTBL(,_PRMarking_MarkNextClosureInFetchBuffer,)
 #endif
 
 MAYBE_DECLARE_RTBL(,_PRMarking_MarkNextRoot,)

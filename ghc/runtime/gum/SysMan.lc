@@ -4,7 +4,7 @@
 %
 %  (c) The Parade/AQUA Projects, Glasgow University, 1994-1995.
 %      P. Trinder, November 30th. 1994.
-%
+% 
 %****************************************************************************
 
 The Sysman task currently controls initiation, termination, of a
@@ -139,6 +139,7 @@ main(int argc, char **argv)
 	    argv++; argc--;
 	}
 	sysman_id = pvm_mytid();/* This must be the first PVM call */
+
 	checkerr(sysman_id);
 
 	/* 
@@ -166,8 +167,8 @@ main(int argc, char **argv)
 	Now create the PE Tasks. We spawn (nPEs-1) pvm threads: the Main Thread 
 	(which starts execution and performs IO) is created by forking SysMan 
         */
+	nPEs--;
 	if (nPEs > 0) {
-	    nPEs--;
 	    /* Initialise the PE task arguments from Sysman's arguments */
 	    pargv = argv + 2;
 #if 0
