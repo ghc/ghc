@@ -35,5 +35,6 @@ TOP:=$(GHC_TOP)
 # Override $(libdir) and $(datadir), so GHC stuff gets installed 
 # into a suitable subdirectory of $(libdir).
 
-libdir  := $(libdir)/$(ProjectNameShort)-$(ProjectVersion)
-datadir := $(datadir)/$(ProjectNameShort)-$(ProjectVersion)
+libdir     := $(libdir)/$(ProjectNameShort)-$(ProjectVersion)
+libexecdir := $(libdir)/bin
+datadir    := $(datadir)/$(ProjectNameShort)-$(ProjectVersion)
