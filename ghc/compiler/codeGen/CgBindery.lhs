@@ -467,8 +467,9 @@ buildLivenessMask uniq sp info_down
 	  ]
 
 	-- flatten this list into a list of unboxed stack slots
-	flatten_slots = foldr (\(ofs,size) r -> [ofs-size+1 .. ofs] ++ r) []
-			   unboxed_slots
+	flatten_slots = sortLt (<) 
+		(foldr (\(ofs,size) r -> [ofs-size+1 .. ofs] ++ r) []
+		      unboxed_slots)
 
 	-- merge in the free slots
 	all_slots = addFreeSlots flatten_slots free ++ 
