@@ -13,7 +13,7 @@ import StgSyn
 import CgMonad
 
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts )
-import CostCentre	( noCCS )
+import CostCentre	( subsumedCCS )
 import CgCon		( cgTopRhsCon )
 import CgClosure	( cgTopRhsClosure )
 import CgTailCall	( performReturn, mkStaticAlgReturnCode )
@@ -184,7 +184,7 @@ cgWorker data_con
 
   | otherwise
   = cgTopRhsClosure work_id
-	    noCCS noBinderInfo NoSRT
+	    subsumedCCS noBinderInfo NoSRT
 	    arg_ids rhs
 	    lf_info
   where
