@@ -95,6 +95,15 @@ module Unique (
 	intDataConKey,
 	intPrimTyConKey,
 	intTyConKey,
+	int8TyConKey,
+	int8DataConKey,
+	int16TyConKey,
+	int16DataConKey,
+	int32TyConKey,
+	int32DataConKey,
+	int64DataConKey,
+	int64PrimTyConKey,
+	int64TyConKey,
 	integerDataConKey,
 	integerMinusOneIdKey,
 	integerPlusOneIdKey,
@@ -177,6 +186,8 @@ module Unique (
 	stateAndForeignObjPrimTyConKey,
 	stateAndIntPrimDataConKey,
 	stateAndIntPrimTyConKey,
+	stateAndInt64PrimDataConKey,
+	stateAndInt64PrimTyConKey,
 	stateAndMutableArrayPrimDataConKey,
 	stateAndMutableArrayPrimTyConKey,
 	stateAndMutableByteArrayPrimDataConKey,
@@ -189,6 +200,8 @@ module Unique (
 	stateAndSynchVarPrimTyConKey,
 	stateAndWordPrimDataConKey,
 	stateAndWordPrimTyConKey,
+	stateAndWord64PrimDataConKey,
+	stateAndWord64PrimTyConKey,
 	stateDataConKey,
 	stRetDataConKey,
 	statePrimTyConKey,
@@ -211,6 +224,15 @@ module Unique (
 	wordDataConKey,
 	wordPrimTyConKey,
 	wordTyConKey,
+	word8TyConKey,
+	word8DataConKey,
+	word16TyConKey,
+	word16DataConKey,
+	word32TyConKey,
+	word32DataConKey,
+	word64DataConKey,
+	word64PrimTyConKey,
+	word64TyConKey,
 	zeroClassOpKey
 	, copyableIdKey
 	, noFollowIdKey
@@ -530,47 +552,59 @@ floatTyConKey				= mkPreludeTyConUnique 12
 funTyConKey				= mkPreludeTyConUnique 13
 intPrimTyConKey				= mkPreludeTyConUnique 14
 intTyConKey				= mkPreludeTyConUnique 15
-integerTyConKey				= mkPreludeTyConUnique 16
-liftTyConKey				= mkPreludeTyConUnique 17
-listTyConKey				= mkPreludeTyConUnique 18
-foreignObjPrimTyConKey			= mkPreludeTyConUnique 19
-foreignObjTyConKey			= mkPreludeTyConUnique 20
-mutableArrayPrimTyConKey		= mkPreludeTyConUnique 21
-mutableByteArrayPrimTyConKey		= mkPreludeTyConUnique 22
-orderingTyConKey			= mkPreludeTyConUnique 23
-synchVarPrimTyConKey		    	= mkPreludeTyConUnique 24
-ratioTyConKey				= mkPreludeTyConUnique 25
-rationalTyConKey			= mkPreludeTyConUnique 26
-realWorldTyConKey			= mkPreludeTyConUnique 27
-return2GMPsTyConKey			= mkPreludeTyConUnique 28
-returnIntAndGMPTyConKey			= mkPreludeTyConUnique 29
-stablePtrPrimTyConKey			= mkPreludeTyConUnique 30
-stablePtrTyConKey			= mkPreludeTyConUnique 31
-stateAndAddrPrimTyConKey		= mkPreludeTyConUnique 32
-stateAndArrayPrimTyConKey		= mkPreludeTyConUnique 33
-stateAndByteArrayPrimTyConKey		= mkPreludeTyConUnique 34
-stateAndCharPrimTyConKey		= mkPreludeTyConUnique 35
-stateAndDoublePrimTyConKey		= mkPreludeTyConUnique 36
-stateAndFloatPrimTyConKey		= mkPreludeTyConUnique 37
-stateAndIntPrimTyConKey			= mkPreludeTyConUnique 38
-stateAndForeignObjPrimTyConKey		= mkPreludeTyConUnique 39
-stateAndMutableArrayPrimTyConKey	= mkPreludeTyConUnique 40
-stateAndMutableByteArrayPrimTyConKey	= mkPreludeTyConUnique 41
-stateAndSynchVarPrimTyConKey	    	= mkPreludeTyConUnique 42
-stateAndPtrPrimTyConKey			= mkPreludeTyConUnique 43
-stateAndStablePtrPrimTyConKey		= mkPreludeTyConUnique 44
-stateAndWordPrimTyConKey		= mkPreludeTyConUnique 45
-statePrimTyConKey			= mkPreludeTyConUnique 46
-stateTyConKey				= mkPreludeTyConUnique 47
-mutableByteArrayTyConKey		= mkPreludeTyConUnique 48
-stTyConKey				= mkPreludeTyConUnique 49
-stRetTyConKey				= mkPreludeTyConUnique 50
-ioTyConKey				= mkPreludeTyConUnique 51
-ioResultTyConKey			= mkPreludeTyConUnique 52
-byteArrayTyConKey			= mkPreludeTyConUnique 53
-wordPrimTyConKey			= mkPreludeTyConUnique 54
-wordTyConKey				= mkPreludeTyConUnique 55
-voidTyConKey				= mkPreludeTyConUnique 56
+int8TyConKey				= mkPreludeTyConUnique 16
+int16TyConKey				= mkPreludeTyConUnique 17
+int32TyConKey				= mkPreludeTyConUnique 18
+int64PrimTyConKey			= mkPreludeTyConUnique 19
+int64TyConKey				= mkPreludeTyConUnique 20
+integerTyConKey				= mkPreludeTyConUnique 21
+liftTyConKey				= mkPreludeTyConUnique 22
+listTyConKey				= mkPreludeTyConUnique 23
+foreignObjPrimTyConKey			= mkPreludeTyConUnique 24
+foreignObjTyConKey			= mkPreludeTyConUnique 25
+mutableArrayPrimTyConKey		= mkPreludeTyConUnique 26
+mutableByteArrayPrimTyConKey		= mkPreludeTyConUnique 27
+orderingTyConKey			= mkPreludeTyConUnique 28
+synchVarPrimTyConKey		    	= mkPreludeTyConUnique 29
+ratioTyConKey				= mkPreludeTyConUnique 30
+rationalTyConKey			= mkPreludeTyConUnique 31
+realWorldTyConKey			= mkPreludeTyConUnique 32
+return2GMPsTyConKey			= mkPreludeTyConUnique 33
+returnIntAndGMPTyConKey			= mkPreludeTyConUnique 34
+stablePtrPrimTyConKey			= mkPreludeTyConUnique 35
+stablePtrTyConKey			= mkPreludeTyConUnique 36
+stateAndAddrPrimTyConKey		= mkPreludeTyConUnique 37
+stateAndArrayPrimTyConKey		= mkPreludeTyConUnique 38
+stateAndByteArrayPrimTyConKey		= mkPreludeTyConUnique 39
+stateAndCharPrimTyConKey		= mkPreludeTyConUnique 40
+stateAndDoublePrimTyConKey		= mkPreludeTyConUnique 41
+stateAndFloatPrimTyConKey		= mkPreludeTyConUnique 42
+stateAndIntPrimTyConKey			= mkPreludeTyConUnique 43
+stateAndInt64PrimTyConKey		= mkPreludeTyConUnique 44
+stateAndForeignObjPrimTyConKey		= mkPreludeTyConUnique 45
+stateAndMutableArrayPrimTyConKey	= mkPreludeTyConUnique 46
+stateAndMutableByteArrayPrimTyConKey	= mkPreludeTyConUnique 47
+stateAndSynchVarPrimTyConKey	    	= mkPreludeTyConUnique 48
+stateAndPtrPrimTyConKey			= mkPreludeTyConUnique 49
+stateAndStablePtrPrimTyConKey		= mkPreludeTyConUnique 50
+stateAndWordPrimTyConKey		= mkPreludeTyConUnique 51
+stateAndWord64PrimTyConKey		= mkPreludeTyConUnique 52
+statePrimTyConKey			= mkPreludeTyConUnique 53
+stateTyConKey				= mkPreludeTyConUnique 54
+mutableByteArrayTyConKey		= mkPreludeTyConUnique 55
+stTyConKey				= mkPreludeTyConUnique 56
+stRetTyConKey				= mkPreludeTyConUnique 57
+ioTyConKey				= mkPreludeTyConUnique 58
+ioResultTyConKey			= mkPreludeTyConUnique 59
+byteArrayTyConKey			= mkPreludeTyConUnique 60
+wordPrimTyConKey			= mkPreludeTyConUnique 61
+wordTyConKey				= mkPreludeTyConUnique 62
+word8TyConKey				= mkPreludeTyConUnique 63
+word16TyConKey				= mkPreludeTyConUnique 64
+word32TyConKey				= mkPreludeTyConUnique 65
+word64PrimTyConKey			= mkPreludeTyConUnique 66
+word64TyConKey				= mkPreludeTyConUnique 67
+voidTyConKey				= mkPreludeTyConUnique 68
 \end{code}
 
 %************************************************************************
@@ -590,11 +624,15 @@ falseDataConKey				= mkPreludeDataConUnique  8
 floatDataConKey				= mkPreludeDataConUnique  9
 gtDataConKey				= mkPreludeDataConUnique 10
 intDataConKey				= mkPreludeDataConUnique 11
-integerDataConKey			= mkPreludeDataConUnique 12
-liftDataConKey				= mkPreludeDataConUnique 13
-ltDataConKey				= mkPreludeDataConUnique 14
-foreignObjDataConKey			= mkPreludeDataConUnique 15
-nilDataConKey				= mkPreludeDataConUnique 18
+int8DataConKey				= mkPreludeDataConUnique 12
+int16DataConKey				= mkPreludeDataConUnique 13
+int32DataConKey				= mkPreludeDataConUnique 14
+int64DataConKey				= mkPreludeDataConUnique 15
+integerDataConKey			= mkPreludeDataConUnique 16
+liftDataConKey				= mkPreludeDataConUnique 17
+ltDataConKey				= mkPreludeDataConUnique 18
+foreignObjDataConKey			= mkPreludeDataConUnique 19
+nilDataConKey				= mkPreludeDataConUnique 20
 ratioDataConKey				= mkPreludeDataConUnique 21
 return2GMPsDataConKey			= mkPreludeDataConUnique 22
 returnIntAndGMPDataConKey		= mkPreludeDataConUnique 23
@@ -606,21 +644,27 @@ stateAndCharPrimDataConKey		= mkPreludeDataConUnique 28
 stateAndDoublePrimDataConKey		= mkPreludeDataConUnique 29
 stateAndFloatPrimDataConKey		= mkPreludeDataConUnique 30
 stateAndIntPrimDataConKey		= mkPreludeDataConUnique 31
-stateAndForeignObjPrimDataConKey	= mkPreludeDataConUnique 32
-stateAndMutableArrayPrimDataConKey	= mkPreludeDataConUnique 33
-stateAndMutableByteArrayPrimDataConKey	= mkPreludeDataConUnique 34
-stateAndSynchVarPrimDataConKey	    	= mkPreludeDataConUnique 35
-stateAndPtrPrimDataConKey		= mkPreludeDataConUnique 36
-stateAndStablePtrPrimDataConKey		= mkPreludeDataConUnique 37
-stateAndWordPrimDataConKey		= mkPreludeDataConUnique 38
-stateDataConKey				= mkPreludeDataConUnique 39
-trueDataConKey				= mkPreludeDataConUnique 40
-wordDataConKey				= mkPreludeDataConUnique 41
-stDataConKey				= mkPreludeDataConUnique 42
-stRetDataConKey				= mkPreludeDataConUnique 43
-ioDataConKey				= mkPreludeDataConUnique 44
-ioOkDataConKey				= mkPreludeDataConUnique 45
-ioFailDataConKey			= mkPreludeDataConUnique 46
+stateAndInt64PrimDataConKey		= mkPreludeDataConUnique 32
+stateAndForeignObjPrimDataConKey	= mkPreludeDataConUnique 33
+stateAndMutableArrayPrimDataConKey	= mkPreludeDataConUnique 34
+stateAndMutableByteArrayPrimDataConKey	= mkPreludeDataConUnique 35
+stateAndSynchVarPrimDataConKey	    	= mkPreludeDataConUnique 36
+stateAndPtrPrimDataConKey		= mkPreludeDataConUnique 37
+stateAndStablePtrPrimDataConKey		= mkPreludeDataConUnique 38
+stateAndWordPrimDataConKey		= mkPreludeDataConUnique 39
+stateAndWord64PrimDataConKey		= mkPreludeDataConUnique 40
+stateDataConKey				= mkPreludeDataConUnique 41
+trueDataConKey				= mkPreludeDataConUnique 42
+wordDataConKey				= mkPreludeDataConUnique 43
+word8DataConKey				= mkPreludeDataConUnique 44
+word16DataConKey			= mkPreludeDataConUnique 45
+word32DataConKey			= mkPreludeDataConUnique 46
+word64DataConKey			= mkPreludeDataConUnique 47
+stDataConKey				= mkPreludeDataConUnique 48
+stRetDataConKey				= mkPreludeDataConUnique 49
+ioDataConKey				= mkPreludeDataConUnique 50
+ioOkDataConKey				= mkPreludeDataConUnique 51
+ioFailDataConKey			= mkPreludeDataConUnique 52
 \end{code}
 
 %************************************************************************
