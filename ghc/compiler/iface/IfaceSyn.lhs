@@ -489,8 +489,12 @@ tyThingToIfaceDecl _ abstract_tcs ext (ATyCon tycon)
     ifaceConDecls _ | abstract       = IfAbstractTyCon
     ifaceConDecls (NewTyCon con _ _) = IfNewTyCon (ifaceConDecl con)
     ifaceConDecls (DataTyCon cons _) = IfDataTyCon (map ifaceConDecl cons)
-    ifaceConDecls AbstractTyCon	     = pprPanic "ifaceConDecls" (ppr tycon)
-	-- We're exporting this thing, so it's locally defined and should not be abstract
+    ifaceConDecls AbstractTyCon	     = IfAbstractTyCon
+	-- The last case should never happen when we are generating an
+	-- interface file (we're exporting this thing, so it's locally defined 
+	-- and should not be abstract).  But tyThingToIfaceDecl is also used
+	-- in TcRnDriver for GHCi, when browsing a module, in which case the
+	-- AbstractTyCon case is perfectly sensible.
 
     ifaceConDecl data_con 
 	= IfaceConDecl (getOccName (dataConName data_con))
