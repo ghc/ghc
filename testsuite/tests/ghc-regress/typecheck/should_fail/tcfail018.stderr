@@ -5,3 +5,4 @@ tcfail018.hs:5:9:
     Possible cause: the monomorphism restriction applied to the following:
       a :: a (bound at tcfail018.hs:5:1)
     Probable fix: give these definition(s) an explicit type signature
+		  or use -fno-monomorphism-restriction

@@ -1,7 +1,8 @@
 
-tcfail010.hs:3:16:
+tcfail010.hs:3:17:
     Ambiguous type variable `a' in the constraint:
-      `Num [a]' arising from use of `+' at tcfail010.hs:3:16
+      `Num [a]' arising from the literal `2' at tcfail010.hs:3:17
     Possible cause: the monomorphism restriction applied to the following:
       q :: [a] -> [a] (bound at tcfail010.hs:3:0)
     Probable fix: give these definition(s) an explicit type signature
+		  or use -fno-monomorphism-restriction
