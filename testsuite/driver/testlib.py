@@ -551,7 +551,13 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
         # wrapping in GHC.TopHandler.runIO ensures we get the same output
         # in the event of an exception as for the compiled program.
         script.write('GHC.TopHandler.runIO Main.main\n')
-    script.write(':q\n')
+    script.close()
+
+    stdin_file = qualify(name, 'stdin')
+    if os.path.exists(stdin_file):
+        stdin = open(stdin_file, 'r')
+        os.system('cat ' + stdin_file + ' >>' + qscriptname)
+        
     script.close()
 
     cmd = 'cd ' + testdir + " && '" \
