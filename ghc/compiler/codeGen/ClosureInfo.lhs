@@ -56,7 +56,9 @@ IMP_Ubiq(){-uitous-}
 IMPORT_DELOOPER(AbsCLoop)		-- here for paranoia-checking
 #endif
 
-import AbsCSyn
+import AbsCSyn		( MagicId, node, mkLiveRegsMask,
+			  {- GHC 0.29 only -} AbstractC, CAddrMode
+			)
 import StgSyn
 import CgMonad
 

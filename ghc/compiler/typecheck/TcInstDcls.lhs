@@ -29,7 +29,7 @@ import RnHsSyn		( SYN_IE(RenamedHsBinds), SYN_IE(RenamedMonoBinds),
 			  SYN_IE(RenamedInstDecl), SYN_IE(RenamedFixityDecl), SYN_IE(RenamedHsExpr),
 			  SYN_IE(RenamedSig), SYN_IE(RenamedSpecInstSig), SYN_IE(RenamedHsDecl)
 			)
-import TcHsSyn		( TcIdOcc(..), SYN_IE(TcIdBndr), SYN_IE(TcHsBinds),
+import TcHsSyn		( SYN_IE(TcHsBinds),
 			  SYN_IE(TcMonoBinds), SYN_IE(TcExpr), tcIdType,
 			  mkHsTyLam, mkHsTyApp,
 			  mkHsDictLam, mkHsDictApp )
@@ -51,7 +51,7 @@ import TcKind		( TcKind, unifyKind )
 import TcMatches	( tcMatchesFun )
 import TcMonoType	( tcTyVarScope, tcContext, tcHsTypeKind )
 import TcSimplify	( tcSimplifyAndCheck )
-import TcType		( SYN_IE(TcType), SYN_IE(TcTyVar), SYN_IE(TcTyVarSet), 
+import TcType		( TcIdOcc(..), SYN_IE(TcIdBndr), SYN_IE(TcType), SYN_IE(TcTyVar), SYN_IE(TcTyVarSet), 
 			  tcInstSigTyVars, tcInstType, tcInstSigTcType, 
 			  tcInstTheta, tcInstTcType, tcInstSigType
 			)
