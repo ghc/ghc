@@ -29,62 +29,11 @@ you will screw up the layout where they are used in case expressions!
 #endif
 
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 202
-# define REALLY_HASKELL_1_3
-# define SYN_IE(a) a
-# define EXP_MODULE(a) module a
-# define IMPORT_DELOOPER(mod) import mod
-# define IMPORT_1_3(mod) import mod
-# define _Addr Addr
-# define _ByteArray GlaExts.ByteArray
-# define _MutableByteArray GlaExts.MutableByteArray
-# define _MutableArray GlaExts.MutableArray
-# define _RealWorld GlaExts.RealWorld
-# define _ST GlaExts.ST
-# define _ForeignObj Foreign.ForeignObj
-# define _runST ST.runST
-# define seqStrictlyST seqST
-# define thenStrictlyST thenST
-# define returnStrictlyST return
-# define MkST ST
-# if __GLASGOW_HASKELL__ >= 209
-#  define STATE_TOK(x)    x
-#  define ST_RET(x,y)     STret (y) (x)
-#  define unsafePerformST(x)  runST (x)
-#  define ST_TO_PrimIO(x) (stToIO (x))
-# else
-#  define STATE_TOK(x)  (S# x)
-#  define ST_RET(x,y)   (x,y)
-#  define unsafePerformST(x) unsafePerformPrimIO(x)
-#  define ST_TO_PrimIO(x) x
-# endif
 # define failWith fail
 # define MkIOError(h,errt,msg) (IOError (Just h) errt msg)
-# define CCALL_THEN thenIO_Prim
-# define Text Show
-# define IMP_FASTSTRING() import FastString
-# if __GLASGOW_HASKELL__ >= 209
-#  define IMP_Ubiq() import GlaExts ; import Addr(Addr(..)); import FastString
-#  define CHK_Ubiq() import GlaExts ; import Addr(Addr(..)); import FastString
-# else
-#  define IMP_Ubiq() import GlaExts ; import FastString
-#  define CHK_Ubiq() import GlaExts ; import FastString
-# endif
 # define minInt (minBound::Int)
 # define maxInt (maxBound::Int)
 #else
-# define STATE_TOK(x)  (S# x)
-# define ST_RET(x,y)   (x,y)
-# define unsafePerformST(x) unsafePerformPrimIO(x)
-# define ST_TO_PrimIO(x) x
-# define SYN_IE(a) a(..)
-# define EXP_MODULE(a) a..
-# define IMPORT_DELOOPER(mod) import mod
-# define IMPORT_1_3(mod) {--}
-# define IMP_FASTSTRING() import FastString
-# define IMP_Ubiq() IMPORT_DELOOPER(Ubiq) ; import FastString
-# define CHK_Ubiq() IMPORT_DELOOPER(Ubiq) ; import FastString
-# define MkST
-# define CCALL_THEN thenPrimIO
 # define MkIOError(h,errt,msg) (errt msg)
 #endif
 
