@@ -194,7 +194,7 @@ cvtd :: Meta.Dec -> MonoBinds RdrName
 -- Used only for declarations in a 'let/where' clause,
 -- not for top level decls
 cvtd (Val (Pvar s) body ds) = FunMonoBind (vName s) False 
-					  (panic "what now?") loc0
+					  [cvtclause (Clause [] body ds)] loc0
 cvtd (Fun nm cls)   	    = FunMonoBind (vName nm) False (map cvtclause cls) loc0
 cvtd (Val p body ds)	    = PatMonoBind (cvtp p) (GRHSs (cvtguard body) 
 							  (cvtdecs ds) 
