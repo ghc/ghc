@@ -25,8 +25,7 @@ module ByteArray
 
 import PrelArr
 import PrelBase
-import PrelForeign
-import PrelStable
+import PrelStable( StablePtr(..) )
 import Ix
 \end{code}
 

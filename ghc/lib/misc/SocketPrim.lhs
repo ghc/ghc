@@ -90,7 +90,7 @@ import Foreign
 import IO
 import IOExts	    ( IORef, newIORef, readIORef, writeIORef )
 import CString      ( unpackNBytesBAIO,
-		      unpackCString, unpackCStringIO,
+		      unpackCStringIO,
 		      unpackCStringLenIO,
 		      allocChars
 		    )
