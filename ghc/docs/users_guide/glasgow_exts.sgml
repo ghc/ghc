@@ -2671,7 +2671,7 @@ then that monad must be declared an instance of the <literal>MonadFix</literal> 
 For details, see the above mentioned reference.
 </para>
 <para>
-The following instances of <literal>MonadFix</literal> is automatically provided: List, Maybe, IO, and
+The following instances of <literal>MonadFix</literal> are automatically provided: List, Maybe, IO, and
 state monads (both lazy and strict).
 </para>
 <para>
