@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.37 2001/08/14 13:40:08 sewardj Exp $
+ * $Id: Stg.h,v 1.38 2001/08/29 17:24:25 qrczak Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -30,6 +30,15 @@
 
 /* Configuration */
 #include "config.h"
+
+#if __GNUC__ >= 3
+/* Assume that a flexible array member at the end of a struct
+ * can be defined thus: T arr[]; */
+#define FLEXIBLE_ARRAY
+#else
+/* Assume that it must be defined thus: T arr[0]; */
+#define FLEXIBLE_ARRAY 0
+#endif
 
 /* Some macros to handle DLLing (Win32 only at the moment). */
 #include "StgDLL.h"

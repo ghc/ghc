@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.26 2001/02/11 17:51:08 simonmar Exp $
+ * $Id: Closures.h,v 1.27 2001/08/29 17:24:25 qrczak Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -139,7 +139,7 @@ typedef struct {
 
 struct StgClosure_ {
     StgHeader   header;
-    struct StgClosure_ *payload[0];
+    struct StgClosure_ *payload[FLEXIBLE_ARRAY];
 };
 
 /* What a stroke of luck - all our mutable closures follow the same
@@ -152,7 +152,7 @@ typedef struct StgMutClosure_ {
     StgHeader   header;
     StgWord     padding;
     struct StgMutClosure_ *mut_link;
-    struct StgClosure_ *payload[0];
+    struct StgClosure_ *payload[FLEXIBLE_ARRAY];
 } StgMutClosure;
 
 typedef struct {
@@ -164,14 +164,14 @@ typedef struct {
     StgHeader   header;
     StgWord     n_args;
     StgClosure *fun;
-    StgClosure *payload[0];
+    StgClosure *payload[FLEXIBLE_ARRAY];
 } StgPAP;
 
 typedef struct {
     StgHeader   header;
     StgWord     n_args;
     StgClosure *fun;
-    StgClosure *payload[0];
+    StgClosure *payload[FLEXIBLE_ARRAY];
 } StgAP_UPD;
 
 typedef struct {
@@ -195,14 +195,14 @@ typedef struct {
 typedef struct {
     StgHeader  header;
     StgWord    words;
-    StgWord    payload[0];
+    StgWord    payload[FLEXIBLE_ARRAY];
 } StgArrWords;
 
 typedef struct {
     StgHeader   header;
     StgWord     ptrs;
     StgMutClosure *mut_link;	/* mutable list */
-    StgClosure *payload[0];
+    StgClosure *payload[FLEXIBLE_ARRAY];
 } StgMutArrPtrs;
 
 typedef struct {
@@ -297,7 +297,7 @@ typedef struct {
   const struct _StgInfoTable* info;
   StgWord        liveness;
   StgWord        ret_addr;
-  StgWord        payload[0];
+  StgWord        payload[FLEXIBLE_ARRAY];
 } StgRetDyn;
 
 /* Concurrent communication objects */
@@ -326,7 +326,7 @@ typedef struct StgBlockingQueueElement_ {
   StgHeader                         header;
   struct StgBlockingQueueElement_  *link;      /* next elem in BQ */
   StgMutClosure                    *mut_link;  /* next elem in mutable list */
-  struct StgClosure_               *payload[0];/* contents of the closure */
+  struct StgClosure_               *payload[FLEXIBLE_ARRAY];/* contents of the closure */
 } StgBlockingQueueElement;
 
 /* only difference to std code is type of the elem in the BQ */
@@ -339,7 +339,7 @@ typedef struct StgBlockingQueue_ {
 /* this closure is hanging at the end of a blocking queue in (see RBH.c) */
 typedef struct StgRBHSave_ {
   StgHeader    header;
-  StgClosure  *payload[0];     /* 2 words ripped out of the guts of the */
+  StgClosure  *payload[FLEXIBLE_ARRAY];     /* 2 words ripped out of the guts of the */
 } StgRBHSave;                  /*  closure holding the blocking queue */
  
 typedef struct StgRBH_ {

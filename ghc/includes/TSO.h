@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.22 2001/07/23 23:26:14 ken Exp $
+ * $Id: TSO.h,v 1.23 2001/08/29 17:24:25 qrczak Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -188,7 +188,7 @@ typedef struct StgTSO_ {
   StgPtr             sp;
   StgUpdateFrame*    su;
   
-  StgWord            stack[0];
+  StgWord            stack[FLEXIBLE_ARRAY];
 } StgTSO;
 
 /* -----------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.21 2001/03/22 03:51:09 hwloidl Exp $
+ * $Id: InfoTables.h,v 1.22 2001/08/29 17:24:25 qrczak Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -173,7 +173,7 @@ extern StgWord16 closure_flags[];
 
 typedef struct {
   StgWord size;
-  StgWord bitmap[0];
+  StgWord bitmap[FLEXIBLE_ARRAY];
 } StgLargeBitmap;
 
 /*
@@ -229,10 +229,10 @@ typedef struct _StgInfoTable {
     StgWord         srt_len : 16; /* }                                   */
 #endif
 #ifdef TABLES_NEXT_TO_CODE
-    StgCode         code[0];
+    StgCode         code[FLEXIBLE_ARRAY];
 #else
     StgFunPtr       entry;
-    StgFunPtr       vector[0];
+    StgFunPtr       vector[FLEXIBLE_ARRAY];
 #endif
 } StgInfoTable;
 
