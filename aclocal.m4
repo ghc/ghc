@@ -4,11 +4,58 @@
 # ensure we don't clash with any pre-supplied autoconf ones.
 
 
+# FP_EVAL_STDERR(COMMAND)
+# ------------------------
+# Eval COMMAND, save its stderr (without lines resulting from shell tracing)
+# into the file conftest.err and the exit status in the variable fp_status.
+AC_DEFUN([FP_EVAL_STDERR],
+[{ (eval $1) 2>conftest.er1
+  fp_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  (exit $fp_status); }[]dnl
+])# FP_EVAL_STDERR
+
+
+# FP_CHECK_FLAG(FLAG, [ACTION-IF-SUPPORTED], [ACTION-IF-NOT-SUPPORTED])
+# -----------------------------------------------------------------------
+# Check to see whether the compiler for the current language supports a
+# particular option.
+#
+# Implementation note: When given an unkown option, GCC issues an warning on
+# stderr only, but returns an exit value of 0 nevertheless. Consequently we have
+# to check stderr *and* the exit value.
+#
+# Used by ghc.
+AC_DEFUN(FP_CHECK_FLAG,
+[AC_LANG_COMPILER_REQUIRE()dnl
+AC_LANG_CASE([C],          [fp_compiler="$CC"  m4_pushdef([fp_Flags], [CFLAGS])],
+             [C++],        [fp_compiler="$CXX" m4_pushdef([fp_Flags], [CXXFLAGS])],
+             [Fortran 77], [fp_compiler="$F77" m4_pushdef([fp_Flags], [FFLAGS])])
+m4_pushdef([fp_Cache], [fp_cv_[]fp_Flags[]AS_TR_SH([$1])])[]dnl
+AC_CACHE_CHECK([whether $fp_compiler accepts $1], [fp_Cache],
+[AC_LANG_CONFTEST([AC_LANG_PROGRAM()])
+fp_save_flags="$fp_Flags"
+fp_Flags="$fp_Flags $1"
+fp_Cache=no
+if FP_EVAL_STDERR([$ac_compile conftest.$ac_ext]) >/dev/null; then
+  test -s conftest.err || fp_Cache=yes
+fi
+fp_Flags="$fp_save_flags"
+rm -f conftest.err conftest.$ac_ext])
+AS_IF([test $fp_Cache = yes], [$2], [$3])[]dnl
+m4_popdef([fp_Cache])[]dnl
+m4_popdef([fp_Flags])[]dnl
+])# FP_CHECK_FLAG
+
+
 # FP_PROG_CONTEXT_DIFF
 # --------------------
 # Figure out how to do context diffs. Sets the output variable ContextDiffCmd.
-# NB: NeXTStep thinks diff'ing a file against itself is "trouble".
-# Used by ghc, glafp-utils/ltx, and glafp-utils/runstdtest
+#
+# Note: NeXTStep thinks diff'ing a file against itself is "trouble".
+#
+# Used by ghc, glafp-utils/ltx, and glafp-utils/runstdtest.
 AC_DEFUN([FP_PROG_CONTEXT_DIFF],
 [AC_CACHE_CHECK([for a working context diff], [fp_cv_context_diff],
 [echo foo > conftest1
@@ -31,6 +78,7 @@ AC_SUBST(ContextDiffCmd, [$fp_cv_context_diff])
 # FP_DECL_ALTZONE
 # -------------------
 # Defines HAVE_DECL_ALTZONE to 1 if declared, 0 otherwise.
+#
 # Used by base package.
 AC_DEFUN([FP_DECL_ALTZONE],
 [AC_REQUIRE([AC_HEADER_TIME])dnl
@@ -53,8 +101,10 @@ AC_CHECK_DECLS([altzone], [], [],[#if TIME_WITH_SYS_TIME
 # Assign VARIABLE the value of the compile-time EXPRESSION using INCLUDES for
 # compilation. Execute IF-FAILS when unable to determine the value. Works for
 # cross-compilation, too.
-# Note: We are lazy and use an internal autoconf macro, but it is supported in
-# autoconf versions 2.50 up to the actual 2.57, so there is little risk.
+#
+# Implementation note: We are lazy and use an internal autoconf macro, but it
+# is supported in autoconf versions 2.50 up to the actual 2.57, so there is
+# little risk.
 AC_DEFUN([FP_COMPUTE_INT],
 [_AC_COMPUTE_INT([$1], [$2], [$3], [$4])[]dnl
 ])# FP_COMPUTE_INT
@@ -66,7 +116,7 @@ AC_DEFUN([FP_COMPUTE_INT],
 # given type. Defines ALIGNMENT_TYPE.
 AC_DEFUN([FP_CHECK_ALIGNMENT],
 [AS_LITERAL_IF([$1], [],
-               [AC_FATAL([$0: requires literal arguments])])dnl
+               [AC_FATAL([$0: requires literal arguments])])[]dnl
 AC_CHECK_TYPE([$1], [], [], [$3])
 AC_CACHE_CHECK([alignment of $1], AS_TR_SH([fp_cv_alignment_$1]),
 [if test "$AS_TR_SH([ac_cv_type_$1])" = yes; then
@@ -1081,25 +1131,3 @@ dnl and we don't want to be global namespace polluters.
 ])
 
 # LocalWords:  fi
-
-
-dnl
-dnl Check to see whether CC (gcc) supports a particular option.
-dnl
-AC_DEFUN(FPTOOLS_CC_FLAG,
-[
-AC_CACHE_CHECK([whether $CC accepts $1], [ac_cv_cc_$2],
-[save_CFLAGS="$CFLAGS"
- CFLAGS="$CFLAGS $1"
- AC_LANG_C
- AC_TRY_COMPILE(,[int main(){return(0);}],
-                 [ac_cv_cc_$2=yes],
-		 [ac_cv_cc_$2=no])
- CFLAGS="$save_CFLAGS"
-])
-if test "$ac_cv_cc_$2"x = "yesx"; then
-  $2=$1;
-else
-  $2="";
-fi;
-])
