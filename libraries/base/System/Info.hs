@@ -57,3 +57,10 @@ compilerVersion :: Version
 compilerVersion = Version {versionBranch=[maj,min], versionTags=[]}
   where (maj,min) = __GLASGOW_HASKELL__ `divMod` 100
 #endif
+
+#ifdef __NHC__
+compilerVersion :: Version
+compilerVersion = Version {versionBranch=[maj,min], versionTags=[]}
+  where (maj,min) = __NHC__ `divMod` 100
+#endif
+
