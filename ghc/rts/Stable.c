@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.3 1999/02/26 12:46:48 simonm Exp $
+ * $Id: Stable.c,v 1.4 1999/03/08 16:41:24 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -133,7 +133,9 @@ initFreeList(snEntry *table, nat n, snEntry *free)
   snEntry *p;
 
   for (p = table + n - 1; p >= table; p--) {
-    p->addr = (P_)free;
+    p->addr   = (P_)free;
+    p->weight = 0;
+    p->sn_obj = NULL;
     free = p;
   }
   stable_ptr_free = table;
@@ -226,7 +228,7 @@ enlargeStablePtrTable(void)
     stable_ptr_table = stgMallocWords(SPT_size * sizeof(snEntry), 
 				      "initStablePtrTable");
     
-    initFreeList(stable_ptr_table+1,INIT_SPT_SIZE-1,NULL);
+    initFreeList(stable_ptr_table,INIT_SPT_SIZE,NULL);
     addrToStableHash = allocHashTable();
   }
   else {
