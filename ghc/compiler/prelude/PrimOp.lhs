@@ -1213,13 +1213,17 @@ primOpInfo (IndexOffForeignObjOp kind)
 
 primOpInfo (WriteOffAddrOp kind)
   = let
-	s = alphaTy; s_tv = alphaTyVar
+	s = betaTy; s_tv = betaTyVar
 
 	(str, prim_ty, _) = getPrimRepInfo kind
 	op_str = _PK_ ("write" ++ str ++ "OffAddr#")
+
+        tvs
+	  | kind == StablePtrRep = [s_tv,alphaTyVar]
+	  | otherwise	         = [s_tv]
     in
     -- NB: *Prim*Result --
-    PrimResult op_str [s_tv]
+    PrimResult op_str tvs
 	[addrPrimTy, intPrimTy, prim_ty, mkStatePrimTy s]
 	statePrimTyCon VoidRep [s]
 
