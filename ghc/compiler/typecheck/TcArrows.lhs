@@ -130,14 +130,12 @@ tc_cmd env (HsIf pred b1 b2) res_ty
 
 -------------------------------------------
 -- 		Arrow application
---     	    (f -< a)   or   (f =< a)
+--     	    (f -< a)   or   (f -<< a)
 
 tc_cmd env cmd@(HsArrApp fun arg _ ho_app lr) (cmd_stk, res_ty)
   = addErrCtxt (cmdCtxt cmd)	$
     do  { arg_ty <- newTyVarTy openTypeKind
-	; let fun_ty = mkCmdArrTy env arg_ty res_ty
-
-	; checkTc (null cmd_stk) (nonEmptyCmdStkErr cmd)
+	; let fun_ty = mkCmdArrTy env (foldl mkPairTy arg_ty cmd_stk) res_ty
 
 	; fun' <- pop_arrow_binders (tcCheckRho fun fun_ty)
 
@@ -148,7 +146,7 @@ tc_cmd env cmd@(HsArrApp fun arg _ ho_app lr) (cmd_stk, res_ty)
 	-- Before type-checking f, remove the "arrow binders" from the 
 	-- environment in the (-<) case.  
 	-- Local bindings, inside the enclosing proc, are not in scope 
-	-- inside f.  In the higher-order case (--<), they are.
+	-- inside f.  In the higher-order case (-<<), they are.
     pop_arrow_binders tc = case ho_app of
 	HsHigherOrderApp -> tc
 	HsFirstOrderApp  -> popArrowBinders tc

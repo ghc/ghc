@@ -289,12 +289,14 @@ dsCmd   :: DsCmdEnv		-- arrow combinators
 	-> DsM (CoreExpr,	-- desugared expression
 		IdSet)		-- set of local vars that occur free
 
---	A |- f :: a t t'
+--	A |- f :: a (t*ts) t'
 --	A, xs |- arg :: t
---	---------------------------
---	A | xs |- f -< arg :: [] t'	---> arr (\ (xs) -> arg) >>> f
+--	-----------------------------
+--	A | xs |- f -< arg :: [ts] t'
+--
+--		---> arr (\ ((xs)*ts) -> (arg*ts)) >>> f
 
-dsCmd ids local_vars env_ids [] res_ty
+dsCmd ids local_vars env_ids stack res_ty
 	(HsArrApp arrow arg arrow_ty HsFirstOrderApp _)
   = let
 	(a_arg_ty, _res_ty') = tcSplitAppTy arrow_ty
@@ -303,18 +305,26 @@ dsCmd ids local_vars env_ids [] res_ty
     in
     dsLExpr arrow			`thenDs` \ core_arrow ->
     dsLExpr arg				`thenDs` \ core_arg ->
-    matchEnvStack env_ids [] core_arg	`thenDs` \ core_make_arg ->
-    returnDs (do_map_arrow ids env_ty arg_ty res_ty
+    mappM newSysLocalDs stack		`thenDs` \ stack_ids ->
+    matchEnvStack env_ids stack_ids
+	(foldl mkCorePairExpr core_arg (map Var stack_ids))
+					`thenDs` \ core_make_arg ->
+    returnDs (do_map_arrow ids
+		(envStackType env_ids stack)
+		arg_ty
+		res_ty
 		core_make_arg
 		core_arrow,
 	      exprFreeVars core_arg `intersectVarSet` local_vars)
 
---	A, xs |- f :: a t t'
+--	A, xs |- f :: a (t*ts) t'
 --	A, xs |- arg :: t
---	---------------------------
---	A | xs |- f -<< arg :: [] t'	---> arr (\ (xs) -> (f,arg)) >>> app
+--	------------------------------
+--	A | xs |- f -<< arg :: [ts] t'
+--
+--		---> arr (\ ((xs)*ts) -> (f,(arg*ts))) >>> app
 
-dsCmd ids local_vars env_ids [] res_ty
+dsCmd ids local_vars env_ids stack res_ty
 	(HsArrApp arrow arg arrow_ty HsHigherOrderApp _)
   = let
 	(a_arg_ty, _res_ty') = tcSplitAppTy arrow_ty
@@ -323,9 +333,15 @@ dsCmd ids local_vars env_ids [] res_ty
     in
     dsLExpr arrow			`thenDs` \ core_arrow ->
     dsLExpr arg				`thenDs` \ core_arg ->
-    matchEnvStack env_ids [] (mkCorePairExpr core_arrow core_arg)
+    mappM newSysLocalDs stack		`thenDs` \ stack_ids ->
+    matchEnvStack env_ids stack_ids
+	(mkCorePairExpr core_arrow
+		(foldl mkCorePairExpr core_arg (map Var stack_ids)))
 					`thenDs` \ core_make_pair ->
-    returnDs (do_map_arrow ids env_ty (mkCorePairTy arrow_ty arg_ty) res_ty
+    returnDs (do_map_arrow ids
+		(envStackType env_ids stack)
+		(mkCorePairTy arrow_ty arg_ty)
+		res_ty
 		core_make_pair
 		(do_app ids arg_ty res_ty),
 	      (exprFreeVars core_arrow `unionVarSet` exprFreeVars core_arg)
