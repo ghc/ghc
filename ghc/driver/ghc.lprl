@@ -469,9 +469,8 @@ $HscLang = 'C'; 	# 'C'    ==> .hc output;
 			# 'java' ==> .java output
 			# 'none' ==> no code output
 $HscLang = 'asm'
-    if ($HaveNativeCodeGen ne 'YES') && $TargetPlatform =~ /^(alpha)-/;
+    if ($HaveNativeCodeGen eq 'YES') && $TargetPlatform =~ /^(i386)-/;
 
-# TEMP: disable x86 & Sparc if $HaveNativeCodeGen && $TargetPlatform =~ /^(i386|alpha|sparc)-/;
 $ProduceHi    = '-hifile=';
 $HiOnStdout   = 0;
 $HiWith       = '';
@@ -1413,8 +1412,8 @@ Again, we'll do the post-recompilation-checker parts of this later.
 				"" ;
     
     local($hsc_out) 	   = "$Tmp_prefix.$hsc_out_suffix" ;
-    local($hsc_out_c_stub) = ( $HscLang eq 'C' ) ? "${Tmp_prefix}_stb.c" : "";
-    local($hsc_out_h_stub) = ( $HscLang eq 'C' ) ? "${Tmp_prefix}_stb.h" : "";
+    local($hsc_out_c_stub) = "${Tmp_prefix}_stb.c";
+    local($hsc_out_h_stub) = "${Tmp_prefix}_stb.h";
 
     if ($Only_preprocess_hc) { # stop after having run $Cc -E
        $do_as=0;
@@ -3407,7 +3406,7 @@ arg: while($_ = $Args[0]) {
 		local($opt_lev) = ( /^-O2$/ ) ? 2 : 1; # max 'em
 		$OptLevel = ( $opt_lev > $OptLevel ) ? $opt_lev : $OptLevel;
 
-		$HscLang = 'C' if $OptLevel == 2; # force use of C compiler
+		$HscLang = 'C';  # force use of C compiler
 		next arg; };
 
     /^-Onot$/	&& do { $OptLevel = 0; next arg; }; # # set it to <no opt>
