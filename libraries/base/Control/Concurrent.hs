@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Concurrent.hs,v 1.4 2002/04/10 15:57:16 simonmar Exp $
+-- $Id: Concurrent.hs,v 1.5 2002/04/18 23:32:56 sof Exp $
 --
 -- A common interface to a collection of useful concurrency
 -- abstractions.
@@ -93,6 +93,13 @@ instance Eq ThreadId where
 
 instance Ord ThreadId where
    compare = cmpThread
+
+foreign import ccall unsafe "rts_getThreadId" getThreadId :: Addr# -> Int
+
+instance Show ThreadId where
+   showsPrec d (ThreadId t) = 
+   	showString "ThreadId " . 
+        showsPrec d (getThreadId (unsafeCoerce# t))
 
 forkIO :: IO () -> IO ThreadId
 forkIO action = IO $ \ s -> 
