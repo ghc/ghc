@@ -33,7 +33,9 @@ data HsLit
 					--	and from TRANSLATION
   | HsIntPrim	    Integer		-- Unboxed Int
   | HsInteger	    Integer		-- Genuinely an integer; arises only from TRANSLATION
+					-- 	(overloaded literals are done with HsOverLit)
   | HsRat	    Rational Type	-- Genuinely a rational; arises only from TRANSLATION
+					-- 	(overloaded literals are done with HsOverLit)
   | HsFloatPrim	    Rational		-- Unboxed Float
   | HsDoublePrim    Rational		-- Unboxed Double
   | HsLitLit	    FastString PostTcType	-- to pass ``literal literals'' through to C
