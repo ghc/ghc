@@ -1,0 +1,484 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+   <TITLE>Access To The GHC CVS Repository</TITLE>
+   <META NAME="GENERATOR" CONTENT="Mozilla/3.04Gold (X11; I; SunOS 5.5.1 i86pc) [Netscape]">
+</HEAD>
+<BODY>
+
+<H1>Coding suggestions for GHC/Hugs related code</h1>
+
+<h2>Comments</h2>
+
+NB These are just suggestions.  They're not set in stone.  Some of
+them are probably misguided.  If you disagree with them, feel free to 
+modify this document (and make your commit message reasonably informative)
+or mail someone (eg <a href="fp-cvs-fptools@dcs.gla.ac.uk">The FP-CVS mailing list</a> or
+<a
+href="mailto:reid-alastair@cs.yale.edu">reid-alastair@cs.yale.edu</a>).
+
+
+<h2>References</h2>
+
+If you haven't read them already, you might like to check the following.
+Where they conflict with our suggestions, they're probably right.
+
+<ul>
+<li>
+Writing Solid Code, Microsoft Press.  (Highly recommended.  Possibly
+the only Microsoft Press book that's worth reading.  SimonPJ has a
+copy.)
+
+<li>
+Autoconf documentation (which doesn't seem to be on the web).
+See also <a href="http://peti.gmd.de/autoconf-archive/">The autoconf macro archive</a> and 
+<a href="http://www.cyclic.com/cyclic-pages/autoconf.html">Cyclic Software's description</a>
+
+<li>
+<a href="http://www.cs.umd.edu/users/cml/cstyle/indhill-cstyle.html">Indian Hill C Style and Coding Standards</a>.
+
+<li>
+<a href="http://www.cs.umd.edu/users/cml/cstyle/">A list of C programming style links</a>
+
+<li>
+<a href="http://www.lysator.liu.se/c/c-www.html">A very large list of C programming links</a>
+
+<li>
+<a href="http://www.geek-girl.com/unix.html">A list of Unix programming links</a>
+
+
+</ul>
+
+
+<h2>Portability issues</h2>
+
+<ul>
+<li>
+We use ANSI C with some extensions.  In particular, we use:
+<ul>
+<li>enum
+<li>ANSI style prototypes
+<li>#elsif, #error, #warning, ## and other cpp features
+</ul>
+
+<li>
+We use the following gcc extensions (see gcc documentation):
+<ul>
+<li>zero length arrays (useful as the last field of a struct)
+<li>inline annotations on functions (see later)
+<li>Labeled elements in initialisers
+<li>Function attributes (mostly just no_return)
+<li>Macro varargs (actually, we don't use them yet but I'm very tempted)
+<li>Alastair really likes to use C++ style comments - but
+    he'll probably regret it later.
+<li>other stuff I've forgotten about...
+</ul>
+
+Some of these gcc/ANSI features could be avoided (for example, we
+could use __inline__ instead of inline or use the usual PROTO((...))
+trick in function prototypes) - but some of them can't be avoided
+so we don't try with the others.
+
+<li>
+char can be signed or unsigned - always say which you mean
+
+<li>
+Some architectures have memory alignment constraints.
+Others don't have any constraints but go faster if you align things.
+These macros tell you which alignment to use
+
+<pre>
+  /* minimum alignment of unsigned int */
+  #define ALIGNMENT_UNSIGNED_INT 4
+
+  /* minimum alignment of long */
+  #define ALIGNMENT_LONG 4
+
+  /* minimum alignment of float */
+  #define ALIGNMENT_FLOAT 4
+
+  /* minimum alignment of double */
+  #define ALIGNMENT_DOUBLE 4
+</pre>
+
+<li>
+Use StgInt, StgWord and StgPtr when reading/writing ints and ptrs to
+the stack or heap.  Note that, by definition, StgInt, StgWord and
+StgPtr are the same size and have the same alignment constraints
+even if sizeof(int) != sizeof(ptr) on that platform.
+
+<li>
+Use StgInt8, StgInt16, etc when you need a certain minimum number of
+bits in a type.  Use int and nat when there's no particular
+constraint.  ANSI C only guarantees that ints are at least 16 bits but
+within GHC we assume they are 32 bits.  (I'm not sure if this is a
+good idea - ADR)
+
+<li>
+Use StgFloat and StgDouble for floating point values which will go
+on/have come from the stack or heap.  Note that StgFloat may be the
+same as StgDouble on some architectures (eg Alphas) and that it might
+occupy many StgWords.
+
+<p>
+Use PK_FLT(addr), PK_DBL(addr) to read StgFloat and
+StgDouble values from the stack/heap, and ASSIGN_FLT(val,addr)/
+ASSIGN_DBL(val,addr) to assign StgFloat/StgDouble values to heap/stack
+locations.  These macros take care of alignment restrictions.
+
+<p>
+Heap/Stack locations are StgWord aligned; the alignment requirements
+of an StgDouble may be more than that of StgWord, but we don't pad
+misaligned StgDoubles (doing so would be too much hassle).  
+
+<p>
+Doing a direct assignment/read of an StgDouble to/from a mis-aligned
+location may not work, so we use the ASSIGN_DBL(,)/PK_DBL() macro,
+which goes via a temporary.  
+
+<p>
+Problem: if the architecture allows mis-aligned accesses, but prefers
+aligned accesses, these macros just add an extra level of indirection.
+We need to distinguish between an architecture that allows mis-aligned
+accesses and one that just imposes a performance penalty (this is most
+of them).  Perhaps have PREFERRED_ALIGNMENT and REQUIRED_ALIGMENT
+configurations?
+
+<li>
+Avoid conditional code like this:
+
+<pre>
+  #ifdef solaris_HOST_OS
+  // do something solaris specific
+  #endif
+</pre>
+
+Instead, add an appropriate test to the configure.in script and use
+the result of that test instead. 
+
+<pre>
+  #ifdef HAVE_BSD_H
+  // use a BSD library
+  #endif
+</pre>
+
+The problem is that things change from one version of an OS to another
+- things get added, things get deleted, things get broken, some things
+are optional extras.  Using "feature tests" instead of "system tests"
+makes things a lot less brittle.  Things also tend to get documented
+better.
+
+</ul>
+
+<h2>Debugging/robustness tricks</h2>
+
+
+Anyone who has tried to debug a garbage collector or code generator
+will tell you: "If a program is going to crash, it should crash as
+soon, as noisily and as often as possible."  There's nothing worse
+than trying to find a bug which only shows up when running GHC on
+itself and doesn't manifest itself until 10 seconds after the actual
+cause of the problem.
+
+<p>
+The ideas in this section are mostly aimed at this issue:
+
+<ul>
+<li>
+Use assertions.  Use lots of assertions.  If you write a comment
+that says "takes a +ve number" add an assertion.  If you're casting
+an int to a nat, add an assertion.  If you're casting an int to a char,
+add an assertion.
+
+<li>
+When defining an enumeration, it's a good idea not to use 0 for normal
+values.  Instead, make 0 raise an internal error.  The idea here is to
+make it easier to detect pointer-related errors on the assumption that
+random pointers are more likely to point to a 0 than to anything else.
+
+<pre>
+typedef enum
+    { i_INTERNAL_ERROR  /* Instruction 0 raises an internal error */
+    , i_PANIC           /* irrefutable pattern match failed! */
+    , i_ERROR           /* user level error */
+
+    ...
+</pre>
+<li> Use #warning or #error whenever you write a piece of incomplete/broken code.
+</ul>
+
+<h2>Syntactic details</h2>
+
+<ul>
+<li><b>Important:</b> Put "redundant" braces or parens in your code.
+Omitting braces and parens leads to very hard to spot bugs -
+especially if you use macros (and you might have noticed that GHC does
+this a lot!)
+
+<p>
+In particular:
+<ul>
+<li>
+Put braces round the body of for loops, while loops, if statements, etc.
+even if they "aren't needed" because it's really hard to find the resulting
+bug if you mess up.  Indent them any way you like but put them in there!
+
+<li>
+When defining a macro, always put parens round args - just in case.
+For example, write:
+<pre>
+  #define add(x,y) ((x)+(y))
+</pre>
+instead of
+<pre>
+  #define add(x,y) x+y
+</pre>
+
+<li>
+Don't define macros that expand to a list of statements.  
+You could just use braces as in:
+
+<pre>
+  #define ASSIGN_CC_ID(ccID)              \
+        {                                 \
+        ccID = CC_ID;                     \
+        CC_ID++;                          \
+        }
+</pre>
+
+but it's better to use the "do { ... } while (0)" trick instead:
+
+<pre>
+  #define ASSIGN_CC_ID(ccID)              \
+        do {                              \
+        ccID = CC_ID;                     \
+        CC_ID++;                          \
+        } while(0)
+</pre>
+
+The following explanation comes from 
+<a href="http://www.cs.umd.edu/users/cml/cstyle/code-std-disc.txt">The Usenet C programming FAQ</a>
+<pre>
+10.4:   What's the best way to write a multi-statement macro?
+
+A:      The usual goal is to write a macro that can be invoked as if it
+        were a statement consisting of a single function call.  This
+        means that the "caller" will be supplying the final semicolon,
+        so the macro body should not.  The macro body cannot therefore
+        be a simple brace-enclosed compound statement, because syntax
+        errors would result if it were invoked (apparently as a single
+        statement, but with a resultant extra semicolon) as the if
+        branch of an if/else statement with an explicit else clause.
+
+        The traditional solution, therefore, is to use
+
+                #define MACRO(arg1, arg2) do {  \
+                        /* declarations */      \
+                        stmt1;                  \
+                        stmt2;                  \
+                        /* ... */               \
+                        } while(0)      /* (no trailing ; ) */
+
+        When the caller appends a semicolon, this expansion becomes a
+        single statement regardless of context.  (An optimizing compiler
+        will remove any "dead" tests or branches on the constant
+        condition 0, although lint may complain.)
+
+        If all of the statements in the intended macro are simple
+        expressions, with no declarations or loops, another technique is
+        to write a single, parenthesized expression using one or more
+        comma operators.  (For an example, see the first DEBUG() macro
+        in question 10.26.)  This technique also allows a value to be
+        "returned."
+
+        References: H&S Sec. 3.3.2 p. 45; CT&P Sec. 6.3 pp. 82-3.
+</pre>
+
+<li>
+Don't even write macros that expand to 0 statements - they can mess you 
+up as well.  Use the doNothing macro instead.
+<pre>
+  #define doNothing() do { } while (0)
+</pre>
+</ul>
+
+<li>
+Use inline functions instead of macros if possible - they're a lot
+less tricky to get right and don't suffer from the usual problems
+of side effects, evaluation order, multiple evaluation, etc.
+
+<ul>
+<li>Inline functions get the naming issue right.  E.g. they
+  can have local variables which (in an expression context)
+  macros can't.
+
+<li> Inline functions have call-by-value semantics whereas macros
+  are call-by-name.  You can be bitten by duplicated computation
+  if you aren't careful.
+</ul>
+
+However, note that macros can serve as both l-values and r-values and
+can be "polymorphic" as these examples show:
+<pre>
+  // you can use this as an l-value or an l-value
+  #define PROF_INFO(cl) (((StgClosure*)(cl))->header.profInfo)
+
+  // polymorphic case
+  // but note that min(min(1,2),3) does 3 comparisions instead of 2!!
+  #define min(x,y) (((x)<=(y)) ? (x) : (y))
+</pre>
+
+<li>
+Inline functions should be "static inline" because:
+<ul>
+<li>
+gcc will delete static inlines if not used or theyre always inlined.
+
+<li>
+  if they're externed, we could get conflicts between 2 copies of the 
+  same function if, for some reason, gcc is unable to delete them.
+  If they're static, we still get multiple copies but at least they don't conflict.
+</ul>
+
+OTOH, the gcc manual says this
+so maybe we should use extern inline?
+
+<pre>
+   When a function is both inline and `static', if all calls to the
+function are integrated into the caller, and the function's address is
+never used, then the function's own assembler code is never referenced.
+In this case, GNU CC does not actually output assembler code for the
+function, unless you specify the option `-fkeep-inline-functions'.
+Some calls cannot be integrated for various reasons (in particular,
+calls that precede the function's definition cannot be integrated, and
+neither can recursive calls within the definition).  If there is a
+nonintegrated call, then the function is compiled to assembler code as
+usual.  The function must also be compiled as usual if the program
+refers to its address, because that can't be inlined.
+
+   When an inline function is not `static', then the compiler must
+assume that there may be calls from other source files; since a global
+symbol can be defined only once in any program, the function must not
+be defined in the other source files, so the calls therein cannot be
+integrated.  Therefore, a non-`static' inline function is always
+compiled on its own in the usual fashion.
+
+   If you specify both `inline' and `extern' in the function
+definition, then the definition is used only for inlining.  In no case
+is the function compiled on its own, not even if you refer to its
+address explicitly.  Such an address becomes an external reference, as
+if you had only declared the function, and had not defined it.
+
+   This combination of `inline' and `extern' has almost the effect of a
+macro.  The way to use it is to put a function definition in a header
+file with these keywords, and put another copy of the definition
+(lacking `inline' and `extern') in a library file.  The definition in
+the header file will cause most calls to the function to be inlined.
+If any uses of the function remain, they will refer to the single copy
+in the library.
+</pre>
+
+<li>
+Try to use ANSI C's enum feature when defining lists of constants of the
+same type.  You'll notice that gdb works better when you do this.
+For example:
+
+<pre>
+    typedef enum { /* N.B. Used as indexes into arrays */
+     NO_HEAP_PROFILING,		
+     HEAP_BY_CC,		
+     HEAP_BY_MOD,		
+     HEAP_BY_GRP,		
+     HEAP_BY_DESCR,		
+     HEAP_BY_TYPE,		
+     HEAP_BY_TIME		
+    } ProfilingFlags;
+</pre>
+instead of
+<pre>
+    # define NO_HEAP_PROFILING	0	/* N.B. Used as indexes into arrays */
+    # define HEAP_BY_CC		1
+    # define HEAP_BY_MOD	2
+    # define HEAP_BY_GRP	3
+    # define HEAP_BY_DESCR	4
+    # define HEAP_BY_TYPE	5
+    # define HEAP_BY_TIME	6
+</pre>
+and 
+<pre>
+    typedef enum {
+     CCchar    = 'C',
+     MODchar   = 'M',
+     GRPchar   = 'G',
+     DESCRchar = 'D',
+     TYPEchar  = 'Y',
+     TIMEchar  = 'T'
+    } ProfilingTag;
+</pre>
+instead of
+<pre>
+    # define CCchar    'C'
+    # define MODchar   'M'
+    # define GRPchar   'G'
+    # define DESCRchar 'D'
+    # define TYPEchar  'Y'
+    # define TIMEchar  'T'
+</pre>
+ToDo: at the time of writing, we still use the former.
+
+<li>
+Alastair likes to use stgCast instead of C syntax.  He claims
+it's easier to write and easier to grep for. YMMV.
+<pre>
+#define stgCast(ty,e) ((ty)(e))
+</pre>
+
+<li> We don't care too much about your indentation style but, if
+you're modifying a function, please try to use the same style as the
+rest of the function (or file).  
+
+<p>
+On which note:
+Hugs related pieces of code often start with the line:
+<pre>
+  /* -*- mode: hugs-c; -*- */
+</pre>
+which helps Emacs mimic the indentation style used by Mark P Jones
+within Hugs.  Add this to your .emacs file.
+<pre>
+  (defun hugs-c-mode ()
+    "C mode with adjusted defaults for use with Hugs (based on linux-c-mode)"
+    (interactive)
+    (c-mode)
+    (setq c-basic-offset 4)
+    (setq indent-tabs-mode nil) ; don't use tabs to indent
+    (setq c-recognize-knr-r nil)  ; no K&R here - don't pay the price
+    ; no: (setq tab-width 4)
+
+    (c-set-offset 'knr-argdecl-intro    0)
+    (c-set-offset 'case-label           0)
+    (c-set-offset 'statement-case-intro '++)
+    (c-set-offset 'statement-case-open  '+)
+    )
+</pre>
+
+
+</ul>
+
+<h2>CVS issues</h2>
+
+<ul>
+<li>
+Don't be tempted to reindent or reorganise large chunks of code - it
+generates large diffs in which it's hard to see whether anything else
+was changed.
+<p>
+If you must reindent or reorganise, don't do anything else in that commit
+and give advance warning that you're about to do it in case anyone else
+is changing that file.
+</ul>
+
+
+
+</body>
+</html>
