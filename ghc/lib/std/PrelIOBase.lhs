@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.35 2001/02/22 13:17:58 simonpj Exp $
+% $Id: PrelIOBase.lhs,v 1.36 2001/02/27 13:38:15 simonmar Exp $
 % 
 % (c) The University of Glasgow, 1994-2000
 %
@@ -405,7 +405,6 @@ data Exception
   | AssertionFailed	String		-- Assertions
   | DynException	Dynamic		-- Dynamic exceptions
   | AsyncException	AsyncException	-- Externally generated errors
-  | PutFullMVar 			-- Put on a full MVar
   | BlockedOnDeadMVar			-- Blocking on a dead MVar
   | NonTermination
   | UserError		String
@@ -468,7 +467,6 @@ instance Show Exception where
   showsPrec _ (AssertionFailed err)      = showString err
   showsPrec _ (DynException _err)        = showString "unknown exception"
   showsPrec _ (AsyncException e)	 = shows e
-  showsPrec _ (PutFullMVar)		 = showString "putMVar: full MVar"
   showsPrec _ (BlockedOnDeadMVar)	 = showString "thread blocked indefinitely"
   showsPrec _ (NonTermination)           = showString "<<loop>>"
   showsPrec _ (UserError err)            = showString err
