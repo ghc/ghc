@@ -4,7 +4,14 @@
 \section[DsCCall]{Desugaring \tr{_ccall_}s and \tr{_casm_}s}
 
 \begin{code}
-module DsCCall ( dsCCall ) where
+module DsCCall 
+	( 
+	   dsCCall 
+	,  getIoOkDataCon
+	,  unboxArg
+	,  boxResult
+	,  can'tSeeDataConsPanic
+	) where
 
 #include "HsVersions.h"
 
@@ -19,6 +26,7 @@ import Id		( Id, dataConArgTys, idType )
 import Maybes		( maybeToBool )
 import PrelVals		( packStringForCId )
 import PrimOp		( PrimOp(..) )
+import CallConv
 import Type		( isUnpointedType, splitAlgTyConApp_maybe, 
 			  splitTyConApp_maybe, splitFunTys, splitForAllTys,
 			  Type
@@ -82,13 +90,13 @@ dsCCall label args may_gc is_asm io_result_ty
     mapAndUnzipDs unboxArg args	`thenDs` \ (unboxed_args, arg_wrappers) ->
     let
 	 final_args = Var old_s : unboxed_args
-	 (ioOkDataCon, result_ty) = getIoOkDataCon io_result_ty
+	 (ioOkDataCon, _, result_ty) = getIoOkDataCon io_result_ty
     in
 
     boxResult ioOkDataCon result_ty `thenDs` \ (final_result_ty, res_wrapper) ->
 
     let
-	the_ccall_op = CCallOp label is_asm may_gc
+	the_ccall_op = CCallOp (Just label) is_asm may_gc cCallConv
 			       (map coreExprType final_args)
 			       final_result_ty
     in
@@ -121,7 +129,6 @@ unboxArg arg
 
   -- Strings
   | arg_ty == stringTy
-  -- ToDo (ADR): - allow synonyms of Strings too?
   = newSysLocalDs byteArrayPrimTy		`thenDs` \ prim_arg ->
     mkAppDs (Var packStringForCId) [VarArg arg]	`thenDs` \ pack_appn ->
     returnDs (Var prim_arg,
@@ -131,7 +138,7 @@ unboxArg arg
 
   | null data_cons
     -- oops: we can't see the data constructors!!!
-  = can't_see_datacons_error "argument" arg_ty
+  = can'tSeeDataConsPanic "argument" arg_ty
 
   -- Byte-arrays, both mutable and otherwise; hack warning
   | is_data_type &&
@@ -174,8 +181,8 @@ unboxArg arg
     maybe_arg2_tycon = splitTyConApp_maybe data_con_arg_ty2
     Just (arg2_tycon,_) = maybe_arg2_tycon
 
-can't_see_datacons_error thing ty
-  = pprPanic "ERROR: Can't see the data constructor(s) for _ccall_/_casm_ "
+can'tSeeDataConsPanic thing ty
+  = pprPanic "ERROR: Can't see the data constructor(s) for _ccall_/_casm_/foreign declaration"
 	     (hcat [text thing, text "; type: ", ppr ty, text "(try compiling with -fno-prune-tydecls ..)\n"])
 \end{code}
 
@@ -189,7 +196,7 @@ boxResult :: Id				-- IOok constructor
 boxResult ioOkDataCon result_ty
   | null data_cons
   -- oops! can't see the data constructors
-  = can't_see_datacons_error "result" result_ty
+  = can'tSeeDataConsPanic "result" result_ty
 
   -- Data types with a single constructor, which has a single, primitive-typed arg
   | (maybeToBool maybe_data_type) &&				-- Data type
@@ -257,8 +264,8 @@ newtype IO a = IO (State# RealWorld -> IOResult a)
 the constructor IO has type (State# RealWorld -> IOResult a) -> IO a
 
 \begin{code}
-getIoOkDataCon :: Type 		-- IO t
-	       -> (Id,Type)	-- Returns (IOok, t)
+getIoOkDataCon :: Type 		 -- IO t
+	       -> (Id, Id, Type) -- Returns (IOok, IO, t)
 
 getIoOkDataCon io_ty
   = let 
@@ -271,7 +278,7 @@ getIoOkDataCon io_ty
 	Just (io_result_tycon, _)	= splitTyConApp_maybe io_result_ty
 	[ioOkDataCon,ioFailDataCon]     = tyConDataCons io_result_tycon
     in
-    (ioOkDataCon, t)
+    (ioOkDataCon, ioDataCon, t)
 \end{code}
 
 Another way to do it, more sensitive:

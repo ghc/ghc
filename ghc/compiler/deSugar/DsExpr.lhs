@@ -154,10 +154,10 @@ dsExpr (HsLitOut (HsFrac r) ty)
 -- others where we know what to do:
 
 dsExpr (HsLitOut (HsIntPrim i) _)
-  = if (i >= toInteger minInt && i <= toInteger maxInt) then
-    	returnDs (Lit (mkMachInt i))
-    else
-	error ("ERROR: Int constant " ++ show i ++ out_of_range_msg)
+  | i >= toInteger minInt && i <= toInteger maxInt 
+  = returnDs (Lit (mkMachInt (fromInteger i)))
+  | otherwise 
+  = error ("ERROR: Int constant " ++ show i ++ out_of_range_msg)
 
 dsExpr (HsLitOut (HsFloatPrim f) _)
   = returnDs (Lit (MachFloat f))
@@ -593,10 +593,13 @@ dsDo do_or_lc stmts return_id then_id zero_id result_ty
 		zero_expr  = TyApp (HsVar zero_id) [b_ty]
 		main_match = PatMatch pat (SimpleMatch (
 			     HsDoOut do_or_lc stmts return_id then_id zero_id result_ty locn))
+
 		the_matches
-		  = if failureFreePat pat
-		    then [main_match]
-		    else [main_match, PatMatch (WildPat a_ty) (SimpleMatch zero_expr)]
+		  | failureFreePat pat = [main_match]
+		  | otherwise	       = 
+			[ main_match
+		        , PatMatch (WildPat a_ty) (SimpleMatch zero_expr)
+			]
 	    in
 	    matchWrapper DoBindMatch the_matches match_msg
 				`thenDs` \ (binders, matching_code) ->

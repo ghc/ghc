@@ -7,13 +7,13 @@
 module DsMonad (
 	DsM,
 	initDs, returnDs, thenDs, andDs, mapDs, listDs,
-	mapAndUnzipDs, zipWithDs,
+	mapAndUnzipDs, zipWithDs, foldlDs,
 	uniqSMtoDsM,
 	newTyVarsDs, cloneTyVarsDs,
 	duplicateLocalDs, newSysLocalDs, newSysLocalsDs,
 	newFailLocalDs,
 	getSrcLocDs, putSrcLocDs,
-	getModuleAndGroupDs,
+	getModuleAndGroupDs, getUniqueDs,
 	extendEnvDs, lookupEnvDs, 
 	DsIdEnv,
 
@@ -39,6 +39,7 @@ import Type             ( Type )
 import TyVar		( cloneTyVar, TyVar )
 import UniqSupply	( splitUniqSupply, getUnique, getUniques,
 			  UniqSM, UniqSupply )
+import Unique		( Unique )			  
 import Util		( zipWithEqual, panic )
 
 infixr 9 `thenDs`
@@ -108,6 +109,13 @@ mapDs f (x:xs)
     mapDs f xs	`thenDs` \ rs ->
     returnDs (r:rs)
 
+foldlDs :: (a -> b -> DsM a) -> a -> [b] -> DsM a
+
+foldlDs k z []     = returnDs z
+foldlDs k z (x:xs) = k z x `thenDs` \ r ->
+		     foldlDs k r xs
+
+
 mapAndUnzipDs :: (a -> DsM (b, c)) -> [a] -> DsM ([b], [c])
 
 mapAndUnzipDs f []     = returnDs ([], [])
@@ -139,6 +147,11 @@ newLocalDs nm ty us loc mod_and_grp env warns
 newSysLocalDs	    = newLocalDs SLIT("ds")
 newSysLocalsDs tys  = mapDs (newLocalDs SLIT("ds")) tys
 newFailLocalDs	    = newLocalDs SLIT("fail")
+
+getUniqueDs :: DsM Unique
+getUniqueDs us loc mod_and_grp env warns
+  = case (getUnique us) of { assigned_uniq ->
+    (assigned_uniq, warns) }
 
 duplicateLocalDs :: Id -> DsM Id
 duplicateLocalDs old_local us loc mod_and_grp env warns

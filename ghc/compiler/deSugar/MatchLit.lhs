@@ -20,7 +20,7 @@ import Id		( Id )
 import DsMonad
 import DsUtils
 
-import Literal		( mkMachInt, Literal(..) )
+import Literal		( mkMachInt_safe, Literal(..) )
 import PrimRep          ( PrimRep(IntRep) )
 import Maybes		( catMaybes )
 import Type		( Type, isUnpointedType )
@@ -68,7 +68,7 @@ matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx (LitPat literal lit_t
       where
 	mk_core_lit :: Type -> HsLit -> Literal
 
-	mk_core_lit ty (HsIntPrim     i) = mkMachInt  i
+	mk_core_lit ty (HsIntPrim     i) = mkMachInt_safe i
 	mk_core_lit ty (HsCharPrim    c) = MachChar   c
 	mk_core_lit ty (HsStringPrim  s) = MachStr    s
 	mk_core_lit ty (HsFloatPrim   f) = MachFloat  f
