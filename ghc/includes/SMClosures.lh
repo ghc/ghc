@@ -1106,7 +1106,7 @@ the same structure as a @SPEC_1_0@ closure.
 #define INTLIKE_CLOSURE_NoNONPTRS(closure)	(1L)
 
 /* Array of static intlike closures */
-extern P_ INTLIKE_closures;
+extern const P_ INTLIKE_closures;
 
 /* Range of static intlike closures MAX_INTLIKE, MIN_INTLIKE is in GhcConstants.lh */
 
