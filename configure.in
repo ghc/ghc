@@ -207,7 +207,6 @@ i[[3456]]86-*-mingw32*)
 	# the gcc command-line used here with -mno-cygwin to
 	# arrange for good things to happen.
 	CFLAGS="-mno-cygwin $CFLAGS"
-	CPPFLAGS="-mno-cygwin $CPPFLAGS"
         ;;
 m68k-next-nextstep2)
         HostPlatform_CPP='m68k_next_nextstep2'
@@ -511,6 +510,11 @@ FPTOOLS_HAVE_GCC
 
 dnl ** figure out how to invoke cpp directly (gcc -E is no good)
 AC_PROG_CPP
+case $HostOS_CPP in
+mingw32)
+   CPP="$CPP -mno-cygwin"
+   ;;
+esac
 
 dnl ** figure out how to do context diffs
 FPTOOLS_PROG_DIFF
