@@ -29,7 +29,7 @@ import Control.Monad.Writer ( Writer, runWriter, tell )
 import Data.Char ( isSpace )
 import Data.IORef ( writeIORef )
 import Data.List ( nub, (\\), foldl' )
-import Data.Maybe ( isJust, maybeToList )
+import Data.Maybe ( isJust, isNothing, maybeToList )
 --import Debug.Trace
 import System.Console.GetOpt ( getOpt, usageInfo, ArgOrder(..), OptDescr(..), ArgDescr(..) )
 import System.Environment ( getArgs )
@@ -37,6 +37,15 @@ import System.IO ( stderr, IOMode(..), openFile, hClose, hGetContents, hPutStrLn
 #if defined(mingw32_HOST_OS)
 import Foreign
 import Foreign.C
+#endif
+
+#if __GLASGOW_HASKELL__ >= 603
+import System.Process
+import System.Exit
+import Control.Exception	( Exception(..), throwIO, catch )
+import Prelude hiding (catch)
+import System.Directory		( doesDirectoryExist, doesFileExist )
+import Control.Concurrent
 #endif
 
 -----------------------------------------------------------------------------
@@ -75,6 +84,9 @@ data Flag
   | Flag_GenContents
   | Flag_UseIndex String
   | Flag_GenIndex
+  | Flag_IgnoreAllExports
+  | Flag_HideModule String
+  | Flag_UsePackage String
   deriving (Eq)
 
 options :: [OptDescr Flag]
@@ -121,7 +133,13 @@ options =
     Option [] ["use-index"] (ReqArg Flag_UseIndex "URL")
 	"use a separately-generated HTML index",
     Option [] ["gen-index"] (NoArg Flag_GenIndex)
-	"generate an HTML index from specified interfaces"
+	"generate an HTML index from specified interfaces",
+    Option [] ["ignore-all-exports"] (NoArg Flag_IgnoreAllExports)
+	"behave as if all modules have the ignore-exports atribute",
+    Option [] ["hide"] (ReqArg Flag_HideModule "M")
+	"behave as if module M has the hide attribute",
+    Option [] ["use-package"] (ReqArg Flag_UsePackage "P")
+	"the modules being processed depend on package P"
   ]
 
 run :: [Flag] -> [FilePath] -> IO ()
@@ -145,6 +163,8 @@ run flags files = do
 			[] -> Nothing
 			(t:_) -> Just t
 
+      verbose = Flag_Verbose `elem` flags
+
   libdir <- case [str | Flag_Lib str <- flags] of
 		[] -> do maybe_exec_dir <- getBaseDir
 				-- Get directory of executable
@@ -165,11 +185,8 @@ run flags files = do
 		  	[] -> Nothing
 		  	fs -> Just (last fs)
 
-      ifaces_to_read = [ parseIfaceOption str 
+      read_iface_flags = [ parseIfaceOption str 
 		       | Flag_ReadInterface str <- flags ]
-
-      no_implicit_prelude = Flag_NoImplicitPrelude `elem` flags
-      verbose = Flag_Verbose `elem` flags
 
       maybe_contents_url = 
 	case [url | Flag_UseContents url <- flags] of
@@ -187,6 +204,11 @@ run flags files = do
 		formats -> Just (last formats)
 		
   prologue <- getPrologue flags
+
+  -- grok the --use-package flags
+  pkg_ifaces_to_read <- getPackageIfaces flags verbose
+
+  let ifaces_to_read = read_iface_flags ++ pkg_ifaces_to_read
 
   read_iface_stuff <- mapM readIface (map snd ifaces_to_read)
 
@@ -229,8 +251,7 @@ run flags files = do
 	loop mod_env ifaces [] = return (reverse ifaces)
 	loop mod_env ifaces ((hsmod,file):mdls)  = do 
 	   let (iface,msgs) = runWriter $
-		   mkInterfacePhase1 no_implicit_prelude verbose mod_env
-			file package hsmod
+		   mkInterfacePhase1 flags verbose mod_env file package hsmod
 	       new_mod_env = Map.insert (iface_module iface) iface mod_env
 	   mapM_ (hPutStrLn stderr) msgs
 	   loop new_mod_env (iface:ifaces) mdls
@@ -321,6 +342,69 @@ getPrologue flags
 		Right doc -> return (Just doc)
 	_otherwise -> dieMsg "multiple -p/--prologue options"
 
+-- ---------------------------------------------------------------------------
+-- External packages
+
+getPackageIfaces :: [Flag] -> Bool -> IO [(String,String)]
+getPackageIfaces flags verbose =
+  let
+	pkgs = [pkg | Flag_UsePackage pkg <- flags]
+  in
+#if __GLASGOW_HASKELL__ < 603
+  if (not (null pkgs))
+	then die ("-use-package not supported; recompile Haddock with GHC 6.4 or later")
+	else return ()
+#else
+  do
+    mb_iface_details <- mapM getPkgIface pkgs
+    return [ ok | Just ok <- mb_iface_details ]
+ where
+  hc_pkg = "ghc-pkg"  -- ToDo: flag
+
+  getPkgIface pkg = do
+	when verbose $
+	   putStrLn ("querying ghc-pkg for " ++ pkg ++ "...")
+        getPkgIface' pkg
+	   `catch` (\e -> do
+		  putStrLn ("Warning: cannot use package " ++ pkg ++ ":")
+		  putStrLn ("   " ++ show e)
+		  return Nothing)
+
+  getPkgIface' pkg = do
+	(hin,hout,herr,p) <- runInteractiveProcess hc_pkg 
+				["field", "haddock-interfaces", pkg]
+				Nothing Nothing
+	hClose hin
+	out <- hGetContents hout
+	forkIO (hGetContents herr >> return ()) -- just sink the stderr
+	r <- waitForProcess p
+	when (r /= ExitSuccess) $
+	   throwIO (ErrorCall ("ghc-pkg failed"))
+	let iface = dropWhile isSpace (tail (dropWhile (/=':') out))
+
+	(hin,hout,herr,p) <- runInteractiveProcess hc_pkg
+	  			["field", "haddock-html", pkg]
+				Nothing Nothing
+	hClose hin
+	forkIO (hGetContents herr >> return ()) -- just sink the stderr
+	out <- hGetContents hout
+	r <- waitForProcess p
+	when (r /= ExitSuccess) $
+	   throwIO (ErrorCall ("ghc-pkg failed"))
+	let html = dropWhile isSpace (tail (dropWhile (/=':') out))
+
+	when verbose $ 
+	   putStrLn ("   interface: " ++ iface ++ "\n   html: " ++ html)
+
+	iface_exists <- doesFileExist iface
+	when (not iface_exists) $ do
+	   throwIO (ErrorCall ("interface " ++ iface ++ " does not exist."))
+	html_exists <- doesDirectoryExist html
+	when (not html_exists) $ do
+	   throwIO (ErrorCall ("HTML directory " ++ html ++ " does not exist."))
+	return (Just (iface, html))
+#endif
+
 -----------------------------------------------------------------------------
 -- Figuring out the definitions that are exported from a module
 
@@ -333,18 +417,28 @@ getPrologue flags
 --      the names we want to link to in the documentation.
 
 mkInterfacePhase1
-   :: Bool				-- no implicit prelude
+   :: [Flag]
    -> Bool				-- verbose
    -> ModuleMap -> FilePath -> Maybe String -> HsModule
    -> ErrMsgM Interface			-- the "interface" of the module
 
-mkInterfacePhase1 no_implicit_prelude verbose mod_map filename package
+mkInterfacePhase1 flags verbose mod_map filename package
 	(HsModule mdl exps imps decls maybe_opts maybe_info maybe_doc) = do  
 
+  let
+      no_implicit_prelude = Flag_NoImplicitPrelude `elem` flags
+      ignore_all_exports = Flag_IgnoreAllExports `elem` flags
+
   -- Process the options, if available
-  opts <- case maybe_opts of
+  opts0 <- case maybe_opts of
 		Just opt_str -> processOptions opt_str
 		Nothing      -> return []
+  let
+	-- check for a --hide option
+	Module mod_str = mdl
+	opts
+	  | Flag_HideModule mod_str `elem` flags = OptHide : opts0
+	  | otherwise			         = opts0
 
   let
      -- expand type signatures with multiple variables into multiple
@@ -418,7 +512,8 @@ mkInterfacePhase1 no_implicit_prelude verbose mod_map filename package
 
   -- make the "export items", which will be converted into docs later
   orig_export_items <- mkExportItems mod_map mdl exported_names decl_map sub_map
-			 		orig_decls opts orig_exports
+			 		orig_decls opts orig_exports 
+					ignore_all_exports
   let
      -- prune the export list to just those declarations that have
      -- documentation, if the 'prune' option is on.
@@ -612,13 +707,17 @@ mkExportItems
 	-> [HsDecl]			-- decls in the current module
 	-> [DocOption]
 	-> Maybe [HsExportSpec]
+	-> Bool				-- --ignore-all-exports flag
 	-> ErrMsgM [ExportItem]
 
 mkExportItems mod_map this_mod exported_names decl_map sub_map decls
-	 opts maybe_exps
-  | Nothing <- maybe_exps	 = everything_local_exported
-  | OptIgnoreExports `elem` opts = everything_local_exported
-  | Just specs <- maybe_exps     = do 
+	 opts maybe_exps ignore_all_exports
+  | isNothing maybe_exps
+    || ignore_all_exports
+    || OptIgnoreExports `elem` opts
+     = everything_local_exported
+  | Just specs <- maybe_exps
+     = do 
 	exps <- mapM lookupExport specs
         return (concat exps)
   where
@@ -1140,8 +1239,7 @@ thisFormatVersion = mkFormatVersion 2
 
 -- | How we store interfaces.  Not everything is stored.
 type StoredInterface2 =
-   (Module,Maybe Doc,Maybe String,Bool,[(HsName,Module)],[HsName],
-      [(HsName,[HsName])])
+   (Module,Maybe Doc,Maybe String,Bool,[(HsName,Module)], [(HsName,[HsName])])
 
 -- | How we store interfaces.  Not everything is stored.
 type StoredInterface1 =
@@ -1196,7 +1294,6 @@ from_interface iface =
       OptHide `elem` iface_options iface,
       [(n,mdl) | (n,Qual mdl n') <- Map.toAscList (iface_env iface),
 		 if n /= n' then error "help!" else True], 
-      iface_reexported iface,
       Map.toAscList (iface_sub iface)
       )
 
@@ -1214,14 +1311,14 @@ putDocEnv bh env = do
   
 
 to_interface1 :: StoredInterface1 -> Interface
-to_interface1 (mdl,descriptionOpt,package, hide, env, reexported, sub) = 
+to_interface1 (mdl,descriptionOpt,package, hide, env, _, sub) = 
    Interface { 
       iface_module	 = mdl,
       iface_filename     = "",
       iface_package      = package,
       iface_env          = Map.fromList env,
       iface_sub          = Map.fromList sub,
-      iface_reexported   = map fst reexported,
+      iface_reexported   = [],
       iface_exports      = [],
       iface_orig_exports = [],
       iface_insts        = [],
@@ -1232,7 +1329,7 @@ to_interface1 (mdl,descriptionOpt,package, hide, env, reexported, sub) =
       }
 
 to_interface2 :: StoredInterface2 -> Interface
-to_interface2 (mdl,descriptionOpt,package, hide, env, reexported, sub) =
+to_interface2 (mdl,descriptionOpt,package, hide, env, sub) =
    Interface { 
       iface_module	 = mdl,
       iface_filename     = "",
@@ -1240,7 +1337,7 @@ to_interface2 (mdl,descriptionOpt,package, hide, env, reexported, sub) =
       iface_env          = 
 	Map.fromList [(n,Qual mdl n) | (n,mdl) <- env],
       iface_sub          = Map.fromList sub,
-      iface_reexported   = reexported,
+      iface_reexported   = [],
       iface_exports      = [],
       iface_orig_exports = [],
       iface_insts        = [],
@@ -1258,7 +1355,7 @@ nullVersion_to_interface (mdl, package, hide, env, reexported, sub) =
       iface_package      = package,
       iface_env          = Map.fromList env,
       iface_sub          = Map.fromList sub,
-      iface_reexported   = map fst reexported,
+      iface_reexported   = [],
       iface_exports      = [],
       iface_orig_exports = [],
       iface_insts        = [],
