@@ -67,11 +67,11 @@ module Type (
 	TvSubstEnv, emptyTvSubst,
 	mkTvSubst, zipTvSubst, zipTopTvSubst, mkTopTvSubst,
 	getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope,
-	extendTvSubst, extendTvSubstList, isInScope,
+ 	extendTvSubst, extendTvSubstList, isInScope, composeTvSubst,
 
 	-- Performing substitution on types
 	substTy, substTys, substTyWith, substTheta, substTyVar, substTyVarBndr,
-	deShadowTy,
+	deShadowTy, 
 
 	-- Pretty-printing
 	pprType, pprParendType, pprTyThingCategory,
@@ -1025,6 +1025,18 @@ type TvSubstEnv = TyVarEnv Type
 	-- in the middle of matching, and unification (see Types.Unify)
 	-- So you have to look at the context to know if it's idempotent or
 	-- apply-once or whatever
+
+composeTvSubst :: InScopeSet -> TvSubstEnv -> TvSubstEnv -> TvSubstEnv
+-- (compose env1 env2)(x) is env1(env2(x)); i.e. apply env2 then env1
+-- It assumes that both are idempotent
+composeTvSubst in_scope env1 env2
+  = env1 `plusVarEnv` mapVarEnv (substTy subst1) env2
+	-- First apply env1 to the range of env2
+	-- Then combine the two, making sure that env1 loses if
+	-- both bind the same variable; that's why env1 is the
+	-- *left* argument to plusVarEnv, becuause the right arg wins
+  where
+    subst1 = TvSubst in_scope env1
 
 emptyTvSubst = TvSubst emptyInScopeSet emptyVarEnv
 isEmptyTvSubst :: TvSubst -> Bool

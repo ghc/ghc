@@ -198,25 +198,23 @@ gadtMatchTys ex_tvs subst tys1 tys2
   = initUM (bindOnly (mkVarSet ex_tvs)) (unify_tys subst tys1 tys2)
 
 ----------------------------
-coreRefineTys :: [TyVar]	-- Try to unify these
-	      -> TvSubst	-- A full-blown apply-once substitition
+coreRefineTys :: InScopeSet	-- Superset of free vars of either type
+	      -> [TyVar]	-- Try to unify these
 	      -> Type		-- Both types should be a fixed point 
 	      -> Type		--   of the incoming substitution
 	      -> Maybe TvSubstEnv	-- In-scope set is unaffected
 -- Used by Core Lint and the simplifier.  Takes a full apply-once substitution.
 -- The incoming substitution's in-scope set should mention all the variables free 
 -- in the incoming types
-coreRefineTys ex_tvs subst@(TvSubst in_scope orig_env) ty1 ty2
+coreRefineTys in_scope ex_tvs ty1 ty2
   = maybeErrToMaybe $ initUM (tryToBind (mkVarSet ex_tvs)) $
     do	{ 	-- Run the unifier, starting with an empty env
-	; extra_env <- unify emptyTvSubstEnv ty1 ty2
+	; subst_env <- unify emptyTvSubstEnv ty1 ty2
 
-		-- Find the fixed point of the resulting non-idempotent
-		-- substitution, and apply it to the incoming substitution
-	; let extra_subst     = TvSubst in_scope extra_env_fixpt
-	      extra_env_fixpt = mapVarEnv (substTy extra_subst) extra_env
-	      orig_env'	      = mapVarEnv (substTy extra_subst) orig_env
-	; return (orig_env' `plusVarEnv` extra_env_fixpt) }
+	-- Find the fixed point of the resulting non-idempotent substitution
+	; let subst  	      = TvSubst in_scope subst_env_fixpt
+	      subst_env_fixpt = mapVarEnv (substTy subst) subst_env
+	; return subst_env_fixpt }
 
 ----------------------------
 tcUnifyTys :: TyVarSet -> [Type] -> [Type] -> Maybe TvSubstEnv

@@ -40,7 +40,6 @@ import HscTypes		( HscEnv(..), NameCache( nsUniqs ),
 			)
 import Maybes		( orElse )
 import ErrUtils		( showPass, dumpIfSet_core )
-import UniqFM		( mapUFM )
 import UniqSupply	( splitUniqSupply, uniqFromSupply )
 import List		( partition )
 import Maybe		( isJust )

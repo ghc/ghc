@@ -34,7 +34,8 @@ import Type		( Type, tyVarsOfType, coreEqType,
 			  isUnboxedTupleType, isSubKind,
 			  substTyWith, emptyTvSubst, extendTvInScope, 
 			  TvSubst, TvSubstEnv, setTvSubstEnv, substTy,
-			  extendTvSubst, isInScope )
+			  extendTvSubst, composeTvSubst, isInScope,
+			  getTvSubstEnv, getTvInScope )
 import TyCon		( isPrimTyCon )
 import BasicTypes	( RecFlag(..), Boxity(..), isNonRec )
 import CmdLineOpts
@@ -464,9 +465,11 @@ lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
 	      pat_res_ty = dataConResTy con (mkTyVarTys tvs)	      
 
         ; subst <- getTvSubst 
-        ; case coreRefineTys tvs subst pat_res_ty scrut_ty of {
-             Nothing   -> return () ;	-- Alternative is dead code
-             Just senv -> updateTvSubstEnv senv $
+	; let in_scope  = getTvInScope subst
+	      subst_env = getTvSubstEnv subst
+        ; case coreRefineTys in_scope tvs pat_res_ty scrut_ty of {
+             Nothing     -> return () ;	-- Alternative is dead code
+             Just refine -> updateTvSubstEnv (composeTvSubst in_scope refine subst_env) $
     do 	{ tvs'     <- mapM lintTy (mkTyVarTys tvs)
 	; con_type <- lintTyApps (dataConRepType con) tvs'
 	; mapM lintBinder ids	-- Lint Ids in the refined world
@@ -579,7 +582,6 @@ addInScopeVars :: [Var] -> LintM a -> LintM a
 addInScopeVars vars m = 
   LintM (\ loc subst errs -> unLintM m loc (extendTvInScope subst vars) errs)
 
--- gaw 2004
 updateTvSubstEnv :: TvSubstEnv -> LintM a -> LintM a
 updateTvSubstEnv substenv m = 
   LintM (\ loc subst errs -> unLintM m loc (setTvSubstEnv subst substenv) errs)

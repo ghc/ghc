@@ -1500,8 +1500,9 @@ simplAlt env handled_cons case_bndr' (DataAlt con, vs, rhs) cont'
     simplBinders env tvs			`thenSmpl` \ (env1, tvs') ->
     let
 	pat_res_ty = dataConResTy con (mkTyVarTys tvs')
+	in_scope   = getInScope env1
     in
-    case coreRefineTys tvs' (error "urk") pat_res_ty (idType case_bndr') of {
+    case coreRefineTys in_scope tvs' pat_res_ty (idType case_bndr') of {
 	Nothing 	-- Dead code; for now, I'm just going to put in an
 			-- error case so I can see them
 	    ->	let rhs' = mkApps (Var eRROR_ID) 
@@ -1514,7 +1515,7 @@ simplAlt env handled_cons case_bndr' (DataAlt con, vs, rhs) cont'
 	Just tv_subst_env -> 	-- The normal case
 
     let 
-	env2  = error "setTvSubstEnv" env1 tv_subst_env
+	env2 = refineSimplEnv env1 tv_subst_env tvs'
 	-- Simplify the Ids in the refined environment, so their types
 	-- reflect the refinement.  Usually this doesn't matter, but it helps
 	-- in mkDupableAlt, when we want to float a lambda that uses these binders
