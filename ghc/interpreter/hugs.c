@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.35 $
- * $Date: 2000/01/11 14:21:43 $
+ * $Revision: 1.36 $
+ * $Date: 2000/01/12 14:47:27 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -1260,6 +1260,11 @@ Int n; {                                /* loading everything after and    */
 
     { Int  m     = namesUpto-1;
       Text mtext = findText(scriptInfo[m].modName);
+
+      /* Hack to avoid starting up in PrelHugs */
+      if (mtext == findText("PrelHugs")) mtext = findText("Prelude");
+
+
       /* Commented out till we understand what
        * this is trying to do.
        * Problem, you cant find a module till later.
