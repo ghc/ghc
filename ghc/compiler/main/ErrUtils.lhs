@@ -8,7 +8,7 @@ module ErrUtils (
 	Message, mkLocMessage, printError,
 
 	ErrMsg, WarnMsg,
-	errMsgSpans, errMsgShortDoc, errMsgExtraInfo,
+	errMsgSpans, errMsgContext, errMsgShortDoc, errMsgExtraInfo,
 	Messages, errorsFound, emptyMessages,
 	mkErrMsg, mkWarnMsg, mkPlainErrMsg, mkLongErrMsg,
 	printErrorsAndWarnings, pprBagOfErrors, pprBagOfWarnings,
