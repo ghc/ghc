@@ -850,12 +850,14 @@ sub mangle_asm {
 	    # toss all prologue stuff, except for loading gp, and the ..ng address
 	    if (($p, $r) = split(/^\t\.prologue/, $c)) {
     	        if (($keep, $junk) = split(/\.\.ng:/, $p)) {
+		    $keep =~ s/^\t\.frame.*\n/\t.frame \$30,0,\$26,0\n/;
+		    $keep =~ s/^\t\.(mask|fmask).*\n//g;
     	    	    $c = $keep . "..ng:\n";
     	        } else {
     	    	    print STDERR "malformed code block ($ent)?\n"
     	    	}
     	    }
-    	    $c .= "\t.frame \$30,0,\$26,0\n\t.prologue" . $r;
+    	    $c .= "\t.prologue" . $r;
     	}
   
 	$c =~ s/FUNNY#END#THING//;
@@ -1375,7 +1377,7 @@ sub rev_tbl {
     local(@words) = ();
     local($after) = '';
     local(@lines) = split(/\n/, $tbl);
-    local($i, $j); #local ($i, $extra, $words_to_pad, $j);
+    local($i, $j);
 
     # Deal with the header...
     for ($i = 0; $i <= $#lines && $lines[$i] !~ /^\t?${T_DOT_WORD}\s+/o; $i++) {
@@ -1413,19 +1415,11 @@ sub rev_tbl {
 	shift(@words)
     }
 
-# Padding removed to reduce code size and improve performance on Pentiums.
-# Simon M. 13/4/96
-    # for 486-cache-friendliness, we want our tables aligned
-    # on 16-byte boundaries (.align 4).  Let's pad:
-#    $extra = ($#words + 1) % 4;
-#    $words_to_pad = ($extra == 0) ? 0 : 4 - $extra;
-#    for ($j = 0; $j < $words_to_pad; $j++) { push(@words, "\t${T_DOT_WORD} 0"); }
-
     for (; $i <= $#lines; $i++) {
 	$after .= $lines[$i] . "\n";
     }
 
-    # Alphas:If we have anonymous text (not part of a procedure), the
+    # Alphas: If we have anonymous text (not part of a procedure), the
     # linker may complain about missing exception information.  Bleh.
     # To suppress this, we place a .ent/.end pair around the code.
     # At the same time, we have to be careful and not enclose any leading
@@ -1434,6 +1428,37 @@ sub rev_tbl {
         local ($ident) = $1;
         $before =~ s/^((\s*\.(file|loc)\s+[^\n]*\n)*)/$1\t.ent $ident\n/;
     	$after .= "\t.end $ident\n";
+    }
+
+    # Alphas: The heroic Simon Marlow found a bug in the Digital UNIX
+    # assembler (!) wherein .quad constants inside .text sections are
+    # first narrowed to 32 bits then sign-extended back to 64 bits.
+    # This obviously screws up our 64-bit bitmaps, so we work around
+    # the bug by replacing .quad with .align 3 + .long + .long [ccshan]
+    if ( $TargetPlatform =~ /^alpha-/ ) {
+	foreach (@words) {
+	    if (/^\s*\.quad\s+([-+0-9].*\S)\s*$/ && length $1 >= 10) {
+		local ($number) = $1;
+		if ($number =~ /^([-+])?(0x?)?([0-9]+)$/) {
+		    local ($sign, $base, $digits) = ($1, $2, $3);
+		    $base = (10, 8, 16)[length $base];
+		    local ($hi, $lo) = (0, 0);
+		    foreach $i (split //, $digits) {
+			$j = $lo * $base + $i;
+			$lo = $j % 4294967296;
+			$hi = $hi * $base + ($j - $lo) / 4294967296;
+		    }
+		    ($hi, $lo) = (4294967295 - $hi, 4294967296 - $lo)
+			if $sign eq "-";
+		    $_ = "\t.align 3\n\t.long $lo\n\t.long $hi\n";
+		    printf STDERR "TURNING %s into 0x %08x %08x\n",
+			$number, $hi, $lo;
+		} else {
+		    print STDERR "Cannot handle \".quad $number\" in info table\n";
+		    exit 1;
+		}
+	    }
+	}
     }
 
     $tbl = $before
