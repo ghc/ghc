@@ -376,11 +376,13 @@ emptyAvailEnv = emptyFM
  plain duplicates or exported entity pairs that have different OccNames.
  (c.f. 5.1.1 of Haskell 1.4 report.)
 -}
-addAvailEnv ie env NotAvailable   = returnRn env
-addAvailEnv ie env (AvailTC _ []) = returnRn env
-addAvailEnv ie env avail
-  = mapMaybeRn (addErrRn  . availClashErr) () conflict `thenRn_`
-    returnRn (addToFM_C add_avail env key elt)
+addAvailEnv :: Bool -> RdrNameIE -> AvailEnv -> AvailInfo -> RnM s d AvailEnv
+addAvailEnv warn_dups ie env NotAvailable   = returnRn env
+addAvailEnv warn_dups ie env (AvailTC _ []) = returnRn env
+addAvailEnv warn_dups ie env avail
+  | warn_dups = mapMaybeRn (addErrRn  . availClashErr) () conflict `thenRn_`
+                returnRn (addToFM_C add_avail env key elt)
+  | otherwise = returnRn (addToFM_C add_avail env key elt)
   where
    key  = nameOccName (availName avail)
    elt  = (ie,avail,reports_on)
@@ -391,11 +393,11 @@ addAvailEnv ie env avail
 
    conflict = conflictFM bad_avail env key elt
    dup 
-    | opt_WarnDuplicateExports = conflictFM dup_avail env key elt
-    | otherwise                = Nothing
+    | warn_dups = conflictFM dup_avail env key elt
+    | otherwise = Nothing
 
 addListToAvailEnv :: AvailEnv -> RdrNameIE -> [AvailInfo] -> RnM s d AvailEnv
-addListToAvailEnv env ie items = foldlRn (addAvailEnv ie) env items
+addListToAvailEnv env ie items = foldlRn (addAvailEnv False ie) env items
 
 bad_avail  (ie1,avail1,r1) (ie2,avail2,r2) 
    = availName avail1 /= availName avail2  -- Same OccName, different Name
@@ -466,7 +468,7 @@ exportsFromAvail this_mod (Just export_items)
 	= failWithRn export_avail_env (exportItemErr ie export_avail)
 
 	| otherwise	-- Phew!  It's OK!
-	= addAvailEnv ie export_avail_env export_avail
+	= addAvailEnv opt_WarnDuplicateExports ie export_avail_env export_avail
        where
           maybe_in_scope  = lookupNameEnv name_env (ieName ie)
 	  Just name	  = maybe_in_scope
