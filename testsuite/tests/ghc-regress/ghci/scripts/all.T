@@ -14,3 +14,4 @@ test('ghci009', normal, ghci_script, ['ghci009.script'])
 test('ghci010', skip, ghci_script, ['ghci010.script'])
 
 test('ghci011', normal, ghci_script, ['ghci011.script'])
+test('ghci012', normal, ghci_script, ['ghci012.script'])
