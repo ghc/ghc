@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.71 2002/03/13 13:51:35 simonmar Exp $
+-- $Id: DriverState.hs,v 1.72 2002/03/15 13:57:31 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -161,7 +161,7 @@ GLOBAL_VAR(v_MaxSimplifierIterations,   4,     Int)
 GLOBAL_VAR(v_StgStats,                  False, Bool)
 GLOBAL_VAR(v_UsageSPInf,  	     	False, Bool)  -- Off by default
 GLOBAL_VAR(v_Strictness,  		True,  Bool)
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 GLOBAL_VAR(v_CPR,         		True,  Bool)
 #endif
 GLOBAL_VAR(v_CSE,         		True,  Bool)
@@ -203,7 +203,7 @@ buildCoreToDo = do
    max_iter   <- readIORef v_MaxSimplifierIterations
    usageSP    <- readIORef v_UsageSPInf
    strictness <- readIORef v_Strictness
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
    cpr        <- readIORef v_CPR
 #endif
    cse        <- readIORef v_CSE
@@ -281,7 +281,7 @@ buildCoreToDo = do
 	],
 	case rule_check of { Just pat -> CoreDoRuleCheck 0 pat; Nothing -> CoreDoNothing },
 
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 	if cpr        then CoreDoCPResult   else CoreDoNothing,
 #endif
 	if strictness then CoreDoStrictness else CoreDoNothing,

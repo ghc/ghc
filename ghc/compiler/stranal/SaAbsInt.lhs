@@ -4,8 +4,8 @@
 \section[SaAbsInt]{Abstract interpreter for strictness analysis}
 
 \begin{code}
-#ifndef DEBUG
--- If DEBUG is off, omit all exports 
+#ifndef OLD_STRICTNESS
+-- If OLD_STRICTNESS is off, omit all exports 
 module SaAbsInt () where
 
 #else
@@ -921,5 +921,5 @@ NB: despite only having a two-point domain, we may still have many
 iterations, because there are several variables involved at once.
 
 \begin{code}
-#endif /* DEBUG */
+#endif /* OLD_STRICTNESS */
 \end{code}

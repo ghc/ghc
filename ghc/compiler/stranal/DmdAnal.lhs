@@ -22,14 +22,14 @@ import DataCon		( dataConTyCon )
 import TyCon		( isProductTyCon, isRecursiveTyCon )
 import Id		( Id, idType, idInlinePragma,
 			  isDataConId, isGlobalId, idArity,
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 			  idDemandInfo,  idStrictness, idCprInfo,
 #endif
 			  idNewStrictness, idNewStrictness_maybe,
 			  setIdNewStrictness, idNewDemandInfo,
 			  setIdNewDemandInfo, idName 
 			)
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 import IdInfo 		( newStrictnessFromOld, newDemand )
 #endif
 import Var		( Var )
@@ -70,8 +70,8 @@ dmdAnalPgm dflags binds
 	let { binds_plus_dmds = do_prog binds } ;
 	endPass dflags "Demand analysis" 
 	 	Opt_D_dump_stranal binds_plus_dmds ;
-#ifdef DEBUG
-	-- Only if DEBUG is on, because only then is the old
+#ifdef OLD_STRICTNESS
+	-- Only if OLD_STRICTNESS is on, because only then is the old
 	-- strictness analyser run
 	let { dmd_changes = get_changes binds_plus_dmds } ;
 	printDump (text "Changes in demands" $$ dmd_changes) ;
@@ -1004,7 +1004,7 @@ boths = zipWithDmds both
 
 
 \begin{code}
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 get_changes binds = vcat (map get_changes_bind binds)
 
 get_changes_bind (Rec pairs) = vcat (map get_changes_pr pairs)

@@ -7,7 +7,7 @@ The original version(s) of all strictness-analyser code (except the
 Semantique analyser) was written by Andy Gill.
 
 \begin{code}
-#ifndef DEBUG
+#ifndef OLD_STRICTNESS
 module StrictAnal ( ) where
 
 #else
@@ -490,5 +490,5 @@ sequenceSa (m:ms) = m		  `thenSa` \ r ->
 		    sequenceSa ms `thenSa` \ rs ->
 		    returnSa (r:rs)
 
-#endif /* DEBUG */
+#endif /* OLD_STRICTNESS */
 \end{code}

@@ -52,7 +52,7 @@ module Id (
 	setIdCgInfo,
 	setIdOccInfo,
 
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 	idDemandInfo, 
 	idStrictness, 
 	idCprInfo,
@@ -73,7 +73,7 @@ module Id (
 	idLBVarInfo,
 	idOccInfo,
 
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 	newStrictnessFromOld 	-- Temporary
 #endif
 
@@ -123,7 +123,7 @@ infixl 	1 `setIdUnfolding`,
 	  `setIdSpecialisation`,
 	  `setInlinePragma`,
 	  `idCafInfo`
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 	  ,`idCprInfo`
 	  ,`setIdStrictness`
 	  ,`setIdDemandInfo`
@@ -323,7 +323,7 @@ idArity id = arityInfo (idInfo id)
 setIdArity :: Id -> Arity -> Id
 setIdArity id arity = modifyIdInfo (`setArityInfo` arity) id
 
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 	---------------------------------
 	-- (OLD) STRICTNESS 
 idStrictness :: Id -> StrictnessInfo
@@ -373,7 +373,7 @@ idUnfolding id = unfoldingInfo (idInfo id)
 setIdUnfolding :: Id -> Unfolding -> Id
 setIdUnfolding id unfolding = modifyIdInfo (`setUnfoldingInfo` unfolding) id
 
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 	---------------------------------
 	-- (OLD) DEMAND
 idDemandInfo :: Id -> Demand.Demand
@@ -400,7 +400,7 @@ setIdSpecialisation id spec_info = modifyIdInfo (`setSpecInfo` spec_info) id
 	---------------------------------
 	-- CG INFO
 idCgInfo :: Id -> CgInfo
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 idCgInfo id = case cgInfo (idInfo id) of
 		  NoCgInfo -> pprPanic "idCgInfo" (ppr id)
 		  info     -> info
@@ -414,7 +414,7 @@ setIdCgInfo id cg_info = modifyIdInfo (`setCgInfo` cg_info) id
 	---------------------------------
 	-- CAF INFO
 idCafInfo :: Id -> CafInfo
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 idCafInfo id = case cgInfo (idInfo id) of
 		  NoCgInfo -> pprPanic "idCafInfo" (ppr id)
 		  info     -> cgCafInfo info
@@ -423,7 +423,7 @@ idCafInfo id = cgCafInfo (idCgInfo id)
 #endif
 	---------------------------------
 	-- CPR INFO
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 idCprInfo :: Id -> CprInfo
 idCprInfo id = cprInfo (idInfo id)
 

@@ -21,7 +21,7 @@ import CoreSyn
 import CostCentre	( pprCostCentreCore )
 import Id		( Id, idType, isDataConId_maybe, idLBVarInfo, idArity,
 			  idInfo, idInlinePragma, idOccInfo,
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 			  idDemandInfo, 
 #endif
 			  globalIdDetails, isGlobalId, isExportedId, 
@@ -34,7 +34,7 @@ import IdInfo		( IdInfo, megaSeqIdInfo,
 			  workerInfo, ppWorkerInfo,
                           tyGenInfo, ppTyGenInfo,
 			  newStrictnessInfo,
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 			  cprInfo, ppCprInfo, 
 			  strictnessInfo,
 #endif
@@ -336,7 +336,7 @@ pprIdBndr id = ppr id <+>
 	       (megaSeqIdInfo (idInfo id) `seq`
 			-- Useful for poking on black holes
 	        ifPprDebug (ppr (idInlinePragma id) <+> ppr (idOccInfo id) <+> 
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 			    ppr (idDemandInfo id) <+>
 #endif
 			    ppr (idNewDemandInfo id) <+>
@@ -356,7 +356,7 @@ ppIdInfo b info
   = hsep [  ppArityInfo a,
             ppTyGenInfo g,
 	    ppWorkerInfo (workerInfo info),
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 	    ppStrictnessInfo s,
             ppCprInfo m,
 #endif
@@ -369,7 +369,7 @@ ppIdInfo b info
   where
     a = arityInfo info
     g = tyGenInfo info
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
     s = strictnessInfo info
     m = cprInfo info
 #endif

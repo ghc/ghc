@@ -159,7 +159,7 @@ doCorePass dfs rb us binds CoreDoSpecialising
    = _scc_ "Specialise"    noStats dfs (specProgram dfs us binds)
 doCorePass dfs rb us binds CoreDoSpecConstr
    = _scc_ "SpecConstr"    noStats dfs (specConstrProgram dfs us binds)
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 doCorePass dfs rb us binds CoreDoCPResult	        
    = _scc_ "CPResult"      noStats dfs (cprAnalyse dfs binds)
 #endif
@@ -175,7 +175,7 @@ doCorePass dfs rb us binds CoreDoNothing
    = noStats dfs (return binds)
 
 strictAnal dfs binds = do
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
      binds <- saBinds dfs binds
 #endif
      dmdAnalPgm dfs binds

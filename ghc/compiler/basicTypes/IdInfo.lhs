@@ -45,7 +45,7 @@ module IdInfo (
 	-- Unfolding
 	unfoldingInfo, setUnfoldingInfo, 
 
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 	-- Old DemandInfo and StrictnessInfo
 	demandInfo, setDemandInfo, 
 	strictnessInfo, setStrictnessInfo,
@@ -121,7 +121,7 @@ infixl 	1 `setTyGenInfo`,
 	  `setNewStrictnessInfo`,
 	  `setAllStrictnessInfo`,
 	  `setNewDemandInfo`
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 	  , `setCprInfo`
 	  , `setDemandInfo`
 	  , `setStrictnessInfo`
@@ -141,7 +141,7 @@ To be removed later
 -- Set old and new strictness info
 setAllStrictnessInfo info Nothing
   = info { newStrictnessInfo = Nothing
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
          , strictnessInfo = NoStrictnessInfo
          , cprInfo = NoCPRInfo
 #endif
@@ -149,7 +149,7 @@ setAllStrictnessInfo info Nothing
 
 setAllStrictnessInfo info (Just sig)
   = info { newStrictnessInfo = Just sig
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
          , strictnessInfo = oldStrictnessFromNew sig
          , cprInfo = cprInfoFromNewStrictness sig
 #endif
@@ -158,7 +158,7 @@ setAllStrictnessInfo info (Just sig)
 seqNewStrictnessInfo Nothing = ()
 seqNewStrictnessInfo (Just ty) = seqStrictSig ty
 
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 oldStrictnessFromNew :: StrictSig -> Demand.StrictnessInfo
 oldStrictnessFromNew sig = mkStrictnessInfo (map oldDemand dmds, isBotRes res_info)
 			 where
@@ -211,7 +211,7 @@ oldDemand (Eval (Prod ds)) = WwUnpack True (map oldDemand ds)
 oldDemand (Eval (Poly _))  = WwStrict
 oldDemand (Call _)         = WwStrict
 
-#endif /* DEBUG */
+#endif /* OLD_STRICTNESS */
 \end{code}
 
 
@@ -280,7 +280,7 @@ data IdInfo
 	arityInfo 	:: !ArityInfo,		-- Its arity
 	specInfo 	:: CoreRules,		-- Specialisations of this function which exist
         tyGenInfo       :: TyGenInfo,           -- Restrictions on usage-generalisation of this Id
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 	cprInfo 	:: CprInfo,             -- Function always constructs a product result
 	demandInfo 	:: Demand.Demand,	-- Whether or not it is definitely demanded
 	strictnessInfo	:: StrictnessInfo,	-- Strictness properties
@@ -315,7 +315,7 @@ megaSeqIdInfo info
     seqDemand (newDemandInfo info)		`seq`
     seqNewStrictnessInfo (newStrictnessInfo info) `seq`
 
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
     Demand.seqDemand (demandInfo info)		`seq`
     seqStrictnessInfo (strictnessInfo info)	`seq`
     seqCpr (cprInfo info)			`seq`
@@ -336,7 +336,7 @@ setSpecInfo 	  info sp = sp `seq` info { specInfo = sp }
 setTyGenInfo      info tg = tg `seq` info { tyGenInfo = tg }
 setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
 setOccInfo	  info oc = oc `seq` info { occInfo = oc }
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 setStrictnessInfo info st = st `seq` info { strictnessInfo = st }
 #endif
 	-- Try to avoid spack leaks by seq'ing
@@ -359,7 +359,7 @@ setUnfoldingInfo  info uf
 	-- actually increases residency significantly. 
   = info { unfoldingInfo = uf }
 
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 setDemandInfo	  info dd = info { demandInfo = dd }
 setCprInfo        info cp = info { cprInfo = cp }
 #endif
@@ -380,7 +380,7 @@ vanillaIdInfo
   = IdInfo {
 	    cgInfo		= noCgInfo,
 	    arityInfo		= unknownArity,
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 	    cprInfo		= NoCPRInfo,
 	    demandInfo		= wwLazy,
 	    strictnessInfo	= NoStrictnessInfo,
@@ -592,7 +592,7 @@ but only as a thunk --- the information is only actually produced further
 downstream, by the code generator.
 
 \begin{code}
-#ifndef DEBUG
+#ifndef OLD_STRICTNESS
 newtype CgInfo = CgInfo CafInfo	-- We are back to only having CafRefs in CgInfo
 noCgInfo = panic "NoCgInfo!"
 #else
@@ -671,7 +671,7 @@ function has the CPR property and which components of the result are
 also CPRs.   
 
 \begin{code}
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 data CprInfo
   = NoCPRInfo
   | ReturnsCPR	-- Yes, this function returns a constructed product
@@ -849,7 +849,7 @@ copyIdInfo :: IdInfo	-- f_local
   	   -> IdInfo	-- f (the exported one)
 	   -> IdInfo	-- New info for f
 copyIdInfo f_local f = f { newStrictnessInfo = newStrictnessInfo f_local,
-#ifdef DEBUG
+#ifdef OLD_STRICTNESS
 			   strictnessInfo = strictnessInfo f_local,
 			   cprInfo        = cprInfo        f_local,
 #endif

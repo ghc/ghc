@@ -2,7 +2,7 @@
 constructed product result}
 
 \begin{code}
-#ifndef DEBUG
+#ifndef OLD_STRICTNESS
 module CprAnalyse ( ) where
 
 #else
@@ -311,5 +311,5 @@ getCprAbsVal v = case idCprInfo v of
 		 arity = idArity v
 	-- Imported (non-nullary) constructors will have the CPR property
 	-- in their IdInfo, so no need to look at their unfolding
-#endif /* DEBUG */
+#endif /* OLD_STRICTNESS */
 \end{code}
