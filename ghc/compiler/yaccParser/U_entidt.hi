@@ -1,7 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface U_entidt where
-import PreludePS(_PackedString)
-import U_list(U_list)
-data U_entidt   = U_entid _PackedString | U_enttype _PackedString | U_enttypeall _PackedString | U_enttypecons _PackedString U_list | U_entclass _PackedString U_list | U_entmod _PackedString
-rdU_entidt :: _Addr -> _PackedString -> _State _RealWorld -> (U_entidt, _State _RealWorld)
-

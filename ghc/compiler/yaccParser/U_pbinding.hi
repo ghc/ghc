@@ -1,9 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface U_pbinding where
-import PreludePS(_PackedString)
-import U_binding(U_binding)
-import U_list(U_list)
-import U_treeHACK(U_tree)
-data U_pbinding   = U_pgrhs U_tree U_list U_binding _PackedString Int
-rdU_pbinding :: _Addr -> _PackedString -> _State _RealWorld -> (U_pbinding, _State _RealWorld)
-

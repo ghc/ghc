@@ -1,6 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface U_finfot where
-import PreludePS(_PackedString)
-data U_finfot   = U_finfo _PackedString _PackedString
-rdU_finfot :: _Addr -> _PackedString -> _State _RealWorld -> (U_finfot, _State _RealWorld)
-
