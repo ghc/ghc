@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: showTime.c,v 1.3 1998/12/02 13:27:57 simonm Exp $
+ * $Id: showTime.c,v 1.4 1999/09/30 12:42:26 sof Exp $
  *
  * ClockTime.showsPrec Runtime Support
  */
@@ -21,31 +21,28 @@
 #endif
 
 StgAddr
-showTime(I_ size, StgByteArray d, StgByteArray buf)
+showTime(I_ size, StgByteArray d, I_ maxsize, StgByteArray buf)
 {
     time_t t;
     struct tm *tm;
 
     switch(size) {
-	default:
-            return (StgAddr)strcpy(buf, "ClockTime.show{LibTime}: out of range");
 	case 0:
 	    t = 0;
 	    break;
 	case -1:
 	    t = - (time_t) ((StgInt *)d)[0];
-	    if (t > 0) 
-                return
- (StgAddr)strcpy(buf, "ClockTime.show{LibTime}: out of range");
 	    break;
 	case 1:
 	    t = (time_t) ((StgInt *)d)[0];
-	    if (t < 0) 
-               return (StgAddr) strcpy(buf, "ClockTime.show{LibTime}: out of range");
 	    break;
+	default:
+	    return (-1);
 	}
     tm = localtime(&t);
-    if (tm != NULL && strftime(buf, 32 /*Magic number*/, "%a %b %d %T %Z %Y", tm) > 0)
-       return (StgAddr)buf;
-    return (StgAddr)strcpy(buf, "ClockTime.show{LibTime}: internal error");
+    if (tm != NULL && strftime(buf, maxsize, "%a %b %d %T %Z %Y", tm) > 0) {
+       return 1;
+    } else {
+       return (-1);
+    }
 }

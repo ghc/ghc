@@ -44,7 +44,9 @@ import PrelHandle
 import PrelArr
 import PrelST
 import PrelAddr
-import PrelPack 	( unpackCString, new_ps_array )
+import PrelPack 	( unpackCString, new_ps_array,
+			  freeze_ps_array, unpackCStringBA
+			)
 #endif
 
 import Ix
@@ -100,9 +102,17 @@ instance Show ClockTime where
       case int2Integer# i of (# s, d #) -> showsPrec p (TOD (J# s d) _nsec)
     showsPrec _ (TOD (J# s# d#) _nsec) = 
       showString $ unsafePerformIO $ do
-	    buf <- allocChars 38 -- exactly enough for error message
-	    str <- showTime (I# s#) d# buf
-	    return (unpackCString str)
+            let buflen@(I# buflen#) = 50 -- big enough for error message
+	    buf <- allocChars buflen 
+	    if s# <# (negateInt# 1#) || s# ># 1# then
+	       return "ClockTime.show{Time}: out of range"
+	     else do
+  	       rc <- showTime (I# s#) d# buflen buf
+	       if rc < 0 then
+	          return "ClockTime.show{Time}: internal error"
+	        else do
+		  ba <- stToIO (freeze_ps_array buf buflen#)
+	          return (unpackCStringBA ba)
 
     showList = showList__ (showsPrec 0)
 #endif
@@ -603,13 +613,14 @@ foreign import "libHS_cbits" "toClockSec"
             toClockSec   :: Int -> Int -> Int -> Int -> Int 
 	    		 -> Int -> Int -> MBytes -> IO Int
 
-foreign import "libHS_cbits" "prim_getClockTime" 
+foreign import "libHS_cbits" "getClockTime" 
            primGetClockTime :: MutableByteArray RealWorld Int
 	                    -> MutableByteArray RealWorld Int
 			    -> IO Int
 foreign import "libHS_cbits" "showTime" 
            showTime :: Int
 	            -> Bytes
+		    -> Int
 		    -> MBytes
-		    -> IO Addr{-packed C string -}
+		    -> IO Int
 \end{code}

@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: stgio.h,v 1.12 1999/09/19 19:26:57 sof Exp $
+ * $Id: stgio.h,v 1.13 1999/09/30 12:42:26 sof Exp $
  *
  * Helper code for GHC's IO subsystem.
  */
@@ -196,7 +196,7 @@ StgInt  const_BUFSIZ (void);
 StgInt setCurrentDirectory (StgByteArray);
 
 /* showTime.c */
-StgAddr showTime (StgInt, StgByteArray, StgByteArray);
+StgInt showTime (StgInt, StgByteArray, StgInt, StgByteArray);
 
 /* system.c */
 StgInt	systemCmd (StgByteArray);
