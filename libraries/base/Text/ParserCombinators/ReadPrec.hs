@@ -28,7 +28,7 @@ module Text.ParserCombinators.ReadPrec
   reset,         -- :: ReadPrec a -> ReadPrec a
 
   -- * Other operations
-  -- All are based directly on their similarly-naned 'ReadP' counterparts.
+  -- | All are based directly on their similarly-named 'ReadP' counterparts.
   get,           -- :: ReadPrec Char
   look,          -- :: ReadPrec String
   (+++),         -- :: ReadPrec a -> ReadPrec a -> ReadPrec a
@@ -95,43 +95,55 @@ minPrec = 0
 -- Operations over ReadPrec
 
 lift :: ReadP a -> ReadPrec a
--- ^ Lift a precedence-insensitive 'ReadP' to a 'ReadPrec'
+-- ^ Lift a precedence-insensitive 'ReadP' to a 'ReadPrec'.
 lift m = P (\_ -> m)
 
 step :: ReadPrec a -> ReadPrec a
--- ^ Increases the precedence context by one
+-- ^ Increases the precedence context by one.
 step (P f) = P (\n -> f (n+1))
 
 reset :: ReadPrec a -> ReadPrec a
--- ^ Resets the precedence context to zero
+-- ^ Resets the precedence context to zero.
 reset (P f) = P (\n -> f minPrec)
 
 prec :: Prec -> ReadPrec a -> ReadPrec a
--- ^ @(prec n p)@ checks that the precedence context is 
---			  less than or equal to n,
+-- ^ @(prec n p)@ checks whether the precedence context is 
+--   less than or equal to @n@, and
+--
 --   * if not, fails
---   * if so, parses p in context n
+--
+--   * if so, parses @p@ in context @n@.
 prec n (P f) = P (\c -> if c <= n then f n else ReadP.pfail)
 
 -- ---------------------------------------------------------------------------
 -- Derived operations
 
 get :: ReadPrec Char
+-- ^ Consumes and returns the next character.
+--   Fails if there is no input left.
 get = lift ReadP.get
 
 look :: ReadPrec String
+-- ^ Look-ahead: returns the part of the input that is left, without
+--   consuming it.
 look = lift ReadP.look
 
 (+++) :: ReadPrec a -> ReadPrec a -> ReadPrec a
+-- ^ Symmetric choice.
 P f1 +++ P f2 = P (\n -> f1 n ReadP.+++ f2 n)
 
 (<++) :: ReadPrec a -> ReadPrec a -> ReadPrec a
+-- ^ Local, exclusive, left-biased choice: If left parser
+--   locally produces any result at all, then right parser is
+--   not used.
 P f1 <++ P f2 = P (\n -> f1 n ReadP.<++ f2 n)
 
 pfail :: ReadPrec a
+-- ^ Always fails.
 pfail = lift ReadP.pfail
 
 choice :: [ReadPrec a] -> ReadPrec a
+-- ^ Combines all parsers in the specified list.
 choice ps = foldr (+++) pfail ps
 
 -- ---------------------------------------------------------------------------
