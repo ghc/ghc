@@ -15,7 +15,15 @@ related information is available from the Haskell home page at
 =============
 
 Release 2.06 represent work done through August '97.
-.....
+
+Highlights of this release:
+
+	* All bugs reported since the release of 2.05 have been fixed.
+	* GHC's interface file parser now uses the latest version of 
+	  Happy, and as a result we've included Happy in the distribution.
+
+A detailed list of changes can be found in the release notes in the
+GHC User's Guide.
 
 + Mailing lists
 ================
