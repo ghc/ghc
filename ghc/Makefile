@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.16 2001/04/24 13:24:45 simonmar Exp $
+# $Id: Makefile,v 1.17 2001/04/27 03:11:25 qrczak Exp $
 #
 
 TOP=.
@@ -38,6 +38,5 @@ endif
 SRC_DIST_FILES += configure
 
 DIST_CLEAN_FILES += ghc.spec config.status
-MAINTAINER_CLEAN_FILES += configure
 
 include $(TOP)/mk/target.mk
