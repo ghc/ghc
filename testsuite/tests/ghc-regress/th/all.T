@@ -1,5 +1,5 @@
 def f(opts):
-  opts.extra_hc_opts = '-fglasgow-exts -package haskell-src'
+  opts.extra_hc_opts = '-fth -package haskell-src'
 
 setTestOpts(f)
 setTestOpts(only_ways(['normal']));
