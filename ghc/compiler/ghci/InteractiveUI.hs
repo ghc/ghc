@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.136 2002/10/15 13:18:51 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.137 2002/10/17 14:49:52 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -24,7 +24,7 @@ import DriverFlags
 import DriverState
 import DriverUtil	( remove_spaces, handle )
 import Linker		( initLinker, showLinkerState, linkLibraries )
-import Finder		( flushPackageCache )
+import Finder		( flushFinderCache )
 import Util
 import Id		( isRecordSelector, recordSelectorFieldLabel, 
 			  isDataConWrapId, isDataConId, idName )
@@ -37,6 +37,7 @@ import Name		( Name, isHomePackageName, nameSrcLoc, nameOccName,
 			  NamedThing(..) )
 import OccName		( isSymOcc )
 import BasicTypes	( defaultFixity, SuccessFlag(..) )
+import Packages
 import Outputable
 import CmdLineOpts	( DynFlag(..), DynFlags(..), getDynFlags, saveDynFlags,
 			  restoreDynFlags, dopt_unset )
@@ -156,11 +157,8 @@ interactiveUI cmstate paths cmdline_objs = do
 
    dflags <- getDynFlags
 
-   -- Link in the available packages
+	-- packages are loaded "on-demand" now
    initLinker
-	--	Now that demand-loading works, we don't really need to pre-load the packages
-	--   pkgs <- getPackages
-	--   linkPackages dflags  pkgs
    linkLibraries dflags cmdline_objs
 
 	-- Initialise buffering for the *interpreted* I/O system
@@ -834,13 +832,20 @@ setOptions wds =
       pkgs_after  <- io (readIORef v_Packages)
 
       -- update things if the users wants more packages
-      when (pkgs_before /= pkgs_after) $
-	 newPackages (pkgs_after \\ pkgs_before)
+      let new_packages = pkgs_after \\ pkgs_before
+      when (not (null new_packages)) $
+	 newPackages new_packages
+
+      -- don't forget about the extra command-line flags from the 
+      -- extra_ghc_opts fields in the new packages
+      new_package_details <- io (getPackageDetails new_packages)
+      let pkg_extra_opts = concatMap extra_ghc_opts new_package_details
+      pkg_extra_dyn <- io (processArgs static_flags pkg_extra_opts [])
 
       -- then, dynamic flags
       io $ do 
 	restoreDynFlags
-        leftovers <- processArgs dynamic_flags leftovers []
+        leftovers <- processArgs dynamic_flags (leftovers ++ pkg_extra_dyn) []
 	saveDynFlags
 
         if (not (null leftovers))
@@ -899,10 +904,6 @@ newPackages new_pkgs = do	-- The new packages are already in v_Packages
   dflags   <- io getDynFlags
   cmstate1 <- io (cmUnload (cmstate state) dflags)
   setGHCiState state{ cmstate = cmstate1, targets = [] }
-
-  io $ do pkgs <- getPackageInfo
-	  flushPackageCache pkgs
-
   setContextAfterLoad []
 
 -----------------------------------------------------------------------------
