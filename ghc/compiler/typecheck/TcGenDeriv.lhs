@@ -58,9 +58,8 @@ import TyCon		( TyCon, isNewTyCon, tyConDataCons, isEnumerationTyCon,
 			  maybeTyConSingleCon, tyConFamilySize, tyConTyVars
 			)
 import TcType		( isUnLiftedType, tcEqType, Type )
-import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy,
-			  floatPrimTy, doublePrimTy
-			)
+import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy, floatPrimTy, doublePrimTy )
+import TysWiredIn	( charDataCon, intDataCon, floatDataCon, doubleDataCon, addrDataCon, wordDataCon )
 import Util		( zipWithEqual, isSingleton,
 			  zipWith3Equal, nOfThem, zipEqual )
 import Panic		( panic, assertPanic )
@@ -212,7 +211,7 @@ gen_Eq_binds tycon
 	nested_eq_expr tys as bs
 	  = foldl1 and_Expr (zipWith3Equal "nested_eq" nested_eq tys as bs)
 	  where
-	    nested_eq ty a b = HsPar (eq_Expr ty (HsVar a) (HsVar b))
+	    nested_eq ty a b = HsPar (eq_Expr tycon ty (HsVar a) (HsVar b))
 \end{code}
 
 %************************************************************************
@@ -369,11 +368,11 @@ gen_Ord_binds tycon
 	    tys_needed  = dataConOrigArgTys data_con
 
 	    nested_compare_expr [ty] [a] [b]
-	      = careful_compare_Case ty eqTag_Expr (HsVar a) (HsVar b)
+	      = careful_compare_Case tycon ty eqTag_Expr (HsVar a) (HsVar b)
 
 	    nested_compare_expr (ty:tys) (a:as) (b:bs)
 	      = let eq_expr = nested_compare_expr tys as bs
-		in  careful_compare_Case ty eq_expr (HsVar a) (HsVar b)
+		in  careful_compare_Case tycon ty eq_expr (HsVar a) (HsVar b)
 
 	default_rhs | null nullary_cons = impossible_Expr	-- Keep desugarer from complaining about
 								-- inexhaustive patterns
@@ -654,10 +653,9 @@ gen_Ix_binds tycon
     data_con
       =	case maybeTyConSingleCon tycon of -- just checking...
 	  Nothing -> panic "get_Ix_binds"
-	  Just dc -> if (any isUnLiftedType (dataConOrigArgTys dc)) then
-			 error ("ERROR: Can't derive Ix for a single-constructor type with primitive argument types: "++tycon_str)
-		     else
-			 dc
+	  Just dc | any isUnLiftedType (dataConOrigArgTys dc)
+		  -> pprPanic "Can't derive Ix for a single-constructor type with primitive argument types:" (ppr tycon)
+		  | otherwise -> dc
 
     con_arity    = dataConSourceArity data_con
     data_con_RDR = getRdrName data_con
@@ -808,13 +806,13 @@ gen_Read_binds get_fixity tycon
      
        	prefix_stmts		-- T a b c
        	  = [bindLex (ident_pat (data_con_str data_con))]
-       	    ++ map read_arg as_needed
+       	    ++ read_args
        	    ++ [result_stmt data_con as_needed]
      	 
        	infix_stmts 		-- a %% b
-       	  = [read_arg a1, 
+       	  = [read_a1, 
    	     bindLex (symbol_pat (data_con_str data_con)),
-     	     read_arg a2,
+     	     read_a2,
      	     result_stmt data_con [a1,a2]]
      
        	lbl_stmts		-- T { f1 = a, f2 = b }
@@ -832,7 +830,9 @@ gen_Read_binds get_fixity tycon
        	dc_nm	     = getName data_con
        	is_infix     = isDataSymOcc (getOccName dc_nm)
        	as_needed    = take con_arity as_RDRs
-       	(a1:a2:_)    = as_needed
+	read_args    = zipWithEqual "gen_Read_binds" read_arg as_needed (dataConOrigArgTys data_con)
+       	(read_a1:read_a2:_) = read_args
+	(a1:a2:_)           = as_needed
        	prec 	     = getPrec is_infix get_fixity dc_nm
 
     ------------------------------------------------------------------------
@@ -850,7 +850,9 @@ gen_Read_binds get_fixity tycon
     data_con_str con = mkHsString (occNameUserString (getOccName con))
     
     read_punc c = bindLex (punc_pat c)
-    read_arg a  = BindStmt (VarPat a) (mkHsVarApps step_RDR [readPrec_RDR]) loc
+    read_arg a ty 
+	| isUnLiftedType ty = pprPanic "Error in deriving:" (text "Can't read unlifted types yet:" <+> ppr ty)
+	| otherwise = BindStmt (VarPat a) (mkHsVarApps step_RDR [readPrec_RDR]) loc
     
     read_field lbl a = read_lbl lbl ++
     		       [read_punc "=",
@@ -928,6 +930,7 @@ gen_Show_binds get_fixity tycon
 	     data_con_RDR  = getRdrName data_con
 	     con_arity     = dataConSourceArity data_con
 	     bs_needed     = take con_arity bs_RDRs
+	     arg_tys       = dataConOrigArgTys data_con		-- Correspond 1-1 with bs_needed
 	     con_pat       = mkConPat data_con_RDR bs_needed
 	     nullary_con   = con_arity == 0
              labels        = dataConFieldLabels data_con
@@ -952,16 +955,13 @@ gen_Show_binds get_fixity tycon
 		 where
 		   occ_nm   = getOccName (fieldLabelName l)
 		   nm       = occNameUserString occ_nm
-
 		   is_op    = isSymOcc occ_nm	    -- Legal, but rare.
-		   the_name 
-		     | is_op     = '(':nm ++ ")"
-		     | otherwise = nm
+		   the_name | is_op     = '(':nm ++ ")"
+			    | otherwise = nm
 
-             show_args = [ mkHsApps showsPrec_RDR [HsLit (HsInt arg_prec), HsVar b]
-			 | b <- bs_needed ]
+             show_args 		     = zipWith show_arg bs_needed arg_tys
 	     (show_arg1:show_arg2:_) = show_args
-	     show_prefix_args = intersperse (HsVar showSpace_RDR) show_args
+	     show_prefix_args	     = intersperse (HsVar showSpace_RDR) show_args
 
 		--  Assumption for record syntax: no of fields == no of labelled fields 
 		--            (and in same order)
@@ -971,6 +971,12 @@ gen_Show_binds get_fixity tycon
 				| (lbl,arg) <- zipEqual "gen_Show_binds" 
 							labels show_args ]
 			       
+		-- Generates (showsPrec p x) for argument x, but it also boxes
+		-- the argument first if necessary.  Note that this prints unboxed
+		-- things without any '#' decorations; could change that if need be
+	     show_arg b arg_ty = mkHsApps showsPrec_RDR [HsLit (HsInt arg_prec), 
+							 box_if_necy "Show" tycon (HsVar b) arg_ty]
+
 		-- Fixity stuff
 	     is_infix = isDataSymOcc dc_occ_nm
              con_prec_plus_one = 1 + getPrec is_infix get_fixity dc_nm
@@ -1261,7 +1267,8 @@ compare_gen_Case ::
 	  -> RdrNameHsExpr -> RdrNameHsExpr
 	  -> RdrNameHsExpr
 careful_compare_Case :: -- checks for primitive types...
-	  Type
+	  TyCon			-- The tycon we are deriving for
+	  -> Type
 	  -> RdrNameHsExpr	-- What to do for equality
 	  -> RdrNameHsExpr -> RdrNameHsExpr
 	  -> RdrNameHsExpr
@@ -1278,24 +1285,41 @@ compare_gen_Case eq a b				-- General case
        mkSimpleMatch [mkNullaryConPat gtTag_RDR] gtTag_Expr placeHolderType generatedSrcLoc]
       generatedSrcLoc
 
-careful_compare_Case ty eq a b
-  | not (isUnLiftedType ty) =
-       compare_gen_Case eq a b
-  | otherwise               =
-         -- we have to do something special for primitive things...
-       HsIf (genOpApp a relevant_eq_op b)
-	    eq
-	    (HsIf (genOpApp a relevant_lt_op b) ltTag_Expr gtTag_Expr generatedSrcLoc)
-	    generatedSrcLoc
+careful_compare_Case tycon ty eq a b
+  | not (isUnLiftedType ty)
+  = compare_gen_Case eq a b
+  | otherwise      -- We have to do something special for primitive things...
+  = HsIf (genOpApp a relevant_eq_op b)
+	 eq
+	 (HsIf (genOpApp a relevant_lt_op b) ltTag_Expr gtTag_Expr generatedSrcLoc)
+	 generatedSrcLoc
   where
-    relevant_eq_op = assoc_ty_id eq_op_tbl ty
-    relevant_lt_op = assoc_ty_id lt_op_tbl ty
+    relevant_eq_op = assoc_ty_id "Ord" tycon eq_op_tbl ty
+    relevant_lt_op = assoc_ty_id "Ord" tycon lt_op_tbl ty
 
-assoc_ty_id tyids ty 
-  = if null res then panic "assoc_ty"
-    else head res
+
+box_if_necy :: String		-- The class involved
+	    -> TyCon		-- The tycon involved
+	    -> RdrNameHsExpr	-- The argument
+	    -> Type		-- The argument type
+	    -> RdrNameHsExpr	-- Boxed version of the arg
+box_if_necy cls_str tycon arg arg_ty
+  | isUnLiftedType arg_ty = HsApp (HsVar box_con) arg
+  | otherwise		  = arg
   where
-    res = [id | (ty',id) <- tyids, ty `tcEqType` ty']
+    box_con = assoc_ty_id cls_str tycon box_con_tbl arg_ty
+
+assoc_ty_id :: String		-- The class involved
+	    -> TyCon		-- The tycon involved
+	    -> [(Type,a)]	-- The table
+	    -> Type		-- The type
+	    -> a		-- The result of the lookup
+assoc_ty_id cls_str tycon tbl ty 
+  | null res = pprPanic "Error in deriving:" (text "Can't derive" <+> text cls_str <+> 
+					      text "for primitive type" <+> ppr ty)
+  | otherwise = head res
+  where
+    res = [id | (ty',id) <- tbl, ty `tcEqType` ty']
 
 eq_op_tbl =
     [(charPrimTy,	eqChar_RDR)
@@ -1315,6 +1339,15 @@ lt_op_tbl =
     ,(doublePrimTy,	ltDouble_RDR)
     ]
 
+box_con_tbl =
+    [(charPrimTy,	getRdrName charDataCon)
+    ,(intPrimTy,	getRdrName intDataCon)
+    ,(wordPrimTy,	getRdrName wordDataCon)
+    ,(addrPrimTy,	getRdrName addrDataCon)
+    ,(floatPrimTy,	getRdrName floatDataCon)
+    ,(doublePrimTy,	getRdrName doubleDataCon)
+    ]
+
 -----------------------------------------------------------------------
 
 and_Expr, append_Expr :: RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
@@ -1324,14 +1357,14 @@ append_Expr a b = genOpApp a append_RDR b
 
 -----------------------------------------------------------------------
 
-eq_Expr :: Type -> RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
-eq_Expr ty a b = genOpApp a eq_op b
+eq_Expr :: TyCon -> Type -> RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
+eq_Expr tycon ty a b = genOpApp a eq_op b
  where
    eq_op
     | not (isUnLiftedType ty) = eq_RDR
     | otherwise               =
          -- we have to do something special for primitive things...
-	assoc_ty_id eq_op_tbl ty
+	assoc_ty_id "Eq" tycon eq_op_tbl ty
 
 \end{code}
 
