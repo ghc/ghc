@@ -292,6 +292,12 @@ MAIN                     MAIN             0    0.0   0.0    100.0 100.0
 	  variable.</para></footnote>.  Notice that this is a recursive
 	  definition.</para>
 	</listitem>
+
+	<listitem>
+	  <para>Time spent in foreign code (see <xref linkend="ffi">)
+	  is always attributed to the cost centre in force at the
+	  Haskell call-site of the foreign function.</para>
+	</listitem>
       </itemizedlist>
 
       <para>What do we mean by one-off costs?  Well, Haskell is a lazy
@@ -327,7 +333,6 @@ x = nfib 25
       doesn't look like you expect it to, feel free to send it (and
       your program) to us at
       <email>glasgow-haskell-bugs@haskell.org</email>.</para>
-
     </sect2>
   </sect1>
 
