@@ -8,8 +8,12 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 
 module PrelCCall (
-	CCallable(..), CReturnable(..),
-	Word(..)
+	CCallable(..),
+	CReturnable(..),
+
+	Word(..),
+	Word64(..),
+	Int64(..)
    ) where
 
 import PrelBase
@@ -42,11 +46,23 @@ instance CCallable   Double
 instance CCallable   Double#
 instance CReturnable Double
 
-data Word = W# Word# 	deriving (Eq, Ord) -- Glasgow extension
+data Word = W# Word# 	   deriving (Eq, Ord) -- Glasgow extension
 
 instance CCallable Word
 instance CCallable Word#
 instance CReturnable Word
+
+
+data Word64 = W64# Word64# --deriving (Eq, Ord) -- Glasgow extension
+data Int64  = I64# Int64#  --deriving (Eq, Ord) -- Glasgow extension
+
+instance CCallable   Word64
+instance CCallable   Word64#
+instance CReturnable Word64
+
+instance CCallable   Int64
+instance CCallable   Int64#
+instance CReturnable Int64
 
 instance CReturnable () -- Why, exactly?
 \end{code}
