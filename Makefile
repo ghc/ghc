@@ -72,10 +72,10 @@ binary-dist ::
 	@for way in $(BINDIST_DOCS_WAYS); do \
 	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way/$(GhcProjectNameShort)-$(GhcProjectVersion); \
 	   for dir in $(BINDIST_DOCS); do \
-	     echo Making $$way documentation in $$dir; \
-	     $(MAKE) -C $$dir --no-print-directory $(MFLAGS) $$way; \
-	     echo cp -f $$dir/*.$$way $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way/$(GhcProjectNameShort)-$(GhcProjectVersion); \
-	     cp -f $$dir/*.$$way $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way/$(GhcProjectNameShort)-$(GhcProjectVersion); \
+	     echo Making $$way documentation in $$dir && \
+	     $(MAKE) -C $$dir --no-print-directory $(MFLAGS) $$way && \
+	     echo cp -f $$dir/*.$$way $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way/$(GhcProjectNameShort)-$(GhcProjectVersion) && \
+	     cp -f $$dir/*.$$way $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way/$(GhcProjectNameShort)-$(GhcProjectVersion) && \
 	     echo "Done."; \
 	   done; \
 	done
