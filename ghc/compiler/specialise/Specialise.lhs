@@ -23,7 +23,7 @@ import Type		( Type, mkTyVarTy, splitSigmaTy, splitFunTysN,
 			)
 import PprType		( {- instance Outputable Type -} )
 import Subst		( Subst, mkSubst, substTy, mkSubst, substBndrs, extendSubstList,
-			  substId, substAndCloneId, substAndCloneIds, lookupIdSubst
+			  substId, substAndCloneId, substAndCloneIds, lookupIdSubst, substInScope
 			) 
 import Var		( TyVar, mkSysTyVar, setVarUnique )
 import VarSet
@@ -34,7 +34,7 @@ import CoreUnfold	( certainlyWillInline )
 import CoreFVs		( exprFreeVars, exprsFreeVars )
 import CoreLint		( beginPass, endPass )
 import PprCore		( pprCoreRules )
-import Rules		( addIdSpecialisations )
+import Rules		( addIdSpecialisations, lookupRule )
 
 import UniqSupply	( UniqSupply,
 			  UniqSM, initUs_, thenUs, thenUs_, returnUs, getUniqueUs, 
@@ -42,7 +42,7 @@ import UniqSupply	( UniqSupply,
 			)
 import Name		( nameOccName, mkSpecOcc, getSrcLoc )
 import FiniteMap
-import Maybes		( MaybeErr(..), catMaybes )
+import Maybes		( MaybeErr(..), catMaybes, maybeToBool )
 import ErrUtils		( dumpIfSet )
 import Bag
 import List		( partition )
@@ -648,7 +648,7 @@ specExpr subst expr@(App fun arg)
 			    returnSM (App fun' arg', uds_arg `plusUDs` uds_app)
 
     go (Var f)       args = case specVar subst f of
-				Var f' -> returnSM (Var f', mkCallUDs f' args)
+				Var f' -> returnSM (Var f', mkCallUDs subst f' args)
 				e'     -> returnSM (e', emptyUDs)	-- I don't expect this!
     go other	     args = specExpr subst other
 
@@ -943,8 +943,8 @@ type CallInfo     = FiniteMap [Maybe Type]			-- Nothing => unconstrained type ar
 unionCalls :: CallDetails -> CallDetails -> CallDetails
 unionCalls c1 c2 = plusFM_C plusFM c1 c2
 
-singleCall :: (Id, [Maybe Type], [DictExpr]) -> CallDetails
-singleCall (id, tys, dicts) 
+singleCall :: Id -> [Maybe Type] -> [DictExpr] -> CallDetails
+singleCall id tys dicts 
   = unitFM id (unitFM tys (dicts, call_fvs))
   where
     call_fvs = exprsFreeVars dicts `unionVarSet` tys_fvs
@@ -970,15 +970,20 @@ callDetailsToList calls = [ (id,tys,dicts)
 		            (tys,dicts) <- fmToList fm
 			  ]
 
-mkCallUDs f args 
+mkCallUDs subst f args 
   | null theta
   || length spec_tys /= n_tyvars
   || length dicts    /= n_dicts
-  = emptyUDs	-- Not overloaded
+  || maybeToBool (lookupRule (substInScope subst) f args)
+	-- There's already a rule covering this call.  A typical case
+	-- is where there's an explicit user-provided rule.  Then
+	-- we don't want to create a specialised version 
+	-- of the function that overlaps.
+  = emptyUDs	-- Not overloaded, or no specialisation wanted
 
   | otherwise
   = MkUD {dict_binds = emptyBag, 
-	  calls      = singleCall (f, spec_tys, dicts)
+	  calls      = singleCall f spec_tys dicts
     }
   where
     (tyvars, theta, tau) = splitSigmaTy (idType f)

@@ -202,10 +202,9 @@ tc_type_kind (HsUsgForAllTy uv_name ty)
       returnTc (kind, mkUsForAllTy uv tc_ty)
 
 tc_type_kind (HsForAllTy (Just tv_names) context ty)
-  = tcExtendTyVarScope tv_names		$ \ tyvars ->
+  = tcExtendTyVarScope tv_names		$ \ forall_tyvars ->
     tcContext context			`thenTc` \ theta ->
     tc_type_kind ty			`thenTc` \ (kind, tau) ->
-    tcGetInScopeTyVars			`thenTc` \ in_scope_vars ->
     let
 	body_kind | null theta = kind
 		  | otherwise  = boxedTypeKind
@@ -227,29 +226,47 @@ tc_type_kind (HsForAllTy (Just tv_names) context ty)
 	--	forall x y. (C x y) => x
 	-- is not ambiguous because x is mentioned and x determines y
 	--
-	-- In addition, GHC insists that at least one type variable
+	-- NOTE: In addition, GHC insists that at least one type variable
 	-- in each constraint is in V.  So we disallow a type like
 	--	forall a. Eq b => b -> b
 	-- even in a scope where b is in scope.
+	-- This is the is_free test below.
 
-	forall_tyvars	    = map varName tyvars	-- was: in_scope_vars.  Why???
 	tau_vars	    = tyVarsOfType tau
 	fds		    = instFunDepsOfTheta theta
 	tvFundep	    = tyVarFunDep fds
 	extended_tau_vars   = oclose tvFundep tau_vars
-	is_ambig ct_var	    = (varName ct_var `elem` forall_tyvars) &&
+	is_ambig ct_var	    = (ct_var `elem` forall_tyvars) &&
 			      not (ct_var `elemUFM` extended_tau_vars)
-	is_free ct_var	    = not (varName ct_var `elem` forall_tyvars)
+	is_free ct_var	    = not (ct_var `elem` forall_tyvars)
 
 	check_pred pred = checkTc (not any_ambig) (ambigErr pred ty) `thenTc_`
 			  checkTc (not all_free)  (freeErr  pred ty)
 	      where 
 		ct_vars	  = varSetElems (tyVarsOfPred pred)
-		any_ambig = any is_ambig ct_vars
+		any_ambig = is_source_polytype && any is_ambig ct_vars
 		all_free  = all is_free  ct_vars
+
+	-- Check ambiguity only for source-program types, not
+	-- for types coming from inteface files.  The latter can
+	-- legitimately have ambiguous types. Example
+	--    class S a where s :: a -> (Int,Int)
+	--    instance S Char where s _ = (1,1)
+	--    f:: S a => [a] -> Int -> (Int,Int)
+	--    f (_::[a]) x = (a*x,b)
+	--	where (a,b) = s (undefined::a)
+	-- Here the worker for f gets the type
+	--	fw :: forall a. S a => Int -> (# Int, Int #)
+	--
+	-- If the list of tv_names is empty, we have a monotype,
+	-- and then we don't need to check for ambiguity either,
+	-- because the test can't fail (see is_ambig).
+	is_source_polytype = case tv_names of
+				(UserTyVar _ : _) -> True
+				other		  -> False
     in
-    mapTc check_pred theta			`thenTc_`
-    returnTc (body_kind, mkSigmaTy tyvars theta tau)
+    mapTc check_pred theta		`thenTc_`
+    returnTc (body_kind, mkSigmaTy forall_tyvars theta tau)
 \end{code}
 
 Help functions for type applications

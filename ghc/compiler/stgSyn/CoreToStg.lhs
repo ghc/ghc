@@ -543,7 +543,8 @@ coreExprToStgFloat env (Case scrut bndr alts)
   = coreExprToStgFloat env scrut		`thenUs` \ (binds, scrut') ->
     newLocalId NotTopLevel env bndr		`thenUs` \ (env', bndr') ->
     alts_to_stg env' (findDefault alts)		`thenUs` \ alts' ->
-    returnUs (binds, mkStgCase scrut' bndr' alts')
+    mkStgCase scrut' bndr' alts'		`thenUs` \ expr' ->
+    returnUs (binds, expr')
   where
     scrut_ty  = idType bndr
     prim_case = isUnLiftedType scrut_ty && not (isUnboxedTupleType scrut_ty)
@@ -789,8 +790,8 @@ mk_stg_let bndr rhs dem floats body
 #endif
   | isUnLiftedType bndr_rep_ty			-- Use a case/PrimAlts
   = ASSERT( not (isUnboxedTupleType bndr_rep_ty) )
-    mkStgBinds floats $
-    mkStgCase rhs bndr (StgPrimAlts bndr_rep_ty [] (StgBindDefault body))
+    mkStgCase rhs bndr (StgPrimAlts bndr_rep_ty [] (StgBindDefault body))	`thenUs` \ expr' ->
+    mkStgBinds floats expr'
 
   | is_whnf
   = if is_strict then
@@ -809,8 +810,8 @@ mk_stg_let bndr rhs dem floats body
   | otherwise 	-- Not WHNF
   = if is_strict then
 	-- Strict let with non-WHNF rhs
-	mkStgBinds floats $
-	mkStgCase rhs bndr (StgAlgAlts bndr_rep_ty [] (StgBindDefault body))
+	mkStgCase rhs bndr (StgAlgAlts bndr_rep_ty [] (StgBindDefault body))	`thenUs` \ expr' ->
+	mkStgBinds floats expr'
     else
 	-- Lazy let with non-WHNF rhs, so keep the floats in the RHS
 	mkStgBinds floats rhs		`thenUs` \ new_rhs ->
@@ -885,11 +886,11 @@ way to enforce ordering  --SDM.
 -- Discard alernatives in case (par# ..) of 
 mkStgCase scrut@(StgPrimApp ParOp _ _) bndr
 	  (StgPrimAlts ty _ deflt@(StgBindDefault _))
-  = StgCase scrut bOGUS_LVs bOGUS_LVs bndr noSRT (StgPrimAlts ty [] deflt)
+  = returnUs (StgCase scrut bOGUS_LVs bOGUS_LVs bndr noSRT (StgPrimAlts ty [] deflt))
 
 mkStgCase (StgPrimApp SeqOp [scrut] _) bndr 
 	  (StgPrimAlts _ _ deflt@(StgBindDefault rhs))
-  = mkStgCase scrut_expr new_bndr (StgAlgAlts scrut_ty [] (StgBindDefault rhs))
+  = mkStgCase scrut_expr new_bndr new_alts
   where
     new_alts | isUnLiftedType scrut_ty = WARN( True, text "mkStgCase" ) StgPrimAlts scrut_ty [] deflt
 	     | otherwise	       = StgAlgAlts  scrut_ty [] deflt
@@ -908,9 +909,15 @@ mkStgCase (StgPrimApp SeqOp [scrut] _) bndr
 		   StgLitArg l -> WARN( True, text "seq on" <+> ppr l ) StgLit l
 
 mkStgCase scrut bndr alts
-  = ASSERT( case scrut of { StgLam _ _ _ -> False; other -> True } )
-	-- We should never find 
-	--	case (\x->e) of { ... }
-	-- The simplifier eliminates such things
-    StgCase scrut bOGUS_LVs bOGUS_LVs bndr noSRT alts
+  = deStgLam scrut	`thenUs` \ scrut' ->
+	-- It is (just) possible to get a lambda as a srutinee here
+	-- Namely: fromDyn (toDyn ((+1)::Int->Int)) False)
+	-- gives:	case ...Bool == Int->Int... of
+	--		   True -> case coerce Bool (\x -> + 1 x) of
+	--				True -> ...
+	--				False -> ...
+	--		   False -> ...
+	-- The True branch of the outer case will never happen, of course.
+
+    returnUs (StgCase scrut' bOGUS_LVs bOGUS_LVs bndr noSRT alts)
 \end{code}

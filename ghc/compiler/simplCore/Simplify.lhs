@@ -1269,13 +1269,14 @@ prepareCaseCont alts  cont thing_inside = simplType (coreAltsType alts)		`thenSm
 	-- (using funResultTy) in mkDupableCont.
 \end{code}
 
-simplCaseBinder checks whether the scrutinee is a variable, v.
-If so, try to eliminate uses of v in the RHSs in favour of case_bndr; 
-that way, there's a chance that v will now only be used once, and hence inlined.
+simplCaseBinder checks whether the scrutinee is a variable, v.  If so,
+try to eliminate uses of v in the RHSs in favour of case_bndr; that
+way, there's a chance that v will now only be used once, and hence
+inlined.
 
-There is a time we *don't* want to do that, namely when -fno-case-of-case
-is on.  This happens in the first simplifier pass, and enhances full laziness.
-Here's the bad case:
+There is a time we *don't* want to do that, namely when
+-fno-case-of-case is on.  This happens in the first simplifier pass,
+and enhances full laziness.  Here's the bad case:
 	f = \ y -> ...(case x of I# v -> ...(case x of ...) ... )
 If we eliminate the inner case, we trap it inside the I# v -> arm,
 which might prevent some full laziness happening.  I've seen this

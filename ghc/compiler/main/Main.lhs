@@ -25,6 +25,7 @@ import MkIface		( writeIface )
 import TcModule		( TcResults(..), typecheckModule )
 import Desugar		( deSugar )
 import SimplCore	( core2core )
+import OccurAnal	( occurAnalyseBinds )
 import CoreLint		( endPass )
 import CoreUtils	( coreBindsSize )
 import CoreTidy		( tidyCorePgm )
@@ -156,7 +157,15 @@ doIt (core_cmds, stg_cmds)
     tidyCorePgm tidy_uniqs this_mod
 		simplified orphan_rules			>>= \ (tidy_binds, tidy_orphan_rules) -> 
 
-    coreBindsSize tidy_binds `seq`
+	-- Run the occurrence analyser one last time, so that
+	-- dead binders get dead-binder info.  This is exploited by
+	-- code generators to avoid spitting out redundant bindings.
+	-- The occurrence-zapping in Simplify.simplCaseBinder means
+	-- that the Simplifier nukes useful dead-var stuff especially
+	-- in case patterns.
+    let occ_anal_tidy_binds = occurAnalyseBinds tidy_binds in
+
+    coreBindsSize occ_anal_tidy_binds `seq`
 --	TEMP: the above call zaps some space usage allocated by the
 --	simplifier, which for reasons I don't understand, persists
 --	thoroughout code generation
@@ -167,7 +176,7 @@ doIt (core_cmds, stg_cmds)
     show_pass "Core2Stg" 			>>
     _scc_     "Core2Stg"
     let
-	stg_binds   = topCoreBindsToStg c2s_uniqs tidy_binds
+	stg_binds   = topCoreBindsToStg c2s_uniqs occ_anal_tidy_binds
     in
 
 	--------------------------  Simplify STG code -------------------------------
@@ -184,7 +193,7 @@ doIt (core_cmds, stg_cmds)
     in
     writeIface this_mod old_iface new_iface
 	       local_tycons local_classes inst_info
-	       final_ids tidy_binds tidy_orphan_rules 		>>
+	       final_ids occ_anal_tidy_binds tidy_orphan_rules 		>>
 
 
 	--------------------------  Code generation -------------------------------
@@ -201,7 +210,7 @@ doIt (core_cmds, stg_cmds)
     show_pass "CodeOutput" 				>>
     _scc_     "CodeOutput"
     codeOutput this_mod local_tycons local_classes
-	       tidy_binds stg_binds2
+	       occ_anal_tidy_binds stg_binds2
 	       c_code h_code abstractC 
 	       ncg_uniqs				>>
 

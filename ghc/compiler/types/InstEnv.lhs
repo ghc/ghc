@@ -87,12 +87,13 @@ What hugs complains about is the `D [a]' instance decl.
      *** Required superclass : C [a]
 \end{pseudocode}
 
-You might wonder what hugs is complaining about.  It's saying that you need to
-add `C [a]' to the context of the `D [a]' instance (as appears in comments).
-But there's that `C [a]' instance decl one line above that says that I can
-reduce the need for a `C [a]' instance to the need for a `C a' instance, and
-in this case, I already have the necessary `C a' instance (since we have `D a'
-explicitly in the context, and `C' is a superclass of `D').
+You might wonder what hugs is complaining about.  It's saying that you
+need to add `C [a]' to the context of the `D [a]' instance (as appears
+in comments).  But there's that `C [a]' instance decl one line above
+that says that I can reduce the need for a `C [a]' instance to the
+need for a `C a' instance, and in this case, I already have the
+necessary `C a' instance (since we have `D a' explicitly in the
+context, and `C' is a superclass of `D').
 
 Unfortunately, the above reasoning indicates a premature commitment to the
 generic `C [a]' instance.  I.e., it prematurely rules out the more specific
@@ -100,11 +101,11 @@ instance `C [Int]'.  This is the mistake that ghc-4.06 makes.  The fix is to
 add the context that hugs suggests (uncomment the `C [a]'), effectively
 deferring the decision about which instance to use.
 
-Now, interestingly enough, 4.04 has this same bug, but it's covered up in this
-case by a little known `optimization' that was disabled in 4.06.  Ghc-4.04
-silently inserts any missing superclass context into an instance declaration.
-In this case, it silently inserts the `C [a]', and everything happens to work
-out.
+Now, interestingly enough, 4.04 has this same bug, but it's covered up
+in this case by a little known `optimization' that was disabled in
+4.06.  Ghc-4.04 silently inserts any missing superclass context into
+an instance declaration.  In this case, it silently inserts the `C
+[a]', and everything happens to work out.
 
 (See `basicTypes/MkId:mkDictFunId' for the code in question.  Search for
 `Mark Jones', although Mark claims no credit for the `optimization' in
@@ -117,22 +118,25 @@ something else out with ghc-4.04.  Let's add the following line:
     d' :: D a => [a]
     d' = c
 
-Everyone raise their hand who thinks that `d :: [Int]' should give a different
-answer from `d' :: [Int]'.  Well, in ghc-4.04, it does.  The `optimization'
-only applies to instance decls, not to regular bindings, giving inconsistent
-behavior.
+Everyone raise their hand who thinks that `d :: [Int]' should give a
+different answer from `d' :: [Int]'.  Well, in ghc-4.04, it does.  The
+`optimization' only applies to instance decls, not to regular
+bindings, giving inconsistent behavior.
 
-Old hugs had this same bug.  Here's how we fixed it: like GHC, the list of
-instances for a given class is ordered, so that more specific instances come
-before more generic ones.  For example, the instance list for C might contain:
-    ..., C Int, ..., C a, ...
-When we go to look for a `C Int' instance we'll get that one first.  But what
-if we go looking for a `C b' (`b' is unconstrained)?  We'll pass the `C Int'
-instance, and keep going.  But if `b' is unconstrained, then we don't know yet
-if the more specific instance will eventually apply.  GHC keeps going, and
-matches on the generic `C a'.  The fix is to, at each step, check to see if
-there's a reverse match, and if so, abort the search.  This prevents hugs
-from prematurely chosing a generic instance when a more specific one exists.
+Old hugs had this same bug.  Here's how we fixed it: like GHC, the
+list of instances for a given class is ordered, so that more specific
+instances come before more generic ones.  For example, the instance
+list for C might contain:
+    ..., C Int, ..., C a, ...  
+When we go to look for a `C Int' instance we'll get that one first.
+But what if we go looking for a `C b' (`b' is unconstrained)?  We'll
+pass the `C Int' instance, and keep going.  But if `b' is
+unconstrained, then we don't know yet if the more specific instance
+will eventually apply.  GHC keeps going, and matches on the generic `C
+a'.  The fix is to, at each step, check to see if there's a reverse
+match, and if so, abort the search.  This prevents hugs from
+prematurely chosing a generic instance when a more specific one
+exists.
 
 --Jeff
 

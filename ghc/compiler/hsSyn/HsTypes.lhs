@@ -165,7 +165,21 @@ pprHsTyVarBndr name kind | kind == boxedTypeKind = ppr name
 			 | otherwise 	         = hsep [ppr name, dcolon, pprParendKind kind]
 
 pprHsForAll []  []  = empty
-pprHsForAll tvs cxt = ptext SLIT("__forall") <+> interppSP tvs <+> ppr_context cxt <+> ptext SLIT("=>")
+pprHsForAll tvs cxt 
+	-- This printer is used for both interface files and
+	-- printing user types in error messages; and alas the
+	-- two use slightly different syntax.  Ah well.
+  = getPprStyle $ \ sty ->
+    if userStyle sty then
+	ptext SLIT("forall") <+> interppSP tvs <> dot <+> 
+	(if null cxt then 
+		empty 
+	 else 
+		ppr_context cxt <+> ptext SLIT("=>")
+	)
+    else	-- Used in interfaces
+	ptext SLIT("__forall") <+> interppSP tvs <+> 
+	ppr_context cxt <+> ptext SLIT("=>")
 
 pprHsContext :: (Outputable name) => HsContext name -> SDoc
 pprHsContext []	 = empty
