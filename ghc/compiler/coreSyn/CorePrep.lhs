@@ -24,7 +24,7 @@ import VarSet
 import VarEnv
 import Id	( mkSysLocal, idType, idNewDemandInfo, idArity,
 		  setIdType, isPrimOpId_maybe, isFCallId, isGlobalId, 
-		  hasNoBinding, idNewStrictness, 
+		  isLocalId, hasNoBinding, idNewStrictness, 
 		  isDataConId_maybe, idUnfolding
 		)
 import HscTypes ( ModDetails(..), implicitTyThingIds, typeEnvElts )
@@ -68,9 +68,15 @@ The goal of this pass is to prepare for code generation.
 
 5.  Do the seq/par munging.  See notes with mkCase below.
 
-6.  Clone all local Ids.  This means that Tidy Core has the property
-    that all Ids are unique, rather than the weaker guarantee of
-    no clashes which the simplifier provides.
+6.  Clone all local Ids.
+    This means that all such Ids are unique, rather than the 
+    weaker guarantee of no clashes which the simplifier provides.
+    And that is what the code generator needs.
+
+    We don't clone TyVars. The code gen doesn't need that, 
+    and doing so would be tiresome because then we'd need
+    to substitute in types.
+
 
 7.  Give each dynamic CCall occurrence a fresh unique; this is
     rather like the cloning step above.
@@ -347,8 +353,9 @@ corePrepExprFloat env (Note other_note expr)
     returnUs (floats, Note other_note expr')
 
 corePrepExprFloat env expr@(Lam _ _)
-  = corePrepAnExpr env body		`thenUs` \ body' ->
-    returnUs (nilOL, mkLams bndrs body')
+  = cloneBndrs env bndrs		`thenUs` \ (env', bndrs') ->
+    corePrepAnExpr env' body		`thenUs` \ body' ->
+    returnUs (nilOL, mkLams bndrs' body')
   where
     (bndrs,body) = collectBinders expr
 
@@ -731,15 +738,18 @@ cloneBndrs env bs = mapAccumLUs cloneBndr env bs
 
 cloneBndr  :: CloneEnv -> Var -> UniqSM (CloneEnv, Var)
 cloneBndr env bndr
-  | isGlobalId bndr		-- Top level things, which we don't want
-  = returnUs (env, bndr)	-- to clone, have become GlobalIds by now
-  
-  | otherwise
+  | isLocalId bndr
   = getUniqueUs   `thenUs` \ uniq ->
     let
 	bndr' = setVarUnique bndr uniq
     in
     returnUs (extendVarEnv env bndr bndr', bndr')
+
+  | otherwise	-- Top level things, which we don't want
+		-- to clone, have become GlobalIds by now
+		-- And we don't clone tyvars
+  = returnUs (env, bndr)
+  
 
 ------------------------------------------------------------------------------
 -- Cloning ccall Ids; each must have a unique name,
