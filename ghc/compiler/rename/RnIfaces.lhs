@@ -211,7 +211,7 @@ mergeIfaces (ParsedIface mod1 (_, files1) _ _ _ _ _ _ fixes1 tdefs1 vdefs1 idefs
 				    ppStr "merged with", ppPStr mod1]) $
     ASSERT(mod1 == mod2)
     ParsedIface mod1
-	(True, unionBags files1 files2)
+	(True, unionBags files2 files1)
 	(panic "mergeIface: module version numbers")
 	(panic "mergeIface: source version numbers")	-- Version numbers etc must be extracted from
 	(panic "mergeIface: usage version numbers")	-- the merged file interfaces named above

@@ -307,7 +307,7 @@ wlkExpr expr
 
       U_negate nexp ->	 		-- prefix negation
 	wlkExpr nexp	`thenUgn` \ expr ->
-	returnUgn (NegApp expr (Unqual SLIT("negate")) )
+	returnUgn (NegApp expr (HsVar (Qual SLIT("Prelude") SLIT("negate"))))
 
       U_llist llist -> -- explicit list
 	wlkList rdExpr llist `thenUgn` \ exprs ->

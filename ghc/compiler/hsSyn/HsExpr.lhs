@@ -60,7 +60,7 @@ data HsExpr tyvar uvar id pat
   -- They are eventually removed by the type checker.
 
   | NegApp	(HsExpr tyvar uvar id pat)	-- negated expr
-		id				-- the negate id
+		(HsExpr tyvar uvar id pat)	-- the negate id (in a HsVar)
 
   | HsPar	(HsExpr tyvar uvar id pat)	-- parenthesised expr
 

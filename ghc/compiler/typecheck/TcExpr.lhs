@@ -169,7 +169,7 @@ tcExpr (HsLit lit@(HsString str))
 tcExpr (HsPar expr) -- preserve parens so printing needn't guess where they go
   = tcExpr expr
 
-tcExpr (NegApp expr n) = tcExpr (HsApp (HsVar n) expr)
+tcExpr (NegApp expr neg) = tcExpr (HsApp neg expr)
 
 tcExpr (HsLam match)
   = tcMatch match	`thenTc` \ (match',lie,ty) ->

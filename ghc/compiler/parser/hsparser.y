@@ -124,9 +124,9 @@ BOOLEAN inpat;
 *                                                                     *
 **********************************************************************/
 
-%token	OCURLY		CCURLY		VCCURLY		SEMI
-%token	OBRACK		CBRACK		OPAREN		CPAREN
-%token	COMMA		BQUOTE
+%token	OCURLY		CCURLY		VCCURLY	
+%token  COMMA		SEMI		OBRACK		CBRACK
+%token	WILDCARD	BQUOTE		OPAREN		CPAREN
 
 
 /**********************************************************************
@@ -137,9 +137,9 @@ BOOLEAN inpat;
 *                                                                     *
 **********************************************************************/
 
-%token	DOTDOT		DCOLON		EQUAL
-%token	LAMBDA		VBAR		RARROW
-%token 	LARROW		MINUS
+%token	DOTDOT		DCOLON		EQUAL		LAMBDA		
+%token	VBAR		RARROW	 	LARROW
+%token	AT		LAZY		DARROW
 
 
 /**********************************************************************
@@ -165,12 +165,12 @@ BOOLEAN inpat;
 /**********************************************************************
 *                                                                     *
 *                                                                     *
-*     Valid symbols/identifiers which need to be recognised           *
+*     Special symbols/identifiers which need to be recognised         *
 *                                                                     *
 *                                                                     *
 **********************************************************************/
 
-%token	WILDCARD	AT		LAZY		BANG
+%token	MINUS		BANG
 %token 	AS		HIDING		QUALIFIED
 
 
@@ -909,7 +909,7 @@ exp	:  oexp DCOLON ctype			{ $$ = mkrestr($1,$3); }
   Operators must be left-associative at the same precedence for
   precedence parsing to work.
 */
-	/* 9 S/R conflicts on qop -> shift */
+	/* 8 S/R conflicts on qop -> shift */
 oexp	:  oexp qop oexp %prec MINUS		{ $$ = mkinfixap($2,$1,$3); }
 	|  dexp
 	;
@@ -1430,9 +1430,8 @@ varid   :  VARID
 	|  QUALIFIED			{ $$ = install_literal("qualified"); }
 	;
 
-/* DARROW BANG are valid varsyms */
+/* BANG are valid varsyms */
 varsym_nominus : VARSYM
-	|  DARROW			{ $$ = install_literal("=>"); }
 	|  BANG				{ $$ = install_literal("!"); }	
 	;
 

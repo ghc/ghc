@@ -348,7 +348,8 @@ doImportDecls iface_cache g_info us src_imps
     ) >>= \ (vals, tcs, unquals, fixes, errs, warns, _) ->
 
     return (vals, tcs, imp_mods, unquals, fixes,
-	    errs, imp_warns `unionBags` warns)
+	    imp_errs `unionBags` errs,
+	    imp_warns `unionBags` warns)
   where
     the_imps = implicit_prel ++ src_imps
     all_imps = implicit_qprel ++ the_imps
@@ -364,21 +365,35 @@ doImportDecls iface_cache g_info us src_imps
 		     then [{- no "import Prelude" -}]
 	             else [ImportDecl pRELUDE False Nothing Nothing prel_loc]
 
-    prel_imps -- WDP: Just guessing on this defn... ToDo
-      = [ imp | imp@(ImportDecl mod _ _ _ _) <- the_imps, fromPrelude mod ]
-
     prel_loc = mkBuiltinSrcLoc
 
     (uniq_imps, imp_dups) = removeDups cmp_mod the_imps
     cmp_mod (ImportDecl m1 _ _ _ _) (ImportDecl m2 _ _ _ _) = cmpPString m1 m2
 
-    qprel_imps = [ imp | imp@(ImportDecl mod True Nothing _ _) <- prel_imps ]
+    qprel_imps = [ imp | imp@(ImportDecl mod True Nothing _ _) <- src_imps,
+		 	 fromPrelude mod ]
+
+    qual_mods = [ (qual_name mod as_mod, imp) | imp@(ImportDecl mod True as_mod _ _) <- src_imps ]
+    qual_name mod (Just as_mod) = as_mod
+    qual_name mod Nothing       = mod
+
+    (_, qual_dups) = removeDups cmp_qual qual_mods
+    bad_qual_dups = filter (not . all_same_mod) qual_dups
+
+    cmp_qual (q1,_) (q2,_) = cmpPString q1 q2
+    all_same_mod ((q,ImportDecl mod _ _ _ _):rest)
+      = all has_same_mod rest
+      where
+	has_same_mod (q,ImportDecl mod2 _ _ _ _) = mod == mod2
+
 
     imp_mods  = [ mod | ImportDecl mod _ _ _ _ <- uniq_imps ]
+
     imp_warns = listToBag (map dupImportWarn imp_dups)
     		`unionBags`
 		listToBag (map qualPreludeImportWarn qprel_imps)
 
+    imp_errs  = listToBag (map dupQualImportErr bad_qual_dups)
 
 doImports iface_cache i_info us []
   = return (emptyBag, emptyBag, emptyBag, emptyBag, emptyBag, emptyBag, emptyBag)
@@ -516,7 +531,7 @@ getBuiltins (((b_val_names,b_tc_names),_,_,_),_,_,_) mod maybe_spec
         (vals, tcs, ies_left) = do_builtin ies
 
 
-getOrigIEs (ParsedIface _ _ _ _ _ _ exps _ _ _ _ _ _) Nothing		-- import all
+getOrigIEs (ParsedIface _ _ _ _ _ _ exps _ _ _ _ _ _) Nothing			-- import all
   = (map mkAllIE (eltsFM exps), [], emptyBag)
 
 getOrigIEs (ParsedIface _ _ _ _ _ _ exps _ _ _ _ _ _) (Just (True, ies))	-- import hiding
@@ -806,6 +821,16 @@ dupImportWarn (ImportDecl m1 _ _ _ locn1 : dup_imps) sty
 qualPreludeImportWarn (ImportDecl m _ _ _ locn)
   = addShortWarnLocLine locn (\ sty ->
     ppCat [ppStr "qualified import of prelude module", ppPStr m])
+
+dupQualImportErr ((q1,ImportDecl _ _ _ _ locn1):dup_quals) sty
+  = ppAboves (item1 : map dup_item dup_quals)
+  where
+    item1 = addShortErrLocLine locn1 (\ sty ->
+	    ppCat [ppStr "multiple imports (from different modules) with same qualified name", ppPStr q1]) sty
+
+    dup_item (q,ImportDecl _ _ _ _ locn)
+          = addShortErrLocLine locn (\ sty ->
+            ppCat [ppStr "here was another import with qualified name", ppPStr q]) sty
 
 unknownImpSpecErr ie imp_mod locn
   = addShortErrLocLine locn (\ sty ->

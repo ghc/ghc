@@ -228,8 +228,8 @@ rnExpr (OpApp e1 op e2)
 
 rnExpr (NegApp e n)
   = rnExpr e 		`thenRn` \ (e', fvs_e) ->
-    lookupValue n	`thenRn` \ nname ->
-    returnRn (NegApp e' nname, fvs_e `unionUniqSets` fv_set nname)
+    rnExpr n		`thenRn` \ (n', fvs_n) ->
+    returnRn (NegApp e' n', fvs_e `unionUniqSets` fvs_n)
 
 rnExpr (HsPar e)
   = rnExpr e 		`thenRn` \ (e', fvs_e) ->

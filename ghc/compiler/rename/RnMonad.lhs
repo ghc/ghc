@@ -43,7 +43,7 @@ import RnHsSyn		( RnName, mkRnName, mkRnUnbound, mkRnImplicit,
 import RnUtils		( RnEnv(..), extendLocalRnEnv,
 			  lookupRnEnv, lookupGlobalRnEnv, lookupTcRnEnv,
 			  unknownNameErr, badClassOpErr, qualNameErr,
-			  dupNamesErr, shadowedNameWarn, negateNameWarn
+			  dupNamesErr, shadowedNameWarn
 			)
 
 import Bag		( Bag, emptyBag, isEmptyBag, snocBag )
@@ -292,12 +292,10 @@ newLocalNames :: String 		-- Documentation string
 	      -> RnMonad x s [RnName]
 
 newLocalNames str names_w_loc
-  = mapRn (addWarnRn . negateNameWarn) negs 	`thenRn_`
-    mapRn (addErrRn . qualNameErr str) quals 	`thenRn_`
+  = mapRn (addErrRn . qualNameErr str) quals 	`thenRn_`
     mapRn (addErrRn . dupNamesErr str) dups  	`thenRn_`
     mkLocalNames these
   where
-    negs  = filter ((== Unqual SLIT("negate")).fst) names_w_loc
     quals = filter (isQual.fst) names_w_loc
     (these, dups) = removeDups cmp_fst names_w_loc
     cmp_fst (a,_) (b,_) = cmp a b

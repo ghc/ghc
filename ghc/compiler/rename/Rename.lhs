@@ -65,7 +65,6 @@ renameModule :: UniqSupply
 \end{code} 
 
 ToDo: May want to arrange to return old interface for this module!
-ToDo: Builtin names which must be read.
 ToDo: Deal with instances (instance version, this module on instance list ???)
 
 \begin{code}
@@ -218,7 +217,7 @@ makeHiMap (Just f)
 
 \begin{code}
 {- TESTING:
-pprPIface (ParsedIface m ?? v mv usgs lcm exm ims lfx ltdm lvdm lids ldp)
+pprPIface (ParsedIface m ms v mv usgs lcm exm ims lfx ltdm lvdm lids ldp)
   = ppAboves [
 	ppCat [ppPStr SLIT("interface"), ppPStr m, ppInt v,
 	       case mv of { Nothing -> ppNil; Just n -> ppInt n }],

@@ -820,7 +820,7 @@ MakeDirectories(install, $(INSTLIBDIR_GHC))
 InstallBinaryTarget(hsp,$(INSTLIBDIR_GHC))
 #endif /* DoInstall... */
 
-YaccRunWithExpectMsg(parser/hsparser,14,0)
+YaccRunWithExpectMsg(parser/hsparser,12,0)
 
 UgenTarget(parser/constr)
 UgenTarget(parser/binding)

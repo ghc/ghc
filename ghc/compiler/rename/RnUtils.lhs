@@ -19,8 +19,7 @@ module RnUtils (
 	qualNameErr,
 	dupNamesErr,
 	shadowedNameWarn,
-	multipleOccWarn,
-	negateNameWarn
+	multipleOccWarn
     ) where
 
 import Ubiq
@@ -203,9 +202,5 @@ shadowedNameWarn locn shadow
 multipleOccWarn (name, occs) sty
   = ppBesides [ppStr "warning:multiple names used to refer to `", ppr sty name, ppStr "': ",
 	       ppInterleave ppComma (map (ppr sty) occs)]
-
-negateNameWarn (name,locn) 
-  = addShortWarnLocLine locn ( \ sty ->
-    ppBesides [ppStr "local binding of `negate' will be used for prefix `-'"])
 \end{code}
 
