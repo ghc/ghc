@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.58 $
- * $Date: 2000/05/12 13:34:07 $
+ * $Revision: 1.59 $
+ * $Date: 2000/05/26 10:14:33 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -2518,7 +2518,7 @@ Type type; {
       SymX(__sel_10_upd_info)         \
       SymX(__sel_11_upd_info)         \
       SymX(__sel_12_upd_info)         \
-      SymX(Upd_frame_info)            \
+      SymX(upd_frame_info)            \
       SymX(seq_frame_info)            \
       SymX(CAF_BLACKHOLE_info)        \
       SymX(IND_STATIC_info)           \
@@ -2539,9 +2539,9 @@ Type type; {
       SymX(INTLIKE_closure)           \
       SymX(suspendThread)             \
       SymX(resumeThread)              \
-      Sym(stackOverflow)             \
+      SymX(stackOverflow)             \
       SymX(int2Integerzh_fast)        \
-      Sym(stg_gc_unbx_r1)            \
+      Sym(stg_gc_unbx_r1)             \
       SymX(ErrorHdrHook)              \
       SymX(mkForeignObjzh_fast)       \
       SymX(__encodeDouble)            \
@@ -2599,34 +2599,26 @@ Type type; {
       /* needed by libHS_cbits */    \
       SymX(malloc)                   \
       SymX(close)                    \
-      Sym(mkdir)                     \
       SymX(close)                    \
       Sym(opendir)                   \
       Sym(closedir)                  \
       Sym(readdir)                   \
-      Sym(tcgetattr)                 \
-      Sym(tcsetattr)                 \
       SymX(isatty)                   \
       SymX(read)                     \
       SymX(lseek)                    \
       SymX(write)                    \
-      Sym(getrusage)                 \
       SymX(realloc)                  \
       SymX(getcwd)                   \
       SymX(free)                     \
       SymX(strcpy)                   \
-      Sym(fcntl)                     \
       SymX(fprintf)                  \
       SymX(exit)                     \
-      Sym(open)                      \
       SymX(unlink)                   \
       SymX(memcpy)                   \
       SymX(memchr)                   \
       SymX(rmdir)                    \
       SymX(rename)                   \
       SymX(chdir)                    \
-      SymX(execl)                    \
-      Sym(waitpid)                   \
       SymX(getenv)                   \
 
 #define EXTERN_SYMS_cygwin32         \
@@ -2656,7 +2648,15 @@ Type type; {
       SymX(localtime)                \
       SymX(strftime)                 \
       SymX(mktime)                   \
-      SymX(gmtime)
+      SymX(execl)                    \
+      Sym(mkdir)                     \
+      Sym(open)                      \
+      Sym(tcgetattr)                 \
+      Sym(tcsetattr)                 \
+      Sym(getrusage)                 \
+      Sym(fcntl)                     \
+      Sym(waitpid)                   \
+      SymX(gmtime)                   \
 
 
 #define EXTERN_SYMS_linux            \
@@ -2676,7 +2676,16 @@ Type type; {
       SymX(gmtime)                   \
       Sym(setitimer)                 \
       Sym(chmod)                     \
+      SymX(execl)                    \
+      Sym(mkdir)                     \
+      Sym(open)                      \
+      Sym(tcgetattr)                 \
+      Sym(tcsetattr)                 \
       Sym(gettimeofday)              \
+      Sym(getrusage)                 \
+      Sym(waitpid)                   \
+      Sym(fcntl)                     \
+
 
 #define EXTERN_SYMS_solaris2         \
       SymX(gettimeofday)             \
@@ -2692,6 +2701,10 @@ Type type; {
 
 #if defined(cygwin32_TARGET_OS)
 #define EXTERN_SYMS_THISPLATFORM EXTERN_SYMS_cygwin32
+#endif
+
+#if defined(mingw32_TARGET_OS)
+#define EXTERN_SYMS_THISPLATFORM /* */
 #endif
 
 
@@ -2764,7 +2777,7 @@ void* lookupObjName ( char* nm )
    if (strlen(nm2+first_real_char) > 7
        && strncmp(nm2+first_real_char, "__init_", 7)==0) {
       t = unZcodeThenFindText(nm2+first_real_char+7);
-      if (t == findText("PrelGHC")) return (4+NULL); /* kludge */
+      if (t == findText("PrelGHC")) return (4+(char*)NULL); /* kludge */
       m = findModule(t);
       if (isNull(m)) goto dire_straits;
       a = lookupOTabName ( m, nm );
@@ -2826,7 +2839,7 @@ int is_not_dynamically_loaded_ptr ( char* p )
  * Control:
  * ------------------------------------------------------------------------*/
 
-Void interface(what)
+Void interfayce(what)
 Int what; {
     switch (what) {
        case POSTPREL: break;

@@ -1,6 +1,6 @@
 
 # --------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.36 2000/05/12 13:49:54 sewardj Exp $                      #
+# $Id: Makefile,v 1.37 2000/05/26 10:14:33 sewardj Exp $                      #
 # --------------------------------------------------------------------------- #
 
 TOP = ..
@@ -11,12 +11,26 @@ SUBDIRS = lib
 # interpreter and relevant .a/.so files                                 #
 # --------------------------------------------------------------------- #
 
-ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
-DYN_EXT=.dll
-LIB_DL=
+ifneq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
+   ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+      ## UNIX
+      LIB_BFD=-lbfd -liberty
+      DYN_EXT=.so
+      LIB_DL=-ldl
+      M_NO_CYGWIN=
+   else
+      ## mingw32
+      LIB_BFD=
+      DYN_EXT=.dll
+      LIB_DL=
+      M_NO_CYGWIN=-mno-cygwin
+   endif
 else
-DYN_EXT=.so
-LIB_DL=-ldl
+   ## cygwin32
+   LIB_BFD=-lbfd -liberty
+   DYN_EXT=.dll
+   LIB_DL=
+   M_NO_CYGWIN=
 endif
 
 ifeq "$(HaveLibGmp)$" "YES"
@@ -38,7 +52,7 @@ C_SRCS = link.c type.c static.c storage.c derive.c input.c compiler.c subst.c \
      translate.c codegen.c lift.c free.c stgSubst.c output.c   \
      hugs.c dynamic.c stg.c sainteger.c object.c interface.c
 
-SRC_CC_OPTS = -I$(GHC_INTERPRETER_DIR) -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR) -D__HUGS__ -DCOMPILING_RTS -DNO_REGS -Wall -Wstrict-prototypes -Wno-unused -DDEBUG -Winline -g -O 
+SRC_CC_OPTS = -I$(GHC_INTERPRETER_DIR) -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR) -D__HUGS__ -DCOMPILING_RTS -DNO_REGS -Wall -Wstrict-prototypes -Wno-unused -DDEBUG -Winline $(M_NO_CYGWIN) -g -O
 
 GHC_LIBS_NEEDED = $(GHC_RUNTIME_DIR)/libHSrts.a
 
@@ -50,7 +64,7 @@ hugs: $(C_OBJS) ../rts/Sanity.o ../rts/Assembler.o ../rts/Disassembler.o   \
       ../rts/StgCRun.o ../rts/PrimOps.o ../rts/Prelude.o ../rts/Storage.o \
       ../rts/Schedule.o ../rts/libHSrts.a
 	$(CC) -o $@ $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) \
-		 -lbfd -liberty $(LibsReadline) $(LIB_DL) \
+		 $(LIB_BFD) $(LibsReadline) $(LIB_DL) \
 		 $(LIB_GMP) -lm
 
 foobar:
@@ -59,7 +73,7 @@ foobar:
 	make all
 
 nHandle$(DYN_EXT): nHandle.c
-ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
+ifeq "$(DYN_EXT)" ".dll"
 	gcc -mno-cygwin -O -Wall -o nHandle.o -c nHandle.c
 	dllwrap -mno-cygwin --target=i386-mingw32 -o nHandle.dll \
                 -def nHandle.def nHandle.o

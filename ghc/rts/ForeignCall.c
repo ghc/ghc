@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: ForeignCall.c,v 1.16 2000/05/12 11:59:39 sewardj Exp $
+ * $Id: ForeignCall.c,v 1.17 2000/05/26 10:14:34 sewardj Exp $
  *
  * (c) The GHC Team 1994-1999.
  *
@@ -205,7 +205,8 @@ static void universal_call_c_generic
       printf("%c",(char)argstr[i]);
     }
     printf("' [%d arg(s)]\n",n_args);
-    assert(0);
+    barf("aborting");
+    ASSERT(0);
   }
 #undef CALL
 #undef CMP

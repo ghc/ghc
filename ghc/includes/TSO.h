@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.15 2000/03/31 03:09:35 hwloidl Exp $
+ * $Id: TSO.h,v 1.16 2000/05/26 10:14:33 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -134,10 +134,10 @@ typedef union {
   StgClosure *closure;
   struct StgTSO_ *tso;
   int fd;
-#if defined(INTERPRETER) && !defined(HAVE_SETITIMER)
-  unsigned int target;
-#else
+#if defined(HAVE_SETITIMER) || defined(mingw32_TARGET_OS)
   unsigned int delay;
+#else
+  unsigned int target;
 #endif
 } StgTSOBlockInfo;
 

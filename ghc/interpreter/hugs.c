@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.74 $
- * $Date: 2000/05/23 11:45:14 $
+ * $Revision: 1.75 $
+ * $Date: 2000/05/26 10:14:33 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -103,7 +103,6 @@ static Bool   printing      = FALSE;    /* TRUE => currently printing value*/
 static Bool   showStats     = FALSE;    /* TRUE => print stats after eval  */
 static Bool   listScripts   = TRUE;   /* TRUE => list scripts after loading*/
 static Bool   addType       = FALSE;    /* TRUE => print type with value   */
-static Bool   useDots       = RISCOS;   /* TRUE => use dots in progress    */
 static Bool   quiet         = FALSE;    /* TRUE => don't show progress     */
 static Bool   lastWasObject = FALSE;
 
@@ -138,7 +137,10 @@ static ConId currentModule_failed = NIL; /* Remember failed module from :r */
 
 #ifdef DIET_HEP
 
+#include "StgDLL.h"
 #include "DietHEP.h"
+
+extern void setRtsFlags ( int );
 
 static int diet_hep_initialised = 0;
 
@@ -148,8 +150,10 @@ void diet_hep_initialise ( void* cstackbase )
     List   modConIds; /* :: [CONID] */
     Bool   prelOK;
     String s;
-    String fakeargv[2] = { "diet_hep", NULL };
-
+    String fakeargv[] = { "diet_hep", "+RTS", 
+                          "-D0", "-RTS", NULL };
+    // GC = 32
+    // sanity = 128
     if (diet_hep_initialised) return;
     diet_hep_initialised = 1;
 
@@ -159,7 +163,8 @@ void diet_hep_initialise ( void* cstackbase )
 
     /* The following copied from interpreter() */
     setBreakAction ( HugsIgnoreBreak );
-    modConIds = initialize(0,fakeargv);
+    modConIds = initialize(sizeof(fakeargv)/sizeof(String)-1,fakeargv);
+    //setRtsFlags(4 | 128 | 32);
     assert(isNull(modConIds));
     setBreakAction ( HugsIgnoreBreak );
     prelOK    = loadThePrelude();
@@ -187,17 +192,6 @@ DH_MODULE DH_LoadLibrary_wrk ( DH_LPCSTR modname )
    m = findModule(t);
    if (isModule(m)) return m; else return 0;
 }
-
-DH_MODULE DH_LoadLibrary ( DH_LPCSTR modname )
-{
-   int xxx;
-   DH_MODULE hdl;
-   diet_hep_initialise ( &xxx );
-   hdl = DH_LoadLibrary_wrk ( modname );
-   printf ( "hdl = %d\n", hdl );
-   return hdl;
-}
-
 
 static
 void* DH_GetProcAddress_wrk ( DH_CALLCONV cconv,
@@ -234,17 +228,61 @@ void* DH_GetProcAddress_wrk ( DH_CALLCONV cconv,
    return adj_thunk;
 }
 
-void* DH_GetProcAddress ( DH_CALLCONV cconv,
-                          DH_MODULE   hModule,
-                          DH_LPCSTR   lpProcName )
+/*----------- EXPORTS -------------*/
+__declspec(dllexport)
+DH_MODULE 
+DH_LoadLibrary ( DH_LPCSTR modname )
+{
+   int xxx;
+   DH_MODULE hdl;
+   diet_hep_initialise ( &xxx );
+   hdl = DH_LoadLibrary_wrk ( modname );
+   printf ( "hdl = %d\n", hdl );
+   return hdl;
+}
+
+
+__declspec(dllexport)
+void*
+DH_GetProcAddress ( DH_CALLCONV cconv,
+                    DH_MODULE   hModule,
+                    DH_LPCSTR   lpProcName )
 {
    int xxx;
    diet_hep_initialise ( &xxx );
    return DH_GetProcAddress_wrk ( cconv, hModule, lpProcName );
 }
 
+
+#if 0
+BOOL APIENTRY
+DllMain (
+         HINSTANCE hInst /* Library instance handle. */ ,
+         DWORD reason /* Reason this function is being called. */ ,
+         LPVOID reserved /* Not used. */ )
+{
+
+  switch (reason)
+    {
+    case DLL_PROCESS_ATTACH:
+      break;
+
+    case DLL_PROCESS_DETACH:
+      break;
+
+    case DLL_THREAD_ATTACH:
+      break;
+
+    case DLL_THREAD_DETACH:
+      break;
+    }
+  return TRUE;
+}
+#endif
+
 //---------------------------------
 //--- testing it ...
+#if 0
 int main ( int argc, char** argv )
 {
    void*   proc;
@@ -259,6 +297,7 @@ fprintf ( stderr, "just before calling it\n");
    fprintf ( stderr, "exiting safely\n");
    return 0;
 }
+#endif
 
 #else
 
@@ -740,7 +779,6 @@ struct options toggle[] = {             /* List of command line toggles    */
     {'g', 1, "Print no. cells recovered after gc",    &gcMessages},
     {'l', 1, "Literate modules as default",           &literateScripts},
     {'e', 1, "Warn about errors in literate modules", &literateErrors},
-    {'.', 1, "Print dots to show progress",           &useDots},
     {'q', 1, "Print nothing to show progress",        &quiet},
     {'w', 1, "Always show which modules are loaded",  &listScripts},
     {'k', 1, "Show kind errors in full",              &kindExpert},
@@ -2403,7 +2441,7 @@ Inst in; {
 static Void local listNames() {         /* list names matching optional pat*/
     String pat   = readFilename();
     List   names = NIL;
-    Int    width = getTerminalWidth() - 1;
+    Int    width = 72;
     Int    count = 0;
     Int    termPos;
     Module mod   = currentModule;
@@ -2603,14 +2641,8 @@ Target t; {
 #endif
     currTarget = (t?t:1);
     aiming     = TRUE;
-    if (useDots) {
-        currPos = strlen(what);
-        maxPos  = getTerminalWidth() - 1;
-        Printf("%s",what);
-    }
-    else
-        for (charCount=0; *what; charCount++)
-            Putchar(*what++);
+    for (charCount=0; *what; charCount++)
+        Putchar(*what++);
     FlushStdout();
 }
 
@@ -2622,20 +2654,6 @@ Target t; {                            /* has now reached t                */
     if (showInstRes)
       return;
 #endif
-    if (useDots) {
-        Int newPos = (Int)((maxPos * ((long)t))/currTarget);
-
-        if (newPos>maxPos)
-            newPos = maxPos;
-
-        if (newPos>currPos) {
-            do
-                Putchar('.');
-            while (newPos>++currPos);
-            FlushStdout();
-        }
-        FlushStdout();
-    }
 }
 
 Void done() {                          /* Goal has now been achieved       */
@@ -2645,17 +2663,11 @@ Void done() {                          /* Goal has now been achieved       */
     if (showInstRes)
       return;
 #endif
-    if (useDots) {
-        while (maxPos>currPos++)
-            Putchar('.');
-        Putchar('\n');
+    for (; charCount>0; charCount--) {
+        Putchar('\b');
+        Putchar(' ');
+        Putchar('\b');
     }
-    else
-        for (; charCount>0; charCount--) {
-            Putchar('\b');
-            Putchar(' ');
-            Putchar('\b');
-        }
     aiming = FALSE;
     FlushStdout();
 }
@@ -2896,6 +2908,7 @@ Int what; {                     /* system to respond as appropriate ...    */
     typeChecker(what);
     compiler(what);   
     codegen(what);
+    interfayce(what);
 
     if (what == MARK) {
        mark(moduleGraph);

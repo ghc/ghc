@@ -1,6 +1,6 @@
 
 # --------------------------------------------------------------------------- #
-# $Id: Makefile-DietHEP,v 1.1 2000/05/12 15:59:37 sewardj Exp $                      #
+# $Id: Makefile-DietHEP,v 1.2 2000/05/26 10:14:34 sewardj Exp $                      #
 # --------------------------------------------------------------------------- #
 
 TOP = ..
@@ -11,18 +11,26 @@ SUBDIRS = lib
 # interpreter and relevant .a/.so files                                 #
 # --------------------------------------------------------------------- #
 
-ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
-DYN_EXT=.dll
-LIB_DL=
+ifneq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
+   ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+      ## UNIX
+      LIB_BFD=-lbfd -liberty
+      DYN_EXT=.so
+      LIB_DL=-ldl
+      M_NO_CYGWIN=
+   else
+      ## mingw32
+      LIB_BFD=
+      DYN_EXT=.dll
+      LIB_DL=
+      M_NO_CYGWIN=-mno-cygwin
+   endif
 else
-DYN_EXT=.so
-LIB_DL=-ldl
-endif
-
-ifeq "$(HaveLibGmp)$" "YES"
-LIB_GMP=-lgmp
-else
-LIB_GMP=../rts/gmp/libgmp.a
+   ## cygwin32
+   LIB_BFD=-lbfd -liberty
+   DYN_EXT=.dll
+   LIB_DL=
+   M_NO_CYGWIN=
 endif
 
 YACC = bison -y
@@ -38,23 +46,29 @@ C_SRCS = link.c type.c static.c storage.c derive.c input.c compiler.c subst.c \
      translate.c codegen.c lift.c free.c stgSubst.c output.c   \
      hugs.c dynamic.c stg.c sainteger.c object.c interface.c
 
-SRC_CC_OPTS = -I$(GHC_INTERPRETER_DIR) -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR) -D__HUGS__ -DCOMPILING_RTS -DNO_REGS -Wall -Wstrict-prototypes -Wno-unused -DDEBUG -Winline -g -DDIET_HEP
+SRC_CC_OPTS = -I$(GHC_INTERPRETER_DIR) -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR) -D__HUGS__ -DCOMPILING_RTS -DNO_REGS -Wall -Wstrict-prototypes -Wno-unused -DDEBUG -Winline -g -DDIET_HEP -DBUILDING_DLL
 
 GHC_LIBS_NEEDED = $(GHC_RUNTIME_DIR)/libHSrts.a \
                   $(GHC_RUNTIME_DIR)/gmp/libgmp.a
 
 all :: parser.c $(GHC_LIBS_NEEDED) nHandle$(DYN_EXT) dh_demo.exe
 
-dh_demo.exe: DietHEP.dll
-	gcc -Wall -g -o dh_demo.exe dh_demo.c DietHEP_dll.a
+dhtarfile: DietHEP.dll
+	rm -f DietHEP.h
+	ln -s ../includes/DietHEP.h .
+	tar cvf dhtarfile.tar --dereference DietHEP.h DietHEP.dll DietHEP_dll.a \
+		Dh_Demo.hs dh_demo.c dh_demo.exe \
+		lib library nHandle.dll Makefile-DietHEP
+	rm -f DietHEP.h
+	bzip2 -v dhtarfile.tar
+
+dh_demo.exe: DietHEP.dll dh_demo.c
+	gcc -Wall -g -o dh_demo.exe dh_demo.c -L./ -lDietHEP
 
 ### EXTREMELY hacky
-DietHEP.a: $(C_OBJS)
-	rm -f DietHEP.o
-	ld -r -o DietHEP.o $^ $(GHC_LIBS_NEEDED)
-	rm -f DietHEP.a
-	ar clq DietHEP.a DietHEP.o
-	rm -f DietHEP.o
+DietHEP.dll: $(C_OBJS) $(GHC_LIBS_NEEDED)
+	dllwrap -o DietHEP.dll --def DietHEP.def --implib libDietHEP.a \
+		$(OBJS) $(GHC_LIBS_NEEDED)
 
 foobar:
 	rm -f ../rts/libHSrts.a  ../rts/libHSrts_u.a
@@ -62,7 +76,7 @@ foobar:
 	make all
 
 nHandle$(DYN_EXT): nHandle.c
-ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
+ifeq "$(DYN_EXT)" ".dll"
 	gcc -mno-cygwin -O -Wall -o nHandle.o -c nHandle.c
 	dllwrap -mno-cygwin --target=i386-mingw32 -o nHandle.dll \
                 -def nHandle.def nHandle.o
@@ -111,7 +125,7 @@ checkrun: all
 # Cleanery & misc                                                       #
 # --------------------------------------------------------------------- #
 
-CLEAN_FILES += hugs nHandle.dll
+CLEAN_FILES += hugs nHandle.dll DietHEP.dll
 CLEAN_FILES += $(TOP)/ghc/rts/libHSrts.a $(TOP)/ghc/rts/*.o
 CLEAN_FILES += parser.c
 
@@ -121,6 +135,3 @@ depend :: parser.c $(LOOPS) $(SRCS_UGNHS)
 
 
 include $(TOP)/mk/target.mk
-
-
-include Makefile.DLLs

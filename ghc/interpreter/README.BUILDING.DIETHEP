@@ -1,0 +1,9 @@
+
+Configure the rts with --target=i386-unknown-mingw32 (I think).
+Build it with this:
+
+   make EXTRA_HC_OPTS=-optc-DHAVE_WIN32_DLL_SUPPORT
+
+I think that will work.
+
+

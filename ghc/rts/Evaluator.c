@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.53 $
- * $Date: 2000/05/18 09:54:47 $
+ * $Revision: 1.54 $
+ * $Date: 2000/05/26 10:14:34 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -336,9 +336,9 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
     numEnters++;
 
 #ifdef DEBUG
-    assert(gSp == tSp);
-    assert(gSu == tSu);
-    assert(gSpLim == tSpLim);
+    ASSERT(gSp == tSp);
+    ASSERT(gSu == tSu);
+    ASSERT(gSpLim == tSpLim);
     IF_DEBUG(evaluator,
              SSS;
              enterCountI++;
@@ -375,7 +375,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
 	   ACQUIRE_LOCK(&sched_mutex);
 	   
 #if defined(HAVE_SETITIMER) || defined(mingw32_TARGET_OS)
-	   cap->rCurrentTSO->block_info.delay 
+	   cap->rCurrentTSO->block_info.delay
 	     = hugsBlock.delay + ticks_since_select;
 #else
 	   cap->rCurrentTSO->block_info.target
@@ -1363,7 +1363,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
         }
     }
     barf("Ran off the end of enter - yoiks");
-    assert(0);
+    ASSERT(0);
 }
 
 #undef RETURN
@@ -2099,7 +2099,8 @@ static void myStackCheck ( Capability* cap )
    /* fprintf(stderr, "myStackCheck\n"); */
    if (!(gSpLim <= gSp && gSp <= stgCast(StgPtr,gSu))) {
       fprintf(stderr, "myStackCheck: invalid initial gSp/gSu \n" );
-      assert(0);
+      barf("aborting");
+      ASSERT(0);
    }
    while (1) {
       if (!( (P_)gSu >= (P_)cap->rCurrentTSO->stack 
@@ -2107,7 +2108,8 @@ static void myStackCheck ( Capability* cap )
               (P_)gSu <= (P_)(cap->rCurrentTSO->stack 
                               + cap->rCurrentTSO->stack_size))) {
          fprintf ( stderr, "myStackCheck: gSu out of stack\n" );
-         assert(0);
+         barf("aborting");
+         ASSERT(0);
       }
       switch (get_itbl(stgCast(StgClosure*,gSu))->type) {
       case CATCH_FRAME:
@@ -2122,7 +2124,9 @@ static void myStackCheck ( Capability* cap )
       case STOP_FRAME:
          goto postloop;
       default:
-         fprintf(stderr, "myStackCheck: invalid activation record\n"); assert(0);
+         fprintf(stderr, "myStackCheck: invalid activation record\n"); 
+         barf("aborting");
+         ASSERT(0);
       }
    }
    postloop:
@@ -2939,6 +2943,7 @@ static void* enterBCO_primop2 ( int primop2code,
                 break;
             }
         case i_raiseInThread:
+          barf("raiseInThread");
 	  ASSERT(0); /* not (yet) supported */
         case i_delay:
 	  {

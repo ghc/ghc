@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.42 $
- * $Date: 2000/05/12 11:59:38 $
+ * $Revision: 1.43 $
+ * $Date: 2000/05/26 10:14:33 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -362,7 +362,7 @@ extern  Void   machdep          ( Int );
 extern  Void   liftControl      ( Int );
 extern  Void   substitution     ( Int );
 extern  Void   typeChecker      ( Int );
-extern  Void   interface        ( Int );
+extern  Void   interfayce       ( Int );
 extern  Void   storage          ( Int );
 
 
@@ -566,6 +566,9 @@ extern HugsBreakAction setBreakAction ( HugsBreakAction );
    to get the signal mask to a sane state each time.
 */
 #include <signal.h>
+
+#if !defined(mingw32_TARGET_OS)
+
 #define setHandler(bh) 	 { sigset_t mask; \
 			   signal(SIGINT,bh); \
 			   sigemptyset(&mask); \
@@ -573,6 +576,11 @@ extern HugsBreakAction setBreakAction ( HugsBreakAction );
 			   sigprocmask(SIG_UNBLOCK, &mask, NULL); \
 			 }
 
+#else
+
+#define setHandler(bh)  do { } while(0)
+
+#endif /* !defined(mingw32_TARGET_OS) */
 
 /*---------------------------------------------------------------------------
  * Environment variables and the registry

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.30 $
- * $Date: 2000/05/10 16:53:35 $
+ * $Revision: 1.31 $
+ * $Date: 2000/05/26 10:14:34 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -1717,10 +1717,10 @@ AsmSp asmBeginPack( AsmBCO bco )
 void asmEndPack( AsmBCO bco, AsmVar v, AsmSp start, AsmInfo info )
 {
     nat size = bco->sp - start;
-    assert(bco->sp >= start);
-    assert(start >= v);
+    ASSERT(bco->sp >= start);
+    ASSERT(start >= v);
     /* only reason to include info is for this assertion */
-    assert(info->layout.payload.ptrs == size);
+    ASSERT(info->layout.payload.ptrs == size);
     emit_i_PACK(bco, bco->sp - v);
     setSp(bco, start);
 }

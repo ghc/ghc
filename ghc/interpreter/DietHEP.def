@@ -1,4 +1,3 @@
 EXPORTS
-DietHEP_impure_ptr = _impure_ptr
 DH_GetProcAddress
 DH_LoadLibrary

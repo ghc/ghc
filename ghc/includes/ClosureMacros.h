@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.21 2000/03/17 14:37:21 simonmar Exp $
+ * $Id: ClosureMacros.h,v 1.22 2000/05/26 10:14:33 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -116,12 +116,11 @@ extern void* DATA_SECTION_END_MARKER_DECL;
 #endif
 
 
-
-#ifdef HAVE_WIN32_DLL_SUPPORT
-extern int is_heap_alloced(const void* x);
-# define HEAP_ALLOCED(x)  (is_heap_alloced(x))
+#ifdef HAVE_WIN32_DLL_SUPPORT /* needed for mingw DietHEP */
+   extern int is_heap_alloced(const void* x);
+#  define HEAP_ALLOCED(x)  (is_heap_alloced(x))
 #else
-# define HEAP_ALLOCED(x)  IS_USER_PTR(x)
+#  define HEAP_ALLOCED(x)  IS_USER_PTR(x)
 #endif
 
 /* When working with Win32 DLLs, static closures are identified by
@@ -138,7 +137,8 @@ extern int is_heap_alloced(const void* x);
    LOOKS_LIKE_STATIC() 
        - distinguishes between static and heap allocated data.
  */
-#ifdef HAVE_WIN32_DLL_SUPPORT
+#if defined(HAVE_WIN32_DLL_SUPPORT) && !defined(INTERPRETER)
+                                       /* definitely do not enable for mingw DietHEP */
 #define LOOKS_LIKE_STATIC(r) (!(HEAP_ALLOCED(r)))
 
 /* Tiresome predicates needed to check for pointers into the closure tables */
@@ -165,20 +165,22 @@ extern int is_heap_alloced(const void* x);
    -------------------------------------------------------------------------- */
 
 #ifdef INTERPRETER
-#ifdef USE_MINIINTERPRETER
-/* yoiks: one of the dreaded pointer equality tests */
-#define IS_HUGS_CONSTR_INFO(info) (((StgInfoTable *)(info))->entry == (StgFunPtr)&Hugs_CONSTR_entry)
+#  ifdef USE_MINIINTERPRETER
+     /* yoiks: one of the dreaded pointer equality tests */
+#    define IS_HUGS_CONSTR_INFO(info) \
+            (((StgInfoTable *)(info))->entry == (StgFunPtr)&Hugs_CONSTR_entry)
+#  else
+#    define IS_HUGS_CONSTR_INFO(info) 0 /* ToDo: more than mildly bogus */
+#  endif
 #else
-#define IS_HUGS_CONSTR_INFO(info) 0 /* ToDo: more than mildly bogus */
-#endif
-#else
-#define IS_HUGS_CONSTR_INFO(info) 0 /* ToDo: more than mildly bogus */
+#  define IS_HUGS_CONSTR_INFO(info) 0 /* ToDo: more than mildly bogus */
 #endif
 
-#ifdef HAVE_WIN32_DLL_SUPPORT
-# define LOOKS_LIKE_GHC_INFO(info) (!HEAP_ALLOCED(info) && !LOOKS_LIKE_STATIC_CLOSURE(info))
+#ifdef HAVE_WIN32_DLL_SUPPORT /* needed for mingw DietHEP */
+#  define LOOKS_LIKE_GHC_INFO(info) (!HEAP_ALLOCED(info) \
+                                     && !LOOKS_LIKE_STATIC_CLOSURE(info))
 #else
-# define LOOKS_LIKE_GHC_INFO(info) IS_CODE_PTR(info)
+#  define LOOKS_LIKE_GHC_INFO(info) IS_CODE_PTR(info)
 #endif
 
 /* -----------------------------------------------------------------------------

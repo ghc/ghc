@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.31 $
- * $Date: 2000/05/10 16:51:52 $
+ * $Revision: 1.32 $
+ * $Date: 2000/05/26 10:14:33 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -27,9 +27,13 @@
 #  include <types.h>
 # endif
 #endif
+
+#if 0
 #if HAVE_SYS_PARAM_H
 # include <sys/param.h>
 #endif
+#endif
+
 #ifdef HAVE_SYS_STAT_H
 # include <sys/stat.h>
 #else
@@ -281,49 +285,6 @@ static String local hscriptDir() {  /* Directory containing hscript.dll	   */
 }
 #endif
 
-#if 0  /* apparently unused */
-static String local RealPath(s)         /* Find absolute pathname of file  */
-String s; {
-#if HAVE__FULLPATH  /* eg DOS */
-    static char path[FILENAME_MAX+1];
-    _fullpath(path,s,FILENAME_MAX+1);
-#elif HAVE_REALPATH /* eg Unix */
-    static char path[MAXPATHLEN+1];
-    realpath(s,path);                
-#else
-    static char path[FILENAME_MAX+1];
-    strcpy(path,s);
-#endif
-    return path;
-}
-#endif
-
-
-static int local pathCmp(p1,p2)       /* Compare paths after normalisation */
-String p1;
-String p2; {
-#if HAVE__FULLPATH  /* eg DOS */
-    static char path1[FILENAME_MAX+1];
-    static char path2[FILENAME_MAX+1];
-    _fullpath(path1,p1,FILENAME_MAX+1);
-    _fullpath(path2,p2,FILENAME_MAX+1);
-#elif HAVE_REALPATH /* eg Unix */
-    static char path1[MAXPATHLEN+1];
-    static char path2[MAXPATHLEN+1];
-    realpath(p1,path1);                
-    realpath(p2,path2);                
-#else
-    static char path1[FILENAME_MAX+1];
-    static char path2[FILENAME_MAX+1];
-    strcpy(path1,p1);
-    strcpy(path2,p2);
-#endif
-#if CASE_INSENSITIVE_FILENAMES
-    strlwr(path1);
-    strlwr(path2);
-#endif
-    return filenamecmp(path1,path2);
-}
 
 static String local normPath(s) /* Try, as much as possible, to normalize  */
 String s; {                     /* a pathname in some appropriate manner.  */
@@ -942,212 +903,6 @@ Void gcCStack() {                       /* Garbage collect elements off    */
 #endif
 
 /* --------------------------------------------------------------------------
- * Terminal dependent stuff:
- * ------------------------------------------------------------------------*/
-
-#if (HAVE_TERMIO_H | HAVE_SGTTY_H | HAVE_TERMIOS_H)
-
-/* grab the varargs prototype for ioctl */
-#if HAVE_SYS_IOCTL_H
-# include <sys/ioctl.h>
-#endif
-
-/* The order of these three tests is very important because
- * some systems have more than one of the requisite header file
- * but only one of them seems to work.
- * Anyone changing the order of the tests should try enabling each of the
- * three branches in turn and write down which ones work as well as which
- * OS/compiler they're using.
- *
- * OS            Compiler      sgtty     termio  termios   notes
- * Linux 2.0.18  gcc 2.7.2     absent    works   works     1
- *
- * Notes:
- * 1) On Linux, termio.h just #includes termios.h and sgtty.h is
- *    implemented using termios.h.
- *    sgtty.h is in /usr/include/bsd which is not on my standard include
- *    path.  Adding it does no harm but you might as well use termios.
- *    --
- *    reid-alastair@cs.yale.edu
- */
-#if HAVE_TERMIOS_H
-
-#include <termios.h>
-typedef  struct termios  TermParams;
-#define  getTerminal(tp) tcgetattr(fileno(stdin), &tp)
-#define  setTerminal(tp) tcsetattr(fileno(stdin), TCSAFLUSH, &tp)
-#define  noEcho(tp)      tp.c_lflag    &= ~(ICANON | ECHO); \
-                         tp.c_cc[VMIN]  = 1;                \
-                         tp.c_cc[VTIME] = 0;
-
-#elif HAVE_SGTTY_H
-
-#include <sgtty.h>
-typedef  struct sgttyb   TermParams;
-#define  getTerminal(tp) ioctl(fileno(stdin),TIOCGETP,&tp)
-#define  setTerminal(tp) ioctl(fileno(stdin),TIOCSETP,&tp)
-#if HPUX
-#define  noEcho(tp)      tp.sg_flags |= RAW; tp.sg_flags &= (~ECHO);
-#else
-#define  noEcho(tp)      tp.sg_flags |= CBREAK; tp.sg_flags &= (~ECHO);
-#endif
-
-#elif HAVE_TERMIO_H
-
-#include <termio.h>
-typedef  struct termio   TermParams;
-#define  getTerminal(tp) ioctl(fileno(stdin),TCGETA,&tp)
-#define  setTerminal(tp) ioctl(fileno(stdin),TCSETAF,&tp)
-#define  noEcho(tp)      tp.c_lflag    &= ~(ICANON | ECHO); \
-                         tp.c_cc[VMIN]  = 1;                \
-                         tp.c_cc[VTIME] = 0;
-
-#endif
-
-static Bool messedWithTerminal = FALSE;
-static TermParams originalSettings;
-
-Void normalTerminal() {                 /* restore terminal initial state  */
-    if (messedWithTerminal)
-        setTerminal(originalSettings);
-}
-
-Void noechoTerminal() {                 /* set terminal into noecho mode   */
-    TermParams settings;
-
-    if (!messedWithTerminal) {
-        getTerminal(originalSettings);
-        messedWithTerminal = TRUE;
-    }
-    getTerminal(settings);
-    noEcho(settings);
-    setTerminal(settings);
-}
-
-Int getTerminalWidth() {                /* determine width of terminal     */
-#ifdef TIOCGWINSZ
-#ifdef _M_UNIX                          /* SCO Unix 3.2.4 defines TIOCGWINSZ*/
-#include <sys/stream.h>                 /* Required by sys/ptem.h          */
-#include <sys/ptem.h>                   /* Required to declare winsize     */
-#endif
-    static struct winsize terminalSize;
-    ioctl(fileno(stdout),TIOCGWINSZ,&terminalSize);
-    return (terminalSize.ws_col==0)? 80 : terminalSize.ws_col;
-#else
-    return 80;
-#endif
-}
-
-Int readTerminalChar() {                /* read character from terminal    */
-    return getchar();                   /* without echo, assuming that     */
-}                                       /* noechoTerminal() is active...   */
-
-#elif SYMANTEC_C
-
-Int readTerminalChar() {                /* read character from terminal    */
-    return getchar();                   /* without echo, assuming that     */
-}                                       /* noechoTerminal() is active...   */
- 
-Int getTerminalWidth() {
-    return console_options.ncols;
-}
-
-Void normalTerminal() {
-    csetmode(C_ECHO, stdin);
-}
-
-Void noechoTerminal() {
-    csetmode(C_NOECHO, stdin);
-}
-
-#else /* no terminal driver - eg DOS, RISCOS */
-
-static Bool terminalEchoReqd = TRUE;
-
-Int getTerminalWidth() {
-#if RISCOS
-    int dummy, width;
-    (void) os_swi3r(OS_ReadModeVariable, -1, 1, 0, &dummy, &dummy, &width);
-    return width+1;
-#else
-    return 80;
-#endif
-}
-
-Void normalTerminal() {                 /* restore terminal initial state  */
-    terminalEchoReqd = TRUE;
-}
-
-Void noechoTerminal() {                 /* turn terminal echo on/off       */
-    terminalEchoReqd = FALSE;
-}
-
-Int readTerminalChar() {                /* read character from terminal    */
-    if (terminalEchoReqd) {
-        return getchar();
-    } else {
-#if IS_WIN32 && !__BORLANDC__
-	/* When reading a character from the console/terminal, we want
-	 * to operate in 'raw' mode (to use old UNIX tty parlance) and have
- 	 * it return when a character is available and _not_ wait until
- 	 * the next time the user hits carriage return. On Windows platforms,
- 	 * this _can_ be done by reading directly from the console, using
-	 * getch().  However, this doesn't sit well with programming
-	 * environments such as Emacs which allow you to create sub-processes
-	 * running Hugs, and then communicate with the running interpreter
-	 * through its standard input and output handles. If you use getch()
-	 * in that setting, you end up trying to read the (unused) console
-	 * of the editor itself, through which not a lot of characters is
-	 * bound to come out, since the editor communicates input to Hugs
-	 * via the standard input handle.
- 	 *
- 	 * To avoid this rather unfortunate situation, we use the Win32
-	 * console API and re-jig the input properties of the standard
-	 * input handle before trying to read a character using stdio's
-	 * getchar().
- 	 * 
- 	 * The 'cost' of this solution is that it is Win32 specific and
-	 * won't work with Windows 3.1 + it is kind of ugly and verbose
-	 * to have to futz around with the console properties on a
-	 * per-char basis. Both of these disadvantages aren't in my
-	 * opinion fatal.
- 	 *
- 	 * -- sof 5/99
- 	 */
-        Int c;
- 	DWORD mo;
- 	HANDLE hIn;
- 
- 	/* I don't quite understand why, but if the FILE*'s underlying file
-	   descriptor is in text mode, we seem to lose the first carriage
-	   return.
- 	 */
- 	setmode(fileno(stdin), _O_BINARY);
- 	hIn = GetStdHandle(STD_INPUT_HANDLE);
- 	GetConsoleMode(hIn, &mo);
- 	SetConsoleMode(hIn, mo & ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT));
-	/* 
-	 * On Win9x, the first time you change the mode (as above) a
-	 * raw '\n' is inserted.  Since enter maps to a raw '\r', and we
-	 * map this (below) to '\n', we can just ignore all *raw* '\n's.
-	 */
-	do {
-	  c = getc(stdin);
-	} while (c == '\n');
- 
- 	/* Same as it ever was - revert back state of stdin. */
- 	SetConsoleMode(hIn, mo);
- 	setmode(fileno(stdin), _O_TEXT);
-#else
-	Int c = getch();
-#endif
-        return c=='\r' ? '\n' : c;      /* slight paranoia about CR-LF    */
-    }
-}
-
-#endif /* no terminal driver */
-
-/* --------------------------------------------------------------------------
  * Interrupt handling:
  * ------------------------------------------------------------------------*/
 
@@ -1309,39 +1064,6 @@ int chdir(const char *s) {
 #endif
 
 
-/*---------------------------------------------------------------------------
- * Printf-related operations:
- *-------------------------------------------------------------------------*/
-
-#if !defined(HAVE_VSNPRINTF)
-int vsnprintf(buffer, count, fmt, ap)
-char*       buffer;
-int         count;
-const char* fmt;
-va_list     ap; {
-#if defined(HAVE__VSNPRINTF)
-    return _vsnprintf(buffer, count, fmt, ap);
-#else
-    return 0;
-#endif
-}
-#endif /* HAVE_VSNPRINTF */
-
-#if !defined(HAVE_SNPRINTF)
-int snprintf(char* buffer, int count, const char* fmt, ...) {
-#if defined(HAVE__VSNPRINTF)
-    int r;
-    va_list ap;                    /* pointer into argument list           */
-    va_start(ap, fmt);             /* make ap point to first arg after fmt */
-    r = vsnprintf(buffer, count, fmt, ap);
-    va_end(ap);                    /* clean up                             */
-    return r;
-#else
-    return 0;
-#endif
-}
-#endif /* HAVE_SNPRINTF */
-
 /* --------------------------------------------------------------------------
  * Things to do with the argv/argc and the env
  * ------------------------------------------------------------------------*/
@@ -1369,7 +1091,7 @@ Int what; {                             /* initialisation etc..            */
                        break;
         case RESET   :
         case BREAK   :
-        case EXIT    : normalTerminal();
+        case EXIT    : 
                        break;
     }
 }
