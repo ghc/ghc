@@ -126,10 +126,10 @@ tc_binds_and_then top_lvl combiner (MonoBind bind sigs is_rec) do_next
       mappM tcTySig [sig | sig@(Sig name _ _) <- sigs]	`thenM` \ tc_ty_sigs ->
   
 
-      getLIE (
-          tcBindWithSigs top_lvl bind tc_ty_sigs
-		         sigs is_rec 			`thenM` \ (poly_binds, poly_ids) ->
+      tcBindWithSigs top_lvl bind 
+		     tc_ty_sigs sigs is_rec	`thenM` \ (poly_binds, poly_ids) ->
   
+      getLIE (
 	  -- Extend the environment to bind the new polymorphic Ids
 	  tcExtendLocalValEnv poly_ids			$
   
@@ -139,8 +139,8 @@ tc_binds_and_then top_lvl combiner (MonoBind bind sigs is_rec) do_next
 	  -- Now do whatever happens next, in the augmented envt
 	  do_next			`thenM` \ thing ->
 
-	  returnM (poly_ids, poly_binds, prag_binds, thing)
-      )	  `thenM` \ ((poly_ids, poly_binds, prag_binds, thing), lie) ->
+	  returnM (prag_binds, thing)
+      )	  `thenM` \ ((prag_binds, thing), lie) ->
 
       case top_lvl of
 
