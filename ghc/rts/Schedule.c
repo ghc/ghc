@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.37 1999/12/01 14:58:09 simonmar Exp $
+ * $Id: Schedule.c,v 1.38 1999/12/01 16:13:25 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -692,6 +692,7 @@ initThread(StgTSO *tso, nat stack_size)
   RELEASE_LOCK(&sched_mutex);
 
   tso->why_blocked  = NotBlocked;
+  tso->blocked_exceptions = NULL;
 
   tso->splim        = (P_)&(tso->stack) + RESERVED_STACK_WORDS;
   tso->stack_size   = stack_size;
