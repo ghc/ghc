@@ -609,97 +609,129 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
         
 #define OP_LO(op,lo)  ((((unsigned)(op)) << 16) | (((unsigned)(lo)) & 0xFFFF))
 #define OP_HI(op,hi)  ((((unsigned)(op)) << 16) | (((unsigned)(hi)) >> 16))
-        {
-            AdjustorStub *adjustorStub;
-            int sz = 0, extra_sz, total_sz;
+    {
+        /* The following code applies to all PowerPC and PowerPC64 platforms
+           whose stack layout is based on the AIX ABI.
 
-                  // from AdjustorAsm.s
-                  // not declared as a function so that AIX-style
-                  // fundescs can never get in the way.
-            extern void *adjustorCode;
+           Besides (obviously) AIX, this includes
+            Mac OS 9 and BeOS/PPC (may they rest in peace),
+                which use the 32-bit AIX ABI
+            powerpc64-linux,
+                which uses the 64-bit AIX ABI
+            and Darwin (Mac OS X),
+                which uses the same stack layout as AIX,
+                but no function descriptors.
+
+           The actual stack-frame shuffling is implemented out-of-line
+           in the function adjustorCode, in AdjustorAsm.S.
+           Here, we set up an AdjustorStub structure, which
+           is a function descriptor (on platforms that have function
+           descriptors) or a short piece of stub code (on Darwin) to call
+           adjustorCode with a pointer to the AdjustorStub struct loaded
+           into register r2.
+
+           One nice thing about this is that there is _no_ code generated at
+           runtime on the platforms that have function descriptors.
+        */
+        AdjustorStub *adjustorStub;
+        int sz = 0, extra_sz, total_sz;
+
+            // from AdjustorAsm.s
+            // not declared as a function so that AIX-style
+            // fundescs can never get in the way.
+        extern void *adjustorCode;
+        
+#ifdef FUNDESCS
+        adjustorStub = stgMallocBytes(sizeof(AdjustorStub), "createAdjustor");
+#else
+        adjustorStub = mallocBytesRWX(sizeof(AdjustorStub));
+#endif
+        adjustor = adjustorStub;
             
-#ifdef FUNDESCS
-            adjustorStub = stgMallocBytes(sizeof(AdjustorStub), "createAdjustor");
-#else
-            adjustorStub = mallocBytesRWX(sizeof(AdjustorStub));
-#endif
-            adjustor = adjustorStub;
-		
-	    adjustorStub->code = (void*) &adjustorCode;
+        adjustorStub->code = (void*) &adjustorCode;
 
 #ifdef FUNDESCS
-                // function descriptors are a cool idea.
-                // We don't need to generate any code at runtime.
-            adjustorStub->toc = adjustorStub;
+            // function descriptors are a cool idea.
+            // We don't need to generate any code at runtime.
+        adjustorStub->toc = adjustorStub;
 #else
 
-                // no function descriptors :-(
-                // We need to do things "by hand".
+            // no function descriptors :-(
+            // We need to do things "by hand".
 #if defined(powerpc_TARGET_ARCH)
-                // lis  r2, hi(adjustorStub)
-            adjustorStub->lis = OP_HI(0x3c40, adjustorStub);
-                // ori  r2, r2, lo(adjustorStub)
-            adjustorStub->ori = OP_LO(0x6042, adjustorStub);
-                // lwz r0, code(r2)
-            adjustorStub->lwz = OP_LO(0x8002, (char*)(&adjustorStub->code)
-                                            - (char*)adjustorStub);
-                // mtctr r0
-            adjustorStub->mtctr = 0x7c0903a6;
-                // bctr
-            adjustorStub->bctr = 0x4e800420;
+            // lis  r2, hi(adjustorStub)
+        adjustorStub->lis = OP_HI(0x3c40, adjustorStub);
+            // ori  r2, r2, lo(adjustorStub)
+        adjustorStub->ori = OP_LO(0x6042, adjustorStub);
+            // lwz r0, code(r2)
+        adjustorStub->lwz = OP_LO(0x8002, (char*)(&adjustorStub->code)
+                                        - (char*)adjustorStub);
+            // mtctr r0
+        adjustorStub->mtctr = 0x7c0903a6;
+            // bctr
+        adjustorStub->bctr = 0x4e800420;
 #else
-            barf("adjustor creation not supported on this platform");
+        barf("adjustor creation not supported on this platform");
 #endif
 
-            // Flush the Instruction cache:
+        // Flush the Instruction cache:
+        {
+            int n = sizeof(AdjustorStub)/sizeof(unsigned);
+            unsigned *p = (unsigned*)adjustor;
+            while(n--)
             {
-                int n = sizeof(AdjustorStub)/sizeof(unsigned);
-                unsigned *p = (unsigned*)adjustor;
-                while(n--)
-                {
-                    __asm__ volatile ("dcbf 0,%0\n\tsync\n\ticbi 0,%0"
-                                        : : "r" (p));
-                    p++;
-                }
-                __asm__ volatile ("sync\n\tisync");
+                __asm__ volatile ("dcbf 0,%0\n\tsync\n\ticbi 0,%0"
+                                    : : "r" (p));
+                p++;
             }
-#endif
-
-            printf("createAdjustor: %s\n", typeString);
-            while(*typeString)
-            {
-                char t = *typeString++;
-
-                switch(t)
-                {
-#if defined(powerpc64_TARGET_ARCH)
-                    case 'd': sz += 1; break;
-                    case 'l': sz += 1; break;
-#else
-                    case 'd': sz += 2; break;
-                    case 'l': sz += 2; break;
-#endif
-                    case 'f': sz += 1; break;
-                    case 'i': sz += 1; break;
-                }
-            }
-            extra_sz = sz - 8;
-            if(extra_sz < 0)
-                extra_sz = 0;
-            total_sz = (6 /* linkage area */
-                      + 8 /* minimum parameter area */
-                      + 2 /* two extra arguments */
-                      + extra_sz)*sizeof(StgWord);
-           
-                // align to 16 bytes.
-                // AIX only requires 8 bytes, but who cares?
-            total_sz = (total_sz+15) & ~0xF;
-           
-            adjustorStub->hptr = hptr;
-            adjustorStub->wptr = wptr;
-            adjustorStub->negative_framesize = -total_sz;
-            adjustorStub->extrawords_plus_one = extra_sz + 1;
+            __asm__ volatile ("sync\n\tisync");
         }
+#endif
+
+            // Calculate the size of the stack frame, in words.
+        while(*typeString)
+        {
+            char t = *typeString++;
+
+            switch(t)
+            {
+#if defined(powerpc_TARGET_ARCH)
+                    // on 32-bit platforms, Double and Int64 occupy two words.
+                case 'd':
+                case 'l':
+                    sz += 2;
+                    break;
+#endif
+                    // everything else is one word.
+                default:
+                    sz += 1;
+            }
+        }
+            // The first eight words of the parameter area
+            // are just "backing store" for the parameters passed in
+            // the GPRs. extra_sz is the number of words beyond those first
+            // 8 words.
+        extra_sz = sz - 8;
+        if(extra_sz < 0)
+            extra_sz = 0;
+
+            // Calculate the total size of the stack frame.
+        total_sz = (6 /* linkage area */
+                  + 8 /* minimum parameter area */
+                  + 2 /* two extra arguments */
+                  + extra_sz)*sizeof(StgWord);
+       
+            // align to 16 bytes.
+            // AIX only requires 8 bytes, but who cares?
+        total_sz = (total_sz+15) & ~0xF;
+       
+            // Fill in the information that adjustorCode in AdjustorAsm.S
+            // will use to create a new stack frame with the additional args.
+        adjustorStub->hptr = hptr;
+        adjustorStub->wptr = wptr;
+        adjustorStub->negative_framesize = -total_sz;
+        adjustorStub->extrawords_plus_one = extra_sz + 1;
+    }
 
 #elif defined(ia64_TARGET_ARCH)
 /*
