@@ -20,7 +20,6 @@ import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..),
 			  Version, bumpVersion, initialVersion, isLoopBreaker
 			)
 import RnMonad
-import RnEnv		( availName )
 
 import TcInstUtil	( InstInfo(..) )
 
@@ -42,8 +41,7 @@ import IdInfo		( IdInfo, StrictnessInfo(..), ArityInfo(..), InlinePragInfo(..),
 import CoreSyn		( CoreExpr, CoreBind, Bind(..), isBuiltinRule, rulesRules, rulesRhsFreeVars )
 import CoreFVs		( exprSomeFreeVars, ruleSomeLhsFreeVars, ruleSomeFreeVars )
 import CoreUnfold	( okToUnfoldInHiFile, couldBeSmallEnoughToInline )
-import Module		( moduleString, pprModule, pprModuleName )
-import RdrName		( RdrName )
+import Module		( moduleString, pprModule, pprModuleName, moduleUserString )
 import Name		( isLocallyDefined, isWiredInName, toRdrName, nameModule,
 			  Name, NamedThing(..)
 			)
@@ -59,18 +57,17 @@ import Type		( mkSigmaTy, splitSigmaTy, mkDictTy, tidyTopType,
 		        )
 
 import PprType
-import FunDeps		( pprFundeps )
 import Rules		( pprProtoCoreRule, ProtoCoreRule(..) )
 
 import Bag		( bagToList, isEmptyBag )
 import Maybes		( catMaybes, maybeToBool )
-import FiniteMap	( emptyFM, addToFM, addToFM_C, fmToList, FiniteMap )
 import UniqFM		( lookupUFM, listToUFM )
-import UniqSet		( uniqSetToList )
 import Util		( sortLt, mapAccumL )
 import SrcLoc		( noSrcLoc )
 import Bag
 import Outputable
+
+import Maybe 		( isNothing )
 \end{code}
 
 
@@ -84,10 +81,22 @@ import Outputable
 writeIface this_mod old_iface new_iface
 	   local_tycons local_classes inst_info
 	   final_ids tidy_binds tidy_orphan_rules
-  = case opt_ProduceHi of {
-      Nothing -> return () ; -- not producing any .hi file
+  = 
+    if isNothing opt_HiDir && isNothing opt_HiFile
+	then return ()  -- not producing any .hi file
+	else 
 
-      Just filename ->
+    let 
+	hi_suf = case opt_HiSuf of { Nothing -> "hi"; Just suf -> suf }
+	filename = case opt_HiFile of {
+			Just f  -> f;
+			Nothing -> 
+		   case opt_HiDir of {
+			Just dir -> dir ++ '/':moduleUserString this_mod 
+					++ '.':hi_suf;
+			Nothing  -> panic "writeIface"
+		}}
+    in
 
     case checkIface old_iface full_new_iface of {
 	Nothing -> do { putStrLn "Interface file unchanged" ;
@@ -105,7 +114,7 @@ writeIface this_mod old_iface new_iface
 	if_hdl <- openFile filename WriteMode
 	printForIface if_hdl (pprIface final_iface)
 	hClose if_hdl
-    }}    
+    }   
   where
     full_new_iface = completeIface new_iface local_tycons local_classes
 				   	     inst_info final_ids tidy_binds

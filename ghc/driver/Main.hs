@@ -1273,8 +1273,7 @@ run_phase Hsc	basename input_fn output_fn
   -- we add the current directory (i.e. the directory in which
   -- the .hs files resides) to the import path, since this is
   -- what gcc does, and it's probably what you want.
-	let (root,dir) = break (=='/') (reverse basename)
-	    current_dir = if null dir then "." else reverse dir
+	let current_dir = getdir basename
 	
 	paths <- readIORef include_paths
 	writeIORef include_paths (current_dir : paths)
@@ -1305,27 +1304,26 @@ run_phase Hsc	basename input_fn output_fn
 	add files_to_clean tmp_stub_h
 	add files_to_clean tmp_stub_c
 	
+  -- figure out where to put the .hi file
+	ohi    <- readIORef output_hi
+	hisuf  <- readIORef hi_suf
+	let hi_flags = case ohi of
+			   Nothing -> [ "-hidir="++current_dir, "-hisuf="++hisuf ]
+			   Just fn -> [ "-hifile="++fn ]
+
+  -- run the compiler!
 	run_something "Haskell Compiler" 
 		 (unwords (hsc : input_fn : (
 		    hsc_opts
-		    ++ [ hi_flag, " -ofile="++output_fn ]
-		    ++ [ "-F="++tmp_stub_c, "-FH="++tmp_stub_h ]
+		    ++ hi_flags
+		    ++ [ 
+			  "-ofile="++output_fn, 
+			  "-F="++tmp_stub_c, 
+			  "-FH="++tmp_stub_h 
+		       ]
 		    ++ stat_opts
 		 )))
 
-  -- Copy the .hi file into the current dir if it changed
-	on doing_hi 
-		  (do ohi <- readIORef output_hi
-		      hisuf <- readIORef hi_suf
-		      let hi_target = case ohi of
-					Nothing -> basename ++ '.':hisuf
-					Just fn -> fn
-		      new_hi_file <- fileExist tmp_hi_file
-		      on new_hi_file
-			     (run_something "Copy hi file"
-				(unwords ["mv", tmp_hi_file, hi_target]))
-		  )	
-	
   -- Generate -Rghc-timing info
 	on (timing) (
   	    run_something "Generate timing stats"
@@ -1972,6 +1970,11 @@ take_longest_prefix s c = reverse pre
 
 newsuf :: String -> String -> String
 newsuf suf s = remove_suffix s '.' ++ suf
+
+-- getdir strips the filename off the input string, returning the directory.
+getdir :: String -> String
+getdir s = if null dir then "." else init dir
+  where dir = take_longest_prefix s '/'
 
 newdir :: String -> String -> String
 newdir dir s = dir ++ '/':drop_longest_prefix s '/'

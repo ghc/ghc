@@ -136,7 +136,9 @@ module CmdLineOpts (
 	opt_OmitInterfacePragmas,
 	opt_ProduceExportCStubs,
 	opt_ProduceExportHStubs,
-	opt_ProduceHi,
+	opt_HiFile,
+	opt_HiDir,
+	opt_HiSuf,
 	opt_NoPruneTyDecls,
 	opt_NoPruneDecls,
 	opt_ReportCompile,
@@ -418,7 +420,11 @@ opt_OmitBlackHoling		= lookUp  SLIT("-dno-black-holing")
 opt_OmitInterfacePragmas	= lookUp  SLIT("-fomit-interface-pragmas")
 opt_ProduceExportCStubs		= lookup_str "-F="
 opt_ProduceExportHStubs		= lookup_str "-FH="
-opt_ProduceHi 			= lookup_str "-hifile=" -- the one to produce this time 
+
+-- where to generate the .hi file
+opt_HiFile			= lookup_str "-hifile="
+opt_HiDir			= lookup_str "-hidir="
+opt_HiSuf			= lookup_str "-hisuf="
 
 -- Language for output: "C", "asm", "java", maybe more
 -- Nothing => don't output anything
