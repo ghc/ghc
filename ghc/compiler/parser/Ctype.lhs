@@ -1,7 +1,7 @@
 Character classification
 
 \begin{code}
-module Ctypes
+module Ctype
 	( is_ident	-- Char# -> Bool
 	, is_symbol	-- Char# -> Bool
 	, is_any	-- Char# -> Bool
@@ -146,7 +146,7 @@ charType c = case c of
    '\89'  -> cAny + cIdent  + cUpper   -- Y
    '\90'  -> cAny + cIdent  + cUpper   -- Z
    '\91'  -> cAny                      -- [
-   '\92'  -> cAny + cSymbol            -- \
+   '\92'  -> cAny + cSymbol            -- backslash
    '\93'  -> cAny                      -- ]
    '\94'  -> cAny + cSymbol            -- ^
    '\95'  -> cAny + cIdent  + cLower   -- _

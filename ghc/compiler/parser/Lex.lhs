@@ -54,7 +54,7 @@ import FastString
 import StringBuffer
 import GlaExts
 import ST		( runST )
-import Ctypes
+import Ctype
 import Char		( chr )
 import Addr
 import PrelRead 	( readRational__ ) -- Glasgow non-std
