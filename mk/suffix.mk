@@ -25,11 +25,6 @@
 #-----------------------------------------------------------------------------
 # Haskell Suffix Rules
 
-# Turn off all the Haskell suffix rules if we're booting from .hc
-# files.  The file bootstrap.mk contains alternative suffix rules in
-# this case.
-ifneq "$(BootingFromHc)" "YES"
-
 # The $(odir) support is for building GHC, where we need to build three
 # different versions from the same sources.  See ghc/compiler/Makefile.
 ifneq "$(odir)" ""
@@ -37,6 +32,11 @@ odir_ = $(odir)/
 else
 odir_ =
 endif
+
+# Turn off all the Haskell suffix rules if we're booting from .hc
+# files.  The file bootstrap.mk contains alternative suffix rules in
+# this case.
+ifneq "$(BootingFromHc)" "YES"
 
 $(odir_)%.$(way_)o : %.hs
 	$(HC_PRE_OPTS)
@@ -56,12 +56,12 @@ $(odir_)%.$(way_)hc : %.hs
 	$(RM) $@
 	$(HC) $(HC_OPTS) -C $< -o $@
 
-$(odir_)%.$(way_)o : %.$(way_)hc 
+$(odir_)%.$(way_)o : %.$(way_)hc
 	$(HC_PRE_OPTS)
 	$(HC) $(HC_OPTS) -c $< -o $@
 	$(HC_POST_OPTS)
 
-$(odir_)%.$(way_)o : %.hc 
+$(odir_)%.$(way_)o : %.hc
 	$(HC_PRE_OPTS)
 	$(HC) $(HC_OPTS) -c $< -o $@
 	$(HC_POST_OPTS)
@@ -99,7 +99,34 @@ $(odir_)%.$(way_)hi : %.$(way_)hc
 	else exit 0 ; \
 	fi
 
-endif # BootingViaC
+else # BootingFromHc
+
+# -----------------------------------------------------------------------------
+# suffix rules for building a .o from a .hc file in bootstrap mode.
+
+ifeq "$(BootingFromUnregisterisedHc)" "YES"
+
+# without mangling
+
+$(odir_)%.o : %.hc
+	$(CC) -x c $< -o $@ -c -O $(HC_BOOT_CC_OPTS) -I.  `echo $(patsubst -monly-%-regs, -DSTOLEN_X86_REGS=%, $(filter -monly-%-regs, $($*_HC_OPTS))) | sed 's/^$$/-DSTOLEN_X86_REGS=4/'`
+
+else
+
+# with mangling
+
+$(odir_)%.raw_s : %.hc
+	$(CC) -x c $< -o $@ -S -O $(HC_BOOT_CC_OPTS) -I.  `echo $(patsubst -monly-%-regs, -DSTOLEN_X86_REGS=%, $(filter -monly-%-regs, $($*_HC_OPTS))) | sed 's/^$$/-DSTOLEN_X86_REGS=4/'`
+
+$(odir_)%.s : %.raw_s
+	$(GHC_MANGLER) $< $@ $(patsubst -monly-%-regs, %, $(filter -monly-%-regs, $($*_HC_OPTS)))
+
+$(odir_)%.o : %.s
+	$(CC) -c -o $@ $<
+
+endif # not BootingFromUnregisterisedHc
+
+endif # BootingFromHc
 
 #-----------------------------------------------------------------------------
 # Happy Suffix Rules
