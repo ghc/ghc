@@ -297,7 +297,11 @@ getWord8 (BinMem _ ix_r sz_r arr_r) = do
     ix <- readFastMutInt ix_r
     sz <- readFastMutInt sz_r
     when (ix >= sz)  $
+#if __GLASGOW_HASKELL__ <= 408
+	throw (mkIOError eofErrorType "Data.Binary.getWord8" Nothing Nothing)
+#else
 	ioError (mkIOError eofErrorType "Data.Binary.getWord8" Nothing Nothing)
+#endif
     arr <- readIORef arr_r
     w <- unsafeRead arr ix
     writeFastMutInt ix_r (ix+1)
