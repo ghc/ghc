@@ -53,9 +53,7 @@ dsListComp quals elt_ty
         c_ty = mkFunTys [elt_ty, n_ty] n_ty
     in
     newSysLocalsDs [c_ty,n_ty]		`thenDs` \ [c, n] ->
-
     dfListComp c n quals		`thenDs` \ result ->
-
     dsLookupGlobalValue buildName	`thenDs` \ build_id ->
     returnDs (Var build_id `App` Type elt_ty 
 			   `App` mkLams [n_tyvar, c, n] result)
