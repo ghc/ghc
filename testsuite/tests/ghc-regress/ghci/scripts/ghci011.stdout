@@ -1,0 +1,6 @@
+data [] a = [] | a : [a]
+-- <wired into compiler>
+data () = ()
+-- <wired into compiler>
+data (,) a b = (,) a b
+-- <wired into compiler>

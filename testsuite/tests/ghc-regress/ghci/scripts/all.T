@@ -13,7 +13,4 @@ test('ghci009', normal, ghci_script, ['ghci009.script'])
 # has a ^C handler installed.
 test('ghci010', skip, ghci_script, ['ghci010.script'])
 
-# Expect failure: this test should list both the type constructor and the data
-# constructor for each of the builtin identifiers ([], (), (,), etc.), but
-# currently only gives the data constructor.
-test('ghci011', expect_fail, ghci_script, ['ghci011.script'])
+test('ghci011', normal, ghci_script, ['ghci011.script'])
