@@ -99,7 +99,7 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 
     The ccall'ing version is a tad different, passing in the return
     address of the caller to the auto-generated C stub (which enters
-    via the stable pointer.) (The auto-generated C stub is on this
+    via the stable pointer.) (The auto-generated C stub is in on this
     game, don't worry :-)
 
     The adjustor makes the assumption that any return value
