@@ -22,7 +22,7 @@ import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt, RenamedPat, RenamedHs
 import TcHsSyn		( TcMatch, TcGRHSs, TcStmt, TcDictBinds, TypecheckedPat )
 
 import TcMonad
-import TcMonoType	( kcHsSigTypes, tcScopedTyVars, checkSigTyVars, tcHsSigType, sigPatCtxt )
+import TcMonoType	( kcHsSigTypes, tcScopedTyVars, checkSigTyVars, tcHsSigType, UserTypeCtxt(..), sigPatCtxt )
 import Inst		( LIE, isEmptyLIE, plusLIE, emptyLIE, plusLIEs, lieToList )
 import TcEnv		( TcId, tcLookupLocalIds, tcExtendLocalValEnv, tcExtendGlobalTyVars,
 			  tcInLocalScope )
@@ -157,7 +157,7 @@ tcMatch xve1 ctxt match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty
 	= thing_inside
     tc_result_sig (Just sig) thing_inside
 	= tcAddScopedTyVars [sig]			$
-	  tcHsSigType sig				`thenTc` \ sig_ty ->
+	  tcHsSigType ResSigCtxt sig			`thenTc` \ sig_ty ->
 
 		-- Check that the signature isn't a polymorphic one, which
 		-- we don't permit (at present, anyway)

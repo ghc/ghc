@@ -530,9 +530,9 @@ tcImports unf_env pcs hst get_fixity this_mod decls
 	-- tcImports recovers internally, but if anything gave rise to
 	-- an error we'd better stop now, to avoid a cascade
 	
-    traceTc (text "Tc1")			`thenNF_Tc_`
-    tcTyAndClassDecls unf_env tycl_decls	`thenTc` \ env ->
-    tcSetEnv env 				$
+    traceTc (text "Tc1")				`thenNF_Tc_`
+    tcTyAndClassDecls unf_env this_mod tycl_decls	`thenTc` \ env ->
+    tcSetEnv env 					$
     
     	-- Typecheck the instance decls, includes deriving
     traceTc (text "Tc2")	`thenNF_Tc_`

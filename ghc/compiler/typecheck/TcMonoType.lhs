@@ -4,9 +4,8 @@
 \section[TcMonoType]{Typechecking user-specified @MonoTypes@}
 
 \begin{code}
-module TcMonoType ( tcHsType, tcHsRecType, tcIfaceType,
-		    tcHsSigType, tcHsLiftedSigType, 
-		    tcRecTheta, checkAmbiguity,
+module TcMonoType ( tcHsSigType, tcHsType, tcIfaceType, tcHsTheta, 
+		    UserTypeCtxt(..),
 
 			-- Kind checking
 		    kcHsTyVar, kcHsTyVars, mkTyClTyVars,
@@ -32,9 +31,10 @@ import TcEnv		( tcExtendTyVarEnv, tcLookup, tcLookupGlobal,
 			)
 import TcMType		( newKindVar, tcInstSigVars, 
 			  zonkKindEnv, zonkTcType, zonkTcTyVars, zonkTcTyVar,
-			  unifyKind, unifyOpenTypeKind
+			  unifyKind, unifyOpenTypeKind,
+			  checkValidType, UserTypeCtxt(..), pprUserTypeCtxt
 			)
-import TcType		( Type, Kind, SourceType(..), ThetaType, SigmaType, TauType,
+import TcType		( Type, Kind, SourceType(..), ThetaType,
 			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy,
 			  tcSplitForAllTys, tcSplitRhoTy,
 		 	  hoistForAllTys, allDistinctTyVars,
@@ -44,12 +44,10 @@ import TcType		( Type, Kind, SourceType(..), ThetaType, SigmaType, TauType,
 			  liftedTypeKind, unliftedTypeKind, mkArrowKind,
 			  mkArrowKinds, tcGetTyVar_maybe, tcGetTyVar, tcSplitFunTy_maybe,
 		  	  tidyOpenType, tidyOpenTypes, tidyTyVar, tidyTyVars,
-			  tyVarsOfType, tyVarsOfPred, mkForAllTys,
-			  isUnboxedTupleType, tcIsForAllTy, isIPPred
+			  tyVarsOfType, mkForAllTys
 			)
 import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToId )
-import FunDeps		( grow )
-import PprType		( pprType, pprTheta, pprPred )
+import PprType		( pprType )
 import Subst		( mkTopTyVarSubst, substTy )
 import CoreFVs		( idFreeTyVars )
 import Id		( mkLocalId, idName, idType )
@@ -58,14 +56,71 @@ import VarEnv
 import VarSet
 import ErrUtils		( Message )
 import TyCon		( TyCon, isSynTyCon, tyConArity, tyConKind )
-import Class		( classArity, classTyCon )
+import Class		( classTyCon )
 import Name		( Name )
 import TysWiredIn	( mkListTy, mkTupleTy, genUnitTyCon )
-import BasicTypes	( Boxity(..), RecFlag(..), isRec )
+import BasicTypes	( Boxity(..) )
 import SrcLoc		( SrcLoc )
 import Util		( mapAccumL, isSingleton )
 import Outputable
 
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Checking types}
+%*									*
+%************************************************************************
+
+Generally speaking we now type-check types in three phases
+
+	1.  Kind check the HsType [kcHsType]
+	2.  Convert from HsType to Type, and hoist the foralls [tcHsType]
+	3.  Check the validity of the resultint type [checkValidType]
+
+Often these steps are done one after the othe (tcHsSigType).
+But in mutually recursive groups of type and class decls we do
+	1 kind-check the whole group
+	2 build TyCons/Classes in a knot-tied wa
+	3 check the validity of types in the now-unknotted TyCons/Classes
+
+\begin{code}
+tcHsSigType :: UserTypeCtxt -> RenamedHsType -> TcM Type
+  -- Do kind checking, and hoist for-alls to the top
+tcHsSigType ctxt ty = tcAddErrCtxt (checkTypeCtxt ctxt ty) (
+			kcTypeType ty		`thenTc_`
+		        tcHsType ty
+		      )				`thenTc` \ ty' ->
+		      checkValidType ctxt ty'	`thenTc_`
+		      returnTc ty'
+
+checkTypeCtxt ctxt ty
+  = vcat [ptext SLIT("In the type:") <+> ppr ty,
+	  ptext SLIT("While checking") <+> pprUserTypeCtxt ctxt ]
+
+tcHsType    :: RenamedHsType -> TcM Type
+  -- Don't do kind checking, nor validity checking, 
+  -- 	but do hoist for-alls to the top
+  -- This is used in type and class decls, where kinding is
+  -- done in advance, and validity checking is done later
+  -- [Validity checking done later because of knot-tying issues.]
+tcHsType ty = tc_type ty  `thenTc` \ ty' ->  
+	      returnTc (hoistForAllTys ty')
+
+tcHsTheta :: RenamedContext -> TcM ThetaType
+-- Used when we are expecting a ClassContext (i.e. no implicit params)
+-- Does not do validity checking, like tcHsType
+tcHsTheta hs_theta = mapTc tc_pred hs_theta
+
+-- In interface files the type is already kinded,
+-- and we definitely don't want to hoist for-alls.
+-- Otherwise we'll change
+--  	dmfail :: forall m:(*->*) Monad m => forall a:* => String -> m a
+-- into 
+-- 	dmfail :: forall m:(*->*) a:* Monad m => String -> m a
+-- which definitely isn't right!
+tcIfaceType ty = tc_type ty
 \end{code}
 
 
@@ -285,50 +340,6 @@ kcClass cls	-- Must be a class
 
 %************************************************************************
 %*									*
-\subsection{Checking types}
-%*									*
-%************************************************************************
-
-tcHsSigType and tcHsLiftedSigType
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-tcHsSigType and tcHsLiftedSigType are used for type signatures written by the programmer
-
-  * We hoist any inner for-alls to the top
-
-  * Notice that we kind-check first, because the type-check assumes
-	that the kinds are already checked.
-
-  * They are only called when there are no kind vars in the environment
-  	so the kind returned is indeed a Kind not a TcKind
-
-\begin{code}
-tcHsSigType, tcHsLiftedSigType :: RenamedHsType -> TcM Type
-  -- Do kind checking, and hoist for-alls to the top
-tcHsSigType       ty = kcTypeType   ty `thenTc_` tcHsType ty
-tcHsLiftedSigType ty = kcLiftedType ty `thenTc_` tcHsType ty
-
-tcHsType    ::            RenamedHsType -> TcM Type
-tcHsRecType :: RecFlag -> RenamedHsType -> TcM Type
-  -- Don't do kind checking, but do hoist for-alls to the top
-  -- These are used in type and class decls, where kinding is
-  -- done in advance
-tcHsType             ty = tc_type NonRecursive ty  `thenTc` \ ty' ->  returnTc (hoistForAllTys ty')
-tcHsRecType wimp_out ty = tc_type wimp_out     ty  `thenTc` \ ty' ->  returnTc (hoistForAllTys ty')
-
--- In interface files the type is already kinded,
--- and we definitely don't want to hoist for-alls.
--- Otherwise we'll change
---  	dmfail :: forall m:(*->*) Monad m => forall a:* => String -> m a
--- into 
--- 	dmfail :: forall m:(*->*) a:* Monad m => String -> m a
--- which definitely isn't right!
-tcIfaceType ty = tc_type NonRecursive ty
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection{tc_type}
 %*									*
 %************************************************************************
@@ -351,9 +362,8 @@ defined.  That in turn places restrictions on what you can check in
 tcHsType; if you poke on too much you get a black hole.  I keep
 forgetting this, hence this warning!
 
-The wimp_out argument tells when we are in a mutually-recursive
-group of type declarations, so omit various checks else we
-get a black hole.  They'll be done again later, in TcTyClDecls.tcGroup.
+So tc_type does no validity-checking.  Instead that's all done
+by TcMType.checkValidType
 
 	--------------------------
 	*** END OF BIG WARNING ***
@@ -361,118 +371,66 @@ get a black hole.  They'll be done again later, in TcTyClDecls.tcGroup.
 
 
 \begin{code}
-tc_type :: RecFlag -> RenamedHsType -> TcM Type
+tc_type :: RenamedHsType -> TcM Type
 
-tc_type wimp_out ty@(HsTyVar name)
-  = tc_app wimp_out ty []
+tc_type ty@(HsTyVar name)
+  = tc_app ty []
 
-tc_type wimp_out (HsListTy ty)
-  = tc_arg_type wimp_out ty	`thenTc` \ tau_ty ->
+tc_type (HsListTy ty)
+  = tc_type ty	`thenTc` \ tau_ty ->
     returnTc (mkListTy tau_ty)
 
-tc_type wimp_out (HsTupleTy (HsTupCon _ boxity arity) tys)
+tc_type (HsTupleTy (HsTupCon _ boxity arity) tys)
   = ASSERT( arity == length tys )
-    mapTc tc_tup_arg tys	`thenTc` \ tau_tys ->
+    tc_types tys	`thenTc` \ tau_tys ->
     returnTc (mkTupleTy boxity arity tau_tys)
-  where
-    tc_tup_arg = case boxity of
-		   Boxed   -> tc_arg_type wimp_out
-		   Unboxed -> tc_type     wimp_out 
-	-- Unboxed tuples can have polymorphic or unboxed args.
- 	-- This happens in the workers for functions returning
- 	-- product types with polymorphic components
 
-tc_type wimp_out (HsFunTy ty1 ty2)
-  = tc_type wimp_out ty1			`thenTc` \ tau_ty1 ->
-	-- Function argument can be polymorphic, but
-	-- must not be an unboxed tuple
-	--
-	-- In a recursive loop we can't ask whether the thing is
-	-- unboxed -- might be a synonym inside a synonym inside a group
-    checkTc (isRec wimp_out || not (isUnboxedTupleType tau_ty1))
-	    (ubxArgTyErr ty1)			`thenTc_`
-    tc_type wimp_out ty2			`thenTc` \ tau_ty2 ->
+tc_type (HsFunTy ty1 ty2)
+  = tc_type ty1			`thenTc` \ tau_ty1 ->
+    tc_type ty2			`thenTc` \ tau_ty2 ->
     returnTc (mkFunTy tau_ty1 tau_ty2)
 
-tc_type wimp_out (HsNumTy n)
+tc_type (HsNumTy n)
   = ASSERT(n== 1)
     returnTc (mkTyConApp genUnitTyCon [])
 
-tc_type wimp_out (HsOpTy ty1 op ty2) =
-  tc_arg_type wimp_out ty1 `thenTc` \ tau_ty1 ->
-  tc_arg_type wimp_out ty2 `thenTc` \ tau_ty2 ->
-  tc_fun_type op [tau_ty1,tau_ty2]
+tc_type (HsOpTy ty1 op ty2)
+  = tc_type ty1 `thenTc` \ tau_ty1 ->
+    tc_type ty2 `thenTc` \ tau_ty2 ->
+    tc_fun_type op [tau_ty1,tau_ty2]
 
-tc_type wimp_out (HsAppTy ty1 ty2)
-  = tc_app wimp_out ty1 [ty2]
+tc_type (HsAppTy ty1 ty2) = tc_app ty1 [ty2]
 
-tc_type wimp_out (HsPredTy pred)
-  = tc_pred wimp_out pred	`thenTc` \ pred' ->
+tc_type (HsPredTy pred)
+  = tc_pred pred	`thenTc` \ pred' ->
     returnTc (mkPredTy pred')
 
-tc_type wimp_out full_ty@(HsForAllTy (Just tv_names) ctxt ty)
+tc_type full_ty@(HsForAllTy (Just tv_names) ctxt ty)
   = let
 	kind_check = kcHsContext ctxt `thenTc_` kcHsType ty
     in
-    tcHsTyVars tv_names kind_check			$ \ tyvars ->
-    tcRecTheta wimp_out ctxt				`thenTc` \ theta ->
+    tcHsTyVars tv_names kind_check	$ \ tyvars ->
+    mapTc tc_pred ctxt			`thenTc` \ theta ->
+    tc_type ty				`thenTc` \ tau ->
+    returnTc (mkSigmaTy tyvars theta tau)
 
-	-- Context behaves like a function type
-	-- This matters.  Return-unboxed-tuple analysis can
-	-- give overloaded functions like
-	--	f :: forall a. Num a => (# a->a, a->a #)
-	-- And we want these to get through the type checker
-    (if null theta then
-	tc_arg_type wimp_out ty
-     else
-	tc_type wimp_out ty
-    )							`thenTc` \ tau ->
-
-    checkAmbiguity wimp_out is_source tyvars theta tau
-  where
-    is_source = case tv_names of
-		   (UserTyVar _ : _) -> True
-	    	   other	     -> False
-
-
-  -- tc_arg_type checks that the argument of a 
-  -- type appplication isn't a for-all type or an unboxed tuple type
-  -- For example, we want to reject things like:
-  --
-  --	instance Ord a => Ord (forall s. T s a)
-  -- and
-  --	g :: T s (forall b.b)
-  --
-  -- Other unboxed types are very occasionally allowed as type
-  -- arguments depending on the kind of the type constructor
-
-tc_arg_type wimp_out arg_ty	
-  | isRec wimp_out
-  = tc_type wimp_out arg_ty
-
-  | otherwise
-  = tc_type wimp_out arg_ty								`thenTc` \ arg_ty' ->
-    checkTc (isRec wimp_out || not (tcIsForAllTy arg_ty'))	 (polyArgTyErr arg_ty)	`thenTc_`
-    checkTc (isRec wimp_out || not (isUnboxedTupleType arg_ty')) (ubxArgTyErr arg_ty)	`thenTc_`
-    returnTc arg_ty'
-
-tc_arg_types wimp_out arg_tys = mapTc (tc_arg_type wimp_out) arg_tys
+tc_types arg_tys = mapTc tc_type arg_tys
 \end{code}
 
 Help functions for type applications
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-tc_app :: RecFlag -> RenamedHsType -> [RenamedHsType] -> TcM Type
-tc_app wimp_out (HsAppTy ty1 ty2) tys
-  = tc_app wimp_out ty1 (ty2:tys)
+tc_app :: RenamedHsType -> [RenamedHsType] -> TcM Type
+tc_app (HsAppTy ty1 ty2) tys
+  = tc_app ty1 (ty2:tys)
 
-tc_app wimp_out ty tys
+tc_app ty tys
   = tcAddErrCtxt (appKindCtxt pp_app)	$
-    tc_arg_types wimp_out tys		`thenTc` \ arg_tys ->
+    tc_types tys			`thenTc` \ arg_tys ->
     case ty of
 	HsTyVar fun -> tc_fun_type fun arg_tys
-	other	    -> tc_type wimp_out ty		`thenTc` \ fun_ty ->
+	other	    -> tc_type ty		`thenTc` \ fun_ty ->
 		       returnNF_Tc (mkAppTys fun_ty arg_tys)
   where
     pp_app = ppr ty <+> sep (map pprParendHsType tys)
@@ -487,21 +445,12 @@ tc_fun_type name arg_tys
 	ATyVar tv -> returnTc (mkAppTys (mkTyVarTy tv) arg_tys)
 
 	AGlobal (ATyCon tc)
-		| isSynTyCon tc ->  checkTc arity_ok err_msg	`thenTc_`
-				    returnTc (mkAppTys (mkSynTy tc (take arity arg_tys))
+		| isSynTyCon tc ->  returnTc (mkAppTys (mkSynTy tc (take arity arg_tys))
 						       (drop arity arg_tys))
-
-		| otherwise	  ->  returnTc (mkTyConApp tc arg_tys)
+		| otherwise	->  returnTc (mkTyConApp tc arg_tys)
 		where
+	  	    arity = tyConArity tc
 
-		    arity_ok = arity <= n_args 
-		    arity = tyConArity tc
-			-- It's OK to have an *over-applied* type synonym
-			--	data Tree a b = ...
-			--	type Foo a = Tree [a]
-			--	f :: Foo a b -> ...
-		    err_msg = arityErr "Type synonym" name arity n_args
-		    n_args  = length arg_tys
 
 	other -> failWithTc (wrongThingErr "type constructor" thing name)
 \end{code}
@@ -510,101 +459,21 @@ tc_fun_type name arg_tys
 Contexts
 ~~~~~~~~
 \begin{code}
-tcRecTheta :: RecFlag -> RenamedContext -> TcM ThetaType
-	-- Used when we are expecting a ClassContext (i.e. no implicit params)
-tcRecTheta wimp_out context = mapTc (tc_pred wimp_out) context
-
-tc_pred wimp_out assn@(HsClassP class_name tys)
+tc_pred assn@(HsClassP class_name tys)
   = tcAddErrCtxt (appKindCtxt (ppr assn))	$
-    tc_arg_types wimp_out tys			`thenTc` \ arg_tys ->
+    tc_types tys			`thenTc` \ arg_tys ->
     tcLookupGlobal class_name			`thenTc` \ thing ->
     case thing of
-	AClass clas -> checkTc (arity == n_tys) err	`thenTc_`
-		       returnTc (ClassP clas arg_tys)
-	    where
-		arity = classArity clas
-		n_tys = length tys
-		err   = arityErr "Class" class_name arity n_tys
+	AClass clas -> returnTc (ClassP clas arg_tys)
+	other 	    -> failWithTc (wrongThingErr "class" (AGlobal thing) class_name)
 
-	other -> failWithTc (wrongThingErr "class" (AGlobal thing) class_name)
-
-tc_pred wimp_out assn@(HsIParam name ty)
+tc_pred assn@(HsIParam name ty)
   = tcAddErrCtxt (appKindCtxt (ppr assn))	$
-    tc_arg_type wimp_out ty			`thenTc` \ arg_ty ->
+    tc_type ty					`thenTc` \ arg_ty ->
     returnTc (IParam name arg_ty)
 \end{code}
 
 
-Check for ambiguity
-~~~~~~~~~~~~~~~~~~~
-	  forall V. P => tau
-is ambiguous if P contains generic variables
-(i.e. one of the Vs) that are not mentioned in tau
-
-However, we need to take account of functional dependencies
-when we speak of 'mentioned in tau'.  Example:
-	class C a b | a -> b where ...
-Then the type
-	forall x y. (C x y) => x
-is not ambiguous because x is mentioned and x determines y
-
-NOTE: In addition, GHC insists that at least one type variable
-in each constraint is in V.  So we disallow a type like
-	forall a. Eq b => b -> b
-even in a scope where b is in scope.
-This is the is_free test below.
-
-Notes on the 'is_source_polytype' test above
-Check ambiguity only for source-program types, not
-for types coming from inteface files.  The latter can
-legitimately have ambiguous types. Example
-   class S a where s :: a -> (Int,Int)
-   instance S Char where s _ = (1,1)
-   f:: S a => [a] -> Int -> (Int,Int)
-   f (_::[a]) x = (a*x,b)
-	where (a,b) = s (undefined::a)
-Here the worker for f gets the type
-	fw :: forall a. S a => Int -> (# Int, Int #)
-
-If the list of tv_names is empty, we have a monotype,
-and then we don't need to check for ambiguity either,
-because the test can't fail (see is_ambig).
-
-\begin{code}
-checkAmbiguity :: RecFlag -> Bool
-	       -> [TyVar] -> ThetaType -> TauType
-	       -> TcM SigmaType
-checkAmbiguity wimp_out is_source_polytype forall_tyvars theta tau
-  | isRec wimp_out = returnTc sigma_ty
-  | otherwise      = mapTc_ check_pred theta	`thenTc_`
-		     returnTc sigma_ty
-  where
-    sigma_ty	      = mkSigmaTy forall_tyvars theta tau
-    tau_vars	      = tyVarsOfType tau
-    extended_tau_vars = grow theta tau_vars
-
-	-- Hack alert.  If there are no tyvars, (ppr sigma_ty) will print
-	-- something strange like {Eq k} -> k -> k, because there is no
-	-- ForAll at the top of the type.  Since this is going to the user
-	-- we want it to look like a proper Haskell type even then; hence the hack
-	-- 
-	-- This shows up in the complaint about
-	--	case C a where
-	--	  op :: Eq a => a -> a
-    ppr_sigma	      | null forall_tyvars = pprTheta theta <+> ptext SLIT("=>") <+> ppr tau
-		      | otherwise	   = ppr sigma_ty 
-
-    is_ambig ct_var   = (ct_var `elem` forall_tyvars) &&
-		        not (ct_var `elemVarSet` extended_tau_vars)
-    is_free ct_var    = not (ct_var `elem` forall_tyvars)
-    
-    check_pred pred = checkTc (not any_ambig)                 (ambigErr pred ppr_sigma) `thenTc_`
-	    	      checkTc (isIPPred pred || not all_free) (freeErr  pred ppr_sigma)
-             where 
-	    	ct_vars	  = varSetElems (tyVarsOfPred pred)
-	    	all_free  = all is_free ct_vars
-	    	any_ambig = is_source_polytype && any is_ambig ct_vars
-\end{code}
 
 %************************************************************************
 %*									*
@@ -680,8 +549,7 @@ tcTySig :: RenamedSig -> TcM TcSigInfo
 
 tcTySig (Sig v ty src_loc)
  = tcAddSrcLoc src_loc				$ 
-   tcAddErrCtxt (tcsigCtxt v) 			$
-   tcHsSigType ty				`thenTc` \ sigma_tc_ty ->
+   tcHsSigType (FunSigCtxt v) ty		`thenTc` \ sigma_tc_ty ->
    mkTcSig (mkLocalId v sigma_tc_ty) src_loc	`thenNF_Tc` \ sig -> 
    returnTc sig
 
@@ -977,8 +845,6 @@ sigPatCtxt bound_tvs bound_ids tidy_env
 %************************************************************************
 
 \begin{code}
-tcsigCtxt v   = ptext SLIT("In a type signature for") <+> quotes (ppr v)
-
 typeKindCtxt :: RenamedHsType -> Message
 typeKindCtxt ty = sep [ptext SLIT("When checking that"),
 	  	       nest 2 (quotes (ppr ty)),
@@ -996,20 +862,4 @@ wrongThingErr expected thing name
     pp_thing (ATyVar _) 	  = ptext SLIT("Type variable")
     pp_thing (ATcId _)  	  = ptext SLIT("Local identifier")
     pp_thing (AThing _) 	  = ptext SLIT("Utterly bogus")
-
-ambigErr pred ppr_ty
-  = sep [ptext SLIT("Ambiguous constraint") <+> quotes (pprPred pred),
-	 nest 4 (ptext SLIT("for the type:") <+> ppr_ty),
-	 nest 4 (ptext SLIT("At least one of the forall'd type variables mentioned by the constraint") $$
-		 ptext SLIT("must be reachable from the type after the =>"))]
-
-freeErr pred ppr_ty
-  = sep [ptext SLIT("All of the type variables in the constraint") <+> quotes (pprPred pred) <+>
-		   ptext SLIT("are already in scope"),
-	 nest 4 (ptext SLIT("At least one must be universally quantified here")),
-	 ptext SLIT("In the type") <+> quotes ppr_ty
-    ]
-
-polyArgTyErr ty = ptext SLIT("Illegal polymorphic type as argument:")   <+> ppr ty
-ubxArgTyErr  ty = ptext SLIT("Illegal unboxed tuple type as argument:") <+> ppr ty
 \end{code}

@@ -4,7 +4,7 @@
 \section[TcTyDecls]{Typecheck type declarations}
 
 \begin{code}
-module TcTyDecls ( tcTyDecl1, kcConDetails ) where
+module TcTyDecls ( tcTyDecl, checkValidTyCon, kcConDetails ) where
 
 #include "HsVersions.h"
 
@@ -12,28 +12,30 @@ import HsSyn		( TyClDecl(..), ConDecl(..), ConDetails(..),
 			  getBangType, getBangStrictness, conDetailsTys
 			)
 import RnHsSyn		( RenamedTyClDecl, RenamedConDecl, RenamedContext )
-import BasicTypes	( NewOrData(..), RecFlag, isRec )
+import BasicTypes	( NewOrData(..) )
 
-import TcMonoType	( tcHsRecType, tcHsTyVars, tcRecTheta,
+import TcMonoType	( tcHsTyVars, tcHsTheta, tcHsType, 
 			  kcHsContext, kcHsSigType, kcHsLiftedSigType
 			)
 import TcEnv		( tcExtendTyVarEnv, 
 			  tcLookupTyCon, tcLookupRecId, 
 			  TyThingDetails(..), RecTcEnv
 			)
-import TcType		( tcEqType, tyVarsOfTypes, tyVarsOfPred, Type, ThetaType )
+import TcType		( tcEqType, tyVarsOfTypes, tyVarsOfPred, ThetaType )
+import TcMType		( checkValidType, UserTypeCtxt(..), checkValidTheta, SourceTyCtxt(..) )
 import TcMonad
 
-import DataCon		( DataCon, mkDataCon, dataConFieldLabels )
+import DataCon		( DataCon, mkDataCon, dataConFieldLabels, dataConWrapId, dataConName )
 import MkId		( mkDataConId, mkDataConWrapId, mkRecordSelId )
 import FieldLabel
-import Var		( TyVar )
+import Var		( TyVar, idType )
 import Name		( Name, NamedThing(..) )
 import Outputable
-import TyCon		( TyCon, tyConTyVars )
+import TyCon		( TyCon, tyConName, tyConTheta, getSynTyConDefn, tyConTyVars, tyConDataCons, isSynTyCon )
 import VarSet		( intersectVarSet, isEmptyVarSet )
 import PrelNames	( unpackCStringName, unpackCStringUtf8Name )
 import ListSetOps	( equivClasses )
+import List		( nubBy )
 \end{code}
 
 %************************************************************************
@@ -43,42 +45,95 @@ import ListSetOps	( equivClasses )
 %************************************************************************
 
 \begin{code}
-tcTyDecl1 :: RecFlag -> RecTcEnv -> RenamedTyClDecl -> TcM (Name, TyThingDetails)
-tcTyDecl1 is_rec unf_env (TySynonym {tcdName = tycon_name, tcdSynRhs = rhs})
+tcTyDecl :: RecTcEnv -> RenamedTyClDecl -> TcM (Name, TyThingDetails)
+tcTyDecl unf_env (TySynonym {tcdName = tycon_name, tcdSynRhs = rhs})
   = tcLookupTyCon tycon_name			`thenNF_Tc` \ tycon ->
     tcExtendTyVarEnv (tyConTyVars tycon)	$
-    tcHsRecType is_rec rhs			`thenTc` \ rhs_ty ->
-	-- Note tcHsRecType not tcHsRecSigType; we allow type synonyms
-	-- that aren't types; e.g.  type List = []
-	--
-	-- If the RHS mentions tyvars that aren't in scope, we'll 
-	-- quantify over them:
-	--	e.g. 	type T = a->a
-	-- will become	type T = forall a. a->a
-	--
-	-- With gla-exts that's right, but for H98 we should complain. 
-	-- We can now do that here without falling into
-	-- a black hole, we still do it in rnDecl (TySynonym case)
-
+    tcHsType rhs				`thenTc` \ rhs_ty ->
     returnTc (tycon_name, SynTyDetails rhs_ty)
 
-tcTyDecl1 is_rec unf_env (TyData {tcdND = new_or_data, tcdCtxt = context,
+tcTyDecl unf_env (TyData {tcdND = new_or_data, tcdCtxt = context,
 			  	  tcdName = tycon_name, tcdCons = con_decls})
   = tcLookupTyCon tycon_name			`thenNF_Tc` \ tycon ->
     let
 	tyvars = tyConTyVars tycon
     in
     tcExtendTyVarEnv tyvars				$
-
-	-- Typecheck the pieces
-    tcRecTheta is_rec context						`thenTc` \ ctxt ->
-    mapTc (tcConDecl is_rec new_or_data tycon tyvars ctxt) con_decls	`thenTc` \ data_cons ->
-    tcRecordSelectors is_rec unf_env tycon data_cons			`thenTc` \ sel_ids -> 
+    tcHsTheta context						`thenTc` \ ctxt ->
+    mapTc (tcConDecl new_or_data tycon tyvars ctxt) con_decls	`thenTc` \ data_cons ->
+    let
+	sel_ids = mkRecordSelectors unf_env tycon data_cons
+    in
     returnTc (tycon_name, DataTyDetails ctxt data_cons sel_ids)
 
-tcTyDecl1 is_rec unf_env (ForeignType {tcdName = tycon_name})
+tcTyDecl unf_env (ForeignType {tcdName = tycon_name})
   = returnTc (tycon_name, ForeignTyDetails)
+
+
+mkRecordSelectors unf_env tycon data_cons
+  = 	-- We'll check later that fields with the same name 
+	-- from different constructors have the same type.
+     [ mkRecordSelId tycon field unpack_id unpackUtf8_id
+     | field <- nubBy eq_name fields ]
+  where
+    fields = [ field | con <- data_cons, field <- dataConFieldLabels con ]
+    eq_name field1 field2 = fieldLabelName field1 == fieldLabelName field2
+
+    unpack_id     = tcLookupRecId unf_env unpackCStringName
+    unpackUtf8_id = tcLookupRecId unf_env unpackCStringUtf8Name
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Validity check}
+%*									*
+%************************************************************************
+
+checkValidTyCon is called once the mutually-recursive knot has been
+tied, so we can look at things freely.
+
+\begin{code}
+checkValidTyCon :: TyCon -> TcM ()
+checkValidTyCon tc
+  | isSynTyCon tc = checkValidType (TySynCtxt name) syn_rhs
+  | otherwise
+  = 	-- Check the context on the data decl
+    checkValidTheta (DataTyCtxt name) (tyConTheta tc)	`thenTc_` 
+	
+	-- Check arg types of data constructors
+    mapTc_ check_data_con data_cons			`thenTc_`
+
+	-- Check that fields with the same name share a type
+    mapTc_ check_fields groups
+
+  where
+    name         = tyConName tc
+    (_, syn_rhs) = getSynTyConDefn tc
+    data_cons    = tyConDataCons tc
+
+    fields = [field | con <- data_cons, field <- dataConFieldLabels con]
+    groups = equivClasses cmp_name fields
+    cmp_name field1 field2 = fieldLabelName field1 `compare` fieldLabelName field2
+
+    check_data_con con = checkValidType (ConArgCtxt (dataConName con)) 
+					(idType (dataConWrapId con))
+				-- This checks the argument types and
+				-- the existential context (if any)			 
+
+    check_fields fields@(first_field_label : other_fields)
+	-- These fields all have the same name, but are from
+	-- different constructors in the data type
+	= 	-- Check that all the fields in the group have the same type
+		-- NB: this check assumes that all the constructors of a given
+		-- data type use the same type variables
+	  checkTc (all (tcEqType field_ty) other_tys) (fieldTypeMisMatch field_name)
+	where
+	    field_ty   = fieldLabelType first_field_label
+	    field_name = fieldLabelName first_field_label
+	    other_tys  = map fieldLabelType other_fields
+\end{code}
+
 
 
 %************************************************************************
@@ -100,24 +155,19 @@ kcConDetails new_or_data ex_ctxt details
 	    -- going to remove the constructor while coercing it to a lifted type.
 
 
-tcConDecl :: RecFlag -> NewOrData -> TyCon -> [TyVar] -> ThetaType -> RenamedConDecl -> TcM DataCon
-
-tcConDecl is_rec new_or_data tycon tyvars ctxt (ConDecl name wkr_name ex_tvs ex_ctxt details src_loc)
+tcConDecl :: NewOrData -> TyCon -> [TyVar] -> ThetaType -> RenamedConDecl -> TcM DataCon
+tcConDecl new_or_data tycon tyvars ctxt (ConDecl name wkr_name ex_tvs ex_ctxt details src_loc)
   = tcAddSrcLoc src_loc							$
     tcHsTyVars ex_tvs (kcConDetails new_or_data ex_ctxt details)	$ \ ex_tyvars ->
-    tcRecTheta is_rec ex_ctxt						`thenTc` \ ex_theta ->
+    tcHsTheta ex_ctxt							`thenTc` \ ex_theta ->
     case details of
 	VanillaCon btys    -> tc_datacon ex_tyvars ex_theta btys
 	InfixCon bty1 bty2 -> tc_datacon ex_tyvars ex_theta [bty1,bty2]
 	RecCon fields	   -> tc_rec_con ex_tyvars ex_theta fields
   where
     tc_datacon ex_tyvars ex_theta btys
-      = let
-	    arg_stricts = map getBangStrictness btys
-	    tys	        = map getBangType btys
-        in
-	mapTc (tcHsRecType is_rec) tys		`thenTc` \ arg_tys ->
-	mk_data_con ex_tyvars ex_theta arg_stricts arg_tys []
+      = mapTc tcHsType (map getBangType btys)	`thenTc` \ arg_tys ->
+	mk_data_con ex_tyvars ex_theta (map getBangStrictness btys) arg_tys []
 
     tc_rec_con ex_tyvars ex_theta fields
       = checkTc (null ex_tyvars) (exRecConErr name)	`thenTc_`
@@ -126,14 +176,14 @@ tcConDecl is_rec new_or_data tycon tyvars ctxt (ConDecl name wkr_name ex_tvs ex_
 	    field_labels = concat field_labels_s
 	    arg_stricts = [str | (ns, bty) <- fields, 
 				 let str = getBangStrictness bty, 
-				 n <- ns		-- One for each.  E.g   x,y,z :: !Int
+				 n <- ns	-- One for each.  E.g   x,y,z :: !Int
 			  ]
 	in
 	mk_data_con ex_tyvars ex_theta arg_stricts 
 		    (map fieldLabelType field_labels) field_labels
 
     tc_field ((field_label_names, bty), tag)
-      = tcHsRecType is_rec (getBangType bty)		`thenTc` \ field_ty ->
+      = tcHsType (getBangType bty)			`thenTc` \ field_ty ->
 	returnTc [mkFieldLabel (getName name) tycon field_ty tag | name <- field_label_names]
 
     mk_data_con ex_tyvars ex_theta arg_stricts arg_tys fields
@@ -158,49 +208,6 @@ thinContext arg_tys ctxt
       in_arg_tys pred = not $ isEmptyVarSet $ 
 			tyVarsOfPred pred `intersectVarSet` arg_tyvars
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Record selectors}
-%*									*
-%************************************************************************
-
-\begin{code}
-tcRecordSelectors is_rec unf_env tycon data_cons
-	-- Omit the check that the fields have consistent types if 
-	-- the group is recursive; TcTyClsDecls.tcGroup will repeat 
-	-- with NonRecursive once we have tied the knot
-  | isRec is_rec = returnTc sel_ids
-  | otherwise	 = mapTc check groups 	`thenTc_` 
-		   returnTc sel_ids
-  where
-    fields = [ field | con   <- data_cons
-		     , field <- dataConFieldLabels con ]
-
-	-- groups is list of fields that share a common name
-    groups		   = equivClasses cmp_name fields
-    cmp_name field1 field2 = fieldLabelName field1 `compare` fieldLabelName field2
-
-    sel_ids = [ mkRecordSelId tycon field unpack_id unpackUtf8_id
-	      | (field : _) <- groups ]
-
-    check fields@(first_field_label : other_fields)
-	-- These fields all have the same name, but are from
-	-- different constructors in the data type
-	= 	-- Check that all the fields in the group have the same type
-		-- NB: this check assumes that all the constructors of a given
-		-- data type use the same type variables
-	  checkTc (all (tcEqType field_ty) other_tys) (fieldTypeMisMatch field_name)
-	where
-	    field_ty   = fieldLabelType first_field_label
-	    field_name = fieldLabelName first_field_label
-	    other_tys  = map fieldLabelType other_fields
-
-    unpack_id     = tcLookupRecId unf_env unpackCStringName
-    unpackUtf8_id = tcLookupRecId unf_env unpackCStringUtf8Name
-\end{code}
-
 
 
 %************************************************************************

@@ -26,9 +26,8 @@ import RnHsSyn		( RenamedHsDecl, RenamedForeignDecl )
 
 import TcMonad
 import TcEnv		( newLocalId )
-import TcMonoType	( tcHsLiftedSigType )
-import TcHsSyn		( TcMonoBinds, TypecheckedForeignDecl,
-			  TcForeignExportDecl )
+import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
+import TcHsSyn		( TcMonoBinds, TypecheckedForeignDecl, TcForeignExportDecl )
 import TcExpr		( tcPolyExpr )			
 import Inst		( emptyLIE, LIE, plusLIE )
 
@@ -76,7 +75,7 @@ tcFImport :: RenamedForeignDecl -> TcM (Id, TypecheckedForeignDecl)
 tcFImport fo@(ForeignImport nm hs_ty imp_decl src_loc)
  = tcAddSrcLoc src_loc			$
    tcAddErrCtxt (foreignDeclCtxt fo)	$
-   tcHsLiftedSigType hs_ty		`thenTc`	\ sig_ty ->
+   tcHsSigType (ForSigCtxt nm) hs_ty	`thenTc`	\ sig_ty ->
    let 
       -- drop the foralls before inspecting the structure
       -- of the foreign type.
@@ -162,8 +161,8 @@ tcFExport fo@(ForeignExport nm hs_ty spec src_loc) =
    tcAddSrcLoc src_loc			$
    tcAddErrCtxt (foreignDeclCtxt fo)	$
 
-   tcHsLiftedSigType hs_ty	       `thenTc`	\ sig_ty ->
-   tcPolyExpr (HsVar nm) sig_ty		`thenTc`    \ (rhs, lie, _, _, _) ->
+   tcHsSigType (ForSigCtxt nm) hs_ty	`thenTc` \ sig_ty ->
+   tcPolyExpr (HsVar nm) sig_ty		`thenTc` \ (rhs, lie, _, _, _) ->
 
    tcCheckFEType sig_ty spec		`thenTc_`
 

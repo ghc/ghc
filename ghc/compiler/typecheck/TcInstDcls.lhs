@@ -23,10 +23,10 @@ import TcHsSyn		( TcMonoBinds, mkHsConApp )
 import TcBinds		( tcSpecSigs )
 import TcClassDcl	( tcMethodBind, badMethodErr )
 import TcMonad       
-import TcMType		( tcInstType, tcInstTyVars )
+import TcMType		( tcInstTyVars, checkValidTheta, UserTypeCtxt(..), SourceTyCtxt(..) )
 import TcType		( tcSplitDFunTy, tcIsTyVarTy, tcSplitTyConApp_maybe,
 			  tyVarsOfTypes, mkClassPred, mkTyVarTy,
-			  isTyVarClassPred, inheritablePred
+			  tcSplitSigmaTy, tcSplitPredTy_maybe, getClassPredTys_maybe
 			)
 import Inst		( InstOrigin(..),
 			  newDicts, instToId,
@@ -40,7 +40,7 @@ import TcEnv		( TcEnv, tcExtendGlobalValEnv,
 			  isLocalThing,
 			)
 import InstEnv		( InstEnv, extendInstEnv )
-import TcMonoType	( tcHsTyVars, tcHsSigType, kcHsSigType, checkSigTyVars )
+import TcMonoType	( tcHsTyVars, kcHsSigType, tcHsType, tcHsSigType, checkSigTyVars )
 import TcSimplify	( tcSimplifyCheck )
 import HscTypes		( HomeSymbolTable, DFunId,
 			  ModDetails(..), PackageInstEnv, PersistentRenamerState
@@ -59,7 +59,7 @@ import Module		( Module, foldModuleEnv )
 import Name		( getSrcLoc )
 import NameSet		( unitNameSet, nameSetToList )
 import PrelInfo		( eRROR_ID )
-import PprType		( pprClassPred, pprPred )
+import PprType		( pprClassPred )
 import TyCon		( TyCon, isSynTyCon )
 import Subst		( mkTopTyVarSubst, substTheta )
 import VarSet		( varSetElems )
@@ -240,21 +240,26 @@ addInstDFuns inst_env dfuns
 \begin{code}
 tcInstDecl1 :: RenamedInstDecl -> NF_TcM [InstInfo]
 -- Deal with a single instance declaration
+-- Type-check all the stuff before the "where"
 tcInstDecl1 decl@(InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
   = 	-- Prime error recovery, set source location
     recoverNF_Tc (returnNF_Tc [])	$
     tcAddSrcLoc src_loc			$
+    tcAddErrCtxt (instDeclCtxt poly_ty)	$
 
-	-- Type-check all the stuff before the "where"
-    traceTc (text "Starting inst" <+> ppr poly_ty)	`thenTc_`
-    tcAddErrCtxt (instDeclCtxt poly_ty)	(
- 	tcHsSigType poly_ty
-    )					`thenTc` \ poly_ty' ->
+	-- Typecheck the instance type itself.  We can't use 
+	-- tcHsSigType, because it's not a valid user type.
+    kcHsSigType poly_ty			`thenTc_`
+    tcHsType poly_ty			`thenTc` \ poly_ty' ->
     let
-	(tyvars, theta, clas, inst_tys) = tcSplitDFunTy poly_ty'
+	(tyvars, theta, tau) = tcSplitSigmaTy poly_ty'
+	maybe_cls_tys	      = case tcSplitPredTy_maybe tau of 
+				   Just pred -> getClassPredTys_maybe pred
+				   Nothing   -> Nothing 
+	Just (clas, inst_tys) = maybe_cls_tys
     in
+    checkTc (maybeToBool maybe_cls_tys) (instHeadErr tau)	`thenTc_`    
 
-    traceTc (text "Check validity")	`thenTc_`
     (case maybe_dfun_name of
 	Nothing ->	-- A source-file instance declaration
 
@@ -264,24 +269,18 @@ tcInstDecl1 decl@(InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
 		-- contain something illegal in normal Haskell, notably
 		--	instance CCallable [Char] 
 	    getDOptsTc						`thenTc` \ dflags -> 
-    	    checkInstValidity dflags theta clas inst_tys	`thenTc_`
-
-		-- Make the dfun id and return it
-	    traceTc (text "new name")	`thenTc_`
-	    newDFunName clas inst_tys src_loc		`thenNF_Tc` \ dfun_name ->
-	    returnNF_Tc (True, dfun_name)
+	    checkValidTheta InstDeclCtxt theta			`thenTc_`
+    	    checkValidInstHead dflags theta clas inst_tys	`thenTc_`
+	    newDFunName clas inst_tys src_loc
 
 	Just dfun_name -> 	-- An interface-file instance declaration
-    		-- Make the dfun id
-	    returnNF_Tc (False, dfun_name)
-    )						`thenNF_Tc` \ (is_local, dfun_name) ->
+			    returnNF_Tc dfun_name
+    )						`thenNF_Tc` \ dfun_name ->
 
-    traceTc (text "Name" <+> ppr dfun_name)	`thenTc_`
     let
 	dfun_id = mkDictFunId dfun_name clas tyvars inst_tys theta
     in
-    returnTc [InstInfo { iDFunId = dfun_id, 
-			 iBinds = binds,    iPrags = uprags }]
+    returnTc [InstInfo { iDFunId = dfun_id, iBinds = binds, iPrags = uprags }]
 \end{code}
 
 
@@ -411,7 +410,7 @@ mkGenericInstance clas loc (hs_ty, binds)
     tcHsTyVars sig_tvs (kcHsSigType hs_ty)	$ \ tyvars ->
 
 	-- Type-check the instance type, and check its form
-    tcHsSigType hs_ty				`thenTc` \ inst_ty ->
+    tcHsSigType GenPatCtxt hs_ty		`thenTc` \ inst_ty ->
     checkTc (validGenericInstanceType inst_ty)
 	    (badGenericInstanceType binds)	`thenTc_`
 
@@ -759,7 +758,7 @@ simplified: only zeze2 is extracted and its body is simplified.
 %*									*
 %************************************************************************
 
-@scrutiniseInstanceHead@ checks the type {\em and} its syntactic constraints:
+@checkValidInstHead@ checks the type {\em and} its syntactic constraints:
 it must normally look like: @instance Foo (Tycon a b c ...) ...@
 
 The exceptions to this syntactic checking: (1)~if the @GlasgowExts@
@@ -769,26 +768,13 @@ compiled elsewhere). In these cases, we let them go through anyway.
 We can also have instances for functions: @instance Foo (a -> b) ...@.
 
 \begin{code}
-checkInstValidity dflags theta clas inst_tys
+checkValidInstHead dflags theta clas inst_tys
   | null errs = returnTc ()
   | otherwise = addErrsTc errs `thenNF_Tc_` failTc
   where
-    errs = checkInstHead dflags theta clas inst_tys ++
-	   [err | pred <- theta, err <- checkInstConstraint dflags pred]
+    errs = check_inst_head dflags theta clas inst_tys
 
-checkInstConstraint dflags pred
-	-- Checks whether a predicate is legal in the
-	-- context of an instance declaration
-  | ok 	       = []
-  | otherwise  = [instConstraintErr pred]
-  where
-    ok = inheritablePred pred &&
-	 (isTyVarClassPred pred || arbitrary_preds_ok)
-
-    arbitrary_preds_ok = dopt Opt_AllowUndecidableInstances dflags
-
-
-checkInstHead dflags theta clas inst_taus
+check_inst_head dflags theta clas inst_taus
   |	-- CCALL CHECK
 	-- A user declaration of a CCallable/CReturnable instance
 	-- must be for a "boxed primitive" type.
@@ -879,12 +865,6 @@ instDeclCtxt inst_ty = ptext SLIT("In the instance declaration for") <+> quotes 
 \end{code}
 
 \begin{code}
-instConstraintErr pred
-  = hang (ptext SLIT("Illegal constraint") <+> 
-	  quotes (pprPred pred) <+> 
-	  ptext SLIT("in instance context"))
-	 4 (ptext SLIT("(Instance contexts must constrain only type variables)"))
-	
 badGenericInstanceType binds
   = vcat [ptext SLIT("Illegal type pattern in the generic bindings"),
 	  nest 4 (ppr binds)]
@@ -901,6 +881,10 @@ dupGenericInsts tc_inst_infos
     ]
   where 
     ppr_inst_ty (tc,inst) = ppr (simpleInstInfoTy inst)
+
+instHeadErr ty
+  = vcat [ptext SLIT("Illegal instance head:") <+> ppr ty,
+	  ptext SLIT("Instance head must be of form <context> => <class> <types>")]
 
 instTypeErr clas tys msg
   = sep [ptext SLIT("Illegal instance declaration for") <+> 

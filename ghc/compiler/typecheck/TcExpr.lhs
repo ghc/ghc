@@ -28,7 +28,7 @@ import TcEnv		( tcLookupClass, tcLookupGlobalId, tcLookupGlobal_maybe,
 			  tcExtendGlobalTyVars
 			)
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcStmts )
-import TcMonoType	( tcHsSigType, checkSigTyVars, sigCtxt )
+import TcMonoType	( tcHsSigType, UserTypeCtxt(..), checkSigTyVars, sigCtxt )
 import TcPat		( badFieldCon, simpleHsLitTy )
 import TcSimplify	( tcSimplifyCheck, tcSimplifyIPs )
 import TcMType		( tcInstTyVars, tcInstType, 
@@ -56,7 +56,7 @@ import VarSet		( elemVarSet )
 import TysWiredIn	( boolTy, mkListTy, listTyCon )
 import PrelNames	( cCallableClassName, 
 			  cReturnableClassName, 
-			  enumFromName, enumFromThenName, negateName,
+			  enumFromName, enumFromThenName, 
 			  enumFromToName, enumFromThenToName,
 			  thenMName, failMName, returnMName, ioTyConName
 			)
@@ -593,9 +593,9 @@ tcMonoExpr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
 
 \begin{code}
 tcMonoExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
- = tcAddErrCtxt (exprSigCtxt in_expr)	$
-   tcHsSigType  poly_ty		`thenTc` \ sig_tc_ty ->
+ = tcHsSigType ExprSigCtxt poly_ty	`thenTc` \ sig_tc_ty ->
 
+   tcAddErrCtxt (exprSigCtxt in_expr)	$
    if not (isQualifiedTy sig_tc_ty) then
 	-- Easy case
 	unifyTauTy sig_tc_ty res_ty	`thenTc_`

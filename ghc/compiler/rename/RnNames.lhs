@@ -272,8 +272,9 @@ filterImports :: ModuleName			-- The module being imported
 	      -> WhereFrom			-- Tells whether it's a {-# SOURCE #-} import
 	      -> Maybe (Bool, [RdrNameIE])	-- Import spec; True => hiding
 	      -> [AvailInfo]			-- What's available
-	      -> RnMG ([AvailInfo],		-- What's actually imported
-		       [AvailInfo],		-- What's to be hidden
+	      -> RnMG ([AvailInfo],		-- "chosens"
+		       [AvailInfo],		-- "hides"
+			-- The true imports are "chosens" - "hides"
 			-- (It's convenient to return both the above sets, because
 			--  the substraction can be done more efficiently when
 			--  building the environment.)

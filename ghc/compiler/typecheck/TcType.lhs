@@ -66,6 +66,7 @@ module TcType (
   Kind, 	-- Stuff to do with kinds is insensitive to pre/post Tc
   unliftedTypeKind, liftedTypeKind, openTypeKind, mkArrowKind, mkArrowKinds, 
   superBoxity, liftedBoxity, hasMoreBoxityInfo, defaultKind, superKind,
+  isTypeKind,
 
   Type, SourceType(..), PredType, ThetaType, 
   mkForAllTy, mkForAllTys, 
@@ -96,7 +97,7 @@ import Type		(	-- Re-exports
 			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
 			  Kind, Type, TauType, SourceType(..), PredType, ThetaType, 
 			  unliftedTypeKind, liftedTypeKind, openTypeKind, mkArrowKind, mkArrowKinds,
-			  mkForAllTy, mkForAllTys, defaultKind,
+			  mkForAllTy, mkForAllTys, defaultKind, isTypeKind,
 			  mkFunTy, mkFunTys, zipFunTys, 
 			  mkTyConApp, mkAppTy, mkAppTys, mkSynTy, applyTy, applyTys,
 			  mkTyVarTy, mkTyVarTys, mkTyConTy,
@@ -344,7 +345,7 @@ tcSplitPredTy_maybe (NoteTy _ ty)  	    = tcSplitPredTy_maybe ty
 tcSplitPredTy_maybe (UsageTy _ ty)	    = tcSplitPredTy_maybe ty
 tcSplitPredTy_maybe (SourceTy p) | isPred p = Just p
 tcSplitPredTy_maybe other	      	    = Nothing
-
+	
 mkPredTy :: PredType -> Type
 mkPredTy pred = SourceTy pred
 

@@ -4,14 +4,14 @@
 \section[TcClassDcl]{Typechecking class declarations}
 
 \begin{code}
-module TcClassDcl ( tcClassDecl1, tcClassDecls2, 
+module TcClassDcl ( tcClassDecl1, checkValidClass, tcClassDecls2, 
 		    tcMethodBind, badMethodErr
 		  ) where
 
 #include "HsVersions.h"
 
 import HsSyn		( TyClDecl(..), Sig(..), MonoBinds(..),
-			  HsExpr(..), HsLit(..), HsType(..), HsPred(..), 
+			  HsExpr(..), HsLit(..), 
 			  mkSimpleMatch, andMonoBinds, andMonoBindList, 
 			  isClassOpSig, isPragSig,
 			  getClassDeclSysNames, placeHolderType
@@ -19,8 +19,7 @@ import HsSyn		( TyClDecl(..), Sig(..), MonoBinds(..),
 import BasicTypes	( TopLevelFlag(..), RecFlag(..), StrictnessMark(..) )
 import RnHsSyn		( RenamedTyClDecl, 
 			  RenamedClassOpSig, RenamedMonoBinds,
-			  RenamedContext, RenamedSig, 
-			  maybeGenericMatch
+			  RenamedSig, maybeGenericMatch
 			)
 import TcHsSyn		( TcMonoBinds )
 
@@ -31,21 +30,23 @@ import TcEnv		( RecTcEnv, TyThingDetails(..), tcAddImportedIdInfo,
 			  tcExtendLocalValEnv, tcExtendTyVarEnv
 			)
 import TcBinds		( tcBindWithSigs, tcSpecSigs )
-import TcMonoType	( tcHsRecType, tcRecTheta, checkSigTyVars, checkAmbiguity, sigCtxt, mkTcSig )
+import TcMonoType	( tcHsType, tcHsTheta, checkSigTyVars, sigCtxt, mkTcSig )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
-import TcMType		( tcInstTyVars )
-import TcType		( Type, ThetaType, mkTyVarTys, mkPredTys, mkClassPred, tcIsTyVarTy, tcSplitTyConApp_maybe )
+import TcMType		( tcInstTyVars, checkValidTheta, checkValidType, SourceTyCtxt(..), UserTypeCtxt(..) )
+import TcType		( Type, mkSigmaTy, mkTyVarTys, mkPredTys, mkClassPred, 
+			  tcIsTyVarTy, tcSplitTyConApp_maybe, tcSplitSigmaTy
+			)
 import TcMonad
 import Generics		( mkGenericRhs, validGenericMethodType )
 import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
-import Class		( classTyVars, classBigSig, classTyCon, 
+import Class		( classTyVars, classBigSig, classTyCon, className,
 			  Class, ClassOpItem, DefMeth (..) )
 import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
 import DataCon		( mkDataCon )
-import Id		( Id, idType, idName )
+import Id		( idType, idName )
 import Module		( Module )
 import Name		( Name, NamedThing(..) )
-import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, plusNameEnv, nameEnvElts )
+import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, plusNameEnv )
 import NameSet		( emptyNameSet )
 import Outputable
 import Var		( TyVar )
@@ -99,21 +100,13 @@ Death to "ExpandingDicts".
 
 \begin{code}
 
-tcClassDecl1 :: RecFlag -> RecTcEnv -> RenamedTyClDecl -> TcM (Name, TyThingDetails)
-tcClassDecl1 is_rec rec_env
+tcClassDecl1 :: RecTcEnv -> RenamedTyClDecl -> TcM (Name, TyThingDetails)
+tcClassDecl1 rec_env
       	     (ClassDecl {tcdCtxt = context, tcdName = class_name,
 			 tcdTyVars = tyvar_names, tcdFDs = fundeps,
 			 tcdSigs = class_sigs, tcdMeths = def_methods,
 			 tcdSysNames = sys_names, tcdLoc = src_loc})
-  = 	-- CHECK ARITY 1 FOR HASKELL 1.4
-    doptsTc Opt_GlasgowExts				`thenTc` \ gla_ext_opt ->
-    let
-	gla_exts = gla_ext_opt || not (maybeToBool def_methods)
-		-- Accept extensions if gla_exts is on,
-		-- or if we're looking at an interface file decl
-    in		-- (in which case def_methods = Nothing
-
-	-- LOOK THINGS UP IN THE ENVIRONMENT
+  = 	-- LOOK THINGS UP IN THE ENVIRONMENT
     tcLookupClass class_name				`thenTc` \ clas ->
     let
 	tyvars   = classTyVars clas
@@ -123,31 +116,24 @@ tcClassDecl1 is_rec rec_env
     in
     tcExtendTyVarEnv tyvars				$ 
 
-	-- SOURCE-CODE CONSISTENCY CHECKS
-    (case def_methods of
-	Nothing  -> 	-- Not source
-		    returnTc Nothing	
-
-	Just dms -> 	-- Source so do error checks
-		    checkTc (gla_exts || length tyvar_names == 1)
-			    (classArityErr class_name)			`thenTc_`
-
-		    checkDefaultBinds clas op_names dms	  `thenTc` \ dm_env ->
-		    checkGenericClassIsUnary clas dm_env  `thenTc_`
-		    returnTc (Just dm_env)
-    )							   `thenTc` \ mb_dm_env ->
+    checkDefaultBinds clas op_names def_methods	  `thenTc` \ mb_dm_env ->
 	
 	-- CHECK THE CONTEXT
-    tcSuperClasses is_rec gla_exts clas context sc_sel_names	`thenTc` \ (sc_theta, sc_sel_ids) ->
+	-- The renamer has already checked that the context mentions
+	-- only the type variable of the class decl.
+	-- Context is already kind-checked
+    ASSERT( length context == length sc_sel_names )
+    tcHsTheta context						`thenTc` \ sc_theta ->
 
 	-- CHECK THE CLASS SIGNATURES,
-    mapTc (tcClassSig is_rec rec_env clas tyvars mb_dm_env) op_sigs	`thenTc` \ sig_stuff ->
+    mapTc (tcClassSig rec_env clas tyvars mb_dm_env) op_sigs	`thenTc` \ sig_stuff ->
 
 	-- MAKE THE CLASS DETAILS
     let
 	(op_tys, op_items) = unzip sig_stuff
         sc_tys		   = mkPredTys sc_theta
 	dict_component_tys = sc_tys ++ op_tys
+        sc_sel_ids	   = [mkDictSelId sc_name clas | sc_name <- sc_sel_names]
 
         dict_con = mkDataCon datacon_name
 			     [NotMarkedStrict | _ <- dict_component_tys]
@@ -166,8 +152,8 @@ tcClassDecl1 is_rec rec_env
 \end{code}
 
 \begin{code}
-checkDefaultBinds :: Class -> [Name] -> RenamedMonoBinds
-		  -> TcM (NameEnv Bool)
+checkDefaultBinds :: Class -> [Name] -> Maybe RenamedMonoBinds
+		  -> TcM (Maybe (NameEnv Bool))
 	-- The returned environment says
 	--	x not in env => no default method
 	--	x -> True    => generic default method
@@ -180,74 +166,39 @@ checkDefaultBinds :: Class -> [Name] -> RenamedMonoBinds
 
   -- But do all this only for source binds
 
-checkDefaultBinds clas ops EmptyMonoBinds = returnTc emptyNameEnv
+checkDefaultBinds clas ops Nothing
+  = returnTc Nothing
 
-checkDefaultBinds clas ops (AndMonoBinds b1 b2)
-  = checkDefaultBinds clas ops b1	`thenTc` \ dm_info1 ->
-    checkDefaultBinds clas ops b2	`thenTc` \ dm_info2 ->
-    returnTc (dm_info1 `plusNameEnv` dm_info2)
+checkDefaultBinds clas ops (Just mbs)
+  = go mbs	`thenTc` \ dm_env ->
+    returnTc (Just dm_env)
+  where
+    go EmptyMonoBinds = returnTc emptyNameEnv
 
-checkDefaultBinds clas ops (FunMonoBind op _ matches loc)
-  = tcAddSrcLoc loc					$
+    go (AndMonoBinds b1 b2)
+      = go b1	`thenTc` \ dm_info1 ->
+        go b2	`thenTc` \ dm_info2 ->
+        returnTc (dm_info1 `plusNameEnv` dm_info2)
+
+    go (FunMonoBind op _ matches loc)
+      = tcAddSrcLoc loc					$
 
   	-- Check that the op is from this class
-    checkTc (op `elem` ops) (badMethodErr clas op)		`thenTc_`
+	checkTc (op `elem` ops) (badMethodErr clas op)		`thenTc_`
 
    	-- Check that all the defns ar generic, or none are
-    checkTc (all_generic || none_generic) (mixedGenericErr op)	`thenTc_`
+	checkTc (all_generic || none_generic) (mixedGenericErr op)	`thenTc_`
 
-    returnTc (unitNameEnv op all_generic)
-  where
-    n_generic    = count (maybeToBool . maybeGenericMatch) matches
-    none_generic = n_generic == 0
-    all_generic  = n_generic == length matches
-
-checkGenericClassIsUnary clas dm_env
-  = -- Check that if the class has generic methods, then the
-    -- class has only one parameter.  We can't do generic
-    -- multi-parameter type classes!
-    checkTc (unary || no_generics) (genericMultiParamErr clas)
-  where
-    unary 	= length (classTyVars clas) == 1
-    no_generics = not (or (nameEnvElts dm_env))
+	returnTc (unitNameEnv op all_generic)
+      where
+	n_generic    = count (maybeToBool . maybeGenericMatch) matches
+	none_generic = n_generic == 0
+	all_generic  = n_generic == length matches
 \end{code}
 
 
 \begin{code}
-tcSuperClasses :: RecFlag -> Bool -> Class
-	       -> RenamedContext 	-- class context
-	       -> [Name]		-- Names for superclass selectors
-	       -> TcM (ThetaType,	-- the superclass context
-		       [Id])		-- superclass selector Ids
-
-tcSuperClasses is_rec gla_exts clas context sc_sel_names
-  = ASSERT( length context == length sc_sel_names )
-	-- Check the context.
-	-- The renamer has already checked that the context mentions
-	-- only the type variable of the class decl.
-
-	-- For std Haskell check that the context constrains only tyvars
-    mapTc_ check_constraint context			`thenTc_`
-
-	-- Context is already kind-checked
-    tcRecTheta is_rec context		`thenTc` \ sc_theta ->
-    let
-       sc_sel_ids = [mkDictSelId sc_name clas | sc_name <- sc_sel_names]
-    in
-	-- Done
-    returnTc (sc_theta, sc_sel_ids)
-
-  where
-    check_constraint sc = checkTc (ok sc) (superClassErr clas sc)
-    ok (HsClassP c tys) | gla_exts  = True
-			| otherwise = all is_tyvar tys 
-    ok (HsIParam _ _)  = False		-- Never legal
-
-    is_tyvar (HsTyVar _) = True
-    is_tyvar other	 = False
-
-
-tcClassSig :: RecFlag -> RecTcEnv	-- Knot tying only!
+tcClassSig :: RecTcEnv			-- Knot tying only!
 	   -> Class	    		-- ...ditto...
 	   -> [TyVar]		 	-- The class type variable, used for error check only
 	   -> Maybe (NameEnv Bool)	-- Info about default methods
@@ -260,20 +211,17 @@ tcClassSig :: RecFlag -> RecTcEnv	-- Knot tying only!
 -- so we distinguish them in checkDefaultBinds, and pass this knowledge in the
 -- Class.DefMeth data structure. 
 
-tcClassSig is_rec unf_env clas clas_tyvars maybe_dm_env
+tcClassSig unf_env clas clas_tyvars maybe_dm_env
 	   (ClassOpSig op_name sig_dm op_ty src_loc)
   = tcAddSrcLoc src_loc $
 
 	-- Check the type signature.  NB that the envt *already has*
 	-- bindings for the type variables; see comments in TcTyAndClassDcls.
+    tcHsType op_ty			`thenTc` \ local_ty ->
 
-    tcHsRecType is_rec op_ty				`thenTc` \ local_ty ->
-
-	-- Check for ambiguous class op types
     let
 	theta = [mkClassPred clas (mkTyVarTys clas_tyvars)]
-    in
-    checkAmbiguity is_rec True clas_tyvars theta local_ty	 `thenTc` \ global_ty ->
+	global_ty = mkSigmaTy clas_tyvars theta local_ty
           -- The default method's type should really come from the
           -- iface file, since it could be usage-generalised, but this
           -- requires altering the mess of knots in TcModule and I'm
@@ -281,7 +229,6 @@ tcClassSig is_rec unf_env clas clas_tyvars maybe_dm_env
           -- of types of default methods (and dict funs) by annotating them
           -- TyGenNever (in MkId).  Ugh!  KSW 1999-09.
 
-    let
 	-- Build the selector id and default method id
 	sel_id = mkDictSelId op_name clas
  	dm_id  = mkDefaultMethodId dm_name global_ty
@@ -301,12 +248,53 @@ tcClassSig is_rec unf_env clas clas_tyvars maybe_dm_env
 				   Just True  -> GenDefMeth
 				   Just False -> DefMeth dm_id
     in
-	-- Check that for a generic method, the type of 
-	-- the method is sufficiently simple
-    checkTc (dm_info /= GenDefMeth || validGenericMethodType local_ty)
-	    (badGenericMethodType op_name op_ty)		`thenTc_`
-
     returnTc (local_ty, (sel_id, dm_info))
+\end{code}
+
+checkValidClass is called once the mutually-recursive knot has been
+tied, so we can look at things freely.
+
+\begin{code}
+checkValidClass :: Class -> TcM ()
+checkValidClass cls
+  = 	-- CHECK ARITY 1 FOR HASKELL 1.4
+    doptsTc Opt_GlasgowExts				`thenTc` \ gla_exts ->
+
+    	-- Check that the class is unary, unless GlaExs
+    checkTc (gla_exts || unary)
+	    (classArityErr cls)				`thenTc_`
+
+   	-- Check the super-classes
+    checkValidTheta (ClassSCCtxt (className cls)) theta	`thenTc_`
+
+	-- Check the class operations
+    mapTc_ check_op op_stuff		`thenTc_`
+
+  	-- Check that if the class has generic methods, then the
+	-- class has only one parameter.  We can't do generic
+	-- multi-parameter type classes!
+    checkTc (unary || no_generics) (genericMultiParamErr cls)
+
+  where
+    (tyvars, theta, sel_ids, op_stuff) = classBigSig cls
+    unary 	= length tyvars == 1
+    no_generics = null [() | (_, GenDefMeth) <- op_stuff]
+
+    check_op (sel_id, dm) 
+	= checkValidTheta SigmaCtxt (tail theta) 	`thenTc_`
+		-- The 'tail' removes the initial (C a) from the
+		-- class itself, leaving just the method type
+
+	  checkValidType (FunSigCtxt op_name) tau	`thenTc_`
+
+		-- Check that for a generic method, the type of 
+		-- the method is sufficiently simple
+	  checkTc (dm /= GenDefMeth || validGenericMethodType op_ty)
+		  (badGenericMethodType op_name op_ty)
+	where
+	  op_name = idName sel_id
+	  op_ty   = idType sel_id
+	  (_,theta,tau) = tcSplitSigmaTy op_ty
 \end{code}
 
 
@@ -524,7 +512,7 @@ tcMethodBind clas origin inst_tyvars inst_tys inst_theta
      tcExtendGlobalTyVars (mkVarSet inst_tyvars) 
      		    (tcAddErrCtxt (methodCtxt sel_id)		$
      		     tcBindWithSigs NotTopLevel meth_bind 
-     		     [sig_info] meth_prags NonRecursive 
+		   		    [sig_info] meth_prags NonRecursive 
      		    ) 						`thenTc` \ (binds, insts, _) -> 
 
      tcExtendLocalValEnv [(meth_name, meth_id)] 
@@ -626,12 +614,8 @@ find_prags sel_name meth_name (prag:prags) = find_prags sel_name meth_name prags
 Contexts and errors
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
-classArityErr class_name
-  = ptext SLIT("Too many parameters for class") <+> quotes (ppr class_name)
-
-superClassErr clas sc
-  = ptext SLIT("Illegal superclass constraint") <+> quotes (ppr sc)
-    <+> ptext SLIT("in declaration for class") <+> quotes (ppr clas)
+classArityErr cls
+  = ptext SLIT("Too many parameters for class") <+> quotes (ppr cls)
 
 defltMethCtxt clas
   = ptext SLIT("When checking the default methods for class") <+> quotes (ppr clas)

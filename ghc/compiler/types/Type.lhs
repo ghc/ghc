@@ -15,7 +15,7 @@ module Type (
 	typeCon,					-- :: BX -> KX
 	liftedTypeKind, unliftedTypeKind, openTypeKind,	-- :: KX
 	mkArrowKind, mkArrowKinds,			-- :: KX -> KX -> KX
-
+	isTypeKind,
 	funTyCon,
 
         usageKindCon,					-- :: KX
@@ -129,6 +129,12 @@ defaultKind :: Kind -> Kind
 -- Used when generalising: default kind '?' to '*'
 defaultKind kind | kind `eqKind` openTypeKind = liftedTypeKind
 	         | otherwise	 	      = kind
+
+isTypeKind :: Kind -> Bool
+-- True of kind * and *#
+isTypeKind k = case splitTyConApp_maybe k of
+		 Just (tc,[k]) -> tc == typeCon
+		 other	       -> False
 \end{code}
 
 
@@ -311,6 +317,7 @@ as apppropriate.
 
 \begin{code}
 mkTyConApp :: TyCon -> [Type] -> Type
+-- Assumes TyCon is not a SynTyCon; use mkSynTy instead for those
 mkTyConApp tycon tys
   | isFunTyCon tycon, [ty1,ty2] <- tys
   = FunTy (mkUTyM ty1) (mkUTyM ty2)

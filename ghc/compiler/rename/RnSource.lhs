@@ -322,19 +322,12 @@ rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdName = tycon,
 
 rnTyClDecl (TySynonym {tcdName = name, tcdTyVars = tyvars, tcdSynRhs = ty, tcdLoc = src_loc})
   = pushSrcLocRn src_loc $
-    doptRn Opt_GlasgowExts			`thenRn` \ glaExts ->
     lookupTopBndrRn name			`thenRn` \ name' ->
     bindTyVarsRn syn_doc tyvars 		$ \ tyvars' ->
-    rnHsType syn_doc (unquantify glaExts ty)	`thenRn` \ ty' ->
+    rnHsType syn_doc ty				`thenRn` \ ty' ->
     returnRn (TySynonym {tcdName = name', tcdTyVars = tyvars', tcdSynRhs = ty', tcdLoc = src_loc})
   where
     syn_doc = text "In the declaration for type synonym" <+> quotes (ppr name)
-
-	-- For H98 we do *not* universally quantify on the RHS of a synonym
-	-- Silently discard context... but the tyvars in the rest won't be in scope
-	-- In interface files all types are quantified, so this is a no-op
-    unquantify glaExts (HsForAllTy Nothing ctxt ty) | glaExts = ty
-    unquantify glaExts ty			     	      = ty
 
 rnTyClDecl (ClassDecl {tcdCtxt = context, tcdName = cname, 
 		       tcdTyVars = tyvars, tcdFDs = fds, tcdSigs = sigs, 

@@ -17,14 +17,16 @@ import HsSyn		( TyClDecl(..),
 			  isIfaceSigDecl, isClassDecl, isSynDecl, isClassOpSig
 			)
 import RnHsSyn		( RenamedTyClDecl, tyClDeclFVs )
-import BasicTypes	( RecFlag(..), NewOrData(..), isRec )
+import BasicTypes	( RecFlag(..), NewOrData(..) )
 import HscTypes		( implicitTyThingIds )
+import Module		( Module )
 
 import TcMonad
 import TcEnv		( TcEnv, RecTcEnv, TcTyThing(..), TyThing(..), TyThingDetails(..),
-			  tcExtendKindEnv, tcLookup, tcExtendGlobalEnv, tcExtendGlobalValEnv )
-import TcTyDecls	( tcTyDecl1, kcConDetails )
-import TcClassDcl	( tcClassDecl1 )
+			  tcExtendKindEnv, tcLookup, tcExtendGlobalEnv, tcExtendGlobalValEnv,
+			  isLocalThing )
+import TcTyDecls	( tcTyDecl, kcConDetails, checkValidTyCon )
+import TcClassDcl	( tcClassDecl1, checkValidClass )
 import TcInstDcls	( tcAddDeclCtxt )
 import TcMonoType	( kcHsTyVars, kcHsType, kcHsLiftedSigType, kcHsContext, mkTyClTyVars )
 import TcMType		( unifyKind, newKindVar, zonkKindEnv )
@@ -34,7 +36,7 @@ import Class		( Class, mkClass, classTyCon )
 import TyCon		( TyCon, ArgVrcs, AlgTyConFlavour(..), 
 			  tyConKind, tyConDataCons,
 			  mkSynTyCon, mkAlgTyCon, mkClassTyCon, mkForeignTyCon, 
-			  isRecursiveTyCon )
+			)
 import DataCon		( dataConOrigArgTys )
 import Var		( varName )
 import FiniteMap
@@ -60,21 +62,22 @@ The main function
 ~~~~~~~~~~~~~~~~~
 \begin{code}
 tcTyAndClassDecls :: RecTcEnv		-- Knot tying stuff
+		  -> Module 		-- Current module
 		  -> [RenamedTyClDecl]
 		  -> TcM TcEnv
 
-tcTyAndClassDecls unf_env decls
+tcTyAndClassDecls unf_env this_mod decls
   = sortByDependency decls 		`thenTc` \ groups ->
-    tcGroups unf_env groups
+    tcGroups unf_env this_mod groups
 
-tcGroups unf_env []
+tcGroups unf_env this_mod []
   = tcGetEnv	`thenNF_Tc` \ env ->
     returnTc env
 
-tcGroups unf_env (group:groups)
-  = tcGroup unf_env group	`thenTc` \ env ->
-    tcSetEnv env		$
-    tcGroups unf_env groups
+tcGroups unf_env this_mod (group:groups)
+  = tcGroup unf_env this_mod group	`thenTc` \ env ->
+    tcSetEnv env			$
+    tcGroups unf_env this_mod groups
 \end{code}
 
 Dealing with a group
@@ -107,22 +110,22 @@ Step 5: 	tcTyClDecl1
 	to tcTyClDecl1.
 	
 
-Step 6:		tcTyClDecl1 again
-	For a recursive group only, check all the decls again, just
-	but this time with the wimp flag off.  Now we can check things
-	like whether a function argument is an unlifted tuple, looking
-	through type synonyms properly.  We can't do that in Step 5.
-
-Step 7:		Extend environment
+Step 6:		Extend environment
 	We extend the type environment with bindings not only for the TyCons and Classes,
 	but also for their "implicit Ids" like data constructors and class selectors
+
+Step 7:		checkValidTyCl
+	For a recursive group only, check all the decls again, just
+	to check all the side conditions on validity.  We could not
+	do this before because we were in a mutually recursive knot.
+
 
 The knot-tying parameters: @rec_details_list@ is an alist mapping @Name@s to
 @TyThing@s.  @rec_vrcs@ is a finite map from @Name@s to @ArgVrcs@s.
 
 \begin{code}
-tcGroup :: RecTcEnv -> SCC RenamedTyClDecl -> TcM TcEnv
-tcGroup unf_env scc
+tcGroup :: RecTcEnv -> Module -> SCC RenamedTyClDecl -> TcM TcEnv
+tcGroup unf_env this_mod scc
   = getDOptsTc							`thenTc` \ dflags ->
 	-- Step 1
     mapNF_Tc getInitialKind decls 				`thenNF_Tc` \ initial_kinds ->
@@ -155,33 +158,27 @@ tcGroup unf_env scc
             rec_vrcs    = calcTyConArgVrcs [tc | ATyCon tc <- all_tyclss]
 	in
 		-- Step 5
-	tcExtendGlobalEnv all_tyclss			$
-	mapTc (tcTyClDecl1 is_rec unf_env) decls	`thenTc` \ tycls_details ->
+		-- Extend the environment with the final 
+		-- TyCons/Classes and check the decls
+	tcExtendGlobalEnv all_tyclss				$
+	mapTc (tcTyClDecl1 unf_env) decls			`thenTc` \ tycls_details ->
+
+		-- Step 6
+		-- Extend the environment with implicit Ids
+	tcExtendGlobalValEnv (implicitTyThingIds all_tyclss)	$
 
 		-- Return results
-	tcGetEnv					`thenNF_Tc` \ env ->
-	returnTc (tycls_details, all_tyclss, env)
-    )						`thenTc` \ (_, all_tyclss, env) ->
+	tcGetEnv				`thenNF_Tc` \ env ->
+	returnTc (tycls_details, tyclss, env)
+    )						`thenTc` \ (_, tyclss, env) ->
 
-    tcSetEnv env				$
 
-    traceTc (text "ready for pass 2" <+> ppr (isRec is_rec))			`thenTc_`
-
-	-- Step 6
-	-- For a recursive group, check all the types again,
-	-- this time with the wimp flag off
-    (if isRec is_rec then
-	mapTc_ (tcTyClDecl1 NonRecursive unf_env) decls
-     else
-	returnTc ()
-    )						`thenTc_`
-
-    traceTc (text "done")			`thenTc_`
-
-	-- Step 7
-	-- Extend the environment with the final TyCons/Classes 
-	-- and their implicit Ids
-    tcExtendGlobalValEnv (implicitTyThingIds all_tyclss) tcGetEnv
+	-- Step 7: Check validity; but only for things defined in this module
+    traceTc (text "ready for validity check")				`thenTc_`
+    mapTc_ checkValidTyCl (filter (isLocalThing this_mod) tyclss)	`thenTc_`
+    traceTc (text "done")						`thenTc_`
+   
+    returnTc env
 
   where
     is_rec = case scc of
@@ -192,9 +189,12 @@ tcGroup unf_env scc
 		AcyclicSCC decl -> [decl]
 		CyclicSCC decls -> decls
 
-tcTyClDecl1 is_rec unf_env decl
-  | isClassDecl decl = tcAddDeclCtxt decl (tcClassDecl1 is_rec unf_env decl)
-  | otherwise	     = tcAddDeclCtxt decl (tcTyDecl1    is_rec unf_env decl)
+tcTyClDecl1 unf_env decl
+  | isClassDecl decl = tcAddDeclCtxt decl (tcClassDecl1 unf_env decl)
+  | otherwise	     = tcAddDeclCtxt decl (tcTyDecl     unf_env decl)
+
+checkValidTyCl (ATyCon tc) = checkValidTyCon tc
+checkValidTyCl (AClass cl) = checkValidClass cl
 \end{code}
 
 
@@ -279,6 +279,7 @@ kcTyClDeclBody decl thing_inside
     in
     tcExtendKindEnv tyvars_w_kinds (thing_inside result_kind)
 \end{code}
+
 
 
 %************************************************************************

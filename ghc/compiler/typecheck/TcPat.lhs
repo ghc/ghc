@@ -23,7 +23,7 @@ import FieldLabel	( fieldLabelName )
 import TcEnv		( tcLookupClass, tcLookupDataCon, tcLookupGlobalId, tcLookupId )
 import TcMType 		( tcInstTyVars, newTyVarTy, unifyTauTy, unifyListTy, unifyTupleTy )
 import TcType		( isTauTy, mkTyConApp, mkClassPred, liftedTypeKind )
-import TcMonoType	( tcHsSigType )
+import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 
 import CmdLineOpts	( opt_IrrefutableTuples )
 import DataCon		( dataConSig, dataConFieldLabels, 
@@ -34,7 +34,7 @@ import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, addrPrimTy
 			)
 import TysWiredIn	( charTy, stringTy, intTy, integerTy )
-import PrelNames	( minusName, eqStringName, eqName, geName, cCallableClassName )
+import PrelNames	( eqStringName, eqName, geName, cCallableClassName )
 import BasicTypes	( isBoxed )
 import Bag
 import Outputable
@@ -120,7 +120,7 @@ tcPat tc_bndr (ParPatIn parend_pat) pat_ty
   = tcPat tc_bndr parend_pat pat_ty
 
 tcPat tc_bndr (SigPatIn pat sig) pat_ty
-  = tcHsSigType sig					`thenTc` \ sig_ty ->
+  = tcHsSigType PatSigCtxt sig				`thenTc` \ sig_ty ->
 
 	-- Check that the signature isn't a polymorphic one, which
 	-- we don't permit (at present, anyway)

@@ -23,6 +23,11 @@ module TcMType (
   tcSplitRhoTyM,
 
   --------------------------------
+  -- Checking type validity
+  Rank, UserTypeCtxt(..), checkValidType, pprUserTypeCtxt,
+  SourceTyCtxt(..), checkValidTheta,
+
+  --------------------------------
   -- Unification
   unifyTauTy, unifyTauTyList, unifyTauTyLists, 
   unifyFunTy, unifyListTy, unifyTupleTy,
@@ -40,23 +45,27 @@ module TcMType (
 
 
 -- friends:
-import TypeRep		( Type(..), SourceType(..), Kind, TyNote(..),	 -- friend
+import TypeRep		( Type(..), SourceType(..), TyNote(..),	 -- Friend; can see representation
+			  Kind, TauType, ThetaType, 
 			  openKindCon, typeCon
 			) 
-import TcType		( tcEqType,
+import TcType		( tcEqType, tcCmpPred,
 			  tcSplitRhoTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
 			  tcSplitTyConApp_maybe, tcSplitFunTy_maybe, tcSplitForAllTys,
-			  tcGetTyVar, tcIsTyVarTy,
+			  tcGetTyVar, tcIsTyVarTy, tcSplitSigmaTy, isUnLiftedType, isIPPred,
 
 			  mkAppTy, mkTyVarTy, mkTyVarTys, mkFunTy, mkTyConApp,
+			  tyVarsOfPred,
 
 			  liftedTypeKind, unliftedTypeKind, openTypeKind, defaultKind, superKind,
 			  superBoxity, liftedBoxity, hasMoreBoxityInfo, typeKind,
 			  tyVarsOfType, tyVarsOfTypes, tidyOpenType, tidyOpenTypes, tidyTyVar,
-			  eqKind,
+			  eqKind, isTypeKind
 			)
 import Subst		( Subst, mkTopTyVarSubst, substTy )
-import TyCon		( TyCon, mkPrimTyCon, isTupleTyCon, tyConArity, tupleTyConBoxity )
+import Class		( classArity, className )
+import TyCon		( TyCon, mkPrimTyCon, isSynTyCon, isUnboxedTupleTyCon, 
+			  isTupleTyCon, tyConArity, tupleTyConBoxity, tyConName )
 import PrimRep		( PrimRep(VoidRep) )
 import Var		( TyVar, varName, tyVarKind, tyVarName, isTyVar, mkTyVar,
 			  isMutTyVar, isSigTyVar )
@@ -64,15 +73,18 @@ import Var		( TyVar, varName, tyVarKind, tyVarName, isTyVar, mkTyVar,
 -- others:
 import TcMonad          -- TcType, amongst others
 import TysWiredIn	( voidTy, listTyCon, mkListTy, mkTupleTy )
-
+import FunDeps		( grow )
+import PprType		( pprPred, pprSourceType, pprTheta )
 import Name		( Name, NamedThing(..), setNameUnique, mkSysLocalName,
 			  mkLocalName, mkDerivedTyConOcc, isSystemName
 			)
 import VarSet
 import BasicTypes	( Boxity, Arity, isBoxed )
+import CmdLineOpts	( dopt, DynFlag(..) )
 import Unique		( Uniquable(..) )
 import SrcLoc		( noSrcLoc )
 import Util		( nOfThem )
+import ListSetOps	( removeDups )
 import Outputable
 \end{code}
 
@@ -363,6 +375,11 @@ zonkTcTypeToType ty = zonkType zonk_unbound_tyvar ty
 	-- Zonk a mutable but unbound type variable to
 	--	Void		if it has kind Lifted
 	--	:Void		otherwise
+	-- We know it's unbound even though we don't carry an environment,
+	-- because at the binding site for a type variable we bind the
+	-- mutable tyvar to a fresh immutable one.  So the mutable store
+	-- plays the role of an environment.  If we come across a mutable
+	-- type variable that isn't so bound, it must be completely free.
     zonk_unbound_tyvar tv
 	| kind `eqKind` liftedTypeKind || kind `eqKind` openTypeKind
 	= putTcTyVar tv voidTy	-- Just to avoid creating a new tycon in
@@ -491,7 +508,351 @@ zonkTyVar unbound_var_fn tyvar
 
 %************************************************************************
 %*									*
-\subsection{The Kind variants}
+\subsection{Checking a user type}
+%*									*
+%************************************************************************
+
+When dealing with a user-written type, we first translate it from an HsType
+to a Type, performing kind checking, and then check various things that should 
+be true about it.  We don't want to perform these checks at the same time
+as the initial translation because (a) they are unnecessary for interface-file
+types and (b) when checking a mutually recursive group of type and class decls,
+we can't "look" at the tycons/classes yet.
+
+One thing we check for is 'rank'.  
+
+	Rank 0: 	monotypes (no foralls)
+	Rank 1:		foralls at the front only, Rank 0 inside
+	Rank 2:		foralls at the front, Rank 1 on left of fn arrow,
+
+	basic ::= tyvar | T basic ... basic
+
+	r2  ::= forall tvs. cxt => r2a
+	r2a ::= r1 -> r2a | basic
+	r1  ::= forall tvs. cxt => r0
+	r0  ::= r0 -> r0 | basic
+	
+
+\begin{code}
+data UserTypeCtxt 
+  = FunSigCtxt Name	-- Function type signature
+  | ExprSigCtxt		-- Expression type signature
+  | ConArgCtxt Name	-- Data constructor argument
+  | TySynCtxt Name	-- RHS of a type synonym decl
+  | GenPatCtxt		-- Pattern in generic decl
+			-- 	f{| a+b |} (Inl x) = ...
+  | PatSigCtxt		-- Type sig in pattern
+			-- 	f (x::t) = ...
+  | ResSigCtxt		-- Result type sig
+			-- 	f x :: t = ....
+  | ForSigCtxt Name	-- Foreign inport or export signature
+
+pprUserTypeCtxt (FunSigCtxt n) = ptext SLIT("the type signature for") <+> quotes (ppr n)
+pprUserTypeCtxt ExprSigCtxt    = ptext SLIT("an expression type signature")
+pprUserTypeCtxt (ConArgCtxt c) = ptext SLIT("the type of constructor") <+> quotes (ppr c)
+pprUserTypeCtxt (TySynCtxt c)  = ptext SLIT("the RHS of a type synonym declaration") <+> quotes (ppr c)
+pprUserTypeCtxt GenPatCtxt     = ptext SLIT("the type pattern of a generic definition")
+pprUserTypeCtxt PatSigCtxt     = ptext SLIT("a pattern type signature")
+pprUserTypeCtxt ResSigCtxt     = ptext SLIT("a result type signature")
+pprUserTypeCtxt (ForSigCtxt n) = ptext SLIT("the foreign signature for") <+> quotes (ppr n)
+\end{code}
+
+\begin{code}
+checkValidType :: UserTypeCtxt -> Type -> TcM ()
+-- Checks that the type is valid for the given context
+checkValidType ctxt ty
+  = doptsTc Opt_GlasgowExts	`thenNF_Tc` \ gla_exts ->
+    let 
+	rank = case ctxt of
+		 GenPatCtxt		  -> 0
+		 PatSigCtxt		  -> 0
+		 ResSigCtxt		  -> 0
+		 ExprSigCtxt 	          -> 1
+		 FunSigCtxt _ | gla_exts  -> 2
+			      | otherwise -> 1
+		 ConArgCtxt _ | gla_exts  -> 2	-- We are given the type of the entire
+			      | otherwise -> 1	-- constructor; hence rank 1 is ok
+		 TySynCtxt _  | gla_exts  -> 1
+			      | otherwise -> 0
+		 ForSigCtxt _		  -> 1
+
+	actual_kind = typeKind ty
+
+	actual_kind_is_lifted = actual_kind `eqKind` liftedTypeKind
+
+	kind_ok = case ctxt of
+			TySynCtxt _  -> True	-- Any kind will do
+			GenPatCtxt   -> actual_kind_is_lifted
+			ForSigCtxt _ -> actual_kind_is_lifted
+			other	     -> isTypeKind actual_kind
+    in
+    tcAddErrCtxt (checkTypeCtxt ctxt ty)	$
+
+	-- Check that the thing has kind Type, and is lifted if necessary
+    checkTc kind_ok (kindErr actual_kind)	`thenTc_`
+
+	-- Check the internal validity of the type itself
+    check_poly_type rank ty
+
+-- Notes re TySynCtxt
+-- We allow type synonyms that aren't types; e.g.  type List = []
+--
+-- If the RHS mentions tyvars that aren't in scope, we'll 
+-- quantify over them:
+--	e.g. 	type T = a->a
+-- will become	type T = forall a. a->a
+--
+-- With gla-exts that's right, but for H98 we should complain. 
+
+
+----------------------------------------
+type Rank = Int
+check_poly_type :: Rank -> Type -> TcM ()
+check_poly_type rank ty 
+  | rank == 0 
+  = check_tau_type 0 False ty
+  | otherwise	-- rank > 0
+  = let
+	(tvs, theta, tau) = tcSplitSigmaTy ty
+    in
+    check_valid_theta SigmaCtxt theta	`thenTc_`
+    check_tau_type (rank-1) False tau	`thenTc_`
+    checkAmbiguity tvs theta tau
+
+----------------------------------------
+check_arg_type :: Type -> TcM ()
+-- The sort of type that can instantiate a type variable,
+-- or be the argument of a type constructor.
+-- Not an unboxed tuple, not a forall.
+-- Other unboxed types are very occasionally allowed as type
+-- arguments depending on the kind of the type constructor
+-- 
+-- For example, we want to reject things like:
+--
+--	instance Ord a => Ord (forall s. T s a)
+-- and
+--	g :: T s (forall b.b)
+--
+-- NB: unboxed tuples can have polymorphic or unboxed args.
+--     This happens in the workers for functions returning
+--     product types with polymorphic components.
+--     But not in user code
+-- 
+-- Question: what about nested unboxed tuples?
+-- 	     Currently rejected.
+check_arg_type ty 
+  = check_tau_type 0 False ty	`thenTc_` 
+    checkTc (not (isUnLiftedType ty)) (unliftedArgErr ty)
+
+----------------------------------------
+check_tau_type :: Rank -> Bool -> Type -> TcM ()
+-- Rank is allowed rank for function args
+-- No foralls otherwise
+-- Bool is True iff unboxed tuple are allowed here
+
+check_tau_type rank ubx_tup_ok ty@(UsageTy _ _)  = addErrTc (usageTyErr ty)
+check_tau_type rank ubx_tup_ok ty@(ForAllTy _ _) = addErrTc (forAllTyErr ty)
+check_tau_type rank ubx_tup_ok (SourceTy sty)    = getDOptsTc		`thenNF_Tc` \ dflags ->
+						   check_source_ty dflags TypeCtxt sty
+check_tau_type rank ubx_tup_ok (TyVarTy _)       = returnTc ()
+check_tau_type rank ubx_tup_ok ty@(FunTy arg_ty res_ty)
+  = check_poly_type rank      arg_ty	`thenTc_`
+    check_tau_type  rank True res_ty
+
+check_tau_type rank ubx_tup_ok (AppTy ty1 ty2)
+  = check_arg_type ty1 `thenTc_` check_arg_type ty2
+
+check_tau_type rank ubx_tup_ok (NoteTy note ty)
+  = check_note note `thenTc_` check_tau_type rank ubx_tup_ok ty
+
+check_tau_type rank ubx_tup_ok ty@(TyConApp tc tys)
+  = mapTc_ check_arg_type tys						`thenTc_`
+    checkTc (not (isSynTyCon tc)	  || syn_arity_ok) arity_msg	`thenTc_`
+    checkTc (not (isUnboxedTupleTyCon tc) || ubx_tup_ok)   ubx_tup_msg
+  where
+    syn_arity_ok = tc_arity <= n_args
+		-- It's OK to have an *over-applied* type synonym
+		--	data Tree a b = ...
+		--	type Foo a = Tree [a]
+		--	f :: Foo a b -> ...
+    n_args    = length tys
+    tc_arity  = tyConArity tc
+
+    arity_msg   = arityErr "Type synonym" (tyConName tc) tc_arity n_args
+    ubx_tup_msg = ubxArgTyErr ty
+
+----------------------------------------
+check_note (FTVNote _)  = returnTc ()
+check_note (SynNote ty) = check_tau_type 0 False ty
+\end{code}
+
+
+\begin{code}
+data SourceTyCtxt
+  = ClassSCCtxt Name	-- Superclasses of clas
+  | SigmaCtxt		-- Context of a normal for-all type
+  | DataTyCtxt Name	-- Context of a data decl
+  | TypeCtxt 		-- Source type in an ordinary type
+  | InstDeclCtxt	-- Context of an instance decl
+		
+pprSourceTyCtxt (ClassSCCtxt c) = ptext SLIT("the super-classes of class") <+> quotes (ppr c)
+pprSourceTyCtxt SigmaCtxt       = ptext SLIT("the context of a polymorphic type")
+pprSourceTyCtxt (DataTyCtxt tc) = ptext SLIT("the context of the data type declaration for") <+> quotes (ppr tc)
+pprSourceTyCtxt InstDeclCtxt    = ptext SLIT("the context of an instance declaration")
+pprSourceTyCtxt TypeCtxt        = ptext SLIT("the context of a type")
+\end{code}
+
+\begin{code}
+checkValidTheta :: SourceTyCtxt -> ThetaType -> TcM ()
+checkValidTheta ctxt theta 
+  = tcAddErrCtxt (checkThetaCtxt ctxt theta) (check_valid_theta ctxt theta)
+
+-------------------------
+check_valid_theta ctxt []
+  = returnTc ()
+check_valid_theta ctxt theta
+  = getDOptsTc					`thenNF_Tc` \ dflags ->
+    warnTc (not (null dups)) (dupPredWarn dups)	`thenNF_Tc_`
+    mapTc_ (check_source_ty dflags ctxt) theta
+  where
+    (_,dups) = removeDups tcCmpPred theta
+
+-------------------------
+check_source_ty dflags ctxt pred@(ClassP cls tys)
+  = 	-- Class predicates are valid in all contexts
+    mapTc_ check_arg_type tys			`thenTc_`
+    checkTc (arity == n_tys) arity_err		`thenTc_`
+    checkTc (all tyvar_head tys || arby_preds_ok) (predTyVarErr pred)
+
+  where
+    class_name = className cls
+    arity      = classArity cls
+    n_tys      = length tys
+    arity_err  = arityErr "Class" class_name arity n_tys
+
+    arby_preds_ok = case ctxt of
+			InstDeclCtxt -> dopt Opt_AllowUndecidableInstances dflags
+			other	     -> dopt Opt_GlasgowExts               dflags
+
+check_source_ty dflags SigmaCtxt (IParam name ty) = check_arg_type ty
+check_source_ty dflags TypeCtxt  (NType tc tys)   = mapTc_ check_arg_type tys
+
+-- Catch-all
+check_source_ty dflags ctxt sty = failWithTc (badSourceTyErr sty)
+
+-------------------------
+tyvar_head ty			-- Haskell 98 allows predicates of form 
+  | tcIsTyVarTy ty = True	-- 	C (a ty1 .. tyn)
+  | otherwise			-- where a is a type variable
+  = case tcSplitAppTy_maybe ty of
+	Just (ty, _) -> tyvar_head ty
+	Nothing	     -> False
+\end{code}
+
+Check for ambiguity
+~~~~~~~~~~~~~~~~~~~
+	  forall V. P => tau
+is ambiguous if P contains generic variables
+(i.e. one of the Vs) that are not mentioned in tau
+
+However, we need to take account of functional dependencies
+when we speak of 'mentioned in tau'.  Example:
+	class C a b | a -> b where ...
+Then the type
+	forall x y. (C x y) => x
+is not ambiguous because x is mentioned and x determines y
+
+NOTE: In addition, GHC insists that at least one type variable
+in each constraint is in V.  So we disallow a type like
+	forall a. Eq b => b -> b
+even in a scope where b is in scope.
+This is the is_free test below.
+
+NB; the ambiguity check is only used for *user* types, not for types
+coming from inteface files.  The latter can legitimately have
+ambiguous types. Example
+
+   class S a where s :: a -> (Int,Int)
+   instance S Char where s _ = (1,1)
+   f:: S a => [a] -> Int -> (Int,Int)
+   f (_::[a]) x = (a*x,b)
+	where (a,b) = s (undefined::a)
+
+Here the worker for f gets the type
+	fw :: forall a. S a => Int -> (# Int, Int #)
+
+If the list of tv_names is empty, we have a monotype, and then we
+don't need to check for ambiguity either, because the test can't fail
+(see is_ambig).
+
+\begin{code}
+checkAmbiguity :: [TyVar] -> ThetaType -> TauType -> TcM ()
+checkAmbiguity forall_tyvars theta tau
+  = mapTc_ check_pred theta	`thenTc_`
+    returnTc ()
+  where
+    tau_vars	      = tyVarsOfType tau
+    extended_tau_vars = grow theta tau_vars
+
+    is_ambig ct_var   = (ct_var `elem` forall_tyvars) &&
+		        not (ct_var `elemVarSet` extended_tau_vars)
+    is_free ct_var    = not (ct_var `elem` forall_tyvars)
+    
+    check_pred pred = checkTc (not any_ambig)                 (ambigErr pred) `thenTc_`
+	    	      checkTc (isIPPred pred || not all_free) (freeErr  pred)
+             where 
+	    	ct_vars	  = varSetElems (tyVarsOfPred pred)
+	    	all_free  = all is_free ct_vars
+	    	any_ambig = any is_ambig ct_vars
+\end{code}
+
+
+\begin{code}
+ambigErr pred
+  = sep [ptext SLIT("Ambiguous constraint") <+> quotes (pprPred pred),
+	 nest 4 (ptext SLIT("At least one of the forall'd type variables mentioned by the constraint") $$
+		 ptext SLIT("must be reachable from the type after the =>"))]
+
+freeErr pred
+  = sep [ptext SLIT("All of the type variables in the constraint") <+> quotes (pprPred pred) <+>
+		   ptext SLIT("are already in scope"),
+	 nest 4 (ptext SLIT("At least one must be universally quantified here"))
+    ]
+
+forAllTyErr     ty = ptext SLIT("Illegal polymorphic type:") <+> ppr ty
+usageTyErr      ty = ptext SLIT("Illegal usage type:") <+> ppr ty
+unliftedArgErr  ty = ptext SLIT("Illegal unlifted type argument:") <+> ppr ty
+ubxArgTyErr     ty = ptext SLIT("Illegal unboxed tuple type as function argument:") <+> ppr ty
+badSourceTyErr sty = ptext SLIT("Illegal constraint") <+> pprSourceType sty
+predTyVarErr pred  = ptext SLIT("Non-type variables in constraint:") <+> pprPred pred
+kindErr kind       = ptext SLIT("Expecting an ordinary type, but found a type of kind") <+> ppr kind
+dupPredWarn dups   = ptext SLIT("Duplicate constraint(s):") <+> pprWithCommas pprPred (map head dups)
+
+checkTypeCtxt ctxt ty
+  = vcat [ptext SLIT("In the type:") <+> ppr_ty,
+	  ptext SLIT("While checking") <+> pprUserTypeCtxt ctxt ]
+  where  
+	-- Hack alert.  If there are no tyvars, (ppr sigma_ty) will print
+	-- something strange like {Eq k} -> k -> k, because there is no
+	-- ForAll at the top of the type.  Since this is going to the user
+	-- we want it to look like a proper Haskell type even then; hence the hack
+	-- 
+	-- This shows up in the complaint about
+	--	case C a where
+	--	  op :: Eq a => a -> a
+    ppr_ty | null forall_tyvars = pprTheta theta <+> ptext SLIT("=>") <+> ppr tau
+	   | otherwise	 	= ppr ty
+    (forall_tyvars, theta, tau) = tcSplitSigmaTy ty
+
+checkThetaCtxt ctxt theta
+  = vcat [ptext SLIT("In the context:") <+> pprTheta theta,
+	  ptext SLIT("While checking") <+> pprSourceTyCtxt ctxt ]
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Kind unification}
 %*									*
 %************************************************************************
 
@@ -522,9 +883,8 @@ unifyOpenTypeKind ty@(TyVarTy tyvar)
 	other	 -> unify_open_kind_help ty
 
 unifyOpenTypeKind ty
-  = case tcSplitTyConApp_maybe ty of
-	Just (tycon, [_]) | tycon == typeCon -> returnTc ()
-	other				     -> unify_open_kind_help ty
+  | isTypeKind ty = returnTc ()
+  | otherwise     = unify_open_kind_help ty
 
 unify_open_kind_help ty	-- Revert to ordinary unification
   = newBoxityVar 	`thenNF_Tc` \ boxity ->

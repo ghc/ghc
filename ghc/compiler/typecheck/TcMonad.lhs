@@ -391,6 +391,8 @@ tryTc recover main down env
 	m_errs_var <- newIORef (emptyBag,emptyBag)
 	catch (my_main m_errs_var) (\ _ -> my_recover m_errs_var)
   where
+    errs_var = getTcErrs down
+
     my_recover m_errs_var
       = do warns_and_errs <- readIORef m_errs_var
 	   recover warns_and_errs down env
@@ -403,7 +405,13 @@ tryTc recover main down env
 		-- errors along the way.
 	    (m_warns, m_errs) <- readIORef m_errs_var
 	    if isEmptyBag m_errs then
-		return result
+		-- No errors, so return normally, but don't lose the warnings
+		if isEmptyBag m_warns then
+		   return result
+		else
+		   do (warns, errs) <- readIORef errs_var
+		      writeIORef errs_var (warns `unionBags` m_warns, errs)
+		      return result
 	      else
 		give_up		-- This triggers the catch
 

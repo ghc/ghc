@@ -7,7 +7,7 @@
 module PprType(
 	pprKind, pprParendKind,
 	pprType, pprParendType,
-	pprPred, pprTheta, pprClassPred,
+	pprSourceType, pprPred, pprTheta, pprClassPred,
 	pprTyVarBndr, pprTyVarBndrs,
 
 	-- Junk
@@ -62,9 +62,13 @@ pprKind       = pprType
 pprParendKind = pprParendType
 
 pprPred :: PredType -> SDoc
-pprPred (ClassP clas tys) = pprClassPred clas tys
-pprPred (IParam n ty)     = hsep [ptext SLIT("?") <> ppr n,
+pprPred = pprSourceType
+
+pprSourceType :: SourceType -> SDoc
+pprSourceType (ClassP clas tys) = pprClassPred clas tys
+pprSourceType (IParam n ty)     = hsep [ptext SLIT("?") <> ppr n,
 				  ptext SLIT("::"), ppr ty]
+pprSourceType (NType tc tys)    = ppr tc <+> hsep (map pprParendType tys)
 
 pprClassPred :: Class -> [Type] -> SDoc
 pprClassPred clas tys = ppr clas <+> hsep (map pprParendType tys)
@@ -193,10 +197,8 @@ ppr_ty ctxt_prec (NoteTy (SynNote ty) expansion)
 
 ppr_ty ctxt_prec (NoteTy (FTVNote _) ty) = ppr_ty ctxt_prec ty
 
-ppr_ty ctxt_prec (SourceTy (NType tc tys))
-  =  ppr_tc_app ctxt_prec tc tys
-
-ppr_ty ctxt_prec (SourceTy pred) = braces (pprPred pred)
+ppr_ty ctxt_prec (SourceTy (NType tc tys)) = ppr_tc_app ctxt_prec tc tys
+ppr_ty ctxt_prec (SourceTy pred)	   = braces (pprPred pred)
 
 ppr_tc_app ctxt_prec tc []  = ppr tc
 ppr_tc_app ctxt_prec tc tys = maybeParen ctxt_prec tYCON_PREC 
