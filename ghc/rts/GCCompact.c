@@ -645,7 +645,7 @@ thread_obj (StgInfoTable *info, StgPtr p)
 
     case TREC_CHUNK:
     {
-        int i;
+        StgWord i;
         StgTRecChunk *tc = (StgTRecChunk *)p;
 	TRecEntry *e = &(tc -> entries[0]);
 	thread((StgPtr)&tc->prev_chunk);

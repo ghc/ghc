@@ -40,6 +40,9 @@ RTS_RET_INFO(stg_upd_frame_info);
 RTS_RET_INFO(stg_noupd_frame_info);
 RTS_RET_INFO(stg_seq_frame_info);
 RTS_RET_INFO(stg_catch_frame_info);
+RTS_RET_INFO(stg_catch_retry_frame_info);
+RTS_RET_INFO(stg_atomically_frame_info);
+RTS_RET_INFO(stg_catch_stm_frame_info);
 
 RTS_ENTRY(stg_upd_frame_ret);
 RTS_ENTRY(stg_seq_frame_ret);
@@ -192,10 +195,18 @@ RTS_ENTRY(stg_raise_entry);
 RTS_ENTRY(stg_END_STM_WAIT_QUEUE_entry);
 RTS_ENTRY(stg_END_STM_CHUNK_LIST_entry);
 RTS_ENTRY(stg_NO_TREC_entry);
+RTS_ENTRY(stg_TVAR_entry);
+RTS_ENTRY(stg_TVAR_WAIT_QUEUE_entry);
+RTS_ENTRY(stg_TREC_CHUNK_entry);
+RTS_ENTRY(stg_TREC_HEADER_entry);
 
 
 RTS_ENTRY(stg_unblockAsyncExceptionszh_ret_ret);
 RTS_ENTRY(stg_blockAsyncExceptionszh_ret_ret);
+RTS_ENTRY(stg_catch_frame_ret);
+RTS_ENTRY(stg_catch_retry_frame_ret);
+RTS_ENTRY(stg_atomically_frame_ret);
+RTS_ENTRY(stg_catch_stm_frame_ret);
 RTS_ENTRY(stg_catch_frame_ret);
 RTS_ENTRY(stg_catch_entry);
 RTS_ENTRY(stg_raise_entry);
