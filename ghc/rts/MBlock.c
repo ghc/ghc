@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.39 2002/11/22 06:54:05 matthewc Exp $
+ * $Id: MBlock.c,v 1.40 2002/11/22 07:43:30 matthewc Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -121,7 +121,7 @@ my_mmap (void *addr, int size)
     else
 	vm_protect(mach_task_self(),ret,size,FALSE,VM_PROT_READ|VM_PROT_WRITE);
 #else
-    ret = mmap(addr, size, PROT_READ | PROT_WRITE, 
+    ret = mmap(addr, size, PROT_READ | PROT_WRITE | PROT_EXEC, 
 	       MAP_ANON | MAP_PRIVATE, -1, 0);
 #endif
 
