@@ -713,6 +713,7 @@ sub mangle_asm {
 		    $e =~ s/^\tpopl \%esi\n//;
 		    $e =~ s/^\tpopl \%ecx\n//;
 		    $e =~ s/^\taddl \$\d+,\%esp\n//;
+		    $e =~ s/^\tsubl \$-\d+,\%esp\n//;
 		} elsif ($TargetPlatform =~ /^m68k-/) {
 		    $e =~ s/^\tunlk a6\n//;
 		    $e =~ s/^\trts\n//;
