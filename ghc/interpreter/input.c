@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.16 $
- * $Date: 1999/12/03 12:39:39 $
+ * $Revision: 1.17 $
+ * $Date: 1999/12/06 16:20:26 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1400,8 +1400,10 @@ static Int local yylex() {             /* Read next input token ...        */
      * Now try to identify token type:
      * --------------------------------------------------------------------*/
 
-    if (c0 == '(' && c1 == '#') { skip(); skip(); return UTL; };
-    if (c0 == '#' && c1 == ')') { skip(); skip(); return UTR; };
+    if (readingInterface) {
+       if (c0 == '(' && c1 == '#') { skip(); skip(); return UTL; };
+       if (c0 == '#' && c1 == ')') { skip(); skip(); return UTR; };
+    }
 
     switch (c0) {
         case EOF  : return 0;                   /* End of file/input       */
