@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.60 2003/05/14 09:13:59 simonmar Exp $
+ * $Id: Printer.c,v 1.61 2003/10/16 20:54:12 sof Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -21,6 +21,7 @@
 #include "Storage.h"
 #include "Bytecodes.h"  /* for InstrPtr */
 #include "Disassembler.h"
+#include "Apply.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -598,7 +599,38 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 	case RET_VEC_BIG:
 	    barf("todo");
 
+	case RET_FUN:
+	{
+	    StgFunInfoTable *fun_info;
+	    StgRetFun *ret_fun;
+	    nat size;
+
+	    ret_fun = (StgRetFun *)sp;
+	    fun_info = get_fun_itbl(ret_fun->fun);
+	    size = ret_fun->size;
+	    fprintf(stderr,"RET_FUN (%p) (type=%d)\n", ret_fun, fun_info->fun_type);
+	    switch (fun_info->fun_type) {
+	    case ARG_GEN:
+		printSmallBitmap(spBottom, sp+1,
+				 BITMAP_BITS(fun_info->bitmap),
+				 BITMAP_SIZE(fun_info->bitmap));
+		break;
+	    case ARG_GEN_BIG:
+		printLargeBitmap(spBottom, sp+2,
+				 (StgLargeBitmap *)fun_info->bitmap,
+				 BITMAP_SIZE(fun_info->bitmap));
+		break;
+	    default:
+		printSmallBitmap(spBottom, sp+1,
+				 BITMAP_BITS(stg_arg_bitmaps[fun_info->fun_type]),
+				 BITMAP_SIZE(stg_arg_bitmaps[fun_info->fun_type]));
+		break;
+	    }
+	    continue;
+	}
+	   
 	default:
+	    fprintf(stderr, "unknown object %d\n", info->type);
 	    barf("printStackChunk");
 	}
     }
@@ -1038,7 +1070,11 @@ findPtr(P_ p, int follow)
   nat s, g;
   P_ q, r;
   bdescr *bd;
+#if defined(__GNUC__)
   const int arr_size = 1024;
+#else
+#define arr_size 1024
+#endif
   StgPtr arr[arr_size];
   int i = 0;
 
