@@ -175,10 +175,13 @@ I_ threadId = 0;
        but slower than GUM sparks. There is no fixed upper bound on the
        number of GRAN sparks either. -- HWL
 */
-#if !defined(GRAN)
+#if defined(PAR)
 
-I_ sparksIgnored =0;
+I_ sparksIgnored =0, sparksCreated = 0; 
 
+#endif
+
+#if defined(CONCURRENT) && !defined(GRAN)
 I_ SparkLimit[SPARK_POOLS];
 
 rtsBool
@@ -198,7 +201,7 @@ initThreadPools(STG_NO_ARGS)
     return rtsTrue;
 
 }
-#endif  /* !GRAN */
+#endif
 
 #ifdef PAR
 rtsBool sameThread;
@@ -2564,8 +2567,8 @@ W_ type;
 #endif
 
     if (type == T_MAIN) {
-        STKO_SpA(stko) -= AREL(1);
-        *STKO_SpA(stko) = (P_) realWorldZh_closure;
+        STKO_SpB(stko) -= BREL(1);
+        *STKO_SpB(stko) = (P_) realWorldZh_closure;
     }
 
     SAVE_Ret = (StgRetAddr) UNVEC(stopThreadDirectReturn,vtbl_stopStgWorld);
