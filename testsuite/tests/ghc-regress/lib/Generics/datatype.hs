@@ -20,9 +20,9 @@ data Data a =>
 -- Some terms and corresponding type representations
 myTerm     = undefined :: MyDataType Int
 myTypeRep  = typeOf myTerm		-- type representation in Typeable
-myTyCon    = typerepTyCon myTypeRep	-- type constructor via Typeable
+myTyCon    = typeRepTyCon myTypeRep	-- type constructor via Typeable
 myDataType = dataTypeOf myTerm		-- datatype representation in Data
-myString1  = tyconString myTyCon	-- type constructor via Typeable
+myString1  = tyConString myTyCon	-- type constructor via Typeable
 myString2  = dataTypeName myDataType	-- type constructor via Data
 
 -- Main function for testing

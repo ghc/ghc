@@ -73,8 +73,8 @@ t6 = foo3 [(True,True),(True,True)] -- should count as 2+2=4
 
 -- Test for list datatype
 isList :: Data a => a -> Bool
-isList x = typerepTyCon (typeOf x) ==
-           typerepTyCon (typeOf (undefined::[()]))
+isList x = typeRepTyCon (typeOf x) ==
+           typeRepTyCon (typeOf (undefined::[()]))
 
 
 -- Test for nil
