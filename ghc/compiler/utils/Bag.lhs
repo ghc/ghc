@@ -25,7 +25,7 @@ module Bag (
 IMP_Ubiq(){-uitous-}
 IMPORT_1_3(List(partition))
 
-import Outputable	( interpp'SP )
+import Outputable	--( interpp'SP )
 import Pretty
 #else
 import List(partition)
@@ -161,11 +161,11 @@ bagToList b = foldrBag (:) [] b
 #ifdef COMPILING_GHC
 
 instance (Outputable a) => Outputable (Bag a) where
-    ppr sty EmptyBag	    = ppPStr SLIT("emptyBag")
+    ppr sty EmptyBag	    = ptext SLIT("emptyBag")
     ppr sty (UnitBag a)     = ppr sty a
-    ppr sty (TwoBags b1 b2) = ppCat [ppr sty b1, pp'SP, ppr sty b2]
+    ppr sty (TwoBags b1 b2) = hsep [ppr sty b1 <> comma, ppr sty b2]
     ppr sty (ListBag as)    = interpp'SP sty as
-    ppr sty (ListOfBags bs) = ppCat [ppLbrack, interpp'SP sty bs, ppRbrack]
+    ppr sty (ListOfBags bs) = brackets (interpp'SP sty bs)
 
 #endif {- COMPILING_GHC -}
 \end{code}
