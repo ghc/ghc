@@ -28,8 +28,8 @@ module System.IO.Error (
     mkIOError,			-- :: IOErrorType -> String -> Maybe Handle
 				--    -> Maybe FilePath -> IOError
 
-    annotateIOError,		-- :: IOError -> String -> Maybe FilePath 
-				--    -> Maybe Handle -> IOError 
+    annotateIOError,		-- :: IOError -> String -> Maybe Handle
+				--    -> Maybe FilePath -> IOError
 #endif
 
     alreadyExistsErrorType,	-- :: IOErrorType
@@ -240,10 +240,10 @@ ioeGetFileName ioe = ioe_filename ioe
 
 annotateIOError :: IOError 
               -> String 
-              -> Maybe FilePath 
               -> Maybe Handle 
+              -> Maybe FilePath 
               -> IOError 
-annotateIOError (IOError hdl errTy _ str path) loc opath ohdl = 
+annotateIOError (IOError hdl errTy _ str path) loc ohdl opath = 
   IOError (hdl `mplus` ohdl) errTy loc str (path `mplus` opath)
   where
     Nothing `mplus` ys = ys
