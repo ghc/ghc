@@ -12,7 +12,6 @@ module SaLib (
 	AbsVal(..),
 	AnalysisKind(..),
 	AbsValEnv{-abstract-}, SYN_IE(StrictEnv), SYN_IE(AbsenceEnv),
-	SYN_IE(StrAnalFlags), getStrAnalFlags,
 	nullAbsValEnv, addOneToAbsValEnv, growAbsValEnvList,
 	lookupAbsValEnv,
 	absValFromStrictness
@@ -92,25 +91,19 @@ implicitly bound to @AbsTop@, the completely uninformative,
 pessimistic value---see @absEval@ of a @Var@.
 
 \begin{code}
-data AbsValEnv = AbsValEnv StrAnalFlags (IdEnv AbsVal)
-
-type StrAnalFlags
-  = (Bool,	-- True <=> AllStrict flag is set
-     Bool)	-- True <=> NumbersStrict flag is set
+data AbsValEnv = AbsValEnv (IdEnv AbsVal)
 
 type StrictEnv  = AbsValEnv	-- Environment for strictness analysis
 type AbsenceEnv = AbsValEnv	-- Environment for absence analysis
 
-nullAbsValEnv flags -- this is the one and only way to create AbsValEnvs
-  = AbsValEnv flags nullIdEnv
+nullAbsValEnv -- this is the one and only way to create AbsValEnvs
+  = AbsValEnv nullIdEnv
 
-addOneToAbsValEnv (AbsValEnv x idenv) y z = AbsValEnv x (addOneToIdEnv idenv y z)
-growAbsValEnvList (AbsValEnv x idenv) ys  = AbsValEnv x (growIdEnvList idenv ys)
+addOneToAbsValEnv (AbsValEnv idenv) y z = AbsValEnv (addOneToIdEnv idenv y z)
+growAbsValEnvList (AbsValEnv idenv) ys  = AbsValEnv (growIdEnvList idenv ys)
 
-lookupAbsValEnv (AbsValEnv _ idenv) y
+lookupAbsValEnv (AbsValEnv idenv) y
   = lookupIdEnv idenv y
-
-getStrAnalFlags (AbsValEnv flags _) = flags
 \end{code}
 
 \begin{code}
