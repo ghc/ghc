@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelIO.hsc,v 1.15 2001/09/17 16:51:55 simonmar Exp $
+-- $Id: PrelIO.hsc,v 1.16 2001/09/18 08:32:11 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -19,7 +19,8 @@ module PrelIO (
    interact, readFile, writeFile, appendFile, readLn, readIO, hReady,
    hWaitForInput, hGetChar, hGetLine, hGetContents, hPutChar, hPutStr,
    hPutStrLn, hPrint,
-   commitBuffer, commitBuffer'
+   commitBuffer',	-- hack, see below
+   hGetcBuffered,	-- needed by ghc/compiler/utils/StringBuffer.lhs
  ) where
 
 #include "HsStd.h"
@@ -567,9 +568,11 @@ commitBuffer hdl raw sz@(I## _) count@(I## _) flush release = do
 -- past the \handle, which is really a pessimisation in this case because
 -- that lambda is a one-shot lambda.
 --
--- Don't forget to export the function, to stop it being inlined too.
+-- Don't forget to export the function, to stop it being inlined too
+-- (this appears to be better than NOINLINE, because the strictness
+-- analyser still gets to worker-wrapper it).
 --
--- This hack is a fairly big win for hPutStr performance.
+-- This hack is a fairly big win for hPutStr performance.  --SDM 18/9/2001
 --
 commitBuffer' hdl raw sz@(I## _) count@(I## _) flush release
   handle_@Handle__{ haFD=fd, haBuffer=ref, haBuffers=spare_buf_ref } = do
