@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.5 1999/03/02 20:01:55 sof Exp $
+ * $Id: Signals.c,v 1.6 1999/06/25 09:16:46 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -9,6 +9,7 @@
 
 #include "Rts.h"
 #include "SchedAPI.h"
+#include "Schedule.h"
 #include "Signals.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"
@@ -73,7 +74,7 @@ generic_handler(int sig)
        either.  However, we have to schedule a new thread somehow.
 
        It's probably ok to request a context switch and allow the
-       scheduler to  start the handler thread, but how to we
+       scheduler to  start the handler thread, but how do we
        communicate this to the scheduler?
 
        We need some kind of locking, but with low overhead (i.e. no
@@ -108,6 +109,8 @@ generic_handler(int sig)
     sigemptyset(&signals);
     sigaddset(&signals, sig);
     sigprocmask(SIG_UNBLOCK, &signals, NULL);
+
+    context_switch = 1;
 }
 
 /* -----------------------------------------------------------------------------
@@ -169,11 +172,13 @@ sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
 	sigdelset(&userSignals, sig);
         action.sa_handler = SIG_DFL;
     	break;
+
     case STG_SIG_HAN:
     	handlers[sig] = (I_)handler;
 	sigaddset(&userSignals, sig);
     	action.sa_handler = generic_handler;
     	break;
+
     default:
         barf("sig_install: bad spi");
     }
