@@ -1230,6 +1230,28 @@ module A where
       </section>
 
       <section>
+	<title>Character references</title>
+
+	<para>Although Haskell source files may contain any character
+	from the Unicode character set, the encoding of these characters
+	as bytes varies between systems, so that only source files
+	restricted to the ASCII character set are portable.  Other
+	characters may be specified in character and string literals
+	using Haskell character escapes.  To represent such characters
+	in documentation comments, Haddock supports SGML-style numeric
+	character references of the forms
+	<literal>&amp;#</literal><replaceable>D</replaceable><literal>;</literal>
+	and
+	<literal>&amp;#x</literal><replaceable>H</replaceable><literal>;</literal>
+	where <replaceable>D</replaceable> and <replaceable>H</replaceable>
+	are decimal and hexadecimal numbers denoting a code position
+	in Unicode (or ISO 10646).  For example, the references
+	<literal>&amp;#x3BB;</literal>, <literal>&amp;#x3bb;</literal>
+	and <literal>&amp;#955;</literal> all represent the lower-case
+	letter lambda.</para>
+      </section>
+
+      <section>
 	<title>Code Blocks</title>
 
 	<para>Displayed blocks of code are indicated by surrounding a
