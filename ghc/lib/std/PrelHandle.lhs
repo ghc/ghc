@@ -437,10 +437,8 @@ the file.  Otherwise, it returns @False@.
 
 \begin{code}
 hIsEOF :: Handle -> IO Bool
-hIsEOF handle =
-    wantReadableHandle "hIsEOF" handle $ \ handle_ -> do
-    let fo = haFO__ handle_
-    rc      <- mayBlock fo (fileEOF fo)  -- ConcHask: UNSAFE, may block
+hIsEOF handle = do
+    rc <- mayBlockRead "hIsEOF" handle fileEOF
     case rc of
       0 -> return False
       1 -> return True
@@ -905,12 +903,7 @@ hFillBufBA handle buf sz
 		            "hFillBufBA"
 			    ("illegal buffer size " ++ showsPrec 9 sz []))  -- 9 => should be parens'ified.
   | otherwise = 
-    wantReadableHandle "hFillBufBA" handle $ \ handle_ -> do
-    let fo  = haFO__ handle_
-    rc      <- mayBlock fo (readChunkBA fo buf sz)    -- ConcHask: UNSAFE, may block.
-    if rc >= (0::Int)
-     then return rc
-     else constructErrorAndFail "hFillBufBA"
+    mayBlockRead "hFillBufBA" handle (\fo -> readChunkBA fo buf sz)
 #endif
 
 hFillBuf :: Handle -> Addr -> Int -> IO Int
@@ -920,13 +913,7 @@ hFillBuf handle buf sz
 		            "hFillBuf"
 			    ("illegal buffer size " ++ showsPrec 9 sz []))  -- 9 => should be parens'ified.
   | otherwise = 
-    wantReadableHandle "hFillBuf" handle $ \ handle_ -> do
-    let fo  = haFO__ handle_
-    rc      <- mayBlock fo (readChunk fo buf sz)    -- ConcHask: UNSAFE, may block.
-    if rc >= 0
-     then return rc
-     else constructErrorAndFail "hFillBuf"
-
+    mayBlockRead "hFillBuf" handle (\fo -> readChunk fo buf sz)
 \end{code}
 
 The @hPutBuf hdl buf len@ action writes an already packed sequence of
@@ -1142,6 +1129,39 @@ mayBlock fo act = do
 	mayBlock fo act  -- output possible
      _ -> do
         return rc
+
+data MayBlock
+  = BlockRead Int
+  | BlockWrite Int
+  | NoBlock Int
+
+mayBlockRead :: String -> Handle -> (ForeignObj -> IO Int) -> IO Int
+mayBlockRead fname handle fn = do
+    r <- wantReadableHandle fname handle $ \ handle_ -> do
+	 let fo = haFO__ handle_
+         rc <- fn fo
+         case rc of
+           -5 -> do  -- (possibly blocking) read
+             fd <- getFileFd fo
+             return (BlockRead fd)
+  	   -6 -> do  -- (possibly blocking) write
+  	     fd <- getFileFd fo
+             return (BlockWrite fd)
+  	   -7 -> do  -- (possibly blocking) write on connected handle
+  	     fd <- getConnFileFd fo
+	     return (BlockWrite fd)
+           _ ->
+             if rc >= 0
+         	  then return (NoBlock rc)
+         	  else constructErrorAndFail fname
+    case r of
+	BlockRead fd -> do
+	   threadWaitRead fd
+	   mayBlockRead fname handle fn
+	BlockWrite fd -> do
+	   threadWaitWrite fd
+	   mayBlockRead fname handle fn
+	NoBlock c -> return c
 \end{code}
 
 Foreign import declarations of helper functions:

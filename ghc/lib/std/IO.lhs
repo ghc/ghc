@@ -110,6 +110,7 @@ import PrelAddr		( Addr(..), nullAddr )
 import PrelByteArr	( ByteArray )
 import PrelPack		( unpackNBytesAccST )
 import PrelException    ( ioError, catch )
+import PrelConc
 
 #ifndef __PARALLEL_HASKELL__
 import PrelForeign  ( ForeignObj )
@@ -157,13 +158,9 @@ blocking until a character is available.
 
 \begin{code}
 hGetChar :: Handle -> IO Char
-hGetChar handle = 
-    wantReadableHandle "hGetChar" handle $ \ handle_ -> do
-    let fo = haFO__ handle_
-    intc     <- mayBlock fo (fileGetc fo)  -- ConcHask: UNSAFE, may block
-    if intc /= ((-1)::Int)
-     then return (chr intc)
-     else constructErrorAndFail "hGetChar"
+hGetChar handle = do
+  c <- mayBlockRead "hGetChar" handle fileGetc
+  return (chr c)
 
 {-
   If EOF is reached before EOL is encountered, ignore the
@@ -202,14 +199,9 @@ character is available.
 
 \begin{code}
 hLookAhead :: Handle -> IO Char
-hLookAhead handle =
-    wantReadableHandle "hLookAhead" handle $ \ handle_ -> do
-    let fo = haFO__ handle_
-    intc    <- mayBlock fo (fileLookAhead fo)  -- ConcHask: UNSAFE, may block
-    if intc /= (-1)
-     then return (chr intc)
-     else constructErrorAndFail "hLookAhead"
-
+hLookAhead handle = do
+  rc <- mayBlockRead "hLookAhead" handle fileLookAhead
+  return (chr rc)
 \end{code}
 
 
