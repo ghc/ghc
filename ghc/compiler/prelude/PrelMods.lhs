@@ -14,7 +14,9 @@ module PrelMods
         (
 	pREL_GHC, pRELUDE, mONAD, rATIO, iX, mAIN, pREL_MAIN, pREL_ERR,
 	pREL_BASE, pREL_NUM, pREL_LIST, pREL_TUP, pREL_ADDR, pREL_READ,
-	pREL_PACK, pREL_CONC, pREL_IO_BASE, pREL_ST, pREL_ARR, pREL_FOREIGN
+	pREL_PACK, pREL_CONC, pREL_IO_BASE, pREL_ST, pREL_ARR, pREL_FOREIGN,
+
+	iNT, wORD
 	) where
 
 #include "HsVersions.h"
@@ -51,5 +53,10 @@ iX	     = SLIT("Ix")
 
 pREL_MAIN    = SLIT("PrelMain")
 mAIN	     = SLIT("Main")
+
+iNT, wORD   :: Module
+
+iNT	     = SLIT("Int")
+wORD	     = SLIT("Word")
 
 \end{code}
