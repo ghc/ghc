@@ -117,6 +117,7 @@
 #endif
 #include "lockFile.h"
 #include "dirUtils.h"
+#include "WCsubst.h"
 
 #include "runProcess.h"
 
