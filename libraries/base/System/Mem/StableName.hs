@@ -33,6 +33,10 @@ import Prelude
 
 import Data.Dynamic
 
+#ifdef __HUGS__
+import Hugs.Stable
+#endif
+
 #ifdef __GLASGOW_HASKELL__
 import GHC.IOBase	( IO(..) )
 import GHC.Base		( Int(..), StableName#, makeStableName#

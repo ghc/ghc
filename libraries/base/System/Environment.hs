@@ -21,12 +21,18 @@ module System.Environment
 
 import Prelude
 
+#ifndef __HUGS__
 import Foreign
 import Foreign.C
 import Control.Monad
+#endif
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.IOBase
+#endif
+
+#ifdef __HUGS__
+import Hugs.System
 #endif
 
 -- ---------------------------------------------------------------------------
@@ -35,6 +41,7 @@ import GHC.IOBase
 -- Computation `getArgs' returns a list of the program's command
 -- line arguments (not including the program name).
 
+#ifndef __HUGS__
 getArgs :: IO [String]
 getArgs = 
   alloca $ \ p_argc ->  
@@ -104,3 +111,4 @@ getEnv name =
 
 foreign import ccall unsafe "getenv"
    c_getenv :: CString -> IO (Ptr CChar)
+#endif  /* __HUGS__ */

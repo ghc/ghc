@@ -35,6 +35,10 @@ import Prelude
 import Control.Monad.Fix
 import Data.Dynamic
 
+#ifdef __HUGS__
+import Hugs.ST
+#endif
+
 #ifdef __GLASGOW_HASKELL__
 import GHC.ST
 import GHC.Base		( unsafeCoerce#, RealWorld )

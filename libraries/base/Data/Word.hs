@@ -29,6 +29,10 @@ module Data.Word
 import GHC.Word
 #endif
 
+#ifdef __HUGS__
+import Hugs.Word
+#endif
+
 {- $notes
 
 * All arithmetic is performed modulo 2^n, where n is the number of

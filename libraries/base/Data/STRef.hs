@@ -27,6 +27,10 @@ import Prelude
 import GHC.STRef
 #endif
 
+#ifdef __HUGS__
+import Hugs.ST
+#endif
+
 import Data.Dynamic
 
 #include "Dynamic.h"

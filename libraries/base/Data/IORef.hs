@@ -28,6 +28,10 @@ module Data.IORef
 
 import Prelude
 
+#ifdef __HUGS__
+import Hugs.IORef
+#endif
+
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base		( mkWeak# )
 import GHC.STRef
@@ -45,18 +49,6 @@ mkWeakIORef :: IORef a -> IO () -> IO (Weak (IORef a))
 mkWeakIORef r@(IORef (STRef r#)) f = IO $ \s ->
   case mkWeak# r# r f s of (# s1, w #) -> (# s1, Weak w #)
 #endif
-
-#if defined __HUGS__
-data IORef a        -- mutable variables containing values of type a
-
-primitive newIORef   "newRef" :: a -> IO (IORef a)
-primitive readIORef  "getRef" :: IORef a -> IO a
-primitive writeIORef "setRef" :: IORef a -> a -> IO ()
-primitive eqIORef    "eqRef"  :: IORef a -> IORef a -> Bool
-
-instance Eq (IORef a) where
-    (==) = eqIORef
-#endif /* __HUGS__ */
 
 -- |Mutate the contents of an 'IORef'
 modifyIORef :: IORef a -> (a -> a) -> IO ()

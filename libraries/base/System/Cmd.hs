@@ -19,10 +19,16 @@ module System.Cmd
 import Prelude
 
 import System.Exit
+#ifndef __HUGS__
 import Foreign.C
+#endif
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.IOBase
+#endif
+
+#ifdef __HUGS__
+import Hugs.System
 #endif
 
 -- ---------------------------------------------------------------------------
@@ -48,6 +54,7 @@ call, which ignores the @SHELL@ environment variable, and always
 passes the command to the Windows command interpreter (@CMD.EXE@ or
 @COMMAND.COM@), hence Unixy shell tricks will not work.
 -}
+#ifndef __HUGS__
 system :: String -> IO ExitCode
 system "" = ioException (IOError Nothing InvalidArgument "system" "null command" Nothing)
 system cmd =
@@ -58,3 +65,4 @@ system cmd =
         n  -> return (ExitFailure n)
 
 foreign import ccall unsafe "systemCmd" primSystem :: CString -> IO Int
+#endif  /* __HUGS__ */

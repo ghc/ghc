@@ -28,11 +28,13 @@ module Control.Concurrent.MVar
 	, withMVar	-- :: MVar a -> (a -> IO b) -> IO b
 	, modifyMVar_ 	-- :: MVar a -> (a -> IO a) -> IO ()
 	, modifyMVar 	-- :: MVar a -> (a -> IO (a,b)) -> IO b
+#ifndef __HUGS__
 	, addMVarFinalizer -- :: MVar a -> IO () -> IO ()
+#endif
     ) where
 
 #ifdef __HUGS__
-import ConcBase	( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
+import Hugs.ConcBase ( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
 		  tryTakeMVar, tryPutMVar, isEmptyMVar,
                   readMVar, swapMVar,
 		)

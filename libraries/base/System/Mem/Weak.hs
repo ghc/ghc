@@ -71,13 +71,14 @@ import Prelude
 
 import Data.Dynamic
 
+#ifdef __HUGS__
+import Hugs.Weak
+#endif
+
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.IOBase
 import GHC.Weak
-
-#include "Dynamic.h"
-INSTANCE_TYPEABLE1(Weak,weakTc,"Weak")
 
 {-|
 Dereferences a weak pointer.  If the key is still alive, then
@@ -113,6 +114,8 @@ finalize (Weak w) = IO $ \s ->
 	(# s1, _,  f #) -> f s1
 #endif
 
+#include "Dynamic.h"
+INSTANCE_TYPEABLE1(Weak,weakTc,"Weak")
 
 {- $precise
 

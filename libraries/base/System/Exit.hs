@@ -25,6 +25,10 @@ import Prelude
 import GHC.IOBase
 #endif
 
+#ifdef __HUGS__
+import Hugs.System
+#endif
+
 -- ---------------------------------------------------------------------------
 -- exitWith
 
@@ -32,6 +36,7 @@ import GHC.IOBase
 -- program's caller.  Before it terminates, any open or semi-closed
 -- handles are first closed.
 
+#ifndef __HUGS__
 exitWith :: ExitCode -> IO a
 exitWith ExitSuccess = throw (ExitException ExitSuccess)
 exitWith code@(ExitFailure n) 
@@ -40,3 +45,4 @@ exitWith code@(ExitFailure n)
 
 exitFailure :: IO a
 exitFailure = exitWith (ExitFailure 1)
+#endif  /* __HUGS__ */

@@ -26,6 +26,10 @@ import GHC.IOBase
 import GHC.Handle
 #endif
 
+#ifdef __HUGS__
+import Hugs.IOExts
+#endif
+
 #ifdef __GLASGOW_HASKELL__
 {-# NOINLINE trace #-}
 {-|

@@ -23,3 +23,7 @@ import Prelude
 #ifdef __GLASGOW_HASKELL__
 import GHC.IOBase
 #endif
+
+#ifdef __HUGS__
+import Hugs.IOExts
+#endif

@@ -28,8 +28,10 @@ module Control.Monad.ST.Lazy (
 	RealWorld,
 	ST.stToIO,
 
+#ifndef __HUGS__
 	-- * Converting between strict and lazy 'ST'
 	strictToLazyST, lazyToStrictST
+#endif
     ) where
 
 import Prelude
@@ -41,10 +43,13 @@ import GHC.Base
 import Control.Monad
 #endif
 
+#ifdef __HUGS__
+import Hugs.LazyST as ST
+#endif
+
 #ifdef __GLASGOW_HASKELL__
 newtype ST s a = ST (State s -> (a, State s))
 data State s = S# (State# s)
-#endif
 
 instance Functor (ST s) where
     fmap f m = ST $ \ s ->
@@ -68,8 +73,6 @@ instance Monad (ST s) where
            in
            k_a new_s
 
-
-#ifdef __GLASGOW_HASKELL__
 {-# NOINLINE runST #-}
 runST :: (forall s. ST s a) -> a
 runST st = case st of ST the_st -> let (r,_) = the_st (S# realWorld#) in r
@@ -107,7 +110,7 @@ Convert a lazy 'ST' computation into a strict one.
 lazyToStrictST :: ST s a -> ST.ST s a
 lazyToStrictST (ST m) = GHC.ST.ST $ \s ->
         case (m (S# s)) of (a, S# s') -> (# s', a #)
-#endif
 
 unsafeInterleaveST :: ST s a -> ST s a
 unsafeInterleaveST = strictToLazyST . ST.unsafeInterleaveST . lazyToStrictST
+#endif

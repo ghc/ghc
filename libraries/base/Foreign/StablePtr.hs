@@ -33,6 +33,9 @@ import GHC.Stable
 import GHC.Err
 #endif
 
+#ifdef __HUGS__
+import Hugs.StablePtr
+#endif
 
 -- $cinterface
 --

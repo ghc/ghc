@@ -35,7 +35,9 @@ module System.IO (
     hGetPosn,		       -- :: Handle -> IO HandlePosn
     hSetPosn,		       -- :: HandlePosn -> IO ()
     hSeek,		       -- :: Handle -> SeekMode -> Integer -> IO ()
+#ifndef __HUGS__
     hTell,		       -- :: Handle -> IO Integer
+#endif
     hWaitForInput,	       -- :: Handle -> Int -> IO Bool
     hReady,		       -- :: Handle -> IO Bool
     hGetChar,		       -- :: Handle -> IO Char
@@ -87,15 +89,19 @@ module System.IO (
     readIO,		       -- :: Read a => String -> IO a
     readLn,		       -- :: Read a => IO a
 
+#ifndef __HUGS__
     hPutBuf,		       -- :: Handle -> Ptr a -> Int -> IO ()
     hGetBuf,		       -- :: Handle -> Ptr a -> Int -> IO Int
+#endif
  
     fixIO,		       -- :: (a -> IO a) -> IO a
 
+#ifndef __HUGS__
     hSetEcho,			-- :: Handle -> Bool -> IO ()
     hGetEcho,			-- :: Handle -> IO Bool
 
     hIsTerminalDevice,	 	-- :: Handle -> IO Bool
+#endif
   ) where
 
 #ifdef __GLASGOW_HASKELL__
@@ -110,11 +116,17 @@ import GHC.Read
 import GHC.Show
 #endif
 
+#ifdef __HUGS__
+import Hugs.IO
+import Hugs.IOExts
+#endif
+
 import System.IO.Error
 
 -- -----------------------------------------------------------------------------
 -- Standard IO
 
+#ifndef __HUGS__
 putChar         :: Char -> IO ()
 putChar c       =  hPutChar stdout c
 
@@ -169,6 +181,7 @@ readIO s        =  case (do { (x,t) <- reads s ;
 			[x]    -> return x
 			[]     -> ioError (userError "Prelude.readIO: no parse")
 			_      -> ioError (userError "Prelude.readIO: ambiguous parse")
+#endif  /* __HUGS__ */
 
 hReady		:: Handle -> IO Bool
 hReady h 	=  hWaitForInput h 0

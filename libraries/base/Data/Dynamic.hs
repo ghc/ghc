@@ -78,6 +78,11 @@ import GHC.Float
 import GHC.IOBase
 #endif
 
+#ifdef __HUGS__
+import Hugs.IO
+import Hugs.IOExts
+#endif
+
 #ifdef __GLASGOW_HASKELL__
 unsafeCoerce :: a -> b
 unsafeCoerce = unsafeCoerce#

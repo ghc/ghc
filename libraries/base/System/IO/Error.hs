@@ -16,11 +16,14 @@
 
 module System.IO.Error (
     IOError,			-- abstract
+#ifndef __HUGS__
     IOErrorType,		-- abstract
+#endif
 
     ioError,		       	-- :: IOError -> IO a
     userError,		       	-- :: String  -> IOError
 
+#ifndef __HUGS__
     mkIOError,			-- :: IOErrorType -> String -> Maybe Handle
 				--    -> Maybe FilePath -> IOError
 
@@ -41,6 +44,7 @@ module System.IO.Error (
     isIllegalOperationErrorType, 
     isPermissionErrorType,
     isUserErrorType, 
+#endif  /* __HUGS__ */
 
     isAlreadyExistsError,	-- :: IOError -> Bool
     isDoesNotExistError,
@@ -51,7 +55,9 @@ module System.IO.Error (
     isPermissionError,
     isUserError,
 
+#ifndef __HUGS__
     ioeGetErrorType,		-- :: IOError -> IOErrorType
+#endif
     ioeGetErrorString,		-- :: IOError -> String
     ioeGetHandle,		-- :: IOError -> Maybe Handle
     ioeGetFileName,		-- :: IOError -> Maybe FilePath
@@ -66,6 +72,11 @@ import GHC.IOBase
 import Text.Show
 #endif
 
+#ifdef __HUGS__
+import Hugs.IO
+#endif
+
+#ifndef __HUGS__
 -- -----------------------------------------------------------------------------
 -- Constructing an IOError
 
@@ -93,6 +104,7 @@ isEOFError           = isEOFErrorType              . ioeGetErrorType
 isIllegalOperation   = isIllegalOperationErrorType . ioeGetErrorType
 isPermissionError    = isPermissionErrorType       . ioeGetErrorType
 isUserError          = isUserErrorType             . ioeGetErrorType
+#endif
 
 -- -----------------------------------------------------------------------------
 -- IOErrorTypes
@@ -115,9 +127,11 @@ userErrorType		  = UserError
 -- -----------------------------------------------------------------------------
 -- IOErrorType predicates
 
+#ifndef __HUGS__
 isAlreadyExistsErrorType, isDoesNotExistErrorType, isAlreadyInUseErrorType,
   isFullErrorType, isEOFErrorType, isIllegalOperationErrorType, 
   isPermissionErrorType, isUserErrorType :: IOErrorType -> Bool
+#endif
 
 #ifdef __GLASGOW_HASKELL__
 isAlreadyExistsErrorType AlreadyExists = True
