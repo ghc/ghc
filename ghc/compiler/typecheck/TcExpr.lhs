@@ -11,6 +11,7 @@ module TcExpr ( tcExpr, tcExpr_id, tcMonoExpr ) where
 #ifdef GHCI 	/* Only if bootstrapped */
 import {-# SOURCE #-}	TcSplice( tcSpliceExpr, tcBracket )
 import HsSyn		( HsReify(..), ReifyFlavour(..) )
+import TcType		( isTauTy )
 import TcEnv		( bracketOK, tcMetaTy, tcLookupGlobal,
 			  wellStaged, metaLevel )
 import TcSimplify	( tcSimplifyBracket )
