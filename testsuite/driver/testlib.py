@@ -428,8 +428,8 @@ def do_compile( name, way, should_fail, top_mod, extra_hc_opts ):
         expected_stderr = ''
         expected_stderr_file = ''
 
-    if expected_stderr != actual_stderr:
-        # print stderr_e, '\n', stderr_a
+    if different_outputs(expected_stderr, actual_stderr):
+        print actual_stderr, '\n', expected_stderr
         if not outputs_differ('stderr', expected_stderr_file, actual_stderr_file):
             return 'fail'
 
@@ -771,12 +771,7 @@ def check_stdout_ok( name ):
        actual_stdout = ''
        actual_stdout_file = ''
 
-   # On Windows, remove '\r' characters from the output
-   if config.platform == 'i386-unknown-mingw32':
-       actual_stdout = re.sub('\r', '', actual_stdout)
-       expected_stdout = re.sub('\r', '', expected_stdout)
-
-   if actual_stdout != expected_stdout:
+   if different_outputs(actual_stdout, expected_stdout):
        return outputs_differ( 'stdout', expected_stdout_file, actual_stdout_file )
    else:
        return 1
@@ -797,16 +792,15 @@ def check_stderr_ok( name ):
        actual_stderr = ''
        actual_stderr_file = ''
 
-   # On Windows, remove '\r' characters from the output
-   if config.platform == 'i386-unknown-mingw32':
-       actual_stderr = re.sub('\r', '', actual_stderr)
-       expected_stderr = re.sub('\r', '', expected_stderr)
-
-   if actual_stderr != expected_stderr:
+   if different_outputs( actual_stderr,expected_stderr ):
        return outputs_differ( 'stderr', expected_stderr_file, actual_stderr_file )
    else:
        return 1
 
+
+def different_outputs( str1, str2 ):
+   # On Windows, remove '\r' characters from the output
+   return re.sub('\r', '', str1) != re.sub('\r', '', str2)
 
 # Output a message indicating that an expected output differed from the
 # actual output, and optionally accept the new output.  Returns true
@@ -839,7 +833,7 @@ def outputs_differ( kind, expected, actual ):
 
 def normalise_errmsg( str ):
     # Merge contiguous whitespace characters into a single space.
-    str = re.sub('[ \t\n]+', ' ', str)
+    str = re.sub('[ \r\t\n]+', ' ', str)
     # Look for file names and zap the directory part:
     #    foo/var/xyzzy/somefile  -->  somefile
     str = re.sub('([^\\s/]+/)*([^\\s/])', '\\2', str)
