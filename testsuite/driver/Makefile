@@ -18,8 +18,10 @@ RUNTESTS_SRCS= \
 
 all :: runtests
 
+SRC_HC_OPTS += -package lang -package util  -cpp  -W -fno-warn-unused-matches  -ibasicRxLib
+
 runtests: $(RUNTESTS_SRCS)
-	$(GHC) $(HC_OPTS) -W -fno-warn-unused-matches --make Main -o runtests -ibasicRxLib -package lang -package util -cpp
+	$(GHC) $(HC_OPTS) --make Main -o runtests
 
 CLEAN_FILES += CmdParser.hs basicRxLib/*.o basicRxLib/*.hi
 
