@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team 2001-
+ * (c) The GHC Team 2001-2003
  *
  * Types + prototypes for functions in Task.c
  * (RTS subsystem for handling tasks, agents thay may execute STG code).
@@ -28,7 +28,7 @@ extern TaskInfo *taskIds;
 
 extern void startTaskManager ( nat maxTasks, void (*taskStart)(void) );
 extern void stopTaskManager ( void );
-void resetTaskManagerAfterFork ();
+extern void resetTaskManagerAfterFork ( void );
 
 extern void startTask ( void (*taskStart)(void) );
 

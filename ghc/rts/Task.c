@@ -200,7 +200,7 @@ stopTaskManager ()
 }
 
 void
-resetTaskManagerAfterFork ()
+resetTaskManagerAfterFork ( void )
 {
 	rts_n_waiting_tasks = 0;
 	taskCount = 0;
