@@ -20,9 +20,7 @@ module Data.Either (
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
-#endif
 
-#ifndef __HUGS__
 {-|
 
 The 'Either' type represents values with two possibilities: a value of
@@ -41,4 +39,4 @@ data  Either a b  =  Left a | Right b	deriving (Eq, Ord )
 either                  :: (a -> c) -> (b -> c) -> Either a b -> c
 either f _ (Left x)     =  f x
 either _ g (Right y)    =  g y
-#endif  /* __HUGS__ */
+#endif  /* __GLASGOW_HASKELL__ */
