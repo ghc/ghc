@@ -147,7 +147,7 @@ IncludeTestDirsInBuild=NO
 #		       	     HC_ROJEMO_NHC
 #		       	     HC_UNSPECIFIED
 
-WithGhcHc = ghc-2.10
+WithGhcHc = @WithGhcHc@
 
 # Extra ways in which to build the compiler (for example, you might want to
 # build a profiled compiler so you can see where it spends its time)
