@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.84 2000/12/14 15:19:48 sewardj Exp $
+ * $Id: Schedule.c,v 1.85 2000/12/19 16:38:15 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -62,7 +62,7 @@
 #include "Schedule.h"
 #include "StgMiscClosures.h"
 #include "Storage.h"
-#include "Evaluator.h"
+#include "Interpreter.h"
 #include "Exception.h"
 #include "Printer.h"
 #include "Main.h"
