@@ -63,4 +63,3 @@ test "ds050" { vtc("-fglasgow-exts") }
 test "ds051" { vtc("") }
 test "ds052" { $expect = "fail" vtc("") }
 test "ds053" { $expect = "fail" vtc("") }
-test "ds054" { $expect = "fail" vtc("") }
