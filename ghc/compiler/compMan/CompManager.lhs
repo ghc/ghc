@@ -78,10 +78,11 @@ import ErrUtils		( showPass )
 import SysTools		( cleanTempFilesExcept )
 import BasicTypes	( SuccessFlag(..), succeeded )
 import StringBuffer	( hGetStringBuffer )
+import Type		( dropForAlls )
 import Util
 import Outputable
 import Panic
-import CmdLineOpts	( DynFlags(..) )
+import CmdLineOpts	( DynFlags(..), dopt )
 import Maybes		( expectJust, orElse, mapCatMaybes )
 import FiniteMap
 
@@ -409,12 +410,17 @@ cmTypeOfExpr cmstate expr
 
 	case maybe_stuff of
 	   Nothing -> return Nothing
-	   Just ty -> return (Just res_str)
+	   Just ty -> return (Just (showSDocForUser unqual doc))
  	     where 
-		res_str = showSDocForUser unqual (text expr <+> dcolon <+> ppr tidy_ty)
+		doc     = text expr <+> dcolon <+> ppr final_ty
 		unqual  = icPrintUnqual (cm_ic cmstate)
 		tidy_ty = tidyType emptyTidyEnv ty
-
+		dflags  = hsc_dflags (cm_hsc cmstate)
+		-- if -fglasgow-exts is on we show the foralls, otherwise
+		-- we don't.
+		final_ty
+		  | dopt Opt_GlasgowExts dflags = tidy_ty
+		  | otherwise			= dropForAlls tidy_ty
 
 -----------------------------------------------------------------------------
 -- cmKindOfType: returns a string representing the kind of a type
