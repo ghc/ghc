@@ -135,9 +135,6 @@
 /* in inputReady.c */
 int inputReady(int fd, int msecs, int isSock);
 
-/* in writeError.c */
-void writeErrString__(HsAddr msg, HsInt len);
-
 /* in Signals.c */
 extern HsInt nocldstop;
 

@@ -117,7 +117,7 @@ import GHC.Base		( assert )
 import GHC.Exception 	as ExceptionBase hiding (catch)
 import GHC.Conc		( throwTo, ThreadId )
 import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
-import Foreign.C.String ( CString, withCStringLen )
+import Foreign.C.String ( CString, withCString )
 import System.IO	( stdout, hFlush )
 #endif
 
@@ -510,10 +510,11 @@ uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
                Deadlock    -> "no threads to run:  infinite loop or deadlock?"
                ErrorCall s -> s
                other       -> showsPrec 0 other "\n"
-         withCStringLen ("Fail: "++msg) $ \(cstr,len) -> writeErrString cstr len
-         
-foreign import ccall unsafe "writeErrString__"
-	writeErrString :: CString -> Int -> IO ()
+         withCString "%s" $ \cfmt ->
+          withCString msg $ \cmsg ->
+            errorBelch cfmt cmsg
+
+foreign import ccall unsafe errorBelch :: CString -> CString -> IO ()
 
 setUncaughtExceptionHandler :: (Exception -> IO ()) -> IO ()
 setUncaughtExceptionHandler = writeIORef uncaughtExceptionHandler
