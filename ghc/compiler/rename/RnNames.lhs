@@ -30,7 +30,7 @@ import UniqFM	( lookupUFM )
 import Bag	( bagToList )
 import Module	( ModuleName, mkThisModule, pprModuleName, WhereFrom(..) )
 import NameSet
-import Name	( Name, ExportFlag(..), ImportReason(..), Provenance(..),
+import Name	( Name, ImportReason(..), Provenance(..),
 		  setLocalNameSort, nameOccName,  nameEnvElts
 		)
 import RdrName	( RdrName, rdrNameOcc, setRdrNameOcc, mkRdrQual, mkRdrUnqual, isQual, isUnqual )
@@ -72,7 +72,7 @@ getGlobalNames (HsModule this_mod _ exports imports decls _ mod_loc)
 	   rec_unqual_fn :: Name -> Bool	-- Is this chap in scope unqualified?
 	   rec_unqual_fn = unQualInScope rec_gbl_env
 
-	   rec_exp_fn :: Name -> ExportFlag
+	   rec_exp_fn :: Name -> Bool
 	   rec_exp_fn = mk_export_fn (availsToNameSet rec_export_avails)
 	in
 
@@ -618,11 +618,8 @@ check_occs ie occs avail
       where
 	name_occ = nameOccName name
 	
-mk_export_fn :: NameSet -> (Name -> ExportFlag)
-mk_export_fn exported_names
-  = \name -> if name `elemNameSet` exported_names
-	     then Exported
-	     else NotExported
+mk_export_fn :: NameSet -> (Name -> Bool)	-- True => exported
+mk_export_fn exported_names = \name ->  name `elemNameSet` exported_names
 \end{code}
 
 %************************************************************************
