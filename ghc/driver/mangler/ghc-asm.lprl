@@ -345,6 +345,7 @@ sub init_TARGET_STUFF {
     $T_HDR_data	    = "\.data\n\t\.align 8\n";
     $T_HDR_rodata   = "\.text\n\t\.align 4\n";
     $T_HDR_closure  = "\.data\n\t\.align 4\n";
+    $T_HDR_info     = "\.text\n\t\.align 4\n";
     $T_HDR_entry    = "\.text\n\t\.align 4\n";
     $T_HDR_vector   = "\.text\n\t\.align 4\n";
 
