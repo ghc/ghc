@@ -86,6 +86,7 @@ module CmdLineOpts (
 	opt_UnfoldingCreationThreshold,
 	opt_UnfoldingConDiscount,
 	opt_UnfoldingUseThreshold,
+	opt_UnfoldingKeenessFactor,
 
 	opt_Verbose,
 	opt_WarnNameShadowing,
@@ -241,10 +242,11 @@ data SimplifierSwitch
 %************************************************************************
 
 \begin{code}
-lookUp	       :: FAST_STRING -> Bool
-lookup_int     :: String -> Maybe Int
-lookup_def_int :: String -> Int -> Int
-lookup_str     :: String -> Maybe String
+lookUp	       	 :: FAST_STRING -> Bool
+lookup_int     	 :: String -> Maybe Int
+lookup_def_int   :: String -> Int -> Int
+lookup_def_float :: String -> Float -> Float
+lookup_str       :: String -> Maybe String
 
 lookUp     sw = maybeToBool (assoc_opts sw)
 	
@@ -255,6 +257,10 @@ lookup_int sw = case (lookup_str sw) of
 		  Just xx -> Just (read xx)
 
 lookup_def_int sw def = case (lookup_str sw) of
+			    Nothing -> def		-- Use default
+		  	    Just xx -> read xx
+
+lookup_def_float sw def = case (lookup_str sw) of
 			    Nothing -> def		-- Use default
 		  	    Just xx -> read xx
 
@@ -336,6 +342,7 @@ opt_UnfoldingUseThreshold	= lookup_def_int "-funfolding-use-threshold"	   uNFOLD
 opt_UnfoldingConDiscount	= lookup_def_int "-funfolding-con-discount"	   uNFOLDING_CON_DISCOUNT_WEIGHT
 			
 opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold"	   lIBERATE_CASE_THRESHOLD
+opt_UnfoldingKeenessFactor	= lookup_def_float "-funfolding-keeness-factor"	   uNFOLDING_KEENESS_FACTOR
 opt_WarnNameShadowing		= lookUp  SLIT("-fwarn-name-shadowing")
 opt_WarnIncompletePatterns	= lookUp  SLIT("-fwarn-incomplete-patterns")
 opt_WarnOverlappedPatterns	= lookUp  SLIT("-fwarn-overlapped-patterns")
