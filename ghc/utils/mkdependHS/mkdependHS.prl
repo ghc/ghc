@@ -224,7 +224,7 @@ while ($_ && $_ ne $End_magic_str) { # delete 'til End_magic_str
     $_ = <OMKF>;
 }
 # insert dependencies
-print "\n$Begin_magic_str", @Depend_lines, $End_magic_str || die "Failed to write out dependencies ($!)";
+print "$Begin_magic_str", @Depend_lines, $End_magic_str || die "Failed to write out dependencies ($!)";
 
 while (<OMKF>) { # copy the rest through
     print $_ || die "Failed to write out dependencies ($!)";
