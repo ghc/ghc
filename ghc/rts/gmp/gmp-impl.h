@@ -57,7 +57,9 @@ MA 02111-1307, USA. */
 #endif
 
 #if defined (alloca)
+# ifndef HAVE_ALLOCA
 #define HAVE_ALLOCA
+# endif
 #endif
 
 #if ! defined (HAVE_ALLOCA) || USE_STACK_ALLOC
