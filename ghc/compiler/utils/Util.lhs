@@ -40,6 +40,9 @@ module Util (
 	-- comparisons
 	thenCmp, cmpList,
 
+	-- strictness
+	seqList, ($!),
+
 	-- pairs
 	IF_NOT_GHC(cfst COMMA applyToPair COMMA applyToFst COMMA)
 	IF_NOT_GHC(applyToSnd COMMA foldPair COMMA)
@@ -722,4 +725,17 @@ unzipWith :: (a -> b -> c) -> [(a, b)] -> [c]
 unzipWith f pairs = map ( \ (a, b) -> f a b ) pairs
 \end{code}
 
+\begin{code}
+#if __HASKELL1__ > 4
+seqList :: [a] -> b -> b
+#else
+seqList :: (Eval a) => [a] -> b -> b
+#endif
+seqList [] b = b
+seqList (x:xs) b = x `seq` seqList xs b
 
+#if __HASKELL1__ <= 4
+($!)    :: (Eval a) => (a -> b) -> a -> b
+f $! x  = x `seq` f x
+#endif
+\end{code}
