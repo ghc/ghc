@@ -195,6 +195,11 @@ run flags files = do
 		[] -> Nothing
 		us -> Just (last us)
 
+      maybe_html_help_format =
+	case [hhformat | Flag_HtmlHelp hhformat <- flags] of
+		[]      -> Nothing
+		formats -> Just (last formats)
+		
   prologue <- getPrologue flags
 
   read_ifaces_s <- mapM readIface (map snd ifaces_to_read)
@@ -213,12 +218,15 @@ run flags files = do
 	die ("-h cannot be used with --gen-index or --gen-contents")
 
   when (Flag_GenContents `elem` flags) $ do
-	ppHtmlContents odir title maybe_index_url visible_read_ifaces prologue
+	ppHtmlContents odir title package maybe_html_help_format maybe_index_url visible_read_ifaces prologue
         copyHtmlBits odir libdir css_file
 
   when (Flag_GenIndex `elem` flags) $ do
-	ppHtmlIndex odir title maybe_contents_url visible_read_ifaces
+	ppHtmlIndex odir title package maybe_html_help_format maybe_contents_url visible_read_ifaces
         copyHtmlBits odir libdir css_file
+        
+  when (Flag_GenContents `elem` flags && Flag_GenIndex `elem` flags) $ do
+    ppHtmlHelpFiles title package visible_read_ifaces odir maybe_html_help_format		
 
   parsed_mods <- mapM parse_file files
 
@@ -255,11 +263,8 @@ run flags files = do
 			     | (mdl, i) <-  these_mod_ifaces ])
 
   when (Flag_Html `elem` flags) $ do
-    let hhformat = case [hhformat | Flag_HtmlHelp hhformat <- flags] of
-		[]      -> Nothing
-		formats -> Just (last formats)
     ppHtml title package source_url these_mod_ifaces odir
-		prologue hhformat
+		prologue maybe_html_help_format
 		maybe_contents_url maybe_index_url
     copyHtmlBits odir libdir css_file
 

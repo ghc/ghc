@@ -18,10 +18,9 @@ contentsHHFile, indexHHFile :: String
 contentsHHFile = "index.hhc"
 indexHHFile = "index.hhk"
 
-ppHHContents :: FilePath -> [(Module,Interface)] -> IO ()
-ppHHContents odir ifaces = do
-  let tree = mkModuleTree (map (\(mod,_) -> (mod,Nothing)) ifaces) --TODO: packages
-      html =
+ppHHContents :: FilePath -> [ModuleTree] -> IO ()
+ppHHContents odir tree = do
+  let html =
       	text "<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML//EN\">" $$
 	text "<HTML>" $$
 	text "<HEAD>" $$

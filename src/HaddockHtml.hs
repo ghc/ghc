@@ -6,7 +6,8 @@
 
 module HaddockHtml ( 
 	ppHtml, copyHtmlBits, 
-	ppHtmlIndex, ppHtmlContents
+	ppHtmlIndex, ppHtmlContents,
+	ppHtmlHelpFiles
   ) where
 
 import Prelude hiding (div)
@@ -18,11 +19,14 @@ import HaddockHH
 import HaddockHH2
 import HsSyn
 
-import IO
-import Maybe	( fromJust, isJust, fromMaybe )
+import Maybe	( fromJust, isJust )
 import List 	( sortBy )
 import Char	( isUpper, toUpper )
 import Monad	( when, unless )
+
+import Foreign
+import Control.Exception ( handle, bracket )
+import System.IO
 
 #if __GLASGOW_HASKELL__ < 503
 import FiniteMap
@@ -47,38 +51,61 @@ ppHtml	:: String
 	-> Maybe String			-- the index URL (--use-index)
 	-> IO ()
 
-ppHtml doctitle package source_url ifaces odir prologue maybe_html_help_format
+ppHtml doctitle maybe_package source_url ifaces odir prologue maybe_html_help_format
 	maybe_contents_url maybe_index_url =  do
   let
 	visible_ifaces = filter visible ifaces
 	visible (_, i) = OptHide `notElem` iface_options i
 
   when (not (isJust maybe_contents_url)) $ 
-    ppHtmlContents odir doctitle maybe_index_url 
+    ppHtmlContents odir doctitle maybe_package maybe_html_help_format maybe_index_url 
 	[ (m,iface{iface_package=Nothing}) | (m,iface) <- visible_ifaces ]
 	-- we don't want to display the packages in a single-package contents
 	prologue
 
   when (not (isJust maybe_index_url)) $ 
-    ppHtmlIndex odir doctitle maybe_contents_url visible_ifaces
-
-  -- Generate index and contents page for Html Help if requested
-  case maybe_html_help_format of
-    Nothing       -> return ()
-    Just "mshelp" -> do
-		ppHHContents odir visible_ifaces
-		ppHHIndex    odir visible_ifaces
-    Just "mshelp2" -> do
-		let pkg_name = fromMaybe "pkg" package
-		ppHH2Contents   odir pkg_name visible_ifaces
-		ppHH2Index      odir pkg_name visible_ifaces
-		ppHH2Files      odir pkg_name visible_ifaces
-		ppHH2Collection odir pkg_name visible_ifaces
-    Just format -> do
-		fail ("The "++format++" format is not implemented")
+    ppHtmlIndex odir doctitle maybe_package maybe_html_help_format maybe_contents_url visible_ifaces
+    
+  when (not (isJust maybe_contents_url && isJust maybe_index_url)) $ 
+	ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format
 
   mapM_ (ppHtmlModule odir doctitle source_url 
 	   maybe_contents_url maybe_index_url) visible_ifaces
+
+ppHtmlHelpFiles	
+    :: String                   -- doctitle
+    -> Maybe String				-- package
+	-> [(Module, Interface)]
+	-> FilePath                 -- destination directory
+	-> Maybe String             -- the Html Help format (--html-help)
+	-> IO ()
+ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format =  do
+  let
+	visible_ifaces = filter visible ifaces
+	visible (_, i) = OptHide `notElem` iface_options i
+
+  -- Generate index and contents page for Html Help if requested
+  case maybe_html_help_format of
+    Just "mshelp2" -> do
+		ppHH2Files      odir maybe_package visible_ifaces
+		ppHH2Collection odir doctitle maybe_package
+    _ -> return ()
+
+
+copyFile :: FilePath -> FilePath -> IO ()
+copyFile fromFPath toFPath =
+	(bracket (openBinaryFile fromFPath ReadMode) hClose $ \hFrom ->
+	 bracket (openBinaryFile toFPath WriteMode) hClose $ \hTo ->
+	 allocaBytes bufferSize $ \buffer ->
+		copyContents hFrom hTo buffer)
+	where
+		bufferSize = 1024
+		
+		copyContents hFrom hTo buffer = do
+			count <- hGetBuf hFrom buffer bufferSize
+			when (count > 0) $ do
+				hPutBuf hTo buffer count
+				copyContents hFrom hTo buffer
 
 
 copyHtmlBits :: FilePath -> FilePath -> Maybe FilePath -> IO ()
@@ -88,14 +115,11 @@ copyHtmlBits odir libdir maybe_css = do
 			Nothing -> libdir ++ pathSeparator:cssFile
 			Just f  -> f
 	css_destination = odir ++ pathSeparator:cssFile
-
-	copyFile f = do
-	   s <- readFile (libdir ++ pathSeparator:f)
-	   writeFile (odir ++ pathSeparator:f) s
-  
-  css_contents <- readFile css_file
-  writeFile css_destination css_contents
-  mapM_ copyFile [ iconFile, plusFile, minusFile, jsFile ]
+	copyLibFile f = do
+	   copyFile (libdir ++ pathSeparator:f) (odir ++ pathSeparator:f)
+ 
+  copyFile css_file css_destination
+  mapM_ copyLibFile [ iconFile, plusFile, minusFile, jsFile ]
 
 footer :: HtmlTable
 footer = 
@@ -179,17 +203,21 @@ moduleInfo iface =
 -- Generate the module contents
 
 ppHtmlContents
-   :: FilePath -> String
+   :: FilePath
+   -> String
+   -> Maybe String
+   -> Maybe String
    -> Maybe String
    -> [(Module,Interface)] -> Maybe Doc
    -> IO ()
-ppHtmlContents odir doctitle maybe_index_url
+ppHtmlContents odir doctitle maybe_package maybe_html_help_format maybe_index_url
   mdls prologue = do
   let tree = mkModuleTree [(mod,iface_package iface) | (mod,iface) <- mdls]
       html = 
-	header (thetitle (toHtml doctitle) +++
-		thelink ! [href cssFile, 
-		  rel "stylesheet", thetype "text/css"]) +++
+	header 
+		((thetitle (toHtml doctitle)) +++
+		 (thelink ! [href cssFile, rel "stylesheet", thetype "text/css"]) +++
+		 (script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
         body << vanillaTable << (
    	    simpleHeader doctitle Nothing maybe_index_url </>
 	    ppPrologue doctitle prologue </>
@@ -198,6 +226,13 @@ ppHtmlContents odir doctitle maybe_index_url
 	    footer
 	  )
   writeFile (odir ++ pathSeparator:contentsHtmlFile) (renderHtml html False)
+  
+  -- Generate contents page for Html Help if requested
+  case maybe_html_help_format of
+    Nothing        -> return ()
+    Just "mshelp"  -> ppHHContents  odir tree
+    Just "mshelp2" -> ppHH2Contents odir maybe_package tree
+    Just format    -> fail ("The "++format++" format is not implemented")
 
 ppPrologue :: String -> Maybe Doc -> HtmlTable
 ppPrologue title Nothing = Html.emptyTable
@@ -208,41 +243,61 @@ ppPrologue title (Just doc) =
 ppModuleTree :: String -> [ModuleTree] -> HtmlTable
 ppModuleTree _ ts = 
   tda [theclass "section1"] << toHtml "Modules" </>
-  td <<  table ! [cellpadding 0, cellspacing 2] << 
-	(aboves (map (mkNode 0 []) ts) <-> mkPackages ts)
+  td <<  table ! [cellpadding 0, cellspacing 2] << htmlTable
+  where
+    genTable htmlTable id []     = (htmlTable,id)
+    genTable htmlTable id (x:xs) = genTable (htmlTable </> u) id' xs      
+      where
+        (u,id') = mkNode [] x id
 
-mkNode :: Int -> [String] -> ModuleTree -> HtmlTable
-mkNode n ss (Node s leaf pkg []) =
-  mkLeaf n s ss leaf
-mkNode n ss (Node s leaf pkg ts) = 
-  mkLeaf n s ss leaf
-  </>
-  aboves (map (mkNode (n+1) (s:ss)) ts)
+    (htmlTable,_) = genTable emptyTable 0 ts
 
-mkLeaf :: Int -> String -> [String] -> Bool -> HtmlTable
-mkLeaf n s _ False = pad_td n << toHtml s
-mkLeaf n s ss True = pad_td n << ppHsModule mdl
-  where mdl = foldr (++) "" (s' : map ('.':) ss')
-	(s':ss') = reverse (s:ss)
+mkNode :: [String] -> ModuleTree -> Int -> (HtmlTable,Int)
+mkNode ss (Node s leaf pkg ts) id = htmlNode
+  where
+    htmlNode = case ts of
+      [] -> ( pad_td 15 << htmlModule                           <-> htmlPkg,id)
+      _  -> ((pad_td  0 << (collapsebutton id_s +++ htmlModule) <-> htmlPkg) </> 
+                (pad_td 20 << sub_tree), id')
+
+    htmlModule 
+      | leaf      = ppHsModule mdl
+      | otherwise = toHtml s
+
+    htmlPkg = case pkg of
+      Nothing -> td << empty
+      Just p  -> td << toHtml p
+
+    mdl = foldr (++) "" (s' : map ('.':) ss')
+    (s':ss') = reverse (s:ss)
 	 -- reconstruct the module name
+    
+    id_s = show id
+    
+    (sub_tree,id') = genSubTree emptyTable (id+1) ts
+    
+    genSubTree :: HtmlTable -> Int -> [ModuleTree] -> (Html,Int)
+    genSubTree htmlTable id [] = (sub_tree,id)
+      where
+        sub_tree = table ! [identifier id_s, thestyle "display:none;", cellpadding 0, cellspacing 0, width "100%"] << htmlTable
+    genSubTree htmlTable id (x:xs) = genSubTree (htmlTable </> u) id' xs      
+      where
+        (u,id') = mkNode (s:ss) x id
 
-pad_td 0 = td
-pad_td n = tda [thestyle ("padding-left:" ++ show (n*20) ++ "px")]
-
-mkPackages :: [ModuleTree] -> HtmlTable
-mkPackages ts = aboves (map go ts)
-  where go (Node s leaf pkg ts) = tda [theclass "pkg"] << mkPkg pkg </> aboves (map go ts)
-
-mkPkg :: Maybe String -> Html
-mkPkg Nothing = empty
-mkPkg (Just p) = toHtml p
+    pad_td 0 = tda [width "100%"]
+    pad_td n = tda [thestyle ("padding-left:" ++ show n ++ "px"), width "100%"]
 
 -- ---------------------------------------------------------------------------
 -- Generate the index
 
-ppHtmlIndex :: FilePath -> String -> Maybe String
-   -> [(Module,Interface)] -> IO ()
-ppHtmlIndex odir doctitle maybe_contents_url ifaces = do
+ppHtmlIndex :: FilePath
+            -> String 
+            -> Maybe String
+            -> Maybe String
+            -> Maybe String
+            -> [(Module,Interface)] 
+            -> IO ()
+ppHtmlIndex odir doctitle maybe_package maybe_html_help_format maybe_contents_url ifaces = do
   let html = 
 	header (thetitle (toHtml (doctitle ++ " (Index)")) +++
 		thelink ! [href cssFile, 
@@ -256,7 +311,13 @@ ppHtmlIndex odir doctitle maybe_contents_url ifaces = do
     mapM_ (do_sub_index index) initialChars
 
   writeFile (odir ++ pathSeparator:indexHtmlFile) (renderHtml html False)
-
+  
+    -- Generate index and contents page for Html Help if requested
+  case maybe_html_help_format of
+    Nothing        -> return ()
+    Just "mshelp"  -> ppHHIndex odir ifaces
+    Just "mshelp2" -> ppHH2Index odir maybe_package ifaces
+    Just format    -> fail ("The "++format++" format is not implemented")
  where
   split_indices = length index > 50
 

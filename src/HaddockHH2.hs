@@ -12,16 +12,16 @@ import Data.List
 import Data.Char
 #endif
 
+import Maybe	( fromMaybe )
 import HaddockModuleTree
 import HaddockUtil
 import HaddockTypes
 
-ppHH2Contents :: FilePath -> String -> [(Module,Interface)] -> IO ()
-ppHH2Contents odir package ifaces = do
+ppHH2Contents :: FilePath -> Maybe String -> [ModuleTree] -> IO ()
+ppHH2Contents odir maybe_package tree = do
   let 	
 	contentsHH2File = package++".HxT"
 
-	tree = mkModuleTree (map (\(mod,_) -> (mod,Nothing)) ifaces) --TODO: packages
 	doc  =
 		text "<?xml version=\"1.0\"?>" $$
 		text "<!DOCTYPE HelpTOC SYSTEM \"ms-help://hx/resources/HelpTOC.DTD\">" $$
@@ -30,6 +30,8 @@ ppHH2Contents odir package ifaces = do
 		text "</HelpTOC>"
   writeFile (odir ++ pathSeparator:contentsHH2File) (render doc)
   where
+	package = fromMaybe "pkg" maybe_package
+	
 	ppModuleTree :: [String] -> [ModuleTree] -> Doc
 	ppModuleTree ss [x]    = ppNode ss x
 	ppModuleTree ss (x:xs) = ppNode ss x $$ ppModuleTree ss xs
@@ -59,8 +61,8 @@ ppHH2Contents odir package ifaces = do
 
 -----------------------------------------------------------------------------------
 
-ppHH2Index :: FilePath -> String -> [(Module,Interface)] -> IO ()
-ppHH2Index odir package ifaces = do
+ppHH2Index :: FilePath -> Maybe String -> [(Module,Interface)] -> IO ()
+ppHH2Index odir maybe_package ifaces = do
   let 
 	indexKHH2File     = package++"K.HxK"
 	indexNHH2File     = package++"N.HxK"
@@ -80,7 +82,9 @@ ppHH2Index odir package ifaces = do
 		text "</HelpIndex>"
   writeFile (odir ++ pathSeparator:indexKHH2File) (render docK)
   writeFile (odir ++ pathSeparator:indexNHH2File) (render docN)
-  where	
+  where
+	package = fromMaybe "pkg" maybe_package
+    
 	index :: [(HsName, [Module])]
 	index = fmToList (foldr getIfaceIndex emptyFM ifaces)
 
@@ -103,8 +107,8 @@ ppHH2Index odir package ifaces = do
 
 -----------------------------------------------------------------------------------
 
-ppHH2Files :: FilePath -> String -> [(Module,Interface)] -> IO ()
-ppHH2Files odir package ifaces = do
+ppHH2Files :: FilePath -> Maybe String -> [(Module,Interface)] -> IO ()
+ppHH2Files odir maybe_package ifaces = do
   let filesHH2File = package++".HxF"
       doc =
         text "<?xml version=\"1.0\"?>" $$
@@ -114,14 +118,16 @@ ppHH2Files odir package ifaces = do
                 text "<File Url=\""<>text contentsHtmlFile<>text "\"/>" $$
                 text "<File Url=\""<>text indexHtmlFile<>text "\"/>" $$
                 ppIndexFiles chars $$
-                text "<File Url=\""<>text cssFile  <>text "\"/>") $$
+                text "<File Url=\""<>text cssFile  <>text "\"/>" $$
                 text "<File Url=\""<>text iconFile <>text "\"/>" $$
                 text "<File Url=\""<>text jsFile   <>text "\"/>" $$
                 text "<File Url=\""<>text plusFile <>text "\"/>" $$
-                text "<File Url=\""<>text minusFile<>text "\"/>" $$
+                text "<File Url=\""<>text minusFile<>text "\"/>") $$
         text "</HelpFileList>"
   writeFile (odir ++ pathSeparator:filesHH2File) (render doc)
   where
+    package = fromMaybe "pkg" maybe_package
+	
     ppMods [] = empty
     ppMods ((Module mdl,_):ifaces) =
 		text "<File Url=\"" <> text (moduleHtmlFile "" mdl) <> text "\"/>" $$
@@ -140,15 +146,16 @@ ppHH2Files odir package ifaces = do
 
 -----------------------------------------------------------------------------------
 
-ppHH2Collection :: FilePath -> String -> [(Module,Interface)] -> IO ()
-ppHH2Collection odir package ifaces = do
+ppHH2Collection :: FilePath -> String -> Maybe String -> IO ()
+ppHH2Collection odir doctitle maybe_package = do
   let 
+	package = fromMaybe "pkg" maybe_package
 	collectionHH2File = package++".HxC"
 	
 	doc =
 		text "<?xml version=\"1.0\"?>" $$
 		text "<!DOCTYPE HelpCollection SYSTEM \"ms-help://hx/resources/HelpCollection.DTD\">" $$
-		text "<HelpCollection DTDVersion=\"1.0\" LangId=\"1033\" Title=\"" <> text package <> text "\">" $$
+		text "<HelpCollection DTDVersion=\"1.0\" LangId=\"1033\" Title=\"" <> text doctitle <> text "\">" $$
 		nest 4 (text "<CompilerOptions CreateFullTextIndex=\"Yes\">" $$
 		        nest 4 (text "<IncludeFile File=\"" <> text package <> text ".HxF\"/>") $$
 		        text "</CompilerOptions>" $$
