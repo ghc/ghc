@@ -733,6 +733,7 @@ sub mangle_asm {
 		    $e =~ s/^\tret\n//;
 		    $e =~ s/^\tpopl \%edi\n//;
 		    $e =~ s/^\tpopl \%esi\n//;
+		    $e =~ s/^\tpopl \%edx\n//;
 		    $e =~ s/^\tpopl \%ecx\n//;
 		    $e =~ s/^\taddl \$\d+,\%esp\n//;
 		    $e =~ s/^\tsubl \$-\d+,\%esp\n//;
