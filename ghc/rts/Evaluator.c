@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.50 $
- * $Date: 2000/04/27 16:35:30 $
+ * $Revision: 1.51 $
+ * $Date: 2000/05/09 10:00:36 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -1197,7 +1197,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                     StgClosure* o;
                     SSS; o = (StgClosure*)grabHpNonUpd(Stablezh_sizeW); LLL;
                     SET_HDR(o,StablePtr_con_info,??);
-                    payloadWord(o,0) = xPopTaggedStable();
+                    payloadWord(o,0) = (W_)xPopTaggedStable();
                     IF_DEBUG(evaluator,
                              fprintf(stderr,"\tBuilt "); 
                              SSS;
@@ -1628,7 +1628,7 @@ static inline void            PushTaggedRealWorld( void            )
        inline void            PushTaggedDouble   ( StgDouble     x ) 
    { gSp -= sizeofW(StgDouble);     ASSIGN_DBL(gSp,x); PushTag(DOUBLE_TAG); }
        inline void            PushTaggedStablePtr   ( StgStablePtr  x ) 
-   { gSp -= sizeofW(StgStablePtr);  *gSp = x;          PushTag(STABLE_TAG); }
+   { gSp -= sizeofW(StgStablePtr);  *gSp = (W_)x;      PushTag(STABLE_TAG); }
 static inline void            PushTaggedBool     ( int           x ) 
    { PushTaggedInt(x); }
 
@@ -1655,7 +1655,7 @@ static inline void            PopTaggedRealWorld ( void )
    { StgDouble r; PopTag(DOUBLE_TAG);  r = PK_DBL(gSp);                  
      gSp += sizeofW(StgDouble);     return r;}
        inline StgStablePtr    PopTaggedStablePtr    ( void ) 
-   { StgInt    r; PopTag(STABLE_TAG);  r = *stgCast(StgStablePtr*, gSp); 
+   { StgStablePtr r; PopTag(STABLE_TAG);  r = *stgCast(StgStablePtr*, gSp); 
      gSp += sizeofW(StgStablePtr);  return r;}
 
 
@@ -2266,6 +2266,7 @@ void SloppifyIntegerEnd ( StgPtr arr0 )
 }
 
 
+__attribute__ ((unused))
 static void myStackCheck ( Capability* cap )
 {
    /* fprintf(stderr, "myStackCheck\n"); */
@@ -2455,8 +2456,8 @@ static void* enterBCO_primop1 ( int primop1code )
         case i_intToAddr:       OP_I_A((StgAddr)x);  break;  /*  ToDo */
         case i_addrToInt:       OP_A_I((StgInt)x);   break;  /* ToDo */
 
-        case i_intToStable:     OP_I_s(x);           break;
-        case i_stableToInt:     OP_s_I(x);           break;
+        case i_intToStable:     OP_I_s((StgStablePtr)x); break;
+        case i_stableToInt:     OP_s_I((W_)x);           break;
 
         case i_indexCharOffAddr:   OP_AI_C(indexCharOffAddrzh(r,x,y));      break;
         case i_readCharOffAddr:    OP_AI_C(indexCharOffAddrzh(r,x,y));      break;
@@ -3106,7 +3107,7 @@ static void* enterBCO_primop2 ( int primop2code,
                 deleteThread(tso);
                 if (tso == cap->rCurrentTSO) { /* suicide */
                     *return2 = ThreadFinished;
-                    return (void*)(1+(NULL));
+                    return (void*)(1+(char*)(NULL));
                 }
                 break;
             }

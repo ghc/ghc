@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.27 $
- * $Date: 2000/04/27 16:35:30 $
+ * $Revision: 1.28 $
+ * $Date: 2000/05/09 10:00:35 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -61,6 +61,12 @@
 static StgClosure* asmAlloc ( nat size );
 extern void* getNameOrTupleClosureCPtr ( int /*Cell*/ c );
 
+
+/* Defined in this file ... */
+AsmObject    asmNewObject      ( void );
+void         asmAddEntity      ( AsmObject, Asm_Kind, StgWord );
+int          asmCalcHeapSizeW  ( AsmObject );
+StgClosure*  asmDerefEntity    ( Asm_Entity );
 
 /* --------------------------------------------------------------------------
  * Initialising and managing objects and entities
@@ -306,7 +312,7 @@ void asmCopyAndLink ( void )
                }
             }
 
-            ASSERT(k == bco->n_instrs);
+            ASSERT((unsigned int)k == bco->n_instrs);
             break;
          }
 
@@ -415,7 +421,7 @@ AsmCon asmBeginCon( AsmInfo info )
    return con;
 }
 
-void asmEndCon( AsmCon con )
+void asmEndCon( AsmCon con __attribute__ ((unused)) )
 {
 }
 
@@ -426,7 +432,7 @@ AsmCAF asmBeginCAF( void )
    return caf;
 }
 
-void asmEndCAF( AsmCAF caf )
+void asmEndCAF( AsmCAF caf __attribute__ ((unused)) )
 {
 }
 
@@ -441,7 +447,7 @@ AsmBCO asmBeginBCO( int /*StgExpr*/ e )
    return bco;
 }
 
-void asmEndBCO( AsmBCO bco )
+void asmEndBCO( AsmBCO bco __attribute__ ((unused)) )
 {
 }
 
@@ -1080,7 +1086,7 @@ AsmSp asmBeginCase( AsmBCO bco )
     return bco->sp;
 }
 
-void asmEndCase( AsmBCO bco )
+void asmEndCase( AsmBCO bco __attribute__ ((unused)) )
 {
 }
 
@@ -1690,7 +1696,7 @@ void asmEndPack( AsmBCO bco, AsmVar v, AsmSp start, AsmInfo info )
     setSp(bco, start);
 }
 
-void asmBeginUnpack( AsmBCO bco )
+void asmBeginUnpack( AsmBCO bco __attribute__ ((unused)) )
 {
     /* dummy to make it look prettier */
 }

@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Assembler.h,v 1.13 2000/04/27 16:35:29 sewardj Exp $
+ * $Id: Assembler.h,v 1.14 2000/05/09 10:00:35 sewardj Exp $
  *
  * (c) The GHC Team 1994-1998.
  *
@@ -280,6 +280,7 @@ extern AsmVar asmPushRefNoOp   ( AsmBCO bco, StgPtr p );
 
 extern void   asmAddRefObject  ( AsmObject obj, AsmObject p );
 extern void   asmAddRefNoOp    ( AsmObject obj, StgPtr p );
+extern void   asmAddRefHugs    ( AsmObject obj,int /*Name*/ n );
 
 extern AsmVar asmAllocCONSTR   ( AsmBCO bco, AsmInfo info );
 
