@@ -1447,13 +1447,13 @@ foreign import ccall unsafe "__hscore_setmode"
 hDuplicate :: Handle -> IO Handle
 hDuplicate h@(FileHandle path m) = do
   new_h_ <- withHandle' "hDuplicate" h m (dupHandle_ Nothing)
-  new_m <- newMVar new_h_
-  return (FileHandle path new_m)
+  newFileHandle path (handleFinalizer path) new_h_
 hDuplicate h@(DuplexHandle path r w) = do
   new_w_ <- withHandle' "hDuplicate" h w (dupHandle_ Nothing)
   new_w <- newMVar new_w_
   new_r_ <- withHandle' "hDuplicate" h r (dupHandle_ (Just new_w))
   new_r <- newMVar new_r_
+  addMVarFinalizer new_w (handleFinalizer path new_w)
   return (DuplexHandle path new_r new_w)
 
 dupHandle_ other_side h_ = do
