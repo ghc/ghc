@@ -111,7 +111,7 @@ Giving a Haskell name and type to an external entry point is clearly
 an unsafe thing to do, as the external name will in most cases be
 untyped. The onus is on the programmer using <Literal>foreign import</Literal> to
 ensure that the Haskell type given correctly maps on to the
-type of the external function. Section
+type of the external function. 
 <XRef LinkEnd="sec-mapping"> specifies the mapping from 
 Haskell types to external types.
 </Para>
@@ -302,7 +302,7 @@ that the callee cleans up the C stack before returning.
 
 <Footnote>
 <Para>
-The <Literal>stdcall</Literal> is a Microsoft Win32 specific wrinkle; it used
+The <Literal>stdcall</Literal> is a Microsoft Win32 specific wrinkle; it's used
 throughout the Win32 API, for instance. On platforms where
 <Literal>stdcall</Literal> isn't meaningful, it should be treated as being equal
 to <Literal>ccall</Literal>.
@@ -414,7 +414,7 @@ unsafe_arr_ty : ByteArray a
 
 GHC permits the passing of its byte array primitive types
 to external functions. There's some restrictions on when
-they can be used; see Section <XRef LinkEnd="sec-arguments">
+they can be used; see <XRef LinkEnd="sec-arguments">
 for more details.
 </Para>
 </ListItem>
@@ -424,8 +424,8 @@ for more details.
 </Para>
 
 <Para>
-Section <XRef LinkEnd="sec-results"> defines
-<Literal>prim&lowbar;result</Literal>; Section <XRef LinkEnd="sec-arguments">
+<XRef LinkEnd="sec-results"> defines
+<Literal>prim&lowbar;result</Literal>; <XRef LinkEnd="sec-arguments">
 defines <Literal>prim&lowbar;arg</Literal>.
 </Para>
 
@@ -467,7 +467,7 @@ C-like languages, although the numeric types are explicitly sized.
 
 The <Emphasis>stable pointer</Emphasis> <Literal>StablePtr</Literal> type looks out of place in
 this list of C-like types, but it has a well-defined and simple
-C mapping, see Section <XRef LinkEnd="sec-mapping">
+C mapping, see <XRef LinkEnd="sec-mapping">
 for details.
 
 </Para>
@@ -946,12 +946,12 @@ external function may cause a Haskell garbage collection as a result
 of being called. This will typically happen when the imported
 function end up calling Haskell functions that reside in the same
 'Haskell world' (i.e., shares the same storage manager heap) -- see
-Section <XRef LinkEnd="sec-entry"> for
+<XRef LinkEnd="sec-entry"> for
 details of how the FFI let's you call Haskell functions from the outside.
 
 If the programmer can guarantee that the imported function won't
 call back into Haskell, the <Literal>foreign import</Literal> can be marked as
-'unsafe' (see Section <XRef LinkEnd="sec-primitive"> for details of
+'unsafe' (see <XRef LinkEnd="sec-primitive"> for details of
 how to do this.)
 
 Unsafe calls are cheaper than safe ones, so distinguishing the two
@@ -1218,7 +1218,7 @@ typedef cType[[Res]] (*Varid_FunPtr)
 
 <Para>
 where <Literal>cType[[]]</Literal> is the Haskell to C type mapping presented
-in Section <XRef LinkEnd="sec-mapping">.
+in <XRef LinkEnd="sec-mapping">.
 </Para>
 
 <Para>
@@ -1352,7 +1352,7 @@ is the widest possible data pointer.
 <ListItem>
 
 <Para>
-Updated defnition of <Literal>varid</Literal> in Section
+Updated defnition of <Literal>varid</Literal> in
 <XRef LinkEnd="sec-prim-name"> to reflect Haskell98's.
 </Para>
 </ListItem>
