@@ -38,7 +38,7 @@ import Int	( indexInt8OffAddr,  indexInt16OffAddr
 import PrelIOBase ( IO(..), IOResult(..) )
 
 #ifndef __PARALLEL_HASKELL__
-import PrelForeign ( ForeignObj(..) )
+import PrelForeign ( ForeignObj(..), StablePtr(..) )
 #endif
 
 \end{code}
@@ -98,6 +98,9 @@ readCharOffAddr a i = _casm_ `` %r=(StgChar)(((StgChar*)%0)[(StgInt)%1]); '' a i
 readIntOffAddr    :: Addr -> Int -> IO Int
 readIntOffAddr a i = _casm_ `` %r=(StgInt)(((StgInt*)%0)[(StgInt)%1]); '' a i
 
+readStablePtrOffAddr    :: Addr -> Int -> IO (StablePtr a)
+readStablePtrOffAddr a i = _casm_ `` %r=(StgStablePtr)(((StgStablePtr*)%0)[(StgInt)%1]); '' a i
+
 readWordOffAddr    :: Addr -> Int -> IO Word
 readWordOffAddr a i = _casm_ `` %r=(StgWord)(((StgWord*)%0)[(StgInt)%1]); '' a i
 
@@ -120,6 +123,10 @@ writeCharOffAddr (A# a#) (I# i#) (C# c#) = IO $ \ s# ->
 writeIntOffAddr    :: Addr -> Int -> Int    -> IO ()
 writeIntOffAddr (A# a#) (I# i#) (I# e#) = IO $ \ s# ->
       case (writeIntOffAddr#  a# i# e# s#) of s2# -> IOok s2# () 
+
+writeStablePtrOffAddr    :: Addr -> Int -> StablePtr a -> IO ()
+writeStablePtrOffAddr (A# a#) (I# i#) (StablePtr e#) = IO $ \ s# ->
+      case (writeStablePtrOffAddr#  a# i# e# s#) of s2# -> IOok s2# () 
 
 writeWordOffAddr    :: Addr -> Int -> Word  -> IO ()
 writeWordOffAddr (A# a#) (I# i#) (W# e#) = IO $ \ s# ->
