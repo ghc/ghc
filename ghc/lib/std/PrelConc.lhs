@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelConc.lhs,v 1.20 2000/07/07 11:03:58 simonmar Exp $
+% $Id: PrelConc.lhs,v 1.21 2000/10/02 11:06:19 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -33,8 +33,6 @@ module PrelConc
 	, newEmptyMVar  -- :: IO (MVar a)
 	, takeMVar 	-- :: MVar a -> IO a
 	, putMVar  	-- :: MVar a -> a -> IO ()
-	, readMVar 	-- :: MVar a -> IO a
-	, swapMVar 	-- :: MVar a -> a -> IO a
 	, tryTakeMVar   -- :: MVar a -> IO (Maybe a)
 	, isEmptyMVar	-- :: MVar a -> IO Bool
 
@@ -135,18 +133,6 @@ newMVar value =
     newEmptyMVar	>>= \ mvar ->
     putMVar mvar value	>>
     return mvar
-
-readMVar :: MVar a -> IO a
-readMVar mvar =
-    takeMVar mvar	>>= \ value ->
-    putMVar mvar value	>>
-    return value
-
-swapMVar :: MVar a -> a -> IO a
-swapMVar mvar new =
-    takeMVar mvar	>>= \ old ->
-    putMVar mvar new	>>
-    return old
 
 -- tryTakeMVar is a non-blocking takeMVar
 tryTakeMVar :: MVar a -> IO (Maybe a)
