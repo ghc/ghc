@@ -39,7 +39,7 @@ import Inst		( lookupInst, LookupInstResult(..),
 			  isIPDict, isInheritableInst, pprDFuns, pprDictsTheta
 			)
 import TcEnv		( tcGetGlobalTyVars, tcLookupId, findGlobals )
-import InstEnv		( lookupInstEnv, classInstEnv )
+import InstEnv		( lookupInstEnv, classInstances )
 import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, checkAmbiguity )
 import TcType		( TcTyVar, TcTyVarSet, ThetaType, TyVarDetails(VanillaTv),
 			  mkClassPred, isOverloadedTy, mkTyConApp,
@@ -1473,7 +1473,7 @@ tcImprove avails
 		-- NB that (?x::t1) and (?x::t2) will be held separately in avails
 		--    so that improve will see them separate
 	eqns = improve get_insts preds
-	get_insts clas = classInstEnv home_ie clas ++ classInstEnv pkg_ie clas
+	get_insts clas = classInstances home_ie clas ++ classInstances pkg_ie clas
      in
      if null eqns then
 	returnM True
@@ -2180,18 +2180,18 @@ addNoInstanceErrs mb_what givens dicts
 	  | not (isClassDict dict) = (overlap_doc, dict : no_inst_dicts)
 	  | otherwise
 	  = case lookupInstEnv dflags inst_envs clas tys of
-		res@(ms, _) 
-		  | length ms > 1 -> (mk_overlap_msg dict res $$ overlap_doc, no_inst_dicts)
-		  | otherwise     -> (overlap_doc, dict : no_inst_dicts) 	-- No match
-		-- NB: there can be exactly one match, in the case where we have
-		--	instance C a where ...
-		-- (In this case, lookupInst doesn't bother to look up, 
-		--  unless -fallow-undecidable-instances is set.)
-		-- So we report this as "no instance" rather than "overlap"; the fix is
-		-- to specify -fallow-undecidable-instances, but we leave that to the programmer!
+		-- The case of exactly one match and no unifiers means
+		-- a successful lookup.  That can't happen here.
+#ifdef DEBUG
+		([m],[]) -> pprPanic "addNoInstanceErrs" (ppr dict)
+#endif
+		([], _)  -> (overlap_doc, dict : no_inst_dicts) 	-- No match
+		res	 -> (mk_overlap_msg dict res $$ overlap_doc, no_inst_dicts)
 	  where
 	    (clas,tys) = getDictClassTys dict
     in
+	
+	-- Now generate a good message for the no-instance bunch
     mk_probable_fix tidy_env2 mb_what no_inst_dicts	`thenM` \ (tidy_env3, probable_fix) ->
     let
     	no_inst_doc | null no_inst_dicts = empty
@@ -2201,18 +2201,23 @@ addNoInstanceErrs mb_what givens dicts
 		| otherwise   = sep [ptext SLIT("Could not deduce") <+> pprDictsTheta no_inst_dicts,
 				     nest 2 $ ptext SLIT("from the context") <+> pprDictsTheta tidy_givens]
     in
+	-- And emit both the non-instance and overlap messages
     addErrTcM (tidy_env3, no_inst_doc $$ overlap_doc)
- 
   where
     mk_overlap_msg dict (matches, unifiers)
       = vcat [	addInstLoc [dict] ((ptext SLIT("Overlapping instances for") 
 					<+> pprPred (dictPred dict))),
     		sep [ptext SLIT("Matching instances") <> colon,
     		     nest 2 (pprDFuns (dfuns ++ unifiers))],
-		if null unifiers 
-    		then empty
-    		else parens (ptext SLIT("The choice depends on the instantiation of") <+>
-    			     quotes (pprWithCommas ppr (varSetElems (tyVarsOfInst dict))))]
+		ASSERT( not (null matches) )
+		if not (isSingleton matches)
+    		then 	-- Two or more matches
+		     empty
+    		else 	-- One match, plus some unifiers
+		ASSERT( not (null unifiers) )
+		parens (vcat [ptext SLIT("The choice depends on the instantiation of") <+>
+	    		         quotes (pprWithCommas ppr (varSetElems (tyVarsOfInst dict))),
+			      ptext SLIT("Use -fallow-incoherent-instances to use the first choice above")])]
       where
     	dfuns = [df | (_, (_,_,df)) <- matches]
 

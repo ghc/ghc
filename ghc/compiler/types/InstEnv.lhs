@@ -11,23 +11,23 @@ module InstEnv (
 
 	emptyInstEnv, extendInstEnv,
 	lookupInstEnv, 
-	classInstEnv, simpleDFunClassTyCon, checkFunDeps
+	classInstances, simpleDFunClassTyCon, checkFunDeps
     ) where
 
 #include "HsVersions.h"
 
 import Class		( Class, classTvsFds )
-import Var		( Id )
+import Var		( Id, isTcTyVar )
 import VarSet
 import VarEnv
-import TcType		( Type, tcTyConAppTyCon, 
-			  tcSplitDFunTy, tyVarsOfTypes,
+import TcType		( Type, tcTyConAppTyCon, tcIsTyVarTy,
+			  tcSplitDFunTy, tyVarsOfTypes, isExistentialTyVar,
 			  matchTys, unifyTyListsX
 			)
 import FunDeps		( checkClsFD )
 import TyCon		( TyCon )
 import Outputable
-import UniqFM		( UniqFM, lookupWithDefaultUFM, emptyUFM, addToUFM_C )
+import UniqFM		( UniqFM, lookupUFM, emptyUFM, addToUFM_C )
 import Id		( idType )
 import CmdLineOpts
 import Util             ( notNull )
@@ -44,31 +44,42 @@ import Maybe		( isJust )
 \begin{code}
 type DFunId	= Id
 type InstEnv    = UniqFM ClsInstEnv	-- Maps Class to instances for that class
-type ClsInstEnv = [InstEnvElt]		-- The instances for a particular class
+
+data ClsInstEnv 
+  = ClsIE [InstEnvElt]	-- The instances for a particular class, in any order
+  	  Bool 		-- True <=> there is an instance of form C a b c
+			-- 	If *not* then the common case of looking up
+			--	(C a b c) can fail immediately
+			-- NB: use tcIsTyVarTy: don't look through newtypes!!
+		        		
 type InstEnvElt = (TyVarSet, [Type], DFunId)
 	-- INVARIANTs: see notes below
 
 emptyInstEnv :: InstEnv
 emptyInstEnv = emptyUFM
 
-classInstEnv :: InstEnv -> Class -> ClsInstEnv
-classInstEnv env cls = lookupWithDefaultUFM env [] cls
+classInstances :: InstEnv -> Class -> [InstEnvElt]
+classInstances env cls = case lookupUFM env cls of
+			  Just (ClsIE insts _) -> insts
+			  Nothing	       -> []
 
 extendInstEnv :: InstEnv -> DFunId -> InstEnv
 extendInstEnv inst_env dfun_id
-  = addToUFM_C add inst_env clas [ins_item]
+  = addToUFM_C add inst_env clas (ClsIE [ins_item] ins_tyvar)
   where
-    add old _ = ins_item : old
+    add (ClsIE cur_insts cur_tyvar) _ = ClsIE (ins_item : cur_insts)
+					      (ins_tyvar || cur_tyvar)
     (ins_tvs, _, clas, ins_tys) = tcSplitDFunTy (idType dfun_id)
     ins_tv_set = mkVarSet ins_tvs
     ins_item   = (ins_tv_set, ins_tys, dfun_id)
+    ins_tyvar  = all tcIsTyVarTy ins_tys
 
 #ifdef UNUSED
 pprInstEnv :: InstEnv -> SDoc
 pprInstEnv env
   = vcat [ brackets (pprWithCommas ppr (varSetElems tyvars)) <+> 
 	   brackets (pprWithCommas ppr tys) <+> ppr dfun
-	 | cls_inst_env <-  eltsUFM env
+	 | ClsIE cls_inst_env _ <-  eltsUFM env
 	 , (tyvars, tys, dfun) <- cls_inst_env
 	 ]
 #endif
@@ -271,10 +282,11 @@ lookupInstEnv dflags (pkg_ie, home_ie) cls tys
 							-- so don't attempt to pune the matches
   | otherwise		 = (pruned_matches, [])
   where
+    all_tvs       = all tcIsTyVarTy tys
     incoherent_ok = dopt Opt_AllowIncoherentInstances  dflags
     overlap_ok    = dopt Opt_AllowOverlappingInstances dflags
-    (home_matches, home_unifs) = lookup_inst_env home_ie cls tys
-    (pkg_matches,  pkg_unifs)  = lookup_inst_env pkg_ie  cls tys
+    (home_matches, home_unifs) = lookup_inst_env home_ie cls tys all_tvs
+    (pkg_matches,  pkg_unifs)  = lookup_inst_env pkg_ie  cls tys all_tvs
     all_matches = home_matches ++ pkg_matches
     all_unifs | incoherent_ok = []	-- Don't worry about these if incoherent is ok!
 	      | otherwise     = home_unifs ++ pkg_unifs
@@ -284,12 +296,32 @@ lookupInstEnv dflags (pkg_ie, home_ie) cls tys
 
 lookup_inst_env :: InstEnv 				-- The envt
 	      	-> Class -> [Type]			-- What we are looking for
+		-> Bool 				-- All the [Type] are tyvars
 	      	-> ([(TyVarSubstEnv, InstEnvElt)], 	-- Successful matches
 	 	    [Id])				-- These don't match but do unify
-lookup_inst_env env key_cls key_tys
-  = find (classInstEnv env key_cls) [] []
+lookup_inst_env env key_cls key_tys key_all_tvs
+  = case lookupUFM env key_cls of
+	Nothing 			    -> ([],[])	-- No instances for this class
+	Just (ClsIE insts has_tv_insts)
+	  | key_all_tvs && not has_tv_insts -> ([],[])	-- Short cut for common case
+		-- The thing we are looking up is of form (C a b c), and
+		-- the ClsIE has no instances of that form, so don't bother to search
+	  | otherwise -> find insts [] []
   where
-    key_vars = tyVarsOfTypes key_tys
+    key_vars = filterVarSet not_existential (tyVarsOfTypes key_tys)
+    not_existential tv = not (isTcTyVar tv && isExistentialTyVar tv)
+	-- The key_tys can contain skolem constants, and we can guarantee that those
+	-- are never going to be instantiated to anything, so we should not involve
+	-- them in the unification test.  Example:
+	--	class Foo a where { op :: a -> Int }
+	--	instance Foo a => Foo [a] 	-- NB overlap
+	--	instance Foo [Int]		-- NB overlap
+	-- 	data T = forall a. Foo a => MkT a
+	--	f :: T -> Int
+	--	f (MkT x) = op [x,x]
+	-- The op [x,x] means we need (Foo [a]).  Without the filterVarSet we'd
+	-- complain, saying that the choice of instance depended on the instantiation
+	-- of 'a'; but of course it isn't *going* to be instantiated.
 
     find [] ms us = (ms, us)
     find (item@(tpl_tyvars, tpl, dfun_id) : rest) ms us
@@ -372,10 +404,10 @@ checkFunDeps (pkg_ie, home_ie) dfun
   where
     (ins_tvs, _, clas, ins_tys) = tcSplitDFunTy (idType dfun)
     ins_tv_set   = mkVarSet ins_tvs
-    cls_inst_env = classInstEnv home_ie clas ++ classInstEnv pkg_ie clas
+    cls_inst_env = classInstances home_ie clas ++ classInstances pkg_ie clas
     bad_fundeps  = badFunDeps cls_inst_env clas ins_tv_set ins_tys
 
-badFunDeps :: ClsInstEnv -> Class
+badFunDeps :: [InstEnvElt] -> Class
 	   -> TyVarSet -> [Type]	-- Proposed new instance type
 	   -> [DFunId]
 badFunDeps cls_inst_env clas ins_tv_set ins_tys 

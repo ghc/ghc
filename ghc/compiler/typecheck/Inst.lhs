@@ -695,28 +695,17 @@ lookupInst inst@(LitInst u (HsFractional f from_rat_name) ty loc)
 
 -- Dictionaries
 lookupInst dict@(Dict _ pred@(ClassP clas tys) loc)
-  = do	{ dflags  <- getDOpts
-	; if all tcIsTyVarTy tys && 
-	     not (dopt Opt_AllowUndecidableInstances dflags)
-		-- Common special case; no lookup
-		-- NB: tcIsTyVarTy... don't look through newtypes!
-		-- Don't take this short cut if we allow undecidable instances
-		-- because we might have "instance T a where ...".
-		-- [That means we need -fallow-undecidable-instances in the 
-		--  client module, as well as the module with the instance decl.]
-	  then return NoInstance
-
-	  else do
-	{ pkg_ie  <- loadImportedInsts clas tys
+  = do	{ pkg_ie <- loadImportedInsts clas tys
 		-- Suck in any instance decls that may be relevant
 	; tcg_env <- getGblEnv
+	; dflags  <- getDOpts
 	; case lookupInstEnv dflags (pkg_ie, tcg_inst_env tcg_env) clas tys of {
 	    ([(tenv, (_,_,dfun_id))], []) -> instantiate_dfun tenv dfun_id pred loc ;
 	    (matches, unifs)		  -> do
 	{ traceTc (text "lookupInst fail" <+> vcat [text "dict" <+> ppr pred,
 						    text "matches" <+> ppr matches,
 					            text "unifs" <+> ppr unifs])
-	; return NoInstance } } } }
+	; return NoInstance } } }
 		-- In the case of overlap (multiple matches) we report
 		-- NoInstance here.  That has the effect of making the 
 		-- context-simplifier return the dict as an irreducible one.
