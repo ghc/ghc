@@ -21,13 +21,13 @@ import BinderInfo
 import CoreSyn
 import CoreFVs		( idRuleVars )
 import CoreUtils	( exprIsTrivial )
-import Id		( isSpecPragmaId, isDataConId, isOneShotLambda, setOneShotLambda, 
+import Id		( isDataConId, isOneShotLambda, setOneShotLambda, 
 			  idOccInfo, setIdOccInfo,
 			  isExportedId, modifyIdInfo, idInfo,
 			  idSpecialisation, 
 			  idType, idUnique, Id
 			)
-import IdInfo		( OccInfo(..), insideLam, shortableIdInfo, copyIdInfo )
+import IdInfo		( OccInfo(..), shortableIdInfo, copyIdInfo )
 
 import VarSet
 import VarEnv
@@ -40,6 +40,7 @@ import PrelNames	( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
 import Unique		( u2i )
 import UniqFM		( keysUFM )  
 import Util		( zipWithEqual, mapAndUnzip )
+import FastTypes
 import Outputable
 \end{code}
 
@@ -311,7 +312,7 @@ occAnalBind env (Rec pairs) body_usage
     ---- stuff for dependency analysis of binds -------------------------------
     edges :: [Node Details1]
     edges = _scc_ "occAnalBind.assoc"
-	    [ (details, IBOX(u2i (idUnique id)), edges_from rhs_usage)
+	    [ (details, iBox (u2i (idUnique id)), edges_from rhs_usage)
 	    | details@(id, rhs_usage, rhs) <- analysed_pairs
 	    ]
 
