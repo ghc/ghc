@@ -515,7 +515,6 @@ dnl ** set up extra GCC options on Win32
 case $HostOS_CPP in
 cygwin32|mingw32)
    STD_CC_OPTS="-mno-cygwin $CC_MWIN32_FLAG"
-   CPP="$CPP $STD_CC_OPTS"
    CFLAGS="$STD_CC_OPTS $CFLAGS"
    CPPFLAGS="$STD_CC_OPTS $CPPFLAGS"
    ;;
@@ -538,6 +537,12 @@ FPTOOLS_CC_MWIN32
 
 dnl ** figure out how to invoke cpp directly (gcc -E is no good)
 AC_PROG_CPP
+
+dnl ** set up extra GCC options on Win32
+case $HostOS_CPP in
+cygwin32|mingw32)
+   CPP="$CPP $STD_CC_OPTS"
+esac
 
 dnl ** figure out how to do context diffs
 FPTOOLS_PROG_DIFF
