@@ -2,13 +2,14 @@
 --
 -- GHC Driver
 --
--- (c) The University of Glasgow 2002
+-- (c) The University of Glasgow 2005
 --
 -----------------------------------------------------------------------------
 
 module DriverPipeline (
-	-- Run a series of compilation steps in a pipeline
-   runPipeline,
+	-- Run a series of compilation steps in a pipeline, for a
+	-- collection of source files.
+   oneShot,
 
 	-- Interfaces for the batch-mode driver
    staticLink,
@@ -70,13 +71,7 @@ import Maybe
 preprocess :: DynFlags -> FilePath -> IO (DynFlags, FilePath)
 preprocess dflags filename =
   ASSERT2(isHaskellSrcFilename filename, text filename) 
-  runPipeline anyHsc dflags
-	False{-temporary output file-}
-	Nothing{-no specific output file-}
-	filename
-	Nothing{-no ModLocation-}
-
-
+  runPipeline anyHsc dflags filename Temporary Nothing{-no ModLocation-}
 
 -- ---------------------------------------------------------------------------
 -- Compile
@@ -87,12 +82,6 @@ preprocess dflags filename =
 -- compiler proper (hsc), where we deal with tedious details like
 -- reading the OPTIONS pragma from the source file, and passing the
 -- output of hsc through the C compiler.
-
--- The driver sits between 'compile' and 'hscMain', translating calls
--- to the former into calls to the latter, and results from the latter
--- into results from the former.  It does things like preprocessing
--- the .hs file if necessary, and compiling up the .stub_c files to
--- generate Linkables.
 
 -- NB.  No old interface can also mean that the source has changed.
 
@@ -149,9 +138,8 @@ compile hsc_env mod_summary
    -- ... and what the next phase should be
    let next_phase = hscNextPhase dflags src_flavour hsc_lang
    -- ... and what file to generate the output into
-   let get_output_fn = genOutputFilenameFunc dflags next_phase 
-				False Nothing basename
-   output_fn     <- get_output_fn next_phase (Just location)
+   output_fn <- getOutputFilename dflags next_phase 
+			Temporary basename next_phase (Just location)
 
    let dflags' = dflags { hscTarget = hsc_lang,
 				hscOutName = output_fn,
@@ -209,8 +197,8 @@ compile hsc_env mod_summary
 		_other -> do
 		   let object_filename = ml_obj_file location
 
-		   runPipeline StopLn dflags
-			       True Nothing output_fn (Just location)
+		   runPipeline StopLn dflags output_fn Persistent
+			       (Just location)
 			-- the object filename comes from the ModLocation
 
 		   o_time <- getModificationTime object_filename
@@ -230,10 +218,7 @@ compileStub dflags stub_c_exists
 	-- compile the _stub.c file w/ gcc
 	let stub_c = hscStubCOutName dflags
 	(_, stub_o) <- runPipeline StopLn dflags
-			    True{-persistent output-} 
-			    Nothing{-no specific output file-}
-			    stub_c
-			    Nothing{-no ModLocation-}
+			    stub_c Persistent Nothing{-no ModLocation-}
 	return (Just stub_o)
 
 
@@ -304,24 +289,93 @@ link BatchCompile dflags batch_attempt_linking hpt
    where
       verb = verbosity dflags
       
+
+-- -----------------------------------------------------------------------------
+-- Compile files in one-shot mode.
+
+oneShot :: DynFlags -> Phase -> [String] -> IO ()
+oneShot dflags stop_phase srcs = do
+  o_files <- mapM (compileFile dflags stop_phase) srcs
+  doLink dflags stop_phase o_files
+
+compileFile :: DynFlags -> Phase -> FilePath -> IO FilePath
+compileFile dflags stop_phase src = do
+   exists <- doesFileExist src
+   when (not exists) $ 
+   	throwDyn (CmdLineError ("does not exist: " ++ src))
+   
+   let
+	split     = dopt Opt_SplitObjs dflags
+	mb_o_file = outputFile dflags
+	ghc_link  = ghcLink dflags	-- Set by -c or -no-link
+
+	-- When linking, the -o argument refers to the linker's output.	
+	-- otherwise, we use it as the name for the pipeline's output.
+        output
+	 | StopLn <- stop_phase, not (isNoLink ghc_link) = Persistent
+		-- -o foo applies to linker
+	 | Just o_file <- mb_o_file = SpecificFile o_file
+		-- -o foo applies to the file we are compiling now
+	 | otherwise = Persistent
+
+        stop_phase' = case stop_phase of 
+			As | split -> SplitAs
+			other      -> stop_phase
+
+   (_, out_file) <- runPipeline stop_phase' dflags
+			  src output Nothing{-no ModLocation-}
+   return out_file
+
+
+doLink :: DynFlags -> Phase -> [FilePath] -> IO ()
+doLink dflags stop_phase o_files
+  | not (isStopLn stop_phase)
+  = return ()		-- We stopped before the linking phase
+
+  | otherwise
+  = case ghcLink dflags of
+	NoLink     -> return ()
+	StaticLink -> staticLink dflags o_files link_pkgs
+	MkDLL      -> doMkDLL dflags o_files link_pkgs
+  where
+   -- Always link in the haskell98 package for static linking.  Other
+   -- packages have to be specified via the -package flag.
+    link_pkgs
+	  | ExtPackage h98_id <- haskell98PackageId (pkgState dflags) = [h98_id]
+	  | otherwise = []
+
+
 -- ---------------------------------------------------------------------------
 -- Run a compilation pipeline, consisting of multiple phases.
 
+-- This is the interface to the compilation pipeline, which runs
+-- a series of compilation steps on a single source file, specifying
+-- at which stage to stop.
+
 -- The DynFlags can be modified by phases in the pipeline (eg. by
--- OPTIONS pragmas), and the changes affect later phases in the
--- pipeline, but we throw away the resulting DynFlags at the end.
+-- GHC_OPTIONS pragmas), and the changes affect later phases in the
+-- pipeline.
+
+data PipelineOutput 
+  = Temporary
+	-- output should be to a temporary file: we're going to
+	-- run more compilation steps on this output later
+  | Persistent
+	-- we want a persistent file, i.e. a file in the current directory
+	-- derived from the input filename, but with the appropriate extension.
+	-- eg. in "ghc -c Foo.hs" the output goes into ./Foo.o.
+  | SpecificFile FilePath
+	-- the output must go into the specified file.
 
 runPipeline
   :: Phase		-- When to stop
   -> DynFlags		-- Dynamic flags
-  -> Bool		-- Final output is persistent?
-  -> Maybe FilePath	-- Where to put the output, optionally
   -> FilePath 		-- Input filename
-  -> Maybe ModLocation  -- A ModLocation for this module, if we have one
+  -> PipelineOutput	-- Output filename
+  -> Maybe ModLocation  -- A ModLocation, if this is a Haskell module
   -> IO (DynFlags, FilePath)	-- (final flags, output filename)
 
-runPipeline stop_phase dflags keep_output 
-  maybe_output_filename input_fn maybe_loc
+runPipeline stop_phase dflags input_fn output maybe_loc
   = do
   let (basename, suffix) = splitFilename input_fn
       start_phase = startPhase suffix
@@ -338,27 +392,29 @@ runPipeline stop_phase dflags keep_output
 		    ("cannot compile this file to desired target: "
 		       ++ input_fn))
 
-  -- generate a function which will be used to calculate output file names
-  -- as we go along.
-  let get_output_fn = genOutputFilenameFunc dflags stop_phase keep_output 
-					 maybe_output_filename basename
+  -- this is a function which will be used to calculate output file names
+  -- as we go along (we partially apply it to some of its inputs here)
+  let get_output_fn = getOutputFilename dflags stop_phase output basename
 
   -- Execute the pipeline...
-  (dflags', output_fn, maybe_loc) <- pipeLoop dflags start_phase stop_phase input_fn 
-				  	      basename suffix get_output_fn maybe_loc
+  (dflags', output_fn, maybe_loc) <- 
+	pipeLoop dflags start_phase stop_phase input_fn 
+	  	 basename suffix get_output_fn maybe_loc
 
   -- Sometimes, a compilation phase doesn't actually generate any output
   -- (eg. the CPP phase when -fcpp is not turned on).  If we end on this
   -- stage, but we wanted to keep the output, then we have to explicitly
   -- copy the file.
-  if keep_output 
-	then do final_fn <- get_output_fn stop_phase maybe_loc
-	        when (final_fn /= output_fn) $
-	 	  copy dflags ("Copying `" ++ output_fn ++ "' to `" ++ final_fn
+  case output of
+    Temporary -> 
+	return (dflags', output_fn)
+    _other ->
+	do final_fn <- get_output_fn stop_phase maybe_loc
+	   when (final_fn /= output_fn) $
+		  copy dflags ("Copying `" ++ output_fn ++ "' to `" ++ final_fn
 			++ "'") output_fn final_fn
-	        return (dflags', final_fn)
-	else
-	        return (dflags', output_fn)
+	   return (dflags', final_fn)
+	        
 
 
 pipeLoop :: DynFlags -> Phase -> Phase 
@@ -389,10 +445,10 @@ pipeLoop dflags phase stop_phase
 	; pipeLoop dflags' next_phase stop_phase output_fn
 		   orig_basename orig_suff orig_get_output_fn maybe_loc }
 
-genOutputFilenameFunc :: DynFlags -> Phase -> Bool -> Maybe FilePath -> String
-  -> (Phase{-next phase-} -> Maybe ModLocation -> IO FilePath)
-genOutputFilenameFunc dflags stop_phase keep_final_output 
-			maybe_output_filename basename
+getOutputFilename
+  :: DynFlags -> Phase -> PipelineOutput -> String
+  -> Phase{-next phase-} -> Maybe ModLocation -> IO FilePath
+getOutputFilename dflags stop_phase output basename
  = func
  where
 	hcsuf      = hcSuf dflags
@@ -407,11 +463,10 @@ genOutputFilenameFunc dflags stop_phase keep_final_output
         myPhaseInputExt other  = phaseInputExt other
 
 	func next_phase maybe_location
-		| is_last_phase, Just f <- maybe_output_filename = return f
-		| is_last_phase && keep_final_output = persistent_fn
-		| keep_this_output 		     = persistent_fn
-     		| otherwise        		     = newTempName dflags suffix
-
+	   | is_last_phase, Persistent <- output     = persistent_fn
+	   | is_last_phase, SpecificFile f <- output = return f
+	   | keep_this_output	   		     = persistent_fn
+     	   | otherwise        	   		     = newTempName dflags suffix
 	   where
 		is_last_phase = next_phase `eqPhase` stop_phase
 
@@ -582,9 +637,6 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 		      = location3 { ml_obj_file = ofile }
 		      | otherwise = location3
 
-  -- Tell the finder cache about this module
-	addHomeModuleToFinder mod_name location4
-
   -- Make the ModSummary to hand to hscMain
 	src_timestamp <- getModificationTime (basename ++ '.':suff)
 	let
@@ -637,6 +689,9 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 			       extCoreName = basename ++ ".hcr" }
 
 	hsc_env <- newHscEnv dflags'
+
+  -- Tell the finder cache about this module
+	addHomeModuleToFinder hsc_env mod_name location4
 
   -- run the compiler!
 	result <- hscMain hsc_env printErrorsAndWarnings

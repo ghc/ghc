@@ -5,7 +5,11 @@
 
 \begin{code}
 module HscTypes ( 
-	HscEnv(..), hscEPS,
+	-- * Sessions and compilation state
+	Session(..), HscEnv(..), hscEPS,
+	FinderCache, FinderCacheEntry,
+	Target(..), TargetId(..), pprTarget, pprTargetId,
+	ModuleGraph, emptyMG,
 
 	ModDetails(..),	
 	ModGuts(..), ModImports(..), ForeignStubs(..),
@@ -83,7 +87,7 @@ import Type		( TyThing(..) )
 import Class		( Class, classSelIds, classTyCon )
 import TyCon		( TyCon, tyConSelIds, tyConDataCons )
 import DataCon		( dataConImplicitIds )
-import Packages		( PackageIdH, PackageId )
+import Packages		( PackageIdH, PackageId, PackageConfig )
 import DynFlags		( DynFlags(..), isOneShot )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString )
 import BasicTypes	( Version, initialVersion, IPName, 
@@ -111,13 +115,42 @@ import Time		( ClockTime )
 %*									*
 %************************************************************************
 
-The HscEnv gives the environment in which to compile a chunk of code.
+
+\begin{code}
+-- | The Session is a handle to the complete state of a compilation
+-- session.  A compilation session consists of a set of modules
+-- constituting the current program or library, the context for
+-- interactive evaluation, and various caches.
+newtype Session = Session (IORef HscEnv)
+\end{code}
+
+HscEnv is like Session, except that some of the fields are immutable.
+An HscEnv is used to compile a single module from plain Haskell source
+code (after preprocessing) to either C, assembly or C--.  Things like
+the module graph don't change during a single compilation.
+
+Historical note: "hsc" used to be the name of the compiler binary,
+when there was a separate driver and compiler.  To compile a single
+module, the driver would invoke hsc on the source code... so nowadays
+we think of hsc as the layer of the compiler that deals with compiling
+a single module.
 
 \begin{code}
 data HscEnv 
-  = HscEnv { hsc_dflags :: DynFlags,
+  = HscEnv { 
+	hsc_dflags :: DynFlags,
+		-- The dynamic flag settings
 
-	     hsc_HPT    :: HomePackageTable,
+	hsc_targets :: [Target],
+		-- The targets (or roots) of the current session
+
+	hsc_mod_graph :: ModuleGraph,
+		-- The module graph of the current session
+
+	hsc_IC :: InteractiveContext,
+		-- The context for evaluating interactive statements
+
+	hsc_HPT    :: HomePackageTable,
 		-- The home package table describes already-compiled
 		-- home-packge modules, *excluding* the module we 
 		-- are compiling right now.
@@ -135,18 +168,47 @@ data HscEnv
 		-- but not actually below the current module in the dependency
 		-- graph.  (This changes a previous invariant: changed Jan 05.)
 	
-		-- The next two are side-effected by compiling
-		-- to reflect sucking in interface files
-	     hsc_EPS	:: IORef ExternalPackageState,
-	     hsc_NC	:: IORef NameCache }
+	hsc_EPS	:: {-# UNPACK #-} !(IORef ExternalPackageState),
+	hsc_NC	:: {-# UNPACK #-} !(IORef NameCache),
+		-- These are side-effected by compiling to reflect
+		-- sucking in interface files.  They cache the state of
+		-- external interface files, in effect.
+
+	hsc_FC  :: {-# UNPACK #-} !(IORef FinderCache)
+		-- The finder's cache.  This caches the location of modules,
+		-- so we don't have to search the filesystem multiple times.
+ }
 
 hscEPS :: HscEnv -> IO ExternalPackageState
 hscEPS hsc_env = readIORef (hsc_EPS hsc_env)
-\end{code}
 
-\begin{code}
-type HomePackageTable  = ModuleEnv HomeModInfo	-- Domain = modules in the home package
-type PackageIfaceTable = ModuleEnv ModIface	-- Domain = modules in the imported packages
+-- | A compilation target.
+--
+-- A target may be supplied with the actual text of the
+-- module.  If so, use this instead of the file contents (this
+-- is for use in an IDE where the file hasn't been saved by
+-- the user yet).
+data Target = Target TargetId (Maybe StringBuffer)
+
+data TargetId
+  = TargetModule Module	   -- | A module name: search for the file
+  | TargetFile   FilePath  -- | A filename: parse it to find the module name.
+
+
+pprTarget :: Target -> SDoc
+pprTarget (Target id _) = pprTargetId id
+
+pprTargetId (TargetModule m) = ppr m
+pprTargetId (TargetFile f)   = text f
+
+type FinderCache = ModuleEnv FinderCacheEntry
+type FinderCacheEntry = (ModLocation, Maybe (PackageConfig,Bool))
+	-- The finder's cache (see module Finder)
+
+type HomePackageTable  = ModuleEnv HomeModInfo
+	-- Domain = modules in the home package
+type PackageIfaceTable = ModuleEnv ModIface
+	-- Domain = modules in the imported packages
 
 emptyHomePackageTable  = emptyModuleEnv
 emptyPackageIfaceTable = emptyModuleEnv
@@ -404,10 +466,10 @@ emptyModIface pkg mod
 \begin{code}
 data InteractiveContext 
   = InteractiveContext { 
-	ic_toplev_scope :: [String],	-- Include the "top-level" scope of
+	ic_toplev_scope :: [Module],	-- Include the "top-level" scope of
 					-- these modules
 
-	ic_exports :: [String],		-- Include just the exports of these
+	ic_exports :: [Module],		-- Include just the exports of these
 					-- modules
 
 	ic_rn_gbl_env :: GlobalRdrEnv,	-- The cached GlobalRdrEnv, built from
@@ -852,17 +914,27 @@ addInstsToPool insts new_insts
 
 %************************************************************************
 %*									*
-		The ModSummary type
+		The module graph and ModSummary type
 	A ModSummary is a node in the compilation manager's
 	dependency graph, and it's also passed to hscMain
 %*									*
 %************************************************************************
 
-The nodes of the module graph are
-	EITHER a regular Haskell source module
-	OR     a hi-boot source module
+A ModuleGraph contains all the nodes from the home package (only).  
+There will be a node for each source module, plus a node for each hi-boot
+module.
 
 \begin{code}
+type ModuleGraph = [ModSummary]  -- The module graph, 
+				 -- NOT NECESSARILY IN TOPOLOGICAL ORDER
+
+emptyMG :: ModuleGraph
+emptyMG = []
+
+-- The nodes of the module graph are
+-- 	EITHER a regular Haskell source module
+-- 	OR     a hi-boot source module
+
 data ModSummary
    = ModSummary {
         ms_mod       :: Module,			-- Name of the module

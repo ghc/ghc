@@ -12,11 +12,11 @@ module DriverMkDepend (
 
 #include "HsVersions.h"
 
-import CompManager	( cmDownsweep, cmTopSort, cyclicModuleErr )
+import qualified GHC
+import GHC		( Session, ModSummary(..) )
 import DynFlags		( DynFlags( verbosity, opt_dep ), getOpts )
 import Util		( escapeSpaces, splitFilename )
-import HscTypes		( IsBootInterface, ModSummary(..), msObjFilePath,
-			   msHsFilePath )
+import HscTypes		( HscEnv, IsBootInterface, msObjFilePath, msHsFilePath )
 import Packages		( PackageIdH(..) )
 import SysTools		( newTempName )
 import qualified SysTools
@@ -47,18 +47,22 @@ import Panic		( catchJust, ioErrors )
 --
 -----------------------------------------------------------------
 
-doMkDependHS :: DynFlags -> [FilePath] -> IO ()
-doMkDependHS dflags srcs
+doMkDependHS :: Session -> [FilePath] -> IO ()
+doMkDependHS session srcs
   = do	{ 	-- Initialisation
-	  files <- beginMkDependHS dflags
+	  dflags <- GHC.getSessionDynFlags session
+	; files <- beginMkDependHS dflags
 
 		-- Do the downsweep to find all the modules
+	; targets <- mapM GHC.guessTarget srcs
+	; GHC.setTargets session targets
 	; excl_mods <- readIORef v_Dep_exclude_mods
-	; mod_summaries <- cmDownsweep dflags srcs [] excl_mods
+	; GHC.depanal session excl_mods
+	; mod_summaries <- GHC.getModuleGraph session
 
 		-- Sort into dependency order
 		-- There should be no cycles
-	; let sorted = cmTopSort False mod_summaries
+	; let sorted = GHC.topSortModuleGraph False mod_summaries
 
 		-- Print out the dependencies if wanted
 	; if verbosity dflags >= 2 then
@@ -67,7 +71,7 @@ doMkDependHS dflags srcs
 		
 		-- Prcess them one by one, dumping results into makefile
 		-- and complaining about cycles
-	; mapM (processDeps dflags (mkd_tmp_hdl files)) sorted
+	; mapM (processDeps session (mkd_tmp_hdl files)) sorted
 
 		-- Tidy up
 	; endMkDependHS dflags files }
@@ -145,7 +149,7 @@ beginMkDependHS dflags = do
 --
 -----------------------------------------------------------------
 
-processDeps :: DynFlags
+processDeps :: Session
 	    -> Handle		-- Write dependencies to here
 	    -> SCC ModSummary
 	    -> IO ()
@@ -164,19 +168,20 @@ processDeps :: DynFlags
 --
 -- For {-# SOURCE #-} imports the "hi" will be "hi-boot".
 
-processDeps dflags hdl (CyclicSCC nodes)
+processDeps session hdl (CyclicSCC nodes)
   =	-- There shouldn't be any cycles; report them	
-    throwDyn (ProgramError (showSDoc $ cyclicModuleErr nodes))
+    throwDyn (ProgramError (showSDoc $ GHC.cyclicModuleErr nodes))
 
-processDeps dflags hdl (AcyclicSCC node)
+processDeps session hdl (AcyclicSCC node)
   = do	{ extra_suffixes   <- readIORef v_Dep_suffixes
+	; hsc_env <- GHC.sessionHscEnv session
 	; include_pkg_deps <- readIORef v_Dep_include_pkg_deps
 	; let src_file  = msHsFilePath node
 	      obj_file  = msObjFilePath node
 	      obj_files = insertSuffixes obj_file extra_suffixes
 
 	      do_imp is_boot imp_mod
-		= do { mb_hi <- findDependency dflags src_file imp_mod 
+		= do { mb_hi <- findDependency hsc_env src_file imp_mod 
 					       is_boot include_pkg_deps
 		     ; case mb_hi of {
 			   Nothing      -> return () ;
@@ -200,16 +205,16 @@ processDeps dflags hdl (AcyclicSCC node)
 	}
 
 
-findDependency	:: DynFlags
+findDependency	:: HscEnv
 		-> FilePath 		-- Importing module: used only for error msg
 		-> Module		-- Imported module
 		-> IsBootInterface	-- Source import
 		-> Bool			-- Record dependency on package modules
 		-> IO (Maybe FilePath)	-- Interface file file
-findDependency dflags src imp is_boot include_pkg_deps
+findDependency hsc_env src imp is_boot include_pkg_deps
   = do	{ 	-- Find the module; this will be fast because
 		-- we've done it once during downsweep
-	  r <- findModule dflags imp True {-explicit-}
+	  r <- findModule hsc_env imp True {-explicit-}
 	; case r of 
 	    Found loc pkg
 		-- Not in this package: we don't need a dependency
@@ -220,9 +225,7 @@ findDependency dflags src imp is_boot include_pkg_deps
 		| otherwise
 		-> return (Just (addBootSuffix_maybe is_boot (ml_hi_file loc)))
 
-	    _ -> throwDyn (ProgramError 
-		 (src ++ ": " ++ "can't locate import `" ++ (moduleUserString imp) ++ "'"
-		  ++ if is_boot then " (SOURCE import)" else ""))
+	    _ -> panic "findDependency"
 	}
 
 -----------------------------

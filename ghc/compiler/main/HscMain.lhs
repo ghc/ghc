@@ -42,6 +42,7 @@ import BasicTypes	( Fixity )
 import SrcLoc		( SrcLoc, noSrcLoc )
 #endif
 
+import Module		( emptyModuleEnv )
 import RdrName		( RdrName )
 import HsSyn		( HsModule )
 import SrcLoc		( Located(..) )
@@ -104,10 +105,15 @@ newHscEnv dflags
   = do 	{ eps_var <- newIORef initExternalPackageState
 	; us      <- mkSplitUniqSupply 'r'
 	; nc_var  <- newIORef (initNameCache us knownKeyNames)
+	; fc_var  <- newIORef emptyModuleEnv
 	; return (HscEnv { hsc_dflags = dflags,
+			   hsc_targets = [],
+			   hsc_mod_graph = [],
+			   hsc_IC     = emptyInteractiveContext,
 			   hsc_HPT    = emptyHomePackageTable,
 			   hsc_EPS    = eps_var,
-			   hsc_NC     = nc_var } ) }
+			   hsc_NC     = nc_var,
+			   hsc_FC     = fc_var } ) }
 			
 
 knownKeyNames :: [Name]	-- Put here to avoid loops involving DsMeta,
@@ -590,11 +596,10 @@ A naked expression returns a singleton Name [it].
 #ifdef GHCI
 hscStmt		-- Compile a stmt all the way to an HValue, but don't run it
   :: HscEnv
-  -> InteractiveContext		-- Context for compiling
   -> String			-- The statement
-  -> IO (Maybe (InteractiveContext, [Name], HValue))
+  -> IO (Maybe (HscEnv, [Name], HValue))
 
-hscStmt hsc_env icontext stmt
+hscStmt hsc_env stmt
   = do	{ maybe_stmt <- hscParseStmt (hsc_dflags hsc_env) stmt
 	; case maybe_stmt of {
       	     Nothing	  -> return Nothing ;	-- Parse error
@@ -602,8 +607,8 @@ hscStmt hsc_env icontext stmt
       	     Just (Just parsed_stmt) -> do {	-- The real stuff
 
 		-- Rename and typecheck it
-	  maybe_tc_result
-		 <- tcRnStmt hsc_env icontext parsed_stmt
+	  let icontext = hsc_IC hsc_env
+	; maybe_tc_result <- tcRnStmt hsc_env icontext parsed_stmt
 
 	; case maybe_tc_result of {
 		Nothing -> return Nothing ;
@@ -615,17 +620,17 @@ hscStmt hsc_env icontext stmt
 			      (ic_type_env new_ic)
 			      tc_expr
 
-	; return (Just (new_ic, bound_names, hval))
+	; return (Just (hsc_env{ hsc_IC=new_ic }, bound_names, hval))
 	}}}}}
 
 hscTcExpr	-- Typecheck an expression (but don't run it)
   :: HscEnv
-  -> InteractiveContext		-- Context for compiling
   -> String			-- The expression
   -> IO (Maybe Type)
 
-hscTcExpr hsc_env icontext expr
+hscTcExpr hsc_env expr
   = do	{ maybe_stmt <- hscParseStmt (hsc_dflags hsc_env) expr
+	; let icontext = hsc_IC hsc_env
 	; case maybe_stmt of {
 	     Nothing      -> return Nothing ;	-- Parse error
 	     Just (Just (L _ (ExprStmt expr _)))
@@ -636,12 +641,12 @@ hscTcExpr hsc_env icontext expr
 
 hscKcType	-- Find the kind of a type
   :: HscEnv
-  -> InteractiveContext		-- Context for compiling
   -> String			-- The type
   -> IO (Maybe Kind)
 
-hscKcType hsc_env icontext str
+hscKcType hsc_env str
   = do	{ maybe_type <- hscParseType (hsc_dflags hsc_env) str
+	; let icontext = hsc_IC hsc_env
 	; case maybe_type of {
 	     Just ty	-> tcRnType hsc_env icontext ty ;
 	     Just other -> do { errorMsg ("not an type: `" ++ str ++ "'") ;
@@ -698,17 +703,16 @@ hscParseThing parser dflags str
 #ifdef GHCI
 hscGetInfo -- like hscStmt, but deals with a single identifier
   :: HscEnv
-  -> InteractiveContext		-- Context for compiling
   -> String			-- The identifier
   -> IO [GetInfoResult]
 
-hscGetInfo hsc_env ic str
+hscGetInfo hsc_env str
    = do maybe_rdr_name <- hscParseIdentifier (hsc_dflags hsc_env) str
 	case maybe_rdr_name of {
 	  Nothing -> return [];
 	  Just (L _ rdr_name) -> do
 
-	maybe_tc_result <- tcRnGetInfo hsc_env ic rdr_name
+	maybe_tc_result <- tcRnGetInfo hsc_env (hsc_IC hsc_env) rdr_name
 
 	case maybe_tc_result of
 	     Nothing     -> return []

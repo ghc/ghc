@@ -27,7 +27,7 @@ import IfaceSyn		( IfaceDecl(..), IfaceConDecl(..), IfaceClassOp(..),
 import IfaceEnv		( newGlobalBinder, lookupIfaceExt, lookupIfaceTc, lookupAvail )
 import HscTypes		( ModIface(..), TyThing, emptyModIface, EpsStats(..),
 			  addEpsInStats, ExternalPackageState(..),
-			  PackageTypeEnv, emptyTypeEnv,  
+			  PackageTypeEnv, emptyTypeEnv,  HscEnv(..),
 			  lookupIfaceByModule, emptyPackageIfaceTable,
 			  IsBootInterface, mkIfaceFixCache, Gated,
 			  implicitTyThings, addRulesToPool, addInstsToPool
@@ -576,7 +576,8 @@ findAndReadIface explicit doc_str mod_name hi_boot_file
 	  else do
 
 	-- Look for the file
-	; mb_found <- ioToIOEnv (findHiFile dflags explicit mod_name hi_boot_file)
+	; hsc_env <- getTopEnv
+	; mb_found <- ioToIOEnv (findHiFile hsc_env explicit mod_name hi_boot_file)
 	; case mb_found of {
 	      Failed err -> do
 		{ traceIf (ptext SLIT("...not found"))
@@ -598,19 +599,19 @@ findAndReadIface explicit doc_str mod_name hi_boot_file
 			-- Don't forget to fill in the package name...
 	}}}
 
-findHiFile :: DynFlags -> Bool -> Module -> IsBootInterface
+findHiFile :: HscEnv -> Bool -> Module -> IsBootInterface
 	   -> IO (MaybeErr FindResult (FilePath, PackageIdH))
-findHiFile dflags explicit mod_name hi_boot_file
+findHiFile hsc_env explicit mod_name hi_boot_file
  = do { 
 	-- In interactive or --make mode, we are *not allowed* to demand-load
 	-- a home package .hi file.  So don't even look for them.
 	-- This helps in the case where you are sitting in eg. ghc/lib/std
 	-- and start up GHCi - it won't complain that all the modules it tries
 	-- to load are found in the home location.
-	let { home_allowed = isOneShot (ghcMode dflags) } ;
+	let { home_allowed = isOneShot (ghcMode (hsc_dflags hsc_env)) } ;
 	maybe_found <-	if home_allowed 
-			then findModule        dflags mod_name explicit
-			else findPackageModule dflags mod_name explicit;
+			then findModule        hsc_env mod_name explicit
+			else findPackageModule hsc_env mod_name explicit;
 
 	case maybe_found of
 	  Found loc pkg -> return (Succeeded (path, pkg))

@@ -369,9 +369,6 @@ ALL_SRCS += $(CONFIG_HS)
 # HsGeneric.hs is not used just now
 EXCLUDED_SRCS += hsSyn/HsGeneric.hs
 
-# main/GHC.hs is not ready yet
-EXCLUDED_SRCS += main/GHC.hs
-
 ifeq ($(GhcWithNativeCodeGen),YES)
 ALL_DIRS += nativeGen
 else

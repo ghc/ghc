@@ -315,7 +315,7 @@ linkExpr hsc_env root_ul_bco
 
 	-- Find what packages and linkables are required
    ; eps <- readIORef (hsc_EPS hsc_env)
-   ; (lnks, pkgs) <- getLinkDeps dflags hpt (eps_PIT eps) needed_mods
+   ; (lnks, pkgs) <- getLinkDeps hsc_env hpt (eps_PIT eps) needed_mods
 
 	-- Link the packages and modules required
    ; linkPackages dflags pkgs
@@ -350,12 +350,12 @@ linkExpr hsc_env root_ul_bco
  
 dieWith msg = throwDyn (ProgramError (showSDoc msg))
 
-getLinkDeps :: DynFlags -> HomePackageTable -> PackageIfaceTable
+getLinkDeps :: HscEnv -> HomePackageTable -> PackageIfaceTable
 	    -> [Module]				-- If you need these
 	    -> IO ([Linkable], [PackageId])	-- ... then link these first
 -- Fails with an IO exception if it can't find enough files
 
-getLinkDeps dflags hpt pit mods
+getLinkDeps hsc_env hpt pit mods
 -- Find all the packages and linkables that a set of modules depends on
  = do {	pls <- readIORef v_PersistentLinkerState ;
 	let {
@@ -404,7 +404,7 @@ getLinkDeps dflags hpt pit mods
 	| otherwise	
 	=	-- It's not in the HPT because we are in one shot mode, 
 		-- so use the Finder to get a ModLocation...
-	  do { mb_stuff <- findModule dflags mod_name False ;
+	  do { mb_stuff <- findModule hsc_env mod_name False ;
 	       case mb_stuff of {
 		  Found loc _ -> found loc mod_name ;
 		  _ -> no_obj mod_name

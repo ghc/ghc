@@ -1078,12 +1078,11 @@ vanillaProv mod = Imported [ImportSpec mod mod False
 \begin{code}
 getModuleContents
   :: HscEnv
-  -> InteractiveContext
   -> Module			-- Module to inspect
   -> Bool			-- Grab just the exports, or the whole toplev
   -> IO (Maybe [IfaceDecl])
 
-getModuleContents hsc_env ictxt mod exports_only
+getModuleContents hsc_env mod exports_only
  = initTcPrintErrors hsc_env iNTERACTIVE (get_mod_contents exports_only)
  where
    get_mod_contents exports_only
@@ -1110,7 +1109,7 @@ getModuleContents hsc_env ictxt mod exports_only
 	     ; thing     <- tcLookupGlobal main_name
 	     ; return (filter_decl (availNames avail) (toIfaceDecl ext_nm thing)) }
 
-   ext_nm = interactiveExtNameFun (icPrintUnqual ictxt)
+   ext_nm = interactiveExtNameFun (icPrintUnqual (hsc_IC hsc_env))
 
 ---------------------
 filter_decl occs decl@(IfaceClass {ifSigs = sigs})

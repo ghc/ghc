@@ -11,7 +11,7 @@ module Finder (
     findPackageModule,  	-- :: ModuleName -> Bool -> IO FindResult
     mkHomeModLocation,		-- :: ModuleName -> FilePath -> IO ModLocation
     mkHomeModLocation2,		-- :: ModuleName -> FilePath -> String -> IO ModLocation
-    addHomeModuleToFinder, 	-- :: Module -> ModLocation -> IO ()
+    addHomeModuleToFinder, 	-- :: HscEnv -> Module -> ModLocation -> IO ()
 
     findLinkable,	-- :: ModuleName -> ModLocation -> IO (Maybe Linkable)
 
@@ -22,7 +22,7 @@ module Finder (
 
 import Module
 import UniqFM		( filterUFM )
-import HscTypes		( Linkable(..), Unlinked(..) )
+import HscTypes
 import Packages
 import FastString
 import Util
@@ -55,24 +55,20 @@ type BaseName = String	-- Basename of file
 -- -----------------------------------------------------------------------------
 -- The finder's cache
 
-GLOBAL_VAR(finder_cache, emptyModuleEnv, ModuleEnv FinderCacheEntry)
-
-type FinderCacheEntry = (ModLocation, Maybe (PackageConfig,Bool))
-
 -- remove all the home modules from the cache; package modules are
 -- assumed to not move around during a session.
-flushFinderCache :: IO ()
-flushFinderCache = do
+flushFinderCache :: IORef FinderCache -> IO ()
+flushFinderCache finder_cache = do
   fm <- readIORef finder_cache
-  writeIORef finder_cache (filterUFM (\(loc,m) -> isNothing m) fm)
+  writeIORef finder_cache $! filterUFM (\(loc,m) -> isNothing m) fm
 
-addToFinderCache :: Module -> FinderCacheEntry -> IO ()
-addToFinderCache mod_name entry = do
+addToFinderCache :: IORef FinderCache -> Module -> FinderCacheEntry -> IO ()
+addToFinderCache finder_cache mod_name entry = do
   fm <- readIORef finder_cache
-  writeIORef finder_cache (extendModuleEnv fm mod_name entry)
+  writeIORef finder_cache $! extendModuleEnv fm mod_name entry
 
-lookupFinderCache :: Module -> IO (Maybe FinderCacheEntry)
-lookupFinderCache mod_name = do
+lookupFinderCache :: IORef FinderCache -> Module -> IO (Maybe FinderCacheEntry)
+lookupFinderCache finder_cache mod_name = do
   fm <- readIORef finder_cache
   return $! lookupModuleEnv fm mod_name
 
@@ -108,19 +104,20 @@ type LocalFindResult = MaybeErr [FilePath] FinderCacheEntry
 
 cached :: Bool
        -> (DynFlags -> Module -> IO LocalFindResult)
-       -> DynFlags -> Module -> Bool -> IO FindResult
-cached home_allowed wrapped_fn dflags name explicit 
+       -> HscEnv -> Module -> Bool -> IO FindResult
+cached home_allowed wrapped_fn hsc_env name explicit 
   = do	{ 	-- First try the cache
-	  mb_entry <- lookupFinderCache name
+	  let cache = hsc_FC hsc_env
+	; mb_entry <- lookupFinderCache cache name
 	; case mb_entry of {
 	    Just old_entry -> return (found old_entry) ;
 	    Nothing    -> do
 
 	{ 	-- Now try the wrapped function
-	  mb_entry <- wrapped_fn dflags name
+	  mb_entry <- wrapped_fn (hsc_dflags hsc_env) name
 	; case mb_entry of
 	    Failed paths  	-> return (NotFound paths)
-	    Succeeded new_entry -> do { addToFinderCache name new_entry
+	    Succeeded new_entry -> do { addToFinderCache cache name new_entry
 			      	      ; return (found new_entry) }
 	}}} 
   where
@@ -137,18 +134,19 @@ cached home_allowed wrapped_fn dflags name explicit
 	where
 	  pkg_name = packageConfigId pkg
 
-addHomeModuleToFinder :: Module -> ModLocation -> IO ()
-addHomeModuleToFinder mod loc = addToFinderCache mod (loc, Nothing)
+addHomeModuleToFinder :: HscEnv -> Module -> ModLocation -> IO ()
+addHomeModuleToFinder hsc_env mod loc 
+  = addToFinderCache (hsc_FC hsc_env) mod (loc, Nothing)
 
 
 -- -----------------------------------------------------------------------------
 -- 	The two external entry points
 
 
-findModule :: DynFlags -> Module -> Bool -> IO FindResult
+findModule :: HscEnv -> Module -> Bool -> IO FindResult
 findModule = cached True findModule' 
   
-findPackageModule :: DynFlags -> Module -> Bool -> IO FindResult
+findPackageModule :: HscEnv -> Module -> Bool -> IO FindResult
 findPackageModule = cached False findPackageModule'
 
 -- -----------------------------------------------------------------------------

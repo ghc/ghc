@@ -1,37 +1,42 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.195 2005/03/18 17:16:03 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
--- (c) The GHC Team 2004
+-- (c) The GHC Team 2005
 --
 -----------------------------------------------------------------------------
 module InteractiveUI ( 
-	interactiveUI,  -- :: CmState -> [FilePath] -> IO ()
+	interactiveUI,
 	ghciWelcomeMsg
    ) where
 
 #include "HsVersions.h"
 
-import CompManager
+-- The GHC interface
+import qualified GHC
+import GHC		( Session, verbosity, dopt, DynFlag(..),
+			  mkModule, pprModule, Type, Module, SuccessFlag(..),
+			  TyThing(..), Name )
+import Outputable
+
+-- following all needed for :info... ToDo: remove
 import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecls(..),
 			  IfaceConDecl(..), IfaceType,
 		   	  pprIfaceDeclHead, pprParendIfaceType,
 			  pprIfaceForAllPart, pprIfaceType )
 import FunDeps		( pprFundeps )
-import Util		( removeSpaces, handle )
-import Linker		( showLinkerState, linkPackages )
-import Util
-import Name		( Name, NamedThing(..) )
+import SrcLoc		( SrcLoc, isGoodSrcLoc )
 import OccName		( OccName, parenSymOcc, occNameUserString )
-import BasicTypes	( StrictnessMark(..), defaultFixity, SuccessFlag(..) )
-import Outputable
-import DynFlags
+import BasicTypes	( StrictnessMark(..), defaultFixity )
+
+-- Other random utilities
 import Panic 		hiding ( showException )
 import Config
-import SrcLoc		( SrcLoc, isGoodSrcLoc )
 import StaticFlags	( opt_IgnoreDotGhci )
+import Linker		( showLinkerState )
+import Util		( removeSpaces, handle, global, toArgs,
+			  looksLikeModuleName, prefixMatch )
 
 #ifndef mingw32_HOST_OS
 import Util		( handle )
@@ -151,10 +156,8 @@ helpText =
  "                         (eg. -v2, -fglasgow-exts, etc.)\n"
 
 
-interactiveUI :: DynFlags -> [FilePath] -> Maybe String -> IO ()
-interactiveUI dflags srcs maybe_expr = do
-
-   cmstate <- cmInit dflags;
+interactiveUI :: Session -> [FilePath] -> Maybe String -> IO ()
+interactiveUI session srcs maybe_expr = do
 
    -- HACK! If we happen to get into an infinite loop (eg the user
    -- types 'let x=x in x' at the prompt), then the thread will block
@@ -172,24 +175,23 @@ interactiveUI dflags srcs maybe_expr = do
    hSetBuffering stdout NoBuffering
 
 	-- Initialise buffering for the *interpreted* I/O system
-   initInterpBuffering cmstate
+   initInterpBuffering session
 
 	-- We don't want the cmd line to buffer any input that might be
 	-- intended for the program, so unbuffer stdin.
    hSetBuffering stdin NoBuffering
 
 	-- initial context is just the Prelude
-   cmstate <- cmSetContext cmstate [] ["Prelude"]
+   GHC.setContext session [] [prelude_mod]
 
 #ifdef USE_READLINE
    Readline.initialize
 #endif
 
-   startGHCi (runGHCi srcs dflags maybe_expr)
+   startGHCi (runGHCi srcs maybe_expr)
 	GHCiState{ progname = "<interactive>",
 		   args = [],
-		   targets = srcs,
-		   cmstate = cmstate,
+		   session = session,
 		   options = [] }
 
 #ifdef USE_READLINE
@@ -198,8 +200,8 @@ interactiveUI dflags srcs maybe_expr = do
 
    return ()
 
-runGHCi :: [FilePath] -> DynFlags -> Maybe String -> GHCi ()
-runGHCi paths dflags maybe_expr = do
+runGHCi :: [FilePath] -> Maybe String -> GHCi ()
+runGHCi paths maybe_expr = do
   let read_dot_files = not opt_IgnoreDotGhci
 
   when (read_dot_files) $ do
@@ -239,6 +241,7 @@ runGHCi paths dflags maybe_expr = do
   -- if verbosity is greater than 0, or we are connected to a
   -- terminal, display the prompt in the interactive loop.
   is_tty <- io (hIsTerminalDevice stdin)
+  dflags <- getDynFlags
   let show_prompt = verbosity dflags > 0 || is_tty
 
   case maybe_expr of
@@ -303,8 +306,8 @@ checkPerms name =
 
 fileLoop :: Handle -> Bool -> GHCi ()
 fileLoop hdl prompt = do
-   cmstate <- getCmState
-   (mod,imports) <- io (cmGetContext cmstate)
+   session <- getSession
+   (mod,imports) <- io (GHC.getContext session)
    when prompt (io (putStr (mkPrompt mod imports)))
    l <- io (IO.try (hGetLine hdl))
    case l of
@@ -331,13 +334,15 @@ stringLoop (s:ss) = do
                  if quit then return () else stringLoop ss
 
 mkPrompt toplevs exports
-   = concat (intersperse " " (map ('*':) toplevs ++ exports)) ++ "> "
+  = showSDoc (hsep (map (\m -> char '*' <> pprModule m) toplevs)
+	     <+> hsep (map pprModule exports)
+	     <> text "> ")
 
 #ifdef USE_READLINE
 readlineLoop :: GHCi ()
 readlineLoop = do
-   cmstate <- getCmState
-   (mod,imports) <- io (cmGetContext cmstate)
+   session <- getSession
+   (mod,imports) <- io (GHC.getContext session)
    io yield
    l <- io (readline (mkPrompt mod imports)
 	  	`finally` setNonBlockingFD 0)
@@ -402,21 +407,19 @@ runStmt stmt
  | null (filter (not.isSpace) stmt) = return []
  | otherwise
  = do st <- getGHCiState
-      cmstate <- getCmState
-      (new_cmstate, result) <- 
-	io $ withProgName (progname st) $ withArgs (args st) $
-	     cmRunStmt cmstate stmt
-      setGHCiState st{cmstate = new_cmstate}
+      session <- getSession
+      result <- io $ withProgName (progname st) $ withArgs (args st) $
+	     	     GHC.runStmt session stmt
       case result of
-	CmRunFailed      -> return []
-	CmRunException e -> throw e  -- this is caught by runCommand(Eval)
-	CmRunOk names    -> return names
+	GHC.RunFailed      -> return []
+	GHC.RunException e -> throw e  -- this is caught by runCommand(Eval)
+	GHC.RunOk names    -> return names
 
 -- possibly print the type and revert CAFs after evaluating an expression
 finishEvalExpr names
  = do b <- isOptionSet ShowType
-      cmstate <- getCmState
-      when b (mapM_ (showTypeOfName cmstate) names)
+      session <- getSession
+      when b (mapM_ (showTypeOfName session) names)
 
       flushInterpBuffers
       io installSignalHandlers
@@ -424,12 +427,18 @@ finishEvalExpr names
       io (when b revertCAFs)
       return True
 
-showTypeOfName :: CmState -> Name -> GHCi ()
-showTypeOfName cmstate n
-   = do maybe_str <- io (cmTypeOfName cmstate n)
-	case maybe_str of
-	  Nothing  -> return ()
-	  Just str -> io (putStrLn (showSDoc (ppr n) ++ " :: " ++ str))
+showTypeOfName :: Session -> Name -> GHCi ()
+showTypeOfName session n
+   = do maybe_tything <- io (GHC.lookupName session n)
+	case maybe_tything of
+	  Nothing    -> return ()
+	  Just thing -> showTyThing thing
+
+showForUser :: SDoc -> GHCi String
+showForUser doc = do
+  session <- getSession
+  unqual <- io (GHC.getPrintUnqual session)
+  return $! showSDocForUser unqual doc
 
 specialCommand :: String -> GHCi Bool
 specialCommand ('!':str) = shellEscape (dropWhile isSpace str)
@@ -459,15 +468,15 @@ no_buf_cmd = "System.IO.hSetBuffering System.IO.stdout System.IO.NoBuffering" ++
 	     " Prelude.>> System.IO.hSetBuffering System.IO.stderr System.IO.NoBuffering"
 flush_cmd  = "System.IO.hFlush System.IO.stdout Prelude.>> System.IO.hFlush IO.stderr"
 
-initInterpBuffering :: CmState -> IO ()
-initInterpBuffering cmstate
- = do maybe_hval <- cmCompileExpr cmstate no_buf_cmd
+initInterpBuffering :: Session -> IO ()
+initInterpBuffering session
+ = do maybe_hval <- GHC.compileExpr session no_buf_cmd
 	
       case maybe_hval of
 	Just hval -> writeIORef turn_off_buffering (unsafeCoerce# hval :: IO ())
 	other	  -> panic "interactiveUI:setBuffering"
 	
-      maybe_hval <- cmCompileExpr cmstate flush_cmd
+      maybe_hval <- GHC.compileExpr session flush_cmd
       case maybe_hval of
 	Just hval -> writeIORef flush_interp (unsafeCoerce# hval :: IO ())
 	_         -> panic "interactiveUI:flush"
@@ -496,17 +505,18 @@ help _ = io (putStr helpText)
 info :: String -> GHCi ()
 info "" = throwDyn (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
 info s  = do { let names = words s
-	     ; init_cms <- getCmState
+	     ; session <- getSession
 	     ; dflags <- getDynFlags
 	     ; let exts = dopt Opt_GlasgowExts dflags
-	     ; mapM_ (infoThing exts init_cms) names }
+	     ; mapM_ (infoThing exts session) names }
   where
-    infoThing exts cms name
-	= do { stuff <- io (cmGetInfo cms name)
-	     ; io (putStrLn (showSDocForUser (cmGetPrintUnqual cms) $
+    infoThing exts session name
+	= do { stuff <- io (GHC.getInfo session name)
+	     ; unqual <- io (GHC.getPrintUnqual session)
+	     ; io (putStrLn (showSDocForUser unqual $
      		   vcat (intersperse (text "") (map (showThing exts) stuff)))) }
 
-showThing :: Bool -> GetInfoResult -> SDoc
+showThing :: Bool -> GHC.GetInfoResult -> SDoc
 showThing exts (wanted_str, thing, fixity, src_loc, insts) 
     = vcat [ showWithLoc src_loc (showDecl exts want_name thing),
 	     show_fixity fixity,
@@ -540,7 +550,7 @@ showDecl exts want_name (IfaceForeign {ifName = tc})
   = ppr tc <+> ptext SLIT("is a foreign type")
 
 showDecl exts want_name (IfaceId {ifName = var, ifType = ty})
-  = ppr var <+> dcolon <+> showType exts ty 
+  = ppr var <+> dcolon <+> showIfaceType exts ty 
 
 showDecl exts want_name (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifSynRhs = mono_ty})
   = hang (ptext SLIT("type") <+> pprIfaceDeclHead [] tycon tyvars)
@@ -603,13 +613,13 @@ showDecl exts want_name (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars =
 	      | otherwise = ptext SLIT("where")
     show_op (IfaceClassOp op dm ty) 
 	| want_name clas || want_name op 
-	= Just (ppr_bndr op <+> dcolon <+> showType exts ty)
+	= Just (ppr_bndr op <+> dcolon <+> showIfaceType exts ty)
 	| otherwise
 	= Nothing
 
-showType :: Bool -> IfaceType -> SDoc
-showType True  ty = pprIfaceType ty -- -fglasgow-exts: print with the foralls
-showType False ty = ppr ty	    -- otherwise, print without the foralls
+showIfaceType :: Bool -> IfaceType -> SDoc
+showIfaceType True  ty = pprIfaceType ty -- -fglasgow-exts: print with the foralls
+showIfaceType False ty = ppr ty	    -- otherwise, print without the foralls
 
 ppr_trim :: (a -> Maybe SDoc) -> [a] -> [SDoc]
 ppr_trim show xs
@@ -630,25 +640,24 @@ ppr_bndr occ = parenSymOcc occ (ppr occ)
 
 addModule :: [FilePath] -> GHCi ()
 addModule files = do
-  state <- getGHCiState
   io (revertCAFs)			-- always revert CAFs on load/add.
   files <- mapM expandPath files
-  let new_targets = files ++ targets state 
-  graph <- io (cmDepAnal (cmstate state) new_targets)
-  (cmstate1, ok, mods) <- io (cmLoadModules (cmstate state) graph)
-  setGHCiState state{ cmstate = cmstate1, targets = new_targets }
-  setContextAfterLoad mods
-  dflags <- getDynFlags
-  modulesLoadedMsg ok mods dflags
+  targets <- mapM (io . GHC.guessTarget) files
+  session <- getSession
+  io (mapM_ (GHC.addTarget session) targets)
+  ok <- io (GHC.load session Nothing)
+  afterLoad ok session
 
 changeDirectory :: String -> GHCi ()
 changeDirectory dir = do
-  state    <- getGHCiState
-  when (targets state /= []) $
+  session <- getSession
+  graph <- io (GHC.getModuleGraph session)
+  when (not (null graph)) $
 	io $ putStr "Warning: changing directory causes all loaded modules to be unloaded,\nbecause the search path has changed.\n"
-  cmstate1 <- io (cmUnload (cmstate state))
-  setGHCiState state{ cmstate = cmstate1, targets = [] }
+  io (GHC.setTargets session [])
+  io (GHC.load session Nothing)
   setContextAfterLoad []
+  io (GHC.workingDirectoryChanged session)
   dir <- expandPath dir
   io (setCurrentDirectory dir)
 
@@ -669,14 +678,14 @@ defineMacro s = do
   let new_expr = '(' : definition ++ ") :: String -> IO String"
 
   -- compile the expression
-  cms <- getCmState
-  maybe_hv <- io (cmCompileExpr cms new_expr)
+  cms <- getSession
+  maybe_hv <- io (GHC.compileExpr cms new_expr)
   case maybe_hv of
      Nothing -> return ()
      Just hv -> io (writeIORef commands --
 		    ((macro_name, keepGoing (runMacro hv)) : cmds))
 
-runMacro :: HValue{-String -> IO String-} -> String -> GHCi ()
+runMacro :: GHC.HValue{-String -> IO String-} -> String -> GHCi ()
 runMacro fun s = do
   str <- io ((unsafeCoerce# fun :: String -> IO String) s)
   stringLoop (lines str)
@@ -700,60 +709,58 @@ loadModule fs = timeIt (loadModule' fs)
 
 loadModule' :: [FilePath] -> GHCi ()
 loadModule' files = do
-  state <- getGHCiState
+  session <- getSession
+
+  -- unload first
+  io (GHC.setTargets session [])
+  io (GHC.load session Nothing)
 
   -- expand tildes
   files <- mapM expandPath files
+  targets <- io (mapM GHC.guessTarget files)
 
-  -- do the dependency anal first, so that if it fails we don't throw
-  -- away the current set of modules.
-  graph <- io (cmDepAnal (cmstate state) files)
+  -- NOTE: we used to do the dependency anal first, so that if it
+  -- fails we didn't throw away the current set of modules.  This would
+  -- require some re-working of the GHC interface, so we'll leave it
+  -- as a ToDo for now.
 
-  -- Dependency anal ok, now unload everything
-  cmstate1 <- io (cmUnload (cmstate state))
-  setGHCiState state{ cmstate = cmstate1, targets = [] }
-
-  io (revertCAFs)  -- always revert CAFs on load.
-  (cmstate2, ok, mods) <- io (cmLoadModules cmstate1 graph)
-  setGHCiState state{ cmstate = cmstate2, targets = files }
-
-  setContextAfterLoad mods
-  dflags <- getDynFlags
-  modulesLoadedMsg ok mods dflags
+  io (GHC.setTargets session targets)
+  ok <- io (GHC.load session Nothing)
+  afterLoad ok session
 
 
 reloadModule :: String -> GHCi ()
 reloadModule "" = do
-  state <- getGHCiState
-  case targets state of
-   [] -> io (putStr "no current target\n")
-   paths -> do
-	-- do the dependency anal first, so that if it fails we don't throw
-	-- away the current set of modules.
-	graph <- io (cmDepAnal (cmstate state) paths)
-
-	io (revertCAFs)		-- always revert CAFs on reload.
-	(cmstate1, ok, mods) 
-		<- io (cmLoadModules (cmstate state) graph)
-        setGHCiState state{ cmstate=cmstate1 }
-	setContextAfterLoad mods
-	dflags <- getDynFlags
-	modulesLoadedMsg ok mods dflags
-
+  io (revertCAFs)		-- always revert CAFs on reload.
+  session <- getSession
+  ok <- io (GHC.load session Nothing)
+  afterLoad ok session
 reloadModule _ = noArgs ":reload"
 
-setContextAfterLoad [] = setContext prel
-setContextAfterLoad (m:_) = do
-  cmstate <- getCmState
-  b <- io (cmModuleIsInterpreted cmstate m)
-  if b then setContext ('*':m) else setContext m
+afterLoad ok session = do
+  io (revertCAFs)  -- always revert CAFs on load.
+  graph <- io (GHC.getModuleGraph session)
+  let mods = map GHC.ms_mod graph
+  setContextAfterLoad mods
+  modulesLoadedMsg ok mods
 
-modulesLoadedMsg ok mods dflags =
+setContextAfterLoad [] = do
+  session <- getSession
+  io (GHC.setContext session [] [prelude_mod])
+setContextAfterLoad (m:_) = do
+  session <- getSession
+  b <- io (GHC.moduleIsInterpreted session m)
+  if b then io (GHC.setContext session [m] []) 
+       else io (GHC.setContext session []  [m])
+
+modulesLoadedMsg :: SuccessFlag -> [Module] -> GHCi ()
+modulesLoadedMsg ok mods = do
+  dflags <- getDynFlags
   when (verbosity dflags > 0) $ do
    let mod_commas 
 	| null mods = text "none."
 	| otherwise = hsep (
-	    punctuate comma (map text mods)) <> text "."
+	    punctuate comma (map pprModule mods)) <> text "."
    case ok of
     Failed ->
        io (putStrLn (showSDoc (text "Failed, modules loaded: " <> mod_commas)))
@@ -763,19 +770,22 @@ modulesLoadedMsg ok mods dflags =
 
 typeOfExpr :: String -> GHCi ()
 typeOfExpr str 
-  = do cms <- getCmState
-       maybe_tystr <- io (cmTypeOfExpr cms str)
-       case maybe_tystr of
-	  Nothing    -> return ()
-	  Just tystr -> io (putStrLn tystr)
+  = do cms <- getSession
+       maybe_ty <- io (GHC.exprType cms str)
+       case maybe_ty of
+	  Nothing -> return ()
+	  Just ty -> do ty' <- cleanType ty
+			tystr <- showForUser (ppr ty')
+		        io (putStrLn (str ++ " :: " ++ tystr))
 
 kindOfType :: String -> GHCi ()
 kindOfType str 
-  = do cms <- getCmState
-       maybe_tystr <- io (cmKindOfType cms str)
-       case maybe_tystr of
+  = do cms <- getSession
+       maybe_ty <- io (GHC.typeKind cms str)
+       case maybe_ty of
 	  Nothing    -> return ()
-	  Just tystr -> io (putStrLn tystr)
+	  Just ty    -> do tystr <- showForUser (ppr ty)
+		           io (putStrLn (str ++ " :: " ++ tystr))
 
 quit :: String -> GHCi Bool
 quit _ = return True
@@ -794,22 +804,22 @@ browseCmd m =
     _ -> throwDyn (CmdLineError "syntax:  :browse <module>")
 
 browseModule m exports_only = do
-  cms <- getCmState
+  s <- getSession
 
-  is_interpreted <- io (cmModuleIsInterpreted cms m)
+  let modl = mkModule m
+  is_interpreted <- io (GHC.moduleIsInterpreted s modl)
   when (not is_interpreted && not exports_only) $
 	throwDyn (CmdLineError ("module '" ++ m ++ "' is not interpreted"))
 
   -- Temporarily set the context to the module we're interested in,
   -- just so we can get an appropriate PrintUnqualified
-  (as,bs) <- io (cmGetContext cms)
-  cms1 <- io (if exports_only then cmSetContext cms [] [prel,m]
-			      else cmSetContext cms [m] [])
-  cms2 <- io (cmSetContext cms1 as bs)
+  (as,bs) <- io (GHC.getContext s)
+  io (if exports_only then GHC.setContext s [] [prelude_mod,modl]
+		      else GHC.setContext s [modl] [])
+  io (GHC.setContext s as bs)
 
-  things <- io (cmBrowseModule cms2 m exports_only)
-
-  let unqual = cmGetPrintUnqual cms1 -- NOTE: cms1 with the new context
+  things <- io (GHC.browseModule s modl exports_only)
+  unqual <- io (GHC.getPrintUnqual s)
 
   dflags <- getDynFlags
   let exts = dopt Opt_GlasgowExts dflags
@@ -833,47 +843,46 @@ setContext str
     sensible m       = looksLikeModuleName m
 
 newContext mods = do
-  cms <- getCmState
-  (as,bs) <- separate cms mods [] []
-  let bs' = if null as && prel `notElem` bs then prel:bs else bs
-  cms' <- io (cmSetContext cms as bs')
-  setCmState cms'
+  session <- getSession
+  (as,bs) <- separate session mods [] []
+  let bs' = if null as && prelude_mod `notElem` bs then prelude_mod:bs else bs
+  io (GHC.setContext session as bs')
 
-separate cmstate []           as bs = return (as,bs)
-separate cmstate (('*':m):ms) as bs = do
-   b <- io (cmModuleIsInterpreted cmstate m)
-   if b then separate cmstate ms (m:as) bs
+separate :: Session -> [String] -> [Module] -> [Module]
+  -> GHCi ([Module],[Module])
+separate session []           as bs = return (as,bs)
+separate session (('*':m):ms) as bs = do
+   let modl = mkModule m
+   b <- io (GHC.moduleIsInterpreted session modl)
+   if b then separate session ms (modl:as) bs
    	else throwDyn (CmdLineError ("module '" ++ m ++ "' is not interpreted"))
-separate cmstate (m:ms)       as bs = separate cmstate ms as (m:bs)
+separate session (m:ms)       as bs = separate session ms as (mkModule m:bs)
 
-prel = "Prelude"
+prelude_mod = mkModule "Prelude"
 
 
 addToContext mods = do
-  cms <- getCmState
-  (as,bs) <- io (cmGetContext cms)
+  cms <- getSession
+  (as,bs) <- io (GHC.getContext cms)
 
   (as',bs') <- separate cms mods [] []
 
   let as_to_add = as' \\ (as ++ bs)
       bs_to_add = bs' \\ (as ++ bs)
 
-  cms' <- io (cmSetContext cms
-			(as ++ as_to_add) (bs ++ bs_to_add))
-  setCmState cms'
+  io (GHC.setContext cms (as ++ as_to_add) (bs ++ bs_to_add))
 
 
 removeFromContext mods = do
-  cms <- getCmState
-  (as,bs) <- io (cmGetContext cms)
+  cms <- getSession
+  (as,bs) <- io (GHC.getContext cms)
 
   (as_to_remove,bs_to_remove) <- separate cms mods [] []
 
   let as' = as \\ (as_to_remove ++ bs_to_remove)
       bs' = bs \\ (as_to_remove ++ bs_to_remove)
 
-  cms' <- io (cmSetContext cms as' bs')
-  setCmState cms'
+  io (GHC.setContext cms as' bs')
 
 ----------------------------------------------------------------------------
 -- Code for `:set'
@@ -918,7 +927,7 @@ setOptions wds =
 
       -- then, dynamic flags
       dflags <- getDynFlags
-      (dflags',leftovers) <- io $ parseDynamicFlags dflags minus_opts
+      (dflags',leftovers) <- io $ GHC.parseDynamicFlags dflags minus_opts
       setDynFlags dflags'
 
         -- update things if the users wants more packages
@@ -979,13 +988,15 @@ optToStr ShowTiming = "s"
 optToStr ShowType   = "t"
 optToStr RevertCAFs = "r"
 
+{- ToDo
 newPackages new_pkgs = do	-- The new packages are already in v_Packages
-  state    <- getGHCiState
-  cmstate1 <- io (cmUnload (cmstate state))
-  setGHCiState state{ cmstate = cmstate1, targets = [] }
+  session <- getSession
+  io (GHC.setTargets session [])
+  io (GHC.load session Nothing)
   dflags   <- getDynFlags
   io (linkPackages dflags new_pkgs)
   setContextAfterLoad []
+-}
 
 -- ---------------------------------------------------------------------------
 -- code for `:show'
@@ -997,21 +1008,33 @@ showCmd str =
 	["linker"]   -> io showLinkerState
 	_ -> throwDyn (CmdLineError "syntax:  :show [modules|bindings]")
 
-showModules
-  = do	{ cms <- getCmState
-	; let show_one ms = io (putStrLn (cmShowModule cms ms))
-	; mapM_ show_one (cmGetModuleGraph cms) }
+showModules = do
+  session <- getSession
+  let show_one ms = do m <- io (GHC.showModule session ms)
+		       io (putStrLn m)
+  graph <- io (GHC.getModuleGraph session)
+  mapM_ show_one graph
 
 showBindings = do
-  cms <- getCmState
-  let
-	unqual = cmGetPrintUnqual cms
---	showBinding b = putStrLn (showSDocForUser unqual (ppr (ifaceTyThing b)))
-	showBinding b = putStrLn (showSDocForUser unqual (ppr (getName b)))
-
-  io (mapM_ showBinding (cmGetBindings cms))
+  s <- getSession
+  unqual <- io (GHC.getPrintUnqual s)
+  bindings <- io (GHC.getBindings s)
+  mapM_ showTyThing bindings
   return ()
 
+showTyThing (AnId id) = do 
+  ty' <- cleanType (GHC.idType id)
+  str <- showForUser (ppr id <> text " :: " <> ppr ty')
+  io (putStrLn str)
+showTyThing _  = return ()
+
+-- if -fglasgow-exts is on we show the foralls, otherwise we don't.
+cleanType :: Type -> GHCi Type
+cleanType ty = do
+  dflags <- getDynFlags
+  if dopt Opt_GlasgowExts dflags 
+	then return ty
+	else return $! GHC.dropForAlls ty
 
 -----------------------------------------------------------------------------
 -- GHCi monad
@@ -1020,8 +1043,7 @@ data GHCiState = GHCiState
      { 
 	progname       :: String,
 	args	       :: [String],
-	targets        :: [FilePath],
-	cmstate        :: CmState,
+	session        :: GHC.Session,
 	options        :: [GHCiOption]
      }
 
@@ -1048,12 +1070,14 @@ getGHCiState   = GHCi $ \r -> readIORef r
 setGHCiState s = GHCi $ \r -> writeIORef r s
 
 -- for convenience...
-getCmState = getGHCiState >>= return . cmstate
-setCmState cms = do s <- getGHCiState; setGHCiState s{cmstate=cms}
+getSession = getGHCiState >>= return . session
 
-getDynFlags = getCmState >>= return . cmGetDFlags
-
-setDynFlags dflags = do s <- getCmState; setCmState (cmSetDFlags s dflags)
+getDynFlags = do
+  s <- getSession
+  io (GHC.getSessionDynFlags s)
+setDynFlags dflags = do 
+  s <- getSession 
+  io (GHC.setSessionDynFlags s dflags)
 
 isOptionSet :: GHCiOption -> GHCi Bool
 isOptionSet opt

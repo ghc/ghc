@@ -11,33 +11,31 @@ module Main (main) where
 
 #include "HsVersions.h"
 
+-- The official GHC API
+import qualified GHC
+import GHC		( Session, DynFlags(..), GhcMode(..), HscTarget(..) )
+import CmdLineParser
+
+-- Implementations of the various modes (--show-iface, mkdependHS. etc.)
+import MkIface		( showIface )
+import DriverPipeline	( oneShot )
+import DriverMkDepend	( doMkDependHS )
+import SysTools		( getTopDir, getUsageMsgPaths )
 #ifdef GHCI
 import InteractiveUI	( ghciWelcomeMsg, interactiveUI )
 #endif
 
-
-import MkIface		( showIface )
-import CompManager	( cmInit, cmLoadModules, cmDepAnal )
-import Config
-import SysTools
-import Packages		( dumpPackages, initPackages, haskell98PackageId,
-			  PackageIdH(..) )
-import DriverPipeline	( runPipeline, staticLink, doMkDLL )
-
-import DriverMkDepend	( doMkDependHS )
-import DriverPhases	( Phase(..), isStopLn, isSourceFilename, anyHsc )
-
-import DynFlags
-import StaticFlags	( parseStaticFlags, staticFlags, v_Ld_inputs )
-import CmdLineParser
+-- Various other random stuff that we need
+import Config		( cProjectVersion, cBooterVersion, cProjectName )
+import Packages		( dumpPackages, initPackages )
+import DriverPhases	( Phase(..), isSourceFilename, anyHsc )
+import StaticFlags	( staticFlags, v_Ld_inputs )
 import BasicTypes	( failed )
 import Util
 import Panic
 
 -- Standard Haskell libraries
-import EXCEPTION	( throwDyn, Exception(..), 
-			  AsyncException(StackOverflow) )
-
+import EXCEPTION	( throwDyn )
 import IO
 import Directory	( doesFileExist, doesDirectoryExist )
 import System		( getArgs, exitWith, ExitCode(..) )
@@ -55,97 +53,65 @@ import Maybe
 -- -K<size>
 
 -----------------------------------------------------------------------------
--- Main loop
+-- GHC's command-line interface
 
 main =
-  ---------------------------------------
-  -- exception handlers
+  GHC.defaultErrorHandler $ do
+  
+  argv0 <- getArgs
+  argv1 <- GHC.init argv0
 
-  -- top-level exception handler: any unrecognised exception is a compiler bug.
-  handle (\exception -> do
-  	   hFlush stdout
-	   case exception of
-		-- an IO exception probably isn't our fault, so don't panic
-		IOException _ ->  hPutStrLn stderr (show exception)
-		AsyncException StackOverflow ->
-			hPutStrLn stderr "stack overflow: use +RTS -K<size> to increase it"
-		_other ->  hPutStr stderr (show (Panic (show exception)))
-	   exitWith (ExitFailure 1)
-         ) $ do
+  -- 2. Parse the "mode" flags (--make, --interactive etc.)
+  (cli_mode, argv2) <- parseModeFlags argv1
 
-  -- all error messages are propagated as exceptions
-  handleDyn (\dyn -> do
-  		hFlush stdout
-  		case dyn of
-		     PhaseFailed _ code -> exitWith code
-		     Interrupted -> exitWith (ExitFailure 1)
-		     _ -> do hPutStrLn stderr (show (dyn :: GhcException))
-			     exitWith (ExitFailure 1)
-	    ) $ do
-
-   installSignalHandlers
-
-   ----------------------------------------
-   -- command-line parsing
-   argv0 <- getArgs
-
-   -- 1. we grab the -B option if there is one
-   let (minusB_args, argv1) = partition (prefixMatch "-B") argv0
-   dflags0 <- initSysTools minusB_args defaultDynFlags
-
-   -- 2. Parse the "mode" flags (--make, --interactive etc.)
-   (cli_mode, argv2) <- parseModeFlags argv1
-
-   -- 3. Parse the static flags
-   argv3 <- parseStaticFlags argv2
-
-   -- 4. Parse the dynamic flags
-   dflags1 <- initDynFlags dflags0
-
-   -- set the default HscTarget.  The HscTarget can be further
-   -- adjusted on a module by module basis, using only the -fvia-C and
-   -- -fasm flags.  If the default HscTarget is not HscC or HscAsm,
-   -- -fvia-C and -fasm have no effect.
-   let lang = case cli_mode of 
-		 DoInteractive  -> HscInterpreted
-		 DoEval _	-> HscInterpreted
-		 _other		-> hscTarget dflags1
-
-   let mode = case cli_mode of
+  let mode = case cli_mode of
 		DoInteractive	-> Interactive
 		DoEval _	-> Interactive
 		DoMake		-> BatchCompile
 		DoMkDependHS	-> MkDepend
 		_		-> OneShot
 
-   let dflags2 = dflags1{ ghcMode = mode,
-                  	  hscTarget  = lang,
-			  -- leave out hscOutName for now
-	                  hscOutName = panic "Main.main:hscOutName not set",
-		  	  verbosity = case cli_mode of
+  -- start our GHC session
+  session <- GHC.newSession mode
+
+  dflags0 <- GHC.getSessionDynFlags session
+
+  -- set the default HscTarget.  The HscTarget can be further
+  -- adjusted on a module by module basis, using only the -fvia-C and
+  -- -fasm flags.  If the default HscTarget is not HscC or HscAsm,
+  -- -fvia-C and -fasm have no effect.
+  let lang = case cli_mode of 
+		 DoInteractive  -> HscInterpreted
+		 DoEval _	-> HscInterpreted
+		 _other		-> hscTarget dflags0
+
+  let dflags1 = dflags0{ ghcMode = mode,
+                  	 hscTarget  = lang,
+			 -- leave out hscOutName for now
+	                 hscOutName = panic "Main.main:hscOutName not set",
+		  	 verbosity = case cli_mode of
 				 	 DoEval _ -> 0
 				 	 _other   -> 1
 			}
 
 	-- The rest of the arguments are "dynamic"
 	-- Leftover ones are presumably files
-   (dflags3, fileish_args) <- parseDynamicFlags dflags2 argv3
+  (dflags2, fileish_args) <- GHC.parseDynamicFlags dflags1 argv2
 
 	-- make sure we clean up after ourselves
-   later (unless (dopt Opt_KeepTmpFiles dflags3) $ 
-	    cleanTempFiles dflags3) $ do
-	-- exceptions will be blocked while we clean the temporary files,
-	-- so there shouldn't be any difficulty if we receive further
-	-- signals.
+  GHC.defaultCleanupHandler dflags2 $ do
 
 	-- Display banner
-   showBanner cli_mode dflags3
+  showBanner cli_mode dflags2
 
 	-- Read the package config(s), and process the package-related
 	-- command-line flags
-   dflags <- initPackages dflags3
+  dflags <- initPackages dflags2
 
-   let
+  -- we've finished manipulating the DynFlags, update the session
+  GHC.setSessionDynFlags session dflags
+
+  let
     {-
       We split out the object files (.o, .dll) and add them
       to v_Ld_inputs for use by the linker.
@@ -173,34 +139,34 @@ main =
     normal_fileish_paths = map normalisePath fileish_args
     (srcs, objs)         = partition looks_like_an_input normal_fileish_paths
 
-    -- Note: have v_Ld_inputs maintain the order in which 'objs' occurred on 
-    --       the command-line.
-   mapM_ (consIORef v_Ld_inputs) (reverse objs)
+  -- Note: have v_Ld_inputs maintain the order in which 'objs' occurred on 
+  --       the command-line.
+  mapM_ (consIORef v_Ld_inputs) (reverse objs)
 
 	---------------- Display configuration -----------
-   when (verbosity dflags >= 4) $
+  when (verbosity dflags >= 4) $
 	dumpPackages dflags
 
-   when (verbosity dflags >= 3) $ do
+  when (verbosity dflags >= 3) $ do
 	hPutStrLn stderr ("Hsc static flags: " ++ unwords staticFlags)
 
 	---------------- Final sanity checking -----------
-   checkOptions cli_mode dflags srcs objs
+  checkOptions cli_mode dflags srcs objs
 
 	---------------- Do the business -----------
-   case cli_mode of
+  case cli_mode of
 	ShowUsage       -> showGhcUsage cli_mode
 	PrintLibdir     -> do d <- getTopDir; putStrLn d
 	ShowVersion     -> showVersion
         ShowNumVersion  -> putStrLn cProjectVersion
         ShowInterface f -> showIface f
-	DoMake 	        -> doMake dflags srcs
-	DoMkDependHS    -> doMkDependHS dflags srcs 
+	DoMake 	        -> doMake session srcs
+	DoMkDependHS    -> doMkDependHS session srcs 
 	StopBefore p    -> oneShot dflags p srcs
-	DoInteractive   -> interactiveUI dflags srcs Nothing
-	DoEval expr     -> interactiveUI dflags srcs (Just expr)
+	DoInteractive   -> interactiveUI session srcs Nothing
+	DoEval expr     -> interactiveUI session srcs (Just expr)
 
-   exitWith ExitSuccess
+  exitWith ExitSuccess
 
 #ifndef GHCI
 interactiveUI _ _ _ = 
@@ -236,7 +202,7 @@ checkOptions cli_mode dflags srcs objs = do
 
 	-- Check that there are some input files
 	-- (except in the interactive case)
-   if null srcs && null objs && not (isInterpretiveMode cli_mode)
+   if null srcs && null objs && needsInputsMode cli_mode
 	then throwDyn (UsageError "no input files")
 	else do
 
@@ -303,6 +269,11 @@ isInteractiveMode _		= False
 isInterpretiveMode DoInteractive = True
 isInterpretiveMode (DoEval _)    = True
 isInterpretiveMode _             = False
+
+needsInputsMode DoMkDependHS	= True
+needsInputsMode (StopBefore _)	= True
+needsInputsMode DoMake		= True
+needsInputsMode _		= False
 
 -- True if we are going to attempt to link in this mode.
 -- (we might not actually link, depending on the GhcLink flag)
@@ -375,79 +346,17 @@ addFlag s = do
   putCmdLineState (m, f, s:flags)
 
 
--- -----------------------------------------------------------------------------
--- Compile files in one-shot mode.
-
-oneShot :: DynFlags -> Phase -> [String] -> IO ()
-oneShot dflags stop_phase srcs = do
-	o_files <- compileFiles stop_phase dflags srcs 
-	doLink dflags stop_phase o_files
-
-compileFiles :: Phase
-	     -> DynFlags
-	     -> [String]	-- Source files
-	     -> IO [String]	-- Object files
-compileFiles stop_phase dflags srcs 
-  = mapM (compileFile stop_phase dflags) srcs
-
-compileFile :: Phase -> DynFlags -> FilePath -> IO FilePath
-compileFile stop_phase dflags src = do
-   exists <- doesFileExist src
-   when (not exists) $ 
-   	throwDyn (CmdLineError ("does not exist: " ++ src))
-   
-   let
-	split    = dopt Opt_SplitObjs dflags
-	o_file   = outputFile dflags
-	ghc_link = ghcLink dflags	-- Set by -c or -no-link
-
-	-- When linking, the -o argument refers to the linker's output.	
-	-- otherwise, we use it as the name for the pipeline's output.
-        maybe_o_file
-	 | StopLn <- stop_phase, not (isNoLink ghc_link) = Nothing
-		-- -o foo applies to linker
-	 | otherwise = o_file
-		-- -o foo applies to the file we are compiling now
-
-        stop_phase' = case stop_phase of 
-			As | split -> SplitAs
-			other      -> stop_phase
-
-   (_, out_file) <- runPipeline stop_phase' dflags
-			 True maybe_o_file src Nothing{-no ModLocation-}
-   return out_file
-
-
-doLink :: DynFlags -> Phase -> [FilePath] -> IO ()
-doLink dflags stop_phase o_files
-  | not (isStopLn stop_phase)
-  = return ()		-- We stopped before the linking phase
-
-  | otherwise
-  = case ghcLink dflags of
-	NoLink     -> return ()
-	StaticLink -> staticLink dflags o_files link_pkgs
-	MkDLL      -> doMkDLL dflags o_files link_pkgs
-  where
-   -- Always link in the haskell98 package for static linking.  Other
-   -- packages have to be specified via the -package flag.
-    link_pkgs
-	  | ExtPackage h98_id <- haskell98PackageId (pkgState dflags) = [h98_id]
-	  | otherwise = []
-
-
 -- ----------------------------------------------------------------------------
 -- Run --make mode
 
-doMake :: DynFlags -> [String] -> IO ()
-doMake dflags []    = throwDyn (UsageError "no input files")
-doMake dflags srcs  = do 
-    state  <- cmInit dflags
-    graph  <- cmDepAnal state srcs
-    (_, ok_flag, _) <- cmLoadModules state graph
+doMake :: Session -> [String] -> IO ()
+doMake sess []    = throwDyn (UsageError "no input files")
+doMake sess srcs  = do 
+    targets <- mapM GHC.guessTarget srcs
+    GHC.setTargets sess targets
+    ok_flag <- GHC.load sess Nothing
     when (failed ok_flag) (exitWith (ExitFailure 1))
     return ()
-
 
 -- ---------------------------------------------------------------------------
 -- Various banners and verbosity output.
