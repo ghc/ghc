@@ -484,9 +484,9 @@ instance Typeable7 (,,,,,,) where
   typeOf7 tu = mkTyConApp tup7Tc []
 
 #endif /* __NHC__ */
-INSTANCE_TYPEABLE1(Ptr,ptrTc,"Foreign.Ptr.Ptr")
-INSTANCE_TYPEABLE1(StablePtr,stableptrTc,"Foreign.StablePtr.StablePtr")
-INSTANCE_TYPEABLE1(IORef,iorefTc,"Data.IORef.IORef")
+INSTANCE_TYPEABLE1(Ptr,ptrTc,"Ptr")
+INSTANCE_TYPEABLE1(StablePtr,stableptrTc,"StablePtr")
+INSTANCE_TYPEABLE1(IORef,iorefTc,"IORef")
 
 -------------------------------------------------------
 --
