@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.5 2000/10/27 13:50:25 sewardj Exp $
+-- $Id: DriverUtil.hs,v 1.6 2000/11/10 14:29:21 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -41,8 +41,6 @@ long_usage = do
      dump "" = return ()
      dump ('$':'$':s) = hPutStr stderr get_prog_name >> dump s
      dump (c:s) = hPutChar stderr c >> dump s
-
-version_str = cProjectVersion
 
 data BarfKind
   = PhaseFailed String ExitCode
@@ -164,10 +162,3 @@ newdir dir s = dir ++ '/':drop_longest_prefix s '/'
 
 remove_spaces :: String -> String
 remove_spaces = reverse . dropWhile isSpace . reverse . dropWhile isSpace
-
-booter_version
- = case "\ 
-	\ __GLASGOW_HASKELL__" of
-    ' ':n:ns -> n:'.':ns
-    ' ':m    -> m
-

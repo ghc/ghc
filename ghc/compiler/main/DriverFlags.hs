@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.16 2000/11/08 16:24:34 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.17 2000/11/10 14:29:21 simonmar Exp $
 --
 -- Driver flags
 --
@@ -147,9 +147,9 @@ static_flags =
 
       ------- version ----------------------------------------------------
   ,  ( "-version"	 , NoArg (do hPutStrLn stdout (cProjectName
-				      ++ ", version " ++ version_str)
+				      ++ ", version " ++ cProjectVersion)
 				     exitWith ExitSuccess))
-  ,  ( "-numeric-version", NoArg (do hPutStrLn stdout version_str
+  ,  ( "-numeric-version", NoArg (do hPutStrLn stdout cProjectVersion
 				     exitWith ExitSuccess))
 
       ------- verbosity ----------------------------------------------------

@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.18 2000/11/08 15:25:25 simonmar Exp $
+-- $Id: Main.hs,v 1.19 2000/11/10 14:29:21 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -208,9 +208,9 @@ main =
    verb <- readIORef v_Verbose
 
    when verb (do hPutStr stderr "Glasgow Haskell Compiler, Version "
- 	         hPutStr stderr version_str
+ 	         hPutStr stderr cProjectVersion
 	         hPutStr stderr ", for Haskell 98, compiled by GHC version "
-	         hPutStrLn stderr booter_version)
+	         hPutStrLn stderr cBooterVersion)
 
    when verb (hPutStrLn stderr ("Using package config file: " ++ conf_file))
 

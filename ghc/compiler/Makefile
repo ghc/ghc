@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.112 2000/11/08 13:51:16 simonmar Exp $
+# $Id: Makefile,v 1.113 2000/11/10 14:29:20 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -39,6 +39,7 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cProjectName          = \"$(ProjectName)\"" >> $(CONFIG_HS)
 	@echo "cProjectVersion       = \"$(ProjectVersion)\"" >> $(CONFIG_HS)
 	@echo "cProjectVersionInt    = \"$(ProjectVersionInt)\"" >> $(CONFIG_HS)
+	@echo "cBooterVersion	     = \"$(GhcVersion)\"" >> $(CONFIG_HS)
 	@echo "cHscIfaceFileVersion  = \"$(HscIfaceFileVersion)\"" >> $(CONFIG_HS)
 	@echo "cHOSTPLATFORM         = \"$(HOSTPLATFORM)\"" >> $(CONFIG_HS)
 	@echo "cTARGETPLATFORM       = \"$(TARGETPLATFORM)\"" >> $(CONFIG_HS)
