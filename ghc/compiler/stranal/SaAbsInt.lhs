@@ -816,19 +816,6 @@ cheapFixpoint anal ids rhss env
 	  AbsAnal -> AbsBot
 \end{code}
 
-\begin{verbatim}
-mkLookupFun :: (key -> key -> Bool)	-- Equality predicate
-	    -> (key -> key -> Bool)	-- Less-than predicate
-	    -> [(key,val)] 		-- The assoc list
-	    -> key 			-- The key
-	    -> Maybe val		-- The corresponding value
-
-mkLookupFun eq lt alist s
-  = case [a | (s',a) <- alist, s' `eq` s] of
-      []    -> Nothing
-      (a:_) -> Just a
-\end{verbatim}
-
 \begin{code}
 fixpoint :: AnalysisKind -> [Id] -> [CoreExpr] -> AbsValEnv -> [AbsVal]
 
