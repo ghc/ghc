@@ -36,7 +36,7 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_AutoSccsOnAllToplevs,
 			  opt_AutoSccsOnExportedToplevs, opt_CompilingGhcInternals )
 import CostCentre	( mkAutoCC, IsCafCC(..), mkAllDictsCC, preludeDictsCostCentre )
 import Id		( idType, SYN_IE(DictVar), GenId, SYN_IE(Id) )
-import ListSetOps	( minusList, intersectLists )
+--ToDo: rm import ListSetOps	( minusList, intersectLists )
 import Name		( isExported )
 import PprType		( GenType )
 import Outputable	( PprStyle(..) )
