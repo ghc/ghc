@@ -1482,7 +1482,7 @@ qualifier list has just one element, a boolean expression.
 <Para>
 The foreign interface consists of language and library support. The former
 is described later in <XRef LinkEnd="ffi">; the latter is outlined below,
-and detailed in the hslibs documentation.
+and detailed in <XRef LinkEnd="sec-Foreign">.
 </Para>
 
 <Sect2 id="glasgow-foreign-headers">
