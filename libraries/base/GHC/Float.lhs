@@ -534,14 +534,21 @@ roundTo base d is =
 -- by R.G. Burger and R.K. Dybvig in PLDI 96.
 -- This version uses a much slower logarithm estimator. It should be improved.
 
--- floatToDigits takes a base and a non-negative RealFloat number,
+-- | @floatToDigits@ takes a base and a non-negative RealFloat number,
 -- and returns a list of digits and an exponent. 
 -- In particular, if x>=0, and
+--
+-- @
 --	floatToDigits base x = ([d1,d2,...,dn], e)
+-- @
+--
 -- then
---	(a) n >= 1
---	(b) x = 0.d1d2...dn * (base**e)
--- 	(c) 0 <= di <= base-1
+--
+--	(1) n >= 1
+--
+--	(2) x = 0.d1d2...dn * (base**e)
+--
+-- 	(3) 0 <= di <= base-1
 
 floatToDigits :: (RealFloat a) => Integer -> a -> ([Int], Int)
 floatToDigits _ 0 = ([0], 0)
