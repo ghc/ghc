@@ -181,7 +181,7 @@ HASKELL_POST_COMPILE=$(patsubst %,$(HASKELL_SPLIT_POST),$(filter -split-objs,$(H
 
 %.txt : %.lit
 	@$(RM) $@
-	$(LIT2TEXT) -c $(LIT2TEXT_OPTS) -o $@ $<
+	$(LIT2TEXT) $(LIT2TEXT_OPTS) -o $@ $<
 	@chmod 444 $@
 
 %.ihtml : %.lit
