@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.26 2001/08/15 09:22:19 rrt Exp $
+# 	$Id: opts.mk,v 1.27 2001/10/23 15:37:09 rrt Exp $
 #
 #################################################################################
 
@@ -44,28 +44,6 @@
 # All these options should be set with
 #	thing += extra-options
 # in case someone higher up the include hierarchy has already added some
-
-
-#################################################################################
-#
-#		Global option flags for utilities
-#
-#################################################################################
-
-# These flags make flex 8-bit
-SRC_FLEX_OPTS	+= -8
-
-SRC_INSTALL_BIN_OPTS	+= -s
-
-# lint gets all CPP's flags too
-SRC_LINT_OPTS		+= -axz -DLINT $(SRC_CPP_OPTS)
-WAY$(_way)_LINT_OPTS	+= WAY$(_way)_CPP_OPTS
-
-# Default fptools options for dllwrap.
-SRC_BLD_DLL_OPTS += -mno-cygwin -mwin32 --target=i386-mingw32
-
-# Flags for CPP when running GreenCard on .pgc files
-GC_CPP_OPTS += -P -E -x c -traditional -D__GLASGOW_HASKELL__
 
 
 #################################################################################
