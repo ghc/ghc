@@ -28,6 +28,9 @@ Email: glasgow-haskell-\{users,bugs\}-request\@dcs.gla.ac.uk}
 
 \section[release-notes]{Release notes}
 
+\subsection[release-2-09]{Release notes for version~2.09---11/97}
+\input{2-09-notes.lit}
+
 \subsection[release-2-08]{Release notes for version~2.08---10/97}
 \input{2-08-notes.lit}
 
