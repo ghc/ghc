@@ -34,7 +34,7 @@ inputReady(int fd, int msecs, int isSock)
 	 */
 	maxfd = fd + 1;
 	tv.tv_sec  = msecs / 1000;
-	tv.tv_usec = msecs % 1000;
+	tv.tv_usec = (msecs % 1000) * 1000;
 	
 	while ((ready = select(maxfd, &rfd, NULL, NULL, &tv)) < 0 ) {
 	    if (errno != EINTR ) {
