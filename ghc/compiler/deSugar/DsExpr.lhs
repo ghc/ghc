@@ -457,8 +457,11 @@ For record construction we do this (assuming T has three arguments)
 recConErr then converts its arugment string into a proper message
 before printing it as
 
-	M.lhs, line 230: missing field op1 was evaluated
+	M.lhs, line 230: Missing field in record construction op1
 
+
+We also handle C{} as valid construction syntax for an unlabelled
+constructor C, setting all of C's fields to bottom.
 
 \begin{code}
 dsExpr (RecordConOut data_con con_expr rbinds)
@@ -472,8 +475,16 @@ dsExpr (RecordConOut data_con con_expr rbinds)
 	      (rhs:rhss) -> ASSERT( null rhss )
 		 	    dsExpr rhs
 	      []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (showSDoc (ppr lbl))
+	unlabelled_bottom arg_ty = mkErrorAppDs rEC_CON_ERROR_ID arg_ty ""
+
+	labels = dataConFieldLabels data_con
     in
-    mapDs mk_arg (zipEqual "dsExpr:RecordCon" arg_tys (dataConFieldLabels data_con)) `thenDs` \ con_args ->
+
+    (if null labels
+	then mapDs unlabelled_bottom arg_tys
+	else mapDs mk_arg (zipEqual "dsExpr:RecordCon" arg_tys labels))
+	`thenDs` \ con_args ->
+
     returnDs (mkApps con_expr' con_args)
 \end{code}
 
