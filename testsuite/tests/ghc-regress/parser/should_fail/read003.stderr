@@ -3,4 +3,11 @@ read003.hs:4:
     Occurs check: cannot construct the infinite type: t = (t, [a], t1)
 	Expected type: (t, [a], t1)
 	Inferred type: t
-    In a pattern binding: a
+    In the right-hand side of a pattern binding: a
+    In a pattern binding:
+	~(a, b, c)
+	    | nullity b = a
+	    | nullity c = a
+	    | otherwise = a
+	    where
+		nullity = null

@@ -1,7 +1,7 @@
 
-read014.hs:4: Warning: Definition but no type signature for `ng1'
-
 read014.hs:4: Warning: Defined but not used: x
+
+read014.hs:4: Warning: Definition but no type signature for `ng1'
 
 read014.hs:6:
     Warning: No explicit method nor default method for `*'
