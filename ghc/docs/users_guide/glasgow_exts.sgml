@@ -2870,49 +2870,6 @@ scope over the methods defined in the <literal>where</literal> part.  For exampl
 </sect3>
 
 <sect3>
-<title>Result type signatures</title>
-
-<para>
-
-<itemizedlist>
-<listitem>
-
-<para>
- The result type of a function can be given a signature,
-thus:
-
-
-<programlisting>
-  f (x::a) :: [a] = [x,x,x]
-</programlisting>
-
-
-The final <literal>:: [a]</literal> after all the patterns gives a signature to the
-result type.  Sometimes this is the only way of naming the type variable
-you want:
-
-
-<programlisting>
-  f :: Int -> [a] -> [a]
-  f n :: ([a] -> [a]) = let g (x::a, y::a) = (y,x)
-                        in \xs -> map g (reverse xs `zip` xs)
-</programlisting>
-
-
-</para>
-</listitem>
-
-</itemizedlist>
-
-</para>
-
-<para>
-Result type signatures are not yet implemented in Hugs.
-</para>
-
-</sect3>
-
-<sect3>
 <title>Where a pattern type signature can occur</title>
 
 <para>
@@ -3025,6 +2982,61 @@ in <literal>f4</literal>'s scope.
 </para>
 
 </sect3>
+
+<sect3>
+<title>Result type signatures</title>
+
+<para>
+The result type of a function can be given a signature, thus:
+
+
+<programlisting>
+  f (x::a) :: [a] = [x,x,x]
+</programlisting>
+
+
+The final <literal>:: [a]</literal> after all the patterns gives a signature to the
+result type.  Sometimes this is the only way of naming the type variable
+you want:
+
+
+<programlisting>
+  f :: Int -> [a] -> [a]
+  f n :: ([a] -> [a]) = let g (x::a, y::a) = (y,x)
+                        in \xs -> map g (reverse xs `zip` xs)
+</programlisting>
+
+</para>
+<para>
+The type variables bound in a result type signature scope over the right hand side
+of the definition. However, consider this corner-case:
+<programlisting>
+  rev1 :: [a] -> [a] = \xs -> reverse xs
+
+  foo ys = rev (ys::[a])
+</programlisting>
+The signature on <literal>rev1</literal> is considered a pattern type signature, not a result
+type signature, and the type variables it binds have the same scope as <literal>rev1</literal>
+itself (i.e. the right-hand side of <literal>rev1</literal> and the rest of the module too).
+In particular, the expression <literal>(ys::[a])</literal> is OK, because the type variable <literal>a</literal>
+is in scope (otherwise it would mean <literal>(ys::forall a.[a])</literal>, which would be rejected).  
+</para>
+<para>
+As mentioned above, <literal>rev1</literal> is made monomorphic by this scoping rule.
+For example, the following program would be rejected, because it claims that <literal>rev1</literal>
+is polymorphic:
+<programlisting>
+  rev1 :: [b] -> [b]
+  rev1 :: [a] -> [a] = \xs -> reverse xs
+</programlisting>
+</para>
+
+<para>
+Result type signatures are not yet implemented in Hugs.
+</para>
+
+</sect3>
+
 </sect2>
 
 <sect2 id="newtype-deriving">
