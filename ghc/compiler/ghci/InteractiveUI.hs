@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.76 2001/06/15 11:40:29 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.77 2001/06/18 09:09:28 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -672,7 +672,7 @@ linkPackages cmdline_lib_specs pkgs
         mapM_ (preloadLib lib_paths) cmdline_lib_specs
      where
 	-- packages that are already linked into GHCi
-	loaded = [ "concurrent", "posix", "text", "util" ]
+	loaded = [ "gmp", "rts", "std", "concurrent", "posix", "text", "util" ]
 
         preloadLib :: [String] -> LibrarySpec -> IO ()
         preloadLib lib_paths lib_spec
