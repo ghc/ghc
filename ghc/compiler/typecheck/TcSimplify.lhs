@@ -2302,7 +2302,7 @@ addNoInstanceErrs mb_what givens dicts
       = vcat [	addInstLoc [dict] ((ptext SLIT("Overlapping instances for") 
 					<+> pprPred (dictPred dict))),
     		sep [ptext SLIT("Matching instances") <> colon,
-    		     nest 2 (vcat [pprDFuns dfuns, text "---", pprDFuns unifiers])],
+    		     nest 2 (vcat [pprDFuns dfuns, pprDFuns unifiers])],
 		ASSERT( not (null matches) )
 		if not (isSingleton matches)
     		then 	-- Two or more matches
