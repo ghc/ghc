@@ -1163,6 +1163,12 @@ of one ptr (not bytes).
 #define indexFloatArrayZh(r,a,i)  indexFloatOffAddrZh(r,BYTE_ARR_CTS(a),i)
 #define indexDoubleArrayZh(r,a,i) indexDoubleOffAddrZh(r,BYTE_ARR_CTS(a),i)
 
+#define indexCharOffForeignObjZh(r,fo,i)   indexCharOffAddrZh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexIntOffForeignObjZh(r,fo,i)    indexIntOffAddrZh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexAddrOffForeignObjZh(r,fo,i)   indexAddrOffAddrZh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexFloatOffForeignObjZh(r,fo,i)  indexFloatOffAddrZh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexDoubleOffForeignObjZh(r,fo,i) indexDoubleOffAddrZh(r,ForeignObj_CLOSURE_DATA(fo),i)
+
 #define indexCharOffAddrZh(r,a,i)   r= ((C_ *)(a))[i]
 #define indexIntOffAddrZh(r,a,i)    r= ((I_ *)(a))[i]
 #define indexAddrOffAddrZh(r,a,i)   r= ((PP_)(a))[i]
