@@ -1132,7 +1132,7 @@ if test "$ac_cv_type_signal" = void; then
 fi
 
 dnl ** check for more functions
-AC_CHECK_FUNCS([ftime getclock getgrgid_r getgrnam_r getpagesize getpwnam_r getpwuid_r getrusage gettimeofday gmtime_r localtime_r lstat readdir_r readlink setenv setitimer siginterrupt symlink sysconf times unsetenv])
+AC_CHECK_FUNCS([ftime getclock getgrgid_r getgrnam_r getpagesize getpwnam_r getpwuid_r getpwnam getpwuid getrusage gettimeofday gmtime_r localtime_r lstat readdir_r readlink setenv setitimer siginterrupt symlink sysconf times unsetenv])
 
 dnl ** Solaris2 needs additionl flag for getpw*_r()
 case "$TargetPlatform" in
