@@ -85,9 +85,9 @@ freeNames x = ( (refsFun x)
 
 Print the free names for the sample program sys1; see module
 FunDatatypes.hs. This should print the list ["id","C"] because the
-"Prelude" function id is used in the sample program, and also
-the term constructor "C" occurs in a pattern; we assume a language
-without explicit datatype declatations ;-)
+"Prelude" function "id" is used in the sample program, and also the
+term constructor "C" occurs in a pattern; we assume a language without
+explicit datatype declarations ;-)
 
 -}
 
