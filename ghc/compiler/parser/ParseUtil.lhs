@@ -108,6 +108,8 @@ checkInstType t
 		checkDictTy ty [] `thenP` \ dict_ty ->
 	      	returnP (HsForAllTy tvs ctxt dict_ty)
 
+        HsParTy ty -> checkInstType ty
+
 	ty ->   checkDictTy ty [] `thenP` \ dict_ty->
 	      	returnP (HsForAllTy Nothing [] dict_ty)
 
@@ -127,17 +129,22 @@ checkTyClHdr :: RdrNameHsType -> P (RdrName, [RdrNameHsTyVar])
 checkTyClHdr ty
   = go ty []
   where
-    go (HsTyVar tc) acc 
+    go (HsTyVar tc)    acc 
 	| not (isRdrTyVar tc) = checkTyVars acc		`thenP` \ tvs ->
 				returnP (tc, tvs)
-    go (HsOpTy t1 (HsTyOp tc) t2) acc  = checkTyVars (t1:t2:acc)	`thenP` \ tvs ->
-				         returnP (tc, tvs)
+    go (HsOpTy t1 (HsTyOp tc) t2) acc  
+			      = checkTyVars (t1:t2:acc)	`thenP` \ tvs ->
+				returnP (tc, tvs)
+    go (HsParTy ty)    acc    = go ty acc
     go (HsAppTy t1 t2) acc    = go t1 (t2:acc)
     go other	       acc    = parseError "Malformed LHS to type of class declaration"
 
 checkContext :: RdrNameHsType -> P RdrNameContext
 checkContext (HsTupleTy _ ts) 	-- (Eq a, Ord b) shows up as a tuple type
   = mapP checkPred ts
+
+checkContext (HsParTy ty)	-- to be sure HsParTy doesn't get into the way
+  = checkContext ty
 
 checkContext (HsTyVar t)	-- Empty context shows up as a unit type ()
   | t == unitTyCon_RDR = returnP []
@@ -157,12 +164,14 @@ checkPred ty
     go (HsTyVar t) args   | not (isRdrTyVar t) 
 		  	  = returnP (HsClassP t args)
     go (HsAppTy l r) args = go l (r:args)
+    go (HsParTy t)   args = go t args
     go _ 	     _    = parseError "Illegal class assertion"
 
 checkDictTy :: RdrNameHsType -> [RdrNameHsType] -> P RdrNameHsType
 checkDictTy (HsTyVar t) args@(_:_) | not (isRdrTyVar t) 
   	= returnP (mkHsDictTy t args)
 checkDictTy (HsAppTy l r) args = checkDictTy l (r:args)
+checkDictTy (HsParTy t)   args = checkDictTy t args
 checkDictTy _ _ = parseError "Malformed context in instance header"
 
 
@@ -246,7 +255,7 @@ checkPat e [] = case e of
 			      returnP (RecPatIn c fs)
 -- Generics 
 	HsType ty          -> returnP (TypePatIn ty) 
-	_ -> patFail
+	_                  -> patFail
 
 checkPat _ _ = patFail
 

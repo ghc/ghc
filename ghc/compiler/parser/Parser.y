@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.99 2002/06/05 14:39:28 simonpj Exp $
+$Id: Parser.y,v 1.100 2002/06/07 07:16:05 chak Exp $
 
 Haskell grammar.
 
@@ -805,9 +805,9 @@ atype :: { RdrNameHsType }
 	| tyvar				{ HsTyVar $1 }
 	| '(' type ',' comma_types1 ')'	{ HsTupleTy (mkHsTupCon tcName Boxed  ($2:$4)) ($2:$4) }
 	| '(#' comma_types1 '#)'	{ HsTupleTy (mkHsTupCon tcName Unboxed     $2) $2      }
-	| '[' type ']'			{ HsListTy $2 }
-	| '[:' type ':]'		{ HsPArrTy $2 }
-	| '(' ctype ')'		        { $2 }
+	| '[' type ']'			{ HsListTy  $2 }
+	| '[:' type ':]'		{ HsPArrTy  $2 }
+	| '(' ctype ')'		        { HsParTy   $2 }
 	| '(' ctype '::' kind ')'	{ HsKindSig $2 $4 }
 -- Generics
         | INTEGER                       { HsNumTy $1 }

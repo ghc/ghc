@@ -110,6 +110,9 @@ rnHsType doc (HsOpTy ty1 op ty2)
     lookupTyFixityRn op'	`thenRn` \ fix ->
     mkHsOpTyRn op' fix ty1' ty2'
 
+rnHsType doc (HsParTy ty)
+  = rnHsType doc ty 	        `thenRn` \ ty' ->
+    returnRn (HsParTy ty')
 
 rnHsType doc (HsNumTy i)
   | i == 1    = returnRn (HsNumTy i)

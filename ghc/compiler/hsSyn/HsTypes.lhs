@@ -109,7 +109,7 @@ data HsType name
   | HsAppTy		(HsType name)
 			(HsType name)
 
-  | HsFunTy		(HsType name) -- function type
+  | HsFunTy		(HsType name)   -- function type
 			(HsType name)
 
   | HsListTy		(HsType name)	-- Element type
@@ -120,6 +120,11 @@ data HsType name
 			[HsType name]	-- Element types (length gives arity)
 
   | HsOpTy		(HsType name) (HsTyOp name) (HsType name)
+
+  | HsParTy		(HsType name)   -- Parenthesis preserved for the
+					-- precedence parser; are removed by
+					-- the type checker
+
   | HsNumTy             Integer		-- Generics only
 
   -- these next two are only used in interfaces
@@ -310,16 +315,22 @@ ppr_mono_ty ctxt_prec (HsPArrTy ty)	  = pabrackets (ppr_mono_ty pREC_TOP ty)
   where
     pabrackets p = ptext SLIT("[:") <> p <> ptext SLIT(":]")
 
-ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty)
-  = maybeParen (ctxt_prec >= pREC_CON)
-	       (hsep [ppr_mono_ty pREC_FUN fun_ty, ppr_mono_ty pREC_CON arg_ty])
+ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty) =
+  maybeParen (ctxt_prec >= pREC_CON)
+	     (hsep [ppr_mono_ty pREC_FUN fun_ty, ppr_mono_ty pREC_CON arg_ty])
 
 ppr_mono_ty ctxt_prec (HsPredTy pred) 
   = braces (ppr pred)
 
--- Generics
-ppr_mono_ty ctxt_prec (HsNumTy n) = integer  n
-ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2) = ppr ty1 <+> ppr op <+> ppr ty2
+ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2) = 
+  maybeParen (ctxt_prec >= pREC_FUN) 
+	     (ppr_mono_ty pREC_FUN ty1 <+> ppr op <+> ppr_mono_ty pREC_FUN ty2)
+
+ppr_mono_ty ctxt_prec (HsParTy ty)        = ppr_mono_ty ctxt_prec ty
+  -- `HsParTy' isn't useful for pretty printing, as it is removed by the type
+  -- checker and we need to be able to pretty print after type checking 
+
+ppr_mono_ty ctxt_prec (HsNumTy n)         = integer n  -- generics only
 \end{code}
 
 

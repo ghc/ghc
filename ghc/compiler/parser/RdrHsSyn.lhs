@@ -149,8 +149,9 @@ extract_ty (HsFunTy ty1 ty2)          acc = extract_ty ty1 (extract_ty ty2 acc)
 extract_ty (HsPredTy p)		      acc = extract_pred p acc
 extract_ty (HsTyVar tv)               acc = tv : acc
 extract_ty (HsForAllTy Nothing cx ty) acc = extract_ctxt cx (extract_ty ty acc)
--- Generics
 extract_ty (HsOpTy ty1 nam ty2)       acc = extract_ty ty1 (extract_ty ty2 acc)
+extract_ty (HsParTy ty)               acc = extract_ty ty acc
+-- Generics
 extract_ty (HsNumTy num)              acc = acc
 extract_ty (HsKindSig ty k)	      acc = extract_ty ty acc
 extract_ty (HsForAllTy (Just tvs) ctxt ty) 

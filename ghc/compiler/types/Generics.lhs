@@ -82,7 +82,8 @@ patterns (not Unit, this is done differently) is done in mk_inst_info
 HsOpTy is tied to Generic definitions which is not a very good design
 feature, indeed a bug. However, the check is easy to move from
 tcHsType back to mk_inst_info and everything will be fine. Also see
-bug #5.
+bug #5. [I don't think that this is the case anymore after SPJ's latest
+changes in that regard.  Delete this comment?  -=chak/7Jun2]
 
 Generics.lhs
 

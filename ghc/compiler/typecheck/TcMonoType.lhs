@@ -299,6 +299,9 @@ kcHsType ty@(HsOpTy ty1 (HsTyOp op) ty2)
     tcAddErrCtxt (appKindCtxt (ppr ty))	$
     kcAppKind op_kind  ty1_kind		`thenTc` \ op_kind' ->
     kcAppKind op_kind' ty2_kind
+
+kcHsType (HsParTy ty)		-- Skip parentheses markers
+  = kcHsType ty
    
 kcHsType (HsNumTy _)		-- The unit type for generics
   = returnTc liftedTypeKind
@@ -440,6 +443,9 @@ tc_type (HsOpTy ty1 (HsTyOp op) ty2)
   = tc_type ty1 `thenTc` \ tau_ty1 ->
     tc_type ty2 `thenTc` \ tau_ty2 ->
     tc_fun_type op [tau_ty1,tau_ty2]
+
+tc_type (HsParTy ty)		-- Remove the parentheses markers
+  = tc_type ty
 
 tc_type (HsNumTy n)
   = ASSERT(n== 1)
