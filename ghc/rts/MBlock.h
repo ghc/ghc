@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.h,v 1.7 2000/12/04 12:31:21 simonmar Exp $
+ * $Id: MBlock.h,v 1.8 2001/01/16 11:53:32 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -44,6 +44,10 @@ extern void * getMBlocks(nat n);
 #define HEAP_BASE 0x50000000
 
 #elif hpux_TARGET_OS
+/* guess */
+#define HEAP_BASE 0x50000000
+
+#elif macosx_TARGET_OS
 /* guess */
 #define HEAP_BASE 0x50000000
 
