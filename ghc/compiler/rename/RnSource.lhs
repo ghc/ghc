@@ -187,7 +187,7 @@ finishSourceInstDecl (InstDecl _       mbinds uprags _               _      )
 	-- Rename the bindings
 	-- NB meth_names can be qualified!
     checkDupNames meth_doc meth_names 		`thenRn_`
-    extendTyVarEnvFVRn (map hsTyVarName inst_tyvars) (		
+    extendTyVarEnvForMethodBinds inst_tyvars (		
 	rnMethodBinds cls [] mbinds
     )						`thenRn` \ (mbinds', meth_fvs) ->
     let 
@@ -345,7 +345,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdName = cname,
 	-- we jolly well ought to get a 'hit' there!
     mapRn lookupSysBinder names			`thenRn` \ names' ->
 
-	-- Tyvars scope over bindings and context
+	-- Tyvars scope over superclass context and method signatures
     bindTyVarsRn cls_doc tyvars			$ \ tyvars' ->
 
 	-- Check the superclasses
@@ -420,7 +420,7 @@ finishSourceTyClDecl (ClassDecl {tcdMeths = Just mbinds, tcdLoc = src_loc})	-- G
 	-- easy to group together in the typechecker.  
 	-- Hence the 
     pushSrcLocRn src_loc				$
-    extendTyVarEnvFVRn (map hsTyVarName tyvars)		$
+    extendTyVarEnvForMethodBinds tyvars			$
     getLocalNameEnv					`thenRn` \ name_env ->
     let
 	meth_rdr_names_w_locs = collectLocatedMonoBinders mbinds
@@ -445,6 +445,18 @@ finishSourceTyClDecl _ tycl_decl@(TyData {tcdDerivs = derivings})
 
 finishSourceTyClDecl _ tycl_decl = returnRn (tycl_decl, emptyFVs)
 	-- Not a class declaration
+\end{code}
+
+For the method bindings in class and instance decls, we extend the 
+type variable environment iff -fglasgow-exts
+
+\begin{code}
+extendTyVarEnvForMethodBinds tyvars thing_inside
+  = doptRn Opt_GlasgowExts			`thenRn` \ opt_GlasgowExts ->
+    if opt_GlasgowExts then
+	extendTyVarEnvFVRn (map hsTyVarName tyvars) thing_inside
+    else
+	thing_inside
 \end{code}
 
 

@@ -19,7 +19,6 @@ import RdrName	( elemRdrEnv )
 import NameSet	( FreeVars )
 import Unique	( Uniquable(..) )
 
-import CmdLineOpts	( DynFlag(Opt_GlasgowExts) )
 import List		( nub )
 import ListSetOps	( removeDupsEq )
 import Outputable
@@ -65,17 +64,16 @@ rnHsType doc (HsForAllTy Nothing ctxt ty)
 	-- Given the signature  C => T  we universally quantify 
 	-- over FV(T) \ {in-scope-tyvars} 
   = getLocalNameEnv		`thenRn` \ name_env ->
-    doptRn Opt_GlasgowExts	`thenRn` \ opt_GlasgowExts ->
     let
 	mentioned_in_tau  = extractHsTyRdrTyVars ty
 	mentioned_in_ctxt = extractHsCtxtRdrTyVars ctxt
 	mentioned	  = nub (mentioned_in_tau ++ mentioned_in_ctxt)
 
-	-- Don't quantify over type variables that are in scope,
-	-- when GlasgowExts is on
-	forall_tyvars
-	   | opt_GlasgowExts = filter (not . (`elemRdrEnv` name_env)) mentioned
-	   | otherwise	     = mentioned
+	-- Don't quantify over type variables that are in scope;
+	-- when GlasgowExts is off, there usually won't be any, except for
+	-- class signatures:
+	--	class C a where { op :: a -> a }
+	forall_tyvars = filter (not . (`elemRdrEnv` name_env)) mentioned
     in
     rnForAll doc (map UserTyVar forall_tyvars) ctxt ty
 
