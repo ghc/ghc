@@ -4,8 +4,8 @@
 \section[RnSource]{Main pass of renamer}
 
 \begin{code}
-module RnSource ( rnDecl, rnTyClDecl, rnRuleDecl, rnInstDecl,
-		  rnSourceDecls, rnHsType, rnHsSigType
+module RnSource ( rnDecl, rnTyClDecl, rnRuleDecl, rnInstDecl, rnSourceDecls, 
+		  rnHsType, rnHsSigType, rnHsTypeFVs, rnHsSigTypeFVs
 	) where
 
 #include "HsVersions.h"
@@ -13,7 +13,7 @@ module RnSource ( rnDecl, rnTyClDecl, rnRuleDecl, rnInstDecl,
 import RnExpr
 import HsSyn
 import HsTypes		( hsTyVarNames, pprHsContext )
-import RdrName		( RdrName, isRdrDataCon, rdrNameOcc, mkRdrNameWkr )
+import RdrName		( RdrName, isRdrDataCon, rdrNameOcc, mkRdrNameWkr, elemRdrEnv )
 import RdrHsSyn		( RdrNameContext, RdrNameHsType, RdrNameConDecl,
 			  extractRuleBndrsTyVars, extractHsTyRdrTyVars,
 			  extractHsCtxtRdrTyVars, extractGenericPatTyVars
@@ -33,11 +33,9 @@ import RnEnv		( lookupTopBndrRn, lookupOccRn, newIPName,
 			)
 import RnMonad
 
-import FunDeps		( oclose )
 import Class		( FunDep, DefMeth (..) )
 import Name		( Name, OccName, nameOccName, NamedThing(..) )
 import NameSet
-import FiniteMap	( elemFM )
 import PrelInfo		( derivableClassKeys, cCallishClassKeys )
 import PrelNames	( deRefStablePtr_RDR, makeStablePtr_RDR,
 			  bindIO_RDR, returnIO_RDR
@@ -104,20 +102,26 @@ rnDecl :: RdrNameHsDecl -> RnMS (RenamedHsDecl, FreeVars)
 rnDecl (ValD binds) = rnTopBinds binds	`thenRn` \ (new_binds, fvs) ->
 		      returnRn (ValD new_binds, fvs)
 
-rnDecl (TyClD tycl_decl) = rnTyClDecl tycl_decl	`thenRn` \ (new_decl, fvs) ->
-			   returnRn (TyClD new_decl, fvs)
-
-rnDecl (RuleD rule)
-  = rnRuleDecl rule	`thenRn` \ (new_rule, fvs) ->
-    returnRn (RuleD new_rule, fvs)
+rnDecl (TyClD tycl_decl)
+  = rnTyClDecl tycl_decl	`thenRn` \ new_decl ->
+    rnClassBinds new_decl	`thenRn` \ (new_decl', fvs) ->
+    returnRn (TyClD new_decl', fvs `plusFV` tyClDeclFVs new_decl')
 
 rnDecl (InstD inst)
-  = rnInstDecl inst	`thenRn` \ (new_inst, fvs) ->
-    returnRn (InstD new_inst, fvs)
+  = rnInstDecl inst		`thenRn` \ new_inst ->
+    rnInstBinds new_inst	`thenRn` \ (new_inst', fvs)
+    returnRn (InstD new_inst, fvs `plusFV` instDeclFVs new_inst')
+
+rnDecl (RuleD rule)
+  | isIfaceRuleDecl rule
+  = rnIfaceRuleDecl rule	`thenRn` \ new_rule ->
+    returnRn (RuleD new_rule, ruleDeclFVs new_rule)
+  | otherwise
+  = rnHsRuleDecl rule
 
 rnDecl (DefD (DefaultDecl tys src_loc))
   = pushSrcLocRn src_loc $
-    rnHsTypes doc_str tys		`thenRn` \ (tys', fvs) ->
+    mapFvRn (rnHsTypeFVs doc_str) tys		`thenRn` \ (tys', fvs) ->
     returnRn (DefD (DefaultDecl tys' src_loc), fvs)
   where
     doc_str = text "a `default' declaration"
@@ -138,11 +142,11 @@ rnDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
 
     extra_fvs imp_exp					`thenRn` \ fvs1 -> 
 
-    rnHsSigType fo_decl_msg ty		       		`thenRn` \ (ty', fvs2) ->
+    rnHsTypeFVs fo_decl_msg ty	       		`thenRn` \ (ty', fvs2) ->
     returnRn (ForD (ForeignDecl name' imp_exp ty' ext_nm cconv src_loc), 
 	      fvs1 `plusFV` fvs2)
  where
-  fo_decl_msg = ptext SLIT("a foreign declaration")
+  fo_decl_msg = ptext SLIT("The foreign declaration for") <+> ppr name
   isDyn	      = isDynamicExtName ext_nm
 
   ok_ext_nm Dynamic 		   = True
@@ -160,9 +164,25 @@ rnDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
 \begin{code}
 rnInstDecl (InstDecl inst_ty mbinds uprags maybe_dfun_rdr_name src_loc)
   = pushSrcLocRn src_loc $
-    rnHsSigType (text "an instance decl") inst_ty `thenRn` \ (inst_ty', inst_fvs) ->
-    let
-	inst_tyvars = case inst_ty' of
+    rnHsSigType (text "an instance decl") inst_ty	`thenRn` \ inst_ty' ->
+
+    (case maybe_dfun_rdr_name of
+	Nothing		   -> returnRn Nothing
+	Just dfun_rdr_name -> lookupSysBinder dfun_rdr_name	`thenRn` \ dfun_name ->
+			      returnRn (Just dfun_name)
+    )							`thenRn` \ maybe_dfun_name ->
+
+    -- The typechecker checks that all the bindings are for the right class.
+    returnRn (InstDecl inst_ty' mbinds' new_uprags maybe_dfun_name src_loc)
+  where
+    meth_doc   = text "the bindings in an instance declaration"
+    meth_names = collectLocatedMonoBinders mbinds
+
+-- Compare rnClassBinds
+rnInstBinds (InstDecl _       mbinds uprags _                   _      )
+	    (InstDecl inst_ty mbinds uprags maybe_dfun_rdr_name src_loc)
+  = let
+	inst_tyvars = case inst_ty of
 			HsForAllTy (Just inst_tyvars) _ _ -> inst_tyvars
 			other			          -> []
 	-- (Slightly strangely) the forall-d tyvars scope over
@@ -188,21 +208,10 @@ rnInstDecl (InstDecl inst_ty mbinds uprags maybe_dfun_rdr_name src_loc)
 	-- But the (unqualified) method names are in scope
     bindLocalNames binders (
        renameSigs (okInstDclSig binder_set) uprags
-    )							`thenRn` \ (new_uprags, prag_fvs) ->
+    )							`thenRn` \ (uprags', prag_fvs) ->
 
-    (case maybe_dfun_rdr_name of
-	Nothing		   -> returnRn (Nothing, emptyFVs)
-
-	Just dfun_rdr_name -> lookupSysBinder dfun_rdr_name	`thenRn` \ dfun_name ->
-			      returnRn (Just dfun_name, unitFV dfun_name)
-    )							`thenRn` \ (maybe_dfun_name, dfun_fv) ->
-
-    -- The typechecker checks that all the bindings are for the right class.
-    returnRn (InstDecl inst_ty' mbinds' new_uprags maybe_dfun_name src_loc,
-	      inst_fvs `plusFV` meth_fvs `plusFV` prag_fvs `plusFV` dfun_fv)
-  where
-    meth_doc   = text "the bindings in an instance declaration"
-    meth_names = collectLocatedMonoBinders mbinds
+    returnRn (InstDecl inst_ty mbinds' uprags' maybe_dfun_rdr_name src_loc,
+	      meth_fvs `plusFV` prag_fvs)
 \end{code}
 
 %*********************************************************
@@ -212,16 +221,15 @@ rnInstDecl (InstDecl inst_ty mbinds uprags maybe_dfun_rdr_name src_loc)
 %*********************************************************
 
 \begin{code}
-rnRuleDecl (IfaceRule rule_name vars fn args rhs src_loc)
+rnIfaceRuleDecl (IfaceRule rule_name vars fn args rhs src_loc)
   = pushSrcLocRn src_loc	$
     lookupOccRn fn		`thenRn` \ fn' ->
     rnCoreBndrs vars		$ \ vars' ->
-    mapFvRn rnCoreExpr args	`thenRn` \ (args', fvs1) ->
-    rnCoreExpr rhs		`thenRn` \ (rhs',  fvs2) ->
-    returnRn (IfaceRule rule_name vars' fn' args' rhs' src_loc, 
-	      (fvs1 `plusFV` fvs2) `addOneFV` fn')
+    mapFvRn rnCoreExpr args	`thenRn` \ args' ->
+    rnCoreExpr rhs		`thenRn` \ rhs' ->
+    returnRn (IfaceRule rule_name vars' fn' args' rhs' src_loc)
 
-rnRuleDecl (HsRule rule_name tvs vars lhs rhs src_loc)
+rnHsRuleDecl (HsRule rule_name tvs vars lhs rhs src_loc)
   = ASSERT( null tvs )
     pushSrcLocRn src_loc			$
 
@@ -247,7 +255,7 @@ rnRuleDecl (HsRule rule_name tvs vars lhs rhs src_loc)
     get_var (RuleBndrSig v _) = v
 
     rn_var (RuleBndr v, id)	 = returnRn (RuleBndr id, emptyFVs)
-    rn_var (RuleBndrSig v t, id) = rnHsType doc t	`thenRn` \ (t', fvs) ->
+    rn_var (RuleBndrSig v t, id) = rnHsTypeFVs doc t	`thenRn` \ (t', fvs) ->
 				   returnRn (RuleBndrSig id t', fvs)
 \end{code}
 
@@ -275,25 +283,24 @@ However, we can also do some scoping checks at the same time.
 rnTyClDecl (IfaceSig name ty id_infos loc)
   = pushSrcLocRn loc $
     lookupTopBndrRn name		`thenRn` \ name' ->
-    rnHsType doc_str ty			`thenRn` \ (ty',fvs1) ->
-    mapFvRn rnIdInfo id_infos		`thenRn` \ (id_infos', fvs2) -> 
-    returnRn (IfaceSig name' ty' id_infos' loc, fvs1 `plusFV` fvs2)
+    rnHsType doc_str ty			`thenRn` \ ty' ->
+    mapRn rnIdInfo id_infos		`thenRn` \ id_infos' -> 
+    returnRn (IfaceSig name' ty' id_infos' loc)
   where
     doc_str = text "the interface signature for" <+> quotes (ppr name)
 
 rnTyClDecl (TyData new_or_data context tycon tyvars condecls nconstrs derivings src_loc gen_name1 gen_name2)
   = pushSrcLocRn src_loc $
     lookupTopBndrRn tycon		    	`thenRn` \ tycon' ->
-    bindTyVarsFVRn data_doc tyvars		$ \ tyvars' ->
-    rnContext data_doc context 			`thenRn` \ (context', cxt_fvs) ->
+    bindTyVarsRn data_doc tyvars		$ \ tyvars' ->
+    rnContext data_doc context 			`thenRn` \ context' ->
     checkDupOrQualNames data_doc con_names	`thenRn_`
-    mapFvRn rnConDecl condecls			`thenRn` \ (condecls', con_fvs) ->
+    mapFvRn rnConDecl condecls			`thenRn` \ condecls' ->
     lookupSysBinder gen_name1	                `thenRn` \ name1' ->
     lookupSysBinder gen_name2		        `thenRn` \ name2' ->
-    rnDerivs derivings				`thenRn` \ (derivings', deriv_fvs) ->
+    rnDerivs derivings				`thenRn` \ derivings' ->
     returnRn (TyData new_or_data context' tycon' tyvars' condecls' nconstrs
-                     derivings' src_loc name1' name2',
-	      cxt_fvs `plusFV` con_fvs `plusFV` deriv_fvs)
+                     derivings' src_loc name1' name2')
   where
     data_doc = text "the data type declaration for" <+> quotes (ppr tycon)
     con_names = map conDeclName condecls
@@ -302,9 +309,9 @@ rnTyClDecl (TySynonym name tyvars ty src_loc)
   = pushSrcLocRn src_loc $
     doptRn Opt_GlasgowExts			`thenRn` \ glaExts ->
     lookupTopBndrRn name			`thenRn` \ name' ->
-    bindTyVarsFVRn syn_doc tyvars 		$ \ tyvars' ->
-    rnHsType syn_doc (unquantify glaExts ty)	`thenRn` \ (ty', ty_fvs) ->
-    returnRn (TySynonym name' tyvars' ty' src_loc, ty_fvs)
+    bindTyVarsRn syn_doc tyvars 		$ \ tyvars' ->
+    rnHsType syn_doc (unquantify glaExts ty)	`thenRn` \ ty' ->
+    returnRn (TySynonym name' tyvars' ty' src_loc)
   where
     syn_doc = text "the declaration for type synonym" <+> quotes (ppr name)
 
@@ -322,20 +329,16 @@ rnTyClDecl (ClassDecl context cname tyvars fds sigs mbinds names src_loc)
 	-- They aren't in scope (because they aren't visible to the user)
 	-- and what we want to do is simply look them up in the cache;
 	-- we jolly well ought to get a 'hit' there!
-	-- So the 'Imported' part of this call is not relevant. 
-	-- Unclean; but since these two are the only place this happens
-	-- I can't work up the energy to do it more beautifully
-
-    mapRn lookupSysBinder names		`thenRn` \ names' ->
+    mapRn lookupSysBinder names			`thenRn` \ names' ->
 
 	-- Tyvars scope over bindings and context
-    bindTyVarsFV2Rn cls_doc tyvars		( \ clas_tyvar_names tyvars' ->
+    bindTyVars2Rn cls_doc tyvars		$ \ clas_tyvar_names tyvars' ->
 
 	-- Check the superclasses
-    rnContext cls_doc context			`thenRn` \ (context', cxt_fvs) ->
+    rnContext cls_doc context			`thenRn` \ context' ->
 
 	-- Check the functional dependencies
-    rnFds cls_doc fds				`thenRn` \ (fds', fds_fvs) ->
+    rnFds cls_doc fds				`thenRn` \ fds' ->
 
 	-- Check the signatures
 	-- First process the class op sigs (op_sigs), then the fixity sigs (non_op_sigs).
@@ -343,15 +346,55 @@ rnTyClDecl (ClassDecl context cname tyvars fds sigs mbinds names src_loc)
 	(op_sigs, non_op_sigs) = partition isClassOpSig sigs
 	sig_rdr_names_w_locs   = [(op,locn) | ClassOpSig op _ _ locn <- sigs]
     in
-    checkDupOrQualNames sig_doc sig_rdr_names_w_locs 	  `thenRn_` 
-    mapFvRn (rn_op cname' clas_tyvar_names fds') op_sigs  `thenRn` \ (sigs', sig_fvs) ->
+    checkDupOrQualNames sig_doc sig_rdr_names_w_locs		`thenRn_` 
+    mapRn (rnClassOp cname' clas_tyvar_names fds') op_sigs	`thenRn` \ sigs' ->
     let
 	binders = mkNameSet [ nm | (ClassOpSig nm _ _ _) <- sigs' ]
     in
-    renameSigs (okClsDclSig binders) non_op_sigs	  `thenRn` \ (non_ops', fix_fvs) ->
+    renameSigs (okClsDclSig binders) non_op_sigs	  `thenRn` \ non_ops' ->
 
-	-- Check the methods
-	-- The newLocals call is tiresome: given a generic class decl
+	-- Typechecker is responsible for checking that we only
+	-- give default-method bindings for things in this class.
+	-- The renamer *could* check this for class decls, but can't
+	-- for instance decls.
+
+    returnRn (ClassDecl context' cname' tyvars' fds' (non_ops' ++ sigs') mbinds' names' src_loc)
+  where
+    cls_doc  = text "the declaration for class" 	<+> ppr cname
+    sig_doc  = text "the signatures for class"  	<+> ppr cname
+    meth_doc = text "the default-methods for class"	<+> ppr cname
+
+rnClassOp clas clas_tyvars clas_fds sig@(ClassOpSig op maybe_dm_stuff ty locn)
+  = pushSrcLocRn locn $
+    lookupTopBndrRn op			`thenRn` \ op_name ->
+    
+    	-- Check the signature
+    rnHsSigType (quotes (ppr op)) ty	`thenRn` \ new_ty ->
+    
+    	-- Make the default-method name
+    (case maybe_dm_stuff of 
+        Nothing -> returnRn Nothing			-- Source-file class decl
+    
+        Just (DefMeth dm_rdr_name)
+    	    -> 	-- Imported class that has a default method decl
+    		-- See comments with tname, snames, above
+    	    	lookupSysBinder dm_rdr_name 	`thenRn` \ dm_name ->
+		returnRn (Just (DefMeth dm_name))
+	    		-- An imported class decl for a class decl that had an explicit default
+	    		-- method, mentions, rather than defines,
+	    		-- the default method, so we must arrange to pull it in
+
+        Just GenDefMeth	-> returnRn (Just GenDefMeth)
+        Just NoDefMeth 	-> returnRn (Just NoDefMeth)
+    )						`thenRn` \ maybe_dm_stuff' ->
+    
+    returnRn (ClassOpSig op_name maybe_dm_stuff' new_ty locn)
+
+rnClassBinds :: RdrNameTyClDecl -> RenamedTyClDecl -> RnMS (RenamedTyClDecl, FreeVars)
+  -- Rename the mbinds only; the rest is done already
+rnClassBinds (ClassDecl _       _     _      _   _    mbinds _     _      )	-- Get mbinds from here
+	     (ClassDecl context cname tyvars fds sigs _      names src_loc)	-- Everything else is here
+  = 	-- The newLocals call is tiresome: given a generic class decl
 	--	class C a where
 	--	  op :: a -> a
 	--	  op {| x+y |} (Inl a) = ...
@@ -360,68 +403,17 @@ rnTyClDecl (ClassDecl context cname tyvars fds sigs mbinds names src_loc)
 	-- we want to name both "x" tyvars with the same unique, so that they are
 	-- easy to group together in the typechecker.  
 	-- Hence the 
+    extendTyVarEnvFVRn (map hsTyVarName tyvars)		$
     getLocalNameEnv					`thenRn` \ name_env ->
     let
 	meth_rdr_names_w_locs = collectLocatedMonoBinders mbinds
 	gen_rdr_tyvars_w_locs = [(tv,src_loc) | tv <- extractGenericPatTyVars mbinds,
-						not (tv `elemFM` name_env)]
+						not (tv `elemRdrEnv` name_env)]
     in
     checkDupOrQualNames meth_doc meth_rdr_names_w_locs	`thenRn_`
     newLocalsRn mkLocalName gen_rdr_tyvars_w_locs	`thenRn` \ gen_tyvars ->
     rnMethodBinds gen_tyvars mbinds			`thenRn` \ (mbinds', meth_fvs) ->
-
-	-- Typechecker is responsible for checking that we only
-	-- give default-method bindings for things in this class.
-	-- The renamer *could* check this for class decls, but can't
-	-- for instance decls.
-
-    returnRn (ClassDecl context' cname' tyvars' fds' (non_ops' ++ sigs') mbinds'
-			       names' src_loc,
-	      sig_fvs	`plusFV`
-
-	      fix_fvs	`plusFV`
-	      cxt_fvs	`plusFV`
-	      fds_fvs	`plusFV`
-	      meth_fvs
-	     )
-    )
-  where
-    cls_doc  = text "the declaration for class" 	<+> ppr cname
-    sig_doc  = text "the signatures for class"  	<+> ppr cname
-    meth_doc = text "the default-methods for class"	<+> ppr cname
-
-    rn_op clas clas_tyvars clas_fds sig@(ClassOpSig op maybe_dm_stuff ty locn)
-      = pushSrcLocRn locn $
- 	lookupTopBndrRn op			`thenRn` \ op_name ->
-
-		-- Check the signature
-	rnHsSigType (quotes (ppr op)) ty	`thenRn` \ (new_ty, op_ty_fvs)  ->
-	let
-	    check_in_op_ty clas_tyvar =
-		 checkRn (clas_tyvar `elemNameSet` oclose clas_fds op_ty_fvs)
-			 (classTyVarNotInOpTyErr clas_tyvar sig)
-	in
-        mapRn_ check_in_op_ty clas_tyvars		 `thenRn_`
-
-		-- Make the default-method name
-	(case maybe_dm_stuff of 
-	    Nothing -> returnRn (Nothing, emptyFVs)		-- Source-file class decl
-
-	    Just (DefMeth dm_rdr_name)
-		-> 	-- Imported class that has a default method decl
-			-- See comments with tname, snames, above
-		    lookupSysBinder dm_rdr_name 	`thenRn` \ dm_name ->
-		    returnRn (Just (DefMeth dm_name), unitFV dm_name)
-			-- An imported class decl for a class decl that had an explicit default
-			-- method, mentions, rather than defines,
-			-- the default method, so we must arrange to pull it in
-	    Just GenDefMeth
-		-> returnRn (Just GenDefMeth, emptyFVs)
-	    Just NoDefMeth
-		-> returnRn (Just NoDefMeth, emptyFVs)
-	)						`thenRn` \ (maybe_dm_stuff', dm_fvs) ->
-
-	returnRn (ClassOpSig op_name maybe_dm_stuff' new_ty locn, op_ty_fvs `plusFV` dm_fvs)
+    returnRn (ClassDecl context cname tyvars fds sigs mbinds' names src_loc, meth_fvs)
 \end{code}
 
 
@@ -451,7 +443,7 @@ rnDerivs (Just clss)
 conDeclName :: RdrNameConDecl -> (RdrName, SrcLoc)
 conDeclName (ConDecl n _ _ _ _ l) = (n,l)
 
-rnConDecl :: RdrNameConDecl -> RnMS (RenamedConDecl, FreeVars)
+rnConDecl :: RdrNameConDecl -> RnMS RenamedConDecl
 rnConDecl (ConDecl name wkr tvs cxt details locn)
   = pushSrcLocRn locn $
     checkConName name		`thenRn_` 
@@ -460,46 +452,45 @@ rnConDecl (ConDecl name wkr tvs cxt details locn)
     lookupSysBinder wkr		`thenRn` \ new_wkr ->
 	-- See comments with ClassDecl
 
-    bindTyVarsFVRn doc tvs 		$ \ new_tyvars ->
-    rnContext doc cxt			`thenRn` \ (new_context, cxt_fvs) ->
-    rnConDetails doc locn details	`thenRn` \ (new_details, det_fvs) -> 
-    returnRn (ConDecl new_name new_wkr new_tyvars new_context new_details locn,
-	      cxt_fvs `plusFV` det_fvs)
+    bindTyVarsRn doc tvs 		$ \ new_tyvars ->
+    rnContext doc cxt			`thenRn` \ new_context ->
+    rnConDetails doc locn details	`thenRn` \ new_details -> 
+    returnRn (ConDecl new_name new_wkr new_tyvars new_context new_details locn)
   where
     doc = text "the definition of data constructor" <+> quotes (ppr name)
 
 rnConDetails doc locn (VanillaCon tys)
-  = mapFvRn (rnBangTy doc) tys	`thenRn` \ (new_tys, fvs)  ->
-    returnRn (VanillaCon new_tys, fvs)
+  = mapRn (rnBangTy doc) tys	`thenRn` \ new_tys  ->
+    returnRn (VanillaCon new_tys)
 
 rnConDetails doc locn (InfixCon ty1 ty2)
-  = rnBangTy doc ty1  		`thenRn` \ (new_ty1, fvs1) ->
-    rnBangTy doc ty2  		`thenRn` \ (new_ty2, fvs2) ->
-    returnRn (InfixCon new_ty1 new_ty2, fvs1 `plusFV` fvs2)
+  = rnBangTy doc ty1  		`thenRn` \ new_ty1 ->
+    rnBangTy doc ty2  		`thenRn` \ new_ty2 ->
+    returnRn (InfixCon new_ty1 new_ty2)
 
 rnConDetails doc locn (RecCon fields)
   = checkDupOrQualNames doc field_names	`thenRn_`
-    mapFvRn (rnField doc) fields	`thenRn` \ (new_fields, fvs) ->
-    returnRn (RecCon new_fields, fvs)
+    mapRn (rnField doc) fields		`thenRn` \ new_fields ->
+    returnRn (RecCon new_fields)
   where
     field_names = [(fld, locn) | (flds, _) <- fields, fld <- flds]
 
 rnField doc (names, ty)
   = mapRn lookupTopBndrRn names	`thenRn` \ new_names ->
-    rnBangTy doc ty		`thenRn` \ (new_ty, fvs) ->
-    returnRn ((new_names, new_ty), fvs) 
+    rnBangTy doc ty		`thenRn` \ new_ty ->
+    returnRn (new_names, new_ty) 
 
 rnBangTy doc (Banged ty)
-  = rnHsType doc ty		`thenRn` \ (new_ty, fvs) ->
-    returnRn (Banged new_ty, fvs)
+  = rnHsType doc ty		`thenRn` \ new_ty ->
+    returnRn (Banged new_ty)
 
 rnBangTy doc (Unbanged ty)
-  = rnHsType doc ty 		`thenRn` \ (new_ty, fvs) ->
-    returnRn (Unbanged new_ty, fvs)
+  = rnHsType doc ty 		`thenRn` \ new_ty ->
+    returnRn (Unbanged new_ty)
 
 rnBangTy doc (Unpacked ty)
-  = rnHsType doc ty 		`thenRn` \ (new_ty, fvs) ->
-    returnRn (Unpacked new_ty, fvs)
+  = rnHsType doc ty 		`thenRn` \ new_ty ->
+    returnRn (Unpacked new_ty)
 
 -- This data decl will parse OK
 --	data T = a Int
@@ -524,14 +515,24 @@ checkConName name
 %*********************************************************
 
 \begin{code}
-rnHsSigType :: SDoc -> RdrNameHsType -> RnMS (RenamedHsType, FreeVars)
+rnHsTypeFVs :: SDoc -> RdrNameHsType -> RnMS (RenamedHsType, FreeVars)
+rnHsTypeFVs doc_str ty 
+  = rnHsType doc_str ty		`thenRn` \ ty' ->
+    returnRn (ty', extractHsTyNames ty')
+
+rnHsSigTypeFVs :: SDoc -> RdrNameHsType -> RnMS (RenamedHsType, FreeVars)
+rnHsSigTypeFVs doc_str ty
+  = rnHsSigType doc_str ty	`thenRn` \ ty' ->
+    returnRn (ty', extractHsTyNames ty')
+
+rnHsSigType :: SDoc -> RdrNameHsType -> RnMS RenamedHsType
 	-- rnHsSigType is used for source-language type signatures,
 	-- which use *implicit* universal quantification.
 rnHsSigType doc_str ty
   = rnHsType (text "the type signature for" <+> doc_str) ty
     
 ---------------------------------------
-rnHsType :: SDoc -> RdrNameHsType -> RnMS (RenamedHsType, FreeVars)
+rnHsType :: SDoc -> RdrNameHsType -> RnMS RenamedHsType
 
 rnHsType doc (HsForAllTy Nothing ctxt ty)
 	-- Implicit quantifiction in source code (no kinds on tyvars)
@@ -542,7 +543,7 @@ rnHsType doc (HsForAllTy Nothing ctxt ty)
 	mentioned_in_tau  = extractHsTyRdrTyVars ty
 	mentioned_in_ctxt = extractHsCtxtRdrTyVars ctxt
 	mentioned	  = nub (mentioned_in_tau ++ mentioned_in_ctxt)
-	forall_tyvars	  = filter (not . (`elemFM` name_env)) mentioned
+	forall_tyvars	  = filter (not . (`elemRdrEnv` name_env)) mentioned
     in
     rnForAll doc (map UserTyVar forall_tyvars) ctxt ty
 
@@ -564,71 +565,69 @@ rnHsType doc (HsForAllTy (Just forall_tyvars) ctxt tau)
 
 rnHsType doc (HsTyVar tyvar)
   = lookupOccRn tyvar 		`thenRn` \ tyvar' ->
-    returnRn (HsTyVar tyvar', unitFV tyvar')
+    returnRn (HsTyVar tyvar')
 
 rnHsType doc (HsOpTy ty1 opname ty2)
   = lookupOccRn opname	`thenRn` \ name' ->
-    rnHsType doc ty1	`thenRn` \ (ty1', fvs1) ->
-    rnHsType doc ty2	`thenRn` \ (ty2',fvs2) -> 
-    returnRn (HsOpTy ty1' name' ty2', fvs1 `plusFV` fvs2 `addOneFV` name')
+    rnHsType doc ty1	`thenRn` \ ty1' ->
+    rnHsType doc ty2	`thenRn` \ ty2' -> 
+    returnRn (HsOpTy ty1' name' ty2')
 
 rnHsType doc (HsNumTy i)
-  | i == 1    = returnRn (HsNumTy i, emptyFVs)
-  | otherwise = failWithRn (HsNumTy i, emptyFVs)
+  | i == 1    = returnRn (HsNumTy i)
+  | otherwise = failWithRn (HsNumTy i)
 			   (ptext SLIT("Only unit numeric type pattern is valid"))
 
 rnHsType doc (HsFunTy ty1 ty2)
-  = rnHsType doc ty1	`thenRn` \ (ty1', fvs1) ->
+  = rnHsType doc ty1	`thenRn` \ ty1' ->
 	-- Might find a for-all as the arg of a function type
-    rnHsType doc ty2	`thenRn` \ (ty2', fvs2) ->
+    rnHsType doc ty2	`thenRn` \ ty2' ->
 	-- Or as the result.  This happens when reading Prelude.hi
 	-- when we find return :: forall m. Monad m -> forall a. a -> m a
-    returnRn (HsFunTy ty1' ty2', fvs1 `plusFV` fvs2)
+    returnRn (HsFunTy ty1' ty2')
 
 rnHsType doc (HsListTy ty)
-  = rnHsType doc ty				`thenRn` \ (ty', fvs) ->
-    returnRn (HsListTy ty', fvs `addOneFV` listTyCon_name)
+  = rnHsType doc ty				`thenRn` \ ty' ->
+    returnRn (HsListTy ty')
 
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
 rnHsType doc (HsTupleTy (HsTupCon _ boxity) tys)
 	-- Don't do lookupOccRn, because this is built-in syntax
 	-- so it doesn't need to be in scope
-  = mapFvRn (rnHsType doc) tys	  	`thenRn` \ (tys', fvs) ->
-    returnRn (HsTupleTy (HsTupCon n' boxity) tys', fvs `addOneFV` n')
+  = mapFvRn (rnHsType doc) tys	  	`thenRn` \ tys' ->
+    returnRn (HsTupleTy (HsTupCon n' boxity) tys')
   where
     n' = tupleTyCon_name boxity (length tys)
   
 
 rnHsType doc (HsAppTy ty1 ty2)
-  = rnHsType doc ty1		`thenRn` \ (ty1', fvs1) ->
-    rnHsType doc ty2		`thenRn` \ (ty2', fvs2) ->
-    returnRn (HsAppTy ty1' ty2', fvs1 `plusFV` fvs2)
+  = rnHsType doc ty1		`thenRn` \ ty1' ->
+    rnHsType doc ty2		`thenRn` \ ty2' ->
+    returnRn (HsAppTy ty1' ty2')
 
 rnHsType doc (HsPredTy pred)
-  = rnPred doc pred	`thenRn` \ (pred', fvs) ->
-    returnRn (HsPredTy pred', fvs)
+  = rnPred doc pred	`thenRn` \ pred' ->
+    returnRn (HsPredTy pred')
 
 rnHsType doc (HsUsgForAllTy uv_rdr ty)
   = bindUVarRn doc uv_rdr $ \ uv_name ->
-    rnHsType doc ty       `thenRn` \ (ty', fvs) ->
-    returnRn (HsUsgForAllTy uv_name ty',
-              fvs )
+    rnHsType doc ty       `thenRn` \ ty' ->
+    returnRn (HsUsgForAllTy uv_name ty')
 
 rnHsType doc (HsUsgTy usg ty)
-  = newUsg usg                      `thenRn` \ (usg', usg_fvs) ->
-    rnHsType doc ty                 `thenRn` \ (ty', ty_fvs) ->
+  = newUsg usg                      `thenRn` \ usg' ->
+    rnHsType doc ty                 `thenRn` \ ty' ->
 	-- A for-all can occur inside a usage annotation
-    returnRn (HsUsgTy usg' ty',
-              usg_fvs `plusFV` ty_fvs)
+    returnRn (HsUsgTy usg' ty')
   where
     newUsg usg = case usg of
-                   HsUsOnce       -> returnRn (HsUsOnce, emptyFVs)
-                   HsUsMany       -> returnRn (HsUsMany, emptyFVs)
+                   HsUsOnce       -> returnRn HsUsOnce
+                   HsUsMany       -> returnRn HsUsMany
                    HsUsVar uv_rdr -> lookupOccRn uv_rdr `thenRn` \ uv_name ->
-                                       returnRn (HsUsVar uv_name, emptyFVs)
+                                     returnRn (HsUsVar uv_name)
 
-rnHsTypes doc tys = mapFvRn (rnHsType doc) tys
+rnHsTypes doc tys = mapRn (rnHsType doc) tys
 \end{code}
 
 \begin{code}
@@ -636,28 +635,27 @@ rnHsTypes doc tys = mapFvRn (rnHsType doc) tys
 -- and we need the workers...
 rnHsTupCon (HsTupCon n boxity)
   = lookupOccRn n	`thenRn` \ n' ->
-    returnRn (HsTupCon n' boxity, unitFV n')
+    returnRn (HsTupCon n' boxity)
 
 rnHsTupConWkr (HsTupCon n boxity)
 	-- Tuple construtors are for the *worker* of the tuple
 	-- Going direct saves needless messing about 
   = lookupOccRn (mkRdrNameWkr n)	`thenRn` \ n' ->
-    returnRn (HsTupCon n' boxity, unitFV n')
+    returnRn (HsTupCon n' boxity)
 \end{code}
 
 \begin{code}
 rnForAll doc forall_tyvars ctxt ty
   = bindTyVarsFVRn doc forall_tyvars	$ \ new_tyvars ->
-    rnContext doc ctxt			`thenRn` \ (new_ctxt, cxt_fvs) ->
-    rnHsType doc ty			`thenRn` \ (new_ty, ty_fvs) ->
-    returnRn (mkHsForAllTy (Just new_tyvars) new_ctxt new_ty,
-	      cxt_fvs `plusFV` ty_fvs)
+    rnContext doc ctxt			`thenRn` \ new_ctxt ->
+    rnHsType doc ty			`thenRn` \ new_ty ->
+    returnRn (mkHsForAllTy (Just new_tyvars) new_ctxt new_ty)
 \end{code}
 
 \begin{code}
-rnContext :: SDoc -> RdrNameContext -> RnMS (RenamedContext, FreeVars)
+rnContext :: SDoc -> RdrNameContext -> RnMS RenamedContext
 rnContext doc ctxt
-  = mapAndUnzipRn rn_pred ctxt		`thenRn` \ (theta, fvs_s) ->
+  = mapRn rn_pred ctxt		`thenRn` \ theta ->
     let
 	(_, dups) = removeDupsEq theta
 		-- We only have equality, not ordering
@@ -665,17 +663,17 @@ rnContext doc ctxt
 	-- Check for duplicate assertions
 	-- If this isn't an error, then it ought to be:
     mapRn (addWarnRn . dupClassAssertWarn theta) dups		`thenRn_`
-    returnRn (theta, plusFVs fvs_s)
+    returnRn theta
   where
    	--Someone discovered that @CCallable@ and @CReturnable@
 	-- could be used in contexts such as:
 	--	foo :: CCallable a => a -> PrimIO Int
 	-- Doing this utterly wrecks the whole point of introducing these
 	-- classes so we specifically check that this isn't being done.
-    rn_pred pred = rnPred doc pred				`thenRn` \ (pred', fvs)->
+    rn_pred pred = rnPred doc pred				`thenRn` \ pred'->
 		   checkRn (not (bad_pred pred'))
 			   (naughtyCCallContextErr pred')	`thenRn_`
-		   returnRn (pred', fvs)
+		   returnRn pred'
 
     bad_pred (HsPClass clas _) = getUnique clas `elem` cCallishClassKeys
     bad_pred other	       = False
@@ -683,13 +681,13 @@ rnContext doc ctxt
 
 rnPred doc (HsPClass clas tys)
   = lookupOccRn clas		`thenRn` \ clas_name ->
-    rnHsTypes doc tys		`thenRn` \ (tys', fvs) ->
-    returnRn (HsPClass clas_name tys', fvs `addOneFV` clas_name)
+    rnHsTypes doc tys		`thenRn` \ tys' ->
+    returnRn (HsPClass clas_name tys')
 
 rnPred doc (HsPIParam n ty)
   = newIPName n			`thenRn` \ name ->
-    rnHsType doc ty		`thenRn` \ (ty', fvs) ->
-    returnRn (HsPIParam name ty', fvs)
+    rnHsType doc ty		`thenRn` \ ty' ->
+    returnRn (HsPIParam name ty')
 \end{code}
 
 \begin{code}
@@ -717,90 +715,84 @@ rnHsTyvar doc tyvar
 %*********************************************************
 
 \begin{code}
-rnIdInfo (HsStrictness str) = returnRn (HsStrictness str, emptyFVs)
-
 rnIdInfo (HsWorker worker)
   = lookupOccRn worker			`thenRn` \ worker' ->
-    returnRn (HsWorker worker', unitFV worker')
+    returnRn (HsWorker worker')
 
-rnIdInfo (HsUnfold inline expr)	= rnCoreExpr expr `thenRn` \ (expr', fvs) ->
-				  returnRn (HsUnfold inline expr', fvs)
-rnIdInfo (HsArity arity)	= returnRn (HsArity arity, emptyFVs)
-rnIdInfo HsNoCafRefs		= returnRn (HsNoCafRefs, emptyFVs)
-rnIdInfo HsCprInfo		= returnRn (HsCprInfo, emptyFVs)
-
+rnIdInfo (HsUnfold inline expr)	= rnCoreExpr expr `thenRn` \ expr' ->
+				  returnRn (HsUnfold inline expr')
+rnIdInfo (HsStrictness str)     = returnRn (HsStrictness str)
+rnIdInfo (HsArity arity)	= returnRn (HsArity arity)
+rnIdInfo HsNoCafRefs		= returnRn HsNoCafRefs
+rnIdInfo HsCprInfo		= returnRn HsCprInfo
 \end{code}
 
 @UfCore@ expressions.
 
 \begin{code}
 rnCoreExpr (UfType ty)
-  = rnHsType (text "unfolding type") ty	`thenRn` \ (ty', fvs) ->
-    returnRn (UfType ty', fvs)
+  = rnHsType (text "unfolding type") ty	`thenRn` \ ty' ->
+    returnRn (UfType ty')
 
 rnCoreExpr (UfVar v)
   = lookupOccRn v 	`thenRn` \ v' ->
-    returnRn (UfVar v', unitFV v')
+    returnRn (UfVar v')
 
 rnCoreExpr (UfLit l)
-  = returnRn (UfLit l, emptyFVs)
+  = returnRn (UfLit l)
 
 rnCoreExpr (UfLitLit l ty)
-  = rnHsType (text "litlit") ty	`thenRn` \ (ty', fvs) ->
-    returnRn (UfLitLit l ty', fvs)
+  = rnHsType (text "litlit") ty	`thenRn` \ ty' ->
+    returnRn (UfLitLit l ty')
 
 rnCoreExpr (UfCCall cc ty)
-  = rnHsType (text "ccall") ty	`thenRn` \ (ty', fvs) ->
-    returnRn (UfCCall cc ty', fvs)
+  = rnHsType (text "ccall") ty	`thenRn` \ ty' ->
+    returnRn (UfCCall cc ty')
 
 rnCoreExpr (UfTuple con args) 
-  = rnHsTupConWkr con			`thenRn` \ (con', fvs1) ->
-    mapFvRn rnCoreExpr args		`thenRn` \ (args', fvs2) ->
-    returnRn (UfTuple con' args', fvs1 `plusFV` fvs2)
+  = rnHsTupConWkr con			`thenRn` \ con' ->
+    mapRn rnCoreExpr args		`thenRn` \ args' ->
+    returnRn (UfTuple con' args')
 
 rnCoreExpr (UfApp fun arg)
-  = rnCoreExpr fun		`thenRn` \ (fun', fv1) ->
-    rnCoreExpr arg		`thenRn` \ (arg', fv2) ->
-    returnRn (UfApp fun' arg', fv1 `plusFV` fv2)
+  = rnCoreExpr fun		`thenRn` \ fun' ->
+    rnCoreExpr arg		`thenRn` \ arg' ->
+    returnRn (UfApp fun' arg')
 
 rnCoreExpr (UfCase scrut bndr alts)
-  = rnCoreExpr scrut			`thenRn` \ (scrut', fvs1) ->
-    bindCoreLocalFVRn bndr		( \ bndr' ->
-	mapFvRn rnCoreAlt alts		`thenRn` \ (alts', fvs2) ->
-	returnRn (UfCase scrut' bndr' alts', fvs2)
-    )						`thenRn` \ (case', fvs3) ->
-    returnRn (case', fvs1 `plusFV` fvs3)
+  = rnCoreExpr scrut			`thenRn` \ scrut' ->
+    bindCoreLocalFVRn bndr		$ \ bndr' ->
+    mapRn rnCoreAlt alts		`thenRn` \ alts' ->
+    returnRn (UfCase scrut' bndr' alts')
 
 rnCoreExpr (UfNote note expr) 
-  = rnNote note			`thenRn` \ (note', fvs1) ->
-    rnCoreExpr expr		`thenRn` \ (expr', fvs2) ->
-    returnRn  (UfNote note' expr', fvs1 `plusFV` fvs2) 
+  = rnNote note			`thenRn` \ note' ->
+    rnCoreExpr expr		`thenRn` \ expr' ->
+    returnRn  (UfNote note' expr')
 
 rnCoreExpr (UfLam bndr body)
   = rnCoreBndr bndr 		$ \ bndr' ->
-    rnCoreExpr body		`thenRn` \ (body', fvs) ->
-    returnRn (UfLam bndr' body', fvs)
+    rnCoreExpr body		`thenRn` \ body' ->
+    returnRn (UfLam bndr' body')
 
 rnCoreExpr (UfLet (UfNonRec bndr rhs) body)
-  = rnCoreExpr rhs		`thenRn` \ (rhs', fvs1) ->
-    rnCoreBndr bndr 		( \ bndr' ->
-	rnCoreExpr body		`thenRn` \ (body', fvs2) ->
-	returnRn (UfLet (UfNonRec bndr' rhs') body', fvs2)
-    )				`thenRn` \ (result, fvs3) ->
-    returnRn (result, fvs1 `plusFV` fvs3)
+  = rnCoreExpr rhs		`thenRn` \ rhs' ->
+    rnCoreBndr bndr 		$ \ bndr' ->
+    rnCoreExpr body		`thenRn` \ body' ->
+    returnRn (UfLet (UfNonRec bndr' rhs') body')
 
 rnCoreExpr (UfLet (UfRec pairs) body)
   = rnCoreBndrs bndrs		$ \ bndrs' ->
-    mapFvRn rnCoreExpr rhss	`thenRn` \ (rhss', fvs1) ->
-    rnCoreExpr body		`thenRn` \ (body', fvs2) ->
-    returnRn (UfLet (UfRec (bndrs' `zip` rhss')) body', fvs1 `plusFV` fvs2)
+    mapRn rnCoreExpr rhss	`thenRn` \ rhss' ->
+    rnCoreExpr body		`thenRn` \ body' ->
+    returnRn (UfLet (UfRec (bndrs' `zip` rhss')) body')
   where
     (bndrs, rhss) = unzip pairs
 \end{code}
 
 \begin{code}
 rnCoreBndr (UfValBinder name ty) thing_inside
-  = rnHsType doc ty		`thenRn` \ (ty', fvs1) ->
+  = rnHsType doc ty		`thenRn` \ ty' ->
     bindCoreLocalFVRn name	( \ name' ->
 	    thing_inside (UfValBinder name' ty')
     )				`thenRn` \ (result, fvs2) ->
@@ -809,7 +801,7 @@ rnCoreBndr (UfValBinder name ty) thing_inside
     doc = text "unfolding id"
     
 rnCoreBndr (UfTyBinder name kind) thing_inside
-  = bindCoreLocalFVRn name		$ \ name' ->
+  = bindCoreLocalRn name		$ \ name' ->
     thing_inside (UfTyBinder name' kind)
     
 rnCoreBndrs []     thing_inside = thing_inside []
@@ -820,40 +812,38 @@ rnCoreBndrs (b:bs) thing_inside = rnCoreBndr b		$ \ name' ->
 
 \begin{code}
 rnCoreAlt (con, bndrs, rhs)
-  = rnUfCon con bndrs			`thenRn` \ (con', fvs1) ->
-    bindCoreLocalsFVRn bndrs		( \ bndrs' ->
-	rnCoreExpr rhs			`thenRn` \ (rhs', fvs2) ->
-	returnRn ((con', bndrs', rhs'), fvs2)
-    )					`thenRn` \ (result, fvs3) ->
-    returnRn (result, fvs1 `plusFV` fvs3)
+  = rnUfCon con bndrs			`thenRn` \ con' ->
+    bindCoreLocalsRn bndrs		$ \ bndrs' ->
+    rnCoreExpr rhs			`thenRn` \ rhs' ->
+    returnRn (con', bndrs', rhs')
 
 rnNote (UfCoerce ty)
-  = rnHsType (text "unfolding coerce") ty	`thenRn` \ (ty', fvs) ->
-    returnRn (UfCoerce ty', fvs)
+  = rnHsType (text "unfolding coerce") ty	`thenRn` \ ty' ->
+    returnRn (UfCoerce ty')
 
-rnNote (UfSCC cc)   = returnRn (UfSCC cc, emptyFVs)
-rnNote UfInlineCall = returnRn (UfInlineCall, emptyFVs)
-rnNote UfInlineMe   = returnRn (UfInlineMe, emptyFVs)
+rnNote (UfSCC cc)   = returnRn (UfSCC cc)
+rnNote UfInlineCall = returnRn UfInlineCall
+rnNote UfInlineMe   = returnRn UfInlineMe
 
 
 rnUfCon UfDefault _
-  = returnRn (UfDefault, emptyFVs)
+  = returnRn UfDefault
 
 rnUfCon (UfTupleAlt tup_con) bndrs
-  = rnHsTupCon tup_con 		`thenRn` \ (HsTupCon con' _, fvs) -> 
-    returnRn (UfDataAlt con', fvs)
+  = rnHsTupCon tup_con 		`thenRn` \ (HsTupCon con' _) -> 
+    returnRn (UfDataAlt con')
 	-- Makes the type checker a little easier
 
 rnUfCon (UfDataAlt con) _
   = lookupOccRn con		`thenRn` \ con' ->
-    returnRn (UfDataAlt con', unitFV con')
+    returnRn (UfDataAlt con')
 
 rnUfCon (UfLitAlt lit) _
-  = returnRn (UfLitAlt lit, emptyFVs)
+  = returnRn (UfLitAlt lit)
 
 rnUfCon (UfLitLitAlt lit ty) _
-  = rnHsType (text "litlit") ty		`thenRn` \ (ty', fvs) ->
-    returnRn (UfLitLitAlt lit ty', fvs)
+  = rnHsType (text "litlit") ty		`thenRn` \ ty' ->
+    returnRn (UfLitLitAlt lit ty')
 \end{code}
 
 %*********************************************************
@@ -885,12 +875,6 @@ validRuleLhs foralls lhs
 \begin{code}
 derivingNonStdClassErr clas
   = hsep [ptext SLIT("non-standard class"), ppr clas, ptext SLIT("in deriving clause")]
-
-classTyVarNotInOpTyErr clas_tyvar sig
-  = hang (hsep [ptext SLIT("Class type variable"),
-		       quotes (ppr clas_tyvar),
-		       ptext SLIT("does not appear in method signature")])
-	 4 (ppr sig)
 
 badDataCon name
    = hsep [ptext SLIT("Illegal data constructor name"), quotes (ppr name)]

@@ -9,6 +9,8 @@ module RnHiFiles (
 	tryLoadInterface, loadOrphanModules,
 	loadExports, loadFixDecls, loadDeprecs,
 
+	lookupFixityRn, 
+
 	getTyClDeclBinders, 
 	removeContext	 	-- removeContext probably belongs somewhere else
    ) where
@@ -538,6 +540,39 @@ readIface wanted_mod file_path
         Left io_err -> bale_out (text (show io_err))
   where
     bale_out err = returnRn (Left (badIfaceFile file_path err))
+\end{code}
+
+
+%*********************************************************
+%*							*
+\subsection{Looking up fixities}
+%*							*
+%*********************************************************
+
+This has to be in RnIfaces (or RnHiFiles) because it calls loadHomeInterface
+
+\begin{code}
+lookupFixityRn :: Name -> RnMS Fixity
+lookupFixityRn name
+  | isLocallyDefined name
+  = getFixityEnv			`thenRn` \ local_fix_env ->
+    returnRn (lookupLocalFixity local_fix_env name)
+
+  | otherwise	-- Imported
+      -- For imported names, we have to get their fixities by doing a loadHomeInterface,
+      -- and consulting the Ifaces that comes back from that, because the interface
+      -- file for the Name might not have been loaded yet.  Why not?  Suppose you import module A,
+      -- which exports a function 'f', which is defined in module B.  Then B isn't loaded
+      -- right away (after all, it's possible that nothing from B will be used).
+      -- When we come across a use of 'f', we need to know its fixity, and it's then,
+      -- and only then, that we load B.hi.  That is what's happening here.
+  = getHomeIfaceTableRn 		`thenRn` \ hit ->
+    loadHomeInterface doc name		`thenRn` \ ifaces ->
+    case lookupTable hit (iPIT ifaces) name of
+	Just iface -> returnRn (lookupNameEnv (mi_fixities iface) name `orElse` defaultFixity)
+	Nothing	   -> returnRn defaultFixity
+  where
+    doc = ptext SLIT("Checking fixity for") <+> ppr name
 \end{code}
 
 

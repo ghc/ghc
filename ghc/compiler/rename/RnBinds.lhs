@@ -18,7 +18,7 @@ module RnBinds (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} RnSource ( rnHsSigType )
+import {-# SOURCE #-} RnSource ( rnHsSigType, rnHsType )
 
 import HsSyn
 import HsBinds		( eqHsSig, sigName, hsSigDoc )
@@ -483,11 +483,12 @@ renameSigs ::  (RenamedSig -> Bool)		-- OK-sig predicate
 	    -> [RdrNameSig]
 	    -> RnMS ([RenamedSig], FreeVars)
 
-renameSigs ok_sig [] = returnRn ([], emptyFVs)	-- Common shortcut
+renameSigs ok_sig []
+  = returnRn ([], emptyFVs)	-- Common shortcut
 
 renameSigs ok_sig sigs
   =	 -- Rename the signatures
-    mapFvRn renameSig sigs   	`thenRn` \ (sigs', fvs) ->
+    mapRn renameSig sigs   	`thenRn` \ sigs' ->
 
 	-- Check for (a) duplicate signatures
 	--	     (b) signatures for things not in this group
@@ -499,7 +500,7 @@ renameSigs ok_sig sigs
 	(goods, bads)	 = partition ok_sig in_scope
     in
     mapRn_ unknownSigErr bads			`thenRn_`
-    returnRn (goods, fvs)
+    returnRn (goods, hsSigFVs goods)
 
 -- We use lookupSigOccRn in the signatures, which is a little bit unsatisfactory
 -- because this won't work for:
@@ -510,39 +511,39 @@ renameSigs ok_sig sigs
 -- is in scope.  (I'm assuming that Baz.op isn't in scope unqualified.)
 -- Doesn't seem worth much trouble to sort this.
 
-renameSig :: Sig RdrName -> RnMS (Sig Name, FreeVars)
+renameSig :: Sig RdrName -> RnMS (Sig Name)
 -- ClassOpSig is renamed elsewhere.
 renameSig (Sig v ty src_loc)
   = pushSrcLocRn src_loc $
     lookupSigOccRn v				`thenRn` \ new_v ->
-    rnHsSigType (quotes (ppr v)) ty		`thenRn` \ (new_ty,fvs) ->
-    returnRn (Sig new_v new_ty src_loc, fvs `addOneFV` new_v)
+    rnHsSigType (quotes (ppr v)) ty		`thenRn` \ new_ty ->
+    returnRn (Sig new_v new_ty src_loc)
 
 renameSig (SpecInstSig ty src_loc)
   = pushSrcLocRn src_loc $
-    rnHsSigType (text "A SPECIALISE instance pragma") ty `thenRn` \ (new_ty, fvs) ->
-    returnRn (SpecInstSig new_ty src_loc, fvs)
+    rnHsType (text "A SPECIALISE instance pragma") ty `thenRn` \ new_ty ->
+    returnRn (SpecInstSig new_ty src_loc)
 
 renameSig (SpecSig v ty src_loc)
   = pushSrcLocRn src_loc $
     lookupSigOccRn v			`thenRn` \ new_v ->
-    rnHsSigType (quotes (ppr v)) ty	`thenRn` \ (new_ty,fvs) ->
-    returnRn (SpecSig new_v new_ty src_loc, fvs `addOneFV` new_v)
+    rnHsSigType (quotes (ppr v)) ty	`thenRn` \ new_ty ->
+    returnRn (SpecSig new_v new_ty src_loc)
 
 renameSig (FixSig (FixitySig v fix src_loc))
   = pushSrcLocRn src_loc $
     lookupSigOccRn v		`thenRn` \ new_v ->
-    returnRn (FixSig (FixitySig new_v fix src_loc), unitFV new_v)
+    returnRn (FixSig (FixitySig new_v fix src_loc))
 
 renameSig (InlineSig v p src_loc)
   = pushSrcLocRn src_loc $
     lookupSigOccRn v		`thenRn` \ new_v ->
-    returnRn (InlineSig new_v p src_loc, unitFV new_v)
+    returnRn (InlineSig new_v p src_loc)
 
 renameSig (NoInlineSig v p src_loc)
   = pushSrcLocRn src_loc $
     lookupSigOccRn v		`thenRn` \ new_v ->
-    returnRn (NoInlineSig new_v p src_loc, unitFV new_v)
+    returnRn (NoInlineSig new_v p src_loc)
 \end{code}
 
 \begin{code}

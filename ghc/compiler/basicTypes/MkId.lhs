@@ -570,7 +570,7 @@ mkPrimOpId prim_op
 	   `setArityInfo` 	exactArity arity
 	   `setStrictnessInfo`	strict_info
 
-    rules = addRule id emptyCoreRules (primOpRule prim_op)
+    rules = addRule emptyCoreRules id (primOpRule prim_op)
 
 
 -- For each ccall we manufacture a separate CCallOpId, giving it

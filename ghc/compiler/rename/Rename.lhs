@@ -13,17 +13,16 @@ import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, RdrNameDeprecation,
 			  RdrNameTyClDecl, RdrNameRuleDecl, RdrNameInstDecl
 			)
 import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, RenamedRuleDecl, RenamedInstDecl,
-			  extractHsTyNames, extractHsCtxtTyNames
+			  extractHsTyNames, extractHsCtxtTyNames,
+			  instDeclFVs, tyClDeclFVs, ruleDeclFVs
 			)
 
 import CmdLineOpts	( DynFlags, DynFlag(..) )
 import RnMonad
 import RnNames		( getGlobalNames )
 import RnSource		( rnSourceDecls, rnDecl, rnTyClDecl, rnRuleDecl, rnInstDecl )
-import RnIfaces		( getImportedInstDecls, importDecl, mkImportInfo, 
+import RnIfaces		( slurpImpDecls, mkImportInfo, 
 			  getInterfaceExports,
-			  getImportedRules, getSlurped,
-			  ImportDeclResult(..),
 			  RecompileRequired, recompileRequired
 			)
 import RnHiFiles	( findAndReadIface, removeContext, loadExports, loadFixDecls, loadDeprecs )
@@ -91,11 +90,8 @@ renameModule :: DynFlags -> Finder
 renameModule dflags finder hit hst old_pcs this_module rdr_module
   = 	-- Initialise the renamer monad
     do {
-	(new_pcs, errors_found, (maybe_rn_stuff, dump_action)) 
+	(new_pcs, errors_found, maybe_rn_stuff) 
 	   <- initRn dflags finder hit hst old_pcs this_module (rename this_module rdr_module) ;
-
-	-- Dump any debugging output
-	dump_action ;
 
 	-- Return results.  No harm in updating the PCS
 	if errors_found then
@@ -106,7 +102,7 @@ renameModule dflags finder hit hst old_pcs this_module rdr_module
 \end{code}
 
 \begin{code}
-rename :: Module -> RdrNameHsModule -> RnMG (Maybe (ModIface, [RenamedHsDecl]), IO ())
+rename :: Module -> RdrNameHsModule -> RnMG (Maybe (ModIface, [RenamedHsDecl]))
 rename this_module this_mod@(HsModule mod_name vers exports imports local_decls mod_deprec loc)
   =  	-- FIND THE GLOBAL NAME ENVIRONMENT
     getGlobalNames this_mod			`thenRn` \ maybe_stuff ->
@@ -114,8 +110,8 @@ rename this_module this_mod@(HsModule mod_name vers exports imports local_decls 
 	-- CHECK FOR EARLY EXIT
     case maybe_stuff of {
 	Nothing -> 	-- Everything is up to date; no need to recompile further
-		rnDump [] []		`thenRn` \ dump_action ->
-		returnRn (Nothing, dump_action) ;
+		rnDump [] []		`thenRn_`
+		returnRn Nothing ;
 
   	Just (gbl_env, local_gbl_env, export_avails, global_avail_env) ->
 
@@ -150,11 +146,11 @@ rename this_module this_mod@(HsModule mod_name vers exports imports local_decls 
     slurpImpDecls slurp_fvs		`thenRn` \ rn_imp_decls ->
 
 	-- EXIT IF ERRORS FOUND
-    rnDump rn_imp_decls rn_local_decls		`thenRn` \ dump_action ->
+    rnDump rn_imp_decls rn_local_decls		`thenRn_` 
     checkErrsRn					`thenRn` \ no_errs_so_far ->
     if not no_errs_so_far then
 	-- Found errors already, so exit now
-	returnRn (Nothing, dump_action)
+	returnRn Nothing
     else
 
 	-- GENERATE THE VERSION/USAGE INFO
@@ -197,7 +193,8 @@ rename this_module this_mod@(HsModule mod_name vers exports imports local_decls 
 		      export_avails source_fvs
 		      rn_imp_decls			`thenRn_`
 
-    returnRn (Just (mod_iface, final_decls), dump_action) }
+    returnRn (Just (mod_iface, final_decls))
+    }
 \end{code}
 
 @implicitFVs@ forces the renamer to slurp in some things which aren't
@@ -269,296 +266,6 @@ isOrphanDecl (RuleD (HsRule _ _ _ lhs _ _))
     check other	      	  = True 	-- Safe fall through
 
 isOrphanDecl other = False
-\end{code}
-
-
-%*********************************************************
-%*						 	 *
-\subsection{Slurping declarations}
-%*							 *
-%*********************************************************
-
-\begin{code}
--------------------------------------------------------
-slurpImpDecls source_fvs
-  = traceRn (text "slurpImp" <+> fsep (map ppr (nameSetToList source_fvs))) `thenRn_`
-
-	-- The current slurped-set records all local things
-    getSlurped					`thenRn` \ source_binders ->
-    slurpSourceRefs source_binders source_fvs	`thenRn` \ (decls, needed) ->
-
-	-- Then get everything else
-    closeDecls decls needed			`thenRn` \ decls1 ->
-
-	-- Finally, get any deferred data type decls
-    slurpDeferredDecls decls1			`thenRn` \ final_decls -> 
-
-    returnRn final_decls
-
--------------------------------------------------------
-slurpSourceRefs :: NameSet			-- Variables defined in source
-		-> FreeVars			-- Variables referenced in source
-		-> RnMG ([RenamedHsDecl],
-			 FreeVars)		-- Un-satisfied needs
--- The declaration (and hence home module) of each gate has
--- already been loaded
-
-slurpSourceRefs source_binders source_fvs
-  = go_outer [] 			-- Accumulating decls
-	     emptyFVs 			-- Unsatisfied needs
-	     emptyFVs			-- Accumulating gates
-  	     (nameSetToList source_fvs)	-- Things whose defn hasn't been loaded yet
-  where
-	-- The outer loop repeatedly slurps the decls for the current gates
-	-- and the instance decls 
-
-	-- The outer loop is needed because consider
-	--	instance Foo a => Baz (Maybe a) where ...
-	-- It may be that @Baz@ and @Maybe@ are used in the source module,
-	-- but not @Foo@; so we need to chase @Foo@ too.
-	--
-	-- We also need to follow superclass refs.  In particular, 'chasing @Foo@' must
-	-- include actually getting in Foo's class decl
-	--	class Wib a => Foo a where ..
-	-- so that its superclasses are discovered.  The point is that Wib is a gate too.
-	-- We do this for tycons too, so that we look through type synonyms.
-
-    go_outer decls fvs all_gates []	
-	= returnRn (decls, fvs)
-
-    go_outer decls fvs all_gates refs	-- refs are not necessarily slurped yet
-	= traceRn (text "go_outer" <+> ppr refs)		`thenRn_`
-	  foldlRn go_inner (decls, fvs, emptyFVs) refs		`thenRn` \ (decls1, fvs1, gates1) ->
-	  getImportedInstDecls (all_gates `plusFV` gates1)	`thenRn` \ inst_decls ->
-	  rnInstDecls decls1 fvs1 gates1 inst_decls		`thenRn` \ (decls2, fvs2, gates2) ->
-	  go_outer decls2 fvs2 (all_gates `plusFV` gates2)
-			       (nameSetToList (gates2 `minusNameSet` all_gates))
-		-- Knock out the all_gates because even if we don't slurp any new
-		-- decls we can get some apparently-new gates from wired-in names
-
-    go_inner (decls, fvs, gates) wanted_name
-	= importDecl wanted_name 		`thenRn` \ import_result ->
-	  case import_result of
-	    AlreadySlurped -> returnRn (decls, fvs, gates)
-	    WiredIn        -> returnRn (decls, fvs, gates `plusFV` getWiredInGates wanted_name)
-	    Deferred       -> returnRn (decls, fvs, gates `addOneFV` wanted_name)	-- It's a type constructor
-			
-	    HereItIs decl -> rnIfaceTyClDecl decl		`thenRn` \ (new_decl, fvs1) ->
-			     returnRn (TyClD new_decl : decls, 
-				       fvs1 `plusFV` fvs,
-			   	       gates `plusFV` getGates source_fvs new_decl)
-
-rnInstDecls decls fvs gates []
-  = returnRn (decls, fvs, gates)
-rnInstDecls decls fvs gates (d:ds) 
-  = rnIfaceDecl d		`thenRn` \ (new_decl, fvs1) ->
-    rnInstDecls (new_decl:decls) 
-	        (fvs1 `plusFV` fvs)
-		(gates `plusFV` getInstDeclGates new_decl)
-		ds
-\end{code}
-
-
-\begin{code}
--------------------------------------------------------
--- closeDecls keeps going until the free-var set is empty
-closeDecls decls needed
-  | not (isEmptyFVs needed)
-  = slurpDecls decls needed	`thenRn` \ (decls1, needed1) ->
-    closeDecls decls1 needed1
-
-  | otherwise
-  = getImportedRules 			`thenRn` \ rule_decls ->
-    case rule_decls of
-	[]    -> returnRn decls	-- No new rules, so we are done
-	other -> rnIfaceDecls decls emptyFVs rule_decls 	`thenRn` \ (decls1, needed1) ->
-		 closeDecls decls1 needed1
-		 
-
--------------------------------------------------------
--- Augment decls with any decls needed by needed.
--- Return also free vars of the new decls (only)
-slurpDecls decls needed
-  = go decls emptyFVs (nameSetToList needed) 
-  where
-    go decls fvs []         = returnRn (decls, fvs)
-    go decls fvs (ref:refs) = slurpDecl decls fvs ref	`thenRn` \ (decls1, fvs1) ->
-			      go decls1 fvs1 refs
-
--------------------------------------------------------
-slurpDecl decls fvs wanted_name
-  = importDecl wanted_name 		`thenRn` \ import_result ->
-    case import_result of
-	-- Found a declaration... rename it
-	HereItIs decl -> rnIfaceTyClDecl decl		`thenRn` \ (new_decl, fvs1) ->
-			 returnRn (TyClD new_decl:decls, fvs1 `plusFV` fvs)
-
-	-- No declaration... (wired in thing, or deferred, or already slurped)
-	other -> returnRn (decls, fvs)
-
-
--------------------------------------------------------
-rnIfaceDecls :: [RenamedHsDecl] -> FreeVars
-	     -> [(Module, RdrNameHsDecl)]
-	     -> RnM d ([RenamedHsDecl], FreeVars)
-rnIfaceDecls decls fvs []     = returnRn (decls, fvs)
-rnIfaceDecls decls fvs (d:ds) = rnIfaceDecl d		`thenRn` \ (new_decl, fvs1) ->
-				rnIfaceDecls (new_decl:decls) (fvs1 `plusFV` fvs) ds
-
-rnIfaceDecl	(mod, decl) = initIfaceRnMS mod (rnDecl decl)	
-rnIfaceTyClDecl (mod, decl) = initIfaceRnMS mod (rnTyClDecl decl)	
-\end{code}
-
-
-%*********************************************************
-%*						 	 *
-\subsection{Deferred declarations}
-%*							 *
-%*********************************************************
-
-The idea of deferred declarations is this.  Suppose we have a function
-	f :: T -> Int
-	data T = T1 A | T2 B
-	data A = A1 X | A2 Y
-	data B = B1 P | B2 Q
-Then we don't want to load T and all its constructors, and all
-the types those constructors refer to, and all the types *those*
-constructors refer to, and so on.  That might mean loading many more
-interface files than is really necessary.  So we 'defer' loading T.
-
-But f might be strict, and the calling convention for evaluating
-values of type T depends on how many constructors T has, so 
-we do need to load T, but not the full details of the type T.
-So we load the full decl for T, but only skeleton decls for A and B:
-	f :: T -> Int
-	data T = {- 2 constructors -}
-
-Whether all this is worth it is moot.
-
-\begin{code}
-slurpDeferredDecls :: [RenamedHsDecl] -> RnMG [RenamedHsDecl]
-slurpDeferredDecls decls = returnRn decls
-
-{-	OMIT FOR NOW
-slurpDeferredDecls :: [RenamedHsDecl] -> RnMG [RenamedHsDecl]
-slurpDeferredDecls decls
-  = getDeferredDecls						`thenRn` \ def_decls ->
-    rnIfaceDecls decls emptyFVs (map stripDecl def_decls)	`thenRn` \ (decls1, fvs) ->
-    ASSERT( isEmptyFVs fvs )
-    returnRn decls1
-
-stripDecl (mod, TyClD (TyData dt _ tc tvs _ nconstrs _ loc name1 name2))
-  = (mod, TyClD (TyData dt [] tc tvs [] nconstrs Nothing loc
-		name1 name2))
-	-- Nuke the context and constructors
-	-- But retain the *number* of constructors!
-	-- Also the tvs will have kinds on them.
--}
-\end{code}
-
-
-%*********************************************************
-%*						 	 *
-\subsection{Extracting the `gates'}
-%*							 *
-%*********************************************************
-
-When we import a declaration like
-\begin{verbatim}
-	data T = T1 Wibble | T2 Wobble
-\end{verbatim}
-we don't want to treat @Wibble@ and @Wobble@ as gates
-{\em unless} @T1@, @T2@ respectively are mentioned by the user program.
-If only @T@ is mentioned
-we want only @T@ to be a gate;
-that way we don't suck in useless instance
-decls for (say) @Eq Wibble@, when they can't possibly be useful.
-
-@getGates@ takes a newly imported (and renamed) decl, and the free
-vars of the source program, and extracts from the decl the gate names.
-
-\begin{code}
-getGates source_fvs (IfaceSig _ ty _ _)
-  = extractHsTyNames ty
-
-getGates source_fvs (ClassDecl ctxt cls tvs _ sigs _ _ _ )
-  = (delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) sigs)
-		        (hsTyVarNames tvs)
-     `addOneToNameSet` cls)
-    `plusFV` maybe_double
-  where
-    get (ClassOpSig n _ ty _) 
-	| n `elemNameSet` source_fvs = extractHsTyNames ty
-	| otherwise		     = emptyFVs
-
-	-- If we load any numeric class that doesn't have
-	-- Int as an instance, add Double to the gates. 
-	-- This takes account of the fact that Double might be needed for
-	-- defaulting, but we don't want to load Double (and all its baggage)
-	-- if the more exotic classes aren't used at all.
-    maybe_double | nameUnique cls `elem` fractionalClassKeys 
-		 = unitFV (getName doubleTyCon)
-		 | otherwise
-		 = emptyFVs
-
-getGates source_fvs (TySynonym tycon tvs ty _)
-  = delListFromNameSet (extractHsTyNames ty)
-		       (hsTyVarNames tvs)
-	-- A type synonym type constructor isn't a "gate" for instance decls
-
-getGates source_fvs (TyData _ ctxt tycon tvs cons _ _ _ _ _)
-  = delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) cons)
-		       (hsTyVarNames tvs)
-    `addOneToNameSet` tycon
-  where
-    get (ConDecl n _ tvs ctxt details _)
-	| n `elemNameSet` source_fvs
-		-- If the constructor is method, get fvs from all its fields
-	= delListFromNameSet (get_details details `plusFV` 
-		  	      extractHsCtxtTyNames ctxt)
-			     (hsTyVarNames tvs)
-    get (ConDecl n _ tvs ctxt (RecCon fields) _)
-		-- Even if the constructor isn't mentioned, the fields
-		-- might be, as selectors.  They can't mention existentially
-		-- bound tyvars (typechecker checks for that) so no need for 
-		-- the deleteListFromNameSet part
-	= foldr (plusFV . get_field) emptyFVs fields
-	
-    get other_con = emptyFVs
-
-    get_details (VanillaCon tys) = plusFVs (map get_bang tys)
-    get_details (InfixCon t1 t2) = get_bang t1 `plusFV` get_bang t2
-    get_details (RecCon fields)  = plusFVs [get_bang t | (_, t) <- fields]
-
-    get_field (fs,t) | any (`elemNameSet` source_fvs) fs = get_bang t
-		     | otherwise			 = emptyFVs
-
-    get_bang bty = extractHsTyNames (getBangType bty)
-\end{code}
-
-@getWiredInGates@ is just like @getGates@, but it sees a wired-in @Name@
-rather than a declaration.
-
-\begin{code}
-getWiredInGates :: Name -> FreeVars
-getWiredInGates name 	-- No classes are wired in
-  = case lookupNameEnv wiredInThingEnv name of
-	Just (AnId the_id) -> getWiredInGates_s (namesOfType (idType the_id))
-
-	Just (ATyCon tc)
-	  |  isSynTyCon tc
-	  -> getWiredInGates_s (delListFromNameSet (namesOfType ty) (map getName tyvars))
-	  where
-	     (tyvars,ty)  = getSynTyConDefn tc
-
-	other -> unitFV name
-
-getWiredInGates_s names = foldr (plusFV . getWiredInGates) emptyFVs (nameSetToList names)
-\end{code}
-
-\begin{code}
-getInstDeclGates (InstD (InstDecl inst_ty _ _ _ _)) = extractHsTyNames inst_ty
-getInstDeclGates other				    = emptyFVs
 \end{code}
 
 
@@ -763,6 +470,41 @@ loadHomeUsage (mod_name, orphans, is_boot, whats_imported)
 \end{code}
 
 
+
+%*********************************************************
+%*						 	 *
+\subsection{Closing up the interface decls}
+%*							 *
+%*********************************************************
+
+Suppose we discover we don't need to recompile.   Then we start from the
+IfaceDecls in the ModIface, and fluff them up by sucking in all the decls they need.
+
+\begin{code}
+closeIfaceDecls :: DynFlags -> Finder
+	      	-> HomeIfaceTable -> HomeSymbolTable
+	      	-> PersistentCompilerState
+	      	-> ModIface 	-- Get the decls from here
+	      	-> IO (PersistentCompilerState, Bool, [RenamedHsDecl])
+				-- True <=> errors happened
+closeIfaceDecls dflags finder hit hst pcs mod 
+		mod_iface@(ModIface { mi_module = mod, mi_decls = iface_decls })
+  = initRn dflags finder hit hst pcs mod $
+
+    let
+	rule_decls = dcl_rules iface_decls
+	inst_decls = dcl_insts iface_decls
+	tycl_decls = dcl_tycl  iface_decls
+	decls = map RuleD rule_decls ++
+		map InstD inst_decls ++
+		map TyClD tycl_decls
+	needed = unionManyNameSets (map ruleDeclFVs rule_decls) `unionNameSets`
+		 unionManyNameSets (map instDeclFVs rule_decls) `unionNameSets`
+		 unionManyNameSets (map tyClDeclFVs rule_decls)
+    in
+    closeDecls decls needed
+\end{code}
+
 %*********************************************************
 %*						 	 *
 \subsection{Unused names}
@@ -936,18 +678,22 @@ printMinimalImports mod_name imps
 
 rnDump  :: [RenamedHsDecl] 	-- Renamed imported decls
 	-> [RenamedHsDecl] 	-- Renamed local decls
-	-> RnMG (IO ())
+	-> RnMG ()
 rnDump imp_decls local_decls
-   = doptRn Opt_D_dump_rn_trace 	`thenRn` \ dump_rn_trace ->
-     doptRn Opt_D_dump_rn_stats 	`thenRn` \ dump_rn_stats ->
-     doptRn Opt_D_dump_rn 		`thenRn` \ dump_rn ->
-     if dump_rn_trace || dump_rn_stats || dump_rn then
- 	getRnStats imp_decls		`thenRn` \ stats_msg ->
-	returnRn (printErrs stats_msg >> 
-	          dumpIfSet dump_rn "Renamer:" 
-			    (vcat (map ppr (local_decls ++ imp_decls))))
-     else
-	returnRn (return ())
+  = doptRn Opt_D_dump_rn_trace 	`thenRn` \ dump_rn_trace ->
+    doptRn Opt_D_dump_rn_stats 	`thenRn` \ dump_rn_stats ->
+    doptRn Opt_D_dump_rn 		`thenRn` \ dump_rn ->
+    getIfacesRn			`thenRn` \ ifaces ->
+
+    ioToRnM (do { dumpIfSet (dump_rn_trace || dump_rn_stats || dump_rn)
+			    "Renamer statistics"
+			    (getRnStats imp_decls ifaces) ;
+
+		  dumpIfSet dump_rn "Renamer:" 
+			    (vcat (map ppr (local_decls ++ imp_decls)))
+    })				`thenRn_`
+
+    returnRn ()
 \end{code}
 
 
@@ -958,47 +704,45 @@ rnDump imp_decls local_decls
 %*********************************************************
 
 \begin{code}
-getRnStats :: [RenamedHsDecl] -> RnMG SDoc
-getRnStats imported_decls
-  = getIfacesRn 		`thenRn` \ ifaces ->
-    let
-	n_mods = length [() | (_, _, True) <- eltsFM (iImpModInfo ifaces)]
-
-	decls_read     = [decl | (avail, True, (_,decl)) <- nameEnvElts (iDecls ifaces),
-				-- Data, newtype, and class decls are in the decls_fm
-				-- under multiple names; the tycon/class, and each
-				-- constructor/class op too.
-				-- The 'True' selects just the 'main' decl
-				 not (isLocallyDefined (availName avail))
-			     ]
-
-	(cd_rd, dd_rd, nd_rd, sd_rd, vd_rd)        = countTyClDecls decls_read
-	(cd_sp, dd_sp, nd_sp, sd_sp, vd_sp, id_sp) = count_decls imported_decls
-
-	unslurped_insts       = iInsts ifaces
-	inst_decls_unslurped  = length (bagToList unslurped_insts)
-	inst_decls_read	      = id_sp + inst_decls_unslurped
-
-	stats = vcat 
-		[int n_mods <+> text "interfaces read",
-		 hsep [ int cd_sp, text "class decls imported, out of", 
-		        int cd_rd, text "read"],
-		 hsep [ int dd_sp, text "data decls imported, out of",  
-			int dd_rd, text "read"],
-		 hsep [ int nd_sp, text "newtype decls imported, out of",  
-		        int nd_rd, text "read"],
-		 hsep [int sd_sp, text "type synonym decls imported, out of",  
-		        int sd_rd, text "read"],
-		 hsep [int vd_sp, text "value signatures imported, out of",  
-		        int vd_rd, text "read"],
-		 hsep [int id_sp, text "instance decls imported, out of",  
-		        int inst_decls_read, text "read"],
-		 text "cls dcls slurp" <+> fsep (map (ppr . tyClDeclName) 
-					   [d | TyClD d <- imported_decls, isClassDecl d]),
-		 text "cls dcls read"  <+> fsep (map (ppr . tyClDeclName) 
+getRnStats :: [RenamedHsDecl] -> Ifaces -> SDoc
+getRnStats imported_decls ifaces
+  = hcat [text "Renamer stats: ", stats])
+  where
+    n_mods = length [() | (_, _, True) <- eltsFM (iImpModInfo ifaces)]
+    
+    decls_read     = [decl | (avail, True, (_,decl)) <- nameEnvElts (iDecls ifaces),
+    			-- Data, newtype, and class decls are in the decls_fm
+    			-- under multiple names; the tycon/class, and each
+    			-- constructor/class op too.
+    			-- The 'True' selects just the 'main' decl
+    			 not (isLocallyDefined (availName avail))
+    		     ]
+    
+    (cd_rd, dd_rd, nd_rd, sd_rd, vd_rd)        = countTyClDecls decls_read
+    (cd_sp, dd_sp, nd_sp, sd_sp, vd_sp, id_sp) = count_decls imported_decls
+    
+    unslurped_insts       = iInsts ifaces
+    inst_decls_unslurped  = length (bagToList unslurped_insts)
+    inst_decls_read	      = id_sp + inst_decls_unslurped
+    
+    stats = vcat 
+    	[int n_mods <+> text "interfaces read",
+    	 hsep [ int cd_sp, text "class decls imported, out of", 
+    	        int cd_rd, text "read"],
+    	 hsep [ int dd_sp, text "data decls imported, out of",  
+    		int dd_rd, text "read"],
+    	 hsep [ int nd_sp, text "newtype decls imported, out of",  
+    	        int nd_rd, text "read"],
+    	 hsep [int sd_sp, text "type synonym decls imported, out of",  
+    	        int sd_rd, text "read"],
+    	 hsep [int vd_sp, text "value signatures imported, out of",  
+    	        int vd_rd, text "read"],
+    	 hsep [int id_sp, text "instance decls imported, out of",  
+    	        int inst_decls_read, text "read"],
+    	 text "cls dcls slurp" <+> fsep (map (ppr . tyClDeclName) 
+    				   [d | TyClD d <- imported_decls, isClassDecl d]),
+    	 text "cls dcls read"  <+> fsep (map (ppr . tyClDeclName) 
 					   [d | d <- decls_read, isClassDecl d])]
-    in
-    returnRn (hcat [text "Renamer stats: ", stats])
 
 count_decls decls
   = (class_decls, 

@@ -52,6 +52,7 @@ import OccName		( OccName )
 import Module		( Module, ModuleName, ModuleEnv,
 			  lookupModuleEnv, lookupModuleEnvByName
 			)
+import Rules		( RuleBase )
 import VarSet		( TyVarSet )
 import VarEnv		( emptyVarEnv )
 import Id		( Id )
@@ -149,7 +150,7 @@ data ModDetails
 	-- The next three fields are created by the typechecker
         md_types    :: TypeEnv,
         md_insts    :: [DFunId],	-- Dfun-ids for the instances in this module
-        md_rules    :: RuleBase		-- Domain may include Ids from other modules
+        md_rules    :: [(Id,CoreRule)]	-- Domain may include Ids from other modules
      }
 \end{code}
 
@@ -158,7 +159,7 @@ emptyModDetails :: ModDetails
 emptyModDetails
   = ModDetails { md_types = emptyTypeEnv,
                  md_insts = [],
-                 md_rules = emptyRuleBase
+                 md_rules = []
     }
 
 emptyModIface :: Module -> ModIface
@@ -386,7 +387,7 @@ data PersistentCompilerState
 	pcs_insts :: PackageInstEnv,	-- The total InstEnv accumulated from all
 					--   the non-home-package modules
 
-	pcs_rules :: PackageRuleEnv,	-- Ditto RuleEnv
+	pcs_rules :: PackageRuleBase,	-- Ditto RuleEnv
 
         pcs_PRS :: PersistentRenamerState
      }

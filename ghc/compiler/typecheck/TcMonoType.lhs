@@ -5,7 +5,7 @@
 
 \begin{code}
 module TcMonoType ( tcHsType, tcHsSigType, tcHsBoxedSigType, 
-		    tcContext, tcClassContext,
+		    tcContext, tcClassContext, checkAmbiguity,
 
 			-- Kind checking
 		    kcHsTyVar, kcHsTyVars, mkTyClTyVars,
@@ -374,6 +374,7 @@ tcHsType full_ty@(HsForAllTy (Just tv_names) ctxt ty)
     checkAmbiguity full_ty tyvars theta tau	`thenTc_`
     returnTc (mkSigmaTy tyvars theta tau)
 
+checkAmbiguity :: RenamedHsType -> [TyVar] -> ThetaType -> Type -> TcM ()
   -- Check for ambiguity
   --   forall V. P => tau
   -- is ambiguous if P contains generic variables
@@ -393,7 +394,7 @@ tcHsType full_ty@(HsForAllTy (Just tv_names) ctxt ty)
   -- This is the is_free test below.
 
 checkAmbiguity full_ty forall_tyvars theta tau
-  = mapTc check_pred theta
+  = mapTc_ check_pred theta
   where
     tau_vars	      = tyVarsOfType tau
     fds		      = instFunDepsOfTheta theta

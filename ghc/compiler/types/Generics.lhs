@@ -10,7 +10,7 @@ import HsSyn		( HsExpr(..), InPat(..), mkSimpleMatch )
 
 import Type             ( Type, isUnLiftedType, applyTys, tyVarsOfType, tyVarsOfTypes,
 			  mkTyVarTys, mkForAllTys, mkTyConApp, splitFunTys,
-			  mkFunTy, funResultTy, isTyVarTy, splitForAllTys,
+			  mkFunTy, isTyVarTy,
 			  splitSigmaTy, getTyVar, splitTyConApp_maybe, funTyCon
 			)
 
@@ -21,12 +21,12 @@ import TyCon            ( TyCon, tyConTyVars, tyConDataConsIfAvailable,
 			)
 import Name		( Name, mkSysLocalName )
 import CoreSyn          ( mkLams, Expr(..), CoreExpr, AltCon(..), Note(..),
-			  mkConApp, Alt, Bind (..), mkTyApps, mkVarApps )
-import BasicTypes       ( RecFlag(..), EP(..), Boxity(..) )
+			  mkConApp, Alt, mkTyApps, mkVarApps )
+import BasicTypes       ( EP(..), Boxity(..) )
 import Var              ( TyVar )
 import VarSet		( isEmptyVarSet )
-import Id               ( Id, mkTemplateLocal, mkTemplateLocals, idType, idName, 
-			  mkTemplateLocalsNum, mkVanillaId, mkId
+import Id               ( Id, mkTemplateLocal, idType, idName, 
+			  mkTemplateLocalsNum, mkId
 			) 
 import TysWiredIn       ( genericTyCons,
 			  genUnitTyCon, genUnitDataCon, plusTyCon, inrDataCon,
@@ -35,9 +35,9 @@ import TysWiredIn       ( genericTyCons,
 import IdInfo           ( vanillaIdInfo, setUnfoldingInfo )
 import CoreUnfold       ( mkTopUnfolding ) 
 
-import Unique		( Uniquable(..), mkBuiltinUnique )
+import Unique		( mkBuiltinUnique )
 import SrcLoc		( builtinSrcLoc )
-import Maybes		( maybeToBool, expectJust )
+import Maybes		( expectJust )
 import Outputable 
 
 #include "HsVersions.h"

@@ -22,7 +22,7 @@ module RdrName (
 	-- Environment
 	RdrNameEnv, 
 	emptyRdrEnv, lookupRdrEnv, addListToRdrEnv, rdrEnvElts, 
-	extendRdrEnv, rdrEnvToList,
+	extendRdrEnv, rdrEnvToList, elemRdrEnv,
 
 	-- Printing;	instance Outputable RdrName
 	pprUnqualRdrName 
@@ -185,6 +185,7 @@ addListToRdrEnv :: RdrNameEnv a -> [(RdrName,a)] -> RdrNameEnv a
 extendRdrEnv	:: RdrNameEnv a -> RdrName -> a -> RdrNameEnv a
 rdrEnvToList    :: RdrNameEnv a -> [(RdrName, a)]
 rdrEnvElts	:: RdrNameEnv a -> [a]
+elemRdrEnv	:: RdrName -> RdrNameEnv a -> Bool
 
 emptyRdrEnv  = emptyFM
 lookupRdrEnv = lookupFM
@@ -192,4 +193,5 @@ addListToRdrEnv = addListToFM
 rdrEnvElts	= eltsFM
 extendRdrEnv    = addToFM
 rdrEnvToList    = fmToList
+elemRdrEnv      = elemFM
 \end{code}

@@ -8,7 +8,7 @@ module TcRules ( tcRules ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( HsDecl(..), RuleDecl(..), RuleBndr(..) )
+import HsSyn		( HsDecl(..), RuleDecl(..), RuleBndr(..), isIfaceRuleDecl )
 import CoreSyn		( CoreRule(..) )
 import RnHsSyn		( RenamedHsDecl, RenamedRuleDecl )
 import HscTypes		( PackageRuleEnv )
@@ -40,10 +40,7 @@ tcRules pkg_rule_env decls
 	      plusLIEs lies, new_local_rules)
   where
     rule_decls = [rule | RuleD rule <- decls]
-    (imported_rules, local_rules) = partition is_iface_rule rule_decls
-
-    is_iface_rule (IfaceRule _ _ _ _ _ _) = True
-    is_iface_rule other			  = False
+    (imported_rules, local_rules) = partition isIfaceRuleDecl rule_decls
 
 tcIfaceRule :: RenamedRuleDecl -> TcM (Id, CoreRule)
   -- No zonking necessary!

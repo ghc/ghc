@@ -389,7 +389,7 @@ mkVarArg v | isId v    = Var v
 %************************************************************************
 
 \begin{code}
-addRule :: Id -> CoreRules -> CoreRule -> CoreRules
+addRule :: CoreRules -> Id -> CoreRule -> CoreRules
 
 -- Insert the new rule just before a rule that is *less specific*
 -- than the new one; or at the end if there isn't such a one.
@@ -399,11 +399,11 @@ addRule :: Id -> CoreRules -> CoreRule -> CoreRules
 -- We make no check for rules that unify without one dominating
 -- the other.   Arguably this would be a bug.
 
-addRule id (Rules rules rhs_fvs) rule@(BuiltinRule _)
+addRule (Rules rules rhs_fvs) id rule@(BuiltinRule _)
   = Rules (rule:rules) rhs_fvs
 	-- Put it at the start for lack of anything better
 
-addRule id (Rules rules rhs_fvs) rule
+addRule (Rules rules rhs_fvs) id rule
   = Rules (insertRule rules new_rule) (rhs_fvs `unionVarSet` new_rhs_fvs)
   where
     new_rule    = occurAnalyseRule rule
@@ -433,7 +433,7 @@ addIdSpecialisations id spec_stuff
   where
     rule_name = _PK_ ("SPEC " ++ showSDoc (ppr id))
     new_rules = foldr add (idSpecialisation id) spec_stuff
-    add (vars, args, rhs) rules = addRule id rules (Rule rule_name vars args rhs)
+    add (vars, args, rhs) rules = addRule rules id (Rule rule_name vars args rhs)
 \end{code}
 
 
@@ -477,41 +477,49 @@ orphanRule (ProtoCoreRule local fn _)
 %************************************************************************
 
 \begin{code}
-data RuleBase = RuleBase (IdEnv CoreRules)	-- Maps an Id to its rules
-			 IdSet			-- Ids (whether local or imported) mentioned on 
-						-- LHS of some rule; these should be black listed
+data RuleBase = RuleBase
+		    IdSet	-- Ids with their rules in their specialisations
+				-- Held as a set, so that it can simply be the initial
+				-- in-scope set in the simplifier
 
-emptyRuleBase = RuleBase emptyVarEnv emptyVarSet
+		     IdSet	-- Ids (whether local or imported) mentioned on 
+				-- LHS of some rule; these should be black listed
 
-extendRuleBaseList :: RuleBase -> [(Name,CoreRule)] -> RuleBase
+emptyRuleBase = RuleBase emptyVarSet emptyVarSet
+
+extendRuleBaseList :: RuleBase -> [(Id,CoreRule)] -> RuleBase
 extendRuleBaseList rule_base new_guys
-  = foldr extendRuleBase rule_base new_guys
+  = foldl extendRuleBase rule_base new_guys
 
-extendRuleBase :: RuleBase -> (Name,CoreRule) -> RuleBase
-extendRuleBase (RuleBase rule_env rule_fvs) (id, rule)
-  = RuleBase (extendVarEnv rule_env id (addRule id rules_for_id rule))
+extendRuleBase :: RuleBase -> (Id,CoreRule) -> RuleBase
+extendRuleBase (RuleBase rule_ids rule_fvs) (id, rule)
+  = RuleBase (extendVarSet rule_ids new_id)
 	     (rule_fvs `unionVarSet` extendVarSet lhs_fvs id)
   where
-    rules_for_id = case lookupWithDefaultVarEnv rule_env emptyCoreRules id
-
+    new_id = setIdSpecialisation id (addRule old_rules id rule)
+    old_rules = case lookupVarSet rule_ids id of
+		   Nothing  -> emptyCoreRules
+		   Just id' -> idSpecialisation id'
+    
     lhs_fvs = ruleSomeLhsFreeVars isId rule
 	-- Find *all* the free Ids of the LHS, not just
 	-- locally defined ones!!
 
-unionRuleBase (rule_ids1, black_ids1) (rule_ids2, black_ids2)
-  = (plusUFM_C merge_rules rule_ids1 rule_ids2,
-     unionVarSet black_ids1 black_ids2)
+unionRuleBase (RuleBase rule_ids1 black_ids1) (RuleBase rule_ids2 black_ids2)
+  = RuleBase (plusUFM_C merge_rules rule_ids1 rule_ids2)
+	     (unionVarSet black_ids1 black_ids2)
   where
-    merge_rules id1 id2 = let rules1 = idSpecialisation id1
-                              rules2 = idSpecialisation id2
-                              new_rules = foldl (addRule id1) rules1 (rulesRules rules2)
-                          in
-                          setIdSpecialisation id1 new_rules
+
+merge_rules id1 id2 = let rules1 = idSpecialisation id1
+                          rules2 = idSpecialisation id2
+                          new_rules = foldl (addRule id1) rules1 (rulesRules rules2)
+                      in
+                      setIdSpecialisation id1 new_rules
 
 pprRuleBase :: RuleBase -> SDoc
-pprRuleBase (rules,_) = vcat [ pprCoreRule (ppr id) rs
-                             | id <- varSetElems rules,
-                               rs <- rulesRules $ idSpecialisation id ]
+pprRuleBase (RuleBase rules _) = vcat [ pprCoreRule (ppr id) rs
+				      | id <- varSetElems rules,
+					rs <- rulesRules $ idSpecialisation id ]
 
 -- prepareLocalRuleBase takes the CoreBinds and rules defined in this module.
 -- It attaches those rules that are for local Ids to their binders, and
@@ -521,11 +529,13 @@ pprRuleBase (rules,_) = vcat [ pprCoreRule (ppr id) rs
 -- The rule Ids and LHS Ids are black-listed; that is, they aren't inlined
 -- so that the opportunity to apply the rule isn't lost too soon
 
-prepareLocalRuleBase :: [CoreBind] -> [ProtoCoreRule] -> ([CoreBind], RuleBase)
+prepareLocalRuleBase :: [CoreBind] -> [(Id,CoreRule)] -> ([CoreBind], RuleBase)
 prepareLocalRuleBase binds local_rules
-  = (map zap_bind binds, (imported_id_rule_ids, rule_lhs_fvs))
+  = error "urk"
+{-
+  = (map zap_bind binds, RuleBase imported_id_rule_ids rule_lhs_fvs)
   where
-    (rule_ids, rule_lhs_fvs) = foldr add_rule emptyRuleBase local_rules
+    RuleBase rule_ids rule_lhs_fvs = extendRuleBaseList emptyRuleBase local_rules
     imported_id_rule_ids = filterVarSet (not . isLocallyDefined) rule_ids
 
 	-- rule_fvs is the set of all variables mentioned in this module's rules
@@ -553,13 +563,17 @@ prepareLocalRuleBase binds local_rules
 			  Just bndr' 			       -> setIdNoDiscard bndr'
 			  Nothing | bndr `elemVarSet` rule_fvs -> setIdNoDiscard bndr
 				  | otherwise		       -> bndr
+-}
 
-addRuleToId id rule = setIdSpecialisation id (addRule id (idSpecialisation id) rule)
+addRuleToId id rule = setIdSpecialisation id (addRule (idSpecialisation id) id rule)
 
 -- prepareOrphanRuleBase does exactly the same as prepareLocalRuleBase, except that
 -- it assumes that none of the rules can be attached to local Ids.
 
 prepareOrphanRuleBase :: [ProtoCoreRule] -> RuleBase
 prepareOrphanRuleBase imported_rules
-  = foldr add_rule (emptyVarSet, emptyVarSet) imported_rules
+  = error "urk"
+{-
+  = foldr add_rule emptyRuleBase imported_rules
+-}
 \end{code}

@@ -31,7 +31,7 @@ import TcEnv		( TcId, TcEnv, TyThingDetails(..), tcAddImportedIdInfo,
 			  tcExtendLocalValEnv, tcExtendTyVarEnv, newDefaultMethodName
 			)
 import TcBinds		( tcBindWithSigs, tcSpecSigs )
-import TcMonoType	( tcHsSigType, tcClassContext, checkSigTyVars, sigCtxt, mkTcSig )
+import TcMonoType	( tcHsSigType, tcClassContext, checkSigTyVars, checkAmbiguity, sigCtxt, mkTcSig )
 import TcSimplify	( tcSimplifyAndCheck, bindInstsOfLocalFuns )
 import TcType		( TcType, TcTyVar, tcInstTyVars, zonkTcSigTyVars )
 import TcMonad
@@ -113,7 +113,7 @@ tcClassDecl1 rec_env
 	-- LOOK THINGS UP IN THE ENVIRONMENT
     tcLookupClass class_name				`thenTc` \ clas ->
     let
-	tyvars   = classTyVars clas
+	(tyvars, fds) = classTvsFds clas
 	op_sigs  = filter isClassOpSig class_sigs
 	op_names = [n | ClassOpSig n _ _ _ <- op_sigs]
 	(_, datacon_name, datacon_wkr_name, sc_sel_names) = getClassDeclSysNames sys_names
@@ -128,7 +128,8 @@ tcClassDecl1 rec_env
     tcSuperClasses clas context sc_sel_names	`thenTc` \ (sc_theta, sc_sel_ids) ->
 
 	-- CHECK THE CLASS SIGNATURES,
-    mapTc (tcClassSig rec_env clas tyvars dm_info) op_sigs	`thenTc` \ sig_stuff ->
+    mapTc (tcClassSig rec_env tyvar_names clas tyvars fds dm_info) 
+	  op_sigs				`thenTc` \ sig_stuff ->
 
 	-- MAKE THE CLASS DETAILS
     let
@@ -236,8 +237,10 @@ tcSuperClasses clas context sc_sel_names
 
 
 tcClassSig :: TcEnv			-- Knot tying only!
+	   -> [HsTyVarBndr Name]	-- From the declaration, for error messages
 	   -> Class	    		-- ...ditto...
 	   -> [TyVar]		 	-- The class type variable, used for error check only
+	   -> [FunDep TyVar]
 	   -> NameEnv (DefMeth Name)	-- Info about default methods
 	   -> RenamedClassOpSig
 	   -> TcM (Type,		-- Type of the method
@@ -248,20 +251,17 @@ tcClassSig :: TcEnv			-- Knot tying only!
 -- so we distinguish them in checkDefaultBinds, and pass this knowledge in the
 -- Class.DefMeth data structure. 
 
-tcClassSig rec_env clas clas_tyvars dm_info
+tcClassSig rec_env tyvar_names clas clas_tyvars fds dm_info
 	   (ClassOpSig op_name maybe_dm op_ty src_loc)
   = tcAddSrcLoc src_loc $
 
 	-- Check the type signature.  NB that the envt *already has*
 	-- bindings for the type variables; see comments in TcTyAndClassDcls.
 
-    -- NB: Renamer checks that the class type variable is mentioned in local_ty,
-    -- and that it is not constrained by theta
     tcHsSigType op_ty				`thenTc` \ local_ty ->
     let
-	global_ty   = mkSigmaTy clas_tyvars 
-			        [mkClassPred clas (mkTyVarTys clas_tyvars)]
-			        local_ty
+	theta	    = [mkClassPred clas (mkTyVarTys clas_tyvars)]
+	global_ty   = mkSigmaTy clas_tyvars theta local_ty
 
 	-- Build the selector id and default method id
 	sel_id      = mkDictSelId op_name clas
@@ -274,7 +274,12 @@ tcClassSig rec_env clas clas_tyvars dm_info
 			DefMeth dm_name -> DefMeth (tcAddImportedIdInfo rec_env dm_id)
 				        where
 					   dm_id = mkDefaultMethodId dm_name clas global_ty
+
+	full_hs_ty = HsForAllTy (Just tyvar_names) op_ty
     in
+	-- Check for ambiguous class op types
+    checkAmbiguity full_ty clas_tyvars theta local_ty		 `thenRn_`
+
 	-- Check that for a generic method, the type of 
 	-- the method is sufficiently simple
     checkTc (dm_info_name /= GenDefMeth || validGenericMethodType local_ty)

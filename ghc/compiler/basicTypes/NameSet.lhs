@@ -9,7 +9,11 @@ module NameSet (
 	NameSet,
 	emptyNameSet, unitNameSet, mkNameSet, unionNameSets, unionManyNameSets,
 	minusNameSet, elemNameSet, nameSetToList, addOneToNameSet, addListToNameSet, 
-	delFromNameSet, delListFromNameSet, isEmptyNameSet, foldNameSet, filterNameSet
+	delFromNameSet, delListFromNameSet, isEmptyNameSet, foldNameSet, filterNameSet,
+	
+	-- Free variables
+	FreeVars, isEmptyFVs, emptyFVs, plusFVs, plusFV, 
+	mkFVs, addOneFV, unitFV, delFV, delFVs
     ) where
 
 #include "HsVersions.h"
@@ -61,4 +65,35 @@ filterNameSet	  = filterUniqSet
 delListFromNameSet set ns = foldl delFromNameSet set ns
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Free variables}
+%*									*
+%************************************************************************
+
+These synonyms are useful when we are thinking of free variables
+
+\begin{code}
+type FreeVars	= NameSet
+
+plusFV   :: FreeVars -> FreeVars -> FreeVars
+addOneFV :: FreeVars -> Name -> FreeVars
+unitFV   :: Name -> FreeVars
+emptyFVs :: FreeVars
+plusFVs  :: [FreeVars] -> FreeVars
+mkFVs	 :: [Name] -> FreeVars
+delFV    :: Name -> FreeVars -> FreeVars
+delFVs   :: [Name] -> FreeVars -> FreeVars
+
+isEmptyFVs  = isEmptyNameSet
+emptyFVs    = emptyNameSet
+plusFVs     = unionManyNameSets
+plusFV      = unionNameSets
+mkFVs	    = mkNameSet
+addOneFV    = addOneToNameSet
+unitFV      = unitNameSet
+delFV n s   = delFromNameSet s n
+delFVs ns s = delListFromNameSet s ns
+\end{code}
 

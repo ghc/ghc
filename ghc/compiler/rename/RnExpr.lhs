@@ -18,14 +18,14 @@ module RnExpr (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} RnBinds  ( rnBinds ) 
-import {-# SOURCE #-} RnSource ( rnHsSigType, rnHsType )
+import {-# SOURCE #-} RnSource ( rnHsTypeFVs )
 
 import HsSyn
 import RdrHsSyn
 import RnHsSyn
 import RnMonad
 import RnEnv
-import RnIfaces		( lookupFixityRn )
+import RnHiFiles	( lookupFixityRn )
 import CmdLineOpts	( DynFlag(..), opt_IgnoreAsserts )
 import Literal		( inIntRange )
 import BasicTypes	( Fixity(..), FixityDirection(..), defaultFixity, negateFixity )
@@ -71,7 +71,7 @@ rnPat (SigPatIn pat ty)
     
     if glaExts
     then rnPat pat		`thenRn` \ (pat', fvs1) ->
-         rnHsType doc ty	`thenRn` \ (ty',  fvs2) ->
+         rnHsTypeFVs doc ty	`thenRn` \ (ty',  fvs2) ->
          returnRn (SigPatIn pat' ty', fvs1 `plusFV` fvs2)
 
     else addErrRn (patSigErr ty)	`thenRn_`
@@ -146,7 +146,7 @@ rnPat (RecPatIn con rpats)
     rnRpats rpats	`thenRn` \ (rpats', fvs) ->
     returnRn (RecPatIn con' rpats', fvs `addOneFV` con')
 rnPat (TypePatIn name) =
-    (rnHsType (text "type pattern") name) `thenRn` \ (name', fvs) ->
+    (rnHsTypeFVs (text "type pattern") name) `thenRn` \ (name', fvs) ->
     returnRn (TypePatIn name', fvs)
 \end{code}
 
@@ -187,7 +187,7 @@ rnMatch match@(Match _ pats maybe_rhs_sig grhss)
     doptRn Opt_GlasgowExts		`thenRn` \ opt_GlasgowExts ->
     (case maybe_rhs_sig of
 	Nothing -> returnRn (Nothing, emptyFVs)
-	Just ty | opt_GlasgowExts -> rnHsType doc_sig ty	`thenRn` \ (ty', ty_fvs) ->
+	Just ty | opt_GlasgowExts -> rnHsTypeFVs doc_sig ty	`thenRn` \ (ty', ty_fvs) ->
 				     returnRn (Just ty', ty_fvs)
 		| otherwise	  -> addErrRn (patSigErr ty)	`thenRn_`
 				     returnRn (Nothing, emptyFVs)
@@ -411,8 +411,8 @@ rnExpr (RecordUpd expr rbinds)
     returnRn (RecordUpd expr' rbinds', fvExpr `plusFV` fvRbinds)
 
 rnExpr (ExprWithTySig expr pty)
-  = rnExpr expr			 		`thenRn` \ (expr', fvExpr) ->
-    rnHsSigType (text "an expression") pty	`thenRn` \ (pty', fvTy) ->
+  = rnExpr expr			 			   `thenRn` \ (expr', fvExpr) ->
+    rnHsTypeFVs (text "an expression type signature") pty  `thenRn` \ (pty', fvTy) ->
     returnRn (ExprWithTySig expr' pty', fvExpr `plusFV` fvTy)
 
 rnExpr (HsIf p b1 b2 src_loc)
@@ -422,10 +422,11 @@ rnExpr (HsIf p b1 b2 src_loc)
     rnExpr b2		`thenRn` \ (b2', fvB2) ->
     returnRn (HsIf p' b1' b2' src_loc, plusFVs [fvP, fvB1, fvB2])
 
-rnExpr (HsType a) = 
-    (rnHsType doc a) `thenRn` \ (t, fvT) -> returnRn (HsType t, fvT)
-       where doc = text "renaming a type pattern"
-		    
+rnExpr (HsType a)
+  = rnHsTypeFVs doc a	`thenRn` \ (t, fvT) -> 
+    returnRn (HsType t, fvT)
+  where 
+    doc = text "renaming a type pattern"
 
 rnExpr (ArithSeqIn seq)
   = lookupOrigName enumClass_RDR	`thenRn` \ enum ->

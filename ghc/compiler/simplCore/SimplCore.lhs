@@ -258,7 +258,7 @@ simplifyPgm :: DynFlags
 	    -> [CoreBind]				    -- Input
 	    -> IO (SimplCount, [CoreBind], Maybe RuleBase)  -- New bindings
 
-simplifyPgm dflags (imported_rule_ids, rule_lhs_fvs) 
+simplifyPgm dflags (RuleBase imported_rule_ids rule_lhs_fvs) 
 	    sw_chkr us binds
   = do {
 	beginPass dflags "Simplify";

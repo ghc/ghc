@@ -16,7 +16,7 @@ module HsDecls (
 	DeprecDecl(..), DeprecTxt,
 	hsDeclName, instDeclName, tyClDeclName, tyClDeclNames,
 	isClassDecl, isSynDecl, isDataDecl, countTyClDecls, toHsRule,
-	mkClassDeclSysNames,
+	mkClassDeclSysNames, isIfaceRuleDecl,
 	getClassDeclSysNames
     ) where
 
@@ -237,7 +237,6 @@ mkClassDeclSysNames  (a,b,c,ds) = a:b:c:ds
 getClassDeclSysNames (a:b:c:ds) = (a,b,c,ds)
 \end{code}
 
-
 \begin{code}
 isDataDecl, isSynDecl, isClassDecl :: TyClDecl name pat -> Bool
 
@@ -373,7 +372,7 @@ data ConDecl name
 		name			-- Name of the constructor's 'worker Id'
 					-- Filled in as the ConDecl is built
 
-		[HsTyVarBndr name]		-- Existentially quantified type variables
+		[HsTyVarBndr name]	-- Existentially quantified type variables
 		(HsContext name)	-- ...and context
 					-- If both are empty then there are no existentials
 
@@ -632,6 +631,8 @@ data RuleDecl name pat
 	name			-- Head of LHS
 	CoreRule
 
+isIfaceRuleDecl (HsRule _ _ _ _ _ _) = False
+isIfaceRuleDecl other		     = True
 
 data RuleBndr name
   = RuleBndr name

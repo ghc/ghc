@@ -9,10 +9,13 @@ module RnHsSyn where
 #include "HsVersions.h"
 
 import HsSyn
+import HsCore
+import Class		( FunDep, DefMeth(..) )
 import TysWiredIn	( tupleTyCon, listTyCon, charTyCon )
 import Name		( Name, getName, isTyVarName )
 import NameSet
 import BasicTypes	( Boxity )
+import Maybes		( orElse )
 import Outputable
 \end{code}
 
@@ -65,6 +68,9 @@ tupleTyCon_name boxity n = getName (tupleTyCon boxity n)
 extractHsTyVars :: RenamedHsType -> NameSet
 extractHsTyVars x = filterNameSet isTyVarName (extractHsTyNames x)
 
+extractFunDepNames :: FunDep Name -> NameSet
+extractFunDepNames (ns1, ns2) = mkNameSet ns1 `unionNameSets` mkNameSet ns2
+
 extractHsTyNames   :: RenamedHsType -> NameSet
 extractHsTyNames ty
   = get ty
@@ -101,6 +107,111 @@ extractHsPredTyNames (HsPIParam n ty)
   = extractHsTyNames ty
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Free variables of declarations}
+%*									*
+%************************************************************************
+
+Return the Names that must be in scope if we are to use this declaration.
+In all cases this is set up for interface-file declarations:
+	- for class decls we ignroe the bindings
+	- for instance decls likewise, plus the pragmas
+	- for rule decls, we ignore HsRules
+
+\begin{code}
+tyClDeclFVs :: RenamedTyClDecl -> NameSet
+tyClDeclFVs (IfaceSig name ty id_infos loc)
+  = extractHsTyNames ty			`plusFV` 
+    plusFVs (map hsIdInfoFVs id_infos)
+
+tyClDeclFVs (TyData _ context _ tyvars condecls _ derivings _ _ _)
+  = delFVs (map hsTyVarName tyvars) $
+    extractHsCtxtTyNames context	`plusFV`
+    plusFVs (map conDeclFVs condecls)	`plusFV`
+    mkNameSet (derivings `orElse` [])
+
+tyClDeclFVs (TySynonym _ tyvars ty _)
+  = delFVs (map hsTyVarName tyvars) (extractHsTyNames ty)
+
+tyClDeclFVs (ClassDecl context _ tyvars fds sigs _ _ src_loc)
+  = delFVs (map hsTyVarName tyvars) $
+    extractHsCtxtTyNames context	  `plusFV`
+    plusFVs (map extractFunDepNames fds)  `plusFV`
+    plusFVs (map hsSigFVs sigs)
+
+----------------
+hsSigFVs (Sig v ty _) 	    	    = extractHsTyNames ty `addOneFV` v
+hsSigFVs (SpecInstSig ty _) 	    = extractHsTyNames ty
+hsSigFVs (SpecSig v ty _)   	    = extractHsTyNames ty `addOneFV` v
+hsSigFVs (FixSig (FixitySig v _ _)) = unitFV v
+hsSigFVs (InlineSig v p _) 	    = unitFV v
+hsSigFVs (NoInlineSig v p _)	    = unitFV v
+hsSigFVs (ClassOpSig v dm ty _)	    = dmFVs dm `plusFV` extractHsTyNames ty `addOneFV` v
+
+dmFVs (Just (DefMeth v)) = unitFV v
+dmFVs other		 = emptyFVs
+
+----------------
+instDeclFVs (InstDecl inst_ty _ _ maybe_dfun _)
+  = extractHsTyNames inst_ty	`plusFV` 
+    (case maybe_dfun of { Just n -> unitFV n; Nothing -> emptyFVs })
+
+----------------
+ruleDeclFVs (HsRule _ _ _ _ _ _) = emptyFVs
+ruleDeclFVs (IfaceRule _ vars _ _ rhs _)
+  = delFVs (map ufBinderName vars) $
+    ufExprFVs rhs
+
+----------------
+conDeclFVs (ConDecl _ _ tyvars context details _)
+  = delFVs (map hsTyVarName tyvars) $
+    extractHsCtxtTyNames context	  `plusFV`
+    conDetailsFVs details
+
+conDetailsFVs (VanillaCon btys)    = plusFVs (map bangTyFVs btys)
+conDetailsFVs (InfixCon bty1 bty2) = bangTyFVs bty1 `plusFV` bangTyFVs bty2
+conDetailsFVs (RecCon flds)	   = plusFVs [bangTyFVs bty | (_, bty) <- flds]
+
+bangTyFVs bty = extractHsTyNames (getBangType bty)
+
+----------------
+hsIdInfoFVs (HsUnfold _ unf) = ufExprFVs unf
+hsIdInfoFVs (HsWorker n)     = unitFV n
+hsIdInfoFVs other	     = emptyFVs
+
+----------------
+ufExprFVs (UfVar n) 	  = unitFV n
+ufExprFVs (UfLit l) 	  = emptyFVs
+ufExprFVs (UfLitLit l ty) = extractHsTyNames ty
+ufExprFVs (UfCCall cc ty) = extractHsTyNames ty
+ufExprFVs (UfType ty)     = extractHsTyNames ty
+ufExprFVs (UfTuple tc es) = hsTupConFVs tc `plusFV` plusFVs (map ufExprFVs es)
+ufExprFVs (UfLam v e)     = ufBndrFVs v (ufExprFVs e)
+ufExprFVs (UfApp e1 e2)   = ufExprFVs e1 `plusFV` ufExprFVs e2
+ufExprFVs (UfCase e n as) = ufExprFVs e `plusFV` delFV n (plusFVs (map ufAltFVs as))
+ufExprFVs (UfNote n e)	  = ufNoteFVs n `plusFV` ufExprFVs e
+ufExprFVs (UfLet (UfNonRec b r) e) = ufExprFVs r `plusFV` ufBndrFVs b (ufExprFVs e)
+ufExprFVs (UfLet (UfRec prs)    e) = foldr ufBndrFVs 
+					   (foldr (plusFV . ufExprFVs . snd) (ufExprFVs e) prs)
+					   (map fst prs) 
+
+ufBndrFVs (UfValBinder n ty) fvs = extractHsTyNames ty `plusFV` delFV n fvs
+ufBndrFVs (UfTyBinder  n k)  fvs = delFV n fvs
+
+ufAltFVs (con, vs, e) = ufConFVs con `plusFV` delFVs vs (ufExprFVs e)
+
+ufConFVs (UfDataAlt n)      = unitFV n
+ufConFVs (UfTupleAlt t)     = hsTupConFVs t
+ufConFVs (UfLitLitAlt _ ty) = extractHsTyNames ty
+ufConFVs other		    = emptyFVs
+
+ufNoteFVs (UfCoerce ty) = extractHsTyNames ty
+ufNoteFVs note		= emptyFVs
+
+hsTupConFVs (HsTupCon n _) = unitFV n
+\end{code}
 
 %************************************************************************
 %*									*

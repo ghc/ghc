@@ -14,11 +14,11 @@ We could either use this, or parameterise @GenCoreExpr@ on @Types@ and
 module HsCore (
 	UfExpr(..), UfAlt, UfBinder(..), UfNote(..),
 	UfBinding(..), UfConAlt(..),
-	HsIdInfo(..), pprHsIdInfo,
+	HsIdInfo(..), pprHsIdInfo, 
 
 	eq_ufExpr, eq_ufBinders, pprUfExpr,
 
-	toUfExpr, toUfBndr
+	toUfExpr, toUfBndr, ufBinderName
     ) where
 
 #include "HsVersions.h"
@@ -47,7 +47,6 @@ import DataCon		( dataConTyCon )
 import TyCon		( isTupleTyCon, tupleTyConBoxity )
 import Type		( Kind )
 import CostCentre
-import SrcLoc		( SrcLoc )
 import Outputable
 \end{code}
 
@@ -92,6 +91,10 @@ data UfBinding name
 data UfBinder name
   = UfValBinder	name (HsType name)
   | UfTyBinder	name Kind
+
+ufBinderName :: UfBinder name -> name
+ufBinderName (UfValBinder n _) = n
+ufBinderName (UfTyBinder  n _) = n
 \end{code}
 
 

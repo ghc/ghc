@@ -7,7 +7,7 @@
 module VarSet (
 	VarSet, IdSet, TyVarSet, UVarSet,
 	emptyVarSet, unitVarSet, mkVarSet,
-	extendVarSet,
+	extendVarSet, extendVarSet_C,
 	elemVarSet, varSetElems, subVarSet,
 	unionVarSet, unionVarSets,
 	intersectVarSet, intersectsVarSet,
@@ -18,12 +18,10 @@ module VarSet (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_PprStyle_Debug )
-import Var		( Var, Id, TyVar, UVar, setVarUnique )
-import Unique		( Unique, Uniquable(..) )
+import Var		( Var, Id, TyVar, UVar )
+import Unique		( Unique )
 import UniqSet
-import UniqFM		( delFromUFM_Directly )
-import Outputable
+import UniqFM		( delFromUFM_Directly, addToUFM_C )
 \end{code}
 
 %************************************************************************
@@ -59,6 +57,7 @@ mapVarSet 	:: (Var -> Var) -> VarSet -> VarSet
 sizeVarSet	:: VarSet -> Int
 filterVarSet	:: (Var -> Bool) -> VarSet -> VarSet
 subVarSet	:: VarSet -> VarSet -> Bool
+extendVarSet_C  :: (Var->Var->Var) -> VarSet -> Var -> VarSet
 
 delVarSetByKey	:: VarSet -> Unique -> VarSet
 
@@ -80,6 +79,7 @@ lookupVarSet	= lookupUniqSet
 mapVarSet	= mapUniqSet
 sizeVarSet	= sizeUniqSet
 filterVarSet	= filterUniqSet
+extendVarSet_C combine s x = addToUFM_C combine s x x
 a `subVarSet` b = isEmptyVarSet (a `minusVarSet` b)
 delVarSetByKey	= delFromUFM_Directly	-- Can't be bothered to add this to UniqSet
 \end{code}

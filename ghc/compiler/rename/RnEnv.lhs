@@ -670,25 +670,6 @@ pprAvail (Avail n) = ppr n
 %************************************************************************
 
 \begin{code}
-type FreeVars	= NameSet
-
-plusFV   :: FreeVars -> FreeVars -> FreeVars
-addOneFV :: FreeVars -> Name -> FreeVars
-unitFV   :: Name -> FreeVars
-emptyFVs :: FreeVars
-plusFVs  :: [FreeVars] -> FreeVars
-mkFVs	 :: [Name] -> FreeVars
-
-isEmptyFVs = isEmptyNameSet
-emptyFVs   = emptyNameSet
-plusFVs    = unionManyNameSets
-plusFV     = unionNameSets
-mkFVs	   = mkNameSet
-
--- No point in adding implicitly imported names to the free-var set
-addOneFV s n = addOneToNameSet s n
-unitFV     n = unitNameSet n
-
 -- A useful utility
 mapFvRn f xs = mapRn f xs	`thenRn` \ stuff ->
 	       let
