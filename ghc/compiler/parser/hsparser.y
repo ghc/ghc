@@ -756,16 +756,16 @@ constr_after_context :
 
 /* Con { op1 :: Int } */
 	|  gtycon OCURLY fields CCURLY		{ $$ = mkconstrrec($1,$3,hsplineno); }
-		/* 1 S/R conflict on OCURLY -> shift */
 	;
+		/* 1 S/R conflict on OCURLY -> shift */
 
 
 /* contype has to reduce to a btype unless there are !'s, so that
    we don't get reduce/reduce conflicts with the second production of constr.
    But as soon as we see a ! we must switch to using bxtype. */
 
-contype : btype					{ $$ = $1 }
-	| bxtype				{ $$ = $1 }
+contype : btype					{ $$ = $1; }
+	| bxtype				{ $$ = $1; }
 	;
 
 /* S !Int Bool; at least one ! */
@@ -783,8 +783,8 @@ batype	:  atype				{ $$ = $1; }
 
 /* A wierd atype is one that isn't a regular atype;
    it starts with a "!", or with a forall. */
-wierd_atype : BANG bigatype			{ $$ = mktbang( $2 ) }
-	    | BANG atype			{ $$ = mktbang( $2 ) }
+wierd_atype : BANG bigatype			{ $$ = mktbang( $2 ); }
+	    | BANG atype			{ $$ = mktbang( $2 ); }
 	    | bigatype 
 	    ;
 
@@ -1034,6 +1034,11 @@ kexpLno	:  LAMBDA
 	/* SCC Expression */
 	|  SCC STRING exp
 		{ if (ignoreSCC) {
+		    if (warnSCC) {
+		        fprintf(stderr,
+			        "\"%s\":%d: _scc_ (`set [profiling] cost centre') ignored\n",
+			        input_filename, hsplineno);
+		    }
 		    $$ = mkpar($3);	/* Note the mkpar().  If we don't have it, then
 					   (x >> _scc_ y >> z) parses as (x >> (y >> z)),
 					   right associated.  But the precedence reorganiser expects
@@ -1144,8 +1149,8 @@ list_rest : 	exp				{ $$ = lsing($1); }
 	   at it, it *will* do the wrong thing [WDP 94/06])
 	*/
 
-letdecls:  LET ocurly decls ccurly		{ $$ = $3 }
-	|  LET vocurly decls vccurly		{ $$ = $3 }
+letdecls:  LET ocurly decls ccurly		{ $$ = $3; }
+	|  LET vocurly decls vccurly		{ $$ = $3; }
 	;
 
 quals	:  qual					{ $$ = lsing($1); }
