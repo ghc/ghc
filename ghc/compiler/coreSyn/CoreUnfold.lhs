@@ -578,6 +578,11 @@ callSiteInline dflags active_inline inline_call occ id arg_infos interesting_con
 		-- then if the context is totally uninteresting (not applied, not scrutinised)
 		-- there is no point in substituting because it might just increase allocation,
 		-- by allocating the function itself many times
+		-- Note [Jan 2002]: this comment looks out of date.  The actual code
+		-- doesn't inline *ever* in an uninteresting context.  Why not?  I
+		-- think it's just because we don't want to inline top-level constants
+		-- into uninteresting contexts, lest we (for example) re-nest top-level
+		-- literal lists.
 		--
 		-- Note: there used to be a '&& not top_level' in the guard above,
 		--	 but that stopped us inlining top-level functions used only once,

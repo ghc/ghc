@@ -756,7 +756,16 @@ big the RHS might be.  If this is the case we don't simplify the RHS
 first, but just inline it un-simplified.
 
 This is much better than first simplifying a perhaps-huge RHS and then
-inlining and re-simplifying it.
+inlining and re-simplifying it.  Indeed, it can be at least quadratically
+better.  Consider
+
+	x1 = e1
+	x2 = e2[x1]
+	x3 = e3[x2]
+	...etc...
+	xN = eN[xN-1]
+
+We may end up simplifying e1 N times, e2 N-1 times, e3 N-3 times etc.
 
 NB: we don't even look at the RHS to see if it's trivial
 We might have
@@ -785,6 +794,9 @@ seems to be to do a callSiteInline based on the fact that there is
 something interesting about the call site (it's strict).  Hmm.  That
 seems a bit fragile.
 
+Conclusion: inline top level things gaily until Phase 0 (the last
+phase), at which point don't.
+
 \begin{code}
 preInlineUnconditionally :: SimplEnv -> TopLevelFlag -> InId -> Bool
 preInlineUnconditionally env top_lvl bndr
@@ -795,7 +807,7 @@ preInlineUnconditionally env top_lvl bndr
 -- top level, and preInlineUnconditionally floats them all back in.
 -- Result is (a) static allocation replaced by dynamic allocation
 --	     (b) many simplifier iterations because this tickles
---		 a related problem
+--		 a related problem; only one inlining per pass
 -- 
 -- On the other hand, I have seen cases where top-level fusion is
 -- lost if we don't inline top level thing (e.g. string constants)
