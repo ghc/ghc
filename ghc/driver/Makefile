@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.35 2000/06/14 13:14:42 simonmar Exp $
+# $Id: Makefile,v 1.36 2000/06/25 17:20:20 panne Exp $
 #
 
 TOP=..
@@ -77,7 +77,7 @@ all :: ghc-inplace
 ghc-inplace : ghc
 	@$(RM) $@
 	echo '#!/bin/sh' >>$@
-	echo exec $(FPTOOLS_TOP_ABS)/ghc/driver/ghc -B$(FPTOOLS_TOP_ABS) $$\* >>$@
+	echo exec $(FPTOOLS_TOP_ABS)/ghc/driver/ghc -B$(FPTOOLS_TOP_ABS) '"$$@"' >>$@
 	chmod 755 $@
 
 CLEAN_FILES += ghc-inplace
