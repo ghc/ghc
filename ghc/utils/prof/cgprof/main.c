@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------
- * $Id: main.c,v 1.1 2000/04/05 10:06:36 simonmar Exp $
+ * $Id: main.c,v 1.2 2003/08/01 14:50:50 panne Exp $
  *									
  *	Copyright (C) 1995-2000 University of Oxford
  *									
@@ -65,7 +65,7 @@ double bsp_l = 1902;
 double bsp_g = 9.3;
 int    bsp_p;
 
-FILE *log;
+FILE *logFile;
 
 
 extern void printDaVinci(int);
@@ -121,7 +121,7 @@ main(int argc, char *argv[]) {
             Pgm,ProfileData,usage);
     exit(1);
   }
-  if (!(log=fopen("ghcprof.log","w"))) {
+  if (!(logFile=fopen("ghcprof.log","w"))) {
     fprintf(stderr,"%s: unable to open log file for writing\n",Pgm);
     exit(1);
   }
@@ -141,13 +141,13 @@ main(int argc, char *argv[]) {
   
   /* printf("Ending initialisation of daVinci\n"); */
  
-  if (Verbose) fprintf(log,"%s: opened profile file \"%s\".\n",Pgm,ProfileData);
+  if (Verbose) fprintf(logFile,"%s: opened profile file \"%s\".\n",Pgm,ProfileData);
   readRawProfile(fptr,&NoNodes,MaxNoNodes);
   fclose(fptr);
-  if (Verbose) fprintf(log,"%s: %d nodes in profile.\n",Pgm,NoNodes);
+  if (Verbose) fprintf(logFile,"%s: %d nodes in profile.\n",Pgm,NoNodes);
 
   if (NoNodes<=0) {
-    fprintf(log,"%s: no call-graph profile data in \"%s\".\n"
+    fprintf(logFile,"%s: no call-graph profile data in \"%s\".\n"
             "Re-run your program using the appropriate profiling flags\n",
             Pgm,ProfileData);
     exit(1);
@@ -163,7 +163,7 @@ main(int argc, char *argv[]) {
   TotalH        = Mat(object_cost,costs,root,0).hrel_max;
   TotalSyncs    = Mat(object_cost,costs,root,0).syncs;
   if (Verbose) printConnectivityMatrix(graph,costs,root);
-  fflush(log);
+  fflush(logFile);
   graphToDaVinci(root,&graph,&costs,0);
   fflush(stdout);
   undo_stack   = calloc(NoDeletes,sizeof(int));
@@ -181,7 +181,7 @@ main(int argc, char *argv[]) {
   select_nodes[0]=root;
   while (fgets(davinci_stdin, MAX_PROFILE_LINE_LENGTH, stdin) && going) {
     cmd = parseDaVinciCmd(davinci_stdin);
-    if (Verbose) fprintf(log,"From davinci=\"%s\"\n",davinci_stdin);
+    if (Verbose) fprintf(logFile,"From davinci=\"%s\"\n",davinci_stdin);
     switch (cmd.type) {
     case DAVINCI_OK:
       continue;
@@ -423,7 +423,7 @@ main(int argc, char *argv[]) {
       break;
     }
     fflush(stdout);
-    fflush(log);
+    fflush(logFile);
   }  
 
   return 0;

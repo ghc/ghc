@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------
- * $Id: daVinci.c,v 1.1 2000/04/05 10:06:36 simonmar Exp $
+ * $Id: daVinci.c,v 1.2 2003/08/01 14:50:50 panne Exp $
  *									
  *	Copyright (C) 1995-2000 University of Oxford
  *									
@@ -507,7 +507,7 @@ static void recur_graphToDaVinci(int node,Matrix *graph,Matrix *costs,char* p_ze
       if (mode==1)
       {
       if ((ptr->comm_max+ptr->comp_idle_max+ptr->comp_max) <= 0.0)
-          { fprintf(log,"Node %d %s is a candidate for deletion\n",node, node_str);
+          { fprintf(logFile,"Node %d %s is a candidate for deletion\n",node, node_str);
             sprintf(tempnode,"\"%d\",",node);
             strcat(p_zeronodes,tempnode);
           }
@@ -536,7 +536,7 @@ static void recur_graphToDaVinci_old(int node,Matrix *graph, Matrix *costs) {
   int i,j,no_children=0,*children,colour,small;
   char line[MAX_FUNNAME], *node_str;
   if (Mat(int,*graph,node,node)<0) {
-    fprintf(log,"r(\"%d\") ",node);
+    fprintf(logFile,"r(\"%d\") ",node);
     printf("r(\"%d\") ",node);
   } else {
     for(i=0;i<graph->cols;i++) 
@@ -558,9 +558,9 @@ static void recur_graphToDaVinci_old(int node,Matrix *graph, Matrix *costs) {
     node_str=(NodeviewCompress)?
 	        printCompressNode(node,ptr):
 	        printUncompressNode(node,ptr);
-    fprintf(log,"l(\"%d\",n(\"\",[a(\"OBJECT\",\"%s\"),",node,node_str);
+    fprintf(logFile,"l(\"%d\",n(\"\",[a(\"OBJECT\",\"%s\"),",node,node_str);
     printf("l(\"%d\",n(\"\",[a(\"OBJECT\",\"%s\"),",node,node_str);
-    fprintf(log,"a(\"FONTFAMILY\",\"courier\"),");
+    fprintf(logFile,"a(\"FONTFAMILY\",\"courier\"),");
     printf("a(\"FONTFAMILY\",\"courier\"),");
     if (symbol_table[node].type==CG_SSTEP)
       printf("a(\"BORDER\",\"double\"),");
@@ -577,27 +577,27 @@ static void recur_graphToDaVinci_old(int node,Matrix *graph, Matrix *costs) {
 
     colour=percentToColour(1.0-nodeColour(ptr));
     //if (!small) 
-       fprintf(log,"a(\"COLOR\",\"#ff%.2x%.2x\")",colour,colour);
+       fprintf(logFile,"a(\"COLOR\",\"#ff%.2x%.2x\")",colour,colour);
        printf("a(\"COLOR\",\"#ff%.2x%.2x\")",colour,colour);
     //else 
     //   printf("a(\"COLOR\",\"yellow\"),"); 
-    fprintf(log,"],[");
+    fprintf(logFile,"],[");
     printf("],[");
     Mat(int,*graph,node,node)=-1;
     for(i=0;i<no_children;i++) {
 
       //if (!small) 
-           fprintf(log,"e(\"%d->%d\",[],",node,children[i]);
+           fprintf(logFile,"e(\"%d->%d\",[],",node,children[i]);
            printf("e(\"%d->%d\",[],",node,children[i]);
       //else 
       //     printf("e(\"%d->%d\",[a(\"EDGECOLOR\",\"yellow\")],",node,children[i]);
  
       recur_graphToDaVinci_old(children[i],graph,costs);
-      fprintf(log,")");
+      fprintf(logFile,")");
       printf(")");
-      if (i<(no_children-1)) {fprintf(log,","); printf(",");}
+      if (i<(no_children-1)) {fprintf(logFile,","); printf(",");}
     } 
-    fprintf(log,"]))");
+    fprintf(logFile,"]))");
     printf("]))");
   } 
 }
@@ -642,7 +642,7 @@ davinciCmd parseDaVinciCmd(char *input) {
 
   crp=input;
   word = parse_word(&crp);
-  if (Verbose) fprintf(log,"{parseDaVinciCmd}=%s size=%d\n",word,result.size);
+  if (Verbose) fprintf(logFile,"{parseDaVinciCmd}=%s size=%d\n",word,result.size);
   if        (strcmp(word,"node_selections_labels")==0) {
     result.type=DAVINCI_NODE;
     result.list =calloc(result.size,sizeof(char*));
@@ -715,7 +715,7 @@ static char* extra_space(int x) {
   static char space[MAX_FUNNAME+1];
   int i;
 
-  if (Verbose) fprintf(log,"Padding is %d\n",x);
+  if (Verbose) fprintf(logFile,"Padding is %d\n",x);
   for(i=0;(i<x)&&(i<MAX_FUNNAME);i++) space[i]=' ';
   space[i]='\0';
   return space;

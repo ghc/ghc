@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------
- * $Id: symbol.c,v 1.2 2001/07/24 06:01:21 ken Exp $
+ * $Id: symbol.c,v 1.3 2003/08/01 14:50:50 panne Exp $
  *									
  *	Copyright (C) 1995-2000 University of Oxford
  *									
@@ -55,7 +55,7 @@ void enlargeSymbolTable() {
 
 name_id lookupSymbolTable(int type,int lineno,char* str) {
   int i;
-  extern FILE *log;
+  extern FILE *logFile;
 
   for(i=0;i<symbol_table_next;i++) {
     if ((type==symbol_table[i].type) && 
@@ -64,7 +64,7 @@ name_id lookupSymbolTable(int type,int lineno,char* str) {
       return i;
     }
   }
-  fprintf(log,"{lookupSymbolTable} %d at %s line %d\n",type,str,lineno);
+  fprintf(logFile,"{lookupSymbolTable} %d at %s line %d\n",type,str,lineno);
   if (symbol_table_next==symbol_table_size) enlargeSymbolTable();
   symbol_table[symbol_table_next].type    = type;
   symbol_table[symbol_table_next].lineno  = lineno;
@@ -100,12 +100,12 @@ int cmp_symbol_entry(const int *x, const int *y) {
  * -------------------------------------------------------------------------- */
 
 void printSymbolTable_entry(int idx) {
-  extern FILE *log;
+  extern FILE *logFile;
   if (symbol_table[idx].type==CG_SSTEP) {
-    fprintf(log,"(line %d of %s) ",symbol_table[idx].lineno,
+    fprintf(logFile,"(line %d of %s) ",symbol_table[idx].lineno,
 	                              symbol_table[idx].filename);
   } else {
-    fprintf(log,"%s ",symbol_table[idx].filename);
+    fprintf(logFile,"%s ",symbol_table[idx].filename);
   }
 }
 

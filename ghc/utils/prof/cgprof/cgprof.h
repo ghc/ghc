@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------
- * $Id: cgprof.h,v 1.1 2000/04/05 10:06:36 simonmar Exp $
+ * $Id: cgprof.h,v 1.2 2003/08/01 14:50:50 panne Exp $
  *									
  *	Copyright (C) 1995-2000 University of Oxford
  *									
@@ -78,5 +78,5 @@ extern void printRawProfile();
 extern void add_costs(object_cost *,object_cost);
 extern void createConnectivityMatrix(int,Matrix *,Matrix *,int *,int);
 extern void printConnectivityMatrix(Matrix,Matrix,int);
-extern FILE* log;
+extern FILE* logFile;
 #endif

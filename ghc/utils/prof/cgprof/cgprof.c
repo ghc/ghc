@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------
- * $Id: cgprof.c,v 1.2 2002/10/05 22:18:46 panne Exp $
+ * $Id: cgprof.c,v 1.3 2003/08/01 14:50:48 panne Exp $
  *									
  *	Copyright (C) 1995-2000 University of Oxford
  *									
@@ -331,7 +331,7 @@ char* StripDoubleQuotes(char* s) /* For fussy daVinci! */
 void fill_cc_matrix(cc_matrix *m,char* name,char* module,char* group,int i)
 { 
   if (i>MAX_IDENTIFIERS) 
-  {  fprintf(log,"Cost centre MAX_IDENTIFIERS exceeded: %i \n",i); exit(1); }
+  {  fprintf(logFile,"Cost centre MAX_IDENTIFIERS exceeded: %i \n",i); exit(1); }
   name = StripDoubleQuotes(name);
   strcpy((*m)[i].name,name); 
   module = StripDoubleQuotes(module);
@@ -348,13 +348,13 @@ void fill_ccs_matrix(ccs_matrix *m,int cc, int ccs, int scc, int ticks, int byte
                         /* change behaviour of type 1 (apart from CAF:REP.  */
   {
     if (i>MAX_IDENTIFIERS) 
-    {  fprintf(log,"Cost centre stack MAX_IDENTIFIERS exceeded: %i \n",i); exit(1); }
+    {  fprintf(logFile,"Cost centre stack MAX_IDENTIFIERS exceeded: %i \n",i); exit(1); }
     hsm = (*m)[i].hsm;
     (*m)[i].cc = cc; (*m)[i].ccs = ccs; 
     (*m)[i].ticks = ticks; (*m)[i].bytes = bytes; (*m)[i].scc = scc;
     (*hsm)[h_o].count = count;
   }
-  else fprintf(log,"Ignoring redeclaration of stack %i\n",i);
+  else fprintf(logFile,"Ignoring redeclaration of stack %i\n",i);
 }
 
 void add_ccs_costs(ccs_matrix *m, int b,int c,int d,int x,int y,int h_o, int co)
@@ -376,7 +376,7 @@ void add_heap_sample_costs(ccs_matrix *m, int b,int c,int d,int x,int y,int h_o,
 void add_heap_object(heap_object_matrix *m, int pos, int t, char* des, int tr)
 {
   if (pos>MAX_IDENTIFIERS) 
-  {  fprintf(log,"Heap object MAX_IDENTIFIERS exceeded: %i \n",pos); exit(1); }
+  {  fprintf(logFile,"Heap object MAX_IDENTIFIERS exceeded: %i \n",pos); exit(1); }
   (*m)[pos].type = t;
   strcpy((*m)[pos].descriptor,des);
   (*m)[pos].type_constr_ref = tr;
@@ -385,7 +385,7 @@ void add_heap_object(heap_object_matrix *m, int pos, int t, char* des, int tr)
 void add_type_constr_object(type_constr_matrix *m, int pos, char* mod, char* n)
 {
   if (pos>MAX_IDENTIFIERS) 
-  {  fprintf(log,"Type constructor MAX_IDENTIFIERS exceeded: %i \n",pos); exit(1); }
+  {  fprintf(logFile,"Type constructor MAX_IDENTIFIERS exceeded: %i \n",pos); exit(1); }
   strcpy((*m)[pos].module,mod);
   strcpy((*m)[pos].name,n);
 }
@@ -396,23 +396,23 @@ void add_type_constr_object(type_constr_matrix *m, int pos, char* mod, char* n)
 void print_heap_update_list(heap_update_list *m, int number)
 {
   int i;
-  fprintf(log,"[");
+  fprintf(logFile,"[");
   for (i=0; i<number;i++)
   {
-    fprintf(log," (%i,%i,%i) ",(*m)[i].ccs,(*m)[i].ho,(*m)[i].count);
+    fprintf(logFile," (%i,%i,%i) ",(*m)[i].ccs,(*m)[i].ho,(*m)[i].count);
   }
-  fprintf(log,"]\n");
+  fprintf(logFile,"]\n");
 }
 
 void print_TheHeap(TheHeap *h)
 {
   int i;
-  fprintf(log,"The Heap\n========\n");
+  fprintf(logFile,"The Heap\n========\n");
   for (i=0; i<MAX_TIME;i++)
   {
     if ((*h)[i].no_samples>0)
     {
-      fprintf(log,"Sample time %i, number of samples %i actual samples "
+      fprintf(logFile,"Sample time %i, number of samples %i actual samples "
                  ,i,(*h)[i].no_samples);
       print_heap_update_list((*h)[i].acc_samples,(*h)[i].no_samples);
     }
@@ -459,12 +459,12 @@ void print_cc_matrix(cc_matrix *m)
 { 
   int i;
   char *blank="blank";
-  fprintf(log,"Cost centre matrix\n");
-  fprintf(log,"==================\n");
+  fprintf(logFile,"Cost centre matrix\n");
+  fprintf(logFile,"==================\n");
   for (i=0; i<MAX_IDENTIFIERS; i++)
     { if (strcmp((*m)[i].name,blank)!=0) 
-         fprintf(log,"%s %s %s\n",(*m)[i].name,(*m)[i].module,(*m)[i].group); }
-  fprintf(log,"\n");
+         fprintf(logFile,"%s %s %s\n",(*m)[i].name,(*m)[i].module,(*m)[i].group); }
+  fprintf(logFile,"\n");
 }
 
 void print_heap_object_matrix(FILE* hfp, TheHeap *h, heap_object_matrix *m)
@@ -547,39 +547,39 @@ void print_type_constr_matrix(type_constr_matrix *m)
 {
   int i;
   char *blank="blank";
-  fprintf(log,"Type constructor matrix\n");
-  fprintf(log,"=======================\n");
+  fprintf(logFile,"Type constructor matrix\n");
+  fprintf(logFile,"=======================\n");
   for (i=0; i<MAX_IDENTIFIERS; i++)
   {
     if (strcmp((*m)[i].name,blank)!=0)
-         fprintf(log,"%i %s %s\n",i,(*m)[i].module,(*m)[i].name);
+         fprintf(logFile,"%i %s %s\n",i,(*m)[i].module,(*m)[i].name);
   }
 }
 
 void print_heap_sample_matrix(heap_sample_matrix *m)
 {
   int i;
-  fprintf(log,"HeapSamples[");
+  fprintf(logFile,"HeapSamples[");
   for (i=0; i<MAX_IDENTIFIERS; i++)
   {
-    if ((*m)[i].count!=-1) fprintf(log,"(%i,%i),",i,(*m)[i].count);
+    if ((*m)[i].count!=-1) fprintf(logFile,"(%i,%i),",i,(*m)[i].count);
   }
-  fprintf(log,"]\n");
+  fprintf(logFile,"]\n");
 }
 
 void print_ccs_matrix(ccs_matrix *m)
 { 
   int i;
-  fprintf(log,"Cost centre stack matrix\n");
-  fprintf(log,"========================\n");
+  fprintf(logFile,"Cost centre stack matrix\n");
+  fprintf(logFile,"========================\n");
   for (i=0; i<MAX_IDENTIFIERS; i++)
   {  if ((*m)[i].cc!=0)
      {
-       fprintf(log,"%i %i %i %i %i \n",(*m)[i].cc,(*m)[i].ccs,(*m)[i].scc,
+       fprintf(logFile,"%i %i %i %i %i \n",(*m)[i].cc,(*m)[i].ccs,(*m)[i].scc,
                                (*m)[i].ticks,(*m)[i].bytes); 
      } 
   }
-  fprintf(log,"\n");
+  fprintf(logFile,"\n");
 }
 
 
@@ -599,7 +599,7 @@ void FormStack(ccs_matrix *m, cc_matrix *n, int i, char s[])
       j = (*m)[j].ccs;
     }
   }
-  else fprintf(log,"ERROR: Form Stack %i\n",i);
+  else fprintf(logFile,"ERROR: Form Stack %i\n",i);
 }
 
 /* This version, which is used, adds the module and group name to the cost centre name*/
@@ -629,7 +629,7 @@ void FormStack2(ccs_matrix *m, cc_matrix *n, int i, char s[])
       j = (*m)[j].ccs;
     }
   }
-  else fprintf(log,"ERROR: Form Stack %i\n",i);
+  else fprintf(logFile,"ERROR: Form Stack %i\n",i);
 }
 
 void PrintStack(ccs_matrix *m, cc_matrix *n, int i)
@@ -638,20 +638,20 @@ void PrintStack(ccs_matrix *m, cc_matrix *n, int i)
   int j = i;
   if ((*m)[j].cc != 0)
   {
-    fprintf(log,"<"); 
-    fprintf(log,"%s,",(*n)[(*m)[j].cc].name);
+    fprintf(logFile,"<"); 
+    fprintf(logFile,"%s,",(*n)[(*m)[j].cc].name);
     while ((*m)[j].ccs != (-1))
     {
-      fprintf(log,"%s,",(*n)[(*m)[(*m)[j].ccs].cc].name);
+      fprintf(logFile,"%s,",(*n)[(*m)[(*m)[j].ccs].cc].name);
       j = (*m)[j].ccs;
     }
-    fprintf(log,"> ");
-    fprintf(log,"%i scc %i ticks %i bytes  ",
+    fprintf(logFile,"> ");
+    fprintf(logFile,"%i scc %i ticks %i bytes  ",
             (*m)[i].scc,(*m)[i].ticks,(*m)[i].bytes);
     print_heap_sample_matrix((*m)[i].hsm);
   }
   else
-  { /* fprintf(log,"empty stack\n"); */ }
+  { /* fprintf(logFile,"empty stack\n"); */ }
 }
 
 int CountStacks(ccs_matrix *m)
@@ -665,7 +665,7 @@ int CountStacks(ccs_matrix *m)
 void PrintAllStacks(ccs_matrix *m, cc_matrix *n)
 {
   int i;
-  fprintf(log,"Stacks\n======\n");
+  fprintf(logFile,"Stacks\n======\n");
   for (i=0;i<MAX_IDENTIFIERS;i++) { PrintStack(m,n,i); }
 }
 
@@ -839,8 +839,8 @@ void readRawProfile(FILE *fp,int *nonodes, int MaxNoNodes) {
 
   /* End of GHC specific variables */
 
-  //fprintf(log,"Number 1 %i \n",MAX_IDENTIFIERS*sizeof(_cc_));
-  //fprintf(log,"Number 2 %i \n",sizeof(cc_matrix));
+  //fprintf(logFile,"Number 1 %i \n",MAX_IDENTIFIERS*sizeof(_cc_));
+  //fprintf(logFile,"Number 2 %i \n",sizeof(cc_matrix));
 
   nolines=0; /* Number of lines read in from profile log file */
 
@@ -854,7 +854,7 @@ void readRawProfile(FILE *fp,int *nonodes, int MaxNoNodes) {
   initialise_type_constr_matrix(tc_m);
   initialise_TheHeap(th);
 
-  fprintf(log,"MAX_IDENTIFIERS = %i \n",MAX_IDENTIFIERS);
+  fprintf(logFile,"MAX_IDENTIFIERS = %i \n",MAX_IDENTIFIERS);
   
   /* end GHC specific */
 
@@ -887,8 +887,8 @@ void readRawProfile(FILE *fp,int *nonodes, int MaxNoNodes) {
       //while (fscanf(fp," %i %[^ ] %[^ ] %s", &z, e, f, g)!=0)
       while (fscanf(fp," %i %[^ ] %s", &z, e, f)!=0)
       {
-        fprintf(log,"Declaring cost centre `%i %s %s %s' \n",z,e,f,f);
-        fflush(log);
+        fprintf(logFile,"Declaring cost centre `%i %s %s %s' \n",z,e,f,f);
+        fflush(logFile);
         fill_cc_matrix(cc_m,e,f,f,z);
         next = fgetc(fp);
       }
@@ -904,7 +904,7 @@ void readRawProfile(FILE *fp,int *nonodes, int MaxNoNodes) {
         {
           if (d==1) /* of size one */
           {  
-            fprintf(log,"Declaring cost centre stack `%i %i %i'\n",a,d,b);
+            fprintf(logFile,"Declaring cost centre stack `%i %i %i'\n",a,d,b);
             fill_ccs_matrix(ccs_m,b,-1,(*ccs_m)[a].scc,(*ccs_m)[a].ticks,(*ccs_m)[a].bytes,0,-1,a);
           }
           if (d==2) /* of size > 1 */
@@ -912,7 +912,7 @@ void readRawProfile(FILE *fp,int *nonodes, int MaxNoNodes) {
             fscanf(fp," %i",&c);
 
             /* CAF fixing */
-            fprintf(log,"Declaring cost centre stack `%i %i %i %i'\n",a,d,b,c);
+            fprintf(logFile,"Declaring cost centre stack `%i %i %i %i'\n",a,d,b,c);
             if ((c==1)&&!(strncmp((*cc_m)[b].name,"CAF",2)))
                // fill_ccs_matrix(ccs_m,b,MAX_IDENTIFIERS-1,(*ccs_m)[a].scc,(*ccs_m)[a].ticks,(*ccs_m)[a].bytes,0,-1,a);
                /* The line above hangs all CAFs off the CAF:REPOSITORY node
@@ -956,7 +956,7 @@ void readRawProfile(FILE *fp,int *nonodes, int MaxNoNodes) {
           next = fgetc(fp);
           while (fscanf(fp,"%i %i %i %i",&a,&d,&b,&c))
           {
-            fprintf(log,"Loading scc_samples `%i %i %i %i'\n",a,d,b,c);
+            fprintf(logFile,"Loading scc_samples `%i %i %i %i'\n",a,d,b,c);
             add_ccs_costs(ccs_m,0,a,d,b,c,0,0);
             next = fgetc(fp);
           }
@@ -970,7 +970,7 @@ void readRawProfile(FILE *fp,int *nonodes, int MaxNoNodes) {
             next = fgetc(fp);
             while (fscanf(fp,"%i %i %i",&a,&d,&b))
             {
-              fprintf(log,"Loading heap_samples `%i %i %i'\n",a,d,b);
+              fprintf(logFile,"Loading heap_samples `%i %i %i'\n",a,d,b);
               add_heap_sample_costs(ccs_m,0,a,0,0,0,d,b);
               next = fgetc(fp);
             }
@@ -1020,12 +1020,12 @@ void readRawProfile(FILE *fp,int *nonodes, int MaxNoNodes) {
                   while (fscanf(fp,"%i %i %i %i %i %i",&a,&d,&b,&c,&z,&x))
                   {
                     add_to_TheHeap(th,a,b,c,z);
-                    fprintf(log,"Adding heap sample %i %i %i %i\n",a,b,c,z);
+                    fprintf(logFile,"Adding heap sample %i %i %i %i\n",a,b,c,z);
                     while (x) /* more than one sample */
                     {
                       fscanf(fp," %i %i %i %i",&b,&c,&z,&x);
                       add_to_TheHeap(th,a,b,c,z);
-                      fprintf(log,"Adding heap sample %i %i %i %i\n",a,b,c,z);
+                      fprintf(logFile,"Adding heap sample %i %i %i %i\n",a,b,c,z);
                     }  
                     next = fgetc(fp);
                   }
@@ -1044,18 +1044,18 @@ void readRawProfile(FILE *fp,int *nonodes, int MaxNoNodes) {
 
    print_cc_matrix(cc_m);
    print_ccs_matrix(ccs_m);
-   fprintf(log,"There are %i stacks\n",CountStacks(ccs_m));
+   fprintf(logFile,"There are %i stacks\n",CountStacks(ccs_m));
    print_type_constr_matrix(tc_m);
 
    /* Functions for heap profile */
    print_TheHeap(th);
-   fprintf(log,"The units for the x axis are \n");
-   PrintXaxis(log,th);
-   fprintf(log,"\n");
-   fprintf(log,"There are %i distinct heap objects\n",number_of_heap_objects(ho_m));
-   names_of_heap_objects(log,ho_m);
-   names_and_colour_assignment(log,ho_m);
-   print_heap_object_matrix(log,th,ho_m);
+   fprintf(logFile,"The units for the x axis are \n");
+   PrintXaxis(logFile,th);
+   fprintf(logFile,"\n");
+   fprintf(logFile,"There are %i distinct heap objects\n",number_of_heap_objects(ho_m));
+   names_of_heap_objects(logFile,ho_m);
+   names_and_colour_assignment(logFile,ho_m);
+   print_heap_object_matrix(logFile,th,ho_m);
 
    PrintAllStacks(ccs_m,cc_m);
    /* comment out line below to remove the heap profile generator */
@@ -1117,11 +1117,11 @@ void readRawProfile(FILE *fp,int *nonodes, int MaxNoNodes) {
         exit(1);
       }
 
-      fprintf(log,"STACK=\"%s\"\n",stack);
+      fprintf(logFile,"STACK=\"%s\"\n",stack);
       raw_profile[raw_profile_next].stack_size=1;
       /* move the stack read frame to the first space (or comma) in the stack string */ 
       for(ptr=stack; ((*ptr)!=' ') && (*ptr!=',');ptr++) {}
-      fprintf(log,"TOS=%d at line %d\n",*ptr,sstepline);
+      fprintf(logFile,"TOS=%d at line %d\n",*ptr,sstepline);
      
       /* to distinguish the head of the stack from the rest */
       /* if read frame points to space you are at the head of the stack */
@@ -1144,7 +1144,7 @@ void readRawProfile(FILE *fp,int *nonodes, int MaxNoNodes) {
       for(;*ptr;ptr++) { /* find the next element in the stack */
         if (*ptr==',') {
 	  *ptr='\0';
-          if (Verbose) fprintf(log,"NAME=\"%s\"\n",drag); /* name of the next element */
+          if (Verbose) fprintf(logFile,"NAME=\"%s\"\n",drag); /* name of the next element */
           if (!ignore_function(drag)) {
             raw_profile[raw_profile_next].stack[
               raw_profile[raw_profile_next].stack_size++]
@@ -1183,7 +1183,7 @@ void readRawProfile(FILE *fp,int *nonodes, int MaxNoNodes) {
   } /* end of new for loop */
 
   *nonodes = symbol_table_next;
-  fprintf(log,"%s: read %d lines from profile.Graph contains %i nodes.\n",
+  fprintf(logFile,"%s: read %d lines from profile.Graph contains %i nodes.\n",
           Pgm,nolines,symbol_table_next);
 
   free_cc_matrix(cc_m); /* be nice and clean up the cost centre matrix */
@@ -1198,14 +1198,14 @@ void printRawProfile() {
   object_cost *cost;
   int         *stack;
   
-  fprintf(log,"\n\nRAW DATA:\n");
+  fprintf(logFile,"\n\nRAW DATA:\n");
   for(i=0;i<raw_profile_next;i++) {
     cost  = &raw_profile[i].cost;
     stack = raw_profile[i].stack;
-    fprintf(log,"Stack=[");
+    fprintf(logFile,"Stack=[");
     for(j=0;j<raw_profile[i].stack_size;j++) 
       printSymbolTable_entry(stack[j]);
-    fprintf(log,"] %d Syncs %f Comp %f Comm %f Wait\n\n",
+    fprintf(logFile,"] %d Syncs %f Comp %f Comm %f Wait\n\n",
 	    cost->syncs,cost->comp_max,cost->comm_max,cost->comp_idle_max);
   }
 }
@@ -1279,15 +1279,15 @@ void printConnectivityMatrix(Matrix graph,Matrix costs,int root) {
   int i,j;
   object_cost cost;
 
-  fprintf(log,"Root node is %d\n",root);
+  fprintf(logFile,"Root node is %d\n",root);
   for(i=0;i<graph.rows;i++) {
-    fprintf(log,"%4d)",i);
+    fprintf(logFile,"%4d)",i);
     printSymbolTable_entry(i);
     cost = Mat(object_cost,costs,i,0);
-    fprintf(log,"%d %f %f %f\n\tBranch=[",
+    fprintf(logFile,"%d %f %f %f\n\tBranch=[",
 	    cost.syncs,cost.comp_max,cost.comm_max,cost.comp_idle_max);
     for(j=0;j<graph.cols;j++) 
-      if (Mat_dense(graph,i,j)) fprintf(log,"%d ",j);
-    fprintf(log,"]\n\n");
+      if (Mat_dense(graph,i,j)) fprintf(logFile,"%d ",j);
+    fprintf(logFile,"]\n\n");
   }
 }
