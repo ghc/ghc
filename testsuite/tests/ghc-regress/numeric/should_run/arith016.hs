@@ -1,9 +1,10 @@
 
 module Main where
 
-import PrelGHC
-import PrelBase
-import PrelFloat
+import GHC.Exts ( Float(F#), 
+		   eqFloat#, neFloat#, ltFloat#, 
+		   leFloat#, gtFloat#, geFloat# 
+		 )
 
 fcmp_eq, fcmp_ne, fcmp_lt, fcmp_le, fcmp_gt, fcmp_ge :: (String, Float -> Float -> Bool)
 fcmp_eq = ("==", \ (F# a) (F# b) -> a `eqFloat#` b)

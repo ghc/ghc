@@ -1,7 +1,7 @@
 -- Test gcdInt/gcdInteger
 
-import PrelBase	( gcdInt )
-import PrelNum	( gcdInteger )
+import GHC.Base	( gcdInt )
+import GHC.Num	( gcdInteger )
 
 main :: IO ()
 main = do
