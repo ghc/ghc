@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.179 2001/08/01 20:37:00 qrczak Exp $
+# $Id: Makefile,v 1.180 2001/08/02 05:15:33 qrczak Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -232,7 +232,7 @@ SRC_HC_OPTS += -recomp $(GhcHcOpts)
 # TODO: change back to 16M when the strictness analyser is working again.
 SRC_HC_OPTS += -H80M
 # TODO: remove when the strictness analyser is working again.
-rename/ParseIface_HC_OPTS += -H100M
+rename/ParseIface_HC_OPTS += -H120M
 parser/Parser_HC_OPTS     += -H100M
 
 # 	Special flags for particular modules
