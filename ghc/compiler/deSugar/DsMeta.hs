@@ -286,7 +286,7 @@ repC (ConDecl con [] [] details loc)
   = do { con1     <- lookupOcc con ;		-- See note [Binders and occurrences] 
 	 repConstr con1 details }
 
-repBangTy :: BangType Name -> DsM (Core (M.Q (M.Strictness, M.Typ)))
+repBangTy :: BangType Name -> DsM (Core (M.StrictTypQ))
 repBangTy (BangType str ty) = do MkC s <- rep2 strName []
                                  MkC t <- repTy ty
                                  rep2 strictTypeName [s, t]
@@ -563,7 +563,7 @@ repClauseTup (Match ps ty (GRHSs guards wheres ty2)) =
      ; clause <- repClause ps1 gs ds
      ; wrapGenSyns (ss1++ss2) clause }}}
 
-repGuards ::  [GRHS Name] ->  DsM (Core M.RightHandSideQ)
+repGuards ::  [GRHS Name] ->  DsM (Core M.RHSQ)
 repGuards [GRHS [ResultStmt e loc] loc2] 
   = do {a <- repE e; repNormal a }
 repGuards other 
@@ -607,7 +607,7 @@ repFields flds = do
 -- The helper function repSts computes the translation of each sub expression
 -- and a bunch of prefix bindings denoting the dynamic renaming.
 
-repSts :: [Stmt Name] -> DsM ([GenSymBind], [Core M.StatementQ])
+repSts :: [Stmt Name] -> DsM ([GenSymBind], [Core M.StmtQ])
 repSts [ResultStmt e loc] = 
    do { a <- repE e
       ; e1 <- repNoBindSt a
@@ -987,10 +987,10 @@ repLetE (MkC ds) (MkC e) = rep2 letEName [ds, e]
 repCaseE :: Core M.ExpQ -> Core [M.MatchQ] -> DsM( Core M.ExpQ)
 repCaseE (MkC e) (MkC ms) = rep2 caseEName [e, ms]
 
-repDoE :: Core [M.StatementQ] -> DsM (Core M.ExpQ)
+repDoE :: Core [M.StmtQ] -> DsM (Core M.ExpQ)
 repDoE (MkC ss) = rep2 doEName [ss]
 
-repComp :: Core [M.StatementQ] -> DsM (Core M.ExpQ)
+repComp :: Core [M.StmtQ] -> DsM (Core M.ExpQ)
 repComp (MkC ss) = rep2 compName [ss]
 
 repListExp :: Core [M.ExpQ] -> DsM (Core M.ExpQ)
@@ -1015,20 +1015,20 @@ repSectionR :: Core M.ExpQ -> Core M.ExpQ -> DsM (Core M.ExpQ)
 repSectionR (MkC x) (MkC y) = rep2 sectionRName [x,y]
 
 ------------ Right hand sides (guarded expressions) ----
-repGuarded :: Core [(M.ExpQ, M.ExpQ)] -> DsM (Core M.RightHandSideQ)
+repGuarded :: Core [(M.ExpQ, M.ExpQ)] -> DsM (Core M.RHSQ)
 repGuarded (MkC pairs) = rep2 guardedName [pairs]
 
-repNormal :: Core M.ExpQ -> DsM (Core M.RightHandSideQ)
+repNormal :: Core M.ExpQ -> DsM (Core M.RHSQ)
 repNormal (MkC e) = rep2 normalName [e]
 
-------------- Statements -------------------
-repBindSt :: Core M.Pat -> Core M.ExpQ -> DsM (Core M.StatementQ)
+------------- Stmts -------------------
+repBindSt :: Core M.Pat -> Core M.ExpQ -> DsM (Core M.StmtQ)
 repBindSt (MkC p) (MkC e) = rep2 bindStName [p,e]
 
-repLetSt :: Core [M.DecQ] -> DsM (Core M.StatementQ)
+repLetSt :: Core [M.DecQ] -> DsM (Core M.StmtQ)
 repLetSt (MkC ds) = rep2 letStName [ds]
 
-repNoBindSt :: Core M.ExpQ -> DsM (Core M.StatementQ)
+repNoBindSt :: Core M.ExpQ -> DsM (Core M.StmtQ)
 repNoBindSt (MkC e) = rep2 noBindStName [e]
 
 -------------- DotDot (Arithmetic sequences) -----------
@@ -1045,14 +1045,14 @@ repFromThenTo :: Core M.ExpQ -> Core M.ExpQ -> Core M.ExpQ -> DsM (Core M.ExpQ)
 repFromThenTo (MkC x) (MkC y) (MkC z) = rep2 fromThenToName [x,y,z]
 
 ------------ Match and Clause Tuples -----------
-repMatch :: Core M.Pat -> Core M.RightHandSideQ -> Core [M.DecQ] -> DsM (Core M.MatchQ)
+repMatch :: Core M.Pat -> Core M.RHSQ -> Core [M.DecQ] -> DsM (Core M.MatchQ)
 repMatch (MkC p) (MkC bod) (MkC ds) = rep2 matchName [p, bod, ds]
 
-repClause :: Core [M.Pat] -> Core M.RightHandSideQ -> Core [M.DecQ] -> DsM (Core M.ClauseQ)
+repClause :: Core [M.Pat] -> Core M.RHSQ -> Core [M.DecQ] -> DsM (Core M.ClauseQ)
 repClause (MkC ps) (MkC bod) (MkC ds) = rep2 clauseName [ps, bod, ds]
 
 -------------- Dec -----------------------------
-repVal :: Core M.Pat -> Core M.RightHandSideQ -> Core [M.DecQ] -> DsM (Core M.DecQ)
+repVal :: Core M.Pat -> Core M.RHSQ -> Core [M.DecQ] -> DsM (Core M.DecQ)
 repVal (MkC p) (MkC b) (MkC ds) = rep2 valName [p, b, ds]
 
 repFun :: Core String -> Core [M.ClauseQ] -> DsM (Core M.DecQ)  
@@ -1264,50 +1264,50 @@ thModule = mkThPkgModule mETA_META_Name
 mk_known_key_name space str uniq 
   = mkKnownKeyExternalName thModule (mkOccFS space str) uniq 
 
-intPrimLName   = varQual FSLIT("intPrimL")      intPrimLIdKey
-floatPrimLName  = varQual FSLIT("floatPrimL")   floatPrimLIdKey
-doublePrimLName = varQual FSLIT("doublePrimL")  doublePrimLIdKey
-integerLName   = varQual FSLIT("integerL")      integerLIdKey
-charLName      = varQual FSLIT("charL")         charLIdKey
-stringLName    = varQual FSLIT("stringL")       stringLIdKey
-rationalLName  = varQual FSLIT("rationalL")     rationalLIdKey
-plitName       = varQual FSLIT("plit")          plitIdKey
-pvarName       = varQual FSLIT("pvar")          pvarIdKey
-ptupName       = varQual FSLIT("ptup")          ptupIdKey
-pconName       = varQual FSLIT("pcon")          pconIdKey
-ptildeName     = varQual FSLIT("ptilde")        ptildeIdKey
-paspatName     = varQual FSLIT("paspat")        paspatIdKey
-pwildName      = varQual FSLIT("pwild")         pwildIdKey
-precName       = varQual FSLIT("prec")          precIdKey
-varName        = varQual FSLIT("var")           varIdKey
-conName        = varQual FSLIT("con")           conIdKey
-litName        = varQual FSLIT("lit")           litIdKey
-appName        = varQual FSLIT("app")           appIdKey
-infixEName     = varQual FSLIT("infixE")        infixEIdKey
-lamName        = varQual FSLIT("lam")           lamIdKey
-tupName        = varQual FSLIT("tup")           tupIdKey
-doEName        = varQual FSLIT("doE")           doEIdKey
-compName       = varQual FSLIT("comp")          compIdKey
+intPrimLName   = varQual FSLIT("intPrimLit")      intPrimLIdKey
+floatPrimLName  = varQual FSLIT("floatPrimLit")   floatPrimLIdKey
+doublePrimLName = varQual FSLIT("doublePrimLit")  doublePrimLIdKey
+integerLName   = varQual FSLIT("integerLit")      integerLIdKey
+charLName      = varQual FSLIT("charLit")         charLIdKey
+stringLName    = varQual FSLIT("stringLit")       stringLIdKey
+rationalLName  = varQual FSLIT("rationalLit")     rationalLIdKey
+plitName       = varQual FSLIT("litPat")          plitIdKey
+pvarName       = varQual FSLIT("varPat")          pvarIdKey
+ptupName       = varQual FSLIT("tupPat")          ptupIdKey
+pconName       = varQual FSLIT("conPat")          pconIdKey
+ptildeName     = varQual FSLIT("tildePat")        ptildeIdKey
+paspatName     = varQual FSLIT("asPat")        paspatIdKey
+pwildName      = varQual FSLIT("wildPat")         pwildIdKey
+precName       = varQual FSLIT("recPat")          precIdKey
+varName        = varQual FSLIT("varExp")           varIdKey
+conName        = varQual FSLIT("conExp")           conIdKey
+litName        = varQual FSLIT("litExp")           litIdKey
+appName        = varQual FSLIT("appExp")           appIdKey
+infixEName     = varQual FSLIT("infixExp")        infixEIdKey
+lamName        = varQual FSLIT("lamExp")           lamIdKey
+tupName        = varQual FSLIT("tupExp")           tupIdKey
+doEName        = varQual FSLIT("doExp")           doEIdKey
+compName       = varQual FSLIT("compExp")          compIdKey
 listExpName    = varQual FSLIT("listExp")       listExpIdKey
 sigExpName     = varQual FSLIT("sigExp")        sigExpIdKey
-condName       = varQual FSLIT("cond")          condIdKey
-letEName       = varQual FSLIT("letE")          letEIdKey
-caseEName      = varQual FSLIT("caseE")         caseEIdKey
+condName       = varQual FSLIT("condExp")          condIdKey
+letEName       = varQual FSLIT("letExp")          letEIdKey
+caseEName      = varQual FSLIT("caseExp")         caseEIdKey
 infixAppName   = varQual FSLIT("infixApp")      infixAppIdKey
 sectionLName   = varQual FSLIT("sectionL")      sectionLIdKey
 sectionRName   = varQual FSLIT("sectionR")      sectionRIdKey
-recConName     = varQual FSLIT("recCon")        recConIdKey
-recUpdName     = varQual FSLIT("recUpd")        recUpdIdKey
-guardedName    = varQual FSLIT("guarded")       guardedIdKey
-normalName     = varQual FSLIT("normal")        normalIdKey
-bindStName     = varQual FSLIT("bindSt")        bindStIdKey
-letStName      = varQual FSLIT("letSt")         letStIdKey
-noBindStName   = varQual FSLIT("noBindSt")      noBindStIdKey
-parStName      = varQual FSLIT("parSt")         parStIdKey
-fromName       = varQual FSLIT("from")          fromIdKey
-fromThenName   = varQual FSLIT("fromThen")      fromThenIdKey
-fromToName     = varQual FSLIT("fromTo")        fromToIdKey
-fromThenToName = varQual FSLIT("fromThenTo")    fromThenToIdKey
+recConName     = varQual FSLIT("recConExp")        recConIdKey
+recUpdName     = varQual FSLIT("recUpdExp")        recUpdIdKey
+guardedName    = varQual FSLIT("guardedRHS")       guardedIdKey
+normalName     = varQual FSLIT("normalRHS")        normalIdKey
+bindStName     = varQual FSLIT("bindStmt")        bindStIdKey
+letStName      = varQual FSLIT("letStmt")         letStIdKey
+noBindStName   = varQual FSLIT("noBindStmt")      noBindStIdKey
+parStName      = varQual FSLIT("parStmt")         parStIdKey
+fromName       = varQual FSLIT("fromExp")          fromIdKey
+fromThenName   = varQual FSLIT("fromThenExp")      fromThenIdKey
+fromToName     = varQual FSLIT("fromToExp")        fromToIdKey
+fromThenToName = varQual FSLIT("fromThenToExp")    fromThenToIdKey
 liftName       = varQual FSLIT("lift")          liftIdKey
 gensymName     = varQual FSLIT("gensym")        gensymIdKey
 returnQName    = varQual FSLIT("returnQ")       returnQIdKey
@@ -1321,20 +1321,20 @@ matchName      = varQual FSLIT("match")         matchIdKey
 clauseName     = varQual FSLIT("clause")        clauseIdKey
 			 
 -- data Dec = ...	 
-funName        = varQual FSLIT("fun")           funIdKey
-valName        = varQual FSLIT("val")           valIdKey
-dataDName      = varQual FSLIT("dataD")         dataDIdKey
-newtypeDName   = varQual FSLIT("newtypeD")      newtypeDIdKey
-tySynDName     = varQual FSLIT("tySynD")        tySynDIdKey
-classDName     = varQual FSLIT("classD")        classDIdKey
-instName       = varQual FSLIT("inst")          instIdKey
-protoName      = varQual FSLIT("proto")         protoIdKey
+funName        = varQual FSLIT("funDec")        funIdKey
+valName        = varQual FSLIT("valDec")        valIdKey
+dataDName      = varQual FSLIT("dataDec")       dataDIdKey
+newtypeDName   = varQual FSLIT("newtypeDec")    newtypeDIdKey
+tySynDName     = varQual FSLIT("tySynDec")      tySynDIdKey
+classDName     = varQual FSLIT("classDec")      classDIdKey
+instName       = varQual FSLIT("instanceDec")   instIdKey
+protoName      = varQual FSLIT("sigDec")        protoIdKey
 			 
 -- data Typ = ...	 
-tforallName    = varQual FSLIT("tforall")       tforallIdKey
-tvarName       = varQual FSLIT("tvar")          tvarIdKey
-tconName       = varQual FSLIT("tcon")          tconIdKey
-tappName       = varQual FSLIT("tapp")          tappIdKey
+tforallName    = varQual FSLIT("forallTyp")       tforallIdKey
+tvarName       = varQual FSLIT("varTyp")          tvarIdKey
+tconName       = varQual FSLIT("conTyp")          tconIdKey
+tappName       = varQual FSLIT("appTyp")          tappIdKey
 			 
 -- data Tag = ...	 
 arrowTyConName = varQual FSLIT("arrowTyCon")    arrowIdKey
@@ -1346,20 +1346,20 @@ namedTyConName = varQual FSLIT("namedTyCon")    namedTyConIdKey
 ctxtName       = varQual FSLIT("cxt")          ctxtIdKey
 			 
 -- data Con = ...	 
-constrName     = varQual FSLIT("constr")        constrIdKey
-recConstrName  = varQual FSLIT("recConstr")     recConstrIdKey
-infixConstrName = varQual FSLIT("infixConstr")  infixConstrIdKey
+constrName     = varQual FSLIT("normalCon")        constrIdKey
+recConstrName  = varQual FSLIT("recCon")     recConstrIdKey
+infixConstrName = varQual FSLIT("infixCon")  infixConstrIdKey
 			 
 exprTyConName  = tcQual  FSLIT("ExpQ")  	       exprTyConKey
 declTyConName  = tcQual  FSLIT("DecQ")  	       declTyConKey
 pattTyConName  = tcQual  FSLIT("Pat")  	       pattTyConKey
 mtchTyConName  = tcQual  FSLIT("MatchQ")  	       mtchTyConKey
 clseTyConName  = tcQual  FSLIT("ClauseQ")  	       clseTyConKey
-stmtTyConName  = tcQual  FSLIT("StatementQ") 	       stmtTyConKey
+stmtTyConName  = tcQual  FSLIT("StmtQ") 	       stmtTyConKey
 consTyConName  = tcQual  FSLIT("ConQ")  	       consTyConKey
 typeTyConName  = tcQual  FSLIT("TypQ")  	       typeTyConKey
-strTypeTyConName  = tcQual  FSLIT("StrType")       strTypeTyConKey
-varStrTypeTyConName  = tcQual  FSLIT("VarStrType")       varStrTypeTyConKey
+strTypeTyConName  = tcQual  FSLIT("StrictTypQ")       strTypeTyConKey
+varStrTypeTyConName  = tcQual  FSLIT("VarStrictTypQ")       varStrTypeTyConKey
 
 fieldTyConName = tcQual FSLIT("FieldExp")              fieldTyConKey
 fieldPTyConName = tcQual FSLIT("FieldPat")             fieldPTyConKey
@@ -1371,10 +1371,10 @@ typTyConName   = tcQual  FSLIT("Typ")  	       typTyConKey
 matTyConName   = tcQual  FSLIT("Match")  	       matTyConKey
 clsTyConName   = tcQual  FSLIT("Clause")  	       clsTyConKey
 
-strictTypeName = varQual  FSLIT("strictType")   strictTypeKey
-varStrictTypeName = varQual  FSLIT("varStrictType")   varStrictTypeKey
-strictName     = varQual  FSLIT("strict")       strictKey
-nonstrictName  = varQual  FSLIT("nonstrict")    nonstrictKey
+strictTypeName = varQual  FSLIT("strictTypQ")   strictTypeKey
+varStrictTypeName = varQual  FSLIT("varStrictTypQ")   varStrictTypeKey
+strictName     = varQual  FSLIT("isStrict")       strictKey
+nonstrictName  = varQual  FSLIT("notStrict")    nonstrictKey
 
 fieldName = varQual FSLIT("fieldExp")              fieldKey
 fieldPName = varQual FSLIT("fieldPat")            fieldPKey
