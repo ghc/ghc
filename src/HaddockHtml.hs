@@ -664,11 +664,11 @@ ppHsClassDecl summary inst_maps@(cls_inst_map, _) orig_c
 	methods_bit
 	   | null decls = Html.emptyTable
 	   | otherwise  = 
-		meth_hdr </>
-		tda [theclass "body"] << spacedTable1 << (
-	       		aboves [ ppFunSig summary n ty doc 
-			       | HsTypeSig _ [n] ty doc <- decls
-			       ]
+		s8 </> meth_hdr </>
+		tda [theclass "body"] << vanillaTable << (
+	       		abovesSep s8 [ ppFunSig summary n ty doc 
+			             | HsTypeSig _ [n] ty doc <- decls
+			             ]
 			)
 
 	instances_bit
@@ -676,7 +676,7 @@ ppHsClassDecl summary inst_maps@(cls_inst_map, _) orig_c
 		Nothing -> Html.emptyTable
 		Just [] -> Html.emptyTable
 		Just is -> 
-		 inst_hdr </>
+		 s8 </> inst_hdr </>
 		 tda [theclass "body"] << spacedTable1 << (
 			aboves (map (declBox.ppInstHead) is)
 		  )
@@ -700,7 +700,7 @@ ppFunSig summary nm ty doc
   | otherwise   = 
 	declBox (ppHsBinder False nm) </>
 	(tda [theclass "body"] << vanillaTable <<  (
-	   do_args True ty </>
+	   do_args dcolon ty </>
 	   (if (isJust doc) 
 		then ndocBox (docToHtml (fromJust doc))
 		else Html.emptyTable)
@@ -712,27 +712,32 @@ ppFunSig summary nm ty doc
 	no_arg_docs (HsTyDoc _ _) = False
  	no_arg_docs _ = True
 
-	do_args :: Bool -> HsType -> HtmlTable
-	do_args first (HsForAllType maybe_tvs ctxt ty)
-	  = (declBox (leader first <+> ppHsForAll maybe_tvs ctxt)
+	do_args :: Html -> HsType -> HtmlTable
+	do_args leader (HsForAllType (Just tvs) ctxt ty)
+	  = (declBox (
+		leader <+> 
+		hsep (keyword "forall" : map ppHsName tvs ++ [toHtml "."]) <+>
+		ppHsContext ctxt)
+	      <-> rdocBox noHtml) </> 
+	    do_args darrow ty
+	do_args leader (HsForAllType Nothing ctxt ty)
+	  = (declBox (leader <+> ppHsContext ctxt)
 		<-> rdocBox noHtml) </> 
-	    do_args False ty
-	do_args first (HsTyFun (HsTyDoc ty doc) r)
-	  = (declBox (leader first <+> ppHsBType ty) <-> 
-	     rdocBox (docToHtml doc)) </>
-	    do_args False r
-	do_args first (HsTyFun ty r)
-	  = (declBox (leader first <+> ppHsBType ty) <->
-	     rdocBox noHtml) </>
-	    do_args False r
-	do_args first (HsTyDoc ty doc)
-	  = (declBox (leader first <+> ppHsBType ty) <-> 
-	     rdocBox (docToHtml doc))
-	do_args first ty = declBox (leader first <+> ppHsBType ty) <->
-			   rdocBox (noHtml)
+	    do_args darrow ty
+	do_args leader (HsTyFun (HsTyDoc ty doc) r)
+	  = (declBox (leader <+> ppHsBType ty) <-> rdocBox (docToHtml doc)) </>
+	    do_args arrow r
+	do_args leader (HsTyFun ty r)
+	  = (declBox (leader <+> ppHsBType ty) <-> rdocBox noHtml) </>
+	    do_args arrow r
+	do_args leader (HsTyDoc ty doc)
+	  = (declBox (leader <+> ppHsBType ty) <-> rdocBox (docToHtml doc))
+	do_args leader ty
+	  = declBox (leader <+> ppHsBType ty) <-> rdocBox (noHtml)
 
-	leader True  = toHtml "::"
-	leader False = toHtml "->"
+	dcolon = toHtml "::"
+	arrow  = toHtml "->"
+	darrow = toHtml "=>"
 
 -- -----------------------------------------------------------------------------
 -- Types and contexts
