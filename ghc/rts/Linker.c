@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.16 2001/02/01 12:37:44 simonmar Exp $
+ * $Id: Linker.c,v 1.17 2001/02/06 12:27:57 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -463,9 +463,10 @@ resolveObjs( void )
 HsInt
 unloadObj( char *path )
 {
-    ObjectCode *oc;
+    ObjectCode *oc, *prev;
 
-    for (oc = objects; oc; oc = oc->next) {
+    prev = NULL;
+    for (oc = objects; oc; prev = oc, oc = oc->next) {
 	if (!strcmp(oc->fileName,path)) {
 
 	    /* Remove all the mappings for the symbols within this
@@ -480,6 +481,12 @@ unloadObj( char *path )
 		}
 	    }
 
+	    if (prev == NULL) {
+		objects = oc->next;
+	    } else {
+		prev->next = oc->next;
+	    }
+
 	    /* We're going to leave this in place, in case there are
 	       any pointers from the heap into it: */
 	    /* free(oc->image); */
@@ -489,7 +496,7 @@ unloadObj( char *path )
 	    return 1;
 	}
     }
-    
+
     belch("unloadObj: can't find `%s' to unload", path);
     return 0;
 }
