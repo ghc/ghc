@@ -98,7 +98,7 @@ INSTALL_DIR  = ./mkdirhier
 VERSION_SYMLINKS_FOR=$(package)
 
 # Binaries to install
-PACKAGE_BINS=$(PACKAGE_SCRIPTS) $(PACKAGE_SH_SCRIPTS) hp2ps
+PACKAGE_BIN_INSTALL=$(PACKAGE_PRL_SCRIPTS) $(PACKAGE_SH_SCRIPTS) $(PACKAGE_BINS)
 
 #----------end of user-serviceable parts------------
 #
@@ -193,7 +193,7 @@ install :: config-pkgs mk-version-symlinks install-dirs install-bin install-libs
 .PHONY: install-bin install-libs install-datas
 
 install-bin:
-	for i in $(PACKAGE_BINS); do \
+	for i in $(PACKAGE_BIN_INSTALL); do \
 	   $(INSTALL_BIN) bin/$(platform)/$(package)-$(version)/$$i $(bindir); \
 	done;
 	for i in $(VERSION_SYMLINKS_FOR) ""; do \
