@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.47 2003/10/01 09:08:10 simonmar Exp $
+ * $Id: RtsAPI.c,v 1.48 2003/10/01 10:36:49 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -386,18 +386,22 @@ SchedulerStatus
 rts_eval (HaskellObj p, /*out*/HaskellObj *ret)
 {
     StgTSO *tso;
+    Capability *cap = rtsApiCapability;
+    rtsApiCapability = NULL;
 
     tso = createGenThread(RtsFlags.GcFlags.initialStkSize, p);
-    return scheduleWaitThread(tso,ret,rtsApiCapability);
+    return scheduleWaitThread(tso,ret,cap);
 }
 
 SchedulerStatus
 rts_eval_ (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
 {
     StgTSO *tso;
+    Capability *cap = rtsApiCapability;
+    rtsApiCapability = NULL;
     
     tso = createGenThread(stack_size, p);
-    return scheduleWaitThread(tso,ret,rtsApiCapability);
+    return scheduleWaitThread(tso,ret,cap);
 }
 
 /*
@@ -408,9 +412,11 @@ SchedulerStatus
 rts_evalIO (HaskellObj p, /*out*/HaskellObj *ret)
 {
     StgTSO* tso; 
+    Capability *cap = rtsApiCapability;
+    rtsApiCapability = NULL;
     
     tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
-    return scheduleWaitThread(tso,ret,rtsApiCapability);
+    return scheduleWaitThread(tso,ret,cap);
 }
 
 /*
@@ -429,6 +435,7 @@ rts_evalStableIO (HsStablePtr s, /*out*/HsStablePtr *ret)
     p = (StgClosure *)deRefStablePtr(s);
     tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
     stat = scheduleWaitThread(tso,&r,rtsApiCapability);
+    rtsApiCapability = NULL;
 
     if (stat == Success && ret != NULL) {
 	ASSERT(r != NULL);
@@ -445,18 +452,22 @@ SchedulerStatus
 rts_evalLazyIO (HaskellObj p, /*out*/HaskellObj *ret)
 {
     StgTSO *tso;
+    Capability *cap = rtsApiCapability;
+    rtsApiCapability = NULL;
 
     tso = createIOThread(RtsFlags.GcFlags.initialStkSize, p);
-    return scheduleWaitThread(tso,ret,rtsApiCapability);
+    return scheduleWaitThread(tso,ret,cap);
 }
 
 SchedulerStatus
 rts_evalLazyIO_ (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
 {
     StgTSO *tso;
+    Capability *cap = rtsApiCapability;
+    rtsApiCapability = NULL;
 
     tso = createIOThread(stack_size, p);
-    return scheduleWaitThread(tso,ret,rtsApiCapability);
+    return scheduleWaitThread(tso,ret,cap);
 }
 
 /* Convenience function for decoding the returned status. */
@@ -503,7 +514,9 @@ void
 rts_unlock()
 {
 #ifdef RTS_SUPPORTS_THREADS
-	rtsApiCapability = NULL;
-	RELEASE_LOCK(&sched_mutex);
+    if(rtsApiCapability)
+	releaseCapability(rtsApiCapability);
+    rtsApiCapability = NULL;
+    RELEASE_LOCK(&sched_mutex);
 #endif
 }
