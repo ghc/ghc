@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.53 $
- * $Date: 2000/03/23 14:54:21 $
+ * $Revision: 1.54 $
+ * $Date: 2000/03/24 12:36:43 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -513,8 +513,8 @@ Text t; {
             newTab[i].inUse = FALSE;                                    \
             newTab[i].nextFree = i-1+TAB_BASE_ADDR;                     \
          }                                                              \
-          fprintf(stderr, "Expanding " #type_name                     \
-                    "table to size %d\n", newSz );                    \
+         /* fprintf(stderr, "Expanding " #type_name                     \
+	    "table to size %d\n", newSz );*/                    \
          newTab[tab_size].nextFree = TAB_BASE_ADDR-1;                   \
          free_list = newSz-1+TAB_BASE_ADDR;                             \
          tab_size = newSz;                                              \
@@ -1717,7 +1717,7 @@ Void setCurrModule(m)              /* set lookup tables for current module */
 Module m; {
     Int i;
     assert(isModule(m));
-fprintf(stderr, "SET CURR MODULE %s\n", textToStr(module(m).text));
+    /* fprintf(stderr, "SET CURR MODULE %s\n", textToStr(module(m).text));*/
     {List t;
      for (t = module(m).names; nonNull(t); t=tl(t))
         assert(isName(hd(t)));

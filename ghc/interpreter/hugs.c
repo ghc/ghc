@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.47 $
- * $Date: 2000/03/23 14:54:21 $
+ * $Revision: 1.48 $
+ * $Date: 2000/03/24 12:36:43 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -107,7 +107,8 @@ static Bool   lastWasObject = FALSE;
        Bool   debugSC       = FALSE;
        Bool   combined      = FALSE;
 
-       String scriptFile;               /* Name of current script (if any) */
+       char* currentFile;               /* Name of current file, or NULL   */
+static char  currentFileName[1000];     /* name is stored here if it exists*/
 
 
 
@@ -215,7 +216,7 @@ String argv[]; {
 
    setLastEdit((String)0,0);
    lastEdit      = 0;
-   scriptFile    = 0;
+   currentFile   = NULL;
 
 #if SYMANTEC_C
    hugsEdit      = "";
@@ -740,7 +741,13 @@ List    prelModules   = NIL;
 List    targetModules = NIL;
 static jmp_buf catch_error;             /* jump buffer for error trapping  */
 
-
+static void setCurrentFile ( Module mod )
+{
+   assert(isModule(mod));
+   strncpy(currentFileName, textToStr(module(mod).text), 990);
+   strcat(currentFileName, textToStr(module(mod).srcExt));
+   currentFile = currentFileName;
+}
 
 static void ppMG ( void )
 {
@@ -749,10 +756,10 @@ static void ppMG ( void )
       u = hd(t);
       switch (whatIs(u)) {
          case GRP_NONREC:
-            fprintf ( stderr, "%s\n", textToStr(textOf(snd(u))));
+            fprintf ( stderr, "  %s\n", textToStr(textOf(snd(u))));
             break;
          case GRP_REC:
-            fprintf ( stderr, "{" );
+            fprintf ( stderr, "  {" );
             for (v = snd(u); nonNull(v); v=tl(v))
                fprintf ( stderr, "%s ", textToStr(textOf(hd(v))) );
             fprintf ( stderr, "}\n" );
@@ -800,18 +807,23 @@ static ConId selectLatestMG ( void )
 }
 
 
-static List /* of CONID */ listFromMG ( void )
+static List /* of CONID */ listFromSpecifiedMG ( List mg )
 {
    List gs;
    List cs = NIL;
-   for (gs = moduleGraph; nonNull(gs); gs=tl(gs)) {
+   for (gs = mg; nonNull(gs); gs=tl(gs)) {
       switch (whatIs(hd(gs))) {
         case GRP_REC:    cs = appendOnto(cs,snd(hd(gs))); break;
         case GRP_NONREC: cs = cons(snd(hd(gs)),cs); break;
-        default:         internal("listFromMG");
+        default:         internal("listFromSpecifiedMG");
       }
    }
    return cs;
+}
+
+static List /* of CONID */ listFromMG ( void )
+{
+   return listFromSpecifiedMG ( moduleGraph );
 }
 
 
@@ -848,6 +860,9 @@ static void mgFromList ( List /* of CONID */ modgList )
       usesT = NIL;
       for (u = module(mod).uses; nonNull(u); u=tl(u))
          usesT = cons(textOf(hd(u)),usesT);
+      /* artifically give all modules a dependency on Prelude */
+      if (mT != textPrelude) 
+         usesT = cons(textPrelude,usesT);
       adjList = cons(pair(mT,usesT),adjList);
    }
 
@@ -874,7 +889,6 @@ static void mgFromList ( List /* of CONID */ modgList )
    }
 
    adjList = modScc ( adjList );
-   adjList = rev(adjList);
    /* adjList is now [ [(module-text, aux-info-field)] ] */
 
    moduleGraph = NIL;
@@ -901,8 +915,9 @@ static void mgFromList ( List /* of CONID */ modgList )
 
       if (isRec)
          moduleGraph = cons( ap(GRP_REC,scc), moduleGraph ); else
-         moduleGraph = cons( ap(GRP_NONREC,hd(scc)), moduleGraph );     
+         moduleGraph = cons( ap(GRP_NONREC,hd(scc)), moduleGraph );
    }
+   moduleGraph = reverse(moduleGraph);
 }
 
 
@@ -956,6 +971,7 @@ static void processModule ( Module m )
    defaultLine    = 0;
    inputExpr      = NIL;
 
+   setCurrentFile(m);
    startModule(m);
    tree = unap(M_MODULE,module(m).tree);
    modNm = zfst3(tree);
@@ -1068,6 +1084,9 @@ static Module parseModuleOrInterface ( ConId mc,
    if (!combined && !sAvail) goto cant_find;
    if (!combined) useSource = TRUE;
 
+   module(mod).srcExt = findText(sExt);
+   setCurrentFile(mod);
+
    /* Actually do the parsing. */
    if (useSource) {
       strcpy(name, path);
@@ -1077,7 +1096,6 @@ static Module parseModuleOrInterface ( ConId mc,
       module(mod).uses      = getModuleImports(module(mod).tree);
       module(mod).fromSrc   = TRUE;
       module(mod).lastStamp = sTime;
-
    } else {
       strcpy(name, path);
       strcat(name, textToStr(mt));
@@ -1274,7 +1292,6 @@ static void achieveTargetModules ( void )
             if (varIsMember(textOf(hd(us)),ood))
                break;
          if (nonNull(us)) {
-fprintf ( stderr, "new OOD %s\n", textToStr(textOf(hd(t))) );
             if (varIsMember(textOf(hd(t)),prelModules))
                Printf ( "warning: prelude module \"%s\" is out-of-date\n",
                         textToStr(textOf(hd(t))) );
@@ -1284,8 +1301,6 @@ fprintf ( stderr, "new OOD %s\n", textToStr(textOf(hd(t))) );
                   ood_new = cons(hd(t),ood_new);
          }
       }
-printf ( "\nood_new = " );print(ood_new,100);
-printf ( "\nood     = " );print(ood,100); printf("\n");
       if (isNull(ood_new)) break;
       ood = appendOnto(ood_new,ood);            
    }
@@ -1330,6 +1345,8 @@ printf ( "\nood     = " );print(ood,100); printf("\n");
          } else {
             /* here's the exception handler, if parsing fails */
             /* A parse error (or similar).  Clean up and abort. */
+            mod = findModule(textOf(mc));
+            if (nonNull(mod)) nukeModule(mod);
             for (t = parsedButNotLoaded; nonNull(t); t=tl(t)) {
                mod = findModule(textOf(hd(t)));
                assert(nonNull(mod));
@@ -1405,18 +1422,23 @@ printf ( "\nood     = " );print(ood,100); printf("\n");
          tryLoadGroup(grp);
       } else {
          /* here's the exception handler, if static/typecheck etc fails */
-         badMods = whatIs(grp)==GRP_REC 
-                 ? snd(grp) 
-                 : singleton(snd(grp));
+         /* nuke the entire rest (ie, the unloaded part)
+            of the module graph */
+         badMods = listFromSpecifiedMG ( mg );
          for (t = badMods; nonNull(t); t=tl(t)) {
             mod = findModule(textOf(hd(t)));
             if (nonNull(mod)) nukeModule(mod);
          }
-         mg2 = moduleGraph; 
-         while (nonNull(mg2) && nonNull(tl(mg2)) && tl(mg2) != mg) 
-            mg2 = tl(mg2);
-         assert(nonNull(mg2) && nonNull(tl(mg2)));
-         tl(mg2) = NIL;
+         /* truncate the module graph just prior to this group. */
+         mg2 = NIL;
+         mg = moduleGraph;
+         while (TRUE) {
+            if (isNull(mg)) break;
+            if (hd(mg) == grp) break;
+            mg2 = cons ( hd(mg), mg2 );
+            mg = tl(mg);
+         }
+         moduleGraph = reverse(mg2);
          return;
          /* end of the exception handler */
       }
@@ -1617,7 +1639,7 @@ static Void local evaluator() {        /* evaluate expr and print value    */
     volatile Module evalMod = allocEvalModule();
     volatile Module currMod = currentModule;
     setCurrModule(evalMod);
-    scriptFile = 0;
+    currentFile = NULL;
 
     defaultDefns = combined ? stdDefaults : evalDefaults;
 
@@ -1687,6 +1709,7 @@ static Void local evaluator() {        /* evaluate expr and print value    */
   cleanup_and_return:
    nukeModule(evalMod);
    setCurrModule(currMod);
+   setCurrentFile(currMod);
 }
 
 
@@ -2455,8 +2478,8 @@ Cell errAssert(l)   /* message to use when raising asserts, etc */
 Int l; {
   char tmp[100];
   Cell str;
-  if (scriptFile) {
-    str = mkStr(findText(scriptFile));
+  if (currentFile) {
+    str = mkStr(findText(currentFile));
   } else {
     str = mkStr(findText(""));
   }
@@ -2469,11 +2492,11 @@ Int l; {
     stopAnyPrinting();
     FPrintf(errorStream,"ERROR");
 
-    if (scriptFile) {
-        FPrintf(errorStream," \"%s\"", scriptFile);
-        setLastEdit(scriptFile,l);
+    if (currentFile) {
+        FPrintf(errorStream," \"%s\"", currentFile);
+        setLastEdit(currentFile,l);
         if (l) FPrintf(errorStream," (line %d)",l);
-        scriptFile = 0;
+        currentFile = NULL;
     }
     FPrintf(errorStream,": ");
     FFlush(errorStream);
