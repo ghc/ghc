@@ -14,6 +14,8 @@ you will screw up the layout where they are used in case expressions!
 
 #define CONCURRENT  Control.Concurrent
 #define EXCEPTION   Control.Exception
+     /* If you want Control.Exception.try, get it as Panic.try, which
+        deals with the shift from 'tryAllIO' to 'try'.  */
 #define DYNAMIC     Data.Dynamic
 #define GLAEXTS     GHC.Exts
 #define DATA_BITS   Data.Bits

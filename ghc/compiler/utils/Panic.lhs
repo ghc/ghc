@@ -13,7 +13,13 @@ module Panic
    ( 
      GhcException(..), ghcError, progName, 
      panic, panic#, assertPanic, trace,
-     showException, showGhcException, throwDyn, tryMost,
+     showException, showGhcException, Exception.throwDyn, tryMost,
+
+     Exception.Exception, 
+     Panic.try,	-- try :: IO a -> IO (Either Exception a)
+		-- This is Control.Exception.try in the new library story
+		--	   Exception.tryAllIO in GHC 4.08
+		-- So it usefully hides the difference
 
 #if __GLASGOW_HASKELL__ <= 408
      catchJust, ioErrors, throwTo,
@@ -26,7 +32,7 @@ import Config
 import FastTypes
 
 import DYNAMIC
-import EXCEPTION as Exception
+import qualified EXCEPTION as Exception
 import TRACE		( trace )
 import UNSAFE_IO	( unsafePerformIO )
 
@@ -37,7 +43,7 @@ GHC's own exception type.
 
 \begin{code}
 ghcError :: GhcException -> a
-ghcError e = throwDyn e
+ghcError e = Exception.throwDyn e
 
 -- error messages all take the form
 --
@@ -64,11 +70,11 @@ progName = unsafePerformIO (getProgName)
 
 short_usage = "Usage: For basic information, try the `--help' option."
    
-showException :: Exception -> String
+showException :: Exception.Exception -> String
 -- Show expected dynamic exceptions specially
-showException (DynException d) | Just e <- fromDynamic d 
-			       = show (e::GhcException)
-showException other_exn	       = show other_exn
+showException (Exception.DynException d) | Just e <- fromDynamic d 
+					 = show (e::GhcException)
+showException other_exn	       	 	 = show other_exn
 
 instance Show GhcException where
   showsPrec _ e@(ProgramError _) = showGhcException e
@@ -111,7 +117,7 @@ Panics and asserts.
 
 \begin{code}
 panic :: String -> a
-panic x = throwDyn (Panic x)
+panic x = Exception.throwDyn (Panic x)
 
 -- #-versions because panic can't return an unboxed int, and that's
 -- what TAG_ is with GHC at the moment.  Ugh. (Simon)
@@ -122,7 +128,7 @@ panic# s = case (panic s) of () -> _ILIT 0
 
 assertPanic :: String -> Int -> a
 assertPanic file line = 
-  throw (AssertionFailed 
+  Exception.throw (Exception.AssertionFailed 
            ("ASSERT failed! file " ++ file ++ ", line " ++ show line))
 \end{code}
 
@@ -131,22 +137,22 @@ assertPanic file line =
 -- exceptions.  Used when we want soft failures when reading interface
 -- files, for example.
 
-tryMost :: IO a -> IO (Either Exception a)
-tryMost action = do r <- myTry action; filter r
+tryMost :: IO a -> IO (Either Exception.Exception a)
+tryMost action = do r <- try action; filter r
   where
-   filter (Left e@(DynException d))
+   filter (Left e@(Exception.DynException d))
 	    | Just ghc_ex <- fromDynamic d
 		= case ghc_ex of
-		    Interrupted -> throw e
-		    Panic _     -> throw e
+		    Interrupted -> Exception.throw e
+		    Panic _     -> Exception.throw e
 		    _other      -> return (Left e)
    filter other 
      = return other
 
 #if __GLASGOW_HASKELL__ <= 408
-myTry = tryAllIO
+try = Exception.tryAllIO
 #else
-myTry = Exception.try
+try = Exception.try
 #endif
 \end{code}	
 

@@ -74,7 +74,7 @@ import UNSAFE_IO	( unsafeInterleaveIO )
 import FIX_IO		( fixIO )
 import Maybe		( mapMaybe )
 import List		( nub )
-import EXCEPTION as Exception
+import Panic		( Exception, try )	-- Get try from Panic to avoid compiler-version troubles
 \end{code}
 
 
@@ -152,13 +152,9 @@ fixM f = TcRn (\ env -> fixIO (\ r -> unTcRn (f r) env))
 Error recovery
 
 \begin{code}
-tryM :: TcRn m r -> TcRn m (Either Exception.Exception r)
+tryM :: TcRn m r -> TcRn m (Either Exception r)
 -- Reflect exception into TcRn monad
-#if __GLASGOW_HASKELL__ <= 408
-tryM (TcRn thing) = TcRn (\ env -> Exception.tryAllIO (thing env))
-#else
-tryM (TcRn thing) = TcRn (\ env -> Exception.try (thing env))
-#endif
+tryM (TcRn thing) = TcRn (\ env -> try (thing env))
 \end{code}
 
 Lazy interleave 
