@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.3 1999/01/13 17:25:41 simonm Exp $
+ * $Id: PrimOps.hc,v 1.4 1999/01/15 17:32:22 simonm Exp $
  *
  * Primitive functions / data
  *
@@ -195,7 +195,7 @@ const
      n = R1.w;						\
      stuff_size = BYTES_TO_STGWORDS(n*scale);		\
      size = sizeofW(StgArrWords)+ stuff_size;		\
-     p = (StgArrWords *)allocate(size);			\
+     p = (StgArrWords *)RET_STGCALL1(P_,allocate,size);	\
      SET_HDR(p, &MUT_ARR_WORDS_info, CCCS);		\
      p->words = stuff_size;				\
      RET_P(p);						\
@@ -221,7 +221,7 @@ FN_(newArrayZh_fast)
     MAYBE_GC(R2_PTR,newArrayZh_fast);
 
     size = sizeofW(StgMutArrPtrs) + n;
-    arr = (StgMutArrPtrs *)allocate(size);
+    arr = (StgMutArrPtrs *)RET_STGCALL1(P_, allocate, size);
 
     SET_HDR(arr,&MUT_ARR_PTRS_info,CCCS);
     arr->ptrs = n;
