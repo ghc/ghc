@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.2 2002/02/12 15:45:46 simonmar Exp $
+# $Id: package.mk,v 1.3 2002/02/13 10:45:28 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -17,10 +17,8 @@ $(PACKAGE).conf.installed : $(PACKAGE).conf.in
 		| sed 's/^#.*$$//g' >$@
 
 boot all :: $(PACKAGE).conf.inplace $(PACKAGE).conf.installed
-	-$(GHC_PKG_INPLACE) --remove-package $(PACKAGE)
-	$(GHC_PKG_INPLACE) --add-package <$(PACKAGE).conf.inplace
-	-$(GHC_PKG_INPLACE) -f $(GHC_DRIVER_DIR)/package.conf --remove-package $(PACKAGE)
-	$(GHC_PKG_INPLACE)  -f $(GHC_DRIVER_DIR)/package.conf --add-package <$(PACKAGE).conf.installed
+	$(GHC_PKG_INPLACE) --update-package <$(PACKAGE).conf.inplace
+	$(GHC_PKG_INPLACE)  -f $(GHC_DRIVER_DIR)/package.conf --update-package <$(PACKAGE).conf.installed
 
 CLEAN_FILES += $(PACKAGE).conf.installed $(PACKAGE).conf.inplace
 
