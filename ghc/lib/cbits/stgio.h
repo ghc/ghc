@@ -80,7 +80,7 @@ int     unlockFile  PROTO((int));
 StgInt	getLock	    PROTO((StgForeignObj, StgInt));
 
 /* inputReady.lc */
-StgInt	inputReady  PROTO((StgForeignObj));
+StgInt	inputReady  PROTO((StgForeignObj,StgInt));
 
 /* openFile.lc */
 StgAddr openFile PROTO((StgByteArray, StgByteArray));
