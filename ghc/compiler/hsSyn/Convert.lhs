@@ -160,8 +160,8 @@ cvtd x = panic "Illegal kind of declaration in where clause"
 
 
 cvtclause :: Meta.Clause (Meta.Pat) (Meta.Exp) (Meta.Dec) -> Hs.Match RdrName
-cvtclause (ps,body,wheres) = Match (map cvtp ps) Nothing 
-                             (GRHSs (cvtguard body) (cvtdecs wheres) void)
+cvtclause (Clause ps body wheres)
+    = Match (map cvtp ps) Nothing (GRHSs (cvtguard body) (cvtdecs wheres) void)
 
 
 
@@ -182,8 +182,8 @@ cvtstmts (ParSt dss : ss)  = ParStmt(map cvtstmts dss)      : cvtstmts ss
 
 
 cvtm :: Meta.Mat -> Hs.Match RdrName
-cvtm (p,body,wheres) = Match [cvtp p] Nothing 
-                             (GRHSs (cvtguard body) (cvtdecs wheres) void)
+cvtm (Mat p body wheres)
+    = Match [cvtp p] Nothing (GRHSs (cvtguard body) (cvtdecs wheres) void)
                              
 cvtguard :: Meta.Rhs -> [GRHS RdrName]
 cvtguard (Guarded pairs) = map cvtpair pairs
