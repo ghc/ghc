@@ -57,7 +57,7 @@ import StgSyn		( SRT(..) )
 import Name		( Name )
 import DataCon		( DataCon, dataConTag, fIRST_TAG )
 import Unique		( Uniquable(..) )
-import CmdLineOpts	( opt_SccProfilingOn )
+import CmdLineOpts	( opt_SccProfilingOn, DynFlags(..), HscTarget(..) )
 import ListSetOps	( assocDefault )
 import Maybes		( isJust )
 import Constants	( wORD_SIZE, sIZEOF_StgFunInfoExtraRev )
@@ -351,9 +351,17 @@ emitVectoredReturnInstr zero_indexed_tag
   = do	{ info_amode <- getSequelAmode
 		-- HACK! assign info_amode to a temp, because retVec
 		-- uses it twice and the NCG doesn't have any CSE yet.
-	; x <- newTemp wordRep
-	; stmtC (CmmAssign x info_amode)
-	; let target = retVec (CmmReg x) zero_indexed_tag
+		-- Only do this for the NCG, because gcc is too stupid
+		-- to optimise away the extra tmp (grrr).
+	; dflags <- getDynFlags
+	; x <- if hscTarget dflags == HscAsm
+		   then do z <- newTemp wordRep
+			   stmtC (CmmAssign z info_amode)
+			   return (CmmReg z)
+		   else
+
+			return info_amode
+	; let target = retVec x zero_indexed_tag
 	; stmtC (CmmJump target []) }
 
 
