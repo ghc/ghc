@@ -1,4 +1,10 @@
-test('arrow1', normal, compile, [''])
+test('arrowapply1', normal, compile, [''])
+test('arrowapply2', normal, compile, [''])
+test('arrowapply3', normal, compile, [''])
+test('arrowcase1', normal, compile, [''])
+test('arrowdo1', normal, compile, [''])
+test('arrowform1', normal, compile, [''])
+test('arrowif1', normal, compile, [''])
 
 # test('mod1', normal, compile_fail, [''])
 # test('mod2', normal, compile_fail, [''])
