@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.198 2004/05/27 15:21:37 simonmar Exp $
+ * $Id: Schedule.c,v 1.199 2004/08/09 14:27:53 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -879,8 +879,6 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 	     || blocked_queue_hd != END_TSO_QUEUE
 	     || sleeping_queue != END_TSO_QUEUE)))
 	context_switch = 1;
-    else
-	context_switch = 0;
 
 run_thread:
 
@@ -1081,6 +1079,14 @@ run_thread:
       break;
 
     case ThreadYielding:
+      // Reset the context switch flag.  We don't do this just before
+      // running the thread, because that would mean we would lose ticks
+      // during GC, which can lead to unfair scheduling (a thread hogs
+      // the CPU because the tick always arrives during GC).  This way
+      // penalises threads that do a lot of allocation, but that seems
+      // better than the alternative.
+      context_switch = 0;
+
 #if defined(GRAN)
       IF_DEBUG(gran, 
 	       DumpGranEvent(GR_DESCHEDULE, t));
@@ -1751,9 +1757,10 @@ createThread(nat size)
   /* put a stop frame on the stack */
   tso->sp -= sizeofW(StgStopFrame);
   SET_HDR((StgClosure*)tso->sp,(StgInfoTable *)&stg_stop_thread_info,CCS_SYSTEM);
+  tso->link = END_TSO_QUEUE;
+
   // ToDo: check this
 #if defined(GRAN)
-  tso->link = END_TSO_QUEUE;
   /* uses more flexible routine in GranSim */
   insertThread(tso, CurrentProc);
 #else
@@ -1930,7 +1937,9 @@ void
 scheduleThread_(StgTSO *tso)
 {
   // Precondition: sched_mutex must be held.
-  PUSH_ON_RUN_QUEUE(tso);
+  // The thread goes at the *end* of the run-queue, to avoid possible
+  // starvation of any threads already on the queue.
+  APPEND_TO_RUN_QUEUE(tso);
   THREAD_RUNNABLE();
 }
 
@@ -1990,7 +1999,7 @@ scheduleWaitThread(StgTSO* tso, /*[out]*/HaskellObj* ret,
     */
     IF_DEBUG(scheduler, sched_belch("waiting for thread (%d)", tso->id));
     
-    PUSH_ON_RUN_QUEUE(tso);
+    APPEND_TO_RUN_QUEUE(tso);
     // NB. Don't call THREAD_RUNNABLE() here, because the thread is
     // bound and only runnable by *this* OS thread, so waking up other
     // workers will just slow things down.
@@ -2421,7 +2430,7 @@ unblockOneLocked(StgBlockingQueueElement *bqe, StgClosure *node)
       /* if it's a TSO just push it onto the run_queue */
       next = bqe->link;
       // ((StgTSO *)bqe)->link = END_TSO_QUEUE; // debugging?
-      PUSH_ON_RUN_QUEUE((StgTSO *)bqe); 
+      APPEND_TO_RUN_QUEUE((StgTSO *)bqe); 
       THREAD_RUNNABLE();
       unblockCount(bqe, node);
       /* reset blocking status after dumping event */
@@ -2465,7 +2474,7 @@ unblockOneLocked(StgTSO *tso)
   ASSERT(tso->why_blocked != NotBlocked);
   tso->why_blocked = NotBlocked;
   next = tso->link;
-  PUSH_ON_RUN_QUEUE(tso);
+  APPEND_TO_RUN_QUEUE(tso);
   THREAD_RUNNABLE();
   IF_DEBUG(scheduler,sched_belch("waking up thread %ld", tso->id));
   return next;
@@ -2915,7 +2924,7 @@ unblockThread(StgTSO *tso)
   tso->link = END_TSO_QUEUE;
   tso->why_blocked = NotBlocked;
   tso->block_info.closure = NULL;
-  PUSH_ON_RUN_QUEUE(tso);
+  APPEND_TO_RUN_QUEUE(tso);
 }
 #endif
 
