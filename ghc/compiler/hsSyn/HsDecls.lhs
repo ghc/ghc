@@ -380,7 +380,8 @@ data HsIdInfo name
   | HsUpdate		UpdateInfo
   | HsArgUsage		ArgUsageInfo
   | HsFBType		FBTypeInfo
-	-- ToDo: specialisations
+  | HsSpecialise	[HsTyVar name] [HsType name] (UfExpr name)
+
 
 data HsStrictnessInfo name
   = HsStrictnessInfo [Demand] 

@@ -33,9 +33,9 @@ import FiniteMap	( FiniteMap, emptyFM )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import FoldrBuildWW	( mkFoldrBuildWW )
-import Id		( mkSysLocal, mkUserId, setIdVisibility, replaceIdInfo, 
-                          replacePragmaInfo, getIdDemandInfo, idType,
-			  getIdInfo, getPragmaInfo, mkIdWithNewUniq,
+import MkId		( mkSysLocal, mkUserId )
+import Id		( setIdVisibility, 
+                          getIdDemandInfo, idType,
 			  nullIdEnv, addOneToIdEnv, delOneFromIdEnv,
  			  lookupIdEnv, IdEnv, 
 			  Id
@@ -57,14 +57,11 @@ import TysWiredIn	( stringTy, isIntegerTy )
 import LiberateCase	( liberateCase )
 import MagicUFs		( MagicUnfoldingFun )
 import PprCore
-import PprType		( GenType{-instance Outputable-}, GenTyVar{-ditto-},
-			  nmbrType
-			)
+import PprType		( nmbrType )
 import SAT		( doStaticArgs )
 import SimplMonad	( zeroSimplCount, showSimplCount, SimplCount )
 import SimplPgm		( simplifyPgm )
 import Specialise
-import SpecUtils	( pprSpecErrs )
 import StrictAnal	( saWwTopBinds )
 import TyVar		( TyVar, nameTyVar )
 import Unique		( Unique{-instance Eq-}, Uniquable(..),
@@ -391,14 +388,15 @@ tidyCoreExpr (Let (Rec pairs) body)
   where
     (bndrs, rhss) = unzip pairs
 
-tidyCoreExpr (SCC cc body)
+tidyCoreExpr (Note (Coerce to_ty from_ty) body)
   = tidyCoreExprEta body	`thenTM` \ body' ->
-    returnTM (SCC cc body')
+    tidyTy to_ty		`thenTM` \ to_ty' ->
+    tidyTy from_ty		`thenTM` \ from_ty' ->
+    returnTM (Note (Coerce to_ty' from_ty') body')
 
-tidyCoreExpr (Coerce coercion ty body)
+tidyCoreExpr (Note note body)
   = tidyCoreExprEta body	`thenTM` \ body' ->
-    tidyTy ty			`thenTM` \ ty' ->
-    returnTM (Coerce coercion ty' body')
+    returnTM (Note note body')
 
 -- Wierd case for par, seq, fork etc. See notes above.
 tidyCoreExpr (Case scrut@(Prim op args) (PrimAlts _ (BindDefault binder rhs)))
@@ -613,20 +611,16 @@ mapTM f (x:xs) = f x	`thenTM` \ r ->
 -- of the binder will print the correct way (i.e. as a global not a local)
 mungeTopBinder :: Id -> (Id -> TopTidyM a) -> TopTidyM a
 mungeTopBinder id thing_inside mod env us
-  = case lookupIdEnv env id of
-	Just (ValBinder global) -> thing_inside global mod env us	-- Already bound
-
-	other -> 	-- Give it a new print-name unless it's an exported thing
-			-- setNameVisibility also does the local/global thing
-		 let
-			(id', us')  | isExported id = (id, us)
-				    | otherwise
-				    = (setIdVisibility (Just mod) us id, 
-				       incrUnique us)
-
-			new_env    = addToUFM env id (ValBinder id')
-		 in
-		 thing_inside id' mod new_env us'
+  =  	-- Give it a new print-name unless it's an exported thing
+	-- setNameVisibility also does the local/global thing
+    let
+	(id', us')  | isExported id = (id, us)
+		    | otherwise
+		    = (setIdVisibility (Just mod) us id, 
+		       incrUnique us)
+	new_env    = addToUFM env id (ValBinder id')
+    in
+    thing_inside id' mod new_env us'
 
 mungeTopBinders []     k = k []
 mungeTopBinders (b:bs) k = mungeTopBinder b	$ \ b' ->

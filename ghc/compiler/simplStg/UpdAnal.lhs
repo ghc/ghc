@@ -15,14 +15,16 @@ module UpdAnal ( updateAnalyse ) where
 import Prelude hiding ( lookup )
 
 import StgSyn
+import MkId		( mkSysLocal )
 import Id		( IdEnv, growIdEnv, addOneToIdEnv, combineIdEnvs, nullIdEnv, 
 			  unitIdEnv, mkIdEnv, rngIdEnv, lookupIdEnv, 
 			  IdSet,
-			  getIdUpdateInfo, addIdUpdateInfo, mkSysLocal, idType, isImportedId,
+			  getIdUpdateInfo, addIdUpdateInfo, idType,
 			  externallyVisibleId,
-			  Id, GenId
+			  Id
 			)
 import IdInfo		( UpdateInfo, UpdateSpec, mkUpdateInfo, updateInfoMaybe )
+import Name		( isLocallyDefined )
 import Type		( splitFunTys, splitSigmaTy )
 import UniqSet
 import Unique		( getBuiltinUniques )
@@ -123,14 +125,15 @@ repeatedly applied to different environments after that.
 
 \begin{code}
 lookup v
-  | isImportedId v
-  = const (case updateInfoMaybe (getIdUpdateInfo v) of
-		Nothing   -> unknownClosure
-		Just spec -> convertUpdateSpec spec)
-  | otherwise
+  | isLocallyDefined v
   = \p -> case lookup_IdEnv p v of
 		Just b  -> b
 		Nothing -> unknownClosure
+
+  | otherwise
+  = const (case updateInfoMaybe (getIdUpdateInfo v) of
+		Nothing   -> unknownClosure
+		Just spec -> convertUpdateSpec spec)
 \end{code}
 
 %-----------------------------------------------------------------------------

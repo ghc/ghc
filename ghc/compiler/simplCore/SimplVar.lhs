@@ -16,13 +16,13 @@ import {-# SOURCE #-} Simplify ( simplExpr )
 import CmdLineOpts	( switchIsOn, SimplifierSwitch(..) )
 import CoreSyn
 import CoreUnfold	( Unfolding(..), UnfoldingGuidance(..), 
-			  FormSummary, whnfOrBottom,
+			  FormSummary, whnfOrBottom, okToInline,
 			  smallEnoughToInline )
 import CoreUtils	( coreExprCc )
-import BinderInfo	( BinderInfo, noBinderInfo, okToInline )
+import BinderInfo	( BinderInfo, noBinderInfo )
 
 import CostCentre	( CostCentre, noCostCentreAttached, isCurrentCostCentre )
-import Id		( idType, getIdInfo, getIdUnfolding, 
+import Id		( idType, getIdUnfolding, 
 			  getIdSpecialisation, setIdSpecialisation,
 			  idMustBeINLINEd, idHasNoFreeTyVars,
 			  mkIdWithNewUniq, mkIdWithNewType, 
@@ -53,7 +53,7 @@ import Outputable
 This where all the heavy-duty unfolding stuff comes into its own.
 
 \begin{code}
-completeVar env var args result_ty
+completeVar env inline_call var args result_ty
 
   | maybeToBool maybe_magic_result
   = tick MagicUnfold	`thenSmpl_`
@@ -76,7 +76,7 @@ completeVar env var args result_ty
 	-- If "essential_unfoldings_only" is true we do no inlinings at all,
 	-- EXCEPT for things that absolutely have to be done
 	-- (see comments with idMustBeINLINEd)
-    && ok_to_inline
+    && (inline_call || ok_to_inline)
     && costCentreOk (getEnclosingCC env) (coreExprCc unf_template)
   =
 {-
@@ -93,6 +93,9 @@ completeVar env var args result_ty
 -}
     tickUnfold var		`thenSmpl_`
     simplExpr unf_env unf_template args result_ty
+
+  | inline_call		-- There was an InlineCall note, but we didn't inline!
+  = returnSmpl (mkGenApp (Note InlineCall (Var var')) args)
 
   | otherwise
   = returnSmpl (mkGenApp (Var var') args)
@@ -135,7 +138,7 @@ completeVar env var args result_ty
     sw_chkr		      = getSwitchChecker env
     essential_unfoldings_only = switchIsOn sw_chkr EssentialUnfoldingsOnly
     is_case_scrutinee	      = switchIsOn sw_chkr SimplCaseScrutinee
-    ok_to_inline	      = okToInline (whnfOrBottom form) small_enough occ_info 
+    ok_to_inline	      = okToInline var (whnfOrBottom form) small_enough occ_info 
     small_enough	      = smallEnoughToInline var arg_evals is_case_scrutinee guidance
     arg_evals		      = [is_evald arg | arg <- args, isValArg arg]
 

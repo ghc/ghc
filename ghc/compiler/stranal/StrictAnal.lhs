@@ -14,18 +14,16 @@ module StrictAnal ( saWwTopBinds ) where
 import CmdLineOpts	( opt_D_dump_stranal, opt_D_simplifier_stats
 			)
 import CoreSyn
-import Id		( idType, addIdStrictness, isWrapperId,
+import Id		( idType, addIdStrictness,
 			  getIdDemandInfo, addIdDemandInfo,
-			  GenId{-instance Outputable-}, Id
+			  Id
 			)
 import IdInfo		( mkStrictnessInfo, mkBottomStrictnessInfo,
 			  mkDemandInfo, willBeDemanded, DemandInfo
 			)
 import PprCore		( pprCoreBinding )
-import PprType		( GenType{-instance Outputable-}, GenTyVar{-ditto-} )
 import SaAbsInt
 import SaLib
-import TyVar		( GenTyVar{-instance Eq-} )
 import WorkWrap		-- "back-end" of strictness analyser
 import Unique		( Unique{-instance Eq -} )
 import UniqSupply       ( UniqSupply )
@@ -248,13 +246,9 @@ saExpr str_env abs_env (App fun arg)
   = saExpr str_env abs_env fun	`thenSa` \ new_fun ->
     returnSa (App new_fun arg)
 
-saExpr str_env abs_env (SCC cc expr)
+saExpr str_env abs_env (Note note expr)
   = saExpr str_env abs_env expr	`thenSa` \ new_expr ->
-    returnSa (SCC cc new_expr)
-
-saExpr str_env abs_env (Coerce c ty expr)
-  = saExpr str_env abs_env expr	`thenSa` \ new_expr ->
-    returnSa (Coerce c ty new_expr)
+    returnSa (Note note new_expr)
 
 saExpr str_env abs_env (Case expr (AlgAlts alts deflt))
   = saExpr    str_env abs_env expr  `thenSa` \ new_expr  ->

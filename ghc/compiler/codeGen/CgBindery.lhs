@@ -35,7 +35,7 @@ import ClosureInfo	( mkLFImported, mkConLFInfo, mkLFArgument, LambdaFormInfo )
 import HeapOffs		( VirtualHeapOffset,
 			  VirtualSpAOffset, VirtualSpBOffset
 			)
-import Id		( idPrimRep, toplevelishId, 
+import Id		( idPrimRep,
 			  mkIdEnv, rngIdEnv, IdEnv,
 			  idSetToList,
 			  Id
@@ -231,8 +231,8 @@ getCAddrMode name
 \begin{code}
 getCAddrModeIfVolatile :: Id -> FCode (Maybe CAddrMode)
 getCAddrModeIfVolatile name
-  | toplevelishId name = returnFC Nothing
-  | otherwise
+--  | toplevelishId name = returnFC Nothing
+--  | otherwise
   = lookupBindC name `thenFC` \ ~(MkCgIdInfo _ volatile_loc stable_loc lf_info) ->
     case stable_loc of
 	NoStableLoc ->	-- Aha!  So it is volatile!

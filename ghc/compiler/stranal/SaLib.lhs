@@ -20,12 +20,11 @@ module SaLib (
 import CoreSyn		( CoreExpr )
 import Id		( nullIdEnv, addOneToIdEnv, growIdEnvList,
 			  lookupIdEnv, IdEnv,
-			  GenId{-instance Outputable-}, Id
+			  Id
 			)
 import IdInfo		( StrictnessInfo(..) )
 import Demand		( Demand{-instance Outputable-} )
 import Outputable
-import PprType		( GenType{-instance Outputable-} )
 \end{code}
 
 %************************************************************************

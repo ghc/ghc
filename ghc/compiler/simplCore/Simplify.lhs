@@ -242,25 +242,10 @@ applied to the specified arguments.
 
 Variables
 ~~~~~~~~~
-Check if there's a macro-expansion, and if so rattle on.  Otherwise do
-the more sophisticated stuff.
 
 \begin{code}
 simplExpr env (Var var) args result_ty
-  = case lookupIdSubst env var of
-  
-      Just (SubstExpr ty_subst id_subst expr)
-	-> simplExpr (setSubstEnvs env (ty_subst, id_subst)) expr args result_ty
-
-      Just (SubstLit lit)		-- A boring old literal
-	-> ASSERT( null args )
-	   returnSmpl (Lit lit)
-
-      Just (SubstVar var') 		-- More interesting!  An id!
-	-> completeVar env var' args result_ty
-
-      Nothing  -- Not in the substitution; hand off to completeVar
-	-> completeVar env var args result_ty 
+  = simplVar env False {- No InlineCall -} var args result_ty
 \end{code}
 
 Literals
@@ -408,62 +393,29 @@ simplExpr env expr@(Case scrut alts) args result_ty
 Coercions
 ~~~~~~~~~
 \begin{code}
-simplExpr env (Coerce coercion ty body) args result_ty
-  = simplCoerce env coercion ty body args result_ty
+simplExpr env (Note (Coerce to_ty from_ty) body) args result_ty
+  = simplCoerce env to_ty from_ty body args result_ty
+
+simplExpr env (Note (SCC cc) body) args result_ty
+  = simplSCC env cc body args result_ty
+
+-- InlineCall is simple enough to deal with on the spot
+-- The only complication is that we slide the InlineCall
+-- inwards past any function arguments
+simplExpr env (Note InlineCall expr) args result_ty
+  = go expr args
+  where
+    go (Var v) args	  = simplVar env True {- InlineCall -} v args result_ty
+
+    go (App fun arg) args = simplArg env arg	`appEager` \ arg' ->
+		            go fun (arg' : args)
+
+    go other args	  = 	-- Unexpected discard; report it
+			    pprTrace "simplExpr: discarding InlineCall" (ppr expr) $
+			    simplExpr env other args result_ty
 \end{code}
 
 
-Set-cost-centre
-~~~~~~~~~~~~~~~
-
-1) Eliminating nested sccs ...
-We must be careful to maintain the scc counts ...
-
-\begin{code}
-simplExpr env (SCC cc1 (SCC cc2 expr)) args result_ty
-  | not (isSccCountCostCentre cc2) && case cmpCostCentre cc1 cc2 of { EQ -> True; _ -> False }
-    	-- eliminate inner scc if no call counts and same cc as outer
-  = simplExpr env (SCC cc1 expr) args result_ty
-
-  | not (isSccCountCostCentre cc2) && not (isSccCountCostCentre cc1)
-    	-- eliminate outer scc if no call counts associated with either ccs
-  = simplExpr env (SCC cc2 expr) args result_ty
-\end{code}
-
-2) Moving sccs inside lambdas ...
-  
-\begin{code}
-simplExpr env (SCC cc (Lam binder@(ValBinder _) body)) args result_ty
-  | not (isSccCountCostCentre cc)
-	-- move scc inside lambda only if no call counts
-  = simplExpr env (Lam binder (SCC cc body)) args result_ty
-
-simplExpr env (SCC cc (Lam binder body)) args result_ty
-	-- always ok to move scc inside type/usage lambda
-  = simplExpr env (Lam binder (SCC cc body)) args result_ty
-\end{code}
-
-3) Eliminating dict sccs ...
-
-\begin{code}
-simplExpr env (SCC cc expr) args result_ty
-  | squashableDictishCcExpr cc expr
-    	-- eliminate dict cc if trivial dict expression
-  = simplExpr env expr args result_ty
-\end{code}
-
-4) Moving arguments inside the body of an scc ...
-This moves the cost of doing the application inside the scc
-(which may include the cost of extracting methods etc)
-
-\begin{code}
-simplExpr env (SCC cost_centre body) args result_ty
-  = let
-	new_env = setEnclosingCC env cost_centre
-    in
-    simplExpr new_env body args result_ty		`thenSmpl` \ body' ->
-    returnSmpl (SCC cost_centre body')
-\end{code}
 
 %************************************************************************
 %*									*
@@ -702,6 +654,33 @@ simplValLam env expr min_no_of_args expr_ty
 \end{code}
 
 
+%************************************************************************
+%*									*
+\subsection[Simplify-var]{Variables}
+%*									*
+%************************************************************************
+
+Check if there's a macro-expansion, and if so rattle on.  Otherwise do
+the more sophisticated stuff.
+
+\begin{code}
+simplVar env inline_call var args result_ty
+  = case lookupIdSubst env var of
+  
+      Just (SubstExpr ty_subst id_subst expr)
+	-> simplExpr (setSubstEnvs env (ty_subst, id_subst)) expr args result_ty
+
+      Just (SubstLit lit)		-- A boring old literal
+	-> ASSERT( null args )
+	   returnSmpl (Lit lit)
+
+      Just (SubstVar var') 		-- More interesting!  An id!
+	-> completeVar env inline_call var' args result_ty
+
+      Nothing  -- Not in the substitution; hand off to completeVar
+	-> completeVar env inline_call var args result_ty 
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -711,28 +690,88 @@ simplValLam env expr min_no_of_args expr_ty
 
 \begin{code}
 -- (coerce (case s of p -> r)) args ==> case s of p -> (coerce r) args
-simplCoerce env coercion ty expr@(Case scrut alts) args result_ty
+simplCoerce env to_ty from_ty expr@(Case scrut alts) args result_ty
   = simplCase env scrut (getSubstEnvs env, alts)
-	      (\env rhs -> simplCoerce env coercion ty rhs args result_ty)
+	      (\env rhs -> simplCoerce env to_ty from_ty rhs args result_ty)
 	      result_ty
 
 -- (coerce (let defns in b)) args  ==> let defns' in (coerce b) args
-simplCoerce env coercion ty (Let bind body) args result_ty
-  = simplBind env bind (\env -> simplCoerce env coercion ty body args result_ty) result_ty
+simplCoerce env to_ty from_ty (Let bind body) args result_ty
+  = simplBind env bind (\env -> simplCoerce env to_ty from_ty body args result_ty) result_ty
 
 -- Default case
-simplCoerce env coercion ty expr args result_ty
-  = simplTy env ty			`appEager` \ ty' ->
-    simplTy env expr_ty			`appEager` \ expr_ty' ->
-    simplExpr env expr [] expr_ty'	`thenSmpl` \ expr' ->
-    returnSmpl (mkGenApp (mkCoerce coercion ty' expr') args)
-  where
-    expr_ty = coreExprType (unTagBinders expr)	-- Rather like simplCase other_scrut
+-- NB: we do *not* push the argments inside the coercion
 
+simplCoerce env to_ty from_ty expr args result_ty
+  = simplTy env to_ty			`appEager` \ to_ty' ->
+    simplTy env from_ty			`appEager` \ from_ty' ->
+    simplExpr env expr [] from_ty'	`thenSmpl` \ expr' ->
+    returnSmpl (mkGenApp (mkCoerce to_ty' from_ty' expr') args)
+  where
 	-- Try cancellation; we do this "on the way up" because
 	-- I think that's where it'll bite best
-    mkCoerce (CoerceOut con1) ty1 (Coerce (CoerceIn  con2) ty2 body) | con1 == con2 = body
-    mkCoerce coercion ty  body = Coerce coercion ty body
+    mkCoerce to_ty1 from_ty1 (Note (Coerce to_ty2 from_ty2) body)
+	= ASSERT( from_ty1 == to_ty2 )
+	  mkCoerce to_ty1 from_ty2 body
+    mkCoerce to_ty from_ty body
+	| to_ty == from_ty = body
+	| otherwise	   = Note (Coerce to_ty from_ty) body
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection[Simplify-scc]{SCC expressions
+%*									*
+%************************************************************************
+
+1) Eliminating nested sccs ...
+We must be careful to maintain the scc counts ...
+
+\begin{code}
+simplSCC env cc1 (Note (SCC cc2) expr) args result_ty
+  | not (isSccCountCostCentre cc2) && case cmpCostCentre cc1 cc2 of { EQ -> True; _ -> False }
+    	-- eliminate inner scc if no call counts and same cc as outer
+  = simplSCC env cc1 expr args result_ty
+
+  | not (isSccCountCostCentre cc2) && not (isSccCountCostCentre cc1)
+    	-- eliminate outer scc if no call counts associated with either ccs
+  = simplSCC env cc2 expr args result_ty
+\end{code}
+
+2) Moving sccs inside lambdas ...
+  
+\begin{code}
+simplSCC env cc (Lam binder@(ValBinder _) body) args result_ty
+  | not (isSccCountCostCentre cc)
+	-- move scc inside lambda only if no call counts
+  = simplExpr env (Lam binder (Note (SCC cc) body)) args result_ty
+
+simplSCC env cc (Lam binder body) args result_ty
+	-- always ok to move scc inside type/usage lambda
+  = simplExpr env (Lam binder (Note (SCC cc) body)) args result_ty
+\end{code}
+
+3) Eliminating dict sccs ...
+
+\begin{code}
+simplSCC env cc expr args result_ty
+  | squashableDictishCcExpr cc expr
+    	-- eliminate dict cc if trivial dict expression
+  = simplExpr env expr args result_ty
+\end{code}
+
+4) Moving arguments inside the body of an scc ...
+This moves the cost of doing the application inside the scc
+(which may include the cost of extracting methods etc)
+
+\begin{code}
+simplSCC env cc body args result_ty
+  = let
+	new_env = setEnclosingCC env cc
+    in
+    simplExpr new_env body args result_ty		`thenSmpl` \ body' ->
+    returnSmpl (Note (SCC cc) body')
 \end{code}
 
 
@@ -894,7 +933,7 @@ Notice that let to case occurs only if x is used strictly in its body
 -- Dead code is now discarded by the occurrence analyser,
 
 simplNonRec env binder@(id,_) rhs body_c body_ty
-  | inlineUnconditionally ok_to_dup binder
+  | inlineUnconditionally binder
   = 	-- The binder is used in definitely-inline way in the body
 	-- So add it to the environment, drop the binding, and continue
     body_c (bindIdToExpr env binder rhs)
@@ -949,7 +988,7 @@ simplNonRec env binder@(id,_) rhs body_c body_ty
       = tick CaseFloatFromLet				`thenSmpl_`
 
 	-- First, bind large let-body if necessary
-	if ok_to_dup || isSingleton (nonErrorRHSs alts)
+	if isSingleton (nonErrorRHSs alts)
 	then
 	    simplCase env scrut (getSubstEnvs env, alts) 
 		      (\env rhs -> simpl_bind env rhs) body_ty
@@ -977,7 +1016,6 @@ simplNonRec env binder@(id,_) rhs body_c body_ty
 	-- All this stuff is computed at the start of the simpl_bind loop
     float_lets       	      = switchIsSet env SimplFloatLetsExposingWHNF
     float_primops    	      = switchIsSet env SimplOkToFloatPrimOps
-    ok_to_dup	     	      = switchIsSet env SimplOkToDupCode
     always_float_let_from_let = switchIsSet env SimplAlwaysFloatLetsFromLets
     try_let_to_case           = switchIsSet env SimplLetToCase
     no_float		      = switchIsSet env SimplNoLetFromStrictLet
@@ -995,7 +1033,7 @@ simplNonRec env binder@(id,_) rhs body_c body_ty
 			ValueForm -> True
 			other -> False
 
-    float_exposes_hnf = floatExposesHNF float_lets float_primops ok_to_dup rhs
+    float_exposes_hnf = floatExposesHNF float_lets float_primops rhs
 
     let_floating_ok  = (will_be_demanded && not no_float) ||
 		       always_float_let_from_let ||
@@ -1202,7 +1240,7 @@ simplRecursiveGroup env new_ids []
   = returnSmpl ([], env)
 
 simplRecursiveGroup env (new_id : new_ids) ((binder, rhs) : pairs)
-  | inlineUnconditionally ok_to_dup binder
+  | inlineUnconditionally binder
   = 	-- Single occurrence, so drop binding and extend env with the inlining
 	-- This is a little delicate, because what if the unique occurrence
 	-- is *before* this binding?  This'll never happen, because
@@ -1224,8 +1262,6 @@ simplRecursiveGroup env (new_id : new_ids) ((binder, rhs) : pairs)
     in
     simplRecursiveGroup new_env new_ids pairs	`thenSmpl` \ (new_pairs, final_env) ->
     returnSmpl (new_binds' ++ new_pairs, final_env)   
-  where
-    ok_to_dup = switchIsSet env SimplOkToDupCode
 \end{code}
 
 
@@ -1289,7 +1325,7 @@ floatBind env top_level bind
 	-- fltRhs has same invariant as fltBind
     fltRhs rhs
       |  (always_float_let_from_let ||
-          floatExposesHNF True False False rhs)
+          floatExposesHNF True False rhs)
       = fltExpr rhs
     
       | otherwise

@@ -10,9 +10,8 @@ module IdUtils ( primOpName ) where
 
 import CoreSyn
 import CoreUnfold	( Unfolding )
-import Id		( mkPrimitiveId )
+import MkId		( mkPrimitiveId )
 import IdInfo		-- quite a few things
-import StdIdInfo
 import Name		( mkWiredInIdName, Name )
 import PrimOp		( primOpInfo, tagOf_PrimOp, PrimOpInfo(..), PrimOp )
 import PrelMods		( pREL_GHC )

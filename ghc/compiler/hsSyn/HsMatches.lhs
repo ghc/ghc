@@ -15,8 +15,8 @@ import HsExpr		( HsExpr, Stmt )
 import HsBinds		( HsBinds, nullBinds )
 
 -- Others
-import PprType		( GenType{-instance Outputable-} )
-import SrcLoc		( SrcLoc{-instances-} )
+import Type		( GenType )
+import SrcLoc		( SrcLoc )
 import Util		( panic )
 import Outputable
 import Name		( NamedThing )

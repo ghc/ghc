@@ -57,11 +57,7 @@ data AnnCoreExpr' val_bdr val_occ flexi annot
   | AnnLet	(AnnCoreBinding val_bdr val_occ flexi annot)
 		(AnnCoreExpr val_bdr val_occ flexi annot)
 
-  | AnnSCC	CostCentre
-		(AnnCoreExpr val_bdr val_occ flexi annot)
-
-  | AnnCoerce	Coercion
-		(GenType flexi)
+  | AnnNote	(CoreNote flexi)
 		(AnnCoreExpr val_bdr val_occ flexi annot)
 \end{code}
 
@@ -91,8 +87,7 @@ deAnnotate (_, AnnCon	con args)   = Con con args
 deAnnotate (_, AnnPrim	op args)    = Prim op args
 deAnnotate (_, AnnLam	binder body)= Lam binder (deAnnotate body)
 deAnnotate (_, AnnApp	fun arg)    = App (deAnnotate fun) arg
-deAnnotate (_, AnnSCC	lbl body)   = SCC lbl (deAnnotate body)
-deAnnotate (_, AnnCoerce c ty body) = Coerce c ty (deAnnotate body)
+deAnnotate (_, AnnNote	note body)  = Note note (deAnnotate body)
 
 deAnnotate (_, AnnLet bind body)
   = Let (deAnnBind bind) (deAnnotate body)

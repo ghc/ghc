@@ -55,16 +55,15 @@ import {-# SOURCE #-} MachMisc ( underscorePrefix, fmtAsmLbl )
 import CgRetConv	( CtrlReturnConvention(..), ctrlReturnConvAlg )
 import CStrings		( pp_cSEP )
 import Id		( externallyVisibleId,
-			  isDataCon, isDictFunId,
-			  isDefaultMethodId_maybe,
+			  isDataCon,
 			  fIRST_TAG,
 			  ConTag,
 			  Id
 			)
 import Maybes		( maybeToBool )
-import PprType		( showTyCon, GenType{-instance Outputable-} )
-import TyCon		( TyCon{-instance Eq-} )
-import Unique		( showUnique, pprUnique, Unique{-instance Eq-} )
+import PprType		( showTyCon )
+import TyCon		( TyCon )
+import Unique		( showUnique, pprUnique, Unique )
 import Util		( assertPanic{-, pprTraceToDo:rm-} )
 import Outputable
 \end{code}

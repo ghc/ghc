@@ -182,13 +182,13 @@ addAutoScc auto_scc_candidate pair@(bndr, core_expr)
  | auto_scc_candidate && worthSCC core_expr && 
    (opt_AutoSccsOnAllToplevs || (isExported bndr && opt_AutoSccsOnExportedToplevs))
      = getModuleAndGroupDs `thenDs` \ (mod,grp) ->
-       returnDs (bndr, SCC (mkAutoCC bndr mod grp IsNotCafCC) core_expr)
+       returnDs (bndr, Note (SCC (mkAutoCC bndr mod grp IsNotCafCC)) core_expr)
  | otherwise 
      = returnDs pair
 
-worthSCC (SCC _ _) = False
-worthSCC (Con _ _) = False
-worthSCC core_expr = True
+worthSCC (Note (SCC _) _) = False
+worthSCC (Con _ _)        = False
+worthSCC core_expr        = True
 \end{code}
 
 If profiling and dealing with a dict binding, wrap the dict in "_scc_ DICT <dict>":
@@ -200,18 +200,9 @@ addDictScc var rhs
     || not (isDictTy (idType var))
   = returnDs rhs				-- That's easy: do nothing
 
-{-
-  | opt_CompilingGhcInternals
-  = returnDs (SCC prel_dicts_cc rhs)
--}
-
   | otherwise
   = getModuleAndGroupDs 	`thenDs` \ (mod, grp) ->
 
 	-- ToDo: do -dicts-all flag (mark dict things with individual CCs)
-    returnDs (SCC (mkAllDictsCC mod grp False) rhs)
-
-{- UNUSED:
-prel_dicts_cc = preludeDictsCostCentre False{-not dupd-} -- ditto
--}
+    returnDs (Note (SCC (mkAllDictsCC mod grp False)) rhs)
 \end{code}

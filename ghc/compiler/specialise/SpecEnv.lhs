@@ -6,14 +6,15 @@
 \begin{code}
 module SpecEnv (
 	SpecEnv,
-	emptySpecEnv, isEmptySpecEnv, specEnvValues,
+	emptySpecEnv, isEmptySpecEnv,
+	specEnvValues, specEnvToList,
 	addToSpecEnv, lookupSpecEnv, substSpecEnv
     ) where
 
 #include "HsVersions.h"
 
 import Type		( Type, GenType, mkTyVarTy, matchTys, tyVarsOfTypes, applyToTyVars )
-import TyVar		( TyVar, TyVarEnv, tyVarFlexi, setTyVarFlexi, lookupTyVarEnv, tyVarSetToList )
+import TyVar		( TyVar, GenTyVar, TyVarEnv, tyVarFlexi, setTyVarFlexi, lookupTyVarEnv, tyVarSetToList )
 import Unify		( Subst, unifyTyListsX )
 import Maybes
 import Util		( assertPanic )
@@ -28,7 +29,8 @@ import Util		( assertPanic )
 %************************************************************************
 
 \begin{code}
-type TemplateType = GenType Bool
+type TemplateTyVar = GenTyVar Bool
+type TemplateType  = GenType Bool
       -- The Bool is True for template type variables;
       -- that is, ones that can be bound
 
@@ -39,6 +41,15 @@ data SpecEnv value
 specEnvValues :: SpecEnv value -> [value]
 specEnvValues EmptySE         = []
 specEnvValues (SpecEnv alist) = map snd alist
+
+specEnvToList :: SpecEnv value -> [([TemplateTyVar], [TemplateType], value)]
+specEnvToList EmptySE         = []
+specEnvToList (SpecEnv alist)
+  = map do_item alist
+  where
+    do_item (tys, val) = (tyvars, tys, val)
+		       where
+			 tyvars = filter tyVarFlexi (tyVarSetToList (tyVarsOfTypes tys))
 \end{code}
 
 In some SpecEnvs overlap is prohibited; that is, no pair of templates unify.

@@ -7,8 +7,7 @@
 module CoreSyn (
 	GenCoreBinding(..), GenCoreExpr(..),
 	GenCoreArg(..), GenCoreBinder(..), GenCoreCaseAlts(..),
-	GenCoreCaseDefault(..),
-	Coercion(..),
+	GenCoreCaseDefault(..), CoreNote(..),
 
 	bindersOf, pairsFromCoreBinds, rhssOfBind,
 
@@ -54,7 +53,7 @@ module CoreSyn (
 #include "HsVersions.h"
 
 import CostCentre	( CostCentre )
-import Id		( idType, GenId{-instance Eq-}, Id )
+import Id		( idType, Id )
 import Type		( isUnboxedType,GenType, Type )
 import TyVar		( GenTyVar, TyVar )
 import Util		( panic, assertPanic )
@@ -171,29 +170,33 @@ scoping.
 		-- The "GenCoreBinding" records that information
 \end{code}
 
-For cost centre scc expressions we introduce a new core construct
-@SCC@ so transforming passes have to deal with it explicitly. The
-alternative of using a new PrimativeOp may result in a bad
-transformations of which we are unaware.
+A @Note@ annotates a @CoreExpr@ with useful information
+of some kind.
 \begin{code}
-     | SCC	CostCentre				    -- label of scc
-		(GenCoreExpr val_bdr val_occ flexi)    -- scc expression
-\end{code}
-
-Coercions arise from uses of the constructor of a @newtype@
-declaration, either in construction (resulting in a @CoreceIn@) or
-pattern matching (resulting in a @CoerceOut@).
-
-\begin{code}
-    | Coerce	Coercion
-		(GenType flexi)		-- Type of the whole expression
+     | Note	(CoreNote flexi)
 		(GenCoreExpr val_bdr val_occ flexi)
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Core-notes}
+%*									*
+%************************************************************************
+
 \begin{code}
-data Coercion	= CoerceIn Id		-- Apply this constructor
-		| CoerceOut Id		-- Strip this constructor
+data CoreNote flexi
+  = SCC 
+	CostCentre
+
+  | Coerce	
+	(GenType flexi)		-- The to-type:   type of whole coerce expression
+	(GenType flexi)		-- The from-type: type of enclosed expression
+
+  | InlineCall			-- Instructs simplifier to inline
+				-- the enclosed call
 \end{code}
+
 
 
 %************************************************************************

@@ -18,10 +18,10 @@ module CoreLift (
 
 import CoreSyn
 import CoreUtils	( coreExprType )
-import Id		( idType, mkSysLocal,
+import MkId		( mkSysLocal )
+import Id		( idType, mkIdWithNewType,
 			  nullIdEnv, growIdEnvList, lookupIdEnv,
-			  mkIdWithNewType,
-			  IdEnv, GenId{-instances-}, Id
+			  IdEnv, Id
 			)
 import Name		( isLocallyDefined, getSrcLoc, getOccString )
 import TyCon		( isBoxedTyCon, TyCon{-instance-} )
@@ -123,13 +123,9 @@ liftCoreExpr expr@(Var var)
 
 liftCoreExpr expr@(Lit lit) = returnL expr
 
-liftCoreExpr (SCC label expr)
+liftCoreExpr (Note note expr)
   = liftCoreExpr expr		`thenL` \ expr ->
-    returnL (SCC label expr)
-
-liftCoreExpr (Coerce coerce ty expr)
-  = liftCoreExpr expr		`thenL` \ expr ->
-    returnL (Coerce coerce ty expr) -- ToDo:right?:Coerce
+    returnL (Note note expr)
 
 liftCoreExpr (Let (NonRec binder rhs) body) -- special case: no lifting
   = liftCoreExpr rhs	`thenL` \ rhs ->

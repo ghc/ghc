@@ -30,7 +30,8 @@ import RnMonad		( RnM, RnDown, SDown, RnNameSupply(..),
 import Bag		( Bag, emptyBag, unionBags, listToBag )
 import Class		( classKey, Class )
 import ErrUtils		( ErrMsg )
-import Id		( dataConArgTys, isNullaryDataCon, mkDictFunId )
+import MkId		( mkDictFunId )
+import Id		( dataConArgTys, isNullaryDataCon )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool )
 import Name		( isLocallyDefined, getSrcLoc, Provenance, 

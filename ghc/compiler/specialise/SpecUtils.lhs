@@ -32,7 +32,7 @@ import Id		( Id )
 import Maybes		( maybeToBool, catMaybes, firstJust )
 import Name		( OccName, pprOccName, modAndOcc, NamedThing(..) )
 import Outputable
-import PprType		( pprParendGenType, pprMaybeTy, TyCon )
+import PprType		( pprParendType, pprMaybeTy, TyCon )
 import TyCon		( tyConTyVars )
 import Type		( mkSigmaTy, instantiateTauTy, instantiateThetaTy,
 			  splitSigmaTy, mkTyVarTy, mkForAllTys,
@@ -184,7 +184,7 @@ argTysMatchSpecTys_error spec_tys arg_tys
     then Nothing
     else Just (sep [ptext SLIT("Spec and Arg Types Inconsistent:"),
 		      ptext SLIT("spectys="), sep [pprMaybeTy ty | ty <- spec_tys],
-		      ptext SLIT("argtys="), sep [pprParendGenType ty | ty <- arg_tys]])
+		      ptext SLIT("argtys="), sep [pprParendType ty | ty <- arg_tys]])
   where
     match (Nothing:spec_tys) (arg:arg_tys)
       = not (isUnboxedType arg) &&
@@ -296,7 +296,7 @@ pp_tyspec :: SDoc -> (OccName, TyCon, [Maybe Type]) -> SDoc
 pp_tyspec pp_mod (_, tycon, tys)
   = hsep [pp_mod,
 	   text "{-# SPECIALIZE data",
-	   ppr tycon, hsep (map pprParendGenType spec_tys),
+	   ppr tycon, hsep (map pprParendType spec_tys),
 	   text "-} {- Essential -}"
 	   ]
   where
@@ -328,7 +328,7 @@ pp_idspec pp_mod (_, id, tys, is_err)
 	   ppr clsop, text "::",
 	   pprGenType spec_ty,
 	   text "#-} {- IN instance",
-	   pprOccName (getOccName cls), pprParendGenType clsty,
+	   pprOccName (getOccName cls), pprParendType clsty,
 	   text "-}", pp_essential ]
 
   | is_default_method_id

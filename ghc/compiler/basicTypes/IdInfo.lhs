@@ -13,32 +13,43 @@ module IdInfo (
 	noIdInfo,
 	ppIdInfo,
 
+	-- Arity
 	ArityInfo(..),
 	exactArity, atLeastArity, unknownArity,
-	arityInfo, addArityInfo, ppArityInfo,
+	arityInfo, setArityInfo, ppArityInfo,
 
+	-- Demand
 	DemandInfo,
-	noDemandInfo, mkDemandInfo, demandInfo, ppDemandInfo, addDemandInfo, willBeDemanded,
+	noDemandInfo, mkDemandInfo, demandInfo, ppDemandInfo, setDemandInfo, willBeDemanded,
+	Demand(..), 	 				-- Non-abstract
 
+	-- Strictness
 	StrictnessInfo(..),				-- Non-abstract
-	Demand(..), NewOrData, 				-- Non-abstract
-
 	workerExists,
 	mkStrictnessInfo, mkBottomStrictnessInfo, noStrictnessInfo, bottomIsGuaranteed,
-	strictnessInfo, ppStrictnessInfo, addStrictnessInfo, 
+	strictnessInfo, ppStrictnessInfo, setStrictnessInfo, 
 
-	unfoldInfo, addUnfoldInfo, 
+	-- Unfolding
+	unfoldingInfo, setUnfoldingInfo, 
 
+	-- Inline prags
+	InlinePragInfo(..),
+	inlinePragInfo, setInlinePragInfo,
+
+	-- Specialisation
 	IdSpecEnv, specInfo, setSpecInfo,
 
+	-- Update
 	UpdateInfo, UpdateSpec,
-	mkUpdateInfo, updateInfo, updateInfoMaybe, ppUpdateInfo, addUpdateInfo,
+	mkUpdateInfo, updateInfo, updateInfoMaybe, ppUpdateInfo, setUpdateInfo,
 
+	-- Arg usage 
 	ArgUsageInfo, ArgUsage(..), ArgUsageType,
-	mkArgUsageInfo, argUsageInfo, addArgUsageInfo, getArgUsage,
+	mkArgUsageInfo, argUsageInfo, setArgUsageInfo, getArgUsage,
 
+	-- FB type
 	FBTypeInfo, FBType(..), FBConsum(..), FBProd(..),
-	fbTypeInfo, ppFBTypeInfo, addFBTypeInfo, mkFBTypeInfo, getFBType
+	fbTypeInfo, ppFBTypeInfo, setFBTypeInfo, mkFBTypeInfo, getFBType
     ) where
 
 #include "HsVersions.h"
@@ -73,29 +84,55 @@ The @IdInfo@ gives information about the value, or definition, of the
 
 \begin{code}
 data IdInfo
-  = IdInfo
-	ArityInfo		-- Its arity
+  = IdInfo {
+	arityInfo :: ArityInfo,			-- Its arity
 
-	DemandInfo		-- Whether or not it is definitely
-				-- demanded
+	demandInfo :: DemandInfo,		-- Whether or not it is definitely demanded
 
-	IdSpecEnv		-- Specialisations of this function which exist
+	specInfo :: IdSpecEnv,			-- Specialisations of this function which exist
 
-	StrictnessInfo		-- Strictness properties
+	strictnessInfo :: StrictnessInfo,	-- Strictness properties
 
-	Unfolding		-- Its unfolding; for locally-defined
-				-- things, this can *only* be NoUnfolding
+	unfoldingInfo :: Unfolding,		-- Its unfolding; for locally-defined
+						-- things, this can *only* be NoUnfolding
 
-	UpdateInfo		-- Which args should be updated
+	updateInfo :: UpdateInfo,		-- Which args should be updated
 
-	ArgUsageInfo		-- how this Id uses its arguments
+	argUsageInfo :: ArgUsageInfo, 		-- how this Id uses its arguments
 
-	FBTypeInfo		-- the Foldr/Build W/W property of this function.
+	fbTypeInfo :: FBTypeInfo,		-- the Foldr/Build W/W property of this function.
+
+	inlinePragInfo :: InlinePragInfo	-- Inline pragmas
+    }
 \end{code}
 
+Setters
+
 \begin{code}
-noIdInfo = IdInfo UnknownArity UnknownDemand emptySpecEnv NoStrictnessInfo noUnfolding
-		  NoUpdateInfo NoArgUsageInfo NoFBTypeInfo 
+setFBTypeInfo 	  fb info = info { fbTypeInfo = fb }
+setArgUsageInfo   au info = info { argUsageInfo = au }
+setUpdateInfo	  ud info = info { updateInfo = ud }
+setDemandInfo	  dd info = info { demandInfo = dd }
+setStrictnessInfo st info = info { strictnessInfo = st }
+setSpecInfo 	  sp info = info { specInfo = sp }
+setArityInfo	  ar info = info { arityInfo = ar  }
+setInlinePragInfo pr info = info { inlinePragInfo = pr }
+setUnfoldingInfo  uf info = info { unfoldingInfo = uf }
+\end{code}
+
+
+\begin{code}
+noIdInfo = IdInfo {
+		arityInfo	= UnknownArity,
+		demandInfo	= UnknownDemand,
+		specInfo	= emptySpecEnv,
+		strictnessInfo	= NoStrictnessInfo,
+		unfoldingInfo	= noUnfolding,
+		updateInfo	= NoUpdateInfo,
+		argUsageInfo	= NoArgUsageInfo,
+		fbTypeInfo	= NoFBTypeInfo, 
+		inlinePragInfo  = NoPragmaInfo
+	   }
 \end{code}
 
 \begin{code}
@@ -103,23 +140,12 @@ ppIdInfo :: Bool	-- True <=> print specialisations, please
 	 -> IdInfo
 	 -> SDoc
 
-ppIdInfo specs_please
-    	 (IdInfo arity demand specenv strictness unfold update arg_usage fbtype)
+ppIdInfo specs_please (IdInfo {arityInfo, updateInfo, strictnessInfo, demandInfo})
   = hsep [
-		    -- order is important!:
-		    ppArityInfo arity,
-		    ppUpdateInfo update,
-
-		    ppStrictnessInfo strictness,
-
-		    if specs_please
-		    then empty -- ToDo -- sty (not (isDataCon for_this_id))
-					 -- better_id_fn inline_env (mEnvToList specenv)
-		    else empty,
-
-		    -- DemandInfo needn't be printed since it has no effect on interfaces
-		    ppDemandInfo demand,
-		    ppFBTypeInfo fbtype
+	    ppArityInfo arityInfo,
+	    ppUpdateInfo updateInfo,
+	    ppStrictnessInfo strictnessInfo,
+	    ppDemandInfo demandInfo
 	]
 \end{code}
 
@@ -134,60 +160,34 @@ data ArityInfo
   = UnknownArity	-- No idea
   | ArityExactly Int	-- Arity is exactly this
   | ArityAtLeast Int	-- Arity is this or greater
-\end{code}
 
-\begin{code}
 exactArity   = ArityExactly
 atLeastArity = ArityAtLeast
 unknownArity = UnknownArity
 
-arityInfo (IdInfo arity _ _ _ _ _ _ _) = arity
-
-addArityInfo (IdInfo _ a b c d e f g) arity	     = IdInfo arity a b c d e f g
-
-ppArityInfo UnknownArity	     = empty
+ppArityInfo UnknownArity	 = empty
 ppArityInfo (ArityExactly arity) = hsep [ptext SLIT("_A_"), int arity]
 ppArityInfo (ArityAtLeast arity) = hsep [ptext SLIT("_A>_"), int arity]
 \end{code}
 
 %************************************************************************
 %*									*
-\subsection[demand-IdInfo]{Demand info about an @Id@}
+\subsection{Inline-pragma information}
 %*									*
 %************************************************************************
 
-Whether a value is certain to be demanded or not.  (This is the
-information that is computed by the ``front-end'' of the strictness
-analyser.)
-
-This information is only used within a module, it is not exported
-(obviously).
-
 \begin{code}
-data DemandInfo
-  = UnknownDemand
-  | DemandedAsPer Demand
+data InlinePragInfo
+  = NoPragmaInfo
+
+  | IWantToBeINLINEd
+
+  | IMustNotBeINLINEd	-- Used by the simplifier to prevent looping
+			-- on recursive definitions
+
+  | IMustBeINLINEd	-- Absolutely must inline; used for PrimOps only
 \end{code}
 
-\begin{code}
-noDemandInfo = UnknownDemand
-
-mkDemandInfo :: Demand -> DemandInfo
-mkDemandInfo demand = DemandedAsPer demand
-
-willBeDemanded :: DemandInfo -> Bool
-willBeDemanded (DemandedAsPer demand) = isStrict demand
-willBeDemanded _		      = False
-\end{code}
-
-\begin{code}
-demandInfo (IdInfo _ demand _ _ _ _ _ _) = demand
-
-addDemandInfo (IdInfo a _ c d e f g h) demand = IdInfo a demand c d e f g h
-
-ppDemandInfo UnknownDemand	      = text "{-# L #-}"
-ppDemandInfo (DemandedAsPer info) = hsep [text "{-#", text (showList [info] ""), text "#-}"]
-\end{code}
 
 %************************************************************************
 %*									*
@@ -226,13 +226,6 @@ might have a specialisation
 
 where pi' :: Lift Int# is the specialised version of pi.
 
-
-\begin{code}
-specInfo :: IdInfo -> IdSpecEnv
-specInfo (IdInfo _ _ spec _ _ _ _ _) = spec
-
-setSpecInfo (IdInfo a b _ d e f g h) spec   = IdInfo a b spec d e f g h
-\end{code}
 
 
 %************************************************************************
@@ -292,11 +285,6 @@ mkBottomStrictnessInfo = BottomGuaranteed
 bottomIsGuaranteed BottomGuaranteed = True
 bottomIsGuaranteed other    	    = False
 
-strictnessInfo (IdInfo _ _ _ strict _ _ _ _) = strict
-
-addStrictnessInfo id_info 		     NoStrictnessInfo = id_info
-addStrictnessInfo (IdInfo a b d _ e f g h) strict	      = IdInfo a b d strict e f g h
-
 ppStrictnessInfo NoStrictnessInfo = empty
 ppStrictnessInfo BottomGuaranteed = ptext SLIT("_bot_")
 
@@ -314,15 +302,37 @@ workerExists other			      = False
 
 %************************************************************************
 %*									*
-\subsection[unfolding-IdInfo]{Unfolding info about an @Id@}
+\subsection[demand-IdInfo]{Demand info about an @Id@}
 %*									*
 %************************************************************************
 
-\begin{code}
-unfoldInfo (IdInfo _ _ _ _ unfolding _ _ _) = unfolding
+Whether a value is certain to be demanded or not.  (This is the
+information that is computed by the ``front-end'' of the strictness
+analyser.)
 
-addUnfoldInfo (IdInfo a b d e _ f g h) uf = IdInfo a b d e uf f g h
+This information is only used within a module, it is not exported
+(obviously).
+
+\begin{code}
+data DemandInfo
+  = UnknownDemand
+  | DemandedAsPer Demand
 \end{code}
+
+\begin{code}
+noDemandInfo = UnknownDemand
+
+mkDemandInfo :: Demand -> DemandInfo
+mkDemandInfo demand = DemandedAsPer demand
+
+willBeDemanded :: DemandInfo -> Bool
+willBeDemanded (DemandedAsPer demand) = isStrict demand
+willBeDemanded _		      = False
+
+ppDemandInfo UnknownDemand	      = text "{-# L #-}"
+ppDemandInfo (DemandedAsPer info) = hsep [text "{-#", text (showList [info] ""), text "#-}"]
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -352,18 +362,6 @@ updateInfoMaybe (SomeUpdateInfo	 u) = Just u
 Text instance so that the update annotations can be read in.
 
 \begin{code}
-instance Read UpdateInfo where
-    readsPrec p s | null s    = panic "IdInfo: empty update pragma?!"
-		  | otherwise = [(SomeUpdateInfo (map ok_digit s),"")]
-      where
-	ok_digit c | c >= '0' && c <= '2' = ord c - ord '0'
-		   | otherwise = panic "IdInfo: not a digit while reading update pragma"
-
-updateInfo (IdInfo _ _ _ _ _ update _ _) = update
-
-addUpdateInfo id_info			 NoUpdateInfo = id_info
-addUpdateInfo (IdInfo a b d e f _ g h) upd_info     = IdInfo a b d e f upd_info g h
-
 ppUpdateInfo NoUpdateInfo	       = empty
 ppUpdateInfo (SomeUpdateInfo [])   = empty
 ppUpdateInfo (SomeUpdateInfo spec) = (<>) (ptext SLIT("_U_ ")) (hcat (map int spec))
@@ -379,10 +377,10 @@ ppUpdateInfo (SomeUpdateInfo spec) = (<>) (ptext SLIT("_U_ ")) (hcat (map int sp
 data ArgUsageInfo
   = NoArgUsageInfo
   | SomeArgUsageInfo ArgUsageType
-  -- ??? deriving (Eq, Ord)
 
 data ArgUsage = ArgUsage Int	-- number of arguments (is linear!)
 	      | UnknownArgUsage
+
 type ArgUsageType  = [ArgUsage]		-- c_1 -> ... -> BLOB
 \end{code}
 
@@ -396,11 +394,6 @@ getArgUsage (SomeArgUsageInfo u)  = u
 \end{code}
 
 \begin{code}
-argUsageInfo (IdInfo _ _ _ _ _ _ au _) = au
-
-addArgUsageInfo id_info			   NoArgUsageInfo = id_info
-addArgUsageInfo (IdInfo a b d e f g _ h) au_info	  = IdInfo a b d e f g au_info h
-
 {- UNUSED:
 ppArgUsageInfo NoArgUsageInfo	  = empty
 ppArgUsageInfo (SomeArgUsageInfo aut) = (<>) (ptext SLIT("_L_ ")) (ppArgUsageType aut)
@@ -414,6 +407,7 @@ ppArgUsageType aut = hcat
 	  hcat (punctuate comma (map ppArgUsage aut)),
 	  char '"' ]
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -441,11 +435,6 @@ getFBType (SomeFBTypeInfo u)  = Just u
 \end{code}
 
 \begin{code}
-fbTypeInfo (IdInfo _ _ _ _ _ _ _ fb) = fb
-
-addFBTypeInfo id_info NoFBTypeInfo = id_info
-addFBTypeInfo (IdInfo a b d e f g h _) fb_info = IdInfo a b d e f g h fb_info
-
 ppFBTypeInfo NoFBTypeInfo = empty
 ppFBTypeInfo (SomeFBTypeInfo (FBType cons prod))
       = (<>) (ptext SLIT("_F_ ")) (ppFBType cons prod)

@@ -135,12 +135,11 @@ analExprFBWW (Lam (id,_) e) env
   = addArgs 1 (analExprFBWW e (delOneFromIdEnv env id))
 
 analExprFBWW (CoTyLam tyvar e) env = analExprFBWW e env
-analExprFBWW (App f atom) env  = rmArg (analExprFBWW f env)
-analExprFBWW (CoTyApp f ty) env  = analExprFBWW f env
-analExprFBWW (SCC lab e) env   = analExprFBWW e env
-analExprFBWW (Coerce _ _ _) env   = panic "AnalFBWW:analExprFBWW:Coerce"
-analExprFBWW (Let binds e) env = analExprFBWW e (analBind binds env)
-analExprFBWW (Case e alts) env = foldl1 joinFBType (analAltsFBWW alts env)
+analExprFBWW (App f atom) env   = rmArg (analExprFBWW f env)
+analExprFBWW (CoTyApp f ty) env = analExprFBWW f env
+analExprFBWW (Note _ e) env     = analExprFBWW e env
+analExprFBWW (Let binds e) env  = analExprFBWW e (analBind binds env)
+analExprFBWW (Case e alts) env  = foldl1 joinFBType (analAltsFBWW alts env)
 
 analAltsFBWW (AlgAlts alts deflt) env
   = case analDefFBWW deflt env of
@@ -216,8 +215,7 @@ annotateExprFBWW (Lam (id,_) e) env
 annotateExprFBWW (CoTyLam tyvar e) env = CoTyLam tyvar (annotateExprFBWW e env)
 annotateExprFBWW (App f atom) env = App (annotateExprFBWW f env) atom
 annotateExprFBWW (CoTyApp f ty) env = CoTyApp (annotateExprFBWW f env) ty
-annotateExprFBWW (SCC lab e) env = SCC lab (annotateExprFBWW e env)
-annotateExprFBWW (Coerce c ty e) env = Coerce c ty (annotateExprFBWW e env)
+annotateExprFBWW (Note note e) env = Note note (annotateExprFBWW e env)
 annotateExprFBWW (Case e alts) env = Case (annotateExprFBWW e env)
 					    (annotateAltsFBWW alts env)
 annotateExprFBWW (Let bnds e) env = Let bnds' (annotateExprFBWW e env')

@@ -32,7 +32,6 @@ import Id		( idType, dataConFieldLabels,
 import MatchCon		( matchConFamily )
 import MatchLit		( matchLiterals )
 import Name		( Name {--O only-} )
-import PprType		( GenType{-instance-}, GenTyVar{-ditto-} )        
 import PrelVals		( pAT_ERROR_ID )
 import Type		( isUnpointedType, splitAlgTyConApp,
 			  Type

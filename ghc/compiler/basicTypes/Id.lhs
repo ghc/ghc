@@ -6,29 +6,17 @@
 \begin{code}
 module Id (
 	-- TYPES
-	GenId(..), -- *naughtily* used in some places (e.g., TcHsSyn)
-	Id, IdDetails,
+	GenId,		 	-- Abstract
+	Id,
+	IdDetails(..),		-- Exposed only to MkId
 	StrictnessMark(..),
 	ConTag, fIRST_TAG,
 	DataCon, DictFun, DictVar,
 
-	-- CONSTRUCTION
-	mkDataCon,
-	mkDefaultMethodId,
-	mkDictFunId,
-	mkIdWithNewUniq, mkIdWithNewName, mkIdWithNewType,
-	mkImported,
-	mkMethodSelId,
-	mkRecordSelId,
-	mkSuperDictSelId,
-	mkSysLocal,
-	mkTemplateLocals,
-	mkTupleCon,
-	mkUserId,
-	mkUserLocal,
-	mkPrimitiveId, 
-	mkWorkerId,
-	setIdVisibility,
+	-- Construction and modification
+	mkId, mkIdWithNewUniq, mkIdWithNewName, mkIdWithNewType,
+	mkTemplateLocals, 
+	setIdVisibility, mkVanillaId,
 
 	-- DESTRUCTION (excluding pragmatic info)
 	idPrimRep,
@@ -36,6 +24,7 @@ module Id (
 	idUnique,
 	idName,
 
+	-- Extracting pieces of particular sorts of Ids
 	dataConRepType,
 	dataConArgTys,
 	dataConNumFields,
@@ -56,30 +45,19 @@ module Id (
 	idWantsToBeINLINEd, getInlinePragma, 
 	idMustBeINLINEd, idMustNotBeINLINEd,
 	isBottomingId,
-	isDataCon, isAlgCon, isNewCon,
-	isDefaultMethodId,
-	isDefaultMethodId_maybe,
-	isDictFunId,
-	isImportedId,
-	isRecordSelector,
-	isDictSelId_maybe,
+	
+	isDataCon, isAlgCon, isNewCon, isTupleCon,
 	isNullaryDataCon,
+
+	isRecordSelector, isSpecPragmaId,
 	isPrimitiveId_maybe,
-	isSysLocalId,
-	isTupleCon,
-	isWrapperId,
-	toplevelishId,
-	unfoldingUnfriendlyId,
 
 	-- PRINTING and RENUMBERING
 	pprId,
 	showId,
 
-	-- Specialialisation
-	getIdSpecialisation,
-	setIdSpecialisation,
-
 	-- UNFOLDING, ARITY, UPDATE, AND STRICTNESS STUFF (etc)
+	idInfo,
 	addIdUnfolding,
 	addIdArity,
 	addIdDemandInfo,
@@ -87,13 +65,13 @@ module Id (
 	addIdUpdateInfo,
 	getIdArity,
 	getIdDemandInfo,
-	getIdInfo,
 	getIdStrictness,
 	getIdUnfolding,
 	getIdUpdateInfo,
-	getPragmaInfo,
-	replaceIdInfo, replacePragmaInfo,
+	replaceIdInfo,
 	addInlinePragma, nukeNoInlinePragma, addNoInlinePragma,
+	getIdSpecialisation,
+	setIdSpecialisation,
 
 	-- IdEnvs AND IdSets
 	IdEnv, GenIdSet, IdSet,
@@ -129,41 +107,34 @@ module Id (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} CoreUnfold ( Unfolding )
-import {-# SOURCE #-} StdIdInfo  ( addStandardIdInfo )
 
 import CmdLineOpts      ( opt_PprStyle_All )
-import SpecEnv	        ( SpecEnv   )
 import Bag
-import Class		( Class )
-import BasicTypes	( Arity )
 import IdInfo
-import Maybes		( maybeToBool )
-import Name	 	( nameUnique, mkLocalName, mkSysLocalName, isLocalName,
-			  mkCompoundName, occNameString, modAndOcc,
-			  changeUnique, isWiredInName, setNameVisibility,
+import Name	 	( nameUnique, isLocalName, mkSysLocalName,
+			  isWiredInName, setNameVisibility,
 			  ExportFlag(..), Provenance,
 			  OccName(..), Name, Module,
 			  NamedThing(..)
 			) 
 import PrimOp		( PrimOp )
 import PrelMods		( pREL_TUP, pREL_BASE )
-import FieldLabel	( fieldLabelName, FieldLabel(..){-instances-} )
-import PragmaInfo	( PragmaInfo(..) )
+import FieldLabel	( fieldLabelName, FieldLabel(..) )
 import SrcLoc		( mkBuiltinSrcLoc )
 import TysWiredIn	( tupleTyCon )
-import TyCon		( TyCon, tyConDataCons, isDataTyCon, isNewTyCon, mkSpecTyCon )
+import TyCon		( TyCon, isDataTyCon, isNewTyCon )
 import Type		( mkSigmaTy, mkTyVarTys, mkFunTys,
 			  mkTyConApp, instantiateTy, mkForAllTys,
 			  tyVarsOfType, instantiateTy, typePrimRep,
 			  instantiateTauTy,
-			  GenType, ThetaType, TauType, Type
+			  ThetaType, TauType, Type, GenType
 			)
 import TyVar		( TyVar, alphaTyVars, isEmptyTyVarSet, 
 			  TyVarEnv, zipTyVarEnv, mkTyVarEnv
 			)
 import UniqFM
 import UniqSet		-- practically all of it
-import Unique		( getBuiltinUniques, Unique, Uniquable(..) )
+import Unique		( Unique, Uniquable(..), getBuiltinUniques )
 import Outputable
 import SrcLoc		( SrcLoc )
 import Util		( nOfThem, assoc )
@@ -181,14 +152,13 @@ in its @IdDetails@.
 ToDo: possibly cache other stuff in the single-constructor @Id@ type.
 
 \begin{code}
-data GenId ty = Id
-	Unique		-- Key for fast comparison
-	Name
-	ty		-- Id's type; used all the time;
-	IdDetails	-- Stuff about individual kinds of Ids.
-	PragmaInfo	-- Properties of this Id requested by programmer
-			-- eg specialise-me, inline-me
-	IdInfo		-- Properties of this Id deduced by compiler
+data GenId ty = Id {
+	idUnique  :: Unique,		-- Key for fast comparison
+	idName    :: Name,
+	idType    :: ty,		-- Id's type; used all the time;
+	idDetails :: IdDetails,		-- Stuff about individual kinds of Ids.
+	idInfo    :: IdInfo		-- Properties of this Id deduced by compiler
+	}
 				   
 type Id	           = GenId Type
 
@@ -198,18 +168,11 @@ data IdDetails
 
   ---------------- Local values
 
-  = LocalId	Bool		-- Local name; mentioned by the user
+  = VanillaId	Bool		-- Ordinary Id
 				-- True <=> no free type vars
-
-  | SysLocalId	Bool	        -- Local name; made up by the compiler
-				-- as for LocalId
 
   | PrimitiveId PrimOp		-- The Id for a primitive operation
                                 
-
-  ---------------- Global values
-
-  | ImportedId			-- Global name (Imported or Implicit); Id imported from an interface
 
   ---------------- Data constructors
 
@@ -232,22 +195,16 @@ data IdDetails
 
   | RecordSelId FieldLabel
 
-  ---------------- Things to do with overloading
+  | SpecPragmaId		-- This guy exists only to make Ids that are
+				-- on the *LHS* of bindings created by SPECIALISE
+				-- pragmas; eg:		s = f Int d
+				-- The SpecPragmaId is never itself mentioned; it
+				-- exists solely so that the specialiser will find
+				-- the call to f, and make specialised version of it.
+				-- The SpecPragmaId binding is discarded by the specialiser
+				-- when it gathers up overloaded calls.
+				-- Meanwhile, it is not discarded as dead code.
 
-  | DictSelId			-- Selector that extracts a method or superclass from a dictionary
-		Class		-- The class
-
-  | DefaultMethodId		-- Default method for a particular class op
-		Class		-- same class, <blah-blah> info as MethodSelId
-
-				-- see below
-  | DictFunId	Class		-- A DictFun is uniquely identified
-		[Type]		-- by its class and type; this type has free type vars,
-				-- whose identity is irrelevant.  Eg Class = Eq
-				--				     Type  = Tree a
-				-- The "a" is irrelevant.  As it is too painful to
-				-- actually do comparisons that way, we kindly supply
-				-- a Unique for that purpose.
 
 
 type ConTag	= Int
@@ -256,113 +213,60 @@ type DictFun	= Id
 type DataCon	= Id
 \end{code}
 
-DictFunIds are generated from instance decls.
-\begin{verbatim}
-	class Foo a where
-	  op :: a -> a -> Bool
-
-	instance Foo a => Foo [a] where
-	  op = ...
-\end{verbatim}
-generates the dict fun id decl
-\begin{verbatim}
-	dfun.Foo.[*] = \d -> ...
-\end{verbatim}
-The dfun id is uniquely named by the (class, type) pair.  Notice, it
-isn't a (class,tycon) pair any more, because we may get manually or
-automatically generated specialisations of the instance decl:
-\begin{verbatim}
-	instance Foo [Int] where
-	  op = ...
-\end{verbatim}
-generates
-\begin{verbatim}
-	dfun.Foo.[Int] = ...
-\end{verbatim}
-The type variables in the name are irrelevant; we print them as stars.
-
 
 %************************************************************************
 %*									*
-\subsection[Id-documentation]{Documentation}
+\subsection{Construction}
 %*									*
 %************************************************************************
 
-[A BIT DATED [WDP]]
+\begin{code}
+mkId :: Name -> ty -> IdDetails -> IdInfo -> GenId ty
+mkId name ty details info
+  = Id {idName = name, idUnique = nameUnique name, idType = ty, 
+	idDetails = details, idInfo = info}
 
-The @Id@ datatype describes {\em values}.  The basic things we want to
-know: (1)~a value's {\em type} (@idType@ is a very common
-operation in the compiler); and (2)~what ``flavour'' of value it might
-be---for example, it can be terribly useful to know that a value is a
-class method.
+mkVanillaId :: Name -> (GenType flexi) -> IdInfo -> GenId (GenType flexi)
+mkVanillaId name ty info
+  = Id {idName = name, idUnique = nameUnique name, idType = ty, 
+	idDetails = VanillaId (isEmptyTyVarSet (tyVarsOfType ty)),
+	idInfo = info}
 
-\begin{description}
-%----------------------------------------------------------------------
-\item[@AlgConId@:] For the data constructors declared by a @data@
-declaration.  Their type is kept in {\em two} forms---as a regular
-@Type@ (in the usual place), and also in its constituent pieces (in
-the ``details''). We are frequently interested in those pieces.
+mkIdWithNewUniq :: Id -> Unique -> Id
+mkIdWithNewUniq id uniq = id {idUnique = uniq}
 
-%----------------------------------------------------------------------
-\item[@TupleConId@:] This is just a special shorthand for @DataCons@ for
-the infinite family of tuples.
+mkIdWithNewName :: Id -> Name -> Id
+mkIdWithNewName id new_name
+  = id {idUnique = uniqueOf new_name, idName = new_name}
 
-%----------------------------------------------------------------------
-\item[@ImportedId@:] These are values defined outside this module.
-{\em Everything} we want to know about them must be stored here (or in
-their @IdInfo@).
+mkIdWithNewType :: GenId ty1 -> ty2 -> GenId ty2
+mkIdWithNewType id ty = id {idType = ty}
+\end{code}
 
-%----------------------------------------------------------------------
-\item[@MethodSelId@:] A selector from a dictionary; it may select either
-a method or a dictionary for one of the class's superclasses.
 
-%----------------------------------------------------------------------
-\item[@DictFunId@:]
+Make some local @Ids@ for a template @CoreExpr@.  These have bogus
+@Uniques@, but that's OK because the templates are supposed to be
+instantiated before use.
 
-@mkDictFunId [a,b..] theta C T@ is the function derived from the
-instance declaration
+\begin{code}
+mkTemplateLocals :: [Type] -> [Id]
+mkTemplateLocals tys
+  = zipWith mk (getBuiltinUniques (length tys)) tys
+  where
+    mk uniq ty = mkVanillaId (mkSysLocalName uniq SLIT("tpl") mkBuiltinSrcLoc)
+			     ty noIdInfo
+\end{code}
 
-	instance theta => C (T a b ..) where
-		...
 
-It builds function @Id@ which maps dictionaries for theta,
-to a dictionary for C (T a b ..).
+\begin{code}
+-- See notes with setNameVisibility (Name.lhs)
+setIdVisibility :: Maybe Module -> Unique -> Id -> Id
+setIdVisibility maybe_mod u id 
+  = id {idName = setNameVisibility maybe_mod u (idName id)}
 
-*Note* that with the ``Mark Jones optimisation'', the theta may
-include dictionaries for the immediate superclasses of C at the type
-(T a b ..).
-
-%----------------------------------------------------------------------
-\item[@LocalId@:] A purely-local value, e.g., a function argument,
-something defined in a @where@ clauses, ... --- but which appears in
-the original program text.
-
-%----------------------------------------------------------------------
-\item[@SysLocalId@:] Same as a @LocalId@, except does {\em not} appear in
-the original program text; these are introduced by the compiler in
-doing its thing.
-\end{description}
-
-Further remarks:
-\begin{enumerate}
-%----------------------------------------------------------------------
-\item
-
-@DataCons@ @TupleCons@, @Importeds@, @SuperDictSelIds@,
-@MethodSelIds@, @DictFunIds@, and @DefaultMethodIds@ have the following
-properties:
-\begin{itemize}
-\item
-They have no free type variables, so if you are making a
-type-variable substitution you don't need to look inside them.
-\item
-They are constants, so they are not free variables.  (When the STG
-machine makes a closure, it puts all the free variables in the
-closure; the above are not required.)
-\end{itemize}
-Note that @Locals@ and @SysLocals@ {\em may} have the above
-properties, but they may not.
-\end{enumerate}
+replaceIdInfo :: GenId ty -> IdInfo -> GenId ty
+replaceIdInfo id info = id {idInfo = info}
+\end{code}
 
 %************************************************************************
 %*									*
@@ -371,60 +275,38 @@ properties, but they may not.
 %************************************************************************
 
 \begin{code}
--- isDataCon returns False for @newtype@ constructors
-isDataCon (Id _ _ _ (AlgConId _ _ _ _ _ _ _ _ tc) _ _) = isDataTyCon tc
-isDataCon (Id _ _ _ (TupleConId _) _ _)		        = True
-isDataCon other					        = False
+fIRST_TAG :: ConTag
+fIRST_TAG =  1	-- Tags allocated from here for real constructors
 
-isNewCon (Id _ _ _ (AlgConId _ _ _ _ _ _ _ _ tc) _ _) = isNewTyCon tc
-isNewCon other					       = False
+-- isDataCon returns False for @newtype@ constructors
+isDataCon (Id {idDetails = AlgConId _ _ _ _ _ _ _ _ tc}) = isDataTyCon tc
+isDataCon (Id {idDetails = TupleConId _})		 = True
+isDataCon other					         = False
+
+isNewCon (Id {idDetails = AlgConId _ _ _ _ _ _ _ _ tc}) = isNewTyCon tc
+isNewCon other					        = False
 
 -- isAlgCon returns True for @data@ or @newtype@ constructors
-isAlgCon (Id _ _ _ (AlgConId _ _ _ _ _ _ _ _ _) _ _) = True
-isAlgCon (Id _ _ _ (TupleConId _) _ _)		      = True
-isAlgCon other					      = False
+isAlgCon (Id {idDetails = AlgConId _ _ _ _ _ _ _ _ _}) = True
+isAlgCon (Id {idDetails = TupleConId _})	       = True
+isAlgCon other					       = False
 
-isTupleCon (Id _ _ _ (TupleConId _) _ _)	 = True
-isTupleCon other				 = False
+isTupleCon (Id {idDetails = TupleConId _}) = True
+isTupleCon other			   = False
 \end{code}
 
-@toplevelishId@ tells whether an @Id@ {\em may} be defined in a nested
-@let(rec)@ (returns @False@), or whether it is {\em sure} to be
-defined at top level (returns @True@). This is used to decide whether
-the @Id@ is a candidate free variable. NB: you are only {\em sure}
-about something if it returns @True@!
-
 \begin{code}
-toplevelishId	  :: Id -> Bool
 idHasNoFreeTyVars :: Id -> Bool
 
-toplevelishId (Id _ _ _ details _ _)
-  = chk details
-  where
-    chk (AlgConId _ __ _ _ _ _ _ _)   = True
-    chk (TupleConId _)    	    = True
-    chk (RecordSelId _)   	    = True
-    chk ImportedId	    	    = True
-    chk (DictSelId _)		    = True
-    chk (DefaultMethodId _)         = True
-    chk (DictFunId     _ _)	    = True
-    chk (LocalId      _)	    = False
-    chk (SysLocalId   _)	    = False
-    chk (PrimitiveId _)		    = True
-
-idHasNoFreeTyVars (Id _ _ _ details _ info)
+idHasNoFreeTyVars (Id {idDetails = details})
   = chk details
   where
     chk (AlgConId _ _ _ _ _ _ _ _ _) = True
-    chk (TupleConId _)    	  = True
-    chk (RecordSelId _)   	  = True
-    chk ImportedId	    	  = True
-    chk (DictSelId _)		  = True
-    chk (DefaultMethodId _)       = True
-    chk (DictFunId     _ _)	  = True
-    chk (LocalId        no_free_tvs) = no_free_tvs
-    chk (SysLocalId     no_free_tvs) = no_free_tvs
-    chk (PrimitiveId _)		    = True
+    chk (TupleConId _)    	   = True
+    chk (RecordSelId _)   	   = True
+    chk (VanillaId    no_free_tvs) = no_free_tvs
+    chk (PrimitiveId _)		   = True
+    chk SpecPragmaId		   = False	-- Play safe
 
 -- omitIfaceSigForId tells whether an Id's info is implied by other declarations,
 -- so we don't need to put its signature in an interface file, even if it's mentioned
@@ -434,13 +316,12 @@ omitIfaceSigForId
 	:: Id
 	-> Bool
 
-omitIfaceSigForId (Id _ name _ details _ _)
+omitIfaceSigForId (Id {idName = name, idDetails = details})
   | isWiredInName name
   = True
 
   | otherwise
   = case details of
-        ImportedId	  -> True		-- Never put imports in interface file
         (PrimitiveId _)	  -> True		-- Ditto, for primitives
 
 	-- This group is Ids that are implied by their type or class decl;
@@ -450,47 +331,19 @@ omitIfaceSigForId (Id _ name _ details _ _)
         (AlgConId _ _ _ _ _ _ _ _ _) -> True
         (TupleConId _)    	     -> True
         (RecordSelId _)   	     -> True
-        (DictSelId _)		     -> True
 
 	other			     -> False	-- Don't omit!
 		-- NB DefaultMethodIds are not omitted
 \end{code}
 
 \begin{code}
-isImportedId (Id _ _ _ ImportedId _ _) = True
-isImportedId other		       = False
+isBottomingId id = bottomIsGuaranteed (strictnessInfo (idInfo id))
 
-isBottomingId (Id _ _ _ _ _ info) = bottomIsGuaranteed (strictnessInfo info)
+isPrimitiveId_maybe (Id {idDetails = PrimitiveId primop}) = Just primop
+isPrimitiveId_maybe other				  = Nothing
 
-isSysLocalId (Id _ _ _ (SysLocalId _) _ _) = True
-isSysLocalId other			   = False
-
-isDictSelId_maybe (Id _ _ _ (DictSelId cls) _ _) = Just cls
-isDictSelId_maybe _				 = Nothing
-
-isDefaultMethodId (Id _ _ _ (DefaultMethodId _) _ _) = True
-isDefaultMethodId other				     = False
-
-isDefaultMethodId_maybe (Id _ _ _ (DefaultMethodId cls) _ _)
-  = Just cls
-isDefaultMethodId_maybe other = Nothing
-
-isDictFunId (Id _ _ _ (DictFunId _ _) _ _) = True
-isDictFunId other		    	   = False
-
-isWrapperId id = workerExists (getIdStrictness id)
-
-isPrimitiveId_maybe (Id _ _ _ (PrimitiveId primop) _ _) = Just primop
-isPrimitiveId_maybe other				= Nothing
-\end{code}
-
-\begin{code}
-unfoldingUnfriendlyId	-- return True iff it is definitely a bad
-	:: Id		-- idea to export an unfolding that
-	-> Bool		-- mentions this Id.  Reason: it cannot
-			-- possibly be seen in another module.
-
-unfoldingUnfriendlyId id = not (externallyVisibleId id)
+isSpecPragmaId (Id {idDetails = SpecPragmaId}) = True
+isSpecPragmaId _			       = False
 \end{code}
 
 @externallyVisibleId@: is it true that another module might be
@@ -502,150 +355,15 @@ local-ness precisely so that the test here would be easy
 
 \begin{code}
 externallyVisibleId :: Id -> Bool
-externallyVisibleId id@(Id _ name _ _ _ _) = not (isLocalName name)
+externallyVisibleId id = not (isLocalName (idName id))
 		     -- not local => global => externally visible
 \end{code}
 
 
-%************************************************************************
-%*									*
-\subsection[Id-type-funs]{Type-related @Id@ functions}
-%*									*
-%************************************************************************
-
 \begin{code}
-idName :: GenId ty -> Name
-idName (Id _ n _ _ _ _) = n
-
-idType :: GenId ty -> ty
-idType (Id _ _ ty _ _ _) = ty
-
-idPrimRep i = typePrimRep (idType i)
+idPrimRep id = typePrimRep (idType id)
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection[Id-overloading]{Functions related to overloading}
-%*									*
-%************************************************************************
-
-\begin{code}
-mkSuperDictSelId :: Unique -> Class -> Int -> Type -> Id
-	-- The Int is an arbitrary tag to say which superclass is selected
-	-- So, for 
-	--	class (C a, C b) => Foo a b where ...
-	-- we get superclass selectors
-	--	Foo_sc1, Foo_sc2
-
-mkSuperDictSelId u clas index ty
-  = addStandardIdInfo $
-    Id u name ty details NoPragmaInfo noIdInfo
-  where
-    name    = mkCompoundName name_fn u (getName clas)
-    details = DictSelId clas
-    name_fn clas_str = clas_str _APPEND_ SLIT("_sc") _APPEND_ (_PK_ (show index))
-
-	-- For method selectors the clean thing to do is
-	-- to give the method selector the same name as the class op itself.
-mkMethodSelId op_name clas ty
-  = addStandardIdInfo $
-    Id (uniqueOf op_name) op_name ty (DictSelId clas) NoPragmaInfo noIdInfo
-
-mkDefaultMethodId dm_name rec_c ty
-  = Id (uniqueOf dm_name) dm_name ty (DefaultMethodId rec_c) NoPragmaInfo noIdInfo
-
-mkDictFunId dfun_name full_ty clas itys
-  = Id (nameUnique dfun_name) dfun_name full_ty details NoPragmaInfo noIdInfo
-  where
-    details  = DictFunId clas itys
-
-mkWorkerId u unwrkr ty info
-  = Id u name ty details NoPragmaInfo info
-  where
-    details = LocalId (no_free_tvs ty)
-    name    = mkCompoundName name_fn u (getName unwrkr)
-    name_fn wkr_str = SLIT("$w") _APPEND_ wkr_str
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[local-funs]{@LocalId@-related functions}
-%*									*
-%************************************************************************
-
-\begin{code}
-mkImported  n ty info = Id (nameUnique n) n ty ImportedId NoPragmaInfo info
-
-mkPrimitiveId n ty primop 
-  = addStandardIdInfo $
-    Id (nameUnique n) n ty (PrimitiveId primop) IMustBeINLINEd noIdInfo
-	-- The pragma @IMustBeINLINEd@ says that this Id absolutely must be inlined.
-	-- It's only true for primitives, because we don't want to make a closure for each of them.
-
-\end{code}
-
-\begin{code}
-no_free_tvs ty = isEmptyTyVarSet (tyVarsOfType ty)
-
--- SysLocal: for an Id being created by the compiler out of thin air...
--- UserLocal: an Id with a name the user might recognize...
-mkSysLocal  :: FAST_STRING -> Unique -> GenType flexi -> SrcLoc -> GenId (GenType flexi)
-mkUserLocal :: OccName     -> Unique -> GenType flexi -> SrcLoc -> GenId (GenType flexi)
-
-mkSysLocal str uniq ty loc
-  = Id uniq (mkSysLocalName uniq str loc) ty (SysLocalId (no_free_tvs ty)) NoPragmaInfo noIdInfo
-
-mkUserLocal occ uniq ty loc
-  = Id uniq (mkLocalName uniq occ loc) ty (LocalId (no_free_tvs ty)) NoPragmaInfo noIdInfo
-
-mkUserId :: Name -> GenType flexi -> GenId (GenType flexi)
-mkUserId name ty
-  = Id (nameUnique name) name ty (LocalId (no_free_tvs ty)) NoPragmaInfo noIdInfo
-\end{code}
-
-\begin{code}
--- See notes with setNameVisibility (Name.lhs)
-setIdVisibility :: Maybe Module -> Unique -> Id -> Id
-setIdVisibility maybe_mod u (Id uniq name ty details prag info)
-  = Id uniq (setNameVisibility maybe_mod u name) ty details prag info
-
-mkIdWithNewUniq :: Id -> Unique -> Id
-mkIdWithNewUniq (Id _ n ty details prag info) u
-  = Id u (changeUnique n u) ty details prag info
-
-mkIdWithNewName :: Id -> Name -> Id
-mkIdWithNewName (Id _ _ ty details prag info) new_name
-  = Id (uniqueOf new_name) new_name ty details prag info
-
-mkIdWithNewType :: Id -> Type -> Id
-mkIdWithNewType (Id u name _ details pragma info) ty 
-  = Id u name ty details pragma info
-\end{code}
-
-Make some local @Ids@ for a template @CoreExpr@.  These have bogus
-@Uniques@, but that's OK because the templates are supposed to be
-instantiated before use.
-\begin{code}
-mkTemplateLocals :: [Type] -> [Id]
-mkTemplateLocals tys
-  = zipWith (\ u -> \ ty -> mkSysLocal SLIT("tpl") u ty mkBuiltinSrcLoc)
-	    (getBuiltinUniques (length tys))
-	    tys
-\end{code}
-
-\begin{code}
-getIdInfo     :: GenId ty -> IdInfo
-getPragmaInfo :: GenId ty -> PragmaInfo
-
-getIdInfo     (Id _ _ _ _ _ info) = info
-getPragmaInfo (Id _ _ _ _ info _) = info
-
-replaceIdInfo :: Id -> IdInfo -> Id
-replaceIdInfo (Id u n ty details pinfo _) info = Id u n ty details pinfo info
-
-replacePragmaInfo :: GenId ty -> PragmaInfo -> GenId ty
-replacePragmaInfo (Id u sn ty details _ info) prag = Id u sn ty details prag info
-\end{code}
 
 %************************************************************************
 %*									*
@@ -659,12 +377,11 @@ besides the code-generator need arity info!)
 
 \begin{code}
 getIdArity :: Id -> ArityInfo
-getIdArity id@(Id _ _ _ _ _ id_info)
-  = arityInfo id_info
+getIdArity id = arityInfo (idInfo id)
 
 addIdArity :: Id -> ArityInfo -> Id
-addIdArity (Id u n ty details pinfo info) arity
-  = Id u n ty details pinfo (info `addArityInfo` arity)
+addIdArity id@(Id {idInfo = info}) arity
+  = id {idInfo = arity `setArityInfo` info}
 \end{code}
 
 %************************************************************************
@@ -673,49 +390,6 @@ addIdArity (Id u n ty details pinfo info) arity
 %*									*
 %************************************************************************
 
-\begin{code}
-mkDataCon :: Name
-	  -> [StrictnessMark] -> [FieldLabel]
-	  -> [TyVar] -> ThetaType
-	  -> [TyVar] -> ThetaType
-	  -> [TauType] -> TyCon
-	  -> Id
-  -- can get the tag and all the pieces of the type from the Type
-
-mkDataCon n stricts fields tvs ctxt con_tvs con_ctxt args_tys tycon
-  = ASSERT(length stricts == length args_tys)
-    addStandardIdInfo data_con
-  where
-    -- NB: data_con self-recursion; should be OK as tags are not
-    -- looked at until late in the game.
-    data_con
-      = Id (nameUnique n)
-	   n
-	   data_con_ty
-	   (AlgConId data_con_tag stricts fields tvs ctxt con_tvs con_ctxt args_tys tycon)
-	   IWantToBeINLINEd	-- Always inline constructors if possible
-	   noIdInfo
-
-    data_con_tag    = assoc "mkDataCon" (data_con_family `zip` [fIRST_TAG..]) data_con
-    data_con_family = tyConDataCons tycon
-
-    data_con_ty
-      = mkSigmaTy (tvs++con_tvs) (ctxt++con_ctxt)
-	(mkFunTys args_tys (mkTyConApp tycon (mkTyVarTys tvs)))
-
-
-mkTupleCon :: Arity -> Name -> Type -> Id
-mkTupleCon arity name ty 
-  = addStandardIdInfo tuple_id
-  where
-    tuple_id = Id (nameUnique name) name ty 
-	  	  (TupleConId arity) 
-		  IWantToBeINLINEd		-- Always inline constructors if possible
-	  	  noIdInfo
-
-fIRST_TAG :: ConTag
-fIRST_TAG =  1	-- Tags allocated from here for real constructors
-\end{code}
 
 dataConNumFields gives the number of actual fields in the
 {\em representation} of the data constructor.  This may be more than appear
@@ -736,20 +410,20 @@ isNullaryDataCon con = dataConNumFields con == 0 -- function of convenience
 
 \begin{code}
 dataConTag :: DataCon -> ConTag	-- will panic if not a DataCon
-dataConTag (Id _ _ _ (AlgConId tag _ _ _ _ _ _ _ _) _ _) = tag
-dataConTag (Id _ _ _ (TupleConId _) _ _)	      = fIRST_TAG
+dataConTag (Id {idDetails = AlgConId tag _ _ _ _ _ _ _ _}) = tag
+dataConTag (Id {idDetails = TupleConId _})	           = fIRST_TAG
 
 dataConTyCon :: DataCon -> TyCon	-- will panic if not a DataCon
-dataConTyCon (Id _ _ _ (AlgConId _ _ _ _ _ _ _ _ tycon) _ _) = tycon
-dataConTyCon (Id _ _ _ (TupleConId a) _ _)	          = tupleTyCon a
+dataConTyCon (Id {idDetails = AlgConId _ _ _ _ _ _ _ _ tycon}) = tycon
+dataConTyCon (Id {idDetails = TupleConId a})	 	       = tupleTyCon a
 
 dataConSig :: DataCon -> ([TyVar], ThetaType, [TyVar], ThetaType, [TauType], TyCon)
 					-- will panic if not a DataCon
 
-dataConSig (Id _ _ _ (AlgConId _ _ _ tyvars theta con_tyvars con_theta arg_tys tycon) _ _)
+dataConSig (Id {idDetails = AlgConId _ _ _ tyvars theta con_tyvars con_theta arg_tys tycon})
   = (tyvars, theta, con_tyvars, con_theta, arg_tys, tycon)
 
-dataConSig (Id _ _ _ (TupleConId arity) _ _)
+dataConSig (Id {idDetails = TupleConId arity})
   = (tyvars, [], [], [], tyvar_tys, tupleTyCon arity)
   where
     tyvars	= take arity alphaTyVars
@@ -772,7 +446,7 @@ dataConSig (Id _ _ _ (TupleConId arity) _ _)
 -- Actually, the unboxed part isn't implemented yet!
 
 dataConRepType :: Id -> Type
-dataConRepType (Id _ _ _ (AlgConId _ _ _ tyvars theta con_tyvars con_theta arg_tys tycon) _ _)
+dataConRepType (Id {idDetails = AlgConId _ _ _ tyvars theta con_tyvars con_theta arg_tys tycon})
   = mkForAllTys (tyvars++con_tyvars) 
 		(mkFunTys arg_tys (mkTyConApp tycon (mkTyVarTys tyvars)))
 dataConRepType other_id
@@ -780,26 +454,20 @@ dataConRepType other_id
     idType other_id
 
 dataConFieldLabels :: DataCon -> [FieldLabel]
-dataConFieldLabels (Id _ _ _ (AlgConId _ _ fields _ _ _ _ _ _) _ _) = fields
-dataConFieldLabels (Id _ _ _ (TupleConId _)		    _ _) = []
+dataConFieldLabels (Id {idDetails = AlgConId _ _ fields _ _ _ _ _ _}) = fields
+dataConFieldLabels (Id {idDetails = TupleConId _})		      = []
 #ifdef DEBUG
-dataConFieldLabels x@(Id _ _ _ idt _ _) = 
+dataConFieldLabels x@(Id {idDetails = idt}) = 
   panic ("dataConFieldLabel: " ++
     (case idt of
-      LocalId _    -> "l"
-      SysLocalId _ -> "sl"
+      VanillaId _   -> "l"
       PrimitiveId _ -> "p"
-      ImportedId -> "i"
-      RecordSelId _ -> "r"
-      DictSelId _ -> "m"
-      DefaultMethodId _ -> "d"
-      DictFunId _ _ -> "di"))
+      RecordSelId _ -> "r"))
 #endif
 
 dataConStrictMarks :: DataCon -> [StrictnessMark]
-dataConStrictMarks (Id _ _ _ (AlgConId _ stricts _ _ _ _ _ _ _) _ _) = stricts
-dataConStrictMarks (Id _ _ _ (TupleConId arity)		     _ _) 
-  = nOfThem arity NotMarkedStrict
+dataConStrictMarks (Id {idDetails = AlgConId _ stricts _ _ _ _ _ _ _}) = stricts
+dataConStrictMarks (Id {idDetails = TupleConId arity})		       = nOfThem arity NotMarkedStrict
 
 dataConRawArgTys :: DataCon -> [TauType] -- a function of convenience
 dataConRawArgTys con = case (dataConSig con) of { (_,_, _, _, arg_tys,_) -> arg_tys }
@@ -815,36 +483,13 @@ dataConArgTys con_id inst_tys
 \end{code}
 
 \begin{code}
-mkRecordSelId field_label selector_ty
-  = addStandardIdInfo $		-- Record selectors have a standard unfolding
-    Id (nameUnique name)
-       name
-       selector_ty
-       (RecordSelId field_label)
-       NoPragmaInfo
-       noIdInfo
-  where
-    name = fieldLabelName field_label
-
 recordSelectorFieldLabel :: Id -> FieldLabel
-recordSelectorFieldLabel (Id _ _ _ (RecordSelId lbl) _ _) = lbl
+recordSelectorFieldLabel (Id {idDetails = RecordSelId lbl}) = lbl
 
-isRecordSelector (Id _ _ _ (RecordSelId lbl) _ _) = True
-isRecordSelector other				  = False
+isRecordSelector (Id {idDetails = RecordSelId lbl}) = True
+isRecordSelector other				    = False
 \end{code}
 
-
-Data type declarations are of the form:
-\begin{verbatim}
-data Foo a b = C1 ... | C2 ... | ... | Cn ...
-\end{verbatim}
-For each constructor @Ci@, we want to generate a curried function; so, e.g., for
-@C1 x y z@, we want a function binding:
-\begin{verbatim}
-fun_C1 = /\ a -> /\ b -> \ [x, y, z] -> Con C1 [a, b] [x, y, z]
-\end{verbatim}
-Notice the ``big lambdas'' and type arguments to @Con@---we are producing
-2nd-order polymorphic lambda calculus with explicit types.
 
 %************************************************************************
 %*									*
@@ -855,44 +500,51 @@ Notice the ``big lambdas'' and type arguments to @Con@---we are producing
 \begin{code}
 getIdUnfolding :: Id -> Unfolding
 
-getIdUnfolding (Id _ _ _ _ _ info) = unfoldInfo info
+getIdUnfolding id = unfoldingInfo (idInfo id)
 
 addIdUnfolding :: Id -> Unfolding -> Id
-addIdUnfolding id@(Id u n ty details prag info) unfolding
-  = Id u n ty details prag (info `addUnfoldInfo` unfolding)
+addIdUnfolding id@(Id {idInfo = info}) unfolding
+  = id {idInfo = unfolding `setUnfoldingInfo` info}
 \end{code}
 
 The inline pragma tells us to be very keen to inline this Id, but it's still
 OK not to if optimisation is switched off.
 
 \begin{code}
-getInlinePragma :: Id -> PragmaInfo
-getInlinePragma (Id _ _ _ _ prag _) = prag
+getInlinePragma :: Id -> InlinePragInfo
+getInlinePragma id = inlinePragInfo (idInfo id)
 
 idWantsToBeINLINEd :: Id -> Bool
 
-idWantsToBeINLINEd (Id _ _ _ _ IWantToBeINLINEd _) = True
-idWantsToBeINLINEd (Id _ _ _ _ IMustBeINLINEd   _) = True
-idWantsToBeINLINEd _				   = False
+idWantsToBeINLINEd id = case getInlinePragma id of
+			  IWantToBeINLINEd -> True
+			  IMustBeINLINEd   -> True
+			  other		   -> False
 
-idMustNotBeINLINEd (Id _ _ _ _ IMustNotBeINLINEd _) = True
-idMustNotBeINLINEd _				    = False
+idMustNotBeINLINEd id = case getInlinePragma id of
+			  IMustNotBeINLINEd -> True
+			  other		    -> False
 
-idMustBeINLINEd (Id _ _ _ _ IMustBeINLINEd _) = True
-idMustBeINLINEd _			      = False
+idMustBeINLINEd id =  case getInlinePragma id of
+			IMustBeINLINEd -> True
+			other	       -> False
 
 addInlinePragma :: Id -> Id
-addInlinePragma (Id u sn ty details _ info)
-  = Id u sn ty details IWantToBeINLINEd info
+addInlinePragma id@(Id {idInfo = info})
+  = id {idInfo = setInlinePragInfo IWantToBeINLINEd info}
 
 nukeNoInlinePragma :: Id -> Id
-nukeNoInlinePragma id@(Id u sn ty details IMustNotBeINLINEd info)
-  = Id u sn ty details NoPragmaInfo info
-nukeNoInlinePragma id@(Id u sn ty details _ info) = id		-- Otherwise no-op
+nukeNoInlinePragma id@(Id {idInfo = info})
+  = case inlinePragInfo info of
+	IMustNotBeINLINEd -> id {idInfo = setInlinePragInfo NoPragmaInfo info}
+	other		  -> id
 
 addNoInlinePragma :: Id -> Id
-addNoInlinePragma id@(Id u sn ty details _ info)
-  = Id u sn ty details IMustNotBeINLINEd info
+addNoInlinePragma id@(Id {idInfo = info})
+  = id {idInfo = IMustNotBeINLINEd `setInlinePragInfo` info}
+
+mustInlineInfo   = IMustBeINLINEd   `setInlinePragInfo` noIdInfo
+wantToInlineInfo = IWantToBeINLINEd `setInlinePragInfo` noIdInfo
 \end{code}
 
 
@@ -905,63 +557,38 @@ addNoInlinePragma id@(Id u sn ty details _ info)
 
 \begin{code}
 getIdDemandInfo :: Id -> DemandInfo
-getIdDemandInfo (Id _ _ _ _ _ info) = demandInfo info
+getIdDemandInfo id = demandInfo (idInfo id)
 
 addIdDemandInfo :: Id -> DemandInfo -> Id
-addIdDemandInfo (Id u n ty details prags info) demand_info
-  = Id u n ty details prags (info `addDemandInfo` demand_info)
+addIdDemandInfo id@(Id {idInfo = info}) demand_info
+  = id {idInfo = demand_info `setDemandInfo` info}
 \end{code}
 
 \begin{code}
 getIdUpdateInfo :: Id -> UpdateInfo
-getIdUpdateInfo (Id _ _ _ _ _ info) = updateInfo info
+getIdUpdateInfo id = updateInfo (idInfo id)
 
 addIdUpdateInfo :: Id -> UpdateInfo -> Id
-addIdUpdateInfo (Id u n ty details prags info) upd_info
-  = Id u n ty details prags (info `addUpdateInfo` upd_info)
-\end{code}
-
-\begin{code}
-{- LATER:
-getIdArgUsageInfo :: Id -> ArgUsageInfo
-getIdArgUsageInfo (Id u n ty info details) = argUsageInfo info
-
-addIdArgUsageInfo :: Id -> ArgUsageInfo -> Id
-addIdArgUsageInfo (Id u n ty info details) au_info
-  = Id u n ty (info `addArgusageInfo` au_info) details
--}
-\end{code}
-
-\begin{code}
-{- LATER:
-getIdFBTypeInfo :: Id -> FBTypeInfo
-getIdFBTypeInfo (Id u n ty info details) = fbTypeInfo info
-
-addIdFBTypeInfo :: Id -> FBTypeInfo -> Id
-addIdFBTypeInfo (Id u n ty info details) upd_info
-  = Id u n ty (info `addFBTypeInfo` upd_info) details
--}
+addIdUpdateInfo id@(Id {idInfo = info}) upd_info
+  = id {idInfo = upd_info `setUpdateInfo` info}
 \end{code}
 
 \begin{code}
 getIdSpecialisation :: Id -> IdSpecEnv
-getIdSpecialisation (Id _ _ _ _ _ info) = specInfo info
+getIdSpecialisation id = specInfo (idInfo id)
 
 setIdSpecialisation :: Id -> IdSpecEnv -> Id
-setIdSpecialisation (Id u n ty details prags info) spec_info
-  = Id u n ty details prags (info `setSpecInfo` spec_info)
+setIdSpecialisation id@(Id {idInfo = info}) spec_info
+  = id {idInfo = spec_info `setSpecInfo` info}
 \end{code}
-
-Strictness: we snaffle the info out of the IdInfo.
 
 \begin{code}
 getIdStrictness :: Id -> StrictnessInfo
-
-getIdStrictness (Id _ _ _ _ _ info) = strictnessInfo info
+getIdStrictness id = strictnessInfo (idInfo id)
 
 addIdStrictness :: Id -> StrictnessInfo -> Id
-addIdStrictness (Id u n ty details prags info) strict_info
-  = Id u n ty details prags (info `addStrictnessInfo` strict_info)
+addIdStrictness id@(Id {idInfo = info}) strict_info
+  = id {idInfo = strict_info `setStrictnessInfo` info}
 \end{code}
 
 %************************************************************************
@@ -973,8 +600,7 @@ addIdStrictness (Id u n ty details prags info) strict_info
 Comparison: equality and ordering---this stuff gets {\em hammered}.
 
 \begin{code}
-cmpId (Id u1 _ _ _ _ _) (Id u2 _ _ _ _ _) = compare u1 u2
--- short and very sweet
+cmpId (Id {idUnique = u1}) (Id {idUnique = u2}) = compare u1 u2
 \end{code}
 
 \begin{code}
@@ -1008,27 +634,23 @@ Default printing code (not used for interfaces):
 \begin{code}
 pprId :: Outputable ty => GenId ty -> SDoc
 
-pprId (Id u n _ _ prags _)
+pprId Id {idUnique = u, idName = n, idInfo = info}
   = hcat [ppr n, pp_prags]
   where
-    pp_prags | opt_PprStyle_All = case prags of
+    pp_prags | opt_PprStyle_All = case inlinePragInfo info of
 				     IMustNotBeINLINEd -> text "{n}"
 				     IWantToBeINLINEd  -> text "{i}"
 				     IMustBeINLINEd    -> text "{I}"
 				     other	       -> empty
 	     | otherwise        = empty
-
-  -- WDP 96/05/06: We can re-elaborate this as we go along...
 \end{code}
 
 \begin{code}
-idUnique (Id u _ _ _ _ _) = u
-
 instance Uniquable (GenId ty) where
     uniqueOf = idUnique
 
 instance NamedThing (GenId ty) where
-    getName this_id@(Id u n _ details _ _) = n
+    getName = idName
 \end{code}
 
 Note: The code generator doesn't carry a @UniqueSupply@, so it uses

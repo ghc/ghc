@@ -43,7 +43,7 @@ module SimplEnv (
 #include "HsVersions.h"
 
 import BinderInfo	( orBinderInfo, andBinderInfo, noBinderInfo, isOneOcc,
-			  okToInline, isOneFunOcc,
+			  isOneFunOcc,
 			  BinderInfo
 			)
 import CmdLineOpts	( switchIsOn, intSwitchSet, opt_UnfoldingCreationThreshold,
@@ -51,6 +51,7 @@ import CmdLineOpts	( switchIsOn, intSwitchSet, opt_UnfoldingCreationThreshold,
 			)
 import CoreSyn
 import CoreUnfold	( mkFormSummary, couldBeSmallEnoughToInline, whnfOrBottom,
+			  okToInline, 
 			  Unfolding(..), FormSummary(..),
 			  calcUnfoldingGuidance	)
 import CoreUtils	( coreExprCc )
@@ -435,9 +436,6 @@ isEvaluated other = False
 
 
 \begin{code}
-mkSimplUnfoldingGuidance chkr out_id rhs
-  = calcUnfoldingGuidance (getInlinePragma out_id) opt_UnfoldingCreationThreshold rhs
-
 extendEnvGivenUnfolding :: SimplEnv -> OutId -> BinderInfo -> Unfolding -> SimplEnv
 extendEnvGivenUnfolding env@(SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst) con_apps)
 	              out_id occ_info rhs_info
@@ -614,7 +612,8 @@ extendEnvGivenBinding env@(SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst)
 	              occ_info out_id rhs
   = SimplEnv chkr encl_cc ty_env (new_in_scope_ids, id_subst) new_con_apps 
   where
-    new_in_scope_ids | okToInline (whnfOrBottom form) 
+    new_in_scope_ids | okToInline out_id
+				  (whnfOrBottom form) 
 				  (couldBeSmallEnoughToInline out_id guidance) 
 				  occ_info 
 		     = env_with_unfolding
@@ -664,12 +663,12 @@ extendEnvGivenBinding env@(SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst)
     form     = _scc_ "eegnr.form_sum" 
 	       mkFormSummary rhs
     guidance = _scc_ "eegnr.guidance" 
-	       mkSimplUnfoldingGuidance chkr out_id rhs
+	       calcUnfoldingGuidance opt_UnfoldingCreationThreshold rhs
 
 	-- Attach a cost centre to the RHS if necessary
     rhs_w_cc  | currentOrSubsumedCosts encl_cc
 	      || not (noCostCentreAttached (coreExprCc rhs))
 	      = rhs
 	      | otherwise
-	      = SCC encl_cc rhs
+	      = Note (SCC encl_cc) rhs
 \end{code}

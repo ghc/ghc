@@ -17,7 +17,6 @@ import TcHsSyn		( maybeBoxedPrimType )
 import CoreUtils	( coreExprType )
 import Id		( Id(..), dataConArgTys, idType )
 import Maybes		( maybeToBool )
-import PprType		( GenType{-instances-} )
 import PrelVals		( packStringForCId )
 import PrimOp		( PrimOp(..) )
 import Type		( isUnpointedType, splitAlgTyConApp_maybe, 

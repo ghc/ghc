@@ -27,7 +27,7 @@ import Id		( Id, dataConTyCon, GenId )
 import Maybes		( maybeToBool )
 import Outputable	
 import TyCon		( maybeTyConSingleCon )
-import PprType		( GenType )
+import Type		( GenType )
 import Name		( NamedThing )
 \end{code}
 

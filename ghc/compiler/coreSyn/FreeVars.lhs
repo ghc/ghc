@@ -287,19 +287,20 @@ fvExpr id_cands tyvar_cands (Let (Rec binds) body)
     binders_ftvs      = foldr (combine . munge_id_ty) noFreeTyVars binders
 	-- We need to collect free tyvars from the binders
 
-fvExpr id_cands tyvar_cands (SCC label expr)
-  = (fvinfo, AnnSCC label expr2)
-  where
-    expr2@(fvinfo,_) = fvExpr id_cands tyvar_cands expr
-
-fvExpr id_cands tyvar_cands (Coerce c ty expr)
+fvExpr id_cands tyvar_cands (Note (Coerce to_ty from_ty) expr)
   = (FVInfo (freeVarsOf   expr2)
-	    (freeTyVarsOf expr2 `combine` tfvs)
+	    (freeTyVarsOf expr2 `combine` tfvs1 `combine` tfvs2)
 	    (leakinessOf  expr2),
-     AnnCoerce c ty expr2)
+     AnnNote (Coerce to_ty from_ty) expr2)
   where
     expr2 = fvExpr id_cands tyvar_cands expr
-    tfvs  = freeTy tyvar_cands ty
+    tfvs1  = freeTy tyvar_cands from_ty
+    tfvs2  = freeTy tyvar_cands to_ty
+
+fvExpr id_cands tyvar_cands (Note other_note expr)
+  = (fvinfo, AnnNote other_note expr2)
+  where
+    expr2@(fvinfo,_) = fvExpr id_cands tyvar_cands expr
 \end{code}
 
 \begin{code}
@@ -476,13 +477,8 @@ addExprFVs fv_cand in_scope (Let binds body)
 
     (body2, fvs_body)  = addExprFVs fv_cand new_in_scope body
 
-addExprFVs fv_cand in_scope (SCC label expr)
-  = (SCC label expr2, expr_fvs)
-  where
-    (expr2, expr_fvs) = addExprFVs fv_cand in_scope expr
-
-addExprFVs fv_cand in_scope (Coerce c ty expr)
-  = (Coerce c ty expr2, expr_fvs)
+addExprFVs fv_cand in_scope (Note note expr)
+  = (Note note expr2, expr_fvs)
   where
     (expr2, expr_fvs) = addExprFVs fv_cand in_scope expr
 \end{code}

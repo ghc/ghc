@@ -554,16 +554,17 @@ If we aren't careful we duplicate the (expensive x) call!
 Constructors are rather like lambdas in this way.
 
 \begin{code}
-occAnal env (Con con args) = (mapIdEnv markDangerousToDup (occAnalArgs env args), 
-			      Con con args)
+occAnal env (Con con args)
+  = (mapIdEnv markDangerousToDup (occAnalArgs env args), 
+     Con con args)
 
-occAnal env (SCC cc body)
-  = (mapIdEnv markInsideSCC usage, SCC cc body')
+occAnal env (Note note@(SCC cc) body)
+  = (mapIdEnv markInsideSCC usage, Note note body')
   where
     (usage, body') = occAnal env body
 
-occAnal env (Coerce c ty body)
-  = (usage, Coerce c ty body')
+occAnal env (Note note body)
+  = (usage, Note note body')
   where
     (usage, body') = occAnal env body
 

@@ -22,11 +22,9 @@ module CoreUnfold (
 	noUnfolding, mkMagicUnfolding, mkUnfolding, getUnfoldingTemplate,
 
 	smallEnoughToInline, couldBeSmallEnoughToInline, 
-	certainlySmallEnoughToInline, inlineUnconditionally,
+	certainlySmallEnoughToInline, inlineUnconditionally, okToInline,
 
-	calcUnfoldingGuidance,
-
-	PragmaInfo(..)		-- Re-export
+	calcUnfoldingGuidance
     ) where
 
 #include "HsVersions.h"
@@ -42,9 +40,9 @@ import Constants	( uNFOLDING_CHEAP_OP_COST,
 			  uNFOLDING_DEAR_OP_COST,
 			  uNFOLDING_NOREP_LIT_COST
 			)
-import BinderInfo	( BinderInfo, isOneFunOcc, isOneSafeFunOcc
+import BinderInfo	( BinderInfo, isOneSameSCCFunOcc,
+			  isInlinableOcc, isOneSafeFunOcc
 			)
-import PragmaInfo	( PragmaInfo(..) )
 import CoreSyn
 import Literal		( Literal )
 import CoreUtils	( unTagBinders )
@@ -52,9 +50,9 @@ import OccurAnal	( occurAnalyseGlobalExpr )
 import CoreUtils	( coreExprType )
 import Id		( Id, idType, getIdArity,  isBottomingId, isDataCon,
 			  idWantsToBeINLINEd, idMustBeINLINEd, idMustNotBeINLINEd,
-			  IdSet, GenId{-instances-} )
+			  IdSet )
 import PrimOp		( fragilePrimOp, primOpCanTriggerGC )
-import IdInfo		( ArityInfo(..) )
+import IdInfo		( ArityInfo(..), InlinePragInfo(..) )
 import Literal		( isNoRepLit )
 import TyCon		( tyConFamilySize )
 import Type		( splitAlgTyConApp_maybe )
@@ -89,10 +87,10 @@ data Unfolding
 \begin{code}
 noUnfolding = NoUnfolding
 
-mkUnfolding inline_prag expr
+mkUnfolding expr
   = let
      -- strictness mangling (depends on there being no CSE)
-     ufg = calcUnfoldingGuidance inline_prag opt_UnfoldingCreationThreshold expr
+     ufg = calcUnfoldingGuidance opt_UnfoldingCreationThreshold expr
      occ = occurAnalyseGlobalExpr expr
      cuf = CoreUnfolding (mkFormSummary expr) ufg occ
 					  
@@ -172,8 +170,7 @@ mkFormSummary expr
     go n (Lit _)	= ASSERT(n==0) ValueForm
     go n (Con _ _)      = ASSERT(n==0) ValueForm
     go n (Prim _ _)	= OtherForm
-    go n (SCC _ e)      = go n e
-    go n (Coerce _ _ e) = go n e
+    go n (Note _ e)     = go n e
 
     go n (Let (NonRec b r) e) | exprIsTrivial r = go n e	-- let f = f' alpha in (f,g) 
 								-- should be treated as a value
@@ -209,7 +206,7 @@ simple variables and constants, and type applications.
 exprIsTrivial (Var v) 		= True
 exprIsTrivial (Lit lit)         = not (isNoRepLit lit)
 exprIsTrivial (App e (TyArg _)) = exprIsTrivial e
-exprIsTrivial (Coerce _ _ e)    = exprIsTrivial e
+exprIsTrivial (Note _ e)        = exprIsTrivial e
 exprIsTrivial other		= False
 \end{code}
 
@@ -217,7 +214,7 @@ exprIsTrivial other		= False
 exprSmallEnoughToDup (Con _ _)      = True	-- Could check # of args
 exprSmallEnoughToDup (Prim op _)    = not (fragilePrimOp op) -- Could check # of args
 exprSmallEnoughToDup (Lit lit)      = not (isNoRepLit lit)
-exprSmallEnoughToDup (Coerce _ _ e) = exprSmallEnoughToDup e
+exprSmallEnoughToDup (Note _ e)     = exprSmallEnoughToDup e
 exprSmallEnoughToDup expr
   = case (collectArgs expr) of { (fun, _, vargs) ->
     case fun of
@@ -236,16 +233,11 @@ exprSmallEnoughToDup expr
 
 \begin{code}
 calcUnfoldingGuidance
-	:: PragmaInfo	    	-- INLINE pragma stuff
-	-> Int		    	-- bomb out if size gets bigger than this
+	:: Int		    	-- bomb out if size gets bigger than this
 	-> CoreExpr    		-- expression to look at
 	-> UnfoldingGuidance
 
-calcUnfoldingGuidance IMustBeINLINEd    bOMB_OUT_SIZE expr = UnfoldAlways	-- Always inline if the INLINE pragma says so
-calcUnfoldingGuidance IWantToBeINLINEd  bOMB_OUT_SIZE expr = UnfoldAlways	-- Always inline if the INLINE pragma says so
-calcUnfoldingGuidance IMustNotBeINLINEd bOMB_OUT_SIZE expr = UnfoldNever	-- ...and vice versa...
-
-calcUnfoldingGuidance NoPragmaInfo bOMB_OUT_SIZE expr
+calcUnfoldingGuidance bOMB_OUT_SIZE expr
   = case collectBinders expr of { (ty_binders, val_binders, body) ->
     case (sizeExpr bOMB_OUT_SIZE val_binders body) of
 
@@ -285,8 +277,7 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
     size_up (Lit lit) | isNoRepLit lit = sizeN uNFOLDING_NOREP_LIT_COST
 		      | otherwise      = sizeZero
 
-    size_up (SCC lbl body)    = size_up body		-- SCCs cost nothing
-    size_up (Coerce _ _ body) = size_up body		-- Coercions cost nothing
+    size_up (Note _ body)  = size_up body		-- Notes cost nothing
 
     size_up (App fun arg)  = size_up fun `addSize` size_up_arg arg
 				-- NB Zero cost for for type applications;
@@ -456,7 +447,7 @@ is more accurate (see @sizeExpr@ above for how this discount size
 is computed).
 
 \begin{code}
-smallEnoughToInline :: Id			-- The function (for trace msg only)
+smallEnoughToInline :: Id			-- The function (trace msg only)
 		    -> [Bool]			-- Evaluated-ness of value arguments
 		    -> Bool			-- Result is scrutinised
 		    -> UnfoldingGuidance
@@ -519,17 +510,33 @@ certain that every use can be inlined.  So, notably, any ArgOccs
 rule this out.  Since ManyOcc doesn't record FunOcc/ArgOcc 
 
 \begin{code}
-inlineUnconditionally :: Bool -> (Id,BinderInfo) -> Bool
+inlineUnconditionally :: (Id,BinderInfo) -> Bool
 
-inlineUnconditionally ok_to_dup (id, occ_info)
+inlineUnconditionally (id, occ_info)
   |  idMustNotBeINLINEd id = False
 
-  |  isOneFunOcc occ_info
-  && idMustBeINLINEd id = True
+  |  isOneSameSCCFunOcc occ_info
+  && idWantsToBeINLINEd id = True
 
-  |  isOneSafeFunOcc (ok_to_dup || idWantsToBeINLINEd id) occ_info
+  |  isOneSafeFunOcc occ_info
   =  True
 
   |  otherwise
   = False
+\end{code}
+
+okToInline is used at call sites, so it is a bit more generous
+
+\begin{code}
+okToInline :: Id		-- The Id
+	   -> Bool		-- The thing is WHNF or bottom; 
+	   -> Bool		-- It's small enough to duplicate the code
+	   -> BinderInfo
+	   -> Bool		-- True <=> inline it
+
+okToInline id _ _ _		-- Check the Id first
+  | idWantsToBeINLINEd id = True
+  | idMustNotBeINLINEd id = False
+
+okToInline id whnf small binder_info = isInlinableOcc whnf small binder_info
 \end{code}

@@ -31,7 +31,6 @@ import TcMonad
 import RnMonad		( RnNameSupply )
 import Inst		( Inst, InstOrigin(..),
 			  newDicts, LIE, emptyLIE, plusLIE, plusLIEs )
-import PragmaInfo	( PragmaInfo(..) )
 import TcDeriv		( tcDeriving )
 import TcEnv		( tcExtendGlobalValEnv, tcAddImportedIdInfo )
 import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, classDataCon )
@@ -54,7 +53,7 @@ import Name		( nameOccName, mkLocalName,
 			  NamedThing(..)
 			)
 import PrelVals		( nO_METHOD_BINDING_ERROR_ID )
-import PprType		( pprParendGenType,  pprConstraint )
+import PprType		( pprParendType,  pprConstraint )
 import SrcLoc		( SrcLoc, noSrcLoc )
 import TyCon		( isSynTyCon, isDataTyCon, tyConDerivings )
 import Type		( Type, ThetaType, isUnpointedType,
@@ -602,12 +601,12 @@ tcSpecInstSig e ce tce inst_infos inst_mapper (SpecInstSig class_name ty src_loc
 	(vcat [hsep [if null simpl_theta then empty else ppr simpl_theta,
 			  if null simpl_theta then empty else ptext SLIT("=>"),
 			  ppr clas,
-			  pprParendGenType inst_ty],
+			  pprParendType inst_ty],
 		   hsep [ptext SLIT("        derived from:"),
 			  if null unspec_theta then empty else ppr unspec_theta,
 			  if null unspec_theta then empty else ptext SLIT("=>"),
 			  ppr clas,
-			  pprParendGenType unspec_inst_ty]])
+			  pprParendType unspec_inst_ty]])
     else id) (
 
     returnTc (unitBag (InstInfo clas inst_tmpls inst_ty simpl_theta

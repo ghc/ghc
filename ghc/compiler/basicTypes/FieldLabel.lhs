@@ -24,6 +24,8 @@ data FieldLabel
 				-- The type in the FieldLabel for op1 will be simply (a->a).
 
 		FieldLabelTag	-- Indicates position within constructor
+				-- (starting with firstFieldLabelTag)
+				--
 				-- If the same field occurs in more than one constructor
 				-- then it'll have a separate FieldLabel on each occasion,
 				-- but with a single name (and presumably the same type!)
@@ -36,7 +38,7 @@ firstFieldLabelTag :: FieldLabelTag
 firstFieldLabelTag = 1
 
 allFieldLabelTags :: [FieldLabelTag]
-allFieldLabelTags = [1..]
+allFieldLabelTags = [firstFieldLabelTag..]
 
 fieldLabelName (FieldLabel n _  _)   = n
 fieldLabelType (FieldLabel _ ty _)   = ty

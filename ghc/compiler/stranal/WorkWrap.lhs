@@ -13,14 +13,13 @@ import CoreUnfold	( Unfolding, certainlySmallEnoughToInline, calcUnfoldingGuidan
 import CmdLineOpts	( opt_UnfoldingCreationThreshold )
 
 import CoreUtils	( coreExprType )
-import Id		( getInlinePragma, getIdStrictness, mkWorkerId,
+import MkId		( mkWorkerId )
+import Id		( getInlinePragma, getIdStrictness,
 			  addIdStrictness, addInlinePragma,
 			  IdSet, emptyIdSet, addOneToIdSet,
 			  GenId, Id
 			)
-import IdInfo		( noIdInfo, addUnfoldInfo,  
-			  mkStrictnessInfo, addStrictnessInfo, StrictnessInfo(..)
-			)
+import IdInfo		( noIdInfo, mkStrictnessInfo, setStrictnessInfo, StrictnessInfo(..) )
 import SaLib
 import UniqSupply	( returnUs, thenUs, mapUs, getUnique, UniqSM )
 import WwLib
@@ -109,13 +108,9 @@ wwExpr (App f a)
   = wwExpr f			`thenUs` \ new_f ->
     returnUs (App new_f a)
 
-wwExpr (SCC cc expr)
+wwExpr (Note note expr)
   = wwExpr expr			`thenUs` \ new_expr ->
-    returnUs (SCC cc new_expr)
-
-wwExpr (Coerce c ty expr)
-  = wwExpr expr			`thenUs` \ new_expr ->
-    returnUs (Coerce c ty new_expr)
+    returnUs (Note note new_expr)
 
 wwExpr (Let bind expr)
   = wwBind False{-not top-level-} bind	`thenUs` \ intermediate_bind ->
@@ -185,9 +180,7 @@ tryWW	:: Id				-- The fn binder
 					-- wrapper.
 tryWW fn_id rhs
   | (certainlySmallEnoughToInline fn_id $
-     calcUnfoldingGuidance (getInlinePragma fn_id) 
-			  opt_UnfoldingCreationThreshold
-			  rhs
+     calcUnfoldingGuidance opt_UnfoldingCreationThreshold rhs
     )
 	    -- No point in worker/wrappering something that is going to be
 	    -- INLINEd wholesale anyway.  If the strictness analyser is run
@@ -209,7 +202,7 @@ tryWW fn_id rhs
     let
 	work_rhs  = work_fn body
 	work_id   = mkWorkerId work_uniq fn_id (coreExprType work_rhs) work_info
-	work_info = noIdInfo `addStrictnessInfo` mkStrictnessInfo work_demands False
+	work_info = mkStrictnessInfo work_demands False `setStrictnessInfo` noIdInfo
 
 	wrap_rhs = wrap_fn work_id
 	wrap_id  = addInlinePragma (fn_id `addIdStrictness`
@@ -241,9 +234,13 @@ getWorkerIdAndCons wrap_id wrapper_fn
     go (Lam _ body)		      	  = go body
     go (Case _ (AlgAlts [(con,_,rhs)] _)) = let (wrap_id, cons) = go rhs
 					    in  (wrap_id, cons `addOneToIdSet` con)
+{-
+	-- Coercions don't mention the construtor now,
+	-- so I don't think we need this
     go (Let (NonRec _ (Coerce (CoerceOut con) _ _)) body) 
 					  = let (wrap_id, cons) = go body
 					    in  (wrap_id, cons `addOneToIdSet` con)
+-}
     go other	 		      	  = (get_work_id other, emptyIdSet)
 
     get_work_id (App fn _)    = get_work_id fn

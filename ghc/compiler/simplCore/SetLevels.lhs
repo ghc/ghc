@@ -26,7 +26,8 @@ import CoreSyn
 import CoreUtils	( coreExprType )
 import CoreUnfold	( FormSummary, whnfOrBottom, mkFormSummary )
 import FreeVars		-- all of it
-import Id		( idType, mkSysLocal, 
+import MkId		( mkSysLocal )
+import Id		( idType,
 			  nullIdEnv, addOneToIdEnv, growIdEnvList,
 			  unionManyIdSets, minusIdSet, mkIdSet,
 			  idSetToList, Id,
@@ -258,13 +259,9 @@ lvlExpr ctxt_lvl envs@(venv, tenv) (_, AnnApp fun arg)
   = lvlExpr ctxt_lvl envs fun		`thenLvl` \ fun' ->
     returnLvl (App fun' arg)
 
-lvlExpr ctxt_lvl envs (_, AnnSCC cc expr)
+lvlExpr ctxt_lvl envs (_, AnnNote note expr)
   = lvlExpr ctxt_lvl envs expr 		`thenLvl` \ expr' ->
-    returnLvl (SCC cc expr')
-
-lvlExpr ctxt_lvl envs (_, AnnCoerce c ty expr)
-  = lvlExpr ctxt_lvl envs expr 		`thenLvl` \ expr' ->
-    returnLvl (Coerce c ty expr')
+    returnLvl (Note note expr')
 
 -- We don't split adjacent lambdas.  That is, given
 --	\x y -> (x+1,y)

@@ -27,7 +27,6 @@ import IdInfo		( ArityInfo(..) )
 import Maybes		( maybeToBool )
 import Name		( isLocallyDefined )
 import BasicTypes       ( Arity )
-import PprType		( GenType{-instance Outputable-} )
 import Outputable
 
 infixr 9 `thenLne`, `thenLne_`

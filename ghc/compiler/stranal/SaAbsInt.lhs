@@ -606,8 +606,7 @@ absEval anal (Let (Rec pairs) body) env
     in
     absEval anal body new_env
 
-absEval anal (SCC cc expr)      env = absEval anal expr env
-absEval anal (Coerce c ty expr) env = absEval anal expr env
+absEval anal (Note note expr) env = absEval anal expr env
 \end{code}
 
 \begin{code}

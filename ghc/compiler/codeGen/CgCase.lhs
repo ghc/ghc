@@ -46,14 +46,12 @@ import ClosureInfo	( mkConLFInfo, mkLFArgument, layOutDynCon )
 import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros )
 import CostCentre	( useCurrentCostCentre, CostCentre )
 import HeapOffs		( VirtualSpBOffset, VirtualHeapOffset )
-import Id		( idPrimRep, toplevelishId,
-			  dataConTag, fIRST_TAG, ConTag,
+import Id		( idPrimRep, dataConTag, fIRST_TAG, ConTag,
 			  isDataCon, DataCon,
 			  idSetToList, GenId{-instance Uniquable,Eq-}, Id
 			)
 import Literal          ( Literal )
 import Maybes		( catMaybes )
-import PprType		( GenType{-instance Outputable-} )
 import PrimOp		( primOpCanTriggerGC, PrimOp(..),
 			  primOpStackRequired, StackRequirement(..)
 			)
@@ -141,46 +139,6 @@ cgCase	:: StgExpr
 \end{code}
 
 Several special cases for primitive operations.
-
-******* TO DO TO DO: fix what follows
-
-Special case for
-
-	case (op x1 ... xn) of
-	  y -> e
-
-where the type of the case scrutinee is a multi-constuctor algebraic type.
-Then we simply compile code for
-
-	let y = op x1 ... xn
-	in
-	e
-
-In this case:
-
-	case (op x1 ... xn) of
-	   C a b -> ...
-	   y     -> e
-
-where the type of the case scrutinee is a multi-constuctor algebraic type.
-we just bomb out at the moment. It never happens in practice.
-
-**** END OF TO DO TO DO
-
-\begin{code}
-cgCase scrut@(StgPrim op args _) live_in_whole_case live_in_alts uniq
-       (StgAlgAlts _ alts (StgBindDefault id _ deflt_rhs))
-  = if not (null alts) then
-    	panic "cgCase: case on PrimOp with default *and* alts\n"
-	-- For now, die if alts are non-empty
-    else
-	cgExpr (StgLet (StgNonRec id scrut_rhs) deflt_rhs)
-  where
-    scrut_rhs       = StgRhsClosure useCurrentCostCentre stgArgOcc{-safe-} scrut_free_vars
-				Updatable [] scrut
-    scrut_free_vars = [ fv | StgVarArg fv <- args, not (toplevelishId fv) ]
-			-- Hack, hack
-\end{code}
 
 
 \begin{code}

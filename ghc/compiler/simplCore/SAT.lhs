@@ -163,13 +163,9 @@ satExpr (Let (Rec binds) body)
     mapSAT satExpr rhss		    `thenSAT` \ rhss' ->
     returnSAT (Let (Rec (zipEqual "satExpr:Rec" binders rhss')) body')
 
-satExpr (SCC cc expr)
+satExpr (Note note expr)
   = satExpr expr		    `thenSAT` \ expr2 ->
-    returnSAT (SCC cc expr2)
-
-satExpr (Coerce c ty expr)
-  = satExpr expr		    `thenSAT` \ expr2 ->
-    returnSAT (Coerce c ty expr2)
+    returnSAT (Note note expr2)
 \end{code}
 
 \begin{code}

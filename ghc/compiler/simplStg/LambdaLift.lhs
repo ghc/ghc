@@ -11,7 +11,8 @@ module LambdaLift ( liftProgram ) where
 import StgSyn
 
 import Bag		( Bag, emptyBag, unionBags, unitBag, snocBag, bagToList )
-import Id		( idType, mkSysLocal, addIdArity, 
+import MkId		( mkSysLocal )
+import Id		( idType, addIdArity, 
 			  mkIdSet, unitIdSet, minusIdSet, setIdVisibility,
 			  unionManyIdSets, idSetToList, IdSet,
 			  nullIdEnv, growIdEnvList, lookupIdEnv, IdEnv,

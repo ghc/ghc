@@ -20,7 +20,9 @@ import HsTypes		( HsType )
 import Name		( NamedThing )
 import Id		( Id )
 import Outputable	
-import PprType		( pprGenType, pprParendGenType, GenType, GenTyVar )
+import PprType		( pprType, pprParendType )
+import Type		( GenType )
+import TyVar		( GenTyVar )
 import SrcLoc		( SrcLoc )
 \end{code}
 
@@ -273,13 +275,13 @@ ppr_expr (ExplicitList exprs)
   = brackets (fsep (punctuate comma (map ppr_expr exprs)))
 ppr_expr (ExplicitListOut ty exprs)
   = hcat [ brackets (fsep (punctuate comma (map ppr_expr exprs))),
-	   ifNotPprForUser ((<>) space (parens (pprGenType ty))) ]
+	   ifNotPprForUser ((<>) space (parens (pprType ty))) ]
 
 ppr_expr (ExplicitTuple exprs)
   = parens (sep (punctuate comma (map ppr_expr exprs)))
 
 ppr_expr (HsCon con_id tys args)
-  = ppr con_id <+> sep (map pprParendGenType tys ++
+  = ppr con_id <+> sep (map pprParendType tys ++
 		        map pprParendExpr args)
 
 ppr_expr (RecordCon con_id con rbinds)
@@ -313,7 +315,7 @@ ppr_expr (TyLam tyvars expr)
 	 4 (ppr_expr expr)
 
 ppr_expr (TyApp expr [ty])
-  = hang (ppr_expr expr) 4 (pprParendGenType ty)
+  = hang (ppr_expr expr) 4 (pprParendType ty)
 
 ppr_expr (TyApp expr tys)
   = hang (ppr_expr expr)

@@ -15,14 +15,12 @@ import CoreSyn
 import CmdLineOpts	( opt_D_verbose_core2core, opt_D_simplifier_stats )
 import CostCentre	( dupifyCC, CostCentre )
 import Id		( nullIdEnv, addOneToIdEnv, growIdEnvList, IdEnv,
-			  GenId{-instance Outputable-}, Id
+			  Id
 			)
 import PprCore
-import PprType		( GenTyVar )
 import SetLevels	-- all of it
 import BasicTypes	( Unused )
-import TyVar		( GenTyVar{-instance Eq-}, TyVar )
-import Unique		( Unique{-instance Eq-} )
+import TyVar		( TyVar )
 import UniqSupply       ( UniqSupply )
 import List		( partition )
 import Outputable
@@ -236,7 +234,7 @@ floatExpr env lvl (Lam (ValBinder (arg,incd_lvl)) rhs)
      Lam (ValBinder arg) (install heres rhs'))
     }}
 
-floatExpr env lvl (SCC cc expr)
+floatExpr env lvl (Note note@(SCC cc) expr)
   = case (floatExpr env lvl expr)    of { (fs, floating_defns, expr') ->
     let
 	-- annotate bindings floated outwards past an scc expression
@@ -244,7 +242,7 @@ floatExpr env lvl (SCC cc expr)
 
 	annotated_defns = annotate (dupifyCC cc) floating_defns
     in
-    (fs, annotated_defns, SCC cc expr') }
+    (fs, annotated_defns, Note note expr') }
   where
     annotate :: CostCentre -> FloatingBinds -> FloatingBinds
 
@@ -257,18 +255,18 @@ floatExpr env lvl (SCC cc expr)
 	ann_bind (LetFloater (Rec pairs))
 	  = LetFloater (Rec [(binder, ann_rhs rhs) | (binder, rhs) <- pairs])
 
-	ann_bind (CaseFloater fn) = CaseFloater ( \ rhs -> SCC dupd_cc (fn rhs) )
+	ann_bind (CaseFloater fn) = CaseFloater ( \ rhs -> Note (SCC dupd_cc) (fn rhs) )
 
 	ann_rhs (Lam arg e)   = Lam arg (ann_rhs e)
 	ann_rhs rhs@(Con _ _) = rhs	-- no point in scc'ing WHNF data
-	ann_rhs rhs	      = SCC dupd_cc rhs
+	ann_rhs rhs	      = Note (SCC dupd_cc) rhs
 
 	-- Note: Nested SCC's are preserved for the benefit of
 	--       cost centre stack profiling (Durham)
 
-floatExpr env lvl (Coerce c ty expr)
+floatExpr env lvl (Note note expr)	-- Other than SCCs
   = case (floatExpr env lvl expr)    of { (fs, floating_defns, expr') ->
-    (fs, floating_defns, Coerce c ty expr') }
+    (fs, floating_defns, Note note expr') }
 
 floatExpr env lvl (Let bind body)
   = case (floatBind env     lvl bind) of { (fsb, rhs_floats, bind', new_env) ->

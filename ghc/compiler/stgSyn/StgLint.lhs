@@ -21,13 +21,12 @@ import Literal		( literalType, Literal{-instance Outputable-} )
 import Maybes		( catMaybes )
 import Name		( isLocallyDefined, getSrcLoc )
 import ErrUtils		( ErrMsg )
-import PprType		( GenType{-instance Outputable-}, TyCon )
 import PrimOp		( primOpType )
 import SrcLoc		( SrcLoc{-instance Outputable-} )
 import Type		( mkFunTys, splitFunTys, splitAlgTyConApp_maybe,
 			  isTyVarTy, Type
 			)
-import TyCon		( isDataTyCon )
+import TyCon		( TyCon, isDataTyCon )
 import Util		( zipEqual )
 import GlaExts		( trace )
 import Outputable

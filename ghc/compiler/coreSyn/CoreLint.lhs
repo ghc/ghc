@@ -30,7 +30,6 @@ import Name		( isLocallyDefined, getSrcLoc, Name{-instance NamedThing-},
 			  NamedThing(..) )
 import PprCore
 import ErrUtils		( doIfSet, ghcExit )
-import PprType		( GenType, GenTyVar, TyCon )
 import PrimOp		( primOpType )
 import PrimRep		( PrimRep(..) )
 import SrcLoc		( SrcLoc )
@@ -39,7 +38,7 @@ import Type		( mkFunTy, splitFunTy_maybe, mkForAllTy,
 			  isUnpointedType, typeKind, instantiateTy,
 			  splitAlgTyConApp_maybe, Type
 			)
-import TyCon		( isPrimTyCon, isDataTyCon )
+import TyCon		( TyCon, isPrimTyCon, isDataTyCon )
 import TyVar		( TyVar, tyVarKind, mkTyVarEnv )
 import ErrUtils		( ErrMsg )
 import Unique		( Unique )
@@ -205,10 +204,16 @@ lintCoreExpr (Var var)
   | otherwise    = checkInScope var `seqL` returnL (Just (idType var))
 
 lintCoreExpr (Lit lit) = returnL (Just (literalType lit))
-lintCoreExpr (SCC _ expr) = lintCoreExpr expr
-lintCoreExpr e@(Coerce coercion ty expr)
-  = lintCoercion e coercion 	`seqL`
-    lintCoreExpr expr `seqL` returnL (Just ty)
+
+lintCoreExpr (Note (Coerce to_ty from_ty) expr)
+  = lintCoreExpr expr 	`thenMaybeL` \ expr_ty ->
+    lintTy to_ty	`seqL`
+    lintTy from_ty	`seqL`
+    checkTys from_ty expr_ty (mkCoerceErr from_ty expr_ty)	`seqL`
+    returnL (Just to_ty)
+
+lintCoreExpr (Note other_note expr)
+  = lintCoreExpr expr
 
 lintCoreExpr (Let binds body)
   = lintCoreBinding binds `thenL` \binders ->
@@ -297,7 +302,8 @@ lintCoreArg e ty (VarArg v)
     var_ty = idType v
 
 lintCoreArg e ty a@(TyArg arg_ty)
-  = -- ToDo: Check that ty is well-kinded and has no unbound tyvars
+  = lintTy arg_ty			`seqL`
+
     case (splitForAllTy_maybe ty) of
       Nothing -> addErrL (mkTyAppMsg SLIT("Illegal") ty arg_ty e) `seqL` returnL Nothing
 
@@ -406,19 +412,17 @@ lintDeflt deflt@(BindDefault binder rhs) ty
 
 %************************************************************************
 %*									*
-\subsection[lint-coercion]{Coercion}
+\subsection[lint-types]{Types}
 %*									*
 %************************************************************************
 
 \begin{code}
-lintCoercion e (CoerceIn  con) = check_con e con
-lintCoercion e (CoerceOut con) = check_con e con
-
-check_con e con = checkL (isNewCon con)
-		         (mkCoerceErrMsg e)
+lintTy :: Type -> LintM ()
+lintTy ty = returnL ()
+-- ToDo: Check that ty is well-kinded and has no unbound tyvars
 \end{code}
 
-
+    
 %************************************************************************
 %*									*
 \subsection[lint-monad]{The Lint monad}
@@ -571,10 +575,6 @@ mkConErrMsg e
   = ($$) (ptext SLIT("Application of newtype constructor:"))
 	    (ppr e)
 
-mkCoerceErrMsg e
-  = ($$) (ptext SLIT("Coercion using a datatype constructor:"))
-	 (ppr e)
-
 
 mkCaseAltMsg :: CoreCaseAlts -> ErrMsg
 mkCaseAltMsg alts
@@ -665,4 +665,10 @@ mkRhsPrimMsg binder rhs
 		     ppr binder],
 	      hsep [ptext SLIT("Binder's type:"), ppr (idType binder)]
 	     ]
+
+mkCoerceErr from_ty expr_ty
+  = vcat [ptext SLIT("From-type of Coerce differs from type of enclosed expression"),
+	  ptext SLIT("From-type:") <+> ppr from_ty,
+	  ptext SLIT("Type of enclosed expr:") <+> ppr expr_ty
+    ]
 \end{code}

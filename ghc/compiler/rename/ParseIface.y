@@ -83,6 +83,7 @@ import Outputable
 	TYPE_PART       { ITtysig _ _ }
 	ARITY_PART	{ ITarity }
 	UNFOLD_PART	{ ITunfold $$ }
+        SPECIALISE      { ITspecialise }
 	BOTTOM		{ ITbottom }
 	LAM		{ ITlam }
 	BIGLAM		{ ITbiglam }
@@ -92,11 +93,11 @@ import Outputable
 	LETREC		{ ITletrec }
 	IN		{ ITin }
 	OF		{ ITof }
-	COERCE_IN	{ ITcoerce_in }
-	COERCE_OUT	{ ITcoerce_out }
+	COERCE   	{ ITcoerce }
 	ATSIGN		{ ITatsign }
 	CCALL		{ ITccall $$ }
 	SCC		{ ITscc $$ }
+        INLINE_CALL     { ITinline }
 
 	CHAR		{ ITchar $$ }
 	STRING		{ ITstring $$ }	
@@ -485,6 +486,8 @@ id_info_item	: ARITY_PART arity_info			{ HsArity $2 }
 		| strict_info				{ HsStrictness $1 }
 		| BOTTOM 				{ HsStrictness HsBottom }
 		| UNFOLD_PART core_expr			{ HsUnfold $1 $2 }
+                | SPECIALISE OBRACK tv_bndrs CBRACK 
+                     atypes EQUAL core_expr             { HsSpecialise $3 $5 $7 }
 
 arity_info	:: { ArityInfo }
 arity_info	: INTEGER					{ exactArity (fromInteger $1) }
@@ -517,8 +520,6 @@ core_expr	: qvar_name					{ UfVar $1 }
 		| LETREC OCURLY rec_binds CCURLY		
 		  IN core_expr					{ UfLet (UfRec $3) $6 }
 
-		| coerce atype core_expr			{ UfCoerce $1 $2 $3 }
-
 		| CCALL ccall_string 
 			OBRACK atype atypes CBRACK core_args	{ let
 									(is_casm, may_gc) = $1
@@ -526,16 +527,14 @@ core_expr	: qvar_name					{ UfVar $1 }
 								  UfPrim (UfCCallOp $2 is_casm may_gc $5 $4)
 									 $7
 								}
-		| SCC core_expr 	                        {  UfSCC $1 $2	}
+                | INLINE_CALL core_expr                         {  UfNote UfInlineCall $2 }
+                | COERCE atype core_expr                        {  UfNote (UfCoerce $2) $3 }
+		| SCC core_expr 	                        {  UfNote (UfSCC $1) $2	}
 
 rec_binds	:: { [(UfBinder RdrName, UfExpr RdrName)] }
 		:						{ [] }
 		| core_val_bndr EQUAL core_expr SEMI rec_binds	{ ($1,$3) : $5 }
 
-coerce		:: { UfCoercion RdrName }
-coerce		: COERCE_IN  qdata_name				{ UfIn  $2 }
-		| COERCE_OUT qdata_name				{ UfOut $2 }
-		
 prim_alts	:: { [(Literal,UfExpr RdrName)] }
 		:						{ [] }
 		| core_lit RARROW core_expr SEMI prim_alts	{ ($1,$3) : $5 }

@@ -24,14 +24,13 @@ module TcEnv(
 
 #include "HsVersions.h"
 
-import Id	( Id, GenId, idType, mkUserLocal, mkUserId, replaceIdInfo, getIdInfo )
-import PragmaInfo ( PragmaInfo(..) )
+import MkId	( mkUserLocal, mkUserId )
+import Id	( Id, GenId, idType, replaceIdInfo, idInfo )
 import TcKind	( TcKind, kindToTcKind, Kind )
 import TcType	( TcType, TcMaybe, TcTyVar, TcTyVarSet, TcThetaType,
 		  newTyVarTys, tcInstTyVars, zonkTcTyVars, tcInstType
 		)
 import TyVar	( mkTyVarSet, unionTyVarSets, emptyTyVarSet, TyVar )
-import PprType	( GenTyVar )
 import Type	( tyVarsOfType, tyVarsOfTypes, splitForAllTys, splitRhoTy )
 import TyCon	( TyCon, tyConKind, tyConArity, isSynTyCon, Arity )
 import Class	( Class )
@@ -371,7 +370,7 @@ tcAddImportedIdInfo unf_env id
     new_info = -- pprTrace "tcAdd" (ppr id) $
 	       case tcExplicitLookupGlobal unf_env (getName id) of
 		     Nothing	      -> noIdInfo
-		     Just imported_id -> getIdInfo imported_id
+		     Just imported_id -> idInfo imported_id
 		-- ToDo: could check that types are the same
 \end{code}
 

@@ -21,8 +21,9 @@ module CoreUtils (
 import CoreSyn
 
 import CostCentre	( isDictCC, CostCentre, noCostCentre )
-import Id		( idType, mkSysLocal, isBottomingId,
-			  toplevelishId, mkIdWithNewUniq,
+import MkId		( mkSysLocal )
+import Id		( idType, isBottomingId,
+			  mkIdWithNewUniq,
 			  dataConRepType,
 			  addOneToIdEnv, growIdEnvList, lookupIdEnv,
 			  isNullIdEnv, IdEnv, Id
@@ -67,10 +68,10 @@ coreExprType (Var var) = idType   var
 coreExprType (Lit lit) = literalType lit
 
 coreExprType (Let _ body)	= coreExprType body
-coreExprType (SCC _ expr)	= coreExprType expr
 coreExprType (Case _ alts)	= coreAltsType alts
 
-coreExprType (Coerce _ ty _)	= ty -- that's the whole point!
+coreExprType (Note (Coerce ty _) e) = ty
+coreExprType (Note other_note e)    = coreExprType e
 
 -- a Con is a fully-saturated application of a data constructor
 -- a Prim is <ditto> of a PrimOp
@@ -145,9 +146,10 @@ It looks inside lambdas because (scc "foo" \x.e) = \x.scc "foo" e
 
 \begin{code}
 coreExprCc :: GenCoreExpr val_bdr val_occ flexi -> CostCentre
-coreExprCc (SCC cc e) = cc
-coreExprCc (Lam _ e)  = coreExprCc e
-coreExprCc other      = noCostCentre
+coreExprCc (Note (SCC cc) e)   = cc
+coreExprCc (Note other_note e) = coreExprCc e
+coreExprCc (Lam _ e)           = coreExprCc e
+coreExprCc other               = noCostCentre
 \end{code}
 
 %************************************************************************
@@ -242,8 +244,7 @@ bop_expr f (Con con args)    = Con con args
 bop_expr f (Prim op args)    = Prim op args
 bop_expr f (Lam binder expr) = Lam  (bop_binder f binder) (bop_expr f expr)
 bop_expr f (App expr arg)    = App  (bop_expr f expr) arg
-bop_expr f (SCC label expr)  = SCC  label (bop_expr f expr)
-bop_expr f (Coerce c ty e)   = Coerce c ty (bop_expr f e)
+bop_expr f (Note note expr)  = Note note (bop_expr f expr)
 bop_expr f (Let bind expr)   = Let  (bop_bind f bind) (bop_expr f expr)
 bop_expr f (Case expr alts)  = Case (bop_expr f expr) (bop_alts f alts)
 

@@ -616,15 +616,10 @@ rnCoreExpr (UfCase scrut alts)
     rnCoreAlts alts		`thenRn` \ alts' ->
     returnRn (UfCase scrut' alts')
 
-rnCoreExpr (UfSCC cc expr) 
-  = rnCoreExpr expr		`thenRn` \ expr' ->
-    returnRn  (UfSCC cc expr') 
-
-rnCoreExpr(UfCoerce coercion ty body)
-  = rnCoercion coercion		`thenRn` \ coercion' ->
-    rnHsType ty			`thenRn` \ ty' ->
-    rnCoreExpr body		`thenRn` \ body' ->
-    returnRn (UfCoerce coercion' ty' body')
+rnCoreExpr (UfNote note expr) 
+  = rnNote note			`thenRn` \ note' ->
+    rnCoreExpr expr		`thenRn` \ expr' ->
+    returnRn  (UfNote note' expr') 
 
 rnCoreExpr (UfLam bndr body)
   = rnCoreBndr bndr 		$ \ bndr' ->
@@ -697,8 +692,12 @@ rnCoreDefault (UfBindDefault bndr rhs) = bindLocalsRn "unfolding default" [bndr]
 					 rnCoreExpr rhs					`thenRn` \ rhs' ->
 				  	 returnRn (UfBindDefault bndr' rhs')
 
-rnCoercion (UfIn  n) = lookupOccRn n `thenRn` \ n' -> returnRn (UfIn  n')
-rnCoercion (UfOut n) = lookupOccRn n `thenRn` \ n' -> returnRn (UfOut n')
+rnNote (UfCoerce ty)
+  = rnHsType ty			`thenRn` \ ty' ->
+    returnRn (UfCoerce ty')
+
+rnNote (UfSCC cc)   = returnRn (UfSCC cc)
+rnNote UfInlineCall = returnRn UfInlineCall
 
 rnCorePrim (UfOtherOp op) 
   = lookupOccRn op	`thenRn` \ op' ->

@@ -20,7 +20,8 @@ module BinderInfo (
 	getBinderInfoArity,
 	setBinderInfoArityToZero,
 
-	okToInline, isOneOcc, isOneFunOcc, isOneSafeFunOcc, isDeadOcc,
+	isOneOcc, isOneFunOcc, isOneSafeFunOcc, isOneSameSCCFunOcc, 
+	isDeadOcc, isInlinableOcc,
 
 	isFun, isDupDanger -- for Simon Marlow deforestation
     ) where
@@ -111,10 +112,29 @@ isOneFunOcc :: BinderInfo -> Bool
 isOneFunOcc (OneOcc FunOcc _ _ _ _) = True
 isOneFunOcc other_bind 	    	    = False
 
-isOneSafeFunOcc :: Bool -> BinderInfo -> Bool
-isOneSafeFunOcc ok_to_dup (OneOcc FunOcc NoDupDanger NotInsideSCC n_alts _)
-  = ok_to_dup || n_alts <= 1
-isOneSafeFunOcc ok_to_dup other_bind	    = False
+isOneSameSCCFunOcc :: BinderInfo -> Bool
+isOneSameSCCFunOcc (OneOcc FunOcc _ NotInsideSCC _ _) = True
+isOneSameSCCFunOcc other_bind	   		      = False
+
+isOneSafeFunOcc :: BinderInfo -> Bool	-- Completely safe
+isOneSafeFunOcc (OneOcc FunOcc NoDupDanger NotInsideSCC n_alts _) = n_alts <= 1
+isOneSafeFunOcc other						  = False
+
+-- A non-WHNF can be inlined if it doesn't occur inside a lambda,
+-- and occurs exactly once or 
+--     occurs once in each branch of a case and is small
+--
+-- If the thing is in WHNF, there's no danger of duplicating work, 
+-- so we can inline if it occurs once, or is small
+isInlinableOcc :: Bool 	-- True <=> don't worry about dup-danger
+	       -> Bool	-- True <=> don't worry about code size
+	       -> BinderInfo
+	       -> Bool	-- Inlinable
+isInlinableOcc whnf small (ManyOcc _) 
+  = whnf && small
+isInlinableOcc whnf small (OneOcc _ dup_danger _ n_alts _)
+  =  (whnf || (case dup_danger of {NoDupDanger -> True; other -> False}))
+  && (small || n_alts <= 1)
 
 isDeadOcc :: BinderInfo -> Bool
 isDeadOcc DeadCode = True
@@ -129,30 +149,6 @@ isDupDanger DupDanger = True
 isDupDanger _ = False
 \end{code}
 
-
-\begin{code}
-okToInline :: Bool		-- The thing is WHNF or bottom; 
-	   -> Bool		-- It's small enough to duplicate the code
-	   -> BinderInfo
-	   -> Bool		-- True <=> inline it
-
--- A non-WHNF can be inlined if it doesn't occur inside a lambda,
--- and occurs exactly once or 
---     occurs once in each branch of a case and is small
-okToInline False small_enough (OneOcc _ NoDupDanger _ n_alts _)
-  = n_alts <= 1 || small_enough
-
--- If the thing isn't a redex, there's no danger of duplicating work, 
--- so we can inline if it occurs once, or is small
-okToInline True small_enough occ_info 
- = one_occ || small_enough
- where
-   one_occ = case occ_info of
-		OneOcc _ _ _ n_alts _ -> n_alts <= 1
-		other		      -> False
-
-okToInline whnf_or_bot small_enough any_occ = False
-\end{code}
 
 
 Construction

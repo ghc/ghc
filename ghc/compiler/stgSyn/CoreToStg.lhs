@@ -20,11 +20,11 @@ import StgSyn		-- output
 import Bag		( emptyBag, unitBag, unionBags, unionManyBags, bagToList )
 import CoreUtils	( coreExprType )
 import CostCentre	( noCostCentre )
-import Id		( mkSysLocal, idType, isBottomingId,
+import MkId		( mkSysLocal ) 
+import Id		( idType, isBottomingId,
 			  externallyVisibleId, mkIdWithNewUniq,
-
 			  nullIdEnv, addOneToIdEnv, lookupIdEnv, growIdEnvList,
-			  IdEnv, GenId{-instance NamedThing-}, Id
+			  IdEnv, Id
 			)
 import Literal		( mkMachInt, Literal(..) )
 import PrelVals		( unpackCStringId, unpackCString2Id,
@@ -322,10 +322,11 @@ coreExprToStg env expr@(App _ _)
 			   	 (StgApp (StgVarArg fun_id) stg_args bOGUS_LVs))
   where
 	-- Collect arguments, discarding type/usage applications
-    collect_args (App e   (TyArg _))    args = collect_args e   args
-    collect_args (App fun arg)          args = collect_args fun (arg:args)
-    collect_args (Coerce _ _ expr)      args = collect_args expr args
-    collect_args fun                    args = (fun, args)
+    collect_args (App e   (TyArg _))      args = collect_args e   args
+    collect_args (App fun arg)            args = collect_args fun (arg:args)
+    collect_args (Note (Coerce _ _) expr) args = collect_args expr args
+    collect_args (Note InlineCall   expr) args = collect_args expr args
+    collect_args fun                      args = (fun, args)
 \end{code}
 
 %************************************************************************
@@ -334,7 +335,40 @@ coreExprToStg env expr@(App _ _)
 %*									*
 %************************************************************************
 
+
+******* TO DO TO DO: fix what follows
+
+Special case for
+
+	case (op x1 ... xn) of
+	  y -> e
+
+where the type of the case scrutinee is a multi-constuctor algebraic type.
+Then we simply compile code for
+
+	let y = op x1 ... xn
+	in
+	e
+
+In this case:
+
+	case (op x1 ... xn) of
+	   C a b -> ...
+	   y     -> e
+
+where the type of the case scrutinee is a multi-constuctor algebraic type.
+we just bomb out at the moment. It never happens in practice.
+
+**** END OF TO DO TO DO
+
 \begin{code}
+coreExprToStg env (Case scrut@(Prim op args) (AlgAlts alts (BindDefault binder rhs)))
+  = if not (null alts) then
+    	panic "cgCase: case on PrimOp with default *and* alts\n"
+	-- For now, die if alts are non-empty
+    else
+	coreExprToStg env (Let (NonRec binder scrut) rhs)
+
 coreExprToStg env (Case discrim alts)
   = coreExprToStg env discrim		`thenUs` \ stg_discrim ->
     alts_to_stg discrim alts		`thenUs` \ stg_alts ->
@@ -398,13 +432,13 @@ coreExprToStg env (Let bind body)
 
 Covert core @scc@ expression directly to STG @scc@ expression.
 \begin{code}
-coreExprToStg env (SCC cc expr)
+coreExprToStg env (Note (SCC cc) expr)
   = coreExprToStg env expr   `thenUs` \ stg_expr ->
     returnUs (StgSCC (coreExprType expr) cc stg_expr)
 \end{code}
 
 \begin{code}
-coreExprToStg env (Coerce c ty expr) = coreExprToStg env expr
+coreExprToStg env (Note other_note expr) = coreExprToStg env expr
 \end{code}
 
 

@@ -18,14 +18,14 @@ module PprCore (
 
 import CoreSyn
 import CostCentre	( showCostCentre )
-import Id		( idType, getIdInfo, isTupleCon,
+import Id		( idType, idInfo, isTupleCon,
 			  DataCon, GenId{-instances-}, Id
 			) 
 import IdInfo		( ppIdInfo, ppStrictnessInfo )
 import Literal		( Literal{-instances-} )
 import Outputable	-- quite a few things
 import PprEnv
-import PprType		( pprParendGenType, pprTyVarBndr, GenType{-instances-}, GenTyVar{-instance-} )
+import PprType		( pprParendType, pprTyVarBndr )
 import PrimOp		( PrimOp{-instances-} )
 import TyVar		( GenTyVar{-instances-} )
 import Unique		( Unique{-instances-} )
@@ -120,7 +120,7 @@ init_ppr_env tvbndr pbdr pocc
 
 	(Just tvbndr)	 	-- tyvar binders
 	(Just ppr) 		-- tyvar occs
-	(Just pprParendGenType) -- types
+	(Just pprParendType)    -- types
 
 	(Just pbdr) (Just pocc) -- value vars
   where
@@ -271,15 +271,16 @@ ppr_expr pe (Let bind expr)
 		Rec _      -> SLIT("_letrec_ {")
 		NonRec _ _ -> SLIT("let {")
 
-ppr_expr pe (SCC cc expr)
+ppr_expr pe (Note (SCC cc) expr)
   = sep [hsep [ptext SLIT("_scc_"), pSCC pe cc],
-	   ppr_parend_expr pe expr ]
+	 ppr_parend_expr pe expr ]
 
-ppr_expr pe (Coerce c ty expr)
-  = sep [pp_coerce c, pTy pe ty, ppr_expr pe expr]
-  where
-    pp_coerce (CoerceIn  v) = (<>) (ptext SLIT("_coerce_in_ "))  (ppr v)
-    pp_coerce (CoerceOut v) = (<>) (ptext SLIT("_coerce_out_ ")) (ppr v)
+ppr_expr pe (Note (Coerce to_ty from_ty) expr)
+  = sep [hsep [ptext SLIT("_coerce_"), pTy pe to_ty, pTy pe from_ty],
+	 ppr_parend_expr pe expr]
+
+ppr_expr pe (Note InlineCall expr)
+  = ptext SLIT("_inline_") <+> ppr_parend_expr pe expr
 
 only_one_alt (AlgAlts []     (BindDefault _ _)) = True
 only_one_alt (AlgAlts (_:[])  NoDefault) 	= True
@@ -337,7 +338,7 @@ pprCoreBinder LetBind binder
   = vcat [sig, pragmas, ppr binder]
   where
     sig     = pprTypedBinder binder
-    pragmas = ppIdInfo False{-no specs, thanks-} (getIdInfo binder)
+    pragmas = ppIdInfo False{-no specs, thanks-} (idInfo binder)
 
 pprCoreBinder LambdaBind binder = pprTypedBinder binder
 pprCoreBinder CaseBind   binder = ppr binder
@@ -348,7 +349,7 @@ pprIfaceBinder CaseBind binder = ppr binder
 pprIfaceBinder other    binder = pprTypedBinder binder
 
 pprTypedBinder binder
-  = ppr binder <+> ptext SLIT("::") <+> pprParendGenType (idType binder)
+  = ppr binder <+> ptext SLIT("::") <+> pprParendType (idType binder)
 	-- The space before the :: is important; it helps the lexer
 	-- when reading inferfaces.  Otherwise it would lex "a::b" as one thing.
 	--

@@ -213,8 +213,9 @@ data IfaceToken
   | ITarity 
   | ITunfold Bool		-- True <=> there's an INLINE pragma on this Id
   | ITstrict [Demand] | ITbottom
+  | ITspecialise
   | ITlam | ITbiglam | ITcase | ITprim_case | ITlet | ITletrec | ITin | ITof
-  | ITcoerce_in | ITcoerce_out | ITatsign
+  | ITcoerce | ITinline | ITatsign 
   | ITccall (Bool,Bool)		-- (is_casm, may_gc)
   | ITscc CostCentre 
   | ITchar Char | ITstring FAST_STRING
@@ -756,8 +757,9 @@ ifaceKeywordsFM = listToUFM $
        ,("u_",			ITunfold False)
        ,("U_",			ITunfold True)
        ,("A_",			ITarity)
-       ,("coerce_in_",		ITcoerce_in)
-       ,("coerce_out_",		ITcoerce_out)
+       ,("P_",			ITspecialise)
+       ,("coerce_",		ITcoerce)
+       ,("inline_",		ITinline)
        ,("bot_",		ITbottom)
        ,("integer_",		ITinteger_lit)
        ,("rational_",		ITrational_lit)

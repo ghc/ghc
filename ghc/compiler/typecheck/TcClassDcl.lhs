@@ -31,15 +31,15 @@ import TcSimplify	( tcSimplifyAndCheck )
 import TcType		( TcType, TcTyVar, TcTyVarSet, tcInstSigTyVars, 
 			  zonkSigTyVar, tcInstSigTcType
 			)
-import PragmaInfo	( PragmaInfo(..) )
-
+import FieldLabel	( firstFieldLabelTag )
 import Bag		( unionManyBags )
 import Class		( mkClass, classBigSig, Class )
 import CmdLineOpts      ( opt_GlasgowExts )
+import MkId		( mkDataCon, mkSuperDictSelId, 
+			  mkMethodSelId, mkDefaultMethodId
+			)
 import Id		( Id, StrictnessMark(..),
-			  mkSuperDictSelId, mkMethodSelId, 
-			  mkDefaultMethodId, getIdUnfolding, mkDataCon, 
-			  idType
+			  getIdUnfolding, idType
 			)
 import CoreUnfold	( getUnfoldingTemplate )
 import IdInfo
@@ -59,7 +59,7 @@ import Maybes		( assocMaybe, maybeToBool )
 
 -- import TcPragmas	( tcGenPragmas, tcClassOpPragmas )
 tcGenPragmas ty id ps = returnNF_Tc noIdInfo
-tcClassOpPragmas ty sel def spec ps = returnNF_Tc (noIdInfo `setSpecInfo` spec, 
+tcClassOpPragmas ty sel def spec ps = returnNF_Tc (spec `setSpecInfo` noIdInfo, 
 						   noIdInfo)
 \end{code}
 
@@ -188,7 +188,7 @@ tcClassContext rec_class rec_tyvars context pragmas
 	--	D_sc1, D_sc2
 	-- (We used to call them D_C, but now we can have two different
 	--  superclasses both called C!)
-    mapTc mk_super_id (sc_theta `zip` [1..])	`thenTc` \ sc_sel_ids ->
+    mapTc mk_super_id (sc_theta `zip` [firstFieldLabelTag..])	`thenTc` \ sc_sel_ids ->
 
 	-- Done
     returnTc (sc_theta, sc_tys, sc_sel_ids)
@@ -488,7 +488,7 @@ tcMethodBind clas origin inst_tys inst_tyvars sel_id meth_bind
    tcExtendGlobalTyVars inst_tyvars (
      tcAddErrCtxt (methodCtxt sel_id)		$
      tcBindWithSigs NotTopLevel [bndr_name] meth_bind [sig_info]
-		    NonRecursive (\_ -> NoPragmaInfo)	
+		    NonRecursive (\_ -> noIdInfo)	
    )							`thenTc` \ (binds, insts, _) ->
 
 	-- Now check that the instance type variables

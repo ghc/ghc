@@ -15,8 +15,9 @@ import Util		( panic )
 liberateCase = panic "LiberateCase.liberateCase: ToDo"
 
 {- LATER: to end of file:
-import CoreUnfold	( UnfoldingGuidance(..), PragmaInfo(..) )
+import CoreUnfold	( UnfoldingGuidance(..) )
 import Id		( localiseId )
+import IdInfo		{ InlinePragInfo(..) }
 import Maybes
 import Outputable
 import Util
@@ -201,8 +202,7 @@ libCase env (CoTyApp fun ty)    = CoTyApp (libCase env fun) ty
 libCase env (Con con tys args)  = mkCoLetsNoUnboxed (libCaseAtoms env args) (Con con tys args)
 libCase env (Prim op tys args)  = mkCoLetsNoUnboxed (libCaseAtoms env args) (Prim op tys args)
 libCase env (CoTyLam tv body)   = CoTyLam tv (libCase env body)
-libCase env (SCC cc body)       = SCC cc (libCase env body)
-libCase env (Coerce c ty body)	= Coerce c ty (libCase env body)
+libCase env (Note note body)    = Note note (libCase env body)
 
 libCase env (Lam binder body)
   = Lam binder (libCase (addBinders env [binder]) body)

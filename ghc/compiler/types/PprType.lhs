@@ -5,10 +5,8 @@
 
 \begin{code}
 module PprType(
-	GenTyVar, pprGenTyVar, pprTyVarBndr, pprTyVarBndrs,
+	pprTyVar, pprTyVarBndr, pprTyVarBndrs,
 	TyCon, pprTyCon, showTyCon,
-	GenType,
-	pprGenType, pprParendGenType,
 	pprType, pprParendType,
 	pprMaybeTy,
 	getTyDescription,
@@ -44,7 +42,7 @@ import Util
 
 \begin{code}
 instance Outputable (GenType flexi) where
-    ppr ty = pprGenType ty
+    ppr ty = pprType ty
 
 instance Outputable TyCon where
     ppr tycon = pprTyCon tycon
@@ -54,16 +52,7 @@ instance Outputable Class where
     ppr clas = ppr (getName clas)
 
 instance Outputable (GenTyVar flexi) where
-    ppr tv = pprGenTyVar tv
-
--- and two SPECIALIZEd ones:
-{- 
-instance Outputable {-Type, i.e.:-}(GenType Unused) where
-    ppr ty = pprGenType ty
-
-instance Outputable {-TyVar, i.e.:-}(GenTyVar Unused) where
-    ppr ty = pprGenTyVar ty
--}
+    ppr tv = pprTyVar tv
 \end{code}
 
 %************************************************************************
@@ -93,23 +82,19 @@ maybeParen ctxt_prec inner_prec pretty
   | otherwise		   = parens pretty
 \end{code}
 
-@pprGenType@ is the std @Type@ printer; the overloaded @ppr@ function is
-defined to use this.  @pprParendGenType@ is the same, except it puts
-parens around the type, except for the atomic cases.  @pprParendGenType@
+@pprType@ is the std @Type@ printer; the overloaded @ppr@ function is
+defined to use this.  @pprParendType@ is the same, except it puts
+parens around the type, except for the atomic cases.  @pprParendType@
 works just by setting the initial context precedence very high.
 
 \begin{code}
-pprGenType, pprParendGenType :: GenType flexi -> SDoc
+pprType, pprParendType :: GenType flexi -> SDoc
 
-pprGenType       ty = ppr_ty init_ppr_env tOP_PREC   ty
-pprParendGenType ty = ppr_ty init_ppr_env tYCON_PREC ty
-
-pprType, pprParendType :: Type -> SDoc
-pprType       	 ty = ppr_ty init_ppr_env_type tOP_PREC   ty
-pprParendType 	 ty = ppr_ty init_ppr_env_type tYCON_PREC ty
+pprType       ty = ppr_ty init_ppr_env tOP_PREC   ty
+pprParendType ty = ppr_ty init_ppr_env tYCON_PREC ty
 
 pprConstraint :: Class -> [GenType flexi] -> SDoc
-pprConstraint clas tys = hsep [ppr clas, hsep (map (pprParendGenType) tys)]
+pprConstraint clas tys = hsep [ppr clas, hsep (map (pprParendType) tys)]
 
 pprTheta :: ThetaType -> SDoc
 pprTheta theta = parens (hsep (punctuate comma (map ppr_dict theta)))
@@ -118,7 +103,7 @@ pprTheta theta = parens (hsep (punctuate comma (map ppr_dict theta)))
 
 pprMaybeTy :: Maybe (GenType flexi) -> SDoc
 pprMaybeTy Nothing   = char '*'
-pprMaybeTy (Just ty) = pprParendGenType ty
+pprMaybeTy (Just ty) = pprParendType ty
 \end{code}
 
 \begin{code}
@@ -212,14 +197,7 @@ ppr_dict env ctxt (clas, tys) = ppr_class env clas <+>
 \end{code}
 
 \begin{code}
-	-- This one uses only "ppr"
 init_ppr_env
-  = initPprEnv b b b b (Just ppr) (Just ppr) b b b
-  where
-    b = panic "PprType:init_ppr_env"
-
-	-- This one uses pprTyVarBndr, and thus is specific to GenTyVar's types
-init_ppr_env_type
   = initPprEnv b b b b (Just pprTyVarBndr) (Just ppr) b b b
   where
     b = panic "PprType:init_ppr_env"
@@ -235,7 +213,7 @@ ppr_class  env clas  = ppr clas
 %************************************************************************
 
 \begin{code}
-pprGenTyVar (TyVar uniq kind maybe_name _)
+pprTyVar (TyVar uniq kind maybe_name _)
   = case maybe_name of
       	-- If the tyvar has a name we can safely use just it, I think
 	Just n  -> pprOccName (getOccName n) <> ifPprDebug pp_debug
@@ -256,10 +234,10 @@ We print type-variable binders with their kinds in interface files.
 pprTyVarBndr tyvar@(TyVar uniq kind name _)
   = getPprStyle $ \ sty ->
     if ifaceStyle sty && not (isBoxedTypeKind kind) then
-        hcat [pprGenTyVar tyvar, text " :: ", pprParendKind kind]
+        hcat [pprTyVar tyvar, text " :: ", pprParendKind kind]
 	-- See comments with ppDcolon in PprCore.lhs
     else
-        pprGenTyVar tyvar
+        pprTyVar tyvar
 
 pprTyVarBndrs tyvars = hsep (map pprTyVarBndr tyvars)
 \end{code}

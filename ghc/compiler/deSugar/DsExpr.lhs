@@ -257,7 +257,7 @@ dsExpr (CCall label args may_gc is_asm result_ty)
 dsExpr (HsSCC cc expr)
   = dsExpr expr			`thenDs` \ core_expr ->
     getModuleAndGroupDs		`thenDs` \ (mod_name, group_name) ->
-    returnDs ( SCC (mkUserCC cc mod_name group_name) core_expr)
+    returnDs (Note (SCC (mkUserCC cc mod_name group_name)) core_expr)
 
 dsExpr expr@(HsCase discrim matches src_loc)
   = putSrcLocDs src_loc $
@@ -340,7 +340,7 @@ dsExpr (ExplicitTuple expr_list)
 dsExpr (HsCon con_id [ty] [arg])
   | isNewTyCon tycon
   = dsExpr arg		     `thenDs` \ arg' ->
-    returnDs (Coerce (CoerceIn con_id) result_ty arg')
+    returnDs (Note (Coerce result_ty (coreExprType arg')) arg')
   where
     result_ty = mkTyConApp tycon [ty]
     tycon     = dataConTyCon con_id

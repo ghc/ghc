@@ -31,7 +31,8 @@ import StgSyn
 
 import CmdLineOpts	( opt_AutoSccsOnIndividualCafs )
 import CostCentre	-- lots of things
-import Id		( idType, mkSysLocal, emptyIdSet, Id )
+import MkId		(  mkSysLocal )
+import Id		( idType, emptyIdSet, Id )
 import SrcLoc		( noSrcLoc )
 import Type		( splitSigmaTy, splitFunTy_maybe )
 import UniqSupply	( getUnique, splitUniqSupply, UniqSupply )

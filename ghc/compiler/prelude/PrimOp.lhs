@@ -37,13 +37,13 @@ import CStrings		( identToC )
 import Constants   	( mIN_MP_INT_SIZE, mP_STRUCT_SIZE )
 import HeapOffs		( addOff, intOff, totHdrSize, HeapOffset )
 import Outputable
-import PprType		( pprParendGenType, GenTyVar{-instance Outputable-} )
+import PprType		( pprParendType )
 import SMRep	    	( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..) )
 import TyCon		( TyCon{-instances-} )
 import Type		( mkForAllTys, mkFunTy, mkFunTys, mkTyConApp, typePrimRep,
 			  splitAlgTyConApp, Type
 			)
-import TyVar		--( alphaTyVar, betaTyVar, gammaTyVar, GenTyVar{-instance Eq-} )
+import TyVar		--( alphaTyVar, betaTyVar, gammaTyVar )
 import Unique		( Unique{-instance Eq-} )
 import Util		( panic#, assoc, panic{-ToDo:rm-} )
 
@@ -1821,7 +1821,7 @@ pprPrimOp (CCallOp fun is_casm may_gc arg_tys res_ty)
 	  = if is_casm then text "''" else empty
 
 	pp_tys
-	  = hsep (map pprParendGenType (res_ty:arg_tys))
+	  = hsep (map pprParendType (res_ty:arg_tys))
     in
     hcat [text before, ptext fun, after, space, brackets pp_tys]
 

@@ -12,7 +12,7 @@ We could either use this, or parameterise @GenCoreExpr@ on @Types@ and
 
 \begin{code}
 module HsCore (
-	UfExpr(..), UfAlts(..), UfBinder(..), UfCoercion(..),
+	UfExpr(..), UfAlts(..), UfBinder(..), UfNote(..),
 	UfDefault(..), UfBinding(..),
 	UfArg(..), UfPrimOp(..)
     ) where
@@ -46,8 +46,7 @@ data UfExpr name
   | UfApp 	(UfExpr name) (UfArg name)
   | UfCase	(UfExpr name) (UfAlts name)
   | UfLet	(UfBinding name)  (UfExpr name)
-  | UfSCC	CostCentre (UfExpr name)
-  | UfCoerce	(UfCoercion name) (HsType name) (UfExpr name)
+  | UfNote	(UfNote name) (UfExpr name)
 
 data UfPrimOp name
   = UfCCallOp	FAST_STRING	     -- callee
@@ -59,7 +58,9 @@ data UfPrimOp name
 
   | UfOtherOp	name
 
-data UfCoercion name = UfIn name | UfOut name
+data UfNote name = UfSCC CostCentre
+	         | UfCoerce (HsType name)
+	         | UfInlineCall
 
 data UfAlts name
   = UfAlgAlts  [(name, [name], UfExpr name)]
@@ -138,8 +139,8 @@ instance Outputable name => Outputable (UfExpr name) where
       where
 	pp_pair (b,rhs) = hsep [ppr b, equals, ppr rhs]
 
-    ppr (UfSCC uf_cc body)
-      = hsep [ptext SLIT("_scc_ <cost-centre[ToDo]>"), ppr body]
+    ppr (UfNote note body)
+      = hsep [ptext SLIT("_NOTE_ [ToDo]>"), ppr body]
 
 instance Outputable name => Outputable (UfPrimOp name) where
     ppr (UfCCallOp str is_casm can_gc arg_tys result_ty)

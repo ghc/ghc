@@ -10,7 +10,7 @@ module PrelVals where
 
 import {-# SOURCE #-} CoreUnfold ( mkUnfolding )
 
-import Id		( Id, mkImported )
+import Id		( Id, mkVanillaId, mkTemplateLocals  )
 import SpecEnv		( SpecEnv, emptySpecEnv )
 
 -- friends:
@@ -22,7 +22,6 @@ import TysWiredIn
 import CoreSyn		-- quite a bit
 import IdInfo		-- quite a bit
 import Name		( mkWiredInIdName, Module )
-import PragmaInfo
 import Type		
 import TyVar		( openAlphaTyVar, alphaTyVar, betaTyVar, TyVar )
 import Unique		-- lots of *Keys
@@ -32,14 +31,17 @@ import Util		( panic )
 \begin{code}
 -- only used herein:
 
-mk_inline_unfolding = mkUnfolding IWantToBeINLINEd
+mk_inline_unfolding expr = setUnfoldingInfo (mkUnfolding expr)	$
+			   setInlinePragInfo IWantToBeINLINEd  noIdInfo
+
+exactArityInfo n = exactArity n `setArityInfo` noIdInfo
 
 pcMiscPrelId :: Unique{-IdKey-} -> Module -> FAST_STRING -> Type -> IdInfo -> Id
 
 pcMiscPrelId key mod occ ty info
   = let
 	name = mkWiredInIdName key mod occ imp
-	imp  = mkImported name ty info -- the usual case...
+	imp  = mkVanillaId name ty info -- the usual case...
     in
     imp
     -- We lie and say the thing is imported; otherwise, we get into
@@ -73,7 +75,7 @@ templates, but we don't ever expect to generate code for it.
 pc_bottoming_Id key mod name ty
  = pcMiscPrelId key mod name ty bottoming_info
  where
-    bottoming_info = noIdInfo `addStrictnessInfo` mkBottomStrictnessInfo
+    bottoming_info = mkBottomStrictnessInfo `setStrictnessInfo` noIdInfo
 	-- these "bottom" out, no matter what their arguments
 
 eRROR_ID
@@ -82,6 +84,8 @@ eRROR_ID
 generic_ERROR_ID u n
   = pc_bottoming_Id u pREL_ERR n errorTy
 
+rEC_SEL_ERROR_ID
+  = generic_ERROR_ID recSelErrIdKey SLIT("patError")
 pAT_ERROR_ID
   = generic_ERROR_ID patErrorIdKey SLIT("patError")
 rEC_CON_ERROR_ID
@@ -119,7 +123,7 @@ and make a jolly old mess.
 \begin{code}
 tRACE_ID
   = pcMiscPrelId traceIdKey pREL_IO_BASE SLIT("trace") traceTy
-	(noIdInfo `setSpecInfo` pcGenerateSpecs traceIdKey tRACE_ID noIdInfo traceTy)
+	(pcGenerateSpecs traceIdKey tRACE_ID noIdInfo traceTy `setSpecInfo` noIdInfo)
   where
     traceTy = mkSigmaTy [alphaTyVar] [] (mkFunTys [mkListTy charTy, alphaTy] alphaTy)
 \end{code}
@@ -141,7 +145,7 @@ unpackCStringId
   = pcMiscPrelId unpackCStringIdKey pREL_PACK SLIT("unpackCString#")
 		 (mkFunTys [addrPrimTy{-a char *-}] stringTy) noIdInfo
 -- Andy says:
---	(FunTy addrPrimTy{-a char *-} stringTy) (noIdInfo `addInfo` exactArity 1)
+--	(FunTy addrPrimTy{-a char *-} stringTy) (exactArityInfo 1)
 -- but I don't like wired-in IdInfos (WDP)
 
 unpackCString2Id -- for cases when a string has a NUL in it
@@ -153,9 +157,7 @@ unpackCString2Id -- for cases when a string has a NUL in it
 unpackCStringAppendId
   = pcMiscPrelId unpackCStringAppendIdKey pREL_PACK SLIT("unpackAppendCString#")
 		(mkFunTys [addrPrimTy{-a "char *" pointer-},stringTy] stringTy)
-		((noIdInfo
-		 {-LATER:`addUnfoldInfo` mkMagicUnfolding unpackCStringAppendIdKey-})
-		 `addArityInfo` exactArity 2)
+		(exactArityInfo 2)
 
 unpackCStringFoldrId
   = pcMiscPrelId unpackCStringFoldrIdKey pREL_PACK SLIT("unpackFoldrCString#")
@@ -164,9 +166,7 @@ unpackCStringFoldrId
 			   mkFunTys [charTy, alphaTy] alphaTy,
 			   alphaTy]
 			  alphaTy))
-		((noIdInfo
-		 {-LATER:`addUnfoldInfo` mkMagicUnfolding unpackCStringFoldrIdKey-})
-		 `addArityInfo` exactArity 3)
+		(exactArityInfo 3)
 \end{code}
 
 OK, this is Will's idea: we should have magic values for Integers 0,
@@ -209,7 +209,7 @@ integerMinusOneId
 seqId = pcMiscPrelId seqIdKey pRELUDE SLIT("seq")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [alphaTy, betaTy] betaTy))
-		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding seq_template))
+		  (mk_inline_unfolding seq_template)
   where
     [x, y, z]
       = mkTemplateLocals [
@@ -244,7 +244,7 @@ seqId = pcMiscPrelId seqIdKey pRELUDE SLIT("seq")
 parId = pcMiscPrelId parIdKey cONC_BASE SLIT("par")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [alphaTy, betaTy] betaTy))
-		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding par_template))
+		  (mk_inline_unfolding par_template)
   where
     [x, y, z]
       = mkTemplateLocals [
@@ -267,7 +267,7 @@ parId = pcMiscPrelId parIdKey cONC_BASE SLIT("par")
 forkId = pcMiscPrelId forkIdKey cONC_BASE SLIT("fork")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [alphaTy, betaTy] betaTy))
-		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding fork_template))
+		  (mk_inline_unfolding fork_template)
   where
     [x, y, z]
       = mkTemplateLocals [
@@ -291,7 +291,7 @@ GranSim ones:
 parLocalId = pcMiscPrelId parLocalIdKey cONC_BASE SLIT("parLocal")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
-		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding parLocal_template))
+		  (mk_inline_unfolding parLocal_template)
   where
     -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
     [w, g, s, p, x, y, z]
@@ -315,7 +315,7 @@ parLocalId = pcMiscPrelId parLocalIdKey cONC_BASE SLIT("parLocal")
 parGlobalId = pcMiscPrelId parGlobalIdKey cONC_BASE SLIT("parGlobal")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
-		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding parGlobal_template))
+		  (mk_inline_unfolding parGlobal_template)
   where
     -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
     [w, g, s, p, x, y, z]
@@ -341,7 +341,7 @@ parAtId = pcMiscPrelId parAtIdKey cONC_BASE SLIT("parAt")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy,
 		               alphaTy, betaTy, gammaTy] gammaTy))
-		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding parAt_template))
+		  (mk_inline_unfolding parAt_template)
   where
     -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
     [w, g, s, p, v, x, y, z]
@@ -366,7 +366,7 @@ parAtId = pcMiscPrelId parAtIdKey cONC_BASE SLIT("parAt")
 parAtAbsId = pcMiscPrelId parAtAbsIdKey cONC_BASE SLIT("parAtAbs")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
-		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding parAtAbs_template))
+		  (mk_inline_unfolding parAtAbs_template)
   where
     -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
     [w, g, s, p, v, x, y, z]
@@ -391,7 +391,7 @@ parAtAbsId = pcMiscPrelId parAtAbsIdKey cONC_BASE SLIT("parAtAbs")
 parAtRelId = pcMiscPrelId parAtRelIdKey cONC_BASE SLIT("parAtRel")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
-		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding parAtRel_template))
+		  (mk_inline_unfolding parAtRel_template)
   where
     -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
     [w, g, s, p, v, x, y, z]
@@ -417,7 +417,7 @@ parAtForNowId = pcMiscPrelId parAtForNowIdKey cONC_BASE SLIT("parAtForNow")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy,
 				alphaTy, betaTy, gammaTy] gammaTy))
-		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding parAtForNow_template))
+		  (mk_inline_unfolding parAtForNow_template)
   where
     -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
     [w, g, s, p, v, x, y, z]
@@ -445,7 +445,7 @@ parAtForNowId = pcMiscPrelId parAtForNowIdKey cONC_BASE SLIT("parAtForNow")
 copyableId = pcMiscPrelId copyableIdKey cONC_BASE SLIT("copyable")
 		  (mkSigmaTy [alphaTyVar] []
 		    alphaTy)
-		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding copyable_template))
+		  (mk_inline_unfolding copyable_template)
   where
     -- Annotations: x: closure that's tagged to by copyable
     [x, z]
@@ -460,7 +460,7 @@ copyableId = pcMiscPrelId copyableIdKey cONC_BASE SLIT("copyable")
 noFollowId = pcMiscPrelId noFollowIdKey cONC_BASE SLIT("noFollow")
 		  (mkSigmaTy [alphaTyVar] []
 		    alphaTy)
-		  (noIdInfo `addUnfoldInfo` (mk_inline_unfolding noFollow_template))
+		  (mk_inline_unfolding noFollow_template)
   where
     -- Annotations: x: closure that's tagged to not follow
     [x, z]
@@ -496,11 +496,12 @@ voidId = pc_bottoming_Id voidIdKey pREL_BASE SLIT("void") voidTy
 \begin{code}
 buildId
   = pcMiscPrelId buildIdKey pREL_ERR SLIT("build") buildTy
-	((((noIdInfo
-		{-LATER:`addUnfoldInfo` mkMagicUnfolding buildIdKey-})
+	noIdInfo
+	{- LATER:`addUnfoldInfo` mkMagicUnfolding buildIdKey)
 		`addStrictnessInfo` mkStrictnessInfo [WwStrict] False)
 		`addArgUsageInfo` mkArgUsageInfo [ArgUsage 2])
 		`setSpecInfo` pcGenerateSpecs buildIdKey buildId noIdInfo{-ToDo-} buildTy)
+	 -}
 	-- cheating, but since _build never actually exists ...
   where
     -- The type of this strange object is:
@@ -541,10 +542,11 @@ mkBuild ty tv c n g expr
 \begin{code}
 augmentId
   = pcMiscPrelId augmentIdKey pREL_ERR SLIT("augment") augmentTy
-	(((noIdInfo
-		{-LATER:`addUnfoldInfo` mkMagicUnfolding augmentIdKey-})
+	noIdInfo
+	{- LATER:`addUnfoldInfo` mkMagicUnfolding augmentIdKey)
 		`addStrictnessInfo` mkStrictnessInfo [WwStrict,WwLazy False] False)
 		`addArgUsageInfo` mkArgUsageInfo [ArgUsage 2,UnknownArgUsage])
+	-}
 	-- cheating, but since _augment never actually exists ...
   where
     -- The type of this strange object is:
@@ -564,12 +566,13 @@ foldrId = pcMiscPrelId foldrIdKey pREL_BASE SLIT("foldr")
 	  mkSigmaTy [alphaTyVar, betaTyVar] []
 		(mkFunTys [mkFunTys [alphaTy, betaTy] betaTy, betaTy, mkListTy alphaTy] betaTy)
 
-	idInfo = (((((noIdInfo
-			{-LATER:`addUnfoldInfo` mkMagicUnfolding foldrIdKey-})
-			`addStrictnessInfo` mkStrictnessInfo [WwLazy False,WwLazy False,WwStrict] False)
-			`addArityInfo` exactArity 3)
-			`addUpdateInfo` mkUpdateInfo [2,2,1])
-			`setSpecInfo` pcGenerateSpecs foldrIdKey foldrId noIdInfo{-ToDo-} foldrTy)
+	idInfo = noIdInfo
+		{- LATER: mkStrictnessInfo [WwLazy False,WwLazy False,WwStrict] False `setStrictnessInfo` 
+		 exactArity 3 `setArityInfo`
+		 mkUpdateInfo [2,2,1] `setUpdateInfo` 
+		 pcGenerateSpecs foldrIdKey foldrId noIdInfo{-ToDo-} foldrTy `setSpecInfo`
+		 noIdInfo
+		-}
 
 foldlId = pcMiscPrelId foldlIdKey pREL_LIST SLIT("foldl")
 		 foldlTy idInfo
@@ -578,12 +581,13 @@ foldlId = pcMiscPrelId foldlIdKey pREL_LIST SLIT("foldl")
 	  mkSigmaTy [alphaTyVar, betaTyVar] []
 		(mkFunTys [mkFunTys [alphaTy, betaTy] alphaTy, alphaTy, mkListTy betaTy] alphaTy)
 
-	idInfo = (((((noIdInfo
-			{-LATER:`addUnfoldInfo` mkMagicUnfolding foldlIdKey-})
+	idInfo = noIdInfo
+			{- LATER: `addUnfoldInfo` mkMagicUnfolding foldlIdKey)
 			`addStrictnessInfo` mkStrictnessInfo [WwLazy False,WwLazy False,WwStrict] False)
 			`addArityInfo` exactArity 3)
 			`addUpdateInfo` mkUpdateInfo [2,2,1])
 			`setSpecInfo` pcGenerateSpecs foldlIdKey foldlId noIdInfo{-ToDo-} foldlTy)
+		-}
 
 -- A bit of magic goes no here. We translate appendId into ++,
 -- you have to be carefull when you actually compile append:

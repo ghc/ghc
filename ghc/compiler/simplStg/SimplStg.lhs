@@ -30,7 +30,6 @@ import Id		( nullIdEnv, lookupIdEnv, addOneToIdEnv,
 			  GenId{-instance Eq/Outputable -}, Id
 			)
 import Maybes		( maybeToBool )
-import PprType		( GenType{-instance Outputable-} )
 import ErrUtils		( doIfSet )
 import UniqSupply	( splitUniqSupply, UniqSupply )
 import Util		( mapAccumL, panic, assertPanic )

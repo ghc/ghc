@@ -92,7 +92,8 @@ module TysWiredIn (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Id ( Id, mkDataCon, mkTupleCon, StrictnessMark(..) )
+import {-# SOURCE #-} MkId ( mkDataCon, mkTupleCon )
+import {-# SOURCE #-} Id ( Id, StrictnessMark(..) )
 
 -- friends:
 import PrelMods

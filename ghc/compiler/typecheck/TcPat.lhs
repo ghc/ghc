@@ -29,12 +29,10 @@ import Bag		( Bag )
 import CmdLineOpts	( opt_IrrefutableTuples )
 import Id		( GenId, idType, Id )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind )
-import PprType		( GenType, GenTyVar )
 import Type		( splitFunTys, splitRhoTy,
 			  splitFunTy_maybe, splitAlgTyConApp_maybe,
-			  Type, GenType
+			  Type
 			)
-import TyVar		( GenTyVar )
 import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, addrPrimTy
 			)

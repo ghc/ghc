@@ -25,10 +25,10 @@ import BinderInfo
 import CmdLineOpts	( opt_DoEtaReduction, SimplifierSwitch(..) )
 import CoreSyn
 import CoreUnfold	( mkFormSummary, exprIsTrivial, FormSummary(..) )
-import Id		( idType, isBottomingId, mkSysLocal,
+import MkId		( mkSysLocal )
+import Id		( idType, isBottomingId, getIdArity,
 			  addInlinePragma, addIdDemandInfo,
 			  idWantsToBeINLINEd, dataConArgTys, Id,
-			  getIdArity,
 			)
 import IdInfo		( ArityInfo(..), DemandInfo )
 import Maybes		( maybeToBool )
@@ -82,15 +82,14 @@ desired strategy.
 floatExposesHNF
 	:: Bool 		-- Float let(rec)s out of rhs
 	-> Bool 		-- Float cheap primops out of rhs
-	-> Bool 		-- OK to duplicate code
 	-> GenCoreExpr bdr Id flexi
 	-> Bool
 
-floatExposesHNF float_lets float_primops ok_to_dup rhs
+floatExposesHNF float_lets float_primops rhs
   = try rhs
   where
     try (Case (Prim _ _) (PrimAlts alts deflt) )
-      | float_primops && (null alts || ok_to_dup)
+      | float_primops && null alts
       = or (try_deflt deflt : map try_alt alts)
 
     try (Let bind body) | float_lets = try body
@@ -310,9 +309,10 @@ etaCoreExpr expr@(Lam bndr body)
     residual_ok (App fun arg)
 	| arg `mentions` bndr = False
 	| otherwise	      = residual_ok fun
-    residual_ok (Coerce coercion ty body)
-	| TyArg ty `mentions` bndr = False
-	| otherwise		   = residual_ok body
+    residual_ok (Note (Coerce to_ty from_ty) body)
+	|  TyArg to_ty   `mentions` bndr 
+	|| TyArg from_ty `mentions` bndr = False
+	| otherwise		         = residual_ok body
 
     residual_ok other	     = False		-- Safe answer
 	-- This last clause may seem conservative, but consider:
@@ -409,13 +409,12 @@ which aren't WHNF but are ``cheap'' are:
 \begin{code}
 manifestlyCheap :: GenCoreExpr bndr Id flexi -> Bool
 
-manifestlyCheap (Var _)        = True
-manifestlyCheap (Lit _)        = True
-manifestlyCheap (Con _ _)      = True
-manifestlyCheap (SCC _ e)      = manifestlyCheap e
-manifestlyCheap (Coerce _ _ e) = manifestlyCheap e
-manifestlyCheap (Lam x e)      = if isValBinder x then True else manifestlyCheap e
-manifestlyCheap (Prim op _)    = primOpIsCheap op
+manifestlyCheap (Var _)      = True
+manifestlyCheap (Lit _)      = True
+manifestlyCheap (Con _ _)    = True
+manifestlyCheap (Note _ e)   = manifestlyCheap e
+manifestlyCheap (Lam x e)    = if isValBinder x then True else manifestlyCheap e
+manifestlyCheap (Prim op _)  = primOpIsCheap op
 
 manifestlyCheap (Let bind body)
   = manifestlyCheap body && all manifestlyCheap (rhssOfBind bind)

@@ -44,16 +44,18 @@ import TcType		( TcType, TcThetaType, TcTauType,
 import Unify		( unifyTauTy, unifyTauTyLists )
 
 import Kind		( isUnboxedTypeKind, mkTypeKind, isTypeKind, mkBoxedTypeKind )
-import Id		( idType, mkUserId, replacePragmaInfo )
-import IdInfo		( noIdInfo )
+import MkId		( mkUserId )
+import Id		( idType, idName, idInfo, replaceIdInfo )
+import IdInfo		( IdInfo, noIdInfo, setInlinePragInfo, InlinePragInfo(..) )
 import Maybes		( maybeToBool, assocMaybe )
 import Name		( getOccName, getSrcLoc, Name )
-import PragmaInfo	( PragmaInfo(..) )
 import Type		( mkTyVarTy, mkTyVarTys, isTyVarTy, tyVarsOfTypes,
 			  splitSigmaTy, mkForAllTys, mkFunTys, getTyVar, mkDictTy,
-			  splitRhoTy, mkForAllTy, splitForAllTys )
-import TyVar		( GenTyVar, TyVar, tyVarKind, mkTyVarSet, minusTyVarSet, emptyTyVarSet,
-			  elementOfTyVarSet, unionTyVarSets, tyVarSetToList )
+			  splitRhoTy, mkForAllTy, splitForAllTys
+			)
+import TyVar		( TyVar, tyVarKind, mkTyVarSet, minusTyVarSet, emptyTyVarSet,
+			  elementOfTyVarSet, unionTyVarSets, tyVarSetToList
+			)
 import Bag		( bagToList, foldrBag, )
 import Util		( isIn, hasNoDups, assoc )
 import Unique		( Unique )
@@ -226,7 +228,7 @@ tcBindWithSigs
 	-> RenamedMonoBinds
 	-> [TcSigInfo s]
 	-> RecFlag
-	-> (Name -> PragmaInfo)
+	-> (Name -> IdInfo)
 	-> TcM s (TcMonoBinds s, LIE s, [TcIdBndr s])
 
 tcBindWithSigs top_lvl binder_names mbind tc_ty_sigs is_rec prag_info_fn
@@ -339,7 +341,7 @@ tcBindWithSigs top_lvl binder_names mbind tc_ty_sigs is_rec prag_info_fn
 	  where
 	    maybe_sig = maybeSig tc_ty_sigs binder_name
 	    Just (TySigInfo _ sig_poly_id sig_tyvars _ _ _) = maybe_sig
-	    poly_id = replacePragmaInfo (mkUserId binder_name poly_ty) (prag_info_fn binder_name)
+	    poly_id = replaceIdInfo (mkUserId binder_name poly_ty) (prag_info_fn binder_name)
 	    poly_ty = mkForAllTys real_tyvars_to_gen_list $ mkFunTys dict_tys $ zonked_mono_id_ty
 				-- It's important to build a fully-zonked poly_ty, because
 				-- we'll slurp out its free type variables when extending the
@@ -619,7 +621,7 @@ maybeSig (sig@(TySigInfo sig_name _ _ _ _ _) : sigs) name
 
 
 \begin{code}
-tcTySig :: (Name -> PragmaInfo)
+tcTySig :: (Name -> IdInfo)
 	-> RenamedSig
 	-> TcM s (TcSigInfo s)
 
@@ -630,7 +632,7 @@ tcTySig prag_info_fn (Sig v ty src_loc)
 	-- Convert from Type to TcType	
    tcInstSigType sigma_ty	`thenNF_Tc` \ sigma_tc_ty ->
    let
-     poly_id = replacePragmaInfo (mkUserId v sigma_tc_ty) (prag_info_fn v)
+     poly_id = replaceIdInfo (mkUserId v sigma_tc_ty) (prag_info_fn v)
    in
 	-- Instantiate this type
 	-- It's important to do this even though in the error-free case
@@ -789,40 +791,21 @@ part of a binding because then the same machinery can be used for
 moving them into place as is done for type signatures.
 
 \begin{code}
-tcPragmaSigs :: [RenamedSig]			-- The pragma signatures
-	     -> TcM s (Name -> PragmaInfo,	-- Maps name to the appropriate PragmaInfo
+tcPragmaSigs :: [RenamedSig]		-- The pragma signatures
+	     -> TcM s (Name -> IdInfo,	-- Maps name to the appropriate IdInfo
 		       TcMonoBinds s,
 		       LIE s)
 
 -- For now we just deal with INLINE pragmas
 tcPragmaSigs sigs = returnTc (prag_fn, EmptyMonoBinds, emptyLIE )
   where
-    prag_fn name | any has_inline sigs = IWantToBeINLINEd
-		 | otherwise	       = NoPragmaInfo
-		 where
-		    has_inline (InlineSig n _) = (n == name)
-		    has_inline other	       = False
-		
+    prag_fn name = info
+	      where
+		 info | any has_inline sigs = IWantToBeINLINEd `setInlinePragInfo` noIdInfo
+		      | otherwise	    = noIdInfo
 
-{- 
-tcPragmaSigs sigs
-  = mapAndUnzip3Tc tcPragmaSig sigs	`thenTc` \ (names_w_id_infos, binds, lies) ->
-    let
-	name_to_info name = foldr ($) noIdInfo
-				  [info_fn | (n,info_fn) <- names_w_id_infos, n==name]
-    in
-    returnTc (name_to_info,
-	      foldr ThenBinds EmptyBinds binds,
-	      foldr plusLIE emptyLIE lies)
-\end{code}
-
-Here are the easy cases for tcPragmaSigs
-
-\begin{code}
-tcPragmaSig (InlineSig name loc)
-  = returnTc ((name, addUnfoldInfo (iWantToBeINLINEd UnfoldAlways)), EmptyBinds, emptyLIE)
-tcPragmaSig (MagicUnfoldingSig name string loc)
-  = returnTc ((name, addUnfoldInfo (mkMagicUnfolding string)), EmptyBinds, emptyLIE)
+		 has_inline (InlineSig n _) = (n == name)
+		 has_inline other	    = False
 \end{code}
 
 The interesting case is for SPECIALISE pragmas.  There are two forms.
@@ -874,6 +857,11 @@ and the simplifer won't discard SpecIds for exporte things anyway, so maybe this
 a bit of overkill.
 
 \begin{code}
+{-
+tcPragmaSig :: RenamedSig -> TcM s ((Name, IdInfo -> IdInfo), TcMonoBinds s, LIE s)
+tcPragmaSig (InlineSig name loc)
+  = returnTc ((name, setInlinePragInfo IdWantsToBeINLINEd), EmptyBinds, emptyLIE)
+
 tcPragmaSig (SpecSig name poly_ty maybe_spec_name src_loc)
   = tcAddSrcLoc src_loc		 		$
     tcAddErrCtxt (valSpecSigCtxt name spec_ty)	$
@@ -881,80 +869,38 @@ tcPragmaSig (SpecSig name poly_ty maybe_spec_name src_loc)
 	-- Get and instantiate its alleged specialised type
     tcHsType poly_ty				`thenTc` \ sig_sigma ->
     tcInstSigType  sig_sigma			`thenNF_Tc` \ sig_ty ->
+
+	-- Typecheck the RHS 
+	--	f :: sig_ty
+    tcPolyExpr str (Var name) sig_ty	`thenTc` \ (rhs, lie) ->
+
+	-- If this succeeds, then the signature is indeed less general
+	-- than the main function
     let
-	(sig_tyvars, sig_theta, sig_tau) = splitSigmaTy sig_ty
-	origin = ValSpecOrigin name
-    in
+	(tyvars, tys, template)
+	  = case rhs of
+		TyLam tyvars (DictLam dicts (HsLet (MonoBind dict_binds
+we can take apart the RHS, 
+	-- which will be of very specific form
+    
 
-	-- Check that the SPECIALIZE pragma had an empty context
-    checkTc (null sig_theta)
-	    (panic "SPECIALIZE non-empty context (ToDo: msg)") `thenTc_`
-
-	-- Get and instantiate the type of the id mentioned
     tcLookupLocalValueOK "tcPragmaSig" name	`thenNF_Tc` \ main_id ->
-    tcInstSigType [] (idType main_id)		`thenNF_Tc` \ main_ty ->
+
+	-- Check that the specialised signature is an instance
+	-- of the 
     let
-	(main_tyvars, main_rho) = splitForAllTys main_ty
-	(main_theta,main_tau)   = splitRhoTy main_rho
-	main_arg_tys	        = mkTyVarTys main_tyvars
+	rhs_name = case maybe_spec_name of
+			Just name -> name
+			other     -> name
     in
-
-	-- Check that the specialised type is indeed an instance of
-	-- the type of the main function.
-    unifyTauTy sig_tau main_tau		`thenTc_`
-    checkSigTyVars sig_tyvars sig_tau	`thenTc_`
-
-	-- Check that the type variables of the polymorphic function are
-	-- either left polymorphic, or instantiate to ground type.
-	-- Also check that the overloaded type variables are instantiated to
-	-- ground type; or equivalently that all dictionaries have ground type
-    zonkTcTypes main_arg_tys		`thenNF_Tc` \ main_arg_tys' ->
-    zonkTcThetaType main_theta		`thenNF_Tc` \ main_theta' ->
-    tcAddErrCtxt (specGroundnessCtxt main_arg_tys')
-	      (checkTc (all isGroundOrTyVarTy main_arg_tys'))      	`thenTc_`
-    tcAddErrCtxt (specContextGroundnessCtxt main_theta')
-	      (checkTc (and [isGroundTy ty | (_,ty) <- theta']))	`thenTc_`
-
+   
 	-- Build the SpecPragmaId; it is the thing that makes sure we
 	-- don't prematurely dead-code-eliminate the binding we are really interested in.
-    newSpecPragmaId name sig_ty		`thenNF_Tc` \ spec_pragma_id ->
+    newSpecPragmaId name sig_ty		`thenNF_Tc` \ spec_id ->
 
-	-- Build a suitable binding; depending on whether we were given
-	-- a value (Maybe Name) to be used as the specialisation.
-    case using of
-      Nothing ->		-- No implementation function specified
-
-		-- Make a Method inst for the occurrence of the overloaded function
-	newMethodWithGivenTy (OccurrenceOf name)
-		  (TcId main_id) main_arg_tys main_rho	`thenNF_Tc` \ (lie, meth_id) ->
-
-	let
-	    pseudo_bind = VarMonoBind spec_pragma_id pseudo_rhs
-	    pseudo_rhs  = mkHsTyLam sig_tyvars (HsVar (TcId meth_id))
-	in
-	returnTc (pseudo_bind, lie, \ info -> info)
-
-      Just spec_name ->		-- Use spec_name as the specialisation value ...
-
-		-- Type check a simple occurrence of the specialised Id
-	tcId spec_name		`thenTc` \ (spec_body, spec_lie, spec_tau) ->
-
-		-- Check that it has the correct type, and doesn't constrain the
-		-- signature variables at all
-	unifyTauTy sig_tau spec_tau   	 	`thenTc_`
-	checkSigTyVars sig_tyvars sig_tau	`thenTc_`
-
-	    -- Make a local SpecId to bind to applied spec_id
-	newSpecId main_id main_arg_tys sig_ty	`thenNF_Tc` \ local_spec_id ->
-
-	let
-	    spec_rhs   = mkHsTyLam sig_tyvars spec_body
-	    spec_binds = VarMonoBind local_spec_id spec_rhs
-			   `AndMonoBinds`
-	   		 VarMonoBind spec_pragma_id (HsVar (TcId local_spec_id))
-	    spec_info  = SpecInfo spec_tys (length main_theta) local_spec_id
-	in
-	returnTc ((name, addSpecInfo spec_info), spec_binds, spec_lie)
+    returnTc ((name, ...),
+	      VarMonoBind spec_id rhs,
+	      lie)
 -}
 \end{code}
 

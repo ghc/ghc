@@ -1,7 +1,4 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
-%
-\section[Unique]{The @Unique@ data type}
+
 
 @Uniques@ are used to distinguish entities in the compiler (@Ids@,
 @Classes@, etc.) from each other.  Thus, @Uniques@ are the basic
@@ -57,6 +54,7 @@ module Unique (
 	charDataConKey,
 	charPrimTyConKey,
 	charTyConKey,
+	coerceIdKey,
 	composeIdKey,
 	consDataConKey,
 	doubleDataConKey,
@@ -92,6 +90,7 @@ module Unique (
 	functorClassKey,
 	geClassOpKey,
 	gtDataConKey,
+	inlineIdKey,
 	intDataConKey,
 	intPrimTyConKey,
 	intTyConKey,
@@ -139,6 +138,7 @@ module Unique (
 	realWorldPrimIdKey,
 	realWorldTyConKey,
 	recConErrorIdKey,
+	recSelErrIdKey,
 	recUpdErrorIdKey,
 	return2GMPsDataConKey,
 	return2GMPsTyConKey,
@@ -638,6 +638,7 @@ errorIdKey		      = mkPreludeMiscIdUnique  7
 foldlIdKey		      = mkPreludeMiscIdUnique  8
 foldrIdKey		      = mkPreludeMiscIdUnique  9
 forkIdKey   	    	      = mkPreludeMiscIdUnique 10
+recSelErrIdKey		      = mkPreludeMiscIdUnique 11
 integerMinusOneIdKey	      = mkPreludeMiscIdUnique 12
 integerPlusOneIdKey	      = mkPreludeMiscIdUnique 13
 integerPlusTwoIdKey	      = mkPreludeMiscIdUnique 14
@@ -702,4 +703,9 @@ mainKey			= mkPreludeMiscIdUnique 65
 returnMClassOpKey	= mkPreludeMiscIdUnique 66
 otherwiseIdKey		= mkPreludeMiscIdUnique 67
 toEnumClassOpKey	= mkPreludeMiscIdUnique 68
+\end{code}
+
+\begin{code}
+inlineIdKey		= mkPreludeMiscIdUnique 69
+coerceIdKey		= mkPreludeMiscIdUnique 70
 \end{code}

@@ -28,11 +28,10 @@ import Bag		( emptyBag, snocBag, bagToList, Bag )
 import BasicTypes       ( Module )
 import ErrUtils 	( WarnMsg )
 import HsSyn		( OutPat )
-import Id		( mkSysLocal, mkIdWithNewUniq,
-			  lookupIdEnv, growIdEnvList, GenId, IdEnv,
-			  Id
+import MkId		( mkSysLocal )
+import Id		( mkIdWithNewUniq,
+			  lookupIdEnv, growIdEnvList, IdEnv, Id
 			)
-import PprType		( GenType, GenTyVar )
 import Outputable
 import SrcLoc		( noSrcLoc, SrcLoc )
 import TcHsSyn		( TypecheckedPat )

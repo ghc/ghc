@@ -36,8 +36,7 @@ module TcHsSyn (
 
 -- friends:
 import HsSyn	-- oodles of it
-import Id	( GenId(..), IdDetails,	-- Can meddle modestly with Ids
-		  dataConArgTys, Id
+import Id	( idType, dataConArgTys, mkIdWithNewType, Id
 		)
 
 -- others:
@@ -151,9 +150,9 @@ maybeBoxedPrimType ty
 \begin{code}
 zonkTcId :: TcIdOcc s -> NF_TcM s (TcIdOcc s)
 zonkTcId tc_id@(RealId id) = returnNF_Tc tc_id
-zonkTcId (TcId (Id u n ty details prags info))
-  = zonkTcType ty    `thenNF_Tc` \ ty' ->
-    returnNF_Tc (TcId (Id u n ty' details prags info))
+zonkTcId (TcId id)
+  = zonkTcType (idType id)    `thenNF_Tc` \ ty' ->
+    returnNF_Tc (TcId (mkIdWithNewType id ty'))
 \end{code}
 
 This zonking pass runs over the bindings
@@ -180,9 +179,9 @@ extend_te te tyvars = growTyVarEnvList te [(tyvar, mkTyVarTy tyvar) | tyvar <- t
 
 zonkIdBndr :: TyVarEnv Type -> TcIdOcc s -> NF_TcM s Id
 zonkIdBndr te (RealId id) = returnNF_Tc id
-zonkIdBndr te (TcId (Id u n ty details prags info))
-  = zonkTcTypeToType te ty	`thenNF_Tc` \ ty' ->
-    returnNF_Tc (Id u n ty' details prags info)
+zonkIdBndr te (TcId id)
+  = zonkTcTypeToType te (idType id)	`thenNF_Tc` \ ty' ->
+    returnNF_Tc (mkIdWithNewType id ty')
 
 
 zonkIdOcc :: TcIdOcc s -> NF_TcM s Id
@@ -193,9 +192,7 @@ zonkIdOcc (TcId id)
 	new_id = case maybe_id' of
 		    Just id' -> id'
 		    Nothing  -> pprTrace "zonkIdOcc: " (ppr id) $
-				    Id u n voidTy details prags info
-			        where
-				    Id u n _ details prags info = id
+				    mkIdWithNewType id voidTy
     in
     returnNF_Tc new_id
 \end{code}

@@ -35,7 +35,8 @@ import TcMonad
 import TcKind		( TcKind, unifyKind, mkArrowKind, mkBoxedTypeKind )
 
 import Class		( classInstEnv, Class )
-import Id		( mkDataCon, dataConSig, mkRecordSelId, idType,
+import MkId		( mkDataCon, mkRecordSelId )
+import Id		( dataConSig, idType,
 			  dataConFieldLabels, dataConStrictMarks,
 			  StrictnessMark(..), getIdUnfolding,
 			  Id

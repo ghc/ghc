@@ -14,7 +14,8 @@ module WwLib (
 #include "HsVersions.h"
 
 import CoreSyn
-import Id		( GenId, idType, mkSysLocal, dataConArgTys, isDataCon, isNewCon, Id )
+import MkId		( mkSysLocal )
+import Id		( idType, dataConArgTys, isDataCon, isNewCon, Id )
 import IdInfo		( Demand(..) )
 import PrelVals		( aBSENT_ERROR_ID, voidId )
 import TysPrim		( voidTy )
@@ -27,7 +28,6 @@ import Type		( isUnpointedType, mkTyVarTys, mkFunTys,
 import TyCon		( isNewTyCon, isDataTyCon )
 import BasicTypes	( NewOrData(..) )
 import TyVar            ( TyVar )
-import PprType		( GenType, GenTyVar )
 import UniqSupply	( returnUs, thenUs, getUniques, getUnique, UniqSM )
 import Util		( zipEqual, zipWithEqual )
 import Outputable
@@ -368,7 +368,7 @@ mk_absent_let arg body
 mk_unpk_case NewType arg unpk_args boxing_con boxing_tycon body
   	-- A newtype!  Use a coercion not a case
   = ASSERT( null other_args && isNewTyCon boxing_tycon )
-    Let (NonRec unpk_arg (Coerce (CoerceOut boxing_con) (idType unpk_arg) (Var arg)))
+    Let (NonRec unpk_arg (Note (Coerce (idType unpk_arg) (idType arg)) (Var arg)))
 	body
   where
     (unpk_arg:other_args) = unpk_args
@@ -383,7 +383,7 @@ mk_unpk_case DataType arg unpk_args boxing_con boxing_tycon body
 
 mk_pk_let NewType arg boxing_con con_tys unpk_args body
   = ASSERT( null other_args && isNewCon boxing_con )
-    Let (NonRec arg (Coerce (CoerceIn boxing_con) (idType arg) (Var unpk_arg))) body
+    Let (NonRec arg (Note (Coerce (idType arg) (idType unpk_arg)) (Var unpk_arg))) body
   where
     (unpk_arg:other_args) = unpk_args
 

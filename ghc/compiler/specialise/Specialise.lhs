@@ -11,7 +11,8 @@ module Specialise (
 
 #include "HsVersions.h"
 
-import Id		( Id, DictVar, idType, mkUserLocal,
+import MkId		( mkUserLocal )
+import Id		( Id, DictVar, idType, 
 
 			  getIdSpecialisation, setIdSpecialisation,
 
@@ -734,13 +735,9 @@ specExpr e@(Lit _)    = returnSM (e, emptyUDs)
 specExpr e@(Con _ _)  = returnSM (e, emptyUDs)
 specExpr e@(Prim _ _) = returnSM (e, emptyUDs)
 
-specExpr (Coerce co ty body)
+specExpr (Note note body)
   = specExpr body 	`thenSM` \ (body', uds) ->
-    returnSM (Coerce co ty body', uds)
-
-specExpr (SCC cc body)
-  = specExpr body 	`thenSM` \ (body', uds) ->
-    returnSM (SCC cc body', uds)
+    returnSM (Note note body', uds)
 
 
 ---------------- Applications might generate a call instance --------------------
@@ -1179,10 +1176,12 @@ instantiateDictRhs ty_env id_env rhs
     go (Var v)	      = Var (lookupId id_env v)
     go (Lit l)	      = Lit l
     go (Con con args) = Con con (map go_arg args)
-    go (Coerce c t e) = Coerce c (instantiateTy ty_env t) (go e)
+    go (Note n e)     = Note (go_note n) (go e)
     go (Case e alts)  = Case (go e) alts		-- See comment below re alts
     go other	      = pprPanic "instantiateDictRhs" (ppr rhs)
 
+    go_note (Coerce t1 t2) = Coerce (instantiateTy ty_env t1) (instantiateTy ty_env t2)
+    go_note note	   = note
 
 dictRhsFVs :: CoreExpr -> IdSet
 	-- Cheapo function for simple RHSs
@@ -1194,7 +1193,7 @@ dictRhsFVs e
     go (Var v)	           = unitIdSet v
     go (Lit l)	           = emptyIdSet
     go (Con _ args)        = mkIdSet [id | VarArg id <- args]
-    go (Coerce _ _ e)	   = go e
+    go (Note _ e)	   = go e
 
     go (Case e _)	   = go e	-- Claim: no free dictionaries in the alternatives
 					-- These case expressions are of the form

@@ -35,7 +35,8 @@ import Type		( mkTyVarTy, mkSigmaTy, TyVarTemplate,
 			  Class, ThetaType, SigmaType,
 			  InstTyEnv(..)
 			)
-import Id		( mkSysLocal, idType )
+import MkId		( mkSysLocal )
+import Id		( idType )
 import SrcLoc		( SrcLoc, noSrcLoc )
 import UniqSupply
 import Util

@@ -163,11 +163,11 @@ fiExpr to_drop (_,AnnLam b@(TyBinder tyvar) body)
   where
     whnf :: CoreExprWithFVs -> Bool
 
-    whnf (_,AnnLit _)	= True
-    whnf (_,AnnCon _ _)	= True
-    whnf (_,AnnLam x e) = if isValBinder x then True else whnf e
-    whnf (_,AnnSCC _ e)	= whnf e
-    whnf _		= False
+    whnf (_,AnnLit _)	 = True
+    whnf (_,AnnCon _ _)	 = True
+    whnf (_,AnnLam x e)  = if isValBinder x then True else whnf e
+    whnf (_,AnnNote _ e) = whnf e
+    whnf _		 = False
 \end{code}
 
 Applications: we could float inside applications, but it's probably
@@ -183,18 +183,24 @@ fiExpr to_drop (_,AnnApp fun arg)
 
 We don't float lets inwards past an SCC.
 
-ToDo: SCC: {\em should} keep info on current cc, and when passing
-one, if it is not the same, annotate all lets in binds with current
-cc, change current cc to the new one and float binds into expr.
-\begin{code}
-fiExpr to_drop (_, AnnSCC cc expr)
-  = mkCoLets' to_drop (SCC cc (fiExpr [] expr))
-\end{code}
+ToDo: SCC: {\em should} 
 
 \begin{code}
-fiExpr to_drop (_, AnnCoerce c ty expr)
-  = --trace "fiExpr:Coerce:wimping out" $
-    mkCoLets' to_drop (Coerce c ty (fiExpr [] expr))
+fiExpr to_drop (_, AnnNote note@(SCC cc) expr)
+  = 	-- Wimp out for now
+	-- ToDo: keep info on current cc, and when passing
+	-- one, if it is not the same, annotate all lets in binds with current
+	-- cc, change current cc to the new one and float binds into expr.
+    mkCoLets' to_drop (Note note (fiExpr [] expr))
+
+fiExpr to_drop (_, AnnNote InlineCall expr)
+  = 	-- Wimp out for InlineCall; keep it close
+	-- the the call it annotates
+    mkCoLets' to_drop (Note InlineCall (fiExpr [] expr))
+
+fiExpr to_drop (_, AnnNote note@(Coerce _ _) expr)
+  = 	-- Just float in past coercion
+    Note note (fiExpr to_drop expr)
 \end{code}
 
 For @Lets@, the possible ``drop points'' for the \tr{to_drop}

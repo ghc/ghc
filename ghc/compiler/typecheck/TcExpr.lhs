@@ -47,7 +47,7 @@ import Class		( Class )
 import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType )
 import Id		( idType, dataConFieldLabels, dataConSig, recordSelectorFieldLabel,
 			  isRecordSelector,
-			  Id, GenId
+			  Id
 			)
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind, mkArrowKind )
 import Name		( Name{-instance Eq-} )
@@ -74,7 +74,6 @@ import Unique		( Unique, cCallableClassKey, cReturnableClassKey,
 			  thenMClassOpKey, zeroClassOpKey, returnMClassOpKey
 			)
 import Outputable
-import PprType		( GenType, GenTyVar )	-- Instances
 import Maybes		( maybeToBool )
 import ListSetOps	( minusList )
 import Util
@@ -699,6 +698,11 @@ tcArg the_fun (arg, expected_arg_ty, arg_no)
 
 -- tcPolyExpr is like tcExpr, except that the expected type
 -- can be a polymorphic one.
+tcPolyExpr :: SDoc			-- Just for error messages
+	   -> RenamedHsExpr
+	   -> TcType s			-- Expected type
+	   -> TcM s (TcExpr s, LIE s)	-- Resulting type and LIE
+
 tcPolyExpr str arg expected_arg_ty
   | not (maybeToBool (splitForAllTy_maybe expected_arg_ty))
   = 	-- The ordinary, non-rank-2 polymorphic case
@@ -734,11 +738,10 @@ tcPolyExpr str arg expected_arg_ty
 	-- Conclusion: include the free vars of the expected arg type in the
 	-- list of "free vars" for the signature check.
 
-    tcAddErrCtxt (rank2ArgCtxt arg expected_arg_ty) $
     tcExtendGlobalTyVars (tyVarSetToList (tyVarsOfType expected_arg_ty)) $
 
     checkSigTyVars sig_tyvars sig_tau		`thenTc` \ zonked_sig_tyvars ->
-    newDicts Rank2Origin sig_theta		`thenNF_Tc` \ (sig_dicts, dict_ids) ->
+    newDicts SignatureOrigin sig_theta		`thenNF_Tc` \ (sig_dicts, dict_ids) ->
 	-- ToDo: better origin
 
     tcSimplifyAndCheck 
@@ -754,7 +757,7 @@ tcPolyExpr str arg expected_arg_ty
 		   HsLet (MonoBind inst_binds [] Recursive) 
 		   arg' 
 		 , free_insts
-		 )
+    )
 \end{code}
 
 %************************************************************************

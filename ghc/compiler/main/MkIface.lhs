@@ -29,19 +29,17 @@ import WorkWrap		( getWorkerIdAndCons )
 
 import CmdLineOpts
 import Id		( idType, dataConRawArgTys, dataConFieldLabels, 
-			  getIdInfo, getInlinePragma, omitIfaceSigForId,
+			  idInfo, omitIfaceSigForId,
 			  dataConStrictMarks, StrictnessMark(..), 
 			  IdSet, idSetToList, unionIdSets, unitIdSet, minusIdSet, 
 			  isEmptyIdSet, elementOfIdSet, emptyIdSet, mkIdSet,
-			  pprId,
+			  pprId, getIdSpecialisation,
 			  Id
-
 			)
-import IdInfo		( IdInfo, StrictnessInfo, ArityInfo, 
+import IdInfo		( IdInfo, StrictnessInfo, ArityInfo, InlinePragInfo(..), inlinePragInfo,
 			  arityInfo, ppArityInfo, strictnessInfo, ppStrictnessInfo, 
 			  bottomIsGuaranteed, workerExists, 
 			)
-import PragmaInfo	( PragmaInfo(..) )
 import CoreSyn		( CoreExpr, CoreBinding, GenCoreExpr, GenCoreBinding(..) )
 import CoreUnfold	( calcUnfoldingGuidance, UnfoldingGuidance(..), Unfolding )
 import FreeVars		( addExprFVs )
@@ -53,6 +51,7 @@ import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
 			  tyConTheta, tyConTyVars, tyConDataCons
 			)
 import Class		( Class, classBigSig )
+import SpecEnv		( specEnvToList )
 import FieldLabel	( fieldLabelName, fieldLabelType )
 import Type		( mkSigmaTy, splitSigmaTy, mkDictTy,
 			  mkTyVarTys, Type, ThetaType
@@ -262,14 +261,14 @@ ifaceId get_idinfo needed_ids is_rec id rhs
   where
     pp_double_semi = ptext SLIT(";;")
     idinfo         = get_idinfo id
-    inline_pragma  = getInlinePragma id 
+    inline_pragma  = inlinePragInfo idinfo
 
     ty_pretty  = pprType (nmbrGlobalType (idType id))
     sig_pretty = hcat [ppr (getOccName id), ptext SLIT(" _:_ "), ty_pretty]
 
     prag_pretty 
      | opt_OmitInterfacePragmas = empty
-     | otherwise		= hsep [arity_pretty, strict_pretty, unfold_pretty, pp_double_semi]
+     | otherwise		= hsep [arity_pretty, strict_pretty, unfold_pretty, spec_pretty, pp_double_semi]
 
     ------------  Arity  --------------
     arity_pretty  = ppArityInfo (arityInfo idinfo)
@@ -296,20 +295,31 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 			IWantToBeINLINEd -> SLIT("_U_")
 			other		 -> SLIT("_u_")
 
-    show_unfold = not implicit_unfolding && 		-- Not unnecessary
-		  not dodgy_unfolding			-- Not dangerous
+    show_unfold = not implicit_unfolding &&	-- Not unnecessary
+		  unfolding_is_ok		-- Not dangerous
 
     implicit_unfolding = has_worker ||
 			 bottomIsGuaranteed strict_info
 
-    dodgy_unfolding = case guidance of 			-- True <=> too big to show, or the Inline pragma
-			UnfoldNever -> True		-- says it shouldn't be inlined
-			other       -> False
+    unfolding_is_ok
+	= case inline_pragma of
+	    IMustBeINLINEd    -> True
+	    IWantToBeINLINEd  -> True
+	    IMustNotBeINLINEd -> False
+	    NoPragmaInfo      -> case guidance of
+					UnfoldNever -> False	-- Too big
+					other       -> True
 
-    guidance    = calcUnfoldingGuidance inline_pragma
-					opt_InterfaceUnfoldThreshold
-					rhs
+    guidance = calcUnfoldingGuidance opt_InterfaceUnfoldThreshold rhs
 
+    ------------  Specialisations --------------
+    spec_pretty = hsep (map pp_spec (specEnvToList (getIdSpecialisation id)))
+    pp_spec (tyvars, tys, rhs) = hsep [ptext SLIT("_P_"),
+				       brackets (interpp'SP tyvars),
+				       hsep (map pprParendType tys),
+				       ptext SLIT("="),
+				       ppr rhs
+				 ]					
     
     ------------  Extra free Ids  --------------
     new_needed_ids = (needed_ids `minusIdSet` unitIdSet id)	`unionIdSets` 
@@ -344,9 +354,9 @@ ifaceBinds hdl needed_ids final_ids binds
   where
     final_id_map  = listToUFM [(id,id) | id <- final_ids]
     get_idinfo id = case lookupUFM final_id_map id of
-			Just id' -> getIdInfo id'
+			Just id' -> idInfo id'
 			Nothing  -> pprTrace "ifaceBinds not found:" (ppr id) $
-				    getIdInfo id
+				    idInfo id
 
     pretties = go needed_ids (reverse binds)	-- Reverse so that later things will 
 						-- provoke earlier ones to be emitted

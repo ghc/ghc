@@ -72,12 +72,9 @@ wwExpr   (App f atom) =
 wwExpr   (CoTyApp f ty) =
 	wwExpr f                `thenWw` \ f' ->
 	returnWw (CoTyApp f' ty)
-wwExpr   (SCC lab e) =
+wwExpr   (Note note e) =
 	wwExpr e                `thenWw` \ e' ->
-	returnWw (SCC lab e')
-wwExpr   (Coerce c ty e) =
-	wwExpr e                `thenWw` \ e' ->
-	returnWw (Coerce c ty e')
+	returnWw (Note note e')
 wwExpr   (Let bnds e) =
 	wwExpr e                `thenWw` \ e' ->
 	wwBind bnds             `thenWw` \ bnds' ->

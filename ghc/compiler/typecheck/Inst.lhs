@@ -47,7 +47,8 @@ import Bag	( emptyBag, unitBag, unionBags, unionManyBags,
 import Class	( classInstEnv,
 		  Class, ClassInstEnv 
 		)
-import Id	( idType, mkUserLocal, mkSysLocal, Id,
+import MkId	( mkUserLocal, mkSysLocal )
+import Id	( Id, idType, mkId,
 		  GenIdSet, elementOfIdSet
 		)
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
