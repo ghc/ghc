@@ -323,11 +323,23 @@ NL  	    	    	[\n\r]
 			      PUSH_STATE(UserPragma);
 			      RETURN(SPECIALISE_UPRAGMA);
 			    }
+<Code,GlaExt>"{-#"{WS}*"speciali"[sz]e {
+			      PUSH_STATE(UserPragma);
+			      RETURN(SPECIALISE_UPRAGMA);
+			    }
 <Code,GlaExt>"{-#"{WS}*"INLINE" {
 			      PUSH_STATE(UserPragma);
 			      RETURN(INLINE_UPRAGMA);
 			    }
+<Code,GlaExt>"{-#"{WS}*"inline" {
+			      PUSH_STATE(UserPragma);
+			      RETURN(INLINE_UPRAGMA);
+			    }
 <Code,GlaExt>"{-#"{WS}*"NOINLINE" {
+			      PUSH_STATE(UserPragma);
+			      RETURN(NOINLINE_UPRAGMA);
+			    }
+<Code,GlaExt>"{-#"{WS}*"notInline" {
 			      PUSH_STATE(UserPragma);
 			      RETURN(NOINLINE_UPRAGMA);
 			    }
@@ -353,7 +365,7 @@ NL  	    	    	[\n\r]
                               RETURN(SOURCE_UPRAGMA); 
 			    }
 
-<Code,GlaExt>"{-#"{WS}*[A-Z_]+ {
+<Code,GlaExt>"{-#"{WS}*[a-zA-Z_]+ {
     	    	    	      fprintf(stderr, "%s:%d: Warning: Unrecognised pragma '",
     	    	    	        input_filename, hsplineno);
     	    	    	      format_string(stderr, (unsigned char *) yytext, yyleng);
