@@ -74,7 +74,7 @@ import PrelHandle	( readHandle,
 			)
 #endif
 
-import PrelIOBase	( Handle__(..), IOError(..), IOErrorType(..),
+import PrelIOBase	( Handle__(..), IOError, IOErrorType(..),
 #if __GLASGOW_HASKELL__ < 400
 		  	  IOResult(..), 
 #endif
