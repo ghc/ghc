@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.44 2001/12/06 10:00:01 sewardj Exp $
+ * $Id: Stg.h,v 1.45 2002/02/13 07:48:19 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -38,6 +38,10 @@
 #else
 /* Assume that it must be defined thus: T arr[0]; */
 #define FLEXIBLE_ARRAY 0
+#endif
+
+#if defined(SMP) || defined(THREADED_RTS)
+#define RTS_SUPPORTS_THREADS 1
 #endif
 
 /* Some macros to handle DLLing (Win32 only at the moment). */
