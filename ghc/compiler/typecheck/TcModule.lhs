@@ -395,8 +395,9 @@ tcModule pcs hst get_fixity this_mod decls
      	-- Second pass over class and instance declarations, 
 	-- plus rules and foreign exports, to generate bindings
 	tcSetEnv env				$
+	tcClassDecls2 this_mod tycl_decls	`thenNF_Tc` \ (lie_clasdecls, cls_dm_binds, dm_ids) ->
+	tcExtendGlobalValEnv dm_ids		$
 	tcInstDecls2  local_insts		`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
-	tcClassDecls2 this_mod tycl_decls	`thenNF_Tc` \ (lie_clasdecls, cls_dm_binds) ->
 	tcForeignExports decls			`thenTc`    \ (lie_fodecls,   foe_binds, foe_decls) ->
 	tcSourceRules source_rules		`thenNF_Tc` \ (lie_rules,     more_local_rules) ->
 	
