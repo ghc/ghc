@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.93 2001/01/29 17:23:40 simonmar Exp $
+ * $Id: GC.c,v 1.94 2001/01/31 11:03:21 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -743,8 +743,8 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
   }
 
  /* mark the garbage collected CAFs as dead */
-#ifdef DEBUG
-  if (major_gc) { gcCAFs(); }
+#if defined(DEBUG) && !defined(GHCI)
+  if (major_gc) { gcCAFs(); } /* doesn't work w/ GHCI */
 #endif
   
   /* zero the scavenged static object list */
