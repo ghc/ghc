@@ -71,7 +71,7 @@ import UniqSupply	( uniqsFromSupply, uniqFromSupply, splitUniqSupply,
 			  UniqSupply
 			)
 import FiniteMap
-import BasicTypes	( TopLevelFlag, isTopLevel, 
+import BasicTypes	( TopLevelFlag, isTopLevel, isLoopBreaker,
 			  Activation, isActive, isAlwaysActive,
 			  OccInfo(..), isOneOcc
 			)
@@ -862,16 +862,27 @@ story for now.
 \begin{code}
 postInlineUnconditionally :: SimplEnv -> OutId -> OccInfo -> OutExpr -> Bool
 postInlineUnconditionally env bndr occ_info rhs 
-  =  exprIsTrivial rhs && active && isOneOcc occ_info
-	-- We used to have (not loop_breaker && not (isExportedId bndr))
-	-- instead of (isOneOcc occ_info).  Indeed, you might suppose that
+  =  exprIsTrivial rhs
+  && active
+  && not (isLoopBreaker occ_info)
+  && not (isExportedId bndr)
+	-- We used to have (isOneOcc occ_info) instead of
+	-- not (isLoopBreaker occ_info) && not (isExportedId bndr)
+	-- That was because a rather fragile use of rules got confused
+	-- if you inlined even a binding f=g  e.g. We used to have
+	--	map = mapList
+	-- But now a more precise use of phases has eliminated this problem,
+	-- so the is_active test will do the job.  I think.
+	--
+	-- OLD COMMENT: (delete soon)
+	-- Indeed, you might suppose that
 	-- there is nothing wrong with substituting for a trivial RHS, even
 	-- if it occurs many times.  But consider
 	--	x = y
 	--	h = _inline_me_ (...x...)
 	-- Here we do *not* want to have x inlined, even though the RHS is
 	-- trivial, becuase the contract for an INLINE pragma is "no inlining".
-	-- This is important in the rules for the Prelude (e.g. PrelEnum.eftInt).
+	-- This is important in the rules for the Prelude 
   where
     active = case getMode env of
 		   SimplGently  -> isAlwaysActive prag
