@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.157 2001/06/14 14:14:53 simonmar Exp $
+# $Id: Makefile,v 1.158 2001/06/14 15:42:35 simonpj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -48,7 +48,7 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cLeadingUnderscore    = \"$(LeadingUnderscore)\"" >> $(CONFIG_HS)
 	@echo "cRAWCPP               = \"$(GHC_RAWCPP)\"" >> $(CONFIG_HS)
 	@echo "cGCC                  = \"$(WhatGccIsCalled)\"" >> $(CONFIG_HS)
-	@echo "cMkDLL                = \"$(BLD_DLL)\"" >> $(CONFIG_HS)
+	@echo "cMKDLL                = \"$(BLD_DLL)\"" >> $(CONFIG_HS)
 	@echo "cGHC_DRIVER_DIR       = \"$(GHC_DRIVER_DIR)\"" >> $(CONFIG_HS)
 	@echo "cGHC_TOUCHY           = \"$(GHC_TOUCHY)\"" >> $(CONFIG_HS)
 	@echo "cGHC_TOUCHY_DIR       = \"$(GHC_TOUCHY)\"" >> $(CONFIG_HS)
@@ -318,11 +318,11 @@ all :: ghc-inplace
 ghc-inplace : $(HS_PROG)
 	@$(RM) $@
 	echo '#!/bin/sh' >>$@
-	echo exec $(FPTOOLS_TOP_ABS_UNIX)/ghc/compiler/$(HS_PROG) -B$(FPTOOLS_TOP_ABS) '"$$@"' >>$@
+	echo exec $(FPTOOLS_TOP_ABS_UNIX)/ghc/compiler/$(HS_PROG) -B$(FPTOOLS_TOP_ABS)/ghc/compiler '"$$@"' >>$@
 	chmod 755 $@
 ifeq "$(TARGETPLATFORM) and $(MinimalUnixDeps)" "i386-unknown-mingw32 and YES"
 	@$(RM) $@.bat
-	echo "@"$(subst /,\\,$(FPTOOLS_TOP_ABS)/ghc/compiler/$(HS_PROG)) "-B$(FPTOOLS_TOP_ABS) %*" >$@.bat
+	echo "@"$(subst /,\\,$(FPTOOLS_TOP_ABS)/ghc/compiler/$(HS_PROG)) "-B$(FPTOOLS_TOP_ABS)/ghc/compiler %*" >$@.bat
 	chmod 755 $@.bat
 endif
 

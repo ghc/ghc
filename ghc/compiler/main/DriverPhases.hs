@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.9 2001/05/08 10:58:48 simonmar Exp $
+-- $Id: DriverPhases.hs,v 1.10 2001/06/14 15:42:35 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -17,6 +17,8 @@ module DriverPhases (
    objish_file, objish_suffix,
    cish_file, cish_suffix
  ) where
+
+#include "../includes/config.h"
 
 import DriverUtil
 

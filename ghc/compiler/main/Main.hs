@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.70 2001/06/14 12:50:06 simonpj Exp $
+-- $Id: Main.hs,v 1.71 2001/06/14 15:42:35 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -55,13 +55,13 @@ import Panic		( GhcException(..), panic )
 
 -- Standard Haskell libraries
 import IO
-import Concurrent	( myThreadId, throwTo )
 import Directory	( doesFileExist )
 import IOExts		( readIORef, writeIORef )
-import Exception	( throwTo, throwDyn, Exception(DynException) )
+import Exception	( throwDyn, Exception(DynException) )
 import System		( getArgs, exitWith, ExitCode(..) )
 
 #ifndef mingw32_TARGET_OS
+import Concurrent	( myThreadId, throwTo )
 import Posix		( Handler(Catch), installHandler, sigINT, sigQUIT )
 import Dynamic		( toDyn )
 #endif
@@ -126,20 +126,17 @@ main =
 	-- signals.
 
 	-- install signal handlers
-   main_thread <- myThreadId
 #ifndef mingw32_TARGET_OS
+   main_thread <- myThreadId
    let sig_handler = Catch (throwTo main_thread 
 				(DynException (toDyn Interrupted)))
    installHandler sigQUIT sig_handler Nothing 
    installHandler sigINT  sig_handler Nothing
 #endif
 
-   argv   <- getArgs
-
-	-- grab any -B options from the command line first
-   let (top_dir, argv') = getTopDir argv
-
-   initSysTools top_dir
+   argv <- getArgs
+   let (minusB_args, argv') = partition (prefixMatch "-B") argv
+   top_dir <- initSysTools minusB_args
 
 	-- read the package configuration
    conf_file <- packageConfigPath
@@ -297,15 +294,6 @@ main =
    when (mode == DoLink) (doLink o_files)
    when (mode == DoMkDLL) (doMkDLL o_files)
   }
-
-	-- grab the last -B option on the command line, and
-	-- set topDir to its value.
-getTopDir :: [String] -> (String, [String])
-getTopDir args
-  | null minusbs = throwDyn (InstallationError ("missing -B<dir> option"))
-  | otherwise	 = (drop 2 (last minusbs), others)
-  where
-    (minusbs, others) = partition (prefixMatch "-B") args
 
 
 -- replace the string "$libdir" at the beginning of a path with the

@@ -33,7 +33,7 @@ module SysTools (
 
 	-- System interface
 	getProcessID,		-- IO Int
-	system,			-- String -> IO Int	-- System.system
+	System.system, 		-- String -> IO Int	-- System.system
 
 	-- Misc
 	showGhcUsage,		-- IO ()	Shows usage message and exits
@@ -44,22 +44,28 @@ module SysTools (
 
 import DriverUtil
 import Config
-import Outputable	( panic )
+import Outputable
 import Panic		( progName, GhcException(..) )
 import Util		( global )
 import CmdLineOpts	( dynFlag, verbosity )
 
-import List		( intersperse )
+import List		( intersperse, isPrefixOf )
 import Exception	( throwDyn, catchAllIO )
-import IO		( hPutStr, hPutChar, hPutStrLn, hFlush, stderr )
+import IO		( openFile, hClose, IOMode(..),
+			  hPutStr, hPutChar, hPutStrLn, hFlush, stderr
+			)
 import Directory	( doesFileExist, removeFile )
 import IOExts		( IORef, readIORef, writeIORef )
 import Monad		( when, unless )
 import qualified System
 import System		( ExitCode(..) )
-import qualified Posix
 
 #include "../includes/config.h"
+
+#if !defined(mingw32_TARGET_OS)
+import qualified Posix
+#endif
+
 #include "HsVersions.h"
 
 {-# DEPRECATED runSomething "runSomething should be private to SysTools" #-}
@@ -140,41 +146,49 @@ GLOBAL_VAR(v_Pgm_sysman, error "pgm_sysman", String)	-- system manager
 %************************************************************************
 
 \begin{code}
-initSysTools :: String	-- TopDir
-			-- 	for "installed" this is the root of GHC's support files
-			--	for "in-place" it is the root of the build tree
+initSysTools :: [String]	-- Command-line arguments starting "-B"
 
-	     -> IO ()	-- Set all the mutable variables above, holding 
-			--	(a) the system programs
-			--	(b) the package-config file
-			--	(c) the GHC usage message
+	     -> IO String	-- Set all the mutable variables above, holding 
+				--	(a) the system programs
+				--	(b) the package-config file
+				--	(c) the GHC usage message
+				-- Return TopDir
 
-initSysTools top_dir
-  = do  { let installed   pgm = top_dir `slash` "extra-bin" `slash` pgm
+
+initSysTools minusB_args
+  = do  { (am_installed, top_dir) <- getTopDir minusB_args
+		-- top_dir
+		-- 	for "installed" this is the root of GHC's support files
+		--	for "in-place" it is the root of the build tree
+
+	; let installed   pgm = top_dir `slash` "extra-bin" `slash` pgm
 	      inplace dir pgm = top_dir `slash` dir         `slash` pgm
 
-	      installed_pkgconfig = installed "package.conf"
-	      inplace_pkgconfig   = inplace cGHC_DRIVER_DIR "package.conf.inplace"
-
-	-- Discover whether we're running in a build tree or in an installation,
-	-- by looking for the package configuration file.
-	; am_installed <- doesFileExist installed_pkgconfig
+	; let pkgconfig_path | am_installed = top_dir `slash` "package.conf"
+			     | otherwise    = top_dir `slash` cGHC_DRIVER_DIR `slash` "package.conf.inplace"
 
 	-- Check that the in-place package config exists if 
 	-- the installed one does not (we need at least one!)
-	; if am_installed then return () else
-	  do config_exists <- doesFileExist inplace_pkgconfig
-	     if config_exists then return () else
-		throwDyn (InstallationError 
-		             ("Can't find package.conf in " ++ 
-			      inplace_pkgconfig))
+	; config_exists <- doesFileExist pkgconfig_path
+	; if config_exists then return ()
+	  else throwDyn (InstallationError 
+		           ("Can't find package.conf in " ++ pkgconfig_path))
 
-	; let pkgconfig_path | am_installed = installed_pkgconfig
-			     | otherwise    = inplace_pkgconfig
-					
 	-- The GHC usage help message is found similarly to the package configuration
 	; let ghc_usage_msg_path | am_installed = installed "ghc-usage.txt"
 				 | otherwise    = inplace cGHC_DRIVER_DIR "ghc-usage.txt"
+
+
+	-- For all systems, unlit, split, mangle are GHC utilities
+	-- architecture-specific stuff is done when building Config.hs
+	; let unlit_path  | am_installed = installed cGHC_UNLIT
+		       	  | otherwise    = inplace cGHC_UNLIT_DIR cGHC_UNLIT
+
+		-- split and mangle are Perl scripts
+	      split_script  | am_installed = installed cGHC_SPLIT
+		       	    | otherwise    = inplace cGHC_SPLIT_DIR cGHC_SPLIT
+	      mangle_script | am_installed = installed cGHC_MANGLER
+		       	    | otherwise    = inplace cGHC_MANGLER_DIR cGHC_MANGLER
 
 
 #if defined(mingw32_TARGET_OS)
@@ -194,6 +208,11 @@ initSysTools top_dir
 	; let touch_path  | am_installed = installed cGHC_TOUCHY
 		       	  | otherwise    = inplace cGHC_TOUCHY_DIR cGHC_TOUCHY
 
+	-- On Win32 we don't want to rely on #!/bin/perl, so we prepend 
+	-- a call to Perl to get the invocation of split and mangle
+	; let split_path  = perl_path ++ " " ++ split_script
+	      mangle_path = perl_path ++ " " ++ mangle_script
+
 	; let mkdll_path = cMKDLL
 #else
 	--		UNIX-SPECIFIC STUFF
@@ -205,23 +224,16 @@ initSysTools top_dir
 		touch_path = cGHC_TOUCHY
 		perl_path  = cGHC_PERL
 		mkdll_path = panic "Cant build DLLs on a non-Win32 system"
+
+	-- On Unix, for some historical reason, we do an install-time
+	-- configure to find Perl, and slam that on the front of
+	-- the installed script; so we can invoke them directly 
+	-- (not via perl)
+	-- a call to Perl to get the invocation of split and mangle
+	; let split_path  = split_script
+	      mangle_path = mangle_script
+
 #endif
-
-	-- For all systems, unlit, split, mangle are GHC utilities
-	-- architecture-specific stuff is done when building Config.hs
-	--
-	-- However split and mangle are Perl scripts, and on Win32 at least
-	-- we don't want to rely on #!/bin/perl, so we prepend a call to Perl
-	; let unlit_path  | am_installed = installed cGHC_UNLIT
-		       	  | otherwise    = inplace cGHC_UNLIT_DIR cGHC_UNLIT
-
-	      split_script  | am_installed = installed cGHC_SPLIT
-		       	    | otherwise    = inplace cGHC_SPLIT_DIR cGHC_SPLIT
-	      mangle_script | am_installed = installed cGHC_MANGLER
-		       	    | otherwise    = inplace cGHC_MANGLER_DIR cGHC_MANGLER
-
-	      split_path  = perl_path ++ " " ++ split_script
-	      mangle_path = perl_path ++ " " ++ mangle_script
 
 	-- For all systems, copy and remove are provided by the host 
 	-- system; architecture-specific stuff is done when building Config.hs
@@ -252,6 +264,7 @@ initSysTools top_dir
 	; writeIORef v_Pgm_CP  	 	   cp_path
 	; writeIORef v_Pgm_PERL	 	   perl_path
 
+	; return top_dir
 	}
 \end{code}
 
@@ -271,6 +284,66 @@ setPgm ('s' : pgm) = writeIORef v_Pgm_s pgm
 setPgm ('a' : pgm) = writeIORef v_Pgm_a pgm
 setPgm ('l' : pgm) = writeIORef v_Pgm_l pgm
 setPgm pgm	   = unknownFlagErr ("-pgm" ++ pgm)
+\end{code}
+
+
+\begin{code}
+-- Find TopDir
+-- 	for "installed" this is the root of GHC's support files
+--	for "in-place" it is the root of the build tree
+--
+-- Plan of action:
+-- 1. Set proto_top_dir
+-- 	a) look for (the last) -B flag, and use it
+--	b) if there are no -B flags, get the directory 
+--	   where GHC is running
+--
+-- 2. If package.conf exists in proto_top_dir, we are running
+--	installed; and TopDir = proto_top_dir
+--
+-- 3. Otherwise we are running in-place, so
+--	proto_top_dir will be /...stuff.../ghc/compiler
+--	Set TopDir to /...stuff..., which is the root of the build tree
+--
+-- This is very gruesome indeed
+
+getTopDir :: [String]
+	  -> IO (Bool, 		-- True <=> am installed, False <=> in-place
+	         String)	-- TopDir
+
+getTopDir minusbs
+  = do { proto_top_dir <- get_proto
+
+	-- Discover whether we're running in a build tree or in an installation,
+	-- by looking for the package configuration file.
+       ; am_installed <- doesFileExist (proto_top_dir `slash` "package.conf")
+
+       ; if am_installed then
+	    return (True, proto_top_dir)
+	 else
+	    return (False, remove_suffix proto_top_dir)
+       }
+  where
+    get_proto | not (null minusbs) 
+	      = return (dosifyPath (drop 2 (last minusbs)))
+	      | otherwise	   
+	      = do { maybe_exec_dir <- getExecDir	-- Get directory of executable
+		   ; case maybe_exec_dir of		-- (only works on Windows)
+			Nothing  -> throwDyn (InstallationError ("missing -B<dir> option"))
+			Just dir -> return dir }
+
+    remove_suffix dir	-- "/...stuff.../ghc/compiler" --> "/...stuff..."
+	= ASSERT2( not (null p1) && 
+		   not (null p2) && 
+		   dosifyPath dir == dosifyPath (top_dir ++ "/ghc/compiler"),
+		   text dir )
+	  top_dir
+	where
+	 p1      = dropWhile (not . isSlash) (reverse dir)
+	 p2      = dropWhile (not . isSlash) (tail p1)	-- head is '/'
+	 top_dir = reverse (tail p2)			-- head is '/'
+
+getExecDir = return Nothing
 \end{code}
 
 
@@ -436,7 +509,7 @@ runSomething :: String		-- For -v message
 
 runSomething phase_name pgm args
  = traceCmd phase_name cmd_line $
-   do   { exit_code <- system cmd_line
+   do   { exit_code <- System.system cmd_line
 	; if exit_code /= ExitSuccess
 	  then throwDyn (PhaseFailed phase_name exit_code)
   	  else return ()
@@ -479,14 +552,14 @@ traceCmd phase_name cmd_line action
 -- Convert filepath into MSDOS form.
 
 dosifyPaths :: [String] -> [String]
+dosifyPath  :: String -> String
 -- dosifyPath does two things
 -- a) change '/' to '\'
 -- b) remove initial '/cygdrive/'
 
-#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
+#if defined(mingw32_TARGET_OS)
 dosifyPaths xs = map dosifyPath xs
 
-dosifyPath  :: String -> String
 dosifyPath stuff
   = subst '/' '\\' real_stuff
  where
@@ -501,6 +574,7 @@ dosifyPath stuff
   subst a b ls = map (\ x -> if x == a then b else x) ls
 #else
 dosifyPaths xs = xs
+dosifyPath  xs = xs
 #endif
 
 -----------------------------------------------------------------------------
@@ -511,13 +585,20 @@ dosifyPaths xs = xs
 slash		 :: String -> String -> String
 absPath, relPath :: [String] -> String
 
-slash s1 s2 = s1 ++ ('/' : s2)
-
+isSlash '/'   = True
+isSlash '\\'  = True
+isSlash other = False
 
 relPath [] = ""
 relPath xs = foldr1 slash xs
 
 absPath xs = "" `slash` relPath xs
+
+#if defined(mingw32_TARGET_OS)
+slash s1 s2 = s1 ++ ('\\' : s2)
+#else
+slash s1 s2 = s1 ++ ('/' : s2)
+#endif
 
 -----------------------------------------------------------------------------
 -- Convert filepath into MSDOS form.
@@ -529,36 +610,5 @@ foreign import "_getpid" getProcessID :: IO Int
 #else
 getProcessID :: IO Int
 getProcessID = Posix.getProcessID
-#endif
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{System}
-%*									*
-%************************************************************************
-
--- This procedure executes system calls.  In pre-GHC-5.00 and earlier, 
--- the System.system implementation didn't work, so this acts as a fix-up
--- by passing the command line to 'sh'.
-\begin{code}
-system :: String -> IO ExitCode
-system cmd
- = do
-#if !defined(mingw32_TARGET_OS)
-    -- in the case where we do want to use an MSDOS command shell, we assume
-    -- that files and paths have been converted to a form that's
-    -- understandable to the command we're invoking.
-   System.system cmd
-#else
-   tmp <- newTempName "sh"
-   h   <- openFile tmp WriteMode
-   hPutStrLn h cmd
-   hClose h
-   exit_code <- system ("sh - " ++ tmp) `catchAllIO` 
-		       (\exn -> removeFile tmp >> ioError exn)
-   removeFile tmp
-   return exit_code
 #endif
 \end{code}
