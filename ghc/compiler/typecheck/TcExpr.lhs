@@ -11,8 +11,10 @@ module TcExpr ( tcExpr, tcExpr_id, tcMonoExpr ) where
 #ifdef GHCI 	/* Only if bootstrapped */
 import {-# SOURCE #-}	TcSplice( tcSpliceExpr, tcBracket )
 import HsSyn		( HsReify(..), ReifyFlavour(..) )
-import TcEnv		( bracketOK, tcMetaTy )
+import TcEnv		( bracketOK, tcMetaTy, tcLookupGlobal,
+			  wellStaged, metaLevel )
 import TcSimplify	( tcSimplifyBracket )
+import Name		( isExternalName )
 import qualified DsMeta
 #endif
 
@@ -33,8 +35,7 @@ import Inst		( InstOrigin(..),
 			)
 import TcBinds		( tcBindsAndThen )
 import TcEnv		( tcLookupClass, tcLookupGlobal_maybe, tcLookupIdLvl,
-			  tcLookupTyCon, tcLookupDataCon, tcLookupId, tcLookupGlobal,
-			  wellStaged, metaLevel
+			  tcLookupTyCon, tcLookupDataCon, tcLookupId
 			)
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
