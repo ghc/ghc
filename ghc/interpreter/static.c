@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.35 $
- * $Date: 2000/04/04 01:19:07 $
+ * $Revision: 1.36 $
+ * $Date: 2000/04/05 10:25:08 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -1031,6 +1031,7 @@ Cell  cd; {                             /* definitions (w or w/o deriving) */
             name(n).defn = nameId;
         } else {
             implementCfun(n,scs);
+            name(n).hasStrict = nonNull(scs);
         }
 
         hd(cs) = n;

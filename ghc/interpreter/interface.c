@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.45 $
- * $Date: 2000/04/05 09:22:28 $
+ * $Revision: 1.46 $
+ * $Date: 2000/04/05 10:25:08 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -1620,6 +1620,7 @@ List  constrs0;  /* [((ConId,[((Type,VarId,Int))]))]  */
     Pair    conArg, ctxElem;
     Text    conArgNm;
     Int     conArgStrictness;
+    Int     conStrictCompCount;
 
     Text t = textOf(tycon);
 #   ifdef DEBUG_IFACE
@@ -1662,6 +1663,7 @@ List  constrs0;  /* [((ConId,[((Type,VarId,Int))]))]  */
            tyvarsMentioned = NIL;  
            /* tyvarsMentioned :: [VarId] */
 
+           conStrictCompCount = 0;
            conArgs = reverse(fields);
            for (; nonNull(conArgs); conArgs=tl(conArgs)) {
               conArg           = hd(conArgs); /* (Type,Text) */
@@ -1670,10 +1672,7 @@ List  constrs0;  /* [((ConId,[((Type,VarId,Int))]))]  */
               conArgStrictness = intOf(zthd3(conArg));
               tyvarsMentioned = dupListOnto(ifTyvarsIn(conArgTy),
                                             tyvarsMentioned);
-              /* Not sure what the deal is with strictness.  Do we need
-                 to notify the symbol table, or not?  The Hugs desugarer?
-                 Currently disabled. */
-              /* if (conArgStrictness > 0) conArgTy = bang(conArgTy); */
+              if (conArgStrictness > 0) conStrictCompCount++;
               ty = fn(conArgTy,ty);
               if (nonNull(conArgNm)) {
                  /* a field name is mentioned too */
@@ -1706,12 +1705,12 @@ List  constrs0;  /* [((ConId,[((Type,VarId,Int))]))]  */
            ty = tvsToOffsets(line,ty, ktyvars);
 
            /* Finally, stick the constructor's type onto it. */
-           hd(constrs) = ztriple(conid,fields,ty);
+           hd(constrs) = z4ble(conid,fields,ty,mkInt(conStrictCompCount));
         }
 
         /* Final result is that 
-           constrs :: [((ConId,[((Type,Text))],Type))]   
-                      lists the constructors and their types
+           constrs :: [((ConId,[((Type,Text))],Type,Int))]   
+                      lists the constructors, their types and # strict comps
            sels :: [((VarId,Type))]
                    lists the selectors and their types
 	*/
@@ -1722,9 +1721,9 @@ List  constrs0;  /* [((ConId,[((Type,VarId,Int))]))]  */
 
 static List startGHCConstrs ( Int line, List cons, List sels )
 {
-    /* cons :: [((ConId,[((Type,Text,Int))],Type))] */
-    /* sels :: [((VarId,Type))]                     */
-    /* returns [Name]                               */
+    /* cons :: [((ConId,[((Type,Text,Int))],Type,Int))] */
+    /* sels :: [((VarId,Type))]                         */
+    /* returns [Name]                                   */
     List cs, ss;
     Int  conNo = length(cons)>1 ? 1 : 0;
     for(cs=cons; nonNull(cs); cs=tl(cs), conNo++) {
@@ -1764,15 +1763,16 @@ static Name startGHCSel ( Int line, ZPair sel )
 }
 
 
-static Name startGHCConstr ( Int line, Int conNo, ZTriple constr )
+static Name startGHCConstr ( Int line, Int conNo, Z4Ble constr )
 {
-    /* constr :: ((ConId,[((Type,Text,Int))],Type)) */
+    /* constr :: ((ConId,[((Type,Text,Int))],Type,Int)) */
     /* (ADR) ToDo: add rank2 annotation and existential annotation
      * these affect how constr can be used.
      */
-    Text con   = textOf(zfst3(constr));
-    Type type  = zthd3(constr);
-    Int  arity = arityFromType(type);
+    Text con     = textOf(zsel14(constr));
+    Type type    = zsel34(constr);
+    Int  arity   = arityFromType(type);
+    Int  nStrict = intOf(zsel44(constr));
     Name n = findName(con);     /* Allocate constructor fun name   */
     if (isNull(n)) {
         n = newName(con,NIL);
@@ -1781,10 +1781,11 @@ static Name startGHCConstr ( Int line, Int conNo, ZTriple constr )
             textToStr(con)
         EEND;
     }
-    name(n).arity  = arity;     /* Save constructor fun details    */
-    name(n).line   = line;
-    name(n).number = cfunNo(conNo);
-    name(n).type   = type;
+    name(n).arity     = arity;     /* Save constructor fun details    */
+    name(n).line      = line;
+    name(n).number    = cfunNo(conNo);
+    name(n).type      = type;
+    name(n).hasStrict = nStrict > 0;
     return n;
 }
 

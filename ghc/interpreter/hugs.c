@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.57 $
- * $Date: 2000/04/04 17:35:04 $
+ * $Revision: 1.58 $
+ * $Date: 2000/04/05 10:25:08 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -940,7 +940,7 @@ static void mgFromList ( List /* of CONID */ modgList )
       for (u = module(mod).uses; nonNull(u); u=tl(u))
          usesT = cons(textOf(hd(u)),usesT);
 
-      /* artifically give all modules a dependency on Prelude */
+      /* artificially give all modules a dependency on Prelude */
       if (mT != textPrelude && mT != textPrimPrel)
          usesT = cons(textPrelude,usesT);
 

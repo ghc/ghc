@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.61 $
- * $Date: 2000/04/04 15:41:56 $
+ * $Revision: 1.62 $
+ * $Date: 2000/04/05 10:25:08 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -860,6 +860,7 @@ Name newName ( Text t, Cell parent )    /* Add new name to name table      */
     name(nm).arity              = 0;
     name(nm).number             = EXECNAME;
     name(nm).defn               = NIL;
+    name(nm).hasStrict          = FALSE;
     name(nm).stgVar             = NIL;
     name(nm).callconv           = NIL;
     name(nm).type               = NIL;

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.20 $
- * $Date: 2000/03/23 14:54:20 $
+ * $Revision: 1.21 $
+ * $Date: 2000/04/05 10:25:08 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -90,7 +90,7 @@ char* lookupHugsName( void* closure )
     Name nm;
     for( nm = NAME_BASE_ADDR; 
          nm < NAME_BASE_ADDR+tabNameSz; ++nm ) 
-       if (name(nm).inUse) {
+       if (tabName[nm-NAME_BASE_ADDR].inUse) {
            StgVar v  = name(nm).stgVar;
            if (isStgVar(v) 
                && isPtr(stgVarInfo(v)) 

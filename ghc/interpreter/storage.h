@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.38 $
- * $Date: 2000/04/04 15:41:56 $
+ * $Revision: 1.39 $
+ * $Date: 2000/04/05 10:25:08 $
  * ------------------------------------------------------------------------*/
 
 #define DEBUG_STORAGE
@@ -741,6 +741,7 @@ struct strName {
     Int    number;
     Cell   type;
     Cell   defn;
+    Bool   hasStrict;          /* does constructor have strict components? */
     Cell   stgVar;                                      /* really StgVar   */
     Text   callconv;                          /* for foreign import/export */
     void*  primop;                                      /* really StgPrim* */
