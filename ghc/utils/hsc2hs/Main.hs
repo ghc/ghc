@@ -1,7 +1,7 @@
 {-# OPTIONS -fffi -cpp #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.61 2005/01/05 10:26:45 simonmar Exp $
+-- $Id: Main.hs,v 1.62 2005/01/05 11:17:46 malcolm Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -16,8 +16,6 @@ import System.Console.GetOpt
 #else
 import GetOpt
 #endif
-
-import Compat.RawSystem 	( rawSystem )
 
 import System        (getProgName, getArgs, ExitCode(..), exitWith, system)
 import Directory     (removeFile,doesFileExist)
@@ -35,6 +33,12 @@ import CString
 #endif
 #endif
 
+
+#ifdef __GLASGOW_HASKELL__
+import Compat.RawSystem 	( rawSystem )
+#else
+rawSystem prog args = system (prog++unwords args)
+#endif
 
 version :: String
 version = "hsc2hs version 0.66\n"
