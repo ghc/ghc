@@ -49,7 +49,7 @@ import CmdLineOpts	( opt_Static, opt_EnsureSplittableC )
 import Outputable	( assertPanic )
 
 -- DEBUGGING ONLY
---import IOExts		( trace )
+--import TRACE		( trace )
 --import Outputable	( showSDoc )
 --import MachOp		( pprMachOp )
 

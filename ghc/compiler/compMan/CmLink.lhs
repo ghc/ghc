@@ -20,19 +20,22 @@ module CmLink (
   ) where
 
 
+#include "HsVersions.h"
+
 #ifdef GHCI
 import ByteCodeLink	( linkIModules, linkIExpr )
+import Interpreter
+import Name		( Name )
+import FiniteMap
+import ErrUtils		( showPass )
+import DATA_IOREF	( readIORef, writeIORef )
 #endif
 
-import Interpreter
 import DriverPipeline
 import CmTypes
 import HscTypes		( GhciMode(..) )
-import Name		( Name )
 import Module		( ModuleName )
-import FiniteMap
 import Outputable
-import ErrUtils		( showPass )
 import CmdLineOpts	( DynFlags(..) )
 import Util
 
@@ -40,12 +43,11 @@ import Util
 import Exception	( block )
 #endif
 
-import IOExts
+import DATA_IOREF	( IORef )
+
 import List
 import Monad
 import IO
-
-#include "HsVersions.h"
 
 -- ---------------------------------------------------------------------------
 -- The Linker's state
@@ -114,6 +116,7 @@ filterModuleLinkables p (li:lis)
         dump   = filterModuleLinkables p lis
         retain = li : dump
 
+#ifdef GHCI
 linkableInSet :: Linkable -> [Linkable] -> Bool
 linkableInSet l objs_loaded =
   case findModuleLinkable_maybe objs_loaded (linkableModName l) of
@@ -122,7 +125,6 @@ linkableInSet l objs_loaded =
 
 -- These two are used to add/remove entries from the closure env for
 -- new bindings made at the prompt.
-#ifdef GHCI
 delListFromClosureEnv :: PersistentLinkerState -> [Name]
   	-> IO PersistentLinkerState
 delListFromClosureEnv pls names

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.80 2002/06/12 22:04:26 wolfgang Exp $
+-- $Id: DriverState.hs,v 1.81 2002/08/29 15:44:15 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -20,9 +20,10 @@ import DriverPhases
 import DriverUtil
 import Util
 import Config
-import Exception
-import IOExts
 import Panic
+
+import DATA_IOREF	( IORef, newIORef, readIORef, writeIORef )
+import EXCEPTION
 
 import List
 import Char  

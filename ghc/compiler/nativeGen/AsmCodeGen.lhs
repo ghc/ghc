@@ -8,8 +8,6 @@ module AsmCodeGen ( nativeCodeGen ) where
 #include "HsVersions.h"
 #include "NCG.h"
 
-import List		( intersperse )
-
 import MachMisc
 import MachRegs
 import MachCode
@@ -39,6 +37,8 @@ import FastString
 
 -- DEBUGGING ONLY
 --import OrdList
+
+import List		( intersperse )
 \end{code}
 
 The 96/03 native-code generator has machine-independent and

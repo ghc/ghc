@@ -178,9 +178,11 @@ module Pretty (
 #include "HsVersions.h"
 
 import FastString
-import GlaExts
-import Numeric (fromRat)
 import PrimPacked 	( strLength )
+
+import GLAEXTS
+
+import Numeric (fromRat)
 import IO
 
 #if __GLASGOW_HASKELL__ < 503
@@ -195,16 +197,7 @@ import PrelBase		( unpackCString# )
 import GHC.Base		( unpackCString# )
 #endif
 
-#if __GLASGOW_HASKELL__ < 411
-import PrelAddr		( Addr(..) )
-#else
-import Addr		( Addr(..) )
-#if __GLASGOW_HASKELL__ < 503
-import Ptr		( Ptr(..) )
-#else
-import GHC.Ptr		( Ptr(..) )
-#endif
-#endif
+import PrimPacked	( Ptr(..) )
 
 -- Don't import Util( assertPanic ) because it makes a loop in the module structure
 
@@ -608,12 +601,12 @@ isEmpty _     = False
 char  c = textBeside_ (Chr c) 1# Empty
 text  s = case length   s of {IBOX(sl) -> textBeside_ (Str s)  sl Empty}
 ftext s = case lengthFS s of {IBOX(sl) -> textBeside_ (PStr s) sl Empty}
-ptext (A# s) = case strLength (A# s) of {IBOX(sl) -> textBeside_ (LStr s sl) sl Empty}
+ptext (Ptr s) = case strLength (Ptr s) of {IBOX(sl) -> textBeside_ (LStr s sl) sl Empty}
 
 -- RULE that turns (text "abc") into (ptext (A# "abc"#)) to avoid the
 -- intermediate packing/unpacking of the string.
 {-# RULES 
-  "text/str" forall a. text (unpackCString# a) = ptext (A# a)
+  "text/str" forall a. text (unpackCString# a) = ptext (Ptr a)
  #-}
 
 nest IBOX(k)  p = mkNest k (reduceDoc p)        -- Externally callable version

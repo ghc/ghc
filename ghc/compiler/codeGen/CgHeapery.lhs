@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.31 2002/04/29 14:03:41 simonmar Exp $
+% $Id: CgHeapery.lhs,v 1.32 2002/08/29 15:44:13 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -31,12 +31,13 @@ import ClosureInfo	( closureSize, closureGoodStuffSize,
 import PrimRep		( PrimRep(..), isFollowableRep )
 import Unique		( Unique )
 import CmdLineOpts	( opt_GranMacros )
-import GlaExts
 import Outputable
 
 #ifdef DEBUG
 import PprAbsC		( pprMagicId ) -- tmp
 #endif
+
+import GLAEXTS
 \end{code}
 
 %************************************************************************

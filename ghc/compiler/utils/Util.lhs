@@ -1,17 +1,10 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+% (c) The University of Glasgow 1992-2002
 %
 \section[Util]{Highly random utility functions}
 
 \begin{code}
--- IF_NOT_GHC is meant to make this module useful outside the context of GHC
-#define IF_NOT_GHC(a)
-
 module Util (
-#if NOT_USED
-	-- The Eager monad
-	Eager, thenEager, returnEager, mapEager, appEager, runEager,
-#endif
 
 	-- general list processing
 	zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
@@ -29,10 +22,7 @@ module Util (
 	nTimes,
 
 	-- sorting
-	IF_NOT_GHC(quicksort COMMA stableSortLt COMMA mergesort COMMA)
-	sortLt,
-	IF_NOT_GHC(mergeSort COMMA) naturalMergeSortLe,	-- from Carsten
-	IF_NOT_GHC(naturalMergeSort COMMA mergeSortLe COMMA)
+	sortLt, naturalMergeSortLe,
 
 	-- transitive closures
 	transitiveClosure,
@@ -51,16 +41,12 @@ module Util (
 	foldl', seqList,
 
 	-- pairs
-	IF_NOT_GHC(cfst COMMA applyToPair COMMA applyToFst COMMA)
-	IF_NOT_GHC(applyToSnd COMMA foldPair COMMA)
-	unzipWith
+	unzipWith,
 
-	, global
+	global,
 
 #if __GLASGOW_HASKELL__ <= 408
-	, catchJust
-	, ioErrors
-	, throwTo
+	catchJust, ioErrors, throwTo
 #endif
 
     ) where
@@ -68,14 +54,19 @@ module Util (
 #include "../includes/config.h"
 #include "HsVersions.h"
 
-import qualified List	( elem, notElem )
-import List		( zipWith4 )
-import Maybe		( Maybe(..) )
 import Panic		( panic, trace )
-import IOExts		( IORef, newIORef, unsafePerformIO )
 import FastTypes
+
 #if __GLASGOW_HASKELL__ <= 408
-import Exception	( catchIO, justIoErrors, raiseInThread )
+import EXCEPTION	( catchIO, justIoErrors, raiseInThread )
+#endif
+import DATA_IOREF	( IORef, newIORef )
+import UNSAFE_IO	( unsafePerformIO )
+
+import qualified List	( elem, notElem )
+
+#ifndef DEBUG
+import List		( zipWith4 )
 #endif
 
 infixr 9 `thenCmp`
@@ -359,8 +350,6 @@ Quicksort variant from Lennart's Haskell-library contribution.  This
 is a {\em stable} sort.
 
 \begin{code}
-stableSortLt = sortLt	-- synonym; when we want to highlight stable-ness
-
 sortLt :: (a -> a -> Bool) 		-- Less-than predicate
        -> [a] 				-- Input list
        -> [a]				-- Result list
@@ -542,12 +531,15 @@ generalMergeSort p xs = (balancedFold (generalMerge p) . map (: [])) xs
 generalNaturalMergeSort p [] = []
 generalNaturalMergeSort p xs = (balancedFold (generalMerge p) . group p) xs
 
+#if NOT_USED
 mergeSort, naturalMergeSort :: Ord a => [a] -> [a]
 
 mergeSort = generalMergeSort (<=)
 naturalMergeSort = generalNaturalMergeSort (<=)
 
 mergeSortLe le = generalMergeSort le
+#endif
+
 naturalMergeSortLe le = generalNaturalMergeSort le
 \end{code}
 
@@ -751,14 +743,17 @@ suffixMatch pat str = prefixMatch (reverse pat) (reverse str)
 The following are curried versions of @fst@ and @snd@.
 
 \begin{code}
+#if NOT_USED
 cfst :: a -> b -> a	-- stranal-sem only (Note)
 cfst x y = x
+#endif
 \end{code}
 
 The following provide us higher order functions that, when applied
 to a function, operate on pairs.
 
 \begin{code}
+#if NOT_USED
 applyToPair :: ((a -> c),(b -> d)) -> (a,b) -> (c,d)
 applyToPair (f,g) (x,y) = (f x, g y)
 
@@ -767,6 +762,7 @@ applyToFst f (x,y) = (f x,y)
 
 applyToSnd :: (b -> d) -> (a,b) -> (a,d)
 applyToSnd f (x,y) = (x,f y)
+#endif
 
 foldPair :: (a->a->a,b->b->b) -> (a,b) -> [(a,b)] -> (a,b)
 foldPair fg ab [] = ab

@@ -68,8 +68,10 @@ import Bag		( Bag, emptyBag, isEmptyBag, snocBag )
 import UniqSupply
 import Outputable
 
-import IOExts		( IORef, newIORef, readIORef, writeIORef, 
-			  fixIO, unsafePerformIO )
+import DATA_IOREF	( IORef, newIORef, readIORef, writeIORef )
+import UNSAFE_IO	( unsafePerformIO )
+import FIX_IO		( fixIO )
+
 import IO		( hPutStr, stderr )
 	
 infixr 9 `thenRn`, `thenRn_`

@@ -38,7 +38,7 @@ module FastString
         hPutFS,		    -- :: Handle -> FastString -> IO ()
 
 	LitString, 
-	mkLitString#	    -- :: Addr# -> Addr
+	mkLitString#	    -- :: Addr# -> LitString
        ) where
 
 -- This #define suppresses the "import FastString" that
@@ -47,38 +47,36 @@ module FastString
 #include "HsVersions.h"
 
 #if __GLASGOW_HASKELL__ < 503
-import PrelPack
+import PrelPack		hiding (packString)
 import PrelIOBase	( IO(..) )
 #else
-import CString
 import GHC.IOBase	( IO(..) )
 #endif
 
 import PrimPacked
-import GlaExts
-#if __GLASGOW_HASKELL__ < 411
-import PrelAddr		( Addr(..) )
-#else
-import Addr		( Addr(..) )
-#endif
+import GLAEXTS
+import UNSAFE_IO	( unsafePerformIO )
+import ST		( stToIO )
+import DATA_IOREF	( IORef, newIORef, readIORef, writeIORef )
+
 #if __GLASGOW_HASKELL__ < 503
 import PrelArr		( STArray(..), newSTArray )
-import IOExts		( hPutBufBAFull )
 #else
 import GHC.Arr		( STArray(..), newSTArray )
-import IOExts 		( hPutBufBA )
-import CString		( unpackNBytesBA# )
 #endif
 
-import IOExts		( IORef, newIORef, readIORef, writeIORef )
+#if __GLASGOW_HASKELL__ >= 504
+import GHC.IOBase
+import GHC.Handle
+import Foreign.C
+#else
+import IOExts		( hPutBufBAFull )
+#endif
+
 import IO
 import Char             ( chr, ord )
 
 #define hASH_TBL_SIZE 993
-
-#if __GLASGOW_HASKELL__ < 503
-hPutBufBA = hPutBufBAFull
-#endif
 \end{code} 
 
 @FastString@s are packed representations of strings
@@ -129,7 +127,7 @@ nullFastString (UnicodeStr _ []) = True
 nullFastString (UnicodeStr _ (_:_)) = False
 
 unpackFS :: FastString -> String
-unpackFS (FastString _ l# ba#) = unpackNBytesBA# ba# l#
+unpackFS (FastString _ l# ba#) = unpackCStringBA (BA ba#) (I# l#)
 unpackFS (UnicodeStr _ s) = map chr s
 
 unpackIntFS :: FastString -> [Int]
@@ -213,7 +211,7 @@ updTbl fs_table_var (FastStringTable uid# arr#) i# ls =
 
 mkFastString# :: Addr# -> FastString
 mkFastString# a# =
- case strLength (A# a#) of { (I# len#) -> mkFastStringLen# a# len# }
+ case strLength (Ptr a#) of { (I# len#) -> mkFastStringLen# a# len# }
 
 mkFastStringLen# :: Addr# -> Int# -> FastString
 mkFastStringLen# a# len# =
@@ -229,8 +227,8 @@ mkFastStringLen# a# len# =
        -- no match, add it to table by copying out the
        -- the string into a ByteArray
        -- _trace "empty bucket" $
-       case copyPrefixStr (A# a#) (I# len#) of
-	 (ByteArray _ _ barr#) ->  
+       case copyPrefixStr a# (I# len#) of
+	 BA barr# ->  
 	   let f_str = FastString uid# len# barr# in
            updTbl string_table ft h [f_str] >>
            ({- _trace ("new: " ++ show f_str)   $ -} return f_str)
@@ -240,8 +238,8 @@ mkFastStringLen# a# len# =
        -- _trace ("non-empty bucket"++show ls) $
        case bucket_match ls len# a# of
 	 Nothing -> 
-           case copyPrefixStr (A# a#) (I# len#) of
-	     (ByteArray _ _ barr#) ->  
+           case copyPrefixStr a# (I# len#) of
+	     BA barr# ->  
               let f_str = FastString uid# len# barr# in
               updTbl string_table ft h (f_str:ls) >>
 	      ( {- _trace ("new: " ++ show f_str)  $ -} return f_str)
@@ -270,8 +268,8 @@ mkFastSubStringBA# barr# start# len# =
        -- no match, add it to table by copying out the
        -- the string into a ByteArray
        -- _trace "empty bucket(b)" $
-       case copySubStrBA (ByteArray btm btm barr#) (I# start#) (I# len#) of
-         (ByteArray _ _ ba#) ->  
+       case copySubStrBA (BA barr#) (I# start#) (I# len#) of
+         BA ba# ->  
           let f_str = FastString uid# len# ba# in
           updTbl string_table ft h [f_str]     >>
           -- _trace ("new(b): " ++ show f_str)   $
@@ -282,8 +280,8 @@ mkFastSubStringBA# barr# start# len# =
        -- _trace ("non-empty bucket(b)"++show ls) $
        case bucket_match ls start# len# barr# of
 	 Nothing -> 
-          case copySubStrBA (ByteArray btm btm barr#) (I# start#) (I# len#) of
-            (ByteArray _ _ ba#) ->  
+          case copySubStrBA (BA barr#) (I# start#) (I# len#) of
+            BA ba# ->  
               let f_str = FastString uid# len# ba# in
               updTbl string_table ft h (f_str:ls) >>
 	      -- _trace ("new(b): " ++ show f_str)   $
@@ -293,8 +291,6 @@ mkFastSubStringBA# barr# start# len# =
 	      return v
   )
  where
-   btm = error ""
-
    bucket_match [] _ _ _ = Nothing
    bucket_match (v:ls) start# len# ba# =
     case v of
@@ -344,11 +340,11 @@ mkFastStringUnicode s =
 
 mkFastStringNarrow :: String -> FastString
 mkFastStringNarrow str =
- case packString str of
-  (ByteArray _ (I# len#) frozen#) -> 
+ case packString str of { (I# len#, BA frozen#) -> 
     mkFastSubStringBA# frozen# 0# len#
-    {- 0-indexed array, len# == index to one beyond end of string,
-       i.e., (0,1) => empty string.    -}
+ }
+ {- 0-indexed array, len# == index to one beyond end of string,
+    i.e., (0,1) => empty string.    -}
 
 mkFastString :: String -> FastString
 mkFastString str = if all good str
@@ -364,9 +360,9 @@ mkFastStringInt str = if all good str
     where
     good c = c >= 1 && c <= 0xFF
 
-mkFastSubString :: Addr -> Int -> Int -> FastString
-mkFastSubString (A# a#) (I# start#) (I# len#) =
- mkFastStringLen# (addrOffset# a# start#) len#
+mkFastSubString :: Addr# -> Int -> Int -> FastString
+mkFastSubString a# (I# start#) (I# len#) =
+ mkFastStringLen# (a# `plusAddr#` start#) len#
 \end{code}
 
 \begin{code}
@@ -428,41 +424,81 @@ cmpFS (FastString u1# _ b1#) (FastString u2# _ b2#) = -- assume non-null chars
      EQ
   else
    unsafePerformIO (
-    _ccall_ strcmp (ByteArray bot bot b1#) (ByteArray bot bot b2#) >>= \ (I# res) ->
+    strcmp b1# b2# >>= \ (I# res) ->
     return (
     if      res <#  0# then LT
     else if res ==# 0# then EQ
     else		    GT
     ))
-  where
-   bot :: Int
-   bot = error "tagCmp"
-\end{code}
 
-Outputting @FastString@s is quick, just block copying the chunk (using
-@fwrite@).
+foreign import ccall "strcmp" unsafe 
+  strcmp :: ByteArray# -> ByteArray# -> IO Int
 
-\begin{code}
+-- -----------------------------------------------------------------------------
+-- Outputting 'FastString's
+
+#if __GLASGOW_HASKELL__ >= 504
+
+-- this is our own version of hPutBuf for FastStrings, because in
+-- 5.04+ we don't have mutable byte arrays and therefore hPutBufBA.
+-- The closest is hPutArray in Data.Array.IO, but that does some extra
+-- range checks that we want to avoid here.
+
+foreign import ccall unsafe "__hscore_memcpy_dst_off"
+   memcpy_baoff_ba :: RawBuffer -> Int -> RawBuffer -> CSize -> IO (Ptr ())
+
+hPutFS handle (FastString _ l# ba#)
+  | l# ==# 0#  = return ()
+  | otherwise
+   = do wantWritableHandle "hPutFS" handle $ 
+          \ handle_@Handle__{ haFD=fd, haBuffer=ref, haIsStream=stream } -> do
+
+          old_buf@Buffer{ bufBuf=old_raw, bufRPtr=r, bufWPtr=w, bufSize=size }
+	    <- readIORef ref
+
+	  let count = I# l#
+	      raw = unsafeCoerce# ba# :: MutableByteArray# RealWorld
+
+          -- enough room in handle buffer?
+          if (size - w > count)
+		-- There's enough room in the buffer:
+		-- just copy the data in and update bufWPtr.
+	    then do memcpy_baoff_ba old_raw w raw (fromIntegral count)
+		    writeIORef ref old_buf{ bufWPtr = w + count }
+		    return ()
+
+		-- else, we have to flush
+	    else do flushed_buf <- flushWriteBuffer fd stream old_buf
+		    writeIORef ref flushed_buf
+		    let this_buf = 
+			    Buffer{ bufBuf=raw, bufState=WriteBuffer, 
+				    bufRPtr=0, bufWPtr=count, bufSize=count }
+		    flushWriteBuffer fd stream this_buf
+		    return ()
+
+#else
+
 hPutFS :: Handle -> FastString -> IO ()
 hPutFS handle (FastString _ l# ba#)
   | l# ==# 0#  = return ()
   | otherwise  = do mba <- stToIO $ unsafeThawByteArray (ByteArray (bot::Int) bot ba#)
-                    hPutBufBA  handle mba (I# l#)
+                    hPutBufBAFull  handle mba (I# l#)
  where
   bot = error "hPutFS.ba"
+
+#endif
 
 -- ONLY here for debugging the NCG (so -ddump-stix works for string
 -- literals); no idea if this is really necessary.  JRS, 010131
 hPutFS handle (UnicodeStr _ is) 
   = hPutStr handle ("(UnicodeStr " ++ show is ++ ")")
-\end{code}
 
-Here for convenience only.
+-- -----------------------------------------------------------------------------
+-- LitStrings, here for convenience only.
 
-\begin{code}
-type LitString = Addr
+type LitString = Ptr ()
 -- ToDo: make it a Ptr when we don't have to support 4.08 any more
 
 mkLitString# :: Addr# -> LitString
-mkLitString# a# = A# a#
+mkLitString# a# = Ptr a#
 \end{code}

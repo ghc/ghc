@@ -52,8 +52,15 @@ module Flattening (
   flatten, flattenExpr, 
 ) where 
 
--- standard
-import Monad        (liftM, foldM)
+#include "HsVersions.h"
+
+-- friends
+import NDPCoreUtils (tupleTyArgs, funTyArgs, parrElemTy, isDefault,
+		     isLit, mkPArrTy, mkTuple, isSimpleExpr, boolTy, substIdEnv)
+import FlattenMonad (Flatten, runFlatten, mkBind, extendContext, packContext,
+		     liftVar, liftConst, intersectWithContext, mk'fst,
+		     mk'lengthP, mk'replicateP, mk'mapP, mk'bpermuteDftP,
+		     mk'indexOfP,mk'eq,mk'neq) 
 
 -- GHC
 import CmdLineOpts  (opt_Flatten)
@@ -81,20 +88,11 @@ import BasicTypes   (Boxity(..))
 import Outputable   (showSDoc, Outputable(..))
 import FastString
 
--- friends
-import NDPCoreUtils (tupleTyArgs, funTyArgs, parrElemTy, isDefault,
-		     isLit, mkPArrTy, mkTuple, isSimpleExpr, boolTy, substIdEnv)
-import FlattenMonad (Flatten, runFlatten, mkBind, extendContext, packContext,
-		     liftVar, liftConst, intersectWithContext, mk'fst,
-		     mk'lengthP, mk'replicateP, mk'mapP, mk'bpermuteDftP,
-		     mk'indexOfP,mk'eq,mk'neq) 
-
 -- FIXME: fro debugging - remove this
-import IOExts    (trace)
+import TRACE    (trace)
 
-
-#include "HsVersions.h"
-
+-- standard
+import Monad        (liftM, foldM)
 
 -- toplevel transformation
 -- -----------------------

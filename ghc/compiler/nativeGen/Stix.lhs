@@ -32,10 +32,6 @@ module Stix (
 
 #include "HsVersions.h"
 
-import Ratio		( Rational )
-import IOExts		( unsafePerformIO )
-import IO		( hPutStrLn, stderr )
-
 import AbsCSyn		( node, tagreg, MagicId(..) )
 import AbsCUtils	( magicIdPrimRep )
 import ForeignCall	( CCallConv )
@@ -50,6 +46,11 @@ import Constants	( wORD_SIZE )
 import Outputable
 import FastTypes
 import FastString
+
+import UNSAFE_IO	( unsafePerformIO )
+
+import Ratio		( Rational )
+import IO		( hPutStrLn, stderr )
 \end{code}
 
 Two types, StixStmt and StixValue, define Stix.

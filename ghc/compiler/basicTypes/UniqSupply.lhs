@@ -24,12 +24,9 @@ module UniqSupply (
 #include "HsVersions.h"
 
 import Unique
-import GlaExts
 
-#if __GLASGOW_HASKELL__ < 301
-import IOBase		( IO(..), IOResult(..) )
-#else
-#endif
+import GLAEXTS
+import UNSAFE_IO	( unsafeInterleaveIO )
 
 w2i x = word2Int# x
 i2w x = int2Word# x

@@ -47,7 +47,7 @@ import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey )
 import FastTypes
 import Outputable
 
-import IOExts		( IORef, newIORef, readIORef, writeIORef )
+import DATA_IOREF	( IORef, newIORef, readIORef, writeIORef )
 \end{code}
 
 

@@ -48,9 +48,9 @@ import CmdLineOpts	( opt_Static )
 import Stix		( pprStixStmt )
 
 -- DEBUGGING ONLY
-import IOExts		( trace )
 import Outputable	( assertPanic )
 import FastString
+import TRACE		( trace )
 
 infixr 3 `bind`
 \end{code}

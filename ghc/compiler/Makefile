@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.219 2002/06/14 08:23:57 simonpj Exp $
+# $Id: Makefile,v 1.220 2002/08/29 15:44:12 simonmar Exp $
 
 TOP = ..
 
@@ -232,14 +232,6 @@ ifeq "$(bootstrapped)" "YES"
 utils/Binary_HC_OPTS		= -funbox-strict-fields
 endif
 
-# flags for PrimPacked:
-#
-# -monly-2-regs 
-#	because it contains 'ccall strlen' and 'ccall memcmp', which gets 
-#	inlined by gcc, causing a lack of registers.
-#
-utils/PrimPacked_HC_OPTS	= -fvia-C
-
 # ByteCodeItbls uses primops that the NCG doesn't support yet.
 ghci/ByteCodeItbls_HC_OPTS	= -fvia-C
 ghci/ByteCodeLink_HC_OPTS	= -fvia-C -monly-3-regs
@@ -368,10 +360,16 @@ endif
 # ----------------------------------------------------------------------------
 # profiling.
 
-rename/Rename_HC_OPTS += -auto-all
-rename/RnEnv_HC_OPTS += -auto-all
-rename/RnHiFiles_HC_OPTS += -auto-all
-rename/RnSource_HC_OPTS += -auto-all
+# rename/Rename_HC_OPTS += -auto-all
+# rename/RnEnv_HC_OPTS += -auto-all
+# rename/RnHiFiles_HC_OPTS += -auto-all
+# rename/RnIfaces_HC_OPTS += -auto-all
+# rename/RnSource_HC_OPTS += -auto-all
+# rename/RnBinds_HC_OPTS += -auto-all
+# rename/RnExpr_HC_OPTS += -auto-all
+# rename/RnHsSyn_HC_OPTS += -auto-all
+# rename/RnNames_HC_OPTS += -auto-all
+# rename/RnTypes_HC_OPTS += -auto-all
 
 #-----------------------------------------------------------------------------
 # 		clean

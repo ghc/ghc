@@ -39,7 +39,7 @@ import RnMonad
 
 import PrelNames	( gHC_PRIM_Name, gHC_PRIM )
 import Name		( Name {-instance NamedThing-}, 
-			  nameModule, isInternalName, nameIsLocalOrFrom
+			  nameModule, isInternalName
 			 )
 import NameEnv
 import NameSet
@@ -61,9 +61,10 @@ import qualified Binary
 import Panic
 import Config
 
-import IOExts
-import Exception
-import Dynamic		( fromDynamic )
+import EXCEPTION as Exception
+import DYNAMIC		( fromDynamic )
+import DATA_IOREF	( readIORef )
+
 import Directory
 import List		( isSuffixOf )
 \end{code}

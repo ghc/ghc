@@ -79,6 +79,9 @@ import Bag		( consBag, emptyBag )
 import Outputable
 import HscStats		( ppSourceStats )
 import HscTypes
+import MkExternalCore	( emitExternalCore )
+import ParserCore
+import ParserCoreUtils
 import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
 import OccName		( OccName )
 import Name		( Name, nameModule, nameOccName, getName )
@@ -88,17 +91,12 @@ import FastString
 import Maybes		( expectJust )
 import Util		( seqList )
 
-import IOExts		( newIORef, readIORef, writeIORef, 
-			  unsafePerformIO )
+import DATA_IOREF	( newIORef, readIORef, writeIORef )
+import UNSAFE_IO	( unsafePerformIO )
 
 import Monad		( when )
 import Maybe		( isJust, fromJust )
 import IO
-
-import MkExternalCore	( emitExternalCore )
-import ParserCore
-import ParserCoreUtils
-
 \end{code}
 
 

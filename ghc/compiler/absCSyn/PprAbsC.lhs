@@ -58,10 +58,14 @@ import UniqSet		( emptyUniqSet, elementOfUniqSet,
 import StgSyn		( StgOp(..) )
 import BitSet		( BitSet, intBS )
 import Outputable
-import GlaExts
 import FastString
 import Util		( lengthExceeds, listLengthCmp )
 
+#if __GLASGOW_HASKELL__ >= 504
+import Data.Array.ST
+#endif
+
+import GLAEXTS
 import ST
 
 infixr 9 `thenTE`
@@ -1764,13 +1768,46 @@ can safely initialise to static locations.
 \begin{code}
 big_doubles = (getPrimRepSize DoubleRep) /= 1
 
--- floatss are always 1 word
+#if __GLASGOW_HASKELL__ >= 504
+newFloatArray :: (Int,Int) -> ST s (STUArray s Int Float)
+newFloatArray = newArray_
+
+newDoubleArray :: (Int,Int) -> ST s (STUArray s Int Double)
+newDoubleArray = newArray_
+
+castFloatToIntArray :: STUArray s Int Float -> ST s (STUArray s Int Int)
+castFloatToIntArray = castSTUArray
+
+castDoubleToIntArray :: STUArray s Int Double -> ST s (STUArray s Int Int)
+castDoubleToIntArray = castSTUArray
+
+writeFloatArray :: STUArray s Int Float -> Int -> Float -> ST s ()
+writeFloatArray = writeArray
+
+writeDoubleArray :: STUArray s Int Double -> Int -> Double -> ST s ()
+writeDoubleArray = writeArray
+
+readIntArray :: STUArray s Int Int -> Int -> ST s Int
+readIntArray = readArray
+
+#else
+
+castFloatToIntArray :: MutableByteArray s t -> ST s (MutableByteArray s t)
+castFloatToIntArray = return
+
+castDoubleToIntArray :: MutableByteArray s t -> ST s (MutableByteArray s t)
+castDoubleToIntArray = return
+
+#endif
+
+-- floats are always 1 word
 floatToWord :: CAddrMode -> CAddrMode
 floatToWord (CLit (MachFloat r))
   = runST (do
 	arr <- newFloatArray ((0::Int),0)
 	writeFloatArray arr 0 (fromRational r)
-	i <- readIntArray arr 0
+	arr' <- castFloatToIntArray arr
+	i <- readIntArray arr' 0
 	return (CLit (MachInt (toInteger i)))
     )
 
@@ -1780,8 +1817,9 @@ doubleToWords (CLit (MachDouble r))
   = runST (do
 	arr <- newDoubleArray ((0::Int),1)
 	writeDoubleArray arr 0 (fromRational r)
-	i1 <- readIntArray arr 0
-	i2 <- readIntArray arr 1
+	arr' <- castDoubleToIntArray arr
+	i1 <- readIntArray arr' 0
+	i2 <- readIntArray arr' 1
 	return [ CLit (MachInt (toInteger i1))
 	       , CLit (MachInt (toInteger i2))
 	       ]
@@ -1790,7 +1828,8 @@ doubleToWords (CLit (MachDouble r))
   = runST (do
 	arr <- newDoubleArray ((0::Int),0)
 	writeDoubleArray arr 0 (fromRational r)
-	i <- readIntArray arr 0
+	arr' <- castDoubleToIntArray arr
+	i <- readIntArray arr' 0
 	return [ CLit (MachInt (toInteger i)) ]
     )
 \end{code}

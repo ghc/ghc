@@ -49,12 +49,12 @@ module Unique (
 
 import BasicTypes	( Boxity(..) )
 import FastString	( FastString, uniqueOfFS )
-import GlaExts
-import ST
-import Char		( chr, ord )
+import Outputable
 import FastTypes
 
-import Outputable
+import GLAEXTS
+
+import Char		( chr, ord )
 \end{code}
 
 %************************************************************************
@@ -227,48 +227,21 @@ instance Show Unique where
 A character-stingy way to read/write numbers (notably Uniques).
 The ``62-its'' are \tr{[0-9a-zA-Z]}.  We don't handle negative Ints.
 Code stolen from Lennart.
-\begin{code}
-# define BYTE_ARRAY GlaExts.ByteArray
-# define RUN_ST	    ST.runST
-# define AND_THEN   >>=
-# define AND_THEN_  >>
-# define RETURN	    return
 
+\begin{code}
 iToBase62 :: Int -> SDoc
 
 iToBase62 n@(I# n#)
   = ASSERT(n >= 0)
-    let
-#if __GLASGOW_HASKELL__ < 405
-	bytes = case chars62 of { BYTE_ARRAY bounds_who_needs_'em bytes -> bytes }
-#else
-	bytes = case chars62 of { BYTE_ARRAY _ _ bytes -> bytes }
-#endif
-    in
     if n# <# 62# then
-	case (indexCharArray# bytes n#) of { c ->
+	case (indexCharOffAddr# chars62# n#) of { c ->
 	char (C# c) }
     else
 	case (quotRem n 62)		of { (q, I# r#) ->
-	case (indexCharArray# bytes r#) of { c  ->
+	case (indexCharOffAddr# chars62# r#) of { c  ->
 	(<>) (iToBase62 q) (char (C# c)) }}
-
--- keep this at top level! (bug on 94/10/24 WDP)
-chars62 :: BYTE_ARRAY Int
-chars62
-  = RUN_ST (
-	newCharArray (0, 61)	AND_THEN \ ch_array ->
-	fill_in ch_array 0 62 "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-				AND_THEN_
-	unsafeFreezeByteArray ch_array
-    )
   where
-    fill_in ch_array i lim str
-      | i == lim
-      = RETURN ()
-      | otherwise
-      = writeCharArray ch_array i (str !! i)	AND_THEN_
-	fill_in ch_array (i+1) lim str
+     chars62# = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"#
 \end{code}
 
 %************************************************************************

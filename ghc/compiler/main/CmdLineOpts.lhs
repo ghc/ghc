@@ -117,15 +117,15 @@ module CmdLineOpts (
 
 #include "HsVersions.h"
 
-import GlaExts
-import IOExts	( IORef, readIORef, writeIORef )
 import Constants	-- Default values for some flags
 import Util
-import FastTypes
 import FastString	( FastString, mkFastString )
 import Config
-
 import Maybes		( firstJust )
+
+import GLAEXTS
+import DATA_IOREF	( IORef, readIORef, writeIORef )
+import UNSAFE_IO	( unsafePerformIO )
 \end{code}
 
 %************************************************************************

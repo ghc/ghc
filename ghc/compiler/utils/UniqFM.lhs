@@ -50,9 +50,10 @@ import {-# SOURCE #-} Name	( Name )
 
 import Unique		( Uniquable(..), Unique, getKey, mkUniqueGrimily )
 import Panic
-import GlaExts		-- Lots of Int# operations
 import FastTypes
 import Outputable
+
+import GLAEXTS		-- Lots of Int# operations
 \end{code}
 
 %************************************************************************

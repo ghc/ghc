@@ -22,8 +22,10 @@ module BitSet (
 	unionBS, minusBS, intBS
     ) where
 
+#include "HsVersions.h"
+
 #ifdef __GLASGOW_HASKELL__
-import GlaExts
+import GLAEXTS
 -- nothing to import
 #elif defined(__YALE_HASKELL__)
 {-hide import from mkdependHS-}

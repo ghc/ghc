@@ -16,15 +16,17 @@ module Panic
      showGhcException
    ) where
 
+#include "HsVersions.h"
+
 import Config
 import FastTypes
 
-import Dynamic
-import IOExts
-import Exception
+import DYNAMIC
+import EXCEPTION
+import TRACE		( trace )
+import UNSAFE_IO	( unsafePerformIO )
 
 import System
-#include "HsVersions.h"
 \end{code}
 
 GHC's own exception type.

@@ -10,12 +10,12 @@ module Ctype
 	, is_upper	-- Char# -> Bool
 	, is_digit	-- Char# -> Bool
 	) where
-\end{code}
 
-\begin{code}
-import Bits	( Bits((.&.)) )
-import Int	( Int32 )
-import GlaExts  ( Char#, Char(..) )
+#include "HsVersions.h"
+
+import DATA_INT		( Int32 )
+import DATA_BITS	( Bits((.&.)) )
+import GLAEXTS  	( Char#, Char(..) )
 \end{code}
 
 Bit masks

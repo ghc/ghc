@@ -10,6 +10,36 @@ you will screw up the layout where they are used in case expressions!
 
 #endif
 
+#if __GLASGOW_HASKELL__ >= 504
+
+#define CONCURRENT  Control.Concurrent
+#define EXCEPTION   Control.Exception
+#define DYNAMIC     Data.Dynamic
+#define GLAEXTS     GHC.Exts
+#define DATA_BITS   Data.Bits
+#define DATA_INT    Data.Int
+#define DATA_WORD   Data.Word
+#define UNSAFE_IO   System.IO.Unsafe
+#define TRACE       Debug.Trace
+#define DATA_IOREF  Data.IORef
+#define FIX_IO      System.IO
+
+#else
+
+#define CONCURRENT  Concurrent
+#define EXCEPTION   Exception
+#define DYNAMIC     Dynamic
+#define GLAEXTS     GlaExts
+#define DATA_BITS   Bits
+#define DATA_INT    Int
+#define DATA_WORD   Word
+#define UNSAFE_IO   IOExts
+#define TRACE       IOExts
+#define DATA_IOREF  IOExts
+#define FIX_IO      IOExts
+
+#endif
+
 #ifdef __GLASGOW_HASKELL__
 #define GLOBAL_VAR(name,value,ty)  \
 name = Util.global (value) :: IORef (ty); \

@@ -31,7 +31,8 @@ import Outputable
 import FastString	( unpackFS )
 import FastTypes
 import FastString
-import GlaExts		( (+#) )
+
+import GLAEXTS		( (+#) )
 \end{code}
 
 %************************************************************************

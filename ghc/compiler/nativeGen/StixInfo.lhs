@@ -28,8 +28,8 @@ import UniqSupply	( returnUs, UniqSM )
 import BitSet		( BitSet, intBS )
 import Maybes		( maybeToBool )
 
-import Bits
-import Word
+import DATA_BITS
+import DATA_WORD
 \end{code}
 
 Generating code for info tables (arrays of data).

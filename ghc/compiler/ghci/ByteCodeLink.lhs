@@ -54,15 +54,9 @@ import Control.Exception ( throwDyn )
 import GlaExts		( BCO#, newBCO#, unsafeCoerce#, 
 			  ByteArray#, Array#, addrToHValue#, mkApUpd0# )
 
-#if __GLASGOW_HASKELL__ >= 503
 import GHC.Arr		( Array(..) )
 import GHC.IOBase	( IO(..) )
 import GHC.Ptr		( Ptr(..) )
-#else
-import PrelArr		( Array(..) )
-import PrelIOBase	( IO(..) )
-import Ptr		( Ptr(..) )
-#endif
 \end{code}
 
 %************************************************************************

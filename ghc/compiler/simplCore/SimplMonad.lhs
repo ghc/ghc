@@ -80,18 +80,20 @@ import CmdLineOpts	( SimplifierSwitch(..), SimplifierMode(..),
 			  opt_PprStyle_Debug, opt_HistorySize, opt_SimplNoPreInlining,
 			)
 import Unique		( Unique )
-import Maybes		( expectJust )
 import Outputable
-import Array		( array, (//) )
 import FastTypes
-import GlaExts		( indexArray# )
 import FastString
+import Maybes		( expectJust )
+
+import GLAEXTS		( indexArray# )
 
 #if __GLASGOW_HASKELL__ < 503
 import PrelArr  ( Array(..) )
 #else
 import GHC.Arr  ( Array(..) )
 #endif
+
+import Array		( array, (//) )
 
 infixr 0  `thenSmpl`, `thenSmpl_`
 \end{code}
@@ -986,20 +988,10 @@ isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
 	defined_elems = map mk_assoc_elem tidied_on_switches
     in
     -- (avoid some unboxing, bounds checking, and other horrible things:)
-#if __GLASGOW_HASKELL__ < 405
-    case sw_tbl of { Array bounds_who_needs_'em stuff ->
-#else
     case sw_tbl of { Array _ _ stuff ->
-#endif
     \ switch ->
 	case (indexArray# stuff (tagOf_SimplSwitch switch)) of
-#if __GLASGOW_HASKELL__ < 400
-	  Lift v -> v
-#elif __GLASGOW_HASKELL__ < 403
-	  (# _, v #) -> v
-#else
 	  (# v #) -> v
-#endif
     }
   where
     mk_assoc_elem k@(MaxSimplifierIterations lvl)

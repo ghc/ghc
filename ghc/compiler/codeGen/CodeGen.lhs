@@ -57,7 +57,7 @@ import Panic		( assertPanic )
 import Outputable
 #endif
 
-import IOExts		( readIORef )
+import DATA_IOREF	( readIORef )
 \end{code}
 
 \begin{code}

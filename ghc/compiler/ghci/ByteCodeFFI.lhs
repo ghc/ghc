@@ -17,9 +17,10 @@ import ForeignCall	( CCallConv(..) )
 import Bits		( Bits(..), shiftR, shiftL )
 import Foreign		( newArray )
 
-import Word		( Word8, Word32 )
+import Data.Word	( Word8, Word32 )
 import Foreign		( Ptr, mallocBytes )
-import IOExts		( trace, unsafePerformIO )
+import Debug.Trace	( trace )
+import System.IO.Unsafe ( unsafePerformIO )
 import IO		( hPutStrLn, stderr )
 \end{code}
 

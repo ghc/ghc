@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.108 2002/07/06 10:14:31 chak Exp $
+-- $Id: Main.hs,v 1.109 2002/08/29 15:44:15 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -56,29 +56,30 @@ import Outputable
 import Util
 import Panic		( GhcException(..), panic )
 
+import DATA_IOREF	( readIORef, writeIORef )
+import EXCEPTION	( throwDyn, Exception(..), 
+			  AsyncException(StackOverflow) )
+
+#ifndef mingw32_HOST_OS
+import CONCURRENT	( myThreadId )
+# if __GLASGOW_HASKELL__ < 500
+import EXCEPTION        ( raiseInThread )
+#define throwTo  raiseInThread
+# else
+import EXCEPTION	( throwTo )
+# endif
+
+import Posix		( Handler(Catch), installHandler, sigINT, sigQUIT )
+import DYNAMIC		( toDyn )
+#endif
+
 -- Standard Haskell libraries
 import IO
 import Directory	( doesFileExist )
-import IOExts		( readIORef, writeIORef )
-import Exception	( throwDyn, Exception(..), 
-			  AsyncException(StackOverflow) )
 import System		( getArgs, exitWith, ExitCode(..) )
 import Monad
 import List
 import Maybe
-
-#ifndef mingw32_HOST_OS
-import Concurrent	( myThreadId )
-# if __GLASGOW_HASKELL__ < 500
-import Exception        ( raiseInThread )
-#define throwTo  raiseInThread
-# else
-import Exception	( throwTo )
-# endif
-
-import Posix		( Handler(Catch), installHandler, sigINT, sigQUIT )
-import Dynamic		( toDyn )
-#endif
 
 -----------------------------------------------------------------------------
 -- ToDo:

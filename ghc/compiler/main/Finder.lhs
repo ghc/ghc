@@ -26,7 +26,8 @@ import Module
 import FastString
 import Config
 
-import IOExts
+import DATA_IOREF	( readIORef )
+
 import List
 import Directory
 import IO

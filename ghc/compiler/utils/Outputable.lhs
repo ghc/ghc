@@ -56,7 +56,8 @@ import qualified Pretty
 import Pretty		( Doc, Mode(..) )
 import Panic
 
-import Word		( Word32 )
+import DATA_WORD	( Word32 )
+
 import IO		( Handle, stderr, stdout, hFlush )
 import Char             ( chr )
 #if __GLASGOW_HASKELL__ < 410

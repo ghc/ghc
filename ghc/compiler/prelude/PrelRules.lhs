@@ -41,15 +41,16 @@ import PrelNames	( unpackCStringFoldrName, unpackCStringFoldrIdKey, hasKey,
 			  eqStringName, unpackCStringIdKey )
 import Maybes		( orElse )
 import Name		( Name )
-import Bits		( Bits(..) )
-#if __GLASGOW_HASKELL__ >= 500
-import Word		( Word )
-#else
-import Word		( Word64 )
-#endif
 import Outputable
 import FastString
 import CmdLineOpts      ( opt_SimplExcessPrecision )
+
+import DATA_BITS	( Bits(..) )
+#if __GLASGOW_HASKELL__ >= 500
+import DATA_WORD	( Word )
+#else
+import DATA_WORD	( Word64 )
+#endif
 \end{code}
 
 

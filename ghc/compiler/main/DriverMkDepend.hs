@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.20 2002/03/21 09:00:54 simonpj Exp $
+-- $Id: DriverMkDepend.hs,v 1.21 2002/08/29 15:44:15 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -22,8 +22,8 @@ import HscTypes		( ModuleLocation(..) )
 import Util             ( global )
 import Panic
 
-import IOExts
-import Exception
+import DATA_IOREF	( IORef, newIORef, readIORef, writeIORef )
+import EXCEPTION
 
 import Directory
 import IO

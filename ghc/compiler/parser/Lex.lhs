@@ -47,11 +47,11 @@ import Outputable
 
 import FastString
 import StringBuffer
-import GlaExts
 import Ctype
 
-import Bits		( Bits(..) )	   -- non-std
-import Int		( Int32 )
+import GLAEXTS
+import DATA_BITS	( Bits(..) )
+import DATA_INT		( Int32 )
 \end{code}
 
 %************************************************************************

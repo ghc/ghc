@@ -63,10 +63,9 @@ import Unique		( Unique )
 import CmdLineOpts
 import Outputable
 
-import IOExts		( IORef, newIORef, readIORef, writeIORef,
-			  unsafeInterleaveIO, fixIO
-			)
-
+import DATA_IOREF	( IORef, newIORef, readIORef, writeIORef )
+import UNSAFE_IO	( unsafeInterleaveIO )
+import FIX_IO		( fixIO )
 
 infixr 9 `thenTc`, `thenTc_`, `thenNF_Tc`, `thenNF_Tc_` 
 \end{code}

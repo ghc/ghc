@@ -12,10 +12,12 @@ module FastTypes (
     FastBool, fastBool, isFastTrue, fastOr
   ) where
 
+#include "HsVersions.h"
+
 #if defined(__GLASGOW_HASKELL__)
 
 -- Import the beggars
-import GlaExts
+import GLAEXTS
 	( Int(..), Int#, (+#), (-#), (*#), 
 	  quotInt#, negateInt#, (==#), (<#), (<=#), (>=#), (>#)
 	)

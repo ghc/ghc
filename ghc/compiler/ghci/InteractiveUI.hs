@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.131 2002/08/05 09:18:27 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.132 2002/08/29 15:44:14 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -38,7 +38,6 @@ import TyCon		( tyConName, tyConClass_maybe, isPrimTyCon, DataConDetails(..) )
 import FieldLabel	( fieldLabelTyCon )
 import SrcLoc		( isGoodSrcLoc )
 import Module		( moduleName )
-import NameEnv		( nameEnvElts )
 import Name		( Name, isHomePackageName, nameSrcLoc, nameOccName,
 			  NamedThing(..) )
 import OccName		( isSymOcc )
@@ -53,28 +52,32 @@ import Config
 import Posix
 #endif
 
-import Exception
-import Dynamic
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
 import Readline 
 #endif
-import Concurrent
-import IOExts
-import SystemExts
+
+--import SystemExts
+
+import Control.Exception as Exception
+import Data.Dynamic
+import Control.Concurrent
 
 import Numeric
-import List
-import System
-import CPUTime
-import Directory
-import IO
-import Char
-import Monad
+import Data.List
+import System.Cmd
+import System.CPUTime
+import System.Environment
+import System.Directory
+import System.IO as IO
+import Data.Char
+import Control.Monad as Monad
 
-import GlaExts		( unsafeCoerce# )
+import GHC.Exts		( unsafeCoerce# )
 
 import Foreign		( nullPtr )
-import CString		( CString, peekCString, withCString )
+import Foreign.C.String	( CString, peekCString, withCString )
+import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
+
 
 -----------------------------------------------------------------------------
 

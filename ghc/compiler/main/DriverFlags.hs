@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.100 2002/08/02 12:24:04 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.101 2002/08/29 15:44:15 simonmar Exp $
 --
 -- Driver flags
 --
@@ -27,10 +27,10 @@ import Config
 import Util
 import Panic
 
-import Exception
-import IOExts
-import System		( exitWith, ExitCode(..) )
+import EXCEPTION
+import DATA_IOREF	( readIORef, writeIORef )
 
+import System		( exitWith, ExitCode(..) )
 import IO
 import Maybe
 import Monad

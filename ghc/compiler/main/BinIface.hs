@@ -7,6 +7,8 @@
 
 module BinIface ( writeBinIface ) where
 
+#include "HsVersions.h"
+
 import HscTypes
 import BasicTypes
 import NewDemand
@@ -28,14 +30,12 @@ import CmdLineOpts	( opt_IgnoreIfacePragmas, opt_HiVersion )
 import StringBuffer	( hGetStringBuffer )
 import Panic
 import SrcLoc
-
 import Binary
 
-import IOExts		( readIORef )
-import Monad		( when )
-import Exception 	( throwDyn )
+import DATA_IOREF	( readIORef )
+import EXCEPTION	( throwDyn )
 
-#include "HsVersions.h"
+import Monad		( when )
 
 -- BasicTypes
 {-! for IPName derive: Binary !-}

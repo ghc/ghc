@@ -65,11 +65,9 @@ module StringBuffer
 #include "HsVersions.h"
 
 
-#if __GLASGOW_HASKELL__ < 411
-import PrelAddr 	( Addr(..) )
+#if __GLASGOW_HASKELL__ < 502
 import Panic		( panic )
 #else
-import Addr		( Addr(..) )
 #if __GLASGOW_HASKELL__ < 503
 import Ptr		( Ptr(..) )
 #else
@@ -88,13 +86,16 @@ import GHC.IO		( hGetcBuffered )
 import PrimPacked
 import FastString
 
-import GlaExts
-import Foreign
-import IO		( openFile, isEOFError )
-import Addr
-import Exception	( bracket )
+import GLAEXTS
 
-import CString		( unpackCStringBA )
+import Foreign
+
+#if __GLASGOW_HASKELL__ >= 502
+import CForeign
+#endif
+
+import IO		( openFile, isEOFError )
+import EXCEPTION	( bracket )
 
 #if __GLASGOW_HASKELL__ < 503
 import PrelIOBase
@@ -118,7 +119,7 @@ data StringBuffer
 
 \begin{code}
 instance Show StringBuffer where
-	showsPrec _ s = showString ""
+	showsPrec _ s = showString "<stringbuffer>"
 \end{code}
 
 \begin{code}
@@ -130,20 +131,14 @@ hGetStringBuffer fname = do
 	-- the sentinel.  Assume it has a final newline for now, and overwrite
 	-- that with the sentinel.  slurpFileExpandTabs (below) leaves room
 	-- for the sentinel.
-   let  (A# a#) = a;  
+   let  (Ptr a#) = a;  
 	(I# read#) = read;
 	end# = read# -# 1#
 
-         -- add sentinel '\NUL'
-   _casm_ `` ((char *)%0)[(int)%1]=(char)0; '' (A# a#) (I# end#)
-   return (StringBuffer a# end# 0# 0#)
+   -- add sentinel '\NUL'
+   writeCharOffPtr a (I# end#) '\0'
 
-unsafeWriteBuffer :: StringBuffer -> Int# -> Char# -> StringBuffer
-unsafeWriteBuffer s@(StringBuffer a _ _ _) i# ch# =
- unsafePerformIO (
-   _casm_ `` ((char *)%0)[(int)%1]=(char)%2; '' (A# a) (I# i#) (C# ch#) >>= \ () ->
-   return s
- )
+   return (StringBuffer a# end# 0# 0#)
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -153,18 +148,11 @@ unsafeWriteBuffer s@(StringBuffer a _ _ _) i# ch# =
 stringToStringBuffer :: String -> IO StringBuffer
 freeStringBuffer :: StringBuffer -> IO ()
 
-#if __GLASGOW_HASKELL__ >= 411
-stringToStringBuffer str =
-  do let sz@(I# sz#) = length str
-     (Ptr a#) <- mallocBytes (sz+1)
-     fill_in str (A# a#)
-     writeCharOffAddr (A# a#) sz '\0'		-- sentinel
-     return (StringBuffer a# sz# 0# 0#)
- where
-  fill_in [] _ = return ()
-  fill_in (c:cs) a = do
-    writeCharOffAddr a 0 c 
-    fill_in cs (a `plusAddr` 1)
+#if __GLASGOW_HASKELL__ >= 502
+stringToStringBuffer str = do
+  let sz@(I# sz#) = length str
+  Ptr a# <- newCString str
+  return (StringBuffer a# sz# 0# 0#)
 
 freeStringBuffer (StringBuffer a# _ _ _) = Foreign.free (Ptr a#)
 #else
@@ -185,10 +173,12 @@ We guess the size of the buffer required as 20% extra for
 expanded tabs, and enlarge it if necessary.
 
 \begin{code}
+#if __GLASGOW_HASKELL__ < 501
 getErrType :: IO Int
 getErrType =  _ccall_ getErrType__
+#endif
 
-slurpFileExpandTabs :: FilePath -> IO (Addr,Int)
+slurpFileExpandTabs :: FilePath -> IO (Ptr (),Int)
 slurpFileExpandTabs fname = do
   bracket (openFile fname ReadMode) (hClose) 
    (\ handle ->
@@ -200,14 +190,14 @@ slurpFileExpandTabs fname = do
             if sz_i == 0
 			-- empty file: just allocate a buffer containing '\0'
 		then do chunk <- allocMem 1
-			writeCharOffAddr chunk 0 '\0'
+			writeCharOffPtr chunk 0 '\0'
 			return (chunk, 0)
 		else do let sz_i' = (sz_i * 12) `div` 10 -- add 20% for tabs
 	      	        chunk <- allocMem sz_i'
       	    		trySlurp handle sz_i' chunk
    )
 
-trySlurp :: Handle -> Int -> Addr -> IO (Addr, Int)
+trySlurp :: Handle -> Int -> Ptr () -> IO (Ptr (), Int)
 trySlurp handle sz_i chunk =
 #if __GLASGOW_HASKELL__ < 501
   wantReadableHandle "hGetChar" handle $ \ handle_ ->
@@ -221,11 +211,11 @@ trySlurp handle sz_i chunk =
 
 	tAB_SIZE = 8#
 
-	slurpFile :: Int# -> Int# -> Addr -> Int# -> Int# -> IO (Addr, Int)
+	slurpFile :: Int# -> Int# -> Ptr () -> Int# -> Int# -> IO (Ptr (), Int)
 	slurpFile c off chunk chunk_sz max_off = slurp c off
 	 where
 
-	  slurp :: Int# -> Int# -> IO (Addr, Int)
+	  slurp :: Int# -> Int# -> IO (Ptr (), Int)
 	  slurp c off | off >=# max_off = do
 		let new_sz = chunk_sz *# 2#
 	     	chunk' <- reAllocMem chunk (I# new_sz)
@@ -257,16 +247,16 @@ trySlurp handle sz_i chunk =
 			 '\xFFFF' -> return (chunk, I# off)
 #endif
 			 '\t' -> tabIt c off
-			 ch   -> do  writeCharOffAddr chunk (I# off) ch
+			 ch   -> do  writeCharOffPtr chunk (I# off) ch
 				     let c' | ch == '\n' = 0#
 					    | otherwise  = c +# 1#
 				     slurp c' (off +# 1#)
 
-	  tabIt :: Int# -> Int# -> IO (Addr, Int)
+	  tabIt :: Int# -> Int# -> IO (Ptr (), Int)
 	  -- can't run out of buffer in here, because we reserved an
 	  -- extra tAB_SIZE bytes at the end earlier.
 	  tabIt c off = do
-		writeCharOffAddr chunk (I# off) ' '
+		writeCharOffPtr chunk (I# off) ' '
 		let c' = c +# 1#
 		    off' = off +# 1#
 		if c' `remInt#` tAB_SIZE ==# 0#
@@ -282,17 +272,17 @@ trySlurp handle sz_i chunk =
   return (chunk', rc+1 {- room for sentinel -})
 
 
-reAllocMem :: Addr -> Int -> IO Addr
+reAllocMem :: Ptr () -> Int -> IO (Ptr ())
 reAllocMem ptr sz = do
-   chunk <- _ccall_ realloc ptr sz
-   if chunk == nullAddr 
+   chunk <- c_realloc ptr sz
+   if chunk == nullPtr 
       then fail "reAllocMem"
       else return chunk
 
-allocMem :: Int -> IO Addr
+allocMem :: Int -> IO (Ptr ())
 allocMem sz = do
-   chunk <- _ccall_ malloc sz
-   if chunk == nullAddr 
+   chunk <- c_malloc sz
+   if chunk == nullPtr 
 #if __GLASGOW_HASKELL__ < 501
       then constructErrorAndFail "allocMem"
 #else
@@ -300,6 +290,22 @@ allocMem sz = do
 					"out of memory" Nothing)
 #endif
       else return chunk
+
+#if __GLASGOW_HASKELL__ <= 408
+c_malloc sz = do A# a <- c_malloc' sz; return (Ptr a)
+foreign import ccall "malloc" unsafe
+  c_malloc' :: Int -> IO Addr
+
+c_realloc (Ptr a) sz = do A# a <- c_realloc' (A# a) sz; return (Ptr a)
+foreign import ccall "realloc" unsafe
+  c_realloc' :: Addr -> Int -> IO Addr
+#else
+foreign import ccall "malloc" unsafe
+  c_malloc :: Int -> IO (Ptr a)
+
+foreign import ccall "realloc" unsafe
+  c_realloc :: Ptr a -> Int -> IO (Ptr a)
+#endif
 \end{code}
 
 Lookup
@@ -494,16 +500,18 @@ stepOnUntilChar# (StringBuffer fo l# s# c#) x# =
 
          -- conversion
 lexemeToString :: StringBuffer -> String
-lexemeToString (StringBuffer fo _ start_pos# current#) = 
+lexemeToString (StringBuffer fo len# start_pos# current#) = 
  if start_pos# ==# current# then
     ""
  else
-    unpackCStringBA (copySubStr (A# fo) (I# start_pos#) (I# (current# -# start_pos#)))
+    unpackCStringBA
+	(copySubStr fo (I# start_pos#) (I# (current# -# start_pos#)))
+	(I# len#)
     
 lexemeToFastString :: StringBuffer -> FastString
 lexemeToFastString (StringBuffer fo l# start_pos# current#) =
  if start_pos# ==# current# then
     mkFastString ""
  else
-    mkFastSubString (A# fo) (I# start_pos#) (I# (current# -# start_pos#))
+    mkFastSubString fo (I# start_pos#) (I# (current# -# start_pos#))
 \end{code}

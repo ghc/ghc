@@ -22,13 +22,20 @@ import Stix		( CodeSegment(..) )
 import Unique		( pprUnique )
 import Panic		( panic )
 import Pretty
+import FastString
 import qualified Outputable
 
-import ST
+#if __GLASGOW_HASKELL__ >= 504
+import Data.Array.ST
+import Data.Word	( Word8 )
+#else
 import MutableArray
+#endif
+
+import ST
+
 import Char		( chr, ord )
 import Maybe		( isJust )
-import FastString
 
 asmSDoc d = Outputable.withPprStyleDoc (
 	      Outputable.mkCodeStyle Outputable.AsmStyle) d
@@ -477,38 +484,6 @@ pprInstr (DATA s xs)
            = let bs = doubleToBytes (fromRational r)
              in  map (\b -> ptext SLIT("\t.byte\t") <> pprImm (ImmInt b)) bs
 #endif
-
-        -- floatToBytes and doubleToBytes convert to the host's byte
-        -- order.  Providing that we're not cross-compiling for a 
-        -- target with the opposite endianness, this should work ok
-        -- on all targets.
-        floatToBytes :: Float -> [Int]
-        floatToBytes f
-           = runST (do
-                arr <- newFloatArray ((0::Int),3)
-                writeFloatArray arr 0 f
-                i0 <- readCharArray arr 0
-                i1 <- readCharArray arr 1
-                i2 <- readCharArray arr 2
-                i3 <- readCharArray arr 3
-                return (map ord [i0,i1,i2,i3])
-             )
-
-        doubleToBytes :: Double -> [Int]
-        doubleToBytes d
-           = runST (do
-                arr <- newDoubleArray ((0::Int),7)
-                writeDoubleArray arr 0 d
-                i0 <- readCharArray arr 0
-                i1 <- readCharArray arr 1
-                i2 <- readCharArray arr 2
-                i3 <- readCharArray arr 3
-                i4 <- readCharArray arr 4
-                i5 <- readCharArray arr 5
-                i6 <- readCharArray arr 6
-                i7 <- readCharArray arr 7
-                return (map ord [i0,i1,i2,i3,i4,i5,i6,i7])
-             )
 
 -- fall through to rest of (machine-specific) pprInstr...
 \end{code}
@@ -1757,4 +1732,78 @@ pp_comma_lbracket = text ",["
 pp_comma_a	  = text ",a"
 
 #endif {-sparc_TARGET_ARCH-}
+\end{code}
+
+\begin{code}
+#if __GLASGOW_HASKELL__ >= 504
+newFloatArray :: (Int,Int) -> ST s (STUArray s Int Float)
+newFloatArray = newArray_
+
+newDoubleArray :: (Int,Int) -> ST s (STUArray s Int Double)
+newDoubleArray = newArray_
+
+castFloatToCharArray :: STUArray s Int Float -> ST s (STUArray s Int Word8)
+castFloatToCharArray = castSTUArray
+
+castDoubleToCharArray :: STUArray s Int Double -> ST s (STUArray s Int Word8)
+castDoubleToCharArray = castSTUArray
+
+writeFloatArray :: STUArray s Int Float -> Int -> Float -> ST s ()
+writeFloatArray = writeArray
+
+writeDoubleArray :: STUArray s Int Double -> Int -> Double -> ST s ()
+writeDoubleArray = writeArray
+
+readCharArray :: STUArray s Int Word8 -> Int -> ST s Char
+readCharArray arr i = do 
+  w <- readArray arr i
+  return $! (chr (fromIntegral w))
+
+#else
+
+castFloatToCharArray :: MutableByteArray s t -> ST s (MutableByteArray s t)
+castFloatToCharArray = return
+
+castDoubleToCharArray :: MutableByteArray s t -> ST s (MutableByteArray s t)
+castDoubleToCharArray = return
+
+#endif
+
+-- floatToBytes and doubleToBytes convert to the host's byte
+-- order.  Providing that we're not cross-compiling for a 
+-- target with the opposite endianness, this should work ok
+-- on all targets.
+
+-- ToDo: this stuff is very similar to the shenanigans in PprAbs,
+-- could they be merged?
+
+floatToBytes :: Float -> [Int]
+floatToBytes f
+   = runST (do
+        arr <- newFloatArray ((0::Int),3)
+        writeFloatArray arr 0 f
+	arr <- castFloatToCharArray arr
+        i0 <- readCharArray arr 0
+        i1 <- readCharArray arr 1
+        i2 <- readCharArray arr 2
+        i3 <- readCharArray arr 3
+        return (map ord [i0,i1,i2,i3])
+     )
+
+doubleToBytes :: Double -> [Int]
+doubleToBytes d
+   = runST (do
+        arr <- newDoubleArray ((0::Int),7)
+        writeDoubleArray arr 0 d
+	arr <- castDoubleToCharArray arr
+        i0 <- readCharArray arr 0
+        i1 <- readCharArray arr 1
+        i2 <- readCharArray arr 2
+        i3 <- readCharArray arr 3
+        i4 <- readCharArray arr 4
+        i5 <- readCharArray arr 5
+        i6 <- readCharArray arr 6
+        i7 <- readCharArray arr 7
+        return (map ord [i0,i1,i2,i3,i4,i5,i6,i7])
+     )
 \end{code}

@@ -70,7 +70,7 @@ import HscTypes		( lookupType, TyThing(..) )
 import SrcLoc		( SrcLoc )
 import Outputable
 
-import IOExts		( newIORef )
+import DATA_IOREF	( newIORef )
 \end{code}
 
 %************************************************************************

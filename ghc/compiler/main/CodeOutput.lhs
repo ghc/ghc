@@ -20,13 +20,13 @@ import IlxGen		( ilxGen )
 #ifdef JAVA
 import JavaGen		( javaGen )
 import qualified PrintJava
+import OccurAnal	( occurAnalyseBinds )
 #endif
 
 import DriverState	( v_HCHeader )
 import TyCon		( TyCon )
 import Id		( Id )
 import CoreSyn		( CoreBind )
-import OccurAnal	( occurAnalyseBinds )
 import StgSyn		( StgBinding )
 import AbsCSyn		( AbstractC )
 import PprAbsC		( dumpRealC, writeRealC )
@@ -37,7 +37,8 @@ import Outputable
 import Pretty		( Mode(..), printDoc )
 import CmdLineOpts	( DynFlags, HscLang(..), dopt_OutName )
 
-import IOExts
+import DATA_IOREF	( readIORef )
+
 import Monad		( when )
 import IO
 \end{code}

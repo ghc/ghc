@@ -106,8 +106,7 @@ import CForeign
 import Exception	( Exception, try )
 #endif
 
--- lang
-import Exception	( throwDyn )
+import EXCEPTION	( throwDyn )
 
 -- std
 import Directory        ( getModificationTime, doesFileExist )

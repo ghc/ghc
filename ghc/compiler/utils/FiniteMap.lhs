@@ -57,11 +57,12 @@ module FiniteMap (
 #define OUTPUTABLE_key {--}
 #endif
 
-import GlaExts
 import Maybes
 import Bag	  ( Bag, foldrBag )
 import Util
 import Outputable
+
+import GLAEXTS
 
 #if ! OMIT_NATIVE_CODEGEN
 #  define IF_NCG(a) a

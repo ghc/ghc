@@ -53,12 +53,13 @@ import PrimRep		( PrimRep(..) )
 import Stix		( StixStmt(..), StixExpr(..), StixReg(..), 
                           CodeSegment, DestInfo(..) )
 import Panic		( panic )
-import GlaExts
 import Outputable	( pprPanic, ppr, showSDoc )
-import IOExts		( trace )
 import Config           ( cLeadingUnderscore )
 import FastTypes
 import FastString
+
+import GLAEXTS
+import TRACE		( trace )
 
 import Maybe		( catMaybes )
 \end{code}

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.32 2002/04/05 16:43:56 sof Exp $
+-- $Id: DriverUtil.hs,v 1.33 2002/08/29 15:44:15 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -16,9 +16,9 @@ import Util
 import Panic
 import Config		( cLeadingUnderscore )
 
-import IOExts
-import Exception
-import Dynamic
+import EXCEPTION as Exception
+import DYNAMIC
+import DATA_IOREF	( IORef, readIORef, writeIORef )
 
 import Directory	( getDirectoryContents, doesDirectoryExist )
 import IO

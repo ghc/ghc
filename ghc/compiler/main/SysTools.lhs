@@ -61,52 +61,56 @@ module SysTools (
 
  ) where
 
+#include "HsVersions.h"
+
 import DriverUtil
 import Config
 import Outputable
 import Panic		( progName, GhcException(..) )
-import Util		( global, dropList, notNull )
+import Util		( global, notNull )
 import CmdLineOpts	( dynFlag, verbosity )
 
-import Exception	( throwDyn )
+import EXCEPTION	( throwDyn )
 #if __GLASGOW_HASKELL__ > 408
-import qualified Exception ( catch )
+import qualified EXCEPTION as Exception ( catch )
 #else
-import Exception        ( catchAllIO )
+import EXCEPTION        ( catchAllIO )
 #endif
-import IO
-import Directory	( doesFileExist, removeFile )
-import IOExts		( IORef, readIORef, writeIORef )
+
+import DATA_IOREF	( IORef, readIORef, writeIORef )
+import DATA_INT
+    
 import Monad		( when, unless )
 import System		( ExitCode(..), exitWith, getEnv, system )
-import CString
-import Int
-import Addr
-    
+import IO
+import Directory	( doesFileExist, removeFile )
+
 #include "../includes/config.h"
+
+-- GHC <= 4.08 didn't have rawSystem, and runs into problems with long command
+-- lines on mingw32, so we disallow it now.
+#if defined(mingw32_HOST_OS) && (__GLASGOW_HASKELL__ <= 408)
+#error GHC <= 4.08 is not supported for bootstrapping GHC on i386-unknown-mingw32
+#endif
 
 #ifndef mingw32_HOST_OS
 import qualified Posix
 #else
 import List		( isPrefixOf )
+import Util		( dropList )
 import MarshalArray
 import Foreign
 #endif
 
-#if __GLASGOW_HASKELL__ > 408
-# if __GLASGOW_HASKELL__ >= 503
-import GHC.IOBase
-# else
-# endif
-# ifdef mingw32_HOST_OS
+#ifdef mingw32_HOST_OS
+#if __GLASGOW_HASKELL__ > 504
+import System.Cmd       ( rawSystem )
+#else
 import SystemExts       ( rawSystem )
-# endif
+#endif
 #else
 import System		( system )
 #endif
-
-
-#include "HsVersions.h"
 
 -- Make catch work on older GHCs
 #if __GLASGOW_HASKELL__ > 408
@@ -836,14 +840,15 @@ slash s1 s2 = s1 ++ ('/' : s2)
 getExecDir :: IO (Maybe String)
 getExecDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
 		buf <- mallocArray len
-		ret <- getModuleFileName nullAddr buf len
+		ret <- getModuleFileName nullPtr buf len
 		if ret == 0 then free buf >> return Nothing
 		            else do s <- peekCString buf
 				    free buf
 				    return (Just (reverse (dropList "/bin/ghc.exe" (reverse (unDosifyPath s)))))
 
 
-foreign import stdcall "GetModuleFileNameA" unsafe getModuleFileName :: Addr -> CString -> Int -> IO Int32
+foreign import stdcall "GetModuleFileNameA" unsafe 
+  getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
 #else
 getExecDir :: IO (Maybe String) = do return Nothing
 #endif
@@ -853,16 +858,6 @@ foreign import "_getpid" unsafe getProcessID :: IO Int -- relies on Int == Int32
 #else
 getProcessID :: IO Int
 getProcessID = Posix.getProcessID
-#endif
-
-#if defined(mingw32_HOST_OS) && (__GLASGOW_HASKELL__ <= 408)
-rawSystem :: String -> IO ExitCode
-rawSystem cmd = system cmd
- -- mingw only: if you try to build a stage2 compiler with a stage1
- -- that has been bootstrapped with 4.08 (or earlier), this will run
- -- into problems with limits on command-line lengths with the std.
- -- Win32 command interpreters. So don't this - use 5.00 or later
- -- to compile up the GHC sources.
 #endif
 
 quote :: String -> String

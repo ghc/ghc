@@ -50,7 +50,7 @@ import FastString
 import Outputable
 import Binary
 
-import GlaExts
+import GLAEXTS
 \end{code}
 
 We hold both module names and identifier names in a 'Z-encoded' form

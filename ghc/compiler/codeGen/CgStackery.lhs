@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgStackery.lhs,v 1.20 2001/10/03 13:57:42 simonmar Exp $
+% $Id: CgStackery.lhs,v 1.21 2002/08/29 15:44:13 simonmar Exp $
 %
 \section[CgStackery]{Stack management functions}
 
@@ -27,12 +27,10 @@ import AbsCUtils	( mkAbstractCs, getAmodeRep )
 import PrimRep		( getPrimRepSize, PrimRep(..), isFollowableRep )
 import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros )
 import Panic		( panic )
-import Constants	( uF_SIZE, pROF_UF_SIZE, gRAN_UF_SIZE, 
-			  sEQ_FRAME_SIZE, pROF_SEQ_FRAME_SIZE, 
-			  gRAN_SEQ_FRAME_SIZE )
-
+import Constants
 import Util		( sortLt )
-import IOExts		( trace )
+
+import TRACE		( trace )
 \end{code}
 
 %************************************************************************

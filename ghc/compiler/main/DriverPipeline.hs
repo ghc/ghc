@@ -48,19 +48,17 @@ import Maybes		( expectJust )
 
 import ParserCoreUtils ( getCoreModuleName )
 
+import EXCEPTION
+import DATA_IOREF	( readIORef, writeIORef )
+
 #ifdef GHCI
 import Time 		( getClockTime )
 #endif
 import Directory
 import System
-import IOExts
-import Exception
-
 import IO
 import Monad
 import Maybe
-
-import PackedString
 
 -----------------------------------------------------------------------------
 -- genPipeline
