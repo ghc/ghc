@@ -43,6 +43,7 @@ import ErrUtils		( showPass, dumpIfSet_dyn )
 import Unique		( mkPseudoUnique3 )
 import FastString	( FastString(..) )
 import Panic		( GhcException(..) )
+import SMRep		( fixedHdrSize )
 import PprType		( pprType )
 import ByteCodeInstr	( BCInstr(..), ProtoBCO(..), nameOfProtoBCO, bciStackUse )
 import ByteCodeItbls	( ItblEnv, mkITbls )
@@ -495,6 +496,7 @@ schemeT :: Int 		-- Stack depth
         -> BcM BCInstrList
 
 schemeT d s p app
+
 --   | trace ("schemeT: env in = \n" ++ showSDocDebug (ppBCEnv p)) False
 --   = panic "schemeT ?!?!"
 
@@ -528,6 +530,9 @@ schemeT d s p app
      --       else "schemeT: unboxed pair with Void first component") (
      schemeT d s p (head args_r_to_l)
      --)
+
+   | Just (CCall ccall_spec) <- isFCallId_maybe fn
+   = generateCCall d s p ccall_spec fn args_r_to_l
 
    -- Cases 3 and 4
    | otherwise
@@ -588,10 +593,8 @@ schemeT d s p app
          = let (push, arg_words) = pushAtom tag_when_push d p arg
            in  push `appOL` do_pushery (d+arg_words) args
       do_pushery d []
-
-         -- CCALL !
          | Just (CCall ccall_spec) <- isFCallId_maybe fn
-         = generateCCall d s fn ccall_spec
+         = panic "schemeT.do_pushery: unexpected ccall"
 
          | otherwise
          = case maybe_dcon of
@@ -606,20 +609,67 @@ schemeT d s p app
 
 
 
-{- Given that the args for a CCall have been pushed onto the Haskell
-   stack, generate the marshalling (machine) code for the ccall, and
-   create bytecodes to call that and then return in the right way.  
+{- Deal with a CCall.  Taggedly push the args onto the stack R->L,
+   deferencing ForeignObj#s and (ToDo: adjusting addrs to point to
+   payloads in Ptr/Byte arrays).  Then, generate the marshalling
+   (machine) code for the ccall, and create bytecodes to call that and
+   then return in the right way.  
 -}
 generateCCall :: Int -> Sequel 		-- stack and sequel depths
-              -> Id 			-- of target, for type info
+              -> BCEnv
               -> CCallSpec		-- where to call
-              -> BCInstrList
+              -> Id 			-- of target, for type info
+              -> [AnnExpr Id VarSet]	-- args (atoms)
+              -> BcM BCInstrList
 
-generateCCall d s fn ccall_spec@(CCallSpec target cconv safety)
-   = let -- Get the arg and result reps.
-         (a_reps_RAW, maybe_r_rep) = getCCallPrimReps (idType fn)               
+generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
+   = let 
+         -- useful constants
+         addr_usizeW = untaggedSizeW AddrRep
+         addr_tsizeW = taggedSizeW AddrRep
+
+         -- Get the args on the stack, with tags and suitably
+         -- dereferenced for the CCall.  For each arg, return the
+         -- depth to the first word of the bits for that arg, and the
+         -- PrimRep of what was actually pushed.
+
+         f d [] = []
+         f d ((_,a):az) 
+            = let rep_arg = atomRep a
+              in case rep_arg of
+                    -- Don't push the FO; instead push the Addr# it
+                    -- contains.
+                    ForeignObjRep
+                       -> let foro_szW = taggedSizeW ForeignObjRep
+                              push_fo  = fst (pushAtom False{-irrelevant-} d p a)
+                              d_now    = d + addr_tsizeW
+                              code     = push_fo `appOL` toOL [
+                                            UPK_TAG addr_usizeW 0 0,
+                                            SLIDE addr_tsizeW foro_szW
+                                         ]
+                          in  (code, AddrRep) : f d_now az
+                    -- Default case: push taggedly, but otherwise intact.
+                    other
+                       -> let (code_a, sz_a) = pushAtom True d p a
+                          in  (code_a, rep_arg) : f (d+sz_a) az
+
+         (pushs_arg, a_reps_pushed_r_to_l) = unzip (f d0 args_r_to_l)
+
+         push_args    = concatOL pushs_arg
+         d_after_args = d0 + sum (map taggedSizeW a_reps_pushed_r_to_l)
+         a_reps_pushed_RAW
+            | null a_reps_pushed_r_to_l || head a_reps_pushed_r_to_l /= VoidRep
+            = panic "ByteCodeGen.generateCCall: missing or invalid World token?"
+            | otherwise
+            = reverse (tail a_reps_pushed_r_to_l)
+
+         -- Now: a_reps_pushed_RAW are the reps which are actually on the stack.
+         -- push_args is the code to do that.
+         -- d_after_args is the stack depth once the args are on.
+
+         -- Get the result rep.
          (returns_void, r_rep)
-            = case maybe_r_rep of
+            = case maybe_getCCallReturnRep (idType fn) of
                  Nothing -> (True,  VoidRep)
                  Just rr -> (False, rr) 
          {-
@@ -676,21 +726,20 @@ generateCCall d s fn ccall_spec@(CCallSpec target cconv safety)
                                        (ppr ccall_spec)
 
          -- Get the arg reps, zapping the leading Addr# in the dynamic case
-         a_reps | is_static = a_reps_RAW
-                | otherwise = if null a_reps_RAW 
+         a_reps -- | trace (showSDoc (ppr a_reps_pushed_RAW)) False = error "???"
+                | is_static = a_reps_pushed_RAW
+                | otherwise = if null a_reps_pushed_RAW 
                               then panic "ByteCodeGen.generateCCall: dyn with no args"
-                              else tail a_reps_RAW
+                              else tail a_reps_pushed_RAW
 
          -- push the Addr#
-         addr_usizeW = untaggedSizeW AddrRep
-         addr_tsizeW = taggedSizeW AddrRep
          (push_Addr, d_after_Addr)
             | is_static
             = (toOL [PUSH_UBX (Right static_target_addr) addr_usizeW,
                      PUSH_TAG addr_usizeW],
-               d + addr_tsizeW)
+               d_after_args + addr_tsizeW)
             | otherwise	-- is already on the stack
-            = (nilOL, d)
+            = (nilOL, d_after_args)
 
          -- Push the return placeholder.  For a call returning nothing,
          -- this is a VoidRep (tag).
@@ -722,7 +771,10 @@ generateCCall d s fn ccall_spec@(CCallSpec target cconv safety)
                                       (zip args_offW a_reps)
      in
          --trace (show (arg1_offW, args_offW  ,  (map taggedSizeW a_reps) )) (
+         returnBc (
+         push_args `appOL`
          push_Addr `appOL` push_r `appOL` do_call `appOL` wrapup
+         )
          --)
 
 
@@ -742,44 +794,39 @@ mkDummyLiteral pr
 --       PrelGHC.Int# -> PrelGHC.State# PrelGHC.RealWorld
 --                    -> (# PrelGHC.State# PrelGHC.RealWorld, PrelGHC.Int# #)
 --
--- to [IntRep] -> Just IntRep
--- and check that the last arg is VoidRep'd and that an unboxed pair is
--- returned wherein the first arg is VoidRep'd.
+-- to    Just IntRep
+-- and check that an unboxed pair isreturned wherein the first arg is VoidRep'd.
 --
 -- Alternatively, for call-targets returning nothing, convert
 --
 --       PrelGHC.Int# -> PrelGHC.State# PrelGHC.RealWorld
 --                    -> (# PrelGHC.State# PrelGHC.RealWorld, PrelGHC.Int# #)
 --
--- to [IntRep] -> Nothing
+-- to    Nothing
 
-getCCallPrimReps :: Type -> ([PrimRep], Maybe PrimRep)
-getCCallPrimReps fn_ty
+maybe_getCCallReturnRep :: Type -> Maybe PrimRep
+maybe_getCCallReturnRep fn_ty
    = let (a_tys, r_ty) = splitRepFunTys fn_ty
-         a_reps        = map typePrimRep a_tys
-         a_reps_to_go  = init a_reps
          maybe_r_rep_to_go  
             = if length r_reps == 1 then Nothing else Just (r_reps !! 1)
          (r_tycon, r_reps) 
             = case splitTyConApp_maybe (repType r_ty) of
                       (Just (tyc, tys)) -> (tyc, map typePrimRep tys)
                       Nothing -> blargh
-
-         ok = length a_reps >= 1 && VoidRep == last a_reps
-               && ( (length r_reps == 2 && VoidRep == head r_reps)
-                    || r_reps == [VoidRep] )
-               && isUnboxedTupleTyCon r_tycon
-               && case maybe_r_rep_to_go of
-                     Nothing    -> True
-                     Just r_rep -> r_rep /= PtrRep
-                                   -- if it was, it would be impossible 
-                                   -- to create a valid return value 
-                                   -- placeholder on the stack
-         blargh       = pprPanic "getCCallPrimReps: can't handle:" 
-                                 (pprType fn_ty)
+         ok = ( (length r_reps == 2 && VoidRep == head r_reps)
+                || r_reps == [VoidRep] )
+              && isUnboxedTupleTyCon r_tycon
+              && case maybe_r_rep_to_go of
+                    Nothing    -> True
+                    Just r_rep -> r_rep /= PtrRep
+                                  -- if it was, it would be impossible 
+                                  -- to create a valid return value 
+                                  -- placeholder on the stack
+         blargh = pprPanic "maybe_getCCallReturn: can't handle:" 
+                           (pprType fn_ty)
      in 
      --trace (showSDoc (ppr (a_reps, r_reps))) (
-     if ok then (a_reps_to_go, maybe_r_rep_to_go) else blargh
+     if ok then maybe_r_rep_to_go else blargh
      --)
 
 atomRep (AnnVar v)    = typePrimRep (idType v)
@@ -874,7 +921,7 @@ mkUnpackCode vars d p
         code_np = do_nptrs vreps_env_uszw ptrs_szw (reverse (map snd vreps_np))
         do_nptrs off_h off_s [] = nilOL
         do_nptrs off_h off_s (npr:nprs)
-           | npr `elem` [IntRep, FloatRep, DoubleRep, CharRep, AddrRep]
+           | npr `elem` [IntRep, WordRep, FloatRep, DoubleRep, CharRep, AddrRep]
            = approved
            | otherwise
            = pprPanic "ByteCodeGen.mkUnpackCode" (ppr npr)
@@ -913,8 +960,8 @@ pushAtom :: Bool -> Int -> BCEnv -> AnnExpr' Id VarSet -> (BCInstrList, Int)
 pushAtom tagged d p (AnnVar v)
 
    | idPrimRep v == VoidRep
-   = ASSERT(tagged)
-     (unitOL (PUSH_TAG 0), 1)
+   = if tagged then (unitOL (PUSH_TAG 0), 1) 
+               else panic "ByteCodeGen.pushAtom(VoidRep,untaggedly)"
 
    | isFCallId v
    = pprPanic "pushAtom: shouldn't get an FCallId here" (ppr v)
