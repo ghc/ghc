@@ -1,0 +1,24 @@
+* removed deforester from source tree, including the {-# DEFOREST #-}
+  pragma.  This stuff didn't work anymore, so there was no point
+  leaving it hanging around.  If someone wants to pick it up again,
+  the source can be checked out of the repository.
+
+* documentation is now built automatically for binary distributions
+
+* fixed several bugs affecting binary distributions.
+
+* fixed bug in Regex.lhs causing random segmentation faults.
+
+[happy]
+
+* bug fixed in state generation.
+
+* happy now reports the number of unused rules and terminals in the
+  grammar, and lists which ones are unused in the info file.
+
+* happy now tries to avoid generating fully overlapped patterns.
+
+* bug fixed in lexer: line numbers weren't being counted for '--'
+  commented lines.
+
+
