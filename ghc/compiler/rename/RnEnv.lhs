@@ -483,9 +483,13 @@ lookupOrigName rdr_name
 dataTcOccs :: RdrName -> [RdrName]
 -- If the input is a data constructor, return both it and a type
 -- constructor.  This is useful when we aren't sure which we are
--- looking at
+-- looking at.
+--
+-- ToDo: If the user typed "[]" or "(,,)", we'll generate an Exact RdrName,
+--	 and we don't have a systematic way to find the TyCon's Name from
+--	 the DataCon's name.  Sigh
 dataTcOccs rdr_name
-  | isDataOcc occ = [rdr_name, rdr_name_tc]
+  | isDataOcc occ = [rdr_name_tc, rdr_name]
   | otherwise 	  = [rdr_name]
   where    
     occ 	= rdrNameOcc rdr_name
