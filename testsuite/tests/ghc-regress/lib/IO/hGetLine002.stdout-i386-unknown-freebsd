@@ -1,5 +1,0 @@
-this line doesn't end with a newline
-end of file
-Action: hGetLine
-Handle: {loc=<stdin>,type=readable,binary=False,buffering=block (1024)}
-File: <stdin>
