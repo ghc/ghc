@@ -782,7 +782,7 @@ invisibleDataConPrimCCallErr clas inst_ty sty
   = hang (hsep [(ppr sty inst_ty <> ptext SLIT("s constructors not visible when checking")),
                 ppr sty clas, ptext SLIT("instance")])
         4 (hsep [ptext SLIT("(Try either importing"), ppr sty inst_ty, 
-	         ptext SLIT("non-abstractly, or compile using -fno-prune-tydecls ..)")])
+	         ptext SLIT("non-abstractly or compile using -fno-prune-tydecls ..)")])
 
 omittedMethodWarn sel_id clas sty
   = sep [ptext SLIT("Warning: no explicit method nor default method for") <+> ppr sty sel_id, 
