@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.5 1999/05/21 14:46:20 sof Exp $
+ * $Id: RtsAPI.h,v 1.6 1999/07/03 18:39:41 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -19,6 +19,7 @@ typedef StgClosure *HaskellObj;
    ------------------------------------------------------------------------- */
 extern void startupHaskell  ( int argc, char *argv[] );
 extern void shutdownHaskell ( void );
+extern void shutdownHaskellAndExit ( int exitCode );
 
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.

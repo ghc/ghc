@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: SchedAPI.h,v 1.4 1999/06/03 08:09:31 sof Exp $
+ * $Id: SchedAPI.h,v 1.5 1999/07/03 18:39:41 sof Exp $
  *
  * (c) The GHC Team 1998
  *
@@ -23,6 +23,15 @@ typedef enum {
     AllBlocked,  /* subtly different from Deadlock                     */
 } SchedulerStatus;
       
+
+/* 
+ * schedule() plus the thread creation functions are not part
+ * part of the external RTS API, so leave them out if we're
+ * not compiling rts/ bits.   -- sof 7/99
+ * 
+ */
+#ifdef COMPILING_RTS
+
 SchedulerStatus schedule(StgTSO *main_thread, /*out*/StgClosure **ret);
 
 /* 
@@ -83,5 +92,6 @@ void    deleteThread(StgTSO *tso);
  */
 
 void RevertCAFs(void);
+#endif
 
 #endif

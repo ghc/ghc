@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.15 1999/07/02 09:31:54 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.16 1999/07/03 18:39:40 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -137,6 +137,19 @@ startupHaskell(int argc, char *argv[])
 #endif
     /* Record initialization times */
     end_init();
+}
+
+/*
+ * Shutting down the RTS - two ways of doing this, one which
+ * calls exit(), one that doesn't.
+ *
+ * (shutdownHaskellAndExit() is called by System.exitWith).
+ */
+void
+shutdownHaskellAndExit(int n)
+{
+  shutdownHaskell();
+  stg_exit(n);
 }
 
 void
