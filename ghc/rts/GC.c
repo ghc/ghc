@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.17 1999/01/20 16:07:40 simonm Exp $
+ * $Id: GC.c,v 1.18 1999/01/20 16:24:02 simonm Exp $
  *
  * Two-space garbage collector
  *
@@ -434,7 +434,8 @@ void GarbageCollect(void (*get_roots)(void))
      */
     nat blocks = g0s0->to_blocks;
 
-    if ( blocks * 4 > RtsFlags.GcFlags.maxHeapSize ) {
+    if ( blocks * RtsFlags.GcFlags.oldGenFactor * 2 > 
+	 RtsFlags.GcFlags.maxHeapSize ) {
       int adjusted_blocks;  /* signed on purpose */
       int pc_free; 
       
@@ -447,7 +448,7 @@ void GarbageCollect(void (*get_roots)(void))
       blocks = adjusted_blocks;
       
     } else {
-      blocks *= 2;
+      blocks *= RtsFlags.GcFlags.oldGenFactor;
       if (blocks < RtsFlags.GcFlags.minAllocAreaSize) {
 	blocks = RtsFlags.GcFlags.minAllocAreaSize;
       }
