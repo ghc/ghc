@@ -36,7 +36,7 @@ import CgStackery	( freeStackSlots )
 import CLabel		( mkClosureLabel,
 			  mkBitmapLabel, pprCLabel )
 import ClosureInfo	( mkLFImported, mkLFArgument, LambdaFormInfo )
-import BitSet		( mkBS, emptyBS )
+import BitSet
 import PrimRep		( isFollowableRep, getPrimRepSize )
 import Id		( Id, idPrimRep, idType )
 import Type		( typePrimRep )
@@ -452,6 +452,7 @@ buildLivenessMask
 	-> FCode Liveness	-- mask for free/unlifted slots
 
 buildLivenessMask uniq sp = do	
+
 	-- find all unboxed stack-resident ids
 	binds <- getBinds
 	((vsp, free, _, _), heap_usage) <- getUsage
@@ -477,7 +478,10 @@ buildLivenessMask uniq sp = do
 	let rel_slots = reverse (map (sp-) all_slots)
 
 	-- build the bitmap
-	let liveness_mask = ASSERT(all (>=0) rel_slots) (listToLivenessMask rel_slots)
+	let liveness_mask 
+               = ASSERT(all (>=0) rel_slots 
+                        && rel_slots == sortLt (<) rel_slots) 
+                 (listToLivenessMask rel_slots)
 	
 	livenessToAbsC uniq liveness_mask
 
@@ -547,9 +551,8 @@ nukeDeadBindings live_vars = do
 		dead_slots live_vars 
 			[] []
 			[ (i, b) | b@(MkCgIdInfo i _ _ _) <- rngVarEnv binds ]
-	let extra_free = sortLt (<) dead_stk_slots
 	setBinds $ mkVarEnv bs'
-	freeStackSlots extra_free
+	freeStackSlots dead_stk_slots
 \end{code}
 
 Several boring auxiliary functions to do the dirty work.

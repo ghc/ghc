@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgStackery.lhs,v 1.18 2001/08/31 12:39:06 rje Exp $
+% $Id: CgStackery.lhs,v 1.19 2001/09/12 15:52:40 sewardj Exp $
 %
 \section[CgStackery]{Stack management functions}
 
@@ -30,6 +30,7 @@ import Panic		( panic )
 import Constants	( uF_SIZE, sCC_UF_SIZE, gRAN_UF_SIZE, 
 			  sEQ_FRAME_SIZE, sCC_SEQ_FRAME_SIZE, gRAN_SEQ_FRAME_SIZE )
 
+import Util		( sortLt )
 import IOExts		( trace )
 \end{code}
 
@@ -242,7 +243,7 @@ Explicitly free some stack space.
 addFreeStackSlots :: [VirtualSpOffset] -> Slot -> Code
 addFreeStackSlots extra_free slot = do
 	((vsp, free, real, hw),heap_usage) <- getUsage
-	let all_free = addFreeSlots free (zip extra_free (repeat slot))
+	let all_free = addFreeSlots free (zip (sortLt (<) extra_free) (repeat slot))
 	let (new_vsp, new_free) = trim vsp all_free
 	let new_usage = ((new_vsp, new_free, real, hw), heap_usage)
 	setUsage new_usage
