@@ -716,12 +716,26 @@ instance Bits Word64 where
         | otherwise            = W64# (x# `shiftRL64#` negateInt# i#)
     (W64# x#) `rotate` (I# i#)
         | i'# ==# 0# = W64# x#
-        | otherwise  = W64# ((x# `shiftL64#` i'#) `or64#`
-                             (x# `shiftRL64#` (64# -# i'#)))
+        | otherwise  = W64# ((x# `uncheckedShiftL64#` i'#) `or64#`
+                             (x# `uncheckedShiftRL64#` (64# -# i'#)))
         where
         i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
     bitSize  _                = 64
     isSigned _                = False
+
+-- give the 64-bit shift operations the same treatment as the 32-bit
+-- ones (see GHC.Base), namely we wrap them in tests to catch the
+-- cases when we're shifting more than 64 bits to avoid unspecified
+-- behaviour in the C shift operations.
+
+shiftL64#, shiftRL64# :: Word64# -> Int# -> Word64#
+
+a `shiftL64#` b  | b >=# 64#  = wordToWord64# (int2Word# 0#)
+	         | otherwise  = a `uncheckedShiftL64#` b
+
+a `shiftRL64#` b | b >=# 64#  = wordToWord64# (int2Word# 0#)
+		 | otherwise  = a `uncheckedShiftRL64#` b
+
 
 foreign import ccall unsafe "stg_eqWord64"      eqWord64#      :: Word64# -> Word64# -> Bool
 foreign import ccall unsafe "stg_neWord64"      neWord64#      :: Word64# -> Word64# -> Bool
@@ -744,8 +758,8 @@ foreign import ccall unsafe "stg_and64"         and64#         :: Word64# -> Wor
 foreign import ccall unsafe "stg_or64"          or64#          :: Word64# -> Word64# -> Word64#
 foreign import ccall unsafe "stg_xor64"         xor64#         :: Word64# -> Word64# -> Word64#
 foreign import ccall unsafe "stg_not64"         not64#         :: Word64# -> Word64#
-foreign import ccall unsafe "stg_shiftL64"      shiftL64#      :: Word64# -> Int# -> Word64#
-foreign import ccall unsafe "stg_shiftRL64"     shiftRL64#     :: Word64# -> Int# -> Word64#
+foreign import ccall unsafe "stg_uncheckedShiftL64"      uncheckedShiftL64#      :: Word64# -> Int# -> Word64#
+foreign import ccall unsafe "stg_uncheckedShiftRL64"     uncheckedShiftRL64#     :: Word64# -> Int# -> Word64#
 
 foreign import ccall unsafe "stg_integerToWord64" integerToWord64# :: Int# -> ByteArray# -> Word64#
 

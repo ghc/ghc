@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: longlong.c,v 1.2 2001/12/21 15:07:26 simonmar Exp $
+ * $Id: longlong.c,v 1.3 2002/03/19 11:24:52 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -63,15 +63,15 @@ StgWord64 stg_and64      (StgWord64 a, StgWord64 b) {return a & b;}
 StgWord64 stg_or64       (StgWord64 a, StgWord64 b) {return a | b;}
 StgWord64 stg_xor64      (StgWord64 a, StgWord64 b) {return a ^ b;}
 StgWord64 stg_not64      (StgWord64 a)              {return ~a;}
-StgWord64 stg_shiftL64   (StgWord64 a, StgInt b)    {return a << b;}
-StgWord64 stg_shiftRL64  (StgWord64 a, StgInt b)    {return a >> b;}
+StgWord64 stg_uncheckedShiftL64   (StgWord64 a, StgInt b)    {return a << b;}
+StgWord64 stg_uncheckedShiftRL64  (StgWord64 a, StgInt b)    {return a >> b;}
 /* Right shifting of signed quantities is not portable in C, so
    the behaviour you'll get from using these primops depends
    on the whatever your C compiler is doing. ToDo: fix. -- sof 8/98
 */
-StgInt64  stg_iShiftL64  (StgInt64 a,  StgInt b)    {return a << b;}
-StgInt64  stg_iShiftRA64 (StgInt64 a,  StgInt b)    {return a >> b;}
-StgInt64  stg_iShiftRL64 (StgInt64 a,  StgInt b)
+StgInt64  stg_uncheckedIShiftL64  (StgInt64 a,  StgInt b)    {return a << b;}
+StgInt64  stg_uncheckedIShiftRA64 (StgInt64 a,  StgInt b)    {return a >> b;}
+StgInt64  stg_uncheckedIShiftRL64 (StgInt64 a,  StgInt b)
 {return (StgInt64) ((StgWord64) a >> b);}
 
 /* Casting between longs and longer longs.

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.3 2002/02/14 07:31:34 sof Exp $
+ * $Id: HsBase.h,v 1.4 2002/03/19 11:24:52 simonmar Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -112,6 +112,60 @@ HsInt systemCmd(HsAddr cmd);
 
 /* in inputReady.c */
 int inputReady(int fd, int msecs, int isSock);
+
+/* -----------------------------------------------------------------------------
+   64-bit operations, defined in longlong.c
+   -------------------------------------------------------------------------- */
+
+#ifdef SUPPORT_LONG_LONGS
+
+StgInt stg_gtWord64 (StgWord64, StgWord64);
+StgInt stg_geWord64 (StgWord64, StgWord64);
+StgInt stg_eqWord64 (StgWord64, StgWord64);
+StgInt stg_neWord64 (StgWord64, StgWord64);
+StgInt stg_ltWord64 (StgWord64, StgWord64);
+StgInt stg_leWord64 (StgWord64, StgWord64);
+
+StgInt stg_gtInt64 (StgInt64, StgInt64);
+StgInt stg_geInt64 (StgInt64, StgInt64);
+StgInt stg_eqInt64 (StgInt64, StgInt64);
+StgInt stg_neInt64 (StgInt64, StgInt64);
+StgInt stg_ltInt64 (StgInt64, StgInt64);
+StgInt stg_leInt64 (StgInt64, StgInt64);
+
+StgWord64 stg_remWord64  (StgWord64, StgWord64);
+StgWord64 stg_quotWord64 (StgWord64, StgWord64);
+
+StgInt64 stg_remInt64    (StgInt64, StgInt64);
+StgInt64 stg_quotInt64   (StgInt64, StgInt64);
+StgInt64 stg_negateInt64 (StgInt64);
+StgInt64 stg_plusInt64   (StgInt64, StgInt64);
+StgInt64 stg_minusInt64  (StgInt64, StgInt64);
+StgInt64 stg_timesInt64  (StgInt64, StgInt64);
+
+StgWord64 stg_and64  (StgWord64, StgWord64);
+StgWord64 stg_or64   (StgWord64, StgWord64);
+StgWord64 stg_xor64  (StgWord64, StgWord64);
+StgWord64 stg_not64  (StgWord64);
+
+StgWord64 stg_uncheckedShiftL64   (StgWord64, StgInt);
+StgWord64 stg_uncheckedShiftRL64  (StgWord64, StgInt);
+StgInt64  stg_uncheckedIShiftL64  (StgInt64, StgInt);
+StgInt64  stg_uncheckedIShiftRL64 (StgInt64, StgInt);
+StgInt64  stg_uncheckedIShiftRA64 (StgInt64, StgInt);
+
+StgInt64  stg_intToInt64    (StgInt);
+StgInt    stg_int64ToInt    (StgInt64);
+StgWord64 stg_int64ToWord64 (StgInt64);
+
+StgWord64 stg_wordToWord64  (StgWord);
+StgWord   stg_word64ToWord  (StgWord64);
+StgInt64  stg_word64ToInt64 (StgWord64);
+
+StgInt64  stg_integerToInt64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ da);
+StgWord64 stg_integerToWord64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ da);
+
+#endif /* SUPPORT_LONG_LONGS */
 
 /* -----------------------------------------------------------------------------
    INLINE functions.
