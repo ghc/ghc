@@ -21,7 +21,7 @@ dnl  the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 dnl  MA 02111-1307, USA.
 
 
-AC_REVISION($Revision: 1.7 $)dnl
+AC_REVISION($Revision: 1.8 $)dnl
 AC_PREREQ(2.14)dnl
 AC_INIT(gmp-impl.h)
 
@@ -257,6 +257,9 @@ case "$target" in
   powerpc64*-*-*)
     gmp_cflags_gcc="$gmp_cflags_gcc -mpowerpc64"
     AC_DEFINE(_LONG_LONG_LIMB)	dnl FIXME: Remove.
+    ;;
+  powerpc-apple-darwin* | powerpc-apple-macosx*)
+    gmp_cflags_gcc="$gmp_cflags_gcc -mpowerpc -traditional-cpp"
     ;;
   powerpc*-*-*)
     gmp_cflags_gcc="$gmp_cflags_gcc -mpowerpc"
@@ -784,7 +787,7 @@ case "$target" in
     ;;
   power*-*-*)
     case "$target" in
-      *-*-mach* | *-*-rhapsody* | *-*-nextstep*)
+      *-*-mach* | *-*-rhapsody* | *-*-nextstep* | *-*-darwin* | *-*-macosx*)
         ;;	# these use non-conventional assembly syntax.
       powerpc64-*-aix*)
 	gmp_m4postinc="powerpc32/regmap.m4 powerpc64/aix.m4"

@@ -1295,6 +1295,9 @@ case "$target" in
 #define _LONG_LONG_LIMB 1
 EOF
 	    ;;
+  powerpc-apple-darwin* | powerpc-apple-macosx*)
+    gmp_cflags_gcc="$gmp_cflags_gcc -mpowerpc -traditional-cpp"
+    ;;
   powerpc*-*-*)
     gmp_cflags_gcc="$gmp_cflags_gcc -mpowerpc"
     ;;
@@ -4357,7 +4360,7 @@ case "$target" in
     ;;
   power*-*-*)
     case "$target" in
-      *-*-mach* | *-*-rhapsody* | *-*-nextstep*)
+      *-*-mach* | *-*-rhapsody* | *-*-nextstep* | *-*-darwin* | *-*-macosx*)
         ;;	# these use non-conventional assembly syntax.
       powerpc64-*-aix*)
 	gmp_m4postinc="powerpc32/regmap.m4 powerpc64/aix.m4"
