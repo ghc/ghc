@@ -55,7 +55,7 @@ data HsExpr id
 
   | OpApp	(HsExpr id)	-- left operand
 		(HsExpr id)	-- operator
-		Fixity				-- Renamer adds fixity; bottom until then
+		Fixity		-- Renamer adds fixity; bottom until then
 		(HsExpr id)	-- right operand
 
   -- We preserve prefix negation and parenthesis for the precedence parser.
