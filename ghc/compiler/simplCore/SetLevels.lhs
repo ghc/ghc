@@ -46,6 +46,7 @@ import UniqSupply	( thenUs, returnUs, mapUs, mapAndUnzipUs,
 			  UniqSupply
 			)
 import BasicTypes	( Unused )
+import Maybes	        ( maybeToBool )
 import Util		( mapAccumL, zipWithEqual, zipEqual, panic, assertPanic )
 import Outputable
 
@@ -197,7 +198,7 @@ lvlBind :: Level
 	-> LvlM ([LevelledBind], LevelEnvs)
 
 lvlBind ctxt_lvl envs@(venv, tenv) (AnnNonRec name rhs)
-  = setFloatLevel True {- Already let-bound -}
+  = setFloatLevel (Just name) {- Already let-bound -}
 	ctxt_lvl envs rhs ty 	`thenLvl` \ (final_lvl, rhs') ->
     let
 	new_envs = (addOneToIdEnv venv name final_lvl, tenv)
@@ -348,7 +349,7 @@ lvlMFE ctxt_lvl envs@(venv,_) ann_expr
   = lvlExpr ctxt_lvl envs ann_expr
 
   | otherwise		-- Not primitive type so could be let-bound
-  = setFloatLevel False {- Not already let-bound -}
+  = setFloatLevel Nothing {- Not already let-bound -}
 	ctxt_lvl envs ann_expr ty	`thenLvl` \ (final_lvl, expr') ->
     returnLvl expr'
   where
@@ -389,8 +390,8 @@ Let Bound?
 			 Pin (leave) expression here.
 
 \begin{code}
-setFloatLevel :: Bool			-- True <=> the expression is already let-bound
-					-- False <=> it's a possible MFE
+setFloatLevel :: Maybe Id		-- Just id <=> the expression is already let-bound to id
+					-- Nothing <=> it's a possible MFE
 	      -> Level 			-- of context
 	      -> LevelEnvs
 
@@ -400,7 +401,7 @@ setFloatLevel :: Bool			-- True <=> the expression is already let-bound
 	      -> LvlM (Level, 		-- Level to attribute to this let-binding
 		       LevelledExpr)	-- Final rhs
 
-setFloatLevel alreadyLetBound ctxt_lvl envs@(venv, tenv)
+setFloatLevel maybe_let_bound ctxt_lvl envs@(venv, tenv)
 	      expr@(FVInfo fvs tfvs might_leak, _) ty
 -- Invariant: ctxt_lvl is never = Top
 -- Beautiful ASSERT, dudes (WDP 95/04)...
@@ -442,7 +443,16 @@ setFloatLevel alreadyLetBound ctxt_lvl envs@(venv, tenv)
       -- The truth: better to give it expr_lvl in case it is pinning
       -- something non-trivial which depends on it.
   where
-    fv_list = idSetToList    fvs
+    alreadyLetBound = maybeToBool maybe_let_bound
+        
+    
+
+    real_fvs = case maybe_let_bound of
+		Nothing -> fvs		-- Just the expr fvs
+		Just id -> fvs `unionIdSets` mkIdSet (idSpecVars id)
+					-- Tiresome!  Add the specVars
+
+    fv_list = idSetToList    real_fvs
     tv_list = tyVarSetToList tfvs
     expr_lvl = ids_only_lvl `maxLvl` tyvars_only_lvl
     ids_only_lvl    = foldr (maxLvl . idLevel venv)    tOP_LEVEL fv_list
@@ -646,6 +656,7 @@ decideRecFloatLevel ctxt_lvl envs@(venv, tenv) ids rhss
     fvs  = (unionManyIdSets [freeVarsOf   rhs | rhs <- rhss] `unionIdSets`
 	    mkIdSet (concat (map idSpecVars ids)))
 	   `minusIdSet` mkIdSet ids
+
     tfvs = unionManyTyVarSets [freeTyVarsOf rhs | rhs <- rhss]
 	   `unionTyVarSets`
 	   tyVarsOfTypes tys
