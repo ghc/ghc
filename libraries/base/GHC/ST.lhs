@@ -45,14 +45,14 @@ instance Monad (ST s) where
     {-# INLINE return #-}
     {-# INLINE (>>)   #-}
     {-# INLINE (>>=)  #-}
-    return x = ST $ \ s -> (# s, x #)
-    m >> k   =  m >>= \ _ -> k
+    return x = ST (\ s -> (# s, x #))
+    m >> k   = m >>= \ _ -> k
 
     (ST m) >>= k
-      = ST $ \ s ->
+      = ST (\ s ->
 	case (m s) of { (# new_s, r #) ->
 	case (k r) of { ST k2 ->
-	(k2 new_s) }}
+	(k2 new_s) }})
 
 data STret s a = STret (State# s) a
 
