@@ -3448,24 +3448,64 @@ Assertion failures can be caught, see the documentation for the
     unrecognised <replaceable>word</replaceable> is (silently)
     ignored.</para>
 
-<sect2 id="inline-pragma">
-<title>INLINE pragma
+    <sect2 id="deprecated-pragma">
+      <title>DEPRECATED pragma</title>
+      <indexterm><primary>DEPRECATED</primary>
+      </indexterm>
 
-<indexterm><primary>INLINE and NOINLINE pragmas</primary></indexterm>
-<indexterm><primary>pragma, INLINE</primary></indexterm></title>
+      <para>The DEPRECATED pragma lets you specify that a particular
+      function, class, or type, is deprecated.  There are two
+      forms.</para>
 
-<para>
-GHC (with <option>-O</option>, as always) tries to inline (or &ldquo;unfold&rdquo;)
-functions/values that are &ldquo;small enough,&rdquo; thus avoiding the call
-overhead and possibly exposing other more-wonderful optimisations.
-Normally, if GHC decides a function is &ldquo;too expensive&rdquo; to inline, it
-will not do so, nor will it export that unfolding for other modules to
-use.
-</para>
+      <itemizedlist>
+	<listitem>
+	  <para>You can deprecate an entire module thus:</para>
+<programlisting>
+   module Wibble {-# DEPRECATED "Use Wobble instead" #-} where
+     ...
+</programlisting>
+	  <para>When you compile any module that import
+          <literal>Wibble</literal>, GHC will print the specified
+          message.</para>
+	</listitem>
 
-<para>
-The sledgehammer you can bring to bear is the
-<literal>INLINE</literal><indexterm><primary>INLINE pragma</primary></indexterm> pragma, used thusly:
+	<listitem>
+	  <para>You can deprecate a function, class, or type, with the
+	  following top-level declaration:</para>
+<programlisting>
+   {-# DEPRECATED f, C, T "Don't use these" #-}
+</programlisting>
+	  <para>When you compile any module that imports and uses any
+          of the specifed entities, GHC will print the specified
+          message.</para>
+	</listitem>
+      </itemizedlist>
+
+      <para>You can suppress the warnings with the flag
+      <option>-fno-warn-deprecations</option>.</para>
+    </sect2>
+
+    <sect2 id="inline-noinline-pragma">
+      <title>INLINE and NOINLINE pragmas</title>
+
+      <para>These pragmas control the inlining of function
+      definitions.</para>
+
+      <sect3 id="inline-pragma">
+	<title>INLINE pragma</title>
+	<indexterm><primary>INLINE</primary></indexterm>
+
+	<para>GHC (with <option>-O</option>, as always) tries to
+        inline (or &ldquo;unfold&rdquo;) functions/values that are
+        &ldquo;small enough,&rdquo; thus avoiding the call overhead
+        and possibly exposing other more-wonderful optimisations.
+        Normally, if GHC decides a function is &ldquo;too
+        expensive&rdquo; to inline, it will not do so, nor will it
+        export that unfolding for other modules to use.</para>
+
+        <para>The sledgehammer you can bring to bear is the
+        <literal>INLINE</literal><indexterm><primary>INLINE
+        pragma</primary></indexterm> pragma, used thusly:</para>
 
 <programlisting>
 key_function :: Int -> String -> (Bool, Double)
@@ -3474,25 +3514,26 @@ key_function :: Int -> String -> (Bool, Double)
 {-# INLINE key_function #-}
 #endif
 </programlisting>
-(You don't need to do the C pre-processor carry-on unless you're going
-to stick the code through HBC&mdash;it doesn't like <literal>INLINE</literal> pragmas.)
-</para>
 
-<para>
-The major effect of an <literal>INLINE</literal> pragma is to declare a function's
-&ldquo;cost&rdquo; to be very low.  The normal unfolding machinery will then be
-very keen to inline it.
-</para>
+	<para>(You don't need to do the C pre-processor carry-on
+        unless you're going to stick the code through HBC&mdash;it
+        doesn't like <literal>INLINE</literal> pragmas.)</para>
 
-<para>
-Syntactially, an <literal>INLINE</literal> pragma for a function can be put anywhere its type
-signature could be put.
-</para>
+        <para>The major effect of an <literal>INLINE</literal> pragma
+        is to declare a function's &ldquo;cost&rdquo; to be very low.
+        The normal unfolding machinery will then be very keen to
+        inline it.</para>
 
-<para>
-<literal>INLINE</literal> pragmas are a particularly good idea for the
-<literal>then</literal>/<literal>return</literal> (or <literal>bind</literal>/<literal>unit</literal>) functions in a monad.
-For example, in GHC's own <literal>UniqueSupply</literal> monad code, we have:
+	<para>Syntactially, an <literal>INLINE</literal> pragma for a
+        function can be put anywhere its type signature could be
+        put.</para>
+
+	<para><literal>INLINE</literal> pragmas are a particularly
+        good idea for the
+        <literal>then</literal>/<literal>return</literal> (or
+        <literal>bind</literal>/<literal>unit</literal>) functions in
+        a monad.  For example, in GHC's own
+        <literal>UniqueSupply</literal> monad code, we have:</para>
 
 <programlisting>
 #ifdef __GLASGOW_HASKELL__
@@ -3501,95 +3542,140 @@ For example, in GHC's own <literal>UniqueSupply</literal> monad code, we have:
 #endif
 </programlisting>
 
-</para>
+	<para>See also the <literal>NOINLINE</literal> pragma (<xref
+        linkend="noinline-pragma">).</para>
+      </sect3>
 
-<sect3 id="noinline-pragma">
-<title>The NOINLINE pragma </title>
+      <sect3 id="noinline-pragma">
+	<title>NOINLINE pragma</title>
+	
+	<indexterm><primary>NOINLINE</primary></indexterm>
+	<indexterm><primary>NOTINLINE</primary></indexterm>
 
-<indexterm><primary>NOINLINE pragma</primary></indexterm>
-<indexterm><primary>pragma</primary><secondary>NOINLINE</secondary></indexterm>
-<indexterm><primary>NOTINLINE pragma</primary></indexterm>
-<indexterm><primary>pragma</primary><secondary>NOTINLINE</secondary></indexterm>
+	<para>The <literal>NOINLINE</literal> pragma does exactly what
+        you'd expect: it stops the named function from being inlined
+        by the compiler.  You shouldn't ever need to do this, unless
+        you're very cautious about code size.</para>
 
-<para>
-The <literal>NOINLINE</literal> pragma does exactly what you'd expect:
-it stops the named function from being inlined by the compiler.  You
-shouldn't ever need to do this, unless you're very cautious about code
-size.
-</para>
+	<para><literal>NOTINLINE</literal> is a synonym for
+        <literal>NOINLINE</literal> (<literal>NOTINLINE</literal> is
+        specified by Haskell 98 as the standard way to disable
+        inlining, so it should be used if you want your code to be
+        portable).</para>
+      </sect3>
 
-<para><literal>NOTINLINE</literal> is a synonym for
-<literal>NOINLINE</literal> (<literal>NOTINLINE</literal> is specified
-by Haskell 98 as the standard way to disable inlining, so it should be
-used if you want your code to be portable).</para>
-</sect3>
+      <sect3 id="phase-control">
+	<title>Phase control</title>
 
+	<para> Sometimes you want to control exactly when in GHC's
+        pipeline the INLINE pragma is switched on.  Inlining happens
+        only during runs of the <emphasis>simplifier</emphasis>.  Each
+        run of the simplifier has a different <emphasis>phase
+        number</emphasis>; the phase number decreases towards zero.
+        If you use <option>-dverbose-core2core</option> you'll see the
+        sequence of phase numbers for successive runs of the
+        simpifier.  In an INLINE pragma you can optionally specify a
+        phase number, thus:</para>
 
-<sect3 id="phase-control">
-<title>Phase control</title>
-
-<para> Sometimes you want to control exactly when in GHC's pipeline
-the INLINE pragma is switched on.  Inlining happens only during runs of
-the <emphasis>simplifier</emphasis>.  Each run of the simplifier has a different
-<emphasis>phase number</emphasis>; the phase number decreases towards zero.
-If you use <option>-dverbose-core2core</option>
-you'll see the sequence of phase numbers for successive runs of the simpifier.
-In an INLINE pragma you can optionally specify a phase number, thus:
-<itemizedlist>
-<listitem> <para>You can say "inline <literal>f</literal> in Phase 2 and all subsequent
-phases":
+	<itemizedlist>
+	  <listitem>
+	    <para>You can say "inline <literal>f</literal> in Phase 2
+            and all subsequent phases":
 <programlisting>
   {-# INLINE [2] f #-}
 </programlisting>
-</para></listitem>
+            </para>
+	  </listitem>
 
-<listitem> <para>You can say "inline <literal>g</literal> in all phases up to, but
-not including, Phase 3":
+	  <listitem>
+	    <para>You can say "inline <literal>g</literal> in all
+            phases up to, but not including, Phase 3":
 <programlisting>
   {-# INLINE [~3] g #-}
 </programlisting>
-</para></listitem>
+            </para>
+	  </listitem>
 
-<listitem> <para>If you omit the phase indicator, you mean "inline in all phases".
-</para></listitem>
-</itemizedlist>
-You can use a phase number on a NOINLINE pragma too:
-<itemizedlist>
-<listitem> <para>You can say "do not inline <literal>f</literal> until Phase 2; in 
-Phase 2 and subsequently behave as if there was no pragma at all":
+	  <listitem>
+	    <para>If you omit the phase indicator, you mean "inline in
+            all phases".</para>
+	  </listitem>
+	</itemizedlist>
+
+	<para>You can use a phase number on a NOINLINE pragma too:</para>
+
+	<itemizedlist>
+	  <listitem>
+	    <para>You can say "do not inline <literal>f</literal>
+            until Phase 2; in Phase 2 and subsequently behave as if
+            there was no pragma at all":
 <programlisting>
   {-# NOINLINE [2] f #-}
 </programlisting>
-</para></listitem>
+            </para>
+	  </listitem>
 
-<listitem> <para>You can say "do not inline <literal>g</literal> in Phase 3 or any subsequent phase; 
-before that, behave as if there was no pragma":
+	  <listitem>
+	    <para>You can say "do not inline <literal>g</literal> in
+            Phase 3 or any subsequent phase; before that, behave as if
+            there was no pragma":
 <programlisting>
   {-# NOINLINE [~3] g #-}
 </programlisting>
-</para></listitem>
+            </para>
+	  </listitem>
 
-<listitem> <para>If you omit the phase indicator, you mean "never inline this function".
-</para></listitem>
-</itemizedlist>
-</para>
-<para>The same phase-numbering control is available for RULES (<xref LinkEnd="rewrite-rules">).</para>
-</sect3>
+	  <listitem>
+	    <para>If you omit the phase indicator, you mean "never
+            inline this function".</para>
+	  </listitem>
+	</itemizedlist>
 
+	<para>The same phase-numbering control is available for RULES
+	(<xref LinkEnd="rewrite-rules">).</para>
+      </sect3>
+    </sect2>
 
+    <sect2 id="line-pragma">
+      <title>LINE pragma</title>
 
-</sect2>
+      <indexterm><primary>LINE</primary><secondary>pragma</secondary></indexterm>
+      <indexterm><primary>pragma</primary><secondary>LINE</secondary></indexterm>
+      <para>This pragma is similar to C's <literal>&num;line</literal>
+      pragma, and is mainly for use in automatically generated Haskell
+      code.  It lets you specify the line number and filename of the
+      original code; for example</para>
 
-<sect2 id="rules">
-<title>RULES pragma</title>
+<programlisting>
+{-# LINE 42 "Foo.vhs" #-}
+</programlisting>
 
-<para>
-The RULES pragma lets you specify rewrite rules.  It is described in
-<xref LinkEnd="rewrite-rules">.
-</para>
+      <para>if you'd generated the current file from something called
+      <filename>Foo.vhs</filename> and this line corresponds to line
+      42 in the original.  GHC will adjust its error messages to refer
+      to the line/file named in the <literal>LINE</literal>
+      pragma.</para>
+    </sect2>
 
-</sect2>
+    <sect2 id="options-pragma">
+      <title>OPTIONS pragma</title>
+      <indexterm><primary>OPTIONS</primary>
+      </indexterm>
+      <indexterm><primary>pragma</primary><secondary>OPTIONS</secondary>
+      </indexterm>
 
+      <para>The <literal>OPTIONS</literal> pragma is used to specify
+      additional options that are given to the compiler when compiling
+      this source file.  See <xref linkend="source-file-options"> for
+      details.</para>
+    </sect2>
+
+    <sect2 id="rules">
+      <title>RULES pragma</title>
+
+      <para>The RULES pragma lets you specify rewrite rules.  It is
+      described in <xref LinkEnd="rewrite-rules">.</para>
+    </sect2>
 
     <sect2 id="specialize-pragma">
       <title>SPECIALIZE pragma</title>
@@ -3681,73 +3767,7 @@ of the pragma.
 
 </sect2>
 
-<sect2 id="line-pragma">
-<title>LINE pragma
-</title>
 
-<para>
-<indexterm><primary>LINE pragma</primary></indexterm>
-<indexterm><primary>pragma, LINE</primary></indexterm>
-</para>
-
-<para>
-This pragma is similar to C's <literal>&num;line</literal> pragma, and is mainly for use in
-automatically generated Haskell code.  It lets you specify the line
-number and filename of the original code; for example
-</para>
-
-<para>
-
-<programlisting>
-{-# LINE 42 "Foo.vhs" #-}
-</programlisting>
-
-</para>
-
-<para>
-if you'd generated the current file from something called <filename>Foo.vhs</filename>
-and this line corresponds to line 42 in the original.  GHC will adjust
-its error messages to refer to the line/file named in the <literal>LINE</literal>
-pragma.
-</para>
-
-</sect2>
-
-<sect2 id="deprecated-pragma">
-<title>DEPRECATED pragma</title>
-
-<para>
-The DEPRECATED pragma lets you specify that a particular function, class, or type, is deprecated.  
-There are two forms.  
-</para>
-<itemizedlist>
-<listitem><para>
-You can deprecate an entire module thus:</para>
-<programlisting>
-   module Wibble {-# DEPRECATED "Use Wobble instead" #-} where
-     ...
-</programlisting>
-<para>
-When you compile any module that import <literal>Wibble</literal>, GHC will print
-the specified message.</para>
-</listitem>
-
-<listitem>
-<para>
-You can deprecate a function, class, or type, with the following top-level declaration:
-</para>
-<programlisting>
-   {-# DEPRECATED f, C, T "Don't use these" #-}
-</programlisting>
-<para>
-When you compile any module that imports and uses any of the specifed entities, 
-GHC will print the specified message.
-</para>
-</listitem>
-</itemizedlist>
-<para>You can suppress the warnings with the flag <option>-fno-warn-deprecations</option>.</para>
-
-</sect2>
 
 </sect1>
 
