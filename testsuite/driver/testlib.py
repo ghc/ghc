@@ -555,7 +555,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     # figure out what to use for stdin
     if testopts.stdin != '':
-        stdin_file = testopts.stdin
+        stdin_file = in_testdir(testopts.stdin)
     else:
         stdin_file = qualify(name, 'stdin')
 
