@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.44 2000/03/13 10:53:56 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.45 2000/03/13 13:00:00 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -904,8 +904,13 @@ FN_(putMVarzh_fast)
 #endif
 
   if (info == &FULL_MVAR_info) {
+#ifdef INTERPRETER
+    fprintf(stderr, "fatal: put on a full MVar in Hugs; aborting\n" );
+    exit(1);
+#else
     R1.cl = (StgClosure *)&PutFullMVar_closure;
     JMP_(raisezh_fast);
+#endif
   }
   
   mvar->value = R2.cl;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.1 2000/03/13 10:53:56 simonmar Exp $
+ * $Id: Prelude.h,v 1.2 2000/03/13 13:00:00 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -95,6 +95,9 @@ extern const StgInfoTable StablePtr_static_info;
 
 #define W64zh_con_info        I64zh_con_info
 #define W64zh_static_info     I64zh_con_info
+
+#define PutFullMVar_closure    PrelException_PutFullMVar_static_closure
+extern const StgInfoTable PutFullMVar_closure;
 
 #endif
 
