@@ -774,65 +774,8 @@ traceCmd phase_name cmd_line action
 -- GHC than this, we'd better have a copy of the correct implementation
 -- right here.
 
--- If you ever alter this code, you must alter 
---	libraries/base/System/Cmd.hs
--- at the same time!  There are also exensive comments in System.Cmd
--- thare are not repeated here -- go look!
-
-
 #if __GLASGOW_HASKELL__ < 603
-
-rawSystem :: FilePath -> [String] -> IO ExitCode
-
-#ifndef mingw32_TARGET_OS
-
-rawSystem cmd args =
-  withCString cmd $ \pcmd ->
-    withMany withCString (cmd:args) $ \cstrs ->
-      withArray0 nullPtr cstrs $ \arr -> do
-	status <- throwErrnoIfMinus1 "rawSystem" (c_rawSystem pcmd arr)
-        case status of
-            0  -> return ExitSuccess
-            n  -> return (ExitFailure n)
-
-foreign import ccall "rawSystem" unsafe
-  c_rawSystem :: CString -> Ptr CString -> IO Int
-
-#else
-
--- On Windows, the command line is passed to the operating system as
--- a single string.  Command-line parsing is done by the executable
--- itself.
-rawSystem cmd args = do
-	-- NOTE: 'cmd' is assumed to contain the application to run _only_,
-	-- as it'll be surrounded in quotes here.
-  let cmdline = translate cmd ++ concat (map ((' ':) . translate) args)
-  withCString cmdline $ \pcmdline -> do
-    status <- throwErrnoIfMinus1 "rawSystem" (c_rawSystem pcmdline)
-    case status of
-       0  -> return ExitSuccess
-       n  -> return (ExitFailure n)
-
-translate :: String -> String
-translate str = '"' : snd (foldr escape (True,"\"") str)
-  where escape '"'  (b,     str) = (True,  '\\' : '"'  : str)
-        escape '\\' (True,  str) = (True,  '\\' : '\\' : str)
-        escape '\\' (False, str) = (False, '\\' : str)
-	escape c    (b,     str) = (False, c : str)
-	-- This function attempts to invert the Microsoft C runtime's
-	-- quoting rules, which can be found here:
-	--     http://msdn.microsoft.com/library/default.asp?url=/library/en-us/vccelng/htm/progs_12.asp
-	-- (if this URL stops working, you might be able to find it by
-	-- searching for "Parsing C Command-Line Arguments" on MSDN).
-	--
-	-- The Bool passed back along the string is True iff the
-	-- rest of the string is a sequence of backslashes followed by
-	-- a double quote.
-
-foreign import ccall "rawSystem" unsafe
-  c_rawSystem :: CString -> IO Int
-
-#endif
+#include "../../libraries/base/System/RawSystem.hs-inc"
 #endif
 \end{code}
 
