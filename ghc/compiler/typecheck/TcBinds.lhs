@@ -20,20 +20,19 @@ import RnHsSyn		( RenamedHsBinds, RenamedSig, RenamedMonoBinds )
 import TcHsSyn		( TcMonoBinds, TcId, zonkId, mkHsLet )
 
 import TcMonad
-import Inst		( LIE, emptyLIE, mkLIE, plusLIE, lieToList, InstOrigin(..),
-			  newDicts, tyVarsOfInsts, instToId
+import Inst		( LIE, emptyLIE, mkLIE, plusLIE, InstOrigin(..),
+			  newDicts, instToId
 			)
 import TcEnv		( tcExtendLocalValEnv,
-			  newSpecPragmaId, newLocalId,
-			  tcGetGlobalTyVars
+			  newSpecPragmaId, newLocalId
 			)
-import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyToDicts )
+import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyCheck, tcSimplifyToDicts )
 import TcMonoType	( tcHsSigType, checkSigTyVars,
 			  TcSigInfo(..), tcTySig, maybeSig, sigCtxt
 			)
 import TcPat		( tcPat )
 import TcSimplify	( bindInstsOfLocalFuns )
-import TcType		( newTyVarTy, newTyVar, zonkTcTyVarsAndFV,
+import TcType		( newTyVarTy, newTyVar, 
 			  zonkTcTyVarToTyVar
 			)
 import TcUnify		( unifyTauTy, unifyTauTyLists )
@@ -44,7 +43,7 @@ import Var		( idType, idName )
 import IdInfo		( InlinePragInfo(..) )
 import Name		( Name, getOccName, getSrcLoc )
 import NameSet
-import Type		( mkTyVarTy, 
+import Type		( mkTyVarTy, tyVarsOfTypes,
 			  mkForAllTys, mkFunTys, tyVarsOfType, 
 			  mkPredTy, mkForAllTy, isUnLiftedType, 
 			  unliftedTypeKind, liftedTypeKind, openTypeKind
@@ -53,6 +52,7 @@ import Var		( tyVarKind )
 import VarSet
 import Bag
 import Util		( isIn )
+import ListSetOps	( minusList )
 import Maybes		( maybeToBool )
 import BasicTypes	( TopLevelFlag(..), RecFlag(..), isNonRec, isNotTopLevel )
 import FiniteMap	( listToFM, lookupFM )
@@ -409,60 +409,72 @@ is doing.
 %************************************************************************
 
 \begin{code}
-generalise binder_names mbind tau_tvs lie_req sigs
+generalise_help doc tau_tvs lie_req sigs
 
 -----------------------
-  | is_unrestricted && null sigs
+  | null sigs
   =	-- INFERENCE CASE: Unrestricted group, no type signatures
-    tcSimplifyInfer (ptext SLIT("bindings for") <+> pprBinders binder_names)
+    tcSimplifyInfer doc
 		    tau_tvs lie_req
 
 -----------------------
-  | is_unrestricted 
+  | otherwise
   = 	-- CHECKING CASE: Unrestricted group, there are type signatures
 	-- Check signature contexts are empty 
     checkSigsCtxts sigs				`thenTc` \ (sig_avails, sig_dicts) ->
 
 	-- Check that the needed dicts can be
 	-- expressed in terms of the signature ones
-    tcSimplifyInferCheck check_doc tau_tvs sig_avails lie_req	`thenTc` \ (forall_tvs, lie_free, dict_binds) ->
+    tcSimplifyInferCheck doc tau_tvs sig_avails lie_req	`thenTc` \ (forall_tvs, lie_free, dict_binds) ->
 	
    	-- Check that signature type variables are OK
     checkSigsTyVars sigs					`thenTc_`
 
     returnTc (forall_tvs, lie_free, dict_binds, sig_dicts)
 
------------------------
-  | otherwise		-- RESTRICTED CASE: Restricted group
-  =	-- Check signature contexts are empty 
-    (if null sigs then
-	returnTc ()
-     else
-	checkSigsCtxts sigs	`thenTc` \ (_, sig_dicts) ->
-	checkTc (null sig_dicts)
-		(restrictedBindCtxtErr binder_names)
-    )							`thenTc_`
+generalise binder_names mbind tau_tvs lie_req sigs
+  | is_unrestricted	-- UNRESTRICTED CASE
+  = generalise_help doc tau_tvs lie_req sigs
+
+  | otherwise		-- RESTRICTED CASE
+  = 	-- Do a simplification to decide what type variables
+	-- are constrained.  We can't just take the free vars
+	-- of lie_req because that'll have methods that may
+	-- incidentally mention entirely unconstrained variables
+	--  	e.g. a call to 	f :: Eq a => a -> b -> b
+	-- Here, b is unconstrained.  A good example would be
+	--	foo = f (3::Int)
+	-- We want to infer the polymorphic type
+	--	foo :: forall b. b -> b
+    generalise_help doc tau_tvs lie_req sigs	`thenTc` \ (forall_tvs, lie_free, dict_binds, dict_ids) ->
+
+	-- Check signature contexts are empty 
+    checkTc (null sigs || null dict_ids)
+	    (restrictedBindCtxtErr binder_names)	`thenTc_`
 
 	-- Identify constrained tyvars
-    tcGetGlobalTyVars				`thenNF_Tc` \ gbl_tvs ->
-    zonkTcTyVarsAndFV tau_tvs			`thenNF_Tc` \ tau_tvs' ->
-    zonkTcTyVarsAndFV lie_tvs		 	`thenNF_Tc` \ lie_tvs' ->
     let
-	forall_tvs = tau_tvs' `minusVarSet` (lie_tvs' `unionVarSet` gbl_tvs)
-		-- Don't bother to oclose the gbl_tvs; this is a rare case
+	constrained_tvs = varSetElems (tyVarsOfTypes (map idType dict_ids))
+				-- The dict_ids are fully zonked
+	final_forall_tvs = forall_tvs `minusList` constrained_tvs
     in
-    returnTc (varSetElems forall_tvs, lie_req, EmptyMonoBinds, [])
+
+	-- Now simplify with exactly that set of tyvars
+	-- We have to squash those Methods
+    tcSimplifyCheck doc final_forall_tvs [] lie_req	`thenTc` \ (lie_free, binds) ->
+
+    returnTc (final_forall_tvs, lie_free, binds, [])
 
   where
-    tysig_names     = [name | (TySigInfo name _ _ _ _ _ _ _) <- sigs]
     is_unrestricted | opt_NoMonomorphismRestriction = True
 		    | otherwise			    = isUnRestrictedGroup tysig_names mbind
-    lie_tvs = varSetElems (tyVarsOfInsts (lieToList lie_req))
-    check_doc = case tysig_names of
-		   [n]   -> ptext SLIT("type signature for")    <+> quotes (ppr n)
-		   other -> ptext SLIT("type signature(s) for") <+> pprBinders tysig_names
 
+    tysig_names = [name | (TySigInfo name _ _ _ _ _ _ _) <- sigs]
 
+    doc | null sigs = ptext SLIT("banding(s) for")        <+> pprBinders binder_names
+	| otherwise = ptext SLIT("type signature(s) for") <+> pprBinders binder_names
+
+-----------------------
 	-- CHECK THAT ALL THE SIGNATURE CONTEXTS ARE UNIFIABLE
 	-- The type signatures on a mutually-recursive group of definitions
 	-- must all have the same context (or none).
@@ -470,8 +482,6 @@ generalise binder_names mbind tau_tvs lie_req sigs
 	-- We unify them because, with polymorphic recursion, their types
 	-- might not otherwise be related.  This is a rather subtle issue.
 	-- ToDo: amplify
-	--
-	-- We return a representative 
 checkSigsCtxts sigs@(TySigInfo _ id1 sig_tvs theta1 _ _ _ _ : other_sigs)
   = mapTc_ check_one other_sigs		`thenTc_` 
     if null theta1 then

@@ -178,7 +178,7 @@ tcInstDecls1 inst_env0 prs hst unf_env get_fixity mod decls
 	clas_decls = filter isClassDecl tycl_decls
     in
    	-- (1) Do the ordinary instance declarations
-    mapNF_Tc (tcInstDecl1 unf_env) inst_decls    	`thenNF_Tc` \ inst_infos ->
+    mapNF_Tc tcInstDecl1 inst_decls		`thenNF_Tc` \ inst_infos ->
 
 	-- (2) Instances from generic class declarations
     getGenericInstances clas_decls		`thenTc` \ generic_inst_info -> 
@@ -229,9 +229,9 @@ addInstDFuns dfuns infos
 \end{code} 
 
 \begin{code}
-tcInstDecl1 :: TcEnv -> RenamedInstDecl -> NF_TcM [InstInfo]
+tcInstDecl1 :: RenamedInstDecl -> NF_TcM [InstInfo]
 -- Deal with a single instance declaration
-tcInstDecl1 unf_env decl@(InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
+tcInstDecl1 decl@(InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
   = 	-- Prime error recovery, set source location
     recoverNF_Tc (returnNF_Tc [])	$
     tcAddSrcLoc src_loc			$

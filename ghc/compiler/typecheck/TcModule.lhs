@@ -15,7 +15,7 @@ import HsSyn		( HsBinds(..), MonoBinds(..), HsDecl(..), HsExpr(..),
 			  isIfaceRuleDecl, nullBinds, andMonoBindList
 			)
 import HsTypes		( toHsType )
-import PrelNames	( mAIN_Name, mainName, ioTyConName, printName )
+import PrelNames	( SyntaxMap, mAIN_Name, mainName, ioTyConName, printName )
 import RnHsSyn		( RenamedHsBinds, RenamedHsDecl, RenamedHsExpr )
 import TcHsSyn		( TypecheckedMonoBinds, TypecheckedHsExpr,
 			  TypecheckedForeignDecl, TypecheckedRuleDecl,
@@ -33,7 +33,7 @@ import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2 )
 import TcDefaults	( tcDefaults, defaultDefaultTys )
 import TcExpr		( tcMonoExpr )
-import TcEnv		( TcEnv, InstInfo, tcExtendGlobalValEnv, tcLookup_maybe,
+import TcEnv		( TcEnv, RecTcEnv, InstInfo, tcExtendGlobalValEnv, tcLookup_maybe,
 			  isLocalThing, tcSetEnv, tcSetInstEnv, initTcEnv, getTcGEnv,
 			  TcTyThing(..), tcLookupTyCon
 			)
@@ -84,15 +84,15 @@ typecheckModule
 	-> HomeSymbolTable
 	-> ModIface		-- Iface for this module
 	-> PrintUnqualified	-- For error printing
-	-> [RenamedHsDecl]
+	-> (SyntaxMap, [RenamedHsDecl])
 	-> Bool			-- True <=> check for Main.main if Module==Main
 	-> IO (Maybe (PersistentCompilerState, TcResults))
 			-- The new PCS is Augmented with imported information,
 						-- (but not stuff from this module)
 
 
-typecheckModule dflags pcs hst mod_iface unqual decls check_main
-  = do	{ maybe_tc_result <- typecheck dflags pcs hst unqual $
+typecheckModule dflags pcs hst mod_iface unqual (syn_map, decls) check_main
+  = do	{ maybe_tc_result <- typecheck dflags syn_map pcs hst unqual $
 			     tcModule pcs hst get_fixity this_mod decls check_main
 	; printTcDump dflags maybe_tc_result
 	; return maybe_tc_result }
@@ -110,18 +110,24 @@ typecheckExpr :: DynFlags
 	      -> HomeSymbolTable
 	      -> PrintUnqualified	-- For error printing
 	      -> Module
-	      -> (RenamedHsExpr, 	-- The expression itself
+	      -> (SyntaxMap,
+		  RenamedHsExpr, 	-- The expression itself
 	          [RenamedHsDecl])	-- Plus extra decls it sucked in from interface files
 	      -> IO (Maybe (PersistentCompilerState, TypecheckedHsExpr, TcType))
 
-typecheckExpr dflags wrap_io pcs hst unqual this_mod (expr, decls)
-  = typecheck dflags pcs hst unqual $
+typecheckExpr dflags wrap_io pcs hst unqual this_mod (syn_map, expr, decls)
+  = typecheck dflags syn_map pcs hst unqual $
 
  	 -- use the default default settings, i.e. [Integer, Double]
     tcSetDefaultTys defaultDefaultTys $
-    tcImports pcs hst get_fixity this_mod decls	`thenTc` \ (env, new_pcs, local_inst_info, deriv_binds, local_rules) ->
+
+	-- Typecheck the extra declarations
+    fixTc (\ ~(unf_env, _, _, _, _) ->
+	tcImports unf_env pcs hst get_fixity this_mod decls
+    )			`thenTc` \ (env, new_pcs, local_inst_info, deriv_binds, local_rules) ->
     ASSERT( null local_inst_info && nullBinds deriv_binds && null local_rules )
 
+	-- Now typecheck the expression
     tcSetEnv env				$
     tc_expr expr 					`thenTc` \ (expr', expr_ty) ->
     zonkExpr expr'					`thenNF_Tc` \ zonked_expr ->
@@ -170,15 +176,16 @@ typecheckExpr dflags wrap_io pcs hst unqual this_mod (expr, decls)
 
 ---------------
 typecheck :: DynFlags
+	  -> SyntaxMap
 	  -> PersistentCompilerState
 	  -> HomeSymbolTable
 	  -> PrintUnqualified	-- For error printing
 	  -> TcM r
 	  -> IO (Maybe r)
 
-typecheck dflags pcs hst unqual thing_inside 
+typecheck dflags syn_map pcs hst unqual thing_inside 
  = do	{ showPass dflags "Typechecker";
-	; env <- initTcEnv hst (pcs_PTE pcs)
+	; env <- initTcEnv syn_map hst (pcs_PTE pcs)
 
 	; (maybe_tc_result, errs) <- initTc dflags env thing_inside
 
@@ -202,102 +209,108 @@ tcModule :: PersistentCompilerState
 	 -> TcM (PersistentCompilerState, TcResults)
 
 tcModule pcs hst get_fixity this_mod decls check_main
-  = 	-- Type-check the type and class decls, and all imported decls
-	-- tcImports recovers internally, but if anything gave rise to
-	-- an error we'd better stop now, to avoid a cascade
-    checkNoErrsTc (
-	tcImports pcs hst get_fixity this_mod decls
-    )						`thenTc` \ (env, new_pcs, local_inst_info, deriv_binds, local_rules) ->
+  = fixTc (\ ~(unf_env, _, _) ->
+		-- Loop back the final environment, including the fully zonkec
+		-- versions of bindings from this module.  In the presence of mutual
+		-- recursion, interface type signatures may mention variables defined
+		-- in this module, which is why the knot is so big
 
-    tcSetEnv env				$
+		-- Type-check the type and class decls, and all imported decls
+	tcImports unf_env pcs hst get_fixity this_mod decls	
+				`thenTc` \ (env, new_pcs, local_insts, deriv_binds, local_rules) ->
+
+    	tcSetEnv env				$
 
         -- Foreign import declarations next
---  traceTc (text "Tc4")			`thenNF_Tc_`
-    tcForeignImports decls			`thenTc`    \ (fo_ids, foi_decls) ->
-    tcExtendGlobalValEnv fo_ids			$
+        traceTc (text "Tc4")			`thenNF_Tc_`
+	tcForeignImports decls			`thenTc`    \ (fo_ids, foi_decls) ->
+	tcExtendGlobalValEnv fo_ids		$
     
 	-- Default declarations
-    tcDefaults decls				`thenTc` \ defaulting_tys ->
-    tcSetDefaultTys defaulting_tys 		$
+	tcDefaults decls			`thenTc` \ defaulting_tys ->
+	tcSetDefaultTys defaulting_tys 		$
 	
 	-- Value declarations next.
 	-- We also typecheck any extra binds that came out of the "deriving" process
---  traceTc (text "Tc5")				`thenNF_Tc_`
-    tcTopBinds (val_binds `ThenBinds` deriv_binds)	`thenTc` \ ((val_binds, env), lie_valdecls) ->
-    tcSetEnv env $
-    
-	-- Foreign export declarations next
---  traceTc (text "Tc6")		`thenNF_Tc_`
-    tcForeignExports decls		`thenTc`    \ (lie_fodecls, foe_binds, foe_decls) ->
-    
-    	-- Second pass over class and instance declarations,
-    	-- to compile the bindings themselves.
-    tcInstDecls2  local_inst_info		`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
-    tcClassDecls2 this_mod tycl_decls		`thenNF_Tc` \ (lie_clasdecls, cls_dm_binds) ->
-    tcSourceRules source_rules			`thenNF_Tc` \ (lie_rules,     more_local_rules) ->
-    
-         -- Deal with constant or ambiguous InstIds.  How could
-         -- there be ambiguous ones?  They can only arise if a
-         -- top-level decl falls under the monomorphism
-         -- restriction, and no subsequent decl instantiates its
-         -- type.  (Usually, ambiguous type variables are resolved
-         -- during the generalisation step.)
-    let
-        lie_alldecls = lie_valdecls	`plusLIE`
-    		       lie_instdecls	`plusLIE`
-    		       lie_clasdecls	`plusLIE`
-    		       lie_fodecls	`plusLIE`
-    		       lie_rules
-    in
-    tcSimplifyTop lie_alldecls			`thenTc` \ const_inst_binds ->
-
-	-- CHECK THAT main IS DEFINED WITH RIGHT TYPE, IF REQUIRED
-    (if check_main 
-	then tcCheckMain this_mod
-	else returnTc ())		`thenTc_`
-    
-        -- Backsubstitution.    This must be done last.
-        -- Even tcSimplifyTop may do some unification.
-    let
-        all_binds = val_binds		`AndMonoBinds`
-    	            inst_binds		`AndMonoBinds`
-    	            cls_dm_binds	`AndMonoBinds`
-    	            const_inst_binds	`AndMonoBinds`
-    		    foe_binds
-    in
---  traceTc (text "Tc9")		`thenNF_Tc_`
-    zonkTopBinds all_binds		`thenNF_Tc` \ (all_binds', final_env)  ->
-    tcSetEnv final_env			$
-    	-- zonkTopBinds puts all the top-level Ids into the tcGEnv
-    zonkForeignExports foe_decls	`thenNF_Tc` \ foe_decls' ->
-    zonkRules more_local_rules		`thenNF_Tc` \ more_local_rules' ->
-    
-    
-    let	local_things = filter (isLocalThing this_mod) (nameEnvElts (getTcGEnv final_env))
-
-	-- Create any necessary "implicit" bindings (data constructors etc)
-	-- Should we create bindings for dictionary constructors?
-	-- They are always fully applied, and the bindings are just there
-	-- to support partial applications. But it's easier to let them through.
-	implicit_binds = andMonoBindList [ CoreMonoBind id (unfoldingTemplate unf)
-					 | id <- implicitTyThingIds local_things
-					 , let unf = idUnfolding id
-					 , hasUnfolding unf
-					 ]
-
-	local_type_env :: TypeEnv
-	local_type_env = mkTypeEnv local_things
-	    
-	all_local_rules = local_rules ++ more_local_rules'
-    in  
---  traceTc (text "Tc10")		`thenNF_Tc_`
-    returnTc (new_pcs,
-	      TcResults { tc_env     = local_type_env,
-			  tc_binds   = implicit_binds `AndMonoBinds` all_binds', 
-			  tc_fords   = foi_decls ++ foe_decls',
-			  tc_rules   = all_local_rules
-                        }
-    )
+        traceTc (text "Tc5")				`thenNF_Tc_`
+	tcTopBinds (val_binds `ThenBinds` deriv_binds)	`thenTc` \ ((val_binds, env), lie_valdecls) ->
+	
+     	-- Second pass over class and instance declarations, 
+	-- plus rules and foreign exports, to generate bindings
+	tcSetEnv env				$
+	tcInstDecls2  local_insts		`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
+	tcClassDecls2 this_mod tycl_decls	`thenNF_Tc` \ (lie_clasdecls, cls_dm_binds) ->
+	tcForeignExports decls			`thenTc`    \ (lie_fodecls,   foe_binds, foe_decls) ->
+	tcSourceRules source_rules		`thenNF_Tc` \ (lie_rules,     more_local_rules) ->
+	
+	     -- Deal with constant or ambiguous InstIds.  How could
+	     -- there be ambiguous ones?  They can only arise if a
+	     -- top-level decl falls under the monomorphism
+	     -- restriction, and no subsequent decl instantiates its
+	     -- type.  (Usually, ambiguous type variables are resolved
+	     -- during the generalisation step.)
+	let
+	    lie_alldecls = lie_valdecls	 `plusLIE`
+			   lie_instdecls `plusLIE`
+			   lie_clasdecls `plusLIE`
+			   lie_fodecls	 `plusLIE`
+			   lie_rules
+	in
+        traceTc (text "Tc6")				`thenNF_Tc_`
+	tcSimplifyTop lie_alldecls			`thenTc` \ const_inst_binds ->
+	
+		-- CHECK THAT main IS DEFINED WITH RIGHT TYPE, IF REQUIRED
+	(if check_main 
+		then tcCheckMain this_mod
+		else returnTc ())		`thenTc_`
+	
+	    -- Backsubstitution.    This must be done last.
+	    -- Even tcSimplifyTop may do some unification.
+	let
+	    all_binds = val_binds		`AndMonoBinds`
+			    inst_binds		`AndMonoBinds`
+			    cls_dm_binds	`AndMonoBinds`
+			    const_inst_binds	`AndMonoBinds`
+			    foe_binds
+	in
+ 	traceTc (text "Tc7")		`thenNF_Tc_`
+	zonkTopBinds all_binds		`thenNF_Tc` \ (all_binds', final_env)  ->
+	tcSetEnv final_env		$
+		-- zonkTopBinds puts all the top-level Ids into the tcGEnv
+ 	traceTc (text "Tc8")		`thenNF_Tc_`
+	zonkForeignExports foe_decls	`thenNF_Tc` \ foe_decls' ->
+ 	traceTc (text "Tc9")		`thenNF_Tc_`
+	zonkRules more_local_rules	`thenNF_Tc` \ more_local_rules' ->
+	
+	
+	let	local_things = filter (isLocalThing this_mod) (nameEnvElts (getTcGEnv final_env))
+	
+		-- Create any necessary "implicit" bindings (data constructors etc)
+		-- Should we create bindings for dictionary constructors?
+		-- They are always fully applied, and the bindings are just there
+		-- to support partial applications. But it's easier to let them through.
+		implicit_binds = andMonoBindList [ CoreMonoBind id (unfoldingTemplate unf)
+						 | id <- implicitTyThingIds local_things
+						 , let unf = idUnfolding id
+						 , hasUnfolding unf
+						 ]
+	
+		local_type_env :: TypeEnv
+		local_type_env = mkTypeEnv local_things
+		    
+		all_local_rules = local_rules ++ more_local_rules'
+	in  
+	traceTc (text "Tc10")		`thenNF_Tc_`
+	returnTc (final_env,
+		  new_pcs,
+		  TcResults { tc_env     = local_type_env,
+			      tc_binds   = implicit_binds `AndMonoBinds` all_binds', 
+			      tc_fords   = foi_decls ++ foe_decls',
+			      tc_rules   = all_local_rules
+			    }
+	)
+    )			`thenTc` \ (_, pcs, tc_result) ->
+    returnTc (pcs, tc_result)
   where
     tycl_decls   = [d | TyClD d <- decls]
     val_binds    = foldr ThenBinds EmptyBinds [binds | ValD binds <- decls]
@@ -306,13 +319,14 @@ tcModule pcs hst get_fixity this_mod decls check_main
 
 
 \begin{code}
-tcImports :: PersistentCompilerState
+tcImports :: RecTcEnv
+	  -> PersistentCompilerState
 	  -> HomeSymbolTable
 	  -> (Name -> Maybe Fixity)
 	  -> Module
 	  -> [RenamedHsDecl]
-	  -> TcM (TcEnv, PersistentCompilerState, 
-		  [InstInfo], RenamedHsBinds, [TypecheckedRuleDecl])
+	  -> TcM (TcEnv, PersistentCompilerState, [InstInfo], 
+			 RenamedHsBinds, [TypecheckedRuleDecl])
 
 -- tcImports is a slight mis-nomer.  
 -- It deals with everythign that could be an import:
@@ -322,66 +336,68 @@ tcImports :: PersistentCompilerState
 --	rule decls
 -- These can occur in source code too, of course
 
-tcImports pcs hst get_fixity this_mod decls
-  = fixTc (\ ~(unf_env, _, _, _, _) -> 
-	  -- (unf_env :: RecTcEnv) is used for type-checking interface pragmas
+tcImports unf_env pcs hst get_fixity this_mod decls
+   	  -- (unf_env :: RecTcEnv) is used for type-checking interface pragmas
 	  -- which is done lazily [ie failure just drops the pragma
 	  -- without having any global-failure effect].
 	  -- 
 	  -- unf_env is also used to get the pragama info
 	  -- for imported dfuns and default methods
-		
---	traceTc (text "Tc1")			`thenNF_Tc_`
-	tcTyAndClassDecls unf_env tycl_decls	`thenTc` \ env ->
-	tcSetEnv env 				$
-	
-		-- Typecheck the instance decls, includes deriving
---	traceTc (text "Tc2")	`thenNF_Tc_`
-	tcInstDecls1 (pcs_insts pcs) (pcs_PRS pcs) 
-		     hst unf_env get_fixity this_mod 
-		     decls			`thenTc` \ (new_pcs_insts, inst_env, local_inst_info, deriv_binds) ->
-	tcSetInstEnv inst_env			$
-	
-	-- Interface type signatures
-	-- We tie a knot so that the Ids read out of interfaces are in scope
-	--   when we read their pragmas.
-	-- What we rely on is that pragmas are typechecked lazily; if
-	--   any type errors are found (ie there's an inconsistency)
-	--   we silently discard the pragma
---	traceTc (text "Tc3")			`thenNF_Tc_`
-	tcInterfaceSigs unf_env tycl_decls	`thenTc` \ sig_ids ->
-	tcExtendGlobalValEnv sig_ids		$
-	
-	
-        tcIfaceRules (pcs_rules pcs) this_mod iface_rules	`thenNF_Tc` \ (new_pcs_rules, local_rules) ->
-		-- When relinking this module from its interface-file decls
-		-- we'll have IfaceRules that are in fact local to this module
-		-- That's the reason we we get any local_rules out here
 
-	tcGetEnv						`thenTc` \ unf_env ->
-	let
-	    all_things = nameEnvElts (getTcGEnv unf_env)
-
-	     -- sometimes we're compiling in the context of a package module
-	     -- (on the GHCi command line, for example).  In this case, we
-	     -- want to treat everything we pulled in as an imported thing.
-	    imported_things
-		| isHomeModule this_mod
-			= filter (not . isLocalThing this_mod) all_things
-		| otherwise
-		        = all_things
-
-	    new_pte :: PackageTypeEnv
-	    new_pte = extendTypeEnvList (pcs_PTE pcs) imported_things
-	    
-	    new_pcs :: PersistentCompilerState
-	    new_pcs = pcs { pcs_PTE   = new_pte,
-			    pcs_insts = new_pcs_insts,
-			    pcs_rules = new_pcs_rules
-		      }
-	in
-	returnTc (unf_env, new_pcs, local_inst_info, deriv_binds, local_rules)
-    )
+  = checkNoErrsTc $
+	-- tcImports recovers internally, but if anything gave rise to
+	-- an error we'd better stop now, to avoid a cascade
+	
+    traceTc (text "Tc1")			`thenNF_Tc_`
+    tcTyAndClassDecls unf_env tycl_decls	`thenTc` \ env ->
+    tcSetEnv env 				$
+    
+    	-- Typecheck the instance decls, includes deriving
+    traceTc (text "Tc2")	`thenNF_Tc_`
+    tcInstDecls1 (pcs_insts pcs) (pcs_PRS pcs) 
+    	     hst unf_env get_fixity this_mod 
+    	     decls			`thenTc` \ (new_pcs_insts, inst_env, local_insts, deriv_binds) ->
+    tcSetInstEnv inst_env			$
+    
+    -- Interface type signatures
+    -- We tie a knot so that the Ids read out of interfaces are in scope
+    --   when we read their pragmas.
+    -- What we rely on is that pragmas are typechecked lazily; if
+    --   any type errors are found (ie there's an inconsistency)
+    --   we silently discard the pragma
+    traceTc (text "Tc3")			`thenNF_Tc_`
+    tcInterfaceSigs unf_env tycl_decls		`thenTc` \ sig_ids ->
+    tcExtendGlobalValEnv sig_ids		$
+    
+    
+    tcIfaceRules (pcs_rules pcs) this_mod iface_rules	`thenNF_Tc` \ (new_pcs_rules, local_rules) ->
+    	-- When relinking this module from its interface-file decls
+    	-- we'll have IfaceRules that are in fact local to this module
+    	-- That's the reason we we get any local_rules out here
+    
+    tcGetEnv						`thenTc` \ unf_env ->
+    let
+        all_things = nameEnvElts (getTcGEnv unf_env)
+    
+         -- sometimes we're compiling in the context of a package module
+         -- (on the GHCi command line, for example).  In this case, we
+         -- want to treat everything we pulled in as an imported thing.
+        imported_things
+    	  | isHomeModule this_mod
+    	  = filter (not . isLocalThing this_mod) all_things
+    	  | otherwise
+    	  = all_things
+    
+        new_pte :: PackageTypeEnv
+        new_pte = extendTypeEnvList (pcs_PTE pcs) imported_things
+        
+        new_pcs :: PersistentCompilerState
+        new_pcs = pcs { pcs_PTE   = new_pte,
+    		        pcs_insts = new_pcs_insts,
+    		        pcs_rules = new_pcs_rules
+      	          }
+    in
+    returnTc (unf_env, new_pcs, local_insts, deriv_binds, local_rules)
   where
     tycl_decls  = [d | TyClD d <- decls]
     iface_rules = [d | RuleD d <- decls, isIfaceRuleDecl d]

@@ -156,17 +156,18 @@ zonkIdBndr id
 
 zonkIdOcc :: TcId -> NF_TcM Id
 zonkIdOcc id 
-  | not (isLocalId id) || isIP id
-	-- We're avoiding looking up superclass selectors
-	-- and constructors; zonking them is a no-op anyway, and the
-	-- superclass selectors aren't in the environment anyway.
-  = returnNF_Tc id
-  | otherwise 
   = tcLookupGlobal_maybe (idName id)	`thenNF_Tc` \ maybe_id' ->
+	-- We're even look up up superclass selectors and constructors; 
+	-- even though zonking them is a no-op anyway, and the
+	-- superclass selectors aren't in the environment anyway.
+	-- But we don't want to call isLocalId to find out whether
+	-- it's a superclass selector (for example) because that looks
+	-- at the IdInfo field, which in turn be in a knot because of
+	-- the big knot in typecheckModule
     let
 	new_id = case maybe_id' of
 		    Just (AnId id') -> id'
-		    other  -> pprTrace "zonkIdOcc:" (ppr id) id
+		    other  	    -> WARN( isLocalId id, ppr id ) id
     in
     returnNF_Tc new_id
 \end{code}
@@ -351,8 +352,8 @@ zonkExpr (OpApp e1 op fixity e2)
     zonkExpr e2	`thenNF_Tc` \ new_e2 ->
     returnNF_Tc (OpApp new_e1 new_op fixity new_e2)
 
-zonkExpr (NegApp _ _) = panic "zonkExpr: NegApp"
-zonkExpr (HsPar _)    = panic "zonkExpr: HsPar"
+zonkExpr (NegApp _) = panic "zonkExpr: NegApp"
+zonkExpr (HsPar _)  = panic "zonkExpr: HsPar"
 
 zonkExpr (SectionL expr op)
   = zonkExpr expr	`thenNF_Tc` \ new_expr ->
