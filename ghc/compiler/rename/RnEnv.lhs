@@ -499,13 +499,16 @@ combine_globals ns_old ns_new	-- ns_new is often short
 	       choose n' | n==n' && better_provenance n n' = n
 			 | otherwise			   = n'
 
--- Choose a user-imported thing over a non-user-imported thing
--- and an explicitly-imported thing over an implicitly imported thing
+-- Choose 
+--	a local thing		      over an	imported thing
+--	a user-imported thing	      over a	non-user-imported thing
+-- 	an explicitly-imported thing  over an	implicitly imported thing
 better_provenance n1 n2
   = case (getNameProvenance n1, getNameProvenance n2) of
+	(LocalDef _ _,				_			      ) -> True
 	(NonLocalDef (UserImport _ _ True) _ _, _			      ) -> True
 	(NonLocalDef (UserImport _ _ _   ) _ _, NonLocalDef ImplicitImport _ _) -> True
-	other -> False
+	other									-> False
 
 no_conflict :: Name -> Name -> Bool
 no_conflict n1 n2 | isLocallyDefined n1 && isLocallyDefined n2 = False

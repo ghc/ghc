@@ -78,7 +78,7 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
 	importsFromLocalDecls this_mod rec_exp_fn decls	`thenRn` \ (local_gbl_env, local_mod_avails) ->
 
 		-- PROCESS IMPORT DECLS
-	mapAndUnzipRn (importsFromImportDecl rec_unqual_fn)
+	mapAndUnzipRn (importsFromImportDecl this_mod rec_unqual_fn)
 		      all_imports			`thenRn` \ (imp_gbl_envs, imp_avails_s) ->
 
 		-- COMBINE RESULTS
@@ -181,22 +181,23 @@ checkEarlyExit mod
 \end{code}
 	
 \begin{code}
-importsFromImportDecl :: (Name -> Bool)		-- True => print unqualified
+importsFromImportDecl :: Module			-- The module being compiled
+		      -> (Name -> Bool)		-- True => print unqualified
 		      -> RdrNameImportDecl
 		      -> RnMG (GlobalRdrEnv, 
 			       ExportAvails) 
 
-importsFromImportDecl rec_unqual_fn (ImportDecl mod qual_only as_source as_mod import_spec iloc)
+importsFromImportDecl this_mod rec_unqual_fn (ImportDecl imp_mod qual_only as_source as_mod import_spec iloc)
   = pushSrcLocRn iloc $
-    getInterfaceExports mod as_source		`thenRn` \ avails ->
+    getInterfaceExports imp_mod as_source		`thenRn` \ avails ->
 
     if null avails then
 	-- If there's an error in getInterfaceExports, (e.g. interface
 	-- file not found) we get lots of spurious errors from 'filterImports'
-	returnRn (emptyRdrEnv, mkEmptyExportAvails mod)
+	returnRn (emptyRdrEnv, mkEmptyExportAvails imp_mod)
     else
 
-    filterImports mod import_spec avails	`thenRn` \ (filtered_avails, hides, explicits) ->
+    filterImports imp_mod import_spec avails	`thenRn` \ (filtered_avails, hides, explicits) ->
 
 	-- Load all the home modules for the things being
 	-- bought into scope.  This makes sure their fixities
@@ -212,12 +213,10 @@ importsFromImportDecl rec_unqual_fn (ImportDecl mod qual_only as_source as_mod i
 				  other        -> True,
 			
 			       let name = availName avail,
-			       nameModule (availName avail) /= mod
-				-- This nameModule predicate is a bit of a hack.
-				-- PrelBase imports error from PrelErr.hi-boot; but error is
-				-- wired in, so its provenance doesn't say it's from an hi-boot
-				-- file. Result: disaster when PrelErr.hi doesn't exist.
-				--	[Jan 99: I now can't see how the predicate achieves the goal!]
+			       not (isLocallyDefined name || nameModule name == imp_mod)
+				-- Don't try to load the module being compiled
+				--	(this can happen in mutual-recursion situations)
+				-- or from the module being imported (it's already loaded)
 			]
 				
 	same_module n1 n2 = nameModule n1 == nameModule n2
@@ -236,11 +235,11 @@ importsFromImportDecl rec_unqual_fn (ImportDecl mod qual_only as_source as_mod i
 			  | otherwise	       = setNameProvenance name (mk_new_prov name)
 
 	is_explicit name = name `elemNameSet` explicits
-	mk_new_prov name = NonLocalDef (UserImport mod iloc (is_explicit name))
+	mk_new_prov name = NonLocalDef (UserImport imp_mod iloc (is_explicit name))
 				       as_source
 				       (rec_unqual_fn name)
     in
-    qualifyImports mod 
+    qualifyImports imp_mod 
 		   (not qual_only)	-- Maybe want unqualified names
 		   as_mod hides
 		   filtered_avails improve_prov		`thenRn` \ (rdr_name_env, mod_avails) ->
@@ -354,7 +353,7 @@ fixitiesFromLocalDecls gbl_env decls
 available, and filters it through the import spec (if any).
 
 \begin{code}
-filterImports :: Module
+filterImports :: Module				-- The module being imported
 	      -> Maybe (Bool, [RdrNameIE])	-- Import spec; True => hiding
 	      -> [AvailInfo]			-- What's available
 	      -> RnMG ([AvailInfo],		-- What's actually imported

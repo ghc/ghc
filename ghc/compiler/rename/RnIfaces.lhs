@@ -270,7 +270,7 @@ loadDecl mod as_source decls_map (version, decl)
 				       [ (name, (version,avail,decl',name==main_name)) 
 				       | name <- sys_bndrs ++ availNames avail]
 	add_decl decls_map (name, stuff)
-	  = ASSERT2( not (name `elemNameEnv` decls_map), ppr name )
+	  = WARN( name `elemNameEnv` decls_map, ppr name )
 	    addToNameEnv decls_map name stuff
     in
     returnRn new_decls_map

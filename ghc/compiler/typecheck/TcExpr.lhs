@@ -504,18 +504,29 @@ tcMonoExpr (RecordCon con_name rbinds) res_ty
 tcMonoExpr (RecordUpd record_expr rbinds) res_ty
   = tcAddErrCtxt recordUpdCtxt			$
 
-	-- STEP 1
-	-- Figure out the tycon and data cons from the first field name
+	-- STEP 0
+	-- Check that the field names are really field names
     ASSERT( not (null rbinds) )
     let 
-	((first_field_name, _, _) : rest) = rbinds
+	field_names = [field_name | (field_name, _, _) <- rbinds]
     in
-    tcLookupValueMaybe first_field_name		`thenNF_Tc` \ maybe_sel_id ->
-    (case maybe_sel_id of
-	Just sel_id | isRecordSelector sel_id -> returnTc sel_id
-	other				      -> failWithTc (notSelector first_field_name)
-    )						`thenTc` \ sel_id ->
+    mapNF_Tc tcLookupValueMaybe field_names		`thenNF_Tc` \ maybe_sel_ids ->
     let
+	bad_guys = [field_name | (field_name, maybe_sel_id) <- field_names `zip` maybe_sel_ids,
+				 case maybe_sel_id of
+					Nothing -> True
+					Just sel_id -> not (isRecordSelector sel_id)
+		   ]
+    in
+    mapNF_Tc (addErrTc . notSelector) bad_guys	`thenTc_`
+    if not (null bad_guys) then
+	failTc
+    else
+    
+	-- STEP 1
+	-- Figure out the tycon and data cons from the first field name
+    let
+	(Just sel_id : _)	  = maybe_sel_ids
 	(_, tau)	      	  = splitForAllTys (idType sel_id)
 	Just (data_ty, _)     	  = splitFunTy_maybe tau	-- Must succeed since sel_id is a selector
 	(tycon, _, data_cons) 	  = splitAlgTyConApp data_ty
@@ -524,9 +535,11 @@ tcMonoExpr (RecordUpd record_expr rbinds) res_ty
     tcInstTyVars con_tyvars			`thenNF_Tc` \ (_, result_inst_tys, _) ->
 
 	-- STEP 2
-	-- Check for bad fields
+	-- Check that at least one constructor has all the named fields
+	-- i.e. has an empty set of bad fields returned by badFields
     checkTc (any (null . badFields rbinds) data_cons)
 	    (badFieldsUpd rbinds)		`thenTc_`
+
 	-- STEP 3
 	-- Typecheck the update bindings.
 	-- (Do this after checking for bad fields in case there's a field that

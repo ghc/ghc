@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.47 1998/12/10 08:54:18 simonpj Exp $
+# $Id: Makefile,v 1.48 1999/01/07 12:48:13 simonpj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -178,7 +178,7 @@ reader/Lex_HC_OPTS		= -K2m -H16m -fvia-C
 # Heap was 6m with 2.10
 reader/ReadPrefix_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"' -H10m
 
-rename/ParseIface_HC_OPTS 	+= -Onot -H30m -fno-warn-incomplete-patterns
+rename/ParseIface_HC_OPTS 	+= -Onot -H45m -fno-warn-incomplete-patterns
 rename/ParseIface_HAPPY_OPTS    += -g
 
 ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
