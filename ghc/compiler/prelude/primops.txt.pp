@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.8 2001/10/17 11:26:04 simonpj Exp $
+-- $Id: primops.txt.pp,v 1.9 2001/10/31 17:03:12 rrt Exp $
 --
 -- Primitive Operations
 --
@@ -351,8 +351,14 @@ section "Integer#"
 implemented via the GMP package. An integer is represented as a pair
 consisting of an Int\# representing the number of 'limbs' in use and
 the sign, and a ByteArr\# containing the 'limbs' themselves.  Such pairs
-are returned as unboxed pairs, but must be passed as separate components.}
+are returned as unboxed pairs, but must be passed as separate
+components.
+
+For .NET these operations are implemented by foreign imports, so the
+primops are omitted.}
 ------------------------------------------------------------------------
+
+#ifndef ILX
 
 primop   IntegerAddOp   "plusInteger#" GenPrimOp   
    Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr# #)
@@ -458,6 +464,7 @@ primop   IntegerComplementOp  "complementInteger#" GenPrimOp
    Int# -> ByteArr# -> (# Int#, ByteArr# #)
    with out_of_line = True
 
+#endif /* ILX */
 
 ------------------------------------------------------------------------
 section "Double#"

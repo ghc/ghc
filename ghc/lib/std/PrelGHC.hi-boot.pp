@@ -211,6 +211,9 @@ __export PrelGHC
   ztztzhzh
   decodeDoublezh
 
+-- Integer is implemented by foreign imports on .NET, so no primops
+
+#ifndef ILX
   cmpIntegerzh
   cmpIntegerIntzh
   plusIntegerzh
@@ -244,6 +247,7 @@ __export PrelGHC
   orIntegerzh
   xorIntegerzh
   complementIntegerzh
+#endif
 
   Arrayzh
   ByteArrayzh
