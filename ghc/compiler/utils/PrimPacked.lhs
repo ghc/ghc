@@ -170,7 +170,7 @@ Compare two equal-length strings for equality:
 eqStrPrefix :: Addr# -> ByteArray# -> Int# -> Bool
 eqStrPrefix a# barr# len# = 
   unsafePerformIO (
-   _ccall_ strncmp (A# a#) (ByteArray bot bot barr#) (I# len#) >>= \ (I# x#) ->
+   _ccall_ memcmp (A# a#) (ByteArray bot bot barr#) (I# len#) >>= \ (I# x#) ->
    return (x# ==# 0#))
   where
    bot :: Int
@@ -179,13 +179,13 @@ eqStrPrefix a# barr# len# =
 eqCharStrPrefix :: Addr# -> Addr# -> Int# -> Bool
 eqCharStrPrefix a1# a2# len# = 
   unsafePerformIO (
-   _ccall_ strncmp (A# a1#) (A# a2#) (I# len#) >>= \ (I# x#) ->
+   _ccall_ memcmp (A# a1#) (A# a2#) (I# len#) >>= \ (I# x#) ->
    return (x# ==# 0#))
 
 eqStrPrefixBA :: ByteArray# -> ByteArray# -> Int# -> Int# -> Bool
 eqStrPrefixBA b1# b2# start# len# = 
   unsafePerformIO (
-   _casm_ ``%r=(int)strncmp((char *)%0+(int)%1,%2,%3); '' 
+   _casm_ ``%r=(int)memcmp((char *)%0+(int)%1,%2,%3); '' 
 	  (ByteArray bot bot b2#) 
 	  (I# start#) 
           (ByteArray bot bot b1#) 
@@ -198,7 +198,7 @@ eqStrPrefixBA b1# b2# start# len# =
 eqCharStrPrefixBA :: Addr# -> ByteArray# -> Int# -> Int# -> Bool
 eqCharStrPrefixBA a# b2# start# len# = 
   unsafePerformIO (
-   _casm_ ``%r=(int)strncmp((char *)%0+(int)%1,%2,%3); '' 
+   _casm_ ``%r=(int)memcmp((char *)%0+(int)%1,%2,%3); '' 
 	  (ByteArray bot bot b2#) 
 	  (I# start#) 
           (A# a#)
