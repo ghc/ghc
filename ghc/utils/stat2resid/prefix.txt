@@ -5,8 +5,6 @@
 # needs to be uncommented and set, if it hasn't already
 # been set above automatically:
 #
-#$INSTLIBDIR_GHC='/local/fp/lib/fptools/i386-unknown-footos/ghc-2.02';
+#$libdir='/local/fp/lib/fptools/i386-unknown-footos/ghc-2.02';
 #
-#
-# Pls ignore the gumpf that immediately follows..
-#
+

@@ -3,10 +3,12 @@
 #
 # Perl script expect bindings for the following variables to be prepended
 #
-#   TMPDIR INSTLIBDIR_GHC
+#   TMPDIR libdir
+#
+# without them, not much success :-(
 #
 
-$debug = 0;
+$debug = 0; # first line of script, builds confidence :-)
 $outsuffix = ".resid.ps";	# change as appropriate
 
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
@@ -16,7 +18,7 @@ if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $ENV{'TMPDIR'} = ${TMPDIR}; # set the env var as well
 }
 
-@INC = ( ${INSTLIBDIR_GHC} );
+@INC = ( ${libdir} );
 
 require('parse-gcstats.prl')   || die "Can't load parse-gcstats.prl!\n";
 require('process-gcstats.prl') || die "Can't load process-gcstats.prl!\n";
