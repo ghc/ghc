@@ -1298,22 +1298,22 @@ $ cvs checkout nofib/spectral
       </varlistentry>
 
       <varlistentry>
-	<term>Autoconf</term>
-	<indexterm><primary>pre-supposed: Autoconf</primary></indexterm>
-	<indexterm><primary>Autoconf, pre-supposed</primary></indexterm>
+	<term>Autoreconf</term>
+	<indexterm><primary>pre-supposed: Autoreconf</primary></indexterm>
+	<indexterm><primary>Autoreconf, pre-supposed</primary></indexterm>
 	<listitem>
-	  <para>GNU Autoconf is needed if you intend to build from the
+	  <para>GNU Autoreconf is needed if you intend to build from the
           CVS sources, it is <emphasis>not</emphasis> needed if you
           just intend to build a standard source distribution.</para>
 
-	  <para>Version 2.52 or later of autoconf is required.
+	  <para>Version 2.52 or later of autoreconf is required.
 	  NB. vesrion 2.13 will no longer work, as of GHC version
 	  6.1.</para>
 
-	  <para>Autoconf builds the <command>configure</command>
+	  <para>Autoreconf builds the <command>configure</command>
           script from <filename>configure.ac</filename> and
           <filename>aclocal.m4</filename>.  If you modify either of
-          these files, you'll need <command>autoconf</command> to
+          these files, you'll need <command>autoreconf</command> to
           rebuild <filename>configure</filename>.</para>
 	</listitem>
       </varlistentry>
@@ -1434,7 +1434,8 @@ $ cvs checkout nofib/spectral
       want a completely standard build, then the following should
       work:</para>
 
-<screen>$ ./configure
+<screen>$ autoreconf
+$ ./configure
 $ make
 $ make install
 </screen>
@@ -1606,20 +1607,27 @@ $ make install
 	    <para>Change directory to
             <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant> and
             issue the command
-            <command>autoconf</command><indexterm><primary>autoconf</primary></indexterm>
+<ProgramListing>
+autoreconf
+</ProgramListing>
+            <indexterm><primary>autoreconf</primary></indexterm>
             (with no arguments). This GNU program converts
             <filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/configure.ac</filename>
             to a shell script called
             <filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/configure</filename>.
+	      If <command>autoreconf</command> bleats that it can't write the file <filename>configure</filename>,
+	      then delete the latter and try again.  Note that you must use <command>autoreconf</command>,
+	      and not the old <command>autoconf</command>!  If you erroneously use the latter, you'll get 
+	      a message like "No rule to make target 'mk/config.h.in'".
             </para>
 
 	    <para>Some projects, including GHC, have their own
             configure script.  If there's an
             <constant>&dollar;(FPTOOLS&lowbar;TOP)/&lt;project&gt;/configure.ac</constant>,
-            then you need to run <command>autoconf</command> in that
+            then you need to run <command>autoreconf</command> in that
             directory too.</para>
 
-	    <para>Both these steps are completely
+	    <para>These steps are completely
             platform-independent; they just mean that the
             human-written file (<filename>configure.ac</filename>) can
             be short, although the resulting shell script,
@@ -1899,7 +1907,7 @@ $ cd /scratch/joe-bloggs/myfptools-sun4
 	  <para>Prepare for system configuration:</para>
 
 <programlisting>
-$ autoconf
+$ autoreconf
 </programlisting>
 
 	  <para>(You can skip this step if you are starting from a
@@ -1908,11 +1916,11 @@ $ autoconf
           <filename>mk/config.h.in</filename>.)</para>
 
 	  <para>Some projects, including GHC itself, have their own
-	  configure scripts, so it is necessary to run autoconf again
+	  configure scripts, so it is necessary to run autoreconf again
 	  in the appropriate subdirectories. eg:</para>
 
 <programlisting>
-$ (cd ghc; autoconf)
+$ (cd ghc; autoreconf)
 </programlisting>
 	</listitem>
 
@@ -4454,7 +4462,7 @@ During the installation dialogue, make sure that you select all of the following
 	      <command>openssh</command>,
 </para></listitem>
 <listitem><para>
-	      <command>autoconf</command>,
+	      <command>autoreconf</command>,
 </para></listitem>
 <listitem><para>
 	      <command>automake</command>,
@@ -4717,7 +4725,7 @@ you about Windows-specific wrinkles.</para>
 <ItemizedList>
 <listitem>
 <para>
-Run <Command>autoconf</Command> both in <filename>fptools</filename>
+Run <Command>autoreconf</Command> both in <filename>fptools</filename>
 and in <filename>fptools/ghc</filename>.  If you omit the latter step you'll
 get an error when you run <filename>./configure</filename>:
 <Screen>
@@ -4732,11 +4740,11 @@ configure: error: ./configure failed for ghc
 </para>
 </listitem>
 
-<listitem> <para><command>autoconf</command> seems to create the file <filename>configure</filename>
-read-only.  So if you need to run autoconf again (which I sometimes do for safety's sake),
+<listitem> <para><command>autoreconf</command> seems to create the file <filename>configure</filename>
+read-only.  So if you need to run autoreconf again (which I sometimes do for safety's sake),
 you get
 <screen>
-/usr/bin/autoconf: cannot create configure: permission denied
+/usr/bin/autoreconf: cannot create configure: permission denied
 </screen>
 Solution: delete <filename>configure</filename> first.
 </para></listitem>
@@ -4759,7 +4767,7 @@ can be really confusing.
 
 <listitem>
   <para> 
-    After <command>autoconf</command> run <command>./configure</command> in
+    After <command>autoreconf</command> run <command>./configure</command> in
     <filename>fptools/</filename> thus:
 
 <Screen>
