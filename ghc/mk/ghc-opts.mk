@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: ghc-opts.mk,v 1.2 1996/11/21 16:47:59 simonm Exp $
+# $Id: ghc-opts.mk,v 1.3 1997/01/21 10:52:10 sof Exp $
 
 ifdef DoingRTS
 GCap = -optc-DGCap
@@ -8,36 +8,36 @@ GC1s = -optc-DG1s
 endif
 
 GHC_OPTS_norm=-O $(GCap)
-GHC_OPTS_p =-O -prof -GPrelude $(GCap) -hisuf p_hi -hisuf-prelude p_hi
-GHC_OPTS_t =-O -ticky -optc-DDEBUG $(GCap) -hisuf t_hi -hisuf-prelude t_hi
-GHC_OPTS_u =-O -unregisterised ???? -ticky $(GCap) -hisuf u_hi -hisuf-prelude u_hi
-GHC_OPTS_mc=-O -concurrent $(GCap) -hisuf mc_hi -hisuf-prelude mc_hi
-GHC_OPTS_mr=-O -concurrent -prof -GPrelude $(GCap) -hisuf mr_hi -hisuf-prelude mr_hi
-GHC_OPTS_mt=-O -concurrent -ticky -optc-DDEBUG $(GCap) -hisuf mt_hi -hisuf-prelude mt_hi
-GHC_OPTS_mp=-O -parallel $(GCap) -hisuf mp_hi -hisuf-prelude mp_hi
-GHC_OPTS_mg=-O -gransim $(GCap) -hisuf mg_hi -hisuf-prelude mg_hi
+GHC_OPTS_p =-O -prof -GPrelude $(GCap) -hisuf p_hi
+GHC_OPTS_t =-O -ticky -optc-DDEBUG $(GCap) -hisuf t_hi
+GHC_OPTS_u =-O -unregisterised ???? -ticky $(GCap) -hisuf u_hi
+GHC_OPTS_mc=-O -concurrent $(GCap) -hisuf mc_hi
+GHC_OPTS_mr=-O -concurrent -prof -GPrelude $(GCap) -hisuf mr_hi
+GHC_OPTS_mt=-O -concurrent -ticky -optc-DDEBUG $(GCap) -hisuf mt_hi
+GHC_OPTS_mp=-O -parallel $(GCap) -hisuf mp_hi
+GHC_OPTS_mg=-O -gransim $(GCap) -hisuf mg_hi
 
-GHC_OPTS_2s=-O -gc-2s $(GC2s) -hisuf 2s_hi -hisuf-prelude 2s_hi
-GHC_OPTS_1s=-O -gc-1s $(GC1s) -hisuf 1s_hi -hisuf-prelude 1s_hi
-GHC_OPTS_du=-O -gc-du $(GCdu) -hisuf du_hi -hisuf-prelude du_hi
+GHC_OPTS_2s=-O -gc-2s $(GC2s) -hisuf 2s_hi
+GHC_OPTS_1s=-O -gc-1s $(GC1s) -hisuf 1s_hi
+GHC_OPTS_du=-O -gc-du $(GCdu) -hisuf du_hi
 
-GHC_OPTS_a =-user-setup-a $(GCap) -hisuf a_hi -hisuf-prelude a_hi
-GHC_OPTS_b =-user-setup-b $(GCap) -hisuf b_hi -hisuf-prelude b_hi
-GHC_OPTS_c =-user-setup-c $(GCap) -hisuf c_hi -hisuf-prelude c_hi
-GHC_OPTS_d =-user-setup-d $(GCap) -hisuf d_hi -hisuf-prelude d_hi
-GHC_OPTS_e =-user-setup-e $(GCap) -hisuf e_hi -hisuf-prelude e_hi
-GHC_OPTS_f =-user-setup-f $(GCap) -hisuf f_hi -hisuf-prelude f_hi
-GHC_OPTS_g =-user-setup-g $(GCap) -hisuf g_hi -hisuf-prelude g_hi
-GHC_OPTS_h =-user-setup-h $(GCap) -hisuf h_hi -hisuf-prelude h_hi
-GHC_OPTS_i =-user-setup-i $(GCap) -hisuf i_hi -hisuf-prelude i_hi
-GHC_OPTS_j =-user-setup-j $(GCap) -hisuf j_hi -hisuf-prelude j_hi
-GHC_OPTS_k =-user-setup-k $(GCap) -hisuf k_hi -hisuf-prelude k_hi
-GHC_OPTS_l =-user-setup-l $(GCap) -hisuf l_hi -hisuf-prelude l_hi
-GHC_OPTS_m =-user-setup-m $(GCap) -hisuf m_hi -hisuf-prelude m_hi
-GHC_OPTS_n =-user-setup-n $(GCap) -hisuf n_hi -hisuf-prelude n_hi
-GHC_OPTS_o =-user-setup-o $(GCap) -hisuf o_hi -hisuf-prelude o_hi
-GHC_OPTS_A =-user-setup-A $(GCap) -hisuf A_hi -hisuf-prelude A_hi
-GHC_OPTS_B =-user-setup-B $(GCap) -hisuf B_hi -hisuf-prelude B_hi
+GHC_OPTS_a =-user-setup-a $(GCap) -hisuf a_hi
+GHC_OPTS_b =-user-setup-b $(GCap) -hisuf b_hi
+GHC_OPTS_c =-user-setup-c $(GCap) -hisuf c_hi
+GHC_OPTS_d =-user-setup-d $(GCap) -hisuf d_hi
+GHC_OPTS_e =-user-setup-e $(GCap) -hisuf e_hi
+GHC_OPTS_f =-user-setup-f $(GCap) -hisuf f_hi
+GHC_OPTS_g =-user-setup-g $(GCap) -hisuf g_hi
+GHC_OPTS_h =-user-setup-h $(GCap) -hisuf h_hi
+GHC_OPTS_i =-user-setup-i $(GCap) -hisuf i_hi
+GHC_OPTS_j =-user-setup-j $(GCap) -hisuf j_hi
+GHC_OPTS_k =-user-setup-k $(GCap) -hisuf k_hi
+GHC_OPTS_l =-user-setup-l $(GCap) -hisuf l_hi
+GHC_OPTS_m =-user-setup-m $(GCap) -hisuf m_hi
+GHC_OPTS_n =-user-setup-n $(GCap) -hisuf n_hi
+GHC_OPTS_o =-user-setup-o $(GCap) -hisuf o_hi
+GHC_OPTS_A =-user-setup-A $(GCap) -hisuf A_hi
+GHC_OPTS_B =-user-setup-B $(GCap) -hisuf B_hi
 
 # used in hslibs:
 
