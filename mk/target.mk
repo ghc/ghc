@@ -488,11 +488,14 @@ CLEAN_FILES += $(GHCI_LIBRARY)
 
 all :: $(GHCI_LIBRARY)
 
-ifneq "$(HSLIB)" "std"
+ifneq "$(GHCI_LIBRARY)" "HSstd.o"
 # An annoying gotcha is that the Prelude is a bit special,
 # for reasons described in ghc/lib/std/Makefile.
 # So we only put in this standard rule for packages other than std
 # The rule for the Prelude is in ghc/lib/std/Makefile
+# We check for GHCI_LIBRARY being HSstd.o rather than
+# HSLIB being std, because we want to still use the boilerplate rule 
+# for cbits.
 $(GHCI_LIBRARY) :: $(LIBOBJS)
 	ld -r -x -o $@ $(LIBOBJS) $(STUBOBJS)
 endif
