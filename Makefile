@@ -21,18 +21,22 @@ SUBDIRS = $(shell if (test x$(CURRENT_TARGET) = xinstall) ; then echo $(Projects
 # Files to include in fptools source distribution
 #
 SRC_DIST_DIRS += mk docs CONTRIB distrib $(ProjectsToBuild)
-SRC_DIST_FILES += configure.in config.guess config.sub configure aclocal.m4 README ANNOUNCE INSTALL Makefile install-sh
+SRC_DIST_FILES += configure.in config.guess config.sub configure aclocal.m4 README INSTALL Makefile install-sh
 
 #
 # Making a binary distribution
 #
+# To make a particular binary distribution: 
+# set $(Project) to the name of the project (currently Ghc or Happy).
+
 BIN_DIST_TMPDIR=$(shell pwd)
 BIN_DIST_NAME=fptools
 
 #
-# list of toplevel `projects' to include in binary distrib.
+# list of toplevel directories to include in binary distrib.
 #
-BIN_DIST_DIRS=ghc
+BIN_DIST_MAIN_DIR=$($(Project)MainDir)
+BIN_DIST_DIRS=$($(Project)BinDistDirs)
 
 binary-dist:: binary-dist-pre
 
@@ -40,10 +44,10 @@ BIN_DIST_TOP= distrib/Makefile-bin.in \
 	      distrib/configure-bin.in \
 	      README \
 	      distrib/INSTALL \
-	      ANNOUNCE \
-	      ghc/PATCHLEVEL \
+	      $(BIN_DIST_MAIN_DIR)/ANNOUNCE \
+	      $(BIN_DIST_MAIN_DIR)/PATCHLEVEL \
+	      $(BIN_DIST_MAIN_DIR)/RELEASE \
 	      glafp-utils/mkdirhier/mkdirhier \
-	      ghc/RELEASE \
 	      install-sh \
 	      config.guess \
 	      config.sub   \
@@ -51,13 +55,21 @@ BIN_DIST_TOP= distrib/Makefile-bin.in \
 
 binary-dist::
 	@for i in $(BIN_DIST_TOP); do \
-	  echo cp $$i $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME); \
-	  cp $$i $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME); \
+	  if [ -e $$i ]; then \
+	     echo cp $$i $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME); \
+	     cp $$i $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME); \
+	  fi; \
 	done;
-	@echo "hackily rename some of these chaps.."
-	$(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile-bin.in $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in 
-	$(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/configure-bin.in $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/configure.in 
+	@echo "Configuring the Makefile for this project..."
+	touch $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
+	echo "project = $(ProjectNameShort)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
+	echo "version = $(ProjectVersion)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
+	echo "PACKAGE_SH_SCRIPTS = $($(Project)BinDistShScripts)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
+	echo "PACKAGE_PRL_SCRIPTS = $($(Project)BinDistPrlScripts)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
+	echo "PACKAGE_LIB_PRL_SCRIPTS = $($(Project)BinDistLibPrlScripts)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
+	cat $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile-bin.in >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
 	@echo "Generating a shippable configure script.."
+	$(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/configure-bin.in $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/configure.in 
 	( cd $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME); autoconf )
 
 #
@@ -65,7 +77,7 @@ binary-dist::
 # Which documentation to build/install is hardcoded below.
 #
 
-BINDIST_DOCS = docs ghc/docs/users_guide
+BINDIST_DOCS = $($(Project)BinDistDocs)
 BINDIST_DOCS_WAYS = html info dvi
 
 binary-dist ::
@@ -80,47 +92,22 @@ binary-dist ::
 	   done; \
 	done
 
-#
-# binary dist'ing hslibs/, hackily.
-#
-binary-dist ::
-	@echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/hslibs;
-	@$(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/hslibs;
-	$(MAKE) -C hslibs $(MFLAGS) install \
-		BIN_DIST=1 BIN_DIST_NAME=$(BIN_DIST_NAME) \
-		prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
-		exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
-		bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion) \
-		libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/hslibs \
-		libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/hslibs \
-		datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/ghc-$(GhcProjectVersion) ;
-
-# Even more of a hack, but I'm too tired to fix this up right now..
-BIN_DIST_SCRIPTS_NEEDING_RENAMING=ghc stat2resid hstags mkdependHS
+# Rename scripts to $i.prl and $i.sh where necessary.
+# ToDo: do this in a cleaner way...
 
 binary-dist::
-	@for i in $(BIN_DIST_SCRIPTS_NEEDING_RENAMING); do \
+	@for i in $($(Project)BinDistPrlScripts); do \
 	     echo "Renaming $$i to $$i.prl"; \
-	    $(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/$$i  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/$$i.prl; \
+	    $(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion)/$$i  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion)/$$i.prl; \
 	done
-	@echo "Renaming hscpp to hscpp.prl"
-	@$(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/hscpp  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/hscpp.prl
-
-# binary-disting happy, hackily again
-
-binary-dist ::
-	@echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/happy;
-	@$(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/happy;
-	$(MAKE) -C happy $(MFLAGS) install \
-		BIN_DIST=1 BIN_DIST_NAME=$(BIN_DIST_NAME) \
-		prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
-		exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
-		bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion) \
-		libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion) \
-		libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion) \
-		datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/ghc-$(GhcProjectVersion) ;
-	@echo "Renaming happy to happy.sh"
-	@$(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/happy  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/happy.sh
+	@for i in $($(Project)BinDistLibPrlScripts); do \
+	     echo "Renaming $$i to $$i.prl"; \
+	    $(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion)/$$i  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion)/$$i.prl; \
+	done
+	@for i in $($(Project)BinDistLibShScripts); do \
+	     echo "Renaming $$i to $$i.sh"; \
+	    $(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion)/$$i  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion)/$$i.sh; \
+	done
 
 dist :: dist-pre
 include $(TOP)/mk/target.mk
