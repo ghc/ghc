@@ -287,9 +287,6 @@ else
 EXCLUDED_SRCS += deSugar/DsMeta.hs typecheck/TcSplice.lhs hsSyn/Convert.lhs
 endif 
 
-# There are some C files to include in HS_PROG, so add these to HS_OBJS
-HS_OBJS	 += $(C_OBJS)
-
 # -----------------------------------------------
 # mkdependC stuff
 #
