@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.42 2001/01/30 10:52:14 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.43 2001/01/30 15:28:25 simonmar Exp $
 --
 -- Driver flags
 --
@@ -186,10 +186,6 @@ static_flags =
   ,  ( "dppr-debug",       PassFlag (add v_Opt_C) )
   ,  ( "dppr-user-length", AnySuffix (add v_Opt_C) )
       -- rest of the debugging flags are dynamic
-
-	------- Interface files ---------------------------------------------
-  ,  ( "hi"		, NoArg (writeIORef v_ProduceHi True) )
-  ,  ( "nohi"		, NoArg (writeIORef v_ProduceHi False) )
 
 	--------- Profiling --------------------------------------------------
   ,  ( "auto-dicts"	, NoArg (add v_Opt_C "-fauto-sccs-on-dicts") )
