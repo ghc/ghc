@@ -146,7 +146,7 @@ ProjectPatchLevel = $($(Project)ProjectPatchLevel)
 # 
 GhcProjectName         = The Glorious Glasgow Haskell Compilation System
 GhcProjectNameShort    = ghc
-GhcProjectVersion      = 2.09
+GhcProjectVersion      = 2.10
 GhcProjectPatchLevel   = 0
 
 #---------------------------------------------------------------
@@ -648,6 +648,7 @@ YACC			= @YaccCmd@
 
 SGML2LATEX		= sgml2latex
 SGML2HTML		= sgml2html
+SGML2INFO		= sgml2info
 SGML2TXT		= sgml2txt
 
 #-----------------------------------------------------------------------------
