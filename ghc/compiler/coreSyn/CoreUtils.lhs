@@ -325,12 +325,18 @@ completely un-applied primops and foreign-call Ids are sufficiently
 rare that I plan to allow them to be duplicated and put up with
 saturating them.
 
+SCC notes.  We do not treat (_scc_ "foo" x) as trivial, because 
+  a) it really generates code, (and a heap object when it's 
+     a function arg) to capture the cost centre
+  b) see the note [SCC-and-exprIsTrivial] in Simplify.simplLazyBind
+
 \begin{code}
 exprIsTrivial (Var v)	   = True	-- See notes above
 exprIsTrivial (Type _)	   = True
 exprIsTrivial (Lit lit)    = litIsTrivial lit
 exprIsTrivial (App e arg)  = not (isRuntimeArg arg) && exprIsTrivial e
-exprIsTrivial (Note _ e)   = exprIsTrivial e
+exprIsTrivial (Note (SCC _) e) = False		-- See notes above
+exprIsTrivial (Note _       e) = exprIsTrivial e
 exprIsTrivial (Lam b body) = not (isRuntimeVar b) && exprIsTrivial body
 exprIsTrivial other	   = False
 \end{code}
