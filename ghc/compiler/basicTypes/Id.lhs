@@ -29,7 +29,7 @@ module Id (
 	isRecordSelector,
 	isPrimOpId, isPrimOpId_maybe, 
 	isFCallId, isFCallId_maybe,
-	isDataConWorkId, isDataConWorkId_maybe, 
+	isDataConWorkId, isDataConWorkId_maybe, idDataCon,
 	isBottomingId, idIsFrom,
 	hasNoBinding, 
 
@@ -100,7 +100,7 @@ import IdInfo
 #ifdef OLD_STRICTNESS
 import qualified Demand	( Demand )
 #endif
-import DataCon		( isUnboxedTupleCon )
+import DataCon		( DataCon, isUnboxedTupleCon )
 import NewDemand	( Demand, StrictSig, topDmd, topSig, isBottomingSig )
 import Name	 	( Name, OccName, nameIsLocalOrFrom, 
 			  mkSystemVarName, mkSystemVarNameEncoded, mkInternalName,
@@ -272,6 +272,17 @@ isDataConWorkId id = case globalIdDetails id of
 isDataConWorkId_maybe id = case globalIdDetails id of
 			  DataConWorkId con -> Just con
 			  other	            -> Nothing
+
+idDataCon :: Id -> DataCon
+-- Get from either the worker or the wrapper to the DataCon
+-- Currently used only in the desugarer
+--	 INVARIANT: idDataCon (dataConWrapId d) = d
+-- (Remember, dataConWrapId can return either the wrapper or the worker.)
+idDataCon id = case globalIdDetails id of
+		  DataConWorkId con -> con
+		  DataConWrapId con -> con
+		  other		    -> pprPanic "idDataCon" (ppr id)
+
 
 -- hasNoBinding returns True of an Id which may not have a
 -- binding, even though it is defined in this module.  

@@ -104,9 +104,6 @@ data HsExpr id
 		Fixity		-- Renamer adds fixity; bottom until then
 		(LHsExpr id)	-- right operand
 
-  -- We preserve prefix negation and parenthesis for the precedence parser.
-  -- They are eventually removed by the type checker.
-
   | NegApp	(LHsExpr id)	-- negated expr
 		(SyntaxExpr id)	-- Name of 'negate'
 
@@ -153,7 +150,7 @@ data HsExpr id
 
 	-- Record construction
   | RecordCon	(Located id)		-- The constructor.  After type checking
-					-- it's the *worker* Id of the constructor
+					-- it's the dataConWrapId of the constructor
 		PostTcExpr		-- Data con Id applied to type args
 		(HsRecordBinds id)
 

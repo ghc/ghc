@@ -40,7 +40,7 @@ import CoreSyn
 import CoreUtils	( exprType, mkIfThenElse, bindNonRec )
 
 import CostCentre	( mkUserCC )
-import Id		( Id, idType, idName, isDataConWorkId_maybe )
+import Id		( Id, idType, idName, idDataCon )
 import PrelInfo		( rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID )
 import DataCon		( DataCon, dataConWrapId, dataConFieldLabels, dataConInstOrigArgTys )
 import DataCon		( isVanillaDataCon )
@@ -421,8 +421,8 @@ dsExpr (RecordCon (L _ data_con_id) con_expr rbinds)
 	      []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (showSDoc (ppr lbl))
 	unlabelled_bottom arg_ty = mkErrorAppDs rEC_CON_ERROR_ID arg_ty ""
 
-	labels = dataConFieldLabels (fromJust (isDataConWorkId_maybe data_con_id))
-	-- The data_con_id is guaranteed to be the work id of the constructor
+	labels = dataConFieldLabels (idDataCon data_con_id)
+	-- The data_con_id is guaranteed to be the wrapper id of the constructor
     in
 
     (if null labels

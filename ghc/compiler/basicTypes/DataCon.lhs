@@ -100,10 +100,10 @@ The data con has one or two Ids associated with it:
 		- strict args may be flattened
 	The worker is very like a primop, in that it has no binding.
 
-	Newtypes currently do get a worker-Id, but it is never used.
+	Newtypes have no worker Id
 
 
-  The "wrapper Id", $wC, whose type is exactly what it looks like
+  The "wrapper Id", $WC, whose type is exactly what it looks like
 	in the source program. It is an ordinary function,
 	and it gets a top-level binding like any other function.
 

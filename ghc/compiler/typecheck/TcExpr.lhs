@@ -49,7 +49,7 @@ import Kind		( openTypeKind, liftedTypeKind, argTypeKind )
 
 import Id		( idType, recordSelectorFieldLabel, isRecordSelector )
 import DataCon		( DataCon, dataConFieldLabels, dataConStrictMarks, 
-			  dataConWrapId, dataConWorkId )
+			  dataConWrapId )
 import Name		( Name )
 import TyCon		( TyCon, FieldLabel, tyConTyVars, tyConStupidTheta, 
 			  tyConDataCons, tyConFields )
@@ -381,7 +381,7 @@ tcExpr expr@(RecordCon con@(L loc con_name) _ rbinds) res_ty
  	-- Check for missing fields
     checkMissingFields data_con rbinds		`thenM_` 
 
-    returnM (RecordCon (L loc (dataConWorkId data_con)) con_expr rbinds')
+    returnM (RecordCon (L loc (dataConWrapId data_con)) con_expr rbinds')
 
 -- The main complication with RecordUpd is that we need to explicitly
 -- handle the *non-updated* fields.  Consider:
@@ -791,7 +791,6 @@ tcId orig id_name	-- Look up the Id and instantiate its type
 	  -> do	{ checkProcLevel id proc_level
 		; tc_local_id id th_level }
 
-	-- THis 
     ;	other -> failWithTc (ppr other <+> ptext SLIT("used where a value identifer was expected"))
     }
   where

@@ -501,7 +501,7 @@ mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)
 
 -- Data constructor workers are made by setting the name space
 -- of the data constructor OccName (which should be a DataName)
--- to DataName
+-- to VarName
 mkDataConWorkerOcc datacon_occ = setOccNameSpace varName datacon_occ 
 \end{code}
 
