@@ -1,7 +1,7 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelMarshalError.lhs,v 1.2 2001/05/18 16:54:05 simonmar Exp $
+% $Id: PrelMarshalError.lhs,v 1.3 2002/02/04 09:05:46 chak Exp $
 %
-% (c) The FFI task force, 2000
+% (c) The FFI task force, [2000..2002]
 %
 
 Marshalling support: Handling of common error conditions
@@ -10,6 +10,35 @@ Marshalling support: Handling of common error conditions
 {-# OPTIONS -fno-implicit-prelude #-}
 
 module PrelMarshalError (
+
+  -- I/O errors
+  -- ----------
+
+  IOErrorType,            -- abstract data type
+
+  mkIOError,	          -- :: IOErrorType 
+		          -- -> String 
+		          -- -> Maybe FilePath 
+		          -- -> Maybe Handle
+		          -- -> IOError
+  
+  alreadyExistsErrorType, -- :: IOErrorType 
+  doesNotExistErrorType,  -- :: IOErrorType 
+  alreadyInUseErrorType,  -- :: IOErrorType 
+  fullErrorType,	  -- :: IOErrorType 
+  eofErrorType,	          -- :: IOErrorType 
+  illegalOperationType,   -- :: IOErrorType 
+  permissionErrorType,    -- :: IOErrorType 
+  userErrorType,	  -- :: IOErrorType 
+
+  annotateIOError,    	  -- :: IOError 
+		      	  -- -> String 
+		      	  -- -> Maybe FilePath 
+		      	  -- -> Maybe Handle 
+		      	  -- -> IOError 
+
+  -- Result value checks
+  -- -------------------
 
   -- throw an exception on specific return values
   --
@@ -28,11 +57,57 @@ module PrelMarshalError (
 
 import PrelPtr
 import PrelIOBase
+import PrelMaybe
 import PrelNum
 import PrelBase
 
--- exported functions
--- ------------------
+
+-- I/O errors
+-- ----------
+
+-- construct an IO error
+--
+mkIOError :: IOErrorType -> String -> Maybe FilePath -> Maybe Handle -> IOError
+mkIOError errTy loc path hdl =
+  IOException $ IOError hdl errTy loc "" path
+
+-- pre-defined error types corresponding to the predicates in the standard
+-- library `IO'
+--
+alreadyExistsErrorType, doesNotExistErrorType, alreadyInUseErrorType,
+  fullErrorType, eofErrorType, illegalOperationType, permissionErrorType, 
+  userErrorType :: IOErrorType 
+alreadyExistsErrorType = AlreadyExists
+doesNotExistErrorType  = NoSuchThing
+alreadyInUseErrorType  = ResourceBusy
+fullErrorType	       = ResourceExhausted
+eofErrorType	       = EOF
+illegalOperationType   = IllegalOperation
+permissionErrorType    = PermissionDenied
+userErrorType	       = OtherError
+
+-- add location information and possibly a path and handle to an existing I/O
+-- error 
+--
+-- * if no file path or handle is given, the corresponding value that's in the
+--   error is left unaltered
+--
+annotateIOError :: IOError 
+		-> String 
+		-> Maybe FilePath 
+		-> Maybe Handle 
+		-> IOError 
+annotateIOError (IOException (IOError hdl errTy _ str path)) loc opath ohdl = 
+  IOException (IOError (hdl `mplus` ohdl) errTy loc str (path `mplus` opath))
+  where
+    Nothing `mplus` ys = ys
+    xs      `mplus` _  = xs
+annotateIOError exc				             _   _     _    = 
+  exc
+
+
+-- Result value checks
+-- -------------------
 
 -- guard an IO operation and throw an exception if the result meets the given
 -- predicate 

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCTypesISO.lhs,v 1.6 2001/05/18 16:54:05 simonmar Exp $
+% $Id: PrelCTypesISO.lhs,v 1.7 2002/02/04 09:05:46 chak Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -21,6 +21,7 @@ module PrelCTypesISO
 	  -- Typeable, Storable
 	, CClock(..),   CTime(..),
 
+          -- Instances of: Eq and Storable
 	, CFile,        CFpos,     CJmpBuf
 	) where
 \end{code}
@@ -60,12 +61,9 @@ INTEGRAL_TYPE(CSigAtomic,tyConCSigAtomic,"CSigAtomic",HTYPE_SIG_ATOMIC_T)
 INTEGRAL_TYPE(CClock,tyConCClock,"CClock",HTYPE_CLOCK_T)
 INTEGRAL_TYPE(CTime,tyConCTime,"CTime",HTYPE_TIME_T)
 
--- TODO: Instances. But which...?  :-}
-
+-- FIXME: Implement and provide instances for Eq and Storable
 data CFile = CFile
-
 data CFpos = CFpos
-
 data CJmpBuf = CJmpBuf
 
 -- C99 types which are still missing include:

@@ -23,7 +23,7 @@ import PrelNum
 --     Removing all fixities is a fairly safe fix; fixing the "one fixity
 --     per symbol per program" limitation in Hugs would take a lot longer.
 #ifndef __HUGS__
-infixl 8 `shift`, `rotate`
+infixl 8 `shift`, `rotate`, `shiftL`, `shiftR`, `rotateL`, `rotateR`
 infixl 7 .&.
 infixl 6 `xor`
 infixl 5 .|.

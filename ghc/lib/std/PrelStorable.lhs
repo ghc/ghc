@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelStorable.lhs,v 1.10 2001/10/03 13:57:42 simonmar Exp $
+% $Id: PrelStorable.lhs,v 1.11 2002/02/04 09:05:46 chak Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -21,6 +21,8 @@ module PrelStorable
 	     pokeByteOff,    -- :: Ptr b -> Int -> a -> IO ()
 	     peek,           -- :: Ptr a             -> IO a
 	     poke,           -- :: Ptr a        -> a -> IO ()
+
+	     -- DEPRECATED: Don't use!
 	     destruct)       -- :: Ptr a             -> IO ()
         ) where
 \end{code}
@@ -85,6 +87,7 @@ class Storable a where
    poke ptr = pokeElemOff ptr 0
 
    destruct _ = return ()
+{-# DEPRECATED destruct "This function is not standards complaint" #-}
 \end{code}
 
 System-dependent, but rather obvious instances

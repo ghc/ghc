@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelMarshalArray.lhs,v 1.8 2001/08/15 09:54:38 qrczak Exp $
+% $Id: PrelMarshalArray.lhs,v 1.9 2002/02/04 09:05:46 chak Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -39,11 +39,6 @@ module PrelMarshalArray (
   withArray,      -- :: Storable a =>      [a] -> (Ptr a -> IO b) -> IO b
   withArray0,     -- :: Storable a => a -> [a] -> (Ptr a -> IO b) -> IO b
 
-  -- destruction
-  --
-  destructArray,  -- :: Storable a =>         Int -> Ptr a -> IO ()
-  destructArray0, -- :: (Storable a, Eq a) => a   -> Ptr a -> IO ()
-
   -- copying (argument order: destination, source)
   --
   copyArray,      -- :: Storable a => Ptr a -> Ptr a -> Int -> IO ()
@@ -55,7 +50,11 @@ module PrelMarshalArray (
 
   -- indexing
   --
-  advancePtr      -- :: Storable a => Ptr a -> Int -> Ptr a
+  advancePtr,     -- :: Storable a => Ptr a -> Int -> Ptr a
+
+  -- DEPRECATED: Don't use!
+  destructArray,  -- :: Storable a =>         Int -> Ptr a -> IO ()
+  destructArray0, -- :: (Storable a, Eq a) => a   -> Ptr a -> IO ()
 ) where
 
 import Monad
@@ -209,6 +208,7 @@ withArray0 marker vals f  =
 -- destruct each element of an array (in reverse order)
 --
 destructArray          :: Storable a => Int -> Ptr a -> IO ()
+{-# DEPRECATED destructArray "This function is not standards complaint" #-}
 destructArray size ptr  =
   sequence_ [destruct (ptr `advancePtr` i)
     | i <- [size-1, size-2 .. 0]]
@@ -216,6 +216,7 @@ destructArray size ptr  =
 -- like `destructArray', but a terminator indicates where the array ends
 --
 destructArray0            :: (Storable a, Eq a) => a -> Ptr a -> IO ()
+{-# DEPRECATED destructArray0 "This function is not standards complaint" #-}
 destructArray0 marker ptr  = do
   size <- lengthArray0 marker ptr
   sequence_ [destruct (ptr `advancePtr` i)

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCTypes.lhs,v 1.4 2001/05/18 16:54:05 simonmar Exp $
+% $Id: PrelCTypes.lhs,v 1.5 2002/02/04 09:05:46 chak Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -14,13 +14,14 @@ A mapping of C types to corresponding Haskell types. A cool hack...
 module PrelCTypes
 	( -- Integral types, instances of: Eq, Ord, Num, Read, Show, Enum,
 	  -- Typeable, Storable, Bounded, Real, Integral, Bits
-	  CChar(..),    CSChar(..),  CUChar(..)
-	, CShort(..),   CUShort(..), CInt(..),    CUInt(..)
-	, CLong(..),    CULong(..),  CLLong(..),  CULLong(..)
+	  CChar(..),  CSChar(..),  CUChar(..)
+	, CShort(..), CUShort(..), CInt(..),   CUInt(..)
+	, CLong(..),  CULong(..),  CLLong(..), CULLong(..)
 
 	  -- Floating types, instances of: Eq, Ord, Num, Read, Show, Enum,
-	  -- Typeable, Storable, Real, Fractional, Floating, RealFrac, RealFloat
-	, CFloat(..),   CDouble(..), CLDouble(..)
+	  -- Typeable, Storable, Real, Fractional, Floating, RealFrac,
+	  -- RealFloat 
+	, CFloat(..),  CDouble(..), CLDouble(..)
 	) where
 \end{code}
 
