@@ -460,10 +460,11 @@ buildLivenessMask uniq sp info_down
   where
 	-- find all unboxed stack-resident ids
 	unboxed_slots = 		   
-	  [ (ofs, getPrimRepSize rep) | 
+	  [ (ofs, size) | 
 		     (MkCgIdInfo id _ (VirStkLoc ofs) _) <- rngVarEnv binds,
-	        let rep = idPrimRep id,
-		not (isFollowableRep rep)
+	        let rep = idPrimRep id; size = getPrimRepSize rep,
+		not (isFollowableRep rep),
+		size > 0
 	  ]
 
 	-- flatten this list into a list of unboxed stack slots
@@ -581,7 +582,7 @@ dead_slots live_vars fbs ds ((v,i):bs)
   | otherwise
     = case i of
 	MkCgIdInfo _ _ stable_loc _
-	 | is_stk_loc ->
+	 | is_stk_loc && size > 0 ->
 	   dead_slots live_vars fbs ([offset-size+1 .. offset] ++ ds) bs
  	 where
  	  maybe_stk_loc = maybeStkLoc stable_loc
