@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.11 2002/08/29 11:49:11 simonmar Exp $
+ * $Id: HsBase.h,v 1.12 2002/08/30 14:54:58 simonpj Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -585,6 +585,7 @@ __hscore_f_setfl( void )
 #endif
 }
 
+INLINE int __hscore_hs_fileno (FILE *f) { return fileno (f); }
+
 #endif
 
-INLINE int __hscore_hs_fileno (FILE *f) { return fileno (f); }
