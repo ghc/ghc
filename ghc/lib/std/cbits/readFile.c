@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: readFile.c,v 1.13 2000/03/21 17:41:02 simonmar Exp $
+ * $Id: readFile.c,v 1.14 2000/04/04 11:01:33 simonmar Exp $
  *
  * hGetContents Runtime Support
  */
@@ -191,7 +191,13 @@ readChunk(StgForeignPtr ptr, StgAddr buf, StgInt off, StgInt len)
         /* EOF */
 	if ( count == 0 ) {
             FILEOBJ_SET_EOF(fo);
-            return total_count;
+            if ( total_count == 0 ) {
+                ghc_errtype = ERR_EOF;
+	        ghc_errstr = "";
+	        return -1;
+	    } else {
+                return total_count;
+	    }
 
         /* Blocking */
 	} else if ( count == -1 && errno == EAGAIN) {
