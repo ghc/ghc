@@ -457,7 +457,7 @@ By the time the type checker has done its stuff we'll get
 mkGenericRhs :: Id -> TyVar -> TyCon -> LHsExpr RdrName
 mkGenericRhs sel_id tyvar tycon
   = ASSERT( isSingleton ctxt ) 	-- Checks shape of selector-id context
-    pprTrace "mkGenericRhs" (vcat [ppr sel_id, ppr (idType sel_id), ppr tyvar, ppr tycon, ppr local_tvs, ppr final_ty]) $
+--    pprTrace "mkGenericRhs" (vcat [ppr sel_id, ppr (idType sel_id), ppr tyvar, ppr tycon, ppr local_tvs, ppr final_ty]) $
     mkHsApp (toEP bimap) (nlHsVar (getRdrName sel_id))
   where 
 	-- Initialising the "Environment" with the from/to functions
