@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.10 1999/02/18 12:21:07 simonm Exp $
+ * $Id: RtsFlags.c,v 1.11 1999/02/18 13:00:27 sewardj Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -444,7 +444,18 @@ error = rtsTrue;
 #ifdef DEBUG
 	      case 'D':
   	        /* hack warning: interpret the flags as a binary number */
-		*(int*)(&RtsFlags.DebugFlags) = decode(rts_argv[arg]+2);
+		{ 
+                   I_ n = decode(rts_argv[arg]+2);
+                   if (n     &1) RtsFlags.DebugFlags.scheduler   = rtsTrue;
+                   if ((n>>1)&1) RtsFlags.DebugFlags.evaluator   = rtsTrue;
+                   if ((n>>2)&1) RtsFlags.DebugFlags.codegen     = rtsTrue;
+                   if ((n>>3)&1) RtsFlags.DebugFlags.weak        = rtsTrue;
+                   if ((n>>4)&1) RtsFlags.DebugFlags.gccafs      = rtsTrue;
+                   if ((n>>5)&1) RtsFlags.DebugFlags.gc          = rtsTrue;
+                   if ((n>>6)&1) RtsFlags.DebugFlags.block_alloc = rtsTrue;
+                   if ((n>>7)&1) RtsFlags.DebugFlags.sanity      = rtsTrue;
+                   if ((n>>8)&1) RtsFlags.DebugFlags.stable      = rtsTrue;
+                }
 		break;
 #endif
 

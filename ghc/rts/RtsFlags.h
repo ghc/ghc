@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.9 1999/02/05 16:02:50 simonm Exp $
+ * $Id: RtsFlags.h,v 1.10 1999/02/18 13:00:28 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -39,7 +39,9 @@ struct GC_FLAGS {
 };
 
 /* Hack: this struct uses bitfields so that we can use a binary arg
- * with the -D flag
+ * with the -D flag.
+ * Remember to update the corresponding bit of RtsFlags.c if you
+ * change/extend this struct.
  */
 struct DEBUG_FLAGS {  
   /* flags to control debugging output in various subsystems */
