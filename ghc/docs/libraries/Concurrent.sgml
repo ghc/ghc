@@ -3,7 +3,8 @@
 <p>
 
 This library provides the Concurrent Haskell extensions as described
-in  <url name="Concurrent Haskell" url="http://research.microsoft.com/Users/simonpj/Papers/concurrent-haskell.ps.gz">.
+in  <url name="Concurrent Haskell" 
+         url="http://research.microsoft.com/Users/simonpj/Papers/concurrent-haskell.ps.gz">.
 
 <tscreen><verb>
 module Concurrent where
@@ -15,6 +16,7 @@ instance Ord ThreadId
 forkIO           :: IO () -> IO ThreadId
 myThreadId       :: IO ThreadId
 killThread       :: ThreadId -> IO ()
+yield            :: IO ()
 
 data MVar a      -- Synchronisation variables
 newEmptyMVar     :: IO (MVar a)
@@ -71,8 +73,7 @@ Notes:
   Hugs uses cooperative multitasking:
   Context switches only occur when you use one of the primitives
   defined in this module.  This means that programs such as:
-s not been implemented yet on
-Hugs
+
 <tscreen><verb>
 main = forkIO (write 'a') >> write 'b'
  where write c = putChar c >> write c
@@ -83,6 +84,12 @@ main = forkIO (write 'a') >> write 'b'
 
   In practice, cooperative multitasking is sufficient for writing 
   simple graphical user interfaces.
+
+<item>
+The <tt>yield</tt> action forces a context-switch to any other
+currently runnable threads (if any), and is occasionally useful when
+implementing concurrency abstractions (especially so if the
+implementation of Concurrent Haskell uses cooperative multitasking).
 
 <item>
 Hugs does not provide the functions <tt/mergeIO/ or <tt/nmergeIO/ since these
@@ -117,5 +124,7 @@ threads may have accessed the <tt/MVar/ and changed the 'filled-in'
 status of the variable. 
 
 The same proviso applies to <tt/isEmptyChan/.
+
+These two predicates are currently only supported by GHC.
 
 </itemize>
