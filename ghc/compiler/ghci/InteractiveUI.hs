@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.149 2003/03/03 12:30:11 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.150 2003/04/12 16:27:24 panne Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -77,7 +77,7 @@ import GHC.Exts		( unsafeCoerce# )
 
 import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
 
-import GHC.Posix	( setNonBlockingFD )
+import System.Posix.Internals ( setNonBlockingFD )
 
 -----------------------------------------------------------------------------
 

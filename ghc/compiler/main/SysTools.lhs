@@ -92,7 +92,7 @@ import Directory	( doesFileExist, removeFile )
 
 #ifndef mingw32_HOST_OS
 #if __GLASGOW_HASKELL__ > 504
-import qualified GHC.Posix
+import qualified System.Posix.Internals
 #else
 import qualified Posix
 #endif
@@ -853,7 +853,7 @@ getExecDir :: IO (Maybe String) = do return Nothing
 foreign import ccall "_getpid" unsafe getProcessID :: IO Int -- relies on Int == Int32 on Windows
 #elif __GLASGOW_HASKELL__ > 504
 getProcessID :: IO Int
-getProcessID = GHC.Posix.c_getpid >>= return . fromIntegral
+getProcessID = System.Posix.Internals..c_getpid >>= return . fromIntegral
 #else
 getProcessID :: IO Int
 getProcessID = Posix.getProcessID
