@@ -493,8 +493,8 @@ AC_CACHE_CHECK([whether $fp_prog_ar_raw supports -input], [fp_cv_prog_ar_support
 if test $fp_prog_ar_is_gnu = no; then
   rm -f conftest*
   touch conftest.lst
-  if $fp_prog_ar_raw $fp_prog_ar_args conftest.a -input conftest.lst > /dev/null 2> /dev/null; then
-    fp_cv_prog_ar_supports_input=yes
+  if FP_EVAL_STDERR([$fp_prog_ar_raw $fp_prog_ar_args conftest.a -input conftest.lst]) >/dev/null; then
+    test -s conftest.err || fp_cv_prog_ar_supports_input=yes
   fi
   rm -f conftest*
 fi])
