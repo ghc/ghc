@@ -601,8 +601,9 @@ arg: while($_ = $ARGV[0]) {
     /^-nohi$/	    && do { $ProduceHi = 0; next arg; };
     # don't generate an interface (even if generating C)
 
-    /^-hi-diffs$/   && do { $HiDiff_flag = 1; next arg; };
-    # show diffs if the interface file changes
+    /^-hi-diffs$/    && do { $HiDiff_flag = 1; next arg; };
+    /^-no-hi-diffs$/ && do { $HiDiff_flag = 0; next arg; };
+    # show/disable diffs if the interface file changes
 
     /^-E$/	    && do { push(@CcBoth_flags, '-E');
 			    $Only_preprocess_C = 1;
