@@ -1064,9 +1064,8 @@ we generate
 	gfoldl k z T2	    = z T2
 	-- ToDo: add gmapT,Q,M, gfoldr
 
-	gunfold k z _ (Constr "T1") = k (k (z T1))
-	gunfold k z _ (Constr "T2") = z T2
-	gunfold _ _ e _		    = e
+	gunfold k z (Constr "T1") = k (k (z T1))
+	gunfold k z (Constr "T2") = z T2
 
 	conOf (T1 _ _) = Constr "T1"
 	conOf T2       = Constr "T2"
@@ -1094,13 +1093,12 @@ gen_Data_binds tycon
 		     mk_k_app e v = HsPar (mkHsOpApp e k_RDR (HsVar v))
 
 	------------ gunfold
-    gunfold_bind = mk_FunMonoBind tycon_loc gunfold_RDR (map gunfold_eqn data_cons ++ [catch_all])
-    gunfold_eqn con = ([VarPat k_RDR, VarPat z_RDR, wildPat, 
+    gunfold_bind = mk_FunMonoBind tycon_loc gunfold_RDR (map gunfold_eqn data_cons)
+    gunfold_eqn con = ([VarPat k_RDR, VarPat z_RDR,  
 			ConPatIn constr_RDR (PrefixCon [LitPat (mk_constr_string con)])],
 		       apN (dataConSourceArity con)
 			   (\e -> HsVar k_RDR `HsApp` e) 
 			   (z_Expr `HsApp` HsVar (getRdrName con)))
-    catch_all = ([wildPat, wildPat, VarPat e_RDR, wildPat], HsVar e_RDR)
     mk_constr_string con = mkHsString (occNameUserString (getOccName con))
 
 	------------ conOf
