@@ -762,6 +762,8 @@ in error messages.
 
 \begin{code}
 unQualInScope :: GlobalRdrEnv -> Name -> Bool
+-- True if 'f' is in scope, and has only one binding
+-- (i.e. false if A.f and B.f are both in scope as unqualified 'f')
 unQualInScope env
   = (`elemNameSet` unqual_names)
   where

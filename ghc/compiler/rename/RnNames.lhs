@@ -198,6 +198,9 @@ importsFromLocalDecls this_mod decls
 	(_, dups) = removeDups compare all_names
     in
 	-- Check for duplicate definitions
+	-- The complaint will come out as "Multiple declarations of Foo.f" because
+	-- since 'f' is in the env twice, the unQualInScope used by the error-msg
+	-- printer returns False.  It seems awkward to fix, unfortunately.
     mapRn_ (addErrRn . dupDeclErr) dups			`thenRn_` 
 
 
