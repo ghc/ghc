@@ -429,6 +429,8 @@ cantFindError dflags mod_name find_result
 		   <+> ppr pkg)
 
 	    NotFound files
+		| null files
+		-> ptext SLIT("it is not a module in the current program, or in any known package.")
 		| verbosity dflags < 3 
 		-> ptext SLIT("use -v to see a list of the files searched for")
 		| otherwise 
