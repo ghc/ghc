@@ -9,7 +9,7 @@ sub inject_split_markers {
     local($hc_file) = @_;
 
     unlink("$Tmp_prefix.unmkd");
-    local($to_do) = "cp $hc_file $Tmp_prefix.unmkd";
+    local($to_do) = "$Cp $hc_file $Tmp_prefix.unmkd";
     &run_something($to_do, 'Prepare to number split markers');
 
     open(TMPI, "< $Tmp_prefix.unmkd") || &tidy_up_and_die(1,"$Pgm: failed to open `$Tmp_prefix.unmkd' (to read)\n");
@@ -24,10 +24,14 @@ sub inject_split_markers {
 	$_ = <TMPI>;
     }
     print TMPO "__STG_SPLIT_MARKER(1)\n";
-    print TMPO $_ if ! /\/\* SPLIT \*\//;
+    print TMPO $_ if ! /^\s*\/\* SPLIT \*\/\s*$/;
+
+	# Have to be a bit careful detecting /* SPLIT */ comments
+	# since a progam may use a string containing "/* SPLIT */"
+	# We check that there is nothing else on the line
 
     while (<TMPI>) {
-	if (/\/\* SPLIT \*\//) {
+	if (/^\s*\/\* SPLIT \*\/\s*$/) {
 	    $marker_no++;
 	    print TMPO "__STG_SPLIT_MARKER($marker_no)\n";
  	    next;
@@ -54,7 +58,7 @@ sub split_asm_file {
 
     %LocalConstant = (); # we have to subvert C compiler's commoning-up of constants...
 
-    $s_stuff = &ReadTMPIUpToAMarker( '' );
+    $s_stuff = &ReadTMPIUpToAMarker( '', $octr );
     # that first stuff is a prologue for all .s outputs
     $prologue_stuff = &process_asm_block ( $s_stuff );
     # $_ already has some of the next stuff in it...
@@ -66,14 +70,14 @@ sub split_asm_file {
     $prologue_stuff =~ s|"/tmp/ghc\d+\.c"|"$ifile_root\.hc"|g;
 
     while ( $_ ne '' ) { # not EOF
+	$octr++;
 
 	# grab and de-mangle a section of the .s file...
-	$s_stuff = &ReadTMPIUpToAMarker ( $_ );
+	$s_stuff = &ReadTMPIUpToAMarker ( $_, $octr );
 	$this_piece = &process_asm_block ( $s_stuff );
 
 	# output to a file of its own
 	# open a new output file...
-	$octr++;
 	$ofname = "${Tmp_prefix}__${octr}.s";
 	open(OUTF, "> $ofname") || die "$Pgm: can't open output file: $ofname\n";
 
@@ -124,7 +128,7 @@ sub collectExports_mips { # Note: MIPS only
 }
 
 sub ReadTMPIUpToAMarker {
-    local($str) = @_; # already read bits
+    local($str, $count) = @_; # already read bits
 
     
     for ( $_ = <TMPI>; $_ ne '' && ! /_?__stg_split_marker/; $_ = <TMPI> ) {
@@ -154,7 +158,7 @@ sub ReadTMPIUpToAMarker {
 	$_ = <TMPI>;
     }
 
-    print STDERR "### BLOCK:\n$str" if $Dump_asm_splitting_info;
+    print STDERR "### BLOCK:$count:\n$str" if $Dump_asm_splitting_info;
 
     # return str
     $str;
@@ -187,15 +191,15 @@ sub process_asm_block_sparc {
     if ( $OptimiseC ) {
 	$str =~ s/_?__stg_split_marker.*:\n//;
     } else {
-	$str =~ s/(\.text\n\t\.align .\n)\t\.global\s+.*_?__stg_split_marker.*\n\t\.proc.*\n/\1/;
-	$str =~ s/(\t\.align .\n)\t\.global\s+.*_?__stg_split_marker.*\n\t\.proc.*\n/\1/;
+	$str =~ s/(\.text\n\t\.align .\n)\t\.global\s+.*_?__stg_split_marker.*\n\t\.proc.*\n/$1/;
+	$str =~ s/(\t\.align .\n)\t\.global\s+.*_?__stg_split_marker.*\n\t\.proc.*\n/$1/;
     }
 
     # make sure the *.hc filename gets saved; not just ghc*.c (temp name)
     $str =~ s/^\.stabs "(ghc\d+\.c)"/.stabs "$ifile_root.hc"/g; # HACK HACK
 
     # remove/record any literal constants defined here
-    while ( $str =~ /(\t\.align .\n(LC\d+):\n\t\.ascii.*\n)/ ) {
+    while ( $str =~ /(\t\.align .\n(LC\d+):\n(\t\.ascii.*\n)+)/ ) {
 	local($label) = $2;
 	local($body)  = $1;
 
@@ -204,7 +208,7 @@ sub process_asm_block_sparc {
 
 	$LocalConstant{$label} = $body;
 	
-	$str =~ s/\t\.align .\nLC\d+:\n\t\.ascii.*\n//;
+	$str =~ s/\t\.align .\nLC\d+:\n(\t\.ascii.*\n)+//;
     }
 
     # inject definitions for any local constants now used herein
@@ -222,10 +226,10 @@ sub process_asm_block_sparc {
 sub process_asm_block_m68k {
     local($str) = @_;
 
-    # strip the marker (ToDo: something special for unregisterized???)
+    # strip the marker
 
-    $str =~ s/(\.text\n\t\.even\n)\t\.globl\s+.*_?__stg_split_marker.*\n/\1/;
-    $str =~ s/(\t\.even\n)\t\.globl\s+.*_?__stg_split_marker.*\n/\1/;
+    $str =~ s/(\.text\n\t\.even\n)\t\.globl\s+.*_?__stg_split_marker.*\n/$1/;
+    $str =~ s/(\t\.even\n)\t\.globl\s+.*_?__stg_split_marker.*\n/$1/;
 
     # it seems prudent to stick on one of these:
     $str = "\.text\n\t.even\n" . $str;
@@ -262,7 +266,7 @@ sub process_asm_block_alpha {
     if ( $OptimiseC ) {
 	$str =~ s/_?__stg_split_marker.*:\n//;
     } else {
-	$str =~ s/(\t\.align .\n)\t\.globl\s+.*_?__stg_split_marker.*\n\t\.ent.*\n/\1/;
+	$str =~ s/(\t\.align .\n)\t\.globl\s+.*_?__stg_split_marker.*\n\t\.ent.*\n/$1/;
     }
 
     # remove/record any literal constants defined here
@@ -288,7 +292,7 @@ sub process_asm_block_alpha {
     # Slide the dummy direct return code into the vtbl .ent/.end block,
     # to keep the label fixed if it's the last thing in a module, and
     # to avoid having any anonymous text that the linker will complain about
-    $str =~ s/(\t\.end [A-Za-z0-9_]+)\n\t# nop/\tnop\n\1/g;
+    $str =~ s/(\t\.end [A-Za-z0-9_]+)\n\t# nop/\tnop\n$1/g;
 
     print STDERR "### STRIPPED BLOCK (alpha):\n$str" if $Dump_asm_splitting_info;
 
@@ -298,10 +302,10 @@ sub process_asm_block_alpha {
 sub process_asm_block_iX86 {
     local($str) = @_;
 
-    # strip the marker (ToDo: something special for unregisterized???)
+    # strip the marker
 
-    $str =~ s/(\.text\n\t\.align .(,0x90)?\n)\.globl\s+.*_?__stg_split_marker.*\n/\1/;
-    $str =~ s/(\t\.align .(,0x90)?\n)\.globl\s+.*_?__stg_split_marker.*\n/\1/;
+    $str =~ s/(\.text\n\t\.align .(,0x90)?\n)\.globl\s+.*_?__stg_split_marker.*\n/$1/;
+    $str =~ s/(\t\.align .(,0x90)?\n)\.globl\s+.*_?__stg_split_marker.*\n/$1/;
 
     # it seems prudent to stick on one of these:
     $str = "\.text\n\t.align 4\n" . $str;
@@ -392,7 +396,7 @@ sub process_asm_block_mips {
     if ( $OptimiseC ) {
 	$str =~ s/_?__stg_split_marker.*:\n//;
     } else {
-	$str =~ s/(\t\.align .\n)\t\.globl\s+.*_?__stg_split_marker.*\n\t\.ent.*\n/\1/;
+	$str =~ s/(\t\.align .\n)\t\.globl\s+.*_?__stg_split_marker.*\n\t\.ent.*\n/$1/;
     }
 
     # remove/record any literal constants defined here
@@ -418,7 +422,7 @@ sub process_asm_block_mips {
     # Slide the dummy direct return code into the vtbl .ent/.end block,
     # to keep the label fixed if it's the last thing in a module, and
     # to avoid having any anonymous text that the linker will complain about
-    $str =~ s/(\t\.end [A-Za-z0-9_]+)\n\t# nop/\tnop\n\1/g;
+    $str =~ s/(\t\.end [A-Za-z0-9_]+)\n\t# nop/\tnop\n$1/g;
 
     $str .= $UNDEFINED_FUNS; # pin on gratuitiously-large amount of info
 
