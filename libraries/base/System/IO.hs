@@ -143,12 +143,11 @@ module System.IO (
 
 #if !defined(__NHC__)
     openBinaryFile,	       -- :: FilePath -> IOMode -> IO Handle
-#endif
-
-#if !defined(__HUGS__) && !defined(__NHC__)
     hSetBinaryMode,	       -- :: Handle -> Bool -> IO ()
     hPutBuf,		       -- :: Handle -> Ptr a -> Int -> IO ()
     hGetBuf,		       -- :: Handle -> Ptr a -> Int -> IO Int
+#endif
+#if !defined(__NHC__) && !defined(__HUGS__)
     hPutBufNonBlocking,	       -- :: Handle -> Ptr a -> Int -> IO Int
     hGetBufNonBlocking,	       -- :: Handle -> Ptr a -> Int -> IO Int
 #endif
