@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.h,v 1.7 2003/11/12 17:49:07 sof Exp $
+ * $Id: Exception.h,v 1.8 2004/03/01 14:18:35 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -27,6 +27,8 @@ interruptible(StgTSO *t)
 #endif
   case BlockedOnDelay:
     return 1;
+  // NB. Threaded blocked on foreign calls (BlockedOnCCall) are
+  // *not* interruptible.  We can't send these threads an exception.
   default:
     return 0;
   }

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.33 2003/11/12 17:27:05 sof Exp $
+ * $Id: TSO.h,v 1.34 2004/03/01 14:18:35 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -161,11 +161,9 @@ typedef enum {
   , BlockedOnGA  // blocked on a remote closure represented by a Global Address
   , BlockedOnGA_NoSend // same as above but without sending a Fetch message
 #endif
-#if defined(RTS_SUPPORTS_THREADS)
   , BlockedOnCCall
-  , BlockedOnCCall_NoUnblockExc // same as above but don't unblock async exceptions
-  				// in resumeThread()
-#endif
+  , BlockedOnCCall_NoUnblockExc // same as above but don't unblock
+				// async exceptions in resumeThread()
 } StgTSOBlockReason;
 
 #if defined(mingw32_TARGET_OS)
@@ -204,12 +202,13 @@ typedef struct StgTSO_ {
   StgMutClosure *    mut_link;	     /* TSO's are mutable of course! */
   struct StgTSO_*    global_link;    /* Links all threads together */
   
-  StgTSOWhatNext     what_next   : 16;
-  StgTSOBlockReason  why_blocked : 16;
-  StgTSOBlockInfo    block_info;
-  struct StgTSO_*    blocked_exceptions;
-  StgThreadID        id;
-  int                saved_errno;
+  StgTSOWhatNext         what_next   : 16;
+  StgTSOBlockReason      why_blocked : 16;
+  StgTSOBlockInfo        block_info;
+  struct StgTSO_*        blocked_exceptions;
+  StgThreadID            id;
+  int                    saved_errno;
+  struct StgMainThread_* main;
   
   MAYBE_EMPTY_STRUCT(StgTSOTickyInfo,ticky)
   MAYBE_EMPTY_STRUCT(StgTSOProfInfo,prof)

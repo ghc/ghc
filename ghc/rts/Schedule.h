@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.44 2004/02/26 16:14:21 simonmar Exp $
+ * $Id: Schedule.h,v 1.45 2004/03/01 14:18:36 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -33,10 +33,8 @@ void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
 #elif defined(PAR)
 void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
 #else
-void awakenBlockedQueue(StgTSO *tso);
-#if defined(RTS_SUPPORTS_THREADS)
-void awakenBlockedQueueNoLock(StgTSO *tso);
-#endif
+void awakenBlockedQueue (StgTSO *tso);
+void awakenBlockedQueueNoLock (StgTSO *tso);
 #endif
 
 /* unblockOne()
@@ -203,6 +201,7 @@ typedef struct StgMainThread_ {
   Condition        wakeup;
 #endif
 #endif
+  struct StgMainThread_ *prev;
   struct StgMainThread_ *link;
 } StgMainThread;
 
