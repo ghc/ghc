@@ -53,7 +53,6 @@ import {-# SOURCE #-} DataCon ( DataCon, isExistentialDataCon )
 import Class 		( Class, ClassContext )
 import Var   		( TyVar )
 import BasicTypes	( Arity, NewOrData(..), RecFlag(..), Boxity(..), isBoxed )
-import Maybes
 import Name		( Name, nameUnique, NamedThing(getName) )
 import Unique		( Unique, Uniquable(..), anyBoxConKey )
 import PrimRep		( PrimRep(..), isFollowableRep )
