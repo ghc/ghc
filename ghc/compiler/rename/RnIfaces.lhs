@@ -480,6 +480,7 @@ getWiredInGates (AClass cl)
 
 getWiredInGates (AnId the_id) = tyClsNamesOfType (idType the_id)
 getWiredInGates (ADataCon dc) = tyClsNamesOfType (idType (dataConWrapId dc))
+	-- Should include classes in the 'stupid context' of the data con?
 getWiredInGates (ATyCon tc)
   | isSynTyCon tc = tyClsNamesOfType ty
   | otherwise	  = unitFV (getName tc)
