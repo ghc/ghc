@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.54 2000/05/12 20:01:28 panne Exp $
+ * $Id: PrimOps.h,v 1.55 2000/05/28 20:22:08 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -379,8 +379,8 @@ typedef union {
       : abs(b); \
 }
 
-#define gcdIntegerIntzh(r,a,sb,b) \
-  RET_STGCALL3(StgInt, mpn_gcd_1, (unsigned long int *) b, sb, (mp_limb_t)(a))
+#define gcdIntegerIntzh(r,sa,a,b) \
+   r = RET_STGCALL3(StgInt, mpn_gcd_1, (mp_limb_t *)(BYTE_ARR_CTS(a)), sa, b)
 
 /* The rest are all out-of-line: -------- */
 
