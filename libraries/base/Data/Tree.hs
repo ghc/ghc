@@ -25,7 +25,10 @@ import Prelude
 #endif
 
 -- | Multi-way trees, also known as /rose trees/.
-data Tree a   = Node a (Forest a) -- ^ a value and zero or more child trees.
+data Tree a   = Node {
+		rootLabel :: a,		-- ^ label value
+		subForest :: Forest a	-- ^ zero or more child trees
+	}
 #ifndef __HADDOCK__
   deriving (Eq, Read, Show)
 #else /* __HADDOCK__ (which can't figure these out by itself) */
@@ -66,6 +69,6 @@ flatten t = squish t []
 
 -- | Lists of nodes at each level of the tree.
 levels :: Tree a -> [[a]]
-levels t = map (map root) $ takeWhile (not . null) $ iterate subforest [t]
-  where root (Node x _) = x
-	subforest f     = [t | Node _ ts <- f, t <- ts]
+levels t = map (map rootLabel) $
+		takeWhile (not . null) $
+		iterate (concatMap subForest) [t]
