@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.3 1999/10/04 16:14:34 simonmar Exp $
+ * $Id: Select.c,v 1.4 1999/11/03 15:04:25 simonmar Exp $
  *
  * (c) The GHC Team 1995-1999
  *
@@ -31,6 +31,8 @@ nat ticks_since_select = 0;
  * or whether to just check and return immediately.  If there are
  * other threads ready to run, we normally do the non-waiting variety,
  * otherwise we wait (see Schedule.c).
+ *
+ * SMP note: must be called with sched_mutex locked.
  */
 void
 awaitEvent(rtsBool wait)
@@ -50,7 +52,10 @@ awaitEvent(rtsBool wait)
     int min, numFound, delta;
     int maxfd = -1;
    
-    struct timeval tv,tv_before,tv_after;
+    struct timeval tv;
+#ifndef linux_TARGET_OS
+    struct timeval tv_before,tv_after;
+#endif
 
     IF_DEBUG(scheduler,belch("Checking for threads blocked on I/O...\n"));
 
@@ -102,12 +107,28 @@ awaitEvent(rtsBool wait)
       }
     }
 
+    /* Release the scheduler lock while we do the poll.
+     * this means that someone might muck with the blocked_queue
+     * while we do this, but it shouldn't matter:
+     *
+     *   - another task might poll for I/O and remove one
+     *     or more threads from the blocked_queue.
+     *   - more I/O threads may be added to blocked_queue.
+     *   - more delayed threads may be added to blocked_queue. We'll
+     *     just subtract delta from their delays after the poll.
+     *
+     * I believe none of these cases lead to trouble --SDM.
+     */
+    RELEASE_LOCK(&sched_mutex);
+
     /* Check for any interesting events */
 
     tv.tv_sec = min / 1000000;
     tv.tv_usec = min % 1000000;
 
+#ifndef linux_TARGET_OS
     gettimeofday(&tv_before, (struct timezone *) NULL);
+#endif
 
     while ((numFound = select(maxfd+1, &rfd, &wfd, NULL, &tv)) < 0) {
       if (errno != EINTR) {
@@ -115,6 +136,7 @@ awaitEvent(rtsBool wait)
 	fprintf(stderr, "awaitEvent: select failed\n");
 	stg_exit(EXIT_FAILURE);
       }
+      ACQUIRE_LOCK(&sched_mutex);
       /* We got a signal; could be one of ours.  If so, we need
        * to start up the signal handler straight away, otherwise
        * we could block for a long time before the signal is
@@ -124,6 +146,14 @@ awaitEvent(rtsBool wait)
 	start_signal_handlers();
 	return;
       }
+
+      /* If new runnable threads have arrived, stop waiting for
+       * I/O and run them.
+       */
+      if (run_queue_hd != END_TSO_QUEUE) {
+	return;
+      }
+      RELEASE_LOCK(&sched_mutex);
     }	
 
     if (numFound != 0) { 
@@ -133,13 +163,21 @@ awaitEvent(rtsBool wait)
 	and after the select(). 
       */
 
+#ifdef linux_TARGET_OS
+      /* on Linux, tv is set to indicate the amount of time not
+       * slept, so we don't need to gettimeofday() to find out.
+       */
+      delta += min - (tv.tv_sec * 1000000 + tv.tv_usec);
+#else
       gettimeofday(&tv_after, (struct timezone *) NULL);
       delta += (tv_after.tv_sec - tv_before.tv_sec) * 1000000 +
 	        tv_after.tv_usec - tv_before.tv_usec;
-
+#endif
     } else {
       delta += min;
     }
+
+    ACQUIRE_LOCK(&sched_mutex);
 
     /*
       Step through the waiting queue, unblocking every thread that now has
