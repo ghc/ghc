@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.118 2002/04/05 23:24:28 sof Exp $
+-- $Id: InteractiveUI.hs,v 1.119 2002/04/11 08:39:27 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -234,7 +234,7 @@ runGHCi paths dflags = do
   		  Right hdl -> fileLoop hdl False
 
   -- perform a :load for files given on the GHCi command line
-  when (notNull paths) $
+  when (not (null paths)) $
      ghciHandle showException $
 	loadModule (unwords paths)
 
@@ -317,7 +317,7 @@ stringLoop (s:ss) = do
                  if quit then return () else stringLoop ss
 
 mkPrompt toplevs exports
-   = concat (intersperse " " (toplevs ++ map ('*':) exports)) ++ "> "
+   = concat (intersperse " " (map ('*':) toplevs ++ exports)) ++ "> "
 
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
 readlineLoop :: GHCi ()
@@ -717,12 +717,12 @@ newContext mods = do
   setCmState cms'
 
 separate cmstate []           as bs = return (as,bs)
-separate cmstate (('*':m):ms) as bs = separate cmstate ms (m:as) bs
-separate cmstate (m:ms)       as bs = do 
+separate cmstate (('*':m):ms) as bs = do
    b <- io (cmModuleIsInterpreted cmstate m)
-   if b then separate cmstate ms as (m:bs)
+   if b then separate cmstate ms (m:as) bs
    	else throwDyn (CmdLineError ("module `" ++ m ++ "' is not interpreted"))
-	
+separate cmstate (m:ms)       as bs = separate cmstate ms as (m:bs)
+
 prel = "Prelude"
 
 
@@ -810,7 +810,7 @@ setOptions wds =
         leftovers <- processArgs dynamic_flags leftovers []
 	saveDynFlags
 
-        if (notNull leftovers)
+        if (not (null leftovers))
 		then throwDyn (CmdLineError ("unrecognised flags: " ++ 
 						unwords leftovers))
 		else return ()
@@ -823,14 +823,14 @@ unsetOptions str
 	   (minus_opts, rest1) = partition isMinus opts
 	   (plus_opts, rest2)  = partition isPlus rest1
 
-       if (notNull rest2) 
+       if (not (null rest2)) 
 	  then io (putStrLn ("unknown option: `" ++ head rest2 ++ "'"))
 	  else do
 
        mapM unsetOpt plus_opts
  
        -- can't do GHC flags for now
-       if (notNull minus_opts)
+       if (not (null minus_opts))
 	  then throwDyn (CmdLineError "can't unset GHC command-line flags")
 	  else return ()
 
