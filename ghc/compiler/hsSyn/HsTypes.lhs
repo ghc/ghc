@@ -121,9 +121,13 @@ data HsType name
 
   | HsOpTy		(HsType name) (HsTyOp name) (HsType name)
 
-  | HsParTy		(HsType name)   -- Parenthesis preserved for the
-					-- precedence parser; are removed by
-					-- the type checker
+  | HsParTy		(HsType name)   
+	-- Parenthesis preserved for the precedence re-arrangement in RnTypes
+	-- It's important that a * (b + c) doesn't get rearranged to (a*b) + c!
+	-- 
+	-- However, NB that toHsType doesn't add HsParTys (in an effort to keep
+	-- interface files smaller), so when printing a HsType we may need to
+	-- add parens.  
 
   | HsNumTy             Integer		-- Generics only
 
@@ -282,11 +286,17 @@ ppr_hs_context cxt = parens (interpp'SP cxt)
 \begin{code}
 pREC_TOP = (0 :: Int)  -- type   in ParseIface.y
 pREC_FUN = (1 :: Int)  -- btype  in ParseIface.y
-pREC_CON = (2 :: Int)  -- atype  in ParseIface.y
+			-- Used for LH arg of (->)
+pREC_OP  = (2 :: Int)	-- Used for arg of any infix operator
+			-- (we don't keep their fixities around)
+pREC_CON = (3 :: Int)	-- Used for arg of type applicn: 
+			-- always parenthesise unless atomic
 
-maybeParen :: Bool -> SDoc -> SDoc
-maybeParen True  p = parens p
-maybeParen False p = p
+maybeParen :: Int 	-- Precedence of context
+	   -> Int	-- Precedence of top-level operator
+	   -> SDoc -> SDoc	-- Wrap in parens if (ctxt >= op)
+maybeParen ctxt_prec op_prec p | ctxt_prec >= op_prec = parens p
+			       | otherwise	      = p
 	
 -- printing works more-or-less as for Types
 
@@ -296,46 +306,49 @@ pprHsType ty       = ppr_mono_ty pREC_TOP ty
 pprParendHsType ty = ppr_mono_ty pREC_CON ty
 
 ppr_mono_ty ctxt_prec (HsForAllTy maybe_tvs ctxt ty)
-  = maybeParen (ctxt_prec >= pREC_FUN) $
+  = maybeParen ctxt_prec pREC_FUN $
     sep [pp_header, pprHsType ty]
   where
     pp_header = case maybe_tvs of
 		  Just tvs -> pprHsForAll tvs ctxt
 		  Nothing  -> pprHsContext ctxt
 
-ppr_mono_ty ctxt_prec (HsTyVar name)
-  = ppr name
-
-ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)
-  = let p1 = ppr_mono_ty pREC_FUN ty1
-	p2 = ppr_mono_ty pREC_TOP ty2
-    in
-    maybeParen (ctxt_prec >= pREC_FUN)
-	       (sep [p1, ptext SLIT("->") <+> p2])
-
+ppr_mono_ty ctxt_prec (HsTyVar name)      = ppr name
+ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   = ppr_fun_ty ctxt_prec ty1 ty2
 ppr_mono_ty ctxt_prec (HsTupleTy con tys) = hsTupParens con (interpp'SP tys)
 ppr_mono_ty ctxt_prec (HsKindSig ty kind) = parens (ppr_mono_ty pREC_TOP ty <+> dcolon <+> pprKind kind)
 ppr_mono_ty ctxt_prec (HsListTy ty)	  = brackets (ppr_mono_ty pREC_TOP ty)
 ppr_mono_ty ctxt_prec (HsPArrTy ty)	  = pabrackets (ppr_mono_ty pREC_TOP ty)
-  where
-    pabrackets p = ptext SLIT("[:") <> p <> ptext SLIT(":]")
-
-ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty) =
-  maybeParen (ctxt_prec >= pREC_CON)
-	     (hsep [ppr_mono_ty pREC_FUN fun_ty, ppr_mono_ty pREC_CON arg_ty])
-
-ppr_mono_ty ctxt_prec (HsPredTy pred) 
-  = braces (ppr pred)
-
-ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2) = 
-  maybeParen (ctxt_prec >= pREC_FUN) 
-	     (ppr_mono_ty pREC_FUN ty1 <+> ppr op <+> ppr_mono_ty pREC_FUN ty2)
-
-ppr_mono_ty ctxt_prec (HsParTy ty)        = ppr_mono_ty ctxt_prec ty
-  -- `HsParTy' isn't useful for pretty printing, as it is removed by the type
-  -- checker and we need to be able to pretty print after type checking 
-
+ppr_mono_ty ctxt_prec (HsPredTy pred)     = braces (ppr pred)
 ppr_mono_ty ctxt_prec (HsNumTy n)         = integer n  -- generics only
+
+ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty)
+  = maybeParen ctxt_prec pREC_CON $
+    hsep [ppr_mono_ty pREC_FUN fun_ty, ppr_mono_ty pREC_CON arg_ty]
+
+ppr_mono_ty ctxt_prec (HsOpTy ty1 HsArrow ty2) 
+  = ppr_fun_ty ctxt_prec ty1 ty2
+
+ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2)  
+  = maybeParen ctxt_prec pREC_OP $
+    ppr_mono_ty pREC_OP ty1 <+> ppr op <+> ppr_mono_ty pREC_OP ty2
+
+ppr_mono_ty ctxt_prec (HsParTy ty)
+  = parens (ppr_mono_ty pREC_TOP ty)
+  -- Put the parens in where the user did
+  -- But we still use the precedence stuff to add parens because
+  --	toHsType doesn't put in any HsParTys, so we may still need them
+
+--------------------------
+ppr_fun_ty ctxt_prec ty1 ty2
+  = let p1 = ppr_mono_ty pREC_FUN ty1
+	p2 = ppr_mono_ty pREC_TOP ty2
+    in
+    maybeParen ctxt_prec pREC_FUN $
+    sep [p1, ptext SLIT("->") <+> p2]
+
+--------------------------
+pabrackets p = ptext SLIT("[:") <> p <> ptext SLIT(":]")
 \end{code}
 
 
