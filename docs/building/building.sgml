@@ -1839,11 +1839,17 @@ $ (cd ghc; autoconf)
 <programlisting>
 $ ./configure
 </programlisting>
+
+	  <para>Don't forget to check whether you need to add any
+	  arguments to <literal>configure</literal>; for example, a
+	  common requirement is to specify which GHC to use with
+	  <option>--with-ghc=<replaceable>ghc</replaceable></option>.</para>
 	</listitem>
 
 	<listitem>
 	  <para>Create the file <filename>mk/build.mk</filename>,
-          adding definitions for your desired configuration options.</para>
+          adding definitions for your desired configuration
+          options.</para>
 
 <programlisting>
 $ emacs mk/build.mk
