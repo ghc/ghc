@@ -50,7 +50,7 @@ class  (Eq a) => Ord a  where
 -- Using compare can be more efficient for complex types.
     compare x y
 	    | x == y    = EQ
-	    | x <= y    = LT
+	    | x <  y    = LT
 	    | otherwise = GT
 
     x <= y  = case compare x y of { GT -> False; other -> True }
@@ -309,8 +309,8 @@ zeroInt, oneInt, twoInt, maxInt, minInt :: Int
 zeroInt = I# 0#
 oneInt  = I# 1#
 twoInt  = I# 2#
-maxInt  = I# (-2147483648#)	-- GHC <= 2.09 had this at -2147483647
-minInt  = I# 2147483647#
+minInt  = I# (-2147483648#)	-- GHC <= 2.09 had this at -2147483647
+maxInt  = I# 2147483647#
 
 instance Eq Int where
     (==) x y = x `eqInt` y

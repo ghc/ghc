@@ -437,8 +437,8 @@ foldr2_left k z x r (y:ys) = k x y (r ys)
 foldr2_right k z y r []     = z
 foldr2_right k z y r (x:xs) = k x y (r xs)
 
--- foldr2 k z xs ys = foldr (foldr2_left k z) z xs ys
--- foldr2 k z xs ys = foldr (foldr2_right k z) z ys xs
+-- foldr2 k z xs ys = foldr (foldr2_left k z)  (\_ -> z) xs ys
+-- foldr2 k z xs ys = foldr (foldr2_right k z) (\_ -> z) ys xs
 {-# RULES
 "foldr2/left"	forall k,z,ys,g::forall b.(a->b->b)->b->b . 
 		  foldr2 k z (build g) ys = g (foldr2_left  k z) (\_ -> z) ys

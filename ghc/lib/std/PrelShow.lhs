@@ -84,7 +84,7 @@ instance Show Bool where
 instance Show Ordering where
   showsPrec _ LT = showString "LT"
   showsPrec _ EQ = showString "EQ"
-  showsPrec _ GT = showString "EQ"
+  showsPrec _ GT = showString "GT"
 
 instance  Show Char  where
     showsPrec _ '\'' = showString "'\\''"

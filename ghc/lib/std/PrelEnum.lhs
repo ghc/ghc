@@ -265,7 +265,7 @@ instance  Enum Int  where
     enumFromTo (I# x) (I# y) = build (\ c n -> eftIntFB c n x y)
 
     {-# INLINE enumFromThen #-}
-    enumFromThen (I# x1) (I# x2) = build (\ c n -> efdtIntFB c n x1 x2 2147483647#)
+    enumFromThen (I# x1) (I# x2) = build (\ c n -> efdIntFB c n x1 x2)
 
     {-# INLINE enumFromThenTo #-}
     enumFromThenTo (I# x1) (I# x2) (I# y) = build (\ c n -> efdtIntFB c n x1 x2 y)
@@ -308,9 +308,30 @@ efdtIntList x1 x2 y
     go_dn x | y -# x ># delta = [I# x]
 	    | otherwise	      = I# x : go_dn (x +# delta)
 
+efdIntFB c n x1 x2
+  | delta >=# 0# = go_up x1
+  | otherwise    = go_dn x1
+  where
+    delta = x2 -# x1
+    go_up x | 2147483647#    -# x <# delta = I# x `c` n
+	    | otherwise	     		   = I# x `c` go_up (x +# delta)
+    go_dn x | (-2147483648#) -# x ># delta = I# x `c` n
+	    | otherwise	     		   = I# x `c` go_dn (x +# delta)
+
+efdIntList x1 x2
+  | delta >=# 0# = go_up x1
+  | otherwise    = go_dn x1
+  where
+    delta = x2 -# x1
+    go_up x | 2147483647#    -# x <# delta = [I# x]
+	    | otherwise	                   = I# x : go_up (x +# delta)
+    go_dn x | (-2147483648#) -# x ># delta = [I# x]
+	    | otherwise	     		   = I# x : go_dn (x +# delta)
+
 
 {-# RULES
 "eftIntList"	eftIntFB  (:) [] = eftIntList
+"efdIntList"	efdIntFB  (:) [] = efdIntList
 "efdtIntList"	efdtIntFB (:) [] = efdtIntList
  #-}
 \end{code}
