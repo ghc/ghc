@@ -36,7 +36,7 @@ import CoreLift		( liftCoreBindings )
 import CoreLint		( lintCoreBindings )
 import Id		( nullIdEnv, mkIdEnv, idType, 
 			  SYN_IE(DictVar), GenId, SYN_IE(Id) )
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..) )
 import UniqSupply	( splitUniqSupply, UniqSupply )
 \end{code}
 
