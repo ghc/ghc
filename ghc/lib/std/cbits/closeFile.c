@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: closeFile.c,v 1.9 2000/03/28 08:49:56 simonmar Exp $
+ * $Id: closeFile.c,v 1.10 2000/09/25 10:48:50 simonmar Exp $
  *
  * hClose Runtime Support
  */
@@ -32,8 +32,9 @@ closeFile(StgForeignPtr ptr, StgInt flush_buf)
        return 0;
     }
 
-    if ( flush_buf != 0 && (fo->flags & FILEOBJ_WRITE) ) {
-       writeFileObject(ptr,fo->bufWPtr);
+    /* Flush buffer if we have unwritten data */
+    if ( flush_buf != 0 ) {
+	flushBuffer(fo);
     }
 
     /* If the flush failed, we ignore this and soldier on.. */
