@@ -21,16 +21,6 @@
 
 * Parent button should be removed if there isn't a parent.
 
-* a paragraph like
-
-	> text
-	more text
-
-  is interpreted strangely: the second line is interpreted as part of the
-  code block, but the second line is non-literal (and markup within it
-  is interpreted normally).  Rewrite the lexer using Alex, and fix this
-  at the same time.
-
 * derived instance support isn't quite right (doing it properly is 
   hard, though).
 
@@ -53,6 +43,8 @@
   by Daan).
 
 * Comments on instance declarations?  (suggested by Daan and Iavor).
+
+* Comments on default method declarations?  (suggested by Satnam).
 
 * Add a search feature which just invokes Google?
 
