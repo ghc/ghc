@@ -54,7 +54,7 @@ import DriverUtil
 import Config
 import Outputable
 import Panic		( progName, GhcException(..) )
-import Util		( global )
+import Util		( global, dropList )
 import CmdLineOpts	( dynFlag, verbosity )
 
 import Exception	( throwDyn )
