@@ -59,7 +59,7 @@ import Stix		( StixTree(..), StixReg(..), sStLitLbl,
 			)
 import Util		( panic )
 import Char		( isDigit )
-import GlaExts		( word2Int#, int2Word#, shiftRA#, and#, (/=#) )
+import GlaExts		( word2Int#, int2Word#, shiftRL#, and#, (/=#) )
 \end{code}
 
 \begin{code}
@@ -294,7 +294,6 @@ extensions.  Tough.
 \begin{code}
 w2i x = word2Int# x
 i2w x = int2Word# x
-i2w_s x = (x::Int#)
 
 exactLog2 :: Integer -> Maybe Integer
 exactLog2 x
@@ -308,10 +307,10 @@ exactLog2 x
 	  Just (toInteger (I# (pow2 x#)))
        }
   where
-    shiftr x y = shiftRA# x y
+    shiftr x y = shiftRL# x y
 
     pow2 x# | x# ==# 1# = 0#
-            | otherwise = 1# +# pow2 (w2i (i2w x# `shiftr` i2w_s 1#))
+            | otherwise = 1# +# pow2 (w2i (i2w x# `shiftr` 1#))
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
