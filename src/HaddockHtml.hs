@@ -46,8 +46,10 @@ ppHtml	:: String
 	-> Maybe String			-- CSS file
 	-> String			-- $libdir
 	-> InstMaps
+	-> Maybe Doc			-- prologue text, maybe
 	-> IO ()
-ppHtml title source_url ifaces odir maybe_css libdir inst_maps =  do
+
+ppHtml title source_url ifaces odir maybe_css libdir inst_maps prologue =  do
   let 
 	css_file = case maybe_css of
 			Nothing -> libdir ++ pathSeparator:cssFile
@@ -65,7 +67,7 @@ ppHtml title source_url ifaces odir maybe_css libdir inst_maps =  do
   icon_contents <- readFile icon_file
   writeFile icon_destination icon_contents
 
-  ppHtmlContents odir title source_url (map fst visible_ifaces)
+  ppHtmlContents odir title source_url (map fst visible_ifaces) prologue
   ppHtmlIndex odir title visible_ifaces
   mapM_ (ppHtmlModule odir title source_url inst_maps) visible_ifaces
 
@@ -151,9 +153,9 @@ moduleInfo iface
 -- ---------------------------------------------------------------------------
 -- Generate the module contents
 
-ppHtmlContents :: FilePath -> String -> Maybe String -> [Module]
+ppHtmlContents :: FilePath -> String -> Maybe String -> [Module] -> Maybe Doc
    -> IO ()
-ppHtmlContents odir title source_url mods = do
+ppHtmlContents odir title source_url mods prologue = do
   let tree = mkModuleTree mods  
       html = 
 	header (thetitle (toHtml title) +++
@@ -161,10 +163,18 @@ ppHtmlContents odir title source_url mods = do
 		  rel "stylesheet", thetype "text/css"]) +++
         body << vanillaTable << (
    	    simpleHeader title </>
+	    ppPrologue prologue </>
 	    ppModuleTree title tree </>
+	    s15 </>
 	    footer
 	  )
   writeFile (odir ++ pathSeparator:contentsHtmlFile) (renderHtml html)
+
+ppPrologue :: Maybe Doc -> HtmlTable
+ppPrologue Nothing = Html.emptyTable
+ppPrologue (Just doc) = 
+  (tda [theclass "section1"] << toHtml "Description") </>
+  docBox (docToHtml doc)
 
 ppModuleTree :: String -> [ModuleTree] -> HtmlTable
 ppModuleTree title ts = 

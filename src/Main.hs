@@ -8,6 +8,7 @@ module Main (main) where
 
 import HaddockRename
 import HaddockParse
+import HaddockLex
 --import HaddockDB   -- not compiling
 import HaddockHtml
 import HaddockTypes
@@ -54,6 +55,7 @@ data Flag
   | Flag_DocBook
   | Flag_Html
   | Flag_Heading String
+  | Flag_Prologue FilePath
   | Flag_SourceURL String
   | Flag_CSS String
   | Flag_Lib String
@@ -68,9 +70,11 @@ options =
 	"output in HTML",
     Option ['o']  ["odir"]     (ReqArg Flag_OutputDir "DIR")
 	"directory in which to put the output files",
+    Option ['p']  ["prologue"] (ReqArg Flag_Prologue "FILE")
+	"file containing prologue text",
     Option ['s']  ["source"]   (ReqArg Flag_SourceURL "URL") 
 	"base URL for links to source code",
-    Option ['t']  ["title"]  (ReqArg Flag_Heading "TITLE")
+    Option ['t']  ["title"]    (ReqArg Flag_Heading "TITLE")
 	"page heading",
     Option ['v']  ["verbose"]  (NoArg Flag_Verbose)
 	"be verbose",
@@ -104,6 +108,8 @@ run flags files = do
 		[] -> return "."
 		fs -> return (last fs)
 
+  prologue <- getPrologue flags
+
   writeIORef saved_flags flags
   parsed_mods <- sequence (map parse_file files)
 
@@ -129,7 +135,7 @@ run flags files = do
   let inst_maps = collectInstances mod_ifaces
 
   when (Flag_Html `elem` flags) $
-    ppHtml title source_url mod_ifaces odir css_file libdir inst_maps
+    ppHtml title source_url mod_ifaces odir css_file libdir inst_maps prologue
 
 parse_file file = do
   bracket 
@@ -141,6 +147,17 @@ parse_file file = do
 	        Failed err -> do hPutStrLn stderr (file ++ ':':err)
 				 exitWith (ExitFailure 1)
     )
+
+getPrologue :: [Flag] -> IO (Maybe Doc)
+getPrologue flags
+  = case [filename | Flag_Prologue filename <- flags ] of
+	[] -> return Nothing 
+	[filename] -> do
+	   str <- readFile filename
+	   case parseParas (tokenise str) of
+		Left err -> dieMsg err
+		Right doc -> return (Just doc)
+	_otherwise -> dieMsg "multiple -p/--prologue options"
 
 -----------------------------------------------------------------------------
 -- Figuring out the definitions that are exported from a module
