@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.14 1999/03/03 19:05:55 sof Exp $
+ * $Id: Schedule.c,v 1.15 1999/03/08 16:41:42 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -78,7 +78,7 @@ StgTSO   *MainTSO;
    (and possibly some arguments) pushed on its stack.  See
    pushClosure() in Schedule.h.
 
-   createGenThread() and createIOThread() (in Schedule.h) are
+   createGenThread() and createIOThread() (in SchedAPI.h) are
    convenient packaged versions of this function.
    -------------------------------------------------------------------------- */
 
