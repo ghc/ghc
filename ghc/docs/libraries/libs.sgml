@@ -8,14 +8,12 @@
 <article>
 
 <title>The Hugs-GHC Extension Libraries
-<author>Alastair Reid <tt/reid-alastair@cs.yale.edu/ 
-        Simon Marlow <tt/simonm@dcs.gla.ac.uk/
-<date>v0.8, 28 January 1998
+<author>The Hugs/GHC Team
+<date>July 1998
 <abstract>
 Hugs and GHC provide a common set of libraries to aid portability.
 This document specifies the interfaces to these libraries and documents
-known differences.  We hope that these modules will be adopted for inclusion
-as Standard Haskell Libraries sometime soon.
+known differences.
 </abstract>
 
 <toc>
@@ -58,6 +56,16 @@ Operations that lazily read values from a mutable object/handle, have
 the form <tt/getXContents/, e.g., <tt/Channel.getChanContents/ and
 <tt/IO.hGetContents/. (OK, so the latter isn't called
 <tt/getHandleContents/, but you hopefully get the picture.)
+<item>
+Overloaded operators that convert values to some fixed type are named
+<tt/toX/, where <tt/X/ is the type we're converting into, e.g.,
+<tt/toInt/, <tt/toDyn/.
+<p>
+Similarly for overloaded coercion operations that go the other way,
+from a known type to an overloaded one. These have the prefix
+<tt/from/ followed by the name of the type we're converting from,
+e.g., <tt/fromInteger/, <tt/fromDyn/, <tt/fromDynamic/.
+
 </itemize>
 
 <sect> <idx/ST/ 
@@ -150,8 +158,6 @@ space leaks than the strict version, so most programmers will use the
 former unless laziness is explicitly required.  <tt/LazyST/ provides
 two additional operations:
 
-<sect> <idx/LazyST/ <p>
-
 <tscreen> <verb>
 lazyToStrictST :: LazyST.ST s a -> ST.ST s a
 strictToLazyST :: ST.ST s a -> LazyST.ST s a
@@ -167,6 +173,40 @@ result of the lazy state thread it returns is demanded.
 <p>
 
 This library provides the following extensions to the IO monad:
+
+<tscreen><verb>
+module IOExts where
+
+fixIO               :: (a -> IO a) -> IO a
+unsafePerformIO     :: IO a -> a
+unsafeInterleaveIO  :: IO a -> IO a
+		    
+data IORef a        -- mutable variables containing values of type a
+newIORef     	    :: a -> IO (IORef a)
+readIORef    	    :: IORef a -> IO a
+writeIORef   	    :: IORef a -> a -> IO ()
+instance Eq (IORef a)
+
+data IOArray ix elt -- mutable arrays indexed by values of type ix
+                    -- containing values of type a.
+newIOArray          :: Ix ix => (ix,ix) -> elt -> IO (IOArray ix elt)
+boundsIOArray       :: Ix ix => IOArray ix elt -> (ix, ix)
+readIOArray         :: Ix ix => IOArray ix elt -> ix -> IO elt
+writeIOArray        :: Ix ix => IOArray ix elt -> ix -> elt -> IO ()
+freezeIOArray       :: Ix ix => IOArray ix elt -> IO (Array ix elt)
+instance Eq (IOArray ix elt)
+
+openFileEx          :: FilePath -> IOModeEx -> IO Handle
+data IOModeEx = BinaryMode IO.IOMode | TextMode IO.IOMode
+instance Eq IOModeEx
+instance Read IOModeEx
+instance Show IOModeEx
+
+performGC           :: IO ()
+trace               :: String -> a -> a
+unsafePtrEq         :: a -> a -> Bool
+</verb></tscreen>
+
 <itemize>
 <item>
 The operations <tt/fixIO/, <tt/unsafePerformIO/ and <tt/unsafeInterleaveIO/
@@ -177,8 +217,10 @@ References (aka mutable variables) and mutable arrays (but no form of
 mutable byte arrays)
 
 <item>
-<tt/openFileEx/ extends the standard <tr/openFile/ action with support
-for opening binary files.
+<tt/openFileEx/ extends the standard <tt/openFile/ action with support
+for opening binary files. On platforms that make no distinction
+between text and binary files, <tt/openFileEx/ is indistinguishable
+from <tt/openFile/.
 
 <item>
 <tt/performGC/ triggers an immediate garbage collection
@@ -222,39 +264,6 @@ simplified memoisation function:
 
 
 </itemize>
-
-<tscreen><verb>
-module IOExts where
-
-fixIO               :: (a -> IO a) -> IO a
-unsafePerformIO     :: IO a -> a
-unsafeInterleaveIO  :: IO a -> IO a
-		    
-data IORef a        -- mutable variables containing values of type a
-newIORef     	    :: a -> IO (IORef a)
-readIORef    	    :: IORef a -> IO a
-writeIORef   	    :: IORef a -> a -> IO ()
-instance Eq (IORef a)
-
-data IOArray ix elt -- mutable arrays indexed by values of type ix
-                    -- containing values of type a.
-newIOArray          :: Ix ix => (ix,ix) -> elt -> IO (IOArray ix elt)
-boundsIOArray       :: Ix ix => IOArray ix elt -> (ix, ix)
-readIOArray         :: Ix ix => IOArray ix elt -> ix -> IO elt
-writeIOArray        :: Ix ix => IOArray ix elt -> ix -> elt -> IO ()
-freezeIOArray       :: Ix ix => IOArray ix elt -> IO (Array ix elt)
-instance Eq (IOArray ix elt)
-
-openFileEx          :: FilePath -> IOModeEx -> IO Handle
-data IOModeEx = BinaryMode IO.IOMode | TextMode IO.IOMode
-instance Eq IOModeEx
-instance Read IOModeEx
-instance Show IOModeEx
-
-performGC           :: IO ()
-trace               :: String -> a -> a
-unsafePtrEq         :: a -> a -> Bool
-</verb></tscreen>
 
 <!--
   <sect> <idx/GlaExts/ <p>
@@ -328,8 +337,8 @@ Notes:
   <tt/bitSize/ and <tt/isSigned/ are like <tt/floatRadix/ and <tt/floatDigits/
   -- they return parameters of the <em/type/ of their argument rather than 
   of the particular argument they are applied to.  <tt/bitSize/ returns
-  the number of bits in the type (or <tt/Nothing/ for unbounded types); and
-  <tt/isSigned/ returns whether the type is signed or not.  
+  the number of bits in the type; and <tt/isSigned/ returns whether
+  the type is signed or not.
 <item>
   <tt/shift/ performs sign extension on signed number types.
   That is, right shifts fill the top bits with 1 if the number is negative
@@ -598,8 +607,96 @@ Notes:
 <label id="sec:Foreign">
 <p>
 
-This module is provided by GHC but not by Hugs.
-GreenCard for Hugs provides the <tt/ForeignObj/ type.
+This module provides two types to better allow the Haskell world to
+share its data with the outside world (and vice versa), <em/foreign
+objects/ and <em/stable pointers/:
+
+<tscreen><verb>
+module Foreign where
+data ForeignObj  -- abstract, instance of: Eq
+
+makeForeignObj  :: Addr{-object-} -> Addr{-finaliser-} -> IO ForeignObj
+writeForeignObj :: ForeignObj -> Addr{-new value-} -> IO ()
+
+data StablePtr a
+makeStablePtr  :: a -> IO (StablePtr a)
+deRefStablePtr :: StablePtr a -> IO a
+freeStablePtr  :: StablePtr a -> IO ()
+</verb> </tscreen>
+
+<itemize>
+<item>The <tt/ForeignObj/ type provides foreign objects, encapsulated
+references to values outside the Haskell heap. Foreign objects are
+finalised by the garbage collector when they become dead. The
+finaliser to use is given as second argument to <tt/makeForeignOj/,
+and is currently a function pointer to a C function with
+the following signature
+
+<tscreen><verb>
+void finaliseFO(void* obj);
+</verb></tscreen>
+
+The finaliser is passed the reference to the external object (i.e.,
+the first argument to <tt/makeForeignObj/.)
+
+<item>
+The <tt/writeForeignObj/ lets you overwrite the encapsulated foreign
+reference with another.
+
+<item>
+Stable pointers allow you to hand out references to Haskell heap
+objects to the outside world. <bf/ToDo:/ <em/say more./
+</itemize>
+
+In addition to the above, the following operations for indexing via
+a <tt/ForeignObj/ are also, mirrored on the same operations provided
+over <tt/Addr/s:
+
+<tscreen><verb>
+indexCharOffForeignObj   :: ForeignObj -> Int -> Char
+indexIntOffForeignObj    :: ForeignObj -> Int -> Int
+indexAddrOffForeignObj   :: ForeignObj -> Int -> Addr
+indexFloatOffForeignObj  :: ForeignObj -> Int -> Float
+indexDoubleOffForeignObj :: ForeignObj -> Int -> Double
+indexWord8OffForeignObj  :: ForeignObj -> Int -> Word8
+indexWord16OffForeignObj :: ForeignObj -> Int -> Word16
+indexWord32OffForeignObj :: ForeignObj -> Int -> Word32
+indexWord64OffForeignObj :: ForeignObj -> Int -> Word64
+
+indexInt8OffForeignObj  :: ForeignObj -> Int -> Int8
+indexInt16OffForeignObj :: ForeignObj -> Int -> Int16
+indexInt32OffForeignObj :: ForeignObj -> Int -> Int32
+indexInt64OffForeignObj :: ForeignObj -> Int -> Int64
+
+-- read value out of mutable memory
+readCharOffForeignObj    :: ForeignObj -> Int -> IO Char
+readIntOffForeignObj     :: ForeignObj -> Int -> IO Int
+readAddrOffForeignObj    :: ForeignObj -> Int -> IO Addr
+readFloatOffForeignObj   :: ForeignObj -> Int -> IO Float
+readDoubleOffForeignObj  :: ForeignObj -> Int -> IO Double
+readWord8OffForeignObj   :: ForeignObj -> Int -> IO Word8
+readWord16OffForeignObj  :: ForeignObj -> Int -> IO Word16
+readWord32OffForeignObj  :: ForeignObj -> Int -> IO Word32
+readWord64OffForeignObj  :: ForeignObj -> Int -> IO Word64
+readInt8OffForeignObj    :: ForeignObj -> Int -> IO Int8
+readInt16OffForeignObj   :: ForeignObj -> Int -> IO Int16
+readInt32OffForeignObj   :: ForeignObj -> Int -> IO Int32
+readInt64OffForeignObj   :: ForeignObj -> Int -> IO Int64
+
+writeCharOffForeignObj   :: ForeignObj -> Int -> Char   -> IO ()
+writeIntOffForeignObj    :: ForeignObj -> Int -> Int    -> IO ()
+writeAddrOffForeignObj   :: ForeignObj -> Int -> Addr   -> IO ()
+writeFloatOffForeignObj  :: ForeignObj -> Int -> Float  -> IO ()
+writeDoubleOffForeignObj :: ForeignObj -> Int -> Double -> IO ()
+writeWord8OffForeignObj  :: ForeignObj -> Int -> Word8  -> IO ()
+writeWord16OffForeignObj :: ForeignObj -> Int -> Word16 -> IO ()
+writeWord32OffForeignObj :: ForeignObj -> Int -> Word32 -> IO ()
+writeWord64OffForeignObj :: ForeignObj -> Int -> Word64 -> IO ()
+writeInt8OffForeignObj   :: ForeignObj -> Int -> Int8   -> IO ()
+writeInt16OffForeignObj  :: ForeignObj -> Int -> Int16  -> IO ()
+writeInt32OffForeignObj  :: ForeignObj -> Int -> Int32  -> IO ()
+writeInt64OffForeignObj  :: ForeignObj -> Int -> Int64  -> IO ()
+</verb></tscreen>
 
 <sect> <idx/Concurrent/
 <label id="sec:Concurrent">
@@ -747,7 +844,8 @@ default second argument is just returned. <tt/fromDynamic/ returns a
 was not possible.
 </itemize>
 
-<sect1>  <idx/Representing types/ 
+<sect1>  The <tt/Dynamic/ type
+<nidx/The Dynamic type/ 
 <label id="sec:Dynamic:TypeRep">
 <p>
 
@@ -798,8 +896,8 @@ following,
 A really efficient implementation is possible if we guarantee/demand
 that the strings are unique, and for a particular type constructor,
 the application <tt/mkTyCon/ to the string that represents the type
-constructor is never duplicated. [<bf/Q:/ <em>Would this constraint be
-unworkable in practice?</em>]
+constructor is never duplicated. &lsqb;<bf/Q:/ <em>Would this constraint be
+unworkable in practice?</em>&rsqb;
 <item>
 Both <tt/TyCon/ and <tt/TypeRep/ are instances of the <tt/Show/ type
 classes. To have tuple types be shown in infix form, the <tt/Show/
@@ -842,7 +940,6 @@ also provided:
 dynApply   :: Dynamic -> Dynamic -> Dynamic -- unsafe.
 dynApplyMb :: Dynamic -> Dynamic -> Maybe Dynamic
 </verb></tscreen>
-<!-- -- -->
 
 
 <sect> <idx/Pretty/
