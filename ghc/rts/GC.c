@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.122 2001/08/30 10:22:52 simonmar Exp $
+ * $Id: GC.c,v 1.123 2001/10/01 10:52:36 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -758,6 +758,14 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
       // different if compaction is turned on, because we don't need
       // to double the space required to collect the old generation.
       if (max != 0) {
+
+	  // this test is necessary to ensure that the calculations
+	  // below don't have any negative results - we're working
+	  // with unsigned values here.
+	  if (max < min_alloc) {
+	      heapOverflow();
+	  }
+
 	  if (oldest_gen->steps[0].is_compacted) {
 	      if ( (size + (size - 1) * (gens - 2) * 2) + min_alloc > max ) {
 		  size = (max - min_alloc) / ((gens - 1) * 2 - 1);
