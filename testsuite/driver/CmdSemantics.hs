@@ -3,7 +3,6 @@ module CmdSemantics ( parseOneTFile, processParsedTFile )
 where
 
 import CmdSyntax
-import CmdLexer		( isVarChar )
 import CmdParser	( parseScript )
 import TopSort		( topSort )
 import Maybe		( isJust, fromJust )
@@ -168,11 +167,11 @@ setResult is_actual res
 addLocalVarBind :: Var -> String -> IOEV ()
 addLocalVarBind v s
    = getEvalEnv					`thenE` \ p ->
-     if   v `elem` map fst (globals p)
-     then failEV (isGlobalVar v)
-     else setEvalEnv (p{locals = (v,s):(locals p)})
-						`thenE_`
-          returnEV ()
+     (if   v `elem` map fst (globals p)
+      	then setEvalEnv (p{globals = (v,s):(globals p)})
+     	else setEvalEnv (p{locals = (v,s):(locals p)})
+	) `thenE_`
+    returnEV ()
 
 getCounterE :: IOE Int
 getCounterE
