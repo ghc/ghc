@@ -63,6 +63,7 @@ data Expr
   | InstanceOf Expr Type
   | Call Expr Name [Expr]
   | Op Expr String Expr
+  | Raise TypeName [Expr]
   | New Type [Expr] (Maybe [Decl]) -- anonymous innerclass
     deriving (Show)
     
@@ -80,7 +81,7 @@ data Type
   = PrimType  PrimType
   | ArrayType Type
   | Type      TypeName
-    deriving (Show)
+    deriving (Show, Eq)
 
 data PrimType 
   = PrimInt 
@@ -91,7 +92,7 @@ data PrimType
   | PrimDouble
   | PrimByte
   | PrimVoid
-    deriving (Show)
+    deriving (Show, Eq)
 
 type PackageName = String	-- A package name
 				-- like "java.awt.Button"
@@ -112,13 +113,20 @@ data Name        = Name String Type
 				-- So variables might be Int or Object.
 
 				-- ** method calls store the returned
-				-- ** type, not a complete.
+				-- ** type, not a complete arg x result type.
 				--
 				-- Thinking:
 				-- ... foo1.foo2(...).foo3 ...
 				-- here you want to know the *result*
-				-- after callling foo1, then foo2,
+				-- after calling foo1, then foo2,
 				-- then foo3.
+
+instance Eq Name where
+   (Name nm _) == (Name nm' _) = nm == nm'
+
+
+instance Ord Name where
+   (Name nm _) `compare` (Name nm' _) = nm `compare` nm'
 
 
 data Lit

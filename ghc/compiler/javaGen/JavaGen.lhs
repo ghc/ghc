@@ -30,12 +30,16 @@ data *types*
 data constructors
   - There are tWO classes for each Constructor
    (1) - Class with the payload extends the relevent datatype baseclass.
-       - This class has the prefix zdw ($W)
+       - This class has the prefix zdw ($w)
    (2) - Constructor *wrapper* just use their own name.
     - Constructors are upper case, so never clash with keywords
     - So Foo would become 2 classes.
 	* Foo		-- the constructor wrapper
 	* zdwFoo	-- the worker, with the payload
+
+
+$i  for instances.
+$k  for keyword nameclash avoidance.
 
 \begin{code}
 module JavaGen( javaGen ) where
@@ -45,7 +49,7 @@ import Java
 import Literal	( Literal(..) )
 import Id	( Id, isDataConId_maybe, isId, idName, isDeadBinder, idPrimRep
 		, isPrimOpId_maybe )
-import Name	( NamedThing(..), getOccString, isGlobalName 
+import Name	( NamedThing(..), getOccString, isGlobalName, isLocalName
 		, nameModule )
 import PrimRep  ( PrimRep(..) )
 import DataCon	( DataCon, dataConRepArity, dataConRepArgTys, dataConId )
@@ -73,7 +77,7 @@ import PrimOp
 javaGen :: Module -> [Module] -> [TyCon] -> [CoreBind] -> CompilationUnit
 
 javaGen mod import_mods tycons binds
-  = id {-liftCompilationUnit-} package
+  = liftCompilationUnit package
   where
     decls = [Import "haskell.runtime.*"] ++
 	    [Import (moduleString mod) | mod <- import_mods] ++
@@ -222,7 +226,13 @@ javaVar v | isGlobalName (idName v) = mkNew (javaIdType v) []
 javaLit :: Literal.Literal -> Expr
 javaLit (MachInt i)  = Literal (IntLit (fromInteger i))
 javaLit (MachChar c) = Literal (CharLit c)
-javaLit (MachStr fs) = Literal (StringLit (_UNPK_ fs))
+javaLit (MachStr fs) = Literal (StringLit str)
+   where
+	str = concatMap renderString (_UNPK_ fs) ++ "\\000"
+	-- This should really handle all the chars 0..31.
+	renderString '\NUL' = "\\000"
+	renderString other  = [other]
+
 javaLit other	     = pprPanic "javaLit" (ppr other)
 
 -- Pass in the 'shape' of the result.
@@ -248,17 +258,43 @@ javaCase :: (Expr -> Statement) -> CoreExpr -> Id -> [CoreAlt] -> [Statement]
 --		final Object p = ((Cons) x).f1
 --		final Object q = ((Cons) x).f2
 --		...translation of r2...
---	} else return null
+--	} else throw java.lang.Exception
 
+-- This first special case happens a lot, typically
+-- during dictionary deconstruction.
+-- We need to access at least *one* field, to check to see
+-- if we have correct constructor.
+-- If we've got the wrong one, this is _|_, and the
+-- casting will catch this with an exception.
+
+javaCase r e x [(DataAlt d,bs,rhs)] | length bs > 0
+  = java_expr PushExpr e ++
+    [ var [Final] (javaName x)
+	          (whnf primRep (vmPOP (primRepToType primRep))) ] ++
+    bind_args d bs ++
+    javaExpr r rhs
+   where      
+     primRep = idPrimRep x
+     whnf PtrRep = vmWHNF	-- needs evaluation
+     whnf _      = id		-- anything else does notg
+
+     bind_args d bs = [var [Final] (javaName b) 
+			   (Access (Cast (javaConstrWkrType d) (javaVar x)
+				   ) f
+			   )
+		      | (b,f) <- filter isId bs `zip` (constrToFields d)
+		      , not (isDeadBinder b)
+		      ]
+   
 javaCase r e x alts
   | isIfThenElse && isPrimCmp = 
        javaIfThenElse r (fromJust maybePrim) tExpr fExpr
   | otherwise =
-       javaArg Nothing e ++
-     [ var [Final] (javaName x)
-	           (whnf primRep (vmPOP (primRepToType primRep)))
-     , IfThenElse (map mk_alt alts) (Just (Return javaNull))
-     ]
+       java_expr PushExpr e ++
+       [ var [Final] (javaName x)
+		           (whnf primRep (vmPOP (primRepToType primRep)))
+       , mkIfThenElse (map mk_alt alts) 
+       ]
   where
      isIfThenElse = CoreUtils.exprType e == boolTy
 		    -- also need to check that x is not free in
@@ -301,6 +337,14 @@ javaCase r e x alts
 		      , not (isDeadBinder b)
 		      ]
 
+
+mkIfThenElse [(Var (Name "true" _),code)] = code
+mkIfThenElse other = IfThenElse other 
+		(Just (ExprStatement 
+			(Raise excName [Literal (StringLit "case failure")])
+		       )
+                )
+
 javaIfThenElse r cmp tExpr fExpr 
 {-
  - Now what we need to do is generate code for the if/then/else.
@@ -325,11 +369,11 @@ javaBind (NonRec x rhs)
 	final Object x = new Thunk( new Code() { ...code for rhs_x... } )
 -}
 
-  = javaArg (Just name) rhs
+  = java_expr (SetVar name) rhs
   where
     name = case coreTypeToType rhs of
 	    ty@(PrimType _) -> javaName x `withType` ty
-	    _               -> javaName x `withType` thunkType
+	    _               -> javaName x `withType` codeType
 
 javaBind (Rec prs)
 {- 	rec { x = ...rhs_x...; y = ...rhs_y... }
@@ -359,11 +403,12 @@ javaBind (Rec prs)
 		     stmts = [Field [] (javaName b `withType` codeType) Nothing | (b,_) <- prs] ++
 			     [Method [Public] enterName [vmArg] [excName] (javaExpr vmRETURN r)]	
 
-    mk_inst (b,r) = var [Final] (javaInstName b)
-			(mkNew (javaIdType b) [])
+    mk_inst (b,r) = var [Final] name (mkNew ty [])
+	where
+	   name@(Name _ ty)  = javaInstName b
 
-    mk_thunk (b,r) = var [Final] (javaName b `withType` thunkType)
-			 (New thunkType [Var (javaInstName b)] Nothing)
+    mk_thunk (b,r) = var [Final] (javaName b `withType` codeType)
+			 (mkNew thunkType [Var (javaInstName b)])
 
     mk_knot (b,_) = [ ExprStatement (Assign lhs rhs) 
 		    | (b',_) <- prs,
@@ -371,7 +416,6 @@ javaBind (Rec prs)
 		      let rhs = Var (javaName b')
 		    ]
 
--- We are needlessly
 javaLam :: (Expr -> Statement) -> ([CoreBndr], CoreExpr) -> [Statement]
 javaLam r (bndrs, body)
   | null val_bndrs = javaExpr r body
@@ -383,19 +427,36 @@ javaLam r (bndrs, body)
     val_bndrs = map javaName (filter isId bndrs)
 
 javaApp :: (Expr -> Statement) -> CoreExpr -> [CoreExpr] -> [Statement]
-javaApp r (CoreSyn.App f a) as = javaApp r f (a:as)
-javaApp r (CoreSyn.Var f) as
+javaApp r (CoreSyn.App f a) as 
+	| isValArg a = javaApp r f (a:as)
+	| otherwise  = javaApp r f as
+javaApp r (CoreSyn.Var f) as 
   = case isDataConId_maybe f of {
 	Just dc | length as == dataConRepArity dc
-		-> 	-- Saturated constructors
-			-- never returning a primitive at this point
-		   javaArgs as ++
-		   [Return (New (javaIdType f) 
-				(javaPops as)
-				Nothing)]
-    ; other ->   -- Not a saturated constructor
-	-- TODO: case isPrimOpId_maybe 
-	java_apply r (CoreSyn.Var f) as
+	 -- NOTE: Saturated constructors never returning a primitive at this point
+	 --
+	 -- We push the arguments backwards, because we are using
+	 -- the (ugly) semantics of the order of evaluation of arguments,
+	 -- to avoid making up local names. Oh to have a namesupply...
+	 --
+		-> javaArgs (reverse as) ++
+		   [r (New (javaIdType f)
+			   (javaPops as)
+			   Nothing
+		       )
+		   ]
+	        | otherwise ->
+		   --  build a local 
+		   let stmts = 
+			  vmCOLLECT (dataConRepArity dc) this ++
+			[ vmRETURN
+			   (New (javaIdType f)
+				[ vmPOP ty | (Name _ ty) <- constrToFields dc ]
+				Nothing
+			    )
+			]
+		   in javaArgs (reverse as) ++ [r (newCode stmts)]
+    ; other -> java_apply r (CoreSyn.Var f) as
     }
 	
 javaApp r f as = java_apply r f as
@@ -411,7 +472,7 @@ java_apply r f as = javaArgs as ++ javaExpr r f
 -- of pushing values (perhaps thunks) onto the stack.
 
 javaArgs :: [CoreExpr] -> [Statement]
-javaArgs args = concat [ javaArg Nothing a | a <- args, isValArg a]
+javaArgs args = concat [ java_expr PushExpr a | a <- args, isValArg a]
 
 javaPops :: [CoreExpr] -> [Expr]
 javaPops args = [ vmPOP (primRepToType (Type.typePrimRep (CoreUtils.exprType a)))
@@ -419,20 +480,27 @@ javaPops args = [ vmPOP (primRepToType (Type.typePrimRep (CoreUtils.exprType a))
 		, isValArg a
 		]
 
--- The arg's might or might not be thunkable.
+
 -- The result is a list of statments that have the effect of
 -- pushing onto the stack (via one of the VM.PUSH* commands)
--- the argument, perhaps thunked.
+-- the argument, (or returning, or setting a variable)
+-- perhaps thunked.
 
-javaArg :: Maybe Name -> CoreExpr -> [Statement]
-javaArg _ (CoreSyn.Type t) = pprPanic "javaArg" (ppr t)
-javaArg ret e 
+{- This is mixing two things.
+ (1) Optimizations for things like primitives, whnf calls, etc.
+ (2) If something needs a thunk constructor round it.
+ - Seperate them at some point!
+ -}
+data ExprRetStyle = SetVar Name | PushExpr | ReturnExpr
+
+java_expr :: ExprRetStyle -> CoreExpr -> [Statement]
+java_expr _ (CoreSyn.Type t) = pprPanic "java_expr" (ppr t)
+java_expr ret e
    | isPrimCall = [push (fromJust maybePrim)]
 	-- This is a shortcut, 
 	-- basic names and literals do not need a code block
 	-- to compute the value.
-	-- (Perhaps String literals might??)
-   | isPrim primty && exprIsTrivial e = javaExpr push e
+   | isPrim primty && CoreUtils.exprIsTrivial e = javaExpr push e
    | isPrim primty =
  	  let expr  = javaExpr vmRETURN e
 	      code  = access (vmWHNF (newCode expr)) (primRepToType primty)
@@ -441,7 +509,7 @@ javaArg ret e
  	  let expr  = javaExpr vmRETURN e
 	      code  = newCode expr
 	      code' = if CoreUtils.exprIsValue e 
-		      || exprIsTrivial e 
+		      || CoreUtils.exprIsTrivial e 
 		      || isPrim primty
 		      then code
 		      else newThunk code
@@ -451,8 +519,9 @@ javaArg ret e
 	isPrimCall = isJust maybePrim
 
 	push e = case ret of
-		  Just name -> var [Final] name e
-		  Nothing -> vmPUSH e
+		  SetVar name -> var [Final] name e
+		  PushExpr -> vmPUSH e
+		  ReturnExpr -> vmRETURN e
 	corety = CoreUtils.exprType e
 	primty = Type.typePrimRep corety
 	isPrim PtrRep  = False	-- only this needs updated
@@ -460,13 +529,26 @@ javaArg ret e
 
 coreTypeToType = primRepToType . Type.typePrimRep . CoreUtils.exprType
 
--- The GOO version of this function
-exprIsTrivial (CoreSyn.Var v)
-  | Just op <- isPrimOpId_maybe v         = primOpIsDupable op
-  | otherwise                             = True
-exprIsTrivial (CoreSyn.Lit (MachInt _))   = True
-exprIsTrivial (CoreSyn.Lit (MachChar _))  = True
-exprIsTrivial other	      	          = False
+renameForKeywords :: (NamedThing name) => name -> String
+renameForKeywords name 
+  | str `elem` keywords = "zdk" ++ str
+  | otherwise            = str
+  where
+	str = getOccString name
+
+keywords :: [String]
+keywords =
+	[ "return"
+	, "if"
+	, "then"
+	, "else"
+	, "class"
+	, "instance"
+	, "import"
+	, "throw"
+	, "try"
+	]
+
 \end{code}
 
 %************************************************************************
@@ -509,7 +591,9 @@ vmRETURN e = Return (
 	ty = exprType e
 
 var :: [Modifier] -> Name -> Expr -> Statement
-var ms field_name value = Declaration (Field ms field_name (Just value))
+var ms field_name@(Name _ ty) value 
+   | exprType value == ty = Declaration (Field ms field_name (Just value))
+   | otherwise            = var ms field_name (Cast ty value)
 
 vmWHNF :: Expr -> Expr
 vmWHNF e = Call varVM whnfName [e]
@@ -519,9 +603,10 @@ suffix (PrimType t) = primName t
 suffix _            = ""
 
 primName :: PrimType -> String
-primName PrimInt  = "int"
-primName PrimChar = "char"
-primName _         = error "unsupported primitive"
+primName PrimInt       = "int"
+primName PrimChar      = "char"
+primName PrimBoolean   = "boolean"
+primName _             = error "unsupported primitive"
 
 varVM :: Expr
 varVM = Var vmName 
@@ -540,22 +625,12 @@ newThunk e = New thunkType [e] Nothing
 vmArg :: Parameter
 vmArg = Parameter [Final] vmName
 
-{-
-data HaskPrim
-  = FunPrimOp Int 			-- number of arguments expected
-	   ([Expr] -> Expr)	-- mapping from arguments
-  | CmpPrimOp			-- to prim call
-    	    
-getPrimTrans ::
--}
-
 -- This is called with boolean compares, checking 
 -- to see if we can do an obvious shortcut.
--- If there is, we return a (GOO) function for doing this,
+-- If there is, we return a (GOO) expression for doing this,
 
--- so if, we have case (#< x y) of { True -> e1; False -> e2 },
--- we will call splitCmpFn with (#< x y)
--- This return Right (Op x "<" y)
+-- So if, we have case (#< x y) of { True -> e1; False -> e2 },
+-- we will call findCmpFn with (#< x y), this return Just (Op x "<" y)
 
 findCmpPrim :: CoreExpr -> [Expr] -> Maybe Expr
 findCmpPrim (CoreSyn.App f a) as =
@@ -617,6 +692,8 @@ exprType (Literal lit)    = litType lit
 exprType (Cast t _)       = t
 exprType (New t _ _)      = t
 exprType (Call _ (Name _ t) _) = t
+exprType (Access _ (Name _ t)) = t
+exprType (Raise t _)           = error "do not know the type of raise!"
 exprType (Op _ op _) | op `elem` ["==","/=","<","<=","=>",">"]
 		     = PrimType PrimBoolean
 exprType (Op x op _) | op `elem` ["+","-","*"]
@@ -625,7 +702,7 @@ exprType expr = error ("can't figure out an expression type: " ++ show expr)
 
 litType (IntLit i)    = PrimType PrimInt
 litType (CharLit i)   = PrimType PrimChar
-litType (StringLit i) = stringType
+litType (StringLit i) = stringType	-- later, might use char array?
 \end{code}
 
 %************************************************************************
@@ -661,16 +738,21 @@ javaName n
   | otherwise = Name (getOccString n)
 		     (primRepToType (idPrimRep n))
 
--- TypeName's are always global. This would typically return something
+-- TypeName's are almost always global. This would typically return something
 -- like Test.foo or Test.Foozdc or PrelBase.foldr.
+-- Local might use locally bound types, (which do not have '.' in them).
 
 javaIdTypeName :: Id -> TypeName
-javaIdTypeName n = (moduleString (nameModule n') ++ "." ++ getOccString n')
+javaIdTypeName n
+    | isLocalName n' = renameForKeywords n'
+    | otherwise      = moduleString (nameModule n') ++ "." ++ renameForKeywords n'
   where
 	     n' = getName n
 
+-- There is no such thing as a local type constructor.
+
 javaTyConTypeName :: TyCon -> TypeName
-javaTyConTypeName n = (moduleString (nameModule n') ++ "." ++ getOccString n')
+javaTyConTypeName n = (moduleString (nameModule n') ++ "." ++ renameForKeywords n')
   where
 	     n' = getName n
 
@@ -686,9 +768,11 @@ javaConstrWkrName :: DataCon -> TypeName
 javaConstrWkrName = javaIdTypeName . dataConId
 
 -- Makes x_inst for Rec decls
+-- They are *never* is primitive
+-- and always have local (type) names.
 javaInstName :: Id -> Name
-javaInstName n = Name (getOccString n ++ "_inst")
-		      (primRepToType (idPrimRep n))
+javaInstName n = Name (renameForKeywords n ++ "zdi_inst")
+		      (Type (renameForKeywords n))
 \end{code}
 
 %************************************************************************
@@ -726,7 +810,8 @@ access expr (PrimType prim) = accessPrim (Cast valueType expr) prim
 access expr other           = expr
 
 accessPrim expr PrimInt  = Call expr (Name "intValue" inttype) []
-accessPrim expr PrimChar = Call expr (Name "intValue" chartype) []
+accessPrim expr PrimChar = Call expr (Name "charValue" chartype) []
+accessPrim expr other    = pprPanic "accessPrim" (text (show other))
 
 -- This is where we map from typename to types,
 -- allowing to match possible primitive types.
@@ -772,7 +857,6 @@ lifted inner class).
    when lifting.
 
 \begin{code}
-{-
 type Bound = [Name]
 type Frees = [Name]
 
@@ -797,18 +881,22 @@ both (name:names) (name':names')
 combineEnv :: Env -> [Name] -> Env
 combineEnv (Env bound env) new = Env (bound `combine` new) env
 
-addTypeMapping :: Name -> Name -> [Name] -> Env -> Env
-addTypeMapping origName newName frees (Env bound env) 
+addTypeMapping :: TypeName -> TypeName -> [Name] -> Env -> Env
+addTypeMapping origName newName frees (Env bound env)
 	= Env bound ((origName,(newName,frees)) : env)
 
 -- This a list of bound vars (with types)
--- and a mapping from types (?) to (result * [arg]) pairs
-data Env = Env Bound [(Name,(Name,[Name]))]
+-- and a mapping from old class name 
+--     to inner class name (with a list of frees that need passed
+--	                    to the inner class.)
+
+data Env = Env Bound [(TypeName,(TypeName,[Name]))]
 
 newtype LifterM a = 
   	LifterM { unLifterM ::
-		     Name ->
-		     Int -> ( a			-- *
+		     TypeName ->		-- this class name
+		     Int -> 			-- uniq supply
+			  ( a			-- *
 			    , Frees		-- frees
 			    , [Decl]		-- lifted classes
 			    , Int		-- The uniqs
@@ -827,19 +915,19 @@ instance Monad LifterM where
 					     , s)
 	  )
 
-access :: Env -> Name -> LifterM ()
-access env@(Env bound _) name 
+liftAccess :: Env -> Name -> LifterM ()
+liftAccess env@(Env bound _) name 
 	| name `elem` bound = LifterM (\ n s -> ((),[name],[],s))
 	| otherwise         = return ()
 
-scopedName :: Name -> LifterM a -> LifterM a
+scopedName :: TypeName -> LifterM a -> LifterM a
 scopedName name (LifterM m) =
    LifterM (\ _ s -> 
       case m name 1 of
 	(a,frees,lifted,_) -> (a,frees,lifted,s)
       )
 
-genAnonInnerClassName :: LifterM Name
+genAnonInnerClassName :: LifterM TypeName
 genAnonInnerClassName = LifterM (\ n s ->
 	( n ++ "$" ++ show s
 	, []
@@ -848,7 +936,7 @@ genAnonInnerClassName = LifterM (\ n s ->
 	)
     )
 
-genInnerClassName :: Name -> LifterM Name
+genInnerClassName :: TypeName -> LifterM TypeName
 genInnerClassName name = LifterM (\ n s ->
 	( n ++ "$" ++ name 
 	, []
@@ -885,19 +973,19 @@ liftDecl :: Bool -> Env -> Decl -> LifterM Decl
 liftDecl = \ top env decl ->
   case decl of
     { Import n -> return (Import n)
-    ; Field mfs t n e -> 
+    ; Field mfs n e -> 
       do { e <- liftMaybeExpr env e
-	 ; return (Field mfs (liftType env t) n e)
+	 ; return (Field mfs (liftName env n) e)
 	 }
     ; Constructor mfs n as ss -> 
       do { let newBound = getBoundAtParameters as
 	 ; (ss,_) <- liftStatements (combineEnv env newBound) ss
 	 ; return (Constructor mfs n (liftParameters env as) ss)
 	 }
-    ; Method mfs t n as ts ss -> 
+    ; Method mfs n as ts ss -> 
       do { let newBound = getBoundAtParameters as
 	 ; (ss,_) <- liftStatements (combineEnv env newBound) ss
-	 ; return (Method mfs (liftType env t) n (liftParameters env as) ts ss)
+	 ; return (Method mfs (liftName env n) (liftParameters env as) ts ss)
 	 }
     ; Comment s -> return (Comment s)
     ; Interface mfs n is ms -> error "interfaces not supported"
@@ -915,17 +1003,17 @@ liftDecls top env = mapM (liftDecl top env)
 getBoundAtDecls :: [Decl] -> Bound
 getBoundAtDecls = foldr combine [] . map getBoundAtDecl
 
--- TODO
 getBoundAtDecl :: Decl -> Bound
-getBoundAtDecl (Field _ _ n _) = [n]
-getBoundAtDecl _               = []
+getBoundAtDecl (Field _ n _) = [n]
+getBoundAtDecl _             = []
 
 getBoundAtParameters :: [Parameter] -> Bound
 getBoundAtParameters = foldr combine [] . map getBoundAtParameter
 
 -- TODO
 getBoundAtParameter :: Parameter -> Bound
-getBoundAtParameter (Parameter _ _ n) = [n]
+getBoundAtParameter (Parameter _ n) = [n]
+
 
 liftStatement :: Env -> Statement -> LifterM (Statement,Env)
 liftStatement = \ env stmt ->
@@ -940,9 +1028,9 @@ liftStatement = \ env stmt ->
     ; ExprStatement e -> do { e <- liftExpr env e
 			    ; return (ExprStatement e,env)
 			    }
-   ; Declaration decl@(Field mfs t n e) ->
+    ; Declaration decl@(Field mfs n e) ->
       do { e <- liftMaybeExpr env e
-	 ; return ( Declaration (Field mfs t n e)
+	 ; return ( Declaration (Field mfs (liftName env n) e)
 		  , env `combineEnv` getBoundAtDecl decl
 		  )
 	 }
@@ -982,14 +1070,13 @@ liftStatements env (s:ss) =
 	   ; return (s:ss,env) 
 	   }
 
-
 liftExpr :: Env -> Expr -> LifterM Expr
 liftExpr = \ env expr ->
  case expr of
-   { Var n t -> do { access env n 
-		   ; return (Var n t)
-	           }
-   ; Literal l _ -> return expr
+   { Var n -> do { liftAccess env n 
+		 ; return (Var (liftName env n))
+	         }
+   ; Literal l -> return expr
    ; Cast t e -> do { e <- liftExpr env e
 	            ; return (Cast (liftType env t) e) 
 	            }
@@ -1005,6 +1092,9 @@ liftExpr = \ env expr ->
    ; InstanceOf e t -> do { e <- liftExpr env e
 			  ; return (InstanceOf e (liftType env t))
 			  }	    
+   ; Raise n es -> do { es <- liftExprs env es
+		      ; return (Raise n es)
+		      }
    ; Call e n es -> do { e <- liftExpr env e
 		       ; es <- mapM (liftExpr env) es
 		       ; return (Call e n es) 
@@ -1016,11 +1106,14 @@ liftExpr = \ env expr ->
    ; New n es ds -> new env n es ds
    }
 
-liftParameter env (Parameter ms t n) = Parameter ms (liftType env t) n
+liftParameter env (Parameter ms n) = Parameter ms (liftName env n)
 liftParameters env = map (liftParameter env)
+
+liftName env (Name n t) = Name n (liftType env t)
 
 liftExprs :: Env -> [Expr] -> LifterM [Expr]
 liftExprs = mapM . liftExpr
+
 
 liftMaybeExpr :: Env -> (Maybe Expr) -> LifterM (Maybe Expr)
 liftMaybeExpr env Nothing     = return Nothing
@@ -1029,31 +1122,33 @@ liftMaybeExpr env (Just stmt) = do { stmt <- liftExpr env stmt
 				     }
 
 
+
 new :: Env -> Type -> [Expr] -> Maybe [Decl] -> LifterM Expr
 new env@(Env _ pairs) typ args Nothing =
   do { args <- liftExprs env args
-     ; return (listNew env typ args)
+     ; return (liftNew env typ args)
      }
 new env typ [] (Just inner) =
   -- anon. inner class
   do { innerName <- genAnonInnerClassName 
      ; frees <- liftClass env innerName inner [] [unType typ]
      ; return (New (Type (innerName)) 
-	      [ Var name (Type "<arg>") | name <- frees ] Nothing)
+	           (map Var frees) 
+	            Nothing)
      }
   where unType (Type name) = name
 	unType _             = error "incorrect type style"
-	
 new env typ _ (Just inner) = error "cant handle inner class with args"
 
-liftClass :: Env -> Name -> [Decl] -> [Name] -> [Name] -> LifterM [ Name ]
+
+liftClass :: Env -> TypeName -> [Decl] -> [TypeName] -> [TypeName] -> LifterM [ Name ]
 liftClass env@(Env bound _) innerName inner xs is =
   do { let newBound = getBoundAtDecls inner
      ; (inner,frees) <- 
 	   getFrees (liftDecls False (env `combineEnv` newBound) inner)
-     ; let trueFrees = filter (\ xs -> xs /= "VM") (both frees bound)
-     ; let freeDefs = [ Field [Final] objectType n Nothing | n <- trueFrees ]
-     ; let cons = mkCons innerName [(name,objectType) | name <- trueFrees ]
+     ; let trueFrees = filter (\ (Name xs _) -> xs /= "VM") (both frees bound)
+     ; let freeDefs = [ Field [Final] n Nothing | n <- trueFrees ]
+     ; let cons = mkCons innerName trueFrees
      ; let innerClass = Class [] innerName xs is (freeDefs ++ [cons] ++ inner)
      ; rememberClass innerClass
      ; return trueFrees
@@ -1071,9 +1166,6 @@ liftNew (Env _ env) typ@(Type name) exprs
    = case lookup name env of
 	Nothing                     -> New typ exprs Nothing
 	Just (nm,args) | null exprs 
-		-> New (Type nm) (map (\ v -> Var v (Type "<arg>")) args) Nothing
+		-> New (Type nm) (map Var args) Nothing
 	_ -> error "pre-lifted constructor with arguments"
-listNew _           typ exprs = New typ exprs Nothing
-
--}
 \end{code}

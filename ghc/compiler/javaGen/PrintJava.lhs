@@ -179,6 +179,8 @@ expr = \e ->
    ; Access e n -> expr e <> text "." <> name n
    ; Assign l r -> assign (expr l) r
    ; New n es ds -> new (typ n) es (maybeClass ds)
+   ; Raise n es  -> text "raise" <+> text n
+			<+> parens (hsep (punctuate comma (map expr es)))
    ; Call e n es -> call (expr e) (name n) es
    ; Op e1 o e2 -> op e1 o e2
    ; InstanceOf e t -> expr e <+> text "instanceof" <+> typ t
@@ -219,7 +221,7 @@ literal = \l ->
   case l of
     { IntLit i    -> text (show i)
     ; CharLit c   -> text (show c)
-    ; StringLit s -> text (show s)
+    ; StringLit s -> text ("\"" ++ s ++ "\"")	-- strings are already printable
     }
 
 maybeClass Nothing   = Nothing
