@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.61 2001/05/08 14:44:37 simonpj Exp $
+$Id: Parser.y,v 1.62 2001/05/08 16:25:30 simonpj Exp $
 
 Haskell grammar.
 
@@ -672,7 +672,7 @@ gdrhs :: { [RdrNameGRHS] }
 	| gdrh				{ [$1] }
 
 gdrh :: { RdrNameGRHS }
-	: '|' srcloc quals '=' exp  	{ GRHS (reverse (ExprStmt $5 $2 : $3)) $2 }
+	: '|' srcloc quals '=' exp  	{ GRHS (reverse (ResultStmt $5 $2 : $3)) $2 }
 
 -----------------------------------------------------------------------------
 -- Expressions
