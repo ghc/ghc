@@ -12,15 +12,19 @@ module HsMatches where
 
 IMP_Ubiq(){-uitous-}
 
-IMPORT_DELOOPER(HsLoop)		( HsExpr, Stmt, nullBinds, HsBinds )
-import Outputable	--( ifPprShowAll )
+-- Friends
+import HsExpr		( HsExpr, Stmt )
+import HsBinds		( HsBinds, nullBinds )
+
+-- Others
+import Outputable	( ifPprShowAll, PprStyle )
 import PprType		( GenType{-instance Outputable-} )
 import Pretty
 import SrcLoc		( SrcLoc{-instances-} )
 import Util		( panic )
+import Outputable	( Outputable(..) )
 #if __GLASGOW_HASKELL__ >= 202
 import Name
-import PprStyle
 #endif
        
 \end{code}
@@ -129,6 +133,10 @@ pprMatch sty is_case first_match
 		 4 (ppr sty expr))
 
 ----------------------------------------------------------
+
+pprGRHSsAndBinds :: (NamedThing id, Outputable id, Outputable pat,
+	            Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
+		PprStyle -> Bool -> GRHSsAndBinds tyvar uvar id pat -> Doc
 
 pprGRHSsAndBinds sty is_case (GRHSsAndBindsIn grhss binds)
  = ($$) (vcat (map (pprGRHS sty is_case) grhss))
