@@ -826,7 +826,7 @@ lex_num cont exts acc buf =
              -- files is not that common. (ToDo)
 	    case expandWhile# is_digit (incCurrentPos buf') of
               buf2 -> -- points to first non digit char
-		  case currentChar# buf of
+		  case currentChar# buf2 of
 			'E'# -> float_exponent cont exts buf2
 			'e'# -> float_exponent cont exts buf2
 			_    -> float_done cont exts buf2
