@@ -254,7 +254,7 @@ ioeSetHandle      ioe hdl      = ioe{ ioe_handle = Just hdl }
 ioeSetFileName    ioe filename = ioe{ ioe_filename = Just filename }
 
 modifyIOError :: (IOError -> IOError) -> IO a -> IO a
-modifyIOError f io = GHC.Exception.catch io (\e -> ioError (f e))
+modifyIOError f io = catch io (\e -> ioError (f e))
 
 -- -----------------------------------------------------------------------------
 -- annotating an IOError
