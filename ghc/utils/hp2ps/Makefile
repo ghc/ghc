@@ -8,7 +8,7 @@ C_PROG 	= hp2ps
 INSTALL_PROGS += $(C_PROG)
 
 SRC_CC_OPTS += -O
-LIBS	     = -lm
+LIBS	     = $(LIBM)
 
 CLEAN_FILES += $(C_OBJS) $(C_PROG)
 

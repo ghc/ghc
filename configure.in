@@ -842,6 +842,10 @@ else
 fi
 AC_SUBST(LibsReadline)
 
+dnl ** check for math library
+FPTOOLS_CHECK_LIBM()
+AC_SUBST(LIBM)
+
 dnl ################################################################
 dnl Check for libraries
 dnl ################################################################
