@@ -89,7 +89,7 @@ sub init_TARGET_STUFF {
     $T_COPY_DIRVS   = '^\s+\.(IMPORT|EXPORT)';
 
     $T_hsc_cc_PAT   = '\.STRING.*\)(hsc|cc) (.*)\\\\x09(.*)\\\\x00"';
-    $T_DOT_WORD	    = '\.(blockz|word|half|byte)';
+    $T_DOT_WORD	    = '\.word';
     $T_DOT_GLOBAL   = '^\s+\.EXPORT';
     $T_HDR_literal  = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$LIT\$\n";
     $T_HDR_misc	    = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
@@ -104,7 +104,7 @@ sub init_TARGET_STUFF {
     $T_HDR_direct   = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^i386-.*-(linuxaout|freebsd2|nextstep3|cygwin32|mingw32)$/ ) {
+    } elsif ( $TargetPlatform =~ /^i386-.*-(linuxaout|freebsd2|nextstep3|cygwin32)$/ ) {
 				# NeXT added but not tested. CaS
 
     $T_STABBY	    = 1; # 1 iff .stab things (usually if a.out format)
@@ -126,7 +126,6 @@ sub init_TARGET_STUFF {
     $T_HDR_data	    = "\.data\n\t\.align 2\n";
     $T_HDR_consist  = "\.text\n";
     $T_HDR_closure  = "\.data\n\t\.align 2\n";
-    $T_HDR_closure  = "\.data\n\t\.align 2\n\t.long 0\n" if ( $TargetPlatform =~ /.*-mingw32$/ );
     $T_HDR_srt      = "\.data\n\t\.align 2\n";
     $T_HDR_info	    = "\.text\n\t\.align 2\n"; # NB: requires padding
     $T_HDR_entry    = "\.text\n"; # no .align so we're right next to _info (arguably wrong...?)
@@ -394,7 +393,6 @@ sub mangle_asm {
     while (<INASM>) {
 	next if $T_STABBY && /^\.stab.*$TUS[@]?__stg_split_marker/o;
 	next if $T_STABBY && /^\.stab.*ghc.*c_ID/;
-	next if /^\t\.def.*endef$/;
 	next if /$TPREAPP(NO_)?APP/o; 
     	next if /^;/ && $TargetPlatform =~ /^hppa/;
 
@@ -1155,8 +1153,7 @@ sub print_doctored {
     local($_, $need_fallthru_patch) = @_;
 
     if ( $TargetPlatform !~ /^i386-/ 
-      || ! /^\t[a-z]/  # no instructions in here, apparently
-      || /^${T_US}_reg[A-Za-z0-9_]+${T_POST_LBL}/) {
+      || ! /^\t[a-z]/ ) { # no instructions in here, apparently
 	print OUTASM $_;
 	return;
     }
@@ -1334,7 +1331,7 @@ sub rev_tbl {
 	    push(@words, $lines[$i]);
 	}
     } else { # hppa weirdness
-	for ( ; $i <= $#lines && $lines[$i] =~ /^\s+($TDOTWORD|\.IMPORT)/; $i++) {
+	for ( ; $i <= $#lines && $lines[$i] =~ /^\s+\.(word|IMPORT)/; $i++) {
 	    if ($lines[$i] =~ /^\s+\.IMPORT/) {
 		push(@imports, $lines[$i]);
 	    } else {
@@ -1349,8 +1346,7 @@ sub rev_tbl {
     # now throw away the first word (SRT) iff it is empty.
     # The .zero business is for Linux/ELF.
     # The .skip business is for Sparc/Solaris/ELF.
-    # The .blockz business is for HPPA.
-    if ($discard1 && $words[0] =~ /^\t?($TDOTWORD\s+0|\.zero\s+4|\.skip\s+4|\.blockz\s+4)/) {
+    if ($discard1 && $words[0] =~ /^\t?($TDOTWORD\s+0|\.zero\s+4|\.skip\s+4)/) {
 	shift(@words)
     }
 
