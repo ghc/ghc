@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.41 2001/01/28 17:15:33 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.42 2001/01/30 10:52:14 simonmar Exp $
 --
 -- Driver flags
 --
@@ -298,11 +298,6 @@ static_flags =
   ,  ( "fno-strictness"	   , NoArg (writeIORef v_Strictness False) )
   ,  ( "fno-cpr"	   , NoArg (writeIORef v_CPR False) )
   ,  ( "fno-cse"	   , NoArg (writeIORef v_CSE False) )
-
-	-- flags that are "active negatives"
-  ,  ( "fno-prune-tydecls"	, PassFlag (add v_Opt_C) )
-  ,  ( "fno-prune-instdecls"	, PassFlag (add v_Opt_C) )
-  ,  ( "fno-pre-inlining"	, PassFlag (add v_Opt_C) )
 
 	-- All other "-fno-<blah>" options cancel out "-f<blah>" on the hsc cmdline
   ,  ( "fno-",			PrefixPred (\s -> isStaticHscFlag ("f"++s))
