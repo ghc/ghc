@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.87 2001/08/15 14:41:49 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.88 2001/08/15 15:39:59 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -25,7 +25,7 @@ import DriverUtil
 import Linker
 import Finder		( flushPackageCache )
 import Util
-import Id		( isDataConWrapId, idName )
+import Id		( isRecordSelector, isDataConWrapId, idName )
 import Class		( className )
 import TyCon		( tyConName )
 import SrcLoc		( isGoodSrcLoc )
@@ -399,10 +399,12 @@ info s = do
     showTyThing (ATyCon ty)
        = hcat [ppr ty, text " is a type constructor", showSrcLoc (tyConName ty)]
     showTyThing (AnId   id)
-       | isDataConWrapId id 
-       = hcat [ppr id, text " is a data constructor", showSrcLoc (idName id)]
-       | otherwise
-       = hcat [ppr id, text " is a variable", showSrcLoc (idName id)]
+       = hcat [ppr id, text " is a ", text (idDescr id), showSrcLoc (idName id)]
+
+    idDescr id
+       | isRecordSelector id  = "record selector"
+       | isDataConWrapId id   = "data constructor"
+       | otherwise            = "variable"
 
 	-- also print out the source location for home things
     showSrcLoc name
