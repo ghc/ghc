@@ -19,8 +19,7 @@ module Name (
 	nameOccName, nameModule, setNameOcc, nameRdrName, setNameModuleAndLoc, 
 	toRdrName, hashName,
 
-	isUserExportedName, isUserImportedName, isUserImportedExplicitlyName, 
-	maybeUserImportedFrom,
+	isUserExportedName,
 	nameSrcLoc, isLocallyDefinedName, isDllName,
 
 	isSystemName, isLocalName, isGlobalName, isExternallyVisibleName,
@@ -49,7 +48,7 @@ import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, rdrNameOcc,
 import CmdLineOpts	( opt_Static, opt_PprStyle_NoPrags, 
 			  opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 
-import SrcLoc		( noSrcLoc, SrcLoc )
+import SrcLoc		( builtinSrcLoc, noSrcLoc, SrcLoc )
 import Unique		( Unique, Uniquable(..), u2i, pprUnique )
 import Maybes		( expectJust )
 import FastTypes
@@ -178,8 +177,8 @@ mkImportedLocalName uniq occ loc = mkLocalName uniq occ loc
 
 
 mkGlobalName :: Unique -> Module -> OccName -> SrcLoc -> Name
-mkGlobalName uniq mod occ prov = Name { n_uniq = uniq, n_sort = Global mod,
-					n_occ = occ, n_loc = loc }
+mkGlobalName uniq mod occ loc = Name { n_uniq = uniq, n_sort = Global mod,
+				       n_occ = occ, n_loc = loc }
 				
 
 mkKnownKeyGlobal :: RdrName -> Unique -> Name
@@ -198,8 +197,7 @@ mkSysLocalName uniq fs = Name { n_uniq = uniq, n_sort = System,
 mkCCallName :: Unique -> EncodedString -> Name
 	-- The encoded string completely describes the ccall
 mkCCallName uniq str =  Name { n_uniq = uniq, n_sort = Local, 
-			       n_occ = mkCCallOcc str, 
-			       n_prov = noSrcLoc }
+			       n_occ = mkCCallOcc str, n_loc = noSrcLoc }
 
 mkTopName :: Unique -> Module -> FAST_STRING -> Name
 	-- Make a top-level name; make it Global if top-level
@@ -222,8 +220,7 @@ mkIPName uniq occ
   = Name { n_uniq = uniq,
 	   n_sort = Local,
 	   n_occ  = occ,
-	   -- ZZ is this an appropriate provinence?
-	   n_prov = SystemProv }
+	   n_loc = noSrcLoc }
 
 ---------------------------------------------------------------------
 mkDerivedName :: (OccName -> OccName)
@@ -438,78 +435,26 @@ instance Outputable Name where
 	-- When printing interfaces, all Locals have been given nice print-names
     ppr name = pprName name
 
-pprName (Name {n_sort = Local, n_uniq = uniq, n_occ = occ, n_prov = prov})
-	-- Locals
+pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
   = getPprStyle $ \ sty ->
-    if codeStyle sty then
-	pprUnique uniq		-- When printing in code we required all names to 
-				-- be globally unique; for example, we use this identifier
-				-- for the closure name.  So we just print the unique alone.
-    else
-	pprOccName occ <> pp_local_extra sty uniq
-  where
-    sys_local = case prov of
-		  SystemProv -> True
-		  other	     -> False
+    let local | debugStyle sty 
+              = pprOccName occ <> text "{-" <> pprUnique uniq <> text "-}"
+              | codeStyle sty
+              = pprUnique uniq
+              | otherwise
+              = pprOccName occ
 
-    pp_local_extra sty uniq
-	| sys_local      = underscore <> pprUnique uniq 	-- Must print uniques for sys_locals
-	| debugStyle sty = text "{-" <> pprUnique uniq <> text "-}"
-	| otherwise	 = empty
-
-
-pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ, n_prov = prov})
-	-- Globals, and wired in things
-  = getPprStyle $ \ sty ->
-    if codeStyle sty then
-	ppr mod <> underscore <> ppr occ
-    else
-    	pp_mod_dot sty <> ppr occ <> pp_global_debug sty uniq prov
-  where
-    mod = nameSortModule sort
-
-    pp_mod_dot sty
-      = case prov of
-    	   SystemProv -> pp_qual mod user_sty
-		-- ToDo (SDM): the following comment is out of date - do
-	        -- we need to do anything different now that WiredInNames
-		-- don't exist any more?
-
-		-- Hack alert!  Omit the qualifier on SystemProv things in 
-		-- user style.  I claim such SystemProv things will also be 
-		-- WiredIn things. We can't get the omit flag right
-		-- on wired in tycons etc (sigh) so we just leave it out in 
-		-- user style, and hope that leaving it out isn't too 
-		-- consfusing. (e.g. if the programmer hides Bool and  
-		-- redefines it.  If so, use -dppr-debug.)
-
-    	   LocalDef _ _ -> pp_qual mod (user_sty || iface_sty)
-
-    	   NonLocalDef (UserImport imp_mod _ _) omit 
-		| user_sty			     -> pp_qual imp_mod omit
-		| otherwise			     -> pp_qual mod     False
-    	   NonLocalDef ImplicitImport		omit -> pp_qual mod	(user_sty && omit)
-      where
-        user_sty  = userStyle sty
-        iface_sty = ifaceStyle sty
-    
-    pp_qual mod omit_qual
-        | omit_qual  = empty
-        | otherwise  = pprModule mod <> dot
-    
-    pp_global_debug sty uniq prov
-      | debugStyle sty = hcat [text "{-", pprUnique uniq, prov_p prov, text "-}"]
-      | otherwise      = empty
-
-    prov_p prov | opt_PprStyle_NoPrags = empty
-	        | otherwise	       = comma <> pp_prov prov
-
-pp_prov (LocalDef _ Exported)          = char 'x'
-pp_prov (LocalDef _ NotExported)       = char 'l'
-pp_prov (NonLocalDef ImplicitImport _) = char 'j'
-pp_prov (NonLocalDef (UserImport _ _ True ) _) = char 'I'	-- Imported by name
-pp_prov (NonLocalDef (UserImport _ _ False) _) = char 'i'	-- Imported by ..
-pp_prov SystemProv	     	       = char 's'
+        global m | codeStyle sty
+                 = ppr (moduleName m) <> char '_' <> pprOccName occ
+                 | debugStyle sty || not (isLocalModule m)
+                 = ppr (moduleName m) <> dot <> pprOccName occ
+                 | otherwise
+                 = pprOccName occ
+     in case sort of
+           System     -> local
+           Local      -> local
+           Exported   -> local
+           Global mod -> global mod
 \end{code}
 
 
