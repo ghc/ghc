@@ -395,16 +395,15 @@ ppHsClassDecl doc_map True (HsClassDecl loc ty decls) =
          ))
 
 ppHsClassDecl doc_map False decl@(HsClassDecl loc ty decls) =
-  linkTarget c +++ 
   if null decls
-    then declBox (ppClassHdr ty)
+    then declBox (linkTarget c +++ ppClassHdr ty)
     else td << (
 	   vanillaTable << (
 	     if isJust doc
 		then aboves [header, classdoc, body]
 		else aboves [header, body]
         ))
-   where header = declBox (ppClassHdr ty <+> keyword "where")
+   where header = declBox (linkTarget c +++ ppClassHdr ty <+> keyword "where")
 	 classdoc = docBox (markup htmlMarkup (fromJust doc))
 	 meth_hdr = td ! [ theclass "section4" ] << toHtml "Methods"
 	 body   = td << (
