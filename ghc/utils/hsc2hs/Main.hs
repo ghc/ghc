@@ -1,7 +1,7 @@
 {-# OPTIONS -fffi #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.52 2004/02/09 17:23:20 ross Exp $
+-- $Id: Main.hs,v 1.53 2004/02/15 12:20:26 panne Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -494,7 +494,12 @@ output flags name toks = do
     
     let cProgName    = outDir++outBase++"_hsc_make.c"
         oProgName    = outDir++outBase++"_hsc_make.o"
-        progName     = outDir++outBase++"_hsc_make" ++ EXEEXT
+        progName     = outDir++outBase++"_hsc_make"
+#if defined(mingw32_HOST_OS)
+-- This is a real hack, but the quoting mechanism used for calling the C preprocesseor
+-- via GHC has changed a few times, so this seems to be the only way...  :-P * * *
+                          ++ ".exe"
+#endif
 	outHFile     = outBase++"_hsc.h"
         outHName     = outDir++outHFile
         outCName     = outDir++outBase++"_hsc.c"

@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------
 # To compile with nhc98 on unix:
-#     nhc98 -cpp -DEXEEXT="\"\"" -package base -o hsc2hs-bin Main.hs
+#     nhc98 -cpp -package base -o hsc2hs-bin Main.hs
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -24,7 +24,10 @@ ifeq "$(ghc_ge_504)" "NO"
 SRC_HC_OPTS +=  -package util
 endif
 
-SRC_HC_OPTS      += -Wall -cpp '-DEXEEXT="$(exeext)"'
+# Note: Somehow we should pass $(exeext) here, but the history of changes used
+# for calling the C preprocessor via GHC has changed a few times, making a
+# clean solution impossible. So we revert to a hack in Main.hs...
+SRC_HC_OPTS      += -Wall -cpp
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 SRC_HC_OPTS      += -Dmingw32_HOST_OS=1
 endif
