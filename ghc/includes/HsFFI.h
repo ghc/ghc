@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsFFI.h,v 1.12 2000/12/13 11:57:19 simonmar Exp $
+ * $Id: HsFFI.h,v 1.13 2001/01/03 03:10:32 chak Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -78,10 +78,12 @@ typedef StgWord64		HsWord64;
 typedef StgFloat		HsFloat;
 typedef StgDouble		HsDouble;
 typedef StgBool			HsBool;
-typedef void*			HsAddr;         /* this should better match StgAddr */
+typedef void*			HsPtr;          /* this should better match StgAddr */
+typedef void			(*HsFunPtr)(void); /* this should better match StgAddr */
 typedef void*			HsForeignPtr;   /* ... and this StgForeignPtr       */
-typedef void*			HsForeignObj;   /* DEPRECATED */
 typedef void*			HsStablePtr;
+typedef void*			HsAddr;         /* DEPRECATED */
+typedef void*			HsForeignObj;   /* DEPRECATED */
 
 /* this should correspond to the type of StgChar in StgTypes.h */
 #define HS_CHAR_MIN		0
