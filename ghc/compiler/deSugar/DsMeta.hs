@@ -682,10 +682,11 @@ rep_bind :: LHsBind Name -> DsM (SrcSpan, Core TH.DecQ)
 rep_bind (L loc (FunBind fn infx [L _ (Match [] ty (GRHSs guards wheres ty2))]))
  = do { (ss,wherecore) <- repBinds wheres
 	; guardcore <- addBinds ss (repGuards guards)
-	; fn' <- lookupLBinder fn
-	; p   <- repPvar fn'
-	; ans <- repVal p guardcore wherecore
-	; return (loc, ans) }
+	; fn'  <- lookupLBinder fn
+	; p    <- repPvar fn'
+	; ans  <- repVal p guardcore wherecore
+	; ans' <- wrapGenSyns ss ans
+	; return (loc, ans') }
 
 rep_bind (L loc (FunBind fn infx ms))
  =   do { ms1 <- mapM repClauseTup ms
@@ -697,8 +698,9 @@ rep_bind (L loc (PatBind pat (GRHSs guards wheres ty2)))
  =   do { patcore <- repLP pat 
         ; (ss,wherecore) <- repBinds wheres
 	; guardcore <- addBinds ss (repGuards guards)
-        ; ans <- repVal patcore guardcore wherecore
-        ; return (loc, ans) }
+        ; ans  <- repVal patcore guardcore wherecore
+	; ans' <- wrapGenSyns ss ans
+        ; return (loc, ans') }
 
 rep_bind (L loc (VarBind v e))
  =   do { v' <- lookupBinder v 
