@@ -628,10 +628,55 @@ $ ghci -lm
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:def</literal></term>
+	<term><literal>:def</literal> <replaceable>name</replaceable> <replaceable>expr</replaceable></term>
 	<indexterm><primary><literal>:def</literal></primary></indexterm>
 	<listitem>
-	  <para>ToDo.</para>
+	  <para>The command <literal>:def</literal>
+	  <replaceable>name</replaceable>
+	  <replaceable>expr</replaceable> defines a new GHCi command
+	  <literal>:<replaceable>name</replaceable></literal>,
+	  implemented by the Haskell expression
+	  <replaceable>expr</replaceable>, which must have type
+	  <literal>String -> IO String</literal>.  When
+	  <literal>:<replaceable>name</replaceable>
+	  <replaceable>args</replaceable></literal> is typed at the
+	  prompt, GHCi will run the expression
+	  <literal>(<replaceable>name</replaceable>
+	  <replaceable>args</replaceable>)</literal>, take the
+	  resulting <literal>String</literal>, and feed it back into
+	  GHCi as a new sequence of commands.  Separate commands in
+	  the result must be separated by
+	  &lsquo;<literal>\n</literal>&rsquo;.</para>
+
+	  <para>That's all a little confusing, so here's a few
+	  examples.  To start with, here's a new GHCi command which
+	  doesn't take any arguments or produce any results, it just
+	  outputs the current date & time:</para>
+
+<screen>
+Prelude> let date _ = Time.getClockTime >>= print >> return ""
+Prelude> :def date date
+Prelude> :date
+Fri Mar 23 15:16:40 GMT 2001
+</screen>
+
+	  <para>Here's an example of a command that takes an argument.
+	  It's a re-implementation of <literal>:cd</literal>:</para>
+
+<screen>
+Prelude> let mycd d = Directory.setCurrentDirectory d >> return ""
+Prelude> :def mycd mycd
+Prelude> :mycd ..
+</screen>
+
+	  <para>Or I could define a simple way to invoke
+	  &ldquo;<literal>ghc --make Main</literal>&rdquo; in the
+	  current directory:</para>
+
+<screen>
+Prelude> :def make (\_ -> return ":! ghc --make Main")
+</screen>
+
 	</listitem>
       </varlistentry>
 
@@ -711,6 +756,16 @@ $ ghci -lm
 	  forall quantifiers for polymorphic types.  The monomorphism
 	  restriction is <emphasis>not</emphasis> applied to the
 	  expression during type inference.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>:undef</literal> <replaceable>name</replaceable></term>
+	<indexterm><primary><literal>:undef</literal></primary></indexterm>
+	<listitem>
+	  <para>Undefines the user-defined command
+	  <replaceable>name</replaceable> (see <literal>:def</literal>
+	  above).</para>
 	</listitem>
       </varlistentry>
 
