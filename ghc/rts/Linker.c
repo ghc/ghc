@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.116 2003/03/25 17:58:47 sof Exp $
+ * $Id: Linker.c,v 1.117 2003/03/31 12:35:21 simonmar Exp $
  *
- * (c) The GHC Team, 2000, 2001
+ * (c) The GHC Team, 2000-2003
  *
  * RTS Object Linker
  *
@@ -59,7 +59,7 @@
 #include <sys/mman.h>
 #endif
 
-#if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS) || defined(freebsd_TARGET_OS)
+#if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS) || defined(freebsd_TARGET_OS) || defined(netbsd_TARGET_OS)
 #  define OBJFORMAT_ELF
 #elif defined(cygwin32_TARGET_OS) || defined (mingw32_TARGET_OS)
 #  define OBJFORMAT_PEi386
