@@ -277,4 +277,4 @@ endif
 
 % : %.pp
 	rm -f $@
-	$(CPP) -I$(GHC_INCLUDE_DIR) -x c $< | $(SED) -e '/^#/d' > $@
+	$(CPP) $(CPP_OPTS) -x c $< | $(SED) -e '/^#/d' > $@

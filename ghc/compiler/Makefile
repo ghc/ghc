@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.188 2001/08/15 18:31:57 qrczak Exp $
+# $Id: Makefile,v 1.189 2001/08/16 22:54:24 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -323,6 +323,8 @@ PRIMOP_BITS=primop-data-decl.hs-incl \
             primop-strictness.hs-incl  \
             primop-usage.hs-incl  \
             primop-primop-info.hs-incl
+
+SRC_CPP_OPTS += -I$(GHC_INCLUDE_DIR)
 
 ifneq "$(BootingFromHc)" "YES"
 prelude/PrimOp.lhs prelude/PrimOp.o: $(PRIMOP_BITS)

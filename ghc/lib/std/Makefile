@@ -63,6 +63,10 @@ PrelCError_HC_OPTS   = +RTS -K4m -RTS
 SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR)
 
 #-----------------------------------------------------------------------------
+# 	Pre-processing (.pp) files
+SRC_CPP_OPTS += -I$(GHC_INCLUDE_DIR)
+
+#-----------------------------------------------------------------------------
 # 	Rules
 
 PrelPrimopWrappers.hs: ../../compiler/prelude/primops.txt
