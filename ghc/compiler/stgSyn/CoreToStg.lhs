@@ -79,6 +79,25 @@ does some important transformations:
     are globally unique, not simply not-in-scope, which is all that 
     the simplifier ensures.
 
+4.  If we are going to do object-file splitting, we make ALL top-level
+    names into Globals.  Why?
+ 
+    In certain (prelude only) modules we split up the .hc file into
+    lots of separate little files, which are separately compiled by the C
+    compiler.  That gives lots of little .o files.  The idea is that if
+    you happen to mention one of them you don't necessarily pull them all
+    in.  (Pulling in a piece you don't need can be v bad, because it may
+    mention other pieces you don't need either, and so on.)
+    
+   Sadly, splitting up .hc files means that local names (like s234) are
+   now globally visible, which can lead to clashes between two .hc
+   files. So we make them all Global, so they are printed complete
+   with their module name.
+
+   We don't want to do this in CoreTidy, because at that stage we use
+   Global to mean "external" and hence "should appear in interface files".
+   This object-file splitting thing is a code generator matter that we
+   don't want to pollute earlier phases.
 
 NOTE THAT:
 
@@ -653,6 +672,7 @@ newLocalId NotTopLevel env id
 newLocalIds :: TopLevelFlag -> StgEnv -> [Id] -> UniqSM (StgEnv, [Id])
 newLocalIds top_lev env []
   = returnUs (env, [])
+
 newLocalIds top_lev env (b:bs)
   = newLocalId top_lev env b	`thenUs` \ (env', b') ->
     newLocalIds top_lev env' bs	`thenUs` \ (env'', bs') ->

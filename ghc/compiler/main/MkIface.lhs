@@ -24,23 +24,24 @@ import HscTypes		( VersionInfo(..), ModIface(..), ModDetails(..),
 			  IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
 			  TyThing(..), DFunId, TypeEnv, isTyClThing, Avails,
 			  WhatsImported(..), GenAvailInfo(..), 
-			  ImportVersion, AvailInfo, Deprecations(..)
+			  ImportVersion, AvailInfo, Deprecations(..),
+			  extendTypeEnvList
 			)
 
 import CmdLineOpts
-import Id		( Id, idType, idInfo, omitIfaceSigForId, isExportedId, hasNoBinding,
-			  idSpecialisation, idName, setIdInfo
+import Id		( Id, idType, idInfo, omitIfaceSigForId, 
+			  idSpecialisation, setIdInfo, isLocalId
 			)
 import Var		( isId )
 import VarSet
 import DataCon		( StrictnessMark(..), dataConSig, dataConFieldLabels, dataConStrictMarks )
 import IdInfo		-- Lots
-import CoreSyn		( CoreExpr, CoreBind, Bind(..), CoreRule(..), IdCoreRule, 
-			  isBuiltinRule, rulesRules, rulesRhsFreeVars, emptyCoreRules,
-			  bindersOfBinds
+import CoreSyn		( CoreBind, CoreRule(..), IdCoreRule, 
+			  isBuiltinRule, rulesRules, 
+			  bindersOf, bindersOfBinds
 			)
-import CoreFVs		( exprSomeFreeVars, ruleSomeLhsFreeVars, ruleSomeFreeVars, mustHaveLocalBinding )
-import CoreUnfold	( okToUnfoldInHiFile, mkTopUnfolding, neverUnfold, unfoldingTemplate, noUnfolding )
+import CoreFVs		( ruleSomeLhsFreeVars, ruleSomeFreeVars )
+import CoreUnfold	( neverUnfold, unfoldingTemplate )
 import Name		( getName, nameModule, Name, NamedThing(..) )
 import Name 	-- Env
 import OccName		( pprOccName )
@@ -54,7 +55,6 @@ import SrcLoc		( noSrcLoc )
 import Outputable
 import Module		( ModuleName )
 
-import List		( partition )
 import IO		( IOMode(..), openFile, hClose )
 \end{code}
 
@@ -89,25 +89,20 @@ mkModDetails type_env dfun_ids tidy_binds stg_ids orphan_rules
 	-- However, we do keep things like constructors, which should not appear 
 	-- in interface files, because they are needed by importing modules when
 	-- using the compilation manager
-    new_type_env = mkNameEnv [(getName tycl, tycl) | tycl <- orig_type_env, isTyClThing tycl]
-			`plusNameEnv`
-		   mkNameEnv [(idName id, AnId id) | id <- final_ids]
+    new_type_env = extendTypeEnvList (filterNameEnv isTyClThing type_env)
+				     (map AnId final_ids)
 
-    orig_type_env = nameEnvElts type_env
+    stg_id_set = mkVarSet stg_ids
+    final_ids  = [addStgInfo stg_id_set id | bind <- tidy_binds
+					   , id <- bindersOf bind
+					   , isGlobalName (idName id)]
 
-    final_ids = bindsToIds (mkVarSet dfun_ids `unionVarSet` orphan_rule_ids)
-			   (mkVarSet stg_ids)
-			   tidy_binds
 
 	-- The complete rules are gotten by combining
 	--	a) the orphan rules
 	--	b) rules embedded in the top-level Ids
     rule_dcls | opt_OmitInterfacePragmas = []
 	      | otherwise		 = getRules orphan_rules tidy_binds (mkVarSet final_ids)
-
-    orphan_rule_ids = unionVarSets [ ruleSomeFreeVars interestingId rule 
-				   | (_, rule) <- orphan_rules]
-
 
 -- This version is used when we are re-linking a module
 -- so we've only run the type checker on its previous interface 
@@ -121,8 +116,96 @@ mkModDetailsFromIface type_env dfun_ids rules
   where
     rule_dcls = [(id,rule) | IfaceRuleOut id rule <- rules]
 	-- All the rules from an interface are of the IfaceRuleOut form
+\end{code}
 
 
+We have to add on the arity and CAF info computed by the code generator
+This is also the moment at which we may forget that this function has
+a worker: see the comments below
+
+\begin{code}
+addStgInfo :: IdSet 	-- Ids used at code-gen time; they have better pragma info!
+	   -> Id -> Id
+addStgInfo stg_ids id
+  = id `setIdInfo` final_idinfo
+  where
+    idinfo  = idInfo id
+    idinfo' = idinfo `setArityInfo` stg_arity
+		     `setCafInfo`   cafInfo stg_idinfo
+    final_idinfo | worker_ok = idinfo'
+		 | otherwise = idinfo' `setWorkerInfo` NoWorker
+		
+    stg_idinfo = case lookupVarSet stg_ids id of
+			Just id' -> idInfo id'
+			Nothing  -> pprTrace "ifaceBinds not found:" (ppr id) $
+				    idInfo id
+
+    stg_arity = arityInfo stg_idinfo
+
+    ------------  Worker  --------------
+	-- We only treat a function as having a worker if
+	-- the exported arity (which is now the number of visible lambdas)
+	-- is the same as the arity at the moment of the w/w split
+	-- If so, we can safely omit the unfolding inside the wrapper, and
+	-- instead re-generate it from the type/arity/strictness info
+	-- But if the arity has changed, we just take the simple path and
+	-- put the unfolding into the interface file, forgetting the fact
+	-- that it's a wrapper.  
+	--
+	-- How can this happen?  Sometimes we get
+	--	f = coerce t (\x y -> $wf x y)
+	-- at the moment of w/w split; but the eta reducer turns it into
+	--	f = coerce t $wf
+	-- which is perfectly fine except that the exposed arity so far as
+	-- the code generator is concerned (zero) differs from the arity
+	-- when we did the split (2).  
+	--
+	-- All this arises because we use 'arity' to mean "exactly how many
+	-- top level lambdas are there" in interface files; but during the
+	-- compilation of this module it means "how many things can I apply
+	-- this to".
+    worker_ok = case workerInfo idinfo of
+		     NoWorker		          -> True
+		     HasWorker work_id wrap_arity -> wrap_arity == arityLowerBound stg_arity
+\end{code}
+
+
+\begin{code}
+getRules :: [IdCoreRule] 	-- Orphan rules
+	 -> [CoreBind]		-- Bindings, with rules in the top-level Ids
+	 -> IdSet		-- Ids that are exported, so we need their rules
+	 -> [IdCoreRule]
+getRules orphan_rules binds emitted
+  = orphan_rules ++ local_rules
+  where
+    local_rules  = [ (fn, rule)
+ 		   | fn <- bindersOfBinds binds,
+		     fn `elemVarSet` emitted,
+		     rule <- rulesRules (idSpecialisation fn),
+		     not (isBuiltinRule rule),
+				-- We can't print builtin rules in interface files
+				-- Since they are built in, an importing module
+				-- will have access to them anyway
+
+			-- Sept 00: I've disabled this test.  It doesn't stop many, if any, rules
+			-- from coming out, and to make it work properly we need to add ????
+			--	(put it back in for now)
+		     all (`elemVarSet` emitted) (varSetElems (ruleSomeLhsFreeVars interestingId rule))
+				-- Spit out a rule only if all its lhs free vars are emitted
+				-- This is a good reason not to do it when we emit the Id itself
+		   ]
+
+interestingId id = isId id && isLocalId id
+\end{code}
+
+
+%************************************************************************
+%*				 					*
+\subsection{Completing an interface}
+%*				 					*
+%************************************************************************
+
+\begin{code}
 completeIface :: Maybe ModIface		-- The old interface, if we have it
 	      -> ModIface		-- The new one, minus the decls and versions
 	      -> ModDetails		-- The ModDetails for this module
@@ -142,12 +225,6 @@ completeIface maybe_old_iface new_iface mod_details
      rule_dcls   = map ifaceRule (md_rules mod_details)
 \end{code}
 
-
-%************************************************************************
-%*				 					*
-\subsection{Types and classes}
-%*				 					*
-%************************************************************************
 
 \begin{code}
 ifaceTyCls :: TyThing -> [RenamedTyClDecl] -> [RenamedTyClDecl]
@@ -255,24 +332,21 @@ ifaceTyCls (AnId id) so_far
 
 
     ------------  Worker  --------------
-    wrkr_hsinfo = case workerInfo id_info of
+    work_info   = workerInfo id_info
+    has_worker  = case work_info of { HasWorker _ _ -> True; other -> False }
+    wrkr_hsinfo = case work_info of
 		    HasWorker work_id wrap_arity -> [HsWorker (getName work_id)]
 		    NoWorker			 -> []
 
     ------------  Unfolding  --------------
+	-- The unfolding is redundant if there is a worker
     unfold_info = unfoldingInfo id_info
     inline_prag = inlinePragInfo id_info
     rhs		= unfoldingTemplate unfold_info
-    unfold_hsinfo | neverUnfold unfold_info = []
-		  | otherwise		    = [HsUnfold inline_prag (toUfExpr rhs)]
+    unfold_hsinfo |  neverUnfold unfold_info 
+		  || has_worker = []
+		  | otherwise	= [HsUnfold inline_prag (toUfExpr rhs)]
 \end{code}
-
-
-%************************************************************************
-%*				 					*
-\subsection{Instances and rules}
-%*				 					*
-%************************************************************************
 
 \begin{code}
 ifaceInstance :: DFunId -> RenamedInstDecl
@@ -299,212 +373,6 @@ ifaceRule (id, Rule name bndrs args rhs)
 
 bogusIfaceRule id
   = IfaceRule SLIT("bogus") [] (getName id) [] (UfVar (getName id)) noSrcLoc
-\end{code}
-
-
-%************************************************************************
-%*				 					*
-\subsection{Compute final Ids}
-%*				 					* 
-%************************************************************************
-
-A "final Id" has exactly the IdInfo for going into an interface file, or
-exporting to another module.
-
-\begin{code}
-bindsToIds :: IdSet		-- These Ids are needed already
-	   -> IdSet		-- Ids used at code-gen time; they have better pragma info!
-	   -> [CoreBind]	-- In dependency order, later depend on earlier
-	   -> [Id]		-- Set of Ids actually spat out, complete with exactly the IdInfo
-				-- they need for exporting to another module
-
-bindsToIds needed_ids codegen_ids binds
-  = go needed_ids (reverse binds) []
-		-- Reverse so that later things will 
-		-- provoke earlier ones to be emitted
-  where
-	-- The 'needed' set contains the Ids that are needed by earlier
-	-- interface file emissions.  If the Id isn't in this set, and isn't
-	-- exported, there's no need to emit anything
-    need_id needed_set id = id `elemVarSet` needed_set || isExportedId id 
-
-    go needed [] emitted
-	| not (isEmptyVarSet needed) = pprTrace "ifaceBinds: free vars:" 
-					  (sep (map ppr (varSetElems needed)))
-				       emitted
-	| otherwise 		     = emitted
-
-    go needed (NonRec id rhs : binds) emitted
-	| need_id needed id = go new_needed binds (new_id:emitted)
-	| otherwise	    = go needed     binds emitted
-	where
-	  (new_id, extras) = mkFinalId codegen_ids False id rhs
-	  new_needed       = (needed `unionVarSet` extras) `delVarSet` id
-
-	-- Recursive groups are a bit more of a pain.  We may only need one to
-	-- start with, but it may call out the next one, and so on.  So we
-	-- have to look for a fixed point.  We don't want necessarily them all, 
-	-- because without -O we may only need the first one (if we don't emit
-	-- its unfolding)
-    go needed (Rec pairs : binds) emitted
-	= go needed' binds emitted' 
-	where
-	  (new_emitted, extras) = go_rec needed pairs
-	  needed'  = (needed `unionVarSet` extras) `minusVarSet` mkVarSet (map fst pairs) 
-	  emitted' = new_emitted ++ emitted 
-
-    go_rec :: IdSet -> [(Id,CoreExpr)] -> ([Id], IdSet)
-    go_rec needed pairs
-	| null needed_prs = ([], emptyVarSet)
-	| otherwise 	  = (emitted ++           more_emitted,
-			     extras `unionVarSet` more_extras)
-	where
-	  (needed_prs,leftover_prs)   = partition is_needed pairs
-	  (emitted, extras_s)         = unzip [ mkFinalId codegen_ids True id rhs 
-				    	      | (id,rhs) <- needed_prs, not (omitIfaceSigForId id)]
-	  extras	              = unionVarSets extras_s
-	  (more_emitted, more_extras) = go_rec extras leftover_prs
-
-	  is_needed (id,_) = need_id needed id
-\end{code}
-
-
-
-\begin{code}
-mkFinalId :: IdSet		-- The Ids with arity info from the code generator
-	  -> Bool		-- True <=> recursive, so don't include unfolding
-	  -> Id
-	  -> CoreExpr		-- The Id's right hand side
-	  -> (Id, IdSet)	-- The emitted id, plus any *extra* needed Ids
-
-mkFinalId codegen_ids is_rec id rhs
-  | omitIfaceSigForId id 
-  = (id, emptyVarSet)		-- An optimisation for top-level constructors and suchlike
-  | otherwise
-  = (id `setIdInfo` new_idinfo, new_needed_ids)
-  where
-    core_idinfo = idInfo id
-    stg_idinfo  = case lookupVarSet codegen_ids id of
-			Just id' -> idInfo id'
-			Nothing  -> pprTrace "ifaceBinds not found:" (ppr id) $
-				    idInfo id
-
-    new_idinfo | opt_OmitInterfacePragmas
-	       = constantIdInfo
- 	       | otherwise		  
-	       = core_idinfo `setArityInfo` 	 arity_info
-			     `setCafInfo`   	 cafInfo stg_idinfo
-			     `setUnfoldingInfo`	 unfold_info
-			     `setWorkerInfo`	 worker_info
-			     `setSpecInfo`	 emptyCoreRules
-	-- We zap the specialisations because they are
-	-- passed on separately through the modules IdCoreRules
-
-    ------------  Arity  --------------
-    arity_info = arityInfo stg_idinfo
-    stg_arity  = arityLowerBound arity_info
-
-    ------------  Worker  --------------
-	-- We only treat a function as having a worker if
-	-- the exported arity (which is now the number of visible lambdas)
-	-- is the same as the arity at the moment of the w/w split
-	-- If so, we can safely omit the unfolding inside the wrapper, and
-	-- instead re-generate it from the type/arity/strictness info
-	-- But if the arity has changed, we just take the simple path and
-	-- put the unfolding into the interface file, forgetting the fact
-	-- that it's a wrapper.  
-	--
-	-- How can this happen?  Sometimes we get
-	--	f = coerce t (\x y -> $wf x y)
-	-- at the moment of w/w split; but the eta reducer turns it into
-	--	f = coerce t $wf
-	-- which is perfectly fine except that the exposed arity so far as
-	-- the code generator is concerned (zero) differs from the arity
-	-- when we did the split (2).  
-	--
-	-- All this arises because we use 'arity' to mean "exactly how many
-	-- top level lambdas are there" in interface files; but during the
-	-- compilation of this module it means "how many things can I apply
-	-- this to".
-    worker_info = case workerInfo core_idinfo of
-		     info@(HasWorker work_id wrap_arity)
-			| wrap_arity == stg_arity -> info
-			| otherwise	          -> pprTrace "ifaceId: arity change:" (ppr id) 
-						     NoWorker
-		     NoWorker		          -> NoWorker
-
-    has_worker = case worker_info of
-		   HasWorker _ _ -> True
-		   other	 -> False
-
-    HasWorker work_id _ = worker_info
-
-    ------------  Unfolding  --------------
-    inline_pragma  = inlinePragInfo core_idinfo
-    dont_inline	   = isNeverInlinePrag inline_pragma
-    loop_breaker   = isLoopBreaker (occInfo core_idinfo)
-    bottoming_fn   = isBottomingStrictness (strictnessInfo core_idinfo)
-
-    unfolding    = mkTopUnfolding rhs
-    rhs_is_small = not (neverUnfold unfolding)
-
-    unfold_info | show_unfold = unfolding
-		| otherwise   = noUnfolding
-
-    show_unfold = not has_worker	 &&	-- Not unnecessary
-		  not bottoming_fn	 &&	-- Not necessary
-		  not dont_inline	 &&
-		  not loop_breaker	 &&
-		  rhs_is_small		 &&	-- Small enough
-		  okToUnfoldInHiFile rhs 	-- No casms etc
-
-
-    ------------  Extra free Ids  --------------
-    new_needed_ids | opt_OmitInterfacePragmas = emptyVarSet
-	           | otherwise		      = worker_ids	`unionVarSet`
-						unfold_ids	`unionVarSet`
-						spec_ids
-
-    spec_ids = filterVarSet interestingId (rulesRhsFreeVars (specInfo core_idinfo))
-
-    worker_ids | has_worker && interestingId work_id = unitVarSet work_id
-			-- Conceivably, the worker might come from
-			-- another module
-	       | otherwise = emptyVarSet
-
-    unfold_ids | show_unfold = find_fvs rhs
-	       | otherwise   = emptyVarSet
-
-    find_fvs expr = exprSomeFreeVars interestingId expr
-
-interestingId id = isId id && mustHaveLocalBinding id
-\end{code}
-
-
-\begin{code}
-getRules :: [IdCoreRule] 	-- Orphan rules
-	 -> [CoreBind]		-- Bindings, with rules in the top-level Ids
-	 -> IdSet		-- Ids that are exported, so we need their rules
-	 -> [IdCoreRule]
-getRules orphan_rules binds emitted
-  = orphan_rules ++ local_rules
-  where
-    local_rules  = [ (fn, rule)
- 		   | fn <- bindersOfBinds binds,
-		     fn `elemVarSet` emitted,
-		     rule <- rulesRules (idSpecialisation fn),
-		     not (isBuiltinRule rule),
-				-- We can't print builtin rules in interface files
-				-- Since they are built in, an importing module
-				-- will have access to them anyway
-
-			-- Sept 00: I've disabled this test.  It doesn't stop many, if any, rules
-			-- from coming out, and to make it work properly we need to add ????
-			--	(put it back in for now)
-		     all (`elemVarSet` emitted) (varSetElems (ruleSomeLhsFreeVars interestingId rule))
-				-- Spit out a rule only if all its lhs free vars are emitted
-				-- This is a good reason not to do it when we emit the Id itself
-		   ]
 \end{code}
 
 
@@ -584,7 +452,7 @@ diffDecls old_vers old_fixities new_fixities old new
     diff ok_so_far pp new_vers old []      = (False,     pp, new_vers)
     diff ok_so_far pp new_vers [] (nd:nds) = diff False (pp $$ only_new nd) new_vers [] nds
     diff ok_so_far pp new_vers (od:ods) (nd:nds)
-	= case nameOccName od_name `compare` nameOccName nd_name of
+	= case od_name `compare` nd_name of
 		LT -> diff False (pp $$ only_old od) new_vers ods      (nd:nds)
 		GT -> diff False (pp $$ only_new nd) new_vers (od:ods) nds
 		EQ | od `eq_tc` nd -> diff ok_so_far pp 		   new_vers  ods nds

@@ -4,7 +4,10 @@
 \section[GHC_Main]{Main driver for Glasgow Haskell compiler}
 
 \begin{code}
-module HscMain ( HscResult(..), hscMain, hscExpr, hscTypeExpr,
+module HscMain ( HscResult(..), hscMain, 
+#ifdef GHCI
+		 hscExpr, hscTypeExpr,
+#endif
 		 initPersistentCompilerState ) where
 
 #include "HsVersions.h"
@@ -33,7 +36,6 @@ import TcHsSyn
 import InstEnv		( emptyInstEnv )
 import Desugar
 import SimplCore
-import OccurAnal	( occurAnalyseBinds )
 import CoreUtils	( coreBindsSize )
 import CoreTidy		( tidyCorePgm )
 import CoreToStg	( topCoreBindsToStg )
@@ -213,12 +215,12 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
       	  -- We grab the the unfoldings at this point.
 	; simpl_result <- dsThenSimplThenTidy dflags pcs_tc hst this_mod 
  					      print_unqualified is_exported tc_result
-	; let (tidy_binds, orphan_rules, foreign_stuff) = simpl_result
+	; let (pcs_simpl, tidy_binds, orphan_rules, foreign_stuff) = simpl_result
       	    
  	    -------------------
  	    -- CONVERT TO STG
  	    -------------------
-	; (stg_binds, oa_tidy_binds, cost_centre_info, top_level_ids) 
+	; (stg_binds, cost_centre_info, top_level_ids) 
       	     <- myCoreToStg dflags this_mod tidy_binds
 
 
@@ -236,11 +238,11 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
 	; (maybe_stub_h_filename, maybe_stub_c_filename, maybe_ibinds)
       	     <- restOfCodeGeneration dflags toInterp this_mod
  		   (map ideclName (hsModuleImports rdr_module))
-      		   cost_centre_info foreign_stuff env_tc stg_binds oa_tidy_binds
-      		   hit (pcs_PIT pcs_tc)       
+      		   cost_centre_info foreign_stuff env_tc stg_binds tidy_binds
+      		   hit (pcs_PIT pcs_simpl)       
 
       	  -- and the answer is ...
-	; return (HscRecomp pcs_tc new_details final_iface
+	; return (HscRecomp pcs_simpl new_details final_iface
                             maybe_stub_h_filename maybe_stub_c_filename
       			    maybe_ibinds)
       	  }}}}}}}
@@ -296,7 +298,7 @@ myParseModule dflags src_filename
 
 
 restOfCodeGeneration dflags toInterp this_mod imported_module_names cost_centre_info 
-                     foreign_stuff env_tc stg_binds oa_tidy_binds
+                     foreign_stuff env_tc stg_binds tidy_binds
                      hit pit -- these last two for mapping ModNames to Modules
  | toInterp
  = do (ibinds,itbl_env) 
@@ -315,7 +317,7 @@ restOfCodeGeneration dflags toInterp this_mod imported_module_names cost_centre_
       -- _scc_     "CodeOutput"
       (maybe_stub_h_name, maybe_stub_c_name)
          <- codeOutput dflags this_mod local_tycons
-                       oa_tidy_binds stg_binds
+                       tidy_binds stg_binds
                        c_code h_code abstractC
 
       return (maybe_stub_h_name, maybe_stub_c_name, Nothing)
@@ -349,17 +351,14 @@ dsThenSimplThenTidy dflags pcs hst this_mod print_unqual is_exported tc_result
          <- core2core dflags pcs hst is_exported desugared rules
 
       -- Do the final tidy-up
-      (tidy_binds, tidy_orphan_rules) 
-         <- tidyCorePgm dflags this_mod simplified orphan_rules
+      (pcs', tidy_binds, tidy_orphan_rules) 
+         <- tidyCorePgm dflags this_mod pcs simplified orphan_rules
       
-      return (tidy_binds, tidy_orphan_rules, (fe_binders,h_code,c_code))
+      return (pcs', tidy_binds, tidy_orphan_rules, (fe_binders,h_code,c_code))
 
 
 myCoreToStg dflags this_mod tidy_binds
  = do 
-      st_uniqs  <- mkSplitUniqSupply 'g'
-      let occ_anal_tidy_binds = occurAnalyseBinds tidy_binds
-
       () <- coreBindsSize occ_anal_tidy_binds `seq` return ()
       -- TEMP: the above call zaps some space usage allocated by the
       -- simplifier, which for reasons I don't understand, persists
@@ -368,12 +367,11 @@ myCoreToStg dflags this_mod tidy_binds
       -- _scc_     "Core2Stg"
       stg_binds <- topCoreBindsToStg dflags occ_anal_tidy_binds
 
-      showPass dflags "Stg2Stg"
       -- _scc_     "Stg2Stg"
       (stg_binds2, cost_centre_info) <- stg2stg dflags this_mod st_uniqs stg_binds
       let final_ids = collectFinalStgBinders (map fst stg_binds2)
 
-      return (stg_binds2, occ_anal_tidy_binds, cost_centre_info, final_ids)
+      return (stg_binds2, cost_centre_info, final_ids)
 \end{code}
 
 

@@ -10,16 +10,20 @@ module LambdaLift ( liftProgram ) where
 
 import StgSyn
 
+import CmdLineOpts	( opt_EnsureSplittableC )
 import Bag		( Bag, emptyBag, unionBags, unitBag, snocBag, bagToList )
 import Id		( mkVanillaId, idType, setIdArityInfo, Id )
 import VarSet
 import VarEnv
 import IdInfo		( exactArity )
 import Module		( Module )
-import Name             ( mkTopName )
+import Name             ( Name, mkGlobalName, mkLocalName ) 
+import OccName		( mkVarOcc )
 import Type		( splitForAllTys, mkForAllTys, mkFunTys, Type )
+import Unique		( Unique )
 import UniqSupply	( uniqFromSupply, splitUniqSupply, UniqSupply )
 import Util		( zipEqual )
+import SrcLoc		( noSrcLoc )
 import Panic		( panic, assertPanic )
 \end{code}
 
@@ -448,6 +452,23 @@ newSupercombinator ty arity mod ci us idenv
 	-- ToDo: rm the setIdArity?  Just let subsequent stg-saturation pass do it?
   where
     uniq = uniqFromSupply us
+
+
+mkTopName :: Unique -> Module -> FAST_STRING -> Name
+	-- Make a top-level name; make it Global if top-level
+	-- things should be externally visible; Local otherwise
+	-- This chap is only used *after* the tidyCore phase
+	-- Notably, it is used during STG lambda lifting
+	--
+	-- We have to make sure that the name is globally unique
+	-- and we don't have tidyCore to help us. So we append
+	-- the unique.  Hack!  Hack!
+	-- (Used only by the STG lambda lifter.)
+mkTopName uniq mod fs
+  | opt_EnsureSplittableC = mkGlobalName uniq mod occ noSrcLoc
+  | otherwise		  = mkLocalName uniq occ noSrcLoc
+  where
+    occ = mkVarOcc (_PK_ ((_UNPK_ fs) ++ show uniq))
 
 lookUp :: Id -> LiftM (Id,[Id])
 lookUp v mod ci us idenv

@@ -11,14 +11,14 @@ module Name (
 	-- The Name type
 	Name,					-- Abstract
 	mkLocalName, mkSysLocalName, mkCCallName,
-	mkTopName, mkIPName,
+	mkIPName,
 	mkDerivedName, mkGlobalName, mkKnownKeyGlobal, mkWiredInName,
 
 	nameUnique, setNameUnique,
-	tidyTopName, 
 	nameOccName, nameModule, nameModule_maybe,
 	setNameOcc, nameRdrName, setNameModuleAndLoc, 
-	toRdrName, hashName,
+	toRdrName, hashName, 
+	globaliseName, localiseName,
 
 	nameSrcLoc, nameIsLocallyDefined, isDllName, nameIsFrom, nameIsLocalOrFrom,
 
@@ -28,7 +28,7 @@ module Name (
 	-- Environment
 	NameEnv, mkNameEnv,
 	emptyNameEnv, unitNameEnv, nameEnvElts, 
-	extendNameEnv_C, extendNameEnv, foldNameEnv,
+	extendNameEnv_C, extendNameEnv, foldNameEnv, filterNameEnv,
 	plusNameEnv, plusNameEnv_C, extendNameEnv, extendNameEnvList,
 	lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, elemNameEnv, 
 
@@ -173,7 +173,6 @@ mkLocalName uniq occ loc = Name { n_uniq = uniq, n_sort = Local, n_occ = occ, n_
 mkGlobalName :: Unique -> Module -> OccName -> SrcLoc -> Name
 mkGlobalName uniq mod occ loc = Name { n_uniq = uniq, n_sort = Global mod,
 				       n_occ = occ, n_loc = loc }
-				
 
 mkKnownKeyGlobal :: RdrName -> Unique -> Name
 mkKnownKeyGlobal rdr_name uniq
@@ -216,101 +215,19 @@ mkDerivedName f name uniq = name {n_uniq = uniq, n_occ = f (n_occ name)}
 setNameUnique name uniq = name {n_uniq = uniq}
 
 setNameOcc :: Name -> OccName -> Name
-	-- Give the thing a new OccName, *and*
-	-- record that it's no longer a sys-local
-	-- This is used by the tidy-up pass
 setNameOcc name occ = name {n_occ = occ}
 
+globaliseName :: Name -> Module -> Name
+globaliseName n mod = n { n_sort = Global mod }
+				
+localiseName :: Name -> Name
+localiseName n = n { n_sort = Local }
+				
 setNameModuleAndLoc :: Name -> Module -> SrcLoc -> Name
 setNameModuleAndLoc name mod loc = name {n_sort = set (n_sort name), n_loc = loc}
 		       where
 			 set (Global _) = Global mod
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Tidying a name}
-%*									*
-%************************************************************************
-
-tidyTopName is applied to top-level names in the final program
-
-For top-level things, 
-	it globalises Local names 
-		(if all top-level things should be visible)
-	and localises non-exported Global names
-		 (if only exported things should be visible)
-
-In all cases except an exported global, it gives it a new occurrence name.
-
-The "visibility" here concerns whether the .o file's symbol table
-mentions the thing; if so, it needs a module name in its symbol.
-The Global things are "visible" and the Local ones are not
-
-Why should things be "visible"?  Certainly they must be if they
-are exported.  But also:
-
-(a) In certain (prelude only) modules we split up the .hc file into
-    lots of separate little files, which are separately compiled by the C
-    compiler.  That gives lots of little .o files.  The idea is that if
-    you happen to mention one of them you don't necessarily pull them all
-    in.  (Pulling in a piece you don't need can be v bad, because it may
-    mention other pieces you don't need either, and so on.)
-    
-    Sadly, splitting up .hc files means that local names (like s234) are
-    now globally visible, which can lead to clashes between two .hc
-    files. So unlocaliseWhatnot goes through making all the local things
-    into global things, essentially by giving them full names so when they
-    are printed they'll have their module name too.  Pretty revolting
-    really.
-
-(b) When optimisation is on we want to make all the internal
-    top-level defns externally visible
-
-\begin{code}
-tidyTopName :: Module -> TidyOccEnv -> Bool -> Name -> (TidyOccEnv, Name)
-tidyTopName mod env is_exported
-	    name@(Name { n_occ = occ, n_sort = sort, n_uniq = uniq, n_loc = loc })
-  = case sort of
-	Global _ | is_exported -> (env, name)
-		 | otherwise   -> (env, name { n_sort = new_sort })
-		-- Don't change the occurrnce names of globals, because many of them
-		-- are bound by either a class declaration or a data declaration
-		-- or an explicit user export.
-
-	other    | is_exported -> (env', name { n_sort = Global mod, n_occ = occ' })
-		 | otherwise   -> (env', name { n_sort = new_sort,   n_occ = occ' })
-  where
-    (env', occ') = tidyOccName env occ
-    new_sort     = mkLocalTopSort mod
-
-mkTopName :: Unique -> Module -> FAST_STRING -> Name
-	-- Make a top-level name; make it Global if top-level
-	-- things should be externally visible; Local otherwise
-	-- This chap is only used *after* the tidyCore phase
-	-- Notably, it is used during STG lambda lifting
-	--
-	-- We have to make sure that the name is globally unique
-	-- and we don't have tidyCore to help us. So we append
-	-- the unique.  Hack!  Hack!
-	-- (Used only by the STG lambda lifter.)
-mkTopName uniq mod fs
-  = Name { n_uniq = uniq, 
-	   n_sort = mkLocalTopSort mod,
-	   n_occ  = mkVarOcc (_PK_ ((_UNPK_ fs) ++ show uniq)),
-	   n_loc = noSrcLoc }
-
-mkLocalTopSort :: Module -> NameSort
-mkLocalTopSort mod
-  | all_toplev_ids_visible = Global mod
-  | otherwise		   = Local
-
-all_toplev_ids_visible
-  = not opt_OmitInterfacePragmas ||  -- Pragmas can make them visible
-    opt_EnsureSplittableC            -- Splitting requires visiblilty
-\end{code}
-
 
 
 %************************************************************************
@@ -340,7 +257,6 @@ isDllName nm = not opt_Static &&
 
 isTyVarName :: Name -> Bool
 isTyVarName name = isTvOcc (nameOccName name)
-
 \end{code}
 
 
@@ -398,6 +314,7 @@ lookupNameEnv  	 :: NameEnv a -> Name -> Maybe a
 lookupNameEnv_NF :: NameEnv a -> Name -> a
 mapNameEnv	 :: (a->b) -> NameEnv a -> NameEnv b
 foldNameEnv	 :: (a -> b -> b) -> b -> NameEnv a -> b
+filterNameEnv	 :: (elt -> Bool) -> NameEnv elt -> NameEnv elt
 
 emptyNameEnv   	 = emptyUFM
 foldNameEnv	 = foldUFM
@@ -412,6 +329,7 @@ delFromNameEnv 	 = delFromUFM
 elemNameEnv    	 = elemUFM
 mapNameEnv	 = mapUFM
 unitNameEnv    	 = unitUFM
+filterNameEnv	 = filterUFM
 
 lookupNameEnv  	       = lookupUFM
 lookupNameEnv_NF env n = expectJust "lookupNameEnv_NF" (lookupUFM env n)

@@ -11,84 +11,123 @@ module CoreTidy (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlags, DynFlag(..), opt_UsageSPOn, dopt )
+import CmdLineOpts	( DynFlags, DynFlag(..), opt_OmitInterfacePragmas, dopt )
 import CoreSyn
-import CoreUnfold	( noUnfolding )
+import CoreUnfold	( noUnfolding, mkTopUnfolding, okToUnfoldInHiFile )
+import CoreFVs		( ruleSomeFreeVars, exprSomeFreeVars )
 import CoreLint		( showPass, endPass )
-import UsageSPInf       ( doUsageSPInf )
 import VarEnv
 import VarSet
 import Var		( Id, Var )
 import Id		( idType, idInfo, idName, isExportedId,
-			  mkVanillaId, mkId, 
-			  idStrictness, setIdStrictness,
-			  idDemandInfo, setIdDemandInfo,
+			  mkVanillaId, mkId, isLocalId,
+			  setIdStrictness, setIdDemandInfo,
 			) 
-import IdInfo		( specInfo, setSpecInfo, 
-			  setUnfoldingInfo, setDemandInfo,
+import IdInfo		( constantIdInfo,
+			  specInfo, setSpecInfo, 
+			  cprInfo, setCprInfo,
+			  inlinePragInfo, setInlinePragInfo, isNeverInlinePrag,
+			  strictnessInfo, setStrictnessInfo, isBottomingStrictness,
+			  unfoldingInfo, setUnfoldingInfo, 
+			  demandInfo, 
+			  occInfo, isLoopBreaker,
 			  workerInfo, setWorkerInfo, WorkerInfo(..)
 			)
-import Demand		( wwLazy )
-import Name		( getOccName, tidyTopName, mkLocalName, isGlobalName )
-import OccName		( initTidyOccEnv, tidyOccName )
+import Name		( getOccName, nameOccName, globaliseName, setNameOcc, 
+		  	  localiseName, mkLocalName, isGlobalName
+			)
+import OccName		( TidyOccEnv, initTidyOccEnv, tidyOccName )
 import Type		( tidyTopType, tidyType, tidyTyVar )
-import Module		( Module )
-import UniqSupply	( mkSplitUniqSupply )
+import Module		( Module, moduleName )
+import HscTypes		( PersistentCompilerState( pcs_PRS ), PersistentRenamerState( prsOrig ),
+			  OrigNameEnv( origNames ), OrigNameNameEnv
+			)
 import Unique		( Uniquable(..) )
+import FiniteMap	( lookupFM, addToFM )
+import Maybes		( maybeToBool, orElse )
 import ErrUtils		( showPass )
 import SrcLoc		( noSrcLoc )
+import UniqFM		( mapUFM )
+import Outputable
+import List		( partition )
 import Util		( mapAccumL )
 \end{code}
 
 
 
 %************************************************************************
-%*									*
-\subsection{Tidying core}
-%*									*
+%*				 					*
+\subsection{What goes on}
+%*				 					* 
 %************************************************************************
 
-Several tasks are done by @tidyCorePgm@
+[SLPJ: 19 Nov 00]
 
-1. If @opt_UsageSPOn@ then compute usage information (which is
-   needed by Core2Stg).  ** NOTE _scc_ HERE **
-   Do this first, because it may introduce new binders.
+The plan is this.  
 
-2.  Make certain top-level bindings into Globals. The point is that 
-    Global things get externally-visible labels at code generation
-    time
+Step 1: Figure out external Ids
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+First we figure out which Ids are "external" Ids.  An
+"external" Id is one that is visible from outside the compilation
+unit.  These are
+	a) the user exported ones
+	b) ones mentioned in the unfoldings, workers, 
+	   or rules of externally-visible ones 
+This exercise takes a sweep of the bindings bottom to top.  Actually,
+in Step 2 we're also going to need to know which Ids should be
+exported with their unfoldings, so we produce not an IdSet but an
+IdEnv Bool
 
 
-3. Give all binders a nice print-name.  Their uniques aren't changed;
-   rather we give them lexically unique occ-names, so that we can
-   safely print the OccNae only in the interface file.  [Bad idea to
-   change the uniques, because the code generator makes global labels
-   from the uniques for local thunks etc.]
+
+Step 2: Tidy the program
+~~~~~~~~~~~~~~~~~~~~~~~~
+Next we traverse the bindings top to bottom.  For each top-level
+binder
+
+  - Make all external Ids have Global names and vice versa
+    This is used by the code generator to decide whether
+    to make the label externally visible
+
+  - Give external ids a "tidy" occurrence name.  This means
+    we can print them in interface files without confusing 
+    "x" (unique 5) with "x" (unique 10).
+  
+  - Give external Ids the same Unique as they had before
+    if the name is in the renamer's name cache
+  
+  - Give the Id its final IdInfo; in ptic, 
+	* Its flavour becomes ConstantId, reflecting the fact that
+	  from now on we regard it as a constant, not local, Id
+  	* its unfolding, if it should have one
+		
+Finally, substitute these new top-level binders consistently
+throughout, including in unfoldings.  We also tidy binders in
+RHSs, so that they print nicely in interfaces.
 
 \begin{code}
 tidyCorePgm :: DynFlags -> Module
+	    -> PersistentCompilerState
 	    -> [CoreBind] -> [IdCoreRule]
-	    -> IO ([CoreBind], [IdCoreRule])
-tidyCorePgm dflags module_name binds_in orphans_in
-  = do
-	us <- mkSplitUniqSupply 'u'
+	    -> IO (PersistentCompilerState, [CoreBind], [IdCoreRule])
+tidyCorePgm dflags mod pcs binds_in orphans_in
+  = do	{ showPass dflags "Tidy Core"
 
-	showPass dflags "Tidy Core"
+	; let ext_ids = findExternalSet binds_in orphans_in
 
-        binds_in1 <- if opt_UsageSPOn
-                     then _scc_ "CoreUsageSPInf"
-                                doUsageSPInf dflags us binds_in
-                     else return binds_in
+	; let ((orig_env', occ_env, subst_env), binds_out) 
+		  = mapAccumL (tidyTopBind mod ext_ids) init_tidy_env binds_in
 
-	let (tidy_env1, binds_out)  = mapAccumL (tidyBind (Just module_name))
-                                                init_tidy_env binds_in1
-	    orphans_out	  	    = tidyIdRules tidy_env1 orphans_in
+	; let orphans_out = tidyIdRules (occ_env,subst_env) orphans_in
 
-	endPass dflags "Tidy Core" (dopt Opt_D_dump_simpl dflags || 
-				    dopt Opt_D_verbose_core2core dflags)
-	        binds_out
+	; let pcs' = pcs { pcs_PRS = prs { prsOrig = orig { origNames = orig_env' }}}
 
-	return (binds_out, orphans_out)
+	; endPass dflags "Tidy Core" (dopt Opt_D_dump_simpl dflags || 
+				      dopt Opt_D_verbose_core2core dflags)
+	          binds_out
+
+	; return (pcs', binds_out, orphans_out)
+	}
   where
 	-- We also make sure to avoid any exported binders.  Consider
 	--	f{-u1-} = 1	-- Local decl
@@ -98,38 +137,280 @@ tidyCorePgm dflags module_name binds_in orphans_in
 	-- The second exported decl must 'get' the name 'f', so we
 	-- have to put 'f' in the avoids list before we get to the first
 	-- decl.  tidyTopId then does a no-op on exported binders.
-    init_tidy_env = (initTidyOccEnv avoids, emptyVarEnv)
+    prs	 	  = pcs_PRS pcs
+    orig	  = prsOrig prs
+    orig_env 	  = origNames orig
+
+    init_tidy_env = (orig_env, initTidyOccEnv avoids, emptyVarEnv)
     avoids	  = [getOccName bndr | bndr <- bindersOfBinds binds_in,
 				       isGlobalName (idName bndr)]
+\end{code}
 
-tidyBind :: Maybe Module		-- (Just m) for top level, Nothing for nested
-	 -> TidyEnv
+
+%************************************************************************
+%*				 					*
+\subsection{Step 1: finding externals}
+%*				 					* 
+%************************************************************************
+
+\begin{code}
+findExternalSet :: [CoreBind] -> [IdCoreRule]
+		-> IdEnv Bool	-- True <=> show unfolding
+	-- Step 1 from the notes above
+findExternalSet binds orphan_rules
+  = foldr find init_needed binds
+  where
+    orphan_rule_ids :: IdSet
+    orphan_rule_ids = unionVarSets [ ruleSomeFreeVars isIdAndLocal rule 
+				   | (_, rule) <- orphan_rules]
+    init_needed :: IdEnv Bool
+    init_needed = mapUFM (\_ -> False) orphan_rule_ids
+	-- The mapUFM is a bit cheesy.  It is a cheap way
+	-- to turn the set of orphan_rule_ids, which we use to initialise
+	-- the sweep, into a mapping saying 'don't expose unfolding'	
+	-- (When we come to the binding site we may change our mind, of course.)
+
+    find (NonRec id rhs) needed
+	| need_id needed id = addExternal (id,rhs) needed
+	| otherwise 	    = needed
+    find (Rec prs) needed   = find_prs prs needed
+
+	-- For a recursive group we have to look for a fixed point
+    find_prs prs needed	
+	| null needed_prs = needed
+	| otherwise	  = find_prs other_prs new_needed
+	where
+	  (needed_prs, other_prs) = partition (need_pr needed) prs
+	  new_needed = foldr addExternal needed needed_prs
+
+	-- The 'needed' set contains the Ids that are needed by earlier
+	-- interface file emissions.  If the Id isn't in this set, and isn't
+	-- exported, there's no need to emit anything
+    need_id needed_set id       = id `elemVarEnv` needed_set || isExportedId id 
+    need_pr needed_set (id,rhs)	= need_id needed_set id
+
+isIdAndLocal id = isId id && isLocalId id
+
+addExternal :: (Id,CoreExpr) -> IdEnv Bool -> IdEnv Bool
+-- The Id is needed; extend the needed set
+-- with it and its dependents (free vars etc)
+addExternal (id,rhs) needed
+  = extendVarEnv (foldVarSet add_occ needed new_needed_ids)
+		 id show_unfold
+  where
+    add_occ id needed = extendVarEnv needed id False
+	-- "False" because we don't know we need the Id's unfolding
+	-- We'll override it later when we find the binding site
+
+    new_needed_ids | opt_OmitInterfacePragmas = emptyVarSet
+	           | otherwise		      = worker_ids	`unionVarSet`
+						unfold_ids	`unionVarSet`
+						spec_ids
+
+    idinfo	   = idInfo id
+    dont_inline	   = isNeverInlinePrag (inlinePragInfo idinfo)
+    loop_breaker   = isLoopBreaker (occInfo idinfo)
+    bottoming_fn   = isBottomingStrictness (strictnessInfo idinfo)
+    spec_ids	   = rulesRhsFreeVars (specInfo idinfo)
+    worker_info	   = workerInfo idinfo
+
+	-- Stuff to do with the Id's unfolding
+	-- The simplifier has put an up-to-date unfolding
+	-- in the IdInfo, but the RHS will do just as well
+    unfolding	 = unfoldingInfo idinfo
+    rhs_is_small = not (neverUnfold unfolding)
+
+	-- We leave the unfolding there even if there is a worker
+	-- In GHCI the unfolding is used by importers
+	-- When writing an interface file, we omit the unfolding 
+	-- if there is a worker
+    show_unfold = not bottoming_fn	 &&	-- Not necessary
+		  not dont_inline	 &&
+		  not loop_breaker	 &&
+		  rhs_is_small		 &&	-- Small enough
+		  okToUnfoldInHiFile rhs 	-- No casms etc
+
+    unfold_ids | show_unfold = exprSomeFreeVars isIdAndLocal rhs
+	       | otherwise   = emptyVarSet
+
+    worker_ids = case worker_info of
+		   HasWorker work_id _ -> unitVarSet work_id
+		   otherwise	       -> emptyVarSet
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Step 2: top-level tidying}
+%*									*
+%************************************************************************
+
+
+\begin{code}
+type TopTidyEnv = (OrigNameNameEnv, TidyOccEnv, VarEnv Var)
+
+-- TopTidyEnv: when tidying we need to know
+--   * orig_env: Any pre-ordained Names.  These may have arisen because the
+--	  renamer read in an interface file mentioning M.$wf, say,
+--	  and assigned it unique r77.  If, on this compilation, we've
+--	  invented an Id whose name is $wf (but with a different unique)
+--	  we want to rename it to have unique r77, so that we can do easy
+--	  comparisons with stuff from the interface file
+
+--   * occ_env: The TidyOccEnv, which tells us which local occurrences are 'used'
+
+--   * subst_env: A Var->Var mapping that substitutes the new Var for the old
+\end{code}
+
+
+\begin{code}
+tidyTopBind :: Module
+	    -> IdEnv Bool	-- Domain = Ids that should be exernal
+				-- True <=> their unfolding is external too
+	    -> TopTidyEnv -> CoreBind
+	    -> (TopTidyEnv, CoreBind)
+
+tidyTopBind mod ext_ids env (NonRec bndr rhs)
+  = (env', NonRec bndr' rhs')
+  where
+    rhs'	  = tidyTopRhs env rhs
+    (env', bndr') = tidyTopBinder mod ext_ids env rhs' env bndr
+
+tidyTopBind mod ext_ids env (Rec prs)
+  = (final_env, Rec prs')
+  where
+    (final_env, prs')     = mapAccumL do_one env prs
+    do_one env (bndr,rhs) = (env', (bndr', rhs'))
+			  where
+			    rhs'	  = tidyTopRhs final_env rhs
+			    (env', bndr') = tidyTopBinder mod ext_ids final_env
+							  rhs env bndr
+
+tidyTopRhs :: TopTidyEnv -> CoreExpr -> CoreExpr
+	-- Just an impedence matcher
+tidyTopRhs (_, occ_env, subst_env) rhs = tidyExpr (occ_env, subst_env) rhs
+
+tidyTopBinder :: Module -> IdEnv Bool
+	      -> TopTidyEnv -> CoreExpr
+	      -> TopTidyEnv -> Id -> (TopTidyEnv, Id)
+tidyTopBinder mod ext_ids env_idinfo rhs (orig_env, occ_env, subst_env) id
+	-- This function is the heart of Step 2
+	-- The second env is the one to use for the IdInfo
+	-- It's necessary because when we are dealing with a recursive
+	-- group, a variable late in the group might be mentioned
+	-- in the IdInfo of one early in the group
+
+	-- The rhs is already tidied
+	
+  = ((orig_env', occ_env', subst_env'), id')
+  where
+    (orig_env', occ_env', name') = tidyTopName mod orig_env occ_env 
+					       is_external
+					       (idName id)
+    ty'	       = tidyTopType (idType id)
+    idinfo'    = tidyIdInfo env_idinfo is_external unfold_info id
+    id'	       = mkId name' ty' idinfo'
+    subst_env' = extendVarEnv subst_env id id'
+
+    maybe_external = lookupVarEnv ext_ids id
+    is_external    = maybeToBool maybe_external
+
+    -- Expose an unfolding if ext_ids tells us to
+    show_unfold = maybe_external `orElse` False
+    unfold_info | show_unfold = mkTopUnfolding rhs
+		| otherwise   = noUnfolding
+
+tidyIdInfo (_, occ_env, subst_env) is_external unfold_info id
+
+  | opt_OmitInterfacePragmas || not is_external
+	-- No IdInfo if the Id isn't 
+  = constantIdInfo
+
+  | otherwise
+  = constantIdInfo `setCprInfo`   	 cprInfo core_idinfo
+		   `setStrictnessInfo`	 strictnessInfo core_idinfo
+		   `setInlinePragInfo`   inlinePragInfo core_idinfo
+		   `setUnfoldingInfo`	 unfold_info
+		   `setWorkerInfo`	 tidyWorker tidy_env (workerInfo core_idinfo)
+		   `setSpecInfo`	 tidyRules tidy_env (specInfo core_idinfo)
+  where
+    tidy_env    = (occ_env, subst_env)
+    core_idinfo = idInfo id
+
+tidyTopName mod orig_env occ_env external name
+  | global && internal = (orig_env, occ_env,  localiseName name)
+  | local  && internal = (orig_env, occ_env', setNameOcc name occ')
+  | global && external = (orig_env, occ_env,  name)
+  | local  && external = globalise
+  where
+	-- If we want to globalise a currently-local name, check
+	-- whether we have already assigned a unique for it.
+	-- If so, use it; if not, extend the table
+    globalise = case lookupFM orig_env key of
+		  Just orig -> (orig_env,			  occ_env', orig)
+		  Nothing   -> (addToFM orig_env key global_name, occ_env', global_name)
+
+    (occ_env', occ') = tidyOccName occ_env (nameOccName name)
+    key		     = (moduleName mod, occ')
+    global_name      = globaliseName (setNameOcc name occ') mod
+    global	     = isGlobalName name
+    local	     = not global
+    internal	     = not external
+
+tidyIdRules :: TidyEnv -> [IdCoreRule] -> [IdCoreRule]
+tidyIdRules env rules
+  = [ (tidyVarOcc env fn, tidyRule env rule) | (fn,rule) <- rules  ]
+
+
+tidyWorker tidy_env (HasWorker work_id wrap_arity) 
+  = HasWorker (tidyVarOcc tidy_env work_id) wrap_arity
+tidyWorker tidy_env NoWorker
+  = NoWorker
+
+tidyRules :: TidyEnv -> CoreRules -> CoreRules
+tidyRules env (Rules rules fvs) 
+  = Rules (map (tidyRule env) rules)
+	  (foldVarSet tidy_set_elem emptyVarSet fvs)
+  where
+    tidy_set_elem var new_set = extendVarSet new_set (tidyVarOcc env var)
+
+tidyRule :: TidyEnv -> CoreRule -> CoreRule
+tidyRule env rule@(BuiltinRule _) = rule
+tidyRule env (Rule name vars tpl_args rhs)
+  = (Rule name vars' (map (tidyExpr env') tpl_args) (tidyExpr env' rhs))
+  where
+    (env', vars') = tidyBndrs env vars
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Step 2: inner tidying
+%*									*
+%************************************************************************
+
+\begin{code}
+tidyBind :: TidyEnv
 	 -> CoreBind
 	 -> (TidyEnv, CoreBind)
-tidyBind maybe_mod env (NonRec bndr rhs)
+tidyBind env (NonRec bndr rhs)
   = let
-	(env', bndr') = tidy_bndr maybe_mod env' env bndr
+	(env', bndr') = tidyBndr env bndr
 	rhs'	      = tidyExpr env' rhs
 	-- We use env' when tidying the RHS even though it's not
-	-- strictly necessary; it makes the code pretty hard to read
-	-- if we don't!
+	-- strictly necessary; it makes the tidied code pretty 
+	-- hard to read if we don't!
     in
     (env', NonRec bndr' rhs')
 
-tidyBind maybe_mod env (Rec pairs)
-  = let
-	-- We use env' when tidying the rhss
-	-- When tidying the binder itself we may tidy it's
-	-- specialisations; if any of these mention other binders
-	-- in the group we should really feed env' to them too;
-	-- but that seems (a) unlikely and (b) a bit tiresome.
-	-- So I left it out for now
-
-	(bndrs, rhss)  = unzip pairs
-	(env', bndrs') = mapAccumL (tidy_bndr maybe_mod env') env bndrs
-	rhss'	       = map (tidyExpr env') rhss
-  in
-  (env', Rec (zip bndrs' rhss'))
+tidyBind env (Rec prs)
+  = (final_env, Rec prs')
+  where
+    (final_env, prs')     = mapAccumL do_one env prs
+    do_one env (bndr,rhs) = (env', (bndr', rhs'))
+			  where
+			    (env', bndr') = tidyBndr env bndr
+			    rhs'          = tidyExpr final_env rhs
 
 tidyExpr env (Type ty)	     = Type (tidyType env ty)
 tidyExpr env (Lit lit)	     = Lit lit
@@ -138,7 +419,7 @@ tidyExpr env (Note n e)      = Note (tidyNote env n) (tidyExpr env e)
 
 tidyExpr env (Let b e)       = Let b' (tidyExpr env' e)
 			     where
-			       (env', b') = tidyBind Nothing env b
+			       (env', b') = tidyBind env b
 
 tidyExpr env (Case e b alts) = Case (tidyExpr env e) b' (map (tidyAlt env') alts)
 			     where
@@ -157,26 +438,20 @@ tidyAlt env (con, vs, rhs)   = (con, vs', tidyExpr env' rhs)
 tidyNote env (Coerce t1 t2)  = Coerce (tidyType env t1) (tidyType env t2)
 
 tidyNote env note            = note
+\end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Tidying up non-top-level binders}
+%*									*
+%************************************************************************
+
+\begin{code}
 tidyVarOcc (_, var_env) v = case lookupVarEnv var_env v of
 				  Just v' -> v'
 				  Nothing -> v
-\end{code}
 
-\begin{code}
-tidy_bndr (Just mod) env_idinfo env var = tidyTopId mod env env_idinfo var
-tidy_bndr Nothing    env_idinfo env var = tidyBndr      env            var
-\end{code}
-
-
-
-%************************************************************************
-%*									*
-\subsection{Tidying up a binder}
-%*									*
-%************************************************************************
-
-\begin{code}
 tidyBndr :: TidyEnv -> Var -> (TidyEnv, Var)
 tidyBndr env var | isTyVar var = tidyTyVar env var
 		 | otherwise   = tidyId    env var
@@ -193,9 +468,10 @@ tidyId env@(tidy_env, var_env) id
 	name'        	  = mkLocalName (getUnique id) occ' noSrcLoc
 	(tidy_env', occ') = tidyOccName tidy_env (getOccName id)
         ty'          	  = tidyType env (idType id)
+	idinfo		  = idInfo id
 	id'          	  = mkVanillaId name' ty'
-			    `setIdStrictness` idStrictness id
-			    `setIdDemandInfo` idDemandInfo id
+			    `setIdStrictness` strictnessInfo idinfo
+			    `setIdDemandInfo` demandInfo idinfo
 			-- NB: This throws away the IdInfo of the Id, which we
 			-- no longer need.  That means we don't need to
 			-- run over it with env, nor renumber it.
@@ -207,60 +483,4 @@ tidyId env@(tidy_env, var_env) id
 	var_env'	  = extendVarEnv var_env id id'
     in
     ((tidy_env', var_env'), id')
-
-tidyTopId :: Module -> TidyEnv -> TidyEnv -> Id -> (TidyEnv, Id)
-	-- The second env is the one to use for the IdInfo
-	-- It's necessary because when we are dealing with a recursive
-	-- group, a variable late in the group might be mentioned
-	-- in the IdInfo of one early in the group
-tidyTopId mod env@(tidy_env, var_env) env_idinfo id
-  =	-- Top level variables
-    let
-	(tidy_env', name') = tidyTopName mod tidy_env (isExportedId id) (idName id)
-	ty'	           = tidyTopType (idType id)
-	idinfo'		   = tidyIdInfo env_idinfo (idInfo id)
-	id'		   = mkId name' ty' idinfo'
-	var_env'	   = extendVarEnv var_env id id'
-    in
-    ((tidy_env', var_env'), id')
-\end{code}
-
-\begin{code}
--- tidyIdInfo does these things:
---	a) tidy the specialisation info and worker info (if any)
---	b) zap the unfolding and demand info
--- The latter two are to avoid space leaks
-
-tidyIdInfo env info
-  = info5
-  where
-    rules = specInfo info
-
-    info2 | isEmptyCoreRules rules = info 
-	  | otherwise	           = info `setSpecInfo` tidyRules env rules
-		
-    info3 = info2 `setUnfoldingInfo` noUnfolding 
-    info4 = info3 `setDemandInfo`    wwLazy		
-
-    info5 = case workerInfo info of
-		NoWorker -> info4
-		HasWorker w a  -> info4 `setWorkerInfo` HasWorker (tidyVarOcc env w) a
-
-tidyIdRules :: TidyEnv -> [IdCoreRule] -> [IdCoreRule]
-tidyIdRules env rules
-  = [ (tidyVarOcc env fn, tidyRule env rule) | (fn,rule) <- rules  ]
-
-tidyRules :: TidyEnv -> CoreRules -> CoreRules
-tidyRules env (Rules rules fvs) 
-  = Rules (map (tidyRule env) rules)
-	  (foldVarSet tidy_set_elem emptyVarSet fvs)
-  where
-    tidy_set_elem var new_set = extendVarSet new_set (tidyVarOcc env var)
-
-tidyRule :: TidyEnv -> CoreRule -> CoreRule
-tidyRule env rule@(BuiltinRule _) = rule
-tidyRule env (Rule name vars tpl_args rhs)
-  = (Rule name vars' (map (tidyExpr env') tpl_args) (tidyExpr env' rhs))
-  where
-    (env', vars') = tidyBndrs env vars
 \end{code}
