@@ -33,7 +33,7 @@ import RnEnv		( availName,
 			  lookupOrigNames, lookupGlobalRn, newGlobalName
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
-			  moduleNameUserString, moduleName
+			  moduleNameUserString, moduleName, moduleEnvElts
 			)
 import Name		( Name, isLocallyDefined, NamedThing(..), getSrcLoc,
 			  nameOccName, nameModule,
@@ -52,7 +52,7 @@ import PrelInfo		( derivingOccurrences )
 import Type		( funTyCon )
 import ErrUtils		( dumpIfSet )
 import Bag		( bagToList )
-import FiniteMap	( FiniteMap, eltsFM, fmToList, emptyFM, lookupFM, 
+import FiniteMap	( FiniteMap, fmToList, emptyFM, lookupFM, 
 			  addToFM_C, elemFM, addToFM
 			)
 import UniqFM		( lookupUFM )
@@ -176,6 +176,7 @@ rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
 	
 	mod_iface = ModIface {	mi_module   = this_module,
 				mi_version  = initialVersionInfo,
+				mi_boot	    = False,
 				mi_orphan   = any isOrphanDecl rn_local_decls,
 				mi_exports  = my_exports,
 				mi_globals  = gbl_env,
@@ -429,9 +430,9 @@ loadOldIface iface_path Nothing
 			     dcl_insts = new_insts }
 
  	mod_iface = ModIface { mi_module = mod, mi_version = version,
-			       mi_exports = avails, mi_orphan = pi_orphan iface,
+			       mi_exports = avails, mi_usages  = usages,
+			       mi_boot = False, mi_orphan = pi_orphan iface, 
 			       mi_fixities = fix_env, mi_deprecs = deprec_env,
-			       mi_usages  = usages,
 			       mi_decls   = decls,
 			       mi_globals = panic "No mi_globals in old interface"
 		    }
@@ -724,7 +725,8 @@ getRnStats :: [RenamedHsDecl] -> Ifaces -> SDoc
 getRnStats imported_decls ifaces
   = hcat [text "Renamer stats: ", stats]
   where
-    n_mods = length [() | (_, _, True) <- eltsFM (iImpModInfo ifaces)]
+    n_mods = length [() | _ <- moduleEnvElts (iPIT ifaces)]
+	-- This is really only right for a one-shot compile
     
     decls_read     = [decl | (avail, True, (_,decl)) <- nameEnvElts (iDecls ifaces),
     			-- Data, newtype, and class decls are in the decls_fm

@@ -20,7 +20,7 @@ import SrcLoc		( mkSrcLoc )
 
 import Rename		( renameModule, checkOldIface, closeIfaceDecls )
 import Rules		( emptyRuleBase )
-import PrelInfo		( wiredInThings )
+import PrelInfo		( wiredInThingEnv, wiredInThings )
 import PrelNames	( knownKeyNames )
 import PrelRules	( builtinRules )
 import MkIface		( completeIface, mkModDetailsFromIface, mkModDetails,
@@ -38,7 +38,7 @@ import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 import CodeOutput	( codeOutput )
 
-import Module		( ModuleName, moduleName, emptyModuleEnv, mkModuleInThisPackage )
+import Module		( ModuleName, moduleName, mkModuleInThisPackage )
 import CmdLineOpts
 import ErrUtils		( dumpIfSet_dyn )
 import UniqSupply	( mkSplitUniqSupply )
@@ -49,9 +49,8 @@ import StgInterp	( stgToInterpSyn )
 import HscStats		( ppSourceStats )
 import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
 			  PersistentRenamerState(..), ModuleLocation(..),
-			  HomeSymbolTable, PackageSymbolTable, 
+			  HomeSymbolTable, 
 			  OrigNameEnv(..), PackageRuleBase, HomeIfaceTable, 
-			  extendTypeEnv, groupTyThings,
 			  typeEnvClasses, typeEnvTyCons, emptyIfaceTable )
 import InterpSyn	( UnlinkedIBind )
 import StgInterp	( ItblEnv )
@@ -356,17 +355,12 @@ initPersistentCompilerState
   = do prs <- initPersistentRenamerState
        return (
         PCS { pcs_PIT   = emptyIfaceTable,
-              pcs_PST   = initPackageDetails,
+              pcs_PTE   = wiredInThingEnv,
 	      pcs_insts = emptyInstEnv,
 	      pcs_rules = emptyRuleBase,
 	      pcs_PRS   = prs
             }
         )
-
-initPackageDetails :: PackageSymbolTable
-initPackageDetails = extendTypeEnv emptyModuleEnv (groupTyThings wiredInThings)
-
---initPackageDetails = panic "initPackageDetails"
 
 initPersistentRenamerState :: IO PersistentRenamerState
   = do ns <- mkSplitUniqSupply 'r'

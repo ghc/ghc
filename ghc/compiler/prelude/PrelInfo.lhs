@@ -37,15 +37,13 @@ import MkId		( mkPrimOpId, wiredInIds )
 import MkId		-- All of it, for re-export
 import TysPrim		( primTyCons )
 import TysWiredIn	( wiredInTyCons )
-import HscTypes 	( TyThing(..) )
+import HscTypes 	( TyThing(..), TypeEnv, mkTypeEnv )
 
 -- others:
-import Name		( getName, NameEnv, mkNameEnv )
 import TyCon		( tyConDataConsIfAvailable, TyCon )
 import Class	 	( Class, classKey )
 import Type		( funTyCon )
 import Util		( isIn )
-import Outputable	( ppr, pprPanic )
 \end{code}
 
 %************************************************************************
@@ -77,8 +75,8 @@ wiredInTyConThings tc
                             n  <- [dataConId dc, dataConWrapId dc] ]
 			-- Synonyms return empty list of constructors
 
-wiredInThingEnv :: NameEnv TyThing
-wiredInThingEnv = mkNameEnv [ (getName thing, thing) | thing <- wiredInThings ]
+wiredInThingEnv :: TypeEnv
+wiredInThingEnv = mkTypeEnv wiredInThings
 \end{code}
 
 We let a lot of "non-standard" values be visible, so that we can make

@@ -7,18 +7,19 @@
 module HscTypes ( 
 	ModuleLocation(..),
 
-	ModDetails(..),	ModIface(..), GlobalSymbolTable, 
-	HomeSymbolTable, PackageSymbolTable,
+	ModDetails(..),	ModIface(..), 
+	HomeSymbolTable, PackageTypeEnv,
 	HomeIfaceTable, PackageIfaceTable, emptyIfaceTable,
 	lookupTable, lookupTableByModName,
+	emptyModIface,
 
 	IfaceDecls(..), 
 
 	VersionInfo(..), initialVersionInfo,
 
-	TyThing(..), groupTyThings, isTyClThing,
+	TyThing(..), isTyClThing,
 
-	TypeEnv, extendTypeEnv, lookupTypeEnv, 
+	TypeEnv, lookupType, mkTypeEnv, extendTypeEnvList, 
 	typeEnvClasses, typeEnvTyCons,
 
 	WhetherHasOrphans, ImportVersion, WhatsImported(..),
@@ -45,13 +46,13 @@ module HscTypes (
 
 import RdrName		( RdrNameEnv, emptyRdrEnv )
 import Name		( Name, NameEnv, NamedThing,
-			  emptyNameEnv, unitNameEnv, extendNameEnv, plusNameEnv, 
+			  emptyNameEnv, extendNameEnv, 
 			  lookupNameEnv, emptyNameEnv, getName, nameModule,
 			  nameSrcLoc, nameEnvElts )
 import NameSet		( NameSet )
 import OccName		( OccName )
 import Module		( Module, ModuleName, ModuleEnv,
-			  extendModuleEnv, lookupModuleEnv, lookupModuleEnvByName
+			  lookupModuleEnv, lookupModuleEnvByName
 			)
 import Rules		( RuleBase )
 import VarSet		( TyVarSet )
@@ -68,7 +69,7 @@ import RnHsSyn		( RenamedTyClDecl, RenamedRuleDecl, RenamedInstDecl )
 import CoreSyn		( IdCoreRule )
 import Type		( Type )
 
-import FiniteMap	( FiniteMap, emptyFM, addToFM, lookupFM, foldFM )
+import FiniteMap	( FiniteMap )
 import Bag		( Bag )
 import Maybes		( seqMaybe )
 import UniqFM 		( UniqFM, emptyUFM )
@@ -123,6 +124,7 @@ data ModIface
         mi_module   :: Module,			-- Complete with package info
         mi_version  :: VersionInfo,		-- Module version number
         mi_orphan   :: WhetherHasOrphans,       -- Whether this module has orphans
+	mi_boot	    :: IsBootInterface,		-- Whether this interface was read from an hi-boot file
 
         mi_usages   :: [ImportVersion Name],	-- Usages; kept sorted so that it's easy
 						-- to decide whether to write a new iface file
@@ -167,9 +169,15 @@ emptyModDetails
 emptyModIface :: Module -> ModIface
 emptyModIface mod
   = ModIface { mi_module   = mod,
+	       mi_version  = initialVersionInfo,
+	       mi_usages   = [],
+	       mi_orphan   = False,
+	       mi_boot	   = False,
 	       mi_exports  = [],
+	       mi_fixities = emptyNameEnv,
 	       mi_globals  = emptyRdrEnv,
-	       mi_deprecs  = NoDeprecs
+	       mi_deprecs  = NoDeprecs,
+	       mi_decls    = panic "emptyModIface: decls"
     }		
 \end{code}
 
@@ -183,8 +191,6 @@ type HomeIfaceTable     = IfaceTable
 type PackageIfaceTable  = IfaceTable
 
 type HomeSymbolTable    = SymbolTable	-- Domain = modules in the home package
-type PackageSymbolTable = SymbolTable	-- Domain = modules in the some other package
-type GlobalSymbolTable  = SymbolTable	-- Domain = all modules
 
 emptyIfaceTable :: IfaceTable
 emptyIfaceTable = emptyUFM
@@ -214,9 +220,6 @@ lookupTableByModName ht pt mod
 %************************************************************************
 
 \begin{code}
-type TypeEnv = NameEnv TyThing
-emptyTypeEnv = emptyNameEnv
-
 data TyThing = AnId   Id
 	     | ATyCon TyCon
 	     | AClass Class
@@ -238,41 +241,28 @@ typeEnvTyCons  env = [tc | ATyCon tc <- nameEnvElts env]
 
 
 \begin{code}
-lookupTypeEnv :: SymbolTable -> Name -> Maybe TyThing
-lookupTypeEnv tbl name
-  = case lookupModuleEnv tbl (nameModule name) of
-	Just details -> lookupNameEnv (md_types details) name
-	Nothing	     -> Nothing
+type TypeEnv = NameEnv TyThing
 
+emptyTypeEnv = emptyNameEnv
 
-groupTyThings :: [TyThing] -> FiniteMap Module TypeEnv
-  -- Finite map because we want the range too
-groupTyThings things
-  = foldl add emptyFM things
-  where
-    add :: FiniteMap Module TypeEnv -> TyThing -> FiniteMap Module TypeEnv
-    add tbl thing = addToFM tbl mod new_env
-		  where
-		    name    = getName thing
-		    mod     = nameModule name
-		    new_env = case lookupFM tbl mod of
-				Nothing  -> unitNameEnv name thing
-				Just env -> extendNameEnv env name thing
+mkTypeEnv :: [TyThing] -> TypeEnv
+mkTypeEnv things = extendTypeEnvList emptyTypeEnv things
 		
-extendTypeEnv :: SymbolTable -> FiniteMap Module TypeEnv -> SymbolTable
-extendTypeEnv tbl things
-  = foldFM add tbl things
+extendTypeEnvList :: TypeEnv -> [TyThing] -> TypeEnv
+extendTypeEnvList env things
+  = foldl add_thing env things
   where
-    add mod type_env tbl
-	= extendModuleEnv tbl mod new_details
-	where
-	  new_details 
-             = case lookupModuleEnv tbl mod of
-                  Nothing      -> emptyModDetails {md_types = type_env}
-                  Just details -> details {md_types = md_types details 
-                                                     `plusNameEnv` type_env}
+    add_thing :: TypeEnv -> TyThing -> TypeEnv
+    add_thing env thing = extendNameEnv env (getName thing) thing
 \end{code}
 
+\begin{code}
+lookupType :: HomeSymbolTable -> PackageTypeEnv -> Name -> Maybe TyThing
+lookupType hst pte name
+  = case lookupModuleEnv hst (nameModule name) of
+	Just details -> lookupNameEnv (md_types details) name
+	Nothing	     -> lookupNameEnv pte name
+\end{code}
 
 %************************************************************************
 %*									*
@@ -396,7 +386,7 @@ data PersistentCompilerState
         pcs_PIT :: PackageIfaceTable,	-- Domain = non-home-package modules
 					--   the mi_decls component is empty
 
-        pcs_PST :: PackageSymbolTable,	-- Domain = non-home-package modules
+        pcs_PTE :: PackageTypeEnv,	-- Domain = non-home-package modules
 					--   except that the InstEnv components is empty
 
 	pcs_insts :: PackageInstEnv,	-- The total InstEnv accumulated from all
@@ -416,7 +406,9 @@ It contains:
   * A name supply, which deals with allocating unique names to
     (Module,OccName) original names, 
  
-  * An accumulated InstEnv from all the modules in pcs_PST
+  * An accumulated TypeEnv from all the modules in imported packages
+
+  * An accumulated InstEnv from all the modules in imported packages
     The point is that we don't want to keep recreating it whenever
     we compile a new module.  The InstEnv component of pcPST is empty.
     (This means we might "see" instances that we shouldn't "really" see;
@@ -429,6 +421,7 @@ It contains:
     interface files but not yet sucked in, renamed, and typechecked
 
 \begin{code}
+type PackageTypeEnv  = TypeEnv
 type PackageRuleBase = RuleBase
 type PackageInstEnv  = InstEnv
 

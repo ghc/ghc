@@ -18,7 +18,7 @@ where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_IgnoreIfacePragmas )
+import CmdLineOpts	( opt_IgnoreIfacePragmas, opt_NoPruneDecls )
 import HscTypes
 import HsSyn		( HsDecl(..), Sig(..), TyClDecl(..), ConDecl(..), ConDetails(..),
 			  InstDecl(..), HsType(..), hsTyVarNames, getBangType
@@ -40,11 +40,12 @@ import Name		( Name {-instance NamedThing-}, nameOccName,
 			  NamedThing(..),
 			  elemNameEnv
 			 )
-import Module		( Module, ModuleEnv, mkVanillaModule,
+import Module		( Module, ModuleEnv, 
 			  moduleName, isModuleInThisPackage,
 			  ModuleName, WhereFrom(..),
-			  emptyModuleEnv, lookupModuleEnvByName,
-			  extendModuleEnv_C, lookupWithDefaultModuleEnv
+			  emptyModuleEnv, 
+			  extendModuleEnv_C, foldModuleEnv, lookupModuleEnv,
+			  elemModuleSet, extendModuleSet
 			)
 import NameSet
 import PrelInfo		( wiredInThingEnv, fractionalClassKeys )
@@ -53,8 +54,7 @@ import Maybes		( orElse )
 import FiniteMap
 import Outputable
 import Bag
-
-import List		( nub )
+import Util		( sortLt )
 \end{code}
 
 
@@ -69,20 +69,9 @@ import List		( nub )
 \begin{code}
 getInterfaceExports :: ModuleName -> WhereFrom -> RnMG (Module, [(ModuleName,Avails)])
 getInterfaceExports mod_name from
-  = getHomeIfaceTableRn 		`thenRn` \ hit ->
-    case lookupModuleEnvByName hit mod_name of {
-	Just mi -> returnRn (mi_module mi, mi_exports mi) ;
-        Nothing  -> 
-
-    loadInterface doc_str mod_name from	`thenRn` \ ifaces ->
-    case lookupModuleEnvByName (iPIT ifaces) mod_name of
-	Just mi -> returnRn (mi_module mi, mi_exports mi) ;
-		-- loadInterface always puts something in the map
-		-- even if it's a fake
-	Nothing -> returnRn (mkVanillaModule mod_name, [])
-		-- pprPanic "getInterfaceExports" (ppr mod_name)
-    }
-    where
+  = loadInterface doc_str mod_name from	`thenRn` \ iface ->
+    returnRn (mi_module iface, mi_exports iface)
+  where
       doc_str = sep [ppr mod_name, ptext SLIT("is directly imported")]
 \end{code}
 
@@ -101,7 +90,7 @@ getImportedInstDecls gates
     getIfacesRn 					`thenRn` \ ifaces ->
     let
 	orphan_mods =
-	  [mod | (mod, (True, _, False)) <- fmToList (iImpModInfo ifaces)]
+	  [mod | (mod, (True, _)) <- fmToList (iImpModInfo ifaces)]
     in
     loadOrphanModules orphan_mods			`thenRn_` 
 
@@ -227,93 +216,99 @@ mkImportInfo this_mod imports
   = getIfacesRn					`thenRn` \ ifaces ->
     getHomeIfaceTableRn				`thenRn` \ hit -> 
     let
+	(imp_pkg_mods, imp_home_names) = iVSlurp ifaces
+	pit	 		       = iPIT 	 ifaces
+
 	import_all_mods :: [ModuleName]
 		-- Modules where we imported all the names
 		-- (apart from hiding some, perhaps)
-	import_all_mods = nub [ m | ImportDecl m _ _ _ imp_list _ <- imports,
-				    import_all imp_list ]
+	import_all_mods = [ m | ImportDecl m _ _ _ imp_list _ <- imports,
+			        import_all imp_list ]
+		 	where
+			  import_all (Just (False, _)) = False	-- Imports are specified explicitly
+			  import_all other	       = True	-- Everything is imported
 
-	import_all (Just (False, _)) = False	-- Imports are specified explicitly
-	import_all other	     = True	-- Everything is imported
-
-	mod_map   = iImpModInfo ifaces
-	imp_names = iVSlurp     ifaces
-	pit	  = iPIT 	ifaces
-
-	-- mv_map groups together all the things imported from a particular module.
+	-- mv_map groups together all the things imported and used
+	-- from a particular module in this package
+	-- We use a finite map because we want the domain
 	mv_map :: ModuleEnv [Name]
-	mv_map = foldr add_mv emptyModuleEnv imp_names
+	mv_map  = foldNameSet add_mv emptyModuleEnv imp_home_names
+        add_mv name mv_map = extendModuleEnv_C add_item mv_map mod [name]
+			   where
+			     mod = nameModule name
+			     add_item names _ = name:names
 
-        add_mv name mv_map = addItem mv_map (nameModule name) name
+	-- In our usage list we record
+	--	a) Specifically: Detailed version info for imports from modules in this package
+	--			 Gotten from iVSlurp plus import_all_mods
+	--
+	--	b) Everything:   Just the module version for imports from modules in other packages
+	--			 Gotten from iVSlurp plus import_all_mods
+	--
+	--	c) NothingAtAll: The name only of modules, Baz, in this package that are 'below' us, 
+	--			 but which we didn't need at all (this is needed only to decide whether
+	--			 to open Baz.hi or Baz.hi-boot higher up the tree).
+	--			 This happens when a module, Foo, that we explicitly imported has 
+	--			 'import Baz' in its interface file, recording that Baz is below
+	--			 Foo in the module dependency hierarchy.  We want to propagate this info.
+	--			 These modules are in a combination of HIT/PIT and iImpModInfo
+	--
+	--	d) NothingAtAll: The name only of all orphan modules we know of (this is needed
+	--	   		 so that anyone who imports us can find the orphan modules)
+	--			 These modules are in a combination of HIT/PIT and iImpModInfo
 
-	-- Build the result list by adding info for each module.
-	-- For (a) a library module, we don't record it at all unless it contains orphans
-	-- 	   (We must never lose track of orphans.)
-	-- 
-	--     (b) a home-package module
-
-	mk_imp_info mod_name (has_orphans, is_boot, opened) so_far
-	   | mod_name == this_mod	-- Check if M appears in the set of modules 'below' M
-					-- This seems like a convenient place to check
-	   = WARN( not is_boot, ptext SLIT("Wierd:") <+> ppr this_mod <+> 
-			        ptext SLIT("imports itself (perhaps indirectly)") )
-	     so_far
- 
-	   | not opened 		-- We didn't even open the interface
-	   =		-- This happens when a module, Foo, that we explicitly imported has 
-			-- 'import Baz' in its interface file, recording that Baz is below
-			-- Foo in the module dependency hierarchy.  We want to propagate this
-			-- information.  The Nothing says that we didn't even open the interface
-			-- file but we must still propagate the dependency info.
-			-- The module in question must be a local module (in the same package)
-	     go_for_it NothingAtAll
-
-
-	   | is_lib_module
-			-- Ignore modules from other packages, unless it has
-			-- orphans, in which case we must remember it in our
-			-- dependencies.  But in that case we only record the
-			-- module version, nothing more detailed
-	   = if has_orphans then
-		go_for_it (Everything module_vers)
-	     else
-		so_far		
-
-	   | otherwise
-	   = go_for_it whats_imported
-
-	     where
-		go_for_it exports = (mod_name, has_orphans, is_boot, exports) : so_far
-	        mod_iface 	  = lookupTableByModName hit pit mod_name `orElse` panic "mkImportInfo"
-		mod		  = mi_module mod_iface
-	        is_lib_module     = not (isModuleInThisPackage mod)
-	        version_info      = mi_version mod_iface
-	        version_env       = vers_decls version_info
-		module_vers	  = vers_module version_info
-
-		whats_imported = Specifically module_vers
-					      export_vers import_items 
-					      (vers_rules version_info)
-
-	        import_items = [(n,v) | n <- lookupWithDefaultModuleEnv mv_map [] mod,
-				        let v = lookupNameEnv version_env n `orElse` 
-					        pprPanic "mk_whats_imported" (ppr n)
-			       ]
-	        export_vers | moduleName mod `elem` import_all_mods 
-			    = Just (vers_exports version_info)
-			    | otherwise
-			    = Nothing
+	import_info0 = foldModuleEnv mk_imp_info  []	       pit
+	import_info1 = foldModuleEnv mk_imp_info  import_info0 hit
+	import_info  = [ (mod_name, orphans, is_boot, NothingAtAll) 
+		       | (mod_name, (orphans, is_boot)) <- fmToList (iImpModInfo ifaces) ] ++ 
+		       import_info1
 	
-	import_info = foldFM mk_imp_info [] mod_map
+	mk_imp_info :: ModIface -> [ImportVersion Name] -> [ImportVersion Name]
+	mk_imp_info iface so_far
+
+	  | Just ns <- lookupModuleEnv mv_map mod 	-- Case (a)
+	  = go_for_it (Specifically mod_vers maybe_export_vers 
+				    (mk_import_items ns) rules_vers)
+
+	  | mod `elemModuleSet` imp_pkg_mods		-- Case (b)
+	  = go_for_it (Everything mod_vers)
+
+	  | import_all_mod				-- Case (a) and (b); the import-all part
+	  = if is_home_pkg_mod then
+		go_for_it (Specifically mod_vers (Just export_vers) [] rules_vers)
+	    else
+		go_for_it (Everything mod_vers)
+		
+	  | is_home_pkg_mod || has_orphans		-- Case (c) or (d)
+	  = go_for_it NothingAtAll
+
+	  | otherwise = so_far
+	  where
+	    go_for_it exports = (mod_name, has_orphans, mi_boot iface, exports) : so_far
+
+	    mod		    = mi_module iface
+	    mod_name	    = moduleName mod
+	    is_home_pkg_mod = isModuleInThisPackage mod
+	    version_info    = mi_version iface
+	    version_env     = vers_decls   version_info
+	    mod_vers	    = vers_module  version_info
+	    rules_vers	    = vers_rules   version_info
+	    export_vers	    = vers_exports version_info
+	    import_all_mod  = mod_name `elem` import_all_mods
+	    has_orphans	    = mi_orphan iface
+	    
+		-- The sort is to put them into canonical order
+	    mk_import_items ns = [(n,v) | n <- sortLt lt_occ ns, 
+	    		                  let v = lookupNameEnv version_env n `orElse` 
+	    			                  pprPanic "mk_whats_imported" (ppr n)
+		                 ]
+			 where
+			   lt_occ n1 n2 = nameOccName n1 < nameOccName n2
+
+	    maybe_export_vers | import_all_mod = Just (vers_exports version_info)
+			      | otherwise      = Nothing
     in
-    traceRn (text "Modules in Ifaces: " <+> fsep (map ppr (keysFM mod_map)))	`thenRn_`
     returnRn import_info
-
-
-addItem :: ModuleEnv [a] -> Module -> a -> ModuleEnv [a]
-addItem fm mod x = extendModuleEnv_C add_item fm mod [x]
-		 where
-		   add_item xs _ = x:xs
 \end{code}
 
 %*********************************************************
@@ -461,13 +456,17 @@ getSlurped
   = getIfacesRn 	`thenRn` \ ifaces ->
     returnRn (iSlurp ifaces)
 
-recordSlurp ifaces@(Ifaces { iSlurp = slurped_names, iVSlurp = imp_names })
+recordSlurp ifaces@(Ifaces { iSlurp = slurped_names, iVSlurp = (imp_mods, imp_names) })
 	    avail
   = let
 	new_slurped_names = addAvailToNameSet slurped_names avail
-	new_imp_names     = availName avail : imp_names
+	new_vslurp | isModuleInThisPackage mod = (imp_mods, addOneToNameSet imp_names name)
+		   | otherwise		       = (extendModuleSet imp_mods mod, imp_names)
+		   where
+		     mod = nameModule name
+		     name = availName avail
     in
-    ifaces { iSlurp  = new_slurped_names, iVSlurp = new_imp_names }
+    ifaces { iSlurp  = new_slurped_names, iVSlurp = new_vslurp }
 
 recordLocalSlurps local_avails
   = getIfacesRn 	`thenRn` \ ifaces ->
@@ -682,7 +681,8 @@ importDecl name
 getNonWiredInDecl :: Name -> RnMG ImportDeclResult
 getNonWiredInDecl needed_name 
   = traceRn doc_str				`thenRn_`
-    loadHomeInterface doc_str needed_name	`thenRn` \ ifaces ->
+    loadHomeInterface doc_str needed_name	`thenRn_`
+    getIfacesRn					`thenRn` \ ifaces ->
     case lookupNameEnv (iDecls ifaces) needed_name of
 
 {- 		OMIT DEFERRED STUFF FOR NOW, TILL GHCI WORKS
@@ -830,7 +830,7 @@ checkModUsage (mod_name, _, _, NothingAtAll)
   = up_to_date (ptext SLIT("Nothing used from:") <+> ppr mod_name)
 
 checkModUsage (mod_name, _, _, whats_imported)
-  = tryLoadInterface doc_str mod_name ImportBySystem	`thenRn` \ (ifaces, maybe_err) ->
+  = tryLoadInterface doc_str mod_name ImportBySystem	`thenRn` \ (iface, maybe_err) ->
     case maybe_err of {
 	Just err -> out_of_date (sep [ptext SLIT("Can't find version number for module"), 
 				      ppr mod_name]) ;
@@ -839,12 +839,8 @@ checkModUsage (mod_name, _, _, whats_imported)
 		-- the current module doesn't need that import and it's been deleted
 
 	Nothing -> 
-
-    getHomeIfaceTableRn					`thenRn` \ hit ->
     let
-	mod_details   = lookupTableByModName hit (iPIT ifaces) mod_name
-			`orElse` panic "checkModUsage"
-	new_vers      = mi_version mod_details
+	new_vers      = mi_version iface
 	new_decl_vers = vers_decls new_vers
     in
     case whats_imported of {	-- NothingAtAll dealt with earlier

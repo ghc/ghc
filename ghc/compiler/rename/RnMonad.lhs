@@ -35,12 +35,12 @@ import IOExts		( IORef, newIORef, readIORef, writeIORef, unsafePerformIO )
 import HsSyn		
 import RdrHsSyn
 import RnHsSyn		( RenamedFixitySig )
-import HscTypes		( AvailEnv, lookupTypeEnv,
+import HscTypes		( AvailEnv, lookupType,
 			  OrigNameEnv(..), OrigNameNameEnv, OrigNameIParamEnv,
 			  WhetherHasOrphans, ImportVersion, 
 			  PersistentRenamerState(..), IsBootInterface, Avails,
 			  DeclsMap, IfaceInsts, IfaceRules, 
-			  HomeSymbolTable, PackageSymbolTable,
+			  HomeSymbolTable, PackageTypeEnv,
 			  PersistentCompilerState(..), GlobalRdrEnv,
 			  HomeIfaceTable, PackageIfaceTable,
 			  RdrAvailInfo )
@@ -58,7 +58,7 @@ import Name		( Name, OccName, NamedThing(..), getSrcLoc,
 			  NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, 
 			  extendNameEnvList
 			)
-import Module		( Module, ModuleName )
+import Module		( Module, ModuleName, ModuleSet, emptyModuleSet )
 import NameSet		
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import SrcLoc		( SrcLoc, generatedSrcLoc, noSrcLoc )
@@ -261,19 +261,24 @@ data Ifaces = Ifaces {
 		-- All the names (whether "big" or "small", whether wired-in or not,
 		-- whether locally defined or not) that have been slurped in so far.
 
-	iVSlurp :: [Name]
-		-- All the (a) non-wired-in (b) "big" (c) non-locally-defined 
+	iVSlurp :: (ModuleSet, NameSet)
+		-- The Names are all the (a) non-wired-in
+		--			 (b) "big"
+		--	   		 (c) non-locally-defined
+		--	   		 (d) home-package
 		-- names that have been slurped in so far, with their versions.
 		-- This is used to generate the "usage" information for this module.
 		-- Subset of the previous field.
+		-- The module set is the non-home-package modules from which we have
+		-- slurped at least one name.
 		-- It's worth keeping separately, because there's no very easy 
 		-- way to distinguish the "big" names from the "non-big" ones.
 		-- But this is a decision we might want to revisit.
     }
 
-type ImportedModuleInfo = FiniteMap ModuleName 
-				    (WhetherHasOrphans, IsBootInterface, IsLoaded)
-type IsLoaded = Bool
+type ImportedModuleInfo = FiniteMap ModuleName (WhetherHasOrphans, IsBootInterface)
+	-- Contains info ONLY about modules that have not yet
+	--- been loaded into the iPIT
 \end{code}
 
 
@@ -295,7 +300,7 @@ initRn :: DynFlags
 initRn dflags hit hst pcs mod do_rn
   = do 
 	let prs = pcs_PRS pcs
-	let pst = pcs_PST pcs
+	let pte = pcs_PTE pcs
 	let ifaces = Ifaces { iPIT   = pcs_PIT pcs,
 			      iDecls = prsDecls prs,
 		  	      iInsts = prsInsts prs,
@@ -306,7 +311,7 @@ initRn dflags hit hst pcs mod do_rn
 				-- Pretend that the dummy unbound name has already been
 				-- slurped.  This is what's returned for an out-of-scope name,
 				-- and we don't want thereby to try to suck it in!
-			      iVSlurp = []
+			      iVSlurp = (emptyModuleSet, emptyNameSet)
 		      }
         let uniqs = prsNS prs
 
@@ -319,7 +324,7 @@ initRn dflags hit hst pcs mod do_rn
 	
 			       rn_dflags = dflags,
 			       rn_hit    = hit,
-			       rn_done   = is_done hst pst,
+			       rn_done   = is_done hst pte,
 					     
 			       rn_ns     = names_var, 
 			       rn_errs   = errs_var, 
@@ -347,9 +352,9 @@ initRn dflags hit hst pcs mod do_rn
 
 	return (new_pcs, not (isEmptyBag errs), res)
 
-is_done :: HomeSymbolTable -> PackageSymbolTable -> Name -> Bool
+is_done :: HomeSymbolTable -> PackageTypeEnv -> Name -> Bool
 -- Returns True iff the name is in either symbol table
-is_done hst pst n = maybeToBool (lookupTypeEnv pst n `seqMaybe` lookupTypeEnv hst n)
+is_done hst pte n = maybeToBool (lookupType hst pte n)
 
 initRnMS rn_env fixity_env mode thing_inside rn_down g_down
   = let

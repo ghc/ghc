@@ -40,7 +40,7 @@ import Unique		( Unique )
 import Util		( zipWithEqual )
 import Name		( Name, lookupNameEnv )
 import HscTypes		( HomeSymbolTable, PersistentCompilerState(..), 
-			  TyThing(..), TypeEnv, lookupTypeEnv )
+			  TyThing(..), TypeEnv, lookupType )
 import CmdLineOpts	( DynFlags )
 
 infixr 9 `thenDs`
@@ -82,17 +82,14 @@ initDs dflags init_us (hst,pcs,local_type_env) mod action
 	-- such as fold, build, cons etc, so the chances are
 	-- it'll be found in the package symbol table.  That's
 	-- why we don't merge all these tables
-    pst = pcs_PST pcs
-    lookup n = case lookupTypeEnv pst n of {
-		 Just (AnId v) -> v ;
-		 other -> 
-	       case lookupTypeEnv hst n of {
+    pte = pcs_PTE pcs
+    lookup n = case lookupType hst pte n of {
 		 Just (AnId v) -> v ;
 		 other -> 
 	       case lookupNameEnv local_type_env n of
 		 Just (AnId v) -> v ;
 		 other	       -> pprPanic "initDS: lookup:" (ppr n)
-               }}
+               }
 
 thenDs :: DsM a -> (a -> DsM b) -> DsM b
 andDs  :: (a -> a -> a) -> DsM a -> DsM a -> DsM a

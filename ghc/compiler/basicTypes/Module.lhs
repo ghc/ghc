@@ -60,6 +60,8 @@ module Module
     , moduleEnvElts, unitModuleEnv, isEmptyModuleEnv, foldModuleEnv
     , lookupModuleEnvByName, extendModuleEnv_C
 
+    , ModuleSet, emptyModuleSet, mkModuleSet, moduleSetElts, extendModuleSet, elemModuleSet
+
     ) where
 
 #include "HsVersions.h"
@@ -69,6 +71,7 @@ import CmdLineOpts	( opt_InPackage )
 import FastString	( FastString, uniqueOfFS )
 import Unique		( Uniquable(..), mkUniqueGrimily )
 import UniqFM
+import UniqSet
 \end{code}
 
 
@@ -316,4 +319,20 @@ moduleEnvElts       = eltsUFM
 unitModuleEnv       = unitUFM
 isEmptyModuleEnv    = isNullUFM
 foldModuleEnv       = foldUFM
+\end{code}
+
+\begin{code}
+
+type ModuleSet = UniqSet Module
+mkModuleSet	:: [Module] -> ModuleSet
+extendModuleSet :: ModuleSet -> Module -> ModuleSet
+emptyModuleSet  :: ModuleSet
+moduleSetElts   :: ModuleSet -> [Module]
+elemModuleSet   :: Module -> ModuleSet -> Bool
+
+emptyModuleSet  = emptyUniqSet
+mkModuleSet     = mkUniqSet
+extendModuleSet = addOneToUniqSet
+moduleSetElts   = uniqSetToList
+elemModuleSet   = elementOfUniqSet
 \end{code}

@@ -42,9 +42,9 @@ import Type		( funResultTy, splitForAllTys )
 import Bag		( isEmptyBag )
 import ErrUtils		( printErrorsAndWarnings, dumpIfSet_dyn )
 import Id		( idType, idName, idUnfolding )
-import Module           ( Module, plusModuleEnv )
-import Name		( Name, nameOccName, isLocallyDefined, isGlobalName, getName,
-			  toRdrName, nameEnvElts, lookupNameEnv, mkNameEnv
+import Module           ( Module )
+import Name		( Name, nameOccName, isLocallyDefined, isGlobalName,
+			  toRdrName, nameEnvElts, lookupNameEnv, 
 			)
 import TyCon		( tyConGenInfo, isClassTyCon )
 import OccName		( isSysOcc )
@@ -54,9 +54,9 @@ import BasicTypes       ( EP(..), Fixity )
 import Bag		( isEmptyBag )
 import Outputable
 import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, HomeIfaceTable,
-			  PackageSymbolTable, DFunId, ModIface(..),
-			  TypeEnv, extendTypeEnv, lookupTable,
-		          TyThing(..), groupTyThings )
+			  PackageTypeEnv, DFunId, ModIface(..),
+			  TypeEnv, extendTypeEnvList, lookupTable,
+		          TyThing(..), mkTypeEnv )
 import List		( partition )
 \end{code}
 
@@ -87,7 +87,7 @@ typecheckModule
 	-> IO (Maybe TcResults)
 
 typecheckModule dflags this_mod pcs hst hit decls
-  = do	env <- initTcEnv global_symbol_table
+  = do	env <- initTcEnv hst (pcs_PTE pcs)
 
         (maybe_result, (warns,errs)) <- initTc dflags env tc_module
 
@@ -104,8 +104,6 @@ typecheckModule dflags this_mod pcs hst hit decls
            else 
              return Nothing 
   where
-    global_symbol_table = pcs_PST pcs `plusModuleEnv` hst
-
     tc_module :: TcM (TcEnv, TcResults)
     tc_module = fixTc (\ ~(unf_env ,_) -> tcModule pcs hst get_fixity this_mod decls unf_env)
 
@@ -243,13 +241,13 @@ tcModule pcs hst get_fixity this_mod decls unf_env
 						    (nameEnvElts (getTcGEnv final_env))
 
     	local_type_env :: TypeEnv
-    	local_type_env = mkNameEnv [(getName thing, thing) | thing <- local_things]
+    	local_type_env = mkTypeEnv local_things
     
-    	new_pst :: PackageSymbolTable
-    	new_pst = extendTypeEnv (pcs_PST pcs) (groupTyThings imported_things)
+    	new_pte :: PackageTypeEnv
+    	new_pte = extendTypeEnvList (pcs_PTE pcs) imported_things
 
 	final_pcs :: PersistentCompilerState
-	final_pcs = pcs { pcs_PST   = new_pst,
+	final_pcs = pcs { pcs_PTE   = new_pte,
 			  pcs_insts = new_pcs_insts,
 			  pcs_rules = new_pcs_rules
 		    }

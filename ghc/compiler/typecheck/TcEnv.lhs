@@ -6,7 +6,7 @@ module TcEnv(
 	-- Getting stuff from the environment
 	TcEnv, initTcEnv, 
 	tcEnvTyCons, tcEnvClasses, tcEnvIds, tcEnvTcIds, tcEnvTyVars,
-	getTcGST, getTcGEnv,
+	getTcGEnv,
 	
 	-- Instance environment, and InstInfo type
 	tcGetInstEnv, tcSetInstEnv, 
@@ -65,10 +65,10 @@ import Name		( Name, OccName, NamedThing(..),
 			  extendNameEnvList, emptyNameEnv
 			)
 import OccName		( mkDFunOcc, mkDefaultMethodOcc, occNameString )
-import HscTypes		( DFunId, TypeEnv )
+import HscTypes		( DFunId, TypeEnv, HomeSymbolTable, PackageTypeEnv )
 import Module		( Module )
 import InstEnv		( InstEnv, emptyInstEnv )
-import HscTypes		( lookupTypeEnv, TyThing(..), GlobalSymbolTable )
+import HscTypes		( lookupType, TyThing(..) )
 import Util		( zipEqual )
 import SrcLoc		( SrcLoc )
 import Outputable
@@ -88,12 +88,12 @@ type TcIdSet = IdSet
 
 data TcEnv
   = TcEnv {
-	tcGST  	 :: GlobalSymbolTable,	-- The symbol table at the moment we began this compilation
+	tcGST  	 :: Name -> Maybe TyThing,	-- The type environment at the moment we began this compilation
 
 	tcInsts	 :: InstEnv,		-- All instances (both imported and in this module)
 
 	tcGEnv	 :: TypeEnv,		-- The global type environment we've accumulated while
-		    {- NameEnv TyThing-}-- compiling this module:
+		 {- NameEnv TyThing-}	-- compiling this module:
 					--	types and classes (both imported and local)
 					-- 	imported Ids
 					-- (Ids defined in this module are in the local envt)
@@ -141,15 +141,18 @@ data TcTyThing
 --	3. Then we zonk the kind variable.
 --	4. Now we know the kind for 'a', and we add (a -> ATyVar a::K) to the environment
 
-initTcEnv :: GlobalSymbolTable -> IO TcEnv
-initTcEnv gst
+initTcEnv :: HomeSymbolTable -> PackageTypeEnv -> IO TcEnv
+initTcEnv hst pte 
   = do { gtv_var <- newIORef emptyVarSet ;
-	 return (TcEnv { tcGST    = gst,
+	 return (TcEnv { tcGST    = lookup,
 		      	 tcGEnv   = emptyNameEnv,
 		      	 tcInsts  = emptyInstEnv,
 		      	 tcLEnv   = emptyNameEnv,
 		      	 tcTyVars = gtv_var
 	 })}
+  where
+    lookup name = lookupType hst pte name
+
 
 tcEnvClasses env = [cl | AClass cl <- nameEnvElts (tcGEnv env)]
 tcEnvTyCons  env = [tc | ATyCon tc <- nameEnvElts (tcGEnv env)] 
@@ -157,7 +160,6 @@ tcEnvIds     env = [id | AnId   id <- nameEnvElts (tcGEnv env)]
 tcEnvTyVars  env = [tv | ATyVar tv <- nameEnvElts (tcLEnv env)]
 tcEnvTcIds   env = [id | ATcId  id <- nameEnvElts (tcLEnv env)]
 
-getTcGST  (TcEnv { tcGST = gst })   = gst
 getTcGEnv (TcEnv { tcGEnv = genv }) = genv
 
 -- This data type is used to help tie the knot
@@ -180,7 +182,7 @@ lookup_global :: TcEnv -> Name -> Maybe TyThing
 lookup_global env name 
   = case lookupNameEnv (tcGEnv env) name of
 	Just thing -> Just thing
-	Nothing    -> lookupTypeEnv (tcGST env) name
+	Nothing    -> tcGST env name
 
 lookup_local :: TcEnv -> Name -> Maybe TcTyThing
 	-- Try the local envt and then try the global

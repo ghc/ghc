@@ -18,7 +18,14 @@ module RnHiFiles (
 #include "HsVersions.h"
 
 import CmdLineOpts	( opt_IgnoreIfacePragmas )
-import HscTypes
+import HscTypes		( ModuleLocation(..),
+			  ModIface(..), emptyModIface,
+			  VersionInfo(..),
+			  lookupTableByModName, 
+			  ImportVersion, WhetherHasOrphans, IsBootInterface,
+			  DeclsMap, GatedDecl, IfaceInsts, IfaceRules,
+			  AvailInfo, GenAvailInfo(..), Avails, Deprecations(..)
+			 )
 import HsSyn		( HsDecl(..), TyClDecl(..), InstDecl(..),
 			  HsType(..), ConDecl(..), 
 			  FixitySig(..), RuleDecl(..),
@@ -37,14 +44,14 @@ import Name		( Name {-instance NamedThing-}, nameOccName,
 			  NamedThing(..),
 			  mkNameEnv, extendNameEnv
 			 )
-import Module		( Module,
+import Module		( Module, 
 			  moduleName, isModuleInThisPackage,
 			  ModuleName, WhereFrom(..),
-			  extendModuleEnv, lookupModuleEnvByName,
+			  extendModuleEnv, mkVanillaModule
 			)
 import RdrName		( RdrName, rdrNameOcc )
 import NameSet
-import SrcLoc		( mkSrcLoc, SrcLoc )
+import SrcLoc		( mkSrcLoc )
 import Maybes		( maybeToBool, orElse )
 import StringBuffer     ( hGetStringBuffer )
 import FastString	( mkFastString )
@@ -64,7 +71,7 @@ import Bag
 %*********************************************************
 
 \begin{code}
-loadHomeInterface :: SDoc -> Name -> RnM d Ifaces
+loadHomeInterface :: SDoc -> Name -> RnM d ModIface
 loadHomeInterface doc_str name
   = loadInterface doc_str (moduleName (nameModule name)) ImportBySystem
 
@@ -79,14 +86,14 @@ loadOrphanModules mods
     load mod   = loadInterface (mk_doc mod) mod ImportBySystem
     mk_doc mod = ppr mod <+> ptext SLIT("is a orphan-instance module")
 
-loadInterface :: SDoc -> ModuleName -> WhereFrom -> RnM d Ifaces
+loadInterface :: SDoc -> ModuleName -> WhereFrom -> RnM d ModIface
 loadInterface doc mod from 
   = tryLoadInterface doc mod from	`thenRn` \ (ifaces, maybe_err) ->
     case maybe_err of
 	Nothing  -> returnRn ifaces
 	Just err -> failWithRn ifaces err
 
-tryLoadInterface :: SDoc -> ModuleName -> WhereFrom -> RnM d (Ifaces, Maybe Message)
+tryLoadInterface :: SDoc -> ModuleName -> WhereFrom -> RnM d (ModIface, Maybe Message)
   -- Returns (Just err) if an error happened
   -- It *doesn't* add an error to the monad, because sometimes it's ok to fail...
   -- Specifically, when we read the usage information from an interface file,
@@ -97,12 +104,12 @@ tryLoadInterface :: SDoc -> ModuleName -> WhereFrom -> RnM d (Ifaces, Maybe Mess
   -- (If the load fails, we plug in a vanilla placeholder)
 tryLoadInterface doc_str mod_name from
  = getHomeIfaceTableRn		`thenRn` \ hit ->
-   getIfacesRn 			`thenRn` \ ifaces ->
+   getIfacesRn 			`thenRn` \ ifaces@(Ifaces { iPIT = pit }) ->
 	
-	-- Check whether we have it already in the home package
-   case lookupModuleEnvByName hit mod_name of {
-	Just _  -> returnRn (ifaces, Nothing) ;	-- In the home package
-	Nothing -> 
+	-- CHECK WHETHER WE HAVE IT ALREADY
+   case lookupTableByModName hit pit mod_name of {
+	Just iface  -> returnRn (iface, Nothing) ;	-- Already loaded
+	Nothing	    -> 
 
    let
 	mod_map  = iImpModInfo ifaces
@@ -110,10 +117,10 @@ tryLoadInterface doc_str mod_name from
 
 	hi_boot_file 
 	  = case (from, mod_info) of
-		(ImportByUser,       _)    	       -> False 	-- Not hi-boot
-		(ImportByUserSource, _)		       -> True 		-- hi-boot
-		(ImportBySystem, Just (_, is_boot, _)) -> is_boot 	-- 
-		(ImportBySystem, Nothing)	       -> False
+		(ImportByUser,       _)    	    -> False 	-- Not hi-boot
+		(ImportByUserSource, _)		    -> True 	-- hi-boot
+		(ImportBySystem, Just (_, is_boot)) -> is_boot
+		(ImportBySystem, Nothing)	    -> False
 			-- We're importing a module we know absolutely
 			-- nothing about, so we assume it's from
 			-- another package, where we aren't doing 
@@ -121,16 +128,9 @@ tryLoadInterface doc_str mod_name from
 
 	redundant_source_import 
 	  = case (from, mod_info) of 
-		(ImportByUserSource, Just (_,False,_)) -> True
-		other				       -> False
+		(ImportByUserSource, Just (_,False)) -> True
+		other				     -> False
    in
-	-- CHECK WHETHER WE HAVE IT ALREADY
-   case mod_info of {
-	Just (_, _, True)
-		-> 	-- We're read it already so don't re-read it
-		    returnRn (ifaces, Nothing) ;
-
-	_ ->
 
 	-- Issue a warning for a redundant {- SOURCE -} import
 	-- NB that we arrange to read all the ordinary imports before 
@@ -144,11 +144,12 @@ tryLoadInterface doc_str mod_name from
 	Left err -> 	-- Not found, so add an empty export env to the Ifaces map
 			-- so that we don't look again
 	   let
-		new_mod_map = addToFM mod_map mod_name (False, False, True)
-		new_ifaces  = ifaces { iImpModInfo = new_mod_map }
+		fake_mod    = mkVanillaModule mod_name
+		fake_iface  = emptyModIface fake_mod
+		new_ifaces  = ifaces { iPIT = extendModuleEnv pit fake_mod fake_iface }
 	   in
 	   setIfacesRn new_ifaces		`thenRn_`
-	   returnRn (new_ifaces, Just err) ;
+	   returnRn (fake_iface, Just err) ;
 
 	-- Found and parsed!
 	Right (mod, iface) ->
@@ -182,17 +183,19 @@ tryLoadInterface doc_str mod_name from
 
 	-- For an explicit user import, add to mod_map info about
 	-- the things the imported module depends on, extracted
-	-- from its usage info.
+	-- from its usage info; and delete the module itself, which is now in the PIT
 	mod_map1 = case from of
-			ImportByUser -> addModDeps mod (pi_usages iface) mod_map
+			ImportByUser -> addModDeps mod is_loaded (pi_usages iface) mod_map
 			other        -> mod_map
-	mod_map2 = addToFM mod_map1 mod_name (has_orphans, hi_boot_file, True)
+	mod_map2 = delFromFM mod_map1 mod_name
+	is_loaded m = maybeToBool (lookupTableByModName hit pit m)
 
 	-- Now add info about this module to the PIT
 	has_orphans = pi_orphan iface
-	new_pit   = extendModuleEnv (iPIT ifaces) mod mod_iface
+	new_pit   = extendModuleEnv pit mod mod_iface
  	mod_iface = ModIface { mi_module = mod, mi_version = version,
-			       mi_exports = avails, mi_orphan = has_orphans,
+			       mi_orphan = has_orphans, mi_boot = hi_boot_file,
+			       mi_exports = avails, 
 			       mi_fixities = fix_env, mi_deprecs = deprec_env,
 			       mi_usages  = [],	-- Will be filled in later
 			       mi_decls   = panic "No mi_decls in PIT",
@@ -206,41 +209,42 @@ tryLoadInterface doc_str mod_name from
 			      iImpModInfo = mod_map2  }
     in
     setIfacesRn new_ifaces		`thenRn_`
-    returnRn (new_ifaces, Nothing)
-    }}}
+    returnRn (mod_iface, Nothing)
+    }}
 
 -----------------------------------------------------
 --	Adding module dependencies from the 
 --	import decls in the interface file
 -----------------------------------------------------
 
-addModDeps :: Module -> [ImportVersion a] 
+addModDeps :: Module 
+	   -> (ModuleName -> Bool)	-- True for module interfaces
+	   -> [ImportVersion a] 
 	   -> ImportedModuleInfo -> ImportedModuleInfo
 -- (addModDeps M ivs deps)
 -- We are importing module M, and M.hi contains 'import' decls given by ivs
-addModDeps mod new_deps mod_deps
+addModDeps mod is_loaded new_deps mod_deps
   = foldr add mod_deps filtered_new_deps
   where
 	-- Don't record dependencies when importing a module from another package
 	-- Except for its descendents which contain orphans,
 	-- and in that case, forget about the boot indicator
-    filtered_new_deps :: [(ModuleName, (WhetherHasOrphans, IsBootInterface, IsLoaded))]
+    filtered_new_deps :: [(ModuleName, (WhetherHasOrphans, IsBootInterface))]
     filtered_new_deps
 	| isModuleInThisPackage mod 
-			    = [ (imp_mod, (has_orphans, is_boot, False))
-			      | (imp_mod, has_orphans, is_boot, _) <- new_deps 
+			    = [ (imp_mod, (has_orphans, is_boot))
+			      | (imp_mod, has_orphans, is_boot, _) <- new_deps,
+				not (is_loaded imp_mod)
 			      ]			      
-	| otherwise	    = [ (imp_mod, (True, False, False))
-			      | (imp_mod, has_orphans, _, _) <- new_deps, 
-				has_orphans
+	| otherwise	    = [ (imp_mod, (True, False))
+			      | (imp_mod, has_orphans, _, _) <- new_deps,
+				not (is_loaded imp_mod) && has_orphans
 			      ]
     add (imp_mod, dep) deps = addToFM_C combine deps imp_mod dep
 
-    combine old@(_, old_is_boot, old_is_loaded) new
-	| old_is_loaded || not old_is_boot = old	-- Keep the old info if it's already loaded
-							-- or if it's a non-boot pending load
-	| otherwise			    = new	-- Otherwise pick new info
-
+    combine old@(old_has_orphans, old_is_boot) new@(new_has_orphans, new_is_boot)
+	| old_is_boot = new	-- Record the best is_boot info
+	| otherwise   = old
 
 -----------------------------------------------------
 --	Loading the export list
@@ -562,10 +566,8 @@ lookupFixityRn name
       -- When we come across a use of 'f', we need to know its fixity, and it's then,
       -- and only then, that we load B.hi.  That is what's happening here.
   = getHomeIfaceTableRn 		`thenRn` \ hit ->
-    loadHomeInterface doc name		`thenRn` \ ifaces ->
-    case lookupTable hit (iPIT ifaces) name of
-	Just iface -> returnRn (lookupNameEnv (mi_fixities iface) name `orElse` defaultFixity)
-	Nothing	   -> returnRn defaultFixity
+    loadHomeInterface doc name		`thenRn` \ iface ->
+    returnRn (lookupNameEnv (mi_fixities iface) name `orElse` defaultFixity)
   where
     doc = ptext SLIT("Checking fixity for") <+> ppr name
 \end{code}
