@@ -487,7 +487,8 @@ tcGetSrcLoc :: NF_TcM SrcLoc
 tcGetSrcLoc down env = return (getLoc down)
 
 tcGetInstLoc :: InstOrigin -> NF_TcM InstLoc
-tcGetInstLoc origin down env = return (origin, getLoc down, getErrCtxt down)
+tcGetInstLoc origin TcDown{tc_loc=loc, tc_ctxt=ctxt} env
+   = return (origin, loc, ctxt)
 
 tcSetErrCtxtM, tcAddErrCtxtM :: (TidyEnv -> NF_TcM (TidyEnv, Message))
 			     -> TcM a -> TcM a
