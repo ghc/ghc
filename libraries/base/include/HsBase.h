@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.19 2003/02/17 11:43:21 simonmar Exp $
+ * $Id: HsBase.h,v 1.20 2003/04/11 11:43:09 ross Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -109,9 +109,6 @@
 
 /* in ghc_errno.c */
 int *ghcErrno(void);
-
-#if !defined(__HUGS__)
-/* The rest isn't needed by Hugs, so we break off here. */
 
 /* in system.c */
 HsInt systemCmd(HsAddr cmd);
@@ -641,8 +638,6 @@ INLINE int __hsposix_SIG_BLOCK()   { return SIG_BLOCK; }
 INLINE int __hsposix_SIG_UNBLOCK() { return SIG_SETMASK; }
 INLINE int __hsposix_SIG_SETMASK() { return SIG_UNBLOCK; }
 #endif /* mingw32_TARGET_OS */
-
-#endif /* !__HUGS__ */
 
 #endif /* __HSBASE_H__ */
 
