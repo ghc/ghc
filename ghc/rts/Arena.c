@@ -18,11 +18,12 @@
    which most allocations are small.
    -------------------------------------------------------------------------- */
 
-#include <stdlib.h>
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "BlockAlloc.h"
 #include "Arena.h"
+
+#include <stdlib.h>
 
 // Each arena struct is allocated using malloc().
 struct _Arena {
