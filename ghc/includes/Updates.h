@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.17 2000/04/14 15:18:05 sewardj Exp $
+ * $Id: Updates.h,v 1.18 2000/05/15 14:38:11 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -172,14 +172,14 @@ extern void awakenBlockedQueue(StgTSO *q);
 #define PUSH_STD_CCCS(frame)
 #endif
 
-extern DLL_IMPORT_DATA const StgPolyInfoTable Upd_frame_info; 
+extern DLL_IMPORT_DATA const StgPolyInfoTable upd_frame_info; 
 
 #define PUSH_UPD_FRAME(target, Sp_offset)			\
 	{							\
 		StgUpdateFrame *__frame;			\
 		TICK_UPDF_PUSHED(target, GET_INFO((StgClosure*)target)); \
 		__frame = (StgUpdateFrame *)(Sp + (Sp_offset)) - 1; \
-		SET_INFO(__frame, (StgInfoTable *)&Upd_frame_info);   \
+		SET_INFO(__frame, (StgInfoTable *)&upd_frame_info);   \
 		__frame->link = Su;				\
 		__frame->updatee = (StgClosure *)(target);	\
 		PUSH_STD_CCCS(__frame);				\
@@ -232,7 +232,7 @@ extern void newCAF_made_by_Hugs(StgCAF*);
    Update-related prototypes
    -------------------------------------------------------------------------- */
 
-DLL_IMPORT_RTS extern STGFUN(Upd_frame_entry);
+DLL_IMPORT_RTS extern STGFUN(upd_frame_entry);
 
 extern DLL_IMPORT_DATA const StgInfoTable PAP_info;
 DLL_IMPORT_RTS STGFUN(PAP_entry);
