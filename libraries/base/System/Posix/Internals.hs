@@ -43,6 +43,8 @@ import System.IO
 
 #ifdef __HUGS__
 import Hugs.Prelude (IOException(..), IOErrorType(..))
+
+{-# CBITS PrelIOUtils.c #-}
 #endif
 
 -- ---------------------------------------------------------------------------

@@ -116,6 +116,10 @@ import System.IO		( IOError, Handle, ioError )
 import System.IO.Unsafe		( unsafePerformIO )
 #endif
 
+#ifdef __HUGS__
+{-# CBITS errno.c #-}
+#endif
+
 -- "errno" type
 -- ------------
 
