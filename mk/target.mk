@@ -439,7 +439,9 @@ install:: installdirs
 
 ifneq "$(INSTALL_PROGS)" ""
 install:: $(INSTALL_PROGS)
-	$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $(INSTALL_PROGS) $(bindir)
+	for i in $(INSTALL_PROGS); do \
+		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(bindir); \
+	done
 endif
 
 
@@ -460,26 +462,64 @@ ifneq "$(BIN_DIST)" "1"
 	   $(RM) $$i.tmp; \
 	done
 else
-	$(INSTALL_PROGRAM) $(INSTALL_OPTS) $(INSTALL_SCRIPTS) $(bindir)
+	for i in $(INSTALL_SCRIPTS); do \
+		$(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(bindir); \
+	done
 endif
 else
-	$(INSTALL_PROGRAM) $(INSTALL_OPTS) $(INSTALL_SCRIPTS) $(bindir)
+	for i in $(INSTALL_SCRIPTS); do \
+		$(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(bindir); \
+	done
+endif
+endif
+
+ifneq "$(INSTALL_LIB_SCRIPTS)" ""
+install:: $(INSTALL_LIB_SCRIPTS)
+ifeq "$(INTERP)" "perl"
+ifneq "$(BIN_DIST)" "1"
+	@for i in $(INSTALL_LIB_SCRIPTS); do \
+	   $(RM) $$i.tmp; \
+	   echo "eval 'exec $(PERL) -S $$$""0 $$""{1+\"$$$""@\"}'"  > $$i.tmp ; \
+	   echo "      if $$""running_under_some_shell;"           >> $$i.tmp ; \
+	   echo $$"bindir='$(bindir);'"                            >> $$i.tmp ; \
+	   echo $$"libdir='$(real_libdir)';"                       >> $$i.tmp ; \
+	   echo $$"datadir='$(real_datadir)';"                     >> $$i.tmp ; \
+	   cat  $$i                                                >> $$i.tmp ; \
+	   echo $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(libdir) ;    \
+	   $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i.tmp $(libdir)/$$i ; \
+	   $(RM) $$i.tmp; \
+	done
+else
+	for i in $(INSTALL_LIB_SCRIPTS); do \
+		$(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(libdir); \
+	done
+endif
+else
+	for i in $(INSTALL_SCRIPTS); do \
+		$(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(libdir); \
+	done
 endif
 endif
 
 ifneq "$(INSTALL_LIBS)" ""
 install:: $(INSTALL_LIBS)
-	$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_LIBS) $(libdir)
+	for i in $(INSTALL_LIBS); do \
+		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(libdir); \
+	done
 endif
 
 ifneq "$(INSTALL_LIBEXECS)" ""
 install:: $(INSTALL_LIBEXECS)
-	$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $(INSTALL_LIBEXECS) $(libexecdir)
+	-for i in $(INSTALL_LIBEXECS); do \
+		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(libexecdir); \
+	done
 endif
 
 ifneq "$(INSTALL_DATAS)" ""
 install:: $(INSTALL_DATAS)
-	$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_DATAS) $(datadir)
+	for i in $(INSTALL_DATAS); do \
+		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir); \
+	done
 endif
 
 #
