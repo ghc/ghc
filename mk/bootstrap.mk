@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.12 2001/07/23 22:33:53 ken Exp $
+# $Id: bootstrap.mk,v 1.13 2001/07/24 04:45:59 ken Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -46,6 +46,10 @@ endif
 
 ifeq "$(mingw32_TARGET_OS)" "1"
 PLATFORM_CC_OPTS += -mno-cygwin
+endif
+
+ifeq "$(alpha_TARGET_ARCH)" "1"
+PLATFORM_CC_OPTS += -static -Xlinker -noprefix_recognition
 endif
 
 PLATFORM_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt) 
