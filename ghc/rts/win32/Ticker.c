@@ -66,7 +66,7 @@ TimerProc(PVOID param)
 int
 startTicker(nat ms)
 {
-			    
+  unsigned threadId;
   /* 'hStopEvent' is a manual-reset event that's signalled upon
    * shutdown of timer service (=> timer thread.)
    */
@@ -82,7 +82,7 @@ startTicker(nat ms)
 			       TimerProc,
 			       (LPVOID)ms,
 			       0,
-			       NULL) );
+			       &threadId) );
 }
 
 int

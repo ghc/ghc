@@ -126,12 +126,13 @@ static
 BOOL
 NewIOWorkerThread(IOManagerState* iom)
 {
+  unsigned threadId;
   return ( 0 != _beginthreadex(NULL,
 			       0,
 			       IOWorkerProc,
 			       (LPVOID)iom,
 			       0,
-			       NULL) );
+			       &threadId) );
 }
 
 BOOL
