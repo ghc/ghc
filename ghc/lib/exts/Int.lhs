@@ -8,10 +8,7 @@ This code is largely copied from the Hugs library of the same name,
 suitably hammered to use unboxed types.
 
 \begin{code}
------------------------------------------------------------------------------
--- Signed Integers
--- Suitable for use with Hugs 1.4 on 32 bit systems.
------------------------------------------------------------------------------
+#include "MachDeps.h"
 
 module Int
 	( Int8
@@ -33,15 +30,37 @@ module Int
 
 	-- plus Eq, Ord, Num, Bounded, Real, Integral, Ix, Enum, Read,
 	--  Show and Bits instances for each of Int8, Int16, Int32 and Int64
+
+	-- The "official" place to get these from is Addr.
+	, indexInt8OffAddr
+	, indexInt16OffAddr
+	, indexInt32OffAddr
+	, indexInt64OffAddr
+	
+	, readInt8OffAddr
+	, readInt16OffAddr
+	, readInt32OffAddr
+	, readInt64OffAddr
+	
+	, writeInt8OffAddr
+	, writeInt16OffAddr
+	, writeInt32OffAddr
+	, writeInt64OffAddr
+	
+	, sizeofInt8
+	, sizeofInt16
+	, sizeofInt32
+	, sizeofInt64
+
 	) where
 
-import PrelBase
-import PrelNum
-import PrelRead
+import GlaExts
 import Ix
 import Bits
 import PrelGHC
 import CCall
+import Numeric ( readDec )
+import Word    ( Word32 )
 
 -----------------------------------------------------------------------------
 -- The "official" coercion functions
@@ -209,6 +228,9 @@ instance Bits Int8 where
 
 pow2# :: Int# -> Int#
 pow2# x# = iShiftL# 1# x#
+
+sizeofInt8 :: Word32
+sizeofInt8 = 1
 \end{code}
 
 \subsection[Int16]{The @Int16@ interface}
@@ -334,6 +356,9 @@ instance Bits Int16 where
   testBit x i       = (x .&. bit i) /= 0
   bitSize  _        = 16
   isSigned _        = True
+
+sizeofInt16 :: Word32
+sizeofInt16 = 2
 \end{code}
 
 %
@@ -485,6 +510,8 @@ instance Bits Int32 where
   bitSize  _    = 32
   isSigned _    = True
 
+sizeofInt32 :: Word32
+sizeofInt32 = 4
 \end{code}
 
 \subsection[Int64]{The @Int64@ interface}
@@ -512,6 +539,8 @@ instance Show Int64 where
 instance Read Int64 where
   readsPrec p s = [ (integerToInt64 x,r) | (x,r) <- readDec s ]
 
+sizeofInt64 :: Word32
+sizeofInt64 = 8
 \end{code}
 
 %
@@ -530,3 +559,80 @@ signumReal x | x == 0    =  0
 	     | x > 0     =  1
 	     | otherwise = -1
 \end{code}
+
+\begin{code}
+indexInt8OffAddr  :: Addr -> Int -> Int8
+indexInt8OffAddr (A# a#) (I# i#) = intToInt8 (I# (ord# (indexCharOffAddr# a# i#)))
+
+indexInt16OffAddr :: Addr -> Int -> Int16
+indexInt16OffAddr a i =
+#ifdef WORDS_BIGENDIAN
+  intToInt16 ( int8ToInt l + (int8ToInt maxBound) * int8ToInt h)
+#else
+  intToInt16 ( int8ToInt h + (int8ToInt maxBound) * int8ToInt l)
+#endif
+ where
+   byte_idx = i * 2
+   l = indexInt8OffAddr a byte_idx
+   h = indexInt8OffAddr a (byte_idx+1)
+
+indexInt32OffAddr :: Addr -> Int -> Int32
+indexInt32OffAddr (A# a#) i = intToInt32 (I# (indexIntOffAddr# a# i'#))
+ where
+   -- adjust index to be in Int units, not Int32 ones.
+  (I# i'#) 
+#if WORD_SIZE_IN_BYTES==8
+   = i `div` 2
+#else
+   = i
+#endif
+
+indexInt64OffAddr :: Addr -> Int -> Int64
+indexInt64OffAddr (A# i#)
+#if WORD_SIZE_IN_BYTES==8
+ = I64# (indexIntOffAddr# a# i#)
+#else
+ = error "Int.indexInt64OffAddr: not implemented yet"
+#endif
+
+\end{code}
+
+Read words out of mutable memory:
+
+\begin{code}
+readInt8OffAddr :: Addr -> Int -> IO Int8
+readInt8OffAddr a i = _casm_ `` %r=(StgInt8)(((StgInt8*)%0)[(StgInt)%1]); '' a i
+
+readInt16OffAddr  :: Addr -> Int -> IO Int16
+readInt16OffAddr a i = _casm_ `` %r=(StgInt16)(((StgInt16*)%0)[(StgInt)%1]); '' a i
+
+readInt32OffAddr  :: Addr -> Int -> IO Int32
+readInt32OffAddr a i = _casm_ `` %r=(StgInt32)(((StgInt32*)%0)[(StgInt)%1]); '' a i
+
+readInt64OffAddr  :: Addr -> Int -> IO Int64
+#if WORD_SIZE_IN_BYTES==8
+readInt64OffAddr a i = _casm_ `` %r=(StgInt)(((StgInt*)%0)[(StgInt)%1]); '' a i
+#else
+readInt64OffAddr a i = error "Int.readInt64OffAddr: not implemented yet"
+#endif
+\end{code}
+
+\begin{code}
+writeInt8OffAddr  :: Addr -> Int -> Int8  -> IO ()
+writeInt8OffAddr a i e = _casm_ `` (((StgInt8*)%0)[(StgInt)%1])=(StgInt8)%2; '' a i e
+
+writeInt16OffAddr :: Addr -> Int -> Int16 -> IO ()
+writeInt16OffAddr a i e = _casm_ `` (((StgInt16*)%0)[(StgInt)%1])=(StgInt16)%2; '' a i e
+
+writeInt32OffAddr :: Addr -> Int -> Int32 -> IO ()
+writeInt32OffAddr a i e = _casm_ `` (((StgInt32*)%0)[(StgInt)%1])=(StgInt32)%2; '' a i e
+
+writeInt64OffAddr :: Addr -> Int -> Int64 -> IO ()
+#if WORD_SIZE_IN_BYTES==8
+writeInt64OffAddr a i e = _casm_ `` (((StgInt*)%0)[(StgInt)%1])=(StgInt)%2; '' a i e
+#else
+writeInt64OffAddr = error "Int.writeInt64OffAddr: not implemented yet"
+#endif
+
+\end{code}
+
