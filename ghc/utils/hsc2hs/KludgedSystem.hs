@@ -1,6 +1,6 @@
 {-# OPTIONS -cpp -fglasgow-exts #-}
 -----------------------------------------------------------------------------
--- $Id: KludgedSystem.hs,v 1.7 2001/07/03 16:57:03 sewardj Exp $
+-- $Id: KludgedSystem.hs,v 1.8 2001/07/04 09:18:38 sewardj Exp $
 
 -- system that works feasibly under Windows (i.e. passes the command line to sh,
 -- because system() under Windows doesn't look at SHELL, and always uses CMD.EXE)
@@ -8,6 +8,8 @@
 module KludgedSystem (system, defaultCompiler, progNameSuffix) where
 
 #include "../../includes/config.h"
+
+import Config
 
 #ifndef mingw32_TARGET_OS
 
@@ -23,7 +25,6 @@ import qualified System
 import System    (ExitCode)
 import IO        (bracket_)
 import Directory (removeFile)
-import Config
 
 system :: String -> IO ExitCode
 system cmd = do
