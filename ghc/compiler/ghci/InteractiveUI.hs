@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.65 2001/05/04 14:56:53 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.66 2001/05/04 16:36:38 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -188,8 +188,14 @@ runGHCi = do
 
 
 -- NOTE: We only read .ghci files if they are owned by the current user,
---       and aren't world writable.  Otherwise, we could be accidentally 
---	 running code planted by a malicious third party.
+-- and aren't world writable.  Otherwise, we could be accidentally 
+-- running code planted by a malicious third party.
+
+-- Furthermore, We only read ./.ghci if both . and ./.ghci are
+-- owned by the current user and aren't writable by anyone else.  I
+-- think this is sufficient: we don't need to check .. and
+-- ../.. etc. because "."  always refers to the same directory while a
+-- process is running.
 
 checkPerms :: String -> IO Bool
 checkPerms name =
