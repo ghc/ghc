@@ -149,6 +149,10 @@ IncludeTestDirsInBuild=NO
 
 WithGhcHc = @WithGhcHc@
 
+# Variable which is set to the version number of the $(WithGhcHc) we're using.
+# Not currently used, but might come in handy sometime soon.
+#WithGhcHcVersion = $(shell echo `if ( $(WithGhcHc) --version 2>/dev/null >/dev/null ) then $(WithGhcHc) --version 2>&1 | @SedCmd@ -e 's/^.*version [^0-9]*\([.0-9]*\).*/\1/;s/\.//'; else echo unknown; fi; ` )
+
 # Extra ways in which to build the compiler (for example, you might want to
 # build a profiled compiler so you can see where it spends its time)
 GhcCompilerWays=
