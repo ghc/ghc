@@ -234,7 +234,7 @@ ord = (fromEnum :: Char -> Int)
 ord_0 :: Num a => a
 ord_0 = fromInt (ord '0')
 
-{-# GENERATE_SPECS subtract a{Int#,Double#,Int,Double,Complex(Double#),Complex(Double)} #-}
+{-# GENERATE_SPECS subtract a{Int} #-}
 subtract	:: (Num a) => a -> a -> a
 subtract x y	=  y - x
 \end{code}
@@ -689,7 +689,7 @@ const x _		=  x
 
 -- function composition
 {-# INLINE (.) #-}
-{-# GENERATE_SPECS (.) a b c #-}
+{- GENERATE_SPECS (.) a b c -}
 (.)	  :: (b -> c) -> (a -> b) -> a -> c
 (.) f g	x = f (g x)
 
@@ -724,7 +724,7 @@ asTypeOf		=  const
 
 \begin{code}
 data Lift a = Lift a
-{-# GENERATE_SPECS data a :: Lift a #-}
+{- GENERATE_SPECS data a :: Lift a -}
 \end{code}
 
 
@@ -752,7 +752,7 @@ showString      =  (++)
 showParen       :: Bool -> ShowS -> ShowS
 showParen b p   =  if b then showChar '(' . p . showChar ')' else p
 
-{-# GENERATE_SPECS showList__ a #-}
+{- GENERATE_SPECS showList__ a -}
 showList__ :: (a -> ShowS) ->  [a] -> ShowS
 
 showList__ showx []     = showString "[]"
