@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.36 2003/02/22 04:51:52 sof Exp $
+ * $Id: Profiling.c,v 1.37 2003/08/22 22:24:13 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -261,8 +261,8 @@ static void
 initProfilingLogFile(void)
 {
     /* Initialise the log file name */
-    prof_filename = arenaAlloc(prof_arena, strlen(prog_argv[0]) + 6);
-    sprintf(prof_filename, "%s.prof", prog_argv[0]);
+    prof_filename = arenaAlloc(prof_arena, strlen(prog_name) + 6);
+    sprintf(prof_filename, "%s.prof", prog_name);
 
     /* open the log file */
     if ((prof_file = fopen(prof_filename, "w")) == NULL) {
@@ -292,8 +292,8 @@ initProfilingLogFile(void)
     
     if (RtsFlags.ProfFlags.doHeapProfile) {
 	/* Initialise the log file name */
-	hp_filename = arenaAlloc(prof_arena, strlen(prog_argv[0]) + 6);
-	sprintf(hp_filename, "%s.hp", prog_argv[0]);
+	hp_filename = arenaAlloc(prof_arena, strlen(prog_name) + 6);
+	sprintf(hp_filename, "%s.hp", prog_name);
 	
 	/* open the log file */
 	if ((hp_file = fopen(hp_filename, "w")) == NULL) {
@@ -722,7 +722,7 @@ reportCCSProfiling( void )
 	    time_str(), "Final");
 
     fprintf(prof_file, "\n\t  ");
-    fprintf(prof_file, " %s", prog_argv[0]);
+    fprintf(prof_file, " %s", prog_name);
     fprintf(prof_file, " +RTS");
     for (count = 0; rts_argv[count]; count++)
 	fprintf(prof_file, " %s", rts_argv[count]);

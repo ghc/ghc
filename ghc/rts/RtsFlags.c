@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.68 2003/04/21 14:45:28 sof Exp $
+ * $Id: RtsFlags.c,v 1.69 2003/08/22 22:24:13 sof Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -41,8 +41,9 @@ extern struct RTS_FLAGS RtsFlags;
 /*
  * Split argument lists
  */
-int     prog_argc = 0; /* an "int" so as to match normal "argc" */
+int     prog_argc = 0;    /* an "int" so as to match normal "argc" */
 char  **prog_argv = NULL;
+char   *prog_name = NULL; /* 'basename' of prog_argv[0] */
 int     rts_argc = 0;  /* ditto */
 char   *rts_argv[MAX_RTS_ARGS];
 
@@ -497,9 +498,11 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
     char *last_slash;
 
     /* Remove directory from argv[0] -- default files in current directory */
-
-    if ((last_slash = (char *) strrchr(argv[0], '/')) != NULL)
-	strcpy(argv[0], last_slash+1);
+    if ((last_slash = (char *) strrchr(argv[0], '/')) != NULL) {
+	prog_name = last_slash+1;
+    } else {
+	prog_name = argv[0];
+    }
 
     total_arg = *argc;
     arg = 1;

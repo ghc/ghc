@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.34 2003/04/01 15:40:27 sof Exp $
+ * $Id: RtsUtils.c,v 1.35 2003/08/22 22:24:16 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -42,8 +42,8 @@ barf(char *s, ...)
   va_list ap;
   va_start(ap,s);
   /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-  if (prog_argv != NULL && prog_argv[0] != NULL) {
-    fprintf(stderr, "%s: internal error: ", prog_argv[0]);
+  if (prog_argv != NULL && prog_name != NULL) {
+    fprintf(stderr, "%s: internal error: ", prog_name);
   } else {
     fprintf(stderr, "internal error: ");
   }
@@ -61,8 +61,8 @@ prog_belch(char *s, ...)
   va_list ap;
   va_start(ap,s);
   /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-  if (prog_argv != NULL && prog_argv[0] != NULL) {
-    fprintf(stderr, "%s: ", prog_argv[0]);
+  if (prog_argv != NULL && prog_name != NULL) {
+    fprintf(stderr, "%s: ", prog_name);
   } 
   vfprintf(stderr, s, ap);
   fprintf(stderr, "\n");

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.74 2003/08/19 16:32:23 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.75 2003/08/22 22:24:15 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -197,8 +197,8 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
 void
 getProgArgv(int *argc, char **argv[])
 {
-    *argc = prog_argc;
-    *argv = prog_argv;
+    if (argc) { *argc = prog_argc; }
+    if (argv) { *argv = prog_argv; }
 }
 
 void

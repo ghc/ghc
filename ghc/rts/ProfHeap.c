@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.46 2003/05/16 14:16:53 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.47 2003/08/22 22:24:12 sof Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -407,7 +407,7 @@ initHeapProfiling(void)
 
     initEra( &censuses[era] );
 
-    fprintf(hp_file, "JOB \"%s", prog_argv[0]);
+    fprintf(hp_file, "JOB \"%s", prog_name);
 
 #ifdef PROFILING
     {
@@ -432,7 +432,7 @@ initHeapProfiling(void)
     fprintf(hp_file, "END_SAMPLE 0.00\n");
 
 #ifdef DEBUG_HEAP_PROF
-    DEBUG_LoadSymbols(prog_argv[0]);
+    DEBUG_LoadSymbols(prog_name);
 #endif
 
 #ifdef PROFILING
