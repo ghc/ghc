@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.9 1999/07/06 15:05:49 sof Exp $
+ * $Id: Main.c,v 1.10 1999/07/14 13:38:27 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -77,8 +77,7 @@ int main(int argc, char *argv[])
     case Interrupted:
       /* carry on */
     }
-    shutdownHaskell();
-    stg_exit(EXIT_SUCCESS);
+    shutdownHaskellAndExit(EXIT_SUCCESS);
 }
 # endif /* BATCH_MODE */
 
