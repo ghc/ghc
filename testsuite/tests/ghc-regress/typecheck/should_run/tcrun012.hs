@@ -4,8 +4,8 @@
 
 module Main where
 
-main = do { putStrLn $ show $ foo with ?x = 13 
-	  ; putStrLn $ show $ baz () with ?x = 14 }
+main = do { let ?x = 13 in putStrLn $ show $ foo
+	  ; let ?x = 14 in putStrLn $ show $ baz () }
 
 foo :: (?x :: Int) => Int
 foo = ?x
