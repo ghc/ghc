@@ -23,6 +23,8 @@ module IOExts
         , readIORef
         , writeIORef
 
+	, mkWeakIORef
+
 	, IOArray	-- instance of: Eq
 	, newIOArray
 	, boundsIOArray
@@ -71,6 +73,7 @@ import PrelHandle ( openFileEx, IOModeEx(..),
 		  )
 import PrelST
 import PrelArr
+import PrelWeak
 import PrelGHC
 import PrelHandle
 import PrelErr
@@ -109,6 +112,10 @@ newIORef v = stToIO (newVar v) >>= \ var -> return (IORef var)
 readIORef  (IORef var) = stToIO (readVar var)
 writeIORef (IORef var) v = stToIO (writeVar var v)
 #endif
+
+mkWeakIORef :: IORef a -> IO () -> IO (Weak (IORef a))
+mkWeakIORef r@(IORef (MutableVar r#)) f = IO $ \s ->
+  case mkWeak# r# r f s of (# s1, w #) -> (# s1, Weak w #)
 \end{code}
 
 \begin{code}
