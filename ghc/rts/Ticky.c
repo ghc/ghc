@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Ticky.c,v 1.4 1999/03/05 12:02:33 kw217 Exp $
+ * $Id: Ticky.c,v 1.5 1999/03/05 12:43:26 kw217 Exp $
  *
  * (c) The AQUA project, Glasgow University, 1992-1997
  * (c) The GHC Team, 1998-1999
@@ -394,10 +394,13 @@ PrintTickyInfo(void)
   PR_CTR(ENT_FUN_DIRECT_ctr);
   PR_CTR(ENT_IND_ctr);
   PR_CTR(ENT_PAP_ctr);
+  PR_CTR(ENT_AP_UPD_ctr);
+  PR_CTR(ENT_BH_ctr);
   PR_CTR(ENT_THK_ctr);
 
   PR_CTR(RET_NEW_ctr);
   PR_CTR(RET_OLD_ctr);
+  PR_CTR(RET_UNBOXED_TUP_ctr);
   PR_CTR(RET_SEMI_BY_DEFAULT_ctr);
   PR_CTR(RET_SEMI_IN_HEAP_ctr);
   PR_CTR(RET_SEMI_FAILED_IND_ctr);
@@ -422,6 +425,15 @@ PrintTickyInfo(void)
   PR_HST(RET_OLD_hst,6);
   PR_HST(RET_OLD_hst,7);
   PR_HST(RET_OLD_hst,8);
+  PR_HST(RET_UNBOXED_TUP_hst,0);
+  PR_HST(RET_UNBOXED_TUP_hst,1);
+  PR_HST(RET_UNBOXED_TUP_hst,2);
+  PR_HST(RET_UNBOXED_TUP_hst,3);
+  PR_HST(RET_UNBOXED_TUP_hst,4);
+  PR_HST(RET_UNBOXED_TUP_hst,5);
+  PR_HST(RET_UNBOXED_TUP_hst,6);
+  PR_HST(RET_UNBOXED_TUP_hst,7);
+  PR_HST(RET_UNBOXED_TUP_hst,8);
   PR_HST(RET_SEMI_IN_HEAP_hst,0);
   PR_HST(RET_SEMI_IN_HEAP_hst,1);
   PR_HST(RET_SEMI_IN_HEAP_hst,2);
