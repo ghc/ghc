@@ -15,6 +15,7 @@
 -----------------------------------------------------------------------------
 
 -- No: #hide, because bits of this module are exposed by the stm package.
+-- #not-home
 module GHC.Conc
 	( ThreadId(..)
 
