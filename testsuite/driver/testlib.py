@@ -538,7 +538,7 @@ def simple_run( name, prog, args, ignore_output_files ):
    # run the command
    result = runCmd(cmd)
 
-   exit_code = result >> 8;
+   exit_code = result >> 8
    signal    = result & 0xff
 
    # check the exit code
@@ -612,10 +612,13 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     result = runCmd(cmd)
 
-#    if result != 0 and not should_fail:
-#        actual_stderr = qualify(name, 'interp.stderr')
-#        if_verbose(1,'Compile failed (status ' + `result` + ') errors were:')
-#        if_verbose(1,open(actual_stderr).read())
+    exit_code = result >> 8
+    signal    = result & 0xff
+
+    # check the exit code
+    if exit_code != testopts.exit_code:
+        print 'Wrong exit code (expected', testopts.exit_code, ', actual', exit_code, ')'
+        return 'fail'
 
     # split the stdout into compilation/program output
     split_file(in_testdir(outname), delimiter,
