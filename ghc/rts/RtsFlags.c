@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.24 2000/01/13 14:34:04 hwloidl Exp $
+ * $Id: RtsFlags.c,v 1.25 2000/02/17 14:15:10 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -394,36 +394,36 @@ usage_text[] = {
 "  -r<file>  Produce reduction profiling statistics (with -rstderr for stderr)",
 "",
 #endif
-# ifdef PAR
+#if defined(PAR)
 "  -N<n>     Use <n> PVMish processors in parallel (default: 2)",
 /* NB: the -N<n> is implemented by the driver!! */
-# endif
+#endif
 "  -C<secs>  Context-switch interval in seconds",
 "                (0 or no argument means switch as often as possible)",
 "                the default is .01 sec; resolution is .01 sec",
-# ifdef SMP
+#if defined(SMP)
 "  -N<n>     Use <n> OS threads (default: 1)",
-# endif
-"  -e<size>        Size of spark pools (default 100)",
+#endif
+#if defined(SMP) || defined(PAR)
+"  -e<size>  Size of spark pools (default 100)",
+#endif
+#if defined(PAR)
 "  -t<num>   Set maximum number of advisory threads per PE (default 32)",
-"  -o<num>   Set stack chunk size (default 1024)",
-
-# ifdef PAR
 "  -qP       Enable activity profile (output files in ~/<program>*.gr)",
 "  -qQ<size> Set pack-buffer size (default: 1024)",
 "  -qd       Turn on PVM-ish debugging",
 "  -qO       Disable output for performance measurement",
-# endif
-# if defined(SMP) || defined(PAR)
+#endif
+#if defined(SMP) || defined(PAR)
 "  -e<n>     Maximum number of outstanding local sparks (default: 4096)",
 #endif
-# ifdef PAR
+#if defined(PAR)
 "  -d        Turn on PVM-ish debugging",
 "  -O        Disable output for performance measurement",
-# endif /* PAR */
-# ifdef GRAN  /* ToDo: fill in decent Docu here */
+#endif /* PAR */
+#if defined(GRAN)  /* ToDo: fill in decent Docu here */
 "  -b...     All GranSim options start with -b; see GranSim User's Guide for details",
-# endif
+#endif
 "",
 "Other RTS options may be available for programs compiled a different way.",
 "The GHC User's Guide has full details.",
