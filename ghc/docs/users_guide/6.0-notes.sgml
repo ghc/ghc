@@ -1,0 +1,36 @@
+<sect1 id="release-5-04">
+  <title>Release notes for version 6.0</title>
+
+  <sect2>
+    <title>User-visible compiler changes</title>
+    <para></para>
+  </sect2>
+  
+  <sect2>
+    <title>User-visible interpreter (GHCi) changes</title>
+    <para></para>
+  </sect2>
+  
+  <sect2>
+    <title>User-visible library changes</title>
+    <para></para>
+  </sect2>
+
+  <sect2>
+    <title>New experimental features</title>
+    <para></para>
+  </sect2>
+
+  <sect2>
+    <title>Internal changes</title>
+    <para></para>
+  </sect2>
+
+</sect1>
+
+<!-- Emacs stuff:
+     ;;; Local Variables: ***
+     ;;; mode: sgml ***
+     ;;; sgml-parent-document: ("users_guide.sgml" "book" "chapter" "sect1") ***
+     ;;; End: ***
+ -->
