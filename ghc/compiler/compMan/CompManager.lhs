@@ -41,7 +41,11 @@ import DriverFlags	( getDynFlags )
 import DriverPhases
 import DriverUtil
 import Finder
+#ifdef GHCI
 import HscMain		( initPersistentCompilerState, hscThing )
+#else
+import HscMain		( initPersistentCompilerState )
+#endif
 import HscTypes
 import RnEnv		( unQualInScope )
 import Id		( idType, idName )
