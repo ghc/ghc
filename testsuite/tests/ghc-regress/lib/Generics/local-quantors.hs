@@ -15,10 +15,10 @@ instance Data Test
     toConstr (Test _) = testConstr
     fromConstr c = case conIndex c of
                      1 -> Test undefined
-    dataTypeOf _ = testDataType
+    dataTypeOf = testDataType
 
-testConstr   = mkConstr 1 "Test" Prefix
-testDataType = mkDataType [testConstr]
+testConstr     = mkDataConstr 1 "Test" Prefix
+testDataType x = mkDataType [testConstr] x
 
 -- Test for compilation only
 main = undefined

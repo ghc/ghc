@@ -59,10 +59,10 @@ t1 = typeVal :: TypeVal T1
 t2 = typeVal :: TypeVal T2
 t3 = typeVal :: TypeVal T3
 t4 = typeVal :: TypeVal T4
-tCompany = typeVal :: TypeVal Company
-tPerson = typeVal :: TypeVal Person
+tCompany  = typeVal :: TypeVal Company
+tPerson   = typeVal :: TypeVal Person
 tEmployee = typeVal :: TypeVal Employee
-tDept = typeVal :: TypeVal Dept
+tDept     = typeVal :: TypeVal Dept
 
 
 

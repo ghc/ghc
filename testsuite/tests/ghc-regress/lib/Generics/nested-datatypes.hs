@@ -16,12 +16,15 @@ undecidable instances (in GHC 6.1).
 module Main where
 import Data.Dynamic
 import Data.Generics
+
  
 -- A nested datatype
 data Nest a = Box a | Wrap (Nest [a])
 
+
 -- The representation of the type constructor    
 nestTc = mkTyCon "Nest"
+
 
 -- The Typeable instance for the nested datatype    
 instance Typeable a => Typeable (Nest a)
@@ -30,7 +33,6 @@ instance Typeable a => Typeable (Nest a)
       where
 	paratype :: Nest a -> a
 	paratype _ = undefined
-
 
 
 -- The Data instance for the nested datatype
@@ -45,11 +47,14 @@ instance (Data a, Data [a]) => Data (Nest a)
     fromConstr c = case conIndex c of
                      1 -> Box undefined
                      2 -> Wrap undefined
-    dataTypeOf _ = nestDataType
+    dataTypeOf x = nestDataType x
 
-boxConstr    = mkConstr 1 "Box"  Prefix
-wrapConstr   = mkConstr 2 "Wrap" Prefix
-nestDataType = mkDataType [boxConstr,wrapConstr]
+boxConstr      = mkDataConstr 1 "Box"  Prefix
+wrapConstr     = mkDataConstr 2 "Wrap" Prefix
 
--- test for compilation only
-main = undefined
+nestDataType :: Typeable x => x -> DataType
+nestDataType x = mkDataType [boxConstr,wrapConstr] x
+
+
+-- Test for compilation only
+main = print $ True

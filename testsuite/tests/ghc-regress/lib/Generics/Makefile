@@ -14,6 +14,10 @@ tldi03:
 stage2:
 	gmake TEST_HC=${stage2}
 
+# Just do the normal ghc way for testing during development
+normal:
+	gmake WAY=normal
+
 # Just do the ghci way for testing during development
 ghci:
 	gmake TEST_HC=${stage2} WAY=ghci
@@ -36,6 +40,7 @@ clean:
 	find . -depth -name "*.run.*"    -exec rm -rf \{\} \;
 	rm -f bits/bits
 	rm -f ext1/ext1
+	rm -f datatype
 	rm -f findepth/findepth
 	rm -f findepth/findepth
 	rm -f geq/geq

@@ -96,15 +96,18 @@ bin2nat (One  : bs) = 2 * (bin2nat bs) + 1
 showBin :: Data t => t -> Bin
 
 showBin t
-  = if not (max == 0) 
+  = if not (isPrimType myDataType) 
       then con2bin ++ concat (gmapQ showBin t)
       else showBin base
 
  where
 
+  -- The datatype for introspection
+  myDataType = dataTypeOf t
+
   -- Obtain the maximum index for the type at hand
   max :: Int
-  max = maxConIndex (dataTypeOf t)
+  max = maxConIndex myDataType
 
   -- Obtain the index for the constructor at hand
   idx :: Int
@@ -163,7 +166,7 @@ readBin = result
  where
 
   -- The worker, which we also use as type argument
-  result = if not (max == 0)
+  result = if not (isPrimType myDataType)
 
              then do bin <- readB (lengthNat (max - 1))
                      gunfoldR (bin2con bin) readBin
@@ -197,8 +200,12 @@ readBin = result
 
 
 
-main = print $ ( showBin genCom
-               , geq genCom genCom' 
-               )
+main = print $   ( showBin True
+               , ( showBin [True]
+               , ( showBin (1::Int)
+               , ( showBin "1"
+               , ( showBin genCom
+               , ( geq genCom genCom' 
+               ))))))
  where
   genCom' = fromJust (fst (unReadB readBin (showBin genCom))) :: Company

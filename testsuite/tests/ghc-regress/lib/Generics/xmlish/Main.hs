@@ -47,7 +47,7 @@ data2content =         element
  where
 
   -- Handle an element
-  element x = [CElem (Elem (elemtype x)
+  element x = [CElem (Elem (dataTyCon (dataTypeOf x))
                            [] -- no attributes 
                            (concat (gmapQ data2content x)))]
 
@@ -62,20 +62,6 @@ data2content =         element
   -- A special case for floats
   float :: Float -> [Content]
   float x = [CString True (show x)]
-
-
--- Determine element type
-elemtype :: Data a => a -> String
-elemtype = unqualify 	 -- remove module prefix
-         . tyconString   -- turn into string
-         . typerepTyCon  -- extract type constructor
-         . typeOf	 -- query type of term
-
-
--- Remove *.*.*... before name
-unqualify :: String -> String
-unqualify x = let x' = dropWhile (not . (==) '.') x
-               in if x' == [] then x else unqualify (tail x')
 
 
 -- De-trealisation
@@ -102,7 +88,7 @@ content2data = result
                case c of
                  (CElem (Elem x as cs))
                     |    as == [] -- no attributes
-                      && x  == elemtype myType
+                      && x  == dataTyCon (dataTypeOf myType)
                    -> alts cs
                  _ -> mzero
 
@@ -121,7 +107,7 @@ content2data = result
   shapes = map fromConstr consOf
 
   -- Retrieve all constructors of the requested type
-  consOf = dataTypeCons
+  consOf = dataCons
          $ dataTypeOf 
          $ myType
 

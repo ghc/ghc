@@ -29,7 +29,7 @@ findepth d = result
   recurse = gmapM (const (findepth (d-1)))
 
   -- Retrieve all constructors of the requested type
-  consOf   = dataTypeCons
+  consOf   = dataCons
            $ dataTypeOf 
            $ head result
 
