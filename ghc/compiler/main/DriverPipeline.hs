@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.42 2000/12/18 12:43:04 sewardj Exp $
+-- $Id: DriverPipeline.hs,v 1.43 2000/12/18 15:17:46 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -230,9 +230,11 @@ genPipeline todo stop_flag persistent_output lang filename
 	-- the suffix on an output file is determined by the next phase
 	-- in the pipeline, so we add linking to the end of the pipeline
 	-- to force the output from the final phase to be a .o file.
-      stop_phase = case todo of StopBefore phase -> phase
-				DoMkDependHS	 -> Ln
-				DoLink           -> Ln
+      stop_phase = case todo of 
+			StopBefore As | split -> SplitAs
+			StopBefore phase      -> phase
+			DoMkDependHS	      -> Ln
+			DoLink                -> Ln
       annotated_pipeline = annotatePipeline (pipeline ++ [ Ln ]) stop_phase
 
       phase_ne p (p1,_,_) = (p1 /= p)
