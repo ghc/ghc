@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.7 1999/03/17 13:19:19 simonm Exp $
+ * $Id: Prelude.h,v 1.8 1999/05/04 08:52:23 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -94,6 +94,6 @@ extern const StgInfoTable StablePtr_static_info;
 
 #endif
 
-#endif
+#endif /* COMPILING_RTS */
 
 #endif /* PRELUDE_H */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.9 1999/03/15 16:30:25 simonm Exp $
+ * $Id: Stg.h,v 1.10 1999/05/04 08:52:22 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -22,41 +22,12 @@
 #include "options.h"
 #endif
 
+/* Some macros to handle DLLing (Win32 only at the moment). */
+#include "StgDLL.h"
+
 /* ToDo: Set this flag properly: COMPILER and INTERPRETER should not be mutually exclusive. */
 #ifndef INTERPRETER
 #define COMPILER 1
-#endif
-
-/* This is a feature test - doesn't belong here. FixMe. */
-#ifdef __MINGW32__
-#define HAVE_WIN32_DLL_SUPPORT
-#endif
-
-#ifdef HAVE_WIN32_DLL_SUPPORT
-# if __GNUC__ && !defined(__declspec)
-#  define DLLIMPORT
-# else
-#  define DLLIMPORT __declspec(dllimport)
-#  define DLLIMPORT_DATA(x) _imp__##x
-# endif
-#else
-# define DLLIMPORT
-#endif
-
-#ifdef COMPILING_RTS
-#define DLL_IMPORT DLLIMPORT
-#define DLL_IMPORT_RTS
-#define DLL_IMPORT_DATA
-#define DLL_IMPORT_DATA_VAR(x) x
-#else
-#define DLL_IMPORT
-#define DLL_IMPORT_RTS DLLIMPORT
-#define DLL_IMPORT_DATA DLLIMPORT
-# ifdef HAVE_WIN32_DLL_SUPPORT
-#  define DLL_IMPORT_DATA_VAR(x) _imp__##x
-# else
-#  define DLL_IMPORT_DATA_VAR(x) x
-# endif
 #endif
 
 /* bit macros
@@ -160,7 +131,8 @@ extern char **environ;
 
 /* Creating and destroying an adjustor thunk.
    I cannot make myself create a separate .h file
-   for these two (sof.)
+   for these two (sof.) 
+   
 */
 extern void* createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr);
 extern void  freeHaskellFunctionPtr(void* ptr);
