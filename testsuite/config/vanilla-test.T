@@ -305,8 +305,7 @@ def vanilla-compok-test-actions ( $extra_compile_args )
    then $stderr_a = normalise_errmsg(contents($actual_stderr))
         $stderr_e = normalise_errmsg(contents($expected_stderr))
         if   $stderr_e /= $stderr_a
-        then print "UNMATCHED WARNING MSGS:"
-             $dummy = runCmd($diff ++ " " ++ $expected_stderr ++ " " ++ $actual_stderr)
+        then say_fail_because_noteq($expected_stderr, $actual_stderr)
              return False
         else return True
         fi
@@ -345,8 +344,8 @@ def vanilla-compfail-test-actions ( $extra_compile_args )
    $stderr_e = normalise_errmsg(contents($expected_stderr))
 
    if   $stderr_e /= $stderr_a
-   then print "UNMATCHED ERROR MSGS:"
-        $dummy = runCmd($diff ++ " " ++ $expected_stderr ++ " " ++ $actual_stderr)
+   then say_fail_because_noteq($expected_stderr, $actual_stderr)
+        return False
    fi
 
    if $res /= "0" && $stderr_e == $stderr_a
