@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.37 2002/12/11 15:36:51 simonmar Exp $
+ * $Id: StgCRun.c,v 1.38 2003/01/31 17:29:46 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -472,18 +472,18 @@ static void StgRunIsImplementedInAssembler(void)
 		"_StgRun:\n"
 		"\tmflr r0\n"
 		"\tbl saveFP # f14\n"
-		"\tstmw r14,-216(r1)\n"
-		"\tstwu r1,-8480(r1)\n"
+		"\tstmw r13,-220(r1)\n"
+		"\tstwu r1,-%0(r1)\n"
 		"\tmtctr r3\n"
 		"\tmr r12,r3\n"
 		"\tbctr\n"
 		".globl _StgReturn\n"
 		"_StgReturn:\n"
 		"\tmr r3,r14\n"
-		"\tla r1,8480(r1)\n"
-		"\tlmw r14,-216(r1)\n"
+		"\tla r1,%0(r1)\n"
+		"\tlmw r13,-220(r1)\n"
 		"\tb restFP # f14\n"
-	);	/* RESERVED_C_STACK_BYTES + stack frame size == 8192 + 288 == 8480 */
+	: : "i"(RESERVED_C_STACK_BYTES+288 /*stack frame size*/));
 }
 
 #endif
