@@ -147,12 +147,6 @@ primCode [res] Int2WordOp [arg]
 primCode [res] Word2IntOp [arg]
   = simpleCoercion IntRep res arg
 
-primCode [res] AddrNullOp [arg]
-  = let
-        assign = StAssign AddrRep (amodeToStix res) (StInt 0) 
-    in
-    returnUs (\xs -> assign : xs)
-
 primCode [res] AddrToHValueOp [arg]
   = simpleCoercion PtrRep res arg
 
