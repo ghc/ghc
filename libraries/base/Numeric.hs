@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Numeric.hs,v 1.1 2001/07/04 12:07:27 simonmar Exp $
+-- $Id: Numeric.hs,v 1.2 2001/08/02 13:30:36 simonmar Exp $
 --
 -- Odds and ends, mostly functions for reading and showing
 -- RealFloat-like kind of values.
@@ -28,10 +28,12 @@ module Numeric (
 	readOct,          -- :: (Integral a) => ReadS a
 	readHex,          -- :: (Integral a) => ReadS a
 
+{- -- left out for now, as we can only export the H98 interface
         showHex,          -- :: Integral a => a -> ShowS
         showOct,          -- :: Integral a => a -> ShowS
         showBin,          -- :: Integral a => a -> ShowS
-        
+-}  
+      
 	showEFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
 	showFFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
 	showGFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
@@ -42,12 +44,14 @@ module Numeric (
 	floatToDigits,    -- :: (RealFloat a) => Integer -> a -> ([Int], Int)
 	lexDigits,        -- :: ReadS String
 
+{- -- left out for now, as we can only export the H98 interface
           -- general purpose number->string converter.
         showIntAtBase,    -- :: Integral a 
 			  -- => a		-- base
 			  -- -> (a -> Char)      -- digit to char
 			  -- -> a                -- number to show.
 			  -- -> ShowS
+-}
 	) where
 
 import Prelude		-- For dependencies
