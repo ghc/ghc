@@ -182,7 +182,6 @@ expanded tabs, and enlarge it if necessary.
 
 \begin{code}
 #if __GLASGOW_HASKELL__ < 303
-ioError = fail
 mayBlock fo thing = thing
 
 writeCharOffAddr :: Addr -> Int -> Char -> IO ()
@@ -203,7 +202,7 @@ slurpFileExpandTabs fname = do
    (\ handle ->
      do sz <- hFileSize handle
         if sz > toInteger (maxBound::Int) 
-	  then ioError (userError "slurpFile: file too big")
+	  then IOERROR (userError "slurpFile: file too big")
           else do
       	    let sz_i = fromInteger sz
       	        sz_i' = (sz_i * 12) `div` 10		-- add 20% for tabs
