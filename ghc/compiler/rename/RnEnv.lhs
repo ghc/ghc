@@ -258,6 +258,9 @@ lookupInstDeclBndr cls_name rdr_name
   | otherwise	
   = getGlobalAvails	`thenRn` \ avail_env ->
     case lookupNameEnv avail_env cls_name of
+	  -- class not in scope; don't fail as later checks will catch this,
+	  -- but just return (bogus) name. Icky.
+	Nothing -> returnRn (mkUnboundName rdr_name)
 	Just (AvailTC _ ns) -> case [n | n <- ns, nameOccName n == occ] of
 				(n:ns)-> ASSERT( null ns ) returnRn n
 				[]    -> failWithRn (mkUnboundName rdr_name)

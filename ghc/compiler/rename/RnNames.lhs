@@ -178,7 +178,7 @@ importsFromImportDecl this_mod_name (ImportDecl imp_mod_name from qual_only as_m
 
 	mk_prov name = NonLocalDef (UserImport imp_mod iloc (name `elemNameSet` explicits)) 
 	gbl_env      = mkGlobalRdrEnv qual_mod unqual_imp mk_prov filtered_avails hides deprecs
-	exports      = mkExportAvails qual_mod unqual_imp gbl_env filtered_avails
+	exports      = mkExportAvails qual_mod unqual_imp gbl_env hides filtered_avails
     in
     returnRn (gbl_env, exports)
 \end{code}
@@ -220,7 +220,7 @@ importsFromLocalDecls this_mod decls
 	    -- the defn of a non-deprecated thing, when changing a module's 
 	    -- interface
 
-	exports    = mkExportAvails mod_name unqual_imp gbl_env            avails
+	exports    = mkExportAvails mod_name unqual_imp gbl_env hides avails
     in
     returnRn (gbl_env, exports)
 
@@ -367,8 +367,8 @@ filterImports mod from (Just (want_hiding, import_items)) total_avails
 mkEmptyExportAvails :: ModuleName -> ExportAvails
 mkEmptyExportAvails mod_name = (unitFM mod_name [], emptyNameEnv)
 
-mkExportAvails :: ModuleName -> Bool -> GlobalRdrEnv -> [AvailInfo] -> ExportAvails
-mkExportAvails mod_name unqual_imp gbl_env avails
+mkExportAvails :: ModuleName -> Bool -> GlobalRdrEnv -> [AvailInfo] -> [AvailInfo] -> ExportAvails
+mkExportAvails mod_name unqual_imp gbl_env hides avails 
   = (mod_avail_env, entity_avail_env)
   where
     mod_avail_env = unitFM mod_name unqual_avails 
@@ -383,7 +383,7 @@ mkExportAvails mod_name unqual_imp gbl_env avails
 		  | otherwise      = mapMaybe prune avails
 
     prune (Avail n) | unqual_in_scope n = Just (Avail n)
-    prune (Avail n) | otherwise		= Nothing
+                    | otherwise		= Nothing
     prune (AvailTC n ns) | null uqs     = Nothing
 			 | otherwise    = Just (AvailTC n uqs)
 			 where
@@ -391,8 +391,27 @@ mkExportAvails mod_name unqual_imp gbl_env avails
 
     unqual_in_scope n = unQualInScope gbl_env n
 
-    entity_avail_env = mkNameEnv [ (name,avail) | avail <- avails, 
-			  	   		  name  <- availNames avail]
+
+    entity_avail_env  = mkNameEnv ([ (availName avail,avail) | avail <- effective_avails ] ++
+					-- sigh - need to have the method/field names in
+					-- the environment also, so that export lists
+					-- can be computed precisely (cf. exportsFromAvail)
+    				   [ (name,avail) | avail <- effective_avails,
+				   		    name  <- availNames avail ])
+
+	-- remove 'hides' names from the avail list.
+    effective_avails = foldl wipeOut avails hides
+      where
+        wipeOut as (Avail n)       = mapMaybe (delName n) as
+	wipeOut as (AvailTC n ns)  = foldl wipeOut as (map Avail ns)
+
+	delName x a@(Avail n) 
+	  | n == x    = Nothing
+          | otherwise = Just a
+	delName x (AvailTC n ns) 
+	  = case (filter (/=x) ns) of
+	      [] -> Nothing
+	      xs -> Just (AvailTC n xs)
 
 plusExportAvails ::  ExportAvails ->  ExportAvails ->  ExportAvails
 plusExportAvails (m1, e1) (m2, e2)
