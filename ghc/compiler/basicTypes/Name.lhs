@@ -461,14 +461,19 @@ instance Outputable Name where
 	= hcat [pp_mod_dot, ptext (occNameString n), pp_debug sty name]
 	where
 	  pp_mod = pprModule (PprForUser 1) m 
-	  pp_mod_dot = case prov of				--- Omit home module qualifier
+
+	  pp_mod_dot | userStyle sty		-- Omit qualifier in user style
+		     = empty
+		     | otherwise
+	  	     = case prov of		-- Omit home module qualifier
 			LocalDef _ _     -> empty
 			Imported _ _ hif -> pp_mod <> pp_dot hif
 			Implicit hif     -> pp_mod <> pp_dot hif
 			other		 -> pp_mod <> text "."
 
 	  pp_dot HiFile     = text "."		-- Vanilla case
-	  pp_dot HiBootFile = text "!"		-- M!t indicates a name imported from a .hi-boot interface
+	  pp_dot HiBootFile = text "!"		-- M!t indicates a name imported from 
+						-- a .hi-boot interface
 
 
 pp_debug PprDebug (Global uniq m n prov) = hcat [text "{-", pprUnique uniq, char ',', 
