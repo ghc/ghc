@@ -13,7 +13,7 @@ import CoreUnfold	( certainlyWillInline )
 import CoreLint		( showPass, endPass )
 import CoreUtils	( exprType )
 import Id		( Id, idType, idNewStrictness, idArity, isOneShotLambda,
-			  setIdNewStrictness, idInlinePragma, mkWorkerId,
+			  setIdNewStrictness, zapIdNewStrictness, idInlinePragma, mkWorkerId,
 			  setIdWorkerInfo, idCprInfo, setInlinePragma )
 import Type		( Type )
 import IdInfo		( mkStrictnessInfo, noStrictnessInfo, StrictnessInfo(..),
@@ -185,10 +185,28 @@ tryWW	:: RecFlag
 					-- if two, then a worker and a
 					-- wrapper.
 tryWW is_rec fn_id rhs
+  | isNeverInlinePrag inline_prag
+	-- Don't split NOINLINE things, because they will never be inlined
+	-- Furthermore, zap the strictess info in the Id.  Why?  Because
+	-- the NOINLINE says "don't expose any of the inner workings at the call 
+	-- site" and the strictness is certainly an inner working.
+	--
+	-- More concretely, the demand analyser discovers the following strictness
+	-- for unsafePerformIO:  C(U(AV))
+	-- But then consider
+	--	unsafePerformIO (\s -> let r = f x in 
+	--			       case writeIORef v r s of (# s1, _ #) ->
+	--			       (# s1, r #)
+	-- The strictness analyser will find that the binding for r is strict,
+	-- (becuase of uPIO's strictness sig), and so it'll evaluate it before 
+	-- doing the writeIORef.  This actually makes tests/lib/should_run/memo002
+	-- get a deadlock!  
+	--
+	-- Solution: don't expose the strictness of unsafePerformIO.
+  = returnUs [ (zapIdNewStrictness fn_id, rhs) ]
+
   |  arity == 0
 	-- Don't worker-wrapper thunks
-  || isNeverInlinePrag inline_prag
-	-- Don't split things that will never be inlined
   || isNonRec is_rec && certainlyWillInline fn_id
 	-- No point in worker/wrappering a function that is going to be
 	-- INLINEd wholesale anyway.  If the strictness analyser is run

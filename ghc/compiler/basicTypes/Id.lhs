@@ -44,8 +44,8 @@ module Id (
 	-- IdInfo stuff
 	setIdUnfolding,
 	setIdArityInfo,
-	setIdDemandInfo, setIdNewDemandInfo,
-	setIdStrictness, setIdNewStrictness,
+	setIdDemandInfo, setIdNewDemandInfo, 
+	setIdStrictness, setIdNewStrictness, zapIdNewStrictness,
         setIdTyGenInfo,
 	setIdWorkerInfo,
 	setIdSpecialisation,
@@ -356,6 +356,9 @@ oldStrictnessFromNew sig = mkStrictnessInfo (map oldDemand dmds, isBotRes res_in
 
 setIdNewStrictness :: Id -> StrictSig -> Id
 setIdNewStrictness id sig = modifyIdInfo (`setNewStrictnessInfo` Just sig) id
+
+zapIdNewStrictness :: Id -> Id
+zapIdNewStrictness id = modifyIdInfo (`setNewStrictnessInfo` Nothing) id
 
 	---------------------------------
 	-- TYPE GENERALISATION
