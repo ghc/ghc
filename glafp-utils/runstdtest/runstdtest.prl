@@ -311,7 +311,7 @@ if ( $SysSpecificTiming eq '' ) {
 # print out what we found
 if ( $SpixTiming ne 'yes' ) {
     print STDERR "<<$SysSpecificTiming: ",
-	"$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed)",
+	"$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed)",
 	" :$SysSpecificTiming>>\n";
 } else {
     print STDERR "<<$SysSpecificTiming: ",
@@ -388,6 +388,10 @@ sub process_stats_file {
 
 	    $GCs = $1 if /^\s*([0-9,]+) collections? in generation 0/;
 
+	    if ( /^\s+([0-9]+)\s+Mb total memory/ ) {
+		$TotMem = $1;
+	    }
+
 	    if ( /^\s*INIT\s+time\s*(\d+\.\d\d)s\s*\(\s*(\d+\.\d\d)s elapsed\)/ ) {
 		$InitTime = $1; $InitElapsed = $2;
 	    } elsif ( /^\s*MUT\s+time\s*(\d+\.\d\d)s\s*\(\s*(\d+\.\d\d)s elapsed\)/ ) {
@@ -436,6 +440,7 @@ sub process_stats_file {
     print STDERR "Warning: MutElapsed not found in stats file\n" unless defined($MutElapsed);
     print STDERR "Warning: GcTime inot found in stats file\n" unless defined($GcTime);
     print STDERR "Warning: GcElapsed not found in stats file\n" unless defined($GcElapsed);
+    print STDERR "Warning: total memory not found in stats file\n" unless defined($TotMem);
 
     # things we didn't necessarily expect to find
     $MaxResidency     = 0 unless defined($MaxResidency);
