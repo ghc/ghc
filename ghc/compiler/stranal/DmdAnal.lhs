@@ -255,7 +255,13 @@ dmdAnal sigs dmd (Let (NonRec id rhs) body)
 	(body_ty1, id2)    	      = annotateBndr body_ty id1
 	body_ty2		      = addLazyFVs body_ty1 lazy_fv
     in
---    pprTrace "dmdLet" (ppr id <+> ppr (sig,rhs_env))
+    (let vanilla_dmd = vanillaCall (idArity id)
+	 actual_dmd  = idNewDemandInfo id2
+     in
+     if not (vanilla_dmd `betterDemand` actual_dmd) then
+	pprTrace "dmdLet: better demand" (ppr id <+> vcat [text "vanilla" <+> ppr vanilla_dmd,
+							   text "actual" <+> ppr actual_dmd])
+     else \x -> x)
     (body_ty2, Let (NonRec id2 rhs') body')    
 
 dmdAnal sigs dmd (Let (Rec pairs) body) 
@@ -870,9 +876,16 @@ lub :: Demand -> Demand -> Demand
 
 lub Bot d = d
 
-lub Err Bot = Err 
-lub Err Abs = Lazy	-- E.g. f x = if ... then True else error x
-lub Err d   = d 
+lub Err Bot        = Err 
+lub Err Abs        = Lazy	-- E.g. f x = if ... then True else error x
+lub Err (Seq k ds) 
+  | null ds	   = Seq (case k of { Drop -> Keep; other -> k }) []
+			-- Yuk
+  | not (null ds)  = Seq k [Err `lub` d | d <- ds]
+			-- E.g. f x = if ... then fst x else error x
+			-- We *cannot* use the (lub Err d = d) case,
+			-- else we'd get U(VA) for x's demand!!
+lub Err d   	   = d 
 
 lub Lazy d = Lazy
 
@@ -880,9 +893,10 @@ lub Abs  d = defer d
 
 lub Eval Abs		   	       = Lazy
 lub Eval Lazy		   	       = Lazy
+lub Eval (Seq Defer ds)		       = Lazy	-- Essential!
 lub Eval (Seq Drop ds) | not (null ds) = Seq Drop [Lazy | d <- ds]
 lub Eval d   		   	       = Eval
-	-- For the Seq case, consier
+	-- For the Seq Drop case, consider
 	--	f n []     = n
 	--	f n (x:xs) = f (n+x) xs
 	-- Here we want to do better than just V for n.  It's
@@ -935,9 +949,15 @@ defer d	   	    = Lazy
 ---------------
 both :: Demand -> Demand -> Demand
 
-both Bot Bot = Bot
-both Bot Abs = Bot
-both Bot d   = Err
+both Bot Bot 	    = Bot
+both Bot Abs	    = Bot
+both Bot (Seq k ds) 
+  | not (null ds)   = Seq (case k of { Defer -> Drop; other -> k })
+			  [both Bot d | d <- ds]
+	-- E.g. f x = if ... then error (fst x) else fst x
+	-- This equation helps results slightly, 
+	-- but is not necessary for soundness
+both Bot d   	    = Err
 
 both Err d = Err
 
