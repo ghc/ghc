@@ -1196,6 +1196,20 @@ f "2"    = 2
 	</varlistentry>
 
 	<varlistentry>
+	  <term><option>-fignore-asserts</option>:</term>
+	  <listitem>
+	    <indexterm><primary><option>-fignore-asserts</option></primary></indexterm>
+	    <para>Causes GHC to ignore uses of the function
+	    <literal>Exception.assert</literal> in source code (in
+	    other words, rewriting <literal>Exception.assert p
+	    e</literal> to <literal>e</literal> (see <xref
+	    linkend="sec-assertions">).  This flag is turned on by
+	    <option>-O</option>.
+	    </para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
 	  <term><option>-fno-strictness</option></term>
 	  <indexterm><primary><option>-fno-strictness</option></primary>
 	  </indexterm>
@@ -1305,9 +1319,10 @@ data S = S !Int !Int
             at a call site. A bigger function would be assigned a
             bigger cost.) </para>
 
-	    <para> Consequences: (a) nothing larger than
-	    this will be inlined (unless it has an INLINE pragma); (b) nothing larger
-	    than this will be spewed into an interface file. </para>
+	    <para> Consequences: (a) nothing larger than this will be
+	    inlined (unless it has an INLINE pragma); (b) nothing
+	    larger than this will be spewed into an interface
+	    file. </para>
 
 
             <para> Increasing this figure is more likely to result in longer
