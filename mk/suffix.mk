@@ -101,7 +101,7 @@ endif # BootingViaC
 #-----------------------------------------------------------------------------
 # Happy Suffix Rules
 #
-.PRECIOUS: %.hs
+.SECONDARY: %.hs
 
 %.hs : %.ly
 	$(HAPPY) $(HAPPY_OPTS) $<
