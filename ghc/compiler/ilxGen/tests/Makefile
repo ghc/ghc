@@ -75,13 +75,27 @@ prel: ilx
 HSstd_cbits.dll: ../../../lib/std/cbits/HSstd_cbits.dll
 	cp $< $@
 
+%.cordbg.run: HSstd_cbits.dll %.exe
+	cp $(TOP)/lib/std/*.$(ilx_way).dll .
+	cp $(ILX2IL_HOME)/bin/msilxlib$(ilx2il_suffix).dll .
+	cp $(TOP)/lib/std/*.$(ilx_way).pdb .
+	cp $(ILX2IL_HOME)/bin/msilxlib$(ilx2il_suffix).pdb .
+	echo "call devcorb2gen fastchecked" > $@.bat
+	echo "$(LOCALRUN)$(subst /,\\,$*).exe 2>&1" >> $@.bat
+	time -p cmd /c $(subst /,\\,$@).bat
+	rm $@.bat
+
 %.debug.run: HSstd_cbits.dll %.exe
-	cp $(TOP)/lib/std/*.dll .
-	cp $(TOP)/lib/std/*.pdb .
-	cp $(TOP)/lib/std/*.il .
-	cp $(ILX2IL_HOME)/bin/*.dll .
-	cp $(ILX2IL_HOME)/bin/*.pdb .
-	cp $(ILX2IL_HOME)/bin/*.il .
+	cp $(TOP)/lib/std/*.$(ilx_way).dll .
+	cp $(ILX2IL_HOME)/bin/msilxlib$(ilx2il_suffix).dll .
+	echo "call devcorb2gen fastchecked" > $@.bat
+	echo "$(LOCALRUN)$(subst /,\\,$*).exe 2>&1" >> $@.bat
+	time -p cmd /c $(subst /,\\,$@).bat
+	rm $@.bat
+
+%.retail.run: HSstd_cbits.dll %.exe
+	cp $(TOP)/lib/std/*.$(ilx_way).dll .
+	cp $(ILX2IL_HOME)/bin/msilxlib$(ilx2il_suffix).dll .
 	echo "call devcorb2gen free" > $@.bat
 	echo "$(LOCALRUN)$(subst /,\\,$*).exe 2>&1" >> $@.bat
 	time -p cmd /c $(subst /,\\,$@).bat

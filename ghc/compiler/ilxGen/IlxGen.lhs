@@ -45,7 +45,7 @@ import List		( partition, elem, insertBy,any  )
 import UniqSet
 import {-# SOURCE #-}	PprType( pprType )	-- Only called in debug messages
 
-import TysPrim  ( byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
+import TysPrim  ( foreignObjPrimTyCon, weakPrimTyCon, byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 
 -- opt_SimplDoEtaReduction is used to help with assembly naming conventions for different
 -- versions of compiled Haskell code.  We add a ".O" to all assembly and module 
@@ -211,10 +211,10 @@ ilxImportModule _ m = text ".module extern ilx" <+> singleQuotes (ppr m  <> hscO
 -- TODO: emit the right DLL name
 ilxImportCCall :: IlxEnv -> StaticCCallInfo -> SDoc
 ilxImportCCall env (c,cc,args,ret) = 
-    text ".method static private pinvokeimpl" <+> 
+    text ".method static assembly pinvokeimpl" <+> 
     parens (doubleQuotes (text "HSstd_cbits.dll") <+> text "cdecl") <+> retdoc <+> singleQuotes (pprCLabelString c) <+> 
     pprCValArgTys ilxTypeL env (map deepIlxRepType (filter (not. isVoidIlxRepType) args)) <+> 
-    text "native managed { }"
+    text "native unmanaged preservesig { }"
   where 
     retdoc = 
           if isVoidIlxRepType ret then text "void" 
@@ -1137,6 +1137,7 @@ ilxTypeL :: IlxEnv -> Type -> SDoc
 ilxTypeL env ty | isUnLiftedType ty ||  isVoidIlxRepType ty = ilxTypeR env ty
 ilxTypeL env ty = text "thunk" <> angleBrackets (ilxTypeR env ty)
 
+
 --------------------------
 -- Print non-thunkable version of type.
 --
@@ -1586,6 +1587,8 @@ ilxPrimApp env op 	       args ret_ty = ilxPrimOpTable op args env
 type IlxTyFrag = IlxEnv -> SDoc
 ilxType s env = text s
 
+ilxLift ty env = text "thunk" <> angleBrackets (ty env)
+
 ilxTypeSeq :: [IlxTyFrag] -> IlxTyFrag
 ilxTypeSeq ops env = hsep (map (\x -> x env) ops)
 
@@ -1604,8 +1607,10 @@ tyPrimConTable =
 	     (word64PrimTyConKey,	(\_ -> repWord64)),
 	     (floatPrimTyConKey, 	(\_ -> repFloat)),
 	     (doublePrimTyConKey,	(\_ -> repDouble)),
+              -- These can all also accept unlifted parameter types so we explicitly lift.
 	     (arrayPrimTyConKey, 	(\[ty] -> repArray (ilxTypeL2 ty))),
 	     (mutableArrayPrimTyConKey, 	(\[_, ty] -> repMutArray (ilxTypeL2 ty))),
+	     (weakPrimTyConKey, 	(\[_, ty] -> repWeak (ilxTypeL2 ty))),
 	     (mVarPrimTyConKey, 	(\[_, ty] -> repMVar (ilxTypeL2 ty))),
 	     (mutVarPrimTyConKey, 	(\[ty1, ty2] -> repMutVar (ilxTypeL2 ty1) (ilxTypeL2 ty2))),
 	     (mutableByteArrayPrimTyConKey,	(\_ -> repByteArray)),
@@ -1713,7 +1718,8 @@ ilxCgeUn  = ilxOpSeq [ilxOp "clt.un ldc.i4 0 ceq ",ilxMkBool]
 ilxCltUn = ilxOpSeq [ilxOp "clt.un ",ilxMkBool]
 ilxCleUn = ilxOpSeq [ilxOp "cgt.un ldc.i4 0 ceq ",ilxMkBool]
 
-ilxForeignToAddrOp = ilxOpSeq [ilxOp "ldfld void *" , repForeign, ilxOp "::contents"]
+ilxAddrOfForeignOp = ilxOpSeq [ilxOp "ldfld void *" , repForeign, ilxOp "::contents"]
+ilxAddrOfByteArrOp = ilxOp "ldc.i4 0 ldelema unsigned int8"
 
 ilxPrimOpTable :: PrimOp -> [StgArg] -> IlxOpFrag
 ilxPrimOpTable op
@@ -1962,22 +1968,22 @@ ilxPrimOpTable op
 
 	-- ForeignObj: load the address inside the object first
         -- TODO: is this remotely right?
-        IndexOffForeignObjOp_Char    -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof unsigned int8 mul add ldind.u1"])
-	IndexOffForeignObjOp_WideChar    -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof int32 mul add ldind.u4"])
-	IndexOffForeignObjOp_Int     -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof int32 mul add ldind.i4"])
-	IndexOffForeignObjOp_Word    -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof unsigned int32 mul add ldind.u4"])
-	IndexOffForeignObjOp_Addr    ->  arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof native unsigned int mul add ldind.i  "])
-	IndexOffForeignObjOp_StablePtr    ->  ty1_arg2_op (\ty fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof native unsigned int mul add ldind.ref  "])
-	IndexOffForeignObjOp_Float   -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof float32 mul add ldind.r4"])
-	IndexOffForeignObjOp_Double  -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof float64 mul add ldind.r8"])
-	IndexOffForeignObjOp_Int8   -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof int8 mul add ldind.i1"])
-	IndexOffForeignObjOp_Int16   -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof int16 mul add ldind.i2"])
-	IndexOffForeignObjOp_Int32   -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof int32 mul add ldind.i4"])
-	IndexOffForeignObjOp_Int64   -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof int64 mul add ldind.i8"])
-	IndexOffForeignObjOp_Word8  -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof unsigned int8 mul add ldind.u1"])
-	IndexOffForeignObjOp_Word16  -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof unsigned int16 mul add ldind.u2"])
-	IndexOffForeignObjOp_Word32  -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof unsigned int32 mul add ldind.u4"])
-	IndexOffForeignObjOp_Word64  -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof unsigned int64 mul add ldind.u8"])
+        IndexOffForeignObjOp_Char    -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof unsigned int8 mul add ldind.u1"])
+	IndexOffForeignObjOp_WideChar    -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof int32 mul add ldind.u4"])
+	IndexOffForeignObjOp_Int     -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof int32 mul add ldind.i4"])
+	IndexOffForeignObjOp_Word    -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof unsigned int32 mul add ldind.u4"])
+	IndexOffForeignObjOp_Addr    ->  arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof native unsigned int mul add ldind.i  "])
+	IndexOffForeignObjOp_StablePtr    ->  ty1_arg2_op (\ty fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof native unsigned int mul add ldind.ref  "])
+	IndexOffForeignObjOp_Float   -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof float32 mul add ldind.r4"])
+	IndexOffForeignObjOp_Double  -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof float64 mul add ldind.r8"])
+	IndexOffForeignObjOp_Int8   -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof int8 mul add ldind.i1"])
+	IndexOffForeignObjOp_Int16   -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof int16 mul add ldind.i2"])
+	IndexOffForeignObjOp_Int32   -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof int32 mul add ldind.i4"])
+	IndexOffForeignObjOp_Int64   -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof int64 mul add ldind.i8"])
+	IndexOffForeignObjOp_Word8  -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof unsigned int8 mul add ldind.u1"])
+	IndexOffForeignObjOp_Word16  -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof unsigned int16 mul add ldind.u2"])
+	IndexOffForeignObjOp_Word32  -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof unsigned int32 mul add ldind.u4"])
+	IndexOffForeignObjOp_Word64  -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof unsigned int64 mul add ldind.u8"])
 
 	ReadOffAddrOp_Char   -> simp_op (ilxOp "sizeof unsigned int8 mul add ldind.u1")
 	ReadOffAddrOp_WideChar -> simp_op (ilxOp "sizeof int32 mul add ldind.u4")
@@ -2066,7 +2072,7 @@ ilxPrimOpTable op
 
 	RaiseOp -> ty2_op (\ty1 ty2 -> ilxOp "throw")
 	CatchOp -> ty2_op (\ty1 ty2 -> 
-		ilxCallSuppMeth ilxMethA "'catch'" [ty1,ty2] [ilxOp "(func ( /* unit skipped */ ) --> !!0)", ilxOp "(func (!!1) --> (func ( /* unit skipped */ ) --> !!0))"])
+		ilxCallSuppMeth ilxMethA "'catch'" [ty1,ty2] [ilxOp "thunk<(func ( /* unit skipped */ ) --> !!0)>", ilxOp "thunk<(func (!!1) --> (func ( /* unit skipped */ ) --> !!0))>"])
 	                    {-        (State# RealWorld -> (# State# RealWorld, a #) )
 	                           -> (b -> State# RealWorld -> (# State# RealWorld, a #) ) 
 	                           -> State# RealWorld
@@ -2074,14 +2080,14 @@ ilxPrimOpTable op
 	                     -} 
 
 	BlockAsyncExceptionsOp -> ty1_op (\ty1 -> 
-		ilxCallSuppMeth ilxMethA "blockAsyncExceptions" [ty1] [ilxOp "(func ( /* unit skipped */ ) --> !!0)"])
+		ilxCallSuppMeth ilxMethA "blockAsyncExceptions" [ty1] [ilxOp "thunk<(func ( /* unit skipped */ ) --> !!0)>"])
 
                 {-     (State# RealWorld -> (# State# RealWorld, a #))
                     -> (State# RealWorld -> (# State# RealWorld, a #))
                 -}
 
 	UnblockAsyncExceptionsOp -> ty1_op (\ty1 -> 
-		ilxCallSuppMeth ilxMethA "unblockAsyncExceptions" [ty1] [ilxOp "(func ( /* unit skipped */ ) --> !!0)"])
+		ilxCallSuppMeth ilxMethA "unblockAsyncExceptions" [ty1] [ilxOp "thunk<(func ( /* unit skipped */ ) --> !!0)>"])
 
                 {-
 		    State# RealWorld -> (# State# RealWorld, a #))
@@ -2147,17 +2153,17 @@ ilxPrimOpTable op
 	EqStablePtrOp -> ty1_op (\ty1 -> ilxOp "ceq")
                  {-  StablePtr# a -> StablePtr# a -> Int# -}
 
-	MkWeakOp -> ty3_op (\ty1 ty2 ty3 ->  ilxCall (ilxMethodRef (repWeak ilxMethB) classWeak "bake" [ty1,ty2,ty3] [ilxMethA, ilxMethB, ilxOp "!!2"]))
+	MkWeakOp -> ty3_op (\ty1 ty2 ty3 ->  ilxCall (ilxMethodRef (repWeak ilxMethB) classWeak "bake" [ilxLift ty1,ilxLift ty2,ty3] [ilxMethA, ilxMethB, ilxLift (ilxOp "!!2")]))
                  {- o -> b -> c -> State# RealWorld -> (# State# RealWorld, Weak# b #) -}
 
 	DeRefWeakOp -> ty1_op (\ty1 ->  ilxCall (ilxMethodRef (ilxUnboxedPairRep repInt ilxMethA) classWeak "deref" [ty1] [repWeak ilxMethA]))
-	FinalizeWeakOp -> ty1_op (\ty1 ->  ilxCall (ilxMethodRef (ilxUnboxedPairRep repInt (ilxOp "(func ( /* unit skipped */ ) --> class '()')")) classWeak "finalizer" [ty1] [repWeak ilxMethA]))
+	FinalizeWeakOp -> ty1_op (\ty1 ->  ilxCall (ilxMethodRef (ilxUnboxedPairRep repInt (ilxOp "thunk<(func ( /* unit skipped */ ) --> class '()')>")) classWeak "finalizer" [ty1] [repWeak ilxMethA]))
                    {-    Weak# a -> State# RealWorld -> (# State# RealWorld, Int#, 
 	State# RealWorld -> (# State# RealWorld, Unit #)) #) -}
 
 	MkForeignObjOp -> simp_op (ilxOpSeq [ilxOp "newobj void", repForeign, ilxOp "::.ctor(void *)"])
 	WriteForeignObjOp -> ty1_op (\sty -> ilxOpSeq [ilxOp "stfld void *", repForeign, ilxOp "::contents"])
-        ForeignObjToAddrOp -> simp_op ilxForeignToAddrOp
+        ForeignObjToAddrOp -> simp_op ilxAddrOfForeignOp
 	YieldOp -> simp_op (ilxOpSeq [ilxOp "call class [mscorlib]System.Threading.Thread class [mscorlib]System.Threading.Thread::get_CurrentThread() 
                                 call instance void class [mscorlib]System.Threading.Thread::Suspend()"])
 	MyThreadIdOp -> simp_op (ilxOpSeq [ilxOp "call default  class [mscorlib]System.Threading.Thread class [mscorlib]System.Threading.Thread::get_CurrentThread() "])
@@ -2272,15 +2278,20 @@ hasTyCon _  _ = False
 
 isByteArrayCArgTy ty = hasTyCon ty byteArrayPrimTyCon || hasTyCon ty mutableByteArrayPrimTyCon
 isByteArrayCArg v = isByteArrayCArgTy (deepIlxRepType (idType v))
-pinCCallArg v = isByteArrayCArg v 
 
-ilxAddrOfPinnedByteArr = text "ldc.i4 0 ldelema unsigned int8"
+isForeignObjCArgTy ty = hasTyCon ty foreignObjPrimTyCon
+isForeignObjCArg v = isForeignObjCArgTy (deepIlxRepType (idType v))
 
-pushCArg env arg@(StgVarArg v) | isByteArrayCArg v = pushArg env arg <+> text "dup stloc" <+> singleQuotes (ilxEnvQualifyByExact env (ppr v) <> text "pin") <+> ilxAddrOfPinnedByteArr
+pinCCallArg v = isByteArrayCArg v || isForeignObjCArg v  
+
+pinCArg  env arg v = pushArg env arg <+> text "dup stloc" <+> singleQuotes (ilxEnvQualifyByExact env (ppr v) <> text "pin") 
+pushCArg  env arg@(StgVarArg v) | isByteArrayCArg v = pinCArg env arg v <+> ilxAddrOfByteArrOp env
+pushCArg env arg@(StgVarArg v) | isForeignObjCArg v = pinCArg env arg v <+> ilxAddrOfForeignOp env
 pushCArg env arg | otherwise = pushArg env arg
 
 pprCValArgTys f env tys = parens (pprSepWithCommas (pprCValArgTy f env) tys)
 pprCValArgTy f env ty | isByteArrayCArgTy ty = text "void *" <+> ilxComment (text "interior pointer into ByteArr#")
+pprCValArgTy f env ty | isForeignObjCArgTy ty = text "void *" <+> ilxComment (text "foreign object")
 pprCValArgTy f env ty | otherwise = f env ty
 
 

@@ -80,7 +80,7 @@ n18 = add n8 n10
 n19 = add n1 n18
 n20 = add n4 n16
 
-bign = pow n2 n20
+bign = pow n2 n10
 bign1 = add bign n1
 
 main = putStr (chooseN bign1)
