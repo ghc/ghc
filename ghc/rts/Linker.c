@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.137 2003/10/08 10:37:25 wolfgang Exp $
+ * $Id: Linker.c,v 1.138 2003/10/29 16:12:00 wolfgang Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -3000,13 +3000,11 @@ ia64_reloc_pcrel21(Elf_Addr target, Elf_Addr value, ObjectCode *oc)
 #if defined(OBJFORMAT_MACHO)
 
 /*
-  Initial support for MachO linking on Darwin/MacOS X on PowerPC chips
+  Support for MachO linking on Darwin/MacOS X on PowerPC chips
   by Wolfgang Thaller (wolfgang.thaller@gmx.net)
   
   I hereby formally apologize for the hackish nature of this code.
   Things that need to be done:
-  *) handle uninitialized data sections ("__common").
-	Normal common definitions work, but beware if you pass -fno-common to gcc.
   *) implement ocVerifyImage_MachO
   *) add still more sanity checks.
 */
@@ -3134,11 +3132,31 @@ static void* makeJumpIsland(
     return (void*) island;
 }
 
+static char* relocateAddress(
+    ObjectCode* oc,
+    int nSections,
+    struct section* sections,
+    unsigned long address)
+{  
+    int i;
+    for(i = 0; i < nSections; i++)
+    {
+        if(sections[i].addr <= address
+            && address < sections[i].addr + sections[i].size)
+        {
+            return oc->image + sections[i].offset + address - sections[i].addr;
+        }
+    }
+    barf("Invalid Mach-O file:"
+         "Address out of bounds while relocating object file");
+    return NULL;
+}
+
 static int relocateSection(
     ObjectCode* oc,
     char *image, 
     struct symtab_command *symLC, struct nlist *nlist,
-    struct section* sections, struct section *sect)
+    int nSections, struct section* sections, struct section *sect)
 {
     struct relocation_info *relocs;
     int i,n;
@@ -3160,12 +3178,55 @@ static int relocateSection(
 	    
 	    if(!scat->r_pcrel)
 	    {
-		if(scat->r_length == 2 && scat->r_type == GENERIC_RELOC_VANILLA)
+		if(scat->r_length == 2)
 		{
-		    unsigned long* word = (unsigned long*) (image + sect->offset + scat->r_address);
+		    unsigned long word = 0;
+		    unsigned long* wordPtr = (unsigned long*) (image + sect->offset + scat->r_address);
+		    checkProddableBlock(oc,wordPtr);
 		    
-		    checkProddableBlock(oc,word);
-		    *word = scat->r_value + sect->offset + ((long) image);
+		    // Step 1: Figure out what the relocated value should be
+		    if(scat->r_type == GENERIC_RELOC_VANILLA)
+		    {
+		        word = scat->r_value + sect->offset + ((long) image);
+		    }
+		    else if(scat->r_type == PPC_RELOC_SECTDIFF
+		        || scat->r_type == PPC_RELOC_LO16_SECTDIFF
+		        || scat->r_type == PPC_RELOC_HI16_SECTDIFF
+		        || scat->r_type == PPC_RELOC_HA16_SECTDIFF)
+		    {
+		        struct scattered_relocation_info *pair =
+		                (struct scattered_relocation_info*) &relocs[i+1];
+		                
+		        if(!pair->r_scattered || pair->r_type != PPC_RELOC_PAIR)
+		            barf("Invalid Mach-O file: "
+		                 "PPC_RELOC_*_SECTDIFF not followed by PPC_RELOC_PAIR");
+		        
+		        word = (unsigned long)
+		               (relocateAddress(oc, nSections, sections, scat->r_value)
+		              - relocateAddress(oc, nSections, sections, pair->r_value));
+		        i++;
+		    }
+		    else
+		        continue;  // ignore the others
+
+                    if(scat->r_type == GENERIC_RELOC_VANILLA
+                        || scat->r_type == PPC_RELOC_SECTDIFF)
+                    {
+                        *wordPtr = word;
+                    }
+                    else if(scat->r_type == PPC_RELOC_LO16_SECTDIFF)
+                    {
+                        ((unsigned short*) wordPtr)[1] = word & 0xFFFF;
+                    }
+                    else if(scat->r_type == PPC_RELOC_HI16_SECTDIFF)
+                    {
+                        ((unsigned short*) wordPtr)[1] = (word >> 16) & 0xFFFF;
+                    }
+                    else if(scat->r_type == PPC_RELOC_HA16_SECTDIFF)
+                    {
+                        ((unsigned short*) wordPtr)[1] = ((word >> 16) & 0xFFFF)
+                            + ((word & (1<<15)) ? 1 : 0);
+                    }
 		}
 	    }
 	    
@@ -3298,7 +3359,7 @@ static int ocGetNames_MachO(ObjectCode* oc)
     struct load_command *lc = (struct load_command*) (image + sizeof(struct mach_header));
     unsigned i,curSymbol;
     struct segment_command *segLC = NULL;
-    struct section *sections, *la_ptrs = NULL, *nl_ptrs = NULL;
+    struct section *sections;
     struct symtab_command *symLC = NULL;
     struct dysymtab_command *dsymLC = NULL;
     struct nlist *nlist;
@@ -3322,13 +3383,17 @@ static int ocGetNames_MachO(ObjectCode* oc)
 
     for(i=0;i<segLC->nsects;i++)
     {
-	if(!strcmp(sections[i].sectname,"__la_symbol_ptr"))
-	    la_ptrs = &sections[i];
-	else if(!strcmp(sections[i].sectname,"__nl_symbol_ptr"))
-	    nl_ptrs = &sections[i];
-	    
-	    // for now, only add __text and __const to the sections table
-	else if(!strcmp(sections[i].sectname,"__text"))
+        if(sections[i].size == 0)
+            continue;
+        
+        if((sections[i].flags & SECTION_TYPE) == S_ZEROFILL)
+        {
+            char * zeroFillArea = stgCallocBytes(1,sections[i].size,
+                                      "ocGetNames_MachO(common symbols)");
+            sections[i].offset = zeroFillArea - image;
+        }
+    
+	if(!strcmp(sections[i].sectname,"__text"))
 	    addSection(oc, SECTIONKIND_CODE_OR_RODATA, 
 		(void*) (image + sections[i].offset),
 		(void*) (image + sections[i].offset + sections[i].size));
@@ -3340,10 +3405,14 @@ static int ocGetNames_MachO(ObjectCode* oc)
 	    addSection(oc, SECTIONKIND_RWDATA, 
 		(void*) (image + sections[i].offset),
 		(void*) (image + sections[i].offset + sections[i].size));
-		
-	if(sections[i].size > 0)    // size 0 segments do exist
-	    addProddableBlock(oc, (void*) (image + sections[i].offset),
-					    sections[i].size);
+	else if(!strcmp(sections[i].sectname,"__bss")
+	        || !strcmp(sections[i].sectname,"__common"))
+	    addSection(oc, SECTIONKIND_RWDATA, 
+		(void*) (image + sections[i].offset),
+		(void*) (image + sections[i].offset + sections[i].size));
+
+        addProddableBlock(oc, (void*) (image + sections[i].offset),
+                                        sections[i].size);
     }
 
 	// count external symbols defined here
@@ -3460,7 +3529,7 @@ static int ocResolve_MachO(ObjectCode* oc)
     
     for(i=0;i<segLC->nsects;i++)
     {
-	if(!relocateSection(oc,image,symLC,nlist,sections,&sections[i]))
+	if(!relocateSection(oc,image,symLC,nlist,segLC->nsects,sections,&sections[i]))
 	    return 0;
     }
 
