@@ -225,9 +225,10 @@ hiOnlyModLocation path basename hisuf
         return (ModLocation{ ml_hspp_file = Nothing,
  	        	     ml_hs_file   = Nothing,
  	        	     ml_hi_file   = path ++ '/':basename ++ '.':hisuf,
-		 		    -- Remove the .hi-boot suffix from hi_file, if it
-		 		    -- had one.  We always want the name of the real
-		 		    -- .hi file in the ml_hi_file field.
+		 		-- Remove the .hi-boot suffix from
+		 		-- hi_file, if it had one.  We always
+		 		-- want the name of the real .hi file
+		 		-- in the ml_hi_file field.
 	   	             ml_obj_file  = obj_fn
                  })}
 
