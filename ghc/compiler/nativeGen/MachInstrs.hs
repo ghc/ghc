@@ -14,24 +14,22 @@ module MachInstrs (
 
 	-- * Machine instructions
 	Instr(..),
-	Cond(..),
-#if !powerpc_TARGET_ARCH && !i386_TARGET_ARCH
+	Cond(..), condUnsigned, condToSigned, condToUnsigned,
+
+#if !powerpc_TARGET_ARCH && !i386_TARGET_ARCH && !x86_64_TARGET_ARCH
 	Size(..), machRepSize,
 #endif
 	RI(..),
 
-#if i386_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 	Operand(..),
+#endif
+#if i386_TARGET_ARCH
 	i386_insert_ffrees,
 #endif
 #if sparc_TARGET_ARCH
 	riZero, fpRelEA, moveSp, fPair,
 #endif
-#if powerpc_TARGET_ARCH
-	condUnsigned, condToSigned,
-#endif
-	DestInfo(..), hasDestInfo, pprDests,
-
     ) where
 
 #include "HsVersions.h"
@@ -42,7 +40,6 @@ import MachOp		( MachRep(..) )
 import CLabel           ( CLabel, pprCLabel )
 import Panic		( panic )
 import Outputable
-import Config           ( cLeadingUnderscore )
 import FastString
 
 import GLAEXTS
@@ -72,7 +69,7 @@ data Cond
   | ULE		-- For CMP only
   | ULT		-- For CMP only
 #endif
-#if i386_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
   = ALWAYS	-- What's really used? ToDo
   | EQQ
   | GE
@@ -122,6 +119,23 @@ data Cond
 #endif
     deriving Eq  -- to make an assertion work
 
+condUnsigned GU  = True
+condUnsigned LU  = True
+condUnsigned GEU = True
+condUnsigned LEU = True
+condUnsigned _   = False
+
+condToSigned GU  = GTT
+condToSigned LU  = LTT
+condToSigned GEU = GE
+condToSigned LEU = LE
+condToSigned x   = x
+
+condToUnsigned GTT = GU
+condToUnsigned LTT = LU
+condToUnsigned GE  = GEU
+condToUnsigned LE  = LEU
+condToUnsigned x   = x
 
 -- -----------------------------------------------------------------------------
 -- Sizes on this architecture
@@ -129,7 +143,7 @@ data Cond
 -- ToDo: it's not clear to me that we need separate signed-vs-unsigned sizes
 -- here.  I've removed them from the x86 version, we'll see what happens --SDM
 
-#if !powerpc_TARGET_ARCH && !i386_TARGET_ARCH
+#if !powerpc_TARGET_ARCH && !i386_TARGET_ARCH && !x86_64_TARGET_ARCH
 data Size
 #if alpha_TARGET_ARCH
     = B	    -- byte
@@ -363,7 +377,7 @@ bit or 64 bit precision.
 --SDM 1/2003
 -}
 
-#if i386_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 
 -- data Instr continues...
 
@@ -371,6 +385,9 @@ bit or 64 bit precision.
 	| MOV	      MachRep Operand Operand
 	| MOVZxL      MachRep Operand Operand -- size is the size of operand 1
 	| MOVSxL      MachRep Operand Operand -- size is the size of operand 1
+	-- x86_64 note: plain mov into a 32-bit register always zero-extends
+	-- into the 64-bit reg, in contrast to the 8 and 16-bit movs which
+	-- don't affect the high bits of the register.
 
 -- Load effective address (also a very useful three-operand add instruction :-)
 	| LEA         MachRep Operand Operand
@@ -379,9 +396,9 @@ bit or 64 bit precision.
 	| ADD	      MachRep Operand Operand
 	| ADC	      MachRep Operand Operand
 	| SUB	      MachRep Operand Operand
-	| IMUL	      MachRep Operand Operand	-- signed int mul
-	| MUL	      MachRep Operand Operand	-- unsigned int mul
 
+	| MUL	      MachRep Operand Operand
+	| IMUL	      MachRep Operand Operand	-- signed int mul
         | IMUL64      Reg Reg
 	-- operand1:operand2 := (operand1[31:0] *signed operand2[31:0])
 
@@ -403,6 +420,7 @@ bit or 64 bit precision.
         | BT          MachRep Imm Operand
 	| NOP
 
+#if i386_TARGET_ARCH
 -- Float Arithmetic.
 
 -- Note that we cheat by treating G{ABS,MOV,NEG} of doubles 
@@ -442,6 +460,32 @@ bit or 64 bit precision.
     	| GTAN	      MachRep Reg Reg -- src, dst
 	
         | GFREE         -- do ffree on all x86 regs; an ugly hack
+#endif
+
+#if x86_64_TARGET_ARCH
+-- SSE2 floating point: we use a restricted set of the available SSE2
+-- instructions for floating-point.
+
+	-- use MOV for moving (either movss or movsd (movlpd better?))
+
+	| CVTSS2SD	Reg Reg		-- F32 to F64
+	| CVTSD2SS	Reg Reg		-- F64 to F32
+	| CVTSS2SI	Operand Reg	-- F32 to I32/I64 (with rounding)
+	| CVTSD2SI	Operand	Reg	-- F64 to I32/I64 (with rounding)
+	| CVTSI2SS	Operand Reg	-- I32/I64 to F32
+	| CVTSI2SD	Operand Reg	-- I32/I64 to F64
+
+	-- use ADD & SUB for arithmetic.  In both cases, operands
+	-- are  Operand Reg.
+
+ 	-- SSE2 floating-point division:
+	| FDIV		MachRep Operand Operand   -- divisor, dividend(dst)
+
+	-- use CMP for comparisons.  ucomiss and ucomisd instructions
+	-- compare single/double prec floating point respectively.
+
+	| SQRT		MachRep Operand Reg	-- src, dst
+#endif
 
 -- Comparison
 	| TEST          MachRep Operand Operand
@@ -462,7 +506,7 @@ bit or 64 bit precision.
 	| CALL	      (Either Imm Reg)
 
 -- Other things.
-	| CLTD -- sign extend %eax into %edx:%eax
+	| CLTD MachRep	 -- sign extend %eax into %edx:%eax
 
 	| FETCHGOT    Reg  -- pseudo-insn for position-independent code
                            -- pretty-prints as
@@ -475,7 +519,9 @@ data Operand
   | OpImm  Imm	        -- immediate value
   | OpAddr AddrMode	-- memory reference
 
+#endif /* i386 or x86_64 */
 
+#if i386_TARGET_ARCH
 i386_insert_ffrees :: [Instr] -> [Instr]
 i386_insert_ffrees insns
    | any is_G_instr insns
@@ -506,7 +552,6 @@ is_G_instr instr
         GSIN _ _ _ -> True; GCOS _ _ _ -> True; GTAN _ _ _ -> True
         GFREE -> panic "is_G_instr: GFREE (!)"
         other -> False
-
 #endif /* i386_TARGET_ARCH */
 
 
@@ -670,33 +715,4 @@ fPair other = pprPanic "fPair(sparc NCG)" (ppr other)
 	      | FETCHPC Reg            -- pseudo-instruction:
 	                               -- bcl to next insn, mflr reg
 	      
-condUnsigned GU = True
-condUnsigned LU = True
-condUnsigned GEU = True
-condUnsigned LEU = True
-condUnsigned _ = False
-
-condToSigned GU = GTT
-condToSigned LU = LTT
-condToSigned GEU = GE
-condToSigned LEU = LE
-condToSigned x = x
 #endif /* powerpc_TARGET_ARCH */
-
-
--- -----------------------------------------------------------------------------
--- DestInfo
-
--- ToDo: might not be needed anymore --SDM
-
--- used by insnFuture in RegAllocInfo.lhs
-data DestInfo
-   = NoDestInfo             -- no supplied dests; infer from context
-   | DestInfo [CLabel]      -- precisely these dests and no others
-
-hasDestInfo NoDestInfo   = False
-hasDestInfo (DestInfo _) = True
-
-pprDests :: DestInfo -> SDoc
-pprDests NoDestInfo      = text "NoDestInfo"
-pprDests (DestInfo dsts) = brackets (hsep (map pprCLabel dsts))

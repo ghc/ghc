@@ -2,8 +2,8 @@
 --
 -- Pretty-printing assembly language
 --
-        -- (c) The University of Glasgow 1993-2004
-        --
+-- (c) The University of Glasgow 1993-2005
+--
 -----------------------------------------------------------------------------
 
 -- We start with the @pprXXX@s with some cross-platform commonality
@@ -21,7 +21,7 @@ module PprMach (
 #include "HsVersions.h"
 
 import Cmm
-import MachOp		( MachRep(..) )
+import MachOp		( MachRep(..), wordRep, isFloatingRep )
 import MachRegs		-- may differ per-platform
 import MachInstrs
 
@@ -115,13 +115,13 @@ pprBasicBlock (BasicBlock (BlockId id) instrs) =
 -- on which bit of it we care about.  Yurgh.
 
 pprUserReg :: Reg -> Doc
-pprUserReg = pprReg IF_ARCH_i386(I32,)
+pprUserReg = pprReg IF_ARCH_i386(I32,) IF_ARCH_x86_64(I64,)
 
-pprReg :: IF_ARCH_i386(MachRep ->,) Reg -> Doc
+pprReg :: IF_ARCH_i386(MachRep ->, IF_ARCH_x86_64(MachRep ->,)) Reg -> Doc
 
-pprReg IF_ARCH_i386(s,) r
+pprReg IF_ARCH_i386(s, IF_ARCH_x86_64(s,)) r
   = case r of
-      RealReg i      -> ppr_reg_no IF_ARCH_i386(s,) i
+      RealReg i      -> ppr_reg_no IF_ARCH_i386(s, IF_ARCH_x86_64(s,)) i
       VirtualRegI  u  -> text "%vI_" <> asmSDoc (pprUnique u)
       VirtualRegHi u  -> text "%vHi_" <> asmSDoc (pprUnique u)
       VirtualRegF  u  -> text "%vF_" <> asmSDoc (pprUnique u)
@@ -200,6 +200,74 @@ pprReg IF_ARCH_i386(s,) r
 	_  -> SLIT("very naughty I386 register")
       })
 #endif
+
+#if x86_64_TARGET_ARCH
+    ppr_reg_no :: MachRep -> Int -> Doc
+    ppr_reg_no I8   = ppr_reg_byte
+    ppr_reg_no I16  = ppr_reg_word
+    ppr_reg_no I32  = ppr_reg_long
+    ppr_reg_no _    = ppr_reg_quad
+
+    ppr_reg_byte i = ptext
+      (case i of {
+	 0 -> SLIT("%al");     1 -> SLIT("%bl");
+	 2 -> SLIT("%cl");     3 -> SLIT("%dl");
+	 4 -> SLIT("%sil");    5 -> SLIT("%dil"); -- new 8-bit regs!
+	 6 -> SLIT("%bpl");    7 -> SLIT("%spl");
+	 8 -> SLIT("%r8b");    9  -> SLIT("%r9b");
+	10 -> SLIT("%r10b");   11 -> SLIT("%r11b");
+	12 -> SLIT("%r12b");   13 -> SLIT("%r13b");
+	14 -> SLIT("%r14b");   15 -> SLIT("%r15b");
+	_  -> SLIT("very naughty x86_64 byte register")
+      })
+
+    ppr_reg_word i = ptext
+      (case i of {
+	 0 -> SLIT("%ax");     1 -> SLIT("%bx");
+	 2 -> SLIT("%cx");     3 -> SLIT("%dx");
+	 4 -> SLIT("%si");     5 -> SLIT("%di");
+	 6 -> SLIT("%bp");     7 -> SLIT("%sp");
+	 8 -> SLIT("%r8w");    9  -> SLIT("%r9w");
+	10 -> SLIT("%r10w");   11 -> SLIT("%r11w");
+	12 -> SLIT("%r12w");   13 -> SLIT("%r13w");
+	14 -> SLIT("%r14w");   15 -> SLIT("%r15w");
+	_  -> SLIT("very naughty x86_64 word register")
+      })
+
+    ppr_reg_long i = ptext
+      (case i of {
+	 0 -> SLIT("%eax");    1  -> SLIT("%ebx");
+	 2 -> SLIT("%ecx");    3  -> SLIT("%edx");
+	 4 -> SLIT("%esi");    5  -> SLIT("%edi");
+	 6 -> SLIT("%ebp");    7  -> SLIT("%esp");
+	 8 -> SLIT("%r8d");    9  -> SLIT("%r9d");
+	10 -> SLIT("%r10d");   11 -> SLIT("%r11d");
+	12 -> SLIT("%r12d");   13 -> SLIT("%r13d");
+	14 -> SLIT("%r14d");   15 -> SLIT("%r15d");
+	_  -> SLIT("very naughty x86_64 register")
+      })
+
+    ppr_reg_quad i = ptext
+      (case i of {
+	 0 -> SLIT("%rax");	1 -> SLIT("%rbx");
+	 2 -> SLIT("%rcx");	3 -> SLIT("%rdx");
+	 4 -> SLIT("%rsi");	5 -> SLIT("%rdi");
+	 6 -> SLIT("%rbp");	7 -> SLIT("%rsp");
+	 8 -> SLIT("%r8");  	9 -> SLIT("%r9");
+	10 -> SLIT("%r10");    11 -> SLIT("%r11");
+	12 -> SLIT("%r12");    13 -> SLIT("%r13");
+	14 -> SLIT("%r14");    15 -> SLIT("%r15");
+	16 -> SLIT("%xmm0");   17 -> SLIT("%xmm1");
+	18 -> SLIT("%xmm2");   19 -> SLIT("%xmm3");
+	20 -> SLIT("%xmm4");   21 -> SLIT("%xmm5");
+	22 -> SLIT("%xmm6");   23 -> SLIT("%xmm7");
+	24 -> SLIT("%xmm8");   25 -> SLIT("%xmm9");
+	26 -> SLIT("%xmm10");  27 -> SLIT("%xmm11");
+	28 -> SLIT("%xmm12");  28 -> SLIT("%xmm13");
+	30 -> SLIT("%xmm13");  31 -> SLIT("%xmm15")
+      })
+#endif
+
 #if sparc_TARGET_ARCH
     ppr_reg_no :: Int -> Doc
     ppr_reg_no i = ptext
@@ -290,7 +358,7 @@ pprReg IF_ARCH_i386(s,) r
 -- -----------------------------------------------------------------------------
 -- pprSize: print a 'Size'
 
-#if powerpc_TARGET_ARCH || i386_TARGET_ARCH
+#if powerpc_TARGET_ARCH || i386_TARGET_ARCH || x86_64_TARGET_ARCH
 pprSize :: MachRep -> Doc
 #else
 pprSize :: Size -> Doc
@@ -310,13 +378,20 @@ pprSize x = ptext (case x of
 --	 SF -> SLIT("s") UNUSED
 	 TF -> SLIT("t")
 #endif
-#if i386_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 	I8   -> SLIT("b")
 	I16  -> SLIT("w")
 	I32  -> SLIT("l")
-	F32  -> SLIT("s")
-	F64  -> SLIT("l")
+	I64  -> SLIT("q")
+#endif
+#if i386_TARGET_ARCH
+	F32  -> SLIT("l")
+	F64  -> SLIT("q")
 	F80  -> SLIT("t")
+#endif
+#if x86_64_TARGET_ARCH
+	F32  -> SLIT("ss")	-- "scalar single-precision float" (SSE2)
+	F64  -> SLIT("sd")	-- "scalar double-precision float" (SSE2)
 #endif
 #if sparc_TARGET_ARCH
 	B   -> SLIT("sb")
@@ -362,9 +437,9 @@ pprCond c = ptext (case c of {
 	GTT  -> SLIT("gt");
 	GE  -> SLIT("ge")
 #endif
-#if i386_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 	GEU	-> SLIT("ae");	LU    -> SLIT("b");
-	EQQ	-> SLIT("e");	GTT    -> SLIT("g");
+	EQQ	-> SLIT("e");	GTT   -> SLIT("g");
 	GE	-> SLIT("ge");	GU    -> SLIT("a");
 	LTT	-> SLIT("l");	LE    -> SLIT("le");
 	LEU	-> SLIT("be");	NE    -> SLIT("ne");
@@ -466,7 +541,7 @@ pprAddr (AddrRegImm r1 i)
 
 -------------------
 
-#if i386_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 pprAddr (ImmAddr imm off)
   = let	pp_imm = pprImm imm
     in
@@ -481,7 +556,7 @@ pprAddr (AddrBaseIndex base index displacement)
   = let
 	pp_disp  = ppr_disp displacement
 	pp_off p = pp_disp <> char '(' <> p <> char ')'
-	pp_reg r = pprReg I32 r
+	pp_reg r = pprReg wordRep r
     in
     case (base,index) of
       (Nothing, Nothing)    -> pp_disp
@@ -540,39 +615,59 @@ pprSectionHeader Text
 	IF_ARCH_alpha(SLIT("\t.text\n\t.align 3") {-word boundary-}
        ,IF_ARCH_sparc(SLIT(".text\n\t.align 4") {-word boundary-}
        ,IF_ARCH_i386(SLIT(".text\n\t.align 4,0x90") {-needs per-OS variation!-}
+       ,IF_ARCH_x86_64(SLIT(".text\n\t.align 8") {-needs per-OS variation!-}
        ,IF_ARCH_powerpc(SLIT(".text\n.align 2")
-       ,))))
+       ,)))))
 pprSectionHeader Data
     = ptext
 	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
 	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
 	,IF_ARCH_i386(SLIT(".data\n\t.align 4")
+	,IF_ARCH_x86_64(SLIT(".data\n\t.align 8")
         ,IF_ARCH_powerpc(SLIT(".data\n.align 2")
-	,))))
+	,)))))
 pprSectionHeader ReadOnlyData
     = ptext
 	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
 	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
 	,IF_ARCH_i386(SLIT(".section .rodata\n\t.align 4")
+	,IF_ARCH_x86_64(SLIT(".section .rodata\n\t.align 8")
         ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const\n.align 2"),
                                       SLIT(".section .rodata\n\t.align 2"))
-	,))))
+	,)))))
 pprSectionHeader RelocatableReadOnlyData
     = ptext
 	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
 	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
-	,IF_ARCH_i386(SLIT(".data\n\t.align 4")
+	,IF_ARCH_i386(SLIT(".section .rodata\n\t.align 4")
+	,IF_ARCH_x86_64(SLIT(".text\n\t.align 8")
         ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const_data\n.align 2"),
                                       SLIT(".data\n\t.align 2"))
-	,))))
+	,)))))
+	-- the assembler on x86_64/Linux refuses to generate code for
+	--   .quad  x - y
+	-- where x is in the text section and y in the rodata section.
+	-- It works if y is in the text section, though.  This is probably
+	-- going to cause difficulties for PIC, I imagine.
 pprSectionHeader UninitialisedData
     = ptext
 	 IF_ARCH_alpha(SLIT("\t.bss\n\t.align 3")
 	,IF_ARCH_sparc(SLIT(".bss\n\t.align 8") {-<8 will break double constants -}
 	,IF_ARCH_i386(SLIT(".section .bss\n\t.align 4")
+	,IF_ARCH_x86_64(SLIT(".section .bss\n\t.align 8")
         ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const_data\n.align 2"),
                                       SLIT(".section .bss\n\t.align 2"))
-	,))))
+	,)))))
+pprSectionHeader ReadOnlyData16
+    = ptext
+	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 4")
+	,IF_ARCH_sparc(SLIT(".data\n\t.align 16")
+	,IF_ARCH_i386(SLIT(".section .rodata\n\t.align 16")
+	,IF_ARCH_x86_64(SLIT(".section .rodata.cst16\n\t.align 16")
+        ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const\n.align 4"),
+                                      SLIT(".section .rodata\n\t.align 4"))
+	,)))))
+
 pprSectionHeader (OtherSection sec)
     = panic "PprMach.pprSectionHeader: unknown section"
 
@@ -586,11 +681,8 @@ pprData (CmmStaticLit lit)       = pprDataItem lit
 pprGloblDecl :: CLabel -> Doc
 pprGloblDecl lbl
   | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = ptext IF_ARCH_alpha(SLIT(".globl ")
-		        ,IF_ARCH_i386(SLIT(".globl ")
-			,IF_ARCH_sparc(SLIT(".global ")
-		        ,IF_ARCH_powerpc(SLIT(".globl ")
-			,)))) <>
+  | otherwise = ptext IF_ARCH_sparc(SLIT(".global "), 
+				    SLIT(".globl ")) <>
 		pprCLabel_asm lbl
 
 pprLabel :: CLabel -> Doc
@@ -612,8 +704,9 @@ pprASCII str
 pprAlign bytes =
 	IF_ARCH_alpha(ptextSLIT(".align ") <> int pow2,
 	IF_ARCH_i386(ptext SLIT(".align ") <> int bytes,
+	IF_ARCH_x86_64(ptext SLIT(".align ") <> int bytes,
 	IF_ARCH_sparc(ptext SLIT(".align ") <> int bytes,
-	IF_ARCH_powerpc(ptext SLIT(".align ") <> int pow2,))))
+	IF_ARCH_powerpc(ptext SLIT(".align ") <> int pow2,)))))
   where
 	pow2 = log2 bytes
 	
@@ -646,7 +739,7 @@ pprDataItem lit
 	ppr_item I16  x = [ptext SLIT("\t.short\t") <> pprImm imm]
 	ppr_item I64  x = [ptext SLIT("\t.quad\t") <> pprImm imm]
 #endif
-#if i386_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 	ppr_item I16  x = [ptext SLIT("\t.word\t") <> pprImm imm]
 	ppr_item I64  x = [ptext SLIT("\t.quad\t") <> pprImm imm]
 #endif
@@ -672,10 +765,11 @@ pprInstr (COMMENT s)
    =  IF_ARCH_alpha( ((<>) (ptext SLIT("\t# ")) (ftext s))
      ,IF_ARCH_sparc( ((<>) (ptext SLIT("! "))   (ftext s))
      ,IF_ARCH_i386( ((<>) (ptext SLIT("# "))   (ftext s))
+     ,IF_ARCH_x86_64( ((<>) (ptext SLIT("# "))   (ftext s))
      ,IF_ARCH_powerpc( IF_OS_linux(
         ((<>) (ptext SLIT("# ")) (ftext s)),
         ((<>) (ptext SLIT("; ")) (ftext s)))
-     ,))))
+     ,)))))
 
 pprInstr (DELTA d)
    = pprInstr (COMMENT (mkFastString ("\tdelta = " ++ show d)))
@@ -1071,7 +1165,7 @@ pprSizeRegRegReg name size reg1 reg2 reg3
 -- -----------------------------------------------------------------------------
 -- pprInstr for an x86
 
-#if i386_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 
 pprInstr v@(MOV size s@(OpReg src) d@(OpReg dst)) -- hack
   | src == dst
@@ -1081,10 +1175,18 @@ pprInstr v@(MOV size s@(OpReg src) d@(OpReg dst)) -- hack
 #else
     empty
 #endif
+
 pprInstr (MOV size src dst)
   = pprSizeOpOp SLIT("mov") size src dst
-pprInstr (MOVZxL sizes src dst) = pprSizeOpOpCoerce SLIT("movz") sizes I32 src dst
-pprInstr (MOVSxL sizes src dst) = pprSizeOpOpCoerce SLIT("movs") sizes I32 src dst
+
+pprInstr (MOVZxL I32 src dst) = pprSizeOpOp SLIT("mov") I32 src dst
+	-- 32-to-64 bit zero extension on x86_64 is accomplished by a simple
+	-- movl.  But we represent it as a MOVZxL instruction, because
+	-- the reg alloc would tend to throw away a plain reg-to-reg
+	-- move, and we still want it to do that.
+
+pprInstr (MOVZxL sizes src dst) = pprSizeOpOpCoerce SLIT("movz") sizes wordRep src dst
+pprInstr (MOVSxL sizes src dst) = pprSizeOpOpCoerce SLIT("movs") sizes wordRep src dst
 
 -- here we do some patching, since the physical registers are only set late
 -- in the code generation.
@@ -1117,11 +1219,13 @@ pprInstr (IMUL size op1 op2) = pprSizeOpOp SLIT("imul") size op1 op2
    however, cannot be used to determine if the upper half of the
    result is non-zero."  So there.  
 -} 
-pprInstr (MUL size op1 op2) = pprSizeOpOp SLIT("imul") size op1 op2
-
 pprInstr (AND size src dst) = pprSizeOpOp SLIT("and") size src dst
 pprInstr (OR  size src dst) = pprSizeOpOp SLIT("or")  size src dst
+
+pprInstr (XOR F32 src dst)  = pprOpOp SLIT("xorps") F32 src dst
+pprInstr (XOR F64 src dst)  = pprOpOp SLIT("xorpd") F64 src dst
 pprInstr (XOR size src dst) = pprSizeOpOp SLIT("xor")  size src dst
+
 pprInstr (NOT size op) = pprSizeOp SLIT("not") size op
 pprInstr (NEGI size op) = pprSizeOp SLIT("neg") size op
 
@@ -1131,7 +1235,10 @@ pprInstr (SHR size src dst) = pprShift SLIT("shr") size src dst
 
 pprInstr (BT  size imm src) = pprSizeImmOp SLIT("bt") size imm src
 
-pprInstr (CMP size src dst) = pprSizeOpOp SLIT("cmp")  size src dst
+pprInstr (CMP size src dst) 
+  | isFloatingRep size =  pprSizeOpOp SLIT("ucomi")  size src dst -- SSE2
+  | otherwise          =  pprSizeOpOp SLIT("cmp")  size src dst
+
 pprInstr (TEST size src dst) = pprSizeOpOp SLIT("test")  size src dst
 pprInstr (PUSH size op) = pprSizeOp SLIT("push") size op
 pprInstr (POP size op) = pprSizeOp SLIT("pop") size op
@@ -1141,7 +1248,8 @@ pprInstr (POP size op) = pprSizeOp SLIT("pop") size op
 -- pprInstr POPA = ptext SLIT("\tpopal")
 
 pprInstr NOP = ptext SLIT("\tnop")
-pprInstr CLTD = ptext SLIT("\tcltd")
+pprInstr (CLTD I32) = ptext SLIT("\tcltd")
+pprInstr (CLTD I64) = ptext SLIT("\tcqto")
 
 pprInstr (SETCC cond op) = pprCondInstr SLIT("set") cond (pprOperand I8 op)
 
@@ -1150,17 +1258,42 @@ pprInstr (JXX cond (BlockId id))
   where lab = mkAsmTempLabel id
 
 pprInstr (JMP (OpImm imm)) = (<>) (ptext SLIT("\tjmp ")) (pprImm imm)
-pprInstr (JMP op)          = (<>) (ptext SLIT("\tjmp *")) (pprOperand I32 op)
+pprInstr (JMP op)          = (<>) (ptext SLIT("\tjmp *")) (pprOperand wordRep op)
 pprInstr (JMP_TBL op ids)  = pprInstr (JMP op)
 pprInstr (CALL (Left imm))      = (<>) (ptext SLIT("\tcall ")) (pprImm imm)
-pprInstr (CALL (Right reg))     = (<>) (ptext SLIT("\tcall *")) (pprReg I32 reg)
+pprInstr (CALL (Right reg))     = (<>) (ptext SLIT("\tcall *")) (pprReg wordRep reg)
 
 pprInstr (IDIV sz op)	= pprSizeOp SLIT("idiv") sz op
 pprInstr (DIV sz op)    = pprSizeOp SLIT("div")  sz op
 
 pprInstr (IMUL64 sd_hi sd_lo) = pprInstr_imul64 sd_hi sd_lo
 
+#if x86_64_TARGET_ARCH
+pprInstr (MUL size op1 op2) = pprSizeOpOp SLIT("mul") size op1 op2
 
+pprInstr (FDIV size op1 op2) = pprSizeOpOp SLIT("div") size op1 op2
+
+pprInstr (CVTSS2SD from to) = pprRegReg SLIT("cvtss2sd") from to
+pprInstr (CVTSD2SS from to) = pprRegReg SLIT("cvtsd2ss") from to
+pprInstr (CVTSS2SI from to) = pprOpReg  SLIT("cvtss2si") from to
+pprInstr (CVTSD2SI from to) = pprOpReg  SLIT("cvtsd2si") from to
+pprInstr (CVTSI2SS from to) = pprOpReg  SLIT("cvtsi2ss") from to
+pprInstr (CVTSI2SD from to) = pprOpReg  SLIT("cvtsi2sd") from to
+#endif
+
+pprInstr (FETCHGOT reg)
+   = vcat [ ptext SLIT("\tcall 1f"),
+            hcat [ ptext SLIT("1:\tpopl\t"), pprReg I32 reg ],
+            hcat [ ptext SLIT("\taddl\t$_GLOBAL_OFFSET_TABLE_+(.-1b), "),
+                   pprReg I32 reg ]
+          ]
+
+#endif
+
+-- -----------------------------------------------------------------------------
+-- i386 floating-point
+
+#if i386_TARGET_ARCH
 -- Simulating a flat register set on the x86 FP stack is tricky.
 -- you have to free %st(7) before pushing anything on the FP reg stack
 -- so as to preclude the possibility of a FP stack overflow exception.
@@ -1357,31 +1490,6 @@ pprInstr GFREE
             ptext SLIT("\tffree %st(4) ;ffree %st(5) ;ffree %st(6) ;ffree %st(7)") 
           ]
 
-pprInstr (FETCHGOT reg)
-   = vcat [ ptext SLIT("\tcall 1f"),
-            hcat [ ptext SLIT("1:\tpopl\t"), pprReg I32 reg ],
-            hcat [ ptext SLIT("\taddl\t$_GLOBAL_OFFSET_TABLE_+(.-1b), "),
-                   pprReg I32 reg ]
-          ]
-
--- Emit code to make hi_reg:lo_reg be the 64-bit product of hi_reg and lo_reg
-pprInstr_imul64 hi_reg lo_reg
-   = let fakeInsn = text "imul64" <+> pp_hi_reg <> comma <+> pp_lo_reg
-         pp_hi_reg = pprReg I32 hi_reg
-         pp_lo_reg = pprReg I32 lo_reg
-     in     
-         vcat [
-            text "\t# BEGIN " <> fakeInsn,
-            text "\tpushl" <+> pp_hi_reg <> text" ;  pushl" <+> pp_lo_reg,
-            text "\tpushl %eax ; pushl %edx",
-            text "\tmovl 12(%esp), %eax ; imull 8(%esp)",
-            text "\tmovl %edx, 12(%esp) ; movl %eax, 8(%esp)",
-            text "\tpopl %edx ; popl %eax",
-            text "\tpopl" <+> pp_lo_reg <> text " ;  popl" <+> pp_hi_reg,
-            text "\t# END   " <> fakeInsn
-         ]
-
-
 --------------------------
 
 -- coerce %st(0) to the specified size
@@ -1431,7 +1539,26 @@ pprGInstr (GADD sz src1 src2 dst) = pprSizeRegRegReg SLIT("gadd") sz src1 src2 d
 pprGInstr (GSUB sz src1 src2 dst) = pprSizeRegRegReg SLIT("gsub") sz src1 src2 dst
 pprGInstr (GMUL sz src1 src2 dst) = pprSizeRegRegReg SLIT("gmul") sz src1 src2 dst
 pprGInstr (GDIV sz src1 src2 dst) = pprSizeRegRegReg SLIT("gdiv") sz src1 src2 dst
+#endif
 
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
+
+-- Emit code to make hi_reg:lo_reg be the 64-bit product of hi_reg and lo_reg
+pprInstr_imul64 hi_reg lo_reg
+   = let fakeInsn = text "imul64" <+> pp_hi_reg <> comma <+> pp_lo_reg
+         pp_hi_reg = pprReg wordRep hi_reg
+         pp_lo_reg = pprReg wordRep lo_reg
+     in     
+         vcat [
+            text "\t# BEGIN " <> fakeInsn,
+            text "\tpushl" <+> pp_hi_reg <> text" ;  pushl" <+> pp_lo_reg,
+            text "\tpushl %eax ; pushl %edx",
+            text "\tmovl 12(%esp), %eax ; imull 8(%esp)",
+            text "\tmovl %edx, 12(%esp) ; movl %eax, 8(%esp)",
+            text "\tpopl %edx ; popl %eax",
+            text "\tpopl" <+> pp_lo_reg <> text " ;  popl" <+> pp_hi_reg,
+            text "\t# END   " <> fakeInsn
+         ]
 -- Continue with I386-only printing bits and bobs:
 
 pprDollImm :: Imm -> Doc
@@ -1442,6 +1569,10 @@ pprOperand :: MachRep -> Operand -> Doc
 pprOperand s (OpReg r)   = pprReg s r
 pprOperand s (OpImm i)   = pprDollImm i
 pprOperand s (OpAddr ea) = pprAddr ea
+
+pprMnemonic_  :: LitString -> Doc
+pprMnemonic_ name = 
+   char '\t' <> ptext name <> space
 
 pprMnemonic  :: LitString -> MachRep -> Doc
 pprMnemonic name size = 
@@ -1473,6 +1604,15 @@ pprSizeOpOp name size op1 op2
 	pprOperand size op2
     ]
 
+pprOpOp :: LitString -> MachRep -> Operand -> Operand -> Doc
+pprOpOp name size op1 op2
+  = hcat [
+	pprMnemonic_ name,
+	pprOperand size op1,
+	comma,
+	pprOperand size op2
+    ]
+
 pprSizeReg :: LitString -> MachRep -> Reg -> Doc
 pprSizeReg name size reg1
   = hcat [
@@ -1487,6 +1627,24 @@ pprSizeRegReg name size reg1 reg2
 	pprReg size reg1,
         comma,
         pprReg size reg2
+    ]
+
+pprRegReg :: LitString -> Reg -> Reg -> Doc
+pprRegReg name reg1 reg2
+  = hcat [
+	pprMnemonic_ name,
+	pprReg wordRep reg1,
+        comma,
+        pprReg wordRep reg2
+    ]
+
+pprOpReg :: LitString -> Operand -> Reg -> Doc
+pprOpReg name op1 reg2
+  = hcat [
+	pprMnemonic_ name,
+	pprOperand wordRep op1,
+        comma,
+        pprReg wordRep reg2
     ]
 
 pprCondRegReg :: LitString -> MachRep -> Cond -> Reg -> Reg -> Doc

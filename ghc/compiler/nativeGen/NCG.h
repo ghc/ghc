@@ -26,6 +26,12 @@
 # define IF_ARCH_i386(x,y) y
 #endif
 -- - - - - - - - - - - - - - - - - - - - - - 
+#if x86_64_TARGET_ARCH
+# define IF_ARCH_x86_64(x,y) x
+#else
+# define IF_ARCH_x86_64(x,y) y
+#endif
+-- - - - - - - - - - - - - - - - - - - - - - 
 #if freebsd_TARGET_OS
 # define IF_OS_freebsd(x,y) x
 #else

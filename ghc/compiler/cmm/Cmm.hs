@@ -241,6 +241,7 @@ data Section
   | ReadOnlyData
   | RelocatableReadOnlyData
   | UninitialisedData
+  | ReadOnlyData16	-- .rodata.cst16 on x86_64, 16-byte aligned
   | OtherSection String
 
 data CmmStatic

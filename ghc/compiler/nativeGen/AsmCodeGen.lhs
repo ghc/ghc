@@ -552,12 +552,37 @@ cmmMachOpFold op arg@[CmmLit (CmmInt x rep)]
 cmmMachOpFold (MO_S_Conv rep1 rep2) [x] | rep1 == rep2 = x
 cmmMachOpFold (MO_U_Conv rep1 rep2) [x] | rep1 == rep2 = x
 
--- ToDo: eliminate multiple conversions.  Be careful though: can't remove
--- a narrowing, and can't remove conversions to/from floating point types.
+-- Eliminate nested conversions where possible
+cmmMachOpFold conv_outer args@[CmmMachOp conv_inner [x]]
+  | Just (rep1,rep2,signed1) <- isIntConversion conv_inner,
+    Just (_,   rep3,signed2) <- isIntConversion conv_outer
+  = case () of
+	-- widen then narrow to the same size is a nop
+      _ | rep1 < rep2 && rep1 == rep3 -> x
+	-- Widen then narrow to different size: collapse to single conversion
+	-- but remember to use the signedness from the widening, just in case
+	-- the final conversion is a widen.
+	| rep1 < rep2 && rep2 > rep3 ->
+	    cmmMachOpFold (intconv signed1 rep1 rep3) [x]
+	-- Nested widenings: collapse if the signedness is the same
+	| rep1 < rep2 && rep2 < rep3 && signed1 == signed2 ->
+	    cmmMachOpFold (intconv signed1 rep1 rep3) [x]
+	-- Nested narrowings: collapse
+	| rep1 > rep2 && rep2 > rep3 ->
+	    cmmMachOpFold (MO_U_Conv rep1 rep3) [x]
+	| otherwise ->
+	    CmmMachOp conv_outer args
+  where
+	isIntConversion (MO_U_Conv rep1 rep2) = Just (rep1,rep2,False)
+	isIntConversion (MO_S_Conv rep1 rep2) = Just (rep1,rep2,True)
+	isIntConversion _ = Nothing
+ 
+	intconv True  = MO_S_Conv
+	intconv False = MO_U_Conv
 
--- ToDo: eliminate nested comparisons:
---    CmmMachOp MO_Lt [CmmMachOp MO_Eq [x,y], CmmLit (CmmInt 0 _)]
--- turns into a simple equality test.
+-- ToDo: a narrow of a load can be collapsed into a narrow load, right?
+-- but what if the architecture only supports word-sized loads, should
+-- we do the transformation anyway?
 
 cmmMachOpFold mop args@[CmmLit (CmmInt x xrep), CmmLit (CmmInt y _)]
   = case mop of

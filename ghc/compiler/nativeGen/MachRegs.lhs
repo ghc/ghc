@@ -51,6 +51,15 @@ module MachRegs (
 	fake0, fake1, fake2, fake3, fake4, fake5,
 	addrModeRegs,
 #endif
+#if x86_64_TARGET_ARCH
+	rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp,
+	eax, ebx, ecx, edx, esi, edi, ebp, esp,
+	r8, r9, r10, r11, r12, r13, r14, r15,
+  	xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7,
+  	xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15,
+	xmm, eax, edx,
+	addrModeRegs, allFPArgRegs,
+#endif
 #if sparc_TARGET_ARCH
 	fits13Bits,
 	fpRel, gReg, iReg, lReg, oReg, largeOffsetError,
@@ -141,7 +150,7 @@ data AddrMode
   | AddrRegImm	Reg Imm
 #endif
 
-#if i386_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
   = AddrBaseIndex	Base Index Displacement
   | ImmAddr		Imm Int
 
@@ -160,7 +169,7 @@ type Displacement = Imm
   | AddrRegImm	Reg Imm
 #endif
 
-#if i386_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 addrModeRegs :: AddrMode -> [Reg]
 addrModeRegs (AddrBaseIndex b i _) =  b_regs ++ i_regs
   where
@@ -177,7 +186,7 @@ addrOffset addr off
 #if alpha_TARGET_ARCH
       _ -> panic "MachMisc.addrOffset not defined for Alpha"
 #endif
-#if i386_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
       ImmAddr i off0	  -> Just (ImmAddr i (off0 + off))
 
       AddrBaseIndex r i (ImmInt n) -> Just (AddrBaseIndex r i (ImmInt (n + off)))
@@ -280,8 +289,10 @@ spRel :: Int	-- desired stack offset in words, positive or negative
       -> AddrMode
 
 spRel n
-#if i386_TARGET_ARCH
+#if defined(i386_TARGET_ARCH)
   = AddrBaseIndex (Just esp) Nothing (ImmInt (n * wORD_SIZE))
+#elif defined(x86_64_TARGET_ARCH)
+  = AddrBaseIndex (Just rsp) Nothing (ImmInt (n * wORD_SIZE))
 #else
   = AddrRegImm sp (ImmInt (n * wORD_SIZE))
 #endif
@@ -497,6 +508,88 @@ showReg n
 #endif
 
 {-
+AMD x86_64 architecture:
+- Registers 0-16 have 32-bit counterparts (eax, ebx etc.)
+- Registers 0-7 have 16-bit counterparts (ax, bx etc.)
+- Registers 0-3 have 8 bit counterparts (ah, bh etc.)
+
+-}
+
+#if x86_64_TARGET_ARCH
+
+rax, rbx, rcx, rdx, rsp, rbp, rsi, rdi, 
+  r8, r9, r10, r11, r12, r13, r14, r15,
+  xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7,
+  xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15 :: Reg
+
+rax   = RealReg 0
+rbx   = RealReg 1
+rcx   = RealReg 2
+rdx   = RealReg 3
+rsi   = RealReg 4
+rdi   = RealReg 5
+rbp   = RealReg 6
+rsp   = RealReg 7
+r8    = RealReg 8
+r9    = RealReg 9
+r10   = RealReg 10
+r11   = RealReg 11
+r12   = RealReg 12
+r13   = RealReg 13
+r14   = RealReg 14
+r15   = RealReg 15
+xmm0  = RealReg 16
+xmm1  = RealReg 17
+xmm2  = RealReg 18
+xmm3  = RealReg 19
+xmm4  = RealReg 20
+xmm5  = RealReg 21
+xmm6  = RealReg 22
+xmm7  = RealReg 23
+xmm8  = RealReg 24
+xmm9  = RealReg 25
+xmm10 = RealReg 26
+xmm11 = RealReg 27
+xmm12 = RealReg 28
+xmm13 = RealReg 29
+xmm14 = RealReg 30
+xmm15 = RealReg 31
+
+ -- so we can re-use some x86 code:
+eax = rax
+ebx = rbx
+ecx = rcx
+edx = rdx
+esi = rsi
+edi = rdi
+ebp = rbp
+esp = rsp
+
+xmm n = RealReg (16+n)
+
+-- On x86, we might want to have an 8-bit RegClass, which would
+-- contain just regs 1-4 (the others don't have 8-bit versions).
+-- However, we can get away without this at the moment because the
+-- only allocatable integer regs are also 8-bit compatible (1, 3, 4).
+regClass (RealReg i)     = if i < 16 then RcInteger else RcDouble
+regClass (VirtualRegI  u) = RcInteger
+regClass (VirtualRegHi u) = RcInteger
+regClass (VirtualRegD  u) = RcDouble
+regClass (VirtualRegF  u) = pprPanic "regClass(x86_64):VirtualRegF" 
+                                    (ppr (VirtualRegF u))
+
+regNames 
+ = ["%rax", "%rbx", "%rcx", "%rdx", "%rsi", "%rdi", "%rbp", "%rsp" ]
+
+showReg :: RegNo -> String
+showReg n
+  | n >= 16 = "%xmm" ++ show n  
+  | n >= 8  = "%r" ++ show n
+  | otherwise = regNames !! n
+
+#endif
+
+{-
 The SPARC has 64 registers of interest; 32 integer registers and 32
 floating point registers.  The mapping of STG registers to SPARC
 machine registers is defined in StgRegs.h.  We are, of course,
@@ -647,6 +740,42 @@ names in the header files.  Gag me with a spoon, eh?
 #define fake4 12
 #define fake5 13
 #endif
+
+#if x86_64_TARGET_ARCH
+#define rax   0
+#define rbx   1
+#define rcx   2
+#define rdx   3
+#define rsi   4
+#define rdi   5
+#define rbp   6
+#define rsp   7
+#define r8    8
+#define r9    9
+#define r10   10
+#define r11   11
+#define r12   12
+#define r13   13
+#define r14   14
+#define r15   15
+#define xmm0  16
+#define xmm1  17
+#define xmm2  18
+#define xmm3  19
+#define xmm4  20
+#define xmm5  21
+#define xmm6  22
+#define xmm7  23
+#define xmm8  24
+#define xmm9  25
+#define xmm10 26
+#define xmm11 27
+#define xmm12 28
+#define xmm13 29
+#define xmm14 30
+#define xmm15 31
+#endif
+
 #if sparc_TARGET_ARCH
 #define g0 0
 #define g1 1
@@ -824,11 +953,12 @@ allMachRegNos :: [RegNo]
 allMachRegNos
    = IF_ARCH_alpha( [0..63],
      IF_ARCH_i386(  [0..13],
+     IF_ARCH_x86_64( [0..31],
      IF_ARCH_sparc( ([0..31]
                      ++ [f0,f2 .. nCG_FirstFloatReg-1]
                      ++ [nCG_FirstFloatReg .. f31]),
      IF_ARCH_powerpc([0..63],
-                   ))))
+                   )))))
 
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the
@@ -854,6 +984,11 @@ callClobberedRegs
     -- caller-saves registers
     map RealReg [eax,ecx,edx,fake0,fake1,fake2,fake3,fake4,fake5]
 #endif /* i386_TARGET_ARCH */
+#if x86_64_TARGET_ARCH
+    -- caller-saves registers
+    map RealReg ([rax,rcx,rdx,rsi,rdi,r8,r9,r10,r11] ++ [16..31])
+       -- all xmm regs are caller-saves
+#endif /* x86_64_TARGET_ARCH */
 #if sparc_TARGET_ARCH
     map RealReg 
         ( oReg 7 :
@@ -878,6 +1013,10 @@ argRegs :: RegNo -> [Reg]
 
 #if i386_TARGET_ARCH
 argRegs _ = panic "MachRegs.argRegs(x86): should not be used!"
+#endif
+
+#if x86_64_TARGET_ARCH
+argRegs _ = panic "MachRegs.argRegs(x86_64): should not be used!"
 #endif
 
 #if alpha_TARGET_ARCH
@@ -932,6 +1071,13 @@ allArgRegs :: [Reg]
 allArgRegs = panic "MachRegs.allArgRegs(x86): should not be used!"
 #endif
 
+#if x86_64_TARGET_ARCH
+allArgRegs :: [Reg]
+allArgRegs = map RealReg [rdi,rsi,rdx,rcx,r8,r9]
+allFPArgRegs :: [Reg]
+allFPArgRegs = map RealReg [xmm0 .. xmm7]
+#endif
+
 #if powerpc_TARGET_ARCH
 allArgRegs :: [Reg]
 allArgRegs = map RealReg [3..10]
@@ -958,6 +1104,10 @@ freeReg 63 = fastBool False  -- always zero (f31)
 
 #if i386_TARGET_ARCH
 freeReg esp = fastBool False  --	%esp is the C stack pointer
+#endif
+
+#if x86_64_TARGET_ARCH
+freeReg rsp = fastBool False  --	%rsp is the C stack pointer
 #endif
 
 #if sparc_TARGET_ARCH

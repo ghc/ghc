@@ -24,7 +24,7 @@ module RegAllocInfo (
 #include "HsVersions.h"
 
 import Cmm		( BlockId )
-#if powerpc_TARGET_ARCH || i386_TARGET_ARCH
+#if powerpc_TARGET_ARCH || i386_TARGET_ARCH || x86_64_TARGET_ARCH
 import MachOp           ( MachRep(..) )
 #endif
 import MachInstrs
@@ -138,7 +138,7 @@ regUsage instr = case instr of
 
 #endif /* alpha_TARGET_ARCH */
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#if i386_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 
 regUsage instr = case instr of
     MOV    sz src dst	-> usageRW src dst
@@ -173,9 +173,10 @@ regUsage instr = case instr of
     JMP_TBL op ids      -> mkRU (use_R op) []
     CALL   (Left imm)	-> mkRU [] callClobberedRegs
     CALL   (Right reg)	-> mkRU [reg] callClobberedRegs
-    CLTD		-> mkRU [eax] [edx]
+    CLTD   sz		-> mkRU [eax] [edx]
     NOP			-> mkRU [] []
 
+#if i386_TARGET_ARCH
     GMOV   src dst	-> mkRU [src] [dst]
     GLD    sz src dst	-> mkRU (use_EA src) [dst]
     GST    sz src dst	-> mkRU (src : use_EA dst) []
@@ -201,6 +202,17 @@ regUsage instr = case instr of
     GSIN   sz src dst	-> mkRU [src] [dst]
     GCOS   sz src dst	-> mkRU [src] [dst]
     GTAN   sz src dst	-> mkRU [src] [dst]
+#endif
+
+#if x86_64_TARGET_ARCH
+    CVTSS2SD src dst	-> mkRU [src] [dst]
+    CVTSD2SS src dst	-> mkRU [src] [dst]
+    CVTSS2SI src dst	-> mkRU (use_R src) [dst]
+    CVTSD2SI src dst	-> mkRU (use_R src) [dst]
+    CVTSI2SS src dst	-> mkRU (use_R src) [dst]
+    CVTSI2SD src dst	-> mkRU (use_R src) [dst]
+    FDIV sz src dst     -> usageRM src dst
+#endif    
 
     FETCHGOT reg        -> mkRU [] [reg]
 
@@ -244,7 +256,7 @@ regUsage instr = case instr of
     mkRU src dst = RU (filter interesting src)
   	    	      (filter interesting dst)
 
-#endif /* i386_TARGET_ARCH */
+#endif /* i386_TARGET_ARCH || x86_64_TARGET_ARCH */
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if sparc_TARGET_ARCH
 
@@ -370,7 +382,7 @@ regUsage instr = case instr of
 jumpDests :: Instr -> [BlockId] -> [BlockId]
 jumpDests insn acc
   = case insn of
-#if i386_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 	JXX _ id	-> id : acc
 	JMP_TBL _ ids	-> ids ++ acc
 #elif powerpc_TARGET_ARCH
@@ -445,7 +457,7 @@ patchRegs instr env = case instr of
 
 #endif /* alpha_TARGET_ARCH */
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#if i386_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 
 patchRegs instr env = case instr of
     MOV  sz src dst	-> patch2 (MOV  sz) src dst
@@ -477,6 +489,7 @@ patchRegs instr env = case instr of
     JMP op		-> patch1 JMP op
     JMP_TBL op ids      -> patch1 JMP_TBL op $ ids
 
+#if i386_TARGET_ARCH
     GMOV src dst	-> GMOV (env src) (env dst)
     GLD sz src dst	-> GLD sz (lookupAddr src) (env dst)
     GST sz src dst	-> GST sz (env src) (lookupAddr dst)
@@ -502,6 +515,17 @@ patchRegs instr env = case instr of
     GSIN sz src dst	-> GSIN sz (env src) (env dst)
     GCOS sz src dst	-> GCOS sz (env src) (env dst)
     GTAN sz src dst	-> GTAN sz (env src) (env dst)
+#endif
+
+#if x86_64_TARGET_ARCH
+    CVTSS2SD src dst	-> CVTSS2SD (env src) (env dst)
+    CVTSD2SS src dst	-> CVTSD2SS (env src) (env dst)
+    CVTSS2SI src dst	-> CVTSS2SI (patchOp src) (env dst)
+    CVTSD2SI src dst	-> CVTSD2SI (patchOp src) (env dst)
+    CVTSI2SS src dst	-> CVTSI2SS (patchOp src) (env dst)
+    CVTSI2SD src dst	-> CVTSI2SD (patchOp src) (env dst)
+    FDIV sz src dst	-> FDIV sz (patchOp src) (patchOp dst)
+#endif    
 
     CALL (Left imm)	-> instr
     CALL (Right reg)	-> CALL (Right (env reg))
@@ -512,7 +536,7 @@ patchRegs instr env = case instr of
     COMMENT _		-> instr
     DELTA _ 		-> instr
     JXX _ _		-> instr
-    CLTD		-> instr
+    CLTD _		-> instr
 
     _other		-> panic "patchRegs: unrecognised instr"
 
@@ -534,7 +558,7 @@ patchRegs instr env = case instr of
 	lookupIndex Nothing      = Nothing
 	lookupIndex (Just (r,i)) = Just (env r, i)
 
-#endif /* i386_TARGET_ARCH */
+#endif /* i386_TARGET_ARCH || x86_64_TARGET_ARCH*/
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if sparc_TARGET_ARCH
 
@@ -645,7 +669,7 @@ patchRegs instr env = case instr of
 -- by assigning the src and dest temporaries to the same real register.
 
 isRegRegMove :: Instr -> Maybe (Reg,Reg)
-#ifdef i386_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 -- TMP:
 isRegRegMove (MOV _ (OpReg r1) (OpReg r2)) = Just (r1,r2)
 #elif powerpc_TARGET_ARCH
@@ -678,6 +702,12 @@ mkSpillInstr reg delta slot
 	   RcInteger -> MOV I32 (OpReg reg) (OpAddr (spRel off_w))
 	   _         -> GST F80 reg (spRel off_w) {- RcFloat/RcDouble -}
 #endif
+#ifdef x86_64_TARGET_ARCH
+    let off_w = (off-delta) `div` 8
+    in case regClass reg of
+	   RcInteger -> MOV I64 (OpReg reg) (OpAddr (spRel off_w))
+	   _         -> panic "mkSpillInstr: ToDo"
+#endif
 #ifdef sparc_TARGET_ARCH
 	{-SPARC: spill below frame pointer leaving 2 words/spill-}
                         let{off_w = 1 + (off `div` 4);
@@ -705,16 +735,22 @@ mkLoadInstr reg delta slot
     let
         off     = spillSlotToOffset slot
     in
-#ifdef alpha_TARGET_ARCH
+#if alpha_TARGET_ARCH
 	 LD  sz dyn (spRel (- (off `div` 8)))
 #endif
-#ifdef i386_TARGET_ARCH
+#if i386_TARGET_ARCH
 	let off_w = (off-delta) `div` 4
         in case regClass reg of {
               RcInteger -> MOV I32 (OpAddr (spRel off_w)) (OpReg reg);
               _         -> GLD F80 (spRel off_w) reg} {- RcFloat/RcDouble -}
 #endif
-#ifdef sparc_TARGET_ARCH
+#if x86_64_TARGET_ARCH
+	let off_w = (off-delta) `div` 8
+        in case regClass reg of
+              RcInteger -> MOV I64 (OpAddr (spRel off_w)) (OpReg reg)
+              _         -> panic "mkLoadInstr: ToDo"
+#endif
+#if sparc_TARGET_ARCH
         let{off_w = 1 + (off `div` 4);
             sz = case regClass vreg of {
                    RcInteger -> W;
@@ -722,7 +758,7 @@ mkLoadInstr reg delta slot
                    RcDouble  -> DF}}
         in LD sz (fpRel (- off_w)) dyn
 #endif
-#ifdef powerpc_TARGET_ARCH
+#if powerpc_TARGET_ARCH
     let sz = case regClass reg of
                 RcInteger -> I32
                 RcDouble -> F64
