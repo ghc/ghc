@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: config.mk,v 1.9 2000/08/02 15:39:11 simonmar Exp $
+# $Id: config.mk,v 1.10 2000/09/05 09:40:08 simonmar Exp $
 #
 # GHC project configuration
 #
@@ -10,7 +10,7 @@
 # what to include in a binary distribution
 GhcMainDir = ghc
 GhcBinDistDirs = ghc hslibs
-GhcBinDistDocs = docs ghc/docs/set
+GhcBinDistDocs = ghc/docs/set
 GhcBinDistPrlScripts = ghc-$(ProjectVersion)
 GhcBinDistLibPrlScripts = ghc-asm ghc-split ghc-stats
 GhcBinDistBins = hp2ps
