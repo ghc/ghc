@@ -238,14 +238,12 @@ handleJust p =  flip (catchJust p)
 -- >   catch (evaluate undefined) (\e -> return ())  ==> return ()
 --
 -- NOTE: @(evaluate a)@ is /not/ the same as @(a \`seq\` return a)@.
+#ifdef __GLASGOW_HASKELL__
 evaluate :: a -> IO a
-#if defined(__GLASGOW_HASKELL__)
 evaluate a = IO $ \s -> case a `seq` () of () -> (# s, a #)
 	-- NB. can't write  
 	-- 	a `seq` (# s, a #)
 	-- because we can't have an unboxed tuple as a function argument
-#elif defined(__HUGS__)
-evaluate a = a `seq` return a	-- dummy implementation: to be fixed
 #endif
 
 -----------------------------------------------------------------------------
