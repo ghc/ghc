@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.41 2000/04/11 16:51:44 sewardj Exp $
+ * $Id: RtsStartup.c,v 1.42 2000/04/20 13:20:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -226,7 +226,11 @@ nat init_sp = 0;
 static void
 initModules ( void *init_root )
 {
+#ifdef SMP
     Capability cap;
+#else
+#define cap MainRegTable
+#endif
 
     init_sp = 0;
     init_stack = (F_ *)allocate(INIT_STACK_SIZE / sizeof(W_));
@@ -239,7 +243,6 @@ initModules ( void *init_root )
     cap.rSp = (P_)(init_stack + init_sp);
     StgRun((StgFunPtr)stg_init, &cap);
 }
-
 #endif /* !INTERPRETER */
 
 /* -----------------------------------------------------------------------------
