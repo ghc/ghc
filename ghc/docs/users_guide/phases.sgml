@@ -206,6 +206,62 @@ strmod = "\
       and the string gap works as expected.</para>
     </sect2>
 
+    <sect2 id="pre-processor">
+      <title>Options affecting a Haskell pre-processor</title>
+      
+      <indexterm><primary>pre-processing: custom</primary></indexterm>
+      <indexterm><primary>Pre-processor options</primary></indexterm>
+
+      <variablelist>
+	<varlistentry>
+	  <term><option>-F</option></term>
+	  <indexterm><primary><option>-F</option></primary></indexterm>
+	  <listitem>
+	    <para>A custom pre-processor is run over your Haskell
+	    source file only if the <option>-F</option> option
+	    <indexterm><primary>-F</primary></indexterm> is given.
+	    </para>
+	    <para>
+	    Running a custom pre-processor at compile-time is in some
+	    settings appropriate and useful. The <option>-F</option>
+            option lets you run a pre-processor as part of the overall
+	    GHC compilation pipeline, which has the advantage over
+	    running a Haskell pre-processor separately in that it
+	    works in interpreted mode and you can continue to take
+	    reap the benefits of GHC's recompilation checker.
+	    </para>
+	    <para>
+	    The pre-processor is run just before the Haskell
+	    compiler proper processes the Haskell input, but after
+	    the literate markup has been stripped away and (possibly)
+	    the C pre-processor has washed the Haskell input.
+	    </para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>-pgmF</option> <replaceable>cmd</replaceable></term>
+	  <indexterm><primary><option>-pgmF</option> <replaceable>cmd</replaceable></primary></indexterm>
+	  <listitem>
+	    <para>Use <replaceable>cmd</replaceable> as the Haskell
+	  pre-processor. When invoked, the
+	  <replaceable>cmd</replaceable> pre-processor is given at
+	  least three arguments on its command-line: the first
+	  argument is the name of the original source file, the second
+	  is the name of the file holding the input, and the third is
+	  the name of the file where
+	  <replaceable>cmd</replaceable> should write its output to.
+	  </para>
+	  <para>Additional arguments to the
+	  <replaceable>cmd</replaceable> pre-processor can be passed
+	  in using the <option>-optF</option> option. These are fed to
+	  <replaceable>cmd</replaceable> on the command line after the
+	  three standard input and output arguments. 
+        </para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+    </sect2>
+
     <sect2 id="options-C-compiler">
       <title>Options affecting the C compiler (if applicable)</title>
 

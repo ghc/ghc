@@ -1164,6 +1164,13 @@
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
+	    <row>
+	      <entry><option>-pgmF</option> <replaceable>cmd</replaceable></entry>
+	      <entry>Use <replaceable>cmd</replaceable> as the pre-processor
+	      (with <option>-F</option> only)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
 	  </tbody>
 	</tgroup>
       </informaltable>
@@ -1174,6 +1181,7 @@
       <indexterm><primary><option>-pgml</option></primary></indexterm>
       <indexterm><primary><option>-pgmdll</option></primary></indexterm>
       <indexterm><primary><option>-pgmdep</option></primary></indexterm>
+      <indexterm><primary><option>-pgmF</option></primary></indexterm>
 
     </sect2>
 
