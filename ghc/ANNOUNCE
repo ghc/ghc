@@ -76,7 +76,7 @@ To compile up this source-only release, you need a machine with 32+MB
 memory, GNU C (`gcc'), `perl' plus a version of GHC installed (3.02 at
 least).  This release is known to work on the following platforms:
 
-  * i386-unknown-{linux,solaris2,freebsd,cygwin32}
+  * i386-unknown-{linux,solaris2,freebsd,netbsd,cygwin32}
   * sparc-sun-{sunos4,solaris2}
   * hppa1.1-hp-hpux{9,10}
 
