@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.56 2001/12/07 11:34:48 sewardj Exp $
+% $Id: PrelBase.lhs,v 1.57 2001/12/13 11:12:27 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -676,6 +676,33 @@ gtInt, geInt, eqInt, neInt, ltInt, leInt :: Int -> Int -> Bool
 "x# <# x#"  forall x#. x# <#  x# = False
 "x# <=# x#" forall x#. x# <=# x# = True
   #-}
+
+-- Wrappers for the shift operations.  The uncheckedShift# family are
+-- undefined when the amount being shifted by is greater than the size
+-- in bits of Int#, so these wrappers perform a check and return
+-- either zero or -1 appropriately.
+--
+-- Note that these wrappers still produce undefined results when the
+-- second argument (the shift amount) is negative.
+
+shiftL#, shiftR# :: Word# -> Int# -> Word#
+
+a `shiftL#` b   | b >=# WORD_SIZE_IN_BITS# = int2Word# 0#
+	        | otherwise                = a `uncheckedShiftL#` b
+
+a `shiftR#` b   | b >=# WORD_SIZE_IN_BITS# = int2Word# 0#
+	        | otherwise                = a `uncheckedShiftRL#` b
+
+iShiftL#, iShiftRA#, iShiftRL# :: Int# -> Int# -> Int#
+
+a `iShiftL#` b  | b >=# WORD_SIZE_IN_BITS# = 0#
+	        | otherwise                = a `uncheckedIShiftL#` b
+
+a `iShiftRA#` b | b >=# WORD_SIZE_IN_BITS# = if a <# 0# then (-1#) else 0#
+	        | otherwise                = a `uncheckedIShiftRA#` b
+
+a `iShiftRL#` b | b >=# WORD_SIZE_IN_BITS# = 0#
+	        | otherwise                = a `uncheckedIShiftRL#` b
 
 #if WORD_SIZE_IN_BITS == 32
 {-# RULES
