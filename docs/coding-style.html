@@ -191,6 +191,16 @@ an int to a nat, add an assertion.  If you're casting an int to a char,
 add an assertion.
 
 <li>
+Write special debugging code to check the integrity of your data structures.
+(Most of the runtime checking code is in <tt>src/Sanity.c</tt>)
+Add extra assertions which call this code at the start and end of any
+code that operates on your data structures.
+
+<li>
+When you find a hard-to-spot bug, try to think of some assertions,
+sanity checks or whatever that would have made the bug easier to find.
+
+<li>
 When defining an enumeration, it's a good idea not to use 0 for normal
 values.  Instead, make 0 raise an internal error.  The idea here is to
 make it easier to detect pointer-related errors on the assumption that
@@ -204,7 +214,14 @@ typedef enum
 
     ...
 </pre>
+
 <li> Use #warning or #error whenever you write a piece of incomplete/broken code.
+
+<li> When testing, try to make infrequent things happen often.
+     For example, make a context switch/gc/etc happen every time a 
+     context switch/gc/etc can happen.  The system will run like a 
+     pig but it'll catch a lot of bugs.
+
 </ul>
 
 <h2>Syntactic details</h2>
@@ -315,6 +332,10 @@ of side effects, evaluation order, multiple evaluation, etc.
 <li> Inline functions have call-by-value semantics whereas macros
   are call-by-name.  You can be bitten by duplicated computation
   if you aren't careful.
+
+<li> You can use inline functions from inside gdb if you compile with
+  -O0 or -fkeep-inline-functions.  If you use macros, you'd better
+  know what they expand to.
 </ul>
 
 However, note that macros can serve as both l-values and r-values and
@@ -379,10 +400,31 @@ in the library.
 </pre>
 
 <li>
-Try to use ANSI C's enum feature when defining lists of constants of the
-same type.  You'll notice that gdb works better when you do this.
-For example:
+This code
+<pre>
+int* p, q;
+</pre>
+looks like it declares two pointers but, in fact, only p is a pointer.
+It's safer to write this:
+<pre>
+int* p;
+int* q;
+</pre>
+You could also write this:
+<pre>
+int *p, *q;
+</pre>
+but Alastair prefers to split the declarations.
 
+<li>
+Try to use ANSI C's enum feature when defining lists of constants of
+the same type.  Among other benefits, you'll notice that gdb uses the
+name instead of its (usually inscrutable) number when printing values
+with enum types and gdb will let you use the name in expressions you
+type.  
+
+<p>
+Examples:
 <pre>
     typedef enum { /* N.B. Used as indexes into arrays */
      NO_HEAP_PROFILING,		
