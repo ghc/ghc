@@ -49,7 +49,7 @@ def guess_compiler_flags()
 {
    if   $tool contains "ghc"
    then 
-        return "-no-recomp"
+        return "-no-recomp -dcore-lint"
    else 
    if   $tool contains "nhc"
    then 

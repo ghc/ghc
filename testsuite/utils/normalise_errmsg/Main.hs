@@ -13,7 +13,7 @@ comparison of compiler error messages less troublesome.
 -- Look for file names and zap the directory part:
       foo/var/xyzzy/somefile.ext  -->  somefile.ext
 
-This progream is used by the test system (vanilla-test.T) to normalise
+This program is used by the test system (vanilla-test.T) to normalise
 actual compilation error messages before comparing them against
 expected messages.
 -}

@@ -1,0 +1,71 @@
+
+Almost all tests have a single source file and fall into one of the
+categories should_fail (to compile), should_compile, or should_run.
+
+Stuff to do:
+
+1.  Place the source and any expected outputs for the test in 
+
+       ghc-regress/appropriateDirectory/should_<whatever>
+
+    Place a should_xyz test in the should_xyz directory; putting it
+    elsewhere is possible, but confusing.
+
+2.  Edit all.T in the relevant directory and add a line for the
+    test.  How to do this should be obvious.  For the record, the
+    user-level functions are:
+
+       -- Run a should_run vanilla (single-source-file) test.  
+          You can specify extra compile and run flags, and if the
+          run is expected to have a non-zero exit code, that too.
+          The run's .stderr must match the specified .stderr if
+          it exists.  The run's .stdout must match at least one of
+          the specified .stdouts, if they exist.
+
+       vt ( extra_compile_args, 
+            extra_run_args, 
+            expected_nonzero_run_result )
+
+
+       -- Run a vanilla should_compile test.  To pass, the compiler must
+          exit with 0, and the normalised .stderr, if it exists, must
+          match the normalised specified .stderr.
+
+       vtc ( extra_compile_args )
+
+       
+       -- Run a vanilla should_fail test.  To pass, the compiler must
+          exit with non-zero, and the normalised .stderr, which must exist,
+          must match the normalised specified .stderr.
+
+       vtf ( extra_compile_args )
+
+
+LIMITATIONS
+
+1.  Only single-source-file tests are properly supported at the mo.
+    To be fixed.
+
+2.  All compilations are passed -no-recomp -dcore-lint, so there's
+    no point in adding them.
+
+3.  If you want to pass a flag to a whole bunch of tests, write a 
+    small wrapper fn to do this.  See vtc vs myvtc in 
+
+       ghc-regress/typecheck/should_compile/all.T.
+
+4.  Current mis-/un-handled tests are documented in ghc-regress/NOTES.
+
+
+
+ERROR MESSAGE NORMALISATION
+
+Is done to reduce spurious failures due to changes in capitalisation
+and whitespaces.  Expected and actual error messages are normalised
+prior to comparison.  What it does:
+
+-- Remove all whitespace lines
+-- Merge all other whitespace into a single space.
+-- Make all lowercase.
+-- Look for file names and zap the directory part:
+      foo/var/xyzzy/somefile.ext  -->  somefile.ext
