@@ -8,22 +8,17 @@
 module List ( 
     elemIndex, elemIndices,
     find, findIndex, findIndices,
-    nub, nubBy, delete, deleteBy, (\\), union, intersect,
-    intersperse, transpose, partition,
+    nub, nubBy, delete, deleteBy, (\\), deleteFirstsBy,
+    union, intersect,
+    intersperse, transpose, partition, group, groupBy,
+    inits, tails, isPrefixOf, isSuffixOf,
     mapAccumL, mapAccumR,
-    sort, sortBy, insertBy,
-    maximumBy, minimumBy,
+    sort, sortBy, insertBy, maximumBy, minimumBy,
     genericLength, genericTake, genericDrop,
-    genericSplitAt, genericIndex,
+    genericSplitAt, genericIndex, genericReplicate,
     zip4, zip5, zip6, zip7,
     zipWith4, zipWith5, zipWith6, zipWith7,
     unzip4, unzip5, unzip6, unzip7
-
-{- Disappeared from 1.4 libs - include still?
-    sums, products,
-    elemIndexBy, group, groupBy,
-    inits, tails, subsequences, permutations
--}
 
   ) where
 
@@ -55,13 +50,36 @@ findIndex p     = listToMaybe . findIndices p
 findIndices      :: (a -> Bool) -> [a] -> [Int]
 findIndices p xs = [ i | (x,i) <- zip xs [0..], p x]
 
+isPrefixOf              :: (Eq a) => [a] -> [a] -> Bool
+isPrefixOf [] _         =  True
+isPrefixOf _  []        =  False
+isPrefixOf (x:xs) (y:ys)=  x == y && isPrefixOf xs ys
+
+isSuffixOf              :: (Eq a) => [a] -> [a] -> Bool
+isSuffixOf x y          =  reverse x `isPrefixOf` reverse y
+
 -- nub (meaning "essence") remove duplicate elements from its list argument.
 nub                     :: (Eq a) => [a] -> [a]
+#ifdef USE_REPORT_PRELUDE
 nub                     =  nubBy (==)
+#else
+-- stolen from HBC
+nub l                   = nub' l []
+  where
+    nub' [] _		= []
+    nub' (x:xs) l	= if x `elem` l then nub' xs l else x : nub' xs (x:l)
+#endif
 
 nubBy			:: (a -> a -> Bool) -> [a] -> [a]
+#ifdef USE_REPORT_PRELUDE
 nubBy eq []             =  []
 nubBy eq (x:xs)         =  x : nubBy eq (filter (\ y -> not (eq x y)) xs)
+#else
+nubBy eq l              = nubBy' l []
+  where
+    nubBy' [] _		= []
+    nubBy' (x:xs) l	= if elemBy eq x l then nubBy' xs l else x : nubBy' xs (x:l)
+#endif
 
 -- delete x removes the first occurrence of x from its list argument.
 delete                  :: (Eq a) => a -> [a] -> [a]
@@ -78,11 +96,17 @@ deleteBy eq x (y:ys)    = if x `eq` y then ys else y : deleteBy eq x ys
 (\\)		        =  foldl (flip delete)
 
 -- List union, remove the elements of first list from second.
-union :: (Eq a) => [a] -> [a] -> [a]
-union xs ys = xs ++ (ys \\ xs)
+union			:: (Eq a) => [a] -> [a] -> [a]
+union 			= unionBy (==)
 
-intersect :: (Eq a) => [a] -> [a] -> [a]
-intersect xs ys = [ x | x <- xs, x `elem` ys]
+unionBy                 :: (a -> a -> Bool) -> [a] -> [a] -> [a]
+unionBy eq xs ys        =  xs ++ foldl (flip (deleteBy eq)) ys xs
+
+intersect               :: (Eq a) => [a] -> [a] -> [a]
+intersect               =  intersectBy (==)
+
+intersectBy             :: (a -> a -> Bool) -> [a] -> [a] -> [a]
+intersectBy eq xs ys    =  [x | x <- xs, any (eq x) ys]
 
 -- intersperse sep inserts sep between the elements of its list argument.
 -- e.g. intersperse ',' "abcde" == "a,b,c,d,e"
@@ -257,11 +281,6 @@ products 		=  scanl (*) 1
 genericReplicate	:: (Integral i) => i -> a -> [a]
 genericReplicate n x	=  genericTake n (repeat x)
 
-{-
-elemIndexBy 		:: (a -> a -> Bool) -> [a] -> a -> Int
-elemIndexBy eq [] x 	 = error "List.elemIndexBy: empty list"
-elemIndexBy eq (x:xs) x' = if x `eq` x' then 0 else 1 + elemIndexBy eq xs x'
-
 -- group splits its list argument into a list of lists of equal, adjacent
 -- elements.  e.g.,
 -- group "Mississippi" == ["M","i","ss","i","ss","i","pp","i"]
@@ -284,6 +303,12 @@ inits (x:xs) 		=  [[]] ++ map (x:) (inits xs)
 tails 			:: [a] -> [[a]]
 tails []	        =  [[]]
 tails xxs@(_:xs) 	=  xxs : tails xs
+
+{-	Old stuff now not in List
+
+elemIndexBy 		:: (a -> a -> Bool) -> [a] -> a -> Int
+elemIndexBy eq [] x 	 = error "List.elemIndexBy: empty list"
+elemIndexBy eq (x:xs) x' = if x `eq` x' then 0 else 1 + elemIndexBy eq xs x'
 
 -- subsequences xs returns the list of all subsequences of xs.
 -- e.g., subsequences "abc" == ["","c","b","bc","a","ac","ab","abc"]
