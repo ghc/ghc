@@ -25,7 +25,7 @@ GhcCompilerWays =
 
 SRC_HC_OPTS   = -H32m -O0 $(MyWarningOpts)
 GhcHcOpts     = -Rghc-timing -DDEBUG
-GhcLibHcOpts  = -dcore-lint $(MyWarningOpts) -keep-hc-files 
+GhcLibHcOpts  = -O -dcore-lint $(MyWarningOpts) -keep-hc-files 
 GhcLibWays    =
 
 # Debugging RTS
