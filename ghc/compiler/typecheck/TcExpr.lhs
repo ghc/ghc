@@ -53,9 +53,7 @@ import TcType		( TcType, TcSigmaType, TcRhoType, TyVarDetails(VanillaTv),
 			)
 import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType, fieldLabelTyCon )
 import Id		( Id, idType, recordSelectorFieldLabel, isRecordSelector, isDataConWrapId_maybe )
-import DataCon		( dataConFieldLabels, dataConSig, 
-			  dataConStrictMarks
-			)
+import DataCon		( DataCon, dataConFieldLabels, dataConSig, dataConStrictMarks )
 import Name		( Name, isExternalName )
 import TyCon		( TyCon, tyConTyVars, tyConTheta, isAlgTyCon, tyConDataCons )
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
@@ -405,16 +403,8 @@ tcMonoExpr expr@(RecordCon con_name rbinds) res_ty
 	-- Typecheck the record bindings
     tcRecordBinds tycon ty_args rbinds		`thenM` \ rbinds' ->
     
-    let
-      (missing_s_fields, missing_fields) = missingFields rbinds data_con
-    in
-    checkM (null missing_s_fields)
-	(mappM_ (addErrTc . missingStrictFieldCon con_name) missing_s_fields)
-	 				`thenM_`
-    doptM Opt_WarnMissingFields		`thenM` \ warn ->
-    checkM (not (warn && notNull missing_fields))
-	(mappM_ ((warnTc True) . missingFieldCon con_name) missing_fields)
-	 				`thenM_`
+ 	-- Check for missing fields
+    checkMissingFields data_con rbinds		`thenM_` 
 
     returnM (RecordConOut data_con con_expr rbinds')
 
@@ -981,18 +971,31 @@ badFields rbinds data_con
   where
     field_names = map fieldLabelName (dataConFieldLabels data_con)
 
-missingFields rbinds data_con
-  | null field_labels = ([], [])	-- Not declared as a record;
-					-- But C{} is still valid
-  | otherwise	
-  = (missing_strict_fields, other_missing_fields)
+checkMissingFields :: DataCon -> RenamedRecordBinds -> TcM ()
+checkMissingFields data_con rbinds
+  | null field_labels 	-- Not declared as a record;
+			-- But C{} is still valid if no strict fields
+  = if any isMarkedStrict field_strs then
+	-- Illegal if any arg is strict
+	addErrTc (missingStrictFields data_con [])
+    else
+	returnM ()
+			
+  | otherwise		-- A record
+  = checkM (null missing_s_fields)
+	   (addErrTc (missingStrictFields data_con missing_s_fields))	`thenM_`
+
+    doptM Opt_WarnMissingFields		`thenM` \ warn ->
+    checkM (not (warn && notNull missing_ns_fields))
+	   (warnTc True (missingFields data_con missing_ns_fields))
+
   where
-    missing_strict_fields
+    missing_s_fields
 	= [ fl | (fl, str) <- field_info,
 	  	 isMarkedStrict str,
 	  	 not (fieldLabelName fl `elem` field_names_used)
 	  ]
-    other_missing_fields
+    missing_ns_fields
 	= [ fl | (fl, str) <- field_info,
 	  	 not (isMarkedStrict str),
 	  	 not (fieldLabelName fl `elem` field_names_used)
@@ -1003,7 +1006,9 @@ missingFields rbinds data_con
 
     field_info = zipEqual "missingFields"
 			  field_labels
-	  		  (dropList ex_theta (dataConStrictMarks data_con))
+	  		  field_strs
+
+    field_strs = dropList ex_theta (dataConStrictMarks data_con)
 	-- The 'drop' is because dataConStrictMarks
 	-- includes the existential dictionaries
     (_, _, _, ex_theta, _, _) = dataConSig data_con
@@ -1122,15 +1127,22 @@ recordConCtxt expr = ptext SLIT("In the record construction:") <+> ppr expr
 notSelector field
   = hsep [quotes (ppr field), ptext SLIT("is not a record selector")]
 
-missingStrictFieldCon :: Name -> FieldLabel -> SDoc
-missingStrictFieldCon con field
-  = hsep [ptext SLIT("Constructor") <+> quotes (ppr con),
-	  ptext SLIT("does not have the required strict field"), quotes (ppr field)]
+missingStrictFields :: DataCon -> [FieldLabel] -> SDoc
+missingStrictFields con fields
+  = header <> rest
+  where
+    rest | null fields = empty	-- Happens for non-record constructors 
+				-- with strict fields
+	 | otherwise   = colon <+> pprWithCommas ppr fields
 
-missingFieldCon :: Name -> FieldLabel -> SDoc
-missingFieldCon con field
-  = hsep [ptext SLIT("Field") <+> quotes (ppr field),
-	  ptext SLIT("is not initialised")]
+    header = ptext SLIT("Constructor") <+> quotes (ppr con) <+> 
+	     ptext SLIT("does not have the required strict fields") 
+	  
+
+missingFields :: DataCon -> [FieldLabel] -> SDoc
+missingFields con fields
+  = ptext SLIT("Fields of") <+> quotes (ppr con) <+> ptext SLIT("not initialised:") 
+	<+> pprWithCommas ppr fields
 
 polySpliceErr :: Id -> SDoc
 polySpliceErr id
