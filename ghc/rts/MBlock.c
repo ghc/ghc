@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.23 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: MBlock.c,v 1.24 2001/10/26 11:49:19 sewardj Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -115,8 +115,8 @@ getMBlocks(nat n)
 
 char* base_non_committed = (char*)0;
 
-/* Reserve VM 128M at the time to try to minimise the slop cost. */
-#define SIZE_RESERVED_POOL  ( 128 * 1024 * 1024 )
+/* Reserve VM 256M at the time to try to minimise the slop cost. */
+#define SIZE_RESERVED_POOL  ( 256 * 1024 * 1024 )
 
 /* This predicate should be inlined, really. */
 /* TODO: this only works for a single chunk */
@@ -138,32 +138,26 @@ getMBlocks(nat n)
 
   if ( (base_non_committed == 0) || 
        (next_request + size > base_non_committed + SIZE_RESERVED_POOL) ) {
-#ifdef ENABLE_WIN32_DLL_SUPPORT
     if (base_non_committed)
-        barf("Windows programs can only use 128Mb of heap; sorry!");
-#endif
+        barf("Windows programs can only use 256Mb of heap; sorry!");
     base_non_committed = VirtualAlloc ( NULL
                                       , SIZE_RESERVED_POOL
 				      , MEM_RESERVE
 				      , PAGE_READWRITE
 				      );
     if ( base_non_committed == 0 ) {
-# if 1 /*def DEBUG*/
-         fprintf(stderr, "getMBlocks: VirtualAlloc failed with: %d\n", GetLastError());
-# endif
+         fprintf(stderr, "getMBlocks: VirtualAlloc failed with: %ld\n", GetLastError());
          ret=(void*)-1;
     } else {
     /* The returned pointer is not aligned on a mega-block boundary. Make it. */
        base_mblocks = (char*)((unsigned long)base_non_committed & (unsigned long)0xfff00000) + MBLOCK_SIZE;
-# if 0
-       fprintf(stderr, "Dropping %d bytes off of 128M chunk\n", 
+#      if 0
+       fprintf(stderr, "getMBlocks: Dropping %d bytes off of 256M chunk\n", 
 	               (unsigned)base_mblocks - (unsigned)base_non_committed);
-# endif
+#      endif
 
        if ( ((char*)base_mblocks + size) > ((char*)base_non_committed + SIZE_RESERVED_POOL) ) {
-# if 1 /*def DEBUG*/
-          fprintf(stderr, "oops, committed too small a region to start with.");
-# endif
+          fprintf(stderr, "getMBlocks: oops, committed too small a region to start with.");
 	  ret=(void*)-1;
        } else {
           next_request = base_mblocks;
@@ -174,19 +168,20 @@ getMBlocks(nat n)
   if ( ret != (void*)-1 ) {
      ret = VirtualAlloc(next_request, size, MEM_COMMIT, PAGE_READWRITE);
      if (ret == NULL) {
-# if 1 /*def DEBUG*/
-        fprintf(stderr, "getMBlocks: VirtualAlloc failed with: %d\n", GetLastError());
-# endif
+        fprintf(stderr, "getMBlocks: VirtualAlloc failed with: %ld\n", GetLastError());
         ret=(void*)-1;
      }
   }
 
   if (((W_)ret & MBLOCK_MASK) != 0) {
-    barf("GetMBlock: misaligned block returned");
+    barf("getMBlocks: misaligned block returned");
   }
 
-  IF_DEBUG(gc,fprintf(stderr,"Allocated %d megablock(s) at %x\n",n,(nat)ret));
+  if (ret == (void*)-1) {
+     barf("getMBlocks: unknown memory allocation failure on Win32.");
+  }
 
+  IF_DEBUG(gc,fprintf(stderr,"Allocated %d megablock(s) at 0x%x\n",n,(nat)ret));
   next_request = (char*)next_request + size;
 
   mblocks_allocated += n;
@@ -209,9 +204,9 @@ freeMBlock(void* p, nat n)
   rc = VirtualFree(p, n * MBLOCK_SIZE , MEM_DECOMMIT );
   
   if (rc == FALSE) {
-# ifdef DEBUG
+#    ifdef DEBUG
      fprintf(stderr, "freeMBlocks: VirtualFree failed with: %d\n", GetLastError());
-# endif
+#    endif
   }
 
 }
