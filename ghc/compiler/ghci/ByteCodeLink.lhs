@@ -600,7 +600,11 @@ i_ENTER    = (bci_ENTER :: Int)
 i_RETURN   = (bci_RETURN :: Int)
 i_STKCHECK = (bci_STKCHECK :: Int)
 i_JMP      = (bci_JMP :: Int)
+#ifdef bci_CCALL
 i_CCALL    = (bci_CCALL :: Int)
+#else
+i_CCALL    = error "Sorry pal, you need to bootstrap to use i_CCALL."
+#endif
 
 iNTERP_STACK_CHECK_THRESH = (INTERP_STACK_CHECK_THRESH :: Int)
 
