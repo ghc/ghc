@@ -366,10 +366,16 @@ makeDerivEqns tycl_decls
 	   returnM (Nothing, Just (InstInfo { iDFunId = mk_dfun dfun_name,
 					      iBinds = NewTypeDerived rep_tys }))
 	else
-	   if standard_instance then
+	if standard_instance then
 		mk_eqn_help DataType tycon clas []	-- Go via bale-out route
-	   else
+	else
+	-- Non-standard instance
+	if gla_exts then
+		-- Too hard
 	   	bale_out cant_derive_err
+	else
+		-- Just complain about being a non-std instance
+		bale_out non_std_err
       where
 	-- Here is the plan for newtype derivings.  We see
 	--	  newtype T a1...an = T (t ak...an) deriving (.., C s1 .. sm, ...)
@@ -486,13 +492,17 @@ makeDerivEqns tycl_decls
 					ppr (isRecursiveTyCon tycon)
 				      ])
 
+	non_std_err = derivingThingErr clas tys tycon tyvars_to_keep
+				(vcat [non_std_why clas,
+				       ptext SLIT("Try -fglasgow-exts for GHC's newtype-deriving extension")])
+
     bale_out err = addErrTc err `thenM_` returnM (Nothing, Nothing) 
 
     ------------------------------------------------------------------
     chk_out :: Class -> TyCon -> [TcType] -> Maybe SDoc
     chk_out clas tycon tys
 	| notNull tys						        = Just ty_args_why
-	| not (getUnique clas `elem` derivableClassKeys)		= Just non_std_why
+	| not (getUnique clas `elem` derivableClassKeys)		= Just (non_std_why clas)
 	| clas `hasKey` enumClassKey    && not is_enumeration 	        = Just nullary_why
 	| clas `hasKey` boundedClassKey && not is_enumeration_or_single = Just single_nullary_why
 	| clas `hasKey` ixClassKey      && not is_enumeration_or_single = Just single_nullary_why
@@ -509,10 +519,11 @@ makeDerivEqns tycl_decls
 	    nullary_why        = quotes (ppr tycon) <+> ptext SLIT("has non-nullary constructors")
 	    no_cons_why	       = quotes (ppr tycon) <+> ptext SLIT("has no data constructors")
 	    ty_args_why	       = quotes (ppr pred) <+> ptext SLIT("is not a class")
-   	    non_std_why	       = quotes (ppr clas) <+> ptext SLIT("is not a derivable class")
 	    existential_why    = quotes (ppr tycon) <+> ptext SLIT("has existentially-quantified constructor(s)")
 
 	    pred = mkClassPred clas tys
+
+non_std_why clas = quotes (ppr clas) <+> ptext SLIT("is not a derivable class")
 
 new_dfun_name clas tycon 	-- Just a simple wrapper
   = newDFunName clas [mkTyConApp tycon []] (getSrcLoc tycon)
