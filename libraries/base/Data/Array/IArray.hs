@@ -21,6 +21,9 @@ module Data.Array.IArray (
     -- * Class of array types with immutable bounds
     HasBounds,  -- :: (* -> * -> *) -> class
 
+    -- * Ordinary boxed/lazy arrays
+    Array,    
+
     -- * The @Ix@ class and operations
     module Data.Ix,
 
@@ -50,6 +53,7 @@ module Data.Array.IArray (
 import Prelude
 
 import Data.Ix
+import Data.Array (Array)
 #ifdef __HUGS__
 import Hugs.Array.Base
 #else
