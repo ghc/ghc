@@ -335,6 +335,9 @@ sub gather_import_dirs {
               push(@Import_dirs, "${TopPwd}/hslibs/${lib}/edison/Coll");
               push(@Import_dirs, "${TopPwd}/hslibs/${lib}/edison/Seq");
 	   }
+           if ( $lib eq 'util' && ! $INSTALLING ) {
+              push(@Import_dirs, "${TopPwd}/hslibs/${lib}/check");
+	   }
 
            # Yuck ^ 3
            if ( $lib eq 'win32' && ! $INSTALLING ) {
