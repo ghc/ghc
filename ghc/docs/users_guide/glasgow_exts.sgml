@@ -3415,10 +3415,10 @@ So this too is illegal:
 <programlisting>
   class Foo a where
     op1 :: a -> Bool
-    op {| a :*: b |} (Inl x) = True
+    op1 {| a :*: b |} (x :*: y) = True
 
     op2 :: a -> Bool
-    op {| p :*: q |} (Inr y) = False
+    op2 {| p :*: q |} (x :*: y) = False
 </programlisting>
 (The reason for this restriction is that we gather all the equations for a particular type consructor
 into a single generic instance declaration.)
