@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: String.hs,v 1.3 2001/08/17 12:50:34 simonmar Exp $
+-- $Id: String.hs,v 1.4 2001/09/13 11:37:43 simonmar Exp $
 --
 -- Utilities for primitive marshaling
 --
@@ -49,8 +49,6 @@ import Foreign.Ptr
 import Data.Word
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.ByteArr
-import GHC.Pack
 import GHC.List
 import GHC.Real
 import GHC.Num
