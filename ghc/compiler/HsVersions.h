@@ -110,6 +110,10 @@ you will screw up the layout where they are used in case expressions!
 # define minInt (minBound::Int)
 # define maxInt (maxBound::Int)
 #else
+# define STATE_TOK(x)  (S# x)
+# define ST_RET(x,y)   (x,y)
+# define unsafePerformST(x) unsafePerformPrimIO(x)
+# define ST_TO_PrimIO(x) x
 # define SYN_IE(a) a(..)
 # define EXP_MODULE(a) a..
 # define IMPORT_DELOOPER(mod) import mod
