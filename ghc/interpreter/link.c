@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.10 $
- * $Date: 1999/10/29 00:53:25 $
+ * $Revision: 1.11 $
+ * $Date: 1999/11/01 11:01:11 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -102,9 +102,6 @@ Name namePmSub;
 Name namePMFail;
 Name nameEqChar;
 Name nameEqInt;
-#if !OVERLOADED_CONSTANTS
-Name nameEqInteger;
-#endif
 Name nameEqDouble;
 Name namePmInt;
 Name namePmInteger;
@@ -473,29 +470,28 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
             implementPrim(n);
         }
 
-        nameRunST         = linkName("primRunST");
+        nameRunST          = linkName("primRunST");
 
         /* static(tidyInfix)                        */
-        nameNegate        = linkName("negate");
+        nameNegate         = linkName("negate");
         /* user interface                           */
-        nameRunIO         = linkName("primRunIO");
-        namePrint         = linkName("print");
+        nameRunIO          = linkName("primRunIO");
+        namePrint          = linkName("print");
         /* desugar                                  */
-        nameOtherwise     = linkName("otherwise");
-        nameUndefined     = linkName("undefined");
+        nameOtherwise      = linkName("otherwise");
+        nameUndefined      = linkName("undefined");
         /* pmc                                      */
 #if NPLUSK                      
-        namePmSub         = linkName("primPmSub");
+        namePmSub          = linkName("primPmSub");
 #endif                          
         /* translator                               */
-        nameEqChar        = linkName("primEqChar");
-        nameEqInt         = linkName("primEqInt");
-nameCreateAdjThunk = linkName("primCreateAdjThunk");
-#if !OVERLOADED_CONSTANTS
-        nameEqInteger     = linkName("primEqInteger");
-#endif /* !OVERLOADED_CONSTANTS */
-        nameEqDouble      = linkName("primEqDouble");
-        namePmInt         = linkName("primPmInt");
+        nameEqChar         = linkName("primEqChar");
+        nameEqInt          = linkName("primEqInt");
+        nameCreateAdjThunk = linkName("primCreateAdjThunk");
+        nameEqDouble       = linkName("primEqDouble");
+        namePmInt          = linkName("primPmInt");
+        namePmInteger      = linkName("primPmInteger");
+        namePmDouble       = linkName("primPmDouble");
         name(namePmInt).inlineMe = TRUE;
     }
 }

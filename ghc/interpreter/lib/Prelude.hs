@@ -1533,8 +1533,8 @@ primPmInt n x     = fromInt n == x
 primPmInteger    :: Num a => Integer -> a -> Bool
 primPmInteger n x = fromInteger n == x
 
-primPmFlt        :: Fractional a => Double -> a -> Bool
-primPmFlt n x     = fromDouble n == x
+primPmDouble     :: Fractional a => Double -> a -> Bool
+primPmDouble n x  = fromDouble n == x
 
 -- ToDo: make the message more informative.
 primPmFail       :: a
