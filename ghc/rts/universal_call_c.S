@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1999.
  *
  * $RCSfile: universal_call_c.S,v $
- * $Revision: 1.5 $
- * $Date: 1999/10/27 11:11:11 $
+ * $Revision: 1.6 $
+ * $Date: 1999/10/27 11:55:51 $
  * ------------------------------------------------------------------------*/
 	
 #include "config.h"
@@ -81,55 +81,55 @@ universal_call_c_x86_ccall:
 	movl 16(%ebp),%edi
 	movl 8(%ebp),%ebx
 	testl %ebx,%ebx
-	jle cdocall
+	jle .Lcdocall
 	
-clooptop:
+.Lclooptop:
 	cmpb $105,(%ebx,%edi)	# 'i'
 	jne .Lc6
 	pushl (%esi,%ebx,8)
-	jmp clooptest
+	jmp .Lclooptest
 .Lc6:
 	cmpb $73,(%ebx,%edi)	# 'I'
 	jne .Lc8
 	pushl 4(%esi,%ebx,8)
 	pushl (%esi,%ebx,8)
-	jmp clooptest
+	jmp .Lclooptest
 .Lc8:
 	cmpb $102,(%ebx,%edi)	# 'f'
 	jne .Lc10
 	movl (%esi,%ebx,8),%eax
 	pushl %eax
-	jmp clooptest
+	jmp .Lclooptest
 .Lc10:
 	cmpb $70,(%ebx,%edi)	# 'F'
-	jne clooptest
+	jne .Lclooptest
 	movl 4(%esi,%ebx,8),%eax
 	movl (%esi,%ebx,8),%edx
 	pushl %eax
 	pushl %edx
-clooptest:
+.Lclooptest:
 	decl %ebx
         testl %ebx,%ebx
-	jg clooptop
+	jg .Lclooptop
 
-cdocall:	
+.Lcdocall:	
 	call *20(%ebp)
 	
 	cmpb $102,(%edi)	# 'f'
-	je cfloat32
+	je .Lcfloat32
 	cmpb $70,(%edi)		# 'F'
-	je cfloat64
-ciorI:
+	je .Lcfloat64
+.LciorI:
 	movl %eax,0(%esi)
 	movl %edx,4(%esi)
-	jmp cbye
-cfloat32:
+	jmp .Lcbye
+.Lcfloat32:
 	fstps 0(%esi)
-	jmp cbye
-cfloat64:
+	jmp .Lcbye
+.Lcfloat64:
 	fstpl 0(%esi)
-	jmp cbye	
-cbye:
+	jmp .Lcbye	
+.Lcbye:
 	leal -12(%ebp),%esp
 	popl %ebx
 	popl %esi
@@ -157,55 +157,55 @@ universal_call_c_x86_stdcall:
 	movl 16(%ebp),%edi
 	movl 8(%ebp),%ebx
 	testl %ebx,%ebx
-	jle sdocall
+	jle .Lsdocall
 	
-slooptop:
+.Lslooptop:
 	cmpb $105,(%ebx,%edi)	# 'i'
 	jne .Ls6
 	pushl (%esi,%ebx,8)
-	jmp slooptest
+	jmp .Lslooptest
 .Ls6:
 	cmpb $73,(%ebx,%edi)	# 'I'
 	jne .Ls8
 	pushl 4(%esi,%ebx,8)
 	pushl (%esi,%ebx,8)
-	jmp slooptest
+	jmp .Lslooptest
 .Ls8:
 	cmpb $102,(%ebx,%edi)	# 'f'
 	jne .Ls10
 	movl (%esi,%ebx,8),%eax
 	pushl %eax
-	jmp slooptest
+	jmp .Lslooptest
 .Ls10:
 	cmpb $70,(%ebx,%edi)	# 'F'
-	jne slooptest
+	jne .Lslooptest
 	movl 4(%esi,%ebx,8),%eax
 	movl (%esi,%ebx,8),%edx
 	pushl %eax
 	pushl %edx
-slooptest:
+.Lslooptest:
 	decl %ebx
         testl %ebx,%ebx
-	jg slooptop
+	jg .Lslooptop
 
-sdocall:	
+.Lsdocall:	
 	call *20(%ebp)
 	
 	cmpb $102,(%edi)	# 'f'
-	je sfloat32
+	je .Lsfloat32
 	cmpb $70,(%edi)		# 'F'
-	je sfloat64
-siorI:
+	je .Lsfloat64
+.LsiorI:
 	movl %eax,0(%esi)
 	movl %edx,4(%esi)
-	jmp sbye
-sfloat32:
+	jmp .Lsbye
+.Lsfloat32:
 	fstps 0(%esi)
-	jmp sbye
-sfloat64:
+	jmp .Lsbye
+.Lsfloat64:
 	fstpl 0(%esi)
-	jmp sbye	
-sbye:
+	jmp .Lsbye	
+.Lsbye:
 	## don_t clear the args -- the callee does it
 	## leal -12(%ebp),%esp
 	popl %ebx
