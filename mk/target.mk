@@ -328,7 +328,7 @@ endif
 # Remove local symbols from library objects if requested.
 #
 
-ifneq "$(StripLibraries)" ""
+ifeq "$(StripLibraries)" "YES"
 ifneq "$(filter -split-objs,$(HC_OPTS))" ""
 SRC_HC_POST_OPTS += \
   for i in $(basename $@)/*; do \
