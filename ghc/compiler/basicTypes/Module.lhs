@@ -295,10 +295,19 @@ getAllFilesMatching dirs hims (dir_path, suffix) = ( do
 	)
  where
   
-	-- Dreadfully crude.  We want a better way to distinguish
-	-- "library-ish" modules.
-   is_sys | head dir_path == '/' = LibMod
-	  | otherwise 		 = UserMod
+   is_sys | isLibraryPath dir_path = LibMod
+	  | otherwise 		   = UserMod
+
+	-- Dreadfully crude way to tell whether a module is a "library"
+	-- module or not.  The current story is simply that if path is
+	-- absolute we treat it as a library.  Specifically:
+	--	/usr/lib/ghc/
+	--	C:/usr/lib/ghc
+	--	C:\user\lib
+   isLibraryPath ('/' : _	      ) = True
+   isLibraryPath (_   : ':' : '/'  : _) = True
+   isLibraryPath (_   : ':' : '\\' : _) = True
+   isLibraryPaty other			= False
 
    xiffus	 = reverse dotted_suffix 
    dotted_suffix = case suffix of

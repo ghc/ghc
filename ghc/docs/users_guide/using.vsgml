@@ -632,6 +632,9 @@ multi-directory application, use <em>relative</em> path names in your
 Use absolute path names only for directories containing slowly-changing
 library modules.
 
+A path is considered ``absolute'' if it starts with ``@/@'', or
+``@A:/@'', or ``@A:\@'' (or ``@B:/@'', ``@B:\@'' etc).
+
 Patrick Sansom had a workshop paper about how all this is done (though
 the details have changed quite a bit).  Ask
 him (email: <htmlurl name="sansom@@dcs.gla.ac.uk"
