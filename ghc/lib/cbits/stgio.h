@@ -51,7 +51,7 @@ StgInt	fileSize    PROTO((StgForeignObj, StgByteArray));
 StgInt	flushFile   PROTO((StgForeignObj));
 
 /* freeFile.lc */
-void freeStdChannel PROTO((StgForeignObj));
+void freeStdFile PROTO((StgForeignObj));
 void freeFile PROTO((StgForeignObj));
 
 /* getBufferMode.lc */

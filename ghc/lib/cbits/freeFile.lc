@@ -8,12 +8,12 @@
 #include "rtsdefs.h"
 #include "stgio.h"
 
-/* sigh, the standard channels are handled differently,
-   we don't want them freed via the ForeignObj finaliser,
-   as we probably want to use these channels before we
-   *really* shutdown (dumping stats etc.)
+/* sigh, the FILEs attached to the standard descriptors are 
+   handled differently. We don't want them freed via the
+   ForeignObj finaliser, as we probably want to use these
+   before we *really* shut down (dumping stats etc.)
 */
-void freeStdChannel(fp)
+void freeStdFile(fp)
 StgForeignObj fp;
 { return; }
 
