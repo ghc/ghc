@@ -66,7 +66,6 @@ module CmdLineOpts (
 	opt_NumbersStrict,
 	opt_Parallel,
 	opt_SMP,
-	opt_NoMonomorphismRestriction,
 	opt_RuntimeTypes,
 
 	-- optimisation opts
@@ -286,6 +285,7 @@ data DynFlag
    | Opt_AllowOverlappingInstances
    | Opt_AllowUndecidableInstances
    | Opt_AllowIncoherentInstances
+   | Opt_NoMonomorphismRestriction
    | Opt_GlasgowExts
    | Opt_Generics
    | Opt_NoImplicitPrelude 
@@ -559,7 +559,6 @@ opt_DoTickyProfiling		= lookUp  SLIT("-fticky-ticky")
 
 -- language opts
 opt_AllStrict			= lookUp  SLIT("-fall-strict")
-opt_NoMonomorphismRestriction	= lookUp  SLIT("-fno-monomorphism-restriction")
 opt_DictsStrict			= lookUp  SLIT("-fdicts-strict")
 opt_IrrefutableTuples		= lookUp  SLIT("-firrefutable-tuples")
 opt_MaxContextReductionDepth	= lookup_def_int "-fcontext-stack" mAX_CONTEXT_REDUCTION_DEPTH

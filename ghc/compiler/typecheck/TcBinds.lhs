@@ -12,7 +12,7 @@ module TcBinds ( tcBindsAndThen, tcTopBinds,
 import {-# SOURCE #-} TcMatches ( tcGRHSs, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcExpr )
 
-import CmdLineOpts	( opt_NoMonomorphismRestriction )
+import CmdLineOpts	( DynFlag(Opt_NoMonomorphismRestriction) )
 import HsSyn		( HsExpr(..), HsBinds(..), MonoBinds(..), Sig(..), 
 			  Match(..), HsMatchContext(..), 
 			  collectMonoBinders, andMonoBinds,
@@ -412,9 +412,16 @@ is doing.
 %************************************************************************
 
 \begin{code}
-generalise binder_names mbind tau_tvs lie_req sigs
-  | not is_unrestricted 	-- RESTRICTED CASE
-  = 	-- Check signature contexts are empty 
+generalise binder_names mbind tau_tvs lie_req sigs =
+
+  -- check for -fno-monomorphism-restriction
+  doptsTc Opt_NoMonomorphismRestriction		`thenTc` \ no_MR ->
+  let is_unrestricted | no_MR 	  = True
+		      | otherwise = isUnRestrictedGroup tysig_names mbind
+  in
+
+  if not is_unrestricted then 	-- RESTRICTED CASE
+   	-- Check signature contexts are empty 
     checkTc (all is_mono_sig sigs)
 	    (restrictedBindCtxtErr binder_names)	`thenTc_`
 
@@ -427,13 +434,13 @@ generalise binder_names mbind tau_tvs lie_req sigs
 
     returnTc (qtvs, lie_free, binds, [])
 
-  | null sigs			-- UNRESTRICTED CASE, NO TYPE SIGS
-  = tcSimplifyInfer doc tau_tvs lie_req
+  else if null sigs then	-- UNRESTRICTED CASE, NO TYPE SIGS
+    tcSimplifyInfer doc tau_tvs lie_req
 
-  | otherwise			-- UNRESTRICTED CASE, WITH TYPE SIGS
-  = 	-- CHECKING CASE: Unrestricted group, there are type signatures
+  else 				-- UNRESTRICTED CASE, WITH TYPE SIGS
+   	-- CHECKING CASE: Unrestricted group, there are type signatures
 	-- Check signature contexts are empty 
-    checkSigsCtxts sigs				`thenTc` \ (sig_avails, sig_dicts) ->
+    checkSigsCtxts sigs			`thenTc` \ (sig_avails, sig_dicts) ->
     
 	-- Check that the needed dicts can be
 	-- expressed in terms of the signature ones
@@ -445,9 +452,6 @@ generalise binder_names mbind tau_tvs lie_req sigs
     returnTc (forall_tvs, lie_free, dict_binds, sig_dicts)
 
   where
-    is_unrestricted | opt_NoMonomorphismRestriction = True
-		    | otherwise			    = isUnRestrictedGroup tysig_names mbind
-
     tysig_names = [name | (TySigInfo name _ _ _ _ _ _ _) <- sigs]
     is_mono_sig (TySigInfo _ _ _ theta _ _ _ _) = null theta
 

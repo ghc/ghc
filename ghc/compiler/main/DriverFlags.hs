@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.84 2002/01/04 16:02:04 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.85 2002/01/25 10:28:14 simonmar Exp $
 --
 -- Driver flags
 --
@@ -418,6 +418,8 @@ dynamic_flags = [
 
 	-- "active negatives"
   ,  ( "fno-implicit-prelude",  NoArg (setDynFlag Opt_NoImplicitPrelude) )
+  ,  ( "fno-monomorphism-restriction",	
+			NoArg (setDynFlag Opt_NoMonomorphismRestriction) )
 
 	-- the rest of the -f* and -fno-* flags
   ,  ( "fno-", 		PrefixPred (\f -> isFFlag f) (\f -> unSetDynFlag (getFFlag f)) )
