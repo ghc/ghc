@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.4 1998/01/14 11:22:21 sof Exp $
+# 	$Id: opts.mk,v 1.5 1998/01/14 16:09:10 sof Exp $
 #
 #################################################################################
 
@@ -24,15 +24,18 @@
 #
 # P_OPTS is always defined like this:
 #
-# P_OPTS = SRC_P_OPTS WAY$(_way)_P_OPTS BUILD_P_OPTS EXTRA_P_OPTS
+# P_OPTS = SRC_P_OPTS WAY$(_way)_P_OPTS EXTRA_P_OPTS
 #
 # where the variables on the right hand side are set by the user or
 # some other Makefile.  They have the following intended uses:
 #
 #	SRC_P_OPTS		Source-tree options for P
 #	WAY$(_way)_P_OPTS	Source-tree options for P specific to $(way)
-#	BUILD_P_OPTS		Build-tree options for P
 #	EXTRA_P_OPTS		Command-line options for P
+#
+# and for some programs
+#
+#       $($*_P_OPTS)            Target specific options for P
 #
 # All these options should be set with
 #	thing += extra-options
@@ -80,9 +83,9 @@ SRC_TEXI2HTML_OPTS +=-menu -verbose -glossary
 # All the standard gluing together, as in the comment right at the front
 
 
-# For the Haskell compiler and runtests we do something a bit special:
-# we also include target-specific flags
 HC_OPTS            = $(SRC_HC_OPTS) $(WAY$(_way)_HC_OPTS) $($*_HC_OPTS) $(EXTRA_HC_OPTS)
+HC_POST            = $(SRC_HC_POST_OPTS) $(WAY$(_way)_HC_POST_OPTS) $($*_HC_POST_OPTS) $(EXTRA_HC_POST_OPTS)
+HC_PRE             = $(SRC_HC_PRE_OPTS) $(WAY$(_way)_HC_OPTS) $($*_HC_PRE_OPTS) $(EXTRA_HC_PRE_OPTS)
 
 RUNTEST_OPTS       = $(SRC_RUNTEST_OPTS) $(WAY$(_way)_RUNTEST_OPTS) \
                      $($*_RUNTEST_OPTS) $(EXTRA_RUNTEST_OPTS)
