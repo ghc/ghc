@@ -1821,7 +1821,7 @@ Invoke the 'linker' - either the standard linker or the one used to build
 a (Win32) DLL.
 
 \begin{code}
-sub runLinker()
+sub runLinker
 {
     local($libdirs) = '';
 
@@ -1944,7 +1944,7 @@ EOSCRIPT2
     }
 }
 
-sub createWin32DLL()
+sub createWin32DLL
 {
     local ($libdirs);
 
@@ -1988,7 +1988,7 @@ sub createWin32DLL()
     &run_something($to_do, 'DLL creator');
 }
 
-sub prepareWin32DllLink ()
+sub prepareWin32DllLink
 {
     local($linking_main) = @_;
 
