@@ -71,17 +71,13 @@ data BCInstr
    | PUSH_LL   Int Int{-2 offsets-}
    | PUSH_LLL  Int Int Int{-3 offsets-}
    | PUSH_G    Name
-   | PUSH_AS   Name Int	-- push alts and BCO_ptr_ret_info
+   | PUSH_AS   Name --Int	-- push alts and BCO_ptr_ret_info
 			-- Int is lit pool offset for itbl
    | PUSH_LIT  Int	-- push literal word from offset pool
    | PUSH_TAG  Int      -- push this tag on the stack
-
---   | PUSHT_I   Int
---   | PUSHT_F   Float
---  | PUSHT_D   Double
---   | PUSHU_I   Int
---   | PUSHU_F   Float
---   | PUSHU_D   Double
+   | PUSHU_I   Int	-- push this int, NO TAG, on the stack
+   | PUSHU_F   Float	-- ... float ...
+   | PUSHU_D   Double	-- ... double ...
    | SLIDE     Int{-this many-} Int{-down by this much-}
    -- To do with the heap
    | ALLOC     Int	-- make an AP_UPD with this many payload words, zeroed
@@ -115,7 +111,7 @@ instance Outputable BCInstr where
    ppr (PUSH_LLL o1 o2 o3)   = text "PUSH_LLL" <+> int o1 <+> int o2 <+> int o3
    ppr (PUSH_G nm)           = text "PUSH_G  " <+> ppr nm
    ppr (PUSH_AS nm)          = text "PUSH_AS " <+> ppr nm
-   ppr (PUSHT_I i)           = text "PUSHT_I " <+> int i
+   ppr (PUSHU_I i)           = text "PUSHU_I " <+> int i
    ppr (SLIDE n d)           = text "SLIDE   " <+> int n <+> int d
    ppr (ALLOC sz)            = text "ALLOC   " <+> int sz
    ppr (MKAP offset sz)      = text "MKAP    " <+> int offset <+> int sz
@@ -457,10 +453,8 @@ pushAtom tagged d p (AnnVar v)
          result
 
 pushAtom True d p (AnnLit lit)
-   = case lit of
-        MachInt i    -> (unitOL (PUSHT_I (fromInteger i)),  taggedSizeW IntRep)
-        MachFloat r  -> (unitOL (PUSHT_F (fromRational r)), taggedSizeW FloatRep)
-        MachDouble r -> (unitOL (PUSHT_D (fromRational r)), taggedSizeW DoubleRep)
+   = let (ubx_code, ubx_size) = pushAtom False d p (AnnLit lit)
+     in  (ubx_code `snocOL` PUSH_TAG ubx_size, 1 + ubx_size)
 
 pushAtom False d p (AnnLit lit)
    = case lit of
@@ -748,9 +742,6 @@ mkBits findLabel r_is n_is r_lits n_lits r_ptrs n_ptrs (instr:instrs)
         PUSH_LL   o1 o2    -> boring3 i_PUSH_LL o1 o2
         PUSH_LLL  o1 o2 o3 -> boring4 i_PUSH_LLL o1 o2 o3
         PUSH_G    nm       -> exciting2_P i_PUSH_G n_ptrs nm
-        PUSHT_I   i        -> exciting2_I i_PUSHT_I n_lits i
-        PUSHT_F   f        -> exciting2_F i_PUSHT_F n_lits f
-        PUSHT_D   d        -> exciting2_D i_PUSHT_D n_lits d
         PUSHU_I   i        -> exciting2_I i_PUSHU_I n_lits i
         PUSHU_F   f        -> exciting2_F i_PUSHU_F n_lits f
         PUSHU_D   d        -> exciting2_D i_PUSHU_D n_lits d
@@ -844,9 +835,6 @@ instrSizeB instr
         PUSH_LL  _ _   -> 6
         PUSH_LLL _ _ _ -> 8
         PUSH_G   _     -> 4
-        PUSHT_I  _     -> 4
-        PUSHT_F  _     -> 4
-        PUSHT_D  _     -> 4
         PUSHU_I  _     -> 4
         PUSHU_F  _     -> 4
         PUSHU_D  _     -> 4
