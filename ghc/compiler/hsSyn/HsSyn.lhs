@@ -32,7 +32,7 @@ module HsSyn (
 -- friends:
 import HsBinds
 import HsDecls		( HsDecl(..), TyDecl(..), InstDecl(..), ClassDecl(..), 
-			  DefaultDecl(..), 
+			  DefaultDecl(..), ForeignDecl(..), ExtName(..), isDynamic,
 			  FixityDecl(..), 
 			  ConDecl(..), ConDetails(..), BangType(..),
 			  IfaceSig(..), HsIdInfo,  SpecDataSig(..), 
