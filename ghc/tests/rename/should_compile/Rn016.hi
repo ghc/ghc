@@ -1,6 +1,6 @@
-_interface_ Rn016 1 302
+_interface_ Rn016 1 400
 _exports_
-Rn016 K(op1 op2);
+Rn016 K{op1 op2};
 _instances_
 instance {K PrelBase.Int} = $d1;
 instance {K PrelBase.Bool} = $d2;

@@ -1,8 +1,5 @@
 ghc: module version changed to 1; reason: no old .hi file
 _exports_
-ShouldSucceed AList(Node Other);
-_instances_
-instance _forall_ [a] => {PrelBase.Eval (AList a)} = $dEvalAList0;
+ShouldSucceed AList{Node Other};
 _declarations_
-1 $dEvalAList0 _:_ _forall_ [a] => {PrelBase.Eval (AList a)} ;;
-1 data AList b = Node b [b] |  Other (b, PrelBase.Char) ;
+1 data AList $r3u = Node $r3u [$r3u] |  Other ($r3u, PrelBase.Char) ;

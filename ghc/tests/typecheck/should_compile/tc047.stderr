@@ -2,7 +2,7 @@ ghc: module version changed to 1; reason: no old .hi file
 _exports_
 ShouldSucceed f mp sd OL;
 _declarations_
-1 f _:_ _forall_ [a b c] => a -> [(b, c)] -> [c] ;;
-1 mp _:_ _forall_ [a b] => (a -> b) -> [a] -> [b] ;;
-1 sd _:_ _forall_ [a b] => (a, b) -> b ;;
-1 type OL a = [a] ;
+1 f _:_ _forall_ [$a $b $c] => $a -> [($b, $c)] -> [$c] ;;
+1 mp _:_ _forall_ [$a $b] => ($a -> $b) -> [$a] -> [$b] ;;
+1 sd _:_ _forall_ [$a $b] => ($a, $b) -> $b ;;
+1 type OL $r3K = [$r3K] ;

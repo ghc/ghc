@@ -1,12 +1,7 @@
 ghc: module version changed to 1; reason: no old .hi file
 _exports_
-ShouldSucceed F Twine(Twine2) Twist(Twist2);
-_instances_
-instance {PrelBase.Eval Twine} = $dEvalTwine0;
-instance {PrelBase.Eval Twist} = $dEvalTwist0;
+ShouldSucceed F Twine{Twine2} Twist{Twist2};
 _declarations_
-1 $dEvalTwine0 _:_ {PrelBase.Eval Twine} ;;
-1 $dEvalTwist0 _:_ {PrelBase.Eval Twist} ;;
 1 data Twine = Twine2 Twist ;
 1 data Twist = Twist2 Twine ;
 1 type F = Twine ;

@@ -1,14 +1,12 @@
  
 tcfail008.hs:3:
-    Ambiguous type variable(s)
-    `aN4'
-	in the constraint `Num [aN4]'
+    Ambiguous type variable(s) `$0'
+	in the constraint `Num [$0]'
 	arising from the literal `2' at tcfail008.hs:3
  
 tcfail008.hs:3:
-    Ambiguous type variable(s)
-    `aN4'
-	in the constraint `Num aN4'
+    Ambiguous type variable(s) `$0'
+	in the constraint `Num $0'
 	arising from the literal `1' at tcfail008.hs:3
 
 

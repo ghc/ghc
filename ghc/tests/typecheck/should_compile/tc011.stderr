@@ -2,4 +2,4 @@ ghc: module version changed to 1; reason: no old .hi file
 _exports_
 ShouldSucceed x;
 _declarations_
-1 x _:_ _forall_ [a] => a ;;
+1 x _:_ _forall_ [$a] => $a ;;

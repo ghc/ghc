@@ -2,6 +2,6 @@ ghc: module version changed to 1; reason: no old .hi file
 _exports_
 ShouldSucceed init_last merge sort;
 _declarations_
-1 init_last _:_ _forall_ [a] => [a] -> PrelBase.Int -> ([a], [a]) ;;
-1 merge _:_ _forall_ [a] {PrelBase.Ord a} => [a] -> [a] -> [a] ;;
-1 sort _:_ _forall_ [a] {PrelBase.Ord a} => [a] -> [a] ;;
+1 init_last _:_ _forall_ [$a] => [$a] -> PrelBase.Int -> ([$a], [$a]) ;;
+1 merge _:_ _forall_ [$a] {PrelBase.Ord $a} => [$a] -> [$a] -> [$a] ;;
+1 sort _:_ _forall_ [$a] {PrelBase.Ord $a} => [$a] -> [$a] ;;

@@ -1,9 +1,9 @@
 ghc: module version changed to 1; reason: no old .hi file
 _exports_
-ShouldSucceed f H(:H :H op1);
+ShouldSucceed f H{:H :H op1};
 _instances_
 instance {H PrelBase.Bool} = $dHBool0;
 _declarations_
 1 $dHBool0 _:_ {H PrelBase.Bool} ;;
-1 class H a where {op1 :: a -> a -> a} ;
+1 class H $r3F where {op1 :: $r3F -> $r3F -> $r3F} ;
 1 f _:_ PrelBase.Bool -> PrelBase.Int -> PrelBase.Bool ;;

@@ -1,12 +1,12 @@
  
 tcfail073.hs:3:
     Duplicate or overlapping instance declarations
-	for `Eq (a, b)' at PrelTup.hi:11 and tcfail073.hs:8
+	for `Eq ($a, $b)' at PrelTup.hi:14 and tcfail073.hs:8
  
 tcfail073.hs:8:
     Could not deduce `Eq a'
 	(arising from use of `==' at tcfail073.hs:8)
-	from the context (Eq (a, b), /= at (a, b), == at (a, b))
+	from the context (Eq (a, b), /= at [(a, b)], == at [(a, b)])
     Probable cause: missing `Eq a' in instance declaration context
     When checking the methods of an instance declaration
 

@@ -53,12 +53,12 @@ tcfail036.hs:3:
 	for `Num NUM' at tcfail036.hs:8 and tcfail036.hs:7
  
 tcfail036.hs:8:
-    No instance for `Eq NUM'
-	(arising from an instance declaration at tcfail036.hs:8)
+    No instance for `Show NUM'
+	arising from an instance declaration at tcfail036.hs:8
  
 tcfail036.hs:8:
-    No instance for `Show NUM'
-	(arising from an instance declaration at tcfail036.hs:8)
+    No instance for `Eq NUM'
+	arising from an instance declaration at tcfail036.hs:8
 
 
 Compilation had errors

@@ -1,12 +1,12 @@
 ghc: module version changed to 1; reason: no old .hi file
 _exports_
-ShouldSucceed f A(:A :A op1) B(:B :B op2);
+ShouldSucceed f A{:A :A op1} B{:B :B op2};
 _instances_
 instance {A PrelBase.Int} = $dAInt0;
-instance _forall_ [a] {B a} => {B [a]} = $dB0;
+instance _forall_ [$a] {B $a} => {B [$a]} = $dB0;
 _declarations_
 1 $dAInt0 _:_ {A PrelBase.Int} ;;
-1 $dB0 _:_ _forall_ [a] {B a} => {B [a]} ;;
-1 class A a where {op1 :: a} ;
-1 class B b where {op2 :: b -> PrelBase.Int} ;
-1 f _:_ _forall_ [a b] {A b} => a -> b ;;
+1 $dB0 _:_ _forall_ [$a] {B $a} => {B [$a]} ;;
+1 class A $r3P where {op1 :: $r3P} ;
+1 class B $r3K where {op2 :: $r3K -> PrelBase.Int} ;
+1 f _:_ _forall_ [$a $b] {A $b} => $a -> $b ;;

@@ -18,7 +18,7 @@ toOrderedList q		=  case splitMin q of
 insertMany x q		=  foldr insert q x
 pqSort q x		=  toOrderedList (insertMany x q)
 
-check			:: (PriorityQueue q) => (Ord a => q a) -> IO ()
+check			:: forall q. (PriorityQueue q) => (forall a. Ord a => q a) -> IO ()
 check empty		=  do
     putStr "*** sorting\n"
     out (pqSort empty [1 .. 99])

@@ -1,9 +1,9 @@
  
 tcfail002.hs:4:
-    Occurs check: cannot construct the infinite type: aq7 = [aq7]
-    Expected: aq7
-    Inferred: [aq7]
-    In an equation for function `c': c z = z
+    Occurs check: cannot construct the infinite type: $0 = [$0]
+	Expected type: $0
+	Inferred type: [$0]
+    In the right-hand side of an equation for `c': z
 
 
 Compilation had errors

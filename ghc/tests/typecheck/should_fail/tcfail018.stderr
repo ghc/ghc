@@ -1,8 +1,7 @@
  
 tcfail018.hs:5:
-    Ambiguous type variable(s)
-    `aN7'
-	in the constraint `Num [aN7]'
+    Ambiguous type variable(s) `$0'
+	in the constraint `Num [$0]'
 	arising from the literal `1' at tcfail018.hs:5
 
 

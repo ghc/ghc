@@ -1,11 +1,11 @@
 ghc: module version changed to 1; reason: no old .hi file
 _exports_
-ShouldSucceed f Eq'(:Eq' :Eq' deq);
+ShouldSucceed f Eq'{:Eq' :Eq' deq};
 _instances_
-instance _forall_ [a] {Eq' a} => {Eq' [a]} = $dEq'0;
+instance _forall_ [$a] {Eq' $a} => {Eq' [$a]} = $dEq'0;
 instance {Eq' PrelBase.Int} = $dEq'Int0;
 _declarations_
-1 $dEq'0 _:_ _forall_ [a] {Eq' a} => {Eq' [a]} ;;
+1 $dEq'0 _:_ _forall_ [$a] {Eq' $a} => {Eq' [$a]} ;;
 1 $dEq'Int0 _:_ {Eq' PrelBase.Int} ;;
-1 class Eq' a where {deq :: a -> a -> PrelBase.Bool} ;
-1 f _:_ _forall_ [a] {Eq' [a], PrelBase.Num a} => [a] -> PrelBase.Bool ;;
+1 class Eq' $r3K where {deq :: $r3K -> $r3K -> PrelBase.Bool} ;
+1 f _:_ _forall_ [$a] {PrelBase.Num $a, Eq' [$a]} => [$a] -> PrelBase.Bool ;;

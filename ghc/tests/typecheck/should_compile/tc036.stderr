@@ -1,5 +1,5 @@
 ghc: module version changed to 1; reason: no old .hi file
 _exports_
-ShouldSucceed A(:A :A op1);
+ShouldSucceed A{:A :A op1};
 _declarations_
-1 class {PrelBase.Eq a} => A a where {op1 :: a -> a} ;
+1 class {PrelBase.Eq $r3t}  => A $r3t where {op1 :: $r3t -> $r3t} ;

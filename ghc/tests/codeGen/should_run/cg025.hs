@@ -17,4 +17,4 @@ main = do
     file_cts <- readFile (head args)
     hPutStr  stderr file_cts
     trace "hello, trace" $
-      catch (getEnv "__WURBLE__" >> return ()) (\ e -> error "hello, error\n")
+      catch (getEnv "__WURBLE__" >> return ()) (\ e -> error "hello, error")

@@ -1,8 +1,7 @@
  
 cc001.hs:5:
-    Ambiguous type variable(s)
-    `aQf'
-	in the constraint `PrelGHC.CCallable aQf'
+    Ambiguous type variable(s) `$0'
+	in the constraint `PrelGHC.CCallable $0'
 	arising from an argument in the _ccall_ to `foo', namely `(undefined ())' at cc001.hs:5
 
 

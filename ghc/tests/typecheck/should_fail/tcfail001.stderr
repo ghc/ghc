@@ -1,12 +1,12 @@
  
 tcfail001.hs:9: Warning:
-    Duplicated class assertion `A a' in the context: (A a, A a)
+    Duplicate class assertion `A a' in the context: (A a, A a) =>
 
  
 tcfail001.hs:9:
-    Couldn't match the type `[a]' against `aqv -> aqw'
-    Expected: [a]
-    Inferred: aqv -> aqw
+    Couldn't match `[a]' against `$0 -> $1'
+	Expected type: [a]
+	Inferred type: $0 -> $1
     In an equation for function `op': op [] = []
     In the definition for method `op'
 

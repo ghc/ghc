@@ -1,9 +1,9 @@
  
 tcfail012.hs:3:
-    Couldn't match the type `Bool' against `[apR]'
-    Expected: Bool
-    Inferred: [apR]
-    In a pattern binding: True = []
+    Couldn't match `Bool' against `[$0]'
+	Expected type: Bool
+	Inferred type: [$0]
+    In the right-hand side of a pattern binding: []
 
 
 Compilation had errors

@@ -1,22 +1,22 @@
 ghc: module version changed to 1; reason: no old .hi file
 _exports_
-ShouldSucceed charToInt lines' seperatedBy span' strToInt whiteSpace Parse(:Parse :Parse forced parse parseType parseLine parseFile);
+ShouldSucceed charToInt lines' seperatedBy span' strToInt whiteSpace Parse{:Parse :Parse forced parse parseType parseLine parseFile};
 _instances_
-instance _forall_ [a] {Parse a} => {Parse [a]} = $dParse0;
+instance _forall_ [$a] {Parse $a} => {Parse [$a]} = $dParse0;
 instance {Parse PrelBase.Char} = $dParseChar0;
 instance {Parse PrelBase.Int} = $dParseInt0;
 _declarations_
-1 $dParse0 _:_ _forall_ [a] {Parse a} => {Parse [a]} ;;
+1 $dParse0 _:_ _forall_ [$a] {Parse $a} => {Parse [$a]} ;;
 1 $dParseChar0 _:_ {Parse PrelBase.Char} ;;
 1 $dParseInt0 _:_ {Parse PrelBase.Int} ;;
-1 $mforced _:_ _forall_ [a] {Parse a} => a -> PrelBase.Bool ;;
-1 $mparse _:_ _forall_ [a] {Parse a} => PrelBase.String -> (a, PrelBase.String) ;;
-1 $mparseFile _:_ _forall_ [a] {Parse a} => PrelBase.String -> [a] ;;
-1 $mparseLine _:_ _forall_ [a] {Parse a} => PrelBase.String -> a ;;
+1 $mforced _:_ _forall_ [$a] {Parse $a} => $a -> PrelBase.Bool ;;
+1 $mparse _:_ _forall_ [$a] {Parse $a} => PrelBase.String -> ($a, PrelBase.String) ;;
+1 $mparseFile _:_ _forall_ [$a] {Parse $a} => PrelBase.String -> [$a] ;;
+1 $mparseLine _:_ _forall_ [$a] {Parse $a} => PrelBase.String -> $a ;;
 1 charToInt _:_ PrelBase.Char -> PrelBase.Int ;;
-1 class Parse a where {forced = :: a -> PrelBase.Bool; parse = :: PrelBase.String -> (a, PrelBase.String); parseType :: PrelBase.String -> (a, PrelBase.String); parseLine = :: PrelBase.String -> a; parseFile = :: PrelBase.String -> [a]} ;
+1 class Parse $r5B where {forced = :: $r5B -> PrelBase.Bool; parse = :: PrelBase.String -> ($r5B, PrelBase.String); parseType :: PrelBase.String -> ($r5B, PrelBase.String); parseLine = :: PrelBase.String -> $r5B; parseFile = :: PrelBase.String -> [$r5B]} ;
 1 lines' _:_ [PrelBase.Char] -> [[PrelBase.Char]] ;;
 1 seperatedBy _:_ PrelBase.Char -> PrelBase.String -> [PrelBase.String] ;;
-1 span' _:_ _forall_ [a] => (a -> PrelBase.Bool) -> [a] -> ([a], [a]) ;;
+1 span' _:_ _forall_ [$a] => ($a -> PrelBase.Bool) -> [$a] -> ([$a], [$a]) ;;
 1 strToInt _:_ PrelBase.String -> PrelBase.Int ;;
 1 whiteSpace _:_ PrelBase.String -> PrelBase.String ;;

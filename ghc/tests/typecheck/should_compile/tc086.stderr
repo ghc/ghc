@@ -2,8 +2,8 @@ ghc: module version changed to 1; reason: no old .hi file
 _exports_
 ShouldSucceed Group Ring;
 _declarations_
-1 $m* _:_ _forall_ [a] {Ring a} => a -> a -> a ;;
-1 $mone _:_ _forall_ [a] {Group a} => a ;;
-1 $mzero _:_ _forall_ [a] {Group a} => a ;;
-1 class Group a where {one = :: a; zero = :: a; - :: a -> a -> a; + :: a -> a -> a; fromInteger :: PrelBase.Integer -> a; compare :: a -> a -> PrelBase.Ordering} ;
-1 class {Group a} => Ring a where {* = :: a -> a -> a} ;
+1 $m* _:_ _forall_ [$a] {Ring $a} => $a -> $a -> $a ;;
+1 $mone _:_ _forall_ [$a] {Group $a} => $a ;;
+1 $mzero _:_ _forall_ [$a] {Group $a} => $a ;;
+1 class Group $r7i where {one = :: $r7i; zero = :: $r7i; - :: $r7i -> $r7i -> $r7i; + :: $r7i -> $r7i -> $r7i; fromInteger :: PrelBase.Integer -> $r7i; compare :: $r7i -> $r7i -> PrelBase.Ordering} ;
+1 class {Group $r6Z}  => Ring $r6Z where {* = :: $r6Z -> $r6Z -> $r6Z} ;

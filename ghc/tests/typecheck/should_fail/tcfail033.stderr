@@ -1,9 +1,9 @@
  
 tcfail033.hs:4:
-    Occurs check: cannot construct the infinite type: aMq = (aMq, aMt)
-    Expected: aMu (aMq, aMt)
-    Inferred: aMu aMq
-    In a pattern binding: buglet = [x | (x, y) <- buglet]
+    Occurs check: cannot construct the infinite type: $0 = ($0, $1)
+	Expected type: ($0, $1)
+	Inferred type: $0
+    In a list-comprehension qualifier: return x
 
 
 Compilation had errors

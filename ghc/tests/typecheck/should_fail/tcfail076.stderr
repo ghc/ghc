@@ -1,13 +1,13 @@
  
-tcfail076.hs:20:
-    A type signature is more polymorphic than the inferred type
-	Can't for-all the type variable(s) `aO3'
-	in the type `(aNZ -> aNX aO3) -> aNX aO3'
+tcfail076.hs:18:
+    Inferred type is less polymorphic than expected
+	Quantified type variable `res' escapes; i.e. unifies with something more global
+    When checking the type signature for an expression
+	Signature: (a -> m res1) -> m res1
+	Inferred:  (a -> m res) -> m res
     In the first argument of `KContT', namely `(\ cont' -> cont a)'
-    In the first argument of `f', namely
-	`(\ a -> KContT (\ cont' -> cont a))'
-    In the first argument of `unKContT', namely
-	`(f (\ a -> KContT (\ cont' -> cont a)))'
+    In the right-hand side of a lambda abstraction:
+	KContT (\ cont' -> cont a)
 
 
 Compilation had errors

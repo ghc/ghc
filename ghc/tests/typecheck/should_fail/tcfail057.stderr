@@ -1,7 +1,7 @@
  
 tcfail057.hs:5:
     Class used as a type constructor: RealFrac
-    In the type `_forall_ [a] => RealFrac a -> a -> a'
+    In the type `forall a. RealFrac a -> a -> a'
 
 
 Compilation had errors

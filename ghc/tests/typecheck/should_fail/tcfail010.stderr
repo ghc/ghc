@@ -1,9 +1,8 @@
  
 tcfail010.hs:3:
-    Ambiguous type variable(s)
-    `aNe'
-	in the constraint `Num [aNe]'
-	arising from the literal `2' at tcfail010.hs:3
+    Ambiguous type variable(s) `$0'
+	in the constraint `Num [$0]'
+	arising from use of `+' at tcfail010.hs:3
 
 
 Compilation had errors

@@ -1,5 +1,3 @@
 ghc: module version changed to 1; reason: no old .hi file
 _exports_
-ShouldSucceed area2 Point2(Point2);
-_instances_
-instance _forall_ [a] => {PrelBase.Eval (Point2 a)} = $dEvalPoint20;
+ShouldSucceed area2 Point2{Point2};

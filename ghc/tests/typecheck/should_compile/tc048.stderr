@@ -1,18 +1,11 @@
 ghc: module version changed to 1; reason: no old .hi file
 _exports_
-ShouldSucceed mAp ranAFE ranOAL sNd AFE(MkAFE) FG(MkFG) OL(MkOL);
-_instances_
-instance _forall_ [a b c] => {PrelBase.Eval (AFE a b c)} = $dEvalAFE0;
-instance _forall_ [a b] => {PrelBase.Eval (FG a b)} = $dEvalFG0;
-instance _forall_ [a] => {PrelBase.Eval (OL a)} = $dEvalOL0;
+ShouldSucceed mAp ranAFE ranOAL sNd AFE{MkAFE} FG{MkFG} OL{MkOL};
 _declarations_
-1 $dEvalAFE0 _:_ _forall_ [a b c] => {PrelBase.Eval (AFE a b c)} ;;
-1 $dEvalFG0 _:_ _forall_ [a b] => {PrelBase.Eval (FG a b)} ;;
-1 $dEvalOL0 _:_ _forall_ [a] => {PrelBase.Eval (OL a)} ;;
-1 data AFE n a b = MkAFE (OL (n, FG a b)) ;
-1 data FG a b = MkFG (OL (a, b)) ;
-1 data OL a = MkOL [a] ;
-1 mAp _:_ _forall_ [a b] => (a -> b) -> [a] -> [b] ;;
-1 ranAFE _:_ _forall_ [a b c] => AFE a b c -> [FG b c] ;;
-1 ranOAL _:_ _forall_ [a b] => OL (a, b) -> [b] ;;
-1 sNd _:_ _forall_ [a b] => (a, b) -> b ;;
+1 data AFE $r3X $r3Y $r3Z = MkAFE (OL ($r3X, FG $r3Y $r3Z)) ;
+1 data FG $r42 $r43 = MkFG (OL ($r42, $r43)) ;
+1 data OL $r46 = MkOL [$r46] ;
+1 mAp _:_ _forall_ [$a $b] => ($a -> $b) -> [$a] -> [$b] ;;
+1 ranAFE _:_ _forall_ [$a $b $c] => AFE $a $b $c -> [FG $b $c] ;;
+1 ranOAL _:_ _forall_ [$a $b] => OL ($a, $b) -> [$b] ;;
+1 sNd _:_ _forall_ [$a $b] => ($a, $b) -> $b ;;

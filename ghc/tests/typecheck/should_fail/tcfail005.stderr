@@ -1,9 +1,9 @@
  
 tcfail005.hs:3:
-    Couldn't match the type `[a12u]' against `(a12y, a12A)'
-    Expected: [a12u]
-    Inferred: (a12y, a12A)
-    In a pattern binding: (h : i) = (1, ('a'))
+    Couldn't match `[$0]' against `($1, $2)'
+	Expected type: [$0]
+	Inferred type: ($1, $2)
+    In the right-hand side of a pattern binding: (1, 'a')
 
 
 Compilation had errors

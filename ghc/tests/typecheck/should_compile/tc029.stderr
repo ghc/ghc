@@ -1,9 +1,6 @@
 ghc: module version changed to 1; reason: no old .hi file
 _exports_
-ShouldSucceed G K(H M);
-_instances_
-instance {PrelBase.Eval K} = $dEvalK0;
+ShouldSucceed G K{H M};
 _declarations_
-1 $dEvalK0 _:_ {PrelBase.Eval K} ;;
 1 data K = H PrelBase.Bool |  M G ;
 1 type G = [PrelBase.Int] ;

@@ -1,71 +1,46 @@
  
 tcfail068.hs:45:
-    A type signature is more polymorphic than the inferred type
-	Can't for-all the type variable(s) `a1jV'
-	in the type `ST a1jV a1jR'
+    Inferred type is less polymorphic than expected
+	Quantified type variable `$a' escapes; i.e. unifies with something more global
+    When checking the type signature for an expression
+	Signature: ST $b $a1
+	Inferred:  ST $a (c, IndTree $a b)
     In the first argument of `runST', namely `(itrapstate' i k s)'
-    In an equation for function `itrapstate':
-	itrapstate ((i, k), (j, l)) f c d s arr
-		   = runST (itrapstate' i k s)
-		   where
-		       itrapstatesnd i k s
-				     = if i > j then
-					   return (s, (arr))
-				       else
-					   ((readArray arr (i, (k)))
-					    >>= (\ val
-						   -> let (newstate, newval) = f (c (i, (k)) s) val
-						      in (...) >> (...)))
-		       itrapstate' i k s
-				   = if k > l then
-					 return (s, (arr))
-				     else
-					 ((itrapstatesnd i k s)
-					  >>= (\ (s, arr) -> itrapstate' i (k + 1) s))
+    In the right-hand side of an equation for `itrapstate':
+	runST (itrapstate' i k s)
  
 tcfail068.hs:32:
-    A type signature is more polymorphic than the inferred type
-	Can't for-all the type variable(s) `a1mG'
-	in the type `ST a1mG a1mC'
+    Inferred type is less polymorphic than expected
+	Quantified type variable `$a' escapes; i.e. unifies with something more global
+    When checking the type signature for an expression
+	Signature: ST $b $a1
+	Inferred:  ST $a (IndTree $a a)
     In the first argument of `runST', namely `(itrap' i k)'
-    In an equation for function `itrap':
-	itrap ((i, k), (j, l)) f arr
-	      = runST (itrap' i k)
-	      where
-		  itrapsnd i k
-			   = if i > j then
-				 return arr
-			     else
-				 ((readArray arr (i, (k)))
-				  >>= (\ val
-					 -> (writeArray arr (i, (k)) (f val))
-					    >> (itrapsnd (... + 1) k)))
-		  itrap' i k
-			 = if k > l then
-			       return arr
-			   else
-			       ((itrapsnd i k) >> (itrap' i (k + 1)))
+    In the right-hand side of an equation for `itrap':
+	runST (itrap' i k)
  
 tcfail068.hs:21:
-    A type signature is more polymorphic than the inferred type
-	Can't for-all the type variable(s) `a1nb'
-	in the type `ST a1nb a1n1'
+    Inferred type is less polymorphic than expected
+	Quantified type variable `$a' escapes; i.e. unifies with something more global
+    When checking the type signature for an expression
+	Signature: ST $b $a1
+	Inferred:  ST $a (IndTree $a a)
     In the first argument of `runST', namely
 	`((readArray arr i)
 	  >>= (\ val -> (writeArray arr i (f val)) >> (return arr)))'
-    In an equation for function `itiap':
-	itiap i f arr
-	      = runST ((readArray arr i)
-		       >>= (\ val -> (writeArray arr i (f val)) >> (return arr)))
+    In the right-hand side of an equation for `itiap':
+	runST ((readArray arr i)
+	       >>= (\ val -> (writeArray arr i (f val)) >> (return arr)))
  
 tcfail068.hs:14:
-    A type signature is more polymorphic than the inferred type
-	Can't for-all the type variable(s) `a1ob'
-	in the type `ST a1ob a1o7'
-    In the first argument of `runST', namely
-	`(newArray ((1, (1)), (n)) x)'
-    In an equation for function `itgen':
-	itgen n x = runST (newArray ((1, (1)), (n)) x)
+    Inferred type is less polymorphic than expected
+	Quantified type variable `$c' escapes; i.e. unifies with something more global
+    When checking the type signature for an expression
+	Signature: ST $b $a
+	Inferred:  ST $c (IndTree $c $b1)
+    In the first argument of `runST', namely `(newArray ((1, 1), n) x)'
+    In the right-hand side of an equation for `itgen':
+	runST (newArray ((1, 1), n) x)
 
 
 Compilation had errors

@@ -11,9 +11,7 @@ Needless to say that it uses some of GHC's arcane type extensions.
 
 module ShouldFail where
 
-import GlaExts ( All )
-
-data ContT m a		=  KContT ((All res) => (a -> m res) -> m res)
+data ContT m a		=  KContT (forall res. (a -> m res) -> m res)
 unKContT (KContT x)	=  x
 
 callcc			:: ((a -> ContT m b) -> ContT m a) -> ContT m a

@@ -1,14 +1,12 @@
 ghc: module version changed to 1; reason: no old .hi file
 _exports_
-ShouldSucceed g Reps(:Reps :Reps f) X(Tag);
+ShouldSucceed g Reps{:Reps :Reps f} X{Tag};
 _instances_
-instance _forall_ [a] => {PrelBase.Eval (X a)} = $dEvalX0;
 instance {Reps PrelBase.Bool} = $dRepsBool0;
-instance _forall_ [a] => {Reps (X a)} = $dRepsX0;
+instance _forall_ [$a] => {Reps (X $a)} = $dRepsX0;
 _declarations_
-1 $dEvalX0 _:_ _forall_ [a] => {PrelBase.Eval (X a)} ;;
 1 $dRepsBool0 _:_ {Reps PrelBase.Bool} ;;
-1 $dRepsX0 _:_ _forall_ [a] => {Reps (X a)} ;;
-1 class Reps r where {f :: r -> r -> r} ;
-1 data X a = Tag a ;
-1 g _:_ _forall_ [a] {Reps a} => a -> a ;;
+1 $dRepsX0 _:_ _forall_ [$a] => {Reps (X $a)} ;;
+1 class Reps $r3L where {f :: $r3L -> $r3L -> $r3L} ;
+1 data X $r3O = Tag $r3O ;
+1 g _:_ _forall_ [$a] {Reps $a} => $a -> $a ;;

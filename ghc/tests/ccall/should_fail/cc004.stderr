@@ -1,11 +1,11 @@
  
 cc004.hs:2:
     Cannot generalise these overloadings (in a _ccall_):
-	`PrelGHC.CReturnable aSE' arising from the result of the _ccall_ to `f' at cc004.hs:18
+	`PrelGHC.CReturnable $ren' arising from the result of the _ccall_ to `f' at cc004.hs:18
  
 cc004.hs:2:
     Cannot generalise these overloadings (in a _ccall_):
-	`PrelGHC.CReturnable aTM' arising from the result of the _ccall_ to `f' at cc004.hs:11
+	`PrelGHC.CReturnable a' arising from the result of the _ccall_ to `f' at cc004.hs:11
 
 
 Compilation had errors

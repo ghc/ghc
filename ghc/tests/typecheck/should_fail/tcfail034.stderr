@@ -2,7 +2,7 @@
 tcfail034.hs:17:
     Could not deduce `Integral a'
 	(arising from use of `mod' at tcfail034.hs:17)
-	from the context (Num a, Eq a, test at a)
+	from the context (Num a, Eq a, test at [a])
     Probable cause: missing `Integral a' in type signature for `test'
     When checking the type signature(s) for `test'
 

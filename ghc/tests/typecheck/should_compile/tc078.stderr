@@ -5,13 +5,11 @@ tc078.hs:7: Warning:
 
 ghc: module version changed to 1; reason: no old .hi file
 _exports_
-ShouldFail Bar(MkBar);
+ShouldFail Bar{MkBar};
 _instances_
-instance _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (Bar a)} = $dEqBar0;
-instance _forall_ [a] => {PrelBase.Eval (Bar a)} = $dEvalBar0;
-instance _forall_ [a] {PrelBase.Ord a} => {PrelBase.Ord (Bar a)} = $dOrdBar0;
+instance _forall_ [$a] {PrelBase.Eq $a} => {PrelBase.Eq (Bar $a)} = $dEqBar0;
+instance _forall_ [$a] {PrelBase.Ord $a} => {PrelBase.Ord (Bar $a)} = $dOrdBar0;
 _declarations_
-1 $dEqBar0 _:_ _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (Bar a)} ;;
-1 $dEvalBar0 _:_ _forall_ [a] => {PrelBase.Eval (Bar a)} ;;
-1 $dOrdBar0 _:_ _forall_ [a] {PrelBase.Ord a, PrelBase.Eq (Bar a)} => {PrelBase.Ord (Bar a)} ;;
-1 data Bar a = MkBar PrelBase.Int a ;
+1 $dEqBar0 _:_ _forall_ [$a] {PrelBase.Eq $a} => {PrelBase.Eq (Bar $a)} ;;
+1 $dOrdBar0 _:_ _forall_ [$a] {PrelBase.Ord $a, PrelBase.Eq (Bar $a)} => {PrelBase.Ord (Bar $a)} ;;
+1 data Bar $r3x = MkBar PrelBase.Int $r3x ;

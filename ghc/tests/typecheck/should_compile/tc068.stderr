@@ -1,15 +1,11 @@
 ghc: module version changed to 1; reason: no old .hi file
 _exports_
-ShouldSucceed B(X Y) T(D C);
+ShouldSucceed B{X Y} T{D C};
 _instances_
-instance _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (B a)} = $dEqB0;
-instance _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (T a)} = $dEqT0;
-instance _forall_ [a] => {PrelBase.Eval (B a)} = $dEvalB0;
-instance _forall_ [a] => {PrelBase.Eval (T a)} = $dEvalT0;
+instance _forall_ [$a] {PrelBase.Eq $a} => {PrelBase.Eq (B $a)} = $dEqB0;
+instance _forall_ [$a] {PrelBase.Eq $a} => {PrelBase.Eq (T $a)} = $dEqT0;
 _declarations_
-1 $dEqB0 _:_ _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (B a)} ;;
-1 $dEqT0 _:_ _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (T a)} ;;
-1 $dEvalB0 _:_ _forall_ [a] => {PrelBase.Eval (B a)} ;;
-1 $dEvalT0 _:_ _forall_ [a] => {PrelBase.Eval (T a)} ;;
-1 data B b = X |  Y b ;
-1 data T a = D (B a) |  C ;
+1 $dEqB0 _:_ _forall_ [$a] {PrelBase.Eq $a} => {PrelBase.Eq (B $a)} ;;
+1 $dEqT0 _:_ _forall_ [$a] {PrelBase.Eq $a} => {PrelBase.Eq (T $a)} ;;
+1 data B $r40 = X |  Y $r40 ;
+1 data T $r44 = D (B $r44) |  C ;

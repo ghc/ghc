@@ -7,7 +7,7 @@ module Main where
 import System(getArgs)
 import PrelIOBase
 
-sfoldl :: Eval a => (a -> Int -> a) -> a -> [Int] -> a
+sfoldl :: (a -> Int -> a) -> a -> [Int] -> a
 sfoldl f z [] = z
 sfoldl f z (x:xs) = _scc_ "sfoldl1" (sfoldl f fzx (fzx `seq` xs))
                   where fzx = _scc_ "fzx" (f z x)

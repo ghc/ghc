@@ -1,10 +1,7 @@
 ghc: module version changed to 1; reason: no old .hi file
 _exports_
-ShouldSucceed g AnnExpr Expr(Var App);
-_instances_
-instance _forall_ [a] => {PrelBase.Eval (Expr a)} = $dEvalExpr0;
+ShouldSucceed g AnnExpr Expr{Var App};
 _declarations_
-1 $dEvalExpr0 _:_ _forall_ [a] => {PrelBase.Eval (Expr a)} ;;
-1 data Expr a = Var [PrelBase.Char] |  App (AnnExpr a) (AnnExpr a) ;
-1 g _:_ _forall_ [a] => (a, Expr a) -> [[PrelBase.Char]] ;;
-1 type AnnExpr a = (a, Expr a) ;
+1 data Expr $r3E = Var [PrelBase.Char] |  App (AnnExpr $r3E) (AnnExpr $r3E) ;
+1 g _:_ _forall_ [$a] => ($a, Expr $a) -> [[PrelBase.Char]] ;;
+1 type AnnExpr $r3I = ($r3I, Expr $r3I) ;

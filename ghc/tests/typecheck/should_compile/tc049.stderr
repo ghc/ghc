@@ -2,14 +2,14 @@ ghc: module version changed to 1; reason: no old .hi file
 _exports_
 ShouldSucceed fib main1 main2 main3 mem mem1 mem2 mem3 mem4 oR oR1;
 _declarations_
-1 fib _:_ _forall_ [a] {PrelBase.Ord a, PrelBase.Num a} => a -> a ;;
+1 fib _:_ _forall_ [$a] {PrelBase.Num $a, PrelBase.Ord $a} => $a -> $a ;;
 1 main1 _:_ PrelBase.Bool ;;
 1 main2 _:_ PrelBase.Bool ;;
 1 main3 _:_ PrelBase.Bool ;;
-1 mem _:_ _forall_ [a] {PrelBase.Eq a} => a -> [a] -> PrelBase.Bool ;;
-1 mem1 _:_ _forall_ [a] {PrelBase.Eq a} => a -> [a] -> PrelBase.Bool ;;
-1 mem2 _:_ _forall_ [a] {PrelBase.Eq a} => a -> [a] -> PrelBase.Bool ;;
-1 mem3 _:_ _forall_ [a] {PrelBase.Eq [a]} => a -> [a] -> PrelBase.Bool ;;
-1 mem4 _:_ _forall_ [a] {PrelBase.Eq [a]} => a -> [a] -> PrelBase.Bool ;;
+1 mem _:_ _forall_ [$a] {PrelBase.Eq $a} => $a -> [$a] -> PrelBase.Bool ;;
+1 mem1 _:_ _forall_ [$a] {PrelBase.Eq $a} => $a -> [$a] -> PrelBase.Bool ;;
+1 mem2 _:_ _forall_ [$a] {PrelBase.Eq $a} => $a -> [$a] -> PrelBase.Bool ;;
+1 mem3 _:_ _forall_ [$a] {PrelBase.Eq [$a]} => $a -> [$a] -> PrelBase.Bool ;;
+1 mem4 _:_ _forall_ [$a] {PrelBase.Eq [$a]} => $a -> [$a] -> PrelBase.Bool ;;
 1 oR _:_ PrelBase.Bool -> PrelBase.Bool -> PrelBase.Bool ;;
 1 oR1 _:_ PrelBase.Bool -> PrelBase.Bool -> PrelBase.Bool ;;

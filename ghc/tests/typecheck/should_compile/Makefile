@@ -6,6 +6,7 @@ SRC_HC_OPTS += -noC -dcore-lint -fno-warn-incomplete-patterns -hi-with-declarati
 
 tc019_HC_OPTS = -fglasgow-exts
 tc065_HC_OPTS = -syslib misc
+tc089_HC_OPTS = -H12m
 tc097_HC_OPTS = -fglasgow-exts
 
 # mkdependHS doesn't understand OPTIONS pragmas...

@@ -2,5 +2,5 @@ ghc: module version changed to 1; reason: no old .hi file
 _exports_
 ShouldSucceed a b;
 _declarations_
-1 a _:_ _forall_ [a] {PrelBase.Ord a} => a ;;
-1 b _:_ _forall_ [a] {PrelBase.Ord a} => a ;;
+1 a _:_ _forall_ [$a] {PrelBase.Ord $a} => $a ;;
+1 b _:_ _forall_ [$a] {PrelBase.Ord $a} => $a ;;

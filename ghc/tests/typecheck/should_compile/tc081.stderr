@@ -2,6 +2,6 @@ ghc: module version changed to 1; reason: no old .hi file
 _exports_
 ShouldSucceed f f2 f3;
 _declarations_
-1 f _:_ _forall_ [a] {PrelBase.Num a, PrelBase.Ord a} => a -> (a, PrelBase.Bool, [PrelBase.Bool], [PrelBase.Char]) ;;
-1 f2 _:_ _forall_ [a] {PrelBase.Num a, PrelBase.Ord a} => a -> (a, PrelBase.Bool, [PrelBase.Bool], [PrelBase.Char]) ;;
-1 f3 _:_ _forall_ [a] {PrelBase.Num a, PrelBase.Ord a} => a -> (a, PrelBase.Bool, [PrelBase.Bool], [PrelBase.Char]) ;;
+1 f _:_ _forall_ [$a] {PrelBase.Ord $a, PrelBase.Num $a} => $a -> ($a, PrelBase.Bool, [PrelBase.Bool], [PrelBase.Char]) ;;
+1 f2 _:_ _forall_ [$a] {PrelBase.Ord $a, PrelBase.Num $a} => $a -> ($a, PrelBase.Bool, [PrelBase.Bool], [PrelBase.Char]) ;;
+1 f3 _:_ _forall_ [$a] {PrelBase.Ord $a, PrelBase.Num $a} => $a -> ($a, PrelBase.Bool, [PrelBase.Bool], [PrelBase.Char]) ;;
