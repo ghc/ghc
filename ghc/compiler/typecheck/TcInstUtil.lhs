@@ -21,9 +21,8 @@ module TcInstUtil (
 import RnHsSyn		( RenamedMonoBinds, RenamedSig )
 import HsTypes		( toHsType )
 
-import CmdLineOpts	( dopt_AllowOverlappingInstances )
+import CmdLineOpts	( DynFlags, dopt_AllowOverlappingInstances )
 import TcMonad
---import TcEnv		( InstEnv, emptyInstEnv, addToInstEnv )
 import Bag		( bagToList, Bag )
 import Class		( Class )
 import Var		( TyVar, Id, idName )
@@ -33,15 +32,18 @@ import Maybes		( MaybeErr(..), returnMaB, failMaB, thenMaB, maybeToBool )
 import Name		( getSrcLoc, nameModule, isLocallyDefined, toRdrName )
 import SrcLoc		( SrcLoc )
 import Type		( Type, ThetaType, splitTyConApp_maybe, 
-			  mkSigmaTy, mkDictTy, tyVarsOfTypes )
+			  mkSigmaTy, splitSigmaTy, mkDictTy, splitDictTy,
+			  tyVarsOfTypes )
 import PprType		( pprConstraint )
 import Class		( classTyCon )
 import DataCon		( DataCon )
 import TyCon		( TyCon, tyConDataCons )
 import Outputable
-import HscTypes		( InstEnv, ClsInstEnv )
+import HscTypes		( InstEnv, ClsInstEnv, DFunId )
 import Unify		( matchTys, unifyTyListsX )
 import UniqFM		( lookupWithDefaultUFM, addToUFM, emptyUFM )
+import Id		( idType )
+import ErrUtils		( Message )
 \end{code}
 
 
@@ -68,7 +70,7 @@ data InstInfo
       iLocal  :: Bool,		-- True <=> it's defined in this module
       iDFunId :: DFunId,		-- The dfun id
       iBinds  :: RenamedMonoBinds,	-- Bindings, b
-      iLoc    :: SrcLoc			-- Source location assoc'd with this instance's defn
+      iLoc    :: SrcLoc,		-- Source location assoc'd with this instance's defn
       iPrags  :: [RenamedSig]		-- User pragmas recorded for generating specialised instances
     }
 
@@ -320,13 +322,13 @@ True => overlap is permitted, but only if one template matches the other;
         not if they unify but neither is 
 
 \begin{code}
-extendInstEnv :: InstEnv -> [DFunId] -> (InstEnv, [Message])
+extendInstEnv :: DynFlags -> InstEnv -> [DFunId] -> (InstEnv, [Message])
   -- Similar, but all we have is the DFuns
-extendInstEnvWithDFuns env infos
+extendInstEnv dflags env infos
   = go env [] infos
   where
     go env msgs []	     = (env, msgs)
-    go env msgs (dfun:dfuns) = case addToInstEnv inst_env dfun of
+    go env msgs (dfun:dfuns) = case addToInstEnv dflags env dfun of
 				    Succeeded new_env -> go new_env msgs dfuns
 				    Failed dfun'      -> go env (msg:msgs) infos
 						     where
@@ -342,11 +344,12 @@ dupInstErr dfun1 dfun2
 		  where
 		    (_,_,tau) = splitSigmaTy (idType dfun)
 
-addToInstEnv :: InstEnv	-> DFunId
+addToInstEnv :: DynFlags
+             -> InstEnv	-> DFunId
 	     -> MaybeErr InstEnv	-- Success...
 		         DFunId		-- Failure: Offending overlap
 
-addToInstEnv inst_env dfun_id
+addToInstEnv dflags inst_env dfun_id
   = case insert_into (classInstEnv inst_env clas) of
 	Failed stuff 	  -> Failed stuff
 	Succeeded new_env -> Succeeded (addToUFM inst_env clas new_env)
@@ -366,7 +369,7 @@ addToInstEnv inst_env dfun_id
 	-- (b) they unify, and any sort of overlap is prohibited,
 	-- (c) they unify but neither is more specific than t'other
       |  identical 
-      || (unifiable && not opt_AllowOverlappingInstances)
+      || (unifiable && not (dopt_AllowOverlappingInstances dflags))
       || (unifiable && not (ins_item_more_specific || cur_item_more_specific))
       =  failMaB val
 
