@@ -37,6 +37,11 @@
  *	@(#)utils.h	8.3 (Berkeley) 3/20/94
  */
 
+/* Added by SDM 15/2/2002: apparently mingw doesn't define this constant */
+#ifndef _POSIX2_RE_DUP_MAX
+#define _POSIX2_RE_DUP_MAX 255
+#endif
+
 /* utility definitions */
 #define	DUPMAX		_POSIX2_RE_DUP_MAX	/* xxx is this right? */
 #define	INFINITY	(DUPMAX + 1)
