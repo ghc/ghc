@@ -76,7 +76,6 @@ char *ineg PROTO((char *));
 
 long    source_version = 0;
 
-BOOLEAN inpat;
 %}
 
 %union {
@@ -965,12 +964,8 @@ dexp	:  MINUS kexp				{ $$ = mknegate($2); }
 	|  kexp
 	;
 
-/*
-  We need to factor out a leading let expression so we can set
-  inpat=TRUE when parsing (non let) expressions inside stmts and quals
-*/
-expLno 	:  oexpLno DCOLON ctype			{ $$ = mkrestr($1,$3); }
-	|  oexpLno
+expLno 	: oexpLno DCOLON ctype			{ $$ = mkrestr($1,$3); }
+	| oexpLno
 	;
 oexpLno	:  oexpLno qop oexp %prec MINUS		{ $$ = mkinfixap($2,$1,$3); }
 	|  dexpLno
@@ -1083,9 +1078,9 @@ aexp	:  qvar					{ $$ = mkident($1); }
 
 	/* only in patterns ... */
 	/* these add 2 S/R conflict with with  aexp . OCURLY rbinds CCURLY */
-	|  qvar AT aexp				{ checkinpat(); $$ = mkas($1,$3); }
-	|  LAZY aexp				{ checkinpat(); $$ = mklazyp($2); }
-	|  WILDCARD				{ checkinpat(); $$ = mkwildp();   }
+	|  qvar AT aexp				{ $$ = mkas($1,$3); }
+	|  LAZY aexp				{ $$ = mklazyp($2); }
+	|  WILDCARD				{ $$ = mkwildp();   }
 	;
 
 	/* ccall arguments */
@@ -1096,7 +1091,7 @@ cexps	:  cexps aexp				{ $$ = lapp($1,$2); }
 caserest:  ocurly alts ccurly			{ $$ = $2; }
 	|  vocurly alts vccurly			{ $$ = $2; }
 
-dorest  :  ocurly stmts ccurly			{ checkdostmts($2); $$ = $2; }
+dorest  :  ocurly stmts ccurly		        { checkdostmts($2); $$ = $2; }
 	|  vocurly stmts vccurly		{ checkdostmts($2); $$ = $2; }
 	;
 
@@ -1162,14 +1157,13 @@ quals	:  qual					{ $$ = lsing($1); }
 
 qual	:  letdecls				{ $$ = mkseqlet($1); }
 	|  expL					{ $$ = $1; }
-	|  {inpat=TRUE;} expLno 
-	   {inpat=FALSE;} leftexp
-		{ if ($4 == NULL) {
-		      expORpat(LEGIT_EXPR,$2);
-		      $$ = mkguard($2);
+	|  expLno leftexp
+		{ if ($2 == NULL) {
+		      expORpat(LEGIT_EXPR,$1);
+		      $$ = mkguard($1);
 		  } else {
-		      expORpat(LEGIT_PATT,$2);
-		      $$ = mkqual($2,$4);
+		      expORpat(LEGIT_PATT,$1);
+		      $$ = mkqual($1,$2);
 		  }
 		}
 	;
@@ -1190,20 +1184,20 @@ gdpat	:  gd RARROW exp			{ $$ = lsing(mkpgdexp($1,$3)); }
 	|  gd RARROW exp gdpat			{ $$ = mklcons(mkpgdexp($1,$3),$4);  }
 	;
 
-stmts	:  stmt					{ $$ = $1; }
+stmts	:  stmt 				{ $$ = $1; }
 	|  stmts SEMI stmt			{ $$ = lconc($1,$3); }
 	;
 
-stmt	:  /* empty */				{ $$ = Lnil; }
-	|  letdecls				{ $$ = lsing(mkseqlet($1)); }
+stmt	: /* empty */				{ $$ = Lnil; } 
+	| letdecls				{ $$ = lsing(mkseqlet($1)); }
 	|  expL					{ $$ = lsing(mkdoexp($1,hsplineno)); }
-	|  {inpat=TRUE;} expLno {inpat=FALSE;} leftexp
-		{ if ($4 == NULL) {
-		      expORpat(LEGIT_EXPR,$2);
-		      $$ = lsing(mkdoexp($2,endlineno));
+        |  expLno leftexp
+		{ if ($2 == NULL) {
+		      expORpat(LEGIT_EXPR,$1);
+		      $$ = lsing(mkdoexp($1,endlineno));
 		  } else {
-		      expORpat(LEGIT_PATT,$2);
-		      $$ = lsing(mkdobind($2,$4,endlineno));
+		      expORpat(LEGIT_PATT,$1);
+		      $$ = lsing(mkdobind($1,$2,endlineno));
 		  }
 		}
 	;
@@ -1572,7 +1566,7 @@ vccurly1:
 		  FN = NULL; SAMEFN = 0; PREVPATT = NULL;
 		  hsendindent();
 		}
-	;
+  	;
 
 %%
 
@@ -1583,14 +1577,6 @@ vccurly1:
 *  (This stuff is here in case we want to use Yacc macros and such.)  *
 *                                                                     *
 **********************************************************************/
-
-void
-checkinpat()
-{
-  if(!inpat)
-    hsperror("pattern syntax used in expression");
-}
-
 
 /* The parser calls "hsperror" when it sees a
    `report this and die' error.  It sets the stage
