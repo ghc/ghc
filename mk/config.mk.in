@@ -582,6 +582,9 @@ endif
 
 # default C compiler flags
 SRC_CC_OPTS = -O
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+SRC_CC_OPTS += -mno-cygwin -mwin32
+endif
 
 #-----------------------------------------------------------------------------
 # GMP Library (version 2.0.x or above)

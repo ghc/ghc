@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.19 2001/04/03 16:30:43 rrt Exp $
+# 	$Id: opts.mk,v 1.20 2001/04/03 16:43:28 rrt Exp $
 #
 #################################################################################
 
@@ -86,9 +86,6 @@ BLD_DLL_OPTS       = $(SRC_BLD_DLL_OPTS) $(WAY$(_way)_BLD_DLL_OPTS) $($*_HC_OPTS
 CPP_OPTS           = $(SRC_CPP_OPTS) $(WAY$(_way)_CPP_OPTS) $(EXTRA_CPP_OPTS)
 CTAGS_OPTS         = $(SRC_CTAGS_OPTS) $(WAY$(_way)_CTAGS_OPTS) $(EXTRA_CTAGS_OPTS)
 CC_OPTS            = $(SRC_CC_OPTS) $(WAY$(_way)_CC_OPTS) $($*_CC_OPTS) $(EXTRA_CC_OPTS)
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-CC_OPTS += -mno-cygwin -mwin32
-endif
 FLEX_OPTS          = $(SRC_FLEX_OPTS) $(WAY$(_way)_FLEX_OPTS) $(EXTRA_FLEX_OPTS)
 HAPPY_OPTS         = $(SRC_HAPPY_OPTS) $(WAY$(_way)_HAPPY_OPTS) $($*_HAPPY_OPTS) $(EXTRA_HAPPY_OPTS)
 GC_OPTS            = $(SRC_GC_OPTS) $(WAY$(_way)_GC_OPTS) $($*_GC_OPTS) $(EXTRA_GC_OPTS)
