@@ -30,7 +30,7 @@ import Maybes		( catMaybes )
 import Name		( isLocallyDefined, getSrcLoc, Name{-instance NamedThing-},
 			  NamedThing(..) )
 import PprCore
-import Outputable	( PprStyle(..), Outputable(..), pprErrorsStyle, printErrs )
+import Outputable	( PprStyle(..), Outputable(..), pprDumpStyle, printErrs )
 import ErrUtils		( doIfSet, ghcExit )
 import PprType		( GenType, GenTyVar, TyCon )
 import Pretty
@@ -109,9 +109,9 @@ lintCoreBindings whoDunnit spec_done binds
     display bad_news
       = vcat [
 		text ("*** Core Lint Errors: in result of " ++ whoDunnit ++ " ***"),
-		bad_news pprErrorsStyle,
+		bad_news pprDumpStyle,
 		ptext SLIT("*** Offending Program ***"),
-		pprCoreBindings pprErrorsStyle binds,
+		pprCoreBindings pprDumpStyle binds,
 		ptext SLIT("*** End of Offense ***")
 	]
 \end{code}
