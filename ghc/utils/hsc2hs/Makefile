@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.28 2002/01/17 08:38:00 sof Exp $
+# $Id: Makefile,v 1.29 2002/01/21 19:56:20 sof Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -90,7 +90,7 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 	@echo "pathSep               = '/'" >> $(CONFIG_HS)
 else
-	@echo "pathSep               = '\\\\\\'" >> $(CONFIG_HS)
+	@echo "pathSep               = '\\\\'" >> $(CONFIG_HS)
 endif
 	@echo done.
 
