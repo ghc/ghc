@@ -33,6 +33,7 @@ import PprCore
 import ErrUtils		( doIfSet, ghcExit )
 import PrimOp		( primOpType )
 import PrimRep		( PrimRep(..) )
+import Specialise       ( idSpecVars )
 import SrcLoc		( SrcLoc )
 import Type		( mkFunTy, splitFunTy_maybe, mkForAllTy,
 			  splitForAllTy_maybe,
@@ -174,11 +175,17 @@ lintSingleBinding (binder,rhs)
 	`seqL`
 	-- Check (not isUnpointedType)
 	checkIfSpecDoneL (not (isUnpointedType (idType binder)))
-	  (mkRhsPrimMsg binder rhs)
+	  (mkRhsPrimMsg binder rhs)  `seqL`
 
+        -- Check whether binder's specialisations contain any out-of-scope variables
+        ifSpecDoneL (mapL (checkSpecIdInScope binder) spec_vars `seqL` returnL ())
+	  
 	-- We should check the unfolding, if any, but this is tricky because
 	-- the unfolding is a SimplifiableCoreExpr. Give up for now.
     )
+    where
+     spec_vars = idSpecVars binder
+
 \end{code}
 
 %************************************************************************
@@ -202,7 +209,7 @@ lintCoreExpr (Var var)
 	-- The hack here simply doesn't check for out-of-scope-ness for
 	-- data constructors (at least, in a function position).
 
-  | otherwise    = checkInScope var `seqL` returnL (Just (idType var))
+  | otherwise    = checkIdInScope var `seqL` returnL (Just (idType var))
 
 lintCoreExpr (Lit lit) = returnL (Just (literalType lit))
 
@@ -294,7 +301,7 @@ lintCoreArg e ty (LitArg lit)
 
 lintCoreArg e ty (VarArg v)
   = -- Make sure variable is bound
-    checkInScope v `seqL`
+    checkIdInScope v `seqL`
     -- Make sure function type matches argument
     case (splitFunTy_maybe ty) of
       Just (arg,res) | (var_ty == arg) -> returnL(Just res)
@@ -522,6 +529,10 @@ checkIfSpecDoneL True  msg spec  loc scope errs = ((), errs)
 checkIfSpecDoneL False msg True  loc scope errs = ((), addErr errs msg loc)
 checkIfSpecDoneL False msg False loc scope errs = ((), errs)
 
+ifSpecDoneL :: LintM () -> LintM ()
+ifSpecDoneL m False loc scope errs = ((), errs)
+ifSpecDoneL m True  loc scope errs = m True loc scope errs
+
 addErrL :: ErrMsg -> LintM ()
 addErrL msg spec loc scope errs = ((), addErr errs msg loc)
 
@@ -556,13 +567,24 @@ addInScopeVars ids m spec loc scope errs
 \end{code}
 
 \begin{code}
-checkInScope :: Id -> LintM ()
-checkInScope id spec loc scope errs
+checkIdInScope :: Id -> LintM ()
+checkIdInScope id 
+  = checkInScope (ptext SLIT("is out of scope")) id
+
+checkSpecIdInScope :: Id -> Id -> LintM ()
+checkSpecIdInScope binder id 
+  = checkInScope msg id
+    where
+     msg = ptext SLIT("is out of scope inside specialisation info for") <+> 
+	   ppr binder
+
+checkInScope :: SDoc -> Id -> LintM ()
+checkInScope loc_msg id spec loc scope errs
   = let
 	id_name = getName id
     in
     if isLocallyDefined id_name && not (id `elementOfIdSet` scope) then
-      ((), addErr errs (hsep [ppr id, ptext SLIT("is out of scope")]) loc)
+      ((), addErr errs (hsep [ppr id, loc_msg]) loc)
     else
       ((),errs)
 
