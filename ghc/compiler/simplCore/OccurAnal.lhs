@@ -36,7 +36,6 @@ import IdInfo		( OccInfo(..), insideLam, copyIdInfo )
 import VarSet
 import VarEnv
 
-import ThinAir		( noRepStrIds, noRepIntegerIds )
 import Name		( isLocallyDefined )
 import Type		( splitFunTy_maybe, splitForAllTys )
 import Maybes		( maybeToBool )

@@ -20,7 +20,7 @@ import HsSyn		( ExtName(..), ForeignDecl(..), isDynamicExtName, ForKind(..) )
 import HsDecls		( extNameStatic )
 import CallConv
 import TcHsSyn		( TypecheckedForeignDecl )
-import CoreUtils	( exprType, mkInlineMe )
+import CoreUtils	( exprType, mkInlineMe, bindNonRec )
 import DataCon		( DataCon, dataConWrapId )
 import Id		( Id, idType, idName, mkWildId, mkVanillaId )
 import MkId		( mkCCallOpId, mkWorkerId )

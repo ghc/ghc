@@ -48,10 +48,10 @@ import CoreFVs		( exprFreeVars )
 import CoreUnfold	( Unfolding, mkOtherCon, mkUnfolding, otherCons, maybeUnfoldingTemplate,
 			  callSiteInline, hasSomeUnfolding, noUnfolding
 			)
-import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsCheap, exprIsTrivial,
+import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsCheap, exprIsTrivial, exprIsConApp_maybe,
 			  exprType, coreAltsType, exprArity, exprIsValue, idAppIsCheap,
 			  exprOkForSpeculation, etaReduceExpr,
-			  mkCoerce, mkSCC, mkInlineMe
+			  mkCoerce, mkSCC, mkInlineMe, mkAltExpr
 			)
 import Rules		( lookupRule )
 import CostCentre	( isSubsumedCCS, currentCCS, isEmptyCC )
@@ -1141,25 +1141,8 @@ rebuild_case scrut bndr alts se cont
   = complete_case scrut bndr alts se cont
 
   where
-    maybe_con_app    = analyse (collectArgs scrut)
+    maybe_con_app    = exprIsConApp_maybe scrut
     Just (con, args) = maybe_con_app
-
-    analyse (Var fun, args)
-	| maybeToBool maybe_con_app = maybe_con_app
-	where
-	  maybe_con_app = case isDataConId_maybe fun of
-				Just con | length args >= dataConRepArity con 
-					-- Might be > because the arity excludes type args
-				         -> Just (con, args)
-				other    -> Nothing
-
-    analyse (Var fun, [])
-	= case maybeUnfoldingTemplate (idUnfolding fun) of
-	    	Nothing  -> Nothing
-		Just unf -> analyse (collectArgs unf)
-
-    analyse other = Nothing
- 
 
    	-- See if we can get rid of the case altogether
 	-- See the extensive notes on case-elimination above
@@ -1297,7 +1280,7 @@ If we eliminate the inner case, we trap it inside the I# v -> arm,
 which might prevent some full laziness happening.  I've seen this
 in action in spectral/cichelli/Prog.hs:
 	 [(m,n) | m <- [1..max], n <- [1..max]]
-Hence the add_eval_info argument
+Hence the no_case_of_case argument
 
 
 If we do this, then we have to nuke any occurrence info (eg IAmDead)
@@ -1316,8 +1299,8 @@ Urk! b is alive!  Reason: the scrutinee was a variable, and case elimination
 happened.  Hence the zap_occ_info function returned by simplCaseBinder
 
 \begin{code}
-simplCaseBinder add_eval_info (Var v) case_bndr thing_inside
-  | add_eval_info
+simplCaseBinder no_case_of_case (Var v) case_bndr thing_inside
+  | not no_case_of_case
   = simplBinder (zap case_bndr)					$ \ case_bndr' ->
     modifyInScope v case_bndr'					$
 	-- We could extend the substitution instead, but it would be

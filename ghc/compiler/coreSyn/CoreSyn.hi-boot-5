@@ -1,12 +1,6 @@
 __interface CoreSyn 1 0 where
-__export CoreSyn CoreExpr CoreRules CoreRule emptyCoreRules isEmptyCoreRules seqRules ;
+__export CoreSyn CoreExpr ;
 
--- Needed by IdInfo
+-- Needed by Var.lhs
 1 type CoreExpr = Expr Var.Var;
 1 data Expr b ;
-
-1 data CoreRule ;
-1 data CoreRules = Rules [CoreRule] VarSet.VarSet ;
-1 emptyCoreRules :: CoreRules ;
-1 seqRules :: CoreRules -> PrelBase.Z0T ;
-1 isEmptyCoreRules :: CoreRules -> PrelBase.Bool ;

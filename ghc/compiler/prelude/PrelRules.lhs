@@ -23,7 +23,7 @@ import TysWiredIn	( trueDataConId, falseDataConId )
 import TyCon		( tyConDataCons, isEnumerationTyCon, isNewTyCon )
 import DataCon		( DataCon, dataConTag, dataConRepArity, dataConTyCon, dataConId, fIRST_TAG )
 import CoreUnfold	( maybeUnfoldingTemplate )
-import CoreUtils	( exprIsValue, cheapEqExpr )
+import CoreUtils	( exprIsValue, cheapEqExpr, exprIsConApp_maybe )
 import Type		( splitTyConApp_maybe )
 import OccName		( occNameUserString)
 import ThinAir		( unpackCStringFoldrId )
@@ -370,31 +370,14 @@ For dataToTag#, we can reduce if either
 
 \begin{code}
 dataToTagRule [_, val_arg]
-  = case maybeConApp val_arg of
-	Just dc -> ASSERT( not (isNewTyCon (dataConTyCon dc)) )
-	     	   Just (SLIT("DataToTag"), 
-		   	mkIntVal (toInteger (dataConTag dc - fIRST_TAG)))
+  = case exprIsConApp_maybe val_arg of
+	Just (dc,_) -> ASSERT( not (isNewTyCon (dataConTyCon dc)) )
+	     	       Just (SLIT("DataToTag"), 
+		   	     mkIntVal (toInteger (dataConTag dc - fIRST_TAG)))
 
-	other		   -> Nothing
+	other	    -> Nothing
 
 dataToTagRule other = Nothing
-
-maybeConApp :: CoreExpr -> Maybe DataCon
-maybeConApp (Var v)
-  = case maybeUnfoldingTemplate (idUnfolding v) of
-	Just unf -> maybeConApp unf
-	Nothing  -> Nothing
-
-maybeConApp expr
-  = go expr 0
-  where
-    go (App f a) n | isTypeArg a = go f n
- 		   | otherwise   = go f (n+1)
-    go (Var f) n = case isDataConId_maybe f of
-		     Just dc -> ASSERT( n == dataConRepArity dc )
-				Just dc		-- Check it's saturated
-		     other   -> Nothing
-    go other n = Nothing
 \end{code}
 
 %************************************************************************

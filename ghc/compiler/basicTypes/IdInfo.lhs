@@ -28,7 +28,7 @@ module IdInfo (
 	-- Strictness; imported from Demand
 	StrictnessInfo(..),
 	mkStrictnessInfo, noStrictnessInfo,
-	ppStrictnessInfo,isBottomingStrictness, appIsBottom,
+	ppStrictnessInfo,isBottomingStrictness, 
 
 	strictnessInfo, setStrictnessInfo, 	
 
@@ -71,9 +71,7 @@ module IdInfo (
 #include "HsVersions.h"
 
 
-import {-# SOURCE #-} CoreUnfold ( Unfolding, noUnfolding, hasUnfolding, seqUnfolding )
-import {-# SOURCE #-} CoreSyn	 ( CoreExpr, CoreRules, emptyCoreRules, isEmptyCoreRules, seqRules )
-
+import CoreSyn
 import PrimOp	 	( PrimOp )
 import Var              ( Id )
 import BasicTypes	( OccInfo(..), isFragileOccInfo, seqOccInfo,

@@ -13,8 +13,7 @@ module CoreSyn (
 	mkApps, mkTyApps, mkValApps, mkVarApps,
 	mkLit, mkIntLitInt, mkIntLit, 
 	mkStringLit, mkStringLitFS, mkConApp, 
- 	mkAltExpr,
-	bindNonRec, mkIfThenElse, varToCoreExpr,
+	varToCoreExpr,
 
 	bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts, isTyVar, isId,
 	collectBinders, collectTyBinders, collectValBinders, collectTyAndValBinders,
@@ -24,11 +23,15 @@ module CoreSyn (
 
 	isValArg, isTypeArg, valArgCount, valBndrCount,
 
-	-- Seq stuff
-	seqRules, seqExpr, seqExprs, 
+	-- Unfoldings
+	Unfolding(..),	UnfoldingGuidance(..), 	-- Both abstract everywhere but in CoreUnfold.lhs
+	noUnfolding, mkOtherCon,
+	unfoldingTemplate, maybeUnfoldingTemplate, otherCons, 
+	isValueUnfolding, isEvaldUnfolding, isCheapUnfolding, isCompulsoryUnfolding,
+	hasUnfolding, hasSomeUnfolding,
 
-	-- Size
-	coreBindsSize,
+	-- Seq stuff
+	seqRules, seqExpr, seqExprs, seqUnfolding,
 
 	-- Annotated expressions
 	AnnExpr, AnnExpr'(..), AnnBind(..), AnnAlt, deAnnotate, deAnnotate',
@@ -42,17 +45,13 @@ module CoreSyn (
 
 #include "HsVersions.h"
 
-import TysWiredIn	( boolTy, stringTy, nilDataCon )
 import CostCentre	( CostCentre, noCostCentre )
 import Var		( Var, Id, TyVar, isTyVar, isId, idType )
 import VarEnv
-import Id		( mkWildId, idOccInfo, idInfo )
 import Type		( Type, UsageAnn, mkTyVarTy, isUnLiftedType, seqType )
-import IdInfo		( OccInfo(..), megaSeqIdInfo )
 import Literal	        ( Literal(MachStr), mkMachInt )
 import PrimOp		( PrimOp )
 import DataCon		( DataCon, dataConId )
-import TysWiredIn	( trueDataCon, falseDataCon )
 import ThinAir		( unpackCStringId, unpackCString2Id, addr2IntegerId )
 import VarSet
 import Outputable
@@ -153,6 +152,114 @@ rulesRules (Rules rules _) = rules
 
 %************************************************************************
 %*									*
+\subsection{@Unfolding@ type}
+%*									*
+%************************************************************************
+
+The @Unfolding@ type is declared here to avoid numerous loops, but it
+should be abstract everywhere except in CoreUnfold.lhs
+
+\begin{code}
+data Unfolding
+  = NoUnfolding
+
+  | OtherCon [AltCon]		-- It ain't one of these
+				-- (OtherCon xs) also indicates that something has been evaluated
+				-- and hence there's no point in re-evaluating it.
+				-- OtherCon [] is used even for non-data-type values
+				-- to indicated evaluated-ness.  Notably:
+				--	data C = C !(Int -> Int)
+				-- 	case x of { C f -> ... }
+				-- Here, f gets an OtherCon [] unfolding.
+
+  | CompulsoryUnfolding CoreExpr	-- There is no "original" definition,
+					-- so you'd better unfold.
+
+  | CoreUnfolding			-- An unfolding with redundant cached information
+		CoreExpr		-- Template; binder-info is correct
+		Bool			-- This is a top-level binding
+		Bool			-- exprIsCheap template (cached); it won't duplicate (much) work 
+					--	if you inline this in more than one place
+		Bool			-- exprIsValue template (cached); it is ok to discard a `seq` on
+					--	this variable
+		Bool			-- exprIsBottom template (cached)
+		UnfoldingGuidance	-- Tells about the *size* of the template.
+
+
+data UnfoldingGuidance
+  = UnfoldNever
+  | UnfoldIfGoodArgs	Int	-- and "n" value args
+
+			[Int]	-- Discount if the argument is evaluated.
+				-- (i.e., a simplification will definitely
+				-- be possible).  One elt of the list per *value* arg.
+
+			Int	-- The "size" of the unfolding; to be elaborated
+				-- later. ToDo
+
+			Int	-- Scrutinee discount: the discount to substract if the thing is in
+				-- a context (case (thing args) of ...),
+				-- (where there are the right number of arguments.)
+
+noUnfolding = NoUnfolding
+mkOtherCon  = OtherCon
+
+seqUnfolding :: Unfolding -> ()
+seqUnfolding (CoreUnfolding e top b1 b2 b3 g)
+  = seqExpr e `seq` top `seq` b1 `seq` b2 `seq` b3 `seq` seqGuidance g
+seqUnfolding other = ()
+
+seqGuidance (UnfoldIfGoodArgs n ns a b) = n `seq` sum ns `seq` a `seq` b `seq` ()
+seqGuidance other			= ()
+\end{code}
+
+\begin{code}
+unfoldingTemplate :: Unfolding -> CoreExpr
+unfoldingTemplate (CoreUnfolding expr _ _ _ _ _) = expr
+unfoldingTemplate (CompulsoryUnfolding expr)     = expr
+unfoldingTemplate other = panic "getUnfoldingTemplate"
+
+maybeUnfoldingTemplate :: Unfolding -> Maybe CoreExpr
+maybeUnfoldingTemplate (CoreUnfolding expr _ _ _ _ _) = Just expr
+maybeUnfoldingTemplate (CompulsoryUnfolding expr)     = Just expr
+maybeUnfoldingTemplate other 			      = Nothing
+
+otherCons :: Unfolding -> [AltCon]
+otherCons (OtherCon cons) = cons
+otherCons other		  = []
+
+isValueUnfolding :: Unfolding -> Bool
+	-- Returns False for OtherCon
+isValueUnfolding (CoreUnfolding _ _ _ is_evald _ _) = is_evald
+isValueUnfolding other			            = False
+
+isEvaldUnfolding :: Unfolding -> Bool
+	-- Returns True for OtherCon
+isEvaldUnfolding (OtherCon _)		            = True
+isEvaldUnfolding (CoreUnfolding _ _ _ is_evald _ _) = is_evald
+isEvaldUnfolding other			            = False
+
+isCheapUnfolding :: Unfolding -> Bool
+isCheapUnfolding (CoreUnfolding _ _ is_cheap _ _ _) = is_cheap
+isCheapUnfolding other				    = False
+
+isCompulsoryUnfolding :: Unfolding -> Bool
+isCompulsoryUnfolding (CompulsoryUnfolding _) = True
+isCompulsoryUnfolding other		      = False
+
+hasUnfolding :: Unfolding -> Bool
+hasUnfolding (CoreUnfolding _ _ _ _ _ _) = True
+hasUnfolding (CompulsoryUnfolding _)     = True
+hasUnfolding other 	 	         = False
+
+hasSomeUnfolding :: Unfolding -> Bool
+hasSomeUnfolding NoUnfolding = False
+hasSomeUnfolding other	     = True
+\end{code}
+
+
+%************************************************************************
+%*									*
 \subsection{The main data type}
 %*									*
 %************************************************************************
@@ -225,9 +332,14 @@ mkIntLitInt   :: Int     -> Expr b
 mkStringLit   :: String  -> Expr b	-- Makes a [Char] literal
 mkStringLitFS :: FAST_STRING  -> Expr b -- Makes a [Char] literal
 mkConApp      :: DataCon -> [Arg b] -> Expr b
+mkLets	      :: [Bind b] -> Expr b -> Expr b
+mkLams	      :: [b] -> Expr b -> Expr b
 
 mkLit lit	  = Lit lit
 mkConApp con args = mkApps (Var (dataConId con)) args
+
+mkLams binders body = foldr Lam body binders
+mkLets binds body   = foldr Let body binds
 
 mkIntLit    n = Lit (mkMachInt n)
 mkIntLitInt n = Lit (mkMachInt (toInteger n))
@@ -251,47 +363,6 @@ mkStringLitFS str
 varToCoreExpr :: CoreBndr -> Expr b
 varToCoreExpr v | isId v    = Var v
                 | otherwise = Type (mkTyVarTy v)
-\end{code}
-
-\begin{code}
-mkLams :: [b] -> Expr b -> Expr b
-mkLams binders body = foldr Lam body binders
-\end{code}
-
-\begin{code}
-mkLets :: [Bind b] -> Expr b -> Expr b
-mkLets binds body = foldr Let body binds
-
-bindNonRec :: Id -> CoreExpr -> CoreExpr -> CoreExpr
--- (bindNonRec x r b) produces either
---	let x = r in b
--- or
---	case r of x { _DEFAULT_ -> b }
---
--- depending on whether x is unlifted or not
--- It's used by the desugarer to avoid building bindings
--- that give Core Lint a heart attack.  Actually the simplifier
--- deals with them perfectly well.
-bindNonRec bndr rhs body 
-  | isUnLiftedType (idType bndr) = Case rhs bndr [(DEFAULT,[],body)]
-  | otherwise			 = Let (NonRec bndr rhs) body
-
-mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
-mkIfThenElse guard then_expr else_expr
-  = Case guard (mkWildId boolTy) 
-	 [ (DataAlt trueDataCon,  [], then_expr),
-	   (DataAlt falseDataCon, [], else_expr) ]
-\end{code}
-
-
-\begin{code}
-mkAltExpr :: AltCon -> [CoreBndr] -> [Type] -> CoreExpr
-	-- This guy constructs the value that the scrutinee must have
-	-- when you are in one particular branch of a case
-mkAltExpr (DataAlt con) args inst_tys
-  = mkConApp con (map Type inst_tys ++ map varToCoreExpr args)
-mkAltExpr (LitAlt lit) [] []
-  = Lit lit
 \end{code}
 
 
@@ -465,40 +536,6 @@ seq_rules (Rule fs bs es e : rules) = seqBndrs bs `seq` seqExprs (e:es) `seq` se
 seq_rules (BuiltinRule _ : rules) = seq_rules rules
 \end{code}
 
-\begin{code}
-coreBindsSize :: [CoreBind] -> Int
-coreBindsSize bs = foldr ((+) . bindSize) 0 bs
-
-exprSize :: CoreExpr -> Int
-	-- A measure of the size of the expressions
-	-- It also forces the expression pretty drastically as a side effect
-exprSize (Var v)       = varSize v 
-exprSize (Lit lit)     = 1
-exprSize (App f a)     = exprSize f + exprSize a
-exprSize (Lam b e)     = varSize b + exprSize e
-exprSize (Let b e)     = bindSize b + exprSize e
-exprSize (Case e b as) = exprSize e + varSize b + foldr ((+) . altSize) 0  as
-exprSize (Note n e)    = exprSize e
-exprSize (Type t)      = seqType t `seq`
-			 1
-
-exprsSize = foldr ((+) . exprSize) 0 
-
-varSize :: Var -> Int
-varSize b | isTyVar b = 1
-	  | otherwise = seqType (idType b)		`seq`
-			megaSeqIdInfo (idInfo b) 	`seq`
-			1
-
-varsSize = foldr ((+) . varSize) 0
-
-bindSize (NonRec b e) = varSize b + exprSize e
-bindSize (Rec prs)    = foldr ((+) . pairSize) 0 prs
-
-pairSize (b,e) = varSize b + exprSize e
-
-altSize (c,bs,e) = c `seq` varsSize bs + exprSize e
-\end{code}
 
 
 %************************************************************************

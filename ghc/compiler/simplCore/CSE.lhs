@@ -12,7 +12,7 @@ module CSE (
 
 import CmdLineOpts	( opt_D_dump_cse, opt_D_verbose_core2core )
 import Id		( Id, idType )
-import CoreUtils	( hashExpr, cheapEqExpr, exprIsBig )
+import CoreUtils	( hashExpr, cheapEqExpr, exprIsBig, mkAltExpr )
 import DataCon		( isUnboxedTupleCon )
 import Type		( splitTyConApp_maybe )
 import CoreSyn

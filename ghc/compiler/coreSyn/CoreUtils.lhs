@@ -7,53 +7,62 @@
 module CoreUtils (
 	exprType, coreAltsType,
 
+	-- Construction
 	mkNote, mkInlineMe, mkSCC, mkCoerce,
+	bindNonRec, mkIfThenElse, mkAltExpr,
 
 	exprIsBottom, exprIsDupable, exprIsTrivial, exprIsCheap, 
 	exprIsValue,exprOkForSpeculation, exprIsBig, 
-	exprArity, 
+	exprArity, exprIsConApp_maybe,
 
 	idAppIsBottom, idAppIsCheap,
 
 	etaReduceExpr, exprEtaExpandArity,
 
+	-- Size
+	coreBindsSize,
+
+	-- Hashing
 	hashExpr,
 
+	-- Equality
 	cheapEqExpr, eqExpr, applyTypeToArgs
     ) where
 
 #include "HsVersions.h"
 
 
-import {-# SOURCE #-} CoreUnfold	( isEvaldUnfolding )
-
 import GlaExts		-- For `xori` 
 
 import CoreSyn
 import CoreFVs		( exprFreeVars )
 import PprCore		( pprCoreExpr )
-import Var		( isId, isTyVar )
+import Var		( Var, isId, isTyVar )
 import VarSet
 import VarEnv
 import Name		( isLocallyDefined, hashName )
 import Literal		( Literal, hashLiteral, literalType )
+import DataCon		( DataCon, dataConRepArity )
 import PrimOp		( primOpOkForSpeculation, primOpIsCheap )
-import Id		( Id, idType, idFlavour, idStrictness, idLBVarInfo, 
-			  idArity, idName, idUnfolding, idInfo
+import Id		( Id, idType, idFlavour, idStrictness, idLBVarInfo, mkWildId,
+			  idArity, idName, idUnfolding, idInfo, isDataConId_maybe
+
 			)
 import IdInfo		( arityLowerBound, InlinePragInfo(..),
 			  LBVarInfo(..),  
 			  IdFlavour(..),
-			  appIsBottom
-			)
+			  megaSeqIdInfo )
+import Demand		( appIsBottom )
 import Type		( Type, mkFunTy, mkForAllTy,
 			  splitFunTy_maybe, tyVarsOfType, tyVarsOfTypes,
                           isNotUsgTy, mkUsgTy, unUsgTy, UsageAnn(..),
-			  applyTys, isUnLiftedType
+			  applyTys, isUnLiftedType, seqType
 			)
+import TysWiredIn	( boolTy, stringTy, trueDataCon, falseDataCon )
 import CostCentre	( CostCentre )
 import Unique		( buildIdKey, augmentIdKey )
 import Util		( zipWithEqual, mapAccumL )
+import Maybes		( maybeToBool )
 import Outputable
 import TysPrim		( alphaTy )	-- Debugging only
 \end{code}
@@ -118,7 +127,7 @@ applyTypeToArgs e op_ty (other_arg : args)
 
 %************************************************************************
 %*									*
-\subsection{Attaching notes
+\subsection{Attaching notes}
 %*									*
 %************************************************************************
 
@@ -173,6 +182,44 @@ mkSCC cc (Lam x e) = Lam x (mkSCC cc e)	-- Move _scc_ inside lambda
 mkSCC cc expr	   = Note (SCC cc) expr
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Other expression construction}
+%*									*
+%************************************************************************
+
+\begin{code}
+bindNonRec :: Id -> CoreExpr -> CoreExpr -> CoreExpr
+-- (bindNonRec x r b) produces either
+--	let x = r in b
+-- or
+--	case r of x { _DEFAULT_ -> b }
+--
+-- depending on whether x is unlifted or not
+-- It's used by the desugarer to avoid building bindings
+-- that give Core Lint a heart attack.  Actually the simplifier
+-- deals with them perfectly well.
+bindNonRec bndr rhs body 
+  | isUnLiftedType (idType bndr) = Case rhs bndr [(DEFAULT,[],body)]
+  | otherwise			 = Let (NonRec bndr rhs) body
+\end{code}
+
+\begin{code}
+mkAltExpr :: AltCon -> [CoreBndr] -> [Type] -> CoreExpr
+	-- This guy constructs the value that the scrutinee must have
+	-- when you are in one particular branch of a case
+mkAltExpr (DataAlt con) args inst_tys
+  = mkConApp con (map Type inst_tys ++ map varToCoreExpr args)
+mkAltExpr (LitAlt lit) [] []
+  = Lit lit
+
+mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
+mkIfThenElse guard then_expr else_expr
+  = Case guard (mkWildId boolTy) 
+	 [ (DataAlt trueDataCon,  [], then_expr),
+	   (DataAlt falseDataCon, [], else_expr) ]
+\end{code}
 
 %************************************************************************
 %*									*
@@ -435,6 +482,28 @@ exprArity (Note note e) | ok_note note	= exprArity e
 exprArity other	= 0
 \end{code}
 
+\begin{code}
+exprIsConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
+exprIsConApp_maybe expr
+  = analyse (collectArgs expr)
+  where
+    analyse (Var fun, args)
+	| maybeToBool maybe_con_app = maybe_con_app
+	where
+	  maybe_con_app = case isDataConId_maybe fun of
+				Just con | length args >= dataConRepArity con 
+					-- Might be > because the arity excludes type args
+				         -> Just (con, args)
+				other    -> Nothing
+
+    analyse (Var fun, [])
+	= case maybeUnfoldingTemplate (idUnfolding fun) of
+	    	Nothing  -> Nothing
+		Just unf -> exprIsConApp_maybe unf
+
+    analyse other = Nothing
+\end{code} 
+
 
 %************************************************************************
 %*									*
@@ -608,6 +677,49 @@ eqExpr e1 e2
     eq_note env InlineCall     InlineCall     = True
     eq_note env other1	       other2	      = False
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{The size of an expression}
+%*									*
+%************************************************************************
+
+\begin{code}
+coreBindsSize :: [CoreBind] -> Int
+coreBindsSize bs = foldr ((+) . bindSize) 0 bs
+
+exprSize :: CoreExpr -> Int
+	-- A measure of the size of the expressions
+	-- It also forces the expression pretty drastically as a side effect
+exprSize (Var v)       = varSize v 
+exprSize (Lit lit)     = 1
+exprSize (App f a)     = exprSize f + exprSize a
+exprSize (Lam b e)     = varSize b + exprSize e
+exprSize (Let b e)     = bindSize b + exprSize e
+exprSize (Case e b as) = exprSize e + varSize b + foldr ((+) . altSize) 0  as
+exprSize (Note n e)    = exprSize e
+exprSize (Type t)      = seqType t `seq`
+			 1
+
+exprsSize = foldr ((+) . exprSize) 0 
+
+varSize :: Var -> Int
+varSize b | isTyVar b = 1
+	  | otherwise = seqType (idType b)		`seq`
+			megaSeqIdInfo (idInfo b) 	`seq`
+			1
+
+varsSize = foldr ((+) . varSize) 0
+
+bindSize (NonRec b e) = varSize b + exprSize e
+bindSize (Rec prs)    = foldr ((+) . pairSize) 0 prs
+
+pairSize (b,e) = varSize b + exprSize e
+
+altSize (c,bs,e) = c `seq` varsSize bs + exprSize e
+\end{code}
+
 
 %************************************************************************
 %*									*

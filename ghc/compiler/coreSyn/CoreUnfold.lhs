@@ -14,7 +14,7 @@ find, unsurprisingly, a Core expression.
 
 \begin{code}
 module CoreUnfold (
-	Unfolding, UnfoldingGuidance, -- types
+	Unfolding, UnfoldingGuidance,	-- Abstract types
 
 	noUnfolding, mkTopUnfolding, mkUnfolding, mkCompulsoryUnfolding, seqUnfolding,
 	mkOtherCon, otherCons,
@@ -69,48 +69,14 @@ import GlaExts		( fromInt )
 #endif
 \end{code}
 
+
 %************************************************************************
 %*									*
-\subsection{@Unfolding@ and @UnfoldingGuidance@ types}
+\subsection{Making unfoldings}
 %*									*
 %************************************************************************
 
 \begin{code}
-data Unfolding
-  = NoUnfolding
-
-  | OtherCon [AltCon]		-- It ain't one of these
-				-- (OtherCon xs) also indicates that something has been evaluated
-				-- and hence there's no point in re-evaluating it.
-				-- OtherCon [] is used even for non-data-type values
-				-- to indicated evaluated-ness.  Notably:
-				--	data C = C !(Int -> Int)
-				-- 	case x of { C f -> ... }
-				-- Here, f gets an OtherCon [] unfolding.
-
-  | CompulsoryUnfolding CoreExpr	-- There is no "original" definition,
-					-- so you'd better unfold.
-
-  | CoreUnfolding			-- An unfolding with redundant cached information
-		CoreExpr		-- Template; binder-info is correct
-		Bool			-- This is a top-level binding
-		Bool			-- exprIsCheap template (cached); it won't duplicate (much) work 
-					--	if you inline this in more than one place
-		Bool			-- exprIsValue template (cached); it is ok to discard a `seq` on
-					--	this variable
-		Bool			-- exprIsBottom template (cached)
-		UnfoldingGuidance	-- Tells about the *size* of the template.
-
-seqUnfolding :: Unfolding -> ()
-seqUnfolding (CoreUnfolding e top b1 b2 b3 g)
-  = seqExpr e `seq` top `seq` b1 `seq` b2 `seq` b3 `seq` seqGuidance g
-seqUnfolding other = ()
-\end{code}
-
-\begin{code}
-noUnfolding = NoUnfolding
-mkOtherCon  = OtherCon
-
 mkTopUnfolding cpr_info expr = mkUnfolding True {- Top level -} cpr_info expr
 
 mkUnfolding top_lvl cpr_info expr
@@ -131,66 +97,14 @@ mkUnfolding top_lvl cpr_info expr
 
 mkCompulsoryUnfolding expr	-- Used for things that absolutely must be unfolded
   = CompulsoryUnfolding (occurAnalyseGlobalExpr expr)
-
-unfoldingTemplate :: Unfolding -> CoreExpr
-unfoldingTemplate (CoreUnfolding expr _ _ _ _ _) = expr
-unfoldingTemplate (CompulsoryUnfolding expr)     = expr
-unfoldingTemplate other = panic "getUnfoldingTemplate"
-
-maybeUnfoldingTemplate :: Unfolding -> Maybe CoreExpr
-maybeUnfoldingTemplate (CoreUnfolding expr _ _ _ _ _) = Just expr
-maybeUnfoldingTemplate (CompulsoryUnfolding expr)     = Just expr
-maybeUnfoldingTemplate other 			      = Nothing
-
-otherCons (OtherCon cons) = cons
-otherCons other		  = []
-
-isValueUnfolding :: Unfolding -> Bool
-	-- Returns False for OtherCon
-isValueUnfolding (CoreUnfolding _ _ _ is_evald _ _) = is_evald
-isValueUnfolding other			            = False
-
-isEvaldUnfolding :: Unfolding -> Bool
-	-- Returns True for OtherCon
-isEvaldUnfolding (OtherCon _)		            = True
-isEvaldUnfolding (CoreUnfolding _ _ _ is_evald _ _) = is_evald
-isEvaldUnfolding other			            = False
-
-isCheapUnfolding :: Unfolding -> Bool
-isCheapUnfolding (CoreUnfolding _ _ is_cheap _ _ _) = is_cheap
-isCheapUnfolding other				    = False
-
-isCompulsoryUnfolding :: Unfolding -> Bool
-isCompulsoryUnfolding (CompulsoryUnfolding _) = True
-isCompulsoryUnfolding other		      = False
-
-hasUnfolding :: Unfolding -> Bool
-hasUnfolding (CoreUnfolding _ _ _ _ _ _) = True
-hasUnfolding (CompulsoryUnfolding _)     = True
-hasUnfolding other 	 	         = False
-
-hasSomeUnfolding :: Unfolding -> Bool
-hasSomeUnfolding NoUnfolding = False
-hasSomeUnfolding other	     = True
-
-data UnfoldingGuidance
-  = UnfoldNever
-  | UnfoldIfGoodArgs	Int	-- and "n" value args
-
-			[Int]	-- Discount if the argument is evaluated.
-				-- (i.e., a simplification will definitely
-				-- be possible).  One elt of the list per *value* arg.
-
-			Int	-- The "size" of the unfolding; to be elaborated
-				-- later. ToDo
-
-			Int	-- Scrutinee discount: the discount to substract if the thing is in
-				-- a context (case (thing args) of ...),
-				-- (where there are the right number of arguments.)
-
-seqGuidance (UnfoldIfGoodArgs n ns a b) = n `seq` sum ns `seq` a `seq` b `seq` ()
-seqGuidance other			= ()
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{The UnfoldingGuidance type}
+%*									*
+%************************************************************************
 
 \begin{code}
 instance Outputable UnfoldingGuidance where
@@ -202,12 +116,6 @@ instance Outputable UnfoldingGuidance where
 	       int discount ]
 \end{code}
 
-
-%************************************************************************
-%*									*
-\subsection[calcUnfoldingGuidance]{Calculate ``unfolding guidance'' for an expression}
-%*									*
-%************************************************************************
 
 \begin{code}
 calcUnfoldingGuidance

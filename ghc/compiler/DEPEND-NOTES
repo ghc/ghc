@@ -7,7 +7,7 @@ A 'loop' indicates a use from a module compiled later
 
 	Name, PrimRep, FieldLabel (loop Type.Type)
 then
-	Var (loop Const.Con, loop IdInfo.IdInfo, 
+	Var (loop CoreSyn.CoreExpr, loop IdInfo.IdInfo, 
 	     loop Type.GenType, loop Type.Kind)
 then
 	VarEnv, VarSet, ThinAir
@@ -30,19 +30,20 @@ then
 then
 	PrimOp (PprType, TysWiredIn)
 then
-	IdInfo (loop CoreSyn.CoreRules, loop CoreUnfold.Unfolding) 
+	CoreSyn
 then
-	Const (PrimOp.PrimOp, TysWiredIn.stringTy)
+	IdInfo (loop CoreSyn.CoreRules etc, loop CoreUnfold.Unfolding) 
 then
-	Id (Const.Con(..)), CoreSyn
+	Id (lots from IdInfo)
 then
 	CoreFVs, PprCore
 then
-	CoreUtils (PprCore.pprCoreExpr, CoreFVs.exprFreeVars)
+	CoreUtils (PprCore.pprCoreExpr, CoreFVs.exprFreeVars,
+		   loop CoreUnfold.isEvaldUnfolding CoreUnfold.maybeUnfoldingTemplate)
 then	
-	OccurAnal (ThinAir.noRepStrs -- an awkward dependency)
+	OccurAnal (CoreUtils.exprIsTrivial)
 then
-	CoreUnfold (loop OccurAnal.globalOccurAnalyse)
+	CoreUnfold (OccurAnal.occurAnalyseGlobalExpr)
 then
 	Rules (Unfolding), Subst (Unfolding, CoreFVs), CoreTidy (noUnfolding)
 then

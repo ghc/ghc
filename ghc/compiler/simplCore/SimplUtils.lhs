@@ -23,7 +23,7 @@ import CmdLineOpts	( opt_SimplDoLambdaEtaExpansion, opt_SimplCaseMerge )
 import CoreSyn
 import CoreUnfold	( isValueUnfolding )
 import CoreFVs		( exprFreeVars )
-import CoreUtils	( exprIsTrivial, cheapEqExpr, exprType, exprIsCheap, exprEtaExpandArity )
+import CoreUtils	( exprIsTrivial, cheapEqExpr, exprType, exprIsCheap, exprEtaExpandArity, bindNonRec )
 import Subst		( InScopeSet, mkSubst, substBndrs, substBndr, substIds, lookupIdSubst )
 import Id		( Id, idType, isId, idName, 
 			  idOccInfo, idUnfolding,

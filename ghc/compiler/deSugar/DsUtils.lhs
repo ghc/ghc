@@ -38,7 +38,7 @@ import CoreSyn
 
 import DsMonad
 
-import CoreUtils	( exprType )
+import CoreUtils	( exprType, mkIfThenElse )
 import PrelInfo		( iRREFUT_PAT_ERROR_ID )
 import Id		( idType, Id, mkWildId )
 import Literal		( Literal )

@@ -70,9 +70,8 @@ module Id (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} CoreUnfold ( Unfolding )
-import {-# SOURCE #-} CoreSyn    ( CoreRules )
 
+import CoreSyn		( Unfolding, CoreRules )
 import BasicTypes	( Arity )
 import Var		( Id, DictId,
 			  isId, mkIdVar,

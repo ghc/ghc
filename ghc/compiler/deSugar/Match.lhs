@@ -18,6 +18,7 @@ import TcHsSyn		( TypecheckedPat, TypecheckedMatch )
 import DsHsSyn		( outPatType )
 import Check            ( check, ExhaustivePat )
 import CoreSyn
+import CoreUtils	( bindNonRec )
 import DsMonad
 import DsGRHSs		( dsGRHSs )
 import DsUtils

@@ -20,6 +20,7 @@ import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds,
 
 			)
 import CoreSyn
+import CoreUtils	( exprType, mkIfThenElse, bindNonRec )
 
 import DsMonad
 import DsBinds		( dsMonoBinds, AutoScc(..) )
@@ -29,7 +30,6 @@ import DsListComp	( dsListComp )
 import DsUtils		( mkErrorAppDs, mkDsLets, mkConsExpr, mkNilExpr )
 import Match		( matchWrapper, matchSimply )
 
-import CoreUtils	( exprType )
 import CostCentre	( mkUserCC )
 import FieldLabel	( FieldLabel )
 import Id		( Id, idType, recordSelectorFieldLabel )

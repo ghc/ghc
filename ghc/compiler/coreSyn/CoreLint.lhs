@@ -17,7 +17,7 @@ import IO	( hPutStr, hPutStrLn, stderr, stdout )
 import CmdLineOpts      ( opt_D_show_passes, opt_DoCoreLinting, opt_PprStyle_Debug )
 import CoreSyn
 import CoreFVs		( idFreeVars )
-import CoreUtils	( exprOkForSpeculation )
+import CoreUtils	( exprOkForSpeculation, coreBindsSize )
 
 import Bag
 import Literal		( Literal, literalType )

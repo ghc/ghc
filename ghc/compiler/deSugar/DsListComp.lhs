@@ -19,7 +19,7 @@ import DsMonad		-- the monadery used in the desugarer
 import DsUtils
 
 import CmdLineOpts	( opt_FoldrBuildOn )
-import CoreUtils	( exprType )
+import CoreUtils	( exprType, mkIfThenElse )
 import Id		( idType )
 import Var              ( Id, TyVar )
 import PrelInfo		( foldrId, buildId )
