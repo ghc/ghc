@@ -307,7 +307,7 @@ else
 fi
 AC_CACHE_CHECK([for version of happy], fptools_cv_happy_version,
 changequote(, )dnl
-[if test x"$HappyCmd" = x"$SrcTreeHappyCmd"; then
+[if test x"$HappyCmd" = x"$SrcTreeHappyCmd" -a -e $srcdir/happy/mk/version.mk; then
    fptools_cv_happy_version=`grep '^ProjectVersion[ 	]*=' $srcdir/happy/mk/version.mk | sed 's/.*\([0-9][0-9]*\.[0-9][0-9]*\).*/\1/g'`;
 elif test x"$HappyCmd" != x; then
    fptools_cv_happy_version="`$HappyCmd -v |
