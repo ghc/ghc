@@ -11,7 +11,7 @@ module TcUnify (
 
 	-- Various unifications
   unifyTauTy, unifyTauTyList, unifyTauTyLists, 
-  unifyKind, unifyKinds, unifyOpenTypeKind, unifyFunKind,
+  unifyKind, unifyKinds, unifyTypeKind, unifyFunKind,
 
   --------------------------------
   -- Holes
@@ -30,12 +30,12 @@ module TcUnify (
 import HsSyn		( HsExpr(..) )
 import TcHsSyn		( mkHsLet,
 			  ExprCoFn, idCoercion, isIdCoercion, mkCoercion, (<.>), (<$>) )
-import TypeRep		( Type(..), SourceType(..), TyNote(..), openKindCon )
+import TypeRep		( Type(..), PredType(..), TyNote(..), typeCon, openKindCon )
 
 import TcRnMonad         -- TcType, amongst others
 import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			  TcTyVarSet, TcThetaType, TyVarDetails(SigTv),
-			  isTauTy, isSigmaTy, mkFunTys,
+			  isTauTy, isSigmaTy, mkFunTys, mkTyConApp,
 			  tcSplitAppTy_maybe, tcSplitTyConApp_maybe, 
 			  tcGetTyVar_maybe, tcGetTyVar, 
 			  mkFunTy, tyVarsOfType, mkPhiTy,
@@ -47,12 +47,12 @@ import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			)
 import Inst		( newDicts, instToId, tcInstCall )
 import TcMType		( getTcTyVar, putTcTyVar, tcInstType, newKindVar,
-			  newTyVarTy, newTyVarTys, newOpenTypeKind, 
+			  newTyVarTy, newTyVarTys, newBoxityVar, 
 			  zonkTcType, zonkTcTyVars, zonkTcTyVarsAndFV )
 import TcSimplify	( tcSimplifyCheck )
-import TysWiredIn	( listTyCon, parrTyCon, mkListTy, mkPArrTy, mkTupleTy )
+import TysWiredIn	( listTyCon, parrTyCon, tupleTyCon )
 import TcEnv		( tcGetGlobalTyVars, findGlobals )
-import TyCon		( tyConArity, isTupleTyCon, tupleTyConBoxity )
+import TyCon		( TyCon, tyConArity, isTupleTyCon, tupleTyConBoxity )
 import PprType		( pprType )
 import Id		( Id, mkSysLocal )
 import Var		( Var, varName, tyVarKind )
@@ -185,60 +185,46 @@ unify_fun_ty_help ty	-- Special cases failed, so revert to ordinary unification
 \end{code}
 
 \begin{code}
-zapToListTy :: Expected TcType -- expected list type
-	    -> TcM TcType      -- list element type
+----------------------
+zapToListTy, zapToPArrTy :: Expected TcType -- expected list type
+	 		 -> TcM TcType      -- list element type
+unifyListTy, unifyPArrTy :: TcType -> TcM TcType
+zapToListTy = zapToXTy listTyCon
+unifyListTy = unifyXTy listTyCon
+zapToPArrTy = zapToXTy parrTyCon
+unifyPArrTy = unifyXTy parrTyCon
 
-zapToListTy (Check ty)   = unifyListTy ty
-zapToListTy (Infer hole) = do { elt_ty <- newTyVarTy liftedTypeKind ;
-				writeMutVar hole (mkListTy elt_ty) ;
+----------------------
+zapToXTy :: TyCon		-- T :: *->*
+	 -> Expected TcType 	-- Expected type (T a)
+	 -> TcM TcType      	-- Element type, a
+
+zapToXTy tc (Check ty)   = unifyXTy tc ty
+zapToXTy tc (Infer hole) = do { elt_ty <- newTyVarTy liftedTypeKind ;
+				writeMutVar hole (mkTyConApp tc [elt_ty]) ;
 				return elt_ty }
 
-unifyListTy :: TcType -> TcM TcType
-unifyListTy ty@(TyVarTy tyvar)
+----------------------
+unifyXTy :: TyCon -> TcType -> TcM TcType
+unifyXTy tc ty@(TyVarTy tyvar)
   = getTcTyVar tyvar	`thenM` \ maybe_ty ->
     case maybe_ty of
-	Just ty' -> unifyListTy ty'
-	other	 -> unify_list_ty_help ty
+	Just ty' -> unifyXTy tc ty'
+	other	 -> unify_x_ty_help tc ty
 
-unifyListTy ty
+unifyXTy tc ty
   = case tcSplitTyConApp_maybe ty of
-	Just (tycon, [arg_ty]) | tycon == listTyCon -> returnM arg_ty
-	other					    -> unify_list_ty_help ty
+	Just (tycon, [arg_ty]) | tycon == tc -> returnM arg_ty
+	other				     -> unify_x_ty_help tc ty
 
-unify_list_ty_help ty	-- Revert to ordinary unification
-  = newTyVarTy liftedTypeKind		`thenM` \ elt_ty ->
-    unifyTauTy ty (mkListTy elt_ty)	`thenM_`
-    returnM elt_ty
-
--- variant for parallel arrays
---
-zapToPArrTy :: Expected TcType     -- Expected list type
-	    -> TcM TcType	   -- List element type
-
-zapToPArrTy (Check ty)   = unifyPArrTy ty
-zapToPArrTy (Infer hole) = do { elt_ty <- newTyVarTy liftedTypeKind ;
-				writeMutVar hole (mkPArrTy elt_ty) ;
-				return elt_ty }
-
-unifyPArrTy :: TcType -> TcM TcType
-
-unifyPArrTy ty@(TyVarTy tyvar)
-  = getTcTyVar tyvar	`thenM` \ maybe_ty ->
-    case maybe_ty of
-      Just ty' -> unifyPArrTy ty'
-      _        -> unify_parr_ty_help ty
-unifyPArrTy ty
-  = case tcSplitTyConApp_maybe ty of
-      Just (tycon, [arg_ty]) | tycon == parrTyCon -> returnM arg_ty
-      _  					  -> unify_parr_ty_help ty
-
-unify_parr_ty_help ty	-- Revert to ordinary unification
-  = newTyVarTy liftedTypeKind		`thenM` \ elt_ty ->
-    unifyTauTy ty (mkPArrTy elt_ty)	`thenM_`
+unify_x_ty_help tc ty	-- Revert to ordinary unification
+  = newTyVarTy liftedTypeKind			`thenM` \ elt_ty ->
+    unifyTauTy ty (mkTyConApp tc [elt_ty])	`thenM_`
     returnM elt_ty
 \end{code}
 
 \begin{code}
+----------------------
 zapToTupleTy :: Boxity -> Arity -> Expected TcType -> TcM [TcType]
 zapToTupleTy boxity arity (Check ty)   = unifyTupleTy boxity arity ty
 zapToTupleTy boxity arity (Infer hole) = do { (tup_ty, arg_tys) <- new_tuple_ty boxity arity ;
@@ -267,8 +253,9 @@ unify_tuple_ty_help boxity arity ty
 
 new_tuple_ty boxity arity
   = newTyVarTys arity kind	`thenM` \ arg_tys ->
-    return (mkTupleTy boxity arity arg_tys, arg_tys)
+    return (mkTyConApp tup_tc arg_tys, arg_tys)
   where
+    tup_tc = tupleTyCon boxity arity
     kind | isBoxed boxity = liftedTypeKind
 	 | otherwise      = openTypeKind
 \end{code}
@@ -626,18 +613,20 @@ uTys ps_ty1 ty1 ps_ty2 (TyVarTy tyvar2) = uVar True  tyvar2 ps_ty1 ty1
 					-- "True" means args swapped
 
 	-- Predicates
-uTys _ (SourceTy (IParam n1 t1)) _ (SourceTy (IParam n2 t2))
+uTys _ (PredTy (IParam n1 t1)) _ (PredTy (IParam n2 t2))
   | n1 == n2 = uTys t1 t1 t2 t2
-uTys _ (SourceTy (ClassP c1 tys1)) _ (SourceTy (ClassP c2 tys2))
+uTys _ (PredTy (ClassP c1 tys1)) _ (PredTy (ClassP c2 tys2))
   | c1 == c2 = unifyTauTyLists tys1 tys2
-uTys _ (SourceTy (NType tc1 tys1)) _ (SourceTy (NType tc2 tys2))
-  | tc1 == tc2 = unifyTauTyLists tys1 tys2
 
 	-- Functions; just check the two parts
 uTys _ (FunTy fun1 arg1) _ (FunTy fun2 arg2)
   = uTys fun1 fun1 fun2 fun2	`thenM_`    uTys arg1 arg1 arg2 arg2
 
-	-- Type constructors must match
+	-- NewType constructors must match
+uTys _ (NewTcApp tc1 tys1) _ (NewTcApp tc2 tys2)
+  | tc1 == tc2 = unifyTauTyLists tys1 tys2
+
+	-- Ordinary type constructors must match
 uTys ps_ty1 (TyConApp con1 tys1) ps_ty2 (TyConApp con2 tys2)
   | con1 == con2 && equalLength tys1 tys2
   = unifyTauTyLists tys1 tys2
@@ -646,7 +635,7 @@ uTys ps_ty1 (TyConApp con1 tys1) ps_ty2 (TyConApp con2 tys2)
 	-- When we are doing kind checking, we might match a kind '?' 
 	-- against a kind '*' or '#'.  Notably, CCallable :: ? -> *, and
 	-- (CCallable Int) and (CCallable Int#) are both OK
-  = unifyOpenTypeKind ps_ty2
+  = unifyTypeKind ps_ty2
 
 	-- Applications need a bit of care!
 	-- They can match FunTy and TyConApp, so use splitAppTy_maybe
@@ -887,8 +876,9 @@ okToUnifyWith tv ty
     ok (AppTy t1 t2)   		= ok t1 `and` ok t2
     ok (FunTy t1 t2)   		= ok t1 `and` ok t2
     ok (TyConApp _ ts) 		= oks ts
+    ok (NewTcApp _ ts) 		= oks ts
     ok (ForAllTy _ _)  		= Just NotMonoType
-    ok (SourceTy st)   		= ok_st st
+    ok (PredTy st)   		= ok_st st
     ok (NoteTy (FTVNote _) t)   = ok t
     ok (NoteTy (SynNote t1) t2) = ok t1 `and` ok t2
 		-- Type variables may be free in t1 but not t2
@@ -898,7 +888,6 @@ okToUnifyWith tv ty
 
     ok_st (ClassP _ ts) = oks ts
     ok_st (IParam _ t)  = ok t
-    ok_st (NType _ ts)  = oks ts
 
     Nothing `and` m = m
     Just p  `and` m = Just p
@@ -924,23 +913,23 @@ unifyKinds _ _ = panic "unifyKinds: length mis-match"
 \end{code}
 
 \begin{code}
-unifyOpenTypeKind :: TcKind -> TcM ()	
--- Ensures that the argument kind is of the form (Type bx)
--- for some boxity bx
+unifyTypeKind :: TcKind -> TcM ()	
+-- Ensures that the argument kind is a liftedTypeKind or unliftedTypeKind
+-- If it's a kind variable, make it (Type bx), for a fresh boxity variable bx
 
-unifyOpenTypeKind ty@(TyVarTy tyvar)
+unifyTypeKind ty@(TyVarTy tyvar)
   = getTcTyVar tyvar	`thenM` \ maybe_ty ->
     case maybe_ty of
-	Just ty' -> unifyOpenTypeKind ty'
-	other	 -> unify_open_kind_help ty
-
-unifyOpenTypeKind ty
+	Just ty' -> unifyTypeKind ty'
+	Nothing	 -> newBoxityVar					`thenM` \ bx_var ->
+		    putTcTyVar tyvar (mkTyConApp typeCon [bx_var])	`thenM_`
+		    returnM ()
+	
+unifyTypeKind ty
   | isTypeKind ty = returnM ()
-  | otherwise     = unify_open_kind_help ty
-
-unify_open_kind_help ty	-- Revert to ordinary unification
-  = newOpenTypeKind 	`thenM` \ open_kind ->
-    unifyKind ty open_kind
+  | otherwise 	-- Failure
+  = zonkTcType ty	`thenM` \ ty1 ->
+    failWithTc (ptext SLIT("Type expected but") <+> quotes (ppr ty1) <+> ptext SLIT("found"))
 \end{code}
 
 \begin{code}

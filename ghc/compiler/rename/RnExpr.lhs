@@ -28,28 +28,22 @@ import RdrHsSyn
 import RnHsSyn
 import TcRnMonad
 import RnEnv
+import RdrName		( plusGlobalRdrEnv )
 import RnNames		( importsFromLocalDecls )
 import RnTypes		( rnHsTypeFVs, rnPat, litFVs, rnOverLit, rnPatsAndThen,
 			  dupFieldErr, precParseErr, sectionPrecErr, patSigErr, checkTupSize )
 import CmdLineOpts	( DynFlag(..) )
-import BasicTypes	( Fixity(..), FixityDirection(..), IPName(..),
-			  defaultFixity, negateFixity, compareFixity )
-import PrelNames	( hasKey, assertIdKey, 
-			  foldrName, buildName, 
-			  enumClassName, 
+import BasicTypes	( Fixity(..), FixityDirection(..), negateFixity, compareFixity )
+import PrelNames	( hasKey, assertIdKey, assertErrorName,
 			  loopAName, choiceAName, appAName, arrAName, composeAName, firstAName,
-			  splitName, fstName, sndName, ioDataConName, 
-			  replicatePName, mapPName, filterPName,
-			  crossPName, zipPName, toPName,
-			  enumFromToPName, enumFromThenToPName, assertErrorName,
 			  negateName, monadNames, mfixName )
 import Name		( Name, nameOccName )
 import NameSet
 import UnicodeUtil	( stringToUtf8 )
 import UniqFM		( isNullUFM )
 import UniqSet		( emptyUniqSet )
-import Util		( isSingleton, mapAndUnzip )
-import List		( intersectBy, unzip4 )
+import Util		( isSingleton )
+import List		( unzip4 )
 import ListSetOps	( removeDups )
 import Outputable
 import SrcLoc		( noSrcLoc )
@@ -172,13 +166,8 @@ rnExpr (HsVar v)
        returnM (HsVar name, unitFV name)
 
 rnExpr (HsIPVar v)
-  = newIPName v			`thenM` \ name ->
-    let 
-	fvs = case name of
-		Linear _  -> mkFVs [splitName, fstName, sndName]
-		Dupable _ -> emptyFVs 
-    in   
-    returnM (HsIPVar name, fvs)
+  = newIPNameRn v		`thenM` \ name ->
+    returnM (HsIPVar name, emptyFVs)
 
 rnExpr (HsLit lit) 
   = litFVs lit		`thenM` \ fvs -> 
@@ -204,15 +193,11 @@ rnExpr (OpApp e1 op _ e2)
 
 	-- Deal with fixity
 	-- When renaming code synthesised from "deriving" declarations
-	-- we're in Interface mode, and we should ignore fixity; assume
-	-- that the deriving code generator got the association correct
-	-- Don't even look up the fixity when in interface mode
-    getModeRn				`thenM` \ mode -> 
-    (if isInterfaceMode mode
-	then returnM (OpApp e1' op' defaultFixity e2')
-	else lookupFixityRn op_name		`thenM` \ fixity ->
-	     mkOpAppRn e1' op' fixity e2'
-    )					`thenM` \ final_e -> 
+	-- we used to avoid fixity stuff, but we can't easily tell any
+	-- more, so I've removed the test.  Adding HsPars in TcGenDeriv
+	-- should prevent bad things happening.
+    lookupFixityRn op_name		`thenM` \ fixity ->
+    mkOpAppRn e1' op' fixity e2'	`thenM` \ final_e -> 
 
     returnM (final_e,
 	      fv_e1 `plusFV` fv_op `plusFV` fv_e2)
@@ -234,20 +219,20 @@ rnExpr e@(HsBracket br_body loc)
   = addSrcLoc loc		$
     checkTH e "bracket"		`thenM_`
     rnBracket br_body		`thenM` \ (body', fvs_e) ->
-    returnM (HsBracket body' loc, fvs_e `plusFV` thProxyName)
+    returnM (HsBracket body' loc, fvs_e)
 
 rnExpr e@(HsSplice n splice loc)
   = addSrcLoc loc		$
     checkTH e "splice"		`thenM_`
     newLocalsRn [(n,loc)]	`thenM` \ [n'] ->
     rnExpr splice 		`thenM` \ (splice', fvs_e) ->
-    returnM (HsSplice n' splice' loc, fvs_e `plusFV` thProxyName)
+    returnM (HsSplice n' splice' loc, fvs_e)
 
 rnExpr e@(HsReify (Reify flavour name))
   = checkTH e "reify"		`thenM_`
     lookupGlobalOccRn name	`thenM` \ name' ->
 	-- For now, we can only reify top-level things
-    returnM (HsReify (Reify flavour name'), unitFV name' `plusFV` thProxyName)
+    returnM (HsReify (Reify flavour name'), unitFV name')
 
 rnExpr section@(SectionL expr op)
   = rnExpr expr	 				`thenM` \ (expr', fvs_expr) ->
@@ -294,13 +279,8 @@ rnExpr e@(HsDo do_or_lc stmts _ _ src_loc)
     lookupSyntaxNames syntax_names	`thenM` \ (syntax_names', monad_fvs) ->
 
     returnM (HsDo do_or_lc stmts' syntax_names' placeHolderType src_loc, 
-	     fvs `plusFV` implicit_fvs do_or_lc `plusFV` monad_fvs)
+	     fvs `plusFV` monad_fvs)
   where
-    implicit_fvs PArrComp = mkFVs [replicatePName, mapPName, filterPName, crossPName, zipPName]
-    implicit_fvs ListComp = mkFVs [foldrName, buildName]
-    implicit_fvs DoExpr   = emptyFVs
-    implicit_fvs MDoExpr  = emptyFVs
-
     syntax_names = case do_or_lc of
 			DoExpr  -> monadNames
 			MDoExpr -> monadNames ++ [mfixName]
@@ -312,8 +292,7 @@ rnExpr (ExplicitList _ exps)
 
 rnExpr (ExplicitPArr _ exps)
   = rnExprs exps		 	`thenM` \ (exps', fvs) ->
-    returnM  (ExplicitPArr placeHolderType exps', 
-	       fvs `addOneFV` toPName `addOneFV` parrTyCon_name)
+    returnM  (ExplicitPArr placeHolderType exps', fvs)
 
 rnExpr e@(ExplicitTuple exps boxity)
   = checkTupSize tup_size			`thenM_`
@@ -355,12 +334,11 @@ rnExpr (HsType a)
 
 rnExpr (ArithSeqIn seq)
   = rnArithSeq seq	 `thenM` \ (new_seq, fvs) ->
-    returnM (ArithSeqIn new_seq, fvs `addOneFV` enumClassName)
+    returnM (ArithSeqIn new_seq, fvs)
 
 rnExpr (PArrSeqIn seq)
   = rnArithSeq seq	 `thenM` \ (new_seq, fvs) ->
-    returnM (PArrSeqIn new_seq, 
-	     fvs `plusFV` mkFVs [enumFromToPName, enumFromThenToPName])
+    returnM (PArrSeqIn new_seq, fvs)
 \end{code}
 
 These three are pattern syntax appearing in expressions.
@@ -1047,16 +1025,13 @@ right_op_ok fix1 other
   = True
 
 -- Parser initially makes negation bind more tightly than any other operator
+-- And "deriving" code should respect this (use HsPar if not)
 mkNegAppRn neg_arg neg_name
-  = 
-#ifdef DEBUG
-    getModeRn			`thenM` \ mode ->
-    ASSERT( not_op_app mode neg_arg )
-#endif
+  = ASSERT( not_op_app neg_arg )
     returnM (NegApp neg_arg neg_name)
 
-not_op_app SourceMode (OpApp _ _ _ _) = False
-not_op_app mode other	 	      = True
+not_op_app (OpApp _ _ _ _) = False
+not_op_app other	   = True
 \end{code}
 
 \begin{code}
@@ -1067,12 +1042,9 @@ checkPrecMatch False fn match
 
 checkPrecMatch True op (Match (p1:p2:_) _ _)
 	-- True indicates an infix lhs
-  = getModeRn 		`thenM` \ mode ->
-	-- See comments with rnExpr (OpApp ...)
-    if isInterfaceMode mode
-	then returnM ()
-	else checkPrec op p1 False	`thenM_`
-	     checkPrec op p2 True
+  = 	-- See comments with rnExpr (OpApp ...) about "deriving"
+    checkPrec op p1 False	`thenM_`
+    checkPrec op p2 True
 
 checkPrecMatch True op _ = panic "checkPrecMatch"
 
@@ -1129,7 +1101,7 @@ mkAssertErrorExpr
 	expr = HsApp (HsVar assertErrorName) (HsLit msg)
 	msg  = HsStringPrim (mkFastString (stringToUtf8 (showSDoc (ppr sloc))))
     in
-    returnM (expr, unitFV assertErrorName)
+    returnM (expr, emptyFVs)
 \end{code}
 
 %************************************************************************

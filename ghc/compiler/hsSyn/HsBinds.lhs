@@ -15,20 +15,16 @@ import {-# SOURCE #-} HsExpr ( HsExpr, pprExpr,
 			       GRHSs,  pprPatBind )
 
 -- friends:
-import HsImpExp		( pprHsVar )
 import HsPat		( Pat )
 import HsTypes		( HsType )
-import PprCore		( {- instance Outputable (Expr a) -} )
 
 --others:
 import Name		( Name )
-import PrelNames	( isUnboundName )
 import NameSet		( NameSet, elemNameSet, nameSetToList )
-import BasicTypes	( RecFlag(..), FixitySig(..), Activation(..), IPName )
+import BasicTypes	( RecFlag(..), Activation(..), Fixity, IPName )
 import Outputable	
 import SrcLoc		( SrcLoc )
 import Var		( TyVar )
-import Class            ( DefMeth (..) )
 \end{code}
 
 %************************************************************************
@@ -248,12 +244,6 @@ data Sig name
 		(HsType name)
 		SrcLoc
 
-  | ClassOpSig	name		-- Selector name
-                (DefMeth name)	-- Default-method info
-				-- See "THE NAMING STORY" in HsDecls
-		(HsType name)
-		SrcLoc
-
   | SpecSig 	name		-- specialise a function or datatype ...
 		(HsType name)	-- ... to these types
 		SrcLoc
@@ -268,15 +258,15 @@ data Sig name
 		SrcLoc
 
   | FixSig	(FixitySig name)	-- Fixity declaration
+
+data FixitySig name = FixitySig name Fixity SrcLoc 
 \end{code}
 
 \begin{code}
 okBindSig :: NameSet -> Sig Name -> Bool
-okBindSig ns (ClassOpSig _ _ _ _) = False
 okBindSig ns sig		  = sigForThisGroup ns sig
 
 okClsDclSig :: Sig Name -> Bool
-okClsDclSig (Sig _ _ _)       = False
 okClsDclSig (SpecInstSig _ _) = False
 okClsDclSig sig 	      = True	-- All others OK
 
@@ -286,27 +276,29 @@ okInstDclSig ns (FixSig _)	  = False
 okInstDclSig ns (SpecInstSig _ _) = True
 okInstDclSig ns sig		  = sigForThisGroup ns sig
 
+sigForThisGroup :: NameSet -> Sig Name -> Bool
 sigForThisGroup ns sig 
   = case sigName sig of
-	Nothing 		 -> False
-	Just n | isUnboundName n -> True	-- Don't complain about an unbound name again
-	       | otherwise 	 -> n `elemNameSet` ns
+	Nothing -> False
+	Just n  -> n `elemNameSet` ns
 
 sigName :: Sig name -> Maybe name
 sigName (Sig         n _ _)        = Just n
-sigName (ClassOpSig  n _ _ _)      = Just n
 sigName (SpecSig     n _ _)        = Just n
 sigName (InlineSig _ n _ _)        = Just n
 sigName (FixSig (FixitySig n _ _)) = Just n
 sigName other			   = Nothing
 
+sigLoc :: Sig name -> SrcLoc
+sigLoc (Sig         _ _ loc)        = loc
+sigLoc (SpecSig     _ _ loc)        = loc
+sigLoc (InlineSig _ _ _ loc)        = loc
+sigLoc (FixSig (FixitySig n _ loc)) = loc
+sigLoc (SpecInstSig _ loc)	    = loc
+
 isFixitySig :: Sig name -> Bool
 isFixitySig (FixSig _) = True
 isFixitySig _	       = False
-
-isClassOpSig :: Sig name -> Bool
-isClassOpSig (ClassOpSig _ _ _ _) = True
-isClassOpSig _			  = False
 
 isPragSig :: Sig name -> Bool
 	-- Identifies pragmas 
@@ -314,16 +306,26 @@ isPragSig (SpecSig _ _ _)     = True
 isPragSig (InlineSig _ _ _ _) = True
 isPragSig (SpecInstSig _ _)   = True
 isPragSig other		      = False
-\end{code}
 
-\begin{code}
 hsSigDoc (Sig        _ _ loc) 	      = (ptext SLIT("type signature"),loc)
-hsSigDoc (ClassOpSig _ _ _ loc)       = (ptext SLIT("class-method type signature"), loc)
 hsSigDoc (SpecSig    _ _ loc) 	      = (ptext SLIT("SPECIALISE pragma"),loc)
 hsSigDoc (InlineSig True  _ _ loc)    = (ptext SLIT("INLINE pragma"),loc)
 hsSigDoc (InlineSig False _ _ loc)    = (ptext SLIT("NOINLINE pragma"),loc)
 hsSigDoc (SpecInstSig _ loc)	      = (ptext SLIT("SPECIALISE instance pragma"),loc)
 hsSigDoc (FixSig (FixitySig _ _ loc)) = (ptext SLIT("fixity declaration"), loc)
+\end{code}
+
+Signature equality is used when checking for duplicate signatures
+
+\begin{code}
+eqHsSig :: Sig Name -> Sig Name -> Bool
+eqHsSig (FixSig (FixitySig n1 _ _)) (FixSig (FixitySig n2 _ _)) = n1 == n2
+eqHsSig (Sig n1 _ _)         	    (Sig n2 _ _)          	= n1 == n2
+eqHsSig (InlineSig b1 n1 _ _)	    (InlineSig b2 n2 _ _) 	= b1 == b2 && n1 == n2
+ 	-- For specialisations, we don't have equality over
+	-- HsType, so it's not convenient to spot duplicate 
+	-- specialisations here.  Check for this later, when we're in Type land
+eqHsSig _other1 _other2 = False
 \end{code}
 
 \begin{code}
@@ -333,20 +335,6 @@ instance (Outputable name) => Outputable (Sig name) where
 ppr_sig :: Outputable name => Sig name -> SDoc
 ppr_sig (Sig var ty _)
       = sep [ppr var <+> dcolon, nest 4 (ppr ty)]
-
-ppr_sig (ClassOpSig var dm ty _)
-      = sep [ pprHsVar var <+> dcolon, 
-	      nest 4 (ppr ty),
-	      nest 4 (pp_dm_comment) ]
-      where
-	pp_dm = case dm of 
-		  DefMeth _  -> equals 	-- Default method indicator
-		  GenDefMeth -> semi    -- Generic method indicator
-		  NoDefMeth  -> empty   -- No Method at all
-	pp_dm_comment = case dm of 
-		  DefMeth _  -> text "{- has default method -}"
-		  GenDefMeth -> text "{- has generic method -}"
-		  NoDefMeth  -> empty   -- No Method at all
 
 ppr_sig (SpecSig var ty _)
       = sep [ hsep [text "{-# SPECIALIZE", ppr var, dcolon],
@@ -363,21 +351,7 @@ ppr_sig (SpecInstSig ty _)
       = hsep [text "{-# SPECIALIZE instance", ppr ty, text "#-}"]
 
 ppr_sig (FixSig fix_sig) = ppr fix_sig
-\end{code}
 
-Checking for distinct signatures; oh, so boring
-
-
-\begin{code}
-eqHsSig :: Sig Name -> Sig Name -> Bool
-eqHsSig (Sig n1 _ _)         (Sig n2 _ _)          = n1 == n2
-eqHsSig (InlineSig b1 n1 _ _)(InlineSig b2 n2 _ _) = b1 == b2 && n1 == n2
-
-eqHsSig (SpecInstSig ty1 _)  (SpecInstSig ty2 _)  = ty1 == ty2
-eqHsSig (SpecSig n1 ty1 _)   (SpecSig n2 ty2 _)   =
-    -- may have many specialisations for one value;
-    -- but not ones that are exactly the same...
-    (n1 == n2) && (ty1 == ty2)
-
-eqHsSig _other1 _other2 = False
+instance Outputable name => Outputable (FixitySig name) where
+  ppr (FixitySig name fixity loc) = sep [ppr fixity, ppr name]
 \end{code}

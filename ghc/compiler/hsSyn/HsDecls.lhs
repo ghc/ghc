@@ -12,15 +12,14 @@ module HsDecls (
 	DefaultDecl(..), HsGroup(..), SpliceDecl(..),
 	ForeignDecl(..), ForeignImport(..), ForeignExport(..),
 	CImportSpec(..), FoType(..),
-	ConDecl(..), CoreDecl(..),
-	BangType(..), getBangType, getBangStrictness, unbangedType,
-	DeprecDecl(..), DeprecTxt,
+	ConDecl(..), 
+	BangType(..), HsBang(..), getBangType, getBangStrictness, unbangedType, 
+	DeprecDecl(..), 
 	tyClDeclName, tyClDeclNames, tyClDeclTyVars,
-	isClassDecl, isSynDecl, isDataDecl, isIfaceSigDecl, 
-	isTypeOrClassDecl, countTyClDecls,
-	isSourceInstDecl, instDeclDFun, ifaceRuleDeclName,
+	isClassDecl, isSynDecl, isDataDecl, 
+	countTyClDecls,
 	conDetailsTys,
-	collectRuleBndrSigTys, isSrcRule
+	collectRuleBndrSigTys, 
     ) where
 
 #include "HsVersions.h"
@@ -29,31 +28,24 @@ module HsDecls (
 import {-# SOURCE #-}	HsExpr( HsExpr, pprExpr )
 	-- Because Expr imports Decls via HsBracket
 
-import HsBinds		( HsBinds, MonoBinds, Sig(..) )
+import HsBinds		( HsBinds, MonoBinds, Sig(..), FixitySig )
 import HsPat		( HsConDetails(..), hsConArgs )
 import HsImpExp		( pprHsVar )
 import HsTypes
-import PprCore		( pprCoreRule )
-import HsCore		( UfExpr, UfBinder, HsIdInfo, pprHsIdInfo,
-			  eq_ufBinders, eq_ufExpr, pprUfExpr 
-			)
-import CoreSyn		( CoreRule(..), RuleName )
-import BasicTypes	( NewOrData(..), StrictnessMark(..), Activation(..), FixitySig(..) )
+import HscTypes		( DeprecTxt )
+import CoreSyn		( RuleName )
+import BasicTypes	( NewOrData(..), Activation(..) )
 import ForeignCall	( CCallTarget(..), DNCallSpec, CCallConv, Safety,
 			  CExportSpec(..)) 
 
 -- others:
-import Name		( NamedThing )
 import FunDeps		( pprFundeps )
-import TyCon		( DataConDetails(..), visibleDataCons )
-import Class		( FunDep, DefMeth(..) )
+import Class		( FunDep )
 import CStrings		( CLabelString )
 import Outputable	
-import Util		( eqListBy, count )
+import Util		( count )
 import SrcLoc		( SrcLoc )
 import FastString
-
-import Maybe		( isNothing, fromJust )	
 \end{code}
 
 
@@ -73,7 +65,6 @@ data HsDecl id
   | ForD        (ForeignDecl id)
   | DeprecD	(DeprecDecl id)
   | RuleD	(RuleDecl id)
-  | CoreD	(CoreDecl id)
   | SpliceD	(SpliceDecl id)
 
 -- NB: all top-level fixity decls are contained EITHER
@@ -109,8 +100,7 @@ data HsGroup id
 	hs_defds  :: [DefaultDecl id],
 	hs_fords  :: [ForeignDecl id],
 	hs_depds  :: [DeprecDecl id],
-	hs_ruleds :: [RuleDecl id],
-	hs_coreds :: [CoreDecl id]
+	hs_ruleds :: [RuleDecl id]
   }
 \end{code}
 
@@ -124,7 +114,6 @@ instance OutputableBndr name => Outputable (HsDecl name) where
     ppr (SigD sd)    = ppr sd
     ppr (RuleD rd)   = ppr rd
     ppr (DeprecD dd) = ppr dd
-    ppr (CoreD dd)   = ppr dd
     ppr (SpliceD dd) = ppr dd
 
 instance OutputableBndr name => Outputable (HsGroup name) where
@@ -135,13 +124,12 @@ instance OutputableBndr name => Outputable (HsGroup name) where
 		   hs_depds  = deprec_decls,
 		   hs_fords  = foreign_decls,
 		   hs_defds  = default_decls,
-		   hs_ruleds = rule_decls,
-		   hs_coreds = core_decls })
+		   hs_ruleds = rule_decls })
 	= vcat [ppr_ds fix_decls, ppr_ds default_decls, 
 		ppr_ds deprec_decls, ppr_ds rule_decls,
 		ppr val_decls,
 		ppr_ds tycl_decls, ppr_ds inst_decls,
-		ppr_ds foreign_decls, ppr_ds core_decls]
+		ppr_ds foreign_decls]
 	where
 	  ppr_ds [] = empty
 	  ppr_ds ds = text "" $$ vcat (map ppr ds)
@@ -298,13 +286,7 @@ Interface file code:
 -- are both in TyClDecl
 
 data TyClDecl name
-  = IfaceSig {	tcdName :: name,		-- It may seem odd to classify an interface-file signature
-		tcdType :: HsType name,		-- as a 'TyClDecl', but it's very convenient.  
-		tcdIdInfo :: [HsIdInfo name],
-		tcdLoc :: SrcLoc
-    }
-
-  | ForeignType { tcdName    :: name,		-- See remarks about IfaceSig above
+  = ForeignType { tcdName    :: name,
 		  tcdExtName :: Maybe FastString,
 		  tcdFoType  :: FoType,
 		  tcdLoc     :: SrcLoc }
@@ -313,19 +295,13 @@ data TyClDecl name
 		tcdCtxt   :: HsContext name,	 -- Context
 		tcdName   :: name,		 -- Type constructor
 		tcdTyVars :: [HsTyVarBndr name], -- Type variables
-		tcdCons	  :: DataConDetails (ConDecl name),	 -- Data constructors
+		tcdCons	  :: [ConDecl name],	 -- Data constructors
 		tcdDerivs :: Maybe (HsContext name),	-- Derivings; Nothing => not specified
 							-- Just [] => derive exactly what is asked
-		tcdGeneric :: Maybe Bool,	-- Nothing <=> source decl
-						-- Just x  <=> interface-file decl;
-						-- 	x=True <=> generic converter functions available
-						-- We need this for imported data decls, since the
-						-- imported modules may have been compiled with
-						-- different flags to the current compilation unit
 		tcdLoc	   :: SrcLoc
     }
 
-  | TySynonym {	tcdName :: name,		        -- type constructor
+  | TySynonym {	tcdName   :: name,		        -- type constructor
 		tcdTyVars :: [HsTyVarBndr name],	-- type variables
 		tcdSynRhs :: HsType name,	        -- synonym expansion
 		tcdLoc    :: SrcLoc
@@ -336,20 +312,15 @@ data TyClDecl name
 		tcdTyVars  :: [HsTyVarBndr name],	-- The class type variables
 		tcdFDs     :: [FunDep name],		-- Functional dependencies
 		tcdSigs    :: [Sig name],		-- Methods' signatures
-		tcdMeths   :: Maybe (MonoBinds name),	-- Default methods
-							-- 	Nothing for imported class decls
-							-- 	Just bs for source   class decls
-		tcdLoc      :: SrcLoc
+		tcdMeths   :: MonoBinds name,		-- Default methods
+		tcdLoc     :: SrcLoc
     }
 \end{code}
 
 Simple classifiers
 
 \begin{code}
-isIfaceSigDecl, isDataDecl, isSynDecl, isClassDecl :: TyClDecl name -> Bool
-
-isIfaceSigDecl (IfaceSig {}) = True
-isIfaceSigDecl other	     = False
+isDataDecl, isSynDecl, isClassDecl :: TyClDecl name -> Bool
 
 isSynDecl (TySynonym {}) = True
 isSynDecl other		 = False
@@ -359,12 +330,6 @@ isDataDecl other       = False
 
 isClassDecl (ClassDecl {}) = True
 isClassDecl other	   = False
-
-isTypeOrClassDecl (ClassDecl   {}) = True
-isTypeOrClassDecl (TyData      {}) = True
-isTypeOrClassDecl (TySynonym   {}) = True
-isTypeOrClassDecl (ForeignType {}) = True
-isTypeOrClassDecl other		   = False
 \end{code}
 
 Dealing with names
@@ -382,87 +347,26 @@ tyClDeclNames :: Eq name => TyClDecl name -> [(name, SrcLoc)]
 -- We use the equality to filter out duplicate field names
 
 tyClDeclNames (TySynonym   {tcdName = name, tcdLoc = loc})  = [(name,loc)]
-tyClDeclNames (IfaceSig    {tcdName = name, tcdLoc = loc})  = [(name,loc)]
 tyClDeclNames (ForeignType {tcdName = name, tcdLoc = loc})  = [(name,loc)]
 
 tyClDeclNames (ClassDecl {tcdName = cls_name, tcdSigs = sigs, tcdLoc = loc})
-  = (cls_name,loc) : [(n,loc) | ClassOpSig n _ _ loc <- sigs]
+  = (cls_name,loc) : [(n,loc) | Sig n _ loc <- sigs]
 
 tyClDeclNames (TyData {tcdName = tc_name, tcdCons = cons, tcdLoc = loc})
   = (tc_name,loc) : conDeclsNames cons
-
 
 tyClDeclTyVars (TySynonym {tcdTyVars = tvs}) = tvs
 tyClDeclTyVars (TyData    {tcdTyVars = tvs}) = tvs
 tyClDeclTyVars (ClassDecl {tcdTyVars = tvs}) = tvs
 tyClDeclTyVars (ForeignType {})		     = []
-tyClDeclTyVars (IfaceSig {})		     = []
 \end{code}
 
 \begin{code}
-instance (NamedThing name, Ord name) => Eq (TyClDecl name) where
-	-- Used only when building interface files
-  (==) d1@(IfaceSig {}) d2@(IfaceSig {})
-      = tcdName d1 == tcdName d2 && 
-	tcdType d1 == tcdType d2 && 
-	tcdIdInfo d1 == tcdIdInfo d2
-
-  (==) d1@(ForeignType {}) d2@(ForeignType {})
-      = tcdName d1 == tcdName d2 && 
-	tcdFoType d1 == tcdFoType d2
-
-  (==) d1@(TyData {}) d2@(TyData {})
-      = tcdName d1 == tcdName d2 && 
-	tcdND d1   == tcdND   d2 && 
-	eqWithHsTyVars (tcdTyVars d1) (tcdTyVars d2) (\ env -> 
-   	  eq_hsContext env (tcdCtxt d1) (tcdCtxt d2)  &&
-	  eq_hsCD      env (tcdCons d1) (tcdCons d2)
-	)
-
-  (==) d1@(TySynonym {}) d2@(TySynonym {})
-      = tcdName d1 == tcdName d2 && 
-	eqWithHsTyVars (tcdTyVars d1) (tcdTyVars d2) (\ env -> 
-          eq_hsType env (tcdSynRhs d1) (tcdSynRhs d2)
-        )
-
-  (==) d1@(ClassDecl {}) d2@(ClassDecl {})
-    = tcdName d1 == tcdName d2 && 
-      eqWithHsTyVars (tcdTyVars d1) (tcdTyVars d2) (\ env -> 
-   	  eq_hsContext env (tcdCtxt d1) (tcdCtxt d2)  &&
-	  eqListBy (eq_hsFD env) (tcdFDs d1) (tcdFDs d2) &&
-	  eqListBy (eq_cls_sig env) (tcdSigs d1) (tcdSigs d2)
-       )
-
-  (==) _ _ = False	-- default case
-
-eq_hsCD env (DataCons c1) (DataCons c2) = eqListBy (eq_ConDecl env) c1 c2
-eq_hsCD env Unknown	  Unknown	= True
-eq_hsCD env (HasCons n1)  (HasCons n2)  = n1 == n2
-eq_hsCD env d1		  d2		= False
-
-eq_hsFD env (ns1,ms1) (ns2,ms2)
-  = eqListBy (eq_hsVar env) ns1 ns2 && eqListBy (eq_hsVar env) ms1 ms2
-
-eq_cls_sig env (ClassOpSig n1 dm1 ty1 _) (ClassOpSig n2 dm2 ty2 _)
-  = n1==n2 && dm1 `eq_dm` dm2 && eq_hsType env ty1 ty2
-  where
-	-- Ignore the name of the default method for (DefMeth id)
-	-- This is used for comparing declarations before putting
-	-- them into interface files, and the name of the default 
-	-- method isn't relevant
-    NoDefMeth  `eq_dm` NoDefMeth  = True
-    GenDefMeth `eq_dm` GenDefMeth = True
-    DefMeth _  `eq_dm` DefMeth _  = True
-    dm1	       `eq_dm` dm2	  = False
-\end{code}
-
-\begin{code}
-countTyClDecls :: [TyClDecl name] -> (Int, Int, Int, Int, Int)
+countTyClDecls :: [TyClDecl name] -> (Int, Int, Int, Int)
 	-- class, data, newtype, synonym decls
 countTyClDecls decls 
  = (count isClassDecl     decls,
     count isSynDecl       decls,
-    count isIfaceSigDecl  decls,
     count isDataTy        decls,
     count isNewTy         decls) 
  where
@@ -477,10 +381,6 @@ countTyClDecls decls
 instance OutputableBndr name
 	      => Outputable (TyClDecl name) where
 
-    ppr (IfaceSig {tcdName = var, tcdType = ty, tcdIdInfo = info})
-	= getPprStyle $ \ sty ->
-	   hsep [ pprHsVar var, dcolon, ppr ty, pprHsIdInfo info ]
-
     ppr (ForeignType {tcdName = tycon})
 	= hsep [ptext SLIT("foreign import type dotnet"), ppr tycon]
 
@@ -491,13 +391,9 @@ instance OutputableBndr name
     ppr (TyData {tcdND = new_or_data, tcdCtxt = context, tcdName = tycon,
 		 tcdTyVars = tyvars, tcdCons = condecls, 
 		 tcdDerivs = derivings})
-      = pp_tydecl (ptext keyword <+> pp_decl_head context tycon tyvars)
+      = pp_tydecl (ppr new_or_data <+> pp_decl_head context tycon tyvars)
 		  (pp_condecls condecls)
 		  derivings
-      where
-	keyword = case new_or_data of
-			NewType  -> SLIT("newtype")
-			DataType -> SLIT("data")
 
     ppr (ClassDecl {tcdCtxt = context, tcdName = clas, tcdTyVars = tyvars, tcdFDs = fds,
 		    tcdSigs = sigs, tcdMeths = methods})
@@ -506,21 +402,15 @@ instance OutputableBndr name
 
       | otherwise	-- Laid out
       = sep [hsep [top_matter, ptext SLIT("where {")],
-	     nest 4 (sep [sep (map ppr_sig sigs), pp_methods, char '}'])]
+	     nest 4 (sep [sep (map ppr_sig sigs), ppr methods, char '}'])]
       where
         top_matter  = ptext SLIT("class") <+> pp_decl_head context clas tyvars <+> pprFundeps fds
 	ppr_sig sig = ppr sig <> semi
 
-	pp_methods = if isNothing methods
-			then empty
-			else ppr (fromJust methods)
-
 pp_decl_head :: OutputableBndr name => HsContext name -> name -> [HsTyVarBndr name] -> SDoc
 pp_decl_head context thing tyvars = hsep [pprHsContext context, ppr thing, interppSP tyvars]
 
-pp_condecls Unknown	  = ptext SLIT("{- abstract -}")
-pp_condecls (HasCons n)   = ptext SLIT("{- abstract with") <+> int n <+> ptext SLIT("constructors -}")
-pp_condecls (DataCons cs) = equals <+> sep (punctuate (ptext SLIT(" |")) (map ppr cs))
+pp_condecls cs = equals <+> sep (punctuate (ptext SLIT(" |")) (map ppr cs))
 
 pp_tydecl pp_head pp_decl_rhs derivings
   = hang pp_head 4 (sep [
@@ -552,12 +442,12 @@ data ConDecl name
 \end{code}
 
 \begin{code}
-conDeclsNames :: Eq name => DataConDetails (ConDecl name) -> [(name,SrcLoc)]
+conDeclsNames :: Eq name => [ConDecl name] -> [(name,SrcLoc)]
   -- See tyClDeclNames for what this does
   -- The function is boringly complicated because of the records
   -- And since we only have equality, we have to be a little careful
 conDeclsNames cons
-  = snd (foldl do_one ([], []) (visibleDataCons cons))
+  = snd (foldl do_one ([], []) cons)
   where
     do_one (flds_seen, acc) (ConDecl name _ _ (RecCon flds) loc)
 	= (new_flds ++ flds_seen, (name,loc) : [(f,loc) | f <- new_flds] ++ acc)
@@ -566,38 +456,21 @@ conDeclsNames cons
 
     do_one (flds_seen, acc) (ConDecl name _ _ _ loc)
 	= (flds_seen, (name,loc):acc)
-\end{code}
 
-\begin{code}
 conDetailsTys details = map getBangType (hsConArgs details)
-
-eq_ConDecl env (ConDecl n1 tvs1 cxt1 cds1 _)
-	       (ConDecl n2 tvs2 cxt2 cds2 _)
-  = n1 == n2 &&
-    (eq_hsTyVars env tvs1 tvs2	$ \ env ->
-     eq_hsContext env cxt1 cxt2	&&
-     eq_ConDetails env cds1 cds2)
-
-eq_ConDetails env (PrefixCon bts1) (PrefixCon bts2)
-  = eqListBy (eq_btype env) bts1 bts2
-eq_ConDetails env (InfixCon bta1 btb1) (InfixCon bta2 btb2)
-  = eq_btype env bta1 bta2 && eq_btype env btb1 btb2
-eq_ConDetails env (RecCon fs1) (RecCon fs2)
-  = eqListBy (eq_fld env) fs1 fs2
-eq_ConDetails env _ _ = False
-
-eq_fld env (ns1,bt1) (ns2, bt2) = ns1==ns2 && eq_btype env bt1 bt2
 \end{code}
   
 \begin{code}
-data BangType name = BangType StrictnessMark (HsType name)
+data BangType name = BangType HsBang (HsType name)
+
+data HsBang = HsNoBang
+	    | HsStrict	-- ! 
+	    | HsUnbox	-- !! (GHC extension, meaning "unbox")
 
 getBangType       (BangType _ ty) = ty
 getBangStrictness (BangType s _)  = s
 
-unbangedType ty = BangType NotMarkedStrict ty
-
-eq_btype env (BangType s1 t1) (BangType s2 t2) = s1==s2 && eq_hsType env t1 t2
+unbangedType ty = BangType HsNoBang ty
 \end{code}
 
 \begin{code}
@@ -606,24 +479,28 @@ instance (OutputableBndr name) => Outputable (ConDecl name) where
       = sep [pprHsForAll tvs cxt, ppr_con_details con con_details]
 
 ppr_con_details con (InfixCon ty1 ty2)
-  = hsep [ppr_bang ty1, ppr con, ppr_bang ty2]
+  = hsep [ppr ty1, ppr con, ppr ty2]
 
 -- ConDecls generated by MkIface.ifaceTyThing always have a PrefixCon, even
 -- if the constructor is an infix one.  This is because in an interface file
 -- we don't distinguish between the two.  Hence when printing these for the
 -- user, we need to parenthesise infix constructor names.
 ppr_con_details con (PrefixCon tys)
-  = hsep (pprHsVar con : map ppr_bang tys)
+  = hsep (pprHsVar con : map ppr tys)
 
 ppr_con_details con (RecCon fields)
   = ppr con <+> braces (sep (punctuate comma (map ppr_field fields)))
   where
-    ppr_field (n, ty) = ppr n <+> dcolon <+> ppr_bang ty
+    ppr_field (n, ty) = ppr n <+> dcolon <+> ppr ty
 
 instance OutputableBndr name => Outputable (BangType name) where
-    ppr = ppr_bang
-
-ppr_bang (BangType s ty) = ppr s <> pprParendHsType ty
+    ppr (BangType is_strict ty) 
+	= bang <> pprParendHsType ty
+	where
+	  bang = case is_strict of
+			HsNoBang -> empty
+			HsStrict -> char '!'
+			HsUnbox  -> ptext SLIT("!!")
 \end{code}
 
 
@@ -638,43 +515,17 @@ data InstDecl name
   = InstDecl	(HsType name)	-- Context => Class Instance-type
 				-- Using a polytype means that the renamer conveniently
 				-- figures out the quantified type variables for us.
-
 		(MonoBinds name)
-
 		[Sig name]		-- User-supplied pragmatic info
-
-		(Maybe name)		-- Name for the dictionary function
-					-- Nothing for source-file instance decls
-
 		SrcLoc
 
-isSourceInstDecl :: InstDecl name -> Bool
-isSourceInstDecl (InstDecl _ _ _ maybe_dfun _) = isNothing maybe_dfun
-
-instDeclDFun :: InstDecl name -> Maybe name
-instDeclDFun (InstDecl _ _ _ df _) = df	-- A Maybe, but that's ok
-\end{code}
-
-\begin{code}
 instance (OutputableBndr name) => Outputable (InstDecl name) where
 
-    ppr (InstDecl inst_ty binds uprags maybe_dfun_name src_loc)
+    ppr (InstDecl inst_ty binds uprags src_loc)
       = vcat [hsep [ptext SLIT("instance"), ppr inst_ty, ptext SLIT("where")],
 	      nest 4 (ppr uprags),
 	      nest 4 (ppr binds) ]
-      where
-	pp_dfun = case maybe_dfun_name of
-		    Just df -> ppr df
-		    Nothing -> empty
 \end{code}
-
-\begin{code}
-instance Ord name => Eq (InstDecl name) where
-	-- Used for interface comparison only, so don't compare bindings
-  (==) (InstDecl inst_ty1 _ _ dfun1 _) (InstDecl inst_ty2 _ _ dfun2 _)
-       = inst_ty1 == inst_ty2 && dfun1 == dfun2
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -715,12 +566,6 @@ instance (OutputableBndr name)
 data ForeignDecl name
   = ForeignImport name (HsType name) ForeignImport Bool SrcLoc  -- defines name
   | ForeignExport name (HsType name) ForeignExport Bool SrcLoc  -- uses name
-
--- yield the Haskell name defined or used in a foreign declaration
---
-foreignDeclName                           :: ForeignDecl name -> name
-foreignDeclName (ForeignImport n _ _ _ _)  = n
-foreignDeclName (ForeignExport n _ _ _ _)  = n
 
 -- specification of an imported external entity in dependence on the calling
 -- convention 
@@ -826,28 +671,6 @@ data RuleDecl name
 	(HsExpr name)	-- RHS
 	SrcLoc		
 
-  | IfaceRule	 		-- One that's come in from an interface file; pre-typecheck
-	RuleName
-	Activation
-	[UfBinder name]		-- Tyvars and term vars
-	name			-- Head of lhs
-	[UfExpr name]		-- Args of LHS
-	(UfExpr name)		-- Pre typecheck
-	SrcLoc		
-
-  | IfaceRuleOut		-- Post typecheck
-	name			-- Head of LHS
-	CoreRule
-
-isSrcRule :: RuleDecl name -> Bool
-isSrcRule (HsRule _ _ _ _ _ _) = True
-isSrcRule other		       = False
-
-ifaceRuleDeclName :: RuleDecl name -> name
-ifaceRuleDeclName (IfaceRule _ _ _ n _ _ _) = n
-ifaceRuleDeclName (IfaceRuleOut n r)	    = n
-ifaceRuleDeclName (HsRule fs _ _ _ _ _)     = pprPanic "ifaceRuleDeclName" (ppr fs)
-
 data RuleBndr name
   = RuleBndr name
   | RuleBndrSig name (HsType name)
@@ -855,30 +678,14 @@ data RuleBndr name
 collectRuleBndrSigTys :: [RuleBndr name] -> [HsType name]
 collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ ty <- bndrs]
 
-instance (NamedThing name, Ord name) => Eq (RuleDecl name) where
-  -- Works for IfaceRules only; used when comparing interface file versions
-  (IfaceRule n1 a1 bs1 f1 es1 rhs1 _) == (IfaceRule n2 a2 bs2 f2 es2 rhs2 _)
-     = n1==n2 && f1 == f2 && a1==a2 &&
-       eq_ufBinders emptyEqHsEnv bs1 bs2 (\env -> 
-       eqListBy (eq_ufExpr env) (rhs1:es1) (rhs2:es2))
-
 instance OutputableBndr name => Outputable (RuleDecl name) where
   ppr (HsRule name act ns lhs rhs loc)
 	= sep [text "{-# RULES" <+> doubleQuotes (ftext name) <+> ppr act,
-	       pp_forall, pprExpr lhs, equals <+> pprExpr rhs,
-               text "#-}" ]
+	       nest 4 (pp_forall <+> pprExpr lhs), 
+	       nest 4 (equals <+> pprExpr rhs <+> text "#-}") ]
 	where
 	  pp_forall | null ns   = empty
 		    | otherwise	= text "forall" <+> fsep (map ppr ns) <> dot
-
-  ppr (IfaceRule name act tpl_vars fn tpl_args rhs loc) 
-    = hsep [ doubleQuotes (ftext name), ppr act,
-	   ptext SLIT("__forall") <+> braces (interppSP tpl_vars),
-	   ppr fn <+> sep (map (pprUfExpr parens) tpl_args),
-	   ptext SLIT("=") <+> ppr rhs
-      ] <+> semi
-
-  ppr (IfaceRuleOut fn rule) = pprCoreRule (ppr fn) rule
 
 instance OutputableBndr name => Outputable (RuleBndr name) where
    ppr (RuleBndr name) = ppr name
@@ -897,29 +704,7 @@ We use exported entities for things to deprecate.
 \begin{code}
 data DeprecDecl name = Deprecation name DeprecTxt SrcLoc
 
-type DeprecTxt = FastString	-- reason/explanation for deprecation
-
 instance OutputableBndr name => Outputable (DeprecDecl name) where
     ppr (Deprecation thing txt _)
       = hsep [text "{-# DEPRECATED", ppr thing, doubleQuotes (ppr txt), text "#-}"]
-\end{code}
-
-
-%************************************************************************
-%*									*
-		External-core declarations
-%*									*
-%************************************************************************
-
-\begin{code}
-data CoreDecl name	-- a Core value binding (from 'external Core' input)
-  = CoreDecl 	name
-		(HsType name)
-		(UfExpr name)
-		SrcLoc
-        
-instance OutputableBndr name => Outputable (CoreDecl name) where
-    ppr (CoreDecl var ty rhs loc)
-	= getPprStyle $ \ sty ->
-	  hsep [ pprHsVar var, dcolon, ppr ty, ppr rhs ]
 \end{code}

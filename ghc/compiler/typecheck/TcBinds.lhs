@@ -26,7 +26,7 @@ import TcEnv		( tcExtendLocalValEnv, tcExtendLocalValEnv2, newLocalName )
 import TcUnify		( Expected(..), newHole, unifyTauTyLists, checkSigTyVarsWrt, sigCtxt )
 import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyRestricted, 
 			  tcSimplifyToDicts, tcSimplifyIPs )
-import TcMonoType	( tcHsSigType, UserTypeCtxt(..), TcSigInfo(..), 
+import TcHsType		( tcHsSigType, UserTypeCtxt(..), TcSigInfo(..), 
 			  tcTySig, maybeSig, tcSigPolyId, tcSigMonoId, tcAddScopedTyVars
 			)
 import TcPat		( tcPat, tcSubPat, tcMonoPatBndr )
@@ -221,12 +221,11 @@ so all the clever stuff is in here.
   as the Name in the tc_ty_sig
 
 \begin{code}
-tcBindWithSigs	
-	:: TopLevelFlag
-	-> RenamedMonoBinds
-	-> [RenamedSig]		-- Used solely to get INLINE, NOINLINE sigs
-	-> RecFlag
-	-> TcM (TcMonoBinds, [TcId])
+tcBindWithSigs	:: TopLevelFlag
+		-> RenamedMonoBinds
+		-> [RenamedSig]
+		-> RecFlag
+		-> TcM (TcMonoBinds, [TcId])
 
 tcBindWithSigs top_lvl mbind sigs is_rec
   = 	-- TYPECHECK THE SIGNATURES
@@ -253,6 +252,8 @@ tcBindWithSigs top_lvl mbind sigs is_rec
     )						$
 
 	-- TYPECHECK THE BINDINGS
+    traceTc (ptext SLIT("--------------------------------------------------------"))	`thenM_`
+    traceTc (ptext SLIT("Bindings for") <+> ppr (collectMonoBinders mbind))		`thenM_`
     getLIE (tcMonoBinds mbind tc_ty_sigs is_rec)	`thenM` \ ((mbind', bndr_names_w_ids), lie_req) ->
     let
 	(binder_names, mono_ids) = unzip (bagToList bndr_names_w_ids)
@@ -819,7 +820,6 @@ tcSpecSigs (SpecSig name poly_ty src_loc : sigs)
 tcSpecSigs (other_sig : sigs) = tcSpecSigs sigs
 tcSpecSigs []		      = returnM EmptyMonoBinds
 \end{code}
-
 
 %************************************************************************
 %*									*

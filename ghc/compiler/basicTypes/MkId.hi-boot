@@ -1,5 +1,5 @@
 _interface_ MkId 1
 _exports_
-MkId  mkDataConWorkId ;
+MkId  mkDataConIds ;
 _declarations_
-1 mkDataConWorkId _:_ Name.Name -> DataCon.DataCon -> Var.Id ;;
+1 mkDataConIds _:_ Name.Name -> Name.Name -> DataCon.DataCon -> DataCon.DataConIds ;;

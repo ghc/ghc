@@ -23,11 +23,11 @@ import ErrUtils		( Message, addErrLocHdrLine )
 import Type		( mkFunTys, splitFunTys, splitTyConApp_maybe,
 			  isUnLiftedType, isTyVarTy, dropForAlls, Type
 			)
-import TyCon		( TyCon, isAlgTyCon, isNewTyCon, tyConDataCons )
+import TyCon		( isAlgTyCon, isNewTyCon, tyConDataCons )
 import Util		( zipEqual, equalLength )
 import Outputable
 
-infixr 9 `thenL`, `thenL_`, `thenMaybeL`, `thenMaybeL_`
+infixr 9 `thenL`, `thenL_`, `thenMaybeL`
 \end{code}
 
 Checks for
@@ -345,12 +345,6 @@ thenMaybeL m k loc scope errs
       (Nothing, errs2) -> (Nothing, errs2)
       (Just r,  errs2) -> k r loc scope errs2
 
-thenMaybeL_ :: LintM (Maybe a) -> LintM (Maybe b) -> LintM (Maybe b)
-thenMaybeL_ m k loc scope errs
-  = case m loc scope errs of
-      (Nothing, errs2) -> (Nothing, errs2)
-      (Just _,  errs2) -> k loc scope errs2
-
 mapL :: (a -> LintM b) -> [a] -> LintM [b]
 mapL f [] = returnL []
 mapL f (x:xs)
@@ -461,11 +455,6 @@ mkCaseAltMsg alts
   = ($$) (text "In some case alternatives, type of alternatives not all same:")
 	    (empty) -- LATER: ppr alts
 
-mkCaseAbstractMsg :: TyCon -> Message
-mkCaseAbstractMsg tycon
-  = ($$) (ptext SLIT("An algebraic case on an abstract type:"))
-	    (ppr tycon)
-
 mkDefltMsg :: Id -> Message
 mkDefltMsg bndr
   = ($$) (ptext SLIT("Binder of a case expression doesn't match type of scrutinee:"))
@@ -483,12 +472,6 @@ mkRhsConMsg fun_ty arg_tys
   = vcat [text "In a RHS constructor application, con type doesn't match arg types:",
 	      hang (ptext SLIT("Constructor type:")) 4 (ppr fun_ty),
 	      hang (ptext SLIT("Arg types:")) 4 (vcat (map (ppr) arg_tys))]
-
-mkUnappTyMsg :: Id -> Type -> Message
-mkUnappTyMsg var ty
-  = vcat [text "Variable has a for-all type, but isn't applied to any types.",
-	      (<>) (ptext SLIT("Var:      ")) (ppr var),
-	      (<>) (ptext SLIT("Its type: ")) (ppr ty)]
 
 mkAltMsg1 :: Type -> Message
 mkAltMsg1 ty

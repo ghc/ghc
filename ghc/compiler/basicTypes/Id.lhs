@@ -30,7 +30,6 @@ module Id (
 	isPrimOpId, isPrimOpId_maybe, 
 	isFCallId, isFCallId_maybe,
 	isDataConWorkId, isDataConWorkId_maybe, 
-	isDataConWrapId, isDataConWrapId_maybe,
 	isBottomingId,
 	hasNoBinding,
 
@@ -90,8 +89,7 @@ import Var		( Id, DictId,
 			  globalIdDetails, setGlobalIdDetails
 			)
 import qualified Var	( mkLocalId, mkGlobalId, mkSpecPragmaId )
-import Type		( Type, typePrimRep, addFreeTyVars, 
-                          seqType, splitTyConApp_maybe )
+import Type		( Type, typePrimRep, addFreeTyVars, seqType)
 
 import IdInfo 
 
@@ -238,6 +236,7 @@ Meanwhile, it is not discarded as dead code.
 recordSelectorFieldLabel :: Id -> FieldLabel
 recordSelectorFieldLabel id = case globalIdDetails id of
 				 RecordSelId lbl -> lbl
+				 other -> panic "recordSelectorFieldLabel"
 
 isRecordSelector id = case globalIdDetails id of
 			RecordSelId lbl -> True
@@ -267,14 +266,6 @@ isDataConWorkId_maybe id = case globalIdDetails id of
 			  DataConWorkId con -> Just con
 			  other	            -> Nothing
 
-isDataConWrapId_maybe id = case globalIdDetails id of
-				  DataConWrapId con -> Just con
-				  other	            -> Nothing
-
-isDataConWrapId id = case globalIdDetails id of
-			DataConWrapId con -> True
-			other	          -> False
-
 -- hasNoBinding returns True of an Id which may not have a
 -- binding, even though it is defined in this module.  
 -- Data constructor workers used to be things of this kind, but
@@ -297,7 +288,6 @@ isImplicitId id
         FCallId _       -> True
         PrimOpId _      -> True
 	ClassOpId _	-> True
-	GenericOpId _	-> True
         DataConWorkId _ -> True
 	DataConWrapId _ -> True
 		-- These are are implied by their type or class decl;

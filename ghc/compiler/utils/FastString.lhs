@@ -106,6 +106,7 @@ instance Eq FastString where
   a /= b = case cmpFS a b of { LT -> True;  EQ -> False; GT -> True  }
 
 instance Ord FastString where
+	-- Compares lexicographically, not by unique
     a <= b = case cmpFS a b of { LT -> True;  EQ -> True;  GT -> False }
     a <	 b = case cmpFS a b of { LT -> True;  EQ -> False; GT -> False }
     a >= b = case cmpFS a b of { LT -> False; EQ -> True;  GT -> True  }

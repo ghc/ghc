@@ -12,7 +12,6 @@ import {-# SOURCE #-} StixPrim ( amodeToStix )
 
 import MachRegs
 import AbsCSyn		( CStmtMacro(..), CAddrMode, tagreg, CCheckMacro(..) )
-import SMRep		( fixedHdrSize )
 import Constants	( uF_RET, uF_UPDATEE, uF_SIZE )
 import ForeignCall	( CCallConv(..) )
 import MachOp		( MachOp(..) )
@@ -21,7 +20,6 @@ import Stix
 import Panic		( panic )
 import UniqSupply	( returnUs, thenUs, UniqSM )
 import CLabel		( mkBlackHoleInfoTableLabel, mkIndStaticInfoLabel,
-			  mkBlackHoleBQInfoTableLabel,
 			  mkIndInfoLabel, mkUpdInfoLabel, mkRtsGCEntryLabel )
 \end{code}
 --------------------------------------------------------------------------------
@@ -145,12 +143,10 @@ Let's make sure that these CAFs are lifted out, shall we?
 \begin{code}
 -- Some common labels
 
-bh_info, ind_static_info, ind_info :: StixExpr
+bh_info, ind_static_info :: StixExpr
 
 bh_info   	= StCLbl mkBlackHoleInfoTableLabel
-bq_info   	= StCLbl mkBlackHoleBQInfoTableLabel
 ind_static_info	= StCLbl mkIndStaticInfoLabel
-ind_info  	= StCLbl mkIndInfoLabel
 upd_frame_info	= StCLbl mkUpdInfoLabel
 
 -- Some common call trees

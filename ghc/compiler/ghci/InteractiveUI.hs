@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.160 2003/09/23 14:32:58 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.161 2003/10/09 11:58:53 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -19,7 +19,7 @@ import CompManager
 import HscTypes		( TyThing(..), HomeModInfo(hm_linkable), HomePackageTable,
 			  isObjectLinkable, GhciMode(..) )
 import HsSyn		( TyClDecl(..), ConDecl(..), Sig(..) )
-import MkIface		( ifaceTyThing )
+import IfaceSyn		( IfaceDecl( ifName ) )
 import DriverFlags
 import DriverState
 import DriverUtil	( remove_spaces )
@@ -159,20 +159,20 @@ interactiveUI :: [FilePath] -> Maybe String -> IO ()
 interactiveUI srcs maybe_expr = do
    dflags <- getDynFlags
 
-   cmstate <- cmInit Interactive;
+   cmstate <- cmInit Interactive dflags;
 
    hFlush stdout
    hSetBuffering stdout NoBuffering
 
 	-- Initialise buffering for the *interpreted* I/O system
-   cmstate <- initInterpBuffering cmstate dflags
+   initInterpBuffering cmstate
 
 	-- We don't want the cmd line to buffer any input that might be
 	-- intended for the program, so unbuffer stdin.
    hSetBuffering stdin NoBuffering
 
 	-- initial context is just the Prelude
-   cmstate <- cmSetContext cmstate dflags [] ["Prelude"]
+   cmstate <- cmSetContext cmstate [] ["Prelude"]
 
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
    Readline.initialize
@@ -381,10 +381,11 @@ runStmt stmt
  | otherwise
  = do st <- getGHCiState
       dflags <- io getDynFlags
-      let dflags' = dopt_unset dflags Opt_WarnUnusedBinds
+      let cm_state' = cmSetDFlags (cmstate st)
+			 	  (dopt_unset dflags Opt_WarnUnusedBinds)
       (new_cmstate, result) <- 
 	io $ withProgName (progname st) $ withArgs (args st) $
-	cmRunStmt (cmstate st) dflags' stmt
+	     cmRunStmt cm_state' stmt
       setGHCiState st{cmstate = new_cmstate}
       case result of
 	CmRunFailed      -> return []
@@ -438,22 +439,22 @@ no_buf_cmd = "IO.hSetBuffering IO.stdout IO.NoBuffering" ++
 	     " Prelude.>> IO.hSetBuffering IO.stderr IO.NoBuffering"
 flush_cmd  = "IO.hFlush IO.stdout Prelude.>> IO.hFlush IO.stderr"
 
-initInterpBuffering :: CmState -> DynFlags -> IO CmState
-initInterpBuffering cmstate dflags
- = do (cmstate, maybe_hval) <- cmCompileExpr cmstate dflags no_buf_cmd
+initInterpBuffering :: CmState -> IO ()
+initInterpBuffering cmstate
+ = do maybe_hval <- cmCompileExpr cmstate no_buf_cmd
 	
       case maybe_hval of
 	Just hval -> writeIORef turn_off_buffering (unsafeCoerce# hval :: IO ())
 	other	  -> panic "interactiveUI:setBuffering"
 	
-      (cmstate, maybe_hval) <- cmCompileExpr cmstate dflags flush_cmd
+      maybe_hval <- cmCompileExpr cmstate flush_cmd
       case maybe_hval of
 	Just hval -> writeIORef flush_interp (unsafeCoerce# hval :: IO ())
 	_         -> panic "interactiveUI:flush"
 
       turnOffBuffering	-- Turn it off right now
 
-      return cmstate
+      return ()
 
 
 flushInterpBuffers :: GHCi ()
@@ -477,11 +478,10 @@ info "" = throwDyn (CmdLineError "syntax: `:i <thing-you-want-info-about>'")
 info s = do
   let names = words s
   init_cms <- getCmState
-  dflags <- io getDynFlags
   let 
     infoThings cms [] = return cms
     infoThings cms (name:names) = do
-      (cms, stuff) <- io (cmInfoThing cms dflags name)
+      stuff <- io (cmInfoThing cms name)
       io (putStrLn (showSDocForUser unqual (
 	    vcat (intersperse (text "") (map showThing stuff))))
          )
@@ -489,18 +489,21 @@ info s = do
 
     unqual = cmGetPrintUnqual init_cms
 
-    showThing (ty_thing, fixity) 
-	= vcat [ text "-- " <> showTyThing ty_thing, 
-		 showFixity fixity (getName ty_thing),
-	         ppr (ifaceTyThing True{-omit prags-} ty_thing) ]
+    showThing (decl, fixity) 
+	= vcat [ text "-- " <> showTyThing decl, 
+		 showFixity fixity (ifName decl),
+	         showTyThing decl ]
 
     showFixity fix name
 	| fix == defaultFixity = empty
 	| otherwise            = ppr fix <+> 
-				 (if isSymOcc (nameOccName name)
+				 (if isSymOcc name
 				  then ppr name
 				  else char '`' <> ppr name <> char '`')
 
+    showTyThing decl = ppr decl
+
+{-
     showTyThing (AClass cl)
        = hcat [ppr cl, text " is a class", showSrcLoc (className cl)]
     showTyThing (ADataCon dc)
@@ -526,22 +529,22 @@ info s = do
 	| otherwise
 	= empty
 	where loc = nameSrcLoc name
+-}
 
-  cms <- infoThings init_cms names
-  setCmState cms
+  infoThings init_cms names
   return ()
 
 addModule :: [FilePath] -> GHCi ()
 addModule files = do
   state <- getGHCiState
-  dflags <- io (getDynFlags)
   io (revertCAFs)			-- always revert CAFs on load/add.
   files <- mapM expandPath files
   let new_targets = files ++ targets state 
-  graph <- io (cmDepAnal (cmstate state) dflags new_targets)
-  (cmstate1, ok, mods) <- io (cmLoadModules (cmstate state) dflags graph)
+  graph <- io (cmDepAnal (cmstate state) new_targets)
+  (cmstate1, ok, mods) <- io (cmLoadModules (cmstate state) graph)
   setGHCiState state{ cmstate = cmstate1, targets = new_targets }
   setContextAfterLoad mods
+  dflags <- io getDynFlags
   modulesLoadedMsg ok mods dflags
 
 changeDirectory :: String -> GHCi ()
@@ -550,8 +553,7 @@ changeDirectory dir = do
   when (targets state /= []) $
 	io $ putStr "Warning: changing directory causes all loaded modules to be unloaded, \n\ 
 	\because the search path has changed.\n"
-  dflags   <- io getDynFlags
-  cmstate1 <- io (cmUnload (cmstate state) dflags)
+  cmstate1 <- io (cmUnload (cmstate state))
   setGHCiState state{ cmstate = cmstate1, targets = [] }
   setContextAfterLoad []
   dir <- expandPath dir
@@ -575,9 +577,7 @@ defineMacro s = do
 
   -- compile the expression
   cms <- getCmState
-  dflags <- io getDynFlags
-  (new_cmstate, maybe_hv) <- io (cmCompileExpr cms dflags new_expr)
-  setCmState new_cmstate
+  maybe_hv <- io (cmCompileExpr cms new_expr)
   case maybe_hv of
      Nothing -> return ()
      Just hv -> io (writeIORef commands --
@@ -608,43 +608,43 @@ loadModule fs = timeIt (loadModule' fs)
 loadModule' :: [FilePath] -> GHCi ()
 loadModule' files = do
   state <- getGHCiState
-  dflags <- io getDynFlags
 
   -- expand tildes
   files <- mapM expandPath files
 
   -- do the dependency anal first, so that if it fails we don't throw
   -- away the current set of modules.
-  graph <- io (cmDepAnal (cmstate state) dflags files)
+  graph <- io (cmDepAnal (cmstate state) files)
 
   -- Dependency anal ok, now unload everything
-  cmstate1 <- io (cmUnload (cmstate state) dflags)
+  cmstate1 <- io (cmUnload (cmstate state))
   setGHCiState state{ cmstate = cmstate1, targets = [] }
 
   io (revertCAFs)  -- always revert CAFs on load.
-  (cmstate2, ok, mods) <- io (cmLoadModules cmstate1 dflags graph)
+  (cmstate2, ok, mods) <- io (cmLoadModules cmstate1 graph)
   setGHCiState state{ cmstate = cmstate2, targets = files }
 
   setContextAfterLoad mods
+  dflags <- io (getDynFlags)
   modulesLoadedMsg ok mods dflags
 
 
 reloadModule :: String -> GHCi ()
 reloadModule "" = do
   state <- getGHCiState
-  dflags <- io getDynFlags
   case targets state of
    [] -> io (putStr "no current target\n")
    paths -> do
 	-- do the dependency anal first, so that if it fails we don't throw
 	-- away the current set of modules.
-	graph <- io (cmDepAnal (cmstate state) dflags paths)
+	graph <- io (cmDepAnal (cmstate state) paths)
 
 	io (revertCAFs)		-- always revert CAFs on reload.
 	(cmstate1, ok, mods) 
-		<- io (cmLoadModules (cmstate state) dflags graph)
+		<- io (cmLoadModules (cmstate state) graph)
         setGHCiState state{ cmstate=cmstate1 }
 	setContextAfterLoad mods
+	dflags <- io getDynFlags
 	modulesLoadedMsg ok mods dflags
 
 reloadModule _ = noArgs ":reload"
@@ -671,9 +671,7 @@ modulesLoadedMsg ok mods dflags =
 typeOfExpr :: String -> GHCi ()
 typeOfExpr str 
   = do cms <- getCmState
-       dflags <- io getDynFlags
-       (new_cmstate, maybe_tystr) <- io (cmTypeOfExpr cms dflags str)
-       setCmState new_cmstate
+       maybe_tystr <- io (cmTypeOfExpr cms str)
        case maybe_tystr of
 	  Nothing    -> return ()
 	  Just tystr -> io (putStrLn tystr)
@@ -696,56 +694,25 @@ browseCmd m =
 
 browseModule m exports_only = do
   cms <- getCmState
-  dflags <- io getDynFlags
 
   is_interpreted <- io (cmModuleIsInterpreted cms m)
   when (not is_interpreted && not exports_only) $
 	throwDyn (CmdLineError ("module `" ++ m ++ "' is not interpreted"))
 
-  -- temporarily set the context to the module we're interested in,
+  -- Temporarily set the context to the module we're interested in,
   -- just so we can get an appropriate PrintUnqualified
   (as,bs) <- io (cmGetContext cms)
-  cms1 <- io (if exports_only then cmSetContext cms dflags [] [prel,m]
-			      else cmSetContext cms dflags [m] [])
-  cms2 <- io (cmSetContext cms1 dflags as bs)
+  cms1 <- io (if exports_only then cmSetContext cms [] [prel,m]
+			      else cmSetContext cms [m] [])
+  cms2 <- io (cmSetContext cms1 as bs)
 
-  (cms3, things) <- io (cmBrowseModule cms2 dflags m exports_only)
-
-  setCmState cms3
+  things <- io (cmBrowseModule cms2 m exports_only)
 
   let unqual = cmGetPrintUnqual cms1 -- NOTE: cms1 with the new context
 
-      things' = filter wantToSee things
-
-      wantToSee (AnId id)    = not (isImplicitId id)
-      wantToSee (ADataCon _) = False	-- They'll come via their TyCon
-      wantToSee _ 	     = True
-
-      thing_names = map getName things
-
-      thingDecl thing@(AnId id)  = ifaceTyThing True{-omit prags-} thing
-
-      thingDecl thing@(AClass c) =
-        let rn_decl = ifaceTyThing True{-omit prags-} thing in
-	case rn_decl of
-	  ClassDecl { tcdSigs = cons } -> 
-		rn_decl{ tcdSigs = filter methodIsVisible cons }
-	  other -> other
-        where
-           methodIsVisible (ClassOpSig n _ _ _) = n `elem` thing_names
-
-      thingDecl thing@(ATyCon t) =
-        let rn_decl = ifaceTyThing True{-omit prags-} thing in
-	case rn_decl of
-	  TyData { tcdCons = DataCons cons } -> 
-		rn_decl{ tcdCons = DataCons (filter conIsVisible cons) }
-	  other -> other
-        where
-	  conIsVisible (ConDecl n _ _ _ _) = n `elem` thing_names
-
   io (putStrLn (showSDocForUser unqual (
-   	 vcat (map (ppr . thingDecl) things')))
-   )
+   	 vcat (map ppr things)
+      )))
 
 -----------------------------------------------------------------------------
 -- Setting the module context
@@ -764,10 +731,9 @@ setContext str
 
 newContext mods = do
   cms <- getCmState
-  dflags <- io getDynFlags
   (as,bs) <- separate cms mods [] []
   let bs' = if null as && prel `notElem` bs then prel:bs else bs
-  cms' <- io (cmSetContext cms dflags as bs')
+  cms' <- io (cmSetContext cms as bs')
   setCmState cms'
 
 separate cmstate []           as bs = return (as,bs)
@@ -782,7 +748,6 @@ prel = "Prelude"
 
 addToContext mods = do
   cms <- getCmState
-  dflags <- io getDynFlags
   (as,bs) <- io (cmGetContext cms)
 
   (as',bs') <- separate cms mods [] []
@@ -790,14 +755,13 @@ addToContext mods = do
   let as_to_add = as' \\ (as ++ bs)
       bs_to_add = bs' \\ (as ++ bs)
 
-  cms' <- io (cmSetContext cms dflags 
+  cms' <- io (cmSetContext cms
 			(as ++ as_to_add) (bs ++ bs_to_add))
   setCmState cms'
 
 
 removeFromContext mods = do
   cms <- getCmState
-  dflags <- io getDynFlags
   (as,bs) <- io (cmGetContext cms)
 
   (as_to_remove,bs_to_remove) <- separate cms mods [] []
@@ -805,7 +769,7 @@ removeFromContext mods = do
   let as' = as \\ (as_to_remove ++ bs_to_remove)
       bs' = bs \\ (as_to_remove ++ bs_to_remove)
 
-  cms' <- io (cmSetContext cms dflags as' bs')
+  cms' <- io (cmSetContext cms as' bs')
   setCmState cms'
 
 ----------------------------------------------------------------------------
@@ -924,9 +888,9 @@ optToStr RevertCAFs = "r"
 
 newPackages new_pkgs = do	-- The new packages are already in v_Packages
   state    <- getGHCiState
-  dflags   <- io getDynFlags
-  cmstate1 <- io (cmUnload (cmstate state) dflags)
+  cmstate1 <- io (cmUnload (cmstate state))
   setGHCiState state{ cmstate = cmstate1, targets = [] }
+  dflags   <- io getDynFlags
   io (linkPackages dflags new_pkgs)
   setContextAfterLoad []
 
@@ -961,7 +925,8 @@ showBindings = do
   cms <- getCmState
   let
 	unqual = cmGetPrintUnqual cms
-	showBinding b = putStrLn (showSDocForUser unqual (ppr (ifaceTyThing True{-omit prags-} b)))
+--	showBinding b = putStrLn (showSDocForUser unqual (ppr (ifaceTyThing b)))
+	showBinding b = putStrLn (showSDocForUser unqual (ppr (getName b)))
 
   io (mapM_ showBinding (cmGetBindings cms))
   return ()

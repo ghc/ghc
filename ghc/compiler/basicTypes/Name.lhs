@@ -13,17 +13,18 @@ module Name (
 	mkInternalName, mkSystemName, 
 	mkSystemNameEncoded, mkSystemTvNameEncoded, mkFCallName,
 	mkIPName,
-	mkExternalName, mkKnownKeyExternalName, mkWiredInName,
+	mkExternalName, mkWiredInName,
 
 	nameUnique, setNameUnique,
-	nameOccName, nameModule, nameModule_maybe,
-	setNameOcc, setNameSrcLoc, 
-	hashName, externaliseName, localiseName,
+	nameOccName, nameModule, nameModule_maybe, nameModuleName,
+	setNameOcc, 
+	hashName, localiseName,
 
-	nameSrcLoc, eqNameByOcc,
+	nameSrcLoc, nameParent, nameParent_maybe,
 
 	isSystemName, isInternalName, isExternalName,
 	isTyVarName, isDllName, isWiredInName,
+	wiredInNameTyThing_maybe, 
 	nameIsLocalOrFrom, isHomePackageName,
 	
 	-- Class NamedThing and overloaded friends
@@ -33,11 +34,14 @@ module Name (
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-} TypeRep( TyThing )
+
 import OccName		-- All of it
-import Module		( Module, moduleName, isHomeModule )
+import Module		( Module, ModuleName, moduleName, isHomeModule )
 import CmdLineOpts	( opt_Static )
-import SrcLoc		( noSrcLoc, isWiredInLoc, wiredInSrcLoc, SrcLoc )
+import SrcLoc		( noSrcLoc, wiredInSrcLoc, SrcLoc )
 import Unique		( Unique, Uniquable(..), getKey, pprUnique )
+import Maybes		( orElse )
 import FastTypes
 import Outputable
 \end{code}
@@ -61,10 +65,13 @@ data Name = Name {
 -- the SrcLoc in a Name all that often.
 
 data NameSort
-  = External Module	-- (a) TyCon, Class, their derived Ids, dfun Id
-			-- (b) Imported Id
-			-- (c) Top-level Id in the original source, even if
-			--	locally defined
+  = External Module (Maybe Name)
+	-- (Just parent) => this Name is a subordinate name of 'parent'
+	-- e.g. data constructor of a data type, method of a class
+	-- Nothing => not a subordinate
+ 
+  | WiredIn Module (Maybe Name) TyThing
+	-- A variant of External, for wired-in things
 
   | Internal		-- A user-defined Id or TyVar
 			-- defined in the module being compiled
@@ -100,6 +107,7 @@ Notes about the NameSorts:
 nameUnique		:: Name -> Unique
 nameOccName		:: Name -> OccName 
 nameModule		:: Name -> Module
+nameModuleName		:: Name -> ModuleName
 nameSrcLoc		:: Name -> SrcLoc
 
 nameUnique  name = n_uniq name
@@ -115,24 +123,43 @@ isSystemName	  :: Name -> Bool
 isHomePackageName :: Name -> Bool
 isWiredInName	  :: Name -> Bool
 
-isWiredInName name = isWiredInLoc (n_loc name)
+isWiredInName (Name {n_sort = WiredIn _ _ _}) = True
+isWiredInName other			      = False
 
-isExternalName (Name {n_sort = External _}) = True
-isExternalName other	                    = False
+wiredInNameTyThing_maybe :: Name -> Maybe TyThing
+wiredInNameTyThing_maybe (Name {n_sort = WiredIn _ _ thing}) = Just thing
+wiredInNameTyThing_maybe other				     = Nothing
 
-nameModule (Name { n_sort = External mod }) = mod
-nameModule name				    = pprPanic "nameModule" (ppr name)
-
-nameModule_maybe (Name { n_sort = External mod }) = Just mod
-nameModule_maybe name				  = Nothing
+isExternalName (Name {n_sort = External _ _})  = True
+isExternalName (Name {n_sort = WiredIn _ _ _}) = True
+isExternalName other	                       = False
 
 isInternalName name = not (isExternalName name)
 
-nameIsLocalOrFrom from (Name {n_sort = External mod}) = mod == from
-nameIsLocalOrFrom from other			      = True
+nameParent_maybe :: Name -> Maybe Name
+nameParent_maybe (Name {n_sort = External _ p})  = p
+nameParent_maybe (Name {n_sort = WiredIn _ p _}) = p
+nameParent_maybe other	                         = Nothing
 
-isHomePackageName (Name {n_sort = External mod}) = isHomeModule mod
-isHomePackageName other			         = True 	-- Internal and system names
+nameParent :: Name -> Name
+nameParent name = case nameParent_maybe name of
+			Just parent -> parent
+			Nothing     -> name
+
+nameModule name = nameModule_maybe name `orElse` pprPanic "nameModule" (ppr name)
+nameModuleName name = moduleName (nameModule name)
+
+nameModule_maybe (Name { n_sort = External mod _})  = Just mod
+nameModule_maybe (Name { n_sort = WiredIn mod _ _}) = Just mod
+nameModule_maybe name				    = Nothing
+
+nameIsLocalOrFrom from name
+  | isExternalName name = from == nameModule name
+  | otherwise		= True
+
+isHomePackageName name
+  | isExternalName name = isHomeModule (nameModule name)
+  | otherwise		= True  	-- Internal and system names
 
 isDllName :: Name -> Bool	-- Does this name refer to something in a different DLL?
 isDllName nm = not opt_Static && not (isHomePackageName nm)
@@ -142,18 +169,6 @@ isTyVarName name = isTvOcc (nameOccName name)
 
 isSystemName (Name {n_sort = System}) = True
 isSystemName other		      = False
-
-eqNameByOcc :: Name -> Name -> Bool
--- Compare using the strings, not the unique
--- See notes with HsCore.eq_ufVar
-eqNameByOcc (Name {n_sort = sort1, n_occ = occ1})
-	    (Name {n_sort = sort2, n_occ = occ2})
-  = sort1 `eq_sort` sort2 && occ1 == occ2
-  where
-    eq_sort (External m1) (External m2) = moduleName m1 == moduleName m2
-    eq_sort (External _)  _		= False
-    eq_sort _            (External _)   = False
-    eq_sort _		 _		= True
 \end{code}
 
 
@@ -175,16 +190,16 @@ mkInternalName uniq occ loc = Name { n_uniq = uniq, n_sort = Internal, n_occ = o
 	--	* for interface files we tidyCore first, which puts the uniques
 	--	  into the print name (see setNameVisibility below)
 
-mkExternalName :: Unique -> Module -> OccName -> SrcLoc -> Name
-mkExternalName uniq mod occ loc = Name { n_uniq = uniq, n_sort = External mod,
-				         n_occ = occ, n_loc = loc }
+mkExternalName :: Unique -> Module -> OccName -> Maybe Name -> SrcLoc -> Name
+mkExternalName uniq mod occ mb_parent loc 
+  = Name { n_uniq = uniq, n_sort = External mod mb_parent,
+           n_occ = occ, n_loc = loc }
 
-mkKnownKeyExternalName :: Module -> OccName -> Unique -> Name
-mkKnownKeyExternalName mod occ uniq
-  = mkExternalName uniq mod occ noSrcLoc
-
-mkWiredInName :: Module -> OccName -> Unique -> Name
-mkWiredInName mod occ uniq = mkExternalName uniq mod occ wiredInSrcLoc
+mkWiredInName :: Module -> OccName -> Unique -> Maybe Name -> TyThing -> Name
+mkWiredInName mod occ uniq mb_parent thing 
+  = Name { n_uniq = uniq,
+	   n_sort = WiredIn mod mb_parent thing,
+	   n_occ = occ, n_loc = wiredInSrcLoc }
 
 mkSystemName :: Unique -> UserFS -> Name
 mkSystemName uniq fs = Name { n_uniq = uniq, n_sort = System, 
@@ -224,14 +239,8 @@ setNameUnique name uniq = name {n_uniq = uniq}
 setNameOcc :: Name -> OccName -> Name
 setNameOcc name occ = name {n_occ = occ}
 
-externaliseName :: Name -> Module -> Name
-externaliseName n mod = n { n_sort = External mod }
-				
 localiseName :: Name -> Name
 localiseName n = n { n_sort = Internal }
-				
-setNameSrcLoc :: Name -> SrcLoc -> Name
-setNameSrcLoc name loc = name {n_loc = loc}
 \end{code}
 
 
@@ -294,19 +303,29 @@ instance OutputableBndr Name where
 pprName name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
   = getPprStyle $ \ sty ->
     case sort of
-      External mod -> pprExternal sty name uniq mod occ
-      System       -> pprSystem sty uniq occ
-      Internal     -> pprInternal sty uniq occ
+      External mod mb_p      -> pprExternal sty name uniq mod occ mb_p False
+      WiredIn mod mb_p thing -> pprExternal sty name uniq mod occ mb_p True
+      System   		     -> pprSystem sty uniq occ
+      Internal    	     -> pprInternal sty uniq occ
 
-pprExternal sty name uniq mod occ
+pprExternal sty name uniq mod occ mb_p is_wired
   | codeStyle sty        = ppr (moduleName mod) <> char '_' <> pprOccName occ
-  | debugStyle sty       = ppr (moduleName mod) <> dot <> ppr_debug_occ uniq occ
+  | debugStyle sty       = sep [ppr (moduleName mod) <> dot <> pprOccName occ,
+				hsep [text "{-", 
+				      if is_wired then ptext SLIT("(w)") else empty,
+				      pprUnique uniq,
+				      case mb_p of
+					Nothing -> empty
+					Just n  -> brackets (ppr n),
+				      text "-}"]]
   | unqualStyle sty name = pprOccName occ
   | otherwise		 = ppr (moduleName mod) <> dot <> pprOccName occ
 
 pprInternal sty uniq occ
   | codeStyle sty  = pprUnique uniq
-  | debugStyle sty = ppr_debug_occ uniq occ
+  | debugStyle sty = hsep [pprOccName occ, text "{-", 
+			   text (briefOccNameFlavour occ), 
+			   pprUnique uniq, text "-}"]
   | otherwise      = pprOccName occ	-- User style
 
 -- Like Internal, except that we only omit the unique in Iface style
@@ -316,10 +335,6 @@ pprSystem sty uniq occ
 				-- If the tidy phase hasn't run, the OccName
 				-- is unlikely to be informative (like 's'),
 				-- so print the unique
-
-ppr_debug_occ uniq occ = hsep [pprOccName occ, text "{-", 
-			       text (briefOccNameFlavour occ), 
-			       pprUnique uniq, text "-}"]
 \end{code}
 
 %************************************************************************

@@ -9,6 +9,7 @@ Expanding out @foreign import@ and @foreign export@ declarations.
 module DsForeign ( dsForeigns ) where
 
 #include "HsVersions.h"
+import TcRnMonad	-- temp
 
 import CoreSyn
 
@@ -76,8 +77,10 @@ dsForeigns fos
  where
   combine (ForeignStubs acc_h acc_c acc_hdrs acc_feb, acc_f) 
 	  (ForeignImport id _ spec depr loc)
-    = dsFImport id spec	           `thenDs` \ (bs, h, c, mbhd) -> 
+    = traceIf (text "fi start" <+> ppr id)	`thenDs` \ _ ->
+      dsFImport id spec	           `thenDs` \ (bs, h, c, mbhd) -> 
       warnDepr depr loc		   `thenDs` \ _                ->
+      traceIf (text "fi end" <+> ppr id)	`thenDs` \ _ ->
       returnDs (ForeignStubs (h $$ acc_h)
       			     (c $$ acc_c)
 			     (addH mbhd acc_hdrs)
@@ -234,8 +237,8 @@ dsFCall fn_id fcall no_hdrs
     topConDs					     `thenDs` \ topCon -> 
     boxResult maybe_arg_ids augment topCon io_res_ty `thenDs` \ (ccall_result_ty, res_wrapper) ->
 
-    getUniqueDs					`thenDs` \ ccall_uniq ->
-    getUniqueDs					`thenDs` \ work_uniq ->
+    newUnique					`thenDs` \ ccall_uniq ->
+    newUnique					`thenDs` \ work_uniq ->
     let
 	-- Build the worker
 	worker_ty     = mkForAllTys tvs (mkFunTys (map idType work_arg_ids) ccall_result_ty)
@@ -290,7 +293,7 @@ dsFExport :: Id			-- Either the exported Id,
 dsFExport fn_id ty ext_name cconv isDyn
    = 
      let
-        (tvs,sans_foralls)		= tcSplitForAllTys ty
+        (_tvs,sans_foralls)		= tcSplitForAllTys ty
         (fe_arg_tys', orig_res_ty)	= tcSplitFunTys sans_foralls
 	-- We must use tcSplits here, because we want to see 
 	-- the (IO t) in the corner of the type!

@@ -6,8 +6,8 @@
 \begin{code}
 module Rules (
 	RuleBase, emptyRuleBase, 
-	extendRuleBase, extendRuleBaseList, addRuleBaseFVs, 
-	ruleBaseIds, ruleBaseFVs,
+	extendRuleBase, extendRuleBaseList, 
+	ruleBaseIds, 
 	pprRuleBase, ruleCheckProgram,
 
         lookupRule, addRule, addIdSpecialisations
@@ -17,7 +17,7 @@ module Rules (
 
 import CoreSyn		-- All of it
 import OccurAnal	( occurAnalyseRule )
-import CoreFVs		( exprFreeVars, ruleRhsFreeVars, ruleLhsFreeIds )
+import CoreFVs		( exprFreeVars, ruleRhsFreeVars )
 import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
 import CoreUtils	( eqExpr )
 import CoreTidy		( pprTidyIdRules )
@@ -373,14 +373,6 @@ bind vs1 vs2 matcher tpl_vars kont subst
     bug_msg = sep [ppr vs1, ppr vs2]
 
 ----------------------------------------
-matches [] [] tpl_vars kont subst 
-  = kont subst
-matches (e:es) (e':es') tpl_vars kont subst
-  = match e e' tpl_vars (matches es es' tpl_vars kont) subst
-matches es es' tpl_vars kont subst 
-  = match_fail
-
-----------------------------------------
 mkVarArg :: CoreBndr -> CoreArg
 mkVarArg v | isId v    = Var v
 	   | otherwise = Type (mkTyVarTy v)
@@ -594,43 +586,27 @@ data RuleBase = RuleBase
 		    IdSet	-- Ids with their rules in their specialisations
 				-- Held as a set, so that it can simply be the initial
 				-- in-scope set in the simplifier
-
-		    IdSet	-- Ids (whether local or imported) mentioned on 
-				-- LHS of some rule; these should be black listed
-
 	-- This representation is a bit cute, and I wonder if we should
 	-- change it to use (IdEnv CoreRule) which seems a bit more natural
 
-ruleBaseIds (RuleBase ids _) = ids
-ruleBaseFVs (RuleBase _ fvs) = fvs
-
-emptyRuleBase = RuleBase emptyVarSet emptyVarSet
-
-addRuleBaseFVs :: RuleBase -> IdSet -> RuleBase
-addRuleBaseFVs (RuleBase rules fvs) extra_fvs 
-  = RuleBase rules (fvs `unionVarSet` extra_fvs)
+ruleBaseIds (RuleBase ids) = ids
+emptyRuleBase = RuleBase emptyVarSet
 
 extendRuleBaseList :: RuleBase -> [(Id,CoreRule)] -> RuleBase
 extendRuleBaseList rule_base new_guys
   = foldl extendRuleBase rule_base new_guys
 
 extendRuleBase :: RuleBase -> (Id,CoreRule) -> RuleBase
-extendRuleBase (RuleBase rule_ids rule_fvs) (id, rule)
+extendRuleBase (RuleBase rule_ids) (id, rule)
   = RuleBase (extendVarSet rule_ids new_id)
-	     (rule_fvs `unionVarSet` extendVarSet lhs_fvs id)
   where
-    new_id = setIdSpecialisation id (addRule id old_rules rule)
-
+    new_id    = setIdSpecialisation id (addRule id old_rules rule)
     old_rules = idSpecialisation (fromMaybe id (lookupVarSet rule_ids id))
 	-- Get the old rules from rule_ids if the Id is already there, but
 	-- if not, use the Id from the incoming rule.  If may be a PrimOpId,
 	-- in which case it may have rules in its belly already.  Seems
 	-- dreadfully hackoid.
 
-    lhs_fvs = ruleLhsFreeIds rule
-	-- Finds *all* the free Ids of the LHS, not just
-	-- locally defined ones!!
-
 pprRuleBase :: RuleBase -> SDoc
-pprRuleBase (RuleBase rules _) = vcat [ pprTidyIdRules id | id <- varSetElems rules ]
+pprRuleBase (RuleBase rules) = vcat [ pprTidyIdRules id | id <- varSetElems rules ]
 \end{code}

@@ -16,10 +16,6 @@ is the principal client.
 \begin{code}
 module TcType (
   --------------------------------
-  -- TyThing
-  TyThing(..),	-- instance NamedThing
-
-  --------------------------------
   -- Types 
   TcType, TcSigmaType, TcRhoType, TcTauType, TcPredType, TcThetaType, 
   TcTyVar, TcTyVarSet, TcKind, 
@@ -54,14 +50,14 @@ module TcType (
 
   ---------------------------------
   -- Misc type manipulators
-  deNoteType, classNamesOfTheta,
+  deNoteType, classesOfTheta,
   tyClsNamesOfType, tyClsNamesOfDFunHead, 
   getDFunTyKey,
 
   ---------------------------------
   -- Predicate types  
   getClassPredTys_maybe, getClassPredTys, 
-  isPredTy, isClassPred, isTyVarClassPred, 
+  isClassPred, isTyVarClassPred, 
   mkDictTy, tcSplitPredTy_maybe, 
   isDictTy, tcSplitDFunTy, predTyUnique, 
   mkClassPred, isInheritablePred, isLinearPred, isIPPred, mkPredName, 
@@ -92,7 +88,7 @@ module TcType (
   superBoxity, liftedBoxity, hasMoreBoxityInfo, defaultKind, superKind,
   isTypeKind, isAnyTypeKind,
 
-  Type, SourceType(..), PredType, ThetaType, 
+  Type, PredType(..), ThetaType, 
   mkForAllTy, mkForAllTys, 
   mkFunTy, mkFunTys, zipFunTys, 
   mkTyConApp, mkGenTyConApp, mkAppTy, mkAppTys, mkSynTy, applyTy, applyTys,
@@ -100,7 +96,7 @@ module TcType (
 
   isUnLiftedType,	-- Source types are always lifted
   isUnboxedTupleType,	-- Ditto
-  isPrimitiveType, isTyVarTy,
+  isPrimitiveType, isTyVarTy, isPredTy,
 
   tidyTopType, tidyType, tidyPred, tidyTypes, tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
   tidyTyVarBndr, tidyOpenTyVar, tidyOpenTyVars,
@@ -120,8 +116,8 @@ import TypeRep		( Type(..), TyNote(..), funTyCon )  -- friend
 
 import Type		(	-- Re-exports
 			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
-			  tyVarsOfTheta, Kind, Type, SourceType(..),
-			  PredType, ThetaType, unliftedTypeKind,
+			  tyVarsOfTheta, Kind, Type, PredType(..),
+			  ThetaType, unliftedTypeKind,
 			  liftedTypeKind, openTypeKind, mkArrowKind,
 			  mkArrowKinds, mkForAllTy, mkForAllTys,
 			  defaultKind, isTypeKind, isAnyTypeKind,
@@ -129,7 +125,7 @@ import Type		(	-- Re-exports
 			  mkTyConApp, mkGenTyConApp, mkAppTy,
 			  mkAppTys, mkSynTy, applyTy, applyTys,
 			  mkTyVarTy, mkTyVarTys, mkTyConTy, mkPredTy,
-			  mkPredTys, isUnLiftedType,
+			  mkPredTys, isUnLiftedType, isPredTy,
 			  isUnboxedTupleType, isPrimitiveType,
 			  splitTyConApp_maybe,
 			  tidyTopType, tidyType, tidyPred, tidyTypes,
@@ -139,10 +135,9 @@ import Type		(	-- Re-exports
 			  hasMoreBoxityInfo, liftedBoxity,
 			  superBoxity, typeKind, superKind, repType
 			)
-import DataCon		( DataCon )
 import TyCon		( TyCon, isUnLiftedTyCon, tyConUnique )
-import Class		( classHasFDs, Class )
-import Var		( TyVar, Id, tyVarKind, isMutTyVar, mutTyVarDetails )
+import Class		( Class )
+import Var		( TyVar, tyVarKind, isMutTyVar, mutTyVarDetails )
 import ForeignCall	( Safety, playSafe
 			  , DNType(..)
 			)
@@ -152,8 +147,8 @@ import VarSet
 -- others:
 import CmdLineOpts	( DynFlags, DynFlag( Opt_GlasgowExts ), dopt )
 import Name		( Name, NamedThing(..), mkInternalName, getSrcLoc )
-import OccName		( OccName, mkDictOcc )
 import NameSet
+import OccName		( OccName, mkDictOcc )
 import PrelNames	-- Lots (e.g. in isFFIArgumentTy)
 import TysWiredIn	( unitTyCon, charTyCon, listTyCon )
 import BasicTypes	( IPName(..), ipNameName )
@@ -162,26 +157,6 @@ import SrcLoc		( SrcLoc )
 import Util		( cmpList, thenCmp, equalLength, snocView )
 import Maybes		( maybeToBool, expectJust )
 import Outputable
-\end{code}
-
-
-%************************************************************************
-%*									*
-			TyThing
-%*									*
-%************************************************************************
-
-\begin{code}
-data TyThing = AnId     Id
-	     | ADataCon DataCon
-	     | ATyCon   TyCon
-	     | AClass   Class
-
-instance NamedThing TyThing where
-  getName (AnId id)     = getName id
-  getName (ATyCon tc)   = getName tc
-  getName (AClass cl)   = getName cl
-  getName (ADataCon dc) = getName dc
 \end{code}
 
 
@@ -219,13 +194,6 @@ tau ::= tyvar
 
 -- In all cases, a (saturated) type synonym application is legal,
 -- provided it expands to the required form.
-
-
-\begin{code}
-type SigmaType = Type
-type RhoType   = Type
-type TauType   = Type
-\end{code}
 
 \begin{code}
 type TcTyVar    = TyVar		-- Might be a mutable tyvar
@@ -273,10 +241,6 @@ data TyVarDetails
 
    | InstTv	-- Ditto, but instance decl
 
-   | PatSigTv	-- Scoped type variable, introduced by a pattern
-		-- type signature
-		--	\ x::a -> e
-
    | VanillaTv	-- Everything else
 
 isUserTyVar :: TcTyVar -> Bool	-- Avoid unifying these if possible
@@ -302,7 +266,6 @@ tyVarBindingInfo tv
     details SigTv     = ptext SLIT("type signature")
     details ClsTv     = ptext SLIT("class declaration")
     details InstTv    = ptext SLIT("instance declaration")
-    details PatSigTv  = ptext SLIT("pattern type signature")
     details VanillaTv = ptext SLIT("//vanilla//")	-- Ditto
 \end{code}
 
@@ -316,10 +279,9 @@ tyVarBindingInfo tv
 \begin{code}
 mkSigmaTy tyvars theta tau = mkForAllTys tyvars (mkPhiTy theta tau)
 
-mkPhiTy :: [SourceType] -> Type -> Type
+mkPhiTy :: [PredType] -> Type -> Type
 mkPhiTy theta ty = foldr (\p r -> FunTy (mkPredTy p) r) ty theta
 \end{code}
-
 
 @isTauTy@ tests for nested for-alls.
 
@@ -327,9 +289,10 @@ mkPhiTy theta ty = foldr (\p r -> FunTy (mkPredTy p) r) ty theta
 isTauTy :: Type -> Bool
 isTauTy (TyVarTy v)	 = True
 isTauTy (TyConApp _ tys) = all isTauTy tys
+isTauTy (NewTcApp _ tys) = all isTauTy tys
 isTauTy (AppTy a b)	 = isTauTy a && isTauTy b
 isTauTy (FunTy a b)	 = isTauTy a && isTauTy b
-isTauTy (SourceTy p)	 = True		-- Don't look through source types
+isTauTy (PredTy p)	 = True		-- Don't look through source types
 isTauTy (NoteTy _ ty)	 = isTauTy ty
 isTauTy other		 = False
 \end{code}
@@ -337,15 +300,15 @@ isTauTy other		 = False
 \begin{code}
 getDFunTyKey :: Type -> OccName	-- Get some string from a type, to be used to 
 				-- construct a dictionary function name
-getDFunTyKey (TyVarTy tv)    	     = getOccName tv
-getDFunTyKey (TyConApp tc _) 	     = getOccName tc
-getDFunTyKey (AppTy fun _)   	     = getDFunTyKey fun
-getDFunTyKey (NoteTy _ t)    	     = getDFunTyKey t
-getDFunTyKey (FunTy arg _)   	     = getOccName funTyCon
-getDFunTyKey (ForAllTy _ t)  	     = getDFunTyKey t
-getDFunTyKey (SourceTy (NType tc _)) = getOccName tc	-- Newtypes are quite reasonable
-getDFunTyKey ty		     	     = pprPanic "getDFunTyKey" (pprType ty)
--- SourceTy shouldn't happen
+getDFunTyKey (TyVarTy tv)    = getOccName tv
+getDFunTyKey (TyConApp tc _) = getOccName tc
+getDFunTyKey (NewTcApp tc _) = getOccName tc
+getDFunTyKey (AppTy fun _)   = getDFunTyKey fun
+getDFunTyKey (NoteTy _ t)    = getDFunTyKey t
+getDFunTyKey (FunTy arg _)   = getOccName funTyCon
+getDFunTyKey (ForAllTy _ t)  = getDFunTyKey t
+getDFunTyKey ty		     = pprPanic "getDFunTyKey" (pprType ty)
+-- PredTy shouldn't happen
 \end{code}
 
 
@@ -400,10 +363,10 @@ tcSplitTyConApp ty = case tcSplitTyConApp_maybe ty of
 			Nothing	   -> pprPanic "tcSplitTyConApp" (pprType ty)
 
 tcSplitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
-tcSplitTyConApp_maybe (TyConApp tc tys) 	= Just (tc, tys)
-tcSplitTyConApp_maybe (FunTy arg res)   	= Just (funTyCon, [arg,res])
-tcSplitTyConApp_maybe (NoteTy n ty)     	= tcSplitTyConApp_maybe ty
-tcSplitTyConApp_maybe (SourceTy (NType tc tys)) = Just (tc,tys)
+tcSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
+tcSplitTyConApp_maybe (NewTcApp tc tys) = Just (tc, tys)
+tcSplitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
+tcSplitTyConApp_maybe (NoteTy n ty)     = tcSplitTyConApp_maybe ty
 	-- Newtypes are opaque, so they may be split
 	-- However, predicates are not treated
 	-- as tycon applications by the type checker
@@ -426,16 +389,16 @@ tcFunResultTy ty = case tcSplitFunTy_maybe ty of { Just (arg,res) -> res }
 
 
 tcSplitAppTy_maybe :: Type -> Maybe (Type, Type)
-tcSplitAppTy_maybe (FunTy ty1 ty2)   	     = Just (TyConApp funTyCon [ty1], ty2)
-tcSplitAppTy_maybe (AppTy ty1 ty2)   	     = Just (ty1, ty2)
-tcSplitAppTy_maybe (NoteTy n ty)     	     = tcSplitAppTy_maybe ty
-tcSplitAppTy_maybe (SourceTy (NType tc tys)) = tc_split_app tc tys	--- Don't forget that newtype!
-tcSplitAppTy_maybe (TyConApp tc tys)	     = tc_split_app tc tys
-tcSplitAppTy_maybe other	  	     = Nothing
-
-tc_split_app tc tys = case snocView tys of
-			Just (tys',ty') -> Just (TyConApp tc tys', ty')
-			Nothing		-> Nothing
+tcSplitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
+tcSplitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
+tcSplitAppTy_maybe (NoteTy n ty)     = tcSplitAppTy_maybe ty
+tcSplitAppTy_maybe (TyConApp tc tys) = case snocView tys of
+					Just (tys', ty') -> Just (TyConApp tc tys', ty')
+					Nothing		 -> Nothing
+tcSplitAppTy_maybe (NewTcApp tc tys) = case snocView tys of
+					Just (tys', ty') -> Just (NewTcApp tc tys', ty')
+					Nothing		 -> Nothing
+tcSplitAppTy_maybe other	     = Nothing
 
 tcSplitAppTy ty = case tcSplitAppTy_maybe ty of
 		    Just stuff -> stuff
@@ -478,7 +441,7 @@ tcSplitMethodTy ty = split ty
   split (NoteTy n ty)	= split ty
   split _               = panic "splitMethodTy"
 
-tcSplitDFunTy :: Type -> ([TyVar], [SourceType], Class, [Type])
+tcSplitDFunTy :: Type -> ([TyVar], [PredType], Class, [Type])
 -- Split the type of a dictionary function
 tcSplitDFunTy ty 
   = case tcSplitSigmaTy ty       of { (tvs, theta, tau) ->
@@ -518,30 +481,18 @@ allDistinctTyVars (ty:tys) acc
 %*									*
 %************************************************************************
 
-"Predicates" are particular source types, namelyClassP or IParams
-
 \begin{code}
-isPred :: SourceType -> Bool
-isPred (ClassP _ _) = True
-isPred (IParam _ _) = True
-isPred (NType _ _)  = False
-
-isPredTy :: Type -> Bool
-isPredTy (NoteTy _ ty)  = isPredTy ty
-isPredTy (SourceTy sty) = isPred sty
-isPredTy _	        = False
-
 tcSplitPredTy_maybe :: Type -> Maybe PredType
    -- Returns Just for predicates only
-tcSplitPredTy_maybe (NoteTy _ ty)  	    = tcSplitPredTy_maybe ty
-tcSplitPredTy_maybe (SourceTy p) | isPred p = Just p
-tcSplitPredTy_maybe other	      	    = Nothing
+tcSplitPredTy_maybe (NoteTy _ ty) = tcSplitPredTy_maybe ty
+tcSplitPredTy_maybe (PredTy p)  = Just p
+tcSplitPredTy_maybe other	  = Nothing
 	
 predTyUnique :: PredType -> Unique
 predTyUnique (IParam n _)      = getUnique (ipNameName n)
 predTyUnique (ClassP clas tys) = getUnique clas
 
-mkPredName :: Unique -> SrcLoc -> SourceType -> Name
+mkPredName :: Unique -> SrcLoc -> PredType -> Name
 mkPredName uniq loc (ClassP cls tys) = mkInternalName uniq (mkDictOcc (getOccName cls)) loc
 mkPredName uniq loc (IParam ip ty)   = mkInternalName uniq (getOccName (ipNameName ip)) loc
 \end{code}
@@ -552,14 +503,14 @@ mkPredName uniq loc (IParam ip ty)   = mkInternalName uniq (getOccName (ipNameNa
 \begin{code}
 mkClassPred clas tys = ClassP clas tys
 
-isClassPred :: SourceType -> Bool
+isClassPred :: PredType -> Bool
 isClassPred (ClassP clas tys) = True
 isClassPred other	      = False
 
 isTyVarClassPred (ClassP clas tys) = all tcIsTyVarTy tys
 isTyVarClassPred other		   = False
 
-getClassPredTys_maybe :: SourceType -> Maybe (Class, [Type])
+getClassPredTys_maybe :: PredType -> Maybe (Class, [Type])
 getClassPredTys_maybe (ClassP clas tys) = Just (clas, tys)
 getClassPredTys_maybe _		        = Nothing
 
@@ -570,7 +521,7 @@ mkDictTy :: Class -> [Type] -> Type
 mkDictTy clas tys = mkPredTy (ClassP clas tys)
 
 isDictTy :: Type -> Bool
-isDictTy (SourceTy p)   = isClassPred p
+isDictTy (PredTy p)   = isClassPred p
 isDictTy (NoteTy _ ty)	= isDictTy ty
 isDictTy other		= False
 \end{code}
@@ -578,7 +529,7 @@ isDictTy other		= False
 --------------------- Implicit parameters ---------------------------------
 
 \begin{code}
-isIPPred :: SourceType -> Bool
+isIPPred :: PredType -> Bool
 isIPPred (IParam _ _) = True
 isIPPred other	      = False
 
@@ -607,7 +558,6 @@ isLinearPred other		   = False
 %************************************************************************
 
 Comparison, taking note of newtypes, predicates, etc,
-But ignoring usage types
 
 \begin{code}
 tcEqType :: Type -> Type -> Bool
@@ -625,7 +575,7 @@ tcCmpType ty1 ty2 = cmpTy emptyVarEnv ty1 ty2
 
 tcCmpTypes tys1 tys2 = cmpTys emptyVarEnv tys1 tys2
 
-tcCmpPred p1 p2 = cmpSourceTy emptyVarEnv p1 p2
+tcCmpPred p1 p2 = cmpPredTy emptyVarEnv p1 p2
 -------------
 cmpTys env tys1 tys2 = cmpList (cmpTy env) tys1 tys2
 
@@ -644,13 +594,14 @@ cmpTy env (TyVarTy tv1) (TyVarTy tv2) = case lookupVarEnv env tv1 of
 					  Just tv1a -> tv1a `compare` tv2
 					  Nothing   -> tv1  `compare` tv2
 
-cmpTy env (SourceTy p1) (SourceTy p2) = cmpSourceTy env p1 p2
+cmpTy env (PredTy p1) (PredTy p2) = cmpPredTy env p1 p2
 cmpTy env (AppTy f1 a1) (AppTy f2 a2) = cmpTy env f1 f2 `thenCmp` cmpTy env a1 a2
 cmpTy env (FunTy f1 a1) (FunTy f2 a2) = cmpTy env f1 f2 `thenCmp` cmpTy env a1 a2
 cmpTy env (TyConApp tc1 tys1) (TyConApp tc2 tys2) = (tc1 `compare` tc2) `thenCmp` (cmpTys env tys1 tys2)
+cmpTy env (NewTcApp tc1 tys1) (NewTcApp tc2 tys2) = (tc1 `compare` tc2) `thenCmp` (cmpTys env tys1 tys2)
 cmpTy env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmpTy (extendVarEnv env tv1 tv2) t1 t2
     
-    -- Deal with the rest: TyVarTy < AppTy < FunTy < TyConApp < ForAllTy < SourceTy
+    -- Deal with the rest: TyVarTy < AppTy < FunTy < TyConApp < NewTcApp < ForAllTy < PredTy
 cmpTy env (AppTy _ _) (TyVarTy _) = GT
     
 cmpTy env (FunTy _ _) (TyVarTy _) = GT
@@ -660,38 +611,39 @@ cmpTy env (TyConApp _ _) (TyVarTy _) = GT
 cmpTy env (TyConApp _ _) (AppTy _ _) = GT
 cmpTy env (TyConApp _ _) (FunTy _ _) = GT
     
+cmpTy env (NewTcApp _ _) (TyVarTy _) 	= GT
+cmpTy env (NewTcApp _ _) (AppTy _ _) 	= GT
+cmpTy env (NewTcApp _ _) (FunTy _ _) 	= GT
+cmpTy env (NewTcApp _ _) (TyConApp _ _) = GT
+    
 cmpTy env (ForAllTy _ _) (TyVarTy _)    = GT
 cmpTy env (ForAllTy _ _) (AppTy _ _)    = GT
 cmpTy env (ForAllTy _ _) (FunTy _ _)    = GT
 cmpTy env (ForAllTy _ _) (TyConApp _ _) = GT
+cmpTy env (ForAllTy _ _) (NewTcApp _ _) = GT
 
-cmpTy env (SourceTy _)   t2		= GT
+cmpTy env (PredTy _)   t2		= GT
 
 cmpTy env _ _ = LT
 \end{code}
 
 \begin{code}
-cmpSourceTy :: TyVarEnv TyVar -> SourceType -> SourceType -> Ordering
-cmpSourceTy env (IParam n1 ty1) (IParam n2 ty2) = (n1 `compare` n2) `thenCmp` (cmpTy env ty1 ty2)
+cmpPredTy :: TyVarEnv TyVar -> PredType -> PredType -> Ordering
+cmpPredTy env (IParam n1 ty1) (IParam n2 ty2) = (n1 `compare` n2) `thenCmp` (cmpTy env ty1 ty2)
 	-- Compare types as well as names for implicit parameters
 	-- This comparison is used exclusively (I think) for the
 	-- finite map built in TcSimplify
-cmpSourceTy env (IParam _ _)     sty		  = LT
-
-cmpSourceTy env (ClassP _ _)     (IParam _ _)     = GT
-cmpSourceTy env (ClassP c1 tys1) (ClassP c2 tys2) = (c1 `compare` c2) `thenCmp` (cmpTys env tys1 tys2)
-cmpSourceTy env (ClassP _ _)     (NType _ _)      = LT
-
-cmpSourceTy env (NType tc1 tys1) (NType tc2 tys2) = (tc1 `compare` tc2) `thenCmp` (cmpTys env tys1 tys2)
-cmpSourceTy env (NType _ _)	 sty		  = GT
+cmpPredTy env (IParam _ _)     (ClassP _ _)	  = LT
+cmpPredTy env (ClassP _ _)     (IParam _ _)     = GT
+cmpPredTy env (ClassP c1 tys1) (ClassP c2 tys2) = (c1 `compare` c2) `thenCmp` (cmpTys env tys1 tys2)
 \end{code}
 
 PredTypes are used as a FM key in TcSimplify, 
 so we take the easy path and make them an instance of Ord
 
 \begin{code}
-instance Eq  SourceType where { (==)    = tcEqPred }
-instance Ord SourceType where { compare = tcCmpPred }
+instance Eq  PredType where { (==)    = tcEqPred }
+instance Ord PredType where { compare = tcCmpPred }
 \end{code}
 
 
@@ -744,19 +696,19 @@ is_tc uniq ty = case tcSplitTyConApp_maybe ty of
 
 \begin{code}
 deNoteType :: Type -> Type
-	-- Remove synonyms, but not source types
+	-- Remove synonyms, but not predicate types
 deNoteType ty@(TyVarTy tyvar)	= ty
 deNoteType (TyConApp tycon tys) = TyConApp tycon (map deNoteType tys)
-deNoteType (SourceTy p)		= SourceTy (deNoteSourceType p)
+deNoteType (NewTcApp tycon tys) = NewTcApp tycon (map deNoteType tys)
+deNoteType (PredTy p)		= PredTy (deNotePredType p)
 deNoteType (NoteTy _ ty)	= deNoteType ty
 deNoteType (AppTy fun arg)	= AppTy (deNoteType fun) (deNoteType arg)
 deNoteType (FunTy fun arg)	= FunTy (deNoteType fun) (deNoteType arg)
 deNoteType (ForAllTy tv ty)	= ForAllTy tv (deNoteType ty)
 
-deNoteSourceType :: SourceType -> SourceType
-deNoteSourceType (ClassP c tys)   = ClassP c (map deNoteType tys)
-deNoteSourceType (IParam n ty)    = IParam n (deNoteType ty)
-deNoteSourceType (NType tc tys)   = NType tc (map deNoteType tys)
+deNotePredType :: PredType -> PredType
+deNotePredType (ClassP c tys)   = ClassP c (map deNoteType tys)
+deNotePredType (IParam n ty)    = IParam n (deNoteType ty)
 \end{code}
 
 Find the free tycons and classes of a type.  This is used in the front
@@ -766,11 +718,11 @@ end of the compiler.
 tyClsNamesOfType :: Type -> NameSet
 tyClsNamesOfType (TyVarTy tv)		    = emptyNameSet
 tyClsNamesOfType (TyConApp tycon tys)	    = unitNameSet (getName tycon) `unionNameSets` tyClsNamesOfTypes tys
+tyClsNamesOfType (NewTcApp tycon tys)	    = unitNameSet (getName tycon) `unionNameSets` tyClsNamesOfTypes tys
 tyClsNamesOfType (NoteTy (SynNote ty1) ty2) = tyClsNamesOfType ty1
 tyClsNamesOfType (NoteTy other_note    ty2) = tyClsNamesOfType ty2
-tyClsNamesOfType (SourceTy (IParam n ty))   = tyClsNamesOfType ty
-tyClsNamesOfType (SourceTy (ClassP cl tys)) = unitNameSet (getName cl) `unionNameSets` tyClsNamesOfTypes tys
-tyClsNamesOfType (SourceTy (NType tc tys))  = unitNameSet (getName tc) `unionNameSets` tyClsNamesOfTypes tys
+tyClsNamesOfType (PredTy (IParam n ty))   = tyClsNamesOfType ty
+tyClsNamesOfType (PredTy (ClassP cl tys)) = unitNameSet (getName cl) `unionNameSets` tyClsNamesOfTypes tys
 tyClsNamesOfType (FunTy arg res)	    = tyClsNamesOfType arg `unionNameSets` tyClsNamesOfType res
 tyClsNamesOfType (AppTy fun arg)	    = tyClsNamesOfType fun `unionNameSets` tyClsNamesOfType arg
 tyClsNamesOfType (ForAllTy tyvar ty)	    = tyClsNamesOfType ty
@@ -788,9 +740,9 @@ tyClsNamesOfDFunHead dfun_ty
   = case tcSplitSigmaTy dfun_ty of
 	(tvs,_,head_ty) -> tyClsNamesOfType head_ty
 
-classNamesOfTheta :: ThetaType -> [Name]
+classesOfTheta :: ThetaType -> [Class]
 -- Looks just for ClassP things; maybe it should check
-classNamesOfTheta preds = [ getName c | ClassP c _ <- preds ]
+classesOfTheta preds = [ c | ClassP c _ <- preds ]
 \end{code}
 
 
@@ -1023,18 +975,18 @@ uTysX ty1 (TyVarTy tyvar2) k subst@(tmpls,_)
   = uVarX tyvar2 ty1 k subst
 
 	-- Predicates
-uTysX (SourceTy (IParam n1 t1)) (SourceTy (IParam n2 t2)) k subst
+uTysX (PredTy (IParam n1 t1)) (PredTy (IParam n2 t2)) k subst
   | n1 == n2 = uTysX t1 t2 k subst
-uTysX (SourceTy (ClassP c1 tys1)) (SourceTy (ClassP c2 tys2)) k subst
+uTysX (PredTy (ClassP c1 tys1)) (PredTy (ClassP c2 tys2)) k subst
   | c1 == c2 = uTyListsX tys1 tys2 k subst
-uTysX (SourceTy (NType tc1 tys1)) (SourceTy (NType tc2 tys2)) k subst
-  | tc1 == tc2 = uTyListsX tys1 tys2 k subst
 
 	-- Functions; just check the two parts
 uTysX (FunTy fun1 arg1) (FunTy fun2 arg2) k subst
   = uTysX fun1 fun2 (uTysX arg1 arg2 k) subst
 
 	-- Type constructors must match
+uTysX (NewTcApp tc1 tys1) (NewTcApp tc2 tys2) k subst
+  | tc1 == tc2 = uTyListsX tys1 tys2 k subst
 uTysX (TyConApp con1 tys1) (TyConApp con2 tys2) k subst
   | (con1 == con2 && equalLength tys1 tys2)
   = uTyListsX tys1 tys2 k subst
@@ -1172,12 +1124,10 @@ match (TyVarTy v) ty tmpls k senv
     -- expect, due to an intervening Note.  KSW 2000-06.
 
 	-- Predicates
-match (SourceTy (IParam n1 t1)) (SourceTy (IParam n2 t2)) tmpls k senv
+match (PredTy (IParam n1 t1)) (PredTy (IParam n2 t2)) tmpls k senv
   | n1 == n2 = match t1 t2 tmpls k senv
-match (SourceTy (ClassP c1 tys1)) (SourceTy (ClassP c2 tys2)) tmpls k senv
+match (PredTy (ClassP c1 tys1)) (PredTy (ClassP c2 tys2)) tmpls k senv
   | c1 == c2 = match_list_exactly tys1 tys2 tmpls k senv
-match (SourceTy (NType tc1 tys1)) (SourceTy (NType tc2 tys2)) tmpls k senv
-  | tc1 == tc2 = match_list_exactly tys1 tys2 tmpls k senv
 
 	-- Functions; just check the two parts
 match (FunTy arg1 res1) (FunTy arg2 res2) tmpls k senv
@@ -1188,11 +1138,10 @@ match (AppTy fun1 arg1) ty2 tmpls k senv
 	Just (fun2,arg2) -> match fun1 fun2 tmpls (match arg1 arg2 tmpls k) senv
 	Nothing 	 -> Nothing	-- Fail
 
-match (TyConApp tc1 tys1) (TyConApp tc2 tys2) tmpls k senv
+-- Newtypes are opaque; predicate types should not happen
+match (NewTcApp tc1 tys1) (NewTcApp tc2 tys2) tmpls k senv
   | tc1 == tc2 = match_list_exactly tys1 tys2 tmpls k senv
-
--- Newtypes are opaque; other source types should not happen
-match (SourceTy (NType tc1 tys1)) (SourceTy (NType tc2 tys2)) tmpls k senv
+match (TyConApp tc1 tys1) (TyConApp tc2 tys2) tmpls k senv
   | tc1 == tc2 = match_list_exactly tys1 tys2 tmpls k senv
 
 	-- With type synonyms, we have to be careful for the exact

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP Project, Glasgow University, 1992-1998
 %
-% $Id: CgRetConv.lhs,v 1.33 2002/09/13 15:02:28 simonpj Exp $
+% $Id: CgRetConv.lhs,v 1.34 2003/10/09 11:58:46 simonpj Exp $
 %
 \section[CgRetConv]{Return conventions for the code generator}
 
@@ -26,7 +26,7 @@ import Constants	( mAX_FAMILY_SIZE_FOR_VEC_RETURNS,
 			  mAX_Real_Double_REG, mAX_Real_Long_REG
 			)
 import CmdLineOpts	( opt_Unregisterised )
-import Maybes		( catMaybes )
+import Maybes		( mapCatMaybes )
 import PrimRep		( isFloatingRep, PrimRep(..), is64BitRep )
 import TyCon		( TyCon, tyConFamilySize )
 import Util		( isn'tIn )
@@ -224,10 +224,10 @@ mkRegTbl_allRegs regs_in_use
 mkRegTbl' regs_in_use vanillas floats doubles longs
   = (ok_vanilla, ok_float, ok_double, ok_long)
   where
-    ok_vanilla = catMaybes (map (select (VanillaReg VoidRep))  vanillas)
-    ok_float   = catMaybes (map (select FloatReg)	       floats)
-    ok_double  = catMaybes (map (select DoubleReg)	       doubles)
-    ok_long    = catMaybes (map (select (LongReg Int64Rep))    longs)   
+    ok_vanilla = mapCatMaybes (select (VanillaReg VoidRep)) vanillas
+    ok_float   = mapCatMaybes (select FloatReg)	            floats
+    ok_double  = mapCatMaybes (select DoubleReg)	    doubles
+    ok_long    = mapCatMaybes (select (LongReg Int64Rep))   longs   
 				    -- rep isn't looked at, hence we can use any old rep.
 
     select :: (FastInt -> MagicId) -> Int{-cand-} -> Maybe Int

@@ -16,7 +16,6 @@ import CoreLint	( endPass )
 import CoreSyn
 import Type	( Type, applyTy, splitFunTy_maybe, 
 		  isUnLiftedType, isUnboxedTupleType, seqType )
-import TcType	( TyThing( AnId ) )
 import NewDemand  ( Demand, isStrictDmd, lazyDmd, StrictSig(..), DmdType(..) )
 import Var 	( Var, Id, setVarUnique )
 import VarSet
@@ -26,7 +25,7 @@ import Id	( mkSysLocal, idType, idNewDemandInfo, idArity,
 		  isLocalId, hasNoBinding, idNewStrictness, 
 		  idUnfolding, isDataConWorkId_maybe
 		)
-import HscTypes   ( TypeEnv, typeEnvElts )
+import HscTypes   ( TypeEnv, typeEnvElts, TyThing( AnId ) )
 import BasicTypes ( TopLevelFlag(..), isTopLevel, isNotTopLevel,
 		    RecFlag(..), isNonRec
 		  )
@@ -578,9 +577,6 @@ mkLocalNonRec bndr dem floats rhs
   | otherwise
   = floatRhs NotTopLevel NonRecursive bndr (floats, rhs)	`thenUs` \ (floats', rhs') ->
     returnUs (addFloat floats' (FloatLet (NonRec bndr rhs')))
-
-  where
-    bndr_ty	 = idType bndr
 
 
 mkBinds :: Floats -> CoreExpr -> UniqSM CoreExpr

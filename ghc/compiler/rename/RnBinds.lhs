@@ -18,7 +18,7 @@ module RnBinds (
 
 
 import HsSyn
-import HsBinds		( eqHsSig, hsSigDoc )
+import HsBinds		( hsSigDoc, sigLoc, eqHsSig )
 import RdrHsSyn
 import RnHsSyn
 import TcRnMonad
@@ -33,6 +33,7 @@ import CmdLineOpts	( DynFlag(..) )
 import Digraph		( SCC(..), stronglyConnComp )
 import Name		( Name, nameOccName, nameSrcLoc )
 import NameSet
+import PrelNames	( isUnboundName )
 import RdrName		( RdrName, rdrNameOcc )
 import BasicTypes	( RecFlag(..), TopLevelFlag(..), isTopLevel )
 import List		( unzip4 )
@@ -154,7 +155,7 @@ rnTopMonoBinds :: RdrNameMonoBinds
 	       -> RnM (RenamedHsBinds, DefUses)
 
 -- The binders of the binding are in scope already;
--- the top level scope resoluttion does that
+-- the top level scope resolution does that
 
 rnTopMonoBinds mbinds sigs
  =  bindPatSigTyVars (collectSigTysFromMonoBinds mbinds) $ \ _ -> 
@@ -199,7 +200,6 @@ rnMonoBindsAndThen mbinds sigs thing_inside -- Non-empty monobinds
     let
 	all_uses     = duUses bind_dus `plusFV` result_fvs
 	bndrs        = duDefs bind_dus
-	real_uses    = findUses bind_dus result_fvs
 	unused_bndrs = nameSetToList (bndrs `minusNameSet` all_uses)
     in
     warnUnusedLocalBinds unused_bndrs	`thenM_`
@@ -260,11 +260,9 @@ rnMonoBinds top_lvl mbinds sigs
 	-- Warn about missing signatures, 
 	-- but only at top level, and not in interface mode
 	-- (The latter is important when renaming bindings from 'deriving' clauses.)
-    getModeRn				`thenM` \ mode ->
     doptM Opt_WarnMissingSigs 		`thenM` \ warn_missing_sigs ->
     (if isTopLevel top_lvl && 
-	 warn_missing_sigs && 
-	 not (isInterfaceMode mode)
+	 warn_missing_sigs
      then let
 	    type_sig_vars   = [n | Sig n _ _ <- siglist]
 	    un_sigd_binders = filter (not . (`elem` type_sig_vars)) 
@@ -322,13 +320,14 @@ flattenMonoBinds sigs (FunMonoBind name inf matches locn)
 	FunMonoBind new_name inf new_matches locn, sigs_for_me
       )]
 
-
 sigsForMe names_bound_here sigs
   = foldlM check [] (filter (sigForThisGroup names_bound_here) sigs)
   where
+	-- sigForThisGroup only returns signatures for 
+	-- which sigName returns a Just
     check sigs sig = case filter (eqHsSig sig) sigs of
 			[]    -> returnM (sig:sigs)
-			other -> dupSigDeclErr sig	`thenM_`
+			other -> dupSigDeclErr sig other	`thenM_`
 				 returnM sigs
 \end{code}
 
@@ -377,7 +376,7 @@ rnMethodBinds cls gen_tyvars (FunMonoBind name inf matches locn)
 	= extendTyVarEnvFVRn gen_tvs 	$
 	  rnMatch (FunRhs sel_name) match
 	where
-	  tvs     = map rdrNameOcc (extractHsTyRdrNames ty)
+	  tvs     = map rdrNameOcc (extractHsTyRdrTyVars ty)
 	  gen_tvs = [tv | tv <- gen_tyvars, nameOccName tv `elem` tvs] 
 
     rn_match sel_name match = rnMatch (FunRhs sel_name) match
@@ -464,9 +463,12 @@ checkSigs ok_sig sigs
 	-- Check for (a) duplicate signatures
 	--	     (b) signatures for things not in this group
 	-- Well, I can't see the check for (a)... ToDo!
-  = mappM_ unknownSigErr bad_sigs
+  = mappM_ unknownSigErr (filter bad sigs)
   where
-    bad_sigs = filter (not . ok_sig) sigs
+    bad sig = not (ok_sig sig) && 
+	      case sigName sig of
+		Just n | isUnboundName n -> False	-- Don't complain about an unbound name again
+		other			 -> True
 
 -- We use lookupSigOccRn in the signatures, which is a little bit unsatisfactory
 -- because this won't work for:
@@ -482,7 +484,7 @@ renameSigs sigs = mappM renameSig (filter (not . isFixitySig) sigs)
 	-- Remove fixity sigs which have been dealt with already
 
 renameSig :: Sig RdrName -> RnM (Sig Name)
--- ClassOpSig, FixitSig is renamed elsewhere.
+-- FixitSig is renamed elsewhere.
 renameSig (Sig v ty src_loc)
   = addSrcLoc src_loc $
     lookupSigOccRn v				`thenM` \ new_v ->
@@ -514,12 +516,13 @@ renameSig (InlineSig b v p src_loc)
 %************************************************************************
 
 \begin{code}
-dupSigDeclErr sig
+dupSigDeclErr sig sigs
   = addSrcLoc loc $
-    addErr (sep [ptext SLIT("Duplicate") <+> what_it_is <> colon,
-		   ppr sig])
+    addErr (vcat [ptext SLIT("Duplicate") <+> what_it_is <> colon,
+		  nest 2 (vcat (map ppr_sig (sig:sigs)))])
   where
     (what_it_is, loc) = hsSigDoc sig
+    ppr_sig sig = ppr (sigLoc sig) <> colon <+> ppr sig
 
 unknownSigErr sig
   = addSrcLoc loc $

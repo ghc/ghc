@@ -11,19 +11,19 @@ module RnTypes ( rnHsType, rnContext,
 		 precParseErr, sectionPrecErr, dupFieldErr, patSigErr, checkTupSize
   ) where
 
-import CmdLineOpts	( DynFlag(Opt_WarnMisc, Opt_WarnUnusedMatches, Opt_GlasgowExts) )
+import CmdLineOpts	( DynFlag(Opt_WarnUnusedMatches, Opt_GlasgowExts) )
 
 import HsSyn
 import RdrHsSyn	( RdrNameContext, RdrNameHsType, RdrNamePat,
-		  extractHsTyRdrTyVars, extractHsCtxtRdrTyVars )
+		  extractHsRhoRdrTyVars )
 import RnHsSyn	( RenamedContext, RenamedHsType, RenamedPat,
 		  extractHsTyNames, 
 		  parrTyCon_name, tupleTyCon_name, listTyCon_name, charTyCon_name )
 import RnEnv	( lookupOccRn, lookupBndrRn, lookupSyntaxName, lookupGlobalOccRn,
-		  newIPName, bindTyVarsRn, lookupFixityRn, mapFvRn,
+		  bindTyVarsRn, lookupFixityRn, mapFvRn, newIPNameRn,
 		  bindPatSigTyVarsFV, bindLocalsFV, warnUnusedMatches )
 import TcRnMonad
-
+import RdrName	( elemLocalRdrEnv )
 import PrelNames( eqStringName, eqClassName, integralClassName, 
 		  negateName, minusName, lengthPName, indexPName, plusIntegerName, fromIntegerName,
 		  timesIntegerName, ratioDataConName, fromRationalName )
@@ -31,15 +31,12 @@ import Constants	( mAX_TUPLE_SIZE )
 import TysWiredIn	( intTyCon )
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
 			  floatPrimTyCon, doublePrimTyCon )
-import RdrName	( elemRdrEnv )
 import Name	( Name, NamedThing(..) )
 import NameSet
-import Unique	( Uniquable(..) )
 
 import Literal		( inIntRange, inCharRange )
-import BasicTypes	( compareFixity, arrowFixity )
-import List		( nub )
-import ListSetOps	( removeDupsEq, removeDups )
+import BasicTypes	( compareFixity )
+import ListSetOps	( removeDups )
 import Outputable
 
 #include "HsVersions.h"
@@ -84,15 +81,13 @@ rnHsType doc (HsForAllTy Nothing ctxt ty)
 	-- over FV(T) \ {in-scope-tyvars} 
   = getLocalRdrEnv		`thenM` \ name_env ->
     let
-	mentioned_in_tau  = extractHsTyRdrTyVars ty
-	mentioned_in_ctxt = extractHsCtxtRdrTyVars ctxt
-	mentioned	  = nub (mentioned_in_tau ++ mentioned_in_ctxt)
+	mentioned = extractHsRhoRdrTyVars ctxt ty
 
 	-- Don't quantify over type variables that are in scope;
 	-- when GlasgowExts is off, there usually won't be any, except for
 	-- class signatures:
 	--	class C a where { op :: a -> a }
-	forall_tyvars = filter (not . (`elemRdrEnv` name_env)) mentioned
+	forall_tyvars = filter (not . (`elemLocalRdrEnv` name_env)) mentioned
     in
     rnForAll doc (map UserTyVar forall_tyvars) ctxt ty
 
@@ -101,13 +96,11 @@ rnHsType doc (HsForAllTy (Just forall_tyvars) ctxt tau)
 	-- Check that the forall'd tyvars are actually 
 	-- mentioned in the type, and produce a warning if not
   = let
-	mentioned_in_tau		= extractHsTyRdrTyVars tau
-	mentioned_in_ctxt		= extractHsCtxtRdrTyVars ctxt
-	mentioned			= nub (mentioned_in_tau ++ mentioned_in_ctxt)
-	forall_tyvar_names		= hsTyVarNames forall_tyvars
+	mentioned	   = extractHsRhoRdrTyVars ctxt tau
+	forall_tyvar_names = hsTyVarNames forall_tyvars
 
 	-- Explicitly quantified but not mentioned in ctxt or tau
-	warn_guys			= filter (`notElem` mentioned) forall_tyvar_names
+	warn_guys = filter (`notElem` mentioned) forall_tyvar_names
     in
     mappM_ (forAllWarn doc tau) warn_guys	`thenM_`
     rnForAll doc forall_tyvars ctxt tau
@@ -117,11 +110,7 @@ rnHsType doc (HsTyVar tyvar)
     returnM (HsTyVar tyvar')
 
 rnHsType doc (HsOpTy ty1 op ty2)
-  = (case op of
-	HsArrow  -> returnM HsArrow
-	HsTyOp n -> lookupOccRn n    `thenM` \ n' ->
-		    returnM (HsTyOp n')
-    )				`thenM` \ op' ->
+  = lookupOccRn op 		`thenM` \ op' ->
     rnHsType doc ty1		`thenM` \ ty1' ->
     rnHsType doc ty2		`thenM` \ ty2' -> 
     lookupTyFixityRn op'	`thenM` \ fix ->
@@ -202,14 +191,13 @@ have already been renamed and rearranged.  It's made rather tiresome
 by the presence of ->
 
 \begin{code}
-lookupTyFixityRn HsArrow    = returnM arrowFixity
-lookupTyFixityRn (HsTyOp n) 
+lookupTyFixityRn n 
   = doptM Opt_GlasgowExts 			`thenM` \ glaExts ->
     warnIf (not glaExts) (infixTyConWarn n)	`thenM_`
     lookupFixityRn n
 
 -- Building (ty1 `op1` (ty21 `op2` ty22))
-mkHsOpTyRn :: HsTyOp Name -> Fixity 
+mkHsOpTyRn :: Name -> Fixity 
 	   -> RenamedHsType -> RenamedHsType 
 	   -> RnM RenamedHsType
 
@@ -232,13 +220,6 @@ mkHsOpTyRn op1 fix1 ty1 ty2@(HsOpTy ty21 op2 ty22)
 
 mkHsOpTyRn op fix ty1 ty2 			-- Default case, no rearrangment
   = returnM (HsOpTy ty1 op ty2)
-
-mkHsFunTyRn ty1 ty2			-- Precedence of function arrow is 0
-  = returnM (HsFunTy ty1 ty2)		-- so no rearrangement reqd.  Change
-					-- this if fixity of -> increases.
-
-not_op_ty (HsOpTy _ _ _) = False
-not_op_ty other   	 = True
 \end{code}
 
 %*********************************************************
@@ -249,24 +230,7 @@ not_op_ty other   	 = True
 
 \begin{code}
 rnContext :: SDoc -> RdrNameContext -> RnM RenamedContext
-rnContext doc ctxt
-  = mappM rn_pred ctxt		`thenM` \ theta ->
-
-	-- Check for duplicate assertions
-	-- If this isn't an error, then it ought to be:
-    ifOptM Opt_WarnMisc (
-        let
-	    (_, dups) = removeDupsEq theta
-		-- We only have equality, not ordering
-        in
-        mappM_ (addWarn . dupClassAssertWarn theta) dups
-    )				`thenM_`
-
-    returnM theta
-  where
-    rn_pred pred = rnPred doc pred				`thenM` \ pred'->
-		   returnM pred'
-
+rnContext doc ctxt = mappM (rnPred doc) ctxt
 
 rnPred doc (HsClassP clas tys)
   = lookupOccRn clas		`thenM` \ clas_name ->
@@ -274,7 +238,7 @@ rnPred doc (HsClassP clas tys)
     returnM (HsClassP clas_name tys')
 
 rnPred doc (HsIParam n ty)
-  = newIPName n			`thenM` \ name ->
+  = newIPNameRn n		`thenM` \ name ->
     rnHsType doc ty		`thenM` \ ty' ->
     returnM (HsIParam name ty')
 \end{code}
@@ -419,17 +383,11 @@ rnConPat con (RecCon rpats)
     returnM (ConPatIn con' (RecCon rpats'), fvs `addOneFV` con')
 
 rnConPat con (InfixCon pat1 pat2)
-  = lookupOccRn con 	`thenM` \ con' ->
-    rnPat pat1		`thenM` \ (pat1', fvs1) ->
-    rnPat pat2		`thenM` \ (pat2', fvs2) ->
-
-    getModeRn		`thenM` \ mode ->
-	-- See comments with rnExpr (OpApp ...)
-    (if isInterfaceMode mode
-	then returnM (ConPatIn con' (InfixCon pat1' pat2'))
-	else lookupFixityRn con'	`thenM` \ fixity ->
-	     mkConOpPatRn con' fixity pat1' pat2'
-    )							`thenM` \ pat' ->
+  = lookupOccRn con 				`thenM` \ con' ->
+    rnPat pat1					`thenM` \ (pat1', fvs1) ->
+    rnPat pat2					`thenM` \ (pat2', fvs2) ->
+    lookupFixityRn con'				`thenM` \ fixity ->
+    mkConOpPatRn con' fixity pat1' pat2'	`thenM` \ pat' ->
     returnM (pat', fvs1 `plusFV` fvs2 `addOneFV` con')
 
 ------------------------
@@ -552,32 +510,11 @@ checkTupSize tup_size
 
 forAllWarn doc ty tyvar
   = ifOptM Opt_WarnUnusedMatches 	$
-    getModeRn				`thenM` \ mode ->
-    case mode of {
-#ifndef DEBUG
-	     InterfaceMode _ -> returnM () ; -- Don't warn of unused tyvars in interface files
-		                            -- unless DEBUG is on, in which case it is slightly
-					    -- informative.  They can arise from mkRhsTyLam,
-					    -- leading to (say) 	f :: forall a b. [b] -> [b]
-#endif
-	     other ->
-		addWarn (
-		   sep [ptext SLIT("The universally quantified type variable") <+> quotes (ppr tyvar),
+    addWarn (sep [ptext SLIT("The universally quantified type variable") <+> quotes (ppr tyvar),
 		   nest 4 (ptext SLIT("does not appear in the type") <+> quotes (ppr ty))]
 		   $$
 		   doc
                 )
-          }
-
-dupClassAssertWarn ctxt (assertion : dups)
-  = sep [hsep [ptext SLIT("Duplicate class assertion"), 
-	       quotes (ppr assertion),
-	       ptext SLIT("in the context:")],
-	 nest 4 (pprHsContext ctxt <+> ptext SLIT("..."))]
-
-naughtyCCallContextErr (HsClassP clas _)
-  = sep [ptext SLIT("Can't use class") <+> quotes (ppr clas), 
-	 ptext SLIT("in a context")]
 
 precParseErr op1 op2 
   = hang (ptext SLIT("precedence parsing error"))

@@ -5,16 +5,16 @@
 
 \begin{code}
 module DataCon (
-	DataCon,
+	DataCon, DataConIds(..),
 	ConTag, fIRST_TAG,
 	mkDataCon,
 	dataConRepType, dataConSig, dataConName, dataConTag, dataConTyCon,
 	dataConArgTys, dataConOrigArgTys, dataConInstOrigArgTys,
 	dataConRepArgTys, dataConTheta, 
-	dataConFieldLabels, dataConStrictMarks,
+	dataConFieldLabels, dataConStrictMarks, dataConExStricts,
 	dataConSourceArity, dataConRepArity,
 	dataConNumInstArgs, 
-	dataConWorkId, dataConWrapId, dataConWrapId_maybe,
+	dataConWorkId, dataConWrapId, dataConWrapId_maybe, dataConImplicitIds,
 	dataConRepStrictness,
 	isNullaryDataCon, isTupleCon, isUnboxedTupleCon,
 	isExistentialDataCon, classDataCon, dataConExistentialTyVars,
@@ -29,11 +29,11 @@ import {-# SOURCE #-} PprType( pprType )
 
 import Type		( Type, ThetaType, 
 			  mkForAllTys, mkFunTys, mkTyConApp,
-			  mkTyVarTys, splitTyConApp_maybe, repType, 
-			  mkPredTys, isStrictType
+			  mkTyVarTys, splitTyConApp_maybe, 
+			  mkPredTys, isStrictPred
 			)
 import TyCon		( TyCon, tyConDataCons, tyConDataCons, isProductTyCon,
-			  isTupleTyCon, isUnboxedTupleTyCon, isRecursiveTyCon )
+			  isTupleTyCon, isUnboxedTupleTyCon )
 import Class		( Class, classTyCon )
 import Name		( Name, NamedThing(..), nameUnique )
 import Var		( TyVar, Id )
@@ -41,7 +41,6 @@ import FieldLabel	( FieldLabel )
 import BasicTypes	( Arity, StrictnessMark(..) )
 import Outputable
 import Unique		( Unique, Uniquable(..) )
-import Maybes		( orElse )
 import ListSetOps	( assoc )
 import Util		( zipEqual, zipWithEqual, notNull )
 \end{code}
@@ -217,7 +216,7 @@ data DataCon
 		-- "Stupid", because the dictionaries aren't used for anything.  
 		-- 
 		-- Indeed, [as of March 02] they are no 
-		-- longer in the type of the dcWrapId, because
+		-- longer in the type of the wrapper Id, because
 		-- that makes it harder to use the wrap-id to rebuild
 		-- values after record selection or in generics.
 
@@ -228,25 +227,25 @@ data DataCon
 					-- (before unboxing and flattening of
 					--  strict fields)
 
-	dcRepArgTys :: [Type],		-- Final, representation argument types, after unboxing and flattening,
-					-- and including existential dictionaries
-
-	dcRepStrictness :: [StrictnessMark],	-- One for each representation argument	
-
-	dcTyCon  :: TyCon,		-- Result tycon
-
 	-- Now the strictness annotations and field labels of the constructor
 	dcStrictMarks :: [StrictnessMark],
-		-- Strictness annotations as deduced by the compiler.  
-		-- Has no MarkedUserStrict; they have been changed to MarkedStrict
-		-- or MarkedUnboxed by the compiler.
-		-- *Includes the existential dictionaries*
-		-- length = length dcExTheta + dataConSourceArity dataCon
+		-- Strictness annotations as decided by the compiler.  
+		-- Does *not* include the existential dictionaries
+		-- length = dataConSourceArity dataCon
 
 	dcFields  :: [FieldLabel],
 		-- Field labels for this constructor, in the
 		-- same order as the argument types; 
 		-- length = 0 (if not a record) or dataConSourceArity.
+
+	-- Constructor representation
+	dcRepArgTys :: [Type],		-- Final, representation argument types, 
+					-- after unboxing and flattening,
+					-- and *including* existential dictionaries
+
+	dcRepStrictness :: [StrictnessMark],	-- One for each representation argument	
+
+	dcTyCon  :: TyCon,		-- Result tycon
 
 	-- Finally, the curried worker function that corresponds to the constructor
 	-- It doesn't have an unfolding; the code generator saturates these Ids
@@ -254,14 +253,32 @@ data DataCon
 	--
 	-- An entirely separate wrapper function is built in TcTyDecls
 
-	dcWorkId :: Id,		-- The corresponding worker Id
-				-- Takes dcRepArgTys as its arguments
-				-- Perhaps this should be a 'Maybe'; not reqd for newtype constructors
-
-	dcWrapId :: Maybe Id	-- The wrapper Id, if it's necessary
-				-- It's deemed unnecessary if it performs the 
-				-- identity function
+	dcIds :: DataConIds
   }
+
+data DataConIds
+  = NewDC Id			-- Newtypes have only a wrapper, but no worker
+  | AlgDC (Maybe Id) Id 	-- Algebraic data types always have a worker, and
+				-- may or may not have a wrapper, depending on whether
+				-- the wrapper does anything.
+
+	-- *Neither* the worker *nor* the wrapper take the dcStupidTheta dicts as arguments
+
+	-- The wrapper takes dcOrigArgTys as its arguments
+	-- The worker takes dcRepArgTys as its arguments
+	-- If the worker is absent, dcRepArgTys is the same as dcOrigArgTys
+
+	-- The 'Nothing' case of AlgDC is important
+	-- Not only is this efficient,
+	-- but it also ensures that the wrapper is replaced
+	-- by the worker (becuase it *is* the wroker)
+	-- even when there are no args. E.g. in
+	-- 		f (:) x
+	-- the (:) *is* the worker.
+	-- This is really important in rule matching,
+	-- (We could match on the wrappers,
+	-- but that makes it less likely that rules will match
+	-- when we bring bits of unfoldings together.)
 
 type ConTag = Int
 
@@ -330,15 +347,15 @@ mkDataCon :: Name
 	  -> [TyVar] -> ThetaType
 	  -> [TyVar] -> ThetaType
 	  -> [Type] -> TyCon
-	  -> Id -> Maybe Id	-- Worker and possible wrapper
+	  -> DataConIds
 	  -> DataCon
   -- Can get the tag from the TyCon
 
 mkDataCon name 
-	  arg_stricts 	-- Use [] to mean 'all non-strict'
+	  arg_stricts	-- Must match orig_arg_tys 1-1
 	  fields
 	  tyvars theta ex_tyvars ex_theta orig_arg_tys tycon
-	  work_id wrap_id
+	  ids
   = con
   where
     con = MkData {dcName = name, 
@@ -347,9 +364,9 @@ mkDataCon name
 		  dcOrigArgTys = orig_arg_tys,
 		  dcRepArgTys = rep_arg_tys,
 	     	  dcExTyVars = ex_tyvars, dcExTheta = ex_theta,
-		  dcStrictMarks = real_stricts, dcRepStrictness = rep_arg_stricts,
+		  dcStrictMarks = arg_stricts, dcRepStrictness = rep_arg_stricts,
 		  dcFields = fields, dcTag = tag, dcTyCon = tycon, dcRepType = ty,
-		  dcWorkId = work_id, dcWrapId = wrap_id}
+		  dcIds = ids}
 
 	-- Strictness marks for source-args
 	--	*after unboxing choices*, 
@@ -359,11 +376,8 @@ mkDataCon name
 	-- source-language arguments.  We add extra ones for the
 	-- dictionary arguments right here.
     ex_dict_tys  = mkPredTys ex_theta
-    real_stricts = map mk_dict_strict_mark ex_dict_tys ++
-		   zipWith (chooseBoxingStrategy tycon) 
-			   orig_arg_tys 
-			   (arg_stricts ++ repeat NotMarkedStrict)
-    real_arg_tys = ex_dict_tys ++ orig_arg_tys
+    real_arg_tys = ex_dict_tys                      ++ orig_arg_tys
+    real_stricts = map mk_dict_strict_mark ex_theta ++ arg_stricts
 
 	-- Representation arguments and demands
     (rep_arg_stricts, rep_arg_tys) = computeRep real_stricts real_arg_tys
@@ -375,8 +389,8 @@ mkDataCon name
 
     result_ty = mkTyConApp tycon (mkTyVarTys tyvars)
 
-mk_dict_strict_mark ty | isStrictType ty = MarkedStrict
-		       | otherwise	 = NotMarkedStrict
+mk_dict_strict_mark pred | isStrictPred pred = MarkedStrict
+		         | otherwise	     = NotMarkedStrict
 \end{code}
 
 \begin{code}
@@ -393,22 +407,38 @@ dataConRepType :: DataCon -> Type
 dataConRepType = dcRepType
 
 dataConWorkId :: DataCon -> Id
-dataConWorkId = dcWorkId
+dataConWorkId dc = case dcIds dc of
+			AlgDC _ wrk_id -> wrk_id
+			NewDC _ -> pprPanic "dataConWorkId" (ppr dc)
 
 dataConWrapId_maybe :: DataCon -> Maybe Id
-dataConWrapId_maybe = dcWrapId
+dataConWrapId_maybe dc = case dcIds dc of
+				AlgDC mb_wrap _ -> mb_wrap
+				NewDC wrap	-> Just wrap
 
 dataConWrapId :: DataCon -> Id
 -- Returns an Id which looks like the Haskell-source constructor
--- If there is no dcWrapId it's because there is no need for a 
--- wrapper, so the worker is the Right Thing
-dataConWrapId dc = dcWrapId dc `orElse` dcWorkId dc
+dataConWrapId dc = case dcIds dc of
+			AlgDC (Just wrap) _   -> wrap
+			AlgDC Nothing     wrk -> wrk	    -- worker=wrapper
+			NewDC wrap	      -> wrap
+
+dataConImplicitIds :: DataCon -> [Id]
+dataConImplicitIds dc = case dcIds dc of
+			  AlgDC (Just wrap) work -> [wrap,work]
+			  AlgDC Nothing     work -> [work]
+			  NewDC wrap		 -> [wrap]
 
 dataConFieldLabels :: DataCon -> [FieldLabel]
 dataConFieldLabels = dcFields
 
 dataConStrictMarks :: DataCon -> [StrictnessMark]
 dataConStrictMarks = dcStrictMarks
+
+dataConExStricts :: DataCon -> [StrictnessMark]
+-- Strictness of *existential* arguments only
+-- Usually empty, so we don't bother to cache this
+dataConExStricts dc = map mk_dict_strict_mark (dcExTheta dc)
 
 -- Number of type-instantiation arguments
 -- All the remaining arguments of the DataCon are (notionally)
@@ -541,40 +571,8 @@ splitProductType str ty
 	Just stuff -> stuff
 	Nothing    -> pprPanic (str ++ ": not a product") (pprType ty)
 
--- We attempt to unbox/unpack a strict field when either:
---   (i)  The tycon is imported, and the field is marked '! !', or
---   (ii) The tycon is defined in this module, the field is marked '!',
---	  and the -funbox-strict-fields flag is on.
---
--- This ensures that if we compile some modules with -funbox-strict-fields and
--- some without, the compiler doesn't get confused about the constructor
--- representations.
-
-chooseBoxingStrategy :: TyCon -> Type -> StrictnessMark -> StrictnessMark
-	-- Transforms any MarkedUserStricts into MarkUnboxed or MarkedStrict
-chooseBoxingStrategy tycon arg_ty strict
-  = case strict of
-	MarkedUserStrict -> MarkedStrict
-	MarkedUserUnboxed
-	  | can_unbox -> MarkedUnboxed
-	  | otherwise -> MarkedStrict
-	other -> strict
-  where
-    can_unbox = unbox arg_ty
-	-- beware: repType will go into a loop if we try this on a recursive
-	-- type (for reasons unknown...), hence the check for recursion below.
-    unbox ty =  
-	case splitTyConApp_maybe ty of
-		Nothing	-> False
-		Just (arg_tycon, _)
-		  | isRecursiveTyCon arg_tycon -> False
-		  | otherwise ->
-			  case splitTyConApp_maybe (repType ty) of
-		     		Nothing -> False
-		     		Just (arg_tycon, _) -> isProductTyCon arg_tycon
 
 computeRep :: [StrictnessMark]		-- Original arg strictness
-					--   [after strategy choice; can't be MarkedUserStrict]
 	   -> [Type]			-- and types
 	   -> ([StrictnessMark],	-- Representation arg strictness
 	       [Type])			-- And type
@@ -586,5 +584,5 @@ computeRep stricts tys
     unbox MarkedStrict    ty = [(MarkedStrict,    ty)]
     unbox MarkedUnboxed   ty = zipEqual "computeRep" (dataConRepStrictness arg_dc) arg_tys
 			     where
-			       (_, _, arg_dc, arg_tys) = splitProductType "unbox_strict_arg_ty" (repType ty)
+			       (_, _, arg_dc, arg_tys) = splitProductType "unbox_strict_arg_ty" ty
 \end{code}

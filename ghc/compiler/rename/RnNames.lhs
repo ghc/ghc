@@ -6,45 +6,46 @@
 \begin{code}
 module RnNames (
 	rnImports, importsFromLocalDecls, exportsFromAvail,
-	reportUnusedNames, mkModDeps
+	reportUnusedNames, mkModDeps, exportsToAvails
     ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} RnHiFiles	( loadInterface )
-
 import CmdLineOpts	( DynFlag(..) )
-
 import HsSyn		( IE(..), ieName, ImportDecl(..),
 			  ForeignDecl(..), HsGroup(..),
 			  collectLocatedHsBinders, tyClDeclNames 
 			)
 import RdrHsSyn		( RdrNameIE, RdrNameImportDecl, main_RDR_Unqual )
 import RnEnv
+import IfaceEnv		( lookupOrig, lookupImplicitOrig )
+import LoadIface	( loadSrcInterface )
 import TcRnMonad
 
 import FiniteMap
-import PrelNames	( pRELUDE_Name, isBuiltInSyntaxName )
-import Module		( Module, ModuleName, ModuleEnv, moduleName, 
+import PrelNames	( pRELUDE_Name, isBuiltInSyntaxName, isUnboundName )
+import Module		( Module, ModuleName, moduleName, 
 			  moduleNameUserString, isHomeModule,
-			  emptyModuleEnv, unitModuleEnvByName, unitModuleEnv, 
-			  lookupModuleEnvByName, extendModuleEnvByName, moduleEnvElts )
-import Name		( Name, nameSrcLoc, nameOccName, nameModule, isExternalName )
+			  unitModuleEnvByName, unitModuleEnv, 
+			  lookupModuleEnvByName, moduleEnvElts )
+import Name		( Name, nameSrcLoc, nameOccName, nameModuleName,
+			  nameParent, nameParent_maybe, isExternalName )
 import NameSet
 import NameEnv
 import OccName		( OccName, srcDataName, isTcOcc )
-import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
-			  GenAvailInfo(..), AvailInfo, Avails, GhciMode(..),
-			  IsBootInterface,
-			  availName, availNames, availsToNameSet, 
-			  Deprecations(..), ModIface(..), Dependencies(..),
-		  	  GlobalRdrElt(..), unQualInScope, isLocalGRE, pprNameProvenance
+import HscTypes		( GenAvailInfo(..), AvailInfo, Avails, GhciMode(..),
+			  IsBootInterface, IfaceExport, 
+			  availName, availNames, availsToNameSet, unQualInScope, 
+			  Deprecs(..), ModIface(..), Dependencies(..)
 			)
-import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace, lookupRdrEnv, rdrEnvToList,
-			  emptyRdrEnv, foldRdrEnv, rdrEnvElts, mkRdrUnqual, isQual )
+import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace, 
+		  	  GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..), 
+			  emptyGlobalRdrEnv, plusGlobalRdrEnv, globalRdrEnvElts,
+			  unQualOK, lookupGRE_Name,
+			  Provenance(..), ImportSpec(..), 
+			  isLocalGRE, pprNameProvenance )
 import Outputable
-import Maybe		( isJust, isNothing, catMaybes )
-import Maybes		( orElse )
+import Maybes		( isJust, isNothing, catMaybes, mapCatMaybes )
 import ListSetOps	( removeDups )
 import Util		( sortLt, notNull )
 import List		( partition, insert )
@@ -61,7 +62,7 @@ import IO		( openFile, IOMode(..) )
 
 \begin{code}
 rnImports :: [RdrNameImportDecl]
-	  -> TcRn m (GlobalRdrEnv, ImportAvails)
+	  -> RnM (GlobalRdrEnv, ImportAvails)
 
 rnImports imports
   = 		-- PROCESS IMPORT DECLS
@@ -84,7 +85,7 @@ rnImports imports
 	let
 	    (imp_gbl_envs, imp_avails) = unzip (stuff1 ++ stuff2)
 	    gbl_env :: GlobalRdrEnv
-	    gbl_env = foldr plusGlobalRdrEnv emptyRdrEnv imp_gbl_envs
+	    gbl_env = foldr plusGlobalRdrEnv emptyGlobalRdrEnv imp_gbl_envs
 
 	    all_avails :: ImportAvails
 	    all_avails = foldr plusImportAvails emptyImportAvails imp_avails
@@ -119,35 +120,38 @@ preludeImportDecl loc
 \begin{code}
 importsFromImportDecl :: Module
 		      -> RdrNameImportDecl
-		      -> TcRn m (GlobalRdrEnv, ImportAvails)
+		      -> RnM (GlobalRdrEnv, ImportAvails)
 
 importsFromImportDecl this_mod
-	(ImportDecl imp_mod_name is_boot qual_only as_mod imp_spec iloc)
+	(ImportDecl imp_mod_name want_boot qual_only as_mod imp_details iloc)
   = addSrcLoc iloc $
-    let
-	doc = ppr imp_mod_name <+> ptext SLIT("is directly imported")
-    in
 
 	-- If there's an error in loadInterface, (e.g. interface
 	-- file not found) we get lots of spurious errors from 'filterImports'
-    tryM (loadInterface doc imp_mod_name (ImportByUser is_boot))	`thenM` \ mb_iface ->
+    let
+	this_mod_name = moduleName this_mod
+	doc = ppr imp_mod_name <+> ptext SLIT("is directly imported")
+    in
+    loadSrcInterface doc imp_mod_name want_boot	`thenM` \ iface ->
 
-    case mb_iface of {
-	Left exn    -> returnM (emptyRdrEnv, emptyImportAvails ) ;
-	Right iface ->    
+	-- Compiler sanity check: if the import didn't say
+	-- {-# SOURCE #-} we should not get a hi-boot file
+    WARN( not want_boot && mi_boot iface, ppr imp_mod_name )
+
+	-- Issue a user warning for a redundant {- SOURCE -} import
+	-- NB that we arrange to read all the ordinary imports before 
+	-- any of the {- SOURCE -} imports
+    warnIf (want_boot && not (mi_boot iface))
+	   (warnRedundantSourceImport imp_mod_name)	`thenM_`
 
     let
-	imp_mod	     	 = mi_module iface
-	avails_by_module = mi_exports iface
-	deprecs	     	 = mi_deprecs iface
-	is_orph		 = mi_orphan iface 
-	deps 		 = mi_deps iface
+	imp_mod	= mi_module iface
+	deprecs	= mi_deprecs iface
+	is_orph	= mi_orphan iface 
+	deps 	= mi_deps iface
 
-	avails :: Avails
-	avails = [ avail | (mod_name, avails) <- avails_by_module,
-			   mod_name /= this_mod_name,
-			   avail <- avails ]
-	this_mod_name = moduleName this_mod
+	filtered_exports = filter not_this_mod (mi_exports iface)
+	not_this_mod (mod,_) = mod /= this_mod_name
 	-- If the module exports anything defined in this module, just ignore it.
 	-- Reason: otherwise it looks as if there are two local definition sites
 	-- for the thing, and an error gets reported.  Easiest thing is just to
@@ -164,10 +168,11 @@ importsFromImportDecl this_mod
 	--	   import {-# SOURCE #-} A( AType )
 	--
 	-- then you'll get a 'B does not export AType' message.  Oh well.
-
     in
+    exportsToAvails filtered_exports			`thenM` \ avails ->
+
 	-- Filter the imports according to the import list
-    filterImports imp_mod is_boot imp_spec avails    `thenM` \ (filtered_avails, explicits) ->
+    filterImports imp_mod want_boot imp_details avails	`thenM` \ (filtered_avails, explicits) ->
 
     let
 	-- Compute new transitive dependencies
@@ -181,7 +186,7 @@ importsFromImportDecl this_mod
 		--	(a) remove this_mod (might be there as a hi-boot)
 		--	(b) add imp_mod itself
 		-- Take its dependent packages unchanged
-	     ((imp_mod_name, is_boot) : filter not_self (dep_mods deps), dep_pkgs deps)
+	     ((imp_mod_name, want_boot) : filter not_self (dep_mods deps), dep_pkgs deps)
 
 	   | otherwise	
  	   = 	-- Imported module is from another package
@@ -192,10 +197,10 @@ importsFromImportDecl this_mod
 
 	not_self (m, _) = m /= this_mod_name
 
-	import_all = case imp_spec of
-			Just (isHid, ls) -- Imports are spec'd explicitly
-			  | not isHid  -> Just (not (null ls)) 
-			_       -> Nothing	-- Everything is imported, 
+	import_all = case imp_details of
+			Just (is_hiding, ls)	 -- Imports are spec'd explicitly
+			  | not is_hiding -> Just (not (null ls))
+			_ -> Nothing		-- Everything is imported, 
 						-- (or almost everything [hiding])
 
 	qual_mod_name = case as_mod of
@@ -206,12 +211,17 @@ importsFromImportDecl this_mod
 	-- We need to know this so we know what to export when we see
 	--	module M ( module P ) where ...
 	-- Then we must export whatever came from P unqualified.
+	imp_spec  = ImportSpec { is_mod = imp_mod_name, is_qual = qual_only,  
+		  		 is_loc = iloc , is_as = qual_mod_name }
+	mk_deprec = mi_dep_fn iface
+	gres	  = [ GRE { gre_name = name, 
+		  	    gre_prov = Imported [imp_spec] (name `elemNameSet` explicits),
+		  	    gre_deprec = mk_deprec name }
+		  	| avail <- filtered_avails, name <- availNames avail ]
+	gbl_env   = mkGlobalRdrEnv gres
+		  
 	avail_env = mkAvailEnv filtered_avails
-
-	mk_prov name = NonLocalDef (UserImport imp_mod iloc (name `elemNameSet` explicits)) 
-	gbl_env      = mkGlobalRdrEnv qual_mod_name (not qual_only) 
-				      mk_prov filtered_avails deprecs
-	imports      = ImportAvails { 
+	imports   = ImportAvails { 
 			imp_qual     = unitModuleEnvByName qual_mod_name avail_env,
 			imp_env      = avail_env,
 			imp_mods     = unitModuleEnv imp_mod (imp_mod, import_all),
@@ -228,13 +238,26 @@ importsFromImportDecl this_mod
     )							`thenM_`
 
     returnM (gbl_env, imports)
-    }
 
-mkModDeps :: [(ModuleName, IsBootInterface)]
-	  -> ModuleEnv (ModuleName, IsBootInterface)
-mkModDeps deps = foldl add emptyModuleEnv deps
-	       where
-		 add env elt@(m,_) = extendModuleEnvByName env m elt
+exportsToAvails :: [IfaceExport] -> TcRnIf gbl lcl Avails
+exportsToAvails exports 
+  = do 	{ avails_by_module <- mappM do_one exports
+	; return (concat avails_by_module) }
+  where
+    do_one (mod_name, exports) = mapM (do_avail mod_name) exports
+    do_avail mod (Avail n)      = do { n' <- lookupOrig mod n; 
+			 	     ; return (Avail n') }
+    do_avail mod (AvailTC n ns) = do { n' <- lookupOrig mod n
+				     ; ns' <- mappM (lookupImplicitOrig n') ns
+				     ; return (AvailTC n' ns') }
+	-- Note the lookupImplicitOrig.  It ensures that the subordinate names
+	-- record their parent; and that in turn ensures that the GlobalRdrEnv
+	-- has the correct parent for all the names in its range.
+	-- For imported things, we only suck in the binding site later, if ever.
+
+warnRedundantSourceImport mod_name
+  = ptext SLIT("Unnecessary {- SOURCE -} in the import of module")
+          <+> quotes (ppr mod_name)
 \end{code}
 
 
@@ -253,7 +276,7 @@ Complain about duplicate bindings
 
 \begin{code}
 importsFromLocalDecls :: HsGroup RdrName
-		      -> TcRn m (GlobalRdrEnv, ImportAvails)
+		      -> RnM (GlobalRdrEnv, ImportAvails)
 importsFromLocalDecls group
   = getModule				`thenM` \ this_mod ->
     getLocalDeclBinders this_mod group	`thenM` \ avails ->
@@ -273,12 +296,12 @@ importsFromLocalDecls group
 
     doptM Opt_NoImplicitPrelude 		`thenM` \ implicit_prelude ->
     let
-	mod_name   = moduleName this_mod
-	mk_prov n  = LocalDef	-- Provenance is local
-
-	unqual_imp = True	-- Want unqualified names in scope
-	gbl_env = mkGlobalRdrEnv mod_name unqual_imp mk_prov avails NoDeprecs
-	    -- NoDeprecs: don't complain about locally defined names
+	mod_name = moduleName this_mod
+	prov     = LocalDef mod_name
+	gbl_env  = mkGlobalRdrEnv gres
+	gres     = [ GRE { gre_name = name, gre_prov = prov, gre_deprec = Nothing}
+		   | name <- all_names]
+	    -- gre_deprecs = Nothing: don't deprecate locally defined names
 	    -- For a start, we may be exporting a deprecated thing
 	    -- Also we may use a deprecated thing in the defn of another
 	    -- deprecated things.  We may even use a deprecated thing in
@@ -300,8 +323,9 @@ importsFromLocalDecls group
 	    -- defn of gbl_env above).      Stupid reason: when parsing 
 	    -- data type decls, the constructors start as Exact tycon-names,
 	    -- and then get turned into data con names by zapping the name space;
-	    -- but that stops them being Exact, so they get looked up.  Sigh.
-	    -- It doesn't matter because it only affects the Data.Tuple really.
+	    -- but that stops them being Exact, so they get looked up.  
+	    -- Ditto in fixity decls; e.g. 	infix 5 :
+	    -- Sigh. It doesn't matter because it only affects the Data.Tuple really.
 	    -- The important thing is to trim down the exports.
 
  	avails' | implicit_prelude = filter not_built_in_syntax avails
@@ -309,7 +333,7 @@ importsFromLocalDecls group
 	not_built_in_syntax a = not (all isBuiltInSyntaxName (availNames a))
 		-- Only filter it if all the names of the avail are built-in
 		-- In particular, lists have (:) which is not built in syntax
-		-- so we don't filter it out.
+		-- so we don't filter it out.  [Sept 03: wrong: see isBuiltInSyntaxName]
 
 	avail_env = mkAvailEnv avails'
 	imports   = emptyImportAvails {
@@ -334,7 +358,7 @@ files (@loadDecl@ calls @getTyClDeclBinders@).
 	*** See "THE NAMING STORY" in HsDecls ****
 
 \begin{code}
-getLocalDeclBinders :: Module -> HsGroup RdrName -> TcRn m [AvailInfo]
+getLocalDeclBinders :: Module -> HsGroup RdrName -> RnM [AvailInfo]
 getLocalDeclBinders mod (HsGroup {hs_valds = val_decls, 
 				  hs_tyclds = tycl_decls, 
 				  hs_fords = foreign_decls })
@@ -343,18 +367,22 @@ getLocalDeclBinders mod (HsGroup {hs_valds = val_decls,
 	-- permanently bound into the TyCons and Classes.  They don't need
 	-- an export indicator because they are all implicitly exported.
 
-    mappM new_tc tycl_decls				`thenM` \ tc_avails ->
-    mappM new_bndr (for_hs_bndrs ++ val_hs_bndrs)	`thenM` \ simple_bndrs ->
-
-    returnM (tc_avails ++ map Avail simple_bndrs)
+    mappM new_tc     tycl_decls				`thenM` \ tc_avails ->
+    mappM new_simple (for_hs_bndrs ++ val_hs_bndrs)	`thenM` \ simple_avails ->
+    returnM (tc_avails ++ simple_avails)
   where
-    new_bndr (rdr_name,loc) = newTopBinder mod rdr_name loc
+    new_simple rdr_name = newTopSrcBinder mod Nothing rdr_name `thenM` \ name ->
+			  returnM (Avail name)
 
     val_hs_bndrs = collectLocatedHsBinders val_decls
     for_hs_bndrs = [(nm,loc) | ForeignImport nm _ _ _ loc <- foreign_decls]
 
-    new_tc tc_decl = mappM new_bndr (tyClDeclNames tc_decl)	`thenM` \ names@(main_name:_) ->
-		     returnM (AvailTC main_name names)
+    new_tc tc_decl 
+	= newTopSrcBinder mod Nothing main_rdr			`thenM` \ main_name ->
+	  mappM (newTopSrcBinder mod (Just main_name)) sub_rdrs	`thenM` \ sub_names ->
+	  returnM (AvailTC main_name (main_name : sub_names))
+	where
+	  (main_rdr : sub_rdrs) = tyClDeclNames tc_decl
 \end{code}
 
 
@@ -372,7 +400,7 @@ filterImports :: Module				-- The module being imported
 	      -> IsBootInterface		-- Tells whether it's a {-# SOURCE #-} import
 	      -> Maybe (Bool, [RdrNameIE])	-- Import spec; True => hiding
 	      -> [AvailInfo]			-- What's available
-	      -> TcRn m ([AvailInfo],		-- What's imported
+	      -> RnM ([AvailInfo],		-- What's imported
 		       NameSet)			-- What was imported explicitly
 
 	-- Complains if import spec mentions things that the module doesn't export
@@ -407,7 +435,7 @@ filterImports mod from (Just (want_hiding, import_items)) total_avails
     bale_out item = addErr (badImportItemErr mod from item)	`thenM_`
 		    returnM []
 
-    get_item :: RdrNameIE -> TcRn m [(AvailInfo, [Name])]
+    get_item :: RdrNameIE -> RnM [(AvailInfo, [Name])]
 	-- Empty list for a bad item.
 	-- Singleton is typical case.
 	-- Can have two when we are hiding, and mention C which might be
@@ -531,7 +559,7 @@ type ExportOccMap = FiniteMap OccName (Name, RdrNameIE)
 
 exportsFromAvail :: Maybe Module 	-- Nothing => no 'module M(..) where' header at all
 		 -> Maybe [RdrNameIE] 	-- Nothing => no explicit export list
-		 -> TcRn m Avails
+		 -> RnM Avails
 	-- Complains if two distinct exports have same OccName
         -- Warns about identical exports.
 	-- Complains about exports items not in scope
@@ -551,9 +579,9 @@ exportsFromAvail maybe_mod exports
 	        = case maybe_mod of
 		    Just mod -> exports
 		    Nothing | ghci_mode == Interactive -> Nothing
-			    | otherwise		     -> Just [IEVar main_RDR_Unqual] } ;
+			    | otherwise		       -> Just [IEVar main_RDR_Unqual] } ;
 
-	exports_from_avail exports rdr_env imports }
+	exports_from_avail real_exports rdr_env imports }
 
 exports_from_avail Nothing rdr_env
 		   imports@(ImportAvails { imp_env = entity_avail_env })
@@ -563,12 +591,11 @@ exports_from_avail Nothing rdr_env
 	-- (b) locally defined, (c) a 'main' name
 	-- Then we look up in the entity-avail-env
    return [ lookupAvailEnv entity_avail_env name
-	       | (rdr_name, gres) <- rdrEnvToList rdr_env,
-		 isQual rdr_name,	-- Avoid duplicates
-		 GRE { gre_name   = name, 
-		       gre_parent = Nothing,	-- Main things only
-		       gre_prov   = LocalDef } <- gres
-	       ]
+	  | gre <- globalRdrEnvElts rdr_env,
+	    isLocalGRE gre,
+	    let name = gre_name gre,
+	    isNothing (nameParent_maybe name)	-- Main things only
+	  ]
 
 exports_from_avail (Just export_items) rdr_env
 		   (ImportAvails { imp_qual = mod_avail_env, 
@@ -578,7 +605,7 @@ exports_from_avail (Just export_items) rdr_env
     returnM (nameEnvElts export_avail_map)
 
   where
-    exports_from_item :: ExportAccum -> RdrNameIE -> TcRn m ExportAccum
+    exports_from_item :: ExportAccum -> RdrNameIE -> RnM ExportAccum
 
     exports_from_item acc@(mods, occs, avails) ie@(IEModuleContents mod)
 	| mod `elem` mods 	-- Duplicate export of M
@@ -610,15 +637,13 @@ exports_from_avail (Just export_items) rdr_env
 		   returnM (mod:mods, occs', avails')
 
     exports_from_item acc@(mods, occs, avails) ie
-	= lookupGRE (ieName ie)	 		`thenM` \ mb_gre -> 
-	  case mb_gre of {
-	    Nothing  -> addErr (unknownNameErr (ieName ie))	`thenM_`
-			returnM acc ;
-	    Just gre ->		
-
+	= lookupGlobalOccRn (ieName ie)	 		`thenM` \ name -> 
+	  if isUnboundName name then
+		returnM acc 	-- Avoid error cascade
+	  else
 		-- Get the AvailInfo for the parent of the specified name
 	  let
-	    parent = gre_parent gre `orElse` gre_name gre
+	    parent = nameParent name 
 	    avail  = lookupAvailEnv entity_avail_env parent
 	  in
 		-- Filter out the bits we want
@@ -633,7 +658,7 @@ exports_from_avail (Just export_items) rdr_env
 	  warnIf (not (ok_item ie avail)) (dodgyExportWarn ie)	`thenM_`
           check_occs ie occs export_avail			`thenM` \ occs' ->
 	  returnM (mods, occs', addAvail avails export_avail)
-	  }}
+	  }
 
 
 -------------------------------
@@ -651,10 +676,7 @@ filter_unqual env (AvailTC n ns)
 in_scope :: GlobalRdrEnv -> Name -> Bool
 -- Checks whether the Name is in scope unqualified, 
 -- regardless of whether it's ambiguous or not
-in_scope env n 
-  = case lookupRdrEnv env (mkRdrUnqual (nameOccName n)) of
-	Nothing   -> False
-	Just gres -> or [n == gre_name g | g <- gres]
+in_scope env n = any unQualOK (lookupGRE_Name env n)
 
 
 -------------------------------
@@ -665,7 +687,7 @@ ok_item (IEThingAll _) (AvailTC _ [n]) = False
 ok_item _ _ = True
 
 -------------------------------
-check_occs :: RdrNameIE -> ExportOccMap -> AvailInfo -> TcRn m ExportOccMap
+check_occs :: RdrNameIE -> ExportOccMap -> AvailInfo -> RnM ExportOccMap
 check_occs ie occs avail 
   = foldlM check occs (availNames avail)
   where
@@ -694,35 +716,28 @@ check_occs ie occs avail
 %*********************************************************
 
 \begin{code}
-reportUnusedNames :: TcGblEnv -> DefUses -> TcRn m ()
-reportUnusedNames gbl_env dus
+reportUnusedNames :: TcGblEnv -> RnM ()
+reportUnusedNames gbl_env 
   = warnUnusedModules unused_imp_mods	`thenM_`
     warnUnusedTopBinds bad_locals	`thenM_`
     warnUnusedImports bad_imports	`thenM_`
     printMinimalImports minimal_imports
   where
-    used_names :: NameSet
-    used_names = findUses dus emptyNameSet
+    used_names, all_used_names :: NameSet
+    used_names = findUses (tcg_dus gbl_env) emptyNameSet
+    all_used_names = used_names `unionNameSets` 
+		     mkNameSet (mapCatMaybes nameParent_maybe (nameSetToList used_names))
+			-- A use of C implies a use of T,
+			-- if C was brought into scope by T(..) or T(C)
 
 	-- Collect the defined names from the in-scope environment
-	-- Look for the qualified ones only, else get duplicates
     defined_names :: [GlobalRdrElt]
-    defined_names = foldRdrEnv add [] (tcg_rdr_env gbl_env)
-    add rdr_name ns acc | isQual rdr_name = ns ++ acc
-			| otherwise	  = acc
+    defined_names = globalRdrEnvElts (tcg_rdr_env gbl_env)
 
     defined_and_used, defined_but_not_used :: [GlobalRdrElt]
     (defined_and_used, defined_but_not_used) = partition is_used defined_names
 
-    is_used gre = n `elemNameSet` used_names || any (`elemNameSet` used_names) kids
-	-- The 'kids' part is because a use of C implies a use of T,
-	-- if C was brought into scope by T(..) or T(C)
-	     where
-	       n    = gre_name gre
-	       kids = case lookupAvailEnv_maybe avail_env n of
-			Just (AvailTC n ns) -> ns
-			other	            -> []	-- Ids, class ops and datacons
-							-- (The latter two give Nothing)
+    is_used gre = gre_name gre `elemNameSet` all_used_names
     
     -- Filter out the ones that are 
     --  (a) defined in this module, and
@@ -735,8 +750,11 @@ reportUnusedNames gbl_env dus
     
     bad_imports :: [GlobalRdrElt]
     bad_imports = filter bad_imp defined_but_not_used
-    bad_imp (GRE {gre_prov = NonLocalDef (UserImport mod _ True)}) = not (module_unused mod)
-    bad_imp other						   = False
+    bad_imp (GRE {gre_prov = Imported imp_specs True}) 
+	= not (all (module_unused . is_mod) imp_specs)
+		-- Don't complain about unused imports if we've already said the
+		-- entire import is unused
+    bad_imp other = False
     
     -- To figure out the minimal set of imports, start with the things
     -- that are in scope (i.e. in gbl_env).  Then just combine them
@@ -764,10 +782,10 @@ reportUnusedNames gbl_env dus
 	-- We've carefully preserved the provenance so that we can
 	-- construct minimal imports that import the name by (one of)
 	-- the same route(s) as the programmer originally did.
-    add_name (GRE {gre_name = n, gre_parent = p,
-		   gre_prov = NonLocalDef (UserImport m _ _)}) acc 
-	= addToFM_C plusAvailEnv acc (moduleName m) 
-		    (unitAvailEnv (mk_avail n p))
+    add_name (GRE {gre_name = n, 
+		   gre_prov = Imported imp_specs _}) acc 
+	= addToFM_C plusAvailEnv acc (is_mod (head imp_specs))
+		    (unitAvailEnv (mk_avail n (nameParent_maybe n)))
     add_name other acc 
 	= acc
 
@@ -782,8 +800,7 @@ reportUnusedNames gbl_env dus
     	-- Add an empty collection of imports for a module
     	-- from which we have sucked only instance decls
    
-    imports   = tcg_imports gbl_env
-    avail_env = imp_env imports
+    imports = tcg_imports gbl_env
 
     direct_import_mods :: [ModuleName]
     direct_import_mods = map (moduleName . fst) 
@@ -803,14 +820,17 @@ reportUnusedNames gbl_env dus
     		       isNothing (lookupFM minimal_imports1 m),
     		       m /= pRELUDE_Name,
 		       not (hasEmptyImpList m)]
-
-    module_unused :: Module -> Bool
-    module_unused mod = moduleName mod `elem` unused_imp_mods
+	-- hasEmptyImpList arranges not to complain about
+	-- import M (), which is an idiom for importing
+	-- instance declarations
+    
+    module_unused :: ModuleName -> Bool
+    module_unused mod = mod `elem` unused_imp_mods
 
 
 -- ToDo: deal with original imports with 'qualified' and 'as M' clauses
 printMinimalImports :: FiniteMap ModuleName AvailEnv	-- Minimal imports
-		    -> TcRn m ()
+		    -> RnM ()
 printMinimalImports imps
  = ifOptM Opt_D_dump_minimal_imports $ do {
 
@@ -835,7 +855,7 @@ printMinimalImports imps
     to_ies (mod, avail_env) = mappM to_ie (availEnvElts avail_env)	`thenM` \ ies ->
 			      returnM (mod, ies)
 
-    to_ie :: AvailInfo -> TcRn m (IE Name)
+    to_ie :: AvailInfo -> RnM (IE Name)
 	-- The main trick here is that if we're importing all the constructors
 	-- we want to say "T(..)", but if we're importing only a subset we want
 	-- to say "T(A,B,C)".  So we have to find out what the module exports.
@@ -843,18 +863,19 @@ printMinimalImports imps
     to_ie (AvailTC n [m]) = ASSERT( n==m ) 
 			    returnM (IEThingAbs n)
     to_ie (AvailTC n ns)  
-	= loadInterface (text "Compute minimal imports from" <+> ppr n_mod) 
-			n_mod ImportBySystem				`thenM` \ iface ->
+	= loadSrcInterface doc n_mod False			`thenM` \ iface ->
 	  case [xs | (m,as) <- mi_exports iface,
 		     m == n_mod,
 		     AvailTC x xs <- as, 
-		     x == n] of
-	      [xs] | all (`elem` ns) xs -> returnM (IEThingAll n)
-		   | otherwise	        -> returnM (IEThingWith n (filter (/= n) ns))
-	      other			-> pprTrace "to_ie" (ppr n <+> ppr (nameModule n) <+> ppr other) $
-					   returnM (IEVar n)
+		     x == nameOccName n] of
+	      [xs] | all_used xs -> returnM (IEThingAll n)
+		   | otherwise	 -> returnM (IEThingWith n (filter (/= n) ns))
+	      other		 -> pprTrace "to_ie" (ppr n <+> ppr n_mod <+> ppr other) $
+				    returnM (IEVar n)
 	where
-	  n_mod = moduleName (nameModule n)
+	  all_used avail_occs = all (`elem` map nameOccName ns) avail_occs
+	  doc = text "Compute minimal imports from" <+> ppr n
+	  n_mod = nameModuleName n
 \end{code}
 
 
@@ -897,15 +918,9 @@ exportClashErr global_env name1 name2 ie1 ie2
     ppr_export ie name = nest 2 (quotes (ppr ie) <+> ptext SLIT("exports") <+> 
 			 	 quotes (ppr name) <+> pprNameProvenance (get_gre name))
 
-	-- get_gre finds a GRE for the Name, in a very inefficient way
-	-- There isn't a more efficient way to do it, because we don't necessarily
-	-- know the RdrName under which this Name is in scope.  So we just
-	-- search linearly.  Shouldn't matter because this only happens
-	-- in an error message.
+	-- get_gre finds a GRE for the Name, so that we can show its provenance
     get_gre name
-	= case [gre | gres <- rdrEnvElts global_env,
-		      gre  <- gres,
-		      gre_name gre == name] of
+	= case lookupGRE_Name global_env name of
 	     (gre:_) -> gre
 	     []	     -> pprPanic "exportClashErr" (ppr name)
 

@@ -16,7 +16,6 @@ module RdrHsSyn (
 	RdrNameContext,
 	RdrNameDefaultDecl,
 	RdrNameForeignDecl,
-	RdrNameCoreDecl,
 	RdrNameGRHS,
 	RdrNameGRHSs,
 	RdrNameHsBinds,
@@ -47,15 +46,15 @@ module RdrHsSyn (
 
 	main_RDR_Unqual,
 
-	extractHsTyRdrNames,  extractHsTyRdrTyVars, 
-	extractHsCtxtRdrTyVars, extractGenericPatTyVars,
+	extractHsTyRdrTyVars, 
+	extractHsRhoRdrTyVars, extractGenericPatTyVars,
  
 	mkHsOpApp, mkClassDecl, 
 	mkHsNegApp, mkNPlusKPat, mkHsIntegral, mkHsFractional,
 	mkHsDo, mkHsSplice, mkSigDecls,
         mkTyData, mkPrefixCon, mkRecCon,
 	mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
-	mkIfaceExports,      -- :: [RdrNameTyClDecl] -> [RdrExportItem]
+	mkBootIface,
 
 	cvBinds,
 	cvMonoBindsAndSigs,
@@ -94,20 +93,26 @@ module RdrHsSyn (
 #include "HsVersions.h"
 
 import HsSyn		-- Lots of it
+import IfaceType
+import HscTypes		( ModIface(..), emptyModIface, mkIfaceVerCache )
+import IfaceSyn		( IfaceDecl(..), IfaceIdInfo(..) )
 import RdrName		( RdrName, isRdrTyVar, mkRdrUnqual, mkUnqual, rdrNameOcc, 
 			  isRdrTyVar, isRdrDataCon, isUnqual, getRdrName, isQual,
-			  setRdrNameSpace )
-import BasicTypes	( RecFlag(..), FixitySig(..), maxPrecedence )
-import Class            ( DefMeth (..) )
+			  setRdrNameSpace, rdrNameModule )
+import BasicTypes	( RecFlag(..), mapIPName, maxPrecedence, initialVersion )
 import Lexer		( P, setSrcLocFor, getSrcLoc, failLocMsgP )
-import HscTypes		( RdrAvailInfo, GenAvailInfo(..) )
-import TysWiredIn	( unitTyCon )
+import HscTypes		( GenAvailInfo(..) )
+import TysWiredIn	( unitTyCon ) 
 import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
 			  DNCallSpec(..), DNKind(..))
-import OccName  	( srcDataName, varName, isDataOcc, isTcOcc, occNameUserString,
-			  mkDefaultMethodOcc, mkVarOcc )
+import OccName  	( OccName, srcDataName, varName, isDataOcc, isTcOcc, 
+			  occNameUserString, mkVarOcc, isValOcc )
+import BasicTypes	( initialVersion )
+import TyCon		( DataConDetails(..) )
+import Module		( ModuleName )
 import SrcLoc
 import CStrings		( CLabelString )
+import CmdLineOpts	( opt_InPackage )
 import List		( isSuffixOf, nub )
 import Outputable
 import FastString
@@ -131,7 +136,6 @@ type RdrNameContext		= HsContext 		RdrName
 type RdrNameHsDecl		= HsDecl		RdrName
 type RdrNameDefaultDecl		= DefaultDecl		RdrName
 type RdrNameForeignDecl		= ForeignDecl		RdrName
-type RdrNameCoreDecl		= CoreDecl		RdrName
 type RdrNameGRHS		= GRHS			RdrName
 type RdrNameGRHSs		= GRHSs			RdrName
 type RdrNameHsBinds		= HsBinds		RdrName
@@ -176,23 +180,19 @@ main_RDR_Unqual = mkUnqual varName FSLIT("main")
 It's used when making the for-alls explicit.
 
 \begin{code}
-extractHsTyRdrNames :: RdrNameHsType -> [RdrName]
-extractHsTyRdrNames ty = nub (extract_ty ty [])
-
 extractHsTyRdrTyVars :: RdrNameHsType -> [RdrName]
 extractHsTyRdrTyVars ty = nub (filter isRdrTyVar (extract_ty ty []))
 
-extractHsCtxtRdrNames :: HsContext RdrName -> [RdrName]
-extractHsCtxtRdrNames ty = nub (extract_ctxt ty [])
-extractHsCtxtRdrTyVars :: HsContext RdrName -> [RdrName]
-extractHsCtxtRdrTyVars ty = filter isRdrTyVar (extractHsCtxtRdrNames ty)
+extractHsRhoRdrTyVars :: HsContext RdrName -> RdrNameHsType -> [RdrName]
+-- This one takes the context and tau-part of a 
+-- sigma type and returns their free type variables
+extractHsRhoRdrTyVars ctxt ty = nub $ filter isRdrTyVar $
+			        extract_ctxt ctxt (extract_ty ty [])
 
 extract_ctxt ctxt acc = foldr extract_pred acc ctxt
 
 extract_pred (HsClassP cls tys) acc	= foldr extract_ty (cls : acc) tys
 extract_pred (HsIParam n ty) acc	= extract_ty ty acc
-
-extract_tys tys = foldr extract_ty [] tys
 
 extract_ty (HsAppTy ty1 ty2)          acc = extract_ty ty1 (extract_ty ty2 acc)
 extract_ty (HsListTy ty)              acc = extract_ty ty acc
@@ -249,22 +249,14 @@ Similarly for mkConDecl, mkClassOpSig and default-method names.
 mkClassDecl (cxt, cname, tyvars) fds sigs mbinds loc
   = ClassDecl { tcdCtxt = cxt, tcdName = cname, tcdTyVars = tyvars,
 		tcdFDs = fds,  
-		tcdSigs = map cvClassOpSig sigs,  	-- Convert to class-op sigs
+		tcdSigs = sigs,
 		tcdMeths = mbinds,
 		tcdLoc = loc }
 
 mkTyData new_or_data (context, tname, tyvars) data_cons maybe src
   = TyData { tcdND = new_or_data, tcdCtxt = context, tcdName = tname,
 	     tcdTyVars = tyvars,  tcdCons = data_cons, 
-	     tcdDerivs = maybe,   tcdLoc = src, tcdGeneric = Nothing }
-
-cvClassOpSig :: RdrNameSig -> RdrNameSig
-cvClassOpSig (Sig var poly_ty src_loc) 
-  = ClassOpSig var (DefMeth dm_rn) poly_ty src_loc
-  where
-    dm_rn = mkRdrUnqual (mkDefaultMethodOcc (rdrNameOcc var))
-cvClassOpSig sig 
-  = sig
+	     tcdDerivs = maybe,   tcdLoc = src }
 \end{code}
 
 \begin{code}
@@ -276,7 +268,7 @@ mkHsNegApp :: RdrNameHsExpr -> RdrNameHsExpr
 mkHsNegApp (HsLit (HsIntPrim i))    = HsLit (HsIntPrim (-i))    
 mkHsNegApp (HsLit (HsFloatPrim i))  = HsLit (HsFloatPrim (-i))  
 mkHsNegApp (HsLit (HsDoublePrim i)) = HsLit (HsDoublePrim (-i)) 
-mkHsNegApp expr	    		    = NegApp expr     placeHolderName
+mkHsNegApp expr	    		    = NegApp expr placeHolderName
 \end{code}
 
 A useful function for building @OpApps@.  The operator is always a
@@ -303,6 +295,143 @@ unqualSplice = mkRdrUnqual (mkVarOcc FSLIT("splice"))
 		-- A name (uniquified later) to
 		-- identify the splice
 \end{code}
+
+%************************************************************************
+%*									*
+		Hi-boot files
+%*									*
+%************************************************************************
+
+mkBootIface, and its boring helper functions, have two purposes:
+a) HsSyn to IfaceSyn.  The parser parses the former, but we're reading
+	an hi-boot file, and interfaces consist of the latter
+b) Convert unqualifed names from the "current module" to qualified Orig
+   names.  E.g.
+	module This where
+	 foo :: GHC.Base.Int -> GHC.Base.Int
+   becomes
+	 This.foo :: GHC.Base.Int -> GHC.Base.Int
+
+It assumes that everything is well kinded, of course.
+
+\begin{code}
+mkBootIface :: ModuleName -> [HsDecl RdrName] -> ModIface
+-- Make the ModIface for a hi-boot file
+-- The decls are of very limited form
+mkBootIface mod decls
+  = (emptyModIface opt_InPackage mod) {
+	mi_boot     = True,
+	mi_exports  = [(mod, map mk_export decls')],
+	mi_decls    = decls_w_vers,
+	mi_ver_fn   = mkIfaceVerCache decls_w_vers }
+  where
+    decls' = map hsIfaceDecl decls
+    decls_w_vers = repeat initialVersion `zip` decls'
+
+		-- hi-boot declarations don't (currently)
+		-- expose constructors or class methods
+    mk_export decl | isValOcc occ = Avail occ
+	           | otherwise    = AvailTC occ [occ]
+		   where
+		     occ = ifName decl
+
+
+hsIfaceDecl :: HsDecl RdrName -> IfaceDecl
+	-- Change to Iface syntax, and replace unqualified names with
+	-- qualified Orig names from this module.  Reason: normal
+	-- iface files have everything fully qualified, so it's convenient
+	-- for hi-boot files to look the same
+	--
+	-- NB: no constructors or class ops to worry about
+hsIfaceDecl (SigD (Sig name ty _)) 
+  = IfaceId { ifName = rdrNameOcc name, 
+	      ifType = hsIfaceType ty, 
+	      ifIdInfo = NoInfo }
+
+hsIfaceDecl (TyClD decl@(TySynonym {}))
+  = IfaceSyn { ifName = rdrNameOcc (tcdName decl), 
+	       ifTyVars = hsIfaceTvs (tcdTyVars decl), 
+	       ifSynRhs = hsIfaceType (tcdSynRhs decl), 
+	       ifVrcs = [] } 
+
+hsIfaceDecl (TyClD decl@(TyData {}))
+  = IfaceData { ifND = tcdND decl, 
+	        ifName = rdrNameOcc (tcdName decl), 
+	        ifTyVars = hsIfaceTvs (tcdTyVars decl), 
+		ifCtxt = hsIfaceCtxt (tcdCtxt decl),
+		ifCons = Unknown, ifRec = NonRecursive,
+		ifVrcs = [], ifGeneric = False }
+
+hsIfaceDecl (TyClD decl@(ClassDecl {}))
+  = IfaceClass { ifName = rdrNameOcc (tcdName decl), 
+	         ifTyVars = hsIfaceTvs (tcdTyVars decl), 
+		 ifCtxt = hsIfaceCtxt (tcdCtxt decl),
+		 ifFDs = hsIfaceFDs (tcdFDs decl), 
+		 ifSigs = [], 	-- Is this right??
+		 ifRec = NonRecursive, ifVrcs = [] }
+
+hsIfaceDecl decl = pprPanic "hsIfaceDecl" (ppr decl)
+
+hsIfaceName rdr_name	-- Qualify unqualifed occurrences
+				-- with the module name
+  | isUnqual rdr_name = LocalTop (rdrNameOcc rdr_name)
+  | otherwise         = ExtPkg (rdrNameModule rdr_name) (rdrNameOcc rdr_name)
+
+hsIfaceType :: HsType RdrName -> IfaceType	
+hsIfaceType (HsForAllTy mb_tvs cxt ty) 
+  = foldr (IfaceForAllTy . hsIfaceTv) rho tvs
+  where
+    rho = foldr (IfaceFunTy . IfacePredTy . hsIfacePred) tau cxt
+    tau = hsIfaceType ty
+    tvs = case mb_tvs of
+	    Just tvs -> tvs
+	    Nothing  -> map UserTyVar (extractHsRhoRdrTyVars cxt ty)
+
+hsIfaceType ty@(HsTyVar _)     = hs_tc_app ty []
+hsIfaceType ty@(HsAppTy t1 t2) = hs_tc_app ty []
+hsIfaceType (HsFunTy t1 t2)    = IfaceFunTy (hsIfaceType t1) (hsIfaceType t2)
+hsIfaceType (HsListTy t)       = IfaceTyConApp IfaceListTc [hsIfaceType t]
+hsIfaceType (HsPArrTy t)       = IfaceTyConApp IfacePArrTc [hsIfaceType t]
+hsIfaceType (HsTupleTy bx ts)  = IfaceTyConApp (IfaceTupTc bx (length ts)) (hsIfaceTypes ts)
+hsIfaceType (HsOpTy t1 tc t2)  = hs_tc_app (HsTyVar tc) (hsIfaceTypes [t1, t2])
+hsIfaceType (HsParTy t)	       = hsIfaceType t
+hsIfaceType (HsNumTy n)	       = panic "hsIfaceType:HsNum"
+hsIfaceType (HsPredTy p)       = IfacePredTy (hsIfacePred p)
+hsIfaceType (HsKindSig t _)    = hsIfaceType t
+
+-----------
+hsIfaceTypes tys = map hsIfaceType tys
+
+-----------
+hsIfaceCtxt :: [HsPred RdrName] -> [IfacePredType]
+hsIfaceCtxt ctxt = map hsIfacePred ctxt
+
+-----------
+hsIfacePred :: HsPred RdrName -> IfacePredType	
+hsIfacePred (HsClassP cls ts) = IfaceClassP (hsIfaceName cls) (hsIfaceTypes ts)
+hsIfacePred (HsIParam ip t)   = IfaceIParam (mapIPName rdrNameOcc ip) (hsIfaceType t)
+
+-----------
+hs_tc_app :: HsType RdrName -> [IfaceType] -> IfaceType
+hs_tc_app (HsAppTy t1 t2) args = hs_tc_app t1 (hsIfaceType t2 : args)
+hs_tc_app (HsTyVar n) args
+  | isTcOcc (rdrNameOcc n) = IfaceTyConApp (IfaceTc (hsIfaceName n)) args
+  | otherwise		   = foldl IfaceAppTy (IfaceTyVar (rdrNameOcc n)) args
+hs_tc_app ty args 	   = foldl IfaceAppTy (hsIfaceType ty) args
+
+-----------
+hsIfaceTvs tvs = map hsIfaceTv tvs
+
+-----------
+hsIfaceTv (UserTyVar n)     = (rdrNameOcc n, IfaceLiftedTypeKind)
+hsIfaceTv (KindedTyVar n k) = (rdrNameOcc n, toIfaceKind k)
+
+-----------
+hsIfaceFDs :: [([RdrName], [RdrName])] -> [([OccName], [OccName])]
+hsIfaceFDs fds = [ (map rdrNameOcc xs, map rdrNameOcc ys)
+		 | (xs,ys) <- fds ]
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -416,7 +545,7 @@ emptyGroup = HsGroup { hs_valds = MonoBind EmptyMonoBinds [] Recursive,
 			-- they start life as a single giant MonoBinds
 		       hs_tyclds = [], hs_instds = [],
 		       hs_fixds = [], hs_defds = [], hs_fords = [], 
-		       hs_depds = [] ,hs_ruleds = [], hs_coreds = [] }
+		       hs_depds = [] ,hs_ruleds = [] }
 
 findSplice :: [HsDecl a] -> (HsGroup a, Maybe (SpliceDecl a, [HsDecl a]))
 findSplice ds = add emptyGroup ds
@@ -456,7 +585,6 @@ add gp@(HsGroup {hs_defds  = ts}) (DefD d : ds)    = add (gp { hs_defds = d : ts
 add gp@(HsGroup {hs_fords  = ts}) (ForD d : ds)    = add (gp { hs_fords = d : ts }) ds
 add gp@(HsGroup {hs_depds  = ts}) (DeprecD d : ds) = add (gp { hs_depds = d : ts }) ds
 add gp@(HsGroup {hs_ruleds  = ts})(RuleD d : ds)   = add (gp { hs_ruleds = d : ts }) ds
-add gp@(HsGroup {hs_coreds  = ts})(CoreD d : ds)   = add (gp { hs_coreds = d : ts }) ds
 
 add_bind b (MonoBind bs sigs r) = MonoBind (bs `AndMonoBinds` b) sigs r
 add_sig  s (MonoBind bs sigs r) = MonoBind bs 		     (s:sigs) r
@@ -520,29 +648,37 @@ checkTyVars tvs
   = mapM chk tvs
   where
 	--  Check that the name space is correct!
-    chk (HsKindSig (HsTyVar tv) k) | isRdrTyVar tv = return (IfaceTyVar tv k)
+    chk (HsKindSig (HsTyVar tv) k) | isRdrTyVar tv = return (KindedTyVar tv k)
     chk (HsTyVar tv) 	           | isRdrTyVar tv = return (UserTyVar tv)
     chk other	 		   = parseError "Type found where type variable expected"
 
-checkTyClHdr :: RdrNameHsType -> P (RdrName, [RdrNameHsTyVar])
+checkTyClHdr :: RdrNameContext -> RdrNameHsType -> P (RdrNameContext, RdrName, [RdrNameHsTyVar])
 -- The header of a type or class decl should look like
 --	(C a, D b) => T a b
 -- or	T a b
 -- or	a + b
 -- etc
-checkTyClHdr ty
-  = go ty []
+checkTyClHdr cxt ty
+  = go ty []		>>= \ (tc, tvs) ->
+    mapM chk_pred cxt	>>= \ _ ->
+    return (cxt, tc, tvs)
   where
     go (HsTyVar tc)    acc 
 	| not (isRdrTyVar tc) = checkTyVars acc		>>= \ tvs ->
 				return (tc, tvs)
-    go (HsOpTy t1 (HsTyOp tc) t2) acc  
-			      = checkTyVars (t1:t2:acc)	>>= \ tvs ->
+    go (HsOpTy t1 tc t2) acc  = checkTyVars (t1:t2:acc)	>>= \ tvs ->
 				return (tc, tvs)
     go (HsParTy ty)    acc    = go ty acc
     go (HsAppTy t1 t2) acc    = go t1 (t2:acc)
     go other	       acc    = parseError "Malformed LHS to type of class declaration"
 
+	-- The predicates in a type or class decl must all
+	-- be HsClassPs.  They need not all be type variables,
+	-- even in Haskell 98.  E.g. class (Monad m, Monad (t m)) => MonadT t m
+    chk_pred (HsClassP _ args) = return ()
+    chk_pred pred	       = parseError "Malformed context in type or class declaration"
+
+  
 checkContext :: RdrNameHsType -> P RdrNameContext
 checkContext (HsTupleTy _ ts) 	-- (Eq a, Ord b) shows up as a tuple type
   = mapM checkPred ts
@@ -617,8 +753,15 @@ checkPat e [] = case e of
 	EWildPat	    -> return (WildPat placeHolderType)
 	HsVar x	| isQual x  -> parseError ("Qualified variable in pattern: " ++ showRdrName x)
 		| otherwise -> return (VarPat x)
-	HsLit l 	   -> return (LitPat l)
-	HsOverLit l	   -> return (NPatIn l Nothing)
+	HsLit l 	    -> return (LitPat l)
+
+	-- Overloaded numeric patterns (e.g. f 0 x = x)
+	-- Negation is recorded separately, so that the literal is zero or +ve
+	-- NB. Negative *primitive* literals are already handled by
+	--     RdrHsSyn.mkHsNegApp
+	HsOverLit pos_lit            -> return (NPatIn pos_lit Nothing)
+	NegApp (HsOverLit pos_lit) _ -> return (NPatIn pos_lit (Just placeHolderName))
+
 	ELazyPat e	   -> checkPat e [] >>= (return . LazyPat)
 	EAsPat n e	   -> checkPat e [] >>= (return . AsPat n)
         ExprWithTySig e t  -> checkPat e [] >>= \e ->
@@ -631,13 +774,7 @@ checkPat e [] = case e of
 			      in
 			      return (SigPatIn e t')
 
-	-- Translate out NegApps of literals in patterns. We negate
-	-- the Integer here, and add back the call to 'negate' when
-	-- we typecheck the pattern.
-	-- NB. Negative *primitive* literals are already handled by
-	--     RdrHsSyn.mkHsNegApp
-	NegApp (HsOverLit lit) neg -> return (NPatIn lit (Just neg))
-
+	-- n+k patterns
 	OpApp (HsVar n) (HsVar plus) _ (HsOverLit lit@(HsIntegral _ _)) 
 		  	   | plus == plus_RDR
 			   -> return (mkNPlusKPat n lit)
@@ -884,20 +1021,6 @@ mkExport DNCall (entity, v, ty) loc =
 --
 mkExtName :: RdrName -> CLabelString
 mkExtName rdrNm = mkFastString (occNameUserString (rdrNameOcc rdrNm))
-
--- ---------------------------------------------------------------------------
--- Make the export list for an interface
-
-mkIfaceExports :: [RdrNameTyClDecl] -> [RdrAvailInfo]
-mkIfaceExports decls = map getExport decls
-  where getExport d = case d of
-			TyData{}    -> tc_export
-			ClassDecl{} -> tc_export
-			_other      -> var_export
-          where 
-		tc_export  = AvailTC (rdrNameOcc (tcdName d)) 
-				(map (rdrNameOcc.fst) (tyClDeclNames d))
-		var_export = Avail (rdrNameOcc (tcdName d))
 \end{code}
 
 

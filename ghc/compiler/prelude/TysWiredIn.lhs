@@ -11,35 +11,26 @@ types and operations.''
 
 \begin{code}
 module TysWiredIn (
-	wiredInTyCons, genericTyCons,
+	wiredInTyCons, 
 
-	boolTy,
-	boolTyCon,
-	charDataCon,
-	charTy,
-	charTyCon,
-	consDataCon,
-	doubleDataCon,
-	doubleTy,
-	doubleTyCon,
-	falseDataCon, falseDataConId,
-	floatDataCon,
-	floatTy,
-	floatTyCon,
+	boolTy,	boolTyCon, boolTyCon_RDR, boolTyConName,
+	trueDataCon,  trueDataConId,  true_RDR,
+	falseDataCon, falseDataConId, false_RDR,
 
-	intDataCon,
+	charTyCon, charDataCon, charTyCon_RDR,
+	charTy, stringTy, charTyConName,
+
+	
+	doubleTyCon, doubleDataCon, doubleTy,
+	
+	floatTyCon, floatDataCon, floatTy,
+
+	intTyCon, intDataCon, intTyCon_RDR, intDataCon_RDR, intTyConName,
 	intTy,
-	intTyCon,
 
-	integerTy,
-	integerTyCon,
-	smallIntegerDataCon,
-	largeIntegerDataCon,
-
-	listTyCon,
-
+	listTyCon, nilDataCon, consDataCon,
+	listTyCon_RDR, consDataCon_RDR, listTyConName,
 	mkListTy,
-	nilDataCon,
 
 	-- tuples
 	mkTupleTy,
@@ -48,28 +39,18 @@ module TysWiredIn (
 	unboxedSingletonTyCon, unboxedSingletonDataCon,
 	unboxedPairTyCon, unboxedPairDataCon,
 
-	-- Generics
-        genUnitTyCon, genUnitDataCon, 
-	plusTyCon, inrDataCon, inlDataCon,
-	crossTyCon, crossDataCon,
-
-	stringTy,
-	trueDataCon, trueDataConId,
 	unitTy,
 	voidTy,
-	wordDataCon,
-	wordTy,
-	wordTyCon,
 
         -- parallel arrays
 	mkPArrTy,
-	parrTyCon, parrFakeCon, isPArrTyCon, isPArrFakeCon
+	parrTyCon, parrFakeCon, isPArrTyCon, isPArrFakeCon,
+	parrTyCon_RDR, parrTyConName
     ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} MkId( mkDataConWorkId )
-import {-# SOURCE #-} Generics( mkTyConGenInfo )
+import {-# SOURCE #-} MkId( mkDataConIds )
 
 -- friends:
 import PrelNames
@@ -77,30 +58,31 @@ import TysPrim
 
 -- others:
 import Constants	( mAX_TUPLE_SIZE )
-import Module		( mkBasePkgModule )
+import Module		( Module )
+import RdrName		( nameRdrName )
 import Name		( Name, nameUnique, nameOccName, 
 			  nameModule, mkWiredInName )
-import OccName		( mkOccFS, tcName, dataName, mkDataConWorkerOcc, mkGenOcc1, mkGenOcc2 )
+import OccName		( mkOccFS, tcName, dataName, mkTupleOcc, mkDataConWorkerOcc )
 import DataCon		( DataCon, mkDataCon, dataConWorkId, dataConSourceArity )
 import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, AlgTyConFlavour(..), DataConDetails(..), tyConDataCons,
 			  mkTupleTyCon, mkAlgTyCon, tyConName
 			)
 
-import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed )
+import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed, StrictnessMark(..) )
 
 import Type		( Type, mkTyConTy, mkTyConApp, mkTyVarTy, mkTyVarTys, 
 			  mkArrowKinds, liftedTypeKind, unliftedTypeKind,
-			  ThetaType )
+			  ThetaType, TyThing(..) )
 import Unique		( incrUnique, mkTupleTyConUnique,
 			  mkTupleDataConUnique, mkPArrDataConUnique )
 import PrelNames
 import Array
 import FastString
+import Outputable
 
-alpha_tyvar	  = [alphaTyVar]
-alpha_ty	  = [alphaTy]
-alpha_beta_tyvars = [alphaTyVar, betaTyVar]
+alpha_tyvar = [alphaTyVar]
+alpha_ty    = [alphaTy]
 \end{code}
 
 
@@ -114,26 +96,65 @@ If you change which things are wired in, make sure you change their
 names in PrelNames, so they use wTcQual, wDataQual, etc
 
 \begin{code}
-wiredInTyCons :: [TyCon]
-wiredInTyCons = data_tycons ++ tuple_tycons ++ unboxed_tuple_tycons
-
-data_tycons = genericTyCons ++
-	      [ boolTyCon
+wiredInTyCons :: [TyCon]	-- Excludes tuples
+wiredInTyCons = [ unitTyCon	-- Not treated like other tuples, because
+				-- it's defined in GHC.Base, and there's only
+				-- one of it.  We put it in wiredInTyCons so
+				-- that it'll pre-populate the name cache, so
+				-- the special case in lookupOrigNameCache 
+				-- doesn't need to look out for it
+	      , boolTyCon
     	      , charTyCon
     	      , doubleTyCon
     	      , floatTyCon
     	      , intTyCon
-    	      , integerTyCon
     	      , listTyCon
 	      , parrTyCon
-    	      , wordTyCon
     	      ]
+\end{code}
 
-genericTyCons :: [TyCon]
-genericTyCons = [ plusTyCon, crossTyCon, genUnitTyCon ]
+\begin{code}
+mkWiredInTyConName :: Module -> FastString -> Unique -> TyCon -> Name
+mkWiredInTyConName mod fs uniq tycon
+  = mkWiredInName mod (mkOccFS tcName fs) uniq
+		  Nothing 		-- No parent object
+		  (ATyCon tycon)	-- Relevant TyCon
 
-tuple_tycons = unitTyCon : [tupleTyCon Boxed   i | i <- [2..mAX_TUPLE_SIZE] ]
-unboxed_tuple_tycons     = [tupleTyCon Unboxed i | i <- [1..mAX_TUPLE_SIZE] ]
+mkWiredInDataConName :: Module -> FastString -> Unique -> DataCon -> Name -> Name
+mkWiredInDataConName mod fs uniq datacon parent
+  = mkWiredInName mod (mkOccFS dataName fs) uniq
+		  (Just parent) 	-- Name of parent TyCon
+		  (ADataCon datacon)	-- Relevant DataCon
+
+charTyConName	  = mkWiredInTyConName   pREL_BASE FSLIT("Char") charTyConKey charTyCon
+charDataConName   = mkWiredInDataConName pREL_BASE FSLIT("C#") charDataConKey charDataCon charTyConName
+intTyConName	  = mkWiredInTyConName   pREL_BASE FSLIT("Int") intTyConKey   intTyCon
+intDataConName	  = mkWiredInDataConName pREL_BASE FSLIT("I#") intDataConKey  intDataCon intTyConName
+						  
+boolTyConName	  = mkWiredInTyConName   pREL_BASE FSLIT("Bool") boolTyConKey boolTyCon
+falseDataConName  = mkWiredInDataConName pREL_BASE FSLIT("False") falseDataConKey falseDataCon boolTyConName
+trueDataConName	  = mkWiredInDataConName pREL_BASE FSLIT("True")  trueDataConKey  trueDataCon  boolTyConName
+listTyConName	  = mkWiredInTyConName   pREL_BASE FSLIT("[]") listTyConKey listTyCon
+nilDataConName 	  = mkWiredInDataConName pREL_BASE FSLIT("[]") nilDataConKey nilDataCon  listTyConName
+consDataConName	  = mkWiredInDataConName pREL_BASE FSLIT(":") consDataConKey consDataCon listTyConName
+
+floatTyConName	   = mkWiredInTyConName   pREL_FLOAT FSLIT("Float") floatTyConKey floatTyCon
+floatDataConName   = mkWiredInDataConName pREL_FLOAT FSLIT("F#") floatDataConKey floatDataCon floatTyConName
+doubleTyConName    = mkWiredInTyConName   pREL_FLOAT FSLIT("Double") doubleTyConKey doubleTyCon
+doubleDataConName  = mkWiredInDataConName pREL_FLOAT FSLIT("D#") doubleDataConKey doubleDataCon doubleTyConName
+
+parrTyConName	  = mkWiredInTyConName   pREL_PARR FSLIT("[::]") parrTyConKey parrTyCon 
+parrDataConName   = mkWiredInDataConName pREL_PARR FSLIT("PArr") parrDataConKey parrDataCon parrTyConName
+
+boolTyCon_RDR   = nameRdrName boolTyConName
+false_RDR	= nameRdrName falseDataConName
+true_RDR	= nameRdrName trueDataConName
+intTyCon_RDR	= nameRdrName intTyConName
+charTyCon_RDR	= nameRdrName charTyConName
+intDataCon_RDR	= nameRdrName intDataConName
+listTyCon_RDR	= nameRdrName listTyConName
+consDataCon_RDR = nameRdrName consDataConName
+parrTyCon_RDR	= nameRdrName parrTyConName
 \end{code}
 
 
@@ -144,39 +165,22 @@ unboxed_tuple_tycons     = [tupleTyCon Unboxed i | i <- [1..mAX_TUPLE_SIZE] ]
 %************************************************************************
 
 \begin{code}
-pcNonRecDataTyCon = pcTyCon DataTyCon NonRecursive
-pcRecDataTyCon = pcTyCon DataTyCon Recursive
+pcNonRecDataTyCon = pcTyCon False NonRecursive
+pcRecDataTyCon    = pcTyCon False Recursive
 
-pcTyCon new_or_data is_rec name tyvars argvrcs cons
+pcTyCon is_enum is_rec name tyvars argvrcs cons
   = tycon
   where
-    tycon = mkAlgTyCon name kind
+    tycon = mkAlgTyCon name
+		(mkArrowKinds (map tyVarKind tyvars) liftedTypeKind)
                 tyvars
                 []              -- No context
                 argvrcs
                 (DataCons cons)
 		[]		-- No record selectors
-                new_or_data
+                (DataTyCon is_enum)
                 is_rec
-		gen_info
-
-    mod      = nameModule name
-    kind     = mkArrowKinds (map tyVarKind tyvars) liftedTypeKind
-    gen_info = mk_tc_gen_info mod (nameUnique name) name tycon
-
--- We generate names for the generic to/from Ids by incrementing
--- the TyCon unique.  So each Prelude tycon needs 3 slots, one
--- for itself and two more for the generic Ids.
-mk_tc_gen_info mod tc_uniq tc_name tycon
-  = mkTyConGenInfo tycon [name1, name2]
-  where
-	tc_occ_name = nameOccName tc_name
-	occ_name1   = mkGenOcc1 tc_occ_name
-	occ_name2   = mkGenOcc2 tc_occ_name
-	fn1_key     = incrUnique tc_uniq
-	fn2_key     = incrUnique fn1_key
-	name1	    = mkWiredInName  mod occ_name1 fn1_key
-	name2	    = mkWiredInName  mod occ_name2 fn2_key
+		True		-- All the wired-in tycons have generics
 
 pcDataCon :: Name -> [TyVar] -> ThetaType -> [Type] -> TyCon -> DataCon
 -- The Name should be in the DataName name space; it's the name
@@ -190,17 +194,19 @@ pcDataCon dc_name tyvars context arg_tys tycon
   = data_con
   where
     data_con = mkDataCon dc_name	
-                [{- No strictness -}]
+                (map (const NotMarkedStrict) arg_tys)
                 [{- No labelled fields -}]
-                tyvars context [] [] arg_tys tycon work_id 
-		Nothing {- No wrapper for wired-in things
-			   (they are too simple to need one) -}
+                tyvars context [] [] arg_tys tycon 
+		(mkDataConIds bogus_wrap_name wrk_name data_con)
 
     mod      = nameModule dc_name
     wrk_occ  = mkDataConWorkerOcc (nameOccName dc_name)
     wrk_key  = incrUnique (nameUnique dc_name)
     wrk_name = mkWiredInName mod wrk_occ wrk_key
-    work_id  = mkDataConWorkId wrk_name data_con
+			     (Just (tyConName tycon))
+			     (AnId (dataConWorkId data_con))
+    bogus_wrap_name = pprPanic "Wired-in data wrapper id" (ppr dc_name)
+	-- Wired-in types are too simple to need wrappers
 \end{code}
 
 
@@ -229,7 +235,9 @@ mk_tuple :: Boxity -> Int -> (TyCon,DataCon)
 mk_tuple boxity arity = (tycon, tuple_con)
   where
 	tycon   = mkTupleTyCon tc_name tc_kind arity tyvars tuple_con boxity gen_info 
-	tc_name = mkWiredInName mod (mkOccFS tcName name_str) tc_uniq
+	mod	= mkTupleModule boxity arity
+	tc_name = mkWiredInName mod (mkTupleOcc tcName boxity arity) tc_uniq
+				Nothing (ATyCon tycon)
     	tc_kind = mkArrowKinds (map tyVarKind tyvars) res_kind
 	res_kind | isBoxed boxity = liftedTypeKind
 		 | otherwise	  = unliftedTypeKind
@@ -237,14 +245,14 @@ mk_tuple boxity arity = (tycon, tuple_con)
 	tyvars   | isBoxed boxity = take arity alphaTyVars
 		 | otherwise	  = take arity openAlphaTyVars
 
-	tuple_con = pcDataCon name tyvars [] tyvar_tys tycon
+	tuple_con = pcDataCon dc_name tyvars [] tyvar_tys tycon
 	tyvar_tys = mkTyVarTys tyvars
-	(mod_name, name_str) = mkTupNameStr boxity arity
-	name      = mkWiredInName mod (mkOccFS dataName name_str) dc_uniq
+	dc_name   = mkWiredInName mod (mkTupleOcc dataName boxity arity) dc_uniq
+				  (Just tc_name) (ADataCon tuple_con)
  	tc_uniq   = mkTupleTyConUnique   boxity arity
 	dc_uniq   = mkTupleDataConUnique boxity arity
-	mod	  = mkBasePkgModule mod_name
-	gen_info  = mk_tc_gen_info mod tc_uniq tc_name tycon
+	gen_info  = True		-- Tuples all have generics..
+					-- hmm: that's a *lot* of code
 
 unitTyCon     = tupleTyCon Boxed 0
 unitDataCon   = head (tyConDataCons unitTyCon)
@@ -298,13 +306,6 @@ intDataCon = pcDataCon intDataConName [] [] [intPrimTy] intTyCon
 \end{code}
 
 \begin{code}
-wordTy = mkTyConTy wordTyCon
-
-wordTyCon = pcNonRecDataTyCon wordTyConName [] [] [wordDataCon]
-wordDataCon = pcDataCon wordDataConName [] [] [wordPrimTy] wordTyCon
-\end{code}
-
-\begin{code}
 floatTy	= mkTyConTy floatTyCon
 
 floatTyCon   = pcNonRecDataTyCon floatTyConName   [] [] [floatDataCon]
@@ -316,27 +317,6 @@ doubleTy = mkTyConTy doubleTyCon
 
 doubleTyCon   = pcNonRecDataTyCon doubleTyConName   [] [] [doubleDataCon]
 doubleDataCon = pcDataCon	  doubleDataConName [] [] [doublePrimTy] doubleTyCon
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection[TysWiredIn-Integer]{@Integer@ and its related ``pairing'' types}
-%*									*
-%************************************************************************
-
-@Integer@ and its pals are not really primitive.  @Integer@ itself, first:
-\begin{code}
-integerTy :: Type
-integerTy = mkTyConTy integerTyCon
-
-integerTyCon = pcNonRecDataTyCon integerTyConName
-                   [] [] [smallIntegerDataCon, largeIntegerDataCon]
-
-smallIntegerDataCon = pcDataCon smallIntegerDataConName
-		[] [] [intPrimTy] integerTyCon
-largeIntegerDataCon = pcDataCon largeIntegerDataConName
-		[] [] [intPrimTy, byteArrayPrimTy] integerTyCon
 \end{code}
 
 
@@ -391,7 +371,7 @@ primitive counterpart.
 \begin{code}
 boolTy = mkTyConTy boolTyCon
 
-boolTyCon = pcTyCon EnumTyCon NonRecursive boolTyConName
+boolTyCon = pcTyCon True NonRecursive boolTyConName
 		    [] [] [falseDataCon, trueDataCon]
 
 falseDataCon = pcDataCon falseDataConName [] [] [] boolTyCon
@@ -508,23 +488,7 @@ mkPArrTy ty  = mkTyConApp parrTyCon [ty]
 --     `PrelPArr'.
 --
 parrTyCon :: TyCon
-parrTyCon  = tycon
-  where
-    tycon   = mkAlgTyCon 
-		parrTyConName 
-		kind
-		tyvars
-		[]              	 -- No context
-		[(True, False)]
-		(DataCons [parrDataCon]) -- The constructor defined in `PrelPArr'
-		[]			 -- No record selectors
-		DataTyCon
-		NonRecursive
-		genInfo
-    tyvars  = alpha_tyvar
-    mod     = nameModule parrTyConName
-    kind    = mkArrowKinds (map tyVarKind tyvars) liftedTypeKind
-    genInfo = mk_tc_gen_info mod (nameUnique parrTyConName) parrTyConName tycon
+parrTyCon  = pcNonRecDataTyCon parrTyConName alpha_tyvar [(True, False)] [parrDataCon]
 
 parrDataCon :: DataCon
 parrDataCon  = pcDataCon 
@@ -562,14 +526,15 @@ parrFakeConArr  = array (0, mAX_TUPLE_SIZE) [(i, mkPArrFakeCon i)
 -- build a fake parallel array constructor for the given arity
 --
 mkPArrFakeCon       :: Int -> DataCon
-mkPArrFakeCon arity  = pcDataCon name [tyvar] [] tyvarTys parrTyCon
+mkPArrFakeCon arity  = data_con
   where
+	data_con  = pcDataCon name [tyvar] [] tyvarTys parrTyCon
 	tyvar     = head alphaTyVars
 	tyvarTys  = replicate arity $ mkTyVarTy tyvar
         nameStr   = mkFastString ("MkPArr" ++ show arity)
-	name      = mkWiredInName mod (mkOccFS dataName nameStr) uniq
+	name      = mkWiredInName pREL_PARR (mkOccFS dataName nameStr) uniq
+				  Nothing (ADataCon data_con)
 	uniq      = mkPArrDataConUnique arity
-	mod	  = mkBasePkgModule pREL_PARR_Name
 
 -- checks whether a data constructor is a fake constructor for parallel arrays
 --
@@ -577,37 +542,3 @@ isPArrFakeCon      :: DataCon -> Bool
 isPArrFakeCon dcon  = dcon == parrFakeCon (dataConSourceArity dcon)
 \end{code}
 
-%************************************************************************
-%*                                                                      *
-\subsection{Wired In Type Constructors for Representation Types}
-%*                                                                      *
-%************************************************************************
-
-The following code defines the wired in datatypes cross, plus, unit
-and c_of needed for the generic methods.
-
-Ok, so the basic story is that for each type constructor I need to
-create 2 things - a TyCon and a DataCon and then we are basically
-ok. There are going to be no arguments passed to these functions
-because -well- there is nothing to pass to these functions.
-
-\begin{code}
-crossTyCon :: TyCon
-crossTyCon = pcNonRecDataTyCon crossTyConName alpha_beta_tyvars [] [crossDataCon]
-
-crossDataCon :: DataCon
-crossDataCon = pcDataCon crossDataConName alpha_beta_tyvars [] [alphaTy, betaTy] crossTyCon
-
-plusTyCon :: TyCon
-plusTyCon = pcNonRecDataTyCon plusTyConName alpha_beta_tyvars [] [inlDataCon, inrDataCon]
-
-inlDataCon, inrDataCon :: DataCon
-inlDataCon = pcDataCon inlDataConName alpha_beta_tyvars [] [alphaTy] plusTyCon
-inrDataCon = pcDataCon inrDataConName alpha_beta_tyvars [] [betaTy]  plusTyCon
-
-genUnitTyCon :: TyCon 	-- The "1" type constructor for generics
-genUnitTyCon = pcNonRecDataTyCon genUnitTyConName [] [] [genUnitDataCon]
-
-genUnitDataCon :: DataCon
-genUnitDataCon = pcDataCon genUnitDataConName [] [] [] genUnitTyCon
-\end{code}

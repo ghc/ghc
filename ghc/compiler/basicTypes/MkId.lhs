@@ -16,7 +16,7 @@ module MkId (
 	mkDictFunId, mkDefaultMethodId,
 	mkDictSelId, 
 
-	mkDataConWorkId, mkDataConWrapId,
+	mkDataConIds,
 	mkRecordSelId, 
 	mkPrimOpId, mkFCallId,
 
@@ -30,7 +30,7 @@ module MkId (
 	mkRuntimeErrorApp,
 	rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID, rUNTIME_ERROR_ID,
 	nON_EXHAUSTIVE_GUARDS_ERROR_ID,	nO_METHOD_BINDING_ERROR_ID,
-	pAT_ERROR_ID
+	pAT_ERROR_ID, eRROR_ID
     ) where
 
 #include "HsVersions.h"
@@ -43,6 +43,7 @@ import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy,
 import TysWiredIn	( charTy, mkListTy )
 import PrelRules	( primOpRules )
 import Rules		( addRule )
+import Type		( TyThing(..) )
 import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkTyConApp,
 			  mkTyVarTys, mkClassPred, tcEqPred,
 			  mkFunTys, mkFunTy, mkSigmaTy, tcSplitSigmaTy, 
@@ -57,35 +58,35 @@ import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons,
 import Class		( Class, classTyCon, classTyVars, classSelIds )
 import Var		( Id, TyVar, Var )
 import VarSet		( isEmptyVarSet )
-import Name		( mkFCallName, Name )
-import PrimOp		( PrimOp, primOpSig, mkPrimOpIdName )
+import Name		( mkFCallName, mkWiredInName, Name )
+import OccName		( mkOccFS, varName )
+import PrimOp		( PrimOp, primOpSig, primOpOcc, primOpTag )
 import ForeignCall	( ForeignCall )
-import DataCon		( DataCon, 
-			  dataConFieldLabels, dataConRepArity, dataConTyCon,
+import DataCon		( DataCon, DataConIds(..),
+			  dataConFieldLabels, dataConRepArity, 
 			  dataConArgTys, dataConRepType, 
-			  dataConOrigArgTys,
-                          dataConTheta,
-			  dataConSig, dataConStrictMarks, dataConWorkId,
+			  dataConOrigArgTys, dataConTheta,
+			  dataConSig, dataConStrictMarks, dataConExStricts, 
 			  splitProductType
 			)
 import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal, mkLocalId,
 			  mkTemplateLocals, mkTemplateLocalsNum, setIdLocalExported,
-			  mkTemplateLocal, idNewStrictness, idName
+			  mkTemplateLocal, idName
 			)
 import IdInfo		( IdInfo, noCafIdInfo,  setUnfoldingInfo, 
 			  setArityInfo, setSpecInfo, setCafInfo,
 			  setAllStrictnessInfo, vanillaIdInfo,
 			  GlobalIdDetails(..), CafInfo(..)
 			)
-import NewDemand	( mkStrictSig, strictSigResInfo, DmdResult(..),
+import NewDemand	( mkStrictSig, DmdResult(..),
 			  mkTopDmdType, topDmd, evalDmd, lazyDmd, retCPR,
 			  Demand(..), Demands(..) )
-import FieldLabel	( mkFieldLabel, fieldLabelName, 
-			  firstFieldLabelTag, allFieldLabelTags, fieldLabelType
+import FieldLabel	( fieldLabelName, firstFieldLabelTag, 
+			  allFieldLabelTags, fieldLabelType
 			)
 import DmdAnal		( dmdAnalTopRhs )
 import CoreSyn
-import Unique		( mkBuiltinUnique )
+import Unique		( mkBuiltinUnique, mkPrimOpIdUnique )
 import Maybes
 import PrelNames
 import Maybe            ( isJust )
@@ -147,57 +148,6 @@ ghcPrimIds
 %*									*
 %************************************************************************
 
-\begin{code}
-mkDataConWorkId :: Name -> DataCon -> Id
-	-- Makes the *worker* for the data constructor; that is, the function
-	-- that takes the reprsentation arguments and builds the constructor.
-mkDataConWorkId wkr_name data_con
-  = mkGlobalId (DataConWorkId data_con) wkr_name
-	       (dataConRepType data_con) info
-  where
-    info = noCafIdInfo
-	   `setArityInfo`		arity
-	   `setAllStrictnessInfo`	Just strict_sig
-
-    arity      = dataConRepArity data_con
-    strict_sig = mkStrictSig (mkTopDmdType (replicate arity topDmd) cpr_info)
-	-- Notice that we do *not* say the worker is strict
-	-- even if the data constructor is declared strict
-	--	e.g. 	data T = MkT !(Int,Int)
-	-- Why?  Because the *wrapper* is strict (and its unfolding has case
-	-- expresssions that do the evals) but the *worker* itself is not.
-	-- If we pretend it is strict then when we see
-	--	case x of y -> $wMkT y
-	-- the simplifier thinks that y is "sure to be evaluated" (because
-	-- $wMkT is strict) and drops the case.  No, $wMkT is not strict.
-	--
-	-- When the simplifer sees a pattern 
-	--	case e of MkT x -> ...
-	-- it uses the dataConRepStrictness of MkT to mark x as evaluated;
-	-- but that's fine... dataConRepStrictness comes from the data con
-	-- not from the worker Id.
-
-    tycon = dataConTyCon data_con
-    cpr_info | isProductTyCon tycon && 
-	       isDataTyCon tycon    &&
-	       arity > 0 	    &&
-	       arity <= mAX_CPR_SIZE	= retCPR
-	     | otherwise 		= TopRes
-	-- RetCPR is only true for products that are real data types;
-	-- that is, not unboxed tuples or [non-recursive] newtypes
-
-mAX_CPR_SIZE :: Arity
-mAX_CPR_SIZE = 10
--- We do not treat very big tuples as CPR-ish:
---	a) for a start we get into trouble because there aren't 
---	   "enough" unboxed tuple types (a tiresome restriction, 
---	   but hard to fix), 
---	b) more importantly, big unboxed tuples get returned mainly
---	   on the stack, and are often then allocated in the heap
---	   by the caller.  So doing CPR for them may in fact make
---	   things worse.
-\end{code}
-
 The wrapper for a constructor is an ordinary top-level binding that evaluates
 any strict args, unboxes any args that are going to be flattened, and calls
 the worker.
@@ -235,45 +185,94 @@ Notice that
   Making an explicit case expression allows the simplifier to eliminate
   it in the (common) case where the constructor arg is already evaluated.
 
+
 \begin{code}
-mkDataConWrapId :: Name -> DataCon -> Maybe Id
--- Only make a wrapper Id if necessary
+mkDataConIds :: Name -> Name -> DataCon -> DataConIds
+	-- Makes the *worker* for the data constructor; that is, the function
+	-- that takes the reprsentation arguments and builds the constructor.
+mkDataConIds wrap_name wkr_name data_con
+  | isNewTyCon tycon
+  = NewDC nt_wrap_id
 
-mkDataConWrapId wrap_name data_con
-  | is_newtype || any isMarkedStrict strict_marks
-  = 	-- We need a wrapper function
-    Just (mkGlobalId (DataConWrapId data_con) wrap_name wrap_ty info)
+  | any isMarkedStrict all_strict_marks		-- Algebraic, needs wrapper
+  = AlgDC (Just alg_wrap_id) wrk_id
 
-  | otherwise
-  = Nothing	-- The common case, where there is no point in 
-		-- having a wrapper function.  Not only is this efficient,
-		-- but it also ensures that the wrapper is replaced
-		-- by the worker (becuase it *is* the wroker)
-		-- even when there are no args. E.g. in
-		-- 		f (:) x
-		-- the (:) *is* the worker.
-		-- This is really important in rule matching,
-		-- (We could match on the wrappers,
-		-- but that makes it less likely that rules will match
-		-- when we bring bits of unfoldings together.)
+  | otherwise					-- Algebraic, no wrapper
+  = AlgDC Nothing wrk_id
   where
     (tyvars, _, ex_tyvars, ex_theta, orig_arg_tys, tycon) = dataConSig data_con
-    is_newtype = isNewTyCon tycon
     all_tyvars = tyvars ++ ex_tyvars
-    work_id    = dataConWorkId data_con
 
-    common_info = noCafIdInfo		-- The NoCaf-ness is set by noCafIdInfo
-		  `setArityInfo` arity
-		-- It's important to specify the arity, so that partial
-		-- applications are treated as values
+    ex_dict_tys  = mkPredTys ex_theta
+    all_arg_tys  = ex_dict_tys ++ orig_arg_tys
+    result_ty    = mkTyConApp tycon (mkTyVarTys tyvars)
 
-    info | is_newtype = common_info `setUnfoldingInfo` newtype_unf
-	 | otherwise  = common_info `setUnfoldingInfo` data_unf
-				    `setAllStrictnessInfo` Just wrap_sig
+    wrap_ty = mkForAllTys all_tyvars (mkFunTys all_arg_tys result_ty)
+	-- We used to include the stupid theta in the wrapper's args
+	-- but now we don't.  Instead the type checker just injects these
+	-- extra constraints where necessary.
 
-    wrap_sig = mkStrictSig (mkTopDmdType arg_dmds res_info)
-    res_info = strictSigResInfo (idNewStrictness work_id)
-    arg_dmds = map mk_dmd strict_marks
+	----------- Worker (algebraic data types only) --------------
+    wrk_id = mkGlobalId (DataConWorkId data_con) wkr_name
+	 		(dataConRepType data_con) wkr_info
+
+    wkr_arity = dataConRepArity data_con
+    wkr_info  = noCafIdInfo
+	        `setArityInfo`		wkr_arity
+	        `setAllStrictnessInfo`	Just wkr_sig
+
+    wkr_sig = mkStrictSig (mkTopDmdType (replicate wkr_arity topDmd) cpr_info)
+	-- Notice that we do *not* say the worker is strict
+	-- even if the data constructor is declared strict
+	--	e.g. 	data T = MkT !(Int,Int)
+	-- Why?  Because the *wrapper* is strict (and its unfolding has case
+	-- expresssions that do the evals) but the *worker* itself is not.
+	-- If we pretend it is strict then when we see
+	--	case x of y -> $wMkT y
+	-- the simplifier thinks that y is "sure to be evaluated" (because
+	-- $wMkT is strict) and drops the case.  No, $wMkT is not strict.
+	--
+	-- When the simplifer sees a pattern 
+	--	case e of MkT x -> ...
+	-- it uses the dataConRepStrictness of MkT to mark x as evaluated;
+	-- but that's fine... dataConRepStrictness comes from the data con
+	-- not from the worker Id.
+
+    cpr_info | isProductTyCon tycon && 
+	       isDataTyCon tycon    &&
+	       wkr_arity > 0 	    &&
+	       wkr_arity <= mAX_CPR_SIZE	= retCPR
+	     | otherwise 			= TopRes
+	-- RetCPR is only true for products that are real data types;
+	-- that is, not unboxed tuples or [non-recursive] newtypes
+
+	----------- Wrappers for newtypes --------------
+    nt_wrap_id   = mkGlobalId (DataConWrapId data_con) wrap_name wrap_ty nt_wrap_info
+    nt_wrap_info = noCafIdInfo		-- The NoCaf-ness is set by noCafIdInfo
+		  `setArityInfo` 1	-- Arity 1
+		  `setUnfoldingInfo`     newtype_unf
+    newtype_unf  = ASSERT( null ex_tyvars && null ex_theta && 
+			  isSingleton orig_arg_tys )
+	  	   -- No existentials on a newtype, but it can have a context
+	  	   -- e.g. 	newtype Eq a => T a = MkT (...)
+	  	   mkTopUnfolding $ Note InlineMe $
+	  	   mkLams tyvars $ Lam id_arg1 $ 
+	  	   mkNewTypeBody tycon result_ty (Var id_arg1)
+
+    id_arg1 = mkTemplateLocal 1 (head orig_arg_tys)
+
+	----------- Wrappers for algebraic data types -------------- 
+    alg_wrap_id = mkGlobalId (DataConWrapId data_con) wrap_name wrap_ty alg_wrap_info
+    alg_wrap_info = noCafIdInfo		-- The NoCaf-ness is set by noCafIdInfo
+		    `setArityInfo` 	   alg_arity
+			-- It's important to specify the arity, so that partial
+			-- applications are treated as values
+		    `setUnfoldingInfo`     alg_unf
+		    `setAllStrictnessInfo` Just wrap_sig
+
+    all_strict_marks = dataConExStricts data_con ++ dataConStrictMarks data_con
+    wrap_sig = mkStrictSig (mkTopDmdType arg_dmds cpr_info)
+    arg_dmds = map mk_dmd all_strict_marks
     mk_dmd str | isMarkedStrict str = evalDmd
 	       | otherwise	    = lazyDmd
 	-- The Cpr info can be important inside INLINE rhss, where the
@@ -285,42 +284,19 @@ mkDataConWrapId wrap_name data_con
 	--	...(let w = C x in ...(w p q)...)...
 	-- we want to see that w is strict in its two arguments
 
-    newtype_unf = ASSERT( null ex_tyvars && null ex_dict_args && 
-			  isSingleton orig_arg_tys )
-	  	  -- No existentials on a newtype, but it can have a context
-	  	  -- e.g. 	newtype Eq a => T a = MkT (...)
-	  	  mkTopUnfolding $ Note InlineMe $
-	  	  mkLams tyvars $ Lam id_arg1 $ 
-	  	  mkNewTypeBody tycon result_ty (Var id_arg1)
+    alg_unf = mkTopUnfolding $ Note InlineMe $
+	      mkLams all_tyvars $ 
+	      mkLams ex_dict_args $ mkLams id_args $
+	      foldr mk_case con_app 
+		    (zip (ex_dict_args ++ id_args) all_strict_marks)
+		    i3 []
 
-    data_unf = mkTopUnfolding $ Note InlineMe $
-	       mkLams all_tyvars $ 
-	       mkLams ex_dict_args $ mkLams id_args $
-	       foldr mk_case con_app 
-		     (zip (ex_dict_args++id_args) strict_marks) i3 []
-
-    con_app i rep_ids = mkApps (Var work_id)
+    con_app i rep_ids = mkApps (Var wrk_id)
 			       (map varToCoreExpr (all_tyvars ++ reverse rep_ids))
-
-    ex_dict_tys  = mkPredTys ex_theta
-    all_arg_tys  = ex_dict_tys ++ orig_arg_tys
-    result_ty    = mkTyConApp tycon (mkTyVarTys tyvars)
-
-    wrap_ty = mkForAllTys all_tyvars (mkFunTys all_arg_tys result_ty)
-	-- We used to include the stupid theta in the wrapper's args
-	-- but now we don't.  Instead the type checker just injects these
-	-- extra constraints where necessary.
-
-    mkLocals i tys = (zipWith mkTemplateLocal [i..i+n-1] tys, i+n)
-		   where
-		     n = length tys
 
     (ex_dict_args,i2)  = mkLocals 1  ex_dict_tys
     (id_args,i3)       = mkLocals i2 orig_arg_tys
-    arity	       = i3-1
-    (id_arg1:_)   = id_args		-- Used for newtype only
-
-    strict_marks  = dataConStrictMarks data_con
+    alg_arity	       = i3-1
 
     mk_case 
 	   :: (Id, StrictnessMark)	-- Arg, strictness
@@ -343,6 +319,21 @@ mkDataConWrapId wrap_name data_con
 					body i' (reverse con_args ++ rep_args))]
 			      where 
 				(con_args, i') = mkLocals i tys
+
+mAX_CPR_SIZE :: Arity
+mAX_CPR_SIZE = 10
+-- We do not treat very big tuples as CPR-ish:
+--	a) for a start we get into trouble because there aren't 
+--	   "enough" unboxed tuple types (a tiresome restriction, 
+--	   but hard to fix), 
+--	b) more importantly, big unboxed tuples get returned mainly
+--	   on the stack, and are often then allocated in the heap
+--	   by the caller.  So doing CPR for them may in fact make
+--	   things worse.
+
+mkLocals i tys = (zipWith mkTemplateLocal [i..i+n-1] tys, i+n)
+	       where
+		 n = length tys
 \end{code}
 
 
@@ -393,9 +384,6 @@ Similarly for (recursive) newtypes
 \begin{code}
 mkRecordSelId tycon field_label
 	-- Assumes that all fields with the same field label have the same type
-	--
-	-- Annoyingly, we have to pass in the unpackCString# Id, because
-	-- we can't conjure it up out of thin air
   = sel_id
   where
     sel_id     = mkGlobalId (RecordSelId field_label) (fieldLabelName field_label) selector_ty info
@@ -505,6 +493,7 @@ mkRecordSelId tycon field_label
 	where
             arg_ids = mkTemplateLocalsNum field_base (dataConOrigArgTys data_con)
 			-- No need to instantiate; same tyvars in datacon as tycon
+			-- Records can't be existential, so no existential tyvars or dicts
 
 	    unpack_base = field_base + length arg_ids
 	    uniqs = map mkBuiltinUnique [unpack_base..]
@@ -548,7 +537,7 @@ mkReboxingAlt us con args rhs
     (DataAlt con, args', mkLets binds rhs)
 
   where
-    stricts = dataConStrictMarks con
+    stricts = dataConExStricts con ++ dataConStrictMarks con
 
     go [] stricts us = ([], [])
 
@@ -613,10 +602,9 @@ mkDictSelId name clas
 	-- But it's type must expose the representation of the dictionary
 	-- to gat (say)		C a -> (a -> a)
 
-    field_lbl = mkFieldLabel name tycon sel_ty tag
-    tag       = assoc "MkId.mkDictSelId" (map idName (classSelIds clas) `zip` allFieldLabelTags) name
+    tag  = assoc "MkId.mkDictSelId" (map idName (classSelIds clas) `zip` allFieldLabelTags) name
 
-    info      = noCafIdInfo
+    info = noCafIdInfo
 		`setArityInfo`	    	1
 		`setUnfoldingInfo`  	mkTopUnfolding rhs
 		`setAllStrictnessInfo`	Just strict_sig
@@ -673,7 +661,9 @@ mkPrimOpId prim_op
   where
     (tyvars,arg_tys,res_ty, arity, strict_sig) = primOpSig prim_op
     ty   = mkForAllTys tyvars (mkFunTys arg_tys res_ty)
-    name = mkPrimOpIdName prim_op
+    name = mkWiredInName gHC_PRIM (primOpOcc prim_op) 
+			 (mkPrimOpIdUnique (primOpTag prim_op))
+			 Nothing (AnId id) 
     id   = mkGlobalId (PrimOpId prim_op) name ty info
 		
     info = noCafIdInfo
@@ -817,6 +807,29 @@ they can unify with both unlifted and lifted types.  Hence we provide
 another gun with which to shoot yourself in the foot.
 
 \begin{code}
+mkWiredInIdName mod fs uniq id
+ = mkWiredInName mod (mkOccFS varName fs) uniq Nothing (AnId id)
+
+unsafeCoerceName = mkWiredInIdName gHC_PRIM FSLIT("unsafeCoerce#") unsafeCoerceIdKey  unsafeCoerceId
+nullAddrName     = mkWiredInIdName gHC_PRIM FSLIT("nullAddr#")	   nullAddrIdKey      nullAddrId
+seqName		 = mkWiredInIdName gHC_PRIM FSLIT("seq")	   seqIdKey	      seqId
+realWorldName	 = mkWiredInIdName gHC_PRIM FSLIT("realWorld#")	   realWorldPrimIdKey realWorldPrimId
+lazyIdName	 = mkWiredInIdName pREL_BASE FSLIT("lazy")         lazyIdKey	      lazyId
+
+errorName		 = mkWiredInIdName pREL_ERR FSLIT("error")	     errorIdKey eRROR_ID
+recSelErrorName		 = mkWiredInIdName pREL_ERR FSLIT("recSelError")     recSelErrorIdKey rEC_SEL_ERROR_ID
+runtimeErrorName	 = mkWiredInIdName pREL_ERR FSLIT("runtimeError")    runtimeErrorIdKey rUNTIME_ERROR_ID
+irrefutPatErrorName	 = mkWiredInIdName pREL_ERR FSLIT("irrefutPatError") irrefutPatErrorIdKey iRREFUT_PAT_ERROR_ID
+recConErrorName		 = mkWiredInIdName pREL_ERR FSLIT("recConError")     recConErrorIdKey rEC_CON_ERROR_ID
+patErrorName 		 = mkWiredInIdName pREL_ERR FSLIT("patError") 	     patErrorIdKey pAT_ERROR_ID
+noMethodBindingErrorName = mkWiredInIdName pREL_ERR FSLIT("noMethodBindingError")
+					   noMethodBindingErrorIdKey nO_METHOD_BINDING_ERROR_ID
+nonExhaustiveGuardsErrorName 
+  = mkWiredInIdName pREL_ERR FSLIT("nonExhaustiveGuardsError") 
+		    nonExhaustiveGuardsErrorIdKey nON_EXHAUSTIVE_GUARDS_ERROR_ID
+\end{code}
+
+\begin{code}
 -- unsafeCoerce# :: forall a b. a -> b
 unsafeCoerceId
   = pcMiscPrelId unsafeCoerceName ty info
@@ -930,9 +943,9 @@ rEC_SEL_ERROR_ID		= mkRuntimeErrorId recSelErrorName
 rUNTIME_ERROR_ID	 	= mkRuntimeErrorId runtimeErrorName
 iRREFUT_PAT_ERROR_ID		= mkRuntimeErrorId irrefutPatErrorName
 rEC_CON_ERROR_ID		= mkRuntimeErrorId recConErrorName
-nON_EXHAUSTIVE_GUARDS_ERROR_ID	= mkRuntimeErrorId nonExhaustiveGuardsErrorName
 pAT_ERROR_ID			= mkRuntimeErrorId patErrorName
 nO_METHOD_BINDING_ERROR_ID      = mkRuntimeErrorId noMethodBindingErrorName
+nON_EXHAUSTIVE_GUARDS_ERROR_ID	= mkRuntimeErrorId nonExhaustiveGuardsErrorName
 
 -- The runtime error Ids take a UTF8-encoded string as argument
 mkRuntimeErrorId name = pc_bottoming_Id name runtimeErrorTy

@@ -32,8 +32,6 @@ module Digraph(
 ------------------------------------------------------------------------------
 
 
-#define ARR_ELT		(COMMA)
-
 import Util	( sortLt )
 
 -- Extensions
@@ -80,7 +78,8 @@ stronglyConnComp
 	=> [(node, key, [key])]		-- The graph; its ok for the
 					-- out-list to contain keys which arent
 					-- a vertex key, they are ignored
-	-> [SCC node]
+	-> [SCC node]	-- Returned in topologically sorted order
+			-- Later components depend on earlier ones, but not vice versa
 
 stronglyConnComp edges
   = map get_node (stronglyConnCompR edges)
@@ -307,9 +306,6 @@ preorder (Node a ts) = a : preorderF ts
 preorderF           :: Forest a -> [a]
 preorderF ts         = concat (map preorder ts)
 
-preOrd :: Graph -> [Vertex]
-preOrd  = preorderF . dff
-
 tabulate        :: Bounds -> [Vertex] -> Table Int
 tabulate bnds vs = array bnds (zipWith (,) vs [1..])
 
@@ -363,12 +359,6 @@ scc g = dfs g (reverse (postOrd (transposeG g)))
 ------------------------------------------------------------
 
 \begin{code}
-tree              :: Bounds -> Forest Vertex -> Graph
-tree bnds ts       = buildG bnds (concat (map flat ts))
-		   where
-		     flat (Node v rs) = [ (v, w) | Node w us <- ts ] ++
-                    		        concat (map flat ts)
-
 back              :: Graph -> Table Int -> Graph
 back g post        = mapT select g
  where select v ws = [ w | w <- ws, post!v < post!w ]

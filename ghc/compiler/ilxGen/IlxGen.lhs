@@ -16,7 +16,7 @@ import TyCon	( TyCon,  tyConPrimRep, isUnboxedTupleTyCon, tyConDataCons,
 		  tyConTyVars, isDataTyCon, isAlgTyCon, tyConArity
 		)
 import Type	( liftedTypeKind, openTypeKind, unliftedTypeKind,
-		  isUnLiftedType, isTyVarTy, mkTyVarTy, sourceTypeRep,
+		  isUnLiftedType, isTyVarTy, mkTyVarTy, predTypeRep,
 		  splitForAllTys, splitFunTys, applyTy, applyTys, eqKind, tyVarsOfTypes
 		)
 import TypeRep	( Type(..) )
@@ -1119,7 +1119,6 @@ pushLit env (MachWord w)   = text "ldc.i4" <+> integer w <+> text "conv.u4"
 pushLit env (MachWord64 w) = text "ldc.i8" <+> integer w <+> text "conv.u8"
 pushLit env (MachFloat f)  = text "ldc.r4" <+> rational f
 pushLit env (MachDouble f) = text "ldc.r8" <+> rational f
-pushLit env (MachLitLit _ _) = trace "WARNING: Cannot compile MachLitLit to ILX in IlxGen.lhs" (text "// MachLitLit!!!  Not valid in ILX!!")
 pushLit env (MachNullAddr)  = text "ldc.i4 0"
 pushLit env (MachLabel l _) = trace "WARNING: Cannot compile MachLabel to ILX in IlxGen.lhs" (text "// MachLabel!!!  Not valid in ILX!!")
 
@@ -1169,7 +1168,7 @@ deepIlxRepType ty@(TyConApp tc tys)
 deepIlxRepType (AppTy f x)     = AppTy (deepIlxRepType f) (deepIlxRepType x)
 deepIlxRepType (ForAllTy b ty) = ForAllTy b (deepIlxRepType ty)
 deepIlxRepType (NoteTy   _ ty) = deepIlxRepType ty
-deepIlxRepType (SourceTy p)    = deepIlxRepType (sourceTypeRep p)
+deepIlxRepType (PredTy p)      = deepIlxRepType (predTypeRep p)
 deepIlxRepType ty@(TyVarTy tv) = ty
 
 idIlxRepType id = deepIlxRepType (idType id)

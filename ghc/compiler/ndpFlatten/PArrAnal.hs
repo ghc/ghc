@@ -42,6 +42,7 @@ import TypeRep      (Type(..))
 import Var (Var(..),Id)
 import Literal      (Literal)
 import CoreSyn (Expr(..),CoreExpr,Bind(..))
+import PprCore ( {- instances -} )
 -- 
 
 data ArrayUsage = Prim | NonPrim | Array 
@@ -135,8 +136,8 @@ typeArrayUsage (TyConApp tc tcargs) =
     tcargsAU = map typeArrayUsage tcargs
     tcCombine  = foldr combineArrayUsage Prim tcargsAU
   in auCon tcCombine
-typeArrayUsage t@(SourceTy _) =
-  pprPanic "PArrAnal.typeArrayUsage: encountered 'SourceType - shouldn't be here!"
+typeArrayUsage t@(PredTy _) =
+  pprPanic "PArrAnal.typeArrayUsage: encountered 'PredType - shouldn't be here!"
            (ppr t)                 
  
 

@@ -30,16 +30,13 @@ import TysPrim		( charPrimTy, addrPrimTy, floatPrimTy, doublePrimTy,
 			  intPrimTy, wordPrimTy, int64PrimTy, word64PrimTy
 			)
 import PrimRep		( PrimRep(..) )
-import TcType		( Type, tcCmpType )
-import Type		( typePrimRep )
-import PprType		( pprParendType )
+import Type		( Type )
 import CStrings		( pprFSInCStyle )
 
 import Outputable
 import FastTypes
 import FastString
 import Binary
-import Util		( thenCmp )
 
 import Ratio 		( numerator )
 import FastString	( uniqueOfFS, lengthFS )
@@ -343,7 +340,7 @@ cmpLit (MachFloat     a)   (MachFloat	   b)   = a `compare` b
 cmpLit (MachDouble    a)   (MachDouble	   b)   = a `compare` b
 cmpLit (MachLabel     a _) (MachLabel      b _) = a `compare` b
 cmpLit lit1		   lit2		        | litTag lit1 <# litTag lit2 = LT
-					        | otherwise  		       = GT
+					        | otherwise  		     = GT
 
 litTag (MachChar      _)   = _ILIT(1)
 litTag (MachStr       _)   = _ILIT(2)

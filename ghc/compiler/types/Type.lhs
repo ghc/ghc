@@ -6,7 +6,8 @@
 \begin{code}
 module Type (
         -- re-exports from TypeRep:
-	Type, PredType, ThetaType,
+	TyThing(..),
+	Type, PredType(..), ThetaType,
 	Kind, TyVarSubst, 
 
 	superKind, superBoxity,				-- KX and BX respectively
@@ -40,13 +41,14 @@ module Type (
 	applyTy, applyTys, isForAllTy, dropForAlls,
 
 	-- Source types
-	SourceType(..), sourceTypeRep, mkPredTy, mkPredTys,
+	isPredTy, predTypeRep, mkPredTy, mkPredTys,
 
 	-- Newtypes
-	splitNewType_maybe,
+	splitRecNewType_maybe,
 
 	-- Lifting and boxity
-	isUnLiftedType, isUnboxedTupleType, isAlgType, isStrictType, isPrimitiveType,
+	isUnLiftedType, isUnboxedTupleType, isAlgType, isPrimitiveType,
+	isStrictType, isStrictPred, 
 
 	-- Free variables
 	tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
@@ -76,11 +78,10 @@ import TypeRep
 
 -- Other imports:
 
-import {-# SOURCE #-}	PprType( pprType )	-- Only called in debug messages
 import {-# SOURCE #-}   Subst  ( substTyWith )
 
 -- friends:
-import Var	( Id, TyVar, tyVarKind, tyVarName, setTyVarName )
+import Var	( TyVar, tyVarKind, tyVarName, setTyVarName )
 import VarEnv
 import VarSet
 
@@ -156,22 +157,19 @@ mkTyVarTys :: [TyVar] -> [Type]
 mkTyVarTys = map mkTyVarTy -- a common use of mkTyVarTy
 
 getTyVar :: String -> Type -> TyVar
-getTyVar msg (TyVarTy tv)     = tv
-getTyVar msg (SourceTy p)     = getTyVar msg (sourceTypeRep p)
-getTyVar msg (NoteTy _ t)     = getTyVar msg t
-getTyVar msg other	      = panic ("getTyVar: " ++ msg)
-
-getTyVar_maybe :: Type -> Maybe TyVar
-getTyVar_maybe (TyVarTy tv) 	= Just tv
-getTyVar_maybe (NoteTy _ t) 	= getTyVar_maybe t
-getTyVar_maybe (SourceTy p) 	= getTyVar_maybe (sourceTypeRep p)
-getTyVar_maybe other	        = Nothing
+getTyVar msg ty = case getTyVar_maybe ty of
+		    Just tv -> tv
+		    Nothing -> panic ("getTyVar: " ++ msg)
 
 isTyVarTy :: Type -> Bool
-isTyVarTy (TyVarTy tv)     = True
-isTyVarTy (NoteTy _ ty)    = isTyVarTy ty
-isTyVarTy (SourceTy p)     = isTyVarTy (sourceTypeRep p)
-isTyVarTy other            = False
+isTyVarTy ty = isJust (getTyVar_maybe ty)
+
+getTyVar_maybe :: Type -> Maybe TyVar
+getTyVar_maybe (TyVarTy tv) 	 = Just tv
+getTyVar_maybe (NoteTy _ t) 	 = getTyVar_maybe t
+getTyVar_maybe (PredTy p) 	 = getTyVar_maybe (predTypeRep p)
+getTyVar_maybe (NewTcApp tc tys) = getTyVar_maybe (newTypeRep tc tys)
+getTyVar_maybe other	         = Nothing
 \end{code}
 
 
@@ -184,10 +182,11 @@ invariant: use it.
 
 \begin{code}
 mkAppTy orig_ty1 orig_ty2
-  = ASSERT( not (isSourceTy orig_ty1) )	-- Source types are of kind *
+  = ASSERT2( not (isPredTy orig_ty1), crudePprType orig_ty1 )	-- Source types are of kind *
     mk_app orig_ty1
   where
     mk_app (NoteTy _ ty1)    = mk_app ty1
+    mk_app (NewTcApp tc tys) = NewTcApp tc (tys ++ [orig_ty2])
     mk_app (TyConApp tc tys) = mkGenTyConApp tc (tys ++ [orig_ty2])
     mk_app ty1		     = AppTy orig_ty1 orig_ty2
 	-- We call mkGenTyConApp because the TyConApp could be an 
@@ -207,21 +206,26 @@ mkAppTys orig_ty1 []	    = orig_ty1
 	--   returns to (Ratio Integer), which has needlessly lost
 	--   the Rational part.
 mkAppTys orig_ty1 orig_tys2
-  = ASSERT( not (isSourceTy orig_ty1) )	-- Source types are of kind *
+  = ASSERT( not (isPredTy orig_ty1) )	-- Source types are of kind *
     mk_app orig_ty1
   where
     mk_app (NoteTy _ ty1)    = mk_app ty1
+    mk_app (NewTcApp tc tys) = NewTcApp tc (tys ++ orig_tys2)
     mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ orig_tys2)
+				-- Use mkTyConApp in case tc is (->)
     mk_app ty1		     = foldl AppTy orig_ty1 orig_tys2
 
 splitAppTy_maybe :: Type -> Maybe (Type, Type)
 splitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
 splitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
 splitAppTy_maybe (NoteTy _ ty)     = splitAppTy_maybe ty
-splitAppTy_maybe (SourceTy p)      = splitAppTy_maybe (sourceTypeRep p)
+splitAppTy_maybe (PredTy p)        = splitAppTy_maybe (predTypeRep p)
+splitAppTy_maybe (NewTcApp tc tys) = splitAppTy_maybe (newTypeRep tc tys)
 splitAppTy_maybe (TyConApp tc tys) = case snocView tys of
 					Nothing -> Nothing
-					Just (tys',ty') -> Just (TyConApp tc tys', ty')
+					Just (tys',ty') -> Just (mkGenTyConApp tc tys', ty')
+						-- mkGenTyConApp just in case the tc is a newtype
+
 splitAppTy_maybe other	     	   = Nothing
 
 splitAppTy :: Type -> (Type, Type)
@@ -234,10 +238,12 @@ splitAppTys ty = split ty ty []
   where
     split orig_ty (AppTy ty arg)        args = split ty ty (arg:args)
     split orig_ty (NoteTy _ ty)         args = split orig_ty ty args
-    split orig_ty (SourceTy p)          args = split orig_ty (sourceTypeRep p) args
+    split orig_ty (PredTy p)            args = split orig_ty (predTypeRep p) args
+    split orig_ty (NewTcApp tc tc_args) args = split orig_ty (newTypeRep tc tc_args) args
+    split orig_ty (TyConApp tc tc_args) args = (mkGenTyConApp tc [], tc_args ++ args)
+						-- mkGenTyConApp just in case the tc is a newtype
     split orig_ty (FunTy ty1 ty2)       args = ASSERT( null args )
 					       (TyConApp funTyCon [], [ty1,ty2])
-    split orig_ty (TyConApp tc tc_args) args = (TyConApp tc [], tc_args ++ args)
     split orig_ty ty		        args = (orig_ty, args)
 \end{code}
 
@@ -257,51 +263,58 @@ isFunTy :: Type -> Bool
 isFunTy ty = isJust (splitFunTy_maybe ty)
 
 splitFunTy :: Type -> (Type, Type)
-splitFunTy (FunTy arg res) = (arg, res)
-splitFunTy (NoteTy _ ty)   = splitFunTy ty
-splitFunTy (SourceTy p)    = splitFunTy (sourceTypeRep p)
+splitFunTy (FunTy arg res)   = (arg, res)
+splitFunTy (NoteTy _ ty)     = splitFunTy ty
+splitFunTy (PredTy p)        = splitFunTy (predTypeRep p)
+splitFunTy (NewTcApp tc tys) = splitFunTy (newTypeRep tc tys)
+splitFunTy other	     = pprPanic "splitFunTy" (crudePprType other)
 
 splitFunTy_maybe :: Type -> Maybe (Type, Type)
-splitFunTy_maybe (FunTy arg res) = Just (arg, res)
-splitFunTy_maybe (NoteTy _ ty)   = splitFunTy_maybe ty
-splitFunTy_maybe (SourceTy p)    = splitFunTy_maybe (sourceTypeRep p)
-splitFunTy_maybe other	         = Nothing
+splitFunTy_maybe (FunTy arg res)   = Just (arg, res)
+splitFunTy_maybe (NoteTy _ ty)     = splitFunTy_maybe ty
+splitFunTy_maybe (PredTy p)        = splitFunTy_maybe (predTypeRep p)
+splitFunTy_maybe (NewTcApp tc tys) = splitFunTy_maybe (newTypeRep tc tys)
+splitFunTy_maybe other	           = Nothing
 
 splitFunTys :: Type -> ([Type], Type)
 splitFunTys ty = split [] ty ty
   where
-    split args orig_ty (FunTy arg res) = split (arg:args) res res
-    split args orig_ty (NoteTy _ ty)   = split args orig_ty ty
-    split args orig_ty (SourceTy p)    = split args orig_ty (sourceTypeRep p)
-    split args orig_ty ty              = (reverse args, orig_ty)
+    split args orig_ty (FunTy arg res) 	 = split (arg:args) res res
+    split args orig_ty (NoteTy _ ty)   	 = split args orig_ty ty
+    split args orig_ty (PredTy p)     	 = split args orig_ty (predTypeRep p)
+    split args orig_ty (NewTcApp tc tys) = split args orig_ty (newTypeRep tc tys)
+    split args orig_ty ty                = (reverse args, orig_ty)
 
 zipFunTys :: Outputable a => [a] -> Type -> ([(a,Type)], Type)
 zipFunTys orig_xs orig_ty = split [] orig_xs orig_ty orig_ty
   where
-    split acc []     nty ty  	         = (reverse acc, nty)
-    split acc (x:xs) nty (FunTy arg res) = split ((x,arg):acc) xs res res
-    split acc xs     nty (NoteTy _ ty)   = split acc           xs nty ty
-    split acc xs     nty (SourceTy p)    = split acc           xs nty (sourceTypeRep p)
-    split acc (x:xs) nty ty              = pprPanic "zipFunTys" (ppr orig_xs <+> pprType orig_ty)
+    split acc []     nty ty  	           = (reverse acc, nty)
+    split acc (x:xs) nty (FunTy arg res)   = split ((x,arg):acc) xs res res
+    split acc xs     nty (NoteTy _ ty)     = split acc           xs nty ty
+    split acc xs     nty (PredTy p)        = split acc           xs nty (predTypeRep p)
+    split acc xs     nty (NewTcApp tc tys) = split acc           xs nty (newTypeRep tc tys)
+    split acc (x:xs) nty ty                = pprPanic "zipFunTys" (ppr orig_xs <+> crudePprType orig_ty)
     
 funResultTy :: Type -> Type
-funResultTy (FunTy arg res) = res
-funResultTy (NoteTy _ ty)   = funResultTy ty
-funResultTy (SourceTy p)    = funResultTy (sourceTypeRep p)
-funResultTy ty		    = pprPanic "funResultTy" (pprType ty)
+funResultTy (FunTy arg res)   = res
+funResultTy (NoteTy _ ty)     = funResultTy ty
+funResultTy (PredTy p)        = funResultTy (predTypeRep p)
+funResultTy (NewTcApp tc tys) = funResultTy (newTypeRep tc tys)
+funResultTy ty		      = pprPanic "funResultTy" (crudePprType ty)
 
 funArgTy :: Type -> Type
-funArgTy (FunTy arg res) = arg
-funArgTy (NoteTy _ ty)   = funArgTy ty
-funArgTy (SourceTy p)    = funArgTy (sourceTypeRep p)
-funArgTy ty		 = pprPanic "funArgTy" (pprType ty)
+funArgTy (FunTy arg res)   = arg
+funArgTy (NoteTy _ ty)     = funArgTy ty
+funArgTy (PredTy p)        = funArgTy (predTypeRep p)
+funArgTy (NewTcApp tc tys) = funArgTy (newTypeRep tc tys)
+funArgTy ty		   = pprPanic "funArgTy" (crudePprType ty)
 \end{code}
 
 
 ---------------------------------------------------------------------
 				TyConApp
 				~~~~~~~~
-@mkTyConApp@ is a key function, because it builds a TyConApp, FunTy or SourceTy,
+@mkTyConApp@ is a key function, because it builds a TyConApp, FunTy or PredTy,
 as apppropriate.
 
 \begin{code}
@@ -316,18 +329,15 @@ mkTyConApp tycon tys
   | isFunTyCon tycon, [ty1,ty2] <- tys
   = FunTy ty1 ty2
 
-  | isNewTyCon tycon,			-- A saturated newtype application;
-    not (isRecursiveTyCon tycon),	-- Not recursive (we don't use SourceTypes for them)
-    tys `lengthIs` tyConArity tycon     -- use the SourceType form
-  = SourceTy (NType tycon tys)
+  | isNewTyCon tycon
+  = NewTcApp tycon tys
 
   | otherwise
   = ASSERT(not (isSynTyCon tycon))
     TyConApp tycon tys
 
 mkTyConTy :: TyCon -> Type
-mkTyConTy tycon = ASSERT( not (isSynTyCon tycon) ) 
-		  TyConApp tycon []
+mkTyConTy tycon = mkTyConApp tycon []
 
 -- splitTyConApp "looks through" synonyms, because they don't
 -- mean a distinct type, but all other type-constructor applications
@@ -342,13 +352,14 @@ tyConAppArgs ty = snd (splitTyConApp ty)
 splitTyConApp :: Type -> (TyCon, [Type])
 splitTyConApp ty = case splitTyConApp_maybe ty of
 			Just stuff -> stuff
-			Nothing	   -> pprPanic "splitTyConApp" (pprType ty)
+			Nothing	   -> pprPanic "splitTyConApp" (crudePprType ty)
 
 splitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
 splitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 splitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
 splitTyConApp_maybe (NoteTy _ ty)     = splitTyConApp_maybe ty
-splitTyConApp_maybe (SourceTy p)      = splitTyConApp_maybe (sourceTypeRep p)
+splitTyConApp_maybe (PredTy p)        = splitTyConApp_maybe (predTypeRep p)
+splitTyConApp_maybe (NewTcApp tc tys) = splitTyConApp_maybe (newTypeRep tc tys)
 splitTyConApp_maybe other	      = Nothing
 \end{code}
 
@@ -408,17 +419,14 @@ repType looks through
 	(e) [recursive] newtypes
 It's useful in the back end.
 
-Remember, non-recursive newtypes get expanded as part of the SourceTy case,
-but recursive ones are represented by TyConApps and have to be expanded
-by steam.
-
 \begin{code}
 repType :: Type -> Type
+-- Only applied to types of kind *; hence tycons are saturated
 repType (ForAllTy _ ty)   = repType ty
 repType (NoteTy   _ ty)   = repType ty
-repType (SourceTy  p)     = repType (sourceTypeRep p)
-repType (TyConApp tc tys) | isNewTyCon tc && tys `lengthIs` tyConArity tc
-			  = repType (newTypeRep tc tys)
+repType (PredTy  p)       = repType (predTypeRep p)
+repType (NewTcApp tc tys) = ASSERT( tys `lengthIs` tyConArity tc )
+			    repType (new_type_rep tc tys)
 repType ty	 	  = ty
 
 
@@ -428,6 +436,7 @@ typePrimRep ty = case repType ty of
 		   FunTy _ _	 -> PtrRep
 		   AppTy _ _	 -> PtrRep	-- ??
 		   TyVarTy _	 -> PtrRep
+		   other	 -> pprPanic "typePrimRep" (crudePprType ty)
 \end{code}
 
 
@@ -453,17 +462,19 @@ splitForAllTy_maybe :: Type -> Maybe (TyVar, Type)
 splitForAllTy_maybe ty = splitFAT_m ty
   where
     splitFAT_m (NoteTy _ ty)		= splitFAT_m ty
-    splitFAT_m (SourceTy p)		= splitFAT_m (sourceTypeRep p)
+    splitFAT_m (PredTy p)		= splitFAT_m (predTypeRep p)
+    splitFAT_m (NewTcApp tc tys)	= splitFAT_m (newTypeRep tc tys)
     splitFAT_m (ForAllTy tyvar ty)	= Just(tyvar, ty)
     splitFAT_m _			= Nothing
 
 splitForAllTys :: Type -> ([TyVar], Type)
 splitForAllTys ty = split ty ty []
    where
-     split orig_ty (ForAllTy tv ty)	  tvs = split ty ty (tv:tvs)
-     split orig_ty (NoteTy _ ty)	  tvs = split orig_ty ty tvs
-     split orig_ty (SourceTy p)		  tvs = split orig_ty (sourceTypeRep p) tvs
-     split orig_ty t			  tvs = (reverse tvs, orig_ty)
+     split orig_ty (ForAllTy tv ty)  tvs = split ty ty (tv:tvs)
+     split orig_ty (NoteTy _ ty)     tvs = split orig_ty ty tvs
+     split orig_ty (PredTy p)	     tvs = split orig_ty (predTypeRep p) tvs
+     split orig_ty (NewTcApp tc tys) tvs = split orig_ty (newTypeRep tc tys) tvs
+     split orig_ty t		     tvs = (reverse tvs, orig_ty)
 
 dropForAlls :: Type -> Type
 dropForAlls ty = snd (splitForAllTys ty)
@@ -481,10 +492,11 @@ the expression.
 
 \begin{code}
 applyTy :: Type -> Type -> Type
-applyTy (SourceTy p) 	 arg = applyTy (sourceTypeRep p) arg
-applyTy (NoteTy _ fun)   arg = applyTy fun arg
-applyTy (ForAllTy tv ty) arg = substTyWith [tv] [arg] ty
-applyTy other		 arg = panic "applyTy"
+applyTy (PredTy p) 	  arg = applyTy (predTypeRep p) arg
+applyTy (NewTcApp tc tys) arg = applyTy (newTypeRep tc tys) arg
+applyTy (NoteTy _ fun)    arg = applyTy fun arg
+applyTy (ForAllTy tv ty)  arg = substTyWith [tv] [arg] ty
+applyTy other		  arg = panic "applyTy"
 
 applyTys :: Type -> [Type] -> Type
 -- This function is interesting because 
@@ -506,7 +518,7 @@ applyTys orig_fun_ty arg_tys
   = substTyWith (take n_args tvs) arg_tys 
 		(mkForAllTys (drop n_args tvs) rho_ty)
   | otherwise		-- Too many type args
-  = ASSERT2( n_tvs > 0, pprType orig_fun_ty )	-- Zero case gives infnite loop!
+  = ASSERT2( n_tvs > 0, crudePprType orig_fun_ty )	-- Zero case gives infnite loop!
     applyTys (substTyWith tvs (take n_tvs arg_tys) rho_ty)
 	     (drop n_tvs arg_tys)
   where
@@ -527,46 +539,75 @@ concerned, but which has low-level representation as far as the back end is conc
 
 Source types are always lifted.
 
-The key function is sourceTypeRep which gives the representation of a source type:
+The key function is predTypeRep which gives the representation of a source type:
 
 \begin{code}
 mkPredTy :: PredType -> Type
-mkPredTy pred = SourceTy pred
+mkPredTy pred = PredTy pred
 
 mkPredTys :: ThetaType -> [Type]
-mkPredTys preds = map SourceTy preds
+mkPredTys preds = map PredTy preds
 
-sourceTypeRep :: SourceType -> Type
--- Convert a predicate to its "representation type";
--- the type of evidence for that predicate, which is actually passed at runtime
-sourceTypeRep (IParam _ ty)     = ty
-sourceTypeRep (ClassP clas tys) = mkTyConApp (classTyCon clas) tys
-	-- Note the mkTyConApp; the classTyCon might be a newtype!
-sourceTypeRep (NType  tc tys)   = newTypeRep tc tys
+predTypeRep :: PredType -> Type
+-- Convert a PredType to its "representation type";
+-- the post-type-checking type used by all the Core passes of GHC.
+predTypeRep (IParam _ ty)     = ty
+predTypeRep (ClassP clas tys) = mkTyConApp (classTyCon clas) tys
+	-- Result might be a NewTcApp, but the consumer will
+	-- look through that too if necessary
+
+isPredTy :: Type -> Bool
+isPredTy (NoteTy _ ty) = isPredTy ty
+isPredTy (PredTy sty)  = True
+isPredTy _	       = False
+\end{code}
+
+
+%************************************************************************
+%*									*
+		NewTypes
+%*									*
+%************************************************************************
+
+\begin{code}
+splitRecNewType_maybe :: Type -> Maybe Type
+-- Newtypes are always represented by a NewTcApp
+-- Sometimes we want to look through a recursive newtype, and that's what happens here
+-- Only applied to types of kind *, hence the newtype is always saturated
+splitRecNewType_maybe (NoteTy _ ty) = splitRecNewType_maybe ty  
+splitRecNewType_maybe (NewTcApp tc tys)
+  | isRecursiveTyCon tc
+  = ASSERT( tys `lengthIs` tyConArity tc && isNewTyCon tc )
+	-- The assert should hold because repType should
+	-- only be applied to *types* (of kind *)
+    Just (new_type_rep tc tys)
+splitRecNewType_maybe other = Nothing
+			
+-----------------------------
+newTypeRep :: TyCon -> [Type] -> Type
+-- A local helper function (not exported)
+-- Expands a newtype application to 
+--	*either* a vanilla TyConApp (recursive newtype, or non-saturated)
+--	*or*     the newtype representation (otherwise)
+-- Either way, the result is not a NewTcApp
+--
+-- NB: the returned TyConApp is always deconstructed immediately by the 
+--     caller... a TyConApp with a newtype type constructor never lives
+--     in an ordinary type
+newTypeRep tc tys
+  | not (isRecursiveTyCon tc),		-- Not recursive and saturated
+    tys `lengthIs` tyConArity tc 	-- treat as equivalent to expansion
+  = new_type_rep tc tys
+  | otherwise
+  = TyConApp tc tys
 	-- ToDo: Consider caching this substitution in a NType
 
-isSourceTy :: Type -> Bool
-isSourceTy (NoteTy _ ty)  = isSourceTy ty
-isSourceTy (SourceTy sty) = True
-isSourceTy _	          = False
-
-
-splitNewType_maybe :: Type -> Maybe Type
--- Newtypes that are recursive are reprsented by TyConApp, just
--- as they always were.  Occasionally we want to find their representation type.
--- NB: remember that in this module, non-recursive newtypes are transparent
-
-splitNewType_maybe ty
-  = case splitTyConApp_maybe ty of
-	Just (tc,tys) | isNewTyCon tc -> ASSERT( tys `lengthIs` tyConArity tc )
-						-- The assert should hold because repType should
-						-- only be applied to *types* (of kind *)
-					 Just (newTypeRep tc tys)
-	other -> Nothing
-			
--- A local helper function (not exported)
-newTypeRep new_tycon tys = case newTyConRep new_tycon of
-			     (tvs, rep_ty) -> substTyWith tvs tys rep_ty
+----------------------------
+-- new_type_rep doesn't ask any questions: 
+-- it just expands newtype, whether recursive or not
+new_type_rep new_tycon tys = ASSERT( tys `lengthIs` tyConArity new_tycon )
+			     case newTyConRep new_tycon of
+				 (tvs, rep_ty) -> substTyWith tvs tys rep_ty
 \end{code}
 
 
@@ -584,8 +625,9 @@ typeKind :: Type -> Kind
 
 typeKind (TyVarTy tyvar)	= tyVarKind tyvar
 typeKind (TyConApp tycon tys)	= foldr (\_ k -> funResultTy k) (tyConKind tycon) tys
+typeKind (NewTcApp tycon tys)	= foldr (\_ k -> funResultTy k) (tyConKind tycon) tys
 typeKind (NoteTy _ ty)		= typeKind ty
-typeKind (SourceTy _)		= liftedTypeKind -- Predicates are always 
+typeKind (PredTy _)		= liftedTypeKind -- Predicates are always 
 						 -- represented by lifted types
 typeKind (AppTy fun arg)	= funResultTy (typeKind fun)
 
@@ -613,9 +655,10 @@ typeKind (ForAllTy tv ty)	= typeKind ty
 tyVarsOfType :: Type -> TyVarSet
 tyVarsOfType (TyVarTy tv)		= unitVarSet tv
 tyVarsOfType (TyConApp tycon tys)	= tyVarsOfTypes tys
+tyVarsOfType (NewTcApp tycon tys)	= tyVarsOfTypes tys
 tyVarsOfType (NoteTy (FTVNote tvs) ty2) = tvs
 tyVarsOfType (NoteTy (SynNote ty1) ty2)	= tyVarsOfType ty2	-- See note [Syn] below
-tyVarsOfType (SourceTy sty)		= tyVarsOfSourceType sty
+tyVarsOfType (PredTy sty)		= tyVarsOfPred sty
 tyVarsOfType (FunTy arg res)		= tyVarsOfType arg `unionVarSet` tyVarsOfType res
 tyVarsOfType (AppTy fun arg)		= tyVarsOfType fun `unionVarSet` tyVarsOfType arg
 tyVarsOfType (ForAllTy tyvar ty)	= tyVarsOfType ty `minusVarSet` unitVarSet tyvar
@@ -639,15 +682,11 @@ tyVarsOfTypes :: [Type] -> TyVarSet
 tyVarsOfTypes tys = foldr (unionVarSet.tyVarsOfType) emptyVarSet tys
 
 tyVarsOfPred :: PredType -> TyVarSet
-tyVarsOfPred = tyVarsOfSourceType	-- Just a subtype
-
-tyVarsOfSourceType :: SourceType -> TyVarSet
-tyVarsOfSourceType (IParam _ ty)  = tyVarsOfType ty
-tyVarsOfSourceType (ClassP _ tys) = tyVarsOfTypes tys
-tyVarsOfSourceType (NType _ tys)  = tyVarsOfTypes tys
+tyVarsOfPred (IParam _ ty)  = tyVarsOfType ty
+tyVarsOfPred (ClassP _ tys) = tyVarsOfTypes tys
 
 tyVarsOfTheta :: ThetaType -> TyVarSet
-tyVarsOfTheta = foldr (unionVarSet . tyVarsOfSourceType) emptyVarSet
+tyVarsOfTheta = foldr (unionVarSet . tyVarsOfPred) emptyVarSet
 
 -- Add a Note with the free tyvars to the top of the type
 addFreeTyVars :: Type -> Type
@@ -705,8 +744,10 @@ tidyType env@(tidy_env, subst) ty
 				Just tv' -> TyVarTy tv'
     go (TyConApp tycon tys) = let args = map go tys
 			      in args `seqList` TyConApp tycon args
+    go (NewTcApp tycon tys) = let args = map go tys
+			      in args `seqList` NewTcApp tycon args
     go (NoteTy note ty)     = (NoteTy $! (go_note note)) $! (go ty)
-    go (SourceTy sty)	    = SourceTy (tidySourceType env sty)
+    go (PredTy sty)	    = PredTy (tidyPred env sty)
     go (AppTy fun arg)	    = (AppTy $! (go fun)) $! (go arg)
     go (FunTy fun arg)	    = (FunTy $! (go fun)) $! (go arg)
     go (ForAllTy tv ty)	    = ForAllTy tvp $! (tidyType envp ty)
@@ -718,13 +759,9 @@ tidyType env@(tidy_env, subst) ty
 
 tidyTypes env tys = map (tidyType env) tys
 
-tidyPred :: TidyEnv -> SourceType -> SourceType
-tidyPred = tidySourceType
-
-tidySourceType :: TidyEnv -> SourceType -> SourceType
-tidySourceType env (IParam n ty)     = IParam n (tidyType env ty)
-tidySourceType env (ClassP clas tys) = ClassP clas (tidyTypes env tys)
-tidySourceType env (NType tc tys)    = NType  tc   (tidyTypes env tys)
+tidyPred :: TidyEnv -> PredType -> PredType
+tidyPred env (IParam n ty)     = IParam n (tidyType env ty)
+tidyPred env (ClassP clas tys) = ClassP clas (tidyTypes env tys)
 \end{code}
 
 
@@ -761,11 +798,12 @@ isUnLiftedType :: Type -> Bool
 	-- They are pretty bogus types, mind you.  It would be better never to
 	-- construct them
 
-isUnLiftedType (ForAllTy tv ty) = isUnLiftedType ty
-isUnLiftedType (NoteTy _ ty)	= isUnLiftedType ty
-isUnLiftedType (TyConApp tc _)  = isUnLiftedTyCon tc
-isUnLiftedType (SourceTy _)	= False		-- All source types are lifted
-isUnLiftedType other		= False	
+isUnLiftedType (ForAllTy tv ty)  = isUnLiftedType ty
+isUnLiftedType (NoteTy _ ty)	 = isUnLiftedType ty
+isUnLiftedType (TyConApp tc _)   = isUnLiftedTyCon tc
+isUnLiftedType (PredTy _)	 = False		-- All source types are lifted
+isUnLiftedType (NewTcApp tc tys) = isUnLiftedType (newTypeRep tc tys)
+isUnLiftedType other		 = False	
 
 isUnboxedTupleType :: Type -> Bool
 isUnboxedTupleType ty = case splitTyConApp_maybe ty of
@@ -788,15 +826,19 @@ this function should be in TcType, but isStrictType is used by DataCon,
 which is below TcType in the hierarchy, so it's convenient to put it here.
 
 \begin{code}
-isStrictType (ForAllTy tv ty)		= isStrictType ty
-isStrictType (NoteTy _ ty)   		= isStrictType ty
-isStrictType (TyConApp tc _)		= isUnLiftedTyCon tc
-isStrictType (SourceTy (ClassP clas _)) = opt_DictsStrict && not (isNewTyCon (classTyCon clas))
+isStrictType (ForAllTy tv ty)  = isStrictType ty
+isStrictType (NoteTy _ ty)     = isStrictType ty
+isStrictType (TyConApp tc _)   = isUnLiftedTyCon tc
+isStrictType (NewTcApp tc tys) = isStrictType (newTypeRep tc tys)
+isStrictType (PredTy pred)     = isStrictPred pred
+isStrictType other	       = False	
+
+isStrictPred (ClassP clas _) = opt_DictsStrict && not (isNewTyCon (classTyCon clas))
+isStrictPred other	     = False
 	-- We may be strict in dictionary types, but only if it 
 	-- has more than one component.
 	-- [Being strict in a single-component dictionary risks
 	--  poking the dictionary component, which is wrong.]
-isStrictType other			= False	
 \end{code}
 
 \begin{code}
@@ -823,8 +865,9 @@ seqType (TyVarTy tv) 	  = tv `seq` ()
 seqType (AppTy t1 t2) 	  = seqType t1 `seq` seqType t2
 seqType (FunTy t1 t2) 	  = seqType t1 `seq` seqType t2
 seqType (NoteTy note t2)  = seqNote note `seq` seqType t2
-seqType (SourceTy p) 	  = seqPred p
+seqType (PredTy p) 	  = seqPred p
 seqType (TyConApp tc tys) = tc `seq` seqTypes tys
+seqType (NewTcApp tc tys) = tc `seq` seqTypes tys
 seqType (ForAllTy tv ty)  = tv `seq` seqType ty
 
 seqTypes :: [Type] -> ()
@@ -835,9 +878,8 @@ seqNote :: TyNote -> ()
 seqNote (SynNote ty)  = seqType ty
 seqNote (FTVNote set) = sizeUniqSet set `seq` ()
 
-seqPred :: SourceType -> ()
+seqPred :: PredType -> ()
 seqPred (ClassP c tys) = c  `seq` seqTypes tys
-seqPred (NType tc tys) = tc `seq` seqTypes tys
 seqPred (IParam n ty)  = n  `seq` seqType ty
 \end{code}
 
@@ -869,9 +911,31 @@ eqKind  = eqType	-- No worries about looking
 eq_ty env (NoteTy _ t1)       t2	  	  = eq_ty env t1 t2
 eq_ty env t1		      (NoteTy _ t2)       = eq_ty env t1 t2
 
--- Look through SourceTy.  This is where the looping danger comes from
-eq_ty env (SourceTy sty1)     t2		  = eq_ty env (sourceTypeRep sty1) t2
-eq_ty env t1		      (SourceTy sty2)     = eq_ty env t1 (sourceTypeRep sty2)
+-- Look through PredTy and NewTcApp.  This is where the looping danger comes from.
+-- We don't bother to check for the PredType/PredType case, no good reason
+-- Hmm: maybe there is a good reason: see the notes below about newtypes
+eq_ty env (PredTy sty1)     t2		  = eq_ty env (predTypeRep sty1) t2
+eq_ty env t1		    (PredTy sty2) = eq_ty env t1 (predTypeRep sty2)
+
+-- NB: we *cannot* short-cut the newtype comparison thus:
+-- eq_ty env (NewTcApp tc1 tys1) (NewTcApp tc2 tys2) 
+--	| (tc1 == tc2) = (eq_tys env tys1 tys2)
+--
+-- Consider:
+--	newtype T a = MkT [a]
+--	newtype Foo m = MkFoo (forall a. m a -> Int)
+--	w1 :: Foo []
+--	w1 = ...
+--	
+--	w2 :: Foo T
+--	w2 = MkFoo (\(MkT x) -> case w1 of MkFoo f -> f x)
+--
+-- We end up with w2 = w1; so we need that Foo T = Foo []
+-- but we can only expand saturated newtypes, so just comparing
+-- T with [] won't do. 
+
+eq_ty env (NewTcApp tc1 tys1) t2		  = eq_ty env (newTypeRep tc1 tys1) t2
+eq_ty env t1		      (NewTcApp tc2 tys2) = eq_ty env t1 (newTypeRep tc2 tys2)
 
 -- The rest is plain sailing
 eq_ty env (TyVarTy tv1)       (TyVarTy tv2)       = case lookupVarEnv env tv1 of

@@ -18,6 +18,7 @@ import TyCon
 import Class
 import TypeRep
 import Type
+import PprExternalCore	-- Instances
 import DataCon	( DataCon, dataConExistentialTyVars, dataConRepArgTys, 
 		  dataConName, dataConWrapId_maybe )
 import CoreSyn
@@ -28,12 +29,10 @@ import CoreTidy	( tidyExpr )
 import VarEnv	( emptyTidyEnv )
 import Literal
 import Name
-import CostCentre
 import Outputable
 import ForeignCall
-import PprExternalCore	
 import CmdLineOpts
-import Maybes	( orElse, catMaybes )
+import Maybes	( mapCatMaybes )
 import IO
 import FastString
 
@@ -73,11 +72,11 @@ mkExternalCore (ModGuts {mg_module=this_mod, mg_types = type_env, mg_binds = bin
     other_implicit_binds  = map get_defn (concatMap other_implicit_ids (typeEnvElts type_env))
 
 implicit_con_ids :: TyThing -> [Id]
-implicit_con_ids (ATyCon tc) | isAlgTyCon tc = catMaybes (map dataConWrapId_maybe (tyConDataCons tc))
+implicit_con_ids (ATyCon tc) | isAlgTyCon tc = mapCatMaybes dataConWrapId_maybe (tyConDataCons tc)
 implicit_con_ids other       		     = []
 
 other_implicit_ids :: TyThing -> [Id]
-other_implicit_ids (ATyCon tc) = tyConSelIds tc ++ tyConGenIds tc
+other_implicit_ids (ATyCon tc) = tyConSelIds tc
 other_implicit_ids (AClass cl) = classSelIds cl
 other_implicit_ids other       = []
 
@@ -110,7 +109,7 @@ collect_tdefs _ tdefs = tdefs
 make_cdef :: DataCon -> C.Cdef
 make_cdef dcon =  C.Constr dcon_name existentials tys
   where 
-    dcon_name    = make_con_qid (dataConName dcon)
+    dcon_name    = make_var_id (dataConName dcon)
     existentials = map make_tbind ex_tyvars
     ex_tyvars    = dataConExistentialTyVars dcon
     tys 	 = map make_ty (dataConRepArgTys dcon)
@@ -126,7 +125,8 @@ make_vdef b =
   case b of
     NonRec v e -> C.Nonrec (f (v,e))
     Rec ves -> C.Rec (map f ves)
-  where f (v,e) = (make_var_qid (Var.varName v), make_ty (varType v),make_exp e)
+  where f (v,e) = (make_var_id (Var.varName v), make_ty (varType v),make_exp e)
+	-- Top level bindings are unqualified now
 
 make_exp :: CoreExpr -> C.Exp
 make_exp (Var v) =  
@@ -187,7 +187,7 @@ make_ty (ForAllTy tv t) 	 = C.Tforall (make_tbind tv) (make_ty t)
 make_ty (TyConApp tc ts) 	 = foldl C.Tapp (C.Tcon (make_con_qid (tyConName tc))) 
 					 (map make_ty ts)
 -- The special case for newtypes says "do not expand newtypes".
--- Reason: sourceTypeRep does substitution and, while substitution deals
+-- Reason: predTypeRep does substitution and, while substitution deals
 -- 	   correctly with name capture, it's only correct if you see the uniques!
 --	   If you just see occurrence names, name capture may occur.
 -- Example: newtype A a = A (forall b. b -> a)
@@ -198,11 +198,11 @@ make_ty (TyConApp tc ts) 	 = foldl C.Tapp (C.Tcon (make_con_qid (tyConName tc)))
 -- expose the representation in interface files, which definitely isn't right.
 -- Maybe CoreTidy should know whether to expand newtypes or not?
 
-make_ty (SourceTy (NType tc ts)) = foldl C.Tapp (C.Tcon (make_con_qid (tyConName tc))) 
+make_ty (NewTcApp tc ts) = foldl C.Tapp (C.Tcon (make_con_qid (tyConName tc))) 
 					 (map make_ty ts)
 
-make_ty (SourceTy p)		 = make_ty (sourceTypeRep p)
-make_ty (NoteTy _ t) 		 = make_ty t
+make_ty (PredTy p)	= make_ty (predTypeRep p)
+make_ty (NoteTy _ t) 	= make_ty t
 
 
 

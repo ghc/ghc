@@ -11,13 +11,14 @@
 module SrcLoc (
 	SrcLoc,			-- Abstract
 
-	mkSrcLoc, isGoodSrcLoc,	isWiredInLoc,
+	mkSrcLoc, isGoodSrcLoc,	mkGeneralSrcLoc,
 	noSrcLoc, 		-- "I'm sorry, I haven't a clue"
 	advanceSrcLoc,
 
 	importedSrcLoc,		-- Unknown place in an interface
 	wiredInSrcLoc,		-- Something wired into the compiler
 	generatedSrcLoc,	-- Code generated within the compiler
+	interactiveSrcLoc,	-- Code from an interactive session
 
 	srcLocFile,		-- return the file name part
 	srcLocLine,		-- return the line part
@@ -28,7 +29,6 @@ module SrcLoc (
 
 import Util		( thenCmp )
 import Outputable
-import FastString	( unpackFS )
 import FastTypes
 import FastString
 
@@ -45,17 +45,13 @@ We keep information about the {\em definition} point for each entity;
 this is the obvious stuff:
 \begin{code}
 data SrcLoc
-  = WiredInLoc		-- Used exclusively for Ids and TyCons
-			-- that are totally wired in to the
-			-- compiler.  That supports the 
-			-- occasionally-useful predicate
-			-- isWiredInName
-
-  | SrcLoc	FastString	-- A precise location (file name)
+  = SrcLoc	FastString	-- A precise location (file name)
 		FastInt		-- line
 		FastInt		-- column
 
-  | UnhelpfulSrcLoc FastString	-- Just a general indication
+  | ImportedLoc	String		-- Module name
+
+  | UnhelpfulLoc FastString	-- Just a general indication
 
 {-
 data SrcSpan
@@ -86,30 +82,37 @@ rare case.
 Things to make 'em:
 \begin{code}
 mkSrcLoc x line col = SrcLoc x (iUnbox line) (iUnbox col)
-wiredInSrcLoc	  = WiredInLoc
-noSrcLoc	  = UnhelpfulSrcLoc FSLIT("<No locn>")
-importedSrcLoc	  = UnhelpfulSrcLoc FSLIT("<imported>")
-generatedSrcLoc   = UnhelpfulSrcLoc FSLIT("<compiler-generated-code>")
+noSrcLoc	  = UnhelpfulLoc FSLIT("<no locn>")
+generatedSrcLoc   = UnhelpfulLoc FSLIT("<compiler-generated code>")
+wiredInSrcLoc     = UnhelpfulLoc FSLIT("<wired into compiler>")
+interactiveSrcLoc = UnhelpfulLoc FSLIT("<interactive session>")
+
+mkGeneralSrcLoc :: FastString -> SrcLoc
+mkGeneralSrcLoc = UnhelpfulLoc 
+
+importedSrcLoc :: String -> SrcLoc
+importedSrcLoc mod_name = ImportedLoc mod_name
 
 isGoodSrcLoc (SrcLoc _ _ _) = True
-isGoodSrcLoc other        = False
-
-isWiredInLoc WiredInLoc = True
-isWiredInLoc other	= False
+isGoodSrcLoc other          = False
 
 srcLocFile :: SrcLoc -> FastString
 srcLocFile (SrcLoc fname _ _) = fname
+srcLocFile other	      = FSLIT("<unknown file")
 
 srcLocLine :: SrcLoc -> Int
 srcLocLine (SrcLoc _ l c) = iBox l
+srcLocLine other	  = panic "srcLocLine: unknown line"
 
 srcLocCol :: SrcLoc -> Int
 srcLocCol (SrcLoc _ l c) = iBox c
+srcLocCol other	  = panic "srcLocCol: unknown col"
 
 advanceSrcLoc :: SrcLoc -> Char -> SrcLoc
 advanceSrcLoc (SrcLoc f l c) '\t' = SrcLoc f  l (tab c)
 advanceSrcLoc (SrcLoc f l c) '\n' = SrcLoc f  (l +# 1#) 0#
 advanceSrcLoc (SrcLoc f l c) _    = SrcLoc f  l (c +# 1#)
+advanceSrcLoc loc	     _	  = loc	-- Better than nothing
 
 -- Advance to the next tab stop.  Tabs are at column positions 0, 8, 16, etc.
 tab :: FastInt -> FastInt
@@ -132,21 +135,21 @@ instance Eq SrcLoc where
 instance Ord SrcLoc where
   compare = cmpSrcLoc
 
-cmpSrcLoc WiredInLoc WiredInLoc = EQ
-cmpSrcLoc WiredInLoc other      = LT
+cmpSrcLoc (UnhelpfulLoc s1) (UnhelpfulLoc s2) = s1 `compare` s2
+cmpSrcLoc (UnhelpfulLoc _)  other      	      = LT
 
-cmpSrcLoc (UnhelpfulSrcLoc s1) (UnhelpfulSrcLoc s2) = s1 `compare` s2
-cmpSrcLoc (UnhelpfulSrcLoc s1) other		    = GT
+cmpSrcLoc (ImportedLoc _)  (UnhelpfulLoc _)  = GT
+cmpSrcLoc (ImportedLoc m1) (ImportedLoc m2)  = m1 `compare` m2
+cmpSrcLoc (ImportedLoc _)  other	     = LT
 
-cmpSrcLoc (SrcLoc _ _ _) WiredInLoc	     = GT
-cmpSrcLoc (SrcLoc _ _ _) (UnhelpfulSrcLoc _) = LT
 cmpSrcLoc (SrcLoc s1 l1 c1) (SrcLoc s2 l2 c2)      
   = (s1 `compare` s2) `thenCmp` (l1 `cmpline` l2) `thenCmp` (c1 `cmpline` c2)
   where
 	l1 `cmpline` l2 | l1 <#  l2 = LT
 			| l1 ==# l2 = EQ
 			| otherwise = GT 
-					  
+cmpSrcLoc (SrcLoc _ _ _) other = GT
+
 instance Outputable SrcLoc where
     ppr (SrcLoc src_path src_line src_col)
       = getPprStyle $ \ sty ->
@@ -158,10 +161,7 @@ instance Outputable SrcLoc where
 	else
 	   hcat [text "{-# LINE ", int (iBox src_line), space,
 		 char '\"', ftext src_path, text " #-}"]
-      where
-	src_file = unpackFS src_path	-- Leave the directory prefix intact,
-					-- so emacs can find the file
 
-    ppr (UnhelpfulSrcLoc s) = ftext s
-    ppr WiredInLoc	    = ptext SLIT("<Wired in>")
+    ppr (ImportedLoc mod) = ptext SLIT("Imported from") <+> quotes (text mod)
+    ppr (UnhelpfulLoc s)  = ftext s
 \end{code}

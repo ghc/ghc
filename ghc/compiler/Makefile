@@ -232,7 +232,7 @@ CLEAN_FILES += $(CONFIG_HS)
 ALL_DIRS = \
   utils basicTypes types hsSyn prelude rename typecheck deSugar coreSyn \
   specialise simplCore stranal stgSyn simplStg codeGen absCSyn main \
-  profiling parser cprAnalysis compMan ndpFlatten cbits
+  profiling parser cprAnalysis compMan ndpFlatten cbits iface
 
 # Make sure we include Config.hs even if it doesn't exist yet...
 ALL_SRCS += $(CONFIG_HS)
@@ -345,7 +345,9 @@ endif
 #	The standard suffix rule for compiling a Haskell file
 #	adds these flags to the command line
 
-prelude/PrimOp_HC_OPTS 		= -no-recomp -H80m
+# There used to be a -no-recomp flag on PrimOp, but why?
+# It's an expensive module to recompile!
+prelude/PrimOp_HC_OPTS 		= -H80m
 
 # because the NCG can't handle the 64-bit math in here
 prelude/PrelRules_HC_OPTS	= -fvia-C

@@ -65,7 +65,7 @@ import FastString
 import GLAEXTS
 import TRACE		( trace )
 
-import Maybe		( catMaybes )
+import Maybes		( mapCatMaybes )
 \end{code}
 
 \begin{code}
@@ -116,7 +116,7 @@ save_cands    = [BaseReg,Sp,SpLim,Hp,HpLim]
 restore_cands = save_cands
 
 volatileSavesOrRestores do_saves vols
-   = catMaybes (map mkCode vols)
+   = mapCatMaybes mkCode vols
      where
         mkCode mid
            | case mid of { BaseReg -> True; _ -> False } 

@@ -56,8 +56,8 @@ module Module
     , moduleString		-- :: Module -> EncodedString
     , moduleUserString		-- :: Module -> UserString
 
+    , mkModule
     , mkBasePkgModule		-- :: UserString -> Module
-    , mkThPkgModule		-- :: UserString -> Module
     , mkHomeModule		-- :: ModuleName -> Module
     , isHomeModule		-- :: Module -> Bool
     , mkPackageModule		-- :: ModuleName -> Module
@@ -83,9 +83,8 @@ module Module
 #include "HsVersions.h"
 import OccName
 import Outputable
-import Packages		( PackageName, basePackage, thPackage )
+import Packages		( PackageName, basePackage )
 import CmdLineOpts	( opt_InPackage )
-import FastString	( FastString )
 import Unique		( Uniquable(..) )
 import Maybes		( expectJust )
 import UniqFM
@@ -270,21 +269,16 @@ pprModule (Module mod p) = getPprStyle $ \ sty ->
 
 
 \begin{code}
-mkBasePkgModule :: ModuleName -> Module
-mkBasePkgModule mod_nm
-  = Module mod_nm pack_info
+mkModule :: PackageName -> ModuleName -> Module
+mkModule pkg_name mod_name 
+  = Module mod_name pkg_info
   where
-    pack_info
-      | opt_InPackage == basePackage = ThisPackage
-      | otherwise		     = AnotherPackage
+    pkg_info
+      | opt_InPackage == pkg_name = ThisPackage
+      | otherwise		  = AnotherPackage
 
-mkThPkgModule :: ModuleName -> Module
-mkThPkgModule mod_nm
-  = Module mod_nm pack_info
-  where
-    pack_info
-      | opt_InPackage == thPackage = ThisPackage
-      | otherwise		   = AnotherPackage
+mkBasePkgModule :: ModuleName -> Module
+mkBasePkgModule mod_nm = mkModule basePackage mod_nm
 
 mkHomeModule :: ModuleName -> Module
 mkHomeModule mod_nm = Module mod_nm ThisPackage

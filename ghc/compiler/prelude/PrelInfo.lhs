@@ -5,12 +5,11 @@
 
 \begin{code}
 module PrelInfo (
-	module PrelNames,
 	module MkId,
 
-	wiredInThingEnv,
 	ghcPrimExports,
-	knownKeyNames,
+	wiredInThings, basicKnownKeyNames,
+	primOpId,
 	
 	-- Random other things
 	maybeCharLikeCon, maybeIntLikeCon,
@@ -26,28 +25,22 @@ import PrelNames	( basicKnownKeyNames,
 			  hasKey, charDataConKey, intDataConKey,
 			  numericClassKeys, standardClassKeys,
 			  noDictClassKeys )
-#ifdef GHCI
-import DsMeta		( templateHaskellNames )
-import NameSet		( nameSetToList )
-#endif
 
-import PrimOp		( allThePrimOps, primOpOcc )
+import PrimOp		( PrimOp, allThePrimOps, primOpOcc, primOpTag, maxPrimOpTag )
 import DataCon		( DataCon )
-import Id		( idName )
+import Id		( Id, idName )
 import MkId		( mkPrimOpId, wiredInIds )
 import MkId		-- All of it, for re-export
-import Name		( Name, nameOccName, NamedThing(..) )
-import RdrName		( mkRdrUnqual )
-import HsSyn		( HsTyVarBndr(..) )
-import OccName		( mkVarOcc )
+import Name		( nameOccName )
 import TysPrim		( primTyCons )
 import TysWiredIn	( wiredInTyCons )
-import HscTypes 	( TyThing(..), implicitTyThings, TypeEnv, mkTypeEnv,
-			  GenAvailInfo(..), RdrAvailInfo )
-import Class	 	( Class, classKey, className )
-import Type		( funTyCon, openTypeKind, liftedTypeKind )
+import HscTypes 	( TyThing(..), implicitTyThings, GenAvailInfo(..), RdrAvailInfo )
+import Class	 	( Class, classKey )
+import Type		( funTyCon )
 import TyCon		( tyConName )
 import Util		( isIn )
+
+import Array		( Array, array, (!) )
 \end{code}
 
 %************************************************************************
@@ -61,11 +54,11 @@ We have two ``builtin name funs,'' one to look up @TyCons@ and
 
 \begin{code}
 wiredInThings :: [TyThing]
-wiredInThings
+wiredInThings		
   = concat
     [		-- Wired in TyCons and their implicit Ids
 	  tycon_things
-	, implicitTyThings tycon_things
+	, concatMap implicitTyThings tycon_things
 
 		-- Wired in Ids
 	, map AnId wiredInIds
@@ -75,22 +68,27 @@ wiredInThings
     ]
   where
     tycon_things = map ATyCon ([funTyCon] ++ primTyCons ++ wiredInTyCons)
-
-wiredInThingEnv :: TypeEnv
-wiredInThingEnv = mkTypeEnv wiredInThings
-
-knownKeyNames :: [Name]
-knownKeyNames 
-  = map getName wiredInThings 
-    ++ basicKnownKeyNames
-#ifdef GHCI
-    ++ nameSetToList templateHaskellNames
-#endif
 \end{code}
 
 We let a lot of "non-standard" values be visible, so that we can make
 sense of them in interface pragmas. It's cool, though they all have
 "non-standard" names, so they won't get past the parser in user code.
+
+%************************************************************************
+%*									*
+		PrimOpIds
+%*									*
+%************************************************************************
+
+\begin{code}
+primOpIds :: Array Int Id	-- Indexed by PrimOp tag
+primOpIds = array (1,maxPrimOpTag) [ (primOpTag op, mkPrimOpId op) 
+				   | op <- allThePrimOps]
+
+primOpId :: PrimOp -> Id
+primOpId op = primOpIds ! primOpTag op
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -108,10 +106,6 @@ ghcPrimExports :: [RdrAvailInfo]
    [ AvailTC occ [occ] |
      n <- funTyCon : primTyCons, let occ = nameOccName (tyConName n) 
    ]
-
-alpha = mkRdrUnqual (mkVarOcc FSLIT("a"))
-openAlpha = IfaceTyVar alpha openTypeKind
-liftedAlpha = IfaceTyVar alpha liftedTypeKind
 \end{code}
 
 

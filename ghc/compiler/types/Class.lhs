@@ -57,15 +57,14 @@ data Class
 type FunDep a	  = ([a],[a])	--  e.g. class C a b c |  a b -> c, a c -> b  where ...
 				--  Here fun-deps are [([a,b],[c]), ([a,c],[b])]
 
-type ClassOpItem = (Id, DefMeth Name)
+type ClassOpItem = (Id, DefMeth)
 	-- Selector function; contains unfolding
 	-- Default-method info
 
-data DefMeth id = NoDefMeth 		-- No default method
-	        | DefMeth id 		-- A polymorphic default method (named id)
-					-- 	(Only instantiated to RdrName and Name, never Id)
-	        | GenDefMeth 		-- A generic default method
-                deriving Eq  
+data DefMeth = NoDefMeth 		-- No default method
+	     | DefMeth  		-- A polymorphic default method
+	     | GenDefMeth 		-- A generic default method
+             deriving Eq  
 \end{code}
 
 The @mkClass@ function fills in the indirect superclasses.
@@ -155,6 +154,11 @@ instance Outputable Class where
 
 instance Show Class where
     showsPrec p c = showsPrecSDoc p (ppr c)
+
+instance Outputable DefMeth where
+    ppr DefMeth     =  text "{- has default method -}"
+    ppr GenDefMeth  =  text "{- has generic method -}"
+    ppr NoDefMeth   =  empty   -- No default method
 \end{code}
 
 

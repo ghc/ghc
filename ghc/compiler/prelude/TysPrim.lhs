@@ -45,18 +45,19 @@ module TysPrim(
 #include "HsVersions.h"
 
 import Var		( TyVar, mkTyVar )
-import Name		( Name, mkInternalName )
-import OccName		( mkVarOcc )
+import Name		( Name, mkInternalName, mkWiredInName )
+import OccName		( mkVarOcc, mkOccFS, tcName )
 import PrimRep		( PrimRep(..) )
 import TyCon		( TyCon, ArgVrcs, mkPrimTyCon, mkLiftedPrimTyCon )
 import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
 			  unliftedTypeKind, liftedTypeKind, openTypeKind, 
-			  Kind, mkArrowKinds
+			  Kind, mkArrowKinds,
+			  TyThing(..)
 			)
 import SrcLoc		( noSrcLoc )
 import Unique		( mkAlphaTyVarUnique )
 import PrelNames
-import FastString	( mkFastString )
+import FastString	( FastString, mkFastString )
 import Outputable
 
 import Char 		( ord, chr )
@@ -96,8 +97,39 @@ primTyCons
     , word32PrimTyCon
     , word64PrimTyCon
     ]
-\end{code}
 
+mkPrimTc :: FastString -> Unique -> TyCon -> Name
+mkPrimTc fs uniq tycon
+  = mkWiredInName gHC_PRIM (mkOccFS tcName fs) 
+		  uniq
+		  Nothing 		-- No parent object
+		  (ATyCon tycon)	-- Relevant TyCon
+
+charPrimTyConName    	      = mkPrimTc FSLIT("Char#") charPrimTyConKey charPrimTyCon
+intPrimTyConName     	      = mkPrimTc FSLIT("Int#") intPrimTyConKey  intPrimTyCon
+int32PrimTyConName	      = mkPrimTc FSLIT("Int32#") int32PrimTyConKey int32PrimTyCon
+int64PrimTyConName   	      = mkPrimTc FSLIT("Int64#") int64PrimTyConKey int64PrimTyCon
+wordPrimTyConName    	      = mkPrimTc FSLIT("Word#") wordPrimTyConKey wordPrimTyCon
+word32PrimTyConName  	      = mkPrimTc FSLIT("Word32#") word32PrimTyConKey word32PrimTyCon
+word64PrimTyConName  	      = mkPrimTc FSLIT("Word64#") word64PrimTyConKey word64PrimTyCon
+addrPrimTyConName    	      = mkPrimTc FSLIT("Addr#") addrPrimTyConKey addrPrimTyCon
+floatPrimTyConName   	      = mkPrimTc FSLIT("Float#") floatPrimTyConKey floatPrimTyCon
+doublePrimTyConName  	      = mkPrimTc FSLIT("Double#") doublePrimTyConKey doublePrimTyCon
+statePrimTyConName   	      = mkPrimTc FSLIT("State#") statePrimTyConKey statePrimTyCon
+realWorldTyConName   	      = mkPrimTc FSLIT("RealWorld") realWorldTyConKey realWorldTyCon
+arrayPrimTyConName   	      = mkPrimTc FSLIT("Array#") arrayPrimTyConKey arrayPrimTyCon
+byteArrayPrimTyConName	      = mkPrimTc FSLIT("ByteArray#") byteArrayPrimTyConKey byteArrayPrimTyCon
+mutableArrayPrimTyConName     = mkPrimTc FSLIT("MutableArray#") mutableArrayPrimTyConKey mutableArrayPrimTyCon
+mutableByteArrayPrimTyConName = mkPrimTc FSLIT("MutableByteArray#") mutableByteArrayPrimTyConKey mutableByteArrayPrimTyCon
+mutVarPrimTyConName	      = mkPrimTc FSLIT("MutVar#") mutVarPrimTyConKey mutVarPrimTyCon
+mVarPrimTyConName	      = mkPrimTc FSLIT("MVar#") mVarPrimTyConKey mVarPrimTyCon
+stablePtrPrimTyConName        = mkPrimTc FSLIT("StablePtr#") stablePtrPrimTyConKey stablePtrPrimTyCon
+stableNamePrimTyConName       = mkPrimTc FSLIT("StableName#") stableNamePrimTyConKey stableNamePrimTyCon
+foreignObjPrimTyConName       = mkPrimTc FSLIT("ForeignObj#") foreignObjPrimTyConKey foreignObjPrimTyCon
+bcoPrimTyConName 	      = mkPrimTc FSLIT("BCO#") bcoPrimTyConKey bcoPrimTyCon
+weakPrimTyConName  	      = mkPrimTc FSLIT("Weak#") weakPrimTyConKey weakPrimTyCon
+threadIdPrimTyConName  	      = mkPrimTc FSLIT("ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
+\end{code}
 
 %************************************************************************
 %*									*

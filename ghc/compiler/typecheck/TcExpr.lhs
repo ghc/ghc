@@ -11,16 +11,16 @@ module TcExpr ( tcCheckSigma, tcCheckRho, tcInferRho, tcMonoExpr ) where
 #ifdef GHCI 	/* Only if bootstrapped */
 import {-# SOURCE #-}	TcSplice( tcSpliceExpr, tcBracket )
 import HsSyn		( HsReify(..), ReifyFlavour(..) )
+import Id		( Id )
 import TcType		( isTauTy )
-import TcEnv		( bracketOK, tcMetaTy, checkWellStaged )
-import Name		( isExternalName )
+import TcEnv		( tcMetaTy, checkWellStaged )
 import qualified DsMeta
 #endif
 
 import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), recBindFields,
 			  HsMatchContext(..) )
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
-import TcHsSyn		( TcExpr, TcRecordBinds, hsLitType, mkHsDictApp, mkHsTyApp, mkHsLet, (<$>) )
+import TcHsSyn		( TcExpr, TcRecordBinds, hsLitType, mkHsDictApp, mkHsTyApp, (<$>) )
 import TcRnMonad
 import TcUnify		( Expected(..), newHole, zapExpectedType, zapExpectedTo, tcSubExp, tcGen,
 			  unifyFunTy, zapToListTy, zapToPArrTy, zapToTupleTy )
@@ -31,25 +31,24 @@ import Inst		( InstOrigin(..),
 			  instToId, tcInstCall, tcInstDataCon
 			)
 import TcBinds		( tcBindsAndThen )
-import TcEnv		( tcLookupClass, tcLookupGlobal_maybe, tcLookup,
-			  tcLookupTyCon, tcLookupDataCon, tcLookupId, checkProcLevel
+import TcEnv		( tcLookup, tcLookupGlobalId, 
+			  tcLookupDataCon, tcLookupId, checkProcLevel
 			)
 import TcArrows		( tcProc )
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts, tcThingWithSig, TcMatchCtxt(..) )
-import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
+import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
 import TcPat		( badFieldCon )
-import TcMType		( tcInstTyVars, tcInstType, newTyVarTy, newTyVarTys, zonkTcType )
+import TcMType		( tcInstTyVars, tcInstType, newTyVarTy, zonkTcType )
 import TcType		( TcType, TcSigmaType, TcRhoType, TyVarDetails(VanillaTv),
 			  tcSplitFunTys, tcSplitTyConApp, mkTyVarTys,
 			  isSigmaTy, mkFunTy, mkFunTys,
-			  mkTyConApp, mkClassPred, 
-			  tyVarsOfTypes, isLinearPred,
+			  mkTyConApp, tyVarsOfTypes, isLinearPred,
 			  liftedTypeKind, openTypeKind, 
 			  tcSplitSigmaTy, tidyOpenType
 			)
 import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType, fieldLabelTyCon )
-import Id		( Id, idType, recordSelectorFieldLabel, isRecordSelector )
-import DataCon		( DataCon, dataConFieldLabels, dataConSig, dataConStrictMarks, dataConWrapId )
+import Id		( idType, recordSelectorFieldLabel, isRecordSelector )
+import DataCon		( DataCon, dataConFieldLabels, dataConStrictMarks, dataConWrapId )
 import Name		( Name )
 import TyCon		( TyCon, tyConTyVars, tyConTheta, isAlgTyCon, tyConDataCons )
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
@@ -57,8 +56,7 @@ import VarSet		( emptyVarSet, elemVarSet )
 import TysWiredIn	( boolTy )
 import PrelNames	( enumFromName, enumFromThenName, 
 			  enumFromToName, enumFromThenToName,
-			  enumFromToPName, enumFromThenToPName,
-			  ioTyConName
+			  enumFromToPName, enumFromThenToPName
 			)
 import ListSetOps	( minusList )
 import CmdLineOpts
@@ -388,14 +386,14 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
     let 
 	field_names = recBindFields rbinds
     in
-    mappM tcLookupGlobal_maybe field_names		`thenM` \ maybe_sel_ids ->
+    mappM tcLookupGlobalId field_names		`thenM` \ sel_ids ->
+	-- The renamer has already checked that they
+	-- are all in scope
     let
 	bad_guys = [ addErrTc (notSelector field_name) 
-		   | (field_name, maybe_sel_id) <- field_names `zip` maybe_sel_ids,
-		     not (is_selector maybe_sel_id)
+		   | (field_name, sel_id) <- field_names `zip` sel_ids,
+		     not (isRecordSelector sel_id) 	-- Excludes class ops
 		   ]
-	is_selector (Just (AnId sel_id)) = isRecordSelector sel_id	-- Excludes class ops
-	is_selector other 		 = False	
     in
     checkM (null bad_guys) (sequenceM bad_guys `thenM_` failM)	`thenM_`
     
@@ -403,7 +401,7 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
 	-- Figure out the tycon and data cons from the first field name
     let
 		-- It's OK to use the non-tc splitters here (for a selector)
-	(Just (AnId sel_id) : _) = maybe_sel_ids
+	sel_id : _   = sel_ids
 	field_lbl    = recordSelectorFieldLabel sel_id	-- We've failed already if
 	tycon	     = fieldLabelTyCon field_lbl	-- it's not a field label
 	data_cons    = tyConDataCons tycon
@@ -731,15 +729,15 @@ tcId name	-- Look up the Id and instantiate its type
   = 	-- First check whether it's a DataCon
 	-- Reason: we must not forget to chuck in the
 	--	   constraints from their "silly context"
-    tcLookup name		`thenM` \ maybe_thing ->
-    case maybe_thing of {
+    tcLookup name		`thenM` \ thing ->
+    case thing of {
 	AGlobal (ADataCon data_con)  -> inst_data_con data_con 
     ;	AGlobal (AnId id)	     -> loop (HsVar id) (idType id)
 		-- A global cannot possibly be ill-staged
 		-- nor does it need the 'lifting' treatment
 
     ;	ATcId id th_level proc_level -> tc_local_id id th_level proc_level
-    ;	other 			     -> pprPanic "tcId" (ppr name)
+    ;	other 			     -> pprPanic "tcId" (ppr name $$ ppr thing)
     }
   where
 
@@ -931,10 +929,7 @@ checkMissingFields data_con rbinds
 			  field_labels
 	  		  field_strs
 
-    field_strs = dropList ex_theta (dataConStrictMarks data_con)
-	-- The 'drop' is because dataConStrictMarks
-	-- includes the existential dictionaries
-    (_, _, _, ex_theta, _, _) = dataConSig data_con
+    field_strs = dataConStrictMarks data_con
 \end{code}
 
 %************************************************************************
@@ -1019,11 +1014,6 @@ appCtxt fun args
   where
     the_app = foldl HsApp fun args	-- Used in error messages
 
-lurkingRank2Err fun fun_ty
-  = hang (hsep [ptext SLIT("Illegal use of"), quotes (ppr fun)])
-	 4 (vcat [ptext SLIT("It is applied to too few arguments"),  
-		  ptext SLIT("so that the result type has for-alls in it:") <+> ppr fun_ty])
-
 badFieldsUpd rbinds
   = hang (ptext SLIT("No constructor has all these fields:"))
 	 4 (pprQuotedList (recBindFields rbinds))
@@ -1050,10 +1040,6 @@ missingFields con fields
   = ptext SLIT("Fields of") <+> quotes (ppr con) <+> ptext SLIT("not initialised:") 
 	<+> pprWithCommas ppr fields
 
-polySpliceErr :: Id -> SDoc
-polySpliceErr id
-  = ptext SLIT("Can't splice the polymorphic local variable") <+> quotes (ppr id)
-
 wrongArgsCtxt too_many_or_few fun args
   = hang (ptext SLIT("Probable cause:") <+> quotes (ppr fun)
 		    <+> ptext SLIT("is applied to") <+> text too_many_or_few 
@@ -1061,4 +1047,10 @@ wrongArgsCtxt too_many_or_few fun args
 	 4 (parens (ppr the_app))
   where
     the_app = foldl HsApp fun args	-- Used in error messages
+
+#ifdef GHCI
+polySpliceErr :: Id -> SDoc
+polySpliceErr id
+  = ptext SLIT("Can't splice the polymorphic local variable") <+> quotes (ppr id)
+#endif
 \end{code}

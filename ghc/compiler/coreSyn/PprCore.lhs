@@ -258,8 +258,6 @@ ppr_case_pat con args
 
 pprArg (Type ty) = ptext SLIT("@") <+> pprParendType ty
 pprArg expr      = pprParendExpr expr
-
-arrow = ptext SLIT("->")
 \end{code}
 
 Other printing bits-and-bobs used with the general @pprCoreBinding@

@@ -14,7 +14,7 @@ module TcMType (
   newTyVar, newSigTyVar,
   newTyVarTy,		-- Kind -> TcM TcType
   newTyVarTys,		-- Int -> Kind -> TcM [TcType]
-  newKindVar, newKindVars, newOpenTypeKind,
+  newKindVar, newKindVars, newBoxityVar,
   putTcTyVar, getTcTyVar,
   newMutTyVar, readMutTyVar, writeMutTyVar, 
 
@@ -25,17 +25,17 @@ module TcMType (
   --------------------------------
   -- Checking type validity
   Rank, UserTypeCtxt(..), checkValidType, pprUserTypeCtxt,
-  SourceTyCtxt(..), checkValidTheta, 
-  checkValidTyCon, checkValidClass, 
+  SourceTyCtxt(..), checkValidTheta, checkFreeness,
   checkValidInstHead, instTypeErr, checkAmbiguity,
-  arityErr,
+  arityErr, 
 
   --------------------------------
   -- Zonking
   zonkType,
   zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, 
   zonkTcType, zonkTcTypes, zonkTcClassConstraints, zonkTcThetaType,
-  zonkTcPredType, zonkTcTyVarToTyVar, zonkKindEnv,
+  zonkTcPredType, zonkTcTyVarToTyVar, 
+  zonkTcKindToKind
 
   ) where
 
@@ -43,48 +43,41 @@ module TcMType (
 
 
 -- friends:
-import TypeRep		( Type(..), SourceType(..), TyNote(..),	 -- Friend; can see representation
-			  Kind, ThetaType, typeCon
+import TypeRep		( Type(..), PredType(..), TyNote(..),	 -- Friend; can see representation
+			  Kind, ThetaType
 			) 
 import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  TcTyVarSet, TcKind, TcTyVar, TyVarDetails(..),
 			  tcEqType, tcCmpPred, isClassPred,
 			  tcSplitPhiTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
 			  tcSplitTyConApp_maybe, tcSplitForAllTys,
-			  tcIsTyVarTy, tcSplitSigmaTy, mkTyConApp,
+			  tcIsTyVarTy, tcSplitSigmaTy, 
 			  isUnLiftedType, isIPPred, isTyVarTy,
 
 			  mkAppTy, mkTyVarTy, mkTyVarTys, 
 			  tyVarsOfPred, getClassPredTys_maybe,
 
-			  liftedTypeKind, openTypeKind, defaultKind, superKind,
+			  liftedTypeKind, defaultKind, superKind,
 			  superBoxity, liftedBoxity, typeKind,
 			  tyVarsOfType, tyVarsOfTypes, 
 			  eqKind, isTypeKind, 
-			  isFFIArgumentTy, isFFIImportResultTy
 			)
 import Subst		( Subst, mkTopTyVarSubst, substTy )
-import Class		( Class, DefMeth(..), classArity, className, classBigSig )
+import Class		( Class, classArity, className )
 import TyCon		( TyCon, isSynTyCon, isUnboxedTupleTyCon, 
-			  tyConArity, tyConName, tyConTheta, 
-			  getSynTyConDefn, tyConDataCons )
-import DataCon		( DataCon, dataConWrapId, dataConName, dataConSig, dataConFieldLabels )
-import FieldLabel	( fieldLabelName, fieldLabelType )
-import Var		( TyVar, idType, idName, tyVarKind, tyVarName, isTyVar, 
+			  tyConArity, tyConName )
+import Var		( TyVar, tyVarKind, tyVarName, isTyVar, 
 			  mkTyVar, mkMutTyVar, isMutTyVar, mutTyVarRef )
 
 -- others:
-import Generics		( validGenericMethodType )
 import TcRnMonad          -- TcType, amongst others
-import PrelNames	( hasKey )
-import ForeignCall	( Safety(..) )
 import FunDeps		( grow )
-import PprType		( pprPred, pprSourceType, pprTheta, pprClassPred )
+import PprType		( pprPred, pprTheta, pprClassPred )
 import Name		( Name, setNameUnique, mkSystemTvNameEncoded )
 import VarSet
 import CmdLineOpts	( dopt, DynFlag(..) )
-import Util		( nOfThem, isSingleton, equalLength, notNull, lengthExceeds )
-import ListSetOps	( equivClasses, removeDups )
+import Util		( nOfThem, isSingleton, equalLength, notNull )
+import ListSetOps	( removeDups )
 import Outputable
 \end{code}
 
@@ -134,11 +127,11 @@ newKindVar
 newKindVars :: Int -> TcM [TcKind]
 newKindVars n = mappM (\ _ -> newKindVar) (nOfThem n ())
 
-newOpenTypeKind :: TcM TcKind	-- Returns the kind (Type bx), where bx is fresh
-newOpenTypeKind
-  = newUnique 							  `thenM` \ uniq ->
-    newMutTyVar (mkSystemTvNameEncoded uniq FSLIT("bx")) superBoxity VanillaTv  `thenM` \ kv ->
-    returnM (mkTyConApp typeCon [TyVarTy kv])
+newBoxityVar :: TcM TcKind	-- Really TcBoxity
+  = newUnique 						  `thenM` \ uniq ->
+    newMutTyVar (mkSystemTvNameEncoded uniq FSLIT("bx")) 
+		superBoxity VanillaTv			  `thenM` \ kv ->
+    returnM (TyVarTy kv)
 \end{code}
 
 
@@ -319,19 +312,17 @@ zonkTcPredType (IParam n t)
 		     are used at the end of type checking
 
 \begin{code}
-zonkKindEnv :: [(Name, TcKind)] -> TcM [(Name, Kind)]
-zonkKindEnv pairs 
-  = mappM zonk_it pairs
- where
-    zonk_it (name, tc_kind) = zonkType zonk_unbound_kind_var tc_kind `thenM` \ kind ->
-			      returnM (name, kind)
-
+zonkTcKindToKind :: TcKind -> TcM Kind
+zonkTcKindToKind tc_kind 
+  = zonkType zonk_unbound_kind_var tc_kind
+  where
 	-- When zonking a kind, we want to
 	--	zonk a *kind* variable to (Type *)
 	--	zonk a *boxity* variable to *
-    zonk_unbound_kind_var kv | tyVarKind kv `eqKind` superKind   = putTcTyVar kv liftedTypeKind
-			     | tyVarKind kv `eqKind` superBoxity = putTcTyVar kv liftedBoxity
-			     | otherwise		 	 = pprPanic "zonkKindEnv" (ppr kv)
+    zonk_unbound_kind_var kv 
+	| tyVarKind kv `eqKind` superKind   = putTcTyVar kv liftedTypeKind
+	| tyVarKind kv `eqKind` superBoxity = putTcTyVar kv liftedBoxity
+	| otherwise		 	    = pprPanic "zonkKindEnv" (ppr kv)
 			
 -- zonkTcTyVarToTyVar is applied to the *binding* occurrence 
 -- of a type variable, at the *end* of type checking.  It changes
@@ -421,14 +412,17 @@ zonkType unbound_var_fn ty
     go (TyConApp tycon tys)	  = mappM go tys	`thenM` \ tys' ->
 				    returnM (TyConApp tycon tys')
 
+    go (NewTcApp tycon tys)	  = mappM go tys	`thenM` \ tys' ->
+				    returnM (NewTcApp tycon tys')
+
     go (NoteTy (SynNote ty1) ty2) = go ty1		`thenM` \ ty1' ->
 				    go ty2		`thenM` \ ty2' ->
 				    returnM (NoteTy (SynNote ty1') ty2')
 
     go (NoteTy (FTVNote _) ty2)   = go ty2	-- Discard free-tyvar annotations
 
-    go (SourceTy p)		  = go_pred p		`thenM` \ p' ->
-				    returnM (SourceTy p')
+    go (PredTy p)		  = go_pred p		`thenM` \ p' ->
+				    returnM (PredTy p')
 
     go (FunTy arg res)      	  = go arg		`thenM` \ arg' ->
 				    go res		`thenM` \ res' ->
@@ -450,8 +444,6 @@ zonkType unbound_var_fn ty
 
     go_pred (ClassP c tys) = mappM go tys	`thenM` \ tys' ->
 			     returnM (ClassP c tys')
-    go_pred (NType tc tys) = mappM go tys	`thenM` \ tys' ->
-			     returnM (NType tc tys')
     go_pred (IParam n ty)  = go ty		`thenM` \ ty' ->
 			     returnM (IParam n ty')
 
@@ -521,6 +513,7 @@ data UserTypeCtxt
 			-- 	f x :: t = ....
   | ForSigCtxt Name	-- Foreign inport or export signature
   | RuleSigCtxt Name 	-- Signature on a forall'd variable in a RULE
+  | DefaultDeclCtxt	-- Types in a default declaration
 
 -- Notes re TySynCtxt
 -- We allow type synonyms that aren't types; e.g.  type List = []
@@ -542,19 +535,22 @@ pprUserTypeCtxt PatSigCtxt     	= ptext SLIT("a pattern type signature")
 pprUserTypeCtxt ResSigCtxt     	= ptext SLIT("a result type signature")
 pprUserTypeCtxt (ForSigCtxt n) 	= ptext SLIT("the foreign signature for") <+> quotes (ppr n)
 pprUserTypeCtxt (RuleSigCtxt n) = ptext SLIT("the type signature on") <+> quotes (ppr n)
+pprUserTypeCtxt DefaultDeclCtxt = ptext SLIT("a `default' declaration")
 \end{code}
 
 \begin{code}
 checkValidType :: UserTypeCtxt -> Type -> TcM ()
 -- Checks that the type is valid for the given context
 checkValidType ctxt ty
-  = doptM Opt_GlasgowExts	`thenM` \ gla_exts ->
+  = traceTc (text "checkValidType" <+> ppr ty)	`thenM_`
+    doptM Opt_GlasgowExts	`thenM` \ gla_exts ->
     let 
 	rank | gla_exts = Arbitrary
 	     | otherwise
 	     = case ctxt of	-- Haskell 98
 		 GenPatCtxt	-> Rank 0
 		 PatSigCtxt	-> Rank 0
+		 DefaultDeclCtxt-> Rank 0
 		 ResSigCtxt	-> Rank 0
 		 TySynCtxt _    -> Rank 0
 		 ExprSigCtxt 	-> Rank 1
@@ -582,31 +578,13 @@ checkValidType ctxt ty
 		-- but for type synonyms we allow them even at
 		-- top level
     in
-    addErrCtxt (checkTypeCtxt ctxt ty)	$
-
 	-- Check that the thing has kind Type, and is lifted if necessary
     checkTc kind_ok (kindErr actual_kind)	`thenM_`
 
 	-- Check the internal validity of the type itself
-    check_poly_type rank ubx_tup ty
+    check_poly_type rank ubx_tup ty		`thenM_`
 
-
-checkTypeCtxt ctxt ty
-  = vcat [ptext SLIT("In the type:") <+> ppr_ty ty,
-	  ptext SLIT("While checking") <+> pprUserTypeCtxt ctxt ]
-
-	-- Hack alert.  If there are no tyvars, (ppr sigma_ty) will print
-	-- something strange like {Eq k} -> k -> k, because there is no
-	-- ForAll at the top of the type.  Since this is going to the user
-	-- we want it to look like a proper Haskell type even then; hence the hack
-	-- 
-	-- This shows up in the complaint about
-	--	case C a where
-	--	  op :: Eq a => a -> a
-ppr_ty ty | null forall_tvs && notNull theta = pprTheta theta <+> ptext SLIT("=>") <+> ppr tau
-          | otherwise	 		     = ppr ty
-          where
-	    (forall_tvs, theta, tau) = tcSplitSigmaTy ty
+    traceTc (text "checkValidType done" <+> ppr ty)
 \end{code}
 
 
@@ -665,7 +643,7 @@ check_tau_type :: Rank -> UbxTupFlag -> Type -> TcM ()
 -- No foralls otherwise
 
 check_tau_type rank ubx_tup ty@(ForAllTy _ _) = failWithTc (forAllTyErr ty)
-check_tau_type rank ubx_tup (SourceTy sty)    = getDOpts		`thenM` \ dflags ->
+check_tau_type rank ubx_tup (PredTy sty)    = getDOpts		`thenM` \ dflags ->
 						check_source_ty dflags TypeCtxt sty
 check_tau_type rank ubx_tup (TyVarTy _)       = returnM ()
 check_tau_type rank ubx_tup ty@(FunTy arg_ty res_ty)
@@ -701,6 +679,9 @@ check_tau_type rank ubx_tup (NoteTy (SynNote syn) ty)
 check_tau_type rank ubx_tup (NoteTy other_note ty)
   = check_tau_type rank ubx_tup ty
 
+check_tau_type rank ubx_tup (NewTcApp tc tys)
+  = mappM_ check_arg_type tys
+
 check_tau_type rank ubx_tup ty@(TyConApp tc tys)
   | isSynTyCon tc	
   = 	-- NB: Type.mkSynTy builds a TyConApp (not a NoteTy) for an unsaturated
@@ -734,9 +715,9 @@ check_tau_type rank ubx_tup ty@(TyConApp tc tys)
     ubx_tup_msg = ubxArgTyErr ty
 
 ----------------------------------------
-forAllTyErr     ty = ptext SLIT("Illegal polymorphic type:") <+> ppr_ty ty
-unliftedArgErr  ty = ptext SLIT("Illegal unlifted type argument:") <+> ppr_ty ty
-ubxArgTyErr     ty = ptext SLIT("Illegal unboxed tuple type as function argument:") <+> ppr_ty ty
+forAllTyErr     ty = ptext SLIT("Illegal polymorphic type:") <+> ppr ty
+unliftedArgErr  ty = ptext SLIT("Illegal unlifted type argument:") <+> ppr ty
+ubxArgTyErr     ty = ptext SLIT("Illegal unboxed tuple type as function argument:") <+> ppr ty
 kindErr kind       = ptext SLIT("Expecting an ordinary type, but found a type of kind") <+> ppr kind
 \end{code}
 
@@ -789,7 +770,7 @@ check_valid_theta ctxt theta
   = getDOpts					`thenM` \ dflags ->
     warnTc (notNull dups) (dupPredWarn dups)	`thenM_`
 	-- Actually, in instance decls and type signatures, 
-	-- duplicate constraints are eliminated by TcMonoType.hoistForAllTys,
+	-- duplicate constraints are eliminated by TcHsType.hoistForAllTys,
 	-- so this error can only fire for the context of a class or
 	-- data type decl.
     mappM_ (check_source_ty dflags ctxt) theta
@@ -799,8 +780,10 @@ check_valid_theta ctxt theta
 -------------------------
 check_source_ty dflags ctxt pred@(ClassP cls tys)
   = 	-- Class predicates are valid in all contexts
-    mappM_ check_arg_type tys		`thenM_`
     checkTc (arity == n_tys) arity_err		`thenM_`
+
+	-- Check the form of the argument types
+    mappM_ check_arg_type tys				`thenM_`
     checkTc (check_class_pred_tys dflags ctxt tys)
 	    (predTyVarErr pred $$ how_to_allow)
 
@@ -824,8 +807,6 @@ check_source_ty dflags SigmaCtxt (IParam _ ty) = check_arg_type ty
 	-- discharge all the potential usas of the ?x in e.   For example, a
 	-- constraint Foo [Int] might come out of e,and applying the
 	-- instance decl would show up two uses of ?x.
-
-check_source_ty dflags TypeCtxt  (NType tc tys)   = mappM_ check_arg_type tys
 
 -- Catch-all
 check_source_ty dflags ctxt sty = failWithTc (badSourceTyErr sty)
@@ -931,7 +912,7 @@ checkThetaCtxt ctxt theta
   = vcat [ptext SLIT("In the context:") <+> pprTheta theta,
 	  ptext SLIT("While checking") <+> pprSourceTyCtxt ctxt ]
 
-badSourceTyErr sty = ptext SLIT("Illegal constraint") <+> pprSourceType sty
+badSourceTyErr sty = ptext SLIT("Illegal constraint") <+> pprPred sty
 predTyVarErr pred  = ptext SLIT("Non-type variables in constraint:") <+> pprPred pred
 dupPredWarn dups   = ptext SLIT("Duplicate constraint(s):") <+> pprWithCommas pprPred (map head dups)
 
@@ -942,133 +923,6 @@ arityErr kind name n m
 	n_arguments | n == 0 = ptext SLIT("no arguments")
 		    | n == 1 = ptext SLIT("1 argument")
 		    | True   = hsep [int n, ptext SLIT("arguments")]
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Validity check for TyCons}
-%*									*
-%************************************************************************
-
-checkValidTyCon is called once the mutually-recursive knot has been
-tied, so we can look at things freely.
-
-\begin{code}
-checkValidTyCon :: TyCon -> TcM ()
-checkValidTyCon tc
-  | isSynTyCon tc = checkValidType (TySynCtxt name) syn_rhs
-  | otherwise
-  = 	-- Check the context on the data decl
-    checkValidTheta (DataTyCtxt name) (tyConTheta tc)	`thenM_` 
-	
-	-- Check arg types of data constructors
-    mappM_ checkValidDataCon data_cons			`thenM_`
-
-	-- Check that fields with the same name share a type
-    mappM_ check_fields groups
-
-  where
-    name         = tyConName tc
-    (_, syn_rhs) = getSynTyConDefn tc
-    data_cons    = tyConDataCons tc
-
-    fields = [field | con <- data_cons, field <- dataConFieldLabels con]
-    groups = equivClasses cmp_name fields
-    cmp_name field1 field2 = fieldLabelName field1 `compare` fieldLabelName field2
-
-    check_fields fields@(first_field_label : other_fields)
-	-- These fields all have the same name, but are from
-	-- different constructors in the data type
-	= 	-- Check that all the fields in the group have the same type
-		-- NB: this check assumes that all the constructors of a given
-		-- data type use the same type variables
-	  checkTc (all (tcEqType field_ty) other_tys) (fieldTypeMisMatch field_name)
-	where
-	    field_ty   = fieldLabelType first_field_label
-	    field_name = fieldLabelName first_field_label
-	    other_tys  = map fieldLabelType other_fields
-
-checkValidDataCon :: DataCon -> TcM ()
-checkValidDataCon con
-  = checkValidType ctxt (idType (dataConWrapId con))	`thenM_`
-		-- This checks the argument types and
-		-- ambiguity of the existential context (if any)
-    addErrCtxt (existentialCtxt con)
-	       (checkFreeness ex_tvs ex_theta)
-  where
-    ctxt = ConArgCtxt (dataConName con) 
-    (_, _, ex_tvs, ex_theta, _, _) = dataConSig con
-
-
-fieldTypeMisMatch field_name
-  = sep [ptext SLIT("Different constructors give different types for field"), quotes (ppr field_name)]
-
-existentialCtxt con = ptext SLIT("When checking the existential context of constructor") 
-		      <+> quotes (ppr con)
-\end{code}
-
-
-checkValidClass is called once the mutually-recursive knot has been
-tied, so we can look at things freely.
-
-\begin{code}
-checkValidClass :: Class -> TcM ()
-checkValidClass cls
-  = 	-- CHECK ARITY 1 FOR HASKELL 1.4
-    doptM Opt_GlasgowExts				`thenM` \ gla_exts ->
-
-    	-- Check that the class is unary, unless GlaExs
-    checkTc (notNull tyvars)	(nullaryClassErr cls)	`thenM_`
-    checkTc (gla_exts || unary) (classArityErr cls)	`thenM_`
-
-   	-- Check the super-classes
-    checkValidTheta (ClassSCCtxt (className cls)) theta	`thenM_`
-
-	-- Check the class operations
-    mappM_ check_op op_stuff		`thenM_`
-
-  	-- Check that if the class has generic methods, then the
-	-- class has only one parameter.  We can't do generic
-	-- multi-parameter type classes!
-    checkTc (unary || no_generics) (genericMultiParamErr cls)
-
-  where
-    (tyvars, theta, _, op_stuff) = classBigSig cls
-    unary 	= isSingleton tyvars
-    no_generics = null [() | (_, GenDefMeth) <- op_stuff]
-
-    check_op (sel_id, dm) 
-	= checkValidTheta SigmaCtxt (tail theta) 	`thenM_`
-		-- The 'tail' removes the initial (C a) from the
-		-- class itself, leaving just the method type
-
-	  checkValidType (FunSigCtxt op_name) tau	`thenM_`
-
-		-- Check that for a generic method, the type of 
-		-- the method is sufficiently simple
-	  checkTc (dm /= GenDefMeth || validGenericMethodType op_ty)
-		  (badGenericMethodType op_name op_ty)
-	where
-	  op_name = idName sel_id
-	  op_ty   = idType sel_id
-	  (_,theta,tau) = tcSplitSigmaTy op_ty
-
-nullaryClassErr cls
-  = ptext SLIT("No parameters for class")  <+> quotes (ppr cls)
-
-classArityErr cls
-  = vcat [ptext SLIT("Too many parameters for class") <+> quotes (ppr cls),
-	  parens (ptext SLIT("Use -fglasgow-exts to allow multi-parameter classes"))]
-
-genericMultiParamErr clas
-  = ptext SLIT("The multi-parameter class") <+> quotes (ppr clas) <+> 
-    ptext SLIT("cannot have generic methods")
-
-badGenericMethodType op op_ty
-  = hang (ptext SLIT("Generic method type is too complex"))
-       4 (vcat [ppr op <+> dcolon <+> ppr op_ty,
-		ptext SLIT("You can only use type variables, arrows, and tuples")])
 \end{code}
 
 

@@ -30,7 +30,7 @@ import TcType		( TcType, TcTyVar, TcSigmaType,
 			  mkClassPred, liftedTypeKind )
 import TcUnify		( tcSubOff, Expected(..), readExpectedType, zapExpectedType, 
 			  unifyTauTy, zapToListTy, zapToPArrTy, zapToTupleTy )  
-import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
+import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
 
 import TysWiredIn	( stringTy )
 import CmdLineOpts	( opt_IrrefutableTuples )
@@ -271,8 +271,8 @@ tcPat tc_bndr pat@(NPatIn over_lit mb_neg) pat_ty
 	-- But in NPat, the literal is used to find identical patterns
 	-- 	so we must negate the literal when necessary!
     	lit' = case (over_lit, mb_neg) of
- 		 (HsIntegral i _,   Nothing) -> HsInteger i
- 		 (HsIntegral i _,   Just _)  -> HsInteger (-i)
+ 		 (HsIntegral i _,   Nothing) -> HsInteger i pat_ty'
+ 		 (HsIntegral i _,   Just _)  -> HsInteger (-i) pat_ty'
  		 (HsFractional f _, Nothing) -> HsRat f pat_ty'
  		 (HsFractional f _, Just _)  -> HsRat (-f) pat_ty'
     in

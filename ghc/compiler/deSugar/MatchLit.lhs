@@ -19,14 +19,14 @@ import TcHsSyn		( TypecheckedPat )
 import Id		( Id )
 import CoreSyn
 import TyCon		( tyConDataCons )
-import TcType		( tcSplitTyConApp, isIntegerTy  )
-
+import TcType		( tcSplitTyConApp, isIntegerTy )
 import PrelNames	( ratioTyConKey )
 import Unique		( hasKey )
 import Literal		( mkMachInt, Literal(..) )
 import Maybes		( catMaybes )
 import Panic		( panic, assertPanic )
 import Ratio 		( numerator, denominator )
+import Outputable
 \end{code}
 
 %************************************************************************
@@ -56,7 +56,7 @@ dsLit (HsChar c)       = returnDs (mkCharExpr c)
 dsLit (HsCharPrim c)   = returnDs (mkLit (MachChar c))
 dsLit (HsString str)   = mkStringLitFS str
 dsLit (HsStringPrim s) = returnDs (mkLit (MachStr s))
-dsLit (HsInteger i)    = mkIntegerExpr i
+dsLit (HsInteger i _)  = mkIntegerExpr i
 dsLit (HsInt i)	       = returnDs (mkIntExpr i)
 dsLit (HsIntPrim i)    = returnDs (mkIntLit i)
 dsLit (HsFloatPrim f)  = returnDs (mkLit (MachFloat f))

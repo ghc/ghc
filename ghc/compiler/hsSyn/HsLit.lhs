@@ -9,7 +9,7 @@ module HsLit where
 #include "HsVersions.h"
 
 import Type	( Type )
-import HsTypes	( SyntaxName, PostTcType )
+import HsTypes	( SyntaxName )
 import Outputable
 import FastString
 import Ratio	( Rational )
@@ -32,7 +32,7 @@ data HsLit
   | HsInt	    Integer		-- Genuinely an Int; arises from TcGenDeriv, 
 					--	and from TRANSLATION
   | HsIntPrim	    Integer		-- Unboxed Int
-  | HsInteger	    Integer		-- Genuinely an integer; arises only from TRANSLATION
+  | HsInteger	    Integer  Type	-- Genuinely an integer; arises only from TRANSLATION
 					-- 	(overloaded literals are done with HsOverLit)
   | HsRat	    Rational Type	-- Genuinely a rational; arises only from TRANSLATION
 					-- 	(overloaded literals are done with HsOverLit)
@@ -46,7 +46,7 @@ instance Eq HsLit where
   (HsStringPrim x1) == (HsStringPrim x2) = x1==x2
   (HsInt x1)	    == (HsInt x2)	 = x1==x2
   (HsIntPrim x1)    == (HsIntPrim x2)    = x1==x2
-  (HsInteger x1)    == (HsInteger x2)    = x1==x2
+  (HsInteger x1 _)  == (HsInteger x2 _)  = x1==x2
   (HsRat x1 _)	    == (HsRat x2 _)      = x1==x2
   (HsFloatPrim x1)  == (HsFloatPrim x2)  = x1==x2
   (HsDoublePrim x1) == (HsDoublePrim x2) = x1==x2
@@ -58,9 +58,12 @@ data HsOverLit 			-- An overloaded literal
   | HsFractional    Rational SyntaxName	-- Frac-looking literals
 					-- The name is fromRational
 
+-- Comparison operations are needed when grouping literals
+-- for compiling pattern-matching (module MatchLit)
 instance Eq HsOverLit where
   (HsIntegral i1 _)   == (HsIntegral i2 _)   = i1 == i2
   (HsFractional f1 _) == (HsFractional f2 _) = f1 == f2
+  l1		      == l2		     = False
 
 instance Ord HsOverLit where
   compare (HsIntegral i1 _)   (HsIntegral i2 _)   = i1 `compare` i2
@@ -77,7 +80,7 @@ instance Outputable HsLit where
     ppr (HsString s)	 = pprHsString s
     ppr (HsStringPrim s) = pprHsString s <> char '#'
     ppr (HsInt i)	 = integer i
-    ppr (HsInteger i)	 = integer i
+    ppr (HsInteger i _)	 = integer i
     ppr (HsRat f _)	 = rational f
     ppr (HsFloatPrim f)	 = rational f <> char '#'
     ppr (HsDoublePrim d) = rational d <> text "##"

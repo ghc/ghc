@@ -13,7 +13,6 @@ import Match		( matchWrapper, matchSimply )
 import MatchLit		( dsLit )
 import DsBinds		( dsMonoBinds, AutoScc(..) )
 import DsGRHSs		( dsGuarded )
-import DsCCall		( dsCCall )
 import DsListComp	( dsListComp, dsPArrComp )
 import DsUtils		( mkErrorAppDs, mkStringLit, mkConsExpr, mkNilExpr,
 			  mkCoreTupTy, selectMatchVar,
@@ -346,7 +345,7 @@ dsExpr (ExplicitPArr ty xs)
     returnDs (mkApps (Var toP) [Type ty, coreList])
 
 dsExpr (ExplicitTuple expr_list boxity)
-  = mapDs dsExpr expr_list	  `thenDs` \ core_exprs  ->
+  = mappM dsExpr expr_list	  `thenDs` \ core_exprs  ->
     returnDs (mkConApp (tupleCon boxity (length expr_list))
 	    	       (map (Type .  exprType) core_exprs ++ core_exprs))
 
@@ -434,8 +433,8 @@ dsExpr (RecordConOut data_con con_expr rbinds)
     in
 
     (if null labels
-	then mapDs unlabelled_bottom arg_tys
-	else mapDs mk_arg (zipEqual "dsExpr:RecordCon" arg_tys labels))
+	then mappM unlabelled_bottom arg_tys
+	else mappM mk_arg (zipEqual "dsExpr:RecordCon" arg_tys labels))
 	`thenDs` \ con_args ->
 
     returnDs (mkApps con_expr' con_args)
@@ -506,7 +505,7 @@ dsExpr expr@(RecordUpdOut record_expr record_in_ty record_out_ty rbinds)
 	-- and the right hand sides with applications of the wrapper Id
 	-- so that everything works when we are doing fancy unboxing on the
 	-- constructor aguments.
-    mapDs mk_alt cons_to_upd		`thenDs` \ alts ->
+    mappM mk_alt cons_to_upd		`thenDs` \ alts ->
     matchWrapper RecUpd alts		`thenDs` \ ([discrim_var], matching_code) ->
 
     returnDs (bindNonRec discrim_var record_expr' matching_code)

@@ -14,6 +14,7 @@ module DsCCall
 
 #include "HsVersions.h"
 
+
 import CoreSyn
 
 import DsMonad
@@ -30,7 +31,7 @@ import TcType		( tcSplitTyConApp_maybe )
 import Type		( Type, isUnLiftedType, mkFunTys, mkFunTy,
 			  tyVarsOfType, mkForAllTys, mkTyConApp, 
 			  isPrimitiveType, splitTyConApp_maybe, 
-			  splitNewType_maybe, splitForAllTy_maybe,
+			  splitRecNewType_maybe, splitForAllTy_maybe,
 			  isUnboxedTupleType
 			)
 
@@ -62,6 +63,11 @@ import PrelNames	( Unique, hasKey, ioTyConKey, boolTyConKey, unitTyConKey,
 import VarSet		( varSetElems )
 import Constants	( wORD_SIZE)
 import Outputable
+
+#ifdef DEBUG
+import TypeRep
+#endif
+
 \end{code}
 
 Desugaring of @ccall@s consists of adding some state manipulation,
@@ -109,7 +115,7 @@ dsCCall :: CLabelString	-- C routine to invoke
 dsCCall lbl args may_gc result_ty
   = mapAndUnzipDs unboxArg args	       `thenDs` \ (unboxed_args, arg_wrappers) ->
     boxResult [] id Nothing result_ty  `thenDs` \ (ccall_result_ty, res_wrapper) ->
-    getUniqueDs			       `thenDs` \ uniq ->
+    newUnique			       `thenDs` \ uniq ->
     let
 	target = StaticTarget lbl
 	the_fcall    = CCall (CCallSpec target CCallConv may_gc)
@@ -155,7 +161,7 @@ unboxArg arg
   = returnDs (arg, \body -> body)
 
   -- Recursive newtypes
-  | Just rep_ty <- splitNewType_maybe arg_ty
+  | Just rep_ty <- splitRecNewType_maybe arg_ty
   = unboxArg (mkCoerce2 rep_ty arg_ty arg)
       
   -- Booleans
@@ -172,7 +178,8 @@ unboxArg arg
   -- Data types with a single constructor, which has a single, primitive-typed arg
   -- This deals with Int, Float etc; also Ptr, ForeignPtr
   | is_product_type && data_con_arity == 1 
-  = ASSERT(isUnLiftedType data_con_arg_ty1 )	-- Typechecker ensures this
+  = ASSERT2(isUnLiftedType data_con_arg_ty1, crudePprType arg_ty)
+			-- Typechecker ensures this
     newSysLocalDs arg_ty		`thenDs` \ case_bndr ->
     newSysLocalDs data_con_arg_ty1	`thenDs` \ prim_arg ->
     returnDs (Var prim_arg,
@@ -335,10 +342,10 @@ boxResult arg_ids augment mbTopCon result_ty
     		-- The ccall returns a non-() value
         | isUnboxedTupleType prim_res_ty
         = let
-		(Just (_, ls@(prim_res_ty1:extras))) = splitTyConApp_maybe prim_res_ty
+		Just (_, ls) = splitTyConApp_maybe prim_res_ty
 		arity = 1 + length ls
 	  in
-	  mapDs newSysLocalDs ls 		`thenDs` \ args_ids@(result_id:as) ->
+	  mappM newSysLocalDs ls 		`thenDs` \ args_ids@(result_id:as) ->
 	  newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_id ->
 	  let
 		the_rhs = return_result (Var state_id) 
@@ -352,8 +359,7 @@ boxResult arg_ids augment mbTopCon result_ty
 	  in
 	  returnDs (ccall_res_ty, the_alt)
 	| otherwise
-	=	
-	  newSysLocalDs prim_res_ty 		`thenDs` \ result_id ->
+	= newSysLocalDs prim_res_ty 		`thenDs` \ result_id ->
 	  newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_id ->
 	  let
 		the_rhs = return_result (Var state_id) 
@@ -385,7 +391,7 @@ resultWrapper result_ty
 				    (LitAlt (mkMachInt 0),[],Var falseDataConId)])
 
   -- Recursive newtypes
-  | Just rep_ty <- splitNewType_maybe result_ty
+  | Just rep_ty <- splitRecNewType_maybe result_ty
   = resultWrapper rep_ty `thenDs` \ (maybe_ty, wrapper) ->
     returnDs (maybe_ty, \e -> mkCoerce2 result_ty rep_ty (wrapper e))
 

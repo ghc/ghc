@@ -26,7 +26,7 @@ module Outputable (
 	text, char, ftext, ptext,
 	int, integer, float, double, rational,
 	parens, brackets, braces, quotes, doubleQuotes, angleBrackets,
-	semi, comma, colon, dcolon, space, equals, dot,
+	semi, comma, colon, dcolon, space, equals, dot, arrow,
 	lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
 	(<>), (<+>), hcat, hsep, 
 	($$), ($+$), vcat, 
@@ -81,8 +81,6 @@ data PprStyle
 					-- make sense to the ordinary user;
 					-- must be very close to Haskell
 					-- syntax, etc.
-
-  | PprInterface PrintUnqualified	-- Interface generation
 
   | PprCode CodeStyle		-- Print code; either C or assembler
 
@@ -156,7 +154,6 @@ getPprStyle df sty = df sty sty
 \begin{code}
 unqualStyle :: PprStyle -> Name -> Bool
 unqualStyle (PprUser    unqual _) n = unqual n
-unqualStyle (PprInterface unqual) n = unqual n
 unqualStyle other		  n = False
 
 codeStyle :: PprStyle -> Bool
@@ -201,7 +198,7 @@ printDump doc = do
    better_doc = doc $$ text ""
     -- We used to always print in debug style, but I want
     -- to try the effect of a more user-ish style (unless you
-    -- say -dppr-debug
+    -- say -dppr-debug)
 
 printForUser :: Handle -> PrintUnqualified -> SDoc -> IO ()
 printForUser handle unqual doc 
@@ -282,6 +279,7 @@ rbrack sty = Pretty.rbrack
 lbrace sty = Pretty.lbrace
 rbrace sty = Pretty.rbrace
 dcolon sty = Pretty.ptext SLIT("::")
+arrow  sty = Pretty.ptext SLIT("->")
 underscore = char '_'
 dot	   = char '.'
 

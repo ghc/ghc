@@ -58,15 +58,15 @@ import TysWiredIn	( nilDataCon, consDataCon,
                           tupleCon, mkTupleTy,
 			  unitDataConId, unitTy,
                           charTy, charDataCon, 
-                          intTy, intDataCon, smallIntegerDataCon, 
+                          intTy, intDataCon, 
 			  floatDataCon, 
                           doubleDataCon,
 			  stringTy, isPArrFakeCon )
 import BasicTypes	( Boxity(..) )
 import UniqSet		( mkUniqSet, minusUniqSet, isEmptyUniqSet, UniqSet )
-import UniqSupply	( splitUniqSupply, uniqFromSupply )
+import UniqSupply	( splitUniqSupply, uniqFromSupply, uniqsFromSupply )
 import PrelNames	( unpackCStringName, unpackCStringUtf8Name, 
-			  plusIntegerName, timesIntegerName, 
+			  plusIntegerName, timesIntegerName, smallIntegerDataConName, 
 			  lengthPName, indexPName )
 import Outputable
 import UnicodeUtil      ( intsToUtf8, stringToUtf8 )
@@ -134,13 +134,13 @@ tidyNPat lit lit_ty default_pat
   | otherwise		= default_pat
 
   where
-    mk_int    (HsInteger i) = HsIntPrim i
+    mk_int    (HsInteger i _) = HsIntPrim i
 
-    mk_float  (HsInteger i) = HsFloatPrim (fromInteger i)
-    mk_float  (HsRat f _)   = HsFloatPrim f
+    mk_float  (HsInteger i _) = HsFloatPrim (fromInteger i)
+    mk_float  (HsRat f _)     = HsFloatPrim f
 
-    mk_double (HsInteger i) = HsDoublePrim (fromInteger i)
-    mk_double (HsRat f _)   = HsDoublePrim f
+    mk_double (HsInteger i _) = HsDoublePrim (fromInteger i)
+    mk_double (HsRat f _)     = HsDoublePrim f
 \end{code}
 
 
@@ -287,7 +287,7 @@ mkCoPrimCaseMatchResult var match_alts
   = MatchResult CanFail mk_case
   where
     mk_case fail
-      = mapDs (mk_alt fail) match_alts		`thenDs` \ alts ->
+      = mappM (mk_alt fail) match_alts		`thenDs` \ alts ->
 	returnDs (Case (Var var) var ((DEFAULT, [], fail) : alts))
 
     mk_alt fail (lit, MatchResult _ body_fn) = body_fn fail	`thenDs` \ body ->
@@ -328,13 +328,13 @@ mkCoAlgCaseMatchResult var match_alts
 	      = CanFail
 
     wild_var = mkWildId (idType var)
-    mk_case fail = mapDs (mk_alt fail) match_alts	`thenDs` \ alts ->
+    mk_case fail = mappM (mk_alt fail) match_alts	`thenDs` \ alts ->
 		   returnDs (Case (Var var) wild_var (mk_default fail ++ alts))
 
     mk_alt fail (con, args, MatchResult _ body_fn)
 	= body_fn fail				`thenDs` \ body ->
-	  getUniquesDs				`thenDs` \ us ->
-	  returnDs (mkReboxingAlt us con args body)
+	  newUniqueSupply			`thenDs` \ us ->
+	  returnDs (mkReboxingAlt (uniqsFromSupply us) con args body)
 
     mk_default fail | exhaustive_case = []
 		    | otherwise       = [(DEFAULT, [], fail)]
@@ -387,7 +387,7 @@ mkCoAlgCaseMatchResult var match_alts
 	unboxAlt = 
 	  newSysLocalDs intPrimTy			`thenDs` \l	   ->
 	  dsLookupGlobalId indexPName		`thenDs` \indexP   ->
-	  mapDs (mkAlt indexP) match_alts               `thenDs` \alts     ->
+	  mappM (mkAlt indexP) match_alts               `thenDs` \alts     ->
 	  returnDs (DataAlt intDataCon, [l], (Case (Var l) wild (dft : alts)))
           where
 	    wild = mkWildId intPrimTy
@@ -450,7 +450,8 @@ mkCharExpr c = mkConApp charDataCon [mkLit (MachChar c)]
 
 mkIntegerExpr i
   | inIntRange i  	-- Small enough, so start from an Int
-  = returnDs (mkSmallIntegerLit i)
+  = dsLookupDataCon  smallIntegerDataConName	`thenDs` \ integer_dc ->
+    returnDs (mkSmallIntegerLit integer_dc i)
 
 -- Special case for integral literals with a large magnitude:
 -- They are transformed into an expression involving only smaller
@@ -458,25 +459,27 @@ mkIntegerExpr i
 
   | otherwise 		-- Big, so start from a string
   = dsLookupGlobalId plusIntegerName		`thenDs` \ plus_id ->
-    dsLookupGlobalId timesIntegerName	`thenDs` \ times_id ->
+    dsLookupGlobalId timesIntegerName		`thenDs` \ times_id ->
+    dsLookupDataCon  smallIntegerDataConName	`thenDs` \ integer_dc ->
     let 
+	lit i = mkSmallIntegerLit integer_dc i
         plus a b  = Var plus_id  `App` a `App` b
         times a b = Var times_id `App` a `App` b
 
 	-- Transform i into (x1 + (x2 + (x3 + (...) * b) * b) * b) with abs xi <= b
 	horner :: Integer -> Integer -> CoreExpr
 	horner b i | abs q <= 1 = if r == 0 || r == i 
-				  then mkSmallIntegerLit i 
-				  else mkSmallIntegerLit r `plus` mkSmallIntegerLit (i-r)
-	           | r == 0     =                   	      horner b q `times` mkSmallIntegerLit b
-	           | otherwise  = mkSmallIntegerLit r `plus` (horner b q `times` mkSmallIntegerLit b)
+				  then lit i 
+				  else lit r `plus` lit (i-r)
+	           | r == 0     =               horner b q `times` lit b
+	           | otherwise  = lit r `plus` (horner b q `times` lit b)
   		   where
 		     (q,r) = i `quotRem` b
 
     in
     returnDs (horner tARGET_MAX_INT i)
 
-mkSmallIntegerLit i = mkConApp smallIntegerDataCon [mkIntLit i]
+mkSmallIntegerLit small_integer_data_con i = mkConApp small_integer_data_con [mkIntLit i]
 
 mkStringLit str	= mkStringLitFS (mkFastString str)
 
@@ -547,7 +550,7 @@ mkSelectorBinds pat val_expr
 	-- This does not matter after desugaring, but there's a subtle 
 	-- issue with implicit parameters. Consider
 	--	(x,y) = ?i
-	-- Then, ?i is given type {?i :: Int}, a SourceType, which is opaque
+	-- Then, ?i is given type {?i :: Int}, a PredType, which is opaque
 	-- to the desugarer.  (Why opaque?  Because newtypes have to be.  Why
 	-- does it get that type?  So that when we abstract over it we get the
 	-- right top-level type  (?i::Int) => ...)
@@ -561,7 +564,7 @@ mkSelectorBinds pat val_expr
     mkErrorAppDs iRREFUT_PAT_ERROR_ID 
 		 unitTy (showSDoc (ppr pat))	`thenDs` \ err_expr ->
     newSysLocalDs unitTy			`thenDs` \ err_var ->
-    mapDs (mk_bind val_var err_var) binders	`thenDs` \ binds ->
+    mappM (mk_bind val_var err_var) binders	`thenDs` \ binds ->
     returnDs ( (val_var, val_expr) : 
 	       (err_var, err_expr) :
 	       binds )

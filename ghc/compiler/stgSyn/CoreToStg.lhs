@@ -860,15 +860,7 @@ thenLne :: LneM a -> (a -> LneM b) -> LneM b
 thenLne m k env lvs_cont 
   = k (m env lvs_cont) env lvs_cont
 
-mapLne  :: (a -> LneM b)   -> [a] -> LneM [b]
-mapLne f [] = returnLne []
-mapLne f (x:xs)
-  = f x		`thenLne` \ r  ->
-    mapLne f xs	`thenLne` \ rs ->
-    returnLne (r:rs)
-
 mapAndUnzipLne  :: (a -> LneM (b,c))   -> [a] -> LneM ([b],[c])
-
 mapAndUnzipLne f [] = returnLne ([],[])
 mapAndUnzipLne f (x:xs)
   = f x		    	`thenLne` \ (r1,  r2)  ->
@@ -876,7 +868,6 @@ mapAndUnzipLne f (x:xs)
     returnLne (r1:rs1, r2:rs2)
 
 mapAndUnzip3Lne :: (a -> LneM (b,c,d)) -> [a] -> LneM ([b],[c],[d])
-
 mapAndUnzip3Lne f []	= returnLne ([],[],[])
 mapAndUnzip3Lne f (x:xs)
   = f x		    	 `thenLne` \ (r1,  r2,  r3)  ->
@@ -884,7 +875,6 @@ mapAndUnzip3Lne f (x:xs)
     returnLne (r1:rs1, r2:rs2, r3:rs3)
 
 mapAndUnzip4Lne :: (a -> LneM (b,c,d,e)) -> [a] -> LneM ([b],[c],[d],[e])
-
 mapAndUnzip4Lne f []	= returnLne ([],[],[],[])
 mapAndUnzip4Lne f (x:xs)
   = f x		    	 `thenLne` \ (r1,  r2,  r3, r4)  ->

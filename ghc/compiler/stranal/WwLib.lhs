@@ -20,7 +20,7 @@ import NewDemand	( Demand(..), DmdResult(..), Demands(..) )
 import MkId		( realWorldPrimId, voidArgId, mkRuntimeErrorApp, rUNTIME_ERROR_ID )
 import TysWiredIn	( tupleCon )
 import Type		( Type, isUnLiftedType, mkFunTys,
-			  splitForAllTys, splitFunTys, splitNewType_maybe, isAlgType
+			  splitForAllTys, splitFunTys, splitRecNewType_maybe, isAlgType
 			)
 import BasicTypes	( Boxity(..) )
 import Var              ( Var, isId )
@@ -223,7 +223,7 @@ mkWWargs :: Type
 		     Type)			-- Type of wrapper body
 
 mkWWargs fun_ty demands one_shots
-  | Just rep_ty <- splitNewType_maybe fun_ty
+  | Just rep_ty <- splitRecNewType_maybe fun_ty
    	-- The newtype case is for when the function has
 	-- a recursive newtype after the arrow (rare)
 	-- We check for arity >= 0 to avoid looping in the case

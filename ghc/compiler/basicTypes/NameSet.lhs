@@ -19,7 +19,7 @@ module NameSet (
 	-- Defs and uses
 	Defs, Uses, DefUse, DefUses,
 	emptyDUs, usesOnly, mkDUs, plusDU, 
-	findUses, duDefs, duUses
+	findUses, duDefs, duUses, allUses
     ) where
 
 #include "HsVersions.h"
@@ -120,9 +120,10 @@ delFVs ns s = delListFromNameSet s ns
 type Defs = NameSet
 type Uses = NameSet
 
-type DefUse  = (Maybe Defs, Uses)
 type DefUses = [DefUse]
 	-- In dependency order: earlier Defs scope over later Uses
+
+type DefUse  = (Maybe Defs, Uses)
 	-- For items (Just ds, us), the use of any member 
 	-- of the ds implies that all the us are used too
 	--

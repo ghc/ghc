@@ -19,8 +19,6 @@ module Binary
    openBinMem,
 --   closeBin,
 
-   getUserData,
-
    seekBin,
    tellBin,
    castBin,
@@ -44,7 +42,7 @@ module Binary
    putByteArray,
 
    getBinFileWithDict,	-- :: Binary a => FilePath -> IO a
-   putBinFileWithDict,	-- :: Binary a => FilePath -> Module -> a -> IO ()
+   putBinFileWithDict,	-- :: Binary a => FilePath -> ModuleName -> a -> IO ()
 
   ) where
 
@@ -53,7 +51,6 @@ module Binary
 -- The *host* architecture version:
 #include "MachDeps.h"
 
-import {-# SOURCE #-} Module
 import FastString
 import Unique
 import Panic
@@ -143,9 +140,13 @@ eofErrorType = EOF
 type BinArray = IOUArray Int Word8
 #endif
 
+---------------------------------------------------------------
+--		BinHandle
+---------------------------------------------------------------
+
 data BinHandle
   = BinMem {		-- binary data stored in an unboxed array
-     state :: BinHandleState,	-- sigh, need parameterized modules :-)
+     bh_usr :: UserData,	-- sigh, need parameterized modules :-)
      off_r :: !FastMutInt,		-- the current offset
      sz_r  :: !FastMutInt,		-- size of the array (cached)
      arr_r :: !(IORef BinArray) 	-- the array (bounds: (0,size-1))
@@ -154,7 +155,7 @@ data BinHandle
 	-- the binary data to a file.
 
   | BinIO {		-- binary data stored in a file
-     state :: BinHandleState,
+     bh_usr :: UserData,
      off_r :: !FastMutInt,		-- the current offset (cached)
      hdl   :: !IO.Handle		-- the file handle (must be seekable)
    }
@@ -162,11 +163,26 @@ data BinHandle
 	-- to call repeatedly.  If anyone else is modifying this Handle
 	-- at the same time, we'll be screwed.
 
+getUserData :: BinHandle -> UserData
+getUserData bh = bh_usr bh
+
+setUserData :: BinHandle -> UserData -> BinHandle
+setUserData bh us = bh { bh_usr = us }
+
+
+---------------------------------------------------------------
+--		Bin
+---------------------------------------------------------------
+
 newtype Bin a = BinPtr Int 
   deriving (Eq, Ord, Show, Bounded)
 
 castBin :: Bin a -> Bin b
 castBin (BinPtr i) = BinPtr i
+
+---------------------------------------------------------------
+--		class Binary
+---------------------------------------------------------------
 
 class Binary a where
     put_   :: BinHandle -> a -> IO ()
@@ -186,17 +202,16 @@ getAt  :: Binary a => BinHandle -> Bin a -> IO a
 getAt bh p = do seekBin bh p; get bh
 
 openBinIO_ :: IO.Handle -> IO BinHandle
-openBinIO_ h = openBinIO h noBinHandleUserData
+openBinIO_ h = openBinIO h 
 
-openBinIO :: IO.Handle -> Module -> IO BinHandle
-openBinIO h mod = do
+openBinIO :: IO.Handle -> IO BinHandle
+openBinIO h = do
   r <- newFastMutInt
   writeFastMutInt r 0
-  state <- newWriteState mod
-  return (BinIO state r h)
+  return (BinIO noUserData r h)
 
-openBinMem :: Int -> Module -> IO BinHandle
-openBinMem size mod
+openBinMem :: Int -> IO BinHandle
+openBinMem size
  | size <= 0 = error "Data.Binary.openBinMem: size must be >= 0"
  | otherwise = do
    arr <- newArray_ (0,size-1)
@@ -205,13 +220,7 @@ openBinMem size mod
    writeFastMutInt ix_r 0
    sz_r <- newFastMutInt
    writeFastMutInt sz_r size
-   state <- newWriteState mod
-   return (BinMem state ix_r sz_r arr_r)
-
-noBinHandleUserData = error "Binary.BinHandle: no user data"
-
-getUserData :: BinHandle -> BinHandleState
-getUserData bh = state bh
+   return (BinMem noUserData ix_r sz_r arr_r)
 
 tellBin :: BinHandle -> IO (Bin a)
 tellBin (BinIO  _ r _)   = do ix <- readFastMutInt r; return (BinPtr ix)
@@ -250,6 +259,7 @@ writeBinMem (BinMem _ ix_r sz_r arr_r) fn = do
   hClose h
 
 readBinMem :: FilePath -> IO BinHandle
+-- Return a BinHandle with a totally undefined State
 readBinMem filename = do
   h <- openBinaryFile filename ReadMode
   filesize' <- hFileSize h
@@ -264,7 +274,7 @@ readBinMem filename = do
   writeFastMutInt ix_r 0
   sz_r <- newFastMutInt
   writeFastMutInt sz_r filesize
-  return (BinMem initReadState ix_r sz_r arr_r)
+  return (BinMem noUserData ix_r sz_r arr_r)
 
 -- expand the size of the array to include a specified offset
 expandBin :: BinHandle -> Int -> IO ()
@@ -596,66 +606,110 @@ lazyGet bh = do
     seekBin bh p -- skip over the object for now
     return a
 
--- -----------------------------------------------------------------------------
--- BinHandleState
+-- --------------------------------------------------------------
+-- 	Main wrappers: getBinFileWithDict, putBinFileWithDict
+--
+--	This layer is built on top of the stuff above, 
+--	and should not know anything about BinHandles
+-- --------------------------------------------------------------
 
-type BinHandleState = 
-	(Module, 
-	 IORef Int,
-	 IORef (UniqFM (Int,FastString)),
-	 Array Int FastString)
-
-initReadState :: BinHandleState
-initReadState = (undef, undef, undef, undef)
-
-newWriteState :: Module -> IO BinHandleState
-newWriteState m = do
-  j_r <- newIORef 0
-  out_r <- newIORef emptyUFM
-  return (m,j_r,out_r,undef)
-
-undef = error "Binary.BinHandleState"
-
--- -----------------------------------------------------------------------------
--- FastString binary interface
+initBinMemSize       = (1024*1024) :: Int
+binaryInterfaceMagic = 0x1face :: Word32
 
 getBinFileWithDict :: Binary a => FilePath -> IO a
 getBinFileWithDict file_path = do
   bh <- Binary.readBinMem file_path
+
+	-- Read the magic number to check that this really is a GHC .hi file
+	-- (This magic number does not change when we change 
+	--  GHC interface file format)
   magic <- get bh
   when (magic /= binaryInterfaceMagic) $
 	throwDyn (ProgramError (
 	   "magic number mismatch: old/corrupt interface file?"))
-  dict_p <- Binary.get bh		-- get the dictionary ptr
-  data_p <- tellBin bh
+
+	-- Read the dictionary
+	-- The next word in the file is a pointer to where the dictionary is
+	-- (probably at the end of the file)
+  dict_p <- Binary.get bh	-- Get the dictionary ptr
+  data_p <- tellBin bh		-- Remember where we are now
   seekBin bh dict_p
   dict <- getDictionary bh
-  seekBin bh data_p
-  let (mod, j_r, out_r, _) = state bh
-  get bh{ state = (mod,j_r,out_r,dict) }
+  seekBin bh data_p		-- Back to where we were before
 
-initBinMemSize = (1024*1024) :: Int
+	-- Initialise the user-data field of bh
+  let bh' = setUserData bh (initReadState dict)
+	
+	-- At last, get the thing 
+  get bh'
 
-binaryInterfaceMagic = 0x1face :: Word32
-
-putBinFileWithDict :: Binary a => FilePath -> Module -> a -> IO ()
-putBinFileWithDict file_path mod a = do
-  bh <- openBinMem initBinMemSize mod
+putBinFileWithDict :: Binary a => FilePath -> a -> IO ()
+putBinFileWithDict file_path the_thing = do
+  bh <- openBinMem initBinMemSize
   put_ bh binaryInterfaceMagic
-  p <- tellBin bh
-  put_ bh p		-- placeholder for ptr to dictionary
-  put_ bh a
-  let (_, j_r, fm_r, _) = state bh
-  j <- readIORef j_r
-  fm <- readIORef fm_r
-  dict_p <- tellBin bh
-  putAt bh p dict_p	-- fill in the placeholder
-  seekBin bh dict_p	-- seek back to the end of the file
+
+	-- Remember where the dictionary pointer will go
+  dict_p_p <- tellBin bh
+  put_ bh dict_p_p	-- Placeholder for ptr to dictionary
+
+	-- Make some intial state
+  usr_state <- newWriteState
+
+	-- Put the main thing, 
+  put_ (setUserData bh usr_state) the_thing
+
+	-- Get the final-state
+  j <- readIORef  (ud_next usr_state)
+  fm <- readIORef (ud_map  usr_state)
+  dict_p <- tellBin bh	-- This is where the dictionary will start
+
+	-- Write the dictionary pointer at the fornt of the file
+  putAt bh dict_p_p dict_p	-- Fill in the placeholder
+  seekBin bh dict_p		-- Seek back to the end of the file
+
+	-- Write the dictionary itself
   putDictionary bh j (constructDictionary j fm)
+
+	-- And send the result to the file
   writeBinMem bh file_path
   
-type Dictionary = Array Int FastString
-	-- should be 0-indexed
+-- -----------------------------------------------------------------------------
+-- UserData
+-- -----------------------------------------------------------------------------
+
+data UserData = 
+   UserData { 	-- This field is used only when reading
+	      ud_dict :: Dictionary,
+
+		-- The next two fields are only used when writing
+	      ud_next :: IORef Int,	-- The next index to use
+	      ud_map  :: IORef (UniqFM (Int,FastString))
+	}
+
+noUserData = error "Binary.UserData: no user data"
+
+initReadState :: Dictionary -> UserData
+initReadState dict = UserData{ ud_dict = dict,
+			       ud_next = undef "next",
+			       ud_map  = undef "map" }
+
+newWriteState :: IO UserData
+newWriteState = do
+  j_r <- newIORef 0
+  out_r <- newIORef emptyUFM
+  return (UserData { ud_dict = panic "dict",
+		     ud_next = j_r,
+		     ud_map  = out_r })
+
+
+undef s = panic ("Binary.UserData: no " ++ s)
+
+---------------------------------------------------------
+--		The Dictionary 
+---------------------------------------------------------
+
+type Dictionary = Array Int FastString	-- The dictionary
+					-- Should be 0-indexed
 
 putDictionary :: BinHandle -> Int -> Dictionary -> IO ()
 putDictionary bh sz dict = do
@@ -670,6 +724,10 @@ getDictionary bh = do
 
 constructDictionary :: Int -> UniqFM (Int,FastString) -> Dictionary
 constructDictionary j fm = array (0,j-1) (eltsUFM fm)
+
+---------------------------------------------------------
+--		Reading and writing FastStrings
+---------------------------------------------------------
 
 putFS bh (FastString id l ba) = do
   put_ bh (I# l)
@@ -693,7 +751,8 @@ getFS bh = do
 
 instance Binary FastString where
   put_ bh f@(FastString id l ba) =
-    case getUserData bh of { (_, j_r, out_r, dict) -> do
+    case getUserData bh of { 
+	UserData { ud_next = j_r, ud_map = out_r, ud_dict = dict} -> do
     out <- readIORef out_r
     let uniq = getUnique f
     case lookupUFM out uniq of
@@ -708,4 +767,4 @@ instance Binary FastString where
 
   get bh = do 
 	j <- get bh
-	case getUserData bh of (_, _, _, arr) -> return $! (arr ! j)
+	return $! (ud_dict (getUserData bh) ! j)

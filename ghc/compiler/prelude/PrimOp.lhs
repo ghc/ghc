@@ -7,7 +7,7 @@
 module PrimOp (
 	PrimOp(..), allThePrimOps,
 	primOpType, primOpSig, primOpArity,
-	mkPrimOpIdName, primOpTag, primOpOcc,
+	primOpTag, maxPrimOpTag, primOpOcc,
 
 	commutableOp,
 
@@ -15,12 +15,7 @@ module PrimOp (
 	primOpOkForSpeculation, primOpIsCheap, primOpIsDupable,
 	primOpHasSideEffects,
 
-	getPrimOpResultInfo,  PrimOpResultInfo(..),
-
-	eqCharName, eqIntName, neqIntName,
-	ltCharName, eqWordName, ltWordName, eqAddrName, ltAddrName,
-	eqFloatName, ltFloatName, eqDoubleName, ltDoubleName, 
-	ltIntName, geIntName, leIntName, minusIntName, tagToEnumName	
+	getPrimOpResultInfo,  PrimOpResultInfo(..)
     ) where
 
 #include "HsVersions.h"
@@ -31,14 +26,10 @@ import TysWiredIn
 
 import NewDemand
 import Var		( TyVar )
-import Name		( Name, mkWiredInName )
 import OccName		( OccName, pprOccName, mkVarOcc )
 import TyCon		( TyCon, isPrimTyCon, tyConPrimRep )
 import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, typePrimRep, tyConAppTyCon )
-import PprType          () -- get at Outputable Type instance.
-import Unique		( mkPrimOpIdUnique )
 import BasicTypes	( Arity, Boxity(..) )
-import PrelNames	( gHC_PRIM )
 import Outputable
 import FastTypes
 \end{code}
@@ -90,6 +81,7 @@ instance Show PrimOp where
 \end{code}
 
 An @Enum@-derived list would be better; meanwhile... (ToDo)
+
 \begin{code}
 allThePrimOps :: [PrimOp]
 allThePrimOps =
@@ -394,19 +386,12 @@ primOpType op
       GenPrimOp occ tyvars arg_tys res_ty -> 
 	mkForAllTys tyvars (mkFunTys arg_tys res_ty)
 
-mkPrimOpIdName :: PrimOp -> Name
-	-- Make the name for the PrimOp's Id
-	-- We have to pass in the Id itself because it's a WiredInId
-	-- and hence recursive
-mkPrimOpIdName op
-  = mkWiredInName gHC_PRIM (primOpOcc op) (mkPrimOpIdUnique (primOpTag op))
-
 primOpOcc :: PrimOp -> OccName
 primOpOcc op = case (primOpInfo op) of
-			      Dyadic    occ _	  -> occ
-			      Monadic   occ _	  -> occ
-			      Compare   occ _	  -> occ
-			      GenPrimOp occ _ _ _ -> occ
+		Dyadic    occ _	    -> occ
+		Monadic   occ _	    -> occ
+		Compare   occ _	    -> occ
+		GenPrimOp occ _ _ _ -> occ
 
 -- primOpSig is like primOpType but gives the result split apart:
 -- (type variables, argument types, result type)
@@ -471,35 +456,3 @@ pprPrimOp  :: PrimOp -> SDoc
 pprPrimOp other_op = pprOccName (primOpOcc other_op)
 \end{code}
 
-
-%************************************************************************
-%*									*
-	Names for some primops (for ndpFlatten/FlattenMonad.lhs)
-%*									*
-%************************************************************************
-
-\begin{code}
-eqIntName	= mkPrimOpIdName IntEqOp
-ltIntName	= mkPrimOpIdName IntLtOp
-geIntName	= mkPrimOpIdName IntGeOp
-leIntName	= mkPrimOpIdName IntLeOp
-neqIntName	= mkPrimOpIdName IntNeOp
-minusIntName	= mkPrimOpIdName IntSubOp
-
-eqCharName	= mkPrimOpIdName CharEqOp
-ltCharName	= mkPrimOpIdName CharLtOp
-
-eqFloatName	= mkPrimOpIdName FloatEqOp
-ltFloatName	= mkPrimOpIdName FloatLtOp
-
-eqDoubleName	= mkPrimOpIdName DoubleEqOp
-ltDoubleName	= mkPrimOpIdName DoubleLtOp
-
-eqWordName	= mkPrimOpIdName WordEqOp
-ltWordName	= mkPrimOpIdName WordLtOp
-
-eqAddrName	= mkPrimOpIdName AddrEqOp
-ltAddrName	= mkPrimOpIdName AddrLtOp
-
-tagToEnumName	= mkPrimOpIdName TagToEnumOp
-\end{code}

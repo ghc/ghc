@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.125 2003/09/24 13:04:51 simonmar Exp $
+$Id: Parser.y,v 1.126 2003/10/09 11:59:02 simonpj Exp $
 
 Haskell grammar.
 
@@ -14,29 +14,24 @@ module Parser ( parseModule, parseStmt, parseIdentifier, parseIface ) where
 #include "HsVersions.h"
 
 import HsSyn
-import HsTypes		( mkHsTupCon )
-
 import RdrHsSyn
-import HscTypes		( ParsedIface(..), IsBootInterface, noDependencies )
+import HscTypes		( ModIface, IsBootInterface, DeprecTxt )
 import Lexer
 import RdrName
-import PrelNames	( mAIN_Name, funTyConName, listTyConName, 
-			  parrTyConName, consDataConName )
-import TysWiredIn	( unitTyCon, unitDataCon, tupleTyCon, 
-			  tupleCon, nilDataCon )
+import TysWiredIn	( unitTyCon, unitDataCon, tupleTyCon, tupleCon, nilDataCon,
+			  listTyCon_RDR, parrTyCon_RDR, consDataCon_RDR )
+import Type		( funTyCon )
 import ForeignCall	( Safety(..), CExportSpec(..), 
-			  CCallConv(..), CCallTarget(..), defaultCCallConv,
+			  CCallConv(..), CCallTarget(..), defaultCCallConv
 			)
-import OccName		( UserFS, varName, tcName, dataName, tcClsName, tvName )
-import TyCon		( DataConDetails(..) )
+import OccName		( UserFS, varName, dataName, tcClsName, tvName )
 import DataCon		( DataCon, dataConName )
-import SrcLoc		( SrcLoc )
+import SrcLoc		( SrcLoc, noSrcLoc )
 import Module
-import CmdLineOpts	( opt_SccProfilingOn, opt_InPackage )
+import CmdLineOpts	( opt_SccProfilingOn )
 import Type		( Kind, mkArrowKind, liftedTypeKind )
-import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), 
-			  IPName(..), NewOrData(..), StrictnessMark(..),
-			  Activation(..), FixitySig(..) )
+import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
+			  NewOrData(..), Activation(..) )
 import Panic
 
 import GLAEXTS
@@ -266,37 +261,32 @@ cvtopdecls :: { [RdrNameHsDecl] }
 -----------------------------------------------------------------------------
 -- Interfaces (.hi-boot files)
 
-iface   :: { ParsedIface }
-	: 'module' modid 'where' ifacebody
-	  {	    ParsedIface {
-			pi_mod     = $2,
-			pi_pkg     = opt_InPackage,
-			pi_vers    = 1, 		-- Module version
-			pi_orphan  = False,
-			pi_exports = (1,[($2,mkIfaceExports $4)]),
-			pi_deps    = noDependencies,
-			pi_usages  = [],
-			pi_fixity  = [],
-			pi_insts   = [],
-			pi_decls   = map (\x -> (1,x)) $4,
-		 	pi_rules   = (1,[]),
-		 	pi_deprecs = Nothing
-	   	    }
-	   }
+iface   :: { ModIface }
+	: 'module' modid 'where' ifacebody  { mkBootIface $2 $4 }
 
-ifacebody :: { [RdrNameTyClDecl] }
+ifacebody :: { [HsDecl RdrName] }
 	:  '{'            ifacedecls '}'		{ $2 }
  	|      vocurly    ifacedecls close		{ $2 }
 
-ifacedecls :: { [RdrNameTyClDecl] }
+ifacedecls :: { [HsDecl RdrName] }
 	: ifacedecl ';' ifacedecls	{ $1 : $3 }
 	| ';' ifacedecls		{ $2 }
 	| ifacedecl			{ [$1] }
 	| {- empty -}			{ [] }
 
-ifacedecl :: { RdrNameTyClDecl }
-	: tycl_decl			{ $1 }
-	| srcloc var '::' sigtype	{ IfaceSig $2 $4 [] $1 }
+ifacedecl :: { HsDecl RdrName }
+	: var '::' sigtype	
+                { SigD (Sig $1 $3 noSrcLoc) }
+ 	| 'type' syn_hdr '=' ctype	
+ 		{ let (tc,tvs) = $2 in TyClD (TySynonym tc tvs $4 noSrcLoc) }
+	| new_or_data tycl_hdr
+		{ TyClD (mkTyData $1 $2 [] Nothing noSrcLoc) }
+	| 'class' tycl_hdr fds
+		{ TyClD (mkClassDecl $2 $3 [] EmptyMonoBinds noSrcLoc) }
+
+new_or_data :: { NewOrData }
+	: 'data'	{ DataType }
+	| 'newtype'	{ NewType }
 
 -----------------------------------------------------------------------------
 -- The Export List
@@ -393,7 +383,7 @@ topdecl :: { RdrBinding }
   	: tycl_decl			{ RdrHsDecl (TyClD $1) }
 	| srcloc 'instance' inst_type where
 		{ let (binds,sigs) = cvMonoBindsAndSigs $4
-		  in RdrHsDecl (InstD (InstDecl $3 binds sigs Nothing $1)) }
+		  in RdrHsDecl (InstD (InstDecl $3 binds sigs $1)) }
 	| srcloc 'default' '(' comma_types0 ')'		{ RdrHsDecl (DefD (DefaultDecl $4 $1)) }
 	| 'foreign' fdecl				{ RdrHsDecl $2 }
 	| '{-# DEPRECATED' deprecations '#-}'	 	{ RdrBindings (reverse $2) }
@@ -409,18 +399,17 @@ tycl_decl :: { RdrNameTyClDecl }
 		-- Instead we just say b is out of scope
  		{ let (tc,tvs) = $3 in TySynonym tc tvs $5 $1 }
 
-
 	| srcloc 'data' tycl_hdr constrs deriving
-		{ mkTyData DataType $3 (DataCons (reverse $4)) $5 $1 }
+		{ mkTyData DataType $3 (reverse $4) $5 $1 }
 
 	| srcloc 'newtype' tycl_hdr '=' newconstr deriving
-		{ mkTyData NewType $3 (DataCons [$5]) $6 $1 }
+		{ mkTyData NewType $3 [$5] $6 $1 }
 
 	| srcloc 'class' tycl_hdr fds where
 		{ let 
 			(binds,sigs) = cvMonoBindsAndSigs $5 
 		  in
-	 	  mkClassDecl $3 $4 sigs (Just binds) $1 }
+	 	  mkClassDecl $3 $4 sigs binds $1 }
 
 syn_hdr :: { (RdrName, [RdrNameHsTyVar]) }	-- We don't retain the syntax of an infix
 						-- type synonym declaration. Oh well.
@@ -434,10 +423,8 @@ syn_hdr :: { (RdrName, [RdrNameHsTyVar]) }	-- We don't retain the syntax of an i
 --	(Eq a, Ord b) => T a b
 -- Rather a lot of inlining here, else we get reduce/reduce errors
 tycl_hdr :: { (RdrNameContext, RdrName, [RdrNameHsTyVar]) }
-	: context '=>' type		{% checkTyClHdr $3	>>= \ (tc,tvs) ->
-					   return ($1, tc, tvs) }
-	| type				{% checkTyClHdr $1	>>= \ (tc,tvs) ->
-					   return ([], tc, tvs) }
+	: context '=>' type		{% checkTyClHdr $1 $3 }
+	| type				{% checkTyClHdr [] $1 }
 
 -----------------------------------------------------------------------------
 -- Nested declarations
@@ -715,9 +702,9 @@ type :: { RdrNameHsType }
 
 gentype :: { RdrNameHsType }
         : btype                         { $1 }
-        | btype qtyconop gentype        { HsOpTy $1 (HsTyOp $2) $3 }
-        | btype  '`' tyvar '`' gentype  { HsOpTy $1 (HsTyOp $3) $5 }
-	| btype '->' gentype		{ HsOpTy $1 HsArrow $3 }
+        | btype qtyconop gentype        { HsOpTy $1 $2 $3 }
+        | btype  '`' tyvar '`' gentype  { HsOpTy $1 $3 $5 }
+	| btype '->' gentype		{ HsFunTy $1 $3 }
 
 btype :: { RdrNameHsType }
 	: btype atype			{ HsAppTy $1 $2 }
@@ -726,8 +713,8 @@ btype :: { RdrNameHsType }
 atype :: { RdrNameHsType }
 	: gtycon			{ HsTyVar $1 }
 	| tyvar				{ HsTyVar $1 }
-	| '(' type ',' comma_types1 ')'	{ HsTupleTy (mkHsTupCon tcName Boxed  ($2:$4)) ($2:$4) }
-	| '(#' comma_types1 '#)'	{ HsTupleTy (mkHsTupCon tcName Unboxed     $2) $2      }
+	| '(' type ',' comma_types1 ')'	{ HsTupleTy Boxed  ($2:$4) }
+	| '(#' comma_types1 '#)'	{ HsTupleTy Unboxed $2     }
 	| '[' type ']'			{ HsListTy  $2 }
 	| '[:' type ':]'		{ HsPArrTy  $2 }
 	| '(' ctype ')'		        { HsParTy   $2 }
@@ -756,7 +743,7 @@ tv_bndrs :: { [RdrNameHsTyVar] }
 
 tv_bndr :: { RdrNameHsTyVar }
 	: tyvar				{ UserTyVar $1 }
-	| '(' tyvar '::' kind ')'	{ IfaceTyVar $2 $4 }
+	| '(' tyvar '::' kind ')'	{ KindedTyVar $2 $4 }
 
 fds :: { [([RdrName], [RdrName])] }
 	: {- empty -}			{ [] }
@@ -838,9 +825,9 @@ stype :: { RdrNameBangType }
 	: ctype				{ unbangedType $1 }
 	| strict_mark atype		{ BangType $1 $2 }
 
-strict_mark :: { StrictnessMark }
-	: '!'				{ MarkedUserStrict }
-	| '!' '!'			{ MarkedUserUnboxed }
+strict_mark :: { HsBang }
+	: '!'				{ HsStrict }
+	| '!' '!'			{ HsUnbox }
 
 deriving :: { Maybe RdrNameContext }
 	: {- empty -}			{ Nothing }
@@ -984,6 +971,8 @@ aexp1	:: { RdrNameHsExpr }
 -- Here was the syntax for type applications that I was planning
 -- but there are difficulties (e.g. what order for type args)
 -- so it's not enabled yet.
+-- But this case *is* used for the left hand side of a generic definition,
+-- which is parsed as an expression before being munged into a pattern
  	| qcname '{|' gentype '|}'          { (HsApp (HsVar $1) (HsType $3)) }
 
 aexp2	:: { RdrNameHsExpr }
@@ -1267,9 +1256,9 @@ gtycon 	:: { RdrName }	-- A "general" qualified tycon
 	: oqtycon			{ $1 }
 	| '(' ')'			{ getRdrName unitTyCon }
 	| '(' commas ')'		{ getRdrName (tupleTyCon Boxed $2) }
-	| '(' '->' ')'			{ nameRdrName funTyConName }
-	| '[' ']'			{ nameRdrName listTyConName }
-	| '[:' ':]'			{ nameRdrName parrTyConName }
+	| '(' '->' ')'			{ getRdrName funTyCon }
+	| '[' ']'			{ listTyCon_RDR }
+	| '[:' ':]'			{ parrTyCon_RDR }
 
 oqtycon :: { RdrName }	-- An "ordinary" qualified tycon
 	: qtycon			{ $1 }
@@ -1398,8 +1387,7 @@ consym :: { RdrName }
 	: CONSYM		{ mkUnqual dataName $1 }
 
 	-- ':' means only list cons
-	| ':'			{ nameRdrName consDataConName }
-				-- NB: SrcName because we are reading source
+	| ':'			{ consDataCon_RDR }
 
 
 -----------------------------------------------------------------------------

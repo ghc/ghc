@@ -300,7 +300,7 @@ maybeExternaliseId id
   | opt_EnsureSplittableC, 	-- Externalise the name for -split-objs
     isInternalName name
   = moduleName				 `thenFC` \ mod ->
-    returnFC (setIdName id (mkExternalName uniq mod new_occ (nameSrcLoc name)))
+    returnFC (setIdName id (mkExternalName uniq mod new_occ Nothing (nameSrcLoc name)))
   | otherwise		
   = returnFC id
   where

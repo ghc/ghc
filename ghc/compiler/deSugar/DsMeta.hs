@@ -30,21 +30,18 @@ import HsSyn  	  ( Pat(..), HsExpr(..), Stmt(..), HsLit(..), HsOverLit(..),
 		    Match(..), GRHSs(..), GRHS(..), HsBracket(..),
                     HsStmtContext(ListComp,DoExpr), ArithSeqInfo(..),
 		    HsBinds(..), MonoBinds(..), HsConDetails(..),
-		    TyClDecl(..), HsGroup(..),
+		    TyClDecl(..), HsGroup(..), HsBang(..),
 		    HsReify(..), ReifyFlavour(..), 
-		    HsType(..), HsContext(..), HsPred(..), HsTyOp(..),
+		    HsType(..), HsContext(..), HsPred(..), 
 	 	    HsTyVarBndr(..), Sig(..), ForeignDecl(..),
 		    InstDecl(..), ConDecl(..), BangType(..),
 		    PendingSplice, splitHsInstDeclTy,
 		    placeHolderType, tyClDeclNames,
 		    collectHsBinders, collectPatBinders, collectPatsBinders,
-		    hsTyVarName, hsConArgs, getBangType,
-		    toHsType
+		    hsTyVarName, hsConArgs
 		  )
 
-import PrelNames  ( mETA_META_Name, rationalTyConName, negateName,
-		    parrTyConName )
-import MkIface	  ( ifaceTyThing )
+import PrelNames  ( mETA_META_Name, rationalTyConName, integerTyConName, negateName )
 import Name       ( Name, nameOccName, nameModule, getSrcLoc )
 import OccName	  ( isDataOcc, isTvOcc, occNameUserString )
 -- To avoid clashes with DsMeta.varName we must make a local alias for OccName.varName
@@ -53,16 +50,16 @@ import OccName	  ( isDataOcc, isTvOcc, occNameUserString )
 -- ws previously used in this file.
 import qualified OccName( varName, tcName )
 
-import Module	  ( Module, mkThPkgModule, moduleUserString )
+import Module	  ( Module, mkModule, moduleUserString )
 import Id         ( Id, idType )
-import Name	  ( mkKnownKeyExternalName )
+import Name	  ( mkExternalName )
 import OccName	  ( mkOccFS )
 import NameEnv
 import NameSet
 import Type       ( Type, mkGenTyConApp )
-import TcType	  ( TyThing(..), tcTyConAppArgs )
-import TyCon	  ( DataConDetails(..) )
-import TysWiredIn ( stringTy )
+import TcType	  ( tcTyConAppArgs )
+import TyCon	  ( DataConDetails(..), tyConName )
+import TysWiredIn ( stringTy, parrTyCon )
 import CoreSyn
 import CoreUtils  ( exprType )
 import SrcLoc	  ( noSrcLoc )
@@ -72,7 +69,7 @@ import Panic	  ( panic )
 import Unique	  ( mkPreludeTyConUnique, mkPreludeMiscIdUnique )
 import BasicTypes ( NewOrData(..), StrictnessMark(..), isBoxed ) 
 import SrcLoc     ( SrcLoc )
-
+import Packages	  ( thPackage )
 import Outputable
 import FastString	( mkFastString )
 
@@ -97,9 +94,12 @@ dsBracket brack splices
 
 -----------------------------------------------------------------------------
 dsReify :: HsReify Id -> DsM CoreExpr
+dsReify r = panic "dsReify"	-- To be re-done
+
 -- Returns a CoreExpr of type 	reifyType --> M.TypeQ
 --				reifyDecl --> M.DecQ
 --				reifyFixty --> Q M.Fix
+{-
 dsReify (ReifyOut ReifyType name)
   = do { thing <- dsLookupGlobal name ;
 		-- By deferring the lookup until now (rather than doing it
@@ -118,7 +118,7 @@ dsReify r@(ReifyOut ReifyDecl name)
 	   Just (MkC d) -> return d 
 	   Nothing	-> pprPanic "dsReify" (ppr r)
 	}
-
+-}
 {- -------------- Examples --------------------
 
   [| \x -> x |]
@@ -207,9 +207,9 @@ repTyClD decl = do x <- repTyClD' decl
 repTyClD' :: TyClDecl Name -> DsM (Maybe (SrcLoc, Core M.DecQ))
 
 repTyClD' (TyData { tcdND = DataType, tcdCtxt = cxt, 
-		   tcdName = tc, tcdTyVars = tvs, 
-		   tcdCons = DataCons cons, tcdDerivs = mb_derivs,
-           tcdLoc = loc}) 
+		    tcdName = tc, tcdTyVars = tvs, 
+		    tcdCons = cons, tcdDerivs = mb_derivs,
+	            tcdLoc = loc}) 
  = do { tc1 <- lookupOcc tc ;		-- See note [Binders and occurrences] 
         dec <- addTyVarBinds tvs $ \bndrs -> do {
       	       cxt1   <- repContext cxt ;
@@ -220,9 +220,9 @@ repTyClD' (TyData { tcdND = DataType, tcdCtxt = cxt,
         return $ Just (loc, dec) }
 
 repTyClD' (TyData { tcdND = NewType, tcdCtxt = cxt, 
-		   tcdName = tc, tcdTyVars = tvs, 
-		   tcdCons = DataCons [con], tcdDerivs = mb_derivs,
-           tcdLoc = loc}) 
+		    tcdName = tc, tcdTyVars = tvs, 
+		    tcdCons = [con], tcdDerivs = mb_derivs,
+    		    tcdLoc = loc}) 
  = do { tc1 <- lookupOcc tc ;		-- See note [Binders and occurrences] 
         dec <- addTyVarBinds tvs $ \bndrs -> do {
       	       cxt1   <- repContext cxt ;
@@ -242,7 +242,7 @@ repTyClD' (TySynonym { tcdName = tc, tcdTyVars = tvs, tcdSynRhs = ty,
 repTyClD' (ClassDecl { tcdCtxt = cxt, tcdName = cls, 
 		      tcdTyVars = tvs, 
 		      tcdFDs = [], 	-- We don't understand functional dependencies
-		      tcdSigs = sigs, tcdMeths = mb_meth_binds,
+		      tcdSigs = sigs, tcdMeths = meth_binds,
               tcdLoc = loc})
  = do { cls1 <- lookupOcc cls ;		-- See note [Binders and occurrences] 
     	dec  <- addTyVarBinds tvs $ \bndrs -> do {
@@ -252,11 +252,6 @@ repTyClD' (ClassDecl { tcdCtxt = cxt, tcdName = cls,
  		  decls1 <- coreList decQTyConName (sigs1 ++ binds1) ;
  		  repClass cxt1 cls1 (coreList' stringTy bndrs) decls1 } ;
     	return $ Just (loc, dec) }
- where
-	-- If the user quotes a class decl, it'll have default-method 
-	-- bindings; but if we (reifyDecl C) where C is a class, we
-	-- won't be given the default methods (a definite infelicity).
-   meth_binds = mb_meth_binds `orElse` EmptyMonoBinds
 
 -- Un-handled cases
 repTyClD' d = do { addDsWarn (hang msg 4 (ppr d)) ;
@@ -265,7 +260,7 @@ repTyClD' d = do { addDsWarn (hang msg 4 (ppr d)) ;
   where
     msg = ptext SLIT("Cannot desugar this Template Haskell declaration:")
 
-repInstD' (InstDecl ty binds _ _ loc)
+repInstD' (InstDecl ty binds _ loc)
 	-- Ignore user pragmas for now
  = do { cxt1 <- repContext cxt ;
 	inst_ty1 <- repPred (HsClassP cls tys) ;
@@ -291,8 +286,8 @@ repBangTy (BangType str ty) = do MkC s <- rep2 strName []
                                  MkC t <- repTy ty
                                  rep2 strictTypeName [s, t]
     where strName = case str of
-                        NotMarkedStrict -> notStrictName
-                        _ -> isStrictName
+			HsNoBang -> notStrictName
+			other    -> isStrictName
 
 -------------------------------------------------------
 -- 			Deriving clause
@@ -326,9 +321,8 @@ rep_sigs' sigs = do { sigs1 <- mapM rep_sig sigs ;
 rep_sig :: Sig Name -> DsM [(SrcLoc, Core M.DecQ)]
 	-- Singleton => Ok
 	-- Empty     => Too hard, signature ignored
-rep_sig (ClassOpSig nm _ ty loc) = rep_proto nm ty loc
-rep_sig (Sig nm ty loc)	       = rep_proto nm ty loc
-rep_sig other		       = return []
+rep_sig (Sig nm ty loc) = rep_proto nm ty loc
+rep_sig other		= return []
 
 rep_proto :: Name -> HsType Name -> SrcLoc -> DsM [(SrcLoc, Core M.DecQ)]
 rep_proto nm ty loc = do { nm1 <- lookupOcc nm ; 
@@ -411,14 +405,13 @@ repTy (HsListTy t)		  = do
 				      repTapp tcon t1
 repTy (HsPArrTy t)                = do
 				      t1   <- repTy t
-				      tcon <- repTy (HsTyVar parrTyConName)
+				      tcon <- repTy (HsTyVar (tyConName parrTyCon))
 				      repTapp tcon t1
 repTy (HsTupleTy tc tys)	  = do
 				      tys1 <- repTys tys 
 				      tcon <- repTupleTyCon (length tys)
 				      repTapps tcon tys1
-repTy (HsOpTy ty1 HsArrow ty2) 	  = repTy (HsFunTy ty1 ty2)
-repTy (HsOpTy ty1 (HsTyOp n) ty2) = repTy ((HsTyVar n `HsAppTy` ty1) 
+repTy (HsOpTy ty1 n ty2) 	  = repTy ((HsTyVar n `HsAppTy` ty1) 
 					   `HsAppTy` ty2)
 repTy (HsParTy t)  	       	  = repTy t
 repTy (HsNumTy i)                 =
@@ -1129,18 +1122,16 @@ repListTyCon = rep2 listTName []
 repLiteral :: HsLit -> DsM (Core M.Lit)
 repLiteral lit 
   = do lit' <- case lit of
-                   HsIntPrim i -> return $ HsInteger i
-                   HsInt i -> return $ HsInteger i
-                   HsFloatPrim r -> do rat_ty <- lookupType rationalTyConName
-                                       return $ HsRat r rat_ty
-                   HsDoublePrim r -> do rat_ty <- lookupType rationalTyConName
-                                        return $ HsRat r rat_ty
+                   HsIntPrim i    -> mk_integer i
+                   HsInt i        -> mk_integer i
+                   HsFloatPrim r  -> mk_rational r
+                   HsDoublePrim r -> mk_rational r
                    _ -> return lit
        lit_expr <- dsLit lit'
        rep2 lit_name [lit_expr]
   where
     lit_name = case lit of
-		 HsInteger _    -> integerLName
+		 HsInteger _ _  -> integerLName
 		 HsInt     _    -> integerLName
 		 HsIntPrim _    -> intPrimLName
 		 HsFloatPrim _  -> floatPrimLName
@@ -1152,10 +1143,14 @@ repLiteral lit
     uh_oh = pprPanic "DsMeta.repLiteral: trying to represent exotic literal"
 		    (ppr lit)
 
+mk_integer  i = do integer_ty <- lookupType integerTyConName
+                   return $ HsInteger i integer_ty
+mk_rational r = do rat_ty <- lookupType rationalTyConName
+                   return $ HsRat r rat_ty
+
 repOverloadedLiteral :: HsOverLit -> DsM (Core M.Lit)
-repOverloadedLiteral (HsIntegral i _)   = repLiteral (HsInteger i)
-repOverloadedLiteral (HsFractional f _) = do { rat_ty <- lookupType rationalTyConName ;
-					       repLiteral (HsRat f rat_ty) }
+repOverloadedLiteral (HsIntegral i _)   = do { lit <- mk_integer  i; repLiteral lit }
+repOverloadedLiteral (HsFractional f _) = do { lit <- mk_rational f; repLiteral lit }
 	-- The type Rational will be in the environment, becuase 
 	-- the smart constructor 'THSyntax.rationalL' uses it in its type,
 	-- and rationalL is sucked in when any TH stuff is used
@@ -1218,11 +1213,11 @@ coreVar id = MkC (Var id)
 --  2) Make a "Name"
 --  3) Add the name to knownKeyNames
 
-templateHaskellNames :: NameSet
+templateHaskellNames :: [Name]
 -- The names that are implicitly mentioned by ``bracket''
 -- Should stay in sync with the import list of DsMeta
 
-templateHaskellNames = mkNameSet [
+templateHaskellNames = [
     returnQName, bindQName, sequenceQName, gensymName, liftName,
     -- Lit
     charLName, stringLName, integerLName, intPrimLName,
@@ -1277,10 +1272,11 @@ tcQual   = mk_known_key_name OccName.tcName
 
 thModule :: Module
 -- NB: the THSyntax module comes from the "haskell-src" package
-thModule = mkThPkgModule mETA_META_Name
+thModule = mkModule thPackage  mETA_META_Name
 
 mk_known_key_name space str uniq 
-  = mkKnownKeyExternalName thModule (mkOccFS space str) uniq 
+  = mkExternalName uniq thModule (mkOccFS space str) 
+	           Nothing noSrcLoc
 
 returnQName   = varQual FSLIT("returnQ")   returnQIdKey
 bindQName     = varQual FSLIT("bindQ")     bindQIdKey
@@ -1323,9 +1319,9 @@ conEName        = varQual FSLIT("conE")        conEIdKey
 litEName        = varQual FSLIT("litE")        litEIdKey
 appEName        = varQual FSLIT("appE")        appEIdKey
 infixEName      = varQual FSLIT("infixE")      infixEIdKey
-infixAppName    = varQual FSLIT("infixApp")      infixAppIdKey
-sectionLName    = varQual FSLIT("sectionL")      sectionLIdKey
-sectionRName    = varQual FSLIT("sectionR")      sectionRIdKey
+infixAppName    = varQual FSLIT("infixApp")    infixAppIdKey
+sectionLName    = varQual FSLIT("sectionL")    sectionLIdKey
+sectionRName    = varQual FSLIT("sectionR")    sectionRIdKey
 lamEName        = varQual FSLIT("lamE")        lamEIdKey
 tupEName        = varQual FSLIT("tupE")        tupEIdKey
 condEName       = varQual FSLIT("condE")       condEIdKey

@@ -9,17 +9,15 @@ module TcRules ( tcRules ) where
 #include "HsVersions.h"
 
 import HsSyn		( RuleDecl(..), RuleBndr(..), collectRuleBndrSigTys )
-import CoreSyn		( CoreRule(..) )
 import RnHsSyn		( RenamedRuleDecl )
 import TcHsSyn		( TypecheckedRuleDecl, mkHsLet )
 import TcRnMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyInferCheck )
 import TcMType		( newTyVarTy )
 import TcType		( tyVarsOfTypes, openTypeKind )
-import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs )
-import TcMonoType	( tcHsSigType, UserTypeCtxt(..), tcAddScopedTyVars )
+import TcHsType		( tcHsSigType, UserTypeCtxt(..), tcAddScopedTyVars )
 import TcExpr		( tcCheckRho )
-import TcEnv		( tcExtendLocalValEnv, tcLookupGlobalId, tcLookupId )
+import TcEnv		( tcExtendLocalValEnv )
 import Inst		( instToId )
 import Id		( idType, mkLocalId )
 import Outputable
@@ -30,30 +28,12 @@ tcRules :: [RenamedRuleDecl] -> TcM [TypecheckedRuleDecl]
 tcRules decls = mappM tcRule decls
 
 tcRule :: RenamedRuleDecl -> TcM TypecheckedRuleDecl
-tcRule (IfaceRule name act vars fun args rhs src_loc)
-  = addSrcLoc src_loc 		$
-    addErrCtxt (ruleCtxt name)	$
-    tcLookupGlobalId fun		`thenM` \ fun' ->
-    tcCoreLamBndrs vars			$ \ vars' ->
-    mappM tcCoreExpr args		`thenM` \ args' ->
-    tcCoreExpr rhs			`thenM` \ rhs' ->
-    returnM (IfaceRuleOut fun' (Rule name act vars' args' rhs'))
-
-tcRule (IfaceRuleOut fun rule)	-- Built-in rules, and only built-in rules, 
-				-- come this way.  Usually IfaceRuleOut is only
-				-- used for the *output* of the type checker
-  = tcLookupId fun		`thenM` \ fun' ->
-	-- NB: tcLookupId, not tcLookupGlobalId
-	-- Reason: when compiling GHC.Base, where eqString is defined,
-	--	   we'll get the builtin rule for eqString, but eqString
-	--	   will be in the *local* type environment.
-	-- Seems like a bit of a hack
-    returnM (IfaceRuleOut fun' rule)   
-
 tcRule (HsRule name act vars lhs rhs src_loc)
   = addSrcLoc src_loc 				$
     addErrCtxt (ruleCtxt name)			$
-    newTyVarTy openTypeKind				`thenM` \ rule_ty ->
+    traceTc (ptext SLIT("---- Rule ------")
+		 <+> ppr name)			`thenM_` 
+    newTyVarTy openTypeKind			`thenM` \ rule_ty ->
 
 	-- Deal with the tyvars mentioned in signatures
     tcAddScopedTyVars (collectRuleBndrSigTys vars) (

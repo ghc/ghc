@@ -266,11 +266,11 @@ corresponds roughly to @matchVarCon@.
 
 \begin{code}
 match vars@(v:vs) eqns_info
-  = mapDs (tidyEqnInfo v) eqns_info	`thenDs` \ tidy_eqns_info ->
+  = mappM (tidyEqnInfo v) eqns_info	`thenDs` \ tidy_eqns_info ->
     let
 	tidy_eqns_blks = unmix_eqns tidy_eqns_info
     in
-    mapDs (matchEqnBlock vars) tidy_eqns_blks	`thenDs` \ match_results ->
+    mappM (matchEqnBlock vars) tidy_eqns_blks	`thenDs` \ match_results ->
     returnDs (foldr1 combineMatchResults match_results)
   where
     unmix_eqns []    = []
@@ -712,7 +712,7 @@ matchWrapper ctxt matches
 	EqnInfo _ _ arg_pats _ : _ = eqns_info
 	error_string = matchContextErrString ctxt
     in
-    mapDs selectMatchVar arg_pats		`thenDs` \ new_vars ->
+    mappM selectMatchVar arg_pats		`thenDs` \ new_vars ->
     match_fun dflags new_vars eqns_info 	`thenDs` \ match_result ->
 
     mkErrorAppDs pAT_ERROR_ID result_ty error_string	`thenDs` \ fail_expr ->

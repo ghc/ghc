@@ -83,7 +83,7 @@ dsMonoBinds auto_scc (PatMonoBind pat grhss locn) rest
   = putSrcLocDs locn $
     dsGuarded grhss				`thenDs` \ body_expr ->
     mkSelectorBinds pat body_expr		`thenDs` \ sel_binds ->
-    mapDs (addAutoScc auto_scc) sel_binds	`thenDs` \ sel_binds ->
+    mappM (addAutoScc auto_scc) sel_binds	`thenDs` \ sel_binds ->
     returnDs (sel_binds ++ rest)
 
 	-- Common special case: no type or dictionary abstraction
@@ -134,7 +134,7 @@ dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exports inlines binds) rest
     let
 	dict_args = map Var dicts
 
-	mk_bind (tyvars, global, local) n	-- locals !! n == local
+	mk_bind ((tyvars, global, local), n)	-- locals !! n == local
 	  = 	-- Need to make fresh locals to bind in the selector, because
 		-- some of the tyvars will be bound to voidTy
 	    newSysLocalsDs (map substitute local_tys) 	`thenDs` \ locals' ->
@@ -148,7 +148,7 @@ dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exports inlines binds) rest
 	    ty_args    = map mk_ty_arg all_tyvars
 	    substitute = substTyWith all_tyvars ty_args
     in
-    zipWithDs mk_bind exports [0..]		`thenDs` \ export_binds ->
+    mappM mk_bind (exports `zip` [0..])		`thenDs` \ export_binds ->
      -- don't scc (auto-)annotate the tuple itself.
     returnDs ((poly_tup_id, poly_tup_expr) : (export_binds ++ rest))
 \end{code}

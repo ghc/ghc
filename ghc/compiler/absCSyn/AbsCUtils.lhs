@@ -423,13 +423,6 @@ flatAbsC stmt@(CRetVector _ _ _ _)              = returnFlt (AbsCNop, stmt)
 flatAbsC stmt@(CModuleInitBlock _ _ _)          = returnFlt (AbsCNop, stmt)
 \end{code}
 
-\begin{code}
-flat_maybe :: Maybe AbstractC -> FlatM (Maybe AbstractC, AbstractC)
-flat_maybe Nothing      = returnFlt (Nothing, AbsCNop)
-flat_maybe (Just abs_c) = flatAbsC abs_c `thenFlt` \ (heres, tops) ->
-		          returnFlt (Just heres, tops)
-\end{code}
-
 %************************************************************************
 %*									*
 \subsection[flat-simultaneous]{Doing things simultaneously}
@@ -606,6 +599,7 @@ mkHalfWord_HIADDR res arg
      let 
 	 hw_shift = mkIntCLit (wORD_SIZE_IN_BITS `quot` 2)
 
+#        if WORDS_BIGENDIAN
          a_hw_mask1
             = CMachOpStmt t_hw_mask1
                           MO_Nat_Shl [CLit (mkMachWord 1), hw_shift] Nothing
@@ -613,12 +607,11 @@ mkHalfWord_HIADDR res arg
             = CMachOpStmt t_hw_mask2
                           MO_Nat_Sub [t_hw_mask1, CLit (mkMachWord 1)] Nothing
          final
-#        if WORDS_BIGENDIAN
             = CSequential [ a_hw_mask1, a_hw_mask2,
                  CMachOpStmt res MO_Nat_And [arg, t_hw_mask2] Nothing
               ]
 #        else
-            = CMachOpStmt res MO_Nat_Shr [arg, hw_shift] Nothing
+         final = CMachOpStmt res MO_Nat_Shr [arg, hw_shift] Nothing
 #        endif
      in
          returnFlt final

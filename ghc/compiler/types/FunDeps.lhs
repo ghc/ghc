@@ -17,7 +17,7 @@ import Name		( getSrcLoc )
 import Var		( Id, TyVar )
 import Class		( Class, FunDep, classTvsFds )
 import Subst		( mkSubst, emptyInScopeSet, substTy )
-import TcType		( Type, ThetaType, SourceType(..), PredType,
+import TcType		( Type, ThetaType, PredType(..), 
 			  predTyUnique, mkClassPred, tyVarsOfTypes, tyVarsOfPred,
 			  unifyTyListsX, unifyExtendTysX, tcEqType
 			)
@@ -177,7 +177,7 @@ improve :: InstEnv Id		-- Gives instances for given class
 type InstEnv a = Class -> [(TyVarSet, [Type], a)]
 -- This is a bit clumsy, because InstEnv is really
 -- defined in module InstEnv.  However, we don't want
--- to define it (and ClsInstEnv) here because InstEnv
+-- to define it here because InstEnv
 -- is their home.  Nor do we want to make a recursive
 -- module group (InstEnv imports stuff from FunDeps).
 \end{code}

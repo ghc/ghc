@@ -9,13 +9,13 @@ module TcSplice( tcSpliceExpr, tcSpliceDecls, tcBracket ) where
 #include "HsVersions.h"
 
 import HscMain		( compileExpr )
-import TcRnDriver	( importSupportingDecls, tcTopSrcDecls )
+import TcRnDriver	( tcTopSrcDecls )
 	-- These imports are the reason that TcSplice 
 	-- is very high up the module hierarchy
 
 import qualified Language.Haskell.THSyntax as Meta
 
-import HscTypes		( HscEnv(..), PersistentCompilerState(..) )
+import HscTypes		( HscEnv(..) )
 import HsSyn		( HsBracket(..), HsExpr(..) )
 import Convert		( convertToHsExpr, convertToHsDecls )
 import RnExpr		( rnExpr )
@@ -26,10 +26,9 @@ import TcHsSyn		( TcExpr, TypecheckedHsExpr, mkHsLet, zonkTopExpr )
 import TcSimplify	( tcSimplifyTop, tcSimplifyBracket )
 import TcUnify		( Expected, zapExpectedTo, zapExpectedType )
 import TcType		( TcType, openTypeKind, mkAppTy )
-import TcEnv		( spliceOK, tcMetaTy, tcWithTempInstEnv, bracketOK )
-import TcRnTypes	( TopEnv(..) )
+import TcEnv		( spliceOK, tcMetaTy, bracketOK )
 import TcMType		( newTyVarTy, UserTypeCtxt(ExprSigCtxt) )
-import TcMonoType	( tcHsSigType )
+import TcHsType		( tcHsSigType )
 import Name		( Name )
 import TcRnMonad
 
@@ -109,14 +108,12 @@ tc_bracket (TypBr typ)
 	-- Result type is Type (= Q Typ)
 
 tc_bracket (DecBr decls)
-  = tcWithTempInstEnv (tcTopSrcDecls decls)	`thenM_`
-	-- Typecheck the declarations, dicarding any side effects
-	-- on the instance environment (which is in a mutable variable)
-	-- and the extended environment.  We'll get all that stuff
-	-- later, when we splice it in
+  = tcTopSrcDecls decls		`thenM_`
+	-- Typecheck the declarations, dicarding the result
+	-- We'll get all that stuff later, when we splice it in
 
-    tcMetaTy decTyConName		`thenM` \ decl_ty ->
-    tcMetaTy qTyConName			`thenM` \ q_ty ->
+    tcMetaTy decTyConName	`thenM` \ decl_ty ->
+    tcMetaTy qTyConName		`thenM` \ q_ty ->
     returnM (mkAppTy q_ty (mkListTy decl_ty))
 	-- Result type is Q [Dec]
 \end{code}
@@ -186,10 +183,9 @@ tcTopSplice expr res_ty
 
     showSplice "expression" 
 	       zonked_q_expr (ppr expr2)	`thenM_`
-    initRn SourceMode (rnExpr expr2)		`thenM` \ (exp3, fvs) ->
-    importSupportingDecls fvs			`thenM` \ env ->
+    rnExpr expr2				`thenM` \ (exp3, fvs) ->
 
-    setGblEnv env (tcMonoExpr exp3 res_ty)
+    tcMonoExpr exp3 res_ty
 
 
 tcTopSpliceExpr :: RenamedHsExpr -> TcType -> TcM TypecheckedHsExpr
@@ -265,19 +261,10 @@ runMetaD e = runMeta e
 runMeta :: TypecheckedHsExpr 	-- Of type X
 	-> TcM t		-- Of type t
 runMeta expr
-  = getTopEnv		`thenM` \ top_env ->
+  = getTopEnv		`thenM` \ hsc_env ->
     getGblEnv		`thenM` \ tcg_env ->
-    getEps		`thenM` \ eps ->
-    getNameCache	`thenM` \ name_cache -> 
     getModule		`thenM` \ this_mod ->
     let
-	ghci_mode = top_mode top_env
-
-	hsc_env = HscEnv { hsc_mode = ghci_mode, hsc_HPT = top_hpt top_env,
-			   hsc_dflags = top_dflags top_env }
-
-	pcs = PCS { pcs_nc = name_cache, pcs_EPS = eps }
-
 	type_env = tcg_type_env tcg_env
 	rdr_env  = tcg_rdr_env tcg_env
     in
@@ -286,7 +273,7 @@ runMeta expr
 	-- Running might fail if it throws an exception
     tryM (ioToTcRn (do
 	hval <- HscMain.compileExpr 
-		      hsc_env pcs this_mod 
+		      hsc_env this_mod 
 	              rdr_env type_env expr
         Meta.runQ (unsafeCoerce# hval)		-- Coerce it to Q t, and run it
     ))					`thenM` \ either_tval ->

@@ -15,6 +15,17 @@ module OccName (
 	OccName, 	-- Abstract, instance of Outputable
 	pprOccName, 
 
+	-- The OccEnv type
+	OccEnv, emptyOccEnv, unitOccEnv, extendOccEnv,
+	lookupOccEnv, mkOccEnv, extendOccEnvList, elemOccEnv,
+	occEnvElts, foldOccEnv, plusOccEnv_C, extendOccEnv_C,
+
+
+	-- The OccSet type
+	OccSet, emptyOccSet, unitOccSet, mkOccSet, extendOccSet, extendOccSetList,
+	unionOccSets, unionManyOccSets, minusOccSet, elemOccSet, occSetElts, 
+	foldOccSet, isEmptyOccSet, intersectOccSet, intersectsOccSet,
+
 	mkOccFS, mkSysOcc, mkSysOccFS, mkFCallOcc, mkKindOccFS,
 	mkVarOcc, mkVarOccEncoded,
 	mkSuperDictSelOcc, mkDFunOcc, mkForeignExportOcc,
@@ -29,6 +40,8 @@ module OccName (
 	occNameFS, occNameString, occNameUserString, occNameSpace, 
 	occNameFlavour, briefOccNameFlavour,
 	setOccNameSpace,
+
+	mkTupleOcc, isTupleOcc_maybe,
 
 	-- Tidying up
 	TidyOccEnv, emptyTidyOccEnv, tidyOccName, initTidyOccEnv,
@@ -47,8 +60,10 @@ module OccName (
 
 import Char	( isDigit, isUpper, isLower, isAlphaNum, ord, chr, digitToInt )
 import Util	( thenCmp )
-import Unique	( Unique )
-import FiniteMap ( FiniteMap, emptyFM, lookupFM, addToFM, elemFM )
+import Unique	( Unique, mkUnique, Uniquable(..) )
+import BasicTypes ( Boxity(..), Arity )
+import UniqFM
+import UniqSet
 import FastString
 import Outputable
 import Binary
@@ -173,7 +188,11 @@ instance Outputable OccName where
     ppr = pprOccName
 
 pprOccName :: OccName -> SDoc
-pprOccName (OccName sp occ) = pprEncodedFS occ
+pprOccName (OccName sp occ) 
+  = getPprStyle $ \ sty ->
+    pprEncodedFS occ <> if debugStyle sty then
+			   braces (text (briefNameSpaceFlavour sp))
+			else empty
 \end{code}
 
 
@@ -227,6 +246,92 @@ mkVarOccEncoded fs = mkSysOccFS varName fs
 
 %************************************************************************
 %*									*
+		Environments
+%*									*
+%************************************************************************
+
+OccEnvs are used mainly for the envts in ModIfaces.
+
+They are efficient, because FastStrings have unique Int# keys.  We assume
+this key is less than 2^24, so we can make a Unique using
+	mkUnique ns key  :: Unique
+where 'ns' is a Char reprsenting the name space.  This in turn makes it
+easy to build an OccEnv.
+
+\begin{code}
+instance Uniquable OccName where
+  getUnique (OccName ns fs)
+      = mkUnique char (I# (uniqueOfFS fs))
+      where	-- See notes above about this getUnique function
+        char = case ns of
+		VarName   -> 'i'
+		DataName  -> 'd'
+		TvName    -> 'v'
+		TcClsName -> 't'
+
+type OccEnv a = UniqFM a
+
+emptyOccEnv :: OccEnv a
+unitOccEnv  :: OccName -> a -> OccEnv a
+extendOccEnv :: OccEnv a -> OccName -> a -> OccEnv a
+extendOccEnvList :: OccEnv a -> [(OccName, a)] -> OccEnv a
+lookupOccEnv :: OccEnv a -> OccName -> Maybe a
+mkOccEnv     :: [(OccName,a)] -> OccEnv a
+elemOccEnv   :: OccName -> OccEnv a -> Bool
+foldOccEnv   :: (a -> b -> b) -> b -> OccEnv a -> b
+occEnvElts   :: OccEnv a -> [a]
+extendOccEnv_C :: (a->a->a) -> OccEnv a -> OccName -> a -> OccEnv a
+plusOccEnv_C   :: (a->a->a) -> OccEnv a -> OccEnv a -> OccEnv a
+
+emptyOccEnv  	 = emptyUFM
+unitOccEnv   	 = unitUFM
+extendOccEnv 	 = addToUFM
+extendOccEnvList = addListToUFM
+lookupOccEnv 	 = lookupUFM
+mkOccEnv         = listToUFM
+elemOccEnv	 = elemUFM
+foldOccEnv	 = foldUFM
+occEnvElts 	 = eltsUFM
+plusOccEnv_C	 = plusUFM_C
+extendOccEnv_C   = addToUFM_C
+
+
+type OccSet = UniqFM OccName
+
+emptyOccSet	  :: OccSet
+unitOccSet	  :: OccName -> OccSet
+mkOccSet          :: [OccName] -> OccSet
+extendOccSet      :: OccSet -> OccName -> OccSet
+extendOccSetList  :: OccSet -> [OccName] -> OccSet
+unionOccSets	  :: OccSet -> OccSet -> OccSet
+unionManyOccSets  :: [OccSet] -> OccSet
+minusOccSet 	  :: OccSet -> OccSet -> OccSet
+elemOccSet	  :: OccName -> OccSet -> Bool
+occSetElts	  :: OccSet -> [OccName]
+foldOccSet	  :: (OccName -> b -> b) -> b -> OccSet -> b
+isEmptyOccSet	  :: OccSet -> Bool
+intersectOccSet   :: OccSet -> OccSet -> OccSet
+intersectsOccSet  :: OccSet -> OccSet -> Bool
+
+emptyOccSet	  = emptyUniqSet
+unitOccSet	  = unitUniqSet
+mkOccSet          = mkUniqSet
+extendOccSet	  = addOneToUniqSet
+extendOccSetList  = addListToUniqSet
+unionOccSets      = unionUniqSets
+unionManyOccSets  = unionManyUniqSets
+minusOccSet	  = minusUniqSet
+elemOccSet        = elementOfUniqSet
+occSetElts        = uniqSetToList
+foldOccSet	  = foldUniqSet
+isEmptyOccSet     = isEmptyUniqSet
+intersectOccSet   = intersectUniqSets
+intersectsOccSet s1 s2 = not (isEmptyOccSet (s1 `intersectOccSet` s2))
+\end{code}
+
+
+%************************************************************************
+%*									*
 \subsection{Predicates and taking them apart}
 %*									*
 %************************************************************************
@@ -256,10 +361,12 @@ occNameFlavour (OccName VarName s)   = "Variable"
 
 -- briefOccNameFlavour is used in debug-printing of names
 briefOccNameFlavour :: OccName -> String
-briefOccNameFlavour (OccName DataName _)    = "d"
-briefOccNameFlavour (OccName VarName _)     = "v"
-briefOccNameFlavour (OccName TvName _)      = "tv"
-briefOccNameFlavour (OccName TcClsName _)   = "tc"
+briefOccNameFlavour (OccName sp _) = briefNameSpaceFlavour sp
+
+briefNameSpaceFlavour DataName  = "d"
+briefNameSpaceFlavour VarName   = "v"
+briefNameSpaceFlavour TvName    = "tv"
+briefNameSpaceFlavour TcClsName = "tc"
 \end{code}
 
 \begin{code}
@@ -289,6 +396,7 @@ isDataOcc other		       = False
 -- Pretty inefficient!
 isSymOcc (OccName DataName s) = isLexConSym (decodeFS s)
 isSymOcc (OccName VarName s)  = isLexSym (decodeFS s)
+isSymOcc other		      = False
 \end{code}
 
 
@@ -448,31 +556,25 @@ because that isn't a single lexeme.  So we encode it to 'lle' and *then*
 tack on the '1', if necessary.
 
 \begin{code}
-type TidyOccEnv = FiniteMap FastString Int	-- The in-scope OccNames
-emptyTidyOccEnv = emptyFM
+type TidyOccEnv = OccEnv Int	-- The in-scope OccNames
+	-- Range gives a plausible starting point for new guesses
+
+emptyTidyOccEnv = emptyOccEnv
 
 initTidyOccEnv :: [OccName] -> TidyOccEnv	-- Initialise with names to avoid!
-initTidyOccEnv = foldl (\env (OccName _ fs) -> addToFM env fs 1) emptyTidyOccEnv
+initTidyOccEnv = foldl (\env occ -> extendOccEnv env occ 1) emptyTidyOccEnv
 
 tidyOccName :: TidyOccEnv -> OccName -> (TidyOccEnv, OccName)
 
 tidyOccName in_scope occ@(OccName occ_sp fs)
-  | not (fs `elemFM` in_scope)
-  = (addToFM in_scope fs 1, occ)	-- First occurrence
+  = case lookupOccEnv in_scope occ of
+	Nothing -> 	-- Not already used: make it used
+		   (extendOccEnv in_scope occ 1, occ)
 
-  | otherwise				-- Already occurs
-  = go in_scope (unpackFS fs)
-  where
-
-    go in_scope str = case lookupFM in_scope pk_str of
-			Just n  -> go (addToFM in_scope pk_str (n+1)) (str ++ show n)
-				-- Need to go round again, just in case "t3" (say) 
-				-- clashes with a "t3" that's already in scope
-
-			Nothing -> (addToFM in_scope pk_str 1, mkSysOccFS occ_sp pk_str)
-				-- str is now unique
-		    where
-		      pk_str = mkFastString str
+	Just n  -> 	-- Already used: make a new guess, 
+			-- change the guess base, and try again
+		   tidyOccName  (extendOccEnv in_scope occ (n+1))
+				(mkSysOcc occ_sp (unpackFS fs ++ show n))
 \end{code}
 
 
@@ -544,20 +646,6 @@ encode cs = case maybe_tuple cs of
 		go []     = []
 		go (c:cs) = encode_ch c ++ go cs
 
-maybe_tuple "(# #)" = Just("Z1H")
-maybe_tuple ('(' : '#' : cs) = case count_commas (0::Int) cs of
-				 (n, '#' : ')' : cs) -> Just ('Z' : shows (n+1) "H")
-				 other		     -> Nothing
-maybe_tuple "()" = Just("Z0T")
-maybe_tuple ('(' : cs)       = case count_commas (0::Int) cs of
-				 (n, ')' : cs) -> Just ('Z' : shows (n+1) "T")
-				 other	       -> Nothing
-maybe_tuple other    	     = Nothing
-
-count_commas :: Int -> String -> (Int, String)
-count_commas n (',' : cs) = count_commas (n+1) cs
-count_commas n cs	  = (n,cs)
-
 encodeFS :: UserFS -> EncodedFS
 encodeFS fast_str  | all unencodedChar str = fast_str
 		   | otherwise	           = mkFastString (encode str)
@@ -613,56 +701,120 @@ decodeFS fs = mkFastString (decode (unpackFS fs))
 
 decode :: EncodedString -> UserString
 decode [] = []
-decode ('Z' : rest) = decode_escape rest
-decode ('z' : rest) = decode_escape rest
+decode ('Z' : d : rest) | isDigit d = decode_tuple   d rest
+			| otherwise = decode_upper   d : decode rest
+decode ('z' : d : rest) | isDigit d = decode_num_esc d rest
+			| otherwise = decode_lower   d : decode rest
 decode (c   : rest) = c : decode rest
 
-decode_escape :: EncodedString -> UserString
+decode_upper, decode_lower :: Char -> Char
 
-decode_escape ('L' : rest) = '(' : decode rest
-decode_escape ('R' : rest) = ')' : decode rest
-decode_escape ('M' : rest) = '[' : decode rest
-decode_escape ('N' : rest) = ']' : decode rest
-decode_escape ('C' : rest) = ':' : decode rest
-decode_escape ('Z' : rest) = 'Z' : decode rest
+decode_upper 'L' = '('
+decode_upper 'R' = ')'
+decode_upper 'M' = '['
+decode_upper 'N' = ']'
+decode_upper 'C' = ':'
+decode_upper 'Z' = 'Z'
+decode_upper ch  = pprTrace "decode_upper" (char ch) ch
+	     	
+decode_lower 'z' = 'z'
+decode_lower 'a' = '&'
+decode_lower 'b' = '|'
+decode_lower 'c' = '^'
+decode_lower 'd' = '$'
+decode_lower 'e' = '='
+decode_lower 'g' = '>'
+decode_lower 'h' = '#'
+decode_lower 'i' = '.'
+decode_lower 'l' = '<'
+decode_lower 'm' = '-'
+decode_lower 'n' = '!'
+decode_lower 'p' = '+'
+decode_lower 'q' = '\''
+decode_lower 'r' = '\\'
+decode_lower 's' = '/'
+decode_lower 't' = '*'
+decode_lower 'u' = '_'
+decode_lower 'v' = '%'
+decode_lower ch  = pprTrace "decode_lower" (char ch) ch
 
-decode_escape ('z' : rest) = 'z' : decode rest
-decode_escape ('a' : rest) = '&' : decode rest
-decode_escape ('b' : rest) = '|' : decode rest
-decode_escape ('c' : rest) = '^' : decode rest
-decode_escape ('d' : rest) = '$' : decode rest
-decode_escape ('e' : rest) = '=' : decode rest
-decode_escape ('g' : rest) = '>' : decode rest
-decode_escape ('h' : rest) = '#' : decode rest
-decode_escape ('i' : rest) = '.' : decode rest
-decode_escape ('l' : rest) = '<' : decode rest
-decode_escape ('m' : rest) = '-' : decode rest
-decode_escape ('n' : rest) = '!' : decode rest
-decode_escape ('p' : rest) = '+' : decode rest
-decode_escape ('q' : rest) = '\'' : decode rest
-decode_escape ('r' : rest) = '\\' : decode rest
-decode_escape ('s' : rest) = '/' : decode rest
-decode_escape ('t' : rest) = '*' : decode rest
-decode_escape ('u' : rest) = '_' : decode rest
-decode_escape ('v' : rest) = '%' : decode rest
-
--- Tuples are coded as Z23T
 -- Characters not having a specific code are coded as z224U
-decode_escape (c : rest)
-  | isDigit c = go (digitToInt c) rest
+decode_num_esc d rest
+  = go (digitToInt d) rest
   where
     go n (c : rest) | isDigit c = go (10*n + digitToInt c) rest
-    go 0 ('T' : rest) 		= "()" ++ (decode rest)
-    go n ('T' : rest)		= '(' : replicate (n-1) ',' ++ ')' : decode rest
-    go 1 ('H' : rest)		= "(# #)" ++ (decode rest)
-    go n ('H' : rest)		= '(' : '#' : replicate (n-1) ',' ++ '#' : ')' : decode rest
     go n ('U' : rest)           = chr n : decode rest
-    go n other = pprPanic "decode_escape" (ppr n <+> text (c:rest))
-
-decode_escape (c : rest) = pprTrace "decode_escape" (char c) (decode rest)
-decode_escape []	 = pprTrace "decode_escape" (text "empty") ""
+    go n other = pprPanic "decode_num_esc" (ppr n <+> text other)
 \end{code}
 
+
+%************************************************************************
+%*									*
+		Stuff for dealing with tuples
+%*									*
+%************************************************************************
+
+Tuples are encoded as
+	Z3T or Z3H
+for 3-tuples or unboxed 3-tuples respectively.  No other encoding starts 
+	Z<digit>
+
+* "(# #)" is the tycon for an unboxed 1-tuple (not 0-tuple)
+  There are no unboxed 0-tuples.  
+
+* "()" is the tycon for a boxed 0-tuple.
+  There are no boxed 1-tuples.
+
+
+\begin{code}
+maybe_tuple :: UserString -> Maybe EncodedString
+
+maybe_tuple "(# #)" = Just("Z1H")
+maybe_tuple ('(' : '#' : cs) = case count_commas (0::Int) cs of
+				 (n, '#' : ')' : cs) -> Just ('Z' : shows (n+1) "H")
+				 other		     -> Nothing
+maybe_tuple "()" = Just("Z0T")
+maybe_tuple ('(' : cs)       = case count_commas (0::Int) cs of
+				 (n, ')' : cs) -> Just ('Z' : shows (n+1) "T")
+				 other	       -> Nothing
+maybe_tuple other    	     = Nothing
+
+count_commas :: Int -> String -> (Int, String)
+count_commas n (',' : cs) = count_commas (n+1) cs
+count_commas n cs	  = (n,cs)
+\end{code}
+
+\begin{code}
+decode_tuple :: Char -> EncodedString -> UserString
+decode_tuple d rest
+  = go (digitToInt d) rest
+  where
+    go n (c : rest) | isDigit c = go (10*n + digitToInt c) rest
+    go 0 ['T']	 		= "()"
+    go n ['T']			= '(' : replicate (n-1) ',' ++ ")"
+    go 1 ['H']			= "(# #)"
+    go n ['H']			= '(' : '#' : replicate (n-1) ',' ++ "#)"
+    go n other = pprPanic "decode_tuple" (ppr n <+> text other)
+
+mkTupleOcc :: NameSpace -> Boxity -> Arity -> OccName
+mkTupleOcc ns bx ar
+  = OccName ns (mkFastString ('Z' : (show ar ++ bx_char)))
+  where
+    bx_char = case bx of
+		Boxed   -> "T"
+		Unboxed -> "H"
+
+isTupleOcc_maybe :: OccName -> Maybe (NameSpace, Boxity, Arity)
+-- Tuples are special, because there are so many of them!
+isTupleOcc_maybe (OccName ns fs)
+  = case unpackFS fs of
+	('Z':d:rest) | isDigit d -> Just (decode_tup (digitToInt d) rest)
+	other			 -> Nothing
+  where
+    decode_tup n "H" 	  = (ns, Unboxed, n)
+    decode_tup n "T" 	  = (ns, Boxed, n)
+    decode_tup n (d:rest) = decode_tup (n*10 + digitToInt d) rest
+\end{code}
 
 %************************************************************************
 %*									*
@@ -718,8 +870,15 @@ isUpperISO    (C# c#) = c# `geChar#` '\xc0'# && c# `leChar#` '\xde'# && c# `neCh
 isLowerISO    (C# c#) = c# `geChar#` '\xdf'# && c# `leChar#` '\xff'# && c# `neChar#` '\xf7'#
 	--0xdf <= oc && oc <= 0xff && oc /= 0xf7 where oc = ord c
 \end{code}
+
+%************************************************************************
+%*									*
+		Binary instance
+    Here rather than BinIface because OccName is abstract
+%*									*
+%************************************************************************
+
 \begin{code}
-{-* Generated by DrIFT-v1.0 : Look, but Don't Touch. *-}
 instance Binary NameSpace where
     put_ bh VarName = do
 	    putByte bh 0
@@ -745,7 +904,4 @@ instance Binary OccName where
 	  aa <- get bh
 	  ab <- get bh
 	  return (OccName aa ab)
-
---  Imported from other files :-
-
 \end{code}

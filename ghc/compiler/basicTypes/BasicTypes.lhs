@@ -17,10 +17,12 @@ module BasicTypes(
 	Version, bumpVersion, initialVersion, bogusVersion,
 
 	Arity, 
+	
+	DeprecTxt,
 
 	Unused, unused,
 
-	FixitySig(..), Fixity(..), FixityDirection(..),
+	Fixity(..), FixityDirection(..),
 	defaultFixity, maxPrecedence, 
 	arrowFixity, negateFixity, negatePrecedence,
 	compareFixity,
@@ -29,11 +31,13 @@ module BasicTypes(
 
 	NewOrData(..), 
 
-	RecFlag(..), isRec, isNonRec,
+	RecFlag(..), isRec, isNonRec, boolToRecFlag,
 
 	TopLevelFlag(..), isTopLevel, isNotTopLevel,
 
-	Boxity(..), isBoxed, tupleParens,
+	Boxity(..), isBoxed, 
+
+	TupCon(..), tupParens, tupleParens,
 
 	OccInfo(..), seqOccInfo, isFragileOcc, isOneOcc, 
 	isDeadOcc, isLoopBreaker,
@@ -53,8 +57,8 @@ module BasicTypes(
 
 #include "HsVersions.h"
 
+import FastString( FastString )
 import Outputable
-import SrcLoc
 \end{code}
 
 %************************************************************************
@@ -96,15 +100,23 @@ type Version = Int
 bogusVersion :: Version	-- Shouldn't look at these
 bogusVersion = error "bogusVersion"
 
-bumpVersion :: Bool -> Version -> Version 
--- Bump if the predicate (typically equality between old and new) is false
-bumpVersion False v = v+1
-bumpVersion True  v = v
+bumpVersion :: Version -> Version 
+bumpVersion v = v+1
 
 initialVersion :: Version
 initialVersion = 1
 \end{code}
 
+%************************************************************************
+%*									*
+		Deprecations
+%*									*
+%************************************************************************
+
+
+\begin{code}
+type DeprecTxt = FastString	-- reason/explanation for deprecation
+\end{code}
 
 %************************************************************************
 %*									*
@@ -130,9 +142,13 @@ ipNameName (Linear  n) = n
 mapIPName :: (a->b) -> IPName a -> IPName b
 mapIPName f (Dupable n) = Dupable (f n)
 mapIPName f (Linear  n) = Linear  (f n)
+
+instance Outputable name => Outputable (IPName name) where
+    ppr (Dupable n) = char '?' <> ppr n -- Ordinary implicit parameters
+    ppr (Linear  n) = char '%' <> ppr n -- Splittable implicit parameters
 \end{code}
 
-		
+
 %************************************************************************
 %*									*
 \subsection[Fixity]{Fixity info}
@@ -140,15 +156,6 @@ mapIPName f (Linear  n) = Linear  (f n)
 %************************************************************************
 
 \begin{code}
-------------------------
-data FixitySig name = FixitySig name Fixity SrcLoc 
-
-instance Eq name => Eq (FixitySig name) where
-   (FixitySig n1 f1 _) == (FixitySig n2 f2 _) = n1==n2 && f1==f2
-
-instance Outputable name => Outputable (FixitySig name) where
-  ppr (FixitySig name fixity loc) = sep [ppr fixity, ppr name]
-
 ------------------------
 data Fixity = Fixity Int FixityDirection
 
@@ -219,6 +226,10 @@ data NewOrData
   = NewType  	-- "newtype Blah ..."
   | DataType 	-- "data Blah ..."
   deriving( Eq )	-- Needed because Demand derives Eq
+
+instance Outputable NewOrData where
+  ppr NewType  = ptext SLIT("newtype")
+  ppr DataType = ptext SLIT("data")
 \end{code}
 
 
@@ -240,7 +251,12 @@ isNotTopLevel TopLevel    = False
 
 isTopLevel TopLevel	= True
 isTopLevel NotTopLevel  = False
+
+instance Outputable TopLevelFlag where
+  ppr TopLevel    = ptext SLIT("<TopLevel>")
+  ppr NotTopLevel = ptext SLIT("<NotTopLevel>")
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -257,10 +273,6 @@ data Boxity
 isBoxed :: Boxity -> Bool
 isBoxed Boxed   = True
 isBoxed Unboxed = False
-
-tupleParens :: Boxity -> SDoc -> SDoc
-tupleParens Boxed   p = parens p
-tupleParens Unboxed p = ptext SLIT("(#") <+> p <+> ptext SLIT("#)")
 \end{code}
 
 
@@ -273,6 +285,7 @@ tupleParens Unboxed p = ptext SLIT("(#") <+> p <+> ptext SLIT("#)")
 \begin{code} 
 data RecFlag = Recursive 
 	     | NonRecursive
+	     deriving( Eq )
 
 isRec :: RecFlag -> Bool
 isRec Recursive    = True
@@ -281,6 +294,34 @@ isRec NonRecursive = False
 isNonRec :: RecFlag -> Bool
 isNonRec Recursive    = False
 isNonRec NonRecursive = True
+
+boolToRecFlag :: Bool -> RecFlag
+boolToRecFlag True  = Recursive
+boolToRecFlag False = NonRecursive
+
+instance Outputable RecFlag where
+  ppr Recursive    = ptext SLIT("Recursive")
+  ppr NonRecursive = ptext SLIT("NonRecursive")
+\end{code}
+
+%************************************************************************
+%*									*
+		Tuples
+%*									*
+%************************************************************************
+
+\begin{code}
+data TupCon = TupCon Boxity Arity
+
+instance Eq TupCon where
+  (TupCon b1 a1) == (TupCon b2 a2) = b1==b2 && a1==a2
+   
+tupParens :: TupCon -> SDoc -> SDoc
+tupParens (TupCon b _) p = tupleParens b p
+
+tupleParens :: Boxity -> SDoc -> SDoc
+tupleParens Boxed   p = parens p
+tupleParens Unboxed p = ptext SLIT("(#") <+> p <+> ptext SLIT("#)")
 \end{code}
 
 %************************************************************************
@@ -290,7 +331,7 @@ isNonRec NonRecursive = True
 %************************************************************************
 
 This is the "Embedding-Projection pair" datatype, it contains 
-two pieces of code (normally either RenamedHsExpr's or Id's)
+two pieces of code (normally either RenamedExpr's or Id's)
 If we have a such a pair (EP from to), the idea is that 'from' and 'to'
 represents functions of type 
 
@@ -400,12 +441,10 @@ The strictness annotations on types in data type declarations
 e.g. 	data T = MkT !Int !(Bool,Bool)
 
 \begin{code}
-data StrictnessMark
-   = MarkedUserStrict	-- "!"  in a source decl
-   | MarkedUserUnboxed  -- "!!" in a source decl
-   | MarkedStrict	-- "!"  in an interface decl: strict but not unboxed
-   | MarkedUnboxed	-- "!!" in an interface decl: unboxed 
-   | NotMarkedStrict	-- No annotation at all
+data StrictnessMark	-- Used in interface decls only
+   = MarkedStrict	
+   | MarkedUnboxed	
+   | NotMarkedStrict	
    deriving( Eq )
 
 isMarkedUnboxed MarkedUnboxed = True
@@ -415,10 +454,9 @@ isMarkedStrict NotMarkedStrict = False
 isMarkedStrict other	       = True	-- All others are strict
 
 instance Outputable StrictnessMark where
-  ppr MarkedUserStrict = ptext SLIT("!u")
   ppr MarkedStrict     = ptext SLIT("!")
-  ppr MarkedUnboxed    = ptext SLIT("! !")
-  ppr NotMarkedStrict  = empty
+  ppr MarkedUnboxed    = ptext SLIT("!!")
+  ppr NotMarkedStrict  = ptext SLIT("_")
 \end{code}
 
 

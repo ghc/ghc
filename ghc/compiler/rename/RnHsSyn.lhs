@@ -9,13 +9,11 @@ module RnHsSyn where
 #include "HsVersions.h"
 
 import HsSyn
-import HsCore
-import Class		( FunDep, DefMeth(..) )
-import TyCon		( visibleDataCons, tyConName )
+import Class		( FunDep )
 import TysWiredIn	( tupleTyCon, listTyCon, parrTyCon, charTyCon )
 import Name		( Name, getName, isTyVarName )
 import NameSet
-import BasicTypes	( Boxity, FixitySig )
+import BasicTypes	( Boxity )
 import Outputable
 \end{code}
 
@@ -30,7 +28,6 @@ type RenamedRuleDecl		= RuleDecl		Name
 type RenamedTyClDecl		= TyClDecl		Name
 type RenamedDefaultDecl		= DefaultDecl		Name
 type RenamedForeignDecl		= ForeignDecl		Name
-type RenamedCoreDecl		= CoreDecl		Name
 type RenamedGRHS		= GRHS			Name
 type RenamedGRHSs		= GRHSs			Name
 type RenamedHsBinds		= HsBinds		Name
@@ -81,12 +78,10 @@ extractHsTyNames ty
     get (HsAppTy ty1 ty2)      = get ty1 `unionNameSets` get ty2
     get (HsListTy ty)          = unitNameSet listTyCon_name `unionNameSets` get ty
     get (HsPArrTy ty)          = unitNameSet parrTyCon_name `unionNameSets` get ty
-    get (HsTupleTy con tys)    = hsTupConFVs con `unionNameSets` extractHsTyNames_s tys
+    get (HsTupleTy con tys)    = extractHsTyNames_s tys
     get (HsFunTy ty1 ty2)      = get ty1 `unionNameSets` get ty2
     get (HsPredTy p)	       = extractHsPredTyNames p
-    get (HsOpTy ty1 tycon ty2) = get ty1 `unionNameSets` get ty2 `unionNameSets`
-				 case tycon of { HsTyOp n -> unitNameSet n ; 
-						 HsArrow  -> emptyNameSet }
+    get (HsOpTy ty1 op ty2)    = get ty1 `unionNameSets` get ty2 `unionNameSets` unitNameSet op
     get (HsParTy ty)           = get ty
     get (HsNumTy n)            = emptyNameSet
     get (HsTyVar tv)	       = unitNameSet tv
@@ -129,65 +124,12 @@ In all cases this is set up for interface-file declarations:
 
 \begin{code}
 ----------------
-impDeclFVs :: RenamedHsDecl -> NameSet
-	-- Just the ones that come from imports
-impDeclFVs (InstD d) = instDeclFVs d
-impDeclFVs (TyClD d) = tyClDeclFVs d
-
-----------------
-tyClDeclFVs :: RenamedTyClDecl -> NameSet
-tyClDeclFVs (ForeignType {})
-  = emptyFVs
-
-tyClDeclFVs (IfaceSig {tcdType = ty, tcdIdInfo = id_infos})
-  = extractHsTyNames ty			`plusFV` 
-    plusFVs (map hsIdInfoFVs id_infos)
-
-tyClDeclFVs (TyData {tcdCtxt = context, tcdTyVars = tyvars, tcdCons = condecls})
-  = delFVs (map hsTyVarName tyvars)	$
-    extractHsCtxtTyNames context	`plusFV`
-    plusFVs (map conDeclFVs (visibleDataCons condecls))
-
-tyClDeclFVs (TySynonym {tcdTyVars = tyvars, tcdSynRhs = ty})
-  = delFVs (map hsTyVarName tyvars) (extractHsTyNames ty)
-
-tyClDeclFVs (ClassDecl {tcdCtxt = context, tcdTyVars = tyvars, tcdFDs = fds, 
-			tcdSigs = sigs, tcdMeths = maybe_meths})
-  = delFVs (map hsTyVarName tyvars) $
-    extractHsCtxtTyNames context	  `plusFV`
-    plusFVs (map extractFunDepNames fds)  `plusFV`
-    hsSigsFVs sigs			  `plusFV`
-    dm_fvs
-  where
-    dm_fvs = case maybe_meths of
-		Nothing -> mkFVs [v | ClassOpSig _ (DefMeth v) _ _ <- sigs]
-		  -- No method bindings, so this class decl comes from an interface file, 
-		  -- So we want to treat the default-method names as free (they should
-		  -- be defined somewhere else).  [In source code this is not so; the class
-		  -- decl will bind whatever default-methods are necessary.]
-		Just _ -> emptyFVs	-- Source code, so the default methods
-					-- are *bound* not *free*
-
-----------------
 hsSigsFVs sigs = plusFVs (map hsSigFVs sigs)
 
 hsSigFVs (Sig v ty _) 	    = extractHsTyNames ty
 hsSigFVs (SpecInstSig ty _) = extractHsTyNames ty
 hsSigFVs (SpecSig v ty _)   = extractHsTyNames ty
-hsSigFVs (ClassOpSig _ _ ty _) = extractHsTyNames ty
 hsSigFVs other		    = emptyFVs
-
-----------------
-instDeclFVs (InstDecl inst_ty _ _ maybe_dfun _)
-  = extractHsTyNames inst_ty	`plusFV` 
-    (case maybe_dfun of { Just n -> unitFV n; Nothing -> emptyFVs })
-
-----------------
-ruleDeclFVs (HsRule _ _ _ _ _ _) = emptyFVs
-ruleDeclFVs (IfaceRuleOut _ _)	 = emptyFVs
-ruleDeclFVs (IfaceRule _ _ vars _ args rhs _)
-  = delFVs (map ufBinderName vars) $
-    ufExprFVs rhs `plusFV` plusFVs (map ufExprFVs args)
 
 ----------------
 conDeclFVs (ConDecl _ tyvars context details _)
@@ -200,41 +142,6 @@ conDetailsFVs (InfixCon bty1 bty2) = bangTyFVs bty1 `plusFV` bangTyFVs bty2
 conDetailsFVs (RecCon flds)	   = plusFVs [bangTyFVs bty | (_, bty) <- flds]
 
 bangTyFVs bty = extractHsTyNames (getBangType bty)
-
-----------------
-hsIdInfoFVs (HsUnfold _ unf) = ufExprFVs unf
-hsIdInfoFVs (HsWorker n a)   = unitFV n
-hsIdInfoFVs other	     = emptyFVs
-
-----------------
-ufExprFVs (UfVar n) 	  = unitFV n
-ufExprFVs (UfLit l) 	  = emptyFVs
-ufExprFVs (UfFCall cc ty) = extractHsTyNames ty
-ufExprFVs (UfType ty)     = extractHsTyNames ty
-ufExprFVs (UfTuple tc es) = hsTupConFVs tc `plusFV` plusFVs (map ufExprFVs es)
-ufExprFVs (UfLam v e)     = ufBndrFVs v (ufExprFVs e)
-ufExprFVs (UfApp e1 e2)   = ufExprFVs e1 `plusFV` ufExprFVs e2
-ufExprFVs (UfCase e n as) = ufExprFVs e `plusFV` delFV n (plusFVs (map ufAltFVs as))
-ufExprFVs (UfNote n e)	  = ufNoteFVs n `plusFV` ufExprFVs e
-ufExprFVs (UfLet (UfNonRec b r) e) = ufExprFVs r `plusFV` ufBndrFVs b (ufExprFVs e)
-ufExprFVs (UfLet (UfRec prs)    e) = foldr ufBndrFVs 
-					   (foldr (plusFV . ufExprFVs . snd) (ufExprFVs e) prs)
-					   (map fst prs) 
-
-ufBndrFVs (UfValBinder n ty) fvs = extractHsTyNames ty `plusFV` delFV n fvs
-ufBndrFVs (UfTyBinder  n k)  fvs = delFV n fvs
-
-ufAltFVs (con, vs, e) = ufConFVs con `plusFV` delFVs vs (ufExprFVs e)
-
-ufConFVs (UfDataAlt n)      = unitFV n
-ufConFVs (UfTupleAlt t)     = hsTupConFVs t
-ufConFVs other		    = emptyFVs
-
-ufNoteFVs (UfCoerce ty) = extractHsTyNames ty
-ufNoteFVs note		= emptyFVs
-
-hsTupConFVs (HsTupCon bx n) = unitFV (tyConName (tupleTyCon bx n))
-	-- Always return the TyCon; that'll suck in the data con
 \end{code}
 
 

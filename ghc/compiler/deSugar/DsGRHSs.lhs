@@ -52,7 +52,7 @@ dsGRHSs :: TypecheckedMatchContext -> [TypecheckedPat]	-- These are to build a M
 	-> DsM (Type, MatchResult)
 
 dsGRHSs kind pats (GRHSs grhss binds ty)
-  = mapDs (dsGRHS kind pats) grhss		`thenDs` \ match_results ->
+  = mappM (dsGRHS kind pats) grhss		`thenDs` \ match_results ->
     let 
 	match_result1 = foldr1 combineMatchResults match_results
 	match_result2 = adjustMatchResultDs (dsLet binds) match_result1

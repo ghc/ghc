@@ -11,18 +11,17 @@ module TcDefaults ( tcDefaults ) where
 import HsSyn		( DefaultDecl(..) )
 import Name		( Name )
 import TcRnMonad
-import TcEnv		( tcLookupGlobal_maybe )
-import TcMonoType	( tcHsType )
+import TcEnv		( tcLookupClass )
+import TcHsType		( tcHsSigType, UserTypeCtxt( DefaultDeclCtxt ) )
 import TcSimplify	( tcSimplifyDefault )
 import TcType           ( Type, mkClassPred, isTauTy )
 import PrelNames	( numClassName )
 import Outputable
-import HscTypes		( TyThing(..) )
 \end{code}
 
 \begin{code}
 tcDefaults :: [DefaultDecl Name]
-	   -> TcM [Type]	    -- Defaulting types to heave
+	   -> TcM (Maybe [Type])    -- Defaulting types to heave
 				    -- into Tc monad for later use
 				    -- in Disambig.
 
@@ -39,29 +38,19 @@ tcDefaults []
 	-- defaultDefaultTys
 
 tcDefaults [DefaultDecl [] locn]
-  = returnM []			-- Default declaration specifying no types
+  = returnM (Just [])		-- Default declaration specifying no types
 
 tcDefaults [DefaultDecl mono_tys locn]
-  = tcLookupGlobal_maybe numClassName	`thenM` \ maybe_num ->
-    case maybe_num of
-	Just (AClass num_class) -> common_case num_class
-	other	          	-> returnM []
-		-- In the Nothing case, Num has not been sucked in, so the 
-		-- defaults will never be used; so simply discard the default decl.
-		-- This slightly benefits modules that don't use any
-		-- numeric stuff at all, by avoid the necessity of
-		-- always sucking in Num
-  where
-    common_case num_class
-      = addSrcLoc locn 		$
-    	addErrCtxt defaultDeclCtxt	$
-    	mappM tc_default_ty mono_tys	`thenM` \ tau_tys ->
+  = addSrcLoc locn 			$
+    addErrCtxt defaultDeclCtxt		$
+    tcLookupClass numClassName		`thenM` \ num_class ->
+    mappM tc_default_ty mono_tys	`thenM` \ tau_tys ->
     
- 		-- Check that all the types are instances of Num
- 		-- We only care about whether it worked or not
-    	tcSimplifyDefault [mkClassPred num_class [ty] | ty <- tau_tys]	`thenM_`
+    	-- Check that all the types are instances of Num
+    	-- We only care about whether it worked or not
+    tcSimplifyDefault [mkClassPred num_class [ty] | ty <- tau_tys]	`thenM_`
     
-    	returnM tau_tys
+    returnM (Just tau_tys)
 
 tcDefaults decls@(DefaultDecl _ loc : _) =
     addSrcLoc loc $
@@ -69,7 +58,7 @@ tcDefaults decls@(DefaultDecl _ loc : _) =
 
 
 tc_default_ty hs_ty 
- = tcHsType hs_ty				`thenM` \ ty ->
+ = tcHsSigType DefaultDeclCtxt hs_ty		`thenM` \ ty ->
    checkTc (isTauTy ty) (polyDefErr hs_ty)	`thenM_`
    returnM ty
 

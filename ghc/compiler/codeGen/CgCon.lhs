@@ -26,30 +26,27 @@ import CgBindery	( getArgAmodes, bindNewToNode,
 			  idInfoToAmode, stableAmodeIdInfo,
 			  heapIdInfo, CgIdInfo, bindNewToStack
 			)
-import CgStackery	( mkVirtStkOffsets, freeStackSlots, updateFrameSize )
-import CgUsages		( getRealSp, getVirtSp, setRealAndVirtualSp,
-			  getSpRelOffset )
+import CgStackery	( mkVirtStkOffsets, freeStackSlots )
+import CgUsages		( getRealSp, getVirtSp, setRealAndVirtualSp )
 import CgRetConv	( assignRegs )
-import Constants	( mAX_INTLIKE, mIN_INTLIKE, mAX_CHARLIKE, mIN_CHARLIKE,
-			  mIN_UPD_SIZE )
+import Constants	( mAX_INTLIKE, mIN_INTLIKE, mAX_CHARLIKE, mIN_CHARLIKE )
 import CgHeapery	( allocDynClosure )
 import CgTailCall	( performReturn, mkStaticAlgReturnCode,
 			  returnUnboxedTuple )
 import CLabel		( mkClosureLabel )
 import ClosureInfo	( mkConLFInfo, mkLFArgument, layOutDynConstr, 
-			  layOutStaticConstr, closureSize, mkStaticClosure
+			  layOutStaticConstr, mkStaticClosure
 			)
 import CostCentre	( currentOrSubsumedCCS, dontCareCCS, CostCentreStack,
 			  currentCCS )
 import DataCon		( DataCon, dataConTag, 
-			  isUnboxedTupleCon, isNullaryDataCon, dataConWorkId, 
+			  isUnboxedTupleCon, dataConWorkId, 
 			  dataConName, dataConRepArity
 			)
 import Id		( Id, idName, idPrimRep, isDeadBinder )
 import Literal		( Literal(..) )
 import PrelInfo		( maybeCharLikeCon, maybeIntLikeCon )
 import PrimRep		( PrimRep(..), isFollowableRep )
-import Unique		( Uniquable(..) )
 import Util
 import Outputable
 

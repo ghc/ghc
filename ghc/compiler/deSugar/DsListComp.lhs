@@ -11,7 +11,6 @@ module DsListComp ( dsListComp, dsPArrComp ) where
 import {-# SOURCE #-} DsExpr ( dsExpr, dsLet )
 
 import BasicTypes	( Boxity(..) )
-import TyCon		( tyConName )
 import HsSyn		( Pat(..), HsExpr(..), Stmt(..),
 			  HsMatchContext(..), HsStmtContext(..),
 			  collectHsBinders )
@@ -30,10 +29,10 @@ import Type		( mkTyVarTy, mkFunTys, mkFunTy, Type,
 			  splitTyConApp_maybe )
 import TysPrim		( alphaTyVar )
 import TysWiredIn	( nilDataCon, consDataCon, trueDataConId, falseDataConId, 
-			  unitDataConId, unitTy, mkListTy )
+			  unitDataConId, unitTy, mkListTy, parrTyCon )
 import Match		( matchSimply )
 import PrelNames	( foldrName, buildName, replicatePName, mapPName, 
-			  filterPName, zipPName, crossPName, parrTyConName ) 
+			  filterPName, zipPName, crossPName ) 
 import PrelInfo		( pAT_ERROR_ID )
 import SrcLoc		( noSrcLoc )
 import Panic		( panic )
@@ -147,7 +146,7 @@ with the Unboxed variety.
 deListComp :: [TypecheckedStmt] -> CoreExpr -> DsM CoreExpr
 
 deListComp (ParStmt stmtss_w_bndrs : quals) list
-  = mapDs do_list_comp stmtss_w_bndrs	`thenDs` \ exps ->
+  = mappM do_list_comp stmtss_w_bndrs	`thenDs` \ exps ->
     mkZipBind qual_tys			`thenDs` \ (zip_fn, zip_rhs) ->
 
 	-- Deal with [e | pat <- zip l1 .. ln] in example above
@@ -233,9 +232,9 @@ mkZipBind :: [Type] -> DsM (Id, CoreExpr)
 --				(a2:as'2) -> (a2,a2) : zip as'1 as'2)]
 
 mkZipBind elt_tys 
-  = mapDs newSysLocalDs  list_tys	`thenDs` \ ass ->
-    mapDs newSysLocalDs  elt_tys	`thenDs` \ as' ->
-    mapDs newSysLocalDs  list_tys	`thenDs` \ as's ->
+  = mappM newSysLocalDs  list_tys	`thenDs` \ ass ->
+    mappM newSysLocalDs  elt_tys	`thenDs` \ as' ->
+    mappM newSysLocalDs  list_tys	`thenDs` \ as's ->
     newSysLocalDs zip_fn_ty		`thenDs` \ zip_fn ->
     let 
 	inner_rhs = mkConsExpr ret_elt_ty 
@@ -473,7 +472,7 @@ deLambda ty p e  =
 parrElemType   :: CoreExpr -> Type
 parrElemType e  = 
   case splitTyConApp_maybe (exprType e) of
-    Just (tycon, [ty]) | tyConName tycon == parrTyConName -> ty
+    Just (tycon, [ty]) | tycon == parrTyCon -> ty
     _							  -> panic
       "DsListComp.parrElemType: not a parallel array type"
 \end{code}

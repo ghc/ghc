@@ -1,23 +1,23 @@
 {
 module ParserCore ( parseCore ) where
 
+import IfaceSyn
 import ForeignCall
-
-import HsCore
 import RdrHsSyn
+import TcIface ( tcIfaceKind )
 import HsSyn
-import TyCon
-import TcType
 import RdrName
 import OccName
+import Name( nameOccName, nameModuleName )
 import Module
 import ParserCoreUtils
 import LexCore
 import Literal
 import BasicTypes
-import Type
 import SrcLoc
-import PrelNames
+import TysPrim( wordPrimTyCon, intPrimTyCon, charPrimTyCon, 
+		floatPrimTyCon, doublePrimTyCon, addrPrimTyCon )
+import TyCon ( TyCon, tyConName )
 import FastString
 import Outputable
 
@@ -68,154 +68,182 @@ import Outputable
 
 %%
 
-module	:: { RdrNameHsModule }
-	: '%module' modid tdefs vdefgs
-		{ HsModule (Just (mkHomeModule $2)) Nothing 
-		           [] ($3 ++ concat $4) Nothing noSrcLoc}
+module	:: { HsExtCore RdrName }
+         : '%module' modid tdefs vdefgs
+		{ HsExtCore (mkHomeModule $2) $3 $4 }
 
-tdefs	:: { [RdrNameHsDecl] }
+modid	:: { ModuleName }
+	: CNAME	                 { mkSysModuleNameFS (mkFastString $1) }
+
+-------------------------------------------------------------
+--     Type and newtype declarations are in HsSyn syntax
+
+tdefs	:: { [TyClDecl RdrName] }
 	: {- empty -}	{[]}
 	| tdef ';' tdefs	{$1:$3}
 
-tdef	:: { RdrNameHsDecl }
-	: '%data' q_tc_name tbinds '=' '{' cons1 '}'
-                { TyClD (mkTyData DataType ([], $2, $3) (DataCons $6) Nothing noSrcLoc) }
-	| '%newtype' q_tc_name tbinds trep 
-		{ TyClD (mkTyData NewType ([], $2, $3) ($4 $2) Nothing noSrcLoc) }
+tdef	:: { TyClDecl RdrName }
+	: '%data' q_tc_name tv_bndrs '=' '{' cons1 '}'
+                { mkTyData DataType ([], ifaceExtRdrName $2, map toHsTvBndr $3) $6 Nothing noSrcLoc }
+	| '%newtype' q_tc_name tv_bndrs trep 
+		{ let tc_rdr = ifaceExtRdrName $2 in
+                  mkTyData NewType ([], tc_rdr, map toHsTvBndr $3) ($4 (rdrNameOcc tc_rdr)) Nothing noSrcLoc }
 
 -- For a newtype we have to invent a fake data constructor name
 -- It doesn't matter what it is, because it won't be used
-trep    :: { (RdrName -> DataConDetails (ConDecl RdrName)) }
-        : {- empty -}   { (\ tc_name -> Unknown) }
-        | '=' ty        { (\ tc_name -> let { dc_name  = setRdrNameSpace tc_name dataName ;
-			                      con_info = PrefixCon [unbangedType $2] }
-			                in DataCons [ConDecl dc_name [] [] con_info noSrcLoc]) }
-
-tbind	:: { HsTyVarBndr RdrName }
-	:  name                    { IfaceTyVar $1 liftedTypeKind }
-	|  '(' name '::' akind ')' { IfaceTyVar $2 $4 }
-
-tbinds 	:: { [HsTyVarBndr RdrName] }
-	: {- empty -}	{ [] }
-	| tbind tbinds	{ $1:$2 }
-
-vdefgs	:: { [[RdrNameHsDecl]] }
-	: {- empty -}	        { [] }
-	| vdefg ';' vdefgs	{ ($1:$3) }
-
-vdefg	:: { [RdrNameHsDecl] }
-	: '%rec' '{' vdefs1 '}' { map CoreD $3   }
-	|  vdef                 { [CoreD $1] }
-
-let_bind :: { UfBinding RdrName }
-	: '%rec' '{' vdefs1 '}' { UfRec (map convBind $3)   }
-	|  vdef                 { let (b,r) = convBind $1
-				  in UfNonRec b r }
-
-vdefs1	:: { [RdrNameCoreDecl] }
-	: vdef		        { [$1] }
-	| vdef ';' vdefs1       { $1:$3 }
-
-vdef	:: { RdrNameCoreDecl }
-	: qname '::' ty '=' exp { CoreDecl $1 $3 $5 noSrcLoc }
-  -- NB: qname includes data constructors, because
-  --     we allow data-constructor wrappers at top level
-
-
-vbind	:: { (RdrName, RdrNameHsType) }
-	: '(' name '::' ty ')'	{ ($2,$4) }
-
-vbinds	:: { [(RdrName, RdrNameHsType)] }
-	: {-empty -} 	{ [] }
-	| vbind vbinds	{ $1:$2 }
-
-bind	:: { UfBinder RdrName }
-        : '@' tbind 	{ let (IfaceTyVar v k) = $2  in UfTyBinder  v k  }
-	| vbind		{ let (v,ty) = $1 in UfValBinder v ty }
-
-binds1 	:: { [UfBinder RdrName] }
-	: bind		{ [$1] }
-	| bind binds1	{ $1:$2 }
-
-attbinds :: { [RdrNameHsTyVar] }
-	: {- empty -} 	     { [] }
-	| '@' tbind attbinds { $2:$3 }
-
-akind	:: { Kind }
-	: '*' 		   { liftedTypeKind   }	
-	| '#'		   { unliftedTypeKind }
-	| '?'		   { openTypeKind     }
-        | '(' kind ')'	   { $2 }
-
-kind 	:: { Kind }
-	: akind 	   { $1 }
-	| akind '->' kind  { mkArrowKind $1 $3 }
+trep    :: { OccName -> [ConDecl RdrName] }
+        : {- empty -}   { (\ tc_occ -> []) }
+        | '=' ty        { (\ tc_occ -> let { dc_name  = mkRdrUnqual (setOccNameSpace dataName tc_occ) ;
+			                      con_info = PrefixCon [unbangedType (toHsType $2)] }
+			                in [ConDecl dc_name [] [] con_info noSrcLoc]) }
 
 cons1	:: { [ConDecl RdrName] }
 	: con		{ [$1] }
 	| con ';' cons1	{ $1:$3 }
 
 con	:: { ConDecl RdrName }
-	: q_d_patt attbinds atys 
-		{ ConDecl $1 $2 [] (PrefixCon (map unbangedType $3)) noSrcLoc}
+	: d_pat_occ attv_bndrs hs_atys 
+		{ ConDecl (mkRdrUnqual $1) $2 [] (PrefixCon (map unbangedType $3)) noSrcLoc}
 
-atys	:: { [ RdrNameHsType] }
+attv_bndrs :: { [HsTyVarBndr RdrName] }
+	: {- empty -} 	         { [] }
+	| '@' tv_bndr attv_bndrs {  toHsTvBndr $2 : $3 }
+
+hs_atys :: { [HsType RdrName] }
+         : atys               { map toHsType $1 }
+
+
+---------------------------------------
+--                 Types
+---------------------------------------
+
+atys	:: { [IfaceType] }
 	: {- empty -}   { [] }
 	| aty atys      { $1:$2 }
 
-aty	:: { RdrNameHsType }
-	: name	     { HsTyVar $1 }
-	| q_tc_name     { HsTyVar $1 }
+aty	:: { IfaceType }
+	: tv_occ    { IfaceTyVar $1 }
+	| q_tc_name  { IfaceTyConApp (IfaceTc $1) [] }
 	| '(' ty ')' { $2 }
 
+bty	:: { IfaceType }
+	: tv_occ atys    { foldl IfaceAppTy (IfaceTyVar $1) $2 }
+        | q_tc_name atys  { IfaceTyConApp (IfaceTc $1) $2 }
 
-bty	:: { RdrNameHsType }
-	: aty	     { $1 }
-        | bty aty    { HsAppTy $1 $2 }
+ty	:: { IfaceType }
+	: bty	                     { $1 }
+	| bty '->' ty                { IfaceFunTy $1 $3 }
+	| '%forall' tv_bndrs '.' ty  { foldr IfaceForAllTy $4 $2 }
 
-ty	:: { RdrNameHsType }
-	: bty	                   { $1 }
-	| bty '->' ty              { HsFunTy $1 $3 }
-	| '%forall' tbinds '.' ty  { HsForAllTy (Just $2) [] $4 }
+----------------------------------------------
+--        Bindings are in Iface syntax
 
-aexp    :: { UfExpr RdrName }
-	: qname 	{ UfVar $1 }
-	| lit		{ UfLit $1 }
+vdefgs	:: { [IfaceBinding] }
+	: {- empty -}	        { [] }
+	| let_bind ';' vdefgs	{ $1 : $3 }
+
+let_bind :: { IfaceBinding }
+	: '%rec' '{' vdefs1 '}' { IfaceRec $3 }
+	|  vdef                 { let (b,r) = $1
+				  in IfaceNonRec b r }
+
+vdefs1	:: { [(IfaceIdBndr, IfaceExpr)] }
+	: vdef		        { [$1] }
+	| vdef ';' vdefs1       { $1:$3 }
+
+vdef	:: { (IfaceIdBndr, IfaceExpr) }
+	: qd_occ '::' ty '=' exp { (($1, $3), $5) }
+  -- NB: qd_occ includes data constructors, because
+  --     we allow data-constructor wrappers at top level
+  -- But we discard the module name, because it must be the
+  -- same as the module being compiled, and Iface syntax only
+  -- has OccNames in binding positions
+
+qd_occ :: { OccName }
+        : var_occ { $1 }
+        | d_occ   { $1 }
+
+---------------------------------------
+--  Binders
+bndr	:: { IfaceBndr }
+        : '@' tv_bndr 	{ IfaceTvBndr $2 }
+	| id_bndr	{ IfaceIdBndr $1 }
+
+bndrs 	:: { [IfaceBndr] }
+	: bndr		{ [$1] }
+	| bndr bndrs	{ $1:$2 }
+
+id_bndr	:: { IfaceIdBndr }
+	: '(' var_occ '::' ty ')'	{ ($2,$4) }
+
+id_bndrs :: { [IfaceIdBndr] }
+	: {-empty -}    	{ [] }
+	| id_bndr id_bndrs	{ $1:$2 }
+
+tv_bndr	:: { IfaceTvBndr }
+	:  tv_occ                    { ($1, IfaceLiftedTypeKind) }
+	|  '(' tv_occ '::' akind ')' { ($2, $4) }
+
+tv_bndrs 	:: { [IfaceTvBndr] }
+	: {- empty -}	{ [] }
+	| tv_bndr tv_bndrs	{ $1:$2 }
+
+akind	:: { IfaceKind }
+	: '*' 		   { IfaceLiftedTypeKind   }	
+	| '#'		   { IfaceUnliftedTypeKind }
+	| '?'		   { IfaceOpenTypeKind     }
+        | '(' kind ')'	   { $2 }
+
+kind 	:: { IfaceKind }
+	: akind 	   { $1 }
+	| akind '->' kind  { IfaceFunKind $1 $3 }
+
+-----------------------------------------
+--             Expressions
+
+aexp    :: { IfaceExpr }
+	: var_occ	         { IfaceLcl $1 }
+	| modid '.' qd_occ	 { IfaceExt (ExtPkg $1 $3) }
+	| lit		{ IfaceLit $1 }
 	| '(' exp ')' 	{ $2 }
 
-fexp	:: { UfExpr RdrName }
-	: fexp aexp	{ UfApp $1 $2 }
-	| fexp '@' aty	{ UfApp $1 (UfType $3) }
+fexp	:: { IfaceExpr }
+	: fexp aexp	{ IfaceApp $1 $2 }
+	| fexp '@' aty	{ IfaceApp $1 (IfaceType $3) }
 	| aexp		{ $1 }
 
-exp	:: { UfExpr RdrName }
-	: fexp		           { $1 }
-	| '\\' binds1 '->' exp 	   { foldr UfLam $4 $2 }
-	| '%let' let_bind '%in' exp   { UfLet $2 $4 }
-	| '%case' aexp '%of' vbind
-	  '{' alts1 '}'		   { UfCase $2 (fst $4) $6 }
-	| '%coerce' aty exp   	   { UfNote (UfCoerce $2) $3 } -- what about the 'from' type?
+exp	:: { IfaceExpr }
+	: fexp		              { $1 }
+	| '\\' bndrs '->' exp 	      { foldr IfaceLam $4 $2 }
+	| '%let' let_bind '%in' exp   { IfaceLet $2 $4 }
+	| '%case' aexp '%of' id_bndr
+	  '{' alts1 '}'		      { IfaceCase $2 (fst $4) $6 }
+	| '%coerce' aty exp   	      { IfaceNote (IfaceCoerce $2) $3 }
 	| '%note' STRING exp 	   
 	    { case $2 of
-	       --"SCC"        -> UfNote (UfSCC "scc") $3
-	       "InlineCall" -> UfNote UfInlineCall $3
-	       "InlineMe"   -> UfNote UfInlineMe $3
+	       --"SCC"      -> IfaceNote (IfaceSCC "scc") $3
+	       "InlineCall" -> IfaceNote IfaceInlineCall $3
+	       "InlineMe"   -> IfaceNote IfaceInlineMe $3
             }
-        | '%external' STRING aty   { UfFCall (ForeignCall.CCall 
-                                               (CCallSpec (StaticTarget 
-                                                            (mkFastString $2)) 
-                                                          CCallConv (PlaySafe False))) $3 }
-alts1	:: { [UfAlt RdrName] }
+        | '%external' STRING aty   { IfaceFCall (ForeignCall.CCall 
+                                                    (CCallSpec (StaticTarget (mkFastString $2)) 
+                                                               CCallConv (PlaySafe False))) 
+                                                 $3 }
+
+alts1	:: { [IfaceAlt] }
 	: alt		{ [$1] }
 	| alt ';' alts1	{ $1:$3 }
 
-alt	:: { UfAlt RdrName }
-	: q_d_patt attbinds vbinds '->' exp 
-		{ (UfDataAlt $1, (map hsTyVarName $2 ++ map fst $3), $5) } 
+alt	:: { IfaceAlt }
+	: modid '.' d_pat_occ bndrs '->' exp 
+		{ (IfaceDataAlt $3, map ifaceBndrName $4, $6) } 
+                       -- The external syntax currently includes the types of the
+		       -- the args, but they aren't needed internally
+                       -- Nor is the module qualifier
 	| lit '->' exp
-		{ (UfLitAlt $1, [], $3) }
+		{ (IfaceLitAlt $1, [], $3) }
 	| '%_' '->' exp
-		{ (UfDefault, [], $3) }
+		{ (IfaceDefault, [], $3) }
 
 lit	:: { Literal }
 	: '(' INTEGER '::' aty ')'	{ convIntLit $2 $4 }
@@ -223,71 +251,76 @@ lit	:: { Literal }
 	| '(' CHAR '::' aty ')'		{ MachChar (fromEnum $2) }
 	| '(' STRING '::' aty ')'	{ MachStr (mkFastString $2) }
 
-name	:: { RdrName }
-	: NAME	{ mkRdrUnqual (mkVarOccEncoded (mkFastString $1)) }
+tv_occ	:: { OccName }
+	: NAME	{ mkSysOcc tvName $1 }
 
-cname	:: { String }
-	: CNAME	{ $1 }
-         
-mname	:: { String }
-	: CNAME	{ $1 }
-
-modid	:: { ModuleName }
-	: CNAME	{ mkSysModuleNameFS (mkFastString $1) }
-
-qname	:: { RdrName }           -- Includes data constructors
-	: name	                 { $1 }
-	| mname '.' NAME	 { mkIfaceOrig varName (mkFastString $1) (mkFastString $3) }
-        | q_d_occ                { $1 }
+var_occ	:: { OccName }
+	: NAME	{ mkSysOcc varName $1 }
 
 
 -- Type constructor
-q_tc_name	:: { RdrName }
-        : mname '.' cname 
-		{ mkIfaceOrig tcName (mkFastString $1) (mkFastString $3) }
+q_tc_name	:: { IfaceExtName }
+        : modid '.' CNAME	{ ExtPkg $1 (mkSysOcc tcName $3) }
 
 -- Data constructor in a pattern or data type declaration; use the dataName, 
 -- because that's what we expect in Core case patterns
-q_d_patt :: { RdrName }
-        : mname '.' cname 
-		{ mkIfaceOrig dataName (mkFastString $1) (mkFastString $3) }
+d_pat_occ :: { OccName }
+        : CNAME      { mkSysOcc dataName $1 }
 
 -- Data constructor occurrence in an expression;
 -- use the varName because that's the worker Id
-q_d_occ :: { RdrName }
-        : mname '.' cname 
-		{ mkIfaceOrig varName (mkFastString $1) (mkFastString $3) }
-
+d_occ :: { OccName }
+       : CNAME { mkSysOcc varName $1 }
 
 {
-convBind :: RdrNameCoreDecl -> (UfBinder RdrName, UfExpr RdrName)
-convBind (CoreDecl n ty rhs _) = (UfValBinder n ty, rhs)
 
-convIntLit :: Integer -> RdrNameHsType -> Literal
-convIntLit i (HsTyVar n)
-  | n == intPrimRdrName  = MachInt  i  
-  | n == wordPrimRdrName = MachWord i
-  | n == charPrimRdrName = MachChar (fromInteger i)
-  | n == addrPrimRdrName && i == 0 = MachNullAddr
+ifaceBndrName (IfaceIdBndr (n,_)) = n
+ifaceBndrName (IfaceTvBndr (n,_)) = n
+
+convIntLit :: Integer -> IfaceType -> Literal
+convIntLit i (IfaceTyConApp tc [])
+  | tc `eqTc` intPrimTyCon  = MachInt  i  
+  | tc `eqTc` wordPrimTyCon = MachWord i
+  | tc `eqTc` charPrimTyCon = MachChar (fromInteger i)
+  | tc `eqTc` addrPrimTyCon && i == 0 = MachNullAddr
 convIntLit i aty
-  = pprPanic "Unknown integer literal type" (ppr aty $$ ppr intPrimRdrName) 
+  = pprPanic "Unknown integer literal type" (ppr aty)
 
-convRatLit :: Rational -> RdrNameHsType -> Literal
-convRatLit r (HsTyVar n)
-  | n == floatPrimRdrName  = MachFloat  r
-  | n == doublePrimRdrName = MachDouble r
+convRatLit :: Rational -> IfaceType -> Literal
+convRatLit r (IfaceTyConApp tc [])
+  | tc `eqTc` floatPrimTyCon  = MachFloat  r
+  | tc `eqTc` doublePrimTyCon = MachDouble r
 convRatLit i aty
-  = pprPanic "Unknown rational literal type" (ppr aty $$ ppr intPrimRdrName) 
+  = pprPanic "Unknown rational literal type" (ppr aty)
 
+eqTc :: IfaceTyCon -> TyCon -> Bool   -- Ugh!
+eqTc (IfaceTc (ExtPkg mod occ)) tycon
+  = mod == nameModuleName nm && occ == nameOccName nm
+  where
+    nm = tyConName tycon
 
-wordPrimRdrName, intPrimRdrName, floatPrimRdrName, doublePrimRdrName, addrPrimRdrName :: RdrName
-wordPrimRdrName   = nameRdrName wordPrimTyConName
-intPrimRdrName    = nameRdrName intPrimTyConName
-charPrimRdrName   = nameRdrName charPrimTyConName
-floatPrimRdrName  = nameRdrName floatPrimTyConName
-doublePrimRdrName = nameRdrName doublePrimTyConName
-addrPrimRdrName   = nameRdrName addrPrimTyConName
+-- Tiresomely, we have to generate both HsTypes (in type/class decls) 
+-- and IfaceTypes (in Core expressions).  So we parse them as IfaceTypes,
+-- and convert to HsTypes here.  But the IfaceTypes we can see here
+-- are very limited (see the productions for 'ty', so the translation
+-- isn't hard
+toHsType :: IfaceType -> HsType RdrName
+toHsType (IfaceTyVar v)        		 = HsTyVar (mkRdrUnqual v)
+toHsType (IfaceAppTy t1 t2)    		 = HsAppTy (toHsType t1) (toHsType t2)
+toHsType (IfaceFunTy t1 t2)    		 = HsFunTy (toHsType t1) (toHsType t2)
+toHsType (IfaceTyConApp (IfaceTc tc) ts) = foldl HsAppTy (HsTyVar (ifaceExtRdrName tc)) (map toHsType ts) 
+toHsType (IfaceForAllTy tv t)            = add_forall (toHsTvBndr tv) (toHsType t)
 
+toHsTvBndr :: IfaceTvBndr -> HsTyVarBndr RdrName
+toHsTvBndr (tv,k) = KindedTyVar (mkRdrUnqual tv) (tcIfaceKind k)
+
+ifaceExtRdrName :: IfaceExtName -> RdrName
+ifaceExtRdrName (ExtPkg mod occ) = mkOrig mod occ
+ifaceExtRdrName other = pprPanic "ParserCore.ifaceExtRdrName" (ppr other)
+
+add_forall tv (HsForAllTy (Just tvs) cxt t) = HsForAllTy (Just (tv:tvs)) cxt t
+add_forall tv t                             = HsForAllTy (Just [tv]) [] t
+  
 happyError :: P a 
 happyError s l = failP (show l ++ ": Parse error\n") (take 100 s) l
 }

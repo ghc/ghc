@@ -56,6 +56,7 @@ import Literal		( Literal, literalType, literalPrimRep )
 import ForeignCall	( ForeignCall )
 import DataCon		( DataCon, dataConName )
 import CoreSyn		( AltCon )
+import PprCore		( {- instances -} )
 import PrimOp		( PrimOp )
 import Outputable
 import Util             ( count )

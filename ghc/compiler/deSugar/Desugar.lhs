@@ -9,9 +9,9 @@ module Desugar ( deSugar, deSugarExpr ) where
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlag(..), dopt, opt_SccProfilingOn )
-import HscTypes		( ModGuts(..), ModGuts, HscEnv(..), ExternalPackageState(..), 
-			  PersistentCompilerState(..), Dependencies(..), TypeEnv, GlobalRdrEnv,
-	  		  lookupType, unQualInScope )
+import HscTypes		( ModGuts(..), ModGuts, HscEnv(..), 
+			  Dependencies(..), TypeEnv, 
+	  		  unQualInScope )
 import HsSyn		( MonoBinds, RuleDecl(..), RuleBndr(..), 
 			  HsExpr(..), HsBinds(..), MonoBinds(..) )
 import TcHsSyn		( TypecheckedRuleDecl, TypecheckedHsExpr )
@@ -27,9 +27,10 @@ import DsBinds		( dsMonoBinds, AutoScc(..) )
 import DsForeign	( dsForeigns )
 import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
 				-- depends on DsExpr.hi-boot.
-import Module		( Module, moduleEnvElts )
+import Module		( Module, moduleEnvElts, emptyModuleEnv )
 import Id		( Id )
-import NameEnv		( lookupNameEnv )
+import RdrName	 	( GlobalRdrEnv )
+import NameSet
 import VarEnv
 import VarSet
 import Bag		( isEmptyBag, mapBag, emptyBag )
@@ -39,10 +40,9 @@ import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings,
 import Outputable
 import qualified Pretty
 import UniqSupply	( mkSplitUniqSupply )
-import Maybes		( orElse )
 import SrcLoc		( SrcLoc )
-import FastString
 import DATA_IOREF	( readIORef )
+import FastString
 \end{code}
 
 %************************************************************************
@@ -52,36 +52,36 @@ import DATA_IOREF	( readIORef )
 %************************************************************************
 
 \begin{code}
-deSugar :: HscEnv -> PersistentCompilerState
-        -> TcGblEnv -> IO (Maybe ModGuts)
+deSugar :: HscEnv -> TcGblEnv -> IO (Maybe ModGuts)
+-- Can modify PCS by faulting in more declarations
 
-deSugar hsc_env pcs
-        (TcGblEnv { tcg_mod      = mod,
-		    tcg_type_env = type_env,
-		    tcg_usages   = usage_var,
-		    tcg_imports  = imports,
-		    tcg_exports  = exports,
-		    tcg_rdr_env  = rdr_env,
-		    tcg_fix_env  = fix_env,
-	    	    tcg_deprecs  = deprecs,
-		    tcg_insts    = insts,
-		    tcg_binds	 = binds,
-		    tcg_fords    = fords,
-		    tcg_rules	 = rules })
+deSugar hsc_env 
+        (TcGblEnv { tcg_mod       = mod,
+		    tcg_type_env  = type_env,
+		    tcg_imports   = imports,
+		    tcg_exports   = exports,
+		    tcg_dus	  = dus, 
+		    tcg_inst_uses = dfun_uses_var,
+		    tcg_rdr_env   = rdr_env,
+		    tcg_fix_env   = fix_env,
+	    	    tcg_deprecs   = deprecs,
+		    tcg_insts     = insts,
+		    tcg_binds	  = binds,
+		    tcg_fords     = fords,
+		    tcg_rules	  = rules })
   = do	{ showPass dflags "Desugar"
-	; us <- mkSplitUniqSupply 'd'
-	; usages <- readIORef usage_var 
 
 	-- Do desugaring
-	; let ((ds_binds, ds_rules, ds_fords), ds_warns) 
-		= initDs dflags us lookup mod
-			 (dsProgram binds rules fords)
-	
-	      warns    = mapBag mk_warn ds_warns
-	      warn_doc = pprBagOfWarnings warns
+	; let { is_boot = imp_dep_mods imports }
+	; (results, warnings) <- initDs hsc_env mod type_env is_boot $
+				 dsProgram binds rules fords
+
+	; let { (ds_binds, ds_rules, ds_fords) = results
+	      ; warns    = mapBag mk_warn warnings
+	      ; warn_doc = pprBagOfWarnings warns }
 
 	-- Display any warnings
-        ; doIfSet (not (isEmptyBag ds_warns))
+        ; doIfSet (not (isEmptyBag warnings))
 		  (printErrs warn_doc)
 
 	    -- if warnings are considered errors, leave.
@@ -96,6 +96,9 @@ deSugar hsc_env pcs
 	; doIfSet (dopt Opt_D_dump_ds dflags) 
 		  (printDump (ppr_ds_rules ds_rules))
 
+	; dfun_uses <- readIORef dfun_uses_var		-- What dfuns are used
+	; let used_names = allUses dus emptyNameSet `unionNameSets` dfun_uses
+	; usages <- mkUsageInfo hsc_env imports used_names
 	; let 
 	     deps = Deps { dep_mods = moduleEnvElts (imp_dep_mods imports), 
 			   dep_pkgs = imp_dep_pkgs imports,
@@ -104,7 +107,7 @@ deSugar hsc_env pcs
 		mg_module   = mod,
 		mg_exports  = exports,
 		mg_deps	    = deps,
-		mg_usages   = mkUsageInfo hsc_env eps imports usages,
+		mg_usages   = usages,
 		mg_dir_imps = [m | (m,_) <- moduleEnvElts (imp_mods imports)],
 	        mg_rdr_env  = rdr_env,
 		mg_fix_env  = fix_env,
@@ -127,38 +130,25 @@ deSugar hsc_env pcs
     mk_warn :: (SrcLoc,SDoc) -> (SrcLoc, Pretty.Doc)
     mk_warn (loc, sdoc) = addShortWarnLocLine loc print_unqual sdoc
 
-	-- The lookup function passed to initDs is used for well-known Ids, 
-	-- such as fold, build, cons etc, so the chances are
-	-- it'll be found in the package symbol table.  That's
-	-- why we don't merge all these tables
-    eps	     = pcs_EPS pcs
-    pte      = eps_PTE eps
-    hpt      = hsc_HPT hsc_env
-    lookup n = case lookupType hpt pte n of {
-		 Just v -> v ;
-		 other  -> 
-	       case lookupNameEnv type_env n of
-		 Just v -> v ;
-		 other	-> pprPanic "Desugar: lookup:" (ppr n)
-               }
 
 deSugarExpr :: HscEnv
-	    -> PersistentCompilerState
 	    -> Module -> GlobalRdrEnv -> TypeEnv 
  	    -> TypecheckedHsExpr
 	    -> IO CoreExpr
-deSugarExpr hsc_env pcs this_mod rdr_env type_env tc_expr
+deSugarExpr hsc_env this_mod rdr_env type_env tc_expr
   = do	{ showPass dflags "Desugar"
 	; us <- mkSplitUniqSupply 'd'
 
 	-- Do desugaring
-	; let (core_expr, ds_warns) = initDs dflags us lookup this_mod (dsExpr tc_expr)    
-	      warn_doc = pprBagOfWarnings (mapBag mk_warn ds_warns)
+	; let { is_boot = emptyModuleEnv }	-- Assume no hi-boot files when
+						-- doing stuff from the command line
+	; (core_expr, ds_warns) <- initDs hsc_env this_mod type_env is_boot $
+				   dsExpr tc_expr
 
 	-- Display any warnings 
 	-- Note: if -Werror is used, we don't signal an error here.
         ; doIfSet (not (isEmptyBag ds_warns))
-		  (printErrs warn_doc)
+		  (printErrs (pprBagOfWarnings (mapBag mk_warn ds_warns)))
 
 	-- Dump output
 	; dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared" (pprCoreExpr core_expr)
@@ -166,18 +156,12 @@ deSugarExpr hsc_env pcs this_mod rdr_env type_env tc_expr
         ; return core_expr
 	}
   where
-    dflags   = hsc_dflags hsc_env
-    hpt      = hsc_HPT hsc_env
-    pte      = eps_PTE (pcs_EPS pcs)
-    lookup n = lookupNameEnv type_env n	`orElse`	-- Look in the type env of the
-							-- current module first
-	       lookupType hpt pte n 	`orElse`	-- Then other modules
-	       pprPanic "Desugar: lookup:" (ppr n)
+    dflags       = hsc_dflags hsc_env
+    print_unqual = unQualInScope rdr_env
 
     mk_warn :: (SrcLoc,SDoc) -> (SrcLoc, Pretty.Doc)
     mk_warn (loc,sdoc) = addShortWarnLocLine loc print_unqual sdoc
 
-    print_unqual = unQualInScope rdr_env
 
 dsProgram all_binds rules fo_decls
   = dsMonoBinds auto_scc all_binds []	`thenDs` \ core_prs ->
@@ -192,7 +176,7 @@ dsProgram all_binds rules fo_decls
 
 	local_binders = mkVarSet (bindersOfBinds ds_binds)
     in
-    mapDs (dsRule local_binders) rules	`thenDs` \ ds_rules ->
+    mappM (dsRule local_binders) rules	`thenDs` \ ds_rules ->
     returnDs (ds_binds, ds_rules, ds_fords)
   where
     auto_scc | opt_SccProfilingOn = TopLevel
@@ -214,9 +198,6 @@ ppr_ds_rules rules
 
 \begin{code}
 dsRule :: IdSet -> TypecheckedRuleDecl -> DsM (Id, CoreRule)
-dsRule in_scope (IfaceRuleOut fun rule)	-- Built-in rules come this way
-  = returnDs (fun, rule)
-
 dsRule in_scope (HsRule name act vars lhs rhs loc)
   = putSrcLocDs loc		$
     ds_lhs all_vars lhs		`thenDs` \ (fn, args) ->

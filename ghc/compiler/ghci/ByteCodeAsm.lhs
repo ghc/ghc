@@ -28,18 +28,18 @@ import TyCon		( TyCon )
 import PrimOp		( PrimOp )
 import PrimRep		( PrimRep(..), isFollowableRep, is64BitRep )
 import Constants	( wORD_SIZE )
-import FastString	( FastString(..), unpackFS )
+import FastString	( FastString(..) )
 import SMRep		( StgWord )
 import FiniteMap
 import Outputable
 
-import Control.Monad	( foldM, zipWithM )
-import Control.Monad.ST	( ST, runST )
+import Control.Monad	( foldM )
+import Control.Monad.ST	( runST )
 
 import GHC.Word		( Word(..) )
 import Data.Array.MArray
 import Data.Array.Unboxed ( listArray )
-import Data.Array.Base	( STUArray, UArray(..), unsafeWrite )
+import Data.Array.Base	( UArray(..) )
 import Data.Array.ST	( castSTUArray )
 import Foreign		( Word16, free )
 import Data.Int		( Int64 )

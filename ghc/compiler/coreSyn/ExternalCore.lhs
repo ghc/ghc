@@ -14,13 +14,13 @@ data Tdef
   | Newtype (Qual Tcon) [Tbind] (Maybe Ty)
 
 data Cdef 
-  = Constr (Qual Dcon) [Tbind] [Ty]
+  = Constr Dcon [Tbind] [Ty]
 
 data Vdefg 
   = Rec [Vdef]
   | Nonrec Vdef
 
-type Vdef = (Qual Var,Ty,Exp) 
+type Vdef = (Var,Ty,Exp) 	-- Top level bindings are unqualified now
 
 data Exp 
   = Var (Qual Var)

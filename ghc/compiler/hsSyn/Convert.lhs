@@ -14,12 +14,12 @@ import Language.Haskell.THSyntax as Meta
 
 import HsSyn as Hs
 	(	HsExpr(..), HsLit(..), ArithSeqInfo(..), 
-		HsStmtContext(..), TyClDecl(..),
+		HsStmtContext(..), TyClDecl(..), HsBang(..),
 		Match(..), GRHSs(..), GRHS(..), HsPred(..),
 		HsDecl(..), TyClDecl(..), InstDecl(..), ConDecl(..),
 		Stmt(..), HsBinds(..), MonoBinds(..), Sig(..),
 		Pat(..), HsConDetails(..), HsOverLit, BangType(..),
-		placeHolderType, HsType(..), HsTupCon(..),
+		placeHolderType, HsType(..), 
 		HsTyVarBndr(..), HsContext,
 		mkSimpleMatch, mkHsForAllTy
 	) 
@@ -29,10 +29,8 @@ import Module   ( mkModuleName )
 import RdrHsSyn	( mkHsIntegral, mkHsFractional, mkClassDecl, mkTyData )
 import OccName
 import SrcLoc	( SrcLoc, generatedSrcLoc )
-import TyCon	( DataConDetails(..) )
 import Type	( Type )
-import BasicTypes( Boxity(..), RecFlag(Recursive), 
-		   NewOrData(..), StrictnessMark(..) )
+import BasicTypes( Boxity(..), RecFlag(Recursive), NewOrData(..) )
 import ForeignCall ( Safety(..), CCallConv(..), CCallTarget(..),
                      CExportSpec(..)) 
 import HsDecls ( CImportSpec(..), ForeignImport(..), ForeignExport(..),
@@ -59,13 +57,13 @@ mk_con con = case con of
 	 -> ConDecl (cName c) noExistentials noContext
 		  (InfixCon (mk_arg st1) (mk_arg st2)) loc0
   where
-    mk_arg (IsStrict, ty) = BangType MarkedUserStrict (cvtType ty)
-    mk_arg (NotStrict, ty) = BangType NotMarkedStrict (cvtType ty)
+    mk_arg (IsStrict, ty)  = BangType HsStrict (cvtType ty)
+    mk_arg (NotStrict, ty) = BangType HsNoBang (cvtType ty)
 
     mk_id_arg (i, IsStrict, ty)
-        = (vName i, BangType MarkedUserStrict (cvtType ty))
+        = (vName i, BangType HsStrict (cvtType ty))
     mk_id_arg (i, NotStrict, ty)
-        = (vName i, BangType NotMarkedStrict (cvtType ty))
+        = (vName i, BangType HsNoBang (cvtType ty))
 
 mk_derivs [] = Nothing
 mk_derivs cs = Just [HsClassP (tconName c) [] | c <- cs]
@@ -80,24 +78,24 @@ cvt_top (TySynD tc tvs rhs)
 cvt_top (DataD ctxt tc tvs constrs derivs)
   = Left $ TyClD (mkTyData DataType 
                            (cvt_context ctxt, tconName tc, cvt_tvs tvs)
-                           (DataCons (map mk_con constrs))
+                           (map mk_con constrs)
                            (mk_derivs derivs) loc0)
 
 cvt_top (NewtypeD ctxt tc tvs constr derivs)
   = Left $ TyClD (mkTyData NewType 
                            (cvt_context ctxt, tconName tc, cvt_tvs tvs)
-                           (DataCons [mk_con constr])
+                           [mk_con constr]
                            (mk_derivs derivs) loc0)
 
 cvt_top (ClassD ctxt cl tvs decs)
   = Left $ TyClD (mkClassDecl (cvt_context ctxt, tconName cl, cvt_tvs tvs)
                               noFunDeps sigs
-			      (Just binds) loc0)
+			      binds loc0)
   where
     (binds,sigs) = cvtBindsAndSigs decs
 
 cvt_top (InstanceD tys ty decs)
-  = Left $ InstD (InstDecl inst_ty binds sigs Nothing loc0)
+  = Left $ InstD (InstDecl inst_ty binds sigs loc0)
   where
     (binds, sigs) = cvtBindsAndSigs decs
     inst_ty = HsForAllTy Nothing 
@@ -314,7 +312,7 @@ cvtType ty = trans (root ty [])
         root t zs 	   = (t,zs)
 
         trans (TupleT n,args)
-            | length args == n = HsTupleTy (HsTupCon Boxed n) args
+            | length args == n = HsTupleTy Boxed args
             | n == 0 = foldl HsAppTy (HsTyVar (tconName "()")) args
             | otherwise = foldl HsAppTy (HsTyVar (tconName ("(" ++ replicate (n-1) ',' ++ ")"))) args
         trans (ArrowT,   [x,y]) = HsFunTy x y

@@ -74,18 +74,16 @@ import Name	    (Name)
 import VarSet       (VarSet, emptyVarSet, extendVarSet, varSetElems )
 import VarEnv       (VarEnv, emptyVarEnv, zipVarEnv, plusVarEnv,
 		     elemVarEnv, lookupVarEnv, lookupVarEnv_NF, delVarEnvList)
-import TyCon        (tyConName)
 import Type	    (Type, tyConAppTyCon)
-import HscTypes	    (HomePackageTable, PersistentCompilerState(pcs_EPS), 
+import HscTypes	    (HomePackageTable,
 		     ExternalPackageState(eps_PTE), HscEnv(hsc_HPT),
 		     TyThing(..), lookupType)
-import PrelNames    (charPrimTyConName, intPrimTyConName, floatPrimTyConName,
-		     doublePrimTyConName, fstName, andName, orName,
+import PrelNames    ( fstName, andName, orName,
 		     lengthPName, replicatePName, mapPName, bpermutePName,
 		     bpermuteDftPName, indexOfPName)
-import PrimOp	    (eqCharName, eqIntName, eqFloatName, eqDoubleName,
-		     neqIntName)
-		     -- neqCharName, neqFloatName,neqDoubleName,
+import TysPrim      ( charPrimTyCon, intPrimTyCon, floatPrimTyCon, doublePrimTyCon )
+import PrimOp	    ( PrimOp(..) )
+import PrelInfo	    ( primOpId )
 import CoreSyn      (Expr(..), Bind(..), CoreBndr, CoreExpr, CoreBind, mkApps)
 import CoreUtils    (exprType)
 
@@ -130,11 +128,11 @@ data FlattenState = FlattenState {
 
 -- initial value of the flattening state
 --
-initialFlattenState :: PersistentCompilerState 
+initialFlattenState :: ExternalPackageState
 		    -> HomePackageTable 
 		    -> UniqSupply 
 		    -> FlattenState
-initialFlattenState pcs hpt us = 
+initialFlattenState eps hpt us = 
   FlattenState {
     us	     = us,
     env      = lookup,
@@ -144,7 +142,7 @@ initialFlattenState pcs hpt us =
   }
   where
     lookup n = 
-      case lookupType hpt (eps_PTE (pcs_EPS pcs)) n of
+      case lookupType hpt (eps_PTE eps) n of
         Just (AnId v) -> v 
 	_             -> pprPanic "FlattenMonad: unknown name:" (ppr n)
 
@@ -164,12 +162,12 @@ instance Monad Flatten where
 -- execute the given flattening computation (EXPORTED)
 --
 runFlatten :: HscEnv
-	   -> PersistentCompilerState 
+	   -> ExternalPackageState
 	   -> UniqSupply 
 	   -> Flatten a 
 	   -> a    
-runFlatten hsc_env pcs us m 
-  = fst $ unFlatten m (initialFlattenState pcs (hsc_HPT hsc_env) us)
+runFlatten hsc_env eps us m 
+  = fst $ unFlatten m (initialFlattenState eps (hsc_HPT hsc_env) us)
 
 
 -- variable generation
@@ -364,14 +362,14 @@ mk'or a1 a2  = mkFunApp orName [a1, a2]
 -- `Double') (EXPORTED)
 --
 mk'eq          :: Type -> CoreExpr -> CoreExpr -> Flatten CoreExpr
-mk'eq ty a1 a2  = mkFunApp eqName [a1, a2]
+mk'eq ty a1 a2  = return (mkApps (Var eqName) [a1, a2])
 		  where
-		    name = tyConName . tyConAppTyCon $ ty
+		    tc = tyConAppTyCon ty
 		    --
-		    eqName | name == charPrimTyConName   = eqCharName
-			   | name == intPrimTyConName    = eqIntName
-			   | name == floatPrimTyConName  = eqFloatName
-			   | name == doublePrimTyConName = eqDoubleName
+		    eqName | tc == charPrimTyCon   = primOpId CharEqOp
+			   | tc == intPrimTyCon    = primOpId IntEqOp
+			   | tc == floatPrimTyCon  = primOpId FloatEqOp
+			   | tc == doublePrimTyCon = primOpId DoubleEqOp
 			   | otherwise 		         =
 			     pprPanic "FlattenMonad.mk'eq: " (ppr ty)
 
@@ -380,12 +378,12 @@ mk'eq ty a1 a2  = mkFunApp eqName [a1, a2]
 -- `Double') (EXPORTED)
 --
 mk'neq          :: Type -> CoreExpr -> CoreExpr -> Flatten CoreExpr
-mk'neq ty a1 a2  = mkFunApp neqName [a1, a2]
+mk'neq ty a1 a2  = return (mkApps (Var neqName) [a1, a2])
 		   where
-		     name = tyConName . tyConAppTyCon $ ty
+		     tc = tyConAppTyCon ty
 		     --
 		     neqName {- | name == charPrimTyConName   = neqCharName -}
-			     | name == intPrimTyConName    = neqIntName
+			     | tc == intPrimTyCon	      = primOpId IntNeOp
 			     {- | name == floatPrimTyConName  = neqFloatName -}
 			     {- | name == doublePrimTyConName = neqDoubleName -}
 			     | otherwise		   =

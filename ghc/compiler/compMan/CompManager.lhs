@@ -8,9 +8,9 @@
 module CompManager ( 
     ModuleGraph, ModSummary(..),
 
-    CmState, emptyCmState,  -- abstract
+    CmState, 		-- abstract
 
-    cmInit, 	   -- :: GhciMode -> IO CmState
+    cmInit, 	   -- :: GhciMode -> DynFlags -> IO CmState
 
     cmDepAnal,	   -- :: CmState -> DynFlags -> [FilePath] -> IO ModuleGraph
 
@@ -46,6 +46,7 @@ module CompManager (
     cmGetModInfo,		-- :: CmState -> (ModuleGraph, HomePackageTable)
     findModuleLinkable_maybe,	-- Exported to InteractiveUI
 
+    cmSetDFlags,
     cmGetBindings, 	-- :: CmState -> [TyThing]
     cmGetPrintUnqual,	-- :: CmState -> PrintUnqualified
 
@@ -57,13 +58,11 @@ where
 #include "HsVersions.h"
 
 import DriverPipeline	( CompResult(..), preprocess, compile, link )
+import HscMain		( newHscEnv )
 import DriverState	( v_Output_file, v_NoHsMain )
 import DriverPhases
-import DriverUtil
 import Finder
-import HscMain		( initPersistentCompilerState )
-import HscTypes hiding	( moduleNameToModule )
-import NameEnv
+import HscTypes
 import PrelNames        ( gHC_PRIM_Name )
 import Module		( Module, ModuleName, moduleName, mkModuleName, isHomeModule,
 			  ModuleEnv, lookupModuleEnvByName, mkModuleEnv, moduleEnvElts,
@@ -80,19 +79,20 @@ import Util
 import Outputable
 import Panic
 import CmdLineOpts	( DynFlags(..), getDynFlags )
-import Maybes		( expectJust, orElse )
+import Maybes		( expectJust, orElse, mapCatMaybes )
 
 import DATA_IOREF	( readIORef )
 
 #ifdef GHCI
 import HscMain		( hscThing, hscStmt, hscTcExpr )
-import Module		( moduleUserString )
-import TcRnDriver	( mkGlobalContext, getModuleContents )
-import Name		( Name, NamedThing(..), isExternalName, nameModule )
+import TcRnDriver	( mkExportEnv, getModuleContents )
+import IfaceSyn		( IfaceDecl )
+import Name		( Name )
+import NameEnv
 import Id		( idType )
 import Type		( tidyType )
 import VarEnv		( emptyTidyEnv )
-import BasicTypes	( Fixity, FixitySig(..), defaultFixity )
+import BasicTypes	( Fixity )
 import Linker		( HValue, unload, extendLinkEnv )
 import GHC.Exts		( unsafeCoerce# )
 import Foreign
@@ -115,31 +115,31 @@ import Time		( ClockTime )
 -- Persistent state for the entire system
 data CmState
    = CmState {
-        gmode :: GhciMode,           -- NEVER CHANGES
-
-        hpt   :: HomePackageTable,   -- Info about home package module
-        mg    :: ModuleGraph,        -- the module graph
-  	ic    :: InteractiveContext, -- command-line binding info
-
-        pcs    :: PersistentCompilerState -- compile's persistent state
+	cm_hsc :: HscEnv,		-- Includes the home-package table
+	cm_mg  :: ModuleGraph,		-- The module graph
+  	cm_ic  :: InteractiveContext 	-- Command-line binding info
      }
 
-cmGetModInfo	 cmstate = (mg cmstate, hpt cmstate)
-cmGetBindings    cmstate = nameEnvElts (ic_type_env (ic cmstate))
-cmGetPrintUnqual cmstate = icPrintUnqual (ic cmstate)
+#ifdef GHCI
+cmGetModInfo	 cmstate = (cm_mg cmstate, hsc_HPT (cm_hsc cmstate))
+cmGetBindings    cmstate = nameEnvElts (ic_type_env (cm_ic cmstate))
+cmGetPrintUnqual cmstate = icPrintUnqual (cm_ic cmstate)
+cmHPT		 cmstate = hsc_HPT (cm_hsc cmstate)
+#endif
 
-emptyCmState :: GhciMode -> IO CmState
-emptyCmState gmode
-    = do pcs     <- initPersistentCompilerState
-         return (CmState { hpt    = emptyHomePackageTable,
-                           mg     = emptyMG, 
-                           gmode  = gmode,
-			   ic     = emptyInteractiveContext,
-                           pcs    = pcs })
+cmInit :: GhciMode -> DynFlags -> IO CmState
+cmInit ghci_mode dflags
+   = do { hsc_env <- newHscEnv ghci_mode dflags
+	; return (CmState { cm_hsc = hsc_env,
+			    cm_mg  = emptyMG, 
+			    cm_ic  = emptyInteractiveContext })}
 
-cmInit :: GhciMode -> IO CmState
-cmInit mode = emptyCmState mode
-
+discardCMInfo :: CmState -> CmState
+-- Forget the compilation manager's state, including the home package table
+-- but retain the persistent info in HscEnv
+discardCMInfo cm_state
+  = cm_state { cm_mg = emptyMG, cm_ic = emptyInteractiveContext,
+	       cm_hsc = (cm_hsc cm_state) { hsc_HPT = emptyHomePackageTable } }
 
 -------------------------------------------------------------------
 --			The unlinked image
@@ -150,8 +150,6 @@ cmInit mode = emptyCmState mode
 -- recompiling.
 
 type UnlinkedImage = [Linkable]	-- the unlinked images (should be a set, really)
-emptyUI :: UnlinkedImage
-emptyUI = []
 
 findModuleLinkable_maybe :: [Linkable] -> ModuleName -> Maybe Linkable
 findModuleLinkable_maybe lis mod
@@ -159,21 +157,6 @@ findModuleLinkable_maybe lis mod
         []   -> Nothing
         [li] -> Just li
         many -> pprPanic "findModuleLinkable" (ppr mod)
-
-filterModuleLinkables :: (ModuleName -> Bool) -> [Linkable] -> [Linkable]
-filterModuleLinkables p [] = []
-filterModuleLinkables p (li:lis)
-   = case li of
-        LM _ modnm _ -> if p modnm then retain else dump
-     where
-        dump   = filterModuleLinkables p lis
-        retain = li : dump
-
-linkableInSet :: Linkable -> [Linkable] -> Bool
-linkableInSet l objs_loaded =
-  case findModuleLinkable_maybe objs_loaded (linkableModName l) of
-	Nothing -> False
-	Just m  -> linkableTime l == linkableTime m
 \end{code}
 
 
@@ -191,61 +174,35 @@ linkableInSet l objs_loaded =
 -- module.  They always shadow anything in scope in the current context.
 
 cmSetContext
-	:: CmState -> DynFlags
+	:: CmState
 	-> [String]		-- take the top-level scopes of these modules
 	-> [String]		-- and the just the exports from these
 	-> IO CmState
-cmSetContext cmstate dflags toplevs exports = do 
-  let CmState{ hpt=hpt, pcs=pcs, ic=old_ic } = cmstate
-      hsc_env = HscEnv { hsc_mode = Interactive, hsc_dflags = dflags,
-			 hsc_HPT = hpt }
+cmSetContext cmstate toplevs exports = do 
+  let old_ic = cm_ic cmstate
 
-  toplev_mods <- mapM (getTopLevModule hpt)    (map mkModuleName toplevs)
-  export_mods <- mapM (moduleNameToModule hpt) (map mkModuleName exports)
+  export_env <- mkExportEnv (cm_hsc cmstate) 
+			    (map mkModuleName exports)
 
-  (new_pcs, maybe_env)
-      <- mkGlobalContext hsc_env pcs toplev_mods export_mods
-
-  case maybe_env of 
-    Nothing  -> return cmstate
-    Just env -> return cmstate{ pcs = new_pcs,
-			        ic = old_ic{ ic_toplev_scope = toplev_mods,
-			      		     ic_exports = export_mods,
-			       		     ic_rn_gbl_env = env } }
-
-getTopLevModule hpt mn =
-  case lookupModuleEnvByName hpt mn of
-
-    Just mod_info
-      | isJust (mi_globals iface) -> return (mi_module iface)
-      where
-	iface = hm_iface mod_info
-
-    _other -> throwDyn (CmdLineError (
-	  "cannot enter the top-level scope of a compiled module (module `" ++
-	   moduleNameUserString mn ++ "')"))
-
-moduleNameToModule :: HomePackageTable -> ModuleName -> IO Module
-moduleNameToModule hpt mn = do
-  case lookupModuleEnvByName hpt mn of
-    Just mod_info -> return (mi_module (hm_iface mod_info))
-    _not_a_home_module -> do
-	  maybe_stuff <- findModule mn
-	  case maybe_stuff of
-	    Left _ -> throwDyn (CmdLineError ("can't find module `"
-	  			    ++ moduleNameUserString mn ++ "'"))
-	    Right (m,_) -> return m
+  putStrLn (showSDoc (text "export env" $$ ppr export_env))
+  return cmstate{ cm_ic = old_ic { ic_toplev_scope = toplevs,
+		     		   ic_exports = exports,
+			       	   ic_rn_gbl_env = export_env } }
 
 cmGetContext :: CmState -> IO ([String],[String])
-cmGetContext CmState{ic=ic} = 
-  return (map moduleUserString (ic_toplev_scope ic), 
-	  map moduleUserString (ic_exports ic))
+cmGetContext CmState{cm_ic=ic} = 
+  return (ic_toplev_scope ic, ic_exports ic)
 
 cmModuleIsInterpreted :: CmState -> String -> IO Bool
 cmModuleIsInterpreted cmstate str 
- = case lookupModuleEnvByName (hpt cmstate) (mkModuleName str) of
-      Just details       -> return (isJust (mi_globals (hm_iface details)))
+ = case lookupModuleEnvByName (cmHPT cmstate) (mkModuleName str) of
+      Just details       -> return (isJust (hm_globals details))
       _not_a_home_module -> return False
+
+-----------------------------------------------------------------------------
+cmSetDFlags :: CmState -> DynFlags -> CmState
+cmSetDFlags cm_state dflags 
+  = cm_state { cm_hsc = (cm_hsc cm_state) { hsc_dflags = dflags } }
 
 -----------------------------------------------------------------------------
 -- cmInfoThing: convert a String to a TyThing
@@ -253,44 +210,18 @@ cmModuleIsInterpreted cmstate str
 -- A string may refer to more than one TyThing (eg. a constructor,
 -- and type constructor), so we return a list of all the possible TyThings.
 
-cmInfoThing :: CmState -> DynFlags -> String -> IO (CmState, [(TyThing,Fixity)])
-cmInfoThing cmstate dflags id
-   = do (new_pcs, things) <- hscThing hsc_env pcs icontext id
-	let new_pit = eps_PIT (pcs_EPS new_pcs)
-	    pairs = map (\x -> (x, getFixity new_pit (getName x))) things
-	return (cmstate{ pcs=new_pcs }, pairs)
-   where
-     CmState{ hpt=hpt, pcs=pcs, ic=icontext } = cmstate
-     hsc_env = HscEnv { hsc_mode   = Interactive,
-			hsc_dflags = dflags,
-			hsc_HPT    = hpt }
-
-     getFixity :: PackageIfaceTable -> Name -> Fixity
-     getFixity pit name
-	| isExternalName name,
-	  Just iface  <- lookupIface hpt pit (nameModule name),
-	  Just (FixitySig _ fixity _) <- lookupNameEnv (mi_fixities iface) name
-	= fixity
-	| otherwise
-	= defaultFixity
+cmInfoThing :: CmState -> String -> IO [(IfaceDecl,Fixity)]
+cmInfoThing cmstate id
+   = hscThing (cm_hsc cmstate) (cm_ic cmstate) id
 
 -- ---------------------------------------------------------------------------
 -- cmBrowseModule: get all the TyThings defined in a module
 
-cmBrowseModule :: CmState -> DynFlags -> String -> Bool 
-	-> IO (CmState, [TyThing])
-cmBrowseModule cmstate dflags str exports_only = do
-  let mn = mkModuleName str
-  mod <- moduleNameToModule hpt mn
-  (pcs1, maybe_ty_things) 
-	<- getModuleContents hsc_env pcs mod exports_only
-  case maybe_ty_things of
-	Nothing -> return (cmstate{pcs=pcs1}, [])
-	Just ty_things -> return (cmstate{pcs=pcs1}, ty_things)
-  where
-     hsc_env = HscEnv { hsc_mode = Interactive, hsc_dflags = dflags,
-			hsc_HPT = hpt }
-     CmState{ hpt=hpt, pcs=pcs, ic=icontext } = cmstate
+cmBrowseModule :: CmState -> String -> Bool -> IO [IfaceDecl]
+cmBrowseModule cmstate str exports_only
+  = getModuleContents (cm_hsc cmstate) (cm_ic cmstate) 
+		      (mkModuleName str) exports_only
+
 
 -----------------------------------------------------------------------------
 -- cmRunStmt:  Run a statement/expr.
@@ -300,19 +231,13 @@ data CmRunResult
   | CmRunFailed 
   | CmRunException Exception	-- statement raised an exception
 
-cmRunStmt :: CmState -> DynFlags -> String -> IO (CmState, CmRunResult)		
-cmRunStmt cmstate@CmState{ hpt=hpt, pcs=pcs, ic=icontext }
-          dflags expr
+cmRunStmt :: CmState -> String -> IO (CmState, CmRunResult)		
+cmRunStmt cmstate@CmState{ cm_hsc=hsc_env, cm_ic=icontext } expr
    = do 
-	let hsc_env = HscEnv { hsc_mode   = Interactive,
-			       hsc_dflags = dflags,
-			       hsc_HPT    = hpt }
-				
-        (new_pcs, maybe_stuff) 
-	    <- hscStmt hsc_env pcs icontext expr
+        maybe_stuff <- hscStmt hsc_env icontext expr
 
         case maybe_stuff of
-	   Nothing -> return (cmstate{ pcs=new_pcs }, CmRunFailed)
+	   Nothing -> return (cmstate, CmRunFailed)
 	   Just (new_ic, names, hval) -> do
 
 		let thing_to_run = unsafeCoerce# hval :: IO [HValue]
@@ -323,7 +248,7 @@ cmRunStmt cmstate@CmState{ hpt=hpt, pcs=pcs, ic=icontext }
 			-- on error, keep the *old* interactive context,
 			-- so that 'it' is not bound to something
 			-- that doesn't exist.
-		        return ( cmstate{ pcs=new_pcs }, CmRunException e )
+		        return ( cmstate, CmRunException e )
 
 		    Right hvals -> do
 			-- Get the newly bound things, and bind them.  
@@ -331,7 +256,7 @@ cmRunStmt cmstate@CmState{ hpt=hpt, pcs=pcs, ic=icontext }
 			-- the new ones override the old ones. 
 			extendLinkEnv (zip names hvals)
 	     		
-			return (cmstate{ pcs=new_pcs, ic=new_ic }, 
+			return (cmstate{ cm_ic=new_ic }, 
 				CmRunOk names)
 
 
@@ -373,36 +298,28 @@ foreign import "rts_evalStableIO"  {- safe -}
 -----------------------------------------------------------------------------
 -- cmTypeOfExpr: returns a string representing the type of an expression
 
-cmTypeOfExpr :: CmState -> DynFlags -> String -> IO (CmState, Maybe String)
-cmTypeOfExpr cmstate dflags expr
-   = do (new_pcs, maybe_stuff) <- hscTcExpr hsc_env pcs ic expr
-
-	let new_cmstate = cmstate{pcs = new_pcs}
+cmTypeOfExpr :: CmState -> String -> IO (Maybe String)
+cmTypeOfExpr cmstate expr
+   = do maybe_stuff <- hscTcExpr (cm_hsc cmstate) (cm_ic cmstate) expr
 
 	case maybe_stuff of
-	   Nothing -> return (new_cmstate, Nothing)
-	   Just ty -> return (new_cmstate, Just str)
+	   Nothing -> return Nothing
+	   Just ty -> return (Just str)
  	     where 
 		str     = showSDocForUser unqual (text expr <+> dcolon <+> ppr tidy_ty)
-		unqual  = icPrintUnqual ic
+		unqual  = icPrintUnqual (cm_ic cmstate)
 		tidy_ty = tidyType emptyTidyEnv ty
-   where
-     CmState{ hpt=hpt, pcs=pcs, ic=ic } = cmstate
-     hsc_env = HscEnv { hsc_mode   = Interactive,
-			hsc_dflags = dflags,
-			hsc_HPT    = hpt }
-				
 
 
 -----------------------------------------------------------------------------
 -- cmTypeOfName: returns a string representing the type of a name.
 
 cmTypeOfName :: CmState -> Name -> IO (Maybe String)
-cmTypeOfName CmState{ pcs=pcs, ic=ic } name
+cmTypeOfName CmState{ cm_ic=ic } name
  = do 
     hPutStrLn stderr ("cmTypeOfName: " ++ showSDoc (ppr name))
     case lookupNameEnv (ic_type_env ic) name of
-	Nothing -> return Nothing
+	Nothing        -> return Nothing
 	Just (AnId id) -> return (Just str)
 	   where
 	     unqual = icPrintUnqual ic
@@ -414,30 +331,24 @@ cmTypeOfName CmState{ pcs=pcs, ic=ic } name
 -----------------------------------------------------------------------------
 -- cmCompileExpr: compile an expression and deliver an HValue
 
-cmCompileExpr :: CmState -> DynFlags -> String -> IO (CmState, Maybe HValue)
-cmCompileExpr cmstate dflags expr
+cmCompileExpr :: CmState -> String -> IO (Maybe HValue)
+cmCompileExpr cmstate expr
    = do 
-	let hsc_env = HscEnv { hsc_mode   = Interactive,
-			       hsc_dflags = dflags,
-			       hsc_HPT    = hpt }
-				
-        (new_pcs, maybe_stuff) 
-	    <- hscStmt hsc_env pcs icontext 
+        maybe_stuff 
+	    <- hscStmt (cm_hsc cmstate) (cm_ic cmstate)
 		       ("let __cmCompileExpr = "++expr)
 
         case maybe_stuff of
-	   Nothing -> return (cmstate{ pcs=new_pcs }, Nothing)
+	   Nothing -> return Nothing
 	   Just (new_ic, names, hval) -> do
 
 			-- Run it!
 		hvals <- (unsafeCoerce# hval) :: IO [HValue]
 
 		case (names,hvals) of
-		  ([n],[hv]) -> return (cmstate{ pcs=new_pcs }, Just hv)
+		  ([n],[hv]) -> return (Just hv)
 		  _ 	     -> panic "cmCompileExpr"
 
-   where
-       CmState{ hpt=hpt, pcs=pcs, ic=icontext } = cmstate
 #endif /* GHCI */
 \end{code}
 
@@ -453,26 +364,26 @@ cmCompileExpr cmstate dflags expr
 -- Unload the compilation manager's state: everything it knows about the
 -- current collection of modules in the Home package.
 
-cmUnload :: CmState -> DynFlags -> IO CmState
-cmUnload state@CmState{ gmode=mode, pcs=pcs } dflags
+cmUnload :: CmState -> IO CmState
+cmUnload state@CmState{ cm_hsc = hsc_env }
  = do -- Throw away the old home dir cache
       flushFinderCache
 
       -- Unload everything the linker knows about
-      cm_unload mode dflags []
+      cm_unload hsc_env []
 
       -- Start with a fresh CmState, but keep the PersistentCompilerState
-      new_state <- cmInit mode
-      return new_state{ pcs=pcs }
+      return (discardCMInfo state)
 
-cm_unload Batch dflags linkables = return ()
-
+cm_unload hsc_env linkables
+  = case hsc_mode hsc_env of
+	Batch -> return ()
 #ifdef GHCI
-cm_unload Interactive dflags linkables = Linker.unload dflags linkables
+	Interactive -> Linker.unload (hsc_dflags hsc_env) linkables
 #else
-cm_unload Interactive dflags linkables = panic "unload: no interpreter"
+	Interactive -> panic "unload: no interpreter"
 #endif
-
+    
 
 -----------------------------------------------------------------------------
 -- Trace dependency graph
@@ -485,14 +396,18 @@ cm_unload Interactive dflags linkables = panic "unload: no interpreter"
 -- He wants to do the dependency analysis before the unload, so that
 -- if the former fails he can use the later
 
-cmDepAnal :: CmState -> DynFlags -> [FilePath] -> IO ModuleGraph
-cmDepAnal cmstate dflags rootnames
+cmDepAnal :: CmState -> [FilePath] -> IO ModuleGraph
+cmDepAnal cmstate rootnames
   = do showPass dflags "Chasing dependencies"
-       when (verbosity dflags >= 1 && gmode cmstate == Batch) $
+       when (verbosity dflags >= 1 && gmode == Batch) $
            hPutStrLn stderr (showSDoc (hcat [
 	     text "Chasing modules from: ",
 	     hcat (punctuate comma (map text rootnames))]))
-       downsweep rootnames (mg cmstate)
+       downsweep rootnames (cm_mg cmstate)
+  where
+    hsc_env = cm_hsc cmstate
+    dflags  = hsc_dflags hsc_env
+    gmode   = hsc_mode hsc_env
 
 -----------------------------------------------------------------------------
 -- The real business of the compilation manager: given a system state and
@@ -500,18 +415,17 @@ cmDepAnal cmstate dflags rootnames
 -- the system state at the same time.
 
 cmLoadModules :: CmState 		-- The HPT may not be as up to date
-	      -> DynFlags		-- 	as the ModuleGraph
               -> ModuleGraph		-- Bang up to date
               -> IO (CmState,		-- new state
 		     SuccessFlag,	-- was successful
 		     [String])		-- list of modules loaded
 
-cmLoadModules cmstate1 dflags mg2unsorted
+cmLoadModules cmstate1 mg2unsorted
    = do -- version 1's are the original, before downsweep
-        let pcs1      = pcs    cmstate1
-        let hpt1      = hpt    cmstate1
-
-        let ghci_mode = gmode cmstate1 -- this never changes
+	let hsc_env   = cm_hsc cmstate1
+        let hpt1      = hsc_HPT hsc_env
+        let ghci_mode = hsc_mode   hsc_env -- this never changes
+        let dflags    = hsc_dflags hsc_env -- this never changes
 
         -- Do the downsweep to reestablish the module graph
         let verb = verbosity dflags
@@ -545,6 +459,7 @@ cmLoadModules cmstate1 dflags mg2unsorted
 
 		-- Uniq of ModuleName is the same as Module, fortunately...
 	let hpt2 = delListFromUFM hpt1 (map linkableModName new_linkables)
+            hsc_env2 = hsc_env { hsc_HPT = hpt2 }
 
 	-- When (verb >= 2) $
         --    putStrLn (showSDoc (text "Valid linkables:" 
@@ -576,7 +491,7 @@ cmLoadModules cmstate1 dflags mg2unsorted
 
 	-- Unload any modules which are going to be re-linked this
 	-- time around.
-	cm_unload ghci_mode dflags stable_linkables
+	cm_unload hsc_env2 stable_linkables
 
 	-- we can now glom together our linkable sets
 	let valid_linkables = valid_old_linkables ++ new_linkables
@@ -601,17 +516,13 @@ cmLoadModules cmstate1 dflags mg2unsorted
         -- Now do the upsweep, calling compile for each module in
         -- turn.  Final result is version 3 of everything.
 
-        let threaded2 = CmThreaded pcs1 hpt2
-
 	-- clean up between compilations
 	let cleanup = cleanTempFilesExcept verb 
 			  (ppFilesFromSummaries (flattenSCCs mg2))
 
-        (upsweep_ok, threaded3, modsUpswept)
-           <- upsweep_mods ghci_mode dflags valid_linkables reachable_from 
-                           threaded2 cleanup upsweep_these
-
-        let (CmThreaded pcs3 hpt3) = threaded3
+        (upsweep_ok, hsc_env3, modsUpswept)
+           <- upsweep_mods hsc_env2 valid_linkables reachable_from 
+                           cleanup upsweep_these
 
         -- At this point, modsUpswept and newLis should have the same
         -- length, so there is one new (or old) linkable for each 
@@ -653,10 +564,10 @@ cmLoadModules cmstate1 dflags mg2unsorted
 	         hPutStrLn stderr "Warning: output was redirected with -o, but no output will be generated\nbecause there is no Main module."
 
 	      -- link everything together
-              linkresult <- link ghci_mode dflags do_linking hpt3 
+              linkresult <- link ghci_mode dflags do_linking (hsc_HPT hsc_env3)
 
-	      cmLoadFinish Succeeded linkresult 
-			   hpt3 modsDone ghci_mode pcs3
+	      let cmstate3 = cmstate1 { cm_mg = modsDone, cm_hsc = hsc_env3 }
+	      cmLoadFinish Succeeded linkresult cmstate3
 
          else 
            -- Tricky.  We need to back out the effects of compiling any
@@ -674,7 +585,8 @@ cmLoadModules cmstate1 dflags mg2unsorted
                      = filter ((`notElem` mods_to_zap_names).modSummaryName) 
 			  modsDone
 
-              let hpt4 = retainInTopLevelEnvs (map modSummaryName mods_to_keep) hpt3
+              let hpt4 = retainInTopLevelEnvs (map modSummaryName mods_to_keep) 
+					      (hsc_HPT hsc_env3)
 
 	      -- Clean up after ourselves
 	      cleanTempFilesExcept verb (ppFilesFromSummaries mods_to_keep)
@@ -682,26 +594,24 @@ cmLoadModules cmstate1 dflags mg2unsorted
 	      -- Link everything together
               linkresult <- link ghci_mode dflags False hpt4
 
-	      cmLoadFinish Failed linkresult 
-			   hpt4 mods_to_keep ghci_mode pcs3
+	      let cmstate3 = cmstate1 { cm_mg = mods_to_keep,
+					cm_hsc = hsc_env3 { hsc_HPT = hpt4 } }
+	      cmLoadFinish Failed linkresult cmstate3
 
 
 -- Finish up after a cmLoad.
 
 -- If the link failed, unload everything and return.
-cmLoadFinish ok Failed hpt mods ghci_mode pcs = do
-  dflags    <- getDynFlags
-  cm_unload ghci_mode dflags []
-  new_state <- cmInit ghci_mode
-  return (new_state{ pcs=pcs }, Failed, [])
+cmLoadFinish ok Failed cmstate
+  = do cm_unload (cm_hsc cmstate) []
+       return (discardCMInfo cmstate, Failed, [])
 
 -- Empty the interactive context and set the module context to the topmost
 -- newly loaded module, or the Prelude if none were loaded.
-cmLoadFinish ok Succeeded hpt mods ghci_mode pcs
-  = do let new_cmstate = CmState{ hpt=hpt, mg=mods,
-                                  gmode=ghci_mode, pcs=pcs,
-				  ic = emptyInteractiveContext }
-           mods_loaded = map (moduleNameUserString.modSummaryName) mods
+cmLoadFinish ok Succeeded cmstate
+  = do let new_cmstate = cmstate { cm_ic = emptyInteractiveContext }
+           mods_loaded = map (moduleNameUserString.modSummaryName) 
+			     (cm_mg cmstate)
 
        return (new_cmstate, ok, mods_loaded)
 
@@ -928,72 +838,62 @@ findPartiallyCompletedCycles modsDone theGraph
              else chewed_rest
 
 
-data CmThreaded  -- stuff threaded through individual module compilations
-   = CmThreaded PersistentCompilerState HomePackageTable
-
-
 -- Compile multiple modules, stopping as soon as an error appears.
 -- There better had not be any cyclic groups here -- we check for them.
-upsweep_mods :: GhciMode
-	     -> DynFlags
+upsweep_mods :: HscEnv			-- Includes up-to-date HPT
              -> [Linkable]		-- Valid linkables
              -> (ModuleName -> [ModuleName])  -- to construct downward closures
-             -> CmThreaded            -- PCS & HPT
 	     -> IO ()		      -- how to clean up unwanted tmp files
              -> [SCC ModSummary]      -- mods to do (the worklist)
                                       -- ...... RETURNING ......
              -> IO (SuccessFlag,
-                    CmThreaded,		-- Includes linkables
+                    HscEnv,		-- With an updated HPT
                     [ModSummary])	-- Mods which succeeded
 
-upsweep_mods ghci_mode dflags oldUI reachable_from threaded cleanup
+upsweep_mods hsc_env oldUI reachable_from cleanup
      []
-   = return (Succeeded, threaded, [])
+   = return (Succeeded, hsc_env, [])
 
-upsweep_mods ghci_mode dflags oldUI reachable_from threaded cleanup
+upsweep_mods hsc_env oldUI reachable_from cleanup
      ((CyclicSCC ms):_)
    = do hPutStrLn stderr ("Module imports form a cycle for modules:\n\t" ++
                           unwords (map (moduleNameUserString.modSummaryName) ms))
-        return (Failed, threaded, [])
+        return (Failed, hsc_env, [])
 
-upsweep_mods ghci_mode dflags oldUI reachable_from threaded cleanup
+upsweep_mods hsc_env oldUI reachable_from cleanup
      ((AcyclicSCC mod):mods)
-   = do --case threaded of
-        --   CmThreaded pcsz hptz
-        --      -> putStrLn ("UPSWEEP_MOD: hpt = " ++ 
-	--		     show (map (moduleNameUserString.moduleName.mi_module.hm_iface) (eltsUFM hptz)))
+   = do -- putStrLn ("UPSWEEP_MOD: hpt = " ++ 
+	--	     show (map (moduleNameUserString.moduleName.mi_module.hm_iface) (eltsUFM (hsc_HPT hsc_env)))
 
-        (ok_flag, threaded1) <- upsweep_mod ghci_mode dflags oldUI threaded mod 
+        (ok_flag, hsc_env1) <- upsweep_mod hsc_env oldUI mod 
                   	    		    (reachable_from (modSummaryName mod))
 
 	cleanup		-- Remove unwanted tmp files between compilations
 
         if failed ok_flag then
-	     return (Failed, threaded1, [])
+	     return (Failed, hsc_env1, [])
 	  else do 
-	     (restOK, threaded2, modOKs) 
-                       <- upsweep_mods ghci_mode dflags oldUI reachable_from 
-                                       threaded1 cleanup mods
-             return (restOK, threaded2, mod:modOKs)
+	     (restOK, hsc_env2, modOKs) 
+                       <- upsweep_mods hsc_env1 oldUI reachable_from cleanup mods
+             return (restOK, hsc_env2, mod:modOKs)
 
 
 -- Compile a single module.  Always produce a Linkable for it if 
 -- successful.  If no compilation happened, return the old Linkable.
-upsweep_mod :: GhciMode 
-	    -> DynFlags
+upsweep_mod :: HscEnv
             -> UnlinkedImage
-            -> CmThreaded
             -> ModSummary
             -> [ModuleName]
-            -> IO (SuccessFlag, CmThreaded)
+            -> IO (SuccessFlag, 
+		   HscEnv)		-- With updated HPT
 
-upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_inc_me
+upsweep_mod hsc_env oldUI summary1 reachable_inc_me
    = do 
         let this_mod = ms_mod summary1
 	    location = ms_location summary1
 	    mod_name = moduleName this_mod
+	    hpt1     = hsc_HPT hsc_env
 
-        let (CmThreaded pcs1 hpt1) = threaded1
         let mb_old_iface = case lookupModuleEnvByName hpt1 mod_name of
 			     Just mod_info -> Just (hm_iface mod_info)
 			     Nothing	   -> Nothing
@@ -1007,8 +907,9 @@ upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_inc_me
 	   -- interface in the HPT.  We never demand-load home interfaces in
 	   -- interactive mode.
             hpt1_strictDC
-               = ASSERT(ghci_mode == Batch || all (`elemUFM` hpt1) reachable_only)
+               = ASSERT(hsc_mode hsc_env == Batch || all (`elemUFM` hpt1) reachable_only)
 		 retainInTopLevelEnvs reachable_only hpt1
+	    hsc_env_strictDC = hsc_env { hsc_HPT = hpt1_strictDC }
 
             old_linkable = expectJust "upsweep_mod:old_linkable" maybe_old_linkable
 
@@ -1016,26 +917,27 @@ upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_inc_me
 	       | Just l <- maybe_old_linkable, isObjectLinkable l = True
 	       | otherwise = False
 
-        compresult <- compile ghci_mode this_mod location source_unchanged
-			 have_object mb_old_iface hpt1_strictDC pcs1
+        compresult <- compile hsc_env_strictDC this_mod location 
+			      source_unchanged have_object mb_old_iface
 
         case compresult of
 
            -- Compilation "succeeded", and may or may not have returned a new
            -- linkable (depending on whether compilation was actually performed
 	   -- or not).
-           CompOK pcs2 new_details new_iface maybe_new_linkable
+           CompOK new_details new_globals new_iface maybe_new_linkable
               -> do let 
 			new_linkable = maybe_new_linkable `orElse` old_linkable
 			new_info = HomeModInfo { hm_iface = new_iface,
+						 hm_globals = new_globals,
 						 hm_details = new_details,
 						 hm_linkable = new_linkable }
 			hpt2      = extendModuleEnv hpt1 this_mod new_info
 
-                    return (Succeeded, CmThreaded pcs2 hpt2)
+                    return (Succeeded, hsc_env { hsc_HPT = hpt2 })
 
            -- Compilation failed.  Compile may still have updated the PCS, tho.
-           CompErrs pcs2 -> return (Failed, CmThreaded pcs2 hpt1)
+           CompErrs -> return (Failed, hsc_env)
 
 -- Filter modules in the HPT
 retainInTopLevelEnvs :: [ModuleName] -> HomePackageTable -> HomePackageTable
@@ -1089,7 +991,7 @@ topological_sort include_source_imports summaries
                  Nothing -> panic "reverse_topological_sort"
                  Just mk -> (summ, mk, 
                                 -- ignore imports not from the home package
-                                catMaybes (map (flip lookup key_map) m_imports))
+                             mapCatMaybes (flip lookup key_map) m_imports)
 
          edges     = map toEdge summaries
          key_map   = zip [nm | (s,nm,imps) <- edges] [1 ..] :: [(ModuleName,Int)]

@@ -7,35 +7,31 @@ The bits common to TcInstDcls and TcDeriv.
 
 \begin{code}
 module InstEnv (
-	DFunId, ClsInstEnv, InstEnv,
+	DFunId, InstEnv,
 
 	emptyInstEnv, extendInstEnv, pprInstEnv,
-	lookupInstEnv, InstLookupResult(..),
-	classInstEnv, simpleDFunClassTyCon
+	lookupInstEnv, 
+	classInstEnv, simpleDFunClassTyCon, checkFunDeps
     ) where
 
 #include "HsVersions.h"
 
 import Class		( Class, classTvsFds )
-import Var		( TyVar, Id )
+import Var		( Id )
 import VarSet
 import VarEnv
-import Maybes		( MaybeErr(..), returnMaB, failMaB, thenMaB, maybeToBool )
-import Name		( getSrcLoc, nameModule )
-import SrcLoc		( SrcLoc, isGoodSrcLoc )
-import TcType		( Type, tcTyConAppTyCon, mkTyVarTy,
+import TcType		( Type, tcTyConAppTyCon, 
 			  tcSplitDFunTy, tyVarsOfTypes,
-			  matchTys, unifyTyListsX, allDistinctTyVars
+			  matchTys, unifyTyListsX
 			)
-import PprType		( pprClassPred )
 import FunDeps		( checkClsFD )
 import TyCon		( TyCon )
 import Outputable
-import UniqFM		( UniqFM, lookupWithDefaultUFM, addToUFM, emptyUFM, eltsUFM )
-import Id		( idType, idName )
-import ErrUtils		( Message )
+import UniqFM		( UniqFM, lookupWithDefaultUFM, emptyUFM, eltsUFM, addToUFM_C )
+import Id		( idType )
 import CmdLineOpts
 import Util             ( notNull )
+import Maybe		( isJust )
 \end{code}
 
 
@@ -47,15 +43,25 @@ import Util             ( notNull )
 
 \begin{code}
 type DFunId	= Id
+type InstEnv    = UniqFM ClsInstEnv	-- Maps Class to instances for that class
+type ClsInstEnv = [InstEnvElt]		-- The instances for a particular class
+type InstEnvElt = (TyVarSet, [Type], DFunId)
+	-- INVARIANTs: see notes below
 
-type InstEnv    = UniqFM ClsInstEnv		-- Maps Class to instances for that class
+emptyInstEnv :: InstEnv
+emptyInstEnv = emptyUFM
 
-simpleDFunClassTyCon :: DFunId -> (Class, TyCon)
-simpleDFunClassTyCon dfun
-  = (clas, tycon)
+classInstEnv :: InstEnv -> Class -> ClsInstEnv
+classInstEnv env cls = lookupWithDefaultUFM env [] cls
+
+extendInstEnv :: InstEnv -> DFunId -> InstEnv
+extendInstEnv inst_env dfun_id
+  = addToUFM_C add inst_env clas [ins_item]
   where
-    (_,_,clas,[ty]) = tcSplitDFunTy (idType dfun)
-    tycon  	    = tcTyConAppTyCon ty 
+    add old _ = ins_item : old
+    (ins_tvs, _, clas, ins_tys) = tcSplitDFunTy (idType dfun_id)
+    ins_tv_set = mkVarSet ins_tvs
+    ins_item   = (ins_tv_set, ins_tys, dfun_id)
 
 pprInstEnv :: InstEnv -> SDoc
 pprInstEnv env
@@ -64,6 +70,14 @@ pprInstEnv env
 	 | cls_inst_env <-  eltsUFM env
 	 , (tyvars, tys, dfun) <- cls_inst_env
 	 ]
+
+
+simpleDFunClassTyCon :: DFunId -> (Class, TyCon)
+simpleDFunClassTyCon dfun
+  = (clas, tycon)
+  where
+    (_,_,clas,[ty]) = tcSplitDFunTy (idType dfun)
+    tycon  	    = tcTyConAppTyCon ty 
 \end{code}		      
 
 %************************************************************************
@@ -71,17 +85,6 @@ pprInstEnv env
 \subsection{Instance environments: InstEnv and ClsInstEnv}
 %*									*
 %************************************************************************
-
-\begin{code}
-type ClsInstEnv = [(TyVarSet, [Type], DFunId)]	-- The instances for a particular class
-	-- INVARIANTs: see notes below
-
-emptyInstEnv :: InstEnv
-emptyInstEnv = emptyUFM
-
-classInstEnv :: InstEnv -> Class -> ClsInstEnv
-classInstEnv env cls = lookupWithDefaultUFM env [] cls
-\end{code}
 
 A @ClsInstEnv@ all the instances of that class.  The @Id@ inside a
 ClsInstEnv mapping is the dfun for that instance.
@@ -247,152 +250,91 @@ thing we are looking up can have an arbitrary "flexi" part.
 
 \begin{code}
 lookupInstEnv :: DynFlags
-	      -> InstEnv 		-- The envt
-	      -> Class -> [Type]	-- What we are looking for
-	      -> InstLookupResult
-
-data InstLookupResult 
-  = FoundInst 			-- There is a (template,substitution) pair 
-				-- that makes the template match the key, 
-				-- and no template is an instance of the key
-	TyVarSubstEnv Id
-
-  | NoMatch Bool	-- Boolean is true iff there is at least one
-			-- template that matches the key.
-			-- (but there are other template(s) that are
-			--  instances of the key, so we don't report 
-			--  FoundInst)
-	-- The NoMatch True case happens when we look up
+	      -> (InstEnv, 	-- Home-package inst-env
+		  InstEnv) 	-- External package inst-env
+	      -> Class -> [Type]			-- What we are looking for
+	      -> ([(TyVarSubstEnv, InstEnvElt)], 	-- Successful matches
+		  [Id])					-- These don't match but do unify
+	-- The second component of the tuple happens when we look up
 	--	Foo [a]
 	-- in an InstEnv that has entries for
 	--	Foo [Int]
 	--	Foo [b]
 	-- Then which we choose would depend on the way in which 'a'
-	-- is instantiated.  So we say there is no match, but identify
-	-- it as ambiguous case in the hope of giving a better error msg.
-	-- See the notes above from Jeff Lewis
+	-- is instantiated.  So we report that Foo [b] is a match (mapping b->a)
+	-- but Foo [Int] is a unifier.  This gives the caller a better chance of
+	-- giving a suitable error messagen
 
-lookupInstEnv dflags env key_cls key_tys
-  = find (classInstEnv env key_cls)
+lookupInstEnv dflags (home_ie, pkg_ie) cls tys
+  | not (null all_unifs) = (all_matches, all_unifs)	-- This is always an error situation,
+							-- so don't attempt to pune the matches
+  | otherwise		 = (pruned_matches, [])
+  where
+    incoherent_ok = dopt Opt_AllowIncoherentInstances  dflags
+    overlap_ok    = dopt Opt_AllowOverlappingInstances dflags
+    (home_matches, home_unifs) = lookup_inst_env incoherent_ok home_ie cls tys
+    (pkg_matches,  pkg_unifs)  = lookup_inst_env incoherent_ok pkg_ie  cls tys
+    all_matches = home_matches ++ pkg_matches
+    all_unifs   = home_unifs ++ pkg_unifs
+
+    pruned_matches | overlap_ok = foldr insert_overlapping [] all_matches
+		   | otherwise  = all_matches
+
+lookup_inst_env :: Bool
+	      -> InstEnv 				-- The envt
+	      -> Class -> [Type]			-- What we are looking for
+	      -> ([(TyVarSubstEnv, InstEnvElt)], 	-- Successful matches
+		  [Id])					-- These don't match but do unify
+lookup_inst_env incoherent_ok env key_cls key_tys
+  = find (classInstEnv env key_cls) [] []
   where
     key_vars = tyVarsOfTypes key_tys
 
-    find [] = NoMatch False
-    find ((tpl_tyvars, tpl, dfun_id) : rest)
+    find [] ms us = (ms, us)
+    find (item@(tpl_tyvars, tpl, dfun_id) : rest) ms us
       = case matchTys tpl_tyvars tpl key_tys of
-	  Nothing                 ->
-		-- Check whether the things unify, so that
-		-- we bale out if a later instantiation of this
-		-- predicate might match this instance
-		-- [see notes about overlapping instances above]
-	    case unifyTyListsX (key_vars `unionVarSet` tpl_tyvars) key_tys tpl of
-	      Just _ | not (dopt Opt_AllowIncoherentInstances dflags)
-		     -> NoMatch (any_match rest)
+	  Just (subst, leftovers) -> ASSERT( null leftovers )
+				     find rest ((subst,item):ms) us
+	  Nothing 
+	   | incoherent_ok -> find rest ms us
 		-- If we allow incoherent instances we don't worry about the 
 		-- test and just blaze on anyhow.  Requested by John Hughes.
-	      other  -> find rest
+	   | otherwise
+		-- Does not match, so next check whether the things unify
+		-- [see notes about overlapping instances above]
+	   -> case unifyTyListsX (key_vars `unionVarSet` tpl_tyvars) key_tys tpl of
+	        Just _   -> find rest ms (dfun_id:us)
+	        Nothing  -> find rest ms us
 
-	  Just (subst, leftovers) -> ASSERT( null leftovers )
-				     FoundInst subst dfun_id
+insert_overlapping :: (TyVarSubstEnv, InstEnvElt) -> [(TyVarSubstEnv, InstEnvElt)] 
+		   -> [(TyVarSubstEnv, InstEnvElt)]
+-- Add a new solution, knocking out strictly less specific ones
+insert_overlapping new_item [] = [new_item]
+insert_overlapping new_item (item:items)
+  | new_beats_old && old_beats_new = item : insert_overlapping new_item items
+	-- Duplicate => keep both for error report
+  | new_beats_old = insert_overlapping new_item items
+	-- Keep new one
+  | old_beats_new = item : items
+	-- Keep old one
+  | otherwise		  = item : insert_overlapping new_item items
+	-- Keep both
+  where
+    new_beats_old = new_item `beats` item
+    old_beats_new = item `beats` new_item
 
-    any_match rest = or [ maybeToBool (matchTys tvs tpl key_tys)
-		        | (tvs,tpl,_) <- rest
-			]
+    (_, (tvs1, tys1, _)) `beats` (_, (tvs2, tys2, _))
+	= isJust (matchTys tvs2 tys2 tys1)	-- A beats B if A is more specific than B	
+						-- I.e. if B can be instantiated to match A
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{Extending an instance environment}
+		Functional dependencies
 %*									*
 %************************************************************************
 
-@extendInstEnv@ extends a @ClsInstEnv@, checking for overlaps.
-
-A boolean flag controls overlap reporting.
-
-True => overlap is permitted, but only if one template matches the other;
-        not if they unify but neither is 
-
-\begin{code}
-extendInstEnv :: DynFlags -> InstEnv -> [DFunId] -> (InstEnv, [(SrcLoc,Message)])
-  -- Similar, but all we have is the DFuns
-extendInstEnv dflags env dfun_ids = foldl (addToInstEnv dflags) (env, []) dfun_ids
-
-
-addToInstEnv :: DynFlags
-             -> (InstEnv, [(SrcLoc,Message)])
-	     -> DFunId
-	     -> (InstEnv, [(SrcLoc,Message)])	-- Resulting InstEnv and augmented error messages
-
-addToInstEnv dflags (inst_env, errs) dfun_id
-	-- Check first that the new instance doesn't 
-	-- conflict with another.  See notes below about fundeps.
-  | notNull bad_fundeps
-  = (inst_env, fundep_err : errs)		-- Bad fundeps; report the first only
-
-  | otherwise
-  = case insert_into cls_inst_env of 
-	Failed err	  -> (inst_env, err : errs)
-	Succeeded new_env -> (addToUFM inst_env clas new_env, errs)
-
-  where
-    cls_inst_env = classInstEnv inst_env clas
-    (ins_tvs, _, clas, ins_tys) = tcSplitDFunTy (idType dfun_id)
-    bad_fundeps = badFunDeps cls_inst_env clas ins_tv_set ins_tys
-    fundep_err  = fundepErr dfun_id (head bad_fundeps)
-
-    ins_tv_set = mkVarSet ins_tvs
-    ins_item   = (ins_tv_set, ins_tys, dfun_id)
-
-    insert_into [] = returnMaB [ins_item]
-    insert_into env@(cur_item@(tpl_tvs, tpl_tys, tpl_dfun_id) : rest)
-      = case unifyTyListsX (ins_tv_set `unionVarSet` tpl_tvs) tpl_tys ins_tys of
-	  Just subst -> insert_unifiable env subst
-	  Nothing    -> carry_on cur_item rest
-
-    carry_on cur_item rest = insert_into rest     `thenMaB` \ rest' ->
-			     returnMaB (cur_item : rest')
-
-	    -- The two templates unify.  This is acceptable iff
-	    -- (a) -fallow-overlapping-instances is on
-	    -- (b) one is strictly more specific than the other
-	    -- [It's bad if they are identical or incomparable]
-    insert_unifiable env@(cur_item@(tpl_tvs, tpl_tys, tpl_dfun_id) : rest) subst
-      |  ins_item_more_specific && cur_item_more_specific
-      = 	-- Duplicates
-	failMaB (dupInstErr dfun_id tpl_dfun_id)
-
-      |  not (dopt Opt_AllowOverlappingInstances dflags)
-      || not (ins_item_more_specific || cur_item_more_specific)
-      =  	-- Overlap illegal, or the two are incomparable
-	 failMaB (overlapErr dfun_id tpl_dfun_id)
-	 
-      | otherwise
-      = 	-- OK, it's acceptable.  Remaining question is whether
-		-- we drop it here or compare it with others
-	if ins_item_more_specific then
-		-- New item is an instance of current item, so drop it here
-	    returnMaB (ins_item : env)
-	else
-	    carry_on cur_item rest
-
-      where
-	ins_item_more_specific = allVars subst ins_tvs
-      	cur_item_more_specific = allVars subst (varSetElems tpl_tvs)
-
-allVars :: TyVarSubstEnv -> [TyVar] -> Bool
--- True iff all the type vars are mapped to distinct type vars
-allVars subst tvs
-  = allDistinctTyVars (map lookup tvs) emptyVarSet
-  where
-    lookup tv = case lookupSubstEnv subst tv of
-		  Just (DoneTy ty) -> ty
-		  Nothing	   -> mkTyVarTy tv
-\end{code}
-
-Functional dependencies
-~~~~~~~~~~~~~~~~~~~~~~~
 Here is the bad case:
 	class C a b | a->b where ...
 	instance C Int Bool where ...
@@ -419,9 +361,20 @@ them separate.  But we want to make sure that given any constraint
 if s1 matches 
 
 
-
-
 \begin{code}
+checkFunDeps :: (InstEnv, InstEnv) -> DFunId 
+	     -> Maybe [DFunId]	-- Nothing  <=> ok
+				-- Just dfs <=> conflict with dfs
+-- Check wheher adding DFunId would break functional-dependency constraints
+checkFunDeps (home_ie, pkg_ie) dfun
+  | null bad_fundeps = Nothing
+  | otherwise	     = Just bad_fundeps
+  where
+    (ins_tvs, _, clas, ins_tys) = tcSplitDFunTy (idType dfun)
+    ins_tv_set   = mkVarSet ins_tvs
+    cls_inst_env = classInstEnv home_ie clas ++ classInstEnv pkg_ie clas
+    bad_fundeps  = badFunDeps cls_inst_env clas ins_tv_set ins_tys
+
 badFunDeps :: ClsInstEnv -> Class
 	   -> TyVarSet -> [Type]	-- Proposed new instance type
 	   -> [DFunId]
@@ -432,28 +385,4 @@ badFunDeps cls_inst_env clas ins_tv_set ins_tys
     ]
   where
     (clas_tvs, fds) = classTvsFds clas
-\end{code}
-
-
-\begin{code}
-dupInstErr dfun1 dfun2 = addInstErr (ptext SLIT("Duplicate instance declarations:"))  dfun1 dfun2
-overlapErr dfun1 dfun2 = addInstErr (ptext SLIT("Overlapping instance declarations:")) dfun1 dfun2
-fundepErr  dfun1 dfun2 = addInstErr (ptext SLIT("Functional dependencies conflict between instance declarations:")) 
-				    dfun1 dfun2
-
-addInstErr :: SDoc -> DFunId -> DFunId -> (SrcLoc, Message)
-addInstErr what dfun1 dfun2 
- = (getSrcLoc dfun1, hang what 2 (ppr_dfun dfun1 $$ ppr_dfun dfun2))
-  where
-   
-    ppr_dfun dfun = pp_loc <> colon <+> pprClassPred clas tys
-      where
-	(_,_,clas,tys) = tcSplitDFunTy (idType dfun)
-	loc = getSrcLoc dfun
-	mod = nameModule (idName dfun)
-	
-	-- Worth trying to print a good location... imported dfuns
-	-- don't have a useful SrcLoc but we can say which module they come from
-	pp_loc | isGoodSrcLoc loc = ppr loc
-	       | otherwise	  = ptext SLIT("In module") <+> ppr mod
 \end{code}

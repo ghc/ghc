@@ -1013,7 +1013,7 @@ spaces n       = ' ' : spaces (n MINUS ILIT(1))
 \end{code}
 
 \begin{code}
-pprCols = (100 :: Int) -- could make configurable
+pprCols = (120 :: Int) -- could make configurable
 
 printDoc :: Mode -> Handle -> Doc -> IO ()
 printDoc mode hdl doc

@@ -1,225 +1,483 @@
 %
-% (c) The AQUA Project, Glasgow University, 1996-1998
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1999
 %
-\section[TcTyDecls]{Typecheck type declarations}
+
+Analysis functions over data types.  Specficially
+	a) detecting recursive types
+	b) computing argument variances
+
+This stuff is only used for source-code decls; it's recorded in interface
+files for imported data types.
+
 
 \begin{code}
-module TcTyDecls ( tcTyDecl, kcConDetails, tcMkDataCon ) where
+module TcTyDecls(
+        calcTyConArgVrcs, tyVarVrc,
+	calcRecFlags, calcCycleErrs,
+	newTyConRhs
+    ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( TyClDecl(..), ConDecl(..), HsConDetails(..), BangType,
-			  getBangType, getBangStrictness, conDetailsTys
-			)
-import RnHsSyn		( RenamedTyClDecl, RenamedConDecl, RenamedContext )
-import BasicTypes	( NewOrData(..), StrictnessMark(..) )
-
-import TcMonoType	( tcHsTyVars, tcHsTheta, tcHsType, 
-			  kcHsContext, kcHsSigType, kcHsLiftedSigType
-			)
-import TcEnv		( tcExtendTyVarEnv, tcLookupTyCon, TyThingDetails(..) )
-import TcType		( Type, tyVarsOfTypes, tyVarsOfPred, ThetaType )
-import RnEnv		( lookupSysName )
-import TcRnMonad
-
-import DataCon		( DataCon, mkDataCon, dataConFieldLabels )
-import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType, allFieldLabelTags, mkFieldLabel )
-import MkId		( mkDataConWorkId, mkDataConWrapId, mkRecordSelId )
-import Var		( TyVar )
-import Name		( Name )
-import OccName		( mkDataConWrapperOcc, mkDataConWorkerOcc, mkGenOcc1, mkGenOcc2 )
+import TypeRep          ( Type(..), TyNote(..), PredType(..) )  -- friend
+import HsSyn		( TyClDecl(..), HsPred(..) )
+import RnHsSyn		( extractHsTyNames )
+import Type		( predTypeRep )
+import BuildTyCl	( newTyConRhs )
+import HscTypes		( TyThing(..) )
+import TyCon            ( TyCon, ArgVrcs, tyConArity, tyConDataCons_maybe, tyConDataCons, tyConTyVars,
+                          getSynTyConDefn, isSynTyCon, isAlgTyCon, isHiBootTyCon,
+			  tyConName, isNewTyCon, isProductTyCon, tyConArgVrcs )
+import Class		( classTyCon )
+import DataCon          ( dataConRepArgTys, dataConOrigArgTys )
+import Var              ( TyVar )
+import VarSet
+import Name		( Name, isTyVarName )
+import NameEnv
+import NameSet
+import Digraph 		( SCC(..), stronglyConnComp, stronglyConnCompR )
+import Maybe		( isNothing )
+import BasicTypes	( RecFlag(..) )
 import Outputable
-import TyCon		( TyCon, DataConDetails(..), visibleDataCons,
-			  tyConTyVars, tyConName )
-import VarSet		( intersectVarSet, isEmptyVarSet )
-import Generics		( mkTyConGenInfo )
-import CmdLineOpts	( DynFlag(..) )
-import List		( nubBy )
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Type checking}
-%*									*
-%************************************************************************
-
-\begin{code}
-tcTyDecl :: RenamedTyClDecl -> TcM (Name, TyThingDetails)
-tcTyDecl (TySynonym {tcdName = tycon_name, tcdSynRhs = rhs})
-  = tcLookupTyCon tycon_name			`thenM` \ tycon ->
-    tcExtendTyVarEnv (tyConTyVars tycon)	$
-    tcHsType rhs				`thenM` \ rhs_ty ->
-    returnM (tycon_name, SynTyDetails rhs_ty)
-
-tcTyDecl (TyData {tcdND = new_or_data, tcdCtxt = context,
-		  tcdName = tycon_name, tcdCons = con_decls,
-		  tcdGeneric = generic})
-  = tcLookupTyCon tycon_name			`thenM` \ tycon ->
-    let
-	tyvars = tyConTyVars tycon
-    in
-    tcExtendTyVarEnv tyvars				$
-    tcHsTheta context					`thenM` \ ctxt ->
-    tcConDecls new_or_data tycon tyvars ctxt con_decls	`thenM` \ data_cons ->
-    let
-	sel_ids = mkRecordSelectors tycon data_cons
-    in
-    tcGenericInfo tycon generic				`thenM` \ gen_info ->
-    returnM (tycon_name, DataTyDetails ctxt data_cons sel_ids gen_info)
-
-tcTyDecl (ForeignType {tcdName = tycon_name})
-  = returnM (tycon_name, ForeignTyDetails)
-
-
-tcGenericInfo tycon generics	-- Source code decl: consult the flag
-  = do_we_want	generics	`thenM` \ want_generics ->
-    if want_generics then
-	mapM (lookupSysName (tyConName tycon))
-	     [mkGenOcc1, mkGenOcc2]		`thenM` \ gen_sys_names ->
-	returnM (mkTyConGenInfo tycon gen_sys_names)
-    else
-	returnM Nothing
-  where
-    do_we_want (Just g) = returnM g		-- Interface file decl
-						-- so look at decl
-    do_we_want Nothing  = doptM Opt_Generics	-- Source code decl
-						-- so look at flag
-
-mkRecordSelectors tycon data_cons
-  = 	-- We'll check later that fields with the same name 
-	-- from different constructors have the same type.
-     [ mkRecordSelId tycon field 
-     | field <- nubBy eq_name fields ]
-  where
-    fields = [ field | con <- visibleDataCons data_cons, 
-		       field <- dataConFieldLabels con ]
-    eq_name field1 field2 = fieldLabelName field1 == fieldLabelName field2
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{Kind and type check constructors}
+	Cycles in class and type synonym declarations
 %*									*
 %************************************************************************
 
+We check for type synonym and class cycles on the *source* code.
+Main reasons: 
+
+  a) Otherwise we'd need a special function to extract type-synonym tycons
+	from a type, whereas we have extractHsTyNames already
+
+  b) If we checked for type synonym loops after building the TyCon, we
+	can't do a hoistForAllTys on the type synonym rhs, (else we fall into
+	a black hole) which seems unclean.  Apart from anything else, it'd mean 
+	that a type-synonym rhs	could have for-alls to the right of an arrow, 
+	which means adding new cases to the validity checker
+
+	Indeed, in general, checking for cycles beforehand means we need to
+	be less careful about black holes through synonym cycles.
+
+The main disadvantage is that a cycle that goes via a type synonym in an 
+.hi-boot file can lead the compiler into a loop, because it assumes that cycles
+only occur in source code.  But hi-boot files are trusted anyway, so this isn't
+much worse than (say) a kind error.
+
+[  NOTE ----------------------------------------------
+If we reverse this decision, this comment came from tcTyDecl1, and should
+ go back there
+	-- dsHsType, not tcHsKindedType, to avoid a loop.  tcHsKindedType does hoisting,
+	-- which requires looking through synonyms... and therefore goes into a loop
+	-- on (erroneously) recursive synonyms.
+	-- Solution: do not hoist synonyms, because they'll be hoisted soon enough
+	-- 	     when they are substituted
+
+We'd also need to add back in this definition
+
+synTyConsOfType :: Type -> [TyCon]
+-- Does not look through type synonyms at all
+-- Return a list of synonym tycons
+synTyConsOfType ty
+  = nameEnvElts (go ty)
+  where
+     go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
+     go (TyVarTy v)	  	  = emptyNameEnv
+     go (TyConApp tc tys) 	  = go_tc tc tys	-- See note (a)
+     go (NewTcApp tc tys)	  = go_s tys	-- Ignore tycon
+     go (AppTy a b)	  	  = go a `plusNameEnv` go b
+     go (FunTy a b)	  	  = go a `plusNameEnv` go b
+     go (PredTy (IParam _ ty))    = go ty	
+     go (PredTy (ClassP cls tys)) = go_s tys	-- Ignore class
+     go (NoteTy (SynNote ty) _)	  = go ty	-- Don't look through it!
+     go (NoteTy other ty)	  = go ty	
+     go (ForAllTy _ ty)	  	  = go ty
+
+	-- Note (a): the unexpanded branch of a SynNote has a
+	--	     TyConApp for the synonym, so the tc of
+	--	     a TyConApp must be tested for possible synonyms
+
+     go_tc tc tys | isSynTyCon tc = extendNameEnv (go_s tys) (tyConName tc) tc
+		  | otherwise	  = go_s tys
+     go_s tys = foldr (plusNameEnv . go) emptyNameEnv tys
+---------------------------------------- END NOTE ]
+
 \begin{code}
-kcConDetails :: NewOrData -> RenamedContext 
-	     -> HsConDetails Name (BangType Name) -> TcM ()
-kcConDetails new_or_data ex_ctxt details
-  = kcHsContext ex_ctxt		`thenM_`
-    mappM_ kc_sig_type (conDetailsTys details)
+calcCycleErrs :: [TyClDecl Name] -> ([[Name]],	-- Recursive type synonym groups
+			             [[Name]])	-- Ditto classes
+calcCycleErrs decls
+  = (findCyclics syn_edges, findCyclics cls_edges)
   where
-    kc_sig_type = case new_or_data of
-		    DataType -> kcHsSigType
-		    NewType  -> kcHsLiftedSigType
-	    -- Can't allow an unlifted type here, because we're effectively
-	    -- going to remove the constructor while coercing it to a lifted type.
+	--------------- Type synonyms ----------------------
+    syn_edges 	     = [ (name, mk_syn_edges rhs) | TySynonym { tcdName = name, tcdSynRhs = rhs } <- decls ]
+    mk_syn_edges rhs = [ tc | tc <- nameSetToList (extractHsTyNames rhs), not (isTyVarName tc) ]
+
+	--------------- Classes ----------------------
+    cls_edges = [ (name, mk_cls_edges ctxt) | ClassDecl { tcdName = name, tcdCtxt = ctxt } <- decls ]
+    mk_cls_edges ctxt = [ cls | HsClassP cls _ <- ctxt ]
+\end{code}
 
 
-tcConDecls :: NewOrData -> TyCon -> [TyVar] -> ThetaType 
-	   -> DataConDetails RenamedConDecl -> TcM (DataConDetails DataCon)
+%************************************************************************
+%*									*
+	Deciding which type constructors are recursive
+%*									*
+%************************************************************************
 
-tcConDecls new_or_data tycon tyvars ctxt con_decls
-  = case con_decls of
-	Unknown     -> returnM Unknown
-	HasCons n   -> returnM (HasCons n)
-	DataCons cs -> mappM tc_con_decl cs	`thenM` \ data_cons ->
-		       returnM (DataCons data_cons)
+A newtype M.T is defined to be "recursive" iff
+	(a) its rhs mentions an abstract (hi-boot) TyCon
+   or	(b) one can get from T's rhs to T via type 
+	    synonyms, or non-recursive newtypes *in M*
+ e.g.  newtype T = MkT (T -> Int)
+
+(a)	is conservative; it assumes that the hi-boot type can loop
+	around to T.  That's why in (b) we can restrict attention
+	to tycons in M, because any loops through newtypes outside M
+	will be broken by those newtypes
+
+An algebraic data type M.T is "recursive" iff
+	it has just one constructor, and 
+	(a) its arg types mention an abstract (hi-boot) TyCon
+ or	(b) one can get from its arg types to T via type synonyms, 
+	    or by non-recursive newtypes or non-recursive product types in M
+ e.g.  data T = MkT (T -> Int) Bool
+
+A type synonym is recursive if one can get from its
+right hand side back to it via type synonyms.  (This is
+reported as an error.)
+
+A class is recursive if one can get from its superclasses
+back to it.  (This is an error too.)
+
+Hi-boot types
+~~~~~~~~~~~~~
+A data type read from an hi-boot file will have an Unknown in its data constructors,
+and will respond True to isHiBootTyCon. The idea is that we treat these as if one
+could get from these types to anywhere.  So when we see
+
+  	module Baz where
+	import {-# SOURCE #-} Foo( T )
+	newtype S = MkS T
+
+then we mark S as recursive, just in case. What that means is that if we see
+
+	import Baz( S )
+	newtype R = MkR S
+
+then we don't need to look inside S to compute R's recursiveness.  Since S is imported
+(not from an hi-boot file), one cannot get from R back to S except via an hi-boot file,
+and that means that some data type will be marked recursive along the way.  So R is
+unconditionly non-recursive (i.e. there'll be a loop breaker elsewhere if necessary)
+
+This in turn means that we grovel through fewer interface files when computing 
+recursiveness, because we need only look at the type decls in the module being
+compiled, plus the outer structure of directly-mentioned types.
+
+\begin{code}
+calcRecFlags :: [TyThing] -> (Name -> RecFlag)
+calcRecFlags tyclss
+  = is_rec
   where
-    tc_con_decl (ConDecl name ex_tvs ex_ctxt details src_loc)
-      = addSrcLoc src_loc						$
-	tcHsTyVars ex_tvs (kcConDetails new_or_data ex_ctxt details)	$ \ ex_tyvars ->
-	tcHsTheta ex_ctxt						`thenM` \ ex_theta ->
-	case details of
-	    PrefixCon btys     -> tc_datacon ex_tyvars ex_theta btys
-	    InfixCon bty1 bty2 -> tc_datacon ex_tyvars ex_theta [bty1,bty2]
-	    RecCon fields      -> tc_rec_con ex_tyvars ex_theta fields
-      where
+    is_rec n | n `elemNameSet` rec_names = Recursive
+	     | otherwise		 = NonRecursive
+
+    rec_names = nt_loop_breakers `unionNameSets` prod_loop_breakers
+
+    all_tycons = map getTyCon tyclss	-- Recursion of newtypes/data types
+					-- can happen via the class TyCon
+
+	-------------------------------------------------
+	-- 			NOTE
+	-- These edge-construction loops rely on
+	-- every loop going via tyclss, the types and classes
+	-- in the module being compiled.  Stuff in interface 
+	-- files should be correctly marked.  If not (e.g. a
+	-- type synonym in a hi-boot file) we can get an infinite
+	-- loop.  We could program round this, but it'd make the code
+	-- rather less nice, so I'm not going to do that yet.
+
+	--------------- Newtypes ----------------------
+    new_tycons = filter isNewTyCon all_tycons
+    nt_loop_breakers = mkNameSet (findLoopBreakers nt_edges)
+    is_rec_nt tc = tyConName tc  `elemNameSet` nt_loop_breakers
+	-- is_rec_nt is a locally-used helper function
+
+    nt_edges = [(t, mk_nt_edges t) | t <- new_tycons]
+
+    mk_nt_edges nt 	-- Invariant: nt is a newtype
+	= concatMap (mk_nt_edges1 nt) (tcTyConsOfType (newTyConRhs nt))
+			-- tyConsOfType looks through synonyms
+
+    mk_nt_edges1 nt tc 
+	| tc `elem` new_tycons = [tc]		-- Loop
+	| isHiBootTyCon tc     = [nt]		-- Make it self-recursive if 
+						-- it mentions an hi-boot TyCon
+		-- At this point we know that either it's a local data type,
+		-- or it's imported.  Either way, it can't form part of a cycle
+	| otherwise = []
+
+	--------------- Product types ----------------------
+	-- The "prod_tycons" are the non-newtype products
+    prod_tycons = [tc | tc <- all_tycons, 
+			not (isNewTyCon tc), isProductTyCon tc]
+    prod_loop_breakers = mkNameSet (findLoopBreakers prod_edges)
+
+    prod_edges = [(tc, mk_prod_edges tc) | tc <- prod_tycons]
 	
-	tc_datacon ex_tyvars ex_theta btys
-	  = mappM tcHsType (map getBangType btys)	`thenM` \ arg_tys ->
-	    tcMkDataCon name 
-			(map getBangStrictness btys)
-			[{- No field labels -}] 
-			tyvars ctxt ex_tyvars ex_theta 
-			arg_tys tycon
-    
-	tc_rec_con ex_tyvars ex_theta fields
-	  = checkTc (null ex_tyvars) (exRecConErr name)		`thenM_`
-	    mappM tc_field (fields `zip` allFieldLabelTags)	`thenM` \ field_labels ->
-	    let
-		arg_stricts = [getBangStrictness bty | (n, bty) <- fields] 
-		arg_tys     = map fieldLabelType field_labels
-	    in
-	    tcMkDataCon name arg_stricts field_labels
-			tyvars ctxt ex_tyvars ex_theta 
-			arg_tys tycon
-    
-	tc_field ((field_label_name, bty), tag)
-	  = tcHsType (getBangType bty)		`thenM` \ field_ty ->
-	    returnM (mkFieldLabel field_label_name tycon field_ty tag)
-    
-tcMkDataCon :: Name
-	    -> [StrictnessMark] -> [FieldLabel]
-	    -> [TyVar] -> ThetaType
-	    -> [TyVar] -> ThetaType
-	    -> [Type] -> TyCon
-	    -> TcM DataCon
--- A wrapper for DataCon.mkDataCon that
---   a) makes the worker Id
---   b) makes the wrapper Id if necessary, including
---	allocating its unique (hence monadic)
-tcMkDataCon src_name arg_stricts fields 
-	    tyvars ctxt ex_tyvars ex_theta 
-	    arg_tys tycon
-  = lookupSysName src_name mkDataConWrapperOcc	`thenM` \ wrap_name ->
-    lookupSysName src_name mkDataConWorkerOcc 	`thenM` \ work_name -> 
-	-- This last one takes the name of the data constructor in the source
-	-- code, which (for Haskell source anyway) will be in the SrcDataName name
-	-- space, and makes it into a "real data constructor name"
+    mk_prod_edges tc 	-- Invariant: tc is a product tycon
+	= concatMap (mk_prod_edges1 tc) (dataConOrigArgTys (head (tyConDataCons tc)))
 
-    doptM Opt_UnboxStrictFields  `thenM` \ unbox_strict_fields ->
+    mk_prod_edges1 ptc ty = concatMap (mk_prod_edges2 ptc) (tcTyConsOfType ty)
 
-    let
-	real_stricts 
-	  | unbox_strict_fields  = map unboxUserStrict arg_stricts
-	  | otherwise            = arg_stricts
+    mk_prod_edges2 ptc tc 
+ 	| tc `elem` prod_tycons   = [tc]		-- Local product
+ 	| tc `elem` new_tycons    = if is_rec_nt tc 	-- Local newtype
+				    then []
+				    else mk_prod_edges1 ptc (newTyConRhs tc)
+	| isHiBootTyCon tc	  = [ptc]	-- Make it self-recursive if 
+						-- it mentions an hi-boot TyCon
+		-- At this point we know that either it's a local non-product data type,
+		-- or it's imported.  Either way, it can't form part of a cycle
+	| otherwise = []
+			
+getTyCon (ATyCon tc) = tc
+getTyCon (AClass cl) = classTyCon cl
 
-	unboxUserStrict MarkedUserStrict = MarkedUserUnboxed
-	unboxUserStrict other            = other
-
-	data_con = mkDataCon src_name real_stricts fields
-			     tyvars (thinContext arg_tys ctxt) 
-			     ex_tyvars ex_theta
-			     arg_tys tycon 
-			     data_con_work_id data_con_wrap_id
-	data_con_work_id = mkDataConWorkId work_name data_con
-	data_con_wrap_id = mkDataConWrapId wrap_name data_con
-    in
-    returnM data_con	
-
--- The context for a data constructor should be limited to
--- the type variables mentioned in the arg_tys
-thinContext arg_tys ctxt
-  = filter in_arg_tys ctxt
+findLoopBreakers :: [(TyCon, [TyCon])] -> [Name]
+-- Finds a set of tycons that cut all loops
+findLoopBreakers deps
+  = go [(tc,tc,ds) | (tc,ds) <- deps]
   where
-      arg_tyvars = tyVarsOfTypes arg_tys
-      in_arg_tys pred = not $ isEmptyVarSet $ 
-			tyVarsOfPred pred `intersectVarSet` arg_tyvars
+    go edges = [ name
+	       | CyclicSCC ((tc,_,_) : edges') <- stronglyConnCompR edges,
+		 name <- tyConName tc : go edges']
+
+findCyclics :: [(Name,[Name])] -> [[Name]]
+findCyclics deps
+  = [names | CyclicSCC names <- stronglyConnComp edges]
+  where
+    edges = [(name,name,ds) | (name,ds) <- deps]
+\end{code}
+
+These two functions know about type representations, so they could be
+in Type or TcType -- but they are very specialised to this module, so 
+I've chosen to put them here.
+
+\begin{code}
+tcTyConsOfType :: Type -> [TyCon]
+-- tcTyConsOfType looks through all synonyms, but not through any newtypes.  
+-- When it finds a Class, it returns the class TyCon.  The reaons it's here
+-- (not in Type.lhs) is because it is newtype-aware.
+tcTyConsOfType ty 
+  = nameEnvElts (go ty)
+  where
+     go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
+     go (TyVarTy v)	  	  = emptyNameEnv
+     go (TyConApp tc tys) 	  = go_tc tc tys
+     go (NewTcApp tc tys) 	  = go_tc tc tys
+     go (AppTy a b)	  	  = go a `plusNameEnv` go b
+     go (FunTy a b)	  	  = go a `plusNameEnv` go b
+     go (PredTy (IParam _ ty))    = go ty
+     go (PredTy (ClassP cls tys)) = go_tc (classTyCon cls) tys
+     go (NoteTy _ ty)		  = go ty
+     go (ForAllTy _ ty)	  	  = go ty
+
+     go_tc tc tys = extendNameEnv (go_s tys) (tyConName tc) tc
+     go_s tys = foldr (plusNameEnv . go) emptyNameEnv tys
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{Errors and contexts}
+	Compuing TyCon argument variances
 %*									*
 %************************************************************************
 
+Computing the tyConArgVrcs info
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+@tyConArgVrcs@ gives a list of (occPos,occNeg) flags, one for each
+tyvar.  For @AlgTyCon@s and @SynTyCon@s, this info must be precomputed
+separately.  Note that this is information about occurrences of type
+variables, not usages of term variables.
+
+The function @calcTyConArgVrcs@ must be passed a list of *algebraic or
+syntycons only* such that all tycons referred to (by mutual recursion)
+appear in the list.  The fixpointing will be done on this set of
+tycons as a whole.  It returns a list of @tyconVrcInfo@ data, ready to
+be (knot-tyingly?) stuck back into the appropriate fields.
 
 \begin{code}
-exRecConErr name
-  = ptext SLIT("Can't combine named fields with locally-quantified type variables")
-    $$
-    (ptext SLIT("In the declaration of data constructor") <+> ppr name)
+calcTyConArgVrcs :: [TyThing] -> Name -> ArgVrcs
+-- Gives arg variances for TyCons, 
+-- including the class TyCon of a class
+calcTyConArgVrcs tyclss
+  = get_vrc
+  where
+    tycons = map getTyCon tyclss
+
+	-- We should only look up things that are in the map
+    get_vrc n = case lookupNameEnv final_oi n of
+		  Just (_, pms) -> pms
+		  Nothing -> pprPanic "calcVrcs" (ppr n)
+
+	-- We are going to fold over this map,
+	-- so we need the TyCon in the range
+    final_oi :: NameEnv (TyCon, ArgVrcs)
+    final_oi = tcaoFix initial_oi
+
+    initial_oi :: NameEnv (TyCon, ArgVrcs)
+    initial_oi = mkNameEnv [(tyConName tc, (tc, initial tc))
+			   | tc <- tycons]
+    initial tc = if isAlgTyCon tc && isNothing (tyConDataCons_maybe tc) then
+                         -- make pessimistic assumption (and warn)
+                         abstractVrcs tc
+                       else
+                         replicate (tyConArity tc) (False,False)
+
+    tcaoFix :: NameEnv (TyCon, ArgVrcs)   -- initial ArgVrcs per tycon
+	    -> NameEnv (TyCon, ArgVrcs)   -- fixpointed ArgVrcs per tycon
+    tcaoFix oi 
+	| changed   = tcaoFix oi'
+	| otherwise = oi'
+	where
+	 (changed,oi') = foldNameEnv iterate (False,oi) oi
+
+    iterate (tc, pms) (changed,oi')
+      =	(changed || (pms /= pms'),
+	 extendNameEnv oi' (tyConName tc) (tc, pms'))
+      where
+	pms' = tcaoIter oi' tc  -- seq not simult
+
+    tcaoIter :: NameEnv (TyCon, ArgVrcs)  -- reference ArgVrcs (initial)
+	     -> TyCon                     -- tycon to update
+	     -> ArgVrcs                   -- new ArgVrcs for tycon
+
+    tcaoIter oi tc | isAlgTyCon tc
+      = if null data_cons then
+	    abstractVrcs tc		-- Data types with no constructors
+	else
+            map (\v -> anyVrc (vrcInTy (lookup oi) v) argtys) vs
+      where
+       	data_cons = tyConDataCons tc
+       	vs        = tyConTyVars tc
+       	argtys    = concatMap dataConRepArgTys data_cons	-- Rep? or Orig?
+
+    tcaoIter oi tc | isSynTyCon tc
+      = let (tyvs,ty) = getSynTyConDefn tc
+                        -- we use the already-computed result for tycons not in this SCC
+        in  map (\v -> vrcInTy (lookup oi) v ty) tyvs
+
+    lookup oi tc = case lookupNameEnv oi (tyConName tc) of
+			Just (_, pms) -> pms
+			Nothing	      -> tyConArgVrcs tc
+	 -- We use the already-computed result for tycons not in this SCC
+
+
+abstractVrcs :: TyCon -> ArgVrcs
+abstractVrcs tc = 
+#ifdef DEBUG
+                  pprTrace "Vrc: abstract tycon:" (ppr tc) $
+#endif
+                  warn_abstract_vrcs `seq` replicate (tyConArity tc) (True,True)
+
+warn_abstract_vrcs
+-- we pull the message out as a CAF so the warning only appears *once*
+  = trace ("WARNING: tyConArgVrc info inaccurate due to unavailable constructors.\n"
+        ++ "         Use -fno-prune-tydecls to fix.") $
+                ()
+\end{code}
+
+
+Variance of tyvars in a type
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A general variance-check function.  We pass a function for determining
+the @ArgVrc@s of a tycon; when fixpointing this refers to the current
+value; otherwise this should be looked up from the tycon's own
+tyConArgVrcs.  Again, it knows the representation of Types.
+
+\begin{code}
+vrcInTy :: (TyCon -> ArgVrcs)  -- function to get argVrcs of a tycon (break out of recursion)
+        -> TyVar               -- tyvar to check Vrcs of
+        -> Type                -- type to check for occ in
+        -> (Bool,Bool)         -- (occurs positively, occurs negatively)
+
+vrcInTy fao v (NoteTy (SynNote _)   ty) = vrcInTy fao v ty
+    			-- SynTyCon doesn't neccessarily have vrcInfo at this point,
+    			-- so don't try and use it
+
+vrcInTy fao v (NoteTy (FTVNote ftv) ty) = if elemVarSet v ftv
+    					  then vrcInTy fao v ty
+    					  else (False,False)
+    			-- note that ftv cannot be calculated as occPos||occNeg,
+    			-- since if a tyvar occurs only as unused tyconarg,
+    			-- occPos==occNeg==False, but ftv=True
+
+vrcInTy fao v (TyVarTy v')              = if v==v'
+    					  then (True,False)
+    					  else (False,False)
+
+vrcInTy fao v (AppTy ty1 ty2)           = if vrcInTy fao v ty2 /= (False,False)
+                                          then (True,True)
+                                          else vrcInTy fao v ty1
+                        -- ty1 is probably unknown (or it would have been beta-reduced);
+                        -- hence if v occurs in ty2 at all then it could occur with
+                        -- either variance.  Otherwise it occurs as it does in ty1.
+
+vrcInTy fao v (FunTy ty1 ty2)           = negVrc (vrcInTy fao v ty1)
+                                          `orVrc`
+                                          vrcInTy fao v ty2
+					 
+vrcInTy fao v (ForAllTy v' ty)          = if v==v'
+					  then (False,False)
+    					  else vrcInTy fao v ty
+
+vrcInTy fao v (TyConApp tc tys)         = let pms1 = map (vrcInTy fao v) tys
+    					      pms2 = fao tc
+    				          in  orVrcs (zipWith timesVrc pms1 pms2)
+
+vrcInTy fao v (NewTcApp tc tys)         = let pms1 = map (vrcInTy fao v) tys
+    					      pms2 = fao tc
+    				          in  orVrcs (zipWith timesVrc pms1 pms2)
+
+vrcInTy fao v (PredTy st) = vrcInTy fao v (predTypeRep st)
+\end{code}
+
+
+External entry point: assumes tyconargvrcs already computed.
+
+\begin{code}
+tyVarVrc :: TyVar               -- tyvar to check Vrc of
+         -> Type                -- type to check for occ in
+         -> (Bool,Bool)         -- (occurs positively, occurs negatively)
+
+tyVarVrc = vrcInTy tyConArgVrcs
+\end{code}
+
+
+Variance algebra
+~~~~~~~~~~~~~~~~
+
+\begin{code}
+orVrc :: (Bool,Bool) -> (Bool,Bool) -> (Bool,Bool)
+orVrc (p1,m1) (p2,m2) = (p1||p2,m1||m2)
+
+orVrcs :: [(Bool,Bool)] -> (Bool,Bool)
+orVrcs = foldl orVrc (False,False)
+
+negVrc :: (Bool,Bool) -> (Bool,Bool)
+negVrc (p1,m1) = (m1,p1)
+
+anyVrc :: (a -> (Bool,Bool)) -> [a] -> (Bool,Bool)
+anyVrc p as = foldl (\ pm a -> pm `orVrc` p a)
+                    (False,False) as
+
+timesVrc :: (Bool,Bool) -> (Bool,Bool) -> (Bool,Bool)
+timesVrc (p1,m1) (p2,m2) = (p1 && p2 || m1 && m2,
+    			    p1 && m2 || m1 && p2)
 \end{code}

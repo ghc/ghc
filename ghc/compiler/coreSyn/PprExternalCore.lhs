@@ -55,12 +55,12 @@ ptdef (Newtype tcon tbinds rep ) =
 			   Nothing -> empty
 
 pcdef (Constr dcon tbinds tys)  =
-  (pqname dcon) <+> (sep [hsep (map pattbind tbinds),sep (map paty tys)])
+  (pname dcon) <+> (sep [hsep (map pattbind tbinds),sep (map paty tys)])
 
 pname id = text id
 
 pqname ("",id) = pname id
-pqname (m,id) = pname m <> char '.' <> pname id
+pqname (m,id)  = pname m <> char '.' <> pname id
 
 ptbind (t,Klifted) = pname t
 ptbind (t,k) = parens (pname t <> text "::" <> pkind k)
@@ -96,7 +96,7 @@ pforall tbs t = hsep (map ptbind tbs) <+> char '.' <+> pty t
 pvdefg (Rec vtes) = text "%rec" $$ braces (indent (vcat (punctuate (char ';') (map pvte vtes))))
 pvdefg (Nonrec vte) = pvte vte
 
-pvte (v,t,e) = sep [pqname v <+> text "::" <+> pty t <+> char '=',
+pvte (v,t,e) = sep [pname v <+> text "::" <+> pty t <+> char '=',
 		    indent (pexp e)]
 
 paexp (Var x) = pqname x

@@ -11,25 +11,26 @@ module TcDeriv ( tcDeriving ) where
 #include "HsVersions.h"
 
 import HsSyn		( HsBinds(..), TyClDecl(..), MonoBinds(..),
-			  andMonoBindList, collectMonoBinders )
+			  andMonoBindList )
 import RdrHsSyn		( RdrNameMonoBinds )
 import RnHsSyn		( RenamedHsBinds, RenamedTyClDecl, RenamedHsPred )
 import CmdLineOpts	( DynFlag(..) )
 
+import Generics		( mkGenericBinds )
 import TcRnMonad
-import TcEnv		( tcExtendTempInstEnv, newDFunName, 
+import TcEnv		( newDFunName, 
 			  InstInfo(..), pprInstInfo, InstBindings(..),
 			  pprInstInfoDetails, tcLookupTyCon, tcExtendTyVarEnv
 			)
 import TcGenDeriv	-- Deriv stuff
-import InstEnv		( simpleDFunClassTyCon )
-import TcMonoType	( tcHsPred )
+import InstEnv		( simpleDFunClassTyCon, extendInstEnv )
+import TcHsType		( tcHsPred )
 import TcSimplify	( tcSimplifyDeriv )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
-import RnEnv		( bindLocalsFV, extendTyVarEnvFVRn )
+import RnEnv		( bindLocalNames )
 import TcRnMonad	( thenM, returnM, mapAndUnzipM )
-import HscTypes		( DFunId )
+import HscTypes		( DFunId, FixityEnv, typeEnvTyCons )
 
 import BasicTypes	( NewOrData(..) )
 import Class		( className, classArity, classKey, classTyVars, classSCTheta, Class )
@@ -37,18 +38,16 @@ import Subst		( mkTyVarSubst, substTheta )
 import ErrUtils		( dumpIfSet_dyn )
 import MkId		( mkDictFunId )
 import DataCon		( dataConOrigArgTys, isNullaryDataCon, isExistentialDataCon )
-import Maybes		( maybeToBool, catMaybes )
+import Maybes		( catMaybes )
 import Name		( Name, getSrcLoc )
 import Unique		( Unique, getUnique )
-import NameSet
-import RdrName		( RdrName )
 
 import TyCon		( tyConTyVars, tyConDataCons, tyConArity, 
 			  tyConTheta, isProductTyCon, isDataTyCon,
 			  isEnumerationTyCon, isRecursiveTyCon, TyCon
 			)
 import TcType		( TcType, ThetaType, mkTyVarTy, mkTyVarTys, mkTyConApp, 
-			  getClassPredTys_maybe,
+			  getClassPredTys_maybe, tcTyConAppTyCon,
 			  isUnLiftedType, mkClassPred, tyVarsOfTypes, tcSplitFunTys, isTypeKind,
 			  tcEqTypes, tcSplitAppTys, mkAppTys, tcSplitDFunTy )
 import Var		( TyVar, tyVarKind, idType, varName )
@@ -194,22 +193,21 @@ version.  So now all classes are "offending".
 
 \begin{code}
 tcDeriving  :: [RenamedTyClDecl]	-- All type constructors
-	    -> TcM ([InstInfo],		-- The generated "instance decls".
-		    RenamedHsBinds,	-- Extra generated bindings
-		    FreeVars)		-- These are free in the generated bindings
+	    -> TcM ([InstInfo],		-- The generated "instance decls"
+		    RenamedHsBinds)	-- Extra generated top-level bindings
 
 tcDeriving tycl_decls
-  = recoverM (returnM ([], EmptyBinds, emptyFVs)) $
+  = recoverM (returnM ([], EmptyBinds)) $
     getDOpts			`thenM` \ dflags ->
 
   	-- Fish the "deriving"-related information out of the TcEnv
 	-- and make the necessary "equations".
     makeDerivEqns tycl_decls		    		`thenM` \ (ordinary_eqns, newtype_inst_info) ->
-    tcExtendTempInstEnv (map iDFunId newtype_inst_info)	$
+    extendLocalInstEnv (map iDFunId newtype_inst_info)  $
 	-- Add the newtype-derived instances to the inst env
 	-- before tacking the "ordinary" ones
 
-    deriveOrdinaryStuff ordinary_eqns			`thenM` \ (ordinary_inst_info, binds, fvs) ->
+    deriveOrdinaryStuff ordinary_eqns			`thenM` \ (ordinary_inst_info, binds) ->
     let
 	inst_info  = newtype_inst_info ++ ordinary_inst_info
     in
@@ -217,7 +215,7 @@ tcDeriving tycl_decls
     ioToTcRn (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances" 
 	     (ddump_deriving inst_info binds))		`thenM_`
 
-    returnM (inst_info, binds, fvs)
+    returnM (inst_info, binds)
 
   where
     ddump_deriving :: [InstInfo] -> RenamedHsBinds -> SDoc
@@ -230,64 +228,35 @@ tcDeriving tycl_decls
 
 -----------------------------------------
 deriveOrdinaryStuff []	-- Short cut
-  = returnM ([], EmptyBinds, emptyFVs)
+  = returnM ([], EmptyBinds)
 
 deriveOrdinaryStuff eqns
-  =	-- Take the equation list and solve it, to deliver a list of
-	-- solutions, a.k.a. the contexts for the instance decls
-	-- required for the corresponding equations.
-    solveDerivEqns eqns	    		`thenM` \ new_dfuns ->
+  = do	{	-- Take the equation list and solve it, to deliver a list of
+		-- solutions, a.k.a. the contexts for the instance decls
+		-- required for the corresponding equations.
+	; new_dfuns <- solveDerivEqns eqns
 
-	-- Now augment the InstInfos, adding in the rather boring
-	-- actual-code-to-do-the-methods binds.  We may also need to
-	-- generate extra not-one-inst-decl-specific binds, notably
-	-- "con2tag" and/or "tag2con" functions.  We do these
-	-- separately.
-    gen_taggery_Names new_dfuns		`thenM` \ nm_alist_etc ->
+	-- Generate the InstInfo for each dfun, 
+	-- plus any auxiliary bindings it needs
+	; (inst_infos, aux_binds_s) <- mapAndUnzipM genInst new_dfuns
 
-    let
-	extra_mbind_list = map gen_tag_n_con_monobind nm_alist_etc
-	extra_mbinds     = andMonoBindList extra_mbind_list
-	mbinders	 = collectMonoBinders extra_mbinds
-    in
-    mappM gen_bind new_dfuns		`thenM` \ rdr_name_inst_infos ->
-	
-    traceTc (text "tcDeriv" <+> vcat (map ppr rdr_name_inst_infos))	`thenM_`
-    getModule				`thenM` \ this_mod ->
-    initRn (InterfaceMode this_mod) (
-	-- Rename to get RenamedBinds.
-	-- The only tricky bit is that the extra_binds must scope 
-	-- over the method bindings for the instances.
-	bindLocalsFV (ptext (SLIT("deriving"))) mbinders	$ \ _ ->
-	rnTopMonoBinds extra_mbinds []			`thenM` \ (rn_extra_binds, dus) ->
+	-- Generate any extra not-one-inst-decl-specific binds, 
+	-- notably "con2tag" and/or "tag2con" functions.  
+	; extra_binds <- genTaggeryBinds new_dfuns
 
-	mapAndUnzipM rn_inst_info rdr_name_inst_infos	`thenM` \ (pairs, fvs_s) ->
+	-- Generate the generic to/from functions from each type declaration
+	; tcg_env <- getGblEnv
+	; let gen_binds = mkGenericBinds (typeEnvTyCons (tcg_type_env tcg_env))
 
-	let
-	   (rn_inst_infos, aux_binds_s) = unzip pairs
-	   all_binds = rn_extra_binds `ThenBinds` foldr ThenBinds EmptyBinds aux_binds_s
-   	in
-	returnM ((rn_inst_infos, all_binds),
-		 duUses dus `plusFV` plusFVs fvs_s)
-    )				`thenM` \ ((rn_inst_infos, rn_extra_binds), fvs) ->
-   returnM (rn_inst_infos, rn_extra_binds, fvs)
+	-- Rename these extra bindings
+	; (rn_binds, _fvs1) <- rnTopMonoBinds (extra_binds `AndMonoBinds` gen_binds) []
 
-  where
-    rn_inst_info (dfun, (meth_binds, aux_binds)) 
-	= 	-- Rename the auxiliary bindings
-	  bindLocalsFV (ptext (SLIT("deriving"))) mbinders	$ \ _ ->
-	  rnTopMonoBinds aux_binds []			`thenM` \ (rn_aux_binds, dus) ->
+	; let all_binds = rn_binds `ThenBinds` 
+			  foldr ThenBinds EmptyBinds aux_binds_s
 
-		-- Bring the right type variables into scope
-	  extendTyVarEnvFVRn (map varName tyvars)	$
-	  rnMethodBinds (className cls) [] meth_binds	`thenM` \ (rn_meth_binds, fvs) ->
-
-	  return ((InstInfo { iDFunId = dfun, iBinds = VanillaInst rn_meth_binds [] }, 
-	 	   rn_aux_binds), 
-		  duUses dus `plusFV` fvs)
-	where
-	  mbinders = collectMonoBinders aux_binds
-	  (tyvars, _, cls, _) = tcSplitDFunTy (idType dfun)
+	-- Done
+	; traceTc (text "tcDeriv" <+> vcat (map pprInstInfo inst_infos))
+	; returnM (inst_infos, all_binds) }
 \end{code}
 
 
@@ -354,8 +323,7 @@ makeDerivEqns tycl_decls
       = new_dfun_name clas tycon	 `thenM` \ dfun_name ->
 	returnM (Just (dfun_name, clas, tycon, tyvars, constraints), Nothing)
       where
-	tyvars    = tyConTyVars tycon
-	data_cons = tyConDataCons tycon
+	tyvars      = tyConTyVars tycon
 	constraints = extra_constraints ++ ordinary_constraints
 		 -- "extra_constraints": see note [Data decl contexts] above
 	extra_constraints = tyConTheta tycon
@@ -544,7 +512,6 @@ new_dfun_name clas tycon 	-- Just a simple wrapper
 	-- The type passed to newDFunName is only used to generate
 	-- a suitable string; hence the empty type arg list
 
-
 ------------------------------------------------------------------
 -- Check side conditions that dis-allow derivability for particular classes
 -- This is *apart* from the newtype-deriving mechanism
@@ -682,7 +649,7 @@ solveDerivEqns orig_eqns
         checkNoErrs (
 		  -- Extend the inst info from the explicit instance decls
 		  -- with the current set of solutions, and simplify each RHS
-	    tcExtendTempInstEnv dfuns $
+	    extendLocalInstEnv dfuns $
 	    mappM gen_soln orig_eqns
 	)				`thenM` \ new_solns ->
 	if (current_solns == new_solns) then
@@ -701,6 +668,15 @@ solveDerivEqns orig_eqns
 mk_deriv_dfun (dfun_name, clas, tycon, tyvars, _) theta
   = mkDictFunId dfun_name tyvars theta
 		clas [mkTyConApp tycon (mkTyVarTys tyvars)] 
+
+extendLocalInstEnv :: [DFunId] -> TcM a -> TcM a
+-- Add new locall-defined instances; don't bother to check
+-- for functional dependency errors -- that'll happen in TcInstDcls
+extendLocalInstEnv dfuns thing_inside
+ = do { env <- getGblEnv
+      ; let  inst_env' = foldl extendInstEnv (tcg_inst_env env) dfuns 
+	     env'      = env { tcg_inst_env = inst_env' }
+      ; setGblEnv env' thing_inside }
 \end{code}
 
 %************************************************************************
@@ -766,33 +742,46 @@ the renamer.  What a great hack!
 \end{itemize}
 
 \begin{code}
--- Generate the method bindings for the required instance
--- (paired with DFunId, as we need that when renaming
---  the method binds)
-gen_bind :: DFunId -> TcM (DFunId, (RdrNameMonoBinds, RdrNameMonoBinds))
-gen_bind dfun
+-- Generate the InstInfo for the required instance,
+-- plus any auxiliary bindings required
+genInst :: DFunId -> TcM (InstInfo, RenamedHsBinds)
+genInst dfun
   = getFixityEnv		`thenM` \ fix_env -> 
     let
-        (clas, tycon) = simpleDFunClassTyCon dfun
-    	gen_binds_fn  = assoc "gen_bind:bad derived class"
- 			      gen_list (getUnique clas)
-    
-    	gen_list = [(eqClassKey,      no_aux_binds gen_Eq_binds)
- 		   ,(ordClassKey,     no_aux_binds gen_Ord_binds)
- 		   ,(enumClassKey,    no_aux_binds gen_Enum_binds)
- 		   ,(boundedClassKey, no_aux_binds gen_Bounded_binds)
- 		   ,(ixClassKey,      no_aux_binds gen_Ix_binds)
- 		   ,(showClassKey,    no_aux_binds (gen_Show_binds fix_env))
- 		   ,(readClassKey,    no_aux_binds (gen_Read_binds fix_env))
-		   ,(typeableClassKey,no_aux_binds gen_Typeable_binds)
-		   ,(dataClassKey,    gen_Data_binds fix_env)
- 		   ]
-
-		-- Used for generators that don't need to produce	
-		-- any auxiliary bindings
-	no_aux_binds f tc = (f tc, EmptyMonoBinds)
+	(tyvars,_,clas,[ty]) 	= tcSplitDFunTy (idType dfun)
+	clas_nm			= className clas
+	tycon  	      	     	= tcTyConAppTyCon ty 
+    	(meth_binds, aux_binds) = assoc "gen_bind:bad derived class"
+	 			  gen_list (getUnique clas) fix_env tycon
     in
-    returnM (dfun, gen_binds_fn tycon)
+	-- Rename the auxiliary bindings (if any)
+    rnTopMonoBinds aux_binds []			`thenM` \ (rn_aux_binds, _dus) ->
+    
+	-- Bring the right type variables into 
+	-- scope, and rename the method binds
+    bindLocalNames (map varName tyvars)		$
+    rnMethodBinds clas_nm [] meth_binds		`thenM` \ (rn_meth_binds, _fvs) ->
+
+	-- Build the InstInfo
+    returnM (InstInfo { iDFunId = dfun, iBinds = VanillaInst rn_meth_binds [] }, 
+	     rn_aux_binds)
+
+gen_list :: [(Unique, FixityEnv -> TyCon -> (RdrNameMonoBinds, RdrNameMonoBinds))]
+gen_list = [(eqClassKey,      no_aux_binds (ignore_fix_env gen_Eq_binds))
+ 	   ,(ordClassKey,     no_aux_binds (ignore_fix_env gen_Ord_binds))
+ 	   ,(enumClassKey,    no_aux_binds (ignore_fix_env gen_Enum_binds))
+ 	   ,(boundedClassKey, no_aux_binds (ignore_fix_env gen_Bounded_binds))
+ 	   ,(ixClassKey,      no_aux_binds (ignore_fix_env gen_Ix_binds))
+	   ,(typeableClassKey,no_aux_binds (ignore_fix_env gen_Typeable_binds))
+ 	   ,(showClassKey,    no_aux_binds gen_Show_binds)
+ 	   ,(readClassKey,    no_aux_binds gen_Read_binds)
+	   ,(dataClassKey,    gen_Data_binds)
+ 	   ]
+
+  -- no_aux_binds is used for generators that don't 
+  -- need to produce any auxiliary bindings
+no_aux_binds f fix_env tc = (f fix_env tc, EmptyMonoBinds)
+ignore_fix_env f fix_env tc = f tc
 \end{code}
 
 
@@ -829,14 +818,11 @@ We're deriving @Enum@, or @Ix@ (enum type only???)
 If we have a @tag2con@ function, we also generate a @maxtag@ constant.
 
 \begin{code}
-gen_taggery_Names :: [DFunId]
-		  -> TcM [(RdrName,	-- for an assoc list
-		  	   TyCon,	-- related tycon
-			   TagThingWanted)]
-
-gen_taggery_Names dfuns
-  = foldlM do_con2tag []           tycons_of_interest `thenM` \ names_so_far ->
-    foldlM do_tag2con names_so_far tycons_of_interest
+genTaggeryBinds :: [DFunId] -> TcM RdrNameMonoBinds
+genTaggeryBinds dfuns
+  = do	{ names_so_far <- foldlM do_con2tag []           tycons_of_interest
+	; nm_alist_etc <- foldlM do_tag2con names_so_far tycons_of_interest
+	; return (andMonoBindList (map gen_tag_n_con_monobind nm_alist_etc)) }
   where
     all_CTs = map simpleDFunClassTyCon dfuns
     all_tycons		    = map snd all_CTs

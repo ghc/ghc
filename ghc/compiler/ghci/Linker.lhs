@@ -36,11 +36,10 @@ import DriverState	( v_Cmdline_frameworks, v_Framework_paths )
 #endif
 import Finder		( findModule, findLinkable )
 import HscTypes
-import Name		( Name,  nameModule, isExternalName, isWiredInName )
+import Name		( Name, nameModule, nameModuleName, isExternalName, isWiredInName )
 import NameEnv
 import NameSet		( nameSetToList )
 import Module
-import FastString	( FastString(..), unpackFS )
 import ListSetOps	( minusList )
 import CmdLineOpts	( DynFlags(verbosity), getDynFlags )
 import BasicTypes	( SuccessFlag(..), succeeded, failed )
@@ -144,7 +143,7 @@ filterNameMap mods env
    = filterNameEnv keep_elt env
    where
      keep_elt (n,_) = isExternalName n 
-		      && (moduleName (nameModule n) `elem` mods)
+		      && (nameModuleName n `elem` mods)
 \end{code}
 
 
@@ -308,8 +307,7 @@ preloadLib dflags lib_paths framework_paths lib_spec
 %************************************************************************
 
 \begin{code}
-linkExpr :: HscEnv -> PersistentCompilerState
-	 -> UnlinkedBCO -> IO HValue
+linkExpr :: HscEnv -> UnlinkedBCO -> IO HValue
 
 -- Link a single expression, *including* first linking packages and 
 -- modules that this expression depends on.
@@ -317,13 +315,14 @@ linkExpr :: HscEnv -> PersistentCompilerState
 -- Raises an IO exception if it can't find a compiled version of the
 -- dependents to link.
 
-linkExpr hsc_env pcs root_ul_bco
+linkExpr hsc_env root_ul_bco
   = do {  
 	-- Initialise the linker (if it's not been done already)
      initDynLinker
 
 	-- Find what packages and linkables are required
-   ; (lnks, pkgs) <- getLinkDeps hpt pit needed_mods
+   ; eps <- readIORef (hsc_EPS hsc_env)
+   ; (lnks, pkgs) <- getLinkDeps hpt (eps_PIT eps) needed_mods
 
 	-- Link the packages and modules required
    ; linkPackages dflags pkgs
@@ -342,7 +341,6 @@ linkExpr hsc_env pcs root_ul_bco
    ; return root_hval
    }}
    where
-     pit    = eps_PIT (pcs_EPS pcs)
      hpt    = hsc_HPT hsc_env
      dflags = hsc_dflags hsc_env
      free_names = nameSetToList (bcoFreeNames root_ul_bco)
@@ -472,9 +470,6 @@ findModuleLinkable_maybe lis mod
         []   -> Nothing
         [li] -> Just li
         many -> pprPanic "findModuleLinkable" (ppr mod)
-
-filterModuleLinkables :: (ModuleName -> Bool) -> [Linkable] -> [Linkable]
-filterModuleLinkables p ls = filter (p . linkableModName) ls
 
 linkableInSet :: Linkable -> [Linkable] -> Bool
 linkableInSet l objs_loaded =
@@ -650,8 +645,7 @@ unload_wkr dflags linkables pls
 	objs_loaded' <- filterM (maybeUnload objs_to_keep) (objs_loaded pls)
         bcos_loaded' <- filterM (maybeUnload bcos_to_keep) (bcos_loaded pls)
 
-       	let objs_retained = map linkableModName objs_loaded'
-	    bcos_retained = map linkableModName bcos_loaded'
+       	let bcos_retained = map linkableModName bcos_loaded'
 	    itbl_env'     = filterNameMap bcos_retained (itbl_env pls)
             closure_env'  = filterNameMap bcos_retained (closure_env pls)
   	    new_pls = pls { itbl_env = itbl_env',

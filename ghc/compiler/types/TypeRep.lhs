@@ -5,10 +5,11 @@
 
 \begin{code}
 module TypeRep (
+	TyThing(..), 
 	Type(..), TyNote(..), 		-- Representation visible 
-	SourceType(..), 		-- to friends
+	PredType(..),	 		-- to friends
 	
- 	Kind, PredType, ThetaType,		-- Synonyms
+ 	Kind, ThetaType,		-- Synonyms
 	TyVarSubst,
 
 	superKind, superBoxity,				-- KX and BX respectively
@@ -19,25 +20,32 @@ module TypeRep (
 	mkArrowKind, mkArrowKinds,			-- :: KX -> KX -> KX
 
 	funTyCon
+#ifdef DEBUG
+	, crudePprType
+#endif
     ) where
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-} DataCon( DataCon )
+
 -- friends:
-import Var	  ( TyVar )
+import Var	  ( Id, TyVar, tyVarKind )
 import VarEnv     ( TyVarEnv )
 import VarSet     ( TyVarSet )
-import Name	  ( Name )
+import Name	  ( Name, mkWiredInName, mkInternalName )
+import OccName	  ( mkOccFS, mkKindOccFS, tcName )
 import BasicTypes ( IPName )
-import TyCon	  ( TyCon, KindCon, mkFunTyCon, mkKindCon, mkSuperKindCon )
+import TyCon	  ( TyCon, KindCon, mkFunTyCon, mkKindCon, mkSuperKindCon, isNewTyCon )
 import Class	  ( Class )
-import Binary
 
 -- others
-import PrelNames	( superKindName, superBoxityName, liftedConName, 
-			  unliftedConName, typeConName, openKindConName, 
-			  funTyConName
+import PrelNames	( gHC_PRIM, kindConKey, boxityConKey, liftedConKey, 
+			  unliftedConKey, typeConKey, anyBoxConKey, 
+			  funTyConKey
 			)
+import SrcLoc		( noSrcLoc )
+import Outputable
 \end{code}
 
 %************************************************************************
@@ -109,22 +117,28 @@ Here the 'implicit expansion' we get from treating P and Q as transparent
 would give rise to infinite types, which in turn makes eqType diverge.
 Similarly splitForAllTys and splitFunTys can get into a loop.  
 
-Solution: for recursive newtypes use a coerce, and treat the newtype
-and its representation as distinct right through the compiler.  That's
-what you get if you use recursive newtypes.  (They are rare, so who
-cares if they are a tiny bit less efficient.)
+Solution: 
 
-So: non-recursive newtypes are represented using a SourceTy (see below)
-    recursive newtypes are represented using a TyConApp
+* Newtypes are always represented using NewTcApp, never as TyConApp.
 
-The TyCon still says "I'm a newtype", but we do not represent the
-newtype application as a SourceType; instead as a TyConApp.
+* For non-recursive newtypes, P, treat P just like a type synonym after 
+  type-checking is done; i.e. it's opaque during type checking (functions
+  from TcType) but transparent afterwards (functions from Type).  
+  "Treat P as a type synonym" means "all functions expand NewTcApps 
+  on the fly".
 
+  Applications of the data constructor P simply vanish:
+	P x = x
+  
 
-NOTE: currently [March 02] we regard a newtype as 'recursive' if it's in a
-mutually recursive group.  That's a bit conservative: only if there's a loop
-consisting only of newtypes do we need consider it as recursive.  But it's
-not so easy to discover that, and the situation isn't that common.
+* For recursive newtypes Q, treat the Q and its representation as 
+  distinct right through the compiler.  Applications of the data consructor
+  use a coerce:
+	Q = \(x::Q->Q). coerce Q x
+  They are rare, so who cares if they are a tiny bit less efficient.
+
+The typechecker (TcTyDecls) identifies enough type construtors as 'recursive'
+to cut all loops.  The other members of the loop may be marked 'non-recursive'.
 
 
 %************************************************************************
@@ -152,6 +166,19 @@ data Type
 			-- 	synonyms have their own constructors, below.
 	[Type]		-- Might not be saturated.
 
+  | NewTcApp		-- Application of a NewType TyCon.   All newtype applications
+	TyCon		-- show up like this until they are fed through newTypeRep,
+			-- which returns 
+			--	* an ordinary TyConApp for non-saturated, 
+			--	 or recursive newtypes
+			--
+			--	* the representation type of the newtype for satuarted, 
+			--	  non-recursive ones
+			-- [But the result of a call to newTypeRep is always consumed
+			--  immediately; it never lives on in another type.  So in any
+			--  type, newtypes are always represented with NewTcApp.]
+	[Type]		-- Might not be saturated.
+
   | FunTy		-- Special case of TyConApp: TyConApp FunTyCon [t1,t2]
 	Type
 	Type
@@ -160,8 +187,8 @@ data Type
 	TyVar
 	Type	
 
-  | SourceTy		-- A high level source type 
-	SourceType	-- ...can be expanded to a representation type...
+  | PredTy		-- A high level source type 
+	PredType	-- ...can be expanded to a representation type...
 
   | NoteTy 		-- A type with a note attached
 	TyNote
@@ -173,23 +200,19 @@ data TyNote
   | SynNote Type	-- Used for type synonyms
 			-- The Type is always a TyConApp, and is the un-expanded form.
 			-- The type to which the note is attached is the expanded form.
-
 \end{code}
 
 -------------------------------------
  		Source types
 
 A type of the form
-	SourceTy sty
-represents a value whose type is the Haskell source type sty.
+	PredTy p
+represents a value whose type is the Haskell predicate p, 
+where a predicate is what occurs before the '=>' in a Haskell type.
 It can be expanded into its representation, but: 
 
 	* The type checker must treat it as opaque
 	* The rest of the compiler treats it as transparent
-
-There are two main uses
-	a) Haskell predicates
-	b) newtypes
 
 Consider these examples:
 	f :: (Eq a) => a -> Int
@@ -200,13 +223,10 @@ Here the "Eq a" and "?x :: Int -> Int" and "r\l" are all called *predicates*
 Predicates are represented inside GHC by PredType:
 
 \begin{code}
-data SourceType 
+data PredType 
   = ClassP Class [Type]		-- Class predicate
   | IParam (IPName Name) Type	-- Implicit parameter
-  | NType TyCon [Type]		-- A *saturated*, *non-recursive* newtype application
-				-- [See notes at top about newtypes]
 
-type PredType  = SourceType	-- A subtype for predicates
 type ThetaType = [PredType]
 \end{code}
 
@@ -274,6 +294,20 @@ Define  KX, the type of a kind
 	BX, the type of a boxity
 
 \begin{code}
+superKindName    = kindQual FSLIT("KX") kindConKey
+superBoxityName  = kindQual FSLIT("BX") boxityConKey
+liftedConName    = kindQual FSLIT("*") liftedConKey
+unliftedConName  = kindQual FSLIT("#") unliftedConKey
+openKindConName  = kindQual FSLIT("?") anyBoxConKey
+typeConName	 = kindQual FSLIT("Type") typeConKey
+
+kindQual str uq = mkInternalName uq (mkKindOccFS tcName str) noSrcLoc
+	-- Kinds are not z-encoded in interface file, hence mkKindOccFS
+	-- And they don't come from any particular module; indeed we always
+	-- want to print them unqualified.  Hence the InternalName.
+\end{code}
+
+\begin{code}
 superKind :: SuperKind 		-- KX, the type of all kinds
 superKind = TyConApp (mkSuperKindCon superKindName) []
 
@@ -320,27 +354,24 @@ mkArrowKinds :: [Kind] -> Kind -> Kind
 mkArrowKinds arg_kinds result_kind = foldr mkArrowKind result_kind arg_kinds
 \end{code}
 
------------------------------------------------------------------------------
-Binary kinds for interface files
+
+%************************************************************************
+%*									*
+			TyThing
+%*									*
+%************************************************************************
+
+Despite the fact that DataCon has to be imported via a hi-boot route, 
+this module seems the right place for TyThing, because it's needed for
+funTyCon and all the types in TysPrim.
 
 \begin{code}
-instance Binary Kind where
-  put_ bh k@(TyConApp tc [])
-	| tc == openKindCon  = putByte bh 0
-  put_ bh k@(TyConApp tc [TyConApp bc _])
-	| tc == typeCon && bc == liftedBoxityCon   = putByte bh 2
-	| tc == typeCon && bc == unliftedBoxityCon = putByte bh 3
-  put_ bh (FunTy f a) = do putByte bh 4;	put_ bh f; put_ bh a
-  put_ bh _ = error "Binary.put(Kind): strange-looking Kind"
-
-  get bh = do 
-	b <- getByte bh
-	case b of 
-	  0 -> return openTypeKind
-	  2 -> return liftedTypeKind
-	  3 -> return unliftedTypeKind
-	  _ -> do f <- get bh; a <- get bh; return (FunTy f a)
+data TyThing = AnId     Id
+	     | ADataCon DataCon
+	     | ATyCon   TyCon
+	     | AClass   Class
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -359,6 +390,45 @@ funTyCon = mkFunTyCon funTyConName (mkArrowKinds [liftedTypeKind, liftedTypeKind
 	-- expected/actual stuff in the unifier does not go contra-variant, whereas
 	-- the kind sub-typing does.  Sigh.  It really only matters if you use (->) in
 	-- a prefix way, thus:  (->) Int# Int#.  And this is unusual.
+
+funTyConName = mkWiredInName gHC_PRIM
+			(mkOccFS tcName FSLIT("(->)"))
+			funTyConKey
+			Nothing 		-- No parent object
+			(ATyCon funTyCon)	-- Relevant TyCon
 \end{code}
 
 
+
+%************************************************************************
+%*									*
+		Crude printing
+	For debug purposes, we may want to print a type directly
+%*									*
+%************************************************************************
+
+\begin{code}
+#ifdef DEBUG
+crudePprType :: Type -> SDoc
+crudePprType (TyVarTy tv)      = ppr tv
+crudePprType (AppTy t1 t2)     = crudePprType t1 <+> (parens (crudePprType t2))
+crudePprType (FunTy t1 t2)     = crudePprType t1 <+> (parens (crudePprType t2))
+crudePprType (TyConApp tc tys) = ppr_tc_app (ppr tc <> pp_nt tc) tys
+crudePprType (NewTcApp tc tys) = ptext SLIT("<nt>") <+> ppr_tc_app (ppr tc <> pp_nt tc) tys
+crudePprType (ForAllTy tv ty)  = sep [ptext SLIT("forall") <+> 
+				        parens (ppr tv <+> crudePprType (tyVarKind tv)) <> dot,
+				      crudePprType ty]
+crudePprType (PredTy st)  	        = braces (crudePprPredTy st)
+crudePprType (NoteTy (SynNote ty1) ty2) = crudePprType ty1
+crudePprType (NoteTy other ty)          = crudePprType ty
+
+crudePprPredTy (ClassP cls tys) = ppr_tc_app (ppr cls) tys
+crudePprPredTy (IParam ip ty)   = ppr ip <> dcolon <> crudePprType ty
+
+ppr_tc_app :: SDoc -> [Type] -> SDoc
+ppr_tc_app tc tys = tc <+> sep (map (parens . crudePprType) tys)
+
+pp_nt tc | isNewTyCon tc = ptext SLIT("(nt)")
+	 | otherwise     = empty
+#endif
+\end{code}

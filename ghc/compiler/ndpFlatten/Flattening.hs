@@ -73,8 +73,7 @@ import Var	    (Var(..))
 import DataCon	    (DataCon, dataConTag)
 import TypeRep      (Type(..))
 import Type         (isTypeKind)
-import HscTypes	    (PersistentCompilerState, ModGuts(..), 
-		     ModGuts, HscEnv(..) )
+import HscTypes	    ( ModGuts(..), ModGuts, HscEnv(..), hscEPS )
 import CoreFVs	    (exprFreeVars)
 import CoreSyn	    (Expr(..), Bind(..), Alt(..), AltCon(..), Note(..),
 		     CoreBndr, CoreExpr, CoreBind, mkLams, mkLets,
@@ -103,15 +102,15 @@ import Monad        (liftM, foldM)
 -- compiling a complete module (EXPORTED) 
 --
 flatten :: HscEnv
-	-> PersistentCompilerState 
 	-> ModGuts
 	-> IO ModGuts
-flatten hsc_env pcs mod_impl@(ModGuts {mg_binds = binds}) 
+flatten hsc_env mod_impl@(ModGuts {mg_binds = binds}) 
   | not opt_Flatten = return mod_impl -- skip without -fflatten
   | otherwise       =
   do
     let dflags = hsc_dflags hsc_env
 
+    eps <- hscEPS hsc_env
     us <- mkSplitUniqSupply 'l'		-- 'l' as in fLattening
     --
     -- announce vectorisation
@@ -120,7 +119,7 @@ flatten hsc_env pcs mod_impl@(ModGuts {mg_binds = binds})
     --
     -- vectorise all toplevel bindings
     --
-    let binds' = runFlatten hsc_env pcs us $ vectoriseTopLevelBinds binds
+    let binds' = runFlatten hsc_env eps us $ vectoriseTopLevelBinds binds
     --
     -- and dump the result if requested
     --
@@ -132,14 +131,14 @@ flatten hsc_env pcs mod_impl@(ModGuts {mg_binds = binds})
 -- compiling a single expression in interactive mode (EXPORTED) 
 --
 flattenExpr :: HscEnv
-	    -> PersistentCompilerState 
 	    -> CoreExpr			-- the expression to be flattened
 	    -> IO CoreExpr
-flattenExpr hsc_env pcs expr
+flattenExpr hsc_env expr
   | not opt_Flatten = return expr       -- skip without -fflatten
   | otherwise       =
   do
     let dflags = hsc_dflags hsc_env
+    eps <- hscEPS hsc_env
 
     us <- mkSplitUniqSupply 'l'		-- 'l' as in fLattening
     --
@@ -149,7 +148,7 @@ flattenExpr hsc_env pcs expr
     --
     -- vectorise the expression
     --
-    let expr' = fst . runFlatten hsc_env pcs us $ vectorise expr
+    let expr' = fst . runFlatten hsc_env eps us $ vectorise expr
     --
     -- and dump the result if requested
     --

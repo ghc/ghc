@@ -20,22 +20,22 @@ import HsSyn		( HsExpr(..), HsBinds(..), Match(..), GRHSs(..), GRHS(..),
 			  ReboundNames,
 			  pprMatch, getMatchLoc, isDoExpr,
 			  pprMatchContext, pprStmtContext, pprStmtResultContext,
-			  mkMonoBind, collectSigTysFromPats, andMonoBindList, glueBindsOnGRHSs
+			  mkMonoBind, collectSigTysFromPats, glueBindsOnGRHSs
 			)
 import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt, RenamedHsExpr,
 			  RenamedPat, RenamedMatchContext )
 import TcHsSyn		( TcMatch, TcGRHSs, TcStmt, TcDictBinds, TcHsBinds, TcExpr,
-			  TcMonoBinds, TcPat, TcStmt, ExprCoFn,
+			  TcPat, TcStmt, ExprCoFn,
 			  isIdCoercion, (<$>), (<.>) )
 
 import TcRnMonad
-import TcMonoType	( tcAddScopedTyVars, tcHsSigType, UserTypeCtxt(..) )
+import TcHsType		( tcAddScopedTyVars, tcHsSigType, UserTypeCtxt(..) )
 import Inst		( tcSyntaxName, tcInstCall )
 import TcEnv		( TcId, tcLookupLocalIds, tcLookupId, tcExtendLocalValEnv, tcExtendLocalValEnv2 )
 import TcPat		( tcPat, tcMonoPatBndr )
 import TcMType		( newTyVarTy, newTyVarTys, zonkTcType ) 
 import TcType		( TcType, TcTyVar, TcSigmaType, TcRhoType,
-			  tyVarsOfTypes, tidyOpenTypes, tidyOpenType, isSigmaTy,
+			  tyVarsOfTypes, tidyOpenTypes, isSigmaTy,
 			  mkFunTy, isOverloadedTy, liftedTypeKind, openTypeKind, 
 			  mkArrowKind, mkAppTy )
 import TcBinds		( tcBindsAndThen )
@@ -44,15 +44,13 @@ import TcUnify		( Expected(..), newHole, zapExpectedType, zapExpectedBranches, r
 			  checkSigTyVarsWrt, tcSubExp, tcGen )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
 import Name		( Name )
-import PrelNames	( monadNames, mfixName )
 import TysWiredIn	( boolTy, mkListTy, mkPArrTy )
-import Id		( idType, mkSysLocal, mkLocalId )
+import Id		( idType, mkLocalId )
 import CoreFVs		( idFreeTyVars )
 import BasicTypes	( RecFlag(..) )
 import VarSet
-import Var		( Id )
 import Bag
-import Util		( isSingleton, notNull, zipEqual )
+import Util		( isSingleton, notNull )
 import Outputable
 
 import List		( nub )
@@ -146,9 +144,11 @@ tcGRHSsPat grhss exp_ty = tcGRHSs match_ctxt grhss exp_ty
 \end{code}
 
 \begin{code}
-data TcMatchCtxt 
-  = MC { mc_what :: RenamedMatchContext,		-- What kind of thing this is
-    	 mc_body :: RenamedHsExpr -> Expected TcRhoType -> TcM TcExpr }	-- Type checker for a body of an alternative
+data TcMatchCtxt 	-- c.f. TcStmtCtxt, also in this module
+  = MC { mc_what :: RenamedMatchContext,	-- What kind of thing this is
+    	 mc_body :: RenamedHsExpr 		-- Type checker for a body of an alternative
+		    -> Expected TcRhoType 
+		    -> TcM TcExpr }	
 
 tcMatches :: TcMatchCtxt
 	  -> [RenamedMatch]
@@ -481,7 +481,7 @@ tcStmts ctxt stmts
     tcStmtsAndThen (:) ctxt stmts (returnM [])
 
 data TcStmtCtxt 
-  = SC { sc_what :: HsStmtContext Name,		-- What kind of thing this is
+  = SC { sc_what :: HsStmtContext Name,				-- What kind of thing this is
     	 sc_rhs  :: RenamedHsExpr -> TcType -> TcM TcExpr,	-- Type checker for RHS computations
 	 sc_body :: RenamedHsExpr -> TcM TcExpr,		-- Type checker for return computation
 	 sc_ty   :: TcType }					-- Return type; used *only* to check
@@ -634,8 +634,8 @@ sigPatCtxt bound_tvs bound_ids tys tidy_env
   = 	-- tys is (body_ty : pat_tys)  
     mapM zonkTcType tys		`thenM` \ tys' ->
     let
-	(env1, tidy_tys) = tidyOpenTypes tidy_env (map idType show_ids)
-	(env2, tidy_body_ty : tidy_pat_tys) = tidyOpenTypes env1 tys'
+	(env1,  tidy_tys) = tidyOpenTypes tidy_env (map idType show_ids)
+	(_env2, tidy_body_ty : tidy_pat_tys) = tidyOpenTypes env1 tys'
     in
     returnM (env1,
 		 sep [ptext SLIT("When checking an existential match that binds"),

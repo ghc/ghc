@@ -44,7 +44,7 @@ import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr,
 			)
 import CoreFVs		( exprFreeVars )
 import TypeRep		( Type(..), TyNote(..) )  -- friend
-import Type		( ThetaType, SourceType(..), PredType,
+import Type		( ThetaType, PredType(..), 
 			  tyVarsOfType, tyVarsOfTypes, mkAppTy, 
 			)
 import VarSet
@@ -58,8 +58,7 @@ import IdInfo		( IdInfo, vanillaIdInfo,
 			  specInfo, setSpecInfo, 
 			  setArityInfo, unknownArity, arityInfo,
 			  unfoldingInfo, setUnfoldingInfo,
-			  WorkerInfo(..), workerExists, workerInfo, setWorkerInfo, WorkerInfo,
-                          lbvarInfo, LBVarInfo(..), setLBVarInfo, hasNoLBVarInfo
+			  WorkerInfo(..), workerExists, workerInfo, setWorkerInfo, WorkerInfo
 			)
 import BasicTypes	( OccInfo(..) )
 import Unique		( Unique, Uniquable(..), deriveUnique )
@@ -427,11 +426,8 @@ substTheta subst theta
   | otherwise	       = map (substPred subst) theta
 
 substPred :: TyVarSubst -> PredType -> PredType
-substPred = substSourceType
-
-substSourceType subst (IParam n ty)     = IParam n (subst_ty subst ty)
-substSourceType subst (ClassP clas tys) = ClassP clas (map (subst_ty subst) tys)
-substSourceType subst (NType  tc   tys) = NType  tc   (map (subst_ty subst) tys)
+substPred subst (IParam n ty)     = IParam n (subst_ty subst ty)
+substPred subst (ClassP clas tys) = ClassP clas (map (subst_ty subst) tys)
 
 subst_ty subst ty
    = go ty
@@ -439,7 +435,10 @@ subst_ty subst ty
     go (TyConApp tc tys)	   = let args = map go tys
 				     in  args `seqList` TyConApp tc args
 
-    go (SourceTy p)  		   = SourceTy $! (substSourceType subst p)
+    go (NewTcApp tc tys)	   = let args = map go tys
+				     in  args `seqList` NewTcApp tc args
+
+    go (PredTy p)  		   = PredTy $! (substPred subst p)
 
     go (NoteTy (SynNote ty1) ty2)  = NoteTy (SynNote $! (go ty1)) $! (go ty2)
     go (NoteTy (FTVNote _) ty2)    = go ty2		-- Discard the free tyvar note
@@ -632,8 +631,7 @@ simplIdInfo subst old_info
 \begin{code}
 -- substBndr and friends are used when doing expression substitution only
 -- In this case we can *preserve* occurrence information, and indeed we *want*
--- to do so else lose useful occ info in rules.  Hence the calls to 
--- simpl_id with keepOccInfo
+-- to do so else lose useful occ info in rules. 
 
 substBndr :: Subst -> Var -> (Subst, Var)
 substBndr subst bndr
@@ -651,8 +649,6 @@ substRecBndrs subst bndrs
 	-- Here's the reason we need to pass rec_subst to subst_id
     (new_subst, new_bndrs) = mapAccumL (subst_id True {- keep fragile info -} new_subst) 
 			 	       subst bndrs
-
-keepOccInfo occ = False	-- Never fragile
 \end{code}
 
 
@@ -747,7 +743,6 @@ substIdInfo :: Bool	-- True <=> keep even fragile info
 -- Substitute the 
 --	rules
 --	worker info
---	LBVar info
 -- Zap the unfolding 
 -- If keep_fragile then
 --	keep OccInfo

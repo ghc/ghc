@@ -228,7 +228,6 @@ tryWW is_rec fn_id rhs
     maybe_fn_dmd = newDemandInfo fn_info
     unfolding 	 = unfoldingInfo fn_info
     inline_prag  = inlinePragInfo fn_info
-    maybe_sig    = newStrictnessInfo fn_info
 
 	-- In practice it always will have a strictness 
 	-- signature, even if it's a uninformative one

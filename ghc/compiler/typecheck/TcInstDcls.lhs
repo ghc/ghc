@@ -4,69 +4,50 @@
 \section[TcInstDecls]{Typechecking instance declarations}
 
 \begin{code}
-module TcInstDcls ( tcInstDecls1, tcIfaceInstDecls, 
-		    tcInstDecls2, tcAddDeclCtxt ) where
+module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
 
 #include "HsVersions.h"
 
-
-import CmdLineOpts	( DynFlag(..) )
-
-import HsSyn		( InstDecl(..), TyClDecl(..), HsType(..),
-			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..), HsTyVarBndr(..),
+import HsSyn		( InstDecl(..), HsType(..),
+			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..), 
 			  andMonoBindList, collectMonoBinders, 
-			  isClassDecl, isSourceInstDecl, toHsType
+			  isClassDecl 
 			)
-import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, 
-			  RenamedMonoBinds, RenamedTyClDecl, RenamedHsType, 
-			  extractHsTyVars, maybeGenericMatch
-			)
+import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedTyClDecl )
 import TcHsSyn		( TcMonoBinds, mkHsConApp )
 import TcBinds		( tcSpecSigs )
-import TcClassDcl	( tcMethodBind, mkMethodBind, badMethodErr )
+import TcClassDcl	( tcMethodBind, mkMethodBind, badMethodErr, 
+			  tcClassDecl2, getGenericInstances )
 import TcRnMonad       
 import TcMType		( tcInstType, checkValidTheta, checkValidInstHead, instTypeErr, 
-			  checkAmbiguity, UserTypeCtxt(..), SourceTyCtxt(..) )
-import TcType		( mkClassPred, mkTyVarTy, tcSplitForAllTys, tyVarsOfType,
+			  checkAmbiguity, SourceTyCtxt(..) )
+import TcType		( mkClassPred, tcSplitForAllTys, tyVarsOfType,
 			  tcSplitSigmaTy, getClassPredTys, tcSplitPredTy_maybe, mkTyVarTys,
-			  TyVarDetails(..)
+			  TyVarDetails(..), tcSplitDFunTy
 			)
-import Inst		( InstOrigin(..), tcInstClassOp, newDicts, instToId, showLIE )
+import Inst		( InstOrigin(..), tcInstClassOp, newDicts, instToId, 
+			  showLIE, tcExtendLocalInstEnv )
 import TcDeriv		( tcDeriving )
-import TcEnv		( tcExtendGlobalValEnv, 
-			  tcLookupClass, tcExtendTyVarEnv2,
-			  tcExtendInstEnv, tcExtendLocalInstEnv, tcLookupGlobalId,
- 			  InstInfo(..), InstBindings(..), pprInstInfo, simpleInstInfoTyCon, 
-			  simpleInstInfoTy, newDFunName
+import TcEnv		( tcExtendGlobalValEnv, tcExtendTyVarEnv2,
+ 			  InstInfo(..), InstBindings(..), 
+			  newDFunName, tcExtendLocalValEnv
 			)
 import PprType		( pprClassPred )
-import TcMonoType	( tcHsTyVars, kcHsSigType, tcHsType, tcHsSigType )
+import TcHsType		( kcHsSigType, tcHsKindedType )
 import TcUnify		( checkSigTyVars )
 import TcSimplify	( tcSimplifyCheck, tcSimplifyTop )
-import HscTypes		( DFunId )
 import Subst		( mkTyVarSubst, substTheta, substTy )
 import DataCon		( classDataCon )
-import Class		( Class, classBigSig )
+import Class		( classBigSig )
 import Var		( idName, idType )
 import NameSet		
 import MkId		( mkDictFunId, rUNTIME_ERROR_ID )
 import FunDeps		( checkInstFDs )
-import Generics		( validGenericInstanceType )
 import Name		( getSrcLoc )
 import NameSet		( unitNameSet, emptyNameSet, nameSetToList )
-import TyCon		( TyCon )
-import TysWiredIn	( genericTyCons )
-import SrcLoc           ( SrcLoc )
-import Unique		( Uniquable(..) )
-import Util             ( lengthExceeds )
-import BasicTypes	( NewOrData(..) )
 import UnicodeUtil	( stringToUtf8 )
-import ErrUtils		( dumpIfSet_dyn )
-import ListSetOps	( Assoc, emptyAssoc, plusAssoc_C, mapAssoc, 
-			  assocElts, extendAssoc_C, equivClassesByUniq, minusList
-			)
 import Maybe		( catMaybes )
-import List		( partition )
+import ListSetOps	( minusList )
 import Outputable
 import FastString
 \end{code}
@@ -160,23 +141,15 @@ tcInstDecls1	-- Deal with both source-code and imported instance decls
    -> TcM (TcGblEnv,		-- The full inst env
 	   [InstInfo],		-- Source-code instance decls to process; 
 				-- contains all dfuns for this module
-	   RenamedHsBinds,	-- Supporting bindings for derived instances
-	   FreeVars)		-- And the free vars of the derived code
+	   RenamedHsBinds)	-- Supporting bindings for derived instances
 
 tcInstDecls1 tycl_decls inst_decls
   = checkNoErrs $
 	-- Stop if addInstInfos etc discovers any errors
 	-- (they recover, so that we get more than one error each round)
-    let
-      (src_inst_decls, iface_inst_decls) = partition isSourceInstDecl inst_decls
-    in
-
-	-- (0) Deal with the imported instance decls
-    tcIfaceInstDecls iface_inst_decls	`thenM` \ imp_dfuns ->
-    tcExtendInstEnv imp_dfuns		$
 
    	-- (1) Do the ordinary instance declarations
-    mappM tcLocalInstDecl1 src_inst_decls    `thenM` \ local_inst_infos ->
+    mappM tcLocalInstDecl1 inst_decls    `thenM` \ local_inst_infos ->
 
     let
 	local_inst_info = catMaybes local_inst_infos
@@ -189,21 +162,23 @@ tcInstDecls1 tycl_decls inst_decls
 	--      a) imported instance decls (from this module)
 	--	b) local instance decls
 	--	c) generic instances
-    tcExtendLocalInstEnv local_inst_info	$
-    tcExtendLocalInstEnv generic_inst_info	$
+    addInsts local_inst_info	$
+    addInsts generic_inst_info	$
 
 	-- (3) Compute instances from "deriving" clauses; 
-	--     note that we only do derivings for things in this module; 
-	--     we ignore deriving decls from interfaces!
 	-- This stuff computes a context for the derived instance decl, so it
 	-- needs to know about all the instances possible; hence inst_env4
-    tcDeriving tycl_decls			`thenM` \ (deriv_inst_info, deriv_binds, fvs) ->
-    tcExtendLocalInstEnv deriv_inst_info	$
+    tcDeriving tycl_decls	`thenM` \ (deriv_inst_info, deriv_binds) ->
+    addInsts deriv_inst_info	$
 
-    getGblEnv					`thenM` \ gbl_env ->
+    getGblEnv			`thenM` \ gbl_env ->
     returnM (gbl_env, 
 	     generic_inst_info ++ deriv_inst_info ++ local_inst_info,
-	     deriv_binds, fvs)
+	     deriv_binds)
+
+addInsts :: [InstInfo] -> TcM a -> TcM a
+addInsts infos thing_inside
+  = tcExtendLocalInstEnv (map iDFunId infos) thing_inside
 \end{code} 
 
 \begin{code}
@@ -217,16 +192,16 @@ tcLocalInstDecl1 :: RenamedInstDecl
 	-- Imported ones should have been checked already, and may indeed
 	-- contain something illegal in normal Haskell, notably
 	--	instance CCallable [Char] 
-tcLocalInstDecl1 decl@(InstDecl poly_ty binds uprags Nothing src_loc)
+tcLocalInstDecl1 decl@(InstDecl poly_ty binds uprags src_loc)
   =	-- Prime error recovery, set source location
     recoverM (returnM Nothing)		$
     addSrcLoc src_loc			$
-    addErrCtxt (instDeclCtxt poly_ty)	$
+    addErrCtxt (instDeclCtxt1 poly_ty)	$
 
 	-- Typecheck the instance type itself.  We can't use 
 	-- tcHsSigType, because it's not a valid user type.
-    kcHsSigType poly_ty			`thenM_`
-    tcHsType poly_ty			`thenM` \ poly_ty' ->
+    kcHsSigType poly_ty			`thenM` \ kinded_ty ->
+    tcHsKindedType kinded_ty		`thenM` \ poly_ty' ->
     let
 	(tyvars, theta, tau) = tcSplitSigmaTy poly_ty'
     in
@@ -242,163 +217,6 @@ tcLocalInstDecl1 decl@(InstDecl poly_ty binds uprags Nothing src_loc)
     msg  = parens (ptext SLIT("the instance types do not agree with the functional dependencies of the class"))
 \end{code}
 
-Imported instance declarations
-
-\begin{code}
-tcIfaceInstDecls :: [RenamedInstDecl] -> TcM [DFunId]
--- Deal with the instance decls, 
-tcIfaceInstDecls decls = mappM tcIfaceInstDecl decls
-
-tcIfaceInstDecl :: RenamedInstDecl -> TcM DFunId
-	-- An interface-file instance declaration
-	-- Should be in scope by now, because we should
-	-- have sucked in its interface-file definition
-	-- So it will be replete with its unfolding etc
-tcIfaceInstDecl decl@(InstDecl poly_ty binds uprags (Just dfun_name) src_loc)
-  = tcLookupGlobalId dfun_name
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Extracting generic instance declaration from class declarations}
-%*									*
-%************************************************************************
-
-@getGenericInstances@ extracts the generic instance declarations from a class
-declaration.  For exmaple
-
-	class C a where
-	  op :: a -> a
-	
-	  op{ x+y } (Inl v)   = ...
-	  op{ x+y } (Inr v)   = ...
-	  op{ x*y } (v :*: w) = ...
-	  op{ 1   } Unit      = ...
-
-gives rise to the instance declarations
-
-	instance C (x+y) where
-	  op (Inl v)   = ...
-	  op (Inr v)   = ...
-	
-	instance C (x*y) where
-	  op (v :*: w) = ...
-
-	instance C 1 where
-	  op Unit      = ...
-
-
-\begin{code}
-getGenericInstances :: [RenamedTyClDecl] -> TcM [InstInfo] 
-getGenericInstances class_decls
-  = mappM get_generics class_decls		`thenM` \ gen_inst_infos ->
-    let
-	gen_inst_info = concat gen_inst_infos
-    in
-    if null gen_inst_info then
-	returnM []
-    else
-    getDOpts						`thenM`  \ dflags ->
-    ioToTcRn (dumpIfSet_dyn dflags Opt_D_dump_deriv "Generic instances" 
-	 	    (vcat (map pprInstInfo gen_inst_info)))	
-							`thenM_`
-    returnM gen_inst_info
-
-get_generics decl@(ClassDecl {tcdMeths = Nothing})
-  = returnM []	-- Imported class decls
-
-get_generics decl@(ClassDecl {tcdName = class_name, tcdMeths = Just def_methods, tcdLoc = loc})
-  | null groups		
-  = returnM [] -- The comon case: no generic default methods
-
-  | otherwise	-- A source class decl with generic default methods
-  = recoverM (returnM [])				$
-    tcAddDeclCtxt decl					$
-    tcLookupClass class_name				`thenM` \ clas ->
-
-	-- Make an InstInfo out of each group
-    mappM (mkGenericInstance clas loc) groups		`thenM` \ inst_infos ->
-
-	-- Check that there is only one InstInfo for each type constructor
-  	-- The main way this can fail is if you write
-	--	f {| a+b |} ... = ...
-	--	f {| x+y |} ... = ...
-	-- Then at this point we'll have an InstInfo for each
-    let
-	tc_inst_infos :: [(TyCon, InstInfo)]
-	tc_inst_infos = [(simpleInstInfoTyCon i, i) | i <- inst_infos]
-
-	bad_groups = [group | group <- equivClassesByUniq get_uniq tc_inst_infos,
-			      group `lengthExceeds` 1]
-	get_uniq (tc,_) = getUnique tc
-    in
-    mappM (addErrTc . dupGenericInsts) bad_groups	`thenM_`
-
-	-- Check that there is an InstInfo for each generic type constructor
-    let
-	missing = genericTyCons `minusList` [tc | (tc,_) <- tc_inst_infos]
-    in
-    checkTc (null missing) (missingGenericInstances missing)	`thenM_`
-
-    returnM inst_infos
-
-  where
-	-- Group the declarations by type pattern
-	groups :: [(RenamedHsType, RenamedMonoBinds)]
-	groups = assocElts (getGenericBinds def_methods)
-
-
----------------------------------
-getGenericBinds :: RenamedMonoBinds -> Assoc RenamedHsType RenamedMonoBinds
-  -- Takes a group of method bindings, finds the generic ones, and returns
-  -- them in finite map indexed by the type parameter in the definition.
-
-getGenericBinds EmptyMonoBinds    = emptyAssoc
-getGenericBinds (AndMonoBinds m1 m2) 
-  = plusAssoc_C AndMonoBinds (getGenericBinds m1) (getGenericBinds m2)
-
-getGenericBinds (FunMonoBind id infixop matches loc)
-  = mapAssoc wrap (foldl add emptyAssoc matches)
-	-- Using foldl not foldr is vital, else
-	-- we reverse the order of the bindings!
-  where
-    add env match = case maybeGenericMatch match of
-		      Nothing		-> env
-		      Just (ty, match') -> extendAssoc_C (++) env (ty, [match'])
-
-    wrap ms = FunMonoBind id infixop ms loc
-
----------------------------------
-mkGenericInstance :: Class -> SrcLoc
-		  -> (RenamedHsType, RenamedMonoBinds)
-		  -> TcM InstInfo
-
-mkGenericInstance clas loc (hs_ty, binds)
-  -- Make a generic instance declaration
-  -- For example:	instance (C a, C b) => C (a+b) where { binds }
-
-  = 	-- Extract the universally quantified type variables
-    let
-	sig_tvs = map UserTyVar (nameSetToList (extractHsTyVars hs_ty))
-    in
-    tcHsTyVars sig_tvs (kcHsSigType hs_ty)	$ \ tyvars ->
-
-	-- Type-check the instance type, and check its form
-    tcHsSigType GenPatCtxt hs_ty		`thenM` \ inst_ty ->
-    checkTc (validGenericInstanceType inst_ty)
-	    (badGenericInstanceType binds)	`thenM_`
-
-	-- Make the dictionary function.
-    newDFunName clas [inst_ty] loc		`thenM` \ dfun_name ->
-    let
-	inst_theta = [mkClassPred clas [mkTyVarTy tv] | tv <- tyvars]
-	dfun_id    = mkDictFunId dfun_name tyvars inst_theta clas [inst_ty]
-    in
-
-    returnM (InstInfo { iDFunId = dfun_id, iBinds = VanillaInst binds [] })
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -407,10 +225,26 @@ mkGenericInstance clas loc (hs_ty, binds)
 %************************************************************************
 
 \begin{code}
-tcInstDecls2 :: [InstInfo] -> TcM TcMonoBinds
-tcInstDecls2 inst_decls
-  = mappM tcInstDecl2 inst_decls	`thenM` \ binds_s ->
-    returnM (andMonoBindList binds_s)
+tcInstDecls2 :: [RenamedTyClDecl] -> [InstInfo] 
+	     -> TcM (TcLclEnv, TcMonoBinds)
+-- (a) From each class declaration, 
+--	generate any default-method bindings
+-- (b) From each instance decl
+--	generate the dfun binding
+
+tcInstDecls2 tycl_decls inst_decls
+  = do	{	-- (a) Default methods from class decls
+	  (dm_binds_s, dm_ids_s) <- mapAndUnzipM tcClassDecl2 $
+			            filter isClassDecl tycl_decls
+	; tcExtendLocalValEnv (concat dm_ids_s) 	$ do 
+    
+	 	-- (b) instance declarations
+	; inst_binds_s <- mappM tcInstDecl2 inst_decls
+
+		-- Done
+	; tcl_env <- getLclEnv
+	; returnM (tcl_env, andMonoBindList dm_binds_s	`AndMonoBinds`
+			    andMonoBindList inst_binds_s) }
 \end{code}
 
 ======= New documentation starts here (Sept 92)	 ==============
@@ -485,9 +319,9 @@ tcInstDecl2 :: InstInfo -> TcM TcMonoBinds
 
 tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
   =	 -- Prime error recovery
-    recoverM (returnM EmptyMonoBinds)	$
-    addSrcLoc (getSrcLoc dfun_id)			   	$
-    addErrCtxt (instDeclCtxt (toHsType (idType dfun_id)))	$
+    recoverM (returnM EmptyMonoBinds)		$
+    addSrcLoc (getSrcLoc dfun_id)		$
+    addErrCtxt (instDeclCtxt2 (idType dfun_id))	$
     let
 	inst_ty 	 = idType dfun_id
 	(inst_tyvars, _) = tcSplitForAllTys inst_ty
@@ -844,44 +678,17 @@ simplified: only zeze2 is extracted and its body is simplified.
 %************************************************************************
 
 \begin{code}
-tcAddDeclCtxt decl thing_inside
-  = addSrcLoc (tcdLoc decl) 	$
-    addErrCtxt ctxt 	$
-    thing_inside
+instDeclCtxt1 hs_inst_ty 
+  = inst_decl_ctxt (case hs_inst_ty of
+			HsForAllTy _ _ (HsPredTy pred) -> ppr pred
+			HsPredTy pred	      	       -> ppr pred
+			other			       -> ppr hs_inst_ty)	-- Don't expect this
+instDeclCtxt2 dfun_ty
+  = inst_decl_ctxt (ppr (mkClassPred cls tys))
   where
-     thing = case decl of
-	   	ClassDecl {}		  -> "class"
-		TySynonym {}		  -> "type synonym"
-		TyData {tcdND = NewType}  -> "newtype"
-		TyData {tcdND = DataType} -> "data type"
+    (_,_,cls,tys) = tcSplitDFunTy dfun_ty
 
-     ctxt = hsep [ptext SLIT("In the"), text thing, 
-		  ptext SLIT("declaration for"), quotes (ppr (tcdName decl))]
+inst_decl_ctxt doc = ptext SLIT("In the instance declaration for") <+> quotes doc
 
-instDeclCtxt inst_ty = ptext SLIT("In the instance declaration for") <+> quotes doc
-		     where
-			doc = case inst_ty of
-				HsForAllTy _ _ (HsPredTy pred) -> ppr pred
-				HsPredTy pred	      	       -> ppr pred
-				other			       -> ppr inst_ty	-- Don't expect this
-\end{code}
-
-\begin{code}
-badGenericInstanceType binds
-  = vcat [ptext SLIT("Illegal type pattern in the generic bindings"),
-	  nest 4 (ppr binds)]
-
-missingGenericInstances missing
-  = ptext SLIT("Missing type patterns for") <+> pprQuotedList missing
-	  
-dupGenericInsts tc_inst_infos
-  = vcat [ptext SLIT("More than one type pattern for a single generic type constructor:"),
-	  nest 4 (vcat (map ppr_inst_ty tc_inst_infos)),
-	  ptext SLIT("All the type patterns for a generic type constructor must be identical")
-    ]
-  where 
-    ppr_inst_ty (tc,inst) = ppr (simpleInstInfoTy inst)
-
-methodCtxt     = ptext SLIT("When checking the methods of an instance declaration")
 superClassCtxt = ptext SLIT("When checking the super-classes of an instance declaration")
 \end{code}

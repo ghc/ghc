@@ -6,7 +6,7 @@
 
 \begin{code}
 module HscMain ( 
-	HscResult(..), hscMain, initPersistentCompilerState
+	HscResult(..), hscMain, newHscEnv
 #ifdef GHCI
 	, hscStmt, hscTcExpr, hscThing, 
 	, compileExpr
@@ -16,7 +16,9 @@ module HscMain (
 #include "HsVersions.h"
 
 #ifdef GHCI
+import HsSyn		( Stmt(..) )
 import TcHsSyn		( TypecheckedHsExpr )
+import IfaceSyn		( IfaceDecl )
 import CodeOutput	( outputForeignStubs )
 import ByteCodeGen	( byteCodeGen, coreExprToBCOs )
 import Linker		( HValue, linkExpr )
@@ -25,51 +27,49 @@ import CorePrep		( corePrepExpr )
 import Flattening	( flattenExpr )
 import TcRnDriver	( tcRnStmt, tcRnExpr, tcRnThing ) 
 import RdrHsSyn		( RdrNameStmt )
+import RdrName		( GlobalRdrEnv )
 import Type		( Type )
 import PrelNames	( iNTERACTIVE )
 import StringBuffer	( stringToStringBuffer )
 import SrcLoc		( noSrcLoc )
 import Name		( Name )
 import CoreLint		( lintUnfolding )
+import DsMeta		( templateHaskellNames )
+import BasicTypes	( Fixity )
 #endif
 
-import HsSyn
-
-import RdrName		( nameRdrName )
 import StringBuffer	( hGetStringBuffer )
 import Parser
 import Lexer		( P(..), ParseResult(..), mkPState, showPFailed )
 import SrcLoc		( mkSrcLoc )
-import TcRnDriver	( checkOldIface, tcRnModule, tcRnExtCore, tcRnIface )
-import RnEnv		( extendOrigNameCache )
-import PrelInfo		( wiredInThingEnv, knownKeyNames )
-import PrelRules	( builtinRules )
-import MkIface		( mkIface )
+import TcRnDriver	( tcRnModule, tcRnExtCore, tcRnIface )
+import IfaceEnv		( initNameCache )
+import LoadIface	( ifaceStats, initExternalPackageState )
+import PrelInfo		( wiredInThings, basicKnownKeyNames )
+import RdrName		( GlobalRdrEnv )
+import MkIface		( checkOldIface, mkIface )
 import Desugar
 import Flattening       ( flatten )
 import SimplCore
 import TidyPgm		( tidyCorePgm )
 import CorePrep		( corePrepPgm )
 import CoreToStg	( coreToStg )
+import Name		( Name, NamedThing(..) )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 import CodeOutput	( codeOutput )
 
-import Module		( emptyModuleEnv )
 import CmdLineOpts
 import DriverPhases     ( isExtCore_file )
-import ErrUtils		( dumpIfSet_dyn, showPass )
+import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass )
 import UniqSupply	( mkSplitUniqSupply )
 
-import Bag		( consBag, emptyBag )
 import Outputable
 import HscStats		( ppSourceStats )
 import HscTypes
 import MkExternalCore	( emitExternalCore )
 import ParserCore
 import ParserCoreUtils
-import FiniteMap	( emptyFM )
-import Name		( nameModule )
 import Module		( Module, ModLocation(..), showModMsg )
 import FastString
 import Maybes		( expectJust )
@@ -77,27 +77,58 @@ import Maybes		( expectJust )
 import Monad		( when )
 import Maybe		( isJust, fromJust )
 import IO
+import DATA_IOREF	( newIORef, readIORef )
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{The main compiler pipeline}
+		Initialisation
+%*									*
+%************************************************************************
+
+\begin{code}
+newHscEnv :: GhciMode -> DynFlags -> IO HscEnv
+newHscEnv ghci_mode dflags
+  = do 	{ eps_var <- newIORef initExternalPackageState
+	; us      <- mkSplitUniqSupply 'r'
+	; nc_var  <- newIORef (initNameCache us knownKeyNames)
+	; return (HscEnv { hsc_mode   = ghci_mode,
+			   hsc_dflags = dflags,
+			   hsc_HPT    = emptyHomePackageTable,
+			   hsc_EPS    = eps_var,
+			   hsc_NC     = nc_var } ) }
+			
+
+knownKeyNames :: [Name]	-- Put here to avoid loops involving DsMeta,
+			-- where templateHaskellNames are defined
+knownKeyNames = map getName wiredInThings 
+	      ++ basicKnownKeyNames
+#ifdef GHCI
+	      ++ templateHaskellNames
+#endif
+\end{code}
+
+
+%************************************************************************
+%*									*
+		The main compiler pipeline
 %*									*
 %************************************************************************
 
 \begin{code}
 data HscResult
-   -- compilation failed
-   = HscFail     PersistentCompilerState -- updated PCS
-   -- concluded that it wasn't necessary
-   | HscNoRecomp PersistentCompilerState -- updated PCS
-                 ModDetails  	         -- new details (HomeSymbolTable additions)
+   -- Compilation failed
+   = HscFail     
+
+   -- Concluded that it wasn't necessary
+   | HscNoRecomp ModDetails  	         -- new details (HomeSymbolTable additions)
 	         ModIface	         -- new iface (if any compilation was done)
-   -- did recompilation
-   | HscRecomp   PersistentCompilerState -- updated PCS
-                 ModDetails  		 -- new details (HomeSymbolTable additions)
-                 ModIface		 -- new iface (if any compilation was done)
+
+   -- Did recompilation
+   | HscRecomp   ModDetails  		-- new details (HomeSymbolTable additions)
+		 (Maybe GlobalRdrEnv)		
+                 ModIface		-- new iface (if any compilation was done)
 	         Bool	 	 	-- stub_h exists
 	         Bool  		 	-- stub_c exists
 	         (Maybe CompiledByteCode)
@@ -107,7 +138,6 @@ data HscResult
 
 hscMain
   :: HscEnv
-  -> PersistentCompilerState    -- IN: persistent compiler state
   -> Module
   -> ModLocation		-- location info
   -> Bool			-- True <=> source unchanged
@@ -115,35 +145,35 @@ hscMain
   -> Maybe ModIface		-- old interface, if available
   -> IO HscResult
 
-hscMain hsc_env pcs mod location 
+hscMain hsc_env mod location 
 	source_unchanged have_object maybe_old_iface
  = do {
-      (pcs_ch, maybe_chk_result) <- _scc_ "checkOldIface" 
-				    checkOldIface hsc_env pcs mod 
-						  (ml_hi_file location)
-						  source_unchanged maybe_old_iface;
-      case maybe_chk_result of {
-	Nothing -> return (HscFail pcs_ch) ;
-	Just (recomp_reqd, maybe_checked_iface) -> do {
+      (recomp_reqd, maybe_checked_iface) <- 
+		_scc_ "checkOldIface" 
+		checkOldIface hsc_env mod 
+			      (ml_hi_file location)
+			      source_unchanged maybe_old_iface;
 
       let no_old_iface = not (isJust maybe_checked_iface)
           what_next | recomp_reqd || no_old_iface = hscRecomp 
                     | otherwise                   = hscNoRecomp
 
-      ; what_next hsc_env pcs_ch have_object 
+      ; what_next hsc_env have_object 
 		  mod location maybe_checked_iface
-      }}}
+      }
 
 
 -- hscNoRecomp definitely expects to have the old interface available
-hscNoRecomp hsc_env pcs_ch have_object 
+hscNoRecomp hsc_env have_object 
 	    mod location (Just old_iface)
  | hsc_mode hsc_env == OneShot
  = do {
       when (verbosity (hsc_dflags hsc_env) > 0) $
 	  hPutStrLn stderr "compilation IS NOT required";
+      dumpIfaceStats hsc_env ;
+
       let { bomb = panic "hscNoRecomp:OneShot" };
-      return (HscNoRecomp pcs_ch bomb bomb)
+      return (HscNoRecomp bomb bomb)
       }
  | otherwise
  = do {
@@ -151,18 +181,14 @@ hscNoRecomp hsc_env pcs_ch have_object
 		hPutStrLn stderr ("Skipping  " ++ 
 			showModMsg have_object mod location);
 
-      -- Typecheck 
-      (pcs_tc, maybe_tc_result) <- _scc_ "tcRnIface"
-				   tcRnIface hsc_env pcs_ch old_iface ;
+      new_details <- _scc_ "tcRnIface"
+		     tcRnIface hsc_env old_iface ;
+      dumpIfaceStats hsc_env ;
 
-      case maybe_tc_result of {
-         Nothing -> return (HscFail pcs_tc);
-         Just new_details ->
+      return (HscNoRecomp new_details old_iface)
+      }
 
-      return (HscNoRecomp pcs_tc new_details old_iface)
-      }}
-
-hscRecomp hsc_env pcs_ch have_object 
+hscRecomp hsc_env have_object 
 	  mod location maybe_checked_iface
  = do	{
       	  -- what target are we shooting for?
@@ -177,13 +203,13 @@ hscRecomp hsc_env pcs_ch have_object
 			showModMsg (not toInterp) mod location);
 			
 	; front_res <- if toCore then 
-			  hscCoreFrontEnd hsc_env pcs_ch location
+			  hscCoreFrontEnd hsc_env location
 		       else 
-			  hscFrontEnd hsc_env pcs_ch location
+			  hscFrontEnd hsc_env location
 
 	; case front_res of
 	    Left flure -> return flure;
-	    Right (pcs_tc, ds_result) -> do {
+	    Right ds_result -> do {
 
 
 	-- OMITTED: 
@@ -193,11 +219,15 @@ hscRecomp hsc_env pcs_ch have_object
  	    -- FLATTENING
  	    -------------------
 	; flat_result <- _scc_ "Flattening"
- 			 flatten hsc_env pcs_tc ds_result
+ 			 flatten hsc_env ds_result
 
+
+{-	TEMP: need to review space-leak fixing here
+	NB: even the code generator can force one of the
+	    thunks for constructor arguments, for newtypes in particular
 
 	; let 	-- Rule-base accumulated from imported packages
-	     pkg_rule_base = eps_rule_base (pcs_EPS pcs_tc)
+	     pkg_rule_base = eps_rule_base (hsc_EPS hsc_env)
 
 		-- In one-shot mode, ZAP the external package state at
 		-- this point, because we aren't going to need it from
@@ -208,6 +238,7 @@ hscRecomp hsc_env pcs_ch have_object
 		 | otherwise = pcs_tc
 
 	; pkg_rule_base `seq` pcs_middle `seq` return ()
+-}
 
 	-- alive at this point:  
 	--	pcs_middle
@@ -217,21 +248,16 @@ hscRecomp hsc_env pcs_ch have_object
  	    -------------------
  	    -- SIMPLIFY
  	    -------------------
-	; simpl_result <- _scc_     "Core2Core"
-			  core2core hsc_env pkg_rule_base flat_result
+	; simpl_result <- _scc_ "Core2Core"
+			  core2core hsc_env flat_result
 
  	    -------------------
  	    -- TIDY
  	    -------------------
-	; (pcs_simpl, tidy_result) 
-	     <- _scc_ "CoreTidy"
-	        tidyCorePgm dflags pcs_middle simpl_result
+	; tidy_result <- _scc_ "CoreTidy"
+		         tidyCorePgm hsc_env simpl_result
 
-	-- ZAP the persistent compiler state altogether now if we're
-	-- in one-shot mode, to save space.
-	; pcs_final <- if one_shot then return (error "pcs_final missing")
-				   else return pcs_simpl
-
+	-- Emit external core
 	; emitExternalCore dflags tidy_result
 
 	-- Alive at this point:  
@@ -255,6 +281,9 @@ hscRecomp hsc_env pcs_ch have_object
 	; final_iface <-
 	     if one_shot then return (error "no final iface")
 			 else return new_iface
+	; let { final_globals | one_shot  = Nothing
+			      | otherwise = Just $! (mg_rdr_env tidy_result) }
+	; final_globals `seq` return ()
 
 	    -- Build the final ModDetails (except in one-shot mode, where
 	    -- we won't need this information after compilation).
@@ -270,36 +299,38 @@ hscRecomp hsc_env pcs_ch have_object
 	; (stub_h_exists, stub_c_exists, maybe_bcos)
 		<- hscBackEnd dflags tidy_result
 
-      	  -- and the answer is ...
-	; return (HscRecomp pcs_final
-			    final_details
+      	  -- And the answer is ...
+	; dumpIfaceStats hsc_env
+
+	; return (HscRecomp final_details
+			    final_globals
 			    final_iface
                             stub_h_exists stub_c_exists
       			    maybe_bcos)
       	 }}
 
-hscCoreFrontEnd hsc_env pcs_ch location = do {
+hscCoreFrontEnd hsc_env location = do {
  	    -------------------
  	    -- PARSE
  	    -------------------
 	; inp <- readFile (expectJust "hscCoreFrontEnd:hspp" (ml_hspp_file location))
 	; case parseCore inp 1 of
-	    FailP s        -> hPutStrLn stderr s >> return (Left (HscFail pcs_ch));
+	    FailP s        -> hPutStrLn stderr s >> return (Left HscFail);
 	    OkP rdr_module -> do {
     
  	    -------------------
  	    -- RENAME and TYPECHECK
  	    -------------------
-	; (pcs_tc, maybe_tc_result) <- _scc_ "TypeCheck" 
-			     	       tcRnExtCore hsc_env pcs_ch rdr_module
+	; maybe_tc_result <- _scc_ "TypeCheck" 
+			      tcRnExtCore hsc_env rdr_module
 	; case maybe_tc_result of {
-      	     Nothing       -> return (Left  (HscFail pcs_tc));
-      	     Just mod_guts -> return (Right (pcs_tc, mod_guts))
+      	     Nothing       -> return (Left  HscFail);
+      	     Just mod_guts -> return (Right mod_guts)
 					-- No desugaring to do!
 	}}}
 	 
 
-hscFrontEnd hsc_env pcs_ch location = do {
+hscFrontEnd hsc_env location = do {
  	    -------------------
  	    -- PARSE
  	    -------------------
@@ -307,26 +338,26 @@ hscFrontEnd hsc_env pcs_ch location = do {
                              (expectJust "hscFrontEnd:hspp" (ml_hspp_file location))
 
 	; case maybe_parsed of {
-      	     Nothing -> return (Left (HscFail pcs_ch));
+      	     Nothing -> return (Left HscFail);
       	     Just rdr_module -> do {
     
  	    -------------------
  	    -- RENAME and TYPECHECK
  	    -------------------
-	; (pcs_tc, maybe_tc_result) <- _scc_ "Typecheck-Rename" 
-				        tcRnModule hsc_env pcs_ch rdr_module
+	; maybe_tc_result <- _scc_ "Typecheck-Rename" 
+				        tcRnModule hsc_env rdr_module
 	; case maybe_tc_result of {
-      	     Nothing -> return (Left (HscFail pcs_ch));
+      	     Nothing -> return (Left HscFail);
       	     Just tc_result -> do {
 
  	    -------------------
  	    -- DESUGAR
  	    -------------------
 	; maybe_ds_result <- _scc_ "DeSugar" 
-			       deSugar hsc_env pcs_tc tc_result
+		 	     deSugar hsc_env tc_result
 	; case maybe_ds_result of
-	    Nothing        -> return (Left (HscFail pcs_ch));
-	    Just ds_result -> return (Right (pcs_tc, ds_result));
+	    Nothing        -> return (Left HscFail);
+	    Just ds_result -> return (Right ds_result);
 	}}}}}
 
 
@@ -393,7 +424,7 @@ myParseModule dflags src_filename
 
       case unP parseModule (mkPState buf loc dflags) of {
 
-	PFailed l1 l2 err -> do { hPutStrLn stderr (showPFailed l1 l2 err);
+	PFailed l1 l2 err -> do { hPutStrLn stderr (showSDoc (showPFailed l1 l2 err));
                             	  return Nothing };
 
 	POk _ rdr_module -> do {
@@ -456,50 +487,47 @@ A naked expression returns a singleton Name [it].
 #ifdef GHCI
 hscStmt		-- Compile a stmt all the way to an HValue, but don't run it
   :: HscEnv
-  -> PersistentCompilerState    -- IN: persistent compiler state
   -> InteractiveContext		-- Context for compiling
   -> String			-- The statement
-  -> IO ( PersistentCompilerState, 
-	  Maybe (InteractiveContext, [Name], HValue) )
+  -> IO (Maybe (InteractiveContext, [Name], HValue))
 
-hscStmt hsc_env pcs icontext stmt
+hscStmt hsc_env icontext stmt
   = do	{ maybe_stmt <- hscParseStmt (hsc_dflags hsc_env) stmt
 	; case maybe_stmt of {
-      	     Nothing -> return (pcs, Nothing) ;
+      	     Nothing -> return Nothing ;
       	     Just parsed_stmt -> do {
 
 		-- Rename and typecheck it
-	  (pcs1, maybe_tc_result)
-		 <- tcRnStmt hsc_env pcs icontext parsed_stmt
+	  maybe_tc_result
+		 <- tcRnStmt hsc_env icontext parsed_stmt
 
 	; case maybe_tc_result of {
-		Nothing -> return (pcs1, Nothing) ;
+		Nothing -> return Nothing ;
 		Just (new_ic, bound_names, tc_expr) -> do {
 
 		-- Then desugar, code gen, and link it
-	; hval <- compileExpr hsc_env pcs1 iNTERACTIVE 
+	; hval <- compileExpr hsc_env iNTERACTIVE 
 			      (ic_rn_gbl_env new_ic) 
 			      (ic_type_env new_ic)
 			      tc_expr
 
-	; return (pcs1, Just (new_ic, bound_names, hval))
+	; return (Just (new_ic, bound_names, hval))
 	}}}}}
 
 hscTcExpr	-- Typecheck an expression (but don't run it)
   :: HscEnv
-  -> PersistentCompilerState    -- IN: persistent compiler state
   -> InteractiveContext		-- Context for compiling
   -> String			-- The expression
-  -> IO (PersistentCompilerState, Maybe Type)
+  -> IO (Maybe Type)
 
-hscTcExpr hsc_env pcs icontext expr
+hscTcExpr hsc_env icontext expr
   = do	{ maybe_stmt <- hscParseStmt (hsc_dflags hsc_env) expr
 	; case maybe_stmt of {
 	     Just (ExprStmt expr _ _) 
-			-> tcRnExpr hsc_env pcs icontext expr ;
+			-> tcRnExpr hsc_env icontext expr ;
 	     Just other -> do { hPutStrLn stderr ("not an expression: `" ++ expr ++ "'") ;
-			        return (pcs, Nothing) } ;
-      	     Nothing    -> return (pcs, Nothing) } }
+			        return Nothing } ;
+      	     Nothing    -> return Nothing } }
 \end{code}
 
 \begin{code}
@@ -514,7 +542,7 @@ hscParseStmt dflags str
 
       case unP parseStmt (mkPState buf loc dflags) of {
 
-	PFailed l1 l2 err -> do { hPutStrLn stderr (showPFailed l1 l2 err);	
+	PFailed l1 l2 err -> do { hPutStrLn stderr (showSDoc (showPFailed l1 l2 err));	
                                   return Nothing };
 
 	-- no stmt: the line consisted of just space or comments
@@ -540,26 +568,21 @@ hscParseStmt dflags str
 #ifdef GHCI
 hscThing -- like hscStmt, but deals with a single identifier
   :: HscEnv
-  -> PersistentCompilerState    -- IN: persistent compiler state
   -> InteractiveContext		-- Context for compiling
   -> String			-- The identifier
-  -> IO ( PersistentCompilerState,
-	  [TyThing] )
+  -> IO [(IfaceDecl, Fixity)]
 
-hscThing hsc_env pcs0 ic str
-   = do let dflags 	   = hsc_dflags hsc_env
-
-	maybe_rdr_name <- myParseIdentifier dflags str
+hscThing hsc_env ic str
+   = do maybe_rdr_name <- myParseIdentifier (hsc_dflags hsc_env) str
 	case maybe_rdr_name of {
-	  Nothing -> return (pcs0, []);
+	  Nothing -> return [];
 	  Just rdr_name -> do
 
-	(pcs1, maybe_tc_result) <- 
-	   tcRnThing hsc_env pcs0 ic rdr_name
+	maybe_tc_result <- tcRnThing hsc_env ic rdr_name
 
 	case maybe_tc_result of {
-	     Nothing     -> return (pcs1, []) ;
-	     Just things -> return (pcs1, things)
+	     Nothing     -> return [] ;
+	     Just things -> return things
  	}}
 
 myParseIdentifier dflags str
@@ -568,7 +591,7 @@ myParseIdentifier dflags str
        let loc  = mkSrcLoc FSLIT("<interactive>") 1 0
        case unP parseIdentifier (mkPState buf loc dflags) of
 
-	  PFailed l1 l2 err -> do { hPutStrLn stderr (showPFailed l1 l2 err);
+	  PFailed l1 l2 err -> do { hPutStrLn stderr (showSDoc (showPFailed l1 l2 err));
                                     return Nothing }
 
 	  POk _ rdr_name -> return (Just rdr_name)
@@ -584,20 +607,19 @@ myParseIdentifier dflags str
 \begin{code}
 #ifdef GHCI
 compileExpr :: HscEnv 
-	    -> PersistentCompilerState
 	    -> Module -> GlobalRdrEnv -> TypeEnv
 	    -> TypecheckedHsExpr
 	    -> IO HValue
 
-compileExpr hsc_env pcs this_mod rdr_env type_env tc_expr
+compileExpr hsc_env this_mod rdr_env type_env tc_expr
   = do	{ let { dflags  = hsc_dflags hsc_env ;
 		lint_on = dopt Opt_DoCoreLinting dflags }
 	      
 	 	-- Desugar it
-	; ds_expr <- deSugarExpr hsc_env pcs this_mod rdr_env type_env tc_expr
+	; ds_expr <- deSugarExpr hsc_env this_mod rdr_env type_env tc_expr
 	
 		-- Flatten it
-	; flat_expr <- flattenExpr hsc_env pcs ds_expr
+	; flat_expr <- flattenExpr hsc_env ds_expr
 
 		-- Simplify it
 	; simpl_expr <- simplifyExpr dflags flat_expr
@@ -621,7 +643,7 @@ compileExpr hsc_env pcs this_mod rdr_env type_env tc_expr
 	; bcos <- coreExprToBCOs dflags prepd_expr
 
 		-- link it
-	; hval <- linkExpr hsc_env pcs bcos
+	; hval <- linkExpr hsc_env bcos
 
 	; return hval
      }
@@ -631,40 +653,19 @@ compileExpr hsc_env pcs this_mod rdr_env type_env tc_expr
 
 %************************************************************************
 %*									*
-\subsection{Initial persistent state}
+	Statistics on reading interfaces
 %*									*
 %************************************************************************
 
 \begin{code}
-initPersistentCompilerState :: IO PersistentCompilerState
-initPersistentCompilerState 
-  = do nc <- initNameCache
-       return (
-        PCS { pcs_EPS = initExternalPackageState,
-	      pcs_nc  = nc })
-
-initNameCache :: IO NameCache
-  = do us <- mkSplitUniqSupply 'r'
-       return (NameCache { nsUniqs = us,
-			   nsNames = initOrigNames,
-			   nsIPs   = emptyFM })
-
-initExternalPackageState :: ExternalPackageState
-initExternalPackageState
-  = emptyExternalPackageState { 
-      eps_rules  = foldr add_rule (emptyBag, 0) builtinRules,
-      eps_PTE    = wiredInThingEnv,
-    }
+dumpIfaceStats :: HscEnv -> IO ()
+dumpIfaceStats hsc_env
+  = do	{ eps <- readIORef (hsc_EPS hsc_env)
+	; dumpIfSet (dump_if_trace || dump_rn_stats)
+	      	    "Interface statistics"
+	      	    (ifaceStats eps) }
   where
-    add_rule (name,rule) (rules, n_slurped)
-	 = (gated_decl `consBag` rules, n_slurped)
-	where
-	   gated_decl = (gate_fn, (mod, IfaceRuleOut rdr_name rule))
-	   mod	      = nameModule name
-	   rdr_name   = nameRdrName name	-- Seems a bit of a hack to go back
-						-- to the RdrName
-	   gate_fn vis_fn = vis_fn name		-- Load the rule whenever name is visible
-
-initOrigNames :: OrigNameCache
-initOrigNames = foldl extendOrigNameCache emptyModuleEnv knownKeyNames 
+    dflags = hsc_dflags hsc_env
+    dump_rn_stats = dopt Opt_D_dump_rn_stats dflags
+    dump_if_trace = dopt Opt_D_dump_if_trace dflags
 \end{code}

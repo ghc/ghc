@@ -19,10 +19,9 @@ import Literal		( Literal(..), word2IntLit )
 import MachOp		( MachOp(..) )
 import PrimRep		( PrimRep(..), getPrimRepSizeInBytes )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, UniqSM )
-import Constants	( mIN_INTLIKE, mIN_CHARLIKE, uF_UPDATEE, bLOCK_SIZE,
+import Constants	( mIN_INTLIKE, mIN_CHARLIKE, bLOCK_SIZE,
 			  rESERVED_STACK_WORDS )
 import CLabel		( mkIntlikeClosureLabel, mkCharlikeClosureLabel,
-			  mkMAP_FROZEN_infoLabel, 
 			  mkForeignLabel )
 import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..),
 			  CCallConv(..), playSafe, playThreadSafe )
@@ -229,8 +228,6 @@ iNTLIKE_closure = StCLbl mkIntlikeClosureLabel
 
 cHARLIKE_closure :: StixExpr
 cHARLIKE_closure = StCLbl mkCharlikeClosureLabel
-
-mutArrPtrsFrozen_info = StCLbl mkMAP_FROZEN_infoLabel
 
 -- these are the sizes of charLike and intLike closures, in _bytes_.
 charLikeSize = (fixedHdrSize + 1) * (getPrimRepSizeInBytes PtrRep)

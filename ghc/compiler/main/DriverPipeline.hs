@@ -41,6 +41,7 @@ import Module
 import ErrUtils
 import CmdLineOpts
 import Config
+import RdrName		( GlobalRdrEnv )
 import Panic
 import Util
 import BasicTypes	( SuccessFlag(..) )
@@ -95,29 +96,29 @@ preprocess filename =
 
 -- NB.  No old interface can also mean that the source has changed.
 
-compile :: GhciMode                -- distinguish batch from interactive
+compile :: HscEnv
 	-> Module
 	-> ModLocation
 	-> Bool			   -- True <=> source unchanged
 	-> Bool			   -- True <=> have object
         -> Maybe ModIface          -- old interface, if available
-        -> HomePackageTable        -- For home-module stuff
-        -> PersistentCompilerState -- persistent compiler state
         -> IO CompResult
 
 data CompResult
-   = CompOK   PersistentCompilerState	-- Updated PCS
-              ModDetails 		-- New details
+   = CompOK   ModDetails 		-- New details
+	      (Maybe GlobalRdrEnv)	-- Lexical environment for the module
+					-- (Maybe because we may have loaded it from
+					--  its precompiled interface)
               ModIface			-- New iface
               (Maybe Linkable)	-- New code; Nothing => compilation was not reqd
 		                --			(old code is still valid)
 
-   | CompErrs PersistentCompilerState	-- Updated PCS
+   | CompErrs 
 
 
-compile ghci_mode this_mod location
+compile hsc_env this_mod location
 	source_unchanged have_object 
-	old_iface hpt pcs = do 
+	old_iface = do 
 
    dyn_flags <- restoreDynFlags		-- Restore to the state of the last save
 
@@ -154,20 +155,18 @@ compile ghci_mode this_mod location
    -- -no-recomp should also work with --make
    do_recomp <- readIORef v_Recomp
    let source_unchanged' = source_unchanged && do_recomp
-       hsc_env = HscEnv { hsc_mode = ghci_mode,
-			  hsc_dflags = dyn_flags',
-			  hsc_HPT    = hpt }
+       hsc_env' = hsc_env { hsc_dflags = dyn_flags' }
 
    -- run the compiler
-   hsc_result <- hscMain hsc_env pcs this_mod location
+   hsc_result <- hscMain hsc_env' this_mod location
 			 source_unchanged' have_object old_iface
 
    case hsc_result of
-      HscFail pcs -> return (CompErrs pcs)
+      HscFail -> return CompErrs
 
-      HscNoRecomp pcs details iface -> return (CompOK pcs details iface Nothing)
+      HscNoRecomp details iface -> return (CompOK details Nothing iface Nothing)
 
-      HscRecomp pcs details iface
+      HscRecomp details rdr_env iface
 	stub_h_exists stub_c_exists maybe_interpreted_code -> do
 	   let 
 	   maybe_stub_o <- compileStub dyn_flags' stub_c_exists
@@ -202,7 +201,7 @@ compile ghci_mode this_mod location
 	   let linkable = LM unlinked_time mod_name
 			     (hs_unlinked ++ stub_unlinked)
 
-	   return (CompOK pcs details iface (Just linkable))
+	   return (CompOK details rdr_env iface (Just linkable))
 
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support)
@@ -620,14 +619,10 @@ runPhase Hsc basename suff input_fn get_output_fn _maybe_loc = do
 		   		     hscStubCOutName = basename ++ "_stub.c",
 				     hscStubHOutName = basename ++ "_stub.h",
 				     extCoreName = basename ++ ".hcr" }
-	    hsc_env = HscEnv { hsc_mode = OneShot,
-			       hsc_dflags = dyn_flags',
-			       hsc_HPT    = emptyHomePackageTable }
-			
+	hsc_env <- newHscEnv OneShot dyn_flags'
 
   -- run the compiler!
-        pcs <- initPersistentCompilerState
-	result <- hscMain hsc_env pcs mod
+	result <- hscMain hsc_env mod
 			  location{ ml_hspp_file=Just input_fn }
 			  source_unchanged
 			  False
@@ -635,13 +630,14 @@ runPhase Hsc basename suff input_fn get_output_fn _maybe_loc = do
 
 	case result of
 
-	    HscFail pcs -> throwDyn (PhaseFailed "hsc" (ExitFailure 1))
+	    HscFail -> throwDyn (PhaseFailed "hsc" (ExitFailure 1))
 
-            HscNoRecomp pcs details iface -> do
+            HscNoRecomp details iface -> do
 		SysTools.touch "Touching object file" o_file
 		return (Nothing, Just location, output_fn)
 
-	    HscRecomp _pcs _details _iface stub_h_exists stub_c_exists
+	    HscRecomp _details _rdr_env _iface 
+		      stub_h_exists stub_c_exists
 		      _maybe_interpreted_code -> do
 
 		-- deal with stubs

@@ -1,4 +1,5 @@
 module MkId where
 
-mkDataConWorkId :: Name.Name -> DataCon.DataCon -> Var.Id
+mkDataConIds :: Name.Name -> Name.Name -> DataCon.DataCon -> DataCon.DataConIds
+
 

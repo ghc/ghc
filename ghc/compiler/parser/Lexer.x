@@ -1084,8 +1084,7 @@ data ParseResult a
 			-- show this span, e.g. by highlighting it.
 	Message		-- The error message
 
-showPFailed loc1 loc2 err
- = showSDoc (hcat [ppr loc1, text ": ", err])
+showPFailed loc1 loc2 err = hcat [ppr loc1, text ": ", err]
 
 data PState = PState { 
 	buffer	   :: StringBuffer,

@@ -201,7 +201,7 @@ matchEnvStack	:: [Id] 	-- x1..xn
 		-> CoreExpr 	-- e
 		-> DsM CoreExpr
 matchEnvStack env_ids stack_ids body
-  = getUniqSupplyDs			`thenDs` \ uniqs ->
+  = newUniqueSupply			`thenDs` \ uniqs ->
     newSysLocalDs (mkTupleType env_ids)	`thenDs` \ tup_var ->
     matchVarStack tup_var stack_ids 
 		  (coreCaseTuple uniqs tup_var env_ids body)
@@ -358,7 +358,7 @@ dsCmd ids local_vars env_ids stack res_ty (HsApp cmd arg)
     in
     dsfixCmd ids local_vars stack' res_ty cmd
 				`thenDs` \ (core_cmd, free_vars, env_ids') ->
-    mapDs newSysLocalDs stack	`thenDs` \ stack_ids ->
+    mappM newSysLocalDs stack	`thenDs` \ stack_ids ->
     newSysLocalDs arg_ty	`thenDs` \ arg_id ->
     -- push the argument expression onto the stack
     let
@@ -392,7 +392,7 @@ dsCmd ids local_vars env_ids stack res_ty
     in
     dsfixCmd ids local_vars' stack' res_ty body
 				`thenDs` \ (core_body, free_vars, env_ids') ->
-    mapDs newSysLocalDs stack	`thenDs` \ stack_ids ->
+    mappM newSysLocalDs stack	`thenDs` \ stack_ids ->
 
     -- the expression is built from the inside out, so the actions
     -- are presented in reverse order
@@ -433,7 +433,7 @@ dsCmd ids local_vars env_ids stack res_ty (HsIf cond then_cmd else_cmd _loc)
 				`thenDs` \ (core_then, fvs_then, then_ids) ->
     dsfixCmd ids local_vars stack res_ty else_cmd
 				`thenDs` \ (core_else, fvs_else, else_ids) ->
-    mapDs newSysLocalDs stack		`thenDs` \ stack_ids ->
+    mappM newSysLocalDs stack		`thenDs` \ stack_ids ->
     dsLookupTyCon eitherTyConName	`thenDs` \ either_con ->
     dsLookupDataCon leftDataConName	`thenDs` \ left_con ->
     dsLookupDataCon rightDataConName	`thenDs` \ right_con ->
@@ -487,7 +487,7 @@ case bodies, containing the following fields:
 \begin{code}
 dsCmd ids local_vars env_ids stack res_ty (HsCase exp matches src_loc)
   = dsExpr exp				`thenDs` \ core_exp ->
-    mapDs newSysLocalDs stack		`thenDs` \ stack_ids ->
+    mappM newSysLocalDs stack		`thenDs` \ stack_ids ->
 
     -- Extract and desugar the leaf commands in the case, building tuple
     -- expressions that will (after tagging) replace these leaves
@@ -502,7 +502,7 @@ dsCmd ids local_vars env_ids stack res_ty (HsCase exp matches src_loc)
 		      envStackType leaf_ids stack,
 		      core_leaf)
     in
-    mapDs make_branch leaves		`thenDs` \ branches ->
+    mappM make_branch leaves		`thenDs` \ branches ->
     dsLookupTyCon eitherTyConName	`thenDs` \ either_con ->
     dsLookupDataCon leftDataConName	`thenDs` \ left_con ->
     dsLookupDataCon rightDataConName	`thenDs` \ right_con ->
@@ -536,7 +536,7 @@ dsCmd ids local_vars env_ids stack res_ty (HsCase exp matches src_loc)
     matchEnvStack env_ids stack_ids core_body
 					`thenDs` \ core_matches ->
     returnDs(do_map_arrow ids in_ty sum_ty res_ty core_matches core_choices,
-	fvs_exp `unionVarSet` fvs_alts)
+	     fvs_exp `unionVarSet` fvs_alts)
 
 --	A | ys |- c :: [ts] t
 --	----------------------------------
@@ -551,7 +551,7 @@ dsCmd ids local_vars env_ids stack res_ty (HsLet binds body)
     in
     dsfixCmd ids local_vars' stack res_ty body
 				`thenDs` \ (core_body, free_vars, env_ids') ->
-    mapDs newSysLocalDs stack		`thenDs` \ stack_ids ->
+    mappM newSysLocalDs stack		`thenDs` \ stack_ids ->
     -- build a new environment, plus the stack, using the let bindings
     dsLet binds (buildEnvStack env_ids' stack_ids)
 					`thenDs` \ core_binds ->
@@ -598,7 +598,7 @@ dsTrimCmdArg local_vars env_ids (HsCmdTop cmd stack cmd_ty ids)
   = mkCmdEnv ids			`thenDs` \ meth_ids ->
     dsfixCmd meth_ids local_vars stack cmd_ty cmd
 				`thenDs` \ (core_cmd, free_vars, env_ids') ->
-    mapDs newSysLocalDs stack		`thenDs` \ stack_ids ->
+    mappM newSysLocalDs stack		`thenDs` \ stack_ids ->
     matchEnvStack env_ids stack_ids (buildEnvStack env_ids' stack_ids)
 					`thenDs` \ trim_code ->
     let
@@ -751,7 +751,7 @@ dsCmdStmt ids local_vars env_ids out_ids (BindStmt pat cmd _loc)
 
     selectMatchVar pat			`thenDs` \ pat_id ->
     newSysLocalDs env_ty2		`thenDs` \ env_id ->
-    getUniqSupplyDs			`thenDs` \ uniqs ->
+    newUniqueSupply			`thenDs` \ uniqs ->
     let
 	after_c_ty = mkCorePairTy pat_ty env_ty2
 	out_ty = mkTupleType out_ids
@@ -818,7 +818,7 @@ dsCmdStmt ids local_vars env_ids out_ids (RecStmt stmts later_ids rec_ids rhss)
 
     -- post_loop_fn = \((later_ids),(env2_ids)) -> (out_ids)
 
-    getUniqSupplyDs		`thenDs` \ uniqs ->
+    newUniqueSupply		`thenDs` \ uniqs ->
     newSysLocalDs env2_ty	`thenDs` \ env2_id ->
     let
 	later_ty = mkTupleType later_ids
@@ -874,7 +874,7 @@ dsRecCmd ids local_vars stmts later_ids rec_ids rhss
 
     -- mk_pair_fn = \ (out_ids) -> ((later_ids),(rhss))
 
-    mapDs dsExpr rhss		`thenDs` \ core_rhss ->
+    mappM dsExpr rhss		`thenDs` \ core_rhss ->
     let
 	later_tuple = mkTupleExpr later_ids
 	later_ty = mkTupleType later_ids

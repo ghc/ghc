@@ -8,7 +8,7 @@ module TidyPgm( tidyCorePgm, tidyCoreExpr ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
+import CmdLineOpts	( DynFlag(..), dopt )
 import CoreSyn
 import CoreUnfold	( noUnfolding, mkTopUnfolding )
 import CoreFVs		( ruleLhsFreeIds, ruleRhsFreeVars, exprSomeFreeVars )
@@ -26,16 +26,15 @@ import Id		( idType, idInfo, idName, idCoreRules,
 import IdInfo		{- loads of stuff -}
 import NewDemand	( isBottomingSig, topSig )
 import BasicTypes	( Arity, isNeverActive )
-import Name		( getOccName, nameOccName, mkInternalName,
-		  	  localiseName, isExternalName, nameSrcLoc
+import Name		( Name, getOccName, nameOccName, mkInternalName,
+		  	  localiseName, isExternalName, nameSrcLoc, nameParent_maybe
 			)
-import RnEnv		( lookupOrigNameCache, newExternalName )
+import IfaceEnv		( allocateGlobalBinder )
 import NameEnv		( lookupNameEnv, filterNameEnv )
 import OccName		( TidyOccEnv, initTidyOccEnv, tidyOccName )
 import Type		( tidyTopType )
 import Module		( Module )
-import HscTypes		( PersistentCompilerState( pcs_nc ), 
-			  NameCache( nsNames, nsUniqs ),
+import HscTypes		( HscEnv(..), NameCache( nsUniqs ),
 			  TypeEnv, extendTypeEnvList, typeEnvIds,
 			  ModGuts(..), ModGuts, TyThing(..)
 			)
@@ -44,9 +43,9 @@ import ErrUtils		( showPass, dumpIfSet_core )
 import UniqFM		( mapUFM )
 import UniqSupply	( splitUniqSupply, uniqFromSupply )
 import List		( partition )
-import Util		( mapAccumL )
 import Maybe		( isJust )
 import Outputable
+import DATA_IOREF	( IORef, readIORef, writeIORef )
 import FastTypes  hiding ( fastOr )
 \end{code}
 
@@ -86,7 +85,7 @@ binder
     [Even non-exported things need system-wide Uniques because the
     byte-code generator builds a single Name->BCO symbol table.]
 
-    We use the NameCache kept in the PersistentCompilerState as the
+    We use the NameCache kept in the HscEnv as the
     source of such system-wide uniques.
 
     For external Ids, use the original-name cache in the NameCache
@@ -118,16 +117,15 @@ throughout, including in unfoldings.  We also tidy binders in
 RHSs, so that they print nicely in interfaces.
 
 \begin{code}
-tidyCorePgm :: DynFlags
-	    -> PersistentCompilerState
-	    -> ModGuts
-	    -> IO (PersistentCompilerState, ModGuts)
+tidyCorePgm :: HscEnv -> ModGuts -> IO ModGuts
 
-tidyCorePgm dflags pcs
+tidyCorePgm hsc_env
 	    mod_impl@(ModGuts { mg_module = mod, 
 				mg_types = env_tc, mg_insts = insts_tc, 
 				mg_binds = binds_in, mg_rules = orphans_in })
-  = do	{ showPass dflags "Tidy Core"
+  = do	{ let { dflags = hsc_dflags hsc_env
+	      ; nc_var = hsc_NC hsc_env }
+	; showPass dflags "Tidy Core"
 
 	; let omit_iface_prags = dopt Opt_OmitInterfacePragmas dflags
 	; let ext_ids   = findExternalSet   omit_iface_prags binds_in orphans_in
@@ -146,9 +144,8 @@ tidyCorePgm dflags pcs
 	-- The second exported decl must 'get' the name 'f', so we
 	-- have to put 'f' in the avoids list before we get to the first
 	-- decl.  tidyTopId then does a no-op on exported binders.
-	; let   orig_ns       = pcs_nc pcs
-		init_tidy_env = (orig_ns, initTidyOccEnv avoids, emptyVarEnv)
-		avoids	      = [getOccName name | bndr <- typeEnvIds env_tc,
+	; let   init_env = (initTidyOccEnv avoids, emptyVarEnv)
+		avoids   = [getOccName name | bndr <- typeEnvIds env_tc,
 						   let name = idName bndr,
 						   isExternalName name]
 		-- In computing our "avoids" list, we must include
@@ -158,13 +155,10 @@ tidyCorePgm dflags pcs
 		-- since their names are "taken".
 		-- The type environment is a convenient source of such things.
 
-	; let ((orig_ns', occ_env, subst_env), tidy_binds) 
-	       		= mapAccumL (tidyTopBind mod ext_ids) 
-				    init_tidy_env binds_in
+	; (final_env, tidy_binds)
+		<- tidyTopBinds mod nc_var ext_ids init_env binds_in
 
-	; let tidy_rules = tidyIdRules (occ_env,subst_env) ext_rules
-
-	; let pcs' = pcs { pcs_nc = orig_ns' }
+	; let tidy_rules = tidyIdRules final_env ext_rules
 
 	; let tidy_type_env = mkFinalTypeEnv omit_iface_prags env_tc tidy_binds
 
@@ -173,7 +167,8 @@ tidyCorePgm dflags pcs
 		-- to lookup the id in the TypeEnv too, because
 		-- those Ids have had their IdInfo stripped if
 		-- necessary.
-	; let lookup_dfun_id id = 
+	; let (_, subst_env ) = final_env
+	      lookup_dfun_id id = 
 		 case lookupVarEnv subst_env id of
 		   Nothing -> dfun_panic
 		   Just id -> 
@@ -195,7 +190,7 @@ tidyCorePgm dflags pcs
 		"Tidy Core Rules"
 		(pprIdRules tidy_rules)
 
-	; return (pcs', tidy_result)
+	; return tidy_result
 	}
 
 tidyCoreExpr :: CoreExpr -> IO CoreExpr
@@ -220,7 +215,7 @@ mkFinalTypeEnv :: Bool		-- Omit interface pragmas
 --	b) removing all Ids, 
 --	c) adding Ids with correct IdInfo, including unfoldings,
 --		gotten from the bindings
--- From (c) we keep only those Ids with Global names;
+-- From (c) we keep only those Ids with External names;
 --	    the CoreTidy pass makes sure these are all and only
 --	    the externally-accessible ones
 -- This truncates the type environment to include only the 
@@ -397,10 +392,8 @@ addExternal omit_iface_prags (id,rhs) needed
 
 
 \begin{code}
-type TopTidyEnv = (NameCache, TidyOccEnv, VarEnv Var)
-
 -- TopTidyEnv: when tidying we need to know
---   * ns: The NameCache, containing a unique supply and any pre-ordained Names.  
+--   * nc_var: The NameCache, containing a unique supply and any pre-ordained Names.  
 --	  These may have arisen because the
 --	  renamer read in an interface file mentioning M.$wf, say,
 --	  and assigned it unique r77.  If, on this compilation, we've
@@ -412,91 +405,151 @@ type TopTidyEnv = (NameCache, TidyOccEnv, VarEnv Var)
 --     are 'used'
 --
 --   * subst_env: A Var->Var mapping that substitutes the new Var for the old
-\end{code}
 
-
-\begin{code}
-tidyTopBind :: Module
-	    -> IdEnv Bool	-- Domain = Ids that should be external
+tidyTopBinds :: Module
+	     -> IORef NameCache	-- For allocating new unique names
+	     -> IdEnv Bool	-- Domain = Ids that should be external
 				-- True <=> their unfolding is external too
-	    -> TopTidyEnv -> CoreBind
-	    -> (TopTidyEnv, CoreBind)
+	     -> TidyEnv -> [CoreBind]
+	     -> IO (TidyEnv, [CoreBind])
+tidyTopBinds mod nc_var ext_ids tidy_env []
+  = return (tidy_env, [])
 
-tidyTopBind mod ext_ids top_tidy_env@(_,_,subst1) (NonRec bndr rhs)
-  = ((orig,occ,subst) , NonRec bndr' rhs')
+tidyTopBinds mod nc_var ext_ids tidy_env (b:bs)
+  = do	{ (tidy_env1, b')  <- tidyTopBind  mod nc_var ext_ids tidy_env b
+	; (tidy_env2, bs') <- tidyTopBinds mod nc_var ext_ids tidy_env1 bs
+	; return (tidy_env2, b':bs') }
+
+------------------------
+tidyTopBind :: Module
+	     -> IORef NameCache	-- For allocating new unique names
+	     -> IdEnv Bool	-- Domain = Ids that should be external
+				-- True <=> their unfolding is external too
+	     -> TidyEnv -> CoreBind
+	     -> IO (TidyEnv, CoreBind)
+
+tidyTopBind mod nc_var ext_ids tidy_env1@(occ_env1,subst1) (NonRec bndr rhs)
+  = do	{ (occ_env2, name') <- tidyTopName mod nc_var ext_ids occ_env1 bndr
+	; let	{ (bndr', rhs') = tidyTopPair ext_ids tidy_env2 caf_info name' (bndr, rhs)
+		; subst2        = extendVarEnv subst1 bndr bndr'
+		; tidy_env2     = (occ_env2, subst2) }
+	; return (tidy_env2, NonRec bndr' rhs') }
   where
-    ((orig,occ,subst), bndr')
-	 = tidyTopBinder mod ext_ids caf_info
-			 rec_tidy_env rhs rhs' top_tidy_env bndr
-    rec_tidy_env = (occ,subst)
-    rhs' = tidyExpr rec_tidy_env rhs
-    caf_info = hasCafRefs subst1 (idArity bndr') rhs'
+    caf_info = hasCafRefs subst1 (idArity bndr) rhs
 
-tidyTopBind mod ext_ids top_tidy_env@(_,_,subst1) (Rec prs)
-  = (final_env, Rec prs')
+tidyTopBind mod nc_var ext_ids tidy_env1@(occ_env1,subst1) (Rec prs)
+  = do	{ (occ_env2, names') <- tidyTopNames mod nc_var ext_ids occ_env1 bndrs
+	; let	{ prs'      = zipWith (tidyTopPair ext_ids tidy_env2 caf_info)
+				      names' prs
+		; subst2    = extendVarEnvList subst1 (bndrs `zip` map fst prs')
+		; tidy_env2 = (occ_env2, subst2) }
+	; return (tidy_env2, Rec prs') }
   where
-    (final_env@(_,occ,subst), prs') = mapAccumL do_one top_tidy_env prs
-    rec_tidy_env = (occ,subst)
-
-    do_one top_tidy_env (bndr,rhs) 
-	= ((orig,occ,subst), (bndr',rhs'))
-	where
-	((orig,occ,subst), bndr')
-	   = tidyTopBinder mod ext_ids caf_info
-		rec_tidy_env rhs rhs' top_tidy_env bndr
-
-        rhs' = tidyExpr rec_tidy_env rhs
+    bndrs = map fst prs
 
 	-- the CafInfo for a recursive group says whether *any* rhs in
 	-- the group may refer indirectly to a CAF (because then, they all do).
     caf_info 
 	| or [ mayHaveCafRefs (hasCafRefs subst1 (idArity bndr) rhs)
 	     | (bndr,rhs) <- prs ] = MayHaveCafRefs
-	| otherwise = NoCafRefs
+	| otherwise 		   = NoCafRefs
 
-tidyTopBinder :: Module -> IdEnv Bool -> CafInfo
-	      -> TidyEnv 	-- The TidyEnv is used to tidy the IdInfo
-	      -> CoreExpr	-- RHS *before* tidying
-	      -> CoreExpr	-- RHS *after* tidying
-			-- The TidyEnv and the after-tidying RHS are
-			-- both are knot-tied: don't look at them!
-	      -> TopTidyEnv -> Id -> (TopTidyEnv, Id)
-  -- NB: tidyTopBinder doesn't affect the unique supply
+--------------------------------------------------------------------
+--		tidyTopName
+-- This is where we set names to local/global based on whether they really are 
+-- externally visible (see comment at the top of this module).  If the name
+-- was previously local, we have to give it a unique occurrence name if
+-- we intend to externalise it.
+tidyTopNames mod nc_var ext_ids occ_env [] = return (occ_env, [])
+tidyTopNames mod nc_var ext_ids occ_env (id:ids)
+  = do	{ (occ_env1, name)  <- tidyTopName  mod nc_var ext_ids occ_env id
+  	; (occ_env2, names) <- tidyTopNames mod nc_var ext_ids occ_env1 ids
+	; return (occ_env2, name:names) }
 
-tidyTopBinder mod ext_ids caf_info rec_tidy_env rhs tidy_rhs
-	      env@(ns2, occ_env2, subst_env2) id
+tidyTopName :: Module -> IORef NameCache -> VarEnv Bool -> TidyOccEnv
+	    -> Id -> IO (TidyOccEnv, Name)
+tidyTopName mod nc_var ext_ids occ_env id
+  | global && internal = return (occ_env, localiseName name)
+
+  | global && external = return (occ_env, name)
+	-- Global names are assumed to have been allocated by the renamer,
+	-- so they already have the "right" unique
+	-- And it's a system-wide unique too
+
+  -- Now we get to the real reason that all this is in the IO Monad:
+  -- we have to update the name cache in a nice atomic fashion
+
+  | local  && internal = do { nc <- readIORef nc_var
+			    ; let (nc', new_local_name) = mk_new_local nc
+			    ; writeIORef nc_var nc'
+			    ; return (occ_env', new_local_name) }
+	-- Even local, internal names must get a unique occurrence, because
+	-- if we do -split-objs we externalise the name later, in the code generator
+	--
+	-- Similarly, we must make sure it has a system-wide Unique, because
+	-- the byte-code generator builds a system-wide Name->BCO symbol table
+
+  | local  && external = do { nc <- readIORef nc_var
+			    ; let (nc', new_external_name) = mk_new_external nc
+			    ; writeIORef nc_var nc'
+			    ; return (occ_env', new_external_name) }
+  where
+    name	= idName id
+    external    = id `elemVarEnv` ext_ids
+    global	= isExternalName name
+    local	= not global
+    internal	= not external
+    mb_parent   = nameParent_maybe name
+    loc		= nameSrcLoc name
+
+    (occ_env', occ') = tidyOccName occ_env (nameOccName name)
+
+    mk_new_local nc = (nc { nsUniqs = us2 }, mkInternalName uniq occ' loc)
+ 		    where
+		      (us1, us2) = splitUniqSupply (nsUniqs nc)
+		      uniq	 = uniqFromSupply us1
+
+    mk_new_external nc = allocateGlobalBinder nc mod occ' mb_parent loc
+	-- If we want to externalise a currently-local name, check
+	-- whether we have already assigned a unique for it.
+	-- If so, use it; if not, extend the table.
+	-- All this is done by allcoateGlobalBinder.
+	-- This is needed when *re*-compiling a module in GHCi; we want to
+	-- use the same name for externally-visible things as we did before.
+
+
+-----------------------------------------------------------
+tidyTopPair :: VarEnv Bool
+	    -> TidyEnv 	-- The TidyEnv is used to tidy the IdInfo
+			-- It is knot-tied: don't look at it!
+	    -> CafInfo
+	    -> Name		-- New name
+	    -> (Id, CoreExpr) 	-- Binder and RHS before tidying
+	    -> (Id, CoreExpr)
 	-- This function is the heart of Step 2
 	-- The rec_tidy_env is the one to use for the IdInfo
 	-- It's necessary because when we are dealing with a recursive
 	-- group, a variable late in the group might be mentioned
 	-- in the IdInfo of one early in the group
 
-	-- The rhs is already tidied
-
-  = ASSERT(isLocalId id)  -- "all Ids defined in this module are local
-			  -- until the CoreTidy phase"  --GHC comentary
-    ((orig_env', occ_env', subst_env'), id')
+tidyTopPair ext_ids rhs_tidy_env caf_info name' (bndr, rhs)
+  = ASSERT(isLocalId bndr)  -- "all Ids defined in this module are local
+			    -- until the CoreTidy phase"  --GHC comentary
+    (bndr', rhs')
   where
-    (orig_env', occ_env', name') = tidyTopName mod ns2 occ_env2
-					       is_external
-					       (idName id)
-    ty'	   = tidyTopType (idType id)
-    idinfo = tidyTopIdInfo rec_tidy_env is_external 
-			   (idInfo id) unfold_info arity
-			   caf_info
-
-    id' = mkVanillaGlobal name' ty' idinfo
-
-    subst_env' = extendVarEnv subst_env2 id id'
-
-    maybe_external = lookupVarEnv ext_ids id
-    is_external    = isJust maybe_external
+    bndr'   = mkVanillaGlobal name' ty' idinfo'
+    ty'	    = tidyTopType (idType bndr)
+    rhs'    = tidyExpr rhs_tidy_env rhs
+    idinfo' = tidyTopIdInfo rhs_tidy_env (isJust maybe_external)
+			    (idInfo bndr) unfold_info arity
+			    caf_info
 
     -- Expose an unfolding if ext_ids tells us to
     -- Remember that ext_ids maps an Id to a Bool: 
     --	True to show the unfolding, False to hide it
+    maybe_external = lookupVarEnv ext_ids bndr
     show_unfold = maybe_external `orElse` False
-    unfold_info | show_unfold = mkTopUnfolding tidy_rhs
+    unfold_info | show_unfold = mkTopUnfolding rhs'
 		| otherwise   = noUnfolding
 
     -- Usually the Id will have an accurate arity on it, because
@@ -541,50 +594,6 @@ tidyTopIdInfo tidy_env is_external idinfo unfold_info arity caf_info
 		-- NB: we throw away the Rules
 		-- They have already been extracted by findExternalRules
 
-
--- This is where we set names to local/global based on whether they really are 
--- externally visible (see comment at the top of this module).  If the name
--- was previously local, we have to give it a unique occurrence name if
--- we intend to externalise it.
-tidyTopName mod ns occ_env external name
-  | global && internal = (ns, occ_env, localiseName name)
-
-  | global && external = (ns, occ_env, name)
-	-- Global names are assumed to have been allocated by the renamer,
-	-- so they already have the "right" unique
-	-- And it's a system-wide unique too
-
-  | local  && internal = (ns_w_local, occ_env', new_local_name)
-	-- Even local, internal names must get a unique occurrence, because
-	-- if we do -split-objs we externalise the name later, in the code generator
-	--
-	-- Similarly, we must make sure it has a system-wide Unique, because
-	-- the byte-code generator builds a system-wide Name->BCO symbol table
-
-  | local  && external = case lookupOrigNameCache ns_names mod occ' of
-			   Just orig -> (ns,	      occ_env', orig)
-			   Nothing   -> (ns_w_global, occ_env', new_external_name)
-	-- If we want to externalise a currently-local name, check
-	-- whether we have already assigned a unique for it.
-	-- If so, use it; if not, extend the table (ns_w_global).
-	-- This is needed when *re*-compiling a module in GHCi; we want to
-	-- use the same name for externally-visible things as we did before.
-
-  where
-    global	     = isExternalName name
-    local	     = not global
-    internal	     = not external
-    loc		     = nameSrcLoc name
-
-    (occ_env', occ') = tidyOccName occ_env (nameOccName name)
-
-    ns_names	     = nsNames ns
-    (us1, us2)	     = splitUniqSupply (nsUniqs ns)
-    uniq	     = uniqFromSupply us1
-    new_local_name   = mkInternalName uniq occ' loc
-    ns_w_local	     = ns { nsUniqs = us2 }
-
-    (ns_w_global, new_external_name) = newExternalName ns mod occ' loc
 
 
 ------------  Worker  --------------

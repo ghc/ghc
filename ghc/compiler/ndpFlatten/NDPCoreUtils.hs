@@ -51,14 +51,13 @@ module NDPCoreUtils (
 import Panic      (panic)
 import Outputable (Outputable(ppr), pprPanic)
 import BasicTypes (Boxity(..))
-import Var        (Var)
 import Type       (Type, splitTyConApp_maybe, splitFunTy)
-import TyCon      (TyCon(..), isTupleTyCon)
-import PrelNames  (parrTyConName)
+import TyCon      (isTupleTyCon)
 import TysWiredIn (parrTyCon, unitDataConId, tupleCon, intDataCon, mkPArrTy,
 		   boolTy) 
-import CoreSyn    (CoreBndr, CoreExpr, CoreBind, CoreAlt, Expr(..), AltCon(..),
+import CoreSyn    (CoreExpr, CoreAlt, Expr(..), AltCon(..),
 		   Bind(..), mkConApp)
+import PprCore	  ( {- instances -} )
 import Var        (Id)
 import VarEnv     (IdEnv, delVarEnv, delVarEnvList, lookupVarEnv)
 
@@ -90,7 +89,7 @@ funTyArgs  = splitFunTy
 parrElemTy    :: Type -> Type
 parrElemTy ty  = 
   case splitTyConApp_maybe ty of
-    Just (tyCon, [argTy]) | tyConName tyCon == parrTyConName -> argTy
+    Just (tyCon, [argTy]) | tyCon == parrTyCon -> argTy
     _							     -> 
       pprPanic "NDPCoreUtils.parrElemTy: wrong type: " (ppr ty)
 

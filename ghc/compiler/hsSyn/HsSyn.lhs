@@ -9,9 +9,6 @@ therefore, is almost nothing but re-exporting.
 
 \begin{code}
 module HsSyn (
-	-- NB: don't reexport HsCore
-	-- this module tells about "real Haskell"
-
 	module HsBinds,
 	module HsDecls,
 	module HsExpr,
@@ -21,7 +18,7 @@ module HsSyn (
 	module HsTypes,
 	Fixity, NewOrData, 
 
-	HsModule(..), 
+	HsModule(..), HsExtCore(..),
 	collectStmtsBinders, collectStmtBinders,
 	collectHsBinders,   collectLocatedHsBinders, 
 	collectMonoBinders, collectLocatedMonoBinders,
@@ -38,10 +35,11 @@ import HsImpExp
 import HsLit
 import HsPat
 import HsTypes
-import BasicTypes	( Fixity, Version, NewOrData )
+import HscTypes		( DeprecTxt )
+import BasicTypes	( Fixity, NewOrData )
 
 -- others:
-import Name		( NamedThing )
+import IfaceSyn		( IfaceBinding )
 import Outputable
 import SrcLoc		( SrcLoc )
 import Module		( Module )
@@ -63,10 +61,17 @@ data HsModule name
 	[HsDecl name]	-- Type, class, value, and interface signature decls
 	(Maybe DeprecTxt)	-- reason/explanation for deprecation of this module
 	SrcLoc
+
+data HsExtCore name	-- Read from Foo.hcr
+  = HsExtCore
+	Module
+	[TyClDecl name]	-- Type declarations only; just as in Haskell source,
+			-- so that we can infer kinds etc
+	[IfaceBinding]	-- And the bindings
 \end{code}
 
 \begin{code}
-instance (NamedThing name, OutputableBndr name)
+instance (OutputableBndr name)
 	=> Outputable (HsModule name) where
 
     ppr (HsModule Nothing _ imports decls _ src_loc)

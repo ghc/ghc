@@ -98,8 +98,8 @@ loadPackageConfig conf_filename = do
    buf <- hGetStringBuffer conf_filename
    let loc  = mkSrcLoc (mkFastString conf_filename) 1 0
    case unP parse (mkPState buf loc defaultDynFlags) of
-	PFailed l1 l2 err -> do
-            throwDyn (InstallationError (showPFailed l1 l2 err))
+	PFailed l1 l2 err -> 
+	  throwDyn (InstallationError (showSDoc (showPFailed l1 l2 err)))
 
 	POk _ pkg_details -> do
 	    return pkg_details

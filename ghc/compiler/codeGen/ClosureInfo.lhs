@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.58 2003/06/09 13:17:38 matthewc Exp $
+% $Id: ClosureInfo.lhs,v 1.59 2003/10/09 11:58:46 simonpj Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -89,6 +89,8 @@ import Bitmap
 
 import Maybe		( isJust )
 import DATA_BITS
+
+import TypeRep	-- TEMP
 \end{code}
 
 %************************************************************************

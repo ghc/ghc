@@ -1,43 +1,32 @@
 \begin{code}
-module Generics ( mkTyConGenInfo, mkGenericRhs, 
+module Generics ( canDoGenerics, mkGenericBinds,
+		  mkGenericRhs, 
 		  validGenericInstanceType, validGenericMethodType
     ) where
 
 
-import RnHsSyn		( RenamedHsExpr )
-import HsSyn		( HsExpr(..), Pat(..), mkSimpleMatch, placeHolderType )
-
+import HsSyn
 import Type             ( Type, isUnLiftedType, tyVarsOfType, tyVarsOfTypes,
-			  mkTyVarTys, mkForAllTys, mkTyConApp, 
-			  mkFunTy, isTyVarTy, getTyVar_maybe,
-			  funTyCon
+			  isTyVarTy, getTyVar_maybe, funTyCon
 			)
-import TcType		( tcSplitTyConApp_maybe, tcSplitSigmaTy, tcSplitSigmaTy )
-import DataCon          ( DataCon, dataConOrigArgTys, dataConWrapId, isExistentialDataCon )
+import TcType		( tcSplitTyConApp_maybe, tcSplitSigmaTy, tcSplitSigmaTy, isTauTy )
+import DataCon          ( DataCon, dataConOrigArgTys, isExistentialDataCon,
+			  dataConSourceArity )
 
-import TyCon            ( TyCon, tyConTyVars, tyConDataCons_maybe, 
-			  tyConGenInfo, isNewTyCon, isBoxedTupleTyCon
+import TyCon            ( TyCon, tyConName, tyConDataCons, 
+			  tyConHasGenerics, isBoxedTupleTyCon
 			)
-import Name		( Name, mkSystemName )
-import CoreSyn          ( mkLams, Expr(..), CoreExpr, AltCon(..), 
-			  mkConApp, Alt, mkTyApps, mkVarApps )
-import CoreUtils	( exprArity )
+import Name		( nameModuleName, nameOccName, getSrcLoc )
+import OccName		( mkGenOcc1, mkGenOcc2 )
+import RdrName		( RdrName, getRdrName, mkVarUnqual, mkOrig )
 import BasicTypes       ( EP(..), Boxity(..) )
 import Var              ( TyVar )
 import VarSet		( varSetElems )
-import Id               ( Id, mkGlobalId, idType, idName, mkSysLocal )
-import MkId		( mkReboxingAlt, mkNewTypeBody )
-import TysWiredIn       ( genericTyCons,
-			  genUnitTyCon, genUnitDataCon, plusTyCon, inrDataCon,
-			  inlDataCon, crossTyCon, crossDataCon
-			)
-import IdInfo           ( GlobalIdDetails(..), noCafIdInfo, setUnfoldingInfo, setArityInfo )
-import CoreUnfold       ( mkTopUnfolding ) 
-
-import Maybe		( isNothing )
-import SrcLoc		( noSrcLoc )
-import Unique		( Unique, builtinUniques, mkBuiltinUnique )
-import Util             ( takeList, dropList )
+import Id               ( Id, idType )
+import PrelNames
+	
+import SrcLoc		( generatedSrcLoc )
+import Util             ( takeList )
 import Outputable 
 import FastString
 
@@ -191,7 +180,7 @@ validGenericInstanceType :: Type -> Bool
 
 validGenericInstanceType inst_ty
   = case tcSplitTyConApp_maybe inst_ty of
-	Just (tycon, tys) ->  all isTyVarTy tys && tycon `elem` genericTyCons
+	Just (tycon, tys) ->  all isTyVarTy tys && tyConName tycon `elem` genericTyConNames
 	Nothing		  ->  False
 
 validGenericMethodType :: Type -> Bool
@@ -228,102 +217,67 @@ validGenericMethodType ty
 %************************************************************************
 
 \begin{code}
-mkTyConGenInfo :: TyCon -> [Name] -> Maybe (EP Id)
--- mkTyConGenInfo is called twice
---	once from TysWiredIn for Tuples
---	once the typechecker TcTyDecls 
--- to generate generic types and conversion functions for all datatypes.
--- 
--- Must only be called with an algebraic type.
--- 
--- The two names are the names constructed by the renamer
--- for the fromT and toT conversion functions.
+canDoGenerics :: [DataCon] -> Bool
+-- Called on source-code data types, to see if we should generate
+-- generic functions for them.  (This info is recorded in the interface file for
+-- imported data types.)
 
-mkTyConGenInfo tycon []
-  = Nothing	-- This happens when we deal with the interface-file type
-		-- decl for a module compiled without -fgenerics
-
-mkTyConGenInfo tycon [from_name, to_name]
-  | isNothing maybe_datacons	-- Abstractly imported types don't have
-  = Nothing			-- to/from operations, (and should not need them)
-
-	-- If any of the constructor has an unboxed type as argument,
+canDoGenerics data_cons
+  =  not (any bad_con data_cons) 	-- See comment below
+  && not (null data_cons)		-- No values of the type
+  where
+    bad_con dc = any bad_arg_type (dataConOrigArgTys dc) || isExistentialDataCon dc
+  	-- If any of the constructor has an unboxed type as argument,
 	-- then we can't build the embedding-projection pair, because
 	-- it relies on instantiating *polymorphic* sum and product types
 	-- at the argument types of the constructors
+
 	-- Nor can we do the job if it's an existential data constructor,
-  | or [ any isUnLiftedType (dataConOrigArgTys dc) || isExistentialDataCon dc
-       | dc <- datacons ]
-  = Nothing
 
-  | null datacons	-- There are no constructors; 
-  = Nothing		-- there are no values of this type
+	-- Nor if the args are polymorphic types (I don't think)
+    bad_arg_type ty = isUnLiftedType ty || not (isTauTy ty)
+\end{code}
 
-  | otherwise
-  = ASSERT( not (null datacons) )	-- mk_sum_stuff loops if no datacons
-    Just (EP { fromEP = mk_id from_name from_ty from_id_info,
-	       toEP   = mk_id to_name   to_ty   to_id_info })
+%************************************************************************
+%*									*
+\subsection{Generating the RHS of a generic default method}
+%*									*
+%************************************************************************
+
+\begin{code}
+type US = Int	-- Local unique supply, just a plain Int
+type FromAlt = (Pat RdrName, HsExpr RdrName)
+
+mkGenericBinds :: [TyCon] -> MonoBinds RdrName
+mkGenericBinds tcs = andMonoBindList [ mkTyConGenBinds tc 
+				     | tc <- tcs, tyConHasGenerics tc]
+
+mkTyConGenBinds :: TyCon -> MonoBinds RdrName
+mkTyConGenBinds tycon
+  = FunMonoBind to_RDR False {- Not infix -}
+		[mkSimpleHsAlt pat rhs | (pat,rhs) <- from_alts]
+		loc
+	`AndMonoBinds`
+    FunMonoBind from_RDR False 
+		[mkSimpleHsAlt (VarPat to_arg) to_body] loc
   where
-    mk_id = mkGlobalId (GenericOpId tycon)
+    loc	     = getSrcLoc tycon
+    datacons = tyConDataCons tycon
+    (from_RDR, to_RDR) = mkGenericNames tycon
 
-    maybe_datacons = tyConDataCons_maybe tycon
-    Just datacons  = maybe_datacons		-- [C, D]
-
-    tyvars	   = tyConTyVars tycon		-- [a, b, c]
-    tycon_ty	   = mkTyConApp tycon tyvar_tys	-- T a b c
-    tyvar_tys      = mkTyVarTys tyvars
-
-    from_id_info = noCafIdInfo `setUnfoldingInfo` mkTopUnfolding from_fn
-				      `setArityInfo`     exprArity from_fn
-    to_id_info   = noCafIdInfo `setUnfoldingInfo` mkTopUnfolding to_fn
-				      `setArityInfo`     exprArity to_fn
-	-- It's important to set the arity info, so that
-	-- the calling convention (gotten from arity) 
-	-- matches reality.
-
-    from_ty = mkForAllTys tyvars (mkFunTy tycon_ty rep_ty)
-    to_ty   = mkForAllTys tyvars (mkFunTy rep_ty tycon_ty)
-
-    (from_fn, to_fn, rep_ty) 
-	| isNewTyCon tycon
-	= ( mkLams tyvars $ Lam x  $ mkNewTypeBody tycon the_arg_ty (Var x),
-	    Var (dataConWrapId the_datacon),
-	    the_arg_ty )
-
-	| otherwise
-	= ( mkLams tyvars $ Lam x     $ Case (Var x) x from_alts,
-	    mkLams tyvars $ Lam rep_var to_inner,
-	    idType rep_var )
-
-    -- x :: T a b c
-    x = mkGenericLocal u1 tycon_ty
-    (u1 : uniqs) = builtinUniques
-
-	    ----------------------
-	    -- 	Newtypes only
-    [the_datacon]  = datacons
-    the_arg_ty	   = head (dataConOrigArgTys the_datacon)
-		-- NB: we use the arg type of the data constructor, rather than
-		--     the representation type of the newtype; in degnerate (recursive)
-		--     cases the rep type might be (), but the arg type is still T:
-		-- 		newtype T = MkT T
-
-	    ----------------------
-	    -- 	Non-newtypes only
     -- Recurse over the sum first
-    -- The "2" is the first free unique
-    (from_alts, to_inner, rep_var) = mk_sum_stuff uniqs tyvars datacons
-    
-mkTyConGenInfo tycon names = pprPanic "mkTyConGenInfo" (ppr tycon <+> ppr names)
-    
+    from_alts :: [FromAlt]
+    (from_alts, to_arg, to_body) = mk_sum_stuff init_us datacons
+    init_us = 1::Int		-- Unique supply
 
 ----------------------------------------------------
 --	Dealing with sums
 ----------------------------------------------------
-mk_sum_stuff :: [Unique] 	-- Base for generating unique names
-	     -> [TyVar]		-- Type variables over which the tycon is abstracted
-	     -> [DataCon] 	-- The data constructors
-	     -> ([Alt Id], CoreExpr, Id)
+
+mk_sum_stuff :: US 			-- Base for generating unique names
+	     -> [DataCon]	 	-- The data constructors
+	     -> ([FromAlt],			-- Alternatives for the T->Trep "from" function
+		 RdrName, HsExpr RdrName)	-- Arg and body of the Trep->T "to" function
 
 -- For example, given
 --	data T = C | D Int Int Int
@@ -335,93 +289,85 @@ mk_sum_stuff :: [Unique] 	-- Base for generating unique names
 --						   D a b c }} },
 --			   cd)
 
-mk_sum_stuff us tyvars [datacon]
-   = ([from_alt], to_body_fn app_exp, rep_var)
+mk_sum_stuff us [datacon]
+   = ([from_alt], to_arg, to_body_fn app_exp)
    where
-     types        = dataConOrigArgTys datacon 	-- Existentials already excluded
-     datacon_vars = zipWith mkGenericLocal us types
-     us'          = dropList types us
+     n_args = dataConSourceArity datacon	-- Existentials already excluded
 
-     app_exp      = mkVarApps (Var (dataConWrapId datacon)) (tyvars ++ datacon_vars)
-     from_alt     = mkReboxingAlt us' datacon datacon_vars from_alt_rhs
-			-- We are talking about *user* datacons here; hence
-			--	dataConWrapId
-			-- 	mkReboxingAlt
+     datacon_vars = map mkGenericLocal [us .. us+n_args-1]
+     us'          = us + n_args
 
-     (_,args',_)  = from_alt
-     us''	  = dropList args' us'	-- Conservative, but safe
-     
-     (_, from_alt_rhs, to_body_fn, rep_var) = mk_prod_stuff us'' datacon_vars
+     datacon_rdr  = getRdrName datacon
+     app_exp      = mkHsVarApps datacon_rdr datacon_vars
+     from_alt     = (mkConPat datacon_rdr datacon_vars, from_alt_rhs)
 
-mk_sum_stuff (u:us) tyvars datacons
-  = (wrap inlDataCon l_from_alts ++ wrap inrDataCon r_from_alts,
-     Case (Var rep_var) rep_var [(DataAlt inlDataCon, [l_rep_var], l_to_body),
-			 	 (DataAlt inrDataCon, [r_rep_var], r_to_body)],
-     rep_var)
+     (_, from_alt_rhs, to_arg, to_body_fn) = mk_prod_stuff us' datacon_vars
+
+mk_sum_stuff us datacons
+  = (wrap inlDataCon_RDR l_from_alts ++ wrap inrDataCon_RDR r_from_alts,
+     to_arg,
+     HsCase (HsVar to_arg) 
+	    [mkSimpleHsAlt (mkConPat inlDataCon_RDR [l_to_arg]) l_to_body,
+	     mkSimpleHsAlt (mkConPat inrDataCon_RDR [r_to_arg]) r_to_body]
+	    generatedSrcLoc)
   where
-    (l_datacons, r_datacons)	        = splitInHalf datacons
-    (l_from_alts, l_to_body, l_rep_var) = mk_sum_stuff us tyvars l_datacons
-    (r_from_alts, r_to_body, r_rep_var) = mk_sum_stuff us tyvars r_datacons
-    rep_tys				= [idType l_rep_var, idType r_rep_var]
-    rep_ty				= mkTyConApp plusTyCon rep_tys
-    rep_var 				= mkGenericLocal u rep_ty
+    (l_datacons, r_datacons)		= splitInHalf datacons
+    (l_from_alts, l_to_arg, l_to_body)	= mk_sum_stuff us' l_datacons
+    (r_from_alts, r_to_arg, r_to_body)	= mk_sum_stuff us' r_datacons
 
-    wrap :: DataCon -> [Alt Id] -> [Alt Id] 
+    to_arg = mkGenericLocal us
+    us'	   = us+1
+
+    wrap :: RdrName -> [FromAlt] -> [FromAlt]
 	-- Wrap an application of the Inl or Inr constructor round each alternative
-    wrap datacon alts
-	= [(dc, args, App datacon_app rhs) | (dc,args,rhs) <- alts]
-	where
-	  datacon_app = mkTyApps (Var (dataConWrapId datacon)) rep_tys
+    wrap dc alts = [(pat, HsApp (HsVar dc) rhs) | (pat,rhs) <- alts]
+
 
 ----------------------------------------------------
 --	Dealing with products
 ----------------------------------------------------
-mk_prod_stuff :: [Unique]		-- Base for unique names
-	      -> [Id] 			-- arg-ids; args of the original user-defined constructor
+mk_prod_stuff :: US			-- Base for unique names
+	      -> [RdrName]		-- arg-ids; args of the original user-defined constructor
 					-- 	They are bound enclosing from_rhs
 					-- 	Please bind these in the to_body_fn 
-	      -> ([Unique],		-- Depleted unique-name supply
-		  CoreExpr, 		-- from-rhs: puts together the representation from the arg_ids
-		  CoreExpr -> CoreExpr,	-- to_body_fn: takes apart the representation
-		  Id)			-- The rep-id; please bind this to the representation
+	      -> (US,			-- Depleted unique-name supply
+		  HsExpr RdrName, 			-- from-rhs: puts together the representation from the arg_ids
+		  RdrName,				-- to_arg: 
+		  HsExpr RdrName -> HsExpr RdrName)	-- to_body_fn: takes apart the representation
 
 -- For example:
--- mk_prod_stuff [a,b,c] = ( a :*: (b :*: c),
---			     \x -> case abc of { a :*: bc ->
---			 	   case bc  of { b :*: c  -> 
---				   x,
---		             abc )
+-- mk_prod_stuff abc [a,b,c] = ( a :*: (b :*: c),
+--			         \x -> case abc of { a :*: bc ->
+--			 	       case bc  of { b :*: c  -> 
+--				       x)
 
--- We need to use different uqiques in the branches 
+-- We need to use different uniques in the branches 
 -- because the returned to_body_fns are nested.  
 -- Hence the returned unqique-name supply
 
-mk_prod_stuff (u:us) []		-- Unit case
-  = (us,
-     Var (dataConWrapId genUnitDataCon),
-     \x -> x, 
-     mkGenericLocal u (mkTyConApp genUnitTyCon []))
+mk_prod_stuff us []		-- Unit case
+  = (us+1,
+     HsVar genUnitDataCon_RDR,
+     mkGenericLocal us,
+     \x -> x)
 
 mk_prod_stuff us [arg_var]	-- Singleton case
-  = (us, Var arg_var, \x -> x, arg_var)
+  = (us, HsVar arg_var, arg_var, \x -> x)
 
-mk_prod_stuff (u:us) arg_vars	-- Two or more
+mk_prod_stuff us arg_vars	-- Two or more
   = (us'', 
-     mkConApp crossDataCon (map Type rep_tys ++ [l_alt_rhs, r_alt_rhs]),
-     \x -> Case (Var rep_var) rep_var 
-		[(DataAlt crossDataCon, [l_rep_var, r_rep_var], l_to_body_fn (r_to_body_fn x))],
-     rep_var)
+     HsVar crossDataCon_RDR `HsApp` l_alt_rhs `HsApp` r_alt_rhs,
+     to_arg, 
+     \x -> HsCase (HsVar to_arg)
+		  [mkSimpleHsAlt (mkConPat crossDataCon_RDR [l_to_arg, r_to_arg])
+				 (l_to_body_fn (r_to_body_fn x))] generatedSrcLoc)
   where
-    (l_arg_vars, r_arg_vars) 		 = splitInHalf arg_vars
-    (us', l_alt_rhs, l_to_body_fn, l_rep_var) = mk_prod_stuff us  l_arg_vars
-    (us'', r_alt_rhs, r_to_body_fn, r_rep_var) = mk_prod_stuff us' r_arg_vars
-    rep_var = mkGenericLocal u (mkTyConApp crossTyCon rep_tys)
-    rep_tys = [idType l_rep_var, idType r_rep_var]
-\end{code}
+    to_arg = mkGenericLocal us
+    (l_arg_vars, r_arg_vars) 		      = splitInHalf arg_vars
+    (us',  l_alt_rhs, l_to_arg, l_to_body_fn) = mk_prod_stuff (us+1)  l_arg_vars
+    (us'', r_alt_rhs, r_to_arg, r_to_body_fn) = mk_prod_stuff us' r_arg_vars
 
-A little utility function
 
-\begin{code}
 splitInHalf :: [a] -> ([a],[a])
 splitInHalf list = (left, right)
 		 where
@@ -429,8 +375,17 @@ splitInHalf list = (left, right)
 		   left  = take half list
 		   right = drop half list
 
-mkGenericLocal :: Unique -> Type -> Id
-mkGenericLocal uniq ty = mkSysLocal FSLIT("g") uniq ty
+mkGenericLocal :: US -> RdrName
+mkGenericLocal u = mkVarUnqual (mkFastString ("g" ++ show u))
+
+mkGenericNames tycon
+  = (from_RDR, to_RDR)
+  where
+    tc_name  = tyConName tycon
+    tc_occ   = nameOccName tc_name
+    tc_mod   = nameModuleName tc_name
+    from_RDR = mkOrig tc_mod (mkGenOcc1 tc_occ)
+    to_RDR   = mkOrig tc_mod (mkGenOcc2 tc_occ)
 \end{code}
 
 %************************************************************************
@@ -488,14 +443,13 @@ By the time the type checker has done its stuff we'll get
 	   op = \b. \dict::Ord b. toOp b (op Trep b dict)
 
 \begin{code}
-mkGenericRhs :: Id -> TyVar -> TyCon -> RenamedHsExpr
+mkGenericRhs :: Id -> TyVar -> TyCon -> HsExpr RdrName
 mkGenericRhs sel_id tyvar tycon
-  = HsApp (toEP bimap) (HsVar (idName sel_id))
+  = HsApp (toEP bimap) (HsVar (getRdrName sel_id))
   where 
 	-- Initialising the "Environment" with the from/to functions
 	-- on the datatype (actually tycon) in question
-	Just (EP from to) = tyConGenInfo tycon	-- Caller checked this will succeed
-        ep        	  = EP (HsVar (idName from)) (HsVar (idName to)) 
+	(from_RDR, to_RDR) = mkGenericNames tycon 
 
         -- Takes out the ForAll and the Class restrictions 
         -- in front of the type of the method.
@@ -507,17 +461,18 @@ mkGenericRhs sel_id tyvar tycon
 
 	-- Now we probably have a tycon in front
         -- of us, quite probably a FunTyCon.
+        ep    = EP (HsVar from_RDR) (HsVar to_RDR) 
         bimap = generate_bimap (tyvar, ep, local_tvs) final_ty
 
-type EPEnv = (TyVar,		-- The class type variable
-	      EP RenamedHsExpr,	-- The EP it maps to
-	      [TyVar]		-- Other in-scope tyvars; they have an identity EP
+type EPEnv = (TyVar,			-- The class type variable
+	      EP (HsExpr RdrName),	-- The EP it maps to
+	      [TyVar]			-- Other in-scope tyvars; they have an identity EP
 	     )
 
 -------------------
 generate_bimap :: EPEnv
 	       -> Type
-	       -> EP RenamedHsExpr
+	       -> EP (HsExpr RdrName)
 -- Top level case - splitting the TyCon.
 generate_bimap env@(tv,ep,local_tvs) ty 
   = case getTyVar_maybe ty of
@@ -527,7 +482,7 @@ generate_bimap env@(tv,ep,local_tvs) ty
 	Nothing	 -> bimapApp env (tcSplitTyConApp_maybe ty)
 
 -------------------
-bimapApp :: EPEnv -> Maybe (TyCon, [Type]) -> EP RenamedHsExpr
+bimapApp :: EPEnv -> Maybe (TyCon, [Type]) -> EP (HsExpr RdrName)
 bimapApp env Nothing		    = panic "TcClassDecl: Type Application!"
 bimapApp env (Just (tycon, ty_args)) 
   | tycon == funTyCon       = bimapArrow arg_eps
@@ -543,32 +498,32 @@ bimapApp env (Just (tycon, ty_args))
 -------------------
 -- bimapArrow :: [EP a a', EP b b'] -> EP (a->b) (a'->b')
 bimapArrow [ep1, ep2]
-  = EP { fromEP = mk_hs_lam [VarPat g1, VarPat g2] from_body, 
-	 toEP   = mk_hs_lam [VarPat g1, VarPat g2] to_body }
+  = EP { fromEP = mk_hs_lam [VarPat a_RDR, VarPat b_RDR] from_body, 
+	 toEP   = mk_hs_lam [VarPat a_RDR, VarPat b_RDR] to_body }
   where
-    from_body = fromEP ep2 `HsApp` (HsPar $ HsVar g1 `HsApp` (HsPar $ toEP   ep1 `HsApp` HsVar g2))
-    to_body   = toEP   ep2 `HsApp` (HsPar $ HsVar g1 `HsApp` (HsPar $ fromEP ep1 `HsApp` HsVar g2))
+    from_body = fromEP ep2 `HsApp` (HsPar $ HsVar a_RDR `HsApp` (HsPar $ toEP   ep1 `HsApp` HsVar b_RDR))
+    to_body   = toEP   ep2 `HsApp` (HsPar $ HsVar a_RDR `HsApp` (HsPar $ fromEP ep1 `HsApp` HsVar b_RDR))
 
 -------------------
 bimapTuple eps 
   = EP { fromEP = mk_hs_lam [tuple_pat] from_body,
 	 toEP   = mk_hs_lam [tuple_pat] to_body }
   where
-    names	= takeList eps genericNames
+    names	= takeList eps gs_RDR
     tuple_pat	= TuplePat (map VarPat names) Boxed
     eps_w_names = eps `zip` names
     to_body     = ExplicitTuple [toEP   ep `HsApp` HsVar g | (ep,g) <- eps_w_names] Boxed
     from_body   = ExplicitTuple [fromEP ep `HsApp` HsVar g | (ep,g) <- eps_w_names] Boxed
 
 -------------------
-genericNames :: [Name]
-genericNames = [mkSystemName (mkBuiltinUnique i) (mkFastString ('g' : show i)) | i <- [1..]]
-(g1:g2:g3:_) = genericNames
+a_RDR	= mkVarUnqual FSLIT("a")
+b_RDR	= mkVarUnqual FSLIT("b")
+gs_RDR	= [ mkVarUnqual (mkFastString ("g"++show i)) | i <- [(1::Int) .. ] ]
 
-mk_hs_lam pats body = HsPar (HsLam (mkSimpleMatch pats body placeHolderType noSrcLoc))
+mk_hs_lam pats body = HsPar (HsLam (mkSimpleMatch pats body placeHolderType generatedSrcLoc))
 
-idEP :: EP RenamedHsExpr
+idEP :: EP (HsExpr RdrName)
 idEP = EP idexpr idexpr
      where
-       idexpr = mk_hs_lam [VarPat g3] (HsVar g3)
+       idexpr = mk_hs_lam [VarPat a_RDR] (HsVar a_RDR)
 \end{code}

@@ -60,7 +60,7 @@ import TcMType	  ( zonkTcTyVarToTyVar, zonkType, zonkTcType, zonkTcTyVars,
 import TysPrim	  ( charPrimTy, intPrimTy, floatPrimTy,
 		    doublePrimTy, addrPrimTy
 		  )
-import TysWiredIn ( charTy, stringTy, intTy, integerTy,
+import TysWiredIn ( charTy, stringTy, intTy, 
 		    mkListTy, mkPArrTy, mkTupleTy, unitTy,
 		    voidTy, listTyCon, tupleTyCon )
 import TyCon	  ( mkPrimTyCon, tyConKind )
@@ -187,7 +187,7 @@ hsLitType (HsString str)   = stringTy
 hsLitType (HsStringPrim s) = addrPrimTy
 hsLitType (HsInt i)	   = intTy
 hsLitType (HsIntPrim i)    = intPrimTy
-hsLitType (HsInteger i)    = integerTy
+hsLitType (HsInteger i ty) = ty
 hsLitType (HsRat _ ty)	   = ty
 hsLitType (HsFloatPrim f)  = floatPrimTy
 hsLitType (HsDoublePrim d) = doublePrimTy
@@ -828,7 +828,7 @@ zonkPat env (ConPatOut n stuff ty tvs dicts)
     let
 	env1 = extendZonkEnv env new_dicts
     in
-    zonkConStuff env stuff		`thenM` \ (new_stuff, ids) ->
+    zonkConStuff env1 stuff		`thenM` \ (new_stuff, ids) ->
     returnM (ConPatOut n new_stuff new_ty new_tvs new_dicts, 
 		 listToBag new_dicts `unionBags` ids)
 
@@ -948,9 +948,6 @@ zonkRule env (HsRule name act vars lhs rhs loc)
    zonk_bndr (RuleBndr v) 
 	| isId v    = zonkIdBndr env v
 	| otherwise = zonkTcTyVarToTyVar v
-
-zonkRule env (IfaceRuleOut fun rule)
-  = returnM (IfaceRuleOut (zonkIdOcc env fun) rule)
 \end{code}
 
 

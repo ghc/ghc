@@ -10,7 +10,8 @@ module Inst (
 	showLIE,
 
 	Inst, 
-	pprInst, pprInsts, pprInstsInFull, tidyInsts, tidyMoreInsts,
+	pprInst, pprInsts, pprInstsInFull, pprDFuns,
+	tidyInsts, tidyMoreInsts,
 
 	newDictsFromOld, newDicts, cloneDict, 
 	newOverloadedLit, newIPDict, 
@@ -23,6 +24,7 @@ module Inst (
 	instLoc, getDictClassTys, dictPred,
 
 	lookupInst, LookupInstResult(..),
+	tcExtendLocalInstEnv, tcGetInstEnvs,
 
 	isDict, isClassDict, isMethod, 
 	isLinearInst, linearInstType, isIPDict, isInheritableInst,
@@ -45,15 +47,16 @@ import TcHsSyn	( TcExpr, TcId, TcIdSet,
 		  mkCoercion, ExprCoFn
 		)
 import TcRnMonad
-import TcEnv	( tcGetInstEnv, tcLookupId, tcLookupTyCon, checkWellStaged, topIdLvl )
-import InstEnv	( InstLookupResult(..), lookupInstEnv )
+import TcEnv	( tcLookupId, checkWellStaged, topIdLvl, tcMetaTy )
+import InstEnv	( DFunId, InstEnv, lookupInstEnv, checkFunDeps, extendInstEnv )
+import TcIface	( loadImportedInsts )
 import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType, 
 		  zonkTcThetaType, tcInstTyVar, tcInstType, tcInstTyVars
 		)
 import TcType	( Type, TcType, TcThetaType, TcTyVarSet,
-		  SourceType(..), PredType, TyVarDetails(VanillaTv),
+		  PredType(..), TyVarDetails(VanillaTv),
 		  tcSplitForAllTys, tcSplitForAllTys, mkTyConApp,
-		  tcSplitPhiTy, mkGenTyConApp,
+		  tcSplitPhiTy, isTyVarTy, tcSplitDFunTy,
 		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
 		  tcIsTyVarTy, mkPredTy, mkTyVarTy, mkTyVarTys,
 		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,
@@ -62,19 +65,21 @@ import TcType	( Type, TcType, TcThetaType, TcTyVarSet,
 		  isInheritablePred, isIPPred, 
 		  tidyType, tidyTypes, tidyFreeTyVars, tcSplitSigmaTy
 		)
+import HscTypes	( ExternalPackageState(..) )
 import CoreFVs	( idFreeTyVars )
 import DataCon	( DataCon,dataConSig )
 import Id	( Id, idName, idType, mkUserLocal, mkSysLocal, mkLocalId, setIdUnique )
 import PrelInfo	( isStandardClass, isNoDictClass )
-import Name	( Name, mkMethodOcc, getOccName )
-import PprType	( pprPred, pprParendType )	
+import Name	( Name, mkMethodOcc, getOccName, getSrcLoc, isHomePackageName, isInternalName )
+import NameSet	( addOneToNameSet )
+import PprType	( pprPred, pprParendType, pprThetaArrow, pprClassPred )	
 import Subst	( substTy, substTyWith, substTheta, mkTyVarSubst )
 import Literal	( inIntRange )
 import Var	( TyVar )
 import VarEnv	( TidyEnv, emptyTidyEnv, lookupSubstEnv, SubstResult(..) )
 import VarSet	( elemVarSet, emptyVarSet, unionVarSet )
 import TysWiredIn ( floatDataCon, doubleDataCon )
-import PrelNames( fromIntegerName, fromRationalName, rationalTyConName )
+import PrelNames	( integerTyConName, fromIntegerName, fromRationalName, rationalTyConName )
 import BasicTypes( IPName(..), mapIPName, ipNameName )
 import UniqSupply( uniqsFromSupply )
 import Outputable
@@ -358,7 +363,8 @@ newOverloadedLit orig lit@(HsIntegral i fi) expected_ty
 				-- syntax.  Reason: tcSyntaxName does unification
 				-- which is very inconvenient in tcSimplify
   = tcSyntaxName orig expected_ty (fromIntegerName, HsVar fi)	`thenM` \ (_,expr) ->
-    returnM (HsApp expr (HsLit (HsInteger i)))
+    mkIntegerLit i						`thenM` \ integer_lit ->
+    returnM (HsApp expr integer_lit)
 
   | Just expr <- shortCutIntLit i expected_ty 
   = returnM expr
@@ -390,10 +396,10 @@ newLitInst orig lit expected_ty
 
 shortCutIntLit :: Integer -> TcType -> Maybe TcExpr
 shortCutIntLit i ty
-  | isIntTy ty && inIntRange i 			-- Short cut for Int
+  | isIntTy ty && inIntRange i 		-- Short cut for Int
   = Just (HsLit (HsInt i))
-  | isIntegerTy ty 				-- Short cut for Integer
-  = Just (HsLit (HsInteger i))
+  | isIntegerTy ty 			-- Short cut for Integer
+  = Just (HsLit (HsInteger i ty))
   | otherwise = Nothing
 
 shortCutFracLit :: Rational -> TcType -> Maybe TcExpr
@@ -404,13 +410,15 @@ shortCutFracLit f ty
   = Just (mkHsConApp doubleDataCon [] [HsLit (HsDoublePrim f)])
   | otherwise = Nothing
 
+mkIntegerLit :: Integer -> TcM TcExpr
+mkIntegerLit i
+  = tcMetaTy integerTyConName 	`thenM` \ integer_ty ->
+    returnM (HsLit (HsInteger i integer_ty))
+
 mkRatLit :: Rational -> TcM TcExpr
 mkRatLit r
-  = tcLookupTyCon rationalTyConName 			`thenM` \ rat_tc ->
-    let
-	rational_ty  = mkGenTyConApp rat_tc []
-    in
-    returnM (HsLit (HsRat r rational_ty))
+  = tcMetaTy rationalTyConName 	`thenM` \ rat_ty ->
+    returnM (HsLit (HsRat r rat_ty))
 \end{code}
 
 
@@ -483,6 +491,16 @@ pprInst m@(Method u id tys theta tau loc)
 	  show_uniq u,
 	  ppr (instToId m) -}]
 
+
+pprDFuns :: [DFunId] -> SDoc
+-- Prints the dfun as an instance declaration
+pprDFuns dfuns = vcat [ hang (ppr (getSrcLoc dfun) <> colon)
+			2 (ptext SLIT("instance") <+> sep [pprThetaArrow theta,
+							   pprClassPred clas tys])
+		      | dfun <- dfuns
+		      , let (_, theta, clas, tys) = tcSplitDFunTy (idType dfun) ]
+	-- Print without the for-all, which the programmer doesn't write
+
 show_uniq u = ifPprDebug (text "{-" <> ppr u <> text "-}")
 
 tidyInst :: TidyEnv -> Inst -> Inst
@@ -511,6 +529,43 @@ showLIE str
 
 %************************************************************************
 %*									*
+	Extending the instance environment
+%*									*
+%************************************************************************
+
+\begin{code}
+tcExtendLocalInstEnv :: [DFunId] -> TcM a -> TcM a
+  -- Add new locally-defined instances
+tcExtendLocalInstEnv dfuns thing_inside
+ = do { traceDFuns dfuns
+      ; eps <- getEps
+      ; env <- getGblEnv
+      ; inst_env' <- foldlM (extend (eps_inst_env eps)) 
+			    (tcg_inst_env env) 
+			    dfuns
+      ; let env' = env { tcg_insts = dfuns ++ tcg_insts env,
+			 tcg_inst_env = inst_env' }
+      ; setGblEnv env' thing_inside }
+ where
+  extend pkg_ie home_ie dfun
+   = do	{ case checkFunDeps (home_ie, pkg_ie) dfun of
+		Just dfuns -> funDepErr dfun dfuns
+		Nothing    -> return ()
+	; return (extendInstEnv home_ie dfun) }
+
+traceDFuns dfuns
+  = traceTc (text "Adding instances:" <+> vcat (map pp dfuns))
+  where
+    pp dfun = ppr dfun <+> dcolon <+> ppr (idType dfun)
+
+funDepErr dfun dfuns
+  = addSrcLoc (getSrcLoc dfun) $
+    addErr (hang (ptext SLIT("Functional dependencies conflict between instance declarations:"))
+	       2 (pprDFuns (dfun:dfuns)))
+\end{code}
+
+%************************************************************************
+%*									*
 \subsection{Looking up Insts}
 %*									*
 %************************************************************************
@@ -526,48 +581,6 @@ lookupInst :: Inst -> TcM (LookupInstResult s)
 -- the LIE.  Instead, any Insts needed by the lookup are returned in
 -- the LookupInstResult, where they can be further processed by tcSimplify
 
-
--- Dictionaries
-lookupInst dict@(Dict _ pred@(ClassP clas tys) loc)
-  = getDOpts			`thenM` \ dflags ->
-    tcGetInstEnv		`thenM` \ inst_env ->
-    case lookupInstEnv dflags inst_env clas tys of
-
-      FoundInst tenv dfun_id
-	->	-- It's possible that not all the tyvars are in
-		-- the substitution, tenv. For example:
-		--	instance C X a => D X where ...
-		-- (presumably there's a functional dependency in class C)
-		-- Hence the mk_ty_arg to instantiate any un-substituted tyvars.	
-	   getStage						`thenM` \ use_stage ->
-	   checkWellStaged (ptext SLIT("instance for") <+> quotes (ppr pred))
-			   (topIdLvl dfun_id) use_stage		`thenM_`
-	   traceTc (text "lookupInst" <+> ppr dfun_id <+> ppr (topIdLvl dfun_id) <+> ppr use_stage) `thenM_`
-	   let
-		(tyvars, rho) = tcSplitForAllTys (idType dfun_id)
-		mk_ty_arg tv  = case lookupSubstEnv tenv tv of
-				   Just (DoneTy ty) -> returnM ty
-				   Nothing 	    -> tcInstTyVar VanillaTv tv `thenM` \ tc_tv ->
-						       returnM (mkTyVarTy tc_tv)
-	   in
-	   mappM mk_ty_arg tyvars	`thenM` \ ty_args ->
-	   let
-		dfun_rho   = substTy (mkTyVarSubst tyvars ty_args) rho
-		(theta, _) = tcSplitPhiTy dfun_rho
-		ty_app     = mkHsTyApp (HsVar dfun_id) ty_args
-	   in
-	   if null theta then
-		returnM (SimpleInst ty_app)
-	   else
-	   newDictsAtLoc loc theta	`thenM` \ dicts ->
-	   let 
-		rhs = mkHsDictApp ty_app (map instToId dicts)
-	   in
-	   returnM (GenInst dicts rhs)
-
-      other	-> returnM NoInstance
-
-lookupInst (Dict _ _ _)         = returnM NoInstance
 
 -- Methods
 
@@ -592,9 +605,9 @@ lookupInst inst@(LitInst u (HsIntegral i from_integer_name) ty loc)
   = ASSERT( from_integer_name == fromIntegerName )	-- A LitInst invariant
     tcLookupId fromIntegerName			`thenM` \ from_integer ->
     tcInstClassOp loc from_integer [ty]		`thenM` \ method_inst ->
+    mkIntegerLit i				`thenM` \ integer_lit ->
     returnM (GenInst [method_inst]
-		     (HsApp (HsVar (instToId method_inst)) (HsLit (HsInteger i))))
-
+		     (HsApp (HsVar (instToId method_inst)) integer_lit))
 
 lookupInst inst@(LitInst u (HsFractional f from_rat_name) ty loc)
   | Just expr <- shortCutFracLit f ty
@@ -606,6 +619,78 @@ lookupInst inst@(LitInst u (HsFractional f from_rat_name) ty loc)
     tcInstClassOp loc from_rational [ty]	`thenM` \ method_inst ->
     mkRatLit f					`thenM` \ rat_lit ->
     returnM (GenInst [method_inst] (HsApp (HsVar (instToId method_inst)) rat_lit))
+
+-- Dictionaries
+lookupInst dict@(Dict _ pred@(ClassP clas tys) loc)
+  | all isTyVarTy tys	 -- Common special case; no lookup
+  = returnM NoInstance
+	
+  | otherwise
+  = do	{ pkg_ie  <- loadImportedInsts clas tys
+		-- Suck in any instance decls that may be relevant
+	; tcg_env <- getGblEnv
+	; dflags  <- getDOpts
+	; case lookupInstEnv dflags (pkg_ie, tcg_inst_env tcg_env) clas tys of {
+	    ([(tenv, (_,_,dfun_id))], []) -> instantiate_dfun tenv dfun_id pred loc ;
+	    other 			  -> return NoInstance } }
+		-- In the case of overlap (multiple matches) we report
+		-- NoInstance here.  That has the effect of making the 
+		-- context-simplifier return the dict as an irreducible one.
+		-- Then it'll be given to addNoInstanceErrs, which will do another
+		-- lookupInstEnv to get the detailed info about what went wrong.
+
+lookupInst (Dict _ _ _) = returnM NoInstance
+
+-----------------
+instantiate_dfun tenv dfun_id pred loc
+  = 	-- Record that this dfun is needed
+    record_dfun_usage dfun_id		`thenM_`
+
+ 	-- It's possible that not all the tyvars are in
+	-- the substitution, tenv. For example:
+	--	instance C X a => D X where ...
+	-- (presumably there's a functional dependency in class C)
+	-- Hence the mk_ty_arg to instantiate any un-substituted tyvars.	
+    getStage						`thenM` \ use_stage ->
+    checkWellStaged (ptext SLIT("instance for") <+> quotes (ppr pred))
+    		    (topIdLvl dfun_id) use_stage		`thenM_`
+    traceTc (text "lookupInst" <+> ppr dfun_id <+> ppr (topIdLvl dfun_id) <+> ppr use_stage) `thenM_`
+    let
+    	(tyvars, rho) = tcSplitForAllTys (idType dfun_id)
+    	mk_ty_arg tv  = case lookupSubstEnv tenv tv of
+    			   Just (DoneTy ty) -> returnM ty
+    			   Nothing 	    -> tcInstTyVar VanillaTv tv `thenM` \ tc_tv ->
+    					       returnM (mkTyVarTy tc_tv)
+    in
+    mappM mk_ty_arg tyvars	`thenM` \ ty_args ->
+    let
+    	dfun_rho   = substTy (mkTyVarSubst tyvars ty_args) rho
+    	(theta, _) = tcSplitPhiTy dfun_rho
+    	ty_app     = mkHsTyApp (HsVar dfun_id) ty_args
+    in
+    if null theta then
+    	returnM (SimpleInst ty_app)
+    else
+    newDictsAtLoc loc theta	`thenM` \ dicts ->
+    let 
+    	rhs = mkHsDictApp ty_app (map instToId dicts)
+    in
+    returnM (GenInst dicts rhs)
+
+record_dfun_usage dfun_id
+  | isInternalName dfun_name = return ()		-- From this module
+  | not (isHomePackageName dfun_name) = return ()	-- From another package package
+  | otherwise = getGblEnv 	`thenM` \ tcg_env ->
+		updMutVar (tcg_inst_uses tcg_env)
+			  (`addOneToNameSet` idName dfun_id)
+  where
+    dfun_name = idName dfun_id
+
+tcGetInstEnvs :: TcM (InstEnv, InstEnv)
+-- Gets both the home-pkg inst env (includes module being compiled)
+-- and the external-package inst-env
+tcGetInstEnvs = do { eps <- getEps; env <- getGblEnv;
+		     return (tcg_inst_env env, eps_inst_env eps) }
 \end{code}
 
 
@@ -662,6 +747,9 @@ tcSyntaxName orig ty (std_nm, user_nm_expr)
 	-- case of locally-polymorphic methods.
     in
     addErrCtxtM (syntaxNameCtxt user_nm_expr orig tau1)	$
+
+	-- Check that the user-supplied thing has the
+	-- same type as the standard one
     tcCheckSigma user_nm_expr tau1			`thenM` \ expr ->
     returnM (std_nm, expr)
 

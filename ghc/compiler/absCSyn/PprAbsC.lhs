@@ -846,9 +846,7 @@ pprFCall call uniq args results vol_regs
 	     ]
       DNCall (DNCallSpec isStatic kind assem nm argTys resTy) ->
          let
-	  target    = StaticTarget (mkFastString nm)
 	  resultVar = "_ccall_result"
-	  
 	  hasAssemArg = isStatic || kind == DNConstructor
 	  invokeOp  = 
 	    case kind of

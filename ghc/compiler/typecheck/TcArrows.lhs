@@ -11,14 +11,14 @@ module TcArrows ( tcProc ) where
 import {-# SOURCE #-}	TcExpr( tcCheckRho )
 
 import HsSyn
-import TcHsSyn	( TcCmd, TcCmdTop, TcExpr, TcPat, mkHsLet )
+import TcHsSyn	( TcCmdTop, TcExpr, TcPat, mkHsLet )
 
 import TcMatches ( TcStmtCtxt(..), tcMatchPats, matchCtxt, tcStmts,
 		  TcMatchCtxt(..), tcMatchesCase )
 
 import TcType	( TcType, TcTauType, TcRhoType, mkFunTys, mkTyConApp,
 		  mkTyVarTy, mkAppTys, tcSplitTyConApp_maybe, tcEqType )
-import TcMType	( newTyVar, newTyVarTy, newTyVarTys, newSigTyVar, zonkTcType )
+import TcMType	( newTyVarTy, newTyVarTys, newSigTyVar, zonkTcType )
 import TcBinds	( tcBindsAndThen )
 import TcSimplify ( tcSimplifyCheck )
 import TcUnify	( Expected(..), checkSigTyVarsWrt, zapExpectedTo )
@@ -28,7 +28,7 @@ import TysWiredIn ( boolTy, pairTyCon )
 import VarSet 
 import Type	( Kind,
 		  mkArrowKinds, liftedTypeKind, openTypeKind, tyVarsOfTypes )
-import RnHsSyn	( RenamedHsExpr, RenamedPat, RenamedHsCmd, RenamedHsCmdTop )
+import RnHsSyn	( RenamedHsExpr, RenamedPat, RenamedHsCmdTop )
 
 import Outputable
 import Util	( lengthAtLeast )

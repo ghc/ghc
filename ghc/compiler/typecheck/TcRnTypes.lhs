@@ -3,28 +3,21 @@
 %
 \begin{code}
 module TcRnTypes(
-	TcRn, TcM, RnM,	-- The monad is opaque outside this module
+	TcRnIf, TcRn, TcM, RnM,	IfM, IfL, IfG, -- The monad is opaque outside this module
+	TcRef,
 
-	-- Standard monadic operations
-	thenM, thenM_, returnM, failM,
-
-	-- Non-standard operations
-	runTcRn, fixM, tryM, ioToTcRn,
-	newMutVar, readMutVar, writeMutVar,
-	getEnv, setEnv, updEnv, unsafeInterleaveM, zapEnv,
-		
 	-- The environment types
-	Env(..), TopEnv(..), TcGblEnv(..), 
-	TcLclEnv(..), RnLclEnv(..),
+	Env(..), 
+	TcGblEnv(..), TcLclEnv(..), 
+	IfGblEnv(..), IfLclEnv(..),
 
 	-- Ranamer types
-	RnMode(..), isInterfaceMode, isCmdLineMode,
 	EntityUsage, emptyUsages, ErrCtxt,
 	ImportAvails(..), emptyImportAvails, plusImportAvails, 
 	plusAvail, pruneAvails,  
 	AvailEnv, emptyAvailEnv, unitAvailEnv, plusAvailEnv, 
 	mkAvailEnv, lookupAvailEnv, lookupAvailEnv_maybe, availEnvElts, addAvail,
-	WhereFrom(..),
+	WhereFrom(..), mkModDeps,
 
 	-- Typechecker types
 	TcTyThing(..),
@@ -42,25 +35,27 @@ module TcRnTypes(
 	plusLIEs, mkLIE, isEmptyLIE, lieToList, listToLIE,
 
 	-- Misc other types
-	TcRef, TcId, TcIdSet
+	TcId, TcIdSet
   ) where
 
 #include "HsVersions.h"
 
 import HsSyn		( PendingSplice, HsOverLit, MonoBinds, RuleDecl, ForeignDecl )
-import RnHsSyn		( RenamedHsExpr, RenamedPat, RenamedArithSeqInfo )
-import HscTypes		( GhciMode, ExternalPackageState, HomePackageTable, 
-			  NameCache, GlobalRdrEnv, LocalRdrEnv, FixityEnv,
-			  TypeEnv, TyThing, Avails, GenAvailInfo(..), AvailInfo,
-			   availName, IsBootInterface, Deprecations,
-			   ExternalPackageState(..), emptyExternalPackageState )
+import RnHsSyn		( RenamedPat, RenamedArithSeqInfo )
+import HscTypes		( FixityEnv,
+			  HscEnv, TypeEnv, TyThing, 
+			  Avails, GenAvailInfo(..), AvailInfo,
+			  availName, IsBootInterface, Deprecations )
 import Packages		( PackageName )
 import TcType		( TcTyVarSet, TcType, TcTauType, TcThetaType, 
 			  TcPredType, TcKind, tcCmpPred, tcCmpType, tcCmpTypes )
 import InstEnv		( DFunId, InstEnv )
+import IOEnv
+import RdrName		( GlobalRdrEnv, LocalRdrEnv )
 import Name		( Name )
 import NameEnv
-import NameSet		( NameSet, emptyNameSet )
+import NameSet		( NameSet, emptyNameSet, DefUses )
+import OccName		( OccEnv )
 import Type		( Type )
 import Class		( Class )
 import Var		( Id, TyVar )
@@ -69,28 +64,15 @@ import Module
 import SrcLoc		( SrcLoc )
 import VarSet		( IdSet )
 import ErrUtils		( Messages, Message )
-import CmdLineOpts	( DynFlags )
 import UniqSupply	( UniqSupply )
 import BasicTypes	( IPName )
 import Util		( thenCmp )
 import Bag
 import Outputable
-import DATA_IOREF	( IORef, newIORef, readIORef, writeIORef )
-import UNSAFE_IO	( unsafeInterleaveIO )
-import FIX_IO		( fixIO )
-import EXCEPTION	( Exception(..) )
-import IO		( isUserError )
 import Maybe		( mapMaybe )
 import ListSetOps	( unionLists )
-import Panic		( tryJust )
 \end{code}
 
-
-\begin{code}
-type TcRef a = IORef a
-type TcId    = Id 			-- Type may be a TcType
-type TcIdSet = IdSet
-\end{code}
 
 %************************************************************************
 %*									*
@@ -99,164 +81,22 @@ type TcIdSet = IdSet
 %*									*
 %************************************************************************
 
-The monad itself has to be defined here, 
-because it is mentioned by ErrCtxt
+The monad itself has to be defined here, because it is mentioned by ErrCtxt
 
 \begin{code}
-newtype TcRn m a = TcRn (Env m -> IO a)
-unTcRn (TcRn f) = f
+type TcRef a = IORef a
+type TcId    = Id 			-- Type may be a TcType
+type TcIdSet = IdSet
 
-type TcM a = TcRn TcLclEnv a
-type RnM a = TcRn RnLclEnv a
-
-returnM :: a -> TcRn m a
-returnM a = TcRn (\ env -> return a)
-
-thenM :: TcRn m a -> (a -> TcRn m b) -> TcRn m b
-thenM (TcRn m) f = TcRn (\ env -> do { r <- m env ;
-				       unTcRn (f r) env })
-
-thenM_ :: TcRn m a -> TcRn m b -> TcRn m b
-thenM_ (TcRn m) f = TcRn (\ env -> do { m env ; unTcRn f env })
-
-failM :: TcRn m a
-failM = TcRn (\ env -> ioError (userError "TcRn failure"))
-
-instance Monad (TcRn m) where
-  (>>=)  = thenM
-  (>>)   = thenM_
-  return = returnM
-  fail s = failM	-- Ignore the string
+type TcRnIf a b c = IOEnv (Env a b) c
+type IfM lcl a  = TcRnIf IfGblEnv lcl a		-- Iface stuff
+type IfG a  = IfM () a				-- Top level
+type IfL a  = IfM IfLclEnv a			-- Nested
+type TcRn a = TcRnIf TcGblEnv TcLclEnv a
+type RnM  a = TcRn a		-- Historical
+type TcM  a = TcRn a		-- Historical
 \end{code}
 
-
-%************************************************************************
-%*									*
-	Fundmantal combinators specific to the monad
-%*									*
-%************************************************************************
-
-Running it
-
-\begin{code}
-runTcRn :: Env m -> TcRn m a -> IO a
-runTcRn env (TcRn m) = m env
-\end{code}
-
-The fixpoint combinator
-
-\begin{code}
-{-# NOINLINE fixM #-}
-  -- Aargh!  Not inlining fixTc alleviates a space leak problem.
-  -- Normally fixTc is used with a lazy tuple match: if the optimiser is
-  -- shown the definition of fixTc, it occasionally transforms the code
-  -- in such a way that the code generator doesn't spot the selector
-  -- thunks.  Sigh.
-
-fixM :: (a -> TcRn m a) -> TcRn m a
-fixM f = TcRn (\ env -> fixIO (\ r -> unTcRn (f r) env))
-\end{code}
-
-Error recovery
-
-\begin{code}
-tryM :: TcRn m r -> TcRn m (Either Exception r)
--- Reflect exception into TcRn monad
-tryM (TcRn thing) = TcRn (\ env -> tryJust tc_errors (thing env))
-  where 
-#if __GLASGOW_HASKELL__ > 504 || __GLASGOW_HASKELL__ < 500
-	tc_errors e@(IOException ioe) | isUserError ioe = Just e
-#elif __GLASGOW_HASKELL__ == 502
-	tc_errors e@(UserError _) = Just e
-#else 
-	tc_errors e@(IOException ioe) | isUserError e = Just e
-#endif
-	tc_errors _other = Nothing
-	-- type checker failures show up as UserErrors only
-\end{code}
-
-Lazy interleave 
-
-\begin{code}
-unsafeInterleaveM :: TcRn m a -> TcRn m a
-unsafeInterleaveM (TcRn m) = TcRn (\ env -> unsafeInterleaveIO (m env))
-\end{code}
-
-\end{code}
-
-Performing arbitrary I/O, plus the read/write var (for efficiency)
-
-\begin{code}
-ioToTcRn :: IO a -> TcRn m a
-ioToTcRn io = TcRn (\ env -> io)
-
-newMutVar :: a -> TcRn m (TcRef a)
-newMutVar val = TcRn (\ env -> newIORef val)
-
-writeMutVar :: TcRef a -> a -> TcRn m ()
-writeMutVar var val = TcRn (\ env -> writeIORef var val)
-
-readMutVar :: TcRef a -> TcRn m a
-readMutVar var = TcRn (\ env -> readIORef var)
-\end{code}
-
-Getting the environment
-
-\begin{code}
-getEnv :: TcRn m (Env m)
-{-# INLINE getEnv #-}
-getEnv = TcRn (\ env -> return env)
-
-setEnv :: Env n -> TcRn n a -> TcRn m a
-{-# INLINE setEnv #-}
-setEnv new_env (TcRn m) = TcRn (\ env -> m new_env)
-
-updEnv :: (Env m -> Env n) -> TcRn n a -> TcRn m a
-{-# INLINE updEnv #-}
-updEnv upd (TcRn m) = TcRn (\ env -> m (upd env))
-\end{code}
-
-\begin{code}
-zapEnv :: TcRn m a -> TcRn m a
-zapEnv act = TcRn $ \env@Env{ env_top=top, env_gbl=gbl, env_lcl=lcl } ->
-  case top of {
-   TopEnv{ 
-     top_mode    = mode,
-     top_dflags  = dflags,
-     top_hpt     = hpt,
-     top_eps     = eps,
-     top_us      = us
-    } -> do
-
-  eps_snap <- readIORef eps
-  ref <- newIORef $! emptyExternalPackageState{ eps_PTE = eps_PTE eps_snap }
-
-  let
-     top' = TopEnv {
-		top_mode   = mode,
-		top_dflags = dflags,
-		top_hpt    = hpt,
-		top_eps    = ref,
-		top_us	   = us
-	    }
-
-     type_env = tcg_type_env gbl
-     mod = tcg_mod gbl
-     gbl' = TcGblEnv {
-		tcg_mod = mod,
-		tcg_type_env = type_env
-	    }
-
-     env' = Env {
-		env_top = top',
-		env_gbl = gbl',
-		env_lcl = lcl
-		-- leave the rest empty
-	     }
-
-  case act of { TcRn f -> f env' }
- }
-\end{code}
 
 %************************************************************************
 %*									*
@@ -265,50 +105,19 @@ zapEnv act = TcRn $ \env@Env{ env_top=top, env_gbl=gbl, env_lcl=lcl } ->
 %************************************************************************
 
 \begin{code}
-data Env a	-- Changes as we move into an expression
+data Env gbl lcl	-- Changes as we move into an expression
   = Env {
-	env_top	 :: TopEnv,	-- Top-level stuff that never changes
-				--   Mainly a bunch of updatable refs
+	env_top	 :: HscEnv,	-- Top-level stuff that never changes
 				--   Includes all info about imported things
-	env_gbl  :: TcGblEnv,	-- Info about things defined at the top leve
+
+	env_us   :: TcRef UniqSupply,	-- Unique supply for local varibles
+
+	env_gbl  :: gbl,	-- Info about things defined at the top level
 				--   of the module being compiled
 
-	env_lcl  :: a,		-- Different for the type checker 
-				-- and the renamer
-
-	env_loc  :: SrcLoc	-- Source location
+	env_lcl  :: lcl		-- Nested stuff -- changes as we go into 
+				-- an expression
     }
-
-data TopEnv	-- Built once at top level then does not change
-		-- Concerns imported stuff
-		-- Exceptions: error recovery points, meta computation points
-   = TopEnv {
-	top_mode    :: GhciMode,
-        top_dflags  :: DynFlags,
-
-	-- Stuff about imports
-	top_eps	   :: TcRef ExternalPackageState,
-		-- PIT, ImportedModuleInfo
-		-- DeclsMap, IfaceRules, IfaceInsts, InstGates
-		-- TypeEnv, InstEnv, RuleBase
-		-- Mutable, because we demand-load declarations that extend the state
-
-	top_hpt	 :: HomePackageTable,
-		-- The home package table that we've accumulated while 
-		-- compiling the home package, 
-		-- *excluding* the module we are compiling right now.
-		-- (In one-shot mode the current module is the only
-		--  home-package module, so tc_hpt is empty.  All other
-		--  modules count as "external-package" modules.)
-		-- tc_hpt is not mutable because we only demand-load 
-		-- external packages; the home package is eagerly 
-		-- loaded by the compilation manager.
-
-	-- The global name supply
-	top_nc	   :: TcRef NameCache,		-- Maps original names to Names
-	top_us     :: TcRef UniqSupply,		-- Unique supply for this module
-	top_errs   :: TcRef Messages
-   }
 
 -- TcGblEnv describes the top-level of the module at the 
 -- point at which the typechecker is finished work.
@@ -316,12 +125,12 @@ data TopEnv	-- Built once at top level then does not change
 
 data TcGblEnv
   = TcGblEnv {
-	tcg_mod    :: Module,		-- Module being compiled
-	tcg_usages :: TcRef EntityUsage,  -- What version of what entities 
-					  -- have been used from other home-pkg modules
+	tcg_mod     :: Module,		-- Module being compiled
 	tcg_rdr_env :: GlobalRdrEnv,	-- Top level envt; used during renaming
-	tcg_fix_env :: FixityEnv,	-- Ditto
-	tcg_default :: [Type],		-- Types used for defaulting
+	tcg_default :: Maybe [Type],	-- Types used for defaulting
+					-- Nothing => no 'default' decl
+
+	tcg_fix_env  :: FixityEnv,	-- Just for things in this module
 
 	tcg_type_env :: TypeEnv,	-- Global type env for the module we are compiling now
 		-- All TyCons and Classes (for this module) end up in here right away,
@@ -329,21 +138,22 @@ data TcGblEnv
 		--
 		-- (Ids defined in this module start in the local envt, 
 		--  though they move to the global envt during zonking)
+
+	tcg_type_env_var :: TcRef TypeEnv,	
+		-- Used only to initialise the interface-file
+		-- typechecker in initIfaceTcRn, so that it can see stuff
+		-- bound in this module when dealing with hi-boot recursions
+		-- Updated at intervals (e.g. after dealing with types and classes)
 	
-	tcg_inst_env :: TcRef InstEnv,	-- Global instance env: a combination of 
-					--	tc_pcs, tc_hpt, *and* tc_insts
-		-- This field is mutable so that it can be updated inside a
-		-- Template Haskell splice, which might suck in some new
-		-- instance declarations.  This is a slightly different strategy
-		-- than for the type envt, where we look up first in tcg_type_env
-		-- and then in the mutable EPS, because the InstEnv for this module
-		-- is constructed (in principle at least) only from the modules
-		-- 'below' this one, so it's this-module-specific
-		--
-		-- On the other hand, a declaration quote [d| ... |] may introduce
-		-- some new instance declarations that we *don't* want to persist
-		-- outside the quote, so we tiresomely need to revert the InstEnv
-		-- after finishing the quote (see TcSplice.tcBracket)
+	tcg_inst_env :: InstEnv,	-- Instance envt for *home-package* modules
+					-- Includes the dfuns in tcg_insts
+	tcg_inst_uses :: TcRef NameSet,	-- Home-package Dfuns actually used 
+		-- Used to generate version dependencies
+		-- This records usages, rather like tcg_dus, but it has to
+		-- be a mutable variable so it can be augmented 
+		-- when we look up an instance.  These uses of dfuns are
+		-- rather like the free variables of the program, but
+		-- are implicit instead of explicit.
 
 		-- Now a bunch of things about this module that are simply 
 		-- accumulated, but never consulted until the end.  
@@ -353,6 +163,11 @@ data TcGblEnv
 	tcg_imports :: ImportAvails,		-- Information about what was imported 
 						--    from where, including things bound
 						--    in this module
+	tcg_dus :: DefUses,  	-- What is defined in this module and what is used.
+				-- The latter is used to generate 
+				--	(a) version tracking; no need to recompile if these
+				--		things have not changed version stamp
+				-- 	(b) unused-import info
 
 		-- The next fields accumulate the payload of the module
 		-- The binds, rules and foreign-decl fiels are collected
@@ -362,6 +177,46 @@ data TcGblEnv
 	tcg_insts   :: [DFunId],		-- ...Instances
 	tcg_rules   :: [RuleDecl Id],		-- ...Rules
 	tcg_fords   :: [ForeignDecl Id]		-- ...Foreign import & exports
+    }
+\end{code}
+
+%************************************************************************
+%*									*
+		The interface environments
+  	      Used when dealing with IfaceDecls
+%*									*
+%************************************************************************
+
+\begin{code}
+data IfGblEnv 
+  = IfGblEnv {
+	-- The type environment for the module being compiled,
+	-- in case the interface refers back to it via a reference that
+	-- was originally a hi-boot file.
+	-- We need the module name so we can test when it's appropriate
+	-- to look in this env.
+	if_rec_types :: Maybe (Module, IfG TypeEnv),
+		-- Allows a read effect, so it can be in a mutable
+		-- variable; c.f. handling the external package type env
+		-- Nothing => interactive stuff, no loops possible
+
+	if_is_boot   :: ModuleEnv (ModuleName, IsBootInterface)
+	-- Tells what we know about boot interface files
+	-- When we're importing a module we know absolutely
+	-- nothing about, so we assume it's from
+	-- another package, where we aren't doing 
+	-- dependency tracking. So it won't be a hi-boot file.
+    }
+
+data IfLclEnv
+  = IfLclEnv {
+	-- The module for the current IfaceDecl
+	-- So if we see   f = \x -> x
+	-- it means M.f = \x -> x, where M is the if_mod
+	if_mod :: ModuleName,
+
+	if_tv_env  :: OccEnv TyVar,	-- Nested tyvar bindings
+	if_id_env  :: OccEnv Id		-- Nested id binding
     }
 \end{code}
 
@@ -388,21 +243,31 @@ Why?  Because they are now Ids not TcIds.  This final GlobalEnv is
 	b) used in the ModDetails of this module
 
 \begin{code}
-data TcLclEnv
+data TcLclEnv		-- Changes as we move inside an expression
+			-- Discarded after typecheck/rename; not passed on to desugarer
   = TcLclEnv {
-	tcl_ctxt :: ErrCtxt,	-- Error context
+	tcl_loc  :: SrcLoc,		-- Source location
+	tcl_ctxt :: ErrCtxt,		-- Error context
+	tcl_errs :: TcRef Messages,	-- Place to accumulate errors
 
 	tcl_th_ctxt    :: ThStage,	-- Template Haskell context
 	tcl_arrow_ctxt :: ArrowCtxt,	-- Arrow-notation context
+
+	tcl_rdr :: LocalRdrEnv,		-- Local name envt
+		--   Does *not* include global name envt; may shadow it
+		--   Includes both ordinary variables and type variables;
+		--   they are kept distinct because tyvar have a different
+		--   occurrence contructor (Name.TvOcc)
+		-- We still need the unsullied global name env so that
+    		--   we can look up record field names
 
 	tcl_env    :: NameEnv TcTyThing,  -- The local type environment: Ids and TyVars
 					  -- defined in this module
 					
 	tcl_tyvars :: TcRef TcTyVarSet,	-- The "global tyvars"
-					-- Namely, the in-scope TyVars bound in tcl_lenv, 
-					-- plus the tyvars mentioned in the types of 
-					-- Ids bound in tcl_lenv
-					-- Why mutable? see notes with tcGetGlobalTyVars
+			-- Namely, the in-scope TyVars bound in tcl_lenv, 
+			-- plus the tyvars mentioned in the types of Ids bound in tcl_lenv
+			-- Why mutable? see notes with tcGetGlobalTyVars
 
 	tcl_lie :: TcRef LIE		-- Place to accumulate type constraints
     }
@@ -476,19 +341,15 @@ data TcTyThing
   = AGlobal TyThing			-- Used only in the return type of a lookup
   | ATcId   TcId ThLevel ProcLevel 	-- Ids defined in this module; may not be fully zonked
   | ATyVar  TyVar 			-- Type variables
-  | AThing  TcKind			-- Used temporarily, during kind checking
--- Here's an example of how the AThing guy is used
--- Suppose we are checking (forall a. T a Int):
---	1. We first bind (a -> AThink kv), where kv is a kind variable. 
---	2. Then we kind-check the (T a Int) part.
---	3. Then we zonk the kind variable.
---	4. Now we know the kind for 'a', and we add (a -> ATyVar a::K) to the environment
+  | ARecTyCon TcKind 			-- Used temporarily, during kind checking, for the
+  | ARecClass TcKind			--	tycons and clases in this recursive group
 
 instance Outputable TcTyThing where	-- Debugging only
-   ppr (AGlobal g)     = text "AGlobal" <+> ppr g
-   ppr (ATcId g tl pl) = text "ATcId" <+> ppr g <+> ppr tl <+> ppr pl
-   ppr (ATyVar t)      = text "ATyVar" <+> ppr t
-   ppr (AThing k)      = text "AThing" <+> ppr k
+   ppr (AGlobal g)      = text "AGlobal" <+> ppr g
+   ppr (ATcId g tl pl)  = text "ATcId" <+> ppr g <+> ppr tl <+> ppr pl
+   ppr (ATyVar t)       = text "ATyVar" <+> ppr t
+   ppr (ARecTyCon k)    = text "ARecTyCon" <+> ppr k
+   ppr (ARecClass k)    = text "ARecClass" <+> ppr k
 \end{code}
 
 \begin{code}
@@ -496,37 +357,6 @@ type ErrCtxt = [TidyEnv -> TcM (TidyEnv, Message)]
 			-- Innermost first.  Monadic so that we have a chance
 			-- to deal with bound type variables just before error
 			-- message construction
-\end{code}
-
-
-%************************************************************************
-%*									*
-		The local renamer environment
-%*									*
-%************************************************************************
-
-\begin{code}
-data RnLclEnv
-  = RnLclEnv {
-	rn_mode :: RnMode,
-	rn_lenv :: LocalRdrEnv		-- Local name envt
-		--   Does *not* include global name envt; may shadow it
-		--   Includes both ordinary variables and type variables;
-		--   they are kept distinct because tyvar have a different
-		--   occurrence contructor (Name.TvOcc)
-		-- We still need the unsullied global name env so that
-    		--   we can look up record field names
-     }	
-
-data RnMode = SourceMode		-- Renaming source code
-	    | InterfaceMode Module	-- Renaming interface declarations from M
-	    | CmdLineMode		-- Renaming a command-line expression
-
-isInterfaceMode (InterfaceMode _) = True
-isInterfaceMode _ 		  = False
-
-isCmdLineMode CmdLineMode = True
-isCmdLineMode _ = False
 \end{code}
 
 
@@ -563,7 +393,7 @@ emptyUsages = emptyNameSet
 %************************************************************************
 
 ImportAvails summarises what was imported from where, irrespective
-of whether the imported htings are actually used or not
+of whether the imported things are actually used or not
 It is used 	* when processing the export list
 		* when constructing usage info for the inteface file
 		* to identify the list of directly imported modules
@@ -630,6 +460,12 @@ data ImportAvails
  	imp_orphs :: [ModuleName]
 		-- Orphan modules below us in the import tree
       }
+
+mkModDeps :: [(ModuleName, IsBootInterface)]
+	  -> ModuleEnv (ModuleName, IsBootInterface)
+mkModDeps deps = foldl add emptyModuleEnv deps
+	       where
+		 add env elt@(m,_) = extendModuleEnvByName env m elt
 
 emptyImportAvails :: ImportAvails
 emptyImportAvails = ImportAvails { imp_env    	= emptyAvailEnv, 
@@ -736,17 +572,11 @@ The @WhereFrom@ type controls where the renamer looks for an interface file
 \begin{code}
 data WhereFrom 
   = ImportByUser IsBootInterface	-- Ordinary user import (perhaps {-# SOURCE #-})
-
-  | ImportForUsage IsBootInterface	-- Import when chasing usage info from an interaface file
-					-- 	Failure in this case is not an error
-
   | ImportBySystem			-- Non user import.
 
 instance Outputable WhereFrom where
   ppr (ImportByUser is_boot) | is_boot     = ptext SLIT("{- SOURCE -}")
 			     | otherwise   = empty
-  ppr (ImportForUsage is_boot) | is_boot   = ptext SLIT("{- USAGE SOURCE -}")
-			       | otherwise = ptext SLIT("{- USAGE -}")
   ppr ImportBySystem     		   = ptext SLIT("{- SYSTEM -}")
 \end{code}
 
@@ -921,10 +751,6 @@ data InstOrigin
 	-- translated term, and so need not be bound.  Nor should they
 	-- be abstracted over.
 
-  | CCallOrigin		String			-- CCall label
-			(Maybe RenamedHsExpr)	-- Nothing if it's the result
-						-- Just arg, for an argument
-
   | UnknownOrigin	-- Help! I give up...
 \end{code}
 
@@ -968,11 +794,6 @@ pprInstLoc (InstLoc orig locn ctxt)
 	        quotes (ppr clas), text "type:", ppr ty]
     pp_orig (ValSpecOrigin name)
 	= hsep [ptext SLIT("a SPECIALIZE user-pragma for"), quotes (ppr name)]
-    pp_orig (CCallOrigin clabel Nothing{-ccall result-})
-	= hsep [ptext SLIT("the result of the _ccall_ to"), quotes (text clabel)]
-    pp_orig (CCallOrigin clabel (Just arg_expr))
-	= hsep [ptext SLIT("an argument in the _ccall_ to"), quotes (text clabel) <> comma, 
-		text "namely", quotes (ppr arg_expr)]
     pp_orig (UnknownOrigin)
 	= ptext SLIT("...oops -- I don't know where the overloading came from!")
 \end{code}

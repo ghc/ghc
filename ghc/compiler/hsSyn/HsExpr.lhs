@@ -11,9 +11,9 @@ module HsExpr where
 -- friends:
 import HsDecls		( HsGroup )
 import HsBinds		( HsBinds(..), nullBinds )
-import HsPat		( Pat )
-import HsLit		( HsLit, HsOverLit )
-import HsTypes		( HsType, PostTcType, SyntaxName )
+import HsPat		( Pat(..), HsConDetails(..) )
+import HsLit		( HsLit(..), HsOverLit )
+import HsTypes		( HsType, PostTcType, SyntaxName, placeHolderType )
 import HsImpExp		( isOperator, pprHsVar )
 
 -- others:
@@ -23,10 +23,46 @@ import Var		( TyVar, Id )
 import Name		( Name )
 import DataCon		( DataCon )
 import BasicTypes	( IPName, Boxity, tupleParens, Fixity(..) )
-import SrcLoc		( SrcLoc )
+import SrcLoc		( SrcLoc, generatedSrcLoc )
 import Outputable	
 import FastString
 \end{code}
+
+
+%************************************************************************
+%*									*
+	Some useful helpers for constructing expressions
+%*									*
+%************************************************************************
+
+\begin{code}
+mkHsApps    f xs = foldl HsApp (HsVar f) xs
+mkHsVarApps f xs = foldl HsApp (HsVar f) (map HsVar xs)
+
+mkHsIntLit n = HsLit (HsInt n)
+mkHsString s = HsString (mkFastString s)
+
+mkConPat con vars   = ConPatIn con (PrefixCon (map VarPat vars))
+mkNullaryConPat con = ConPatIn con (PrefixCon [])
+
+mkSimpleHsAlt :: Pat id -> HsExpr id -> Match id
+-- A simple lambda with a single pattern, no binds, no guards; pre-typechecking
+mkSimpleHsAlt pat expr 
+  = mkSimpleMatch [pat] expr placeHolderType generatedSrcLoc
+
+mkSimpleMatch :: [Pat id] -> HsExpr id -> Type -> SrcLoc -> Match id
+mkSimpleMatch pats rhs rhs_ty locn
+  = Match pats Nothing (GRHSs (unguardedRHS rhs locn) EmptyBinds rhs_ty)
+
+unguardedRHS :: HsExpr id -> SrcLoc -> [GRHS id]
+unguardedRHS rhs loc = [GRHS [ResultStmt rhs loc] loc]
+
+glueBindsOnGRHSs :: HsBinds id -> GRHSs id -> GRHSs id
+glueBindsOnGRHSs EmptyBinds grhss = grhss
+glueBindsOnGRHSs binds1 (GRHSs grhss binds2 ty)
+  = GRHSs grhss (binds1 `ThenBinds` binds2) ty
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -597,18 +633,6 @@ data GRHSs id
 data GRHS id
   = GRHS  [Stmt id]		-- The RHS is the final ResultStmt
 	  SrcLoc
-
-mkSimpleMatch :: [Pat id] -> HsExpr id -> Type -> SrcLoc -> Match id
-mkSimpleMatch pats rhs rhs_ty locn
-  = Match pats Nothing (GRHSs (unguardedRHS rhs locn) EmptyBinds rhs_ty)
-
-unguardedRHS :: HsExpr id -> SrcLoc -> [GRHS id]
-unguardedRHS rhs loc = [GRHS [ResultStmt rhs loc] loc]
-
-glueBindsOnGRHSs :: HsBinds id -> GRHSs id -> GRHSs id
-glueBindsOnGRHSs EmptyBinds grhss = grhss
-glueBindsOnGRHSs binds1 (GRHSs grhss binds2 ty)
-  = GRHSs grhss (binds1 `ThenBinds` binds2) ty
 \end{code}
 
 @getMatchLoc@ takes a @Match@ and returns the

@@ -5,48 +5,51 @@
 
 \begin{code}
 module DsMonad (
-	DsM,
-	initDs, returnDs, thenDs, mapDs, listDs, fixDs,
-	mapAndUnzipDs, zipWithDs, foldlDs,
-	uniqSMtoDsM,
-	newTyVarsDs, cloneTyVarsDs,
+	DsM, mappM,
+	initDs, returnDs, thenDs, listDs, fixDs, mapAndUnzipDs, foldlDs,
+
+	newTyVarsDs, 
 	duplicateLocalDs, newSysLocalDs, newSysLocalsDs, newUniqueId,
 	newFailLocalDs,
 	getSrcLocDs, putSrcLocDs,
 	getModuleDs,
-	getUniqueDs, getUniquesDs,
-	UniqSupply, getUniqSupplyDs,
+	newUnique, 
+	UniqSupply, newUniqueSupply,
 	getDOptsDs,
 	dsLookupGlobal, dsLookupGlobalId, dsLookupTyCon, dsLookupDataCon,
 
 	DsMetaEnv, DsMetaVal(..), dsLookupMetaEnv, dsExtendMetaEnv,
 
 	dsWarn, 
-	DsWarnings,
+	DsWarning,
 	DsMatchContext(..)
     ) where
 
 #include "HsVersions.h"
 
 import TcHsSyn		( TypecheckedPat, TypecheckedMatchContext, TypecheckedHsExpr )
-import HscTypes		( TyThing(..) )
+import TcRnMonad
+import IfaceEnv		( tcIfaceGlobal )
+import HscTypes		( TyThing(..), TypeEnv, HscEnv, 
+			  IsBootInterface,
+			  tyThingId, tyThingTyCon, tyThingDataCon  )
 import Bag		( emptyBag, snocBag, Bag )
 import DataCon		( DataCon )
 import TyCon		( TyCon )
 import DataCon		( DataCon )
 import Id		( mkSysLocal, setIdUnique, Id )
-import Module		( Module )
+import Module		( Module, ModuleName, ModuleEnv )
 import Var		( TyVar, setTyVarUnique )
 import Outputable
 import SrcLoc		( noSrcLoc, SrcLoc )
 import Type             ( Type )
-import UniqSupply	( initUs_, getUniqueUs, getUniquesUs, thenUs, returnUs, 
-			  fixUs, UniqSM, UniqSupply, getUs )
-import Unique		( Unique ) 
+import UniqSupply	( UniqSupply, uniqsFromSupply )
 import Name		( Name, nameOccName )
 import NameEnv
 import OccName          ( occNameFS )
 import CmdLineOpts	( DynFlags )
+
+import DATA_IOREF	( newIORef, readIORef )
 
 infixr 9 `thenDs`
 \end{code}
@@ -55,17 +58,29 @@ Now the mondo monad magic (yes, @DsM@ is a silly name)---carry around
 a @UniqueSupply@ and some annotations, which
 presumably include source-file location information:
 \begin{code}
-newtype DsM result
-  = DsM (DsEnv -> DsWarnings -> UniqSM (result, DsWarnings))
+type DsM result = TcRnIf DsGblEnv DsLclEnv result
 
-unDsM (DsM x) = x	
+-- Compatibility functions
+fixDs    = fixM
+thenDs   = thenM
+returnDs = returnM
+listDs   = sequenceM
+foldlDs  = foldlM
+mapAndUnzipDs = mapAndUnzipM
 
-data DsEnv = DsEnv {
-	ds_dflags :: DynFlags,
-	ds_globals :: Name -> TyThing,	-- Lookup well-known Ids
+
+type DsWarning = (SrcLoc, SDoc)
+
+data DsGblEnv = DsGblEnv {
+	ds_mod	   :: Module,       		-- For SCC profiling
+	ds_warns   :: IORef (Bag DsWarning),	-- Warning messages
+	ds_if_env  :: IfGblEnv			-- Used for looking up global, 
+						-- possibly-imported things
+    }
+
+data DsLclEnv = DsLclEnv {
 	ds_meta	   :: DsMetaEnv,	-- Template Haskell bindings
-	ds_loc	   :: SrcLoc,		-- to put in pattern-matching error msgs
-	ds_mod	   :: Module       	-- module: for SCC profiling
+	ds_loc	   :: SrcLoc		-- to put in pattern-matching error msgs
      }
 
 -- Inside [| |] brackets, the desugarer looks 
@@ -80,81 +95,29 @@ data DsMetaVal
    | Splice TypecheckedHsExpr	-- These bindings are introduced by
 				-- the PendingSplices on a HsBracketOut
 
-instance Monad DsM where
-  return = returnDs
-  (>>=)  = thenDs
-
-type DsWarnings = Bag DsWarning         -- The desugarer reports matches which are
-					-- completely shadowed or incomplete patterns
-type DsWarning = (SrcLoc, SDoc)
-
-{-# INLINE thenDs #-}
-{-# INLINE returnDs #-}
-
 -- initDs returns the UniqSupply out the end (not just the result)
 
-initDs  :: DynFlags
-	-> UniqSupply
-	-> (Name -> TyThing)
-	-> Module   -- module name: for profiling
+initDs  :: HscEnv
+	-> Module -> TypeEnv
+	-> ModuleEnv (ModuleName,IsBootInterface)	
 	-> DsM a
-	-> (a, DsWarnings)
+	-> IO (a, Bag DsWarning)
 
-initDs dflags init_us lookup mod (DsM action)
-  = initUs_ init_us (action ds_env emptyBag)
-  where
-    ds_env = DsEnv { ds_dflags = dflags, ds_globals = lookup,
-		     ds_loc = noSrcLoc, ds_mod = mod,
-		     ds_meta = emptyNameEnv }
+initDs hsc_env mod type_env is_boot thing_inside
+  = do 	{ warn_var <- newIORef emptyBag
+	; let { if_env = IfGblEnv { if_rec_types = Just (mod, return type_env),
+				    if_is_boot = is_boot }
+	      ; gbl_env = DsGblEnv { ds_mod = mod, 
+				     ds_if_env = if_env, 
+				     ds_warns = warn_var }
+	      ; lcl_env = DsLclEnv { ds_meta = emptyNameEnv, 
+				     ds_loc = noSrcLoc } }
 
-thenDs :: DsM a -> (a -> DsM b) -> DsM b
+	; res <- initTcRnIf 'd' hsc_env gbl_env lcl_env thing_inside
 
-thenDs (DsM m1) m2 = DsM( \ env warns ->
-    m1 env warns	`thenUs` \ (result, warns1) ->
-    unDsM (m2 result) env warns1)
-
-returnDs :: a -> DsM a
-returnDs result = DsM (\ env warns -> returnUs (result, warns))
-
-fixDs :: (a -> DsM a) -> DsM a
-fixDs f = DsM (\env warns -> fixUs (\ ~(a, _warns') -> unDsM (f a) env warns))
-
-listDs :: [DsM a] -> DsM [a]
-listDs []     = returnDs []
-listDs (x:xs)
-  = x		`thenDs` \ r  ->
-    listDs xs	`thenDs` \ rs ->
-    returnDs (r:rs)
-
-mapDs :: (a -> DsM b) -> [a] -> DsM [b]
-
-mapDs f []     = returnDs []
-mapDs f (x:xs)
-  = f x		`thenDs` \ r  ->
-    mapDs f xs	`thenDs` \ rs ->
-    returnDs (r:rs)
-
-foldlDs :: (a -> b -> DsM a) -> a -> [b] -> DsM a
-
-foldlDs k z []     = returnDs z
-foldlDs k z (x:xs) = k z x `thenDs` \ r ->
-		     foldlDs k r xs
-
-mapAndUnzipDs :: (a -> DsM (b, c)) -> [a] -> DsM ([b], [c])
-
-mapAndUnzipDs f []     = returnDs ([], [])
-mapAndUnzipDs f (x:xs)
-  = f x		    	`thenDs` \ (r1, r2)  ->
-    mapAndUnzipDs f xs	`thenDs` \ (rs1, rs2) ->
-    returnDs (r1:rs1, r2:rs2)
-
-zipWithDs :: (a -> b -> DsM c) -> [a] -> [b] -> DsM [c]
-
-zipWithDs f []	   ys = returnDs []
-zipWithDs f (x:xs) (y:ys)
-  = f x y		`thenDs` \ r  ->
-    zipWithDs f xs ys	`thenDs` \ rs ->
-    returnDs (r:rs)
+	; warns <- readIORef warn_var
+	; return (res, warns)
+	}
 \end{code}
 
 And all this mysterious stuff is so we can occasionally reach out and
@@ -163,61 +126,35 @@ functions are defined with it.  The difference in name-strings makes
 it easier to read debugging output.
 
 \begin{code}
-uniqSMtoDsM :: UniqSM a -> DsM a
-uniqSMtoDsM u_action = DsM(\ env warns -> 
-	u_action	`thenUs` \ res ->
-	returnUs (res, warns))
-
-    
-getUniqueDs :: DsM Unique
-getUniqueDs = DsM (\ env warns -> 
-    getUniqueUs		`thenUs` \ uniq -> 
-    returnUs (uniq, warns))
-
-getUniquesDs :: DsM [Unique]
-getUniquesDs = DsM(\ env warns -> 
-    getUniquesUs		`thenUs` \ uniqs -> 
-    returnUs (uniqs, warns))
-
-getUniqSupplyDs :: DsM UniqSupply
-getUniqSupplyDs = DsM(\ env warns -> 
-    getUs		`thenUs` \ uniqs -> 
-    returnUs (uniqs, warns))
-
 -- Make a new Id with the same print name, but different type, and new unique
 newUniqueId :: Name -> Type -> DsM Id
 newUniqueId id ty
-  = getUniqueDs 	`thenDs` \ uniq ->
+  = newUnique 	`thenDs` \ uniq ->
     returnDs (mkSysLocal (occNameFS (nameOccName id)) uniq ty)
 
 duplicateLocalDs :: Id -> DsM Id
 duplicateLocalDs old_local 
-  = getUniqueDs 	`thenDs` \ uniq ->
+  = newUnique 	`thenDs` \ uniq ->
     returnDs (setIdUnique old_local uniq)
 
 newSysLocalDs, newFailLocalDs :: Type -> DsM Id
 newSysLocalDs ty
-  = getUniqueDs 	`thenDs` \ uniq ->
+  = newUnique 	`thenDs` \ uniq ->
     returnDs (mkSysLocal FSLIT("ds") uniq ty)
 
-newSysLocalsDs tys = mapDs newSysLocalDs tys
+newSysLocalsDs tys = mappM newSysLocalDs tys
 
 newFailLocalDs ty 
-  = getUniqueDs 	`thenDs` \ uniq ->
+  = newUnique 	`thenDs` \ uniq ->
     returnDs (mkSysLocal FSLIT("fail") uniq ty)
 	-- The UserLocal bit just helps make the code a little clearer
 \end{code}
 
 \begin{code}
-cloneTyVarsDs :: [TyVar] -> DsM [TyVar]
-cloneTyVarsDs tyvars 
-  = getUniquesDs	`thenDs` \ uniqs ->
-    returnDs (zipWith setTyVarUnique tyvars uniqs)
-
 newTyVarsDs :: [TyVar] -> DsM [TyVar]
 newTyVarsDs tyvar_tmpls 
-  = getUniquesDs	`thenDs` \ uniqs ->
-    returnDs (zipWith setTyVarUnique tyvar_tmpls uniqs)
+  = newUniqueSupply	`thenDs` \ uniqs ->
+    returnDs (zipWith setTyVarUnique tyvar_tmpls (uniqsFromSupply uniqs))
 \end{code}
 
 We can also reach out and either set/grab location information from
@@ -225,56 +162,52 @@ the @SrcLoc@ being carried around.
 
 \begin{code}
 getDOptsDs :: DsM DynFlags
-getDOptsDs = DsM(\ env warns -> returnUs (ds_dflags env, warns))
+getDOptsDs = getDOpts
 
 getModuleDs :: DsM Module
-getModuleDs = DsM(\ env warns -> returnUs (ds_mod env, warns))
+getModuleDs = do { env <- getGblEnv; return (ds_mod env) }
 
 getSrcLocDs :: DsM SrcLoc
-getSrcLocDs = DsM(\ env warns -> returnUs (ds_loc env, warns))
+getSrcLocDs = do { env <- getLclEnv; return (ds_loc env) }
 
 putSrcLocDs :: SrcLoc -> DsM a -> DsM a
-putSrcLocDs new_loc (DsM expr) = DsM(\ env warns ->
-    expr (env { ds_loc = new_loc }) warns)
+putSrcLocDs new_loc thing_inside = updLclEnv (\ env -> env {ds_loc = new_loc}) thing_inside
 
 dsWarn :: DsWarning -> DsM ()
-dsWarn warn = DsM(\ env warns -> returnUs ((), warns `snocBag` warn))
+dsWarn warn = do { env <- getGblEnv; updMutVar (ds_warns env) (`snocBag` warn) }
 \end{code}
 
 \begin{code}
 dsLookupGlobal :: Name -> DsM TyThing
+-- Very like TcEnv.tcLookupGlobal
 dsLookupGlobal name 
-  = DsM(\ env warns -> returnUs (ds_globals env name, warns))
+  = do	{ env <- getGblEnv
+	; setEnvs (ds_if_env env, ())
+		  (tcIfaceGlobal name) }
 
 dsLookupGlobalId :: Name -> DsM Id
 dsLookupGlobalId name 
   = dsLookupGlobal name		`thenDs` \ thing ->
-    returnDs $ case thing of
-		AnId id -> id
-		other   -> pprPanic "dsLookupGlobalId" (ppr name)
+    returnDs (tyThingId thing)
 
 dsLookupTyCon :: Name -> DsM TyCon
 dsLookupTyCon name
   = dsLookupGlobal name		`thenDs` \ thing ->
-    returnDs $ case thing of
-		 ATyCon tc -> tc
-		 other     -> pprPanic "dsLookupTyCon" (ppr name)
+    returnDs (tyThingTyCon thing)
 
 dsLookupDataCon :: Name -> DsM DataCon
 dsLookupDataCon name
   = dsLookupGlobal name		`thenDs` \ thing ->
-    returnDs $ case thing of
-		 ADataCon dc -> dc
-		 other       -> pprPanic "dsLookupDataCon" (ppr name)
+    returnDs (tyThingDataCon thing)
 \end{code}
 
 \begin{code}
 dsLookupMetaEnv :: Name -> DsM (Maybe DsMetaVal)
-dsLookupMetaEnv name = DsM(\ env warns -> returnUs (lookupNameEnv (ds_meta env) name, warns))
+dsLookupMetaEnv name = do { env <- getLclEnv; return (lookupNameEnv (ds_meta env) name) }
 
 dsExtendMetaEnv :: DsMetaEnv -> DsM a -> DsM a
-dsExtendMetaEnv menv (DsM m)
-  = DsM (\ env warns -> m (env { ds_meta = ds_meta env `plusNameEnv` menv }) warns)
+dsExtendMetaEnv menv thing_inside
+  = updLclEnv (\env -> env { ds_meta = ds_meta env `plusNameEnv` menv }) thing_inside
 \end{code}
 
 

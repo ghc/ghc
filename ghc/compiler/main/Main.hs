@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.133 2003/09/23 14:33:00 simonmar Exp $
+-- $Id: Main.hs,v 1.134 2003/10/09 11:58:57 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -332,9 +332,9 @@ doMake :: [String] -> IO ()
 doMake []    = throwDyn (UsageError "no input files")
 doMake srcs  = do 
     dflags <- getDynFlags 
-    state  <- cmInit Batch
-    graph  <- cmDepAnal state dflags srcs
-    (_, ok_flag, _) <- cmLoadModules state dflags graph
+    state  <- cmInit Batch dflags
+    graph  <- cmDepAnal state srcs
+    (_, ok_flag, _) <- cmLoadModules state graph
     when (failed ok_flag) (exitWith (ExitFailure 1))
     return ()
 

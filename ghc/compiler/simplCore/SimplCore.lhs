@@ -16,12 +16,12 @@ import CoreSyn
 import CoreFVs		( ruleRhsFreeVars )
 import HscTypes		( HscEnv(..), GhciMode(..),
 			  ModGuts(..), ModGuts, Avails, availsToNameSet, 
-			  PackageRuleBase, HomePackageTable, ModDetails(..),
-			  HomeModInfo(..)
+			  ModDetails(..),
+			  HomeModInfo(..), ExternalPackageState(..), hscEPS
 			)
 import CSE		( cseProgram )
-import Rules		( RuleBase, emptyRuleBase, ruleBaseFVs, ruleBaseIds, 
-			  extendRuleBaseList, addRuleBaseFVs, pprRuleBase, 
+import Rules		( RuleBase, emptyRuleBase, ruleBaseIds, 
+			  extendRuleBaseList, pprRuleBase, 
 			  ruleCheckProgram )
 import Module		( moduleEnvElts )
 import Name		( Name, isExternalName )
@@ -65,17 +65,15 @@ import List             ( partition )
 
 \begin{code}
 core2core :: HscEnv
-	  -> PackageRuleBase
 	  -> ModGuts
 	  -> IO ModGuts
 
-core2core hsc_env pkg_rule_base
+core2core hsc_env 
 	  mod_impl@(ModGuts { mg_exports = exports, 
 			      mg_binds = binds_in, 
 			      mg_rules = rules_in })
   = do
         let dflags 	  = hsc_dflags hsc_env
-	    hpt		  = hsc_HPT hsc_env
 	    ghci_mode	  = hsc_mode hsc_env
 	    core_todos
 		| Just todo <- dopt_CoreToDo dflags  =  todo
@@ -85,12 +83,12 @@ core2core hsc_env pkg_rule_base
 	let (cp_us, ru_us) = splitUniqSupply us
 
 		-- COMPUTE THE RULE BASE TO USE
-	(rule_base, local_rule_ids, orphan_rules, rule_rhs_fvs)
-		<- prepareRules dflags pkg_rule_base hpt ru_us binds_in rules_in
+	(rule_base, local_rule_ids, orphan_rules)
+		<- prepareRules hsc_env ru_us binds_in rules_in
 
 		-- PREPARE THE BINDINGS
 	let binds1 = updateBinders ghci_mode local_rule_ids 
-				   rule_rhs_fvs exports binds_in
+				   orphan_rules exports binds_in
 
 		-- DO THE BUSINESS
 	(stats, processed_binds)
@@ -216,17 +214,19 @@ noStats dfs thing = do { binds <- thing; return (zeroSimplCount dfs, binds) }
 -- so that the opportunity to apply the rule isn't lost too soon
 
 \begin{code}
-prepareRules :: DynFlags -> PackageRuleBase -> HomePackageTable
+prepareRules :: HscEnv 
 	     -> UniqSupply
 	     -> [CoreBind]
 	     -> [IdCoreRule]		-- Local rules
 	     -> IO (RuleBase, 		-- Full rule base
 		    IdSet,		-- Local rule Ids
-		    [IdCoreRule],	-- Orphan rules
-		    IdSet) 		-- RHS free vars of all rules
+		    [IdCoreRule])	-- Orphan rules defined in this module
 
-prepareRules dflags pkg_rule_base hpt us binds local_rules
-  = do	{ let env	       = emptySimplEnv SimplGently [] local_ids 
+prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
+	     us binds local_rules
+  = do	{ eps <- hscEPS hsc_env
+
+	; let env	       = emptySimplEnv SimplGently [] local_ids 
 	      (better_rules,_) = initSmpl dflags us (mapSmpl (simplRule env) local_rules)
 
 	; let (local_rules, orphan_rules) = partition ((`elemVarSet` local_ids) . fst) better_rules
@@ -239,21 +239,18 @@ prepareRules dflags pkg_rule_base hpt us binds local_rules
 		--	Example:	class Foo a where
 		--			  op :: a -> a
 		--			{-# RULES "op" op x = x #-}
+	      local_rule_base = extendRuleBaseList emptyRuleBase local_rules
+	      local_rule_ids  = ruleBaseIds local_rule_base	-- Local Ids with rules attached
 
-	      rule_rhs_fvs		  = unionVarSets (map (ruleRhsFreeVars . snd) better_rules)
-	      local_rule_base		  = extendRuleBaseList emptyRuleBase local_rules
-	      local_rule_ids		  = ruleBaseIds local_rule_base	-- Local Ids with rules attached
-	      imp_rule_base		  = foldl add_rules pkg_rule_base (moduleEnvElts hpt)
-	      rule_base			  = extendRuleBaseList imp_rule_base orphan_rules
-	      final_rule_base		  = addRuleBaseFVs rule_base (ruleBaseFVs local_rule_base)
-		-- The last step black-lists the free vars of local rules too
+	      imp_rule_base   = foldl add_rules (eps_rule_base eps) (moduleEnvElts hpt)
+	      final_rule_base = extendRuleBaseList imp_rule_base orphan_rules
 
 	; dumpIfSet_dyn dflags Opt_D_dump_rules "Transformation rules"
 		(vcat [text "Local rules", pprRuleBase local_rule_base,
 		       text "",
 		       text "Imported rules", pprRuleBase final_rule_base])
 
-	; return (final_rule_base, local_rule_ids, orphan_rules, rule_rhs_fvs)
+	; return (final_rule_base, local_rule_ids, orphan_rules)
     }
   where
     add_rules rule_base mod_info = extendRuleBaseList rule_base (md_rules (hm_details mod_info))
@@ -264,7 +261,7 @@ prepareRules dflags pkg_rule_base hpt us binds local_rules
 
 updateBinders :: GhciMode
 	      -> IdSet	 		-- Locally defined ids with their Rules attached
-	      -> IdSet			-- Ids free in the RHS of local rules
+	      -> [IdCoreRule]		-- Orphan rules
 	      -> Avails			-- What is exported
 	      -> [CoreBind] -> [CoreBind]
 	-- A horrible function
@@ -294,7 +291,7 @@ updateBinders :: GhciMode
 --     the rules (maybe we should?), so this substitution would make the rule
 --     bogus.
 
-updateBinders ghci_mode rule_ids rule_rhs_fvs exports binds
+updateBinders ghci_mode rule_ids orphan_rules exports binds
   = map update_bndrs binds
   where
     update_bndrs (NonRec b r) = NonRec (update_bndr b) r
@@ -306,8 +303,14 @@ updateBinders ghci_mode rule_ids rule_rhs_fvs exports binds
 	where
 	  bndr_with_rules = lookupVarSet rule_ids bndr `orElse` bndr
 
+    orph_rhs_fvs = unionVarSets (map (ruleRhsFreeVars . snd) orphan_rules)
+	-- An orphan rule must keep alive the free vars 
+	-- of its right-hand side.  
+	-- Non-orphan rules are attached to the Id (bndr_with_rules above)
+	-- and that keeps the rhs free vars alive
+
     dont_discard bndr =  is_exported (idName bndr)
-		      || bndr `elemVarSet` rule_rhs_fvs 
+		      || bndr `elemVarSet` orph_rhs_fvs 
 
     	-- In interactive mode, we don't want to discard any top-level
     	-- entities at all (eg. do not inline them away during

@@ -47,7 +47,7 @@ import Name		( hashName, isDllName )
 import Literal		( hashLiteral, literalType, litIsDupable, 
 			  litIsTrivial, isZeroLit )
 import DataCon		( DataCon, dataConRepArity, dataConArgTys,
-			  isExistentialDataCon, dataConTyCon, dataConName )
+			  isExistentialDataCon, dataConTyCon )
 import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idNewStrictness, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo,
@@ -59,7 +59,7 @@ import NewDemand	( appIsBottom )
 import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe,
 			  splitFunTy,
 			  applyTys, isUnLiftedType, seqType, mkTyVarTy,
-			  splitForAllTy_maybe, isForAllTy, splitNewType_maybe, 
+			  splitForAllTy_maybe, isForAllTy, splitRecNewType_maybe, 
 			  splitTyConApp_maybe, eqType, funResultTy, applyTy,
 			  funResultTy, applyTy
 			)
@@ -932,13 +932,15 @@ eta_expand n us expr ty
 	; Nothing ->
 
 		-- Given this:
-		-- 	newtype T = MkT (Int -> Int)
+		-- 	newtype T = MkT ([T] -> Int)
 		-- Consider eta-expanding this
 		--  	eta_expand 1 e T
 		-- We want to get
-		--	coerce T (\x::Int -> (coerce (Int->Int) e) x)
+		--	coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
+		-- Only try this for recursive newtypes; the non-recursive kind
+		-- are transparent anyway
 
-    	case splitNewType_maybe ty of {
+    	case splitRecNewType_maybe ty of {
  	  Just ty' -> mkCoerce2 ty ty' (eta_expand n us (mkCoerce2 ty' ty expr) ty') ;
  	  Nothing  -> pprTrace "Bad eta expand" (ppr expr $$ ppr ty) expr
     	}}}

@@ -55,10 +55,6 @@ To think about
 * Consider f x = x+1 `fatbar` error (show x)
   We'd like to unbox x, even if that means reboxing it in the error case.
 
-\begin{code}
-instance Outputable TopLevelFlag where
-  ppr flag = empty
-\end{code}
 
 %************************************************************************
 %*									*
@@ -886,17 +882,6 @@ argDemand d	    = d
 \end{code}
 
 \begin{code}
-betterStrictness :: StrictSig -> StrictSig -> Bool
-betterStrictness (StrictSig t1) (StrictSig t2) = betterDmdType t1 t2
-
-betterDmdType t1 t2 = (t1 `lubType` t2) == t2
-
-betterDemand :: Demand -> Demand -> Bool
--- If d1 `better` d2, and d2 `better` d2, then d1==d2
-betterDemand d1 d2 = (d1 `lub` d2) == d2
-\end{code}
-
-\begin{code}
 -------------------------
 -- Consider (if x then y else []) with demand V
 -- Then the first branch gives {y->V} and the second
@@ -1166,7 +1151,15 @@ get_changes_dmd id
     old = newDemand (idDemandInfo id)
     new_better = new `betterDemand` old 
     old_better = old `betterDemand` new
-#endif
+
+betterStrictness :: StrictSig -> StrictSig -> Bool
+betterStrictness (StrictSig t1) (StrictSig t2) = betterDmdType t1 t2
+
+betterDmdType t1 t2 = (t1 `lubType` t2) == t2
+
+betterDemand :: Demand -> Demand -> Bool
+-- If d1 `better` d2, and d2 `better` d2, then d1==d2
+betterDemand d1 d2 = (d1 `lub` d2) == d2
 
 squashSig (StrictSig (DmdType fv ds res))
   = StrictSig (DmdType emptyDmdEnv (map squashDmd ds) res)
@@ -1178,4 +1171,5 @@ squashDmd (Box d)    = Box (squashDmd d)
 squashDmd (Eval ds)  = Eval (mapDmds squashDmd ds)
 squashDmd (Defer ds) = Defer (mapDmds squashDmd ds)
 squashDmd d          = d
+#endif
 \end{code}

@@ -27,7 +27,7 @@ import HsSyn		( ForeignDecl(..), HsExpr(..),
 import RnHsSyn		( RenamedForeignDecl )
 
 import TcRnMonad
-import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
+import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
 import TcHsSyn		( TcMonoBinds, TypecheckedForeignDecl, TcForeignDecl )
 import TcExpr		( tcCheckSigma )			
 
@@ -225,7 +225,8 @@ tcFExport fo@(ForeignExport nm hs_ty spec isDeprec src_loc) =
    newUnique			`thenM` \ uniq ->
    getModule			`thenM` \ mod ->
    let
-        gnm  = mkExternalName uniq mod (mkForeignExportOcc (getOccName nm)) src_loc
+        gnm  = mkExternalName uniq mod (mkForeignExportOcc (getOccName nm)) 
+			      Nothing src_loc
 	id   = setIdLocalExported (mkLocalId gnm sig_ty)
 	bind = VarMonoBind id rhs
    in
@@ -291,9 +292,6 @@ checkDotnet _      = Just (text "requires C code generation (-fvia-C)")
 checkDotnet other  = Just (text "requires .NET support (-filx or win32)")
 #endif
 
-checkC HscC  = Nothing
-checkC other = Just (text "requires C code generation (-fvia-C)")
-			   
 checkCOrAsm HscC   = Nothing
 checkCOrAsm HscAsm = Nothing
 checkCOrAsm other  
@@ -304,12 +302,6 @@ checkCOrAsmOrInterp HscAsm         = Nothing
 checkCOrAsmOrInterp HscInterpreted = Nothing
 checkCOrAsmOrInterp other  
    = Just (text "requires interpreted, C or native code generation")
-
-checkCOrAsmOrDotNet HscC   = Nothing
-checkCOrAsmOrDotNet HscAsm = Nothing
-checkCOrAsmOrDotNet HscILX = Nothing
-checkCOrAsmOrDotNet other  
-   = Just (text "requires C, native or .NET ILX code generation")
 
 checkCOrAsmOrDotNetOrInterp HscC           = Nothing
 checkCOrAsmOrDotNetOrInterp HscAsm         = Nothing

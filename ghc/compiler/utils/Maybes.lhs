@@ -5,16 +5,18 @@
 
 \begin{code}
 module Maybes (
+	module Maybe,		-- Re-export all of Maybe
+
 	MaybeErr(..),
 
 	orElse, 
-	mapMaybe,
+	mapCatMaybes,
 	allMaybes,
 	firstJust,
 	expectJust,
 	maybeToBool,
 
-	thenMaybe, seqMaybe, returnMaybe, failMaybe, catMaybes,
+	thenMaybe, seqMaybe, returnMaybe, failMaybe, 
 
 	thenMaB, returnMaB, failMaB
 
@@ -22,7 +24,7 @@ module Maybes (
 
 #include "HsVersions.h"
 
-import Maybe( catMaybes, mapMaybe )
+import Maybe
 
 
 infixr 4 `orElse`
@@ -66,18 +68,18 @@ firstJust (Nothing : ms) = firstJust ms
 \end{code}
 
 \begin{code}
-findJust :: (a -> Maybe b) -> [a] -> Maybe b
-findJust f []	  = Nothing
-findJust f (a:as) = case f a of
-		      Nothing -> findJust f as
-		      b	 -> b
-\end{code}
-
-\begin{code}
 expectJust :: String -> Maybe a -> a
 {-# INLINE expectJust #-}
 expectJust err (Just x) = x
 expectJust err Nothing  = error ("expectJust " ++ err)
+\end{code}
+
+\begin{code}
+mapCatMaybes :: (a -> Maybe b) -> [a] -> [b]
+mapCatMaybes f [] = []
+mapCatMaybes f (x:xs) = case f x of
+			  Just y  -> y : mapCatMaybes f xs
+			  Nothing -> mapCatMaybes f xs
 \end{code}
 
 The Maybe monad

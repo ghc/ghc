@@ -9,7 +9,6 @@ module HscStats ( ppSourceStats ) where
 #include "HsVersions.h"
 
 import HsSyn
-import TyCon		( DataConDetails(..) )
 import Outputable
 import Char		( isSpace )
 import Util             ( count )
@@ -64,13 +63,13 @@ ppSourceStats short (HsModule _ exports imports decls _ src_loc)
     
     trim ls     = takeWhile (not.isSpace) (dropWhile isSpace ls)
 
-    (fixity_sigs, bind_tys, _, bind_specs, bind_inlines) 
+    (fixity_sigs, bind_tys, bind_specs, bind_inlines) 
 	= count_sigs [d | SigD d <- decls]
 		-- NB: this omits fixity decls on local bindings and
 		-- in class decls.  ToDo
 
     tycl_decls  = [d | TyClD d <- decls]
-    (class_ds, data_ds, newt_ds, type_ds, _) = countTyClDecls tycl_decls
+    (class_ds, type_ds, data_ds, newt_ds) = countTyClDecls tycl_decls
 
     inst_decls  = [d | InstD d <- decls]
     inst_ds     = length inst_decls
@@ -102,17 +101,13 @@ ppSourceStats short (HsModule _ exports imports decls _ src_loc)
     count_monobinds (PatMonoBind p r _)          = (0,1)
     count_monobinds (FunMonoBind f _ m _)        = (0,1)
 
-    count_mb_monobinds (Just mbs) = count_monobinds mbs
-    count_mb_monobinds Nothing	  = (0,0)
+    count_sigs sigs = foldr add4 (0,0,0,0) (map sig_info sigs)
 
-    count_sigs sigs = foldr add5 (0,0,0,0,0) (map sig_info sigs)
-
-    sig_info (FixSig _)		    = (1,0,0,0,0)
-    sig_info (Sig _ _ _)            = (0,1,0,0,0)
-    sig_info (ClassOpSig _ _ _ _)   = (0,0,1,0,0)
-    sig_info (SpecSig _ _ _)        = (0,0,0,1,0)
-    sig_info (InlineSig _ _ _ _)    = (0,0,0,0,1)
-    sig_info _                      = (0,0,0,0,0)
+    sig_info (FixSig _)		    = (1,0,0,0)
+    sig_info (Sig _ _ _)            = (0,1,0,0)
+    sig_info (SpecSig _ _ _)        = (0,0,1,0)
+    sig_info (InlineSig _ _ _ _)    = (0,0,0,1)
+    sig_info _                      = (0,0,0,0)
 
     import_info (ImportDecl _ _ qual as spec _)
 	= add6 (1, qual_info qual, as_info as, 0,0,0) (spec_info spec)
@@ -124,35 +119,31 @@ ppSourceStats short (HsModule _ exports imports decls _ src_loc)
     spec_info (Just (False, _)) = (0,0,0,0,1,0)
     spec_info (Just (True, _))  = (0,0,0,0,0,1)
 
-    data_info (TyData {tcdCons = DataCons cs, tcdDerivs = derivs})
+    data_info (TyData {tcdCons = cs, tcdDerivs = derivs})
 	= (length cs, case derivs of {Nothing -> 0; Just ds -> length ds})
     data_info other = (0,0)
 
     class_info decl@(ClassDecl {})
 	= case count_sigs (tcdSigs decl) of
-	    (_,_,classops,_,_) ->
-	       (classops, addpr (count_mb_monobinds (tcdMeths decl)))
+	    (_,classops,_,_) ->
+	       (classops, addpr (count_monobinds (tcdMeths decl)))
     class_info other = (0,0)
 
-    inst_info (InstDecl _ inst_meths inst_sigs _ _)
+    inst_info (InstDecl _ inst_meths inst_sigs _)
 	= case count_sigs inst_sigs of
-	    (_,_,_,ss,is) ->
+	    (_,_,ss,is) ->
 	       (addpr (count_monobinds inst_meths), ss, is)
 
     addpr :: (Int,Int) -> Int
-    add1  :: Int -> Int -> Int
     add2  :: (Int,Int) -> (Int,Int) -> (Int, Int)
     add3  :: (Int,Int,Int) -> (Int,Int,Int) -> (Int, Int, Int)
     add4  :: (Int,Int,Int,Int) -> (Int,Int,Int,Int) -> (Int, Int, Int, Int)
-    add5  :: (Int,Int,Int,Int,Int) -> (Int,Int,Int,Int,Int) -> (Int, Int, Int, Int, Int)
     add6  :: (Int,Int,Int,Int,Int,Int) -> (Int,Int,Int,Int,Int,Int) -> (Int, Int, Int, Int, Int, Int)
 
     addpr (x,y) = x+y
-    add1 x1 y1  = x1+y1
     add2 (x1,x2) (y1,y2) = (x1+y1,x2+y2)
     add3 (x1,x2,x3) (y1,y2,y3) = (x1+y1,x2+y2,x3+y3)
     add4 (x1,x2,x3,x4) (y1,y2,y3,y4) = (x1+y1,x2+y2,x3+y3,x4+y4)
-    add5 (x1,x2,x3,x4,x5) (y1,y2,y3,y4,y5) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5)
     add6 (x1,x2,x3,x4,x5,x6) (y1,y2,y3,y4,y5,y6) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5,x6+y6)
 \end{code}
 

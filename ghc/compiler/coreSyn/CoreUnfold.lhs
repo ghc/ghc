@@ -42,8 +42,7 @@ import PprCore		( pprCoreExpr )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import CoreUtils	( exprIsValue, exprIsCheap, exprIsTrivial )
 import Id		( Id, idType, isId,
-			  idUnfolding,
-			  isFCallId_maybe, globalIdDetails
+			  idUnfolding, globalIdDetails
 			)
 import DataCon		( isUnboxedTupleCon )
 import Literal		( litSize )
@@ -137,7 +136,7 @@ calcUnfoldingGuidance bOMB_OUT_SIZE expr
 	| not inline -> UnfoldNever
 		-- A big function with an INLINE pragma must
 		-- have an UnfoldIfGoodArgs guidance
-	| inline     -> UnfoldIfGoodArgs n_val_binders
+	| otherwise  -> UnfoldIfGoodArgs n_val_binders
 					 (map (const 0) val_binders)
 					 max_inline_size 0
 

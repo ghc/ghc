@@ -14,7 +14,7 @@ module TyCon(
 	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, isPrimTyCon,
 	isEnumerationTyCon, 
 	isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, tupleTyConBoxity,
-	isRecursiveTyCon, newTyConRep,
+	isRecursiveTyCon, newTyConRep, isHiBootTyCon,
 
 	mkForeignTyCon, isForeignTyCon,
 
@@ -34,7 +34,7 @@ module TyCon(
 	tyConKind,
 	tyConUnique,
 	tyConTyVars,
-	tyConArgVrcs_maybe,
+	tyConArgVrcs_maybe, tyConArgVrcs,
 	tyConDataConDetails, tyConDataCons, tyConDataCons_maybe, tyConFamilySize,
 	tyConSelIds,
 	tyConTheta,
@@ -42,13 +42,14 @@ module TyCon(
 	tyConArity,
 	isClassTyCon, tyConClass_maybe,
 	getSynTyConDefn,
+	tyConExtName,		-- External name for foreign types
 
         maybeTyConSingleCon,
 
 	matchesTyCon,
 
 	-- Generics
-        tyConGenIds, tyConGenInfo
+        tyConHasGenerics
 ) where
 
 #include "HsVersions.h"
@@ -62,12 +63,11 @@ import {-# SOURCE #-} DataCon ( DataCon, isExistentialDataCon )
 
 import Var   		( TyVar, Id )
 import Class		( Class )
-import BasicTypes	( Arity, RecFlag(..), Boxity(..), 
-			  isBoxed, EP(..) )
+import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed )
 import Name		( Name, nameUnique, NamedThing(getName) )
 import PrelNames	( Unique, Uniquable(..), anyBoxConKey )
 import PrimRep		( PrimRep(..), isFollowableRep )
-import Maybes		( orElse )
+import Maybes		( orElse, expectJust )
 import Outputable
 import FastString
 \end{code}
@@ -99,7 +99,7 @@ data TyCon
 	tyConArity  :: Arity,
 	
 	tyConTyVars   :: [TyVar],
-	tyConArgVrcs  :: ArgVrcs,
+	argVrcs       :: ArgVrcs,
 	algTyConTheta :: [PredType],
 
 	dataCons :: DataConDetails DataCon,
@@ -110,10 +110,8 @@ data TyCon
 	algTyConRec     :: RecFlag,	-- Tells whether the data type is part of 
 					-- a mutually-recursive group or not
 
-	genInfo :: Maybe (EP Id),	-- Convert T <-> Tring
-					-- Some TyCons don't have it; 
-					-- e.g. the TyCon for a Class dictionary,
-					-- and TyCons with unboxed arguments
+	hasGenerics :: Bool,	-- True <=> generic to/from functions are available
+					--	    (in the exports of the data type's source module)
 
 	algTyConClass :: Maybe Class
 		-- Just cl if this tycon came from a class declaration
@@ -125,13 +123,13 @@ data TyCon
 	tyConName    :: Name,
 	tyConKind    :: Kind,
 	tyConArity   :: Arity,
-	tyConArgVrcs :: ArgVrcs,
+	argVrcs      :: ArgVrcs,
 	primTyConRep :: PrimRep,	-- Many primitive tycons are unboxed, but some are
 					-- boxed (represented by pointers). The PrimRep tells.
 
 	isUnLifted   :: Bool,	-- Most primitive tycons are unlifted, 
 				-- but foreign-imported ones may not be
-	tyConExtName :: Maybe FastString
+	tyConExtName :: Maybe FastString	-- Just xx for foreign-imported types
     }
 
   | TupleTyCon {
@@ -143,7 +141,7 @@ data TyCon
 	tyConBoxed  :: Boxity,
 	tyConTyVars :: [TyVar],
 	dataCon     :: DataCon,
-	genInfo     :: Maybe (EP Id)		-- Generic type and conv funs 
+	hasGenerics :: Bool
     }
 
   | SynTyCon {
@@ -156,7 +154,7 @@ data TyCon
 	synTyConDefn    :: Type,	-- Right-hand side, mentioning these type vars.
 					-- Acts as a template for the expansion when
 					-- the tycon is applied to some types.
-	tyConArgVrcs :: ArgVrcs
+	argVrcs :: ArgVrcs
     }
 
   | KindCon {		-- Type constructor at the kind level
@@ -172,11 +170,10 @@ data TyCon
     }
 
 type ArgVrcs = [(Bool,Bool)]  -- Tyvar variance info: [(occPos,occNeg)]
+	-- [] means "no information, assume the worst"
 
 data AlgTyConFlavour
-  = DataTyCon		-- Data type
-
-  | EnumTyCon		-- Special sort of enumeration type
+  = DataTyCon Bool	-- Data type; True <=> an enumeration type
 
   | NewTyCon Type	-- Newtype, with its *ultimate* representation type
 			-- By 'ultimate' I mean that the rep type is not itself
@@ -200,10 +197,6 @@ data DataConDetails datacon
 
   | Unknown		-- We're importing this data type from an hi-boot file
 			-- and we don't know what its constructors are
-
-  | HasCons Int		-- In a quest for compilation speed we have imported
-			-- only the number of constructors (to get return 
-			-- conventions right) but not the constructors themselves
 
 visibleDataCons (DataCons cs) = cs
 visibleDataCons other	      = []
@@ -247,53 +240,41 @@ mkFunTyCon name kind
 	tyConArity  = 2
     }
 
-tyConGenInfo :: TyCon -> Maybe (EP Id)
-tyConGenInfo (AlgTyCon   { genInfo = info }) = info
-tyConGenInfo (TupleTyCon { genInfo = info }) = info
-tyConGenInfo other			     = Nothing
-
-tyConGenIds :: TyCon -> [Id]
--- Returns the generic-programming Ids; these Ids need bindings
-tyConGenIds tycon = case tyConGenInfo tycon of
-			Nothing		  -> []
-			Just (EP from to) -> [from,to]
-
 -- This is the making of a TyCon. Just the same as the old mkAlgTyCon,
 -- but now you also have to pass in the generic information about the type
 -- constructor - you can get hold of it easily (see Generics module)
-mkAlgTyCon name kind tyvars theta argvrcs cons sels flavour is_rec 
-	      gen_info
+mkAlgTyCon name kind tyvars theta argvrcs cons sels flavour is_rec gen_info
   = AlgTyCon {	
-	tyConName 		= name,
-	tyConUnique		= nameUnique name,
-	tyConKind		= kind,
-	tyConArity		= length tyvars,
-	tyConTyVars		= tyvars,
-	tyConArgVrcs		= argvrcs,
-	algTyConTheta		= theta,
-	dataCons		= cons, 
-	selIds			= sels,
-	algTyConClass		= Nothing,
-	algTyConFlavour 	= flavour,
-	algTyConRec		= is_rec,
-	genInfo   	        = gen_info
+	tyConName 	 = name,
+	tyConUnique	 = nameUnique name,
+	tyConKind	 = kind,
+	tyConArity	 = length tyvars,
+	tyConTyVars	 = tyvars,
+	argVrcs		 = argvrcs,
+	algTyConTheta	 = theta,
+	dataCons	 = cons, 
+	selIds		 = sels,
+	algTyConClass	 = Nothing,
+	algTyConFlavour  = flavour,
+	algTyConRec	 = is_rec,
+	hasGenerics = gen_info
     }
 
 mkClassTyCon name kind tyvars argvrcs con clas flavour is_rec
   = AlgTyCon {	
-	tyConName 		= name,
-	tyConUnique		= nameUnique name,
-	tyConKind		= kind,
-	tyConArity		= length tyvars,
-	tyConTyVars		= tyvars,
-	tyConArgVrcs		= argvrcs,
-	algTyConTheta		= [],
-	dataCons		= DataCons [con],
-	selIds			= [],
-	algTyConClass		= Just clas,
-	algTyConFlavour		= flavour,
-	algTyConRec		= is_rec,
-	genInfo   	        = Nothing
+	tyConName 	 = name,
+	tyConUnique	 = nameUnique name,
+	tyConKind	 = kind,
+	tyConArity	 = length tyvars,
+	tyConTyVars	 = tyvars,
+	argVrcs		 = argvrcs,
+	algTyConTheta	 = [],
+	dataCons	 = DataCons [con],
+	selIds		 = [],
+	algTyConClass	 = Just clas,
+	algTyConFlavour	 = flavour,
+	algTyConRec	 = is_rec,
+	hasGenerics = False
     }
 
 
@@ -306,7 +287,7 @@ mkTupleTyCon name kind arity tyvars con boxed gen_info
 	tyConBoxed = boxed,
 	tyConTyVars = tyvars,
 	dataCon = con,
-	genInfo = gen_info
+	hasGenerics = gen_info
     }
 
 -- Foreign-imported (.NET) type constructors are represented
@@ -320,7 +301,7 @@ mkForeignTyCon name ext_name kind arity arg_vrcs
 	tyConUnique  = nameUnique name,
 	tyConKind    = kind,
 	tyConArity   = arity,
-        tyConArgVrcs = arg_vrcs,
+        argVrcs      = arg_vrcs,
 	primTyConRep = PtrRep,
 	isUnLifted   = False,
 	tyConExtName = ext_name
@@ -341,21 +322,21 @@ mkPrimTyCon' name kind arity arg_vrcs rep is_unlifted
 	tyConUnique  = nameUnique name,
 	tyConKind    = kind,
 	tyConArity   = arity,
-        tyConArgVrcs = arg_vrcs,
+        argVrcs      = arg_vrcs,
 	primTyConRep = rep,
 	isUnLifted   = is_unlifted,
 	tyConExtName = Nothing
     }
 
-mkSynTyCon name kind arity tyvars rhs argvrcs
+mkSynTyCon name kind tyvars rhs argvrcs
   = SynTyCon {	
 	tyConName = name,
 	tyConUnique = nameUnique name,
 	tyConKind = kind,
-	tyConArity = arity,
+	tyConArity = length tyvars,
 	tyConTyVars = tyvars,
 	synTyConDefn = rhs,
-	tyConArgVrcs = argvrcs
+	argVrcs      = argvrcs
     }
 
 setTyConName tc name = tc {tyConName = name, tyConUnique = nameUnique name}
@@ -426,8 +407,8 @@ isSynTyCon (SynTyCon {}) = True
 isSynTyCon _		 = False
 
 isEnumerationTyCon :: TyCon -> Bool
-isEnumerationTyCon (AlgTyCon {algTyConFlavour = EnumTyCon}) = True
-isEnumerationTyCon other				    = False
+isEnumerationTyCon (AlgTyCon {algTyConFlavour = DataTyCon is_enum}) = is_enum
+isEnumerationTyCon other				  	    = False
 
 isTupleTyCon :: TyCon -> Bool
 -- The unit tycon didn't used to be classed as a tuple tycon
@@ -450,6 +431,11 @@ isRecursiveTyCon :: TyCon -> Bool
 isRecursiveTyCon (AlgTyCon {algTyConRec = Recursive}) = True
 isRecursiveTyCon other				      = False
 
+isHiBootTyCon :: TyCon -> Bool
+-- Used for knot-tying in hi-boot files
+isHiBootTyCon (AlgTyCon {dataCons = Unknown}) = True
+isHiBootTyCon other			      = False
+
 isForeignTyCon :: TyCon -> Bool
 -- isForeignTyCon identifies foreign-imported type constructors
 -- For the moment, they are primitive but lifted, but that may change
@@ -458,6 +444,11 @@ isForeignTyCon other				      = False
 \end{code}
 
 \begin{code}
+tyConHasGenerics :: TyCon -> Bool
+tyConHasGenerics (AlgTyCon {hasGenerics = hg})   = hg
+tyConHasGenerics (TupleTyCon {hasGenerics = hg}) = hg
+tyConHasGenerics other				 = False	-- Synonyms
+
 tyConDataConDetails :: TyCon -> DataConDetails DataCon
 tyConDataConDetails (AlgTyCon {dataCons = cons}) = cons
 tyConDataConDetails (TupleTyCon {dataCon = con}) = DataCons [con]
@@ -475,7 +466,6 @@ tyConDataCons_maybe other			          = Nothing
 
 tyConFamilySize  :: TyCon -> Int
 tyConFamilySize (AlgTyCon {dataCons = DataCons cs}) = length cs
-tyConFamilySize (AlgTyCon {dataCons = HasCons n})   = n
 tyConFamilySize (TupleTyCon {}) 	  	    = 1
 #ifdef DEBUG
 tyConFamilySize other = pprPanic "tyConFamilySize:" (ppr other)
@@ -510,14 +500,16 @@ each tyvar, if available.  See @calcAlgTyConArgVrcs@ for how this is
 actually computed (in another file).
 
 \begin{code}
-tyConArgVrcs_maybe :: TyCon -> Maybe ArgVrcs
+tyConArgVrcs :: TyCon -> ArgVrcs
+tyConArgVrcs tc = expectJust "tyConArgVrcs" (tyConArgVrcs_maybe tc)
 
-tyConArgVrcs_maybe (FunTyCon   {}                     ) = Just [(False,True),(True,False)]
-tyConArgVrcs_maybe (AlgTyCon   {tyConArgVrcs = oi})     = Just oi
-tyConArgVrcs_maybe (PrimTyCon  {tyConArgVrcs = oi})     = Just oi
-tyConArgVrcs_maybe (TupleTyCon {tyConArity = arity   }) = Just (replicate arity (True,False))
-tyConArgVrcs_maybe (SynTyCon   {tyConArgVrcs = oi })    = Just oi
-tyConArgVrcs_maybe _                                    = Nothing
+tyConArgVrcs_maybe :: TyCon -> Maybe ArgVrcs
+tyConArgVrcs_maybe (FunTyCon   {})		     = Just [(False,True),(True,False)]
+tyConArgVrcs_maybe (AlgTyCon   {argVrcs = oi})       = Just oi
+tyConArgVrcs_maybe (PrimTyCon  {argVrcs = oi})       = Just oi
+tyConArgVrcs_maybe (TupleTyCon {tyConArity = arity}) = Just (replicate arity (True,False))
+tyConArgVrcs_maybe (SynTyCon   {argVrcs = oi})       = Just oi
+tyConArgVrcs_maybe _                                 = Nothing
 \end{code}
 
 \begin{code}

@@ -86,7 +86,7 @@ matchConFamily (var:vars) eqns_info
 	get_uniq (EqnInfo _ _ (ConPatOut data_con _ _ _ _ : _) _) = getUnique data_con
     in
 	-- Now make a case alternative out of each group
-    mapDs (match_con vars) eqn_groups	`thenDs` \ alts ->
+    mappM (match_con vars) eqn_groups	`thenDs` \ alts ->
 
     returnDs (mkCoAlgCaseMatchResult var alts)
 \end{code}
@@ -99,7 +99,7 @@ Wadler's chapter in SLPJ.
 match_con vars (eqn1@(EqnInfo _ _ (ConPatOut data_con (PrefixCon arg_pats) _ ex_tvs ex_dicts : _) _)
 		: other_eqns)
   = -- Make new vars for the con arguments; avoid new locals where possible
-    mapDs selectMatchVar arg_pats	`thenDs` \ arg_vars ->
+    mappM selectMatchVar arg_pats	`thenDs` \ arg_vars ->
 
     -- Now do the business to make the alt for _this_ ConPat ...
     match (arg_vars ++ vars) 

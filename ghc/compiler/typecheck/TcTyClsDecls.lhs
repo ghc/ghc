@@ -10,46 +10,43 @@ module TcTyClsDecls (
 
 #include "HsVersions.h"
 
-import HsSyn		( TyClDecl(..),  
-			  ConDecl(..),   Sig(..), HsPred(..), 
-			  tyClDeclName, hsTyVarNames, tyClDeclTyVars,
-			  isTypeOrClassDecl, isClassDecl, isSynDecl, isClassOpSig
+import HsSyn		( TyClDecl(..),  HsConDetails(..), HsTyVarBndr(..),
+			  ConDecl(..),   Sig(..), BangType(..), HsBang(..),
+			  tyClDeclTyVars, getBangType, getBangStrictness
 			)
-import RnHsSyn		( RenamedTyClDecl, tyClDeclFVs )
-import RnEnv		( lookupSysName )
-import BasicTypes	( RecFlag(..), NewOrData(..) )
+import RnHsSyn		( RenamedTyClDecl, RenamedConDecl )
+import BasicTypes	( RecFlag(..), NewOrData(..), StrictnessMark(..) )
 import HscTypes		( implicitTyThings )
-
+import BuildTyCl	( buildClass, buildAlgTyCon, buildSynTyCon, buildDataCon )
 import TcRnMonad
-import TcEnv		( TcTyThing(..), TyThing(..), TyThingDetails(..),
-			  tcExtendKindEnv, tcLookup, tcLookupGlobal, tcExtendGlobalEnv,
-			  isLocalThing )
-import TcTyDecls	( tcTyDecl, kcConDetails )
-import TcClassDcl	( tcClassDecl1 )
-import TcInstDcls	( tcAddDeclCtxt )
-import TcMonoType	( kcHsTyVars, kcHsType, kcHsLiftedSigType, kcHsContext, mkTyClTyVars )
-import TcMType		( newKindVar, zonkKindEnv, checkValidTyCon, checkValidClass )
+import TcEnv		( TcTyThing(..), TyThing(..), 
+			  tcLookup, tcLookupGlobal, tcExtendGlobalEnv,
+			  tcExtendRecEnv, tcLookupTyVar )
+import TcTyDecls	( calcTyConArgVrcs, calcRecFlags, calcCycleErrs )
+import TcClassDcl	( tcClassSigs, tcAddDeclCtxt )
+import TcHsType		( kcHsTyVars, kcHsLiftedSigType, kcHsSigType, kcCheckHsType, 
+			  kcHsContext, tcTyVarBndrs, tcHsKindedType, tcHsKindedContext )
+import TcMType		( newKindVar, checkValidTheta, checkValidType, checkFreeness, 
+			  UserTypeCtxt(..), SourceTyCtxt(..), pprUserTypeCtxt ) 
 import TcUnify		( unifyKind )
-import TcType		( Type, Kind, TcKind, mkArrowKind, liftedTypeKind, zipFunTys )
+import TcType		( TcKind, ThetaType, TcType,
+			  mkArrowKind, liftedTypeKind, 
+			  tcSplitSigmaTy, tcEqType )
 import Type		( splitTyConApp_maybe )
-import Variance         ( calcTyConArgVrcs )
-import Class		( Class, mkClass, classTyCon )
-import TyCon		( TyCon, ArgVrcs, AlgTyConFlavour(..), DataConDetails(..), visibleDataCons,
-			  tyConKind, tyConTyVars, tyConDataCons, isNewTyCon,
-			  mkSynTyCon, mkAlgTyCon, mkClassTyCon, mkForeignTyCon
-			)
-import TysWiredIn	( unitTy )
-import Subst		( substTyWith )
-import DataCon		( dataConOrigArgTys )
-import Var		( varName )
-import OccName		( mkClassTyConOcc )
-import FiniteMap
-import Digraph		( stronglyConnComp, SCC(..) )
-import Name		( Name )
-import NameEnv
-import NameSet
+import PprType		( pprThetaArrow, pprParendType )
+import FieldLabel	( fieldLabelName, fieldLabelType )
+import Generics		( validGenericMethodType, canDoGenerics )
+import Class		( Class, className, classTyCon, DefMeth(..), classBigSig )
+import TyCon		( TyCon, ArgVrcs, DataConDetails(..), 
+			  tyConDataCons, mkForeignTyCon, isProductTyCon, isRecursiveTyCon,
+			  tyConTheta, getSynTyConDefn, tyConDataCons, isSynTyCon, tyConName )
+import DataCon		( DataCon, dataConWrapId, dataConName, dataConSig, dataConFieldLabels )
+import Var		( TyVar, idType, idName )
+import Name		( Name, getSrcLoc )
 import Outputable
-import Maybes		( mapMaybe, orElse, catMaybes )
+import Util		( zipLazy, isSingleton, notNull )
+import ListSetOps	( equivClasses )
+import CmdLineOpts	( DynFlag( Opt_GlasgowExts, Opt_Generics, Opt_UnboxStrictFields ) )
 \end{code}
 
 
@@ -58,27 +55,6 @@ import Maybes		( mapMaybe, orElse, catMaybes )
 \subsection{Type checking for type and class declarations}
 %*									*
 %************************************************************************
-
-The main function
-~~~~~~~~~~~~~~~~~
-\begin{code}
-tcTyAndClassDecls :: [RenamedTyClDecl]
-		  -> TcM TcGblEnv	-- Returns extended environment
-
-tcTyAndClassDecls decls
-  = do { edge_map <- mkEdgeMap tc_decls ;
-	 let { edges = mkEdges edge_map tc_decls } ;
-	 tcGroups edge_map (stronglyConnComp edges) }
-  where
-    tc_decls = filter isTypeOrClassDecl decls
-
-tcGroups edge_map [] = getGblEnv
-
-tcGroups edge_map (group:groups)
-  = tcGroup edge_map group	`thenM` \ env ->
-    setGblEnv env		$
-    tcGroups edge_map groups
-\end{code}
 
 Dealing with a group
 ~~~~~~~~~~~~~~~~~~~~
@@ -124,111 +100,73 @@ The knot-tying parameters: @rec_details_list@ is an alist mapping @Name@s to
 @TyThing@s.  @rec_vrcs@ is a finite map from @Name@s to @ArgVrcs@s.
 
 \begin{code}
-tcGroup :: EdgeMap -> SCC RenamedTyClDecl 
-	-> TcM TcGblEnv 	-- Input env extended by types and classes 
-				-- and their implicit Ids,DataCons
-					
-tcGroup edge_map scc
-  = 	-- Step 1
-    mappM getInitialKind decls 		`thenM` \ initial_kinds ->
+tcTyAndClassDecls :: [RenamedTyClDecl]
+   	           -> TcM TcGblEnv 	-- Input env extended by types and classes 
+					-- and their implicit Ids,DataCons
+tcTyAndClassDecls decls
+  = do	{ 	-- First check for cyclic type synonysm or classes
+		-- See notes with checkCycleErrs
+	  checkCycleErrs decls
 
-	-- Step 2
-    tcExtendKindEnv initial_kinds (mappM kcTyClDecl decls)	`thenM_`
+	; tyclss <- fixM (\ rec_tyclss ->
+	  do	{ lcl_things <- mappM getInitialKind decls
+			-- Extend the local env with kinds, and
+			-- the global env with the knot-tied results
+		; let { gbl_things = mkGlobalThings decls rec_tyclss }
+		; tcExtendRecEnv gbl_things lcl_things $ do	
 
-	-- Step 3
-    zonkKindEnv initial_kinds		`thenM` \ final_kinds ->
+		-- The local type environment is populated with 
+		--		{"T" -> ARecTyCon k, ...}
+		-- and the global type envt with
+		-- 		{"T" -> ATyCon T, ...}
+		-- where k is T's (unzonked) kind
+		--	 T is the loop-tied TyCon itself
+		-- We must populate the environment with the loop-tied T's right
+		-- away, because the kind checker may "fault in" some type 
+		-- constructors that recursively mention T
 
-	-- Check for loops; if any are found, bale out now
-	-- because the compiler itself will loop otherwise!
-    checkNoErrs (checkLoops edge_map scc)	`thenM` \ is_rec_tycon ->
+		-- Kind-check the declarations, returning kind-annotated decls
+		{ kc_decls <- mappM kcTyClDecl decls
 
-	-- Tie the knot
-    traceTc (text "starting" <+> ppr final_kinds)		`thenM_`
-    fixM ( \ ~(rec_details_list, _, _) ->
-		-- Step 4 
- 	let
-	    kind_env    = mkNameEnv final_kinds
-	    rec_details = mkNameEnv rec_details_list
+		-- Calculate variances and rec-flag
+		; let {	calc_vrcs = calcTyConArgVrcs rec_tyclss
+		      ; calc_rec  = calcRecFlags     rec_tyclss }
+		    
+		; mappM (tcTyClDecl calc_vrcs calc_rec) kc_decls
+	    }})
+	-- Finished with knot-tying now
+	-- Extend the environment with the finished things
+	; tcExtendGlobalEnv tyclss $ do
 
-		-- Calculate variances, and feed into buildTyConOrClass
-            rec_vrcs = calcTyConArgVrcs [tc | ATyCon tc <- tyclss]
-
-	    build_one = buildTyConOrClass is_rec_tycon kind_env
-					  rec_vrcs rec_details
-	    tyclss = map build_one decls
-
-	in
-		-- Step 5
-		-- Extend the environment with the final 
-		-- TyCons/Classes and check the decls
-	tcExtendGlobalEnv tyclss	$
-	mappM tcTyClDecl1 decls		`thenM` \ tycls_details ->
-
-		-- Return results
-	getGblEnv				`thenM` \ env ->
-	returnM (tycls_details, env, tyclss)
-    )						`thenM` \ (_, env, tyclss) ->
-
-	-- Step 7: Check validity
-    setGblEnv env 				$
-
-    traceTc (text "ready for validity check")	`thenM_`
-    getModule					`thenM` \ mod ->
-    mappM_ (checkValidTyCl mod) decls		`thenM_`
-    traceTc (text "done")			`thenM_`
+	-- Perform the validity check
+	{ traceTc (text "ready for validity check")
+	; mappM_ checkValidTyCl decls
+ 	; traceTc (text "done")
    
-    let		-- Add the tycons that come from the classes
-		-- We want them in the environment because 
-		-- they are mentioned in interface files
-	implicit_things = implicitTyThings tyclss
-    in
-    traceTc ((text "Adding" <+> ppr tyclss) $$ (text "and" <+> ppr implicit_things)) 	`thenM_`
-    tcExtendGlobalEnv implicit_things getGblEnv
+	-- Add the implicit things;
+	-- we want them in the environment because 
+	-- they may be mentioned in interface files
+	; let {	implicit_things = concatMap implicitTyThings tyclss }
+	; traceTc ((text "Adding" <+> ppr tyclss) $$ (text "and" <+> ppr implicit_things))
+  	; tcExtendGlobalEnv implicit_things getGblEnv
+    }}
 
+mkGlobalThings :: [RenamedTyClDecl] 	-- The decls
+	       -> [TyThing]		-- Knot-tied, in 1-1 correspondence with the decls
+	       -> [(Name,TyThing)]
+-- Driven by the Decls, and treating the TyThings lazily
+-- make a TypeEnv for the new things
+mkGlobalThings decls things
+  = map mk_thing (decls `zipLazy` things)
   where
-    decls = case scc of
-		AcyclicSCC decl -> [decl]
-		CyclicSCC decls -> decls
-
-tcTyClDecl1 decl
-  | isClassDecl decl = tcAddDeclCtxt decl (tcClassDecl1 decl)
-  | otherwise	     = tcAddDeclCtxt decl (tcTyDecl     decl)
-
--- We do the validity check over declarations, rather than TyThings
--- only so that we can add a nice context with tcAddDeclCtxt
-checkValidTyCl this_mod decl
-  = tcLookupGlobal (tcdName decl)	`thenM` \ thing ->
-    if not (isLocalThing this_mod thing) then
-	-- Don't bother to check validity for non-local things
-	returnM ()
-    else
-    tcAddDeclCtxt decl $
-    case thing of
-	ATyCon tc -> checkValidTyCon tc
-	AClass cl -> checkValidClass cl
+    mk_thing (ClassDecl {tcdName = name}, ~(AClass cl)) = (name,         AClass cl)
+    mk_thing (decl, 			  ~(ATyCon tc)) = (tcdName decl, ATyCon tc)
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{Step 1: Initial environment}
-%*									*
-%************************************************************************
-
-\begin{code}
-getInitialKind :: RenamedTyClDecl -> TcM (Name, TcKind)
-getInitialKind decl
- = kcHsTyVars (tyClDeclTyVars decl)	`thenM` \ arg_kinds ->
-   newKindVar				`thenM` \ result_kind  ->
-   returnM (tcdName decl, mk_kind arg_kinds result_kind)
-
-mk_kind tvs_w_kinds res_kind = foldr (mkArrowKind . snd) res_kind tvs_w_kinds
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Step 2: Kind checking}
+		Kind checking
 %*									*
 %************************************************************************
 
@@ -246,190 +184,214 @@ depends on *all the uses of class D*.  For example, the use of
 Monad c in bop's type signature means that D must have kind Type->Type.
 
 \begin{code}
-kcTyClDecl :: RenamedTyClDecl -> TcM ()
+------------------------------------------------------------------------
+getInitialKind :: TyClDecl Name -> TcM (Name, TcTyThing)
+
+-- Note the lazy pattern match on the ATyCon etc
+-- Exactly the same reason as the zipLay above
+
+getInitialKind (TyData {tcdName = name})
+ = newKindVar				`thenM` \ kind  ->
+   returnM (name, ARecTyCon kind)
+
+getInitialKind (TySynonym {tcdName = name})
+ = newKindVar				`thenM` \ kind  ->
+   returnM (name, ARecTyCon kind)
+
+getInitialKind (ClassDecl {tcdName = name})
+ = newKindVar				`thenM` \ kind  ->
+   returnM (name, ARecClass kind)
+
+
+------------------------------------------------------------------------
+kcTyClDecl :: RenamedTyClDecl -> TcM RenamedTyClDecl
 
 kcTyClDecl decl@(TySynonym {tcdSynRhs = rhs})
-  = kcTyClDeclBody decl		$ \ result_kind ->
-    kcHsType rhs		`thenM` \ rhs_kind ->
-    unifyKind result_kind rhs_kind
+  = do 	{ res_kind <- newKindVar
+	; kcTyClDeclBody decl res_kind		$ \ tvs' ->
+	  do { rhs' <- kcCheckHsType rhs res_kind
+	     ; return (decl {tcdTyVars = tvs', tcdSynRhs = rhs'}) } }
 
-kcTyClDecl (ForeignType {}) = returnM ()
-
-kcTyClDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = context, tcdCons = con_decls})
-  = kcTyClDeclBody decl			$ \ result_kind ->
-    kcHsContext context			`thenM_` 
-    mappM_ kc_con_decl (visibleDataCons con_decls)
+kcTyClDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
+  = kcTyClDeclBody decl liftedTypeKind	$ \ tvs' ->
+    do	{ ctxt' <- kcHsContext ctxt	
+	; cons' <- mappM kc_con_decl cons
+	; return (decl {tcdTyVars = tvs', tcdCtxt = ctxt', tcdCons = cons'}) }
   where
-    kc_con_decl (ConDecl _ ex_tvs ex_ctxt details loc)
-      = kcHsTyVars ex_tvs		`thenM` \ kind_env ->
-	tcExtendKindEnv kind_env	$
-	kcConDetails new_or_data ex_ctxt details
+    kc_con_decl (ConDecl name ex_tvs ex_ctxt details loc)
+      = kcHsTyVars ex_tvs		$ \ ex_tvs' ->
+	do { ex_ctxt' <- kcHsContext ex_ctxt
+	   ; details' <- kc_con_details details 
+	   ; return (ConDecl name ex_tvs' ex_ctxt' details' loc)}
 
-kcTyClDecl decl@(ClassDecl {tcdCtxt = context,  tcdSigs = class_sigs})
-  = kcTyClDeclBody decl		$ \ result_kind ->
-    kcHsContext context		`thenM_`
-    mappM_ kc_sig (filter isClassOpSig class_sigs)
+    kc_con_details (PrefixCon btys) 
+	= do { btys' <- mappM kc_arg_ty btys ; return (PrefixCon btys') }
+    kc_con_details (InfixCon bty1 bty2) 
+	= do { bty1' <- kc_arg_ty bty1; bty2' <- kc_arg_ty bty2; return (InfixCon bty1' bty2') }
+    kc_con_details (RecCon fields) 
+	= do { fields' <- mappM kc_field fields; return (RecCon fields') }
+
+    kc_field (fld, bty) = do { bty' <- kc_arg_ty bty ; return (fld, bty') }
+
+    kc_arg_ty (BangType str ty) = do { ty' <- kc_arg_ty_body ty; return (BangType str ty') }
+    kc_arg_ty_body = case new_or_data of
+		   	 DataType -> kcHsSigType
+			 NewType  -> kcHsLiftedSigType
+	    -- Can't allow an unlifted type for newtypes, because we're effectively
+	    -- going to remove the constructor while coercing it to a lifted type.
+
+kcTyClDecl decl@(ClassDecl {tcdCtxt = ctxt,  tcdSigs = sigs})
+  = kcTyClDeclBody decl liftedTypeKind	$ \ tvs' ->
+    do	{ ctxt' <- kcHsContext ctxt	
+	; sigs' <- mappM kc_sig sigs
+	; return (decl {tcdTyVars = tvs', tcdCtxt = ctxt', tcdSigs = sigs'}) }
   where
-    kc_sig (ClassOpSig _ _ op_ty loc) = kcHsLiftedSigType op_ty
+    kc_sig (Sig nm op_ty loc) = do { op_ty' <- kcHsLiftedSigType op_ty
+				   ; return (Sig nm op_ty' loc) }
+    kc_sig other_sig	      = return other_sig
 
-kcTyClDeclBody :: RenamedTyClDecl -> (Kind -> TcM a) -> TcM a
--- Extend the env with bindings for the tyvars, taken from
--- the kind of the tycon/class.  Give it to the thing inside, and 
--- check the result kind matches
-kcTyClDeclBody decl thing_inside
+kcTyClDecl decl@(ForeignType {}) 
+  = return decl
+
+kcTyClDeclBody :: RenamedTyClDecl -> TcKind
+	       -> ([HsTyVarBndr Name] -> TcM a)
+	       -> TcM a
+  -- Extend the env with bindings for the tyvars, taken from
+  -- the kind of the tycon/class.  Give it to the thing inside, and 
+  -- check the result kind matches
+kcTyClDeclBody decl res_kind thing_inside
   = tcAddDeclCtxt decl		$
-    tcLookup (tcdName decl)	`thenM` \ thing ->
-    let
-	kind = case thing of
-		  AGlobal (ATyCon tc) -> tyConKind tc
-		  AGlobal (AClass cl) -> tyConKind (classTyCon cl)
-		  AThing kind	      -> kind
-		-- For some odd reason, a class doesn't include its kind
+    kcHsTyVars (tyClDeclTyVars decl)	$ \ kinded_tvs ->
+    do 	{ tc_ty_thing <- tcLookup (tcdName decl)
+	; let { tc_kind = case tc_ty_thing of
+			    ARecClass k -> k
+			    ARecTyCon k -> k
+	  }
+	; unifyKind tc_kind (foldr (mkArrowKind . kindedTyVarKind) 
+				   res_kind kinded_tvs)
+	; thing_inside kinded_tvs }
 
-	(tyvars_w_kinds, result_kind) = zipFunTys (hsTyVarNames (tyClDeclTyVars decl)) kind
-    in
-    tcExtendKindEnv tyvars_w_kinds (thing_inside result_kind)
+kindedTyVarKind (KindedTyVar _ k) = k
 \end{code}
-
 
 
 %************************************************************************
 %*									*
-\subsection{Step 4: Building the tycon/class}
+\subsection{Type checking}
 %*									*
 %************************************************************************
 
 \begin{code}
-buildTyConOrClass 
-	:: (Name -> AlgTyConFlavour -> RecFlag)	-- Whether it's recursive
-	-> NameEnv Kind
-	-> FiniteMap TyCon ArgVrcs -> NameEnv TyThingDetails
-	-> RenamedTyClDecl -> TyThing
+tcTyClDecl :: (Name -> ArgVrcs) -> (Name -> RecFlag) 
+	   -> RenamedTyClDecl -> TcM TyThing
 
-buildTyConOrClass rec_tycon kenv rec_vrcs rec_details
-    (TySynonym {tcdName = tycon_name, tcdTyVars = tyvar_names})
-  = ATyCon tycon
+tcTyClDecl calc_vrcs calc_isrec decl
+  = tcAddDeclCtxt decl (tcTyClDecl1 calc_vrcs calc_isrec decl)
+
+tcTyClDecl1 calc_vrcs calc_isrec 
+	  (TySynonym {tcdName = tc_name, tcdTyVars = tvs, tcdSynRhs = rhs_ty})
+  =   tcTyVarBndrs tvs		$ \ tvs' -> do 
+    { rhs_ty' <- tcHsKindedType rhs_ty
+    ; return (ATyCon (buildSynTyCon tc_name tvs' rhs_ty' arg_vrcs)) }
   where
-	tycon = mkSynTyCon tycon_name tycon_kind arity tyvars rhs_ty argvrcs
-	tycon_kind	    = lookupNameEnv_NF kenv tycon_name
-	arity		    = length tyvar_names
-	tyvars		    = mkTyClTyVars tycon_kind tyvar_names
-	SynTyDetails rhs_ty = lookupNameEnv_NF rec_details tycon_name
-        argvrcs		    = lookupWithDefaultFM rec_vrcs bogusVrcs tycon
+    arg_vrcs = calc_vrcs tc_name
 
-buildTyConOrClass rec_tycon kenv rec_vrcs rec_details
-    (TyData {tcdND = data_or_new, tcdName = tycon_name, 
-	     tcdTyVars = tyvar_names})
-  = ATyCon tycon
+tcTyClDecl1 calc_vrcs calc_isrec 
+	  (TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdTyVars = tvs,
+		   tcdName = tc_name, tcdCons = cons})
+  = tcTyVarBndrs tvs		$ \ tvs' -> do 
+  { ctxt' 	 <- tcHsKindedContext ctxt
+  ; want_generic <- doptM Opt_Generics
+  ; tycon <- fixM (\ tycon -> do 
+	{ cons' <- mappM (tcConDecl new_or_data tycon tvs' ctxt') cons
+	; buildAlgTyCon new_or_data tc_name tvs' ctxt' 
+  			(DataCons cons') arg_vrcs is_rec
+			(want_generic && canDoGenerics cons')
+	})
+  ; return (ATyCon tycon)
+  }
   where
-	tycon = mkAlgTyCon tycon_name tycon_kind tyvars ctxt argvrcs
-			   data_cons sel_ids flavour 
-			   (rec_tycon tycon_name flavour) gen_info
+    arg_vrcs = calc_vrcs tc_name
+    is_rec   = calc_isrec tc_name
 
-	DataTyDetails ctxt data_cons sel_ids gen_info = lookupNameEnv_NF rec_details tycon_name
-
-	tycon_kind = lookupNameEnv_NF kenv tycon_name
-	tyvars	   = mkTyClTyVars tycon_kind tyvar_names
-        argvrcs	   = lookupWithDefaultFM rec_vrcs bogusVrcs tycon
-
-	-- Watch out!  mkTyConApp asks whether the tycon is a NewType,
-	-- so flavour has to be able to answer this question without consulting rec_details
-	flavour = case data_or_new of
-		    NewType  -> NewTyCon (mkNewTyConRep tycon)
-		    DataType | all_nullary data_cons -> EnumTyCon
-	 		     | otherwise	     -> DataTyCon
-
- 	all_nullary (DataCons cons) = all (null . dataConOrigArgTys) cons
-	all_nullary other	    = False	-- Safe choice for unknown data types
-			-- NB (null . dataConOrigArgTys).  It used to say isNullaryDataCon
-			-- but that looks at the *representation* arity, and that in turn
-			-- depends on deciding whether to unpack the args, and that 
-			-- depends on whether it's a data type or a newtype --- so
-			-- in the recursive case we can get a loop.  This version is simple!
-
-buildTyConOrClass rec_tycon kenv rec_vrcs rec_details
-  (ForeignType {tcdName = tycon_name, tcdExtName = tycon_ext_name})
-  = ATyCon (mkForeignTyCon tycon_name tycon_ext_name liftedTypeKind 0 [])
-
-buildTyConOrClass rec_tycon kenv rec_vrcs rec_details
-  (ClassDecl {tcdName = class_name, tcdTyVars = tyvar_names, tcdFDs = fundeps} )
-  = AClass clas
+tcTyClDecl1 calc_vrcs calc_isrec 
+	  (ClassDecl {tcdName = class_name, tcdTyVars = tvs, 
+		      tcdCtxt = ctxt, tcdMeths = meths,
+		      tcdFDs = fundeps, tcdSigs = sigs} )
+  = tcTyVarBndrs tvs		$ \ tvs' -> do 
+  { ctxt' <- tcHsKindedContext ctxt
+  ; fds' <- mappM tc_fundep fundeps
+  ; sig_stuff <- tcClassSigs class_name sigs meths
+  ; clas <- fixM (\ clas ->
+		let 	-- This little knot is just so we can get
+			-- hold of the name of the class TyCon, which we
+			-- need to look up its recursiveness and variance
+		    tycon_name = tyConName (classTyCon clas)
+		    tc_isrec = calc_isrec tycon_name
+		    tc_vrcs  = calc_vrcs  tycon_name
+		in
+		buildClass class_name tvs' ctxt' fds' 
+			   sig_stuff tc_isrec tc_vrcs)
+  ; return (AClass clas) }
   where
- 	clas = mkClass class_name tyvars fds
-		       sc_theta sc_sel_ids op_items
-		       tycon
+    tc_fundep (tvs1, tvs2) = do { tvs1' <- mappM tcLookupTyVar tvs1 ;
+				; tvs2' <- mappM tcLookupTyVar tvs2 ;
+				; return (tvs1', tvs2') }
 
-	tycon = mkClassTyCon tycon_name class_kind tyvars
-                             argvrcs dict_con
-			     clas 		-- Yes!  It's a dictionary 
-			     flavour
-			     (rec_tycon class_name flavour)
-		-- A class can be recursive, and in the case of newtypes 
-		-- this matters.  For example
-		-- 	class C a where { op :: C b => a -> b -> Int }
-		-- Because C has only one operation, it is represented by
-		-- a newtype, and it should be a *recursive* newtype.
-		-- [If we don't make it a recursive newtype, we'll expand the
-		-- newtype like a synonym, but that will lead toan inifinite type
 
-	ClassDetails sc_theta sc_sel_ids op_items dict_con tycon_name 
-		= lookupNameEnv_NF rec_details class_name
+tcTyClDecl1 calc_vrcs calc_isrec 
+	  (ForeignType {tcdName = tc_name, tcdExtName = tc_ext_name})
+  = returnM (ATyCon (mkForeignTyCon tc_name tc_ext_name liftedTypeKind 0 []))
 
-	class_kind = lookupNameEnv_NF kenv class_name
-	tyvars	   = mkTyClTyVars class_kind tyvar_names
-        argvrcs	   = lookupWithDefaultFM rec_vrcs bogusVrcs tycon
+-----------------------------------
+tcConDecl :: NewOrData -> TyCon -> [TyVar] -> ThetaType 
+	  -> RenamedConDecl -> TcM DataCon
 
- 	flavour = case dataConOrigArgTys dict_con of
-			-- The tyvars in the datacon are the same as in the class
-		    [rep_ty] -> NewTyCon rep_ty
-		    other    -> DataTyCon 
+tcConDecl new_or_data tycon tyvars ctxt 
+	   (ConDecl name ex_tvs ex_ctxt details src_loc)
+  = addSrcLoc src_loc		$
+    tcTyVarBndrs ex_tvs		$ \ ex_tvs' -> do 
+    { ex_ctxt' <- tcHsKindedContext ex_ctxt
+    ; unbox_strict <- doptM Opt_UnboxStrictFields
+    ; let 
+	tc_datacon field_lbls btys
+	  = do { arg_tys <- mappM (tcHsKindedType . getBangType) btys
+    	       ; buildDataCon name 
+    		    (argStrictness unbox_strict tycon btys arg_tys)
+    		    field_lbls
+    		    tyvars ctxt ex_tvs' ex_ctxt'
+    		    arg_tys tycon }
+    ; case details of
+	PrefixCon btys     -> tc_datacon [] btys
+	InfixCon bty1 bty2 -> tc_datacon [] [bty1,bty2]
+	RecCon fields      -> do { checkTc (null ex_tvs') (exRecConErr name)
+				 ; let { (field_names, btys) = unzip fields }
+				 ; tc_datacon field_names btys } }
 
-	-- We can find the functional dependencies right away, 
-	-- and it is vital to do so. Why?  Because in the next pass
-	-- we check for ambiguity in all the type signatures, and we
-	-- need the functional dependcies to be done by then
-	fds	   = [(map lookup xs, map lookup ys) | (xs,ys) <- fundeps]
-	tyvar_env  = mkNameEnv [(varName tv, tv) | tv <- tyvars]
-	lookup     = lookupNameEnv_NF tyvar_env
+argStrictness :: Bool		-- True <=> -funbox-strict_fields
+	      -> TyCon -> [BangType Name] 
+	      -> [TcType] -> [StrictnessMark]
+argStrictness unbox_strict tycon btys arg_tys
+ = zipWith (chooseBoxingStrategy unbox_strict tycon) 
+	   arg_tys 
+	   (map getBangStrictness btys ++ repeat HsNoBang)
 
-bogusVrcs = panic "Bogus tycon arg variances"
-\end{code}
+-- We attempt to unbox/unpack a strict field when either:
+--   (i)  The field is marked '!!', or
+--   (ii) The field is marked '!', and the -funbox-strict-fields flag is on.
 
-\begin{code}
-mkNewTyConRep :: TyCon		-- The original type constructor
-	      -> Type		-- Chosen representation type
-				-- (guaranteed not to be another newtype)
-
--- Find the representation type for this newtype TyCon
--- Remember that the representation type is the ultimate representation
--- type, looking through other newtypes.
--- 
--- The non-recursive newtypes are easy, because they look transparent
--- to splitTyConApp_maybe, but recursive ones really are represented as
--- TyConApps (see TypeRep).
--- 
--- The trick is to to deal correctly with recursive newtypes
--- such as	newtype T = MkT T
-
--- a newtype with no data constructors -- appears in External Core programs
-mkNewTyConRep tc | (null (tyConDataCons tc)) = unitTy
-mkNewTyConRep tc
-  = go [] tc
+chooseBoxingStrategy :: Bool -> TyCon -> TcType -> HsBang -> StrictnessMark
+chooseBoxingStrategy unbox_strict_fields tycon arg_ty bang
+  = case bang of
+	HsNoBang				    -> NotMarkedStrict
+	HsStrict | unbox_strict_fields && can_unbox -> MarkedUnboxed
+	HsUnbox  | can_unbox			    -> MarkedUnboxed
+	other					    -> MarkedStrict
   where
-	-- Invariant: tc is a NewTyCon
-	-- 	      tcs have been seen before
-    go tcs tc 
-	| tc `elem` tcs = unitTy
-	| otherwise
-	= let
-	      rep_ty = head (dataConOrigArgTys (head (tyConDataCons tc)))
-	  in
-	  case splitTyConApp_maybe rep_ty of
-			Nothing -> rep_ty 
-			Just (tc', tys) | not (isNewTyCon tc') -> rep_ty
-				        | otherwise	       -> go1 (tc:tcs) tc' tys
-
-    go1 tcs tc tys = substTyWith (tyConTyVars tc) tys (go tcs tc)
+    can_unbox = case splitTyConApp_maybe arg_ty of
+		   Nothing 	       -> False
+		   Just (arg_tycon, _) -> not (isRecursiveTyCon tycon) &&
+					  isProductTyCon arg_tycon
 \end{code}
 
 %************************************************************************
@@ -438,129 +400,204 @@ mkNewTyConRep tc
 %*									*
 %************************************************************************
 
-Dependency analysis
-~~~~~~~~~~~~~~~~~~~
-\begin{code}
-checkLoops :: EdgeMap -> SCC RenamedTyClDecl
-	   -> TcM (Name -> AlgTyConFlavour -> RecFlag)
--- Check for illegal loops in a single strongly-connected component
---	a) type synonyms
---	b) superclass hierarchy
---
--- Also return a function that says which tycons are recursive.
--- Remember: 
---	a newtype is recursive if it is part of a recursive
---	group consisting only of newtype and synonyms
-
-checkLoops edge_map (AcyclicSCC _)
-  = returnM (\ _ _ -> NonRecursive)
-
-checkLoops edge_map (CyclicSCC decls)
-  = let		-- CHECK FOR CLASS CYCLES
-	cls_edges  = mapMaybe mkClassEdges decls
-	cls_cycles = findCycles cls_edges
-    in
-    mapM_ (cycleErr "class") cls_cycles		`thenM_`
-
-    let		-- CHECK FOR SYNONYM CYCLES
-	syn_edges  = mkEdges edge_map (filter isSynDecl decls)
-	syn_cycles = findCycles syn_edges
-    in
-    mapM_ (cycleErr "type synonym") syn_cycles	`thenM_`
-
-    let 	-- CHECK FOR NEWTYPE CYCLES
-	newtype_edges  = mkEdges edge_map (filter is_nt_cycle_decl decls)
-	newtype_cycles = findCycles newtype_edges
-	rec_newtypes   = mkNameSet [tcdName d | ds <- newtype_cycles, d <- ds]
-
-	rec_tycon name (NewTyCon _)
-	  | name `elemNameSet` rec_newtypes = Recursive
-	  | otherwise			    = NonRecursive
-	rec_tycon name other_flavour = Recursive
-    in
-    returnM rec_tycon
-
-----------------------------------------------------
--- A class with one op and no superclasses, or vice versa,
---		is treated just like a newtype.
--- It's a bit unclean that this test is repeated in buildTyConOrClass
-is_nt_cycle_decl (TySynonym {})				     = True
-is_nt_cycle_decl (TyData {tcdND = NewType}) 		     = True
-is_nt_cycle_decl (ClassDecl {tcdCtxt = ctxt, tcdSigs = sigs}) = length ctxt + length sigs == 1
-is_nt_cycle_decl other					     = False
-
-----------------------------------------------------
-findCycles edges = [ ds | CyclicSCC ds <- stronglyConnComp edges]
-
-----------------------------------------------------
---		Building edges for SCC analysis
---
--- When building the edges, we treat the 'main name' of the declaration as the
--- key for the node, but when dealing with External Core we may come across 
--- references to one of the implicit names for the declaration.  For example:
---	class Eq a where ....			
---	data :TSig a = :TSig (:TEq a) ....
--- The first decl is sucked in from an interface file; the second
--- is in an External Core file, generated from a class decl for Sig.  
--- We have to recognise that the reference to :TEq represents a 
--- dependency on the class Eq declaration, else the SCC stuff won't work right.
--- 
--- This complication can only happen when consuming an External Core file
--- 
--- Solution: keep an "EdgeMap" (bad name) that maps :TEq -> Eq.
--- Don't worry about data constructors, because we're only building
--- SCCs for type and class declarations here.  So the tiresome mapping
--- is need only to map   [class tycon -> class]
-
-type EdgeMap = NameEnv Name
-
-mkEdgeMap :: [RenamedTyClDecl] -> TcM EdgeMap
-mkEdgeMap decls = do { mb_pairs <- mapM mk_mb_pair decls ;
-		       return (mkNameEnv (catMaybes mb_pairs)) }
-		where
-		  mk_mb_pair (ClassDecl { tcdName = cls_name })
-			= do { tc_name <- lookupSysName cls_name mkClassTyConOcc ;
-			       return (Just (tc_name, cls_name)) }
-		  mk_mb_pair other = return Nothing
-
-mkEdges :: EdgeMap -> [RenamedTyClDecl] -> [(RenamedTyClDecl, Name, [Name])]
--- We use the EdgeMap to map any implicit names to 
--- the 'main name' for the declaration
-mkEdges edge_map decls 
-  = [ (decl, tyClDeclName decl, get_refs decl) | decl <- decls ]
-  where
-    get_refs decl = [ lookupNameEnv edge_map n `orElse` n 
-		    | n <- nameSetToList (tyClDeclFVs decl) ]
-
-----------------------------------------------------
--- mk_cls_edges looks only at the context of class decls
--- Its used when we are figuring out if there's a cycle in the
--- superclass hierarchy
-
-mkClassEdges :: RenamedTyClDecl -> Maybe (RenamedTyClDecl, Name, [Name])
-mkClassEdges decl@(ClassDecl {tcdCtxt = ctxt, tcdName = name}) = Just (decl, name, [c | HsClassP c _ <- ctxt])
-mkClassEdges other_decl				   	       = Nothing
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Error management
-%*									*
-%************************************************************************
+Validity checking is done once the mutually-recursive knot has been
+tied, so we can look at things freely.
 
 \begin{code}
-cycleErr :: String -> [RenamedTyClDecl] -> TcM ()
-
-cycleErr kind_of_decl decls
-  = addErrAt loc (ppr_cycle kind_of_decl decls)
+checkCycleErrs :: [TyClDecl Name] -> TcM ()
+checkCycleErrs tyclss
+  | null syn_cycles && null cls_cycles
+  = return ()
+  | otherwise
+  = do	{ mappM_ recSynErr syn_cycles
+	; mappM_ recClsErr cls_cycles
+	; failM	}	-- Give up now, because later checkValidTyCl
+			-- will loop if the synonym is recursive
   where
-    loc = tcdLoc (head decls)
+    (syn_cycles, cls_cycles) = calcCycleErrs tyclss
 
-ppr_cycle kind_of_decl decls
-  = hang (ptext SLIT("Cycle in") <+> text kind_of_decl <+> ptext SLIT("declarations:"))
-	 4 (vcat (map pp_decl decls))
+checkValidTyCl :: RenamedTyClDecl -> TcM ()
+-- We do the validity check over declarations, rather than TyThings
+-- only so that we can add a nice context with tcAddDeclCtxt
+checkValidTyCl decl
+  = tcAddDeclCtxt decl $
+    do	{ thing <- tcLookupGlobal (tcdName decl)
+	; traceTc (text "Validity of" <+> ppr thing)	
+	; case thing of
+	    ATyCon tc -> checkValidTyCon tc
+	    AClass cl -> checkValidClass cl 
+	; traceTc (text "Done validity of" <+> ppr thing)	
+	}
+
+-------------------------
+checkValidTyCon :: TyCon -> TcM ()
+checkValidTyCon tc
+  | isSynTyCon tc 
+  = addErrCtxt (checkTypeCtxt syn_ctxt syn_rhs) $
+    checkValidType syn_ctxt syn_rhs
+  | otherwise
+  = 	-- Check the context on the data decl
+    checkValidTheta (DataTyCtxt name) (tyConTheta tc)	`thenM_` 
+	
+	-- Check arg types of data constructors
+    mappM_ checkValidDataCon data_cons			`thenM_`
+
+	-- Check that fields with the same name share a type
+    mappM_ check_fields groups
+
   where
-    pp_decl decl = hsep [quotes (ppr (tcdName decl)), 
-			 ptext SLIT("at"), ppr (tcdLoc decl)]
+    syn_ctxt	 = TySynCtxt name
+    name         = tyConName tc
+    (_, syn_rhs) = getSynTyConDefn tc
+    data_cons    = tyConDataCons tc
+
+    fields = [field | con <- data_cons, field <- dataConFieldLabels con]
+    groups = equivClasses cmp_name fields
+    cmp_name field1 field2 = fieldLabelName field1 `compare` fieldLabelName field2
+
+    check_fields fields@(first_field_label : other_fields)
+	-- These fields all have the same name, but are from
+	-- different constructors in the data type
+	= 	-- Check that all the fields in the group have the same type
+		-- NB: this check assumes that all the constructors of a given
+		-- data type use the same type variables
+	  checkTc (all (tcEqType field_ty) other_tys) (fieldTypeMisMatch field_name)
+	where
+	    field_ty   = fieldLabelType first_field_label
+	    field_name = fieldLabelName first_field_label
+	    other_tys  = map fieldLabelType other_fields
+
+-------------------------------
+checkValidDataCon :: DataCon -> TcM ()
+checkValidDataCon con
+  = addErrCtxt (dataConCtxt con) (
+      checkValidType ctxt (idType (dataConWrapId con))	`thenM_`
+		-- This checks the argument types and
+		-- ambiguity of the existential context (if any)
+      checkFreeness ex_tvs ex_theta)
+  where
+    ctxt = ConArgCtxt (dataConName con) 
+    (_, _, ex_tvs, ex_theta, _, _) = dataConSig con
+
+
+-------------------------------
+checkValidClass :: Class -> TcM ()
+checkValidClass cls
+  = do	{ 	-- CHECK ARITY 1 FOR HASKELL 1.4
+	  gla_exts <- doptM Opt_GlasgowExts
+
+    	-- Check that the class is unary, unless GlaExs
+	; checkTc (notNull tyvars) (nullaryClassErr cls)
+	; checkTc (gla_exts || unary) (classArityErr cls)
+
+   	-- Check the super-classes
+	; checkValidTheta (ClassSCCtxt (className cls)) theta
+
+	-- Check the class operations
+	; mappM_ check_op op_stuff
+
+  	-- Check that if the class has generic methods, then the
+	-- class has only one parameter.  We can't do generic
+	-- multi-parameter type classes!
+	; checkTc (unary || no_generics) (genericMultiParamErr cls)
+	}
+  where
+    (tyvars, theta, _, op_stuff) = classBigSig cls
+    unary 	= isSingleton tyvars
+    no_generics = null [() | (_, GenDefMeth) <- op_stuff]
+
+    check_op (sel_id, dm) 
+	= addErrCtxt (classOpCtxt sel_id) (
+	  checkValidTheta SigmaCtxt (tail theta) 	`thenM_`
+		-- The 'tail' removes the initial (C a) from the
+		-- class itself, leaving just the method type
+
+	  checkValidType (FunSigCtxt op_name) tau	`thenM_`
+
+		-- Check that for a generic method, the type of 
+		-- the method is sufficiently simple
+	  checkTc (dm /= GenDefMeth || validGenericMethodType op_ty)
+		  (badGenericMethodType op_name op_ty)
+	)
+	where
+	  op_name = idName sel_id
+	  op_ty   = idType sel_id
+	  (_,theta,tau) = tcSplitSigmaTy op_ty
+
+
+
+---------------------------------------------------------------------
+fieldTypeMisMatch field_name
+  = sep [ptext SLIT("Different constructors give different types for field"), quotes (ppr field_name)]
+
+checkTypeCtxt ctxt ty
+  = vcat [ptext SLIT("In the type:") <+> ppr_ty,
+	  ptext SLIT("While checking") <+> pprUserTypeCtxt ctxt ]
+  where
+	-- Hack alert.  If there are no tyvars, (ppr sigma_ty) will print
+	-- something strange like {Eq k} -> k -> k, because there is no
+	-- ForAll at the top of the type.  Since this is going to the user
+	-- we want it to look like a proper Haskell type even then; hence the hack
+	-- 
+	-- This shows up in the complaint about
+	--	case C a where
+	--	  op :: Eq a => a -> a
+    ppr_ty | null forall_tvs = pprThetaArrow theta <+> ppr tau
+           | otherwise	     = ppr ty
+
+    (forall_tvs, theta, tau) = tcSplitSigmaTy ty
+
+dataConCtxt con = sep [ptext SLIT("When checking the data constructor:"),
+		       nest 2 (ex_part <+> pprThetaArrow ex_theta <+> ppr con <+> arg_part)]
+  where
+    (_, _, ex_tvs, ex_theta, arg_tys, _) = dataConSig con
+    ex_part | null ex_tvs = empty
+	    | otherwise   = ptext SLIT("forall") <+> hsep (map ppr ex_tvs) <> dot
+	-- The 'ex_theta' part could be non-empty, if the user (bogusly) wrote
+	--	data T a = Eq a => T a a
+	-- So we make sure to print it
+
+    fields = dataConFieldLabels con
+    arg_part | null fields = sep (map pprParendType arg_tys)
+	     | otherwise   = braces (sep (punctuate comma 
+			     [ ppr n <+> dcolon <+> ppr ty 
+			     | (n,ty) <- fields `zip` arg_tys]))
+
+classOpCtxt sel_id = sep [ptext SLIT("When checking the class method:"),
+			  nest 2 (ppr sel_id <+> dcolon <+> ppr (idType sel_id))]
+
+nullaryClassErr cls
+  = ptext SLIT("No parameters for class")  <+> quotes (ppr cls)
+
+classArityErr cls
+  = vcat [ptext SLIT("Too many parameters for class") <+> quotes (ppr cls),
+	  parens (ptext SLIT("Use -fglasgow-exts to allow multi-parameter classes"))]
+
+genericMultiParamErr clas
+  = ptext SLIT("The multi-parameter class") <+> quotes (ppr clas) <+> 
+    ptext SLIT("cannot have generic methods")
+
+badGenericMethodType op op_ty
+  = hang (ptext SLIT("Generic method type is too complex"))
+       4 (vcat [ppr op <+> dcolon <+> ppr op_ty,
+		ptext SLIT("You can only use type variables, arrows, and tuples")])
+
+recSynErr tcs
+  = addSrcLoc (getSrcLoc (head tcs)) $
+    addErr (sep [ptext SLIT("Cycle in type synonym declarations:"),
+		 nest 2 (vcat (map ppr_thing tcs))])
+
+recClsErr clss
+  = addSrcLoc (getSrcLoc (head clss)) $
+    addErr (sep [ptext SLIT("Cycle in class declarations (via superclasses):"),
+		 nest 2 (vcat (map ppr_thing clss))])
+
+ppr_thing :: Name -> SDoc
+ppr_thing n = ppr n <+> parens (ppr (getSrcLoc n))
+
+
+exRecConErr name
+  = ptext SLIT("Can't combine named fields with locally-quantified type variables")
+    $$
+    (ptext SLIT("In the declaration of data constructor") <+> ppr name)
 \end{code}

@@ -527,13 +527,13 @@ balancedFold' :: (a -> a -> a) -> [a] -> [a]
 balancedFold' f (x:y:xs) = f x y : balancedFold' f xs
 balancedFold' f xs = xs
 
-generalMergeSort p [] = []
-generalMergeSort p xs = (balancedFold (generalMerge p) . map (: [])) xs
-
 generalNaturalMergeSort p [] = []
 generalNaturalMergeSort p xs = (balancedFold (generalMerge p) . group p) xs
 
 #if NOT_USED
+generalMergeSort p [] = []
+generalMergeSort p xs = (balancedFold (generalMerge p) . map (: [])) xs
+
 mergeSort, naturalMergeSort :: Ord a => [a] -> [a]
 
 mergeSort = generalMergeSort (<=)
@@ -772,11 +772,6 @@ applyToFst f (x,y) = (f x,y)
 applyToSnd :: (b -> d) -> (a,b) -> (a,d)
 applyToSnd f (x,y) = (x,f y)
 #endif
-
-foldPair :: (a->a->a,b->b->b) -> (a,b) -> [(a,b)] -> (a,b)
-foldPair fg ab [] = ab
-foldPair fg@(f,g) ab ((a,b):abs) = (f a u,g b v)
-		       where (u,v) = foldPair fg ab abs
 \end{code}
 
 \begin{code}

@@ -1,4 +1,0 @@
-module Generics where
-
-mkTyConGenInfo ::  TyCon.TyCon -> [Name.Name]
-	 -> Data.Maybe.Maybe (BasicTypes.EP Var.Id)
