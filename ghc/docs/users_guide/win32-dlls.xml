@@ -170,6 +170,15 @@ make-sessions running under cygwin.
 </title>
 
 <para>
+<emphasis>Making Haskell libraries into DLLs doesn't work on Windows at the
+moment; however, all the machinery is
+still there. If you're interested, contact the GHC team. Note that
+building an entire Haskell application as a single DLL is still supported: it's
+	just multi-DLL Haskell programs that don't work.  The Windows
+	distribution of GHC contains static libraries only.</emphasis></para>
+
+<!--
+<para>
 <indexterm><primary>Dynamic link libraries, Win32</primary></indexterm>
 <indexterm><primary>DLLs, Win32</primary></indexterm>
 On Win32 platforms, the compiler is capable of both producing and using
@@ -240,16 +249,12 @@ option on all the Haskell modules that make up your application.
 </para>
 
 </sect2>
+-->
 
 <sect2 id="win32-dlls-create">
 <title>Creating a DLL</title>
 
 <para>
-<emphasis>Making libraries into DLLs doesn't work on Windows at the
-moment (and is no longer supported); however, all the machinery is
-still there. If you're interested, contact the GHC team. Note that
-building an entire Haskell application as a DLL is still supported
-(it's just inter-DLL Haskell calls that don't work).</emphasis>
 <indexterm><primary>Creating a Win32 DLL</primary></indexterm>
 <indexterm><primary>&ndash;&ndash;mk-dll</primary></indexterm>
 Sealing up your Haskell library inside a DLL is straightforward;
@@ -270,11 +275,13 @@ consist of all the object files and archives given on the command
 line.
 </para>
 
+<!--
 <para>
 To create a `static' DLL, i.e. one that does not depend on the GHC DLLs,
 use the <option>-static</option> when compiling up your Haskell code and
 building the DLL.
 </para>
+-->
 
 <para>
 A couple of things to notice:
@@ -283,6 +290,7 @@ A couple of things to notice:
 <para>
 
 <itemizedlist>
+<!--
 <listitem>
 <para>
 Since DLLs correspond to packages (see <xref linkend="packages"/>) you need
@@ -296,6 +304,7 @@ linkend="win32-dlls-foreign"/>). Hence the modules
 you compile into a DLL must have a common root.
 </para>
 </listitem>
+-->
 
 <listitem>
 <para>
@@ -305,7 +314,7 @@ this, you can specify the <emphasis>module definition file</emphasis> to use
 on the command line as follows:
 
 <screen>
-ghc &ndash;&ndash;mk-dll -o .... -optdll--def -optdllMyDef.def
+ghc &ndash;&ndash;mk-dll -o .... -optdll&ndash;&ndash;def -optdllMyDef.def
 </screen>
 
 See Microsoft documentation for details, but a module definition file
@@ -374,7 +383,7 @@ functions you want to call from the outside. For example,
 <programlisting>
 module Adder where
 
-adder :: Int -> Int -> IO Int  -- gratuitous use of IO
+adder :: Int -> Int -> IO Int  &ndash;&ndash; gratuitous use of IO
 adder x y = return (x+y)
 
 foreign export stdcall adder :: Int -> Int -> IO Int
