@@ -163,10 +163,18 @@ sub slurp_file { # follows an example in the `open' item in perl man page
 
     # ${CPP} better be 'gcc -E', or the -x option will fail...
     # ..and the -MM & -MMD.
-    $result = system("${CPP} -MM -MMD $Include_dirs @Defines -x c $fname >/dev/null");
+    $result = system("${CPP} -MM -MMD $Include_dirs @Defines -x c $fname > /dev/null");
+ 
     if ($result != 0) {
-	unlink($tempfile);
-	exit($result);
+        # On the cheesy side..we do want to know what went wrong, so
+	# re-run the command. (This also has the beneficial effect
+	# of fixing a redirection problem with gcc-2.95 builds used with
+	# mingw32.)
+	$result = system("${CPP} -MM -MMD $Include_dirs @Defines -x c $fname ");
+	if ($result != 0) {
+	   unlink($tempfile);
+   	   exit($result);
+        }
     };
 
     local($dep_contents)='';
