@@ -67,6 +67,7 @@ import PrelGHC     ( indexCharOffForeignObj#, indexIntOffForeignObj#,
 		     indexDoubleOffForeignObj#
 		   )
 import PrelAddr    ( Addr(..) )
+import PrelCCall   ( Word(..) )
 import Word 
    ( 
      indexWord8OffForeignObj
