@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.20 1999/09/15 13:45:20 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.21 1999/09/22 11:53:33 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -121,9 +121,11 @@ startupHaskell(int argc, char *argv[])
     /* Initialise the stats department */
     initStats();
 
-    /* Initialise the user signal handler set */
 #if !defined(mingw32_TARGET_OS) && !defined(PAR)
+    /* Initialise the user signal handler set */
     initUserSignals();
+    /* Set up handler to run on SIGINT */
+    init_shutdown_handler();
 #endif
  
     /* When the RTS and Prelude live in separate DLLs,
@@ -179,7 +181,7 @@ shutdownHaskell(void)
 
   /* stop the ticker */
   initialize_virtual_timer(0);
-
+  
 #if defined(PROFILING) || defined(DEBUG)
   endProfiling();
 #endif

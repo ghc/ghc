@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.7 1999/07/14 13:39:46 simonmar Exp $
+ * $Id: Signals.c,v 1.8 1999/09/22 11:53:33 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -244,5 +244,39 @@ start_signal_handlers(void)
 {
 }
 #endif
+
+static void
+shutdown_handler(int sig)
+{
+  shutdownHaskellAndExit(EXIT_FAILURE);
+}
+
+/*
+ * The RTS installs a default signal handler for catching
+ * SIGINT, so that we can perform an orderly shutdown (finalising
+ * objects and flushing buffers etc.)
+ *
+ * Haskell code may install their own SIGINT handler, which is
+ * fine, provided they're so kind as to put back the old one
+ * when they de-install.
+ */
+void
+init_shutdown_handler()
+{
+    struct sigaction action,oact;
+
+    action.sa_handler = shutdown_handler;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = 0;
+    if (sigaction(SIGINT, &action, &oact) != 0) {
+      /* Oh well, at least we tried. */
+#ifdef DEBUG
+      fprintf(stderr, "init_shutdown_handler: failed to reg SIGINT handler");
+#endif
+    }
+}
+
+
+
 
 #endif /*! mingw32_TARGET_OS */
