@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.28 $
- * $Date: 1999/12/20 16:55:27 $
+ * $Revision: 1.29 $
+ * $Date: 2000/01/05 13:53:37 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -312,7 +312,7 @@ Text unZcodeThenFindText ( String s )
             if (*s != 'T') goto parse_error;
             s++;
             p[n++] = '(';
-            while (i > 0) { p[n++] = ','; i--; };
+            while (i >= 0) { p[n++] = ','; i--; };
             p[n++] = ')';
             break;
          default: 

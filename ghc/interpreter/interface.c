@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.14 $
- * $Date: 1999/12/20 16:55:26 $
+ * $Revision: 1.15 $
+ * $Date: 2000/01/05 13:53:36 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1794,39 +1794,55 @@ static Void finishGHCClass ( Tycon cls_tyc )
  * Instances
  * ------------------------------------------------------------------------*/
 
-Inst startGHCInstance (line,ctxt0,cls,var)
+Inst startGHCInstance (line,ktyvars,cls,var)
 Int   line;
-List  ctxt0;  /* [((QConId, VarId))] */
-Type  cls;    /* Type  */
-VarId var; {  /* VarId */
-    List tmp, tvs, ks;
+List  ktyvars; /* [((VarId,Kind))] */
+Type  cls;     /* Type  */
+VarId var; {   /* VarId */
+    List tmp, tvs, ks, spec;
+
+    List xs1, xs2;
+    Kind k;
+
     Inst in = newInst();
 #   ifdef DEBUG_IFACE
     printf ( "begin startGHCInstance\n" );
 #   endif
 
-    /* Make tvs into a list of tyvars with bogus kinds. */
-    tvs = ifTyvarsIn(cls);
-    /* tvs :: [VarId] */
-
-    ks = NIL;
-    for (tmp = tvs; nonNull(tmp); tmp=tl(tmp)) {
-       hd(tmp) = zpair(hd(tmp),STAR);
-       ks = cons(STAR,ks);
+    tvs = ifTyvarsIn(cls);  /* :: [VarId] */
+    /* tvs :: [VarId].
+       The order of tvs is important for tvsToOffsets.
+       tvs should be a permutation of ktyvars.  Fish the tyvar kinds
+       out of ktyvars and attach them to tvs.
+    */
+    for (xs1=tvs; nonNull(xs1); xs1=tl(xs1)) {
+       k = NIL;
+       for (xs2=ktyvars; nonNull(xs2); xs2=tl(xs2))
+          if (textOf(hd(xs1)) == textOf(zfst(hd(xs2))))
+             k = zsnd(hd(xs2));
+       if (isNull(k)) internal("startGHCInstance: finding kinds");
+       hd(xs1) = zpair(hd(xs1),k);
     }
-    /* tvs :: [((VarId,STAR))] */
+
+    cls = tvsToOffsets(line,cls,tvs);
+    spec = NIL;
+    while (isAp(cls)) {
+       spec = cons(fun(cls),spec);
+       cls  = arg(cls);
+    }
+    spec = reverse(spec);
+
     inst(in).line         = line;
     inst(in).implements   = NIL;
-    inst(in).kinds        = ks;
-    inst(in).specifics    = tvsToOffsets(line,ctxt0,tvs);
-    inst(in).numSpecifics = length(ctxt0);
-    inst(in).head         = tvsToOffsets(line,cls,tvs);
+    inst(in).kinds        = simpleKind(length(tvs)); /* do this right */
+    inst(in).specifics    = spec;
+    inst(in).numSpecifics = length(spec);
+    inst(in).head         = cls;
 
     /* Figure out the name of the class being instanced, and store it
        at inst(in).c.  finishGHCInstance will resolve it to a real Class. */
     { 
        Cell cl = inst(in).head;
-       while (isAp(cl)) cl = arg(cl);
        assert(whatIs(cl)==DICTAP);
        cl = unap(DICTAP,cl);       
        cl = fst(cl);
@@ -2024,8 +2040,19 @@ static Type conidcellsToTycons ( Int line, Type type )
       case QUAL:
          return pair(QUAL,pair(conidcellsToTycons(line,fst(snd(type))),
                                conidcellsToTycons(line,snd(snd(type)))));
-      case DICTAP: /* bogus?? */
-         return ap(DICTAP, conidcellsToTycons(line, snd(type)));
+      case DICTAP: /* :: ap(DICTAP, pair(Class,[Type]))
+                      Not sure if this is really the right place to
+                      convert it to the form Hugs wants, but will do so anyway.
+                    */
+         /* return ap(DICTAP, conidcellsToTycons(line, snd(type))); */
+	{
+           Class cl   = fst(unap(DICTAP,type));
+           List  args = snd(unap(DICTAP,type));
+           if (length(args) != 1) 
+              internal("conidcellsToTycons: DICTAP: multiparam ap");
+           return
+              conidcellsToTycons(line,pair(cl,hd(args)));
+        }
       case UNBOXEDTUP:
          return ap(UNBOXEDTUP, conidcellsToTycons(line, snd(type)));
       case BANG:

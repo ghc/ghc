@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.23 $
- * $Date: 1999/12/20 16:55:28 $
+ * $Revision: 1.24 $
+ * $Date: 2000/01/05 13:53:37 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -343,10 +343,11 @@ extern  Ptr             cptrOf          Args((Cell));
 #define I_FIXDECL    113  /* snd :: ((NIL|Int, Associativity, ConVarId))   
                                     fixity, associativity, name            */
 
-#define I_INSTANCE   114 /* snd :: ((Line, [((QConId,VarId))], 
-                                    Type, VarId, Inst))
+#define I_INSTANCE   114 /* snd :: ((Line, 
+                                     [((VarId,Kind))], 
+                                     Type, VarId, Inst))
                    lineno, 
-                   forall-y bit (eg __forall [a b] {M.C1 a, M.C2 b} =>),
+                   forall-y bit (eg __forall [a b] =>),
                    other bit, eg { C a1 } -> { C2 a2 } -> ... -> { Cn an },
                    name of dictionary builder,
                    (after startGHCInstance) the instance table location    */

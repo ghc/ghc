@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.19 $
- * $Date: 1999/12/16 16:34:42 $
+ * $Revision: 1.20 $
+ * $Date: 2000/01/05 13:53:36 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -223,19 +223,17 @@ ifQTCName : ifTCName                    { $$ = gc1($1); }
 
 
 /*- Interface contexts ------------------------------------*/
-ifCtxInst /* __forall [a b] {M.C1 a, M.C2 b} =>  */
-          /* :: [(QConId, VarId)]                */
-          : ALL ifForall ifCtxDecl      {$$=gc3($3);}
-          | ALL ifForall IMPLIES        {$$=gc3(NIL);}
+ifCtxInst /* __forall [a b] =>     :: [((VarId,Kind))] */
+          : ALL ifForall IMPLIES        {$$=gc3($2);}
           |                             {$$=gc0(NIL);}
           ;
 ifInstHd /* { Class aType }    :: (ConId, Type) */
-          : '{' ifQCon ifAType '}'       {$$=gc4(ap(DICTAP,
-                                                 zpair($2,singleton($3))));}
+          : '{' ifQCon ifAType '}'      {$$=gc4(ap(DICTAP,
+                                                zpair($2,singleton($3))));}
           ;
 
 ifInstHdL /* { C a1 } -> { C2 a2 } -> ... -> { Cn an } :: Type */
-          : ifInstHd ARROW ifInstHdL    {$$=gc3(fn($1,$3));}
+          : ifInstHd ARROW ifInstHdL    {$$=gc3(ap($1,$3));}
           | ifInstHd                    {$$=gc1($1);}
           ;
 
@@ -332,7 +330,7 @@ ifType    : ALL ifForall ifCtxDeclT IMPLIES ifType
           | ifBType ARROW ifType        { $$ = gc3(fn($1,$3)); }
           | ifBType                     { $$ = gc1($1); }
           ;					
-ifForall  /* [(VarId,Kind)] */
+ifForall  /* [((VarId,Kind))] */
           : '[' ifKindedTyvarL ']'      { $$ = gc3($2); }
           ;
 
@@ -355,7 +353,7 @@ ifBType   : ifAType                     { $$ = gc1($1);        }
 ifAType   : ifQTCName                   { $$ = gc1($1); }
           | ifTyvar                     { $$ = gc1($1); }
           | '(' ')'                     { $$ = gc2(typeUnit); }
-          | '(' ifTypeL2 ')'            { $$ = gc3(buildTuple($2)); }
+          | '(' ifTypeL2 ')'            { $$ = gc3(buildTuple(reverse($2))); }
           | '[' ifType ']'              { $$ = gc3(ap(mkCon(tycon(typeList).text),
                                                       $2));}
           | '{' ifQTCName ifATypes '}'  { $$ = gc4(ap(DICTAP,
@@ -376,11 +374,11 @@ ifUsage   : '-'                         { $$ = gc1(NIL); }
 
 
 /*- Interface kinds ---------------------------------------*/
-ifKindedTyvarL /* [(VarId,Kind)] */
+ifKindedTyvarL /* [((VarId,Kind))] */
           :                              { $$ = gc0(NIL);         }
           | ifKindedTyvar ifKindedTyvarL { $$ = gc2(cons($1,$2)); }
           ;
-ifKindedTyvar /* (VarId,Kind) */
+ifKindedTyvar /* ((VarId,Kind)) */
           : ifTyvar                     { $$ = gc1(zpair($1,STAR)); }
           | ifTyvar COCO ifAKind        { $$ = gc3(zpair($1,$3));   }
           ; 
