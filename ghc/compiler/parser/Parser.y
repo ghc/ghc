@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.6 1999/06/07 14:58:40 simonmar Exp $
+$Id: Parser.y,v 1.7 1999/06/25 14:38:54 simonmar Exp $
 
 Haskell grammar.
 
@@ -764,10 +764,13 @@ stmtlist :: { [RdrNameStmt] }
 	|     layout_on  stmts close	{ reverse $2 }
 
 stmts :: { [RdrNameStmt] }
-	: stmts ';' stmt		{ $3 : $1 }
-	| stmts ';'			{ $1 }
+	: ';' stmts1			{ $2 }
+	| stmts1			{ $1 }
+
+stmts1 :: { [RdrNameStmt] }
+	: stmts1 ';' stmt		{ $3 : $1 }
+	| stmts1 ';'			{ $1 }
 	| stmt 				{ [$1] }
- 	| {- empty -}			{ [] }
 
 stmt  :: { RdrNameStmt }
 	: srcloc infixexp '<-' exp	{% checkPattern $2 `thenP` \p ->
