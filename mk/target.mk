@@ -802,18 +802,18 @@ check:: $(TESTS)
 #------------------------------------------------------------
 # 			Tags
 
-.PHONY: TAGS
+.PHONY: TAGS tags
 
-TAGS:: $(SOURCES)
+tags TAGS:: $(TAGS_HS_SRCS) $(TAGS_C_SRCS)
 	@$(RM) TAGS
 	@touch TAGS
-ifneq "$(HS_SRCS)" ""
+ifneq "$(TAGS_HS_SRCS)" ""
 	$(HSTAGS) $(HSTAGS_OPTS) -- $(TAGS_HS_SRCS)
 endif
-ifneq "$(C_SRCS)" ""
+ifneq "$(TAGS_C_SRCS)" ""
 	etags -a $(TAGS_C_SRCS)
 endif
-	@( DEREFFED=`ls -l Makefile | sed -e 's/.*-> \(.*\)/\1/g'` && $(RM) `dirname $$DEREFFED`/TAGS && $(CP) TAGS `dirname $$DEREFFED` ) || echo TAGS file generated, perhaps copy over to source tree?
+	@( DEREFFED=`ls -l Makefile | sed -e 's/.*-> \(.*\)/\1/g'` && $(RM) `dirname $$DEREFFED`/TAGS && $(CP) TAGS `dirname $$DEREFFED` ) 2>/dev/null || echo TAGS file generated, perhaps copy over to source tree?
 
 #------------------------------------------------------------
 # 			Makefile debugging
