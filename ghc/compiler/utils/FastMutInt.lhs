@@ -25,6 +25,10 @@ import PrelIOBase
 import GHC.Base
 import GHC.IOBase
 #endif
+
+#if __GLASGOW_HASKELL__ < 411
+newByteArray# = newCharArray#
+#endif
 \end{code}
 
 \begin{code}
