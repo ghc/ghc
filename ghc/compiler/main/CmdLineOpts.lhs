@@ -104,6 +104,7 @@ import FastString	( FastString, mkFastString )
 import Config
 import Maybes		( firstJust )
 
+import Panic		( ghcError, GhcException(UsageError) )
 import GLAEXTS
 import DATA_IOREF	( IORef, readIORef, writeIORef )
 import UNSAFE_IO	( unsafePerformIO )
@@ -708,19 +709,36 @@ packed_static_opts   = map mkFastString unpacked_static_opts
 
 lookUp     sw = sw `elem` packed_static_opts
 	
-lookup_str sw = firstJust (map (startsWith sw) unpacked_static_opts)
+-- (lookup_str "foo") looks for the flag -foo=X or -fooX, 
+-- and returns the string X
+lookup_str sw 
+   = case firstJust (map (startsWith sw) unpacked_static_opts) of
+	Just ('=' : str) -> Just str
+	Just str         -> Just str
+	Nothing		 -> Nothing	
 
 lookup_int sw = case (lookup_str sw) of
 		  Nothing -> Nothing
-		  Just xx -> Just (read xx)
+		  Just xx -> Just (try_read sw xx)
 
 lookup_def_int sw def = case (lookup_str sw) of
 			    Nothing -> def		-- Use default
-		  	    Just xx -> read xx
+		  	    Just xx -> try_read sw xx
 
 lookup_def_float sw def = case (lookup_str sw) of
 			    Nothing -> def		-- Use default
-		  	    Just xx -> read xx
+		  	    Just xx -> try_read sw xx
+
+
+try_read :: Read a => String -> String -> a
+-- (try_read sw str) tries to read s; if it fails, it
+-- bleats about flag sw
+try_read sw str
+  = case reads str of
+	((x,_):_) -> x	-- Be forgiving: ignore trailing goop, and alternative parses
+	[]	  -> ghcError (UsageError ("Malformed argument " ++ str ++ " for flag " ++ sw))
+			-- ToDo: hack alert. We should really parse the arugments
+			-- 	 and announce errors in a more civilised way.
 
 
 {-
