@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: StgTicky.h,v 1.11 2002/02/14 11:56:04 njn Exp $
+ * $Id: StgTicky.h,v 1.12 2002/04/09 11:00:11 njn Exp $
  *
  * (c) The AQUA project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -135,8 +135,8 @@
 
 #define TICK_ENT_VIA_NODE()	ENT_VIA_NODE_ctr++
 
-#define TICK_ENT_STATIC_THK(n)	ENT_STATIC_THK_ctr++ 
-#define TICK_ENT_DYN_THK(n)	ENT_DYN_THK_ctr++
+#define TICK_ENT_STATIC_THK()	ENT_STATIC_THK_ctr++ 
+#define TICK_ENT_DYN_THK()	ENT_DYN_THK_ctr++
 
 typedef struct _StgEntCounter {
     unsigned	registeredp:16,	/* 0 == no, 1 == yes */
