@@ -260,6 +260,7 @@ data DynFlag
    | Opt_WarnUnusedMatches
    | Opt_WarnDeprecations
    | Opt_WarnDodgyImports
+   | Opt_WarnOrphans
 
    -- language opts
    | Opt_AllowOverlappingInstances
@@ -648,7 +649,8 @@ minusWallOpts
       [	Opt_WarnTypeDefaults,
 	Opt_WarnNameShadowing,
 	Opt_WarnMissingSigs,
-	Opt_WarnHiShadows
+	Opt_WarnHiShadows,
+	Opt_WarnOrphans
       ]
 \end{code}
 

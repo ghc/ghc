@@ -234,7 +234,7 @@ import FastString
 import DATA_IOREF	( writeIORef )
 import Monad		( when )
 import List		( insert )
-import Maybes		( orElse, mapCatMaybes, isNothing, fromJust, expectJust )
+import Maybes		( orElse, mapCatMaybes, isNothing, isJust, fromJust, expectJust )
 \end{code}
 
 
@@ -317,7 +317,7 @@ mkIface hsc_env location maybe_old_iface
 			mi_fix_fn = mkIfaceFixCache fixities }
 
 		-- Add version information
-		; (new_iface, no_change_at_all, pp_diffs) 
+		; (new_iface, no_change_at_all, pp_diffs, pp_orphs) 
 			= _scc_ "versioninfo" 
 			 addVersionInfo maybe_old_iface intermediate_iface decls
 		}
@@ -328,6 +328,8 @@ mkIface hsc_env location maybe_old_iface
 		writeBinIface hi_file_path new_iface
 
 		-- Debug printing
+	; when (isJust pp_orphs && dopt Opt_WarnOrphans dflags) 
+	       (printDump (fromJust pp_orphs))
 	; when (dopt Opt_D_dump_hi_diffs dflags) (printDump pp_diffs)
 	; dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE" 
 			(pprModIface new_iface)
@@ -424,7 +426,8 @@ addVersionInfo :: Maybe ModIface	-- The old interface, read from M.hi
 	       -> [IfaceDecl]		-- The new decls
 	       -> (ModIface, 
 		   Bool,		-- True <=> no changes at all; no need to write new Iface
-		   SDoc)		-- Differences
+		   SDoc,		-- Differences
+		   Maybe SDoc)		-- Warnings about orphans
 
 addVersionInfo Nothing new_iface new_decls
 -- No old interface, so definitely write a new one!
@@ -432,8 +435,9 @@ addVersionInfo Nothing new_iface new_decls
 			  || anyNothing getRuleKey (mi_rules new_iface),
 		 mi_decls  = [(initialVersion, decl) | decl <- new_decls],
 		 mi_ver_fn = \n -> Just initialVersion },
-     False, ptext SLIT("No old interface file") $$ 
-	    pprOrphans orph_insts orph_rules)
+     False, 
+     ptext SLIT("No old interface file"),
+     pprOrphans orph_insts orph_rules)
   where
     orph_insts = filter (isNothing . getInstKey) (mi_insts new_iface)
     orph_rules = filter (isNothing . getRuleKey) (mi_rules new_iface)
@@ -447,10 +451,9 @@ addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers,
 	       new_iface@(ModIface { mi_fix_fn = new_fixities })
 	       new_decls
 
-  | no_change_at_all = (old_iface,   True,  ptext SLIT("Interface file unchanged") $$ pp_orphs)
+  | no_change_at_all = (old_iface,   True,  ptext SLIT("Interface file unchanged"), pp_orphs)
   | otherwise	     = (final_iface, False, vcat [ptext SLIT("Interface file has changed"),
-						  nest 2 pp_diffs,
-						  text "" $$ pp_orphs])
+						  nest 2 pp_diffs], pp_orphs)
   where
     final_iface = new_iface { mi_mod_vers  = bump_unless no_output_change old_mod_vers,
 			      mi_exp_vers  = bump_unless no_export_change old_exp_vers,
@@ -574,10 +577,16 @@ addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers,
     pp_orphs = pprOrphans new_orph_insts new_orph_rules
 
 pprOrphans insts rules
-  = vcat [if null insts then empty else
-	     ptext SLIT("Orphan instances:") <+> vcat (map ppr insts),
-	  if null rules then empty else
-	     ptext SLIT("Orphan rules:") <+> vcat (map ppr rules)]
+  | null insts && null rules = Nothing
+  | otherwise
+  = Just $ vcat [
+	if null insts then empty else
+	     hang (ptext SLIT("Warning: orphan instances:"))
+		2 (vcat (map ppr insts)),
+	if null rules then empty else
+	     hang (ptext SLIT("Warning: orphan rules:"))
+		2 (vcat (map ppr rules))
+    ]
 
 computeChangedOccs :: [(OccName, IfaceEq)] -> OccSet
 computeChangedOccs eq_info

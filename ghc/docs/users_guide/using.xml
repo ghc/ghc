@@ -950,6 +950,27 @@ f foo = foo { x = 6 }
       </varlistentry>
 
       <varlistentry>
+	<term><option>-fwarn-orphans</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-fwarn-orphans</option></primary></indexterm>
+	  <indexterm><primary>orphan instances, warning</primary></indexterm>
+	  <indexterm><primary>orphan rules, warning</primary></indexterm>
+	  
+	  <para>This option causes a warning to be emitted whenever the 
+	    module contains an "orphan" instance declaration or rewrite rule.
+	    An instance declartion is an orphan if it appears in a module in
+	    which neither the class nor the type being instanced are declared
+	    in the same module.  A rule is an orphan if it is a rule for a
+	    function declared in another module.  A module containing any
+	  orphans is called an orphan module.</para>
+	  <para>The trouble with orphans is that GHC must pro-actively read the interface
+	    files for all orphan modules, just in case their instances or rules
+	    play a role, whether or not the module's interface would otherwise 
+	    be of any use.  Other things being equal, avoid orphan modules.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term>
           <option>-fwarn-overlapping-patterns</option>:
           <indexterm><primary><option>-fwarn-overlapping-patterns</option></primary></indexterm>

@@ -460,6 +460,7 @@ fFlags = [
   ( "warn-unused-imports",       	Opt_WarnUnusedImports ),
   ( "warn-unused-matches",       	Opt_WarnUnusedMatches ),
   ( "warn-deprecations",         	Opt_WarnDeprecations ),
+  ( "warn-orphans",	         	Opt_WarnOrphans ),
   ( "fi",				Opt_FFI ),  -- support `-ffi'...
   ( "ffi",				Opt_FFI ),  -- ...and also `-fffi'
   ( "arrows",				Opt_Arrows ), -- arrow syntax
