@@ -1,8 +1,8 @@
-{-
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1995-1996
+% (c) The AQUA Project, Glasgow University, 1994-1996
 %
-\section[LibDirectory]{Haskell 1.3 Directory Operations}
+
+\section[Directory]{Module @Directory@}
 
 A directory contains a series of entries, each of which is a named
 reference to a file system object (file, directory etc.).  Some
@@ -16,16 +16,27 @@ Each file system object is referenced by a {\em path}.  There is
 normally at least one absolute path to each file system object.  In
 some operating systems, it may also be possible to have paths which
 are relative to the current directory.
--}
+
+\begin{code}
 module Directory ( 
     createDirectory, removeDirectory, removeFile, 
     renameDirectory, renameFile, getDirectoryContents,
-    getCurrentDirectory, setCurrentDirectory ) where
+    getCurrentDirectory, setCurrentDirectory
+  ) where
 
-import GHCio
-import PreludeGlaST
-import GHCps	( packCBytesST, unpackPS )
+import Foreign
+import IOBase
+import STBase		( PrimIO )
+import PackedString	( packCBytesST, unpackPS )
+\end{code}
 
+%*********************************************************
+%*							*
+\subsection{Signatures}
+%*							*
+%*********************************************************
+
+\begin{code}
 createDirectory 	:: FilePath -> IO ()
 removeDirectory 	:: FilePath -> IO ()
 removeFile 		:: FilePath -> IO ()
@@ -34,9 +45,15 @@ renameFile 		:: FilePath -> FilePath -> IO ()
 getDirectoryContents 	:: FilePath -> IO [FilePath]
 getCurrentDirectory 	:: IO FilePath
 setCurrentDirectory 	:: FilePath -> IO ()
+\end{code}
 
---------------------
-{-
+
+%*********************************************************
+%*							*
+\subsection{Signatures}
+%*							*
+%*********************************************************
+
 $createDirectory dir$ creates a new directory
 {\em dir} which is initially empty, or as near to empty as the
 operating system allows.
@@ -67,17 +84,16 @@ $EMLINK$]
 The path refers to an existing non-directory object.
 [$EEXIST$]
 \end{itemize}
--}
 
+\begin{code}
 createDirectory path =
-    _ccall_ createDirectory path    `stThen` \ rc ->
+    _ccall_ createDirectory path    `thenIO_Prim` \ rc ->
     if rc == 0 then
         return ()
     else
         constructErrorAndFail "createDirectory"
+\end{code}
 
-------------------------
-{-
 $removeDirectory dir$ removes an existing directory {\em dir}.  The
 implementation may specify additional constraints which must be
 satisfied before a directory can be removed (e.g. the directory has to
@@ -111,16 +127,16 @@ The implementation does not support removal in this situation.
 The operand refers to an existing non-directory object.
 [$ENOTDIR$]
 \end{itemize}
--}
+
+\begin{code}
 removeDirectory path =
-    _ccall_ removeDirectory path    `stThen` \ rc ->
+    _ccall_ removeDirectory path    `thenIO_Prim` \ rc ->
     if rc == 0 then
         return ()
     else
         constructErrorAndFail "removeDirectory"
+\end{code}
 
-----------------------------
-{-
 $removeFile file$ removes the directory entry for an existing file
 {\em file}, where {\em file} is not itself a directory. The
 implementation may specify additional constraints which must be
@@ -148,16 +164,16 @@ Implementation-dependent constraints are not satisfied.
 The operand refers to an existing directory.
 [$EPERM$, $EINVAL$]
 \end{itemize}
--}
+
+\begin{code}
 removeFile path =
-    _ccall_ removeFile path `stThen` \ rc ->
+    _ccall_ removeFile path `thenIO_Prim` \ rc ->
     if rc == 0 then
         return ()
     else
         constructErrorAndFail "removeFile"
+\end{code}
 
----------------------------
-{-
 $renameDirectory old$ {\em new} changes the name of an existing
 directory from {\em old} to {\em new}.  If the {\em new} directory
 already exists, it is atomically replaced by the {\em old} directory.
@@ -196,16 +212,16 @@ The implementation does not support renaming in this situation.
 Either path refers to an existing non-directory object.
 [$ENOTDIR$, $EISDIR$]
 \end{itemize}
--}
+
+\begin{code}
 renameDirectory opath npath =
-    _ccall_ renameDirectory opath npath	`stThen` \ rc ->
+    _ccall_ renameDirectory opath npath	`thenIO_Prim` \ rc ->
     if rc == 0 then
         return ()
     else
         constructErrorAndFail "renameDirectory"
+\end{code}
 
------------------------------
-{-
 $renameFile old$ {\em new} changes the name of an existing file system
 object from {\em old} to {\em new}.  If the {\em new} object already
 exists, it is atomically replaced by the {\em old} object.  Neither
@@ -243,16 +259,16 @@ Either path refers to an existing directory.
 [$ENOTDIR$, $EISDIR$, $EINVAL$, 
 $EEXIST$, $ENOTEMPTY$]
 \end{itemize}
--}
+
+\begin{code}
 renameFile opath npath =
-    _ccall_ renameFile opath npath  `stThen` \ rc ->
+    _ccall_ renameFile opath npath  `thenIO_Prim` \ rc ->
     if rc == 0 then
         return ()
     else
         constructErrorAndFail	"renameFile"
+\end{code}
 
----------------------------
-{-
 $getDirectoryContents dir$ returns a list of
 <i>all</i> entries in {\em dir}.
 
@@ -277,14 +293,15 @@ Insufficient resources are available to perform the operation.
 The path refers to an existing non-directory object.
 [$ENOTDIR$]
 \end{itemize}
--}
+
+\begin{code}
 getDirectoryContents path =
-    _ccall_ getDirectoryContents path	`stThen` \ ptr ->
+    _ccall_ getDirectoryContents path	`thenIO_Prim` \ ptr ->
     if ptr == ``NULL'' then
         constructErrorAndFail "getDirectoryContents"
     else
 	stToIO (getEntries ptr 0)	>>= \ entries ->
-	_ccall_ free ptr		`stThen` \ () ->
+	_ccall_ free ptr		`thenIO_Prim` \ () ->
 	return entries
   where
     getEntries :: Addr -> Int -> PrimIO [FilePath]
@@ -298,9 +315,8 @@ getDirectoryContents path =
             _ccall_ free str			    >>= \ () ->
             getEntries ptr (n+1)		    >>= \ entries ->
 	    return (unpackPS entry : entries)
+\end{code}
 
----------------------
-{-
 If the operating system has a notion of current directories,
 $getCurrentDirectory$ returns an absolute path to the
 current directory of the calling process.
@@ -321,19 +337,19 @@ Insufficient resources are available to perform the operation.
 \item $UnsupportedOperation$
 The operating system has no notion of current directory.
 \end{itemize}
--}
+
+\begin{code}
 getCurrentDirectory =
-    _ccall_ getCurrentDirectory	    `stThen` \ str ->
+    _ccall_ getCurrentDirectory	    `thenIO_Prim` \ str ->
     if str /= ``NULL'' then
-        _ccall_ strlen str		`stThen` \ len ->
+        _ccall_ strlen str		`thenIO_Prim` \ len ->
         stToIO (packCBytesST len str)	>>=	    \ pwd ->
-        _ccall_ free str		`stThen` \ () ->
+        _ccall_ free str		`thenIO_Prim` \ () ->
         return (unpackPS pwd)
     else
         constructErrorAndFail "getCurrentDirectory"
+\end{code}
 
---------------------------
-{-
 If the operating system has a notion of current directories,
 $setCurrentDirectory dir$ changes the current
 directory of the calling process to {\em dir}.
@@ -359,13 +375,14 @@ current directory cannot be dynamically changed.
 The path refers to an existing non-directory object.
 [$ENOTDIR$]
 \end{itemize}
--}
+
+\begin{code}
 setCurrentDirectory path =
-    _ccall_ setCurrentDirectory path	`stThen` \ rc ->
+    _ccall_ setCurrentDirectory path	`thenIO_Prim` \ rc ->
     if rc == 0 then
         return ()
     else
         constructErrorAndFail "setCurrentDirectory"
-
+\end{code}
 
 

@@ -1,4 +1,3 @@
-{-
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1995
 %
@@ -7,7 +6,6 @@
 Standard, unbounded channel abstraction.
 
 \begin{code}
--}
 module Channel
        (
 	 {- abstract type defined -}
@@ -28,8 +26,9 @@ module Channel
 
        ) where
 
-import GHCbase
-{-
+import IOBase	( IO(..) )		-- Suspicious!
+import ConcBase
+import STBase
 \end{code}
 
 A channel is represented by two @MVar@s keeping track of the two ends
@@ -37,7 +36,6 @@ of the channel contents,i.e.,  the read- and write ends. Empty @MVar@s
 are used to handle consumers trying to read from an empty channel.
 
 \begin{code}
--}
 
 data Chan a
  = Chan (MVar (Stream a))
@@ -48,7 +46,6 @@ type Stream a = MVar (ChItem a)
 data ChItem a = ChItem a (Stream a)
 
 
-{-
 \end{code}
 
 See the Concurrent Haskell paper for a diagram explaining the
@@ -58,7 +55,6 @@ how the different channel operations proceed.
 these two @MVar@s with an empty @MVar@.
 
 \begin{code}
--}
 
 newChan :: IO (Chan a)
 newChan
@@ -67,7 +63,6 @@ newChan
    newMVar hole      >>= \ write ->
    return (Chan read write)
 
-{-
 \end{code}
 
 To put an element on a channel, a new hole at the write end is created.
@@ -76,7 +71,6 @@ filled in with a new stream element holding the entered value and the
 new hole.
 
 \begin{code}
--}
 
 putChan :: Chan a -> a -> IO ()
 putChan (Chan read write) val
@@ -110,13 +104,11 @@ unGetChan (Chan read write) val
    putMVar read new_rend              >>
    return ()
 
-{-
 \end{code}
 
 Operators for interfacing with functional streams.
 
 \begin{code}
--}
 
 getChanContents :: Chan a -> IO [a]
 getChanContents ch
@@ -148,3 +140,5 @@ getChanContents_prim ch = ST $ \ s ->
 -------------
 putList2Chan :: Chan a -> [a] -> IO ()
 putList2Chan ch ls = sequence (map (putChan ch) ls)
+
+\end{code}

@@ -1,4 +1,3 @@
-{-
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1995
 %
@@ -8,7 +7,6 @@ Avoiding the loss of ref. transparency by attaching the merge to the
 IO monad.
 
 \begin{code}
--}
 module Merge
 
 	(
@@ -18,9 +16,6 @@ module Merge
 
 import Semaphore
 
-import GHCbase
-import GHCio		( stThen )
-import Concurrent	( forkIO )
 
 max_buff_size = 1
 
@@ -93,3 +88,4 @@ nmergeIO lss
     mapIO f xs = accumulate (map f xs)
 
 #endif {- __CONCURRENT_HASKELL__ -}
+\end{code}

@@ -1,10 +1,42 @@
-module Ix ( Ix(range, index, inRange) ) where
+%
+% (c) The AQUA Project, Glasgow University, 1994-1996
+%
 
+\section[Ix]{Module @Ix@}
+
+\begin{code}
+module Ix (
+	Ix(range, index, inRange)
+  ) where
+
+import Prelude	()
+import IOBase	( error )		{-# SOURCE #-}
+import PrelNum
+import PrelTup
+import PrelBase
+\end{code}
+
+%*********************************************************
+%*							*
+\subsection{The @Ix@ class}
+%*							*
+%*********************************************************
+
+\begin{code}
 class  (Show a, Ord a) => Ix a  where
     range		:: (a,a) -> [a]
     index		:: (a,a) -> a -> Int
     inRange		:: (a,a) -> a -> Bool
+\end{code}
 
+
+%*********************************************************
+%*							*
+\subsection{Instances of @Ix@}
+%*							*
+%*********************************************************
+
+\begin{code}
 instance  Ix Char  where
     range (c,c')	=  [c..c']
     index b@(c,c') ci
@@ -119,3 +151,4 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
     inRange ((l1,l2,l3,l4,l5),(u1,u2,u3,u4,u5)) (i1,i2,i3,i4,i5) =
         inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
             inRange (l3,u3) i3 && inRange (l4,u4) i4 && inRange (l5,u5) i5
+\end{code}

@@ -1,0 +1,67 @@
+This loop-breaking module is used solely to braek the loops caused by
+SPECIALIZE pragmas.
+
+\begin{code}
+interface SpecLoop where
+
+import RdrHsSyn		( RdrName )
+import Name		( Name, OrigName, OccName )
+import TyVar		( GenTyVar )
+import TyCon		( TyCon )
+import Class		( GenClass, GenClassOp )
+import Id		( GenId )
+import Unique		( Unique )
+import UniqFM		( Uniquable(..) )
+import MachRegs		( Reg )
+import CLabel		( CLabel )
+
+data RdrName 
+data GenClass a b
+data GenClassOp a
+data GenId a		-- NB: fails the optimisation criterion
+data GenTyVar a		-- NB: fails the optimisation criterion
+data Name
+data OrigName
+data OccName
+data TyCon
+data Unique
+data Reg
+data CLabel
+
+
+class Uniquable a where
+	uniqueOf :: a -> Unique
+
+-- SPECIALIZing in FiniteMap
+instance Eq Reg
+instance Eq CLabel
+instance Eq OccName
+instance Eq RdrName
+instance Eq OrigName
+instance Eq (GenId a)
+instance Eq TyCon
+instance Eq (GenClass a b)
+instance Eq Unique
+instance Eq Name
+
+instance Ord Reg
+instance Ord CLabel
+instance Ord OccName
+instance Ord RdrName
+instance Ord OrigName
+instance Ord (GenId a)
+instance Ord TyCon
+instance Ord (GenClass a b)
+instance Ord Unique
+instance Ord Name
+
+-- SPECIALIZing in UniqFM, UniqSet
+instance Uniquable OrigName
+instance Uniquable (GenId a)
+instance Uniquable TyCon
+instance Uniquable (GenClass a b)
+instance Uniquable Unique
+instance Uniquable Name
+
+-- SPECIALIZing in Name
+\end{code}

@@ -1,11 +1,39 @@
+%
+% (c) The AQUA Project, Glasgow University, 1994-1996
+%
 
-module Complex(Complex((:+)), realPart, imagPart, conjugate, mkPolar,
-               cis, polar, magnitude, phase)  where
+\section[Complex]{Module @Complex@}
+
+\begin{code}
+module Complex (
+	Complex((:+)), 
+
+	realPart, imagPart, conjugate, mkPolar,
+	cis, polar, magnitude, phase
+    )  where
+
 
 infix  6  :+
+\end{code}
 
+%*********************************************************
+%*							*
+\subsection{The @Complex@ type}
+%*							*
+%*********************************************************
+
+\begin{code}
 data  (RealFloat a)     => Complex a = !a :+ !a  deriving (Eq,Read,Show)
+\end{code}
 
+
+%*********************************************************
+%*							*
+\subsection{Functions over @Complex@}
+%*							*
+%*********************************************************
+
+\begin{code}
 realPart, imagPart :: (RealFloat a) => Complex a -> a
 realPart (x:+y)	 =  x
 imagPart (x:+y)	 =  y
@@ -29,9 +57,17 @@ magnitude (x:+y) =  scaleFloat k
 		          mk = - k
 
 phase (x:+y)	 =  atan2 y x
+\end{code}
 
 
-instance  (RealFloat a) => Num (Complex a)  where
+%*********************************************************
+%*							*
+\subsection{Instances of @Complex@}
+%*							*
+%*********************************************************
+
+\begin{code}
+instance  (RealFloat a) => Prelude.Num (Complex a)  where
     (x:+y) + (x':+y')	=  (x+x') :+ (y+y')
     (x:+y) - (x':+y')	=  (x-x') :+ (y-y')
     (x:+y) * (x':+y')	=  (x*x'-y*y') :+ (x*y'+y*x')
@@ -50,7 +86,7 @@ instance  (RealFloat a) => Fractional (Complex a)  where
 
     fromRational a	=  fromRational a :+ 0
 
-instance  (RealFloat a) => Floating (Complex a)	where
+instance  (Prelude.RealFloat a) => Floating (Complex a)	where
     pi             =  pi :+ 0
     exp (x:+y)     =  expx * cos y :+ expx * sin y
                       where expx = exp x
@@ -89,3 +125,4 @@ instance  (RealFloat a) => Floating (Complex a)	where
     asinh z        =  log (z + sqrt (1+z*z))
     acosh z        =  log (z + (z+1) * sqrt ((z-1)/(z+1)))
     atanh z        =  log ((1+z) / sqrt (1-z*z))
+\end{code}

@@ -1,4 +1,3 @@
-{-
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1995
 %
@@ -16,8 +15,8 @@ potentially, wakes up a blocked reader  (same as for @putMVar@ on empty @MVar@).
 \item Writing to a filled @SampleVar@ overwrites the current value.
  (different from @putMVar@ on full @MVar@.)
 \end{itemize}
--}
 
+\begin{code}
 module SampleVar
        (
          SampleVar,        --:: type _ =
@@ -29,7 +28,8 @@ module SampleVar
 
        ) where
 
-import GHCbase
+import ConcBase
+
 
 type SampleVar a
  = MVar (Int,		-- 1  == full
@@ -76,3 +76,4 @@ writeSample svar v
      _ -> 
        putMVar val v >> 
        putMVar svar (min 1 (readers+1), val)
+\end{code}

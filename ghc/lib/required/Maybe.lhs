@@ -1,6 +1,34 @@
+%
+% (c) The AQUA Project, Glasgow University, 1994-1996
+%
+
+\section[Maybe]{Module @Maybe@}
+
+\begin{code}
 module Maybe(
+    Maybe(..),
     the, exists, theExists, maybe, fromMaybe, listToMaybe, maybeToList,
-    findMaybe, catMaybes, mapMaybe, joinMaybe, unfoldr ) where
+    findMaybe, catMaybes, mapMaybe, joinMaybe, unfoldr
+  ) where
+
+import Prelude	()
+import IOBase	( error )
+import Monad	( filter )
+import PrelList
+import PrelBase
+\end{code}
+
+
+%*********************************************************
+%*							*
+\subsection{Functions}
+%*							*
+%*********************************************************
+
+\begin{code}
+maybe                   :: b -> (a -> b) -> Maybe a -> b
+maybe n f Nothing       =  n
+maybe n f (Just x)      =  f x
 
 exists                 :: Maybe a -> Bool
 exists                 =  maybe False (const True)
@@ -50,3 +78,4 @@ unfoldr f x =
   case f x of
   Just (y,x') -> let (ys,x'') = unfoldr f x' in (y:ys,x'')
   Nothing     -> ([],x)
+\end{code}

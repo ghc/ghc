@@ -1,4 +1,3 @@
-{-
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1995
 %
@@ -6,7 +5,7 @@
 
 General/quantity semaphores
 
--}
+\begin{code}
 module Semaphore
       (
        {- abstract -}
@@ -24,17 +23,17 @@ module Semaphore
 	
       ) where
 
-import GHCbase
+import ConcBase
+\end{code}
 
-{-
 General semaphores are also implemented readily in terms of shared
 @MVar@s, only have to catch the case when the semaphore is tried
 waited on when it is empty (==0). Implement this in the same way as
 shared variables are implemented - maintaining a list of @MVar@s
 representing threads currently waiting. The counter is a shared
 variable, ensuring the mutual exclusion on its access.
--}
 
+\begin{code}
 data QSem = QSem (MVar (Int, [MVar ()]))
 
 newQSem :: Int -> IO QSem
@@ -110,3 +109,4 @@ signalQSemN (QSemN sem) n
      else
 	free avail blocked >>= \ (avail',blocked') ->
         return (avail',(req,block):blocked')
+\end{code}

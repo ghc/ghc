@@ -1,4 +1,3 @@
-{-
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1995
 %
@@ -8,7 +7,6 @@ Channel variables, are one-element channels described in the Concurrent
 Haskell paper (available from @ftp://ftp.dcs.gla.ac.uk/pub/glasgow-fp/drafts@)
 
 \begin{code}
--}
 module ChannelVar
        (
 	 {- abstract -}
@@ -20,8 +18,7 @@ module ChannelVar
 
        ) where
 
-import GHCbase
-{-
+import ConcBase
 \end{code}
 
 @MVars@ provide the basic mechanisms for synchronising access to a shared
@@ -31,7 +28,6 @@ access to the channel variable,i.e., a producer is forced to wait up for
 a consumer to remove the previous value before it can deposit a new one in the @CVar@.
 
 \begin{code}
--}
 
 data CVar a
  = CVar (MVar a)     -- prod -> cons
@@ -55,3 +51,4 @@ getCVar (CVar datum ack)
  = takeMVar datum >>= \ val ->
    putMVar ack () >> 
    return val
+\end{code}

@@ -1,59 +1,91 @@
+%
+% (c) The AQUA Project, Glasgow University, 1994-1996
+%
+
+\section[IO]{Module @IO@}
+
+\begin{code}
 module IO (
     Handle, HandlePosn,
+
     IOMode(ReadMode,WriteMode,AppendMode,ReadWriteMode),
     BufferMode(NoBuffering,LineBuffering,BlockBuffering),
     SeekMode(AbsoluteSeek,RelativeSeek,SeekFromEnd),
-    stdin, stdout, stderr, openFile, hClose, hFileSize, hIsEOF, isEOF,
+
+    stdin, stdout, stderr, 
+    openFile, hClose, hFileSize, hIsEOF, isEOF,
     hSetBuffering, hGetBuffering, hFlush, hGetPosn, hSetPosn, hSeek, 
     hIsOpen, hIsClosed, hIsReadable, hIsWritable, hIsSeekable, hReady, 
     hGetChar, hLookAhead, hGetContents, hPutChar, hPutStr, hPrint,
+
     isAlreadyExistsError, isAlreadyInUseError, isFullError, isEOFError,
     isIllegalOperation, isPermissionError, isUserError, 
-    ioeGetHandle, ioeGetFileName ) where
+    ioeGetHandle, ioeGetFileName
+  ) where
 
+import Prelude	()
 import Ix
-import GHCio	-- much of the real stuff is in here
-import GHCbase
-import GHCps	( nilPS, packCBytesST, unpackPS )
+import STBase
+import IOBase
+import ArrBase		( MutableByteArray(..), newCharArray )
+import IOHandle		-- much of the real stuff is in here
+import PackedString	( nilPS, packCBytesST, unpackPS )
+import PrelBase
+import GHC
+\end{code}
 
---GHCio:hClose                :: Handle -> IO () 
---GHCio:hFileSize             :: Handle -> IO Integer
---GHCio:hFlush                :: Handle -> IO () 
---GHCio:hGetBuffering         :: Handle -> IO BufferMode
+%*********************************************************
+%*							*
+\subsection{Signatures}
+%*							*
+%*********************************************************
+
+\begin{code}
+--IOHandle:hClose                :: Handle -> IO () 
+--IOHandle:hFileSize             :: Handle -> IO Integer
+--IOHandle:hFlush                :: Handle -> IO () 
+--IOHandle:hGetBuffering         :: Handle -> IO BufferMode
 hGetChar              :: Handle -> IO Char
 hGetContents          :: Handle -> IO String
---GHCio:hGetPosn              :: Handle -> IO HandlePosn
---GHCio:hIsClosed             :: Handle -> IO Bool
---GHCio:hIsEOF                :: Handle -> IO Bool
---GHCio:hIsOpen               :: Handle -> IO Bool
---GHCio:hIsReadable           :: Handle -> IO Bool
---GHCio:hIsSeekable           :: Handle -> IO Bool
---GHCio:hIsWritable           :: Handle -> IO Bool
+--IOHandle:hGetPosn              :: Handle -> IO HandlePosn
+--IOHandle:hIsClosed             :: Handle -> IO Bool
+--IOHandle:hIsEOF                :: Handle -> IO Bool
+--IOHandle:hIsOpen               :: Handle -> IO Bool
+--IOHandle:hIsReadable           :: Handle -> IO Bool
+--IOHandle:hIsSeekable           :: Handle -> IO Bool
+--IOHandle:hIsWritable           :: Handle -> IO Bool
 hLookAhead            :: Handle -> IO Char
 hPrint                :: Show a => Handle -> a -> IO ()
 hPutChar              :: Handle -> Char -> IO ()
 hPutStr               :: Handle -> String -> IO ()
 hReady                :: Handle -> IO Bool 
---GHCio:hSeek                 :: Handle -> SeekMode -> Integer -> IO () 
---GHCio:hSetBuffering         :: Handle -> BufferMode -> IO ()
---GHCio:hSetPosn              :: HandlePosn -> IO () 
-ioeGetFileName        :: IOError -> Maybe FilePath
-ioeGetHandle          :: IOError -> Maybe Handle
-isAlreadyExistsError  :: IOError -> Bool
-isAlreadyInUseError   :: IOError -> Bool
---GHCio:isEOF                 :: IO Bool
-isEOFError            :: IOError -> Bool
-isFullError           :: IOError -> Bool
-isIllegalOperation    :: IOError -> Bool
-isPermissionError     :: IOError -> Bool
-isUserError           :: IOError -> Maybe String
---GHCio:openFile              :: FilePath -> IOMode -> IO Handle
---GHCio:stdin, stdout, stderr :: Handle
+--IOHandle:hSeek                 :: Handle -> SeekMode -> Integer -> IO () 
+--IOHandle:hSetBuffering         :: Handle -> BufferMode -> IO ()
+--IOHandle:hSetPosn              :: HandlePosn -> IO () 
+-- ioeGetFileName        :: IOError -> Maybe FilePath
+-- ioeGetHandle          :: IOError -> Maybe Handle
+-- isAlreadyExistsError  :: IOError -> Bool
+-- isAlreadyInUseError   :: IOError -> Bool
+--IOHandle:isEOF                 :: IO Bool
+-- isEOFError            :: IOError -> Bool
+-- isFullError           :: IOError -> Bool
+-- isIllegalOperation    :: IOError -> Bool
+-- isPermissionError     :: IOError -> Bool
+-- isUserError           :: IOError -> Maybe String
+--IOHandle:openFile              :: FilePath -> IOMode -> IO Handle
+--IOHandle:stdin, stdout, stderr :: Handle
+\end{code}
 
----------------------------
--- Computation $hReady hdl$ indicates whether at least
--- one item is available for input from handle {\em hdl}.
+%*********************************************************
+%*							*
+\subsection{Simple input operations}
+%*							*
+%*********************************************************
 
+Computation $hReady hdl$ indicates whether at least
+one item is available for input from handle {\em hdl}.
+
+\begin{code}
 --hReady :: Handle -> IO Bool 
 hReady handle = 
     readHandle handle				    >>= \ htype ->
@@ -74,17 +106,18 @@ hReady handle =
 	  writeHandle handle htype		    >>
 	  fail (IllegalOperation "handle is not open for reading")
       other -> 
-	  _ccall_ inputReady (filePtr other)  	    `stThen` \ rc ->
+	  _ccall_ inputReady (filePtr other)  	    `thenIO_Prim` \ rc ->
 	  writeHandle handle (markHandle htype)   >>
           case rc of
             0 -> return False
             1 -> return True
             _ -> constructErrorAndFail "hReady"
+\end{code}
 
----------------------------
---Computation $hGetChar hdl$ reads the next character from handle {\em
---hdl}, blocking until a character is available.
+Computation $hGetChar hdl$ reads the next character from handle 
+{\em hdl}, blocking until a character is available.
 
+\begin{code}
 --hGetChar :: Handle -> IO Char
 
 hGetChar handle = 
@@ -106,18 +139,19 @@ hGetChar handle =
 	  writeHandle handle htype		    >>
 	  fail (IllegalOperation "handle is not open for reading")
       other -> 
-	  _ccall_ fileGetc (filePtr other)  	    `stThen` \ intc ->
+	  _ccall_ fileGetc (filePtr other)  	    `thenIO_Prim` \ intc ->
 	  writeHandle handle (markHandle htype)   >>
           if intc /= ``EOF'' then
               return (chr intc)
           else
               constructErrorAndFail "hGetChar"
+\end{code}
 
--------------------------------
--- Computation $hLookahead hdl$ returns the next character from handle
---{\em hdl} without removing it from the input buffer, blocking until a
--- character is available.
+Computation $hLookahead hdl$ returns the next character from handle
+{\em hdl} without removing it from the input buffer, blocking until a
+character is available.
 
+\begin{code}
 --hLookAhead :: Handle -> IO Char
 
 hLookAhead handle = 
@@ -139,18 +173,26 @@ hLookAhead handle =
 	  writeHandle handle htype		    >>
 	  fail (IllegalOperation "handle is not open for reading")
       other -> 
-	  _ccall_ fileLookAhead (filePtr other)    `stThen` \ intc ->
+	  _ccall_ fileLookAhead (filePtr other)    `thenIO_Prim` \ intc ->
 	  writeHandle handle (markHandle htype)   >>
           if intc /= ``EOF'' then
               return (chr intc)
           else
               constructErrorAndFail "hLookAhead"
+\end{code}
 
------------------------------------
--- Computation $hGetContents hdl$ returns the list of characters
--- corresponding to the unread portion of the channel or file managed by
--- {\em hdl}, which is made semi-closed.
 
+%*********************************************************
+%*							*
+\subsection{Getting the entire contents of a handle}
+%*							*
+%*********************************************************
+
+Computation $hGetContents hdl$ returns the list of characters
+corresponding to the unread portion of the channel or file managed by
+{\em hdl}, which is made semi-closed.
+
+\begin{code}
 --hGetContents :: Handle -> IO String
 
 hGetContents handle =
@@ -184,7 +226,7 @@ hGetContents handle =
 	        writeHandle handle (SemiClosedHandle (filePtr other) buf_info)
                                           	    >>
                 unsafeInterleavePrimIO (lazyReadLine handle)
-						    `stThen` \ contents ->
+						    `thenIO_Prim` \ contents ->
 	        return contents
 
             Just (BlockBuffering size) ->
@@ -192,18 +234,18 @@ hGetContents handle =
 	        writeHandle handle (SemiClosedHandle (filePtr other) buf_info)
                                           	    >>
                 unsafeInterleavePrimIO (lazyReadBlock handle)
-						    `stThen` \ contents ->
+						    `thenIO_Prim` \ contents ->
 	        return contents
             _ -> -- Nothing is treated pessimistically as NoBuffering
 	        writeHandle handle (SemiClosedHandle (filePtr other) (``NULL'', 0))
                                           	    >>
                 unsafeInterleavePrimIO (lazyReadChar handle)
-						    `stThen` \ contents ->
+						    `thenIO_Prim` \ contents ->
 	        return contents
   where
     allocBuf :: Maybe Int -> IO (Addr, Int)
     allocBuf msize =
-	_ccall_ malloc size		    	    `stThen` \ buf ->
+	_ccall_ malloc size		    	    `thenIO_Prim` \ buf ->
 	if buf /= ``NULL'' then
 	    return (buf, size)
 	else
@@ -213,13 +255,13 @@ hGetContents handle =
 	    case msize of
 	      Just x -> x
 	      Nothing -> ``BUFSIZ''
+\end{code}
 
-{-
-   Note that someone may yank our handle out from under us, and then re-use
-   the same FILE * for something else.  Therefore, we have to re-examine the
-   handle every time through.
--}
+Note that someone may yank our handle out from under us, and then re-use
+the same FILE * for something else.  Therefore, we have to re-examine the
+handle every time through.
 
+\begin{code}
 lazyReadBlock :: Handle -> PrimIO String
 lazyReadLine  :: Handle -> PrimIO String
 lazyReadChar  :: Handle -> PrimIO String
@@ -291,12 +333,20 @@ lazyReadChar handle =
               unsafeInterleavePrimIO (lazyReadChar handle)
 						    >>= \ more ->
 	      returnPrimIO (chr char : more)
+\end{code}
 
------------------------------------
--- Computation $hPutChar hdl c$ writes the character {\em c} to the file
--- or channel managed by {\em hdl}.  Characters may be buffered if
--- buffering is enabled for {\em hdl}.
 
+%*********************************************************
+%*							*
+\subsection{Simple output functions}
+%*							*
+%*********************************************************
+
+Computation $hPutChar hdl c$ writes the character {\em c} to the file
+or channel managed by {\em hdl}.  Characters may be buffered if
+buffering is enabled for {\em hdl}.
+
+\begin{code}
 --hPutChar :: Handle -> Char -> IO ()
 
 hPutChar handle c =
@@ -315,17 +365,18 @@ hPutChar handle c =
 	  writeHandle handle htype		    >>
 	  fail (IllegalOperation "handle is not open for writing")
       other -> 
-	  _ccall_ filePutc (filePtr other) (ord c) `stThen` \ rc ->
+	  _ccall_ filePutc (filePtr other) (ord c) `thenIO_Prim` \ rc ->
 	  writeHandle handle (markHandle htype)   >>
           if rc == 0 then
               return ()
           else
               constructErrorAndFail "hPutChar"
+\end{code}
 
-------------------------------------
--- Computation $hPutStr hdl s$ writes the string {\em s} to the file or
--- channel managed by {\em hdl}.
+Computation $hPutStr hdl s$ writes the string {\em s} to the file or
+channel managed by {\em hdl}.
 
+\begin{code}
 --hPutStr :: Handle -> String -> IO ()
 
 hPutStr handle str = 
@@ -344,7 +395,7 @@ hPutStr handle str =
 	  writeHandle handle htype		    >>
 	  fail (IllegalOperation "handle is not open for writing")
       other -> 
-          getBufferMode other			    `stThen` \ other ->
+          getBufferMode other			    `thenIO_Prim` \ other ->
           (case bufferMode other of
             Just LineBuffering ->
 		writeLines (filePtr other) str
@@ -354,7 +405,7 @@ hPutStr handle str =
 	        writeBlocks (filePtr other) ``BUFSIZ'' str
             _ -> -- Nothing is treated pessimistically as NoBuffering
 	        writeChars (filePtr other) str
-	  )    					    `stThen` \ success ->
+	  )    					    `thenIO_Prim` \ success ->
 	  writeHandle handle (markHandle other) >>
           if success then
               return ()
@@ -393,7 +444,7 @@ hPutStr handle str =
       shoveString n ls = 
        case ls of
          [] ->   
-	   if n `eqInt#` 0# then
+	   if n ==# 0# then
 	      returnPrimIO True
 	   else
              _ccall_ writeFile arr fp (I# n) >>= \rc ->
@@ -403,14 +454,14 @@ hPutStr handle str =
 	   write_char arr# n x	>>
 	   
 	   {- Flushing lines - should we bother? -}
-	   if n `eqInt#` bufLen {- || (chopOnNewLine && (x `eqChar#` '\n'#)) -} then
-	      _ccall_ writeFile arr fp (I# (n `plusInt#` 1#)) >>= \ rc ->
+	   if n ==# bufLen {- || (chopOnNewLine && (x `eqChar#` '\n'#)) -} then
+	      _ccall_ writeFile arr fp (I# (n +# 1#)) >>= \ rc ->
 	      if rc == 0 then
 		 shoveString 0# xs
 	       else
 		 return False
 	    else
-	       shoveString (n `plusInt#` 1#) xs
+	       shoveString (n +# 1#) xs
      in
      shoveString 0# s
 
@@ -422,39 +473,13 @@ hPutStr handle str =
 	    writeChars fp cs
 	else
 	    returnPrimIO False
+\end{code}
 
-------------------------------------------
--- Computation $hPrint hdl t$ writes the string representation of {\em
--- t} given by the $shows$ function to the file or channel managed by
--- {\em hdl}.
+Computation $hPrint hdl t$ writes the string representation of {\em t}
+given by the $shows$ function to the file or channel managed by {\em
+hdl}.
 
+\begin{code}
 --hPrint :: Show a => Handle -> a -> IO ()
 hPrint hdl = hPutStr hdl . show
-
-------------------------------------------
--- almost no effort made on these so far...
-
-isAlreadyExistsError (AlreadyExists _) = True
-isAlreadyExistsError _		       = False
-
-isAlreadyInUseError (ResourceBusy _) = True
-isAlreadyInUseError _		     = False
-
-isFullError (ResourceExhausted _) = True
-isFullError _			  = False
-
-isEOFError EOF = True
-isEOFError _   = True
-
-isIllegalOperation (IllegalOperation _) = True
-isIllegalOperation _			= False
-
-isPermissionError (PermissionDenied _)	= True
-isPermissionError _			= False
-
-isUserError (UserError s) = Just s
-isUserError _		  = Nothing
-
-ioeGetHandle _ = Nothing -- a stub, essentially
-
-ioeGetFileName _ = Nothing -- a stub, essentially
+\end{code}

@@ -1,3 +1,10 @@
+%
+% (c) The AQUA Project, Glasgow University, 1994-1996
+%
+
+\section[List]{Module @Lhar@}
+
+\begin{code}
 module List ( 
     delete, deleteBy, (\\), deleteFirsts, deleteFirstsBy,
     elemBy, notElemBy, lookupBy, maximumBy, minimumBy,
@@ -10,8 +17,19 @@ module List (
     elemIndex, elemIndexBy, intersperse, group, groupBy,
     mapAccumL, mapAccumR,
     inits, tails, subsequences, permutations, 
-    union, intersect ) where
+    union, intersect
+  ) where
 
+import Prelude
+\end{code}
+
+%*********************************************************
+%*							*
+\subsection{List functions}
+%*							*
+%*********************************************************
+
+\begin{code}
 -- delete x removes the first occurrence of x from its list argument.
 delete                  :: (Eq a) => a -> [a] -> [a]
 delete                  =  deleteBy (==)
@@ -236,5 +254,4 @@ union xs ys 		=  xs ++ (ys \\ xs)
 
 intersect 		:: (Eq a) => [a] -> [a] -> [a]
 intersect xs ys 	=  [x | x <- xs, x `elem` ys]
-
-
+\end{code}

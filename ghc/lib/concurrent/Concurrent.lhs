@@ -1,7 +1,7 @@
-{-
 %
-% (c) The AQUA Project, Glasgow University, 1995
+% (c) The AQUA Project, Glasgow University, 1994-1996
 %
+
 \section[Concurrent]{Concurrent Haskell constructs}
 
 A common interface to a collection of useful concurrency abstractions.
@@ -11,29 +11,15 @@ Currently, the collection only contains the abstractions found in the
 \tr{ftp.dcs.gla.ac.uk/pub/glasgow-fp/drafts}.)  plus a couple of
 others. See the paper and the individual files containing the module
 definitions for explanation on what they do.
--}
 
+\begin{code}
 module Concurrent (
-	forkIO,
-	par, seq, fork, -- re-exported from GHCbase
-
-	-- waiting on file descriptor I/O
-	threadWaitRead, threadWaitWrite, 
-
-	-- wait for timeout
-        threadDelay,
-
 	module ChannelVar,
 	module Channel,
 	module Semaphore,
 	module Merge,
 	module SampleVar,
-
-	-- IVars and MVars come from here, too
-	IVar, MVar,
-	newEmptyMVar, takeMVar, putMVar, newMVar, readMVar, swapMVar,
-	newIVar, readIVar, writeIVar
-
+	module ConcBase
     ) where
 
 import Parallel
@@ -42,13 +28,5 @@ import Channel
 import Semaphore
 import Merge
 import SampleVar
-
-import GHCbase
-
-forkIO :: IO () -> IO ()
-
-forkIO (IO (ST action)) = IO $ ST $ \ s ->
-    let
-	(_, new_s) = action s
-    in
-    new_s `fork` (Right (), s)
+import ConcBase
+\end{code}
