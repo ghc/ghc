@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.49 2001/11/28 15:43:23 simonmar Exp $
+ * $Id: Printer.c,v 1.50 2001/12/06 14:33:02 simonmar Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -65,15 +65,25 @@ void printObj( StgClosure *obj )
     printClosure(obj);
 }
 
-static void printStdObject( StgClosure *obj, char* tag )
+static inline void
+printStdObjHdr( StgClosure *obj, char* tag )
 {
-    StgWord i, j;
-    const StgInfoTable* info = get_itbl(obj);
     fprintf(stdout,"%s(",tag);
     printPtr((StgPtr)obj->header.info);
 #ifdef PROFILING
     fprintf(stdout,", %s", obj->header.prof.ccs->cc->label);
 #endif
+}
+
+static void
+printStdObject( StgClosure *obj, char* tag )
+{
+    StgWord i, j;
+    const StgInfoTable* info;
+
+    printStdObjHdr( obj, tag );
+
+    info = get_itbl(obj);
     for (i = 0; i < info->layout.payload.ptrs; ++i) {
         fprintf(stdout,", ");
         printPtr((StgPtr)obj->payload[i]);
@@ -84,7 +94,8 @@ static void printStdObject( StgClosure *obj, char* tag )
     fprintf(stdout,")\n");
 }
 
-void printClosure( StgClosure *obj )
+void
+printClosure( StgClosure *obj )
 {
     StgInfoTable *info;
     
@@ -100,7 +111,7 @@ void printClosure( StgClosure *obj )
     case MUT_VAR:
         {
 	  StgMutVar* mv = (StgMutVar*)obj;
-	  fprintf(stderr,"MUT_VAR(var=%p, link=%p)\n", mv->var, mv->mut_link);
+	  fprintf(stdout,"MUT_VAR(var=%p, link=%p)\n", mv->var, mv->mut_link);
           break;
         }
 
@@ -131,9 +142,9 @@ void printClosure( StgClosure *obj )
         }
 
     case FOREIGN:
-            fprintf(stderr,"FOREIGN("); 
+            fprintf(stdout,"FOREIGN("); 
             printPtr((StgPtr)( ((StgForeignObj*)obj)->data ));
-            fprintf(stderr,")\n"); 
+            fprintf(stdout,")\n"); 
             break;
 
     case IND:
@@ -290,8 +301,9 @@ void printClosure( StgClosure *obj )
             break;
 
     case THUNK_SELECTOR:
-            printStdObject(obj,"THUNK_SELECTOR");
-            break;
+	printStdObjHdr(obj, "THUNK_SELECTOR");
+	fprintf(stdout, ", %p)\n", ((StgSelector *)obj)->selectee);
+	break;
 
     case ARR_WORDS:
         {
@@ -302,8 +314,8 @@ void printClosure( StgClosure *obj )
                 putchar(arrWordsGetChar(obj,i));
 		} */
 	    for (i=0; i<((StgArrWords *)obj)->words; i++)
-	      fprintf(stderr, "%ld", ((StgArrWords *)obj)->payload[i]);
-            fprintf(stderr,"\")\n");
+	      fprintf(stdout, "%ld", ((StgArrWords *)obj)->payload[i]);
+            fprintf(stdout,"\")\n");
             break;
         }
 
@@ -458,12 +470,12 @@ void printStackChunk( StgPtr sp, StgPtr spBottom )
 	  sp++;
 	small_bitmap:
 	  while (bitmap != 0) {
-	    fprintf(stderr,"   stk[%ld] (%p) = ", spBottom-sp, sp);
+	    fprintf(stdout,"   stk[%ld] (%p) = ", spBottom-sp, sp);
 	    if ((bitmap & 1) == 0) {
 	      printPtr((P_)*sp);
 	      fprintf(stdout,"\n");
 	    } else {
-	      fprintf(stderr,"Word# %ld\n", *sp);
+	      fprintf(stdout,"Word# %ld\n", *sp);
 	    }	      
 	    sp++;
 	    bitmap = bitmap >> 1;
@@ -478,7 +490,7 @@ void printStackChunk( StgPtr sp, StgPtr spBottom )
 	  break;
 	}
       }
-      fprintf(stderr,"Stack[%ld] (%p) = ", spBottom-sp, sp);
+      fprintf(stdout,"Stack[%ld] (%p) = ", spBottom-sp, sp);
       sp = printStackObj(sp);
     }
 }
@@ -965,7 +977,9 @@ findPtr(P_ p, int follow)
 		  if (*q == (W_)p) {
 		      if (i < arr_size) {
 			  r = q;
-			  while (!LOOKS_LIKE_GHC_INFO(*r)) { r--; };
+			  while (!LOOKS_LIKE_GHC_INFO(*r) || *r == NULL) {
+			      r--;
+			  }
 			  fprintf(stdout, "%p = ", r);
 			  printClosure((StgClosure *)r);
 			  arr[i++] = r;
