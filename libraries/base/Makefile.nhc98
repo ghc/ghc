@@ -9,7 +9,7 @@ SRCS	= \
 	Data/Ratio.hs Data/Set.hs Data/Tuple.hs Data/Word.hs Data/Array.hs \
 	Data/HashTable.hs Data/Typeable.hs Data/Dynamic.hs \
 	Data/Monoid.hs Data/Queue.hs Data/Tree.hs \
-	Control/Monad.hs Control/Monad/Fix.hs Control/Monad/Trans.hs \
+	Control/Monad.hs Control/Monad/Fix.hs \
 	Control/Arrow.hs Debug/Trace.hs \
 	NHC/SizedTypes.hs \
 	System/IO.hs System/IO/Error.hs System/IO/Unsafe.hs \
@@ -27,7 +27,6 @@ SRCS	= \
 	Text/Read.hs Text/Show.hs Text/Show/Functions.hs
 
 #	[Data/Dynamic.hs] Data/Generics.hs Data/STRef.hs Data/Unique.hs
-#	Control/Monad/Identity.hs
 #	Debug/QuickCheck.hs
 #	System/CPUTime.hsc System/Time.hsc
 #	System/Mem.hs System/Mem/StableName.hs System/Mem/Weak.hs
@@ -59,8 +58,6 @@ $(OBJDIR)/System/Random.$O: $(OBJDIR)/Data/Char.$O $(OBJDIR)/Data/IORef.$O \
 	$(OBJDIR)/System/IO/Unsafe.$O $(OBJDIR)/Foreign/Ptr.$O
 $(OBJDIR)/Debug/Trace.$O: $(OBJDIR)/System/IO.$O $(OBJDIR)/System/IO/Unsafe.$O
 $(OBJDIR)/Control/Monad/Fix.$O: $(OBJDIR)/System/IO.$O
-$(OBJDIR)/Control/Monad/Identity.$O: $(OBJDIR)/Control/Monad.$O \
-	$(OBJDIR)/Control/Monad/Fix.$O
 $(OBJDIR)/Foreign/Marshal/Alloc.$O:  $(OBJDIR)/Data/Maybe.$O \
 	$(OBJDIR)/Foreign/Ptr.$O $(OBJDIR)/Foreign/Storable.$O \
 	$(OBJDIR)/Foreign/C/Types.$O
@@ -87,8 +84,6 @@ System/IO.$C:      System/IO/Error.$C
 System/Random.$C:  Data/Char.$C Data/IORef.$C System/IO/Unsafe.$C
 Debug/Trace.$C:    System/IO.$C System/IO/Unsafe.$C
 Control/Monad/Fix.$C:      System/IO.$C
-Control/Monad/Identity.$C: Control/Monad.$C Control/Monad/Fix.$C
-Control/Monad/Trans.$C:    System/IO.$C
 Foreign/Marshal/Alloc.$C:  Data/Maybe.$C Foreign/Ptr.$C Foreign/Storable.$C \
 	Foreign/C/Types.$C
 Foreign/Marshal/Array.$C:  Control/Monad.$C Foreign/Ptr.$C Foreign/Storable.$C \
