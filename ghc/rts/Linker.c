@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.55 2001/08/10 08:24:38 simonmar Exp $
+ * $Id: Linker.c,v 1.56 2001/08/13 14:34:40 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -1304,8 +1304,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
             COFF_section* section_sym 
                = findPEi386SectionCalled ( oc, sym->Name );
             if (!section_sym) {
-               fprintf ( stderr, "bad section = `%s'\n", sym->Name );
-               barf("Can't find abovementioned PEi386 section");
+               belch("%s: can't find section `%s'", oc->fileName, sym->Name);
                return 0;
             }
             S = ((UInt32)(oc->image))
@@ -1318,8 +1317,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
             if ((void*)S == NULL)
                (void*)S = lookupSymbol( symbol );
             if (S == 0) {
-	        belch("ocResolve_PEi386: %s: unknown symbol `%s'", 
-                      oc->fileName, symbol);
+	        belch("%s: unknown symbol `%s'", oc->fileName, symbol);
 	        return 0;
             }
          }
@@ -1344,17 +1342,15 @@ ocResolve_PEi386 ( ObjectCode* oc )
                *pP = S - ((UInt32)pP) - 4;
                break;
             default: 
-               fprintf(stderr, 
-                       "unhandled PEi386 relocation type %d\n",
-                       reltab_j->Type);
-               barf("unhandled PEi386 relocation type");
+               belch("%s: unhandled PEi386 relocation type %d", 
+		     oc->fileName, reltab_j->Type);
                return 0;
          }
 
       }
    }
    
-   /* fprintf(stderr, "completed     %s\n", oc->fileName); */
+   IF_DEBUG(linker, belch("completed %s", oc->fileName));
    return 1;
 }
 
@@ -1416,13 +1412,13 @@ ocVerifyImage_ELF ( ObjectCode* oc )
        ehdr->e_ident[EI_MAG1] != ELFMAG1 ||
        ehdr->e_ident[EI_MAG2] != ELFMAG2 ||
        ehdr->e_ident[EI_MAG3] != ELFMAG3) {
-      belch("ocVerifyImage_ELF: not an ELF header");
+      belch("%s: not an ELF header", oc->fileName);
       return 0;
    }
    IF_DEBUG(linker,belch( "Is an ELF header" ));
 
    if (ehdr->e_ident[EI_CLASS] != ELFCLASS32) {
-      belch("ocVerifyImage_ELF: not 32 bit ELF" );
+      belch("%s: not 32 bit ELF", oc->fileName);
       return 0;
    }
 
@@ -1434,12 +1430,12 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    if (ehdr->e_ident[EI_DATA] == ELFDATA2MSB) {
        IF_DEBUG(linker,belch( "Is big-endian" ));
    } else {
-       belch("ocVerifyImage_ELF: unknown endiannness");
+       belch("%s: unknown endiannness", oc->fileName);
        return 0;
    }
 
    if (ehdr->e_type != ET_REL) {
-      belch("ocVerifyImage_ELF: not a relocatable object (.o) file");
+      belch("%s: not a relocatable object (.o) file", oc->fileName);
       return 0;
    }
    IF_DEBUG(linker, belch( "Is a relocatable object (.o) file" ));
@@ -1449,7 +1445,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
       case EM_386:   IF_DEBUG(linker,belch( "x86" )); break;
       case EM_SPARC: IF_DEBUG(linker,belch( "sparc" )); break;
       default:       IF_DEBUG(linker,belch( "unknown" )); 
-                     belch("ocVerifyImage_ELF: unknown architecture");
+                     belch("%s: unknown architecture", oc->fileName);
                      return 0;
    }
 
@@ -1462,7 +1458,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    shdr = (Elf32_Shdr*) (ehdrC + ehdr->e_shoff);
 
    if (ehdr->e_shstrndx == SHN_UNDEF) {
-      belch("ocVerifyImage_ELF: no section header string table");
+      belch("%s: no section header string table", oc->fileName);
       return 0;
    } else {
       IF_DEBUG(linker,belch( "Section header string table is section %d", 
@@ -1503,7 +1499,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
       }
    }  
    if (nstrtab != 1) {
-      belch("ocVerifyImage_ELF: no string tables, or too many");
+      belch("%s: no string tables, or too many", oc->fileName);
       return 0;
    }
 
@@ -1520,7 +1516,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
                shdr[i].sh_size % sizeof(Elf32_Sym)
              ));
       if (0 != shdr[i].sh_size % sizeof(Elf32_Sym)) {
-         belch("ocVerifyImage_ELF: non-integral number of symbol table entries");
+         belch("%s: non-integral number of symbol table entries", oc->fileName);
          return 0;
       }
       for (j = 0; j < nent; j++) {
@@ -1555,7 +1551,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    }
 
    if (nsymtabs == 0) {
-      belch("ocVerifyImage_ELF: didn't find any symbol tables");
+      belch("%s: didn't find any symbol tables", oc->fileName);
       return 0;
    }
 
@@ -1578,7 +1574,7 @@ ocGetNames_ELF ( ObjectCode* oc )
    ASSERT(symhash != NULL);
 
    if (!strtab) {
-      belch("ocGetNames_ELF: no strtab");
+      belch("%s: no strtab", oc->fileName);
       return 0;
    }
 
@@ -1669,9 +1665,10 @@ ocGetNames_ELF ( ObjectCode* oc )
 
 /* Do ELF relocations which lack an explicit addend.  All x86-linux
    relocations appear to be of this form. */
-static int do_Elf32_Rel_relocations ( ObjectCode* oc, char* ehdrC,
-                                      Elf32_Shdr* shdr, int shnum, 
-                                      Elf32_Sym*  stab, char* strtab )
+static int
+do_Elf32_Rel_relocations ( ObjectCode* oc, char* ehdrC,
+                           Elf32_Shdr* shdr, int shnum, 
+                           Elf32_Sym*  stab, char* strtab )
 {
    int j;
    char *symbol;
@@ -1714,8 +1711,8 @@ static int do_Elf32_Rel_relocations ( ObjectCode* oc, char* ehdrC,
                (void*)S = lookupSymbol( symbol );
          }
          if (!S) {
-            barf("do_Elf32_Rel_relocations:  %s: unknown symbol `%s'", 
-                 oc->fileName, symbol);
+            belch("%s: unknown symbol `%s'", oc->fileName, symbol);
+	    return 0;
          }
          IF_DEBUG(linker,belch( "`%s' resolves to %p", symbol, (void*)S ));
       }
@@ -1727,9 +1724,8 @@ static int do_Elf32_Rel_relocations ( ObjectCode* oc, char* ehdrC,
          case R_386_PC32: *pP = S + A - P; break;
 #        endif
          default: 
-            fprintf(stderr, "unhandled ELF relocation(Rel) type %d\n",
-                            ELF32_R_TYPE(info));
-            barf("do_Elf32_Rel_relocations: unhandled ELF relocation type");
+            belch("%s: unhandled ELF relocation(Rel) type %d\n",
+		  oc->fileName, ELF32_R_TYPE(info));
             return 0;
       }
 
@@ -1740,9 +1736,10 @@ static int do_Elf32_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 
 /* Do ELF relocations for which explicit addends are supplied.
    sparc-solaris relocations appear to be of this form. */
-static int do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
-                                       Elf32_Shdr* shdr, int shnum, 
-                                       Elf32_Sym*  stab, char* strtab )
+static int
+do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
+                            Elf32_Shdr* shdr, int shnum, 
+                            Elf32_Sym*  stab, char* strtab )
 {
    int j;
    char *symbol;
@@ -1791,8 +1788,8 @@ static int do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
                (void*)S = lookupSymbol( symbol );
          }
          if (!S) {
-	   barf("do_Elf32_Rela_relocations: %s: unknown symbol `%s'", 
-                   oc->fileName, symbol);
+	   belch("%s: unknown symbol `%s'", oc->fileName, symbol);
+	   return 0;
 	   /* 
 	   S = 0x11223344;
 	   fprintf ( stderr, "S %p A %p S+A %p S+A-P %p\n",S,A,S+A,S+A-P);
@@ -1831,9 +1828,8 @@ static int do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
             break;
 #        endif
          default: 
-            fprintf(stderr, "unhandled ELF relocation(RelA) type %d\n",
-                            ELF32_R_TYPE(info));
-            barf("do_Elf32_Rela_relocations: unhandled ELF relocation type");
+            belch("%s: unhandled ELF relocation(RelA) type %d\n",
+		  oc->fileName, ELF32_R_TYPE(info));
             return 0;
       }
 
@@ -1859,7 +1855,7 @@ ocResolve_ELF ( ObjectCode* oc )
    strtab = findElfSection ( ehdrC, SHT_STRTAB );
 
    if (stab == NULL || strtab == NULL) {
-      belch("ocResolve_ELF: can't find string or symbol table");
+      belch("%s: can't find string or symbol table", oc->fileName);
       return 0; 
    }
 
