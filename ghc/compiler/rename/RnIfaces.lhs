@@ -696,9 +696,14 @@ that we know just what instances to bring into scope.
 \begin{code}
 getInterfaceExports :: ModuleName -> WhereFrom -> RnMG (Module, Avails)
 getInterfaceExports mod_name from
-  = loadInterface doc_str mod_name from	`thenRn` \ ifaces ->
-    case lookupFM (iImpModInfo ifaces) mod_name of
-	Just (_, _, Just (mod, _, _, _, _, avails)) -> returnRn (mod, avails)
+  = getHomeSymbolTableRn 		`thenRn` \ hst ->
+    case lookupModuleEnvByName hst mod_name of {
+	Just mds -> returnRn (mdModule mds, mdExports mds) ;
+
+ 
+    loadInterface doc_str mod_name from	`thenRn` \ ifaces ->
+    case lookupModuleEnv (iPST ifaces) mod_name of
+	Just mds -> returnRn (mdModule mod, mdExports mds)
 	-- loadInterface always puts something in the map
 	-- even if it's a fake
   where
@@ -792,11 +797,14 @@ lookupFixityRn name
       -- right away (after all, it's possible that nothing from B will be used).
       -- When we come across a use of 'f', we need to know its fixity, and it's then,
       -- and only then, that we load B.hi.  That is what's happening here.
-  = loadHomeInterface doc name		`thenRn` \ ifaces ->
-    getHomeSymbolTableRn 		`thenRn` \ hst ->
-    returnRn (lookupFixityEnv hst name		   `orElse`
-	      lookupFixityEnv (iPST ifaces) name)  `orElse`
-	      defaultFixity)
+  = getHomeSymbolTableRn 		`thenRn` \ hst ->
+    case lookupFixityEnv hst name of {
+	Just fixity -> returnRn fixity ;
+	Nothing	    -> 
+
+    loadHomeInterface doc name		`thenRn` \ ifaces ->
+    returnRn (lookupFixityEnv (iPST ifaces) name `orElse` defaultFixity) 
+    }
   where
     doc = ptext SLIT("Checking fixity for") <+> ppr name
 \end{code}

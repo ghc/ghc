@@ -187,8 +187,8 @@ but they are mostly elaborated elsewhere
 \begin{code}
 data VersionInfo 
   = VersionInfo {
-	modVers :: Version,
-	fixVers :: Version,
+	modVers  :: Version,
+	fixVers  :: Version,
 	ruleVers :: Version,
 	declVers :: NameEnv Version
     }
