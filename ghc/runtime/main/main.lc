@@ -6,7 +6,9 @@
 
 \begin{code}
 #if defined(PROFILING) || defined(PAR) || defined(CONCURRENT)
+#if !defined(_AIX)
 #define NON_POSIX_SOURCE /* time things on Solaris -- sigh */
+#endif
 #endif
 
 #include "rtsdefs.h"

@@ -20,7 +20,9 @@ which should be <= the length of a word in bits.  -- HWL
 \begin{code}
 #if defined(GRAN) || defined(PAR)
 
+#ifndef _AIX
 #define NON_POSIX_SOURCE    /* gettimeofday */
+#endif
 
 #include "rtsdefs.h" 
 

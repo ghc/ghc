@@ -16,7 +16,10 @@ Handling of select() of read&write on file descriptors or timer expiry.
 /* #define STK_CHK_DEBUG */
 
 #define NULL_REG_MAP
+
+#if !defined(_AIX)
 #define NON_POSIX_SOURCE
+#endif
 /* Should there be a POSIX alternative based on poll()? */
 
 #include "rtsdefs.h"

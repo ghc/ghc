@@ -24,7 +24,9 @@ to support.  So much for standards.
 
 # include "config.h"
 
+#if !defined(_AIX)
 # define NON_POSIX_SOURCE
+#endif
 
 # include "rtsdefs.h"
 

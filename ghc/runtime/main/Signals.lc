@@ -31,7 +31,7 @@ much pain.
 # define NON_POSIX_SOURCE
 #endif
 
-#if defined(freebsd_TARGET_OS) || defined(aix_TARGET_OS)
+#if defined(freebsd_TARGET_OS) 
 # define NON_POSIX_SOURCE
 #endif
 

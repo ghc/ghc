@@ -11,7 +11,9 @@
 \begin{code}
 #ifdef PAR /* whole file */
 
+#ifndef _AIX
 #define NON_POSIX_SOURCE /* so says Solaris */
+#endif
 
 #include "rtsdefs.h"
 #include <setjmp.h>
