@@ -39,11 +39,13 @@ import PrelVals		( augmentId, buildId )
 import PrimOp		( primOpIsCheap )
 import SimplEnv
 import SimplMonad
-import Type		( tyVarsOfType, mkForAllTys, mkTyVarTys, getTyVar_maybe,
+import Type		( tyVarsOfType, tyVarsOfTypes, mkForAllTys, mkTyVarTys, getTyVar_maybe,
 			  splitAlgTyConApp_maybe, instantiateTy, Type
 			)
 import TyCon		( isDataTyCon )
-import TyVar		( elementOfTyVarSet, delFromTyVarEnv )
+import TyVar		( mkTyVarSet, intersectTyVarSets, elementOfTyVarSet, tyVarSetToList,
+			  delFromTyVarEnv
+			)
 import SrcLoc		( noSrcLoc )
 import Util		( isIn, zipWithEqual, panic, assertPanic )
 
@@ -182,31 +184,36 @@ mkRhsTyLam [] body = returnSmpl body
 mkRhsTyLam tyvars body
   = go (\x -> x) body
   where
-    tyvar_tys = mkTyVarTys tyvars
+    main_tyvar_set = mkTyVarSet tyvars
 
     go fn (Let bind@(NonRec var rhs) body) | exprIsTrivial rhs
       = go (fn . Let bind) body
 
     go fn (Let bind@(NonRec var rhs) body)
-      = mk_poly var				`thenSmpl` \ (var', rhs') ->
+      = mk_poly tyvars_here var_ty			`thenSmpl` \ (var', rhs') ->
 	go (fn . Let (mk_silly_bind var rhs')) body	`thenSmpl` \ body' ->
-	returnSmpl (Let (NonRec var' (mkTyLam tyvars (fn rhs))) body')
+	returnSmpl (Let (NonRec var' (mkTyLam tyvars_here (fn rhs))) body')
+      where
+	tyvars_here = tyVarSetToList (main_tyvar_set `intersectTyVarSets` tyVarsOfType var_ty)
+	var_ty = idType var
 
     go fn (Let (Rec prs) body)
-       = mapAndUnzipSmpl mk_poly vars		`thenSmpl` \ (vars', rhss') ->
+       = mapAndUnzipSmpl (mk_poly tyvars_here) var_tys	`thenSmpl` \ (vars', rhss') ->
 	 let
 	    gn body = fn $ foldr Let body (zipWith mk_silly_bind vars rhss')
 	 in
 	 go gn body				`thenSmpl` \ body' ->
-	 returnSmpl (Let (Rec (vars' `zip` [mkTyLam tyvars (gn rhs) | rhs <- rhss])) body')
+	 returnSmpl (Let (Rec (vars' `zip` [mkTyLam tyvars_here (gn rhs) | rhs <- rhss])) body')
        where
 	 (vars,rhss) = unzip prs
+	 tyvars_here = tyVarSetToList (main_tyvar_set `intersectTyVarSets` tyVarsOfTypes var_tys)
+	 var_tys     = map idType vars
 
     go fn body = returnSmpl (mkTyLam tyvars (fn body))
 
-    mk_poly var
-      = newId (mkForAllTys tyvars (idType var))	`thenSmpl` \ poly_id ->
-	returnSmpl (poly_id, mkTyApp (Var poly_id) tyvar_tys)
+    mk_poly tyvars_here var_ty
+      = newId (mkForAllTys tyvars_here var_ty)	`thenSmpl` \ poly_id ->
+	returnSmpl (poly_id, mkTyApp (Var poly_id) (mkTyVarTys tyvars_here))
 
     mk_silly_bind var rhs = NonRec (addInlinePragma var) rhs
 		-- The addInlinePragma is really important!  If we don't say 

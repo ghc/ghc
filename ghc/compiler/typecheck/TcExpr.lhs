@@ -36,7 +36,7 @@ import TcEnv		( TcIdOcc(..), tcInstId,
 import TcMatches	( tcMatchesCase, tcMatchExpected )
 import TcGRHSs		( tcStmt )
 import TcMonoType	( tcHsType )
-import TcPat		( tcPat )
+import TcPat		( tcPat, badFieldsCon )
 import TcSimplify	( tcSimplifyAndCheck )
 import TcType		( TcType, TcTauType, TcMaybe(..),
 			  tcInstType, tcInstSigTcType, tcInstTyVars,
@@ -457,7 +457,7 @@ tcMonoExpr (RecordCon con_name _ rbinds) res_ty
     let
 	bad_fields = badFields rbinds con_id
     in
-    checkTc (null bad_fields) (badFieldsCon con_id bad_fields)	`thenTc_`
+    checkTc (null bad_fields) (badFieldsCon con_name bad_fields)	`thenTc_`
 
 	-- Typecheck the record bindings
 	-- (Do this after checkRecordFields in case there's a field that
@@ -1026,10 +1026,6 @@ badFieldsUpd rbinds
     fields = [field | (field, _, _) <- rbinds]
 
 recordUpdCtxt = ptext SLIT("In a record update construct")
-
-badFieldsCon con fields
-  = hsep [ptext SLIT("Constructor"), 		ppr con,
-	   ptext SLIT("does not have field(s):"), pprQuotedList fields]
 
 notSelector field
   = hsep [quotes (ppr field), ptext SLIT("is not a record selector")]
