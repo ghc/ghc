@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.217 2002/05/11 10:02:21 panne Exp $
+# $Id: Makefile,v 1.218 2002/05/29 22:39:39 sof Exp $
 
 TOP = ..
 
@@ -25,7 +25,7 @@ WAYS=$(GhcCompilerWays)
 # equivalent of `env' if it doesn't exist locally).
 #
 ifneq "$(way)" "dll"
-ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 HS_PROG=ghc$(_way)-$(ProjectVersion)
 else
 HS_PROG=ghc$(_way)
@@ -125,7 +125,6 @@ compiling_with_4xx=NO
 else
 bootstrapped = $(shell if (test $(GhcCanonVersion) -ge $(ProjectVersionInt) -a $(GhcPatchLevel) -ge $(ProjectPatchLevel)); then echo YES; else echo NO; fi)
 compiling_with_4xx = $(shell if (test $(GhcCanonVersion) -lt 500); then echo YES; else echo NO; fi)
-ghc_502_at_least = $(shell if (test $(GhcCanonVersion) -ge 502); then echo YES; else echo NO; fi)
 endif
 
 # Only include GHCi if we're bootstrapping with at least version 411
@@ -134,12 +133,6 @@ ifeq "$(bootstrapped)" "YES"
 SRC_HC_OPTS += -DGHCI
 ALL_DIRS += ghci
 endif
-endif
-
-# Enable code that assumes a MSDOSish subshell. See mk/config.mk.in
-# for explanatory comment as to what this does.
-ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-ghc_501_at_least = $(shell if (test $(GhcVanonVersion) -ge 5010); then echo YES; else echo NO; fi)
 endif
 
 # There are some C files to include in HS_PROG, so add these to HS_OBJS
