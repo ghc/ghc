@@ -1,18 +1,29 @@
 
    =============================================================
-    The (Interactive) Glasgow Haskell Compiler -- version 6.2.2
+    The (Interactive) Glasgow Haskell Compiler -- version 6.4
    =============================================================
 
-The GHC Team is pleased to announce the latest patchlevel release of
-GHC, 6.2.2.  This is a bugfix release only, there are no new features.
-Code that worked with 6.2.1 will work unchanged with 6.2.2.
+The GHC Team is pleased to announce a new major release of GHC.  It
+has been a long time since the last major release (Dec 2003!), and a
+lot has happened:
 
-A lot of bugfixes have gone into 6.2.2; we believe it is one of the
-most stable releases of GHC ever.  Thanks to everyone who has been
-involved in testing pre-releases and submitting bug reports.
+  - GADTs (Generalised Abstract Datatypes) are supported  
 
-This will also be the last release along the 6.2 branch, the next
-release (out "soon") will be 6.4 with plenty of new features.
+  - STM (Software Transactional Memory) is implemented
+
+  - Full support for Cabal and a much improved package framework
+
+  - Better support for mutually-recursive modules
+
+  - A complete rewrite of the back end
+
+  - Accurate source locations in error messages
+
+  - Lots of new libraries
+
+The full release notes are here:
+
+  http://haskell.org/ghc/docs/6.4/html/users_guide/release-6-4.html
 
 How to get it
 ~~~~~~~~~~~~~
@@ -28,6 +39,8 @@ distribution is also available from the same place.
 
 Packages will appear as they are built - if the package for your
 system isn't available yet, please try again later.
+
+
 
 Background
 ~~~~~~~~~~
@@ -69,6 +82,7 @@ and perl. This release is known to work on the following platforms:
   * i386-unknown-{linux,*bsd,mingw32}
   * sparc-sun-solaris2
   * powerpc-apple-darwin (MacOS X)
+  * powerpc-apple-linux
 
 Ports to other platforms are possible with varying degrees of
 difficulty.  The builder's guide on the web site gives a complete
