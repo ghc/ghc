@@ -59,7 +59,7 @@ import Maybe		( isJust )
 import FiniteMap
 import Outputable
 import Bag
-import Util		( sortLt )
+import Util		( sortLt, seqList )
 \end{code}
 
 
@@ -242,7 +242,11 @@ mkImportInfo this_mod imports
 	    maybe_export_vers | import_all_mod = Just (vers_exports version_info)
 			      | otherwise      = Nothing
     in
-    returnRn import_info
+
+    -- seq the list of ImportVersions returned: occasionally these
+    -- don't get evaluated for a while and we can end up hanging on to
+    -- the entire collection of Ifaces.
+    seqList import_info (returnRn import_info)
 \end{code}
 
 %*********************************************************
