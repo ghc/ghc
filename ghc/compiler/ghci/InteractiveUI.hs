@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.12 2000/11/22 11:12:52 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.13 2000/11/22 15:51:48 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -180,10 +180,11 @@ changeDirectory = io . setCurrentDirectory
 loadModule :: String -> GHCi ()
 loadModule path = do
   state <- getGHCiState
-  (new_cmstate, ok, mods) <- io (cmLoadModule (cmstate state) path)
+  cmstate1 <- io (cmUnload (cmstate state))
+  (cmstate2, ok, mods) <- io (cmLoadModule cmstate1 path)
 
   let new_state = GHCiState {
-  			cmstate = new_cmstate,
+  			cmstate = cmstate2,
 			modules = mods,
 			current_module = case mods of 
 					   [] -> defaultCurrentModule
@@ -207,9 +208,9 @@ reloadModule "" = do
   state <- getGHCiState
   case target state of
    Nothing -> io (putStr "no current target\n")
-   Just path -> do (new_cmstate, ok, mod) 
-			<- io (cmLoadModule (cmstate state) path)
-  		   setGHCiState state{cmstate=new_cmstate}  
+   Just path
+      -> do (new_cmstate, ok, mod) <- io (cmLoadModule (cmstate state) path)
+            setGHCiState state{cmstate=new_cmstate}  
 reloadModule _ = noArgs ":reload"
 
 -- set options in the interpreter.  Syntax is exactly the same as the

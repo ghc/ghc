@@ -4,7 +4,7 @@
 \section[CompManager]{The Compilation Manager}
 
 \begin{code}
-module CompManager ( cmInit, cmLoadModule,
+module CompManager ( cmInit, cmLoadModule, cmUnload,
 #ifdef GHCI
                      cmGetExpr, cmTypeExpr, cmRunExpr,
 #endif
@@ -160,6 +160,22 @@ emptyMG = []
 
 \end{code}
 
+Unload the compilation manager's state: everything it knows about the
+current collection of modules in the Home package.
+
+\begin{code}
+cmUnload :: CmState -> IO CmState
+cmUnload state 
+ = do -- Throw away the old home dir cache
+      emptyHomeDirCache
+      -- Throw away the HIT and the HST
+      return state{ pcms=pcms{ hst=new_hst, hit=new_hit } }
+   where
+     CmState{ pcms=pcms } = state
+     PersistentCMState{ hst=hst, hit=hit } = pcms
+     (new_hst, new_hit) = retainInTopLevelEnvs [] (hst,hit)
+\end{code}
+
 The real business of the compilation manager: given a system state and
 a module name, try and bring the module up to date, probably changing
 the system state at the same time.
@@ -186,9 +202,6 @@ cmLoadModule cmstate1 rootname
         -- Do the downsweep to reestablish the module graph
         -- then generate version 2's by removing from HIT,HST,UI any
         -- modules in the old MG which are not in the new one.
-
-        -- Throw away the old home dir cache
-        emptyHomeDirCache
 
 	dflags <- getDynFlags
         let verb = verbosity dflags
