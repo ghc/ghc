@@ -24,6 +24,7 @@ import DsForeign	( dsForeigns )
 import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
 				-- depends on DsExpr.hi-boot.
 import Module		( Module )
+import Id		( Id )
 import VarEnv
 import VarSet
 import Bag		( isEmptyBag )

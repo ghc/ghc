@@ -76,22 +76,65 @@ hscMain
   -> IO HscResult
 
 hscMain dflags core_cmds stg_cmds summary maybe_old_iface
-	output_filename mod_details pcs1 
- = do
-      source_unchanged :: Bool -- extracted from summary?
+	output_filename mod_details pcs
+ = do {
+      -- ????? source_unchanged :: Bool -- extracted from summary?
 
-      (pcs2, check_errs, (recomp_reqd, maybe_checked_iface))
-         <- checkOldIface dflags finder hit hst pcs1 mod source_unchanged
-                          maybe_old_iface
+      (ch_pcs, check_errs, (recomp_reqd, maybe_checked_iface))
+         <- checkOldIface dflags finder hit hst pcs mod source_unchanged
+                          maybe_old_iface;
+      if check_errs then
+         return (HscFail ch_pcs)
+      else do {
 
-      -- test check_errs and give up if a problem happened
-      what_next = if recomp_reqd then hscRecomp else hscNoRecomp
+      let no_old_iface = not (isJust maybe_checked_iface)
+          what_next | recomp_reqd || no_old_iface = hscRecomp 
+                    | otherwise                   = hscNoRecomp
 
-      return $
-         what_next dflags core_cmds stg_cmds summary hit hst 
-                   pcs2 maybe_checked_iface
+      return (what_next dflags core_cmds stg_cmds summary hit hst 
+                        pcs2 maybe_checked_iface)
+      }}
 
-hscNoRecomp = panic "hscNoRecomp"
+
+hscNoRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
+ = do {
+      -- we definitely expect to have the old interface available
+      old_iface = case maybe_old_iface of 
+                     Just old_if -> old_if
+                     Nothing -> panic "hscNoRecomp:old_iface"
+
+      -- CLOSURE
+      (pcs_cl, closure_errs, cl_hs_decls) 
+         <- closeIfaceDecls dflags finder hit hst pcs old_iface
+      if closure_errs then 
+         return (HscFail cl_pcs) 
+      else do {
+
+      -- TYPECHECK
+      maybe_tc_result
+         <- typecheckModule dflags mod pcs_cl hst hit pit cl_hs_decls;
+      case maybe_tc_result of {
+         Nothing -> return (HscFail cl_pcs);
+         Just tc_result -> do {
+
+      let pcs_tc        = tc_pcs tc_result
+          env_tc        = tc_env tc_result
+          binds_tc      = tc_binds tc_result
+          local_tycons  = tc_tycons tc_result
+          local_classes = tc_classes tc_result
+          local_insts   = tc_insts tc_result
+          local_rules   = tc_rules tc_result
+
+      -- create a new details from the closed, typechecked, old iface
+      let new_details = mkModDetailsFromIface env_tc local_insts local_rules
+
+      return (HscOK final_details
+		    Nothing -- tells CM to use old iface and linkables
+		    Nothing Nothing -- foreign export stuff
+                    Nothing -- ibinds
+		    pcs_tc)
+      }}}}
+
 
 hscRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
  = do {
@@ -119,22 +162,24 @@ hscRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
          Just tc_result -> do {
 
       let pcs_tc        = tc_pcs tc_result
-      let env_tc        = tc_env tc_result
-      let binds_tc      = tc_binds tc_result
-      let local_tycons  = tc_tycons tc_result
-      let local_classes = tc_classes tc_result
+          env_tc        = tc_env tc_result
+          binds_tc      = tc_binds tc_result
+          local_tycons  = tc_tycons tc_result
+          local_classes = tc_classes tc_result
+          local_insts   = tc_insts tc_result
 
       -- DESUGAR, SIMPLIFY, TIDY-CORE
       -- We grab the the unfoldings at this point.
-      (tidy_binds, orphan_rules, fe_binders, h_code, c_code)   -- return modDetails?
-         <- dsThenSimplThenTidy dflags mod tc_result rule_base ds_uniqs
+      (tidy_binds, orphan_rules, foreign_stuff)
+         <- dsThenSimplThenTidy dflags mod tc_result ds_uniqs
 
       -- CONVERT TO STG
       (stg_binds, cost_centre_info, top_level_ids) 
          <- myCoreToStg c2s_uniqs st_uniqs this_mod tidy_binds
 
       -- cook up a new ModDetails now we (finally) have all the bits
-      let new_details = completeModDetails tc_env tidy_binds top_level_ids orphan_rules
+      let new_details = mkModDetails tc_env local_insts tidy_binds 
+			             top_level_ids orphan_rules
 
       -- and possibly create a new ModIface
       let maybe_final_iface = completeIface maybe_old_iface new_iface new_details 
@@ -143,7 +188,7 @@ hscRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
       (maybe_ibinds, maybe_stub_h_filename, maybe_stub_c_filename) 
          <- restOfCodeGeneration toInterp
                                  this_mod imported_modules cost_centre_info 
-                                 fe_binders local_tycons local_classes stg_binds
+                                 fe_binders tc_env stg_binds
 
       -- and the answer is ...
       return (HscOK new_details maybe_final_iface 
@@ -184,10 +229,10 @@ myParseModule dflags summary
 
 
 restOfCodeGeneration toInterp this_mod imported_modules cost_centre_info 
-                     fe_binders local_tycons local_classes stg_binds
+                     foreign_stuff tc_env stg_binds
  | toInterp
- = return (Nothing, Nothing, stgToInterpSyn stg_binds local_tycons local_classes)
-
+ = return (Nothing, Nothing, 
+	   Just (stgToInterpSyn stg_binds local_tycons local_classes))
  | otherwise
  = do --------------------------  Code generation -------------------------------
       show_pass "CodeGen"
@@ -199,19 +244,24 @@ restOfCodeGeneration toInterp this_mod imported_modules cost_centre_info
       --------------------------  Code output -------------------------------
       show_pass "CodeOutput"
       -- _scc_     "CodeOutput"
+      let (fe_binders, h_code, c_code) = foreign_stuff
       (maybe_stub_h_name, maybe_stub_c_name)
          <- codeOutput this_mod local_tycons local_classes
                        occ_anal_tidy_binds stg_binds2
                        c_code h_code abstractC ncg_uniqs
 
-      return (maybe_stub_h_name, maybe_stub_c_name, [{-UnlinkedIBind-}])
+      return (maybe_stub_h_name, maybe_stub_c_name, Nothing)
+ where
+    local_tycons  = tcEnvTyCons tc_env
+    local_classes = tcEnvClasses tc_env
 
 
-dsThenSimplThenTidy dflags mod tc_result rule_base ds_uniqs
+dsThenSimplThenTidy dflags mod tc_result
+-- make up ds_uniqs here
  = do --------------------------  Desugaring ----------------
       -- _scc_     "DeSugar"
       (desugared, rules, h_code, c_code, fe_binders) 
-         <- deSugar this_mod ds_uniqs tc_results
+         <- deSugar this_mod ds_uniqs tc_result
 
       --------------------------  Main Core-language transformations ----------------
       -- _scc_     "Core2Core"
@@ -221,8 +271,7 @@ dsThenSimplThenTidy dflags mod tc_result rule_base ds_uniqs
       (tidy_binds, tidy_orphan_rules) 
          <- tidyCorePgm this_mod simplified orphan_rules
       
-      return (tidy_binds, tidy_orphan_rules, fe_binders, h_code, c_code)
-
+      return (tidy_binds, tidy_orphan_rules, (fe_binders,h_code,c_code))
 
 
 myCoreToStg c2s_uniqs st_uniqs this_mod tidy_binds

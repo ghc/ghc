@@ -9,7 +9,7 @@ module StgInterp (
     ClosureEnv, ItblEnv,
     linkIModules,
     stgToInterpSyn,
-    runStgI  -- tmp, for testing
+--    runStgI  -- tmp, for testing
  ) where
 
 {- -----------------------------------------------------------------------------
@@ -64,7 +64,7 @@ import Module		( moduleNameFS )
 #endif
 
 import TyCon		( TyCon, isDataTyCon, tyConDataCons, tyConFamilySize )
-import Class		( Class )
+import Class		( Class, classTyCon )
 import InterpSyn
 import StgSyn
 import Addr
@@ -85,14 +85,9 @@ type ClosureEnv = FiniteMap RdrName HValue
 -- Run our STG program through the interpreter
 -- ---------------------------------------------------------------------------
 
+#if 0
+-- To be nuked at some point soon.
 runStgI :: [TyCon] -> [Class] -> [StgBinding] -> IO Int
-
-#ifndef GHCI
-runStgI	      = panic "StgInterp.runStgI: not implemented"
-linkIModules  = panic "StgInterp.linkIModules: not implemented"
-#else
-
-
 
 -- the bindings need to have a binding for stgMain, and the
 -- body of it had better represent something of type Int# -> Int#
@@ -128,6 +123,7 @@ runStgI tycons classes stgbinds
                            emptyUFM{-initial de-}
                     )
         return result
+#endif
 
 -- ---------------------------------------------------------------------------
 -- Convert STG to an unlinked interpretable
@@ -140,7 +136,7 @@ stgToInterpSyn :: [StgBinding]
 stgToInterpSyn binds local_tycons local_classes
  = do let ibinds = concatMap (translateBind emptyUniqSet) binds
       let tycs   = local_tycons ++ map classTyCon local_classes
-      itblenv <- makeItbls tycs
+      itblenv <- mkITbls tycs
       return (ibinds, itblenv)
 
 
@@ -421,7 +417,7 @@ linkIModules :: ClosureEnv -- incoming global closure env; returned updated
 	     -> ItblEnv    -- incoming global itbl env; returned updated
 	     -> [([UnlinkedIBind], ItblEnv)]
 	     -> IO ([LinkedIBind], ItblEnv, ClosureEnv)
-linkIModules gie gce mods = do
+linkIModules gce gie mods = do
   let (bindss, ies) = unzip mods
       binds  = concat bindss
       top_level_binders = map (toRdrName.binder) binds
@@ -431,9 +427,9 @@ linkIModules gie gce mods = do
       new_gce = addListToFM gce (zip top_level_binders new_rhss)
       new_rhss = map (\b -> evalP (bindee b) emptyUFM) new_binds
     ---vvvvvvvvv---------------------------------------^^^^^^^^^-- circular
-      (new_binds, final_gce) = linkIBinds final_gie new_gce binds
+      new_binds = linkIBinds final_gie new_gce binds
 
-  return (new_binds, final_gie, final_gce)
+  return (new_binds, final_gie, new_gce)
 
 
 -- We're supposed to augment the environments with the values of any
@@ -1231,6 +1227,5 @@ load addr = do x <- peek addr
 
 foreign import "strncpy" strncpy :: Addr -> ByteArray# -> CInt -> IO ()
 
-#endif /* ndef GHCI */
 \end{code}
 

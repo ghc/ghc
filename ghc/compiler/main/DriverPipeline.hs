@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.5 2000/10/23 09:03:27 simonpj Exp $
+-- $Id: DriverPipeline.hs,v 1.6 2000/10/25 14:42:32 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -731,11 +731,8 @@ data CompResult
                        -- summary and code; Nothing => compilation not reqd
                        -- (old summary and code are still valid)
               PersistentCompilerState	-- updated PCS
-              (Bag WarnMsg) 		-- warnings
 
    | CompErrs PersistentCompilerState	-- updated PCS
-              (Bag ErrMsg)		-- errors
-              (Bag WarnMsg)             -- warnings
 
 
 compile finder summary old_iface hst pcs = do 

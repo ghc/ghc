@@ -66,7 +66,7 @@ codeOutput dflags mod_name tycons classes core_binds stg_binds
     do let filenm = dopt_OutName dflags 
        stub_names <- outputForeignStubs dflags c_code h_code
        case dopt_HscLang dflags of
-          HscInterpreter -> return stub_names
+          HscInterpreted -> return stub_names
           HscAsm         -> outputAsm dflags filenm flat_abstractC ncg_uniqs
                             >> return stub_names
           HscC           -> outputC dflags filenm flat_abstractC	

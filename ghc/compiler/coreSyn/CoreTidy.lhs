@@ -76,7 +76,7 @@ tidyCorePgm dflags module_name binds_in orphans_in
 
         binds_in1 <- if opt_UsageSPOn
                      then _scc_ "CoreUsageSPInf"
-                                doUsageSPInf dflags us binds_in 
+                                doUsageSPInf dflags us binds_in
                      else return binds_in
 
 	let (tidy_env1, binds_out)  = mapAccumL (tidyBind (Just module_name))
