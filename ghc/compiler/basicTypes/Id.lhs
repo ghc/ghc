@@ -307,7 +307,7 @@ idArityInfo id = arityInfo (idInfo id)
 idArity :: Id -> Arity
 idArity id = arityLowerBound (idArityInfo id)
 
-setIdArityInfo :: Id -> ArityInfo -> Id
+setIdArityInfo :: Id -> Arity -> Id
 setIdArityInfo id arity = modifyIdInfo (`setArityInfo` arity) id
 
 	---------------------------------

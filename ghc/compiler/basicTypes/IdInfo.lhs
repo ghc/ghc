@@ -20,7 +20,7 @@ module IdInfo (
 
 	-- Arity
 	ArityInfo(..),
-	exactArity, atLeastArity, unknownArity, hasArity,
+	exactArity, unknownArity, hasArity,
 	arityInfo, setArityInfo, ppArityInfo, arityLowerBound,
 
 	-- New demand and strictness info
@@ -289,7 +289,7 @@ setUnfoldingInfo  info uf
   = info { unfoldingInfo = uf }
 
 setDemandInfo	  info dd = info { demandInfo = dd }
-setArityInfo	  info ar = info { arityInfo = ar  }
+setArityInfo	  info ar = info { arityInfo = Just ar  }
 setCgInfo         info cg = info { cgInfo = cg }
 setCprInfo        info cp = info { cprInfo = cp }
 setLBVarInfo      info lb = info { lbvarInfo = lb }
@@ -304,7 +304,7 @@ vanillaIdInfo :: IdInfo
 vanillaIdInfo 
   = IdInfo {
 	    cgInfo		= noCgInfo,
-	    arityInfo		= UnknownArity,
+	    arityInfo		= unknownArity,
 	    demandInfo		= wwLazy,
 	    specInfo		= emptyCoreRules,
             tyGenInfo		= noTyGenInfo,
@@ -338,42 +338,31 @@ of their arities; so it should not be asking...	 (but other things
 besides the code-generator need arity info!)
 
 \begin{code}
-data ArityInfo
-  = UnknownArity	-- No idea
+type ArityInfo = Maybe Arity
+  	-- A partial application of this Id to up to n-1 value arguments
+	-- does essentially no work.  That is not necessarily the
+	-- same as saying that it has n leading lambdas, because coerces
+	-- may get in the way.
 
-  | ArityExactly Arity	-- Arity is exactly this.  We use this when importing a
-			-- function; it's already been compiled and we know its
-			-- arity for sure.
-
-  | ArityAtLeast Arity	-- A partial application of this Id to up to n-1 value arguments
-			-- does essentially no work.  That is not necessarily the
-			-- same as saying that it has n leading lambdas, because coerces
-			-- may get in the way.
-
-			-- functions in the module being compiled.  Their arity
-			-- might increase later in the compilation process, if
-			-- an extra lambda floats up to the binding site.
-  deriving( Eq )
+	-- The arity might increase later in the compilation process, if
+	-- an extra lambda floats up to the binding site.
 
 seqArity :: ArityInfo -> ()
 seqArity a = arityLowerBound a `seq` ()
 
-exactArity   = ArityExactly
-atLeastArity = ArityAtLeast
-unknownArity = UnknownArity
+exactArity   = Just
+unknownArity = Nothing
 
 arityLowerBound :: ArityInfo -> Arity
-arityLowerBound UnknownArity     = 0
-arityLowerBound (ArityAtLeast n) = n
-arityLowerBound (ArityExactly n) = n
+arityLowerBound Nothing  = 0
+arityLowerBound (Just n) = n
 
 hasArity :: ArityInfo -> Bool
-hasArity UnknownArity = False
-hasArity other	      = True
+hasArity Nothing = False
+hasArity other   = True
 
-ppArityInfo UnknownArity	 = empty
-ppArityInfo (ArityExactly arity) = hsep [ptext SLIT("ArityExactly"), int arity]
-ppArityInfo (ArityAtLeast arity) = hsep [ptext SLIT("ArityAtLeast"), int arity]
+ppArityInfo Nothing	 = empty
+ppArityInfo (Just arity) = hsep [ptext SLIT("Arity"), int arity]
 \end{code}
 
 %************************************************************************

@@ -31,7 +31,7 @@ import Id		( Id, idType, idInfo, isDataConId, hasNoBinding,
 			)
 import IdInfo		( OccInfo(..), isDeadOcc, isLoopBreaker,
 			  setArityInfo, 
-			  setUnfoldingInfo, atLeastArity,
+			  setUnfoldingInfo, 
 			  occInfo
 			)
 import Demand		( isStrict )
@@ -633,7 +633,7 @@ completeBinding old_bndr new_bndr top_lvl black_listed new_rhs thing_inside
 		-- We make new IdInfo for the new binder by starting from the old binder, 
 		-- doing appropriate substitutions.
 		-- Then we add arity and unfolding info to get the new binder
-  	new_bndr_info = idInfo new_bndr `setArityInfo` arity_info
+  	new_bndr_info = idInfo new_bndr `setArityInfo` arity
 
 		-- Add the unfolding *only* for non-loop-breakers
 		-- Making loop breakers not have an unfolding at all 
@@ -657,7 +657,7 @@ completeBinding old_bndr new_bndr top_lvl black_listed new_rhs thing_inside
     loop_breaker      = isLoopBreaker occ_info
     trivial_rhs	      = exprIsTrivial new_rhs
     must_keep_binding = black_listed || loop_breaker || isExportedId old_bndr
-    arity_info	      = atLeastArity (exprArity new_rhs)
+    arity	      = exprArity new_rhs
 \end{code}    
 
 

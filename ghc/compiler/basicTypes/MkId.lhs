@@ -144,7 +144,7 @@ mkDataConId work_name data_con
     id = mkGlobalId (DataConId data_con) work_name (dataConRepType data_con) info
     info = noCafNoTyGenIdInfo
 	   `setCgArity`		arity
-	   `setArityInfo`	exactArity arity
+	   `setArityInfo`	arity
 	   `setCprInfo`		cpr_info
 	   `setStrictnessInfo`	strict_info
 	   `setNewStrictnessInfo`	mkNewStrictnessInfo id arity strict_info cpr_info
@@ -224,7 +224,7 @@ mkDataConWrapId data_con
 		-- wrapper constructor isn't inlined
 	   `setCgArity` 	arity
 		-- The NoCaf-ness is set by noCafNoTyGenIdInfo
-	   `setArityInfo`	exactArity arity
+	   `setArityInfo`	arity
 		-- It's important to specify the arity, so that partial
 		-- applications are treated as values
 	   `setNewStrictnessInfo` 	mkNewStrictnessInfo wrap_id arity noStrictnessInfo cpr_info
@@ -414,7 +414,7 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
     arity = 1 + n_dict_tys + n_field_dict_tys
     info = noCafNoTyGenIdInfo
 	   `setCgInfo`		(CgInfo arity caf_info)
-	   `setArityInfo`	exactArity arity
+	   `setArityInfo`	arity
 	   `setUnfoldingInfo`	unfolding	
 	-- ToDo: consider adding further IdInfo
 
@@ -553,7 +553,7 @@ mkDictSelId name clas
 
     info      = noCafNoTyGenIdInfo
 		`setCgArity` 	    1
-		`setArityInfo`	    exactArity 1
+		`setArityInfo`	    1
 		`setUnfoldingInfo`  unfolding
 		
 	-- We no longer use 'must-inline' on record selectors.  They'll
@@ -605,7 +605,7 @@ mkPrimOpId prim_op
     info = noCafNoTyGenIdInfo
 	   `setSpecInfo`	rules
 	   `setCgArity` 	arity
-	   `setArityInfo` 	exactArity arity
+	   `setArityInfo` 	arity
 	   `setStrictnessInfo`	strict_info
 	   `setNewStrictnessInfo`	mkNewStrictnessInfo id arity strict_info NoCPRInfo
 
@@ -638,7 +638,7 @@ mkFCallId uniq fcall ty
 
     info = noCafNoTyGenIdInfo
 	   `setCgArity` 	arity
-	   `setArityInfo` 	exactArity arity
+	   `setArityInfo` 	arity
 	   `setStrictnessInfo`	strict_info
 	   `setNewStrictnessInfo`	mkNewStrictnessInfo id arity strict_info NoCPRInfo
 

@@ -90,7 +90,7 @@ tcIdInfo unf_env in_scope_vars name ty info_ins
     tcPrag info HsCprInfo       = returnTc (info `setCprInfo`	 ReturnsCPR)
 
     tcPrag info (HsArity arity) = 
-	returnTc (info `setArityInfo` (ArityExactly arity)
+	returnTc (info `setArityInfo` arity
 	 	       `setCgArity`   arity)
 
     tcPrag info (HsUnfold inline_prag expr)
