@@ -21,8 +21,5 @@ main = do
     hPutStr  stderr file_cts
     trace "hello, trace" $
       catch (getEnv "__WURBLE__" >> return ()) (\ e -> error "hello, error\n")
-Trace On:
 hello, trace
-Trace Off.
-
 Fail: hello, error
