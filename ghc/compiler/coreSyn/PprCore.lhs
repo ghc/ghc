@@ -29,7 +29,6 @@ import PprType		( pprParendType, pprTyVarBndr )
 import PrimOp		( PrimOp{-instances-} )
 import TyVar		( GenTyVar{-instances-} )
 import Unique		( Unique{-instances-} )
-import Util		( panic{-ToDo:rm-} )
 \end{code}
 
 %************************************************************************
