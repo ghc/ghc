@@ -19,7 +19,7 @@ endif
 LIBRARY = libHSposix$(_way).a
 HS_SRCS	= $(wildcard *.lhs)
 LIBOBJS = $(HS_OBJS)
-HS_IFACES= $(HS_SRCS:.lhs=.$(way_)hi) GHC.$(way_)hi
+HS_IFACES= $(HS_SRCS:.lhs=.$(way_)hi)
 
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options
