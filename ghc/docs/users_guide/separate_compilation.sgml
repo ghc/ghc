@@ -90,8 +90,8 @@
 	<listitem>
 	  <para>If there is no <option>-odir</option> option (the
 	  default), then the object filename is derived from the
-	  source filename by replacing the suffix with
-	  <replaceable>osuf</replaceable>.</para>
+	  source filename (ignoring the module name) by replacing the
+	  suffix with <replaceable>osuf</replaceable>.</para>
 	</listitem>
 	<listitem>
 	  <para>If
