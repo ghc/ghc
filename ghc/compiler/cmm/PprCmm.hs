@@ -315,7 +315,9 @@ pprExpr9 e =
         CmmLit    lit       -> pprLit1 lit
         CmmLoad   expr rep  -> ppr rep <> brackets( ppr expr )
         CmmReg    reg       -> ppr reg
+        CmmRegOff reg off   -> parens (ppr reg <+> char '+' <+> int off)
 	CmmMachOp mop args  -> genMachOp mop args
+        CmmPicBaseReg       -> text "PIC_BASE_REG"
 	e                   -> parens (pprExpr e)
 
 genMachOp :: MachOp -> [CmmExpr] -> SDoc
