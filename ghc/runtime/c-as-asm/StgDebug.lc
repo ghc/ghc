@@ -1561,8 +1561,10 @@ DEBUG_REGS()
   StgFloat FltReg4 = SAVE_Flt4;
   StgDouble DblReg1 = SAVE_Dbl1;
   StgDouble DblReg2 = SAVE_Dbl2;
+#if HAVE_LONG_LONG
   StgDouble LngReg1 = SAVE_Lng1;
   StgDouble LngReg2 = SAVE_Lng2;
+#endif
 
   fprintf(stderr,"STG-Machine Register Values:\n\n");
   fprintf(stderr,"Node:  %08lx;  Hp:    %08lx;  HpLim: %08lx;  Tag:   %8lu\n",Node,(W_)Hp,(W_)HpLim,TagReg);
@@ -1584,7 +1586,9 @@ DEBUG_REGS()
   fprintf(stderr,"       %8lu, %8lu, %8lu, %8lu\n",R5.i,R6.i,R7.i,R8.i);
   fprintf(stderr,"Float: %8g, %8g, %8g, %8g\n",FltReg1,FltReg2,FltReg3,FltReg4);
   fprintf(stderr,"Dble:  %8g, %8g\n",DblReg1,DblReg2);
+#if HAVE_LONG_LONG
   fprintf(stderr,"Long:  %8lu, %8lu\n",LngReg1,LngReg2); 
+#endif
 }
 
 #ifndef CONCURRENT
