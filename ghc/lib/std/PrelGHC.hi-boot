@@ -245,6 +245,8 @@ indexDoubleOffForeignObj#
   makeStablePtr#
   deRefStablePtr#
   reallyUnsafePtrEquality#
+
+  unsafeCoerce#
 ;
 
 _declarations_
