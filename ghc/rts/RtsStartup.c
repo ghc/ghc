@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.53 2001/09/04 18:29:21 ken Exp $
+ * $Id: RtsStartup.c,v 1.54 2001/10/31 10:34:29 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -177,7 +177,7 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
     /* Initialise the user signal handler set */
     initUserSignals();
     /* Set up handler to run on SIGINT, etc. */
-    init_default_handlers();
+    initDefaultHandlers();
 #endif
  
 #ifdef RTS_GTK_FRONTPANEL

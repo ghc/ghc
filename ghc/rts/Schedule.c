@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.103 2001/10/27 22:05:48 sof Exp $
+ * $Id: Schedule.c,v 1.104 2001/10/31 10:34:29 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -529,6 +529,13 @@ schedule( void )
     }
 #endif /* SMP */
 
+    /* check for signals each time around the scheduler */
+#ifndef mingw32_TARGET_OS
+    if (signals_pending()) {
+      startSignalHandlers();
+    }
+#endif
+
     /* Check whether any waiting threads need to be woken up.  If the
      * run queue is empty, and there are no other tasks running, we
      * can wait indefinitely for something to happen.
@@ -545,13 +552,6 @@ schedule( void )
     }
     /* we can be interrupted while waiting for I/O... */
     if (interrupted) continue;
-
-    /* check for signals each time around the scheduler */
-#ifndef mingw32_TARGET_OS
-    if (signals_pending()) {
-      start_signal_handlers();
-    }
-#endif
 
     /* 
      * Detect deadlock: when we have no threads to run, there are no

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.h,v 1.5 2000/02/22 12:09:24 simonmar Exp $
+ * $Id: Signals.h,v 1.6 2001/10/31 10:34:29 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -20,9 +20,8 @@ extern void unblockUserSignals(void);
 
 /* sig_install declared in PrimOps.h */
 
-extern void start_signal_handlers(void);
-
-extern void init_default_handlers(void);
+extern void startSignalHandlers(void);
+extern void initDefaultHandlers(void);
 
 #else
 

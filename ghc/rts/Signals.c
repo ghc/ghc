@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.21 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: Signals.c,v 1.22 2001/10/31 10:34:29 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -7,7 +7,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-/* This is non=Posix compliant.
+/* This is non-Posix-compliant.
    #include "PosixSource.h" 
 */
 #include "Rts.h"
@@ -38,39 +38,55 @@ StgPtr *next_pending_handler = pending_handler_buf;
 StgInt nocldstop = 0;
 
 /* -----------------------------------------------------------------------------
-   Allocate/resize the table of signal handlers.
-   -------------------------------------------------------------------------- */
+ * Allocate/resize the table of signal handlers.
+ * -------------------------------------------------------------------------- */
 
 static void
 more_handlers(I_ sig)
 {
-    I_ i;
+    StgInt i;
 
     if (sig < nHandlers)
-      return;
+	return;
 
     if (handlers == NULL)
-      handlers = (I_ *) malloc((sig + 1) * sizeof(I_));
+	handlers = (StgInt *) malloc((sig + 1) * sizeof(StgInt));
     else
-      handlers = (I_ *) realloc(handlers, (sig + 1) * sizeof(I_));
+	handlers = (StgInt *) realloc(handlers, (sig + 1) * sizeof(StgInt));
 
     if (handlers == NULL) {
-      /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-      barf("VM exhausted (in more_handlers)");
+	// don't fflush(stdout); WORKAROUND bug in Linux glibc
+	barf("VM exhausted (in more_handlers)");
     }
     for(i = nHandlers; i <= sig; i++)
-      /* Fill in the new slots with default actions */
-      handlers[i] = STG_SIG_DFL;
+	// Fill in the new slots with default actions
+	handlers[i] = STG_SIG_DFL;
 
     nHandlers = sig + 1;
 }
 
 /* -----------------------------------------------------------------------------
-   Low-level signal handler
+ * SIGCONT handler
+ *
+ * It seems that shells tend to put stdin back into blocking mode
+ * following a suspend/resume of the process.  Here we arrange to put
+ * it back into non-blocking mode.  We don't do anything to
+ * stdout/stderr because these handles don't get put into non-blocking
+ * mode at all - see the comments on stdout/stderr in PrelHandle.hsc.
+ * -------------------------------------------------------------------------- */
 
-   Places the requested handler on a stack of pending handlers to be
-   started up at the next context switch.
-   -------------------------------------------------------------------------- */
+static void
+cont_handler(int sig STG_UNUSED)
+{
+    setNonBlockingFd(0);
+}
+
+/* -----------------------------------------------------------------------------
+ * Low-level signal handler
+ *
+ * Places the requested handler on a stack of pending handlers to be
+ * started up at the next context switch.
+ * -------------------------------------------------------------------------- */
 
 static void
 generic_handler(int sig)
@@ -105,24 +121,29 @@ generic_handler(int sig)
        circumstances, depending on the signal.  
     */
 
-    *next_pending_handler++ = deRefStablePtr(stgCast(StgStablePtr,handlers[sig]));
+    *next_pending_handler++ = deRefStablePtr((StgStablePtr)handlers[sig]);
 
-    /* stack full? */
+    // stack full?
     if (next_pending_handler == &pending_handler_buf[N_PENDING_HANDLERS]) {
-      barf("too many pending signals");
+	barf("too many pending signals");
     }
     
-    /* re-establish the signal handler, and carry on */
+    // re-establish the signal handler, and carry on
     sigemptyset(&signals);
     sigaddset(&signals, sig);
     sigprocmask(SIG_UNBLOCK, &signals, NULL);
+
+    // *always* do the SIGCONT handler, even if the user overrides it.
+    if (sig == SIGCONT) {
+	cont_handler(sig);
+    }
 
     context_switch = 1;
 }
 
 /* -----------------------------------------------------------------------------
-   Blocking/Unblocking of the user signals
-   -------------------------------------------------------------------------- */
+ * Blocking/Unblocking of the user signals
+ * -------------------------------------------------------------------------- */
 
 static sigset_t userSignals;
 static sigset_t savedSignals;
@@ -147,8 +168,8 @@ unblockUserSignals(void)
 
 
 /* -----------------------------------------------------------------------------
-   Install a Haskell signal handler.
-   -------------------------------------------------------------------------- */
+ * Install a Haskell signal handler.
+ * -------------------------------------------------------------------------- */
 
 StgInt 
 stg_sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
@@ -157,12 +178,13 @@ stg_sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
     struct sigaction action;
     StgInt previous_spi;
 
-    /* Block the signal until we figure out what to do */
-    /* Count on this to fail if the signal number is invalid */
-    if(sig < 0 || sigemptyset(&signals) || sigaddset(&signals, sig) ||
-       sigprocmask(SIG_BLOCK, &signals, NULL))
-      return STG_SIG_ERR;
-
+    // Block the signal until we figure out what to do
+    // Count on this to fail if the signal number is invalid
+    if (sig < 0 || sigemptyset(&signals) ||
+	sigaddset(&signals, sig) || sigprocmask(SIG_BLOCK, &signals, NULL)) {
+	return STG_SIG_ERR;
+    }
+    
     more_handlers(sig);
 
     previous_spi = handlers[sig];
@@ -181,7 +203,7 @@ stg_sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
     	break;
 
     case STG_SIG_HAN:
-    	handlers[sig] = (I_)handler;
+    	handlers[sig] = (StgInt)handler;
 	sigaddset(&userSignals, sig);
     	action.sa_handler = generic_handler;
     	break;
@@ -200,24 +222,22 @@ stg_sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
     if (sigaction(sig, &action, NULL) || 
 	sigprocmask(SIG_UNBLOCK, &signals, NULL)) 
     {
-      /* need to return an error code, so avoid a stable pointer leak
-       * by freeing the previous handler if there was one.
-       */	 
-      if (previous_spi >= 0) {
-	  freeStablePtr(stgCast(StgStablePtr,handlers[sig]));
-      }
-      return STG_SIG_ERR;
+	// need to return an error code, so avoid a stable pointer leak
+	// by freeing the previous handler if there was one.
+	if (previous_spi >= 0) {
+	    freeStablePtr(stgCast(StgStablePtr,handlers[sig]));
+	}
+	return STG_SIG_ERR;
     }
-
+    
     return previous_spi;
 }
 
 /* -----------------------------------------------------------------------------
-   Creating new threads for the pending signal handlers.
-   -------------------------------------------------------------------------- */
-
+ * Creating new threads for the pending signal handlers.
+ * -------------------------------------------------------------------------- */
 void
-start_signal_handlers(void)
+startSignalHandlers(void)
 {
   blockUserSignals();
   
@@ -233,27 +253,26 @@ start_signal_handlers(void)
   unblockUserSignals();
 }
 
-#else /* PAR */
+#else // PAR
 StgInt 
 stg_sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
 {
-  /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-  barf("no signal handling support in a parallel implementation");
+    // don't fflush(stdout); WORKAROUND bug in Linux glibc
+    barf("no signal handling support in a parallel implementation");
 }
 
 void
-start_signal_handlers(void)
+startSignalHandlers(void)
 {
 }
 #endif
 
 /* -----------------------------------------------------------------------------
-   SIGINT handler.
-
-   We like to shutdown nicely after receiving a SIGINT, write out the
-   stats, write profiling info, close open files and flush buffers etc.
-   -------------------------------------------------------------------------- */
-
+ * SIGINT handler.
+ *
+ * We like to shutdown nicely after receiving a SIGINT, write out the
+ * stats, write profiling info, close open files and flush buffers etc.
+ * -------------------------------------------------------------------------- */
 #ifdef SMP
 pthread_t startup_guy;
 #endif
@@ -262,28 +281,29 @@ static void
 shutdown_handler(int sig STG_UNUSED)
 {
 #ifdef SMP
-  /* if I'm a worker thread, send this signal to the guy who
-   * originally called startupHaskell().  Since we're handling
-   * the signal, it won't be a "send to all threads" type of signal
-   * (according to the POSIX threads spec).
-   */
-  if (pthread_self() != startup_guy) {
-    pthread_kill(startup_guy, sig);
-  } else
+    // if I'm a worker thread, send this signal to the guy who
+    // originally called startupHaskell().  Since we're handling
+    // the signal, it won't be a "send to all threads" type of signal
+    // (according to the POSIX threads spec).
+    if (pthread_self() != startup_guy) {
+	pthread_kill(startup_guy, sig);
+	return;
+    }
 #endif
 
-  /* If we're already trying to interrupt the RTS, terminate with
-   * extreme prejudice.  So the first ^C tries to exit the program
-   * cleanly, and the second one just kills it.
-   */
-  if (interrupted) {
-      exit(EXIT_INTERRUPTED);
-  } else {
-      interruptStgRts();
-  }
+    // If we're already trying to interrupt the RTS, terminate with
+    // extreme prejudice.  So the first ^C tries to exit the program
+    // cleanly, and the second one just kills it.
+    if (interrupted) {
+	exit(EXIT_INTERRUPTED);
+    } else {
+	interruptStgRts();
+    }
 }
 
-/*
+/* -----------------------------------------------------------------------------
+ * Install default signal handlers.
+ *
  * The RTS installs a default signal handler for catching
  * SIGINT, so that we can perform an orderly shutdown.
  *
@@ -295,31 +315,40 @@ shutdown_handler(int sig STG_UNUSED)
  * by ignoring it.  Apparently IEEE requires floating-point
  * exceptions to be ignored by default, but alpha-dec-osf3
  * doesn't seem to do so.
- */
+ * -------------------------------------------------------------------------- */
 void
-init_default_handlers()
+initDefaultHandlers()
 {
     struct sigaction action,oact;
 
 #ifdef SMP
     startup_guy = pthread_self();
 #endif
+
+    // install the SIGINT handler
     action.sa_handler = shutdown_handler;
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
     if (sigaction(SIGINT, &action, &oact) != 0) {
-      /* Oh well, at least we tried. */
-      prog_belch("failed to install SIGINT handler");
+	prog_belch("warning: failed to install SIGINT handler");
     }
 
-    siginterrupt(SIGINT, 1);
+    siginterrupt(SIGINT, 1);	// isn't this the default? --SDM
 
+    // install the SIGCONT handler
+    action.sa_handler = cont_handler;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = 0;
+    if (sigaction(SIGCONT, &action, &oact) != 0) {
+	prog_belch("warning: failed to install SIGCONT handler");
+    }
+
+    // install the SIGFPE handler
     action.sa_handler = SIG_IGN;
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
     if (sigaction(SIGFPE, &action, &oact) != 0) {
-      /* Oh well, at least we tried. */
-      prog_belch("failed to install SIGFPE handler");
+	prog_belch("warning: failed to install SIGFPE handler");
     }
 #ifdef alpha_TARGET_ARCH
     ieee_set_fp_control(0);
