@@ -57,7 +57,7 @@ import OccName          ( mkSysOccFS,
 			  tcName, varName, dataName, clsName, tvName,
 			  EncodedFS 
 			)
-import Module           ( ModuleName, PackageName, mkSysModuleNameFS, mkModule )
+import Module           ( ModuleName, PackageName, mkSysModuleNameFS )
 import SrcLoc		( SrcLoc )
 import CmdLineOpts	( opt_InPackage, opt_IgnoreIfacePragmas )
 import Outputable

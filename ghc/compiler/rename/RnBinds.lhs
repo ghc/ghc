@@ -27,7 +27,7 @@ import RnMonad
 import RnTypes		( rnHsSigType, rnHsType )
 import RnExpr		( rnMatch, rnGRHSs, rnPat, checkPrecMatch )
 import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, lookupInstDeclBndr,
-			  lookupGlobalOccRn, lookupSigOccRn, bindPatSigTyVars,
+			  lookupSigOccRn, bindPatSigTyVars,
 			  warnUnusedLocalBinds, mapFvRn, extendTyVarEnvFVRn,
 			)
 import CmdLineOpts	( DynFlag(..) )

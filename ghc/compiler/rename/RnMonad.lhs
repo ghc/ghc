@@ -39,7 +39,7 @@ import RnHsSyn		( RenamedFixitySig )
 import HscTypes		( AvailEnv, emptyAvailEnv, lookupType,
 			  NameSupply(..), 
 			  ImportedModuleInfo, WhetherHasOrphans, ImportVersion, 
-			  PersistentRenamerState(..), Avails,
+			  PersistentRenamerState(..), 
 			  DeclsMap, IfaceInsts, IfaceRules, 
 			  HomeSymbolTable, TyThing,
 			  PersistentCompilerState(..), GlobalRdrEnv, LocalRdrEnv,
