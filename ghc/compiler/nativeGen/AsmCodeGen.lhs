@@ -209,7 +209,6 @@ primOpt
 primOpt op arg@[StInt x]
   = case op of
     	IntNegOp -> StInt (-x)
-    	IntAbsOp -> StInt (abs x)
     	_ -> StPrim op arg
 
 primOpt op args@[StInt x, StInt y]

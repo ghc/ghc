@@ -375,7 +375,6 @@ primOpCosts IntMulOp  = Cost (3, 1, 0, 0, 0)  + umul_costs
 primOpCosts IntQuotOp = Cost (3, 1, 0, 0, 0)  + div_costs
 primOpCosts IntRemOp  = Cost (3, 1, 0, 0, 0)  + rem_costs
 primOpCosts IntNegOp  = Cost (1, 1, 0, 0, 0) -- translates into 1 sub
-primOpCosts IntAbsOp  = Cost (0, 1, 0, 0, 0) -- abs closure already costed
 
 primOpCosts FloatGtOp  = Cost (2, 0, 0, 0, 2) -- expensive f-comp
 primOpCosts FloatGeOp  = Cost (2, 0, 0, 0, 2) -- expensive f-comp
@@ -460,7 +459,7 @@ data PrimOp
     -- but these take more than that; see special cases in primOpCosts
     -- I counted the generated ass. instructions for these -> checked
     | IntMulOp | IntQuotOp
-    | IntRemOp | IntNegOp | IntAbsOp
+    | IntRemOp | IntNegOp
 
     -- Rest is unchecked so far -- HWL
 

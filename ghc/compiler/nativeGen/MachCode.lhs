@@ -298,7 +298,6 @@ getRegister (StDouble d)
 getRegister (StPrim primop [x]) -- unary PrimOps
   = case primop of
       IntNegOp -> trivialUCode (NEG Q False) x
-      IntAbsOp -> trivialUCode (ABS Q) x
 
       NotOp    -> trivialUCode NOT x
 
@@ -536,7 +535,6 @@ getRegister (StDouble d)
 getRegister (StPrim primop [x]) -- unary PrimOps
   = case primop of
       IntNegOp  -> trivialUCode (NEGI L) x
-      IntAbsOp  -> absIntCode x
 
       NotOp	-> trivialUCode (NOT L) x
 
