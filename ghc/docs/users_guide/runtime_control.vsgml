@@ -188,21 +188,6 @@ heap size based on the current amount of live data.
 %PostScript), using the @stat2resid@<nidx>stat2resid</nidx> utility in
 %the GHC distribution (@ghc/utils/stat2resid@).
 
-% <tag>@-F2s@:</tag> 
-% <nidx>-F2s RTS option</nidx>
-% 
-% Forces a program compiled for generational GC to use two-space copying
-% collection. The two-space collector may outperform the generational
-% collector for programs which have a very low heap residency. It can
-% also be used to generate a statistics file from which a basic heap
-% residency profile can be produced (see Section <ref name="stat2resid -
-% residency info from GC stats" id="stat2resid">).
-% 
-% There will still be a small execution overhead imposed by the
-% generational compilation as the test for old generation updates will
-% still be executed (of course none will actually happen).  This
-% overhead is typically less than 1\%.
-% 
 % <tag>@-j<size>@:</tag>
 % <nidx>-j&lt;size&gt; RTS option</nidx>
 % Force a major garbage collection every @<size>@ bytes.  (Normally
@@ -257,11 +242,10 @@ The @<file>@ business works just like on the @-S@ RTS option (above).
 
 ``Ticky-ticky'' statistics are counts of various program actions
 (updates, enters, etc.)  The program must have been compiled using
-@-fstg-reduction-counts@<nidx>-fstg-reduction-counts option</nidx>
-(a.k.a. ``ticky-ticky profiling''), and, for it to be really useful,
-linked with suitable system libraries.  Not a trivial undertaking:
-consult the installation guide on how to set things up for easy
-``ticky-ticky'' profiling.
+@-ticky@<nidx>-ticky option</nidx> (a.k.a. ``ticky-ticky profiling''),
+and, for it to be really useful, linked with suitable system
+libraries.  Not a trivial undertaking: consult the installation guide
+on how to set things up for easy ``ticky-ticky'' profiling.
 
 <tag>@-D<num>@:</tag>
 <nidx>-D RTS option</nidx>
@@ -269,17 +253,19 @@ An RTS debugging flag; varying quantities of output depending on which
 bits are set in @<num>@.  Only works if the RTS was compiled with the
 @DEBUG@ option.
 
-<tag>@-N@:</tag>
-<nidx>-N RTS option</nidx>
-
-Normally, the garbage collector black-holes closures which are being
-evaluated, as a space-saving measure.  This option turns off
-blackholing.  You shouldn't ever need to use it.
-
-Historical note: this option used to be used to work around a problem
-with signal handling, where a signal handler might need to evaluate
-blackholed closures.  Signal handlers are now run in a separate
-thread, and don't suffer from this problem.
+% Blackholing can't be turned off in new RTS --SDM
+%
+% <tag>@-N@:</tag>
+% <nidx>-N RTS option</nidx>
+% 
+% Normally, the garbage collector black-holes closures which are being
+% evaluated, as a space-saving measure.  This option turns off
+% blackholing.  You shouldn't ever need to use it.
+% 
+% Historical note: this option used to be used to work around a problem
+% with signal handling, where a signal handler might need to evaluate
+% blackholed closures.  Signal handlers are now run in a separate
+% thread, and don't suffer from this problem.
 
 <tag>@-Z@:</tag>
 <nidx>-Z RTS option</nidx>
