@@ -158,9 +158,9 @@ mkModuleInit way cost_centre_info this_mod mb_main_mod foreign_stubs imported_mo
 	  | Module.moduleName this_mod /= main_mod_name 
   	  = AbsCNop	-- The normal case
 	  | otherwise	-- this_mod contains the main function
-	  = CModuleInitBlock (mkPlainModuleInitLabel dOLLAR_MAIN)
-			     (mkModuleInitLabel dOLLAR_MAIN way)
-			     (mk_import_register this_mod)
+	  = CCodeBlock (mkPlainModuleInitLabel dOLLAR_MAIN)
+		       (CJump (CLbl (mkPlainModuleInitLabel this_mod) CodePtrRep))
+			     
     in
     mkAbstractCs [
 	cc_decls,
