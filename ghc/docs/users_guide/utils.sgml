@@ -449,7 +449,9 @@ tags:
             The intention is that <literal>#peek</literal> and
             <literal>#poke</literal> can be used for implementing the
             operations of class <literal>Storable</literal> for a
-            given C struct (see <xref linkend="sec-Storable">).</para>
+            given C struct (see the
+            <literal>Foreign.Storable</literal> module in the library
+            documentation).</para>
 	  </listitem>
 	</varlistentry>
 

@@ -44,10 +44,11 @@ but it's useful if you are changing the implementation.   </para>  </listitem>
 
       <variablelist>
 	<varlistentry>
-	  <term>RedHat Linux/x86</term>
+	  <term>RedHat or SuSE Linux/x86</term>
 	  <listitem>
-	    <para>RPM source & binary packages for RedHat Linux (x86
-	    only) are available for most major releases.</para>
+	    <para>RPM source & binary packages for RedHat and SuSE
+	    Linux (x86 only) are available for most major
+	    releases.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -95,8 +96,9 @@ Binary distributions come in &ldquo;bundles,&rdquo; one bundle per file called
 </Para>
 
 <Para>
-Then you should find a single directory, <Literal>fptools</Literal>, with the following
-structure:
+Then you should find a single directory,
+<Literal>ghc-<replaceable>version</replaceable></Literal>, with the
+following structure:
 </Para>
 
 <Para>

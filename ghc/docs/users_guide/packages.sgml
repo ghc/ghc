@@ -13,8 +13,8 @@
     are also a good way to provide convenient access to a Haskell
     layer over a C library.</para>
 
-    <para>GHC comes with several packages (see <xref
-    linkend="book-hslibs">), and packages can be added to or removed
+    <para>GHC comes with several packages (see the accompanying
+    library documentation), and packages can be added to or removed
     from an existing GHC installation, using the supplied
     <literal>ghc-pkg</literal><indexterm><primary><literal>ghc-pkg</literal></primary>
     </indexterm> tool, described in <xref
@@ -534,7 +534,7 @@
 	    <secondary>package specification</secondary></indexterm>
 	  <listitem>
 	    <para>On Darwin/MacOS X, a list of directories containing frameworks for this
-	    package. This corresponds to the <option>-framework-path</options> option.
+	    package. This corresponds to the <option>-framework-path</option> option.
 	    It is ignored on all other platforms.</para>
 	  </listitem>
 	</varlistentry>

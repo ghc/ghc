@@ -1,143 +1,21 @@
-<sect1 id="release-5-02">
-  <title>Release notes for version 5.02</title>
+<sect1 id="release-5-04">
+  <title>Release notes for version 5.04</title>
 
   <sect2>
     <title>User-visible compiler changes</title>
-
     <itemizedlist>
-
       <listitem>
-	<para>Majorly improved support for Windows platforms.  Binary
-	builds are now entirely freestanding.  There is no longer any
-	need to install Cygwin or Mingwin to use it.  It's a
-	one-click-install-and-off-you-go story now.</para>
+	<para></para>
       </listitem>
-
-      <listitem>
-	<para>Several small changes to bring GHC into line with the
-	newest Haskell&nbsp;98 report.</para>
-      </listitem>
-
-      <listitem>
-	<para>RTS options can now be specified using the environment
-	variable <envar>GHCRTS</envar>.</para>
-      </listitem>
-      
-      <listitem>
-	<para>The maximum heap size, set with 
-        <literal>+RTS -M<replaceable>size</replaceable></literal>,
-        now defaults to unlimited.  We recommend however that you set
-        a maximum heap size appropriate for your machine using the
-        <envar>GHCRTS</envar> variable.</para>
-      </listitem>
-
-      <listitem>
-	<para>Thanks to the heroic efforts of Ken Shan
-	<email>ken@digitas.harvard.edu</email>, GHC now works again on
-	the Alpha architecture (just Tru64 at the moment), and many
-	64-bit bugs have been shaken out.  Interactive mode and the
-        native code generator do not currently work, sorry.</para>
-      </listitem>
-
-      <listitem>
-	<para>New option: <option>-fno-code</option> which causes GHC
-	to omit code generation and all future compilation stages (see
-	<xref linkend="options-codegen">).</para>
-      </listitem>
-
-      <listitem>
-        <para>New option <option>-package-conf
-        <replaceable>file</replaceable></option>.  This makes GHC read
-        additional package descriptions from
-        <replaceable>file</replaceable>.  See <xref
-        linkend="using-local-packages">.</para>
-      </listitem>
-
-      <listitem>
-	<para><option>+RTS
-          -i<replaceable>seconds</replaceable></option> flag reinstated for heap
-          profiling.  See <xref linkend="rts-options-heap-prof">.</para>
-      </listitem>
-
-      <listitem>
-	<para><option>-funbox-strict-fields</option> now works
-	correctly.  See <xref linkend="options-f">.</para>
-      </listitem>
-
-      <listitem>
-	<para>
-        Many bug fixes related to implicit-parameter support.</para>
-      </listitem>
-
-      <listitem>
-	<para>
-        Data declarations with no constructors are allowed.  This
-        facilitates types whose only value is bottom, and which have
-        no representation.</para>
-      </listitem>
-
-      <listitem>
-	<para>
-        You can disconnect numeric syntax from the Prelude syntax.
-        Doing this means you can define your own arithmetic.  The
-        relevant flag is <option>-fno-implicit-prelude</option>.  See
-        <xref linkend="options-language">.
-        </para>
-      </listitem>
-
     </itemizedlist>
   </sect2>
 
   <sect2>
     <title>User-visible interpreter (GHCi) changes</title>
-
     <itemizedlist>
       <listitem>
-         <para>GHCi now works on Windows.</para>
+	<para></para>
       </listitem>
-
-      <listitem>
-	<para>Partial FFI support in GHCi.  At the moment, foreign
-        import (static and dynamic) are supported on x86 and sparc
-        platforms.</para>
-      </listitem>
-
-      <listitem>
-	<para>New interpreter command <literal>:add</literal>, to add
-	modules to the current bunch.  See
-        <xref linkend="ghci-commands">.</para>
-      </listitem>
-
-      <listitem>
-	<para>New interpreter command <literal>:info</literal>, to provide
-	information on values, types and classes, a la Hugs.  See
-        <xref linkend="ghci-commands">.</para>
-      </listitem>
-
-      <listitem>
-	<para>Multiple target modules are supported.  You may specify
-	multiple modules for the <literal>:add</literal> and
-	<literal>:load</literal> commands.  From the command line, you
-	may specify multiple modules when starting GHCi and when
-	compiling in <option>&ndash;&ndash;make</option> mode.  See
-        <xref linkend="ghci-commands">.</para>
-      </listitem>
-
-      <listitem>
-	<para>New flags <option>-ignore-dot-ghci</option> and
-	<option>-read-dot-ghci</option>.  See
-        <xref linkend="ghci-dot-files">.</para>
-      </listitem>
-
-      <listitem>
-	<para>When starting GHCi from the command line, you may now
-	use the flags
-	<option>-L<replaceable>library-path</replaceable></option> and
-	<option>-l<replaceable>library-name</replaceable></option> to
-	specify libraries to be loaded into the interactive
-	session.  See <xref linkend="ghci-invokation">.</para>
-      </listitem>
-
     </itemizedlist>
   </sect2>
 
@@ -145,134 +23,16 @@
     <title>User-visible library changes</title>
     <itemizedlist>
       <listitem>
-	<para>The <literal>SocketPrim</literal> and
-	<literal>BSD</literal> modules in the <literal>net</literal>
-	package have been re-written to use the FFI, be more portable,
-	and be more thread-safe.  There are minor user-visible
-	changes: the functions <function>writeSocket</function>,
-	<function>readSocket</function> and
-	<function>readSocketAll</function> have been removed (use
-	<function>socketToHandle</function> and
-	<literal>Handle</literal> operations instead).</para>
-      </listitem>
-
-      <listitem>
-	<para>New function: <function>Exception.throwDynTo</function>.
-	See <xref linkend="sec-Dynamic-Exceptions">.</para>
-      </listitem>
-
-      <listitem>
-	<para><literal>BlockedOnDeadMVar</literal> and
-        <literal>ThreadKilled</literal> exceptions no longer generate
-        any output by default for forked threads.</para>
-      </listitem>
-
-      <listitem>
-	<para><literal>Weak.addForeignFinalizer</literal> is
-	deprecated; use the <literal>ForeignPtr</literal> library
-	instead.</para>
-      </listitem>
-
-      <listitem>
-	<para>The I/O library has been completely rewritten, using the
-	new FFI libraries and <command>hsc2hs</command>.  The main
-	improvement is to the way streams are handled: simultaneous
-	read and write with multiple threads using a socket or FIFO is
-	now possible, whereas before it was necessary to use two
-	separate handles.</para>
-      </listitem>
-
-      <listitem>
-	<para>As a result of the I/O rewrite, the extensions
-	<literal>IOExts.hConnectTo</literal> and
-	<literal>IOExts.withHandleFor</literal> have been removed.
-	Also, <literal>hGetBuf</literal> and
-	<literal>hPutBuf</literal> have been removed, and
-	<literal>hGetBufFull</literal> and
-	<literal>hPutBufFull</literal> have been renamed to
-	<literal>hGetBuf</literal> and <literal>hPutBuf</literal>
-	respectively (similary for the <literal>BA</literal>
-	versions of these functions).</para>
-      </listitem>
-
-      <listitem>
-	<para><literal>System.exitWith</literal> now throws
-	<literal>ExitException</literal> rather than causing the
-	program to exit immediately.  <literal>ExitException</literal>
-	is by default caught by the top level exception handler in the
-	main thread, where it causes the program to exit.  Hence, calling
-	<literal>System.exitWith</literal> in GHCi no longer causes
-	GHCi itself to exit.</para>
-      </listitem>
-
-      <listitem>
-	<para>New function: <literal>MVar.addMVarFinalizer</literal>
-	(see <xref linkend="sec-MVars">).</para>
-      </listitem>
-
-      <listitem>
-	<para>New module <literal>SystemExts</literal> for useful
-	system-ish functionality (see <xref
-	linkend="sec-SystemExts">).</para>
-      </listitem>
-
-      <listitem>
-	<para><literal>SocketPrim</literal>: added instances of
-	<literal>Eq</literal> and <literal>Show</literal> for the
-	<literal>Socket</literal> type.</para>
-      </listitem>
-
-      <listitem>
-	<para>The implementation of
-	<literal>MarsalAlloc.allocaBytes</literal> now uses GHC's
-	internal allocator and is much faster than before.  As a
-	result, the <literal>UnsafeCString</literal> type and
-	functions are no longer necessary and have been removed from
-	<literal>CString</literal>.</para>
+	<para></para>
       </listitem>
     </itemizedlist>
   </sect2>
 
   <sect2>
     <title>New experimental features</title>
-
     <itemizedlist>
-      <!-- don't forget: 31-bit support -->
-
       <listitem>
-	<para>Partial support for hierarchical module names.</para>
-      </listitem>
-
-      <listitem>
-         <para>Mucho hacking on the .NET code generator, including
-         some FFI extensions for .NET interop.  It's still
-         severely b0rk3d, so won't do anything useful.  Yet.</para>
-      </listitem>
-
-      <listitem>
-         <para>Emission of external Core format.  The goal is for
-         other tools to be able to grab the Core resulting from GHC's
-         front end manglings and optimisations.  Core format is
-         formally defined by the document <ulink url="http://www.haskell.org/ghc/docs/papers/core.ps.gz"
-         <citetitle>An External Representation for the GHC Core Language</citetitle></ulink>.
-         We also have sample
-         tools for reading, writing and typechecking external Core,
-         available in the source distribution directory <literal>/fptools/ghc/utils/ext-core</literal>.
-         Ultimately we plan that Core files can also be read by
-         GHC.  The relevant flag is <option>-fext-core</option>.
-         </para>
-      </listitem>
-
-      <listitem>
-	<para>A compacting garbage collector has been added.  It isn't
-	on by default, because it is somewhat slower than the existing
-	copying collector, but can be automatically enabled when
-	memory gets tight by setting the maximum heap size (see <xref
-	linkend="rts-options-gc">).  Compaction works together with
-	the existing generational scheme: it is only used on the
-	oldest generation.  Despite the "experimental"
-	classification, we've jumped up and down quite significantly
-	on this code, and it seems stable.</para>
+	<para></para>
       </listitem>
     </itemizedlist>
   </sect2>
@@ -281,24 +41,8 @@
     <title>Internal changes</title>
     <itemizedlist>
       <listitem>
-	<para>The implementation of the <literal>Array</literal>,
-	<literal>IArray</literal> and <literal>MArray</literal>
-	libraries have been rewritten so that bulk operations like
-	<literal>listArray</literal> and <literal>elems</literal> do
-	less range checking and hence go faster.</para>
+	<para></para>
       </listitem>
-
-      <listitem>
-	<para>The <literal>CPUTime</literal> library has been replaced
-	by one written using the FFI.  No externally visible
-	changes.</para>
-      </listitem>
-
-      <listitem>
-	<para>The compiler has a new strictness-and-absence analyser,
-        which is alleged to help it generate better code.</para>
-      </listitem>
-
     </itemizedlist>
   </sect2>
 

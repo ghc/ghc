@@ -174,10 +174,6 @@
 	  <para>Of course, if you have foreign calls in your program
           then all bets are off, because you can trash the heap, the
           stack, or whatever.</para>
-
-	  <para>If you are interested in hard-core debugging of a
-          crashing GHC-compiled program, please see <xref
-          linkend="hard-core-debug">.</para>
 	</listitem>
       </varlistentry>
 

@@ -19,8 +19,9 @@ performance because of the implementation costs of Haskell's
 Before you get too carried away working at the lowest level (e.g.,
 sloshing <literal>MutableByteArray&num;</literal>s around your
 program), you may wish to check if there are libraries that provide a
-&ldquo;Haskellised veneer&rdquo; over the features you want.  See
-<xref linkend="book-hslibs">.
+&ldquo;Haskellised veneer&rdquo; over the features you want.  The
+separate libraries documentation describes all the libraries that come
+with GHC.
 </para>
 
 <!-- LANGUAGE OPTIONS -->
@@ -163,14 +164,16 @@ program), you may wish to check if there are libraries that provide a
 
 <para>With the <option>-fglasgow-exts</option> flag, GHC lets you declare
 a data type with no constructors.  For example:</para>
+
 <programlisting>
   data S      -- S :: *
   data T a    -- T :: * -> *
 </programlisting>
+
 <para>Syntactically, the declaration lacks the "= constrs" part.  The 
-type can be parameterised, but only over ordinary types, of kind *; since
-Haskell does not have kind signatures, you cannot parameterise over higher-kinded
-types.</para>
+type can be parameterised over types of any kind, but if the kind is
+not <literal>*</literal> then an explicit kind annotation must be used
+(see <xref linkend="sec-kinding">).</para>
 
 <para>Such data types have only one value, namely bottom.
 Nevertheless, they can be useful when defining "phantom types".</para>
@@ -894,21 +897,19 @@ is <literal>(?x::a) => (a,a)</literal>, and not
 class constraints.
 </para>
 <para>
-An implicit parameter is bound using an expression of the form 
-<emphasis>expr</emphasis> <literal>with</literal> <emphasis>binds</emphasis>, 
-where <literal>with</literal> is a new keyword. This form binds the implicit
-parameters arising in the body, not the free variables as a <literal>let</literal> or
-<literal>where</literal> would do. For example, we define the <literal>min</literal> function by binding
-<literal>cmp</literal>.
+An implicit parameter is bound using the standard
+<literal>let</literal> binding form, where the bindings must be a
+collection of simple bindings to implicit-style variables (no
+function-style bindings, and no type signatures); these bindings are
+neither polymorphic or recursive. This form binds the implicit
+parameters arising in the body, not the free variables as a
+<literal>let</literal> or <literal>where</literal> would do. For
+example, we define the <literal>min</literal> function by binding
+<literal>cmp</literal>.</para>
 <programlisting>
   min :: [a] -> a
-  min  = least with ?cmp = (<=)
+  min  = let ?cmp = (<=) in least
 </programlisting>
-Syntactically, the <emphasis>binds</emphasis> part of a <literal>with</literal> construct must be a
-collection of simple bindings to variables (no function-style
-bindings, and no type signatures); these bindings are neither
-polymorphic or recursive.
-</para>
 <para>
 Note the following additional constraints:
 <itemizedlist>
@@ -1379,7 +1380,7 @@ for rank-2 types.
 </sect3>
 </sect2>
 
-<sect2>
+<sect2 id="type-synonyms">
 <title>Liberalised type synonyms 
 </title>
 
@@ -2346,21 +2347,24 @@ assert pred val ==> assertError "Main.hs|15" pred val
 
 <para>
 The rewrite is only performed by the compiler when it spots
-applications of <function>Exception.assert</function>, so you can still define and
-use your own versions of <function>assert</function>, should you so wish. If not,
-import <literal>Exception</literal> to make use <function>assert</function> in your code.
+applications of <function>Control.Exception.assert</function>, so you
+can still define and use your own versions of
+<function>assert</function>, should you so wish. If not, import
+<literal>Control.Exception</literal> to make use
+<function>assert</function> in your code.
 </para>
 
 <para>
 To have the compiler ignore uses of assert, use the compiler option
-<option>-fignore-asserts</option>. <indexterm><primary>-fignore-asserts option</primary></indexterm> That is,
-expressions of the form <literal>assert pred e</literal> will be rewritten to <literal>e</literal>.
+<option>-fignore-asserts</option>. <indexterm><primary>-fignore-asserts
+option</primary></indexterm> That is, expressions of the form
+<literal>assert pred e</literal> will be rewritten to
+<literal>e</literal>.
 </para>
 
 <para>
 Assertion failures can be caught, see the documentation for the
-<literal>Exception</literal> library (<xref linkend="sec-Exception">)
-for the details.
+<literal>Control.Exception</literal> library for the details.
 </para>
 
 </sect1>
@@ -2368,6 +2372,53 @@ for the details.
 
 <sect1 id="syntax-extns">
 <title>Syntactic extensions</title>
+
+<!-- ====================== HIERARCHICAL MODULES =======================  -->
+
+    <sect2 id="hierarchical-modules">
+      <title>Hierarchical Modules</title>
+
+      <para>GHC supports a small extension to the syntax of module
+      names: a module name is allowed to contain a dot
+      <literal>&lsquo;.&rsquo;</literal>.  This is also known as the
+      &ldquo;hierarchical module namespace&rdquo; extension, because
+      it extends the normally flat Haskell module namespace into a
+      more flexible hierarchy of modules.</para>
+
+      <para>A module name in the extended syntax consists of a
+      sequence of components, each separated by a dot.  When searching
+      for an interface file (or a source file, in the case of GHCi or
+      when using <option>--make</option>) for an imported module, GHC
+      interprets the dot as a path separator.  So for example, if a
+      module <literal>A.B.C</literal> is imported, then for each
+      directory <literal>D</literal> on the search path (see the
+      <option>-i</option> option, <xref
+      linkend="options-finding-imports">), GHC will look in the
+      directory <literal>D/A/B</literal><footnote><para>On Windows,
+      this would be <literal>D\A\B</literal>.</para></footnote> for an
+      interface file called <filename>C.hi</filename> or a source file
+      <filename>C.hs</filename> or <filename>C.lhs</filename>.</para>
+
+      <para>Note that as far as the compiler is concerned, module
+      names are always fully qualified; the hierarchy only has a
+      special meaning when searching for interface files and source
+      files in the filesystem.  In particular, this means that the
+      full module name must be given after the
+      <literal>module</literal> keyword at the beginning of the
+      module; for example, the module <literal>A.B.C</literal> must
+      begin</para>
+
+<programlisting>module A.B.C</programlisting>
+
+      <para>GHC comes with a large collection of libraries arranged
+      hierarchically; see the accompanying library documentation.
+      There is an ongoing project to create and maintain a stable set
+      of <quote>core</quote> libraries used by several Haskell
+      compilers, and the libraries that GHC comes with represent the
+      current status of that project.  For more details, see <ulink
+      url="http://www.haskell.org/~simonmar/libraries/libraries.html">.</ulink></para>
+
+    </sect2>
 
 <!-- ====================== PATTERN GUARDS =======================  -->
 
@@ -2554,14 +2605,18 @@ qualifier list has just one element, a boolean expression.
 <title>Rebindable syntax</title>
 
 
-	    <para> Your may want to
-            define your own numeric class hierarchy.  It completely
-            defeats that purpose if the literal "1" means
-            "<literal>Prelude.fromInteger 1</literal>", which is what
-            the Haskell Report specifies.  So the
-            <option>-fno-implicit-prelude</option> flag causes the
-            following pieces of built-in syntax to refer to <emphasis>whatever
-            is in scope</emphasis>, not the Prelude versions:</para>
+      <para>GHC allows most kinds of built-in syntax to be rebound by
+      the user, to facilitate replacing the <literal>Prelude</literal>
+      with a home-grown version, for example.</para>
+
+            <para>You may want to define your own numeric class
+            hierarchy.  It completely defeats that purpose if the
+            literal "1" means "<literal>Prelude.fromInteger
+            1</literal>", which is what the Haskell Report specifies.
+            So the <option>-fno-implicit-prelude</option> flag causes
+            the following pieces of built-in syntax to refer to
+            <emphasis>whatever is in scope</emphasis>, not the Prelude
+            versions:</para>
 
 	    <itemizedlist>
 	      <listitem>
@@ -2587,11 +2642,12 @@ qualifier list has just one element, a boolean expression.
 	      </listitem>
 
 	      <listitem>
-	      <para>"Do" notation is translated using whatever functions
-	      <literal>(>>=)</literal>, <literal>(>>)</literal>, <literal>fail</literal>, 
-	      and <literal>return</literal>, are in scope (not the Prelude versions).
-	      List comprehensions, and parallel array comprehensions, are unaffected.
-	     </para></listitem>
+	  <para>"Do" notation is translated using whatever
+	      functions <literal>(>>=)</literal>,
+	      <literal>(>>)</literal>, <literal>fail</literal>, and
+	      <literal>return</literal>, are in scope (not the Prelude
+	      versions).  List comprehensions, and parallel array
+	      comprehensions, are unaffected.  </para></listitem>
 	    </itemizedlist>
 
 	     <para>Be warned: this is an experimental facility, with fewer checks than

@@ -18,11 +18,14 @@
       which contains a module <literal>A</literal>, say, it generates
       an object <filename>A.o</filename>, <emphasis>and</emphasis> a
       companion <emphasis>interface file</emphasis>
-      <filename>A.hi</filename>.  The interface file is not intended
-      for human consumption, as you'll see if you take a look at one.
-      It's merely there to help the compiler compile other modules in
-      the same program.</para>
-
+      <filename>A.hi</filename>.  The interface file is merely there
+      to help the compiler compile other modules in the same program.
+      Interfaces are in a binary format, so don't try to look at one;
+      however you <emphasis>can</emphasis> see the contents of an
+      interface file by using GHC with the
+      <option>--show-iface</option> option (see <xref
+      linkend="hi-options">, below).</para>
+      
       <para>NOTE: In general, the name of a file containing module
       <literal>M</literal> should be named <filename>M.hs</filename>
       or <literal>M.lhs</literal>.  The only exception to this rule is
@@ -163,8 +166,20 @@
             the labour.</para>
 	  </listitem>
 	</varlistentry>
+
+	<varlistentry>
+	  <term><option>--show-iface</option>
+	  <replaceable>file</replaceable></term>
+	  <indexterm><primary><option>--show-iface</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Where <replaceable>file</replaceable> is the name of
+	    an interface file, dumps the contents of that interface in
+	    a human-readable (ish) format.</para>
+	  </listitem>
+	</varlistentry>
       </variablelist>
-	
+
     </sect2>
 
     <sect2 id="recomp">
@@ -551,41 +566,34 @@ import {-# SOURCE #-} A
       would look like the following:</para>
 
 <ProgramListing>
-__interface A 1 0 where
-__export A TA{MkTA} ;
-1 newtype TA = MkTA PrelBase.Int ;
+module A where
+newtype TA = MkTA GHC.Base.Int
 </ProgramListing>
 
-      <para>The syntax is essentially the same as a normal
-      <filename>.hi</filename> file (unfortunately), so you can
-      usually tailor an existing <filename>.hi</filename> file to make
-      a <filename>.hi-boot</filename> file.</para>
+      <para>The syntax is similar to a normal Haskell source file, but
+      with some important differences:</para>
+
+      <itemizedlist>
+	<listitem>
+	  <para>Non-local entities must be qualified with their
+	  <emphasis>original</emphasis> defining module.  Qualifying
+	  by a module which just re-exports the entity won't do.  In
+	  particular, most <literal>Prelude</literal> entities aren't
+	  actually defined in the <literal>Prelude</literal> (see for
+	  example <literal>GHC.Base.Int</literal> in the above
+	  example).</para>
+	</listitem>
+	<listitem>
+	  <para>Only <literal>data</literal>, <literal>type</literal>,
+	  <literal>newtype</literal>, <literal>class</literal>, and
+	  type signature declarations may be included.</para>
+	</listitem>
+      </itemizedlist>
 
       <para>Notice that we only put the declaration for the newtype
       <literal>TA</literal> in the <literal>hi-boot</literal> file,
       not the signature for <Function>f</Function>, since
       <Function>f</Function> isn't used by <literal>B</literal>.</para>
-
-      <para>The number &ldquo;1&rdquo; after
-      &ldquo;&lowbar;&lowbar;interface A&rdquo; gives the version
-      number of module A; it is incremented whenever anything in A's
-      interface file changes.  In a normal interface file, the
-      &ldquo;0&rdquo; is the version number of the compiler which
-      generated the interface file; it is used to ensure that we don't
-      mix-and-match interface files between compiler versions.
-      Leaving it as zero in an <literal>hi-boot</literal> file turns
-      off this check.</para>
-
-      <para>The number &ldquo;1&rdquo; at the beginning of a
-      declaration is the <emphasis>version number</emphasis> of that
-      declaration: for the purposes of <filename>.hi-boot</filename>
-      files these can all be set to 1.  All names must be fully
-      qualified with the <emphasis>original</emphasis> module that an
-      object comes from: for example, the reference to
-      <literal>Int</literal> in the interface for <literal>A</literal>
-      comes from <literal>PrelBase</literal>, which is a module
-      internal to GHC's prelude.  It's a pain, but that's the way it
-      is.</para>
 
       <para>If you want an <literal>hi-boot</literal> file to export a
       data type, but you don't want to give its constructors (because
@@ -593,18 +601,12 @@ __export A TA{MkTA} ;
       you can write simply:</para>
 
 <ProgramListing>
-__interface A 1 0 where
-__export A TA;
-1 data TA
+module A where
+data TA
 </ProgramListing>
 
       <para>(You must write all the type parameters, but leave out the
       '=' and everything that follows it.)</para>
-
-      <para><emphasis>Note:</emphasis> This is all a temporary
-      solution, a version of the compiler that handles mutually
-      recursive modules properly without the manual construction of
-      interface files, is (allegedly) in the works.</para>
     </sect2>
 
 

@@ -62,7 +62,8 @@ Web Page.
 
 <Para>
 Some details about Parallel Haskell follow.  For more information
-about concurrent Haskell, see <xref linkend="sec-Concurrent">.
+about concurrent Haskell, see the module
+<literal>Control.Concurrent</literal> in the library documentation.
 </Para>
 
 <Sect2>

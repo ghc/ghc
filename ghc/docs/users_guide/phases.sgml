@@ -482,7 +482,7 @@ strmod = "\
 	    This option corresponds to the <option>-framework</option> option for Apple's Linker.
 	    Please note that frameworks and packages are two different things - frameworks don't
 	    contain any haskell code. Rather, they are Apple's way of packaging shared libraries.
-	    To link to Apple's &ldquo;Carbon&qdquo; API, for example, you'd use
+	    To link to Apple's &ldquo;Carbon&rdquo; API, for example, you'd use
 	    <option>-framework Carbon</option>.
 	    </para>
 	  </listitem>

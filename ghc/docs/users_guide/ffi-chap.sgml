@@ -30,9 +30,9 @@
     </listitem>
   </itemizedlist>
 
-  <para>The FFI libraries are documented in <xref
-  linkend="sec-Foreign">.</para>
-
+  <para>The FFI libraries are documented in the accompanying library
+  documentation; see for example the <literal>Foreign</literal>
+  module.</para>
 
   <sect1 id="sec-ffi-ghcexts">
     <title>GHC extensions to the FFI Addendum</title>

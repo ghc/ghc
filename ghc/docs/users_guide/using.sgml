@@ -363,7 +363,7 @@ module X where
 	  <para>Print the path to GHC's library directory.  This is
 	  the top of the directory tree containing GHC's libraries,
 	  interfaces, and include files (usually something like
-	  <literal>/usr/local/lib/ghc-5.02</literal> on Unix).  This
+	  <literal>/usr/local/lib/ghc-5.04</literal> on Unix).  This
 	  is the value of
 	  <literal>$libdir</literal><indexterm><primary><literal>libdir</literal></primary>
 	  </indexterm>in the package configuration file (see <xref
@@ -1408,36 +1408,31 @@ data S = S !Int !Int
       </variablelist>
 
     </sect2>
-
+    
   </sect1>
-
-&phases;  
-
-<Sect1 id="sec-using-concurrent">
+  
+  &phases;  
+  
+  <sect1 id="sec-using-concurrent">
 <title>Using Concurrent Haskell</title>
 
+	     <indexterm><primary>Concurrent Haskell&mdash;use</primary></indexterm>
+
 <para>
-<indexterm><primary>Concurrent Haskell&mdash;use</primary></indexterm>
+GHC supports Concurrent Haskell by default, without requiring a
+special option or libraries compiled in a certain way.  To get access
+to the support libraries for Concurrent Haskell, just import
+<literal>Control.Concurrent</literal> (details are in the accompanying
+library documentation).</para>
+
+<para>
+RTS options are provided for modifying the behaviour of the threaded
+runtime system.  See <XRef LinkEnd="parallel-rts-opts">.
 </para>
 
 <para>
-GHC (as of version 4.00) supports Concurrent Haskell by default,
-without requiring a special option or libraries compiled in a certain
-way.  To get access to the support libraries for Concurrent Haskell
-(i.e. <literal>Concurrent</literal> and friends), use the
-<option>-package concurrent</option> option.
-</para>
-
-<para>
-Three RTS options are provided for modifying the behaviour of the
-threaded runtime system.  See the descriptions of
-<option>-C[&lt;us&gt;]</option>, <option>-q</option>, and
-<option>-t&lt;num&gt;</option> in <XRef LinkEnd="parallel-rts-opts">.
-</para>
-
-<para>
-Concurrent Haskell is described in more detail in <XRef
-LinkEnd="sec-Concurrent">.
+Concurrent Haskell is described in more detail in the documentation
+for the <literal>Control.Concurrent</literal> module.
 </para>
 
 </Sect1>

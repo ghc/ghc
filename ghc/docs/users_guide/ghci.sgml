@@ -9,11 +9,11 @@
     </footnote>
   is GHC's interactive environment, in which Haskell expressions can
   be interactively evaluated and programs can be interpreted.  If
-  you're famililar with Hugs<indexterm><primary>Hugs</primary>
+  you're famililar with <ulink url="http://www.haskell.org/hugs/">Hugs</ulink><indexterm><primary>Hugs</primary>
   </indexterm>, then you'll be right at home with GHCi.  However, GHCi
   also has support for interactively loading compiled code, as well as
   supporting all<footnote><para>except <literal>foreign export</literal>, at the moment</para>
-  </footnote>the language extensions that GHC provides.</para>
+  </footnote> the language extensions that GHC provides.</para>
   <indexterm><primary>FFI</primary><secondary>GHCi support</secondary></indexterm>
   <indexterm><primary>Foreign Function Interface</primary><secondary>GHCi support</secondary></indexterm>
 
@@ -27,11 +27,12 @@
 $ ghci
    ___         ___ _
   / _ \ /\  /\/ __(_)
- / /_\// /_/ / /  | |      GHC Interactive, version 5.00, For Haskell 98.
+ / /_\// /_/ / /  | |      GHC Interactive, version 5.04, for Haskell 98.
 / /_\\/ __  / /___| |      http://www.haskell.org/ghc/
 \____/\/ /_/\____/|_|      Type :? for help.
 
-Loading package std ... linking ... done.
+Loading package base ... linking ... done.
+Loading package haskell98 ... linking ... done.
 Prelude> 
 </screen>
 
@@ -42,23 +43,37 @@ Prelude>
 
 <screen>
  Commands available from the prompt:
-   &lt;stmt&gt;              evaluate/run &lt;stmt&gt;
-   :cd &lt;dir&gt;           change directory to &lt;dir&gt;
-   :def &lt;cmd&gt; &lt;expr&gt;   define a macro :&lt;cmd&gt;
-   :help, :?           display this list of commands
-   :load &lt;filename&gt;    load a module (and it dependents)
-   :module &lt;mod&gt;       set the context for expression evaluation to &lt;mod&gt;
-   :reload             reload the current module set
-   :set &lt;option&gt; ...   set options
-   :type &lt;expr&gt;        show the type of &lt;expr&gt;
-   :unset &lt;option&gt; ... unset options
-   :quit               exit GHCi
-   :!&lt;command&gt;         run the shell command &lt;command&gt;
+
+   %lt;stmt&gt;                     evaluate/run %lt;stmt&gt;
+   :add %lt;filename&gt; ...        add module(s) to the current target set
+   :browse [*]%lt;module&gt;        display the names defined by %lt;module&gt;
+   :cd %lt;dir&gt;                  change directory to %lt;dir&gt;
+   :def %lt;cmd&gt; %lt;expr&gt;          define a command :%lt;cmd&gt;
+   :help, :?                  display this list of commands
+   :info [%lt;name&gt; ...]         display information about the given names
+   :load %lt;filename&gt; ...       load module(s) and their dependents
+   :module [+/-] [*]%lt;mod&gt; ... set the context for expression evaluation
+   :reload                    reload the current module set
+
+   :set %lt;option&gt; ...          set options
+   :set args %lt;arg&gt; ...        set the arguments returned by System.getArgs
+   :set prog %lt;progname&gt;       set the value returned by System.getProgName
+
+   :show modules              show the currently loaded modules
+   :show bindings             show the current bindings made at the prompt
+
+   :type %lt;expr&gt;               show the type of %lt;expr&gt;
+   :undef %lt;cmd&gt;               undefine user-defined command :%lt;cmd&gt;
+   :unset %lt;option&gt; ...        unset options
+   :quit                      exit GHCi
+   :!%lt;command&gt;                run the shell command %lt;command&gt;
+
  Options for `:set' and `:unset':
+
     +r                 revert top-level expressions after each evaluation
     +s                 print timing/memory stats after each evaluation
     +t                 print type after evaluation
-    -&lt;flag&gt;            most GHC command line flags can also be set here
+    -%lt;flags&gt;           most GHC command line flags can also be set here
                          (eg. -v2, -fglasgow-exts, etc.)
 </screen>
 
@@ -203,8 +218,8 @@ Ok, modules loaded: Main.
     normally converted to byte-code and run using the interpreter.
     However, interpreted code can also run alongside compiled code in
     GHCi; indeed, normally when GHCi starts, it loads up a compiled
-    copy of package <literal>std</literal>, which contains the Prelude
-    and standard libraries.</para>
+    copy of the <literal>base</literal> package, which contains the
+    <literal>Prelude</literal>.</para>
 
     <para>Why should we want to run compiled code?  Well, compiled
     code is roughly 10x faster than interpreted code, but takes about
@@ -526,8 +541,9 @@ Prelude>
 </screen>
       <para>Any exceptions raised during the evaluation or execution
       of the statement are caught and printed by the GHCi command line
-      interface (see <xref linkend="sec-Exception"> for more
-      information on GHC's Exception support).</para>
+      interface (for more information on exceptions, see the module
+      <literal>Control.Exception</literal> in the libraries
+      documentation).</para>
 
       <para>Every new binding shadows any existing bindings of the
       same name, including entities that are in scope in the current
@@ -640,28 +656,25 @@ $ ghci Main.hs
       <indexterm><primary>packages</primary><secondary>with GHCi</secondary></indexterm>
 
       <para>GHCi can make use of all the packages that come with GHC,
-      For example, to start up GHCi with the <literal>text</literal>
+      For example, to start up GHCi with the <literal>network</literal>
       package loaded:</para>
 
 <screen>
-$ ghci -package text
+$ ghci -package network
    ___         ___ _
   / _ \ /\  /\/ __(_)
- / /_\// /_/ / /  | |      GHC Interactive, version 5.00, For Haskell 98.
+ / /_\// /_/ / /  | |      GHC Interactive, version 5.04, for Haskell 98.
 / /_\\/ __  / /___| |      http://www.haskell.org/ghc/
 \____/\/ /_/\____/|_|      Type :? for help.
 
-Loading package std ... linking ... done.
-Loading package lang ... linking ... done.
-Loading package text ... linking ... done.
+Loading package base ... linking ... done.
+Loading package haskell98 ... linking ... done.
+Loading package network ... linking ... done.
 Prelude> 
 </screen>      
 
-      <para>Note that GHCi also loaded the <literal>lang</literal>
-      package even though we didn't ask for it: that's because the
-      <literal>text</literal> package makes use of one or more of the
-      modules in <literal>lang</literal>, and therefore has a
-      dependency on it.</para>
+      <para>Note that GHCi will also automatically load any packages
+      on which the requested package depends.</para>
 
       <para>The following command works to load new packages into a
       running GHCi:</para>

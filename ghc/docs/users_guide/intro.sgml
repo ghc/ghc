@@ -41,8 +41,8 @@
   details.</para>
 
   <para>GHC comes with a large collection of libraries, with
-  everything from parser combinators to networking.  These are all
-  described in <xref linkend="book-hslibs">.</para>
+  everything from parser combinators to networking.  The libraries are
+  described in separate documentation.</para>
 
   <Sect1 id="mailing-lists-GHC">
     <Title>Meta-information: Web sites, mailing lists, etc.</Title>
@@ -383,7 +383,7 @@
   </sect1>
 
 
-&relnotes
+&relnotes;
 
 </Chapter>
 

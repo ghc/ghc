@@ -299,6 +299,14 @@
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
+	    <row>
+	      <entry><option>--show-iface</option> <replaceable>file</replaceable></entry>
+	      <entry>Read the interface in
+	      <replaceable>file</replaceable> and dump it as text to
+	      <literal>stdout</literal>.</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
 	  </tbody>
 	</tgroup>
       </informaltable>
@@ -1092,17 +1100,17 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-framework</option> <replaceable>name</replaceable></endtry>
+	      <entry><option>-framework</option> <replaceable>name</replaceable></entry>
 	      <entry>On Darwin/MacOS X only, link in the framework <replaceable>name</replaceable>.
-		This option corresponds to the <option>-framework</option> option for Apple's Linker.
+		This option corresponds to the <option>-framework</option> option for Apple's Linker.</entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-framework-path</option> <replaceable>name</replaceable></endtry>
+	      <entry><option>-framework-path</option> <replaceable>name</replaceable></entry>
 	      <entry>On Darwin/MacOS X only, add <replaceable>dir</replaceable> to the list of
 	        directories searched for frameworks.
-		This option corresponds to the <option>-F</option> option for Apple's Linker.
+		This option corresponds to the <option>-F</option> option for Apple's Linker.</entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>

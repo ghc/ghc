@@ -239,9 +239,9 @@ main = print (array (1,1) [(1,2), (1,3)])</programlisting>
 	  integral types (<literal>Int8</literal>,
 	  <literal>Int16</literal>, <literal>Int32</literal>,
 	  <literal>Int64</literal> and the unsigned
-	  <literal>Word</literal> variants), see <xref
-	  linkend="sec-Int"> and <xref linkend="sec-Word">.</para>
-
+	  <literal>Word</literal> variants), see the modules
+	  <literal>Data.Int</literal> and <literal>Data.Word</literal>
+	  in the library documentation.</para>
 	</listitem>
       </varlistentry>
 

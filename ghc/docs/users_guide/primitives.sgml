@@ -1172,7 +1172,8 @@ C.
 </para>
 
 <para>
-Please see <xref LinkEnd="sec-stable-pointers"> for more details.
+Please see the module <literal>Foreign.StablePtr</literal> in the
+library documentation for more details.
 </para>
 </listitem>
 </varlistentry>
@@ -1188,7 +1189,8 @@ memory when you're done with it.&rdquo;
 </para>
 
 <para>
-Please see <xref LinkEnd="sec-ForeignObj"> for more details.
+Please see module <literal>Foreign.ForeignPtr</literal> in the library
+documentatation for more details.
 </para>
 </listitem>
 </varlistentry>
