@@ -1,12 +1,12 @@
 #!/bin/bash
 
-TROOT=/home/v-julsew/Oct19
+TROOT=/home/v-julsew/Nov25
 
-STGHUGSFLAGS=-P$TROOT/fpO/ghc/interpreter/lib
-NROOT=$TROOT/fpO/nofib
-HUGZ=$TROOT/fpO/ghc/interpreter
+STGHUGSFLAGS=-P$TROOT/fpt/ghc/interpreter/lib
+NROOT=$TROOT/fpt/nofib
+HUGZ=$TROOT/fpt/ghc/interpreter
 LD_LIBRARY_PATH=$HUGZ:$LD_LIBRARY_PATH
-HSCPP=$TROOT/fpO/ghc/utils/hscpp
+HSCPP=$TROOT/fpt/ghc/utils/hscpp
 
 echo
 echo "==================== $1/$2 ===================="
