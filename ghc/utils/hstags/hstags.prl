@@ -1,49 +1,39 @@
+#
+# To fully function, this script needs the following variables
+# set:
+#
+#   INSTALLING
+#   TMPDIR
+#   TOP_PWD
+#   INSTLIBDIR_GHC
+#   INSTDATADIR_GHC
+#   PROJECTVERSION
+#   HSP_IMPORTS
+
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $tmp = $ENV{'TMPDIR'} . "/$$.eht";
 } else {
-    $tmp ="$(TMPDIR)/$$.eht";
-    $ENV{'TMPDIR'} = '$(TMPDIR)'; # set the env var as well
+    $tmp ="${TMPDIR}/$$.eht";
+    $ENV{'TMPDIR'} = ${TMPDIR}; # set the env var as well
 }
 
-#------------------------------------------------------------------------
-# If you are adjusting paths by hand for a binary GHC distribution,
-# de-commenting the line to set GLASGOW_HASKELL_ROOT should do.
-# Or you can leave it as is, and set the environment variable externally.
-#------------------------------------------------------------------------
-# $ENV{'GLASGOW_HASKELL_ROOT'} = '/some/absolute/path/name';
+$TopPwd         = "${TOP_PWD}";
+$InstLibDirGhc  = "${INSTLIBDIR_GHC}";
 
-if (! $ENV{'GLASGOW_HASKELL_ROOT'}) { # good -- death to environment variables
-    $TopPwd	    = '$(TOP_PWD)';
-    $InstLibDirGhc  = '$(INSTLIBDIR_GHC)';
-    $InstDataDirGhc = '$(INSTDATADIR_GHC)';
-} else {
-    $TopPwd = $ENV{'GLASGOW_HASKELL_ROOT'};
-
-    if ( '$(INSTLIBDIR_GHC)' =~ /\/local\/fp(\/.*)/ ) {
-	$InstLibDirGhc	= $ENV{'GLASGOW_HASKELL_ROOT'} . $1;
-    } else {
-	print STDERR "GLASGOW_HASKELL_ROOT environment variable is set;\nBut can't untangle $(INSTLIBDIR_GHC).\n(Installation error)\n";
-	exit(1);
-    }
-
-    if ( '$(INSTDATADIR_GHC)' =~ /\/local\/fp(\/.*)/ ) {
-	$InstDataDirGhc	= $ENV{'GLASGOW_HASKELL_ROOT'} . $1;
-    } else {
-	print STDERR "GLASGOW_HASKELL_ROOT environment variable is set;\nBut can't untangle $(INSTDATADIR_GHC).\n(Installation error)\n";
-	exit(1);
-    }
-}
-
-$Unlit = ( $(INSTALLING) ) ? "$InstLibDirGhc/unlit"
-			   : "$TopPwd/$(CURRENT_DIR)/$(GHC_UNLIT)";
-$HsCpp = # but this is re-set to "cat" (after options) if -cpp not seen
-	 ( $(INSTALLING) ) ? "$InstLibDirGhc/hscpp"
-			   : "$TopPwd/$(CURRENT_DIR)/$(GHC_HSCPP)";
-$HsP   = ( $(INSTALLING) ) ? "$InstLibDirGhc/hsp"
-			   : "$TopPwd/$(CURRENT_DIR)/$(GHC_HSP)";
-$HsTagsHelp
-       = ( $(INSTALLING) ) ? "$InstLibDirGhc/hstags-help"
-			   : "$TopPwd/$(CURRENT_DIR)/$(HSTAGSSRC)/hstags-help";
+$Unlit = ( $INSTALLING ? 
+           "${InstLibDirGhc}/unlit" : 
+	   "${TopPwd}/ghc/utils/unlit/unlit" );
+# but this is re-set to "cat" (after options) if -cpp not seen
+$HsCpp = ( $INSTALLING ? 
+	   "${InstLibDirGhc}/hscpp" : 
+	   "${TopPwd}/ghc/utils/hscpp/hscpp" );
+$HsP   = ( $INSTALLING ? 
+	   "${InstLibDirGhc}/hsp" : 
+	   "${TopPwd}/ghc/compiler/hsp" );
+$HsTagsHelp = 
+	 ( $INSTALLING ? 
+	   "${InstLibDirGhc}/hstags-help" : 
+	   "${TopPwd}/ghc/utils/hstags/hstags-help" );
 
 $Verbose = 0;
 $Append = '>';
@@ -57,7 +47,7 @@ while ($ARGV[0] =~ /^-./) {
     /^--/		&& last;
     /^-v/		&& ($Verbose  =  1, next);
     /^-a$/		&& ($Append   = '>>', next);
-    /^-fglasgow-ext/	&& ($HsP_opts .= ' -N', next);
+    /^-fglasgow-exts/	&& ($HsP_opts .= ' -N', next);
     /^-optP(.*)/	&& ($Cpp_opts .= " $1", next);
     /^-[UDI]/		&& ($Cpp_opts .= " $_", next);
     /^-cpp/		&& ($DoCpp = 1, next);
@@ -65,13 +55,14 @@ while ($ARGV[0] =~ /^-./) {
     push(@Files, $_);
 }
 
-$ghc_version_info = $(PROJECTVERSION) * 100;
+$ghc_version_info = int(${PROJECTVERSION} * 100);
 $DoHsCpp = ( ! $DoCpp ) ? 'cat'
 			: "$HsCpp -D__HASKELL1__=2 -D__GLASGOW_HASKELL__=$ghc_version_info $Cpp_opts";
 
 # to find Prelude.hi
-$HsP_opts .= ( ( $(INSTALLING) ) ? " -J$InstDataDirGhc/imports"
-				 : " -J$TopPwd/$(CURRENT_DIR)/$(GHC_LIBSRC)/prelude" );
+$HsP_opts .= ( $INSTALLING  ? 
+	       "-J${InstLibDirGhc}/imports" : 
+	       ( '-J' . join(' -J',split(/:/,${HSP_IMPORTS})) ));
 
 open(STDOUT, "$Append TAGS") || die "can't create TAGS";
 
@@ -93,10 +84,10 @@ foreach $f ( @ARGV ) {
     $return_val = $?;
     die "Fatal error $return_val\n" if $return_val != 0;
 
-    $stuff = `ls -l $tmp`;
-    @size = split(/[ \t]+/,$stuff);
-
-    print STDOUT "\f\n$f,",$size[3],"\n";
+    ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
+     $atime,$mtime, $ctime,$blksize,$blocks) = stat("$tmp");
+  
+    print STDOUT "\f\n$f,${size}\n";
     print STDOUT `cat $tmp`;
 }
 
