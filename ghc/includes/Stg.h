@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.50 2002/12/11 15:36:39 simonmar Exp $
+ * $Id: Stg.h,v 1.51 2003/05/23 08:28:48 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -77,9 +77,6 @@
 #else
 #  define LAZY_BLACKHOLING
 #endif
-
-/* ToDo: remove */
-#define COMPILER 1
 
 /* TABLES_NEXT_TO_CODE says whether to assume that info tables are
  * assumed to reside just before the code for a function.

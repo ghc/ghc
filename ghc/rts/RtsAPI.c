@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.43 2003/03/18 10:28:15 simonmar Exp $
+ * $Id: RtsAPI.c,v 1.44 2003/05/23 08:28:48 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -179,7 +179,6 @@ rts_mkFunPtr (HsFunPtr a)
   return p;
 }
 
-#ifdef COMPILER /* GHC has em, Hugs doesn't */
 HaskellObj
 rts_mkBool (HsBool b)
 {
@@ -195,7 +194,6 @@ rts_mkString (char *s)
 {
   return rts_apply((StgClosure *)unpackCString_closure, rts_mkPtr(s));
 }
-#endif /* COMPILER */
 
 HaskellObj
 rts_apply (HaskellObj f, HaskellObj arg)
@@ -366,7 +364,6 @@ rts_getFunPtr (HaskellObj p)
     return (void *)(p->payload[0]);
 }
 
-#ifdef COMPILER /* GHC has em, Hugs doesn't */
 HsBool
 rts_getBool (HaskellObj p)
 {
@@ -378,7 +375,6 @@ rts_getBool (HaskellObj p)
     barf("rts_getBool: not a Bool");
   }
 }
-#endif /* COMPILER */
 
 /* ----------------------------------------------------------------------------
    Evaluating Haskell expressions
