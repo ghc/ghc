@@ -726,10 +726,10 @@ pprDeprecs NoDeprecs = empty
 pprDeprecs deprecs   = ptext SLIT("{-## __D") <+> guts <+> ptext SLIT("##-}")
 		     where
 		       guts = case deprecs of
-				DeprecAll txt  -> ptext txt
+				DeprecAll txt  -> doubleQuotes (ptext txt)
 				DeprecSome env -> pp_deprecs env
 
 pp_deprecs env = vcat (punctuate semi (map pp_deprec (nameEnvElts env)))
 	       where
-		 pp_deprec (name, txt) = pprOcc name <+> ptext txt
+		 pp_deprec (name, txt) = pprOcc name <+> doubleQuotes (ptext txt)
 \end{code}
