@@ -1,6 +1,3 @@
-# -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.47 2003/07/31 17:45:22 ross Exp $
-
 TOP=..
 include $(TOP)/mk/boilerplate.mk
 
@@ -19,7 +16,6 @@ ALL_DIRS = \
 	Data/Array/IO \
 	Data/STRef \
 	Debug \
-	Debug/QuickCheck \
 	Foreign \
 	Foreign/C \
 	Foreign/Marshal \
