@@ -1656,7 +1656,7 @@ opts =
 
 	------- Miscellaneous -----------------------------------------------
   ,  ( "cpp"		, NoArg (writeIORef cpp_flag True) )
-  ,  ( "#include"	, SepArg (add cmdline_hc_includes) )
+  ,  ( "#include"	, HasArg (add cmdline_hc_includes) )
   ,  ( "no-link-chk"    , NoArg (return ()) ) -- ignored for backwards compat
 
 	------- Output Redirection ------------------------------------------
@@ -1835,9 +1835,9 @@ processOneArg (('-':arg):args) = do
 
 findArg :: String -> (String,OptKind)
 findArg arg
-  = case [ (rest,k) | (pat,k) <- opts, 
-		      Just rest <- [my_prefix_match pat arg],
-		      is_prefix k || null rest ] of
+  = case [ (remove_spaces rest, k) | (pat,k) <- opts, 
+				     Just rest <- [my_prefix_match pat arg],
+				     is_prefix k || null rest ] of
 	[] -> throwDyn (UnknownFlag ('-':arg))
 	(one:_) -> one
 
@@ -1971,3 +1971,6 @@ newsuf suf s = remove_suffix s '.' ++ suf
 
 newdir :: String -> String -> String
 newdir dir s = dir ++ '/':drop_longest_prefix s '/'
+
+remove_spaces :: String -> String
+remove_spaces = reverse . dropWhile isSpace . reverse . dropWhile isSpace
