@@ -30,7 +30,7 @@ import CmSummarise	( summarise, ModSummary(..),
 import Module		( ModuleName, moduleName, packageOfModule, 
 			  isModuleInThisPackage, PackageName )
 import CmStaticInfo	( Package(..), PackageConfigInfo )
-import DriverPipeline 	( compile, CompResult(..) )
+import DriverPipeline 	( compile, preprocess, CompResult(..) )
 import HscTypes		( HomeSymbolTable, HomeIfaceTable, 
 			  PersistentCompilerState )
 import HscMain		( initPersistentCompilerState )
@@ -492,9 +492,10 @@ downsweep rootNm
      where
         getSummary :: ModuleName -> IO ModSummary
         getSummary nm
+           | trace ("getSummary: "++ showSDoc (ppr nm)) True
            = do found <- findModule nm
 		case found of
-		   Just (mod, location) -> summarise mod location
+		   Just (mod, location) -> summarise preprocess mod location
 		   Nothing -> panic ("CompManager: can't find module `" ++ 
 					showSDoc (ppr nm) ++ "'")
 

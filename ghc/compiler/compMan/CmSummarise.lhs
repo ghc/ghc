@@ -41,8 +41,8 @@ data ModSummary
 instance Outputable ModSummary where
    ppr ms
       = sep [text "ModSummary {",
-             nest 3 (sep [text "ms_mod =" <+> ppr (ms_mod ms),
-             text "ms_imports=" <+> ppr (ms_imports ms)]),
+             nest 3 (sep [text "ms_mod =" <+> ppr (ms_mod ms) <> comma,
+             text "ms_imports =" <+> ppr (ms_imports ms)]),
              char '}'
             ]
 
@@ -70,13 +70,18 @@ ms_get_imports summ
 
 type Fingerprint = Int
 
-summarise :: Module -> ModuleLocation -> IO ModSummary
-summarise mod location
+-- The first arg is supposed to be DriverPipeline.preprocess.
+-- Passed in here to avoid a hard-to-avoid circular dependency
+-- between CmSummarise and DriverPipeline.
+summarise :: (FilePath -> IO FilePath)
+          -> Module -> ModuleLocation -> IO ModSummary
+summarise preprocess mod location
    | isModuleInThisPackage mod
-   = do let hspp_fn = unJust (ml_hspp_file location) "summarise"
+   = do let hs_fn = unJust (ml_hs_file location) "summarise"
+        hspp_fn <- preprocess hs_fn
         modsrc <- readFile hspp_fn
         let imps = getImports modsrc
-        return (ModSummary mod location (Just imps))
+        return (ModSummary mod location{ml_hspp_file=Just hspp_fn} (Just imps))
    | otherwise
    = return (ModSummary mod location Nothing)
 \end{code}

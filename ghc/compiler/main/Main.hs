@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.19 2000/11/10 14:29:21 simonmar Exp $
+-- $Id: Main.hs,v 1.20 2000/11/13 12:43:20 sewardj Exp $
 --
 -- GHC Driver program
 --
@@ -23,6 +23,7 @@ import DriverMkDepend
 import DriverUtil
 import DriverPhases	( Phase(..) )
 import CmdLineOpts	( HscLang(..), DynFlags(..), v_Static_hsc_opts )
+import Module		( mkModuleName )
 import TmpFiles
 import Finder		( initFinder )
 import CmStaticInfo
@@ -221,11 +222,11 @@ main =
    when (mode == DoMkDependHS) beginMkDependHS
 
 	-- make/interactive require invoking the compilation manager
-   if (mode == DoMake)        then beginMake srcs        else do
-   if (mode == DoInteractive) then beginInteractive srcs else do
+   if (mode == DoMake)        then beginMake pkg_details srcs else do
+   if (mode == DoInteractive) then beginInteractive srcs      else do
 
 	-- for each source file, find which phases to run
-   pipelines <- mapM (genPipeline mode stop_flag) srcs
+   pipelines <- mapM (genPipeline mode stop_flag True) srcs
    let src_pipelines = zip srcs pipelines
 
 	-- sanity checking
@@ -263,12 +264,15 @@ setTopDir args = do
     some -> writeIORef v_TopDir (drop 2 (last some)))
   return others
 
-beginMake [] = throwDyn (UsageError "no input files")
-beginMake (_:_:_) = throwDyn (UsageError "only one module allowed with --make")
-{-
-beginMake [mod] = do
-  state <- cmInit ""{-ToDo:remove-} pkg_details
-  cmLoadModule state (mkModuleName mod)
--}
+beginMake :: PackageConfigInfo -> [String] -> IO ()
+beginMake pkg_details mods
+   | null mods
+   = throwDyn (UsageError "no input files")
+   | not (null (tail mods))
+   = throwDyn (UsageError "only one module allowed with --make")
+   | otherwise
+   = do state <- cmInit pkg_details
+        cmLoadModule state (mkModuleName (head mods))
+        return ()
 
 beginInteractive srcs = panic "`ghc --interactive' unimplemented"

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.18 2000/11/09 12:54:08 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.19 2000/11/13 12:43:20 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -119,6 +119,7 @@ data IntermediateFileType
 genPipeline
    :: GhcMode		-- when to stop
    -> String		-- "stop after" flag (for error messages)
+   -> Bool		-- True => output is persistent
    -> String		-- original filename
    -> IO [ 		-- list of phases to run for this file
 	     (Phase,
@@ -126,7 +127,7 @@ genPipeline
 	      String)   	     -- output file suffix
          ]	
 
-genPipeline todo stop_flag filename
+genPipeline todo stop_flag persistent_output filename
  = do
    split      <- readIORef v_Split_object_files
    mangle     <- readIORef v_Do_asm_mangling
@@ -211,9 +212,10 @@ genPipeline todo stop_flag filename
 	     : annotatePipeline (next_phase:ps) stop
      	  where
      		keep_this_output
-     		     | next_phase == stop = Persistent
-     		     | otherwise =
-     			case next_phase of
+     		     | next_phase == stop 
+                     = if persistent_output then Persistent else Temporary
+     		     | otherwise
+     		     = case next_phase of
      			     Ln -> Persistent
      			     Mangle | keep_raw_s -> Persistent
      			     As     | keep_s     -> Persistent
@@ -723,7 +725,7 @@ doLink o_files = do
 preprocess :: FilePath -> IO FilePath
 preprocess filename =
   ASSERT(haskellish_file filename) 
-  do pipeline <- genPipeline (StopBefore Hsc) ("preprocess") filename
+  do pipeline <- genPipeline (StopBefore Hsc) ("preprocess") False filename
      runPipeline pipeline filename False{-no linking-} False{-no -o flag-}
 
 
@@ -816,7 +818,7 @@ compile summary old_iface hst hit pcs = do
 			Nothing -> panic "compile: no interpreted code"
 
 		-- we're in batch mode: finish the compilation pipeline.
-		_other -> do pipe <- genPipeline (StopBefore Ln) "" output_fn
+		_other -> do pipe <- genPipeline (StopBefore Ln) "" True output_fn
 			     o_file <- runPipeline pipe output_fn False False
 			     return [ DotO o_file ]
 
@@ -857,7 +859,7 @@ dealWithStubs basename maybe_stub_h maybe_stub_c
 			])
 
 			-- compile the _stub.c file w/ gcc
-		pipeline <- genPipeline (StopBefore Ln) "" stub_c
+		pipeline <- genPipeline (StopBefore Ln) "" True stub_c
 		stub_o <- runPipeline pipeline stub_c False{-no linking-} 
 				False{-no -o option-}
 

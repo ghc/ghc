@@ -92,7 +92,9 @@ hscMain
 
 hscMain dflags source_unchanged location maybe_old_iface hst hit pcs
  = do {
-      putStrLn "CHECKING OLD IFACE";
+      putStrLn ("CHECKING OLD IFACE for hs = " ++ show (ml_hs_file location)
+                ++ ", hspp = " ++ show (ml_hspp_file location));
+
       (pcs_ch, errs_found, (recomp_reqd, maybe_checked_iface))
          <- checkOldIface dflags hit hst pcs (unJust (ml_hi_file location) "hscMain")
 			  source_unchanged maybe_old_iface;
