@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.168 2004/07/21 10:07:33 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.169 2004/07/30 08:40:11 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -500,6 +500,9 @@ showThing name (thing, fixity, src_loc)
 -- with "..." for the parts we are less interested in.
 
 showDecl :: (OccName -> Bool) -> IfaceDecl -> SDoc
+showDecl want_name (IfaceForeign {ifName = tc})
+  = ppr tc <+> ptext SLIT("is a foreign type")
+
 showDecl want_name (IfaceId {ifName = var, ifType = ty})
   = ppr var <+> dcolon <+> ppr ty 
 
