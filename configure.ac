@@ -622,7 +622,9 @@ AC_ARG_WITH(gcc,
          withval=`cygpath -w ${withval} | sed -e 's@\\\\@/@g' `
        fi
  fi;
- CC="$withval"],
+ CC="$withval"
+ export CC
+ ],
 [WhatGccIsCalled="gcc"]
 )
 AC_SUBST(WhatGccIsCalled)
