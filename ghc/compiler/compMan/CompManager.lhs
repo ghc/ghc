@@ -6,14 +6,27 @@
 \begin{code}
 module CompManager ( 
     cmInit, 	  -- :: GhciMode -> IO CmState
+
     cmLoadModule, -- :: CmState -> FilePath -> IO (CmState, [String])
+
     cmUnload,	  -- :: CmState -> IO CmState
+
     cmTypeOfName, -- :: CmState -> Name -> IO (Maybe String)
 
     cmSetContext, -- :: CmState -> String -> IO CmState
+
     cmGetContext, -- :: CmState -> IO String
+
 #ifdef GHCI
     cmRunStmt,	  --  :: CmState -> DynFlags -> String -> IO (CmState, [Name])
+
+    cmTypeOfExpr, --  :: CmState -> DynFlags -> String
+		  --  -> IO (CmState, Maybe String)
+
+    cmTypeOfName, -- :: CmState -> Name -> IO (Maybe String)
+
+    cmCompileExpr,-- :: CmState -> DynFlags -> String 
+		  -- -> IO (CmState, Maybe HValue)#endif
 #endif
     CmState, emptyCmState  -- abstract
   )
@@ -165,19 +178,24 @@ moduleNameToModule mn
 -- cmRunStmt:  Run a statement/expr.
 
 #ifdef GHCI
-cmRunStmt :: CmState -> DynFlags -> String -> IO (CmState, [Name])
+cmRunStmt :: CmState -> DynFlags -> String
+	-> IO (CmState,			-- new state
+	       [Name])			-- names bound by this evaluation
 cmRunStmt cmstate dflags expr
    = do 
-	let icontext = ic cmstate
-	    InteractiveContext { 
+	let InteractiveContext { 
 	       	ic_rn_env = rn_env, 
 	       	ic_type_env = type_env,
 	       	ic_module   = this_mod } = icontext
 
-        (new_pcs, maybe_stuff) <- hscStmt dflags hst hit pcs icontext expr
+        (new_pcs, maybe_stuff) 
+	    <- hscStmt dflags hst hit pcs icontext expr
+
         case maybe_stuff of
 	   Nothing -> return (cmstate{ pcs=new_pcs }, [])
 	   Just (ids, bcos) -> do
+
+		-- update the interactive context
 	        let 
 		    new_rn_env   = extendLocalRdrEnv rn_env (map idName ids)
 
@@ -190,20 +208,40 @@ cmRunStmt cmstate dflags expr
 		    new_ic = icontext { ic_rn_env   = new_rn_env, 
 			  	  	ic_type_env = new_type_env }
 
+		-- link it
 		hval <- linkExpr pls bcos
-		hvals <- unsafeCoerce# hval :: IO [HValue]
+
+		-- run it!
+		let thing_to_run = unsafeCoerce# hval :: IO [HValue]
+		hvals <- thing_to_run
+
+		-- get the newly bound things, and bind them
 		let names = map idName ids
 		new_pls <- updateClosureEnv pls (zip names hvals)
-	        return (cmstate{ pcs=new_pcs, pls=new_pls, ic=new_ic }, names)
 
-   -- ToDo: check that the module we passed in is sane/exists?
+	        return (cmstate{ pcs=new_pcs, pls=new_pls, ic=new_ic }, names)
    where
-       CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls } = cmstate
+       CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls, ic=icontext } = cmstate
 #endif
 
 -----------------------------------------------------------------------------
--- cmTypeOf: returns a string representing the type of a name.
+-- cmTypeOfExpr: returns a string representing the type of an expression
 
+#ifdef GHCI
+cmTypeOfExpr :: CmState -> DynFlags -> String -> IO (CmState, Maybe String)
+cmTypeOfExpr cmstate dflags expr
+  = do (new_cmstate, names)
+	   <- cmRunStmt cmstate dflags ("let __cmTypeOfExpr=" ++ expr)
+       case names of
+	 [name] -> do maybe_tystr <- cmTypeOfName new_cmstate name
+		      return (new_cmstate, maybe_tystr)
+	 _other -> pprPanic "cmTypeOfExpr" (ppr names)
+#endif
+
+-----------------------------------------------------------------------------
+-- cmTypeOfName: returns a string representing the type of a name.
+
+#ifdef GHCI
 cmTypeOfName :: CmState -> Name -> IO (Maybe String)
 cmTypeOfName CmState{ hit=hit, pcs=pcs, ic=ic } name
  = case lookupNameEnv (ic_type_env ic) name of
@@ -219,6 +257,42 @@ cmTypeOfName CmState{ hit=hit, pcs=pcs, ic=ic } name
 	   in return (Just str)
 
 	_ -> panic "cmTypeOfName"
+#endif
+
+-----------------------------------------------------------------------------
+-- cmCompileExpr: compile an expression and deliver an HValue
+
+#ifdef GHCI
+cmCompileExpr :: CmState -> DynFlags -> String -> IO (CmState, Maybe HValue)
+cmCompileExpr cmstate dflags expr
+   = do 
+	let InteractiveContext { 
+	       	ic_rn_env = rn_env, 
+	       	ic_type_env = type_env,
+	       	ic_module   = this_mod } = icontext
+
+        (new_pcs, maybe_stuff) 
+	    <- hscStmt dflags hst hit pcs icontext 
+		  ("let __cmCompileExpr="++expr)
+
+        case maybe_stuff of
+	   Nothing -> return (cmstate{ pcs=new_pcs }, Nothing)
+	   Just (ids, bcos) -> do
+
+		-- link it
+		hval <- linkExpr pls bcos
+
+		-- run it!
+		let thing_to_run = unsafeCoerce# hval :: IO [HValue]
+		hvals <- thing_to_run
+
+		case (ids,hvals) of
+		  ([id],[hv]) -> return (cmstate{ pcs=new_pcs }, Just hv)
+		  _ -> panic "cmCompileExpr"
+
+   where
+       CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls, ic=icontext } = cmstate
+#endif
 
 -----------------------------------------------------------------------------
 -- cmInfo: return "info" about an expression.  The info might be:

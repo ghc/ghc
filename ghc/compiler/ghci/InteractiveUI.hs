@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.52 2001/02/26 15:06:58 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.53 2001/02/27 15:26:04 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -60,7 +60,7 @@ builtin_commands :: [(String, String -> GHCi Bool)]
 builtin_commands = [
   ("add",	keepGoing addModule),
   ("cd",    	keepGoing changeDirectory),
---  ("def",	keepGoing defineMacro),
+  ("def",	keepGoing defineMacro),
   ("help",	keepGoing help),
   ("?",		keepGoing help),
   ("load",	keepGoing loadModule),
@@ -124,20 +124,18 @@ interactiveUI cmstate mod cmdline_libs = do
 
    dflags <- getDynFlags
 
-{-
-   (cmstate, _) <- cmRunStmt cmstate dflags False prel 
-		  	"PrelHandle.hFlush PrelHandle.stdout"
-   case maybe_stuff of
-	Nothing -> return ()
-	Just (hv,_,_) -> writeIORef flush_stdout hv
-   
-   (cmstate, _) <- cmGetExpr cmstate dflags False prel 
-		  		"PrelHandle.hFlush PrelHandle.stdout"
-   case maybe_stuff of
-	Nothing -> return ()
-	Just (hv,_,_) -> writeIORef flush_stderr hv
--}
-   
+   (cmstate, maybe_hval) 
+	<- cmCompileExpr cmstate dflags "IO.hFlush PrelHandle.stderr"
+   case maybe_hval of
+	Just hval -> writeIORef flush_stderr (unsafeCoerce# hval :: IO ())
+	_ -> panic "interactiveUI:stderr"
+
+   (cmstate, maybe_hval) 
+	<- cmCompileExpr cmstate dflags "IO.hFlush PrelHandle.stdout"
+   case maybe_hval of
+	Just hval -> writeIORef flush_stdout (unsafeCoerce# hval :: IO ())
+	_ -> panic "interactiveUI:stdout"
+
    (unGHCi runGHCi) GHCiState{ target = mod,
 			       cmstate = cmstate,
 			       options = [ShowTiming] }
@@ -278,11 +276,11 @@ showTypeOfName cmstate n
 
 flushEverything :: GHCi ()
 flushEverything
-   = io $ {-do flush_so <- readIORef flush_stdout
-     	     cmRunExpr flush_so
+   = io $ do flush_so <- readIORef flush_stdout
+     	     flush_so
      	     flush_se <- readIORef flush_stdout
-     	     cmRunExpr flush_se
-	  -} (return ())
+     	     flush_se
+             return ()
 
 specialCommand :: String -> GHCi Bool
 specialCommand ('!':str) = shellEscape (dropWhile isSpace str)
@@ -322,7 +320,6 @@ setContext str
 changeDirectory :: String -> GHCi ()
 changeDirectory d = io (setCurrentDirectory d)
 
-{-
 defineMacro :: String -> GHCi ()
 defineMacro s = do
   let (macro_name, definition) = break isSpace s
@@ -332,7 +329,7 @@ defineMacro s = do
 	else do
   if (macro_name `elem` map fst cmds) 
 	then throwDyn (OtherError 
-		("command `" ++ macro_name ++ "' already defined"))
+		("command `" ++ macro_name ++ "' is already defined"))
 	else do
 
   -- give the expression a type signature, so we can be sure we're getting
@@ -342,15 +339,17 @@ defineMacro s = do
   -- compile the expression
   st <- getGHCiState
   dflags <- io (getDynFlags)
-  (new_cmstate, maybe_stuff) <- 
-      	 io (cmGetExpr (cmstate st) dflags new_expr)
+  (new_cmstate, maybe_hv) <- io (cmCompileExpr (cmstate st) dflags new_expr)
   setGHCiState st{cmstate = new_cmstate}
-  case maybe_stuff of
-     Nothing -> return ()
-     Just (hv, unqual, ty) 
-	-> io (writeIORef commands 
-		 ((macro_name, keepGoing (runMacro hv)) : cmds))
--}
+  case maybe_hv of
+	Nothing -> return ()
+	Just hv -> 
+	  do funs <- io (unsafeCoerce# hv :: IO [HValue])
+	     case funs of
+		[fun] -> io (writeIORef commands 	
+		 		((macro_name, keepGoing (runMacro fun))
+				 : cmds))
+		_ -> throwDyn (OtherError "defineMacro: bizarre")
 
 runMacro :: HValue{-String -> IO String-} -> String -> GHCi ()
 runMacro fun s = do
@@ -414,15 +413,11 @@ typeOfExpr :: String -> GHCi ()
 typeOfExpr str 
   = do st <- getGHCiState
        dflags <- io (getDynFlags)
-       (new_cmstate, names) 
-	  <- io (cmRunStmt (cmstate st) dflags ("let it=" ++ str))
+       (new_cmstate, maybe_tystr) <- io (cmTypeOfExpr (cmstate st) dflags str)
        setGHCiState st{cmstate = new_cmstate}
-       case names of
-	 [name] -> do maybe_tystr <- io (cmTypeOfName new_cmstate name)
-		      case maybe_tystr of
-			Nothing    -> return ()
-			Just tystr -> io (putStrLn (":: " ++  tystr))
-	 _other -> pprPanic "typeOfExpr" (ppr names)
+       case maybe_tystr of
+	  Nothing    -> return ()
+	  Just tystr -> io (putStrLn tystr)
 
 quit :: String -> GHCi Bool
 quit _ = return True
@@ -540,8 +535,8 @@ data GHCiOption
 	| RevertCAFs		-- revert CAFs after every evaluation
 	deriving Eq
 
-GLOBAL_VAR(flush_stdout, error "no flush_stdout", HValue)
-GLOBAL_VAR(flush_stderr, error "no flush_stdout", HValue)
+GLOBAL_VAR(flush_stdout, error "no flush_stdout", IO ())
+GLOBAL_VAR(flush_stderr, error "no flush_stdout", IO ())
 
 newtype GHCi a = GHCi { unGHCi :: GHCiState -> IO (GHCiState, a) }
 
