@@ -546,8 +546,8 @@ data Exception
 	-- argument of 'ErrorCall' is the string passed to 'error' when it was
 	-- called.
   | ExitException	ExitCode
-	-- ^The 'ExitException' exception is thrown by 'System.exitWith' (and
-	-- 'System.exitFailure').  The 'ExitCode' argument is the value passed 
+	-- ^The 'ExitException' exception is thrown by 'System.Exit.exitWith' (and
+	-- 'System.Exit.exitFailure').  The 'ExitCode' argument is the value passed 
 	-- to 'System.exitWith'.  An unhandled 'ExitException' exception in the
 	-- main thread will cause the program to be terminated with the given 
 	-- exit code.

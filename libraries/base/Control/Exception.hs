@@ -165,7 +165,7 @@ INSTANCE_TYPEABLE0(AsyncException,asyncExceptionTc,"AsyncException")
 --
 -- Also note that The "Prelude" also exports a
 -- function called 'catch' which has the same type as
--- 'Exception.catch', the difference being that the
+-- 'Control.Exception.catch', the difference being that the
 -- "Prelude" version only catches the IO and user
 -- families of exceptions (as required by Haskell 98).  We recommend
 -- either hiding the "Prelude" version of
@@ -421,7 +421,7 @@ The primary source of asynchronous exceptions, however, is
 
 >  throwTo :: ThreadId -> Exception -> IO ()
 
-'throwTo' (also 'throwDynTo' and 'Concurrent.killThread') allows one
+'throwTo' (also 'throwDynTo' and 'Control.Concurrent.killThread') allows one
 running thread to raise an arbitrary exception in another thread.  The
 exception is therefore asynchronous with respect to the target thread,
 which could be doing anything at the time it receives the exception.
