@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.124 2002/02/15 07:50:36 sof Exp $
+ * $Id: Schedule.c,v 1.125 2002/02/15 14:49:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -3072,51 +3072,30 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
     StgAP_UPD * ap;
 
     /* If we find a CATCH_FRAME, and we've got an exception to raise,
-     * then build PAP(handler,exception,realworld#), and leave it on
-     * top of the stack ready to enter.
+     * then build the THUNK raise(exception), and leave it on
+     * top of the CATCH_FRAME ready to enter.
      */
     if (get_itbl(su)->type == CATCH_FRAME && exception != NULL) {
-      StgCatchFrame *cf = (StgCatchFrame *)su;
+      StgClosure *raise;
+
       /* we've got an exception to raise, so let's pass it to the
        * handler in this frame.
        */
-      ap = (StgAP_UPD *)allocate(sizeofW(StgPAP) + 2);
-      TICK_ALLOC_UPD_PAP(3,0);
-      SET_HDR(ap,&stg_PAP_info,cf->header.prof.ccs);
-	      
-      ap->n_args = 2;
-      ap->fun = cf->handler;	/* :: Exception -> IO a */
-      ap->payload[0] = exception;
-      ap->payload[1] = ARG_TAG(0); /* realworld token */
+      raise = (StgClosure *)allocate(sizeofW(StgClosure)+1);
+      TICK_ALLOC_SE_THK(1,0);
+      SET_HDR(raise,&stg_raise_info,cf->header.prof.ccs);
+      raise->payload[0] = exception;
 
-      /* throw away the stack from Sp up to and including the
-       * CATCH_FRAME.
+      /* throw away the stack from Sp up to the CATCH_FRAME.
        */
-      sp = (P_)su + sizeofW(StgCatchFrame) - 1; 
-      tso->su = cf->link;
+      sp = (P_)su - 1;
 
-      /* Restore the blocked/unblocked state for asynchronous exceptions
-       * at the CATCH_FRAME.  
-       *
-       * If exceptions were unblocked at the catch, arrange that they
-       * are unblocked again after executing the handler by pushing an
-       * unblockAsyncExceptions_ret stack frame.
-       */
-      if (!cf->exceptions_blocked) {
-	*(sp--) = (W_)&stg_unblockAsyncExceptionszh_ret_info;
-      }
-      
-      /* Ensure that async exceptions are blocked when running the handler.
-       */
-      if (tso->blocked_exceptions == NULL) {
-	tso->blocked_exceptions = END_TSO_QUEUE;
-      }
-      
-      /* Put the newly-built PAP on top of the stack, ready to execute
+      /* Put the newly-built THUNK on top of the stack, ready to execute
        * when the thread restarts.
        */
-      sp[0] = (W_)ap;
+      sp[0] = (W_)raise;
       tso->sp = sp;
+      tso->su = su;
       tso->what_next = ThreadEnterGHC;
       IF_DEBUG(sanity, checkTSO(tso));
       return;
