@@ -11,17 +11,17 @@ module Monad
 	  mzero     -- :: (MonadPlus m) => m a
 	, mplus     -- :: (MonadPlus m) => m a -> m a -> m a
 	)
-    , join          -- :: (Monad m) => m (m a) -> m a
+    , join          -- :: (Monad m) => m (m a) -> m a
     , guard	    -- :: (Monad m) => Bool -> m ()
-    , when          -- :: (Monad m) => Bool -> m () -> m ()
-    , unless        -- :: (Monad m) => Bool -> m () -> m ()
-    , ap	    -- :: (Monad m) => (m (a -> b)) -> (m a) -> m b
+    , when          -- :: (Monad m) => Bool -> m () -> m ()
+    , unless        -- :: (Monad m) => Bool -> m () -> m ()
+    , ap	    -- :: (Monad m) => (m (a -> b)) -> (m a) -> m b
     , msum	    -- :: (MonadPlus m) => [m a] -> m a
     , filterM	    -- :: (Monad m) => (a -> m Bool) -> [m a] -> m [a]
-    , mapAndUnzipM  -- :: (Monad m) => (a -> m (b,c)) -> [a] -> m ([b], [c])
-    , zipWithM      -- :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
+    , mapAndUnzipM  -- :: (Monad m) => (a -> m (b,c)) -> [a] -> m ([b], [c])
+    , zipWithM      -- :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
     , zipWithM_     -- :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m ()
-    , foldM	    -- :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a 
+    , foldM	    -- :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a 
     
     , liftM	    -- :: (Monad m) => (a -> b) -> (m a -> m b)
     , liftM2	    -- :: (Monad m) => (a -> b -> c) -> (m a -> m b -> m c)
