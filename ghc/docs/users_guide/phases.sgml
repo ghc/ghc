@@ -358,12 +358,7 @@ strmod = "\
             be supplying its definition of <function>main()</function>
             at link-time, you will have to. To signal that to the
             driver script when linking, use
-            <option>-no-hs-main</option>. In fact, this only has an
-            effect when using <option>-dynamic</option> (i.e. when the
-            RTS is in a DLL); the rest of the time, static linking
-            allows the RTS's <function>main()</function> to be
-            overridden in the same way as any other library
-            routine.</para>
+            <option>-no-hs-main</option>.</para>
 
 	    <para>Notice that since the command-line passed to the
             linker is rather involved, you probably want to use
