@@ -12,8 +12,10 @@ Interface files
 * The double semicolon at the end of an interface-file signature is so that
   the lexer can run through the pragmas very fast when -O isn't being used.
 
-* In export lists, T!(A,B) says that constructors A and B are exported, 
-  but not the type T.  Similarly for classes.
+* In export lists, T|(A,B) says that constructors A and B are exported, 
+  but not the type T.  Similarly for classes.  
+  We can't say T(T,A,B) and T(A,B) to export or not-export T respectively,
+  because the type T might have a constructor T.
 
 ===========================================================================
 
