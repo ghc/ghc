@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.7 1998/06/11 18:43:55 sof Exp $
+# 	$Id: opts.mk,v 1.8 1998/10/07 14:18:31 simonm Exp $
 #
 #################################################################################
 
@@ -51,14 +51,7 @@
 # These flags make flex 8-bit
 SRC_FLEX_OPTS	+= -8
 
-#
-# Make sure we install things with group 'grasp' at Glasgow
-# At Glasgow, we would rather the installed binaries were stripped.
-# (Delete if you feel otherwise.)
 SRC_INSTALL_BIN_OPTS	+= -s
-ifeq ($(AT_GLASGOW),1)
-SRC_INSTALL_OPTS	+= -g grasp
-endif
 
 # lint gets all CPP's flags too
 SRC_LINT_OPTS		+= -axz -DLINT $(SRC_CPP_OPTS)
