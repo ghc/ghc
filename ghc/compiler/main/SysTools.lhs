@@ -860,11 +860,7 @@ getProcessID = Posix.getProcessID
 #endif
 
 quote :: String -> String
-#if defined(mingw32_HOST_OS)
 quote "" = ""
 quote s  = "\"" ++ s ++ "\""
-#else
-quote s = s
-#endif
 
 \end{code}
