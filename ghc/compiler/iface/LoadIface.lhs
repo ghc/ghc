@@ -8,7 +8,7 @@ module LoadIface (
 	loadHomeInterface, loadInterface,
 	loadSrcInterface, loadOrphanModules,
 	readIface,	-- Used when reading the module's old interface
-	predInstGates, ifaceInstGates, ifaceStats,
+	predInstGates, ifaceInstGates, ifaceStats, discardDeclPrags,
 	initExternalPackageState
    ) where
 
@@ -227,9 +227,10 @@ loadInterface doc_str mod_name from
 	--     If we do loadExport first the wrong info gets into the cache (unless we
 	-- 	explicitly tag each export which seems a bit of a bore)
 
-	{ new_eps_decls <- loadDecls mod (eps_decls eps) (mi_decls iface)
-	; new_eps_insts <- loadInsts mod (eps_insts eps) (mi_insts iface)
-	; new_eps_rules <- loadRules mod (eps_rules eps) (mi_rules iface)
+	{ ignore_prags <- doptM Opt_IgnoreInterfacePragmas
+	; new_eps_decls <- loadDecls ignore_prags mod (eps_decls eps) (mi_decls iface)
+	; new_eps_rules <- loadRules ignore_prags mod (eps_rules eps) (mi_rules iface)
+	; new_eps_insts <- loadInsts              mod (eps_insts eps) (mi_insts iface)
 
 	; let {	final_iface = iface {	mi_decls = panic "No mi_decls in PIT",
 					mi_insts = panic "No mi_insts in PIT",
@@ -252,17 +253,17 @@ loadInterface doc_str mod_name from
 -- the declaration itself, will find the fully-glorious Name
 -----------------------------------------------------
 
-loadDecls :: Module -> DeclPool
+loadDecls :: Bool	-- Don't load pragmas into the decl pool
+	  -> Module -> DeclPool
 	  -> [(Version, IfaceDecl)]
 	  -> IfM lcl DeclPool
-loadDecls mod (Pool decls_map n_in n_out) decls
-  = do	{ ignore_prags <- doptM Opt_IgnoreInterfacePragmas
-	; decls_map' <- foldlM (loadDecl ignore_prags mod) decls_map decls
+loadDecls ignore_prags mod (Pool decls_map n_in n_out) decls
+  = do	{ decls_map' <- foldlM (loadDecl ignore_prags mod) decls_map decls
 	; returnM (Pool decls_map' (n_in + length decls) n_out) }
 
 loadDecl ignore_prags mod decls_map (_version, decl)
   = do 	{ main_name <- mk_new_bndr Nothing (ifName decl)
-	; let decl' | ignore_prags = zapIdInfo decl
+	; let decl' | ignore_prags = discardDeclPrags decl
 		    | otherwise    = decl
 
 	-- Populate the name cache with final versions of all the subordinate names
@@ -280,9 +281,10 @@ loadDecl ignore_prags mod decls_map (_version, decl)
     mk_new_bndr mb_parent occ = newGlobalBinder mod occ mb_parent loc
     loc = importedSrcLoc (moduleUserString mod)
 
-zapIdInfo decl@(IfaceId {ifIdInfo = HasInfo _}) = decl { ifIdInfo = DiscardedInfo }
-zapIdInfo decl 		    			= decl
-	-- Don't alter "NoInfo", just "HasInfo"
+discardDeclPrags :: IfaceDecl -> IfaceDecl
+discardDeclPrags decl@(IfaceId {ifIdInfo = HasInfo _}) = decl { ifIdInfo = NoInfo }
+discardDeclPrags decl 		    	  	       = decl
+
 
 -----------------
 ifaceDeclSubBndrs :: IfaceDecl -> [OccName]
@@ -359,14 +361,13 @@ loadInstDecl mod pool decl@(IfaceInst {ifInstHead = inst_ty})
 --	Loading Rules
 -----------------------------------------------------
 
-loadRules :: Module -> RulePool -> [IfaceRule] -> IfL RulePool
-loadRules mod pool@(Pool rule_pool n_in n_out) rules
-  = do	{ ignore_prags <- doptM Opt_IgnoreInterfacePragmas
-	; if ignore_prags then 
-		 returnM pool
-	  else do
-	{ new_pool <- foldlM (loadRule (moduleName mod)) rule_pool rules
-	; returnM (Pool new_pool (n_in + length rules) n_out) } }
+loadRules :: Bool	-- Don't load pragmas into the decl pool
+	  -> Module -> RulePool -> [IfaceRule] -> IfL RulePool
+loadRules ignore_prags mod pool@(Pool rule_pool n_in n_out) rules
+  | ignore_prags = returnM pool
+  | otherwise
+  = do	{ new_pool <- foldlM (loadRule (moduleName mod)) rule_pool rules
+	; returnM (Pool new_pool (n_in + length rules) n_out) }
 
 loadRule :: ModuleName -> RulePoolContents -> IfaceRule -> IfL RulePoolContents
 -- "Gate" the rule simply by a crude notion of the free vars of

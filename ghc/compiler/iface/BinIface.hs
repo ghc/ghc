@@ -795,7 +795,6 @@ instance Binary IfaceIdInfo where
     put_ bh (HasInfo i) = do
 	    putByte bh 1
 	    lazyPut bh i
-    put_ bh DiscardedInfo = panic "BinIface:DiscardedInfo"
 
     get bh = do
 	    h <- getByte bh

@@ -12,7 +12,7 @@ module TcIface (
 #include "HsVersions.h"
 
 import IfaceSyn
-import LoadIface	( loadHomeInterface, predInstGates )
+import LoadIface	( loadHomeInterface, predInstGates, discardDeclPrags )
 import IfaceEnv		( lookupIfaceTop, newGlobalBinder, lookupOrig,
 			  extendIfaceIdEnv, extendIfaceTyVarEnv, newIPName,
 			  tcIfaceTyVar, tcIfaceTyCon, tcIfaceClass, tcIfaceExtId,
@@ -246,11 +246,23 @@ and even if they were, the type decls might be mutually recursive.
 typecheckIface :: HscEnv
 	       -> ModIface 	-- Get the decls from here
 	       -> IO ModDetails
-typecheckIface hsc_env iface@(ModIface { mi_module = mod, mi_decls = ver_decls,
-				         mi_rules = rules, mi_insts = dfuns })
+typecheckIface hsc_env iface
   = initIfaceTc hsc_env iface $ \ tc_env_var -> do
-	{ 	-- Typecheck the decls
-	  names <- mappM (lookupOrig (moduleName mod) . ifName) decls
+	{ 	-- Get the right set of decls and rules.  If we are compiling without -O
+		-- we discard pragmas before typechecking, so that we don't "see"
+		-- information that we shouldn't.  From a versioning point of view
+		-- It's not actually *wrong* to do so, but in fact GHCi is unable 
+		-- to handle unboxed tuples, so it must not see unfoldings.
+	  ignore_prags <- doptM Opt_IgnoreInterfacePragmas
+	; let { decls | ignore_prags = map (discardDeclPrags . snd) (mi_decls iface)
+		      | otherwise    = map snd (mi_decls iface)
+	      ; rules | ignore_prags = []
+		      | otherwise    = mi_rules iface
+	      ; dfuns    = mi_insts iface
+	      ; mod_name = moduleName (mi_module iface)
+	  }
+		-- Typecheck the decls
+	; names <- mappM (lookupOrig mod_name . ifName) decls
 	; ty_things <- fixM (\ rec_ty_things -> do
 		{ writeMutVar tc_env_var (mkNameEnv (names `zipLazy` rec_ty_things))
 			-- This only makes available the "main" things,
@@ -266,14 +278,12 @@ typecheckIface hsc_env iface@(ModIface { mi_module = mod, mi_decls = ver_decls,
 	; writeMutVar tc_env_var type_env
 
 		-- Now do those rules and instances
-	; dfuns <- mapM tcIfaceInst (mi_insts iface)
-	; rules <- mapM tcIfaceRule (mi_rules iface)
+	; dfuns <- mapM tcIfaceInst dfuns
+	; rules <- mapM tcIfaceRule rules
 
 		-- Finished
 	; return (ModDetails { md_types = type_env, md_insts = dfuns, md_rules = rules }) 
     }
-  where
-    decls = map snd ver_decls
 \end{code}
 
 
@@ -842,10 +852,9 @@ do_one mod (IfaceRec pairs) thing_inside
 %************************************************************************
 
 \begin{code}
-tcIdInfo name ty NoInfo        = return vanillaIdInfo
-tcIdInfo name ty DiscardedInfo = return vanillaIdInfo
-tcIdInfo name ty (HasInfo iface_info)
-  = foldlM tcPrag init_info iface_info
+tcIdInfo :: Name -> Type -> IfaceIdInfo -> IfL IdInfo
+tcIdInfo name ty NoInfo		= return vanillaIdInfo
+tcIdInfo name ty (HasInfo info) = foldlM tcPrag init_info info
   where
     -- Set the CgInfo to something sensible but uninformative before
     -- we start; default assumption is that it has CAFs

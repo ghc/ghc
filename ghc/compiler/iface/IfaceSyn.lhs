@@ -169,24 +169,16 @@ data IfaceRule
 data IfaceIdInfo
   = NoInfo			-- When writing interface file without -O
   | HasInfo [IfaceInfoItem]	-- Has info, and here it is
-  | DiscardedInfo		-- HasInfo in the .hi file, but discarded 
-				-- when it was read in
--- Here's why we need this NoInfo/DiscardedInfo stuff
+
+-- Here's a tricky case:
 --   * Compile with -O module A, and B which imports A.f
 --   * Change function f in A, and recompile without -O
---   * If we read in A.hi and discard IdInfo, the 
---	new (empty) IdInfo for f looks like the 
---	old (discarded) IdInfo for f
---	=> no new version # for f
---   * But that might mean that we fail to recompile B, when 
---	actually we should
---
---   * We also want to ensure that if A.hi was *already* compiled 
---     without -O we *don't* then recompile B
---
--- When we discard IdInfo on *reading* we make it into DiscardedInfo
--- On *writing* we make it NoInfo
--- DiscardedInfo is never written into a file
+--   * When we read in old A.hi we read in its IdInfo (as a thunk)
+--	(In earlier GHCs we used to drop IdInfo immediately on reading,
+--	 but we do not do that now.  Instead it's discarded when the
+--	 ModIface is read into the various decl pools.)
+--   * The version comparsion sees that new (=NoInfo) differs from old (=HasInfo *)
+--	and so gives a new version.
 
 data IfaceInfoItem
   = HsArity	 Arity
@@ -397,9 +389,8 @@ instance Outputable IfaceConAlt where
 
 ------------------
 instance Outputable IfaceIdInfo where
-   ppr NoInfo = empty
-   ppr DiscardedInfo = ptext SLIT("<discarded>")
-   ppr (HasInfo is)   = ptext SLIT("{-") <+> fsep (map ppr_hs_info is) <+> ptext SLIT("-}")
+   ppr NoInfo       = empty
+   ppr (HasInfo is) = ptext SLIT("{-") <+> fsep (map ppr_hs_info is) <+> ptext SLIT("-}")
 
 ppr_hs_info (HsUnfold prag unf) = sep [ptext SLIT("Unfolding: ") <> ppr prag,
 				       parens (pprIfaceExpr noParens unf)]
@@ -806,7 +797,6 @@ eq_cls_sig env (IfaceClassOp n1 dm1 ty1) (IfaceClassOp n2 dm2 ty2)
 \begin{code}
 -----------------
 eqIfIdInfo NoInfo	 NoInfo	       = Equal
-eqIfIdInfo DiscardedInfo DiscardedInfo = Equal	-- Should not happen?
 eqIfIdInfo (HasInfo is1) (HasInfo is2) = eqListBy eq_item is1 is2
 eqIfIdInfo i1 i2 = NotEqual
 
