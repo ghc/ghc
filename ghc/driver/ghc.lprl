@@ -2784,7 +2784,7 @@ arg: while($_ = $Args[0]) {
 			    push(@SysLibrary, "-lHS${syslib}_cbits")
 			      unless $syslib eq 'contrib'; #HACK! it has no cbits
 
-			    if ( $syslib eq 'posiz') {
+			    if ( $syslib eq 'posix') {
 				$syslib='ghc';
 				goto again;
 			    }
