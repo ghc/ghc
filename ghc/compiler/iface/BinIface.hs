@@ -8,6 +8,7 @@
 module BinIface ( writeBinIface, readBinIface, v_IgnoreHiWay ) where
 
 #include "HsVersions.h"
+#include "MachDeps.h"
 
 import HscTypes
 import BasicTypes
@@ -25,11 +26,10 @@ import Binary
 import Util
 
 import DATA_IOREF
+import DATA_WORD	( Word8 )
 import EXCEPTION	( throwDyn )
 import Monad		( when )
 import Outputable
-
-#include "HsVersions.h"
 
 -- ---------------------------------------------------------------------------
 writeBinIface :: FilePath -> ModIface -> IO ()
@@ -111,6 +111,7 @@ instance Binary ModIface where
 	put_ bh (show opt_HiVersion)
 	build_tag <- readIORef v_Build_tag
 	put  bh build_tag
+        put_ bh (WORD_SIZE_IN_BITS :: Word8)
 	put_ bh mod
 	put_ bh is_boot
 	put_ bh mod_vers
@@ -145,6 +146,15 @@ instance Binary ModIface where
 	   throwDyn (ProgramError (
 		"mismatched interface file ways: expected "
 		++ build_tag ++ ", found " ++ check_way))
+
+	check_ws <- get bh
+	let our_ws = WORD_SIZE_IN_BITS :: Word8
+        when (check_ws /= our_ws) $
+	   -- use userError because this will be caught by readIface
+	   -- which will emit an error msg containing the iface module name.
+	   throwDyn (ProgramError (
+		"mismatched word size: expected "
+		++ show our_ws ++ ", found " ++ show check_ws))
 
 	mod_name  <- get bh
 	is_boot   <- get bh
