@@ -73,7 +73,7 @@ import TcTyClsDecls	( tcTyAndClassDecls )
 import RnNames		( rnImports, exportsFromAvail, reportUnusedNames )
 import RnIfaces		( slurpImpDecls, checkVersions, RecompileRequired, outOfDate )
 import RnHiFiles	( readIface, loadOldIface )
-import RnEnv		( lookupSrcName, lookupOccRn,
+import RnEnv		( lookupSrcName, lookupOccRn, plusGlobalRdrEnv,
 			  ubiquitousNames, implicitModuleFVs, implicitStmtFVs, dataTcOccs )
 import RnExpr		( rnStmts, rnExpr )
 import RnNames		( importsFromLocalDecls )
@@ -112,7 +112,7 @@ import HscTypes		( PersistentCompilerState(..), InteractiveContext(..),
 #ifdef GHCI
 import RdrName		( rdrEnvElts )
 import RnHiFiles	( loadInterface )
-import RnEnv		( mkGlobalRdrEnv, plusGlobalRdrEnv )
+import RnEnv		( mkGlobalRdrEnv )
 import HscTypes		( GlobalRdrElt(..), GlobalRdrEnv, ImportReason(..), Provenance(..), 
 			  isLocalGRE )
 #endif
@@ -600,7 +600,10 @@ tcRnSrcDecls ds
 	   Just (splice_expr, rest_ds) -> do {
 
 	setGblEnv tcg_env $ do {
-		
+
+#ifndef GHCI
+	failWithTc (text "Can't do a top-level splice; need a bootstrapped compiler")
+#else
 	-- Rename the splice expression, and get its supporting decls
 	(rn_splice_expr, fvs) <- initRn SourceMode (rnExpr splice_expr) ;
 	tcg_env <- importSupportingDecls fvs ;
@@ -613,7 +616,9 @@ tcRnSrcDecls ds
 	(tcg_env, src_fvs2) <- tcRnSrcDecls (spliced_decls ++ rest_ds) ;
 
 	return (tcg_env, src_fvs1 `plusFV` src_fvs2)
-    }}}}
+    }
+#endif /* GHCI */
+    }}}
 \end{code}
 
 
