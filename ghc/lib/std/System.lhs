@@ -188,22 +188,21 @@ unpackProgName argv
 --
 -- Suitable for use with Hugs 98
 -----------------------------------------------------------------------------
-import Prelude
-import privileged Prelude ( primGetRawArgs
-			  , primGetEnv
-			  , prelCleanupAfterRunAction
-			  , copy_String_to_cstring
-			  , readIORef
-			  , nh_stderr
-			  , nh_stdout
-			  , nh_stdin 
-			  , nh_exitwith 
-			  , nh_flush
-			  , nh_close
-			  , nh_system
-			  , nh_free
-			  , nh_getPID
-			  )
+import PrimPrel ( primGetRawArgs
+		, primGetEnv
+		, prelCleanupAfterRunAction
+		, copy_String_to_cstring
+		, readIORef
+		, nh_stderr
+		, nh_stdout
+		, nh_stdin 
+		, nh_exitwith 
+		, nh_flush
+		, nh_close
+		, nh_system
+		, nh_free
+		, nh_getPID
+		)
 
 
 data ExitCode = ExitSuccess | ExitFailure Int

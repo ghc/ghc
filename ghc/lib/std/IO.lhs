@@ -87,32 +87,29 @@ module IO (
 
 #ifdef __HUGS__
 import Ix(Ix)
-import Prelude
-import privileged Prelude ( IORef
-			  , unsafePerformIO
-			  , prelCleanupAfterRunAction
-			  , copy_String_to_cstring
-			  , primIntToChar
-			  , primWriteCharOffAddr
-			  , nullAddr
-			  , newIORef
-			  , writeIORef
-			  , readIORef
-			  , nh_close
-			  , nh_errno
-			  , nh_stdin
-			  , nh_stdout
-			  , nh_stderr
-			  , nh_flush
-			  , nh_open
-			  , nh_free
-			  , nh_read
-			  , nh_write
-			  , nh_filesize
-			  , nh_iseof
-			  )
-			
-
+import PrimPrel ( IORef
+		, unsafePerformIO
+		, prelCleanupAfterRunAction
+		, copy_String_to_cstring
+		, primIntToChar
+		, primWriteCharOffAddr
+		, nullAddr
+		, newIORef
+		, writeIORef
+		, readIORef
+		, nh_close
+		, nh_errno
+		, nh_stdin
+		, nh_stdout
+		, nh_stderr
+		, nh_flush
+		, nh_open
+		, nh_free
+		, nh_read
+		, nh_write
+		, nh_filesize
+		, nh_iseof
+		)
 #else
 --import PrelST
 import PrelBase

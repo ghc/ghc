@@ -66,11 +66,10 @@ foreign import "libHS_cbits" "clockTicks" clockTicks :: IO Int
 #else
 
 \begin{code}
-import Prelude
-import privileged Prelude ( nh_getCPUtime
-			  , nh_getCPUprec
-		          , unsafePerformIO
-			  )
+import PrimPrel ( nh_getCPUtime
+		, nh_getCPUprec
+		, unsafePerformIO
+		)
 
 getCPUTime :: IO Integer
 getCPUTime 

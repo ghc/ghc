@@ -45,15 +45,14 @@ import PrelShow
 import PrelArr		-- Most of the hard work is done here
 import PrelBase
 #else
-import Prelude
-import privileged Prelude ( PrimArray
-			  , runST
-		          , primNewArray
-	                  , primWriteArray
-			  , primReadArray
-			  , primUnsafeFreezeArray
-			  , primIndexArray
-			  )
+import PrimPrel ( PrimArray
+		, runST
+		, primNewArray
+	        , primWriteArray
+		, primReadArray
+		, primUnsafeFreezeArray
+		, primIndexArray
+		)
 import Ix
 import List( (\\) )
 #endif

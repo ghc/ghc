@@ -102,6 +102,43 @@ module PrimPrel (
     asTypeOf, error, undefined,
     seq, ($!)
 	-- Now we have the extra (non standard) thing.
+
+	, IORef
+	, PrimArray
+	, copy_String_to_cstring
+	, newIORef
+	, nh_close
+	, nh_errno
+	, nh_exitwith 
+	, nh_filesize
+	, nh_flush
+	, nh_free
+	, nh_getCPUprec
+	, nh_getCPUtime
+	, nh_getPID
+	, nh_iseof
+	, nh_open
+	, nh_read
+	, nh_stderr
+	, nh_stdin
+	, nh_stdout
+	, nh_system
+	, nh_write
+	, nullAddr
+	, prelCleanupAfterRunAction
+	, primGetEnv
+	, primGetRawArgs
+	, primIndexArray
+	, primIntToChar
+	, primNewArray
+	, primReadArray
+	, primUnsafeFreezeArray
+	, primWriteArray
+	, primWriteCharOffAddr
+	, readIORef
+	, runST
+	, unsafePerformIO
+	, writeIORef
     ) where
 
 -- Standard value bindings {Prelude} ----------------------------------------
