@@ -35,9 +35,11 @@ import IdInfo 		( newStrictnessFromOld, newDemand )
 #endif
 import Var		( Var )
 import VarEnv
+import TysWiredIn	( unboxedPairDataCon )
+import TysPrim		( realWorldStatePrimTy )
 import UniqFM		( plusUFM_C, addToUFM_Directly, lookupUFM_Directly,
 			  keysUFM, minusUFM, ufmToList, filterUFM )
-import Type		( isUnLiftedType )
+import Type		( isUnLiftedType, eqType )
 import CoreLint		( showPass, endPass )
 import Util		( mapAndUnzip, mapAccumL, mapAccumR, lengthIs )
 import BasicTypes	( Arity, TopLevelFlag(..), isTopLevel, isNeverActive,
@@ -306,8 +308,30 @@ dmdAnalAlt sigs dmd (con,bndrs,rhs)
   = let 
 	(rhs_ty, rhs')   = dmdAnal sigs dmd rhs
 	(alt_ty, bndrs') = annotateBndrs rhs_ty bndrs
-    in
-    (alt_ty, (con, bndrs', rhs'))
+	final_alt_ty | io_hack_reqd = alt_ty `lubType` topDmdType
+		     | otherwise    = alt_ty
+
+	-- There's a hack here for I/O operations.  Consider
+	-- 	case foo x s of { (# s, r #) -> y }
+	-- Is this strict in 'y'.  Normally yes, but what if 'foo' is an I/O
+	-- operation that simply terminates the program (not in an erroneous way)?
+	-- In that case we should not evaluate y before the call to 'foo'.
+	-- Hackish solution: spot the IO-like situation and add a virtual branch,
+	-- as if we had
+	-- 	case foo x s of 
+	--	   (# s, r #) -> y 
+	--	   other      -> return ()
+	-- So the 'y' isn't necessarily going to be evaluated
+	--
+	-- A more complete example where this shows up is:
+	--	do { let len = <expensive> ;
+	--	   ; when (...) (exitWith ExitSuccess)
+	--	   ; print len }
+
+	io_hack_reqd = con == DataAlt unboxedPairDataCon &&
+		       idType (head bndrs) `eqType` realWorldStatePrimTy
+    in	
+    (final_alt_ty, (con, bndrs', rhs'))
 \end{code}
 
 %************************************************************************
