@@ -945,6 +945,7 @@ getOptionsFromSource file
 	    l <- hGetLine h
 	    case () of
 		() | null l -> look h
+		   | prefixMatch "#" l -> look h
 		   | prefixMatch "{-# LINE" l -> look h
 		   | Just (opts:_) <- matchRegex optionRegex l
 			-> return (words opts)
