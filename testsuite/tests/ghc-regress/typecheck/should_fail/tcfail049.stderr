@@ -1,2 +1,2 @@
 
-tcfail049.hs:3:6: Variable not in scope: `g'
+tcfail049.hs:3:6: Not in scope: `g'

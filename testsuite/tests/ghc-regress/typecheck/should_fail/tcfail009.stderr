@@ -1,7 +1,7 @@
 
 tcfail009.hs:3:16:
     Couldn't match `Int' against `Integer'
-	Expected type: Int
-	Inferred type: Integer
-    In the type signature of the expression: 2 :: Integer
+      Expected type: Int
+      Inferred type: Integer
+    In the expression: 2 :: Integer
     In an arithmetic sequence: [(1 :: Int) .. (2 :: Integer)]

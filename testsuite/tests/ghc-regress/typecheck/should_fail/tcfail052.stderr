@@ -1,2 +1,2 @@
 
-tcfail052.hs:3:15: Type variable not in scope: `c'
+tcfail052.hs:3:15: Not in scope: type variable `c'
