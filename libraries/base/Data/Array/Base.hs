@@ -1071,6 +1071,10 @@ instance MArray (STArray s) e (ST s) where
     {-# INLINE unsafeWrite #-}
     unsafeWrite = ArrST.unsafeWriteSTArray
 
+#ifdef __HUGS__
+INSTANCE_TYPEABLE3(STArray,sTArrayTc,"STArray")
+#endif
+
 -----------------------------------------------------------------------------
 -- Flat unboxed mutable arrays (ST monad)
 

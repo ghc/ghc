@@ -30,6 +30,10 @@ import GHC.STRef
 
 #ifdef __HUGS__
 import Hugs.ST
+import Data.Typeable
+
+#include "Typeable.h"
+INSTANCE_TYPEABLE2(STRef,stRefTc,"STRef")
 #endif
 
 -- |Mutate the contents of an 'STRef'

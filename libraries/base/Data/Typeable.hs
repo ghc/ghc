@@ -104,7 +104,7 @@ import GHC.IOBase	( IO, MVar, Exception, ArithException, IOException,
 			  ArrayException, AsyncException, Handle )
 import GHC.ST		( ST )
 import GHC.STRef	( STRef )
-import GHC.Ptr          ( Ptr )
+import GHC.Ptr          ( Ptr, FunPtr )
 import GHC.ForeignPtr   ( ForeignPtr )
 import GHC.Stable       ( StablePtr )
 import GHC.Arr		( Array, STArray )
@@ -117,10 +117,8 @@ import Hugs.IO
 import Hugs.IORef
 import Hugs.IOExts
 	-- For the Typeable instance
-import Hugs.Array	 ( Array )
-import Hugs.ST		 ( ST, STRef, STArray )
-import Hugs.ForeignPtr	 ( ForeignPtr )
-imprt 
+import Hugs.Array	( Array )
+import Hugs.ConcBase	( MVar )
 #endif
 
 #ifdef __GLASGOW_HASKELL__
@@ -134,7 +132,7 @@ import NHC.IOExtras (IORef,newIORef,readIORef,writeIORef,unsafePerformIO)
 import IO (Handle)
 import Ratio (Ratio)
 	-- For the Typeable instance
-import NHC.FFI	( Ptr,StablePtr )
+import NHC.FFI	( Ptr,FunPtr,StablePtr,ForeignPtr )
 import Array	( Array )
 #endif
 
@@ -482,9 +480,7 @@ INSTANCE_TYPEABLE2(Either,eitherTc,"Either")
 INSTANCE_TYPEABLE2((->),funTc,"->")
 INSTANCE_TYPEABLE1(IO,ioTc,"IO")
 
-#ifdef __GLASGOW_HASKELL__
-
-
+#if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
 -- Types defined in GHC.IOBase
 INSTANCE_TYPEABLE1(MVar,mvarTc,"MVar" )
 INSTANCE_TYPEABLE0(Exception,exceptionTc,"Exception")
@@ -492,23 +488,24 @@ INSTANCE_TYPEABLE0(IOException,ioExceptionTc,"IOException")
 INSTANCE_TYPEABLE0(ArithException,arithExceptionTc,"ArithException")
 INSTANCE_TYPEABLE0(ArrayException,arrayExceptionTc,"ArrayException")
 INSTANCE_TYPEABLE0(AsyncException,asyncExceptionTc,"AsyncException")
+#endif
 
 -- Types defined in GHC.Arr
 INSTANCE_TYPEABLE2(Array,arrayTc,"Array")
-#endif
 
+#ifdef __GLASGOW_HASKELL__
+-- Hugs has these too, but their Typeable<n> instances are defined
+-- elsewhere to keep this module within Haskell 98.
+-- This is important because every invocation of runhugs or ffihugs
+-- uses this module via Data.Dynamic.
+INSTANCE_TYPEABLE2(ST,stTc,"ST")
+INSTANCE_TYPEABLE2(STRef,stRefTc,"STRef")
+INSTANCE_TYPEABLE3(STArray,sTArrayTc,"STArray")
+#endif
 
 #ifndef __NHC__
 INSTANCE_TYPEABLE2((,),pairTc,",")
 INSTANCE_TYPEABLE3((,,),tup3Tc,",,")
-
--- I don't think NHC has ST, STRef, STArray, ForeignPtr
--- but GHC and Hugs do
-INSTANCE_TYPEABLE2(ST,stTc,"ST")
-INSTANCE_TYPEABLE2(STRef,stRefTc,"STRef")
-INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
-INSTANCE_TYPEABLE3(STArray,sTArrayTc,"STArray")
-
 
 tup4Tc :: TyCon
 tup4Tc = mkTyCon ",,,"
@@ -533,11 +530,13 @@ tup7Tc = mkTyCon ",,,,,,"
 
 instance Typeable7 (,,,,,,) where
   typeOf7 tu = mkTyConApp tup7Tc []
-
 #endif /* __NHC__ */
+
 INSTANCE_TYPEABLE1(Ptr,ptrTc,"Ptr")
-INSTANCE_TYPEABLE1(StablePtr,stableptrTc,"StablePtr")
-INSTANCE_TYPEABLE1(IORef,iorefTc,"IORef")
+INSTANCE_TYPEABLE1(FunPtr,funPtrTc,"FunPtr")
+INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
+INSTANCE_TYPEABLE1(StablePtr,stablePtrTc,"StablePtr")
+INSTANCE_TYPEABLE1(IORef,iORefTc,"IORef")
 
 -------------------------------------------------------
 --
