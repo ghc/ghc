@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.19 $
- * $Date: 2001/02/11 17:51:07 $
+ * $Revision: 1.20 $
+ * $Date: 2001/03/21 10:56:04 $
  * ---------------------------------------------------------------------------*/
 
 #ifdef DEBUG
@@ -97,6 +97,13 @@ int disInstr ( StgBCO *bco, int pc )
          printPtr( (StgPtr)itbls[instrs[pc]] );
          fprintf(stderr, "\n");
          pc += 2; break;
+
+      case bci_CASEFAIL: 
+         fprintf(stderr, "CASEFAIL\n" );
+         break;
+      case bci_JMP:
+         fprintf(stderr, "JMP to   %d\n", instrs[pc]);
+         pc += 1; break;
 
       case bci_TESTLT_I:
          fprintf(stderr, "TESTLT_I %d, fail to %d\n", literals[instrs[pc]],

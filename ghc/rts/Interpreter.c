@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.20 $
- * $Date: 2001/02/15 14:30:07 $
+ * $Revision: 1.21 $
+ * $Date: 2001/03/21 10:56:04 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -738,6 +738,12 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  }
               }
         
+              case bci_JMP: {
+                 /* BCO_NEXT modifies bciPtr, so be conservative. */
+                 int nextpc = BCO_NEXT;
+                 bciPtr     = nextpc;
+                 goto nextInsn;
+              }
               case bci_CASEFAIL:
                  barf("interpretBCO: hit a CASEFAIL");
 

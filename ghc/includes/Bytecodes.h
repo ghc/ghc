@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Bytecodes.h,v 1.5 2001/02/06 12:01:00 sewardj Exp $
+ * $Id: Bytecodes.h,v 1.6 2001/03/21 10:56:04 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -51,6 +51,7 @@
 #define bci_ENTER     24
 #define bci_RETURN    25
 #define bci_STKCHECK  26
+#define bci_JMP       27
 
 
 /* If a BCO definitely requires less than this many words of stack,
