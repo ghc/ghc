@@ -1,4 +1,8 @@
--- This one should fail, because M.f is ambiguous
+-- This one should fail, because it exports 
+-- both List:nub and Rnfail040_A:nub
+--
+-- 	List:nub        is in scope as M.nub and nub
+--	Rnfail040_A:nub is in scope as T.nub, M.nub, and nub
 
 module M1 (module M) where
 

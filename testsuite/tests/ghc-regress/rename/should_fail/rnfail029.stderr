@@ -1,3 +1,5 @@
 
 rnfail029.hs:2:
-    The export items `List.map' and `module ShouldFail' create conflicting exports for `map'
+    Conflicting exports for `map':
+      `List.map' exports `GHC.Base.map' imported from Prelude at rnfail029.hs:2
+      `module ShouldFail' exports `ShouldFail.map' defined at rnfail029.hs:4

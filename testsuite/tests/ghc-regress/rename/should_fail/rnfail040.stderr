@@ -1,4 +1,6 @@
 
-rnfail040.hs:3:
-    The export item `module M'
-    creates conflicting exports for `Data.List.nub' and `Rnfail040_A.nub'
+rnfail040.hs:7:
+    Conflicting exports for `nub':
+      `module M' exports `Data.List.nub' imported from List at rnfail040.hs:10
+      `module M' exports `Rnfail040_A.nub' imported from Rnfail040_A at rnfail040.hs:11
+					     (defined at Rnfail040_A.hs:2)
