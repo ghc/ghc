@@ -2658,21 +2658,21 @@ As you can guess <literal>justOnes</literal> will evaluate to <literal>Just [1,1
 </para>
 
 <para>
-The MonadRec library introduces the <literal>MonadRec</literal> class. It's definition is:
+The MonadFix library introduces the <literal>MonadFix</literal> class. It's definition is:
 </para>
 <programlisting>
-class Monad m => MonadRec m where
+class Monad m => MonadFix m where
    mfix :: (a -> m a) -> m a
 </programlisting>
 <para>
 The function <literal>mfix</literal>
 dictates how the required recursion operation should be performed. If recursive bindings are required for a monad,
-then that monad must be declared an instance of the <literal>MonadRec</literal> class.
+then that monad must be declared an instance of the <literal>MonadFix</literal> class.
 For details, see the above mentioned reference.
 </para>
 <para>
-The <literal>MonadRec</literal> library automatically declares List, Maybe, IO, and
-state monads (both lazy and strict) as instances of the <literal>MonadRec</literal> class.
+The <literal>MonadFix</literal> library automatically declares List, Maybe, IO, and
+state monads (both lazy and strict) as instances of the <literal>MonadFix</literal> class.
 </para>
 <para>
 There are three important points in using the recursive-do notation:
@@ -2683,13 +2683,13 @@ than <literal>do</literal>).
 </para></listitem>
 
 <listitem><para>
-If you want to declare an instance of the <literal>MonadRec</literal> class for one of 
-your own monads, or you need to refer to the class name <literal>MonadRec</literal> in any other way (for instance in
-writing a type constraint), then your program should <literal>import Control.Monad.MonadRec</literal>.
+If you want to declare an instance of the <literal>MonadFix</literal> class for one of 
+your own monads, or you need to refer to the class name <literal>MonadFix</literal> in any other way (for instance in
+writing a type constraint), then your program should <literal>import Control.Monad.MonadFix</literal>.
 Otherwise, you don't need to import any special libraries to use the mdo-notation. That is,
 as long as you only use the predefined instances mentioned above, the mdo-notation will
 be automatically available. (Note: This differs from the Hugs implementation, where
-<literal>MonadRec</literal> should always be imported.)
+<literal>MonadFix</literal> should always be imported.)
 </para></listitem>
 
 <listitem><para>
@@ -2698,6 +2698,13 @@ As with other extensions, ghc should be given the flag <literal>-fglasgow-exts</
 </itemizedlist>
 </para>
 
+<para>
+Historical note: The originial implementation of the mdo-notation, and most
+of the existing documents, use the names 
+<literal>MonadRec</literal> for the class, and 
+<literal>Control.Monad.MonadRec</literal> for the library. These names
+are no longer supported.
+</para>
 
 <para>
 The web page: <ulink url="http://www.cse.ogi.edu/PacSoft/projects/rmb">http://www.cse.ogi.edu/PacSoft/projects/rmb</ulink>
