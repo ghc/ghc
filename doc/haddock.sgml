@@ -236,6 +236,24 @@
       </varlistentry>
 
       <varlistentry>
+	<term><option>--dump-interface</option>=<replaceable>file</replaceable></term>
+	<indexterm><primary><option>--dump-interface</option></primary>
+	</indexterm>
+	<listitem>
+	  <para>Produce an <firstterm>interface
+	  file</firstterm><footnote><para>Haddock interface files are
+	  not the same as Haskell interface files, I just couldn't
+	  think of a better name.</para> </footnote>
+	  in the file <replaceable>file</replaceable>.  An interface
+	  file contains information Haddock needs to produce more
+	  documentation that refers to the modules currently being
+	  processed - see the <option>--read-interface</option> option
+	  for more details.  The interface file is in a binary format;
+	  don't try to read it.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-h</option></term>
 	<term><option>--html</option></term>
 	<indexterm><primary><option>-h</option></primary></indexterm>
@@ -285,6 +303,72 @@
       </varlistentry>
 
       <varlistentry>
+	<term><option>-i</option> <replaceable>path</replaceable>,<replaceable>file</replaceable></term>
+	<term><option>--read-interface</option>=<replaceable>path</replaceable>,<replaceable>file</replaceable></term>
+	<indexterm><primary><option>-i</option></primary></indexterm>
+	<indexterm><primary><option>--read-interface</option></primary></indexterm>
+	<listitem>
+	  <para>Read the interface file in
+	  <replaceable>file</replaceable>, which must have been
+	  produced by running Haddock with the
+	  <option>--dump-interface</option> option.  The interface
+	  describes a set of modules whose HTML documentation is
+	  located in <replaceable>path</replaceable> (which may be a
+	  relative pathname).  The <replaceable>path</replaceable> is
+	  optional, and defaults to <quote>.</quote>.</para>
+
+	  <para>This option allows Haddock to produce separate sets of
+	  documentation with hyperlinks between them.  The
+	  <replaceable>path</replaceable> is used to direct hyperlinks
+	  to point to the right files; so make sure you don't move the
+	  HTML files later or these links will break.  Using a
+	  relative <replaceable>path</replaceable> means that a
+	  documentation subtree can still be moved around without
+	  breaking links.</para>
+
+	  <para>Multiple <option>--read-interface</option> options may
+	  be given.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>--ms-help</option></term>
+	<indexterm><primary><option>--ms-help</option></primary>
+	</indexterm>
+	<listitem>
+	  <para>(In HTML mode only) Produce extra contents and index
+	  files for the Microsoft HTML Help system.  The files created
+	  will be named <filename>index.hhc</filename> and
+	  <filename>index.hhk</filename> respectively.</para>
+
+	  <para>Using the Microsoft HTML Help system provides two
+	  advantages over plain HTML: the help viewer gives you a nice
+	  hierarchical folding contents pane on the left, and the
+	  documentation files are compressed and therefore much
+	  smaller (roughly a factor of 10).  The disadvantages are
+	  that the viewer is only available on Windows, and the help
+	  can't be viewed over the web.</para>
+
+	  <para>In order to create a compiled Microsoft help file, you
+	  also need the Microsoft HTML Help compiler, which is
+	  available free from <ulink
+	  url="http://www.microsoft.com/">http://www.microsoft.com/</ulink>
+	  (search for <quote>HTML Help compiler</quote>).</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>--no-implicit-prelude</option></term>
+	<indexterm><primary><option>--no-implicit-prelude</option></primary>
+	</indexterm>
+	<listitem>
+	  <para>Don't automatically import <literal>Prelude</literal>
+	  in every module.  Used when producing documentation for the
+	  <literal>Prelude</literal> itself.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-o</option> <replaceable>dir</replaceable></term>
 	<term><option>--odir</option>=<replaceable>dir</replaceable></term>
 	<indexterm><primary><option>-o</option></primary></indexterm>
@@ -292,6 +376,20 @@
 	<listitem>
 	  <para>Generate files into <replaceable>dir</replaceable>
 	  instead of the current directory.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-p</option> <replaceable>file</replaceable></term>
+	<term><option>--prologue</option>=<replaceable>file</replaceable></term>
+	<indexterm><primary><option>-p</option></primary></indexterm>
+	<indexterm><primary><option>--prologue</option></primary></indexterm>
+	<listitem>
+	  <para>Specify a file containing documentation which is
+	  placed on the main contents page under the heading
+	  &ldquo;Description&rdquo;.  The file is parsed as a normal
+	  Haddock doc comment (but the comment markers are not
+	  required).</para>
 	</listitem>
       </varlistentry>
 
