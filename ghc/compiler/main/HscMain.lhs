@@ -388,6 +388,13 @@ myCoreToStg dflags this_mod tidy_binds
 %************************************************************************
 
 \begin{code}
+#ifndef GHCI
+hscExpr dflags hst hit pcs this_module expr
+  = panic "hscExpr: non-interactive build"
+hscTypeExpr dflags hst hit pcs0 this_module expr
+  = panic "hscTypeExpr: non-interactive build"
+#else 
+
 hscExpr
   :: DynFlags
   -> HomeSymbolTable	
@@ -396,11 +403,6 @@ hscExpr
   -> Module			-- Context for compiling
   -> String			-- The expression
   -> IO ( PersistentCompilerState, Maybe UnlinkedIExpr )
-
-#ifndef GHCI
-hscExpr dflags hst hit pcs this_module expr
-  = panic "hscExpr: non-interactive build"
-#else 
 
 hscExpr dflags hst hit pcs0 this_module expr
    = do {

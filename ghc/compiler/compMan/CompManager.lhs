@@ -42,9 +42,9 @@ import ErrUtils		( showPass )
 import Util
 import Outputable
 import Panic		( panic )
+import CmdLineOpts	( DynFlags(..) )
 
 #ifdef GHCI
-import CmdLineOpts	( DynFlags(..) )
 import Interpreter	( HValue )
 import HscMain		( hscExpr, hscTypeExpr )
 import RdrName

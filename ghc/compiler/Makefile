@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.115 2000/11/19 18:39:53 simonmar Exp $
+# $Id: Makefile,v 1.116 2000/11/22 10:01:45 sewardj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -165,7 +165,7 @@ space:= $(empty) $(empty)
 SRC_HC_OPTS += \
   -cpp -fglasgow-exts \
   -Rghc-timing -I. -IcodeGen -InativeGen -Iparser \
-  -i$(subst $(space),:,$(DIRS)) 
+  -i$(subst $(space),:,$(DIRS)) -O -H32m -prof
 
 ghc_407_at_least = $(shell expr "$(GhcMinVersion)" \>= 7)
 ifeq "$(ghc_407_at_least)" "1"
