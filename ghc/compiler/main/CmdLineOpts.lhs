@@ -88,6 +88,7 @@ module CmdLineOpts (
         opt_AllowOverlappingInstances,
  	opt_AllowUndecidableInstances,
 	opt_GlasgowExts,
+	opt_Generics,
 	opt_IrrefutableTuples,
 	opt_NumbersStrict,
 	opt_Parallel,
@@ -381,6 +382,7 @@ opt_DictsStrict			= lookUp  SLIT("-fdicts-strict")
 opt_AllowOverlappingInstances   = lookUp  SLIT("-fallow-overlapping-instances")
 opt_AllowUndecidableInstances 	= lookUp  SLIT("-fallow-undecidable-instances")
 opt_GlasgowExts			= lookUp  SLIT("-fglasgow-exts")
+opt_Generics			= lookUp  SLIT("-fgenerics")
 opt_IrrefutableTuples		= lookUp  SLIT("-firrefutable-tuples")
 opt_MaxContextReductionDepth	= lookup_def_int "-fcontext-stack" mAX_CONTEXT_REDUCTION_DEPTH
 opt_NumbersStrict		= lookUp  SLIT("-fnumbers-strict")
