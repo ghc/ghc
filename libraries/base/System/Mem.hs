@@ -24,7 +24,7 @@ import Hugs.IOExts
 
 #ifdef __GLASGOW_HASKELL__
 -- | Triggers an immediate garbage collection
-foreign import ccall {-safe-} "performGC" performGC :: IO ()
+foreign import ccall {-safe-} "performMajorGC" performGC :: IO ()
 #endif
 
 #ifdef __NHC__
