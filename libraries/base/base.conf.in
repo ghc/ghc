@@ -3,13 +3,13 @@
 Package {
         name           = "base",
 #ifdef INSTALLING
-	import_dirs    = [ "$libdir/imports/base" ]
+	import_dirs    = [ "$libdir/imports/base" ],
 #else
 	import_dirs    = [ "$libdir/libraries/base" ],
 #endif
         source_dirs    = [],
 #ifdef INSTALLING
-        library_dirs   = [ "$libdir" ]
+        library_dirs   = [ "$libdir" ],
 #else
         library_dirs   = [ "$libdir/libraries/base"
                          , "$libdir/libraries/base/cbits" ],
@@ -30,7 +30,7 @@ Package {
 #endif
 			    ],
 #ifdef INSTALLING
-        include_dirs   = []
+        include_dirs   = [],
 #else
         include_dirs   = [ "$libdir/libraries/base/include" ],
 #endif
