@@ -131,7 +131,7 @@ wwExpr :: CoreExpr -> UniqSM CoreExpr
 
 wwExpr e@(Type _)   	      = returnUs e
 wwExpr e@(Lit _)    	      = returnUs e
-wwExpr e@(Note InlineMe expr) = returnUs expr
+wwExpr e@(Note InlineMe expr) = returnUs e
 	-- Don't w/w inside InlineMe's
 
 wwExpr e@(Var v)
