@@ -861,11 +861,14 @@ dnl ** check for Windows include files
 AC_CHECK_HEADERS(windows.h)
 
 dnl ** check for OpenGL include files
+fp_save_cppflags="$CPPFLAGS"
+CPPFLAGS="$CPPFLAGS $X_CFLAGS"
 if test $UseQuartzOpenGL = YES ; then
   AC_CHECK_HEADERS(OpenGL/gl.h)
 else
   AC_CHECK_HEADERS(GL/gl.h)
 fi
+CPPFLAGS="$fp_save_cppflags"
 
 dnl ** check if it is safe to include both <time.h> and <sys/time.h>
 AC_HEADER_TIME

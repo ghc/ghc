@@ -669,7 +669,9 @@ define(<<AC_CV_NAME_supported>>, translit(fptools_cv_htype_sup_$1, [ *], [_p]))d
 changequote([, ])dnl
 AC_MSG_CHECKING(Haskell type for $1)
 AC_CACHE_VAL(AC_CV_NAME,
-[AC_CV_NAME_supported=yes;
+[AC_CV_NAME_supported=yes
+fp_check_htype_save_cppflags="$CPPFLAGS"
+CPPFLAGS="$CPPFLAGS $X_CFLAGS"
 AC_TRY_RUN([#include <stdio.h>
 #include <stddef.h>
 
@@ -744,6 +746,7 @@ main() {
 }],AC_CV_NAME=`cat conftestval`,
 ifelse([$2], , [AC_CV_NAME=NotReallyAType; AC_CV_NAME_supported=no], AC_CV_NAME=$2),
 ifelse([$3], , [AC_CV_NAME=NotReallyATypeCross; AC_CV_NAME_supported=no], AC_CV_NAME=$3))]) dnl
+CPPFLAGS="$fp_check_htype_save_cppflags"
 if test "$AC_CV_NAME_supported" = yes; then
   AC_MSG_RESULT($AC_CV_NAME)
   AC_DEFINE_UNQUOTED(AC_TYPE_NAME, $AC_CV_NAME, [Define to Haskell type for $1])
