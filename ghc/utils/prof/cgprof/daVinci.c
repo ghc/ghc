@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------
- * $Id: daVinci.c,v 1.2 2003/08/01 14:50:50 panne Exp $
+ * $Id: daVinci.c,v 1.3 2003/08/01 14:58:48 panne Exp $
  *									
  *	Copyright (C) 1995-2000 University of Oxford
  *									
@@ -40,7 +40,6 @@ char *lastDavinciCmd;
  * -------------------------------------------------------------------------- */
 
 void cmdDaVinci(char* format,...) {
-  static char xs[MAX_PROFILE_LINE_LENGTH];
   va_list args;
 
   va_start(args, format);
@@ -254,7 +253,7 @@ static char *printCompressNode(int node, object_cost *ptr) {
   static char res[(MAX_FUNNAME+20)*4];
   char tempstring[MAX_FUNNAME+20];
   char *padding;
-  int width=0,x;
+  int x;
   char delimiter[] = "&";
 
   if (symbol_table[node].type==CG_SSTEP) 
@@ -462,8 +461,8 @@ int percentToColour(double colour) {
 
 static void recur_graphToDaVinci(int node,Matrix *graph,Matrix *costs,char* p_zeronodes, int mode){
   object_cost *ptr;
-  int i,j,no_children=0,*children,colour,small;
-  char line[MAX_FUNNAME], *node_str;
+  int i,j,no_children=0,*children,colour;
+  char *node_str;
   char tempnode[MAX_FUNNAME];
   if (Mat(int,*graph,node,node)<0) {
     printf("r(\"%d\") ",node);
@@ -533,8 +532,8 @@ static void recur_graphToDaVinci(int node,Matrix *graph,Matrix *costs,char* p_ze
 
 static void recur_graphToDaVinci_old(int node,Matrix *graph, Matrix *costs) {
   object_cost *ptr;
-  int i,j,no_children=0,*children,colour,small;
-  char line[MAX_FUNNAME], *node_str;
+  int i,j,no_children=0,*children,colour;
+  char *node_str;
   if (Mat(int,*graph,node,node)<0) {
     fprintf(logFile,"r(\"%d\") ",node);
     printf("r(\"%d\") ",node);
@@ -609,7 +608,6 @@ static void recur_graphToDaVinci_old(int node,Matrix *graph, Matrix *costs) {
 
 void updateColours(int root, Matrix *graph, Matrix *costs) {
   int i,colour,last;
-  object_cost *ptr;
 
   printf("graph(change_attr([");
   for(last=costs->rows-1;last>=0;last--)
@@ -633,7 +631,7 @@ void updateColours(int root, Matrix *graph, Matrix *costs) {
 davinciCmd parseDaVinciCmd(char *input) {
   davinciCmd result;
   char *crp;
-  char *word,*label;
+  char *word;
   int i;
   
   result.size=1;
