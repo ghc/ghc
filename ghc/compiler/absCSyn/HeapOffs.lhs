@@ -40,7 +40,7 @@ import Maybes		( catMaybes )
 import SMRep
 import Pretty		-- ********** NOTE **********
 import Util		( panic )
-import PprStyle         ( PprStyle )
+import Outputable       ( PprStyle )
 \end{code}
 
 %************************************************************************

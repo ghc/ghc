@@ -28,7 +28,7 @@ import PrimOp		( PrimOp(..), isCompareOp, showPrimOp,
 			)
 import PrimRep		( PrimRep(..), isFloatingRep )
 import OrdList		( OrdList )
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..) )
 import SMRep		( SMRep(..), SMSpecRepKind, SMUpdateKind )
 import Stix
 import StixMacro	( heapCheck )

@@ -38,7 +38,7 @@ import ClosureInfo	( mkLFImported, mkConLFInfo, mkLFArgument, LambdaFormInfo )
 import HeapOffs		( SYN_IE(VirtualHeapOffset),
 			  SYN_IE(VirtualSpAOffset), SYN_IE(VirtualSpBOffset)
 			)
-import Id		( idPrimRep, toplevelishId, isDataCon,
+import Id		( idPrimRep, toplevelishId, 
 			  mkIdEnv, rngIdEnv, SYN_IE(IdEnv),
 			  idSetToList,
 			  GenId{-instance NamedThing-}, SYN_IE(Id)
@@ -50,7 +50,7 @@ import Name		( isLocallyDefined, isWiredInName,
 #ifdef DEBUG
 import PprAbsC		( pprAmode )
 #endif
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..) )
 import Pretty		( Doc )
 import PrimRep          ( PrimRep )
 import StgSyn		( SYN_IE(StgArg), SYN_IE(StgLiveVars), GenStgArg(..) )

@@ -54,8 +54,7 @@ import Id		( idPrimRep, toplevelishId,
 			)
 import Literal          ( Literal )
 import Maybes		( catMaybes )
-import Outputable       ( Outputable(..) )
-import PprStyle		( PprStyle(..) )
+import Outputable       ( Outputable(..), PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
 import Pretty		( Doc )
 import PrimOp		( primOpCanTriggerGC, PrimOp(..),

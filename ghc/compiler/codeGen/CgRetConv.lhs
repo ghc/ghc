@@ -39,7 +39,7 @@ import Id		( isDataCon, dataConRawArgTys,
 			  SYN_IE(Id)
 			)
 import Maybes		( catMaybes )
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..), Outputable(..) )
 import PprType		( TyCon{-instance Outputable-} )
 import PrimOp		( primOpCanTriggerGC,
 			  getPrimOpResultInfo, PrimOpResultInfo(..),
@@ -50,11 +50,8 @@ import TyCon		( tyConDataCons, tyConFamilySize )
 import Type		( typePrimRep )
 import Pretty		( Doc )
 import Util		( zipWithEqual, mapAccumL, isn'tIn,
-			  pprError, pprTrace, panic, assertPanic
+			  pprError, pprTrace, panic, assertPanic, assertPprPanic
 			)
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable       ( Outputable(..) )
-#endif
 \end{code}
 
 %************************************************************************
@@ -121,7 +118,7 @@ then it gives up, returning @ReturnInHeap@.
 dataReturnConvAlg :: DataCon -> DataReturnConvention
 
 dataReturnConvAlg data_con
-  = ASSERT(isDataCon data_con)
+  = ASSERT2(isDataCon data_con, (ppr PprDebug data_con))
     case leftover_kinds of
 	[]    ->	ReturnInRegs reg_assignment
 	other ->	ReturnInHeap	-- Didn't fit in registers

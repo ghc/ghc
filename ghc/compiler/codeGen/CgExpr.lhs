@@ -45,7 +45,7 @@ import Id		( dataConTyCon, idPrimRep, getIdArity,
 			)
 import IdInfo		( ArityInfo(..) )
 import Name		( isLocallyDefined )
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..), Outputable(..) )
 import Pretty		( Doc )
 import PrimOp		( primOpCanTriggerGC, primOpHeapReq, HeapRequirement(..),
 			  getPrimOpResultInfo, PrimOp(..), PrimOpResultInfo(..)
@@ -54,9 +54,6 @@ import PrimRep		( getPrimRepSize, PrimRep(..) )
 import TyCon		( tyConDataCons, maybeTyConSingleCon  )
 import Maybes		( assocMaybe, maybeToBool )
 import Util		( panic, isIn, pprPanic, assertPanic )
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable       ( Outputable(..) )
-#endif
 \end{code}
 
 This module provides the support code for @StgToAbstractC@ to deal

@@ -35,7 +35,7 @@ import AbsCUtils	( magicIdPrimRep )
 import CLabel		( isAsmTemp, CLabel )
 import Maybes		( maybeToBool, expectJust )
 import OrdList		-- quite a bit of it
-import PprStyle
+import Outputable	( PprStyle(..) )
 import Pretty		( ptext, rational )
 import PrimRep		( isFloatingRep, PrimRep(..) )
 import PrimOp		( PrimOp(..), showPrimOp )

@@ -65,16 +65,12 @@ import Id		( externallyVisibleId, cmpId_withSpecDataCon,
 			  SYN_IE(Id)
 			)
 import Maybes		( maybeToBool )
-import PprStyle		( PprStyle(..) )
+import Outputable	( Outputable(..), PprStyle(..) )
 import PprType		( showTyCon, GenType{-instance Outputable-} )
 import TyCon		( TyCon{-instance Eq-} )
 import Unique		( showUnique, pprUnique, Unique{-instance Eq-} )
 import Pretty
 import Util		( assertPanic{-, pprTraceToDo:rm-}, Ord3(..) )
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable       ( Outputable(..) )
-#endif
-
 \end{code}
 
 things we want to find out:

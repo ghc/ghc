@@ -87,21 +87,18 @@ import Id		( idType, getIdArity,
 import IdInfo		( ArityInfo(..) )
 import Maybes		( maybeToBool )
 import Name		( getOccString )
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..), Outputable(..) )
 import PprType		( getTyDescription, GenType{-instance Outputable-} )
 import Pretty		--ToDo:rm
 import PrelInfo		( maybeCharLikeTyCon, maybeIntLikeTyCon )
 import PrimRep		( getPrimRepSize, separateByPtrFollowness, PrimRep )
 import SMRep		-- all of it
 import TyCon		( TyCon{-instance NamedThing-} )
-import Type		( isPrimType, splitForAllTy, splitFunTyExpandingDictsAndPeeking,
+import Type		( isPrimType, splitFunTyExpandingDictsAndPeeking,
 			  mkFunTys, maybeAppSpecDataTyConExpandingDicts,
 			  SYN_IE(Type)
 			)
 import Util		( isIn, mapAccumL, panic, pprPanic, assertPanic )
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable       ( Outputable(..) )
-#endif
 \end{code}
 
 The ``wrapper'' data type for closure information:

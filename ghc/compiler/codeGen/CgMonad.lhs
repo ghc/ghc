@@ -68,7 +68,7 @@ import Id		( idType,
 			  SYN_IE(Id)
 			)
 import Maybes		( maybeToBool )
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..), Outputable(..) )
 import PprType		( GenType{-instance Outputable-} )
 import Pretty		( Doc, vcat, hsep, ptext )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
@@ -76,9 +76,6 @@ import StgSyn		( SYN_IE(StgLiveVars) )
 import Type		( typePrimRep )
 import UniqSet		( elementOfUniqSet )
 import Util		( sortLt, panic, pprPanic )
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable       ( Outputable(..) )
-#endif
 
 infixr 9 `thenC`	-- Right-associative!
 infixr 9 `thenFC`

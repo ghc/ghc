@@ -46,7 +46,6 @@ import FiniteMap	( addToFM, emptyFM, lookupFM, FiniteMap )
 import HeapOffs		( isZeroOff, subOff, pprHeapOffset )
 import Literal		( showLiteral, Literal(..) )
 import Maybes		( maybeToBool, catMaybes )
-import PprStyle		( PprStyle(..) )
 import Pretty
 import PrimOp		( primOpNeedsWrapper, pprPrimOp, PrimOp(..) )
 import PrimRep		( isFloatingRep, showPrimRep, PrimRep(..) )
@@ -57,7 +56,7 @@ import Unique		( pprUnique, Unique{-instance NamedThing-} )
 import UniqSet		( emptyUniqSet, elementOfUniqSet,
 			  addOneToUniqSet, SYN_IE(UniqSet)
 			)
-import Outputable	( printDoc )
+import Outputable	( PprStyle(..), printDoc )
 import Util		( nOfThem, panic, assertPanic )
 
 infixr 9 `thenTE`

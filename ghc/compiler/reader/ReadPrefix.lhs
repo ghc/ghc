@@ -24,22 +24,19 @@ import HsSyn
 import HsTypes		( HsTyVar(..) )
 import HsPragmas	( noDataPragmas, noClassPragmas, noInstancePragmas, noGenPragmas )
 import RdrHsSyn         
+import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..) )
 import PrefixToHs
 
+import CmdLineOpts      ( opt_PprUserLength )
 import ErrUtils		( addErrLoc, ghcExit )
 import FiniteMap	( elemFM, FiniteMap )
 import Name		( OccName(..), SYN_IE(Module) )
 import Lex		( isLexConId )
-import PprStyle		( PprStyle(..) )
+import Outputable	( Outputable(..), PprStyle(..) )
 import PrelMods
 import Pretty
 import SrcLoc		( mkGeneratedSrcLoc, noSrcLoc, SrcLoc )
 import Util		( nOfThem, pprError, panic )
-
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable       ( Outputable(..) )
-#endif
-
 \end{code}
 
 %************************************************************************
@@ -433,7 +430,7 @@ wlkPat pat
 		 let
 		     err = addErrLoc loc "Illegal pattern `application'"
 			             (\sty -> hsep (map (ppr sty) (lpat:lpats)))
-		     msg = show (err PprForUser)
+		     msg = show (err (PprForUser opt_PprUserLength))
 		 in
 #if __GLASGOW_HASKELL__ == 201
 	         ioToUgnM  (GHCbase.ioToPrimIO (hPutStr stderr msg)) `thenUgn` \ _ ->
@@ -777,7 +774,7 @@ mk_class_assertion :: RdrNameHsType -> (RdrName, RdrNameHsType)
 
 mk_class_assertion (MonoTyApp (MonoTyVar name) ty@(MonoTyVar tyname)) = (name, ty)
 mk_class_assertion other
-  = pprError "ERROR: malformed type context: " (ppr PprForUser other)
+  = pprError "ERROR: malformed type context: " (ppr (PprForUser opt_PprUserLength) other)
     -- regrettably, the parser does let some junk past
     -- e.g., f :: Num {-nothing-} => a -> ...
 \end{code}
