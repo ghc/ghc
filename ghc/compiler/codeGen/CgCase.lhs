@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.69 2004/08/13 13:05:51 simonmar Exp $
+% $Id: CgCase.lhs,v 1.70 2004/08/13 13:25:45 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -152,7 +152,7 @@ cgCase (StgApp v []) live_in_whole_case live_in_alts bndr srt
 Special case #3: inline PrimOps and foreign calls.
 
 \begin{code}
-cgCase (StgOpApp op args _) 
+cgCase (StgOpApp op@(StgPrimOp primop) args _) 
        live_in_whole_case live_in_alts bndr srt alt_type alts
   | not (primOpOutOfLine primop)
   = cgInlinePrimOp primop args bndr alt_type live_in_alts alts
