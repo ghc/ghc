@@ -1,6 +1,6 @@
 -- !!! Monomorphism restriction
 
-module ShouldCompile
+module ShouldCompile where
 
 foo :: Eq a => a -> b -> b
 foo x y = y
