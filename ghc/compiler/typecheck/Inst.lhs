@@ -60,7 +60,7 @@ import PprType	( pprPred )
 import Type	( Type, PredType(..), 
 		  isTyVarTy, mkDictTy, mkPredTy,
 		  splitForAllTys, splitSigmaTy, funArgTy,
-		  splitMethodTy, splitRhoTy,
+		  splitMethodTy, splitRhoTy, classesOfPreds,
 		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
 		  tidyOpenType, tidyOpenTypes
 		)
@@ -724,7 +724,7 @@ lookupSimpleInst clas tys
 	-> returnNF_Tc (Just (substClasses (mkSubst emptyInScopeSet tenv) theta'))
         where
 	   (_, theta, _) = splitSigmaTy (idType dfun)
-	   theta' = map (\(Class clas tys) -> (clas,tys)) theta
+	   theta'	 = classesOfPreds theta
 
       other  -> returnNF_Tc Nothing
 \end{code}
