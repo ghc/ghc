@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.98 2002/07/08 14:38:26 simonpj Exp $
+ * $Id: Linker.c,v 1.99 2002/07/17 08:26:44 simonmar Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -23,6 +23,9 @@
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
+
+#include <stdlib.h>
+#include <string.h>
 
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
@@ -285,7 +288,6 @@ typedef struct _RtsSymbolVal {
       Maybe_ForeignObj				\
       Maybe_Stable_Names			\
       Sym(StgReturn)				\
-      Sym(__stginit_GHCziPrim)			\
       Sym(init_stack)				\
       SymX(__stg_chk_0)				\
       SymX(__stg_chk_1)				\
