@@ -13,6 +13,7 @@ instance Eq  ThreadId
 instance Ord ThreadId
 
 forkIO           :: IO () -> IO ThreadId
+myThreadId       :: IO ThreadId
 killThread       :: ThreadId -> IO ()
 
 data MVar a      -- Synchronisation variables
@@ -32,6 +33,7 @@ writeChan        :: Chan a -> a -> IO ()
 readChan         :: Chan a -> IO a
 dupChan          :: Chan a -> IO (Chan a)
 unReadChan       :: Chan a -> a -> IO ()
+isEmptyChan      :: Chan a -> IO Bool
 getChanContents  :: Chan a -> IO [a]
 writeList2Chan   :: Chan a -> [a] -> IO ()
                       
@@ -95,6 +97,9 @@ plan is that in the future <tt/killThread/ will raise an exception in
 the killed thread which it can catch --- perhaps allowing it to kill
 its children before exiting.
 
+The action <tt/myThreadId/ returns the <tt/ThreadId/ of the thread
+which performs it.
+
 <item>
 The <tt/Ord/ instance for <tt/ThreadId/s provides an arbitrary total ordering
 which might be used to build an ordered binary tree, say.  
@@ -110,5 +115,7 @@ represent just a snapshot of the state of the <tt/MVar/. By the
 time a thread gets to inspect the result and act upon it, other
 threads may have accessed the <tt/MVar/ and changed the 'filled-in'
 status of the variable. 
+
+The same proviso applies to <tt/isEmptyChan/.
 
 </itemize>
