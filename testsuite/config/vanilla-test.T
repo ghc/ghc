@@ -162,7 +162,7 @@ def vanilla-compfail-test-actions ( $extra_compile_args )
    fi
 
    $res = simple_build_Main_WRK ( $extra_compile_args, True )
-   print "---> " ++ $res
+   -- print "---> " ++ $res
    $actual_stderr = qualify("comp.stderr")
    $stderr_a = normalise_errmsg(contents($actual_stderr))
    $stderr_e = normalise_errmsg(contents($expected_stderr))
