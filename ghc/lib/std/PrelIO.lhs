@@ -366,7 +366,8 @@ swapBuffers handle_ buf sz = do
    setBuf fo buf sz
    return (handle_{ haBuffers__ = fo_buf : haBuffers__ handle_ })
 
--- commitBuffer handle buf sz count flush
+-----------------------------------------------------------------------------------
+-- commitAndReleaseBuffer handle buf sz count flush
 -- 
 -- Write the contents of the buffer 'buf' ('sz' bytes long, containing
 -- 'count' bytes of data) to handle (handle must be block or line buffered).
@@ -392,6 +393,7 @@ commitAndReleaseBuffer
 	-> Int				-- number of bytes of data in buffer
 	-> Bool				-- flush the handle afterward?
 	-> IO ()
+
 commitAndReleaseBuffer hdl@(Handle h) buf sz count flush = do
       h_ <- takeMVar h
 
@@ -418,18 +420,18 @@ commitAndReleaseBuffer hdl@(Handle h) buf sz count flush = do
 
       let ok    h_ = putMVar h h_ >> return ()
 
-      if (fo_bufSize - fo_wptr < count)	-- not enough room in handle buffer?
+      if (flush || fo_bufSize - fo_wptr < count)  -- not enough room in handle buffer?
 
 	    then do rc <- mayBlock fo (flushFile fo)
 		    if (rc < 0) 
-			then constructErrorAndFail "commitBuffer"
+			then constructErrorAndFail "commitAndReleaseBuffer"
 			else
-		     if flush || sz /= fo_bufSize
+		     if (flush || sz /= fo_bufSize)
 			then do rc <- write_buf fo buf count
 		    		if (rc < 0)
-					then constructErrorAndFail "commitBuffer"
-			      		else do handle_ <- freeBuffer handle_ buf sz
-					        ok handle_
+				    then constructErrorAndFail "commitAndReleaseBuffer"
+			      	    else do handle_ <- freeBuffer handle_ buf sz
+					    ok handle_
 
 			-- don't have to flush, and the new buffer is the
 			-- same size as the old one, so just swap them...
@@ -437,16 +439,26 @@ commitAndReleaseBuffer hdl@(Handle h) buf sz count flush = do
 				setBufWPtr fo count
 				ok handle_
 
+		-- not flushing, and there's enough room in the buffer:
+		-- just copy the data in and update bufWPtr.
 	    else do memcpy (plusAddr fo_buf (AddrOff# fo_wptr)) buf count
 		    setBufWPtr fo (fo_wptr + count)
-		    if flush 
-			then do rc <- mayBlock fo (flushFile fo)
-				if (rc < 0) 
-					then constructErrorAndFail "commitBuffer"
-					else do handle_ <- freeBuffer handle_ buf sz
-						ok handle_
-			else do handle_ <- freeBuffer handle_ buf sz
-				ok handle_
+		    handle_ <- freeBuffer handle_ buf sz
+		    ok handle_
+
+------------------------------------------------------------------------------------
+-- commitBuffer handle buf sz count flush
+-- 
+-- Flushes 'count' bytes from the buffer 'buf' (size 'sz') to 'handle'.
+-- There are several cases to consider altogether:
+-- 
+-- If flush, 
+-- 	   - flush handle buffer,
+-- 	   - write out new buffer directly
+-- 
+-- else
+-- 	   - if there's enough room in the handle buffer, then copy new buf into it
+-- 	     else flush handle buffer, then copy new buffer into it
 
 commitBuffer
 	:: Handle			-- handle to commit to
@@ -454,6 +466,7 @@ commitBuffer
 	-> Int				-- number of bytes of data in buffer
 	-> Bool				-- flush the handle afterward?
 	-> IO ()
+
 commitBuffer handle buf sz count flush = do
     wantWriteableHandle "commitBuffer" handle $ \handle_ -> do
       let fo = haFO__ handle_
@@ -463,19 +476,21 @@ commitBuffer handle buf sz count flush = do
       fo_wptr    <- getBufWPtr fo
       fo_bufSize <- getBufSize fo
 
-      (if (fo_bufSize - fo_wptr < count)  -- not enough room in handle buffer?
-	    then mayBlock fo (flushFile fo)
-	    else return 0)
+      new_wptr <-                       -- not enough room in handle buffer?
+	(if flush || (fo_bufSize - fo_wptr < count)
+	    then do rc <- mayBlock fo (flushFile fo)
+		    if (rc < 0) then constructErrorAndFail "commitBuffer"
+				else return 0
+	    else return fo_wptr )
 
-      if (fo_bufSize < count)		-- committed buffer too large?
+      if (flush || fo_bufSize < count)	-- committed buffer too large?
 
 	    then do rc <- write_buf fo buf count
-		    if rc < 0 then constructErrorAndFail "commitBuffer"
-			      else return ()
+		    if (rc < 0) then constructErrorAndFail "commitBuffer"
+			        else return ()
 
-	    else do memcpy (plusAddr fo_buf (AddrOff# fo_wptr)) buf count
-		    setBufWPtr fo (fo_wptr + count)
-		    (if flush then mayBlock fo (flushFile fo) else return 0)
+	    else do memcpy (plusAddr fo_buf (AddrOff# new_wptr)) buf count
+		    setBufWPtr fo (new_wptr + count)
 		    return ()
 
 write_buf fo buf 0 = return 0
