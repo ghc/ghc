@@ -2716,7 +2716,7 @@ genCCall fn cconv ret_rep args
            -> returnNat (unitOL (CALL (Left (fn__2 tot_arg_size))))
         Right dyn 
            -> get_op dyn `thenNat` \ (dyn_c, dyn_r, dyn_rep) ->
-              ASSERT(dyn_rep == L)
+              ASSERT(case dyn_rep of { L -> True; _ -> False})
               returnNat (dyn_c `snocOL` CALL (Right dyn_r))
     ) 
 				`thenNat` \ callinsns ->
