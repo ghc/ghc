@@ -70,6 +70,12 @@ StgInt	shutdownSocket PROTO((StgInt, StgInt));
 /* readDescriptor.lc */
 StgInt	readDescriptor PROTO((StgInt, StgAddr, StgInt));
 
+/* recvFrom.c */
+StgInt	recvFrom__ PROTO((StgInt, StgAddr, StgInt, StgAddr));
+
+/* sendTo.c */
+StgInt	sendTo__ PROTO((StgInt, StgAddr, StgInt, StgAddr, StgInt));
+
 /* writeDescriptor.lc */
 StgInt	writeDescriptor PROTO((StgInt, StgAddr, StgInt));
 
