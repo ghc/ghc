@@ -16,6 +16,7 @@ import OrdList		( OrdList, consOL, snocOL, appOL, unitOL,
 import FiniteMap	( FiniteMap, addListToFM, listToFM, 
 			  addToFM, lookupFM, fmToList, emptyFM )
 import CoreSyn
+import PprCore		( pprCoreExpr, pprCoreAlt )
 import Literal		( Literal(..) )
 import PrimRep		( PrimRep(..) )
 import CoreFVs		( freeVars )
@@ -109,10 +110,12 @@ pprAltCode discrs_n_codes
      where f (discr, code) = ppr discr <> colon <+> vcat (map ppr (fromOL code))
 
 instance Outputable a => Outputable (ProtoBCO a) where
-   ppr (ProtoBCO name instrs)
+   ppr (ProtoBCO name instrs origin)
       = (text "ProtoBCO" <+> ppr name <> colon)
         $$ nest 6 (vcat (map ppr (fromOL instrs)))
-
+        $$ case origin of
+              Left alts -> vcat (map (pprCoreAlt.deAnnAlt) alts)
+              Right rhs -> pprCoreExpr (deAnnotate rhs)
 \end{code}
 
 %************************************************************************
@@ -125,7 +128,13 @@ instance Outputable a => Outputable (ProtoBCO a) where
 
 type BCInstrList = OrdList BCInstr
 
-data ProtoBCO a = ProtoBCO a BCInstrList
+data ProtoBCO a 
+   = ProtoBCO a 			-- name, in some sense
+              BCInstrList 		-- instrs
+					-- what the BCO came from
+              (Either [AnnAlt Id VarSet]
+                      (AnnExpr Id VarSet))
+
 
 type Sequel = Int	-- back off to this depth before ENTER
 
@@ -154,7 +163,7 @@ schemeR_wrk nm (args, body)
          argcheck  = if null args then nilOL else unitOL (ARGCHECK szw_args)
      in
      schemeE szw_args 0 p_init body 		`thenBc` \ body_code ->
-     emitBc (ProtoBCO (getName nm) (appOL argcheck body_code))
+     emitBc (ProtoBCO (getName nm) (appOL argcheck body_code) (Right body))
 
 
 -- Compile code to apply the given expression to the remaining args
@@ -242,7 +251,7 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
      mkMultiBranch alt_stuff				`thenBc` \ alt_final ->
      let 
          alt_bco_name = getName bndr
-         alt_bco      = ProtoBCO alt_bco_name alt_final
+         alt_bco      = ProtoBCO alt_bco_name alt_final (Left alts)
      in
      schemeE (d + ret_frame_sizeW) 
              (d + ret_frame_sizeW) p scrut		`thenBc` \ scrut_code ->
@@ -552,7 +561,7 @@ data BCO a = BCO [Word16] 	-- instructions
 
 -- Top level assembler fn.
 assembleBCO :: ProtoBCO Name -> BCO Name
-assembleBCO (ProtoBCO nm instrs_ordlist)
+assembleBCO (ProtoBCO nm instrs_ordlist origin)
    = let
          -- pass 1: collect up the offsets of the local labels
          instrs = fromOL instrs_ordlist

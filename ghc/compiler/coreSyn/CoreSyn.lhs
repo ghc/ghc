@@ -35,7 +35,8 @@ module CoreSyn (
 	seqRules, seqExpr, seqExprs, seqUnfolding,
 
 	-- Annotated expressions
-	AnnExpr, AnnExpr'(..), AnnBind(..), AnnAlt, deAnnotate, deAnnotate',
+	AnnExpr, AnnExpr'(..), AnnBind(..), AnnAlt, 
+	deAnnotate, deAnnotate', deAnnAlt,
 
 	-- Core rules
 	CoreRules(..), 	-- Representation needed by friends
@@ -572,7 +573,8 @@ deAnnotate' (AnnLet bind body)
 
 deAnnotate' (AnnCase scrut v alts)
   = Case (deAnnotate scrut) v (map deAnnAlt alts)
-  where
-    deAnnAlt (con,args,rhs) = (con,args,deAnnotate rhs)
+
+deAnnAlt :: AnnAlt bndr annot -> Alt bndr
+deAnnAlt (con,args,rhs) = (con,args,deAnnotate rhs)
 \end{code}
 

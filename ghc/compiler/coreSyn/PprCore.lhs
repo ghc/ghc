@@ -11,7 +11,7 @@
 module PprCore (
 	pprCoreExpr, pprParendExpr,
 	pprCoreBinding, pprCoreBindings, pprIdBndr,
-	pprCoreBinding, pprCoreBindings,
+	pprCoreBinding, pprCoreBindings, pprCoreAlt,
 	pprCoreRules, pprCoreRule, pprIdCoreRule
     ) where
 
@@ -71,6 +71,7 @@ pprCoreBinding  = pprTopBind pprCoreEnv
 pprCoreExpr     = ppr_noparend_expr pprCoreEnv
 pprParendExpr   = ppr_parend_expr   pprCoreEnv
 pprArg 	        = ppr_arg pprCoreEnv
+pprCoreAlt      = ppr_alt pprCoreEnv
 
 pprCoreEnv = initCoreEnv pprCoreBinder
 \end{code}
@@ -206,14 +207,12 @@ ppr_expr add_par pe (Case expr var alts)
   = add_par $
     sep [sep [ptext SLIT("case") <+> ppr_noparend_expr pe expr,
 	      ptext SLIT("of") <+> ppr_bndr var <+> char '{'],
-	 nest 4 (sep (punctuate semi (map ppr_alt alts))),
+	 nest 4 (sep (punctuate semi (map (ppr_alt pe) alts))),
 	 char '}'
     ]
   where
     ppr_bndr = pBndr pe CaseBind
  
-    ppr_alt (con, args, rhs) = hang (ppr_case_pat pe con args)
-			            4 (ppr_noparend_expr pe rhs)
 
 -- special cases: let ... in let ...
 -- ("disgusting" SLPJ)
@@ -270,6 +269,9 @@ ppr_expr add_par pe (Note InlineCall expr)
 
 ppr_expr add_par pe (Note InlineMe expr)
   = add_par $ ptext SLIT("__inline_me") <+> ppr_parend_expr pe expr
+
+ppr_alt pe (con, args, rhs) 
+  = hang (ppr_case_pat pe con args) 4 (ppr_noparend_expr pe rhs)
 
 ppr_case_pat pe con@(DataAlt dc) args
   | isTupleTyCon tc
