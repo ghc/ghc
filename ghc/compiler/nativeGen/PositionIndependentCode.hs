@@ -243,7 +243,12 @@ howToAccessLabel isJump lbl
    | otherwise = AccessViaSymbolPtr
 
 #else
-howToAccessLabel = panic "PositionIndependentCode.howToAccessLabel"
+--
+-- all other platforms
+--
+howToAccessLabel _ _
+        | not opt_PIC = AccessDirectly
+        | otherwise   = panic "howToAccessLabel: PIC not defined for this platform"
 #endif
 
 -- -------------------------------------------------------------------
