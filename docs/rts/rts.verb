@@ -20,6 +20,8 @@
 \marginparsep 0 in 
 \sloppy
 
+\usepackage{epsfig}
+
 \newcommand{\note}[1]{{\em Note: #1}}
 % DIMENSION OF TEXT:
 \textheight 8.5 in
@@ -54,7 +56,8 @@ Alastair Reid \\ Yale University}
 \tableofcontents
 \newpage
 
-\section{Introduction}
+\part{Introduction}
+\section{Overview}
 
 This document describes the GHC/Hugs run-time system.  It serves as 
 a Glasgow/Yale/Nottingham ``contract'' about what the RTS does.
@@ -176,74 +179,14 @@ the old generation is no bigger than the current new generation.
 
 \end{itemize}
 
-
-\section{The Scheduler}
-
-The Scheduler is the heart of the run-time system.  A running program
-consists of a single running thread, and a list of runnable and
-blocked threads.  The running thread returns to the scheduler when any
-of the following conditions arises:
-
-\begin{itemize}
-\item A heap check fails, and a garbage collection is required
-\item Compiled code needs to switch to interpreted code, and vice
-versa.
-\item The thread becomes blocked.
-\item The thread is preempted.
-\end{itemize}
-
-A running system has a global state, consisting of
-
-\begin{itemize}
-\item @Hp@, the current heap pointer, which points to the next
-available address in the Heap.
-\item @HpLim@, the heap limit pointer, which points to the end of the
-heap.
-\item The Thread Preemption Flag, which is set whenever the currently
-running thread should be preempted at the next opportunity.
-\item A list of runnable threads. 
-\item A list of blocked threads.
-\end{itemize}
-
-Each thread is represented by a Thread State Object (TSO), which is
-described in detail in Section \ref{sect:TSO}.
-
-The following is pseudo-code for the inner loop of the scheduler
-itself.
-
-@
-while (threads_exist) {
-  // handle global problems: GC, parallelism, etc
-  if (need_gc) gc();  
-  if (external_message) service_message();
-  // deal with other urgent stuff
-
-  pick a runnable thread;
-  do {
-    switch (thread->whatNext) {
-      case (RunGHC  pc): status=runGHC(pc);  break;
-      case (RunHugs bc): status=runHugs(bc); break;
-    }
-    switch (status) {  // handle local problems
-      case (StackOverflow): enlargeStack; break;
-      case (Error e)      : error(thread,e); break;
-      case (ExitWith e)   : exit(e); break;
-      case (Yield)        : break;
-    }
-  } while (thread_runnable);
-}
-@
-
-Optimisations to avoid excess trampolining from Hugs into itself.
-How do we invoke GC, ccalls, etc.
-General ccall (@ccall-GC@) and optimised ccall.
-
+%-----------------------------------------------------------------------------
+\part{Evaluation Model}
 \section{Compiled Execution}
 
 This section describes the framework in which compiled code evaluates
 expressions.  Only at certain points will compiled code need to be
 able to talk to the interpreted world; these are discussed in Section
-\ref{sec:hugs-ghc-interaction}.
+\ref{sect:switching-worlds}.
 
 \subsection{Calling conventions}
 
@@ -729,8 +672,30 @@ May have to revert black holes - ouch!
 
 \section{Interpreted Execution}
 
+This section describes how the Hugs interpreter interprets code in the
+same environment as compiled code executes.  Both evaluation models
+use a common garbage collector, so they must agree on the form of
+objects in the heap.
+
+Hugs interprets code by converting it to byte-code and applying a
+byte-code interpreter to it.  Wherever possible, we try to ensure that
+the byte-code is all that is required to interpret a section of code.
+This means not dynamically generating info tables, and hence we can
+only have a small number of possible heap objects each with a staticly
+compiled info table.  Similarly for stack objects: in fact we only
+have one Hugs stack object, in which all information is tagged for the
+garbage collector.
+
+There is, however, one exception to this rule.  Hugs must generate
+info tables for any constructors it is asked to compile, since the
+alternative is to force a context-switch each time compiled code
+enters a Hugs-built constructor, which would be prohibitively
+expensive.
+
 \subsection{Hugs Heap Objects}
 \label{sect:hugs-heap-objects}
+
+\subsubsection{Byte-Code Objects}
 
 Compiled byte code lives on the global heap, in objects called
 Byte-Code Objects (or BCOs).  The layout of BCOs is described in
@@ -747,26 +712,161 @@ collected some time later.
 A BCO represents a basic block of code - all entry points are at the
 beginning of a BCO, and it is impossible to jump into the middle of
 one.  A BCO represents not only the code for a function, but also its
-closure; a BCO can be entered just like any other closure.  The
-calling convention for any BCO is:
+closure; a BCO can be entered just like any other closure.  Hugs
+performs lambda-lifting during compilation to byte-code, and each
+top-level combinator becomes a BCO in the heap.
+
+\subsubsection{Thunks}
+
+A thunk consists of a code pointer, and values for the free variables
+of that code.  Since Hugs byte-code is lambda-lifted, free variables
+become arguments and are expected to be on the stack by the called
+function.
+
+Hugs represents thunks with an AP object.  The AP object contains one
+or more pointers to other heap objects.  When it is entered, it pushes
+an update frame followed by its payload on the stack, and enters the
+first word (which will be a pointer to a BCO).  The layout of AP
+objects is described in more detail in Section \ref{sect:AP}.
+
+\subsubsection{Partial Applications}
+
+Partial applications are represented by PAP objects.  A PAP object is
+exactly the same as an AP object, except that it is non-updatable.
+The layout of PAP objects is described in Section \ref{sect:PAP}.
+
+\subsection{Calling conventions}
+\label{sect:hugs-calling-conventions}
+
+The calling convention for any byte-code function is straightforward:
 
 \begin{itemize}
 \item Push any arguments on the stack.
-\item If the code has free variables, push their values on the stack
-(in a pre-defined order, pointers first).
+\item Push a pointer to the BCO.
 \item Begin interpreting the byte code.
 \end{itemize}
 
-If the code has free variables, it cannot be entered directly.  The
-values for the free variables come from a thunk, which is represented
-by an AP object (Section \ref{sect:AP}).  The AP object contains a
-pointer to a BCO and a number of values.  When entered, it pushes the
-values on the stack and enters the BCO.  
+The @ENTER@ byte-code instruction decides how to enter its argument.
+The object being entered must be either
 
-The AP object can be used for both thunks and partial applications,
-since the calling convention is the same in each case.  The AP object
-has a counterpart which is used for Hugs return addresses, as we shall
-see in Section \ref{ghc-to-hugs-return}.
+\begin{itemize}
+\item A BCO,
+\item An AP,
+\item A PAP,
+\item A constructor,
+\item A GHC-built closure, or
+\item An indirection.
+\end{itemize}
+
+If @ENTER@ is applied to a BCO, we just begin interpreting the
+byte-code contained therein.  If the object is an AP, we push an
+update frame, push the values from the AP on the stack, and enter its
+associated object.  If the object is a PAP, we push its values on the
+stack and enter the first one.  If the object is a constructor, we
+simply return (see Section \ref{sect:hugs-return-convention}).  The
+fourth case is convered in Section \ref{sect:hugs-to-ghc-closure}.  If
+the object is an indirection, we simply enter the object it points to.
+
+\subsection{Return convention}
+\label{sect:hugs-return-convention}
+
+When Hugs pushes a return address, it pushes both a pointer to the BCO
+to return to, and a pointer to a static code fragment @HUGS_RET@ (this
+will be described in Section \ref{sect:ghc-to-hugs-return}).  The
+stack layout is shown in Figure \ref{fig:hugs-return-fig}.
+
+\begin{figure}
+\begin{center}
+\input{hugs_ret.pstex_t}
+\end{center}
+\caption{Stack layout for a hugs return address}
+\label{fig:hugs-return-stack}
+\end{figure}
+
+\begin{figure}
+\begin{center}
+\input{hugs_ret2.pstex_t}
+\end{center}
+\caption{Stack layout on enterings a hugs return address}
+\label{fig:hugs-return2}
+\end{figure}
+
+When a Hugs byte-code sequence is returning, it first places the
+return value on the stack.  It then examines the return address (now
+the second word on the stack):
+
+\begin{itemize}
+
+\item If the return address is @HUGS_RET@, rearrange the stack so that
+it has the returned object followed by the pointer to the BCO at the
+top, then enter the BCO (Figure \ref{fig:hugsreturn2}).
+
+\item If the top of the stack is not @HUGS_RET@, we need to do a world
+switch as described in Section \ref{sect:hugs-to-ghc-return}.
+
+\end{itemize}
+
+
+\section{The Scheduler}
+
+The Scheduler is the heart of the run-time system.  A running program
+consists of a single running thread, and a list of runnable and
+blocked threads.  The running thread returns to the scheduler when any
+of the following conditions arises:
+
+\begin{itemize}
+\item A heap check fails, and a garbage collection is required
+\item Compiled code needs to switch to interpreted code, and vice
+versa.
+\item The thread becomes blocked.
+\item The thread is preempted.
+\end{itemize}
+
+A running system has a global state, consisting of
+
+\begin{itemize}
+\item @Hp@, the current heap pointer, which points to the next
+available address in the Heap.
+\item @HpLim@, the heap limit pointer, which points to the end of the
+heap.
+\item The Thread Preemption Flag, which is set whenever the currently
+running thread should be preempted at the next opportunity.
+\item A list of runnable threads. 
+\item A list of blocked threads.
+\end{itemize}
+
+Each thread is represented by a Thread State Object (TSO), which is
+described in detail in Section \ref{sect:TSO}.
+
+The following is pseudo-code for the inner loop of the scheduler
+itself.
+
+@
+while (threads_exist) {
+  // handle global problems: GC, parallelism, etc
+  if (need_gc) gc();  
+  if (external_message) service_message();
+  // deal with other urgent stuff
+
+  pick a runnable thread;
+  do {
+    switch (thread->whatNext) {
+      case (RunGHC  pc): status=runGHC(pc);  break;
+      case (RunHugs bc): status=runHugs(bc); break;
+    }
+    switch (status) {  // handle local problems
+      case (StackOverflow): enlargeStack; break;
+      case (Error e)      : error(thread,e); break;
+      case (ExitWith e)   : exit(e); break;
+      case (Yield)        : break;
+    }
+  } while (thread_runnable);
+}
+@
+
+Optimisations to avoid excess trampolining from Hugs into itself.
+How do we invoke GC, ccalls, etc.
+General ccall (@ccall-GC@) and optimised ccall.
 
 \section{Switching Worlds}
 
@@ -827,29 +927,12 @@ The code for both objects is the same:
 \end{itemize}
 
 \subsection{A GHC thread returns to a Hugs-compiled return address}
-\label{ghc-to-hugs-return}
+\label{sect:ghc-to-hugs-return}
 
-When Hugs pushes return addresses on the stack, they look like this:
-
-@
-	|		|
-	|_______________|
-	|               |  -----> bytecode object
-	|_______________|
-	|               |  _____
-	|_______________|	| 
-				|	_____
-				|	|    | Info Table
-				|	|    | 
-				|_____\	|____| hugs_return
-				      /	.    .
-					.    . Code
-					.    .
-@
-
-If GHC is returning, it will return to the address at the top of the
-stack.  This address is a pointer to a statically compiled code
-fragment called @hugs_return@, which:
+Hugs return addresses are laid out as in Figure
+\ref{fig:hugs-return-stack}.  If GHC is returning, it will return to
+the address at the top of the stack, namely @HUGS_RET@.  The code at
+@HUGS_RET@ performs the following:
 
 \begin{itemize}
 \item pushes \Arg{1} (the return value) on the stack.
@@ -858,8 +941,9 @@ fragment called @hugs_return@, which:
 \end{itemize}
 
 \noindent When Hugs runs, it will enter the return value, which will
-return using the correct Hugs convention to the return address
-underneath it on the stack.
+return using the correct Hugs convention (Section
+\ref{sect:hugs-return-convention}) to the return address underneath it
+on the stack.
 
 \subsection{A Hugs thread enters a GHC-compiled closure}
 \label{sect:hugs-to-ghc-closure}
@@ -886,21 +970,10 @@ following sequence of instructions:
 \subsection{A Hugs thread returns to a GHC-compiled return address}
 \label{sect:hugs-to-ghc-return}
 
-When Hugs is about to return, the stack looks like this:
-
-@
-	|		|
-	|_______________|
-	|               |  -----> return address
-	|_______________|
-	|               |  -----> object being returned
-	|_______________|  
-				
-@
-
-The return address is recognisable as a GHC-return address by virtue
-of not being @hugs_return@.  Hugs recognises that it needs to do a
-world-switch and performs the following sequence:
+When hugs encounters a return address on the stack that is not
+@HUGS_RET@, it knows that a world-switch is required.  At this point
+the stack contains a pointer to the return value, followed by the GHC
+return address.  The following sequence is then performed:
 
 \begin{itemize}
 \item save the state of the thread in the TSO.
@@ -908,10 +981,10 @@ world-switch and performs the following sequence:
 \end{itemize}
 
 The first thing that GHC will do is enter the object on the top of the
-stack, which is a pointer to the value being returned.  This value
-will then return itself to the return address using the GHC return
-convention.
+stack, which is a pointer to the return value.  This value will then
+return itself to the return address using the GHC return convention.
 
+\part{Implementation}
 \section{Heap objects}
 \label{sect:fixed-header}
 
@@ -1398,7 +1471,7 @@ which can be executed by Hugs.  For a top-level function, the BCO also
 serves as the closure for the function.
 
 The semantics of BCOs are described in Section
-\ref{hugs-heap-objects}.  A BCO has the following structure:
+\ref{sect:hugs-heap-objects}.  A BCO has the following structure:
 
 \begin{center}
 \begin{tabular}{|l|l|l|l|l|l|}
@@ -1413,7 +1486,7 @@ The semantics of BCOs are described in Section
 \begin{itemize}
 \item \emph{BCO} is a pointer to a static code fragment/info table that
 returns to the scheduler to invoke Hugs (Section
-\ref{ghc-to-hugs-closure}).
+\ref{sect:ghc-to-hugs-closure}).
 \item \emph{Layout} contains the number of pointer literals in the
 \emph{Literals} field.
 \item \emph{Offset} is the offset to the byte code from the start of
@@ -1428,11 +1501,8 @@ code.
 \subsubsection{AP objects}
 \label{sect:AP}
 
-Hugs uses a standard object for thunks, partial applications and
-return addresses.  Thunks and partial applications live on the heap,
-whereas return addresses live on the stack.
-
-The layout of an AP is 
+Hugs uses a standard object called an AP for thunks and partial
+applications.  The layout of an AP is
 
 \begin{center}
 \begin{tabular}{|l|l|l|l|}
@@ -1447,7 +1517,7 @@ The layout of an AP is
 \begin{itemize}
 \item \emph{AP} is a pointer to a statically-compiled code
 fragment/info table that returns to the scheduler to invoke Hugs
-(Sections \ref{ghc-to-hugs-closure}, \ref{ghc-to-hugs-return}).
+(Sections \ref{sect:ghc-to-hugs-closure}, \ref{sect:ghc-to-hugs-return}).
 \item \emph{BCO} is a pointer to the BCO for the thunk.
 \item \emph{Layout} contains the number of pointers and the size of
 the \emph{Free Variables} field.
@@ -2835,6 +2905,7 @@ to implement than Sparud's.
 \subsection{Internal workings of the Generational Collector}
 
 
+\section{Dynamic Linking}
 
 \section{Profiling}
 
