@@ -32,7 +32,7 @@ module TcMonad(
 	tcAddErrCtxtM, tcSetErrCtxtM,
 	tcAddErrCtxt, tcSetErrCtxt,
 
-	tcNewMutVar, tcReadMutVar, tcWriteMutVar, TcRef,
+	tcNewMutVar, tcNewSigTyVar, tcReadMutVar, tcWriteMutVar, TcRef,
 	tcNewMutTyVar, tcReadMutTyVar, tcWriteMutTyVar,
 
 	TcError, TcWarning, TidyEnv, emptyTidyEnv,
@@ -52,7 +52,7 @@ import Bag		( Bag, emptyBag, isEmptyBag,
 			  foldBag, unitBag, unionBags, snocBag )
 import Class		( Class )
 import Name		( Name )
-import Var		( TyVar, newMutTyVar, readMutTyVar, writeMutTyVar )
+import Var		( TyVar, newMutTyVar, newSigTyVar, readMutTyVar, writeMutTyVar )
 import VarEnv		( TyVarEnv, emptyVarEnv, TidyEnv, emptyTidyEnv )
 import VarSet		( TyVarSet )
 import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply, splitUniqSupply,
@@ -429,6 +429,9 @@ tcReadMutVar var down env = readIORef var
 
 tcNewMutTyVar :: Name -> Kind -> NF_TcM s TyVar
 tcNewMutTyVar name kind down env = newMutTyVar name kind
+
+tcNewSigTyVar :: Name -> Kind -> NF_TcM s TyVar
+tcNewSigTyVar name kind down env = newSigTyVar name kind
 
 tcReadMutTyVar :: TyVar -> NF_TcM s (Maybe Type)
 tcReadMutTyVar tyvar down env = readMutTyVar tyvar

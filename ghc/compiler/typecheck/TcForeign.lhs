@@ -27,7 +27,7 @@ import RnHsSyn		( RenamedHsDecl, RenamedForeignDecl )
 
 import TcMonad
 import TcEnv		( newLocalId )
-import TcType		( tcInstTcType, typeToTcType, tcSplitRhoTy, zonkTcTypeToType )
+import TcType		( typeToTcType, tcSplitRhoTy, zonkTcTypeToType )
 import TcMonoType	( tcHsTopBoxedType )
 import TcHsSyn		( TcMonoBinds, TypecheckedForeignDecl,
 			  TcForeignExportDecl )

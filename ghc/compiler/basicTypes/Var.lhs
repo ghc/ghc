@@ -15,8 +15,9 @@ module Var (
 	TyVar,
 	tyVarName, tyVarKind,
 	setTyVarName, setTyVarUnique,
-	mkTyVar, mkSysTyVar, isTyVar,
-	newMutTyVar, readMutTyVar, writeMutTyVar, isMutTyVar, makeTyVarImmutable,
+	mkTyVar, mkSysTyVar, isTyVar, isSigTyVar,
+	newMutTyVar, newSigTyVar,
+	readMutTyVar, writeMutTyVar, isMutTyVar, makeTyVarImmutable,
 
 	-- Ids
 	Id, DictId,
@@ -76,7 +77,9 @@ data VarDetails
   | ConstantId Con			-- The Id for a constant (data constructor or primop)
   | RecordSelId FieldLabel		-- The Id for a record selector
   | TyVar
-  | MutTyVar (IORef (Maybe Type))	-- Used during unification
+  | MutTyVar (IORef (Maybe Type)) 	-- Used during unification;
+	     Bool			-- True <=> this is a type signature variable, which
+					--	    should not be unified with a non-tyvar type
 
 -- For a long time I tried to keep mutable Vars statically type-distinct
 -- from immutable Vars, but I've finally given up.   It's just too painful.
@@ -177,13 +180,21 @@ newMutTyVar name kind =
      return (Var { varName = name, 
 		   realUnique = getKey (nameUnique name),
 		   varType = kind, 
-		   varDetails = MutTyVar loc })
+		   varDetails = MutTyVar loc False})
+
+newSigTyVar :: Name -> Kind -> IO TyVar
+newSigTyVar name kind = 
+  do loc <- newIORef Nothing
+     return (Var { varName = name, 
+		   realUnique = getKey (nameUnique name),
+		   varType = kind, 
+		   varDetails = MutTyVar loc True})
 
 readMutTyVar :: TyVar -> IO (Maybe Type)
-readMutTyVar (Var {varDetails = MutTyVar loc}) = readIORef loc
+readMutTyVar (Var {varDetails = MutTyVar loc _}) = readIORef loc
 
 writeMutTyVar :: TyVar -> Maybe Type -> IO ()
-writeMutTyVar (Var {varDetails = MutTyVar loc}) val = writeIORef loc val
+writeMutTyVar (Var {varDetails = MutTyVar loc _}) val = writeIORef loc val
 
 makeTyVarImmutable :: TyVar -> TyVar
 makeTyVarImmutable tyvar = tyvar { varDetails = TyVar}
@@ -192,13 +203,17 @@ makeTyVarImmutable tyvar = tyvar { varDetails = TyVar}
 \begin{code}
 isTyVar :: Var -> Bool
 isTyVar (Var {varDetails = details}) = case details of
-					TyVar      -> True
-					MutTyVar _ -> True
-					other	   -> False
+					TyVar        -> True
+					MutTyVar _ _ -> True
+					other	     -> False
 
 isMutTyVar :: Var -> Bool
-isMutTyVar (Var {varDetails = MutTyVar _}) = True
-isMutTyVar other			       = False
+isMutTyVar (Var {varDetails = MutTyVar _ _}) = True
+isMutTyVar other			     = False
+
+isSigTyVar :: Var -> Bool
+isSigTyVar (Var {varDetails = MutTyVar _ is_sig}) = is_sig
+isSigTyVar other			          = False
 \end{code}
 
 

@@ -22,18 +22,18 @@ import TcEnv		( tcExtendTyVarEnv, tcLookupTy, tcGetValueEnv, tcGetInScopeTyVars,
 			  tcGetGlobalTyVars, TcTyThing(..)
 			)
 import TcType		( TcType, TcKind, TcTyVar, TcThetaType, TcTauType,
-			  typeToTcType, tcInstTcType, kindToTcKind,
-			  newKindVar,
+			  typeToTcType, kindToTcKind,
+			  newKindVar, tcInstSigVar,
 			  zonkTcKindToKind, zonkTcTypeToType, zonkTcTyVars, zonkTcType
 			)
 import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToIdBndr )
 import TcUnify		( unifyKind, unifyKinds, unifyTypeKind )
 import Type		( Type, ThetaType, 
 			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy, zipFunTys,
-			  mkSigmaTy, mkDictTy, mkTyConApp, mkAppTys, splitRhoTy,
+			  mkSigmaTy, mkDictTy, mkTyConApp, mkAppTys, splitForAllTys, splitRhoTy,
 			  boxedTypeKind, unboxedTypeKind, tyVarsOfType,
 			  mkArrowKinds, getTyVar_maybe, getTyVar,
-		  	  tidyOpenType, tidyOpenTypes, tidyTyVar
+		  	  tidyOpenType, tidyOpenTypes, tidyTyVar, fullSubstTy
 			)
 import Id		( mkUserId, idName, idType, idFreeTyVars )
 import Var		( TyVar, mkTyVar )
@@ -379,19 +379,26 @@ mkTcSig poly_id src_loc
 	-- the tyvars *do* get unified with something, we want to carry on
 	-- typechecking the rest of the program with the function bound
 	-- to a pristine type, namely sigma_tc_ty
-   tcInstTcType (idType poly_id)		`thenNF_Tc` \ (tyvars, rho) ->
    let
-     (theta, tau) = splitRhoTy rho
-	-- This splitSigmaTy tries hard to make sure that tau' is a type synonym
+	(tyvars, rho) = splitForAllTys (idType poly_id)
+   in
+   mapNF_Tc tcInstSigVar tyvars		`thenNF_Tc` \ tyvars' ->
+	-- Make *signature* type variables
+
+   let
+     tyvar_tys' = mkTyVarTys tyvars'
+     rho' = fullSubstTy (zipVarEnv tyvars tyvar_tys') emptyVarSet rho
+     (theta', tau') = splitRhoTy rho'
+	-- This splitRhoTy tries hard to make sure that tau' is a type synonym
 	-- wherever possible, which can improve interface files.
    in
    newMethodWithGivenTy SignatureOrigin 
 		poly_id
-		(mkTyVarTys tyvars) 
-		theta tau			`thenNF_Tc` \ inst ->
+		tyvar_tys'
+		theta' tau'			`thenNF_Tc` \ inst ->
 	-- We make a Method even if it's not overloaded; no harm
 	
-   returnNF_Tc (TySigInfo name poly_id tyvars theta tau (instToIdBndr inst) inst src_loc)
+   returnNF_Tc (TySigInfo name poly_id tyvars' theta' tau' (instToIdBndr inst) inst src_loc)
   where
     name = idName poly_id
 \end{code}

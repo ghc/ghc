@@ -26,6 +26,7 @@ module TcType (
   tcSplitRhoTy,
 
   tcInstTyVars,
+  tcInstSigVar,
   tcInstTcType,
 
   typeToTcType,
@@ -172,13 +173,13 @@ tcInstTyVars :: [TyVar]
 	     -> NF_TcM s ([TcTyVar], [TcType], TyVarEnv TcType)
 
 tcInstTyVars tyvars
-  = mapNF_Tc inst_tyvar tyvars	`thenNF_Tc` \ tc_tyvars ->
+  = mapNF_Tc tcInstTyVar tyvars	`thenNF_Tc` \ tc_tyvars ->
     let
 	tys = mkTyVarTys tc_tyvars
     in
     returnNF_Tc (tc_tyvars, tys, zipVarEnv tyvars tys)
 
-inst_tyvar tyvar	-- Could use the name from the tyvar?
+tcInstTyVar tyvar
   = tcGetUnique 		`thenNF_Tc` \ uniq ->
     let
 	name = setNameUnique (tyVarName tyvar) uniq
@@ -208,6 +209,15 @@ inst_tyvar tyvar	-- Could use the name from the tyvar?
 	returnNF_Tc kind)	`thenNF_Tc` \ kind' ->
 
     tcNewMutTyVar name kind'
+
+tcInstSigVar tyvar	-- Very similar to tcInstTyVar
+  = tcGetUnique 	`thenNF_Tc` \ uniq ->
+    let 
+	name = setNameUnique (tyVarName tyvar) uniq
+	kind = tyVarKind tyvar
+    in
+    ASSERT( not (kind == openTypeKind) )	-- Shouldn't happen
+    tcNewSigTyVar name kind
 \end{code}
 
 @tcInstTcType@ instantiates the outer-level for-alls of a TcType with

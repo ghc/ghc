@@ -25,7 +25,7 @@ import Type	( Type(..), tyVarsOfType, funTyCon,
 import TyCon	( TyCon, isTupleTyCon, isUnboxedTupleTyCon, 
 		  tyConArity )
 import Name	( hasBetterProv )
-import Var	( TyVar, tyVarKind, varName )
+import Var	( TyVar, tyVarKind, varName, isSigTyVar )
 import VarEnv	
 import VarSet	( varSetElems )
 import TcType	( TcType, TcTauType, TcTyVar, TcKind, 
@@ -271,13 +271,17 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2@(TyVarTy tv2)
 
 	Nothing -> checkKinds swapped tv1 ty2			`thenTc_`
 
-			-- Try to update sys-y type variables in preference to sig-y ones
-		   if varName tv1 `hasBetterProv` varName tv2 then
-			tcPutTyVar tv2 (TyVarTy tv1)				`thenNF_Tc_`
+		   if tv1 `dominates` tv2 then
+			tcPutTyVar tv2 (TyVarTy tv1)		`thenNF_Tc_`
 			returnTc ()
 		   else
-			tcPutTyVar tv1 ps_ty2					`thenNF_Tc_`
+			tcPutTyVar tv1 ps_ty2			`thenNF_Tc_`
 			returnTc ()
+  where
+    tv1 `dominates` tv2 =  isSigTyVar tv1 
+				-- Don't unify a signature type variable if poss
+			|| varName tv1 `hasBetterProv` varName tv2 
+				-- Try to update sys-y type variables in preference to sig-y ones
 
 	-- Second one isn't a type variable
 uUnboundVar swapped tv1 maybe_ty1 ps_ty2 non_var_ty2
@@ -286,9 +290,11 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 non_var_ty2
   = returnTc ()
 
   | otherwise
-  = checkKinds swapped tv1 non_var_ty2		`thenTc_`
-    occur_check non_var_ty2			`thenTc_`
-    tcPutTyVar tv1 ps_ty2			`thenNF_Tc_`
+  = checkKinds swapped tv1 non_var_ty2			`thenTc_`
+    occur_check non_var_ty2				`thenTc_`
+    checkTcM (not (isSigTyVar tv1))
+	     (failWithTcM (unifyWithSigErr tv1 ps_ty2))	`thenTc_`
+    tcPutTyVar tv1 ps_ty2				`thenNF_Tc_`
     returnTc ()
   where
     occur_check ty = mapTc occur_check_tv (varSetElems (tyVarsOfType ty))	`thenTc_`
@@ -481,6 +487,13 @@ unifyMisMatch ty1 ty2
 			   quotes (ppr tidy_ty2)])
     in
     failWithTcM (env, msg)
+
+unifyWithSigErr tyvar ty
+  = (env2, hang (ptext SLIT("Cannot unify the type-signature variable") <+> quotes (ppr tidy_tyvar))
+	      4 (ptext SLIT("with the type") <+> quotes (ppr tidy_ty)))
+  where
+    (env1, tidy_tyvar) = tidyTyVar emptyTidyEnv tyvar
+    (env2, tidy_ty)    = tidyOpenType  env1     ty
 
 unifyOccurCheck tyvar ty
   = (env2, hang (ptext SLIT("Occurs check: cannot construct the infinite type:"))
