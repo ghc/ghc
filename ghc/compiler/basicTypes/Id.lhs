@@ -96,6 +96,7 @@ import Type		( Type, typePrimRep, addFreeTyVars,
 import IdInfo 
 
 import qualified Demand	( Demand )
+import DataCon		( isUnboxedTupleCon )
 import NewDemand	( Demand, StrictSig, topDmd, topSig, isBottomingSig )
 import Name	 	( Name, OccName,
 			  mkSystemName, mkSystemNameEncoded, mkInternalName,
@@ -276,11 +277,13 @@ isDataConWrapId id = case globalIdDetails id of
 -- binding, even though it is defined in this module.  
 -- Data constructor workers used to be things of this kind, but
 -- they aren't any more.  Instead, we inject a binding for 
--- them at the CorePrep stage.
+-- them at the CorePrep stage. 
+-- EXCEPT: unboxed tuples, which definitely have no binding
 hasNoBinding id = case globalIdDetails id of
-			PrimOpId _  -> True
-			FCallId _   -> True
-			other	    -> False
+			PrimOpId _  	 -> True
+			FCallId _   	 -> True
+			DataConWorkId dc -> isUnboxedTupleCon dc
+			other	         -> False
 
 isImplicitId :: Id -> Bool
 	-- isImplicitId tells whether an Id's info is implied by other
