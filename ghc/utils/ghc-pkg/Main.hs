@@ -406,7 +406,13 @@ expandEnvVars pkg defines force = do
 	      , extra_frameworks= e_frames
 	      })
   where
-   expandStrings = mapM expandString
+   expandStrings vs = do
+     xs <- mapM expandString vs
+       -- Flatten the elements of the expanded list; this is
+       -- to permit substitutions for list-valued variables. e.g.,
+       --     package_deps["${deps}"] where env var (say) 'deps'
+       -- is "base,haskell98,network"
+     return (concat (map (wordsBy (==',')) xs))
    
     -- Just for fun, keep this in the IO monad.
    expandString :: String -> IO String
@@ -429,6 +435,11 @@ expandEnvVars pkg defines force = do
 	   (\ _ -> do dieOrForce force ("Unable to expand variable " ++ 
 					show nm)
 		      return "")
+
+wordsBy :: (Char -> Bool) -> String -> [String]
+wordsBy p s = case dropWhile p s of
+  "" -> []
+  s' -> w : wordsBy p s'' where (w,s'') = break p s'
 
 -----------------------------------------------------------------------------
 
