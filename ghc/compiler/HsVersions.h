@@ -10,6 +10,12 @@ you will screw up the layout where they are used in case expressions!
 
 #endif
 
+#ifdef __GLASGOW_HASKELL__
+#define GLOBAL_VAR(name,value,ty)  \
+name = global (value) :: IORef (ty); \
+{-# NOINLINE name #-}
+#endif
+
 #define COMMA ,
 
 #ifdef DEBUG
