@@ -2,6 +2,7 @@ include ($confdir ++ "/../vanilla-test.T")
 
 test "IOError001"	{ $stdin = "IOError001.hs" 
 			  vtr("","","") }
+test "IOError002" 	{ vtr("","","") }
 test "finalization001" 	{ vtr("","","") }
 test "hClose001" 	{ vtr("","","") }
 test "hFileSize001" 	{ vtr("","","") }
