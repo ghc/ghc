@@ -340,6 +340,7 @@ eq_fld env (ns1,bt1) (ns2, bt2) = ns1==ns2 && eq_btype env bt1 bt2
 eq_btype env (Banged t1)   (Banged t2)   = eq_hsType env t1 t2
 eq_btype env (Unbanged t1) (Unbanged t2) = eq_hsType env t1 t2
 eq_btype env (Unpacked t1) (Unpacked t2) = eq_hsType env t1 t2
+eq_btype env _             _             = False
 \end{code}
 
 \begin{code}
