@@ -28,3 +28,9 @@ j (C (a,b)) = a + b
 data D a b = D Int !(a,b) !(E Int)
 data E a = E a
 k (D a (b,c) (E d)) = a + b + c + d
+
+-- test 6: records
+data F a b = F { x :: !Int, y :: !(Float,Float), z :: !(a,b) }
+l F{x = a} = a
+m (F a b c) = a
+n F{z = (a,b)} = a
