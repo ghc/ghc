@@ -1,1 +1,1 @@
-mdofail005.hs:10: parse error on input `<-'
+mdofail005.hs:10:13: parse error on input `<-'
