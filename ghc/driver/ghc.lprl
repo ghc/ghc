@@ -370,7 +370,7 @@ require special handling.
 # We need to look in ghc/ and glaExts/ when searching for implicitly needed .hi files, but 
 # we should really *not* look there for explicitly imported modules.
 
-$Haskell1Version = 4; # i.e., Haskell 1.4
+$Haskell1Version = 5; # i.e., Haskell 1.4
 @Cpp_define	 = ();
 
 # Cpp symbols defined when we're processing Haskell source.
@@ -2288,7 +2288,7 @@ sub process_ghc_timings {
     local($tot_samples) = 0;
 
     while (<STATS>) {
-	if (! /Gen:\s+0/ && /^\s*\d+\s+\d+\s+(\d+)\s+\d+\.\d+/ ) {
+	if (! /Gen:\s+0/ && ! /Minor/ && /^\s*\d+\s+\d+\s+(\d+)\s+\d+\.\d+/ ) {
 	 	$max_live = $1 if $max_live < $1;
 		$tot_live += $1;
 		$tot_samples += 1;
