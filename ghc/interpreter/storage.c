@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.35 $
- * $Date: 2000/01/10 17:06:41 $
+ * $Revision: 1.36 $
+ * $Date: 2000/01/10 17:19:32 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"

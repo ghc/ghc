@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.30 $
- * $Date: 2000/01/10 17:06:41 $
+ * $Revision: 1.31 $
+ * $Date: 2000/01/10 17:19:33 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -439,7 +439,7 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
         setCurrModule(modulePrelude);
 
         /* primops */
-        nameMkIO           = linkName("primMkIO");
+        nameMkIO           = linkName("hugsprimMkIO");
         for (i=0; asmPrimOps[i].name; ++i) {
             Text t = findText(asmPrimOps[i].name);
             Name n = findName(t);
@@ -470,7 +470,7 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
 #       endif                          
         /* translator                               */
         nameEqChar         = linkName("primEqChar");
-        nameCreateAdjThunk = linkName("primCreateAdjThunk");
+        nameCreateAdjThunk = linkName("hugsprimCreateAdjThunk");
         namePmInt          = linkName("hugsprimPmInt");
         namePmInteger      = linkName("hugsprimPmInteger");
         namePmDouble       = linkName("primPmDouble");
