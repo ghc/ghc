@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.21 2001/08/29 14:55:58 sewardj Exp $
+ * $Id: RtsUtils.c,v 1.22 2001/08/29 15:02:02 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -115,7 +115,11 @@ stgReallocWords (void *p, int n, char *msg)
 void *
 stgCallocBytes (int n, int m, char *msg)
 {
-  return stgMallocBytes(n*m, msg);
+  int   i;
+  int   sz = n * m;
+  char* p  = stgMallocBytes(sz, msg);
+  for (i = 0; i < sz; i++) p[i] = 0;
+  return p;
 }
 
 void 
