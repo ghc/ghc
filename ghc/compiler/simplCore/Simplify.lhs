@@ -34,7 +34,7 @@ import IdInfo		( OccInfo(..), isLoopBreaker,
 			)
 import NewDemand	( isStrictDmd )
 import Unify		( coreRefineTys )
-import DataCon		( dataConTyCon, dataConRepStrictness, isVanillaDataCon )
+import DataCon		( dataConTyCon, dataConRepStrictness, isVanillaDataCon, dataConResTy )
 import TyCon		( tyConArity )
 import CoreSyn
 import PprCore		( pprParendExpr, pprCoreExpr )
@@ -48,9 +48,11 @@ import CoreUtils	( exprIsDupable, exprIsTrivial, needsCaseBinding,
 import Rules		( lookupRule )
 import BasicTypes	( isMarkedStrict )
 import CostCentre	( currentCCS )
-import Type		( isUnLiftedType, seqType, tyConAppArgs, funArgTy,
-			  splitFunTy_maybe, splitFunTy, eqType, substTy
+import Type		( TvSubstEnv, isUnLiftedType, seqType, tyConAppArgs, funArgTy,
+			  splitFunTy_maybe, splitFunTy, eqType, substTy,
+			  mkTyVarTys, mkTyConApp
 			)
+import VarEnv		( elemVarEnv )
 import Subst		( SubstResult(..), emptySubst, substExpr, 
 			  substId, simplIdInfo )
 import TysPrim		( realWorldStatePrimTy )
@@ -62,7 +64,7 @@ import OrdList
 import Maybe		( Maybe )
 import Maybes		( orElse )
 import Outputable
-import Util             ( notNull )
+import Util             ( notNull, equalLength )
 \end{code}
 
 
@@ -1323,11 +1325,11 @@ rebuildCase env scrut case_bndr alts cont
     in
 
 	-- Deal with variable scrutinee
-    simplCaseBinder env scrut case_bndr 	`thenSmpl` \ (alt_env, case_bndr', zap_occ_info) ->
+    simplCaseBinder env scrut case_bndr 	`thenSmpl` \ (alt_env, case_bndr') ->
 
 	-- Deal with the case alternatives
-    simplAlts alt_env zap_occ_info handled_cons
-	      case_bndr' better_alts dup_cont res_ty'	`thenSmpl` \ alts' ->
+    simplAlts alt_env handled_cons
+	      case_bndr' better_alts dup_cont 	`thenSmpl` \ alts' ->
 
 	-- Put the case back together
     mkCase scrut case_bndr' res_ty' alts'	`thenSmpl` \ case_expr ->
@@ -1404,10 +1406,19 @@ the same for the pattern-bound variables!  Example:
 Here, b and p are dead.  But when we move the argment inside the first
 case RHS, and eliminate the second case, we get
 
-	case x or { (a,b) -> a b }
+	case x of { (a,b) -> a b }
 
 Urk! b is alive!  Reason: the scrutinee was a variable, and case elimination
-happened.  Hence the zap_occ_info function returned by simplCaseBinder
+happened.  
+
+Indeed, this can happen anytime the case binder isn't dead:
+	case <any> of x { (a,b) -> 
+        case x of { (p,q) -> p } }
+Here (a,b) both look dead, but come alive after the inner case is eliminated.
+The point is that we bring into the envt a binding
+	let x = (a,b) 
+after the outer case, and that makes (a,b) alive.  At least we do unless
+the case binder is guaranteed dead.
 
 \begin{code}
 simplCaseBinder env (Var v) case_bndr
@@ -1417,87 +1428,111 @@ simplCaseBinder env (Var v) case_bndr
 --     not (isEvaldUnfolding (idUnfolding v))
 
   = simplBinder env (zap case_bndr)		`thenSmpl` \ (env, case_bndr') ->
-    returnSmpl (modifyInScope env v case_bndr', case_bndr', zap)
+    returnSmpl (modifyInScope env v case_bndr', case_bndr')
 	-- We could extend the substitution instead, but it would be
 	-- a hack because then the substitution wouldn't be idempotent
-	-- any more (v is an OutId).  And this just just as well.
+	-- any more (v is an OutId).  And this does just as well.
   where
     zap b = b `setIdOccInfo` NoOccInfo
 	    
 simplCaseBinder env other_scrut case_bndr 
   = simplBinder env case_bndr 		`thenSmpl` \ (env, case_bndr') ->
-    returnSmpl (env, case_bndr', \ bndr -> bndr)	-- NoOp on bndr
+    returnSmpl (env, case_bndr')
 \end{code}
 
 
 
 \begin{code}
 simplAlts :: SimplEnv 
-	  -> (InId -> InId)		-- Occ-info zapper
 	  -> [AltCon]			-- Alternatives the scrutinee can't be
 					-- in the default case
 	  -> OutId			-- Case binder
 	  -> [InAlt] -> SimplCont
-	  -> OutType			-- Result type
 	  -> SimplM [OutAlt]		-- Includes the continuation
 
-simplAlts env zap_occ_info handled_cons case_bndr' alts cont' res_ty'
+simplAlts env handled_cons case_bndr' alts cont'
   = mapSmpl simpl_alt alts
   where
-    mk_rhs_env env case_bndr_unf
-	= modifyInScope env case_bndr' (case_bndr' `setIdUnfolding` case_bndr_unf)
+    simpl_alt alt = simplAlt env handled_cons case_bndr' alt cont'	`thenSmpl` \ (_, alt') ->
+	 	    returnSmpl alt'
 
-    simpl_alt (DEFAULT, _, rhs)
-	= let unf = mkOtherCon handled_cons in
-		-- Record the constructors that the case-binder *can't* be.
-	  simplExprC (mk_rhs_env env unf) rhs cont'	`thenSmpl` \ rhs' ->
-	  returnSmpl (DEFAULT, [], rhs')
+simplAlt :: SimplEnv -> [AltCon] -> OutId -> InAlt -> SimplCont
+	 -> SimplM (Maybe TvSubstEnv, OutAlt)
+-- Simplify an alternative, returning the type refinement for the 
+-- alternative, if the alternative does any refinement at all
 
-    simpl_alt (LitAlt lit, _, rhs)
-	= let unf = mkUnfolding False (Lit lit) in
-	  simplExprC (mk_rhs_env env unf) rhs cont'	`thenSmpl` \ rhs' ->
-	  returnSmpl (LitAlt lit, [], rhs')
+simplAlt env handled_cons case_bndr' (DEFAULT, bndrs, rhs) cont'
+  = ASSERT( null bndrs )
+    simplExprC env' rhs cont'	`thenSmpl` \ rhs' ->
+    returnSmpl (Nothing, (DEFAULT, [], rhs'))
+  where
+    env' = mk_rhs_env env case_bndr' (mkOtherCon handled_cons)
+	-- Record the constructors that the case-binder *can't* be.
 
-    simpl_alt (DataAlt con, vs, rhs)
-	| isVanillaDataCon con
-	= 	-- Deal with the pattern-bound variables
-		-- Mark the ones that are in ! positions in the data constructor
-		-- as certainly-evaluated.
-		-- NB: it happens that simplBinders does *not* erase the OtherCon
-		--     form of unfolding, so it's ok to add this info before 
-		--     doing simplBinders
-	  simplBinders env (add_evals con vs)		`thenSmpl` \ (env, vs') ->
+simplAlt env handled_cons case_bndr' (LitAlt lit, bndrs, rhs) cont'
+  = ASSERT( null bndrs )
+    simplExprC env' rhs cont'	`thenSmpl` \ rhs' ->
+    returnSmpl (Nothing, (LitAlt lit, [], rhs'))
+  where
+    env' = mk_rhs_env env case_bndr' (mkUnfolding False (Lit lit))
+
+simplAlt env handled_cons case_bndr' (DataAlt con, vs, rhs) cont'
+  | isVanillaDataCon con
+  = 	-- Deal with the pattern-bound variables
+	-- Mark the ones that are in ! positions in the data constructor
+	-- as certainly-evaluated.
+	-- NB: it happens that simplBinders does *not* erase the OtherCon
+	--     form of unfolding, so it's ok to add this info before 
+	--     doing simplBinders
+    simplBinders env (add_evals con vs)		`thenSmpl` \ (env, vs') ->
 
 		-- Bind the case-binder to (con args)
-	  let unf = mkUnfolding False (mkConApp con con_args)
-	      inst_tys' = tyConAppArgs (idType case_bndr')
-	      con_args  = map Type inst_tys' ++ map varToCoreExpr vs' 
-	  in
-	  simplExprC (mk_rhs_env env unf) rhs cont'	`thenSmpl` \ rhs' ->
-	  returnSmpl (DataAlt con, vs', rhs')
+    let unf       = mkUnfolding False (mkConApp con con_args)
+	inst_tys' = tyConAppArgs (idType case_bndr')
+	con_args  = map Type inst_tys' ++ map varToCoreExpr vs' 
+	env'      = mk_rhs_env env case_bndr' unf
+    in
+    simplExprC env' rhs cont'	`thenSmpl` \ rhs' ->
+    returnSmpl (Nothing, (DataAlt con, vs', rhs'))
 
-
-	| otherwise	-- GADT case
-	= simplBinders env (add_evals con vs)		`thenSmpl` \ (env, vs') ->
-	  let unf         = mkUnfolding False con_app
-	      con_app    = mkConApp con con_args
-	      con_args   = map varToCoreExpr vs' 	-- NB: no inst_tys'
-	      pat_res_ty = exprType con_app
-	      env_w_unf  = mk_rhs_env env unf
-	      tv_subst   = getTvSubst env
-	  in
-	  case coreRefineTys vs' tv_subst pat_res_ty (idType case_bndr') of
-	     Just tv_subst_env -> 
-		simplExprC (setTvSubstEnv env_w_unf tv_subst_env) rhs cont'	`thenSmpl` \ rhs' ->
-		returnSmpl (DataAlt con, vs', rhs')
-	     Nothing -> 	-- Dead code; for now, I'm just going to put in an
-				-- error case so I can see them
-		let rhs' = mkApps (Var eRROR_ID) 
+  | otherwise	-- GADT case
+  = let
+	(tvs,ids) = span isTyVar vs
+    in
+    simplBinders env tvs			`thenSmpl` \ (env1, tvs') ->
+    let
+	pat_res_ty = dataConResTy con (mkTyVarTys tvs')
+	tv_subst   = getTvSubst env
+    in
+    case coreRefineTys tvs' tv_subst pat_res_ty (idType case_bndr') of {
+	Nothing 	-- Dead code; for now, I'm just going to put in an
+			-- error case so I can see them
+	    ->	let rhs' = mkApps (Var eRROR_ID) 
 				[Type (substTy tv_subst (exprType rhs)),
 				 Lit (mkStringLit "Impossible alternative (GADT)")]
 		in 
-		returnSmpl (DataAlt con, vs', rhs')
+		simplBinders env1 ids		`thenSmpl` \ (env2, ids') -> 
+		returnSmpl (Nothing, (DataAlt con, tvs' ++ ids', rhs')) ;
 
+	Just tv_subst_env -> 	-- The normal case
+
+    let 
+	env2  = setTvSubstEnv env1 tv_subst_env
+	-- Simplify the Ids in the refined environment, so their types
+	-- reflect the refinement.  Usually this doesn't matter, but it helps
+	-- in mkDupableAlt, when we want to float a lambda that uses these binders
+    in
+    simplBinders env2 (add_evals con ids)	`thenSmpl` \ (env3, ids') ->
+    let unf        = mkUnfolding False con_app
+	con_app    = mkConApp con con_args
+	con_args   = map varToCoreExpr vs' 	-- NB: no inst_tys'
+	env_w_unf  = mk_rhs_env env3 case_bndr' unf
+	vs'	   = tvs' ++ ids'
+    in
+    simplExprC env_w_unf rhs cont'	`thenSmpl` \ rhs' ->
+    returnSmpl (Just tv_subst_env, (DataAlt con, vs', rhs')) }
+
+  where
 	-- add_evals records the evaluated-ness of the bound variables of
 	-- a case pattern.  This is *important*.  Consider
 	--	data T = T !Int !Int
@@ -1506,7 +1541,6 @@ simplAlts env zap_occ_info handled_cons case_bndr' alts cont' res_ty'
 	--
 	-- We really must record that b is already evaluated so that we don't
 	-- go and re-evaluate it when constructing the result.
-
     add_evals dc vs = cat_evals dc vs (dataConRepStrictness dc)
 
     cat_evals dc vs strs
@@ -1521,6 +1555,15 @@ simplAlts env zap_occ_info handled_cons case_bndr' alts cont' res_ty'
 	      zapped_v = zap_occ_info v
 	      evald_v  = zapped_v `setIdUnfolding` mkOtherCon []
 	  go _ _ = pprPanic "cat_evals" (ppr dc $$ ppr vs $$ ppr strs)
+
+	-- If the case binder is alive, then we add the unfolding
+	--	case_bndr = C vs
+	-- to the envt; so vs are now very much alive
+    zap_occ_info | isDeadBinder case_bndr' = \id -> id
+		 | otherwise		   = \id -> id `setIdOccInfo` NoOccInfo
+
+mk_rhs_env env case_bndr' case_bndr_unf
+  = modifyInScope env case_bndr' (case_bndr' `setIdUnfolding` case_bndr_unf)
 \end{code}
 
 
@@ -1728,9 +1771,9 @@ mkDupableAlts env case_bndr' alts dupable_cont
 	  go env alts					`thenSmpl` \ (floats2, alts') ->
 	  returnSmpl (floats2, alt' : alts')
 					
-mkDupableAlt env case_bndr' cont alt@(con, bndrs, rhs)
-  = simplBinders env bndrs				`thenSmpl` \ (env, bndrs') ->
-    simplExprC env rhs cont				`thenSmpl` \ rhs' ->
+mkDupableAlt env case_bndr' cont alt
+  = simplAlt env [] case_bndr' alt cont		`thenSmpl` \ (mb_reft, (con, bndrs', rhs')) ->
+	-- Safe to say that there are no handled-cons for the DEFAULT case
 
     if exprIsDupable rhs' then
 	returnSmpl (emptyFloats env, (con, bndrs', rhs'))
@@ -1753,8 +1796,15 @@ mkDupableAlt env case_bndr' cont alt@(con, bndrs, rhs)
     else
     let
 	rhs_ty'     = exprType rhs'
-        used_bndrs' = filter (not . isDeadBinder) (case_bndr' : bndrs')
-		-- The deadness info on the new binders is unscathed
+        used_bndrs' = filter abstract_over (case_bndr' : bndrs')
+	abstract_over bndr
+	  | isTyVar bndr = not (mb_reft `refines` bndr)
+		-- Don't abstract over tyvar binders which are refined away
+	  | otherwise	 = not (isDeadBinder bndr)
+		-- The deadness info on the new Ids is preserved by simplBinders
+	refines Nothing	        bndr = False
+	refines (Just tv_subst) bndr = bndr `elemVarEnv` tv_subst	
+		-- See Note [Refinement] below
     in
 	-- If we try to lift a primitive-typed something out
 	-- for let-binding-purposes, we will *caseify* it (!),
@@ -1788,7 +1838,7 @@ mkDupableAlt env case_bndr' cont alt@(con, bndrs, rhs)
 	--	   True -> $j s
 	-- (the \v alone is enough to make CPR happy) but I think it's rare
 
-    ( if null used_bndrs' 
+    ( if not (any isId used_bndrs')
 	then newId FSLIT("w") realWorldStatePrimTy  	`thenSmpl` \ rw_id ->
 	     returnSmpl ([rw_id], [Var realWorldPrimId])
 	else 
@@ -1824,3 +1874,26 @@ mkDupableAlt env case_bndr' cont alt@(con, bndrs, rhs)
     in
     returnSmpl (unitFloat env join_bndr join_rhs, (con, bndrs', join_call))
 \end{code}
+
+Note [Refinement]
+~~~~~~~~~~~~~~~~~
+Consider
+	data T a where
+	  MkT :: a -> b -> T a
+
+	f = /\a. \(w::a).
+	   case (case ...) of
+		  MkT a' b (p::a') (q::b) -> [p,w]
+
+The danger is that we'll make a join point
+	
+	j a' p = [p,w]
+
+and that's ill-typed, because (p::a') but (w::a).  
+
+Solution so far: don't abstract over a', because the type refinement
+maps [a' -> a] .  Ultimately that won't work when real refinement goes on.
+
+Then we must abstract over any refined free variables.  Hmm.  Maybe we 
+could just abstract over *all* free variables, thereby lambda-lifting
+the join point?   We should try this.

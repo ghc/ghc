@@ -18,7 +18,7 @@ import CoreUtils	( findDefault, exprOkForSpeculation, coreBindsSize, mkPiType )
 import Unify      	( coreRefineTys )
 import Bag
 import Literal		( literalType )
-import DataCon		( dataConRepType, isVanillaDataCon, dataConTyCon )
+import DataCon		( dataConRepType, isVanillaDataCon, dataConTyCon, dataConResTy )
 import Var		( Var, Id, TyVar, idType, tyVarKind, isTyVar, isId, mustHaveLocalBinding )
 import VarSet
 import Name		( getSrcLoc )
@@ -27,7 +27,7 @@ import ErrUtils		( dumpIfSet_core, ghcExit, Message, showPass,
 			  mkLocMessage, debugTraceMsg )
 import SrcLoc		( SrcLoc, noSrcLoc, mkSrcSpan )
 import Type		( Type, tyVarsOfType, eqType,
-			  splitFunTy_maybe, 
+			  splitFunTy_maybe, mkTyVarTys,
 			  splitForAllTy_maybe, splitTyConApp_maybe,
 			  isUnLiftedType, typeKind, 
 			  isUnboxedTupleType, isSubKind,
@@ -430,43 +430,44 @@ lintCoreAlt scrut_ty alt_ty alt@(LitAlt lit, args, rhs) =
     lit_ty = literalType lit
 
 lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
-  | isVanillaDataCon con
+  | Just (tycon, tycon_arg_tys) <- splitTyConApp_maybe scrut_ty,
+    tycon == dataConTyCon con
   = addLoc (CaseAlt alt) $
-    addInScopeVars args $
-    do { mapM lintBinder args 
-        -- FIX! Add check that all args are Ids.
-	 -- Check the pattern
-	 -- Scrutinee type must be a tycon applicn; checked by caller
-	 -- This code is remarkably compact considering what it does!
-	 -- NB: args must be in scope here so that the lintCoreArgs line works.
-         -- NB: relies on existential type args coming *after* ordinary type args
+    addInScopeVars args $	-- Put the args in scope before lintBinder,
+				-- because the Ids mention the type variables
+    if isVanillaDataCon con then
+    do	{ mapM lintBinder args 
+         	-- FIX! Add check that all args are Ids.
+		 -- Check the pattern
+		 -- Scrutinee type must be a tycon applicn; checked by caller
+		 -- This code is remarkably compact considering what it does!
+		 -- NB: args must be in scope here so that the lintCoreArgs line works.
+	         -- NB: relies on existential type args coming *after* ordinary type args
 
-       ; case splitTyConApp_maybe scrut_ty of { 
-           Just (tycon, tycon_arg_tys) ->
-            do { con_type <- lintTyApps (dataConRepType con) tycon_arg_tys
+	; con_type <- lintTyApps (dataConRepType con) tycon_arg_tys
                  -- Can just map Var as we know that this is a vanilla datacon
-	       ; con_result_ty <- lintCoreArgs con_type (map Var args)
-	       ; checkTys con_result_ty scrut_ty (mkBadPatMsg con_result_ty scrut_ty) 
+	; con_result_ty <- lintCoreArgs con_type (map Var args)
+	; checkTys con_result_ty scrut_ty (mkBadPatMsg con_result_ty scrut_ty) 
  	         -- Check the RHS
-               ; checkAltExpr rhs alt_ty } ;
-            Nothing -> addErrL (mkBadAltMsg scrut_ty alt)
-         } }
- 
-  | otherwise 
-  = addLoc (CaseAlt alt) $
-    addInScopeVars args $	-- Put the args in scope before lintBinder, because
-				-- the Ids mention the type variables
-    do { mapM lintBinder args
-       ; case splitTyConApp_maybe scrut_ty of {
-          Nothing -> addErrL (mkBadAltMsg scrut_ty alt) ;
-          Just (tycon, tycon_args_tys) ->
-           do { checkL (tycon == dataConTyCon con) (mkIncTyconMsg tycon alt) 
-              ; pat_res_ty <- lintCoreArgs (dataConRepType con) (map varToCoreExpr args)
-              ; subst <- getTvSubst 
-              ; case coreRefineTys args subst pat_res_ty scrut_ty of
-                 Just senv -> updateTvSubstEnv senv (checkAltExpr rhs alt_ty)
-                 Nothing   -> return ()	-- Alternative is dead code
-              } } }
+	; checkAltExpr rhs alt_ty }
+
+    else 	-- GADT
+    do	{ let (tvs,ids) = span isTyVar args
+	      pat_res_ty = dataConResTy con (mkTyVarTys tvs)	      
+
+        ; subst <- getTvSubst 
+        ; case coreRefineTys tvs subst pat_res_ty scrut_ty of {
+             Nothing   -> return () ;	-- Alternative is dead code
+             Just senv -> updateTvSubstEnv senv $
+    do 	{ tvs'     <- mapM lintTy (mkTyVarTys tvs)
+	; con_type <- lintTyApps (dataConRepType con) tvs'
+	; mapM lintBinder ids	-- Lint Ids in the refined world
+	; lintCoreArgs con_type (map Var ids)
+	; checkAltExpr rhs alt_ty
+    } } }
+
+  | otherwise	-- Scrut-ty is wrong shape
+  = addErrL (mkBadAltMsg scrut_ty alt)
 \end{code}
 
 %************************************************************************
@@ -692,13 +693,6 @@ mkBadAltMsg :: Type -> CoreAlt -> Message
 mkBadAltMsg scrut_ty alt
   = vcat [ text "Data alternative when scrutinee is not a tycon application",
 	   text "Scrutinee type:" <+> ppr scrut_ty,
-	   text "Alternative:" <+> pprCoreAlt alt ]
-
-mkIncTyconMsg :: TyCon -> CoreAlt -> Message
-mkIncTyconMsg tycon1 alt@(DataAlt con,_,_)
-  = vcat [ text "Incompatible tycon applications in alternative",
-	   text "Scrutinee tycon:" <+> ppr tycon1,
-	   text "Alternative tycon:" <+> ppr (dataConTyCon con),
 	   text "Alternative:" <+> pprCoreAlt alt ]
 
 ------------------------------------------------------

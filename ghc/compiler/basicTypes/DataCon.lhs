@@ -10,7 +10,7 @@ module DataCon (
 	mkDataCon,
 	dataConRepType, dataConSig, dataConName, dataConTag, dataConTyCon,
 	dataConTyVars, dataConStupidTheta, 
-	dataConArgTys, dataConOrigArgTys, 
+	dataConArgTys, dataConOrigArgTys, dataConResTy,
 	dataConInstOrigArgTys, dataConRepArgTys, 
 	dataConFieldLabels, dataConStrictMarks, dataConExStricts,
 	dataConSourceArity, dataConRepArity,
@@ -25,7 +25,7 @@ module DataCon (
 
 #include "HsVersions.h"
 
-import Type		( Type, ThetaType, substTyWith,
+import Type		( Type, ThetaType, substTyWith, substTy, zipTopTvSubst,
 			  mkForAllTys, mkFunTys, mkTyConApp,
 			  splitTyConApp_maybe, 
 			  mkPredTys, isStrictPred, pprType
@@ -497,6 +497,11 @@ dataConArgTys :: DataCon
 				-- It's all post-flattening etc; this is a representation type
 dataConArgTys (MkData {dcRepArgTys = arg_tys, dcTyVars = tyvars}) inst_tys
  = map (substTyWith tyvars inst_tys) arg_tys
+
+dataConResTy :: DataCon -> [Type] -> Type
+dataConResTy (MkData {dcTyVars = tyvars, dcTyCon = tc, dcResTys = res_tys}) inst_tys
+ = substTy (zipTopTvSubst tyvars inst_tys) (mkTyConApp tc res_tys)
+	-- zipTopTvSubst because the res_tys can't contain any foralls
 
 -- And the same deal for the original arg tys
 -- This one only works for vanilla DataCons
