@@ -20,9 +20,7 @@ module Foreign.C.Types
 	, CShort(..), CUShort(..), CInt(..),   CUInt(..)
 	, CLong(..),  CULong(..)
 	, CPtrdiff(..), CSize(..), CWchar(..), CSigAtomic(..)
-#ifndef __HUGS__
         , CLLong(..), CULLong(..)
-#endif
 	  -- Numeric types, instances of: Eq, Ord, Num, Read, Show, Enum,
 	  -- Typeable, Storable
 	, CClock(..),   CTime(..)
@@ -85,10 +83,8 @@ INTEGRAL_TYPE(CUInt,tyConCUInt,"CUInt",HTYPE_UNSIGNED_INT)
 INTEGRAL_TYPE(CLong,tyConCLong,"CLong",HTYPE_LONG)
 INTEGRAL_TYPE(CULong,tyConCULong,"CULong",HTYPE_UNSIGNED_LONG)
 
-#ifndef __HUGS__
 INTEGRAL_TYPE(CLLong,tyConCLLong,"CLLong",HTYPE_LONG_LONG)
 INTEGRAL_TYPE(CULLong,tyConCULLong,"CULLong",HTYPE_UNSIGNED_LONG_LONG)
-#endif
 
 {-# RULES
 "fromIntegral/a->CChar"   fromIntegral = \x -> CChar   (fromIntegral x)
