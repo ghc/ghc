@@ -64,9 +64,9 @@ unsafeCoerce = unsafeCoerce#
 #ifdef __NHC__
 import NonStdUnsafeCoerce (unsafeCoerce)
 import NHC.IOExtras (IORef,newIORef,readIORef,writeIORef,unsafePerformIO)
-#else
-#include "Typeable.h"
 #endif
+
+#include "Typeable.h"
 
 -------------------------------------------------------------
 --
@@ -88,9 +88,7 @@ import NHC.IOExtras (IORef,newIORef,readIORef,writeIORef,unsafePerformIO)
 data Dynamic = Dynamic TypeRep Obj
 #endif
 
-#ifndef __NHC__
 INSTANCE_TYPEABLE0(Dynamic,dynamicTc,"Dynamic")
-#endif
 
 instance Show Dynamic where
    -- the instance just prints the type representation.

@@ -106,9 +106,13 @@ unsafeCoerce = unsafeCoerce#
 #ifdef __NHC__
 import NonStdUnsafeCoerce (unsafeCoerce)
 import NHC.IOExtras (IORef,newIORef,readIORef,writeIORef,unsafePerformIO)
+import IO (Handle)
+import Ratio (Ratio)
+import NHC.FFI (Ptr,StablePtr)
 #else
-#include "Typeable.h"
 #endif
+
+#include "Typeable.h"
 
 #ifndef __HUGS__
 
@@ -444,7 +448,6 @@ gcast2 x = r
 --
 -------------------------------------------------------------
 
-#ifndef __NHC__
 INSTANCE_TYPEABLE1([],listTc,"[]")
 INSTANCE_TYPEABLE1(Maybe,maybeTc,"Maybe")
 INSTANCE_TYPEABLE1(Ratio,ratioTc,"Ratio")
@@ -452,6 +455,7 @@ INSTANCE_TYPEABLE2(Either,eitherTc,"Either")
 INSTANCE_TYPEABLE2((->),funTc,"->")
 INSTANCE_TYPEABLE1(IO,ioTc,"IO")
 INSTANCE_TYPEABLE0((),unitTc,"()")
+#ifndef __NHC__
 INSTANCE_TYPEABLE2((,),pairTc,",")
 INSTANCE_TYPEABLE3((,,),tup3Tc,",,")
 
@@ -479,10 +483,10 @@ tup7Tc = mkTyCon ",,,,,"
 instance Typeable7 (,,,,,,) where
   typeOf7 tu = mkTyConApp tup7Tc []
 
+#endif /* __NHC__ */
 INSTANCE_TYPEABLE1(Ptr,ptrTc,"Foreign.Ptr.Ptr")
 INSTANCE_TYPEABLE1(StablePtr,stableptrTc,"Foreign.StablePtr.StablePtr")
 INSTANCE_TYPEABLE1(IORef,iorefTc,"Data.IORef.IORef")
-#endif /* ! __NHC__ */
 
 -------------------------------------------------------
 --
@@ -490,7 +494,6 @@ INSTANCE_TYPEABLE1(IORef,iorefTc,"Data.IORef.IORef")
 --
 -------------------------------------------------------
 
-#ifndef __NHC__
 INSTANCE_TYPEABLE0(Bool,boolTc,"Bool")
 INSTANCE_TYPEABLE0(Char,charTc,"Char")
 INSTANCE_TYPEABLE0(Float,floatTc,"Float")
@@ -512,7 +515,6 @@ INSTANCE_TYPEABLE0(Word64,word64Tc,"Word64")
 
 INSTANCE_TYPEABLE0(TyCon,tyconTc,"TyCon")
 INSTANCE_TYPEABLE0(TypeRep,typeRepTc,"TypeRep")
-#endif /* !__NHC__ */
 
 #ifdef __GLASGOW_HASKELL__
 INSTANCE_TYPEABLE0(Word,wordTc,"Word" )
