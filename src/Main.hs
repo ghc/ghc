@@ -403,7 +403,7 @@ mkInterface no_implicit_prelude verbose mod_map filename package
 
      -- find the names exported by this module that other modules should *not*
      -- link to (and point them to where they should).
-     reexports = getReExports mdl mod_map orig_exports
+     reexports = getReExports mdl mod_map exported_names exported_visible_names
 
      import_env = local_import_env `plusFM`
 		   buildImportEnv mod_map mdl exported_visible_names 
@@ -824,22 +824,23 @@ all_subs_of_qname _ n@(UnQual _) =
 -- documentation for those names can be found.  This is used for
 -- constructing the iface_reexports field of the Interface.
 
-getReExports :: Module -> ModuleMap -> Maybe [HsExportSpec] -> FiniteMap HsName HsQName
-getReExports mdl mod_map Nothing = emptyFM
-getReExports mdl mod_map (Just exps)
-  = foldr plusFM emptyFM (map extract exps)
+getReExports :: Module -> ModuleMap
+   -> [HsQName]   -- all exported names
+   -> [HsQName]   -- exported names which are documented here
+   -> FiniteMap HsName HsQName
+getReExports mdl mod_map exported exported_visible
+  = listToFM (concat (map get_name invisible_names))
   where
-    extract (HsEModuleContents m) | m /= mdl =
-	  case lookupFM mod_map m of
-	    Nothing -> emptyFM
-	    Just iface
-		| OptHide `elem` iface_options iface -> emptyFM
-		| otherwise -> listToFM (map get_name (keysFM (iface_env iface)))
-		where
-		   get_name n = case lookupFM (iface_reexported iface) n of
-				   Just somewhere_else -> (n, somewhere_else)
-				   Nothing -> (n, Qual m n)
-    extract _ = emptyFM
+   invisible_names = [ n | n <- exported, n `notElem` exported_visible ]
+
+   get_name (UnQual _) = error "getReExports"
+   get_name (Qual m n) = 
+	case lookupFM mod_map m of
+	    Nothing -> []
+	    Just iface ->
+		case lookupFM (iface_reexported iface) n of
+		   Just somewhere_else -> [(n, somewhere_else)]
+		   Nothing -> [(n, Qual m n)]
 
 -- ----------------------------------------------------------------------------
 -- Building name environments
