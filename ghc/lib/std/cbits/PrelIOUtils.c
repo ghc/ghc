@@ -5,6 +5,13 @@
  */
 #include "HsStd.h"
 #include "PrelIOUtils.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <stddef.h>
+
+#ifndef offsetof
+#define offsetof(t, f) ((size_t) &((t *)0)->f)
+#endif
 
 #ifdef _WIN32
 #include <io.h>
@@ -54,7 +61,7 @@ HsInt prel_setmode(HsInt fd, HsBool toBin)
 #ifdef _WIN32
   return setmode(fd,(toBin == HS_BOOL_TRUE) ? _O_BINARY : _O_TEXT);
 #else
-  return EOK;
+  return 0;
 #endif  
 }
 

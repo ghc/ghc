@@ -7,7 +7,21 @@
 
 #if defined(mingw32_TARGET_OS)
 #include <windows.h>
-#include <stdlib.h>
+#endif
+
+#ifdef HAVE_STDLIB_H
+# include <stdlib.h>
+#endif
+#ifdef HAVE_STDDEF_H
+# include <stddef.h>
+#endif
+
+#ifdef HAVE_ERRNO_H
+# include <errno.h>
+#endif
+
+#ifndef offsetof
+#define offsetof(t, f) ((size_t) &((t *)0)->f)
 #endif
 
 HsInt
@@ -58,7 +72,7 @@ HsAddr prel_d_name(struct dirent* d)
 HsInt prel_end_of_dir()
 {
 #ifndef mingw32_TARGET_OS
-  return EOK;
+  return 0;
 #else
   return ENOENT;
 #endif  
