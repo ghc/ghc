@@ -1,19 +1,33 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.25 2003/05/17 00:11:30 ross Exp $
+# $Id: package.mk,v 1.26 2003/05/22 15:36:08 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
+
+ifeq "$(ProjectNameShort)" "ghc"
+STANDALONE_PACKAGE = NO
+else
+STANDALONE_PACKAGE = YES
+endif
 
 # -----------------------------------------------------------------------------
 # Build the package configuration file and tell the compiler about it.
 
 ifeq "$(way)" ""
 
+ifeq "$(STANDALONE_PACKAGE)" "NO"
+PKGCONF_CPP_EXTRA_OPTS = -I$(GHC_INCLUDE_DIR)
+else
+PKGCONF_CPP_EXTRA_OPTS =
+endif
+
+ifeq "$(STANDALONE_PACKAGE)" "NO"
 package.conf.inplace   : package.conf.in
-	$(CPP) $(RAWCPP_FLAGS) -I$(GHC_INCLUDE_DIR) -x c $(PACKAGE_CPP_OPTS) $< \
+	$(CPP) $(RAWCPP_FLAGS) $(PKGCONF_CPP_EXTRA_OPTS) -x c $(PACKAGE_CPP_OPTS) $< \
 		| sed 's/^#.*$$//g' >$@
+endif
 
 package.conf.installed : package.conf.in
-	$(CPP) $(RAWCPP_FLAGS) -I$(GHC_INCLUDE_DIR) -DINSTALLING -x c $(PACKAGE_CPP_OPTS) $< \
+	$(CPP) $(RAWCPP_FLAGS) $(PKGCONF_CPP_EXTRA_OPTS) -DINSTALLING -x c $(PACKAGE_CPP_OPTS) $< \
 		| sed 's/^#.*$$//g' >$@
 
 # we could be more accurate here and add a dependency on
@@ -27,6 +41,8 @@ package.conf.installed : package.conf.in
 # to 'make clean' in ghc without cleaning in libraries too, the packages
 # will be correctly re-installed.
 #
+ifeq "$(STANDALONE_PACKAGE)" "NO"
+
 STAMP_PKG_CONF = $(GHC_DRIVER_DIR)/stamp-pkg-conf-$(PACKAGE)
 CLEAN_FILES += $(STAMP_PKG_CONF)
 
@@ -41,12 +57,21 @@ $(STAMP_PKG_CONF) : package.conf.inplace package.conf.installed
 
 CLEAN_FILES += package.conf.installed package.conf.inplace 
 
+else # $(STANDALONE_PACKAGE) == "YES"
+
+install :: package.conf.installed
+	$(GHC_PKG) --update-package <package.conf.installed
+
+endif # $(STANDALONE_PACKAGE)
+
 endif # $(way) == ""
 
 # -----------------------------------------------------------------------------
 # Building the static library libHS<pkg>.a
 
-HC 	     	= $(GHC_INPLACE)
+ifeq "$(STANDALONE_PACKAGE)" "NO"
+HC = $(GHC_INPLACE)
+endif
 
 SRC_HSC2HS_OPTS += -I.
 
@@ -111,8 +136,15 @@ endif
 # -----------------------------------------------------------------------------
 # Dependencies
 
+ifeq "$(STANDALONE_PACKAGE)" "NO"
 MKDEPENDHS = $(GHC_INPLACE)
-SRC_MKDEPENDC_OPTS += $(addprefix -I,$(ALL_DIRS)) -I$(GHC_INCLUDE_DIR)
+endif
+
+SRC_MKDEPENDC_OPTS += $(addprefix -I,$(ALL_DIRS))
+
+ifeq "$(STANDALONE_PACKAGE)" "NO"
+SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
+endif
 
 endif # $(PACKAGE) /= ""
 
@@ -189,10 +221,10 @@ $(HTML_DOC) : $(HS_PPS)
 		   --read-interface=../$(pkg),../$(pkg)/$(pkg).haddock)
 
 %.raw-hs : %.lhs
-	$(GHC_INPLACE) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
+	$(GHC) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
 
 %.raw-hs : %.hs
-	$(GHC_INPLACE) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
+	$(GHC) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
 
 install-docs :: $(HTML_DOC)
 	@$(INSTALL_DIR) $(datadir)/html/$(PACKAGE)
