@@ -40,6 +40,16 @@ import Foreign.C.TypesISO
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Storable
+import GHC.Stable	( StablePtr )
+import GHC.Num
+import GHC.Int
+import GHC.Word
+import GHC.Stable
+import GHC.Ptr
+import GHC.Float
+import GHC.Err
+import GHC.IOBase
+import GHC.Base
 #elif defined(__HUGS__)
 import HugsStorable
 #endif
