@@ -586,7 +586,7 @@ selectRules (Pool rules n_in n_out) type_env
 	| null gates' = (pool, rule:if_rules)
 	| otherwise   = ((gates',rule) : pool, if_rules)
 	where
-	  gates' = filter (`elemNameEnv` type_env) gates
+	  gates' = filter (not . (`elemNameEnv` type_env)) gates
 
 
 tcIfaceRule :: IfaceRule -> IfL IdCoreRule
