@@ -318,7 +318,7 @@
    TICK_ALLOC_HEAP_NOCTR(alloc);
 
 #define MAYBE_GC(liveness,reentry)			\
-   if (W_[alloc_blocks] >= W_[alloc_blocks_lim]) {	\
+   if (CInt[alloc_blocks] >= CInt[alloc_blocks_lim]) {	\
 	R9  = liveness;					\
         R10 = reentry;					\
         jump stg_gc_gen_hp;				\
