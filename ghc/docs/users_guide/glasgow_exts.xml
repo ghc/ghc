@@ -1731,7 +1731,7 @@ means
 <sect2 id="instance-decls">
 <title>Instance declarations</title>
 
-<sect3>
+<sect3 id="instance-overlap">
 <title>Overlapping instances</title>
 <para>
 In general, <emphasis>GHC requires that that it be unambiguous which instance
@@ -1787,6 +1787,11 @@ So GHC rejects the program.  If you add the flag <option>-fallow-incoherent-inst
 GHC will instead pick (C), without complaining about 
 the problem of subsequent instantiations.
 </para>
+<para>
+Because overlaps are checked and reported lazily, as described above, you need
+the <option>-fallow-overlapping-instances</option> in the module that <emphasis>calls</emphasis> 
+the overloaded function, rather than in the module that <emphasis>defines</emphasis> it.</para>
+
 </sect3>
 
 <sect3>
