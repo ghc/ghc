@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.36 $
- * $Date: 2000/04/05 10:25:08 $
+ * $Revision: 1.37 $
+ * $Date: 2000/04/05 14:14:51 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -4720,12 +4720,6 @@ Cell e; {
         EEND;
     }
 
-#if 0
-    what is this for??
-    if (!moduleThisScript(name(n).mod)) {
-        return n;
-    }
-#endif
     /* Later phases of the system cannot cope if we resolve references
      * to unprocessed objects too early.  This is the main reason that
      * we cannot cope with recursive modules at the moment.
