@@ -20,7 +20,7 @@ import Digraph		( SCC(..), stronglyConnComp )
 import Panic		( panic )
 
 import CmStaticInfo 	( PCI(..), mkPCI, Package(..) )
-import CmFind 		( Finder, newFinder, 
+import Finder 		( Finder, newFinder, 
 			  ModName, ml_modname, isPackageLoc,
 			  PkgName, Path )
 import CmSummarise 	( summarise, ModSummary(..), 

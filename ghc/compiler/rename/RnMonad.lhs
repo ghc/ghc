@@ -58,7 +58,7 @@ import FiniteMap	( FiniteMap, emptyFM, listToFM, plusFM )
 import Bag		( Bag, mapBag, emptyBag, isEmptyBag, snocBag )
 import UniqSupply
 import Outputable
-import CmFind		( Finder )
+import Finder		( Finder )
 import PrelNames	( mkUnboundName )
 import HscTypes		( GlobalSymbolTable, OrigNameEnv, AvailEnv, 
 			  WhetherHasOrphans, ImportVersion, ExportItem,
