@@ -931,11 +931,13 @@ data BaudRate = B0 | B50 | B75 | B110 | B134 | B150 | B200 | B300 | B600
               | B1200 | B1800 | B2400 | B4800 | B9600 | B19200 | B38400
               deriving (Eq, Show)
 
-type Channel = Int
+data Fd 
 
-data ChannelOption = AppendOnWrite
-                   | CloseOnExec
-                   | NonBlockingRead
+intToFd :: Int -> Fd -- use with care.
+
+data FdOption = AppendOnWrite
+              | CloseOnExec
+              | NonBlockingRead
 
 data ControlCharacter = EndOfFile
                       | EndOfLine
@@ -1085,8 +1087,8 @@ otherwise, the command is executed with the current environment.  If
 \tr{wd} is \tr{Just dir}, the command is executed with working
 directory \tr{dir}; otherwise, the command is executed in the current
 working directory.  If \tr{{in,out,err}hdl} is \tr{Just handle}, the
-command is executed with the \tr{Channel} for \tr{std{in,out,err}}
-attached to the specified \tr{handle}; otherwise, the \tr{Channel} for
+command is executed with the \tr{Fd} for \tr{std{in,out,err}}
+attached to the specified \tr{handle}; otherwise, the \tr{Fd} for
 \tr{std{in,out,err}} is left unchanged.
 
 \begin{verbatim}
@@ -1504,11 +1506,11 @@ Various other causes.
 \end{itemize}
 
 \begin{verbatim}
-getTerminalName :: Channel -> IO FilePath
+getTerminalName :: Fd -> IO FilePath
 \end{verbatim}
 
 \tr{getTerminalName fd} calls \tr{ttyname} to obtain a name associated
-with the terminal for \tr{Channel} \tr{fd}. If \tr{fd} is associated
+with the terminal for \tr{Fd} \tr{fd}. If \tr{fd} is associated
 with a terminal, \tr{getTerminalName} returns the name of the
 terminal.
 
@@ -1524,11 +1526,11 @@ Various other causes.
 \end{itemize}
 
 \begin{verbatim}
-queryTerminal :: Channel -> IO Bool
+queryTerminal :: Fd -> IO Bool
 \end{verbatim}
 
 \tr{queryTerminal fd} calls \tr{isatty} to determine whether or
-not \tr{Channel} \tr{fd} is associated with a terminal.
+not \tr{Fd} \tr{fd} is associated with a terminal.
 
 \begin{verbatim}
 getSysVar :: SysVar -> IO Limit
@@ -1627,28 +1629,33 @@ accessModes        :: FileMode       -- rwxrwxrwx
 unionFileModes     :: FileMode -> FileMode -> FileMode
 intersectFileModes :: FileMode -> FileMode -> FileMode
 
-stdInput  :: Channel
-stdInput  = 0
+stdInput  :: Fd
+stdInput  = intToFd 0
 
-stdOutput :: Channel
-stdOutput = 1
+stdOutput :: Fd
+stdOutput = intToFd 1
 
-stdError  :: Channel
-stdError  = 2
+stdError  :: Fd
+stdError  = intToFd 2
 
-openChannel :: FilePath
-            -> OpenMode
-            -> Maybe FileMode  -- Just x => O_CREAT, Nothing => must exist
-            -> Bool            -- O_APPEND
-            -> Bool            -- O_EXCL
-            -> Bool            -- O_NOCTTY
-            -> Bool            -- O_NONBLOCK
-            -> Bool            -- O_TRUNC
-            -> IO Channel
+data OpenFileFlags =
+ OpenFileFlags {
+    append    :: Bool,
+    exclusive :: Bool,
+    noctty    :: Bool,
+    nonBlock  :: Bool,
+    trunc     :: Bool
+ }
+
+openFd :: FilePath
+       -> OpenMode
+       -> Maybe FileMode  -- Just x => O_CREAT, Nothing => must exist
+       -> OpenFileFlags
+       -> IO Fd
 \end{verbatim}
 
-\tr{openChannel path acc mode app excl noctty nonblock trunc} calls
-\tr{open} to obtain a \tr{Channel} for the file \tr{path} with access
+\tr{openFd path acc mode (OpenFileFlags app excl noctty nonblock trunc)} calls
+\tr{open} to obtain a \tr{Fd} for the file \tr{path} with access
 mode \tr{acc}.  If \tr{mode} is \tr{Just m}, the \tr{O_CREAT} flag is
 set and the file's permissions will be based on \tr{m} if it does not
 already exist; otherwise, the \tr{O_CREAT} flag is not set.  The
@@ -1658,10 +1665,10 @@ arguments \tr{app}, \tr{excl}, \tr{noctty}, \tr{nonblock}, and
 respectively.
 
 \begin{verbatim}
-createFile :: FilePath -> FileMode -> IO Channel
+createFile :: FilePath -> FileMode -> IO Fd
 \end{verbatim}
 
-\tr{createFile path mode} calls \tr{creat} to obtain a \tr{Channel}
+\tr{createFile path mode} calls \tr{creat} to obtain a \tr{Fd}
 for file \tr{path}, which will be created with permissions based on
 \tr{mode} if it does not already exist.
 
@@ -1745,12 +1752,12 @@ getFileStatus     :: FilePath -> IO FileStatus
 \tr{FileStatus} information for the file \tr{path}.
 
 \begin{verbatim}
-getChannelStatus :: Channel -> IO FileStatus
+getFdStatus :: Fd -> IO FileStatus
 \end{verbatim}
 
-\tr{getChannelStatus fd} calls \tr{fstat} to get the
+\tr{getFdStatus fd} calls \tr{fstat} to get the
 \tr{FileStatus} information for the file associated with
-\tr{Channel} \tr{fd}.
+\tr{Fd} \tr{fd}.
 
 \begin{verbatim}
 queryAccess :: FilePath -> Bool -> Bool -> Bool -> IO Bool
@@ -1819,14 +1826,14 @@ Various other causes.
 
 
 \begin{verbatim}
-getChannelVar :: PathVar -> Channel -> IO Limit
+getFdVar :: PathVar -> Fd -> IO Limit
 \end{verbatim}
 
-\tr{getChannelVar var fd} calls \tr{fpathconf} to obtain the
+\tr{getFdVar var fd} calls \tr{fpathconf} to obtain the
 dynamic value of the requested configurable file limit or option associated
 with the file or directory attached to the open channel \tr{fd}.
-For defined file limits, \tr{getChannelVar} returns the associated
-value.  For defined file options, the result of \tr{getChannelVar}
+For defined file limits, \tr{getFdVar} returns the associated
+value.  For defined file options, the result of \tr{getFdVar}
 is undefined, but not failure.
 
 The operation may fail with:
@@ -1842,38 +1849,38 @@ Various other causes.
 \index{Posix, input/output}
 
 \begin{verbatim}
-createPipe :: IO (Channel, Channel)
+createPipe :: IO (Fd, Fd)
 \end{verbatim}
 
 \tr{createPipe} calls \tr{pipe} to create a pipe and returns a pair of
-\tr{Channels}, the first for writing and the second for reading.
+\tr{Fd}s, the first for writing and the second for reading.
 
 \begin{verbatim}
-dupChannel :: Channel -> IO Channel
+dup :: Fd -> IO Fd
 \end{verbatim}
 
-\tr{dupChannel fd} calls \tr{dup} to duplicate \tr{Channel} \tr{fd} to
-another \tr{Channel}.
+\tr{dup fd} calls \tr{dup} to duplicate \tr{Fd} \tr{fd} to
+another \tr{Fd}.
 
 \begin{verbatim}
-dupChannelTo :: Channel -> Channel -> IO ()
+dupTo :: Fd -> Fd -> IO ()
 \end{verbatim}
 
-\tr{dupChannelTo src dst} calls \tr{dup2} to duplicate \tr{Channel}
-\tr{src} to \tr{Channel} \tr{dst}.
+\tr{dupTo src dst} calls \tr{dup2} to duplicate \tr{Fd}
+\tr{src} to \tr{Fd} \tr{dst}.
 
 \begin{verbatim}
-closeChannel :: Channel -> IO ()
+fdClose :: Fd -> IO ()
 \end{verbatim}
 
-\tr{closeChannel fd} calls \tr{close} to close \tr{Channel} \tr{fd}.
+\tr{fdClose fd} calls \tr{close} to close \tr{Fd} \tr{fd}.
 
 \begin{verbatim}
-readChannel :: Channel -> ByteCount -> IO (String, ByteCount)
+fdRead :: Fd -> ByteCount -> IO (String, ByteCount)
 \end{verbatim}
 
-\tr{readChannel fd nbytes} calls \tr{read} to read at most \tr{nbytes}
-bytes from \tr{Channel} \tr{fd}, and returns the result as a string
+\tr{fdRead fd nbytes} calls \tr{read} to read at most \tr{nbytes}
+bytes from \tr{Fd} \tr{fd}, and returns the result as a string
 paired with the number of bytes actually read.
 
 The operation may fail with:
@@ -1886,36 +1893,36 @@ Various other causes.
 \end{itemize}
 
 \begin{verbatim}
-writeChannel :: Channel -> String -> IO ByteCount
+fdWrite :: Fd -> String -> IO ByteCount
 \end{verbatim}
 
-\tr{writeChannel fd s} calls \tr{write} to write
-the string \tr{s} to \tr{Channel} \tr{fd} as a
+\tr{fdWrite fd s} calls \tr{write} to write
+the string \tr{s} to \tr{Fd} \tr{fd} as a
 contiguous sequence of bytes.  It returns the number of bytes successfully
 written.
 
 \begin{verbatim}
-queryChannelOption :: ChannelOption -> Channel -> IO Bool
+queryFdOption :: FdOption -> Fd -> IO Bool
 \end{verbatim}
 
-\tr{getChannelOption opt fd} calls \tr{fcntl} to determine whether or
-not the flag associated with \tr{ChannelOption} \tr{opt} is set for
-\tr{Channel} \tr{fd}.
+\tr{getFdOption opt fd} calls \tr{fcntl} to determine whether or
+not the flag associated with \tr{FdOption} \tr{opt} is set for
+\tr{Fd} \tr{fd}.
 
 \begin{verbatim}
-setChannelOption :: ChannelOption -> Bool -> Channel -> IO ()
+setFdOption :: Fd -> FdOption -> Bool -> IO ()
 \end{verbatim}
 
-\tr{setChannelOption opt val fd} calls \tr{fcntl} to set the flag
-associated with \tr{ChannelOption} \tr{opt} on \tr{Channel} \tr{fd} to
+\tr{setFdOption fd opt val} calls \tr{fcntl} to set the flag
+associated with \tr{FdOption} \tr{opt} on \tr{Fd} \tr{fd} to
 \tr{val}.
 
 \begin{verbatim}
-getLock :: Channel -> FileLock -> IO (Maybe (ProcessID, FileLock))
+getLock :: Fd -> FileLock -> IO (Maybe (ProcessID, FileLock))
 \end{verbatim}
 
 \tr{getLock fd lock} calls \tr{fcntl} to get the first \tr{FileLock}
-for \tr{Channel} \tr{fd} which blocks the \tr{FileLock} \tr{lock}.  If
+for \tr{Fd} \tr{fd} which blocks the \tr{FileLock} \tr{lock}.  If
 no such \tr{FileLock} exists, \tr{getLock} returns \tr{Nothing}.
 Otherwise, it returns \tr{Just (pid, block)}, where \tr{block} is the
 blocking \tr{FileLock} and \tr{pid} is the \tr{ProcessID} of the
@@ -1923,31 +1930,31 @@ process holding the blocking \tr{FileLock}.
 
 
 \begin{verbatim}
-setLock :: Channel -> FileLock -> IO ()
+setLock :: Fd -> FileLock -> IO ()
 \end{verbatim}
 
 \tr{setLock fd lock} calls \tr{fcntl} with \tr{F_SETLK} to set or
-clear a lock segment for \tr{Channel} \tr{fd} as indicated by the
+clear a lock segment for \tr{Fd} \tr{fd} as indicated by the
 \tr{FileLock} \tr{lock}.  \tr{setLock} does not block, but fails with
 \tr{SystemError} if the request cannot be satisfied immediately.
 
 \begin{verbatim}
-waitToSetLock :: Channel -> FileLock -> IO ()
+waitToSetLock :: Fd -> FileLock -> IO ()
 \end{verbatim}
 
 \tr{waitToSetLock fd lock} calls \tr{fcntl} with \tr{F_SETLKW} to set
-or clear a lock segment for \tr{Channel} \tr{fd} as indicated by the
+or clear a lock segment for \tr{Fd} \tr{fd} as indicated by the
 \tr{FileLock} \tr{lock}. If the request cannot be satisfied
 immediately, \tr{waitToSetLock} blocks until the request can be
 satisfied.
 
 
 \begin{verbatim}
-seekChannel :: Channel -> SeekMode -> FileOffset -> IO FileOffset
+fdSeek :: Fd -> SeekMode -> FileOffset -> IO FileOffset
 \end{verbatim}
 
-\tr{seekChannel fd whence offset} calls \tr{lseek} to position the
-\tr{Channel} at the given \tr{offset} from the starting location
+\tr{fdSeek fd whence offset} calls \tr{lseek} to position the
+\tr{Fd} \tr{fd} at the given \tr{offset} from the starting location
 indicated by \tr{whence}.  It returns the resulting offset from the
 start of the file in bytes.
 
@@ -1982,71 +1989,69 @@ withInputSpeed  :: TerminalAttributes -> BaudRate -> TerminalAttributes
 outputSpeed     :: TerminalAttributes -> BaudRate
 withOutputSpeed :: TerminalAttributes -> BaudRate -> TerminalAttributes
 
-getTerminalAttributes :: Channel -> IO TerminalAttributes
+getTerminalAttributes :: Fd -> IO TerminalAttributes
 \end{verbatim}
 
 \tr{getTerminalAttributes fd} calls \tr{tcgetattr} to obtain
-the \tr{TerminalAttributes} associated with \tr{Channel}
-\tr{fd}.
+the \tr{TerminalAttributes} associated with \tr{Fd} \tr{fd}.
 
 \begin{verbatim}
-setTerminalAttributes :: Channel 
+setTerminalAttributes :: Fd
                       -> TerminalAttributes 
                       -> TerminalState
                       -> IO ()
 \end{verbatim}
 
 \tr{setTerminalAttributes fd attr ts} calls \tr{tcsetattr} to change
-the \tr{TerminalAttributes} associated with \tr{Channel} \tr{fd} to
+the \tr{TerminalAttributes} associated with \tr{Fd} \tr{fd} to
 \tr{attr}, when the terminal is in the state indicated by \tr{ts}.
 
 \begin{verbatim}
-sendBreak :: Channel -> Int -> IO ()
+sendBreak :: Fd -> Int -> IO ()
 \end{verbatim}
 
 \tr{sendBreak fd duration} calls \tr{tcsendbreak} to transmit a
-continuous stream of zero-valued bits on \tr{Channel} \tr{fd} for the
+continuous stream of zero-valued bits on \tr{Fd} \tr{fd} for the
 specified implementation-dependent \tr{duration}.
 
 \begin{verbatim}
-drainOutput :: Channel -> IO ()
+drainOutput :: Fd -> IO ()
 \end{verbatim}
 
 \tr{drainOutput fd} calls \tr{tcdrain} to block until all output
-written to \tr{Channel} \tr{fd} has been transmitted.
+written to \tr{Fd} \tr{fd} has been transmitted.
 
 \begin{verbatim}
-discardData :: Channel -> QueueSelector -> IO ()
+discardData :: Fd -> QueueSelector -> IO ()
 \end{verbatim}
 
 \tr{discardData fd queues} calls \tr{tcflush} to discard
-pending input and/or output for \tr{Channel} \tr{fd},
+pending input and/or output for \tr{Fd} \tr{fd},
 as indicated by the \tr{QueueSelector} \tr{queues}.
 
 \begin{verbatim}
-controlFlow :: Channel -> FlowAction -> IO ()
+controlFlow :: Fd -> FlowAction -> IO ()
 \end{verbatim}
 
 \tr{controlFlow fd action} calls \tr{tcflow} to control the 
-flow of data on \tr{Channel} \tr{fd}, as indicated by
+flow of data on \tr{Fd} \tr{fd}, as indicated by
 \tr{action}.
 
 \begin{verbatim}
-getTerminalProcessGroupID :: Channel -> IO ProcessGroupID
+getTerminalProcessGroupID :: Fd -> IO ProcessGroupID
 \end{verbatim}
 
 \tr{getTerminalProcessGroupID fd} calls \tr{tcgetpgrp} to
 obtain the \tr{ProcessGroupID} of the foreground process group 
-associated with the terminal attached to \tr{Channel} 
-\tr{fd}.
+associated with the terminal attached to \tr{Fd} \tr{fd}.
 
 \begin{verbatim}
-setTerminalProcessGroupID :: Channel -> ProcessGroupID -> IO ()
+setTerminalProcessGroupID :: Fd -> ProcessGroupID -> IO ()
 \end{verbatim}
 
 \tr{setTerminalProcessGroupID fd pgid} calls \tr{tcsetpgrp} to
 set the \tr{ProcessGroupID} of the foreground process group 
-associated with the terminal attached to \tr{Channel} 
+associated with the terminal attached to \tr{Fd} 
 \tr{fd} to \tr{pgid}.
 
 \subsubsection[System Database]{Posix System Databases}
@@ -2143,7 +2148,7 @@ noError :: ErrorCode
 noError = 0
 
 argumentListTooLong, e2BIG              :: ErrorCode
-badChannel, eBADF                       :: ErrorCode
+badFd, eBADF                            :: ErrorCode
 brokenPipe, ePIPE                       :: ErrorCode
 directoryNotEmpty, eNOTEMPTY            :: ErrorCode
 execFormatError, eNOEXEC                :: ErrorCode

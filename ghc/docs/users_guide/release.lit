@@ -26,6 +26,9 @@ Email: glasgow-haskell-\{users,bugs\}-request\@dcs.gla.ac.uk}
 % pointers to it.  Mentioning something in the release notes is not
 % the same as documenting it.
 
+\section[release-2-03]{Release notes for version~2.04---6/97}
+\input{2-04-notes.lit}
+
 \section[release-2-03]{Release notes for version~2.03---4/97}
 \input{2-03-notes.lit}
 

@@ -144,7 +144,7 @@ exports the type @ST@ including its representation, whereas the module
 None of these modules are involved in any mutual recursion, with the
 sole exception that many modules import @IOBase.error@.
 
-\subsection{The module @GHC@: really primitive stuff}
+\subsection[ghc-libs-ghc]{The module @GHC@: really primitive stuff}
 \label{sect:ghc}
 
 This section defines all the types which are primitive in Glasgow

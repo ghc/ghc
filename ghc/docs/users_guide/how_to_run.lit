@@ -437,13 +437,21 @@ f :: String -> Int
 f []     = 0
 f (_:xs) = 1
 f "2"    = 2
+
+g [] = 2
 \end{verbatim}
 
-where the last pattern match won't ever be reached, as the second
-pattern overlaps it. More often than not, `completeness' of
-patterns is a programmer mistake/error, but if you don't want
-the compiler to ``baby-sit'', use \tr{-fno-warn-incomplete-patterns} option
-to turn them off.\index{-fno-warn-incomplete-patterns option}.
+where the last pattern match in \tr{f} won't ever be reached, as the
+second pattern overlaps it. More often than not, redundant patterns
+is a programmer mistake/error, but if you don't want the compiler to
+``baby-sit'', use the \tr{-fno-warn-overlapping-patterns} option to
+turn these warnings off.\index{-fno-warn-overlapping-patterns option}
+
+Similarly for incomplete patterns, the function \tr{g} will fail when
+applied to non-empty lists, so the compiler will by default emit a
+warning about this. The option \tr{-fno-warn-incomplete-patterns}
+turns rhis off.\index{-fno-warn-incomplete-pattern option}
+
 
 If you're feeling really paranoid, the \tr{-dcore-lint}
 option\index{-dcore-lint option} is a good choice.  It turns on
@@ -604,6 +612,13 @@ info, etc.  If you think these pragmas are messing you up (or you are
 doing some kind of weird experiment), you can tell GHC to ignore them
 with the \tr{-fignore-interface-pragmas}\index{-fignore-interface-pragmas option}
 option.
+
+When compiling without optimisations on, the compiler is extra-careful
+about not slurping in data constructors and instance declarations that
+it will not need. If you believe it is getting it wrong and not
+importing stuff which you think it should, this optimisation can be
+turned off with \tr{-fno-prune-tydecls} and \tr{-fno-prune-instdecls}.
+\index{-fno-prune-tydecls option}\index{-fno-prune-instdecls}
 
 See also \sectionref{options-linker}, which describes how the linker
 finds standard Haskell libraries.
@@ -1088,6 +1103,23 @@ individual type variables) is displayed.
 \item[\tr{-ddump-raw-asm}:]
 \index{-ddump-raw-asm option}
 Dump out the assembly-language stuff, before the ``mangler'' gets it.
+
+\item[\tr{-ddump-rn-trace}:]
+\index{-ddump-rn-trace}
+Make the renamer be *real* chatty about what it is upto.
+
+\item[\tr{-dshow-rn-stats}:]
+\index{-dshow-rn-stats}
+Print out summary of what kind of information the renamer had to bring
+in.
+\item[\tr{-dshow-unused-imports}:]
+\index{-dshow-unused-imports}
+Have the renamer report what imports does not contribute.
+
+\item[\tr{-fwarn-unused-names}:]
+\index{-fwarn-unused-names}
+Have the renamer report which locally defined names are not used/exported.
+
 %
 %\item[\tr{-dgc-debug}:]
 %\index{-dgc-debug option}
@@ -1202,11 +1234,11 @@ trademark of Peyton Jones Enterprises, plc.)
 Sometimes it is useful to make the connection between a source file
 and the command-line options it requires, quite tight. For instance,
 if a (Glasgow) Haskell source file uses \tr{casm}s, the C back-end
-often needs to be told about header files to use. Rather than
+often needs to be told about which header files to include. Rather than
 maintaining the list of files the source depends on in a
-\tr{Makefile} (using \tr{-#include} option), it is possible to do this
-directly in the source file using the \tr{OPTIONS} pragma
-\index{OPTIONS pragma}: 
+\tr{Makefile} (using the \tr{-#include} command-line option), it is
+possible to do this directly in the source file using the \tr{OPTIONS}
+pragma \index{OPTIONS pragma}: 
 
 \begin{verbatim}
 {-# OPTIONS -#include "foo.h" #-}
