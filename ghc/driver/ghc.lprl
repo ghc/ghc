@@ -578,7 +578,9 @@ if (  $Status == 0 && $Only_generate_deps ) {
     push (@MkDependHS_flags, "-s$BuildTag") if $BuildTag;
     push (@MkDependHS_flags, "-D__HASKELL1__=$Haskell1Version");
     # They're not (currently) needed, but we need to quote any -#include options
-    map(s/-#include.*$/'$&'/g, @Cmd_opts);
+    foreach (@Cmd_opts) {
+    	s/-#include.*$/'$&'/g;
+    };
     local($to_do) = "$MkDependHS @MkDependHS_flags -- @Cmd_opts -- @Input_file" ;
     &run_something($to_do, 'Haskell dependencies');
     exit $Status;
