@@ -169,6 +169,8 @@ cd $RPM_BUILD_ROOT
 libdir=`echo %{prefix}/lib | sed 's|^/||'`
 find $libdir ! -type d ! -name '*.p_hi' ! -name '*_p.a' -print | sed 's|^|/|'\
      >$dir/rpm-noprof-lib-files
+find $libdir ! -type d \( -name '*.p_hi' -or -name '*_p.a' \) -print | sed 's|^|/|'\
+     >$dir/rpm-prof-lib-files
 cd $dir
 
 %clean
@@ -178,9 +180,7 @@ rm -rf $RPM_BUILD_ROOT
 %doc ghc/ANNOUNCE ghc/README
 %{prefix}/bin/*
 
-%files prof
-%{prefix}/lib/ghc-%{version}/imports/*/*.p_hi
-%{prefix}/lib/ghc-%{version}/libHS*_p.a
+%files prof -f rpm-prof-lib-files
 
 %files doc
 %doc docs/
