@@ -38,7 +38,7 @@ import Name		( Name {-instance NamedThing-}, isWiredInName, isInternalName, name
 			 )
 import NameEnv 		( delFromNameEnv, lookupNameEnv )
 import NameSet
-import Module		( Module, isHomeModule, extendModuleSet, moduleEnvElts )
+import Module		( Module, isHomeModule )
 import PrelNames	( hasKey, fractionalClassKey, numClassKey, 
 			  integerTyConName, doubleTyConName )
 import FiniteMap

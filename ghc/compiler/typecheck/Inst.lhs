@@ -74,7 +74,6 @@ import VarEnv	( TidyEnv, emptyTidyEnv, lookupSubstEnv, SubstResult(..) )
 import VarSet	( elemVarSet, emptyVarSet, unionVarSet )
 import TysWiredIn ( floatDataCon, doubleDataCon )
 import PrelNames( fromIntegerName, fromRationalName, rationalTyConName )
-import Util	( equalLength )
 import BasicTypes( IPName(..), mapIPName, ipNameName )
 import UniqSupply( uniqsFromSupply )
 import Outputable

@@ -35,7 +35,7 @@ import Inst		( lookupInst, LookupInstResult(..),
 			  instBindingRequired, instCanBeGeneralised,
 			  newDictsFromOld, tcInstClassOp,
 			  getDictClassTys, isTyVarDict,
-			  instLoc, pprInst, zonkInst, tidyInsts, tidyMoreInsts,
+			  instLoc, zonkInst, tidyInsts, tidyMoreInsts,
 			  Inst, pprInsts, pprInstsInFull,
 			  isIPDict, isInheritableInst
 			)

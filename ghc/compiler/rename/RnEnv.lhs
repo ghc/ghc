@@ -49,7 +49,7 @@ import TysWiredIn	( unitTyCon )	-- A little odd
 import Finder		( findModule )
 import FiniteMap
 import UniqSupply
-import SrcLoc		( SrcLoc, noSrcLoc, importedSrcLoc )
+import SrcLoc		( SrcLoc, importedSrcLoc )
 import Outputable
 import ListSetOps	( removeDups, equivClasses )
 import BasicTypes	( mapIPName, FixitySig(..) )

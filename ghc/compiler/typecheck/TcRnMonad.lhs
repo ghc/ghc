@@ -14,7 +14,7 @@ import HscTypes		( HscEnv(..), PersistentCompilerState(..),
 			  GlobalRdrEnv, LocalRdrEnv, NameCache, FixityEnv,
 			  GhciMode, lookupType, unQualInScope )
 import TcRnTypes
-import Module		( Module, moduleName, unitModuleEnv, foldModuleEnv )
+import Module		( Module, unitModuleEnv, foldModuleEnv )
 import Name		( Name, isInternalName )
 import Type		( Type )
 import NameEnv		( extendNameEnvList )
