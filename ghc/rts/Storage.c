@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.82 2003/10/24 09:56:45 simonmar Exp $
+ * $Id: Storage.c,v 1.83 2004/07/21 10:47:28 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -44,7 +44,7 @@ generation *g0		= NULL; /* generation 0, for convenience */
 generation *oldest_gen  = NULL; /* oldest generation, for convenience */
 step *g0s0 		= NULL; /* generation 0, step 0, for convenience */
 
-lnat total_allocated = 0;	/* total memory allocated during run */
+ullong total_allocated = 0;	/* total memory allocated during run */
 
 /*
  * Storage manager mutex:  protects all the above state from

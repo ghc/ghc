@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.25 2003/11/12 17:49:11 sof Exp $
+ * $Id: StoragePriv.h,v 1.26 2004/07/21 10:47:29 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -48,7 +48,7 @@ extern bdescr *nursery;
 extern nat alloc_blocks;
 extern nat alloc_blocks_lim;
 
-extern lnat total_allocated;
+extern ullong total_allocated;
 
 /* Nursery manipulation */
 extern void     allocNurseries ( void );
