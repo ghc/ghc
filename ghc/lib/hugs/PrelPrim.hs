@@ -60,7 +60,7 @@ module PrelPrim (
 --  module Ratio,
     Ratio, Rational, (%), numerator, denominator, approxRational,
 --  Non-standard exports
-    IO, IOResult(..), Addr, StablePtr,
+    IOResult(..), Addr, StablePtr,
     makeStablePtr, freeStablePtr, deRefStablePtr,
 
     Bool(False, True),
