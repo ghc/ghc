@@ -44,8 +44,12 @@ module System.Random
 
 import Prelude
 
+#ifdef __NHC__
+import CPUTime		( getCPUTime )
+#else
 import System.CPUTime	( getCPUTime )
 import System.Time	( getClockTime, ClockTime(..) )
+#endif
 import Data.Char	( isSpace, chr, ord )
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef
@@ -53,6 +57,16 @@ import Numeric		( readDec )
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.IOBase	( stToIO )
+#endif
+
+-- The standard nhc98 implementation of Time.ClockTime does not match
+-- the extended one expected in this module, so we lash-up a quick
+-- replacement here.
+#ifdef __NHC__
+data ClockTime = TOD Integer ()
+foreign import ccall "time.h time" readtime :: Int -> IO Int
+getClockTime :: IO ClockTime
+getClockTime = do t <- readtime 0;  return (TOD (toInteger t) ())
 #endif
 
 {- $intro
@@ -223,7 +237,7 @@ class Random a where
 
   -- |Default methods  
   randoms  :: RandomGen g => g -> [a]
-  randoms  g      = x : randoms g' where (x,g') = random g
+  randoms  g      = (\(x,g') -> x : randoms g') (random g)
 
   randomRs :: RandomGen g => (a,a) -> g -> [a]
   randomRs ival g = x : randomRs ival g' where (x,g') = randomR ival g
