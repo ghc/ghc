@@ -521,21 +521,18 @@ Wed Mar 14 12:23:13 GMT 2001
     <indexterm><primary><option>--interactive</option></primary></indexterm>
 
     <para>GHCi is invoked with the command <literal>ghci</literal> or
-    <literal>ghc --interactive</literal>.  A module or filename can
-    also be specified on the command line; this instructs GHCi to load
-    the that module or filename (and all the modules it depends on),
-    just as if you had said <literal>:load
-    <replaceable>module</replaceable></literal> at the GHCi prompt
-    (see <xref linkend="ghci-commands">).  For example, to start GHCi
-    and load the program whose topmost module is in the file
-    <literal>Main.hs</literal>, we could say:</para>
+    <literal>ghc --interactive</literal>.  One or more modules or
+    filenames can also be specified on the command line; this
+    instructs GHCi to load the specified modules or filenames (and all
+    the modules they depend on), just as if you had said
+    <literal>:load <replaceable>modules</replaceable></literal> at the
+    GHCi prompt (see <xref linkend="ghci-commands">).  For example, to
+    start GHCi and load the program whose topmost module is in the
+    file <literal>Main.hs</literal>, we could say:</para>
 
 <screen>
 $ ghci Main.hs
 </screen>
-
-    <para>Note: only <emphasis>one</emphasis> module name or filename
-    may be given on the command line.</para>
 
     <para>Most of the command-line options accepted by GHC (see <xref
     linkend="using-ghc">) also make sense in interactive mode.  The ones
