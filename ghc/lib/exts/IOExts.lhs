@@ -60,6 +60,12 @@ module IOExts
 	, unsafePtrEq
 	
 	, freeHaskellFunctionPtr
+	
+	, HandlePosition
+	, HandlePosn(..)
+	, hTell                -- :: Handle -> IO HandlePosition
+	
+	, hSetBinaryMode       -- :: Handle -> Bool -> IO Bool
 
         ) where
 
@@ -182,9 +188,12 @@ trace string expr = unsafePerformIO $ do
     fd <- getHandleFd stderr
     hPutStr stderr string
     hPutChar stderr '\n'
-    _ccall_ PostTraceHook fd
+    postTraceHook fd
     return expr
+
+foreign import "PostTraceHook" postTraceHook :: Int -> IO ()
 #endif
+
 \end{code}
 
 Not something you want to call normally, but useful
@@ -192,10 +201,8 @@ in the cases where you do want to flush stuff out of
 the heap or make sure you've got room enough
 
 \begin{code}
-#ifdef __HUGS__
-#else
-performGC :: IO ()
-performGC = _ccall_GC_ performGC
+#ifndef __HUGS__
+foreign import "performGC" performGC :: IO ()
 #endif
 \end{code}
 
@@ -263,4 +270,45 @@ are exported from @IOExts@ and not @withHandleFor@ itself.
 withStdin  h a = withHandleFor h stdin  a
 withStdout h a = withHandleFor h stdout a
 withStderr h a = withHandleFor h stderr a
+\end{code}
+
+@hTell@ is the lower-level version of @hGetPosn@ - return the
+position, without bundling it together with the handle itself:
+
+\begin{code}
+hTell :: Handle -> IO HandlePosition
+hTell h = do
+  (HandlePosn _ x) <- hGetPosn h
+  return x
+\end{code}
+
+@hSetBinaryMode@ lets you change the translation mode for a handle.
+On some platforms (e.g., Win32) a distinction is made between being in
+'text mode' or 'binary mode', with the former terminating lines
+by \r\n rather than just \n.
+
+Debating the Winnitude or otherwise of such a scheme is less than
+interesting -- it's there, so we have to cope.
+
+A side-effect of calling @hSetBinaryMode@ is that the output buffer
+(if any) is flushed prior to changing the translation mode.
+
+\begin{code}
+hSetBinaryMode :: Handle -> Bool -> IO Bool
+hSetBinaryMode handle is_binary = do 
+        -- is_binary = True => set translation mode to binary.
+    wantRWHandle "hSetBinaryMode" handle $ \ handle_ -> do
+    let fo = haFO__ handle_
+    rc	    <- setBinaryMode fo flg
+    if rc >= 0 then 
+       return (int2Bool rc)
+     else
+       constructErrorAndFail "hSetBinaryMode"
+  where
+   flg | is_binary = 1
+       | otherwise = 0
+
+   int2Bool 0 = False
+   int2Bool _ = True
+
 \end{code}
