@@ -32,7 +32,7 @@ class C a where
 test :: ()
 test = $(let 
 	  display :: Name -> Q ()
-	  display q = do { i <- reify q; report False (render (pprInfo i)) }
+	  display q = do { i <- reify q; report False (pprint i) }
 	in do { display ''T
 	      ; display ''R
 	      ; display ''List
