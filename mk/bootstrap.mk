@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.15 2001/09/23 21:29:35 ken Exp $
+# $Id: bootstrap.mk,v 1.16 2001/09/25 13:00:41 simonmar Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -142,7 +142,7 @@ else
 	$(CC) -x c $< -o $@ -S -O $(HC_BOOT_CC_OPTS) -I.  `echo $(patsubst -monly-%-regs, -DSTOLEN_X86_REGS=%, $(filter -monly-%-regs, $($*_HC_OPTS))) | sed 's/^$$/-DSTOLEN_X86_REGS=4/'`
 
 %.s : %.raw_s
-	$(GHC_MANGLER) $< $@ $(patsubst -monly-%-regs, %, $(filter -monly-%-regs, $($*_HC_OPTS)))
+	$(FPTOOLS_TOP)/$(GHC_MANGLER_DIR)/$(GHC_MANGLER) $< $@ $(patsubst -monly-%-regs, %, $(filter -monly-%-regs, $($*_HC_OPTS)))
 
 %.o : %.s
 	$(CC) -c -o $@ $<
