@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.76 2003/09/24 10:32:11 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.77 2003/09/25 15:14:41 panne Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -73,12 +73,25 @@ struct RTS_FLAGS RtsFlags;
 // Count of how many outstanding hs_init()s there have been.
 static int hs_init_count = 0;
 
-#if HAVE_TERMIOS_H
 // Here we save the terminal settings on the standard file
 // descriptors, if we need to change them (eg. to support NoBuffering
 // input).
-struct termios *saved_termios[3] = {NULL,NULL,NULL};
-#endif
+static void *saved_termios[3] = {NULL,NULL,NULL};
+
+void*
+__hscore_get_saved_termios(int fd)
+{
+  return (0 <= fd && fd < sizeof(saved_termios) / sizeof(*saved_termios)) ?
+    saved_termios[fd] : NULL;
+}
+
+void
+__hscore_set_saved_termios(int fd, void* ts)
+{
+  if (0 <= fd && fd < sizeof(saved_termios) / sizeof(*saved_termios)) {
+    saved_termios[fd] = ts;
+  }
+}
 
 /* -----------------------------------------------------------------------------
    Starting up the RTS
@@ -345,8 +358,9 @@ hs_exit(void)
 	sigaddset(&sigset, SIGTTOU);
 	sigprocmask(SIG_BLOCK, &sigset, &old_sigset);
 	for (fd = 0; fd <= 2; fd++) {
-	    if (saved_termios[fd] != NULL) {
-		tcsetattr(fd,TCSANOW,saved_termios[fd]);
+	    struct termios* ts = (struct termios*)__hscore_get_saved_termios(fd);
+	    if (ts != NULL) {
+		tcsetattr(fd,TCSANOW,ts);
 	    }
 	}
 	sigprocmask(SIG_SETMASK, &old_sigset, NULL);
