@@ -405,7 +405,7 @@ lexer cont buf s@(PState{
   where
 	line = srcLocLine loc
 
-	tab y bol atbol buf = -- trace ("tab: " ++ show (I# y) ++ " : " ++ show (currentChar buf)) $
+	tab y bol atbol buf = --trace ("tab: " ++ show (I# y) ++ " : " ++ show (currentChar buf)) $
 	  case currentChar# buf of
 
 	    '\NUL'# ->
@@ -563,7 +563,7 @@ lexBOL cont buf s@(PState{
 
 lexToken :: (Token -> P a) -> Int# -> P a
 lexToken cont glaexts buf =
- -- trace "lexToken" $
+-- trace "lexToken" $
   case currentChar# buf of
 
     -- special symbols ----------------------------------------------------
@@ -606,9 +606,11 @@ lexToken cont glaexts buf =
 	   '-'# -> case lookAhead# buf 2# of
 		    '#'# -> case lookAhead# buf 3# of
 				'#'# -> 
-				   let (lexeme, buf') 
-					  = doDiscard 0# (stepOnBy# (stepOverLexeme buf) 4#) in
-                                            cont (ITpragma lexeme) buf'
+				   lexPragma
+				      cont
+				      (\ cont lexeme buf' -> cont (ITpragma lexeme) buf')
+				      0#
+				      (stepOnBy# (stepOverLexeme buf) 4#)
 				_ -> lex_prag cont (setCurrentPos# buf 3#)
 	   	    _    -> cont ITocurly (incLexeme buf) 
 	   _ -> (layoutOff `thenP_` cont ITocurly)  (incLexeme buf) 
@@ -1121,20 +1123,21 @@ lex_ubx_tuple cont mod buf back_off =
 \end{code}
 
 -----------------------------------------------------------------------------
-doDiscard rips along really fast, looking for a '##-}', 
+'lexPragma' rips along really fast, looking for a '##-}', 
 indicating the end of the pragma we're skipping
 
 \begin{code}
-doDiscard inStr buf =
+lexPragma cont contf inStr buf =
  case currentChar# buf of
    '#'# | inStr ==# 0# ->
        case lookAhead# buf 1# of { '#'# -> 
        case lookAhead# buf 2# of { '-'# ->
        case lookAhead# buf 3# of { '}'# -> 
-	   (lexemeToBuffer buf, stepOverLexeme (setCurrentPos# buf 4#));
-	_    -> doDiscard inStr (incLexeme buf) };
-        _    -> doDiscard inStr (incLexeme buf) };
-        _    -> doDiscard inStr (incLexeme buf) }
+           contf cont (lexemeToBuffer buf)
+	   	      (stepOverLexeme (setCurrentPos# buf 4#));
+	_    -> lexPragma cont contf inStr (incLexeme buf) };
+        _    -> lexPragma cont contf inStr (incLexeme buf) };
+        _    -> lexPragma cont contf inStr (incLexeme buf) }
 
    '"'# ->
        let
@@ -1149,19 +1152,24 @@ doDiscard inStr buf =
 	 '\\'# -> -- escaping something..
 	   if odd_slashes buf True (negateInt# 2#) 
 		then  -- odd number of slashes, " is escaped.
-	      	      doDiscard inStr (incLexeme buf)
+	      	      lexPragma cont contf inStr (incLexeme buf)
 	        else  -- even number of slashes, \ is escaped.
-	      	      doDiscard not_inStr (incLexeme buf)
-         _ -> doDiscard not_inStr (incLexeme buf)
+	      	      lexPragma cont contf not_inStr (incLexeme buf)
+         _ -> lexPragma cont contf not_inStr (incLexeme buf)
 
    '\''# | inStr ==# 0# ->
 	case lookAhead# buf 1# of { '"'# ->
 	case lookAhead# buf 2# of { '\''# ->
-	   doDiscard inStr (setCurrentPos# buf 3#);
-	_ -> doDiscard inStr (incLexeme buf) };
-	_ -> doDiscard inStr (incLexeme buf) }
+	   lexPragma cont contf inStr (setCurrentPos# buf 3#);
+	_ -> lexPragma cont contf inStr (incLexeme buf) };
+	_ -> lexPragma cont contf inStr (incLexeme buf) }
 
-   _ -> doDiscard inStr (incLexeme buf)
+    -- a sign that the input is ill-formed, since pragmas are
+    -- assumed to always be properly closed (in .hi files).
+   '\NUL'# -> trace "lexPragma: unexpected end-of-file" $ 
+	      cont (ITunknown "\NUL") buf
+
+   _ -> lexPragma cont contf inStr (incLexeme buf)
 
 \end{code}
 
