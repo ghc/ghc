@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: longlong.c,v 1.2 2001/07/14 00:06:15 sof Exp $
+ * $Id: longlong.c,v 1.3 2001/07/23 15:11:55 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -26,7 +26,7 @@ The exceptions to the rule are primops that cast to and from
 64-bit entities (these are defined in PrimOps.h)
 */
 
-#include "Stg.h"
+#include "Rts.h"
 
 #ifdef SUPPORT_LONG_LONGS
 
