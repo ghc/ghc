@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.92 2002/06/09 19:27:16 panne Exp $
+ * $Id: Linker.c,v 1.93 2002/06/10 02:13:03 matthewc Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -2433,7 +2433,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 
    for (j = 0; j < nent; j++) {
       Elf_Addr offset = rtab[j].r_offset;
-      Elf_Word info   = rtab[j].r_info;
+      Elf_Addr info   = rtab[j].r_info;
 
       Elf_Addr  P  = ((Elf_Addr)targ) + offset;
       Elf_Word* pP = (Elf_Word*)P;
@@ -2499,31 +2499,32 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 {
    int j;
    char *symbol;
-   Elf_Addr* targ;
+   Elf_Addr targ;
    Elf_Rela* rtab = (Elf_Rela*) (ehdrC + shdr[shnum].sh_offset);
    int         nent = shdr[shnum].sh_size / sizeof(Elf_Rela);
    int target_shndx = shdr[shnum].sh_info;
    int symtab_shndx = shdr[shnum].sh_link;
 
    stab  = (Elf_Sym*) (ehdrC + shdr[ symtab_shndx ].sh_offset);
-   targ  = (Elf_Addr*)(ehdrC + shdr[ target_shndx ].sh_offset);
+   targ  = (Elf_Addr) (ehdrC + shdr[ target_shndx ].sh_offset);
    IF_DEBUG(linker,belch( "relocations for section %d using symtab %d",
                           target_shndx, symtab_shndx ));
 
    for (j = 0; j < nent; j++) {
 #if defined(DEBUG) || defined(sparc_TARGET_ARCH) || defined(ia64_TARGET_ARCH)
+      /* This #ifdef only serves to avoid unused-var warnings. */
       Elf_Addr  offset = rtab[j].r_offset;
+      Elf_Addr  P      = targ + offset;
 #endif
       Elf_Addr  info   = rtab[j].r_info;
       Elf_Addr  A      = rtab[j].r_addend;
       Elf_Addr  S;
       Elf_Addr  value;
 #     if defined(sparc_TARGET_ARCH)
-      /* This #ifdef only serves to avoid unused-var warnings. */
-      Elf_Word* pP = (Elf_Word*)((Elf_Addr)targ + offset);
+      Elf_Word* pP = (Elf_Word*)P;
       Elf_Word  w1, w2;
 #     elif defined(ia64_TARGET_ARCH)
-      Elf64_Xword *pP = (Elf64_Xword *)((Elf_Addr)targ + offset);
+      Elf64_Xword *pP = (Elf64_Xword *)P;
       Elf_Addr addr;
 #     endif
 
