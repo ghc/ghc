@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-module FunctorM (
+module Data.FunctorM (
 	FunctorM(..)
   ) where
 
