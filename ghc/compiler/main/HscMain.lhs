@@ -439,7 +439,9 @@ myCoreToStg dflags this_mod tidy_binds
       () <- coreBindsSize tidy_binds `seq` return ()
       -- TEMP: the above call zaps some space usage allocated by the
       -- simplifier, which for reasons I don't understand, persists
-      -- thoroughout code generation
+      -- thoroughout code generation -- JRS
+      --
+      -- This is still necessary. -- SDM (10 Dec 2001)
 
       stg_binds <- _scc_ "Core2Stg" 
 	     coreToStg dflags tidy_binds
