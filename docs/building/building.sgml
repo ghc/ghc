@@ -585,10 +585,7 @@ $ cvs commit -F <replaceable>commit-message</replaceable> <replaceable>directory
       major cause of headaches. </para>
 
       <para>So, to avoid a lot of hassle, follow this recipe for
-      updating your tree.  Usually you will only want to run cvs update
-      in the sub-projects because running <literal>cvs update -Pd</literal>
-      on top-level will also retrieve any directories you intentionally did
-      not check out:</para>
+      updating your tree:</para>
 
 <screen>
 $ cd fptools
