@@ -10,7 +10,7 @@ Instances of Bounded for various datatypes.
 
 module PrelEnum(
 	Bounded(..), Enum(..),
-	enumFromBounded, enumFromThenBounded,
+	boundedEnumFrom, boundedEnumFromThen,
 
 	-- Instances for Bounded and Eum: (), Char, Int
 
@@ -51,11 +51,11 @@ class  Enum a	where
     enumFromThenTo x1 x2 y = map toEnum [fromEnum x1, fromEnum x2 .. fromEnum y]
 
 -- Default methods for bounded enumerations
-enumFromBounded :: (Enum a, Bounded a) => a -> [a]
-enumFromBounded n = map toEnum [fromEnum n .. fromEnum (maxBound `asTypeOf` n)]
+boundedEnumFrom :: (Enum a, Bounded a) => a -> [a]
+boundedEnumFrom n = map toEnum [fromEnum n .. fromEnum (maxBound `asTypeOf` n)]
 
-enumFromThenBounded :: (Enum a, Bounded a) => a -> a -> [a]
-enumFromThenBounded n1 n2 
+boundedEnumFromThen :: (Enum a, Bounded a) => a -> a -> [a]
+boundedEnumFromThen n1 n2 
   | i_n2 >= i_n1  = map toEnum [i_n1, i_n2 .. fromEnum (maxBound `asTypeOf` n1)]
   | otherwise     = map toEnum [i_n1, i_n2 .. fromEnum (minBound `asTypeOf` n1)]
   where
@@ -130,8 +130,8 @@ instance Enum Bool where
   fromEnum True  = oneInt
 
   -- Use defaults for the rest
-  enumFrom     = enumFromBounded
-  enumFromThen = enumFromThenBounded
+  enumFrom     = boundedEnumFrom
+  enumFromThen = boundedEnumFromThen
 \end{code}
 
 %*********************************************************
@@ -164,8 +164,8 @@ instance Enum Ordering where
   fromEnum GT = twoInt
 
   -- Use defaults for the rest
-  enumFrom     = enumFromBounded
-  enumFromThen = enumFromThenBounded
+  enumFrom     = boundedEnumFrom
+  enumFromThen = boundedEnumFromThen
 \end{code}
 
 %*********************************************************
