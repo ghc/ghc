@@ -835,26 +835,38 @@ This name is not supported by GHC.
 	      <literal>return</literal>, are in scope (not the Prelude
 	      versions).  List comprehensions, and parallel array
 	      comprehensions, are unaffected.  </para></listitem>
+
+	      <listitem>
+		<para>Similarly recursive do notation (see
+		<xref linkend="mdo-notation"/>) uses whatever
+		<literal>mfix</literal> function is in scope, and arrow
+		notation (see <xref linkend="arrow-notation"/>)
+		uses whatever <literal>arr</literal>,
+		<literal>(>>>)</literal>, <literal>first</literal>,
+		<literal>app</literal>, <literal>(|||)</literal> and
+		<literal>loop</literal> functions are in scope.</para>
+	      </listitem>
 	    </itemizedlist>
 
-	     <para>Be warned: this is an experimental facility, with fewer checks than
-	     usual.  In particular, it is essential that the functions GHC finds in scope
-	     must have the appropriate types, namely:
+	     <para>The functions with these names that GHC finds in scope
+	     must have types matching those of the originals, namely:
 	     <screen>
-	        fromInteger  :: forall a. (...) => Integer  -> a
-		fromRational :: forall a. (...) => Rational -> a
-		negate       :: forall a. (...) => a -> a
-		(-)          :: forall a. (...) => a -> a -> a
-		(>>=)	     :: forall m a. (...) => m a -> (a -> m b) -> m b
-		(>>)	     :: forall m a. (...) => m a -> m b -> m b
-		return	     :: forall m a. (...) => a      -> m a
-		fail	     :: forall m a. (...) => String -> m a
+	        fromInteger  :: Integer  -> N
+		fromRational :: Rational -> N
+		negate       :: N -> N
+		(-)          :: N -> N -> N
+		(>>=)	     :: forall a b. M a -> (a -> M b) -> M b
+		(>>)	     :: forall a b. M a -> M b -> M b
+		return	     :: forall a.   a      -> M a
+		fail	     :: forall a.   String -> M a
 	     </screen>
-	     (The (...) part can be any context including the empty context; that part 
-	     is up to you.)
-	     If the functions don't have the right type, very peculiar things may 
-	     happen.  Use <literal>-dcore-lint</literal> to
-	     typecheck the desugared program.  If Core Lint is happy you should be all right.</para>
+	     (Here <literal>N</literal> may be any type,
+	     and <literal>M</literal> any type constructor.)</para>
+
+	     <para>Be warned: this is an experimental facility, with
+	     fewer checks than usual.  Use <literal>-dcore-lint</literal>
+	     to typecheck the desugared program.  If Core Lint is happy
+	     you should be all right.</para>
 
 </sect2>
 </sect1>
