@@ -284,7 +284,7 @@ repE (HsIPVar x)    = panic "Can't represent implicit parameters"
 repE (HsLit l)      = do { a <- repLiteral l;           repLit a }
 repE (HsOverLit l)  = do { a <- repOverloadedLiteral l; repLit a }
 
-repE (HsSplice n e) 
+repE (HsSplice n e loc) 
   = do { mb_val <- dsLookupMetaEnv n
        ; case mb_val of
 	     Just (Splice e) -> do { e' <- dsExpr e

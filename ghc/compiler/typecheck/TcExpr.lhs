@@ -621,10 +621,11 @@ tcMonoExpr (PArrSeqIn _) _
 #ifdef GHCI	/* Only if bootstrapped */
 	-- Rename excludes these cases otherwise
 
-tcMonoExpr (HsSplice n expr) res_ty = tcSpliceExpr n expr res_ty
+tcMonoExpr (HsSplice n expr loc) res_ty = addSrcLoc loc (tcSpliceExpr n expr res_ty)
   
-tcMonoExpr (HsBracket brack) res_ty
-  = getStage 					`thenM` \ level ->
+tcMonoExpr (HsBracket brack loc) res_ty
+  = addSrcLoc loc			$
+    getStage 				`thenM` \ level ->
     case bracketOK level of {
 	Nothing         -> failWithTc (illegalBracket level) ;
 	Just next_level ->

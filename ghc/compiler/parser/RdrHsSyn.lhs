@@ -281,7 +281,7 @@ mkHsDo ctxt stmts loc = HsDo ctxt stmts [] placeHolderType loc
 \end{code}
 
 \begin{code}
-mkHsSplice e = HsSplice unqualSplice e
+mkHsSplice e loc = HsSplice unqualSplice e loc
 
 unqualSplice = mkRdrUnqual (mkVarOcc FSLIT("splice"))
 		-- A name (uniquified later) to
@@ -418,7 +418,7 @@ emptyGroup = HsGroup { hs_valds = MonoBind EmptyMonoBinds [] Recursive,
 		       hs_fixds = [], hs_defds = [], hs_fords = [], 
 		       hs_depds = [] ,hs_ruleds = [], hs_coreds = [] }
 
-findSplice :: [HsDecl a] -> (HsGroup a, Maybe (HsExpr a, [HsDecl a]))
+findSplice :: [HsDecl a] -> (HsGroup a, Maybe (SpliceDecl a, [HsDecl a]))
 findSplice ds = add emptyGroup ds
 
 mkGroup :: [HsDecl a] -> HsGroup a
@@ -430,7 +430,7 @@ addImpDecls group decls = case add group decls of
 				(group', Nothing) -> group'
 				other		  -> panic "addImpDecls"
 
-add :: HsGroup a -> [HsDecl a] -> (HsGroup a, Maybe (HsExpr a, [HsDecl a]))
+add :: HsGroup a -> [HsDecl a] -> (HsGroup a, Maybe (SpliceDecl a, [HsDecl a]))
 	-- This stuff reverses the declarations (again) but it doesn't matter
 
 -- Base cases

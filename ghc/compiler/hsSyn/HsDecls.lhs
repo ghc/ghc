@@ -9,7 +9,7 @@ Definitions for: @TyDecl@ and @oCnDecl@, @ClassDecl@,
 \begin{code}
 module HsDecls (
 	HsDecl(..), TyClDecl(..), InstDecl(..), RuleDecl(..), RuleBndr(..),
-	DefaultDecl(..), HsGroup(..),
+	DefaultDecl(..), HsGroup(..), SpliceDecl(..),
 	ForeignDecl(..), ForeignImport(..), ForeignExport(..),
 	CImportSpec(..), FoType(..),
 	ConDecl(..), CoreDecl(..),
@@ -74,7 +74,7 @@ data HsDecl id
   | DeprecD	(DeprecDecl id)
   | RuleD	(RuleDecl id)
   | CoreD	(CoreDecl id)
-  | SpliceD	(HsExpr id)	-- Top level splice
+  | SpliceD	(SpliceDecl id)
 
 -- NB: all top-level fixity decls are contained EITHER
 -- EITHER SigDs
@@ -125,7 +125,7 @@ instance OutputableBndr name => Outputable (HsDecl name) where
     ppr (RuleD rd)   = ppr rd
     ppr (DeprecD dd) = ppr dd
     ppr (CoreD dd)   = ppr dd
-    ppr (SpliceD e)  = ptext SLIT("splice") <> parens (pprExpr e)
+    ppr (SpliceD dd) = ppr dd
 
 instance OutputableBndr name => Outputable (HsGroup name) where
     ppr (HsGroup { hs_valds  = val_decls,
@@ -145,6 +145,11 @@ instance OutputableBndr name => Outputable (HsGroup name) where
 	where
 	  ppr_ds [] = empty
 	  ppr_ds ds = text "" $$ vcat (map ppr ds)
+
+data SpliceDecl id = SpliceDecl (HsExpr id) SrcLoc	-- Top level splice
+
+instance OutputableBndr name => Outputable (SpliceDecl name) where
+   ppr (SpliceDecl e _) = ptext SLIT("$") <> parens (pprExpr e)
 \end{code}
 
 

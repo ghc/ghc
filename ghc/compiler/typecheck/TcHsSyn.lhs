@@ -413,7 +413,11 @@ zonkGRHSs env (GRHSs grhss binds ty)
 %************************************************************************
 
 \begin{code}
-zonkExpr :: ZonkEnv -> TcExpr -> TcM TypecheckedHsExpr
+zonkExprs :: ZonkEnv -> [TcExpr] -> TcM [TypecheckedHsExpr]
+zonkExpr  :: ZonkEnv -> TcExpr -> TcM TypecheckedHsExpr
+
+zonkExprs env exprs = mappM (zonkExpr env) exprs
+
 
 zonkExpr env (HsVar id)
   = returnM (HsVar (zonkIdOcc env id))
@@ -450,8 +454,8 @@ zonkExpr env (HsBracketOut body bs)
     zonk_b (n,e) = zonkExpr env e	`thenM` \ e' ->
 		   returnM (n,e')
 
-zonkExpr env (HsSplice n e) = WARN( True, ppr e )	-- Should not happen
-			      returnM (HsSplice n e)
+zonkExpr env (HsSplice n e loc) = WARN( True, ppr e )	-- Should not happen
+			          returnM (HsSplice n e loc)
 
 zonkExpr env (OpApp e1 op fixity e2)
   = zonkExpr env e1	`thenM` \ new_e1 ->
@@ -513,16 +517,16 @@ zonkExpr env (HsDo do_or_lc stmts ids ty src_loc)
 
 zonkExpr env (ExplicitList ty exprs)
   = zonkTcTypeToType env ty	`thenM` \ new_ty ->
-    mappM (zonkExpr env) exprs	`thenM` \ new_exprs ->
+    zonkExprs env exprs		`thenM` \ new_exprs ->
     returnM (ExplicitList new_ty new_exprs)
 
 zonkExpr env (ExplicitPArr ty exprs)
   = zonkTcTypeToType env ty	`thenM` \ new_ty ->
-    mappM (zonkExpr env) exprs	`thenM` \ new_exprs ->
+    zonkExprs env exprs		`thenM` \ new_exprs ->
     returnM (ExplicitPArr new_ty new_exprs)
 
 zonkExpr env (ExplicitTuple exprs boxed)
-  = mappM (zonkExpr env) exprs  	`thenM` \ new_exprs ->
+  = zonkExprs env exprs  	`thenM` \ new_exprs ->
     returnM (ExplicitTuple new_exprs boxed)
 
 zonkExpr env (RecordConOut data_con con_expr rbinds)
@@ -554,7 +558,7 @@ zonkExpr env (PArrSeqOut expr info)
     returnM (PArrSeqOut new_expr new_info)
 
 zonkExpr env (HsCCall fun args may_gc is_casm result_ty)
-  = mappM (zonkExpr env) args		`thenM` \ new_args ->
+  = zonkExprs env args			`thenM` \ new_args ->
     zonkTcTypeToType env result_ty	`thenM` \ new_result_ty ->
     returnM (HsCCall fun new_args may_gc is_casm new_result_ty)
 
@@ -629,14 +633,15 @@ zonkStmts env (ParStmtOut bndrstmtss : stmts)
   where
     (bndrss, stmtss) = unzip bndrstmtss
 
-zonkStmts env (RecStmt vs segStmts : stmts)
+zonkStmts env (RecStmt vs segStmts rets : stmts)
   = mappM zonkId vs		`thenM` \ new_vs ->
     let
 	env1 = extendZonkEnv env new_vs
     in
     zonkStmts env1 segStmts	`thenM` \ new_segStmts ->
+    zonkExprs env1 rets		`thenM` \ new_rets ->
     zonkStmts env1 stmts	`thenM` \ new_stmts ->
-    returnM (RecStmt new_vs new_segStmts : new_stmts)
+    returnM (RecStmt new_vs new_segStmts new_rets : new_stmts)
 
 zonkStmts env (ResultStmt expr locn : stmts)
   = zonkExpr env expr	`thenM` \ new_expr ->

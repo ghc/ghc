@@ -228,20 +228,21 @@ rnExpr (HsPar e)
 
 -- Template Haskell extensions
 #ifdef GHCI
-rnExpr (HsBracket br_body)
-  = checkGHCI (thErr "bracket")		`thenM_`
+rnExpr (HsBracket br_body loc)
+  = addSrcLoc loc			$
+    checkGHCI (thErr "bracket")		`thenM_`
     rnBracket br_body			`thenM` \ (body', fvs_e) ->
-    returnM (HsBracket body', fvs_e `addOneFV` qTyConName)
+    returnM (HsBracket body' loc, fvs_e `addOneFV` qTyConName)
 	-- We use the Q tycon as a proxy to haul in all the smart
 	-- constructors; see the hack in RnIfaces
 #endif
 
-rnExpr (HsSplice n e)
-  = checkGHCI (thErr "splice")		`thenM_`
-    getSrcLocM				`thenM` \ loc -> 
+rnExpr (HsSplice n e loc)
+  = addSrcLoc loc			$
+    checkGHCI (thErr "splice")		`thenM_`
     newLocalsRn [(n,loc)]		`thenM` \ [n'] ->
     rnExpr e 				`thenM` \ (e', fvs_e) ->
-    returnM (HsSplice n' e', fvs_e)    
+    returnM (HsSplice n' e' loc, fvs_e)    
 
 rnExpr section@(SectionL expr op)
   = rnExpr expr	 				`thenM` \ (expr', fvs_expr) ->
@@ -724,7 +725,7 @@ segsToStmts ((defs, uses, fwds, ss) : segs)
   where
     (later_stmts, later_uses) = segsToStmts segs
     new_stmt | non_rec	 = head ss
-	     | otherwise = RecStmt rec_names ss
+	     | otherwise = RecStmt rec_names ss []
 	     where
 	       non_rec   = isSingleton ss && isEmptyNameSet fwds
 	       rec_names = nameSetToList (fwds `plusFV` (defs `intersectNameSet` later_uses))

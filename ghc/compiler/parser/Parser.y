@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.106 2002/10/09 15:03:53 simonpj Exp $
+$Id: Parser.y,v 1.107 2002/10/09 16:53:11 simonpj Exp $
 
 Haskell grammar.
 
@@ -415,7 +415,7 @@ topdecl :: { RdrBinding }
 	| 'foreign' fdecl				{ RdrHsDecl $2 }
 	| '{-# DEPRECATED' deprecations '#-}'	 	{ RdrBindings $2 }
 	| '{-# RULES' rules '#-}'		 	{ RdrBindings $2 }
-	| '$(' exp ')'					{ RdrHsDecl (SpliceD $2) }
+	| srcloc '$(' exp ')'				{ RdrHsDecl (SpliceD (SpliceDecl $3 $1)) }
       	| decl						{ $1 }
 
 tycl_decl :: { RdrNameTyClDecl }
@@ -1000,13 +1000,13 @@ aexp2	:: { RdrNameHsExpr }
 	| '_'				{ EWildPat }
 	
 	-- MetaHaskell Extension
-	| ID_SPLICE                     { mkHsSplice (HsVar (mkUnqual varName $1))}  -- $x
-	| '$(' exp ')'   	        { mkHsSplice $2 }                            -- $( exp )
-	| '[|' exp '|]'                 { HsBracket (ExpBr $2) }                       
-	| '[t|' ctype '|]'              { HsBracket (TypBr $2) }                       
-	| '[p|' srcloc infixexp '|]'    {% checkPattern $2 $3 `thenP` \p ->
-					   returnP (HsBracket (PatBr p)) }
-	| '[d|' cvtopdecls '|]'		{ HsBracket (DecBr (mkGroup $2)) }
+	| srcloc ID_SPLICE              { mkHsSplice (HsVar (mkUnqual varName $2)) $1 }  -- $x
+	| srcloc '$(' exp ')'   	{ mkHsSplice $3 $1 }                             -- $( exp )
+	| srcloc '[|' exp '|]'          { HsBracket (ExpBr $3) $1 }                       
+	| srcloc '[t|' ctype '|]'       { HsBracket (TypBr $3) $1 }                       
+	| srcloc '[p|' infixexp '|]'    {% checkPattern $1 $3 `thenP` \p ->
+					   returnP (HsBracket (PatBr p) $1) }
+	| srcloc '[d|' cvtopdecls '|]'	{ HsBracket (DecBr (mkGroup $3)) $1 }
 
 
 texps :: { [RdrNameHsExpr] }

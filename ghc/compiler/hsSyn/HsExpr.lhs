@@ -164,13 +164,13 @@ data HsExpr id
 		(HsExpr id) 	-- expr whose cost is to be measured
 		
   -- MetaHaskell Extensions
-  | HsBracket    (HsBracket id)
+  | HsBracket    (HsBracket id) SrcLoc
 
   | HsBracketOut (HsBracket Name)	-- Output of the type checker is the *original*
 		 [PendingSplice]	-- renamed expression, plus *typechecked* splices
 					-- to be pasted back in by the desugarer
 
-  | HsSplice id (HsExpr id )		-- $z  or $(f 4)
+  | HsSplice id (HsExpr id) SrcLoc	-- $z  or $(f 4)
 					-- The id is just a unique name to 
 					-- identify this splice point
 \end{code}
@@ -389,8 +389,8 @@ ppr_expr (DictApp expr dnames)
 
 ppr_expr (HsType id) = ppr id
 
-ppr_expr (HsSplice n e)      = char '$' <> brackets (ppr n) <> pprParendExpr e
-ppr_expr (HsBracket b)       = pprHsBracket b
+ppr_expr (HsSplice n e _)    = char '$' <> brackets (ppr n) <> pprParendExpr e
+ppr_expr (HsBracket b _)     = pprHsBracket b
 ppr_expr (HsBracketOut e ps) = ppr e $$ ptext SLIT("where") <+> ppr ps
 
 -- add parallel array brackets around a document
@@ -585,8 +585,13 @@ data Stmt id
 	-- The ids are a subset of the variables bound by the stmts that
 	-- either (a) are used before they are bound in the stmts
 	-- or     (b) are used in stmts that follow the RecStmt
-  | RecStmt  [id] 	
+  | RecStmt  [id]
 	     [Stmt id] 
+	     [HsExpr id]	-- Post type-checking only; these expressions correspond
+				-- 1-to-1 with the [id], and are the expresions that should
+				-- be returned by the recursion.  They may not quite be the
+				-- Ids themselves, because the Id may be polymorphic, but
+				-- the returned thing has to be monomorphic.
 \end{code}
 
 ExprStmts and ResultStmts are a bit tricky, because what they mean
@@ -644,7 +649,7 @@ pprStmt (ParStmt stmtss)
  = hsep (map (\stmts -> ptext SLIT("| ") <> ppr stmts) stmtss)
 pprStmt (ParStmtOut stmtss)
  = hsep (map (\stmts -> ptext SLIT("| ") <> ppr stmts) stmtss)
-pprStmt (RecStmt _ segment) = vcat (map ppr segment)
+pprStmt (RecStmt _ segment _) = vcat (map ppr segment)
 
 pprDo :: OutputableBndr id => HsStmtContext any -> [Stmt id] -> SDoc
 pprDo DoExpr stmts   = hang (ptext SLIT("do")) 2 (vcat (map ppr stmts))

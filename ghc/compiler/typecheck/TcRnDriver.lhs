@@ -22,7 +22,7 @@ import {-# SOURCE #-} TcSplice( tcSpliceDecls )
 import CmdLineOpts	( DynFlag(..), opt_PprStyle_Debug, dopt )
 import HsSyn		( HsModule(..), HsBinds(..), MonoBinds(..), HsDecl(..), HsExpr(..),
 			  Stmt(..), Pat(VarPat), HsStmtContext(..), RuleDecl(..),
-			  HsGroup(..),
+			  HsGroup(..), SpliceDecl(..),
 			  mkSimpleMatch, placeHolderType, toHsType, andMonoBinds,
 			  isSrcRule, collectStmtsBinders
 			)
@@ -597,7 +597,7 @@ tcRnSrcDecls ds
 	-- If there is no splice, we're done
 	case group_tail of
 	   Nothing -> return (tcg_env, src_fvs1)
-	   Just (splice_expr, rest_ds) -> do {
+	   Just (SpliceDecl splice_expr splice_loc, rest_ds) -> do {
 
 	setGblEnv tcg_env $ do {
 
@@ -605,7 +605,9 @@ tcRnSrcDecls ds
 	failWithTc (text "Can't do a top-level splice; need a bootstrapped compiler")
 #else
 	-- Rename the splice expression, and get its supporting decls
-	(rn_splice_expr, fvs) <- initRn SourceMode (rnExpr splice_expr) ;
+	(rn_splice_expr, fvs) <- initRn SourceMode $
+				 addSrcLoc splice_loc $
+				 rnExpr splice_expr ;
 	tcg_env <- importSupportingDecls fvs ;
 	setGblEnv tcg_env $ do {
 

@@ -458,22 +458,27 @@ tcStmtAndThen combine do_or_lc m_ty (ParStmtOut bndr_stmts_s) thing_inside
     combine_par stmt (stmts, thing) = (stmt:stmts, thing)
 
 	-- RecStmt
-tcStmtAndThen combine do_or_lc m_ty (RecStmt recNames stmts) thing_inside
+tcStmtAndThen combine do_or_lc m_ty (RecStmt recNames stmts _) thing_inside
   = newTyVarTys (length recNames) liftedTypeKind		`thenM` \ recTys ->
     tcExtendLocalValEnv (zipWith mkLocalId recNames recTys)	$
     tcStmtsAndThen combine_rec do_or_lc m_ty stmts (
 	tcLookupLocalIds recNames  `thenM` \ rn ->
 	returnM ([], rn)
-    )								`thenM` \ (stmts', recNames') ->
+    )								`thenM` \ (stmts', recIds) ->
 
     -- Unify the types of the "final" Ids with those of "knot-tied" Ids
-    unifyTauTyLists recTys (map idType recNames')	`thenM_`
+    mappM tc_ret (recIds `zip` recTys)			`thenM` \ rets' ->
   
     thing_inside					`thenM` \ thing ->
   
-    returnM (combine (RecStmt recNames' stmts') thing)
+    returnM (combine (RecStmt recIds stmts' rets') thing)
   where 
     combine_rec stmt (stmts, thing) = (stmt:stmts, thing)
+
+    -- Unify the types of the "final" Ids with those of "knot-tied" Ids
+    tc_ret (rec_id, rec_ty)
+	= tcSubExp rec_ty (idType rec_id) 	`thenM` \ co_fn ->
+	  returnM (co_fn <$> HsVar rec_id) 
 
 	-- ExprStmt
 tcStmtAndThen combine do_or_lc m_ty@(m, res_elt_ty) stmt@(ExprStmt exp _ locn) thing_inside

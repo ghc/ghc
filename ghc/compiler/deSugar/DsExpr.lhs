@@ -550,7 +550,7 @@ Here is where we desugar the Template Haskell brackets and escapes
 
 #ifdef GHCI	/* Only if bootstrapping */
 dsExpr (HsBracketOut x ps) = dsBracket x ps
-dsExpr (HsSplice n e)      = pprPanic "dsExpr:splice" (ppr e)
+dsExpr (HsSplice n e _)    = pprPanic "dsExpr:splice" (ppr e)
 #endif
 
 \end{code}
@@ -636,10 +636,10 @@ dsDo do_or_lc stmts ids result_ty
 	    returnDs (mkApps (Var bind_id) [Type a_ty, Type b_ty, expr2,
 				            mkLams binders matching_code])
 
-	go (RecStmt rec_vars rec_stmts : stmts)
+	go (RecStmt rec_vars rec_stmts rec_rets : stmts)
 	  = go (bind_stmt : stmts)
 	  where
-	    bind_stmt = dsRecStmt m_ty ids rec_vars rec_stmts
+	    bind_stmt = dsRecStmt m_ty ids rec_vars rec_stmts rec_rets
 	    
     in
     go stmts
@@ -658,19 +658,21 @@ We turn (RecStmt [v1,..vn] stmts) into:
 \begin{code}
 dsRecStmt :: Type		-- Monad type constructor :: * -> *
 	  -> [Id]		-- Ids for: [return,fail,>>=,>>,mfix]
-	  -> [Id] -> [TypecheckedStmt]	-- Guts of the RecStmt
+	  -> [Id] -> [TypecheckedStmt]	-> [TypecheckedHsExpr] 	-- Guts of the RecStmt
 	  -> TypecheckedStmt
-dsRecStmt m_ty ids@[return_id, _, _, _, mfix_id] vars stmts
-  = BindStmt tup_pat mfix_app noSrcLoc
+dsRecStmt m_ty ids@[return_id, _, _, _, mfix_id] vars stmts rets
+  = ASSERT( length vars == length rets )
+    BindStmt tup_pat mfix_app noSrcLoc
   where 
 	(var1:rest) = vars		-- Always at least one
+	(ret1:_)    = rets
 	one_var     = null rest
 
 	mfix_app = HsApp (TyApp (HsVar mfix_id) [tup_ty]) mfix_arg
 	mfix_arg = HsLam (mkSimpleMatch [tup_pat] body tup_ty noSrcLoc)
 
-	tup_expr | one_var   = HsVar var1
-		 | otherwise = ExplicitTuple (map HsVar vars) Boxed
+	tup_expr | one_var   = ret1
+		 | otherwise = ExplicitTuple rets Boxed
 	tup_ty   | one_var   = idType var1
 		 | otherwise = mkTupleTy Boxed (length vars) (map idType vars)
 	tup_pat  | one_var   = VarPat var1
