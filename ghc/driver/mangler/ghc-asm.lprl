@@ -533,7 +533,7 @@ sub mangle_asm {
 	    $chksymb[$i] = '';
         } elsif ( $TargetPlatform =~ /-darwin/
                 && (/^\s*\.subsections_via_symbols/
-                  ||/^\s*\.no_dead_strip.*/) {
+                  ||/^\s*\.no_dead_strip.*/)) {
             # Don't allow Apple's linker to do any dead-stripping of symbols
             # in this file, because it will mess up info-tables in mangled
             # code.
