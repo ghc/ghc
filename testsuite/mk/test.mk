@@ -19,6 +19,9 @@ ifeq "$(PYTHON)" ""
 $(error Python must be installed in order to use the testsuite)
 endif
 
+# export the value of $MAKE for invocation in ghc-regress/driver/
+export MAKE
+
 # ghastly hack, because the driver requires that $tool be an absolute path name.
 GHC_INPLACE_ABS	= $(FPTOOLS_TOP_ABS)/ghc/compiler/ghc-inplace
 
