@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.58 2001/11/27 01:51:23 sof Exp $
+ * $Id: RtsStartup.c,v 1.59 2001/12/06 07:07:12 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -86,10 +86,15 @@ void
 startupHaskell(int argc, char *argv[], void (*init_root)(void))
 {
    /* To avoid repeated initialisations of the RTS */
-   if (rts_has_started_up)
-     return;
-   else
-     rts_has_started_up=1;
+  if (rts_has_started_up) {
+    /* RTS is up and running, so only run the per-module initialisation code */
+    if (init_root) {
+      initModules(init_root);
+    }
+    return;
+  } else {
+    rts_has_started_up=1;
+  }
 
     /* The very first thing we do is grab the start time...just in case we're
      * collecting timing statistics.
@@ -233,7 +238,7 @@ initModules ( void (*init_root)(void) )
 #endif
 
     init_sp = 0;
-    bd = allocGroup(4);
+    bd = allocGroup(INIT_STACK_BLOCKS);
     init_stack = (F_ *)bd->start;
     init_stack[init_sp++] = (F_)stg_init_ret;
     init_stack[init_sp++] = (F_)__stginit_Prelude;
