@@ -51,7 +51,24 @@ StgByteArray how;
 	exclusive = 1;
 	break;
     case 'r':
+#if defined(cygwin32_TARGET_OS)
+	/* With cygwin32-b19, fdopen() returns EBADF under some
+	   hard-to-reproduce situations (causing hsc's renamer
+	   to break on some ~10 modules when recompiling it.)
+	   As a temporary workaround, we open files that was requested
+	   opened as read-only instead as read-write, since fdopen()
+	   only appears to fail on RO file descriptors.
+
+	   This won't have any impact on the correctness of the Haskell IO
+	   implementation since the Handle in Haskell land will record the
+	   file as being read-only, so illegal writes will be caught.
+	   
+	   ToDo: isolate and report.
+	*/
+	oflags = how[1] == '+' ? O_RDWR | O_NOCTTY : O_RDWR | O_NOCTTY;
+#else
 	oflags = how[1] == '+' ? O_RDWR | O_NOCTTY : O_RDONLY | O_NOCTTY;
+#endif
 	exclusive = 0;
 	break;
     default:
@@ -203,6 +220,9 @@ StgByteArray how;
     errno = 0;			/* Just in case fdopen() is lame */
     while ((fp = fdopen(fd, how)) == NULL) {
 	if (errno != EINTR) {
+#if defined(cygwin32_TARGET_OS) && defined(DEBUG)
+	    fprintf(stderr, "openFile %s : %s : %d : %d\n", file, how, errno, fd);
+#endif
 	    cvtErrno();
 	    if (created)
 		(void) unlink(file);

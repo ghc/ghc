@@ -64,7 +64,7 @@ StgAddr dir;
         cvtErrno();
         stdErrno();
 	(void) closedir((DIR*)dir);
-	return 1;
+	return NULL;
     }
     errno = 0;
   }
