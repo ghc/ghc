@@ -71,10 +71,11 @@ system cmd =
         n  -> return (ExitFailure n)
 
 foreign import ccall unsafe "systemCmd" primSystem :: CString -> IO Int
-#endif  /* __GLASGOW_HASKELL__ */
 
 -- ---------------------------------------------------------------------------
 -- rawSystem
 
 -- rawSystem is in a separate file, so we can #include it various places.
 #include "RawSystem.hs-inc"
+
+#endif  /* __GLASGOW_HASKELL__ */
