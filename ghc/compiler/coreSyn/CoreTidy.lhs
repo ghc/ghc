@@ -44,14 +44,14 @@ import HscTypes		( PersistentCompilerState( pcs_PRS ),
 			  ModDetails(..), TyThing(..)
 			)
 import FiniteMap	( lookupFM, addToFM )
-import Maybes		( maybeToBool, orElse )
+import Maybes		( orElse )
 import ErrUtils		( showPass, dumpIfSet_core )
 import SrcLoc		( noSrcLoc )
 import UniqFM		( mapUFM )
 import UniqSupply	( splitUniqSupply, uniqFromSupply )
 import List		( partition )
 import Util		( mapAccumL )
-import Maybe		( isNothing, fromJust )
+import Maybe		( isJust, fromJust, isNothing )
 import Outputable
 \end{code}
 
@@ -462,7 +462,7 @@ tidyTopBinder mod ext_ids cg_info_env tidy_env rhs
     subst_env' = extendVarEnv subst_env2 id id'
 
     maybe_external = lookupVarEnv ext_ids id
-    is_external    = maybeToBool maybe_external
+    is_external    = isJust maybe_external
 
     -- Expose an unfolding if ext_ids tells us to
     show_unfold = maybe_external `orElse` False
