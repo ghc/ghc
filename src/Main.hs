@@ -353,7 +353,7 @@ getPackageIfaces flags verbose =
 #if __GLASGOW_HASKELL__ < 603
   if (not (null pkgs))
 	then die ("-use-package not supported; recompile Haddock with GHC 6.4 or later")
-	else return ()
+	else return []
 #else
   do
     mb_iface_details <- mapM getPkgIface pkgs
