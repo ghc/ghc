@@ -1,0 +1,7 @@
+_interface_ TcUnify 1
+_exports_
+TcUnify unifyTauTy;
+_declarations_
+1 unifyTauTy _:_ TcType.TcTauType -> TcType.TcTauType -> TcMonad.TcM () ;;
+
+
