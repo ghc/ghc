@@ -62,12 +62,13 @@ module System.Directory
     , getModificationTime       -- :: FilePath -> IO ClockTime
    ) where
 
+import System.Environment      ( getEnv )
+import System.FilePath
+import System.IO.Error
+
 #ifdef __NHC__
 import Directory
-import System (getEnv)
-import System.FilePath
 import NHC.FFI
-import IO (try)
 #endif /* __NHC__ */
 
 #ifdef __HUGS__
@@ -83,9 +84,6 @@ import System.Posix.Types
 import System.Posix.Internals
 import System.Time             ( ClockTime(..) )
 import System.IO
-import System.IO.Error
-import System.FilePath
-import System.Environment (getEnv)
 import Foreign
 import Foreign.C
 
