@@ -21,6 +21,7 @@ import TyCon            ( TyCon, tyConTyVars, tyConDataConsIfAvailable,
 import Name		( Name, mkSysLocalName )
 import CoreSyn          ( mkLams, Expr(..), CoreExpr, AltCon(..), 
 			  mkConApp, Alt, mkTyApps, mkVarApps )
+import CoreUtils	( exprArity )
 import BasicTypes       ( EP(..), Boxity(..) )
 import Var              ( TyVar )
 import VarSet		( varSetElems )
@@ -31,7 +32,7 @@ import TysWiredIn       ( genericTyCons,
 			  genUnitTyCon, genUnitDataCon, plusTyCon, inrDataCon,
 			  inlDataCon, crossTyCon, crossDataCon
 			)
-import IdInfo           ( noCafNoTyGenIdInfo, setUnfoldingInfo )
+import IdInfo           ( noCafNoTyGenIdInfo, setUnfoldingInfo, setArityInfo )
 import CoreUnfold       ( mkTopUnfolding ) 
 
 import SrcLoc		( builtinSrcLoc )
@@ -259,7 +260,12 @@ mkTyConGenInfo tycon [from_name, to_name]
     tyvar_tys    = mkTyVarTys tyvars
 
     from_id_info = noCafNoTyGenIdInfo `setUnfoldingInfo` mkTopUnfolding from_fn
+				      `setArityInfo`     exprArity from_fn
     to_id_info   = noCafNoTyGenIdInfo `setUnfoldingInfo` mkTopUnfolding to_fn
+				      `setArityInfo`     exprArity to_fn
+	-- It's important to set the arity info, so that
+	-- the calling convention (gotten from arity) 
+	-- matches reality.
 
     from_ty = mkForAllTys tyvars (mkFunTy tycon_ty rep_ty)
     to_ty   = mkForAllTys tyvars (mkFunTy rep_ty tycon_ty)
