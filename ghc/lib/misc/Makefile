@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.10 1998/12/02 13:26:38 simonm Exp $
+# $Id: Makefile,v 1.11 1999/02/03 16:54:01 simonm Exp $
 #
 # Makefile for miscellaneous libraries.
 #
@@ -37,7 +37,7 @@ SRC_MKDEPENDHS_OPTS += -optdep--include-prelude
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options
 
-SRC_HC_OPTS += -recomp -cpp -fglasgow-exts -fvia-C -Rghc-timing $(GhcLibHcOpts)
+SRC_HC_OPTS += -i../concurrent -recomp -cpp -fglasgow-exts -fvia-C -Rghc-timing $(GhcLibHcOpts)
 
 #
 # Profiling options

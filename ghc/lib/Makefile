@@ -15,7 +15,7 @@ include $(TOP)/mk/boilerplate.mk
 ifeq "$(GhcWithHscBuiltViaC)" "YES"
 SUBDIRS = std exts
 else
-SUBDIRS = std exts misc posix concurrent
+SUBDIRS = std exts concurrent misc posix
 endif
 
 include $(TOP)/mk/target.mk
