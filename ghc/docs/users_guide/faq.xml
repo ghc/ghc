@@ -465,6 +465,23 @@ details.</para>
       </listitem>
     </varlistentry>
 
+    <varlistentry>
+      <term>I get an error message from GHCi about a "duplicate definition for
+	symbol __module_registered"</term>
+      <listitem>
+	<para>An error message like this:
+
+<screen>
+GHCi runtime linker: fatal error: I found a duplicate definition for symbol
+       __module_registered
+    whilst processing object file
+       /usr/local/lib/ghc-6.2/HSfgl.o</screen>
+
+	  probably indicates that when building a library for GHCi
+	  (<filename>HSfgl.o</filename> in the above example), you should use
+	  the <option>-x</option> option to <literal>ld</literal>.</para>
+      </listitem>
+    </varlistentry>
   </variablelist>
 
 </chapter>
