@@ -885,15 +885,19 @@ mkAlts scrut case_bndr alts@((con1,bndrs1,rhs1) : con_alts)
 --------------------------------------------------
 
 mkAlts scrut case_bndr alts
-  | Just (tycon, inst_tys) <- splitTyConApp_maybe (idType case_bndr),
-    isAlgTyCon tycon,	-- It's a data type, tuple, or unboxed tuples.  
-			-- We aren't expecting any newtypes at this point.
-    (alts_no_deflt, Just rhs) <- findDefault alts,
-		-- There is a DEFAULT case
+  | (alts_no_deflt, Just rhs) <- findDefault alts,
+			-- There is a DEFAULT case
+
+    Just (tycon, inst_tys) <- splitTyConApp_maybe (idType case_bndr),
+    isAlgTyCon tycon,		-- It's a data type, tuple, or unboxed tuples.  
+    not (isNewTyCon tycon),	-- We can have a newtype, if we are just doing an eval:
+				-- 	case x of { DEFAULT -> e }
+				-- and we don't want to fill in a default for them!
+
     [missing_con] <- filter is_missing (tyConDataConsIfAvailable tycon)
-		-- There is just one missing constructor!
-  = ASSERT( not (isNewTyCon tycon) )
-    tick (FillInCaseDefault case_bndr)	`thenSmpl_`
+			-- There is just one missing constructor!
+
+  = tick (FillInCaseDefault case_bndr)	`thenSmpl_`
     getUniquesSmpl 			`thenSmpl` \ tv_uniqs ->
     getUniquesSmpl 			`thenSmpl` \ id_uniqs ->
     let
