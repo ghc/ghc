@@ -445,15 +445,15 @@ doesn't need it's main thread to be bound and makes /heavy/ use of concurrency
 runInUnboundThread :: IO a -> IO a
 
 runInUnboundThread action = do
-	bound <- isCurrentThreadBound
-	if bound
-		then do
-			mv <- newEmptyMVar
-			forkIO (Exception.try action >>= putMVar mv)
-			takeMVar mv >>= \either -> case either of
-			Left exception -> Exception.throw exception
-			Right result -> return result
-		else action
+    bound <- isCurrentThreadBound
+    if bound
+        then do
+            mv <- newEmptyMVar
+            forkIO (Exception.try action >>= putMVar mv)
+            takeMVar mv >>= \either -> case either of
+                Left exception -> Exception.throw exception
+                Right result -> return result
+        else action
 	
 #endif /* __GLASGOW_HASKELL__ */
 
