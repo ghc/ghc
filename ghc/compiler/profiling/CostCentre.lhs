@@ -9,9 +9,9 @@ module CostCentre (
 		-- All abstract except to friend: ParseIface.y
 
 	CostCentreStack,
-	noCCS, subsumedCCS, currentCCS, overheadCCS, dontCareCCS,
+	noCCS, subsumedCCS, currentCCS, setCurrentCCS, overheadCCS, dontCareCCS,
 	noCostCentre, noCCAttached,
-	noCCSAttached, isCurrentCCS,  isSubsumedCCS, currentOrSubsumedCCS,
+	noCCSAttached, isCurrentCCS,  isSetCurrentCCS, isSubsumedCCS, currentOrSubsumedCCS,
 
 	mkUserCC, mkAutoCC, mkAllCafsCC, 
 	mkSingletonCCS, cafifyCC, dupifyCC,
@@ -52,6 +52,10 @@ data CostCentreStack
 			-- cost centre to be attached to the object, when it 
 			-- is allocated, is whatever is in the 
 			-- current-cost-centre-stack register.
+
+  | SetCurrentCCS       -- Special cost centre for non-top-level functions
+			-- which is always *set* rather than possibly
+			-- appended to the current CCS.
 
   | SubsumedCCS		-- Cost centre stack for top-level subsumed functions
 			-- (CAFs get an AllCafsCC).
@@ -151,6 +155,7 @@ SIMON: Maybe later...
 noCCS 			= NoCCS
 subsumedCCS 		= SubsumedCCS
 currentCCS	 	= CurrentCCS
+setCurrentCCS	 	= SetCurrentCCS
 overheadCCS	 	= OverheadCCS
 dontCareCCS	 	= DontCareCCS
 
@@ -169,6 +174,9 @@ noCCAttached _				= False
 isCurrentCCS CurrentCCS			= True
 isCurrentCCS _	      			= False
 
+isSetCurrentCCS SetCurrentCCS		= True
+isSetCurrentCCS _	     		= False
+
 isSubsumedCCS SubsumedCCS 		= True
 isSubsumedCCS _		     		= False
 
@@ -177,6 +185,7 @@ isCafCCS _				= False
 
 currentOrSubsumedCCS SubsumedCCS	= True
 currentOrSubsumedCCS CurrentCCS		= True
+currentOrSubsumedCCS SetCurrentCCS	= True
 currentOrSubsumedCCS _			= False
 \end{code}
 
@@ -297,6 +306,7 @@ instance Outputable CostCentreStack where
   ppr ccs = case ccs of
 		NoCCS		-> ptext SLIT("NO_CCS")
 		CurrentCCS	-> ptext SLIT("CCCS")
+		SetCurrentCCS	-> ptext SLIT("SetCCCS")
 		OverheadCCS	-> ptext SLIT("CCS_OVERHEAD")
 		DontCareCCS	-> ptext SLIT("CCS_DONTZuCARE")
 		SubsumedCCS	-> ptext SLIT("CCS_SUBSUMED")

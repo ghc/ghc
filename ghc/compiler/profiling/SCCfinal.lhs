@@ -32,10 +32,15 @@ import StgSyn
 import CmdLineOpts	( opt_AutoSccsOnIndividualCafs )
 import CostCentre	-- lots of things
 import Const		( Con(..) )
-import Id		( Id, mkSysLocal )
+import Id		( Id, mkSysLocal, idType, idName )
 import Module		( Module )
 import UniqSupply	( uniqFromSupply, splitUniqSupply, UniqSupply )
 import Unique           ( Unique )
+import Type		( splitForAllTys, splitTyConApp_maybe )
+import TyCon		( isFunTyCon )
+import VarSet
+import UniqSet
+import Name		( isLocallyDefinedName )
 import Util		( removeDups )
 import Outputable	
 
@@ -57,7 +62,7 @@ stgMassageForProfiling mod_name grp_name us stg_binds
   = let
 	((local_ccs, extern_ccs, cc_stacks),
 	 stg_binds2)
-	  = initMM mod_name us (mapMM do_top_binding stg_binds)
+	  = initMM mod_name us (do_top_bindings stg_binds)
 
 	(fixed_ccs, fixed_cc_stacks)
 	  = if opt_AutoSccsOnIndividualCafs
@@ -77,16 +82,25 @@ stgMassageForProfiling mod_name grp_name us stg_binds
     all_cafs_ccs = mkSingletonCCS all_cafs_cc
 
     ----------
-    do_top_binding :: StgBinding -> MassageM StgBinding
+    do_top_bindings :: [StgBinding] -> MassageM [StgBinding]
 
-    do_top_binding (StgNonRec b rhs) 
+    do_top_bindings [] = returnMM []
+
+    do_top_bindings (StgNonRec b rhs : bs) 
       = do_top_rhs b rhs 		`thenMM` \ rhs' ->
-	returnMM (StgNonRec b rhs')
+	addTopLevelIshId b (
+	   do_top_bindings bs `thenMM` \bs' ->
+	   returnMM (StgNonRec b rhs' : bs')
+	)
 
-    do_top_binding (StgRec pairs)
-      = mapMM do_pair pairs		`thenMM` \ pairs2 ->
-	returnMM (StgRec pairs2)
+    do_top_bindings (StgRec pairs : bs)
+      = addTopLevelIshIds binders (
+	   mapMM do_pair pairs		`thenMM` \ pairs2 ->
+	   do_top_bindings bs `thenMM` \ bs' ->
+	   returnMM (StgRec pairs2 : bs')
+	)
       where
+	binders = map fst pairs
 	do_pair (b, rhs) 
 	   = do_top_rhs b rhs	`thenMM` \ rhs2 ->
 	     returnMM (b, rhs2)
@@ -124,8 +138,8 @@ stgMassageForProfiling mod_name grp_name us stg_binds
 		     returnMM ccs
 		else 
 		     returnMM all_cafs_ccs)		`thenMM`  \ caf_ccs ->
-	set_prevailing_cc caf_ccs (do_expr body)	`thenMM`  \ body' ->
-        returnMM (StgRhsClosure caf_ccs bi srt fv u [] body')
+	   set_prevailing_cc caf_ccs (do_expr body)	`thenMM`  \ body' ->
+           returnMM (StgRhsClosure caf_ccs bi srt fv u [] body')
 
     do_top_rhs binder (StgRhsClosure cc bi srt fv u [] body)
 	-- Top level CAF with cost centre attached
@@ -145,7 +159,7 @@ stgMassageForProfiling mod_name grp_name us stg_binds
     do_top_rhs binder (StgRhsClosure no_ccs bi srt fv u args body)
 	-- Top level function, probably subsumed
       | noCCSAttached no_ccs
-      = set_prevailing_cc currentCCS (do_expr body)	`thenMM` \ body' ->
+      = set_lambda_cc (do_expr body)	`thenMM` \ body' ->
 	returnMM (StgRhsClosure subsumedCCS bi srt fv u args body')
 
       | otherwise
@@ -167,8 +181,8 @@ stgMassageForProfiling mod_name grp_name us stg_binds
       = boxHigherOrderArgs (\args -> StgCon con args res_ty) args
 
     do_expr (StgSCC cc expr)	-- Ha, we found a cost centre!
-      = collectCC cc					`thenMM_`
-	set_prevailing_cc currentCCS (do_expr expr)	`thenMM`  \ expr' ->
+      = collectCC cc		`thenMM_`
+	do_expr expr		`thenMM` \ expr' ->
 	returnMM (StgSCC cc expr')
 
     do_expr (StgCase expr fv1 fv2 bndr srt alts)
@@ -200,30 +214,35 @@ stgMassageForProfiling mod_name grp_name us stg_binds
 	    returnMM (StgBindDefault e')
 
     do_expr (StgLet b e)
-      = do_binding b		 	`thenMM` \ b' ->
-	do_expr e		  	`thenMM` \ e' ->
-	returnMM (StgLet b' e')
+	= do_let b e `thenMM` \ (b,e) ->
+	  returnMM (StgLet b e)
 
-    do_expr (StgLetNoEscape lvs1 lvs2 rhs body)
-      = do_binding rhs			`thenMM` \ rhs' ->
-	do_expr body			`thenMM` \ body' ->
-	returnMM (StgLetNoEscape lvs1 lvs2 rhs' body')
+    do_expr (StgLetNoEscape lvs1 lvs2 b e)
+	= do_let b e `thenMM` \ (b,e) ->
+	  returnMM (StgLetNoEscape lvs1 lvs2 b e)
 
-    ----------
-    do_binding :: StgBinding -> MassageM StgBinding
+    ----------------------------------
 
-    do_binding (StgNonRec b rhs) 
-      = do_rhs rhs 			`thenMM` \ rhs' ->
-	returnMM (StgNonRec b rhs')
+    do_let (StgNonRec b rhs) e
+      = do_rhs rhs		 	`thenMM` \ rhs' ->
+	addTopLevelIshId b (
+	  do_expr e		  	`thenMM` \ e' ->
+	  returnMM (StgNonRec b rhs',e')
+        )
 
-    do_binding (StgRec pairs)
-      = mapMM do_pair pairs `thenMM` \ new_pairs ->
-	returnMM (StgRec new_pairs)
+    do_let (StgRec pairs) e
+      = addTopLevelIshIds binders (
+	   mapMM do_pair pairs	 	`thenMM` \ pairs' ->
+	   do_expr e		  	`thenMM` \ e' ->
+	   returnMM (StgRec pairs', e')
+	)
       where
-	do_pair (b, rhs)
-	  = do_rhs rhs	`thenMM` \ rhs' ->
-	    returnMM (b, rhs')
+	binders = map fst pairs
+	do_pair (b, rhs) 
+	   = do_rhs rhs			`thenMM` \ rhs2 ->
+	     returnMM (b, rhs2)
 
+    ----------------------------------
     do_rhs :: StgRhs -> MassageM StgRhs
 	-- We play much the same game as we did in do_top_rhs above;
 	-- but we don't have to worry about cafs etc.
@@ -243,17 +262,20 @@ stgMassageForProfiling mod_name grp_name us stg_binds
 	returnMM (StgRhsClosure cc bi srt fv u args expr')
 -}
 
+    do_rhs (StgRhsClosure cc bi srt fv u [] body)
+      = do_expr body				`thenMM` \ body' ->
+	returnMM (StgRhsClosure currentCCS bi srt fv u [] body')
+
     do_rhs (StgRhsClosure cc bi srt fv u args body)
-      = set_prevailing_cc_maybe cc 		$ \ cc' ->
-	set_lambda_cc (do_expr body)		`thenMM` \ body' ->
-	returnMM (StgRhsClosure cc' bi srt fv u args body')
+      = set_lambda_cc (do_expr body)		`thenMM` \ body' ->
+	get_prevailing_cc 			`thenMM` \ prev_ccs ->
+	let new_ccs | isCurrentCCS prev_ccs = setCurrentCCS -- are we inside a lambda??
+		    | otherwise             = currentCCS
+	in
+	returnMM (StgRhsClosure new_ccs bi srt fv u args body')
 
     do_rhs (StgRhsCon cc con args)
-      = set_prevailing_cc_maybe cc 		$ \ cc' ->
-        returnMM (StgRhsCon cc' con args)
-
-      	-- ToDo: Box args and sort out any let bindings ???
-      	-- Nope: maybe later? WDP 94/06
+      = returnMM (StgRhsCon currentCCS con args)
 \end{code}
 
 %************************************************************************
@@ -265,55 +287,52 @@ stgMassageForProfiling mod_name grp_name us stg_binds
 \begin{code}
 boxHigherOrderArgs
     :: ([StgArg] -> StgExpr)
-			-- An application lacking its arguments and live-var info
+			-- An application lacking its arguments
     -> [StgArg]		-- arguments which we might box
     -> MassageM StgExpr
 
 boxHigherOrderArgs almost_expr args
-  = returnMM (almost_expr args)
-
-{- No boxing for now ... should be moved to desugarer and preserved ... 
-
-boxHigherOrderArgs almost_expr args live_vars
-  = get_prevailing_cc			`thenMM` \ cc ->
-    if (isCafCC cc || isDictCC cc) then
-	-- no boxing required inside CAF/DICT cc
-	-- since CAF/DICT functions are subsumed anyway
-	returnMM (almost_expr args live_vars)
-    else
-        mapAccumMM do_arg [] args	`thenMM` \ (let_bindings, new_args) ->
-        returnMM (foldr (mk_stg_let cc) (almost_expr new_args live_vars) let_bindings)
+  = getTopLevelIshIds		`thenMM` \ ids ->
+    mapAccumMM (do_arg ids) [] args	`thenMM` \ (let_bindings, new_args) ->
+    returnMM (foldr (mk_stg_let currentCCS) (almost_expr new_args) let_bindings)
   where
     ---------------
-    do_arg bindings atom@(StgLitAtom _) = returnMM (bindings, atom)
+    do_arg ids bindings atom@(StgConArg _) = returnMM (bindings, atom)
 
-    do_arg bindings atom@(StgVarAtom old_var)
+    do_arg ids bindings atom@(StgVarArg old_var)
       = let
-	    var_type = getIdUniType old_var
+	    var_type = idType old_var
 	in
-	if toplevelishId old_var && isFunType (getTauType var_type)
+	if ( not (isLocallyDefinedName (idName old_var)) ||
+	     elemVarSet old_var ids ) && isFunType var_type
 	then
 	    -- make a trivial let-binding for the top-level function
 	    getUniqueMM		`thenMM` \ uniq ->
 	    let
 		new_var = mkSysLocal SLIT("sf") uniq var_type
 	    in
-	    returnMM ( (new_var, old_var) : bindings, StgVarAtom new_var )
+	    returnMM ( (new_var, old_var) : bindings, StgVarArg new_var )
 	else
 	    returnMM (bindings, atom)
 
     ---------------
-    mk_stg_let :: CostCentre -> (Id, Id) -> StgExpr -> StgExpr
+    mk_stg_let :: CostCentreStack -> (Id, Id) -> StgExpr -> StgExpr
 
     mk_stg_let cc (new_var, old_var) body
       = let
-	    rhs_body    = StgApp (StgVarAtom old_var) [{-args-}]
+	    rhs_body    = StgApp old_var [{-args-}]
 	    rhs_closure = StgRhsClosure cc stgArgOcc NoSRT [{-fvs-}] ReEntrant [{-args-}] rhs_body
         in
 	StgLet (StgNonRec new_var rhs_closure) body
       where
 	bOGUS_LVs = emptyUniqSet -- easier to print than: panic "mk_stg_let: LVs"
--}
+
+isFunType var_type 
+  = case splitForAllTys var_type of
+	(_, ty) -> case splitTyConApp_maybe ty of
+			Just (tycon,_) | isFunTyCon tycon -> True
+			_ -> False
+
 \end{code}
 
 %************************************************************************
@@ -329,6 +348,7 @@ type MassageM result
 			-- if none, subsumedCosts at top-level
 			-- useCurrentCostCentre at nested levels
   -> UniqSupply
+  -> VarSet		-- toplevel-ish Ids for boxing
   -> CollectedCCs
   -> (CollectedCCs, result)
 
@@ -339,29 +359,28 @@ initMM :: Module	-- module name, which we may consult
        -> MassageM a
        -> (CollectedCCs, a)
 
-initMM mod_name init_us m = m mod_name noCCS init_us ([],[],[])
+initMM mod_name init_us m = m mod_name noCCS init_us emptyVarSet ([],[],[])
 
 thenMM  :: MassageM a -> (a -> MassageM b) -> MassageM b
 thenMM_ :: MassageM a -> (MassageM b) -> MassageM b
 
-thenMM expr cont mod scope_cc us ccs
+thenMM expr cont mod scope_cc us ids ccs
   = case splitUniqSupply us	of { (s1, s2) ->
-    case (expr mod scope_cc s1 ccs)    	of { (ccs2, result) ->
-    cont result mod scope_cc s2 ccs2 }}
+    case (expr mod scope_cc s1 ids ccs) of { (ccs2, result) ->
+    cont result mod scope_cc s2 ids ccs2 }}
 
-thenMM_ expr cont mod scope_cc us ccs
+thenMM_ expr cont mod scope_cc us ids ccs
   = case splitUniqSupply us	of { (s1, s2) ->
-    case (expr mod scope_cc s1 ccs)    	of { (ccs2, _) ->
-    cont mod scope_cc s2 ccs2 }}
+    case (expr mod scope_cc s1 ids ccs)	of { (ccs2, _) ->
+    cont mod scope_cc s2 ids ccs2 }}
 
 returnMM :: a -> MassageM a
-returnMM result mod scope_cc us ccs = (ccs, result)
+returnMM result mod scope_cc us ids ccs = (ccs, result)
 
 nopMM :: MassageM ()
-nopMM mod scope_cc us ccs = (ccs, ())
+nopMM mod scope_cc us ids ccs = (ccs, ())
 
 mapMM :: (a -> MassageM b) -> [a] -> MassageM [b]
-
 mapMM f [] = returnMM []
 mapMM f (m:ms)
   = f m		`thenMM` \ r  ->
@@ -369,7 +388,6 @@ mapMM f (m:ms)
     returnMM (r:rs)
 
 mapAccumMM :: (acc -> x -> MassageM (acc, y)) -> acc -> [x] -> MassageM (acc, [y])
-
 mapAccumMM f b [] = returnMM (b, [])
 mapAccumMM f b (m:ms)
   = f b m		`thenMM` \ (b2, r)  ->
@@ -377,52 +395,44 @@ mapAccumMM f b (m:ms)
     returnMM (b3, r:rs)
 
 getUniqueMM :: MassageM Unique
-getUniqueMM mod scope_cc us ccs = (ccs, uniqFromSupply us)
+getUniqueMM mod scope_cc us ids ccs = (ccs, uniqFromSupply us)
+
+addTopLevelIshId :: Id -> MassageM a -> MassageM a
+addTopLevelIshId id scope mod scope_cc us ids ccs
+  | isCurrentCCS scope_cc = scope mod scope_cc us ids ccs
+  | otherwise             = scope mod scope_cc us (extendVarSet ids id) ccs
+
+addTopLevelIshIds :: [Id] -> MassageM a -> MassageM a
+addTopLevelIshIds [] cont = cont
+addTopLevelIshIds (id:ids) cont 
+  = addTopLevelIshId id (addTopLevelIshIds ids cont)
+
+getTopLevelIshIds :: MassageM VarSet
+getTopLevelIshIds mod scope_cc us ids ccs = (ccs, ids)
 \end{code}
 
-I'm not sure about all this prevailing CC stuff  --SDM
+The prevailing CCS is used to tell whether we're in a top-levelish
+position, where top-levelish is defined as "not inside a lambda".
+Prevailing CCs used to be used for something much more complicated,
+I'm sure --SDM
 
 \begin{code}
-set_prevailing_cc :: CostCentreStack -> MassageM a -> MassageM a
-set_prevailing_cc cc_to_set_to action mod scope_cc us ccs
-    	-- set unconditionally
-  = action mod cc_to_set_to us ccs
-
-set_prevailing_cc_maybe :: CostCentreStack -> (CostCentreStack -> MassageM a) -> MassageM a
-set_prevailing_cc_maybe cc_to_try action mod scope_cc us ccs
-    	-- set only if a real cost centre
-  = let
-	cc_to_use
-	  = if noCCSAttached cc_to_try
-	    then scope_cc    -- carry on as before
-	    else cc_to_try   -- use new cost centre
-    in
-    action cc_to_use mod cc_to_use us ccs
-
 set_lambda_cc :: MassageM a -> MassageM a
-set_lambda_cc action mod scope_cc us ccs
-	-- used when moving inside a lambda; 
- 	-- if we were chugging along as "caf/dict" we change to "ccc"
-  = let
-	cc_to_use = currentCCS
-	{-
-	  = if isCafCC scope_cc || isDictCC scope_cc
-	    then useCurrentCostCentre
-	    else scope_cc
-	-}
-    in
-    action mod cc_to_use us ccs
+set_lambda_cc action mod scope_cc us ids ccs
+  = action mod currentCCS us ids ccs
 
+set_prevailing_cc :: CostCentreStack -> MassageM a -> MassageM a
+set_prevailing_cc cc_to_set_to action mod scope_cc us ids ccs
+  = action mod cc_to_set_to us ids ccs
 
 get_prevailing_cc :: MassageM CostCentreStack
-get_prevailing_cc mod scope_cc us ccs = (ccs, scope_cc)
-
+get_prevailing_cc mod scope_cc us ids ccs = (ccs, scope_cc)
 \end{code}
 
 \begin{code}
 collectCC :: CostCentre -> MassageM ()
 
-collectCC cc mod_name scope_cc us (local_ccs, extern_ccs, ccss)
+collectCC cc mod_name scope_cc us ids (local_ccs, extern_ccs, ccss)
   = ASSERT(not (noCCAttached cc))
     if (cc `ccFromThisModule` mod_name) then
 	((cc : local_ccs, extern_ccs, ccss), ())
@@ -431,7 +441,7 @@ collectCC cc mod_name scope_cc us (local_ccs, extern_ccs, ccss)
 
 collectCCS :: CostCentreStack -> MassageM ()
 
-collectCCS ccs mod_name scope_cc us (local_ccs, extern_ccs, ccss)
+collectCCS ccs mod_name scope_cc us ids (local_ccs, extern_ccs, ccss)
   = ASSERT(not (noCCSAttached ccs))
     ((local_ccs, extern_ccs, ccs : ccss), ())
 \end{code}

@@ -377,7 +377,7 @@ completeVar sw_chkr in_scope inline_call var cont
 	-- thing, but perhaps we want to inline it anyway
   | has_unfolding && (inline_call || ok_to_inline)
   = getEnclosingCC	`thenSmpl` \ encl_cc ->
-    if must_be_unfolded || costCentreOk encl_cc (coreExprCc unf_template)
+    if must_be_unfolded || costCentreOk encl_cc var
     then	-- OK to unfold
 
 	tickUnfold var		`thenSmpl_` (
@@ -470,11 +470,13 @@ completeVar sw_chkr in_scope inline_call var cont
 --
 -- Here y has a "current cost centre", and we can't inline it inside "foo",
 -- regardless of whether E is a WHNF or not.
+--
+-- We can inline a top-level binding anywhere.
     
-costCentreOk ccs_encl cc_rhs
+costCentreOk ccs_encl x
   =  not opt_SccProfilingOn
   || isSubsumedCCS ccs_encl	  -- can unfold anything into a subsumed scope
-  || not (isEmptyCC cc_rhs)	  -- otherwise need a cc on the unfolding
+  || not (isLocallyDefined x)
 \end{code}		   
 
 

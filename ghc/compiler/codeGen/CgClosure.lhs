@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.26 1999/03/22 16:58:19 simonm Exp $
+% $Id: CgClosure.lhs,v 1.27 1999/04/08 15:46:15 simonm Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -267,12 +267,14 @@ closureCodeBody binder_info closure_info cc [] body
     cl_descr mod_name = closureDescription mod_name (closureName closure_info)
 
     body_label   = entryLabelFromCI closure_info
+    is_box  = case body of { StgApp fun [] -> True; _ -> False }
+
     body_code   = profCtrC SLIT("TICK_ENT_THK") []		`thenC`
 		  thunkWrapper closure_info body_label (
 			-- We only enter cc after setting up update so that cc
 			-- of enclosing scope will be recorded in update frame
 			-- CAF/DICT functions will be subsumed by this enclosing cc
-		    enterCostCentreCode closure_info cc IsThunk	`thenC`
+		    enterCostCentreCode closure_info cc IsThunk	is_box `thenC`
 		    cgExpr body)
 \end{code}
 
@@ -393,7 +395,7 @@ closureCodeBody binder_info closure_info cc all_args body
 	    freeStackSlots (map fst stk_tags)		    `thenC`
 
 		-- Enter the closures cc, if required
-	    enterCostCentreCode closure_info cc IsFunction  `thenC`
+	    enterCostCentreCode closure_info cc IsFunction False `thenC`
 
 		-- Do the business
 	    funWrapper closure_info arg_regs stk_tags slow_label (cgExpr body)
@@ -440,40 +442,43 @@ data IsThunk = IsThunk | IsFunction -- Bool-like, local
 	deriving Eq
 -- #endif
 
-enterCostCentreCode :: ClosureInfo -> CostCentreStack -> IsThunk -> Code
+enterCostCentreCode 
+   :: ClosureInfo -> CostCentreStack
+   -> IsThunk
+   -> Bool	-- is_box: this closure is a special box introduced by SCCfinal
+   -> Code
 
-enterCostCentreCode closure_info ccs is_thunk
+enterCostCentreCode closure_info ccs is_thunk is_box
   = if not opt_SccProfilingOn then
 	nopC
     else
 	ASSERT(not (noCCSAttached ccs))
 
 	if isSubsumedCCS ccs then
-	    --ASSERT(isToplevClosure closure_info)
-	    --ASSERT(is_thunk == IsFunction)
-	    (if isToplevClosure closure_info && is_thunk == IsFunction then \x->x 
-	     else pprTrace "enterCostCenterCode:" (hsep [ppr (is_thunk == IsFunction), 
-							 ppr ccs])) $
+	    ASSERT(isToplevClosure closure_info)
+	    ASSERT(is_thunk == IsFunction)
 	    costCentresC SLIT("ENTER_CCS_FSUB") []
+ 
+	else if isSetCurrentCCS ccs then
+	    ASSERT(not (isToplevClosure closure_info))
+	    ASSERT(is_thunk == IsFunction)
+	    costCentresC SLIT("ENTER_CCS_TCL") [CReg node]
 
 	else if isCurrentCCS ccs then 
-	    if re_entrant 
+	    if re_entrant && not is_box
 		then costCentresC SLIT("ENTER_CCS_FCL") [CReg node]
 		else costCentresC SLIT("ENTER_CCS_TCL") [CReg node]
 
-	else if isCafCCS ccs && isToplevClosure closure_info then
+	else if isCafCCS ccs then
+	    ASSERT(isToplevClosure closure_info)
 	    ASSERT(is_thunk == IsThunk)
 		-- might be a PAP, in which case we want to subsume costs
 	    if re_entrant
 		then costCentresC SLIT("ENTER_CCS_FSUB") []
 		else costCentresC SLIT("ENTER_CCS_CAF") c_ccs
 
-	else -- we've got a "real" cost centre right here in our hands...
-	    case is_thunk of 
-		IsThunk    -> costCentresC SLIT("ENTER_CCS_T") c_ccs
-		IsFunction -> if isCafCCS ccs-- || isDictCC ccs
-			      then costCentresC SLIT("ENTER_CCS_FCAF") c_ccs
-			      else costCentresC SLIT("ENTER_CCS_FLOAD") c_ccs
+	else panic "enterCostCentreCode"
+
    where
 	c_ccs = [mkCCostCentreStack ccs]
 	re_entrant = closureReEntrant closure_info
@@ -690,8 +695,7 @@ chooseDynCostCentres ccs args fvs body
 
 	blame_cc -- cost-centre on whom we blame the allocation
 	  = case (args, fvs, body) of
-	      ([], [just1], StgApp fun [{-no args-}])
-		| just1 == fun
+	      ([], _, StgApp fun [{-no args-}])
 		-> mkCCostCentreStack overheadCCS
 	      _ -> use_cc
 
