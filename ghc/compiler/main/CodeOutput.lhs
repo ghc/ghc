@@ -194,7 +194,12 @@ outputForeignStubs dflags c_code h_code
 
 	stub_c_file_exists
            <- outputForeignStubs_help (hscStubCOutName dflags) stub_c_output_w
-		(hc_header ++ "#include \"RtsAPI.h\"\n")
+		("#define IN_STG_CODE 0\n" ++ 
+		 hc_header ++
+		 "#include \"RtsAPI.h\"\n")
+	   -- we're adding the default hc_header to the stub file, but this
+	   -- isn't really HC code, so we need to define IN_STG_CODE==0 to
+	   -- avoid the register variables etc. being enabled.
 
         return (stub_h_file_exists, stub_c_file_exists)
   where
