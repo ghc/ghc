@@ -73,7 +73,7 @@ data DocOption
   = OptHide		-- this module should not appear in the docs
   | OptPrune
   | OptIgnoreExports	-- pretend everything is exported
-  | OptNotDefinitive	-- not the best place to get docs for things
+  | OptNotHome		-- not the best place to get docs for things
 		 	-- exported by this module.
   deriving (Eq)
 

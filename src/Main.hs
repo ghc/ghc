@@ -1048,7 +1048,7 @@ buildGlobalDocEnv ifaces
   upd old_env iface
      | OptHide `elem` iface_options iface
      = old_env
-     | OptNotDefinitive `elem` iface_options iface
+     | OptNotHome `elem` iface_options iface
      = foldl' keep_old old_env exported_names
      | otherwise
      = foldl' keep_new old_env exported_names
@@ -1060,7 +1060,8 @@ buildGlobalDocEnv ifaces
 	not_reexported (UnQual n) = n `notElem` iface_reexported iface
 		-- UnQual probably shouldn't happen
 
-	keep_old env qnm = Map.insertWith const qnm (Qual mdl nm) env
+	keep_old env qnm = Map.insertWith (\new old -> old) 
+				qnm (Qual mdl nm) env
 		where nm = nameOfQName qnm
 	keep_new env qnm = Map.insert qnm (Qual mdl nm) env 
 		where nm = nameOfQName qnm
@@ -1166,6 +1167,7 @@ parseOption :: String -> ErrMsgM (Maybe DocOption)
 parseOption "hide" = return (Just OptHide)
 parseOption "prune" = return (Just OptPrune)
 parseOption "ignore-exports" = return (Just OptIgnoreExports)
+parseOption "not-home" = return (Just OptNotHome)
 parseOption other = do tell ["Unrecognised option: " ++ other]; return Nothing
 
 -- -----------------------------------------------------------------------------
