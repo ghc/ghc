@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.2 2002/04/10 16:10:26 simonmar Exp $
+% $Id: HsSyn.lhs,v 1.3 2002/04/24 15:57:48 simonmar Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -22,8 +22,7 @@ module HsSyn (
     mkHsForAllType,
 
     prelude_mod, main_mod, 
-    unit_con_name, tuple_con_name,
-    unit_con, tuple_con,
+    unit_con_name, tuple_con_name, nil_con_name,
     as_name, qualified_name, hiding_name, minus_name, pling_name, dot_name,
     forall_name, unsafe_name, safe_name, threadsafe_name, export_name,
     stdcall_name, ccall_name, dotnet_name,
@@ -279,12 +278,11 @@ main_mod	      = Module "Main"
 
 unit_ident	      = HsSpecial "()"
 tuple_ident i	      = HsSpecial ("("++replicate i ','++")")
+nil_ident	      = HsSpecial "[]"
 
 unit_con_name	      = Qual prelude_mod (HsVarName unit_ident)
 tuple_con_name i      = Qual prelude_mod (HsVarName (tuple_ident i))
-
-unit_con	      = HsCon unit_con_name
-tuple_con i	      = HsCon (tuple_con_name i)
+nil_con_name	      = Qual prelude_mod (HsVarName nil_ident)
 
 as_name	              = HsVarName (HsIdent "as")
 qualified_name        = HsVarName (HsIdent "qualified")

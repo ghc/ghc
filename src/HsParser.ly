@@ -1,5 +1,5 @@
 q-----------------------------------------------------------------------------
-$Id: HsParser.ly,v 1.2 2002/04/10 13:23:55 simonmar Exp $
+$Id: HsParser.ly,v 1.3 2002/04/24 15:57:47 simonmar Exp $
 
 (c) Simon Marlow, Sven Panne 1997-2000
 
@@ -206,7 +206,7 @@ The Export List
 
 > qcname :: { HsQName }
 >	:  qvar					{ $1 }
-> 	|  qcon					{ $1 }
+> 	|  gcon					{ $1 }
 
 -----------------------------------------------------------------------------
 Import Declarations
@@ -608,7 +608,7 @@ other implementations don't manage this either.
 
 > aexp1	:: { HsExp }
 >	: qvar				{ HsVar $1 }
->	| gcon				{ $1 }
+>	| gcon				{ HsCon $1 }
 >  	| literal			{ $1 }
 >	| '(' exp ')'			{ HsParen $2 }
 >	| '(' texps ')'			{ HsTuple True  $2 }
@@ -725,11 +725,11 @@ Record Field Update/Construction
 -----------------------------------------------------------------------------
 Variables, Constructors and Operators.
 
-> gcon :: { HsExp }
->  	: '(' ')'		{ unit_con }
->	| '[' ']'		{ HsList [] }
->	| '(' commas ')'	{ tuple_con $2 }
->  	| qcon			{ HsCon $1 }
+> gcon :: { HsQName }
+>  	: '(' ')'		{ unit_con_name }
+>	| '[' ']'		{ nil_con_name }
+>	| '(' commas ')'	{ tuple_con_name $2 }
+>  	| qcon			{ $1 }
 
 > var 	:: { HsName }
 >	: varid			{ $1 }
