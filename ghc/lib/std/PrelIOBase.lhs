@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.42 2001/06/01 13:06:01 sewardj Exp $
+% $Id: PrelIOBase.lhs,v 1.43 2001/10/11 22:27:04 sof Exp $
 % 
 % (c) The University of Glasgow, 1994-2001
 %
@@ -9,8 +9,6 @@
 
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
-#include "config.h"
-
 module PrelIOBase where
 
 import PrelST
@@ -519,10 +517,13 @@ data IOErrorType
   | TimeExpired          | UnsatisfiedConstraints
   | UnsupportedOperation
   | EOF
-#if defined(cygwin32_TARGET_OS) || defined(mingw32_TARGET_OS)
-  | ComError Int           -- HRESULT
-#endif
-  deriving (Eq)
+  | DynIOError Dynamic -- cheap&cheerful extensible IO error type.
+
+instance Eq IOErrorType where
+   x == y = 
+     case x of
+       DynIOError{} -> False -- from a strictness POV, compatible with a derived Eq inst?
+       _ -> getTag# x ==# getTag# y
 
 instance Show IOErrorType where
   showsPrec _ e =
@@ -546,11 +547,7 @@ instance Show IOErrorType where
       UnsatisfiedConstraints -> "unsatisified constraints" -- ultra-precise!
       UnsupportedOperation -> "unsupported operation"
       EOF		-> "end of file"
-#if defined(cygwin32_TARGET_OS) || defined(mingw32_TARGET_OS)
-      ComError _	-> "COM error"
-#endif
-
-
+      DynIOError{}      -> "unknown IO error"
 
 userError       :: String  -> IOError
 userError str	=  UserError str
