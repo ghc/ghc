@@ -24,20 +24,7 @@ stringToUtf8 (c:s)
                         chr (0x80 + c `div`       0x40 `mod` 0x40) :
                         chr (0x80 + c                  `mod` 0x40) :
                         stringToUtf8 s
-    | c <= 0x1FFFFF   = chr (0xF0 + c `div`    0x40000           ) :
-                        chr (0x80 + c `div`     0x1000 `mod` 0x40) :
-                        chr (0x80 + c `div`       0x40 `mod` 0x40) :
-                        chr (0x80 + c                  `mod` 0x40) :
-                        stringToUtf8 s
-    | c <= 0x3FFFFFF  = chr (0xF8 + c `div`  0x1000000           ) :
-                        chr (0x80 + c `div`    0x40000 `mod` 0x40) :
-                        chr (0x80 + c `div`     0x1000 `mod` 0x40) :
-                        chr (0x80 + c `div`       0x40 `mod` 0x40) :
-                        chr (0x80 + c                  `mod` 0x40) :
-                        stringToUtf8 s
-    | c <= 0x7FFFFFFF = chr (0xFC + c `div` 0x40000000           ) :
-                        chr (0x80 + c `div`  0x1000000 `mod` 0x40) :
-                        chr (0x80 + c `div`    0x40000 `mod` 0x40) :
+    | c <= 0x10FFFF   = chr (0xF0 + c `div`    0x40000           ) :
                         chr (0x80 + c `div`     0x1000 `mod` 0x40) :
                         chr (0x80 + c `div`       0x40 `mod` 0x40) :
                         chr (0x80 + c                  `mod` 0x40) :

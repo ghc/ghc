@@ -742,7 +742,7 @@ lex_escape cont buf
 			    [] -> charError buf'
 
 after_charnum cont i buf
-  = if i >= 0 && i <= 0x7FFFFFFF
+  = if i >= 0 && i <= 0x10FFFF
 	then cont (fromInteger i) buf
 	else charError buf
 

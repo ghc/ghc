@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.39 2000/10/03 08:43:05 simonpj Exp $
+% $Id: PrelBase.lhs,v 1.40 2001/02/18 14:45:15 qrczak Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -435,12 +435,9 @@ instance Ord Char where
   (C# c1) <  (C# c2) = c1 `ltChar#` c2
 
 chr :: Int -> Char
-chr (I# i) | i >=# 0#
-#if INT_SIZE_IN_BYTES > 4
-             && i <=# 0x7FFFFFFF#
-#endif
-             = C# (chr# i)
-	   | otherwise = error ("Prelude.chr: bad argument")
+chr (I# i) | i >=# 0# && i <=# 0x10FFFF#
+	     = C# (chr# i)
+	   | otherwise = error "Prelude.chr: bad argument"
 
 unsafeChr :: Int -> Char
 unsafeChr (I# i) =  C# (chr# i)
@@ -687,34 +684,23 @@ unpackCStringUtf8# addr
   = unpack 0#
   where
     unpack nh
-      | ch `eqChar#` '\0'# = []
+      | ch `eqChar#` '\0'#   = []
       | ch `leChar#` '\x7F'# = C# ch : unpack (nh +# 1#)
-      | ch `leChar#` '\xDF'# = C# (chr# ((ord# ch                                  `iShiftL#`  6#) +#
-                                         (ord# (indexCharOffAddr# addr (nh +# 1#))) -# 0x3080#))
-                               : unpack (nh +# 2#)
-      | ch `leChar#` '\xEF'# = C# (chr# ((ord# ch                                  `iShiftL#` 12#) +#
-                                         (ord# (indexCharOffAddr# addr (nh +# 1#)) `iShiftL#`  6#) +#
-                                         (ord# (indexCharOffAddr# addr (nh +# 2#))) -# 0xE2080#))
-                               : unpack (nh +# 3#)
-      | ch `leChar#` '\xF7'# = C# (chr# ((ord# ch                                  `iShiftL#` 18#) +#
-                                         (ord# (indexCharOffAddr# addr (nh +# 1#)) `iShiftL#` 12#) +#
-                                         (ord# (indexCharOffAddr# addr (nh +# 2#)) `iShiftL#`  6#) +#
-                                         (ord# (indexCharOffAddr# addr (nh +# 3#))) -# 0x3C82080#))
-                               : unpack (nh +# 4#)
-      | ch `leChar#` '\xFB'# = C# (chr# ((ord# ch -# 0xF8#                         `iShiftL#` 24#) +#
-                                         (ord# (indexCharOffAddr# addr (nh +# 1#)) `iShiftL#` 18#) +#
-                                         (ord# (indexCharOffAddr# addr (nh +# 2#)) `iShiftL#` 12#) +#
-                                         (ord# (indexCharOffAddr# addr (nh +# 3#)) `iShiftL#`  6#) +#
-                                         (ord# (indexCharOffAddr# addr (nh +# 4#))) -# 0x2082080#))
-                               : unpack (nh +# 5#)
-      | otherwise           = C# (chr# (((ord# ch -# 0xFC#)                        `iShiftL#` 30#) +#
-                                        ((ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#)
-                                                                                   `iShiftL#` 24#) +#
-                                         (ord# (indexCharOffAddr# addr (nh +# 2#)) `iShiftL#` 18#) +#
-                                         (ord# (indexCharOffAddr# addr (nh +# 3#)) `iShiftL#` 12#) +#
-                                         (ord# (indexCharOffAddr# addr (nh +# 4#)) `iShiftL#`  6#) +#
-                                         (ord# (indexCharOffAddr# addr (nh +# 5#))) -# 0x2082080#))
-                               : unpack (nh +# 6#)
+      | ch `leChar#` '\xDF'# =
+          C# (chr# ((ord# ch                                  -# 0xC0#) `iShiftL#`  6# +#
+                    (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#))) :
+          unpack (nh +# 2#)
+      | ch `leChar#` '\xEF'# =
+          C# (chr# ((ord# ch                                  -# 0xE0#) `iShiftL#` 12# +#
+                    (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `iShiftL#`  6# +#
+                    (ord# (indexCharOffAddr# addr (nh +# 2#)) -# 0x80#))) :
+          unpack (nh +# 3#)
+      | otherwise            =
+          C# (chr# ((ord# ch                                  -# 0xF0#) `iShiftL#` 18# +#
+                    (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `iShiftL#` 12# +#
+                    (ord# (indexCharOffAddr# addr (nh +# 2#)) -# 0x80#) `iShiftL#`  6# +#
+                    (ord# (indexCharOffAddr# addr (nh +# 3#)) -# 0x80#))) :
+          unpack (nh +# 4#)
       where
 	ch = indexCharOffAddr# addr nh
 
