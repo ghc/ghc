@@ -1,6 +1,6 @@
 
 # --------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.26 2000/02/24 13:58:56 sewardj Exp $                      #
+# $Id: Makefile,v 1.27 2000/02/24 14:40:38 sewardj Exp $                      #
 # --------------------------------------------------------------------------- #
 
 TOP = ..
@@ -23,6 +23,12 @@ ifeq "$(HaveLibReadline)$" "YES"
 LIB_READLINE=-lreadline -ltermcap
 else
 LIB_READLINE=
+endif
+
+ifeq "$(HaveLibGmp)$" "YES"
+LIB_GMP=-lgmp
+else
+LIB_GMP=../rts/gmp/libgmp.a
 endif
 
 YACC = bison -y
@@ -50,7 +56,7 @@ hugs: $(C_OBJS) ../rts/Sanity.o ../rts/Assembler.o ../rts/Disassembler.o \
       ../rts/StgCRun.o ../rts/PrimOps.o
 	$(CC) -o $@ $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) \
 		 -lbfd -liberty $(LIB_READLINE) $(LIB_DL) \
-		 ../rts/gmp/libgmp.a -lm
+		 $(LIB_GMP) -lm
 
 foobar:
 	rm -f ../rts/libHSrts.a  ../rts/libHSrts_u.a
