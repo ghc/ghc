@@ -20,7 +20,4 @@ instance  Bounded Char  where
     minBound =  '\0'
     maxBound =  '\255'
 
-instance  Bounded Int where
-    minBound =  -2147483648		-- GHC <= 2.09 had this at -2147483647
-    maxBound =   2147483647
 \end{code}

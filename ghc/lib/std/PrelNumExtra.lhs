@@ -384,6 +384,7 @@ instance  Enum Float  where
     toEnum         =  fromIntegral
     fromEnum       =  fromInteger . truncate   -- may overflow
     enumFrom	   =  numericEnumFrom
+    enumFromTo     =  numericEnumFromTo
     enumFromThen   =  numericEnumFromThen
     enumFromThenTo =  numericEnumFromThenTo
 
@@ -396,13 +397,22 @@ instance  Enum Double  where
     enumFromThen   =  numericEnumFromThen
     enumFromThenTo =  numericEnumFromThenTo
 
-numericEnumFrom		:: (Real a) => a -> [a]
-numericEnumFromThen	:: (Real a) => a -> a -> [a]
-numericEnumFromThenTo   :: (Real a) => a -> a -> a -> [a]
+numericEnumFrom		:: (Fractional a) => a -> [a]
 numericEnumFrom		=  iterate (+1)
+
+numericEnumFromThen	:: (Fractional a) => a -> a -> [a]
 numericEnumFromThen n m	=  iterate (+(m-n)) n
-numericEnumFromThenTo n m p = takeWhile (if m >= n then (<= p) else (>= p))
-				      (numericEnumFromThen n m)
+
+numericEnumFromTo       :: (Ord a, Fractional a) => a -> a -> [a]
+numericEnumFromTo n m   = takeWhile (<= m + 1/2) (numericEnumFrom n)
+
+numericEnumFromThenTo   :: (Ord a, Fractional a) => a -> a -> a -> [a]
+numericEnumFromThenTo e1 e2 e3 = takeWhile pred (numericEnumFromThen e1 e2)
+				where
+				 mid = (e2 - e1) / 2
+				 pred | e2 > e1   = (<= e3 + mid)
+				      | otherwise = (>= e3 + mid)
+				      
 \end{code}
 
 @approxRational@, applied to two real fractional numbers x and epsilon,
@@ -472,10 +482,22 @@ instance  (Integral a)	=> RealFrac (Ratio a)  where
 instance  (Integral a)	=> Enum (Ratio a)  where
     succ x	        =  x + 1
     pred x	        =  x - 1
-    enumFrom		=  iterate ((+)1)
-    enumFromThen n m	=  iterate ((+)(m-n)) n
+
     toEnum n            =  fromIntegral n :% 1
     fromEnum            =  fromInteger . truncate
+
+    enumFrom		=  bounded_iterator True (1)
+    enumFromThen n m	=  bounded_iterator (diff >= 0) diff n 
+			  where diff = m - n
+
+
+bounded_iterator :: (Ord a, Num a) => Bool -> a -> a -> [a]
+bounded_iterator inc step v 
+   | inc      && v > new_v = [v]  -- oflow
+   | not inc  && v < new_v = [v]  -- uflow
+   | otherwise             = v : bounded_iterator inc step new_v
+  where
+   new_v = v + step
 
 ratio_prec :: Int
 ratio_prec = 7

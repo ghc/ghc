@@ -325,10 +325,10 @@ instance Ord () where
     compare () () = EQ
 
 instance Enum () where
-    succ x      = x
-    pred x      = x
+    succ x      = error "Prelude.Enum.succ{()}: not possible"
+    pred x      = error "Prelude.Enum.pred{()}: not possible"
     toEnum 0    = ()
-    toEnum _	= error "Prelude.Enum.().toEnum: argument not 0"
+    toEnum _	= error "Prelude.Enum.toEnum{()}: argument not 0"
     fromEnum () = 0
     enumFrom () 	= [()]
     enumFromThen () () 	= [()]
@@ -347,7 +347,7 @@ instance  Show ()  where
 %*********************************************************
 
 \begin{code}
-data Ordering = LT | EQ | GT	deriving (Eq, Ord, Enum, Bounded, Show {- Read -})
+data Ordering = LT | EQ | GT	deriving (Eq, Ord, Enum, Bounded, Show {- in PrelRead: Read -})
 \end{code}
 
 
@@ -365,17 +365,19 @@ data Char = C# Char#	deriving (Eq, Ord)
 instance  Enum Char  where
     succ     c@(C# c#)
        | not (ord# c# ==# 255#) = C# (chr# (ord# c# +# 1#))
-       | otherwise	        = error ("Prelude.Enum{Char}.succ: out of range " ++ show c)
+       | otherwise	        = error ("Prelude.Enum.succ{Char}: tried to take `succ' of maxBound")
     pred     c@(C# c#)
        | not (ord# c# ==# 0#)   = C# (chr# (ord# c# -# 1#))
-       | otherwise	        = error ("Prelude.Enum{Char}.succ: out of range " ++ show c)
+       | otherwise	        = error ("Prelude.Enum.pred{Char}: tried to to take `pred' of minBound")
 
     toEnum   (I# i) | i >=# 0# && i <=# 255# =  C# (chr# i)
-		    | otherwise = error ("Prelude.Enum.Char.toEnum:out of range: " ++ show (I# i))
-    fromEnum (C# c)     	=  I# (ord# c)
+		    | otherwise = error ("Prelude.Enum.toEnum{Char}: out of range: " ++ show (I# i))
+    fromEnum (C# c) =  I# (ord# c)
 
-    enumFrom   (C# c)	       =  efttCh (ord# c)  1#   (># 255#)
-    enumFromTo (C# c1) (C# c2) = efttCh (ord# c1) 1#  (># (ord# c2))
+    enumFrom   (C# c)	       = efttCh (ord# c)  1#   (># 255#)
+    enumFromTo (C# c1) (C# c2) 
+        | c1 `leChar#` c2 = efttCh (ord# c1) 1#               (># (ord# c2))
+        | otherwise       = efttCh (ord# c1) (negateInt# 1#)  (<# (ord# c2))
 
     enumFromThen (C# c1) (C# c2)
 	| c1 `leChar#` c2 = efttCh (ord# c1) (ord# c2 -# ord# c1) (># 255#)
@@ -432,6 +434,9 @@ isUpper c		=  c >= 'A' && c <= 'Z' ||
 isLower c		=  c >= 'a' && c <= 'z' ||
                            c >= '\xDF' && c <= '\xF6' ||
                            c >= '\xF8' && c <= '\xFF'
+isAsciiLower c          =  c >= 'a' && c <= 'z'
+isAsciiUpper c          =  c >= 'A' && c <= 'Z'
+
 isAlpha c		=  isLower c || isUpper c
 isDigit c		=  c >= '0' && c <= '9'
 isOctDigit c		=  c >= '0' && c <= '7'
@@ -442,15 +447,23 @@ isAlphaNum c		=  isAlpha c || isDigit c
 -- Case-changing operations
 
 toUpper, toLower	:: Char -> Char
-toUpper c 
+toUpper c@(C# c#)
+  | isAsciiLower c    = C# (chr# (ord# c# -# 32#))
+  | isAscii c         = c
+    -- fall-through to the slower stuff.
   | isLower c	&& c /= '\xDF' && c /= '\xFF'
-  =  toEnum (fromEnum c - fromEnum 'a' + fromEnum 'A')
-  | otherwise	
-  =  c
+  = toEnum (fromEnum c - fromEnum 'a' + fromEnum 'A')
+  | otherwise
+  = c
 
-toLower c | isUpper c	=  toEnum (fromEnum c - fromEnum 'A' 
+
+
+toLower c@(C# c#)
+  | isAsciiUpper c = C# (chr# (ord# c# +# 32#))
+  | isAscii c      = c
+  | isUpper c	   =  toEnum (fromEnum c - fromEnum 'A' 
                                               + fromEnum 'a')
-	  | otherwise	=  c
+  | otherwise	   =  c
 
 asciiTab :: [String]
 asciiTab = -- Using an array drags in the array module.  listArray ('\NUL', ' ')
@@ -489,20 +502,35 @@ compareInt :: Int -> Int -> Ordering
 			   | x ==# y   = EQ
 			   | otherwise = GT
 
+instance  Bounded Int where
+    minBound =  -2147483648		-- GHC <= 2.09 had this at -2147483647
+    maxBound =   2147483647
+
 instance  Enum Int  where
-    succ x     = x+1
-    pred x     = x-1
+    succ x  
+       | x == maxBound  = error "Prelude.Enum.succ{Int}: tried to take `succ' of maxBound"
+       | otherwise      = x+1
+    pred x
+       | x == minBound  = error "Prelude.Enum.pred{Int}: tried to take `pred' of minBound"
+       | otherwise      = x-1
+
     toEnum   x = x
     fromEnum x = x
 
 #ifndef USE_FOLDR_BUILD
-    enumFrom     (I# c)	         = eftInt c  1#
-    enumFromTo   (I# c1) (I# c2) = efttInt c1 1#  (># c2)
-    enumFromThen (I# c1) (I# c2) = eftInt c1 (c2 -# c1)
+    enumFrom     (I# c)	= efttInt True c 1# (\ _ -> False)
+
+    enumFromTo   (I# c1) (I# c2) 
+        | c1 <# c2  = efttInt True  c1 1#              (># c2)
+	| otherwise = efttInt False c1 (negateInt# 1#) (<# c2)
+
+    enumFromThen (I# c1) (I# c2) 
+        | c1 <# c2  = efttInt True  c1 (c2 -# c1) (\ _ -> False)
+	| otherwise = efttInt False c1 (c2 -# c1) (\ _ -> False)
 
     enumFromThenTo (I# c1) (I# c2) (I# c3)
-	| c1 <=# c2 = efttInt c1 (c2 -# c1) (># c3)
-	| otherwise = efttInt c1 (c2 -# c1) (<# c3)
+	| c1 <=# c2 = efttInt True  c1 (c2 -# c1) (># c3)
+	| otherwise = efttInt False c1 (c2 -# c1) (<# c3)
 
 #else
     {-# INLINE enumFrom #-}
@@ -513,19 +541,16 @@ instance  Enum Int  where
 	let g x = if x <= y then x `c` g (x `plusInt` 1) else n in g x)
 #endif
 
-efttInt :: Int# -> Int# -> (Int# -> Bool) -> [Int]
-efttInt init step done
-  = go init
+efttInt :: Bool -> Int# -> Int# -> (Int# -> Bool) -> [Int]
+efttInt increasing init step done = go init
   where
-    go now | done now  = []
-	   | otherwise = I# now : go (now +# step)
-
-eftInt :: Int# -> Int# -> [Int]
-eftInt init step
-  = go init
-  where
-    go now = I# now : go (now +# step)
-
+    go now 
+     | done now                     = []    
+     | increasing     && now ># nxt = [I# now] -- overflowed
+     | not increasing && now <# nxt = [I# now] -- underflowed
+     | otherwise	            = I# now : go nxt
+     where
+      nxt = now +# step
 
 instance  Num Int  where
     (+)	   x y =  plusInt x y

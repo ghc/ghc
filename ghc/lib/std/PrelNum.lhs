@@ -138,10 +138,10 @@ instance  Integral Int	where
     -- Following chks for zero divisor are non-standard (WDP)
     a `quot` b	=  if b /= 0
 		   then a `quotInt` b
-		   else error "Prelude.Integral{Int}.quot: divide by 0\n"
+		   else error "Prelude.Integral.quot{Int}: divide by 0"
     a `rem` b	=  if b /= 0
 		   then a `remInt` b
-		   else error "Prelude.Integral{Int}.rem: divide by 0\n"
+		   else error "Prelude.Integral.rem{Int}: divide by 0"
 
     x `div` y = if x > 0 && y < 0	then quotInt (x-y-1) y
 		else if x < 0 && y > 0	then quotInt (x-y+1) y
@@ -254,10 +254,10 @@ instance  Integral Integer where
     -- you get slightly better code if you let the compiler
     -- see them right here:
     n `quot` d	=  if d /= 0 then q else 
-		     error "Prelude.Integral{Integer}.quot: divide by 0\n"  
+		     error "Prelude.Integral.quot{Integer}: divide by 0"  
 		   where (q,_) = quotRem n d
     n `rem` d	=  if d /= 0 then r else 
-		     error "Prelude.Integral{Integer}.rem: divide by 0\n"  
+		     error "Prelude.Integral.rem{Integer}: divide by 0"  
 		   where (_,r) = quotRem n d
     n `div` d	=  q  where (q,_) = divMod n d
     n `mod` d	=  r  where (_,r) = divMod n d
@@ -272,11 +272,15 @@ instance  Enum Integer  where
     toEnum n		 =  toInteger n
     fromEnum n		 =  toInt n
     enumFrom n           =  n : enumFrom (n + 1)
-    enumFromThen m n     =  en' m (n - m)
+    enumFromThen e1 e2   =  en' e1 (e2 - e1)
 	                    where en' a b = a : en' (a + b) b
-    enumFromTo n m       =  takeWhile (<= m) (enumFrom n)
-    enumFromThenTo n m p =  takeWhile (if m >= n then (<= p) else (>= p))
-				      (enumFromThen n m)
+    enumFromTo n m
+      | n <= m           =  takeWhile (<= m) (enumFrom n)
+      | otherwise        =  takeWhile (>= m) (enumFromThen n (n-1))
+    enumFromThenTo n m p =  takeWhile pred   (enumFromThen n m)
+	    where
+	     pred | m >= n    = (<= p)
+	          | otherwise = (>= p)
 
 instance  Show Integer  where
     showsPrec   x = showSignedInteger x

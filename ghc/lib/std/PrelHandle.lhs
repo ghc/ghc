@@ -313,6 +313,8 @@ openFileEx f m = do
 #ifndef __CONCURRENT_HASKELL__
     file_flags = file_flags'
 #else
+	-- See comment next to 'stderr' for why we leave
+	-- non-blocking off for now.
     file_flags = file_flags' {-+ 128  Don't block on I/O-}
 #endif
 
