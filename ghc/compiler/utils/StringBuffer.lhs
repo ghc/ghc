@@ -129,11 +129,17 @@ hGetStringBuffer expand_tabs fname = do
 				    return (A# a#, read)
 #endif
 
-   let (A# a#) = a;  (I# read#) = read
+	-- urk! slurpFile gives us a buffer that doesn't have room for
+	-- the sentinel.  Assume it has a final newline for now, and overwrite
+	-- that with the sentinel.  slurpFileExpandTabs (below) leaves room
+	-- for the sentinel.
+   let  (A# a#) = a;  
+	(I# read#) = read;
+	end# = read# -# 1#
 
          -- add sentinel '\NUL'
-   _casm_ `` ((char *)%0)[(int)%1]=(char)0; '' (A# a#) (I# (read# -# 1#))
-   return (StringBuffer a# read# 0# 0#)
+   _casm_ `` ((char *)%0)[(int)%1]=(char)0; '' (A# a#) (I# end#)
+   return (StringBuffer a# end# 0# 0#)
 
 unsafeWriteBuffer :: StringBuffer -> Int# -> Char# -> StringBuffer
 unsafeWriteBuffer s@(StringBuffer a _ _ _) i# ch# =
@@ -269,7 +275,7 @@ trySlurp handle sz_i chunk =
 #if __GLASGOW_HASKELL__ < 404
   writeHandle handle handle_
 #endif
-  return (chunk', rc+1 {-room for sentinel-})
+  return (chunk', rc+1 {- room for sentinel -})
 
 
 reAllocMem :: Addr -> Int -> IO Addr
