@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.143 2002/09/18 06:34:07 mthomas Exp $
+ * $Id: GC.c,v 1.144 2002/09/25 14:46:34 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1306,14 +1306,17 @@ isAlive(StgClosure *p)
     if (LOOKS_LIKE_STATIC(p) || bd->gen_no > N) {
 	return p;
     }
-    // large objects have an evacuated flag
-    if (bd->flags & BF_LARGE) {
-	if (bd->flags & BF_EVACUATED) {
-	    return p;
-	} else {
-	    return NULL;
-	}
+
+    // if it's a pointer into to-space, then we're done
+    if (bd->flags & BF_EVACUATED) {
+	return p;
     }
+
+    // large objects use the evacuated flag
+    if (bd->flags & BF_LARGE) {
+	return NULL;
+    }
+
     // check the mark bit for compacted steps
     if (bd->step->is_compacted && is_marked((P_)p,bd)) {
 	return p;

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.155 2002/09/18 06:34:07 mthomas Exp $
+ * $Id: Schedule.c,v 1.156 2002/09/25 14:46:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -2477,6 +2477,25 @@ GetRoots(evac_fn evac)
   // mark the signal handlers (signals should be already blocked)
   markSignalHandlers(evac);
 #endif
+
+  // main threads which have completed need to be retained until they
+  // are dealt with in the main scheduler loop.  They won't be
+  // retained any other way: the GC will drop them from the
+  // all_threads list, so we have to be careful to treat them as roots
+  // here.
+  { 
+      StgMainThread *m;
+      for (m = main_threads; m != NULL; m = m->link) {
+	  switch (m->tso->what_next) {
+	  case ThreadComplete:
+	  case ThreadKilled:
+	      evac((StgClosure **)&m->tso);
+	      break;
+	  default:
+	      break;
+	  }
+      }
+  }
 }
 
 /* -----------------------------------------------------------------------------
