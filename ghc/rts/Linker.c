@@ -983,24 +983,25 @@ loadObj( char *path )
 
    /* fprintf(stderr, "loadObj %s\n", path ); */
 
-   /* Check that we haven't already loaded this object.  Don't give up
-      at this stage; ocGetNames_* will barf later. */
+   /* Check that we haven't already loaded this object. 
+      Ignore requests to load multiple times */
    {
        ObjectCode *o;
        int is_dup = 0;
        for (o = objects; o; o = o->next) {
-          if (0 == strcmp(o->fileName, path))
+          if (0 == strcmp(o->fileName, path)) {
              is_dup = 1;
+             break; /* don't need to search further */
+          }
        }
        if (is_dup) {
-	 fprintf(stderr,
-            "\n\n"
+          IF_DEBUG(linker, belch(
             "GHCi runtime linker: warning: looks like you're trying to load the\n"
             "same object file twice:\n"
             "   %s\n"
-            "GHCi will continue, but a duplicate-symbol error may shortly follow.\n"
-            "\n"
-            , path);
+            "GHCi will ignore this, but be warned.\n"
+            , path));
+          return 1; /* success */
        }
    }
 
