@@ -317,8 +317,8 @@ Profiling might work, but it is untested.
 
 Thanks to the fine efforts of Tomasz Cholewo <htmlurl
 url="mailto:tjchol01@@mecca.spd.louisville.edu"
-name="<tjchol01@@mecca.spd.louisville.edu>">, GHC works registerised
-(no native code generator) under IRIX 6.2 and 6.3. Depends on having
+name="tjchol01@@mecca.spd.louisville.edu">, GHC works registerised (no
+native code generator) under IRIX 6.2 and 6.3. Depends on having
 specially tweaked version of gcc-2.7.2 around, which can be downloaded
 from <url url="http://mecca.spd.louisville.edu/~tjchol01/software/">.
 
