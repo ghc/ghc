@@ -1,7 +1,7 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS -fffi #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.51 2004/02/09 15:04:19 malcolm Exp $
+-- $Id: Main.hs,v 1.52 2004/02/09 17:23:20 ross Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -829,7 +829,7 @@ getExecDir cmd
   where
     len = 2048::Int -- Plenty, PATH_MAX is 512 under Win32.
 
-foreign import stdcall "GetModuleFileNameA" unsafe
+foreign import stdcall unsafe "GetModuleFileNameA"
   getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
 
 #else
