@@ -12,88 +12,60 @@ dnl * INITIAL SETUP, CHOICE OF PLATFORM(S)
 # Do "./configure --help" to see what flags are available.
 # (Better yet, read the documentation!)
 #
+AC_INIT(mk/platform.mk)
+
 # -------------------------------------------------------------------------
-AC_INIT(STARTUP.in)
-#
 # Prepare to generate the following header files
 #
-AC_CONFIG_HEADER(ghc/includes/config.h)
-# and  literate/config.h ???
-# ToDo !!!!!!!!!!!!!!!!
-#
+AC_CONFIG_HEADER(ghc/includes/config.h literate/lit-deatify/config.h)
+
 # No, we don't do `--srcdir'...
 if test x"$srcdir" != 'x.' ; then
     echo "This configuration does not support the \`--srcdir' option."
     exit 1
 fi
 
+hardtop=`pwd`
+hardtop=`echo $hardtop | sed 's|^/tmp_mnt/|/|' | sed 's|^/export/|/|' | sed 's|^/grasp_tmp|/local/grasp_tmp|'`
+echo ''
+echo "*** The top of your build tree is: $hardtop"
+AC_SUBST(hardtop)
+
 # -------------------------------------------------------------------------
 dnl ** choose what blobs to build (ghc,hslibs,haggis,happy,nofib,????)
 
 # set to the name for the dir if doing it, otherwise empty
-DoingGHC='ghc'
 DoingHsLibs=''
 DoingNoFib=''
 DoingHappy=''
 DoingHaggis=''
-DoingLiterate=''
-# the following are not normally changed
-DoingMkWorld='mkworld'
-DoingGlaFpUtils='glafp-utils'
-
 MkWorldSetup='std'
 
-AC_ARG_ENABLE(ghc,
+AC_ARG_ENABLE(hslibs,
    [
 **********************************************************************
 * Configuration options for the Glasgow functional-programming tools *
 **********************************************************************
 
-First, select *which* of the tools you want to build,
-with --{enable,disable}-{ghc,hslibs,nofib,happy,haggis}.
-(The default is: only GHC (Glasgow Haskell compiler).)
+First, select *which* of the tools you want to build, with
+--{enable,disable}-{hslibs,nofib,happy,haggis}.  (Currently, you have to
+build ghc.)
 
-Second, you may set one of a few applies-in-all-cases options.
-For example, --with-tmpdir=/usr/tmp.
+Second, you may set one of a few applies-in-all-cases options.  For
+example, --with-tmpdir=/usr/tmp.
 
-Then you may set various options which are specifically for the
-tools you choose in step 1.  For GHC, perhaps --enable-concurrent.
-For NoFib, perhaps --enable-all-tests.  And so on.
+Then you may set various options which are specifically for the tools you
+choose in step 1.  For GHC, perhaps --enable-concurrent.  For NoFib,
+perhaps --enable-all-tests.  And so on.
 
-The rest of this message lists all of the configure options.  If the
-option is enabled by default, the message says how to disable it.  And
-vice versa.
+The rest of this message lists all of the configure options.  If the option
+is enabled by default, the message says how to disable it.  And vice versa.
 
-If you are confused, don't forget the installation documents that came
-with the software!
+If you are confused, don't forget the installation documents that came with
+the software!
 
 *******************************************************************
-** FOR SELECTING WHICH GLASGOW FP TOOLS TO BUILD:
-
---disable-ghc     do *not* build GHC as part of Glasgow FP tools],
-   [case "$enableval" in
-        yes) DoingGHC='ghc'
-             ;;
-        no)  DoingGHC=''
-             ;;
-        *)   echo "I don't understand this option: --enable-ghc=$enableval"
-             exit 1
-             ;;
-    esac])
-if test "xxx$DoingGHC" = 'xxxghc' -a \( ! -d ghc \) ; then
-    DoingGHC=''
-    echo 'Doing --disable-ghc, as there is no ghc directory'
-fi
-ghc_mkworld_site_ghc_jm='ghc/mkworld/site-ghc.jm'
-ghc_includes_platform_h='ghc/includes/platform.h'
-# duznae work: ghc_includes_config_h='ghc/includes/config.h'
-if test "xxx$DoingGHC" = 'xxx' ; then
-    ghc_mkworld_site_ghc_jm=''
-    ghc_includes_platform_h=''
-#   ghc_includes_config_h=''
-fi
-
-AC_ARG_ENABLE(hslibs,
+** FOR SELECTING WHICH GLASGOW FP TOOLS TO BUILD:]
    [--enable-hslibs   build suite of Haskell libraries],
    [case "$enableval" in
         yes) DoingHsLibs='hslibs'
@@ -107,10 +79,6 @@ AC_ARG_ENABLE(hslibs,
 if test "xxx$DoingHsLibs" = 'xxxhslibs' -a \( ! -d hslibs \) ; then
     DoingHsLibs=''
     echo 'Doing --disable-hslibs, as there is no hslibs directory'
-fi
-hslibs_mkworld_site_hslibs_jm='hslibs/mkworld/site-hslibs.jm'
-if test "xxx$DoingHsLibs" = 'xxx' ; then
-    hslibs_mkworld_site_hslibs_jm=''
 fi
 
 AC_ARG_ENABLE(nofib,
@@ -127,10 +95,6 @@ AC_ARG_ENABLE(nofib,
 if test "xxx$DoingNoFib" = 'xxxnofib' -a \( ! -d nofib \) ; then
     DoingNoFib=''
     echo 'Doing --disable-nofib, as there is no nofib directory'
-fi
-nofib_mkworld_site_nofib_jm='nofib/mkworld/site-nofib.jm'
-if test "xxx$DoingNoFib" = 'xxx' ; then
-    nofib_mkworld_site_nofib_jm=''
 fi
 
 AC_ARG_ENABLE(happy,
@@ -165,64 +129,10 @@ if test "xxx$DoingHaggis" = 'xxxhaggis' -a \( ! -d haggis \) ; then
     echo 'Doing --disable-haggis, as there is no haggis directory'
 fi
 
-AC_ARG_ENABLE(literate,
-   [
-The following three are \`for hackers only':
---disable-literate    do *not* build literate-programming stuff],
-   [case "$enableval" in
-        yes) DoingLiterate='literate'
-             ;;
-        no)  DoingLiterate=''
-             ;;
-        *)   echo "I don't understand this option: --enable-literate=$enableval"
-             exit 1
-             ;;
-    esac])
-if test "xxx$DoingLiterate" = 'xxxliterate' -a \( ! -d literate \) ; then
-    DoingLiterate=''
-    echo 'Doing --disable-literate, as there is no literate directory'
-fi
-
-AC_ARG_ENABLE(mkworld,
-   [--disable-mkworld     do *not* build \`mkworld' configuration stuff],
-   [case "$enableval" in
-        yes) DoingMkWorld='mkworld'
-             ;;
-        no)  DoingMkWorld=''
-             ;;
-        *)   echo "I don't understand this option: --enable-mkworld=$enableval"
-             exit 1
-             ;;
-    esac])
-if test "xxx$DoingMkWorld" = 'xxxmkworld' -a \( ! -d mkworld \) ; then
-    DoingMkWorld=''
-    echo 'Doing --disable-mkworld, as there is no mkworld directory'
-fi
-
-AC_ARG_ENABLE(glafp-utils,
-   [--disable-glafp-utils do *not* build \`glafp utilities'],
-   [case "$enableval" in
-        yes) DoingGlaFpUtils='glafp-utils'
-             ;;
-        no)  DoingGlaFpUtils=''
-             ;;
-        *)   echo "I don't understand this option: --enable-glafp-utils=$enableval"
-             exit 1
-             ;;
-    esac])
-if test "xxx$DoingGlaFpUtils" = 'xxxglafp-utils' -a \( ! -d glafp-utils \) ; then
-    DoingGlaFpUtils=''
-    echo 'Doing --disable-glafp-utils, as there is no glafp-utils directory'
-fi
-
-AC_SUBST(DoingGHC)
 AC_SUBST(DoingHsLibs)
 AC_SUBST(DoingNoFib)
 AC_SUBST(DoingHappy)
 AC_SUBST(DoingHaggis)
-AC_SUBST(DoingLiterate)
-AC_SUBST(DoingMkWorld)
-AC_SUBST(DoingGlaFpUtils)
 
 # -------------------------------------------------------------------------
 dnl ** choose host(/target/build) platform
@@ -726,19 +636,22 @@ AC_ARG_WITH(tmpdir,
 AC_SUBST(TmpDir)
 
 dnl ** possibly set a max heap for Haskell compilations
-# let the user specify a maximum heap to be used; the old
-# "I have a 64MB machine, why not use a 32MB heap?" thing.
-HcMaxHeapWasSet='NO'
-HcMaxHeap='0'
+HcMaxHeapFlag=''
 AC_ARG_WITH(max-heap,
    [
 --with-max-heap=<heap size, e.g., 32m> 
-	Do all Haskell compilations with a heap of this size.  (If
-	you've got it, flaunt it.)],
-   [HcMaxHeapWasSet='YES'
-    HcMaxHeap="$withval"])
-AC_SUBST(HcMaxHeapWasSet)
-AC_SUBST(HcMaxHeap)
+	Do all Haskell compilations with a heap of this size.],
+   [HcMaxHeapFlag="-H$withval"])
+AC_SUBST(HcMaxHeapFlag)
+
+dnl ** possibly set a max stack for Haskell compilations
+HcMaxStackFlag=''
+AC_ARG_WITH(max-stack,
+   [
+--with-max-stack=<stack size, e.g., 4m> 
+	Do all Haskell compilations with a stack of this size.],
+   [HcMaxStackFlag="-K$withval"])
+AC_SUBST(HcMaxStackFlag)
 
 dnl ** figure out about mkdependHS
 MkDependHSCmd='mkdependHS'
@@ -1273,14 +1186,8 @@ dnl as some seds (notably OSF) only allow 99 commands (!!!).
 dnl We will do the equivalent by a HACK further down.
 
 # -------------------------------------------------------------------------
-dnl
-dnl * `GHC' CONFIGURATION STUFF
+dnl GHC CONFIGURATION STUFF
 
-if test "xxx$DoingGHC" = 'xxxghc' ; then
-# a very big "if"!
-#
-#---------------------------------------------------------------
-#
 dnl ** which Haskell compiler to bootstrap GHC with?
 # Figure out what Haskell compiler(s) to use for booting
 #
@@ -1517,22 +1424,13 @@ AC_SUBST(GhcWithSockets)
 
 # Here, by HACK means, we dump all the Build_ info
 # into a file.  See comment above.
-rm -f ghc/mkworld/buildinfo.jm
-echo creating ghc/mkworld/buildinfo.jm
-cat > ghc/mkworld/buildinfo.jm <<EOF
-XCOMM ** DO NOT EDIT! **
-XCOMM This file is obliterated every time 'configure' is run!
-
-EOF
+rm -f ghc/mk/buildinfo.mk
+echo creating ghc/mk/buildinfo.mk
+touch ghc/mk/buildinfo.mk
 for xx in normal p t u mc mr mt mp mg 2s 1s du a b c d e f g h i j k l m n o A B ; do
     eval "yy=\$Build_$xx"
-    echo "#ifndef Build_$xx"     >> ghc/mkworld/buildinfo.jm
-    echo "#define Build_$xx $yy" >> ghc/mkworld/buildinfo.jm
-    echo "#endif"		 >> ghc/mkworld/buildinfo.jm
+    echo "Build_$xx = $yy" >> ghc/mk/buildinfo.mk
 done
-
-# here ends a very big if DoingGHC = 'ghc' ...
-fi
 
 # -------------------------------------------------------------------------
 dnl
@@ -1593,19 +1491,18 @@ AC_SUBST(WithHsLibsHcType)
 
 # Here, by HACK means, we dump all the Build_ info
 # into a file.  See comment above.
-rm -f hslibs/mkworld/buildinfo.jm
-echo creating hslibs/mkworld/buildinfo.jm
-cat > hslibs/mkworld/buildinfo.jm <<EOF
-XCOMM ** DO NOT EDIT! **
-XCOMM This file is obliterated every time 'configure' is run!
+rm -f hslibs/mk/buildinfo.mk
+echo creating hslibs/mk/buildinfo.mk
+cat > hslibs/mk/buildinfo.mk <<EOF
+# ** DO NOT EDIT! **
+# This file is obliterated every time 'configure' is run!
 
 EOF
 for xx in normal p t u mc mr mt mp mg 2s 1s du a b c d e f g h i j k l m n o A B ; do
     eval "yy=\$Build_$xx"
-    echo "#ifndef Build_$xx"     >> hslibs/mkworld/buildinfo.jm
-    echo "#define Build_$xx $yy" >> hslibs/mkworld/buildinfo.jm
-    echo "#endif"		 >> hslibs/mkworld/buildinfo.jm
+    echo "Build_$xx = $yy" >> hslibs/mk/buildinfo.mk
 done
+
 
 # here ends a very big if DoingHsLibs = 'hslibs' ...
 fi
@@ -1754,16 +1651,6 @@ AC_SUBST(WithHaggisHcType)
 
 # here ends a very big if DoingHaggis = 'haggis' ...
 fi
-#
-# -------------------------------------------------------------------------
-dnl
-dnl * `Literate' CONFIGURATION STUFF
-
-dnl if test "xxx$DoingLiterate" = 'xxxliterate' ; then
-dnl # a very big "if"!
-dnl 
-dnl # here ends a very big if DoingLiterate = 'literate' ...
-dnl fi
 #
 # -------------------------------------------------------------------------
 dnl
@@ -2009,28 +1896,24 @@ dnl AC_SUBST(IncludeParallelNoFibTests)
 
 # Here, by HACK means, we dump all the Include*NoFibTests info
 # into a file.  See comment above.
-rm -f nofib/mkworld/buildinfo.jm
-echo creating nofib/mkworld/buildinfo.jm
+rm -f nofib/mk/buildinfo.mk
+echo creating nofib/mk/buildinfo.mk
 cat > nofib/mkworld/buildinfo.jm <<EOF
-XCOMM ** DO NOT EDIT! **
-XCOMM This file is obliterated every time 'configure' is run!
+# ** DO NOT EDIT! **
+# This file is obliterated every time 'configure' is run!
 
 EOF
 for xx in Real Spectral Imaginary GHC_ONLY Specialise PRIVATE Parallel ; do
     eval "yy=\$Include${xx}NoFibTests"
-    echo "#ifndef Include${xx}NoFibTests"     >> nofib/mkworld/buildinfo.jm
-    echo "#define Include${xx}NoFibTests $yy" >> nofib/mkworld/buildinfo.jm
-    echo "#endif"			      >> nofib/mkworld/buildinfo.jm
+    echo "Include${xx}NoFibTests = $yy" >> nofib/mk/buildinfo.mk
 done
 
 # Here, by HACK means, we add all the Build_ info
 # into a file.  See comment above.
-
+ 
 for xx in normal p t u mc mr mt mp mg 2s 1s du a b c d e f g h i j k l m n o A B ; do
     eval "yy=\$Build_$xx"
-    echo "#ifndef Build_$xx"     >> nofib/mkworld/buildinfo.jm
-    echo "#define Build_$xx $yy" >> nofib/mkworld/buildinfo.jm
-    echo "#endif"		 >> nofib/mkworld/buildinfo.jm
+    echo "Build_$xx = $yy"     >> nofib/mk/buildinfo.mk
 done
 
 # here ends a very big if DoingNoFib = 'nofib' ...
@@ -2042,9 +1925,9 @@ dnl * extract non-header files with substitution (end)
 #
 AC_SUBST(MkWorldSetup)
 
-AC_OUTPUT(Makefile STARTUP mkworld/site.jm mkworld/platform.h mkworld/config.h $ghc_mkworld_site_ghc_jm $ghc_includes_platform_h $hslibs_mkworld_site_hslibs_jm $nofib_mkworld_site_nofib_jm)
+AC_OUTPUT(mk/platform.mk mk/utils.mk mk/install.mk ghc/mk/ghcconfig.mk ghc/includes/platform.h)
 
 echo '************************************************'
-echo '*** NOW DO: sh < STARTUP'
+echo '*** NOW DO: make boot; make all'
 echo '************************************************'
 exit 0

@@ -1,7 +1,0 @@
-BuildPgmFromOneCFile(msub)
-
-InstallBinaryTarget(msub,$(INSTBINDIR))
-
-CDependTarget( $(SRCS_C) )
-
-RunStdTest(msub001,msub,-o1 test.out -f test.makefile testfile)

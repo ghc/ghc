@@ -222,7 +222,7 @@ $Oopt_FoldrBuildInline		= ''; # was '-fdo-inline-foldr-build';
 
 Things to do with C compilers/etc:
 \begin{code}
-$CcRegd	 	= 'gcc';
+$CcRegd	 	= '$(GHC_OPT_HILEV_ASM)';
 @CcBoth_flags	= ('-S');   # flags for *any* C compilation
 @CcInjects	= ();
 
@@ -248,35 +248,35 @@ Prelude ({\em including} its interface file(s)).
 \begin{code}
 $BuildTag	= ''; # default is sequential build w/ Appel-style GC
 
-%BuildAvail	= ('',	    '$(GHC_BUILD_FLAG_normal)',
-		   '_p',    '$(GHC_BUILD_FLAG_p)',
-		   '_t',    '$(GHC_BUILD_FLAG_t)',
-		   '_u',    '$(GHC_BUILD_FLAG_u)',
-		   '_mc',   '$(GHC_BUILD_FLAG_mc)',
-		   '_mr',   '$(GHC_BUILD_FLAG_mr)',
-		   '_mt',   '$(GHC_BUILD_FLAG_mt)',
-		   '_mp',   '$(GHC_BUILD_FLAG_mp)',
-		   '_mg',   '$(GHC_BUILD_FLAG_mg)',
-		   '_2s',   '$(GHC_BUILD_FLAG_2s)',
-		   '_1s',   '$(GHC_BUILD_FLAG_1s)',
-		   '_du',   '$(GHC_BUILD_FLAG_du)',
-		   '_a',    '$(GHC_BUILD_FLAG_a)',
-		   '_b',    '$(GHC_BUILD_FLAG_b)',
-		   '_c',    '$(GHC_BUILD_FLAG_c)',
-		   '_d',    '$(GHC_BUILD_FLAG_d)',
-		   '_e',    '$(GHC_BUILD_FLAG_e)',
-		   '_f',    '$(GHC_BUILD_FLAG_f)',
-		   '_g',    '$(GHC_BUILD_FLAG_g)',
-		   '_h',    '$(GHC_BUILD_FLAG_h)',
-		   '_i',    '$(GHC_BUILD_FLAG_i)',
-		   '_j',    '$(GHC_BUILD_FLAG_j)',
-		   '_k',    '$(GHC_BUILD_FLAG_k)',
-		   '_l',    '$(GHC_BUILD_FLAG_l)',
-		   '_m',    '$(GHC_BUILD_FLAG_m)',
-		   '_n',    '$(GHC_BUILD_FLAG_n)',
-		   '_o',    '$(GHC_BUILD_FLAG_o)',
-		   '_A',    '$(GHC_BUILD_FLAG_A)',
-		   '_B',    '$(GHC_BUILD_FLAG_B)' );
+%BuildAvail	= ('',	    '$(Build_normal)',
+		   '_p',    '$(Build_p)',
+		   '_t',    '$(Build_t)',
+		   '_u',    '$(Build_u)',
+		   '_mc',   '$(Build_mc)',
+		   '_mr',   '$(Build_mr)',
+		   '_mt',   '$(Build_mt)',
+		   '_mp',   '$(Build_mp)',
+		   '_mg',   '$(Build_mg)',
+		   '_2s',   '$(Build_2s)',
+		   '_1s',   '$(Build_1s)',
+		   '_du',   '$(Build_du)',
+		   '_a',    '$(Build_a)',
+		   '_b',    '$(Build_b)',
+		   '_c',    '$(Build_c)',
+		   '_d',    '$(Build_d)',
+		   '_e',    '$(Build_e)',
+		   '_f',    '$(Build_f)',
+		   '_g',    '$(Build_g)',
+		   '_h',    '$(Build_h)',
+		   '_i',    '$(Build_i)',
+		   '_j',    '$(Build_j)',
+		   '_k',    '$(Build_k)',
+		   '_l',    '$(Build_l)',
+		   '_m',    '$(Build_m)',
+		   '_n',    '$(Build_n)',
+		   '_o',    '$(Build_o)',
+		   '_A',    '$(Build_A)',
+		   '_B',    '$(Build_B)' );
 
 %BuildDescr	= ('',	    'normal sequential',
 		   '_p',    'profiling',
@@ -450,7 +450,7 @@ $Only_preprocess_C = 0;	# pretty hackish
 $PostprocessCcOutput = 0;
 
 # native code-gen or via C?
-$HaveNativeCodeGen = $(GHC_WITH_NATIVE_CODEGEN);
+$HaveNativeCodeGen = $(GhcWithNativeCodeGen);
 $HscOut = '-C='; # '-C=' ==> .hc output; '-S=' ==> .s output; '-N=' ==> neither
 $HscOut = '-S='
     if $HaveNativeCodeGen && $TargetPlatform =~ /^(alpha|sparc)-/; #ToDo: add |i386 !
@@ -1780,7 +1780,7 @@ Before continuing we check that the appropriate build is available.
 \begin{code}
 die "$Pgm: no BuildAvail?? $BuildTag\n" if ! $BuildAvail{$BuildTag}; # sanity
 
-if ( $BuildAvail{$BuildTag} =~ /^-build-.*-not-defined$/ ) {
+if ( $BuildAvail{$BuildTag} =~ /^NO$/ ) {
     print STDERR "$Pgm: a `", $BuildDescr{$BuildTag},
 	"' \"build\" is not available with your GHC setup.\n";
     print STDERR "(It was not configured for it at your site.)\n";

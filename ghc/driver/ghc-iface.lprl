@@ -271,7 +271,7 @@ sub calcNewModuleVersion {
 sub mv_change {
     local($mv, $str) = @_;
 
-    print STDERR "$Pgm: module version changed to $mv; reason: $str\n";
+#print STDERR "$Pgm: module version changed to $mv; reason: $str\n";
     return($mv);
 }
 
@@ -287,13 +287,13 @@ sub printNewItemVersion {
     local($idecl) = $Decl{"new:$item"};
 
     if (! defined($Decl{"old:$item"})) {
-	print STDERR "new: $item\n";
+#print STDERR "new: $item\n";
 	print NEWHI  "$item $mod_version\n";
     } elsif ($idecl ne $Decl{"old:$item"})  {
-	print STDERR "changed: $item\n";
+#print STDERR "changed: $item\n";
 	print NEWHI  "$item $mod_version\n";
     } elsif (! defined($Version{"old:$item"}) ) {
-	print STDERR "$item: no old version?!\n" 
+#print STDERR "$item: no old version?!\n" 
     } else {
 	print NEWHI  "$item ", $Version{"old:$item"}, "\n";
     }

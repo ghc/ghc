@@ -1,0 +1,125 @@
+#-----------------------------------------------------------------------------
+# $Id: Makefile.libHS,v 1.2 1996/11/21 16:47:42 simonm Exp $
+
+TOP = ../..
+include $(TOP)/ghc/mk/ghc.mk
+
+# per-build options: shared with runtime system
+include ../mk/buildflags.mk
+
+# Everything here *must* be compiled with the Glasgow Haskell compiler.
+# (Hence the use of $(GHC), rather than $(HC).)
+# The driver will give warnings if -split-objs, but that's cool...
+
+GHC_OPTS = \
+  -recomp -cpp -dcore-lint -irequired -fusing-ghc-internals -fvia-C \
+  $(HcMaxHeapFlag) $(EXTRA_HC_OPTS)
+
+SRCS = $(wildcard prelude/*.hs required/*.hs concurrent/*.hs)
+OBJS = $(SRCS:.hs=.$(suffix)_o)
+
+#-----------------------------------------------------------------------------
+# Rules for building various types of objects from HS files
+
+# Note: the $(*_flags) module-specific flags come after the $(GHC_OPTS_..) 
+# so that things like -O can be overriden on a per-module basis.
+
+ifeq ($(SplitObjs),YES)
+LIB_GHC = $(GHC) $(GHCFLAGS) -split-objs $(notdir $*) -o $@ -c
+else
+LIB_GHC = $(GHC) $(GHCFLAGS) -o $@ -c
+endif
+
+ifneq ($(GhcWithHscBuiltViaC),YES)
+%.o : %.hs
+	$(LIB_GHC) $($*_flags) $*.hs
+
+%.$(suffix)_o : %.hs
+	$(LIB_GHC) $(GHC_OPTS_$(suffix)) $($*_flags) $*.hs
+
+else # $(GhcWithHscBuiltViaC) == YES
+
+%.$(suffix)_o : %.hc
+	$(LIB_GHC) $(GHC_OPTS_$(suffix)) $($*_flags) $*.hs
+endif
+
+#-----------------------------------------------------------------------------
+# build the library itself...
+
+ifeq ($(suffix), norm)
+LIB = libHS.a	 		# this one is special
+else
+LIB = libHS_$(suffix).a
+endif
+
+$(LIB) : $(OBJS)
+	@$(RM) $@
+	$(AR) $@ $^
+
+all :: $(LIB)
+
+clean ::
+	$(RM) $(LIB)
+	$(RM) $(OBJS)
+
+install :: $(LIB)
+	$(INSTALL) $(INSTLIBFLAGS) $(LIB) $(INSTLIBDIR_GHC)
+	$(RANLIB) $(INSTLIBDIR_GHC)/$(LIB)
+
+veryclean ::
+	$(RM) */*.hc */*.hi
+
+#-----------------------------------------------------------------------------
+# per-module flags
+
+# The -Onots are only because -O would not go through on
+# a reasonably-sized machine (i.e., one I have)
+
+prelude/Prelude_flags = \
+   -iprelude -fglasgow-exts -fcompiling-ghc-internals Prelude \
+   -fno-implicit-prelude '-\#include"cbits/stgio.h"' -H18m -Onot
+prelude/GHCbase_flags = \
+  -iprelude -fglasgow-exts -fcompiling-ghc-internals GHCbase \
+  '-\#include"cbits/stgio.h"' -H20m -monly-2-regs -Onot
+prelude/GHCerr_flags = \
+  -iprelude -fglasgow-exts -fcompiling-ghc-internals GHCerr -H12m -Onot
+prelude/GHCps_flags = \
+  -iprelude -fglasgow-exts '-\#include"cbits/stgio.h"' -monly-3-regs -Onot
+prelude/GHCio_flags = \
+  -iprelude -fglasgow-exts '-\#include"cbits/stgio.h"' -Onot
+prelude/GHCmain_flags = -iprelude -fglasgow-exts
+prelude/PreludeGlaST_flags = -iprelude -fglasgow-exts
+
+required/Array_flags = -fglasgow-exts -iprelude -Onot
+required/Directory_flags = \
+  -fglasgow-exts '-\#include"cbits/stgio.h"' -monly-3-regs
+required/IO_flags = -fglasgow-exts '-\#include"cbits/stgio.h"'
+required/Ix_flags = -fglasgow-exts
+required/System_flags = -fglasgow-exts '-\#include"cbits/stgio.h"'
+
+concurrent/Merge_flags = -iconcurrent
+concurrent/Parallel_flags = -fglasgow-exts
+concurrent/Concurrent_flags = -iconcurrent
+
+#-----------------------------------------------------------------------------
+# Depend and install stuff
+
+MKDEPENDHS_OPTS += -I$(GHC_INCLUDES)
+MKDEPENDHS_OPTS += -irequired:prelude:ghc:hbc:glaExts:concurrent
+MKDEPENDHS_OPTS += $(foreach way,$(WAY_SUFFIXES),-s .$(way))
+
+# Todo: make this a generic include of hsdepend.mk or something.
+depend :: $(SRCS)
+	$(MKDEPENDHS) $(MKDEPENDHSFLAGS) -- $(GHCFLAGS) -- -f .depend $(SRCS)
+
+#-----------------------------------------------------------------------------
+# install hi files
+
+ifeq ($(suffix),norm)
+HI_FILES = $(SRCS:.hs=.hi)
+else
+HI_FILES = $(SRCS:.hs=.$(suffix)_hi)
+endif
+
+install :: $(HI_FILES)
+	$(INSTALL) $(INSTDATAFLAGS) $(HI_FILES) $(INSTIMPORTSDIR_GHC)

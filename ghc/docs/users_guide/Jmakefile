@@ -1,6 +1,0 @@
-LiterateSuffixRules()
-DocProcessingSuffixRules()
-
-/* no space between the args! */
-/*LitDocRootTarget(profiling,lit)*/
-LitDocRootTarget(user,lit)

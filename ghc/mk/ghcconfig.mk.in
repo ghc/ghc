@@ -1,0 +1,239 @@
+# -----------------------------------------------------------------------------
+# $Id: ghcconfig.mk.in,v 1.2 1996/11/21 16:48:02 simonm Exp $
+
+# This stuff should be split into separate files: that which can be 
+# messed with, and that which can't.
+
+# =============================================================================
+# Autoconf'ed stuff
+
+WithGhcHc		= @WithGhcHc@
+WithGhcHcType		= @WithGhcHcType@
+
+# Override default haskell compiler if required
+ifneq ($(WithGhcHcType),HC_UNSPECIFIED)
+HC			= $(WithGhcHc)
+HaskellCompilerType	= $(WithGhcHcType)
+endif
+
+GhcWithHscBuiltViaC	= @GhcWithHscBuiltViaC@
+GhcWithHscOptimised 	= @GhcWithHscOptimised@
+GhcWithHscDebug 	= @GhcWithHscDebug@
+GhcBuilderVersion 	= @GhcBuilderVersion@
+GhcWithRegisterised 	= @GhcWithRegisterised@
+GhcWithNativeCodeGen 	= @GhcWithNativeCodeGen@
+
+GhcWithDeforester	= @GhcWithDeforester@
+GhcWithReadline 	= @GhcWithReadline@
+GhcWithSockets 		= @GhcWithSockets@
+
+# =====================================================================
+# Utilties for ghc project
+
+ifeq ($(GhcWithHscOptimised), YES)
+__hsc_opt 		= -O
+else
+__hsc_opt 		=
+endif
+
+ifeq ($(HaskellCompilerType), HC_CHALMERS_HBC)
+SETUP_HC_OPTS 		= $(__hsc_opt) -fpbu
+else
+ifeq ($(HaskellCompilerType), HC_GLASGOW_GHC)
+SETUP_HC_OPTS 		= $(__hsc_opt) -hi-diffs -link-chk
+else
+ifeq ($(HaskellCompilerType),HC_ROJEMO_NHC)
+SETUP_HC_OPTS 		=
+else
+SETUP_HC_OPTS 		=
+endif
+endif
+endif
+
+ifeq ($(HaveGcc), YES)
+ifeq ($(UseGcc),  YES)
+PROJECT_CC_OPTS 	= -O
+endif
+endif
+
+PROJECT_MSUB_OPTS	= -f $(TOP)/ghc/mk/ghcconfig.mk -f $(TOP)/ghc/mk/buildinfo.mk -f $(TOP)/ghc/mk/site-ghc.mk
+
+#-----------------------------------------------------------------------------
+# MkDependHS
+
+ifdef UseInstalledUtils
+MKDEPENDHS		= mkdependHS
+else
+MKDEPENDHS 		= $(MKDEPENDHSSRC)/mkdependHS
+MKDEPENDHSSRC 		= $(GHC_UTILSRC)/mkdependHS
+endif
+
+# Temp until we bootstrap to 2.01 properly
+ifeq ($(Ghc2_0),YES)
+  MKDEPENDHS = mkdependHS
+else
+  MKDEPENDHS = mkdependHS-1.2
+endif
+
+#-----------------------------------------------------------------------------
+# Unlit
+
+UNLIT	 		= $(GHC_UNLITSRC)/unlit
+
+#ToDo: unlitNeededHere
+
+GHC_UNLIT    		= $(UNLIT)
+GHC_UNLITSRC 		= $(GHC_UTILSRC)/unlit
+
+#-----------------------------------------------------------------------------
+# HsTags
+
+ifdef UseInstalledUtils
+HSTAGS	 		= hstags
+else
+HSTAGS	 		= $(HSTAGSSRC)/hstags
+HSTAGSSRC 		= $(GHC_UTILSRC)/hstags
+endif
+
+GLUED_HSTAGS_OPTS = \
+	$(ALL_PROJECTS_HSTAGS_OPTS) \
+	$(PLATFORM_HSTAGS_OPTS) \
+	$(PROJECT_HSTAGS_OPTS) \
+	$(SETUP_HSTAGS_OPTS) \
+	$(HSTAGS_OPTS) \
+	$(EXTRA_HSTAGS_OPTS)
+
+HSTAGSFLAGS        = $(GLUED_HSTAGS_OPTS)
+
+#-----------------------------------------------------------------------------
+# Ugen
+
+ifdef UseInstalledUtils
+UGEN		=  ugen
+else
+UGEN		= $(UGENSRC)/ugen
+UGENSRC 	= $(GHC_UTILSRC)/ugen
+endif
+
+#-----------------------------------------------------------------------------
+# Extra things ``only for'' for the ghc project
+
+PROJECTNAME		= The Glorious Glasgow Haskell Compilation System
+PROJECTVERSION		= 2.01
+PROJECTPATCHLEVEL	= patchlevel 0
+GhcBuildeeVersion	= 201
+
+GHC_DRIVERSRC	    	= $(TOP)/ghc/driver
+GHC_COMPILERSRC  	= $(TOP)/ghc/compiler
+GHC_RUNTIMESRC   	= $(TOP)/ghc/runtime
+GHC_LIBSRC	 	= $(TOP)/ghc/lib
+GHC_INCLUDESRC   	= $(TOP)/ghc/includes
+GHC_UTILSRC	 	= $(TOP)/ghc/utils
+GHC_BOOKSRC	 	= $(TOP)/ghc/book
+
+GHC_INCLUDES		= $(GHC_INCLUDESRC)
+
+ifeq ($(HaskellCompilerType), HC_CHALMERS_HBC)
+GHC_RTS_STYLE = 'hbc'
+else
+ifeq ($(HaskellCompilerType), HC_ROJEMO_NHC)
+GHC_RTS_STYLE = 'ghc' /* wrong, but more likely to trigger something */
+else
+GHC_RTS_STYLE = 'ghc'
+endif
+endif
+
+PROJECT_GHC_OPTS	= -hi-diffs -dcore-lint -link-chk
+
+GLUED_GHC_OPTS = \
+	$(ALL_PROJECTS_GHC_OPTS) \
+	$(PLATFORM_GHC_OPTS) \
+	$(PROJECT_GHC_OPTS) \
+	$(SETUP_GHC_OPTS) \
+	$(GHC_OPTS) \
+	$(EXTRA_GHC_OPTS)
+
+GHCFLAGS=$(GLUED_CPP_DEFINES) $(GLUED_GHC_OPTS)
+
+#-----------------------------------------------------------------------------
+# What to build
+
+BuildYorkInterpreter 	= NO
+UseSemantiqueStrictnessAnalyser = NO
+
+#-----------------------------------------------------------------------------
+# Installation: whether to, where to, what to
+
+AT_GLASGOW 		= @AT_GLASGOW@
+
+ifeq ($(AT_GLASGOW),1)
+GHC_DRIVER_INST_NAME	= ghc-$(PROJECTVERSION)
+else
+GHC_DRIVER_INST_NAME	= ghc
+endif
+
+# Make sure we install things with group 'grasp' at Glasgow
+
+ifeq ($(AT_GLASGOW),1)
+INSTGROUP		= -g grasp
+endif
+
+# At Glasgow, we would rather the installed binaries were stripped.
+# (Delete if you feel otherwise.)
+
+INSTSTRIP		= -s
+
+# Installation directories --------------------------------------------------
+
+prefix_GHC 		= @prefix@
+exec_prefix_GHC 	= @exec_prefix@
+
+ifeq ($(AT_GLASGOW), 1)
+INSTBINDIR_GHC 		= $(exec_prefix_GHC)/bin/`/usr/local/gnu/bin/hw_os`
+else
+INSTBINDIR_GHC 		= $(exec_prefix_GHC)/bin
+endif
+
+INSTSCRIPDIR_GHC   = $(exec_prefix_GHC)/bin
+INSTLIBDIR_GHC 	   = $(prefix_GHC)/lib/ghc/$(PROJECTVERSION)/$(HOSTPLATFORM)
+INSTDATADIR_GHC    = $(prefix_GHC)/lib/ghc/$(PROJECTVERSION)
+INSTIMPORTSDIR_GHC = $(INSTDATADIR_GHC)/imports
+
+# -----------------------------------------------------------------------------
+# Where to find the programs for the various phases
+
+GHC 			= $(GHC_DRIVERSRC)/ghc
+GHC_HSCPP    		= $(GHC_HSCPPSRC)/hscpp $(ALLPROJ_CPP_DEFINES)
+GHC_HSCPPSRC 		= $(GHC_UTILSRC)/hscpp
+GHC_HSP    		= $(GHC_HSPSRC)/hsp
+GHC_HSPSRC 		= $(GHC_HSCSRC)
+GHC_HSC    		= $(GHC_HSCSRC)/hsc
+GHC_HSCSRC 		= $(GHC_COMPILERSRC)
+GHC_SYSMAN    		= $(GHC_RUNTIMESRC)/gum/SysMan
+GHC_SYSMANSRC 		= $(GHC_RUNTIMESRC)
+
+#-----------------------------------------------------------------------------
+# Stuff for the C-compiling phase in particular...
+
+# NON-OPTIMISING C COMPILATION: =================================
+
+ifeq ($(HaveGcc), YES)
+GhcUseGccForDebuggingAsm 	= YES
+GHC_DEBUG_HILEV_ASM 		= $(WhatGccIsCalled)
+else
+GhcUseGccForDebuggingAsm 	= NO
+GHC_DEBUG_HILEV_ASM 		= $(CC)
+endif
+
+# OPTIMISING C COMPILATION (regs, etc): ==========================
+
+ifeq ($(HaveGcc), YES)
+GhcUseGccForOptAsm 		= YES
+GHC_OPT_HILEV_ASM 		= $(WhatGccIsCalled)
+GHC_GCC_IS_AVAILABLE 		= 1
+else
+GhcUseGccForOptAsm	 	= NO
+GHC_OPT_HILEV_ASM 		= $(CC)
+GHC_GCC_IS_AVAILABLE 		= 0
+endif
+

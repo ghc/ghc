@@ -1,0 +1,83 @@
+#-----------------------------------------------------------------------------
+# $Id: install.mk.in,v 1.2 1996/11/21 16:50:34 simonm Exp $
+
+AT_GLASGOW 	= @AT_GLASGOW@
+prefix	 	= @prefix@
+exec_prefix	= @exec_prefix@
+
+ifeq ($(AT_GLASGOW), 1)
+INSTBINDIR 	= $(exec_prefix)/bin/`/usr/local/gnu/bin/hw_os`
+else
+INSTBINDIR 	= $(exec_prefix)/bin
+endif
+
+INSTSCRIPTDIR 	= $(exec_prefix)/bin
+INSTLIBDIR 	= $(prefix)/lib/$(HOSTPLATFORM)
+INSTDATADIR 	= $(prefix)/lib
+
+#-----------------------------------------------------------------------------
+# Man pages & Documentation
+
+# top of manual page tree to install in
+# NB: not necessarily the same place as to look for man pages (?)
+INSTMANROOT	= $(prefix)
+
+# prefix for man page _sources_ (vs .../cat)
+INSTMANSRCROOT 	= $(INSTMANROOT)/man
+
+# man pages for commands
+INSTCOMMANDIR 	= $(INSTMANSRCROOT)$(COMMANSUFFIX)
+
+# man pages for library routines
+INSTLIBMANDIR 	= $(INSTMANSRCROOT)$(LIBMANSUFFIX)
+
+# man pages for system commands
+INSTSYSMANDIR 	= $(INSTMANSRCROOT)$(SYSMANSUFFIX)
+
+# suffix for installing commands'/etcs' man pages
+COMMANSUFFIX 	= 1
+LIBMANSUFFIX 	= 3
+SYSMANSUFFIX 	= 8
+
+ifeq ($(AT_GLASGOW), 1)
+INSTINFODIR 	= /local/doc/info
+else
+INSTINFODIR 	= $(prefix)/info
+endif
+
+#-----------------------------------------------------------------------------
+# How to install things
+
+# this stuff about "who" does the installing doesn't have make vars
+# as it is not intended to be runtime-changeable.
+#
+ifdef OWNER
+INSTOWNER 	= -o $(OWNER)
+else
+INSTOWNER	=
+endif
+
+ifdef GROUP
+INSTGROUP	= -g $(GROUP)
+else
+INSTGROUP	=
+endif
+
+INSTFILEFLAGS	=
+INSTSTRIP	=
+INSTBINFLAGS	= \
+	-m 0755 $(INSTOWNER) $(INSTGROUP) $(INSTFILEFLAGS) $(INSTSTRIP)
+
+
+#	No strip flags on rest of these -- avoids message from install
+#	about stripping non-binaries.
+
+GENINSTALLFLAGS = $(INSTOWNER) $(INSTGROUP) $(INSTFILEFLAGS)
+
+INSTSCRIPTFLAGS 	= -m 0755 $(GENINSTALLFLAGS)
+INSTLIBFLAGS 		= -m 0644 $(GENINSTALLFLAGS)
+INSTDATALIBFLAGS 	= -m 0644 $(GENINSTALLFLAGS)
+INSTINCFLAGS 		= -m 0644 $(GENINSTALLFLAGS)
+INSTDATAFLAGS 		= -m 0644 $(GENINSTALLFLAGS)
+INSTMANFLAGS 		= -m 0644 $(GENINSTALLFLAGS)
+INSTRANLIBFLAGS 	=

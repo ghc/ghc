@@ -1,4 +1,5 @@
 %{
+extern char *malloc ();
 #include "id.h"
 %}
 type tree;

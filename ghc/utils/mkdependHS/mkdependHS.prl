@@ -99,7 +99,7 @@ if (! $ENV{'GLASGOW_HASKELL_ROOT'}) { # good -- death to environment variables
 }
 
 $Unlit = ( $(INSTALLING) ) ? "$InstLibDirGhc/unlit"
-			     : "$TopPwd/$(CURRENT_DIR)/$(GHC_UNLIT)";
+			   : "$TopPwd/ghc/utils/unlit/unlit";
 
 $Begin_magic_str = "# DO NOT DELETE: Beginning of Haskell dependencies\n";
 $End_magic_str = "# DO NOT DELETE: End of Haskell dependencies\n";
@@ -257,7 +257,7 @@ sub read_MODULES {
 
     local($m_dir) = '';
     if ($flavor eq 'prelude') {    
-	$m_dir = ( $(INSTALLING) ) ? "$InstDataDirGhc/imports" : "$TopPwd/$(CURRENT_DIR)/$(GHC_LIBSRC)";
+	$m_dir = ( $(INSTALLING) ) ? "$InstDataDirGhc/imports" : "$TopPwd/ghc/lib";
     } else {
 	$m_dir = ( $(INSTALLING) ) ? "$InstSysLibDir/$lib"     : "$TopPwd/hslibs/$lib";
     }

@@ -11,6 +11,7 @@
 #include "funs.h"
 
 FILE *fh, *fc, *fhs;
+extern int lineno;
 
 tree root; /* The root of the built syntax tree. */
 
@@ -50,6 +51,7 @@ main(argc, argv)
 	fhs = fopen(argv[1], "w"); /* .hs file */
 	argv[1][i-1] = '\0';
 
+	lineno = 1;
 	if(yyparse() == 0) {
 		/* No syntax errors. */
 

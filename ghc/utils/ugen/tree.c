@@ -1,7 +1,7 @@
-
-
 #include "id.h"
 #include "tree.h"
+
+extern char *malloc ();
 
 Ttree ttree(t)
  tree t;

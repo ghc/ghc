@@ -66,7 +66,7 @@ import Unique		( Unique{-instance Eq-} )
 import UniqSupply	( splitUniqSupply )
 import Util		( panic{-ToDo:rm-} )
 
-#if ! OMIT_DEFORESTER
+#ifndef OMIT_DEFORESTER
 import Deforest		( deforestProgram )
 import DefUtils		( deforestable )
 #endif

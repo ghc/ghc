@@ -1,4 +1,0 @@
-#define IHaveSubdirs
-
-SUBDIRS = scripts \
-	  msub

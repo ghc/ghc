@@ -10,7 +10,7 @@ extern tree root;
 typdef	: 
 	TYPE ID SEMICOL deflist END SEMICOL =
 	{
-		root = mktypdef($2, $4);
+		root = mktypdef((id)$2,(tree)$4);
 	};
 
 deflist	:
@@ -20,17 +20,17 @@ deflist	:
 	} |
 	deflist def =
 	{
-		$$ = (long) mkdeflist($1, $2);
+		$$ = (long)mkdeflist((tree)$1,(tree)$2);
 	};
 
 def	:
 	ID COLON STDEF itemlist ENDDEF SEMICOL =
 	{
-		$$ = (long) mkdef($1, $4);
+		$$ = (long)mkdef((id)$1,(tree)$4);
 	} |
 	ID COLON STDEF ENDDEF SEMICOL =
 	{
-		$$ = (long) mkdef($1, mkemitemlist());
+		$$ = (long)mkdef((id)$1,mkemitemlist());
 	};
 
 itemlist:
@@ -40,11 +40,11 @@ itemlist:
 	} |
 	itemlist item =
 	{
-		$$ = (long) mkitemlist($1, $2);
+		$$ = (long)mkitemlist((tree)$1,(tree)$2);
 	};
 
 item	:
 	ID COLON ID SEMICOL =
 	{
-		$$ = (long) mkitem($1, $3);
+		$$ = (long)mkitem((id)$1,(id)$3);
 	};
