@@ -95,7 +95,6 @@ HASKELL_POST_COMPILE=$(patsubst %,$(HASKELL_SPLIT_POST),$(filter -split-objs,$(H
 #-----------------------------------------------------------------------------
 # Lx Suffix Rules
 #
-.PRECIOUS: %.hs
 
 %.hs : %.lx
 	$(LX) $(LX_OPTS) $<
