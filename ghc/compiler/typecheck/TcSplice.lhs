@@ -28,12 +28,13 @@ import TcUnify		( unifyTauTy )
 import TcType		( TcType, openTypeKind, mkAppTy )
 import TcEnv		( spliceOK, tcMetaTy, tcWithTempInstEnv, bracketOK )
 import TcRnTypes	( TopEnv(..) )
-import TcMType		( newTyVarTy, zapToType )
+import TcMType		( newTyVarTy, zapToType, UserTypeCtxt(ExprSigCtxt) )
+import TcMonoType	( tcHsSigType )
 import Name		( Name )
 import TcRnMonad
 
 import TysWiredIn	( mkListTy )
-import DsMeta		( exprTyConName, declTyConName, decTyConName, qTyConName )
+import DsMeta		( exprTyConName, declTyConName, typeTyConName, decTyConName, qTyConName )
 import ErrUtils (Message)
 import Outputable
 import Panic		( showException )
@@ -94,11 +95,17 @@ tcBracket brack res_ty
     returnM (HsBracketOut brack pendings)
     }
 
+tc_bracket :: HsBracket Name -> TcM TcType
 tc_bracket (ExpBr expr) 
   = newTyVarTy openTypeKind		`thenM` \ any_ty ->
     tcMonoExpr expr any_ty		`thenM_`
     tcMetaTy exprTyConName
 	-- Result type is Expr (= Q Exp)
+
+tc_bracket (TypBr typ) 
+  = tcHsSigType ExprSigCtxt typ		`thenM_`
+    tcMetaTy typeTyConName
+	-- Result type is Type (= Q Typ)
 
 tc_bracket (DecBr decls)
   = tcWithTempInstEnv (tcTopSrcDecls decls)	`thenM_`
