@@ -34,10 +34,10 @@ module Module
     , moduleUserString		-- :: Module -> UserString
     , moduleName		-- :: Module -> ModuleName
 
-    , mkVanillaModule	    -- :: ModuleName -> Module
---    , mkThisModule	    -- :: ModuleName -> Module
+    , mkVanillaModule	        -- :: ModuleName -> Module
     , mkPrelModule		-- :: UserString -> Module
-    , mkModule			-- :: ModuleName -> ModuleKind -> Module
+    , mkModule			-- :: ModuleName -> PackageName -> Module
+    , mkHomeModule		-- :: ModuleName -> Module
 
 --    , mkSrcModule
 
@@ -223,6 +223,8 @@ mkModule mod_nm pack_name
     pack_info | pack_name == opt_InPackage = ThisPackage
 	      | otherwise		   = AnotherPackage pack_name
 
+mkHomeModule :: ModuleName -> Module
+mkHomeModule mod_nm = Module mod_nm ThisPackage
 
 -- Used temporarily when we first come across Foo.x in an interface
 -- file, but before we've opened Foo.hi.
