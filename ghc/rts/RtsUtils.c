@@ -1,11 +1,14 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.14 2000/03/31 03:09:36 hwloidl Exp $
+ * $Id: RtsUtils.c,v 1.15 2000/04/14 14:07:43 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
  * General utility functions used in the RTS.
  *
  * ---------------------------------------------------------------------------*/
+
+/* gettimeofday isn't POSIX */
+#define NON_POSIX_SOURCE
 
 #include "Rts.h"
 #include "RtsTypes.h"
