@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.101 2001/10/31 12:51:08 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.102 2001/12/05 00:06:32 sof Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -320,17 +320,12 @@ runCommand c =
 
 showException (DynException dyn) =
   case fromDynamic dyn of
-    Nothing -> 
-	io (putStrLn ("*** Exception: (unknown)"))
-    Just (PhaseFailed phase code) ->
-	io (putStrLn ("Phase " ++ phase ++ " failed (code "
-		       ++ show code ++ ")"))
-    Just Interrupted ->
-	io (putStrLn "Interrupted.")
-    Just (CmdLineError s) -> 
-	io (putStrLn s)	 -- omit the location for CmdLineError
-    Just other_ghc_ex ->
-	io (putStrLn (show other_ghc_ex))
+    Nothing               -> io (putStrLn ("*** Exception: (unknown)"))
+    Just Interrupted      -> io (putStrLn "Interrupted.")
+    Just (CmdLineError s) -> io (putStrLn s)	 -- omit the location for CmdLineError
+    Just ph@PhaseFailed{} -> io (putStrLn (showGhcException ph)) -- ditto
+    Just other_ghc_ex     -> io (print other_ghc_ex)
+
 showException other_exception
   = io (putStrLn ("*** Exception: " ++ show other_exception))
 

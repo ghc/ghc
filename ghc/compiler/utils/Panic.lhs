@@ -42,7 +42,8 @@ ghcError e = throwDyn e
 -- assumed to contain a location already, so we don't print one).
 
 data GhcException
-  = PhaseFailed String ExitCode	-- an external phase (eg. cpp) failed
+  = PhaseFailed String		-- name of phase 
+  		ExitCode	-- an external phase (eg. cpp) failed
   | Interrupted			-- someone pressed ^C
   | UsageError String		-- prints the short usage msg after the error
   | CmdLineError String		-- cmdline prob, but doesn't print usage
@@ -63,7 +64,14 @@ instance Show GhcException where
 showGhcException (UsageError str)
    = showString str . showChar '\n' . showString short_usage
 showGhcException (PhaseFailed phase code)
-   = showString phase . showString " failed, code = " . shows code
+   = showString "phase `" . showString phase . 
+     showString "' failed (exitcode = " . shows int_code . 
+     showString ")"
+  where
+    int_code = 
+      case code of
+        ExitSuccess   -> (0::Int)
+	ExitFailure x -> x
 showGhcException (CmdLineError str)
    = showString str
 showGhcException (ProgramError str)
