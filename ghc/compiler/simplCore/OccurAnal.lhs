@@ -212,7 +212,11 @@ shortMeOut ind_env exported_id local_id
 	if shortableIdInfo (idInfo exported_id) 	-- Only if its IdInfo is 'shortable'
 							-- (see the defn of IdInfo.shortableIdInfo)
 	then True
-	else pprTrace "shortMeOut:" (ppr exported_id) False
+	else 
+#ifdef DEBUG 
+          pprTrace "shortMeOut:" (ppr exported_id)
+#endif
+                                                False
     else
 	False
 \end{code}
