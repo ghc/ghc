@@ -1,1 +1,30 @@
-tcfail075.hs:9:1: parse error on input: "y"
+
+tcfail075.hs:5:
+    Top-level bindings for unlifted types aren't allowed x = 1#
+
+tcfail075.hs:12:
+    Couldn't match `#' against `*'
+	Expected kind: #
+	Inferred kind: *
+    When matching types `Int#' and `t'
+	Expected type: Int#
+	Inferred type: t
+
+tcfail075.hs:15:
+    Couldn't match `#' against `*'
+	Expected kind: #
+	Inferred kind: *
+    When matching types `Int#' and `t'
+	Expected type: Int#
+	Inferred type: t
+
+tcfail075.hs:17:
+    Couldn't match `#' against `*'
+	Expected kind: #
+	Inferred kind: *
+    When matching types `Int#' and `t'
+	Expected type: Int#
+	Inferred type: t
+
+Compilation had errors
+

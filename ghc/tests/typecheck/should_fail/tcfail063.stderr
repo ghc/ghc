@@ -1,1 +1,4 @@
-tcfail063.hs:5:1: is_context_format: type missing after class name on input: "moby"
+tcfail063.hs:4: Illegal class assertion
+
+Compilation had errors
+

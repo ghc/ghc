@@ -1,7 +1,8 @@
 
 tcfail073.hs:3:
     Duplicate or overlapping instance declarations
-	for `Eq (a, b)' at PrelTup.hi:5 and tcfail073.hs:8
+	for `Eq (a, b)'
+	    imported from module `PrelTup' and defined at tcfail073.hs:7
 
 tcfail073.hs:8:
     Could not deduce `Eq a'

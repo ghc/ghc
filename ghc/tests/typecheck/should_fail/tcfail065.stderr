@@ -1,11 +1,9 @@
 
-tcfail065.hs:29:
+tcfail065.hs:28:
     Inferred type is less polymorphic than expected
 	Quantified type variable `x' escapes
 	It unifies with `x1', which is mentioned in the environment
-** SLPJ: I HATE THE 'unifies with' PART **
 	The following variables in the environment mention `x1'
-** AND NOTHING MENTIONED! **
     When checking the type signature
 	setX :: forall x2. x2 -> X x1 -> X x1
     In the definition for method `setX'

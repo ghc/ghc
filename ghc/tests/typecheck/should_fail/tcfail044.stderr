@@ -1,10 +1,10 @@
 
-tcfail044.hs:12:
-    Warning: No explicit method nor default method for `signum'
+tcfail044.hs:8:
+    Warning: No explicit method nor default method for `abs'
 	     in an instance declaration for `Num'
 
-tcfail044.hs:12:
-    Warning: No explicit method nor default method for `abs'
+tcfail044.hs:8:
+    Warning: No explicit method nor default method for `signum'
 	     in an instance declaration for `Num'
 
 tcfail044.hs:5:
@@ -12,7 +12,7 @@ tcfail044.hs:5:
 	(the instance type must be of form (T a b c)
 	 where T is not a synonym, and a,b,c are distinct type variables)
 
-tcfail044.hs:12:
+tcfail044.hs:8:
     Illegal instance declaration for `Num (a -> a)'
 	(the instance type must be of form (T a b c)
 	 where T is not a synonym, and a,b,c are distinct type variables)

@@ -41,7 +41,8 @@ tcfail035.hs:7:
 
 tcfail035.hs:3:
     Duplicate or overlapping instance declarations
-	for `Num NUM' at tcfail035.hs:7 and tcfail035.hs:6
+	for `Num NUM'
+	    defined at tcfail035.hs:7 and defined at tcfail035.hs:6
 
 Compilation had errors
 

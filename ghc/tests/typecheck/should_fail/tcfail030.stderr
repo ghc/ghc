@@ -1,5 +1,5 @@
 
-tcfail030.hs:2: Variable not in scope: `Main.main'
+tcfail030.hs:3: Variable not in scope: `Main.main'
 
 Compilation had errors
 

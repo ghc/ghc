@@ -1,15 +1,24 @@
 
-tcfail067.hs:65:
-    Warning: No explicit method nor default method for `signum'
-	     in an instance declaration for `Num'
-
-tcfail067.hs:65:
+tcfail067.hs:60:
     Warning: No explicit method nor default method for `abs'
 	     in an instance declaration for `Num'
 
-tcfail067.hs:65:
+tcfail067.hs:60:
+    Warning: No explicit method nor default method for `signum'
+	     in an instance declaration for `Num'
+
+tcfail067.hs:60:
+    Could not deduce `Show (SubRange a)'
+	(arising from an instance declaration at tcfail067.hs:60)
+	from the context: (Num a)
+    Probable cause: missing `Show (SubRange a)'
+		    in instance declaration context
+		    or missing instance declaration for `Show (SubRange a)'
+    When checking the superclasses of an instance declaration
+
+tcfail067.hs:61:
     Could not deduce `Ord a'
-	(arising from use of `SubRange' at tcfail067.hs:65)
+	(arising from use of `numSubRangeNegate' at tcfail067.hs:61)
 	from the context: (Num (SubRange a),
 			   Num a,
 			   Eq (SubRange a),
@@ -18,15 +27,6 @@ tcfail067.hs:65:
 			   Show (SubRange a))
     Probable cause: missing `Ord a' in instance declaration context
     When checking the methods of an instance declaration
-
-tcfail067.hs:65:
-    Could not deduce `Show (SubRange a)'
-	(arising from an instance declaration at tcfail067.hs:65)
-	from the context: (Num a)
-    Probable cause: missing `Show (SubRange a)'
-		    in instance declaration context
-		    or missing instance declaration for `Show (SubRange a)'
-    When checking the superclasses of an instance declaration
 
 tcfail067.hs:74:
     Could not deduce `Ord a'

@@ -1,10 +1,10 @@
 ghc: module version changed to 1; reason: no old .hi file
-__export ShouldSucceed Parse{forced parse parseType parseLine parseFile} charToInt lineszq seperatedBy spanzq strToInt whiteSpace;
+__export ShouldSucceed Parse{parseFile parseLine parseType parse forced} charToInt lineszq seperatedBy spanzq strToInt whiteSpace;
 instance {Parse PrelBase.Char} = zdfParseChar;
 instance {Parse PrelBase.Int} = zdfParseInt;
 instance __forall [a] => {Parse a} -> {Parse [a]} = zdfParseZMZN;
 1 charToInt :: PrelBase.Char -> PrelBase.Int ;
-1 class Parse a where {forced = :: a -> PrelBase.Bool; parse = :: PrelBase.String -> (a, PrelBase.String); parseType :: PrelBase.String -> (a, PrelBase.String); parseLine = :: PrelBase.String -> a; parseFile = :: PrelBase.String -> [a]} ;
+1 class Parse a where {parseFile = :: PrelBase.String -> [a]; parseLine = :: PrelBase.String -> a; parseType :: PrelBase.String -> (a, PrelBase.String); parse = :: PrelBase.String -> (a, PrelBase.String); forced = :: a -> PrelBase.Bool} ;
 1 lineszq :: [PrelBase.Char] -> [[PrelBase.Char]] ;
 1 seperatedBy :: PrelBase.Char -> PrelBase.String -> [PrelBase.String] ;
 1 spanzq :: __forall [a] => (a -> PrelBase.Bool) -> [a] -> ([a], [a]) ;

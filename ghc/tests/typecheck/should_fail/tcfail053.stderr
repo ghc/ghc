@@ -1,5 +1,5 @@
 
-tcfail053.hs:4: Type constructor or class not in scope: `A'
+tcfail053.hs:3: Type constructor or class not in scope: `A'
 
 Compilation had errors
 

@@ -1,7 +1,7 @@
 
-tcfail071.hs:8:
+tcfail071.hs:5:
     Mismatched contexts
-    When matching the contexts of the signatures for `f' and `g'
+    When matching the contexts of the signatures for `g' and `f'
 	(the signature contexts in a mutually recursive group should all be identical)
 
 tcfail071.hs:10:

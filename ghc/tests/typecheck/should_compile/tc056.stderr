@@ -1,5 +1,5 @@
 
-tc056.hs:15:
+tc056.hs:14:
     Warning: Duplicate class assertion `Eq' a' in the context:
 		 (Eq' a, Eq' a) => ...
 ghc: module version changed to 1; reason: no old .hi file

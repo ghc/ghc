@@ -1,4 +1,4 @@
 ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed Monad2{MkMonad2} halfListMonad;
-1 data Monad2 m :: (* -> *) = MkMonad2 (__forall [a] => a -> m a) (__forall [a b] => m a -> (a -> m b) -> m b) ;
-1 halfListMonad :: (__forall [a b] => [a] -> (a -> [b]) -> [b]) -> Monad2 PrelBase.ZMZN ;
+1 data Monad2 m :: (* -> *) = MkMonad2 (__forall [a] => a -> m a) (__forall [b a] => m a -> (a -> m b) -> m b) ;
+1 halfListMonad :: (__forall [b a] => [a] -> (a -> [b]) -> [b]) -> Monad2 PrelBase.ZMZN ;

@@ -1,5 +1,5 @@
 
-tcfail068.hs:12:
+tcfail068.hs:13:
     Inferred type is less polymorphic than expected
 	Quantified type variable `s' escapes
 	It unifies with `s1', which is mentioned in the environment
@@ -9,7 +9,7 @@ tcfail068.hs:12:
     In the right-hand side of an equation for `itgen':
 	runST (newArray ((1, 1), n) x)
 
-tcfail068.hs:17:
+tcfail068.hs:18:
     Inferred type is less polymorphic than expected
 	Quantified type variable `s' escapes
 	It unifies with `s1', which is mentioned in the environment
@@ -29,8 +29,8 @@ tcfail068.hs:24:
 	It unifies with `s1', which is mentioned in the environment
 	The following variables in the environment mention `s1'
 	    arr :: IndTree s1 a
-	    itrap' :: Int -> Int -> ST s1 (IndTree s1 a)
-	    itrapsnd :: Int -> Int -> ST s1 (IndTree s1 a)
+	    itrapsnd :: Int -> Int -> ST s1 (MutableArray s1 (Int, Int) a)
+	    itrap' :: Int -> Int -> ST s1 (MutableArray s1 (Int, Int) a)
     In an expression with expected type: forall s2. ST s2 a1
     In the first argument of `runST', namely `(itrap' i k)'
     In the right-hand side of an equation for `itrap':
@@ -42,8 +42,14 @@ tcfail068.hs:36:
 	It unifies with `s1', which is mentioned in the environment
 	The following variables in the environment mention `s1'
 	    arr :: IndTree s1 b
-	    itrapstate' :: Int -> Int -> c -> ST s1 (c, IndTree s1 b)
-	    itrapstatesnd :: Int -> Int -> c -> ST s1 (c, IndTree s1 b)
+	    itrapstatesnd :: Int
+			     -> Int
+			     -> c
+			     -> ST s1 (c, MutableArray s1 (Int, Int) b)
+	    itrapstate' :: Int
+			   -> Int
+			   -> c
+			   -> ST s1 (c, MutableArray s1 (Int, Int) b)
     In an expression with expected type: forall s2. ST s2 a
     In the first argument of `runST', namely `(itrapstate' i k s)'
     In the right-hand side of an equation for `itrapstate':

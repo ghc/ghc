@@ -1,7 +1,8 @@
 
 tcfail056.hs:1:
     Duplicate or overlapping instance declarations
-	for `Eq Foo' at tcfail056.hs:6 and tcfail056.hs:10
+	for `Eq Foo'
+	    defined at tcfail056.hs:8 and defined at tcfail056.hs:5
 
 tcfail056.hs:10: Class `Eq' does not have a method `<='
 
