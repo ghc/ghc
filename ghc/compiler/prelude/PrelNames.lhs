@@ -156,6 +156,7 @@ knownKeyNames
 	deRefStablePtrName,
 	newStablePtrName,
 	bindIOName,
+	thenIOName,
 	returnIOName,
 	failIOName,
 
