@@ -28,7 +28,7 @@ module TcHsSyn (
 	-- re-exported from TcEnv
 	TcId, tcInstId,
 
-	zonkTopBinds, zonkId, zonkIdOcc,
+	zonkTopBinds, zonkId, zonkIdOcc, zonkExpr,
 	zonkForeignExports, zonkRules
   ) where
 

@@ -18,7 +18,8 @@ import HsTypes		( toHsType )
 import RnHsSyn		( RenamedHsBinds, RenamedHsDecl, RenamedHsExpr )
 import TcHsSyn		( TypecheckedMonoBinds, TypecheckedHsExpr,
 			  TypecheckedForeignDecl, TypecheckedRuleDecl,
-			  zonkTopBinds, zonkForeignExports, zonkRules, mkHsLet
+			  zonkTopBinds, zonkForeignExports, zonkRules, mkHsLet,
+			  zonkExpr
 			)
 
 
@@ -121,8 +122,10 @@ typecheckExpr dflags pcs hst unqual this_mod (expr, decls)
     newTyVarTy openTypeKind	`thenTc` \ ty ->
     tcMonoExpr expr ty		`thenTc` \ (expr', lie) ->
     tcSimplifyTop lie		`thenTc` \ binds ->
+    let all_expr = mkHsLet binds expr' in
+    zonkExpr all_expr		`thenNF_Tc` \ zonked_expr ->
     zonkTcType ty		`thenNF_Tc` \ zonked_ty ->
-    returnTc (new_pcs, mkHsLet binds expr', zonked_ty) 
+    returnTc (new_pcs, zonked_expr, zonked_ty) 
   where
     get_fixity :: Name -> Maybe Fixity
     get_fixity n = pprPanic "typecheckExpr" (ppr n)
