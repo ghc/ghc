@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.101 2004/03/05 15:09:37 stolz Exp $
+-- $Id: DriverState.hs,v 1.102 2004/03/24 10:50:35 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -210,6 +210,10 @@ GLOBAL_VAR(v_Library_paths, [],	 [String])
 GLOBAL_VAR(v_Framework_paths, [], [String])
 GLOBAL_VAR(v_Cmdline_frameworks, [], [String])
 #endif
+
+addToOrDeleteDirList :: IORef [String] -> String -> IO ()
+addToOrDeleteDirList ref ""   = writeIORef ref []
+addToOrDeleteDirList ref path = addToDirList ref path
 
 addToDirList :: IORef [String] -> String -> IO ()
 addToDirList ref path

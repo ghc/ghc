@@ -259,7 +259,7 @@ static_flags =
 				) )
 
 	------- Include/Import Paths ----------------------------------------
-  ,  ( "i"		, OptPrefix (addToDirList v_Import_paths) )
+  ,  ( "i"		, OptPrefix (addToOrDeleteDirList v_Import_paths) )
   ,  ( "I" 		, Prefix    (addToDirList v_Include_paths) )
 
 	------- Libraries ---------------------------------------------------
