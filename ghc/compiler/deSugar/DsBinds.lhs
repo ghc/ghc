@@ -34,12 +34,12 @@ import Id		( idType, SYN_IE(DictVar), GenId, SYN_IE(Id) )
 import ListSetOps	( minusList, intersectLists )
 import Name		( isExported )
 import PprType		( GenType )
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..) )
 import Type		( mkTyVarTy, isDictTy, instantiateTy
 			)
 import TyVar		( tyVarSetToList, GenTyVar{-instance Eq-} )
 import TysPrim		( voidTy )
-import Util		( isIn, panic{-, pprTrace ToDo:rm-} )
+import Util		( isIn, panic, assertPanic  )
 \end{code}
 
 %************************************************************************
@@ -106,9 +106,21 @@ dsMonoBinds is_rec (PatMonoBind pat grhss_and_binds locn)
     dsGuarded grhss_and_binds			`thenDs` \ body_expr ->
     mkSelectorBinds pat body_expr
 
-dsMonoBinds is_rec (AbsBinds [] [] exports binds)	-- Common special case
+	-- Common special case: no type or dictionary abstraction
+dsMonoBinds is_rec (AbsBinds [] [] exports binds)
   = dsMonoBinds is_rec binds			`thenDs` \ prs ->
     returnDs (prs ++ [(global, Var local) | (_, global, local) <- exports])
+
+	-- Another common case: one exported variable
+	-- All non-recursive bindings come through this way
+dsMonoBinds is_rec (AbsBinds all_tyvars dicts [(tyvars, global, local)] binds)
+  = ASSERT( all (`elem` tyvars) all_tyvars )
+    dsMonoBinds is_rec binds				`thenDs` \ core_prs ->
+    let 
+	core_binds | is_rec    = [Rec core_prs]
+		   | otherwise = [NonRec b e | (b,e) <- core_prs]
+    in
+    returnDs [(global, mkLam tyvars dicts $ mkCoLetsAny core_binds (Var local))]
 
 dsMonoBinds is_rec (AbsBinds all_tyvars dicts exports binds)
   = dsMonoBinds is_rec binds				`thenDs` \ core_prs ->
