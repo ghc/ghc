@@ -14,6 +14,10 @@
 #include "rtsdefs.h"
 #include <setjmp.h>
 
+#if 1
+#include <windows.h>
+#endif
+
 #if defined(STDC_HEADERS) || defined(HAVE_STRING_H)
 # include <string.h>
 /* An ANSI string.h and pre-ANSI memory.h might conflict.  */
@@ -99,8 +103,15 @@ jmp_buf restart_main;	    /* For restarting after a signal */
 int nPEs = 0;		    /* Number of PEs */
 #endif
 
-int /* return type of "main" is defined by the C standard */
-main(int argc, char *argv[])
+\end{code}
+
+Setting up and initialising the run-time system:
+(used by main(), and people that don't allow Haskell
+to stay in control.)
+
+\begin{code}
+void
+initRTS(int argc, char *argv[])
 {
 #ifdef GRAN
  int i;
@@ -124,7 +135,6 @@ Manager's requirements.
     if (*argv[0] == '-') {     /* Look to see whether we're the Main Thread */
 	IAmMainThread = rtsTrue;
         argv++; argc--;			/* Strip off flag argument */
-/*	fprintf(stderr, "I am Main Thread\n"); */
     }
     /* 
      * Grab the number of PEs out of the argument vector, and
@@ -151,7 +161,6 @@ Manager's requirements.
        what statsfile to use (if any); [if so, write the whole
        cmd-line into it]
        
-       This is unlikely to work well in parallel!  KH.
     */
     initRtsFlagsDefaults();
     defaultsHook(); /* the one supplied does nothing;
@@ -263,6 +272,14 @@ Manager's requirements.
     setjmp(restart_main);
     initUserSignals();
 #endif
+
+
+}
+
+int /* return type of "main" is defined by the C standard */
+main(int argc, char *argv[])
+{
+  initRTS(argc,argv);
 
 #ifdef CONCURRENT
     AvailableStack = AvailableTSO = PrelBase_Z91Z93_closure;
