@@ -3307,7 +3307,7 @@ arg: while($_ = $Args[0]) {
 	} elsif ($heap_size >= $Specific_heap_size) {
 	    $Specific_heap_size = $heap_size;
 	} else {
-	    print STDERR "$Pgm: ignoring heap-size-setting option ($_)...not the largest seen\n";
+	    print STDERR "$Pgm: ignoring heap-size-setting option ($_)...not the largest seen\n" if $Verbose;
 	}
 	next arg; };
 
@@ -3329,7 +3329,7 @@ arg: while($_ = $Args[0]) {
 	} elsif ($stk_size >= $Specific_stk_size) {
 	    $Specific_stk_size = $stk_size;
 	} else {
-	    print STDERR "$Pgm: ignoring stack-size-setting option ($flag $stk_size)...not the largest seen\n";
+	    print STDERR "$Pgm: ignoring stack-size-setting option ($flag $stk_size)...not the largest seen\n" if $Verbose;
 	}
 	next arg; };
 
