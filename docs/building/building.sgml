@@ -1315,7 +1315,7 @@ $ cvs checkout nofib/spectral
 	  <listitem>
 	    <para>PVM is the Parallel Virtual Machine on which
             Parallel Haskell programs run.  (You only need this if you
-            plan to run Parallel Haskell.  Concurent Haskell, which
+            plan to run Parallel Haskell.  Concurrent Haskell, which
             runs concurrent threads on a uniprocessor doesn't need
             it.)  Underneath PVM, you can have (for example) a network
             of workstations (slow) or a multiprocessor box
