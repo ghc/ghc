@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1996-98
+% (c) The University of Glasgow, 1996-2000
 %
 \section[CmdLineOpts]{Things to do with command-line options}
 
@@ -11,7 +11,7 @@ module CmdLineOpts (
 	StgToDo(..),
 	SwitchResult(..),
 	HscLang(..),
-	classifyOpts,
+	DynFlag(..),	-- needed non-abstractly by Main
 
 	intSwitchSet,
 	switchIsOn,
@@ -184,14 +184,11 @@ Static flags are represented by top-level values of type Bool or Int,
 for example.  They therefore have the same value throughout the
 invocation of hsc.
 
-Dynamic flags are represented by a function:
-
-	checkDynFlag :: DynFlag -> SwitchResult
-
-which is passed into hsc by the compilation manager for every
-compilation.  Dynamic flags are those that change on a per-compilation
-basis, perhaps because they may be present in the OPTIONS pragma at
-the top of a module.
+Dynamic flags are represented by an abstract type, DynFlags, which is
+passed into hsc by the compilation manager for every compilation.
+Dynamic flags are those that change on a per-compilation basis,
+perhaps because they may be present in the OPTIONS pragma at the top
+of a module.
 
 Other flag-related blurb:
 
@@ -319,15 +316,11 @@ data DynFlags = DynFlags {
   coreToDo :: CoreToDo,
   stgToDo  :: StgToDo,
   hscLang  :: HscLang,
-  flags    :: [(DynFlag, SwitchResult)]
+  flags    :: [DynFlag]
  }
 
 boolOpt :: DynFlag -> DynFlags -> Bool
-boolOpt f dflags
-  = case lookup f (flags dflags) of
-	Nothing -> False
-	Just (SwBool b) -> b
-	_ -> panic "boolOpt"
+boolOpt f dflags  = f `elem` (flags dflags)
 
 dopt_D_dump_all              = boolOpt Opt_D_dump_all
 dopt_D_dump_most             = boolOpt Opt_D_dump_most
@@ -553,98 +546,6 @@ opt_UseDoubleRegs  | opt_Unregisterised = 0
 		   | otherwise          = mAX_Real_Double_REG
 opt_UseLongRegs    | opt_Unregisterised = 0
 		   | otherwise          = mAX_Real_Long_REG
-\end{code}
-
-\begin{code}
-classifyOpts :: ([CoreToDo],	-- Core-to-Core processing spec
-		 [StgToDo])	-- STG-to-STG   processing spec
-
-classifyOpts = sep argv [] [] -- accumulators...
-  where
-    sep :: [FAST_STRING]	         -- cmd-line opts (input)
-	-> [CoreToDo] -> [StgToDo]	 -- to_do accumulators
-	-> ([CoreToDo], [StgToDo])	 -- result
-
-    sep [] core_td stg_td -- all done!
-      = (reverse core_td, reverse stg_td)
-
-#	define CORE_TD(to_do) sep opts (to_do:core_td) stg_td
-#	define STG_TD(to_do)  sep opts core_td (to_do:stg_td)
-
-    sep (opt1:opts) core_td stg_td
-      = case (_UNPK_ opt1) of -- the non-"just match a string" options are at the end...
-	  ',' : _	-> sep opts core_td stg_td -- it is for the parser
-
-	  "-fsimplify"  -> -- gather up SimplifierSwitches specially...
-			   simpl_sep opts defaultSimplSwitches core_td stg_td
-
-	  "-ffloat-inwards"  -> CORE_TD(CoreDoFloatInwards)
-	  "-ffloat-outwards"      -> CORE_TD(CoreDoFloatOutwards False)
-	  "-ffloat-outwards-full" -> CORE_TD(CoreDoFloatOutwards True)
-	  "-fliberate-case"  -> CORE_TD(CoreLiberateCase)
-	  "-fcse"  	     -> CORE_TD(CoreCSE)
-	  "-fglom-binds"     -> CORE_TD(CoreDoGlomBinds)
-	  "-fprint-core"     -> CORE_TD(CoreDoPrintCore)
-	  "-fstatic-args"    -> CORE_TD(CoreDoStaticArgs)
-	  "-fstrictness"     -> CORE_TD(CoreDoStrictness)
-	  "-fworker-wrapper" -> CORE_TD(CoreDoWorkerWrapper)
-	  "-fspecialise"     -> CORE_TD(CoreDoSpecialising)
-	  "-fusagesp"        -> CORE_TD(CoreDoUSPInf)
-	  "-fcpr-analyse"    -> CORE_TD(CoreDoCPResult)
-
-	  "-fstg-static-args" -> STG_TD(StgDoStaticArgs)
-	  "-dstg-stats"	      -> STG_TD(D_stg_stats)
-	  "-flambda-lift"     -> STG_TD(StgDoLambdaLift)
-	  "-fmassage-stg-for-profiling" -> STG_TD(StgDoMassageForProfiling)
-
-	  _ -> -- NB: the driver is really supposed to handle bad options
-	       sep opts core_td stg_td
-
-    ----------------
-
-    simpl_sep :: [FAST_STRING]            -- cmd-line opts (input)
-	      -> [SimplifierSwitch]	  -- simplifier-switch accumulator
-	      -> [CoreToDo] -> [StgToDo]  -- to_do accumulators
-	      -> ([CoreToDo], [StgToDo])  -- result
-
-	-- "simpl_sep" tailcalls "sep" once it's seen one set
-	-- of SimplifierSwitches for a CoreDoSimplify.
-
-#ifdef DEBUG
-    simpl_sep input@[] simpl_sw core_td stg_td
-      = panic "simpl_sep []"
-#endif
-
-	-- The SimplifierSwitches should be delimited by "[" and "]".
-
-    simpl_sep (opt1:opts) simpl_sw core_td stg_td
-      = case (_UNPK_ opt1) of
-	  "[" -> simpl_sep opts simpl_sw core_td stg_td
-	  "]" -> let
-		    this_simpl = CoreDoSimplify (isAmongSimpl simpl_sw)
-		 in
-		 sep opts (this_simpl : core_td) stg_td
-
-	  opt -> case matchSimplSw opt of
-			Just sw -> simpl_sep opts (sw:simpl_sw) core_td stg_td
-			Nothing -> simpl_sep opts simpl_sw      core_td stg_td
-
-matchSimplSw opt
-  = firstJust	[ matchSwInt  opt "-fmax-simplifier-iterations"		MaxSimplifierIterations
-		, matchSwInt  opt "-finline-phase"			SimplInlinePhase
-		, matchSwBool opt "-fno-rules"				DontApplyRules
-		, matchSwBool opt "-fno-case-of-case"			NoCaseOfCase
-		, matchSwBool opt "-flet-to-case"			SimplLetToCase
-		]
-
-matchSwBool :: String -> String -> a -> Maybe a
-matchSwBool opt str sw | opt == str = Just sw
-		       | otherwise  = Nothing
-
-matchSwInt :: String -> String -> (Int -> a) -> Maybe a
-matchSwInt opt str sw = case startsWith str opt of
-			    Just opt_left -> Just (sw (read opt_left))
-			    Nothing	  -> Nothing
 \end{code}
 
 %************************************************************************
