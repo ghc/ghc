@@ -48,8 +48,8 @@ import TcEnv	( tcLookupGlobal_maybe, tcExtendGlobalValEnv, TcEnv, TcId )
 
 import TcMonad
 import Type	  ( Type )
-import TcType	  ( TcType )
-import TcMType	  ( zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcType, zonkTcSigTyVars )
+import TcType	  ( TcType, tcGetTyVar )
+import TcMType	  ( zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcType, zonkTcTyVars )
 import TysPrim	  ( charPrimTy, intPrimTy, floatPrimTy,
 		    doublePrimTy, addrPrimTy
 		  )
@@ -352,9 +352,12 @@ zonkMonoBinds (AbsBinds tyvars dicts exports inlines val_bind)
 		 new_globals)
   where
     zonkExport (tyvars, global, local)
-	= zonkTcSigTyVars tyvars	`thenNF_Tc` \ new_tyvars ->
+	= zonkTcTyVars tyvars		`thenNF_Tc` \ tys ->
+	  let
+		new_tyvars = map (tcGetTyVar "zonkExport") tys
 		-- This isn't the binding occurrence of these tyvars
-		-- but they should *be* tyvars.  Hence zonkTcSigTyVars.
+		-- but they should *be* tyvars.  Hence tcGetTyVar.
+	  in
 	  zonkIdBndr global		`thenNF_Tc` \ new_global ->
 	  zonkIdOcc local		`thenNF_Tc` \ new_local -> 
 	  returnNF_Tc (new_tyvars, new_global, new_local)

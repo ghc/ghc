@@ -23,17 +23,18 @@ import TcHsSyn		( TcMatch, TcGRHSs, TcStmt, TcDictBinds, TypecheckedPat )
 import TcMonad
 import TcMonoType	( tcAddScopedTyVars, tcHsSigType, UserTypeCtxt(..) )
 import Inst		( LIE, isEmptyLIE, plusLIE, emptyLIE, plusLIEs, lieToList )
-import TcEnv		( TcId, tcLookupLocalIds, tcExtendLocalValEnv, tcExtendGlobalTyVars )
+import TcEnv		( TcId, tcLookupLocalIds, tcExtendLocalValEnv )
 import TcPat		( tcPat, tcMonoPatBndr )
-import TcMType		( newTyVarTy )
-import TcType		( TcType, TcTyVar, tyVarsOfType,
+import TcMType		( newTyVarTy, zonkTcType )
+import TcType		( TcType, TcTyVar, tyVarsOfType, tidyOpenTypes, tidyOpenType,
 			  mkFunTy, isOverloadedTy, liftedTypeKind, openTypeKind  )
 import TcBinds		( tcBindsAndThen )
-import TcUnify		( subFunTy, checkSigTyVars, tcSub, isIdCoercion, (<$>), sigPatCtxt )
+import TcUnify		( subFunTy, checkSigTyVarsWrt, tcSub, isIdCoercion, (<$>) )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
 import Name		( Name )
 import TysWiredIn	( boolTy )
 import Id		( idType )
+import CoreFVs		( idFreeTyVars )
 import BasicTypes	( RecFlag(..) )
 import VarSet
 import Var		( Id )
@@ -109,11 +110,11 @@ tcMatches :: [(Name,Id)]
 	  -> TcType
 	  -> TcM ([TcMatch], LIE)
 
-tcMatches xve fun_or_case matches expected_ty
+tcMatches xve ctxt matches expected_ty
   = mapAndUnzipTc tc_match matches	`thenTc` \ (matches, lies) ->
     returnTc (matches, plusLIEs lies)
   where
-    tc_match match = tcMatch xve fun_or_case match expected_ty
+    tc_match match = tcMatch xve ctxt match expected_ty
 \end{code}
 
 
@@ -224,8 +225,8 @@ tcMatchPats pats expected_ty thing_inside
 	in
 	tcExtendLocalValEnv xve (thing_inside pats' rhs_ty)		`thenTc` \ (result, lie_req2) ->
 
-	returnTc (rhs_ty, lie_req1, ex_tvs, pat_ids, lie_avail, result, lie_req2)
-    ) `thenTc` \ (rhs_ty, lie_req1, ex_tvs, pat_ids, lie_avail, result, lie_req2) -> 
+	returnTc (lie_req1, ex_tvs, pat_ids, lie_avail, result, lie_req2)
+    ) `thenTc` \ (lie_req1, ex_tvs, pat_ids, lie_avail, result, lie_req2) -> 
 
 	-- STEP 4: Check for existentially bound type variables
 	-- Do this *outside* the scope of the tcAddScopedTyVars, else checkSigTyVars
@@ -260,8 +261,7 @@ tcCheckExistentialPat ids ex_tvs lie_avail lie_req match_ty
     returnTc (lie_req, EmptyMonoBinds)
 
   | otherwise
-  = tcExtendGlobalTyVars (tyVarsOfType match_ty)		$
-    tcAddErrCtxtM (sigPatCtxt tv_list ids)			$
+  = tcAddErrCtxtM (sigPatCtxt tv_list ids match_ty)		$
 
     	-- In case there are any polymorpic, overloaded binders in the pattern
 	-- (which can happen in the case of rank-2 type signatures, or data constructors
@@ -270,7 +270,7 @@ tcCheckExistentialPat ids ex_tvs lie_avail lie_req match_ty
 
 	-- Deal with overloaded functions bound by the pattern
     tcSimplifyCheck doc tv_list (lieToList lie_avail) lie1	`thenTc` \ (lie2, dict_binds) ->
-    checkSigTyVars tv_list emptyVarSet				`thenTc_` 
+    checkSigTyVarsWrt (tyVarsOfType match_ty) tv_list		`thenTc_` 
 
     returnTc (lie2, dict_binds `AndMonoBinds` inst_binds)
   where
@@ -447,9 +447,26 @@ sameNoOfArgs matches = isSingleton (nub (map args_in_match matches))
 \end{code}
 
 \begin{code}
+varyingArgsErr name matches
+  = sep [ptext SLIT("Varying number of arguments for function"), quotes (ppr name)]
+
 matchCtxt ctxt  match  = hang (pprMatchContext ctxt     <> colon) 4 (pprMatch ctxt match)
 stmtCtxt do_or_lc stmt = hang (pprMatchContext do_or_lc <> colon) 4 (ppr stmt)
 
-varyingArgsErr name matches
-  = sep [ptext SLIT("Varying number of arguments for function"), quotes (ppr name)]
+sigPatCtxt bound_tvs bound_ids match_ty tidy_env 
+  = zonkTcType match_ty		`thenNF_Tc` \ match_ty' ->
+    let
+	(env1, tidy_tys) = tidyOpenTypes tidy_env (map idType show_ids)
+	(env2, tidy_mty) = tidyOpenType  env1     match_ty'
+    in
+    returnNF_Tc (env1,
+		 sep [ptext SLIT("When checking an existential match that binds"),
+		      nest 4 (vcat (zipWith ppr_id show_ids tidy_tys)),
+		      ptext SLIT("and whose type is") <+> ppr tidy_mty])
+  where
+    show_ids = filter is_interesting bound_ids
+    is_interesting id = any (`elemVarSet` idFreeTyVars id) bound_tvs
+
+    ppr_id id ty     = ppr id <+> dcolon <+> ppr ty
+	-- Don't zonk the types so we get the separate, un-unified versions
 \end{code}

@@ -26,7 +26,7 @@ import Inst		( LIE, emptyLIE, mkLIE, plusLIE, InstOrigin(..),
 			  newDicts, instToId
 			)
 import TcEnv		( tcExtendLocalValEnv, newLocalName )
-import TcUnify		( unifyTauTyLists, checkSigTyVars, sigCtxt )
+import TcUnify		( unifyTauTyLists, checkSigTyVarsWrt, sigCtxt )
 import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyRestricted, tcSimplifyToDicts )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..), 
 			  TcSigInfo(..), tcTySig, maybeSig, tcAddScopedTyVars
@@ -495,7 +495,7 @@ checkSigsTyVars sigs = mapTc_ check_one sigs
 	tcAddErrCtxt (ptext SLIT("When checking the type signature for") 
 		      <+> quotes (ppr id))				$
 	tcAddErrCtxtM (sigCtxt sig_tyvars sig_theta sig_tau)		$
-	checkSigTyVars sig_tyvars (idFreeTyVars id)
+	checkSigTyVarsWrt (idFreeTyVars id) sig_tyvars
 \end{code}
 
 @getTyVarsToGen@ decides what type variables to generalise over.

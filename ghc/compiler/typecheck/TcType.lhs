@@ -46,6 +46,7 @@ module TcType (
   isDoubleTy, isFloatTy, isIntTy,
   isIntegerTy, isAddrTy, isBoolTy, isUnitTy, isForeignPtrTy, 
   isTauTy, tcIsTyVarTy, tcIsForAllTy,
+  allDistinctTyVars,
 
   ---------------------------------
   -- Misc type manipulators
@@ -74,7 +75,6 @@ module TcType (
   ---------------------------------
   -- Unifier and matcher  
   unifyTysX, unifyTyListsX, unifyExtendTysX,
-  allDistinctTyVars,
   matchTy, matchTys, match,
 
   --------------------------------
@@ -452,6 +452,31 @@ tcSplitDFunTy ty
     case tcSplitPredTy_maybe tau of { Just (ClassP clas tys) -> 
     (tvs, theta, clas, tys) }}
 \end{code}
+
+(allDistinctTyVars tys tvs) = True 
+	iff 
+all the types tys are type variables, 
+distinct from each other and from tvs.
+
+This is useful when checking that unification hasn't unified signature
+type variables.  For example, if the type sig is
+	f :: forall a b. a -> b -> b
+we want to check that 'a' and 'b' havn't 
+	(a) been unified with a non-tyvar type
+	(b) been unified with each other (all distinct)
+	(c) been unified with a variable free in the environment
+
+\begin{code}
+allDistinctTyVars :: [Type] -> TyVarSet -> Bool
+
+allDistinctTyVars []       acc
+  = True
+allDistinctTyVars (ty:tys) acc 
+  = case tcGetTyVar_maybe ty of
+	Nothing 		      -> False 	-- (a)
+	Just tv | tv `elemVarSet` acc -> False	-- (b) or (c)
+		| otherwise           -> allDistinctTyVars tys (acc `extendVarSet` tv)
+\end{code}    
 
 
 %************************************************************************
@@ -878,38 +903,6 @@ boxedMarshalableTyCon tc
 			 , boolTyConKey
 			 ]
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Unification with an explicit substitution}
-%*									*
-%************************************************************************
-
-(allDistinctTyVars tys tvs) = True 
-	iff 
-all the types tys are type variables, 
-distinct from each other and from tvs.
-
-This is useful when checking that unification hasn't unified signature
-type variables.  For example, if the type sig is
-	f :: forall a b. a -> b -> b
-we want to check that 'a' and 'b' havn't 
-	(a) been unified with a non-tyvar type
-	(b) been unified with each other (all distinct)
-	(c) been unified with a variable free in the environment
-
-\begin{code}
-allDistinctTyVars :: [Type] -> TyVarSet -> Bool
-
-allDistinctTyVars []       acc
-  = True
-allDistinctTyVars (ty:tys) acc 
-  = case tcGetTyVar_maybe ty of
-	Nothing 		      -> False 	-- (a)
-	Just tv | tv `elemVarSet` acc -> False	-- (b) or (c)
-		| otherwise           -> allDistinctTyVars tys (acc `extendVarSet` tv)
-\end{code}    
 
 
 %************************************************************************

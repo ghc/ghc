@@ -31,7 +31,7 @@ module TcMType (
 
   --------------------------------
   -- Zonking
-  zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, zonkTcSigTyVars,
+  zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, 
   zonkTcType, zonkTcTypes, zonkTcClassConstraints, zonkTcThetaType,
   zonkTcPredType, zonkTcTypeToType, zonkTcTyVarToTyVar, zonkKindEnv,
 
@@ -49,7 +49,7 @@ import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  tcEqType, tcCmpPred,
 			  tcSplitRhoTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
 			  tcSplitTyConApp_maybe, tcSplitForAllTys,
-			  tcGetTyVar, tcIsTyVarTy, tcSplitSigmaTy, 
+			  tcIsTyVarTy, tcSplitSigmaTy, 
 			  isUnLiftedType, isIPPred, 
 
 			  mkAppTy, mkTyVarTy, mkTyVarTys, 
@@ -343,14 +343,6 @@ zonkTcTyVarsAndFV tyvars = mapNF_Tc zonkTcTyVar tyvars	`thenNF_Tc` \ tys ->
 
 zonkTcTyVar :: TcTyVar -> NF_TcM TcType
 zonkTcTyVar tyvar = zonkTyVar (\ tv -> returnNF_Tc (TyVarTy tv)) tyvar
-
-zonkTcSigTyVars :: [TcTyVar] -> NF_TcM [TcTyVar]
--- This guy is to zonk the tyvars we're about to feed into tcSimplify
--- Usually this job is done by checkSigTyVars, but in a couple of places
--- that is overkill, so we use this simpler chap
-zonkTcSigTyVars tyvars
-  = zonkTcTyVars tyvars	`thenNF_Tc` \ tys ->
-    returnNF_Tc (map (tcGetTyVar "zonkTcSigTyVars") tys)
 \end{code}
 
 -----------------  Types

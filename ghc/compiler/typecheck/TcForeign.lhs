@@ -26,7 +26,6 @@ import HsSyn		( HsDecl(..), ForeignDecl(..), HsExpr(..),
 import RnHsSyn		( RenamedHsDecl, RenamedForeignDecl )
 
 import TcMonad
-import TcEnv		( newLocalName )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 import TcHsSyn		( TcMonoBinds, TypecheckedForeignDecl, TcForeignExportDecl )
 import TcExpr		( tcExpr )			
@@ -38,7 +37,7 @@ import PrimRep		( getPrimRepSize, isFloatingRep )
 import Module		( Module )
 import Type		( typePrimRep )
 import OccName		( mkForeignExportOcc )
-import Name		( Name(..), NamedThing(..), mkGlobalName )
+import Name		( NamedThing(..), mkGlobalName )
 import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,
 			  tcSplitForAllTys, 
 			  isFFIArgumentTy, isFFIImportResultTy, 
@@ -46,7 +45,7 @@ import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,
 			  isFFIExternalTy, isFFIDynArgumentTy,
 			  isFFIDynResultTy, isForeignPtrTy
 			)
-import ForeignCall	( CCallSpec(..), CExportSpec(..), CCallTarget(..),
+import ForeignCall	( CExportSpec(..), CCallTarget(..),
 			  isDynamicTarget, isCasmTarget ) 
 import CStrings		( CLabelString, isCLabelString )
 import PrelNames	( hasKey, ioTyConKey )

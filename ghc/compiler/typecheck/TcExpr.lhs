@@ -52,7 +52,7 @@ import DataCon		( dataConFieldLabels, dataConSig,
 import Name		( Name )
 import TyCon		( TyCon, tyConTyVars, isAlgTyCon, tyConDataCons )
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
-import VarSet		( elemVarSet )
+import VarSet		( emptyVarSet, elemVarSet )
 import TysWiredIn	( boolTy, mkListTy, mkPArrTy, listTyCon, parrTyCon )
 import PrelNames	( cCallableClassName, 
 			  cReturnableClassName, 
@@ -85,7 +85,9 @@ tcExpr expr expected_ty
   = tcMonoExpr expr expected_ty
 
   | otherwise
-  = tcGen expected_ty (tcMonoExpr expr)		`thenTc` \ (gen_fn, expr', lie) ->
+  = tcGen expected_ty emptyVarSet (
+	tcMonoExpr expr
+    )					`thenTc` \ (gen_fn, expr', lie) ->
     returnTc (gen_fn <$> expr', lie)
 \end{code}
 
@@ -129,12 +131,12 @@ tcMonoExpr (HsIPVar ip) res_ty
 \begin{code}
 tcMonoExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
  = tcHsSigType ExprSigCtxt poly_ty	`thenTc` \ sig_tc_ty ->
-   tcAddErrCtxt (exprSigCtxt in_expr)	$
    tcExpr expr sig_tc_ty		`thenTc` \ (expr', lie1) ->
 
 	-- Must instantiate the outer for-alls of sig_tc_ty
 	-- else we risk instantiating a ? res_ty to a forall-type
 	-- which breaks the invariant that tcMonoExpr only returns phi-types
+   tcAddErrCtxt (exprSigCtxt in_expr)	$
    tcInstCall SignatureOrigin sig_tc_ty	`thenNF_Tc` \ (inst_fn, lie2, inst_sig_ty) ->
    tcSub res_ty inst_sig_ty		`thenTc` \ (co_fn, lie3) ->
 
@@ -1011,7 +1013,7 @@ caseScrutCtxt expr
   = hang (ptext SLIT("In the scrutinee of a case expression:")) 4 (ppr expr)
 
 exprSigCtxt expr
-  = hang (ptext SLIT("In an expression with a type signature:"))
+  = hang (ptext SLIT("When checking the type signature of the expression:"))
 	 4 (ppr expr)
 
 listCtxt expr

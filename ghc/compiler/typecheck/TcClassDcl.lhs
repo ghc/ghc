@@ -25,8 +25,8 @@ import TcHsSyn		( TcMonoBinds )
 
 import Inst		( Inst, InstOrigin(..), LIE, emptyLIE, plusLIE, plusLIEs, 
 			  instToId, newDicts, newMethod )
-import TcEnv		( TyThingDetails(..), 
-			  tcLookupClass, tcExtendTyVarEnvForMeths, tcExtendGlobalTyVars,
+import TcEnv		( TyThingDetails(..), tcExtendGlobalTyVars,
+			  tcLookupClass, tcExtendTyVarEnvForMeths, 
 			  tcExtendLocalValEnv, tcExtendTyVarEnv
 			)
 import TcBinds		( tcBindWithSigs, tcSpecSigs )
@@ -52,7 +52,6 @@ import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, plusNameEnv
 import NameSet		( emptyNameSet )
 import Outputable
 import Var		( TyVar )
-import VarSet		( mkVarSet, emptyVarSet )
 import CmdLineOpts
 import ErrUtils		( dumpIfSet )
 import Util		( count, isSingleton, lengthIs, equalLength )
@@ -438,10 +437,10 @@ tcDefMeth clas tyvars binds_in prags op_item@(sel_id, DefMeth dm_name)
         (ptext SLIT("class") <+> ppr clas)
 	clas_tyvars
         [this_dict]
-        insts_needed				`thenTc` \ (const_lie, dict_binds) ->
+        insts_needed			`thenTc` \ (const_lie, dict_binds) ->
 
 	-- Simplification can do unification
-    checkSigTyVars clas_tyvars emptyVarSet	`thenTc` \ clas_tyvars' ->
+    checkSigTyVars clas_tyvars		`thenTc` \ clas_tyvars' ->
     
     let
         full_bind = AbsBinds
@@ -508,8 +507,9 @@ tcMethodBind clas origin inst_tyvars inst_tys inst_theta
     )								`thenTc` \ meth_bind ->
      -- Check the bindings; first add inst_tyvars to the envt
      -- so that we don't quantify over them in nested places
-     -- The *caller* put the class/inst decl tyvars into the envt
-     tcExtendGlobalTyVars (mkVarSet inst_tyvars) 
+     -- The *caller* put the class/inst decl tyvars into the tyvar envt,
+     -- but not into the global tyvars, so that the call to checkSigTyVars below works ok
+     tcExtendGlobalTyVars inst_tyvars 
      		    (tcAddErrCtxt (methodCtxt sel_id)		$
      		     tcBindWithSigs NotTopLevel meth_bind 
 		   		    [sig_info] meth_prags NonRecursive 
@@ -531,9 +531,9 @@ tcMethodBind clas origin inst_tyvars inst_tys inst_theta
      -- ...and this is why the call to tcExtendGlobalTyVars must be here
      --    rather than in the caller
      tcAddErrCtxt (ptext SLIT("When checking the type of class method") 
-		   <+> quotes (ppr sel_id))					$
+		   <+> quotes (ppr sel_id))				$
      tcAddErrCtxtM (sigCtxt inst_tyvars inst_theta (idType meth_id))	$
-     checkSigTyVars inst_tyvars emptyVarSet					`thenTc_` 
+     checkSigTyVars inst_tyvars						`thenTc_` 
 
      returnTc (binds `AndMonoBinds` prag_binds1 `AndMonoBinds` prag_binds2, 
 	       insts `plusLIE` prag_lie',

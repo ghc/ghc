@@ -442,8 +442,8 @@ tcExtendLocalValEnv names_w_ids thing_inside
 
 \begin{code}
 tcExtendGlobalTyVars extra_global_tvs thing_inside
-  = tcGetEnv						`thenNF_Tc` \ env ->
-    tc_extend_gtvs (tcTyVars env) extra_global_tvs	`thenNF_Tc` \ gtvs' ->
+  = tcGetEnv							`thenNF_Tc` \ env ->
+    tc_extend_gtvs (tcTyVars env) (mkVarSet extra_global_tvs)	`thenNF_Tc` \ gtvs' ->
     tcSetEnv (env {tcTyVars = gtvs'}) thing_inside
 
 tc_extend_gtvs gtvs extra_global_tvs

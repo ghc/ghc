@@ -150,8 +150,9 @@ tcPat tc_bndr WildPatIn pat_ty
 tcPat tc_bndr (ParPatIn parend_pat) pat_ty
   = tcPat tc_bndr parend_pat pat_ty
 
-tcPat tc_bndr (SigPatIn pat sig) pat_ty
-  = tcHsSigType PatSigCtxt sig		`thenTc` \ sig_ty ->
+tcPat tc_bndr pat_in@(SigPatIn pat sig) pat_ty
+  = tcAddErrCtxt (patCtxt pat_in)	$
+    tcHsSigType PatSigCtxt sig		`thenTc` \ sig_ty ->
     tcSubPat sig_ty pat_ty		`thenTc` \ (co_fn, lie_sig) ->
     tcPat tc_bndr pat sig_ty		`thenTc` \ (pat', lie_req, tvs, ids, lie_avail) ->
     returnTc (co_fn <$> pat', lie_req `plusLIE` lie_sig, tvs, ids, lie_avail)
@@ -487,7 +488,7 @@ tcSubPat sig_ty exp_ty
 %************************************************************************
 
 \begin{code}
-patCtxt pat = hang (ptext SLIT("In the pattern:")) 
+patCtxt pat = hang (ptext SLIT("When checking the pattern:")) 
 		 4 (ppr pat)
 
 badFieldCon :: Name -> Name -> SDoc

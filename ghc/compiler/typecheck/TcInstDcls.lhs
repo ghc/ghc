@@ -52,7 +52,6 @@ import Subst		( substTheta )
 import DataCon		( classDataCon )
 import Class		( Class, classBigSig )
 import Var		( idName, idType )
-import VarSet		( emptyVarSet )
 import Id		( setIdLocalExported )
 import MkId		( mkDictFunId, unsafeCoerceId, eRROR_ID )
 import FunDeps		( checkInstFDs )
@@ -612,9 +611,9 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
 		 dfun_arg_dicts		-- NB! Don't include this_dict here, else the sc_dicts
 					-- get bound by just selecting from this_dict!!
 		 (mkLIE sc_dicts)
-    )						`thenTc` \ (const_lie2, lie_binds2) ->
+    )					`thenTc` \ (const_lie2, lie_binds2) ->
 
-    checkSigTyVars inst_tyvars' emptyVarSet	`thenNF_Tc` \ zonked_inst_tyvars ->
+    checkSigTyVars inst_tyvars' 	`thenNF_Tc` \ zonked_inst_tyvars ->
 
 	-- Create the result bindings
     let
