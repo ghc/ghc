@@ -36,6 +36,7 @@ import DriverUtil	( splitFilename3 )
 import ErrUtils		( showPass )
 import Util
 import DriverUtil
+import TmpFiles
 import Outputable
 import Panic
 import CmdLineOpts	( DynFlags(..) )
@@ -284,6 +285,10 @@ cmLoadModule cmstate1 rootname
            -- Easy; just relink it all.
            do when (verb >= 2) $ 
 		 hPutStrLn stderr "Upsweep completely successful."
+
+	      -- clean up after ourselves
+	      cleanTempFilesExcept verb (ppFilesFromSummaries modsDone)
+
               linkresult 
                  <- link ghci_mode dflags a_root_is_Main ui3 pls2
               case linkresult of
@@ -321,6 +326,9 @@ cmLoadModule cmstate1 rootname
                      = map (unJust "linkables_to_link" . findModuleLinkable_maybe ui4)
                            mods_to_keep_names
 
+	      -- clean up after ourselves
+	      cleanTempFilesExcept verb (ppFilesFromSummaries mods_to_keep)
+
               linkresult <- link ghci_mode dflags False linkables_to_link pls2
               case linkresult of
                  LinkErrs _ _
@@ -333,6 +341,9 @@ cmLoadModule cmstate1 rootname
                           return (cmstate4, False, 
                                   map ms_mod mods_to_keep)
 
+
+ppFilesFromSummaries summaries
+  = [ fn | Just fn <- map (ml_hspp_file . ms_location) summaries ]
 
 -----------------------------------------------------------------------------
 -- getValidLinkables

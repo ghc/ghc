@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.49 2001/01/21 16:37:06 sewardj Exp $
+-- $Id: Main.hs,v 1.50 2001/02/12 13:33:46 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -103,7 +103,7 @@ main =
    later (do  forget_it <- readIORef v_Keep_tmp_files
 	      unless forget_it $ do
 	      verb <- dynFlag verbosity
-	      cleanTempFiles (verb >= 2)
+	      cleanTempFiles verb
      ) $ do
 	-- exceptions will be blocked while we clean the temporary files,
 	-- so there shouldn't be any difficulty if we receive further

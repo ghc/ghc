@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: TmpFiles.hs,v 1.14 2000/12/11 15:26:00 sewardj Exp $
+-- $Id: TmpFiles.hs,v 1.15 2001/02/12 13:33:47 simonmar Exp $
 --
 -- Temporary file management
 --
@@ -10,9 +10,11 @@
 module TmpFiles (
    Suffix,
    initTempFileStorage,  -- :: IO ()
-   cleanTempFiles,       -- :: IO ()
+   cleanTempFiles,       -- :: Int -> IO ()
+   cleanTempFilesExcept, -- :: Int -> [FilePath] -> IO ()
    newTempName,		 -- :: Suffix -> IO FilePath
    addFilesToClean,	 -- :: [FilePath] -> IO ()
+   removeTmpFiles,	 -- :: Int -> [FilePath] -> IO ()
    v_TmpDir
  ) where
 
@@ -46,18 +48,17 @@ initTempFileStorage = do
 	      return ()
           )
 
-cleanTempFiles :: Bool -> IO ()
-cleanTempFiles verbose = do
+cleanTempFiles :: Int -> IO ()
+cleanTempFiles verb = do
   fs <- readIORef v_FilesToClean
+  removeTmpFiles verb fs
 
-  let blowAway f =
-	   (do  when verbose (hPutStrLn stderr ("Removing: " ++ f))
-		if '*' `elem` f then kludgedSystem ("rm -f " ++ f) "Cleaning temp files" >> return ()
-			        else removeFile f)
-	    `catchAllIO`
-	   (\_ -> when verbose (hPutStrLn stderr 
-				("Warning: can't remove tmp file " ++ f)))
-  mapM_ blowAway fs
+cleanTempFilesExcept :: Int -> [FilePath] -> IO ()
+cleanTempFilesExcept verb dont_delete = do
+  fs <- readIORef v_FilesToClean
+  let leftovers = filter (`notElem` dont_delete) fs
+  removeTmpFiles verb leftovers
+  writeIORef v_FilesToClean dont_delete
 
 type Suffix = String
 
@@ -76,3 +77,16 @@ newTempName extn = do
 
 addFilesToClean :: [FilePath] -> IO ()
 addFilesToClean files = mapM_ (add v_FilesToClean) files
+
+removeTmpFiles :: Int -> [FilePath] -> IO ()
+removeTmpFiles verb fs = do
+  let verbose = verb >= 2
+      blowAway f =
+	   (do  when verbose (hPutStrLn stderr ("Removing: " ++ f))
+		if '*' `elem` f 
+		  then kludgedSystem ("rm -f " ++ f) "Cleaning temp files" >> return ()
+		  else removeFile f)
+	    `catchAllIO`
+	   (\_ -> when verbose (hPutStrLn stderr 
+				("Warning: can't remove tmp file " ++ f)))
+  mapM_ blowAway fs
