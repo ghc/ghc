@@ -27,6 +27,7 @@ module Control.Monad
     , zipWithM      -- :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
     , zipWithM_     -- :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m ()
     , foldM         -- :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a 
+    , foldM_        -- :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m ()
     
     , liftM         -- :: (Monad m) => (a -> b) -> (m a -> m b)
     , liftM2        -- :: (Monad m) => (a -> b -> c) -> (m a -> m b -> m c)
@@ -41,6 +42,8 @@ module Control.Monad
     , mapM_         -- :: (Monad m) => (a -> m b) -> [a] -> m ()
     , sequence      -- :: (Monad m) => [m a] -> m [a]
     , sequence_     -- :: (Monad m) => [m a] -> m ()
+    , replicateM    -- :: (Monad m) => Int -> m a -> m [a]
+    , replicateM_   -- :: (Monad m) => Int -> m a -> m ()
     , (=<<)         -- :: (Monad m) => (a -> m b) -> m a -> m b
     ) where
 
@@ -137,6 +140,15 @@ zipWithM_ f xs ys =  sequence_ (zipWith f xs ys)
 foldM             :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a
 foldM _ a []      =  return a
 foldM f a (x:xs)  =  f a x >>= \fax -> foldM f fax xs
+
+foldM_            :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m ()
+foldM_ f a xs     = foldM f a xs >> return ()
+
+replicateM        :: (Monad m) => Int -> m a -> m [a]
+replicateM n x    = sequence (replicate n x)
+
+replicateM_       :: (Monad m) => Int -> m a -> m ()
+replicateM_ n x   = sequence_ (replicate n x)
 
 unless            :: (Monad m) => Bool -> m () -> m ()
 unless p s        =  if p then return () else s
