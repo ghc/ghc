@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.47 2003/06/26 20:49:32 panne Exp $
+ * $Id: MBlock.c,v 1.48 2003/09/19 09:04:09 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -94,7 +94,7 @@ my_mmap (void *addr, lnat size)
 {
     void *ret;
 
-#ifdef solaris2_TARGET_OS
+#if defined(solaris2_TARGET_OS) || defined(irix_TARGET_OS)
     { 
 	int fd = open("/dev/zero",O_RDONLY);
 	ret = mmap(addr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
