@@ -1,4 +1,4 @@
---!! INLINE on recursive functions.
+-- !! INLINE on recursive functions.
 {-
 Date: Thu, 8 Dec 94 11:38:24 GMT
 From: Julian Seward (DRL PhD) <sewardj@computer-science.manchester.ac.uk>

@@ -1,4 +1,4 @@
---!!! class/instance mumble that failed Lint at one time
+-- !!! class/instance mumble that failed Lint at one time
 --
 module Test where
 class Foo a where

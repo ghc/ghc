@@ -1,4 +1,4 @@
---!!! Desugaring sections with function-type arguments
+-- !!! Desugaring sections with function-type arguments
 --  Although this is really a desugaring test, the problem is
 -- only tickled by the simplifier
 
