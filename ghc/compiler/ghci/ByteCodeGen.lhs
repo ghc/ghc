@@ -25,7 +25,7 @@ import PrimRep		( PrimRep(..) )
 import CoreFVs		( freeVars )
 import Type		( typePrimRep )
 import DataCon		( DataCon, dataConTag, fIRST_TAG )
-import Util		( zipEqual, zipWith4Equal )
+import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe )
 import VarSet		( VarSet, varSetElems )
 --import FastTypes
 \end{code}
@@ -38,19 +38,24 @@ byteCodeGen binds
    = let flatBinds = concatMap getBind binds
          getBind (NonRec bndr rhs) = [(bndr, freeVars rhs)]
          getBind (Rec binds)       = [(bndr, freeVars rhs) | (bndr,rhs) <- binds]
+         final_state = runBc (BcM_State [] 0) 
+                             (mapBc schemeR flatBinds `thenBc_` returnBc ())
      in  
-         snd (initBc [] (mapBc schemeR flatBinds))
+         case final_state of
+            BcM_State bcos final_ctr -> bcos
+
 \end{code}
 
 The real machinery.
 
 \begin{code}
+type LocalLabel = Int
+
 data BCInstr
    -- Messing with the stack
    = ARGCHECK Int
    | PUSH_L Int{-size-} Int{-offset-}
    | PUSH_G Name
---   | PUSH_ALTS Name{-labels the alt BCO; derived from case binder-}
    | PUSH_I Integer
    | SLIDE Int{-this many-} Int{-down by this much-}
    -- To do with the heap
@@ -58,11 +63,17 @@ data BCInstr
    | MKAP Int{-place ptr to heap this far down stack-} Int{-# words-}
    | UNPACK Int
    | PACK DataCon Int
-   -- Casery (in French: caseage)
-   | CASE_PTR    [(Discr, BCInstrList)]
-   | CASE_INT    [(Discr, BCInstrList)]
-   | CASE_FLOAT  [(Discr, BCInstrList)]
-   | CASE_DOUBLE [(Discr, BCInstrList)]
+   -- For doing case trees
+   | LABEL       LocalLabel
+   | TESTLT_I    Int LocalLabel
+   | TESTEQ_I    Int LocalLabel
+   | TESTLT_F    Float LocalLabel
+   | TESTEQ_F    Float LocalLabel
+   | TESTLT_D    Double LocalLabel
+   | TESTEQ_D    Double LocalLabel
+   | TESTLT_P    Int LocalLabel
+   | TESTEQ_P    Int LocalLabel
+   | CASEFAIL
    -- To Infinity And Beyond
    | ENTER
 
@@ -76,10 +87,6 @@ instance Outputable BCInstr where
    ppr (MKAP offset sz)      = text "MKAP    " <+> int offset <+> int sz
    ppr (UNPACK sz)           = text "UNPACK  " <+> int sz
    ppr (PACK dcon sz)        = text "PACK    " <+> ppr dcon <+> ppr sz
-   ppr (CASE_PTR altcode)    = text "CASE_P" $$ nest 3 (pprAltCode altcode)
-   ppr (CASE_INT altcode)    = text "CASE_P" $$ nest 3 (pprAltCode altcode)
-   ppr (CASE_FLOAT altcode)  = text "CASE_P" $$ nest 3 (pprAltCode altcode)
-   ppr (CASE_DOUBLE altcode) = text "CASE_P" $$ nest 3 (pprAltCode altcode)
    ppr ENTER                 = text "ENTER"
 
 pprAltCode discrs_n_codes
@@ -119,15 +126,15 @@ lookupBCEnv_maybe = lookupFM
 -- Describes case alts
 data Discr 
    = DiscrI Int
-   | DiscrF Rational
-   | DiscrD Rational
+   | DiscrF Float
+   | DiscrD Double
    | DiscrP Int
    | NoDiscr
 
 instance Outputable Discr where
    ppr (DiscrI i) = int i
-   ppr (DiscrF r) = rational r
-   ppr (DiscrD r) = rational r
+   ppr (DiscrF f) = text (show f)
+   ppr (DiscrD d) = text (show d)
    ppr (DiscrP i) = int i
    ppr NoDiscr    = text "DEF"
 
@@ -218,46 +225,143 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
         d' = d + ret_frame_sizeW + idSizeW bndr
         p' = addToFM p bndr d'
 
-        (case_instr, isAlgCase)
+        isAlgCase
            = case typePrimRep (idType bndr) of
-                IntRep -> (CASE_INT, False)
-                FloatRep -> (CASE_FLOAT, False)
-                DoubleRep -> (CASE_DOUBLE, False)
-                PtrRep -> (CASE_PTR, True)
-                other -> pprPanic "ByteCodeGen.schemeE" (ppr other)
+                IntRep -> False ; FloatRep -> False ; DoubleRep -> False
+                PtrRep -> True
+                other  -> pprPanic "ByteCodeGen.schemeE" (ppr other)
 
-        -- make the code for an alt
-        codeAlt (discr, binds, rhs)
+        -- given an alt, return a discr and code for it.
+        codeAlt alt@(discr, binds, rhs)
            | isAlgCase 
            = let binds_szsw = map idSizeW binds
                  binds_szw  = sum binds_szsw
                  p'' = addListToFM p' (zip binds (scanl (+) d' binds_szsw))
                  d'' = d' + binds_szw
              in schemeE d'' s p'' rhs	`thenBc` \ rhs_code -> 
-                returnBc (UNPACK binds_szw `consOL` rhs_code)
+                returnBc (my_discr alt, UNPACK binds_szw `consOL` rhs_code)
            | otherwise 
-           = ASSERT(null binds) schemeE d' s p' rhs
+           = ASSERT(null binds) 
+             schemeE d' s p' rhs	`thenBc` \ rhs_code ->
+             returnBc (my_discr alt, rhs_code)
 
-        discr (DEFAULT, binds, rhs)  = NoDiscr
-        discr (DataAlt dc, binds, rhs) = DiscrP (dataConTag dc - fIRST_TAG)
-        discr (LitAlt l, binds, rhs)
+        my_discr (DEFAULT, binds, rhs)  = NoDiscr
+        my_discr (DataAlt dc, binds, rhs) = DiscrP (dataConTag dc - fIRST_TAG)
+        my_discr (LitAlt l, binds, rhs)
            = case l of MachInt i     -> DiscrI (fromInteger i)
-                       MachFloat r   -> DiscrF r
-                       MachDouble r  -> DiscrD r
+                       MachFloat r   -> DiscrF (fromRational r)
+                       MachDouble r  -> DiscrD (fromRational r)
 
-        discrs = map discr alts
      in 
-     mapBc codeAlt alts 				`thenBc` \ alt_codes ->
+     mapBc codeAlt alts 				`thenBc` \ alt_stuff ->
+     mkMultiBranch alt_stuff				`thenBc` \ alt_final ->
      let 
-         alt_code     = case_instr (zip discrs alt_codes)
          alt_bco_name = getName bndr
-         alt_bco      = BCO alt_bco_name (unitOL alt_code)
+         alt_bco      = BCO alt_bco_name alt_final
      in
      schemeE (d + ret_frame_sizeW) 
              (d + ret_frame_sizeW) p scrut		`thenBc` \ scrut_code ->
 
      emitBc alt_bco 					`thenBc_`
      returnBc (PUSH_G alt_bco_name `consOL` scrut_code)
+
+
+-- Given a bunch of alts code and their discrs, do the donkey work
+-- of making a multiway branch using a switch tree.
+-- What a load of hassle!
+mkMultiBranch :: [(Discr, BCInstrList)] -> BcM BCInstrList
+mkMultiBranch raw_ways
+   = let d_way     = filter (isNoDiscr.fst) raw_ways
+         notd_ways = naturalMergeSortLe 
+                        (\w1 w2 -> leAlt (fst w1) (fst w2))
+                        (filter (not.isNoDiscr.fst) raw_ways)
+
+         mkTree :: [(Discr, BCInstrList)] -> Discr -> Discr -> BcM BCInstrList
+         mkTree [] range_lo range_hi = returnBc the_default
+
+         mkTree [val] range_lo range_hi
+            | range_lo `eqAlt` range_hi 
+            = returnBc (snd val)
+            | otherwise
+            = getLabelBc 				`thenBc` \ label_neq ->
+              returnBc (mkTestEQ (fst val) label_neq 
+			`consOL` (snd val
+			`appOL`   unitOL (LABEL label_neq)
+			`appOL`   the_default))
+
+         mkTree vals range_lo range_hi
+            = let n = length vals `div` 2
+                  vals_lo = take n vals
+                  vals_hi = drop n vals
+                  v_mid = fst (head vals_hi)
+              in
+              getLabelBc 				`thenBc` \ label_geq ->
+              mkTree vals_lo range_lo (dec v_mid) 	`thenBc` \ code_lo ->
+              mkTree vals_hi v_mid range_hi 		`thenBc` \ code_hi ->
+              returnBc (mkTestLT v_mid label_geq
+                        `consOL` (code_lo
+			`appOL`   unitOL (LABEL label_geq)
+			`appOL`   code_hi))
+ 
+         the_default 
+            = case d_way of [] -> unitOL CASEFAIL
+                            [(_, def)] -> def
+
+         -- None of these will be needed if there are no non-default alts
+         (mkTestLT, mkTestEQ, init_lo, init_hi)
+            | null notd_ways
+            = panic "mkMultiBranch: awesome foursome"
+            | otherwise
+            = case fst (head notd_ways) of {
+              DiscrI _ -> ( \(DiscrI i) fail_label -> TESTLT_I i fail_label,
+                            \(DiscrI i) fail_label -> TESTEQ_I i fail_label,
+                            DiscrI minBound,
+                            DiscrI maxBound );
+              DiscrF _ -> ( \(DiscrF f) fail_label -> TESTLT_F f fail_label,
+                            \(DiscrF f) fail_label -> TESTEQ_F f fail_label,
+                            DiscrF minF,
+                            DiscrF maxF );
+              DiscrD _ -> ( \(DiscrD d) fail_label -> TESTLT_D d fail_label,
+                            \(DiscrD d) fail_label -> TESTEQ_D d fail_label,
+                            DiscrD minD,
+                            DiscrD maxD );
+              DiscrP _ -> ( \(DiscrP i) fail_label -> TESTLT_P i fail_label,
+                            \(DiscrP i) fail_label -> TESTEQ_P i fail_label,
+                            DiscrP minBound,
+                            DiscrP maxBound )
+              }
+
+         (DiscrI i1) `eqAlt` (DiscrI i2) = i1 == i2
+         (DiscrF f1) `eqAlt` (DiscrF f2) = f1 == f2
+         (DiscrD d1) `eqAlt` (DiscrD d2) = d1 == d2
+         (DiscrP i1) `eqAlt` (DiscrP i2) = i1 == i2
+         NoDiscr     `eqAlt` NoDiscr     = True
+         _           `eqAlt` _           = False
+
+         (DiscrI i1) `leAlt` (DiscrI i2) = i1 <= i2
+         (DiscrF f1) `leAlt` (DiscrF f2) = f1 <= f2
+         (DiscrD d1) `leAlt` (DiscrD d2) = d1 <= d2
+         (DiscrP i1) `leAlt` (DiscrP i2) = i1 <= i2
+         NoDiscr     `leAlt` NoDiscr     = True
+         _           `leAlt` _           = False
+
+         isNoDiscr NoDiscr = True
+         isNoDiscr _       = False
+
+         dec (DiscrI i) = DiscrI (i-1)
+         dec (DiscrP i) = DiscrP (i-1)
+         dec other      = other		-- not really right, but if you
+		-- do cases on floating values, you'll get what you deserve
+
+         -- same snotty comment applies to the following
+         minF, maxF :: Float
+         minD, maxD :: Double
+         minF = -1.0e37
+         maxF =  1.0e37
+         minD = -1.0e308
+         maxD =  1.0e308
+     in
+         mkTree notd_ways init_lo init_hi
 
 
 -- Compile code to do a tail call.  Doesn't need to be monadic.
@@ -296,15 +400,17 @@ pushAtom d p (AnnLit lit)
 The bytecode generator's monad.
 
 \begin{code}
-type BcM_State = [BCO Name]		-- accumulates completed BCOs
+data BcM_State 
+   = BcM_State { bcos      :: [BCO Name],	-- accumulates completed BCOs
+                 nextlabel :: Int }		-- for generating local labels
 
 type BcM result = BcM_State -> (result, BcM_State)
 
-mkBcM_State :: [BCO Name] -> BcM_State
-mkBcM_State = id
+mkBcM_State :: [BCO Name] -> Int -> BcM_State
+mkBcM_State = BcM_State
 
-initBc :: BcM_State -> BcM a -> (a, BcM_State)
-initBc init_st m = case m init_st of { (r,st) -> (r,st) }
+runBc :: BcM_State -> BcM () -> BcM_State
+runBc init_st m = case m init_st of { (r,st) -> st }
 
 thenBc :: BcM a -> (a -> BcM b) -> BcM b
 thenBc expr cont st
@@ -325,6 +431,10 @@ mapBc f (x:xs)
     returnBc (r:rs)
 
 emitBc :: BCO Name -> BcM ()
-emitBc bco bcos
-   = ((), bcos)
+emitBc bco st
+   = ((), st{bcos = bco : bcos st})
+
+getLabelBc :: BcM Int
+getLabelBc st
+   = (nextlabel st, st{nextlabel = 1 + nextlabel st})
 \end{code}
