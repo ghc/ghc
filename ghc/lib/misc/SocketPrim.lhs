@@ -917,7 +917,9 @@ packSocketType stype = 1 + (index (Stream, Packet) stype)
 
 \begin{code}
 aNY_PORT = 0::Int
-iNADDR_ANY = ``INADDR_ANY''::Word
+iNADDR_ANY :: HostAddress
+iNADDR_ANY = unsafePerformIO (_casm_ `` %r = htonl(INADDR_ANY); '')
+
 sOMAXCONN = ``SOMAXCONN''::Int
 maxListenQueue = sOMAXCONN
 
