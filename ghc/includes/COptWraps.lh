@@ -232,7 +232,8 @@ in the end.
 
 Getting this right requires three extremely @MAGIC@ macros, no doubt
 chock full of assembly gook for the current platform.  These are
-@MAGIC_CALL_SETUP@, which gets ready for one of these magic calls,
+@MAGIC_CALL_SET
+UP@, which gets ready for one of these magic calls,
 @MAGIC_CALL@, which performs the call and stashes away all possible
 results, and @MAGIC_RETURN@, which collects all possible results back
 up again.
@@ -533,12 +534,20 @@ gets whatever it's after.
     "\ts.d $f0, -8($sp)\n"  	\
     "\tsw  $2, -12($sp)");
 
+
 #define MAGIC_RETURN		\
     __asm__ volatile (		\
     "l.d $f0, -8($sp)\n"	\
     "\tlw  $2, -12($sp)");
 
 #define WRAPPER_NAME(f)	  /* nothing */
+
+/* 
+   Threaded code needs to be able to grab the return address, in case we have
+   an intervening context switch.
+ */
+
+#define SET_RETADDR(loc)  { register StgFunPtrFunPtr ra __asm__ ("$31"); loc = ra; }
 
 #define WRAPPER_SETUP(f,ignore1,ignore2)  SaveAllStgContext();
 
