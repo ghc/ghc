@@ -37,11 +37,12 @@ import RdrHsSyn		( RdrNameDeprecation, RdrNameRuleDecl, RdrNameFixitySig,
 
 \end{code}
 \begin{code}
-cmCompile :: Finder           -- to find modules
-          -> ModSummary       -- summary, including source
-          -> Maybe ModIFace   -- old interface, if available
-          -> HST              -- for home module ModDetails
-          -> PCS              -- IN: persistent compiler state
+cmCompile :: Finder                  -- to find modules
+          -> ModSummary              -- summary, including source
+          -> Maybe ModIFace          -- old interface, if available
+          -> HomeModMap              -- ModuleName -> Module
+          -> HomeSymbolTable         -- for home module ModDetails          
+          -> PersistentCompilerState -- IN: persistent compiler state
           -> IO CompResult
 
 cmCompile finder summary old_iface hst pcs
@@ -61,34 +62,44 @@ data CompResult
               (Maybe (ModIFace, Linkable))
                        -- summary and code; Nothing => compilation not reqd
                        -- (old summary and code are still valid)
-              PCS      -- updated PCS
-              [SDoc]   -- warnings
+              PersistentCompilerState -- updated PCS
+              [SDoc]                  -- warnings
 
-   | CompErrs PCS      -- updated PCS
-              [SDoc]   -- errors
-              [SDoc]   -- warnings
+   | CompErrs PersistentCompilerState -- updated PCS
+              [SDoc]                  -- errors
+              [SDoc]                  -- warnings
 
-emptyPCS :: IO PCS
-emptyPCS = return (MkPCS emptyPIT emptyPST emptyHoldingPen)
-
+emptyPCS :: IO PersistentCompilerState
+emptyPCS = return (PersistentCompilerState 
+                      { pcs_modmap = emptyFM,
+                        pcs_pit    = emptyPIT,
+                        pcs_pst    = emptyPST,
+                        pcs_hp     = emptyHoldingPen })
 
 -- These two are only here to avoid recursion between CmCompile and
 -- CompManager.  They really ought to be in the latter.
-type HST = FiniteMap {-really:Module-} String{- == ModName-} ModDetails
-type HIT = FiniteMap {-really:Module-} String{- == ModName-} ModIFace
+type ModuleEnv a = UniqFM a   -- Domain is Module
 
+type HomeModMap         = FiniteMap ModuleName Module -- domain: home mods only
+type HomeSymbolTable    = ModuleEnv ModDetails        -- ditto
+type HomeInterfaceTable = ModuleEnv ModIFace
 
-data PCS = MkPCS PIT         -- Package interface table
-                 PST         -- Package symbol table
-                 HoldingPen  -- pre slurped interface bits and pieces
+data PersistentCompilerState 
+   = PersistentCompilerState {
+        pcs_modmap :: PackageModMap,         -- domain: package mods only
+        pcs_pit    :: PackageInterfaceTable, -- Package interface table
+        pcs_pst    :: PackageSymbolTable,    -- Package symbol table
+        pcs_hp     :: HoldingPen             -- pre slurped interface bits and pieces
+     }
 
-type PIT = FiniteMap Module ModIFace
-type PST = FiniteMap Module ModDetails
+type PackageModMap         = FiniteMap ModuleName Module
+type PackageInterfaceTable = ModuleEnv ModIFace
+type PackageSymbolTable    = ModuleEnv ModDetails
 
-emptyPIT :: PIT
+emptyPIT :: PackageInterfaceTable
 emptyPIT = emptyFM
 
-emptyPST :: PST
+emptyPST :: PackageSymbolTable
 emptyPST = emptyFM
 
 -- ModIFace is nearly the same as RnMonad.ParsedIface.
