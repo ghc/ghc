@@ -1090,6 +1090,9 @@ sub setupLinkOpts {
   if (!$NoHaskellMain) {
    unshift (@Ld_flags,'-u', "${uscore}PrelMain_mainIO_closure");
   }
+  if ($PROFing ne '') {
+   unshift (@Ld_flags,'-u', "${uscore}_regPrelude");
+  }
   if ($TargetPlatform =~ /^powerpc-|^rs6000-/) {
     # sometimes we have lots of toc entries...
     #  unshift(@Ld_flags, ('-Xlinker -bbigtoc -Xlinker -bnoquiet')); 
