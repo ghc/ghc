@@ -11,11 +11,11 @@ module DataCon (
 	dataConRepType, dataConSig, dataConName, dataConTag, dataConTyCon,
 	dataConArgTys, dataConOrigArgTys, dataConInstOrigArgTys,
 	dataConRepArgTys, dataConTheta,
-	dataConFieldLabels, dataConStrictMarks, 
+	dataConFieldLabels, dataConStrictMarks,
 	dataConSourceArity, dataConRepArity,
 	dataConNumInstArgs, dataConId, dataConWrapId, dataConRepStrictness,
-	isNullaryDataCon, isTupleCon, isUnboxedTupleCon, 
-	isExistentialDataCon, 
+	isNullaryDataCon, isTupleCon, isUnboxedTupleCon,
+	isExistentialDataCon,
 
 	splitProductType_maybe, splitProductType,
 
@@ -29,7 +29,7 @@ import {-# SOURCE #-} Subst( substTy, mkTyVarSubst )
 
 import CmdLineOpts	( opt_DictsStrict )
 import Type		( Type, ThetaType, TauType, ClassContext,
-			  mkForAllTys, mkFunTys, mkTyConApp, 
+			  mkForAllTys, mkFunTys, mkTyConApp,
 			  mkTyVarTys, mkDictTys,
 			  splitTyConApp_maybe, classesToPreds
 			)
@@ -53,7 +53,7 @@ import ListSetOps	( assoc )
 
 Stuff about data constructors
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Every constructor, C, comes with a 
+Every constructor, C, comes with a
 
   *wrapper*, called C, whose type is exactly what it looks like
 	in the source program. It is an ordinary function,
@@ -87,9 +87,9 @@ data DataCon
 	--
 	--	data Eq a => T a = forall b. Ord b => MkT a [b]
 
-	dcRepType   :: Type,	-- Type of the constructor 
+	dcRepType   :: Type,	-- Type of the constructor
 				-- 	forall ab . Ord b => a -> [b] -> MkT a
-				-- (this is *not* of the constructor Id: 
+				-- (this is *not* of the constructor Id:
 				--  see notes after this data type declaration)
 
 	-- The next six fields express the type of the constructor, in pieces
@@ -103,12 +103,12 @@ data DataCon
 	--	dcTyCon    = T
 
 	dcTyVars :: [TyVar], 		-- Type vars and context for the data type decl
-					-- These are ALWAYS THE SAME AS THE TYVARS 
+					-- These are ALWAYS THE SAME AS THE TYVARS
 					-- FOR THE PARENT TyCon.  We occasionally rely on
 					-- this just to avoid redundant instantiation
 	dcTheta  ::  ClassContext,
 
-	dcExTyVars :: [TyVar], 		-- Ditto for the context of the constructor, 
+	dcExTyVars :: [TyVar], 		-- Ditto for the context of the constructor,
 	dcExTheta  :: ClassContext,	-- the existentially quantified stuff
 					
 	dcOrigArgTys :: [Type],		-- Original argument types
@@ -121,7 +121,7 @@ data DataCon
 	dcTyCon  :: TyCon,		-- Result tycon
 
 	-- Now the strictness annotations and field labels of the constructor
-	dcUserStricts :: [StrictnessMark], 
+	dcUserStricts :: [StrictnessMark],
 		-- Strictness annotations, as placed on the data type defn,
 		-- in the same order as the argument types;
 		-- length = dataConSourceArity dataCon
@@ -240,8 +240,8 @@ mkDataCon :: Name
 	  -> DataCon
   -- Can get the tag from the TyCon
 
-mkDataCon name arg_stricts fields 
-	  tyvars theta ex_tyvars ex_theta orig_arg_tys tycon 
+mkDataCon name arg_stricts fields
+	  tyvars theta ex_tyvars ex_theta orig_arg_tys tycon
 	  work_id wrap_id
   = ASSERT(length arg_stricts == length orig_arg_tys)
 	-- The 'stricts' passed to mkDataCon are simply those for the
@@ -250,15 +250,15 @@ mkDataCon name arg_stricts fields
     con
   where
     con = MkData {dcName = name, dcUnique = nameUnique name,
-	  	  dcTyVars = tyvars, dcTheta = theta, 
-		  dcOrigArgTys = orig_arg_tys, 
+	  	  dcTyVars = tyvars, dcTheta = theta,
+		  dcOrigArgTys = orig_arg_tys,
 		  dcRepArgTys = rep_arg_tys,
 	     	  dcExTyVars = ex_tyvars, dcExTheta = ex_theta,
 		  dcRealStricts = all_stricts, dcUserStricts = user_stricts,
 		  dcFields = fields, dcTag = tag, dcTyCon = tycon, dcRepType = ty,
 		  dcId = work_id, dcWrapId = wrap_id}
 
-    (real_arg_stricts, strict_arg_tyss) 
+    (real_arg_stricts, strict_arg_tyss)
 	= unzip (zipWith (unbox_strict_arg_ty tycon) arg_stricts orig_arg_tys)
     rep_arg_tys = mkDictTys ex_theta ++ concat strict_arg_tyss
 	
@@ -268,7 +268,7 @@ mkDataCon name arg_stricts fields
     user_stricts    = ex_dict_stricts ++ arg_stricts
 
     tag = assoc "mkDataCon" (tyConDataCons tycon `zip` [fIRST_TAG..]) con
-    ty  = mkForAllTys (tyvars ++ ex_tyvars) 
+    ty  = mkForAllTys (tyvars ++ ex_tyvars)
 	              (mkFunTys rep_arg_tys result_ty)
 		-- NB: the existential dict args are already in rep_arg_tys
 
@@ -324,10 +324,10 @@ dataConRepArity (MkData {dcRepArgTys = arg_tys}) = length arg_tys
 isNullaryDataCon con  = dataConRepArity con == 0
 
 dataConRepStrictness :: DataCon -> [Demand]
-	-- Give the demands on the arguments of a 
+	-- Give the demands on the arguments of a
 	-- Core constructor application (Con dc args)
 dataConRepStrictness dc
-  = go (dcRealStricts dc) 
+  = go (dcRealStricts dc)
   where
     go []			  = []
     go (MarkedStrict        : ss) = wwStrict : go ss
@@ -343,7 +343,7 @@ dataConSig (MkData {dcTyVars = tyvars, dcTheta = theta,
 		     dcOrigArgTys = arg_tys, dcTyCon = tycon})
   = (tyvars, theta, ex_tyvars, ex_theta, arg_tys, tycon)
 
-dataConArgTys :: DataCon 
+dataConArgTys :: DataCon
 	      -> [Type] 	-- Instantiated at these types
 				-- NB: these INCLUDE the existentially quantified arg types
 	      -> [Type]		-- Needs arguments of these types
@@ -351,7 +351,7 @@ dataConArgTys :: DataCon
 				--     but EXCLUDE the data-decl context which is discarded
 				-- It's all post-flattening etc; this is a representation type
 
-dataConArgTys (MkData {dcRepArgTys = arg_tys, dcTyVars = tyvars, 
+dataConArgTys (MkData {dcRepArgTys = arg_tys, dcTyVars = tyvars,
 		       dcExTyVars = ex_tyvars}) inst_tys
  = map (substTy (mkTyVarSubst (tyvars ++ ex_tyvars) inst_tys)) arg_tys
 
@@ -361,13 +361,13 @@ dataConTheta dc = dcTheta dc
 -- And the same deal for the original arg tys:
 
 dataConInstOrigArgTys :: DataCon -> [Type] -> [Type]
-dataConInstOrigArgTys (MkData {dcOrigArgTys = arg_tys, dcTyVars = tyvars, 
+dataConInstOrigArgTys (MkData {dcOrigArgTys = arg_tys, dcTyVars = tyvars,
 		       dcExTyVars = ex_tyvars}) inst_tys
  = map (substTy (mkTyVarSubst (tyvars ++ ex_tyvars) inst_tys)) arg_tys
 \end{code}
 
 These two functions get the real argument types of the constructor,
-without substituting for any type variables.    
+without substituting for any type variables.
 
 dataConOrigArgTys returns the arg types of the wrapper, excluding all dictionary args.
 
@@ -401,7 +401,7 @@ isExistentialDataCon (MkData {dcExTyVars = tvs}) = not (null tvs)
 %*									*
 %************************************************************************
 
-\begin{code}	
+\begin{code}
 splitProductType_maybe
 	:: Type 			-- A product type, perhaps
 	-> Maybe (TyCon, 		-- The type constructor
@@ -409,7 +409,7 @@ splitProductType_maybe
 		  DataCon,		-- The data constructor
 		  [Type])		-- Its *representation* arg types
 
-	-- Returns (Just ...) for any 
+	-- Returns (Just ...) for any
 	--	concrete (i.e. constructors visible)
 	--	single-constructor
 	--	not existentially quantified
@@ -421,7 +421,7 @@ splitProductType_maybe
 
 splitProductType_maybe ty
   = case splitTyConApp_maybe ty of
-	Just (tycon,ty_args) 
+	Just (tycon,ty_args)
 	   | isProductTyCon tycon  	-- Includes check for non-existential,
 					-- and for constructors visible
 	   -> Just (tycon, ty_args, data_con, dataConArgTys data_con ty_args)
@@ -436,7 +436,7 @@ splitProductType str ty
 
 -- We attempt to unbox/unpack a strict field when either:
 --   (i)  The tycon is imported, and the field is marked '! !', or
---   (ii) The tycon is defined in this module, the field is marked '!', 
+--   (ii) The tycon is defined in this module, the field is marked '!',
 --	  and the -funbox-strict-fields flag is on.
 --
 -- This ensures that if we compile some modules with -funbox-strict-fields and
@@ -446,10 +446,10 @@ splitProductType str ty
 unbox_strict_arg_ty :: TyCon -> StrictnessMark -> Type -> (StrictnessMark, [Type])
 
 unbox_strict_arg_ty tycon strict_mark ty
-  | case strict_mark of 
+  | case strict_mark of
 	NotMarkedStrict   -> False
 	MarkedUnboxed _ _ -> True
-	MarkedStrict      -> opt_UnboxStrictFields && 
+	MarkedStrict      -> opt_UnboxStrictFields &&
 			     isLocallyDefined tycon &&
 			     maybeToBool maybe_product &&
 			     not (isRecursiveTyCon tycon) &&
@@ -464,5 +464,3 @@ unbox_strict_arg_ty tycon strict_mark ty
     maybe_product = splitProductType_maybe ty
     Just (arg_tycon, _, con, arg_tys) = maybe_product
 \end{code}
-
-
