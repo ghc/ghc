@@ -1290,7 +1290,7 @@ hIsSeekable handle =
 -- -----------------------------------------------------------------------------
 -- Changing echo status (Non-standard GHC extensions)
 
--- | Set the echoing status of a handle connected to a terminal (GHC only).
+-- | Set the echoing status of a handle connected to a terminal.
 
 hSetEcho :: Handle -> Bool -> IO ()
 hSetEcho handle on = do
@@ -1303,7 +1303,7 @@ hSetEcho handle on = do
          ClosedHandle -> ioe_closedHandle
          _            -> setEcho (haFD handle_) on
 
--- | Get the echoing status of a handle connected to a terminal (GHC only).
+-- | Get the echoing status of a handle connected to a terminal.
 
 hGetEcho :: Handle -> IO Bool
 hGetEcho handle = do
@@ -1316,7 +1316,7 @@ hGetEcho handle = do
          ClosedHandle -> ioe_closedHandle
          _            -> getEcho (haFD handle_)
 
--- | Is the handle connected to a terminal? (GHC only)
+-- | Is the handle connected to a terminal?
 
 hIsTerminalDevice :: Handle -> IO Bool
 hIsTerminalDevice handle = do

@@ -93,7 +93,7 @@ module System.IO (
 
     -- ** Terminal operations
 
-#if !defined(__HUGS__) && !defined(__NHC__)
+#if !defined(__NHC__)
     hIsTerminalDevice,	 	-- :: Handle -> IO Bool
 
     hSetEcho,			-- :: Handle -> Bool -> IO ()
