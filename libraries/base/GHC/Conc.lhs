@@ -80,6 +80,7 @@ import GHC.Base		( Int(..) )
 import GHC.Exception    ( Exception(..), AsyncException(..) )
 import GHC.Pack		( packCString# )
 import GHC.Ptr          ( Ptr(..), plusPtr, FunPtr(..) )
+import GHC.STRef
 
 infixr 0 `par`, `pseq`
 \end{code}
