@@ -57,6 +57,7 @@ module System.Directory
 
 import Prelude
 
+import Control.Exception       ( bracket )
 import System.Posix.Types
 import System.Time             ( ClockTime(..) )
 import System.IO

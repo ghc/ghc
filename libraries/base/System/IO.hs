@@ -62,12 +62,8 @@ module System.IO (
     ioeGetFileName,	       -- :: IOError -> Maybe FilePath
 
     try,		       -- :: IO a -> IO (Either IOError a)
-    bracket,		       -- :: IO a -> (a -> IO b) -> (a -> IO c) -> IO c
-    bracket_,		       -- :: IO a -> (a -> IO b) -> IO c -> IO c
 
-    -- Non-standard extension (but will hopefully become standard with 1.5) is
-    -- to export the Prelude io functions via IO (in addition to exporting them
-    -- from the prelude...for now.) 
+    -- re-exports of Prelude names
     IO,			       -- instance MonadFix
     FilePath,		       -- :: String
     IOError,
@@ -157,9 +153,6 @@ import IO
   , ioeGetErrorString         -- :: IOError -> String
   , ioeGetHandle              -- :: IOError -> Maybe Handle
   , ioeGetFileName            -- :: IOError -> Maybe FilePath
-  , try                       -- :: IO a -> IO (Either IOError a)
-  , bracket                   -- :: IO a -> (a -> IO b) -> (a -> IO c) -> IO c
-  , bracket_                  -- :: IO a -> (a -> IO b) -> IO c -> IO c
 
   , IO ()
   , FilePath                  -- :: String

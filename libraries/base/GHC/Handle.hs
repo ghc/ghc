@@ -131,8 +131,8 @@ withHandle' fun h m act =
    block $ do
    h_ <- takeMVar m
    checkBufferInvariants h_
-   (h',v)  <- catchException (act h_) 
-		(\ ex -> putMVar m h_ >> throw (augmentIOError ex fun h h_))
+   (h',v)  <- catch (act h_) 
+		(\ ex -> putMVar m h_ >> ioError (augmentIOError ex fun h h_))
    checkBufferInvariants h'
    putMVar m h'
    return v
@@ -146,8 +146,8 @@ withHandle_' fun h m act =
    block $ do
    h_ <- takeMVar m
    checkBufferInvariants h_
-   v  <- catchException (act h_) 
-	    (\ ex -> putMVar m h_ >> throw (augmentIOError ex fun h h_))
+   v  <- catch (act h_) 
+	    (\ ex -> putMVar m h_ >> ioError (augmentIOError ex fun h h_))
    checkBufferInvariants h_
    putMVar m h_
    return v
@@ -162,18 +162,16 @@ withHandle__' fun h m act =
    block $ do
    h_ <- takeMVar m
    checkBufferInvariants h_
-   h'  <- catchException (act h_)
-	    (\ ex -> putMVar m h_ >> throw (augmentIOError ex fun h h_))
+   h'  <- catch (act h_)
+	    (\ ex -> putMVar m h_ >> ioError (augmentIOError ex fun h h_))
    checkBufferInvariants h'
    putMVar m h'
    return ()
 
-augmentIOError (IOException (IOError _ iot _ str fp)) fun h h_
-  = IOException (IOError (Just h) iot fun str filepath)
+augmentIOError (IOError _ iot _ str fp) fun h h_
+  = IOError (Just h) iot fun str filepath
   where filepath | Just _ <- fp = fp
 		 | otherwise    = Just (haFilePath h_)
-augmentIOError other_exception _ _ _
-  = other_exception
 
 -- ---------------------------------------------------------------------------
 -- Wrapper for write operations.
@@ -560,10 +558,8 @@ data IOModeEx
  | TextMode   IOMode
    deriving (Eq, Read, Show)
 
-addFilePathToIOError fun fp (IOException (IOError h iot _ str _))
-  = IOException (IOError h iot fun str (Just fp))
-addFilePathToIOError _   _  other_exception
-  = other_exception
+addFilePathToIOError fun fp (IOError h iot _ str _)
+  = IOError h iot fun str (Just fp)
 
 openFile :: FilePath -> IOMode -> IO Handle
 openFile fp im = 
@@ -571,13 +567,13 @@ openFile fp im =
     (openFile' fp (if   dEFAULT_OPEN_IN_BINARY_MODE 
                    then BinaryMode im
                    else TextMode im))
-    (\e -> throw (addFilePathToIOError "openFile" fp e))
+    (\e -> ioError (addFilePathToIOError "openFile" fp e))
 
 openFileEx :: FilePath -> IOModeEx -> IO Handle
 openFileEx fp m =
   catch
     (openFile' fp m)
-    (\e -> throw (addFilePathToIOError "openFileEx" fp e))
+    (\e -> ioError (addFilePathToIOError "openFileEx" fp e))
 
 
 openFile' filepath ex_mode =
@@ -843,7 +839,7 @@ hIsEOF :: Handle -> IO Bool
 hIsEOF handle =
   catch
      (do hLookAhead handle; return False)
-     (\e -> if isEOFError e then return True else throw e)
+     (\e -> if isEOFError e then return True else ioError e)
 
 isEOF :: IO Bool
 isEOF = hIsEOF stdin

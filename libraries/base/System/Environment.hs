@@ -24,7 +24,7 @@ module System.Environment
   ) where
 
 import Prelude
-import System.IO 	( bracket )
+import Control.Exception 	( bracket )
 
 #ifdef __GLASGOW_HASKELL__
 import Foreign

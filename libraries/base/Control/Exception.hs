@@ -25,11 +25,12 @@ module Control.Exception (
 #endif
 
 	-- * Throwing exceptions
-#ifdef __HUGS__
 	throwIO,	-- :: Exception -> IO a
-#else
+#ifndef __HUGS__
 	throw,		-- :: Exception -> a
-	ioError,	-- :: Exception -> IO a
+#endif
+	ioError,	-- :: IOError -> IO a
+#ifndef __HUGS__
 	throwTo,	-- :: ThreadId -> Exception -> a
 #endif
 
@@ -115,7 +116,7 @@ module Control.Exception (
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base		( assert )
-import GHC.Exception 	as ExceptionBase hiding (try, catch, bracket, bracket_)
+import GHC.Exception 	as ExceptionBase hiding (catch)
 import GHC.Conc		( throwTo, ThreadId )
 import GHC.IOBase	( IO(..) )
 #endif
@@ -125,7 +126,7 @@ import Hugs.Exception	as ExceptionBase
 #endif
 
 import Prelude 		hiding ( catch )
-import System.IO.Error
+import System.IO.Error	hiding ( catch, try )
 import System.IO.Unsafe (unsafePerformIO)
 import Data.Dynamic
 
@@ -171,7 +172,7 @@ throw = throwIO
 --
 -- Note that 'catch' catches all types of exceptions, and is generally
 -- used for \"cleaning up\" before passing on the exception using
--- 'ioError'.  It is not good practice to discard the exception and
+-- 'throwIO'.  It is not good practice to discard the exception and
 -- continue, without first checking the type of the exception (it
 -- might be a 'ThreadKilled', for example).  In this case it is usually better
 -- to use 'catchJust' and select the kinds of exceptions to catch.
@@ -344,7 +345,7 @@ userErrors		:: Exception -> Maybe String
 #endif /* __GLASGOW_HASKELL__ */
 
 #ifdef __GLASGOW_HASKELL__
-ioErrors e@(IOException _) = Just e
+ioErrors (IOException e) = Just e
 ioErrors _ = Nothing
 
 arithExceptions (ArithException e) = Just e
@@ -362,7 +363,7 @@ dynExceptions _ = Nothing
 asyncExceptions (AsyncException e) = Just e
 asyncExceptions _ = Nothing
 
-userErrors e@IOException{} | isUserError e = Just (ioeGetErrorString e)
+userErrors (IOException e) | isUserError e = Just (ioeGetErrorString e)
 userErrors _ = Nothing
 #endif /* __GLASGOW_HASKELL__ */
 

@@ -36,7 +36,6 @@ import Foreign.C.Types	 	( CSize, CInt(..) )
 import Foreign.Storable  	( Storable(sizeOf) )
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Exception		( bracket )
 import GHC.IOBase
 import GHC.Real
 import GHC.Ptr

@@ -19,10 +19,8 @@ module GHC.Exception
 	( module GHC.Exception, 
 	  Exception(..), AsyncException(..), 
 	  IOException(..), ArithException(..), ArrayException(..),
-	  throw, ioError ) 
+	  throw, throwIO, ioError ) 
   where
-
-import Data.Either
 
 import GHC.Base
 import GHC.IOBase
@@ -56,49 +54,10 @@ catchException m k =  ST (\s -> unST m s `primCatch'` \ err -> unST (k err) s)
 catchException (IO m) k =  IO $ \s -> catch# m (\ex -> unIO (k ex)) s
 #endif
 
-catch           :: IO a -> (Exception -> IO a) -> IO a 
+catch           :: IO a -> (IOError -> IO a) -> IO a 
 catch m k	=  catchException m handler
-  where handler err@(IOException _) = k err
+  where handler (IOException err)   = k err
 	handler other               = throw other
-\end{code}
-
-
-%*********************************************************
-%*							*
-\subsection{Try and bracket}
-%*							*
-%*********************************************************
-
-The construct @try comp@ exposes errors which occur within a
-computation, and which are not fully handled.  It always succeeds.
-
-These are the IO-only try/bracket.  For the full exception try/bracket
-see hslibs/lang/Exception.lhs.
-
-\begin{code}
-try            :: IO a -> IO (Either Exception a)
-try f          =  catch (do r <- f
-                            return (Right r))
-                        (return . Left)
-
-bracket        :: IO a -> (a -> IO b) -> (a -> IO c) -> IO c
-bracket before after m = do
-        x  <- before
-        rs <- try (m x)
-        after x
-        case rs of
-           Right r -> return r
-           Left  e -> ioError e
-
--- variant of the above where middle computation doesn't want x
-bracket_        :: IO a -> (a -> IO b) -> IO c -> IO c
-bracket_ before after m = do
-         x  <- before
-         rs <- try m
-         after x
-         case rs of
-            Right r -> return r
-            Left  e -> ioError e
 \end{code}
 
 

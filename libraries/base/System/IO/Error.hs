@@ -20,6 +20,9 @@ module System.IO.Error (
     IOErrorType,		-- abstract
 #endif
 
+    catch,			-- :: IO a -> (IOError -> IO a) -> IO a
+    try,			-- :: IO a -> IO (Either IOError a)
+
     ioError,		       	-- :: IOError -> IO a
     userError,		       	-- :: String  -> IOError
 
@@ -67,11 +70,13 @@ module System.IO.Error (
 
   ) where
 
+import Data.Either
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import Data.Maybe
 import GHC.IOBase
+import GHC.Exception
 import Text.Show
 #endif
 
@@ -82,6 +87,7 @@ import Hugs.IO
 #ifdef __NHC__
 import IO
   ( IOError ()
+  , try
   , ioError
   , userError
   , isAlreadyExistsError	-- :: IOError -> Bool
@@ -100,13 +106,25 @@ import IO
 --import Control.Monad (MonadPlus(mplus))
 #endif
 
+-- | The construct @try comp@ exposes IO errors which occur within a
+-- computation, and which are not fully handled.
+-- Other exceptions are not caught by this variant;
+-- to catch all exceptions, use @try@ from "Control.Exception".
+
+#ifndef __NHC__
+try            :: IO a -> IO (Either IOError a)
+try f          =  catch (do r <- f
+                            return (Right r))
+                        (return . Left)
+#endif
+
 #ifdef __GLASGOW_HASKELL__
 -- -----------------------------------------------------------------------------
 -- Constructing an IOError
 
 mkIOError :: IOErrorType -> String -> Maybe Handle -> Maybe FilePath -> IOError
 mkIOError t location maybe_hdl maybe_filename =
-   IOException IOError{ ioe_type = t, 
+               IOError{ ioe_type = t, 
 			ioe_location = location,
 	   		ioe_descr = "",
 			ioe_handle = maybe_hdl, 
@@ -213,19 +231,15 @@ ioeGetHandle          :: IOError -> Maybe Handle
 ioeGetErrorString     :: IOError -> String
 ioeGetFileName        :: IOError -> Maybe FilePath
 
-ioeGetErrorType (IOException ioe) = ioe_type ioe
-ioeGetErrorType _ = error "System.IO.Error.ioeGetErrorType: not an IO error"
+ioeGetErrorType ioe = ioe_type ioe
 
-ioeGetHandle (IOException ioe) = ioe_handle ioe
-ioeGetHandle _ = error "System.IO.Error.ioeGetHandle: not an IO error"
+ioeGetHandle ioe = ioe_handle ioe
 
-ioeGetErrorString (IOException ioe) 
+ioeGetErrorString ioe
    | isUserErrorType (ioe_type ioe) = ioe_descr ioe
    | otherwise                      = show (ioe_type ioe)
-ioeGetErrorString _ = error "System.IO.Error.ioeGetErrorString: not an IO error"
 
-ioeGetFileName (IOException ioe) = ioe_filename ioe
-ioeGetFileName _ = error "System.IO.Error.ioeGetFileName: not an IO error"
+ioeGetFileName ioe = ioe_filename ioe
 #endif
 
 -- -----------------------------------------------------------------------------
@@ -237,13 +251,11 @@ annotateIOError :: IOError
               -> Maybe FilePath 
               -> Maybe Handle 
               -> IOError 
-annotateIOError (IOException (IOError hdl errTy _ str path)) loc opath ohdl = 
-  IOException (IOError (hdl `mplus` ohdl) errTy loc str (path `mplus` opath))
+annotateIOError (IOError hdl errTy _ str path) loc opath ohdl = 
+  IOError (hdl `mplus` ohdl) errTy loc str (path `mplus` opath)
   where
     Nothing `mplus` ys = ys
     xs      `mplus` _  = xs
-annotateIOError exc _ _ _ = 
-  exc
 #endif
 
 #ifdef 0 /*__NHC__*/

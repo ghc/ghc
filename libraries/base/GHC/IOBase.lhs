@@ -471,9 +471,6 @@ showHandle p h duplex =
 -- has a constructor in the 'Exception' type, and values of other
 -- types may be injected into 'Exception' by coercing them to
 -- 'Dynamic' (see the section on Dynamic Exceptions: "Control.Exception\#DynamicExceptions").
---
--- For backwards compatibility with Haskell 98, 'IOError' is a type synonym
--- for 'Exception'.
 data Exception
   = ArithException  	ArithException
 	-- ^Exceptions raised by arithmetic
@@ -679,35 +676,39 @@ throw exception = raise# exception
 
 -- | A variant of 'throw' that can be used within the 'IO' monad.
 --
--- Although 'ioError' has a type that is an instance of the type of 'throw', the
+-- Although 'throwIO' has a type that is an instance of the type of 'throw', the
 -- two functions are subtly different:
 --
 -- > throw e   `seq` return ()  ===> throw e
--- > ioError e `seq` return ()  ===> return ()
+-- > throwIO e `seq` return ()  ===> return ()
 --
 -- The first example will cause the exception @e@ to be raised,
--- whereas the second one won\'t.  In fact, 'ioError' will only cause
+-- whereas the second one won\'t.  In fact, 'throwIO' will only cause
 -- an exception to be raised when it is used within the 'IO' monad.
--- The 'ioError' variant should be used in preference to 'throw' to
+-- The 'throwIO' variant should be used in preference to 'throw' to
 -- raise an exception within the 'IO' monad because it guarantees
 -- ordering with respect to other 'IO' operations, whereas 'throw'
 -- does not.
-ioError         :: Exception -> IO a 
-ioError err	=  IO $ \s -> throw err s
+throwIO         :: Exception -> IO a 
+throwIO err	=  IO $ \s -> throw err s
 
 ioException	:: IOException -> IO a
 ioException err =  IO $ \s -> throw (IOException err) s
 
+ioError         :: IOError -> IO a 
+ioError		=  ioException
+
 -- ---------------------------------------------------------------------------
 -- IOError type
 
--- A value @IOError@ encode errors occurred in the @IO@ monad.
--- An @IOError@ records a more specific error type, a descriptive
+-- | The Haskell 98 type for exceptions in the @IO@ monad.
+-- In Haskell 98, this is an opaque type.
+type IOError = IOException
+
+-- |Exceptions that occur in the @IO@ monad.
+-- An @IOException@ records a more specific error type, a descriptive
 -- string and maybe the handle that was used when the error was
 -- flagged.
-
-type IOError = Exception
-
 data IOException
  = IOError {
      ioe_handle   :: Maybe Handle,   -- the handle used by the action flagging 
@@ -778,7 +779,7 @@ instance Show IOErrorType where
       DynIOError{}      -> "unknown IO error"
 
 userError       :: String  -> IOError
-userError str	=  IOException (IOError Nothing UserError "" str Nothing)
+userError str	=  IOError Nothing UserError "" str Nothing
 
 -- ---------------------------------------------------------------------------
 -- Showing IOErrors

@@ -43,7 +43,7 @@ import GHC.Real
 import GHC.Num
 import GHC.Show
 import GHC.List
-import GHC.Exception    ( ioError, catch, throw )
+import GHC.Exception    ( ioError, catch )
 import GHC.Conc
 
 -- ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ maybeFillReadBuffer fd is_line is_stream buf
      )
      (\e -> do if isEOFError e 
 		  then return Nothing 
-		  else throw e)
+		  else ioError e)
 
 
 unpack :: RawBuffer -> Int -> Int -> IO [Char]

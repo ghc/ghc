@@ -90,7 +90,7 @@ module Foreign.C.Error (
 -- GHC allows us to get at the guts inside IO errors/exceptions
 --
 #if __GLASGOW_HASKELL__
-import GHC.IOBase (Exception(..), IOException(..), IOErrorType(..))
+import GHC.IOBase (IOException(..), IOErrorType(..))
 #endif /* __GLASGOW_HASKELL__ */
 
 
@@ -406,7 +406,7 @@ errnoToIOError :: String -> Errno -> Maybe Handle -> Maybe String -> IOError
 errnoToIOError loc errno maybeHdl maybeName = unsafePerformIO $ do
     str <- strerror errno >>= peekCString
 #if __GLASGOW_HASKELL__
-    return (IOException (IOError maybeHdl errType loc str maybeName))
+    return (IOError maybeHdl errType loc str maybeName)
     where
     errType
         | errno == eOK             = OtherError
