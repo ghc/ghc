@@ -188,7 +188,13 @@ basicKnownKeyNames
 	otherwiseIdName, 
 	plusIntegerName, timesIntegerName,
 	eqStringName, assertName, assertErrorName, runSTRepName,
-	printName, splitName, fstName, sndName,
+	printName, fstName, sndName,
+
+	-- MonadFix
+	monadFixClassName, mfixName,
+
+	-- Splittable class
+	splittableClassName, splitName,
 
 	-- Booleans
 	andName, orName
@@ -601,10 +607,12 @@ newStablePtrName      = varQual  pREL_STABLE FSLIT("newStablePtr") newStablePtrI
 runSTRepName	   = varQual pREL_ST  FSLIT("runSTRep") runSTRepIdKey
 
 -- The "split" Id for splittable implicit parameters
-splitName          = varQual gLA_EXTS FSLIT("split") splitIdKey
+splittableClassName = clsQual gLA_EXTS FSLIT("Splittable") splittableClassKey
+splitName           = methName splittableClassName FSLIT("split") splitIdKey
 
 -- Recursive-do notation
-mfixName	   = varQual mONAD_FIX FSLIT("mfix") mfixIdKey
+monadFixClassName  = clsQual mONAD_FIX FSLIT("MonadFix") monadFixClassKey
+mfixName	   = methName monadFixClassName FSLIT("mfix") mfixIdKey
 
 -- Arrow notation
 arrAName	   = varQual aRROW FSLIT("arr")	arrAIdKey
@@ -687,6 +695,9 @@ typeable4ClassKey	= mkPreludeClassUnique 24
 typeable5ClassKey	= mkPreludeClassUnique 25
 typeable6ClassKey	= mkPreludeClassUnique 26
 typeable7ClassKey	= mkPreludeClassUnique 27
+
+monadFixClassKey	= mkPreludeClassUnique 28
+splittableClassKey	= mkPreludeClassUnique 29
 \end{code}
 
 %************************************************************************
