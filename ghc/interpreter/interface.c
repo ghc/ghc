@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/06/07 17:22:51 $
+ * $Revision: 1.5 $
+ * $Date: 1999/07/06 15:24:38 $
  * ------------------------------------------------------------------------*/
 
 /* ToDo:
@@ -35,6 +35,8 @@
 #include "dynamic.h"
 
 #define DEBUG_IFACE
+
+extern void print ( Cell, Int );
 
 /* --------------------------------------------------------------------------
  * The "addGHC*" functions act as "impedence matchers" between GHC
@@ -95,25 +97,21 @@ static Void  local finishGHCImports  Args((Triple));
 static Void  local finishGHCExports  Args((Pair));
 static Void  local finishGHCModule   Args((Module));
 
-static Void  local bindGHCNameTo         Args((Name,Text));
 static Kinds local tvsToKind             Args((List));
 static Int   local arityFromType         Args((Type));
+static Int   local arityInclDictParams   Args((Type));
+
                                          
 static List       local ifTyvarsIn       Args((Type));
 
 static Type       local tvsToOffsets       Args((Int,Type,List));
 static Type       local conidcellsToTycons Args((Int,Type));
 
-static Void       local resolveReferencesInObjectModule Args((Module));
-static Bool       local validateOImage Args((void*, Int));
+static Void       local resolveReferencesInObjectModule Args((Module,Bool));
+static Bool       local validateOImage Args((void*, Int, Bool));
+static Void       local readSyms Args((Module));
 
-static Text text_info;
-static Text text_entry;
-static Text text_closure;
-static Text text_static_closure;
-static Text text_static_info;
-static Text text_con_info;
-static Text text_con_entry;
+static void*      local lookupObjName ( char* );
 
 
 /* --------------------------------------------------------------------------
@@ -129,7 +127,10 @@ List ghcImports;  /* [(Module, Text, [ConId|VarId])]
                         finishInterfaces().
 		  */
 
-List ghcExports;  /* [(ConId, [ConId|VarId])] */
+List ghcExports;  /* [(ConId,   -- module name
+                        [ ConId | VarId | pair(ConId,[ConId|VarId])] )]
+                                -- list of entities
+                  */
 
 List ghcModules;  /* [Module] -- modules of the .his loaded in this group */
 
@@ -141,32 +142,77 @@ List stuff; {
 
 static Void local finishGHCExports(paire)
 Pair paire; {
-   Text modTxt = textOf(fst(paire));
-   List ids    = snd(paire);
-   Module mod  = findModule(modTxt);
+   Text modTxt   = textOf(fst(paire));
+   List entities = snd(paire);
+   Module mod    = findModule(modTxt);
    if (isNull(mod)) {
       ERRMSG(0) "Can't find module \"%s\" mentioned in export list",
                 textToStr(modTxt)
       EEND;
    }
-   
-   for (; nonNull(ids); ids=tl(ids)) {
-      Cell xs;
-      Cell id = hd(ids);  /* ConId|VarId */
-      Bool found = FALSE;
-      for (xs = module(mod).exports; nonNull(xs); xs=tl(xs)) {
-         Cell x = hd(xs);
-         if (isQCon(x)) continue;  /* ToDo: fix this right */
-         if (textOf(x)==textOf(id)) { found = TRUE; break; }
-      }
-      if (!found) {
-printf ( "adding %s to exports of %s\n",
-          identToStr(id), textToStr(modTxt) );
-	module(mod).exports = cons ( id, module(mod).exports );
+fprintf(stderr, "----------------------------------finishexports\n");
+   /* Assume that each .hi file only contains one export decl */
+   if (nonNull(module(mod).exports))
+      internal("finishGHCExports: non-empty export list");
+
+   /* Run along what the parser gave us and make export list entries */
+   for (; nonNull(entities); entities=tl(entities)) {
+      Cell ent = hd(entities);
+      List subents;
+      Cell c;
+      switch (whatIs(ent)) {
+         case VARIDCELL: /* variable */
+            c = findName ( snd(ent) );
+            assert(nonNull(c));
+fprintf(stderr, "var %s\n", textToStr(name(c).text));
+            module(mod).exports = cons(c, module(mod).exports);
+            break;
+         case CONIDCELL: /* non data tycon */
+            c = findTycon ( snd(ent) );
+            assert(nonNull(c));
+fprintf(stderr, "non data tycon %s\n", textToStr(tycon(c).text));
+            module(mod).exports = cons(c, module(mod).exports);
+            break;
+         default: /* data T = C1 ... Cn  or class C where f1 ... fn */
+            if (!isPair(ent)) internal("finishExports(2)");
+            subents = snd(ent);
+            ent = fst(ent);
+            c = findTycon ( snd(ent) );
+            if (nonNull(c)) {
+	      /* data */
+fprintf(stderr, "data %s = ", textToStr(tycon(c).text));
+               module(mod).exports = cons(pair(c,DOTDOT), module(mod).exports);
+               for (; nonNull(subents); subents = tl(subents)) {
+                  Cell ent2 = hd(subents);
+                  assert(isCon(ent2));
+                  c = findName ( snd(ent2) );
+fprintf(stderr, "%s ", textToStr(name(c).text));
+                  assert(nonNull(c));
+                  module(mod).exports = cons(c, module(mod).exports);
+               }
+fprintf(stderr, "\n" );
+            } else {
+               /* class */
+               c = findClass ( snd(ent) );
+               assert(nonNull(c));            
+fprintf(stderr, "class %s where ", textToStr(cclass(c).text));
+               module(mod).exports = cons(pair(c,DOTDOT), module(mod).exports);
+
+               for (; nonNull(subents); subents = tl(subents)) {
+                  Cell ent2 = hd(subents);
+                  assert(isVar(ent2));
+                  c = findName ( snd(ent2) );
+fprintf(stderr, "%s ", textToStr(name(c).text));
+                  assert(nonNull(c));
+                  module(mod).exports = cons(c, module(mod).exports);
+               }
+fprintf(stderr, "\n" );
+
+            }
+            break;
       }
    }
 }
-
 
 static Void local finishGHCImports(triple)
 Triple triple;
@@ -318,13 +364,14 @@ Module mod; {
    }
 
    // Last, but by no means least ...
-   resolveReferencesInObjectModule ( mod );
+   resolveReferencesInObjectModule ( mod, FALSE );
 }
 
 Void openGHCIface(t)
 Text t; {
     FILE* f;
     void* img;
+
     Module m = findModule(t);
     if (isNull(m)) {
         m = newModule(t);
@@ -356,13 +403,15 @@ printf ( "new module %s\n", textToStr(t) );
        ERRMSG(0) "Read of object file \"%s\" failed", nameObj
        EEND;
     }
-    if (!validateOImage(img,sizeObj)) {
+    if (!validateOImage(img,sizeObj,FALSE)) {
        ERRMSG(0) "Validation of object file \"%s\" failed", nameObj 
        EEND;
     }
     
     assert(!module(m).oImage);
     module(m).oImage = img;
+
+    readSyms(m);
 
     if (!cellIsMember(m, ghcModules))
        ghcModules = cons(m, ghcModules);
@@ -425,8 +474,6 @@ Type ty;
         EEND;
     }
     n = newName(v,NIL);
-    bindGHCNameTo(n, text_info);
-    bindGHCNameTo(n, text_closure);
 
     tvs = nubList(ifTyvarsIn(ty));
     for (tmp=tvs; nonNull(tmp); tmp=tl(tmp))
@@ -438,6 +485,7 @@ Type ty;
     
     /* prepare for finishGHCVar */
     name(n).type = ty;
+    name(n).arity = arityInclDictParams(ty);
     name(n).line = line;
     ghcVarDecls = cons(n,ghcVarDecls);
 #   ifdef DEBUG_IFACE
@@ -677,28 +725,6 @@ Triple constr; { /* (ConId,[(Type,Text)],Type) */
     name(n).line   = line;
     name(n).number = cfunNo(conNo);
 
-    if (arity == 0) {
-       // expect to find the names
-       // Mod_Con_closure
-       // Mod_Con_static_closure
-       // Mod_Con_static_info
-       bindGHCNameTo(n, text_closure);
-       bindGHCNameTo(n, text_static_closure);
-       bindGHCNameTo(n, text_static_info);
-    } else {
-       // expect to find the names
-       // Mod_Con_closure
-       // Mod_Con_entry
-       // Mod_Con_info
-       // Mod_Con_con_info
-       // Mod_Con_static_info
-       bindGHCNameTo(n, text_closure);
-       bindGHCNameTo(n, text_entry);
-       bindGHCNameTo(n, text_info);
-       bindGHCNameTo(n, text_con_info);
-       bindGHCNameTo(n, text_static_info);
-    }
-
     /* prepare for finishGHCCon */
     name(n).type   = type;
     ghcConstrDecls = cons(n,ghcConstrDecls);
@@ -830,6 +856,8 @@ List mems0; {    /* [(VarId, Type)]       */
         for (mems=mems0; nonNull(mems); mems=tl(mems)) {
            Pair mem  = hd(mems);
            Type memT = snd(mem);
+           Text mnt  = textOf(fst(mem));
+           Name mn;
 
            /* Stick the new context on the member type */
            if (whatIs(memT)==POLYTYPE) internal("addGHCClass");
@@ -853,6 +881,16 @@ List mems0; {    /* [(VarId, Type)]       */
 
            /* Park the type back on the member */
            snd(mem) = memT;
+
+           /* Bind code to the member */
+           mn = findName(mnt);
+           if (nonNull(mn)) {
+              ERRMSG(line) 
+                 "Repeated definition for class method \"%s\"",
+                 textToStr(mnt)
+              EEND;
+           }
+           mn = newName(mnt,NIL);
         }
 
         cclass(nw).members    = mems0;
@@ -893,13 +931,7 @@ static Void  local finishGHCClass(Class nw)
        Text txt = textOf(fst(mem));
        Type ty  = snd(mem);
        Name n   = findName(txt);
-       if (nonNull(n)) {
-          ERRMSG(cclass(nw).line) 
-             "Repeated definition for class method \"%s\"",
-             textToStr(txt)
-          EEND;
-       }
-       n = newName(txt,NIL);
+       assert(nonNull(n));
        name(n).line   = cclass(nw).line;
        name(n).type   = ty;
        name(n).number = ctr++;
@@ -1125,6 +1157,24 @@ List tvs; { /* [(VarId,Kind)] */
     return r;
 }
 
+
+static Int local arityInclDictParams ( Type type )
+{
+   Int arity = 0;
+   if (isPolyType(type)) type = monotypeOf(type);
+   
+   if (whatIs(type) == QUAL)
+   {
+      arity += length ( fst(snd(type)) );
+      type = snd(snd(type));
+   }
+   while (isAp(type) && getHead(type)==typeArrow) {
+      arity++;
+      type = arg(type);
+   }
+   return arity;
+}
+
 /* arity of a constructor with this type */
 static Int local arityFromType(type) 
 Type type; {
@@ -1166,132 +1216,6 @@ Type type; {
 
 
 /* --------------------------------------------------------------------------
- * Dynamic loading code (probably shouldn't be here)
- *
- * o .hi file explicitly says which .so file to load.
- *   This avoids the need for a 1-to-1 relationship between .hi and .so files.
- *
- *   ToDo: when doing a :reload, we ought to check the modification date 
- *         on the .so file.
- *
- * o module handles are unloaded (dlclosed) when we call dropScriptsFrom.
- *
- *   ToDo: do the same for foreign functions - but with complication that 
- *         there may be multiple .so files
- * ------------------------------------------------------------------------*/
-
-typedef struct { char* name; void* addr; } RtsTabEnt;
-
-/* not really true */
-extern int stg_gc_enter_1;
-extern int stg_chk_1;
-extern int stg_update_PAP;
-extern int __ap_2_upd_info;
-
-RtsTabEnt rtsTab[] 
-   = { 
-       { "stg_gc_enter_1",    &stg_gc_enter_1  },
-       { "stg_chk_1",         &stg_chk_1       },
-       { "stg_update_PAP",    &stg_update_PAP  },
-       { "__ap_2_upd_info",   &__ap_2_upd_info },
-       {0,0} 
-     };
-
-char* strsuffix ( char* s, char* suffix )
-{
-   int sl = strlen(s);
-   int xl = strlen(suffix);
-   if (xl > sl) return NULL;
-   if (0 == strcmp(s+sl-xl,suffix)) return s+sl-xl;
-   return NULL;
-}
-
-char* lookupObjName ( char* nameT )
-{
-   Text tm;
-   Text tn;
-   Text ts;
-   Name naam;
-   char* nm;
-   char* ty;
-   char* a;
-   Int   k;
-   Pair  pr;
-
-   if (isupper(((int)(nameT[0])))) {
-      // name defined in a module, eg Mod_xyz_static_closure
-      // Place a zero after the module name, and after
-      // the symbol name proper
-      // --> Mod\0xyz\0static_closure
-      nm = strchr(nameT, '_'); 
-      if (!nm) internal ( "lookupObjName");
-      *nm = 0;
-      nm++;
-      if ((ty=strsuffix(nm, "_static_closure"))) 
-         { *ty = 0; ty++; ts = text_static_closure; } 
-      else
-      if ((ty=strsuffix(nm, "_static_info"   ))) 
-         { *ty = 0; ty++; ts = text_static_info; } 
-      else
-      if ((ty=strsuffix(nm, "_con_info"      ))) 
-         { *ty = 0; ty++; ts = text_con_info; } 
-      else
-      if ((ty=strsuffix(nm, "_con_entry"     ))) 
-         { *ty = 0; ty++; ts = text_con_entry; } 
-      else
-      if ((ty=strsuffix(nm, "_info"          )))  
-         { *ty = 0; ty++; ts = text_info; } 
-      else
-      if ((ty=strsuffix(nm, "_entry"         ))) 
-         { *ty = 0; ty++; ts = text_entry; } 
-      else
-      if ((ty=strsuffix(nm, "_closure"       ))) 
-         { *ty = 0; ty++; ts = text_closure; } 
-      else {
-         fprintf(stderr, "lookupObjName: unknown suffix on %s\n", nameT );
-         return NULL;
-      }
-      tm = findText(nameT);
-      tn = findText(nm);
-      //printf ( "\nlooking at mod `%s' var `%s' ext `%s' \n",textToStr(tm),textToStr(tn),textToStr(ts));
-      naam = jrsFindQualName(tm,tn);
-      if (isNull(naam)) goto not_found;
-      pr = cellAssoc ( ts, name(naam).ghc_names );
-      if (isNull(pr)) goto no_info;
-      return ptrOf(snd(pr));
-   }
-   else {
-      // name presumably originating from the RTS
-      a = NULL;
-      for (k = 0; rtsTab[k].name; k++) {
-         if (0==strcmp(nameT,rtsTab[k].name)) {
-            a = rtsTab[k].addr;
-            break;
-         }
-      }
-      if (!a) goto not_found_rts;
-      return a;
-   }
-
-not_found:
-   fprintf ( stderr, 
-             "lookupObjName: can't resolve name `%s'\n", 
-             nameT );
-   return NULL;
-no_info:
-   fprintf ( stderr, 
-             "lookupObjName: no info for name `%s'\n", 
-             nameT );
-   return NULL;
-not_found_rts: 
-   fprintf ( stderr, 
-             "lookupObjName: can't resolve RTS name `%s'\n",
-             nameT );
-   return NULL;
-}
-
-
-/* --------------------------------------------------------------------------
  * ELF specifics
  * ------------------------------------------------------------------------*/
 
@@ -1314,40 +1238,15 @@ static char* local findElfSection ( void* objImage, Elf32_Word sh_type )
    return ptr;
 }
 
-static AsmClosure local findObjectSymbol_elfo ( void* objImage, char* name )
+
+static Void local resolveReferencesInObjectModule_elf ( Module m, 
+                                                        Bool   verb )
 {
-   Int i, nent, j;
-   Elf32_Shdr* shdr;
-   Elf32_Sym*  stab;
-   char* strtab;
-   char* ehdrC = (char*)objImage;
-   Elf32_Ehdr* ehdr = ( Elf32_Ehdr*)ehdrC;
-   shdr = (Elf32_Shdr*) (ehdrC + ehdr->e_shoff);
-
-   strtab = findElfSection ( objImage, SHT_STRTAB );
-   if (!strtab) internal("findObjectSymbol_elfo");
-
-   for (i = 0; i < ehdr->e_shnum; i++) {
-      if (shdr[i].sh_type != SHT_SYMTAB) continue;
-      stab = (Elf32_Sym*) (ehdrC + shdr[i].sh_offset);
-      nent = shdr[i].sh_size / sizeof(Elf32_Sym);
-      for (j = 0; j < nent; j++) {
-         if ( strcmp(strtab + stab[j].st_name, name) == 0
-              && ELF32_ST_BIND(stab[j].st_info)==STB_GLOBAL ) {
-            return ehdrC + stab[j].st_value;
-         }
-      }
-   }
-   return NULL;
-}
-
-static Void local resolveReferencesInObjectModule_elfo( objImage )
-void* objImage; {
    char symbol[1000]; // ToDo
-   int i, j, k;
+   int i, j;
    Elf32_Sym*  stab;
    char* strtab;
-   char* ehdrC = (char*)objImage;
+   char* ehdrC = (char*)(module(m).oImage);
    Elf32_Ehdr* ehdr = (Elf32_Ehdr*) ehdrC;
    Elf32_Shdr* shdr = (Elf32_Shdr*) (ehdrC + ehdr->e_shoff);
    Elf32_Word* targ;
@@ -1355,10 +1254,10 @@ void* objImage; {
    //stab = findElfSection ( objImage, SHT_SYMTAB );
 
    // also go find the string table
-   strtab = findElfSection ( objImage, SHT_STRTAB );
+   strtab = findElfSection ( ehdrC, SHT_STRTAB );
 
    if (!stab || !strtab) 
-      internal("resolveReferencesInObjectModule_elfo");
+      internal("resolveReferencesInObjectModule_elf");
 
    for (i = 0; i < ehdr->e_shnum; i++) {
       if (shdr[i].sh_type == SHT_REL ) {
@@ -1368,7 +1267,10 @@ void* objImage; {
          Int symtab_shndx = shdr[i].sh_link;
          stab  = (Elf32_Sym*) (ehdrC + shdr[ symtab_shndx ].sh_offset);
          targ  = (Elf32_Word*)(ehdrC + shdr[ target_shndx ].sh_offset);
-         printf ( "relocations for section %d using symtab %d\n", target_shndx, symtab_shndx );
+         if (verb)
+         fprintf ( stderr,
+                  "relocations for section %d using symtab %d\n",
+                  target_shndx, symtab_shndx );
          for (j = 0; j < nent; j++) {
             Elf32_Addr offset = rtab[j].r_offset;
             Elf32_Word info   = rtab[j].r_info;
@@ -1378,22 +1280,34 @@ void* objImage; {
             Elf32_Addr  A = *pP;
             Elf32_Addr  S;
 
-            printf ("Rel entry %3d is raw(%6p %6p)   ", j, (void*)offset, (void*)info );
+            if (verb) fprintf ( stderr, "Rel entry %3d is raw(%6p %6p)   ", 
+                                j, (void*)offset, (void*)info );
             if (!info) {
-               printf ( " ZERO\n" );
+               if (verb) fprintf ( stderr, " ZERO\n" );
                S = 0;
             } else {
-               strcpy ( symbol, strtab+stab[ ELF32_R_SYM(info)].st_name );
-               printf ( "`%s'  ", symbol );
-               if (symbol[0] == 0) {
-                  printf ( "-- ignore?\n" );
-                    S = 0;
-               }
-               else {
+               if (stab[ ELF32_R_SYM(info)].st_name == 0) {
+                  if (verb) fprintf ( stderr, "(noname)  ");
+                  /* nameless (local) symbol */
+                  S = (Elf32_Addr)(ehdrC
+                                   + shdr[stab[ELF32_R_SYM(info)].st_shndx ].sh_offset
+                                   + stab[ELF32_R_SYM(info)].st_value
+                                  );
+                  strcpy ( symbol, "(noname)");
+               } else {
+                  strcpy ( symbol, strtab+stab[ ELF32_R_SYM(info)].st_name );
+                  if (verb) fprintf ( stderr, "`%s'  ", symbol );
                   S = (Elf32_Addr)lookupObjName ( symbol );
-                  printf ( "resolves to %p\n", (void*)S );
-	       }
-            }
+               }
+               if (verb) fprintf ( stderr, "resolves to %p\n", (void*)S );
+               if (!S) {
+                  fprintf ( stderr, "link failure for `%s'\n",
+                                    strtab+stab[ ELF32_R_SYM(info)].st_name );
+                  assert(0);
+               }
+	    }
+            //fprintf ( stderr, "Reloc: P = %p   S = %p   A = %p\n\n",
+            //      (void*)P, (void*)S, (void*)A );
             switch (ELF32_R_TYPE(info)) {
                case R_386_32:   *pP = S + A;     break;
                case R_386_PC32: *pP = S + A - P; break;
@@ -1407,12 +1321,16 @@ void* objImage; {
       }
       else
       if (shdr[i].sh_type == SHT_RELA) {
-         printf ( "RelA " );
+         fprintf ( stderr, "RelA style reloc table -- not yet done" );
+         assert(0);
       }
    }
 }
 
-static Bool local validateOImage_elfo ( void* imgV, Int size )
+
+static Bool local validateOImage_elf ( void*  imgV, 
+                                       Int    size, 
+                                       Bool   verb )
 {
    Elf32_Shdr* shdr;
    Elf32_Sym*  stab;
@@ -1427,130 +1345,140 @@ static Bool local validateOImage_elfo ( void* imgV, Int size )
        ehdr->e_ident[EI_MAG1] != ELFMAG1 ||
        ehdr->e_ident[EI_MAG2] != ELFMAG2 ||
        ehdr->e_ident[EI_MAG3] != ELFMAG3) {
-      printf ( "Not an ELF header\n" ); 
+      if (verb) fprintf ( stderr, "Not an ELF header\n" ); 
       return FALSE;
    }
-   printf ( "Is an ELF header\n" );
+   if (verb) fprintf ( stderr, "Is an ELF header\n" );
 
    if (ehdr->e_ident[EI_CLASS] != ELFCLASS32) {
-      printf ( "Not 32 bit ELF\n" );
+      if (verb) fprintf ( stderr, "Not 32 bit ELF\n" );
       return FALSE;
    }
-   printf ( "Is 32 bit ELF\n" );
+   if (verb) fprintf ( stderr, "Is 32 bit ELF\n" );
 
    if (ehdr->e_ident[EI_DATA] == ELFDATA2LSB) {
-      printf ( "Is little-endian\n" );
+      if (verb) fprintf ( stderr, "Is little-endian\n" );
    } else
    if (ehdr->e_ident[EI_DATA] == ELFDATA2MSB) {
-      printf ( "Is big-endian\n" );
+      if (verb) fprintf ( stderr, "Is big-endian\n" );
    } else {
-      printf ( "Unknown endiannness\n" );
+      if (verb) fprintf ( stderr, "Unknown endiannness\n" );
       return FALSE;
    }
 
    if (ehdr->e_type != ET_REL) {
-      printf ( "Not a relocatable object (.o) file\n" );
+      if (verb) fprintf ( stderr, "Not a relocatable object (.o) file\n" );
       return FALSE;
    }
-   printf ( "Is a relocatable object (.o) file\n" );
+   if (verb) fprintf ( stderr, "Is a relocatable object (.o) file\n" );
 
-   printf ( "Architecture is " );
+   if (verb) fprintf ( stderr, "Architecture is " );
    switch (ehdr->e_machine) {
-      case EM_386:   printf ( "x86\n" ); break;
-      case EM_SPARC: printf ( "sparc\n" ); break;
-      default:       printf ( "unknown\n" ); return FALSE;
+      case EM_386:   if (verb) fprintf ( stderr, "x86\n" ); break;
+      case EM_SPARC: if (verb) fprintf ( stderr, "sparc\n" ); break;
+      default:       if (verb) fprintf ( stderr, "unknown\n" ); return FALSE;
    }
 
-   printf ( "\nSection header table: start %d, n_entries %d, ent_size %d\n", 
-              ehdr->e_shoff, ehdr->e_shnum, ehdr->e_shentsize  );
+   if (verb) 
+   fprintf ( stderr,
+             "\nSection header table: start %d, n_entries %d, ent_size %d\n", 
+             ehdr->e_shoff, ehdr->e_shnum, ehdr->e_shentsize  );
 
    assert (ehdr->e_shentsize == sizeof(Elf32_Shdr));
 
    shdr = (Elf32_Shdr*) (ehdrC + ehdr->e_shoff);
 
    if (ehdr->e_shstrndx == SHN_UNDEF) {
-      printf ( "No section header string table\n" );
+      if (verb) fprintf ( stderr, "No section header string table\n" );
       sh_strtab = NULL;
+      return FALSE;
    } else {
-      printf ( "Section header string table is section %d\n", 
-               ehdr->e_shstrndx);
+      if (verb) fprintf (  stderr,"Section header string table is section %d\n", 
+                          ehdr->e_shstrndx);
       sh_strtab = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
    }
 
    for (i = 0; i < ehdr->e_shnum; i++) {
-      printf ( "%2d:  ", i );
-      printf ( "type=%2d  ", shdr[i].sh_type );
-      printf ( "size=%4d  ", shdr[i].sh_size );
-      if (shdr[i].sh_type == SHT_REL ) printf ( "Rel  " ); else
-      if (shdr[i].sh_type == SHT_RELA) printf ( "RelA " ); else
-                                       printf ( "     " );
-      if (sh_strtab) printf ( "sname=%s", sh_strtab + shdr[i].sh_name );
-      printf ( "\n" );
+      if (verb) fprintf ( stderr, "%2d:  ", i );
+      if (verb) fprintf ( stderr, "type=%2d  ", shdr[i].sh_type );
+      if (verb) fprintf ( stderr, "size=%4d  ", shdr[i].sh_size );
+      if (verb) fprintf ( stderr, "offs=%4d  ", shdr[i].sh_offset );
+      if (verb) fprintf ( stderr, "  (%p .. %p)  ",
+               ehdrC + shdr[i].sh_offset, 
+               ehdrC + shdr[i].sh_offset + shdr[i].sh_size - 1);
+
+      if (shdr[i].sh_type == SHT_REL  && verb) fprintf ( stderr, "Rel  " ); else
+      if (shdr[i].sh_type == SHT_RELA && verb) fprintf ( stderr, "RelA " ); else
+      if (verb)                                fprintf ( stderr, "     " );
+      if (sh_strtab && verb) fprintf ( stderr, "sname=%s", sh_strtab + shdr[i].sh_name );
+      if (verb) fprintf ( stderr, "\n" );
    }
 
-   printf ( "\n\nString tables\n" );
+   if (verb) fprintf ( stderr, "\n\nString tables\n" );
    strtab = NULL;
    nstrtab = 0;
    for (i = 0; i < ehdr->e_shnum; i++) {
       if (shdr[i].sh_type == SHT_STRTAB &&
           i !=  ehdr->e_shstrndx) {
-         printf ( "   section %d is a normal string table\n", i );
+         if (verb) fprintf ( stderr, "   section %d is a normal string table\n", i );
          strtab = ehdrC + shdr[i].sh_offset;
          nstrtab++;
       }
    }  
-   if (nstrtab != 1) 
-      printf ( "WARNING: no string tables, or too many\n" );
+   if (nstrtab != 1) {
+      if (verb) fprintf ( stderr, "WARNING: no string tables, or too many\n" );
+      return FALSE;
+   }
 
    nsymtabs = 0;
-   printf ( "\n\nSymbol tables\n" ); 
+   if (verb) fprintf ( stderr, "\n\nSymbol tables\n" ); 
    for (i = 0; i < ehdr->e_shnum; i++) {
       if (shdr[i].sh_type != SHT_SYMTAB) continue;
-      printf ( "section %d is a symbol table\n", i );
+      if (verb) fprintf ( stderr, "section %d is a symbol table\n", i );
       nsymtabs++;
       stab = (Elf32_Sym*) (ehdrC + shdr[i].sh_offset);
       nent = shdr[i].sh_size / sizeof(Elf32_Sym);
-      printf ( "   number of entries is apparently %d (%d rem)\n",
+      if (verb) fprintf ( stderr, "   number of entries is apparently %d (%d rem)\n",
                nent,
                shdr[i].sh_size % sizeof(Elf32_Sym)
              );
       if (0 != shdr[i].sh_size % sizeof(Elf32_Sym)) {
-         printf ( "non-integral number of symbol table entries\n");
+         if (verb) fprintf ( stderr, "non-integral number of symbol table entries\n");
          return FALSE;
       }
       for (j = 0; j < nent; j++) {
-         printf ( "   %2d  ", j );
-         printf ( "  sec=%-5d  size=%-3d  val=%-5p  ", 
-                     (int)stab[j].st_shndx,
-                     (int)stab[j].st_size,
-                     (char*)stab[j].st_value );
+         if (verb) fprintf ( stderr, "   %2d  ", j );
+         if (verb) fprintf ( stderr, "  sec=%-5d  size=%-3d  val=%-5p  ", 
+                             (int)stab[j].st_shndx,
+                             (int)stab[j].st_size,
+                             (char*)stab[j].st_value );
 
-         printf ( "type=" );
+         if (verb) fprintf ( stderr, "type=" );
          switch (ELF32_ST_TYPE(stab[j].st_info)) {
-            case STT_NOTYPE:  printf ( "notype " ); break;
-            case STT_OBJECT:  printf ( "object " ); break;
-            case STT_FUNC  :  printf ( "func   " ); break;
-            case STT_SECTION: printf ( "section" ); break;
-            case STT_FILE:    printf ( "file   " ); break;
-            default:          printf ( "?      " ); break;
+            case STT_NOTYPE:  if (verb) fprintf ( stderr, "notype " ); break;
+            case STT_OBJECT:  if (verb) fprintf ( stderr, "object " ); break;
+            case STT_FUNC  :  if (verb) fprintf ( stderr, "func   " ); break;
+            case STT_SECTION: if (verb) fprintf ( stderr, "section" ); break;
+            case STT_FILE:    if (verb) fprintf ( stderr, "file   " ); break;
+            default:          if (verb) fprintf ( stderr, "?      " ); break;
          }
-         printf ( "  " );
+         if (verb) fprintf ( stderr, "  " );
 
-         printf ( "bind=" );
+         if (verb) fprintf ( stderr, "bind=" );
          switch (ELF32_ST_BIND(stab[j].st_info)) {
-            case STB_LOCAL :  printf ( "local " ); break;
-            case STB_GLOBAL:  printf ( "global" ); break;
-            case STB_WEAK  :  printf ( "weak  " ); break;
-            default:          printf ( "?     " ); break;
+            case STB_LOCAL :  if (verb) fprintf ( stderr, "local " ); break;
+            case STB_GLOBAL:  if (verb) fprintf ( stderr, "global" ); break;
+            case STB_WEAK  :  if (verb) fprintf ( stderr, "weak  " ); break;
+            default:          if (verb) fprintf ( stderr, "?     " ); break;
          }
-         printf ( "  " );
+         if (verb) fprintf ( stderr, "  " );
 
-         printf ( "name=%s\n", strtab + stab[j].st_name );
+         if (verb) fprintf ( stderr, "name=%s\n", strtab + stab[j].st_name );
       }
    }
 
    if (nsymtabs == 0) {
-      printf ( "Didn't find any symbol tables\n" );
+      if (verb) fprintf ( stderr, "Didn't find any symbol tables\n" );
       return FALSE;
    }
 
@@ -1558,54 +1486,172 @@ static Bool local validateOImage_elfo ( void* imgV, Int size )
 }
 
 
+static void readSyms_elf ( Module m )
+{
+   int i, j, k, nent;
+   Elf32_Sym* stab;
+
+   char*       ehdrC      = (char*)(module(m).oImage);
+   Elf32_Ehdr* ehdr       = (Elf32_Ehdr*)ehdrC;
+   char*       strtab     = findElfSection ( ehdrC, SHT_STRTAB );
+   Elf32_Shdr* shdr       = (Elf32_Shdr*) (ehdrC + ehdr->e_shoff);
+   char*       sh_strtab  = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
+
+   if (!strtab) internal("readSyms_elf");
+
+   k = 0;
+   for (i = 0; i < ehdr->e_shnum; i++) {
+
+      /* make a HugsDLSection entry for relevant sections */
+      DLSect kind = HUGS_DL_SECTION_OTHER;
+      if (0==strcmp(".data",sh_strtab+shdr[i].sh_name) ||
+          0==strcmp(".data1",sh_strtab+shdr[i].sh_name))
+         kind = HUGS_DL_SECTION_RWDATA;
+      if (0==strcmp(".text",sh_strtab+shdr[i].sh_name) ||
+          0==strcmp(".rodata",sh_strtab+shdr[i].sh_name) ||
+          0==strcmp(".rodata1",sh_strtab+shdr[i].sh_name))
+         kind = HUGS_DL_SECTION_CODE_OR_RODATA;
+      if (kind != HUGS_DL_SECTION_OTHER)
+         addDLSect (
+            m,
+            ehdrC + shdr[i].sh_offset, 
+            ehdrC + shdr[i].sh_offset + shdr[i].sh_size - 1,
+            kind
+         );
+
+      if (shdr[i].sh_type != SHT_SYMTAB) continue;
+
+      /* copy stuff into this module's object symbol table */
+      stab = (Elf32_Sym*) (ehdrC + shdr[i].sh_offset);
+      nent = shdr[i].sh_size / sizeof(Elf32_Sym);
+      for (j = 0; j < nent; j++) {
+         if ( ( ELF32_ST_BIND(stab[j].st_info)==STB_GLOBAL ||
+                ELF32_ST_BIND(stab[j].st_info)==STB_LOCAL
+              )
+              &&
+              ( ELF32_ST_TYPE(stab[j].st_info)==STT_FUNC ||
+                ELF32_ST_TYPE(stab[j].st_info)==STT_OBJECT )
+	      ) {
+            char* nm = strtab + stab[j].st_name;
+            char* ad = ehdrC 
+                       + shdr[ stab[j].st_shndx ].sh_offset
+                       + stab[j].st_value;
+            assert(nm);
+            assert(ad);
+            /* fprintf(stderr, "addOTabName: %s %s %p\n",
+               textToStr(module(m).text), nm, ad );
+            */
+            addOTabName ( m, nm, ad );
+         }
+      }
+
+   }
+}
+
+
 /* --------------------------------------------------------------------------
- * Generic lookups
+ * Arch-independent interface to the runtime linker
  * ------------------------------------------------------------------------*/
 
-static Void local bindGHCNameTo ( Name n, Text suffix )
+static Bool local validateOImage ( void* img, Int size, Bool verb )
 {
-    char symbol[1000]; /* ToDo: arbitrary constants must die */
-    AsmClosure res;
-    sprintf(symbol,"%s_%s_%s",
-            textToStr(module(currentModule).text),
-            textToStr(name(n).text),textToStr(suffix));
-    //    fprintf(stderr, "\nbindGHCNameTo %s ", symbol);
-    res = findObjectSymbol_elfo ( module(currentModule).oImage, symbol );
-    if (!res) {
-       ERRMSG(0) "Can't find symbol \"%s\" in object for module \"%s\"",
-                 symbol,
-                 textToStr(module(currentModule).text)
-       EEND;
-    }
-    //fprintf(stderr, " = %p\n", res );
-    name(n).ghc_names = cons(pair(suffix,mkPtr(res)), name(n).ghc_names);
-
-    // set the stgVar to be a CPTRCELL to the closure label.
-    // prefer dynamic over static closures if given a choice
-    if (suffix == text_closure || suffix == text_static_closure) {
-       if (isNull(name(n).stgVar)) {
-          // accept any old thing
-          name(n).stgVar = mkCPtr(res);
-       } else {
-          // only accept something more dynamic that what we have now
-          if (suffix != text_static_closure 
-              && isCPtr(name(n).stgVar)
-              && cptrOf(name(n).stgVar) != res)
-             name(n).stgVar = mkCPtr(res);
-       }
-    }
+   return
+      validateOImage_elf ( img, size, verb );
 }
 
-static Void local resolveReferencesInObjectModule ( Module m )
+
+static Void local resolveReferencesInObjectModule ( Module m, Bool verb )
 {
-fprintf(stderr, "resolveReferencesInObjectModule %s\n",textToStr(module(m).text));
-   resolveReferencesInObjectModule_elfo ( module(m).oImage );
+   resolveReferencesInObjectModule_elf ( m, verb );
 }
 
-static Bool local validateOImage(img,size)
-void* img;
-Int   size; {
-   return validateOImage_elfo ( img, size );
+
+static Void local readSyms ( Module m )
+{
+   readSyms_elf ( m );
+}
+
+
+/* --------------------------------------------------------------------------
+ * General object symbol query stuff
+ * ------------------------------------------------------------------------*/
+
+/* entirely bogus claims about types of these symbols */
+extern int stg_gc_enter_1;
+extern int stg_chk_0;
+extern int stg_chk_1;
+extern int stg_update_PAP;
+extern int __ap_2_upd_info;
+extern int MainRegTable;
+extern int Upd_frame_info;
+
+OSym rtsTab[] 
+   = { 
+       { "stg_gc_enter_1",    &stg_gc_enter_1  },
+       { "stg_chk_0",         &stg_chk_0       },
+       { "stg_chk_1",         &stg_chk_1       },
+       { "stg_update_PAP",    &stg_update_PAP  },
+       { "__ap_2_upd_info",   &__ap_2_upd_info },
+       { "MainRegTable",      &MainRegTable    },
+       { "Upd_frame_info",    &Upd_frame_info  },
+       {0,0} 
+     };
+
+
+void* lookupObjName ( char* nm )
+{
+   int    k;
+   char*  pp;
+   void*  a;
+   Text   t;
+   Module m;
+   char   nm2[200];
+
+   nm2[199] = 0;
+   strncpy(nm2,nm,200);
+
+   // first see if it's an RTS name
+   for (k = 0; rtsTab[k].nm; k++)
+      if (0==strcmp(nm2,rtsTab[k].nm))
+         return rtsTab[k].ad;
+
+   // if not an RTS name, look in the 
+   // relevant module's object symbol table
+   pp = strchr(nm2, '_');
+   if (!pp) goto not_found;
+   *pp = 0;
+   t = findText(nm2);
+   m = findModule(t);
+   if (isNull(m)) goto not_found;
+   a = lookupOTabName ( m, nm );
+   if (a) return a;
+
+  not_found:
+   fprintf ( stderr, 
+             "lookupObjName: can't resolve name `%s'\n", 
+             nm );
+   return NULL;
+}
+
+
+int is_dynamically_loaded_code_or_rodata_ptr ( char* p )
+{
+   return 
+      lookupDLSect(p) == HUGS_DL_SECTION_CODE_OR_RODATA;
+}
+
+
+int is_dynamically_loaded_rwdata_ptr ( char* p )
+{
+   return
+      lookupDLSect(p) == HUGS_DL_SECTION_RWDATA;
+}
+
+
+int is_not_dynamically_loaded_ptr ( char* p )
+{
+   return
+      lookupDLSect(p) == HUGS_DL_SECTION_OTHER;
 }
 
 
@@ -1627,13 +1673,6 @@ Int what; {
             ghcExports          = NIL;
             ghcImports          = NIL;
             ghcModules          = NIL;
-            text_info           = findText("info");
-            text_entry          = findText("entry");
-            text_closure        = findText("closure");
-            text_static_closure = findText("static_closure");
-            text_static_info    = findText("static_info");
-            text_con_info       = findText("con_info");
-            text_con_entry      = findText("con_entry");
             break;
     case MARK: 
             mark(ifImports);

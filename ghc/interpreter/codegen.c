@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.7 $
- * $Date: 1999/06/07 17:22:53 $
+ * $Revision: 1.8 $
+ * $Date: 1999/07/06 15:24:36 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -53,6 +53,22 @@ static StgVar currentTop;
 /* --------------------------------------------------------------------------
  * 
  * ------------------------------------------------------------------------*/
+
+static Cell cptrFromName ( Name n )
+{
+   char  buf[1000];
+   void* p;
+   Module m = name(n).mod;
+   Text  mt = module(m).text;
+   sprintf(buf,"%s_%s_closure", 
+               textToStr(mt), textToStr(name(n).text) );
+   p = lookupOTabName ( m, buf );
+   if (!p) {
+      ERRMSG(0) "Can't find object symbol %s", buf
+      EEND;
+   }
+   return mkCPtr(p);
+}
 
 static Bool varHasClosure( StgVar v )
 {
@@ -107,10 +123,13 @@ static void cgBind( AsmBCO bco, StgVar v )
 static Void pushVar( AsmBCO bco, StgVar v )
 {
     Cell info;
-    assert(isStgVar(v));
+
+    if (!(isStgVar(v) || isCPtr(v))) {
+    assert(isStgVar(v) || isCPtr(v));
+    }
 
     if (isCPtr(v)) {
-fprintf ( stderr, "push cptr %p\n", (void*)cptrOf(v) );
+       asmGHCClosure(bco, cptrOf(v));
     } else {
        info = stgVarInfo(v);
        if (isPtr(info)) {
@@ -130,7 +149,9 @@ static Void pushAtom( AsmBCO bco, StgAtom e )
             pushVar(bco,e);
             break;
     case NAME: 
-            pushVar(bco,name(e).stgVar);
+            if (nonNull(name(e).stgVar))
+               pushVar(bco,name(e).stgVar); else
+               pushVar(bco,cptrFromName(e));
             break;
     case CHARCELL: 
             asmConstChar(bco,charOf(e));
@@ -161,7 +182,7 @@ static Void pushAtom( AsmBCO bco, StgAtom e )
 #endif
             break;
     case CPTRCELL:
-            asmConstWord(bco,cptrOf(e));
+            asmGHCClosure(bco,cptrOf(e));
             break;
     case PTRCELL: 
             asmConstAddr(bco,ptrOf(e));
@@ -487,18 +508,31 @@ static Void build( AsmBCO bco, StgVar v )
         }
     case STGAPP: 
         {
+            Bool   itsaPAP;
             StgVar fun  = stgAppFun(rhs);
+            StgVar fun0 = fun;
             List   args = stgAppArgs(rhs);
             if (isName(fun)) {
-                fun = name(fun).stgVar;
+                if (nonNull(name(fun).stgVar))
+                   fun = name(fun).stgVar; else
+                   fun = cptrFromName(fun);
             }
-            if (isCPtr(fun) 
-                ||
-                (nonNull(stgVarBody(fun))
-                 && whatIs(stgVarBody(fun)) == LAMBDA 
-                 && length(stgLambdaArgs(stgVarBody(fun))) > length(args)
-                )
-               ) {
+
+            if (isCPtr(fun)) {
+               assert(isName(fun0));
+               itsaPAP = name(fun0).arity > length(args);
+fprintf ( stderr, "nativeCall: name %s, arity %d, args %d\n",
+               nameFromOPtr(cptrOf(fun)), name(fun0).arity, length(args) );
+            } else {
+               itsaPAP = FALSE;
+               if (nonNull(stgVarBody(fun))
+                   && whatIs(stgVarBody(fun)) == LAMBDA 
+                   && length(stgLambdaArgs(stgVarBody(fun))) > length(args)
+                  )
+                  itsaPAP = TRUE;
+            }
+
+            if (itsaPAP) {
                 AsmSp  start = asmBeginMkPAP(bco);
                 map1Proc(pushAtom,bco,reverse(args));
                 pushAtom(bco,fun);

@@ -10,8 +10,8 @@
  * in the distribution for details.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.7 $
- * $Date: 1999/06/07 17:22:46 $
+ * $Revision: 1.8 $
+ * $Date: 1999/07/06 15:24:36 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1503,6 +1503,9 @@ Void evalExp() {                    /* compile and run input expression    */
                 RevertCAFs();
                 break;
         case Success:
+	  //fflush(stderr);fflush(stdout);
+	  //fprintf(stderr, "\n\nFinal top-of-stack is\n" );
+	  //printObj ( *(MainRegTable.rSp) );
 	        RevertCAFs();
                 break;
         default:

@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: optimise.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/04/27 10:06:57 $
+ * $Revision: 1.6 $
+ * $Date: 1999/07/06 15:24:39 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -20,6 +20,8 @@
 #include "Assembler.h"
 
 /* #define DEBUG_OPTIMISE */
+
+extern void print ( Cell, Int );
 
 /* --------------------------------------------------------------------------
  * Local functions
@@ -1583,7 +1585,7 @@ StgExpr simplify ( List caseEnv, StgExpr e )
       case LAMBDA:
          stgLambdaBody(e) = simplify(caseEnv,stgLambdaBody(e));
 
-         lambda_local:
+         /* lambda_local: */
          while (whatIsStg(stgLambdaBody(e))==LAMBDA) {
             nLambdasMerged++;
             stgLambdaArgs(e) = appendOnto(stgLambdaArgs(e),
@@ -2201,7 +2203,7 @@ static Bool noisy;
 
 static void local optimiseTopBind( StgVar v )
 {
-   Bool ppPrel = FALSE;
+  /* Bool ppPrel = FALSE; */
    Int  n, m;
    Name naam;
    Int  oldSize, newSize;

@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.7 $
- * $Date: 1999/06/07 17:22:43 $
+ * $Revision: 1.8 $
+ * $Date: 1999/07/06 15:24:37 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -103,6 +103,7 @@ static Bool   listScripts  = TRUE;      /* TRUE => list scripts after loading*/
 static Bool   addType      = FALSE;     /* TRUE => print type with value   */
 static Bool   useDots      = RISCOS;    /* TRUE => use dots in progress    */
 static Bool   quiet        = FALSE;     /* TRUE => don't show progress     */
+static Bool   lastWasObject = FALSE;
        Bool   preludeLoaded = FALSE;
        Bool   optimise      = FALSE;
 
@@ -158,6 +159,7 @@ String bool2str ( Bool b )
 void ppSmStack ( String who )
 {
    int i, j;
+return;
    fflush(stdout);fflush(stderr);
    printf ( "\n" );
    printf ( "ppSmStack %s:  numScripts = %d   namesUpto = %d  needsImports = %s\n",
@@ -892,6 +894,8 @@ Int stacknum; {
    scriptFile = name;
 
    if (scriptInfo[stacknum].fromSource) {
+      if (lastWasObject) finishInterfaces();
+      lastWasObject = FALSE;
       Printf("Reading script \"%s\":\n",name);
       needsImports = FALSE;
       parseScript(name,len);
@@ -912,6 +916,7 @@ Int stacknum; {
 
       loadInterface(name,len);
       scriptFile = 0;
+      lastWasObject = TRUE;
       if (needsImports) return FALSE;
    }
  
@@ -1038,6 +1043,7 @@ Int n; {                                /* loading everything after and    */
     Long fileSize;                      /* has been either changed or added*/
     static char name[FILENAME_MAX+1];
 
+    lastWasObject = FALSE;
     ppSmStack("readscripts-begin");
 #if HUGS_FOR_WINDOWS
     SetCursor(LoadCursor(NULL, IDC_WAIT));
@@ -1105,6 +1111,7 @@ assert(nextNumScripts==NUM_SCRIPTS);
           }
           else
              dropScriptsFrom(numScripts-1);
+
        } else {
       
           if (scriptInfo[numScripts].objLoaded) {
@@ -1300,14 +1307,15 @@ static Void local evaluator() {        /* evaluate expr and print value    */
             Putchar('\n');
         }
     }
-#endif
 
-#if 0
+#else
+
    printf ( "result type is " );
    printType ( stdout, type );
    printf ( "\n" );
    evalExp();
    printf ( "\n" );
+
 #endif
 
 }

@@ -9,8 +9,8 @@
  * in the distribution for details.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.7 $
- * $Date: 1999/06/07 17:22:47 $
+ * $Revision: 1.8 $
+ * $Date: 1999/07/06 15:24:45 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -389,6 +389,26 @@ extern Ext           mkExt Args((Text));
 #define mkOffset(o)  (OFFMIN+(o))
 
 /* --------------------------------------------------------------------------
+ * Object symbols:
+ * ------------------------------------------------------------------------*/
+
+/* An entry in a very crude object symbol table */
+typedef struct { char* nm; void* ad; } 
+   OSym;
+
+/* Indication of section kinds for loaded objects.  Needed by
+   the GC for deciding whether or not a pointer on the stack
+   is a code pointer.
+*/
+typedef enum { HUGS_DL_SECTION_CODE_OR_RODATA,
+               HUGS_DL_SECTION_RWDATA,
+               HUGS_DL_SECTION_OTHER } 
+   DLSect;
+
+typedef struct { void* start; void* end; DLSect sect; } 
+   DLTabEnt;
+
+/* --------------------------------------------------------------------------
  * Modules:
  * ------------------------------------------------------------------------*/
 
@@ -419,10 +439,20 @@ struct Module {
      * evaluating an expression in the context of the current module.
      */
     List  qualImports;
+
     /* ptr to malloc'd lump of memory holding the obj file */
     void* oImage;
 
+    /* ptr to object symbol table; lives in mallocville.  
+       Dynamically expands. */
+    OSym* oTab;
+    Int   sizeoTab;
+    Int   usedoTab;
 
+    /* The section-kind entries for this object module.  Dynamically expands. */    
+    DLTabEnt* dlTab;
+    Int       sizedlTab;
+    Int       useddlTab;        
 };
 
 extern Module currentModule;           /* Module currently being processed */
@@ -433,6 +463,14 @@ extern Module newModule     Args((Text));
 extern Module findModule    Args((Text));
 extern Module findModid     Args((Cell));
 extern Void   setCurrModule Args((Module));
+
+extern void      addOTabName     Args((Module,char*,void*));
+extern void*     lookupOTabName  Args((Module,char*));
+extern char*     nameFromOPtr    Args((void*));
+
+extern void      addDLSect    Args((Module,void*,void*,DLSect));
+extern DLSect    lookupDLSect Args((void*));
+
 
 #define isPrelude(m) (m==modulePrelude)
 
@@ -497,7 +535,6 @@ struct strName {
     Bool   simplified;    /* TRUE => already simplified */
     Bool   isDBuilder;    /* TRUE => is a dictionary builder */
     const void*  primop;  /* really StgPrim* */
-    List   ghc_names;     /* [(Text,Ptr)] */
     Name   nextNameHash;
 };
 

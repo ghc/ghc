@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.7 $
- * $Date: 1999/06/07 17:22:35 $
+ * $Revision: 1.8 $
+ * $Date: 1999/07/06 15:24:41 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -412,9 +412,9 @@ Cell   impList; {
         List es = module(m).exports;
         for(; nonNull(es); es=tl(es)) {
             Cell e = hd(es);
-            if (isName(e))
+            if (isName(e)) {
                 imports = cons(e,imports);
-            else {
+            } else {
                 Cell c = fst(e);
                 List subentities = NIL;
                 imports = cons(c,imports);
@@ -4183,7 +4183,7 @@ Cell e; {
                           EEND;
 #endif
 
-        default         : fprintf(stderr,"whatIs(e) == %d\n",whatIs(e));internal("depExpr");
+        default         : internal("depExpr");
    }
    return e;
 }

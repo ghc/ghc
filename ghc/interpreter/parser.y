@@ -11,8 +11,8 @@
  * in the distribution for details.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.6 $
- * $Date: 1999/06/07 17:22:41 $
+ * $Revision: 1.7 $
+ * $Date: 1999/07/06 15:24:40 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -347,9 +347,7 @@ ifEntities
           ;
 ifEntity
           : ifEntityOcc                 {$$=gc1($1);}
-          | ifEntityOcc ifStuffInside   {$$=gc2($1);}
-          | ifEntityOcc '|' ifStuffInside {$$=gc3($1);} 
-                                       /* exporting datacons but not tycon */
+          | ifEntityOcc ifStuffInside   {$$=gc2(pair($1,$2));}
           ;
 ifEntityOcc
           : ifVar                       { $$ = gc1($1); }
@@ -362,12 +360,9 @@ ifStuffInside
           : '{' ifValOccs '}'           { $$ = gc3($2); }
           ;
 ifValOccs
-          : ifValOcc                    { $$ = gc1(singleton($1)); }
-          | ifValOcc ifValOccs          { $$ = gc2(cons($1,$2));   }
-          ;
-ifValOcc
-          : ifVar                       {$$ = gc1($1); }
-          | ifCon                       {$$ = gc1($1); }
+          :                             { $$ = gc0(NIL); }
+          | ifVar ifValOccs             { $$ = gc2(cons($1,$2));   }
+          | ifCon ifValOccs             { $$ = gc2(cons($1,$2));   }
           ;
 version_list_junk
           :                                {$$=gc0(NIL);}

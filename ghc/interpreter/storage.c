@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.7 $
- * $Date: 1999/06/07 17:22:49 $
+ * $Revision: 1.8 $
+ * $Date: 1999/07/06 15:24:43 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -415,7 +415,6 @@ Cell parent; {
     name(nameHw).type         = NIL;
     name(nameHw).primop       = 0;
     name(nameHw).mod          = currentModule;
-    name(nameHw).ghc_names    = NIL;
     module(currentModule).names=cons(nameHw,module(currentModule).names);
     name(nameHw).nextNameHash = nameHash[h];
     nameHash[h]               = nameHw;
@@ -881,6 +880,12 @@ Text t; {
     module(moduleHw).names         = NIL;
     module(moduleHw).classes       = NIL;
     module(moduleHw).oImage        = NULL;
+    module(moduleHw).oTab          = NULL;
+    module(moduleHw).sizeoTab      = 0;
+    module(moduleHw).usedoTab      = 0;
+    module(moduleHw).dlTab         = NULL;
+    module(moduleHw).sizedlTab     = 0;
+    module(moduleHw).useddlTab     = 0;
     return moduleHw++;
 }
 
@@ -964,6 +969,95 @@ Name jrsFindQualName ( Text mn, Text sn )
 
    return NIL;
 }
+
+
+/* A bit tricky.  Assumes that if tab==NULL, then 
+   currUsed and *currSize must be zero.
+*/
+static
+void* genericExpand ( void* tab, 
+                      int*  currSize, int  currUsed,
+                      int   initSize, int  elemSize )
+{
+   int   size2;
+   void* tab2;
+   if (currUsed < *currSize)
+      return tab;
+   size2 = (*currSize == 0) ? initSize : (2 * *currSize);
+   tab2 = malloc ( size2 * elemSize );
+   if (!tab2) {
+      ERRMSG(0) "Can't allocate enough memory to resize a table"
+      EEND;
+   }
+   if (*currSize > 0)
+      memcpy ( tab2, tab, elemSize * *currSize );
+   *currSize = size2;
+   if (tab) free ( tab );
+   return tab2;
+}
+
+void addOTabName ( Module m, char* nm, void* ad )
+{
+   module(m).oTab
+      = genericExpand ( module(m).oTab, 
+                        &module(m).sizeoTab,
+                        module(m).usedoTab,
+                        8, sizeof(OSym) );
+
+   module(m).oTab[ module(m).usedoTab ].nm = nm;
+   module(m).oTab[ module(m).usedoTab ].ad = ad;
+   module(m).usedoTab++;
+}
+
+
+void addDLSect ( Module m, void* start, void* end, DLSect sect )
+{
+   module(m).dlTab
+      = genericExpand ( module(m).dlTab,
+                        &module(m).sizedlTab,
+                        module(m).useddlTab,
+                        4, sizeof(DLTabEnt) );
+   module(m).dlTab[ module(m).useddlTab ].start = start;
+   module(m).dlTab[ module(m).useddlTab ].end   = end;
+   module(m).dlTab[ module(m).useddlTab ].sect  = sect;
+   module(m).useddlTab++;
+}
+
+
+void* lookupOTabName ( Module m, char* nm )
+{
+   int i;
+   for (i = 0; i < module(m).usedoTab; i++)
+      if (0==strcmp(nm,module(m).oTab[i].nm))
+         return module(m).oTab[i].ad;
+   return NULL;
+}
+
+
+char* nameFromOPtr ( void* p )
+{
+   int i;
+   Module m;
+   for (m=MODMIN; m<moduleHw; m++)
+      for (i = 0; i < module(m).usedoTab; i++)
+         if (p == module(m).oTab[i].ad)
+            return module(m).oTab[i].nm;
+   return NULL;
+}
+
+
+DLSect lookupDLSect ( void* ad )
+{
+   int i;
+   Module m;
+   for (m=MODMIN; m<moduleHw; m++)
+      for (i = 0; i < module(m).useddlTab; i++)
+         if (module(m).dlTab[i].start <= ad &&
+             ad <= module(m).dlTab[i].end)
+            return module(m).dlTab[i].sect;
+   return HUGS_DL_SECTION_OTHER;
+}
+
 
 /* --------------------------------------------------------------------------
  * Script file storage:
@@ -2273,8 +2367,7 @@ Int what; {
                            mark(name(i).defn);
                            mark(name(i).stgVar);
                            mark(name(i).type);
-                           mark(name(i).ghc_names);
-                       }
+                        }
                        end("Names", nameHw-NAMEMIN);
 
                        start();
