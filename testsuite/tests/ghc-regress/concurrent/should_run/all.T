@@ -47,5 +47,9 @@ test "conc033" { myvtr("", "", "") }
 test "conc034" { myvtr("", "+RTS -C0 -RTS", "") }
 test "conc035" { myvtr("", "", "") }
 test "conc036" { myvtr("", "", "") }
-test "conc037" { myvtr("", "", "") }
-test "conc038" { myvtr("", "", "") }
+
+-- These two depend on $(GhcThreadedRts) at the moment, so until we can find
+-- a way to turn them off when $(GhcThreadedRts) == NO, disable them by default:
+--
+-- test "conc037" { myvtr("", "", "") }
+-- test "conc038" { myvtr("", "", "") }
