@@ -24,6 +24,8 @@ module System.Directory
     , getDirectoryContents      -- :: FilePath -> IO [FilePath]
     , getCurrentDirectory       -- :: IO FilePath
     , setCurrentDirectory       -- :: FilePath -> IO ()
+
+    -- * Pre-defined directories
     , getHomeDirectory
     , getAppUserDataDirectory
     , getUserDocumentsDirectory
