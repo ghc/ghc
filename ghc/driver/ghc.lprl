@@ -475,6 +475,7 @@ $HscOut = '-S='
 # TEMP: disable x86  if $HaveNativeCodeGen && $TargetPlatform =~ /^(i386|alpha|sparc)-/;
 $ProduceHi    = '-hifile=';
 $HiOnStdout   = 0;
+$HiWith       = '';
 $HiDiff_flag  = '';
 $Keep_HiDiffs = 0;
 
@@ -767,6 +768,15 @@ sub setupOptimiseFlags {
 	  $Oopt_UnfoldingUseThreshold,
 	  $Oopt_MaxSimplifierIterations,
 	  $Oopt_ShowSimplifierProgress,
+	  #
+	  # The presence of -fclone-binds is *crucial* here as
+	  # -ffull-laziness (which we're about to do next) floats
+	  # bindings outwards, so we better make sure that this
+	  # doesn't result in the floating out of bindings
+	  # with identical uniques, i.e., -ffull-laziness needs
+	  # to be preceeded by a simplifier pass with -fclone-binds
+	  # set.
+          '-fclone-binds',
 	  ']',
 
 #LATER:	'-fcalc-inlinings1', -- pointless for 2.01
@@ -1966,18 +1976,18 @@ sub makeHiMap {
     
     foreach $d ( @Import_dir ) {
 	if ($HiIncludeString) { 
-	   $HiIncludeString = "$HiIncludeString:${d}/%.${HiSuffix}";
+	   $HiIncludeString = "$HiIncludeString:${d}%.${HiSuffix}";
 	} else { 
-	   $HiIncludeString = "$d/%.${HiSuffix}"; 
+	   $HiIncludeString = "$d%.${HiSuffix}"; 
 	}
 
     }
 
     foreach $d ( @SysImport_dir ) {
 	if ($HiIncludeString) { 
-	    $HiIncludeString = "$HiIncludeString:${d}/%.${HiSuffix_prelude}";
+	    $HiIncludeString = "$HiIncludeString:${d}%.${HiSuffix_prelude}";
 	} else { 
-	    $HiIncludeString = "${d}/%.${HiSuffix_prelude}";
+	    $HiIncludeString = "${d}%.${HiSuffix_prelude}";
         }
     }
 
@@ -2603,8 +2613,11 @@ arg: while($_ = $Args[0]) {
 			    next arg; };
     # leave out actual C generation (debugging) [also turns off interface gen]
 
-    /^-hi$/	    && do { $HiOnStdout = 1; $ProduceHi = '-hifile='; next arg; };
+
+    /^-hi$/	         && do { $HiOnStdout = 1; $ProduceHi = '-hifile='; next arg; };
     # _do_ generate an interface; usually used as: -noC -hi
+    /^-hi-with-(.*)$/    && do { $HiOnStdout = 1; $HiWith .= " $1" ; $ProduceHi = '-hifile='; next arg; };
+    # limit ourselves to outputting a particular section.
 
     /^-nohi$/	    && do { $ProduceHi = '-nohifile='; next arg; };
     # don't generate an interface (even if generating C)
