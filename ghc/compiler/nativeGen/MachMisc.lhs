@@ -18,8 +18,9 @@ module MachMisc (
 
 	underscorePrefix,
 	fmtAsmLbl,
-	cvtLitLit,
 	exactLog2,
+
+        stixFor_stdout, stixFor_stderr, stixFor_stdin,
 
 	Instr(..),  IF_ARCH_i386(Operand(..) COMMA,)
 	Cond(..),
@@ -52,6 +53,7 @@ import Stix		( StixTree(..), StixReg(..), CodeSegment )
 import Panic		( panic )
 import Char		( isDigit )
 import GlaExts		( word2Int#, int2Word#, shiftRL#, and#, (/=#) )
+import Outputable	( text )
 \end{code}
 
 \begin{code}
@@ -78,6 +80,30 @@ fmtAsmLbl s
      )
 
 ---------------------------
+stixFor_stdout, stixFor_stderr, stixFor_stdin :: StixTree
+#if i386_TARGET_ARCH
+-- Linux glibc 2 / libc6
+stixFor_stdout  = StInd PtrRep (StLitLbl (text "stdout"))
+stixFor_stderr  = StInd PtrRep (StLitLbl (text "stderr"))
+stixFor_stdin   = StInd PtrRep (StLitLbl (text "stdin"))
+#endif
+
+#if alpha_TARGET_ARCH
+stixFor_stdout = error "stixFor_stdout: not implemented for Alpha"
+stixFor_stderr = error "stixFor_stderr: not implemented for Alpha"
+stixFor_stdin  = error "stixFor_stdin: not implemented for Alpha"
+#endif
+
+#if sparc_TARGET_ARCH
+stixFor_stdout = error "stixFor_stdout: not implemented for Sparc"
+stixFor_stderr = error "stixFor_stderr: not implemented for Sparc"
+stixFor_stdin  = error "stixFor_stdin: not implemented for Sparc"
+#endif
+
+#if 0
+Here's some old stuff from which it shouldn't be too hard to
+implement the above for Alpha/Sparc.
+
 cvtLitLit :: String -> String
 
 --
@@ -85,36 +111,20 @@ cvtLitLit :: String -> String
 -- _iob offsets.
 --
 cvtLitLit "stdin"  = IF_ARCH_alpha("_iob+0" {-probably OK...-}
-		    ,IF_ARCH_i386("_IO_stdin_"
+		    ,IF_ARCH_i386("stdin"
 		    ,IF_ARCH_sparc("__iob+0x0"{-probably OK...-}
 		    ,)))
 
 cvtLitLit "stdout" = IF_ARCH_alpha("_iob+"++show (``FILE_SIZE''::Int)
-		    ,IF_ARCH_i386("_IO_stdout_"
+		    ,IF_ARCH_i386("stdout"
 		    ,IF_ARCH_sparc("__iob+"++show (``FILE_SIZE''::Int)
 		    ,)))
 cvtLitLit "stderr" = IF_ARCH_alpha("_iob+"++show (2*(``FILE_SIZE''::Int))
-		    ,IF_ARCH_i386("_IO_stderr_"
+		    ,IF_ARCH_i386("stderr"
 		    ,IF_ARCH_sparc("__iob+"++show (2*(``FILE_SIZE''::Int))
 		    ,)))
-{-
-cvtLitLit "stdout" = IF_ARCH_alpha("_iob+56"{-dodgy *at best*...-}
-		    ,IF_ARCH_i386("_IO_stdout_"
-		    ,IF_ARCH_sparc("__iob+0x10"{-dodgy *at best*...-}
-		    ,)))
-cvtLitLit "stderr" = IF_ARCH_alpha("_iob+112"{-dodgy *at best*...-}
-		    ,IF_ARCH_i386("_IO_stderr_"
-		    ,IF_ARCH_sparc("__iob+0x20"{-dodgy *at best*...-}
-		    ,)))
--}
-cvtLitLit s
-  | isHex s   = s
-  | otherwise = error ("Native code generator can't handle ``" ++ s ++ "''")
-  where
-    isHex ('0':'x':xs) = all isHexDigit xs
-    isHex _ = False
-    -- Now, where have I seen this before?
-    isHexDigit c = isDigit c || c >= 'A' && c <= 'F' || c >= 'a' && c <= 'f'
+#endif
+
 \end{code}
 
 % ----------------------------------------------------------------

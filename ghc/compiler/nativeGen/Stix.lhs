@@ -45,7 +45,7 @@ data StixTree
   | StString	FAST_STRING
   | StLitLbl	SDoc    -- literal labels
 			    -- (will be _-prefixed on some machines)
-  | StLitLit	FAST_STRING -- innards from CLitLit
+
   | StCLbl	CLabel	    -- labels that we might index into
 
     -- Abstract registers of various kinds
@@ -126,7 +126,6 @@ ppStixTree t
        StString str   -> paren (text "Str" <+> ptext str)
        StComment str  -> paren (text "Comment" <+> ptext str)
        StLitLbl sd    -> sd
-       StLitLit ll    -> paren (text "LitLit" <+> ptext ll)
        StCLbl lbl     -> pprCLabel lbl
        StReg reg      -> ppStixReg reg
        StIndex k b o  -> paren (ppStixTree b <+> char '+' <> 

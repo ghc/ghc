@@ -71,7 +71,6 @@ stmt2Instrs stmt = case stmt of
 	getData (StInt i)    = returnUs (id, ImmInteger i)
 	getData (StDouble d) = returnUs (id, dblImmLit d)
 	getData (StLitLbl s) = returnUs (id, ImmLab s)
-	getData (StLitLit s) = returnUs (id, strImmLit (cvtLitLit (_UNPK_ s)))
 	getData (StCLbl l)   = returnUs (id, ImmCLbl l)
 	getData (StString s) =
 	    getUniqLabelNCG 	    	    `thenUs` \ lbl ->
@@ -158,7 +157,6 @@ mangleIndexTree (StIndex pk base off) = StPrim IntAddOp [base, off]
 maybeImm :: StixTree -> Maybe Imm
 
 maybeImm (StLitLbl s) = Just (ImmLab s)
-maybeImm (StLitLit s) = Just (strImmLit (cvtLitLit (_UNPK_ s)))
 maybeImm (StCLbl   l) = Just (ImmCLbl l)
 
 maybeImm (StIndex rep (StCLbl l) (StInt off)) = 
@@ -252,31 +250,7 @@ getRegister (StString s)
     in
     returnUs (Any PtrRep code)
 
-getRegister (StLitLit s) | _HEAD_ s == '"' && last xs == '"'
-  = getUniqLabelNCG 	    	    `thenUs` \ lbl ->
-    let 
-	imm_lbl = ImmCLbl lbl
 
-	code dst = mkSeqInstrs [
-	    SEGMENT DataSegment,
-	    LABEL lbl,
-	    ASCII False (init xs),
-	    SEGMENT TextSegment,
-#if alpha_TARGET_ARCH
-	    LDA dst (AddrImm imm_lbl)
-#endif
-#if i386_TARGET_ARCH
-	    MOV L (OpImm imm_lbl) (OpReg dst)
-#endif
-#if sparc_TARGET_ARCH
-	    SETHI (HI imm_lbl) dst,
-	    OR False dst (RIImm (LO imm_lbl)) dst
-#endif
-	    ]
-    in
-    returnUs (Any PtrRep code)
-  where
-    xs = _UNPK_ (_TAIL_ s)
 
 -- end of machine-"independent" bit; here we go on the rest...
 

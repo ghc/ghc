@@ -368,13 +368,13 @@ amodeToStix (CLit core)
       MachStr s	     -> StString s
       MachAddr a     -> StInt a
       MachInt i _    -> StInt (toInteger i)
-      MachLitLit s _ -> StLitLit s
+      MachLitLit s _ -> {-trace (_UNPK_ s ++ "\n")-} (litLitToStix (_UNPK_ s))
       MachFloat d    -> StDouble d
       MachDouble d   -> StDouble d
       _ -> panic "amodeToStix:core literal"
 
- -- A CLitLit is just a (CLit . MachLitLit)
-amodeToStix (CLitLit s _) = StLitLit s
+amodeToStix (CLitLit s _)
+   = litLitToStix (_UNPK_ s)
 
 amodeToStix (CMacroExpr _ macro [arg])
   = case macro of
@@ -390,6 +390,15 @@ amodeToStix (CMacroExpr _ macro [arg])
 -- XXX!!!
 -- GET_TAG(info_ptr) is supposed to be  get_itbl(info_ptr)->srt_len,
 -- which we've had to hand-code here.
+
+litLitToStix :: String -> StixTree
+litLitToStix nm
+   = case nm of
+        "stdout" -> stixFor_stdout
+        "stderr" -> stixFor_stderr
+        "stdin"  -> stixFor_stdin
+        other    -> error ("\nlitLitToStix: can't handle `" ++ nm ++ "'\n" 
+                           ++ "suggested workaround: use flag -fvia-C\n")
 \end{code}
 
 Sizes of the CharLike and IntLike closures that are arranged as arrays
