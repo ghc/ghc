@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.71 2001/04/20 10:56:12 michaelw Exp $
+dnl $Id: aclocal.m4,v 1.72 2001/05/25 13:56:25 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -81,7 +81,9 @@ AC_DEFUN(FPTOOLS_REGEX_IN_LIBC,
 #include <unistd.h>
 #endif
 #include <regex.h>
-],[ struct re_pattern_buffer patbuf; re_compile_pattern("",0,&patbuf); ],
+],[ struct re_pattern_buffer patbuf; 
+    re_compile_pattern("",0,&patbuf);
+    re_search_2 (&patbuf, "", 0, "",0, 0,0,0,0); ],
 fptools_cv_have_regex=yes, fptools_cv_have_regex=no)])
 if test "$fptools_cv_have_regex" = yes; then
 	HaveRegex=YES
@@ -889,7 +891,7 @@ dnl The variable LIBM (which is not an output variable by default) is
 dnl set to a value which is suitable for use in a Makefile (for example,
 dnl in make's LOADLIBES macro) provided you AC_SUBST it first.
 dnl
-dnl @version 0.01 $Id: aclocal.m4,v 1.71 2001/04/20 10:56:12 michaelw Exp $
+dnl @version 0.01 $Id: aclocal.m4,v 1.72 2001/05/25 13:56:25 simonmar Exp $
 dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
 
 # FPTOOLS_CHECK_LIBM - check for math library
@@ -977,7 +979,7 @@ dnl Please note that as the ac_opengl macro and the toy example evolves,
 dnl the version number increases, so you may have to adjust the above
 dnl URL accordingly.
 dnl
-dnl @version 0.01 $Id: aclocal.m4,v 1.71 2001/04/20 10:56:12 michaelw Exp $
+dnl @version 0.01 $Id: aclocal.m4,v 1.72 2001/05/25 13:56:25 simonmar Exp $
 dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
 
 AC_DEFUN(FPTOOLS_HAVE_OPENGL,
