@@ -53,6 +53,7 @@ module Int
 	, sizeofInt32
 	, sizeofInt64
 	
+#ifndef __PARALLEL_HASKELL__
 	-- The "official" place to get these from is Foreign
 	, indexInt8OffForeignObj
 	, indexInt16OffForeignObj
@@ -66,6 +67,7 @@ module Int
 	, writeInt16OffForeignObj
 	, writeInt32OffForeignObj
 	, writeInt64OffForeignObj
+#endif
 	
 	-- non-standard, GHC specific
 	, intToWord
@@ -983,9 +985,6 @@ signumReal x | x == 0    =  0
 indexInt8OffAddr  :: Addr -> Int -> Int8
 indexInt8OffAddr (A# a#) (I# i#) = intToInt8 (I# (ord# (indexCharOffAddr# a# i#)))
 
-indexInt8OffForeignObj  :: ForeignObj -> Int -> Int8
-indexInt8OffForeignObj (ForeignObj fo#) (I# i#) = intToInt8 (I# (ord# (indexCharOffForeignObj# fo# i#)))
-
 indexInt16OffAddr :: Addr -> Int -> Int16
 indexInt16OffAddr a i =
 #ifdef WORDS_BIGENDIAN
@@ -998,31 +997,8 @@ indexInt16OffAddr a i =
    l = indexInt8OffAddr a byte_idx
    h = indexInt8OffAddr a (byte_idx+1)
 
-indexInt16OffForeignObj :: ForeignObj -> Int -> Int16
-indexInt16OffForeignObj fo i =
-#ifdef WORDS_BIGENDIAN
-  intToInt16 ( int8ToInt l + (int8ToInt maxBound) * int8ToInt h)
-#else
-  intToInt16 ( int8ToInt h + (int8ToInt maxBound) * int8ToInt l)
-#endif
- where
-   byte_idx = i * 2
-   l = indexInt8OffForeignObj fo byte_idx
-   h = indexInt8OffForeignObj fo (byte_idx+1)
-
 indexInt32OffAddr :: Addr -> Int -> Int32
 indexInt32OffAddr (A# a#) i = intToInt32 (I# (indexIntOffAddr# a# i'#))
- where
-   -- adjust index to be in Int units, not Int32 ones.
-  (I# i'#) 
-#if WORD_SIZE_IN_BYTES==8
-   = i `div` 2
-#else
-   = i
-#endif
-
-indexInt32OffForeignObj :: ForeignObj -> Int -> Int32
-indexInt32OffForeignObj (ForeignObj fo#) i = intToInt32 (I# (indexIntOffForeignObj# fo# i'#))
  where
    -- adjust index to be in Int units, not Int32 ones.
   (I# i'#) 
@@ -1040,6 +1016,33 @@ indexInt64OffAddr (A# a#) (I# i#)
  = I64# (indexInt64OffAddr# a# i#)
 #endif
 
+#ifndef __PARALLEL_HASKELL__
+indexInt8OffForeignObj  :: ForeignObj -> Int -> Int8
+indexInt8OffForeignObj (ForeignObj fo#) (I# i#) = intToInt8 (I# (ord# (indexCharOffForeignObj# fo# i#)))
+
+indexInt16OffForeignObj :: ForeignObj -> Int -> Int16
+indexInt16OffForeignObj fo i =
+#ifdef WORDS_BIGENDIAN
+  intToInt16 ( int8ToInt l + (int8ToInt maxBound) * int8ToInt h)
+#else
+  intToInt16 ( int8ToInt h + (int8ToInt maxBound) * int8ToInt l)
+#endif
+ where
+   byte_idx = i * 2
+   l = indexInt8OffForeignObj fo byte_idx
+   h = indexInt8OffForeignObj fo (byte_idx+1)
+
+indexInt32OffForeignObj :: ForeignObj -> Int -> Int32
+indexInt32OffForeignObj (ForeignObj fo#) i = intToInt32 (I# (indexIntOffForeignObj# fo# i'#))
+ where
+   -- adjust index to be in Int units, not Int32 ones.
+  (I# i'#) 
+#if WORD_SIZE_IN_BYTES==8
+   = i `div` 2
+#else
+   = i
+#endif
+
 indexInt64OffForeignObj :: ForeignObj -> Int -> Int64
 indexInt64OffForeignObj (ForeignObj fo#) (I# i#)
 #if WORD_SIZE_IN_BYTES==8
@@ -1048,6 +1051,7 @@ indexInt64OffForeignObj (ForeignObj fo#) (I# i#)
  = I64# (indexInt64OffForeignObj# fo# i#)
 #endif
 
+#endif /* __PARALLEL_HASKELL__ */
 \end{code}
 
 Read words out of mutable memory:
@@ -1056,20 +1060,11 @@ Read words out of mutable memory:
 readInt8OffAddr :: Addr -> Int -> IO Int8
 readInt8OffAddr a i = _casm_ `` %r=(StgInt8)(((StgInt8*)%0)[(StgInt)%1]); '' a i
 
-readInt8OffForeignObj :: ForeignObj -> Int -> IO Int8
-readInt8OffForeignObj fo i = _casm_ `` %r=(StgInt8)(((StgInt8*)%0)[(StgInt)%1]); '' fo i
-
 readInt16OffAddr  :: Addr -> Int -> IO Int16
 readInt16OffAddr a i = _casm_ `` %r=(StgInt16)(((StgInt16*)%0)[(StgInt)%1]); '' a i
 
-readInt16OffForeignObj  :: ForeignObj -> Int -> IO Int16
-readInt16OffForeignObj fo i = _casm_ `` %r=(StgInt16)(((StgInt16*)%0)[(StgInt)%1]); '' fo i
-
 readInt32OffAddr  :: Addr -> Int -> IO Int32
 readInt32OffAddr a i = _casm_ `` %r=(StgInt32)(((StgInt32*)%0)[(StgInt)%1]); '' a i
-
-readInt32OffForeignObj  :: ForeignObj -> Int -> IO Int32
-readInt32OffForeignObj fo i = _casm_ `` %r=(StgInt32)(((StgInt32*)%0)[(StgInt)%1]); '' fo i
 
 readInt64OffAddr  :: Addr -> Int -> IO Int64
 #if WORD_SIZE_IN_BYTES==8
@@ -1078,32 +1073,34 @@ readInt64OffAddr a i = _casm_ `` %r=(StgInt)(((StgInt*)%0)[(StgInt)%1]); '' a i
 readInt64OffAddr a i = _casm_ `` %r=(StgInt64)(((StgInt64*)%0)[(StgInt)%1]); '' a i
 #endif
 
+#ifndef __PARALLEL_HASKELL__
+readInt8OffForeignObj :: ForeignObj -> Int -> IO Int8
+readInt8OffForeignObj fo i = _casm_ `` %r=(StgInt8)(((StgInt8*)%0)[(StgInt)%1]); '' fo i
+
+readInt16OffForeignObj  :: ForeignObj -> Int -> IO Int16
+readInt16OffForeignObj fo i = _casm_ `` %r=(StgInt16)(((StgInt16*)%0)[(StgInt)%1]); '' fo i
+
+readInt32OffForeignObj  :: ForeignObj -> Int -> IO Int32
+readInt32OffForeignObj fo i = _casm_ `` %r=(StgInt32)(((StgInt32*)%0)[(StgInt)%1]); '' fo i
+
 readInt64OffForeignObj  :: ForeignObj -> Int -> IO Int64
 #if WORD_SIZE_IN_BYTES==8
 readInt64OffForeignObj fo i = _casm_ `` %r=(StgInt)(((StgInt*)%0)[(StgInt)%1]); '' fo i
 #else
 readInt64OffForeignObj fo i = _casm_ `` %r=(StgInt64)(((StgInt64*)%0)[(StgInt)%1]); '' fo i
 #endif
+#endif /* __PARALLEL_HASKELL__ */
 \end{code}
 
 \begin{code}
 writeInt8OffAddr  :: Addr -> Int -> Int8  -> IO ()
 writeInt8OffAddr a i e = _casm_ `` (((StgInt8*)%0)[(StgInt)%1])=(StgInt8)%2; '' a i e
 
-writeInt8OffForeignObj  :: ForeignObj -> Int -> Int8  -> IO ()
-writeInt8OffForeignObj fo i e = _casm_ `` (((StgInt8*)%0)[(StgInt)%1])=(StgInt8)%2; '' fo i e
-
 writeInt16OffAddr :: Addr -> Int -> Int16 -> IO ()
 writeInt16OffAddr a i e = _casm_ `` (((StgInt16*)%0)[(StgInt)%1])=(StgInt16)%2; '' a i e
 
-writeInt16OffForeignObj :: ForeignObj -> Int -> Int16 -> IO ()
-writeInt16OffForeignObj fo i e = _casm_ `` (((StgInt16*)%0)[(StgInt)%1])=(StgInt16)%2; '' fo i e
-
 writeInt32OffAddr :: Addr -> Int -> Int32 -> IO ()
 writeInt32OffAddr a i e = _casm_ `` (((StgInt32*)%0)[(StgInt)%1])=(StgInt32)%2; '' a i e
-
-writeInt32OffForeignObj :: ForeignObj -> Int -> Int32 -> IO ()
-writeInt32OffForeignObj fo i e = _casm_ `` (((StgInt32*)%0)[(StgInt)%1])=(StgInt32)%2; '' fo i e
 
 writeInt64OffAddr :: Addr -> Int -> Int64 -> IO ()
 #if WORD_SIZE_IN_BYTES==8
@@ -1112,12 +1109,22 @@ writeInt64OffAddr a i e = _casm_ `` (((StgInt*)%0)[(StgInt)%1])=(StgInt)%2; '' a
 writeInt64OffAddr a i e = _casm_ `` (((StgInt64*)%0)[(StgInt)%1])=(StgInt64)%2; '' a i e
 #endif
 
+#ifndef __PARALLEL_HASKELL__
+writeInt8OffForeignObj  :: ForeignObj -> Int -> Int8  -> IO ()
+writeInt8OffForeignObj fo i e = _casm_ `` (((StgInt8*)%0)[(StgInt)%1])=(StgInt8)%2; '' fo i e
+
+writeInt16OffForeignObj :: ForeignObj -> Int -> Int16 -> IO ()
+writeInt16OffForeignObj fo i e = _casm_ `` (((StgInt16*)%0)[(StgInt)%1])=(StgInt16)%2; '' fo i e
+
+writeInt32OffForeignObj :: ForeignObj -> Int -> Int32 -> IO ()
+writeInt32OffForeignObj fo i e = _casm_ `` (((StgInt32*)%0)[(StgInt)%1])=(StgInt32)%2; '' fo i e
+
 writeInt64OffForeignObj :: ForeignObj -> Int -> Int64 -> IO ()
 #if WORD_SIZE_IN_BYTES==8
 writeInt64OffForeignObj fo i e = _casm_ `` (((StgInt*)%0)[(StgInt)%1])=(StgInt)%2; '' fo i e
 #else
 writeInt64OffForeignObj fo i e = _casm_ `` (((StgInt64*)%0)[(StgInt)%1])=(StgInt64)%2; '' fo i e
 #endif
-
+#endif /* __PARALLEL_HASKELL__ */
 \end{code}
 
