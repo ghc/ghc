@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: LinkerBasic.c,v 1.1 2001/02/11 17:51:07 simonmar Exp $
+ * $Id: LinkerBasic.c,v 1.2 2001/02/12 13:03:17 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -8,6 +8,7 @@
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
+#include "Hash.h"
 #include "StoragePriv.h"
 #include "LinkerInternals.h"
 
