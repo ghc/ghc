@@ -431,7 +431,7 @@ hscExpr dflags wrap_io hst hit pcs0 this_module expr
 
 		-- Typecheck it
 	maybe_tc_return
-	   <- typecheckExpr dflags wrap_io syn_map pcs1 hst print_unqual this_module rn_expr;
+	   <- typecheckExpr dflags wrap_io pcs1 hst print_unqual this_module rn_expr;
 	case maybe_tc_return of {
 		Nothing -> return ({-WAS:pcs1-} pcs0, Nothing);
 		Just (pcs2, tc_expr, ty) -> do

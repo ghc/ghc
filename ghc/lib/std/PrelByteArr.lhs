@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelByteArr.lhs,v 1.10 2001/01/11 17:25:57 simonmar Exp $
+% $Id: PrelByteArr.lhs,v 1.11 2001/02/20 18:40:54 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -18,6 +18,7 @@ import PrelArr
 import PrelFloat
 import PrelST
 import PrelBase
+import PrelNum ( fromInt )
 \end{code}
 
 %*********************************************************
