@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.44 $
- * $Date: 2000/02/24 12:34:19 $
+ * $Revision: 1.45 $
+ * $Date: 2000/02/29 12:27:35 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -584,6 +584,14 @@ assert(nonNull(namePMFail));
            setCurrModule(modulePrelude);
            module(modulePrelude).exports
               = cons ( nm, module(modulePrelude).exports );
+
+           /* The GHC prelude doesn't seem to export Addr.  Add it to the
+              export list for the sake of compatibility with standalone mode.
+	   */
+           module(modulePrelude).exports
+              = cons ( pair(typeAddr,DOTDOT), 
+                       module(modulePrelude).exports );
+           addTycon(typeAddr);
 
            /* Make nameListMonad be the builder fn for instance Monad [].
               Standalone hugs does this with a disgusting hack in 
