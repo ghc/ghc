@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.13 1999/02/01 18:05:30 simonm Exp $
+ * $Id: PrimOps.h,v 1.14 1999/02/02 14:19:49 simonm Exp $
  *
  * Macros for primitive operations in STG-ish C code.
  *
@@ -687,13 +687,13 @@ EF_(seqzh_fast);
 EF_(mkWeakzh_fast);
 EF_(finaliseWeakzh_fast);
 
-#define deRefWeakzh(code,val,w) 			\
+#define deRefWeakzh(code,val,w)				\
   if (((StgWeak *)w)->header.info == &WEAK_info) {	\
 	code = 1;					\
-	val = ((StgWeak *)w)->value;			\
+	val = (P_)((StgWeak *)w)->value;		\
   } else {						\
 	code = 0;					\
-	val = (StgClosure *)w;				\
+	val = (P_)w;					\
   }
 
 #define sameWeakzh(w1,w2)  ((w1)==(w2))
