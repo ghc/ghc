@@ -253,7 +253,7 @@ SRC_DIST_DIR=$(shell pwd)/$(SRC_DIST_NAME)
 SRC_DIST_DIRS += docs distrib $(SUBDIRS)
 SRC_DIST_FILES += \
 	configure.in config.guess config.sub configure \
-	aclocal.m4 acconfig.h README Makefile install-sh \
+	aclocal.m4 acconfig.h README Makefile Makefile.config install-sh \
 	mk/bootstrap.mk \
 	mk/boilerplate.mk mk/config.h.in mk/config.mk.in mk/opts.mk \
 	mk/paths.mk mk/suffix.mk mk/target.mk
