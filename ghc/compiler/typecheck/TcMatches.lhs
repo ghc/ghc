@@ -142,27 +142,28 @@ tcMatch xve1 ctxt match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty
     tc_grhss pats' rhs_ty 
 	=	-- Check that the remaining "expected type" is not a rank-2 type
 		-- If it is it'll mess up the unifier when checking the RHS
-	  checkTc (isTauTy rhs_ty) lurkingRank2SigErr 		`thenTc_`
+	  checkTc (isTauTy rhs_ty) lurkingRank2SigErr 	`thenTc` \_ -> 
 
 		-- Deal with the result signature
-	  tc_result_sig maybe_rhs_sig	( 
+		-- It "wraps" the rest of the body typecheck because it may
+		-- bring into scope the type variables in the signature
+	  tc_result_sig maybe_rhs_sig rhs_ty 		$
 
 		-- Typecheck the body
-		tcExtendLocalValEnv xve1 	$
-		tcGRHSs ctxt grhss rhs_ty	`thenTc` \ (grhss', lie) ->
-		returnTc ((pats', grhss'), lie)
-	  )
+	  tcExtendLocalValEnv xve1 			$
+	  tcGRHSs ctxt grhss rhs_ty			`thenTc` \ (grhss', lie) ->
+	  returnTc ((pats', grhss'), lie)
 
-    tc_result_sig Nothing thing_inside
+    tc_result_sig Nothing rhs_ty thing_inside
 	= thing_inside
-    tc_result_sig (Just sig) thing_inside
+    tc_result_sig (Just sig) rhs_ty thing_inside
 	= tcAddScopedTyVars [sig]			$
 	  tcHsSigType ResSigCtxt sig			`thenTc` \ sig_ty ->
 
 		-- Check that the signature isn't a polymorphic one, which
 		-- we don't permit (at present, anyway)
 	  checkTc (isTauTy sig_ty) (polyPatSig sig_ty)	`thenTc_`
-	  unifyTauTy expected_ty sig_ty			`thenTc_`
+	  unifyTauTy sig_ty rhs_ty			`thenTc_`
 	  thing_inside
 
 
