@@ -1,7 +1,8 @@
 module ShouldSucceed where
 
 -- import TheUtils
-import Data.Set
+import qualified Data.Set as Set
+import Data.Set (Set)
 import Data.List (partition )
 
 data Digraph vertex = MkDigraph [vertex]
@@ -75,13 +76,13 @@ mkEdges :: (Eq vertex, Ord name) =>
 mkEdges vertices flat_info
  = [ (source_vertex, target_vertex)
    | (source_vertex, _, used_names, _) <- flat_info,
-     target_name   <- setToList used_names,
+     target_name   <- Set.toList used_names,
      target_vertex <- vertices_defining target_name flat_info
    ]
  where
    vertices_defining name flat_info
     = [ vertex |  (vertex, names_defined, _, _) <- flat_info,
-   		name `elementOf` names_defined
+   		name `Set.member` names_defined
       ]
 
 lookupVertex :: (Eq vertex, Ord name) =>
