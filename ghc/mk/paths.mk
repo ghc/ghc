@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: paths.mk,v 1.32 2001/06/14 12:50:07 simonpj Exp $
+# $Id: paths.mk,v 1.33 2001/06/14 13:29:30 simonmar Exp $
 #
 # ghc project specific make variables
 #
@@ -54,7 +54,7 @@ ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 GHC_CP			= "copy /y"
 GHC_PERL		= perl
 GHC_TOUCHY		= touchy$(EXE_SUFFIX)
-cGHC_RAWCPP		= $(subst -mwin32,,$(RAWCPP))
+GHC_RAWCPP		= $(subst -mwin32,,$(RAWCPP))
 #	Don't know why we do this...
 
 else
