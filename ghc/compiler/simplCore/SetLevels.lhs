@@ -47,7 +47,7 @@ module SetLevels (
 
 	Level(..), tOP_LEVEL,
 
-	incMinorLvl, ltMajLvl, ltLvl, isTopLvl
+	incMinorLvl, ltMajLvl, ltLvl, isTopLvl, isInlineCtxt
     ) where
 
 #include "HsVersions.h"
@@ -111,11 +111,35 @@ sub-expression so that it will indeed float.
 
 If you can float to level @Level 0 0@ worth doing so because then your
 allocation becomes static instead of dynamic.  We always start with
-context @Level 0 0@.  @InlineCtxt@ very similar to @Level 0 0@, but is
-used for one purpose: to say "don't float anything out of here".
-That's exactly what we want for the body of an INLINE, where we don't
-want to float anything out at all.  See notes with lvlMFE below.
+context @Level 0 0@.  
 
+
+InlineCtxt
+~~~~~~~~~~
+@InlineCtxt@ very similar to @Level 0 0@, but is used for one purpose:
+to say "don't float anything out of here".  That's exactly what we
+want for the body of an INLINE, where we don't want to float anything
+out at all.  See notes with lvlMFE below.
+
+But, check this out:
+
+-- At one time I tried the effect of not float anything out of an InlineMe,
+-- but it sometimes works badly.  For example, consider PrelArr.done.  It
+-- has the form 	__inline (\d. e)
+-- where e doesn't mention d.  If we float this to 
+--	__inline (let x = e in \d. x)
+-- things are bad.  The inliner doesn't even inline it because it doesn't look
+-- like a head-normal form.  So it seems a lesser evil to let things float.
+-- In SetLevels we do set the context to (Level 0 0) when we get to an InlineMe
+-- which discourages floating out.
+
+So the conclusion is: don't do any floating at all inside an InlineMe.
+(In the above example, don't float the {x=e} out of the \d.)
+
+One particular case is that of workers: we don't want to float the
+call to the worker outside the wrapper, otherwise the worker might get
+inlined into the floated expression, and an importing module won't see
+the worker at all.
 
 \begin{code}
 type LevelledExpr  = TaggedExpr Level
@@ -126,13 +150,7 @@ iNLINE_CTXT = InlineCtxt
 
 incMajorLvl :: Level -> Level
 -- For InlineCtxt we ignore any inc's; we don't want
--- to do any floating at all.  For example,
---	f = __inline__ (\x -> g 3)
--- Don't float the (g 3) because that will stop it being
--- inlined.  One particular case is that of workers: we don't
--- want to float the call to the worker outside the wrapper,
--- otherwise the worker might get inlined into the floated expression, 
--- and an importing module won't see the worker at all.
+-- to do any floating at all; see notes above
 incMajorLvl InlineCtxt		= InlineCtxt
 incMajorLvl (Level major minor) = Level (major+1) 0
 
@@ -390,6 +408,10 @@ lvlBind :: TopLevelFlag		-- Used solely to decide whether to clone
 	-> LvlM (LevelledBind, LevelEnv)
 
 lvlBind top_lvl ctxt_lvl env (AnnNonRec bndr rhs@(rhs_fvs,_))
+  | isInlineCtxt ctxt_lvl	-- Don't do anything inside InlineMe
+  = lvlExpr ctxt_lvl env rhs			`thenLvl` \ rhs' ->
+    returnLvl (NonRec (bndr, ctxt_lvl) rhs', env)
+
   | null abs_vars
   =	-- No type abstraction; clone existing binder
     lvlExpr dest_lvl env rhs			`thenLvl` \ rhs' ->
@@ -416,6 +438,10 @@ lvlBind top_lvl ctxt_lvl env (AnnNonRec bndr rhs@(rhs_fvs,_))
 
 \begin{code}
 lvlBind top_lvl ctxt_lvl env (AnnRec pairs)
+  | isInlineCtxt ctxt_lvl	-- Don't do anything inside InlineMe
+  = mapLvl (lvlExpr ctxt_lvl env) rhss			`thenLvl` \ rhss' ->
+    returnLvl (Rec ((bndrs `zip` repeat ctxt_lvl) `zip` rhss'), env)
+
   | null abs_vars
   = cloneRecVars top_lvl env bndrs ctxt_lvl dest_lvl	`thenLvl` \ (new_env, new_bndrs) ->
     mapLvl (lvlExpr ctxt_lvl new_env) rhss		`thenLvl` \ new_rhss ->

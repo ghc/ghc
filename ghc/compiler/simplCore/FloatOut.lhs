@@ -19,7 +19,7 @@ import CostCentre	( dupifyCC, CostCentre )
 import Id		( Id )
 import VarEnv
 import CoreLint		( showPass, endPass )
-import SetLevels	( setLevels,
+import SetLevels	( setLevels, isInlineCtxt,
 		 	  Level(..), tOP_LEVEL, ltMajLvl, ltLvl, isTopLvl
 			)
 import UniqSupply       ( UniqSupply )
@@ -254,15 +254,10 @@ floatExpr env lvl (Note note@(SCC cc) expr)
 	ann_bind (Rec pairs)
 	  = Rec [(binder, mkSCC dupd_cc rhs) | (binder, rhs) <- pairs]
 
--- At one time I tried the effect of not float anything out of an InlineMe,
--- but it sometimes works badly.  For example, consider PrelArr.done.  It
--- has the form 	__inline (\d. e)
--- where e doesn't mention d.  If we float this to 
---	__inline (let x = e in \d. x)
--- things are bad.  The inliner doesn't even inline it because it doesn't look
--- like a head-normal form.  So it seems a lesser evil to let things float.
--- In SetLevels we do set the context to (Level 0 0) when we get to an InlineMe
--- which discourages floating out.
+floatExpr env lvl (Note InlineMe expr)	-- Other than SCCs
+  = case floatExpr env InlineCtxt expr of { (fs, floating_defns, expr') ->
+    ASSERT( null floating_defns )	-- We do no floating out of Inlines
+    (fs, [], Note InlineMe expr') }	-- See notes in SetLevels
 
 floatExpr env lvl (Note note expr)	-- Other than SCCs
   = case (floatExpr env lvl expr)    of { (fs, floating_defns, expr') ->
@@ -271,9 +266,13 @@ floatExpr env lvl (Note note expr)	-- Other than SCCs
 floatExpr env lvl (Let bind body)
   = case (floatBind env     lvl bind) of { (fsb, rhs_floats, bind', new_env) ->
     case (floatExpr new_env lvl body) of { (fse, body_floats, body') ->
-    (add_stats fsb fse,
-     rhs_floats ++ [(bind_lvl, bind')] ++ body_floats,
-     body')
+    if isInlineCtxt lvl then	-- No floating inside an InlineMe
+	ASSERT( null rhs_floats && null body_floats )
+	(add_stats fsb fse, [], Let bind' body')
+    else
+	(add_stats fsb fse,
+	 rhs_floats ++ [(bind_lvl, bind')] ++ body_floats,
+	 body')
     }}
   where
     bind_lvl = getBindLevel bind
