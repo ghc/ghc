@@ -830,7 +830,6 @@ VERBATIM		= $(VERBATIM_PREFIX)verbatim
 SGMLVERB		= $(SGMLVERB_PREFIX)sgmlverb
 RUNTEST			= $(RUNTEST_PREFIX)runstdtest
 LX			= @LxCmd@
-GREENCARD	        = $(FPTOOLS_TOP)/green-card/src/green-card
 
 BLD_DLL			= dllwrap
 
@@ -839,6 +838,17 @@ BLD_DLL			= dllwrap
 #
 ILX2IL                  = ilx2il
 ILASM                   = ilasm
+
+#
+# ghc-pkg
+#
+GHC_PKG		        = @GhcPkgCmd@
+
+#
+# Greencard
+#
+GREENCARD	        = @GreencardCmd@
+GREENCARD_VERSION	= @GreencardVersion@		
 
 #
 # Happy

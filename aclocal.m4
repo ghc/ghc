@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.115 2003/03/26 12:33:11 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.116 2003/05/17 14:49:45 reid Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -186,6 +186,28 @@ ifelse([$5],,,
 fi
 ])])dnl
 
+
+dnl
+dnl Check for Greencard and version.
+dnl
+AC_DEFUN(FPTOOLS_GREENCARD,
+[
+AC_PATH_PROG(GreencardCmd,green-card)
+AC_CACHE_CHECK([for version of green-card], fptools_cv_greencard_version,
+changequote(, )dnl
+[if test x"$GreencardCmd" != x; then
+   fptools_cv_greencard_version="`$GreencardCmd --version |
+			  grep 'version' | sed -e 's/green-card. version \([^ ]*\).*/\1/g'`"
+else
+   fptools_cv_greencard_version=""
+fi
+changequote([, ])dnl
+])
+FPTOOLS_PROG_CHECK_VERSION([$fptools_cv_greencard_version],-lt,$1,
+  [AC_MSG_ERROR([green-card version $1 or later is required (found '$fptools_cv_greencard_version')])])dnl
+GreencardVersion=$fptools_cv_greencard_version
+AC_SUBST(GreencardVersion)
+])
 
 dnl
 dnl Check for Happy and version.  If we're building GHC, then we need

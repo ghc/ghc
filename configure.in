@@ -670,6 +670,19 @@ fi
 AC_SUBST(CompressCmd)
 AC_SUBST(CompressSuffix)
 
+dnl ** check for ghc-pkg command
+AC_PATH_PROG(GhcPkgCmd,ghc-pkg)
+
+AC_ARG_WITH(greencard,
+[  --with-greencard=<greencard compiler>
+        Use a command different from 'green-card' to compile GreenCard files
+],
+[
+GreencardCmd=$withval;
+FPTOOLS_GREENCARD(3.00)
+]
+)
+
 AC_ARG_ENABLE(src-tree-happy,
 [  --enable-src-tree-happy
         Build and use source tree (fptools/happy) version of happy.
