@@ -167,6 +167,10 @@
 	</listitem>
 
 	<listitem>
+	  <para>(replace
+          <literal>&ndash;&ndash;--whole-archive</literal> with
+          <literal>&ndash;all_load</literal> on MacOS X)</para>
+
 	  <para>GHC does not maintain detailed cross-package
           dependency information.  It does remember which modules in
           other packages the current module depends on, but not which
