@@ -110,17 +110,17 @@ mapUniqSet f (MkUniqSet set)
 {-# SPECIALIZE
     addOneToUniqSet :: UniqSet Unique -> Unique -> UniqSet Unique
     #-}
-{-# SPECIALIZE
+{- SPECIALIZE
     elementOfUniqSet :: Name -> UniqSet Name -> Bool
 		      , Unique -> UniqSet Unique -> Bool
-    #-}
-{-# SPECIALIZE
+    -}
+{- SPECIALIZE
     mkUniqSet :: [Name] -> UniqSet Name
-    #-}
+    -}
 
-{-# SPECIALIZE
+{- SPECIALIZE
     unitUniqSet :: Name -> UniqSet Name
 		 , Unique -> UniqSet Unique
-    #-}
+    -}
 #endif
 \end{code}
