@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: subst.c,v $
- * $Revision: 1.15 $
- * $Date: 2000/03/13 14:11:14 $
+ * $Revision: 1.16 $
+ * $Date: 2000/03/22 18:14:23 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -26,11 +26,7 @@ static Int numTyvars;                   /* no. type vars currently in use  */
 static Int maxTyvars = 0;
 static Int nextGeneric;                 /* number of generics found so far */
 
-#if    FIXED_SUBST
-Tyvar  tyvars[NUM_TYVARS];              /* storage for type variables      */
-#else
 Tyvar  *tyvars = 0;                     /* storage for type variables      */
-#endif
 Int    typeOff;                         /* offset of result type           */
 Type   typeIs;                          /* skeleton of result type         */
 Int    typeFree;                        /* freedom in instantiated type    */
@@ -116,7 +112,6 @@ static Bool local kvarToTypeBind        ( Tyvar *,Type,Int );
 
 Void emptySubstitution() {              /* clear current substitution      */
     numTyvars   = 0;
-#if !FIXED_SUBST
     if (maxTyvars!=NUM_TYVARS) {
         maxTyvars = 0;
         if (tyvars) {
@@ -124,7 +119,6 @@ Void emptySubstitution() {              /* clear current substitution      */
             tyvars = 0;
         }
     }
-#endif
     nextGeneric = 0;
     genericVars = NIL;
     typeIs      = NIL;
@@ -134,12 +128,6 @@ Void emptySubstitution() {              /* clear current substitution      */
 
 static Void local expandSubst(n)        /* add further n type variables to */
 Int n; {                                /* current substituion             */
-#if FIXED_SUBST
-    if (numTyvars+n>NUM_TYVARS) {
-        ERRMSG(0) "Too many type variables in type checker"
-        EEND;
-    }
-#else
     if (numTyvars+n>maxTyvars) {        /* need to expand substitution     */
         Int   newMax = maxTyvars+NUM_TYVARS;
         Tyvar *newTvs;
@@ -173,7 +161,6 @@ Int n; {                                /* current substituion             */
         tyvars    = newTvs;
         maxTyvars = newMax;
     }
-#endif
 }
 
 Int newTyvars(n)                        /* allocate new type variables     */
@@ -514,7 +501,7 @@ Int vn; {                               /* type bound to given type var    */
         case FIXED_TYVAR    : return mkInt(vn);
 
         case UNUSED_GENERIC : (tyv->offs) = GENERIC + nextGeneric++;
-                              if (nextGeneric>=NUM_OFFSETS) {
+                              if (nextGeneric>=(OFF_MAX-OFF_MIN+1)) {
                                   ERRMSG(0)
                                       "Too many quantified type variables"
                                   EEND;

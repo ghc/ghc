@@ -12,15 +12,14 @@
  * included in the distribution.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.25 $
- * $Date: 2000/03/13 11:37:16 $
+ * $Revision: 1.26 $
+ * $Date: 2000/03/22 18:14:22 $
  * ------------------------------------------------------------------------*/
 
 %{
 #ifndef lint
 #define lint
 #endif
-#define defTycon(n,l,lhs,rhs,w)  tyconDefn(intOf(l),lhs,rhs,w); sp-=n
 #define sigdecl(l,vs,t)          ap(SIGDECL,triple(l,vs,t))
 #define fixdecl(l,ops,a,p)       ap(FIXDECL,\
                                     triple(l,ops,mkInt(mkSyntax(a,intOf(p)))))
@@ -28,8 +27,6 @@
 #define only(t)                  ap(ONLY,t)
 #define letrec(bs,e)             (nonNull(bs) ? ap(LETREC,pair(bs,e)) : e)
 #define qualify(ps,t)            (nonNull(ps) ? ap(QUAL,pair(ps,t)) : t)
-#define exportSelf()             singleton(ap(MODULEENT, \
-                                    mkCon(module(currentModule).text)))
 #define yyerror(s)               /* errors handled elsewhere */
 #define YYSTYPE                  Cell
 
@@ -73,6 +70,8 @@ static Void   local noIP	 ( String );
 #define gc5(e)                  gcShadow(5,e)
 #define gc6(e)                  gcShadow(6,e)
 #define gc7(e)                  gcShadow(7,e)
+#define gc8(e)                  gcShadow(8,e)
+#define gc9(e)                  gcShadow(9,e)
 
 %}
 
@@ -103,11 +102,11 @@ static Void   local noIP	 ( String );
 %%
 /*- Top level script/module structure -------------------------------------*/
 
-start     : EXPR exp wherePart          {inputExpr = letrec($3,$2); sp-=2;}
- 	  | CONTEXT context		{inputContext = $2;	    sp-=1;}
-          | SCRIPT topModule            {valDefns  = $2;            sp-=1;}
-          | INTERFACE iface             {sp-=1;}
-          | error                       {syntaxError("input");}
+start     : EXPR exp wherePart      {inputExpr    = letrec($3,$2); sp-=2;}
+ 	  | CONTEXT context	    {inputContext = $2;            sp-=1;}
+          | SCRIPT topModule        {drop(); push($2);}
+          | INTERFACE iface         {sp-=1;}
+          | error                   {syntaxError("input");}
           ;
 
 
@@ -132,8 +131,8 @@ ifTopDecls:                             {$$=gc0(NIL);}
           ;
 
 ifTopDecl    
-          : IMPORT CONID NUMLIT ifOrphans ifOptCOCO ifVersionList
-                                        {$$=gc6(ap(I_IMPORT,zpair($2,$6))); }
+          : IMPORT CONID NUMLIT ifOrphans ifIsBoot ifOptCOCO ifVersionList
+                                        {$$=gc7(ap(I_IMPORT,zpair($2,$7))); }
 
           | INSTIMPORT CONID            {$$=gc2(ap(I_INSTIMPORT,NIL));}
 
@@ -181,6 +180,8 @@ ifTopDecl
 
 /*- Top-level misc interface stuff ------------------------*/
 ifOrphans : '!'                         {$$=gc1(NIL);}
+          |                             {$$=gc0(NIL);}
+ifIsBoot  : '@'                         {$$=gc1(NIL);}
           |                             {$$=gc0(NIL);}
           ;
 ifOptCOCO : COCO                        {$$=gc1(NIL);}
@@ -422,57 +423,40 @@ ifVersionList
 
 
 /*- Haskell module header/import parsing: -----------------------------------
- * Syntax for Haskell modules (module headers and imports) is parsed but
- * most of it is ignored.  However, module names in import declarations
- * are used, of course, if import chasing is turned on.
+ * Module chasing is now totally different from Classic Hugs98.  We parse
+ * the entire syntax tree.  Subsequent passes over the tree collect and
+ * chase imports; we no longer attempt to do so whilst parsing.
  *-------------------------------------------------------------------------*/
 
 /* In Haskell 1.2, the default module header was "module Main where"
  * In 1.3, this changed to "module Main(main) where".
  * We use the 1.2 header because it breaks much less pre-module code.
+ * STG Hugs, 15 March 00: disallow default headers (pro tem).
  */
-topModule : startMain begin modBody end {
-                                         setExportList(singleton(
-                                            ap(MODULEENT,
-                                            mkCon(module(currentModule).text)
-                                            )));
-                                         $$ = gc3($3);
-                                        }
-          | TMODULE modname expspec WHERE '{' modBody end
-                                        {setExportList($3);   $$ = gc7($6);}
+topModule : TMODULE modname expspec WHERE '{' modBody end
+                                        {$$=gc7(ap(M_MODULE,
+						   ztriple($2,$3,$6)));}
+          | TMODULE modname WHERE '{' modBody end
+                                        {$$=gc6(ap(M_MODULE,
+                                            ztriple(
+                                              $2,
+                                              singleton(ap(MODULEENT,$2)),
+                                              $5)));}
           | TMODULE error               {syntaxError("module definition");}
           ;
-/* To implement the Haskell module system, we have to keep track of the
- * current module.  We rely on the use of LALR parsing to ensure that this 
- * side effect happens before any declarations within the module.
- */
-startMain : /* empty */                 {startModule(conMain); 
-                                         $$ = gc0(NIL);}
+
+modname   : CONID                       {$$ = gc1($1);}
           ;
-modname   : CONID                       {startModule($1); $$ = gc1(NIL);}
+modid     : CONID                       {$$ = gc1($1);}
           ;
-modid     : CONID                       {$$ = $1;}
-          | STRINGLIT                   { extern String scriptFile;
-                                          String modName 
-                                             = findPathname(scriptFile,
-                                                 textToStr(textOf($1)));
-                                          if (modName) { 
-                                              /* fillin pathname if known */
-                                              $$ = mkStr(findText(modName));
-                                          } else {
-                                              $$ = $1;
-                                          }
-                                        }
-          ;
-modBody   : topDecls                    {$$ = $1;}
-          | impDecls chase              {$$ = gc2(NIL);}
-          | impDecls ';' chase topDecls {$$ = gc4($4);}
+modBody   : topDecls                    {$$ = gc1($1);}
+          | impDecls                    {$$ = gc1($1);}
+          | impDecls ';' topDecls       {$$ = gc3(appendOnto($1,$3));}
           ;
 
 /*- Exports: --------------------------------------------------------------*/
 
-expspec   : /* empty */                 {$$ = gc0(exportSelf());}
-          | '(' ')'                     {$$ = gc2(NIL);}
+expspec   : '(' ')'                     {$$ = gc2(NIL);}
           | '(' exports ')'             {$$ = gc3($2);}
           | '(' exports ',' ')'         {$$ = gc4($2);}
           ;
@@ -502,36 +486,32 @@ qname     : qvar                        {$$ = $1;}
 
 /*- Import declarations: --------------------------------------------------*/
 
-impDecls  : impDecls ';' impDecl        {imps = cons($3,imps); $$=gc3(NIL);}
-          | impDecl                     {imps = singleton($1); $$=gc1(NIL);}
+impDecls  : impDecls ';' impDecl        {$$ = gc3(appendOnto($3,$1));}
+          | impDecl                     {$$ = gc1($1);}
           ;
-chase     : /* empty */                 {if (chase(imps)) {
-                                             clearStack();
-                                             onto(imps);
-                                             done();
-                                             closeAnyInput();
-                                             return 0;
-                                         }
-                                         $$ = gc0(NIL);
-                                        }
-          ;
+
 /* Note that qualified import ignores the import list. */
-impDecl   : IMPORT modid impspec        {addQualImport($2,$2);
-                                         addUnqualImport($2,$3);
-                                         $$ = gc3($2);}
+impDecl   : IMPORT modid impspec        {$$=gc3(doubleton(
+                                              ap(M_IMPORT_Q,zpair($2,$2)),
+                                              ap(M_IMPORT_UNQ,zpair($2,$3))
+                                            ));}
           | IMPORT modid ASMOD modid impspec
-                                        {addQualImport($2,$4);
-                                         addUnqualImport($2,$5);
-                                         $$ = gc5($2);}
+                                        {$$=gc5(doubleton(
+                                              ap(M_IMPORT_Q,zpair($2,$4)),
+                                              ap(M_IMPORT_UNQ,zpair($2,$5))
+                                         ));}
           | IMPORT QUALIFIED modid ASMOD modid impspec
-                                        {addQualImport($3,$5);
-                                         $$ = gc6($3);}
+                                        {$$=gc6(singleton(
+                                               ap(M_IMPORT_Q,zpair($3,$5))
+                                            ));}
           | IMPORT QUALIFIED modid impspec
-                                        {addQualImport($3,$3);
-                                         $$ = gc4($3);}
+                                        {$$=gc4(singleton(
+                                               ap(M_IMPORT_Q,zpair($3,$3))
+                                            ));}
           | IMPORT PRIVILEGED modid '(' imports ')'
-	                                {addUnqualImport($3,ap(STAR,$5));
-					 $$ = gc6($3);}
+	                                {$$=gc6(singleton(
+                                               ap(M_IMPORT_UNQ,
+                                                  zpair($3,ap(STAR,$5)))));}
           | IMPORT error                {syntaxError("import declaration");}
           ;
 impspec   : /* empty */                 {$$ = gc0(DOTDOT);}
@@ -565,44 +545,50 @@ name      : var                         {$$ = $1;}
 
 /*- Top-level declarations: -----------------------------------------------*/
 
-topDecls  : /* empty */                 {$$ = gc0(NIL);}
-          | ';'                         {$$ = gc1(NIL);}
-          | topDecls1                   {$$ = $1;}
-          | topDecls1 ';'               {$$ = gc2($1);}
-          ;
-topDecls1 : topDecls1 ';' topDecl       {$$ = gc2($1);}
-          | topDecls1 ';' decl          {$$ = gc3(cons($3,$1));}
-          | topDecl                     {$$ = gc0(NIL);}
-          | decl                        {$$ = gc1(cons($1,NIL));}
-          ;
+topDecls : /* empty */                  {$$=gc0(NIL);}
+         | topDecl ';' topDecls         {$$=gc3(cons($1,$3));}
+         | decl    ';' topDecls         {$$=gc3(cons(ap(M_VALUE,$1),$3));}
+         | topDecl                      {$$=gc1(cons($1,NIL));}
+         | decl                         {$$=gc1(cons(ap(M_VALUE,$1),NIL));}
+         ;
 
 /*- Type declarations: ----------------------------------------------------*/
 
-topDecl   : TYPE tyLhs '=' type         {defTycon(4,$3,$2,$4,SYNONYM);}
+topDecl   : TYPE tyLhs '=' type         {$$=gc4(ap(M_TYCON,
+                                                   z4ble($3,$2,$4,
+                                                         SYNONYM)));}
           | TYPE tyLhs '=' type IN invars
-                                        {defTycon(6,$3,$2,
-                                                    ap($4,$6),RESTRICTSYN);}
+                                        {$$=gc6(ap(M_TYCON,
+                                                   z4ble($3,$2,ap($4,$6),
+                                                         RESTRICTSYN)));}
           | TYPE error                  {syntaxError("type definition");}
           | DATA btype2 '=' constrs deriving
-                                        {defTycon(5,$3,checkTyLhs($2),
-                                                   ap(rev($4),$5),DATATYPE);}
+                                        {$$=gc5(ap(M_TYCON,
+                                                z4ble($3,checkTyLhs($2),
+                                                      ap(rev($4),$5),
+                                                      DATATYPE)));}
           | DATA context IMPLIES tyLhs '=' constrs deriving
-                                        {defTycon(7,$5,$4,
-                                                  ap(qualify($2,rev($6)),
-                                                     $7),DATATYPE);}
-          | DATA btype2                 {defTycon(2,$1,checkTyLhs($2),
-                                                    ap(NIL,NIL),DATATYPE);}
-          | DATA context IMPLIES tyLhs  {defTycon(4,$1,$4,
-                                                  ap(qualify($2,NIL),
-                                                     NIL),DATATYPE);}
+                                        {$$=gc7(ap(M_TYCON,
+                                                   z4ble($5,$4,
+                                                      ap(qualify($2,rev($6)),$7),
+                                                      DATATYPE)));}
+          | DATA btype2                 {$$=gc2(ap(M_TYCON,
+                                                   z4ble($1,checkTyLhs($2),
+                                                      ap(NIL,NIL),DATATYPE)));}
+          | DATA context IMPLIES tyLhs  {$$=gc4(ap(M_TYCON,
+                                                  z4ble($1,$4,
+                                                        ap(qualify($2,NIL),NIL),
+                                                        DATATYPE)));}
           | DATA error                  {syntaxError("data definition");}
           | TNEWTYPE btype2 '=' nconstr deriving
-                                        {defTycon(5,$3,checkTyLhs($2),
-                                                    ap($4,$5),NEWTYPE);}
+                                        {$$=gc5(ap(M_TYCON,
+                                                   z4ble($3,checkTyLhs($2),
+                                                         ap($4,$5),NEWTYPE)));}
           | TNEWTYPE context IMPLIES tyLhs '=' nconstr deriving
-                                        {defTycon(7,$5,$4,
-                                                  ap(qualify($2,$6),
-                                                     $7),NEWTYPE);}
+                                        {$$=gc7(ap(M_TYCON,
+                                                   z4ble($5,$4,
+                                                         ap(qualify($2,$6),$7),
+                                                         NEWTYPE)));}
           | TNEWTYPE error              {syntaxError("newtype definition");}
           ;
 tyLhs     : tyLhs varid                 {$$ = gc2(ap($1,$2));}
@@ -674,11 +660,11 @@ derivs    : derivs ',' qconid           {$$ = gc3(cons($3,$1));}
 /*- Processing definitions of primitives ----------------------------------*/
 
 topDecl   : FOREIGN IMPORT callconv DYNAMIC unsafe_flag var COCO type 
-                            {foreignImport($1,$3,NIL,$6,$8); sp-=8;}
+               {$$=gc8(ap(M_FOREIGN_IM,z5ble($1,$3,NIL,$6,$8)));}
           | FOREIGN IMPORT callconv ext_loc ext_name unsafe_flag var COCO type 
-                            {foreignImport($1,$3,pair($4,$5),$7,$9); sp-=9;}
+               {$$=gc9(ap(M_FOREIGN_IM,z5ble($1,$3,pair($4,$5),$7,$9)));}
           | FOREIGN EXPORT callconv DYNAMIC qvarid COCO type 
-                            {foreignExport($1,$3,$4,$5,$7); sp-=7;}
+               {$$=gc7(ap(M_FOREIGN_EX,z5ble($1,$3,$4,$5,$7)));}
 	  ;
 
 callconv  : CCALL                {$$ = gc1(textCcall);}
@@ -696,9 +682,9 @@ unsafe_flag: /* empty */         {$$ = gc0(NIL);}
 
 /*- Class declarations: ---------------------------------------------------*/
 
-topDecl	  : TCLASS crule fds wherePart	{classDefn(intOf($1),$2,$4,$3); sp-=4;}
-          | TINSTANCE irule wherePart   {instDefn(intOf($1),$2,$3);  sp-=3;}
-          | DEFAULT '(' dtypes ')'      {defaultDefn(intOf($1),$3);  sp-=4;}
+topDecl	  : TCLASS crule fds wherePart	{$$=gc4(ap(M_CLASS,z4ble($1,$2,$4,$3)));}
+          | TINSTANCE irule wherePart   {$$=gc3(ap(M_INST,ztriple($1,$2,$3)));}
+          | DEFAULT '(' dtypes ')'      {$$=gc4(ap(M_DEFAULT,zpair($1,$3)));}
           | TCLASS error                {syntaxError("class declaration");}
           | TINSTANCE error             {syntaxError("instance declaration");}
           | DEFAULT error               {syntaxError("default declaration");}
@@ -1279,10 +1265,6 @@ varid1    : VARID                       {$$ = gc1($1);}
 
 /*- Tricks to force insertion of leading and closing braces ---------------*/
 
-begin     : error                       {yyerrok; 
-                                         if (offsideON) goOffside(startColumn);}
-          ;
-                                        /* deal with trailing semicolon    */
 end       : '}'                         {$$ = $1;}
           | error                       {yyerrok; 
                                          if (offsideON && canUnOffside()) {

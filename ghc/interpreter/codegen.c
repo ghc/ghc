@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.18 $
- * $Date: 2000/03/10 20:03:36 $
+ * $Revision: 1.19 $
+ * $Date: 2000/03/22 18:14:22 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -88,29 +88,18 @@ char* lookupHugsName( void* closure )
 {
     extern Name nameHw;
     Name nm;
-    for( nm=NAMEMIN; nm<nameHw; ++nm ) {
-        StgVar v  = name(nm).stgVar;
-        if (isStgVar(v) 
-            && isPtr(stgVarInfo(v)) 
-            && varHasClosure(v)
-            && closureOfVar(v) == closure) {
-            return textToStr(name(nm).text);
-        }
+    for( nm = NAME_BASE_ADDR; 
+         nm < NAME_BASE_ADDR+tabNameSz; ++nm ) 
+       if (name(nm).inUse) {
+           StgVar v  = name(nm).stgVar;
+           if (isStgVar(v) 
+               && isPtr(stgVarInfo(v)) 
+               && varHasClosure(v)
+               && closureOfVar(v) == closure) {
+               return textToStr(name(nm).text);
+           }
     }
     return 0;
-}
-
-/* called at the start of GC */
-void markHugsObjects( void )
-{
-    extern Name nameHw;
-    Name nm;
-    for( nm=NAMEMIN; nm<nameHw; ++nm ) {
-        StgVar v  = name(nm).stgVar;
-        if (isStgVar(v) && isPtr(stgVarInfo(v))) {
-            asmMarkObject((AsmClosure*)ptrOf(stgVarInfo(v)));
-        }
-    }
 }
 
 static void cgBindRep( AsmBCO bco, StgVar v, AsmRep rep )
@@ -218,7 +207,7 @@ static AsmBCO cgAlts( AsmSp root, AsmSp sp, List alts )
        con = stgCaseAltCon(hd(alts));
 
        /* special case: dictionary constructors */
-       if (strncmp(":D",textToStr(name(con).text),2)==0) {
+       if (isName(con) && strncmp(":D",textToStr(name(con).text),2)==0) {
           omit_test = TRUE;
           goto xyzzy;
        }
@@ -752,15 +741,33 @@ Void cgBinds( List binds )
 #endif
 
     for (b=binds,i=0; nonNull(b); b=tl(b),i++) {
+       /* printStg( stdout, hd(b) ); printf( "\n\n"); */
        beginTop(hd(b));
     }
 
     for (b=binds,i=0; nonNull(b); b=tl(b),i++) {
-       //printStg( stdout, hd(b) ); printf( "\n\n");
+       /* printStg( stdout, hd(b) ); printf( "\n\n"); */
        endTop(hd(b));
     }
 
-    //mapProc(zap,binds);
+    /* mapProc(zap,binds); */
+}
+
+/* Called by the evaluator's GC to tell Hugs to mark stuff in the
+   run-time heap.
+*/
+void markHugsObjects( void )
+{
+    extern Name nameHw;
+    Name nm;
+    for ( nm = NAME_BASE_ADDR; 
+          nm < NAME_BASE_ADDR+tabNameSz; ++nm )
+       if (tabName[nm-NAME_BASE_ADDR].inUse) {
+           StgVar v  = name(nm).stgVar;
+           if (isStgVar(v) && isPtr(stgVarInfo(v))) {
+               asmMarkObject(ptrOf(stgVarInfo(v)));
+           }
+       }
 }
 
 /* --------------------------------------------------------------------------

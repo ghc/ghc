@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: prelude.h,v $
- * $Revision: 1.10 $
- * $Date: 2000/03/13 14:10:24 $
+ * $Revision: 1.11 $
+ * $Date: 2000/03/22 18:14:23 $
  * ------------------------------------------------------------------------*/
 
 #define NON_POSIX_SOURCE
@@ -71,35 +71,6 @@
 
 #if HAVE_WINDOWS_H
 #include <windows.h>                    /* Misc. Windows hackery           */
-#endif
-
-#if HUGS_FOR_WINDOWS
-
-#if     __MSDOS__
-# define INT           int
-# define UNSIGNED      unsigned
-# define CHAR          char
-# define TCHAR         char
-# define UCHAR         UNSIGNED CHAR
-# define ULONG         unsigned long
-# define APIENTRY      PASCAL
-# define HUGE          huge
-# define LPOFNHOOKPROC FARPROC
-# define CMDdata(w,l)  (HIWORD(l))      /* decoding WM_COMMAND message     */
-# define CMDitem(w,l)  (w)
-# define CMDhwnd(w,l)  ((HWND)(LOWORD(l)))
-#else
-# define HUGE
-# define CMDdata(w,l)  (HIWORD(w))      /* decoding WM_COMMAND message     */
-# define CMDitem(w,l)  (LOWORD(w))
-# define CMDhwnd(w,l)  ((HWND)(l))
-#endif
-
-#include "win-menu.h"
-extern char *appName;
-extern HWND             hWndText;       /* text output window handle       */
-extern HWND             hWndMain;       /* main window handle              */
-#include "win-text.h"
 #endif
 
 
@@ -265,14 +236,6 @@ typedef shl_t ObjectFile;
 #endif
 #endif
 
-#if DYN_TABLES                          /* Tables may be alloc'd at runtime*/
-#define DECTABLE(tab)      far *tab     /* macros for declaration & defn   */
-#define DEFTABLE(tab,sz)   far *tab = 0
-#else                                   /* or at compile-time:             */
-#define DECTABLE(tab)      tab[]
-#define DEFTABLE(tab,sz)   tab[sz]
-#endif
-
 /*---------------------------------------------------------------------------
  * Printf-related operations:
  *-------------------------------------------------------------------------*/
@@ -284,11 +247,11 @@ typedef shl_t ObjectFile;
 #endif
 
 #if !defined(HAVE_SNPRINTF)
-extern int snprintf   ( char*, int, const char*, ... );
+extern int snprintf ( char*, int, const char*, ... );
 #endif
 
 #if !defined(HAVE_VSNPRINTF)
-extern int vsnprintf  ( char*, int, const char*, va_list );
+extern int vsnprintf ( char*, int, const char*, va_list );
 #endif
 
 /*---------------------------------------------------------------------------
@@ -296,30 +259,6 @@ extern int vsnprintf  ( char*, int, const char*, va_list );
  * Tweaking this lets us redirect prompts, error messages, etc - but has no
  * effect on output of Haskell programs (which should use hPutStr and friends).
  *-------------------------------------------------------------------------*/
-
-#if REDIRECT_OUTPUT
-
-extern Void   hugsPrintf            ( const char *, ... );
-extern Void   hugsPutchar           ( int );
-extern Void   hugsFlushStdout       ( Void );
-extern Void   hugsEnableOutput      ( Bool );
-extern String hugsClearOutputBuffer ( Void );
-                            
-extern Void   hugsFFlush            ( FILE* );
-extern Void   hugsFPrintf           ( FILE*, const char*, ... );
-extern Void   hugsPutc              ( int, FILE* );
-
-#define Printf               hugsPrintf
-#define Putchar              hugsPutchar
-#define FlushStdout          hugsFlushStdout
-#define EnableOutput         hugsEnableOutput
-#define ClearOutputBuffer    hugsClearOutputBuffer
-
-#define FFlush               hugsFFlush
-#define FPrintf              hugsFPrintf
-#define Putc                 hugsPutc
-                             
-#else                        
                              
 #define Printf               printf
 #define Putchar              putchar
@@ -330,7 +269,5 @@ extern Void   hugsPutc              ( int, FILE* );
 #define FFlush               fflush
 #define FPrintf              fprintf
 #define Putc                 putc
-
-#endif
 
 /*-------------------------------------------------------------------------*/

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.21 $
- * $Date: 2000/03/13 11:37:16 $
+ * $Revision: 1.22 $
+ * $Date: 2000/03/22 18:14:22 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -27,7 +27,7 @@
 #include <windows.h>
 #endif
 
-#if IS_WIN32 || HUGS_FOR_WINDOWS
+#if IS_WIN32
 #undef IN
 #endif
 
@@ -567,7 +567,7 @@ static Void local skip() {              /* move forward one char in input  */
                 c1 = EOF;
             else {
                 c1 = nextConsoleChar();
-#if IS_WIN32 && !HUGS_FOR_WINDOWS
+#if IS_WIN32
 		Sleep(0);
 #endif
   		/* On Win32, hitting ctrl-C causes the next getchar to
@@ -1263,7 +1263,7 @@ String readLine() {                    /* Read command line from input     */
  * - Otherwise, if no `{' follows the keywords WHERE/LET or OF, a SOFT `{'
  *   is inserted with the column number of the first token after the
  *   WHERE/LET/OF keyword.
- * - When a soft indentation is uppermost on the indetation stack with
+ * - When a soft indentation is uppermost on the indentation stack with
  *   column col' we insert:
  *    `}'  in front of token with column<col' and pop indentation off stack,
  *    `;'  in front of token with column==col'.
@@ -1611,65 +1611,19 @@ Int startWith; {                       /* determining whether to read a    */
         ERRMSG(row) "Parser overflow"  /* as all syntax errors are caught  */
         EEND;                          /* in the parser...                 */
     }
+
+    if (startWith==SCRIPT) pop();      /* zap spurious closing } token     */
     final = pop();
+
     if (!stackEmpty())                 /* stack should now be empty        */
         internal("parseInput");
     return final;
 }
 
-#ifdef HSCRIPT
-static String memPrefix = "@mem@";
-static Int lenMemPrefix = 5;   /* strlen(memPrefix)*/
-
-Void makeMemScript(mem,fname)
-String mem;
-String fname; {     
-   strcat(fname,memPrefix);
-   itoa((int)mem, fname+strlen(fname), 10); 
-}
-
-Bool isMemScript(fname)
-String fname; {
-   return (strstr(fname,memPrefix) != NULL);
-}
-
-String memScriptString(fname)
-String fname; { 
-    String p = strstr(fname,memPrefix);
-    if (p) {
-        return (String)atoi(p+lenMemPrefix);
-    } else {
-        return NULL;
-    }
-}
-
-Void parseScript(fname,len)             /* Read a script, possibly from mem */
-String fname;
-Long len; {
-    input(RESET);
-    if (isMemScript(fname)) {
-        char* s = memScriptString(fname);
-        stringInput(s);
-    } else {
-        fileInput(fname,len);
-    }
-    parseInput(SCRIPT);
-}
-#else
-Void parseScript(nm,len)               /* Read a script                    */
-String nm;
-Long   len; {                          /* Used to set a target for reading */
-    input(RESET);
-    fileInput(nm,len);
-    parseInput(SCRIPT);
-}
-#endif
-
 Void parseExp() {                      /* Read an expression to evaluate   */
     parseInput(EXPR);
     setLastExpr(inputExpr);
 }
-
 
 #if EXPLAIN_INSTANCE_RESOLUTION
 Void parseContext() {                  /* Read a context to prove   */
@@ -1681,8 +1635,18 @@ Cell parseInterface(nm,len)            /* Read a GHC interface file        */
 String nm;
 Long   len; {                          /* Used to set a target for reading */
    input(RESET);
+   Printf("Reading interface \"%s\"\n", nm );
    fileInput(nm,len);
    return parseInput(INTERFACE);
+}
+
+Cell parseModule(nm,len)               /* Read a module                    */
+String nm;
+Long   len; {                          /* Used to set a target for reading */
+    input(RESET);
+    Printf("Reading source file \"%s\"\n", nm );
+    fileInput(nm,len);
+    return parseInput(SCRIPT);
 }
 
 

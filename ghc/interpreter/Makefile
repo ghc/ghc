@@ -1,6 +1,6 @@
 
 # --------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.27 2000/02/24 14:40:38 sewardj Exp $                      #
+# $Id: Makefile,v 1.28 2000/03/22 18:14:22 sewardj Exp $                      #
 # --------------------------------------------------------------------------- #
 
 TOP = ..
@@ -44,7 +44,7 @@ C_SRCS = link.c type.c static.c storage.c derive.c input.c compiler.c subst.c \
      translate.c codegen.c lift.c free.c stgSubst.c output.c   \
      hugs.c dynamic.c stg.c sainteger.c object.c interface.c
 
-SRC_CC_OPTS = -g -O -I$(GHC_INTERPRETER_DIR) -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR) -D__HUGS__ -DCOMPILING_RTS -Wall -Wstrict-prototypes -Wno-unused -DDEBUG -Winline
+SRC_CC_OPTS = -g  -I$(GHC_INTERPRETER_DIR) -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR) -D__HUGS__ -DCOMPILING_RTS -Wall -Wstrict-prototypes -Wno-unused -DDEBUG -Winline
 
 GHC_LIBS_NEEDED = $(GHC_RUNTIME_DIR)/libHSrts.a
 

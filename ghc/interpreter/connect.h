@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.31 $
- * $Date: 2000/03/20 04:26:23 $
+ * $Revision: 1.32 $
+ * $Date: 2000/03/22 18:14:22 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -375,7 +375,7 @@ extern  Void   input            ( Int );
 extern  Void   consoleInput     ( String );
 extern  Void   projInput        ( String );
 extern  Void   stringInput      ( String );
-extern  Void   parseScript      ( String,Long );
+extern  Cell   parseModule      ( String,Long );
 extern  Void   parseExp         ( Void );
 #if EXPLAIN_INSTANCE_RESOLUTION
 extern  Void   parseContext     ( Void );
@@ -389,7 +389,7 @@ extern  Void   printString      ( String );
 
 
 extern  Void   staticAnalysis   ( Int );
-extern  Void   startModule      ( Cell );
+extern  Void   startModule      ( Module );
 extern  Void   setExportList    ( List );
 extern  Void   setExports       ( List );
 extern  Void   addQualImport    ( Text,Text );
@@ -427,7 +427,7 @@ extern  Int    visitClass       ( Class );
 #if EXPLAIN_INSTANCE_RESOLUTION
 extern  Void   checkContext	( Void );
 #endif
-extern  Void   checkDefns       ( Void );
+extern  Void   checkDefns       ( Module );
 extern  Bool   h98Pred          ( Bool,Cell );
 extern  Cell   h98Context       ( Bool,List );
 extern  Void   h98CheckCtxt     ( Int,String,Bool,List,Inst );
@@ -568,21 +568,18 @@ extern Bool broken;                     /* indicates interrupt received    */
  * ctrlbrk:    set control break handler
  */
 
-#if HUGS_FOR_WINDOWS
-#  define ctrlbrk(bh) 
-#  define allowBreak()  kbhit()
-#else /* !HUGS_FOR_WINDOWS */
-# if HAVE_SIGPROCMASK
-#  include <signal.h>
-#  define ctrlbrk(bh)	{ sigset_t mask; \
+#if HAVE_SIGPROCMASK
+#include <signal.h>
+#define ctrlbrk(bh)	{ sigset_t mask; \
 			  signal(SIGINT,bh); \
 			  sigemptyset(&mask); \
 			  sigaddset(&mask, SIGINT); \
 			  sigprocmask(SIG_UNBLOCK, &mask, NULL); \
 			}
-# else
+#else
 #  define ctrlbrk(bh)	signal(SIGINT,bh)
-# endif
+#endif
+
 #if SYMANTEC_C
 extern int time_release;
 extern int allow_break_count;
@@ -592,7 +589,6 @@ extern int allow_break_count;
 #else
 # define allowBreak()  if (broken) { broken=FALSE; sigRaise(breakHandler); }
 #endif
-#endif /* !HUGS_FOR_WINDOWS */
 
 
 /*---------------------------------------------------------------------------
@@ -623,9 +619,9 @@ extern char installDir[N_INSTALLDIR];
 #if HAVE_UNISTD_H
 # include <sys/types.h>
 # include <unistd.h>
-#elif !HUGS_FOR_WINDOWS
-extern int      chdir           ( const char* );
 #endif
+
+extern int      chdir           ( const char* );
 
 #if HAVE_STDLIB_H
 # include <stdlib.h>
@@ -712,8 +708,8 @@ extern  Void   gcCStack         ( Void );
  *-------------------------------------------------------------------------*/
 
 extern Cell   parseInterface        ( String,Long );
-extern ZPair  readInterface         ( String,Long );
-extern Bool   processInterfaces     ( Void );
+extern List   getInterfaceImports   ( Cell );
+extern void   processInterfaces     ( List );
 extern Void   getFileSize           ( String, Long * );
 extern Void   ifLinkConstrItbl      ( Name n );
 extern Void   hi_o_namesFromSrcName ( String,String*,String* oName );
@@ -928,11 +924,7 @@ typedef struct {                        /* Each type variable contains:    */
     Kind kind;                          /* kind annotation                 */
 } Tyvar;
 
-#if     FIXED_SUBST                     /* storage for type variables      */
-extern  Tyvar           tyvars[];
-#else
 extern  Tyvar           *tyvars;        /* storage for type variables      */
-#endif
 extern  Int             typeOff;        /* offset of result type           */
 extern  Type            typeIs;         /* skeleton of result type         */
 extern  Int             typeFree;       /* freedom in instantiated type    */

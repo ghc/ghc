@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.21 $
- * $Date: 2000/03/20 04:26:23 $
+ * $Revision: 1.22 $
+ * $Date: 2000/03/22 18:14:22 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -45,7 +45,7 @@
 #ifdef HAVE_DOS_H
 # include <dos.h>
 #endif
-#if defined HAVE_CONIO_H && ! HUGS_FOR_WINDOWS
+#if defined HAVE_CONIO_H
 # include <conio.h>
 #endif
 #ifdef HAVE_IO_H
@@ -56,16 +56,6 @@
 #endif
 #ifdef HAVE_WINDOWS_H
 # include <windows.h>
-#endif
-
-#if HUGS_FOR_WINDOWS
-#include <dir.h>
-#include <mem.h>
-
-extern HCURSOR HandCursor;            /* Forward references to cursors   */
-extern HCURSOR GarbageCursor;
-extern HCURSOR SaveCursor;
-static void    local DrawStatusLine     ( HWND );
 #endif
 
 #if DOS
@@ -133,17 +123,7 @@ static String local readRegChildStrings ( HKEY, String, String, Char, String );
  * Find information about a file:
  * ------------------------------------------------------------------------*/
 
-#if RISCOS
-typedef struct { unsigned hi, lo; } Time;
-#define timeChanged(now,thn)    (now.hi!=thn.hi || now.lo!=thn.lo)
-#define timeSet(var,tm)         var.hi = tm.hi; var.lo = tm.lo
-error  timeEarlier not defined
-#else
-typedef time_t Time;
-#define timeChanged(now,thn)      (now!=thn)
-#define timeSet(var,tm)           var = tm
-#define timeEarlier(earlier,now)  (earlier < now)
-#endif
+#include "machdep_time.h"
 
 static Bool local readable      ( String );
 static Void local getFileInfo   ( String, Time *, Long * );
@@ -770,7 +750,7 @@ Bool findFilesForModule (
 }
 
 
-/* If the primaryObjectName for is (eg)
+/* If the primaryObjectName is (eg)
      /foo/bar/PrelSwamp.o
    and the extraFileName is (eg)
      swampy_cbits
@@ -850,9 +830,6 @@ String sub; {
 Bool gcMessages = FALSE;                /* TRUE => print GC messages       */
 
 Void gcStarted() {                      /* Notify garbage collector start  */
-#if HUGS_FOR_WINDOWS
-    SaveCursor = SetCursor(GarbageCursor);
-#endif
     if (gcMessages) {
         Printf("{{Gc");
         FlushStdout();
@@ -872,9 +849,6 @@ Int recovered; {
         Printf("%d}}",recovered);
         FlushStdout();
     }
-#if HUGS_FOR_WINDOWS
-    SetCursor(SaveCursor);
-#endif
 }
 
 Cell *CStackBase;                       /* Retain start of C control stack */
@@ -1127,7 +1101,7 @@ Int readTerminalChar() {                /* read character from terminal    */
     if (terminalEchoReqd) {
         return getchar();
     } else {
-#if IS_WIN32 && !HUGS_FOR_WINDOWS && !__BORLANDC__
+#if IS_WIN32 && !__BORLANDC__
 	/* When reading a character from the console/terminal, we want
 	 * to operate in 'raw' mode (to use old UNIX tty parlance) and have
  	 * it return when a character is available and _not_ wait until
@@ -1585,12 +1559,6 @@ Int what; {                             /* initialisation etc..            */
         case RESET   :
         case BREAK   :
         case EXIT    : normalTerminal();
-#if HUGS_FOR_WINDOWS
-                       if (what==EXIT)
-                           DestroyWindow(hWndMain);
-                       else
-                           SetCursor(LoadCursor(NULL,IDC_ARROW));
-#endif
                        break;
     }
 }

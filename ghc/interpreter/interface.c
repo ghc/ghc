@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.39 $
- * $Date: 2000/03/14 14:34:47 $
+ * $Revision: 1.40 $
+ * $Date: 2000/03/22 18:14:22 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -139,7 +139,7 @@ static Void finishGHCExports    ( ConId,List );
 static Void finishGHCFixdecl    ( Cell prec, Cell assoc, ConVarId name );
 
 static Void finishGHCModule     ( Cell );
-static Void startGHCModule      ( Text, Int, Text );
+static Void startGHCModule      ( Text );
 
 static Void startGHCDataDecl    ( Int,List,Cell,List,List );
 static List finishGHCDataDecl   ( ConId tyc );
@@ -243,12 +243,10 @@ static Cell filterInterface ( Cell root,
 }
 
 
-ZPair readInterface(String fname, Long fileSize)
+List /* of CONID */ getInterfaceImports ( Cell iface )
 {
     List  tops;
     List  imports = NIL;
-    ZPair iface   = parseInterface(fname,fileSize);
-    assert (whatIs(iface)==I_INTERFACE);
 
     for (tops = zsnd(unap(I_INTERFACE,iface)); nonNull(tops); tops=tl(tops))
        if (whatIs(hd(tops)) == I_IMPORT) {
@@ -262,7 +260,7 @@ ZPair readInterface(String fname, Long fileSize)
 #            endif
           }
        }
-    return zpair(iface,imports);
+    return imports;
 }
 
 
@@ -670,13 +668,7 @@ static void ifSetClassDefaultsAndDCon ( Class c )
 }
 
 
-/* ifaces_outstanding holds a list of parsed interfaces
-   for which we need to load objects and create symbol
-   table entries.
-
-   Return TRUE if Prelude `elem` ifaces_outstanding, else FALSE.
-*/
-Bool processInterfaces ( void )
+void processInterfaces ( List /* of CONID */ iface_modnames )
 {
     List    tmp;
     List    xs;
@@ -689,15 +681,12 @@ Bool processInterfaces ( void )
     Module  mod;
     List    all_known_types;
     Int     num_known_types;
-    Bool    didPrelude;
     List    cls_list;         /* :: List Class */
     List    constructor_list; /* :: List Name */
 
     List ifaces       = NIL;  /* :: List I_INTERFACE */
-    List iface_sizes  = NIL;  /* :: List Int         */
-    List iface_onames = NIL;  /* :: List Text        */
 
-    if (isNull(ifaces_outstanding)) return FALSE;
+    if (isNull(iface_modnames)) return;
 
 #   ifdef DEBUG_IFACE
     fprintf ( stderr, 
@@ -705,16 +694,13 @@ Bool processInterfaces ( void )
               length(ifaces_outstanding) );
 #   endif
 
-    /* unzip3 ifaces_outstanding into ifaces, iface_sizes, iface_onames */
-    for (xs = ifaces_outstanding; nonNull(xs); xs=tl(xs)) {
-       ifaces       = cons ( zfst3(hd(xs)), ifaces       );
-       iface_onames = cons ( zsnd3(hd(xs)), iface_onames );
-       iface_sizes  = cons ( zthd3(hd(xs)), iface_sizes  );
+    for (xs = iface_modnames; nonNull(xs); xs=tl(xs)) {
+       mod = findModule(textOf(hd(xs)));
+       assert(nonNull(mod));
+       assert(!module(mod).fromSrc);
+       ifaces = cons ( module(mod).tree, ifaces );
     }
-
-    ifaces       = reverse(ifaces);
-    iface_onames = reverse(iface_onames);
-    iface_sizes  = reverse(iface_sizes);
+    ifaces = reverse(ifaces);
 
     /* Clean up interfaces -- dump non-exported value, class, type decls */
     for (xs = ifaces; nonNull(xs); xs = tl(xs))
@@ -735,7 +721,8 @@ Bool processInterfaces ( void )
        */
        all_known_types = getAllKnownTyconsAndClasses();
        for (xs = ifaces; nonNull(xs); xs=tl(xs))
-          all_known_types = addTyconsAndClassesFromIFace ( hd(xs), all_known_types );
+          all_known_types 
+             = addTyconsAndClassesFromIFace ( hd(xs), all_known_types );
 
        /* Have we reached a fixed point? */
        i = length(all_known_types);
@@ -902,15 +889,8 @@ Bool processInterfaces ( void )
 
 
     /* Allocate module table entries and read in object code. */
-    for (xs=ifaces; 
-         nonNull(xs);
-         xs=tl(xs), iface_sizes=tl(iface_sizes), iface_onames=tl(iface_onames)) {
-       startGHCModule ( textOf(zfst(unap(I_INTERFACE,hd(xs)))),
-                        intOf(hd(iface_sizes)),
-                        hd(iface_onames) );
-    }
-    assert (isNull(iface_sizes));
-    assert (isNull(iface_onames));
+    for (xs=ifaces; nonNull(xs); xs=tl(xs))
+       startGHCModule ( textOf(zfst(unap(I_INTERFACE,hd(xs)))) );
 
 
     /* Now work through the decl lists of the modules, and call the
@@ -1003,7 +983,6 @@ Bool processInterfaces ( void )
        calling the finishGHC* functions.  But don't process
        the export lists; those must wait for later.
     */
-    didPrelude       = FALSE;
     cls_list         = NIL;
     constructor_list = NIL;
     for (xs = ifaces; nonNull(xs); xs = tl(xs)) {
@@ -1013,8 +992,6 @@ Bool processInterfaces ( void )
        if (isNull(mod)) internal("processInterfaces(3)");
        setCurrModule(mod);
        ppModule ( module(mod).text );
-
-       if (mname == textPrelude) didPrelude = TRUE;
 
        for (decls = zsnd(iface); nonNull(decls); decls = tl(decls)) {
           Cell decl = hd(decls);
@@ -1088,8 +1065,6 @@ Bool processInterfaces ( void )
 
     /* Finished! */
     ifaces_outstanding = NIL;
-
-    return didPrelude;
 }
 
 
@@ -1136,38 +1111,34 @@ static ObjectCode* startGHCModule_partial_load ( String objNm, Int objSz )
     return oc;
 }
 
-static Void startGHCModule ( Text mname, Int sizeObj, Text nameObj )
+static Void startGHCModule ( Text mname )
 {
    List   xts;
    Module m = findModule(mname);
+   assert(nonNull(m));
 
-   if (isNull(m)) {
-      m = newModule(mname);
-#     ifdef DEBUG_IFACE
-      fprintf ( stderr, "startGHCIface: name %16s   objsize %d\n", 
-                         textToStr(mname), sizeObj );
-#     endif
-   } else {
-      if (module(m).fake) {
-         module(m).fake = FALSE;
-      } else {
-         ERRMSG(0) "Module \"%s\" already loaded", textToStr(mname)
-         EEND;
-      }
-   }
+#  ifdef DEBUG_IFACE
+   fprintf ( stderr, "startGHCIface: name %16s   objsize %d\n", 
+                      textToStr(mname), module(m).objSize );
+#  endif
+   if (module(m).fake)
+      module(m).fake = FALSE;
 
    /* Get hold of the primary object for the module. */
    module(m).object
-      = startGHCModule_partial_load ( textToStr(nameObj), sizeObj );
+      = startGHCModule_partial_load ( textToStr(module(m).objName), 
+                                      module(m).objSize );
 
    /* and any extras ... */
    for (xts = module(m).objectExtraNames; nonNull(xts); xts=tl(xts)) {
       Int         size;
       ObjectCode* oc;
       Text        xtt = hd(xts);
-      String      nm  = getExtraObjectInfo ( textToStr(nameObj),
-                                             textToStr(xtt),
-                                             &size );
+      String      nm  = getExtraObjectInfo (
+                           textToStr(module(m).objName),
+                           textToStr(xtt),
+                           &size
+                        );
       if (size == -1) {
          ERRMSG(0) "Can't find extra object file \"%s\"", nm
          EEND;
@@ -2487,6 +2458,7 @@ Type type; {
  * ------------------------------------------------------------------------*/
 
 #define EXTERN_SYMS_ALLPLATFORMS     \
+      Sym(MainRegTable)              \
       Sym(stg_gc_enter_1)            \
       Sym(stg_gc_noregs)             \
       Sym(stg_gc_seq_1)              \
@@ -2518,7 +2490,6 @@ Type type; {
       Sym(__sel_10_upd_info)         \
       Sym(__sel_11_upd_info)         \
       Sym(__sel_12_upd_info)         \
-      Sym(MainRegTable)              \
       Sym(Upd_frame_info)            \
       Sym(seq_frame_info)            \
       Sym(CAF_BLACKHOLE_info)        \
@@ -2625,13 +2596,8 @@ Type type; {
       SymX(rmdir)                    \
       SymX(rename)                   \
       SymX(chdir)                    \
-      Sym(localtime)                 \
-      Sym(strftime)                  \
       SymX(execl)                    \
       Sym(waitpid)                   \
-      Sym(timezone)                  \
-      Sym(mktime)                    \
-      Sym(gmtime)                    \
       SymX(getenv)
 
 #define EXTERN_SYMS_cygwin32         \
@@ -2674,7 +2640,12 @@ Type type; {
       SymX(stderr)                   \
       SymX(vfork)                    \
       SymX(_exit)                    \
-      Sym(tzname)                    \
+      SymX(tzname)                   \
+      SymX(localtime)                \
+      SymX(strftime)                 \
+      SymX(timezone)                 \
+      SymX(mktime)                   \
+      SymX(gmtime)                   \
 
 
 

@@ -9,25 +9,20 @@
  * included in the distribution.
  *
  * $RCSfile: errors.h,v $
- * $Revision: 1.7 $
- * $Date: 2000/03/15 23:27:16 $
+ * $Revision: 1.8 $
+ * $Date: 2000/03/22 18:14:22 $
  * ------------------------------------------------------------------------*/
 
 extern Void internal     ( String) HUGS_noreturn;
 extern Void fatal        ( String) HUGS_noreturn;
 
-#if HUGS_FOR_WINDOWS
-#define Hilite()         WinTextcolor(hWndText,RED);
-#define Lolite()         WinTextcolor(hWndText,BLACK);
-#define errorStream      stderr
-#else
 #define Hilite()         doNothing()
 #define Lolite()         doNothing()
 #define errorStream      stdout
-#endif
 
 #define ERRMSG(l)        Hilite(); errHead(l); FPrintf(errorStream,
 #define EEND             ); Lolite(); errFail()
+#define EEND_NO_LONGJMP  ); Lolite(); errFail_no_longjmp()
 #define ETHEN            );
 #define ERRTEXT          Hilite(); FPrintf(errorStream,
 #define ERREXPR(e)       Hilite(); printExp(errorStream,e); Lolite()
@@ -38,9 +33,10 @@ extern Void fatal        ( String) HUGS_noreturn;
 #define ERRKINDS(ks)     Hilite(); printKinds(errorStream,ks); Lolite()
 #define ERRFD(fd)	 Hilite(); printFD(errorStream,fd); Lolite()
 
-extern Void errHead      ( Int );                  /* in main.c            */
-extern Void errFail      ( Void) HUGS_noreturn;
-extern Void errAbort     ( Void );
+extern Void errHead            ( Int );            /* in main.c            */
+extern Void errFail            ( Void ) HUGS_noreturn;
+extern Void errFail_no_longjmp ( Void );
+extern Void errAbort           ( Void );
 extern Cell errAssert    ( Int );
 
 extern sigProto(breakHandler);

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.51 $
- * $Date: 2000/03/13 11:37:17 $
+ * $Revision: 1.52 $
+ * $Date: 2000/03/22 18:14:23 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -26,20 +26,20 @@
  * local function prototypes:
  * ------------------------------------------------------------------------*/
 
-static Int  local hash                  ( String );
-static Int  local saveText              ( Text );
+static Int    local hash                ( String );
+static Int    local saveText            ( Text );
 static Module local findQualifier       ( Text );
-static Void local hashTycon             ( Tycon );
-static List local insertTycon           ( Tycon,List );
-static Void local hashName              ( Name );
-static List local insertName            ( Name,List );
-static Void local patternError          ( String );
-static Bool local stringMatch           ( String,String );
-static Bool local typeInvolves          ( Type,Type );
-static Cell local markCell              ( Cell );
-static Void local markSnd               ( Cell );
-static Cell local lowLevelLastIn        ( Cell );
-static Cell local lowLevelLastOut       ( Cell );
+static Void   local hashTycon           ( Tycon );
+static List   local insertTycon         ( Tycon,List );
+static Void   local hashName            ( Name );
+static List   local insertName          ( Name,List );
+static Void   local patternError        ( String );
+static Bool   local stringMatch         ( String,String );
+static Bool   local typeInvolves        ( Type,Type );
+static Cell   local markCell            ( Cell );
+static Void   local markSnd             ( Cell );
+static Cell   local lowLevelLastIn      ( Cell );
+static Cell   local lowLevelLastOut     ( Cell );
 
 
 /* --------------------------------------------------------------------------
@@ -71,23 +71,29 @@ static Cell local lowLevelLastOut       ( Cell );
 #define TEXTHSZ 512                     /* Size of Text hash table         */
 #define NOTEXT  ((Text)(~0))            /* Empty bucket in Text hash table */
 static  Text    textHw;                 /* Next unused position            */
-static  Text    savedText = NUM_TEXT;   /* Start of saved portion of text  */
+static  Text    savedText = TEXT_SIZE;  /* Start of saved portion of text  */
 static  Text    nextNewText;            /* Next new text value             */
 static  Text    nextNewDText;           /* Next new dict text value        */
-static  char    DEFTABLE(text,NUM_TEXT);/* Storage of character strings    */
+static  char    text[TEXT_SIZE];        /* Storage of character strings    */
 static  Text    textHash[TEXTHSZ][NUM_TEXTH]; /* Hash table storage        */
 
 String textToStr(t)                    /* find string corresp to given Text*/
 Text t; {
     static char newVar[16];
 
-    if (0<=t && t<NUM_TEXT)                     /* standard char string    */
-        return text + t;
-    if (t<0)
-        sprintf(newVar,"d%d",-t);               /* dictionary variable     */
-    else
-        sprintf(newVar,"v%d",t-NUM_TEXT);       /* normal variable         */
-    return newVar;
+    if (isText(t))                              /* standard char string    */
+        return text + t - TEXT_BASE_ADDR;
+    if (isInventedDictVar(t)) {
+        sprintf(newVar,"d%d",
+                t-INDVAR_BASE_ADDR);            /* dictionary variable     */
+        return newVar;
+    }
+    if (isInventedVar(t)) {
+        sprintf(newVar,"v%d",
+                t-INVAR_BASE_ADDR);             /* normal variable         */
+       return newVar;
+    }
+    internal("textToStr");
 }
 
 String identToStr(v) /*find string corresp to given ident or qualified name*/
@@ -122,16 +128,20 @@ Cell v; {
 }
 
 Text inventText()     {                 /* return new unused variable name */
-    return nextNewText++;
+   if (nextNewText >= INVAR_BASE_ADDR+INVAR_MAX_AVAIL)
+      internal("inventText: too many invented variables");
+   return nextNewText++;
 }
 
 Text inventDictText() {                 /* return new unused dictvar name  */
-    return nextNewDText--;
+   if (nextNewDText >= INDVAR_BASE_ADDR+INDVAR_MAX_AVAIL)
+     internal("inventDictText: too many invented variables");
+   return nextNewDText++;
 }
 
 Bool inventedText(t)                    /* Signal TRUE if text has been    */
 Text t; {                               /* generated internally            */
-    return (t<0 || t>=NUM_TEXT);
+    return isInventedVar(t) || isInventedDictVar(t);
 }
 
 #define MAX_FIXLIT 100
@@ -173,13 +183,13 @@ String s; {
     int    hashno  = 0;
     Text   textPos = textHash[h][hashno];
 
-#define TryMatch        {   Text   originalTextPos = textPos;              \
+#   define TryMatch     {   Text   originalTextPos = textPos;              \
                             String t;                                      \
                             for (t=s; *t==text[textPos]; textPos++,t++)    \
                                 if (*t=='\0')                              \
-                                    return originalTextPos;                \
+                                    return originalTextPos+TEXT_BASE_ADDR; \
                         }
-#define Skip            while (text[textPos++]) ;
+#   define Skip         while (text[textPos++]) ;
 
     while (textPos!=NOTEXT) {
         TryMatch
@@ -211,14 +221,13 @@ String s; {
             textHash[h][hashno+1] = NOTEXT;
     }
 
-    return textPos;
+    return textPos+TEXT_BASE_ADDR;
 }
 
 static Int local saveText(t)            /* Save text value in buffer       */
 Text t; {                               /* at top of text table            */
     String s = textToStr(t);
     Int    l = strlen(s);
-
     if (textHw + l + 1 > savedText) {
         ERRMSG(0) "Character string storage space exhausted"
         EEND;
@@ -404,18 +413,19 @@ Text enZcodeThenFindText ( String s )
 
 Text textOf ( Cell c )
 {
+   Int  wot = whatIs(c);
    Bool ok = 
-          (whatIs(c)==VARIDCELL
-           || whatIs(c)==CONIDCELL
-           || whatIs(c)==VAROPCELL
-           || whatIs(c)==CONOPCELL
-           || whatIs(c)==STRCELL
-           || whatIs(c)==DICTVAR
-           || whatIs(c)==IPCELL
-           || whatIs(c)==IPVAR
+          (wot==VARIDCELL
+           || wot==CONIDCELL
+           || wot==VAROPCELL
+           || wot==CONOPCELL
+           || wot==STRCELL
+           || wot==DICTVAR
+           || wot==IPCELL
+           || wot==IPVAR
           );
    if (!ok) {
-      fprintf(stderr, "\ntextOf: bad tag %d\n",whatIs(c) );
+      fprintf(stderr, "\ntextOf: bad tag %d\n",wot );
       internal("textOf: bad tag");
    }
    return snd(c);
@@ -452,6 +462,146 @@ Text t; {
 }
 #endif
 
+
+/* --------------------------------------------------------------------------
+ * Expandable symbol tables.  A template, which is instantiated for the name, 
+ * tycon, class, instance and module tables.  Also, potentially, TREX Exts.
+ * ------------------------------------------------------------------------*/
+
+#define EXPANDABLE_SYMBOL_TABLE(type_name,struct_name,                  \
+                                proc_name,free_proc_name,               \
+                                free_list,tab_name,tab_size,err_msg,    \
+                                TAB_INIT_SIZE,TAB_MAX_SIZE,             \
+                                TAB_BASE_ADDR)                          \
+                                                                        \
+             struct struct_name* tab_name  = NULL;                      \
+             int                 tab_size  = 0;                         \
+      static type_name           free_list = TAB_BASE_ADDR-1;           \
+                                                                        \
+      void free_proc_name ( type_name n )                               \
+      {                                                                 \
+         assert(TAB_BASE_ADDR <= n);                                    \
+         assert(n < TAB_BASE_ADDR+tab_size);                            \
+         assert(tab_name[n-TAB_BASE_ADDR].inUse);                       \
+         tab_name[n-TAB_BASE_ADDR].inUse = FALSE;                      \
+         /*tab_name[n-TAB_BASE_ADDR].nextFree = free_list; */               \
+         /*free_list = n;*/                                                 \
+      }                                                                 \
+                                                                        \
+      type_name proc_name ( void )                                      \
+      {                                                                 \
+         Int    i;                                                      \
+         Int    newSz;                                                  \
+         struct struct_name* newTab;                                    \
+         struct struct_name* temp;                                      \
+         try_again:                                                     \
+         if (free_list != TAB_BASE_ADDR-1) {                            \
+            type_name t = free_list;                                    \
+            free_list = tab_name[free_list-TAB_BASE_ADDR].nextFree;     \
+            assert (!(tab_name[t-TAB_BASE_ADDR].inUse));                \
+            tab_name[t-TAB_BASE_ADDR].inUse = TRUE;                     \
+            return t;                                                   \
+         }                                                              \
+                                                                        \
+         newSz = (tab_size == 0 ? TAB_INIT_SIZE : 2 * tab_size);        \
+         if (newSz > TAB_MAX_SIZE) goto cant_allocate;                  \
+         newTab = malloc(newSz * sizeof(struct struct_name));           \
+         if (!newTab) goto cant_allocate;                               \
+         for (i = 0; i < tab_size; i++)                                 \
+            newTab[i] = tab_name[i];                                    \
+         for (i = tab_size; i < newSz; i++) {                           \
+            newTab[i].inUse = FALSE;                                    \
+            newTab[i].nextFree = i-1+TAB_BASE_ADDR;                     \
+         }                                                              \
+          fprintf(stderr, "Expanding " #type_name                     \
+                    "table to size %d\n", newSz );                    \
+         newTab[tab_size].nextFree = TAB_BASE_ADDR-1;                   \
+         free_list = newSz-1+TAB_BASE_ADDR;                             \
+         tab_size = newSz;                                              \
+         temp = tab_name;                                               \
+         tab_name = newTab;                                             \
+         if (temp) free(temp);                                          \
+         goto try_again;                                                \
+                                                                        \
+         cant_allocate:                                                 \
+         ERRMSG(0) err_msg                                              \
+         EEND;                                                          \
+      }                                                                 \
+
+
+
+EXPANDABLE_SYMBOL_TABLE(Name,strName,allocNewName,freeName,
+                        nameFL,tabName,tabNameSz,
+                        "Name storage space exhausted",
+                        NAME_INIT_SIZE,NAME_MAX_SIZE,NAME_BASE_ADDR)
+
+
+EXPANDABLE_SYMBOL_TABLE(Tycon,strTycon,allocNewTycon,freeTycon,
+                        tyconFL,tabTycon,tabTyconSz,
+                        "Type constructor storage space exhausted",
+                        TYCON_INIT_SIZE,TYCON_MAX_SIZE,TYCON_BASE_ADDR)
+
+
+EXPANDABLE_SYMBOL_TABLE(Class,strClass,allocNewClass,freeClass,
+                        classFL,tabClass,tabClassSz,
+                        "Class storage space exhausted",
+                        CCLASS_INIT_SIZE,CCLASS_MAX_SIZE,CCLASS_BASE_ADDR)
+
+
+EXPANDABLE_SYMBOL_TABLE(Inst,strInst,allocNewInst,freeInst,
+                        instFL,tabInst,tabInstSz,
+                        "Instance storage space exhausted",
+                        INST_INIT_SIZE,INST_MAX_SIZE,INST_BASE_ADDR)
+
+
+EXPANDABLE_SYMBOL_TABLE(Module,strModule,allocNewModule,freeModule,
+                        moduleFL,tabModule,tabModuleSz,
+                        "Module storage space exhausted",
+                        MODULE_INIT_SIZE,MODULE_MAX_SIZE,MODULE_BASE_ADDR)
+
+#ifdef DEBUG_STORAGE
+struct strName* generate_name_ref ( Cell nm )
+{
+   assert(isName(nm));
+   nm -= NAME_BASE_ADDR;
+   assert(tabName[nm].inUse);
+   assert(isModule(tabName[nm].mod));
+   return & tabName[nm]; 
+}
+struct strTycon* generate_tycon_ref ( Cell tc )
+{
+   assert(isTycon(tc) || isTuple(tc));
+   tc -= TYCON_BASE_ADDR;
+   assert(tabTycon[tc].inUse);
+   assert(isModule(tabTycon[tc].mod));
+   return & tabTycon[tc]; 
+}
+struct strClass* generate_cclass_ref ( Cell cl )
+{
+   assert(isClass(cl));
+   cl -= CCLASS_BASE_ADDR;
+   assert(tabClass[cl].inUse);
+   assert(isModule(tabClass[cl].mod));
+   return & tabClass[cl]; 
+}
+struct strInst* generate_inst_ref ( Cell in )
+{  
+   assert(isInst(in));
+   in -= INST_BASE_ADDR;
+   assert(tabInst[in].inUse);
+   assert(isModule(tabInst[in].mod));
+   return & tabInst[in]; 
+}
+struct strModule* generate_module_ref ( Cell mo )
+{  
+   assert(isModule(mo));
+   mo -= MODULE_BASE_ADDR;
+   assert(tabModule[mo].inUse);
+   return & tabModule[mo]; 
+}
+#endif
+
+
 /* --------------------------------------------------------------------------
  * Tycon storage:
  *
@@ -462,38 +612,50 @@ Text t; {
  * ------------------------------------------------------------------------*/
 
 #define TYCONHSZ 256                            /* Size of Tycon hash table*/
-#define tHash(x) ((x)%TYCONHSZ)                 /* Tycon hash function     */
-static  Tycon    tyconHw;                       /* next unused Tycon       */
-static  Tycon    DEFTABLE(tyconHash,TYCONHSZ);  /* Hash table storage      */
-struct  strTycon DEFTABLE(tabTycon,NUM_TYCON);  /* Tycon storage           */
-
-Tycon newTycon(t)                       /* add new tycon to tycon table    */
-Text t; {
-    Int h = tHash(t);
-    if (tyconHw-TYCMIN >= NUM_TYCON) {
-        ERRMSG(0) "Type constructor storage space exhausted"
-        EEND;
-    }
-    tycon(tyconHw).text          = t;   /* clear new tycon record          */
-    tycon(tyconHw).kind          = NIL;
-    tycon(tyconHw).defn          = NIL;
-    tycon(tyconHw).what          = NIL;
-    tycon(tyconHw).conToTag      = NIL;
-    tycon(tyconHw).tagToCon      = NIL;
-    tycon(tyconHw).tuple         = -1;
-    tycon(tyconHw).mod           = currentModule;
-    tycon(tyconHw).itbl          = NULL;
-    module(currentModule).tycons = cons(tyconHw,module(currentModule).tycons);
-    tycon(tyconHw).nextTyconHash = tyconHash[h];
-    tyconHash[h]                 = tyconHw;
-
-    return tyconHw++;
+     //#define tHash(x) (((x)-TEXT_BASE_ADDR)%TYCONHSZ)/* Tycon hash function     */
+static int tHash(Text x)
+{
+   int r;
+   assert(isText(x) || inventedText(x));
+   x -= TEXT_BASE_ADDR;
+   if (x < 0) x = -x;
+   r= x%TYCONHSZ;
+   assert(r>=0);
+   assert(r<TYCONHSZ);
+   return r;
+}
+static  Tycon    tyconHash[TYCONHSZ];           /* Hash table storage      */
+int RC_T ( int x ) 
+{
+   assert (x >= 0 && x < TYCONHSZ);
+   return x;
+}
+Tycon newTycon ( Text t )               /* add new tycon to tycon table    */
+{
+    Int   h                      = tHash(t);
+    Tycon tc                     = allocNewTycon();
+    tabTycon
+      [tc-TYCON_BASE_ADDR].tuple = -1;
+    tabTycon
+      [tc-TYCON_BASE_ADDR].mod   = currentModule;
+    tycon(tc).text               = t;   /* clear new tycon record          */
+    tycon(tc).kind               = NIL;
+    tycon(tc).defn               = NIL;
+    tycon(tc).what               = NIL;
+    tycon(tc).conToTag           = NIL;
+    tycon(tc).tagToCon           = NIL;
+    tycon(tc).itbl               = NULL;
+    tycon(tc).arity              = 0;
+    module(currentModule).tycons = cons(tc,module(currentModule).tycons);
+    tycon(tc).nextTyconHash      = tyconHash[RC_T(h)];
+    tyconHash[RC_T(h)]                 = tc;
+    return tc;
 }
 
 Tycon findTycon(t)                      /* locate Tycon in tycon table     */
 Text t; {
-    Tycon tc = tyconHash[tHash(t)];
-
+    Tycon tc = tyconHash[RC_T(tHash(t))];
+assert(isTycon(tc) || isTuple(tc) || isNull(tc));
     while (nonNull(tc) && tycon(tc).text!=t)
 	tc = tycon(tc).nextTyconHash;
     return tc;
@@ -502,7 +664,7 @@ Text t; {
 Tycon addTycon(tc)  /* Insert Tycon in tycon table - if no clash is caused */
 Tycon tc; {
     Tycon oldtc; 
-    assert(whatIs(tc)==TYCON || whatIs(tc)==TUPLE);
+    assert(isTycon(tc) || isTuple(tc));
     oldtc = findTycon(tycon(tc).text);
     if (isNull(oldtc)) {
         hashTycon(tc);
@@ -514,16 +676,18 @@ Tycon tc; {
 
 static Void local hashTycon(tc)         /* Insert Tycon into hash table    */
 Tycon tc; {
-  if (!(isTycon(tc) || isTuple(tc))) {
-    printf("\nbad stuff: " ); print(tc,10); printf("\n");
-      assert(isTycon(tc) || isTuple(tc));
-  }
-   if (1) {
-     Text  t = tycon(tc).text;
-     Int   h = tHash(t);
-     tycon(tc).nextTyconHash = tyconHash[h];
-     tyconHash[h]            = tc;
+   Text t;
+   Int  h;
+   assert(isTycon(tc) || isTuple(tc));
+   {int i; for (i = 0; i < TYCONHSZ; i++)
+       assert (tyconHash[i] == 0 
+               || isTycon(tyconHash[i])
+               || isTuple(tyconHash[i]));
    }
+   t = tycon(tc).text;
+   h = tHash(t);
+   tycon(tc).nextTyconHash = tyconHash[RC_T(h)];
+   tyconHash[RC_T(h)]            = tc;
 }
 
 Tycon findQualTycon(id) /*locate (possibly qualified) Tycon in tycon table */
@@ -590,10 +754,12 @@ List addTyconsMatching(pat,ts)          /* Add tycons matching pattern pat */
 String pat;                             /* to list of Tycons ts            */
 List   ts; {                            /* Null pattern matches every tycon*/
     Tycon tc;                           /* (Tycons with NIL kind excluded) */
-    for (tc=TYCMIN; tc<tyconHw; ++tc)
-        if (!pat || stringMatch(pat,textToStr(tycon(tc).text)))
-            if (nonNull(tycon(tc).kind))
-                ts = insertTycon(tc,ts);
+    for (tc = TYCON_BASE_ADDR;
+         tc < TYCON_BASE_ADDR+tabTyconSz; ++tc)
+        if (tabTycon[tc-TYCON_BASE_ADDR].inUse)
+           if (!pat || stringMatch(pat,textToStr(tycon(tc).text)))
+               if (nonNull(tycon(tc).kind))
+                  ts = insertTycon(tc,ts);
     return ts;
 }
 
@@ -625,8 +791,10 @@ Tycon mkTuple ( Int n )
    Int i;
    if (n >= NUM_TUPLES)
       internal("mkTuple: request for tuple of unsupported size");
-   for (i = TYCMIN; i < tyconHw; i++)
-      if (tycon(i).tuple == n) return i;
+   for (i = TYCON_BASE_ADDR;
+        i < TYCON_BASE_ADDR+tabTyconSz; i++)
+      if (tabTycon[i-TYCON_BASE_ADDR].inUse)
+         if (tycon(i).tuple == n) return i;
    internal("mkTuple: request for non-existent tuple");
 }
 
@@ -645,42 +813,68 @@ Tycon mkTuple ( Int n )
  * ------------------------------------------------------------------------*/
 
 #define NAMEHSZ  256                            /* Size of Name hash table */
-#define nHash(x) ((x)%NAMEHSZ)                  /* hash fn :: Text->Int    */
-        Name     nameHw;                        /* next unused name        */
-static  Name     DEFTABLE(nameHash,NAMEHSZ);    /* Hash table storage      */
-struct  strName  DEFTABLE(tabName,NUM_NAME);    /* Name table storage      */
+//#define nHash(x) (((x)-TEXT_BASE_ADDR)%NAMEHSZ) /* hash fn :: Text->Int    */
+static int nHash(Text x)
+{
+   assert(isText(x) || inventedText(x));
+   x -= TEXT_BASE_ADDR;
+   if (x < 0) x = -x;
+   return x%NAMEHSZ;
+}
+static  Name     nameHash[NAMEHSZ];             /* Hash table storage      */
+int RC_N ( int x ) 
+{
+   assert (x >= 0 && x < NAMEHSZ);
+   return x;
+}
+void hashSanity ( void )
+{
+   Int i, j;
+   for (i = 0; i < TYCONHSZ; i++) {
+      j = tyconHash[i];
+      while (nonNull(j)) {
+         assert(isTycon(j) || isTuple(j));
+         j = tycon(j).nextTyconHash;
+      }
+   }
+   for (i = 0; i < NAMEHSZ; i++) {
+      j = nameHash[i];
+      while (nonNull(j)) {
+         assert(isName(j));
+         j = name(j).nextNameHash;
+      }
+   }
+}
 
-Name newName(t,parent)                  /* Add new name to name table      */
-Text t; 
-Cell parent; {
+Name newName ( Text t, Cell parent )    /* Add new name to name table      */
+{
     Int h = nHash(t);
-    if (nameHw-NAMEMIN >= NUM_NAME) {
-        ERRMSG(0) "Name storage space exhausted"
-        EEND;
-    }
-    name(nameHw).text         = t;      /* clear new name record           */
-    name(nameHw).line         = 0;
-    name(nameHw).syntax       = NO_SYNTAX;
-    name(nameHw).parent       = parent;
-    name(nameHw).arity        = 0;
-    name(nameHw).number       = EXECNAME;
-    name(nameHw).defn         = NIL;
-    name(nameHw).stgVar       = NIL;
-    name(nameHw).callconv     = NIL;
-    name(nameHw).type         = NIL;
-    name(nameHw).primop       = 0;
-    name(nameHw).mod          = currentModule;
-    name(nameHw).itbl         = NULL;
-    module(currentModule).names=cons(nameHw,module(currentModule).names);
-    name(nameHw).nextNameHash = nameHash[h];
-    nameHash[h]               = nameHw;
-    return nameHw++;
+    Name nm = allocNewName();
+    tabName
+       [nm-NAME_BASE_ADDR].mod  = currentModule;
+    name(nm).text               = t;    /* clear new name record           */
+    name(nm).line               = 0;
+    name(nm).syntax             = NO_SYNTAX;
+    name(nm).parent             = parent;
+    name(nm).arity              = 0;
+    name(nm).number             = EXECNAME;
+    name(nm).defn               = NIL;
+    name(nm).stgVar             = NIL;
+    name(nm).callconv           = NIL;
+    name(nm).type               = NIL;
+    name(nm).primop             = NULL;
+    name(nm).itbl               = NULL;
+    module(currentModule).names = cons(nm,module(currentModule).names);
+    name(nm).nextNameHash       = nameHash[RC_N(h)];
+    nameHash[RC_N(h)]                 = nm;
+    return nm;
 }
 
 Name findName(t)                        /* Locate name in name table       */
 Text t; {
-    Name n = nameHash[nHash(t)];
-
+    Name n = nameHash[RC_N(nHash(t))];
+assert(isText(t));
+assert(isName(n) || isNull(n));
     while (nonNull(n) && name(n).text!=t)
 	n = name(n).nextNameHash;
     return n;
@@ -689,7 +883,7 @@ Text t; {
 Name addName(nm)                        /* Insert Name in name table - if  */
 Name nm; {                              /* no clash is caused              */
     Name oldnm; 
-    assert(whatIs(nm)==NAME);
+    assert(isName(nm));
     oldnm = findName(name(nm).text);
     if (isNull(oldnm)) {
         hashName(nm);
@@ -706,8 +900,8 @@ Name nm; {
     assert(isName(nm));
     t = name(nm).text;
     h = nHash(t);
-    name(nm).nextNameHash = nameHash[h];
-    nameHash[h]           = nm;
+    name(nm).nextNameHash = nameHash[RC_N(h)];
+    nameHash[RC_N(h)]           = nm;
 }
 
 Name findQualName(id)              /* Locate (possibly qualified) name*/
@@ -756,8 +950,10 @@ Cell id; {                         /* in name table                   */
 Name nameFromStgVar ( StgVar v )
 {
    Int n;
-   for (n = NAMEMIN; n < nameHw; n++)
-      if (name(n).stgVar == v) return n;
+   for (n = NAME_BASE_ADDR;
+        n < NAME_BASE_ADDR+tabNameSz; n++)
+      if (tabName[n-NAME_BASE_ADDR].inUse)
+         if (name(n).stgVar == v) return n;
    return NIL;
 }
 
@@ -766,9 +962,11 @@ void* getHugs_AsmObject_for ( char* s )
    StgVar v;
    Text   t = findText(s);
    Name   n = NIL;
-   for (n = NAMEMIN; n < nameHw; n++)
-      if (name(n).text == t) break;
-   if (n == nameHw) {
+   for (n = NAME_BASE_ADDR; 
+        n < NAME_BASE_ADDR+tabNameSz; n++)
+      if (tabName[n-NAME_BASE_ADDR].inUse)
+         if (name(n).text == t) break;
+   if (n == NAME_BASE_ADDR+tabNameSz) {
       fprintf ( stderr, "can't find `%s' in ...\n", s );
       internal("getHugs_AsmObject_for(1)");
    }
@@ -828,8 +1026,10 @@ Tycon addTupleTycon ( Int n )
    Module m;
    Name   nm;
 
-   for (i = TYCMIN; i < tyconHw; i++)
-      if (tycon(i).tuple == n) return i;
+   for (i = TYCON_BASE_ADDR; 
+        i < TYCON_BASE_ADDR+tabTyconSz; i++)
+      if (tabTycon[i-TYCON_BASE_ADDR].inUse)
+         if (tycon(i).tuple == n) return i;
 
    if (combined)
       m = findFakeModule(findText(n==0 ? "PrelBase" : "PrelTup")); else
@@ -945,13 +1145,17 @@ List addNamesMatching(pat,ns)           /* Add names matching pattern pat  */
 String pat;                             /* to list of names ns             */
 List   ns; {                            /* Null pattern matches every name */
     Name nm;                            /* (Names with NIL type, or hidden */
+                                        /* or invented names are excluded) */
 #if 1
-    for (nm=NAMEMIN; nm<nameHw; ++nm)   /* or invented names are excluded) */
-        if (!inventedText(name(nm).text) && nonNull(name(nm).type)) {
-            String str = textToStr(name(nm).text);
-            if (str[0]!='_' && (!pat || stringMatch(pat,str)))
-                ns = insertName(nm,ns);
-        }
+    for (nm = NAME_BASE_ADDR;
+         nm < NAME_BASE_ADDR+tabNameSz; ++nm)
+       if (tabName[nm-NAME_BASE_ADDR].inUse) {
+          if (!inventedText(name(nm).text) && nonNull(name(nm).type)) {
+             String str = textToStr(name(nm).text);
+             if (str[0]!='_' && (!pat || stringMatch(pat,str)))
+                 ns = insertName(nm,ns);
+          }
+       }
     return ns;
 #else
     List mns = module(currentModule).names;
@@ -1033,40 +1237,30 @@ String str; {
  * Storage of type classes, instances etc...:
  * ------------------------------------------------------------------------*/
 
-static Class classHw;                  /* next unused class                */
 static List  classes;                  /* list of classes in current scope */
-static Inst  instHw;                   /* next unused instance record      */
 
-struct strClass DEFTABLE(tabClass,NUM_CLASSES); /* table of class records  */
-struct strInst far *tabInst;           /* (pointer to) table of instances  */
-
-Class newClass(t)                      /* add new class to class table     */
-Text t; {
-    if (classHw-CLASSMIN >= NUM_CLASSES) {
-        ERRMSG(0) "Class storage space exhausted"
-        EEND;
-    }
-    cclass(classHw).text      = t;
-    cclass(classHw).arity     = 0;
-    cclass(classHw).kinds     = NIL;
-    cclass(classHw).head      = NIL;
-    cclass(classHw).fds       = NIL;
-    cclass(classHw).xfds      = NIL;
-    cclass(classHw).dcon      = NIL;
-    cclass(classHw).supers    = NIL;
-    cclass(classHw).dsels     = NIL;
-    cclass(classHw).members   = NIL;
-    cclass(classHw).defaults  = NIL;
-    cclass(classHw).instances = NIL;
-    classes=cons(classHw,classes);
-    cclass(classHw).mod       = currentModule;
-    module(currentModule).classes=cons(classHw,module(currentModule).classes);
-    return classHw++;
+Class newClass ( Text t )              /* add new class to class table     */
+{
+    Class cl                     = allocNewClass();
+    tabClass
+      [cl-CCLASS_BASE_ADDR].mod  = currentModule;
+    cclass(cl).text              = t;
+    cclass(cl).arity             = 0;
+    cclass(cl).kinds             = NIL;
+    cclass(cl).head              = NIL;
+    cclass(cl).fds               = NIL;
+    cclass(cl).xfds              = NIL;
+    cclass(cl).dcon              = NIL;
+    cclass(cl).supers            = NIL;
+    cclass(cl).dsels             = NIL;
+    cclass(cl).members           = NIL;
+    cclass(cl).defaults          = NIL;
+    cclass(cl).instances         = NIL;
+    classes                      = cons(cl,classes);
+    module(currentModule).classes
+       = cons(cl,module(currentModule).classes);
+    return cl;
 }
-
-Class classMax() {                      /* Return max Class in use ...     */
-    return classHw;                     /* This is a bit ugly, but it's not*/
-}                                       /* worth a lot of effort right now */
 
 Class findClass(t)                     /* look for named class in table    */
 Text t; {
@@ -1114,18 +1308,15 @@ Cell c; {                               /* class in class list             */
 }
 
 Inst newInst() {                       /* Add new instance to table        */
-    if (instHw-INSTMIN >= NUM_INSTS) {
-        ERRMSG(0) "Instance storage space exhausted"
-        EEND;
-    }
-    inst(instHw).kinds      = NIL;
-    inst(instHw).head       = NIL;
-    inst(instHw).specifics  = NIL;
-    inst(instHw).implements = NIL;
-    inst(instHw).builder    = NIL;
-    inst(instHw).mod        = currentModule;
-
-    return instHw++;
+    Inst in                    = allocNewInst();
+    tabInst
+       [in-INST_BASE_ADDR].mod = currentModule;
+    inst(in).kinds             = NIL;
+    inst(in).head              = NIL;
+    inst(in).specifics         = NIL;
+    inst(in).implements        = NIL;
+    inst(in).builder           = NIL;
+    return in;
 }
 
 #ifdef DEBUG_DICTS
@@ -1141,14 +1332,17 @@ Inst in; {
 
 Inst findFirstInst(tc)                  /* look for 1st instance involving */
 Tycon tc; {                             /* the type constructor tc         */
-    return findNextInst(tc,INSTMIN-1);
+    return findNextInst(tc,INST_BASE_ADDR-1);
 }
 
 Inst findNextInst(tc,in)                /* look for next instance involving*/
 Tycon tc;                               /* the type constructor tc         */
 Inst  in; {                             /* starting after instance in      */
-    while (++in < instHw) {
-        Cell pi = inst(in).head;
+    Cell pi;
+    while (++in < INST_BASE_ADDR+tabInstSz) {
+        if (!tabInst[in-INST_BASE_ADDR].inUse) continue;
+        assert(isModule(inst(in).mod));
+        pi = inst(in).head;
         for (; isAp(pi); pi=fun(pi))
             if (typeInvolves(arg(pi),tc))
                 return in;
@@ -1185,19 +1379,20 @@ Class findQualClassWithoutConsultingExportList ( QualId q )
       t_class = qtextOf(q);
    }
 
-   for (cl = CLASSMIN; cl < classHw; cl++) {
-      if (cclass(cl).text == t_class) {
-         /* Class name is ok, but is this the right module? */
-         if (isNull(t_mod)   /* no module name specified */
-             || (nonNull(t_mod) 
-                 && t_mod == module(cclass(cl).mod).text)
-            )
-            return cl;
-      }
+   for (cl = CCLASS_BASE_ADDR; 
+        cl < CCLASS_BASE_ADDR+tabClassSz; cl++) {
+      if (tabClass[cl-CCLASS_BASE_ADDR].inUse)
+         if (cclass(cl).text == t_class) {
+            /* Class name is ok, but is this the right module? */
+            if (isNull(t_mod)   /* no module name specified */
+                || (nonNull(t_mod) 
+                    && t_mod == module(cclass(cl).mod).text)
+               )
+               return cl;
+         }
    }
    return NIL;
 }
-
 
 /* Same deal, except for Tycons. */
 Tycon findQualTyconWithoutConsultingExportList ( QualId q )
@@ -1216,40 +1411,18 @@ Tycon findQualTyconWithoutConsultingExportList ( QualId q )
       t_tycon = qtextOf(q);
    }
 
-   for (tc = TYCMIN; tc < tyconHw; tc++) {
-      if (tycon(tc).text == t_tycon) {
-         /* Tycon name is ok, but is this the right module? */
-         if (isNull(t_mod)   /* no module name specified */
-             || (nonNull(t_mod) 
-                 && t_mod == module(tycon(tc).mod).text)
-            )
-            return tc;
-      }
+   for (tc = TYCON_BASE_ADDR; 
+        tc < TYCON_BASE_ADDR+tabTyconSz; tc++) {
+      if (tabTycon[tc-TYCON_BASE_ADDR].inUse)
+         if (tycon(tc).text == t_tycon) {
+            /* Tycon name is ok, but is this the right module? */
+            if (isNull(t_mod)   /* no module name specified */
+                || (nonNull(t_mod) 
+                    && t_mod == module(tycon(tc).mod).text)
+               )
+               return tc;
+         }
    }
-   return NIL;
-}
-
-Tycon findTyconInAnyModule ( Text t )
-{
-   Tycon tc;
-   for (tc = TYCMIN; tc < tyconHw; tc++)
-      if (tycon(tc).text == t) return tc;
-   return NIL;
-}
-
-Class findClassInAnyModule ( Text t )
-{
-   Class cc;
-   for (cc = CLASSMIN; cc < classHw; cc++)
-      if (cclass(cc).text == t) return cc;
-   return NIL;
-}
-
-Name findNameInAnyModule ( Text t )
-{
-   Name nm;
-   for (nm = NAMEMIN; nm < nameHw; nm++)
-      if (name(nm).text == t) return nm;
    return NIL;
 }
 
@@ -1270,16 +1443,49 @@ Name findQualNameWithoutConsultingExportList ( QualId q )
       t_name = qtextOf(q);
    }
 
-   for (nm = NAMEMIN; nm < nameHw; nm++) {
-      if (name(nm).text == t_name) {
-         /* Name is ok, but is this the right module? */
-         if (isNull(t_mod)   /* no module name specified */
-             || (nonNull(t_mod) 
-                 && t_mod == module(name(nm).mod).text)
-            )
-            return nm;
-      }
+   for (nm = NAME_BASE_ADDR; 
+        nm < NAME_BASE_ADDR+tabNameSz; nm++) {
+      if (tabName[nm-NAME_BASE_ADDR].inUse)
+         if (name(nm).text == t_name) {
+            /* Name is ok, but is this the right module? */
+            if (isNull(t_mod)   /* no module name specified */
+                || (nonNull(t_mod) 
+                    && t_mod == module(name(nm).mod).text)
+               )
+               return nm;
+         }
    }
+   return NIL;
+}
+
+
+Tycon findTyconInAnyModule ( Text t )
+{
+   Tycon tc;
+   for (tc = TYCON_BASE_ADDR; 
+        tc < TYCON_BASE_ADDR+tabTyconSz; tc++)
+      if (tabTycon[tc-TYCON_BASE_ADDR].inUse)
+         if (tycon(tc).text == t) return tc;
+   return NIL;
+}
+
+Class findClassInAnyModule ( Text t )
+{
+   Class cc;
+   for (cc = CCLASS_BASE_ADDR; 
+        cc < CCLASS_BASE_ADDR+tabClassSz; cc++)
+      if (tabClass[cc-CCLASS_BASE_ADDR].inUse)
+         if (cclass(cc).text == t) return cc;
+   return NIL;
+}
+
+Name findNameInAnyModule ( Text t )
+{
+   Name nm;
+   for (nm = NAME_BASE_ADDR; 
+        nm < NAME_BASE_ADDR+tabNameSz; nm++)
+      if (tabName[nm-NAME_BASE_ADDR].inUse)
+         if (name(nm).text == t) return nm;
    return NIL;
 }
 
@@ -1290,16 +1496,22 @@ List getAllKnownTyconsAndClasses ( void )
    Tycon tc;
    Class nw;
    List  xs = NIL;
-   for (tc = TYCMIN; tc < tyconHw; tc++) {
-      /* almost certainly undue paranoia about duplicate avoidance, but .. */
-      QualId q = mkQCon( module(tycon(tc).mod).text, tycon(tc).text );
-      if (!qualidIsMember(q,xs))
-         xs = cons ( q, xs );
+   for (tc = TYCON_BASE_ADDR; 
+        tc < TYCON_BASE_ADDR+tabTyconSz; tc++) {
+      if (tabTycon[tc-TYCON_BASE_ADDR].inUse) {
+         /* almost certainly undue paranoia about duplicate avoidance */
+         QualId q = mkQCon( module(tycon(tc).mod).text, tycon(tc).text );
+         if (!qualidIsMember(q,xs))
+            xs = cons ( q, xs );
+      }
    }
-   for (nw = CLASSMIN; nw < classHw; nw++) {
-      QualId q = mkQCon( module(cclass(nw).mod).text, cclass(nw).text );
-      if (!qualidIsMember(q,xs))
-         xs = cons ( q, xs );
+   for (nw = CCLASS_BASE_ADDR; 
+        nw < CCLASS_BASE_ADDR+tabClassSz; nw++) {
+      if (tabClass[nw-CCLASS_BASE_ADDR].inUse) {
+         QualId q = mkQCon( module(cclass(nw).mod).text, cclass(nw).text );
+         if (!qualidIsMember(q,xs))
+            xs = cons ( q, xs );
+      }
    }
    return xs;
 }
@@ -1308,15 +1520,18 @@ List getAllKnownTyconsAndClasses ( void )
 void locateSymbolByName ( Text t )
 {
    Int i;
-   for (i = NAMEMIN; i < nameHw; i++)
-      if (name(i).text == t)
-         fprintf ( stderr, "name(%d)\n", i-NAMEMIN);
-   for (i = TYCMIN; i < tyconHw; i++)
-      if (tycon(i).text == t)
-         fprintf ( stderr, "tycon(%d)\n", i-TYCMIN);
-   for (i = CLASSMIN; i < classHw; i++)
-      if (cclass(i).text == t)
-         fprintf ( stderr, "class(%d)\n", i-CLASSMIN);
+   for (i = NAME_BASE_ADDR; 
+        i < NAME_BASE_ADDR+tabNameSz; i++)
+      if (tabName[i-NAME_BASE_ADDR].inUse && name(i).text == t)
+         fprintf ( stderr, "name(%d)\n", i-NAME_BASE_ADDR);
+   for (i = TYCON_BASE_ADDR; 
+        i < TYCON_BASE_ADDR+tabTyconSz; i++)
+      if (tabTycon[i-TYCON_BASE_ADDR].inUse && tycon(i).text == t)
+         fprintf ( stderr, "tycon(%d)\n", i-TYCON_BASE_ADDR);
+   for (i = CCLASS_BASE_ADDR; 
+        i < CCLASS_BASE_ADDR+tabClassSz; i++)
+      if (tabClass[i-CCLASS_BASE_ADDR].inUse && cclass(i).text == t)
+         fprintf ( stderr, "class(%d)\n", i-CCLASS_BASE_ADDR);
 }
 
 /* --------------------------------------------------------------------------
@@ -1326,51 +1541,14 @@ void locateSymbolByName ( Text t )
  * operations are defined as macros, expanded inline.
  * ------------------------------------------------------------------------*/
 
-Cell DEFTABLE(cellStack,NUM_STACK); /* Storage for cells on stack          */
+Cell cellStack[NUM_STACK];          /* Storage for cells on stack          */
 StackPtr sp;                        /* stack pointer                       */
-
-#if GIMME_STACK_DUMPS
-
-#define UPPER_DISP  5               /* # display entries on top of stack   */
-#define LOWER_DISP  5               /* # display entries on bottom of stack*/
-
-Void hugsStackOverflow() {          /* Report stack overflow               */
-    extern Int  rootsp;
-    extern Cell evalRoots[];
-
-    ERRMSG(0) "Control stack overflow" ETHEN
-    if (rootsp>=0) {
-        Int i;
-        if (rootsp>=UPPER_DISP+LOWER_DISP) {
-            for (i=0; i<UPPER_DISP; i++) {
-                ERRTEXT "\nwhile evaluating: " ETHEN
-                ERREXPR(evalRoots[rootsp-i]);
-            }
-            ERRTEXT "\n..." ETHEN
-            for (i=LOWER_DISP-1; i>=0; i--) {
-                ERRTEXT "\nwhile evaluating: " ETHEN
-                ERREXPR(evalRoots[i]);
-            }
-        }
-        else {
-            for (i=rootsp; i>=0; i--) {
-                ERRTEXT "\nwhile evaluating: " ETHEN
-                ERREXPR(evalRoots[i]);
-            }
-        }
-    }
-    ERRTEXT "\n"
-    EEND;
-}
-
-#else /* !GIMME_STACK_DUMPS */
 
 Void hugsStackOverflow() {          /* Report stack overflow               */
     ERRMSG(0) "Control stack overflow"
     EEND;
 }
 
-#endif /* !GIMME_STACK_DUMPS */
 
 /* --------------------------------------------------------------------------
  * Module storage:
@@ -1389,32 +1567,100 @@ Void hugsStackOverflow() {          /* Report stack overflow               */
  *
  * ------------------------------------------------------------------------*/
 
-static  Module   moduleHw;              /* next unused Module              */
-struct  Module   DEFTABLE(tabModule,NUM_MODULE); /* Module storage         */
 Module  currentModule;                  /* Module currently being processed*/
 
-Bool isValidModule(m)                  /* is m a legitimate module id?     */
+Bool isValidModule(m)                   /* is m a legitimate module id?    */
 Module m; {
-    return (MODMIN <= m && m < moduleHw);
+    return isModule(m);
 }
 
-Module newModule(t)                     /* add new module to module table  */
-Text t; {
-    if (moduleHw-MODMIN >= NUM_MODULE) {
-        ERRMSG(0) "Module storage space exhausted"
-        EEND;
-    }
-    module(moduleHw).text             = t; /* clear new module record      */
-    module(moduleHw).qualImports      = NIL;
-    module(moduleHw).fake             = FALSE;
-    module(moduleHw).exports          = NIL;
-    module(moduleHw).tycons           = NIL;
-    module(moduleHw).names            = NIL;
-    module(moduleHw).classes          = NIL;
-    module(moduleHw).object           = NULL;
-    module(moduleHw).objectExtras     = NULL;
-    module(moduleHw).objectExtraNames = NIL;
-    return moduleHw++;
+Module newModule ( Text t )             /* add new module to module table  */
+{
+    Module mod                   = allocNewModule();
+    module(mod).text             = t;      /* clear new module record      */
+
+    module(mod).tycons           = NIL;
+    module(mod).names            = NIL;
+    module(mod).classes          = NIL;
+    module(mod).exports          = NIL;
+    module(mod).qualImports      = NIL;
+    module(mod).fake             = FALSE;
+
+    module(mod).tree             = NIL;
+    module(mod).completed        = FALSE;
+    module(mod).lastStamp        = 0; /* ???? */
+
+    module(mod).fromSrc          = TRUE;
+    module(mod).srcExt           = findText("");
+    module(mod).uses             = NIL;
+
+    module(mod).objName          = findText("");
+    module(mod).objSize          = 0;
+
+    module(mod).object           = NULL;
+    module(mod).objectExtras     = NULL;
+    module(mod).objectExtraNames = NIL;
+    return mod;
+}
+
+void nukeModule ( Module m )
+{
+   ObjectCode* oc;
+   ObjectCode* oc2;
+   Int         i;
+assert(isModule(m));
+fprintf(stderr, "NUKEMODULE `%s'\n", textToStr(module(m).text));
+   oc = module(m).object;
+   while (oc) {
+      oc2 = oc->next;
+      ocFree(oc);
+      oc = oc2;
+   }
+   oc = module(m).objectExtras;
+   while (oc) {
+      oc2 = oc->next;
+      ocFree(oc);
+      oc = oc2;
+   }
+
+   for (i = NAME_BASE_ADDR; i < NAME_BASE_ADDR+tabNameSz; i++)
+      if (tabName[i-NAME_BASE_ADDR].inUse && name(i).mod == m) {
+         if (name(i).itbl) free(name(i).itbl);
+         name(i).itbl = NULL;
+         freeName(i);
+      }
+
+   for (i = TYCON_BASE_ADDR; i < TYCON_BASE_ADDR+tabTyconSz; i++)
+      if (tabTycon[i-TYCON_BASE_ADDR].inUse && tycon(i).mod == m) {
+	 if (tycon(i).itbl) free(tycon(i).itbl);
+         tycon(i).itbl = NULL;
+         freeTycon(i);
+      }
+
+   for (i = CCLASS_BASE_ADDR; i < CCLASS_BASE_ADDR+tabClassSz; i++)
+      if (tabClass[i-CCLASS_BASE_ADDR].inUse) {
+         if (cclass(i).mod == m) {
+            freeClass(i);
+         } else {
+            List /* Inst */ ins;
+            List /* Inst */ ins2 = NIL;
+            for (ins = cclass(i).instances; nonNull(ins); ins=tl(ins))
+               if (inst(hd(ins)).mod != m) 
+                  ins2 = cons(hd(ins),ins2);
+            cclass(i).instances = ins2;
+         }
+      }
+
+
+   for (i = INST_BASE_ADDR; i < INST_BASE_ADDR+tabInstSz; i++)
+      if (tabInst[i-INST_BASE_ADDR].inUse && inst(i).mod == m)
+         freeInst(i);
+
+   freeModule(m);
+   //for (i = 0; i < TYCONHSZ; i++) tyconHash[i] = 0;
+   //for (i = 0; i < NAMEHSZ; i++)  nameHash[i] = 0;
+   //classes = NIL;
+   //hashSanity();
 }
 
 void ppModules ( void )
@@ -1422,10 +1668,12 @@ void ppModules ( void )
    Int i;
    fflush(stderr); fflush(stdout);
    printf ( "begin MODULES\n" );
-   for (i = moduleHw-1; i >= MODMIN; i--)
-      printf ( " %2d: %16s\n",
-               i-MODMIN, textToStr(module(i).text)
-             );
+   for (i  = MODULE_BASE_ADDR+tabModuleSz-1;
+        i >= MODULE_BASE_ADDR; i--)
+      if (tabModule[i-MODULE_BASE_ADDR].inUse)
+         printf ( " %2d: %16s\n",
+                  i-MODULE_BASE_ADDR, textToStr(module(i).text)
+                );
    printf ( "end   MODULES\n" );
    fflush(stderr); fflush(stdout);
 }
@@ -1434,9 +1682,11 @@ void ppModules ( void )
 Module findModule(t)                    /* locate Module in module table  */
 Text t; {
     Module m;
-    for(m=MODMIN; m<moduleHw; ++m) {
-        if (module(m).text==t)
-            return m;
+    for(m = MODULE_BASE_ADDR; 
+        m < MODULE_BASE_ADDR+tabModuleSz; ++m) {
+        if (tabModule[m-MODULE_BASE_ADDR].inUse)
+            if (module(m).text==t)
+                return m;
     }
     return NIL;
 }
@@ -1444,9 +1694,7 @@ Text t; {
 Module findModid(c)                    /* Find module by name or filename  */
 Cell c; {
     switch (whatIs(c)) {
-        case STRCELL   : { Script s = scriptThisFile(snd(c));
-                           return (s==-1) ? NIL : moduleOfScript(s);
-                         }
+        case STRCELL   : internal("findModid-STRCELL unimp");
         case CONIDCELL : return findModule(textOf(c));
         default        : internal("findModid");
     }
@@ -1460,10 +1708,8 @@ Text t; {
         if (textOf(fst(hd(ms)))==t)
             return snd(hd(ms));
     }
-#if 1 /* mpj */
     if (module(currentModule).text==t)
         return currentModule;
-#endif
     return NIL;
 }
 
@@ -1471,16 +1717,25 @@ Void setCurrModule(m)              /* set lookup tables for current module */
 Module m; {
     Int i;
     assert(isModule(m));
-    if (m!=currentModule) {
-        currentModule = m; /* This is the only assignment to currentModule */
-        for (i=0; i<TYCONHSZ; ++i)
-            tyconHash[i] = NIL;
-        mapProc(hashTycon,module(m).tycons);
-        for (i=0; i<NAMEHSZ; ++i)
-            nameHash[i] = NIL;
-        mapProc(hashName,module(m).names);
-        classes = module(m).classes;
+fprintf(stderr, "SET CURR MODULE %s\n", textToStr(module(m).text));
+    {List t;
+     for (t = module(m).names; nonNull(t); t=tl(t))
+        assert(isName(hd(t)));
+     for (t = module(m).tycons; nonNull(t); t=tl(t))
+        assert(isTycon(hd(t)) || isTuple(hd(t)));
+     for (t = module(m).classes; nonNull(t); t=tl(t))
+        assert(isClass(hd(t)));
     }
+
+    currentModule = m; /* This is the only assignment to currentModule */
+    for (i=0; i<TYCONHSZ; ++i)
+       tyconHash[RC_T(i)] = NIL;
+    mapProc(hashTycon,module(m).tycons);
+    for (i=0; i<NAMEHSZ; ++i)
+       nameHash[RC_N(i)] = NIL;
+    mapProc(hashName,module(m).names);
+    classes = module(m).classes;
+    hashSanity();
 }
 
 Name jrsFindQualName ( Text mn, Text sn )
@@ -1488,9 +1743,12 @@ Name jrsFindQualName ( Text mn, Text sn )
    Module m;
    List   ns;
 
-   for (m=MODMIN; m<moduleHw; m++)
-      if (module(m).text == mn) break;
-   if (m == moduleHw) return NIL;
+   for (m = MODULE_BASE_ADDR; 
+        m < MODULE_BASE_ADDR+tabModuleSz; m++)
+      if (tabModule[m-MODULE_BASE_ADDR].inUse 
+          && module(m).text == mn) break;
+
+   if (m == MODULE_BASE_ADDR+tabModuleSz) return NIL;
    
    for (ns = module(m).names; nonNull(ns); ns=tl(ns)) 
       if (name(hd(ns)).text == sn) return hd(ns);
@@ -1503,8 +1761,9 @@ char* nameFromOPtr ( void* p )
 {
    int i;
    Module m;
-   for (m=MODMIN; m<moduleHw; m++) {
-      if (module(m).object) {
+   for (m = MODULE_BASE_ADDR; 
+        m < MODULE_BASE_ADDR+tabModuleSz; m++) {
+      if (tabModule[m-MODULE_BASE_ADDR].inUse && module(m).object) {
          char* nm = ocLookupAddr ( module(m).object, p );
          if (nm) return nm;
       }
@@ -1521,6 +1780,7 @@ char* nameFromOPtr ( void* p )
 
 void* lookupOTabName ( Module m, char* sym )
 {
+   assert(isModule(m));
    if (module(m).object)
       return ocLookupSym ( module(m).object, sym );
    return NULL;
@@ -1531,11 +1791,13 @@ void* lookupOExtraTabName ( char* sym )
 {
    ObjectCode* oc;
    Module      m;
-   for (m = MODMIN; m < moduleHw; m++) {
-      for (oc = module(m).objectExtras; oc; oc=oc->next) {
-         void* ad = ocLookupSym ( oc, sym );
-         if (ad) return ad;
-      }
+   for (m = MODULE_BASE_ADDR; 
+        m < MODULE_BASE_ADDR+tabModuleSz; m++) {
+      if (tabModule[m-MODULE_BASE_ADDR].inUse)
+         for (oc = module(m).objectExtras; oc; oc=oc->next) {
+            void* ad = ocLookupSym ( oc, sym );
+            if (ad) return ad;
+         }
    }
    return NULL;
 }
@@ -1548,233 +1810,24 @@ OSectionKind lookupSection ( void* ad )
    ObjectCode*  oc;
    OSectionKind sect;
 
-   for (m=MODMIN; m<moduleHw; m++) {
-      if (module(m).object) {
-         sect = ocLookupSection ( module(m).object, ad );
-         if (sect != HUGS_SECTIONKIND_NOINFOAVAIL)
-            return sect;
-      }
-      for (oc = module(m).objectExtras; oc; oc=oc->next) {
-         sect = ocLookupSection ( oc, ad );
-         if (sect != HUGS_SECTIONKIND_NOINFOAVAIL)
-            return sect;
+   for (m = MODULE_BASE_ADDR; 
+        m < MODULE_BASE_ADDR+tabModuleSz; m++) {
+      if (tabModule[m-MODULE_BASE_ADDR].inUse) {
+         if (module(m).object) {
+            sect = ocLookupSection ( module(m).object, ad );
+            if (sect != HUGS_SECTIONKIND_NOINFOAVAIL)
+               return sect;
+         }
+         for (oc = module(m).objectExtras; oc; oc=oc->next) {
+            sect = ocLookupSection ( oc, ad );
+            if (sect != HUGS_SECTIONKIND_NOINFOAVAIL)
+               return sect;
+         }
       }
    }
    return HUGS_SECTIONKIND_OTHER;
 }
 
-
-/* --------------------------------------------------------------------------
- * Script file storage:
- *
- * script files are read into the system one after another.  The state of
- * the stored data structures (except the garbage-collected heap) is recorded
- * before reading a new script.  In the event of being unable to read the
- * script, or if otherwise requested, the system can be restored to its
- * original state immediately before the file was read.
- * ------------------------------------------------------------------------*/
-
-typedef struct {                       /* record of storage state prior to */
-    Text  file;                        /* reading script/module            */
-    Text  textHw;
-    Text  nextNewText;
-    Text  nextNewDText;
-    Module moduleHw;
-    Tycon tyconHw;
-    Name  nameHw;
-    Class classHw;
-    Inst  instHw;
-#if TREX
-    Ext   extHw;
-#endif
-} script;
-
-#ifdef  DEBUG_SHOWUSE
-static Void local showUse(msg,val,mx)
-String msg;
-Int val, mx; {
-    Printf("%6s : %5d of %5d (%2d%%)\n",msg,val,mx,(100*val)/mx);
-}
-#endif
-
-static Script scriptHw;                 /* next unused script number       */
-static script scripts[NUM_SCRIPTS];     /* storage for script records      */
-
-
-void ppScripts ( void )
-{
-   Int i;
-   fflush(stderr); fflush(stdout);
-   printf ( "begin SCRIPTS\n" );
-   for (i = scriptHw-1; i >= 0; i--)
-      printf ( " %2d: %16s  tH=%d  mH=%d  yH=%d  "
-               "nH=%d  cH=%d  iH=%d  nnS=%d,%d\n",
-               i, textToStr(scripts[i].file),
-               scripts[i].textHw, scripts[i].moduleHw,
-               scripts[i].tyconHw, scripts[i].nameHw, 
-               scripts[i].classHw, scripts[i].instHw,
-               scripts[i].nextNewText, scripts[i].nextNewDText 
-             );
-   printf ( "end   SCRIPTS\n" );
-   fflush(stderr); fflush(stdout);
-}
-
-Script startNewScript(f)                /* start new script, keeping record */
-String f; {                             /* of status for later restoration  */
-    if (scriptHw >= NUM_SCRIPTS) {
-        ERRMSG(0) "Too many script files in use"
-        EEND;
-    }
-#ifdef DEBUG_SHOWUSE
-    showUse("Text",   textHw,           NUM_TEXT);
-    showUse("Module", moduleHw-MODMIN,  NUM_MODULE);
-    showUse("Tycon",  tyconHw-TYCMIN,   NUM_TYCON);
-    showUse("Name",   nameHw-NAMEMIN,   NUM_NAME);
-    showUse("Class",  classHw-CLASSMIN, NUM_CLASSES);
-    showUse("Inst",   instHw-INSTMIN,   NUM_INSTS);
-#if TREX
-    showUse("Ext",    extHw-EXTMIN,     NUM_EXT);
-#endif
-#endif
-    scripts[scriptHw].file         = findText( f ? f : "<nofile>" );
-    scripts[scriptHw].textHw       = textHw;
-    scripts[scriptHw].nextNewText  = nextNewText;
-    scripts[scriptHw].nextNewDText = nextNewDText;
-    scripts[scriptHw].moduleHw     = moduleHw;
-    scripts[scriptHw].tyconHw      = tyconHw;
-    scripts[scriptHw].nameHw       = nameHw;
-    scripts[scriptHw].classHw      = classHw;
-    scripts[scriptHw].instHw       = instHw;
-#if TREX
-    scripts[scriptHw].extHw        = extHw;
-#endif
-    return scriptHw++;
-}
-
-Bool isPreludeScript() {                /* Test whether this is the Prelude*/
-    return (scriptHw < N_PRELUDE_SCRIPTS /*==0*/ );
-}
-
-Bool moduleThisScript(m)                /* Test if given module is defined */
-Module m; {                             /* in current script file          */
-    return scriptHw < 1
-           || m>=scripts[scriptHw-1].moduleHw;
-}
-
-Module lastModule() {              /* Return module in current script file */
-    return (moduleHw>MODMIN ? moduleHw-1 : modulePrelude);
-}
-
-#define scriptThis(nm,t,tag)            Script nm(x)                       \
-                                        t x; {                             \
-                                            Script s=0;                    \
-                                            while (s<scriptHw              \
-                                                   && x>=scripts[s].tag)   \
-                                                s++;                       \
-                                            return s;                      \
-                                        }
-scriptThis(scriptThisName,Name,nameHw)
-scriptThis(scriptThisTycon,Tycon,tyconHw)
-scriptThis(scriptThisInst,Inst,instHw)
-scriptThis(scriptThisClass,Class,classHw)
-#undef scriptThis
-
-Module moduleOfScript(s)
-Script s; {
-    return (s==0) ? modulePrelude : scripts[s-1].moduleHw;
-}
-
-String fileOfModule(m)
-Module m; {
-    Script s;
-    if (m == modulePrelude) {
-        return STD_PRELUDE;
-    }
-    for(s=0; s<scriptHw; ++s) {
-        if (scripts[s].moduleHw == m) {
-            return textToStr(scripts[s].file);
-        }
-    }
-    return 0;
-}
-
-Script scriptThisFile(f)
-Text f; {
-    Script s;
-    for (s=0; s < scriptHw; ++s) {
-        if (scripts[s].file == f) {
-            return s+1;
-        }
-    }
-    if (f == findText(STD_PRELUDE)) {
-        return 0;
-    }
-    return (-1);
-}
-
-Void dropScriptsFrom(sno)               /* Restore storage to state prior  */
-Script sno; {                           /* to reading script sno           */
-    if (sno<scriptHw) {                 /* is there anything to restore?   */
-        int i;
-        textHw       = scripts[sno].textHw;
-        nextNewText  = scripts[sno].nextNewText;
-        nextNewDText = scripts[sno].nextNewDText;
-        moduleHw     = scripts[sno].moduleHw;
-        tyconHw      = scripts[sno].tyconHw;
-        nameHw       = scripts[sno].nameHw;
-        classHw      = scripts[sno].classHw;
-        instHw       = scripts[sno].instHw;
-#if USE_DICTHW
-        dictHw       = scripts[sno].dictHw;
-#endif
-#if TREX
-        extHw        = scripts[sno].extHw;
-#endif
-
-#if 0
-        for (i=moduleHw; i >= scripts[sno].moduleHw; --i) {
-            if (module(i).objectFile) {
-                printf("[bogus] closing objectFile for module %d\n",i);
-                /*dlclose(module(i).objectFile);*/
-            }
-        }
-        moduleHw = scripts[sno].moduleHw;
-#endif
-        for (i=0; i<TEXTHSZ; ++i) {
-            int j = 0;
-            while (j<NUM_TEXTH && textHash[i][j]!=NOTEXT
-                               && textHash[i][j]<textHw)
-                ++j;
-            if (j<NUM_TEXTH)
-                textHash[i][j] = NOTEXT;
-        }
-
-        currentModule=NIL;
-        for (i=0; i<TYCONHSZ; ++i) {
-            tyconHash[i] = NIL;
-        }
-        for (i=0; i<NAMEHSZ; ++i) {
-            nameHash[i] = NIL;
-        }
-
-        for (i=CLASSMIN; i<classHw; i++) {
-            List ins = cclass(i).instances;
-            List is  = NIL;
-
-            while (nonNull(ins)) {
-                List temp = tl(ins);
-                if (hd(ins)<instHw) {
-                    tl(ins) = is;
-                    is      = ins;
-                }
-                ins = temp;
-            }
-            cclass(i).instances = rev(is);
-        }
-
-        scriptHw = sno;
-    }
-}
 
 /* --------------------------------------------------------------------------
  * Heap storage:
@@ -1865,16 +1918,6 @@ Cell l, r; {                            /* heap, garbage collecting first  */
     return c;
 }
 
-Void overwrite(dst,src)                 /* overwrite dst cell with src cell*/
-Cell dst, src; {                        /* both *MUST* be pairs            */
-    if (isPair(dst) && isPair(src)) {
-        fst(dst) = fst(src);
-        snd(dst) = snd(src);
-    }
-    else
-        internal("overwrite");
-}
-
 static Int *marks;
 static Int marksSize;
 
@@ -1903,7 +1946,7 @@ Cell c; {                               /* cells reachable from given root */
         fst(c) = markCell(fst(c));
         markSnd(c);
     }
-    else if (isNull(fst(c)) || fst(c)>=BCSTAG) {
+    else if (isNull(fst(c)) || isTagPtr(fst(c))) {
 	STACK_CHECK
         markSnd(c);
     }
@@ -1934,7 +1977,7 @@ ma: t = c;                              /* Keep pointer to original pair   */
         fst(c) = markCell(fst(c));
         goto ma;
     }
-    else if (isNull(fst(c)) || fst(c)>=BCSTAG)
+    else if (isNull(fst(c)) || isTagPtr(fst(c)))
         goto ma;
     return;
 }
@@ -1955,8 +1998,9 @@ Void garbageCollect()     {             /* Run garbage collector ...       */
     register Int mask;
     register Int place;
     Int      recovered;
-
     jmp_buf  regs;                      /* save registers on stack         */
+fprintf ( stderr, "wa-hey!  garbage collection!  too difficult!  bye!\n" );
+exit(0);
     setjmp(regs);
 
     gcStarted();
@@ -2014,14 +2058,14 @@ static Cell lastExprSaved;              /* last expression to be saved     */
 Void setLastExpr(e)                     /* save expression for later recall*/
 Cell e; {
     lastExprSaved = NIL;                /* in case attempt to save fails   */
-    savedText     = NUM_TEXT;
+    savedText     = TEXT_SIZE;
     lastExprSaved = lowLevelLastIn(e);
 }
 
 static Cell local lowLevelLastIn(c)     /* Duplicate expression tree (i.e. */
 Cell c; {                               /* acyclic graph) for later recall */
     if (isPair(c)) {                    /* Duplicating any text strings    */
-        if (isBoxTag(fst(c)))           /* in case these are lost at some  */
+        if (isTagNonPtr(fst(c)))        /* in case these are lost at some  */
             switch (fst(c)) {           /* point before the expr is reused */
                 case VARIDCELL :
                 case VAROPCELL :
@@ -2049,7 +2093,7 @@ Cell getLastExpr() {                    /* recover previously saved expr   */
 static Cell local lowLevelLastOut(c)    /* As with lowLevelLastIn() above  */
 Cell c; {                               /* except that Cells refering to   */
     if (isPair(c)) {                    /* Text values are restored to     */
-        if (isBoxTag(fst(c)))           /* appropriate values              */
+        if (isTagNonPtr(fst(c)))        /* appropriate values              */
             switch (fst(c)) {
                 case VARIDCELL :
                 case VAROPCELL :
@@ -2074,10 +2118,32 @@ Cell c; {                               /* except that Cells refering to   */
  * Miscellaneous operations on heap cells:
  * ------------------------------------------------------------------------*/
 
-/* Profiling suggests that the number of calls to whatIs() is typically    */
-/* rather high.  The recoded version below attempts to improve the average */
-/* performance for whatIs() using a binary search for part of the analysis */
+Cell whatIs ( register Cell c )
+{
+    if (isPair(c)) {
+        register Cell fstc = fst(c);
+        return isTag(fstc) ? fstc : AP;
+    }
+    if (isOffset(c))           return OFFSET;
+    if (isChar(c))             return CHARCELL;
+    if (isInt(c))              return INTCELL;
+    if (isName(c))             return NAME;
+    if (isTycon(c))            return TYCON;
+    if (isTuple(c))            return TUPLE;
+    if (isClass(c))            return CLASS;
+    if (isInst(c))             return INSTANCE;
+    if (isModule(c))           return MODULE;
+    if (isText(c))             return TEXTCELL;
+    if (isInventedVar(c))      return INVAR;
+    if (isInventedDictVar(c))  return INDVAR;
+    if (isSpec(c))             return c;
+    if (isNull(c))             return c;
+    fprintf ( stderr, "whatIs: unknown %d\n", c );
+    internal("whatIs");
+}
 
+
+#if 0
 Cell whatIs(c)                         /* identify type of cell            */
 register Cell c; {
     if (isPair(c)) {
@@ -2104,6 +2170,7 @@ register Cell c; {
                                         else            return TUPLE;
 #endif
 
+
 /*  if (isPair(c)) {
         register Cell fstc = fst(c);
         return isTag(fstc) ? fstc : AP;
@@ -2122,6 +2189,8 @@ register Cell c; {
     if (c>=TUPMIN)   return TUPLE;
     return c;*/
 }
+#endif
+
 
 /* A very, very simple printer.
  * Output is uglier than from printExp - but the printer is more
@@ -2132,7 +2201,29 @@ Void print ( Cell c, Int depth )
 {
     if (0 == depth) {
         Printf("...");
-    } else {
+    }
+    else if (isNull(c)) {
+       Printf("NIL");
+    }
+    else if (isTagPtr(c)) {
+        Printf("TagP(%d)", c);
+    }
+    else if (isTagNonPtr(c)) {
+        Printf("TagNP(%d)", c);
+    }
+    else if (isSpec(c)) {
+        Printf("TagS(%d)", c);
+    }
+    else if (isText(c)) {
+        Printf("text(%d)=\"%s\"",c-TEXT_BASE_ADDR,textToStr(c));
+    }
+    else if (isInventedVar(c)) {
+        Printf("invented(%d)", c-INVAR_BASE_ADDR);
+    }
+    else if (isInventedDictVar(c)) {
+        Printf("inventedDict(%d)",c-INDVAR_BASE_ADDR);
+    }
+    else {
         Int tag = whatIs(c);
         switch (tag) {
         case AP: 
@@ -2158,27 +2249,23 @@ Void print ( Cell c, Int depth )
                 Printf("ptr(%p)",ptrOf(c));
                 break;
         case CLASS:
-                Printf("class(%d)", c-CLASSMIN);
-                if (CLASSMIN <= c && c < classHw) {
-                    Printf("=\"%s\"", textToStr(cclass(c).text));
-                }
+                Printf("class(%d)", c-CCLASS_BASE_ADDR);
+                Printf("=\"%s\"", textToStr(cclass(c).text));
                 break;
         case INSTANCE:
-                Printf("instance(%d)", c - INSTMIN);
+                Printf("instance(%d)", c - INST_BASE_ADDR);
                 break;
         case NAME:
-                Printf("name(%d)", c-NAMEMIN);
-                if (NAMEMIN <= c && c < nameHw) {
-                    Printf("=\"%s\"", textToStr(name(c).text));
-                }
+                Printf("name(%d)", c-NAME_BASE_ADDR);
+                Printf("=\"%s\"", textToStr(name(c).text));
                 break;
         case TYCON:
-                Printf("tycon(%d)", c-TYCMIN);
-                if (TYCMIN <= c && c < tyconHw)
-                    Printf("=\"%s\"", textToStr(tycon(c).text));
+                Printf("tycon(%d)", c-TYCON_BASE_ADDR);
+                Printf("=\"%s\"", textToStr(tycon(c).text));
                 break;
         case MODULE:
-                Printf("module(%d)", c - MODMIN);
+                Printf("module(%d)", c - MODULE_BASE_ADDR);
+                Printf("=\"%s\"", textToStr(module(c).text));
                 break;
         case OFFSET:
                 Printf("Offset %d", offsetOf(c));
@@ -2203,9 +2290,6 @@ Void print ( Cell c, Int depth )
                     print(snd(c),depth-1);
                 }
                 Printf(")");
-                break;
-        case NIL:
-                Printf("NIL");
                 break;
         case WILDCARD:
                 Printf("_");
@@ -2338,10 +2422,10 @@ Void print ( Cell c, Int depth )
                 Putchar(')');
                 break;
         default:
-                if (isBoxTag(tag)) {
-                    Printf("Tag(%d)=%d", c, tag);
-                } else if (isConTag(tag)) {
-                    Printf("%d@(%d,",c,tag);
+                if (isTagNonPtr(tag)) {
+                    Printf("(TagNP=%d,%d)", c, tag);
+                } else if (isTagPtr(tag)) {
+                    Printf("(TagP=%d,",tag);
                     print(snd(c), depth-1);
                     Putchar(')');
                     break;
@@ -2432,13 +2516,14 @@ Cell c; {
 Int intOf(c)                           /* find integer value of cell?      */
 Cell c; {
     assert(isInt(c));
-    return isPair(c) ? (Int)(snd(c)) : (Int)(c-INTZERO);
+    return isPair(c) ? (Int)(snd(c)) : (Int)(c-SMALL_INT_ZERO);
 }
 
 Cell mkInt(n)                          /* make cell representing integer   */
 Int n; {
-    return (MINSMALLINT <= n && n <= MAXSMALLINT)
-           ? INTZERO+n
+    return (SMALL_INT_MIN    <= SMALL_INT_ZERO+n &&
+            SMALL_INT_ZERO+n <= SMALL_INT_MAX)
+           ? SMALL_INT_ZERO+n
            : pair(INTCELL,n);
 }
 
@@ -2764,7 +2849,7 @@ List xs; {                              /* non destructive                 */
 
 
 /* --------------------------------------------------------------------------
- * Strongly-typed lists (z-lists) and tuples (experimental)
+ * Tagged tuples (experimental)
  * ------------------------------------------------------------------------*/
 
 static void z_tag_check ( Cell x, int tag, char* caller )
@@ -2781,61 +2866,6 @@ static void z_tag_check ( Cell x, int tag, char* caller )
       internal(buf);
    }  
 }
-
-#if 0
-Cell zcons ( Cell x, Cell xs )
-{
-   if (!(isNull(xs) || whatIs(xs)==ZCONS)) 
-      internal("zcons: ill typed tail");
-   return ap(ZCONS,ap(x,xs));
-}
-
-Cell zhd ( Cell xs )
-{
-   if (isNull(xs)) internal("zhd: empty list");
-   z_tag_check(xs,ZCONS,"zhd");
-   return fst( snd(xs) );
-}
-
-Cell ztl ( Cell xs )
-{
-   if (isNull(xs)) internal("ztl: empty list");
-   z_tag_check(xs,ZCONS,"zhd");
-   return snd( snd(xs) );
-}
-
-Int zlength ( ZList xs )
-{
-   Int n = 0;
-   while (nonNull(xs)) {
-      z_tag_check(xs,ZCONS,"zlength");
-      n++;
-      xs = snd( snd(xs) );
-   }
-   return n;
-}
-
-ZList zreverse ( ZList xs )
-{
-   ZList rev = NIL;
-   while (nonNull(xs)) {
-      z_tag_check(xs,ZCONS,"zreverse");
-      rev = zcons(zhd(xs),rev);
-      xs = ztl(xs);
-   }
-   return rev;
-}
-
-Cell zsingleton ( Cell x )
-{
-   return zcons (x,NIL);
-}
-
-Cell zdoubleton ( Cell x, Cell y )
-{
-   return zcons(x,zcons(y,NIL));
-}
-#endif
 
 Cell zpair ( Cell x1, Cell x2 )
 { return ap(ZTUP2,ap(x1,x2)); }
@@ -2977,7 +3007,7 @@ static void print100 ( Int x )
 
 void dumpTycon ( Int t )
 {
-   if (isTycon(TYCMIN+t) && !isTycon(t)) t += TYCMIN;
+   if (isTycon(TYCON_BASE_ADDR+t) && !isTycon(t)) t += TYCON_BASE_ADDR;
    if (!isTycon(t)) {
       printf ( "dumpTycon %d: not a tycon\n", t);
       return;
@@ -3003,7 +3033,7 @@ void dumpTycon ( Int t )
 
 void dumpName ( Int n )
 {
-   if (isName(NAMEMIN+n) && !isName(n)) n += NAMEMIN;
+   if (isName(NAME_BASE_ADDR+n) && !isName(n)) n += NAME_BASE_ADDR;
    if (!isName(n)) {
       printf ( "dumpName %d: not a name\n", n);
       return;
@@ -3029,7 +3059,7 @@ void dumpName ( Int n )
 
 void dumpClass ( Int c )
 {
-   if (isClass(CLASSMIN+c) && !isClass(c)) c += CLASSMIN;
+   if (isClass(CCLASS_BASE_ADDR+c) && !isClass(c)) c += CCLASS_BASE_ADDR;
    if (!isClass(c)) {
       printf ( "dumpClass %d: not a class\n", c);
       return;
@@ -3058,7 +3088,7 @@ void dumpClass ( Int c )
 
 void dumpInst ( Int i )
 {
-   if (isInst(INSTMIN+i) && !isInst(i)) i += INSTMIN;
+   if (isInst(INST_BASE_ADDR+i) && !isInst(i)) i += INST_BASE_ADDR;
    if (!isInst(i)) {
       printf ( "dumpInst %d: not an instance\n", i);
       return;
@@ -3081,22 +3111,6 @@ void dumpInst ( Int i )
  * storage control:
  * ------------------------------------------------------------------------*/
 
-#if DYN_TABLES
-static void far* safeFarCalloc ( Int,Int));
-static void far* safeFarCalloc(n,s)     /* allocate table storage and check*/
-Int n, s; {                             /* for non-null return             */
-    void far* tab = farCalloc(n,s);
-    if (tab==0) {
-        ERRMSG(0) "Cannot allocate run-time tables"
-        EEND;
-    }
-    return tab;
-}
-#define TABALLOC(v,t,n)                 v=(t far*)safeFarCalloc(n,sizeof(t));
-#else
-#define TABALLOC(v,t,n)
-#endif
-
 Void storage(what)
 Int what; {
     Int i;
@@ -3117,59 +3131,77 @@ Int what; {
                        lsave  = NIL;
                        rsave  = NIL;
                        if (isNull(lastExprSaved))
-                           savedText = NUM_TEXT;
+                           savedText = TEXT_SIZE;
                        break;
 
         case MARK    : 
                        start();
-                       for (i=NAMEMIN; i<nameHw; ++i) {
-                           mark(name(i).parent);
-                           mark(name(i).defn);
-                           mark(name(i).stgVar);
-                           mark(name(i).type);
-                        }
+                       for (i = NAME_BASE_ADDR; 
+                            i < NAME_BASE_ADDR+tabNameSz; ++i) {
+                          if (tabName[i-NAME_BASE_ADDR].inUse) {
+                             mark(name(i).parent);
+                             mark(name(i).defn);
+                             mark(name(i).stgVar);
+                             mark(name(i).type);
+                          }
+                       }
                        end("Names", nameHw-NAMEMIN);
 
                        start();
-                       for (i=MODMIN; i<moduleHw; ++i) {
-                           mark(module(i).tycons);
-                           mark(module(i).names);
-                           mark(module(i).classes);
-                           mark(module(i).exports);
-                           mark(module(i).qualImports);
-                           mark(module(i).objectExtraNames);
+                       for (i = MODULE_BASE_ADDR; 
+                            i < MODULE_BASE_ADDR+tabModuleSz; ++i) {
+                          if (tabModule[i-MODULE_BASE_ADDR].inUse) {
+                             mark(module(i).tycons);
+                             mark(module(i).names);
+                             mark(module(i).classes);
+                             mark(module(i).exports);
+                             mark(module(i).qualImports);
+                             mark(module(i).objectExtraNames);
+                          }
                        }
+                       mark(moduleGraph);
+                       mark(prelModules);
+                       mark(targetModules);
                        end("Modules", moduleHw-MODMIN);
 
                        start();
-                       for (i=TYCMIN; i<tyconHw; ++i) {
-                           mark(tycon(i).defn);
-                           mark(tycon(i).kind);
-                           mark(tycon(i).what);
+                       for (i = TYCON_BASE_ADDR; 
+                            i < TYCON_BASE_ADDR+tabTyconSz; ++i) {
+                          if (tabTycon[i-TYCON_BASE_ADDR].inUse) {
+                             mark(tycon(i).defn);
+                             mark(tycon(i).kind);
+                             mark(tycon(i).what);
+                          }
                        }
                        end("Type constructors", tyconHw-TYCMIN);
 
                        start();
-                       for (i=CLASSMIN; i<classHw; ++i) {
-                           mark(cclass(i).head);
-                           mark(cclass(i).kinds);
-			   mark(cclass(i).fds);
-			   mark(cclass(i).xfds);
-                           mark(cclass(i).dsels);
-                           mark(cclass(i).supers);
-                           mark(cclass(i).members);
-                           mark(cclass(i).defaults);
-                           mark(cclass(i).instances);
+                       for (i = CCLASS_BASE_ADDR; 
+                            i < CCLASS_BASE_ADDR+tabClassSz; ++i) {
+                          if (tabModule[i-MODULE_BASE_ADDR].inUse) {
+                             mark(cclass(i).head);
+                             mark(cclass(i).kinds);
+	  		     mark(cclass(i).fds);
+		  	     mark(cclass(i).xfds);
+                             mark(cclass(i).dsels);
+                             mark(cclass(i).supers);
+                             mark(cclass(i).members);
+                             mark(cclass(i).defaults);
+                             mark(cclass(i).instances);
+                          }
                        }
                        mark(classes);
                        end("Classes", classHw-CLASSMIN);
 
                        start();
-                       for (i=INSTMIN; i<instHw; ++i) {
-                           mark(inst(i).head);
-                           mark(inst(i).kinds);
-                           mark(inst(i).specifics);
-                           mark(inst(i).implements);
+                       for (i = INST_BASE_ADDR; 
+                            i < INST_BASE_ADDR+tabInstSz; ++i) {
+                          if (tabInst[i-INST_BASE_ADDR].inUse) {
+                             mark(inst(i).head);
+                             mark(inst(i).kinds);
+                             mark(inst(i).specifics);
+                             mark(inst(i).implements);
+                          }
                        }
                        end("Instances", instHw-INSTMIN);
 
@@ -3220,58 +3252,17 @@ Int what; {
                            EEND;
                        }
 
-                       TABALLOC(text,      char,             NUM_TEXT)
-                       TABALLOC(tyconHash, Tycon,            TYCONHSZ)
-                       TABALLOC(tabTycon,  struct strTycon,  NUM_TYCON)
-                       TABALLOC(nameHash,  Name,             NAMEHSZ)
-                       TABALLOC(tabName,   struct strName,   NUM_NAME)
-                       TABALLOC(tabClass,  struct strClass,  NUM_CLASSES)
-                       TABALLOC(cellStack, Cell,             NUM_STACK)
-                       TABALLOC(tabModule, struct Module,    NUM_SCRIPTS)
-#if TREX
-                       TABALLOC(tabExt,    Text,             NUM_EXT)
-#endif
                        clearStack();
 
                        textHw        = 0;
-                       nextNewText   = NUM_TEXT;
-                       nextNewDText  = (-1);
+                       nextNewText   = INVAR_BASE_ADDR;
+                       nextNewDText  = INDVAR_BASE_ADDR;
                        lastExprSaved = NIL;
-                       savedText     = NUM_TEXT;
-                       for (i=0; i<TEXTHSZ; ++i)
-                           textHash[i][0] = NOTEXT;
+                       savedText     = TEXT_SIZE;
 
-
-                       moduleHw = MODMIN;
-
-                       tyconHw  = TYCMIN;
-                       for (i=0; i<TYCONHSZ; ++i)
-                           tyconHash[i] = NIL;
-#if TREX
-                       extHw    = EXTMIN;
-#endif
-
-                       nameHw   = NAMEMIN;
-                       for (i=0; i<NAMEHSZ; ++i)
-                           nameHash[i] = NIL;
-
-                       classHw  = CLASSMIN;
-
-                       instHw   = INSTMIN;
-
-#if USE_DICTHW
-                       dictHw   = 0;
-#endif
-
-                       tabInst  = (struct strInst far *)
-                                    farCalloc(NUM_INSTS,sizeof(struct strInst));
-
-                       if (tabInst==0) {
-                           ERRMSG(0) "Cannot allocate instance tables"
-                           EEND;
-                       }
-
-                       scriptHw = 0;
+                       for (i=0; i<TEXTHSZ;  ++i) textHash[i][0] = NOTEXT;
+                       for (i=0; i<TYCONHSZ; ++i) tyconHash[RC_T(i)] = NIL;
+                       for (i=0; i<NAMEHSZ;  ++i) nameHash[RC_N(i)] = NIL;
 
                        break;
     }

@@ -9,16 +9,17 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.52 $
- * $Date: 2000/03/15 23:27:16 $
+ * $Revision: 1.53 $
+ * $Date: 2000/03/22 18:14:22 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
 #include "connect.h"
 #include "errors.h"
-#include "Assembler.h" /* for asmPrimOps and AsmReps */
-
+#include "Assembler.h"                  /* for asmPrimOps and AsmReps      */
+#include "Rts.h"                        /* to make Prelude.h palatable     */
+#include "Prelude.h"                    /* for fixupRTStoPreludeRefs       */
 
 
 Type typeArrow;                         /* Function spaces                 */
@@ -374,14 +375,16 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
         nameMkPrimMVar           = addPrimCfunREP(findText("MVar#"),1,0,0);
         nameMkInteger            = addPrimCfunREP(findText("Integer#"),1,0,0);
 
-        name(namePrimSeq).type   = primType(MONAD_Id, "ab", "b");
-        name(namePrimCatch).type = primType(MONAD_Id, "aH", "a");
-        name(namePrimRaise).type = primType(MONAD_Id, "E", "a");
+        if (!combined) {
+           name(namePrimSeq).type   = primType(MONAD_Id, "ab", "b");
+           name(namePrimCatch).type = primType(MONAD_Id, "aH", "a");
+           name(namePrimRaise).type = primType(MONAD_Id, "E", "a");
 
-        /* This is a lie.  For a more accurate type of primTakeMVar
-           see ghc/interpreter/lib/Prelude.hs.
-	*/
-        name(namePrimTakeMVar).type = primType(MONAD_Id, "rbc", "d");
+           /* This is a lie.  For a more accurate type of primTakeMVar
+              see ghc/interpreter/lib/Prelude.hs.
+	   */
+           name(namePrimTakeMVar).type = primType(MONAD_Id, "rbc", "d");
+        }
 
         if (!combined) {
            for (i=2; i<=NUM_DTUPLES; i++) {/* Add derived instances of tuples */
@@ -528,7 +531,7 @@ Int what; {
            Name nm;
            Module modulePrelBase = findModule(findText("PrelBase"));
            assert(nonNull(modulePrelBase));
-	   fprintf(stderr, "linkControl(POSTPREL)\n");
+	   /* fprintf(stderr, "linkControl(POSTPREL)\n"); */
            setCurrModule(modulePrelude);
            linkPreludeTC();
            linkPreludeCM();
@@ -631,29 +634,36 @@ assert(nonNull(namePMFail));
                Module modulePrelBase;
 
                modulePrelude = findFakeModule(textPrelude);
-               module(modulePrelude).objectExtraNames 
-                  = singleton(findText("libHS_cbits"));
 
-               nameMkC = addWiredInBoxingTycon("PrelBase", "Char",  "C#",CHAR_REP,   STAR );
-               nameMkI = addWiredInBoxingTycon("PrelBase", "Int",   "I#",INT_REP,    STAR );
-               nameMkW = addWiredInBoxingTycon("PrelAddr", "Word",  "W#",WORD_REP,   STAR );
-               nameMkA = addWiredInBoxingTycon("PrelAddr", "Addr",  "A#",ADDR_REP,   STAR );
-               nameMkF = addWiredInBoxingTycon("PrelFloat","Float", "F#",FLOAT_REP,  STAR );
-               nameMkD = addWiredInBoxingTycon("PrelFloat","Double","D#",DOUBLE_REP, STAR );
+               nameMkC = addWiredInBoxingTycon("PrelBase", "Char",  "C#",
+                                               CHAR_REP,   STAR );
+               nameMkI = addWiredInBoxingTycon("PrelBase", "Int",   "I#",
+                                               INT_REP,    STAR );
+               nameMkW = addWiredInBoxingTycon("PrelAddr", "Word",  "W#",
+                                               WORD_REP,   STAR );
+               nameMkA = addWiredInBoxingTycon("PrelAddr", "Addr",  "A#",
+                                               ADDR_REP,   STAR );
+               nameMkF = addWiredInBoxingTycon("PrelFloat","Float", "F#",
+                                               FLOAT_REP,  STAR );
+               nameMkD = addWiredInBoxingTycon("PrelFloat","Double","D#",
+                                               DOUBLE_REP, STAR );
                nameMkInteger            
-                       = addWiredInBoxingTycon("PrelNum","Integer","Integer#",0 ,STAR );
+                       = addWiredInBoxingTycon("PrelNum","Integer","Integer#",
+                                               0 ,STAR );
                nameMkPrimByteArray      
-                       = addWiredInBoxingTycon("PrelGHC","ByteArray","PrimByteArray#",0 ,STAR );
+                       = addWiredInBoxingTycon("PrelGHC","ByteArray",
+                                               "PrimByteArray#",0 ,STAR );
 
                for (i=0; i<NUM_TUPLES; ++i) {
                    if (i != 1) addTupleTycon(i);
                }
 	       addWiredInEnumTycon("PrelBase","Bool",
-                                   doubleton(findText("False"),findText("True")));
+                                   doubleton(findText("False"),
+                                             findText("True")));
 
                //nameMkThreadId
-               //        = addWiredInBoxingTycon("PrelConc","ThreadId","ThreadId#"
-               //                                ,1,0,THREADID_REP);
+               //   = addWiredInBoxingTycon("PrelConc","ThreadId","ThreadId#"
+               //                           ,1,0,THREADID_REP);
 
                setCurrModule(modulePrelude);
 
@@ -671,6 +681,9 @@ assert(nonNull(namePMFail));
                   nameId. 
                */
                modulePrelBase = findModule(findText("PrelBase"));
+               module(modulePrelBase).objectExtraNames 
+                  = singleton(findText("libHS_cbits"));
+
                setCurrModule(modulePrelBase);
                pFun(nameId,             "id");
                setCurrModule(modulePrelude);
@@ -678,7 +691,8 @@ assert(nonNull(namePMFail));
            } else {
                fixupRTStoPreludeRefs(NULL);
 
-               modulePrelude = newModule(textPrelude);
+               modulePrelude = //newModule(textPrelude);
+                               findFakeModule(textPrelude);
                setCurrModule(modulePrelude);
         
                for (i=0; i<NUM_TUPLES; ++i) {

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.30 $
- * $Date: 2000/03/13 11:37:16 $
+ * $Revision: 1.31 $
+ * $Date: 2000/03/22 18:14:23 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -39,7 +39,7 @@ static Void   local importEntity        ( Module,Cell );
 static Void   local importName          ( Module,Name );
 static Void   local importTycon         ( Module,Tycon );
 static Void   local importClass         ( Module,Class );
-static List   local checkExports        ( List );
+static List   local checkExports        ( List, Module );
 
 static Void   local checkTyconDefn      ( Tycon );
 static Void   local depConstrs          ( Tycon,List,Cell );
@@ -255,24 +255,9 @@ Kind   extKind;                         /* Kind of extension, *->row->row  */
  * Static analysis of modules:
  * ------------------------------------------------------------------------*/
 
-#if HSCRIPT
-String reloadModule;
-#endif
-
-Void startModule(nm)                             /* switch to a new module */
-Cell nm; {
-    Module m;
-    if (!isCon(nm)) internal("startModule");
-    if (isNull(m = findModule(textOf(nm))))
-        m = newModule(textOf(nm));
-    else if (!isPreludeScript()) {
-        /* You're allowed to break the rules in the Prelude! */
-#if HSCRIPT
-        reloadModule = textToStr(textOf(nm));
-#endif
-        ERRMSG(0) "Module \"%s\" already loaded", textToStr(textOf(nm))
-        EEND;
-    }
+Void startModule ( Module m )                    /* switch to a new module */
+{
+    if (isNull(m)) internal("startModule");
     setCurrModule(m);
 }
 
@@ -381,10 +366,11 @@ Cell entity; { /* Entry from import list */
                         case NEWTYPE:
                         case DATATYPE:
                             if (DOTDOT == snd(entity)) {
-                                imports=dupOnto(tycon(f).defn,imports);
+                                imports = dupOnto(tycon(f).defn,imports);
                             } else {
-                                imports=checkSubentities(imports,snd(entity),tycon(f).defn,
-                                                         "constructor of type",t);
+                                imports = checkSubentities(
+                                             imports,snd(entity),tycon(f).defn,
+                                             "constructor of type",t);
                             }
                             break;
                         default:;
@@ -399,8 +385,9 @@ Cell entity; { /* Entry from import list */
                         if (DOTDOT == snd(entity)) {
                             return dupOnto(cclass(f).members,imports);
                         } else {
-                            return checkSubentities(imports,snd(entity),cclass(f).members,
-                                   "member of class",t);
+                            return checkSubentities(
+                                      imports,snd(entity),cclass(f).members,
+                                      "member of class",t);
                         }
                     }
                 }
@@ -476,11 +463,6 @@ Pair importSpec; {
     List   imports = NIL; /* entities we want to import */
     List   hidden  = NIL; /* entities we want to hide   */
 
-    if (moduleThisScript(m)) { 
-        ERRMSG(0) "Module \"%s\" recursively imports itself",
-                  textToStr(module(m).text)
-        EEND;
-    }
     if (isPair(impList) && HIDDEN == fst(impList)) {
         /* Somewhat inefficient - but obviously correct:
          * imports = importsOf("module Foo") `setDifference` hidden;
@@ -526,7 +508,8 @@ Module source;
 Name n; {
     Name clash = addName(n);
     if (nonNull(clash) && clash!=n) {
-        ERRMSG(0) "Entity \"%s\" imported from module \"%s\" already defined in module \"%s\"",
+        ERRMSG(0) "Entity \"%s\" imported from module \"%s\""
+                  " already defined in module \"%s\"",
                   textToStr(name(n).text), 
                   textToStr(module(source).text),
                   textToStr(module(name(clash).mod).text)
@@ -707,9 +690,9 @@ Cell e; {
     return exports; /* NOTUSED */
 }
 
-static List local checkExports(exports)
-List exports; {
-    Module m  = lastModule();
+static List local checkExports ( List exports, Module thisModule )
+{
+    Module m  = thisModule;
     Text   mt = module(m).text;
     List   es = NIL;
 
@@ -1887,7 +1870,7 @@ Type   type; {
     }
 
     if (nonNull(tvs)) {
-	if (length(tvs)>=NUM_OFFSETS) {
+	if (length(tvs) >= (OFF_MAX-OFF_MIN+1)) {
             ERRMSG(line) "Too many type variables in %s\n", where
             EEND;
         } else {
@@ -3170,7 +3153,7 @@ Int  beta; {
                               return copyAdj(tyv->bound,tyv->offs,beta);
                           }
                           vn -= beta;
-                          if (vn<0 || vn>=NUM_OFFSETS) {
+                          if (vn<0 || vn>=(OFF_MAX-OFF_MIN+1)) {
                               internal("copyAdj");
                           }
                           return mkOffset(vn);
@@ -4734,9 +4717,12 @@ Cell e; {
         EEND;
     }
 
+#if 0
+    what is this for??
     if (!moduleThisScript(name(n).mod)) {
         return n;
     }
+#endif
     /* Later phases of the system cannot cope if we resolve references
      * to unprocessed objects too early.  This is the main reason that
      * we cannot cope with recursive modules at the moment.
@@ -5037,8 +5023,8 @@ Void checkContext(void) {		/* Top level static check on Expr  */
 }
 #endif
 
-Void checkDefns() {                     /* Top level static analysis       */
-    Module thisModule = lastModule();
+Void checkDefns ( Module thisModule ) { /* Top level static analysis       */
+
     staticAnalysis(RESET);
 
     setCurrModule(thisModule);
@@ -5055,8 +5041,9 @@ Void checkDefns() {                     /* Top level static analysis       */
         /* Every module (including the Prelude) implicitly contains 
          * "import qualified Prelude" 
          */
-        module(thisModule).qualImports=cons(pair(mkCon(textPrelude),modulePrelude),
-                                            module(thisModule).qualImports);
+        module(thisModule).qualImports
+           =cons(pair(mkCon(textPrelude),modulePrelude),
+                 module(thisModule).qualImports);
     }
     mapProc(checkImportList, unqualImports);
 
@@ -5105,7 +5092,8 @@ Void checkDefns() {                     /* Top level static analysis       */
     /* export list.  Note that this has to happen before dependency        */
     /* analysis so that references to Prelude.foo will be resolved         */
     /* when compiling the prelude.                                         */
-    module(thisModule).exports = checkExports(module(thisModule).exports);
+    module(thisModule).exports 
+       = checkExports ( module(thisModule).exports, thisModule );
 
     mapProc(checkTypeIn,typeInDefns);   /* check restricted synonym defns  */
 

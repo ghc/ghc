@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: scc.c,v $
- * $Revision: 1.6 $
- * $Date: 2000/03/13 11:37:16 $
+ * $Revision: 1.7 $
+ * $Date: 2000/03/22 18:14:23 $
  * ------------------------------------------------------------------------*/
 
 #ifndef SCC_C
@@ -70,8 +70,8 @@ static Int local LOWLINK( Cell v )      /* calculate `lowlink' of v        */
 }
 
 #ifdef SCC
-static List local SCC(bs)               /* sort list with added dependency */
-List bs; {                              /* info into SCCs                  */
+static List local SCC ( List bs )       /* sort list with added dependency */
+{                                       /* info into SCCs                  */
     List tmp = NIL;
     clearStack();
     daSccs = NIL;                       /* clear current list of SCCs      */
@@ -86,8 +86,9 @@ List bs; {                              /* info into SCCs                  */
 #endif
 
 #ifdef SCC2                             /* Two argument version            */
-static List local SCC2(bs,cs)           /* sort lists with added dependency*/
-List bs, cs; {                          /* info into SCCs                  */
+static List local SCC2 ( List bs,
+                         List cs )      /* sort lists with added dependency*/
+{                                       /* info into SCCs                  */
     List tmp = NIL;
     clearStack();
     daSccs = NIL;                       /* clear current list of SCCs      */

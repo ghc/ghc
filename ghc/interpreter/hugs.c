@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.45 $
- * $Date: 2000/03/20 04:26:23 $
+ * $Revision: 1.46 $
+ * $Date: 2000/03/22 18:14:22 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -41,7 +41,7 @@ Bool multiInstRes = FALSE;
  * Local function prototypes:
  * ------------------------------------------------------------------------*/
 
-static Void   local initialize        ( Int,String [] );
+static List   local initialize        ( Int,String [] );
 static Void   local promptForInput    ( String );
 static Void   local interpreter       ( Int,String [] );
 static Void   local menu              ( Void );
@@ -51,14 +51,11 @@ static Void   local set               ( Void );
 static Void   local changeDir         ( Void );
 static Void   local load              ( Void );
 static Void   local project           ( Void );
-static Void   local readScripts       ( Int );
-static Void   local whatScripts       ( Void );
 static Void   local editor            ( Void );
 static Void   local find              ( Void );
 static Bool   local startEdit         ( Int,String );
 static Void   local runEditor         ( Void );
 static Void   local setModule         ( Void );
-static Module local findEvalModule    ( Void );
 static Void   local evaluator         ( Void );
 static Void   local stopAnyPrinting   ( Void );
 static Void   local showtype          ( Void );
@@ -72,7 +69,7 @@ static Void   local listNames         ( Void );
 static Void   local toggleSet         ( Char,Bool );
 static Void   local togglesIn         ( Bool );
 static Void   local optionInfo        ( Void );
-#if USE_REGISTRY || HUGS_FOR_WINDOWS
+#if USE_REGISTRY
 static String local optionsToStr      ( Void );
 #endif
 static Void   local readOptions       ( String );
@@ -80,10 +77,6 @@ static Bool   local processOption     ( String );
 static Void   local setHeapSize       ( String );
 static Int    local argToInt          ( String );
 
-static Void   local loadProject       ( String );
-static Void   local clearProject      ( Void );
-static Bool   local addScript         ( Int );
-static Void   local forgetScriptsFrom ( Script );
 static Void   local setLastEdit       ( String,Int );
 static Void   local failed            ( Void );
 static String local strCopy           ( String );
@@ -95,9 +88,6 @@ static Void   local browse	      ( Void );
  * ------------------------------------------------------------------------*/
 
 #include "machdep.c"
-#ifdef WANT_TIMER
-#include "timer.c"
-#endif
 
 /* --------------------------------------------------------------------------
  * Local data areas:
@@ -117,30 +107,6 @@ static Bool   lastWasObject = FALSE;
        Bool   debugSC       = FALSE;
        Bool   combined      = FALSE;
 
-typedef 
-   struct { 
-      String modName;                   /* Module name                     */
-      Bool   details;             /* FALSE => remaining fields are invalid */
-      String path;                      /* Path to module                  */
-      String srcExt;                    /* ".hs" or ".lhs" if fromSource   */
-      Time   lastChange;                /* Time of last change to script   */
-      Bool   fromSource;                /* FALSE => load object code       */
-      Bool   postponed;                 /* Indicates postponed load        */
-      Bool   objLoaded;
-      Long   size;
-      Long   oSize;
-   }
-   ScriptInfo;
-
-static Void   local makeStackEntry    ( ScriptInfo*,String );
-static Void   local addStackEntry     ( String );
-
-static ScriptInfo scriptInfo[NUM_SCRIPTS];
-
-static Int    numScripts;               /* Number of scripts loaded        */
-static Int    nextNumScripts;
-static Int    namesUpto;                /* Number of script names set      */
-static Bool   needsImports;             /* set to TRUE if imports required */
        String scriptFile;               /* Name of current script (if any) */
 
 
@@ -159,44 +125,6 @@ static Int    hpSize     = DEFAULTHEAP; /* Desired heap size               */
 
        List  ifaces_outstanding = NIL;
 
-#if REDIRECT_OUTPUT
-static Bool disableOutput = FALSE;      /* redirect output to buffer?      */
-#endif
-
-String bool2str ( Bool b )
-{
-   if (b) return "Yes"; else return "No ";
-}
-
-void ppSmStack ( String who )
-{
-   int i, j;
-return;
-   fflush(stdout);fflush(stderr);
-   printf ( "\n" );
-   printf ( "ppSmStack %s:  numScripts = %d   namesUpto = %d  needsImports = %s\n",
-            who, numScripts, namesUpto, bool2str(needsImports) );
-   assert (namesUpto >= numScripts);
-   printf ( "     Det FrS Pst ObL           Module Ext   Size ModTime  Path\n" );
-   for (i = namesUpto-1; i >= 0; i--) {
-      printf ( "%c%2d: %3s %3s %3s %3s %16s %-4s %5ld %8lx %s\n",
-               (i==numScripts ? '*' : ' '),
-               i, bool2str(scriptInfo[i].details), 
-                  bool2str(scriptInfo[i].fromSource),
-                  bool2str(scriptInfo[i].postponed), 
-                  bool2str(scriptInfo[i].objLoaded),
-                  scriptInfo[i].modName, 
-                  scriptInfo[i].fromSource ? scriptInfo[i].srcExt : "",
-                  scriptInfo[i].size, 
-                  scriptInfo[i].lastChange,
-                  scriptInfo[i].path
-             );
-   }
-   fflush(stdout);fflush(stderr);
-   ppScripts();
-   ppModules();
-   printf ( "\n" );
-}
 
 /* --------------------------------------------------------------------------
  * Hugs entry point:
@@ -229,7 +157,9 @@ char *argv[]; {
     CStackBase = &argc;                 /* Save stack base for use in gc   */
 
 #ifdef DEBUG
+#if 0
     checkBytecodeCount();		/* check for too many bytecodes    */
+#endif
 #endif
 
     /* If first arg is +Q or -Q, be entirely silent, and automatically run
@@ -237,7 +167,7 @@ char *argv[]; {
     if (argc > 1 && (strcmp(argv[1],"+Q") == 0 || strcmp(argv[1],"-Q")==0)) {
        autoMain = TRUE;
        if (strcmp(argv[1],"-Q") == 0) {
-	 hugsEnableOutput(0);
+	 EnableOutput(0);
        }
     }
 
@@ -275,112 +205,85 @@ char *argv[]; {
  * Initialization, interpret command line args and read prelude:
  * ------------------------------------------------------------------------*/
 
-static Void local initialize(argc,argv)/* Interpreter initialization       */
+static List /*CONID*/ initialize(argc,argv)  /* Interpreter initialization */
 Int    argc;
 String argv[]; {
-    Script i;
-    String proj        = 0;
-    char argv_0_orig[1000];
+   Int    i;
+   String proj        = 0;
+   char   argv_0_orig[1000];
+   List   initialModules;
 
-    setLastEdit((String)0,0);
-    lastEdit      = 0;
-    scriptFile    = 0;
-    numScripts    = 0;
-    namesUpto     = 1;
+   setLastEdit((String)0,0);
+   lastEdit      = 0;
+   scriptFile    = 0;
 
-#if HUGS_FOR_WINDOWS
-    hugsEdit      = strCopy(fromEnv("EDITOR","c:\\windows\\notepad.exe"));
-#elif SYMANTEC_C
-    hugsEdit      = "";
+#if SYMANTEC_C
+   hugsEdit      = "";
 #else
-    hugsEdit      = strCopy(fromEnv("EDITOR",NULL));
+   hugsEdit      = strCopy(fromEnv("EDITOR",NULL));
 #endif
-    hugsPath      = strCopy(HUGSPATH);
-    readOptions("-p\"%s> \" -r$$");
+   hugsPath      = strCopy(HUGSPATH);
+   readOptions("-p\"%s> \" -r$$");
 #if USE_REGISTRY
-    projectPath   = strCopy(readRegChildStrings(HKEY_LOCAL_MACHINE,ProjectRoot,
+   projectPath   = strCopy(readRegChildStrings(HKEY_LOCAL_MACHINE,ProjectRoot,
                                                 "HUGSPATH", PATHSEP, ""));
-    readOptions(readRegString(HKEY_LOCAL_MACHINE,HugsRoot,"Options",""));
-    readOptions(readRegString(HKEY_CURRENT_USER, HugsRoot,"Options",""));
+   readOptions(readRegString(HKEY_LOCAL_MACHINE,HugsRoot,"Options",""));
+   readOptions(readRegString(HKEY_CURRENT_USER, HugsRoot,"Options",""));
 #endif /* USE_REGISTRY */
-    readOptions(fromEnv("STGHUGSFLAGS",""));
+   readOptions(fromEnv("STGHUGSFLAGS",""));
 
    strncpy(argv_0_orig,argv[0],1000);   /* startupHaskell mangles argv[0] */
    startupHaskell (argc,argv);
-   argc = prog_argc; argv = prog_argv;
+   argc = prog_argc; 
+   argv = prog_argv;
 
-   namesUpto = numScripts = 0;
+#  if DEBUG
+   { 
+      char exe_name[N_INSTALLDIR + 6];
+      strcpy(exe_name, installDir);
+      strcat(exe_name, "hugs");
+      DEBUG_LoadSymbols(exe_name);
+   }
+#  endif
 
-   /* Pre-scan flags to see if -c or +c is present.  This needs to
-      precede adding the stack entry for Prelude.  On the other hand,
-      that stack entry needs to be made before the cmd line args are
-      properly examined.  Hence the following pre-scan of them.
-   */
+   /* Find out early on if we're in combined mode or not.
+      everybody(PREPREL) needs to know this.
+   */ 
    for (i=1; i < argc; ++i) {
       if (strcmp(argv[i], "--")==0) break;
       if (strcmp(argv[i], "-c")==0) combined = FALSE;
       if (strcmp(argv[i], "+c")==0) combined = TRUE;
    }
 
-   addStackEntry("Prelude");
-   if (combined) addStackEntry("PrelHugs");
+   everybody(PREPREL);
+   initialModules = NIL;
 
    for (i=1; i < argc; ++i) {            /* process command line arguments  */
-        if (strcmp(argv[i], "--")==0) break;
-        if (strcmp(argv[i],"+")==0 && i+1<argc) {
-            if (proj) {
-                ERRMSG(0) "Multiple project filenames on command line"
-                EEND;
-            } else {
-                proj = argv[++i];
-            }
-        } else if (argv[i] && argv[i][0]/* workaround for /bin/sh silliness*/
-                 && !processOption(argv[i])) {
-            addStackEntry(argv[i]);
-        }
-    }
+      if (strcmp(argv[i], "--")==0) break;
+      if (argv[i] && argv[i][0]/* workaround for /bin/sh silliness*/
+          && !processOption(argv[i])) {
+         initialModules
+            = cons ( mkCon(findText(argv[i])), initialModules );
+      }
+   }
 
-#if DEBUG
-    { 
-       char exe_name[N_INSTALLDIR + 6];
-       strcpy(exe_name, installDir);
-       strcat(exe_name, "hugs");
-       DEBUG_LoadSymbols(exe_name);
-    }
-#endif
+   if (haskell98) {
+       Printf("Haskell 98 mode: Restart with command line option -98"
+              " to enable extensions\n");
+   } else {
+       Printf("Hugs mode: Restart with command line option +98 for"
+              " Haskell 98 mode\n");
+   }
 
+   if (combined) {
+       Printf("Combined mode: Restart with command line -c for"
+              " standalone mode\n\n" );
+   } else {
+       Printf("Standalone mode: Restart with command line +c for"
+              " combined mode\n\n" );
+   }
 
-#if 0
-    if (!scriptName[0]) {
-        Printf("Prelude not found on current path: \"%s\"\n",
-               hugsPath ? hugsPath : "");
-        fatal("Unable to load prelude");
-    }
-#endif
-
-    if (haskell98) {
-        Printf("Haskell 98 mode: Restart with command line option -98 to enable extensions\n");
-    } else {
-        Printf("Hugs mode: Restart with command line option +98 for Haskell 98 mode\n");
-    }
-
-    if (combined) {
-        Printf("Combined mode: Restart with command line -c for standalone mode\n\n" );
-    } else {
-        Printf("Standalone mode: Restart with command line +c for combined mode\n\n" );
-    }
- 
-    everybody(PREPREL);
-
-    evalModule = findText("");      /* evaluate wrt last module by default */
-    if (proj) {
-        if (namesUpto>1) {
-            fprintf(stderr,
-                    "\nUsing project file, ignoring additional filenames\n");
-        }
-        loadProject(strCopy(proj));
-    }
-    readScripts(0);
+   return initialModules;
 }
 
 /* --------------------------------------------------------------------------
@@ -474,7 +377,7 @@ ToDo
     Putchar('\n');
 }
 
-#if USE_REGISTRY || HUGS_FOR_WINDOWS
+#if USE_REGISTRY
 #define PUTC(c)                         \
     *next++=(c)
 
@@ -599,14 +502,8 @@ String s; {                             /* return FALSE if none found.     */
             case 'h' : setHeapSize(s+1);
                        return TRUE;
 
-            case 'c' : if (heapBuilt()) {
-                          FPrintf(stderr, 
-                                  "You can't enable/disable combined"
-                                  " operation inside Hugs\n" );
-                       } else {
- 		          /* don't do anything, since pre-scan of args
-                             will have got it already */
-                       }
+            case 'c' :  /* don't do anything, since pre-scan of args
+                           will have got it already */
                        return TRUE;
 
             case 'D' : /* hack */
@@ -833,468 +730,788 @@ static Void local changeDir() {         /* change directory                */
     }
 }
 
+
 /* --------------------------------------------------------------------------
- * Loading project and script files:
+ * The new module chaser, loader, etc
  * ------------------------------------------------------------------------*/
 
-static Void local loadProject(s)        /* Load project file               */
-String s; {
-    clearProject();
-    currProject = s;
-    projInput(currProject);
-    scriptFile = currProject;
-    forgetScriptsFrom(N_PRELUDE_SCRIPTS);
-    while ((s=readFilename())!=0)
-        addStackEntry(s);
-    if (namesUpto<=1) {
-        ERRMSG(0) "Empty project file"
-        EEND;
-    }
-    scriptFile    = 0;
-    projectLoaded = TRUE;
-}
-
-static Void local clearProject() {      /* clear name for current project  */
-    if (currProject)
-        free(currProject);
-    currProject   = 0;
-    projectLoaded = FALSE;
-#if HUGS_FOR_WINDOWS
-    setLastEdit((String)0,0);
-#endif
-}
+List    moduleGraph   = NIL;
+List    prelModules   = NIL;
+List    targetModules = NIL;
+static jmp_buf catch_error;             /* jump buffer for error trapping  */
 
 
 
-static Void local makeStackEntry ( ScriptInfo* ent, String iname )
+static void ppMG ( void )
 {
-   Bool   ok, fromObj;
-   Bool   sAvail, iAvail, oAvail;
-   Time   sTime,  iTime,  oTime;
-   Long   sSize,  iSize,  oSize;
-   String path,   sExt;
+   List t,u,v;
+   for (t = moduleGraph; nonNull(t); t=tl(t)) {
+      u = hd(t);
+      switch (whatIs(u)) {
+         case GRP_NONREC:
+            fprintf ( stderr, "%s\n", textToStr(textOf(snd(u))));
+            break;
+         case GRP_REC:
+            fprintf ( stderr, "{" );
+            for (v = snd(u); nonNull(v); v=tl(v))
+               fprintf ( stderr, "%s ", textToStr(textOf(hd(v))) );
+            fprintf ( stderr, "}\n" );
+            break;
+         default:
+            internal("ppMG");
+      }
+   }
+}
 
+
+static Bool elemMG ( ConId mod )
+{
+   List gs;
+   for (gs = moduleGraph; nonNull(gs); gs=tl(gs))
+     switch (whatIs(hd(gs))) {
+        case GRP_NONREC: 
+           if (textOf(mod)==textOf(snd(hd(gs)))) return TRUE;
+           break;
+        case GRP_REC: 
+           if (varIsMember(textOf(mod),snd(hd(gs)))) return TRUE;
+           break;
+        default: 
+           internal("elemMG");
+     }
+  return FALSE;
+}
+
+
+static ConId selectArbitrarilyFromGroup ( Cell group )
+{
+   switch (whatIs(group)) {
+      case GRP_NONREC: return snd(group);
+      case GRP_REC:    return hd(snd(group));
+      default:         internal("selectArbitrarilyFromGroup");
+   }
+}
+
+static ConId selectLatestMG ( void )
+{
+   List gs = moduleGraph;
+   if (isNull(gs)) internal("selectLatestMG(1)");
+   while (nonNull(gs) && nonNull(tl(gs))) gs = tl(gs);
+   return selectArbitrarilyFromGroup(hd(gs));
+}
+
+
+static List /* of CONID */ listFromMG ( void )
+{
+   List gs;
+   List cs = NIL;
+   for (gs = moduleGraph; nonNull(gs); gs=tl(gs)) {
+      switch (whatIs(hd(gs))) {
+        case GRP_REC:    cs = appendOnto(cs,snd(hd(gs))); break;
+        case GRP_NONREC: cs = cons(snd(hd(gs)),cs); break;
+        default:         internal("listFromMG");
+      }
+   }
+   return cs;
+}
+
+
+/* Calculate the strongly connected components of modgList
+   and assign them to moduleGraph.  Uses the .uses field of
+   each of the modules to build the graph structure.
+*/
+#define  SCC             modScc          /* make scc algorithm for StgVars */
+#define  LOWLINK         modLowlink
+#define  DEPENDS(t)      snd(t)
+#define  SETDEPENDS(c,v) snd(c)=v
+#include "scc.c"
+#undef   SETDEPENDS
+#undef   DEPENDS
+#undef   LOWLINK
+#undef   SCC
+
+static void mgFromList ( List /* of CONID */ modgList )
+{
+   List   t;
+   List   u;
+   Text   mT;
+   List   usesT;
+   List   adjList; /* :: [ (Text, [Text]) ] */
+   Module mod;
+   List   scc;
+   Bool   isRec;
+
+   adjList = NIL;
+   for (t = modgList; nonNull(t); t=tl(t)) {
+      mT = textOf(hd(t));
+      mod = findModule(mT);
+      assert(nonNull(mod));
+      usesT = NIL;
+      for (u = module(mod).uses; nonNull(u); u=tl(u))
+         usesT = cons(textOf(hd(u)),usesT);
+      adjList = cons(pair(mT,usesT),adjList);
+   }
+
+   /* adjList is now [ (module-text, [modules-which-i-import-text]) ].
+      Modify this so that the adjacency list is a list of pointers
+      back to bits of adjList -- that's what modScc needs.
+   */
+   for (t = adjList; nonNull(t); t=tl(t)) {
+      List adj = NIL;
+      /* for each elem of the adjacency list ... */
+      for (u = snd(hd(t)); nonNull(u); u=tl(u)) {
+         List v;
+         Text a = hd(u);
+         /* find the element of adjList whose fst is a */
+         for (v = adjList; nonNull(v); v=tl(v)) {
+            assert(isText(a));
+            assert(isText(fst(hd(v))));
+            if (fst(hd(v))==a) break;
+         }
+         if (isNull(v)) internal("mgFromList");
+         adj = cons(hd(v),adj);
+      }
+      snd(hd(t)) = adj;
+   }
+
+   adjList = modScc ( adjList );
+   adjList = rev(adjList);
+   /* adjList is now [ [(module-text, aux-info-field)] ] */
+
+   moduleGraph = NIL;
+
+   for (t = adjList; nonNull(t); t=tl(t)) {
+
+      scc = hd(t);
+      /* scc :: [ (module-text, aux-info-field) ] */
+      for (u = scc; nonNull(u); u=tl(u))
+         hd(u) = mkCon(fst(hd(u)));
+
+      /* scc :: [CONID] */
+      if (length(scc) > 1) {
+         isRec = TRUE;
+      } else {
+         /* singleton module in scc; does it import itself? */
+         mod = findModule ( textOf(hd(scc)) );
+         assert(nonNull(mod));
+         isRec = FALSE;
+         for (u = module(mod).uses; nonNull(u); u=tl(u))
+            if (textOf(hd(u))==textOf(hd(scc)))
+               isRec = TRUE;
+      }
+
+      if (isRec)
+         moduleGraph = cons( ap(GRP_REC,scc), moduleGraph ); else
+         moduleGraph = cons( ap(GRP_NONREC,hd(scc)), moduleGraph );     
+   }
+}
+
+
+static List /* of CONID */ getModuleImports ( Cell tree )
+{
+   Cell  te;
+   List  tes;
+   ConId use;
+   List  uses = NIL;
+   for (tes = zthd3(unap(M_MODULE,tree)); nonNull(tes); tes=tl(tes)) {
+      te = hd(tes);
+      switch(whatIs(te)) {
+         case M_IMPORT_Q:
+            use = zfst(unap(M_IMPORT_Q,te));
+            assert(isCon(use));
+            if (!varIsMember(textOf(use),uses)) uses = cons ( use, uses );
+            break;
+         case M_IMPORT_UNQ:
+            use = zfst(unap(M_IMPORT_UNQ,te));
+            assert(isCon(use));
+            if (!varIsMember(textOf(use),uses)) uses = cons ( use, uses );
+            break;
+         default:
+            break;
+      }
+   }
+   return uses;
+}
+
+
+static void processModule ( Module m )
+{
+   Cell  tree;
+   ConId modNm;
+   List  topEnts;
+   List  tes;
+   Cell  te;
+   Cell  te2;
+
+   tyconDefns     = NIL;
+   typeInDefns    = NIL;
+   valDefns       = NIL;
+   classDefns     = NIL;
+   instDefns      = NIL;
+   selDefns       = NIL;
+   genDefns       = NIL;
+   unqualImports  = NIL;
+   foreignImports = NIL;
+   foreignExports = NIL;
+   defaultDefns   = NIL;
+   defaultLine    = 0;
+   inputExpr      = NIL;
+
+   startModule(m);
+   tree = unap(M_MODULE,module(m).tree);
+   modNm = zfst3(tree);
+   assert(textOf(modNm)==module(m).text);  /* wrong, but ... */
+   setExportList(zsnd3(tree));
+   topEnts = zthd3(tree);
+
+   for (tes = topEnts; nonNull(tes); tes=tl(tes)) {
+      te  = hd(tes);
+      assert(isGenPair(te));
+      te2 = snd(te);
+      switch(whatIs(te)) {
+         case M_IMPORT_Q: 
+            addQualImport(zfst(te2),zsnd(te2));
+            break;
+         case M_IMPORT_UNQ:
+            addUnqualImport(zfst(te2),zsnd(te2));
+            break;
+         case M_TYCON:
+            tyconDefn(zsel14(te2),zsel24(te2),zsel34(te2),zsel44(te2));
+            break;
+         case M_CLASS:
+            classDefn(zsel14(te2),zsel24(te2),zsel34(te2),zsel44(te2));
+            break;
+         case M_INST:
+            instDefn(zfst3(te2),zsnd3(te2),zthd3(te2));
+            break;
+         case M_DEFAULT:
+            defaultDefn(zfst(te2),zsnd(te2));
+            break;
+         case M_FOREIGN_IM:
+            foreignImport(zsel15(te2),zsel25(te2),zsel35(te2),
+                          zsel45(te2),zsel55(te2));
+            break;
+         case M_FOREIGN_EX:
+            foreignExport(zsel15(te2),zsel25(te2),zsel35(te2),
+                          zsel45(te2),zsel55(te2));
+         case M_VALUE:
+            valDefns = cons(te2,valDefns);
+            break;
+         default:
+            internal("processModule");
+      }
+   }
+   checkDefns(m);
+   typeCheckDefns();
+   compileDefns();
+}
+
+
+static Module parseModuleOrInterface ( ConId mc, 
+                                       List renewFromSource, 
+                                       List renewFromObject )
+{
+   /* Allocate a module-table entry. */
+   /* Parse the entity and fill in the .tree and .uses entries. */
+   String path;
+   String sExt;
+   Bool sAvail; Time sTime; Long sSize;
+   Bool iAvail; Time iTime; Long iSize;
+   Bool oAvail; Time oTime; Long oSize;
+   Bool ok;
+   Bool useSource;
+   char name[10000];
+
+   Text   mt  = textOf(mc);
+   Module mod = findModule ( mt );
+
+   /* fprintf ( stderr, "parseModuleOrInterface `%s' == %d\n",
+                textToStr(mt),mod); */
+   if (nonNull(mod) && !module(mod).fake)
+      internal("parseModuleOrInterface");
+   if (nonNull(mod)) 
+      module(mod).fake = FALSE;
+
+   if (isNull(mod)) 
+      mod = newModule(mt);
+
+   /* This call malloc-ates path; we should deallocate it. */
    ok = findFilesForModule (
-           iname,
+           textToStr(module(mod).text),
            &path,
            &sExt,
            &sAvail, &sTime, &sSize,
            &iAvail, &iTime, &iSize,
            &oAvail, &oTime, &oSize
         );
-   if (!ok) {
-      ERRMSG(0) 
-         "Can't find source or object+interface for module \"%s\"",
-         /* "Can't find source for module \"%s\"", */
-         iname
-      EEND;
-   }
-   /* findFilesForModule should enforce this */
-   if (!(sAvail || (oAvail && iAvail))) 
-      internal("chase");
-   /* Load objects in preference to sources if both are available */
-   /* 11 Oct 99: disable object loading in the interim.
-      Will probably only reinstate when HEP becomes available.
-   */
-   if (combined) {
-      fromObj = sAvail
-                ? (oAvail && iAvail && timeEarlier(sTime,oTime))
-                : TRUE;
+
+   if (!ok) goto cant_find;
+   if (!sAvail && !(iAvail && oAvail)) goto cant_find;
+
+   /* Find out whether to use source or object. */
+   if (varIsMember(mt,renewFromSource)) {
+      if (!sAvail) goto cant_find;
+      useSource = TRUE;
+   } else
+   if (varIsMember(mt,renewFromObject)) {
+      if (!(oAvail && iAvail)) goto cant_find;
+      useSource = FALSE;
+   } else
+   if (sAvail && !(iAvail && oAvail)) {
+      useSource = TRUE;
+   } else
+   if (!sAvail && (iAvail && oAvail)) {
+      useSource = FALSE;
    } else {
-      fromObj = FALSE;
+      useSource = firstTimeIsLater(sTime,whicheverIsLater(oTime,iTime));
    }
 
-   /* ToDo: namesUpto overflow */
-   ent->modName     = strCopy(iname);
-   ent->details     = TRUE;
-   ent->path        = path;
-   ent->fromSource  = !fromObj;
-   ent->srcExt      = sExt;
-   ent->postponed   = FALSE;
-   ent->lastChange  = sTime; /* ToDo: is this right? */
-   ent->size        = fromObj ? iSize : sSize;
-   ent->oSize       = fromObj ? oSize : 0;
-   ent->objLoaded   = FALSE;
-}
+   if (!combined && !sAvail) goto cant_find;
+   if (!combined) useSource = TRUE;
 
+   /* Actually do the parsing. */
+   if (useSource) {
+      strcpy(name, path);
+      strcat(name, textToStr(mt));
+      strcat(name, sExt);
+      module(mod).tree      = parseModule(name,sSize);
+      module(mod).uses      = getModuleImports(module(mod).tree);
+      module(mod).fromSrc   = TRUE;
+      module(mod).lastStamp = sTime;
 
-
-static Void nukeEnding( String s )
-{
-    Int l = strlen(s);
-    if (l > 4 && strncmp(s+l-4,".u_o" ,4)==0) s[l-4] = 0; else
-    if (l > 5 && strncmp(s+l-5,".u_hi",5)==0) s[l-5] = 0; else
-    if (l > 3 && strncmp(s+l-3,".hs"  ,3)==0) s[l-3] = 0; else
-    if (l > 4 && strncmp(s+l-4,".lhs" ,4)==0) s[l-4] = 0; else
-    if (l > 4 && strncmp(s+l-4,".dll" ,4)==0) s[l-4] = 0; else
-    if (l > 4 && strncmp(s+l-4,".DLL" ,4)==0) s[l-4] = 0;
-}
-
-static Void local addStackEntry(s)     /* Add script to list of scripts    */
-String s; {                            /* to be read in ...                */
-    String s2;
-    Bool   found;
-    Int    i;
-
-    if (namesUpto>=NUM_SCRIPTS) {
-        ERRMSG(0) "Too many module files (maximum of %d allowed)",
-                  NUM_SCRIPTS
-        EEND;
-    }
-
-    s = strCopy(s);
-    nukeEnding(s);
-    for (s2 = s; *s2; s2++)
-       if (*s2 == SLASH && *(s2+1)) s = s2+1;
-
-    found = FALSE;
-    for (i = 0; i < namesUpto; i++)
-       if (strcmp(scriptInfo[i].modName,s)==0)
-          found = TRUE;
-
-    if (!found) {
-       makeStackEntry ( &scriptInfo[namesUpto], strCopy(s) );
-       namesUpto++;
-    }
-    free(s);
-}
-
-/* Return TRUE if no imports were needed; FALSE otherwise. */
-static Bool local addScript(stacknum)   /* read single file                */
-Int stacknum; {
-   Bool didPrelude;
-   static char name[FILENAME_MAX+1];
-   Int len = scriptInfo[stacknum].size;
-
-#if HUGS_FOR_WINDOWS                    /* Set clock cursor while loading  */
-    allowBreak();
-    SetCursor(LoadCursor(NULL, IDC_WAIT));
-#endif
-
-    //   setLastEdit(name,0);
-
-   strcpy(name, scriptInfo[stacknum].path);
-   strcat(name, scriptInfo[stacknum].modName);
-   if (scriptInfo[stacknum].fromSource)
-      strcat(name, scriptInfo[stacknum].srcExt); else
+   } else {
+      strcpy(name, path);
+      strcat(name, textToStr(mt));
+      strcat(name, DLL_ENDING);
+      module(mod).objName = findText(name);
+      module(mod).objSize = oSize;
+      strcpy(name, path);
+      strcat(name, textToStr(mt));
       strcat(name, ".u_hi");
+      module(mod).tree      = parseInterface(name,iSize);
+      module(mod).uses      = getInterfaceImports(module(mod).tree);
+      module(mod).fromSrc   = FALSE;
+      module(mod).lastStamp = whicheverIsLater(oTime,iTime);
+   }
 
-   scriptFile = name;
+   if (path) free(path);
+   return mod;
 
-   if (scriptInfo[stacknum].fromSource) {
-      if (lastWasObject) {
-         didPrelude = processInterfaces();
-         if (didPrelude) {
-            preludeLoaded = TRUE;
-            everybody(POSTPREL);
+  cant_find:
+   if (path) free(path);
+   ERRMSG(0) 
+      "Can't find source or object+interface for module \"%s\"",
+      textToStr(mt)
+   EEND;
+}
+
+
+static void tryLoadGroup ( Cell grp )
+{
+   Module m;
+   List   t;
+   switch (whatIs(grp)) {
+      case GRP_NONREC:
+         m = findModule(textOf(snd(grp)));
+         assert(nonNull(m));
+         if (module(m).fromSrc) {
+            processModule ( m );
+         } else {
+            processInterfaces ( singleton(snd(grp)) );
+         }
+         break;
+      case GRP_REC:
+	 for (t = snd(grp); nonNull(t); t=tl(t)) {
+            m = findModule(textOf(hd(t)));
+            assert(nonNull(m));
+            if (module(m).fromSrc) {
+               ERRMSG(0) "Source module \"%s\" imports itself recursively",
+                         textToStr(textOf(hd(t)))
+               EEND;
+            }
+	 }
+         processInterfaces ( snd(grp) );
+         break;
+      default:
+         internal("tryLoadGroup");
+   }
+}
+
+
+static void fallBackToPrelModules ( void )
+{
+   Module m;
+   for (m = MODULE_BASE_ADDR;
+        m < MODULE_BASE_ADDR+tabModuleSz; m++)
+      if (module(m).inUse
+          && !varIsMember(module(m).text, prelModules))
+         nukeModule(m);
+}
+
+
+/* This function catches exceptions in most of the system.
+   So it's only ok for procedures called from this one
+   to do EENDs (ie, write error messages).  Others should use
+   EEND_NO_LONGJMP.
+*/
+static void achieveTargetModules ( void )
+{
+   volatile List   ood;
+   volatile List   modgList;
+   volatile List   renewFromSource;
+   volatile List   renewFromObject;
+   volatile List   t;
+   volatile Module mod;
+   volatile Bool   ok;
+
+   String path = NULL;
+   String sExt = NULL;
+   Bool sAvail; Time sTime; Long sSize;
+   Bool iAvail; Time iTime; Long iSize;
+   Bool oAvail; Time oTime; Long oSize;
+
+   volatile Time oisTime;
+   volatile Time oiTime;
+   volatile Bool sourceIsLatest;
+   volatile Bool out_of_date;
+   volatile List ood_new;
+   volatile List us;
+   volatile List modgList_new;
+   volatile List parsedButNotLoaded;
+   volatile List toChase;
+   volatile List trans_cl;
+   volatile List trans_cl_new;
+   volatile List u;
+   volatile List mg;
+   volatile List mg2;
+   volatile Cell grp;
+   volatile List badMods;
+
+   /* First, examine timestamps to find out which modules are
+      out of date with respect to the source/interface/object files.
+   */
+   ood      = NIL;
+   modgList = listFromMG();
+
+   renewFromSource = renewFromObject = NIL;
+
+   for (t = modgList; nonNull(t); t=tl(t)) {
+
+      if (varIsMember(textOf(hd(t)),prelModules))
+         continue;
+
+      mod = findModule(textOf(hd(t)));
+      if (isNull(mod)) internal("achieveTargetSet(1)");
+      
+      ok = findFilesForModule (
+              textToStr(module(mod).text),
+              &path,
+              &sExt,
+              &sAvail, &sTime, &sSize,
+              &iAvail, &iTime, &iSize,
+              &oAvail, &oTime, &oSize
+           );
+      if (!combined && !sAvail) ok = FALSE;
+      if (!ok) {
+         fallBackToPrelModules();
+         ERRMSG(0) 
+            "Can't find source or object+interface for module \"%s\"",
+            textToStr(module(mod).text)
+         EEND_NO_LONGJMP;
+         if (path) free(path);
+         return;
+      }
+      /* findFilesForModule should enforce this */
+      if (!(sAvail || (oAvail && iAvail)))
+         internal("achieveTargetSet(2)");
+
+      if (!combined) {
+         oisTime = sTime;
+         sourceIsLatest = TRUE;
+      } else {
+         if (sAvail && !(oAvail && iAvail)) {
+            oisTime = sTime;
+            sourceIsLatest = TRUE;
+         } else 
+         if (!sAvail && (oAvail && iAvail)) {
+            oisTime = whicheverIsLater(oTime,iTime);
+            sourceIsLatest = FALSE;
+         } else
+         if (sAvail && (oAvail && iAvail)) {
+            oisTime = whicheverIsLater(oTime,iTime);
+            if (firstTimeIsLater(sTime,oisTime)) {
+               oisTime = sTime;
+               sourceIsLatest = TRUE;
+            } else {
+               sourceIsLatest = FALSE;
+            }
+         } else {
+            internal("achieveTargetSet(1a)");
          }
       }
-      lastWasObject = FALSE;
-      Printf("Reading script \"%s\":\n",name);
-      needsImports = FALSE;
-      parseScript(name,len);
-      if (needsImports) return FALSE;
-      checkDefns();
-      typeCheckDefns();
-      compileDefns();
-   } else {
-      Cell    iface;
-      List    imports;
-      ZTriple iface_info;
-      char    nameObj[FILENAME_MAX+1];
-      Int     sizeObj;
-
-      Printf("Reading  iface \"%s\":\n", name);
-      scriptFile = name;
-      needsImports = FALSE;
-
-      // set nameObj for the benefit of openGHCIface
-      strcpy(nameObj, scriptInfo[stacknum].path);
-      strcat(nameObj, scriptInfo[stacknum].modName);
-      strcat(nameObj, DLL_ENDING);
-      sizeObj = scriptInfo[stacknum].oSize;
-
-      iface = readInterface(name,len);
-      imports = zsnd(iface); iface = zfst(iface);
-
-      if (nonNull(imports)) chase(imports);
-      scriptFile = 0;
-      lastWasObject = TRUE;
-
-      iface_info = ztriple(iface, findText(nameObj), mkInt(sizeObj) );
-      ifaces_outstanding = cons(iface_info,ifaces_outstanding);
-
-      if (needsImports) return FALSE;
-   }
- 
-   scriptFile = 0;
-
-   return TRUE;
-}
-
-
-Bool chase(imps)                        /* Process list of import requests */
-List imps; {
-    Int    dstPosn;
-    ScriptInfo tmp;
-    Int    origPos  = numScripts;       /* keep track of original position */
-    String origName = scriptInfo[origPos].modName;
-    for (; nonNull(imps); imps=tl(imps)) {
-        String iname = textToStr(textOf(hd(imps)));
-        Int    i     = 0;
-        for (; i<namesUpto; i++)
-            if (strcmp(scriptInfo[i].modName,iname)==0)
-                break;
-	//fprintf(stderr, "import name = %s   num = %d\n", iname, i );
-
-        if (i<namesUpto) {
-           /* We should have filled in the details of each module
-              the first time we hear about it.
-	   */
-           assert(scriptInfo[i].details);
-        }
-
-        if (i>=origPos) {               /* Neither loaded or queued        */
-            String theName;
-            Time   theTime;
-            Bool   thePost;
-            Bool   theFS;
-
-            needsImports = TRUE;
-            if (scriptInfo[origPos].fromSource)
-               scriptInfo[origPos].postponed  = TRUE;
-
-            if (i==namesUpto) {         /* Name not found (i==namesUpto)   */
-                 /* Find out where it lives, whether source or object, etc */
-               makeStackEntry ( &scriptInfo[i], iname );
-               namesUpto++;
-            }
-            else 
-            if (scriptInfo[i].postponed && scriptInfo[i].fromSource) {
-                                        /* Check for recursive dependency  */
-                ERRMSG(0)
-                  "Recursive import dependency between \"%s\" and \"%s\"",
-                  scriptInfo[origPos].modName, iname
-                EEND;
-            }
-            /* Move stack entry i to somewhere below origPos.  If i denotes 
-             * an object, destination is immediately below origPos.  
-             * Otherwise, it's underneath the queue of objects below origPos.
-             */
-            dstPosn = origPos-1;
-            if (scriptInfo[i].fromSource)
-               while (!scriptInfo[dstPosn].fromSource && dstPosn > 0)
-                  dstPosn--;
-
-            dstPosn++;
-            tmp = scriptInfo[i];
-            for (; i > dstPosn; i--) scriptInfo[i] = scriptInfo[i-1];
-            scriptInfo[dstPosn] = tmp;
-            if (dstPosn < nextNumScripts) nextNumScripts = dstPosn;
-            origPos++;
-        }
-    }
-    return needsImports;
-}
-
-static Void local forgetScriptsFrom(scno)/* remove scripts from system     */
-Script scno; {
-    Script i;
-#if 0
-    for (i=scno; i<namesUpto; ++i)
-        if (scriptName[i])
-            free(scriptName[i]);
-#endif
-    dropScriptsFrom(scno-1);
-    namesUpto = scno;
-    if (numScripts>namesUpto)
-        numScripts = scno;
-}
-
-/* --------------------------------------------------------------------------
- * Commands for loading and removing script files:
- * ------------------------------------------------------------------------*/
-
-static Void local load() {           /* read filenames from command line   */
-    String s;                        /* and add to list of scripts waiting */
-                                     /* to be read                         */
-    while ((s=readFilename())!=0)
-        addStackEntry(s);
-    readScripts(N_PRELUDE_SCRIPTS);
-}
-
-static Void local project() {          /* read list of script names from   */
-    String s;                          /* project file                     */
-
-    if ((s=readFilename()) || currProject) {
-        if (!s)
-            s = strCopy(currProject);
-        else if (readFilename()) {
-            ERRMSG(0) "Too many project files"
-            EEND;
-        }
-        else
-            s = strCopy(s);
-    }
-    else {
-        ERRMSG(0) "No project filename specified"
-        EEND;
-    }
-    loadProject(s);
-    readScripts(N_PRELUDE_SCRIPTS);
-}
-
-static Void local readScripts(n)        /* Reread current list of scripts, */
-Int n; {                                /* loading everything after and    */
-    Time timeStamp;                     /* including the first script which*/
-    Long fileSize;                      /* has been either changed or added*/
-    static char name[FILENAME_MAX+1];
-    Bool didPrelude;
-
-    lastWasObject = FALSE;
-    ppSmStack("readscripts-begin");
-#if HUGS_FOR_WINDOWS
-    SetCursor(LoadCursor(NULL, IDC_WAIT));
-#endif
-
-#if 0
-    for (; n<numScripts; n++) {         /* Scan previously loaded scripts  */
-        ppSmStack("readscripts-loop1");
-        getFileInfo(scriptName[n], &timeStamp, &fileSize);
-        if (timeChanged(timeStamp,lastChange[n])) {
-            dropScriptsFrom(n-1);
-            numScripts = n;
-            break;
-        }
-    }
-    for (; n<NUM_SCRIPTS; n++)          /* No scripts have been postponed  */
-        postponed[n] = FALSE;           /* at this stage                   */
-    numScripts = 0;
-
-    while (numScripts<namesUpto) {      /* Process any remaining scripts   */
-        ppSmStack("readscripts-loop2");
-        getFileInfo(scriptName[numScripts], &timeStamp, &fileSize);
-        timeSet(lastChange[numScripts],timeStamp);
-        if (numScripts>0)               /* no new script for prelude       */
-            startNewScript(scriptName[numScripts]);
-        if (addScript(scriptName[numScripts],fileSize))
-            numScripts++;
-        else
-            dropScriptsFrom(numScripts-1);
-    }
-#endif
-
-    interface(RESET);
-
-    for (; n<numScripts; n++) {
-        ppSmStack("readscripts-loop2");
-        strcpy(name, scriptInfo[n].path);
-        strcat(name, scriptInfo[n].modName);
-        if (scriptInfo[n].fromSource)
-           strcat(name, scriptInfo[n].srcExt); else
-           strcat(name, ".u_hi");  //ToDo: should be .o
-        getFileInfo(name,&timeStamp, &fileSize);
-        if (timeChanged(timeStamp,scriptInfo[n].lastChange)) {
-           dropScriptsFrom(n-1);
-           numScripts = n;
-           break;
-        }
-    }
-    for (; n<NUM_SCRIPTS; n++)
-        scriptInfo[n].postponed = FALSE;
-
-    //numScripts = 0;
-
-    while (numScripts < namesUpto) {
-       ppSmStack ( "readscripts-loop2" );
-
-       if (scriptInfo[numScripts].fromSource) {
-
-          if (numScripts>0)
-              startNewScript(scriptInfo[numScripts].modName);
-          nextNumScripts = NUM_SCRIPTS; //bogus initialisation
-          if (addScript(numScripts)) {
-             numScripts++;
-             assert(nextNumScripts==NUM_SCRIPTS);
-          }
-          else
-             dropScriptsFrom(numScripts-1);
-
-       } else {
       
-          if (scriptInfo[numScripts].objLoaded) {
-             numScripts++;
-          } else {
-             scriptInfo[numScripts].objLoaded = TRUE;
-             /* new */
-             if (numScripts>0)
-                 startNewScript(scriptInfo[numScripts].modName);
-	     /* end */
-             nextNumScripts = NUM_SCRIPTS;
-             if (addScript(numScripts)) {
-                numScripts++;
-                assert(nextNumScripts==NUM_SCRIPTS);
-             } else {
-	        //while (!scriptInfo[numScripts].fromSource && numScripts > 0)
-	        //   numScripts--;
-	        //if (scriptInfo[numScripts].fromSource)
-	        //   numScripts++;
-                numScripts = nextNumScripts;
-                assert(nextNumScripts<NUM_SCRIPTS);
-             }
-          }
-       }
-       if (numScripts==namesUpto) ppSmStack( "readscripts-final") ;
-    }
+      out_of_date = firstTimeIsLater(oisTime,module(mod).lastStamp);
+      if (out_of_date) {
+         assert(!varIsMember(textOf(hd(t)),ood));
+         ood = cons(hd(t),ood);
+         if (sourceIsLatest)
+            renewFromSource = cons(hd(t),renewFromSource); else
+            renewFromObject = cons(hd(t),renewFromObject);
+      }
 
-    didPrelude = processInterfaces();
-    if (didPrelude) {
-       preludeLoaded = TRUE;
-       everybody(POSTPREL);
-    }
+      if (path) { free(path); path = NULL; };
+   }
 
+   /* Second, form a simplistic transitive closure of the out-of-date
+      modules: a module is out of date if it imports an out-of-date
+      module. 
+   */
+   while (1) {
+      ood_new = NIL;
+      for (t = modgList; nonNull(t); t=tl(t)) {
+         mod = findModule(textOf(hd(t)));
+         assert(nonNull(mod));
+         for (us = module(mod).uses; nonNull(us); us=tl(us))
+            if (varIsMember(textOf(hd(us)),ood))
+               break;
+         if (nonNull(us)) {
+fprintf ( stderr, "new OOD %s\n", textToStr(textOf(hd(t))) );
+            if (varIsMember(textOf(hd(t)),prelModules))
+               Printf ( "warning: prelude module \"%s\" is out-of-date\n",
+                        textToStr(textOf(hd(t))) );
+            else
+               if (!varIsMember(textOf(hd(t)),ood_new) &&
+                   !varIsMember(textOf(hd(t)),ood))
+                  ood_new = cons(hd(t),ood_new);
+         }
+      }
+printf ( "\nood_new = " );print(ood_new,100);
+printf ( "\nood     = " );print(ood,100); printf("\n");
+      if (isNull(ood_new)) break;
+      ood = appendOnto(ood_new,ood);            
+   }
 
-    { Int  m     = namesUpto-1;
-      Text mtext = findText(scriptInfo[m].modName);
+   /* Now ood holds the entire set of modules which are out-of-date.
+      Throw them out of the system, yielding a "reduced system",
+      in which the remaining modules are in-date.
+   */
+   for (t = ood; nonNull(t); t=tl(t)) {
+      mod = findModule(textOf(hd(t)));
+      assert(nonNull(mod));
+      nukeModule(mod);      
+   }
+   modgList_new = NIL;
+   for (t = modgList; nonNull(t); t=tl(t))
+      if (!varIsMember(textOf(hd(t)),ood))
+         modgList_new = cons(hd(t),modgList_new);
+   modgList = modgList_new;
 
-      /* Hack to avoid starting up in PrelHugs */
-      if (mtext == findText("PrelHugs")) mtext = findText("Prelude");
+   /* Update the module group list to reflect the reduced system.
+      We do this so that if the following parsing phases fail, we can 
+      safely fall back to the reduced system.
+   */
+   mgFromList ( modgList );
 
+   /* Parse modules/interfaces, collecting parse trees and chasing
+      imports, starting from the target set. 
+   */
+   parsedButNotLoaded = NIL;
+   toChase = dupList(targetModules);
+   
+   while (nonNull(toChase)) {
+      ConId mc = hd(toChase);
+      toChase  = tl(toChase);
+      if (!varIsMember(textOf(mc),modgList)
+          && !varIsMember(textOf(mc),parsedButNotLoaded)) {
 
-      /* Commented out till we understand what
-       * this is trying to do.
-       * Problem, you cant find a module till later.
-       */
-#if 0
-       setCurrModule(findModule(mtext)); 
-#endif
-      evalModule = mtext;
-    }
+         if (setjmp(catch_error)==0) {
+            /* try this; it may throw an exception */
+            mod = parseModuleOrInterface ( 
+                     mc, renewFromSource, renewFromObject );
+         } else {
+            /* here's the exception handler, if parsing fails */
+            /* A parse error (or similar).  Clean up and abort. */
+            for (t = parsedButNotLoaded; nonNull(t); t=tl(t)) {
+               mod = findModule(textOf(hd(t)));
+               assert(nonNull(mod));
+               if (nonNull(mod)) nukeModule(mod);
+            }
+            return;
+            /* end of the exception handler */
+         }
 
-    
+         parsedButNotLoaded = cons(mc, parsedButNotLoaded);
+         toChase = dupOnto(module(mod).uses,toChase);
+      }
+   }
 
-    if (listScripts)
-        whatScripts();
-    if (numScripts<=1)
-        setLastEdit((String)0, 0);
-    ppSmStack("readscripts-end  ");
+   modgList = dupOnto(parsedButNotLoaded, modgList);
+
+   /* We successfully parsed all modules reachable from the target
+      set which were not part of the reduced system.  However, there
+      may be modules in the reduced system which are not reachable from
+      the target set.  We detect these now by building the transitive
+      closure of the target set, and nuking modules in the reduced
+      system which are not part of that closure. 
+   */
+   trans_cl = dupList(targetModules);
+   while (1) {
+      trans_cl_new = NIL;
+      for (t = trans_cl; nonNull(t); t=tl(t)) {
+         mod = findModule(textOf(hd(t)));
+         assert(nonNull(mod));
+         for (u = module(mod).uses; nonNull(u); u=tl(u))
+            if (!varIsMember(textOf(hd(u)),trans_cl)
+                && !varIsMember(textOf(hd(u)),trans_cl_new)
+                && !varIsMember(textOf(hd(u)),prelModules))
+               trans_cl_new = cons(hd(u),trans_cl_new);
+      }
+      if (isNull(trans_cl_new)) break;
+      trans_cl = appendOnto(trans_cl_new,trans_cl);
+   }
+   modgList_new = NIL;
+   for (t = modgList; nonNull(t); t=tl(t)) {
+      if (varIsMember(textOf(hd(t)),trans_cl)) {
+         modgList_new = cons(hd(t),modgList_new);
+      } else {
+         mod = findModule(textOf(hd(t)));
+         assert(nonNull(mod));
+         nukeModule(mod);
+      }
+   }
+   modgList = modgList_new;
+   
+   /* Now, the module symbol tables hold exactly the set of
+      modules reachable from the target set, and modgList holds
+      their names.   Calculate the scc-ified module graph, 
+      since we need that to guide the next stage, that of
+      Actually Loading the modules. 
+
+      If no errors occur, moduleGraph will reflect the final graph
+      loaded.  If an error occurs loading a group, we nuke 
+      that group, truncate the moduleGraph just prior to that 
+      group, and exit.  That leaves the system having successfully
+      loaded all groups prior to the one which failed.
+   */
+   mgFromList ( modgList );
+
+   for (mg = moduleGraph; nonNull(mg); mg=tl(mg)) {
+      grp = hd(mg);
+      
+      if (!varIsMember(textOf(selectArbitrarilyFromGroup(grp)),
+                       parsedButNotLoaded)) continue;
+
+      if (setjmp(catch_error)==0) {
+         /* try this; it may throw an exception */
+         tryLoadGroup(grp);
+      } else {
+         /* here's the exception handler, if static/typecheck etc fails */
+         badMods = whatIs(grp)==GRP_REC 
+                 ? snd(grp) 
+                 : singleton(snd(grp));
+         for (t = badMods; nonNull(t); t=tl(t)) {
+            mod = findModule(textOf(hd(t)));
+            if (nonNull(mod)) nukeModule(mod);
+         }
+         mg2 = moduleGraph; 
+         while (nonNull(mg2) && nonNull(tl(mg2)) && tl(mg2) != mg) 
+            mg2 = tl(mg2);
+         assert(nonNull(mg2) && nonNull(tl(mg2)));
+         tl(mg2) = NIL;
+         return;
+         /* end of the exception handler */
+      }
+
+   }
+
+   /* Err .. I think that's it.  If we get here, we've successfully
+      achieved the target set.  Phew!
+   */
 }
 
-static Void local whatScripts() {       /* list scripts in current session */
-    int i;
-    Printf("\nHugs session for:");
-    if (projectLoaded)
-        Printf(" (project: %s)",currProject);
-    for (i=0; i<numScripts; ++i)
-      Printf("\n%s%s",scriptInfo[i].path, scriptInfo[i].modName);
-    Putchar('\n');
+
+static Bool loadThePrelude ( void )
+{
+   Bool ok;
+   ConId conPrelude;
+   ConId conPrelHugs;
+   moduleGraph = prelModules = NIL;
+
+   if (combined) {
+      conPrelude    = mkCon(findText("Prelude"));
+      conPrelHugs   = mkCon(findText("PrelHugs"));
+      targetModules = doubleton(conPrelude,conPrelHugs);
+      achieveTargetModules();
+      ok = elemMG(conPrelude) && elemMG(conPrelHugs);
+   } else {
+      conPrelude    = mkCon(findText("Prelude"));
+      targetModules = singleton(conPrelude);
+      achieveTargetModules();
+      ok = elemMG(conPrelude);
+   }
+
+   if (ok) prelModules = listFromMG();
+   return ok;
 }
+
+
+static void refreshActions ( ConId nextCurrMod )
+{
+   ConId tryFor = mkCon(module(currentModule).text);
+   achieveTargetModules();
+   if (nonNull(nextCurrMod))
+      tryFor = nextCurrMod;
+   if (!elemMG(tryFor))
+      tryFor = selectLatestMG();
+   /* combined mode kludge, to get Prelude rather than PrelHugs */
+   if (combined && textOf(tryFor)==findText("PrelHugs"))
+      tryFor = mkCon(findText("Prelude"));
+
+   setCurrModule ( findModule(textOf(tryFor)) );
+   Printf("Hugs session for:\n");
+   ppMG();
+}
+
+
+static void addActions ( List extraModules /* :: [CONID] */ )
+{
+   List t;
+   for (t = extraModules; nonNull(t); t=tl(t)) {
+      ConId extra = hd(t);
+      if (!varIsMember(textOf(extra),targetModules))
+         targetModules = cons(extra,targetModules);
+   }
+   refreshActions ( isNull(extraModules) 
+                    ? NIL 
+                    : hd(reverse(extraModules)) 
+                  );
+}
+
+
+static void loadActions ( List loadModules /* :: [CONID] */ )
+{
+   List t;
+   targetModules = dupList ( prelModules );   
+
+   for (t = loadModules; nonNull(t); t=tl(t)) {
+      ConId load = hd(t);
+      if (!varIsMember(textOf(load),targetModules))
+         targetModules = cons(load,targetModules);
+   }
+   refreshActions ( isNull(loadModules) 
+                    ? NIL 
+                    : hd(reverse(loadModules)) 
+                  );
+}
+
 
 /* --------------------------------------------------------------------------
  * Access to external editor:
  * ------------------------------------------------------------------------*/
 
+/* ToDo: All this editor stuff needs fixing. */
+
 static Void local editor() {            /* interpreter-editor interface    */
+#if 0
     String newFile  = readFilename();
     if (newFile) {
         setLastEdit(newFile,0);
@@ -1304,11 +1521,11 @@ static Void local editor() {            /* interpreter-editor interface    */
         }
     }
     runEditor();
+#endif
 }
 
 static Void local find() {              /* edit file containing definition */
 #if 0
-This just plain wont work no more.
 ToDo: Fix!
     String nm = readFilename();         /* of specified name               */
     if (!nm) {
@@ -1341,19 +1558,20 @@ ToDo: Fix!
 }
 
 static Void local runEditor() {         /* run editor on script lastEdit   */
+#if 0
     if (startEdit(lastEdLine,lastEdit)) /* at line lastEdLine              */
         readScripts(N_PRELUDE_SCRIPTS);
+#endif
 }
 
 static Void local setLastEdit(fname,line)/* keep name of last file to edit */
 String fname;
 Int    line; {
+#if 0
     if (lastEdit)
         free(lastEdit);
     lastEdit = strCopy(fname);
     lastEdLine = line;
-#if HUGS_FOR_WINDOWS
-    DrawStatusLine(hWndMain);           /* Redo status line                */
 #endif
 }
 
@@ -1361,32 +1579,57 @@ Int    line; {
  * Read and evaluate an expression:
  * ------------------------------------------------------------------------*/
 
-static Void local setModule(){/*set module in which to evaluate expressions*/
-    String s = readFilename();
-    if (!s) s = "";              /* :m clears the current module selection */
-    evalModule = findText(s);
-    setLastEdit(fileOfModule(findEvalModule()),0);
+static Void setModule ( void ) {
+                              /*set module in which to evaluate expressions*/
+   Module m;
+   ConId  mc = NIL;
+   String s  = readFilename();
+   if (!s) {
+      mc = selectLatestMG();
+      if (combined && textOf(mc)==findText("PrelHugs"))
+         mc = mkCon(findText("Prelude"));
+      m = findModule(textOf(mc));
+      assert(nonNull(m));
+   } else {
+      m = findModule(findText(s));
+      if (isNull(m)) {
+         ERRMSG(0) "Cannot find module \"%s\"", s
+         EEND_NO_LONGJMP;
+         return;
+      }
+   }
+   setCurrModule(m);          
 }
 
-static Module local findEvalModule() { /*Module in which to eval expressions*/
-    Module m = findModule(evalModule); 
-    if (isNull(m))
-        m = lastModule();
-    return m;
+static Module allocEvalModule ( void )
+{
+   Module evalMod = newModule( findText("_Eval_Module_") );
+   module(evalMod).names   = module(currentModule).names;
+   module(evalMod).tycons  = module(currentModule).tycons;
+   module(evalMod).classes = module(currentModule).classes;
+   return evalMod;
 }
 
 static Void local evaluator() {        /* evaluate expr and print value    */
-    Type  type, bd;
-    Kinds ks   = NIL;
-
-    setCurrModule(findEvalModule());
+    volatile Type   type;
+    volatile Type   bd;
+    volatile Kinds  ks      = NIL;
+    volatile Module evalMod = allocEvalModule();
+    volatile Module currMod = currentModule;
+    setCurrModule(evalMod);
     scriptFile = 0;
-    startNewScript(0);                 /* Enables recovery of storage      */
-                                       /* allocated during evaluation      */
-    parseExp();
-    checkExp();
+
     defaultDefns = combined ? stdDefaults : evalDefaults;
-    type         = typeCheckExp(TRUE);
+
+    if (setjmp(catch_error)==0) {
+       /* try this */
+       parseExp();
+       checkExp();
+       type = typeCheckExp(TRUE);
+    } else {
+       /* if an exception happens, we arrive here */
+       goto cleanup_and_return;
+    }
 
     if (isPolyType(type)) {
         ks = polySigOf(type);
@@ -1396,17 +1639,14 @@ static Void local evaluator() {        /* evaluate expr and print value    */
         bd = type;
 
     if (whatIs(bd)==QUAL) {
-        ERRMSG(0) "Unresolved overloading" ETHEN
-        ERRTEXT   "\n*** Type       : "    ETHEN ERRTYPE(type);
-        ERRTEXT   "\n*** Expression : "    ETHEN ERREXPR(inputExpr);
-        ERRTEXT   "\n"
-        EEND;
+       ERRMSG(0) "Unresolved overloading" ETHEN
+       ERRTEXT   "\n*** Type       : "    ETHEN ERRTYPE(type);
+       ERRTEXT   "\n*** Expression : "    ETHEN ERREXPR(inputExpr);
+       ERRTEXT   "\n"
+       EEND_NO_LONGJMP;
+       goto cleanup_and_return;
     }
   
-#ifdef WANT_TIMER
-    updateTimers();
-#endif
-
 #if 1
     if (isProgType(ks,bd)) {
         inputExpr = ap(nameRunIO_toplevel,inputExpr);
@@ -1415,11 +1655,12 @@ static Void local evaluator() {        /* evaluate expr and print value    */
     } else {
         Cell d = provePred(ks,NIL,ap(classShow,bd));
         if (isNull(d)) {
-            ERRMSG(0) "Cannot find \"show\" function for:" ETHEN
-            ERRTEXT   "\n*** expression : "   ETHEN ERREXPR(inputExpr);
-            ERRTEXT   "\n*** of type    : "   ETHEN ERRTYPE(type);
-            ERRTEXT   "\n"
-            EEND;
+           ERRMSG(0) "Cannot find \"show\" function for:" ETHEN
+           ERRTEXT   "\n*** expression : "   ETHEN ERREXPR(inputExpr);
+           ERRTEXT   "\n*** of type    : "   ETHEN ERRTYPE(type);
+           ERRTEXT   "\n"
+           EEND_NO_LONGJMP;
+           goto cleanup_and_return;
         }
         inputExpr = ap2(nameShow,           d,inputExpr);
         inputExpr = ap (namePutStr,         inputExpr);
@@ -1443,43 +1684,40 @@ static Void local evaluator() {        /* evaluate expr and print value    */
 
 #endif
 
+  cleanup_and_return:
+   nukeModule(evalMod);
+   setCurrModule(currMod);
 }
 
-static Void local stopAnyPrinting() {  /* terminate printing of expression,*/
-    if (printing) {                    /* after successful termination or  */
-        printing = FALSE;              /* runtime error (e.g. interrupt)   */
-        Putchar('\n');
-        if (showStats) {
-#define plural(v)   v, (v==1?"":"s")
-            Printf("%lu cell%s",plural(numCells));
-            if (numGcs>0)
-                Printf(", %u garbage collection%s",plural(numGcs));
-            Printf(")\n");
-#undef plural
-        }
-        FlushStdout();
-        garbageCollect();
-    }
-}
+
 
 /* --------------------------------------------------------------------------
  * Print type of input expression:
  * ------------------------------------------------------------------------*/
 
-static Void local showtype() {         /* print type of expression (if any)*/
-    Cell type;
+static Void showtype ( void ) {        /* print type of expression (if any)*/
 
-    setCurrModule(findEvalModule());
-    startNewScript(0);                 /* Enables recovery of storage      */
-                                       /* allocated during evaluation      */
-    parseExp();
-    checkExp();
-    defaultDefns = evalDefaults;
-    type = typeCheckExp(FALSE);
-    printExp(stdout,inputExpr);
-    Printf(" :: ");
-    printType(stdout,type);
-    Putchar('\n');
+    volatile Cell   type;
+    volatile Module evalMod = allocEvalModule();
+    volatile Module currMod = currentModule;
+    setCurrModule(evalMod);
+
+    if (setjmp(catch_error)==0) {
+       /* try this */
+       parseExp();
+       checkExp();
+       defaultDefns = evalDefaults;
+       type = typeCheckExp(FALSE);
+       printExp(stdout,inputExpr);
+       Printf(" :: ");
+       printType(stdout,type);
+       Putchar('\n');
+    } else {
+       /* if an exception happens, we arrive here */
+    }
+ 
+    nukeModule(evalMod);
+    setCurrModule(currMod);
 }
 
 
@@ -1525,8 +1763,6 @@ static Void local browse() {            /* browse modules                  */
     String s;
     Bool all = FALSE;
 
-    setCurrModule(findEvalModule());
-    startNewScript(0);                  /* for recovery of storage         */
     for (; (s=readFilename())!=0; count++)
 	if (strcmp(s,"all") == 0) {
 	    all = TRUE;
@@ -1534,7 +1770,7 @@ static Void local browse() {            /* browse modules                  */
 	} else
 	    browseit(findModule(findText(s)),s,all);
     if (count == 0) {
-	browseit(findEvalModule(),NULL,all);
+	browseit(currentModule,NULL,all);
     }
 }
 
@@ -1624,8 +1860,11 @@ static Void dumpStg ( void )
 {
    String s;
    Int i;
+#if 0
+   Whats this for?
    setCurrModule(findEvalModule());
    startNewScript(0);
+#endif
    s = readFilename();
 
    /* request to locate a symbol by name */
@@ -1715,13 +1954,11 @@ static Void local info() {              /* describe objects                */
     Int    count = 0;                   /* or give menu of commands        */
     String s;
 
-    setCurrModule(findEvalModule());
-    startNewScript(0);                  /* for recovery of storage         */
     for (; (s=readFilename())!=0; count++) {
         describe(findText(s));
     }
     if (count == 0) {
-        whatScripts();
+       /* whatScripts(); */
     }
 }
 
@@ -1929,7 +2166,7 @@ static Void local listNames() {         /* list names matching optional pat*/
     Int    width = getTerminalWidth() - 1;
     Int    count = 0;
     Int    termPos;
-    Module mod   = findEvalModule();
+    Module mod   = currentModule;
 
     if (pat) {                          /* First gather names to list      */
         do {
@@ -1940,7 +2177,8 @@ static Void local listNames() {         /* list names matching optional pat*/
     }
     if (isNull(names)) {                /* Then print them out             */
         ERRMSG(0) "No names selected"
-        EEND;
+        EEND_NO_LONGJMP;
+        return;
     }
     for (termPos=0; nonNull(names); names=tl(names)) {
         String s = objToStr(mod,hd(names));
@@ -1989,57 +2227,69 @@ String moduleName; {
  * main read-eval-print loop, with error trapping:
  * ------------------------------------------------------------------------*/
 
-static jmp_buf catch_error;             /* jump buffer for error trapping  */
-
 static Void local interpreter(argc,argv)/* main interpreter loop           */
 Int    argc;
 String argv[]; {
-    Int errorNumber = setjmp(catch_error);
 
-    if (errorNumber && autoMain) {
-       fprintf(stderr, "hugs +Q: compilation failed -- can't run `main'\n" );
-       exit(1);
-    }
+    List   modConIds; /* :: [CONID] */
+    Bool   prelOK;
+    String s;
 
     breakOn(TRUE);                      /* enable break trapping           */
-    if (numScripts==0) {                /* only succeeds on first time,    */
-        if (errorNumber)                /* before prelude has been loaded  */
-            fatal("Unable to load prelude");
-        initialize(argc,argv);
-        forHelp();
+    modConIds = initialize(argc,argv);  /* the initial modules to load     */
+    prelOK    = loadThePrelude();
+    if (combined) everybody(POSTPREL);
+
+    if (!prelOK) {
+       if (autoMain)
+          fprintf(stderr, "hugs +Q: fatal error: can't load the Prelude.\n" );
+       else
+          fprintf(stderr, "hugs: fatal error: can't load the Prelude.\n" );
+       exit(1);
+    }    
+
+    loadActions(modConIds);
+
+    if (autoMain) {
+       for (; nonNull(modConIds); modConIds=tl(modConIds))
+          if (!elemMG(hd(modConIds))) {
+             fprintf(stderr,
+                     "hugs +Q: compilation failed -- can't run `main'\n" );
+             exit(1);
+          }
     }
+
+    modConIds = NIL;
 
     /* initialize calls startupHaskell, which trashes our signal handlers */
     breakOn(TRUE);
+    forHelp();
 
     for (;;) {
         Command cmd;
         everybody(RESET);               /* reset to sensible initial state */
-        dropScriptsFrom(numScripts-1);  /* remove partially loaded scripts */
-                                        /* not counting prelude as a script*/
 
-        promptForInput(textToStr(module(findEvalModule()).text));
+        promptForInput(textToStr(module(currentModule).text));
 
         cmd = readCommand(cmds, (Char)':', (Char)'!');
-#ifdef WANT_TIMER
-        updateTimers();
-#endif
         switch (cmd) {
             case EDIT   : editor();
                           break;
             case FIND   : find();
                           break;
-            case LOAD   : clearProject();
-                          forgetScriptsFrom(N_PRELUDE_SCRIPTS);
-                          load();
+            case LOAD   : modConIds = NIL;
+                          while ((s=readFilename())!=0)
+                             modConIds = cons(mkCon(findText(s)),modConIds);
+                          loadActions(modConIds);
+                          modConIds = NIL;
                           break;
-            case ALSO   : clearProject();
-                          forgetScriptsFrom(numScripts);
-                          load();
+            case ALSO   : modConIds = NIL;
+                          while ((s=readFilename())!=0)
+                             modConIds = cons(mkCon(findText(s)),modConIds);
+                          addActions(modConIds);
+                          modConIds = NIL;
                           break;
-            case RELOAD : readScripts(N_PRELUDE_SCRIPTS);
-                          break;
-            case PROJECT: project();
+            case RELOAD : refreshActions(NIL);
                           break;
             case SETMODULE :
                           setModule();
@@ -2088,11 +2338,7 @@ String argv[]; {
                           break;
             case NOCMD  : break;
         }
-#ifdef WANT_TIMER
-        updateTimers();
-        Printf("Elapsed time (ms): %ld (user), %ld (system)\n",
-               millisecs(userElapsed), millisecs(systElapsed));
-#endif
+
         if (autoMain) break;
     }
     breakOn(FALSE);
@@ -2188,6 +2434,23 @@ static Void local failed() {           /* Goal cannot be reached due to    */
  * Error handling:
  * ------------------------------------------------------------------------*/
 
+static Void local stopAnyPrinting() {  /* terminate printing of expression,*/
+    if (printing) {                    /* after successful termination or  */
+        printing = FALSE;              /* runtime error (e.g. interrupt)   */
+        Putchar('\n');
+        if (showStats) {
+#define plural(v)   v, (v==1?"":"s")
+            Printf("%lu cell%s",plural(numCells));
+            if (numGcs>0)
+                Printf(", %u garbage collection%s",plural(numGcs));
+            Printf(")\n");
+#undef plural
+        }
+        FlushStdout();
+        garbageCollect();
+    }
+}
+
 Cell errAssert(l)   /* message to use when raising asserts, etc */
 Int l; {
   char tmp[100];
@@ -2199,7 +2462,6 @@ Int l; {
   }
   return (ap2(nameTangleMessage,str,mkInt(l)));
 }
-
 
 Void errHead(l)                        /* print start of error message     */
 Int l; {
@@ -2223,6 +2485,11 @@ Void errFail() {                        /* terminate error message and     */
     longjmp(catch_error,1);
 }
 
+Void errFail_no_longjmp() {             /* terminate error message but     */
+    Putc('\n',errorStream);             /* don't produce an exception      */
+    FFlush(errorStream);
+}
+
 Void errAbort() {                       /* altern. form of error handling  */
     failed();                           /* used when suitable error message*/
     stopAnyPrinting();                  /* has already been printed        */
@@ -2231,25 +2498,16 @@ Void errAbort() {                       /* altern. form of error handling  */
 
 Void internal(msg)                      /* handle internal error           */
 String msg; {
-#if HUGS_FOR_WINDOWS
-    char buf[300];
-    wsprintf(buf,"INTERNAL ERROR: %s",msg);
-    MessageBox(hWndMain, buf, appName, MB_ICONHAND | MB_OK);
-#endif
     failed();
     stopAnyPrinting();
     Printf("INTERNAL ERROR: %s\n",msg);
     FlushStdout();
+exit(9);
     longjmp(catch_error,1);
 }
 
 Void fatal(msg)                         /* handle fatal error              */
 String msg; {
-#if HUGS_FOR_WINDOWS
-    char buf[300];
-    wsprintf(buf,"FATAL ERROR: %s",msg);
-    MessageBox(hWndMain, buf, appName, MB_ICONHAND | MB_OK);
-#endif
     FlushStdout();
     Printf("\nFATAL ERROR: %s\n",msg);
     everybody(EXIT);
@@ -2257,9 +2515,6 @@ String msg; {
 }
 
 sigHandler(breakHandler) {              /* respond to break interrupt      */
-#if HUGS_FOR_WINDOWS
-    MessageBox(GetFocus(), "Interrupted!", appName, MB_ICONSTOP | MB_OK);
-#endif
     Hilite();
     Printf("{Interrupted!}\n");
     Lolite();
@@ -2310,163 +2565,6 @@ String s; {
  * tweaking these functions.
  * ------------------------------------------------------------------------*/
 
-#if REDIRECT_OUTPUT && !HUGS_FOR_WINDOWS
-
-#ifdef HAVE_STDARG_H
-#include <stdarg.h>
-#else
-#include <varargs.h>
-#endif
-
-/* ----------------------------------------------------------------------- */
-
-#define BufferSize 10000              /* size of redirected output buffer  */
-
-typedef struct _HugsStream {
-    char buffer[BufferSize];          /* buffer for redirected output      */
-    Int  next;                        /* next space in buffer              */
-} HugsStream;
-
-static Void   local vBufferedPrintf  ( HugsStream*, const char*, va_list );
-static Void   local bufferedPutchar  ( HugsStream*, Char );
-static String local bufferClear      ( HugsStream *stream );
-
-static Void local vBufferedPrintf(stream, fmt, ap)
-HugsStream* stream;
-const char* fmt;
-va_list     ap; {
-    Int spaceLeft = BufferSize - stream->next;
-    char* p = &stream->buffer[stream->next];
-    Int charsAdded = vsnprintf(p, spaceLeft, fmt, ap);
-    if (0 <= charsAdded && charsAdded < spaceLeft) 
-        stream->next += charsAdded;
-#if 1 /* we can either buffer the first n chars or buffer the last n chars */
-    else
-        stream->next = 0;
-#endif
-}
-
-static Void local bufferedPutchar(stream, c)
-HugsStream *stream;
-Char        c; {
-    if (BufferSize - stream->next >= 2) {
-        stream->buffer[stream->next++] = c;
-        stream->buffer[stream->next] = '\0';
-    }
-}    
-
-static String local bufferClear(stream)
-HugsStream *stream; {
-    if (stream->next == 0) {
-        return "";
-    } else {
-        stream->next = 0;
-        return stream->buffer;
-    }
-}
-
-/* ----------------------------------------------------------------------- */
-
-static HugsStream outputStreamH;
-/* ADR note: 
- * We rely on standard C semantics to initialise outputStreamH.next to 0.
- */
-
-Void hugsEnableOutput(f) 
-Bool f; {
-    disableOutput = !f;
-}
-
-String hugsClearOutputBuffer() {
-    return bufferClear(&outputStreamH);
-}
-
-#ifdef HAVE_STDARG_H
-Void hugsPrintf(const char *fmt, ...) {
-    va_list ap;                    /* pointer into argument list           */
-    va_start(ap, fmt);             /* make ap point to first arg after fmt */
-    if (!disableOutput) {
-        vprintf(fmt, ap);
-    } else {
-        vBufferedPrintf(&outputStreamH, fmt, ap);
-    }
-    va_end(ap);                    /* clean up                             */
-}
-#else
-Void hugsPrintf(fmt, va_alist) 
-const char *fmt;
-va_dcl {
-    va_list ap;                    /* pointer into argument list           */
-    va_start(ap);                  /* make ap point to first arg after fmt */
-    if (!disableOutput) {
-        vprintf(fmt, ap);
-    } else {
-        vBufferedPrintf(&outputStreamH, fmt, ap);
-    }
-    va_end(ap);                    /* clean up                             */
-}
-#endif
-
-Void hugsPutchar(c)
-int c; {
-    if (!disableOutput) {
-        putchar(c);
-    } else {
-        bufferedPutchar(&outputStreamH, c);
-    }
-}
-
-Void hugsFlushStdout() {
-    if (!disableOutput) {
-        fflush(stdout);
-    }
-}
-
-Void hugsFFlush(fp)
-FILE* fp; {
-    if (!disableOutput) {
-        fflush(fp);
-    }
-}
-
-#ifdef HAVE_STDARG_H
-Void hugsFPrintf(FILE *fp, const char* fmt, ...) {
-    va_list ap;             
-    va_start(ap, fmt);      
-    if (!disableOutput) {
-        vfprintf(fp, fmt, ap);
-    } else {
-        vBufferedPrintf(&outputStreamH, fmt, ap);
-    }
-    va_end(ap);             
-}
-#else
-Void hugsFPrintf(FILE *fp, const char* fmt, va_list)
-FILE* fp;
-const char* fmt;
-va_dcl {
-    va_list ap;             
-    va_start(ap);      
-    if (!disableOutput) {
-        vfprintf(fp, fmt, ap);
-    } else {
-        vBufferedPrintf(&outputStreamH, fmt, ap);
-    }
-    va_end(ap);             
-}
-#endif
-
-Void hugsPutc(c, fp)
-int   c;
-FILE* fp; {
-    if (!disableOutput) {
-        putc(c,fp);
-    } else {
-        bufferedPutchar(&outputStreamH, c);
-    }
-}
-    
-#endif /* REDIRECT_OUTPUT && !HUGS_FOR_WINDOWS */
 /* --------------------------------------------------------------------------
  * Send message to each component of system:
  * ------------------------------------------------------------------------*/
@@ -2489,10 +2587,4 @@ Int what; {                     /* system to respond as appropriate ...    */
     codegen(what);
 }
 
-/* --------------------------------------------------------------------------
- * Hugs for Windows code (WinMain and related functions)
- * ------------------------------------------------------------------------*/
-
-#if HUGS_FOR_WINDOWS
-#include "winhugs.c"
-#endif
+/*-------------------------------------------------------------------------*/
