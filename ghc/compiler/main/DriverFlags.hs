@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.6 2000/10/18 09:40:18 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.7 2000/10/24 15:58:02 simonmar Exp $
 --
 -- Driver flags
 --
@@ -261,7 +261,7 @@ static_flags =
   ,  ( "static" 	, NoArg (writeIORef static True) )
 
         ------ Compiler flags -----------------------------------------------
-  ,  ( "O2-for-C"	   , NoArg (writeIORef opt_minus_o2_for_C True) )
+  ,  ( "O2-for-C"	   , NoArg (writeIORef v_minus_o2_for_C True) )
   ,  ( "O"		   , OptPrefix (setOptLevel) )
 
   ,  ( "fasm"		   , OptPrefix (\_ -> writeIORef hsc_lang HscAsm) )
@@ -272,9 +272,9 @@ static_flags =
   ,  ( "fno-asm-mangling"  , NoArg (writeIORef do_asm_mangling False) )
 
   ,  ( "fmax-simplifier-iterations", 
-		Prefix (writeIORef opt_MaxSimplifierIterations . read) )
+		Prefix (writeIORef v_MaxSimplifierIterations . read) )
 
-  ,  ( "fusagesp"	   , NoArg (do writeIORef opt_UsageSPInf True
+  ,  ( "fusagesp"	   , NoArg (do writeIORef v_UsageSPInf True
 				       add opt_C "-fusagesp-on") )
 
   ,  ( "fexcess-precision" , NoArg (do writeIORef excess_precision True
@@ -324,7 +324,7 @@ dynamic_flags = [
   ,  ( "U",		Prefix (\s -> addOpt_P ("-U'"++s++"'") ) )
 
 	------ Debugging ----------------------------------------------------
-  ,  ( "dstg-stats",	NoArg (writeIORef opt_StgStats True) )
+  ,  ( "dstg-stats",	NoArg (writeIORef v_StgStats True) )
 
   ,  ( "ddump_all",         	 NoArg (setDynFlag Opt_D_dump_all) )
   ,  ( "ddump_most",         	 NoArg (setDynFlag Opt_D_dump_most) )
@@ -373,8 +373,8 @@ dynamic_flags = [
   ,  ( "-fwarn-missing-fields",    NoArg (setDynFlag Opt_WarnMissingFields) )
   ,  ( "-fwarn-missing-methods",   NoArg (setDynFlag Opt_WarnMissingMethods))
   ,  ( "-fwarn-missing-signatures", NoArg (setDynFlag Opt_WarnMissingSigs) )
-  ,  ( "-fwarn-name-shadowing",    NoArg (setDynFlag Opt_WarnNameShadowin) )
-  ,  ( "-fwarn-overlapping-patterns", NoArg (setDynFlag Opt_WarnOverlappingPatterns )) )
+  ,  ( "-fwarn-name-shadowing",    NoArg (setDynFlag Opt_WarnNameShadowing) )
+  ,  ( "-fwarn-overlapping-patterns", NoArg (setDynFlag Opt_WarnOverlappingPatterns ) )
   ,  ( "-fwarn-simple-patterns",   NoArg (setDynFlag Opt_WarnSimplePatterns))
   ,  ( "-fwarn-type-defaults",     NoArg (setDynFlag Opt_WarnTypeDefaults) )
   ,  ( "-fwarn-unused-binds",      NoArg (setDynFlag Opt_WarnUnusedBinds) )
@@ -437,8 +437,8 @@ build_hsc_opts = do
 		  	W_not     -> []
 
 	-- optimisation
-  minus_o <- readIORef opt_level
-  optimisation_opts <-
+  minus_o <- readIORef v_OptLevel
+  let optimisation_opts = 
         case minus_o of
 	    0 -> hsc_minusNoO_flags
 	    1 -> hsc_minusO_flags
@@ -451,7 +451,7 @@ build_hsc_opts = do
   let stg_massage | WayProf `elem` ways_ =  "-fmassage-stg-for-profiling"
 	          | otherwise            = ""
 
-  stg_stats <- readIORef opt_StgStats
+  stg_stats <- readIORef v_StgStats
   let stg_stats_flag | stg_stats = "-dstg-stats"
 		     | otherwise = ""
 

@@ -12,7 +12,7 @@ module CmdLineOpts (
 	SwitchResult(..),
 	HscLang(..),
 	DynFlag(..),	-- needed non-abstractly by DriverFlags
-	DynFlags,	-- abstract
+	DynFlags(..),
 
 	intSwitchSet,
 	switchIsOn,

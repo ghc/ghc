@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.4 2000/10/11 16:26:04 simonmar Exp $
+-- $Id: DriverState.hs,v 1.5 2000/10/24 15:58:02 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -16,7 +16,6 @@ import CmdLineOpts
 import DriverUtil
 import Util
 import Config
-import Array
 
 import Exception
 import IOExts
@@ -228,14 +227,14 @@ GLOBAL_VAR(warning_opt, W_default, WarningState)
 -----------------------------------------------------------------------------
 -- Compiler optimisation options
 
-GLOBAL_VAR(opt_level, 0, Int)
+GLOBAL_VAR(v_OptLevel, 0, Int)
 
 setOptLevel :: String -> IO ()
-setOptLevel ""  	    = do { writeIORef opt_level 1; go_via_C }
-setOptLevel "not" 	    = writeIORef opt_level 0
+setOptLevel ""  	    = do { writeIORef v_OptLevel 1; go_via_C }
+setOptLevel "not" 	    = writeIORef v_OptLevel 0
 setOptLevel [c] | isDigit c = do
    let level = ord c - ord '0'
-   writeIORef opt_level level
+   writeIORef v_OptLevel level
    when (level >= 1) go_via_C
 setOptLevel s = unknownFlagErr ("-O"++s)
 
@@ -244,27 +243,25 @@ go_via_C = do
    case l of { HscAsm -> writeIORef hsc_lang HscC; 
 	       _other -> return () }
 
-GLOBAL_VAR(opt_minus_o2_for_C, False, Bool)
+GLOBAL_VAR(v_minus_o2_for_C, False, Bool)
 
-GLOBAL_VAR(opt_MaxSimplifierIterations, 4,     Int)
-GLOBAL_VAR(opt_StgStats,                False, Bool)
-GLOBAL_VAR(opt_UsageSPInf,  	     	False, Bool)  -- Off by default
-GLOBAL_VAR(opt_Strictness,  		True,  Bool)
-GLOBAL_VAR(opt_CPR,         		True,  Bool)
+GLOBAL_VAR(v_MaxSimplifierIterations, 4,     Int)
+GLOBAL_VAR(v_StgStats,                False, Bool)
+GLOBAL_VAR(v_UsageSPInf,  	     	False, Bool)  -- Off by default
+GLOBAL_VAR(v_Strictness,  		True,  Bool)
+GLOBAL_VAR(v_CPR,         		True,  Bool)
+GLOBAL_VAR(v_CSE,         		True,  Bool)
 
 hsc_minusO2_flags = hsc_minusO_flags	-- for now
 
-hsc_minusNoO_flags = do
-  iter        <- readIORef opt_MaxSimplifierIterations
-  return [ 
+hsc_minusNoO_flags =
+       [ 
  	"-fignore-interface-pragmas",
 	"-fomit-interface-pragmas"
 	]
 
-hsc_minusO_flags = do
-  stgstats   <- readIORef opt_StgStats
-
-  return [ 
+hsc_minusO_flags =
+  [ 
 	"-ffoldr-build-on",
         "-fdo-eta-reduction",
 	"-fdo-lambda-eta-expansion",
@@ -273,23 +270,23 @@ hsc_minusO_flags = do
 	"-flet-to-case"
    ]
 
-build_CoreToDo
-   :: Int 	-- opt level
-   -> Int	-- max iterations
-   -> Bool 	-- do usageSP
-   -> Bool	-- do strictness
-   -> Bool	-- do CPR
-   -> Bool	-- do CSE
-   -> [CoreToDo]
+buildCoreToDo :: IO [CoreToDo]
+buildCoreToDo = do
+   opt_level  <- readIORef v_OptLevel
+   max_iter   <- readIORef v_MaxSimplifierIterations
+   usageSP    <- readIORef v_UsageSPInf
+   strictness <- readIORef v_Strictness
+   cpr        <- readIORef v_CPR
+   cse        <- readIORef v_CSE
 
-build_CoreToDo level max_iter usageSP strictness cpr cse
-  | level == 0 = [
+   if opt_level == 0 then return
+      [
 	CoreDoSimplify (isAmongSimpl [
 	    MaxSimplifierIterations max_iter
 	])
       ]
 
-  | level >= 1 = [ 
+    else {- level >= 1 -} return [ 
 
 	-- initial simplify: mk specialiser happy: minimum effort please
 	CoreDoSimplify (isAmongSimpl [
@@ -394,7 +391,7 @@ build_CoreToDo level max_iter usageSP strictness cpr cse
 	  MaxSimplifierIterations max_iter
 		-- No -finline-phase: allow all Ids to be inlined now
 	])
-   ]
+     ]
 
 -----------------------------------------------------------------------------
 -- Paths & Libraries
