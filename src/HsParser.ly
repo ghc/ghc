@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
-$Id: HsParser.ly,v 1.14 2002/06/20 12:38:07 simonmar Exp $
+$Id: HsParser.ly,v 1.15 2002/07/15 10:14:31 simonmar Exp $
 
 (c) Simon Marlow, Sven Panne 1997-2002
 
@@ -23,7 +23,7 @@ ToDo: Differentiate between record updates and labeled construction.
 > import HsParseUtils
 > import HaddockLex 	hiding (Token)
 > import HaddockParse
-> import HaddockUtil	( parseModuleHeader )
+> import HaddockUtil 	hiding (splitTyConApp)
 > import Char 		( isSpace )
 > }
 
@@ -189,15 +189,16 @@ The Export List
 
 > exportlist :: { [HsExportSpec] }
 >	:  export ',' exportlist		{ $1 : $3 }
->	|  docgroup exportlist			{ $1 : $2 }
->	|  docnamed exportlist			{ HsEDocNamed (fst $1) : $2 }
->	|  docnext  exportlist			{ HsEDoc $1 : $2 }
+>	|  export exp_doc ',' exportlist	{ $1 : $2 : $4 }
+>	|  exp_doc exportlist			{ $1 : $2 }
 > 	|  ',' exportlist			{ $2 }
 >	|  export				{ [$1] }
 > 	|  {- empty -}				{ [] }
 
-> docgroup :: { HsExportSpec }
+> exp_doc :: { HsExportSpec }
 > 	: docsection			{ case $1 of { (i,s) -> HsEGroup i s } }
+>	| docnamed			{ HsEDocNamed (fst $1) }
+>	| docnext			{ HsEDoc $1 }
 
 > export :: { HsExportSpec }
 > 	:  qvar					{ HsEVar $1 }
@@ -299,7 +300,7 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >		{ HsTypeDecl $3 (fst $2) (snd $2) $5 Nothing }
 >	| 'data' ctype srcloc constrs deriving
 >		{% checkDataHeader $2 `thenP` \(cs,c,t) ->
->		   returnP (HsDataDecl $3 cs c t (reverse $4) $5 Nothing) }
+>		   returnP (HsDataDecl $3 cs c t $4 $5 Nothing) }
 >	| 'newtype' ctype srcloc '=' constr deriving
 >		{% checkDataHeader $2 `thenP` \(cs,c,t) ->
 >		   returnP (HsNewTypeDecl $3 cs c t $5 $6 Nothing) }
@@ -458,10 +459,11 @@ Datatype declarations
 
 > constrs :: { [HsConDecl] }
 > 	  : {- empty; a GHC extension -}  { [] }
-> 	  | '=' constrs1                  { $2 }
+> 	  | maybe_docnext '=' constrs1    { addConDocs $3 $1 }
 
 > constrs1 :: { [HsConDecl] }
->	: constrs1 '|' constr		{ $3 : $1 }
+>	: constr maybe_docnext '|' maybe_docprev constrs1
+>			{ addConDoc $1 $4 : addConDocs $5 $2 }
 >	| constr			{ [$1] }
 
 > constr :: { HsConDecl }
@@ -504,7 +506,8 @@ Datatype declarations
 >	| '!' atype			{ HsBangedTy   $2 }
 
 > fielddecls :: { [HsFieldDecl] }
->	: fielddecl ',' fielddecls	{ $1 : $3 }
+>	: fielddecl maybe_docnext ',' maybe_docprev fielddecls
+>		{ addFieldDoc $1 $4 : addFieldDocs $5 $2 }
 >	| ',' fielddecls		{ $2 }
 >	| fielddecl			{ [$1] }
 >	| {- empty -}			{ [] }

@@ -10,6 +10,7 @@ module HaddockUtil (
   -- * Misc utilities
   nameOfQName, collectNames, declBinders, declMainBinder, declSubBinders, 
   splitTyConApp, restrictTo, declDoc, parseModuleHeader, freeTyCons, unbang,
+  addFieldDoc, addFieldDocs, addConDoc, addConDocs,
 
   -- * Filename utilities
   basename, dirname, splitFilename3, 
@@ -33,6 +34,7 @@ import System
 import RegexString
 import Binary
 import IOExts
+import Monad
 
 -- -----------------------------------------------------------------------------
 -- Some Utilities
@@ -94,6 +96,23 @@ freeTyCons ty = go ty []
 	go (HsTyTuple b ts) r = foldr go r ts
 	go (HsTyVar v) r = r
 	go (HsTyDoc t _) r = go t r
+
+-- -----------------------------------------------------------------------------
+-- Adding documentation to record fields (used in parsing).
+
+addFieldDoc (HsFieldDecl ns ty doc1) doc2 = 
+   HsFieldDecl ns ty (doc1 `mplus` doc2)
+
+addFieldDocs [] doc = []
+addFieldDocs (x:xs) doc = addFieldDoc x doc : xs
+
+addConDoc (HsConDecl pos nm tvs ctxt typeList doc1) doc2 = 
+   HsConDecl pos nm tvs ctxt typeList (doc1 `mplus` doc2)
+addConDoc (HsRecDecl pos nm tvs ctxt fields doc1) doc2=
+   HsRecDecl pos nm tvs ctxt fields (doc1 `mplus` doc2)
+
+addConDocs [] doc = []
+addConDocs (x:xs) doc = addConDoc x doc : xs
 
 -- ---------------------------------------------------------------------------
 -- Making abstract declarations
