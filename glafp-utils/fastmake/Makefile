@@ -10,9 +10,7 @@ SCRIPT_OBJS=fastmake.prl
 #
 SCRIPT_SUBST_VARS=TMPDIR
 
-INTERP=$(PERL)
-# ToDo: install
-DESTDIR=$(INSTSCRIPTDIR)
+INTERP=perl
 CLEAN_FILES += $(SCRIPT_PROG)
 
 include $(TOP)/mk/target.mk
