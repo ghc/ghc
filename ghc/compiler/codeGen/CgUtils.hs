@@ -439,9 +439,9 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag
 	}
   where
     use_switch 	 = ASSERT( n_branches > 1 && n_tags > 1 ) 
-		   pprTrace "mk_switch" (ppr tag_expr <+> text "n_tags: "
+		   {- pprTrace "mk_switch" (ppr tag_expr <+> text "n_tags: "
 					<+> int n_tags <+> text "dense: "
-					<+> int n_branches) $
+					<+> int n_branches) $ -}
 		   n_tags > 2 && (small || dense)
 		 -- a 2-branch switch always turns into an if.
     small      	 = n_tags <= 4
