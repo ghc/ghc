@@ -354,7 +354,7 @@ mkProtoBCO nm instrs_ordlist origin
 -- resulting BCO a name.
 schemeR :: (Id, AnnExpr Id VarSet) -> BcM ()
 schemeR (nm, rhs) 
-{-
+
    | trace (showSDoc (
               (char ' '
                $$ (ppr.filter (not.isTyVar).varSetElems.fst) rhs
@@ -362,11 +362,13 @@ schemeR (nm, rhs)
                $$ char ' '
               ))) False
    = undefined
--}
+
    | otherwise
    = schemeR_wrk rhs nm (collect [] rhs)
 
 
+collect xs (_, AnnNote note e)
+   = collect xs e
 collect xs (_, AnnLam x e) 
    = collect (if isTyVar x then xs else (x:xs)) e
 collect xs not_lambda
@@ -374,11 +376,12 @@ collect xs not_lambda
 
 schemeR_wrk original_body nm (args, body)
    = let fvs       = filter (not.isTyVar) (varSetElems (fst original_body))
-         all_args  = fvs ++ reverse args
+         all_args  = reverse args ++ fvs --ORIG: fvs ++ reverse args
          szsw_args = map taggedIdSizeW all_args
          szw_args  = sum szsw_args
          p_init    = listToFM (zip all_args (mkStackOffsets 0 szsw_args))
-         argcheck  = {-if null args then nilOL else-} unitOL (ARGCHECK szw_args)
+         argcheck  = --if null args then nilOL else
+                     unitOL (ARGCHECK szw_args)
      in
      schemeE szw_args 0 p_init body 		`thenBc` \ body_code ->
      emitBc (mkProtoBCO (getName nm) (appOL argcheck body_code) (Right original_body))
@@ -477,13 +480,13 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
         -- given an alt, return a discr and code for it.
         codeAlt alt@(discr, binds_f, rhs)
            | isAlgCase 
-           = let binds_r      = reverse binds_f
-                 binds_r_szsw = map untaggedIdSizeW binds_r
-                 binds_szw    = sum binds_r_szsw
-                 p''          = addListToFM 
-                                   p' (zip binds_r (mkStackOffsets d' binds_r_szsw))
-                 d''          = d' + binds_szw
-                 unpack_code  = mkUnpackCode 0 0 (map (typePrimRep.idType) binds_f)
+           = let binds_r        = reverse binds_f
+                 binds_r_t_szsw = map taggedIdSizeW binds_r
+                 binds_t_szw    = sum binds_r_t_szsw
+                 p''            = addListToFM 
+                                   p' (zip binds_r (mkStackOffsets d' binds_r_t_szsw))
+                 d''            = d' + binds_t_szw
+                 unpack_code    = mkUnpackCode 0 0 (map (typePrimRep.idType) binds_f)
              in schemeE d'' s p'' rhs	`thenBc` \ rhs_code -> 
                 returnBc (my_discr alt, unpack_code `appOL` rhs_code)
            | otherwise 
@@ -1160,7 +1163,7 @@ mkLitF f
 mkLitD d
    | wORD_SIZE == 4
    = runST (do
-        arr <- newDoubleArray ((0::Int),0)
+        arr <- newDoubleArray ((0::Int),1)
         writeDoubleArray arr 0 d
         d_arr <- castSTUArray arr
         w0 <- readWordArray d_arr 0

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.8 $
- * $Date: 2001/01/05 15:24:28 $
+ * $Revision: 1.9 $
+ * $Date: 2001/01/09 17:36:21 $
  * ---------------------------------------------------------------------------*/
 
 #ifdef GHCI
@@ -78,6 +78,12 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
              fprintf(stderr,"Entering: "); printObj(obj);
              fprintf(stderr,"iSp = %p\tiSu = %p\n", iSp, iSu);
              fprintf(stderr, "\n" );
+
+	     //	     checkSanity(1);
+	     //             iSp--; StackWord(0) = obj;
+	     //             checkStack(iSp,cap->rCurrentTSO->stack+cap->rCurrentTSO->stack_size,iSu);
+	     //             iSp++;
+
              printStack(iSp,cap->rCurrentTSO->stack+cap->rCurrentTSO->stack_size,iSu);
              fprintf(stderr, "\n\n");
             );
@@ -93,6 +99,9 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
           StgAP_UPD *ap = (StgAP_UPD*)obj;
           Words = ap->n_args;
 
+	  /* WARNING: do a stack overflow check here !
+             This code (copied from stg_AP_UPD_entry) is not correct without it. */
+
           iSp -= sizeofW(StgUpdateFrame);
 
           {
@@ -104,7 +113,6 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
               iSu = __frame;
           }
 
-	  /* WARNING: do a stack overflow check here ! */
           iSp -= Words;
 
           /* Reload the stack */
@@ -150,6 +158,8 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                            fprintf(stderr,"\n");
                          }
                  );
+
+	  //             checkStack(iSp,cap->rCurrentTSO->stack+cap->rCurrentTSO->stack_size,iSu);
 
           switch (BCO_NEXT) {
 
@@ -321,6 +331,17 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                     bciPtr = failto;
                  goto nextInsn;
               }
+              case bci_TESTEQ_I: {
+                 /* The top thing on the stack should be a tagged int. */
+                 int discr   = BCO_NEXT;
+                 int failto  = BCO_NEXT;
+                 I_ stackInt = (I_)StackWord(1);
+                 ASSERT(1 == StackWord(0));
+		 fprintf(stderr, "TESTEQ_I: discr = %d, stack = %d\n",(I_)BCO_LIT(discr), stackInt); 
+                 if (stackInt != (I_)BCO_LIT(discr))
+                    bciPtr = failto;
+                 goto nextInsn;
+              }
 
               /* Control-flow ish things */
               case bci_ENTER: {
@@ -331,14 +352,14 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                     compiled code. */
                  int           o_itoc_itbl = BCO_NEXT;
                  int           tag         = StackWord(0);
-                 StgInfoTable* ret_itbl    = (StgInfoTable*)StackWord(tag+1 +1);
+                 StgInfoTable* ret_itbl    = (StgInfoTable*)StackWord(tag +1);
                  ASSERT(tag <= 2); /* say ... */
                  if (ret_itbl == (StgInfoTable*)&stg_ctoi_ret_R1_info
                      /* || ret_itbl == stg_ctoi_ret_F1_info
                         || ret_itbl == stg_ctoi_ret_D1_info */) {
                      /* Returning to interpreted code.  Interpret the BCO 
                         immediately underneath the itbl. */
-                     StgBCO* ret_bco = (StgBCO*)StackWord(tag+1 +1+1);
+                     StgBCO* ret_bco = (StgBCO*)StackWord(tag +1+1);
                      iSp --;
                      StackWord(0) = (W_)ret_bco;
                      goto nextEnter;
@@ -359,7 +380,6 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
 
               /* As yet unimplemented */
               case bci_TESTLT_I:
-              case bci_TESTEQ_I:
               case bci_TESTLT_F:
               case bci_TESTEQ_F:
               case bci_TESTLT_D:

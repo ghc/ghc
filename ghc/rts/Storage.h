@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.20 2000/12/19 12:51:58 simonmar Exp $
+ * $Id: Storage.h,v 1.21 2001/01/09 17:36:21 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -360,9 +360,6 @@ static __inline__ StgOffset PAP_sizeW   ( unsigned int n_args )
 
 static __inline__ StgOffset CONSTR_sizeW( unsigned int p, unsigned int np )  
 { return sizeofW(StgHeader) + p + np; }
-
-static __inline__ StgOffset BCO_sizeW   ( unsigned int p, unsigned int np, unsigned int is ) 
-{ return sizeofW(StgBCO) + p + np + (is+sizeof(StgWord)-1)/sizeof(StgWord); }
 
 static __inline__ StgOffset THUNK_SELECTOR_sizeW ( void )                    
 { return sizeofW(StgHeader) + MIN_UPD_SIZE; }
