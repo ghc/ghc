@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.91 2002/01/29 16:24:08 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.92 2002/02/28 08:53:58 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -774,11 +774,14 @@ FN_(gcdIntzh_fast)
 {
   /* R1 = the first Int#; R2 = the second Int# */
   mp_limb_t aa;
-  I_        r;
+  I_ r;
   FB_
   aa = (mp_limb_t)(R1.i);
   r = RET_STGCALL3(StgInt, mpn_gcd_1, (mp_limb_t *)(&aa), 1, (mp_limb_t)(R2.i));
-  RET_N(r);
+
+  R1.i = r;
+  /* Result parked in R1, return via info-pointer at TOS */
+  JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
 
@@ -787,7 +790,7 @@ FN_(gcdIntegerIntzh_fast)
   /* R1 = s1; R2 = d1; R3 = the int */
   I_ r;
   FB_
-  r = RET_STGCALL3(I_,mpn_gcd_1,(mp_limb_t *)(BYTE_ARR_CTS(R2.p)), R1.i, R3.i);
+  r = RET_STGCALL3(StgInt,mpn_gcd_1,(mp_limb_t *)(BYTE_ARR_CTS(R2.p)), R1.i, R3.i);
   RET_N(r);
   FE_
 }
@@ -814,24 +817,26 @@ FN_(cmpIntegerIntzh_fast)
   }
 
   if (usize != vsize) {
-    RET_N(usize - vsize);
+    R1.i = usize - vsize; JMP_(ENTRY_CODE(Sp[0]));
   }
 
   if (usize == 0) {
-    RET_N(0);
+    R1.i = 0; JMP_(ENTRY_CODE(Sp[0]));
   }
 
   u_digit = *(mp_limb_t *)(BYTE_ARR_CTS(R2.p));
 
   if (u_digit == (mp_limb_t) (unsigned long) v_digit) {
-    RET_N(0);
+    R1.i = 0; JMP_(ENTRY_CODE(Sp[0]));
   }
 
   if (u_digit > (mp_limb_t) (unsigned long) v_digit) {
-    RET_N(usize);
+    R1.i = usize; 
   } else {
-    RET_N(-usize);
+    R1.i = -usize; 
   }
+
+  JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
 
@@ -850,11 +855,11 @@ FN_(cmpIntegerzh_fast)
   vsize = R3.i;
 
   if (usize != vsize) {
-      RET_N(usize - vsize);
+    R1.i = usize - vsize; JMP_(ENTRY_CODE(Sp[0]));
   }
 
   if (usize == 0) {
-      RET_N(0);
+    R1.i = 0; JMP_(ENTRY_CODE(Sp[0]));
   }
 
   size = abs(usize);
@@ -865,14 +870,16 @@ FN_(cmpIntegerzh_fast)
   cmp = RET_STGCALL3(I_, mpn_cmp, (mp_limb_t *)up, (mp_limb_t *)vp, size);
 
   if (cmp == 0) {
-      RET_N(0);
+    R1.i = 0; JMP_(ENTRY_CODE(Sp[0]));
   }
 
   if ((cmp < 0) == (usize < 0)) {
-      RET_N(1);
+    R1.i = 1;
   } else {
-      RET_N(-1);
+    R1.i = (-1); 
   }
+  /* Result parked in R1, return via info-pointer at TOS */
+  JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
 
@@ -888,7 +895,9 @@ FN_(integer2Intzh_fast)
     r = ((mp_limb_t *) (BYTE_ARR_CTS(R2.p)))[0];
     if (s < 0) r = -r;
   }
-  RET_N(r);
+  /* Result parked in R1, return via info-pointer at TOS */
+  R1.i = r;
+  JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
 
@@ -905,7 +914,9 @@ FN_(integer2Wordzh_fast)
     r = ((mp_limb_t *) (BYTE_ARR_CTS(R2.p)))[0];
     if (s < 0) r = -r;
   }
-  RET_N(r);
+  /* Result parked in R1, return via info-pointer at TOS */
+  R1.w = r;
+  JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
 
@@ -985,13 +996,13 @@ FN_(forkzh_fast)
 
   /* create it right now, return ThreadID in R1 */
   R1.t = RET_STGCALL2(StgTSO *, createIOThread, 
-		      RtsFlags.GcFlags.initialStkSize, R1.cl);
+		     RtsFlags.GcFlags.initialStkSize, R1.cl);
   STGCALL1(scheduleThread, R1.t);
       
   /* switch at the earliest opportunity */ 
   context_switch = 1;
   
-  JMP_(ENTRY_CODE(Sp[0]));
+  RET_N(R1.t);
   FE_
 }
 
