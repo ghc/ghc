@@ -1,6 +1,6 @@
 
 # ----------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.1 1999/01/12 13:45:10 sewardj Exp $                        #
+# $Id: Makefile,v 1.2 1999/01/12 14:13:51 sewardj Exp $                        #
 # ----------------------------------------------------------------------------- #
 
 TOP = ../..
@@ -128,6 +128,18 @@ prelclean:
 	$(RM) Directory.lhs      Monad.hs           PreludeText.hs
 	$(RM) Locale.lhs Int.hs IO.hs Addr.lhs Time.lhs Word.hs
 	$(RM) *.unlit
+
+
+# --------------------------------------------------------------------- #
+# Testing                                                               #
+# --------------------------------------------------------------------- #
+
+check :: all
+	./test/runtests test/static/*.hs
+	./test/runtests test/typechecker/*.hs
+	./test/runtests test/runtime/*.hs
+	./test/runtests test/std/*.hs
+	./test/runtests test/exts/*.hs
 
 
 # --------------------------------------------------------------------- #
