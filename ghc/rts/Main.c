@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.15 2000/01/14 13:17:16 hwloidl Exp $
+ * $Id: Main.c,v 1.16 2000/01/14 13:38:54 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -120,8 +120,8 @@ int main(int argc, char *argv[])
     case Success:
       exit_status = EXIT_SUCCESS;
       break;
-    case NoStatus:
-      barf("main thread completed with no status");
+    default:
+      barf("main thread completed with invalid status");
     }
     shutdownHaskellAndExit(exit_status);
 }
