@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.68 2001/06/13 15:50:57 rrt Exp $
+$Id: Parser.y,v 1.69 2001/06/27 11:15:34 simonmar Exp $
 
 Haskell grammar.
 
@@ -34,7 +34,7 @@ import Panic
 
 import GlaExts
 import CStrings		( CLabelString )
-import FastString	( tailFS )
+import FastString
 import Maybes		( orElse )
 import Outputable
 
@@ -285,8 +285,8 @@ importdecls :: { [RdrNameImportDecl] }
 	| {- empty -}				{ [] }
 
 importdecl :: { RdrNameImportDecl }
-	: 'import' srcloc maybe_src optqualified CONID maybeas maybeimpspec 
-		{ ImportDecl (mkModuleNameFS $5) $3 $4 $6 $7 $2 }
+	: 'import' srcloc maybe_src optqualified modid maybeas maybeimpspec 
+		{ ImportDecl $5 $3 $4 $6 $7 $2 }
 
 maybe_src :: { WhereFrom }
 	: '{-# SOURCE' '#-}'			{ ImportByUserSource }
@@ -1114,6 +1114,11 @@ layout_on_for_do  :: { () }	: {% layoutOn False }
 
 modid 	:: { ModuleName }
 	: CONID			{ mkModuleNameFS $1 }
+        | QCONID		{ mkModuleNameFS
+				   (mkFastString
+				     (unpackFS (fst $1) ++ 
+					'.':unpackFS (snd $1)))
+				}
 
 tycon 	:: { RdrName }
 	: CONID			{ mkUnqual tcClsName $1 }
