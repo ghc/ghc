@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.9 1999/10/26 17:15:39 sewardj Exp $
+ * $Id: Stable.c,v 1.10 2000/02/29 19:59:38 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -152,6 +152,27 @@ initStablePtrTable(void)
   SPT_size = 0;
 }
 
+/*
+ * get at the real stuff...remove indirections.
+ *
+ * ToDo: move to a better home.
+ */
+static
+StgClosure*
+removeIndirections(StgClosure* p)
+{
+  StgClosure* q = p;
+
+  while (q->header.info->type == IND ||
+         q->header.info->type == IND_STATIC ||
+         q->header.info->type == IND_OLDGEN ||
+         q->header.info->type == IND_PERM ||
+         q->header.info->type == IND_OLDGEN_PERM ) {
+      q = ((StgInd *)q)->indirectee;
+  }
+  return q;
+}
+
 StgWord
 lookupStableName(StgPtr p)
 {
@@ -160,7 +181,13 @@ lookupStableName(StgPtr p)
   if (stable_ptr_free == NULL) {
     enlargeStablePtrTable();
   }
-    
+
+  /* removing indirections increases the likelihood
+   * of finding a match in the stable name
+   * hash table.
+   */
+  p = (StgPtr)removeIndirections((StgClosure*)p);
+
   (void *)sn = lookupHashTable(addrToStableHash,(W_)p);
   
   if (sn != 0) {
