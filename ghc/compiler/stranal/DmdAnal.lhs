@@ -905,6 +905,8 @@ lub (Seq k1 ds1) (Seq k2 ds2)
     lub_ds k1 ds1 k2 ds2		     = ds1 `lubs` ds2
 
 	------------------
+	-- Note that (Keep `lub` Drop) is Drop, not Keep
+	-- Why not?  See the example above with (lub Eval d).
     lub_keep Keep k     = k
 
     lub_keep Drop Defer = Defer
