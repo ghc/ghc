@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.87 2001/07/11 01:27:04 sof Exp $
+-- $Id: DriverPipeline.hs,v 1.88 2001/07/11 14:50:49 sof Exp $
 --
 -- GHC Driver
 --
@@ -293,6 +293,15 @@ pipeLoop ((phase, keep, o_suffix):phases)
    			   then odir_ify (orig_basename ++ '.':suffix)
    			   else newTempName suffix
 
+run_phase :: Phase
+	  -> String                -- basename of original input source
+	  -> String		   -- its extension
+	  -> FilePath		   -- name of file which contains the input to this phase.
+	  -> FilePath              -- where to stick the result.
+	  -> IO (Maybe FilePath)
+	  	  -- Nothing => stop the compilation pipeline
+		  -- Just fn => the result of this phase can be found in 'fn'
+		  --            (this can either be 'input_fn' or 'output_fn').
 -------------------------------------------------------------------------------
 -- Unlit phase 
 
