@@ -224,6 +224,9 @@ getContArgs chkr fun orig_cont
 	--	* (error "Hello") arg
 	--	* f (error "Hello") where f is strict
 	--	etc
+	-- Then, especially in the first of these cases, we'd like to discard
+	-- the continuation, leaving just the bottoming expression.  But the
+	-- type might not be right, so we may have to add a coerce.
     go acc ss inl cont 
 	| null ss && discardableCont cont = (reverse acc, discardCont cont, inl)
 	| otherwise			  = (reverse acc, cont, 	    inl)
