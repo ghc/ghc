@@ -111,6 +111,9 @@
 /* Define if you have the WinExec function.  */
 #define HAVE_WINEXEC 0
 
+/* Define if you support the production (and use) of Win32 DLLs. */
+#undef HAVE_WIN32_DLL_SUPPORT
+
 /* Define if C Symbols have a leading underscore added by the compiler */
 #undef LEADING_UNDERSCORE
 
