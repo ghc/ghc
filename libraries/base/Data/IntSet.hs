@@ -134,7 +134,7 @@ shiftRL (W# x) (I# i)
  * Newer Hugs defines 'Word' in the Prelude but no operations.
 --------------------------------------------------------------------}
 import Data.Word
-infixl 9 \\
+infixl 9 \\ -- comment to fool cpp
 
 type Nat = Word32   -- illegal on 64-bit platforms!
 
