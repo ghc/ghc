@@ -501,8 +501,9 @@ tidyCoreExpr (Con con args)
     returnTM (Con con args')
 
 tidyCoreExpr (Prim prim args)
-  = mapTM tidyCoreArg args	`thenTM` \ args' ->
-    returnTM (Prim prim args')
+  = tidyPrimOp prim		`thenTM` \ prim' ->
+    mapTM tidyCoreArg args	`thenTM` \ args' ->
+    returnTM (Prim prim' args')
 
 tidyCoreExpr (Lam (ValBinder v) body)
   = newId v			$ \ v' ->
@@ -631,6 +632,15 @@ tidyCoreArg (TyArg ty)   = tidyTy ty 	`thenTM` \ ty' ->
 			   returnTM (TyArg ty')
 tidyCoreArg (UsageArg u) = returnTM (UsageArg u)
 \end{code}
+
+\begin{code}
+tidyPrimOp (CCallOp fn casm gc tys ty)
+  = mapTM tidyTy tys	`thenTM` \ tys' ->
+    tidyTy ty		`thenTM` \ ty' ->
+    returnTM (CCallOp fn casm gc tys' ty')
+
+tidyPrimOp other_prim_op = returnTM other_prim_op
+\end{code}    
 
 
 %************************************************************************
