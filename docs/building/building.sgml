@@ -741,11 +741,11 @@ $ cvs checkout nofib/spectral
       </varlistentry>
 
       <varlistentry>
-	<term><literal>green-card</literal></term>
-	<indexterm><primary><literal>green-card</literal></primary><secondary>project</secondary></indexterm>
+	<term><literal>greencard</literal></term>
+	<indexterm><primary><literal>greencard</literal></primary><secondary>project</secondary></indexterm>
 	<listitem>
 	  <para>The <ulink
-	  url="http://www.haskell.org/greencard/">Green Card</ulink>
+	  url="http://www.haskell.org/greencard/">GreenCard</ulink>
 	  system for generating Haskell foreign function
 	  interfaces.</para>
 	</listitem>

@@ -727,10 +727,10 @@ fi
 
 AC_ARG_WITH(greencard,
 [  --with-greencard=<greencard compiler>
-        Use a command different from 'green-card' to compile GreenCard files
+        Use a command different from 'greencard' to compile GreenCard files
 ],
 [
-GreencardCmd=$withval;
+GreenCardCmd=$withval;
 FPTOOLS_GREENCARD(3.00)
 ]
 )

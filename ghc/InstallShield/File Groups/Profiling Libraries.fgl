@@ -16,7 +16,7 @@ file5=C:\TEMP\fptools\hslibs\net\libHSnet_p.a
 file6=C:\TEMP\fptools\hslibs\text\libHStext_p.a
 file7=C:\TEMP\fptools\hslibs\util\libHSutil_p.a
 file8=C:\TEMP\fptools\hslibs\win32\src\libHSwin32_p.a
-file9=C:\TEMP\fptools\green-card\lib\ghc\libHSgreencard_p.a
+file9=C:\TEMP\fptools\greencard\lib\ghc\libHSgreencard_p.a
 SubDir0=lib\imports
 
 [lib\imports]
@@ -84,7 +84,7 @@ file30=C:\TEMP\fptools\hslibs\data\edison\Seq\BankersQueue.p_hi
 
 [lib\imports\greencard]
 fulldirectory=
-file0=C:\TEMP\fptools\green-card\lib\ghc\StdDIS.p_hi
+file0=C:\TEMP\fptools\greencard\lib\ghc\StdDIS.p_hi
 
 [lib\imports\lang]
 fulldirectory=

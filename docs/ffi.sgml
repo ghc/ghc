@@ -11,7 +11,7 @@ interfaces provided by GHC and Hugs.  However, the FFI specified in this
 document is not in the market of trying to completely bridge the gap between
 the actual type of an external function, and what is a
 <Emphasis>convenient</Emphasis> type for that function to the Haskell
-programmer. That is the domain of tools like HaskellDirect or Green Card, both
+programmer. That is the domain of tools like HaskellDirect or GreenCard, both
 of which are capable of generating Haskell code that uses this FFI.
 </Para>
 

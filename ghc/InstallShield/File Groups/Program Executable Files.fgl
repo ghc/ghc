@@ -80,8 +80,8 @@ file34=C:\TEMP\fptools\ghc\lib\std\cbits\libHSstd_cbits.a
 file35=C:\TEMP\fptools\ghc\lib\std\cbits\libHSstd_cbits_imp.a
 file36=C:\TEMP\fptools\hslibs\win32\src\libHSwin32_imp.a
 file37=C:\TEMP\fptools\hslibs\win32\src\libHSwin32.a
-file38=C:\TEMP\fptools\green-card\lib\ghc\libHSgreencard_imp.a
-file39=C:\TEMP\fptools\green-card\lib\ghc\libHSgreencard.a
+file38=C:\TEMP\fptools\greencard\lib\ghc\libHSgreencard_imp.a
+file39=C:\TEMP\fptools\greencard\lib\ghc\libHSgreencard.a
 file40=C:\TEMP\fptools\ghc\utils\hscpp\hscpp
 file41=C:\TEMP\fptools\ghc\utils\mkdependHS\mkdependHS
 file42=C:\TEMP\fptools\hslibs\net\libHSnet_imp.a
@@ -308,7 +308,7 @@ file22=C:\TEMP\fptools\hslibs\text\haxml\lib\Haskell2Xml.hi
 
 [lib\imports\greencard]
 fulldirectory=
-file0=C:\TEMP\fptools\green-card\lib\ghc\StdDIS.hi
+file0=C:\TEMP\fptools\greencard\lib\ghc\StdDIS.hi
 
 [lib\imports\concurrent]
 fulldirectory=

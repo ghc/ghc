@@ -101,9 +101,9 @@ BootingFromUnregisterisedHc = @BootingFromUnregisterisedHc@
 
 # build the libs first if we're bootstrapping from .hc files
 ifeq "$(BootingFromHc)" "YES"
-AllProjects = glafp-utils libraries hslibs ghc green-card happy hdirect hood nofib haddock alex
+AllProjects = glafp-utils libraries hslibs ghc greencard happy hdirect hood nofib haddock alex
 else
-AllProjects = glafp-utils ghc libraries hslibs green-card happy hdirect hood nofib haddock alex
+AllProjects = glafp-utils ghc libraries hslibs greencard happy hdirect hood nofib haddock alex
 endif
 
 #
@@ -386,9 +386,9 @@ HappyHcOpts = -O
 
 ################################################################################
 #
-#		green-card project
+#		greencard project
 #
-# 	Green-card specific options
+# 	GreenCard specific options
 #
 ################################################################################
 
@@ -853,10 +853,10 @@ ILASM                   = ilasm
 GHC_PKG		        = @GhcPkgCmd@
 
 #
-# Greencard
+# GreenCard
 #
-GREENCARD	        = @GreencardCmd@
-GREENCARD_VERSION	= @GreencardVersion@		
+GREENCARD	        = @GreenCardCmd@
+GREENCARD_VERSION	= @GreenCardVersion@		
 
 #
 # Happy

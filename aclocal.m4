@@ -269,15 +269,15 @@ AS_IF([test "$fp_num1" $2 "$fp_num2"], [$4], [$5])[]dnl
 
 
 dnl
-dnl Check for Greencard and version.
+dnl Check for GreenCard and version.
 dnl
 AC_DEFUN(FPTOOLS_GREENCARD,
 [
-AC_PATH_PROG(GreencardCmd,greencard)
+AC_PATH_PROG(GreenCardCmd,greencard)
 AC_CACHE_CHECK([for version of greencard], fptools_cv_greencard_version,
 changequote(, )dnl
-[if test x"$GreencardCmd" != x; then
-   fptools_cv_greencard_version="`$GreencardCmd --version |
+[if test x"$GreenCardCmd" != x; then
+   fptools_cv_greencard_version="`$GreenCardCmd --version |
 			  grep 'version' | sed -e 's/greencard. version \([^ ]*\).*/\1/g'`"
 else
    fptools_cv_greencard_version=""
@@ -286,8 +286,8 @@ changequote([, ])dnl
 ])
 FP_COMPARE_VERSIONS([$fptools_cv_greencard_version],[-lt],[$1],
   [AC_MSG_ERROR([greencard version $1 or later is required (found '$fptools_cv_greencard_version')])])[]dnl
-GreencardVersion=$fptools_cv_greencard_version
-AC_SUBST(GreencardVersion)
+GreenCardVersion=$fptools_cv_greencard_version
+AC_SUBST(GreenCardVersion)
 ])
 
 dnl

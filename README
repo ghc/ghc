@@ -12,7 +12,7 @@ the following directories:
     haggis	  The Haggis GUI toolkit
     happy	  The Happy Haskell parser generator
     hdirect       Haskell interop tool
-    green-card	  A foreign function interface pre-processor for Haskell.
+    greencard	  A foreign function interface pre-processor for Haskell.
     libraries	  Haskell libraries (reqd. by ghc)
     nofib	  The NoFib Haskell benchmarking suite
 

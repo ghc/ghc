@@ -21,7 +21,7 @@ endif
 
 ifneq "$(Project)" ""
    ifeq "$(Project)" "GreenCard"
-       ProjectDirectory=green-card
+       ProjectDirectory=greencard
    else
 	ifeq "$(Project)" "HaskellDirect"
 		ProjectDirectory=hdirect
