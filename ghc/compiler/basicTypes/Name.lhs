@@ -130,26 +130,6 @@ mkWiredInTyConName uniq mod fs tycon
   = Name { n_uniq = uniq, n_sort = WiredInTyCon mod tycon,
 	   n_occ = mkSrcOccFS tcName fs, n_prov = SystemProv }
 
-fixupSystemName :: Name -> Module -> Provenance -> Name
-	-- Give the SystemProv name an appropriate provenance, and
-	-- perhaps change the Moulde too (so that its HiFlag is right)
-	-- There is a painful hack in that we want to push this
-	-- better name into an WiredInId/TyCon so that it prints
-	-- nicely in error messages
-fixupSystemName name@(Name {n_sort = Global _}) mod' prov'
-  = name {n_sort = Global mod', n_prov = prov'}
-
-fixupSystemName name@(Name {n_sort = WiredInId _ id}) mod' prov'
-  = name'
-  where
-    name' = name {n_sort = WiredInId mod' id', n_prov = prov'}
-    id'   = setIdName id name'
-
-fixupSystemName name@(Name {n_sort = WiredInTyCon _ tc}) mod' prov'
-  = name'
-  where
-    name' = name {n_sort = WiredInTyCon mod' tc', n_prov = prov'}
-    tc'   = setTyConName tc name'
 
 ---------------------------------------------------------------------
 mkDerivedName :: (OccName -> OccName)

@@ -347,8 +347,10 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 					   unfold_ids	`unionVarSet`
 					   spec_ids
 
-    worker_ids | has_worker = unitVarSet work_id
-	       | otherwise  = emptyVarSet
+    worker_ids | has_worker && interesting work_id = unitVarSet work_id
+			-- Conceivably, the worker might come from
+			-- another module
+	       | otherwise			   = emptyVarSet
 
     spec_ids = foldr add emptyVarSet spec_list
 	     where
@@ -360,8 +362,9 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     find_fvs expr = free_vars
 		  where
 		    free_vars = exprSomeFreeVars interesting expr
-		    interesting id = isId id && isLocallyDefined id &&
-				     not (omitIfaceSigForId id)
+
+    interesting id = isId id && isLocallyDefined id &&
+		     not (omitIfaceSigForId id)
 \end{code}
 
 \begin{code}

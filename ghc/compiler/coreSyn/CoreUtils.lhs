@@ -619,7 +619,7 @@ substId clone_fn
     ty' = fullSubstTy ty_subst in_scope id_ty
 
 	-- id2 has its SpecEnv zapped
-	-- It's filled in later by 
+	-- It's filled in later by Simplify.simplPrags
     (id2,old2) | isEmptySpecEnv spec_env = (id1, True)
 	       | otherwise  	         = (setIdSpecialisation id1 emptySpecEnv, False)
     spec_env  = getIdSpecialisation id

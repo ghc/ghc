@@ -71,7 +71,8 @@ newImportedGlobalName mod occ
 	Just name | isSystemName name	-- A known-key name; fix the provenance and module
 		  -> getOmitQualFn			`thenRn` \ omit_fn ->
 		     let
-			  new_name = fixupSystemName name mod (NonLocalDef ImplicitImport (omit_fn name))
+			  new_name = setNameProvenance (setNameModule name mod)
+						       (NonLocalDef ImplicitImport (omit_fn name))
 			  new_cache = addToFM cache key new_name
 		     in
 		     setNameSupplyRn (us, inst_ns, new_cache)	`thenRn_`

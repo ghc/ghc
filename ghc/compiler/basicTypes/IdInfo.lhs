@@ -11,7 +11,6 @@ module IdInfo (
 	IdInfo,		-- Abstract
 
 	noIdInfo,
-	ppIdInfo,
 
 	-- Arity
 	ArityInfo(..),
@@ -108,24 +107,6 @@ noIdInfo = IdInfo {
 		cafInfo		= MayHaveCafRefs,
 		inlinePragInfo  = NoInlinePragInfo
 	   }
-\end{code}
-
-\begin{code}
-ppIdInfo :: IdInfo -> SDoc
-ppIdInfo (IdInfo {arityInfo      = a,
-		  demandInfo	 = d,
-		  strictnessInfo = s,
-		  updateInfo 	 = u,
-		  cafInfo	 = c
-		  }) 
-  = hsep [
-	    ppArityInfo a,
-	    ppUpdateInfo u,
-	    ppStrictnessInfo s,
-	    ppr d,
-	    ppCafInfo c
-	-- Inline pragma printed out with all binders; see PprCore.pprIdBndr
-	]
 \end{code}
 
 %************************************************************************
@@ -278,7 +259,6 @@ might have a specialisation
 	[Int#] ===>  (case pi' of Lift pi# -> pi#)
 
 where pi' :: Lift Int# is the specialised version of pi.
-
 
 
 %************************************************************************

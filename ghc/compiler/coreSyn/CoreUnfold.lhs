@@ -19,7 +19,7 @@ module CoreUnfold (
 	noUnfolding, mkMagicUnfolding, mkUnfolding, getUnfoldingTemplate,
 	isEvaldUnfolding, hasUnfolding,
 
-	smallEnoughToInline, couldBeSmallEnoughToInline, 
+	smallEnoughToInline, unfoldAlways, couldBeSmallEnoughToInline, 
 	certainlySmallEnoughToInline, 
 	okToUnfoldInHiFile,
 
@@ -132,6 +132,10 @@ data UnfoldingGuidance
 			Int	-- Scrutinee discount: the discount to substract if the thing is in
 				-- a context (case (thing args) of ...),
 				-- (where there are the right number of arguments.)
+
+unfoldAlways :: UnfoldingGuidance -> Bool
+unfoldAlways UnfoldAlways = True
+unfoldAlways other	  = False
 \end{code}
 
 \begin{code}

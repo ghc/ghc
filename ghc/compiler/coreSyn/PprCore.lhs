@@ -19,10 +19,15 @@ import CoreSyn
 import CostCentre	( pprCostCentreCore )
 import Id		( idType, idInfo, getInlinePragma, getIdDemandInfo, Id )
 import Var		( isTyVar )
-import IdInfo		( ppIdInfo )
+import IdInfo		( IdInfo,
+			  arityInfo, ppArityInfo,
+			  demandInfo, updateInfo, ppUpdateInfo, specInfo, 
+			  strictnessInfo, ppStrictnessInfo, cafInfo, ppCafInfo
+			)
 import Const		( Con(..), DataCon )
 import DataCon		( isTupleCon, isUnboxedTupleCon )
 import PprType		( pprParendType, pprTyVarBndr )
+import SpecEnv		( specEnvToList )
 import PprEnv
 import Outputable
 \end{code}
@@ -96,9 +101,8 @@ initCoreEnv pbdr
 	(Just ppr) 		-- tyvar occs
 	(Just pprParendType)    -- types
 
-	(Just pbdr) (Just pprIdBndr) -- value vars
-	-- The pprIdBndr part here is a temporary debugging aid
-	-- Revert to ppr if it gets tiresome
+	(Just pbdr) (Just ppr) -- value vars
+	-- Use pprIdBndr for this last one as a debugging device.
 \end{code}
 
 %************************************************************************
@@ -315,3 +319,39 @@ pprTypedBinder binder
 -- When printing any Id binder in debug mode, we print its inline pragma
 pprIdBndr id = ppr id <+> ifPprDebug (ppr (getInlinePragma id) <+> ppr (getIdDemandInfo id)) 
 \end{code}
+
+
+\begin{code}
+ppIdInfo :: IdInfo -> SDoc
+ppIdInfo info
+  = hsep [
+	    ppArityInfo a,
+	    ppUpdateInfo u,
+	    ppStrictnessInfo s,
+	    ppr d,
+	    ppCafInfo c,
+	    ppSpecInfo p
+	-- Inline pragma printed out with all binders; see PprCore.pprIdBndr
+	]
+  where
+    a = arityInfo info
+    d = demandInfo info
+    s = strictnessInfo info
+    u = updateInfo info
+    c = cafInfo info
+    p = specInfo info
+\end{code}
+
+\begin{code}
+ppSpecInfo spec_env
+  = vcat (map pp_item (specEnvToList spec_env))
+  where
+    pp_item (tyvars, tys, rhs) = hsep [ptext SLIT("__P"),
+				       hsep (map pprParendType tys),
+				       ptext SLIT("->"),
+				       ppr head]
+	where
+	   (_, body) = collectBinders rhs
+	   (head, _) = collectArgs body
+\end{code}
+

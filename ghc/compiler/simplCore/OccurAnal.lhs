@@ -251,7 +251,7 @@ occAnalBind :: OccEnv
 		[CoreBind])
 
 occAnalBind env (NonRec binder rhs) body_usage
-  | isDeadBinder tagged_binder		-- It's not mentioned
+  | not (binder `usedIn` body_usage)		-- It's not mentioned
   = (body_usage, [])
 
   | otherwise			-- It's mentioned in the body
@@ -341,7 +341,7 @@ occAnalBind env (Rec pairs) body_usage
 
 	-- Non-recursive SCC
     do_final_bind (AcyclicSCC ((bndr, rhs_usage, rhs'), _, _)) (body_usage, binds_so_far)
-      | isDeadBinder tagged_bndr
+      | not (bndr `usedIn` body_usage)
       = (body_usage, binds_so_far)			-- Dead code
       | otherwise
       = (combined_usage, new_bind : binds_so_far)	
@@ -352,7 +352,7 @@ occAnalBind env (Rec pairs) body_usage
 
 	-- Recursive SCC
     do_final_bind (CyclicSCC cycle) (body_usage, binds_so_far)
-      | all isDeadBinder tagged_bndrs
+      | not (any (`usedIn` body_usage) bndrs)		-- NB: look at body_usage, not total_usage
       = (body_usage, binds_so_far)			-- Dead code
       | otherwise
       = (combined_usage, final_bind:binds_so_far)
@@ -734,6 +734,11 @@ addOneOcc usage id info
 emptyDetails = (emptyVarEnv :: UsageDetails)
 
 unitDetails id info = (unitVarEnv id info :: UsageDetails)
+
+usedIn :: Id -> UsageDetails -> Bool
+v `usedIn` details =  isExported v
+		   || v `elemVarEnv` details
+		   || isSpecPragmaId v
 
 tagBinders :: UsageDetails	    -- Of scope
 	   -> [Id]		    -- Binders

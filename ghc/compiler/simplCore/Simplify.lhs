@@ -42,7 +42,7 @@ import Name		( isExported, isLocallyDefined )
 import CoreSyn
 import CoreUnfold	( Unfolding(..), UnfoldingGuidance(..),
 			  mkUnfolding, smallEnoughToInline, 
-			  isEvaldUnfolding
+			  isEvaldUnfolding, unfoldAlways
 			)
 import CoreUtils	( IdSubst, SubstCoreExpr(..),
 			  cheapEqExpr, exprIsDupable, exprIsWHNF, exprIsTrivial,
@@ -774,7 +774,8 @@ simplPrags old_bndr new_bndr new_rhs
   = returnSmpl (bndr_w_unfolding)
 
   | otherwise
-  = getSimplBinderStuff `thenSmpl` \ (ty_subst, id_subst, in_scope, us) ->
+  = pprTrace "simplPrags" (ppr old_bndr) $
+    getSimplBinderStuff `thenSmpl` \ (ty_subst, id_subst, in_scope, us) ->
     let
 	spec_env' = substSpecEnv ty_subst in_scope (subst_val id_subst) spec_env
     in
@@ -893,28 +894,6 @@ okToInline :: SwitchChecker
 -- so we can inline if it occurs once, or is small
 
 okToInline sw_chkr in_scope id form guidance cont
-  | switchIsOn sw_chkr EssentialUnfoldingsOnly
-  =
-#ifdef DEBUG
-    if opt_D_dump_inlinings then
-	pprTrace "Considering inlining"
-		 (ppr id <+> vcat [text "essential inlinings only",
-				   text "inline prag:" <+> ppr inline_prag,
-				   text "ANSWER =" <+> if result then text "YES" else text "NO"])
-		 result
-    else
-#endif
-    result
-  where
-    inline_prag  = getInlinePragma id
-    result = idMustBeINLINEd id
-		-- If "essential_unfoldings_only" is true we do no inlinings at all,
-		-- EXCEPT for things that absolutely have to be done
-		-- (see comments with idMustBeINLINEd)
-
-
-okToInline sw_chkr in_scope id form guidance cont
-	-- Essential unfoldings only not on
   =
 #ifdef DEBUG
     if opt_D_dump_inlinings then
@@ -927,27 +906,35 @@ okToInline sw_chkr in_scope id form guidance cont
 				   text "result scrut" <+> ppr result_scrut,
 				   text "ANSWER =" <+> if result then text "YES" else text "NO"])
 		  result
-     else
+    else
 #endif
     result
   where
-    result = case inline_prag of
-		IAmDead		  -> pprTrace "okToInline: dead" (ppr id) False
+    result =
+      case inline_prag of
+	IAmDead		  -> pprTrace "okToInline: dead" (ppr id) False
+	IAmASpecPragmaId  -> False
+	IMustNotBeINLINEd -> False
+	IAmALoopBreaker   -> False
+	IMustBeINLINEd    -> True	-- If "essential_unfoldings_only" is true we do no inlinings at all,
+					-- EXCEPT for things that absolutely have to be done
+					-- (see comments with idMustBeINLINEd)
+	IWantToBeINLINEd  -> inlinings_enabled
+	ICanSafelyBeINLINEd inside_lam one_branch
+			  -> inlinings_enabled && (unfold_always || consider_single inside_lam one_branch) 
+	NoInlinePragInfo  -> inlinings_enabled && (unfold_always || consider_multi)
 
-		IAmASpecPragmaId  -> False
-		IMustNotBeINLINEd -> False
-		IAmALoopBreaker   -> False
-		IMustBeINLINEd    -> True
-		IWantToBeINLINEd  -> True
-	
-		ICanSafelyBeINLINEd inside_lam one_branch
-			-> (small_enough || one_branch) && some_benefit &&
-			   (whnf || not_inside_lam)
-		    
-			where
-			   not_inside_lam = case inside_lam of {InsideLam -> False; other -> True}
+    inlinings_enabled = not (switchIsOn sw_chkr EssentialUnfoldingsOnly)
+    unfold_always     = unfoldAlways guidance
 
-		other   -> whnf && small_enough && some_benefit
+	-- Consider benefit for ICanSafelyBeINLINEd
+    consider_single inside_lam one_branch
+	= (small_enough || one_branch) && some_benefit && (whnf || not_inside_lam)
+	where
+	  not_inside_lam = case inside_lam of {InsideLam -> False; other -> True}
+
+	-- Consider benefit for NoInlinePragInfo
+    consider_multi = whnf && small_enough && some_benefit
 			-- We could consider using exprIsCheap here,
 			-- as in postInlineUnconditionally, but unlike the latter we wouldn't
 			-- necessarily eliminate a thunk; and the "form" doesn't tell
@@ -992,8 +979,7 @@ contIsInteresting (ArgOf _ _ _)		      = False
 contIsInteresting (ApplyTo _ (Type _) _ cont) = contIsInteresting cont
 contIsInteresting (CoerceIt _ _ _ cont)	      = contIsInteresting cont
 
--- Even a case with only a default case is a bit interesting;
--- 	we may be able to eliminate it after inlining.
+-- See notes below on why a case with only a DEFAULT case is not intersting
 -- contIsInteresting (Select _ _ [(DEFAULT,_,_)] _ _) = False
 
 contIsInteresting _ 			      = True
@@ -1032,6 +1018,7 @@ since we can just eliminate this case instead (x is in WHNF).  Similar
 applies when x is bound to a lambda expression.  Hence
 contIsInteresting looks for case expressions with just a single
 default case.
+
 
 %************************************************************************
 %*									*
@@ -1455,19 +1442,20 @@ simplAlts zap_occ_info scrut_cons case_bndr'' alts cont'
     handled_cons = scrut_cons ++ [con | (con,_,_) <- alts, con /= DEFAULT]
 
     simpl_alt (DEFAULT, _, rhs)
-	= modifyInScope (case_bndr'' `setIdUnfolding` OtherCon handled_cons)	$
+	=	-- In the default case we record the constructors that the
+		-- case-binder *can't* be.
+		-- We take advantage of any OtherCon info in the case scrutinee
+	  modifyInScope (case_bndr'' `setIdUnfolding` OtherCon handled_cons)	$
 	  simplExpr rhs cont'							`thenSmpl` \ rhs' ->
 	  returnSmpl (DEFAULT, [], rhs')
 
     simpl_alt (con, vs, rhs)
-	= 	-- Deal with the case-bound variables
+	= 	-- Deal with the pattern-bound variables
 		-- Mark the ones that are in ! positions in the data constructor
 		-- as certainly-evaluated
 	  simplBinders (add_evals con vs)	$ \ vs' ->
 
 		-- Bind the case-binder to (Con args)
-		-- In the default case we record the constructors it *can't* be.
-		-- We take advantage of any OtherCon info in the case scrutinee
 	  let
 		con_app = Con con (map Type inst_tys' ++ map varToCoreExpr vs')
 	  in
