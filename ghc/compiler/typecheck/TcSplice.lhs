@@ -129,21 +129,10 @@ tcSpliceExpr name expr res_ty
 -- inner escape before dealing with the outer one
 
 tcTopSplice expr res_ty
-  = checkNoErrs (
-	-- checkNoErrs: must not try to run the thing
-	--	        if the type checker fails!
+  = tcMetaTy exprTyConName		`thenM` \ meta_exp_ty ->
 
-	tcMetaTy exprTyConName		`thenM` \ meta_exp_ty ->
-	setStage topSpliceStage (
-	  getLIE (tcMonoExpr expr meta_exp_ty)
-        )				`thenM` \ (expr', lie) ->
-
-	-- Solve the constraints
-	tcSimplifyTop lie		`thenM` \ const_binds ->
-
-	-- Wrap the bindings around it and zonk
-	zonkTopExpr (mkHsLet const_binds expr')
-    )					`thenM` \ zonked_q_expr ->
+	-- Typecheck the expression
+    tcTopSpliceExpr expr meta_exp_ty	`thenM` \ zonked_q_expr ->
 
 	-- Run the expression
     traceTc (text "About to run" <+> ppr zonked_q_expr) 	`thenM_`
@@ -163,6 +152,23 @@ tcTopSplice expr res_ty
     importSupportingDecls fvs			`thenM` \ env ->
 
     setGblEnv env (tcMonoExpr exp3 res_ty)
+
+
+tcTopSpliceExpr :: RenamedHsExpr -> TcType -> TcM TypecheckedHsExpr
+tcTopSpliceExpr expr meta_ty
+  = checkNoErrs $	-- checkNoErrs: must not try to run the thing
+			--	        if the type checker fails!
+
+    setStage topSpliceStage $
+
+	-- Typecheck the expression
+    getLIE (tcMonoExpr expr meta_ty)	`thenM` \ (expr', lie) ->
+
+	-- Solve the constraints
+    tcSimplifyTop lie			`thenM` \ const_binds ->
+	
+	-- And zonk it
+    zonkTopExpr (mkHsLet const_binds expr')
 \end{code}
 
 
@@ -177,15 +183,10 @@ tcTopSplice expr res_ty
 tcSpliceDecls expr
   = tcMetaTy decTyConName		`thenM` \ meta_dec_ty ->
     tcMetaTy qTyConName    		`thenM` \ meta_q_ty ->
-    setStage topSpliceStage (
-	getLIE (tcMonoExpr expr (mkAppTy meta_q_ty (mkListTy meta_dec_ty)))
-    )					`thenM` \ (expr', lie) ->
-	-- Solve the constraints
-    tcSimplifyTop lie			`thenM` \ const_binds ->
-    let 
-	q_expr = mkHsLet const_binds expr'
+    let
+	list_q = mkAppTy meta_q_ty (mkListTy meta_dec_ty)
     in
-    zonkTopExpr q_expr			`thenM` \ zonked_q_expr ->
+    tcTopSpliceExpr expr list_q		`thenM` \ zonked_q_expr ->
 
 	-- Run the expression
     traceTc (text "About to run" <+> ppr zonked_q_expr) 	`thenM_`

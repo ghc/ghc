@@ -13,7 +13,7 @@ import {-# SOURCE #-}	TcSplice( tcSpliceExpr, tcBracket )
 import HsSyn		( HsReify(..), ReifyFlavour(..) )
 import TcType		( isTauTy )
 import TcEnv		( bracketOK, tcMetaTy, tcLookupGlobal,
-			  wellStaged, metaLevel )
+			  checkWellStaged, metaLevel )
 import TcSimplify	( tcSimplifyBracket )
 import Name		( isExternalName )
 import qualified DsMeta
@@ -805,8 +805,10 @@ tcId name	-- Look up the Id and instantiate its type
 		-- If 'x' occurs many times we may get many identical
 		-- bindings of the same splice proxy, but that doesn't
 		-- matter, although it's a mite untidy.
-		-- NB: isExernalName is true of top level things, 
-		-- and false of nested bindings
+		--
+		-- NB: During type-checking, isExernalName is true of 
+		-- top level things, and false of nested bindings
+		-- Top-level things don't need lifting.
 	
 	let
 	    id_ty = idType id
@@ -829,11 +831,7 @@ tcId name	-- Look up the Id and instantiate its type
 	returnM (HsVar id, id_ty))
 
       other -> 
-	let
-	   use_lvl = metaLevel use_stage
-	in
-	checkTc (wellStaged bind_lvl use_lvl)
-		(badStageErr id bind_lvl use_lvl)	`thenM_`
+	checkWellStaged (quotes (ppr id)) bind_lvl use_stage	`thenM_`
 #endif
 	-- This is the bit that handles the no-Template-Haskell case
 	case isDataConWrapId_maybe id of
@@ -1050,12 +1048,6 @@ Boring and alphabetical:
 arithSeqCtxt expr
   = hang (ptext SLIT("In an arithmetic sequence:")) 4 (ppr expr)
 
-
-badStageErr id bind_lvl use_lvl
-  = ptext SLIT("Stage error:") <+> quotes (ppr id) <+> 
-	hsep   [ptext SLIT("is bound at stage") <+> ppr bind_lvl,
-		ptext SLIT("but used at stage") <+> ppr use_lvl]
-
 parrSeqCtxt expr
   = hang (ptext SLIT("In a parallel array sequence:")) 4 (ppr expr)
 
@@ -1123,7 +1115,6 @@ missingStrictFields con fields
     header = ptext SLIT("Constructor") <+> quotes (ppr con) <+> 
 	     ptext SLIT("does not have the required strict field(s)") 
 	  
-
 missingFields :: DataCon -> [FieldLabel] -> SDoc
 missingFields con fields
   = ptext SLIT("Fields of") <+> quotes (ppr con) <+> ptext SLIT("not initialised:") 

@@ -37,7 +37,8 @@ module TcEnv(
 	RecTcGblEnv, tcLookupRecId_maybe, 
 
 	-- Template Haskell stuff
-	wellStaged, spliceOK, bracketOK, tcMetaTy, metaLevel,
+	checkWellStaged, spliceOK, bracketOK, tcMetaTy, metaLevel, 
+	topIdLvl, 
 
 	-- New Ids
 	newLocalName, newDFunName,
@@ -104,11 +105,41 @@ metaLevel Comp	        = topLevel
 metaLevel (Splice l)    = l
 metaLevel (Brack l _ _) = l
 
-wellStaged :: Level 	-- Binding level
-	   -> Level	-- Use level
-	   -> Bool
-wellStaged bind_stage use_stage 
-  = bind_stage <= use_stage
+
+checkWellStaged :: SDoc		-- What the stage check is for
+		-> Level 	-- Binding level
+	        -> Stage	-- Use stage
+		-> TcM ()	-- Fail if badly staged, adding an error
+checkWellStaged pp_thing bind_lvl use_stage
+  | bind_lvl <= use_lvl 	-- OK!
+  = returnM ()	
+
+  | bind_lvl == topLevel	-- GHC restriction on top level splices
+  = failWithTc $ 
+    sep [ptext SLIT("GHC stage restriction:") <+>  pp_thing,
+	 nest 2 (ptext SLIT("is used in a top-level splice, and must be imported, not defined locally"))]
+
+  | otherwise			-- Badly staged
+  = failWithTc $ 
+    ptext SLIT("Stage error:") <+> pp_thing <+> 
+	hsep   [ptext SLIT("is bound at stage") <+> ppr bind_lvl,
+		ptext SLIT("but used at stage") <+> ppr use_lvl]
+  where
+    use_lvl = metaLevel use_stage
+
+
+topIdLvl :: Id -> Level
+-- Globals may either be imported, or may be from an earlier "chunk" 
+-- (separated by declaration splices) of this module.  The former
+-- *can* be used inside a top-level splice, but the latter cannot.
+-- Hence we give the former impLevel, but the latter topLevel
+-- E.g. this is bad:
+--	x = [| foo |]
+--	$( f x )
+-- By the time we are prcessing the $(f x), the binding for "x" 
+-- will be in the global env, not the local one.
+topIdLvl id | isLocalId id = topLevel
+	    | otherwise    = impLevel
 
 -- Indicates the legal transitions on bracket( [| |] ).
 bracketOK :: Stage -> Maybe Level
@@ -182,9 +213,11 @@ newLocalName name	-- Make a clone
     returnM (mkInternalName uniq (getOccName name) (getSrcLoc name))
 \end{code}
 
-Make a name for the dict fun for an instance decl.
-It's a *local* name for the moment.  The CoreTidy pass
-will externalise it.
+Make a name for the dict fun for an instance decl.  It's a *local*
+name for the moment.  The CoreTidy pass will externalise it.  Even in
+--make and ghci stuff, we rebuild the instance environment each time,
+so the dfun id is internal to begin with, and external when compiling
+other modules
 
 \begin{code}
 newDFunName :: Class -> [Type] -> SrcLoc -> TcM Name
@@ -339,21 +372,8 @@ tcLookupIdLvl name
   = tcLookup name	`thenM` \ thing -> 
     case thing of
 	ATcId tc_id lvl	  -> returnM (tc_id, lvl)
-	AGlobal (AnId id) 	-- See [Note: Levels]
-	  | isLocalId id  -> returnM (id, topLevel)
-	  | otherwise     -> returnM (id, impLevel)
+	AGlobal (AnId id) -> returnM (id, topIdLvl id)
 	other		  -> pprPanic "tcLookupIdLvl" (ppr name)
-
--- 		[Note: Levels]
--- Globals may either be imported, or may be from an earlier "chunk" 
--- (separated by declaration splices) of this module.  The former
--- *can* be used inside a top-level splice, but the latter cannot.
--- Hence we give the former impLevel, but the latter topLevel
--- E.g. this is bad:
---	x = [| foo |]
---	$( f x )
--- By the time we are prcessing the $(f x), the binding for "x" 
--- will be in the global env, not the local one.
 
 tcLookupLocalIds :: [Name] -> TcM [TcId]
 -- We expect the variables to all be bound, and all at

@@ -385,10 +385,8 @@ tcDefMeth clas tyvars binds_in prags op_item@(sel_id, DefMeth dm_name)
           -- TyGenNever (in MkId).  Ugh!  KSW 1999-09.
 
         theta       = [mkClassPred clas inst_tys]
- 	dm_id       = mkDefaultMethodId dm_name dm_ty
-	local_dm_id = setIdLocalExported dm_id
-		-- Reason for setIdLocalExported: see notes with MkId.mkDictFunId
-	xtve = tyvars `zip` clas_tyvars
+	local_dm_id = mkDefaultMethodId dm_name dm_ty
+	xtve 	    = tyvars `zip` clas_tyvars
     in
     newDicts origin theta 				`thenM` \ [this_dict] ->
 
@@ -416,7 +414,7 @@ tcDefMeth clas tyvars binds_in prags op_item@(sel_id, DefMeth dm_name)
     		    emptyNameSet	-- No inlines (yet)
     		    (dict_binds `andMonoBinds` defm_bind)
     in
-    returnM (full_bind, [dm_id])
+    returnM (full_bind, [local_dm_id])
   where
     origin = ClassDeclOrigin
 \end{code}

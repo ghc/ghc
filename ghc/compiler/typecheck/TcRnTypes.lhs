@@ -355,7 +355,7 @@ topSpliceStage = Splice (topLevel - 1)	-- Stage for the body of a top-level spli
 
 
 impLevel, topLevel :: Level
-topLevel = 1	-- Things dedined at top level of this module
+topLevel = 1	-- Things defined at top level of this module
 impLevel = 0	-- Imported things; they can be used inside a top level splice
 --
 -- For example: 

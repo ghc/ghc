@@ -57,8 +57,7 @@ import Inst		( showLIE )
 import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2 )
 import TcDefaults	( tcDefaults )
-import TcEnv		( RecTcGblEnv, 
-			  tcExtendGlobalValEnv, 
+import TcEnv		( tcExtendGlobalValEnv, 
 			  tcExtendGlobalEnv,
 			  tcExtendInstEnv, tcExtendRules,
 			  tcLookupTyCon, tcLookupGlobal,

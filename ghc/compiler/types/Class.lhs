@@ -63,6 +63,7 @@ type ClassOpItem = (Id, DefMeth Name)
 
 data DefMeth id = NoDefMeth 		-- No default method
 	        | DefMeth id 		-- A polymorphic default method (named id)
+					-- 	(Only instantiated to RdrName and Name, never Id)
 	        | GenDefMeth 		-- A generic default method
                 deriving Eq  
 \end{code}

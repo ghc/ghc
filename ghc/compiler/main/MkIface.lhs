@@ -250,7 +250,7 @@ ifaceTyThing (AClass clas) = cls_decl
 
     toClassOpSig (sel_id, def_meth)
 	= ASSERT(sel_tyvars == clas_tyvars)
-	  ClassOpSig (getName sel_id) def_meth' (toHsType op_ty) noSrcLoc
+	  ClassOpSig (getName sel_id) def_meth (toHsType op_ty) noSrcLoc
 	where
 		-- Be careful when splitting the type, because of things
 		-- like  	class Foo a where
@@ -259,10 +259,6 @@ ifaceTyThing (AClass clas) = cls_decl
 		--		  op :: (Ord a) => a -> a
 	  (sel_tyvars, rho_ty) = tcSplitForAllTys (idType sel_id)
 	  op_ty		       = tcFunResultTy rho_ty
-	  def_meth' = case def_meth of
-			 NoDefMeth  -> NoDefMeth
-			 GenDefMeth -> GenDefMeth
-			 DefMeth id -> DefMeth (getName id)
 
 ifaceTyThing (ATyCon tycon) = ty_decl
   where

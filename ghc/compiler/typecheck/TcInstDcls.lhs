@@ -545,9 +545,6 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
 
 	-- Create the result bindings
     let
-	local_dfun_id = setIdLocalExported dfun_id
-		-- Reason for setIdLocalExported: see notes with MkId.mkDictFunId
-
         dict_constr   = classDataCon clas
 	scs_and_meths = map instToId sc_dicts ++ meth_ids
 	this_dict_id  = instToId this_dict
@@ -593,7 +590,7 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
 	main_bind = AbsBinds
 		 	 zonked_inst_tyvars
 		 	 (map instToId dfun_arg_dicts)
-		 	 [(inst_tyvars', local_dfun_id, this_dict_id)] 
+		 	 [(inst_tyvars', dfun_id, this_dict_id)] 
 		 	 inlines all_binds
     in
     showLIE "instance" 		`thenM_`

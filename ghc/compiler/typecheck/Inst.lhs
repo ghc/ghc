@@ -21,7 +21,7 @@ module Inst (
 	ipNamesOfInst, ipNamesOfInsts, fdPredsOfInst, fdPredsOfInsts,
 	instLoc, getDictClassTys, dictPred,
 
-	lookupInst, lookupSimpleInst, LookupInstResult(..),
+	lookupInst, LookupInstResult(..),
 
 	isDict, isClassDict, isMethod, 
 	isLinearInst, linearInstType, isIPDict, isInheritableInst,
@@ -43,7 +43,7 @@ import TcHsSyn	( TcExpr, TcId, TcIdSet, TypecheckedHsExpr,
 		  mkHsTyApp, mkHsDictApp, mkHsConApp, zonkId
 		)
 import TcRnMonad
-import TcEnv	( tcGetInstEnv, tcLookupId, tcLookupTyCon )
+import TcEnv	( tcGetInstEnv, tcLookupId, tcLookupTyCon, checkWellStaged, topIdLvl )
 import InstEnv	( InstLookupResult(..), lookupInstEnv )
 import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType, zapToType,
 		  zonkTcThetaType, tcInstTyVar, tcInstType, tcInstTyVars
@@ -540,7 +540,7 @@ lookupInst :: Inst -> TcM (LookupInstResult s)
 
 
 -- Dictionaries
-lookupInst dict@(Dict _ (ClassP clas tys) loc)
+lookupInst dict@(Dict _ pred@(ClassP clas tys) loc)
   = getDOpts			`thenM` \ dflags ->
     tcGetInstEnv		`thenM` \ inst_env ->
     case lookupInstEnv dflags inst_env clas tys of
@@ -551,6 +551,10 @@ lookupInst dict@(Dict _ (ClassP clas tys) loc)
 		--	instance C X a => D X where ...
 		-- (presumably there's a functional dependency in class C)
 		-- Hence the mk_ty_arg to instantiate any un-substituted tyvars.	
+	   getStage						`thenM` \ use_stage ->
+	   checkWellStaged (ptext SLIT("instance for") <+> quotes (ppr pred))
+			   (topIdLvl dfun_id) use_stage		`thenM_`
+	   traceTc (text "lookupInst" <+> ppr dfun_id <+> ppr (topIdLvl dfun_id) <+> ppr use_stage) `thenM_`
 	   let
 		(tyvars, rho) = tcSplitForAllTys (idType dfun_id)
 		mk_ty_arg tv  = case lookupSubstEnv tenv tv of
@@ -616,28 +620,6 @@ lookupInst inst@(LitInst u (HsFractional f from_rat_name) ty loc)
     returnM (GenInst [method_inst] (HsApp (HsVar (instToId method_inst)) rat_lit))
 \end{code}
 
-There is a second, simpler interface, when you want an instance of a
-class at a given nullary type constructor.  It just returns the
-appropriate dictionary if it exists.  It is used only when resolving
-ambiguous dictionaries.
-
-\begin{code}
-lookupSimpleInst :: Class
-		 -> [Type]			-- Look up (c,t)
-	         -> TcM (Maybe ThetaType)	-- Here are the needed (c,t)s
-
-lookupSimpleInst clas tys
-  = getDOpts			`thenM` \ dflags ->
-    tcGetInstEnv		`thenM` \ inst_env -> 
-    case lookupInstEnv dflags inst_env clas tys of
-      FoundInst tenv dfun
-	-> returnM (Just (substTheta (mkSubst emptyInScopeSet tenv) theta))
-        where
-	   (_, rho)  = tcSplitForAllTys (idType dfun)
-	   (theta,_) = tcSplitPhiTy rho
-
-      other  -> returnM Nothing
-\end{code}
 
 
 %************************************************************************
