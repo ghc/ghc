@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.222 2002/09/13 15:02:25 simonpj Exp $
+# $Id: Makefile,v 1.223 2002/09/16 10:16:14 simonmar Exp $
 
 TOP = ..
 
@@ -101,7 +101,7 @@ CLEAN_FILES += $(CONFIG_HS)
 ALL_DIRS = \
   utils basicTypes types hsSyn prelude rename typecheck deSugar coreSyn \
   specialise simplCore stranal stgSyn simplStg codeGen absCSyn main \
-  profiling parser usageSP cprAnalysis compMan ndpFlatten 
+  profiling parser usageSP cprAnalysis compMan ndpFlatten
 
 # Make sure we include Config.hs even if it doesn't exist yet...
 ALL_SRCS += $(CONFIG_HS)
@@ -175,7 +175,7 @@ space:= $(empty) $(empty)
 SRC_HC_OPTS += \
   -cpp -fglasgow-exts -Rghc-timing \
   -I. -IcodeGen -InativeGen -Iparser \
-  -i$(subst $(space),:,$(ALL_DIRS)) 
+  $(patsubst %, -i%, $(ALL_DIRS))
 
 # Omitted: 	-I$(GHC_INCLUDE_DIR)
 # We should have -I$(GHC_INCLUDE_DIR) in SRC_HC_OPTS, 
