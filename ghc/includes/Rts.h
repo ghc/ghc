@@ -38,20 +38,6 @@ extern "C" {
 #define __MSVCRT__ 1
 #endif
 
-#if defined(__GNUC__)
-#define GNU_ATTRIBUTE(at) __attribute__((at))
-#else
-#define GNU_ATTRIBUTE(at)
-#endif
-
-#if __GNUC__ >= 3 
-#define GNUC3_ATTRIBUTE(at) __attribute__((at))
-#else
-#define GNUC3_ATTRIBUTE(at)
-#endif
-
-#define STG_UNUSED    GNUC3_ATTRIBUTE(__unused__)
-
 /*
  * We often want to know the size of something in units of an
  * StgWord... (rounded up, of course!)

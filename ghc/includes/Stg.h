@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.66 2005/01/28 12:55:52 simonmar Exp $
+ * $Id: Stg.h,v 1.67 2005/02/01 14:14:41 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2004
  *
@@ -81,6 +81,23 @@
 # error "Don't know how to inline functions with your C compiler."
 #endif
 
+/*
+ * GCC attributes
+ */
+#if defined(__GNUC__)
+#define GNU_ATTRIBUTE(at) __attribute__((at))
+#else
+#define GNU_ATTRIBUTE(at)
+#endif
+
+#if __GNUC__ >= 3 
+#define GNUC3_ATTRIBUTE(at) __attribute__((at))
+#else
+#define GNUC3_ATTRIBUTE(at)
+#endif
+
+#define STG_UNUSED    GNUC3_ATTRIBUTE(__unused__)
+
 /* -----------------------------------------------------------------------------
    Global type definitions
    -------------------------------------------------------------------------- */
@@ -106,7 +123,7 @@ typedef StgClosurePtr   L_;
 typedef StgInt64        LI_;
 typedef StgWord64       LW_;
 
-#define IF_(f)		static F_ f(void)
+#define IF_(f)		static F_ GNUC3_ATTRIBUTE(used) f(void) 
 #define FN_(f)		F_ f(void)
 #define EF_(f)		extern F_ f(void)
 
