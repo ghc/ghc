@@ -220,7 +220,7 @@ outputForeignStubs dflags c_code h_code
 -- turn out to be empty, in which case no file should be created.
 outputForeignStubs_help fname "" injects     = return False
 outputForeignStubs_help fname doc_str injects
-   = do writeFile fname (injects ++ doc_str)
+   = do writeFile fname (injects ++ doc_str ++ "\n")
         return True
 \end{code}
 
