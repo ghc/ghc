@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.34 2003/10/30 18:51:26 sof Exp $
+ * $Id: HsBase.h,v 1.35 2003/11/02 00:06:23 panne Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -34,6 +34,10 @@
 #endif
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>
+/* Ultra-ugly: OpenBSD uses a broken macro for sigfillset (missing cast) */
+#if __OpenBSD__
+#undef sigfillset
+#endif
 #endif
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
