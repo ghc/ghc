@@ -278,7 +278,7 @@ getErrno :: IO Errno
 -- thread gets its own copy.
 #ifdef __NHC__
 getErrno = do e <- peek _errno; return (Errno e)
-foreign import ccall unsafe "errno.h &errno" _errno :: IO (Ptr CInt)
+foreign import ccall unsafe "errno.h &errno" _errno :: Ptr CInt
 #else
 getErrno = do e <- get_errno; return (Errno e)
 foreign import ccall unsafe "HsBase.h __hscore_get_errno" get_errno :: IO CInt
