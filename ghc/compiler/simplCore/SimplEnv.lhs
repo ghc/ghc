@@ -50,14 +50,15 @@ IMP_Ubiq(){-uitous-}
 IMPORT_DELOOPER(SmplLoop)		-- breaks the MagicUFs / SimplEnv loop
 #endif
 
-import BinderInfo	( orBinderInfo, andBinderInfo, noBinderInfo,
-			  BinderInfo(..){-instances, too-}, FunOrArg, DuplicationDanger, InsideSCC
+import BinderInfo	( orBinderInfo, andBinderInfo, noBinderInfo, isOneOcc,
+			  okToInline, 
+			  BinderInfo {-instances, too-}
 			)
 import CmdLineOpts	( switchIsOn, intSwitchSet, opt_UnfoldingCreationThreshold,
 			  SimplifierSwitch(..), SwitchResult(..)
 			)
 import CoreSyn
-import CoreUnfold	( mkFormSummary, okToInline, couldBeSmallEnoughToInline,
+import CoreUnfold	( mkFormSummary, couldBeSmallEnoughToInline, whnfOrBottom,
 			  Unfolding(..), UfExpr, RdrName,
 			  SimpleUnfolding(..), FormSummary(..),
 			  calcUnfoldingGuidance, UnfoldingGuidance(..)
@@ -602,7 +603,9 @@ extendEnvGivenBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con
 	              occ_info out_id rhs
   = SimplEnv chkr encl_cc ty_env in_id_env new_out_id_env new_con_apps 
   where
-    new_out_id_env | okToInline form occ_info (couldBeSmallEnoughToInline guidance) 
+    new_out_id_env | okToInline (whnfOrBottom form) 
+				(couldBeSmallEnoughToInline guidance) 
+				occ_info 
 		   = out_id_env_with_unfolding
 		   | otherwise
 		   = out_id_env
@@ -647,8 +650,8 @@ extendEnvGivenBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con
 
     is_interesting v        = _scc_ "eegnr.mkidset" 
 			      case lookupIdEnv out_id_env v of
-				Just (_, OneOcc _ _ _ _ _, _) -> True
-				other			      -> False
+				Just (_, occ, _) -> isOneOcc occ
+				other	         -> False
 
 	-- Compute unfolding details
     rhs_info = OutUnfolding unf_cc (SimpleUnfolding form guidance template)
