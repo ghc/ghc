@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: PrelTopHandler.lhs,v 1.3 2001/07/12 10:37:55 rrt Exp $
+-- $Id: PrelTopHandler.lhs,v 1.4 2001/08/15 09:24:19 rrt Exp $
 --
 -- (c) The University of Glasgow, 2001
 --
@@ -67,7 +67,11 @@ reportError bombOut str = do
 	then stg_exit 1
         else return ()
 
+#ifndef ILX
 foreign label "ErrorHdrHook" errorHdrHook :: Ptr ()
+#else
+foreign import "ErrorHdrHook" errorHdrHook :: Ptr ()
+#endif
 
 foreign import ccall "writeErrString__" unsafe
 	writeErrString :: Ptr () -> CString -> Int -> IO ()
