@@ -437,6 +437,8 @@ ifeq "$(DLL_NAME)" ""
 DLL_NAME = $(patsubst %.a, %.dll, $(subst lib,,$(LIBRARY)))
 endif
 
+DLL_NAME := $(DLL_PEN)/$(DLL_NAME)
+
 all :: $(DLL_NAME)
 
 ifeq "$(DLL_IMPLIB_NAME)" ""
@@ -445,7 +447,6 @@ endif
 
 $(DLL_NAME) :: $(LIBRARY)
 	$(BLD_DLL) --output-lib $(DLL_IMPLIB_NAME) -o $(DLL_NAME) $(LIBRARY) $(BLD_DLL_OPTS)
-	$(MV) $(DLL_NAME) $(DLL_PEN)
 endif
 
 #
