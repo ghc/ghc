@@ -40,7 +40,8 @@ import TcType		( TcThetaType, newTyVarTy, newTyVar,
 			)
 import TcUnify		( unifyTauTy, unifyTauTyLists )
 
-import Id		( mkVanillaId, setInlinePragma, idFreeTyVars )
+import CoreFVs		( idFreeTyVars )
+import Id		( mkVanillaId, setInlinePragma )
 import Var		( idType, idName )
 import IdInfo		( InlinePragInfo(..) )
 import Name		( Name, getOccName, getSrcLoc )

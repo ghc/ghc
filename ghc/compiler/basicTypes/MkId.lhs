@@ -76,7 +76,7 @@ import Id		( idType, mkId,
 			  mkVanillaId, mkTemplateLocals,
 			  mkTemplateLocal, idCprInfo
 			)
-import IdInfo		( IdInfo, vanillaIdInfo, mkIdInfo,
+import IdInfo		( IdInfo, constantIdInfo, mkIdInfo,
 			  exactArity, setUnfoldingInfo, setCafInfo, setCprInfo,
 			  setArityInfo, setSpecInfo, setTyGenInfo,
 			  mkStrictnessInfo, setStrictnessInfo,
@@ -144,7 +144,7 @@ mkSpecPragmaId occ uniq ty loc
 mkDefaultMethodId dm_name rec_c ty
   = mkId dm_name ty info
   where
-    info = vanillaIdInfo `setTyGenInfo` TyGenNever
+    info = constantIdInfo `setTyGenInfo` TyGenNever
              -- type is wired-in (see comment at TcClassDcl.tcClassSig), so
              -- do not generalise it
 
@@ -632,7 +632,7 @@ mkDictFunId dfun_name clas inst_tyvars inst_tys dfun_theta
   = mkId dfun_name dfun_ty info
   where
     dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
-    info = vanillaIdInfo `setTyGenInfo` TyGenNever
+    info = constantIdInfo `setTyGenInfo` TyGenNever
              -- type is wired-in (see comment at TcClassDcl.tcClassSig), so
              -- do not generalise it
 
@@ -686,8 +686,7 @@ another gun with which to shoot yourself in the foot.
 unsafeCoerceId
   = pcMiscPrelId unsafeCoerceIdKey pREL_GHC SLIT("unsafeCoerce#") ty info
   where
-    info = vanillaIdInfo
-	   `setUnfoldingInfo` mkCompulsoryUnfolding rhs
+    info = constantIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 	   
 
     ty  = mkForAllTys [openAlphaTyVar,openBetaTyVar]
@@ -705,7 +704,7 @@ evaluate its argument and call the dataToTag# primitive.
 getTagId
   = pcMiscPrelId getTagIdKey pREL_GHC SLIT("getTag#") ty info
   where
-    info = vanillaIdInfo
+    info = constantIdInfo
 	   `setUnfoldingInfo`	mkCompulsoryUnfolding rhs
 	-- We don't provide a defn for this; you must inline it
 
@@ -813,7 +812,7 @@ pc_bottoming_Id key mod name ty
 generic_ERROR_ID u n = pc_bottoming_Id u pREL_ERR n errorTy
 
 -- Very useful...
-noCafIdInfo = vanillaIdInfo `setCafInfo` NoCafRefs
+noCafIdInfo = constantIdInfo `setCafInfo` NoCafRefs
 
 (openAlphaTyVar:openBetaTyVar:_) = openAlphaTyVars
 openAlphaTy  = mkTyVarTy openAlphaTyVar

@@ -10,13 +10,12 @@ module SimplCore ( core2core ) where
 
 import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..), 
 			  SwitchResult(..), intSwitchSet,
-                          opt_UsageSPOn,
 			  DynFlags, DynFlag(..), dopt, dopt_CoreToDo
 			)
 import CoreLint		( showPass, endPass )
 import CoreSyn
-import CoreFVs		( ruleSomeFreeVars )
-import HscTypes		( PackageRuleBase, HomeSymbolTable, ModDetails(..) )
+import CoreFVs		( ruleRhsFreeVars )
+import HscTypes		( PackageRuleBase, HomeSymbolTable, IsExported, ModDetails(..) )
 import CSE		( cseProgram )
 import Rules		( RuleBase, emptyRuleBase, ruleBaseFVs, ruleBaseIds, 
 			  extendRuleBaseList, addRuleBaseFVs )
@@ -31,7 +30,7 @@ import SimplMonad
 import ErrUtils		( dumpIfSet, dumpIfSet_dyn )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
-import Id		( Id, isDataConWrapId, setIdNoDiscard, isLocalId )
+import Id		( idName, isDataConWrapId, setIdNoDiscard, isLocalId )
 import VarSet
 import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
@@ -45,6 +44,7 @@ import UniqSupply	( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import IO		( hPutStr, stderr )
 import Outputable
 
+import Maybes		( orElse )
 import List             ( partition )
 \end{code}
 
@@ -71,7 +71,7 @@ core2core dflags pkg_rule_base hst is_exported binds rules
 
 		-- COMPUTE THE RULE BASE TO USE
 	(rule_base, local_rule_stuff, orphan_rules)
-		<- prepareRules dflags pkg_rule_base hst ru_us rules
+		<- prepareRules dflags pkg_rule_base hst ru_us binds rules
 
 		-- PREPARE THE BINDINGS
 	let binds1 = updateBinders local_rule_stuff is_exported binds
@@ -165,10 +165,11 @@ noStats dfs thing = do { binds <- thing; return (zeroSimplCount dfs, binds) }
 \begin{code}
 prepareRules :: DynFlags -> PackageRuleBase -> HomeSymbolTable
 	     -> UniqSupply
+	     -> [CoreBind]
 	     -> [IdCoreRule]		-- Local rules
-	     -> IO (RuleBase, 			-- Full rule base
-		    (IdSet,IdSet),		-- Local rule Ids, and RHS fvs
-		    [IdCoreRule]) 		-- Orphan rules
+	     -> IO (RuleBase, 		-- Full rule base
+		    (IdSet,IdSet),	-- Local rule Ids, and RHS fvs
+		    [IdCoreRule]) 	-- Orphan rules
 
 prepareRules dflags pkg_rule_base hst us binds rules
   = do	{ let (better_rules,_) = initSmpl dflags sw_chkr us local_ids black_list_all 
@@ -177,13 +178,13 @@ prepareRules dflags pkg_rule_base hst us binds rules
 	; dumpIfSet_dyn dflags Opt_D_dump_rules "Transformation rules"
 		        (vcat (map pprIdCoreRule better_rules))
 
-	; let (local_id_rules, orphan_rules) = partition (isLocalId . fst) better_rules
-	      local_rule_rhs_fvs	     = unionVarSets (map ruleRhsFreeVars local_id_rules)
-	      local_rule_base		     = extendRuleBaseList emptyRuleBase local_id_rules	
-	      local_rule_ids		     = ruleBaseIds local_rule_base	-- Local Ids with rules attached
-	      imp_rule_base		     = foldl add_rules pkg_rule_base (moduleEnvElts hst)
-	      rule_base			     = extendRuleBaseList imp_rule_base orphan_rules
-	      final_rule_base		     = addRuleBaseFVs rule_base (ruleBaseFVs local_rule_base)
+	; let (local_rules, orphan_rules) = partition (isLocalId . fst) better_rules
+	      local_rule_rhs_fvs	  = unionVarSets (map (ruleRhsFreeVars . snd) local_rules)
+	      local_rule_base		  = extendRuleBaseList emptyRuleBase local_rules
+	      local_rule_ids		  = ruleBaseIds local_rule_base	-- Local Ids with rules attached
+	      imp_rule_base		  = foldl add_rules pkg_rule_base (moduleEnvElts hst)
+	      rule_base			  = extendRuleBaseList imp_rule_base orphan_rules
+	      final_rule_base		  = addRuleBaseFVs rule_base (ruleBaseFVs local_rule_base)
 		-- The last step black-lists the free vars of local rules too
 
 	; return (final_rule_base, (local_rule_ids, local_rule_rhs_fvs), orphan_rules)
@@ -202,8 +203,9 @@ prepareRules dflags pkg_rule_base hst us binds rules
     local_ids = foldr (unionVarSet . mkVarSet . bindersOf) emptyVarSet binds
 
 
-updateBinders :: IdSet 		-- Locally defined ids with their Rules attached
-	      -> IdSet		-- Ids free in the RHS of local rules
+updateBinders :: (IdSet, 		-- Locally defined ids with their Rules attached
+		  IdSet)		-- Ids free in the RHS of local rules
+	      -> IsExported
 	      -> [CoreBind] -> [CoreBind]
 	-- A horrible function
 
@@ -228,14 +230,14 @@ updateBinders :: IdSet 		-- Locally defined ids with their Rules attached
 --     the rules (maybe we should?), so this substitution would make the rule
 --     bogus.
 
-updateBinders rule_ids rule_rhs_fvs is_exported binds
+updateBinders (rule_ids, rule_rhs_fvs) is_exported binds
   = map update_bndrs binds
   where
     update_bndrs (NonRec b r) = NonRec (update_bndr b) r
     update_bndrs (Rec prs)    = Rec [(update_bndr b, r) | (b,r) <- prs]
 
     update_bndr bndr 
-	|  is_exported (getName bndr)
+	|  is_exported (idName bndr)
 	|| bndr `elemVarSet` rule_rhs_fvs = setIdNoDiscard bndr'
 	| otherwise			  = bndr'
 	where

@@ -37,9 +37,9 @@ import DataCon		( StrictnessMark(..), dataConSig, dataConFieldLabels, dataConStr
 import IdInfo		-- Lots
 import CoreSyn		( CoreExpr, CoreBind, Bind(..), CoreRule(..), IdCoreRule, 
 			  isBuiltinRule, rulesRules, rulesRhsFreeVars, emptyCoreRules,
-			  bindersOfBinds, mustHaveLocalBinding
+			  bindersOfBinds
 			)
-import CoreFVs		( exprSomeFreeVars, ruleSomeLhsFreeVars, ruleSomeFreeVars )
+import CoreFVs		( exprSomeFreeVars, ruleSomeLhsFreeVars, ruleSomeFreeVars, mustHaveLocalBinding )
 import CoreUnfold	( okToUnfoldInHiFile, mkTopUnfolding, neverUnfold, unfoldingTemplate, noUnfolding )
 import Name		( getName, nameModule, Name, NamedThing(..) )
 import Name 	-- Env

@@ -5,7 +5,7 @@
 
 \begin{code}
 module RnNames (
-	getGlobalNames
+	getGlobalNames, exportsFromAvail
     ) where
 
 #include "HsVersions.h"
@@ -58,7 +58,7 @@ getGlobalNames :: Module -> RdrNameHsModule
 			GlobalRdrEnv,	-- Maps just *local* things
 			ExportAvails)	-- The exported stuff
 
-getGlobalNames this_mod (HsModule _ _ exports imports decls _ mod_loc)
+getGlobalNames this_mod (HsModule _ _ _ imports decls _ mod_loc)
   = 		-- PROCESS LOCAL DECLS
 		-- Do these *first* so that the correct provenance gets
 		-- into the global name cache.

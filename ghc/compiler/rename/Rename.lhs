@@ -19,7 +19,7 @@ import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, RenamedRuleDecl, RenamedInstDe
 
 import CmdLineOpts	( DynFlags, DynFlag(..) )
 import RnMonad
-import RnNames		( getGlobalNames )
+import RnNames		( getGlobalNames, exportsFromAvail )
 import RnSource		( rnSourceDecls, rnTyClDecl, rnIfaceRuleDecl, rnInstDecl )
 import RnIfaces		( slurpImpDecls, mkImportInfo, 
 			  getInterfaceExports, closeDecls,
@@ -62,7 +62,7 @@ import Outputable
 import IO		( openFile, IOMode(..) )
 import HscTypes		( PersistentCompilerState, HomeIfaceTable, HomeSymbolTable, 
 			  ModIface(..), WhatsImported(..), 
-			  VersionInfo(..), ImportVersion, 
+			  VersionInfo(..), ImportVersion, IsExported,
 			  IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
 			  GlobalRdrEnv, pprGlobalRdrEnv,
 			  AvailEnv, GenAvailInfo(..), AvailInfo, Avails,
@@ -85,7 +85,7 @@ renameModule :: DynFlags
 	     -> HomeIfaceTable -> HomeSymbolTable
 	     -> PersistentCompilerState 
 	     -> Module -> RdrNameHsModule 
-	     -> IO (PersistentCompilerState, Maybe (PrintUnqualified, ModIface, [RenamedHsDecl]))
+	     -> IO (PersistentCompilerState, Maybe (PrintUnqualified, IsExported, ModIface, [RenamedHsDecl]))
 	-- Nothing => some error occurred in the renamer
 
 renameModule dflags hit hst old_pcs this_module rdr_module
@@ -95,10 +95,9 @@ renameModule dflags hit hst old_pcs this_module rdr_module
 	; (new_pcs, msgs, maybe_rn_stuff) <- initRn dflags hit hst old_pcs this_module 
 						    (rename this_module rdr_module)
 
-	; let print_unqualified :: Name -> Bool	-- Is this chap in scope unqualified?
-	      print_unqualified = case maybe_rn_stuff of
-				    Just (unqual, _, _) -> unqual
-				    Nothing	        -> alwaysQualify
+	; let print_unqualified = case maybe_rn_stuff of
+				    Just (unqual, _, _, _) -> unqual
+				    Nothing	           -> alwaysQualify
 
 
 	 	-- Print errors from renaming
@@ -114,7 +113,7 @@ renameModule dflags hit hst old_pcs this_module rdr_module
 
 \begin{code}
 rename :: Module -> RdrNameHsModule -> RnMG (Maybe (PrintUnqualified, IsExported, ModIface, [RenamedHsDecl]))
-rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
+rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec loc)
   = pushSrcLocRn loc		$
 
  	-- FIND THE GLOBAL NAME ENVIRONMENT
@@ -128,7 +127,7 @@ rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
 	returnRn Nothing 
     else
 	
-		-- PROCESS EXPORT LIST (but not if we've had errors already)
+	-- PROCESS EXPORT LIST 
     exportsFromAvail mod_name exports all_avails gbl_env	`thenRn` \ export_avails ->
 	
     traceRn (text "Local top-level environment" $$ 

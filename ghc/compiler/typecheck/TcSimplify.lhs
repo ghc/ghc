@@ -1073,7 +1073,6 @@ tcSimplifyTop wanted_lie
 		-- Collect together all the bad guys
 	bad_guys = non_stds ++ concat std_bads
     in
-
 	-- Disambiguate the ones that look feasible
     mapTc disambigGroup std_oks		`thenTc` \ binds_ambig ->
 
@@ -1247,14 +1246,6 @@ warnDefault dicts default_ty
     warn dicts  = tcAddSrcLoc (get_loc (head dicts)) $
 		  warnTc True (vcat [ptext SLIT("Defaulting the following constraint(s) to type") <+> quotes (ppr default_ty),
 				     pprInstsInFull dicts])
-
-addRuleLhsErr dict
-  = addInstErrTcM (instLoc dict)
-	(tidy_env,
-	 vcat [ptext SLIT("Could not deduce") <+> quotes (pprInst tidy_dict),
-	       nest 4 (ptext SLIT("LHS of a rule must have no overloading"))])
-  where
-    (tidy_env, tidy_dict) = tidyInst emptyTidyEnv dict
 
 addTopIPErr dict
   = addInstErrTcM (instLoc dict) 

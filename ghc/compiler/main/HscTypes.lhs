@@ -231,7 +231,7 @@ lookupIface hit pit name
 lookupIfaceByModName :: HomeIfaceTable -> PackageIfaceTable -> ModuleName -> Maybe ModIface
 -- We often have two IfaceTables, and want to do a lookup
 lookupIfaceByModName hit pit mod
-  = lookupModuleEnvByName ht mod `seqMaybe` lookupModuleEnvByName pt mod
+  = lookupModuleEnvByName hit mod `seqMaybe` lookupModuleEnvByName pit mod
 \end{code}
 
 

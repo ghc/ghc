@@ -27,7 +27,7 @@ import CoreUtils	( exprIsTrivial, cheapEqExpr, exprType, exprIsCheap, exprEtaExp
 import Subst		( InScopeSet, mkSubst, substBndrs, substBndr, substIds, substExpr )
 import Id		( idType, idName, 
 			  idUnfolding, idStrictness,
-			  mkId, idInfo
+			  mkVanillaId, idInfo
 			)
 import IdInfo		( StrictnessInfo(..), ArityInfo, atLeastArity, vanillaIdInfo )
 import Maybes		( maybeToBool, catMaybes )
@@ -621,7 +621,7 @@ tryRhsTyLam rhs thing_inside		-- Only does something if there's a let
 	let
 	    poly_name = setNameUnique (idName var) uniq		-- Keep same name
 	    poly_ty   = mkForAllTys tyvars_here (idType var)	-- But new type of course
-	    poly_id   = mkId poly_name poly_ty vanillaIdInfo
+	    poly_id   = mkVanillaId poly_name poly_ty 
 
 		-- In the olden days, it was crucial to copy the occInfo of the original var, 
 		-- because we were looking at occurrence-analysed but as yet unsimplified code!

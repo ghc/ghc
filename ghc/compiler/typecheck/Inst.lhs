@@ -50,10 +50,10 @@ import TcType	( TcThetaType,
 		  zonkTcTyVars, zonkTcType, zonkTcTypes, 
 		  zonkTcThetaType
 		)
-import Bag
+import CoreFVs	( idFreeTyVars )
 import Class	( Class, FunDep )
 import FunDeps	( instantiateFdClassTys )
-import Id	( Id, idFreeTyVars, idType, mkUserLocal, mkSysLocal )
+import Id	( Id, idType, mkUserLocal, mkSysLocal )
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
 import Name	( mkDictOcc, mkMethodOcc, mkIPOcc, getOccName, nameUnique )
 import PprType	( pprPred )	
@@ -77,6 +77,7 @@ import TysWiredIn ( isIntTy,
 import PrelNames( Unique, hasKey, fromIntName, fromIntegerClassOpKey )
 import Maybe	( catMaybes )
 import Util	( thenCmp, zipWithEqual, mapAccumL )
+import Bag
 import Outputable
 \end{code}
 

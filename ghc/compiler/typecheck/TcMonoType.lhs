@@ -50,7 +50,8 @@ import Type		( Type, Kind, PredType(..), ThetaType,
 			)
 import PprType		( pprType, pprPred )
 import Subst		( mkTopTyVarSubst, substTy )
-import Id		( mkVanillaId, idName, idType, idFreeTyVars )
+import CoreFVs		( idFreeTyVars )
+import Id		( mkVanillaId, idName, idType )
 import Var		( Id, Var, TyVar, mkTyVar, tyVarKind )
 import VarEnv
 import VarSet

@@ -10,7 +10,7 @@ Haskell. [WDP 94/11])
 module IdInfo (
 	IdInfo,		-- Abstract
 
-	vanillaIdInfo, mkIdInfo, seqIdInfo, megaSeqIdInfo,
+	vanillaIdInfo, constantIdInfo, mkIdInfo, seqIdInfo, megaSeqIdInfo,
 
 	-- Zapping
 	zapFragileInfo,	zapLamInfo, zapSpecPragInfo, shortableIdInfo, copyIdInfo,
@@ -164,7 +164,7 @@ megaSeqIdInfo info
 Setters
 
 \begin{code}
-setFlavourInfo    info fl = fl `seq` info { flavourInfo = wk }
+setFlavourInfo    info fl = fl `seq` info { flavourInfo = fl }
 setWorkerInfo     info wk = wk `seq` info { workerInfo = wk }
 setSpecInfo 	  info sp = PSEQ sp (info { specInfo = sp })
 setTyGenInfo      info tg = tg `seq` info { tyGenInfo = tg }
@@ -198,7 +198,7 @@ setCprInfo        info cp = info { cprInfo = cp }
 setLBVarInfo      info lb = info { lbvarInfo = lb }
 
 setNoDiscardInfo  info = case flavourInfo info of
-				VanillaId -> info { flavourInfo = NoDiscardId }
+				VanillaId -> info { flavourInfo = ExportedId }
 				other	  -> info
 zapSpecPragInfo   info = case flavourInfo info of
 				SpecPragmaId -> info { flavourInfo = VanillaId }
@@ -209,6 +209,9 @@ zapSpecPragInfo   info = case flavourInfo info of
 \begin{code}
 vanillaIdInfo :: IdInfo
 vanillaIdInfo = mkIdInfo VanillaId
+
+constantIdInfo :: IdInfo
+constantIdInfo = mkIdInfo ConstantId
 
 mkIdInfo :: IdFlavour -> IdInfo
 mkIdInfo flv = IdInfo {
@@ -241,7 +244,8 @@ data IdFlavour
   | ExportedId			-- Locally defined, exported
   | SpecPragmaId		-- Locally defined, RHS holds specialised call
 
-  | ImportedId 			-- Imported from elsewhere
+  | ConstantId 			-- Imported from elsewhere, or a dictionary function,
+				-- default method Id.
 
   | DataConId DataCon		-- The Id for a data constructor *worker*
   | DataConWrapId DataCon	-- The Id for a data constructor *wrapper*
@@ -257,7 +261,7 @@ ppFlavourInfo :: IdFlavour -> SDoc
 ppFlavourInfo VanillaId         = empty
 ppFlavourInfo ExportedId        = ptext SLIT("[Exported]")
 ppFlavourInfo SpecPragmaId    	= ptext SLIT("[SpecPrag]")
-ppFlavourInfo ImportedId        = ptext SLIT("[Imported]")
+ppFlavourInfo ConstantId        = ptext SLIT("[Constant]")
 ppFlavourInfo (DataConId _)     = ptext SLIT("[DataCon]")
 ppFlavourInfo (DataConWrapId _) = ptext SLIT("[DataConWrapper]")
 ppFlavourInfo (PrimOpId _)    	= ptext SLIT("[PrimOp]")

@@ -38,7 +38,7 @@ module PrelNames (
 
 import Module	  ( ModuleName, mkPrelModule, mkModuleName )
 import OccName	  ( NameSpace, UserFS, varName, dataName, tcName, clsName, mkKindOccFS )
-import RdrName	  ( RdrName, mkOrig, mkRdrOrig, mkUnqual )
+import RdrName	  ( RdrName, mkOrig, mkUnqual )
 import UniqFM
 import Unique	  ( Unique, Uniquable(..), hasKey,
 		    mkPreludeMiscIdUnique, mkPreludeDataConUnique,
@@ -48,7 +48,7 @@ import BasicTypes ( Boxity(..), Arity )
 import UniqFM	  ( UniqFM, listToUFM )
 import Name	  ( Name, mkLocalName, mkKnownKeyGlobal, nameRdrName )
 import RdrName    ( rdrNameOcc )
-import SrcLoc     ( noSrcLoc )
+import SrcLoc     ( builtinSrcLoc )
 import Util	  ( nOfThem )
 import Panic	  ( panic )
 \end{code}
@@ -582,7 +582,7 @@ dataQual mod str uq = mkKnownKeyGlobal (dataQual_RDR mod str) uq
 tcQual   mod str uq = mkKnownKeyGlobal (tcQual_RDR   mod str) uq
 clsQual  mod str uq = mkKnownKeyGlobal (clsQual_RDR  mod str) uq
 
-kindQual str uq = mkLocalName (mkKindOccFS tcName str) uq
+kindQual str uq = mkLocalName uq (mkKindOccFS tcName str) builtinSrcLoc
 	-- Kinds are not z-encoded in interface file, hence mkKindOccFS
 	-- And they don't come from any particular module; indeed we always
 	-- want to print them unqualified.  Hence the LocalName
@@ -960,7 +960,7 @@ noDictClassKeys 	-- These classes are used only for type annotations;
 -- mkUnboundName makes a place-holder Name; it shouldn't be looked at except possibly
 -- during compiler debugging.
 mkUnboundName :: RdrName -> Name
-mkUnboundName rdr_name = mkLocalName unboundKey (rdrNameOcc rdr_name) noSrcLoc
+mkUnboundName rdr_name = mkLocalName unboundKey (rdrNameOcc rdr_name) builtinSrcLoc
 
 isUnboundName :: Name -> Bool
 isUnboundName name = name `hasKey` unboundKey

@@ -27,7 +27,7 @@ import TcClassDcl	( tcClassDecls2, mkImplicitClassBinds )
 import TcDefaults	( tcDefaults )
 import TcEnv		( TcEnv, InstInfo(iDFunId), tcExtendGlobalValEnv, 
 			  tcEnvTyCons, tcEnvClasses,  isLocalThing,
-			  RecTcEnv, tcSetEnv, tcSetInstEnv, initTcEnv, getTcGEnv
+			  tcSetEnv, tcSetInstEnv, initTcEnv, getTcGEnv
 			)
 import TcRules		( tcRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
@@ -89,12 +89,7 @@ typecheckModule dflags this_mod pcs hst mod_iface unqual decls
   = do	{ showPass dflags "Typechecker";
 	; env <- initTcEnv hst (pcs_PTE pcs)
 
-	; (maybe_result, (warns,errs)) <- initTc dflags env tc_module
-
-	; let { maybe_tc_result :: Maybe TcResults ;
-	        maybe_tc_result = case maybe_result of
-					Nothing    -> Nothing
-				 	Just (_,r) -> Just r }
+	; (maybe_tc_result, (warns,errs)) <- initTc dflags env (tcModule pcs hst get_fixity this_mod decls)
 
 	; printErrorsAndWarnings unqual (errs,warns)
 	; printTcDump dflags maybe_tc_result
@@ -105,9 +100,6 @@ typecheckModule dflags this_mod pcs hst mod_iface unqual decls
              return Nothing 
 	}
   where
-    tc_module :: TcM (RecTcEnv, TcResults)
-    tc_module = fixTc (\ ~(unf_env ,_) -> tcModule pcs hst get_fixity this_mod decls unf_env)
-
     fixity_env = mi_fixities mod_iface
 
     get_fixity :: Name -> Maybe Fixity
@@ -121,81 +113,94 @@ tcModule :: PersistentCompilerState
 	 -> (Name -> Maybe Fixity)
 	 -> Module
 	 -> [RenamedHsDecl]
-	 -> RecTcEnv		-- The knot-tied environment
-	 -> TcM (TcEnv, TcResults)
+	 -> TcM TcResults
 
-  -- (unf_env :: RecTcEnv) is used for type-checking interface pragmas
-  -- which is done lazily [ie failure just drops the pragma
-  -- without having any global-failure effect].
-  -- 
-  -- unf_env is also used to get the pragama info
-  -- for imported dfuns and default methods
-
-tcModule pcs hst get_fixity this_mod decls unf_env
+tcModule pcs hst get_fixity this_mod decls
   = 		 -- Type-check the type and class decls
-    tcTyAndClassDecls unf_env decls		`thenTc` \ env ->
-    tcSetEnv env 				$
-    let
-        classes = tcEnvClasses env
-        tycons  = tcEnvTyCons env	-- INCLUDES tycons derived from classes
-    in
+    fixTc (\ ~(unf_env, _, _, _, _) -> 
+	  -- (unf_env :: RecTcEnv) is used for type-checking interface pragmas
+	  -- which is done lazily [ie failure just drops the pragma
+	  -- without having any global-failure effect].
+	  -- 
+	  -- unf_env is also used to get the pragama info
+	  -- for imported dfuns and default methods
+		
+--	traceTc (text "Tc1")			`thenNF_Tc_`
+	tcTyAndClassDecls unf_env decls		`thenTc` \ env ->
+	tcSetEnv env 				$
+	let
+	    classes = tcEnvClasses env
+	    tycons  = tcEnvTyCons env	-- INCLUDES tycons derived from classes
+	in
+	
+		-- Typecheck the instance decls, includes deriving
+--	traceTc (text "Tc2")	`thenNF_Tc_`
+	tcInstDecls1 (pcs_insts pcs) (pcs_PRS pcs) 
+			 hst unf_env get_fixity this_mod 
+			 tycons decls		`thenTc` \ (new_pcs_insts, inst_env, local_inst_info, deriv_binds) ->
+	tcSetInstEnv inst_env			$
+	
+	-- Interface type signatures
+	-- We tie a knot so that the Ids read out of interfaces are in scope
+	--   when we read their pragmas.
+	-- What we rely on is that pragmas are typechecked lazily; if
+	--   any type errors are found (ie there's an inconsistency)
+	--   we silently discard the pragma
+	-- We must do this before mkImplicitDataBinds (which comes next), since
+	-- the latter looks up unpackCStringId, for example, which is usually 
+	-- imported
+--	traceTc (text "Tc3")			`thenNF_Tc_`
+	tcInterfaceSigs unf_env decls		`thenTc` \ sig_ids ->
+	tcExtendGlobalValEnv sig_ids		$
+	
+	-- Create any necessary record selector Ids and their bindings
+	-- "Necessary" includes data and newtype declarations
+	-- We don't create bindings for dictionary constructors;
+	-- they are always fully applied, and the bindings are just there
+	-- to support partial applications
+	mkImplicitDataBinds  this_mod tycons	`thenTc`    \ (data_ids, imp_data_binds) ->
+	mkImplicitClassBinds this_mod classes	`thenNF_Tc` \ (cls_ids,  imp_cls_binds) ->
+	
+	-- Extend the global value environment with 
+	--	(a) constructors
+	--	(b) record selectors
+	--	(c) class op selectors
+	-- 	(d) default-method ids... where? I can't see where these are
+	--	    put into the envt, and I'm worried that the zonking phase
+	--	    will find they aren't there and complain.
+	tcExtendGlobalValEnv data_ids		$
+	tcExtendGlobalValEnv cls_ids		$
+	tcGetEnv					`thenTc` \ unf_env ->
+	returnTc (unf_env, new_pcs_insts, local_inst_info, deriv_binds,
+			   imp_data_binds `AndMonoBinds` imp_cls_binds)
+    )		`thenTc` \ (env, new_pcs_insts, local_inst_info, deriv_binds, data_cls_binds) ->
     
-    	-- Typecheck the instance decls, includes deriving
-    tcInstDecls1 (pcs_insts pcs) (pcs_PRS pcs) 
-		 hst unf_env get_fixity this_mod 
-		 tycons decls		`thenTc` \ (new_pcs_insts, inst_env, local_inst_info, deriv_binds) ->
-    tcSetInstEnv inst_env			$
-    
-        -- Default declarations
-    tcDefaults decls				`thenTc` \ defaulting_tys ->
-    tcSetDefaultTys defaulting_tys 		$
-    
-    -- Interface type signatures
-    -- We tie a knot so that the Ids read out of interfaces are in scope
-    --   when we read their pragmas.
-    -- What we rely on is that pragmas are typechecked lazily; if
-    --   any type errors are found (ie there's an inconsistency)
-    --   we silently discard the pragma
-    -- We must do this before mkImplicitDataBinds (which comes next), since
-    -- the latter looks up unpackCStringId, for example, which is usually 
-    -- imported
-    tcInterfaceSigs unf_env decls		`thenTc` \ sig_ids ->
-    tcExtendGlobalValEnv sig_ids		$
-    
-    -- Create any necessary record selector Ids and their bindings
-    -- "Necessary" includes data and newtype declarations
-    -- We don't create bindings for dictionary constructors;
-    -- they are always fully applied, and the bindings are just there
-    -- to support partial applications
-    mkImplicitDataBinds  this_mod tycons	`thenTc`    \ (data_ids, imp_data_binds) ->
-    mkImplicitClassBinds this_mod classes	`thenNF_Tc` \ (cls_ids,  imp_cls_binds) ->
-    
-    -- Extend the global value environment with 
-    --	(a) constructors
-    --	(b) record selectors
-    --	(c) class op selectors
-    -- 	(d) default-method ids... where? I can't see where these are
-    --	    put into the envt, and I'm worried that the zonking phase
-    --	    will find they aren't there and complain.
-    tcExtendGlobalValEnv data_ids		$
-    tcExtendGlobalValEnv cls_ids		$
-    tcGetEnv					`thenTc` \ unf_env ->
-    
+    tcSetEnv env				$
+
         -- Foreign import declarations next
+--  traceTc (text "Tc4")			`thenNF_Tc_`
     tcForeignImports decls			`thenTc`    \ (fo_ids, foi_decls) ->
     tcExtendGlobalValEnv fo_ids			$
     
-    -- Value declarations next.
-    -- We also typecheck any extra binds that came out of the "deriving" process
+	-- Default declarations
+    tcDefaults decls				`thenTc` \ defaulting_tys ->
+    tcSetDefaultTys defaulting_tys 		$
+	
+	-- Value declarations next.
+	-- We also typecheck any extra binds that came out of the "deriving" process
+--  traceTc (text "Tc5")					`thenNF_Tc_`
     tcTopBinds (get_binds decls `ThenBinds` deriv_binds)	`thenTc` \ ((val_binds, env), lie_valdecls) ->
     tcSetEnv env $
     
-        -- Foreign export declarations next
+	-- Foreign export declarations next
+--  traceTc (text "Tc6")		`thenNF_Tc_`
     tcForeignExports decls		`thenTc`    \ (lie_fodecls, foe_binds, foe_decls) ->
     
     	-- Second pass over class and instance declarations,
     	-- to compile the bindings themselves.
+--  traceTc (text "Tc7")			`thenNF_Tc_`
     tcInstDecls2  local_inst_info		`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
+--  traceTc (text "Tc8")			`thenNF_Tc_`
     tcClassDecls2 this_mod decls		`thenNF_Tc` \ (lie_clasdecls, cls_dm_binds) ->
     tcRules (pcs_rules pcs) this_mod decls	`thenNF_Tc` \ (new_pcs_rules, lie_rules, local_rules) ->
     
@@ -217,14 +222,14 @@ tcModule pcs hst get_fixity this_mod decls unf_env
         -- Backsubstitution.    This must be done last.
         -- Even tcSimplifyTop may do some unification.
     let
-        all_binds = imp_data_binds 	`AndMonoBinds` 
-    		    imp_cls_binds	`AndMonoBinds` 
+        all_binds = data_cls_binds 	`AndMonoBinds` 
     		    val_binds		`AndMonoBinds`
     	            inst_binds		`AndMonoBinds`
     	            cls_dm_binds	`AndMonoBinds`
     	            const_inst_binds	`AndMonoBinds`
     		    foe_binds
     in
+--  traceTc (text "Tc9")		`thenNF_Tc_`
     zonkTopBinds all_binds		`thenNF_Tc` \ (all_binds', final_env)  ->
     tcSetEnv final_env			$
     	-- zonkTopBinds puts all the top-level Ids into the tcGEnv
@@ -247,8 +252,8 @@ tcModule pcs hst get_fixity this_mod decls unf_env
 			  pcs_rules = new_pcs_rules
 		    }
     in  
-    returnTc (unf_env,
-	      TcResults { tc_pcs     = final_pcs,
+--  traceTc (text "Tc10")		`thenNF_Tc_`
+    returnTc (TcResults { tc_pcs     = final_pcs,
 			  tc_env     = local_type_env,
 			  tc_binds   = all_binds', 
 			  tc_insts   = map iDFunId local_inst_info,

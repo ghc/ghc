@@ -25,7 +25,6 @@ module Id (
 	omitIfaceSigForId, isDeadBinder,
 	exportWithOrigOccName,
 	externallyVisibleId,
-	idFreeTyVars,
 	isIP,
 	isSpecPragmaId,	isRecordSelector,
 	isPrimOpId, isPrimOpId_maybe, 
@@ -82,8 +81,7 @@ import Var		( Id, DictId,
 			  maybeModifyIdInfo,
 			  externallyVisibleId
 			)
-import VarSet
-import Type		( Type, tyVarsOfType, typePrimRep, addFreeTyVars, 
+import Type		( Type, typePrimRep, addFreeTyVars, 
                           usOnce, seqType, splitTyConApp_maybe )
 
 import IdInfo 
@@ -133,9 +131,6 @@ Absolutely all Ids are made by mkId.  It
 \begin{code}
 mkId :: Name -> Type -> IdInfo -> Id
 mkId name ty info = mkIdVar name (addFreeTyVars ty) info
-
-mkImportedId :: Name -> Type -> IdInfo -> Id
-mkImportedId name ty info = mkId name ty (info `setFlavourInfo` ImportedId)
 \end{code}
 
 \begin{code}
@@ -183,9 +178,6 @@ mkTemplateLocal i ty = mkSysLocal SLIT("tpl") (mkBuiltinUnique i) ty
 %************************************************************************
 
 \begin{code}
-idFreeTyVars :: Id -> TyVarSet
-idFreeTyVars id = tyVarsOfType (idType id)
-
 setIdType :: Id -> Type -> Id
 	-- Add free tyvar info to the type
 setIdType id ty = seqType ty `seq` setVarType id (addFreeTyVars ty)
@@ -264,7 +256,7 @@ isExportedId id = case idFlavour id of
 isLocalId :: Id -> Bool
 -- True of Ids that are locally defined, but are not constants
 -- like data constructors, record selectors, and the like. 
--- See comments with CoreSyn.isLocalVar
+-- See comments with CoreFVs.isLocalVar
 isLocalId id = case idFlavour id of
 		 VanillaId    -> True
 		 ExportedId   -> True

@@ -19,7 +19,7 @@ import UsageSPInf       ( doUsageSPInf )
 import VarEnv
 import VarSet
 import Var		( Id, Var )
-import Id		( idType, idInfo, idName, 
+import Id		( idType, idInfo, idName, isExportedId,
 			  mkVanillaId, mkId, exportWithOrigOccName,
 			  idStrictness, setIdStrictness,
 			  idDemandInfo, setIdDemandInfo,
@@ -216,7 +216,7 @@ tidyTopId :: Module -> TidyEnv -> TidyEnv -> Id -> (TidyEnv, Id)
 tidyTopId mod env@(tidy_env, var_env) env_idinfo id
   =	-- Top level variables
     let
-	(tidy_env', name') = tidyTopName mod tidy_env (idIsExported id) (idName id)
+	(tidy_env', name') = tidyTopName mod tidy_env (isExportedId id) (idName id)
 	ty'	           = tidyTopType (idType id)
 	idinfo'		   = tidyIdInfo env_idinfo (idInfo id)
 	id'		   = mkId name' ty' idinfo'

@@ -57,7 +57,7 @@ import CoreSyn
 import CoreUtils	( exprType, exprIsTrivial, exprIsBottom, mkPiType )
 import CoreFVs		-- all of it
 import Subst
-import Id		( Id, idType, idFreeTyVars, mkSysLocal, isOneShotLambda, modifyIdInfo, 
+import Id		( Id, idType, mkSysLocal, isOneShotLambda, modifyIdInfo, 
 			  idSpecialisation, idWorkerInfo, setIdInfo
 			)
 import IdInfo		( workerExists, vanillaIdInfo, demandInfo, setDemandInfo )

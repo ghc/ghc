@@ -31,7 +31,7 @@ import TysWiredIn       ( genericTyCons,
 			  genUnitTyCon, genUnitDataCon, plusTyCon, inrDataCon,
 			  inlDataCon, crossTyCon, crossDataCon
 			)
-import IdInfo           ( vanillaIdInfo, setUnfoldingInfo )
+import IdInfo           ( constantIdInfo, setUnfoldingInfo )
 import CoreUnfold       ( mkTopUnfolding ) 
 
 import Unique		( mkBuiltinUnique )
@@ -258,8 +258,8 @@ mkTyConGenInfo tycon from_name to_name
     tycon_ty	 = mkTyConApp tycon tyvar_tys		-- T a b c
     tyvar_tys    = mkTyVarTys tyvars
 
-    from_id_info = vanillaIdInfo `setUnfoldingInfo` mkTopUnfolding from_fn
-    to_id_info   = vanillaIdInfo `setUnfoldingInfo` mkTopUnfolding to_fn
+    from_id_info = constantIdInfo `setUnfoldingInfo` mkTopUnfolding from_fn
+    to_id_info   = constantIdInfo `setUnfoldingInfo` mkTopUnfolding to_fn
 
     from_ty = mkForAllTys tyvars (mkFunTy tycon_ty rep_ty)
     to_ty   = mkForAllTys tyvars (mkFunTy rep_ty tycon_ty)

@@ -39,7 +39,7 @@ module TcHsSyn (
 import HsSyn	-- oodles of it
 
 -- others:
-import Id	( idName, idType, idUnfolding, setIdType, omitIfaceSigForId, isIP, Id )
+import Id	( idName, idType, isLocalId, idUnfolding, setIdType, isIP, Id )
 import DataCon	( dataConWrapId )	
 import TcEnv	( tcLookupGlobal_maybe, tcExtendGlobalValEnv,
 		  TcEnv, TcId, tcInstId
@@ -174,7 +174,7 @@ zonkIdOcc id
     let
 	new_id = case maybe_id' of
 		    Just (AnId id') -> id'
-		    other  -> pprTrace "zonkIdOcc: " (ppr id) id
+		    other  -> pprTrace "zonkIdOcc:" (ppr id) id
     in
     returnNF_Tc new_id
 \end{code}

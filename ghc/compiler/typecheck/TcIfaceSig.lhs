@@ -29,7 +29,7 @@ import CoreUnfold
 import CoreLint		( lintUnfolding )
 import WorkWrap		( mkWrapper )
 
-import Id		( Id, mkId, mkImportedId, isDataConWrapId_maybe )
+import Id		( Id, mkId, mkVanillaId, isDataConWrapId_maybe )
 import MkId		( mkCCallOpId )
 import IdInfo
 import DataCon		( dataConSig, dataConArgTys )
@@ -68,12 +68,12 @@ tcInterfaceSigs unf_env decls
 	tcHsType ty					`thenTc` \ sigma_ty ->
 	tcIdInfo unf_env in_scope_vars name 
 		 sigma_ty vanillaIdInfo id_infos	`thenTc` \ id_info ->
-	returnTc (mkImportedId name sigma_ty id_info)
+	returnTc (mkId name sigma_ty id_info)
 \end{code}
 
 \begin{code}
 tcIdInfo unf_env in_scope_vars name ty info info_ins
-  = foldlTc tcPrag vanillaIdInfo info_ins
+  = foldlTc tcPrag constantIdInfo info_ins
   where
     tcPrag info (HsArity arity) = returnTc (info `setArityInfo`  arity)
     tcPrag info (HsNoCafRefs)   = returnTc (info `setCafInfo`	 NoCafRefs)

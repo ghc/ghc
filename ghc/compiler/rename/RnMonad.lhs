@@ -102,7 +102,7 @@ traceHiDiffsRn msg
      if b then putDocRn msg else returnRn ()
 
 putDocRn :: SDoc -> RnM d ()
-putDocRn msg = ioToRnM (printDump msg)	`thenRn_`
+putDocRn msg = ioToRnM (printErrs alwaysQualify msg)	`thenRn_`
 	       returnRn ()
 \end{code}
 

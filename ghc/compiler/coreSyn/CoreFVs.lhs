@@ -5,12 +5,12 @@ Taken quite directly from the Peyton Jones/Lester paper.
 
 \begin{code}
 module CoreFVs (
+	isLocalVar, mustHaveLocalBinding,
+
 	exprFreeVars, exprsFreeVars,
 	exprSomeFreeVars, exprsSomeFreeVars,
-	idRuleVars, idFreeVars, 
+	idRuleVars, idFreeVars, idFreeTyVars,
 	ruleSomeFreeVars, ruleSomeLhsFreeVars, ruleRhsFreeVars,
-
-	mustHaveLocalBinding,
 
 	CoreExprWithFVs, CoreBindWithFVs, freeVars, freeVarsOf,
     ) where
@@ -18,12 +18,35 @@ module CoreFVs (
 #include "HsVersions.h"
 
 import CoreSyn
-import Id		( Id, idFreeTyVars, hasNoBinding, idSpecialisation )
+import Id		( Id, idName, idType, isLocalId, hasNoBinding, idSpecialisation )
 import VarSet
 import Var		( Var, isId )
 import Type		( tyVarsOfType )
 import Util		( mapAndUnzip )
 import Outputable
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{isLocalVar}
+%*									*
+%************************************************************************
+
+@isLocalVar@ returns True of all TyVars, and of Ids that are defined in 
+this module and are not constants like data constructors and record selectors.
+These are the variables that we need to pay attention to when finding free
+variables, or doing dependency analysis.
+
+\begin{code}
+isLocalVar :: Var -> Bool
+isLocalVar v = isTyVar v || isLocalId v
+\end{code}
+
+\begin{code}
+mustHaveLocalBinding :: Var -> Bool
+-- True <=> the variable must have a binding in this module
+mustHaveLocalBinding v = isTyVar v || (isLocalId v && not (hasNoBinding v))
 \end{code}
 
 
@@ -138,11 +161,18 @@ expr_fvs (Let (Rec pairs) body)
 
 
 \begin{code}
-idRuleVars ::Id -> VarSet
-idRuleVars id = ASSERT( isId id) rulesRhsFreeVars (idSpecialisation id)
-
 idFreeVars :: Id -> VarSet
 idFreeVars id = ASSERT( isId id) idRuleVars id `unionVarSet` idFreeTyVars id
+
+idFreeTyVars :: Id -> TyVarSet
+-- Only local Ids conjured up locally, can have free type variables.
+-- (During type checking top-level Ids can have free tyvars)
+idFreeTyVars id = tyVarsOfType (idType id)
+-- | isLocalId id = tyVarsOfType (idType id)
+--		| otherwise    = emptyVarSet
+
+idRuleVars ::Id -> VarSet
+idRuleVars id = ASSERT( isId id) rulesRhsFreeVars (idSpecialisation id)
 
 rulesSomeFreeVars :: InterestingVarFun -> CoreRules -> VarSet
 rulesSomeFreeVars interesting (Rules rules _)
