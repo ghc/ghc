@@ -1137,7 +1137,7 @@ dnl ** check for wide-char classifications
 dnl FreeBSD has an emtpy wctype.h, so test one of the affected
 dnl functions if it's really there.
 AC_CHECK_HEADERS(wctype.h,
-  AC_CHECK_FUNCS(iswspace)
+  [AC_CHECK_FUNCS(iswspace)]
 )
 
 dnl ** check for readline, for Hugs and hslibs' Readline
