@@ -1,5 +1,5 @@
 /* --------------------------------------------------------------------------
- * $Id: mkDerivedConstants.c,v 1.2 2002/01/29 16:49:42 simonmar Exp $
+ * $Id: mkDerivedConstants.c,v 1.3 2002/01/29 18:32:18 sof Exp $
  *
  * (c) The GHC Team, 1992-1998
  *
@@ -19,8 +19,6 @@ main(int argc, char *argv[])
     printf("#define STD_HDR_SIZE   %d\n", sizeofW(StgHeader));
     printf("#define PROF_HDR_SIZE  %d\n", sizeofW(StgProfHeader));
     printf("#define GRAN_HDR_SIZE  %d\n", sizeofW(StgGranHeader));
-    printf("#define PAR_HDR_SIZE   %d\n", sizeofW(StgParHeader));
-    printf("#define TICKY_HDR_SIZE %d\n", sizeofW(StgTickyHeader));
 
     printf("#define ARR_WORDS_HDR_SIZE  %d\n", 
 	   sizeofW(StgArrWords) - sizeofW(StgHeader));
