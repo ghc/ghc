@@ -121,7 +121,14 @@ nativeCodeGen dflags cmms us
 	   returnUs (Cmm cmms, my_vcat docs, concat imps)
     in do
     dumpIfSet_dyn dflags Opt_D_dump_opt_cmm "Optimised Cmm" (pprCmms [ppr_cmms])
-    return (insn_sdoc Pretty.$$ dyld_stubs imports)
+    return (insn_sdoc Pretty.$$ dyld_stubs imports
+#if HAVE_SUBSECTIONS_VIA_SYMBOLS
+                -- On recent versions of Darwin, the linker supports
+                -- dead-stripping of code and data on a per-symbol basis.
+                -- There's a hack to make this work in PprMach.pprNatCmmTop.
+            Pretty.$$ Pretty.text ".subsections_via_symbols"
+#endif
+            )
 
   where
 

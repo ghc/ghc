@@ -27,6 +27,9 @@ import MachInstrs
 
 import CLabel		( CLabel, pprCLabel, externallyVisibleCLabel,
 			  labelDynamic, mkAsmTempLabel, entryLblToInfoLbl )
+#if HAVE_SUBSECTIONS_VIA_SYMBOLS
+import CLabel       ( mkDeadStripPreventer )
+#endif
 
 import Panic		( panic )
 import Unique		( pprUnique )
@@ -68,8 +71,13 @@ pprNatCmmTop (CmmProc [] lbl _ []) = pprLabel lbl
 pprNatCmmTop (CmmProc info lbl params blocks) = 
   pprSectionHeader Text $$
   (if not (null info)
-	then vcat (map pprData info) 
-		$$ pprLabel (entryLblToInfoLbl lbl)
+	then
+#if HAVE_SUBSECTIONS_VIA_SYMBOLS
+            pprCLabel_asm (mkDeadStripPreventer $ entryLblToInfoLbl lbl)
+                <> char ':' $$
+#endif
+            vcat (map pprData info) $$
+            pprLabel (entryLblToInfoLbl lbl)
 	else empty) $$
   (case blocks of
 	[] -> empty
@@ -77,7 +85,22 @@ pprNatCmmTop (CmmProc info lbl params blocks) =
 		(if null info then pprLabel lbl else empty) $$
 		-- the first block doesn't get a label:
 		vcat (map pprInstr instrs) $$
-		vcat (map pprBasicBlock rest))
+		vcat (map pprBasicBlock rest)
+  )
+#if HAVE_SUBSECTIONS_VIA_SYMBOLS
+        -- If we are using the .subsections_via_symbols directive
+        -- (available on recent versions of Darwin),
+        -- we have to make sure that there is some kind of reference
+        -- from the entry code to a label on the _top_ of of the info table,
+        -- so that the linker will not think it is unreferenced and dead-strip
+        -- it. That's why the label is called a DeadStripPreventer (_dsp).
+  $$ if not (null info)
+		    then text "\t.long "
+		      <+> pprCLabel_asm (entryLblToInfoLbl lbl)
+		      <+> char '-'
+		      <+> pprCLabel_asm (mkDeadStripPreventer $ entryLblToInfoLbl lbl)
+		    else empty
+#endif
 
 
 pprBasicBlock :: NatBasicBlock -> Doc

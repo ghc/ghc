@@ -1245,6 +1245,22 @@ dnl ** check for ld, whether it has an -x option, and if it is GNU ld
 FP_PROG_LD_X
 FP_PROG_LD_IS_GNU
 
+dnl ** check for Apple-style dead-stripping support
+dnl    (.subsections-via-symbols assembler directive)
+
+
+AC_MSG_CHECKING(for .subsections_via_symbols)
+AC_TRY_COMPILE(,[__asm__ (".subsections_via_symbols");],
+    [
+        AC_MSG_RESULT(yes)
+        AC_DEFINE([HAVE_SUBSECTIONS_VIA_SYMBOLS],[1],
+            [Define to 1 if Apple-style dead-stripping is supported.])
+    ],
+    [
+        AC_DEFINE([HAVE_SUBSECTIONS_VIA_SYMBOLS],[0],
+            [Define to 1 if Apple-style dead-stripping is supported.])
+    ])
+
 AC_CONFIG_FILES([mk/config.mk])
 AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])
 AC_OUTPUT

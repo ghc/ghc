@@ -534,6 +534,11 @@ extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg);
 #ifdef darwin_TARGET_OS
 static void StgRunIsImplementedInAssembler(void)
 {
+#if HAVE_SUBSECTIONS_VIA_SYMBOLS
+            // if the toolchain supports deadstripping, we have to
+            // prevent it here (it tends to get confused here).
+        __asm__ volatile (".no_dead_strip _StgRunIsImplementedInAssembler");
+#endif
 	__asm__ volatile (
 		"\n.globl _StgRun\n"
 		"_StgRun:\n"
