@@ -17,13 +17,11 @@ module ErrUtils (
 
 IMP_Ubiq(){-uitous-}
 
+import CmdLineOpts      ( opt_PprUserLength )
 import Bag		--( bagToList )
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..), Outputable(..) )
 import Pretty
 import SrcLoc		( noSrcLoc, SrcLoc{-instance-} )
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable
-#endif
 \end{code}
 
 \begin{code}
@@ -33,7 +31,7 @@ type Message = PprStyle -> Doc
 
 addErrLoc :: SrcLoc -> String -> Error -> Error
 addErrLoc locn title rest_of_err_msg sty
-  = hang (hcat [ppr PprForUser locn,
+  = hang (hcat [ppr (PprForUser opt_PprUserLength) locn,
 		if null title then empty else text (": " ++ title),
 		char ':'])
     	 4 (rest_of_err_msg sty)
@@ -41,11 +39,11 @@ addErrLoc locn title rest_of_err_msg sty
 addShortErrLocLine, addShortWarnLocLine :: SrcLoc -> Error -> Error
 
 addShortErrLocLine locn rest_of_err_msg sty
-  = hang ((<>) (ppr PprForUser locn) (char ':'))
+  = hang ((<>) (ppr (PprForUser opt_PprUserLength) locn) (char ':'))
 	 4 (rest_of_err_msg sty)
 
 addShortWarnLocLine locn rest_of_err_msg sty
-  = hang ((<>) (ppr PprForUser locn) (ptext SLIT(":warning:")))
+  = hang ((<>) (ppr (PprForUser opt_PprUserLength) locn) (ptext SLIT(":warning:")))
 	 4 (rest_of_err_msg sty)
 
 dontAddErrLoc :: String -> Error -> Error
