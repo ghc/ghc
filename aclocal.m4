@@ -954,6 +954,26 @@ fi
 ])# FP_PROG_FO_PROCESSOR
 
 
+# FP_PROG_GHC_PKG
+# ----------------
+# Try to find a ghc-pkg matching the ghc mentioned in the environment variable
+# WithGhc. If the latter is unset or no matching ghc-pkg can be found, try to
+# find a plain ghc-pkg. Sets the output variable GhcPkgCmd.
+AC_DEFUN([FP_PROG_GHC_PKG],
+[AC_CACHE_CHECK([for ghc-pkg matching $WithGhc], fp_cv_matching_ghc_pkg,
+[fp_ghc_pkg_guess=`echo $WithGhc | sed 's,ghc\(@<:@^/\\@:>@*\)$,ghc-pkg\1,'`
+if "$fp_ghc_pkg_guess" -l > /dev/null 2>&1; then
+  fp_cv_matching_ghc_pkg=$fp_ghc_pkg_guess
+else
+  fp_cv_matching_ghc_pkg=no
+fi])
+if test x"$fp_cv_matching_ghc_pkg" = xno; then
+  AC_PATH_PROG([GhcPkgCmd], [ghc-pkg])
+else
+  GhcPkgCmd=$fp_cv_matching_ghc_pkg
+fi])# FP_PROG_GHC_PKG
+
+
 # FP_CHECK_WIN32
 # --------------
 # If Windows is the target platform (e.g. MinGW/MSYS or Cygwin with

@@ -860,15 +860,7 @@ FP_DIR_DOCBOOK_XSL([/usr/share/xml/docbook/stylesheet/nwalsh/current /usr/share/
 FP_PROG_FO_PROCESSOR
 
 dnl ** check for ghc-pkg command
-changequote(, )dnl
-ghc_pkg_guess=`echo $WithGhc | sed 's@ghc\([^/\\]*\)$@ghc-pkg\1@'`
-changequote([, ])dnl
-if $ghc_pkg_guess -l >/dev/null 2>/dev/null; then
-   GhcPkgCmd=$ghc_pkg_guess
-   AC_MSG_NOTICE([using $ghc_pkg_guess for ghc-pkg])
-else
-   AC_PATH_PROG(GhcPkgCmd,ghc-pkg)
-fi
+FP_PROG_GHC_PKG
 
 AC_ARG_WITH(greencard,
 [AC_HELP_STRING([--with-greencard=ARG],
