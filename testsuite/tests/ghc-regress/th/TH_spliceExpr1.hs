@@ -1,4 +1,4 @@
--- test reification of type synonym declarations
+-- test representation and splicing of left-parenthesised right infix operators
 
 module TH_spliceExpr1
 where
