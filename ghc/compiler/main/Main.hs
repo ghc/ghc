@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.79 2001/07/03 11:14:33 simonmar Exp $
+-- $Id: Main.hs,v 1.80 2001/07/04 15:43:38 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -160,12 +160,6 @@ main =
    (flags2, mode, stop_flag) <- getGhcMode argv'
    writeIORef v_GhcMode mode
 
-	-- Show the GHCi banner?
-#  ifdef GHCI
-   when (mode == DoInteractive) $
-      hPutStrLn stdout ghciWelcomeMsg
-#  endif
-
 	-- process all the other arguments, and get the source files
    non_static <- processArgs static_flags flags2 []
 
@@ -233,9 +227,15 @@ main =
     	-- complain about any unknown flags
    mapM unknownFlagErr [ f | f@('-':_) <- srcs ]
 
-	-- Display details of the configuration in verbose mode
    verb <- dynFlag verbosity
 
+	-- Show the GHCi banner
+#  ifdef GHCI
+   when (mode == DoInteractive && verb >= 1) $
+      hPutStrLn stdout ghciWelcomeMsg
+#  endif
+
+	-- Display details of the configuration in verbose mode
    when (verb >= 2) 
 	(do hPutStr stderr "Glasgow Haskell Compiler, Version "
  	    hPutStr stderr cProjectVersion
