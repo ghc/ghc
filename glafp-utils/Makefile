@@ -14,6 +14,6 @@ include $(TOP)/mk/boilerplate.mk
 #
 # ToDo: remove msub for good
 #
-SUBDIRS = mkdependC fastmake lndir ltx mkdirhier runstdtest sgmlverb
+SUBDIRS = mkdependC lndir ltx mkdirhier runstdtest sgmlverb
 
 include $(TOP)/mk/target.mk
