@@ -58,7 +58,6 @@ import Monad
 import Maybe
 
 import PackedString
-import MatchPS
 
 -----------------------------------------------------------------------------
 -- genPipeline
@@ -981,9 +980,9 @@ doMkDLL o_files = do
 	 ++ pkg_lib_path_opts
 	 ++ pkg_lib_opts
 	 ++ pkg_extra_ld_opts
-         ++ (case findPS (packString (concat extra_ld_opts)) (packString "--def") of
-               Nothing -> [ "--export-all" ]
-	       Just _  -> [ "" ])
+         ++ (if "--def" `elem` (concatMap words extra_ld_opts)
+	       then [ "" ]
+               else [ "--export-all" ])
 	 ++ extra_ld_opts
 	))
 
