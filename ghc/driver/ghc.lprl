@@ -1140,7 +1140,7 @@ sub setupSyslibs {
   # to implement the itimers, since cygwin.dll does not
   # support it. Only reqd. for `ways' that use itimers.
   #
-  push(@SysLibrary, '-lwinmm')   if $TargetPlatform eq 'i386-unknown-cygwin32';
+  push(@SysLibrary, '-lwinmm')   if ($TargetPlatform =~ /-(mingw32|cygwin32)$/);
    # Note: currently only tested with mingw, may cause conflicts when linking
    #       with libcygwin.a
   push(@SysLibrary, '-lwsock32') if ($TargetPlatform =~ /-(mingw32|cygwin32)$/);
@@ -2007,8 +2007,8 @@ sub prepareWin32DllLink ()
          foreach $a ( @UserLibrary ) {
            $a = "${a}_imp" if ($a =~ /^-lHS/);
          }
-         push(@Link_file, ( $INSTALLING ) ? "$InstLibDirGhc/Main.o"
-			                  : "$TopPwd/$CURRENT_DIR/$GHC_RUNTIME_DIR/Main.o") if $linking_main;
+         push(@Link_file, ( $INSTALLING ) ? "$InstLibDirGhc/Main.dll_o"
+			                  : "$TopPwd/$CURRENT_DIR/$GHC_RUNTIME_DIR/Main.dll_o") if $linking_main;
          push(@Link_file, ( $INSTALLING ) ? "$InstLibDirGhc/PrelMain.o"
 			                  : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/PrelMain.o") if $linking_main;
        }
