@@ -52,6 +52,7 @@ module GlaExts
 
         -- misc bits
 	trace,
+	Lift(..),
 
         -- and finally, all the unboxed primops of GHC!
         module GHC
