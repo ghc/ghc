@@ -28,12 +28,10 @@ module Foreign.ForeignPtr
 	, touchForeignPtr
 	, castForeignPtr
 
-#ifndef __NHC__
 	, mallocForeignPtr
 	, mallocForeignPtrBytes
 	, mallocForeignPtrArray
 	, mallocForeignPtrArray0
-#endif
         ) 
 	where
 
@@ -49,6 +47,8 @@ import NHC.FFI
   , unsafeForeignPtrToPtr
   , touchForeignPtr
   , castForeignPtr
+  , Storable(sizeOf)
+  , malloc, mallocBytes, finalizerFree
   )
 #endif
 
@@ -118,7 +118,7 @@ withForeignPtr fo io
 unsafeForeignPtrToPtr = foreignPtrToPtr
 #endif
 
-#ifdef __HUGS__
+#ifndef __GLASGOW_HASKELL__
 mallocForeignPtr :: Storable a => IO (ForeignPtr a)
 mallocForeignPtr = do
   r <- malloc
@@ -128,9 +128,8 @@ mallocForeignPtrBytes :: Int -> IO (ForeignPtr a)
 mallocForeignPtrBytes n = do
   r <- mallocBytes n
   newForeignPtr r finalizerFree
-#endif /* __HUGS__ */
+#endif /* __HUGS__ || __NHC__ */
 
-#ifndef __NHC__
 mallocForeignPtrArray :: Storable a => Int -> IO (ForeignPtr a)
 mallocForeignPtrArray  = doMalloc undefined
   where
@@ -139,4 +138,3 @@ mallocForeignPtrArray  = doMalloc undefined
 
 mallocForeignPtrArray0      :: Storable a => Int -> IO (ForeignPtr a)
 mallocForeignPtrArray0 size  = mallocForeignPtrArray (size + 1)
-#endif
