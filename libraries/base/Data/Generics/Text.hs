@@ -68,7 +68,7 @@ gread = readP_to_S gread'
  where
 
   -- Helper for recursive read
-  gread' :: Data a => ReadP a
+  gread' :: Data a' => ReadP a'
   gread' = allButString `extR` stringCase
 
    where
@@ -80,7 +80,7 @@ gread = readP_to_S gread'
     -- Determine result type
     myDataType = dataTypeOf (getArg allButString)
      where
-      getArg :: ReadP a -> a
+      getArg :: ReadP a'' -> a''
       getArg = undefined
 
     -- The generic default for gread

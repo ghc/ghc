@@ -68,7 +68,7 @@ import Hugs.ForeignPtr		( FinalizerPtr )
 malloc :: Storable a => IO (Ptr a)
 malloc  = doMalloc undefined
   where
-    doMalloc       :: Storable a => a -> IO (Ptr a)
+    doMalloc       :: Storable b => b -> IO (Ptr b)
     doMalloc dummy  = mallocBytes (sizeOf dummy)
 
 -- |Allocate a block of memory of the given number of bytes.
@@ -91,7 +91,7 @@ mallocBytes size  = failWhenNULL "malloc" (_malloc (fromIntegral size))
 alloca :: Storable a => (Ptr a -> IO b) -> IO b
 alloca  = doAlloca undefined
   where
-    doAlloca       :: Storable a => a -> (Ptr a -> IO b) -> IO b
+    doAlloca       :: Storable a' => a' -> (Ptr a' -> IO b') -> IO b'
     doAlloca dummy  = allocaBytes (sizeOf dummy)
 
 -- |@'allocaBytes' n f@ executes the computation @f@, passing as argument
@@ -131,7 +131,7 @@ allocaBytes size  = bracket (mallocBytes size) free
 realloc :: Storable b => Ptr a -> IO (Ptr b)
 realloc  = doRealloc undefined
   where
-    doRealloc           :: Storable b => b -> Ptr a -> IO (Ptr b)
+    doRealloc           :: Storable b' => b' -> Ptr a' -> IO (Ptr b')
     doRealloc dummy ptr  = let
 			     size = fromIntegral (sizeOf dummy)
 			   in

@@ -116,7 +116,7 @@ unfoldTreeM_BF f b = liftM (fst . fromJust . deQueue) $
 -- by Chris Okasaki, /ICFP'00/.
 unfoldForestM_BF :: Monad m => (b -> m (a, [b])) -> [b] -> m (Forest a)
 unfoldForestM_BF f = liftM (reverseOnto []) . unfoldForestQ f . listToQueue
-  where reverseOnto :: [a] -> Queue a -> [a]
+  where reverseOnto :: [a'] -> Queue a' -> [a']
 	reverseOnto as q = case deQueue q of
 		Nothing -> as
 		Just (a, q') -> reverseOnto (a:as) q'
@@ -131,7 +131,7 @@ unfoldForestQ f aQ = case deQueue aQ of
 		tQ <- unfoldForestQ f (foldl addToQueue aQ as)
 		let (ts, tQ') = splitOnto [] as tQ
 		return (addToQueue tQ' (Node b ts))
-  where splitOnto :: [a] -> [b] -> Queue a -> ([a], Queue a)
+  where splitOnto :: [a'] -> [b'] -> Queue a' -> ([a'], Queue a')
 	splitOnto as [] q = (as, q)
 	splitOnto as (_:bs) q = case fromJust (deQueue q) of
 		(a, q') -> splitOnto (a:as) bs q'

@@ -106,7 +106,7 @@ mallocForeignPtr :: Storable a => IO (ForeignPtr a)
 -- assume that the memory returned by 'mallocForeignPtr' has been
 -- allocated with 'Foreign.Marshal.Alloc.malloc'.
 mallocForeignPtr = doMalloc undefined
-  where doMalloc :: Storable a => a -> IO (ForeignPtr a)
+  where doMalloc :: Storable b => b -> IO (ForeignPtr b)
         doMalloc a = do
   	  r <- newIORef []
 	  IO $ \s ->

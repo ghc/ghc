@@ -85,7 +85,7 @@ import GHC.Base
 mallocArray :: Storable a => Int -> IO (Ptr a)
 mallocArray  = doMalloc undefined
   where
-    doMalloc            :: Storable a => a -> Int -> IO (Ptr a)
+    doMalloc            :: Storable a' => a' -> Int -> IO (Ptr a')
     doMalloc dummy size  = mallocBytes (size * sizeOf dummy)
 
 -- |Like 'mallocArray', but add an extra position to hold a special
@@ -100,7 +100,7 @@ mallocArray0 size  = mallocArray (size + 1)
 allocaArray :: Storable a => Int -> (Ptr a -> IO b) -> IO b
 allocaArray  = doAlloca undefined
   where
-    doAlloca            :: Storable a => a -> Int -> (Ptr a -> IO b) -> IO b
+    doAlloca            :: Storable a' => a' -> Int -> (Ptr a' -> IO b') -> IO b'
     doAlloca dummy size  = allocaBytes (size * sizeOf dummy)
 
 -- |Like 'allocaArray', but add an extra position to hold a special
@@ -114,7 +114,7 @@ allocaArray0 size  = allocaArray (size + 1)
 reallocArray :: Storable a => Ptr a -> Int -> IO (Ptr a)
 reallocArray  = doRealloc undefined
   where
-    doRealloc                :: Storable a => a -> Ptr a -> Int -> IO (Ptr a)
+    doRealloc                :: Storable a' => a' -> Ptr a' -> Int -> IO (Ptr a')
     doRealloc dummy ptr size  = reallocBytes ptr (size * sizeOf dummy)
 
 -- |Adjust the size of an array including an extra position for the end marker.
@@ -237,7 +237,7 @@ withArrayLen0 marker vals f  =
 copyArray :: Storable a => Ptr a -> Ptr a -> Int -> IO ()
 copyArray  = doCopy undefined
   where
-    doCopy                     :: Storable a => a -> Ptr a -> Ptr a -> Int -> IO ()
+    doCopy                     :: Storable a' => a' -> Ptr a' -> Ptr a' -> Int -> IO ()
     doCopy dummy dest src size  = copyBytes dest src (size * sizeOf dummy)
 
 -- |Copy the given number of elements from the second array (source) into the
@@ -246,7 +246,7 @@ copyArray  = doCopy undefined
 moveArray :: Storable a => Ptr a -> Ptr a -> Int -> IO ()
 moveArray  = doMove undefined
   where
-    doMove                     :: Storable a => a -> Ptr a -> Ptr a -> Int -> IO ()
+    doMove                     :: Storable a' => a' -> Ptr a' -> Ptr a' -> Int -> IO ()
     doMove dummy dest src size  = moveBytes dest src (size * sizeOf dummy)
 
 
@@ -271,5 +271,5 @@ lengthArray0 marker ptr  = loop 0
 advancePtr :: Storable a => Ptr a -> Int -> Ptr a
 advancePtr  = doAdvance undefined
   where
-    doAdvance             :: Storable a => a -> Ptr a -> Int -> Ptr a
+    doAdvance             :: Storable a' => a' -> Ptr a' -> Int -> Ptr a'
     doAdvance dummy ptr i  = ptr `plusPtr` (i * sizeOf dummy)

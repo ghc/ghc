@@ -116,7 +116,7 @@ withPool = bracket newPool freePool
 pooledMalloc :: Storable a => Pool -> IO (Ptr a)
 pooledMalloc = pm undefined
   where
-    pm           :: Storable a => a -> Pool -> IO (Ptr a)
+    pm           :: Storable a' => a' -> Pool -> IO (Ptr a')
     pm dummy pool = pooledMallocBytes pool (sizeOf dummy)
 
 -- | Allocate the given number of bytes of storage in the pool.
@@ -134,7 +134,7 @@ pooledMallocBytes (Pool pool) size = do
 pooledRealloc :: Storable a => Pool -> Ptr a -> IO (Ptr a)
 pooledRealloc = pr undefined
   where
-    pr               :: Storable a => a -> Pool -> Ptr a -> IO (Ptr a)
+    pr               :: Storable a' => a' -> Pool -> Ptr a' -> IO (Ptr a')
     pr dummy pool ptr = pooledReallocBytes pool ptr (sizeOf dummy)
 
 -- | Adjust the storage area for an element in the pool to the given size.
@@ -154,7 +154,7 @@ pooledReallocBytes (Pool pool) ptr size = do
 pooledMallocArray :: Storable a => Pool -> Int -> IO (Ptr a)
 pooledMallocArray = pma undefined
   where
-    pma                :: Storable a => a -> Pool -> Int -> IO (Ptr a)
+    pma                :: Storable a' => a' -> Pool -> Int -> IO (Ptr a')
     pma dummy pool size = pooledMallocBytes pool (size * sizeOf dummy)
 
 -- | Allocate storage for the given number of elements of a storable type in the
@@ -169,7 +169,7 @@ pooledMallocArray0 pool size =
 pooledReallocArray :: Storable a => Pool -> Ptr a -> Int -> IO (Ptr a)
 pooledReallocArray = pra undefined
   where
-    pra                ::  Storable a => a -> Pool -> Ptr a -> Int -> IO (Ptr a)
+    pra                ::  Storable a' => a' -> Pool -> Ptr a' -> Int -> IO (Ptr a')
     pra dummy pool ptr size  = pooledReallocBytes pool ptr (size * sizeOf dummy)
 
 -- | Adjust the size of an array with an end marker in the given pool.

@@ -174,7 +174,7 @@ mallocForeignPtrBytes n = do
 mallocForeignPtrArray :: Storable a => Int -> IO (ForeignPtr a)
 mallocForeignPtrArray  = doMalloc undefined
   where
-    doMalloc            :: Storable a => a -> Int -> IO (ForeignPtr a)
+    doMalloc            :: Storable b => b -> Int -> IO (ForeignPtr b)
     doMalloc dummy size  = mallocForeignPtrBytes (size * sizeOf dummy)
 
 -- | This function is similar to 'Foreign.Marshal.Array.mallocArray0',
