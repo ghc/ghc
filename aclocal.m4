@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.106 2002/07/20 05:37:10 dons Exp $
+dnl $Id: aclocal.m4,v 1.107 2002/07/23 10:08:58 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -220,6 +220,26 @@ if test -d $srcdir/ghc -a ! -f $srcdir/ghc/compiler/parser/Parser.hs; then
 fi
 HappyVersion=$fptools_cv_happy_version;
 AC_SUBST(HappyVersion)
+])
+
+dnl
+dnl Check for Haddock and version.  If there's no installed Haddock, we look
+dnl for a haddock source tree and point the build system at that instead.
+dnl
+AC_DEFUN(FPTOOLS_HADDOCK,
+[
+if test -d $srcdir/haddock; then
+   SrcTreeHaddockCmd=$hardtop/haddock/src/haddock-inplace
+fi
+if test x"$UseSrcTreeHaddock" = xYES; then
+  HaddockCmd=$SrcTreeHaddockCmd
+else
+  AC_PATH_PROG(HaddockCmd,haddock,$SrcTreeHaddockCmd)
+fi
+dnl Darn, I forgot to make Haddock print out its version number when
+dnl invoked with -v.  We could try generating some HTML and grepping
+dnl through that to find the version number, but I think we'll make
+dnl do without it for now.
 ])
 
 dnl
