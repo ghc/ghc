@@ -55,6 +55,7 @@ import Panic		( panic )
 import GlaExts		( word2Int#, int2Word#, shiftRL#, and#, (/=#) )
 import Outputable	( pprPanic, ppr )
 import IOExts		( trace )
+import FastTypes
 \end{code}
 
 \begin{code}
@@ -168,11 +169,11 @@ exactLog2 x
   = if (x <= 0 || x >= 2147483648) then
        Nothing
     else
-       case (fromInteger x) of { I# x# ->
+       case iUnbox (fromInteger x) of { x# ->
        if (w2i ((i2w x#) `and#` (i2w (0# -# x#))) /=# x#) then
 	  Nothing
        else
-	  Just (toInteger (I# (pow2 x#)))
+	  Just (toInteger (iBox (pow2 x#)))
        }
   where
     shiftr x y = shiftRL# x y

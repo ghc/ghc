@@ -45,107 +45,107 @@ pprReg :: IF_ARCH_i386(Size ->,) Reg -> SDoc
 
 pprReg IF_ARCH_i386(s,) r
   = case r of
-      RealReg (I# i) -> ppr_reg_no IF_ARCH_i386(s,) i
+      RealReg i      -> ppr_reg_no IF_ARCH_i386(s,) i
       VirtualRegI u  -> text "%vI_" <> ppr u
       VirtualRegF u  -> text "%vF_" <> ppr u      
   where
 #if alpha_TARGET_ARCH
-    ppr_reg_no :: FAST_REG_NO -> SDoc
+    ppr_reg_no :: Int -> SDoc
     ppr_reg_no i = ptext
       (case i of {
-	ILIT( 0) -> SLIT("$0");   ILIT( 1) -> SLIT("$1");
-	ILIT( 2) -> SLIT("$2");   ILIT( 3) -> SLIT("$3");
-	ILIT( 4) -> SLIT("$4");   ILIT( 5) -> SLIT("$5");
-	ILIT( 6) -> SLIT("$6");   ILIT( 7) -> SLIT("$7");
-	ILIT( 8) -> SLIT("$8");   ILIT( 9) -> SLIT("$9");
-	ILIT(10) -> SLIT("$10");  ILIT(11) -> SLIT("$11");
-	ILIT(12) -> SLIT("$12");  ILIT(13) -> SLIT("$13");
-	ILIT(14) -> SLIT("$14");  ILIT(15) -> SLIT("$15");
-	ILIT(16) -> SLIT("$16");  ILIT(17) -> SLIT("$17");
-	ILIT(18) -> SLIT("$18");  ILIT(19) -> SLIT("$19");
-	ILIT(20) -> SLIT("$20");  ILIT(21) -> SLIT("$21");
-	ILIT(22) -> SLIT("$22");  ILIT(23) -> SLIT("$23");
-	ILIT(24) -> SLIT("$24");  ILIT(25) -> SLIT("$25");
-	ILIT(26) -> SLIT("$26");  ILIT(27) -> SLIT("$27");
-	ILIT(28) -> SLIT("$28");  ILIT(29) -> SLIT("$29");
-	ILIT(30) -> SLIT("$30");  ILIT(31) -> SLIT("$31");
-	ILIT(32) -> SLIT("$f0");  ILIT(33) -> SLIT("$f1");
-	ILIT(34) -> SLIT("$f2");  ILIT(35) -> SLIT("$f3");
-	ILIT(36) -> SLIT("$f4");  ILIT(37) -> SLIT("$f5");
-	ILIT(38) -> SLIT("$f6");  ILIT(39) -> SLIT("$f7");
-	ILIT(40) -> SLIT("$f8");  ILIT(41) -> SLIT("$f9");
-	ILIT(42) -> SLIT("$f10"); ILIT(43) -> SLIT("$f11");
-	ILIT(44) -> SLIT("$f12"); ILIT(45) -> SLIT("$f13");
-	ILIT(46) -> SLIT("$f14"); ILIT(47) -> SLIT("$f15");
-	ILIT(48) -> SLIT("$f16"); ILIT(49) -> SLIT("$f17");
-	ILIT(50) -> SLIT("$f18"); ILIT(51) -> SLIT("$f19");
-	ILIT(52) -> SLIT("$f20"); ILIT(53) -> SLIT("$f21");
-	ILIT(54) -> SLIT("$f22"); ILIT(55) -> SLIT("$f23");
-	ILIT(56) -> SLIT("$f24"); ILIT(57) -> SLIT("$f25");
-	ILIT(58) -> SLIT("$f26"); ILIT(59) -> SLIT("$f27");
-	ILIT(60) -> SLIT("$f28"); ILIT(61) -> SLIT("$f29");
-	ILIT(62) -> SLIT("$f30"); ILIT(63) -> SLIT("$f31");
-	_ -> SLIT("very naughty alpha register")
+	 0 -> SLIT("$0");    1 -> SLIT("$1");
+	 2 -> SLIT("$2");    3 -> SLIT("$3");
+	 4 -> SLIT("$4");    5 -> SLIT("$5");
+	 6 -> SLIT("$6");    7 -> SLIT("$7");
+	 8 -> SLIT("$8");    9 -> SLIT("$9");
+	10 -> SLIT("$10");  11 -> SLIT("$11");
+	12 -> SLIT("$12");  13 -> SLIT("$13");
+	14 -> SLIT("$14");  15 -> SLIT("$15");
+	16 -> SLIT("$16");  17 -> SLIT("$17");
+	18 -> SLIT("$18");  19 -> SLIT("$19");
+	20 -> SLIT("$20");  21 -> SLIT("$21");
+	22 -> SLIT("$22");  23 -> SLIT("$23");
+	24 -> SLIT("$24");  25 -> SLIT("$25");
+	26 -> SLIT("$26");  27 -> SLIT("$27");
+	28 -> SLIT("$28");  29 -> SLIT("$29");
+	30 -> SLIT("$30");  31 -> SLIT("$31");
+	32 -> SLIT("$f0");  33 -> SLIT("$f1");
+	34 -> SLIT("$f2");  35 -> SLIT("$f3");
+	36 -> SLIT("$f4");  37 -> SLIT("$f5");
+	38 -> SLIT("$f6");  39 -> SLIT("$f7");
+	40 -> SLIT("$f8");  41 -> SLIT("$f9");
+	42 -> SLIT("$f10"); 43 -> SLIT("$f11");
+	44 -> SLIT("$f12"); 45 -> SLIT("$f13");
+	46 -> SLIT("$f14"); 47 -> SLIT("$f15");
+	48 -> SLIT("$f16"); 49 -> SLIT("$f17");
+	50 -> SLIT("$f18"); 51 -> SLIT("$f19");
+	52 -> SLIT("$f20"); 53 -> SLIT("$f21");
+	54 -> SLIT("$f22"); 55 -> SLIT("$f23");
+	56 -> SLIT("$f24"); 57 -> SLIT("$f25");
+	58 -> SLIT("$f26"); 59 -> SLIT("$f27");
+	60 -> SLIT("$f28"); 61 -> SLIT("$f29");
+	62 -> SLIT("$f30"); 63 -> SLIT("$f31");
+	_  -> SLIT("very naughty alpha register")
       })
 #endif
 #if i386_TARGET_ARCH
-    ppr_reg_no :: Size -> FAST_REG_NO -> SDoc
+    ppr_reg_no :: Size -> Int -> SDoc
     ppr_reg_no B i= ptext
       (case i of {
-	ILIT( 0) -> SLIT("%al");  ILIT( 1) -> SLIT("%bl");
-	ILIT( 2) -> SLIT("%cl");  ILIT( 3) -> SLIT("%dl");
-	_ -> SLIT("very naughty I386 byte register")
+	 0 -> SLIT("%al");   1 -> SLIT("%bl");
+	 2 -> SLIT("%cl");   3 -> SLIT("%dl");
+	_  -> SLIT("very naughty I386 byte register")
       })
 
     ppr_reg_no _ i = ptext
       (case i of {
-	ILIT( 0) -> SLIT("%eax");  ILIT( 1) -> SLIT("%ebx");
-	ILIT( 2) -> SLIT("%ecx");  ILIT( 3) -> SLIT("%edx");
-	ILIT( 4) -> SLIT("%esi");  ILIT( 5) -> SLIT("%edi");
-	ILIT( 6) -> SLIT("%ebp");  ILIT( 7) -> SLIT("%esp");
-	ILIT( 8) -> SLIT("%fake0");  ILIT( 9) -> SLIT("%fake1");
-	ILIT(10) -> SLIT("%fake2");  ILIT(11) -> SLIT("%fake3");
-	ILIT(12) -> SLIT("%fake4");  ILIT(13) -> SLIT("%fake5");
-	_ -> SLIT("very naughty I386 register")
+	 0 -> SLIT("%eax");   1 -> SLIT("%ebx");
+	 2 -> SLIT("%ecx");   3 -> SLIT("%edx");
+	 4 -> SLIT("%esi");   5 -> SLIT("%edi");
+	 6 -> SLIT("%ebp");   7 -> SLIT("%esp");
+	 8 -> SLIT("%fake0");   9 -> SLIT("%fake1");
+	10 -> SLIT("%fake2");  11 -> SLIT("%fake3");
+	12 -> SLIT("%fake4");  13 -> SLIT("%fake5");
+	_  -> SLIT("very naughty I386 register")
       })
 #endif
 #if sparc_TARGET_ARCH
-    ppr_reg_no :: FAST_REG_NO -> SDoc
+    ppr_reg_no :: Int -> SDoc
     ppr_reg_no i = ptext
       (case i of {
-	ILIT( 0) -> SLIT("%g0");  ILIT( 1) -> SLIT("%g1");
-	ILIT( 2) -> SLIT("%g2");  ILIT( 3) -> SLIT("%g3");
-	ILIT( 4) -> SLIT("%g4");  ILIT( 5) -> SLIT("%g5");
-	ILIT( 6) -> SLIT("%g6");  ILIT( 7) -> SLIT("%g7");
-	ILIT( 8) -> SLIT("%o0");  ILIT( 9) -> SLIT("%o1");
-	ILIT(10) -> SLIT("%o2");  ILIT(11) -> SLIT("%o3");
-	ILIT(12) -> SLIT("%o4");  ILIT(13) -> SLIT("%o5");
-	ILIT(14) -> SLIT("%o6");  ILIT(15) -> SLIT("%o7");
-	ILIT(16) -> SLIT("%l0");  ILIT(17) -> SLIT("%l1");
-	ILIT(18) -> SLIT("%l2");  ILIT(19) -> SLIT("%l3");
-	ILIT(20) -> SLIT("%l4");  ILIT(21) -> SLIT("%l5");
-	ILIT(22) -> SLIT("%l6");  ILIT(23) -> SLIT("%l7");
-	ILIT(24) -> SLIT("%i0");  ILIT(25) -> SLIT("%i1");
-	ILIT(26) -> SLIT("%i2");  ILIT(27) -> SLIT("%i3");
-	ILIT(28) -> SLIT("%i4");  ILIT(29) -> SLIT("%i5");
-	ILIT(30) -> SLIT("%i6");  ILIT(31) -> SLIT("%i7");
-	ILIT(32) -> SLIT("%f0");  ILIT(33) -> SLIT("%f1");
-	ILIT(34) -> SLIT("%f2");  ILIT(35) -> SLIT("%f3");
-	ILIT(36) -> SLIT("%f4");  ILIT(37) -> SLIT("%f5");
-	ILIT(38) -> SLIT("%f6");  ILIT(39) -> SLIT("%f7");
-	ILIT(40) -> SLIT("%f8");  ILIT(41) -> SLIT("%f9");
-	ILIT(42) -> SLIT("%f10"); ILIT(43) -> SLIT("%f11");
-	ILIT(44) -> SLIT("%f12"); ILIT(45) -> SLIT("%f13");
-	ILIT(46) -> SLIT("%f14"); ILIT(47) -> SLIT("%f15");
-	ILIT(48) -> SLIT("%f16"); ILIT(49) -> SLIT("%f17");
-	ILIT(50) -> SLIT("%f18"); ILIT(51) -> SLIT("%f19");
-	ILIT(52) -> SLIT("%f20"); ILIT(53) -> SLIT("%f21");
-	ILIT(54) -> SLIT("%f22"); ILIT(55) -> SLIT("%f23");
-	ILIT(56) -> SLIT("%f24"); ILIT(57) -> SLIT("%f25");
-	ILIT(58) -> SLIT("%f26"); ILIT(59) -> SLIT("%f27");
-	ILIT(60) -> SLIT("%f28"); ILIT(61) -> SLIT("%f29");
-	ILIT(62) -> SLIT("%f30"); ILIT(63) -> SLIT("%f31");
-	_ -> SLIT("very naughty sparc register")
+	 0 -> SLIT("%g0");   1 -> SLIT("%g1");
+	 2 -> SLIT("%g2");   3 -> SLIT("%g3");
+	 4 -> SLIT("%g4");   5 -> SLIT("%g5");
+	 6 -> SLIT("%g6");   7 -> SLIT("%g7");
+	 8 -> SLIT("%o0");   9 -> SLIT("%o1");
+	10 -> SLIT("%o2");  11 -> SLIT("%o3");
+	12 -> SLIT("%o4");  13 -> SLIT("%o5");
+	14 -> SLIT("%o6");  15 -> SLIT("%o7");
+	16 -> SLIT("%l0");  17 -> SLIT("%l1");
+	18 -> SLIT("%l2");  19 -> SLIT("%l3");
+	20 -> SLIT("%l4");  21 -> SLIT("%l5");
+	22 -> SLIT("%l6");  23 -> SLIT("%l7");
+	24 -> SLIT("%i0");  25 -> SLIT("%i1");
+	26 -> SLIT("%i2");  27 -> SLIT("%i3");
+	28 -> SLIT("%i4");  29 -> SLIT("%i5");
+	30 -> SLIT("%i6");  31 -> SLIT("%i7");
+	32 -> SLIT("%f0");  33 -> SLIT("%f1");
+	34 -> SLIT("%f2");  35 -> SLIT("%f3");
+	36 -> SLIT("%f4");  37 -> SLIT("%f5");
+	38 -> SLIT("%f6");  39 -> SLIT("%f7");
+	40 -> SLIT("%f8");  41 -> SLIT("%f9");
+	42 -> SLIT("%f10"); 43 -> SLIT("%f11");
+	44 -> SLIT("%f12"); 45 -> SLIT("%f13");
+	46 -> SLIT("%f14"); 47 -> SLIT("%f15");
+	48 -> SLIT("%f16"); 49 -> SLIT("%f17");
+	50 -> SLIT("%f18"); 51 -> SLIT("%f19");
+	52 -> SLIT("%f20"); 53 -> SLIT("%f21");
+	54 -> SLIT("%f22"); 55 -> SLIT("%f23");
+	56 -> SLIT("%f24"); 57 -> SLIT("%f25");
+	58 -> SLIT("%f26"); 59 -> SLIT("%f27");
+	60 -> SLIT("%f28"); 61 -> SLIT("%f29");
+	62 -> SLIT("%f30"); 63 -> SLIT("%f31");
+	_  -> SLIT("very naughty sparc register")
       })
 #endif
 \end{code}

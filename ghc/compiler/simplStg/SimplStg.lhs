@@ -18,20 +18,21 @@ import StgStats	        ( showStgStats )
 import StgVarInfo	( setStgVarInfo )
 import SRT		( computeSRTs )
 
-import CmdLineOpts	( opt_StgDoLetNoEscapes, opt_D_verbose_stg2stg,
-			  opt_DoStgLinting, opt_D_dump_stg,
+import CmdLineOpts	( DynFlags, DynFlag(..), dopt, 
+			  opt_StgDoLetNoEscapes,
 			  StgToDo(..)
 			)
 import Id		( Id )
 import Module		( Module, moduleString )
-import ErrUtils		( doIfSet, dumpIfSet )
+import ErrUtils		( doIfSet_dyn, dumpIfSet_dyn )
 import UniqSupply	( splitUniqSupply, UniqSupply )
 import IO		( hPutStr, stdout )
 import Outputable
 \end{code}
 
 \begin{code}
-stg2stg :: [StgToDo]		-- spec of what stg-to-stg passes to do
+stg2stg :: DynFlags
+	-> [StgToDo]		-- spec of what stg-to-stg passes to do
 	-> Module		-- module name (profiling only)
 	-> UniqSupply		-- a name supply
 	-> [StgBinding]		-- input...
@@ -41,10 +42,10 @@ stg2stg :: [StgToDo]		-- spec of what stg-to-stg passes to do
 	      [CostCentre],	   -- "extern" cost-centres
 	      [CostCentreStack]))  -- pre-defined "singleton" cost centre stacks
 
-stg2stg stg_todos module_name us binds
+stg2stg dflags stg_todos module_name us binds
   = case (splitUniqSupply us)	of { (us4now, us4later) ->
 
-    doIfSet opt_D_verbose_stg2stg (printErrs (text "VERBOSE STG-TO-STG:")) >>
+    doIfSet_dyn dflags Opt_D_verbose_stg2stg (printErrs (text "VERBOSE STG-TO-STG:")) >>
 
     end_pass us4now "Core2Stg" ([],[],[]) binds
 		>>= \ (binds', us, ccs) ->
@@ -71,14 +72,14 @@ stg2stg stg_todos module_name us binds
 	srt_binds       = computeSRTs annotated_binds
     in
 
-    dumpIfSet opt_D_dump_stg "STG syntax:" 
+    dumpIfSet_dyn dflags Opt_D_dump_stg "STG syntax:" 
 	      (pprStgBindingsWithSRTs srt_binds)	>>
 
     return (srt_binds, cost_centres)
    }
 
   where
-    stg_linter = if opt_DoStgLinting
+    stg_linter = if dopt Opt_DoStgLinting dflags
 		 then lintStgBindings
 		 else ( \ whodunnit binds -> binds )
 
@@ -112,7 +113,7 @@ stg2stg stg_todos module_name us binds
 
     end_pass us2 what ccs binds2
       = -- report verbosely, if required
-	(if opt_D_verbose_stg2stg then
+	(if dopt Opt_D_verbose_stg2stg dflags then
 	    hPutStr stdout (showSDoc
 	      (text ("*** "++what++":") $$ vcat (map ppr binds2)
 	    ))

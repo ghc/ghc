@@ -45,6 +45,8 @@ import FiniteMap	( addToFM, lookupFM, FiniteMap )
 import Outputable
 import Constants	( rESERVED_C_STACK_BYTES )
 import Unique		( Unique, Uniquable(..) )
+import FastTypes
+
 \end{code}
 
 %************************************************************************
@@ -146,7 +148,7 @@ regUsage :: Instr -> RegUsage
 interesting (VirtualRegI _)  = True
 interesting (VirtualRegF _)  = True
 interesting (VirtualRegD _)  = True
-interesting (RealReg (I# i)) = _IS_TRUE_(freeReg i)
+interesting (RealReg i)      = _IS_TRUE_(freeReg i)
 
 #if alpha_TARGET_ARCH
 

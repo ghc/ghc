@@ -23,6 +23,7 @@ import Constants	( mIN_INTLIKE, mIN_CHARLIKE, uF_UPDATEE, bLOCK_SIZE,
 import CLabel		( mkIntlikeClosureLabel, mkCharlikeClosureLabel,
 			  mkMAP_FROZEN_infoLabel, mkForeignLabel )
 import Outputable
+import FastTypes
 
 #include "NCG.h"
 \end{code}
@@ -475,13 +476,13 @@ amodeToStix am@(CVal rr CharRep)
 amodeToStix (CVal rr pk) = StInd pk (amodeToStix (CAddr rr))
 
 amodeToStix (CAddr (SpRel off))
-  = StIndex PtrRep stgSp (StInt (toInteger IBOX(off)))
+  = StIndex PtrRep stgSp (StInt (toInteger (iBox off)))
 
 amodeToStix (CAddr (HpRel off))
-  = StIndex IntRep stgHp (StInt (toInteger (- IBOX(off))))
+  = StIndex IntRep stgHp (StInt (toInteger (- (iBox off))))
 
 amodeToStix (CAddr (NodeRel off))
-  = StIndex IntRep stgNode (StInt (toInteger IBOX(off)))
+  = StIndex IntRep stgNode (StInt (toInteger (iBox off)))
 
 amodeToStix (CAddr (CIndex base off pk))
   = StIndex pk (amodeToStix base) (amodeToStix off)

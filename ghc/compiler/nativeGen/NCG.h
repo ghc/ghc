@@ -23,8 +23,6 @@ you will screw up the layout where they are used in case expressions!
 
 #endif
 
-#define FAST_REG_NO FAST_INT
-
 #include "../includes/config.h"
 
 #if 0

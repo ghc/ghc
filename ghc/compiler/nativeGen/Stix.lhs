@@ -38,6 +38,7 @@ import SMRep		( fixedHdrSize, arrWordsHdrSize, arrPtrsHdrSize )
 import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply,
                           UniqSM, thenUs, returnUs, getUniqueUs )
 import Outputable
+import FastTypes
 \end{code}
 
 Here is the tag at the nodes of our @StixTree@.	 Notice its
@@ -204,11 +205,11 @@ ppStixReg (StixTemp u pr)
 
 ppMId BaseReg              = text "BaseReg"
 ppMId (VanillaReg kind n)  = hcat [pprPrimRep kind, text "IntReg(", 
-                                   int (I# n), char ')']
-ppMId (FloatReg n)         = hcat [text "FltReg(", int (I# n), char ')']
-ppMId (DoubleReg n)        = hcat [text "DblReg(", int (I# n), char ')']
+                                   int (iBox n), char ')']
+ppMId (FloatReg n)         = hcat [text "FltReg(", int (iBox n), char ')']
+ppMId (DoubleReg n)        = hcat [text "DblReg(", int (iBox n), char ')']
 ppMId (LongReg kind n)     = hcat [pprPrimRep kind, text "LongReg(", 
-                                   int (I# n), char ')']
+                                   int (iBox n), char ')']
 ppMId Sp                   = text "Sp"
 ppMId Su                   = text "Su"
 ppMId SpLim                = text "SpLim"
@@ -244,8 +245,8 @@ stgHp		    = StReg (StixMagicId Hp)
 stgHpLim	    = StReg (StixMagicId HpLim)
 stgCurrentTSO	    = StReg (StixMagicId CurrentTSO)
 stgCurrentNursery   = StReg (StixMagicId CurrentNursery)
-stgR9               = StReg (StixMagicId (VanillaReg WordRep ILIT(9)))
-stgR10              = StReg (StixMagicId (VanillaReg WordRep ILIT(10)))
+stgR9               = StReg (StixMagicId (VanillaReg WordRep (_ILIT 9)))
+stgR10              = StReg (StixMagicId (VanillaReg WordRep (_ILIT 10)))
 
 getNatLabelNCG :: NatM CLabel
 getNatLabelNCG

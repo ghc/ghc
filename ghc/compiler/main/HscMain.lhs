@@ -76,7 +76,7 @@ hscMain
   -> PersistentCompilerState    -- IN: persistent compiler state
   -> IO HscResult
 
-hscMain flags core_cmds stg_cmds summary maybe_old_iface
+hscMain dflags core_cmds stg_cmds summary maybe_old_iface
 	output_filename mod_details pcs1 =
 
 	--------------------------  Reader  ----------------
@@ -91,14 +91,14 @@ hscMain flags core_cmds stg_cmds summary maybe_old_iface
 
     buf <- hGetStringBuffer True{-expand tabs-} src_filename
 
-    let glaexts | opt_GlasgowExts = 1#
-		| otherwise       = 0#
+    let glaexts | dopt Opt_GlasgowExts dflags = 1#
+		| otherwise 		      = 0#
 
     case parse buf PState{ bol = 0#, atbol = 1#,
 		           context = [], glasgow_exts = glaexts,
 		           loc = mkSrcLoc src_filename 1 } of {
 
-	PFailed err -> return (CompErrs pcs err)
+	PFailed err -> return (HscErrs pcs (unitBag err) emptyBag)
 
 	POk _ rdr_module@(HsModule mod_name _ _ _ _ _ _) ->
 
@@ -118,7 +118,8 @@ hscMain flags core_cmds stg_cmds summary maybe_old_iface
     show_pass "Renamer" 			>>
     _scc_     "Renamer"
 
-    renameModule rn_uniqs rdr_module		>>= \ maybe_rn_stuff ->
+    renameModule dflags finder pcs hst rdr_module	
+						>>= \ (pcs_rn, maybe_rn_stuff) ->
     case maybe_rn_stuff of {
 	Nothing -> 	-- Hurrah!  Renamer reckons that there's no need to
 			-- go any further
@@ -250,23 +251,38 @@ hscMain flags core_cmds stg_cmds summary maybe_old_iface
 %************************************************************************
 
 \begin{code}
-initPersistentCompilerState :: PersistentCompilerState
+initPersistentCompilerState :: IO PersistentCompilerState
 initPersistentCompilerState 
+<<<<<<< HscMain.lhs
+  = do prs <- initPersistentRenamerState
+       return (
+        PCS { pcs_PST   = initPackageDetails,
+	      pcs_insts = emptyInstEnv,
+	      pcs_rules = emptyRuleEnv,
+	      pcs_PRS   = initPersistentRenamerState 
+            }
+        )
+=======
   = PCS { pcs_PST   = initPackageDetails,
 	  pcs_insts = emptyInstEnv,
 	  pcs_rules = initRules,
 	  pcs_PRS   = initPersistentRenamerState }
+>>>>>>> 1.12
 
 initPackageDetails :: PackageSymbolTable
 initPackageDetails = extendTypeEnv emptyModuleEnv wiredInThings
 
-initPersistentRenamerState :: PersistentRenamerState
-  = PRS { prsOrig  = Orig { origNames  = initOrigNames,
-			    origIParam = emptyFM },
-	  prsDecls = emptyNameEnv,
-	  prsInsts = emptyBag,
-	  prsRules = emptyBag
-    }
+initPersistentRenamerState :: IO PersistentRenamerState
+  = do ns <- mkSplitUniqSupply 'r'
+       return (
+        PRS { prsOrig  = Orig { origNames  = initOrigNames,
+			       origIParam = emptyFM },
+	      prsDecls = emptyNameEnv,
+	      prsInsts = emptyBag,
+	      prsRules = emptyBag,
+	      prsNS    = ns
+            }
+        )
 
 initOrigNames :: FiniteMap (ModuleName,OccName) Name
 initOrigNames = grab knownKeyNames `plusFM` grab (map getName wiredInThings)

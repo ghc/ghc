@@ -63,6 +63,7 @@ import Stix		( StixTree(..), StixReg(..),
                           getUniqueNat, returnNat, thenNat, NatM )
 import Unique		( mkPseudoUnique2, Uniquable(..), Unique )
 import Outputable
+import FastTypes
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -603,30 +604,30 @@ names in the header files.  Gag me with a spoon, eh?
 \begin{code}
 baseRegOffset :: MagicId -> Int
 
-baseRegOffset (VanillaReg _ ILIT(1)) = OFFSET_R1
-baseRegOffset (VanillaReg _ ILIT(2)) = OFFSET_R2
-baseRegOffset (VanillaReg _ ILIT(3)) = OFFSET_R3
-baseRegOffset (VanillaReg _ ILIT(4)) = OFFSET_R4
-baseRegOffset (VanillaReg _ ILIT(5)) = OFFSET_R5
-baseRegOffset (VanillaReg _ ILIT(6)) = OFFSET_R6
-baseRegOffset (VanillaReg _ ILIT(7)) = OFFSET_R7
-baseRegOffset (VanillaReg _ ILIT(8)) = OFFSET_R8
-baseRegOffset (VanillaReg _ ILIT(9)) = OFFSET_R9
-baseRegOffset (VanillaReg _ ILIT(10)) = OFFSET_R10
-baseRegOffset (FloatReg  ILIT(1))    = OFFSET_F1
-baseRegOffset (FloatReg  ILIT(2))    = OFFSET_F2
-baseRegOffset (FloatReg  ILIT(3))    = OFFSET_F3
-baseRegOffset (FloatReg  ILIT(4))    = OFFSET_F4
-baseRegOffset (DoubleReg ILIT(1))    = OFFSET_D1
-baseRegOffset (DoubleReg ILIT(2))    = OFFSET_D2
+baseRegOffset (VanillaReg _ 1#)      = OFFSET_R1
+baseRegOffset (VanillaReg _ 2#)      = OFFSET_R2
+baseRegOffset (VanillaReg _ 3#)      = OFFSET_R3
+baseRegOffset (VanillaReg _ 4#)      = OFFSET_R4
+baseRegOffset (VanillaReg _ 5#)      = OFFSET_R5
+baseRegOffset (VanillaReg _ 6#)      = OFFSET_R6
+baseRegOffset (VanillaReg _ 7#)      = OFFSET_R7
+baseRegOffset (VanillaReg _ 8#)      = OFFSET_R8
+baseRegOffset (VanillaReg _ 9#)      = OFFSET_R9
+baseRegOffset (VanillaReg _ 10#)     = OFFSET_R10
+baseRegOffset (FloatReg  1#)         = OFFSET_F1
+baseRegOffset (FloatReg  2#)         = OFFSET_F2
+baseRegOffset (FloatReg  3#)         = OFFSET_F3
+baseRegOffset (FloatReg  4#)         = OFFSET_F4
+baseRegOffset (DoubleReg 1#)         = OFFSET_D1
+baseRegOffset (DoubleReg 2#)         = OFFSET_D2
 baseRegOffset Sp		     = OFFSET_Sp
 baseRegOffset Su		     = OFFSET_Su
 baseRegOffset SpLim		     = OFFSET_SpLim
 #ifdef OFFSET_Lng1
-baseRegOffset (LongReg _ ILIT(1))    = OFFSET_Lng1
+baseRegOffset (LongReg _ 1))         = OFFSET_Lng1
 #endif
 #ifdef OFFSET_Lng2
-baseRegOffset (LongReg _ ILIT(2))    = OFFSET_Lng2
+baseRegOffset (LongReg _ 2))         = OFFSET_Lng2
 #endif
 baseRegOffset Hp		     = OFFSET_Hp
 baseRegOffset HpLim		     = OFFSET_HpLim
@@ -721,7 +722,7 @@ magicIdRegMaybe :: MagicId -> Maybe Reg
 magicIdRegMaybe BaseReg			= Just (RealReg REG_Base)
 #endif
 #ifdef REG_R1
-magicIdRegMaybe (VanillaReg _ ILIT(1)) 	= Just (RealReg REG_R1)
+magicIdRegMaybe (VanillaReg _ 1#) 	= Just (RealReg REG_R1)
 #endif 
 #ifdef REG_R2 
 magicIdRegMaybe (VanillaReg _ ILIT(2)) 	= Just (RealReg REG_R2)
@@ -814,7 +815,7 @@ allMachRegNos
 -- register allocator to attempt to map VRegs to.
 allocatableRegs :: [Reg]
 allocatableRegs
-   = let isFree (I# i) = _IS_TRUE_(freeReg i)
+   = let isFree i = _IS_TRUE_(freeReg i)
      in  map RealReg (filter isFree allMachRegNos)
 
 -------------------------------
@@ -894,91 +895,91 @@ allArgRegs = panic "MachRegs.allArgRegs(x86): should not be used!"
 \end{code}
 
 \begin{code}
-freeReg :: FastInt -> FastBool
+freeReg :: Int -> FastBool
 
 #if alpha_TARGET_ARCH
-freeReg ILIT(26) = fastBool False  -- return address (ra)
-freeReg ILIT(28) = fastBool False  -- reserved for the assembler (at)
-freeReg ILIT(29) = fastBool False  -- global pointer (gp)
-freeReg ILIT(30) = fastBool False  -- stack pointer (sp)
-freeReg ILIT(31) = fastBool False  -- always zero (zeroh)
-freeReg ILIT(63) = fastBool False  -- always zero (f31)
+freeReg 26 = fastBool False  -- return address (ra)
+freeReg 28 = fastBool False  -- reserved for the assembler (at)
+freeReg 29 = fastBool False  -- global pointer (gp)
+freeReg 30 = fastBool False  -- stack pointer (sp)
+freeReg 31 = fastBool False  -- always zero (zeroh)
+freeReg 63 = fastBool False  -- always zero (f31)
 #endif
 
 #if i386_TARGET_ARCH
-freeReg ILIT(esp) = fastBool False  --	%esp is the C stack pointer
+freeReg esp = fastBool False  --	%esp is the C stack pointer
 #endif
 
 #if sparc_TARGET_ARCH
-freeReg ILIT(g0) = fastBool False  --	%g0 is always 0.
-freeReg ILIT(g5) = fastBool False  --	%g5 is reserved (ABI).
-freeReg ILIT(g6) = fastBool False  --	%g6 is reserved (ABI).
-freeReg ILIT(g7) = fastBool False  --	%g7 is reserved (ABI).
-freeReg ILIT(i6) = fastBool False  --	%i6 is our frame pointer.
-freeReg ILIT(o6) = fastBool False  --	%o6 is our stack pointer.
-freeReg ILIT(f0) = fastBool False  --  %f0/%f1 are the C fp return registers.
-freeReg ILIT(f1) = fastBool False
+freeReg g0 = fastBool False  --	%g0 is always 0.
+freeReg g5 = fastBool False  --	%g5 is reserved (ABI).
+freeReg g6 = fastBool False  --	%g6 is reserved (ABI).
+freeReg g7 = fastBool False  --	%g7 is reserved (ABI).
+freeReg i6 = fastBool False  --	%i6 is our frame pointer.
+freeReg o6 = fastBool False  --	%o6 is our stack pointer.
+freeReg f0 = fastBool False  --  %f0/%f1 are the C fp return registers.
+freeReg f1 = fastBool False
 #endif
 
 #ifdef REG_Base
-freeReg ILIT(REG_Base) = fastBool False
+freeReg REG_Base = fastBool False
 #endif
 #ifdef REG_R1
-freeReg ILIT(REG_R1)   = fastBool False
+freeReg REG_R1   = fastBool False
 #endif	
 #ifdef REG_R2  
-freeReg ILIT(REG_R2)   = fastBool False
+freeReg REG_R2   = fastBool False
 #endif	
 #ifdef REG_R3  
-freeReg ILIT(REG_R3)   = fastBool False
+freeReg REG_R3   = fastBool False
 #endif	
 #ifdef REG_R4  
-freeReg ILIT(REG_R4)   = fastBool False
+freeReg REG_R4   = fastBool False
 #endif	
 #ifdef REG_R5  
-freeReg ILIT(REG_R5)   = fastBool False
+freeReg REG_R5   = fastBool False
 #endif	
 #ifdef REG_R6  
-freeReg ILIT(REG_R6)   = fastBool False
+freeReg REG_R6   = fastBool False
 #endif	
 #ifdef REG_R7  
-freeReg ILIT(REG_R7)   = fastBool False
+freeReg REG_R7   = fastBool False
 #endif	
 #ifdef REG_R8  
-freeReg ILIT(REG_R8)   = fastBool False
+freeReg REG_R8   = fastBool False
 #endif
 #ifdef REG_F1
-freeReg ILIT(REG_F1) = fastBool False
+freeReg REG_F1 = fastBool False
 #endif
 #ifdef REG_F2
-freeReg ILIT(REG_F2) = fastBool False
+freeReg REG_F2 = fastBool False
 #endif
 #ifdef REG_F3
-freeReg ILIT(REG_F3) = fastBool False
+freeReg REG_F3 = fastBool False
 #endif
 #ifdef REG_F4
-freeReg ILIT(REG_F4) = fastBool False
+freeReg REG_F4 = fastBool False
 #endif
 #ifdef REG_D1
-freeReg ILIT(REG_D1) = fastBool False
+freeReg REG_D1 = fastBool False
 #endif
 #ifdef REG_D2
-freeReg ILIT(REG_D2) = fastBool False
+freeReg REG_D2 = fastBool False
 #endif
 #ifdef REG_Sp 
-freeReg ILIT(REG_Sp)   = fastBool False
+freeReg REG_Sp   = fastBool False
 #endif 
 #ifdef REG_Su
-freeReg ILIT(REG_Su)   = fastBool False
+freeReg REG_Su   = fastBool False
 #endif 
 #ifdef REG_SpLim 
-freeReg ILIT(REG_SpLim) = fastBool False
+freeReg REG_SpLim = fastBool False
 #endif 
 #ifdef REG_Hp 
-freeReg ILIT(REG_Hp)   = fastBool False
+freeReg REG_Hp   = fastBool False
 #endif
 #ifdef REG_HpLim
-freeReg ILIT(REG_HpLim) = fastBool False
+freeReg REG_HpLim = fastBool False
 #endif
 freeReg n               = fastBool True
 \end{code}

@@ -32,9 +32,8 @@ import CgClosure	( cgTopRhsClosure )
 import CgCon		( cgTopRhsCon )
 import CgConTbls	( genStaticConBits )
 import ClosureInfo	( mkClosureLFInfo )
-import CmdLineOpts	( opt_SccProfilingOn, opt_EnsureSplittableC, 
-			  opt_D_dump_absC
-			)
+import CmdLineOpts	( DynFlags, DynFlag(..),
+			  opt_SccProfilingOn, opt_EnsureSplittableC )
 import CostCentre       ( CostCentre, CostCentreStack )
 import Id               ( Id, idName )
 import Module           ( Module, moduleString, moduleName, 
@@ -45,7 +44,7 @@ import TyCon            ( TyCon, isDataTyCon )
 import Class		( Class, classTyCon )
 import BasicTypes	( TopLevelFlag(..) )
 import UniqSupply	( mkSplitUniqSupply )
-import ErrUtils		( dumpIfSet )
+import ErrUtils		( dumpIfSet_dyn )
 import Util
 import Panic		( assertPanic )
 \end{code}
@@ -53,7 +52,8 @@ import Panic		( assertPanic )
 \begin{code}
 
 
-codeGen :: Module		-- Module name
+codeGen :: DynFlags
+	-> Module		-- Module name
 	-> [Module]		-- Import names
 	-> ([CostCentre],	-- Local cost-centres needing declaring/registering
 	    [CostCentre],	-- "extern" cost-centres needing declaring
@@ -63,7 +63,7 @@ codeGen :: Module		-- Module name
 	-> [(StgBinding,[Id])]	-- Bindings to convert, with SRTs
 	-> IO AbstractC		-- Output
 
-codeGen mod_name imported_modules cost_centre_info fe_binders
+codeGen dflags mod_name imported_modules cost_centre_info fe_binders
 	tycons classes stg_binds
   = mkSplitUniqSupply 'f'	>>= \ fl_uniqs  -> -- absC flattener
     let
@@ -82,7 +82,7 @@ codeGen mod_name imported_modules cost_centre_info fe_binders
 
 	flat_abstractC = flattenAbsC fl_uniqs abstractC
     in
-    dumpIfSet opt_D_dump_absC "Abstract C" (dumpRealC abstractC)	>>
+    dumpIfSet_dyn dflags Opt_D_dump_absC "Abstract C" (dumpRealC abstractC)	>>
     return flat_abstractC
 
   where

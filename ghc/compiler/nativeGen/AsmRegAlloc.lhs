@@ -22,6 +22,7 @@ import OrdList		( unitOL, appOL, fromOL, concatOL )
 import Outputable
 import Unique		( Unique, Uniquable(..), mkPseudoUnique3 )
 import CLabel		( CLabel, pprCLabel )
+import FastTypes
 
 import List		( mapAccumL, nub, sort )
 import Array		( Array, array, (!), bounds )
@@ -625,8 +626,8 @@ mk_initial_approx ino (i:is) succ_map ia_so_far
    = let wrs 
             = case regUsage i of RU rrr www -> www
          new_fes 
-            = [case ino of      { I# inoh ->
-               case ino_succ of { I# ino_succh ->
+            = [case iUnbox ino of      { inoh ->
+               case iUnbox ino_succ of { ino_succh ->
                MkFE inoh ino_succh 
                }}
                   | ino_succ <- succ_map ! ino]
@@ -674,8 +675,8 @@ upd_liveness_info pred_map succ_map insn_array prev_approx
            = approx
            | otherwise
            = let fes_to_futures
-                    = [case ino of        { I# inoh ->
-                       case future_ino of { I# future_inoh ->
+                    = [case iUnbox ino of        { inoh ->
+                       case iUnbox future_ino of { future_inoh ->
                        MkFE inoh future_inoh
                        }}
                           | future_ino <- succ_map ! ino]
@@ -685,8 +686,8 @@ upd_liveness_info pred_map succ_map insn_array prev_approx
                     = foldr unionRegSets emptyRegSet future_lives
 
                  fes_from_histories
-                    = [case history_ino of { I# history_inoh ->
-                       case ino of         { I# inoh ->
+                    = [case iUnbox history_ino of { history_inoh ->
+                       case iUnbox ino of         { inoh ->
                        MkFE history_inoh inoh
                        }}
                           | history_ino <- pred_map ! ino]
@@ -869,12 +870,12 @@ find_flow_edges insns
 
 -- A data type for flow edges
 data FE 
-   = MkFE Int# Int# deriving (Eq, Ord)
+   = MkFE FastInt FastInt deriving (Eq, Ord)
 
 -- deriving Show on types with unboxed fields doesn't work
 instance Show FE where
     showsPrec _ (MkFE s d) 
-       = showString "MkFE" . shows (I# s) . shows ' ' . shows (I# d)
+       = showString "MkFE" . shows (iBox s) . shows ' ' . shows (iBox d)
 
 -- Blargh.  Use ghc stuff soon!  Or: perhaps that's not such a good
 -- idea.  Most of these sets are either empty or very small, and it

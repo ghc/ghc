@@ -73,6 +73,7 @@ import UniqFM 		( UniqFM )
 import Outputable
 import SrcLoc		( SrcLoc, isGoodSrcLoc )
 import Util		( thenCmp )
+import UniqSupply	( UniqSupply )
 \end{code}
 
 %************************************************************************
@@ -415,7 +416,8 @@ data PersistentRenamerState
   = PRS { prsOrig  :: OrigNameEnv,
 	  prsDecls :: DeclsMap,
 	  prsInsts :: IfaceInsts,
-	  prsRules :: IfaceRules
+	  prsRules :: IfaceRules,
+	  prsNS    :: UniqSupply
     }
 \end{code}
 

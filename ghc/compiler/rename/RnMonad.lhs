@@ -299,8 +299,8 @@ initRn dflags finder hit hst pcs mod loc do_rn
   = do 
 	let prs = pcs_PRS pcs
 	let pst = pcs_PST pcs
+        let uniqs = prsNS prs
 
-	uniqs     <- mkSplitUniqSupply 'r'
 	names_var <- newIORef (uniqs, origNames (prsOrig prs), 
 				      origIParam (prsOrig prs))
 	errs_var  <- newIORef (emptyBag,emptyBag)
@@ -322,14 +322,15 @@ initRn dflags finder hit hst pcs mod loc do_rn
 	res <- do_rn rn_down ()
 	
 	-- Grab state and record it
-	(warns, errs) 		   <- readIORef errs_var
-	new_ifaces    		   <- readIORef iface_var
-	(_, new_origN, new_origIP) <- readIORef names_var
+	(warns, errs) 			<- readIORef errs_var
+	new_ifaces    			<- readIORef iface_var
+	(new_NS, new_origN, new_origIP) <- readIORef names_var
 	let new_orig = Orig { origNames = new_origN, origIParam = new_origIP }
 	let new_prs = prs { prsOrig = new_orig,
 			    prsDecls = iDecls new_ifaces,
 			    prsInsts = iInsts new_ifaces,
-			    prsRules = iRules new_ifaces }
+			    prsRules = iRules new_ifaces,
+			    prsNS    = new_NS }
 	let new_pcs = pcs { pcs_PIT = iPIT new_ifaces, 
 			    pcs_PRS = new_prs }
 	
