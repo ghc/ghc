@@ -262,6 +262,7 @@ $As	 	 = ''; # "assembler" is normally GCC
 
 $Lnkr	 	 = ''; # "linker" is normally GCC
 @Ld_flags	 = ();
+@Dll_flags	 = ();
 
 # 'nm' is used for consistency checking (ToDo: mk-world-ify)
 # ToDo: check the OS or something ("alpha" is surely not the crucial question)
@@ -457,19 +458,20 @@ Here are the initial defaults applied to all files:
 $Cpp_flag_set = 0;	  # (hack)
 $Only_preprocess_C = 0;	  # pretty hackish
 $Only_preprocess_hc = 0;  # ditto
-$Only_generate_deps = 0;  # "
+$Only_generate_deps = 0;  # ""
+$Only_generate_dll  = 0;
 $PostprocessCcOutput = 0;
 
 # Win32 only:
-#    static /= 0 => produce code for DLLs (when compiling/linking.)
+#    static = 0 => produce code for DLLs (when compiling & linking.)
 $Static = 1;
-$Static = 0 if ($TargetPlatform =~ /-mingw32$/);
+$Static = 0 if ($EnableWin32DLLs eq 'YES');
 
 # native code-gen or via C?
 $HaveNativeCodeGen = $GhcWithNativeCodeGen;
 $HscOut = '-C='; # '-C=' ==> .hc output; '-S=' ==> .s output; '-N=' ==> neither
 $HscOut = '-S='
-    if $HaveNativeCodeGen && $TargetPlatform =~ /^(alpha)-/;
+    if ($HaveNativeCodeGen ne 'YES') && $TargetPlatform =~ /^(alpha)-/;
 # TEMP: disable x86 & Sparc if $HaveNativeCodeGen && $TargetPlatform =~ /^(i386|alpha|sparc)-/;
 $ProduceHi    = '-hifile=';
 $HiOnStdout   = 0;
@@ -497,6 +499,7 @@ $Isuffix    = '';
 $Osuffix    = '';	# default: use the normal suffix for that kind of output
 $HiSuffix   = 'hi';
 $HiSuffix_prelude = '';
+$CompilingPrelude=0;
 $Do_recomp_chkr = 0;	# don't use the recompilatio checker unless asked
 $Do_cc	    = -1;   # a MAGIC indeterminate value; will be set to 1 or 0.
 $Do_as	    = 1;
@@ -583,6 +586,13 @@ if (  $Status == 0 && $Only_generate_deps ) {
     };
     local($to_do) = "$MkDependHS @MkDependHS_flags @HsSourceCppOpts -- @Cmd_opts -- @Input_file" ;
     &run_something($to_do, 'Haskell dependencies');
+    exit $Status;
+}
+
+# ..or just to construct a (Haskell) DLL.
+if (  $Status == 0 && $Only_generate_dll && $EnableWin32DLLs ) {
+
+    &createWin32DLL();
     exit $Status;
 }
 
@@ -1071,10 +1081,16 @@ Decide what the consistency-checking options are in force for this run:
   # Funny place to put it, but why not.
   #
   if ( $HiSuffix_prelude eq '' ) {
-       local($Tag) = "${BuildTag}";
-       $Tag =~ s/_//;
-       $Tag = "${Tag}_" if $Tag ne '';
-       $HiSuffix_prelude="${Tag}hi";
+
+       if ($CompilingPrelude) {
+         $HiSuffix_prelude = "$HiSuffix" if $CompilingPrelude;
+       } else {
+         local($Tag) = "${BuildTag}";
+  
+         $Tag =~ s/_//;
+         $Tag =  "${Tag}_" if $Tag ne '';
+         $HiSuffix_prelude="${Tag}hi";
+       }
   }
 } # setupBuildFlags
 \end{code}
@@ -1120,6 +1136,8 @@ sub setupMachOpts {
       unshift(@CcRegd_flags_hc, '-fno-defer-pop');
       unshift(@CcRegd_flags_hc, '-fomit-frame-pointer');
       unshift(@CcRegd_flags,    "-DSTOLEN_X86_REGS=$StolenX86Regs");
+      
+      unshift(@CcBoth_flags,  ('-DDONT_WANT_WIN32_DLL_SUPPORT')) if ($Static);
 
   } elsif ($TargetPlatform =~ /^m68k-/) {
       # -fno-defer-pop : for the .hc files, we want all the pushing/
@@ -1360,149 +1378,15 @@ foreach $ifile (@Input_file) {
     &ProcessInputFile($ifile);
 }
 
-if ( $Status > 0 ) { # don't link if there were errors...
+# don't link if there were errors...
+if ( $Status > 0 ) { 
     print STDERR $ShortUsage;
     &tidy_up();
     exit $Status;
 }
 
-# append last minute flags linker and consistency flags
-&setupBuildFlags();
-&setupSyslibs();
-&setupLinkOpts();
-
-\end{code}
-
-Link if appropriate.
-\begin{code}
-if ($Do_lnkr) {
-    local($libdirs) = '';
-
-    # glue them together:
-    push(@UserLibrary_dir, @SysLibrary_dir);
-
-    $libdirs = '-L' . join(' -L',@UserLibrary_dir) if $#UserLibrary_dir >= 0;
-
-    # for a linker, use an explicitly given one, or the going C compiler ...
-    local($lnkr) = ( $Lnkr ) ? $Lnkr : $CcRegd;
-
-    if ( ($Specific_output_file eq '') && 
-         ($TargetPlatform eq 'i386-unknown-cygwin32') ) {
-         $Specific_output_file = 'main.exe';
-         print STDERR "Output file not specified, defaulting to \"main.exe\"\n";
-    }
-
-    local($output) = ($Specific_output_file ne '') ? "-o $Specific_output_file" : '';
-    @Files_to_tidy = ($Specific_output_file ne '') ? $Specific_output_file : 'a.out'; 
-
-    #
-    # Win32 DLLs - link with import libraries, not the real archives.
-    # 
-    if ( $TargetPlatform =~ /-mingw32$/ && !$Static ) {
-       foreach $a ( @SysLibrary ) {
-	  next if ($a eq '-lm');
-          $a = "${a}_imp" if ($a =~ /^-l/);
-       }
-       push(@Link_file, ( $INSTALLING ) ? "$InstLibDirGhc/Main.o"
-			                 : "$TopPwd/$CURRENT_DIR/$GHC_RUNTIME_DIR/Main.o");
-       push(@Link_file, ( $INSTALLING ) ? "$InstLibDirGhc/PrelMain.o"
-			                 : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/PrelMain.o");
-       push(@Ld_flags,  "-mno-cygwin");
-    }
-    local($to_do) = "$lnkr $Verbose @Ld_flags $output @Link_file $TopClosureFile $libdirs @UserLibrary @SysLibrary";
-    &run_something($to_do, 'Linker');
-
-    # finally, check the consistency info in the binary
-    local($executable) = $Files_to_tidy[0];
-    @Files_to_tidy = (); # reset; we don't want to nuke it if it's inconsistent
-
-    if ( $LinkChk ) {
-    	# dynamically load consistency-chking code; then do it.
-	require('ghc-consist.prl')
-	    || &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-consist.prl!\n");
-
-    	&chk_consistency_info ( $executable );
-    }
-
-    # if PVM parallel stuff, we do truly weird things.
-    # Essentially: (1) move the executable over to where PVM expects
-    # to find it.  (2) create a script in place of the executable
-    # which will cause the program to be run, via SysMan.
-    if ( $PARing eq 'p' ) {
-	local($pvm_executable) = $executable;
-	local($pvm_executable_base);
-
-	if ( $pvm_executable !~ /^\// ) { # a relative path name: make absolute
-	    local($pwd) = `pwd`;
-	    chop($pwd);
-	    $pwd =~ s/^\/tmp_mnt//;
-	    $pvm_executable = "$pwd/$pvm_executable";
-	}
-
-	$pvm_executable =~ s|/|=|g; # make /s into =s
-	$pvm_executable_base = $pvm_executable;
-
-	$pvm_executable = $ENV{'PVM_ROOT'} . '/bin/' . $ENV{'PVM_ARCH'}
-			. "/$pvm_executable";
-
-	&run_something("$Rm -f $pvm_executable; $Cp -p $executable $pvm_executable && $Rm -f $executable", 'Moving binary to PVM land');
-
-	# OK, now create the magic script for "$executable"
-	open(EXEC, "> $executable") || &tidy_up_and_die(1,"$Pgm: couldn't open $executable to write!\n");
-	print EXEC <<EOSCRIPT1;
-eval 'exec perl -S \$0 \${1+"\$@"}'
-  if \$running_under_some_shell;
-# =!=!=!=!=!=!=!=!=!=!=!
-# This script is automatically generated: DO NOT EDIT!!!
-# Generated by Glasgow Haskell, version ${ProjectVersion} ${ProjectPatchLevel}
-#
-\$pvm_executable      = '$pvm_executable';
-\$pvm_executable_base = '$pvm_executable_base';
-\$SysMan = '$SysMan';
-EOSCRIPT1
-
-	print EXEC <<\EOSCRIPT2;
-# first, some magical shortcuts to run "commands" on the binary
-# (which is hidden)
-if ($#ARGV == 1 && $ARGV[0] eq '+RTS' && $ARGV[1] =~ /^--((size|file|strip|rm|nm).*)/ ) {
-    local($cmd) = $1;
-    system("$cmd $pvm_executable");
-    exit(0); # all done
-}
-
-# OK, really run it; process the args first
-$ENV{'PE'} = $pvm_executable_base;
-$debug = '';
-$nprocessors = 2; # the default
-@nonPVM_args = ();
-$in_RTS_args = 0;
-
-# ToDo: handle --RTS
-args: while ($a = shift(@ARGV)) {
-    if ( $a eq '+RTS' ) {
-	$in_RTS_args = 1;
-    } elsif ( $a eq '-RTS' ) {
-	$in_RTS_args = 0;
-    }
-    if ( $a eq '-d' && $in_RTS_args ) {
-	$debug = '-';
-    } elsif ( $a =~ /^-N(\d+)/ && $in_RTS_args ) {
-	$nprocessors = $1;
-    } else {
-	push(@nonPVM_args, $a);
-    }
-}
-
-local($return_val) = 0;
-system("$SysMan $debug $pvm_executable $nprocessors @nonPVM_args");
-$return_val = $?;
-system("mv $ENV{'HOME'}/$pvm_executable_base.???.gr .") if -f "$ENV{'HOME'}/$pvm_executable_base.001.gr";
-exit($return_val);
-EOSCRIPT2
-	close(EXEC) || die "Failed closing $executable\n";
-	chmod 0755, $executable;
-    }
-}
+# Link if appropriate.
+&runLinker() if $Do_lnkr;
 
 # that...  that's all, folks!
 &tidy_up();
@@ -2066,6 +1950,208 @@ sub makeHiMap {
 
 \end{code}
 
+Invoke the 'linker' - either the standard linker or the one used to build
+a (Win32) DLL.
+
+\begin{code}
+sub runLinker()
+{
+    local($libdirs) = '';
+
+    # append last minute flags linker and consistency flags
+    &setupBuildFlags();
+    &setupSyslibs();
+    &setupLinkOpts();
+
+    # glue them together:
+    push(@UserLibrary_dir, @SysLibrary_dir);
+
+    $libdirs = '-L' . join(' -L',@UserLibrary_dir) if $#UserLibrary_dir >= 0;
+
+    # for a linker, use an explicitly given one, or the going C compiler ...
+    local($lnkr) = ( $Lnkr ) ? $Lnkr : $CcRegd;
+
+    if ( ($Specific_output_file eq '') && 
+         ($TargetPlatform eq 'i386-unknown-cygwin32') ) {
+         $Specific_output_file = 'main.exe';
+         print STDERR "Output file not specified, defaulting to \"main.exe\"\n";
+    }
+
+    local($output) = ($Specific_output_file ne '') ? "-o $Specific_output_file" : '';
+    @Files_to_tidy = ($Specific_output_file ne '') ? $Specific_output_file : 'a.out'; 
+
+    &prepareWin32DllLink(1);
+
+    local($to_do) = "$lnkr $Verbose @Ld_flags $output @Link_file $TopClosureFile $libdirs @UserLibrary @SysLibrary";
+    &run_something($to_do, 'Linker');
+
+    # finally, check the consistency info in the binary
+    local($executable) = $Files_to_tidy[0];
+    @Files_to_tidy = (); # reset; we don't want to nuke it if it's inconsistent
+
+    if ( $LinkChk ) {
+    	# dynamically load consistency-chking code; then do it.
+	require('ghc-consist.prl')
+	    || &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-consist.prl!\n");
+
+    	&chk_consistency_info ( $executable );
+    }
+
+    # if PVM parallel stuff, we do truly weird things.
+    # Essentially: (1) move the executable over to where PVM expects
+    # to find it.  (2) create a script in place of the executable
+    # which will cause the program to be run, via SysMan.
+    if ( $PARing eq 'p' ) {
+	local($pvm_executable) = $executable;
+	local($pvm_executable_base);
+
+	if ( $pvm_executable !~ /^\// ) { # a relative path name: make absolute
+	    local($pwd) = `pwd`;
+	    chop($pwd);
+	    $pwd =~ s/^\/tmp_mnt//;
+	    $pvm_executable = "$pwd/$pvm_executable";
+	}
+
+	$pvm_executable =~ s|/|=|g; # make /s into =s
+	$pvm_executable_base = $pvm_executable;
+
+	$pvm_executable = $ENV{'PVM_ROOT'} . '/bin/' . $ENV{'PVM_ARCH'}
+			. "/$pvm_executable";
+
+	&run_something("$Rm -f $pvm_executable; $Cp -p $executable $pvm_executable && $Rm -f $executable", 'Moving binary to PVM land');
+
+	# OK, now create the magic script for "$executable"
+	open(EXEC, "> $executable") || &tidy_up_and_die(1,"$Pgm: couldn't open $executable to write!\n");
+	print EXEC <<EOSCRIPT1;
+eval 'exec perl -S \$0 \${1+"\$@"}'
+  if \$running_under_some_shell;
+# =!=!=!=!=!=!=!=!=!=!=!
+# This script is automatically generated: DO NOT EDIT!!!
+# Generated by Glasgow Haskell, version ${ProjectVersion} ${ProjectPatchLevel}
+#
+\$pvm_executable      = '$pvm_executable';
+\$pvm_executable_base = '$pvm_executable_base';
+\$SysMan = '$SysMan';
+EOSCRIPT1
+
+	print EXEC <<\EOSCRIPT2;
+# first, some magical shortcuts to run "commands" on the binary
+# (which is hidden)
+if ($#ARGV == 1 && $ARGV[0] eq '+RTS' && $ARGV[1] =~ /^--((size|file|strip|rm|nm).*)/ ) {
+    local($cmd) = $1;
+    system("$cmd $pvm_executable");
+    exit(0); # all done
+}
+
+# OK, really run it; process the args first
+$ENV{'PE'} = $pvm_executable_base;
+$debug = '';
+$nprocessors = 2; # the default
+@nonPVM_args = ();
+$in_RTS_args = 0;
+
+# ToDo: handle --RTS
+args: while ($a = shift(@ARGV)) {
+    if ( $a eq '+RTS' ) {
+	$in_RTS_args = 1;
+    } elsif ( $a eq '-RTS' ) {
+	$in_RTS_args = 0;
+    }
+    if ( $a eq '-d' && $in_RTS_args ) {
+	$debug = '-';
+    } elsif ( $a =~ /^-N(\d+)/ && $in_RTS_args ) {
+	$nprocessors = $1;
+    } else {
+	push(@nonPVM_args, $a);
+    }
+}
+
+local($return_val) = 0;
+system("$SysMan $debug $pvm_executable $nprocessors @nonPVM_args");
+$return_val = $?;
+system("mv $ENV{'HOME'}/$pvm_executable_base.???.gr .") if -f "$ENV{'HOME'}/$pvm_executable_base.001.gr";
+exit($return_val);
+EOSCRIPT2
+	close(EXEC) || die "Failed closing $executable\n";
+	chmod 0755, $executable;
+    }
+}
+
+sub createWin32DLL()
+{
+    local ($libdirs);
+
+    # append last minute flags linker and consistency flags
+    &setupBuildFlags();
+    &setupSyslibs();
+    &setupLinkOpts();
+
+    # glue them together:
+    push(@UserLibrary_dir, @SysLibrary_dir);
+
+    $libdirs = '-L' . join(' -L',@UserLibrary_dir) if $#UserLibrary_dir >= 0;
+
+    &prepareWin32DllLink(0);
+
+    local ($bld_dll) = "dllwrap";
+
+    local ($output) = ($Specific_output_file ne '') ? "$Specific_output_file" : 'HSdll.dll';
+    local ($output_dir);
+    local ($output_file);
+    local ($output_lib, $output_def);
+
+    ($output_dir = $output) =~ s|(.*/)[^/]+$|$1|;
+    $output_dir = "" if ($output_dir eq $output);
+    ($output_file = $output) =~ s|.*/([^/]+)$|$1|;
+
+    ($output_lib = $output_file) =~ s|(.+)\.[^\.]*$|${output_dir}lib$1_imp.a|;
+    ($output_def = $output_file) =~ s|(.+)\.[^\.]*$|${output_dir}$1.def|;
+
+    push (@Dll_flags, "-mno-cygwin --target=i386-mingw32") if ($TargetPlatform =~ /^.*mingw32$/);
+    push (@Dll_flags, "--output-lib $output_lib");
+    # If the "--def " option hasn't been supplied, assume everything 
+    # is going to be exported via the DLL.."
+    if (!grep(/--def/, @Dll_flags)) {
+      push (@Dll_flags, "--export-all --output-def $output_def");
+    }
+
+    local($to_do) = "$bld_dll @Dll_flags -o $output @Link_file $libdirs @UserLibrary @SysLibrary";
+    # Make sure the user sees this piece of magic.
+    print STDERR "$to_do\n" if (!$Verbose);
+    &run_something($to_do, 'DLL creator');
+}
+
+sub prepareWin32DllLink ()
+{
+    local($linking_main) = @_;
+
+    #
+    # Win32 DLLs - link with import libraries, not the real archives.
+    # 
+    if ( $TargetPlatform =~ /-mingw32$/ ) {
+       if (!$Static) {
+	 #
+	 # If the libraries have the form libHSfoo.a, we
+	 # transform that into libHSfoo_imp.a - the import
+	 # library of the DLL.
+	 # 
+         foreach $a ( @SysLibrary ) {
+           $a = "${a}_imp" if ($a =~ /^-lHS/);
+         }
+         foreach $a ( @UserLibrary ) {
+           $a = "${a}_imp" if ($a =~ /^-lHS/);
+         }
+         push(@Link_file, ( $INSTALLING ) ? "$InstLibDirGhc/Main.o"
+			                  : "$TopPwd/$CURRENT_DIR/$GHC_RUNTIME_DIR/Main.o") if $linking_main;
+         push(@Link_file, ( $INSTALLING ) ? "$InstLibDirGhc/PrelMain.o"
+			                  : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/PrelMain.o") if $linking_main;
+       }
+       push(@Ld_flags,  "-mno-cygwin");
+    }
+}
+\end{code}
+
+
 %************************************************************************
 %*									*
 \section[Driver-misc-utils]{Miscellaneous utilities}
@@ -2627,6 +2713,24 @@ sub add_syslib {
 	, ''     # extra ghc opts
 	, ''     # extra cc opts
 	, '-luser32 -lgdi32'     # extra ld opts
+	],
+       com,
+	[  # where to slurp interface files from
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc/imports/com"
+	       : "$TopPwd/hdirect/lib"
+	  )
+	, # where to find the archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/hdirect/lib"
+	  )
+	, ''
+	, 'exts' # Syslib dependencies
+	, ''     # extra ghc opts
+	, ''     # extra cc opts
+	, '-luser32 -lole32 -loleaut32 -ladvapi32'
+	         # extra ld opts
 	]
     );
 
@@ -2847,6 +2951,8 @@ arg: while($_ = $Args[0]) {
     # stop after preprocessing C
     /^-M$/	    && do { $Only_generate_deps = 1; $Do_as = 0; $Do_lnkr = 0; next arg; };
     # only generate dependency information.
+    /^--mk-dll$/    && do { $Only_generate_dll  = 1; $Do_as = 0; $Do_lnkr = 0; next arg; };
+    # Build a Win32 DLL (where supported).
     /^-S$/	    && do { $Do_as = 0; $Do_lnkr = 0; next arg; };
     # stop after generating assembler
 	
@@ -3040,6 +3146,7 @@ arg: while($_ = $Args[0]) {
     /^-optc(.*)$/   && do { push(@CcBoth_flags,     $1); next arg; };
     /^-opta(.*)$/   && do { push(@As_flags,         $1); next arg; };
     /^-optl(.*)$/   && do { push(@Ld_flags,         $1); next arg; };
+    /^-optdll(.*)$/ && do { push(@Dll_flags,        $1); next arg; };
     /^-optdep(.*)$/ && do { push(@MkDependHS_flags, $1); next arg; };
 
     #---------- Haskell C pre-processor (hscpp) ----------------------------
@@ -3106,7 +3213,7 @@ arg: while($_ = $Args[0]) {
     /^-fno-speciali[sz]e$/
 		&& do { $Oopt_DoSpecialise = ''; next arg; };
 
-    /^-fcompiling-prelude$/ && do { push(@HsC_flags, $_); next arg; };
+    /^-fcompiling-prelude$/ && do { $CompilingPrelude=1; push(@HsC_flags, $_); next arg; };
 
 # Now the foldr/build options, which are *on* by default (for -O).
 
