@@ -844,7 +844,7 @@ dnl ** does struct stat contain st_blksize?
 AC_STRUCT_ST_BLKSIZE
 
 dnl ** do we have long longs?
-FPTOOLS_C_LONG_LONG
+AC_CHECK_TYPES([long long])
 
 dnl ** check what fields struct msghdr contains
 FPTOOLS_MSGHDR_MSG_ACCRIGHTS

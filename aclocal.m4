@@ -663,31 +663,6 @@ undefine([AC_TYPE_NAME])dnl
 undefine([AC_CV_NAME])dnl
 ])
 
-dnl ** figure out whether C compiler supports 'long long's
-dnl    (Closely based on Andreas Zeller's macro for testing
-dnl     for this under C++)
-dnl
-dnl    If the C compiler supports `long long' types,
-dnl    define `HAVE_LONG_LONG'.
-dnl
-AC_DEFUN(FPTOOLS_C_LONG_LONG,
-[
-AC_REQUIRE([AC_PROG_CC])
-AC_MSG_CHECKING(whether ${CC} supports long long types)
-AC_CACHE_VAL(fptools_cv_have_long_long,
-[
-AC_LANG_SAVE
-AC_LANG_C
-AC_TRY_COMPILE(,[long long a;],
-fptools_cv_have_long_long=yes,
-fptools_cv_have_long_long=no)
-AC_LANG_RESTORE
-])
-AC_MSG_RESULT($fptools_cv_have_long_long)
-if test "$fptools_cv_have_long_long" = yes; then
-AC_DEFINE(HAVE_LONG_LONG)
-fi
-])
 
 dnl ** Obtain the value of a C constant.
 dnl    The value will be `(-1)' if the constant is undefined.
