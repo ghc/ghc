@@ -1,5 +1,5 @@
 /* --------------------------------------------------------------------------
- * $Id: mkNativeHdr.c,v 1.2 1998/12/02 13:21:50 simonm Exp $
+ * $Id: mkNativeHdr.c,v 1.3 2000/01/25 18:09:52 sewardj Exp $
  *
  * (c) The GHC Team, 1992-1998
  *
@@ -19,6 +19,8 @@
 #define OFFSET_R6    OFFSET(RegTable, RegTable.rR6)
 #define OFFSET_R7    OFFSET(RegTable, RegTable.rR7)
 #define OFFSET_R8    OFFSET(RegTable, RegTable.rR8)
+#define OFFSET_R9    OFFSET(RegTable, RegTable.rR9)
+#define OFFSET_R10   OFFSET(RegTable, RegTable.rR10)
 #define OFFSET_F1    OFFSET(RegTable, RegTable.rF1)
 #define OFFSET_F2    OFFSET(RegTable, RegTable.rF2)
 #define OFFSET_F3    OFFSET(RegTable, RegTable.rF3)
@@ -54,6 +56,8 @@ main()
     printf("#define OFFSET_R6 %d\n", OFFSET_R6);
     printf("#define OFFSET_R7 %d\n", OFFSET_R7);
     printf("#define OFFSET_R8 %d\n", OFFSET_R8);
+    printf("#define OFFSET_R9 %d\n", OFFSET_R9);
+    printf("#define OFFSET_R10 %d\n", OFFSET_R10);
     printf("#define OFFSET_F1 %d\n", OFFSET_F1);
     printf("#define OFFSET_F2 %d\n", OFFSET_F2);
     printf("#define OFFSET_F3 %d\n", OFFSET_F3);

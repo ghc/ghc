@@ -7,7 +7,8 @@ module Stix (
 	CodeSegment(..), StixReg(..), StixTree(..), StixTreeList,
 	sStLitLbl, pprStixTrees,
 
-	stgBaseReg, stgNode, stgSp, stgSu, stgSpLim, stgHp, stgHpLim, stgTagReg,
+	stgBaseReg, stgNode, stgSp, stgSu, stgSpLim, 
+        stgHp, stgHpLim, stgTagReg, stgR9, stgR10,
 	getUniqLabelNCG,
 
 	fixedHS, arrWordsHS, arrPtrsHS
@@ -21,7 +22,7 @@ import AbsCSyn		( node, tagreg, MagicId(..) )
 import AbsCUtils	( magicIdPrimRep )
 import CallConv		( CallConv, pprCallConv )
 import CLabel		( mkAsmTempLabel, CLabel, pprCLabel, pprCLabel_asm )
-import PrimRep          ( PrimRep, showPrimRep )
+import PrimRep          ( PrimRep(..), showPrimRep )
 import PrimOp           ( PrimOp, pprPrimOp )
 import Unique           ( Unique )
 import SMRep		( fixedHdrSize, arrWordsHdrSize, arrPtrsHdrSize )
@@ -203,6 +204,8 @@ stgSu 		    = StReg (StixMagicId Su)
 stgSpLim	    = StReg (StixMagicId SpLim)
 stgHp		    = StReg (StixMagicId Hp)
 stgHpLim	    = StReg (StixMagicId HpLim)
+stgR9               = StReg (StixMagicId (VanillaReg WordRep ILIT(9)))
+stgR10              = StReg (StixMagicId (VanillaReg WordRep ILIT(10)))
 
 getUniqLabelNCG :: UniqSM CLabel
 getUniqLabelNCG

@@ -6,6 +6,7 @@
 module StixMacro ( macroCode, checkCode ) where
 
 #include "HsVersions.h"
+#include "nativeGen/NCG.h"
 
 import {-# SOURCE #-} StixPrim ( amodeToStix )
 
@@ -232,6 +233,16 @@ checkCode macro args assts
 
 	fail = StLabel ulbl_fail
 	join = StLabel ulbl_pass
+
+        -- see includes/StgMacros.h for explaination of these magic consts
+        aLL_NON_PTRS
+           = IF_ARCH_alpha(16383,65535)
+
+        assign_liveness ptr_regs 
+           = StAssign WordRep stgR9
+                      (StPrim XorOp [StInt aLL_NON_PTRS, ptr_regs])
+        assign_reentry reentry 
+           = StAssign WordRep stgR10 reentry
     in	
 
     returnUs (
@@ -301,8 +312,12 @@ checkCode macro args assts
                            assts (assign_ret r ret : gc_ut ptrs nonptrs : join : xs))
 
 	HP_CHK_GEN     -> 
-		error "unimplemented check"
-  )
+                let [words,liveness,reentry] = args_stix
+                in (\xs -> assign_hp words : cjmp_hp :
+                           assts (assign_liveness liveness :
+                                  assign_reentry reentry :
+                                  gc_gen : join : xs))
+    )
 	
 -- Various canned heap-check routines
 
@@ -313,6 +328,7 @@ gc_unpt_r1         = StJump (StLitLbl (ptext SLIT("stg_gc_unpt_r1")))
 gc_unbx_r1         = StJump (StLitLbl (ptext SLIT("stg_gc_unbx_r1")))
 gc_f1              = StJump (StLitLbl (ptext SLIT("stg_gc_f1")))
 gc_d1              = StJump (StLitLbl (ptext SLIT("stg_gc_d1")))
+gc_gen             = StJump (StLitLbl (ptext SLIT("stg_gen_chk")))
 
 gc_ut (StInt p) (StInt np)
                    = StJump (StLitLbl (ptext SLIT("stg_gc_ut_") <> int (fromInteger p) 
