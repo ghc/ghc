@@ -352,35 +352,31 @@ sepBindsByDropPoint drop_pts []
 
 sepBindsByDropPoint drop_pts floaters
   = let
-	(per_drop_pt, must_stay_here, _)
-	    --= sep drop_pts emptyIdSet{-fvs of prev drop_pts-} floaters
-	    = split' drop_pts floaters [] empty_boxes
-	empty_boxes = nOfThem (length drop_pts) []
+	(must_stay_here : per_drop_pt)
+	    = split' floaters ((emptyIdSet : drop_pts) `zip` repeat [])
     in
-    (map reverse per_drop_pt, reverse must_stay_here)
+    (per_drop_pt, must_stay_here)
   where
-    split' drop_pts_fvs [] mult_branch drop_boxes
-      = (drop_boxes, mult_branch, drop_pts_fvs)
+    split' [] drop_boxes = map (reverse . snd) drop_boxes
 
-    split' drop_pts_fvs (bind:binds) mult_branch drop_boxes
-      | no_of_branches == 1	-- Exactly one branch
-      = split' drop_pts_fvs' binds mult_branch drop_boxes'
-
-      | otherwise		-- Zero or many branches; drop it here
-      = split' drop_pts_fvs binds (bind:mult_branch) drop_boxes
-
+    split' (bind:binds) drop_boxes
+      = split' binds drop_boxes'
       where
-	binders		= bindersOf (fst bind)
-	no_of_branches  = length [() | True <- in_branch_flags]
-	in_branch_flags = [ any (`elementOfIdSet` branch_fvs) binders
-			  | branch_fvs <- drop_pts_fvs ]
+	drop_boxes' = zipWith drop drop_flags drop_boxes
+	drop_flags  | no_of_branches == 1	-- Exactly one branch
+		    = used_in_flags
+		    | otherwise			-- Zero or many branches; drop it here
+		    = True : repeat False
 
-	(drop_pts_fvs', drop_boxes') = unzip (zipWith3 drop in_branch_flags drop_pts_fvs drop_boxes)
-	drop True drop_fvs box  = (drop_fvs `unionIdSets` fvsOfBind bind, bind:box)
-	drop False drop_fvs box = (drop_fvs, 				  box)
+	binders		= bindersOf (fst bind)
+	no_of_branches  = length [() | True <- used_in_flags]
+	used_in_flags   = [ any (`elementOfIdSet` branch_fvs) binders
+			  | (branch_fvs,_) <- drop_boxes ]
+
+	drop True  (drop_fvs, box) = (drop_fvs `unionIdSets` fvsOfBind bind, bind:box)
+	drop False (drop_fvs, box) = (drop_fvs, 				  box)
       
 
-    -------------------------
     fvsOfBind (_,fvs)	= fvs
 
 floatedBindsFVs :: FloatingBinds -> FreeVarsSet
