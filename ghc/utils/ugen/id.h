@@ -1,1 +1,0 @@
-typedef char *id;
