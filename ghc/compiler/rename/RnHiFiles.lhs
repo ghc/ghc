@@ -224,15 +224,9 @@ loadInterface doc_str mod_name from
 				vers_rules = rule_vers,
 				vers_decls = decls_vers }
 
- 	this_mod_name = moduleName this_mod
-	is_loaded m   =  m == this_mod_name 
-		      || maybeToBool (lookupIfaceByModName hpt pit m)
-		-- We treat the currently-being-compiled module as 'loaded' because
-		-- even though it isn't yet in the HIT or PIT; otherwise it gets
-		-- put into iImpModInfo, and then spat out into its own interface
-		-- file as a dependency
-
 	-- Now add info about this module to the PIT
+	-- Even home modules loaded by this route (which only 
+	-- happens in OneShot mode) are put in the PIT
 	has_orphans = pi_orphan iface
 	new_pit   = extendModuleEnv pit mod mod_iface
  	mod_iface = ModIface { mi_module = mod, mi_package = pi_pkg iface,
