@@ -674,5 +674,10 @@ hPutFS handle (CharStr a# l#)
   | otherwise  = hPutBufFull handle (Ptr a#) (I# l#)
 #endif
 
+-- ONLY here for debugging the NCG (so -ddump-stix works for string
+-- literals); no idea if this is really necessary.  JRS, 010131
+hPutFS handle (UnicodeStr _ is) 
+  = hPutStr handle ("(UnicodeStr " ++ show is ++ ")")
+
 #endif
 \end{code}
