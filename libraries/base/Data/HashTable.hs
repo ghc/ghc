@@ -33,19 +33,31 @@ module Data.HashTable (
 -- This module is imported by Data.Dynamic, which is pretty low down in the
 -- module hierarchy, so don't import "high-level" modules
 
+#ifdef __GLASGOW_HASKELL__
 import GHC.Base
+#else
+import Prelude	hiding	( lookup )
+#endif
 import Data.Tuple	( fst )
 import Data.Bits
 import Data.Maybe
 import Data.List	( maximumBy, filter, length, concat )
+import Data.Int		( Int32 )
 
+#if defined(__GLASGOW_HASKELL__)
 import GHC.Num
-import GHC.Int  	( Int32 )
 import GHC.Real		( Integral(..), fromIntegral )
 
-import GHC.IOBase	( IO, IOArray, newIOArray, readIOArray, writeIOArray, unsafeReadIOArray, unsafeWriteIOArray,
+import GHC.IOBase	( IO, IOArray, newIOArray, readIOArray, writeIOArray,
+			  unsafeReadIOArray, unsafeWriteIOArray,
 			  IORef, newIORef, readIORef, writeIORef )
 import GHC.Err		( undefined )
+#elif defined(__HUGS__)
+import Data.Char	( ord )
+import Hugs.IOArray	( IOArray, newIOArray, readIOArray, writeIOArray,
+			  unsafeReadIOArray, unsafeWriteIOArray )
+import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
+#endif
 import Control.Monad	( when, mapM, sequence_ )
 
 -----------------------------------------------------------------------
