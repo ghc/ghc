@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.87 2000/08/08 15:16:09 sewardj Exp $
+# $Id: Makefile,v 1.88 2000/08/09 11:39:02 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -249,27 +249,27 @@ PRIMOP_BITS=primop-data-decl.hs-incl \
 prelude/PrimOp.lhs: $(PRIMOP_BITS)
 
 primop-data-decl.hs-incl: prelude/primops.txt
-	$(GENPOC) --data-decl          < prelude/primops.txt > primop-data-decl.hs-incl
+	$(GENPOC) --data-decl          < $< > $@
 primop-tag.hs-incl: prelude/primops.txt
-	$(GENPOC) --primop-tag         < prelude/primops.txt > primop-tag.hs-incl
+	$(GENPOC) --primop-tag         < $< > $@
 primop-list.hs-incl: prelude/primops.txt
-	$(GENPOC) --primop-list        < prelude/primops.txt > primop-list.hs-incl
+	$(GENPOC) --primop-list        < $< > $@
 primop-has-side-effects.hs-incl: prelude/primops.txt
-	$(GENPOC) --has-side-effects   < prelude/primops.txt > primop-has-side-effects.hs-incl
+	$(GENPOC) --has-side-effects   < $< > $@
 primop-out-of-line.hs-incl: prelude/primops.txt
-	$(GENPOC) --out-of-line        < prelude/primops.txt > primop-out-of-line.hs-incl
+	$(GENPOC) --out-of-line        < $< > $@
 primop-commutable.hs-incl: prelude/primops.txt
-	$(GENPOC) --commutable         < prelude/primops.txt > primop-commutable.hs-incl
+	$(GENPOC) --commutable         < $< > $@
 primop-needs-wrapper.hs-incl: prelude/primops.txt
-	$(GENPOC) --needs-wrapper      < prelude/primops.txt > primop-needs-wrapper.hs-incl
+	$(GENPOC) --needs-wrapper      < $< > $@
 primop-can-fail.hs-incl: prelude/primops.txt
-	$(GENPOC) --can-fail           < prelude/primops.txt > primop-can-fail.hs-incl
+	$(GENPOC) --can-fail           < $< > $@
 primop-strictness.hs-incl: prelude/primops.txt
-	$(GENPOC) --strictness         < prelude/primops.txt > primop-strictness.hs-incl
+	$(GENPOC) --strictness         < $< > $@
 primop-usage.hs-incl: prelude/primops.txt
-	$(GENPOC) --usage              < prelude/primops.txt > primop-usage.hs-incl
+	$(GENPOC) --usage              < $< > $@
 primop-primop-info.hs-incl: prelude/primops.txt
-	$(GENPOC) --primop-primop-info < prelude/primops.txt > primop-primop-info.hs-incl
+	$(GENPOC) --primop-primop-info < $< > $@
 
 
 
