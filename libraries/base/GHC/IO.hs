@@ -607,7 +607,8 @@ hPutBuf :: Handle			-- handle to write to
 	-> Int				-- number of bytes of data in buffer
 	-> IO ()
 hPutBuf handle ptr count
-  | count <= 0 = illegalBufferSize handle "hPutBuf" count
+  | count == 0 = return ()
+  | count <  0 = illegalBufferSize handle "hPutBuf" count
   | otherwise = 
     wantWritableHandle "hPutBuf" handle $ 
       \ handle_@Handle__{ haFD=fd, haBuffer=ref, haIsStream=is_stream } -> do
@@ -647,7 +648,8 @@ writeChunk fd ptr bytes = loop 0 bytes
 
 hGetBuf :: Handle -> Ptr a -> Int -> IO Int
 hGetBuf handle ptr count
-  | count <= 0 = illegalBufferSize handle "hGetBuf" count
+  | count == 0 = return 0
+  | count <  0 = illegalBufferSize handle "hGetBuf" count
   | otherwise = 
       wantReadableHandle "hGetBuf" handle $ 
 	\ handle_@Handle__{ haFD=fd, haBuffer=ref } -> do
@@ -694,6 +696,7 @@ slurpFile fname = do
     ioError (userError "slurpFile: file too big")
    else do
     let sz_i = fromIntegral sz
+    if sz_i == 0 then return (nullPtr, 0) else do
     chunk <- mallocBytes sz_i
     r <- hGetBuf handle chunk sz_i
     hClose handle
