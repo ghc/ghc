@@ -25,9 +25,8 @@ import PprCore		( pprCoreExpr )
 import Literal		( Literal(..), literalPrimRep )
 import PrimRep		( PrimRep(..) )
 import PrimOp		( PrimOp(..) )
-import CStrings		( CLabelString )
 import CoreFVs		( freeVars )
-import Type		( typePrimRep, splitTyConApp_maybe, isTyVarTy, splitForAllTys )
+import Type		( typePrimRep, splitTyConApp_maybe, isTyVarTy )
 import DataCon		( dataConTag, fIRST_TAG, dataConTyCon, 
                           dataConWrapId, isUnboxedTupleCon )
 import TyCon		( TyCon(..), tyConFamilySize, isDataTyCon, tyConDataCons,
@@ -37,13 +36,12 @@ import Type		( Type, repType, splitRepFunTys )
 import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem )
 import Var		( isTyVar )
 import VarSet		( VarSet, varSetElems )
-import PrimRep		( getPrimRepSize, isFollowableRep )
+import PrimRep		( isFollowableRep )
 import CmdLineOpts	( DynFlags, DynFlag(..) )
 import ErrUtils		( showPass, dumpIfSet_dyn )
 import Unique		( mkPseudoUnique3 )
 import FastString	( FastString(..) )
 import Panic		( GhcException(..) )
-import SMRep		( fixedHdrSize )
 import PprType		( pprType )
 import ByteCodeInstr	( BCInstr(..), ProtoBCO(..), nameOfProtoBCO, bciStackUse )
 import ByteCodeItbls	( ItblEnv, mkITbls )
@@ -55,13 +53,12 @@ import Linker		( lookupSymbol )
 
 import List		( intersperse, sortBy, zip4 )
 import Foreign		( Ptr(..), mallocBytes )
-import Addr		( Addr(..), nullAddr, addrToInt, writeCharOffAddr )
+import Addr		( Addr(..), writeCharOffAddr )
 import CTypes		( CInt )
 import Exception	( throwDyn )
 
 import PrelBase		( Int(..) )
 import PrelGHC		( ByteArray# )
-import IOExts		( unsafePerformIO )
 import PrelIOBase	( IO(..) )
 
 \end{code}
@@ -278,16 +275,16 @@ schemeE d s p e@(fvs, AnnVar v)
 
    | otherwise
    = -- returning an unboxed value.  Heave it on the stack, SLIDE, and RETURN.
-     let (push, szw) = pushAtom True d p (AnnVar v)
-     in  returnBc (push 			-- value onto stack
-                   `appOL`  mkSLIDE szw (d-s) 	-- clear to sequel
-                   `snocOL` RETURN v_rep)	-- go
+     pushAtom True d p (AnnVar v)	`thenBc` \ (push, szw) ->
+     returnBc (push 			-- value onto stack
+               `appOL`  mkSLIDE szw (d-s) 	-- clear to sequel
+               `snocOL` RETURN v_rep)	-- go
    where
       v_rep = typePrimRep (idType v)
 
 schemeE d s p (fvs, AnnLit literal)
-   = let (push, szw) = pushAtom True d p (AnnLit literal)
-         l_rep = literalPrimRep literal
+   = pushAtom True d p (AnnLit literal)	`thenBc` \ (push, szw) ->
+     let l_rep = literalPrimRep literal
      in  returnBc (push 			-- value onto stack
                    `appOL`  mkSLIDE szw (d-s) 	-- clear to sequel
                    `snocOL` RETURN l_rep)	-- go
@@ -314,19 +311,23 @@ schemeE d s p (fvs, AnnLet binds b)
 
          -- ToDo: don't build thunks for things with no free variables
          buildThunk dd ([], size, id, off)
-            = PUSH_G (Left (getName id))
-              `consOL` unitOL (MKAP (off+size-1) size)
+            = returnBc (PUSH_G (Left (getName id))
+                        `consOL` unitOL (MKAP (off+size-1) size))
          buildThunk dd ((fv:fvs), size, id, off)
-            = case pushAtom True dd p' (AnnVar fv) of
-                 (push_code, pushed_szw)
-                    -> push_code `appOL`
-                       buildThunk (dd+pushed_szw) (fvs, size, id, off)
+            = pushAtom True dd p' (AnnVar fv) 
+					`thenBc` \ (push_code, pushed_szw) ->
+              buildThunk (dd+pushed_szw) (fvs, size, id, off)
+					`thenBc` \ more_push_code ->
+              returnBc (push_code `appOL` more_push_code)
 
-         thunkCode = concatOL (map (buildThunk d') infos)
+         genThunkCode = mapBc (buildThunk d') infos	`thenBc` \ tcodes ->
+                        returnBc (concatOL tcodes)
+
          allocCode = toOL (map ALLOC sizes)
      in
      schemeE d' s p' b   				`thenBc`  \ bodyCode ->
      mapBc (schemeR False) (zip xs rhss)		`thenBc_`
+     genThunkCode					`thenBc` \ thunkCode ->
      returnBc (allocCode `appOL` thunkCode `appOL` bodyCode)
 
 
@@ -359,7 +360,6 @@ schemeE d s p (fvs_case, AnnCase (fvs_scrut, scrut) bndr
      in  trace ("WARNING: ignoring polymorphic case in interpreted mode.\n" ++
                 "   Possibly due to strict polymorphic/functional constructor args.\n" ++
                 "   Your program may leak space unexpectedly.\n")
-                -- ++ showSDoc (char ' ' $$ pprCoreExpr (deAnnotate new_expr) $$ char ' '))
          (schemeE d s p new_expr)
 
 
@@ -506,7 +506,7 @@ schemeT d s p app
 
    -- Handle case 0
    | Just (arg, constr_names) <- maybe_is_tagToEnum_call
-   = pushAtom True d p arg 		`bind` \ (push, arg_words) ->
+   = pushAtom True d p arg 		`thenBc` \ (push, arg_words) ->
      implement_tagToId constr_names	`thenBc` \ tagToId_sequence ->
      returnBc (push `appOL`  tagToId_sequence            
                     `appOL`  mkSLIDE 1 (d+arg_words-s)
@@ -538,8 +538,8 @@ schemeT d s p app
    -- Cases 3 and 4
    | otherwise
    = if   is_con_call && isUnboxedTupleCon con
-     then returnBc unboxedTupleException
-     else code `seq` returnBc code
+     then unboxedTupleException
+     else do_pushery d (map snd args_final_r_to_l)
 
    where
       -- Detect and extract relevant info for the tagToEnum kludge.
@@ -548,7 +548,7 @@ schemeT d s p app
                   = case splitTyConApp_maybe (repType ty) of
                        (Just (tyc, [])) |  isDataTyCon tyc
                                         -> map getName (tyConDataCons tyc)
-                       other            -> panic "maybe_is_tagToEnum_call.extract_constr_Ids"
+                       other -> panic "maybe_is_tagToEnum_call.extract_constr_Ids"
            in 
            case app of
               (_, AnnApp (_, AnnApp (_, AnnVar v) (_, AnnType t)) arg)
@@ -585,28 +585,30 @@ schemeT d s p app
            where isPtr = isFollowableRep . atomRep
 
       -- make code to push the args and then do the SLIDE-ENTER thing
-      code          = do_pushery d (map snd args_final_r_to_l)
       tag_when_push = not is_con_call
       narg_words    = sum (map (get_arg_szw . atomRep . snd) args_r_to_l)
       get_arg_szw   = if tag_when_push then taggedSizeW else untaggedSizeW
 
       do_pushery d (arg:args)
-         = let (push, arg_words) = pushAtom tag_when_push d p arg
-           in  push `appOL` do_pushery (d+arg_words) args
+         = pushAtom tag_when_push d p arg	`thenBc` \ (push, arg_words) ->
+           do_pushery (d+arg_words) args	`thenBc` \ more_push_code ->
+           returnBc (push `appOL` more_push_code)
       do_pushery d []
          | Just (CCall ccall_spec) <- isFCallId_maybe fn
          = panic "schemeT.do_pushery: unexpected ccall"
-
          | otherwise
          = case maybe_dcon of
-              Just con -> PACK con narg_words `consOL` (
-                          mkSLIDE 1 (d - narg_words - s) `snocOL` ENTER)
+              Just con -> returnBc (
+                             (PACK con narg_words `consOL`
+                              mkSLIDE 1 (d - narg_words - s)) `snocOL`
+                              ENTER
+                          )
               Nothing
-                 -> let (push, arg_words) = pushAtom True d p (AnnVar fn)
-                    in  push 
-                        `appOL` mkSLIDE (narg_words+arg_words) 
-                                        (d - s - narg_words)
-                        `snocOL` ENTER
+                 -> pushAtom True d p (AnnVar fn)	
+						`thenBc` \ (push, arg_words) ->
+                    returnBc (push `appOL` mkSLIDE (narg_words+arg_words) 
+                                                   (d - s - narg_words)
+                              `snocOL` ENTER)
 
 
 
@@ -634,27 +636,32 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
          -- depth to the first word of the bits for that arg, and the
          -- PrimRep of what was actually pushed.
 
-         f d [] = []
-         f d ((_,a):az) 
+         pargs d [] = returnBc []
+         pargs d ((_,a):az) 
             = let rep_arg = atomRep a
               in case rep_arg of
                     -- Don't push the FO; instead push the Addr# it
                     -- contains.
                     ForeignObjRep
-                       -> let foro_szW = taggedSizeW ForeignObjRep
-                              push_fo  = fst (pushAtom False{-irrelevant-} d p a)
+                       -> pushAtom False{-irrelevant-} d p a
+							`thenBc` \ (push_fo, _) ->
+                          let foro_szW = taggedSizeW ForeignObjRep
                               d_now    = d + addr_tsizeW
                               code     = push_fo `appOL` toOL [
                                             UPK_TAG addr_usizeW 0 0,
                                             SLIDE addr_tsizeW foro_szW
                                          ]
-                          in  (code, AddrRep) : f d_now az
+                          in  pargs d_now az 		`thenBc` \ rest ->
+                              returnBc ((code, AddrRep) : rest)
                     -- Default case: push taggedly, but otherwise intact.
                     other
-                       -> let (code_a, sz_a) = pushAtom True d p a
-                          in  (code_a, rep_arg) : f (d+sz_a) az
-
-         (pushs_arg, a_reps_pushed_r_to_l) = unzip (f d0 args_r_to_l)
+                       -> pushAtom True d p a		`thenBc` \ (code_a, sz_a) ->
+                          pargs (d+sz_a) az		`thenBc` \ rest ->
+                          returnBc ((code_a, rep_arg) : rest)
+     in
+         pargs d0 args_r_to_l				`thenBc` \ code_n_reps ->
+     let
+         (pushs_arg, a_reps_pushed_r_to_l) = unzip code_n_reps
 
          push_args    = concatOL pushs_arg
          d_after_args = d0 + sum (map taggedSizeW a_reps_pushed_r_to_l)
@@ -960,18 +967,18 @@ mkUnpackCode vars d p
 -- 5 and not to 4.  Stack locations are numbered from zero, so a depth
 -- 6 stack has valid words 0 .. 5.
 
-pushAtom :: Bool -> Int -> BCEnv -> AnnExpr' Id VarSet -> (BCInstrList, Int)
+pushAtom :: Bool -> Int -> BCEnv -> AnnExpr' Id VarSet -> BcM (BCInstrList, Int)
 pushAtom tagged d p (AnnVar v)
 
    | idPrimRep v == VoidRep
-   = if tagged then (unitOL (PUSH_TAG 0), 1) 
+   = if tagged then returnBc (unitOL (PUSH_TAG 0), 1) 
                else panic "ByteCodeGen.pushAtom(VoidRep,untaggedly)"
 
    | isFCallId v
    = pprPanic "pushAtom: shouldn't get an FCallId here" (ppr v)
 
    | Just primop <- isPrimOpId_maybe v
-   = (unitOL (PUSH_G (Right primop)), 1)
+   = returnBc (unitOL (PUSH_G (Right primop)), 1)
 
    | otherwise
    = let  {-
@@ -998,11 +1005,11 @@ pushAtom tagged d p (AnnVar v)
          sz_u   = untaggedIdSizeW v
          nwords = if tagged then sz_t else sz_u
      in
-         result
+         returnBc result
 
 pushAtom True d p (AnnLit lit)
-   = let (ubx_code, ubx_size) = pushAtom False d p (AnnLit lit)
-     in  (ubx_code `snocOL` PUSH_TAG ubx_size, 1 + ubx_size)
+   = pushAtom False d p (AnnLit lit)		`thenBc` \ (ubx_code, ubx_size) ->
+     returnBc (ubx_code `snocOL` PUSH_TAG ubx_size, 1 + ubx_size)
 
 pushAtom False d p (AnnLit lit)
    = case lit of
@@ -1015,12 +1022,13 @@ pushAtom False d p (AnnLit lit)
      where
         code rep
            = let size_host_words = untaggedSizeW rep
-             in (unitOL (PUSH_UBX (Left lit) size_host_words), size_host_words)
+             in  returnBc (unitOL (PUSH_UBX (Left lit) size_host_words), 
+                           size_host_words)
 
         pushStr s 
-           = let mallocvilleAddr
+           = let getMallocvilleAddr
                     = case s of
-                         CharStr s i -> A# s
+                         CharStr s i -> returnBc (A# s)
 
                          FastString _ l ba -> 
                             -- sigh, a string in the heap is no good to us.
@@ -1030,16 +1038,17 @@ pushAtom False d p (AnnLit lit)
                             -- at the same time.
                             let n = I# l
                             -- CAREFUL!  Chars are 32 bits in ghc 4.09+
-                            in  unsafePerformIO (
+                            in  ioToBc (
                                    do (Ptr a#) <- mallocBytes (n+1)
                                       strncpy (Ptr a#) ba (fromIntegral n)
                                       writeCharOffAddr (A# a#) n '\0'
                                       return (A# a#)
                                    )
-                         _ -> panic "StgInterp.lit2expr: unhandled string constant type"
+                         other -> panic "ByteCodeGen.pushAtom.pushStr"
              in
+                getMallocvilleAddr `thenBc` \ addr ->
                 -- Get the addr on the stack, untaggedly
-                (unitOL (PUSH_UBX (Right mallocvilleAddr) 1), 1)
+                   returnBc (unitOL (PUSH_UBX (Right addr) 1), 1)
 
 
 
