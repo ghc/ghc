@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.21 2001/04/02 07:24:12 qrczak Exp $
+ * $Id: TSO.h,v 1.22 2001/07/23 23:26:14 ken Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -97,11 +97,7 @@ typedef enum {
 } StgTSOWhatNext;
 
 /*
- * We are completely paranoid and make thread IDs 64 bits to avoid
- * having to worry about overflow.  A little calculation shows that
- * even doing 10^6 forks per second would take 35 million years to
- * overflow a 64 bit thread ID :-)
- *
+ * Thread IDs are 32 bits.
  */
 typedef StgWord32 StgThreadID;
 
