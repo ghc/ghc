@@ -15,13 +15,13 @@ module Inst (
 	newMethod, newMethodWithGivenTy, newOverloadedLit,
 	newIPDict, tcInstId,
 
-	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, instLoc, getDictClassTys,
-	getIPs,
-	predsOfInsts, predsOfInst,
+	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, 
+	ipNamesOfInst, ipNamesOfInsts, predsOfInst, predsOfInsts,
+	instLoc, getDictClassTys, 
 
 	lookupInst, lookupSimpleInst, LookupInstResult(..),
 
-	isDict, isClassDict, isMethod, instMentionsIPs,
+	isDict, isClassDict, isMethod, 
 	isTyVarDict, isStdClassTyVarDict, isMethodFor, 
 	instBindingRequired, instCanBeGeneralised,
 
@@ -51,7 +51,7 @@ import TcType	( Type,
 		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
 		  tcIsTyVarTy, mkPredTy, mkTyVarTy, mkTyVarTys,
 		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,
-		  predMentionsIPs, isClassPred, isTyVarClassPred, 
+		  isClassPred, isTyVarClassPred, 
 		  getClassPredTys, getClassPredTys_maybe, mkPredName,
 		  tidyType, tidyTypes, tidyFreeTyVars,
 		  tcCmpType, tcCmpTypes, tcCmpPred
@@ -217,9 +217,15 @@ predsOfInst (LitInst _ _ _ _)	     = []
 	-- But Num and Fractional have only one parameter and no functional
 	-- dependencies, so I think no caller of predsOfInst will care.
 
-ipsOfPreds theta = [(n,ty) | IParam n ty <- theta]
+ipNamesOfInsts :: [Inst] -> [Name]
+ipNamesOfInst  :: Inst   -> [Name]
+-- Get the implicit parameters mentioned by these Insts
 
-getIPs inst = ipsOfPreds (predsOfInst inst)
+ipNamesOfInsts insts = [n | inst <- insts, n <- ipNamesOfInst inst]
+
+ipNamesOfInst (Dict _ (IParam n _) _)  = [n]
+ipNamesOfInst (Method _ _ _ theta _ _) = [n | IParam n _ <- theta]
+ipNamesOfInst other		       = []
 
 tyVarsOfInst :: Inst -> TcTyVarSet
 tyVarsOfInst (LitInst _ _ ty _)      = tyVarsOfType  ty
@@ -254,13 +260,6 @@ isMethod other		      = False
 isMethodFor :: TcIdSet -> Inst -> Bool
 isMethodFor ids (Method uniq id tys _ _ loc) = id `elemVarSet` ids
 isMethodFor ids inst			     = False
-
-instMentionsIPs :: Inst -> NameSet -> Bool
-  -- True if the Inst mentions any of the implicit
-  -- parameters in the supplied set of names
-instMentionsIPs (Dict _ pred _)          ip_names = pred `predMentionsIPs` ip_names
-instMentionsIPs (Method _ _ _ theta _ _) ip_names = any (`predMentionsIPs` ip_names) theta
-instMentionsIPs other			 ip_names = False
 
 isStdClassTyVarDict (Dict _ pred _) = case getClassPredTys_maybe pred of
 					Just (clas, [ty]) -> isStandardClass clas && tcIsTyVarTy ty

@@ -865,6 +865,15 @@ check_source_ty dflags ctxt pred@(ClassP cls tys)
 			other	      -> dopt Opt_GlasgowExts               dflags
 
 check_source_ty dflags SigmaCtxt (IParam name ty) = check_arg_type ty
+	-- Implicit parameters only allows in type
+	-- signatures; not in instance decls, superclasses etc
+	-- The reason for not allowing implicit params in instances is a bit subtle
+	-- If we allowed	instance (?x::Int, Eq a) => Foo [a] where ...
+	-- then when we saw (e :: (?x::Int) => t) it would be unclear how to 
+	-- discharge all the potential usas of the ?x in e.   For example, a
+	-- constraint Foo [Int] might come out of e,and applying the
+	-- instance decl would show up two uses of ?x.
+
 check_source_ty dflags TypeCtxt  (NType tc tys)   = mapTc_ check_arg_type tys
 
 -- Catch-all

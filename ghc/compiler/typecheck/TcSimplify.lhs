@@ -25,11 +25,12 @@ import TcHsSyn		( TcExpr, TcId,
 import TcMonad
 import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  tyVarsOfInst, predsOfInsts, predsOfInst,
-			  isDict, isClassDict, instName,
+			  isDict, isClassDict, 
 			  isStdClassTyVarDict, isMethodFor,
-			  instToId, tyVarsOfInsts,
+			  instToId, tyVarsOfInsts, 
+			  ipNamesOfInsts, ipNamesOfInst,
 			  instBindingRequired, instCanBeGeneralised,
-			  newDictsFromOld, instMentionsIPs,
+			  newDictsFromOld, 
 			  getDictClassTys, isTyVarDict,
 			  instLoc, pprInst, zonkInst, tidyInsts, tidyMoreInsts,
 			  Inst, LIE, pprInsts, pprInstsInFull,
@@ -44,7 +45,7 @@ import TcType		( ThetaType, PredType, mkClassPred, isOverloadedTy,
 			  tyVarsOfPred, getClassPredTys_maybe, isClassPred, isIPPred,
 			  inheritablePred, predHasFDs )
 import Id		( idType )
-import NameSet		( mkNameSet )
+import NameSet		( NameSet, mkNameSet, elemNameSet )
 import Class		( classBigSig )
 import FunDeps		( oclose, grow, improve, pprEquationDoc )
 import PrelInfo		( isNumericClass, isCreturnableClass, isCcallishClass )
@@ -322,10 +323,14 @@ having to be passed at each call site.  But of course, the WHOLE
 IDEA is that ?y should be passed at each call site (that's what
 dynamic binding means) so we'd better infer the second.
 
-BOTTOM LINE: you *must* quantify over implicit parameters. See
-isFreeAndInheritable.
+BOTTOM LINE: when *inferring types* you *must* quantify 
+over implicit parameters. See the predicate isFreeWhenInferring.
 
-BUT WATCH OUT: for *expressions*, this isn't right.  Consider:
+
+Question 2: type signatures
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BUT WATCH OUT: When you supply a type signature, we can't force you
+to quantify over implicit parameters.  For example:
 
 	(?x + 1) :: Int
 
@@ -338,10 +343,9 @@ so the above strictures don't apply.  Hence the difference between
 tcSimplifyCheck (which *does* allow implicit paramters to be inherited)
 and tcSimplifyCheckBind (which does not).
 
-
-Question 2: type signatures
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-OK, so is it legal to give an explicit, user type signature to f, thus:
+What about when you supply a type signature for a binding?
+Is it legal to give the following explicit, user type 
+signature to f, thus:
 
 	f :: Int -> Int
 	f x = (x::Int) + ?y
@@ -364,8 +368,33 @@ vs
 Indeed, simply inlining f (at the Haskell source level) would change the
 dynamic semantics.
 
-Conclusion: the above type signature is illegal.  You'll get a message
-of the form "could not deduce (?y::Int) from ()".
+Nevertheless, as Launchbury says (email Oct 01) we can't really give the
+semantics for a Haskell program without knowing its typing, so if you 
+change the typing you may change the semantics.
+
+To make things consistent in all cases where we are *checking* against
+a supplied signature (as opposed to inferring a type), we adopt the
+rule: 
+
+	a signature does not need to quantify over implicit params.
+
+[This represents a (rather marginal) change of policy since GHC 5.02,
+which *required* an explicit signature to quantify over all implicit
+params for the reasons mentioned above.]
+
+But that raises a new question.  Consider 
+
+	Given (signature)	?x::Int
+	Wanted (inferred)	?x::Int, ?y::Bool
+
+Clearly we want to discharge the ?x and float the ?y out.  But
+what is the criterion that distinguishes them?  Clearly it isn't
+what free type variables they have.  The Right Thing seems to be
+to float a constraint that
+	neither mentions any of the quantified type variables
+	nor any of the quantified implicit parameters
+
+See the predicate isFreeWhenChecking.
 
 
 Question 3: monomorphism
@@ -528,9 +557,9 @@ inferLoop doc tau_tvs wanteds
 	qtvs  = grow preds tau_tvs' `minusVarSet` oclose preds gbl_tvs
 
 	try_me inst
-	  | isFreeAndInheritable qtvs inst = Free
-	  | isClassDict inst 		   = DontReduceUnlessConstant	-- Dicts
-	  | otherwise	    		   = ReduceMe 			-- Lits and Methods
+	  | isFreeWhenInferring qtvs inst = Free
+	  | isClassDict inst 		  = DontReduceUnlessConstant	-- Dicts
+	  | otherwise	    		  = ReduceMe 			-- Lits and Methods
     in
 		-- Step 2
     reduceContext doc try_me [] wanteds'    `thenTc` \ (no_improvement, frees, binds, irreds) ->
@@ -599,13 +628,21 @@ polymorphic in.
 The net effect of [NO TYVARS] 
 
 \begin{code}
-isFreeAndInheritable qtvs inst
-  =  isFree qtvs inst					-- Constrains no quantified vars
-  && all inheritablePred (predsOfInst inst)		-- And no implicit parameter involved
-							-- (see "Notes on implicit parameters")
+isFreeWhenInferring :: TyVarSet -> Inst	-> Bool
+isFreeWhenInferring qtvs inst
+  =  isFreeWrtTyVars qtvs inst			-- Constrains no quantified vars
+  && all inheritablePred (predsOfInst inst)	-- And no implicit parameter involved
+						-- (see "Notes on implicit parameters")
 
-isFree qtvs inst
-  = not (tyVarsOfInst inst `intersectsVarSet` qtvs)
+isFreeWhenChecking :: TyVarSet	-- Quantified tyvars
+	 	   -> NameSet	-- Quantified implicit parameters
+		   -> Inst -> Bool
+isFreeWhenChecking qtvs ips inst
+  =  isFreeWrtTyVars qtvs inst
+  && isFreeWrtIPs    ips inst
+
+isFreeWrtTyVars qtvs inst = not (tyVarsOfInst inst `intersectsVarSet` qtvs)
+isFreeWrtIPs     ips inst = not (any (`elemNameSet` ips) (ipNamesOfInst inst))
 \end{code}
 
 
@@ -627,13 +664,13 @@ tcSimplifyCheck
 	 -> TcM (LIE,		-- Free
 		 TcDictBinds)	-- Bindings
 
--- tcSimplifyCheck is used when checking exprssion type signatures,
+-- tcSimplifyCheck is used when checking expression type signatures,
 -- class decls, instance decls etc.
 -- Note that we psss isFree (not isFreeAndInheritable) to tcSimplCheck
 -- It's important that we can float out non-inheritable predicates
 -- Example:		(?x :: Int) is ok!
 tcSimplifyCheck doc qtvs givens wanted_lie
-  = tcSimplCheck doc isFree get_qtvs
+  = tcSimplCheck doc get_qtvs
 		 givens wanted_lie	`thenTc` \ (qtvs', frees, binds) ->
     returnTc (frees, binds)
   where
@@ -653,7 +690,7 @@ tcSimplifyInferCheck
 		 TcDictBinds)	-- Bindings
 
 tcSimplifyInferCheck doc tau_tvs givens wanted_lie
-  = tcSimplCheck doc isFreeAndInheritable get_qtvs givens wanted_lie
+  = tcSimplCheck doc get_qtvs givens wanted_lie
   where
 	-- Figure out which type variables to quantify over
 	-- You might think it should just be the signature tyvars,
@@ -680,7 +717,7 @@ tcSimplifyInferCheck doc tau_tvs givens wanted_lie
 Here is the workhorse function for all three wrappers.
 
 \begin{code}
-tcSimplCheck doc is_free get_qtvs givens wanted_lie
+tcSimplCheck doc get_qtvs givens wanted_lie
   = check_loop givens (lieToList wanted_lie)	`thenTc` \ (qtvs, frees, binds, irreds) ->
 
 	-- Complain about any irreducible ones
@@ -690,6 +727,8 @@ tcSimplCheck doc is_free get_qtvs givens wanted_lie
     returnTc (qtvs, mkLIE frees, binds)
 
   where
+    ip_set = mkNameSet (ipNamesOfInsts givens)
+
     check_loop givens wanteds
       =		-- Step 1
     	mapNF_Tc zonkInst givens	`thenNF_Tc` \ givens' ->
@@ -700,8 +739,8 @@ tcSimplCheck doc is_free get_qtvs givens wanted_lie
     	let
  	    -- When checking against a given signature we always reduce
  	    -- until we find a match against something given, or can't reduce
- 	    try_me inst | is_free qtvs' inst = Free
- 			| otherwise          = ReduceMe
+ 	    try_me inst | isFreeWhenChecking qtvs' ip_set inst = Free
+ 			| otherwise  			       = ReduceMe
     	in
     	reduceContext doc try_me givens' wanteds'	`thenTc` \ (no_improvement, frees, binds, irreds) ->
 
@@ -764,13 +803,17 @@ tcSimplifyRestricted doc tau_tvs wanted_lie
 	--
 	-- We quantify only over constraints that are captured by qtvs;
 	-- these will just be a subset of non-dicts.  This in contrast
-	-- to normal inference (using isFreeAndInheritable) in which we quantify over
+	-- to normal inference (using isFreeWhenInferring) in which we quantify over
 	-- all *non-inheritable* constraints too.  This implements choice
 	-- (B) under "implicit parameter and monomorphism" above.
+	--
+	-- Remember that we may need to do *some* simplification, to
+	-- (for example) squash {Monad (ST s)} into {}.  It's not enough
+	-- just to float all constraints
     mapNF_Tc zonkInst (lieToList wanted_lie)	`thenNF_Tc` \ wanteds' ->
     let
-        try_me inst | isFree qtvs inst = Free
-	            | otherwise        = ReduceMe
+        try_me inst | isFreeWrtTyVars qtvs inst = Free
+	            | otherwise                 = ReduceMe
     in
     reduceContext doc try_me [] wanteds'	`thenTc` \ (no_improvement, frees, binds, irreds) ->
     ASSERT( no_improvement )
@@ -874,14 +917,13 @@ tcSimplifyIPs given_ips wanted_lie
   = simpl_loop given_ips wanteds	`thenTc` \ (frees, binds) ->
     returnTc (mkLIE frees, binds)
   where
-    doc	     = text "tcSimplifyIPs" <+> ppr ip_names
+    doc	     = text "tcSimplifyIPs" <+> ppr given_ips
     wanteds  = lieToList wanted_lie
-    ip_names = map instName given_ips
-    ip_set   = mkNameSet ip_names
+    ip_set   = mkNameSet (ipNamesOfInsts given_ips)
 
 	-- Simplify any methods that mention the implicit parameter
-    try_me inst | inst `instMentionsIPs` ip_set = ReduceMe
-		| otherwise		        = Free
+    try_me inst | isFreeWrtIPs ip_set inst = Free
+		| otherwise		   = ReduceMe
 
     simpl_loop givens wanteds
       = mapNF_Tc zonkInst givens		`thenNF_Tc` \ givens' ->

@@ -53,7 +53,7 @@ module TcType (
   isPredTy, isClassPred, isTyVarClassPred, predHasFDs,
   mkDictTy, tcSplitPredTy_maybe, predTyUnique,
   isDictTy, tcSplitDFunTy, predTyUnique, 
-  mkClassPred, predMentionsIPs, inheritablePred, isIPPred, mkPredName,
+  mkClassPred, inheritablePred, isIPPred, mkPredName,
 
   ---------------------------------
   -- Foreign import and export
@@ -423,10 +423,6 @@ inheritablePred :: PredType -> Bool
 -- which can be free in g's rhs, and shared by both calls to g
 inheritablePred (ClassP _ _) = True
 inheritablePred other	     = False
-
-predMentionsIPs :: SourceType -> NameSet -> Bool
-predMentionsIPs (IParam n _) ns = n `elemNameSet` ns
-predMentionsIPs other	     ns = False
 \end{code}
 
 
