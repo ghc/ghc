@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsFFI.h,v 1.9 2000/11/13 17:17:40 simonmar Exp $
+ * $Id: HsFFI.h,v 1.10 2000/11/14 14:47:23 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -32,30 +32,33 @@
 #include <limits.h>
 #endif
 
+#ifdef INT8_MIN
+#define __INT8_MIN  		INT8_MIN
+#define __INT16_MIN 		INT16_MIN
+#define __INT32_MIN 		INT32_MIN
+#define __INT64_MIN 		INT64_MIN
+#define __INT8_MAX  		INT8_MAX
+#define __INT16_MAX 		INT16_MAX
+#define __INT32_MAX 		INT32_MAX
+#define __INT64_MAX 		INT64_MAX
+#define __UINT8_MAX 		UINT8_MAX
+#define __UINT16_MAX		UINT16_MAX
+#define __UINT32_MAX		UINT32_MAX
+#define __UINT64_MAX		UINT64_MAX
+#else
 /* if we had no luck, let's do it for ourselves (assuming 64bit long longs) */
-#ifndef INT8_MIN
-#define INT8_MIN		(-128)
-#define INT16_MIN		(-32767-1)
-#define INT32_MIN		(-2147483647-1)
-#define INT64_MIN		(-9223372036854775807LL-1)
-#define INT8_MAX		(127)
-#define INT16_MAX		(32767)
-#define INT32_MAX		(2147483647)
-#define INT64_MAX		(9223372036854775807LL)
-#define UINT8_MAX		(255U)
-#define UINT16_MAX		(65535U)
-#define UINT32_MAX		(4294967295U)
-#define UINT64_MAX		(18446744073709551615ULL)
-/* Define these types too. Some C 99 code may assume that if INT8_MIN
-   is defined then int8_t is also present. */
-typedef StgInt8			int8_t;
-typedef StgInt16		int16_t;
-typedef StgInt32		int32_t;
-typedef StgInt64		int64_t;
-typedef StgWord8		uint8_t;
-typedef StgWord16		uint16_t;
-typedef StgWord32		uint32_t;
-typedef StgWord64		uint64_t;
+#define __INT8_MIN		(-128)
+#define __INT16_MIN		(-32767-1)
+#define __INT32_MIN		(-2147483647-1)
+#define __INT64_MIN		(-9223372036854775807LL-1)
+#define __INT8_MAX		(127)
+#define __INT16_MAX		(32767)
+#define __INT32_MAX		(2147483647)
+#define __INT64_MAX		(9223372036854775807LL)
+#define __UINT8_MAX		(255U)
+#define __UINT16_MAX		(65535U)
+#define __UINT32_MAX		(4294967295U)
+#define __UINT64_MAX		(18446744073709551615ULL)
 #endif
 
 /* get limits for floating point types */
@@ -81,31 +84,31 @@ typedef void*			HsStablePtr;
 
 /* this should correspond to the type of StgChar in StgTypes.h */
 #define HS_CHAR_MIN		0
-#define HS_CHAR_MAX		INT32_MAX
+#define HS_CHAR_MAX		__INT32_MAX
 
 /* this mirrors the distinction of cases in StgTypes.h */
 #if   SIZEOF_VOID_P == 8
-#define HS_INT_MIN		INT64_MIN
-#define HS_INT_MAX		INT64_MAX
+#define HS_INT_MIN		__INT64_MIN
+#define HS_INT_MAX		__INT64_MAX
 #elif SIZEOF_VOID_P == 4
-#define HS_INT_MIN		INT32_MIN
-#define HS_INT_MAX		INT32_MAX
+#define HS_INT_MIN		__INT32_MIN
+#define HS_INT_MAX		__INT32_MAX
 #else
 #error GHC untested on this architecture: sizeof(void *) != 4 or 8
 #endif
 
-#define HS_INT8_MIN		INT8_MIN
-#define HS_INT8_MAX		INT8_MAX
-#define HS_INT16_MIN		INT16_MIN
-#define HS_INT16_MAX		INT16_MAX
-#define HS_INT32_MIN		INT32_MIN
-#define HS_INT32_MAX		INT32_MAX
-#define HS_INT64_MIN		INT64_MIN
-#define HS_INT64_MAX		INT64_MAX
-#define HS_WORD8_MAX		UINT8_MAX
-#define HS_WORD16_MAX		UINT16_MAX
-#define HS_WORD32_MAX		UINT32_MAX
-#define HS_WORD64_MAX		UINT64_MAX
+#define HS_INT8_MIN		__INT8_MIN
+#define HS_INT8_MAX		__INT8_MAX
+#define HS_INT16_MIN		__INT16_MIN
+#define HS_INT16_MAX		__INT16_MAX
+#define HS_INT32_MIN		__INT32_MIN
+#define HS_INT32_MAX		__INT32_MAX
+#define HS_INT64_MIN		__INT64_MIN
+#define HS_INT64_MAX		__INT64_MAX
+#define HS_WORD8_MAX		__UINT8_MAX
+#define HS_WORD16_MAX		__UINT16_MAX
+#define HS_WORD32_MAX		__UINT32_MAX
+#define HS_WORD64_MAX		__UINT64_MAX
 
 #define HS_FLOAT_RADIX		FLT_RADIX
 #define HS_FLOAT_ROUNDS		FLT_ROUNDS
