@@ -112,7 +112,7 @@ toLower                 :: Char -> Char
 -- -----------------------------------------------------------------------------
 -- Win32 implementation
 
-#if (defined(HAVE_WCTYPE_H) && HAVE_ISWSPACE) || mingw32_TARGET_OS
+#if (defined(HAVE_WCTYPE_H) && HAVE_ISWSPACE && defined(HTYPE_WINT_T) || mingw32_TARGET_OS
 
 -- Use the wide-char classification functions if available.  Glibc
 -- seems to implement these properly, even for chars > 0xffff, as long
@@ -123,8 +123,8 @@ toLower                 :: Char -> Char
 -- friends won't work properly with characters > 0xffff.  These
 -- characters are represented as surrogate pairs in UTF-16.
 
-type WInt = (#type wint_t)
-type CInt = (#type int)
+type WInt = HTYPE_WINT_T
+type CInt = HTYPE_INT
 
 isDigit    c = iswdigit (fromIntegral (ord c)) /= 0
 isAlpha    c = iswalpha (fromIntegral (ord c)) /= 0
@@ -193,8 +193,8 @@ isAlphaNum c		=  isAlpha c || isDigit c
 
 -- Case-changing operations
 
-toUpper c@(C## c##)
-  | isAsciiLower c    = C## (chr## (ord## c## -## 32##))
+toUpper c@(C# c#)
+  | isAsciiLower c    = C# (chr# (ord# c# -# 32#))
   | isAscii c         = c
     -- fall-through to the slower stuff.
   | isLower c	&& c /= '\xDF' && c /= '\xFF'
@@ -203,8 +203,8 @@ toUpper c@(C## c##)
   = c
 
 
-toLower c@(C## c##)
-  | isAsciiUpper c = C## (chr## (ord## c## +## 32##))
+toLower c@(C# c#)
+  | isAsciiUpper c = C# (chr# (ord# c# +# 32#))
   | isAscii c      = c
   | isUpper c	   = unsafeChr (ord c `minusInt` ord 'A' `plusInt` ord 'a')
   | otherwise	   =  c
