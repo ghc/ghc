@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.9 2001/03/28 16:51:03 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.10 2001/04/26 14:33:44 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -113,8 +113,8 @@ beginMkDependHS = do
 	-- reference.
   import_dirs <- readIORef v_Import_paths
   pkg_import_dirs <- getPackageImportPath
-  import_dir_contents <- mapM getDirectoryContents import_dirs
-  pkg_import_dir_contents <- mapM getDirectoryContents pkg_import_dirs
+  import_dir_contents <- mapM softGetDirectoryContents import_dirs
+  pkg_import_dir_contents <- mapM softGetDirectoryContents pkg_import_dirs
   writeIORef v_Dep_dir_contents 
 	(zip import_dirs import_dir_contents ++
   	 zip pkg_import_dirs pkg_import_dir_contents)
@@ -199,4 +199,3 @@ findDependency is_source src imp = do
  
    -- in
    search dir_contents
-

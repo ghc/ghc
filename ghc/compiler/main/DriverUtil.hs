@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.19 2001/03/08 09:50:18 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.20 2001/04/26 14:33:44 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -20,6 +20,7 @@ import Exception
 import Dynamic
 import RegexString
 
+import Directory	( getDirectoryContents )
 import IO
 import System
 import List
@@ -64,6 +65,17 @@ getOptionsFromSource file
 		   | otherwise -> return []
 
 optionRegex = mkRegex "\\{-#[ \t]+OPTIONS[ \t]+(.*)#-\\}"   -- -}
+
+-----------------------------------------------------------------------------
+-- A version of getDirectoryContents that is non-fatal if the
+-- directory doesn't exist.
+
+softGetDirectoryContents d
+   = IO.catch (getDirectoryContents d)
+	  (\_ -> do hPutStr stderr 
+		          ("WARNING: error while reading directory " ++ d)
+		    return []
+	  )
 
 -----------------------------------------------------------------------------
 -- Utils

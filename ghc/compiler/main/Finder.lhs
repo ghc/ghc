@@ -81,7 +81,7 @@ maybeHomeModule mod_name = do
 	   -- to ["."]).
 	   home_imports <- readIORef v_Import_paths
 	   let extendFM fm path = do
-		   contents <- getDirectoryContents' path
+		   contents <- softGetDirectoryContents path
                    let clean_contents = filter isUsefulFile contents
 		   return (addListToFM fm (zip clean_contents (repeat path)))
 	   home_map <- foldM extendFM emptyFM home_imports
@@ -160,7 +160,7 @@ newPkgCache pkgs = do
     	    let dirs = import_dirs pkg
     		pkg_name = _PK_ (name pkg)
     	    let addDir fm dir = do
-    		    contents <- getDirectoryContents' dir
+    		    contents <- softGetDirectoryContents dir
     		    return (addListToFM fm (zip contents 
     					       (repeat (pkg_name,dir))))
     	    foldM addDir fm dirs
@@ -198,12 +198,4 @@ maybePackageModule mod_name = do
 isUsefulFile fn
    = let suffix = (reverse . takeWhile (/= '.') . reverse) fn
      in  suffix `elem` ["hi", "hs", "lhs", "hi-boot", "hi-boot-5"]
-
-getDirectoryContents' d
-   = IO.catch (getDirectoryContents d)
-	  (\_ -> do hPutStr stderr 
-		          ("WARNING: error while reading directory " ++ d)
-		    return []
-	  )
-
 \end{code}
