@@ -41,7 +41,7 @@ defaultsHook (void)
 void
 enableTimingStats( void )	/* called from the driver */
 {
-#if __GLASGOW_HASKELL__ >= 505
+#if __GLASGOW_HASKELL__ >= 411
     RtsFlags.GcFlags.giveStats = ONELINE_GC_STATS;
 #endif
     /* ignored when bootstrapping with an older GHC */
