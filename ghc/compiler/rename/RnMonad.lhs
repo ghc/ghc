@@ -111,7 +111,8 @@ data RnDown = RnDown {
 		  rn_ns      :: IORef RnNameSupply,
 		  rn_errs    :: IORef (Bag WarnMsg, Bag ErrMsg),
 	  	  rn_ifaces  :: IORef Ifaces,
-		  rn_hi_maps :: (ModuleHiMap,	-- for .hi files
+		  rn_hi_maps :: (SearchPath,	-- For error messages
+				 ModuleHiMap,	-- for .hi files
 				 ModuleHiMap)	-- for .hi-boot files
 		}
 
@@ -750,7 +751,7 @@ setIfacesRn :: Ifaces -> RnM d ()
 setIfacesRn ifaces (RnDown {rn_ifaces = iface_var}) _
   = writeIORef iface_var ifaces
 
-getHiMaps :: RnM d (ModuleHiMap, ModuleHiMap)
+getHiMaps :: RnM d (SearchPath, ModuleHiMap, ModuleHiMap)
 getHiMaps (RnDown {rn_hi_maps = himaps}) _ 
   = return himaps
 \end{code}

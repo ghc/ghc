@@ -84,20 +84,32 @@ import List	( nub )
 \begin{code}
 loadHomeInterface :: SDoc -> Name -> RnM d Ifaces
 loadHomeInterface doc_str name
-  = loadInterface doc_str (moduleName (nameModule name)) ImportBySystem		`thenRn` \ (_, ifaces) ->
-    returnRn ifaces
+  = loadInterface doc_str (moduleName (nameModule name)) ImportBySystem
 
 loadOrphanModules :: [ModuleName] -> RnM d ()
 loadOrphanModules mods
   | null mods = returnRn ()
-  | otherwise = traceRn (text "Loading orphan modules:" <+> fsep (map pprModuleName mods))	`thenRn_` 
-		mapRn_ load mods	`thenRn_`
+  | otherwise = traceRn (text "Loading orphan modules:" <+> 
+			 fsep (map pprModuleName mods))		`thenRn_` 
+		mapRn_ load mods				`thenRn_`
 		returnRn ()
   where
-    load mod = loadInterface (pprModuleName mod <+> ptext SLIT("is a orphan-instance module")) mod ImportBySystem
+    load mod   = loadInterface (mk_doc mod) mod ImportBySystem
+    mk_doc mod = pprModuleName mod <+> ptext SLIT("is a orphan-instance module")
+	   
 
-loadInterface :: SDoc -> ModuleName -> WhereFrom -> RnM d (Module, Ifaces)
-loadInterface doc_str mod_name from
+loadInterface :: SDoc -> ModuleName -> WhereFrom -> RnM d Ifaces
+loadInterface doc mod from 
+  = tryLoadInterface doc mod from	`thenRn` \ (ifaces, maybe_err) ->
+    case maybe_err of
+	Nothing  -> returnRn ifaces
+	Just err -> failWithRn ifaces err
+
+tryLoadInterface :: SDoc -> ModuleName -> WhereFrom -> RnM d (Ifaces, Maybe Message)
+	-- Returns (Just err) if an error happened
+	-- Guarantees to return with iImpModInfo m --> (... Just cts)
+	-- (If the load fails, we plug in a vanilla placeholder
+tryLoadInterface doc_str mod_name from
  = getIfacesRn 			`thenRn` \ ifaces ->
    let
 	mod_map  = iImpModInfo ifaces
@@ -123,9 +135,9 @@ loadInterface doc_str mod_name from
    in
 	-- CHECK WHETHER WE HAVE IT ALREADY
    case mod_info of {
-	Just (_, _, _, Just (load_mod, _, _))
+	Just (_, _, _, Just _)
 		-> 	-- We're read it already so don't re-read it
-		    returnRn (load_mod, ifaces) ;
+		    returnRn (ifaces, Nothing) ;
 
 	_ ->
 
@@ -138,7 +150,7 @@ loadInterface doc_str mod_name from
 	-- READ THE MODULE IN
    findAndReadIface doc_str mod_name hi_boot_file   `thenRn` \ read_result ->
    case read_result of {
-	Nothing -> 	-- Not found, so add an empty export env to the Ifaces map
+	Left err -> 	-- Not found, so add an empty export env to the Ifaces map
 			-- so that we don't look again
 	   let
 		mod         = mkVanillaModule mod_name
@@ -146,10 +158,10 @@ loadInterface doc_str mod_name from
 		new_ifaces  = ifaces { iImpModInfo = new_mod_map }
 	   in
 	   setIfacesRn new_ifaces		`thenRn_`
-	   failWithRn (mod, new_ifaces) (noIfaceErr mod hi_boot_file) ;
+	   returnRn (new_ifaces, Just err) ;
 
 	-- Found and parsed!
-	Just iface ->
+	Right iface ->
 
 	-- LOAD IT INTO Ifaces
 
@@ -200,7 +212,7 @@ loadInterface doc_str mod_name from
 			      iDeprecs	  = new_deprecs }
     in
     setIfacesRn new_ifaces		`thenRn_`
-    returnRn (mod, new_ifaces)
+    returnRn (new_ifaces, Nothing)
     }}
 
 addModDeps :: Module -> [ImportVersion a] 
@@ -416,12 +428,12 @@ checkUpToDate mod_name
 
 	-- CHECK WHETHER WE HAVE IT ALREADY
     case read_result of
-	Nothing -> 	-- Old interface file not found, so we'd better bail out
-		    traceRn (sep [ptext SLIT("Didnt find old iface"), 
-				  pprModuleName mod_name])	`thenRn_`
+	Left err -> 	-- Old interface file not found, or garbled, so we'd better bail out
+		    traceRn (vcat [ptext SLIT("No old iface") <+> pprModuleName mod_name,
+				   err])			`thenRn_`
 		    returnRn outOfDate
 
-	Just iface
+	Right iface
 		-> 	-- Found it, so now check it
 		    checkModUsage (pi_usages iface)
   where
@@ -440,21 +452,19 @@ checkModUsage ((mod_name, old_mod_vers, _, _, Specifically []) : rest)
     checkModUsage rest	-- This one's ok, so check the rest
 
 checkModUsage ((mod_name, old_mod_vers, _, _, whats_imported)  : rest)
-  = loadInterface doc_str mod_name ImportBySystem	`thenRn` \ (mod, ifaces) ->
+  = tryLoadInterface doc_str mod_name ImportBySystem	`thenRn` \ (ifaces, maybe_err) ->
+    case maybe_err of {
+	Just err -> traceRn (sep [ptext SLIT("Can't find version number for module"), 
+			     pprModuleName mod_name])		`thenRn_`
+		     returnRn outOfDate ;
+		-- Couldn't find or parse a module mentioned in the
+		-- old interface file.  Don't complain -- it might just be that
+		-- the current module doesn't need that import and it's been deleted
+	Nothing -> 
     let
-	maybe_mod_vers = case lookupFM (iImpModInfo ifaces) mod_name of
-			   Just (version, _, _, Just (_, _, _)) -> Just version
-			   other			        -> Nothing
+	new_mod_vers = case lookupFM (iImpModInfo ifaces) mod_name of
+			   Just (version, _, _, _) -> version
     in
-    case maybe_mod_vers of {
-	Nothing -> 	-- If we can't find a version number for the old module then
-			-- bail out saying things aren't up to date
-		traceRn (sep [ptext SLIT("Can't find version number for module"), 
-			      pprModuleName mod_name])
-		`thenRn_` returnRn outOfDate ;
-
-	Just new_mod_vers ->
-
 	-- If the module version hasn't changed, just move on
     if new_mod_vers == old_mod_vers then
 	traceRn (sep [ptext SLIT("Module version unchanged:"), pprModuleName mod_name])
@@ -588,15 +598,11 @@ that we know just what instances to bring into scope.
 \begin{code}
 getInterfaceExports :: ModuleName -> WhereFrom -> RnMG (Module, Avails)
 getInterfaceExports mod_name from
-  = loadInterface doc_str mod_name from	`thenRn` \ (mod, ifaces) ->
+  = loadInterface doc_str mod_name from	`thenRn` \ ifaces ->
     case lookupFM (iImpModInfo ifaces) mod_name of
-	Nothing -> -- Not there; it must be that the interface file wasn't found;
-		   -- the error will have been reported already.
-		   -- (Actually loadInterface should put the empty export env in there
-		   --  anyway, but this does no harm.)
-		   returnRn (mod, [])
-
 	Just (_, _, _, Just (mod, _, avails)) -> returnRn (mod, avails)
+	-- loadInterface always puts something in the map
+	-- even if it's a fake
   where
     doc_str = sep [pprModuleName mod_name, ptext SLIT("is directly imported")]
 \end{code}
@@ -978,7 +984,7 @@ getDeclSysBinders new_name other_decl
 findAndReadIface :: SDoc -> ModuleName 
 		 -> IsBootInterface	-- True  <=> Look for a .hi-boot file
 					-- False <=> Look for .hi file
-		 -> RnM d (Maybe ParsedIface)
+		 -> RnM d (Either Message ParsedIface)
 	-- Nothing <=> file not found, or unreadable, or illegible
 	-- Just x  <=> successfully found and parsed 
 
@@ -988,7 +994,7 @@ findAndReadIface doc_str mod_name hi_boot_file
       -- one for 'normal' ones, the other for .hi-boot files,
       -- hence the need to signal which kind we're interested.
 
-    getHiMaps			`thenRn` \ (hi_map, hiboot_map) ->
+    getHiMaps			`thenRn` \ (search_path, hi_map, hiboot_map) ->
     let
 	relevant_map | hi_boot_file = hiboot_map
 		     | otherwise    = hi_map
@@ -1000,7 +1006,8 @@ findAndReadIface doc_str mod_name hi_boot_file
 	
 	-- Can't find it
       Nothing    -> traceRn (ptext SLIT("...not found"))	`thenRn_`
-		    returnRn Nothing
+		    returnRn (Left (noIfaceErr mod_name hi_boot_file search_path))
+
   where
     trace_msg = sep [hsep [ptext SLIT("Reading"), 
 			   if hi_boot_file then ptext SLIT("[boot]") else empty,
@@ -1012,7 +1019,7 @@ findAndReadIface doc_str mod_name hi_boot_file
 @readIface@ tries just the one file.
 
 \begin{code}
-readIface :: ModuleName -> String -> RnM d (Maybe ParsedIface)
+readIface :: ModuleName -> String -> RnM d (Either Message ParsedIface)
 	-- Nothing <=> file not found, or unreadable, or illegible
 	-- Just x  <=> successfully found and parsed 
 readIface wanted_mod file_path
@@ -1027,20 +1034,20 @@ readIface wanted_mod file_path
 		  POk _  (PIface iface) ->
 		      warnCheckRn (read_mod == wanted_mod)
 		    		  (hiModuleNameMismatchWarn wanted_mod read_mod) `thenRn_`
-		      returnRn (Just iface)
+		      returnRn (Right iface)
 		    where
 		      read_mod = moduleName (pi_mod iface)
 
-	          PFailed err   -> failWithRn Nothing err 
-	          other 	-> failWithRn Nothing (ptext SLIT("Unrecognisable interface file"))
-			 	-- This last case can happen if the interface file is (say) empty
-				-- in which case the parser thinks it looks like an IdInfo or
-				-- something like that.  Just an artefact of the fact that the
-				-- parser is used for several purposes at once.
+		  PFailed err   -> bale_out err
+	          parse_result 	-> bale_out empty
+		 	-- This last case can happen if the interface file is (say) empty
+			-- in which case the parser thinks it looks like an IdInfo or
+			-- something like that.  Just an artefact of the fact that the
+			-- parser is used for several purposes at once.
 
-        Left err
-	  | isDoesNotExistError err -> returnRn Nothing
-	  | otherwise               -> failWithRn Nothing (cannaeReadFile file_path err)
+        Left io_err -> bale_out (text (show io_err))
+  where
+    bale_out err = returnRn (Left (badIfaceFile file_path err))
 \end{code}
 
 %*********************************************************
@@ -1050,18 +1057,18 @@ readIface wanted_mod file_path
 %*********************************************************
 
 \begin{code}
-noIfaceErr filename boot_file
-  = hsep [ptext SLIT("Could not find valid"), boot, 
-	  ptext SLIT("interface file"), quotes (pprModule filename)]
+noIfaceErr mod_name boot_file search_path
+  = vcat [ptext SLIT("Could not find interface file for") <+> quotes (pprModuleName mod_name),
+	  ptext SLIT("in the directories") <+> vcat [ text dir <> text "/*" <> pp_suffix suffix 
+						    | (dir,suffix) <- search_path]
+	]
   where
-    boot | boot_file = ptext SLIT("[boot]")
-	 | otherwise = empty
+    pp_suffix suffix | boot_file = ptext SLIT(".hi-boot")
+		     | otherwise = text suffix
 
-cannaeReadFile file err
-  = hcat [ptext SLIT("Failed in reading file: "), 
-          text file, 
-	  ptext SLIT("; error="), 
-	  text (show err)]
+badIfaceFile file err
+  = vcat [ptext SLIT("Bad interface file:") <+> text file, 
+	  nest 4 err]
 
 getDeclErr name
   = vcat [ptext SLIT("Failed to find interface decl for") <+> quotes (ppr name),

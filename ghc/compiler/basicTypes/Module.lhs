@@ -254,8 +254,9 @@ do quite a lot of.)
 type SearchPath = [(String,String)]	-- List of (directory,suffix) pairs to search 
                                         -- for interface files.
 
-mkModuleHiMaps :: SearchPath -> IO (ModuleHiMap, ModuleHiMap)
-mkModuleHiMaps dirs = foldM (getAllFilesMatching dirs) (env,env) dirs
+mkModuleHiMaps :: SearchPath -> IO (SearchPath, ModuleHiMap, ModuleHiMap)
+mkModuleHiMaps dirs = do (hi,hi_boot) <- foldM (getAllFilesMatching dirs) (env,env) dirs
+			 return (dirs, hi, hi_boot)
  where
   env = emptyFM
 
