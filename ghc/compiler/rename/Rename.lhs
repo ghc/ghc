@@ -497,7 +497,7 @@ reportUnusedNames gbl_env avail_env (ExportEnv export_avails _) mentioned_names
 		    | sub_name <- nameSetToList used_names,
 	              let avail = case lookupNameEnv avail_env sub_name of
 			    Just avail -> avail
-		            Nothing -> pprTrace "r.u.n" (ppr sub_name) $
+		            Nothing -> WARN( True, text "reportUnusedName: not in avail_env" <+> ppr sub_name )
 				       Avail sub_name
 		    ]
 
