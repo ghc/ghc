@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.27 2000/01/14 13:17:15 hwloidl Exp $
+ * $Id: RtsStartup.c,v 1.28 2000/02/07 20:57:58 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -130,9 +130,7 @@ startupHaskell(int argc, char *argv[])
 
     /* start the ticker */
     install_vtalrm_handler();
-#if 0 /* tmp--SDM */
     initialize_virtual_timer(TICK_MILLISECS);
-#endif
 
     /* start our haskell execution tasks */
 #ifdef SMP
