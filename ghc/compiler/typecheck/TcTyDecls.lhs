@@ -303,18 +303,7 @@ mkRecordSelector tycon fields@((first_con, first_field_label) : other_fields)
 	-- Check that all the fields in the group have the same type
 	-- This check assumes that all the constructors of a given
 	-- data type use the same type variables
-  = (if null other_fields then (\x->x) else
-	let lbls = [fieldLabelName f | (_,f) <- fields]
-	    uniqs = [nameUnique l | l <- lbls]
-
-	in
-        pprTrace "mkRecordSelector" (vcat [ppr fields,
-					ppr lbls,
-					ppr uniqs,
-					hsep [text (show (field_name `compare` fieldLabelName f)) | (_,f) <- fields]
-					]))
-				  
-    checkTc (all (== field_ty) other_tys)
+  = checkTc (all (== field_ty) other_tys)
 	    (fieldTypeMisMatch field_name)	`thenTc_`
     returnTc selector_id
   where

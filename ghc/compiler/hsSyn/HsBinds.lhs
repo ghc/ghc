@@ -194,7 +194,7 @@ ppr_monobind (AbsBinds tyvars dictvars exports inlines val_binds)
      = sep [ptext SLIT("AbsBinds"),
 	    brackets (interpp'SP tyvars),
 	    brackets (interpp'SP dictvars),
-	    brackets (interpp'SP exports),
+	    brackets (sep (punctuate comma (map ppr exports))),
 	    brackets (interpp'SP (nameSetToList inlines))]
        $$
        nest 4 (ppr val_binds)

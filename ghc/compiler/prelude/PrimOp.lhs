@@ -1994,8 +1994,10 @@ primOpIsDupable means that the use of the primop is small enough to
 duplicate into different case branches.  See CoreUtils.exprIsDupable.
 
 \begin{code}
-primOpIsDupable (CCallOp _ _ _ _) = False
-primOpIsDupable op		  = not (primOpOutOfLine op)
+primOpIsDupable (CCallOp _ _ might_gc _) = not might_gc
+	-- If the ccall can't GC then the call is pretty cheap, and
+	-- we're happy to duplicate
+primOpIsDupable op		         = not (primOpOutOfLine op)
 \end{code}
 
 

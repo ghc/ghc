@@ -23,7 +23,7 @@ import HsSyn	( HsModule(..), HsDecl(..), TyClDecl(..),
 import RdrHsSyn	( RdrNameIE, RdrNameImportDecl,
 		  RdrNameHsModule, RdrNameHsDecl
 		)
-import RnIfaces	( getInterfaceExports, getDeclBinders,
+import RnIfaces	( getInterfaceExports, getDeclBinders, getDeclSysBinders,
 		  recordSlurp, checkUpToDate
 		)
 import RnEnv
@@ -313,7 +313,12 @@ getLocalDeclBinders new_name decl
   = getDeclBinders new_name decl	`thenRn` \ maybe_avail ->
     case maybe_avail of
 	Nothing    -> returnRn []		-- Instance decls and suchlike
-	Just avail -> returnRn [avail]
+	Just avail -> getDeclSysBinders new_sys_name decl		`thenRn_`  
+		      returnRn [avail]
+  where
+	-- The getDeclSysBinders is just to get the names of superclass selectors
+	-- etc, into the cache
+    new_sys_name rdr_name loc = newImplicitBinder (rdrNameOcc rdr_name) loc
 
 binds_haskell_name (FoImport _) _   = True
 binds_haskell_name FoLabel      _   = True

@@ -688,7 +688,7 @@ simplVar var cont
 #ifdef DEBUG
 					    if isLocallyDefined var && not (idMustBeINLINEd var)
 						-- The idMustBeINLINEd test accouunts for the fact
-						-- that class method selectors don't have top level
+						-- that class dictionary constructors don't have top level
 						-- bindings and hence aren't in scope.
 					    then
 						-- Not in scope

@@ -219,8 +219,8 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
 
     size_up (Note _ body)     = size_up body	-- Notes cost nothing
 
-    size_up (App fun (Type t)) = size_up fun
-    size_up (App fun arg)      = size_up_app fun `addSize` size_up arg
+    size_up (App fun (Type t))  = size_up fun
+    size_up (App fun arg)       = size_up_app fun [arg]
 
     size_up (Con con args) = foldr (addSize . size_up) 
 				   (size_up_con con args)
@@ -250,10 +250,15 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
 	      	Just (tc,_,_) -> tyConFamilySize tc
 
     ------------ 
+    size_up_app (App fun arg) args   = size_up_app fun (arg:args)
+    size_up_app fun 	      args   = foldr (addSize . size_up) (fun_discount fun) args
+
 	-- A function application with at least one value argument
 	-- so if the function is an argument give it an arg-discount
-    size_up_app (App fun arg) = size_up_app fun  `addSize` size_up arg
-    size_up_app fun	      = arg_discount fun `addSize` size_up fun
+	-- Also behave specially if the function is a build
+    fun_discount (Var fun) | idUnique fun == buildIdKey = buildSize
+    			   | fun `is_elem` args 	= scrutArg fun
+    fun_discount other					= sizeZero
 
     ------------ 
     size_up_alt (con, bndrs, rhs) = size_up rhs
@@ -272,11 +277,11 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
 	op_cost | primOpIsDupable op = opt_UF_CheapOp
 		| otherwise 	     = opt_UF_DearOp
 
-    ------------
 	-- We want to record if we're case'ing, or applying, an argument
     arg_discount (Var v) | v `is_elem` args = scrutArg v
     arg_discount other			    = sizeZero
 
+    ------------
     is_elem :: Id -> [Id] -> Bool
     is_elem = isIn "size_up_scrut"
 
@@ -321,6 +326,14 @@ conSizeN (I# n) = SizeIs 1# emptyBag (n +# 1#)
 	-- when asked about 'x' when x is bound to (C 3#).
 	-- This avoids gratuitous 'ticks' when x itself appears as an
 	-- atomic constructor argument.
+
+buildSize = SizeIs (-2#) emptyBag 4#
+	-- We really want to inline applications of build
+	-- build t (\cn -> e) should cost only the cost of e (because build will be inlined later)
+	-- Indeed, we should add a result_discount becuause build is 
+	-- very like a constructor.  We don't bother to check that the
+	-- build is saturated (it usually is).  The "-2" discounts for the \c n
+	-- The "4" is rather arbitrary.
 						
 scrutArg v	= SizeIs 0# (unitBag v) 0#
 
@@ -465,9 +478,11 @@ callSiteInline black_listed inline_call id args interesting_cont
 			-- The only time we hold back is when substituting inside a lambda;
 			-- then if the context is totally uninteresting (not applied, not scrutinised)
 			-- there is no point in substituting because it might just increase allocation.
-	  = case in_lam of
-		NotInsideLam -> True
-		InsideLam    -> whnf && (not (null args) || interesting_cont)
+	  = WARN( case in_lam of { NotInsideLam -> True; other -> False },
+		  text "callSiteInline:oneOcc" <+> ppr id )
+		-- If it has one occurrence, not inside a lambda, PreInlineUnconditionally
+		-- should have zapped it already
+	    whnf && (not (null args) || interesting_cont)
 
 	  | otherwise	-- Occurs (textually) more than once, so look at its size
 	  = case guidance of
@@ -501,7 +516,7 @@ callSiteInline black_listed inline_call id args interesting_cont
 			-- Consider an I# = INLINE (\x -> I# {x})
 			-- The unfolding guidance deems it to have size 2, and no arguments.
 			-- So in an application (I# y) we must take the extra arg 'y' as
-			-- evidene of an interesting context!
+			-- evidence of an interesting context!
 			
 		  small_enough = (size - discount) <= opt_UF_UseThreshold
 		  discount     = computeDiscount n_vals_wanted arg_discounts res_discount 

@@ -24,7 +24,7 @@ import RnHsSyn		( RenamedTyClDecl, RenamedClassPragmas,
 			)
 import TcHsSyn		( TcMonoBinds )
 
-import Inst		( Inst, InstOrigin(..), LIE, emptyLIE, plusLIE, newDicts, newMethod )
+import Inst		( Inst, InstOrigin(..), LIE, emptyLIE, plusLIE, plusLIEs, newDicts, newMethod )
 import TcEnv		( TcId, ValueEnv, TcTyThing(..), tcAddImportedIdInfo,
 			  tcLookupClass, tcLookupTy, tcExtendTyVarEnvForMeths, tcExtendGlobalTyVars,
 			  tcExtendLocalValEnv
@@ -44,9 +44,7 @@ import Class		( mkClass, classBigSig, Class )
 import CmdLineOpts      ( opt_GlasgowExts, opt_WarnMissingMethods )
 import MkId		( mkDictSelId, mkDataConId, mkDefaultMethodId )
 import DataCon		( mkDataCon, notMarkedStrict )
-import Id		( Id,
-			  getIdUnfolding, idType, idName
-			)
+import Id		( Id, setInlinePragma, getIdUnfolding, idType, idName )
 import CoreUnfold	( getUnfoldingTemplate )
 import IdInfo
 import Name		( Name, nameOccName, isLocallyDefined, NamedThing(..) )
@@ -180,7 +178,11 @@ tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
 			   [{-No existential tyvars-}] [{-Or context-}]
 			   dict_component_tys
 		      	   tycon dict_con_id
+
+	-- In general, constructors don't have to be inlined, but this one
+	-- does, because we don't make a top level binding for it.	
 	dict_con_id = mkDataConId dict_con
+		      `setInlinePragma` IMustBeINLINEd
 
         argvrcs = lookupWithDefaultFM rec_vrcs (pprPanic "tcClassDecl1: argvrcs:" $
                                                          ppr tycon_name)
@@ -378,22 +380,10 @@ we get the default methods:
 defm.Foo.op1 :: forall a. Foo a => a -> Bool
 defm.Foo.op1 = /\a -> \dfoo -> \x -> True
 
-====================== OLD ==================
-\begin{verbatim}
-defm.Foo.op2 :: forall a, b. (Foo a, Ord b) => a -> b -> b -> b
-defm.Foo.op2 = /\ a b -> \ dfoo dord -> \x y z ->
-		  if (op1 a dfoo x) && (< b dord y z) then y else z
-\end{verbatim}
-Notice that, like all ids, the foralls of defm.Foo.op2 are at the top.
-====================== END OF OLD ===================
-
-NEW:
-\begin{verbatim}
 defm.Foo.op2 :: forall a. Foo a => forall b. Ord b => a -> b -> b -> b
 defm.Foo.op2 = /\ a -> \ dfoo -> /\ b -> \ dord -> \x y z ->
 		  if (op1 a dfoo x) && (< b dord y z) then y else z
 \end{verbatim}
-
 
 When we come across an instance decl, we may need to use the default
 methods:
@@ -436,55 +426,15 @@ tcDefaultMethodBinds
 	-> TcM s (LIE, TcMonoBinds)
 
 tcDefaultMethodBinds clas default_binds
-  = 	-- Construct suitable signatures
-    tcInstTyVars tyvars		`thenNF_Tc` \ (clas_tyvars, inst_tys, _) ->
-
-	-- Check that the default bindings come from this class
+  = 	-- Check that the default bindings come from this class
     checkFromThisClass clas op_sel_ids default_binds	`thenNF_Tc_`
 
-	-- Typecheck the default bindings
-    let
-        theta = [(clas,inst_tys)]
-	tc_dm sel_id_w_dm@(_, Just dm_id)
-	  = tcMethodBind clas origin clas_tyvars inst_tys theta
-			 default_binds [{-no prags-}] False
-			 sel_id_w_dm		`thenTc` \ (bind, insts, (_, local_dm_id)) ->
-	    returnTc (bind, insts, (clas_tyvars, dm_id, local_dm_id))
-    in
-    tcExtendTyVarEnvForMeths tyvars clas_tyvars (
-	mapAndUnzip3Tc tc_dm sel_ids_w_dms
-    )						`thenTc` \ (defm_binds, insts_needed, abs_bind_stuff) ->
+	-- Do each default method separately
+    mapAndUnzipTc tc_dm sel_ids_w_dms			`thenTc` \ (defm_binds, const_lies) ->
 
-
-	-- Check the context
-    newDicts origin theta 			`thenNF_Tc` \ (this_dict, [this_dict_id]) ->
-    let
-	avail_insts = this_dict
-    in
-    tcAddErrCtxt (defltMethCtxt clas) $
-
-	-- tcMethodBind has checked that the class_tyvars havn't
-	-- been unified with each other or another type, but we must
-	-- still zonk them before passing them to tcSimplifyAndCheck
-    mapNF_Tc zonkTcTyVarBndr clas_tyvars	`thenNF_Tc` \ clas_tyvars' ->
-
-    tcSimplifyAndCheck
-	(ptext SLIT("class") <+> ppr clas)
-	(mkVarSet clas_tyvars')
-	avail_insts
-	(unionManyBags insts_needed)		`thenTc` \ (const_lie, dict_binds) ->
-
-    let
-	full_binds = AbsBinds
-		 	clas_tyvars'
-			[this_dict_id]
-			abs_bind_stuff
-			emptyNameSet	-- No inlines (yet)
-			(dict_binds `andMonoBinds` andMonoBindList defm_binds)
-    in
-    returnTc (const_lie, full_binds)
-
+    returnTc (plusLIEs const_lies, andMonoBindList defm_binds)
   where
+
     (tyvars, sc_theta, sc_sel_ids, op_sel_ids, defm_ids) = classBigSig clas
 
     sel_ids_w_dms = [pair | pair@(_, Just _) <- op_sel_ids `zip` defm_ids]
@@ -492,6 +442,54 @@ tcDefaultMethodBinds clas default_binds
 			-- user default declaration
 
     origin = ClassDeclOrigin
+
+    -- We make a separate binding for each default method.
+    -- At one time I used a single AbsBinds for all of them, thus
+    --	AbsBind [d] [dm1, dm2, dm3] { dm1 = ...; dm2 = ...; dm3 = ... }
+    -- But that desugars into
+    --	ds = \d -> (..., ..., ...)
+    --	dm1 = \d -> case ds d of (a,b,c) -> a
+    -- And since ds is big, it doesn't get inlined, so we don't get good
+    -- default methods.  Better to make separate AbsBinds for each
+    
+    tc_dm sel_id_w_dm@(_, Just dm_id)
+      = tcInstTyVars tyvars		`thenNF_Tc` \ (clas_tyvars, inst_tys, _) ->
+	let
+	    theta = [(clas,inst_tys)]
+	in
+	newDicts origin theta 			`thenNF_Tc` \ (this_dict, [this_dict_id]) ->
+	let
+	    avail_insts = this_dict
+	in
+	tcExtendTyVarEnvForMeths tyvars clas_tyvars (
+	    tcMethodBind clas origin clas_tyvars inst_tys theta
+		         default_binds [{-no prags-}] False
+		         sel_id_w_dm	
+        )					`thenTc` \ (defm_bind, insts_needed, (_, local_dm_id)) ->
+    
+	tcAddErrCtxt (defltMethCtxt clas) $
+    
+	    -- tcMethodBind has checked that the class_tyvars havn't
+	    -- been unified with each other or another type, but we must
+	    -- still zonk them before passing them to tcSimplifyAndCheck
+	mapNF_Tc zonkTcTyVarBndr clas_tyvars	`thenNF_Tc` \ clas_tyvars' ->
+    
+	    -- Check the context
+	tcSimplifyAndCheck
+	    (ptext SLIT("class") <+> ppr clas)
+	    (mkVarSet clas_tyvars')
+	    avail_insts
+	    insts_needed			`thenTc` \ (const_lie, dict_binds) ->
+    
+	let
+	    full_bind = AbsBinds
+			    clas_tyvars'
+			    [this_dict_id]
+			    [(clas_tyvars', dm_id, local_dm_id)]
+			    emptyNameSet	-- No inlines (yet)
+			    (dict_binds `andMonoBinds` defm_bind)
+	in
+	returnTc (full_bind, const_lie)
 \end{code}
 
 \begin{code}

@@ -21,7 +21,7 @@ import CoreUnfold	( Unfolding(..) )
 import CoreUtils	( whnfOrBottom, eqExpr )
 import PprCore		( pprCoreRule )
 import Subst		( Subst, InScopeSet, substBndr, lookupSubst, extendSubst,
-			  mkSubst, substEnv, setSubstEnv,
+			  mkSubst, substEnv, setSubstEnv, emptySubst, isInScope,
 			  unBindSubst, bindSubstList, unBindSubstList,
 			)
 import Id		( Id, getIdUnfolding, 
@@ -122,10 +122,30 @@ matchRule :: InScopeSet -> CoreRule -> [CoreExpr] -> Maybe (FAST_STRING, CoreExp
 -- of the output.
 --
 -- ASSUMPTION (A):
---	No variable free in the template is bound in the target
+--	A1. No top-level variable is bound in the target
+--	A2. No template variable  is bound in the target
+--	A3. No lambda bound template variable is free in any subexpression of the target
+--
+-- To see why A1 is necessary, consider matching
+--	\x->f 	   against    \f->f
+-- When we meet the lambdas we substitute [f/x] in the template (a no-op),
+-- and then erroneously succeed in matching f against f.
+--
+-- To see why A2 is needed consider matching 
+--	forall a. \b->b	   against   \a->3
+-- When we meet the lambdas we substitute [a/b] in the template, and then
+-- erroneously succeed in matching what looks like the template variable 'a' against 3.
+--
+-- A3 is needed to validate the rule that says
+--	(\x->E) matches F
+-- if
+--	(\x->E)	matches (\x->F x)
+
 
 matchRule in_scope (Rule rn tpl_vars tpl_args rhs) args
- = go tpl_args args (mkSubst in_scope emptySubstEnv)
+ = go tpl_args args emptySubst
+	-- We used to use the in_scope set, but I don't think that's necessary
+	-- After all, the result is going to be simplified again with that in_scope set
  where
    tpl_var_set = mkVarSet tpl_vars
 
@@ -188,11 +208,10 @@ type Matcher result =  IdOrTyVarSet		-- Template variables
 		    -> Subst  -> Maybe result	-- Substitution so far -> result
 -- The *SubstEnv* in these Substs apply to the TEMPLATE only 
 
--- The *InScopeSet* in these Substs gives a superset of the free vars
--- 	in the term being matched.  This set can get augmented, for example
---	when matching against a lambda:
---		(\x.M)  ~  N 	iff	M  ~  N x
---	but we must clone x if it's already free in N
+-- The *InScopeSet* in these Substs gives variables bound so far in the
+--	target term.  So when matching forall a. (\x. a x) against (\y. y y)
+--	while processing the body of the lambdas, the in-scope set will be {y}.
+--	That lets us do the occurs-check when matching 'a' against 'y'
 
 match :: CoreExpr		-- Template
       -> CoreExpr		-- Target
@@ -202,8 +221,13 @@ match_fail = Nothing
 
 match (Var v1) e2 tpl_vars kont subst
   = case lookupSubst subst v1 of
-	Nothing	| v1 `elemVarSet` tpl_vars  -> kont (extendSubst subst v1 (DoneEx e2))
-			-- v1 is a template variables
+	Nothing	| v1 `elemVarSet` tpl_vars  	-- v1 is a template variable
+		-> if (any (`isInScope` subst) (varSetElems (exprFreeVars e2))) then
+			 match_fail		-- Occurs check failure
+						-- e.g. match forall a. (\x-> a x) against (\y. y y)
+		   else
+			 kont (extendSubst subst v1 (DoneEx e2))
+
 
 		| eqExpr (Var v1) e2		 -> kont subst
 			-- v1 is not a template variable, so it must be a global constant
@@ -222,23 +246,18 @@ match (App f1 a1) (App f2 a2) tpl_vars kont subst
 match (Lam x1 e1) (Lam x2 e2) tpl_vars kont subst
   = bind [x1] [x2] (match e1 e2) tpl_vars kont subst
 
-{-	THESE EQUATIONS ARE BOGUS.  SLPJ 19 May 99
 -- This rule does eta expansion
 --		(\x.M)  ~  N 	iff	M  ~  N x
--- We must clone the binder in case it's already in scope in N
+-- See assumption A3
 match (Lam x1 e1) e2 tpl_vars kont subst
-  = match e1 (App e2 (mkVarArg x1')) tpl_vars kont' subst'
-  where
-    (subst', x1') = substBndr subst x1
-    kont' subst   = kont (unBindSubst subst x1 x1')
+  = bind [x1] [x1] (match e1 (App e2 (mkVarArg x1))) tpl_vars kont subst
 
 -- Eta expansion the other way
 --	M  ~  (\y.N)	iff   \y.M y  ~  \y.N
 --			iff   M	y     ~  N
 -- Remembering that by (A), y can't be free in M, we get this
 match e1 (Lam x2 e2) tpl_vars kont subst
-  = match (App e1 (mkVarArg x2)) e2 tpl_vars kont subst
--}
+  = bind [x2] [x2] (match (App e1 (mkVarArg x2)) e2) tpl_vars kont subst
 
 match (Case e1 x1 alts1) (Case e2 x2 alts2) tpl_vars kont subst
   = match e1 e2 tpl_vars case_kont subst

@@ -142,6 +142,11 @@ fiExpr to_drop (_, AnnType ty) = ASSERT( null to_drop )
 				 Type ty
 
 fiExpr to_drop (_, AnnCon c args)
+   | isDataCon c	-- Don't float into the args of a data construtor;
+			-- the simplifier will float straight back out
+   = mkCoLets' to_drop (Con c (map (fiExpr []) args))
+
+   | otherwise
    = mkCoLets' drop_here (Con c args')
    where
      (drop_here : arg_drops) = sepBindsByDropPoint (map freeVarsOf args) to_drop

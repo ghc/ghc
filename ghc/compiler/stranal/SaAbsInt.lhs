@@ -632,9 +632,7 @@ findStrictness tys str_val abs_val
   where
     tys_w_index = tys `zip` [(1::Int) ..]
 
-    find_str (ty,n) = -- let res = 
-		      -- in pprTrace "findStr" (ppr ty <+> int n <+> ppr res) res
-		      findRecDemand str_fn abs_fn ty
+    find_str (ty,n) = findRecDemand str_fn abs_fn ty
 		    where
 		      str_fn val = foldl (absApply StrAnal) str_val 
 					 (map (mk_arg val n) tys_w_index)

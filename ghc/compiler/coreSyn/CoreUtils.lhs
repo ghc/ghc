@@ -149,10 +149,13 @@ mkFormSummary expr
 
 	-- We want selectors to look like values
 	-- e.g.  case x of { (a,b) -> a }
-	-- should give a ValueForm, so that it will be inlined
-	-- vigorously
-    go n expr@(Case _ _ _) | exprIsCheap expr = ValueForm
-		  	   | otherwise	      = OtherForm
+	-- should give a ValueForm, so that it will be inlined vigorously
+	-- [June 99. I can't remember why this is a good idea.  It means that
+	-- all overloading selectors get inlined at their usage sites, which is
+	-- not at all necessarily a good thing.  So I'm rescinding this decision for now.]
+--    go n expr@(Case _ _ _) | exprIsCheap expr = ValueForm
+
+    go n expr@(Case _ _ _)  = OtherForm
 
     go 0 (Lam x e) | isId x    = ValueForm	-- NB: \x.bottom /= bottom!
     		   | otherwise = go 0 e

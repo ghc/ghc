@@ -13,7 +13,7 @@ module RnIfaces (
 
 	checkUpToDate,
 
-	getDeclBinders
+	getDeclBinders, getDeclSysBinders
     ) where
 
 #include "HsVersions.h"

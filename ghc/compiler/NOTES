@@ -1,28 +1,14 @@
-cvs remove TcGRHSs.hi-boot TcGRHSs.hi-boot-5 TcGRHSs.lhs
-cvs remove pbinding.ugn
-cvs add grhsb.ugn gdexp.ugn
-cvs add basicTypes/OccName.lhs
+Notes June 99
+~~~~~~~~~~~~~
+* In nofib/spectral/mandel2/Main.check_radius, there's a call to (fromIntegral m), where
+  m is defined at top level. The full-laziness pass doesn't catch this because by
+  the time it runs, enough inlining has happened that it looks like
+	case ccall ... of (# a,b #) -> ...
+  and the full laziness pass doesn't float unboxed things.
 
+* The same function is an excellent example of where liberate-case would be a win.
 
-New in 4.02
-* Scoped type variables
-* Warnings for unused variables should work now (they didn't before)
-* Simplifier improvements:
-	- Much better treatment of strict arguments
-	- Better treatment of bottoming Ids
-	- No need for w/w split for fns that are merely strict
-	- Fewer iterations needed, I hope
-* Less gratuitous renaming in interface files and abs C
-* OccName is a separate module, and is an abstract data type
-
------------------------
-
-
-* CHECK that the things seek_liftable found are done in Core
-
-* CHECK that there aren't too many indirections in STG
-	local = ...
-	global = local Int
+* Don't forget to try CSE
 
 Interface files
 ~~~~~~~~~~~~~~~
@@ -37,115 +23,3 @@ Interface files
   We can't say T(T,A,B) and T(A,B) to export or not-export T respectively,
   because the type T might have a constructor T.
 
-===========================================================================
-
-		Nofib failures
-		~~~~~~~~~~~~~~
-
-* spectral/hartel/wave4main, wang, spectral/simple, real/symalg
-
-Bus error
-
-* real/anna
-
-expected stdout not matched by reality
-*** big.sum.out	Thu Aug 22 14:37:05 1996
---- /tmp/runtest21900.1	Mon Jan 20 17:57:49 1997
-***************
-*** 1 ****
-! 12796    49
---- 1 ----
-! 63325 97
-
-
-* /real/compress2
-
-expected stderr not matched by reality
-Warning: missing newline at end of file /tmp/runtest14691.2
-*** /tmp/no_stderr14691	Thu Jan 23 14:33:29 1997
---- /tmp/runtest14691.2	Thu Jan 23 14:33:29 1997
-***************
-*** 0 ****
---- 1,2 ----
-+ 
-+ Fail: Prelude.Enum.Char.toEnum:out of range
-
-
-* real/ebnf2ps
- 
-IOSupplement.hs: 43: value not in scope: getEnv
-
-	...and...
- 
-HappyParser.hs: 127: Couldn't match the type
-			 [HappyParser.Token'] against PrelBase.Int
-    Expected: HappyParser.HappyReduction
-    Inferred: PrelBase.Int -> HappyParser.Token' -> HappyParser.HappyState HappyParser.Token' ([HappyParser.HappyAbsSyn] -> [AbstractSyntax.Production]) -> PrelBase.Int -> PrelBase.Int -> o{-a1yN-} -> o{-a1yO-} -> [HappyParser.Token'] -> a{-a1yP-}
-    In an equation for function HappyParser.action_1:
-	HappyParser.action_1 _ = HappyParser.happyFail
-
-
-* GHC_ONLY/bugs/andy_cherry
-
-DataTypes.lhs: 3: Could not find valid interface file for `GenUtils'
-
-Need "make depend"
-
-* GHC_ONLY/bugs/lex
-
-Pattern match fail in lex; must be producing empty or multi-valued result
-
-Aggravated by dreadful error messages:
-+ 
-+ Fail: In irrefutable pattern
-+ Fail: In pattern-matching
-+ Fail: In pattern-matching
-+ Fail: In pattern-matching
-+ Fail: In pattern-matching
-+ Fail: In pattern-matching
-+ Fail: In pattern-matching
-+ Fail: In pattern-matching
-+ Fail: In pattern-matching
-+ Fail: In pattern-matching
-+ Fail: In pattern-matching
-+ Fail: In pattern-matching
-+ Fail: In pattern-matching
-+ Fail: In pattern-matching
-+ Fail: In pattern-matching
-+ Fail: In pattern-matchingtoo many nested calls to `error'
-
-
-* GHC_ONLY/bugs/jtod_circint
-
-Main.hs: 12: No instance for: Signal.Signal (Signal.Stream Bit.Bit)
-    Main.hs: 12: at a use of an overloaded identifier: `Signal.one'
-
-instance-decl slurping is WRONG
-
-* GHC_ONLY/arith005
-
-ceiling doesn't work properly
-
---- 1,3 ----
-+ [1, 1, 2, 3, 4, 5, 0, -2, -3, -4, 1000013, 124, 101, 103, 1, 0, 17001, 0, 1, 4]
-+ [1, 1, 2, 3, 4, 5, 0, -2, -3, -4, 1000013, 124, 101, 103, 1, 0, 17001, 0, 1, 4]
-  [0, 0, 2, 3, 4, 5, -1, -2, -3, -4, 1000012, 124, 101, 103, 1, 0, 17000, 0, 1, 4]
-***************
-*** 2,5 ****
-  [0, 0, 2, 3, 4, 5, -1, -2, -3, -4, 1000012, 124, 101, 103, 1, 0, 17000, 0, 1, 4]
-- [0, 0, 2, 3, 4, 5, -1, -2, -3, -4, 1000012, 124, 101, 103, 1, 0, 17000, 0, 1, 4]
-- [0, 0, 2, 3, 4, 5, -1, -2, -3, -4, 1000012, 124, 101, 103, 1, 0, 17000, 0, 1, 4]
-  [0, 0, 1, 2, 3, 4, -1, -3, -4, -5, 1000012, 123, 100, 102, 0, -1, 17000, -1, 0, 3]
---- 4,5 ----
-
-
-* GHC_ONLY/bugs/lennart_array
-
-Wrong array semantics (but who cares?)
-
-* GHC_ONLY/bugs/life_space_leak
-
--n *** sum I got: 
-0 0
--n *** sum I expected: 
-02845  1350

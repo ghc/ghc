@@ -285,12 +285,12 @@ occAnalBind env (Rec pairs) body_usage
     pp_item (_, bndr, _)     = ppr bndr
 
     binders = map fst pairs
-    new_env = env `addNewCands` binders
+    rhs_env = env `addNewCands` binders
 
     analysed_pairs :: [Details1]
     analysed_pairs  = [ (bndr, rhs_usage, rhs')
 		      | (bndr, rhs) <- pairs,
-			let (rhs_usage, rhs') = occAnalRhs new_env bndr rhs
+			let (rhs_usage, rhs') = occAnalRhs rhs_env bndr rhs
 		      ]
 
     sccs :: [SCC (Node Details1)]
@@ -497,7 +497,7 @@ occAnalRhs :: OccEnv
 occAnalRhs env id rhs
   = (final_usage, rhs')
   where
-    (rhs_usage, rhs') = occAnal env rhs
+    (rhs_usage, rhs') = occAnal (zapCtxt env) rhs
 
 	-- [March 98] A new wrinkle is that if the binder has specialisations inside
 	-- it then we count the specialised Ids as "extra rhs's".  That way
@@ -639,7 +639,7 @@ occAnal env expr@(Lam _ _)
 
 occAnal env (Case scrut bndr alts)
   = case mapAndUnzip (occAnalAlt alt_env) alts of { (alts_usage_s, alts')   -> 
-    case occAnal env scrut		       of { (scrut_usage, scrut') ->
+    case occAnal (zapCtxt env) scrut	       of { (scrut_usage, scrut') ->
     let
 	alts_usage  = foldr1 combineAltsUsageDetails alts_usage_s
 	(alts_usage1, tagged_bndr) = tagBinder alts_usage bndr
@@ -657,8 +657,10 @@ occAnal env (Let bind body)
     new_env = env `addNewCands` (bindersOf bind)
 
 occAnalArgs env args
-  = case mapAndUnzip (occAnal env) args of	{ (arg_uds_s, args') ->
+  = case mapAndUnzip (occAnal arg_env) args of	{ (arg_uds_s, args') ->
     (foldr combineUsageDetails emptyDetails arg_uds_s, args')}
+  where
+    arg_env = zapCtxt env
 \end{code}
 
 Applications are dealt with specially because we want
@@ -685,8 +687,8 @@ occAnalApp env (Var fun, args)
 		| otherwise		    = occAnalArgs env args
 
 occAnalApp env (fun, args)
-  = case occAnal env fun of		{ (fun_uds, fun') ->
-    case occAnalArgs env args of	{ (args_uds, args') ->
+  = case occAnal (zapCtxt env) fun of		{ (fun_uds, fun') ->
+    case occAnalArgs env args of		{ (args_uds, args') ->
     let
 	final_uds = fun_uds `combineUsageDetails` args_uds
     in
@@ -767,6 +769,9 @@ getCtxt :: OccEnv -> Int -> (Bool, OccEnv)	-- True <=> this is a linear lambda
 getCtxt env@(OccEnv ifun cands []) n = (False, env)
 getCtxt (OccEnv ifun cands ctxt)   n = (and (take n ctxt), OccEnv ifun cands (drop n ctxt))
 		-- Only return True if *all* the lambdas are linear
+
+zapCtxt env@(OccEnv ifun cands []) = env
+zapCtxt     (OccEnv ifun cands _ ) = OccEnv ifun cands []
 
 type UsageDetails = IdEnv BinderInfo	-- A finite map from ids to their usage
 
