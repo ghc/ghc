@@ -1,4 +1,7 @@
 
+These insns are for building Hugs on mingw32.  We don't want no
+cygwin no more :)
+
 You need to have a fptools/mk/build.mk which looks like this in 
 order to build Hugs which has a hope of working in combined mode.
 
@@ -8,3 +11,29 @@ GhcHcOpts=-DDEBUG -fasm-x86    # -fasm-x86 is optional
 GhcRtsHcOpts=-optc-DDEBUG -optc-D__HUGS__ -unreg -optc-g
 GhcRtsCcOpts=-optc-DDEBUG -optc-g -optc-D__HUGS__
 SplitObjs=NO            # essential
+
+
+Then you need to configure like this:
+
+  ./configure --host=i386-unknown-mingw32 --enable-win32-dlls
+
+Then
+
+  make boot
+
+Then
+
+  cd ghc/rts/gmp/mpn/generic
+  for f in *.c *.h ; do echo $f ; rm -f ../$f ; cp $f ../$f ; done
+  # because mingw32 doesn't understand the symlinks that GMP makes
+  # during make boot
+
+  cd ../../..
+  make
+  cd ../utils
+  make boot
+  make
+  cd ../interpreter
+  make
+
+
