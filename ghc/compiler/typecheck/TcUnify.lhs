@@ -24,7 +24,7 @@ import Type	( Type(..), tyVarsOfType, funTyCon,
 		)
 import TyCon	( TyCon, isTupleTyCon, isUnboxedTupleTyCon, 
 		  tyConArity )
-import Name	( isSystemName )
+import Name	( hasBetterProv )
 import Var	( TyVar, tyVarKind, varName )
 import VarEnv	
 import VarSet	( varSetElems )
@@ -272,8 +272,7 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2@(TyVarTy tv2)
 	Nothing -> checkKinds swapped tv1 ty2			`thenTc_`
 
 			-- Try to update sys-y type variables in preference to sig-y ones
-			-- (the latter respond False to isSystemName)
-		   if isSystemName (varName tv2) then
+		   if varName tv1 `hasBetterProv` varName tv2 then
 			tcPutTyVar tv2 (TyVarTy tv1)				`thenNF_Tc_`
 			returnTc ()
 		   else

@@ -10,7 +10,8 @@ module Name (
 
 	-- The Name type
 	Name,					-- Abstract
-	mkLocalName, mkSysLocalName, mkTopName,
+	mkLocalName, mkImportedLocalName, mkSysLocalName, 
+	mkTopName,
 	mkDerivedName, mkGlobalName,
 	mkWiredInIdName,   mkWiredInTyConName,
 	maybeWiredInIdName, maybeWiredInTyConName,
@@ -24,12 +25,12 @@ module Name (
 	isLocallyDefinedName,
 
 	isSystemName, isLocalName, isGlobalName, isExternallyVisibleName,
-
+	
 
 	-- Provenance
 	Provenance(..), ImportReason(..), pprProvenance,
 	ExportFlag(..), PrintUnqualified,
-        pprNameProvenance, systemProvenance,
+        pprNameProvenance, systemProvenance, hasBetterProv,
 
 	-- Class NamedThing and overloaded friends
 	NamedThing(..),
@@ -92,6 +93,16 @@ mkLocalName uniq occ loc = Name { n_uniq = uniq, n_sort = Local, n_occ = occ,
 	--	  uniques if you get confused
 	--	* for interface files we tidyCore first, which puts the uniques
 	--	  into the print name (see setNameVisibility below)
+
+mkImportedLocalName :: Unique -> OccName -> SrcLoc -> Name
+	-- Just the same as mkLocalName, except the provenance is different
+	-- Reason: this flags the name as one that came in from an interface file.
+	-- This is useful when trying to decide which of two type variables
+	-- should 'win' when unifying them.
+	-- NB: this is only for non-top-level names, so we use ImplicitImport
+mkImportedLocalName uniq occ loc = Name { n_uniq = uniq, n_sort = Local, n_occ = occ, 
+					  n_prov = NonLocalDef ImplicitImport True }
+
 
 mkGlobalName :: Unique -> Module -> OccName -> Provenance -> Name
 mkGlobalName uniq mod occ prov = Name { n_uniq = uniq, n_sort = Global mod,
@@ -418,6 +429,15 @@ isGlobalName other	             = True
 -- outside the module, *as seen by the linker*.  Externally visible
 -- does not mean visible at the source level (that's isExported).
 isExternallyVisibleName name = isGlobalName name
+
+hasBetterProv :: Name -> Name -> Bool
+hasBetterProv name1 name2
+  = case n_prov name1 of
+	LocalDef _ _ 	-> True
+	SystemProv   	-> False
+	NonLocalDef _ _ -> case n_prov name2 of
+				LocalDef _ _ -> False
+				other 	     -> True
 
 isSystemName (Name {n_prov = SystemProv}) = True
 isSystemName other			  = False
