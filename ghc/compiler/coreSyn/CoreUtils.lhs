@@ -18,7 +18,8 @@ module CoreUtils (
 	idAppIsBottom, idAppIsCheap,
 
 	-- Expr transformation
-	etaReduceExpr, exprEtaExpandArity,
+	etaReduce, exprEtaExpandArity, 
+-- etaExpandExpr,
 
 	-- Size
 	coreBindsSize,
@@ -499,7 +500,7 @@ exprIsConApp_maybe expr
 %*									*
 %************************************************************************
 
-@etaReduceExpr@ trys an eta reduction at the top level of a Core Expr.
+@etaReduce@ trys an eta reduction at the top level of a Core Expr.
 
 e.g.	\ x y -> f x y	===>  f
 
@@ -508,11 +509,11 @@ The idea is that lambdas are often quite helpful: they indicate
 head normal forms, so we don't want to chuck them away lightly.
 
 \begin{code}
-etaReduceExpr :: CoreExpr -> CoreExpr
+etaReduce :: CoreExpr -> CoreExpr
 		-- ToDo: we should really check that we don't turn a non-bottom
 		-- lambda into a bottom variable.  Sigh
 
-etaReduceExpr expr@(Lam bndr body)
+etaReduce expr@(Lam bndr body)
   = check (reverse binders) body
   where
     (binders, body) = collectBinders expr
@@ -529,7 +530,7 @@ etaReduceExpr expr@(Lam bndr body)
 
     check _ _ = expr	-- Bale out
 
-etaReduceExpr expr = expr		-- The common case
+etaReduce expr = expr		-- The common case
 \end{code}
 	
 
@@ -583,6 +584,53 @@ min_zero (x:xs) = go x xs
 				| otherwise = go min xs 
 
 \end{code}
+
+
+\begin{pseudocode}
+etaExpand :: Int	  	-- Add this number of value args
+	  -> UniquSupply
+	  -> CoreExpr -> Type	-- Expression and its type
+	  -> CoreEpxr
+
+-- Given e' = etaExpand n us e ty
+-- We should have
+--	ty = exprType e = exprType e'
+--
+-- etaExpand deals with for-alls and coerces. For example:
+--		etaExpand 1 E
+-- where  E :: forall a. T
+--	  newtype T = MkT (A -> B)
+--
+-- would return
+--	(/\b. coerce T (\y::A -> (coerce (A->B) (E b) y)
+
+-- (case x of { I# x -> /\ a -> coerce T E)
+
+etaExpand n us expr ty
+  | n == 0	-- Saturated, so nothing to do
+  = expr
+
+  | otherwise	-- An unsaturated constructor or primop; eta expand it
+  = case splitForAllTy_maybe ty of { 
+ 	  Just (tv,ty') -> Lam tv (etaExpand n us (App expr (Type (mkTyVarTy tv))) ty')
+
+ 	  Nothing ->
+  
+    	case splitFunTy_maybe ty of {
+ 	  Just (arg_ty, res_ty) -> Lam arg' (etaExpand (n-1) us2 (App expr (Var arg')) res_ty)
+				where
+				   arg'	      = mkSysLocal SLIT("eta") uniq arg_ty
+ 				   (us1, us2) = splitUnqiSupply us
+				   uniq	      = uniqFromSupply us1
+				   
+	  Nothing -> 
+  
+    	case splitNewType_maybe ty of {
+ 	  Just ty' -> mkCoerce ty ty' (etaExpand n us (mkCoerce ty' ty expr) ty')
+  
+ 	  Nothing -> pprTrace "Bad eta expand" (ppr expr $$ ppr ty) expr
+    	}}}
+\end{pseudocode}
 
 
 %************************************************************************

@@ -25,7 +25,7 @@ import Module		( moduleEnvElts )
 import CoreUnfold
 import PprCore		( pprCoreBindings, pprIdCoreRule, pprCoreExpr )
 import OccurAnal	( occurAnalyseBinds )
-import CoreUtils	( etaReduceExpr, coreBindsSize )
+import CoreUtils	( etaReduce, coreBindsSize )
 import Simplify		( simplTopBinds, simplExpr )
 import SimplUtils	( simplBinders )
 import SimplMonad
@@ -297,7 +297,7 @@ simpl_arg e
 -- Otherwise we don't match when given an argument like
 --	(\a. h a a)
   = simplExpr e 	`thenSmpl` \ e' ->
-    returnSmpl (etaReduceExpr e')
+    returnSmpl (etaReduce e')
 \end{code}
 
 

@@ -346,7 +346,7 @@ completeLam rev_bndrs body cont
 
 	Nothing	      -> rebuild (foldl (flip Lam) body' rev_bndrs) cont
   where
-	-- We don't use CoreUtils.etaReduceExpr, because we can be more
+	-- We don't use CoreUtils.etaReduce, because we can be more
 	-- efficient here: (a) we already have the binders, (b) we can do
 	-- the triviality test before computing the free vars
     try_eta body | not opt_SimplDoEtaReduction = Nothing

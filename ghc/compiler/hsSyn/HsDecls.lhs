@@ -3,7 +3,7 @@
 %
 \section[HsDecls]{Abstract syntax: global declarations}
 
-Definitions for: @TyDecl@ and @ConDecl@, @ClassDecl@,
+Definitions for: @TyDecl@ and @oCnDecl@, @ClassDecl@,
 @InstDecl@, @DefaultDecl@ and @ForeignDecl@.
 
 \begin{code}
