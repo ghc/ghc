@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (only on platforms that provide a regex lib)
 --
--- $Id: Regex.hs,v 1.2 2002/04/24 16:31:46 simonmar Exp $
---
 -- Regular expression matching.
 -- Uses the POSIX regular expression interface in Text.Regex.Posix for now.
 --
@@ -49,10 +47,10 @@ matchRegex p str =
 	Just (before, match, after, sub_strs) -> Just sub_strs
 
 matchRegexAll :: Regex -> String ->
-        Maybe ( String,  -- $`
-                String,  -- $&
-                String,  -- $'
-                [String] -- $1..
+        Maybe ( String,  -- \$`
+                String,  -- \$&
+                String,  -- \$'
+                [String] -- \$1..
               )
 matchRegexAll p str = unsafePerformIO (RE.regexec p str)
 
