@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.99 2002/07/11 06:52:23 ken Exp $
+-- $Id: DriverFlags.hs,v 1.100 2002/08/02 12:24:04 simonmar Exp $
 --
 -- Driver flags
 --
@@ -572,6 +572,10 @@ machdepCCOpts
 --                    , if suffixMatch "mingw32" cTARGETPLATFORM then "-mno-cygwin" else "" 
 		      ],
 		      [ "-fno-defer-pop", "-fomit-frame-pointer",
+			-- we want -fno-builtin, because when gcc inlines
+			-- built-in functions like memcpy() it tends to
+			-- run out of registers, requiring -monly-n-regs
+			"-fno-builtin",
 	                "-DSTOLEN_X86_REGS="++show n_regs ]
 		    )
 
