@@ -1123,6 +1123,8 @@ hscMaybeAdjustLang current_hsc_lang = do
 	 | current_hsc_lang == HscInterpreted = current_hsc_lang
 	-- force -fvia-C if we are being asked for a .hc file
 	 | todo == StopBefore HCc  || keep_hc = HscC
+	-- force -fvia-C when profiling or ticky-ticky is on
+	 | opt_SccProfilingOn || opt_DoTickyProfiling = HscC
 	-- otherwise, stick to the plan
 	 | otherwise = current_hsc_lang
   return hsc_lang
