@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Base.hs,v 1.3 2001/07/31 13:38:10 simonmar Exp $
+-- $Id: Base.hs,v 1.4 2001/07/31 14:36:19 simonmar Exp $
 --
 -- Basis for IArray and MArray.  Not intended for external consumption;
 -- use IArray or MArray instead.
@@ -37,6 +37,8 @@ import GHC.Word		( Word8(..), Word16(..), Word32(..), Word64(..) )
 
 import Data.Dynamic
 #include "Dynamic.h"
+
+#include "MachDeps.h"
 
 -----------------------------------------------------------------------------
 -- Class of immutable arrays
