@@ -428,23 +428,23 @@ The basic encoding scheme is this.
 	and    'z', which translates to 'zz'
   We need both so that we can preserve the variable/tycon distinction
 
-* Most other printable characters translate to 'Zx' for some
+* Most other printable characters translate to 'zx' or 'Zx' for some
 	alphabetic character x
 
-* The others translate as 'Zxdd' where 'dd' is exactly two hexadecimal
+* The others translate as 'zxdd' where 'dd' is exactly two hexadecimal
 	digits for the ord of the character
 
 	Before		After
 	--------------------------
 	Trak		Trak
-	foo_wib		foo_wib
-	>		Zg
-	>1		Zg1
-	foo#		fooZh
-	foo##		fooZhZh
-	foo##1		fooZhXh1
+	foo_wib		foozuwib
+	>		zg
+	>1		zg1
+	foo#		foozh
+	foo##		foozhzh
+	foo##1		foozhzh1
 	fooZ		fooZZ	
-	:+		ZcZp
+	:+		Zczp
 	()		Z0T
 	(,,,,)		Z4T
 
@@ -543,16 +543,17 @@ decode (c   : rest) = c : decode rest
 
 decode_escape :: EncodedString -> UserString
 
-decode_escape ('Z' : rest) = 'Z' : decode rest
-decode_escape ('C' : rest) = ':' : decode rest
 decode_escape ('L' : rest) = '(' : decode rest
 decode_escape ('R' : rest) = ')' : decode rest
 decode_escape ('M' : rest) = '[' : decode rest
 decode_escape ('N' : rest) = ']' : decode rest
+decode_escape ('C' : rest) = ':' : decode rest
+decode_escape ('Z' : rest) = 'Z' : decode rest
 
 decode_escape ('z' : rest) = 'z' : decode rest
 decode_escape ('a' : rest) = '&' : decode rest
 decode_escape ('b' : rest) = '|' : decode rest
+decode_escape ('c' : rest) = '^' : decode rest
 decode_escape ('d' : rest) = '$' : decode rest
 decode_escape ('e' : rest) = '=' : decode rest
 decode_escape ('g' : rest) = '>' : decode rest
@@ -566,7 +567,7 @@ decode_escape ('q' : rest) = '\'' : decode rest
 decode_escape ('r' : rest) = '\\' : decode rest
 decode_escape ('s' : rest) = '/' : decode rest
 decode_escape ('t' : rest) = '*' : decode rest
-decode_escape ('u' : rest) = '^' : decode rest
+decode_escape ('u' : rest) = '_' : decode rest
 decode_escape ('v' : rest) = '%' : decode rest
 decode_escape ('x' : d1 : d2 : rest) = chr (digitToInt d1 * 16 + digitToInt d2)  : decode rest
 
