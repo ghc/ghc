@@ -32,4 +32,9 @@ Happy.
 \item add some suffix rules for SGML, we can use SGML-Tools for
 documentation now.
 
+\item added the GHC/Hugs extension library documentation as a separate
+document, and removed that information from the Users' Guide.
+
+\item Fixed a bug where ':::' wasn't being parsed properly in interface files.
+
 \end{itemize}
