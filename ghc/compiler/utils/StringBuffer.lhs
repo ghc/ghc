@@ -123,7 +123,7 @@ data StringBuffer
 \end{code}
 
 \begin{code}
-instance Text StringBuffer where
+instance Show StringBuffer where
 	showsPrec _ s = showString ""
 \end{code}
 
@@ -504,7 +504,7 @@ lexemeToString (StringBuffer fo _ start_pos# current#) =
  else
     unpackCStringBA (copySubStr (A# fo) (I# start_pos#) (I# (current# -# start_pos#)))
     
-lexemeToByteArray :: StringBuffer -> _ByteArray Int
+lexemeToByteArray :: StringBuffer -> ByteArray Int
 lexemeToByteArray (StringBuffer fo _ start_pos# current#) = 
  if start_pos# ==# current# then
     error "lexemeToByteArray" 
