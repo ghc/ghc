@@ -19,7 +19,13 @@ else
 SRC_HC_OPTS += -package data -package text -package util -package net
 endif
 
-HS_PROG = haddock.bin
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+HS_PROG_EXT = .exe
+else
+HS_PROG_EXT = .bin
+endif
+
+HS_PROG = haddock$(HS_PROG_EXT)
 
 HsParser_HC_OPTS      += -Onot
 HaddockParse_HC_OPTS  += -Onot
@@ -60,7 +66,9 @@ INPLACE_SCRIPT_PROG    = haddock-inplace
 ifeq "$(INSTALLING)" "1"
 TOP_PWD 	:= $(prefix)
 SCRIPT_PROG 	=  $(INSTALLED_SCRIPT_PROG)
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 LINK	 	=  haddock
+endif
 else
 TOP_PWD 	:= $(FPTOOLS_TOP_ABS)
 SCRIPT_PROG 	=  $(INPLACE_SCRIPT_PROG)
