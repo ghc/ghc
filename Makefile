@@ -77,6 +77,8 @@ build ::
 
 ifeq "$(findstring ghc, $(SUBDIRS))" "ghc"
 
+.PHONY: stage1 stage2 stage3 bootstrap bootstrap2 bootstrap3
+
 stage1 : build
 
 stage2 :
@@ -88,8 +90,12 @@ stage3 :
 	$(MAKE) -C ghc/compiler stage=3
 
 bootstrap  : bootstrap2
-bootstrap2 : stage1 stage2
-bootstrap3 : stage1 stage2 stage3
+
+bootstrap2 : stage1
+	$(MAKE) stage2
+
+bootstrap3 : bootstrap2
+	$(MAKE) stage3
 
 all :: bootstrap
 
