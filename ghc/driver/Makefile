@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.54 2001/02/26 16:50:30 simonmar Exp $
+# $Id: Makefile,v 1.55 2001/03/15 15:54:35 simonmar Exp $
 #
 
 TOP=..
@@ -8,21 +8,6 @@ include $(TOP)/mk/boilerplate.mk
 
 # hack for ghci-inplace script, see below
 INSTALLING=1
-
-ifeq "$(GhcWithHscBuiltViaC)" "YES"
-HC=$(GHC_INPLACE)
-endif
-
-ghc_407_at_least = $(shell expr "$(GhcMinVersion)" \>= 7)
-ifeq "$(ghc_407_at_least)" "1"
-ifneq "$(mingw32_TARGET_OS)" "1"
-SRC_HC_OPTS += -fglasgow-exts -cpp -package concurrent -package posix -package text
-else
-SRC_HC_OPTS += -fglasgow-exts -cpp -package concurrent -package text
-endif
-else
-SRC_HC_OPTS += -fglasgow-exts -cpp -syslib concurrent -syslib posix -syslib misc
-endif
 
 ifeq "$(INSTALLING)" "1"	
 SUBDIRS = mangler split
@@ -56,6 +41,19 @@ CLEAN_FILES += $(CONFIG_HS)
 # -----------------------------------------------------------------------------
 # package configuration files...
 
+ghc_407_at_least = $(shell expr "$(GhcMinVersion)" \>= 7)
+ifeq "$(ghc_407_at_least)" "1"
+ifneq "$(mingw32_TARGET_OS)" "1"
+SRC_HC_OPTS += -fglasgow-exts -cpp -package concurrent -package posix -package text
+else
+SRC_HC_OPTS += -fglasgow-exts -cpp -package concurrent -package text
+endif
+else
+SRC_HC_OPTS += -fglasgow-exts -cpp -syslib concurrent -syslib posix -syslib misc
+endif
+
+SRC_HC_OPTS += -DWANT_PRETTY
+
 all :: package.conf package.conf.inplace
 
 pkgconf : Config.o Package.o PackageSrc.o Utils.o
@@ -66,6 +64,8 @@ package.conf.inplace : pkgconf
 
 package.conf : pkgconf
 	./pkgconf install >$@
+
+Package.o : ../utils/ghc-pkg/Package.hs
 
 INSTALL_DATAS += package.conf
 

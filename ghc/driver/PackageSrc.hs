@@ -18,12 +18,13 @@ main = do
         _ -> do hPutStr stderr "usage: pkgconf (install | in-place)\n"
                 exitWith (ExitFailure 1)
 
-package_details :: Bool -> [Package]
+package_details :: Bool -> [PackageConfig]
 package_details installing =
  [
         Package {
 	name           = "gmp",  -- GMP is at the bottom of the heap
         import_dirs    = [],
+        source_dirs    = [],
         library_dirs   = if cHaveLibGmp == "YES"
                             then []
                             else if installing
@@ -42,6 +43,7 @@ package_details installing =
         Package {
 	name           = "rts",  -- The RTS is just another package!
         import_dirs    = [],
+        source_dirs    = [],
         library_dirs   = if installing
                             then [ clibdir ]
                             else [ ghc_src_dir cGHC_RUNTIME_DIR ],
@@ -106,6 +108,7 @@ package_details installing =
 	import_dirs    = if installing
                             then [ clibdir ++ "/imports/std" ]
                             else [ ghc_src_dir cGHC_LIB_DIR ++ "/std" ],
+        source_dirs    = [],
         library_dirs   = if installing
                             then [ clibdir ]
                             else [ ghc_src_dir cGHC_LIB_DIR ++ "/std"
@@ -134,6 +137,7 @@ package_details installing =
                              then [ clibdir ++ "/imports/lang" ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/lang"
                                   , cFPTOOLS_TOP_ABS ++ "/hslibs/lang/monads" ],
+         source_dirs    = [],
          library_dirs   = if installing
                              then [ clibdir ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/lang"
@@ -161,6 +165,7 @@ package_details installing =
          import_dirs    = if installing
                              then [ clibdir ++ "/imports/concurrent" ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/concurrent" ],
+         source_dirs    = [],
          library_dirs   = if installing
                              then [ clibdir ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/concurrent" ],
@@ -185,6 +190,7 @@ package_details installing =
                                   , cFPTOOLS_TOP_ABS ++ "/hslibs/data/edison/Assoc"
                                   , cFPTOOLS_TOP_ABS ++ "/hslibs/data/edison/Coll"
                                   , cFPTOOLS_TOP_ABS ++ "/hslibs/data/edison/Seq" ],
+         source_dirs    = [],
          library_dirs   = if installing
                              then [clibdir ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/data" ],
@@ -205,6 +211,7 @@ package_details installing =
          import_dirs    = if installing
                              then [ clibdir ++ "/imports/net" ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/net" ],
+         source_dirs    = [],
          library_dirs   = if installing
                              then [ clibdir ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/net"
@@ -230,6 +237,7 @@ package_details installing =
          import_dirs    = if installing
                              then [ clibdir ++ "/imports/posix" ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/posix" ],
+         source_dirs    = [],
          library_dirs   = if installing
                              then [ clibdir ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/posix"
@@ -254,6 +262,7 @@ package_details installing =
                                   , cFPTOOLS_TOP_ABS ++ "/hslibs/text/html" 
                                   , cFPTOOLS_TOP_ABS ++ "/hslibs/text/HaXml/lib" 
                                   , cFPTOOLS_TOP_ABS ++ "/hslibs/text/parsec" ],
+         source_dirs    = [],
          library_dirs   = if installing
                              then [ clibdir ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/text"
@@ -276,6 +285,7 @@ package_details installing =
                              then [ clibdir ++ "/imports/util" ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/util"
                                   , cFPTOOLS_TOP_ABS ++ "/hslibs/util/check" ],
+         source_dirs    = [],
          library_dirs   = if installing
                              then [ clibdir ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/util"
@@ -303,6 +313,7 @@ package_details installing =
          import_dirs    = if installing
                              then [ clibdir ++ "/imports/hssource" ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/hssource" ],
+         source_dirs    = [],
          library_dirs   = if installing
                              then [ clibdir ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/hssource" ],
@@ -321,6 +332,7 @@ package_details installing =
          import_dirs    = if installing
                              then [ clibdir ++ "/imports/greencard" ]
                    	     else [ cFPTOOLS_TOP_ABS ++ "/green-card/lib/ghc" ],
+         source_dirs    = [],
          library_dirs   = if installing
                              then [ clibdir ]
                              else [ cFPTOOLS_TOP_ABS ++ "/green-card/lib/ghc" ],
@@ -339,6 +351,7 @@ package_details installing =
 	 import_dirs    = if installing
                              then [ clibdir ++ "/imports/win32" ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/win32" ],
+         source_dirs    = [],
          library_dirs   = if installing
                              then [ clibdir ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/win32" ],
@@ -357,6 +370,7 @@ package_details installing =
          import_dirs    = if installing
                              then [ clibdir ++ "/imports/com" ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hdirect/lib" ],
+         source_dirs    = [],
          library_dirs   = if installing
                              then [ clibdir ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hdirect/lib" ],
