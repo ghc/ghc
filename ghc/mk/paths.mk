@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: paths.mk,v 1.43 2002/12/11 15:36:41 simonmar Exp $
+# $Id: paths.mk,v 1.44 2004/11/11 09:36:40 simonmar Exp $
 #
 # ghc project specific make variables
 #
@@ -17,6 +17,7 @@ GHC_COMPILER_DIR_REL  	= compiler
 GHC_RUNTIME_DIR_REL   	= rts
 GHC_UTILS_DIR_REL 	= utils
 GHC_DRIVER_DIR_REL	= driver
+GHC_LIB_DIR_REL		= lib
 
 GHC_UNLIT_DIR_REL	= $(GHC_UTILS_DIR_REL)/unlit
 GHC_HSTAGS_DIR_REL	= $(GHC_UTILS_DIR_REL)/hasktags
@@ -27,6 +28,7 @@ GHC_GENAPPLY_DIR_REL	= $(GHC_UTILS_DIR_REL)/genapply
 GHC_MANGLER_DIR_REL 	= $(GHC_DRIVER_DIR_REL)/mangler
 GHC_SPLIT_DIR_REL 	= $(GHC_DRIVER_DIR_REL)/split
 GHC_SYSMAN_DIR_REL	= $(GHC_RUNTIME_DIR_REL)/parallel
+GHC_LIB_COMPAT_DIR_REL	= $(GHC_LIB_DIR_REL)/compat
 
 GHC_INCLUDE_DIR   	= $(GHC_TOP)/$(GHC_INCLUDE_DIR_REL)
 GHC_COMPILER_DIR  	= $(GHC_TOP)/$(GHC_COMPILER_DIR_REL)
@@ -38,9 +40,7 @@ GHC_GENPRIMOP_DIR	= $(GHC_TOP)/$(GHC_GENPRIMOP_DIR_REL)
 GHC_GENAPPLY_DIR	= $(GHC_TOP)/$(GHC_GENAPPLY_DIR_REL)
 GHC_MANGLER_DIR         = $(GHC_TOP)/$(GHC_MANGLER_DIR_REL)
 GHC_SPLIT_DIR           = $(GHC_TOP)/$(GHC_SPLIT_DIR_REL)
-
-
-GHC_LIB_DIR	 	= $(FPTOOLS_TOP)/libraries
+GHC_LIB_COMPAT_DIR      = $(GHC_TOP)/$(GHC_LIB_COMPAT_DIR_REL)
 
 # -----------------------------------------------------------------------------
 # Names of programs in the GHC tree
