@@ -49,6 +49,11 @@ int getpagesize PROTO((void));
 int mprotect PROTO((caddr_t, size_t, int));
 #endif
 
+#if defined(aix_TARGET_OS)
+/* PROT_NONE doesn't work on aix, PROT_READ works and should suit the job */
+#define PROT_NONE PROT_READ
+#endif
+ 
 /* Needed for FreeBSD (SDM, 96/03) */
 #ifndef PROT_NONE
 #define PROT_NONE 0
