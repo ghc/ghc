@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.16 2000/04/13 14:11:00 simonmar Exp $
+# $Id: Makefile,v 1.17 2000/04/13 18:49:21 panne Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -11,7 +11,7 @@ else
 override WAYS=
 endif
 
-LIBRARY=libHS_cbits$(_way).a
+LIBRARY=libHSstd_cbits$(_way).a
 
 C_SRCS= $(wildcard *.c)
 
@@ -29,10 +29,10 @@ all :: DllVersionInfo.o
 $(DLL_NAME) : DllVersionInfo.o
 endif
 
-DLL_NAME = HScbits.dll
-DLL_IMPLIB_NAME = libHS_cbits_imp.a
+DLL_NAME = HSstdcbits.dll
+DLL_IMPLIB_NAME = libHSstd_cbits_imp.a
 DLL_DESCRIPTION = "Haskell Prelude helpers"
-SRC_BLD_DLL_OPTS += --export-all --output-def=HScbits.def DllVersionInfo.o
+SRC_BLD_DLL_OPTS += --export-all --output-def=HSstdcbits.def DllVersionInfo.o
 SRC_BLD_DLL_OPTS += -lwinmm -lwsock32 -lHSrts_imp -lgmp -L. -L../../../rts/gmp -L../../../rts
 
 #
