@@ -18,7 +18,9 @@ module System.Directory
 
     -- * Actions on directories
       createDirectory		-- :: FilePath -> IO ()
+    , createDirectoryIfMissing  -- :: Bool -> FilePath -> IO ()
     , removeDirectory		-- :: FilePath -> IO ()
+    , removeDirectoryRecursive  -- :: FilePath -> IO ()
     , renameDirectory		-- :: FilePath -> FilePath -> IO ()
 
     , getDirectoryContents      -- :: FilePath -> IO [FilePath]
@@ -80,7 +82,7 @@ import Hugs.Directory
 import Prelude
 
 import Control.Exception       ( bracket )
-import Control.Monad           ( when )
+import Control.Monad           ( when, unless )
 import System.Posix.Types
 import System.Posix.Internals
 import System.Time             ( ClockTime(..) )
@@ -234,9 +236,24 @@ The path refers to an existing non-directory object.
 
 createDirectory :: FilePath -> IO ()
 createDirectory path = do
+  modifyIOError (`ioeSetFileName` path) $
     withCString path $ \s -> do
       throwErrnoIfMinus1Retry_ "createDirectory" $
 	mkdir s 0o777
+
+-- | @'createDirectoryIfMissing' parents dir@ creates a new directory 
+-- @dir@ if it doesn\'t exist. If the first argument is 'True'
+-- the function will also create all parent directories if they are missing.
+createDirectoryIfMissing :: Bool     -- ^ Create its parents too?
+		         -> FilePath -- ^ The path to the directory you want to make
+		         -> IO ()
+createDirectoryIfMissing parents file = do
+  b <- doesDirectoryExist file
+  case (b,parents, file) of 
+    (_,     _, "") -> return ()
+    (True,  _,  _) -> return ()
+    (_,  True,  _) -> mapM_ (createDirectoryIfMissing False) (tail (pathParents file))
+    (_, False,  _) -> createDirectory file
 
 {- | @'removeDirectory' dir@ removes an existing directory /dir/.  The
 implementation may specify additional constraints which must be
@@ -284,6 +301,24 @@ removeDirectory path = do
   modifyIOError (`ioeSetFileName` path) $
     withCString path $ \s ->
        throwErrnoIfMinus1Retry_ "removeDirectory" (c_rmdir s)
+
+-- | @'removeDirectoryRecursive' dir@  removes an existing directory /dir/
+-- together with its content and all subdirectories. Be careful, 
+-- if the directory contains symlinks, the function will follow them.
+removeDirectoryRecursive :: FilePath -> IO ()
+removeDirectoryRecursive startLoc = do
+  cont <- getDirectoryContents startLoc
+  sequence_ [rm (startLoc `joinFileName` x) | x <- cont, x /= "." && x /= ".."]
+  removeDirectory startLoc
+  where
+    rm :: FilePath -> IO ()
+    rm f = do temp <- try (removeFile f)
+              case temp of
+                Left e  -> do isDir <- doesDirectoryExist f
+                              -- If f is not a directory, re-throw the error
+                              unless isDir $ ioError e
+                              removeDirectoryRecursive f
+                Right _ -> return ()
 
 {- |'removeFile' /file/ removes the directory entry for an existing file
 /file/, where /file/ is not itself a directory. The
