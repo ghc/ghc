@@ -9,7 +9,7 @@
 
     <P>The libraries are divided into several <EM>packages</EM>.</P>
 
-    <P>GHC/GHCi users note: most of the time, all the packages are
+    <P><EM>GHC/GHCi users note</EM>: most of the time, all the packages are
     available without the need to use any additional command-line
     options.  The only time when this is not the case is when linking
     a program on the command line, without using the <tt>--make</tt>
@@ -17,6 +17,11 @@
     adding the <tt>-package P</tt> flag (where <tt>P</tt> is the
     package name) to the command line for each package.  See the
     User's Guide for more details.</P>
+
+    <P><EM>Hugs users note</EM>: Hugs currently provides modules
+    from the <TT>base</TT>, <TT>haskell98</TT>, <TT>network</TT> and
+    <TT>haskell-src</TT> packages.  These modules are always available,
+    as a single hierarchy; Hugs does not use the package subdivision.</P>
 
     <P>
         <UL>
