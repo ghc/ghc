@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.9 $
- * $Date: 1999/10/15 21:40:51 $
+ * $Revision: 1.10 $
+ * $Date: 1999/10/29 00:53:25 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -541,7 +541,9 @@ Int what; {
 
                        /* deriving                              */
                        pFun(nameApp,            "++");
+                       pFun(nameReadField,      "readField");
                        pFun(nameReadParen,      "readParen");
+                       pFun(nameShowField,      "showField");
                        pFun(nameShowParen,      "showParen");
                        pFun(nameLex,            "lex");
                        pFun(nameEnToEn,         "toEnumPR"); //not sure
