@@ -2,23 +2,22 @@
 
 {-
 
-This example demonstrates the inadequacy of an apparantly simpler
+This example demonstrates the inadequacy of an apparently simpler
 variation on gmapQ. To this end, let us first recall a few facts.
 Firstly, function application (including constructor application) is
-left-associative. This is the reason why we had chosen our generic
+left-associative. This is the reason why we had preferred our generic
 fold to be left-associative too. (In "The Sketch Of a Polymorphic
-Symphony" you can a right-associative generic fold, too.) Secondly,
-lists are right-associative. So we want to query a term by retrieving
-a list of results from the immediate subterms, then the natural
-left-to-right order of traversal needs some extra effort. That is, we
-traverse a left-associative data-structure while we want to construct
-a right-associative one. In the module Data.Generics, we solve the
-problem by a common higher-order trick, that is, we do not cons lists
-during folding but we pass functions on lists starting from the
-identity function and passing [] to the resulting function. This is
-captured by a fancy datatype constructor Q. Below, we shou that we
-get indeed a unnatural right-to-left order if we just apply the simple
-constant datatype constructor instead of Q.
+Symphony" you can find a right-associative generic fold.)  Secondly,
+lists are right-associative. Because of these inverse associativities
+queries for the synthesis of lists require some extra effort to
+reflect the left-to-right of immediate subterms in the queried list.
+In the module Data.Generics, we solve the problem by a common
+higher-order trick, that is, we do not cons lists during folding but
+we pass functions on lists starting from the identity function and
+passing [] to the resulting function. This is captured by a fancy
+datatype constructor Q. The example illustrates that we get indeed a
+unnatural right-to-left order if we just apply the simple constant
+datatype constructor CONST instead of Q.
 
 Contributed by Ralf Laemmel, ralf@cwi.nl
 

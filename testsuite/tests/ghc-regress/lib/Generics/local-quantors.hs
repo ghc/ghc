@@ -1,7 +1,7 @@
 {-# OPTIONS -fglasgow-exts #-}
 
 -- A datatype with a locally quantified component
--- Seems to be too polymorphic to descent into structure!
+-- Seems to be too polymorphic to descend into structure!
 -- Largely irrelevant?!
 
 module Main where
