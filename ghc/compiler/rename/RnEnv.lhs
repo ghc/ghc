@@ -217,6 +217,13 @@ lookupTopBndrRn rdr_name
   = getModeRn	`thenRn` \ mode ->
     if isInterfaceMode mode
 	then lookupSysBinder rdr_name	
+		-- lookupSysBinder uses the Module in the monad to set
+		-- the correct module for the binder.  This is important because
+		-- when GHCi is reading in an old interface, it just sucks it
+		-- in entire (Rename.loadHomeDecls) which uses lookupTopBndrRn
+		-- rather than via the iface file cache which uses newTopBndrRn
+		-- We must get the correct Module into the thing.
+
     else 
     getModuleRn		`thenRn` \ mod ->
     getGlobalNameEnv	`thenRn` \ global_env ->
