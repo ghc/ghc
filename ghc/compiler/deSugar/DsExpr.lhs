@@ -30,14 +30,16 @@ import DsUtils		( mkErrorAppDs, mkDsLets, mkStringLit, mkStringLitFS,
 			)
 import Match		( matchWrapper, matchSimply )
 
+import FieldLabel	( FieldLabel, fieldLabelTyCon )
 import CostCentre	( mkUserCC )
 import Id		( Id, idType, recordSelectorFieldLabel )
 import PrelInfo		( rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID )
 import DataCon		( DataCon, dataConWrapId, dataConArgTys, dataConFieldLabels )
 import DataCon		( isExistentialDataCon )
 import Literal		( Literal(..) )
+import TyCon		( tyConDataCons )
 import Type		( splitFunTys,
-			  splitAlgTyConApp, splitAlgTyConApp_maybe, splitTyConApp_maybe, 
+			  splitAlgTyConApp, splitTyConApp_maybe, tyConAppArgs,
 			  splitAppTy, isUnLiftedType, Type
 			)
 import TysWiredIn	( tupleCon, listTyCon, charDataCon, intDataCon, isIntegerTy )
@@ -384,18 +386,20 @@ might do some argument-evaluation first; and may have to throw away some
 dictionaries.
 
 \begin{code}
+dsExpr (RecordUpdOut record_expr record_out_ty dicts [])
+  = dsExpr record_expr
+
 dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
-  = getSrcLocDs		`thenDs` \ src_loc ->
+  = getSrcLocDs			`thenDs` \ src_loc ->
     dsExpr record_expr	 	`thenDs` \ record_expr' ->
 
 	-- Desugar the rbinds, and generate let-bindings if
 	-- necessary so that we don't lose sharing
 
     let
-	record_in_ty	       = exprType record_expr'
-	(_, in_inst_tys, cons) = splitAlgTyConApp record_in_ty
-	(_, out_inst_tys, _)   = splitAlgTyConApp record_out_ty
-	cons_to_upd  	       = filter has_all_fields cons
+	record_in_ty = exprType record_expr'
+	in_inst_tys  = tyConAppArgs record_in_ty
+	out_inst_tys = tyConAppArgs record_out_ty
 
 	mk_val_arg field old_arg_id 
 	  = case [rhs | (sel_id, rhs, _) <- rbinds, 
@@ -420,7 +424,7 @@ dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
 				    src_loc)
     in
 	-- Record stuff doesn't work for existentials
-    ASSERT( all (not . isExistentialDataCon) cons )
+    ASSERT( all (not . isExistentialDataCon) data_cons )
 
 	-- It's important to generate the match with matchWrapper,
 	-- and the right hand sides with applications of the wrapper Id
@@ -432,12 +436,22 @@ dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
     returnDs (bindNonRec discrim_var record_expr' matching_code)
 
   where
+    updated_fields :: [FieldLabel]
+    updated_fields = [recordSelectorFieldLabel sel_id | (sel_id,_,_) <- rbinds]
+
+	-- Get the type constructor from the first field label, 
+	-- so that we are sure it'll have all its DataCons
+	-- (In GHCI, it's possible that some TyCons may not have all
+	--  their constructors, in a module-loop situation.)
+    tycon       = fieldLabelTyCon (head updated_fields)
+    data_cons   = tyConDataCons tycon
+    cons_to_upd = filter has_all_fields data_cons
+
     has_all_fields :: DataCon -> Bool
     has_all_fields con_id 
-      = all ok rbinds
+      = all (`elem` con_fields) updated_fields
       where
-	con_fields        = dataConFieldLabels con_id
-	ok (sel_id, _, _) = recordSelectorFieldLabel sel_id `elem` con_fields
+	con_fields = dataConFieldLabels con_id
 \end{code}
 
 
@@ -599,12 +613,10 @@ dsLit (HsRat r ty)
     returnDs (mkConApp ratio_data_con [Type integer_ty, num, denom])
   where
     (ratio_data_con, integer_ty)
-      = case (splitAlgTyConApp_maybe ty) of
-	  Just (tycon, [i_ty], [con])
+      = case splitAlgTyConApp ty of
+	  (tycon, [i_ty], [con])
 	    -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
 	       (con, i_ty)
-
-	  _ -> (panic "ratio_data_con", panic "integer_ty")
 \end{code}
 
 
