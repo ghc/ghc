@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.3 1999/01/13 17:25:40 simonm Exp $
+ * $Id: MBlock.c,v 1.4 1999/01/14 18:31:17 sof Exp $
  *
  * MegaBlock Allocator Interface.  This file contains all the dirty
  * architecture-dependent hackery required to get a chunk of aligned
@@ -87,32 +87,22 @@ getMBlocks(nat n)
 #else
 # ifdef _WIN32
   {
-    /* avoid using cygwin32's mmap implementation, it's buggy and
-       it's just as easy to do what we want to do directly.
+    /* Note: on 95, the legal range for next_request is: [0x00400000, 0x7fffffff]
+             under NT it is: [0x00010000, 0x7fffffff]
+
+       We start allocating at 0x50000000, hopefully that's not conflicting with
+       others.. (ToDo: have the allocator try to gracefully rebase itself in
+       case our initial guess is conflicting with others.)
     */
-   HANDLE hFile = (HANDLE)0xFFFFFFFF;
-   SECURITY_ATTRIBUTES sa;
-   HANDLE h;
-
-   sa.nLength = sizeof (SECURITY_ATTRIBUTES);
-   sa.bInheritHandle = TRUE;
-   sa.lpSecurityDescriptor = 0;
-
-   h = CreateFileMapping(hFile, &sa, PAGE_READWRITE, 0, size, NULL);
-   if ( h == 0 ) {
+    ret = VirtualAlloc(next_request, size, MEM_RESERVE | MEM_COMMIT , PAGE_READWRITE);
+    if (!ret) {
 #  ifdef DEBUG
-      fprintf(stderr, "getMBlocks: CreateFileMapping failed with: %d\n", GetLastError());
-#  endif
-      ret=(void*)-1;
-   } else {
-      ret = MapViewOfFileEx (h, FILE_MAP_WRITE, 0, 0, size, next_request);
-      if ( ret != next_request ) {
-#  ifdef DEBUG
-         fprintf(stderr, "getMBlocks: MapViewOfFileEx failed with: %d\n", GetLastError());
+         fprintf(stderr, "getMBlocks: VirtualAlloc failed with: %d\n", GetLastError());
 #  endif
          ret =(void*)-1;
-      }
-   }
+
+    }
+    return ret;
   }
 # else
   ret = mmap(next_request, size, PROT_READ | PROT_WRITE, 
