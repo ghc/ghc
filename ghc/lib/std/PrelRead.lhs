@@ -175,6 +175,8 @@ lex (c:s) | isSingle c = return ([c],s)
 		(nam,t) <- return (span isIdChar s)
 		return (c:nam, t)
           | isDigit c  = do
+{- Removed, 13/03/2000 by SDM.
+   Doesn't work, and not required by Haskell report.
 	         let
 		  (pred, s', isDec) =
 		    case s of
@@ -183,9 +185,9 @@ lex (c:s) | isSingle c = return ([c],s)
 		      ('x':rs) -> (isHexDigit, rs, False)
 		      ('X':rs) -> (isHexDigit, rs, False)
 		      _	       -> (isDigit, s, True)
-
-		 (ds,s)  <- return (span pred s')
-		 (fe,t)  <- lexFracExp isDec s
+-}
+		 (ds,s)  <- return (span isDigit s)
+		 (fe,t)  <- lexFracExp s
 		 return (c:ds++fe,t)
           | otherwise  = mzero    -- bad character
              where
@@ -193,11 +195,11 @@ lex (c:s) | isSingle c = return ([c],s)
               isSym c    =  c `elem` "!@#$%&*+./<=>?\\^|:-~"
               isIdChar c =  isAlphaNum c || c `elem` "_'"
 
-              lexFracExp True ('.':cs)   = do
+              lexFracExp ('.':c:cs) | isDigit c = do
 			(ds,t) <- lex0Digits cs
 			(e,u)  <- lexExp t
-			return ('.':ds++e,u)
-              lexFracExp _ s        = return ("",s)
+			return ('.':c:ds++e,u)
+              lexFracExp s        = return ("",s)
 
               lexExp (e:s) | e `elem` "eE" = 
 	          (do
