@@ -872,6 +872,7 @@ SGML_SRCS = $(wildcard *.sgml)
 endif
 endif
 
+SGML_TEX  = $(SGML_DOC).tex
 SGML_DVI  = $(SGML_DOC).dvi
 SGML_PS   = $(SGML_DOC).ps
 SGML_PDF  = $(SGML_DOC).pdf
@@ -889,7 +890,7 @@ rtf  :: $(SGML_RTF)
 html :: $(SGML_HTML)
 txt  :: $(SGML_TEXT)
 
-CLEAN_FILES += $(SGML_TEXT) $(SGML_PS) $(SGML_DVI) $(SGML_PDF) $(SGML_RTF) $(SGML_HTML) $(SGML_DOC)-*.html
+CLEAN_FILES += $(SGML_TEXT) $(SGML_TEX) $(SGML_PS) $(SGML_DVI) $(SGML_PDF) $(SGML_RTF) $(SGML_HTML) $(SGML_DOC)-*.html
 # can't use $(SGML_SRCS) here, it was maybe used elsewhere
 MOSTLY_CLEAN_FILES += $(patsubst %.vsgml, %.sgml, $(VSGML_SRCS))
 
