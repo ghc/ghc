@@ -537,8 +537,8 @@ absEval anal (Case expr (PrimAlts alts deflt)) env
   = let
 	expr_val    = absEval anal expr env
 	abs_alts    = [ absEval anal rhs env | (_, rhs) <- alts ]
-			-- Don't bother to extend envt, because unbound vars
-			-- default to the conservative AbsTop
+			-- PrimAlts don't bind anything, so no need
+			-- to extend the environment
 
 	abs_deflt   = absEvalDefault anal expr_val deflt env
     in
@@ -629,8 +629,12 @@ absEvalAlgAlt anal other_scrutinee (con, args, rhs) env
 	-- (If the scrutinee is Top we'll never evaluated this function
 	-- call anyway!)
     ASSERT(ok_scrutinee)
-    absEval anal rhs env
+    absEval anal rhs rhs_env
   where
+    rhs_env = growAbsValEnvList env (args `zip` repeat AbsTop)
+		-- We must extend the environment, because
+		-- there might be shadowing
+
     ok_scrutinee
       = case other_scrutinee of {
 	  AbsTop -> True;   -- i.e., OK
