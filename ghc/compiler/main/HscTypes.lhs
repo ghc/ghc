@@ -135,8 +135,12 @@ where the object file will reside if/when it is created.
 
 A @ModIface@ plus a @ModDetails@ summarises everything we know 
 about a compiled module.  The @ModIface@ is the stuff *before* linking,
-and can be written out to an interface file.  The @ModDetails@ is after
-linking; it is the "linked" form of the mi_decls field.
+and can be written out to an interface file.  (The @ModDetails@ is after 
+linking; it is the "linked" form of the mi_decls field.)
+
+When we *read* an interface file, we also construct a @ModIface@ from it,
+except that the mi_decls part is empty; when reading we consolidate
+the declarations into a single indexed map in the @PersistentRenamerState@.
 
 \begin{code}
 data ModIface 
@@ -514,6 +518,24 @@ type IsExported = Name -> Bool		-- True for names that are exported from this mo
 %*									*
 %************************************************************************
 
+The @PersistentCompilerState@ persists across successive calls to the
+compiler.
+
+  * A ModIface for each non-home-package module
+
+  * An accumulated TypeEnv from all the modules in imported packages
+
+  * An accumulated InstEnv from all the modules in imported packages
+    The point is that we don't want to keep recreating it whenever
+    we compile a new module.  The InstEnv component of pcPST is empty.
+    (This means we might "see" instances that we shouldn't "really" see;
+    but the Haskell Report is vague on what is meant to be visible, 
+    so we just take the easy road here.)
+
+  * Ditto for rules
+ 
+  * The persistent renamer state
+
 \begin{code}
 data PersistentCompilerState 
    = PCS {
@@ -532,24 +554,12 @@ data PersistentCompilerState
      }
 \end{code}
 
-The @PersistentRenamerState@ persists across successive calls to the
-compiler.
 
-It contains:
+The persistent renamer state contains:
+
   * A name supply, which deals with allocating unique names to
     (Module,OccName) original names, 
  
-  * An accumulated TypeEnv from all the modules in imported packages
-
-  * An accumulated InstEnv from all the modules in imported packages
-    The point is that we don't want to keep recreating it whenever
-    we compile a new module.  The InstEnv component of pcPST is empty.
-    (This means we might "see" instances that we shouldn't "really" see;
-    but the Haskell Report is vague on what is meant to be visible, 
-    so we just take the easy road here.)
-
-  * Ditto for rules
-
   * A "holding pen" for declarations that have been read out of
     interface files but not yet sucked in, renamed, and typechecked
 
@@ -561,6 +571,9 @@ type PackageInstEnv  = InstEnv
 data PersistentRenamerState
   = PRS { prsOrig    :: !NameSupply,
 	  prsImpMods :: !ImportedModuleInfo,
+
+		-- Holding pens for stuff that has been read in
+		-- but not yet slurped into the renamer
 	  prsDecls   :: !DeclsMap,
 	  prsInsts   :: !IfaceInsts,
 	  prsRules   :: !IfaceRules

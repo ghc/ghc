@@ -99,18 +99,19 @@ checkInstType t
 	      	returnP (HsForAllTy Nothing [] dict_ty)
 
 checkContext :: RdrNameHsType -> P RdrNameContext
-checkContext (HsTupleTy _ ts) 
+checkContext (HsTupleTy _ ts) 	-- (Eq a, Ord b) shows up as a tuple type
   = mapP (\t -> checkPred t []) ts `thenP` \ps ->
     returnP ps
-checkContext (HsTyVar t) -- empty contexts are allowed
+
+checkContext (HsTyVar t)	-- Empty context shows up as a unit type ()
   | t == unitTyCon_RDR = returnP []
+
 checkContext t 
   = checkPred t [] `thenP` \p ->
     returnP [p]
 
-checkPred :: RdrNameHsType -> [RdrNameHsType] 
-	-> P (HsPred RdrName)
-checkPred (HsTyVar t) args@(_:_) | not (isRdrTyVar t) 
+checkPred :: RdrNameHsType -> [RdrNameHsType] -> P (HsPred RdrName)
+checkPred (HsTyVar t) args | not (isRdrTyVar t) 
   	= returnP (HsClassP t args)
 checkPred (HsAppTy l r) args = checkPred l (r:args)
 checkPred (HsPredTy (HsIParam n ty)) [] = returnP (HsIParam n ty)

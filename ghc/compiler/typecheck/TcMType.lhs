@@ -20,7 +20,7 @@ module TcMType (
   --------------------------------
   -- Instantiation
   tcInstTyVar, tcInstTyVars,
-  tcInstSigTyVars, tcInstType,
+  tcInstSigTyVars, tcInstType, tcInstSigType,
   tcSplitRhoTyM,
 
   --------------------------------
@@ -63,7 +63,7 @@ import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  isFFIArgumentTy, isFFIImportResultTy
 			)
 import Subst		( Subst, mkTopTyVarSubst, substTy )
-import Class		( classArity, className )
+import Class		( Class, classArity, className )
 import TyCon		( TyCon, mkPrimTyCon, isSynTyCon, isUnboxedTupleTyCon, 
 			  tyConArity, tyConName )
 import PrimRep		( PrimRep(VoidRep) )
@@ -227,6 +227,28 @@ tcInstType ty
 			   (theta, tau) = tcSplitRhoTy (substTy tenv rho)	-- Used to be tcSplitRhoTyM
 			 in
 			 returnNF_Tc (tyvars', theta, tau)
+
+
+tcInstSigType :: TyVarDetails -> Type -> NF_TcM ([TcTyVar], TcThetaType, TcType)
+-- Very similar to tcInstSigType, but uses signature type variables
+-- Also, somewhat arbitrarily, don't deal with the monomorphic case so efficiently
+tcInstSigType tv_details poly_ty
+ = let
+	(tyvars, rho) = tcSplitForAllTys poly_ty
+   in
+   tcInstSigTyVars tv_details tyvars		`thenNF_Tc` \ tyvars' ->
+	-- Make *signature* type variables
+
+   let
+     tyvar_tys' = mkTyVarTys tyvars'
+     rho' = substTy (mkTopTyVarSubst tyvars tyvar_tys') rho
+	-- mkTopTyVarSubst because the tyvars' are fresh
+
+     (theta', tau') = tcSplitRhoTy rho'
+	-- This splitRhoTy tries hard to make sure that tau' is a type synonym
+	-- wherever possible, which can improve interface files.
+   in
+   returnNF_Tc (tyvars', theta', tau')
 \end{code}
 
 
@@ -856,7 +878,8 @@ check_source_ty dflags ctxt pred@(ClassP cls tys)
   = 	-- Class predicates are valid in all contexts
     mapTc_ check_arg_type tys			`thenTc_`
     checkTc (arity == n_tys) arity_err		`thenTc_`
-    checkTc (all tyvar_head tys || arby_preds_ok) (predTyVarErr pred)
+    checkTc (all tyvar_head tys || arby_preds_ok)
+	    (predTyVarErr pred $$ how_to_allow)
 
   where
     class_name = className cls
@@ -869,6 +892,11 @@ check_source_ty dflags ctxt pred@(ClassP cls tys)
 						-- in checkValidInstHead
 			InstThetaCtxt -> dopt Opt_AllowUndecidableInstances dflags
 			other	      -> dopt Opt_GlasgowExts               dflags
+
+    how_to_allow = case ctxt of
+		     InstHeadCtxt  -> empty	-- Should not happen
+		     InstThetaCtxt -> parens undecidableMsg
+		     other	   -> parens (ptext SLIT("Use -fglasgow-exts to permit this"))
 
 check_source_ty dflags SigmaCtxt (IParam _ ty) = check_arg_type ty
 	-- Implicit parameters only allows in type
@@ -921,7 +949,7 @@ compiled elsewhere). In these cases, we let them go through anyway.
 We can also have instances for functions: @instance Foo (a -> b) ...@.
 
 \begin{code}
-checkValidInstHead :: Type -> TcM ()
+checkValidInstHead :: Type -> TcM (Class, [TcType])
 
 checkValidInstHead ty	-- Should be a source type
   = case tcSplitPredTy_maybe ty of {
@@ -934,7 +962,8 @@ checkValidInstHead ty	-- Should be a source type
 
     getDOptsTc					`thenNF_Tc` \ dflags ->
     mapTc_ check_arg_type tys			`thenTc_`
-    check_inst_head dflags clas tys
+    check_inst_head dflags clas tys		`thenTc_`
+    returnTc (clas, tys)
     }}
 
 check_inst_head dflags clas tys
@@ -980,7 +1009,9 @@ check_tyvars dflags clas tys
   | otherwise 				      = failWithTc (instTypeErr (pprClassPred clas tys) msg)
   where
     msg =  parens (ptext SLIT("There must be at least one non-type-variable in the instance head")
-	        $$ ptext SLIT("Use -fallow-undecidable-instances to lift this restriction"))
+		   $$ undecidableMsg)
+
+undecidableMsg = ptext SLIT("Use -fallow-undecidable-instances to permit this")
 \end{code}
 
 \begin{code}

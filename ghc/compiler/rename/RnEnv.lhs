@@ -424,8 +424,12 @@ getImplicitModuleFVs mod_name decls	-- Compiling a module
 		      || mod_name == pREL_MAIN_Name = unitFV ioTyConName
 		      |  otherwise 		    = emptyFVs
 
+	-- deriv_classes is now a list of HsTypes, so a "normal" one
+	-- appears as a (HsClassP c []).  The non-normal ones for the new
+	-- newtype-deriving extension, and they don't require any
+	-- implicit names, so we can silently filter them out.
 	deriv_occs = [occ | TyClD (TyData {tcdDerivs = Just deriv_classes}) <- decls,
-		   	    cls <- deriv_classes,
+		   	    HsClassP cls [] <- deriv_classes,
 			    occ <- lookupWithDefaultUFM derivingOccurrences [] cls ]
 
 -- ubiquitous_names are loaded regardless, because 

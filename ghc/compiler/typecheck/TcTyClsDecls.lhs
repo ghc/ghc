@@ -130,7 +130,7 @@ The knot-tying parameters: @rec_details_list@ is an alist mapping @Name@s to
 \begin{code}
 tcGroup :: RecTcEnv -> Module -> SCC RenamedTyClDecl -> TcM TcEnv
 tcGroup unf_env this_mod scc
-  = getDOptsTc							`thenTc` \ dflags ->
+  = getDOptsTc							`thenNF_Tc` \ dflags ->
 	-- Step 1
     mapNF_Tc getInitialKind decls 				`thenNF_Tc` \ initial_kinds ->
 

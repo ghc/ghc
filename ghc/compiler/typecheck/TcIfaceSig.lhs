@@ -142,7 +142,7 @@ tcPragExpr unf_env name in_scope_vars expr
 
 		-- Check for type consistency in the unfolding
 	tcGetSrcLoc		`thenNF_Tc` \ src_loc -> 
-	getDOptsTc		`thenTc` \ dflags ->
+	getDOptsTc		`thenNF_Tc` \ dflags ->
 	case lintUnfolding dflags src_loc in_scope_vars core_expr' of
 	  (Nothing,_)       -> returnTc (Just core_expr')  -- ignore warnings
 	  (Just fail_msg,_) -> failWithTc ((doc <+> text "failed Lint") $$ fail_msg)

@@ -612,7 +612,11 @@ lookupFixityRn name
       -- loadHomeInterface, and consulting the Ifaces that comes back
       -- from that, because the interface file for the Name might not
       -- have been loaded yet.  Why not?  Suppose you import module A,
-      -- which exports a function 'f', which is defined in module B.
+      -- which exports a function 'f', thus;
+      --        module CurrentModule where
+      --	  import A( f )
+      -- 	module A( f ) where
+      --	  import B( f )
       -- Then B isn't loaded right away (after all, it's possible that
       -- nothing from B will be used).  When we come across a use of
       -- 'f', we need to know its fixity, and it's then, and only

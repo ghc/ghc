@@ -495,6 +495,12 @@ The InstInfo type summarises the information in an instance declaration
 
     instance c => k (t tvs) where b
 
+It is used just for *local* instance decls (not ones from interface files).
+But local instance decls includes
+	- derived ones
+	- generic ones
+as well as explicit user written ones.
+
 \begin{code}
 data InstInfo
   = InstInfo {
@@ -503,8 +509,13 @@ data InstInfo
       iPrags  :: [RenamedSig]		-- User pragmas recorded for generating specialised instances
     }
 
-pprInstInfo info = vcat [ptext SLIT("InstInfo:") <+> ppr (idType (iDFunId info)),
-			 nest 4 (ppr (iBinds info))]
+  | NewTypeDerived {		-- Used for deriving instances of newtypes, where the
+				-- witness dictionary is identical to the argument dictionary
+				-- Hence no bindings.
+      iDFunId :: DFunId			-- The dfun id
+    }
+
+pprInstInfo info = vcat [ptext SLIT("InstInfo:") <+> ppr (idType (iDFunId info))]
 
 simpleInstInfoTy :: InstInfo -> Type
 simpleInstInfoTy info = case tcSplitDFunTy (idType (iDFunId info)) of

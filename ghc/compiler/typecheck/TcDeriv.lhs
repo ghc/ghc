@@ -13,7 +13,7 @@ module TcDeriv ( tcDeriving ) where
 import HsSyn		( HsBinds(..), MonoBinds(..), TyClDecl(..),
 			  collectLocatedMonoBinders )
 import RdrHsSyn		( RdrNameMonoBinds )
-import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds, RenamedTyClDecl )
+import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds, RenamedTyClDecl, RenamedHsPred )
 import CmdLineOpts	( DynFlag(..), DynFlags )
 
 import TcMonad
@@ -22,6 +22,7 @@ import TcEnv		( tcSetInstEnv, newDFunName, InstInfo(..), pprInstInfo,
 			)
 import TcGenDeriv	-- Deriv stuff
 import InstEnv		( InstEnv, simpleDFunClassTyCon, extendInstEnv )
+import TcMonoType	( tcHsPred )
 import TcSimplify	( tcSimplifyThetas )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
@@ -29,29 +30,33 @@ import RnEnv		( bindLocatedLocalsRn )
 import RnMonad		( renameDerivedCode, thenRn, mapRn, returnRn )
 import HscTypes		( DFunId, PersistentRenamerState )
 
-import BasicTypes	( Fixity )
-import Class		( className, classKey, Class )
+import BasicTypes	( Fixity, NewOrData(..) )
+import Class		( className, classKey, classTyVars, Class )
 import ErrUtils		( dumpIfSet_dyn, Message )
 import MkId		( mkDictFunId )
-import DataCon		( dataConArgTys, isNullaryDataCon, isExistentialDataCon )
+import DataCon		( dataConRepArgTys, isNullaryDataCon, isExistentialDataCon )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool, catMaybes )
 import Module		( Module )
 import Name		( Name, getSrcLoc, nameUnique )
 import RdrName		( RdrName )
 
-import TyCon		( tyConTyVars, tyConDataCons,
+import TyCon		( tyConTyVars, tyConDataCons, tyConArity, newTyConRep,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
 			  isEnumerationTyCon, TyCon
 			)
-import TcType		( ThetaType, mkTyVarTys, mkTyConApp, 
-			  isUnLiftedType, mkClassPred )
-import Var		( TyVar )
+import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, getClassPredTys_maybe,
+			  isUnLiftedType, mkClassPred, tyVarsOfTypes, tcSplitFunTys, 
+			  tcSplitTyConApp_maybe )
+import Var		( TyVar, tyVarKind )
+import VarSet		( mkVarSet, subVarSet )
 import PrelNames
 import Util		( zipWithEqual, sortLt )
 import ListSetOps	( removeDups,  assoc )
 import Outputable
+import Maybe		( isJust )
 import List		( nub )
+import FastString 	( FastString )
 \end{code}
 
 %************************************************************************
@@ -187,17 +192,37 @@ tcDeriving  :: PersistentRenamerState
 	    -> TcM ([InstInfo],		-- The generated "instance decls".
 		    RenamedHsBinds)	-- Extra generated bindings
 
-tcDeriving prs mod inst_env_in get_fixity tycl_decls
+tcDeriving prs mod inst_env get_fixity tycl_decls
   = recoverTc (returnTc ([], EmptyBinds)) $
 
   	-- Fish the "deriving"-related information out of the TcEnv
 	-- and make the necessary "equations".
-    makeDerivEqns tycl_decls	    	`thenTc` \ eqns ->
-    if null eqns then
-	returnTc ([], EmptyBinds)
-    else
+    makeDerivEqns tycl_decls		    		`thenTc` \ (ordinary_eqns, inst_info2) ->
+    
+    deriveOrdinaryStuff mod prs inst_env get_fixity 
+			ordinary_eqns			`thenTc` \ (inst_info1, binds) ->
+    let
+	inst_info  = inst_info2 ++ inst_info1	-- info2 usually empty
+    in
 
-	-- Take the equation list and solve it, to deliver a list of
+    getDOptsTc				`thenNF_Tc` \ dflags ->
+    ioToTc (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances" 
+	 	          (ddump_deriving inst_info binds))	`thenTc_`
+
+    returnTc (inst_info, binds)
+
+  where
+    ddump_deriving :: [InstInfo] -> RenamedHsBinds -> SDoc
+    ddump_deriving inst_infos extra_binds
+      = vcat (map pprInstInfo inst_infos) $$ ppr extra_binds
+
+
+-----------------------------------------
+deriveOrdinaryStuff mod prs inst_env_in get_fixity []	-- Short cut
+  = returnTc ([], EmptyBinds)
+
+deriveOrdinaryStuff mod prs inst_env_in get_fixity eqns
+  =	-- Take the equation list and solve it, to deliver a list of
 	-- solutions, a.k.a. the contexts for the instance decls
 	-- required for the corresponding equations.
     solveDerivEqns inst_env_in eqns	    	`thenTc` \ new_dfuns ->
@@ -207,11 +232,10 @@ tcDeriving prs mod inst_env_in get_fixity tycl_decls
 	-- generate extra not-one-inst-decl-specific binds, notably
 	-- "con2tag" and/or "tag2con" functions.  We do these
 	-- separately.
-
     gen_taggery_Names new_dfuns			`thenTc` \ nm_alist_etc ->
 
     tcGetEnv					`thenNF_Tc` \ env ->
-    getDOptsTc					`thenTc` \ dflags ->
+    getDOptsTc					`thenNF_Tc` \ dflags ->
     let
 	extra_mbind_list = map gen_tag_n_con_monobind nm_alist_etc
 	extra_mbinds     = foldr AndMonoBinds EmptyMonoBinds extra_mbind_list
@@ -228,20 +252,11 @@ tcDeriving prs mod inst_env_in get_fixity tycl_decls
 			mapRn rn_meths method_binds_s		`thenRn` \ rn_method_binds_s ->
 			returnRn (rn_method_binds_s, rn_extra_binds)
 		  )
-
 	new_inst_infos = zipWith gen_inst_info new_dfuns rn_method_binds_s
     in
-
-    ioToTc (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances" 
-	      (ddump_deriving new_inst_infos rn_extra_binds))	`thenTc_`
-
     returnTc (new_inst_infos, rn_extra_binds)
-  where
-    ddump_deriving :: [InstInfo] -> RenamedHsBinds -> SDoc
-    ddump_deriving inst_infos extra_binds
-      = vcat (map pprInstInfo inst_infos) $$ ppr extra_binds
-      where
 
+  where
 	-- Make a Real dfun instead of the dummy one we have so far
     gen_inst_info :: DFunId -> RenamedMonoBinds -> InstInfo
     gen_inst_info dfun binds
@@ -274,68 +289,138 @@ or} has just one data constructor (e.g., tuples).
 all those.
 
 \begin{code}
-makeDerivEqns :: [RenamedTyClDecl] -> TcM [DerivEqn]
+makeDerivEqns :: [RenamedTyClDecl] 
+	      -> TcM ([DerivEqn],	-- Ordinary derivings
+		      [InstInfo])	-- Special newtype derivings
 
 makeDerivEqns tycl_decls
-  = mapTc mk_eqn derive_these	 	`thenTc` \ maybe_eqns ->
-    returnTc (catMaybes maybe_eqns)
+  = mapAndUnzipTc mk_eqn derive_these	 	`thenTc` \ (maybe_ordinaries, maybe_newtypes) ->
+    returnTc (catMaybes maybe_ordinaries, catMaybes maybe_newtypes)
   where
     ------------------------------------------------------------------
-    derive_these :: [(Name, Name)]
-	-- Find the (Class,TyCon) pairs that must be `derived'
+    derive_these :: [(NewOrData, Name, RenamedHsPred)]
+	-- Find the (nd, TyCon, Pred) pairs that must be `derived'
 	-- NB: only source-language decls have deriving, no imported ones do
-    derive_these = [ (clas,tycon) 
-		   | TyData {tcdName = tycon, tcdDerivs = Just classes} <- tycl_decls,
-		     clas <- nub classes ]
+    derive_these = [ (nd, tycon, pred) 
+		   | TyData {tcdND = nd, tcdName = tycon, tcdDerivs = Just preds} <- tycl_decls,
+		     pred <- preds ]
 
     ------------------------------------------------------------------
-    mk_eqn :: (Name, Name) -> NF_TcM (Maybe DerivEqn)
-	-- we swizzle the tyvars and datacons out of the tycon
+    mk_eqn :: (NewOrData, Name, RenamedHsPred) -> NF_TcM (Maybe DerivEqn, Maybe InstInfo)
+	-- We swizzle the tyvars and datacons out of the tycon
 	-- to make the rest of the equation
 
-    mk_eqn (clas_name, tycon_name)
-      = tcLookupClass clas_name					`thenNF_Tc` \ clas ->
-	tcLookupTyCon tycon_name				`thenNF_Tc` \ tycon ->
-	let
-	    clas_key  = classKey clas
-	    tyvars    = tyConTyVars tycon
-	    tyvar_tys = mkTyVarTys tyvars
-	    ty	      = mkTyConApp tycon tyvar_tys
-	    data_cons = tyConDataCons tycon
-	    locn      = getSrcLoc tycon
-	    constraints = extra_constraints ++ concat (map mk_constraints data_cons)
-
-	    -- "extra_constraints": see notes above about contexts on data decls
-	    extra_constraints
-	      | offensive_class = tyConTheta tycon
-	      | otherwise	= []
-
-	    offensive_class = clas_key `elem` needsDataDeclCtxtClassKeys
-    
-	    mk_constraints data_con
-	       = [ mkClassPred clas [arg_ty]
-		 | arg_ty <- dataConArgTys data_con tyvar_tys,
-		   not (isUnLiftedType arg_ty)	-- No constraints for unlifted types?
-		 ]
-	in
-	case chk_out clas tycon of
-	   Just err ->  tcAddSrcLoc (getSrcLoc tycon)	$
-			addErrTc err			`thenNF_Tc_` 
-			returnNF_Tc Nothing
-	   Nothing  ->  newDFunName clas [ty] locn `thenNF_Tc` \ dfun_name ->
-			returnNF_Tc (Just (dfun_name, clas, tycon, tyvars, constraints))
-
-
+    mk_eqn (new_or_data, tycon_name, pred)
+      = tcLookupTyCon tycon_name		`thenNF_Tc` \ tycon ->
+	tcAddSrcLoc (getSrcLoc tycon)		$
+        tcAddErrCtxt (derivCtxt tycon)		$
+        tcHsPred pred				`thenTc` \ pred' ->
+	case getClassPredTys_maybe pred' of
+	   Nothing 	    -> bale_out (malformedPredErr tycon pred)
+	   Just (clas, tys) -> mk_eqn_help new_or_data tycon clas tys
 
     ------------------------------------------------------------------
-    chk_out :: Class -> TyCon -> Maybe Message
-    chk_out clas tycon
-	| clas `hasKey` enumClassKey    && not is_enumeration 	        = bog_out nullary_why
-	| clas `hasKey` boundedClassKey && not is_enumeration_or_single = bog_out single_nullary_why
-	| clas `hasKey` ixClassKey      && not is_enumeration_or_single = bog_out single_nullary_why
-	| null data_cons		     = bog_out no_cons_why
-	| any isExistentialDataCon data_cons = Just (existentialErr clas tycon)
-	| otherwise			     = Nothing
+    mk_eqn_help DataType tycon clas tys
+      | Just err <- chk_out clas tycon tys
+      = bale_out (derivingThingErr clas tys tycon tyvars err)
+      | otherwise 
+      = new_dfun_name clas tycon	 `thenNF_Tc` \ dfun_name ->
+	returnNF_Tc (Just (dfun_name, clas, tycon, tyvars, constraints), Nothing)
+      where
+	tyvars    = tyConTyVars tycon
+	data_cons = tyConDataCons tycon
+	constraints = extra_constraints ++ 
+	  	      [ mkClassPred clas [arg_ty] 
+		      | data_con <- tyConDataCons tycon,
+		        arg_ty   <- dataConRepArgTys data_con,	
+				-- Use the same type variables
+				-- as the type constructor,
+				-- hence no need to instantiate
+			not (isUnLiftedType arg_ty)	-- No constraints for unlifted types?
+		      ]
+
+	
+	 -- "extra_constraints": see notes above about contexts on data decls
+	extra_constraints | offensive_class = tyConTheta tycon
+			  | otherwise	    = []
+	
+	offensive_class = classKey clas `elem` needsDataDeclCtxtClassKeys
+
+
+    mk_eqn_help NewType tycon clas []
+      | clas `hasKey` readClassKey || clas `hasKey` showClassKey
+      = mk_eqn_help DataType tycon clas []	-- Use the generate-full-code mechanism for Read and Show
+
+    mk_eqn_help NewType tycon clas tys
+      = doptsTc Opt_GlasgowExts			`thenTc` \ gla_exts ->
+	if not gla_exts then			-- Not glasgow-exts?
+	   mk_eqn_help DataType tycon clas tys	--   revert to ordinary mechanism
+        else if not can_derive then
+	   bale_out cant_derive_err
+	else
+	   new_dfun_name clas tycon  		`thenNF_Tc` \ dfun_name ->
+	   returnTc (Nothing, Just (NewTypeDerived (mk_dfun dfun_name)))
+      where
+	-- Here is the plan for newtype derivings.  We see
+	--	  newtype T a1...an = T (t ak...an) deriving (C1...Cm)
+	-- where aj...an do not occur free in t, and the Ci are *partial applications* of
+	-- classes with the last parameter missing
+	--
+	-- We generate the instances
+	--	 instance Ci (t ak...aj) => Ci (T a1...aj)
+	-- where T a1...aj is the partial application of the LHS of the correct kind
+	--
+	-- Running example: newtype T s a = MkT (ST s a) deriving( Monad )
+
+	kind = tyVarKind (last (classTyVars clas))
+		-- Kind of the thing we want to instance
+		--   e.g. argument kind of Monad, *->*
+
+	(arg_kinds, _) = tcSplitFunTys kind
+	n_args_to_drop = length arg_kinds	
+		-- Want to drop 1 arg from (T s a) and (ST s a)
+		-- to get 	instance Monad (ST s) => Monad (T s)
+
+	(tyvars, rep_ty) 	   = newTyConRep tycon
+ 	maybe_rep_app		   = tcSplitTyConApp_maybe rep_ty	
+	Just (rep_tc, rep_ty_args) = maybe_rep_app
+
+	n_tyvars_to_keep = tyConArity tycon  - n_args_to_drop
+	tyvars_to_keep = ASSERT( n_tyvars_to_keep >= 0 && n_tyvars_to_keep <= length tyvars )
+			 take n_tyvars_to_keep tyvars	-- Kind checking should ensure this
+
+	n_args_to_keep = tyConArity rep_tc - n_args_to_drop
+ 	args_to_keep   = ASSERT( n_args_to_keep >= 0 && n_args_to_keep <= length rep_ty_args )
+			 take n_args_to_keep rep_ty_args
+
+	ctxt_pred = mkClassPred clas (tys ++ [mkTyConApp rep_tc args_to_keep])
+
+	mk_dfun dfun_name = mkDictFunId dfun_name clas tyvars 
+		    				  (tys ++ [mkTyConApp tycon (mkTyVarTys tyvars_to_keep)] )
+						  [ctxt_pred]
+
+	-- We can only do this newtype deriving thing if:
+	can_derive =  isJust maybe_rep_app 	-- The rep type is a type constructor app
+		   && (tyVarsOfTypes args_to_keep `subVarSet` mkVarSet tyvars_to_keep) 
+						-- and the tyvars are all in scope
+
+	cant_derive_err = derivingThingErr clas tys tycon tyvars_to_keep
+					   SLIT("too hard for cunning newtype deriving")
+
+
+    bale_out err = addErrTc err `thenNF_Tc_` returnNF_Tc (Nothing, Nothing) 
+
+    ------------------------------------------------------------------
+    chk_out :: Class -> TyCon -> [TcType] -> Maybe FastString
+    chk_out clas tycon tys
+	| not (null tys)						= Just non_std_why
+	| not (getUnique clas `elem` derivableClassKeys)		= Just non_std_why
+	| clas `hasKey` enumClassKey    && not is_enumeration 	        = Just nullary_why
+	| clas `hasKey` boundedClassKey && not is_enumeration_or_single = Just single_nullary_why
+	| clas `hasKey` ixClassKey      && not is_enumeration_or_single = Just single_nullary_why
+	| null data_cons		    			 	= Just no_cons_why
+	| any isExistentialDataCon data_cons 				= Just existential_why     
+	| otherwise			     				= Nothing
 	where
 	    data_cons = tyConDataCons tycon
 	    is_enumeration = isEnumerationTyCon tycon
@@ -345,8 +430,13 @@ makeDerivEqns tycl_decls
 	    single_nullary_why = SLIT("one constructor data type or type with all nullary constructors expected")
 	    nullary_why        = SLIT("data type with all nullary constructors expected")
 	    no_cons_why	       = SLIT("type has no data constructors")
+	    non_std_why	       = SLIT("not a derivable class")
+	    existential_why    = SLIT("it has existentially-quantified constructor(s)")
 
-	    bog_out why = Just (derivingThingErr clas tycon why)
+new_dfun_name clas tycon 	-- Just a simple wrapper
+  = newDFunName clas [mkTyConApp tycon []] (getSrcLoc tycon)
+	-- The type passed to newDFunName is only used to generate
+	-- a suitable string; hence the empty type arg list
 \end{code}
 
 %************************************************************************
@@ -402,7 +492,7 @@ solveDerivEqns inst_env_in orig_eqns
     iterateOnce current_solns
       =	    -- Extend the inst info from the explicit instance decls
 	    -- with the current set of solutions, giving a
-	getDOptsTc				`thenTc` \ dflags ->
+	getDOptsTc				`thenNF_Tc` \ dflags ->
         let (new_dfuns, inst_env) =
 		add_solns dflags inst_env_in orig_eqns current_solns
         in
@@ -611,17 +701,15 @@ gen_taggery_Names dfuns
 \end{code}
 
 \begin{code}
-derivingThingErr :: Class -> TyCon -> FAST_STRING -> Message
-
-derivingThingErr clas tycon why
-  = sep [hsep [ptext SLIT("Can't make a derived instance of"), quotes (ppr clas)],
-	 hsep [ptext SLIT("for the type"), quotes (ppr tycon)],
+derivingThingErr clas tys tycon tyvars why
+  = sep [hsep [ptext SLIT("Can't make a derived instance of"), quotes (ppr pred)],
 	 parens (ptext why)]
+  where
+    pred = mkClassPred clas (tys ++ [mkTyConApp tycon (mkTyVarTys tyvars)])
 
-existentialErr clas tycon
-  = sep [ptext SLIT("Can't derive any instances for type") <+> quotes (ppr tycon),
-	 ptext SLIT("because it has existentially-quantified constructor(s)")]
+malformedPredErr tycon pred = ptext SLIT("Illegal deriving item") <+> ppr pred
 
 derivCtxt tycon
   = ptext SLIT("When deriving classes for") <+> quotes (ppr tycon)
 \end{code}
+

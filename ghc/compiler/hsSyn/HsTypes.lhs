@@ -18,7 +18,7 @@ module HsTypes (
 	, PostTcType, placeHolderType,
 
 	-- Printing
-	, pprParendHsType, pprHsForAll, pprHsContext, pprHsTyVarBndr
+	, pprParendHsType, pprHsForAll, pprHsContext, ppr_hs_context, pprHsTyVarBndr
 
 	-- Equality over Hs things
 	, EqHsEnv, emptyEqHsEnv, extendEqHsEnv,
@@ -229,21 +229,17 @@ pprHsForAll tvs cxt
 	ptext SLIT("forall") <+> interppSP tvs <> dot <+> 
               -- **! ToDo: want to hide uvars from user, but not enough info
               -- in a HsTyVarBndr name (see PprType).  KSW 2000-10.
-	(if null cxt then 
-		empty 
-	 else 
-		ppr_context cxt <+> ptext SLIT("=>")
-	)
+	pprHsContext cxt
     else	-- Used in interfaces
 	ptext SLIT("__forall") <+> interppSP tvs <+> 
-	ppr_context cxt <+> ptext SLIT("=>")
+	ppr_hs_context cxt <+> ptext SLIT("=>")
 
 pprHsContext :: (Outputable name) => HsContext name -> SDoc
 pprHsContext []	 = empty
-pprHsContext cxt = ppr_context cxt <+> ptext SLIT("=>")
+pprHsContext cxt = ppr_hs_context cxt <+> ptext SLIT("=>")
 
-ppr_context []  = empty
-ppr_context cxt = parens (interpp'SP cxt)
+ppr_hs_context []  = empty
+ppr_hs_context cxt = parens (interpp'SP cxt)
 \end{code}
 
 \begin{code}

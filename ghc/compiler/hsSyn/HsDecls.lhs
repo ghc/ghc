@@ -277,10 +277,8 @@ data TyClDecl name pat
 		tcdTyVars :: [HsTyVarBndr name], -- type variables
 		tcdCons	  :: [ConDecl name],	 -- data constructors (empty if abstract)
 		tcdNCons  :: Int,		 -- Number of data constructors (valid even if type is abstract)
-		tcdDerivs :: Maybe [name],	 -- derivings; Nothing => not specified
-				 -- (i.e., derive default); Just [] => derive
-				 -- *nothing*; Just <list> => as you would
-				 -- expect...
+		tcdDerivs :: Maybe (HsContext name),	-- derivings; Nothing => not specified
+							-- Just [] => derive exactly what is asked
 		tcdSysNames :: DataSysNames name,	-- Generic converter functions
 		tcdLoc	    :: SrcLoc
     }
@@ -515,7 +513,7 @@ pp_tydecl pp_head pp_decl_rhs derivings
 	pp_decl_rhs,
 	case derivings of
 	  Nothing 	   -> empty
-	  Just ds	   -> hsep [ptext SLIT("deriving"), parens (interpp'SP ds)]
+	  Just ds	   -> hsep [ptext SLIT("deriving"), ppr_hs_context ds]
     ])
 \end{code}
 

@@ -590,11 +590,11 @@ popErrCtxt down = case tc_ctxt down of
 			[]     -> down
 			m : ms -> down{tc_ctxt = ms}
 
-doptsTc :: DynFlag -> TcM Bool
+doptsTc :: DynFlag -> NF_TcM Bool
 doptsTc dflag (TcDown{tc_dflags=dflags}) env_down
    = return (dopt dflag dflags)
 
-getDOptsTc :: TcM DynFlags
+getDOptsTc :: NF_TcM DynFlags
 getDOptsTc (TcDown{tc_dflags=dflags}) env_down
    = return dflags
 \end{code}

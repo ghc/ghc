@@ -282,6 +282,7 @@ data DynFlag
    -- language opts
    | Opt_AllowOverlappingInstances
    | Opt_AllowUndecidableInstances
+   | Opt_AllowIncoherentInstances
    | Opt_GlasgowExts
    | Opt_Generics
    | Opt_NoImplicitPrelude 

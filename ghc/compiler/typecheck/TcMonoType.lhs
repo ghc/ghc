@@ -4,7 +4,7 @@
 \section[TcMonoType]{Typechecking user-specified @MonoTypes@}
 
 \begin{code}
-module TcMonoType ( tcHsSigType, tcHsType, tcIfaceType, tcHsTheta, 
+module TcMonoType ( tcHsSigType, tcHsType, tcIfaceType, tcHsTheta, tcHsPred,
 		    UserTypeCtxt(..),
 
 			-- Kind checking
@@ -28,7 +28,7 @@ import TcEnv		( tcExtendTyVarEnv, tcLookup, tcLookupGlobal,
 			  tcInLocalScope,
 		 	  TyThing(..), TcTyThing(..), tcExtendKindEnv
 			)
-import TcMType		( newKindVar, tcInstSigTyVars, zonkKindEnv, 
+import TcMType		( newKindVar, zonkKindEnv, tcInstSigType,
 			  checkValidType, UserTypeCtxt(..), pprUserTypeCtxt
 			)
 import TcUnify		( unifyKind, unifyOpenTypeKind )
@@ -41,8 +41,8 @@ import TcType		( Type, Kind, SourceType(..), ThetaType, TyVarDetails(..),
 			  liftedTypeKind, unliftedTypeKind, mkArrowKind,
 			  mkArrowKinds, tcSplitFunTy_maybe
 			)
-
 import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToId )
+
 import Subst		( mkTopTyVarSubst, substTy )
 import Id		( mkLocalId, idName, idType )
 import Var		( TyVar, mkTyVar, tyVarKind )
@@ -321,18 +321,27 @@ kcAppKind fun_kind arg_kind
 
 
 ---------------------------
+kc_pred :: RenamedHsPred -> TcM TcKind	-- Does *not* check for a saturated
+					-- application (reason: used from TcDeriv)
+kc_pred pred@(HsIParam name ty)
+  = kcHsType ty
+
+kc_pred pred@(HsClassP cls tys)
+  = kcClass cls				`thenTc` \ kind ->
+    mapTc kcHsType tys			`thenTc` \ arg_kinds ->
+    newKindVar 				`thenNF_Tc` \ kv -> 
+    unifyKind kind (mkArrowKinds arg_kinds kv)	`thenTc_` 
+    returnTc kv
+
+---------------------------
 kcHsContext ctxt = mapTc_ kcHsPred ctxt
 
-kcHsPred :: RenamedHsPred -> TcM ()
-kcHsPred pred@(HsIParam name ty)
+kcHsPred pred		-- Checks that the result is of kind liftedType
   = tcAddErrCtxt (appKindCtxt (ppr pred))	$
-    kcLiftedType ty
-
-kcHsPred pred@(HsClassP cls tys)
-  = tcAddErrCtxt (appKindCtxt (ppr pred))	$
-    kcClass cls					`thenTc` \ kind ->
-    mapTc kcHsType tys				`thenTc` \ arg_kinds ->
-    unifyKind kind (mkArrowKinds arg_kinds liftedTypeKind)
+    kc_pred pred				`thenTc` \ kind ->
+    unifyKind liftedTypeKind kind		`thenTc_`
+    returnTc ()
+    
 
  ---------------------------
 kcTyVar name	-- Could be a tyvar or a tycon
@@ -468,6 +477,10 @@ tc_fun_type name arg_tys
 Contexts
 ~~~~~~~~
 \begin{code}
+tcHsPred pred = kc_pred pred `thenTc_`  tc_pred pred
+	-- Is happy with a partial application, e.g. (ST s)
+	-- Used from TcDeriv
+
 tc_pred assn@(HsClassP class_name tys)
   = tcAddErrCtxt (appKindCtxt (ppr assn))	$
     tc_types tys			`thenTc` \ arg_tys ->
@@ -571,30 +584,16 @@ mkTcSig poly_id src_loc
 	-- the tyvars *do* get unified with something, we want to carry on
 	-- typechecking the rest of the program with the function bound
 	-- to a pristine type, namely sigma_tc_ty
-   let
-	(tyvars, rho) = tcSplitForAllTys (idType poly_id)
-   in
-   tcInstSigTyVars SigTv tyvars			`thenNF_Tc` \ tyvars' ->
-	-- Make *signature* type variables
+   tcInstSigType SigTv (idType poly_id)		`thenNF_Tc` \ (tyvars', theta', tau') ->
 
-   let
-     tyvar_tys' = mkTyVarTys tyvars'
-     rho' = substTy (mkTopTyVarSubst tyvars tyvar_tys') rho
-	-- mkTopTyVarSubst because the tyvars' are fresh
-
-     (theta', tau') = tcSplitRhoTy rho'
-	-- This splitRhoTy tries hard to make sure that tau' is a type synonym
-	-- wherever possible, which can improve interface files.
-   in
    newMethodWithGivenTy SignatureOrigin 
-		poly_id
-		tyvar_tys'
-		theta' tau'			`thenNF_Tc` \ inst ->
+			poly_id
+			(mkTyVarTys tyvars')
+			theta' tau'		`thenNF_Tc` \ inst ->
 	-- We make a Method even if it's not overloaded; no harm
 	
-   returnNF_Tc (TySigInfo name poly_id tyvars' theta' tau' (instToId inst) [inst] src_loc)
-  where
-    name = idName poly_id
+   returnNF_Tc (TySigInfo (idName poly_id) poly_id tyvars' theta' tau' 
+			  (instToId inst) [inst] src_loc)
 \end{code}
 
 

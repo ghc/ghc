@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.79 2001/11/29 13:47:10 simonpj Exp $
+$Id: Parser.y,v 1.80 2001/12/20 11:19:08 simonpj Exp $
 
 Haskell grammar.
 
@@ -538,7 +538,7 @@ sig_vars :: { [RdrName] }
 -- A ctype is a for-all type
 ctype	:: { RdrNameHsType }
 	: 'forall' tyvars '.' ctype	{ mkHsForAllTy (Just $2) [] $4 }
-	| context type			{ mkHsForAllTy Nothing   $1 $2 }
+	| context '=>' type		{ mkHsForAllTy Nothing   $1 $3 }
 	-- A type of form (context => type) is an *implicit* HsForAllTy
 	| type				{ $1 }
 
@@ -620,8 +620,8 @@ constrs1 :: { [RdrNameConDecl] }
 	| constr			{ [$1] }
 
 constr :: { RdrNameConDecl }
-	: srcloc forall context constr_stuff
-		{ mkConDecl (fst $4) $2 $3 (snd $4) $1 }
+	: srcloc forall context '=>' constr_stuff
+		{ mkConDecl (fst $5) $2 $3 (snd $5) $1 }
 	| srcloc forall constr_stuff
 		{ mkConDecl (fst $3) $2 [] (snd $3) $1 }
 
@@ -630,7 +630,7 @@ forall :: { [RdrNameHsTyVar] }
 	| {- empty -}			{ [] }
 
 context :: { RdrNameContext }
-	: btype '=>'			{% checkContext $1 }
+	: btype 			{% checkContext $1 }
 
 constr_stuff :: { (RdrName, RdrNameConDetails) }
 	: btype				{% mkVanillaCon $1 []		    }
@@ -658,15 +658,11 @@ stype :: { RdrNameBangType }
 	: ctype				{ unbangedType $1 }
 	| '!' atype			{ BangType MarkedUserStrict $2 }
 
-deriving :: { Maybe [RdrName] }
+deriving :: { Maybe RdrNameContext }
 	: {- empty -}			{ Nothing }
-	| 'deriving' qtycls		{ Just [$2] }
-	| 'deriving' '('          ')'	{ Just [] }
-	| 'deriving' '(' dclasses ')'	{ Just (reverse $3) }
-
-dclasses :: { [RdrName] }
-	: dclasses ',' qtycls		{ $3 : $1 }
-       	| qtycls			{ [$1] }
+	| 'deriving' context		{ Just $2 }
+             -- Glasgow extension: allow partial 
+             -- applications in derivings
 
 -----------------------------------------------------------------------------
 -- Value definitions

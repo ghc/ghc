@@ -244,8 +244,9 @@ the env is kept ordered, the first match must be the only one.  The
 thing we are looking up can have an arbitrary "flexi" part.
 
 \begin{code}
-lookupInstEnv :: InstEnv 			-- The envt
-	      -> Class -> [Type]	-- Key
+lookupInstEnv :: DynFlags
+	      -> InstEnv 		-- The envt
+	      -> Class -> [Type]	-- What we are looking for
 	      -> InstLookupResult
 
 data InstLookupResult 
@@ -269,7 +270,7 @@ data InstLookupResult
 	-- it as ambiguous case in the hope of giving a better error msg.
 	-- See the notes above from Jeff Lewis
 
-lookupInstEnv env key_cls key_tys
+lookupInstEnv dflags env key_cls key_tys
   = find (classInstEnv env key_cls)
   where
     key_vars = tyVarsOfTypes key_tys
@@ -283,8 +284,12 @@ lookupInstEnv env key_cls key_tys
 		-- predicate might match this instance
 		-- [see notes about overlapping instances above]
 	    case unifyTyListsX (key_vars `unionVarSet` tpl_tyvars) key_tys tpl of
-	      Nothing        -> find rest
-	      Just _         -> NoMatch (any_match rest)
+	      Just _ | not (dopt Opt_AllowIncoherentInstances dflags)
+		     -> NoMatch (any_match rest)
+		-- If we allow incoherent instances we don't worry about the 
+		-- test and just blaze on anyhow.  Requested by John Hughes.
+	      other  -> find rest
+
 	  Just (subst, leftovers) -> ASSERT( null leftovers )
 				     FoundInst subst dfun_id
 

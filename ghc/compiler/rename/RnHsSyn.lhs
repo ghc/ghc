@@ -129,7 +129,10 @@ tyClDeclFVs (IfaceSig {tcdType = ty, tcdIdInfo = id_infos})
 
 tyClDeclFVs (TyData {tcdCtxt = context, tcdTyVars = tyvars, tcdCons = condecls, tcdDerivs = derivings})
   = delFVs (map hsTyVarName tyvars) $
-    extractHsCtxtTyNames context	`plusFV`
+    extractHsCtxtTyNames context		`plusFV`
+    (case derivings of 
+	Nothing -> emptyFVs
+	Just ds -> extractHsCtxtTyNames ds)	`plusFV`
     plusFVs (map conDeclFVs condecls)
 
 tyClDeclFVs (TySynonym {tcdTyVars = tyvars, tcdSynRhs = ty})

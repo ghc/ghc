@@ -290,11 +290,12 @@ rnTyClDecl (ForeignType {tcdName = name, tcdFoType = fo_type, tcdExtName = ext_n
 
 rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdName = tycon,
 		    tcdTyVars = tyvars, tcdCons = condecls, tcdNCons = nconstrs,
-		    tcdLoc = src_loc, tcdSysNames = sys_names})
+		    tcdDerivs = derivs, tcdLoc = src_loc, tcdSysNames = sys_names})
   = pushSrcLocRn src_loc $
     lookupTopBndrRn tycon		    	`thenRn` \ tycon' ->
     bindTyVarsRn data_doc tyvars		$ \ tyvars' ->
     rnContext data_doc context 			`thenRn` \ context' ->
+    rn_derivs derivs 				`thenRn` \ derivs' ->
     checkDupOrQualNames data_doc con_names	`thenRn_`
 
 	-- Check that there's at least one condecl,
@@ -311,11 +312,14 @@ rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdName = tycon,
     mapRn lookupSysBinder sys_names	        `thenRn` \ sys_names' ->
     returnRn (TyData {tcdND = new_or_data, tcdCtxt = context', tcdName = tycon',
 		      tcdTyVars = tyvars', tcdCons = condecls', tcdNCons = nconstrs,
-		      tcdDerivs = Nothing, tcdLoc = src_loc, tcdSysNames = sys_names'})
+		      tcdDerivs = derivs', tcdLoc = src_loc, tcdSysNames = sys_names'})
   where
     data_doc = text "In the data type declaration for" <+> quotes (ppr tycon)
     con_names = map conDeclName condecls
 
+    rn_derivs Nothing   = returnRn Nothing
+    rn_derivs (Just ds) = rnContext data_doc ds	`thenRn` \ ds' -> returnRn (Just ds')
+    
 rnTyClDecl (TySynonym {tcdName = name, tcdTyVars = tyvars, tcdSynRhs = ty, tcdLoc = src_loc})
   = pushSrcLocRn src_loc $
     lookupTopBndrRn name			`thenRn` \ name' ->
@@ -400,13 +404,6 @@ rnClassOp clas clas_fds sig@(ClassOpSig op dm_stuff ty locn)
 finishSourceTyClDecl :: RdrNameTyClDecl -> RenamedTyClDecl -> RnMS (RenamedTyClDecl, FreeVars)
 	-- Used for source file decls only
 	-- Renames the default-bindings of a class decl
-	--	   the derivings of a data decl
-finishSourceTyClDecl (TyData {tcdDerivs = Just derivs, tcdLoc = src_loc})	-- Derivings in here
-		     rn_ty_decl							-- Everything else is here
-  = pushSrcLocRn src_loc	 $
-    mapRn rnDeriv derivs	`thenRn` \ derivs' ->
-    returnRn (rn_ty_decl {tcdDerivs = Just derivs'}, mkNameSet derivs')
-
 finishSourceTyClDecl (ClassDecl {tcdMeths = Just mbinds, tcdLoc = src_loc})	-- Get mbinds from here
 	 rn_cls_decl@(ClassDecl {tcdName = cls, tcdTyVars = tyvars})		-- Everything else is here
   -- There are some default-method bindings (abeit possibly empty) so 
@@ -436,7 +433,7 @@ finishSourceTyClDecl (ClassDecl {tcdMeths = Just mbinds, tcdLoc = src_loc})	-- G
     meth_doc = text "In the default-methods for class"	<+> ppr (tcdName rn_cls_decl)
 
 finishSourceTyClDecl _ tycl_decl = returnRn (tycl_decl, emptyFVs)
-	-- Not a class or data type declaration
+	-- Not a class declaration
 \end{code}
 
 
@@ -445,15 +442,6 @@ finishSourceTyClDecl _ tycl_decl = returnRn (tycl_decl, emptyFVs)
 \subsection{Support code for type/data declarations}
 %*							*
 %*********************************************************
-
-\begin{code}
-rnDeriv :: RdrName -> RnMS Name
-rnDeriv cls
-  = lookupOccRn cls	`thenRn` \ clas_name ->
-    checkRn (getUnique clas_name `elem` derivableClassKeys)
-	    (derivingNonStdClassErr clas_name)	`thenRn_`
-    returnRn clas_name
-\end{code}
 
 \begin{code}
 conDeclName :: RdrNameConDecl -> (RdrName, SrcLoc)
@@ -702,11 +690,9 @@ validRuleLhs foralls lhs
 %*********************************************************
 
 \begin{code}
-derivingNonStdClassErr clas
-  = hsep [ptext SLIT("non-standard class"), ppr clas, ptext SLIT("in deriving clause")]
-
 badDataCon name
    = hsep [ptext SLIT("Illegal data constructor name"), quotes (ppr name)]
+
 badRuleLhsErr name lhs
   = sep [ptext SLIT("Rule") <+> ptext name <> colon,
 	 nest 4 (ptext SLIT("Illegal left-hand side:") <+> ppr lhs)]

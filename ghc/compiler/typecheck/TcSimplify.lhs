@@ -1923,7 +1923,8 @@ complainCheck doc givens irreds
 	-- the given set as an optimisation
 
 addNoInstanceErrs what_doc givens dicts
-  = tcGetInstEnv	`thenNF_Tc` \ inst_env ->
+  = getDOptsTc		`thenNF_Tc` \ dflags ->
+    tcGetInstEnv	`thenNF_Tc` \ inst_env ->
     let
     	(tidy_env1, tidy_givens) = tidyInsts givens
 	(tidy_env2, tidy_dicts)  = tidyMoreInsts tidy_env1 dicts
@@ -1968,7 +1969,7 @@ addNoInstanceErrs what_doc givens dicts
 	ambig_overlap = any ambig_overlap1 dicts
     	ambig_overlap1 dict 
 		| isClassDict dict
-		= case lookupInstEnv inst_env clas tys of
+		= case lookupInstEnv dflags inst_env clas tys of
 			    NoMatch ambig -> ambig
 			    other 	  -> False
 		| otherwise = False

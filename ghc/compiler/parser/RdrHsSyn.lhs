@@ -212,7 +212,6 @@ mkClassDecl cxt cname tyvars fds sigs mbinds loc
       --  superclasses both called C!)
     new_names = mkClassDeclSysNames (tname, dname, dwname, sc_sel_names)
 
--- mkTyData :: ??
 mkTyData new_or_data context tname list_var list_con i maybe src
   = let t_occ  = rdrNameOcc tname
         name1 = mkRdrUnqual (mkGenOcc1 t_occ) 

@@ -592,8 +592,9 @@ lookupInst :: Inst
 -- Dictionaries
 
 lookupInst dict@(Dict _ (ClassP clas tys) loc)
-  = tcGetInstEnv		`thenNF_Tc` \ inst_env ->
-    case lookupInstEnv inst_env clas tys of
+  = getDOptsTc			`thenNF_Tc` \ dflags ->
+    tcGetInstEnv		`thenNF_Tc` \ inst_env ->
+    case lookupInstEnv dflags inst_env clas tys of
 
       FoundInst tenv dfun_id
 	-> let
@@ -670,8 +671,9 @@ lookupSimpleInst :: Class
 	         -> NF_TcM (Maybe ThetaType)	-- Here are the needed (c,t)s
 
 lookupSimpleInst clas tys
-  = tcGetInstEnv		`thenNF_Tc` \ inst_env -> 
-    case lookupInstEnv inst_env clas tys of
+  = getDOptsTc			`thenNF_Tc` \ dflags ->
+    tcGetInstEnv		`thenNF_Tc` \ inst_env -> 
+    case lookupInstEnv dflags inst_env clas tys of
       FoundInst tenv dfun
 	-> returnNF_Tc (Just (substTheta (mkSubst emptyInScopeSet tenv) theta))
         where

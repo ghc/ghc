@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.82 2001/12/10 14:08:14 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.83 2001/12/20 11:19:07 simonpj Exp $
 --
 -- Driver flags
 --
@@ -427,6 +427,7 @@ fFlags = [
   ( "glasgow-exts", 		 	Opt_GlasgowExts ),
   ( "allow-overlapping-instances", 	Opt_AllowOverlappingInstances ),
   ( "allow-undecidable-instances", 	Opt_AllowUndecidableInstances ),
+  ( "allow-incoherent-instances", 	Opt_AllowIncoherentInstances ),
   ( "generics",  			Opt_Generics )
   ]
 
