@@ -54,9 +54,6 @@ PrelArrExtra_HC_OPTS     += -monly-2-regs
 Directory_HC_OPTS   	 += -monly-3-regs 
 Time_HC_OPTS        	 += -monly-3-regs
 
-# argh, adding USP seems to require extra heap... an extra 2 to 6MB,
-# in fact, on each of these.  (KSW 1998-12)
-
 # Far too much heap is needed to compile PrelNumExtra with -O at the
 # moment, but there you go..
 PrelNumExtra_HC_OPTS     += -H34m -K2m

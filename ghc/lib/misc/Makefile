@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.14 1999/05/11 16:47:46 keithw Exp $
+# $Id: Makefile,v 1.15 1999/05/11 17:05:46 keithw Exp $
 #
 # Makefile for miscellaneous libraries.
 #
@@ -58,8 +58,6 @@ endif
 #
 # Specific flags
 #
-
-# KSW 1998-12: had to increase some of the heap sizes by 2m for USP
 
 BSD_HC_OPTS          += -I../std/cbits -H8m -optc-DNON_POSIX_SOURCE
 Socket_HC_OPTS       += -I../std/cbits -optc-DNON_POSIX_SOURCE
