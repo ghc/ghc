@@ -31,7 +31,8 @@ import WwLib		( mkWrapper )
 import SpecEnv		( SpecEnv )
 import PrimOp		( PrimOp(..) )
 
-import Id		( GenId, mkImported, mkUserId, isPrimitiveId_maybe, dataConArgTys )
+import Id		( GenId, mkImported, mkUserId, 
+			  isPrimitiveId_maybe, dataConArgTys, SYN_IE(Id) )
 import Type		( mkSynTy, getAppDataTyConExpandingDicts )
 import TyVar		( mkTyVar )
 import Name		( Name )
@@ -45,6 +46,11 @@ import PprStyle		( PprStyle(..) )
 import Util		( zipWithEqual, panic, pprTrace, pprPanic )
 
 import IdInfo
+
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable
+#endif
+
 \end{code}
 
 Ultimately, type signatures in interfaces will have pragmatic
@@ -60,6 +66,7 @@ tcInterfaceSigs :: [RenamedHsDecl] -> TcM s [Id]
 
 tcInterfaceSigs (SigD (IfaceSig name ty id_infos src_loc) : rest)
   = tcAddSrcLoc src_loc $
+    tcAddErrCtxt (ifaceSigCtxt name) $
     tcHsType ty					`thenTc` \ sigma_ty ->
     tcIdInfo name sigma_ty noIdInfo id_infos	`thenTc` \ id_info' ->
     let
@@ -107,7 +114,7 @@ tcStrictness ty info (StrictnessInfo demands maybe_worker)
     let
 	-- Watch out! We can't pull on maybe_worker_id too eagerly!
 	info' = case maybe_worker_id of
-			Just worker_id -> info `addUnfoldInfo` mkUnfolding False (wrap_fn worker_id)
+			Just worker_id -> info `addUnfoldInfo` mkUnfolding NoPragmaInfo (wrap_fn worker_id)
 			Nothing        -> info
     in
     returnTc (info' `addStrictnessInfo` StrictnessInfo demands maybe_worker_id)
@@ -139,14 +146,14 @@ tcUnfolding name core_expr
   = forkNF_Tc (
 	recoverNF_Tc no_unfolding (
 		tcCoreExpr core_expr	`thenTc` \ core_expr' ->
-		returnTc (mkUnfolding False core_expr')
+		returnTc (mkUnfolding NoPragmaInfo core_expr')
     ))			
   where
 	-- The trace tells what wasn't available, for the benefit of
 	-- compiler hackers who want to improve it!
     no_unfolding = getErrsTc		`thenNF_Tc` \ (warns,errs) ->
 		   returnNF_Tc (pprTrace "tcUnfolding failed with:" 
-				   	(ppHang (ppr PprDebug name) 4 (pprBagOfErrors PprDebug errs))
+				   	(hang (ppr PprDebug name) 4 (pprBagOfErrors PprDebug errs))
 					NoUnfolding)
 \end{code}
 
@@ -165,7 +172,7 @@ tcVar name
 	Nothing -> failTc (noDecl name)
     }
 
-noDecl name sty = ppCat [ppPStr SLIT("Warning: no binding for"), ppr sty name]
+noDecl name sty = hsep [ptext SLIT("Warning: no binding for"), ppr sty name]
 \end{code}
 
 UfCore expressions.
@@ -339,4 +346,8 @@ tcCorePrim (UfCCallOp str casm gc arg_tys res_ty)
     returnTc (CCallOp str casm gc arg_tys' res_ty')
 \end{code}
 
+\begin{code}
+ifaceSigCtxt sig_name sty
+  = hsep [ptext SLIT("In an interface-file signature for"), ppr sty sig_name]
+\end{code}
 
