@@ -631,6 +631,14 @@ occAnal env (App fun arg)
     (fun_usage `combineUsageDetails` mapVarEnv markLazy arg_usage, App fun' arg')
     }}    
     
+-- Ignore type variables altogether
+--   (a) occurrences inside type lambdas only not marked as InsideLam
+--   (b) type variables not in environment
+
+occAnal env expr@(Lam x body) | isTyVar x
+  = case occAnal env body of { (body_usage, body') ->
+    (body_usage, Lam x body')
+    }
 
 -- For value lambdas we do a special hack.  Consider
 -- 	(\x. \y. ...x...)
