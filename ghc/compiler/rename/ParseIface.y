@@ -424,6 +424,11 @@ context_list1	: class					{ [$1] }
 class		:: { (RdrName, [RdrNameHsType]) }
 class		:  qcls_name atypes			{ ($1, $2) }
 
+types0		:: { [RdrNameHsType] 			{- Zero or more -}  }	
+types0		:  {- empty -}				{ [ ] }
+		|  type					{ [ $1 ] }
+		|  types2				{ $1 }
+
 types2		:: { [RdrNameHsType] 			{- Two or more -}  }	
 types2		:  type ',' type			{ [$1,$3] }
 		|  type ',' types2			{ $1 : $3 }
@@ -442,8 +447,7 @@ atype		:: { RdrNameHsType }
 atype		:  qtc_name 			  	{ MonoTyVar $1 }
 		|  tv_name			  	{ MonoTyVar $1 }
 		|  '(' types2 ')'	  		{ MonoTupleTy $2 True{-boxed-} }
-		|  '(#' type '#)'  			{ MonoTupleTy [$2] False{-unboxed-} }
-		|  '(#' types2 '#)'			{ MonoTupleTy $2 False{-unboxed-} }
+		|  '(#' types0 '#)'			{ MonoTupleTy $2 False{-unboxed-} }
 		|  '[' type ']'		  		{ MonoListTy  $2 }
 		|  '{' qcls_name atypes '}'		{ MonoDictTy $2 $3 }
 		|  '(' type ')'		  		{ $2 }
@@ -653,11 +657,15 @@ core_aexpr      : qvar_name				        { UfVar $1 }
 		| core_lit		 { UfCon (UfLitCon $1) [] }
 		| '(' core_expr ')'	 { $2 }
 		| '(' comma_exprs2 ')'	 { UfTuple (mkTupConRdrName (length $2)) $2 }
-		| '(#' core_expr '#)'	 { UfTuple (mkUbxTupConRdrName 1) [$2] }
-		| '(#' comma_exprs2 '#)' { UfTuple (mkUbxTupConRdrName (length $2)) $2 }
+		| '(#' comma_exprs0 '#)' { UfTuple (mkUbxTupConRdrName (length $2)) $2 }
 
 -- This one is dealt with by qdata_name: see above comments
 --		| '('  ')'	 	 { UfTuple (mkTupConRdrName 0) [] }
+
+comma_exprs0    :: { [UfExpr RdrName] }	-- Zero or more
+comma_exprs0	: {- empty -}			{ [ ] }
+		| core_expr			{ [ $1 ] }
+		| comma_exprs2			{ $1 }
 
 comma_exprs2	:: { [UfExpr RdrName] }	-- Two or more
 comma_exprs2	: core_expr ',' core_expr			{ [$1,$3] }
