@@ -1,38 +1,35 @@
 
-==================== Reader ====================
+==================== Parser ====================
 module OneOfEverything (
-	fixn, FooData, FooDataB(..), FooDataC(..),
-	EqTree(EqLeaf, EqBranch), EqClass(..), OrdClass(orda, ordb),
-	module OneC, module OneOfEverything
+	module OneOfEverything, module OneC, OrdClass(orda, ordb),
+	EqClass(..), EqTree(EqLeaf, EqBranch), FooDataC(..), FooDataB(..),
+	FooData, fixn
     ) where
 import Prelude
 import IO (putStr)
 import System hiding (getArgs)
 import Monad
 {- rec -}
-g :: (Num a, Eq b) => Foo a -> [b] -> (a, a, a) -> b
-bindwith :: (OrdClass a, OrdClass b) => a -> b -> b
-fixn x y = x
-fixl x y = x
-fixr x y = x
-singlebind x = x
-bindwith a b = b
-reca a = recb a
-recb a = reca a
-(~(a, b, c))
-    | nullity b = a
-    | nullity c = a
-    | otherwise = a
-    where
-	{- rec -}
-	nullity = null
-mat a b c d
-      | foof a b = d
-      | foof a c = d
-      | foof b c = d
-      where
-	  {- rec -}
-	  foof a b = a zeze b
+bindwith ::
+    {- implicit forall -} (OrdClass a, OrdClass b) => a -> b -> b
+g ::
+    {- implicit forall -}
+    (Num a, Eq b) =>
+    Foo a -> [b] -> (a, a, a) -> b
+g x y zz = head y
+f _
+  x
+  1
+  1.93
+  'c'
+  "dog"
+  ~y
+  (zz@(Foo a b))
+  (c Bar d)
+  [1, 2]
+  (3, 4)
+  ((n+42))
+    = y
 expr a b c d
        = ((((((((a zp (ZC a b)) zp (a ZC b))
 	       zp (((1 zm 'c') zm "abc") zm 1.293))
@@ -52,60 +49,71 @@ expr a b c d
 	       {- rec -}
 	       y = foo
 	     in
-	       (((((((y zp [1, 2, 3, 4]) zp (4, 3, 2, 1)) zp (4 :: (Num a) => a))
+	       (((((((y zp [1, 2, 3, 4]) zp (4, 3, 2, 1))
+		    zp (4 :: {- implicit forall -} (Num a) => a))
 		   zp (if 42 zeze 42.0 then 1 else 4))
 		  zp ([1 .. ]))
 		 zp ([2, 4 .. ]))
 		zp ([3 .. 5]))
 	       zp ([4, 8 .. 999]))
-f _
-  x
-  1
-  1.93
-  'c'
-  "dog"
-  ~y
-  (zz@(Foo a b))
-  (c Bar d)
-  [1, 2]
-  (3, 4)
-  ((n+42))
-    = y
-g x y zz = head y
-default (Integer, Rational)
-instance (Eq a) => EqClass (EqTree a) where
-    []
-    eqc x = 'a'
-class (Ord a) => OrdClass a where {
-    ordc :: a -> Char; ordb :: a -> Char; orda :: a -> Char;
-    }
+mat a b c d
+      | foof a b = d
+      | foof a c = d
+      | foof b c = d
+      where
+	  {- rec -}
+	  foof a b = a zeze b
+(~(a, b, c))
+    | nullity b = a
+    | nullity c = a
+    | otherwise = a
+    where
+	{- rec -}
+	nullity = null
+recb a = reca a
+reca a = recb a
+bindwith a b = b
+singlebind x = x
+fixr x y = x
+fixl x y = x
+fixn x y = x
+infix 6 fixn
+infixl 7 zpzh
+infixr 8 fixr
+type Pair a b = (a, b)
+data FooData = forall. FooCon Int
+data FooDataB = forall. FooConB Double
+data (Eq a) => EqTree a =
+    forall. EqLeaf a | forall. EqBranch (EqLeaf a) (EqLeaf a)
 class (Eq a) => EqClass a where {
-    eqc :: a -> Char;
+    eqc :: {- implicit forall -} a -> Char;
     eqc x = '?'
     }
-data (Eq a) => EqTree a = EqLeaf a | EqBranch (EqLeaf a) (EqLeaf a)
-data FooDataB = FooConB Double
-data FooData = FooCon Int
-type Pair a b = (a, b)
-infixr 8 fixr
-infixl 7 zpzh
-infix 6 fixn
+class (Ord a) => OrdClass a where {
+    orda :: {- implicit forall -} a -> Char;
+    ordb :: {- implicit forall -} a -> Char;
+    ordc :: {- implicit forall -} a -> Char;
+    }
+instance {- implicit forall -} (Eq a) => EqClass (EqTree a) where
+    []
+    eqc x = 'a'
+default (Rational, Integer)
 
 
-
-read001.hs:5: Type constructor or class not in scope: `FooDataC'
 
 read001.hs:5: Unknown module in export list: module `OneC'
 
-read001.hs:40: Type constructor or class not in scope: `EqLeaf'
+read001.hs:5: Type constructor or class not in scope: `FooDataC'
 
-read001.hs:40: Type constructor or class not in scope: `EqLeaf'
+read001.hs:38: Type constructor or class not in scope: `EqLeaf'
 
-read001.hs:80: Variable not in scope: `isSpace'
-
-read001.hs:87: Variable not in scope: `x'
+read001.hs:38: Type constructor or class not in scope: `EqLeaf'
 
 read001.hs:87: Variable not in scope: `x'
+
+read001.hs:88: Variable not in scope: `x'
+
+read001.hs:94: Variable not in scope: `isSpace'
 
 read001.hs:95: Variable not in scope: `foo'
 

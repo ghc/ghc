@@ -1,3 +1,16 @@
-This current error message is rather unhelpful:
 
-	read009.hs:12: parse error on input `'
+==================== Parser ====================
+module ShouldFail where
+{- rec -}
+h x = x
+foo = do
+	let {- rec -}
+	    foo = True
+
+
+
+read009.hs:5:
+    `do' statements must end in expression: do let foo = True
+
+Compilation had errors
+
