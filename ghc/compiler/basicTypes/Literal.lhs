@@ -152,7 +152,7 @@ word2IntLit, int2WordLit, char2IntLit, int2CharLit,
  addr2IntLit, int2AddrLit, float2DoubleLit, double2FloatLit :: Literal -> Literal
 
 word2IntLit (MachWord w) 
-  | w > tARGET_MAX_INT = MachInt ((-1) + tARGET_MAX_WORD - w)
+  | w > tARGET_MAX_INT = MachInt (w - tARGET_MAX_WORD - 1)
   | otherwise	       = MachInt w
 
 int2WordLit (MachInt i)
