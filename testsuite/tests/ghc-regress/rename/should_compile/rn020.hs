@@ -1,4 +1,4 @@
--- Duplicate fields in record decls
+-- !!! Duplicate fields in record decls
 
 module OK where
 
