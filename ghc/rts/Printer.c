@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.48 2001/11/20 16:17:23 simonmar Exp $
+ * $Id: Printer.c,v 1.49 2001/11/28 15:43:23 simonmar Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -41,7 +41,7 @@ static rtsBool lookup_name   ( char *name, unsigned *result );
 static void    enZcode       ( char *in, char *out );
 #endif
 static char    unZcode       ( char ch );
-rtsBool lookupGHCName ( StgPtr addr, const char **result );
+const char *   lookupGHCName ( void *addr );
 static void    printZcoded   ( const char *raw );
 
 /* --------------------------------------------------------------------------
@@ -51,7 +51,8 @@ static void    printZcoded   ( const char *raw );
 void printPtr( StgPtr p )
 {
     const char *raw;
-    if (lookupGHCName( p, &raw )) {
+    raw = lookupGHCName(p);
+    if (raw != NULL) {
         printZcoded(raw);
     } else {
         fprintf(stdout, "%p", p);
@@ -798,16 +799,15 @@ static void enZcode( char *in, char *out )
 }
 #endif
 
-rtsBool lookupGHCName( StgPtr addr, const char **result )
+const char *lookupGHCName( void *addr )
 {
     nat i;
     for( i = 0; i < table_size && table[i].value != (unsigned) addr; ++i ) {
     }
     if (i < table_size) {
-        *result = table[i].name;
-        return rtsTrue;
+        return table[i].name;
     } else {
-        return rtsFalse;
+        return NULL;
     }
 }
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.29 2001/11/28 15:01:02 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.30 2001/11/28 15:43:23 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -28,11 +28,7 @@
 #include "RetainerProfile.h"
 #include "LdvProfile.h"
 #include "Arena.h"
-
-#ifdef DEBUG_HEAP_PROF
 #include "Printer.h"
-static void fprint_data(FILE *fp);
-#endif
 
 /* -----------------------------------------------------------------------------
  * era stores the current time period.  It is the same as the
@@ -338,7 +334,9 @@ nextEra( void )
     initEra( &censuses[era] );
 }
 
-/* -------------------------------------------------------------------------- */
+/* -----------------------------------------------------------------------------
+ * DEBUG heap profiling, by info table
+ * -------------------------------------------------------------------------- */
 
 #ifdef DEBUG_HEAP_PROF
 FILE *hp_file;
@@ -358,6 +356,9 @@ void endProfiling( void )
 }
 #endif /* DEBUG_HEAP_PROF */
 
+/* --------------------------------------------------------------------------
+ * Initialize the heap profilier
+ * ----------------------------------------------------------------------- */
 nat
 initHeapProfiling(void)
 {
@@ -536,12 +537,18 @@ str_matches_selector( char* str, char* sel )
        if (*sel == '\0') return rtsFalse;
    }
 }
+#endif // PROFILING
 
-// Figure out whether a closure should be counted in this census, by
-// testing against all the specified constraints.
+/* -----------------------------------------------------------------------------
+ * Figure out whether a closure should be counted in this census, by
+ * testing against all the specified constraints.
+ * -------------------------------------------------------------------------- */
 rtsBool
 closureSatisfiesConstraints( StgClosure* p )
 {
+#ifdef DEBUG_HEAP_PROF
+    return rtsTrue;
+#else
    rtsBool b;
    if (RtsFlags.ProfFlags.modSelector) {
        b = str_matches_selector( ((StgClosure *)p)->header.prof.ccs->cc->module,
@@ -577,8 +584,8 @@ closureSatisfiesConstraints( StgClosure* p )
        return rtsFalse;
    }
    return rtsTrue;
-}
 #endif /* PROFILING */
+}
 
 /* -----------------------------------------------------------------------------
  * Aggregate the heap census info for biographical profiling
@@ -725,10 +732,10 @@ dumpCensus( Census *census )
 #ifdef DEBUG_HEAP_PROF
 	switch (RtsFlags.ProfFlags.doHeapProfile) {
 	case HEAP_BY_INFOPTR:
-	    fprint_data(hp_file);
+	    fprintf(hp_file, "%s", lookupGHCName(ctr->identity));
 	    break;
 	case HEAP_BY_CLOSURE_TYPE:
-	    fprint_closure_types(hp_file);
+	    fprintf(hp_file, "%s", (char *)ctr->identity);
 	    break;
 	}
 #endif
@@ -955,7 +962,9 @@ heapCensus( void )
   }
 #endif
 
+#ifdef PROFILING
   stat_startHeapCensus();
+#endif
 
   // traverse the heap, collecting the census info
   heapCensusChain( census, small_alloc_list );
@@ -998,7 +1007,9 @@ heapCensus( void )
   // we're into the next time period now
   nextEra();
 
+#ifdef PROFILING
   stat_endHeapCensus();
+#endif
 }    
 
 #endif /* PROFILING || DEBUG_HEAP_PROF */

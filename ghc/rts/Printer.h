@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.h,v 1.5 2000/01/14 14:56:40 simonmar Exp $
+ * $Id: Printer.h,v 1.6 2001/11/28 15:43:23 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -24,5 +24,5 @@ char  *	           info_type_by_ip ( StgInfoTable *ip );
 
 extern void DEBUG_LoadSymbols( char *name );
 
-extern rtsBool lookupGHCName( StgPtr addr, const char **result );
+extern const char *lookupGHCName( void *addr );
 #endif
