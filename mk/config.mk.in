@@ -509,6 +509,11 @@ HSTAGS_PREFIX           = $(FPTOOLS_TOP)/ghc/utils/hstags/
 # $(MKDEPENDHS) is the Haskell dependency generator (ghc -M).
 
 GHC		= @GHC@
+GhcVersion	= @GhcVersion@
+GhcMajVersion	= @GhcMajVersion@
+GhcMinVersion	= @GhcMinVersion@
+GhcPatchLevel	= @GhcPatchLevel@
+
 HBC		= @HBC@
 NHC		= @NHC@
 

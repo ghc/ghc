@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.51 2000/06/29 13:40:17 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.52 2000/06/30 09:34:09 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -348,6 +348,33 @@ else
    fi
 fi
 rm -fr conftest*
+])
+
+dnl Test for version of installed ghc.  Uses $GHC.  Largely pinched from c2hs.
+dnl
+AC_DEFUN(FPTOOLS_GHC_VERSION,
+[ AC_CACHE_CHECK([version of ghc], fptools_cv_ghc_version, [
+    fptools_cv_ghc_version=`$GHC --version 2>&1 | sed -e 's/.*\([[0-9]]\)\.\([[0-9]]*\)\([[.-]]\([[0-9]]*\)\)\?.*/\1.\2.\4/'`
+  ])
+  ghc_maj_vers=`echo $fptools_cv_ghc_version | sed -e 's/^\([[0-9]]\).*/\1/'`
+  ghc_min_vers=`echo $fptools_cv_ghc_version | sed -e 's/^[[0-9]]\.\([[0-9]]*\).*/\1/'`
+  ghc_patch_level=`echo $fptools_cv_ghc_version | sed -e 's/^[[0-9]]\.[[0-9]]*\.\([[0-9]]*\)/\1/'`
+
+  if test "$ghc_patch_level" = ""; then 
+	GhcVersion=$ghc_maj_vers.$ghc_min_vers
+	ghc_patch_level="0"
+  else
+	GhcVersion=$ghc_maj_vers.$ghc_min_vers.$ghc_patch_level
+  fi
+
+  GhcMajVersion=$ghc_maj_vers
+  GhcMinVersion=$ghc_min_vers
+  GhcPatchLevel=$ghc_patch_level
+
+  AC_SUBST(GhcVersion)
+  AC_SUBST(GhcMajVersion)
+  AC_SUBST(GhcMinVersion)
+  AC_SUBST(GhcPatchLevel)
 ])
 
 dnl ** figure out the alignment restriction of a type
