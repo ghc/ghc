@@ -16,14 +16,16 @@ module TcModule (
 
 IMP_Ubiq(){-uitous-}
 
-import HsSyn		( HsDecl(..), HsModule(..), HsBinds(..), Bind, HsExpr,
+import HsSyn		( HsDecl(..), HsModule(..), HsBinds(..), HsExpr, MonoBinds,
 			  TyDecl, SpecDataSig, ClassDecl, InstDecl, IfaceSig,
 			  SpecInstSig, DefaultDecl, Sig, Fake, InPat,
+			  SYN_IE(RecFlag), nonRecursive,
  			  FixityDecl, IE, ImportDecl
 			)
 import RnHsSyn		( SYN_IE(RenamedHsModule), RenamedFixityDecl(..) )
 import TcHsSyn		( SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedHsExpr),
-			  TcIdOcc(..), zonkBinds, zonkDictBinds )
+			  SYN_IE(TypecheckedDictBinds),
+			  TcIdOcc(..), zonkBinds )
 
 import TcMonad
 import Inst		( Inst, plusLIE )
@@ -47,15 +49,16 @@ import TcKind		( TcKind )
 
 import RnMonad		( RnNameSupply(..) )
 import Bag		( listToBag )
-import Class		( GenClass, classSelIds )
 import ErrUtils		( SYN_IE(Warning), SYN_IE(Error) )
 import Id		( idType, GenId, SYN_IE(IdEnv), nullIdEnv )
-import Maybes		( catMaybes )
+import Maybes		( catMaybes, MaybeErr )
 import Name		( Name, isLocallyDefined, pprModule )
 import Pretty
 import TyCon		( TyCon, isSynTyCon )
-import Type		( applyTyCon, mkSynTy )
+import Class		( GenClass, SYN_IE(Class), classGlobalIds )
+import Type		( applyTyCon, mkSynTy, SYN_IE(Type) )
 import PprType		( GenType, GenTyVar )
+import PprStyle         ( PprStyle )
 import TysWiredIn	( unitTy )
 import PrelMods		( gHC_MAIN, mAIN )
 import PrelInfo		( main_NAME, mainPrimIO_NAME, ioTyCon_NAME, primIoTyCon_NAME )
@@ -64,10 +67,16 @@ import Unify		( unifyTauTy )
 import UniqFM		( lookupUFM_Directly, lookupWithDefaultUFM_Directly,
 		          filterUFM, eltsUFM )
 import Unique		( Unique  )
+import UniqSupply       ( UniqSupply )
 import Util
 import Bag		( Bag, isEmptyBag )
 
 import FiniteMap	( emptyFM, FiniteMap )
+
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable
+#endif
+
 tycon_specs = emptyFM
 \end{code}
 
@@ -76,7 +85,7 @@ Outside-world interface:
 -- Convenient type synonyms first:
 type TcResults
   = (TcResultBinds,
-     [TyCon], 
+     [TyCon], [Class],
      Bag InstInfo,		-- Instance declaration information
      TcSpecialiseRequests,
      TcDDumpDeriv)
@@ -89,14 +98,14 @@ type TcResultBinds
 				-- class default-methods binds
      TypecheckedHsBinds,	-- binds from value decls
 
-     [(Id, TypecheckedHsExpr)]) -- constant instance binds
+     TypecheckedHsBinds)	-- constant instance binds
 
 type TcSpecialiseRequests
   = FiniteMap TyCon [(Bool, [Maybe Type])]
     -- source tycon specialisation requests
 
 type TcDDumpDeriv
-  = PprStyle -> Pretty
+  = PprStyle -> Doc
 
 ---------------
 typecheckModule
@@ -176,8 +185,9 @@ tcModule rn_name_supply
 	--	a) constructors
 	--	b) record selectors
 	--	c) class op selectors
+	-- 	d) default-method ids
 	tcExtendGlobalValEnv data_ids				$
-	tcExtendGlobalValEnv (concat (map classSelIds classes))	$
+	tcExtendGlobalValEnv (concat (map classGlobalIds classes))	$
 
 	    -- Interface type signatures
 	    -- We tie a knot so that the Ids read out of interfaces are in scope
@@ -211,10 +221,11 @@ tcModule rn_name_supply
 	    tcCheckMainSig mod_name	`thenTc_` 
 	    tcGetEnv			`thenNF_Tc` \ env ->
 	    returnTc ( (EmptyBinds, (inst_binds, cls_binds, env)),
-		       lie_instdecls `plusLIE` lie_clasdecls,
-		       () ))
+		       lie_instdecls `plusLIE` lie_clasdecls
+		     )
+	)
 
-	`thenTc` \ ((val_binds, (inst_binds, cls_binds, final_env)), lie_alldecls, _) ->
+	`thenTc` \ ((val_binds, (inst_binds, cls_binds, final_env)), lie_alldecls) ->
 
 	-- Deal with constant or ambiguous InstIds.  How could
 	-- there be ambiguous ones?  They can only arise if a
@@ -238,7 +249,8 @@ tcModule rn_name_supply
 	-- These bindings ought really to be bundled together in a huge
 	-- recursive group, but HsSyn doesn't have recursion among Binds, only
 	-- among MonoBinds.  Sigh again.
-    zonkDictBinds nullTyVarEnv nullIdEnv const_insts 	`thenNF_Tc` \ (const_insts', ve1) ->
+    zonkBinds nullTyVarEnv nullIdEnv (MonoBind const_insts [] nonRecursive)
+						 	`thenNF_Tc` \ (const_insts', ve1) ->
     zonkBinds nullTyVarEnv ve1 val_binds 		`thenNF_Tc` \ (val_binds', ve2) ->
 
     zonkBinds nullTyVarEnv ve2 data_binds 	`thenNF_Tc` \ (data_binds', _) ->
@@ -257,7 +269,7 @@ tcModule rn_name_supply
     returnTc (
 	(data_binds', cls_binds', inst_binds', val_binds', const_insts'),
 
-	local_tycons, inst_info, tycon_specs,
+	local_tycons, local_classes, inst_info, tycon_specs,
 
 	ddump_deriv
     )))
@@ -303,17 +315,17 @@ tcCheckMainSig mod_name
 	       | otherwise = primIoTyCon_NAME
 
 mainTyCheckCtxt main_name sty
-  = ppCat [ppPStr SLIT("When checking that"), ppr sty main_name, ppPStr SLIT("has the required type")]
+  = hsep [ptext SLIT("When checking that"), ppr sty main_name, ptext SLIT("has the required type")]
 
 noMainErr mod_name main_name sty
-  = ppCat [ppPStr SLIT("Module"), pprModule sty mod_name, 
-	   ppPStr SLIT("must include a definition for"), ppr sty main_name]
+  = hsep [ptext SLIT("Module"), pprModule sty mod_name, 
+	   ptext SLIT("must include a definition for"), ppr sty main_name]
 
 mainTyMisMatch :: Name -> Type -> TcType s -> Error
 mainTyMisMatch main_name expected actual sty
-  = ppHang (ppCat [ppr sty main_name, ppPStr SLIT("has the wrong type")])
-	 4 (ppAboves [
-			ppCat [ppPStr SLIT("Expected:"), ppr sty expected],
-			ppCat [ppPStr SLIT("Inferred:"), ppr sty actual]
+  = hang (hsep [ppr sty main_name, ptext SLIT("has the wrong type")])
+	 4 (vcat [
+			hsep [ptext SLIT("Expected:"), ppr sty expected],
+			hsep [ptext SLIT("Inferred:"), ppr sty actual]
 		     ])
 \end{code}
