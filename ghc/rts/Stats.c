@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.46 2002/08/19 16:02:26 simonmar Exp $
+ * $Id: Stats.c,v 1.47 2004/05/27 09:29:28 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -821,5 +821,5 @@ statDescribeGens(void)
    each compilation and expression evaluation.
    -------------------------------------------------------------------------- */
 
-extern HsInt getAllocations( void ) 
-{ return (HsInt)(total_allocated * sizeof(W_)); }
+extern HsInt64 getAllocations( void ) 
+{ return (HsInt64)total_allocated * sizeof(W_); }

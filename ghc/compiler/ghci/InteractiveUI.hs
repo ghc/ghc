@@ -1,10 +1,10 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.165 2004/04/05 11:14:30 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.166 2004/05/27 09:29:29 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
--- (c) The GHC Team 2000
+-- (c) The GHC Team 2004
 --
 -----------------------------------------------------------------------------
 module InteractiveUI ( 
@@ -57,6 +57,7 @@ import Control.Concurrent
 
 import Numeric
 import Data.List
+import Data.Int		( Int64 )
 import System.Cmd
 import System.CPUTime
 import System.Environment
@@ -1018,18 +1019,20 @@ timeIt action
 		  a <- action
 		  allocs2 <- io $ getAllocations
 		  time2   <- io $ getCPUTime
-		  io $ printTimes (allocs2 - allocs1) (time2 - time1)
+		  io $ printTimes (fromIntegral (allocs2 - allocs1)) 
+				  (time2 - time1)
 		  return a
 
-foreign import ccall "getAllocations" getAllocations :: IO Int
+foreign import ccall unsafe "getAllocations" getAllocations :: IO Int64
+	-- defined in ghc/rts/Stats.c
 
-printTimes :: Int -> Integer -> IO ()
+printTimes :: Integer -> Integer -> IO ()
 printTimes allocs psecs
    = do let secs = (fromIntegral psecs / (10^12)) :: Float
 	    secs_str = showFFloat (Just 2) secs
 	putStrLn (showSDoc (
 		 parens (text (secs_str "") <+> text "secs" <> comma <+> 
-			 int allocs <+> text "bytes")))
+			 text (show allocs) <+> text "bytes")))
 
 -----------------------------------------------------------------------------
 -- reverting CAFs
