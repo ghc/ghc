@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.110 2003/07/23 13:39:11 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.111 2003/09/02 09:20:05 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -1634,7 +1634,7 @@ FN_(delayzh_fast)
     ACQUIRE_LOCK(&sched_mutex);
 #ifdef mingw32_TARGET_OS
     /* could probably allocate this on the heap instead */
-    ares = (StgAsyncIOResult*)RET_STGCALL2(P_,stgMallocBytes,sizeof(StgAsyncIOResult), "asyncWritezh_fast");
+    ares = (StgAsyncIOResult*)RET_STGCALL2(P_,stgMallocBytes,sizeof(StgAsyncIOResult), "delayzh_fast");
     reqID = RET_STGCALL1(W_,addDelayRequest,R1.i);
     ares->reqID   = reqID;
     ares->len     = 0;
