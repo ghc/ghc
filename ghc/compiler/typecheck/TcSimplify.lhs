@@ -1608,6 +1608,8 @@ It's OK: the final zonking stage should zap y to (), which is fine.
 
 \begin{code}
 tcSimplifyTop :: [Inst] -> TcM TcDictBinds
+-- The TcLclEnv should be valid here, solely to improve
+-- error message generation for the monomorphism restriction
 tcSimplifyTop wanteds
   = getLclEnv							`thenM` \ lcl_env ->
     traceTc (text "tcSimplifyTop" <+> ppr (lclEnvElts lcl_env))	`thenM_`
