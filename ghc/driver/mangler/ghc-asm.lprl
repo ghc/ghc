@@ -779,7 +779,7 @@ sub mangle_asm {
 		
 		# HWL HACK: dont die, just print a warning
 		#print stderr  "HWL: this should die! Prologue junk?: $p\n" if $p =~ /^\t[^\.]/;
-		die "Prologue junk?: $p\n" if $p =~ /^\t[^\.]/;
+		die "Prologue junk?: $p\n" if $p =~ /^\s+[^\s\.]/;
 		
 		if ($TargetPlatform =~ /^powerpc-apple-.*/ && $pcrel_label ne "") {
 		    # on PowerPC, we have to keep a part of the prologue
