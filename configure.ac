@@ -1061,41 +1061,11 @@ FP_CHECK_CONSTS([E2BIG EACCES EADDRINUSE EADDRNOTAVAIL EADV EAFNOSUPPORT EAGAIN 
 dnl ** can we open files in binary mode?
 FP_CHECK_CONST([O_BINARY], [#include <fcntl.h>], [0])
 
-dnl ** check for GetModuleFileName and WinExec (windows only)
-dnl Old: AC_CHECK_FUNCS(WinExec GetModuleFileName)       dnl Windows
-dnl Doesn't work because the linker can't see the functions if
-dnl you omit the #include <windows.h>.  (I've no idea why not...)
+FP_CHECK_FUNC([WinExec],
+  [@%:@include <windows.h>], [WinExec("",0)])
 
-FPTOOLS_TRY_LINK_NOWARN(,[
-#if HAVE_WINDOWS_H
-#include <windows.h>
-#endif
-main() { 
-  WinExec("",0);
-  exit(0);
-}
-],
-[have_winexec=1],
-[have_winexec=0])
-if test "$have_winexec" = "1"; then
-  AC_DEFINE([HAVE_WINEXEC], [1], [Define to 1 if you have the WinExec function.])
-fi
-
-FPTOOLS_TRY_LINK_NOWARN(,[
-#if HAVE_WINDOWS_H
-#include <windows.h>
-#endif
-main() { 
-  char* dir;
-  GetModuleFileName((HMODULE)0,dir,0);
-  exit(0);
-}
-],
-[have_getmodulefilename=1],
-[have_getmodulefilename=0])
-if test "$have_getmodulefilename" = "1"; then
-AC_DEFINE([HAVE_GETMODULEFILENAME], [1], [Define to 1 if you have the GetModuleFileName function.])
-fi
+FP_CHECK_FUNC([GetModuleFileName],
+  [@%:@include <windows.h>], [GetModuleFileName((HMODULE)0,(LPTSTR)0,0)])
 
 dnl ** check return type of signal handlers
 dnl Foo: assumes we can use prototypes.
