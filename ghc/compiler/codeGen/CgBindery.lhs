@@ -514,11 +514,19 @@ buildContLivenessMask name = do
 
         let lbl = mkBitmapLabel name
 
-	-- realSp points to the frame-header for the current stack frame,
-	-- and the end of this frame is frame_sp.  The size is therefore
-	-- realSp - frame_sp - 1 (subtract one for the frame-header).
 	frame_sp <- getStackFrame
-	let liveness = Liveness lbl (realSp-1-frame_sp) mask
+	let 
+	     -- realSp points to the frame-header for the current stack frame,
+	     -- and the end of this frame is frame_sp.  The size is therefore
+	     -- realSp - frame_sp - 1 (subtract one for the frame-header).
+	     frame_size = realSp - frame_sp - 1
+
+	     -- make sure the bitmap covers the full frame, by adding
+	     -- zero words at the end as necessary
+	     expand n []     = take ((n+31) `quot` 32) (repeat emptyBS)
+	     expand n (b:bs) = b : expand (n-32) bs
+
+	     liveness = Liveness lbl frame_size (expand frame_size mask)
 
 	absC (CBitmap liveness)
 	return liveness
