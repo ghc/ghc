@@ -205,7 +205,7 @@ calcUnfoldingGuidance bOMB_OUT_SIZE expr
 	    discount_for b 
 		| num_cases == 0 = 0
 		| is_fun_ty  	 = num_cases * opt_UF_FunAppDiscount
-		| is_data_ty 	 = num_cases * tyConFamilySize tycon * opt_UF_ScrutConDiscount
+		| is_data_ty 	 = num_cases * opt_UF_ScrutConDiscount
 		| otherwise  	 = num_cases * opt_UF_PrimArgDiscount
 		where
 		  num_cases	      = foldlBag (\n b' -> if b==b' then n+1 else n) 0 cased_args
@@ -267,6 +267,7 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
       = nukeScrutDiscount (size_up scrut)		`addSize`
 	arg_discount scrut				`addSize`
 	foldr (addSize . size_up_alt) sizeZero alts	
+	  `addSizeN` 1  -- charge one for the case itself.
 
 -- Just charge for the alts that exist, not the ones that might exist
 --	`addSizeN`
