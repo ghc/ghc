@@ -92,7 +92,7 @@ import TysPrim
 
 -- others:
 import Constants	( mAX_TUPLE_SIZE )
-import Name		( Module, varOcc, mkWiredInTyConName, mkWiredInIdName )
+import Name		( Module, mkWiredInTyConName, mkWiredInIdName, mkSrcOccFS, dataName )
 import DataCon		( DataCon, mkDataCon )
 import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, mkAlgTyCon, mkSynTyCon, mkTupleTyCon )
@@ -152,7 +152,7 @@ pcDataCon key mod str tyvars context arg_tys tycon
 		[ NotMarkedStrict | a <- arg_tys ]
 		[ {- no labelled fields -} ]
 		tyvars context [] [] arg_tys tycon id
-    name = mkWiredInIdName key mod (varOcc str) id
+    name = mkWiredInIdName key mod (mkSrcOccFS dataName str) id
     id   = mkDataConId data_con
 \end{code}
 

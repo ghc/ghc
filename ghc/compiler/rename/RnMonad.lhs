@@ -27,16 +27,16 @@ import List		( intersperse )
 import HsSyn		
 import RdrHsSyn
 import RnHsSyn		( RenamedFixitySig )
-import BasicTypes	( Version, IfaceFlavour(..) )
+import BasicTypes	( Version )
 import SrcLoc		( noSrcLoc )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine,
 			  pprBagOfErrors, ErrMsg, WarnMsg, Message
 			)
-import Name		( Module, Name, OccName, PrintUnqualified,
-			  isLocallyDefinedName, pprModule, 
-			  modAndOcc, NamedThing(..)
+import Name		( Module, Name, OccName, NamedThing(..), IfaceFlavour,
+			  isLocallyDefinedName, nameModule, nameOccName
 			)
 import NameSet		
+import RdrName		( RdrName )
 import CmdLineOpts	( opt_D_show_rn_trace, opt_IgnoreIfacePragmas, opt_WarnHiShadows )
 import PrelInfo		( builtinNames )
 import TysWiredIn	( boolTyCon )
@@ -103,11 +103,14 @@ type RnMG r     = RnM RealWorld GDown     r		-- Getting global names etc
 type SSTRWRef a = SSTRef RealWorld a		-- ToDo: there ought to be a standard defn of this
 
 	-- Common part
-data RnDown s = RnDown
-		  SrcLoc
-		  (SSTRef s RnNameSupply)
-		  (SSTRef s (Bag WarnMsg, Bag ErrMsg))
-		  (SSTRef s ([Occurrence],[Occurrence]))	-- Occurrences: compulsory and optional resp
+data RnDown s = RnDown {
+		  rn_loc  :: SrcLoc,
+		  rn_omit :: Name -> Bool, 			-- True <=> omit qualifier when printing
+		  rn_ns   :: SSTRef s RnNameSupply,
+		  rn_errs :: SSTRef s (Bag WarnMsg, Bag ErrMsg),
+		  rn_occs :: SSTRef s ([Occurrence],[Occurrence]),	-- Occurrences: compulsory and optional resp
+		  rn_mod  :: Module
+		}
 
 type Occurrence = (Name, SrcLoc)		-- The srcloc is the occurrence site
 
@@ -116,27 +119,27 @@ data Necessity = Compulsory | Optional		-- We *must* find definitions for
 						-- for optional ones.
 
 	-- For getting global names
-data GDown = GDown
-		ModuleHiMap   -- for .hi files
-		ModuleHiMap   -- for .hi-boot files
-		(SSTRWRef Ifaces)
+data GDown = GDown {
+		rn_hi_map     :: ModuleHiMap,   -- for .hi files
+		rn_hiboot_map :: ModuleHiMap,   -- for .hi-boot files
+		rn_ifaces     :: SSTRWRef Ifaces
+	     }
 
 	-- For renaming source code
-data SDown s = SDown
-		  RnEnv			-- Global envt; the fixity component gets extended
+data SDown s = SDown {
+		  rn_mode :: RnMode,
+		  rn_genv :: RnEnv,	-- Global envt; the fixity component gets extended
 					--   with local fixity decls
-		  LocalRdrEnv		-- Local name envt
+		  rn_lenv :: LocalRdrEnv	-- Local name envt
 					--   Does *not* includes global name envt; may shadow it
 					--   Includes both ordinary variables and type variables;
 					--   they are kept distinct because tyvar have a different
 					--   occurrence contructor (Name.TvOcc)
 					-- We still need the unsullied global name env so that
 					--   we can look up record field names
-		  Module
-		  RnSMode
+		}
 
-
-data RnSMode	= SourceMode			-- Renaming source code
+data RnMode	= SourceMode			-- Renaming source code
 		| InterfaceMode			-- Renaming interface declarations.  
 			Necessity		-- The "necessity"
 						-- flag says free variables *must* be found and slurped
@@ -240,8 +243,7 @@ type ExportAvails = (FiniteMap Module Avails,	-- Used to figure out "module M" e
 						-- Maps a Name to the AvailInfo that contains it
 
 
-data GenAvailInfo name	= NotAvailable 
-			| Avail name		-- An ordinary identifier
+data GenAvailInfo name	= Avail name		-- An ordinary identifier
 			| AvailTC name 		-- The name of the type or class
 				  [name]	-- The available pieces of type/class. NB: If the type or
 						-- class is itself to be in scope, it must be in this list.
@@ -255,10 +257,10 @@ type RdrAvailInfo = GenAvailInfo OccName
 ===================================================
 
 \begin{code}
-type ExportItem		 = (Module, IfaceFlavour, [RdrAvailInfo])
+type ExportItem		 = (Module, [RdrAvailInfo])
 type VersionInfo name    = [ImportVersion name]
 
-type ImportVersion name  = (Module, IfaceFlavour, Version, WhatsImported name)
+type ImportVersion name  = (Module, Version, WhatsImported name)
 data WhatsImported name  = Everything 
 			 | Specifically [LocalVersion name]	-- List guaranteed non-empty
 
@@ -287,7 +289,7 @@ type RdrNamePragma = ()				-- Fudge for now
 -------------------
 
 data Ifaces = Ifaces {
-		iMod :: Module,				-- Name of this module
+		iMod :: Module,				-- Name of the module being compiled
 
 		iModMap :: FiniteMap Module (IfaceFlavour, 		-- Exports
 					     Version, 
@@ -353,8 +355,10 @@ initRn mod us dirs loc do_rn = do
   occs_var  <- sstToIO (newMutVarSST initOccs)
   (himap, hibmap) <- mkModuleHiMaps dirs
   let
-        rn_down = RnDown loc names_var errs_var occs_var
-	g_down  = GDown himap hibmap iface_var
+        rn_down = RnDown { rn_loc = loc, rn_omit = \n -> False, rn_ns = names_var, 
+			   rn_errs = errs_var, rn_occs = occs_var,
+			   rn_mod = mod }
+	g_down  = GDown { rn_hi_map = himap, rn_hiboot_map = hibmap, rn_ifaces = iface_var }
 
 	-- do the business
   res <- sstToIO (do_rn rn_down g_down)
@@ -364,10 +368,10 @@ initRn mod us dirs loc do_rn = do
   return (res, errs, warns)
 
 
-initRnMS :: RnEnv -> Module -> RnSMode -> RnMS RealWorld r -> RnMG r
-initRnMS rn_env@(RnEnv name_env _) mod_name mode m rn_down g_down
+initRnMS :: RnEnv -> RnMode -> RnMS RealWorld r -> RnMG r
+initRnMS rn_env mode m rn_down g_down
   = let
-	s_down = SDown rn_env emptyRdrEnv mod_name mode
+	s_down = SDown { rn_genv = rn_env, rn_lenv = emptyRdrEnv, rn_mode = mode }
     in
     m rn_down s_down
 
@@ -385,7 +389,9 @@ emptyIfaces mod = Ifaces { iMod = mod,
 		  }
 
 builtins :: FiniteMap (Module,OccName) Name
-builtins = bagToFM (mapBag (\ name -> (modAndOcc name, name)) builtinNames)
+builtins = bagToFM $
+	   mapBag (\ name -> ((nameModule name, nameOccName name), name)) 
+		  builtinNames
 
 	-- Initial value for the occurrence pool.
 initOccs :: ([Occurrence],[Occurrence])	-- Compulsory and optional respectively
@@ -497,8 +503,11 @@ renameSourceCode mod_name name_supply m
 	newMutVarSST (emptyBag,emptyBag)	`thenSST` \ errs_var ->
 	newMutVarSST ([],[])			`thenSST` \ occs_var ->
     	let
-	    rn_down = RnDown mkGeneratedSrcLoc names_var errs_var occs_var
-	    s_down = SDown emptyRnEnv emptyRdrEnv mod_name (InterfaceMode Compulsory)
+	    rn_down = RnDown { rn_loc = mkGeneratedSrcLoc, rn_ns = names_var,
+			       rn_errs = errs_var, rn_occs = occs_var,
+			       rn_mod = mod_name }
+	    s_down = SDown { rn_mode = InterfaceMode Compulsory,
+			     rn_genv = emptyRnEnv, rn_lenv = emptyRdrEnv }
 	in
 	m rn_down s_down			`thenSST` \ result ->
 	
@@ -508,7 +517,7 @@ renameSourceCode mod_name name_supply m
 		pprTrace "Urk! renameSourceCode found errors" (display errs) 
 #ifdef DEBUG
 	 else if not (isEmptyBag warns) then
-		pprTrace "Urk! renameSourceCode found warnings" (display warns)
+		pprTrace "Note: renameSourceCode found warnings" (display warns)
 #endif
 	 else
 		id) $
@@ -528,7 +537,7 @@ thenRn   :: RnM s d a -> (a -> RnM s d b) -> RnM s d b
 thenRn_  :: RnM s d a -> RnM s d b -> RnM s d b
 andRn    :: (a -> a -> a) -> RnM s d a -> RnM s d a -> RnM s d a
 mapRn    :: (a -> RnM s d b) -> [a] -> RnM s d [b]
-mapMaybeRn :: (a -> RnM s d b) -> b -> Maybe a -> RnM s d b
+mapMaybeRn :: (a -> RnM s d (Maybe b)) -> [a] -> RnM s d [b]
 sequenceRn :: [RnM s d a] -> RnM s d [a]
 foldlRn :: (b  -> a -> RnM s d b) -> b -> [a] -> RnM s d b
 mapAndUnzipRn :: (a -> RnM s d (b,c)) -> [a] -> RnM s d ([b],[c])
@@ -570,8 +579,12 @@ mapAndUnzip3Rn f (x:xs)
     mapAndUnzip3Rn f xs	`thenRn` \ (rs1, rs2, rs3) ->
     returnRn (r1:rs1, r2:rs2, r3:rs3)
 
-mapMaybeRn f def Nothing  = returnRn def
-mapMaybeRn f def (Just v) = f v
+mapMaybeRn f []     = returnRn []
+mapMaybeRn f (x:xs) = f x		`thenRn` \ maybe_r ->
+		      mapMaybeRn f xs 	`thenRn` \ rs ->
+		      case maybe_r of
+			Nothing -> returnRn rs
+			Just r  -> returnRn (r:rs)
 \end{code}
 
 
@@ -587,7 +600,7 @@ mapMaybeRn f def (Just v) = f v
 
 \begin{code}
 failWithRn :: a -> Message -> RnM s d a
-failWithRn res msg (RnDown loc names_var errs_var occs_var) l_down
+failWithRn res msg (RnDown {rn_errs = errs_var, rn_loc = loc}) l_down
   = readMutVarSST  errs_var  					`thenSST`  \ (warns,errs) ->
     writeMutVarSST errs_var (warns, errs `snocBag` err)		`thenSST_` 
     returnSST res
@@ -595,7 +608,7 @@ failWithRn res msg (RnDown loc names_var errs_var occs_var) l_down
     err = addShortErrLocLine loc msg
 
 warnWithRn :: a -> Message -> RnM s d a
-warnWithRn res msg (RnDown loc names_var errs_var occs_var) l_down
+warnWithRn res msg (RnDown {rn_errs = errs_var, rn_loc = loc}) l_down
   = readMutVarSST  errs_var  				 	`thenSST`  \ (warns,errs) ->
     writeMutVarSST errs_var (warns `snocBag` warn, errs)	`thenSST_` 
     returnSST res
@@ -617,7 +630,7 @@ addWarnRn :: Message -> RnM s d ()
 addWarnRn warn = warnWithRn () warn
 
 checkErrsRn :: RnM s d Bool		-- True <=> no errors so far
-checkErrsRn  (RnDown loc names_var errs_var occs_var) l_down
+checkErrsRn (RnDown {rn_errs = errs_var}) l_down
   = readMutVarSST  errs_var  				 	`thenSST`  \ (warns,errs) ->
     returnSST (isEmptyBag errs)
 \end{code}
@@ -627,28 +640,28 @@ checkErrsRn  (RnDown loc names_var errs_var occs_var) l_down
 
 \begin{code}
 pushSrcLocRn :: SrcLoc -> RnM s d a -> RnM s d a
-pushSrcLocRn loc' m (RnDown loc names_var errs_var occs_var) l_down
-  = m (RnDown loc' names_var errs_var occs_var) l_down
+pushSrcLocRn loc' m down l_down
+  = m (down {rn_loc = loc'}) l_down
 
 getSrcLocRn :: RnM s d SrcLoc
-getSrcLocRn (RnDown loc names_var errs_var occs_var) l_down
-  = returnSST loc
+getSrcLocRn down l_down
+  = returnSST (rn_loc down)
 \end{code}
 
 ================  Name supply =====================
 
 \begin{code}
 getNameSupplyRn :: RnM s d RnNameSupply
-getNameSupplyRn (RnDown loc names_var errs_var occs_var) l_down
-  = readMutVarSST names_var
+getNameSupplyRn rn_down l_down
+  = readMutVarSST (rn_ns rn_down)
 
 setNameSupplyRn :: RnNameSupply -> RnM s d ()
-setNameSupplyRn names' (RnDown loc names_var errs_var occs_var) l_down
+setNameSupplyRn names' (RnDown {rn_ns = names_var}) l_down
   = writeMutVarSST names_var names'
 
 -- See comments with RnNameSupply above.
 newInstUniq :: (OccName, OccName) -> RnM s d Int
-newInstUniq key (RnDown loc names_var errs_var occs_var) l_down
+newInstUniq key (RnDown {rn_ns = names_var}) l_down
   = readMutVarSST names_var				`thenSST` \ (us, mapInst, cache) ->
     let
 	uniq = case lookupFM mapInst key of
@@ -687,8 +700,8 @@ but it seems simpler just to do all the compulsory ones first.
 
 \begin{code}
 addOccurrenceName :: Name -> RnMS s Name	-- Same name returned as passed
-addOccurrenceName name (RnDown loc names_var errs_var occs_var)
-		       (SDown rn_env local_env mod_name mode)
+addOccurrenceName name (RnDown {rn_loc = loc, rn_occs = occs_var})
+		       (SDown {rn_mode = mode})
   | isLocallyDefinedName name ||
     not_necessary necessity
   = returnSST name
@@ -707,8 +720,8 @@ addOccurrenceName name (RnDown loc names_var errs_var occs_var)
 
 
 addOccurrenceNames :: [Name] -> RnMS s ()
-addOccurrenceNames names (RnDown loc names_var errs_var occs_var)
-		         (SDown rn_env local_env mod_name mode)
+addOccurrenceNames names (RnDown {rn_loc = loc, rn_occs = occs_var})
+		         (SDown {rn_mode = mode})
   | not_necessary necessity 
   = returnSST ()
 
@@ -729,8 +742,8 @@ addOccurrenceNames names (RnDown loc names_var errs_var occs_var)
 not_necessary Compulsory = False
 not_necessary Optional   = opt_IgnoreIfacePragmas
 
-popOccurrenceName :: RnSMode -> RnM s d (Maybe Occurrence)
-popOccurrenceName mode (RnDown loc names_var errs_var occs_var) l_down
+popOccurrenceName :: RnMode -> RnM s d (Maybe Occurrence)
+popOccurrenceName mode (RnDown {rn_occs = occs_var}) l_down
   = readMutVarSST occs_var			`thenSST` \ occs ->
     case (mode, occs) of
 		-- Find a compulsory occurrence
@@ -755,11 +768,32 @@ popOccurrenceName mode (RnDown loc names_var errs_var occs_var) l_down
 -- as occurrences.
 
 discardOccurrencesRn :: RnM s d a -> RnM s d a
-discardOccurrencesRn enclosed_thing (RnDown loc names_var errs_var occs_var) l_down
+discardOccurrencesRn enclosed_thing rn_down l_down
   = newMutVarSST ([],[])						`thenSST` \ new_occs_var ->
-    enclosed_thing (RnDown loc names_var errs_var new_occs_var) l_down
+    enclosed_thing (rn_down {rn_occs = new_occs_var}) l_down
 \end{code}
 
+
+================  Module =====================
+
+\begin{code}
+getModuleRn :: RnM s d Module
+getModuleRn (RnDown {rn_mod = mod_name}) l_down
+  = returnSST mod_name
+
+setModuleRn :: Module -> RnM s d a -> RnM s d a
+setModuleRn new_mod enclosed_thing rn_down l_down
+  = enclosed_thing (rn_down {rn_mod = new_mod}) l_down
+\end{code}
+
+\begin{code}
+setOmitQualFn :: (Name -> Bool) -> RnM s d a -> RnM s d a
+setOmitQualFn fn m g_down l_down = m (g_down { rn_omit = fn }) l_down
+
+getOmitQualFn :: RnM s d (Name -> Bool)
+getOmitQualFn (RnDown {rn_omit = omit_fn}) l_down
+  = returnSST omit_fn
+\end{code}
 
 %************************************************************************
 %*									*
@@ -771,46 +805,40 @@ discardOccurrencesRn enclosed_thing (RnDown loc names_var errs_var occs_var) l_d
 
 \begin{code}
 getNameEnvs :: RnMS s (GlobalRdrEnv, LocalRdrEnv)
-getNameEnvs rn_down (SDown (RnEnv global_env fixity_env) local_env mod_name mode)
+getNameEnvs rn_down (SDown {rn_genv = RnEnv global_env fixity_env, rn_lenv = local_env})
   = returnSST (global_env, local_env)
 
 getLocalNameEnv :: RnMS s LocalRdrEnv
-getLocalNameEnv rn_down (SDown rn_env local_env mod_name mode)
+getLocalNameEnv rn_down (SDown {rn_lenv = local_env})
   = returnSST local_env
 
 setLocalNameEnv :: LocalRdrEnv -> RnMS s a -> RnMS s a
-setLocalNameEnv local_env' m rn_down (SDown rn_env local_env mod_name mode)
-  = m rn_down (SDown rn_env local_env' mod_name mode)
+setLocalNameEnv local_env' m rn_down l_down
+  = m rn_down (l_down {rn_lenv = local_env'})
 
 getFixityEnv :: RnMS s FixityEnv
-getFixityEnv rn_down (SDown (RnEnv name_env fixity_env) local_env mod_name mode)
+getFixityEnv rn_down (SDown {rn_genv = RnEnv name_env fixity_env})
   = returnSST fixity_env
 
 extendFixityEnv :: [(Name, RenamedFixitySig)] -> RnMS s a -> RnMS s a
 extendFixityEnv fixes enclosed_scope
-	        rn_down (SDown (RnEnv name_env fixity_env) local_env mod_name mode)
+	        rn_down l_down@(SDown {rn_genv = RnEnv name_env fixity_env})
   = let
 	new_fixity_env = extendNameEnv fixity_env fixes
     in
-    enclosed_scope rn_down (SDown (RnEnv name_env new_fixity_env) local_env mod_name mode)
+    enclosed_scope rn_down (l_down {rn_genv = RnEnv name_env new_fixity_env})
 \end{code}
 
-================  Module and Mode =====================
+================  Mode  =====================
 
 \begin{code}
-getModuleRn :: RnMS s Module
-getModuleRn rn_down (SDown rn_env local_env mod_name mode)
-  = returnSST mod_name
-\end{code}
-
-\begin{code}
-getModeRn :: RnMS s RnSMode
-getModeRn rn_down (SDown rn_env local_env mod_name mode)
+getModeRn :: RnMS s RnMode
+getModeRn rn_down (SDown {rn_mode = mode})
   = returnSST mode
 
-setModeRn :: RnSMode -> RnMS s a -> RnMS s a
-setModeRn new_mode thing_inside rn_down (SDown rn_env local_env mod_name mode)
-  = thing_inside rn_down (SDown rn_env local_env mod_name new_mode)
+setModeRn :: RnMode -> RnMS s a -> RnMS s a
+setModeRn new_mode thing_inside rn_down l_down
+  = thing_inside rn_down (l_down {rn_mode = new_mode})
 \end{code}
 
 
@@ -822,18 +850,17 @@ setModeRn new_mode thing_inside rn_down (SDown rn_env local_env mod_name mode)
 
 \begin{code}
 getIfacesRn :: RnMG Ifaces
-getIfacesRn rn_down (GDown himap hibmap iface_var)
+getIfacesRn rn_down (GDown {rn_ifaces = iface_var})
   = readMutVarSST iface_var
 
 setIfacesRn :: Ifaces -> RnMG ()
-setIfacesRn ifaces rn_down (GDown himap hibmap iface_var)
+setIfacesRn ifaces rn_down (GDown {rn_ifaces = iface_var})
   = writeMutVarSST iface_var ifaces
 
-getModuleHiMap :: IfaceFlavour -> RnMG ModuleHiMap
-getModuleHiMap as_source rn_down (GDown himap hibmap iface_var)
-  = case as_source of
-      HiBootFile -> returnSST hibmap
-      _		 -> returnSST himap
+getModuleHiMap :: Bool -> RnMG ModuleHiMap
+getModuleHiMap want_hi_boot rn_down (GDown {rn_hi_map = himap, rn_hiboot_map = hibmap})
+  | want_hi_boot = returnSST hibmap
+  | otherwise    = returnSST himap
 
 \end{code}
 

@@ -47,16 +47,15 @@ addErrLocHdrLine locn hdr rest_of_err_msg
 
 addShortWarnLocLine locn rest_of_err_msg
   = ( locn
-    , hang (ppr locn <> ptext SLIT(": Warning:")) 
-        4 rest_of_err_msg
+    , hang (ppr locn <> colon)
+	 4 (ptext SLIT("Warning:") <+> rest_of_err_msg)
     )
 
 dontAddErrLoc :: String -> Message -> ErrMsg
 dontAddErrLoc title rest_of_err_msg
  | null title = (noSrcLoc, rest_of_err_msg)
  | otherwise  =
-    ( noSrcLoc, hang (hcat [text title, char ':'])
-		  4  rest_of_err_msg )
+    ( noSrcLoc, hang (text title <> colon) 4 rest_of_err_msg )
 
 pprBagOfErrors :: Bag ErrMsg -> SDoc
 pprBagOfErrors bag_of_errors

@@ -9,22 +9,26 @@ import HsDecls		( HsIdInfo(..), HsStrictnessInfo(..) )
 import HsTypes		( mkHsForAllTy )
 import HsCore
 import Const		( Literal(..), mkMachInt_safe )
-import BasicTypes	( IfaceFlavour(..), Fixity(..), FixityDirection(..), 
+import BasicTypes	( Fixity(..), FixityDirection(..), 
 			  NewOrData(..), Version
 			)
+import CostCentre       ( CostCentre(..), IsDictCC(..), IsCafCC(..), IsDupdCC(..) )
 import HsPragmas	( noDataPragmas, noClassPragmas )
 import Type		( Kind, mkArrowKind, boxedTypeKind, openTypeKind )
 import IdInfo           ( ArityInfo, exactArity )
 import Lex		
 
-import RnEnv            ( ifaceUnqualTC, ifaceUnqualVar, ifaceUnqualTv, ifaceQualVar, ifaceQualTC )
 import RnMonad		( ImportVersion, LocalVersion, ParsedIface(..), WhatsImported(..),
 			  RdrNamePragma, ExportItem, RdrAvailInfo, GenAvailInfo(..)
 			) 
 import Bag		( emptyBag, unitBag, snocBag )
 import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM, FiniteMap )
-import Name		( OccName, isTCOcc, Provenance, Module,
-			  varOcc, tcOcc, mkModuleFS
+import RdrName          ( RdrName, mkRdrUnqual, mkSysQual, mkSysUnqual )
+import Name		( OccName, Provenance, Module )
+import OccName          ( mkSysModuleFS, mkSysOccFS,
+			  tcName, varName, dataName, clsName, tvName,
+			  IfaceFlavour, hiFile, hiBootFile,
+			  EncodedFS 
 			)
 import PrelMods         ( mkTupNameStr, mkUbxTupNameStr )
 import PrelInfo         ( mkTupConRdrName, mkUbxTupConRdrName )
@@ -86,8 +90,9 @@ import Ratio ( (%) )
  '__litlit'	{ ITlit_lit }
  '__string'	{ ITstring_lit }
  '__ccall'	{ ITccall $$ }
- '__scc' 	{ ITscc $$ }
- '__a'		{ ITtypeapp }
+ '__scc' 	{ ITscc }
+ '__sccC'       { ITsccAllCafs }
+ '__sccD'       { ITsccAllDicts }
 
  '__A'		{ ITarity }
  '__P'		{ ITspecialise }
@@ -175,8 +180,8 @@ import_part :				    		  { [] }
 	    |  import_part import_decl			  { $2 : $1 }
 	    
 import_decl :: { ImportVersion OccName }
-import_decl : 'import' mod_name opt_bang INTEGER '::' whats_imported ';'
-			{ ($2, $3, fromInteger $4, $6) }
+import_decl : 'import' mod_fs opt_bang INTEGER '::' whats_imported ';'
+			{ (mkSysModuleFS $2 $3, fromInteger $4, $6) }
 
 whats_imported      :: { WhatsImported OccName }
 whats_imported      :                                           { Everything }
@@ -187,7 +192,8 @@ name_version_pairs  :  						{ [] }
 		    |  name_version_pair name_version_pairs	{ $1 : $2 }
 
 name_version_pair   ::	{ LocalVersion OccName }
-name_version_pair   :  entity_occ INTEGER			{ ($1, fromInteger $2) }
+name_version_pair   :  var_occ INTEGER			        { ($1, fromInteger $2) }
+                    |  tc_occ  INTEGER                          { ($1, fromInteger $2) }
 
 instance_import_part :: { [Module] }
 instance_import_part : 						{   []    }
@@ -198,26 +204,34 @@ instance_import_part : 						{   []    }
 
 exports_part	:: { [ExportItem] }
 exports_part	:  					{ [] }
-		| exports_part '__export' opt_bang mod_name entities ';'
-						{ ($4,$3,$5) : $1 }
+		| exports_part '__export' opt_bang mod_fs entities ';'
+						{ (mkSysModuleFS $4 $3,$5) : $1 }
 
 opt_bang	:: { IfaceFlavour }
-opt_bang	:						{ HiFile }
-		| '!'						{ HiBootFile }
+opt_bang	:					{ hiFile }
+		| '!'					{ hiBootFile }
 
 entities	:: { [RdrAvailInfo] }
-entities	: 						{ [] }
-		|  entity entities				{ $1 : $2 }
+entities	: 					{ [] }
+		|  entity entities			{ $1 : $2 }
 
 entity		:: { RdrAvailInfo }
-entity		:  entity_occ 				{ if isTCOcc $1 
-							  then AvailTC $1 [$1]
-							  else Avail $1 }
-		|  entity_occ stuff_inside		{ AvailTC $1 ($1:$2) }
-		|  entity_occ '|' stuff_inside		{ AvailTC $1 $3 }
+entity		:  tc_occ 				{ AvailTC $1 [$1] }
+		|  var_occ				{ Avail $1 }
+		|  tc_occ stuff_inside		        { AvailTC $1 ($1:$2) }
+		|  tc_occ '|' stuff_inside		{ AvailTC $1 $3 }
 
 stuff_inside	:: { [OccName] }
 stuff_inside	:  '{' val_occs '}'			{ $2 }
+
+val_occ		:: { OccName }
+		:  var_occ 		{ $1 }
+                |  data_occ             { $1 }
+
+val_occs	:: { [OccName] }
+		:  val_occ    		{ [$1] }
+		|  val_occ val_occs	{ $1 : $2 }
+
 
 --------------------------------------------------------------------------
 
@@ -274,15 +288,15 @@ decl    : src_loc var_name '::' type maybe_idinfo
   		 	 { SigD (IfaceSig $2 $4 ($5 $2) $1) }
 	| src_loc 'type' tc_name tv_bndrs '=' type 		       
 			{ TyClD (TySynonym $3 $4 $6 $1) }
-	| src_loc 'data' decl_context data_fs tv_bndrs constrs 	       
-	       		{ TyClD (TyData DataType $3 (ifaceUnqualTC $4) $5 $6 Nothing noDataPragmas $1) }
+	| src_loc 'data' decl_context tc_name tv_bndrs constrs 	       
+	       		{ TyClD (TyData DataType $3 $4 $5 $6 Nothing noDataPragmas $1) }
 	| src_loc 'newtype' decl_context tc_name tv_bndrs newtype_constr
 			{ TyClD (TyData NewType $3 $4 $5 $6 Nothing noDataPragmas $1) }
 	| src_loc 'class' decl_context tc_name tv_bndrs csigs
 			{ TyClD (mkClassDecl $3 $4 $5 $6 EmptyMonoBinds 
 					noClassPragmas $1) }
-        | src_loc fixity mb_fix val_occ
-                        { FixD (FixitySig (Unqual $4) (Fixity $3 $2) $1) }
+        | src_loc fixity mb_fix var_or_data_name
+                        { FixD (FixitySig $4 (Fixity $3 $2) $1) }
 
 maybe_idinfo  :: { RdrName -> [HsIdInfo RdrName] }
 maybe_idinfo  : {- empty -} 	{ \_ -> [] }
@@ -313,8 +327,8 @@ constrs1	:  constr		{ [$1] }
 		|  constr '|' constrs1	{ $1 : $3 }
 
 constr		:: { RdrNameConDecl }
-constr		:  src_loc ex_stuff data_fs batypes		{ mkConDecl (ifaceUnqualVar $3) $2 (VanillaCon $4) $1 }
-		|  src_loc ex_stuff data_fs '{' fields1 '}'	{ mkConDecl (ifaceUnqualVar $3) $2 (RecCon $5)     $1 }
+constr		:  src_loc ex_stuff data_name batypes		{ mkConDecl $3 $2 (VanillaCon $4) $1 }
+		|  src_loc ex_stuff data_name '{' fields1 '}'	{ mkConDecl $3 $2 (RecCon $5)     $1 }
                 -- We use "data_fs" so as to include ()
 
 newtype_constr	:: { [RdrNameConDecl] {- Empty if handwritten abstract -} }
@@ -362,7 +376,7 @@ context_list1	: class					{ [$1] }
 		| class ',' context_list1 		{ $1 : $3 }
 
 class		:: { (RdrName, [RdrNameHsType]) }
-class		:  qtc_name atypes			{ ($1, $2) }
+class		:  qcls_name atypes			{ ($1, $2) }
 
 types2		:: { [RdrNameHsType] 			{- Two or more -}  }	
 types2		:  type ',' type			{ [$1,$3] }
@@ -375,59 +389,48 @@ btype		:  atype				{ $1 }
 atype		:: { RdrNameHsType }
 atype		:  qtc_name 			  	{ MonoTyVar $1 }
 		|  tv_name			  	{ MonoTyVar $1 }
-	  	|  '(' ')' 				{ MonoTupleTy [] True }
 		|  '(' types2 ')'	  		{ MonoTupleTy $2 True{-boxed-} }
 		|  '(#' type '#)'  			{ MonoTupleTy [$2] False{-unboxed-} }
 		|  '(#' types2 '#)'			{ MonoTupleTy $2 False{-unboxed-} }
 		|  '[' type ']'		  		{ MonoListTy  $2 }
-		|  '{' qtc_name atypes '}'		{ MonoDictTy $2 $3 }
+		|  '{' qcls_name atypes '}'		{ MonoDictTy $2 $3 }
 		|  '(' type ')'		  		{ $2 }
+
+-- This one is dealt with via qtc_name
+--	  	|  '(' ')' 				{ MonoTupleTy [] True }
 
 atypes		:: { [RdrNameHsType] 	{-  Zero or more -} }
 atypes		:  					{ [] }
 		|  atype atypes				{ $1 : $2 }
 ---------------------------------------------------------------------
+mod_fs	        :: { EncodedFS }
+		:  CONID		{ $1 }
 
 mod_name	:: { Module }
-		:  CONID		{ mkModuleFS $1 }
+		:  mod_fs		{ mkSysModuleFS $1 hiFile }
 
-var_fs		:: { FAST_STRING }
+
+---------------------------------------------------
+var_fs		:: { EncodedFS }
 		: VARID			{ $1 }
 		| VARSYM		{ $1 }
 		| '-' 			{ SLIT("-") }
 		| '!'	  		{ SLIT("!") }
 
-data_fs         :: { FAST_STRING }
-		:  CONID		{ $1 }
-		|  CONSYM		{ $1 }
-		|  '->'			{ SLIT("->") }
-                |  '(' ')'        	{ SLIT("()") }
-		|  '(' commas ')'	{ snd (mkTupNameStr $2) }
-		|  '[' ']'              { SLIT("[]") }
 
-commas		:: { Int }
-		: ','			{ 2 }
-		| commas ','		{ $1 + 1 }
+qvar_fs		:: { (EncodedFS, EncodedFS, IfaceFlavour) }
+		:  QVARID		{ $1 }
+		|  QVARSYM		{ $1 }
 
-val_occ		:: { OccName }
-		:  var_fs 		{ varOcc $1 }
-                |  data_fs              { varOcc $1 }
-
-val_occs	:: { [OccName] }
-		:  val_occ    		{ [$1] }
-		|  val_occ val_occs	{ $1 : $2 }
-
-entity_occ	:: { OccName }
-		:  var_fs		{ varOcc $1 }
-		|  data_fs 		{ tcOcc $1 }
+var_occ	        :: { OccName }
+		:  var_fs		{ mkSysOccFS varName $1 }
 
 var_name	:: { RdrName }
-var_name	:  var_fs		{ ifaceUnqualVar $1 }
+var_name	:  var_occ		{ mkRdrUnqual $1 }
 
 qvar_name	:: { RdrName }
 qvar_name	:  var_name		{ $1 }
-		|  QVARID		{ ifaceQualVar $1 }
-		|  QVARSYM		{ ifaceQualVar $1 }
+		|  qvar_fs      	{ mkSysQual varName $1 }
 
 var_names	:: { [RdrName] }
 var_names	: 			{ [] }
@@ -436,45 +439,74 @@ var_names	: 			{ [] }
 var_names1	:: { [RdrName] }
 var_names1	: var_name var_names	{ $1 : $2 }
 
+---------------------------------------------------
+-- For some bizarre reason, 
+--      (,,,)      is dealt with by the parser
+--      Foo.(,,,)  is dealt with by the lexer
+-- Sigh
+
+data_fs	        :: { EncodedFS }
+		:  CONID		{ $1 }
+		|  CONSYM		{ $1 }
+
+qdata_fs	:: { (EncodedFS, EncodedFS, IfaceFlavour) }
+                :  QCONID		{ $1 }
+                |  QCONSYM		{ $1 }
+
+data_occ	:: { OccName }
+		:  data_fs		{ mkSysOccFS dataName $1 }
+
 data_name	:: { RdrName }
-		:  CONID		{ ifaceUnqualVar $1 }
-		|  CONSYM		{ ifaceUnqualVar $1 }
-		|  '(' commas ')'	{ ifaceUnqualVar (snd (mkTupNameStr $2)) }
-		|  '[' ']'              { ifaceUnqualVar SLIT("[]") }
+                :  data_occ             { mkRdrUnqual $1 }
 
 qdata_name	:: { RdrName }
 qdata_name	:  data_name		{ $1 }
-		|  QCONID		{ ifaceQualVar $1 }
-		|  QCONSYM		{ ifaceQualVar $1 }
+		|  qdata_fs 	        { mkSysQual dataName $1 }
 				
 qdata_names	:: { [RdrName] }
 qdata_names	:				{ [] }
 		| qdata_name qdata_names	{ $1 : $2 }
 
+var_or_data_name :: { RdrName }
+                  : var_name                    { $1 }
+                  | data_name                   { $1 }
+
+---------------------------------------------------
+tc_fs           :: { EncodedFS }
+                :  data_fs              { $1 }
+
+tc_occ	        :: { OccName }
+		:  tc_fs 		{ mkSysOccFS tcName $1 }
+
 tc_name		:: { RdrName }
-tc_name		:  CONID		{ ifaceUnqualTC $1 }
-		|  CONSYM		{ ifaceUnqualTC $1 }
-		|  '(' '->' ')'		{ ifaceUnqualTC SLIT("->") }
-		|  '(' commas ')'	{ ifaceUnqualTC (snd (mkTupNameStr $2)) }
-		|  '[' ']'		{ ifaceUnqualTC SLIT("[]") }
+                :  tc_occ		{ mkRdrUnqual $1 }
 
 qtc_name	:: { RdrName }
-qtc_name	: tc_name		{ $1 }
-		| QCONID		{ ifaceQualTC $1 }
-		| QCONSYM		{ ifaceQualTC $1 }
+                : tc_name		{ $1 }
+		| qdata_fs		{ mkSysQual tcName $1 }
 
+---------------------------------------------------
+cls_name	:: { RdrName }
+        	:  data_fs		{ mkSysUnqual clsName $1 }
+
+qcls_name	:: { RdrName }
+         	: cls_name		{ $1 }
+		| qdata_fs		{ mkSysQual clsName $1 }
+
+---------------------------------------------------
 tv_name		:: { RdrName }
-tv_name		:  VARID 		{ ifaceUnqualTv $1 }
-		|  VARSYM		{ ifaceUnqualTv $1 {- Allow t2 as a tyvar -} }
+		:  VARID 		{ mkSysUnqual tvName $1 }
+		|  VARSYM		{ mkSysUnqual tvName $1 {- Allow t2 as a tyvar -} }
 
 tv_bndr		:: { HsTyVar RdrName }
-tv_bndr		:  tv_name '::' akind	{ IfaceTyVar $1 $3 }
+		:  tv_name '::' akind	{ IfaceTyVar $1 $3 }
 		|  tv_name		{ IfaceTyVar $1 boxedTypeKind }
 
 tv_bndrs	:: { [HsTyVar RdrName] }
 		:  			{ [] }
 		| tv_bndr tv_bndrs	{ $1 : $2 }
 
+---------------------------------------------------
 kind		:: { Kind }
 		: akind			{ $1 }
 		| akind '->' kind	{ mkArrowKind $1 $3 }
@@ -531,17 +563,17 @@ core_expr	: '\\' core_bndrs '->' core_expr	{ foldr UfLam $4 $2 }
 		| con_or_primop '{' core_args '}'	{ UfCon $1 $3 }
                 | '__litlit' STRING atype               { UfCon (UfLitLitCon $2 $3) [] }
 
-                | '__inline' core_expr               { UfNote UfInlineCall $2 }
-                | '__coerce' atype core_expr         { UfNote (UfCoerce $2) $3 }
-		| '__scc' core_expr                  { UfNote (UfSCC $1) $2  }
-		| fexpr				     { $1 }
+                | '__inline' core_expr                  { UfNote UfInlineCall $2 }
+                | '__coerce' atype core_expr            { UfNote (UfCoerce $2) $3 }
+		| scc core_expr                         { UfNote (UfSCC $1) $2  }
+		| fexpr				        { $1 }
 
 fexpr   :: { UfExpr RdrName }
 fexpr   : fexpr core_arg				{ UfApp $1 $2 }
         | core_aexpr					{ $1 }
 
 core_arg	:: { UfExpr RdrName }
-		: '__a' atype                                  { UfType $2 }
+		: '@' atype                                     { UfType $2 }
                 | core_aexpr                                    { $1 }
 
 core_args	:: { [UfExpr RdrName] }
@@ -563,10 +595,12 @@ core_aexpr      : qvar_name				        { UfVar $1 }
 
 		| core_lit		 { UfCon (UfLitCon $1) [] }
 		| '(' core_expr ')'	 { $2 }
-		| '('  ')'	 	 { UfTuple (mkTupConRdrName 0) [] }
 		| '(' comma_exprs2 ')'	 { UfTuple (mkTupConRdrName (length $2)) $2 }
 		| '(#' core_expr '#)'	 { UfTuple (mkUbxTupConRdrName 1) [$2] }
 		| '(#' comma_exprs2 '#)' { UfTuple (mkUbxTupConRdrName (length $2)) $2 }
+
+-- This one is dealt with by qdata_name: see above comments
+--		| '('  ')'	 	 { UfTuple (mkTupConRdrName 0) [] }
 
 comma_exprs2	:: { [UfExpr RdrName] }	-- Two or more
 comma_exprs2	: core_expr ',' core_expr			{ [$1,$3] }
@@ -596,15 +630,11 @@ core_pat	:: { (UfCon RdrName, [RdrName]) }
 core_pat	: core_lit			{ (UfLitCon  $1, []) }
 		| '__litlit' STRING atype	{ (UfLitLitCon $2 $3, []) }
 		| qdata_name var_names		{ (UfDataCon $1, $2) }
-		| '(' comma_var_names ')' 	{ (UfDataCon (mkTupConRdrName (length $2)), $2) }
+		| '(' comma_var_names1 ')' 	{ (UfDataCon (mkTupConRdrName (length $2)), $2) }
 		| '(#' comma_var_names1 '#)'	{ (UfDataCon (mkUbxTupConRdrName (length $2)), $2) }
 		| '__DEFAULT'			{ (UfDefault, []) }
 		| '(' core_pat ')'		{ $2 }
 
-
-comma_var_names :: { [RdrName] }	-- Zero, or two or more
-comma_var_names : 						{ [] }
-		| var_name ',' comma_var_names1		{ $1 : $3 }
 
 comma_var_names1 :: { [RdrName] }	-- One or more
 comma_var_names1 : var_name					{ [$1] }
@@ -641,13 +671,38 @@ core_val_bndr 	:: { UfBinder RdrName }
 core_val_bndr	: var_name '::' atype				{ UfValBinder $1 $3 }
 
 core_tv_bndr	:: { UfBinder RdrName }
-core_tv_bndr	:  '__a' tv_name '::' akind		{ UfTyBinder $2 $4 }
-		|  '__a' tv_name			{ UfTyBinder $2 boxedTypeKind }
+core_tv_bndr	:  '@' tv_name '::' akind		{ UfTyBinder $2 $4 }
+		|  '@' tv_name			        { UfTyBinder $2 boxedTypeKind }
 
 ccall_string	:: { FAST_STRING }
 		: STRING					{ $1 }
 		| VARID						{ $1 }
 		| CONID						{ $1 }
+
+------------------------------------------------------------------------
+scc     :: { CostCentre }
+        :  '__sccC' '{' mod_name STRING '}'                      { AllCafsCC $3 $4 }
+        |  '__sccD' '{' mod_name STRING cc_dup '}'               { AllDictsCC $3 $4 $5 }
+        |  '__scc' '(' cc_name mod_name STRING cc_dict cc_dup cc_caf '}'
+                             { NormalCC { cc_name = $3, cc_mod = $4, cc_grp = $5,
+                                          cc_is_dict = $6, cc_is_dupd = $7, cc_is_caf = $8 } }
+
+cc_name :: { EncodedFS }
+        : CONID                 { $1 }
+        | VARID                 { $1 }
+  
+cc_dup  :: { IsDupdCC }
+cc_dup  :                       { OriginalCC }
+        | '!'                   { DupdCC }
+
+cc_caf  :: { IsCafCC }
+        :                       { NotCafCC }
+        | '__C'                 { CafCC }
+
+cc_dict :: { IsDictCC }
+        :                       { VanillaCC }
+        | '__A'                 { DictCC }
+
 
 -------------------------------------------------------------------
 

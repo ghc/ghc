@@ -35,15 +35,14 @@ module Lex (
 import Char 		( ord, isSpace )
 import List             ( isSuffixOf )
 
-import CostCentre	-- Pretty much all of it
 import IdInfo		( InlinePragInfo(..) )
-import Name		( isLowerISO, isUpperISO, mkModule )
-
+import Name		( isLowerISO, isUpperISO )
+import OccName		( IfaceFlavour, hiFile, hiBootFile )
 import PrelMods		( mkTupNameStr, mkUbxTupNameStr )
 import CmdLineOpts	( opt_IgnoreIfacePragmas, opt_HiVersion, opt_NoHiCheck )
 import Demand		( Demand(..) {- instance Read -} )
 import UniqFM           ( UniqFM, listToUFM, lookupUFM)
-import BasicTypes	( NewOrData(..), IfaceFlavour(..) )
+import BasicTypes	( NewOrData(..) )
 import SrcLoc		( SrcLoc, incSrcLine, srcLocFile )
 
 import Maybes		( MaybeErr(..) )
@@ -142,7 +141,9 @@ data IfaceToken
   | ITnocaf
   | ITunfold InlinePragInfo
   | ITstrict ([Demand], Bool)
-  | ITscc CostCentre
+  | ITscc
+  | ITsccAllCafs
+  | ITsccAllDicts
 
   | ITdotdot  			-- reserved symbols
   | ITdcolon
@@ -189,9 +190,6 @@ data IfaceToken
   | ITunknown String		-- Used when the lexer can't make sense of it
   | ITeof			-- end of file token
   deriving Text -- debugging
-
-instance Text CostCentre -- cheat!
-
 \end{code}
 
 %************************************************************************
@@ -281,9 +279,7 @@ lexIface cont buf =
 		                        (stepOnBy# buf 3#)) -- past __S
 	   	    's'# -> 
 			case prefixMatch (stepOnBy# buf 3#) "cc" of
-		               Just buf' -> lex_scc cont 
-						(stepOnUntil (not . isSpace) 
-						(stepOverLexeme buf'))
+		               Just buf' -> lex_scc cont (stepOverLexeme buf')
 		     	       Nothing   -> lex_id cont buf
 		    _ -> lex_id cont buf
 	   _    -> lex_id cont buf
@@ -359,54 +355,9 @@ lex_demand cont buf =
 ------------------
 lex_scc cont buf =
  case currentChar# buf of
-  '"'# ->
-        case prefixMatch (stepOn buf) "CAFs." of
-         Just buf' ->
-          case untilChar# (stepOverLexeme buf') '\"'# of
-           buf'' -> cont (ITscc (mkAllCafsCC (mkModule (lexemeToString buf'')) _NIL_)) 
-			 (stepOn (stepOverLexeme buf''))
-         Nothing ->
-            case prefixMatch (stepOn buf) "DICTs." of
-             Just buf' ->
-              case untilChar# (stepOverLexeme buf') '\"'# of
-               buf'' -> cont (ITscc (mkAllDictsCC (mkModule (lexemeToString buf'')) _NIL_ True)) 
-                        (stepOn (stepOverLexeme buf''))
-             Nothing ->
-	      let
-	       match_user_cc buf =
-                case untilChar# buf '/'# of
-                 buf' -> 
-                  let mod_name = mkModule (lexemeToString buf') in
---	                  case untilChar# (stepOn (stepOverLexeme buf')) '/'# of
---	                   buf'' -> 
---                            let grp_name = lexemeToFastString buf'' in
-		    case untilChar# (stepOn (stepOverLexeme buf')) '\"'# of
-		     buf'' ->
-		       -- The label may contain arbitrary characters, so it
-		       -- may have been escaped etc., hence we `read' it in to get
-		       -- rid of these meta-chars in the string and then pack it (again.)
-		       -- ToDo: do the same for module name (single quotes allowed in m-names).
-		       -- BTW, the code in this module is totally gruesome..
-		       let upk_label = _UNPK_ (lexemeToFastString buf'') in
-		       case reads ('"':upk_label++"\"") of
-			((cc_label,_):_) -> 
-			    let cc_name = _PK_ cc_label in
-			    (mkUserCC cc_name mod_name _NIL_{-grp_name-}, 
-		             stepOn (stepOverLexeme buf''))
-			_ -> 
-			  trace ("trouble lexing scc label: " ++ upk_label ++ " , ignoring") 
-			  (mkUserCC _NIL_ mod_name _NIL_{-grp_name-}, 
-		           stepOn (stepOverLexeme buf''))
-              in
-              case prefixMatch (stepOn buf) "CAF:" of
-               Just buf' ->
-		 case match_user_cc (stepOverLexeme buf') of
-		  (cc, buf'') -> cont (ITscc (cafifyCC cc)) buf''
-               Nothing ->
-                 case match_user_cc (stepOn buf) of
-		  (cc, buf'') -> cont (ITscc cc) buf''
-  c -> cont (ITunknown [C# c]) (stepOn buf)
-
+  'C'# -> cont ITsccAllCafs  (stepOverLexeme (stepOn buf))
+  'D'# -> cont ITsccAllDicts (stepOverLexeme (stepOn buf))
+  other -> cont ITscc buf
 
 -----------
 lex_num :: (IfaceToken -> IfM a) -> (Int -> Int) -> Int# -> IfM a
@@ -511,8 +462,8 @@ lex_con cont buf =
  case expandWhile# is_ident buf of 	  { buf1 ->
  case expandWhile# (eqChar# '#'#) buf1 of { buf' ->
  case currentChar# buf' of
-     '.'# -> munch HiFile
-     '!'# -> munch HiBootFile
+     '.'# -> munch hiFile
+     '!'# -> munch hiBootFile
      _    -> just_a_conid
  
    where

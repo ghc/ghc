@@ -8,7 +8,7 @@ types and operations.''
 
 \begin{code}
 module TysPrim(
-	alphaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
+	alphaTyVars, betaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
 	alphaTy, betaTy, gammaTy, deltaTy,
 	openAlphaTyVar, openAlphaTyVars,
 
@@ -62,6 +62,8 @@ import Unique
 alphaTyVars :: [TyVar]
 alphaTyVars = [ mkSysTyVar u boxedTypeKind
 	      | u <- map mkAlphaTyVarUnique [2..] ]
+
+betaTyVars = tail alphaTyVars
 
 alphaTyVar, betaTyVar, gammaTyVar :: TyVar
 (alphaTyVar:betaTyVar:gammaTyVar:deltaTyVar:_) = alphaTyVars

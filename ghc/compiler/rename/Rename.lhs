@@ -9,7 +9,7 @@ module Rename ( renameModule ) where
 #include "HsVersions.h"
 
 import HsSyn
-import RdrHsSyn		( RdrName(..), RdrNameHsModule )
+import RdrHsSyn		( RdrNameHsModule )
 import RnHsSyn		( RenamedHsModule, RenamedHsDecl, extractHsTyNames )
 
 import CmdLineOpts	( opt_HiMap, opt_D_show_rn_trace,
@@ -23,12 +23,15 @@ import RnIfaces		( getImportedInstDecls, importDecl, getImportVersions, getSpeci
 			  getDeferredDataDecls,
 			  mkSearchPath, getSlurpedNames, getRnStats
 			)
-import RnEnv		( addImplicitOccsRn, availName, availNames, availsToNameSet, warnUnusedTopNames )
+import RnEnv		( addImplicitOccsRn, availName, availNames, availsToNameSet, 
+			  warnUnusedTopNames
+			)
 import Name		( Name, isLocallyDefined,
 			  NamedThing(..), ImportReason(..), Provenance(..),
 			  nameModule, pprModule, pprOccName, nameOccName,
-			  getNameProvenance
+			  getNameProvenance, occNameUserString, 
 			)
+import RdrName		( RdrName )
 import NameSet
 import TyCon		( TyCon )
 import PrelMods		( mAIN, pREL_MAIN )
@@ -102,7 +105,7 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls loc)
     in
 
 	-- RENAME THE SOURCE
-    initRnMS rn_env mod_name SourceMode (
+    initRnMS rn_env SourceMode (
 	addImplicits mod_name				`thenRn_`
 	rnSourceDecls local_decls
     )							`thenRn` \ (rn_local_decls, fvs) ->
@@ -143,7 +146,7 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls loc)
     
 	-- RETURN THE RENAMED MODULE
     let
-	import_mods = [mod | ImportDecl mod _ _ _ _ _ <- imports]
+	import_mods = [mod | ImportDecl mod _ _ _ _ <- imports]
 
 	renamed_module = HsModule mod_name vers 
 				  trashed_exports trashed_imports
@@ -227,7 +230,7 @@ slurpDecls decls
 \end{code}
 
 \begin{code}
-closeDecls :: RnSMode
+closeDecls :: RnMode
 	   -> [RenamedHsDecl]			-- Declarations got so far
 	   -> RnMG [RenamedHsDecl]		-- input + extra decls slurped
 	-- The monad includes a list of possibly-unresolved Names
@@ -257,7 +260,8 @@ closeDecls mode decls
 		           mod_name = nameModule (fst name_w_loc)
 
 rn_iface_decl mod_name mode decl
-  = initRnMS emptyRnEnv mod_name mode (rnIfaceDecl decl)
+  = setModuleRn mod_name $
+    initRnMS emptyRnEnv mode (rnIfaceDecl decl)
 					
 rn_inst_decl mode (mod_name,decl)    = rn_iface_decl mod_name mode (InstD decl)
 rn_data_decl mode (mod_name,ty_decl) = rn_iface_decl mod_name mode (TyClD ty_decl)
@@ -284,35 +288,27 @@ reportUnusedNames (RnEnv gbl_env _) avail_env (ExportEnv export_avails _) mentio
 				      ]
 
 	defined_names = mkNameSet (concat (rdrEnvElts gbl_env))
-	defined_but_not_used = defined_names `minusNameSet` really_used_names
+	defined_but_not_used = nameSetToList (defined_names `minusNameSet` really_used_names)
 
-	-- Filter out the ones only defined implicitly or whose OccNames
-	-- start with an '_', which we won't report.
-	bad_guys = filter is_explicit (nameSetToList defined_but_not_used)
-	is_explicit n = case getNameProvenance n of
-			  LocalDef _ _ 				    -> True
-			  NonLocalDef (UserImport _ _ explicit) _ _ -> explicit
-			  other					    -> False
-  
-	-- Now group by whether locally defined or imported; 
-	-- one group is the locally-defined ones, one group per import module
-	groups = equivClasses cmp bad_guys
-	       where
-		 name1 `cmp` name2 = getNameProvenance name1 `cmph` getNameProvenance name2
-		 
-		 cmph (LocalDef _ _) (NonLocalDef _ _ _)    = LT
-		 cmph (LocalDef _ _) (LocalDef _ _)         = EQ
-		 cmph (NonLocalDef (UserImport m1 _ _) _ _)
-		      (NonLocalDef (UserImport m2 _ _) _ _)
-		      = m1 `compare` m2
-		 cmph (NonLocalDef _ _ _) (LocalDef _ _)    = GT
-			-- In-scope NonLocalDefs must have UserImport info on them
-
-	-- ToDo: report somehow on T(..) things where no constructors
-	-- are imported
+	-- Filter out the ones only defined implicitly
+	bad_guys = filter reportableUnusedName defined_but_not_used
     in
-    mapRn warnUnusedTopNames groups	`thenRn_`
+    warnUnusedTopNames bad_guys	`thenRn_`
     returnRn ()
+
+reportableUnusedName :: Name -> Bool
+reportableUnusedName name
+  = explicitlyImported (getNameProvenance name) && 
+    not (startsWithUnderscore (occNameUserString (nameOccName name)))
+  where
+    explicitlyImported (LocalDef _ _) 		             = True	-- Report unused defns of local vars
+    explicitlyImported (NonLocalDef (UserImport _ _ expl) _) = expl 	-- Report unused explicit imports
+    explicitlyImported other			             = False	-- Don't report others
+   
+	-- Haskell 98 encourages compilers to suppress warnings about
+	-- unused names in a pattern if they start with "_".
+    startsWithUnderscore ('_' : _) = True	-- Suppress warnings for names starting
+    startsWithUnderscore other     = False	-- with an underscore
 
 rnStats :: [RenamedHsDecl] -> RnMG ()
 rnStats all_decls

@@ -41,8 +41,8 @@ module Outputable (
 
 
 	-- error handling
-	pprPanic, pprPanic#, pprError, pprTrace, assertPprPanic,
-	trace, panic, panic#, assertPanic, warnPprTrace
+	pprPanic, pprPanic#, pprError, pprTrace, assertPprPanic, warnPprTrace,
+	trace, panic, panic#, assertPanic
     ) where
 
 #include "HsVersions.h"
@@ -207,8 +207,16 @@ rational n sty = Pretty.rational n
 parens d sty       = Pretty.parens (d sty)
 braces d sty       = Pretty.braces (d sty)
 brackets d sty     = Pretty.brackets (d sty)
-quotes d sty       = Pretty.quotes (d sty)
 doubleQuotes d sty = Pretty.doubleQuotes (d sty)
+
+-- quotes encloses something in single quotes...
+-- but it omits them if the thing ends in a single quote
+-- so that we don't get `foo''.  Instead we just have foo'.
+quotes d sty = case show pp_d of
+		 ('\'' : _) -> pp_d
+		 other	    -> Pretty.quotes pp_d
+	     where
+	       pp_d = d sty
 
 semi sty   = Pretty.semi
 comma sty  = Pretty.comma

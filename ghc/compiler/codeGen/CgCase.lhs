@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.21 1998/12/22 18:03:27 simonm Exp $
+% $Id: CgCase.lhs,v 1.22 1999/01/27 14:51:31 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -546,7 +546,12 @@ Tag is held in a temporary.
 
 \begin{code}
 cgInlineAlts bndr (StgAlgAlts ty alts deflt)
-  = cgAlgAlts NoGC uniq AbsCNop{-restore_cc-} False{-no semi-tagging-}
+  =	   -- bind the default binder (it covers all the alternatives)
+    (if (isDeadBinder bndr)
+	then nopC
+	else bindNewToReg bndr node mkLFArgument)	`thenC`
+
+    cgAlgAlts NoGC uniq AbsCNop{-restore_cc-} False{-no semi-tagging-}
 		False{-not poly case-} alts deflt
                 False{-don't emit yield-}  	`thenFC` \ (tagged_alts, deflt_c) ->
 

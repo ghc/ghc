@@ -36,7 +36,7 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_EnsureSplittableC,
 import CostCentre       ( CostCentre, CostCentreStack )
 import FiniteMap	( FiniteMap )
 import Id               ( Id, idName )
-import Name             ( Module, moduleCString, moduleString )
+import Name             ( Module, moduleString )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import Type             ( Type )
 import TyCon            ( TyCon )
@@ -93,12 +93,6 @@ codeGen mod_name (local_CCs, extern_CCs, singleton_CCSs)
    mkAbstractCs [ cost_centre_stuff, module_code ]
 
   where
-    -----------------
-    grp_name  = case opt_SccGroup of
-		  Just xx -> _PK_ xx
-		  Nothing -> _PK_ (moduleString mod_name)	-- default: module name
-
-    -----------------
     mkCcRegister ccs cc_stacks import_names
       = let
 	    register_ccs     = mkAbstractCs (map mk_register ccs)
@@ -108,7 +102,7 @@ codeGen mod_name (local_CCs, extern_CCs, singleton_CCSs)
 	in
 	[
 	    CCallProfCCMacro SLIT("START_REGISTER_CCS") 
-	       [ CLitLit (_PK_ ("_reg" ++ moduleCString mod_name)) AddrRep],
+	       [ CLitLit (_PK_ ("_reg" ++ moduleString mod_name)) AddrRep],
 	    register_ccs,
 	    register_cc_stacks,
 	    register_imports,
@@ -123,7 +117,7 @@ codeGen mod_name (local_CCs, extern_CCs, singleton_CCSs)
 
 	mk_import_register import_name
 	  = CCallProfCCMacro SLIT("REGISTER_IMPORT") 
-	      [CLitLit (_PK_ ("_reg" ++ moduleCString import_name)) AddrRep]
+	      [CLitLit (_PK_ ("_reg" ++ moduleString import_name)) AddrRep]
 \end{code}
 
 %************************************************************************

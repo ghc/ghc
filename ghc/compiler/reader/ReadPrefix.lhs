@@ -14,18 +14,22 @@ import HsSyn
 import HsTypes		( HsTyVar(..) )
 import HsPragmas	( noDataPragmas, noClassPragmas )
 import RdrHsSyn         
-import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..), IfaceFlavour(..) )
+import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..) )
+import PrelMods		( pRELUDE )
 import PrefixToHs
 import CallConv
 
 import CmdLineOpts      ( opt_NoImplicitPrelude, opt_GlasgowExts )
-import Name		( OccName, srcTvOcc, srcVarOcc, srcTCOcc, 
-			  Module, mkModuleFS,
-			  isConOcc, isLexConId, isWildCardOcc
+import OccName		( Module, mkSrcModuleFS, mkImportModuleFS,
+			  hiFile, hiBootFile,
+			  NameSpace, tcName, clsName, tcClsName, varName, dataName, tvName,
+			  isLexCon
+			)
+import RdrName		( RdrName, isRdrDataCon, mkSrcQual, mkSrcUnqual, mkPreludeQual,	
+			  dummyRdrVarName
 			)
 import Outputable
 import SrcLoc		( SrcLoc )
-import PrelMods		( pRELUDE )
 import FastString	( mkFastCharString )
 import PrelRead		( readRational__ )
 \end{code}
@@ -57,14 +61,18 @@ wlkMaybe wlk_it (U_just x)
 \end{code}
 
 \begin{code}
-wlkTCId   = wlkQid srcTCOcc
-wlkVarId  = wlkQid srcVarOcc
-wlkDataId = wlkQid srcVarOcc
-wlkEntId = wlkQid (\occ -> if isLexConId occ
-			   then srcTCOcc occ
-			   else srcVarOcc occ)
+wlkTcClsId = wlkQid (\_ -> tcClsName)
+wlkTcId    = wlkQid (\_ -> tcName)
+wlkClsId   = wlkQid (\_ -> clsName)
+wlkVarId   = wlkQid (\occ -> if isLexCon occ
+			     then dataName
+			     else varName)
+wlkDataId  = wlkQid (\_ -> dataName)
+wlkEntId   = wlkQid (\occ -> if isLexCon occ
+			     then tcClsName
+			     else varName)
 
-wlkQid	:: (FAST_STRING -> OccName) -> U_qid -> UgnM RdrName
+wlkQid	:: (FAST_STRING -> NameSpace) -> U_qid -> UgnM RdrName
 
 -- There are three kinds of qid:
 --	qualified name (aqual)		A.x
@@ -78,22 +86,22 @@ wlkQid	:: (FAST_STRING -> OccName) -> U_qid -> UgnM RdrName
 -- EXCEPT: when we're compiling with -fno-implicit-prelude, in which
 -- case we need to unqualify these things. -- SDM.
 
-wlkQid mk_occ_name (U_noqual name)
-  = returnUgn (Unqual (mk_occ_name name))
-wlkQid mk_occ_name (U_aqual  mod name)
-  = returnUgn (Qual (mkModuleFS mod) (mk_occ_name name) HiFile)
-wlkQid mk_occ_name (U_gid n name)
+wlkQid mk_name_space (U_noqual name)
+  = returnUgn (mkSrcUnqual (mk_name_space name) name)
+wlkQid mk_name_space (U_aqual  mod name)
+  = returnUgn (mkSrcQual (mk_name_space name) mod name)
+wlkQid mk_name_space (U_gid n name)	-- Built in Prelude things
   | opt_NoImplicitPrelude 
-	= returnUgn (Unqual (mk_occ_name name))
+  = returnUgn (mkSrcUnqual (mk_name_space name) name)
   | otherwise
-	= returnUgn (Qual pRELUDE (mk_occ_name name) HiFile)
+  = returnUgn (mkPreludeQual (mk_name_space name) pRELUDE name)
 
 
-rdTCId  pt = rdU_qid pt `thenUgn` wlkTCId
+rdTCId  pt = rdU_qid pt `thenUgn` wlkTcId
 rdVarId pt = rdU_qid pt `thenUgn` wlkVarId
 
 rdTvId  pt = rdU_stringId pt `thenUgn` \ string -> wlkTvId string
-wlkTvId string = returnUgn (Unqual (srcTvOcc string))
+wlkTvId string = returnUgn (mkSrcUnqual tvName string)
 
 cvFlag :: U_long -> Bool
 cvFlag 0 = False
@@ -119,7 +127,7 @@ rdModule
     rdU_tree pt `thenUgn` \ (U_hmodule mod_fs himplist hexplist
 				       hmodlist srciface_version srcline) ->
     let
-	mod_name = mkModuleFS mod_fs
+	mod_name = mkSrcModuleFS mod_fs
     in
 
     setSrcFileUgn srcfile 		$
@@ -398,14 +406,15 @@ wlkPat pat
 	wlkLiteral lit	`thenUgn` \ lit ->
 	returnUgn (LitPatIn lit)
 
-      U_ident nn ->			-- simple identifier
+      U_ident (U_noqual s) | s == SLIT("_")->  returnUgn WildPatIn	-- Wild-card pattern
+
+      U_ident nn ->		-- simple identifier
 	wlkVarId nn	`thenUgn` \ n ->
-	let occ = rdrNameOcc n in
 	returnUgn (
-	  if isConOcc occ then
+	  if isRdrDataCon n then
 		ConPatIn n []
 	  else
-		if (isWildCardOcc occ) then WildPatIn else (VarPatIn n)
+		VarPatIn n
 	)
 
       U_ap l r ->	-- "application": there's a list of patterns lurking here!
@@ -745,7 +754,7 @@ wlkHsType ttype
 	returnUgn (MonoTyVar tyvar)
 
       U_tname tcon -> -- type constructor
-	wlkTCId tcon	`thenUgn` \ tycon ->
+	wlkTcId tcon	`thenUgn` \ tycon ->
 	returnUgn (MonoTyVar tycon)
 
       U_tapp t1 t2 ->
@@ -775,11 +784,11 @@ wlkInstType ttype
       U_forall u_tyvars u_theta inst_head ->
 	wlkList rdTvId u_tyvars		`thenUgn` \ tyvars -> 
 	wlkContext  u_theta		`thenUgn` \ theta ->
-	wlkConAndTys inst_head		`thenUgn` \ (clas, tys)	 ->
+	wlkClsTys inst_head		`thenUgn` \ (clas, tys)	 ->
 	returnUgn (HsForAllTy (map UserTyVar tyvars) theta (MonoDictTy clas tys))
 
       other -> -- something else
-	wlkConAndTys other   `thenUgn` \ (clas, tys) ->
+	wlkClsTys other   `thenUgn` \ (clas, tys) ->
 	returnUgn (HsForAllTy [] [] (MonoDictTy clas tys))
 \end{code}
 
@@ -796,22 +805,21 @@ wlkConAndTyVars ttype
     returnUgn (split ty [])
 
 
-wlkContext   :: U_list  -> UgnM RdrNameContext
-rdConAndTys  :: ParseTree -> UgnM (RdrName, [HsType RdrName])
+wlkContext :: U_list  -> UgnM RdrNameContext
+rdClsTys   :: ParseTree -> UgnM (RdrName, [HsType RdrName])
 
-wlkContext list = wlkList rdConAndTys list
+wlkContext list = wlkList rdClsTys list
 
-rdConAndTys pt = rdU_ttype pt `thenUgn` wlkConAndTys
+rdClsTys pt = rdU_ttype pt `thenUgn` wlkClsTys
 
-wlkConAndTys ttype
-  = wlkHsType ttype	`thenUgn` \ ty ->
-    let
-	split (MonoTyApp fun ty) tys = split fun (ty : tys)
-	split (MonoTyVar tycon)  tys = (tycon, tys)
-	split other		 tys = pprPanic "ERROR: malformed type: "
-					     (ppr other)
-    in
-    returnUgn (split ty [])
+wlkClsTys ttype
+  = go ttype []
+  where
+    go (U_tname tcon) tys = wlkClsId tcon	`thenUgn` \ cls ->
+		 	    returnUgn (cls, tys)
+
+    go (U_tapp t1 t2) tys = wlkHsType t2		`thenUgn` \ ty2 ->
+			    go t1 (ty2 : tys)
 \end{code}
 
 \begin{code}
@@ -903,10 +911,9 @@ rdImport pt
     mkSrcLocUgn srcline				$ \ src_loc      ->
     wlkMaybe rdU_stringId ias		`thenUgn` \ maybe_as	->
     wlkMaybe rd_spec ispec		`thenUgn` \ maybe_spec	->
-    returnUgn (ImportDecl (mkModuleFS imod) 
+    returnUgn (ImportDecl (mkImportModuleFS imod (cvIfaceFlavour isrc)) 
 			  (cvFlag iqual) 
-			  (cvIfaceFlavour isrc) 
-			  (case maybe_as of { Just m -> Just (mkModuleFS m); Nothing -> Nothing })
+			  (case maybe_as of { Just m -> Just (mkSrcModuleFS m); Nothing -> Nothing })
 			  maybe_spec src_loc)
   where
     rd_spec pt = rdU_either pt 		`thenUgn` \ spec ->
@@ -916,8 +923,8 @@ rdImport pt
 	U_right pt -> rdEntities pt 	`thenUgn` \ ents ->
 		      returnUgn (True, ents)
 
-cvIfaceFlavour 0 = HiFile	-- No pragam
-cvIfaceFlavour 1 = HiBootFile	-- {-# SOURCE #-}
+cvIfaceFlavour 0 = hiFile	-- No pragam
+cvIfaceFlavour 1 = hiBootFile	-- {-# SOURCE #-}
 \end{code}
 
 \begin{code}
@@ -929,25 +936,25 @@ rdEntity pt
   = rdU_entidt pt `thenUgn` \ entity ->
     case entity of
       U_entid evar -> 		-- just a value
-	wlkEntId	evar		`thenUgn` \ var ->
+	wlkEntId evar		`thenUgn` \ var ->
 	returnUgn (IEVar var)
 
       U_enttype x -> 		-- abstract type constructor/class
-	wlkTCId	x		`thenUgn` \ thing ->
+	wlkTcClsId x		`thenUgn` \ thing ->
 	returnUgn (IEThingAbs thing)
 
       U_enttypeall x -> 	-- non-abstract type constructor/class
-	wlkTCId	x		`thenUgn` \ thing ->
+	wlkTcClsId x		`thenUgn` \ thing ->
 	returnUgn (IEThingAll thing)
 
       U_enttypenamed x ns -> 	-- non-abstract type constructor/class
 				-- with specified constrs/methods
-	wlkTCId	x		`thenUgn` \ thing ->
+	wlkTcClsId x		`thenUgn` \ thing ->
 	wlkList rdVarId ns	`thenUgn` \ names -> 
 	returnUgn (IEThingWith thing names)
 
       U_entmod mod -> 		-- everything provided unqualified by a module
-	returnUgn (IEModuleContents (mkModuleFS mod))
+	returnUgn (IEModuleContents (mkSrcModuleFS mod))
 \end{code}
 
 

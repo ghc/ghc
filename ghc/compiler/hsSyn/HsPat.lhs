@@ -26,7 +26,7 @@ import BasicTypes	( Fixity )
 -- others:
 import Var		( Id, TyVar )
 import DataCon		( DataCon, dataConTyCon )
-import Name		( isConSymOcc, getOccName, NamedThing )
+import Name		( isDataSymOcc, getOccName, NamedThing )
 import Maybes		( maybeToBool )
 import Outputable	
 import TyCon		( maybeTyConSingleCon )
@@ -201,7 +201,7 @@ pprOutPat (ConPat name ty tyvars dicts pats)
     parens      $
     case pats of
       [p1,p2] 
-        | userStyle sty && isConSymOcc (getOccName name) ->
+        | userStyle sty && isDataSymOcc (getOccName name) ->
 	    hsep [ppr p1, ppr name, ppr p2]
       _ -> hsep [ppr name, interppSP tyvars, interppSP dicts, interppSP pats]
 

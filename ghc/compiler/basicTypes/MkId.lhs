@@ -80,8 +80,9 @@ import List		( nub )
 %************************************************************************
 
 \begin{code}
-mkSpecPragmaId occ uniq ty
-  = mkUserLocal occ uniq ty `setInlinePragma` IAmASpecPragmaId
+mkSpecPragmaId occ uniq ty loc
+  = mkUserLocal occ uniq ty loc `setInlinePragma` IAmASpecPragmaId
+	-- Maybe a SysLocal?  But then we'd lose the location
 
 mkDefaultMethodId dm_name rec_c ty
   = mkVanillaId dm_name ty

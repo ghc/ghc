@@ -13,7 +13,10 @@ import HsSyn
 import HsDecls		( HsIdInfo(..), HsStrictnessInfo(..) )
 import HsPragmas
 import HsTypes		( getTyVarName, pprClassAssertion, cmpHsTypes )
-import RdrHsSyn
+import RdrName		( RdrName, isRdrDataCon, rdrNameOcc )
+import RdrHsSyn		( RdrNameContext, RdrNameHsType, RdrNameConDecl,
+			  extractHsTyVars
+			)
 import RnHsSyn
 import HsCore
 
@@ -21,22 +24,22 @@ import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs )
 import RnEnv		( bindTyVarsRn, lookupBndrRn, lookupOccRn, 
 			  lookupImplicitOccRn, addImplicitOccRn,
 			  bindLocalsRn, 
-			  bindTyVarsFVRn, bindTyVarsFV2Rn, extendTyVarEnvRn,
+			  bindTyVarsFVRn, bindTyVarsFV2Rn, extendTyVarEnvFVRn,
 			  checkDupOrQualNames, checkDupNames,
 			  newLocallyDefinedGlobalName, newImportedGlobalName, 
 			  newImportedGlobalFromRdrName,
-			  ifaceFlavour, newDFunName,
+			  newDFunName,
 			  FreeVars, emptyFVs, plusFV, plusFVs, unitFV, addOneFV
 			)
 import RnMonad
 
 import Name		( Name, OccName,
 			  ExportFlag(..), Provenance(..), 
-			  nameOccName, NamedThing(..), isConOcc,
+			  nameOccName, NamedThing(..),
 			  mkDefaultMethodOcc, mkDFunOcc
 			)
 import NameSet
-import BasicTypes	( TopLevelFlag(..), IfaceFlavour(..) )
+import BasicTypes	( TopLevelFlag(..) )
 import TysWiredIn	( tupleTyCon, unboxedTupleTyCon, listTyCon )
 import Type		( funTyCon )
 import FiniteMap	( elemFM )
@@ -82,8 +85,8 @@ rnSourceDecls decls
 	-- Fixity decls have been dealt with already; ignore them
     go fvs ds' []          = returnRn (ds', fvs)
     go fvs ds' (FixD _:ds) = go fvs ds' ds
-    go fvs ds' (d:ds)      = rnDecl d	`thenRn` \(d', fvs) ->
-			     go (fvs `plusFV` fvs) (d':ds') ds
+    go fvs ds' (d:ds)      = rnDecl d	`thenRn` \(d', fvs') ->
+			     go (fvs `plusFV` fvs') (d':ds') ds
 
 rnIfaceDecl :: RdrNameHsDecl -> RnMS s RenamedHsDecl
 rnIfaceDecl d
@@ -153,7 +156,7 @@ rnDecl (TyClD (TyData new_or_data context tycon tyvars condecls derivings pragma
     returnRn (TyClD (TyData new_or_data context' tycon' tyvars' condecls' derivings' noDataPragmas src_loc),
 	      cxt_fvs `plusFV` plusFVs con_fvs_s `plusFV` deriv_fvs)
   where
-    data_doc = text "the data type declaration for" <+> ppr tycon
+    data_doc = text "the data type declaration for" <+> quotes (ppr tycon)
     con_names = map conDeclName condecls
 
 rnDecl (TyClD (TySynonym name tyvars ty src_loc))
@@ -244,8 +247,8 @@ rnDecl (TyClD (ClassDecl context cname tyvars sigs mbinds pragmas tname dname sr
 
 	    (InterfaceMode _, Just _) 
 		-> 	-- Imported class that has a default method decl
-		    newImportedGlobalName mod_name dm_occ (ifaceFlavour clas)	`thenRn` \ dm_name ->
-		    addOccurrenceName dm_name					`thenRn_`
+		    newImportedGlobalName mod_name dm_occ	`thenRn` \ dm_name ->
+		    addOccurrenceName dm_name			`thenRn_`
 		    returnRn (Just dm_name)
 
 	    other -> returnRn Nothing
@@ -273,7 +276,7 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun src_loc))
 	-- (Slightly strangely) the forall-d tyvars scope over
 	-- the method bindings too
     in
-    extendTyVarEnvRn inst_tyvars		$
+    extendTyVarEnvFVRn inst_tyvars		$
 
 	-- Rename the bindings
 	-- NB meth_names can be qualified!
@@ -282,7 +285,7 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun src_loc))
     let 
 	binders = mkNameSet (map fst (bagToList (collectMonoBinders mbinds')))
     in
-    renameSigs NotTopLevel True binders uprags	`thenRn` \ new_uprags ->
+    renameSigs NotTopLevel True binders uprags	`thenRn` \ (new_uprags, prag_fvs) ->
     mkDFunName inst_ty' maybe_dfun src_loc	`thenRn` \ dfun_name ->
     addOccurrenceName dfun_name			`thenRn_`
 			-- The dfun is not optional, because we use its version number
@@ -290,7 +293,7 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun src_loc))
 
 	-- The typechecker checks that all the bindings are for the right class.
     returnRn (InstD (InstDecl inst_ty' mbinds' new_uprags (Just dfun_name) src_loc),
-	      inst_fvs `plusFV` meth_fvs)
+	      inst_fvs `plusFV` meth_fvs `plusFV` prag_fvs)
   where
     meth_doc = text "the bindings in an instance declaration"
     meth_names   = bagToList (collectMonoBinders mbinds)
@@ -353,7 +356,7 @@ rnDerivs Nothing -- derivs not specified
 
 rnDerivs (Just ds)
   = mapRn rn_deriv ds `thenRn` \ derivs ->
-    returnRn (Just derivs, mkNameSet derivs)
+    returnRn (Just derivs, foldl addOneFV emptyFVs derivs)
   where
     rn_deriv clas
       = lookupOccRn clas	    `thenRn` \ clas_name ->
@@ -437,7 +440,7 @@ rnBangTy doc (Unbanged ty)
 -- from interface files, which always print in prefix form
 
 checkConName name
-  = checkRn (isConOcc (rdrNameOcc name))
+  = checkRn (isRdrDataCon name)
 	    (badDataCon name)
 \end{code}
 
@@ -783,7 +786,7 @@ dupClassAssertWarn ctxt (assertion : dups)
   = sep [hsep [ptext SLIT("Duplicate class assertion"), 
 	       quotes (pprClassAssertion assertion),
 	       ptext SLIT("in the context:")],
-	 nest 4 (pprContext ctxt)]
+	 nest 4 (pprContext ctxt <+> ptext SLIT("..."))]
 
 badDataCon name
    = hsep [ptext SLIT("Illegal data constructor name"), quotes (ppr name)]

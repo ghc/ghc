@@ -79,12 +79,13 @@ import TysPrim		-- TYPES
 import TysWiredIn
 
 -- others:
-import RdrHsSyn		( RdrName(..), varQual, tcQual, qual )
-import BasicTypes	( IfaceFlavour )
+import RdrName		( RdrName, mkPreludeQual )
 import Var		( varUnique, Id )
-import Name		( Name, OccName, Provenance(..),
-			  getName, mkGlobalName, modAndOcc
+import Name		( Name, OccName, Provenance(..), 
+			  NameSpace, tcName, clsName, varName, dataName,
+			  getName, mkGlobalName, nameRdrName, systemProvenance
 			)
+import RdrName		( rdrNameModule, rdrNameOcc, mkSrcQual )
 import Class		( Class, classKey )
 import TyCon		( tyConDataCons, TyCon )
 import Type		( funTyCon )
@@ -257,26 +258,26 @@ thinAirIdNames
   = map mkKnownKeyGlobal
     [
 	-- Needed for converting literals to Integers (used in tidyCoreExpr)
-      (varQual (pREL_BASE, SLIT("int2Integer")),  int2IntegerIdKey)	
-    , (varQual (pREL_BASE, SLIT("addr2Integer")), addr2IntegerIdKey)
+      (varQual pREL_BASE SLIT("int2Integer"),  int2IntegerIdKey)	
+    , (varQual pREL_BASE SLIT("addr2Integer"), addr2IntegerIdKey)
 
 	-- OK, this is Will's idea: we should have magic values for Integers 0,
 	-- +1, +2, and -1 (go ahead, fire me):
-    , (varQual (pREL_BASE, SLIT("integer_0")),  integerZeroIdKey)    
-    , (varQual (pREL_BASE, SLIT("integer_1")),  integerPlusOneIdKey) 
-    , (varQual (pREL_BASE, SLIT("integer_2")),  integerPlusTwoIdKey) 
-    , (varQual (pREL_BASE, SLIT("integer_m1")), integerMinusOneIdKey)
+    , (varQual pREL_BASE SLIT("integer_0"),  integerZeroIdKey)    
+    , (varQual pREL_BASE SLIT("integer_1"),  integerPlusOneIdKey) 
+    , (varQual pREL_BASE SLIT("integer_2"),  integerPlusTwoIdKey) 
+    , (varQual pREL_BASE SLIT("integer_m1"), integerMinusOneIdKey)
 
 
 	-- String literals
-    , (varQual (pREL_PACK, SLIT("packCString#")),   packCStringIdKey)
-    , (varQual (pREL_PACK, SLIT("unpackCString#")), unpackCStringIdKey)
-    , (varQual (pREL_PACK, SLIT("unpackNBytes#")),  unpackCString2IdKey)
-    , (varQual (pREL_PACK, SLIT("unpackAppendCString#")), unpackCStringAppendIdKey)
-    , (varQual (pREL_PACK, SLIT("unpackFoldrCString#")),  unpackCStringFoldrIdKey)
+    , (varQual pREL_PACK SLIT("packCString#"),   packCStringIdKey)
+    , (varQual pREL_PACK SLIT("unpackCString#"), unpackCStringIdKey)
+    , (varQual pREL_PACK SLIT("unpackNBytes#"),  unpackCString2IdKey)
+    , (varQual pREL_PACK SLIT("unpackAppendCString#"), unpackCStringAppendIdKey)
+    , (varQual pREL_PACK SLIT("unpackFoldrCString#"),  unpackCStringFoldrIdKey)
 
 	-- Folds; introduced by desugaring list comprehensions
-    , (varQual (pREL_BASE, SLIT("foldr")), foldrIdKey)
+    , (varQual pREL_BASE SLIT("foldr"), foldrIdKey)
     ]
 
 thinAirModules = [pREL_PACK]	-- See notes with RnIfaces.findAndReadIface
@@ -337,8 +338,9 @@ Ids, Synonyms, Classes and ClassOps with builtin keys.
 
 \begin{code}
 mkKnownKeyGlobal :: (RdrName, Unique) -> Name
-mkKnownKeyGlobal (Qual mod occ hif, uniq)
-  = mkGlobalName uniq mod occ NoProvenance
+mkKnownKeyGlobal (rdr_name, uniq)
+  = mkGlobalName uniq (rdrNameModule rdr_name) (rdrNameOcc rdr_name)
+		 systemProvenance
 
 ioTyCon_NAME	  = mkKnownKeyGlobal (ioTyCon_RDR,       ioTyConKey)
 main_NAME	  = mkKnownKeyGlobal (main_RDR,	         mainKey)
@@ -441,116 +443,116 @@ These RdrNames are not really "built in", but some parts of the compiler
 to write them all down in one place.
 
 \begin{code}
-prelude_primop op = qual (modAndOcc (mkPrimitiveId op))
+prelude_primop op = nameRdrName (getName (mkPrimitiveId op))
 
-main_RDR		= varQual (mAIN,     SLIT("main"))
-otherwiseId_RDR 	= varQual (pREL_BASE, SLIT("otherwise"))
+main_RDR		= varQual mAIN      SLIT("main")
+otherwiseId_RDR 	= varQual pREL_BASE SLIT("otherwise")
 
-intTyCon_RDR		= qual (modAndOcc intTyCon)
-ioTyCon_RDR		= tcQual  (pREL_IO_BASE, SLIT("IO"))
-ioDataCon_RDR  	   	= varQual (pREL_IO_BASE, SLIT("IO"))
-bindIO_RDR	        = varQual (pREL_IO_BASE, SLIT("bindIO"))
+intTyCon_RDR		= nameRdrName (getName intTyCon)
+ioTyCon_RDR		= tcQual   pREL_IO_BASE SLIT("IO")
+ioDataCon_RDR  	   	= dataQual pREL_IO_BASE SLIT("IO")
+bindIO_RDR	        = varQual  pREL_IO_BASE SLIT("bindIO")
 
-orderingTyCon_RDR	= tcQual (pREL_BASE, SLIT("Ordering"))
-rationalTyCon_RDR	= tcQual (pREL_NUM,  SLIT("Rational"))
-ratioTyCon_RDR		= tcQual (pREL_NUM,  SLIT("Ratio"))
-ratioDataCon_RDR	= varQual (pREL_NUM, SLIT(":%"))
+orderingTyCon_RDR	= tcQual   pREL_BASE SLIT("Ordering")
+rationalTyCon_RDR	= tcQual   pREL_NUM  SLIT("Rational")
+ratioTyCon_RDR		= tcQual   pREL_NUM  SLIT("Ratio")
+ratioDataCon_RDR	= dataQual pREL_NUM  SLIT(":%")
 
-byteArrayTyCon_RDR		= tcQual (pREL_ARR,  SLIT("ByteArray"))
-mutableByteArrayTyCon_RDR	= tcQual (pREL_ARR,  SLIT("MutableByteArray"))
+byteArrayTyCon_RDR		= tcQual pREL_ARR  SLIT("ByteArray")
+mutableByteArrayTyCon_RDR	= tcQual pREL_ARR  SLIT("MutableByteArray")
 
-foreignObjTyCon_RDR	= tcQual (pREL_IO_BASE, SLIT("ForeignObj"))
-stablePtrTyCon_RDR	= tcQual (pREL_STABLE,  SLIT("StablePtr"))
-deRefStablePtr_RDR      = varQual (pREL_STABLE, SLIT("deRefStablePtr"))
-makeStablePtr_RDR       = varQual (pREL_STABLE, SLIT("makeStablePtr"))
+foreignObjTyCon_RDR	= tcQual  pREL_IO_BASE SLIT("ForeignObj")
+stablePtrTyCon_RDR	= tcQual  pREL_FOREIGN SLIT("StablePtr")
+deRefStablePtr_RDR      = varQual pREL_FOREIGN SLIT("deRefStablePtr")
+makeStablePtr_RDR       = varQual pREL_FOREIGN SLIT("makeStablePtr")
 
-eqClass_RDR		= tcQual (pREL_BASE, SLIT("Eq"))
-ordClass_RDR		= tcQual (pREL_BASE, SLIT("Ord"))
-boundedClass_RDR	= tcQual (pREL_BASE, SLIT("Bounded"))
-numClass_RDR		= tcQual (pREL_BASE, SLIT("Num"))
-enumClass_RDR 		= tcQual (pREL_BASE, SLIT("Enum"))
-monadClass_RDR		= tcQual (pREL_BASE, SLIT("Monad"))
-monadPlusClass_RDR	= tcQual (pREL_BASE, SLIT("MonadPlus"))
-functorClass_RDR	= tcQual (pREL_BASE, SLIT("Functor"))
-showClass_RDR		= tcQual (pREL_BASE, SLIT("Show"))
-realClass_RDR		= tcQual (pREL_NUM,  SLIT("Real"))
-integralClass_RDR	= tcQual (pREL_NUM,  SLIT("Integral"))
-fractionalClass_RDR	= tcQual (pREL_NUM,  SLIT("Fractional"))
-floatingClass_RDR	= tcQual (pREL_NUM,  SLIT("Floating"))
-realFracClass_RDR	= tcQual (pREL_NUM,  SLIT("RealFrac"))
-realFloatClass_RDR	= tcQual (pREL_NUM,  SLIT("RealFloat"))
-readClass_RDR		= tcQual (pREL_READ, SLIT("Read"))
-ixClass_RDR		= tcQual (iX,	     SLIT("Ix"))
-ccallableClass_RDR	= tcQual (pREL_GHC,  SLIT("CCallable"))
-creturnableClass_RDR	= tcQual (pREL_GHC,  SLIT("CReturnable"))
+eqClass_RDR		= clsQual pREL_BASE SLIT("Eq")
+ordClass_RDR		= clsQual pREL_BASE SLIT("Ord")
+boundedClass_RDR	= clsQual pREL_BASE SLIT("Bounded")
+numClass_RDR		= clsQual pREL_BASE SLIT("Num")
+enumClass_RDR 		= clsQual pREL_BASE SLIT("Enum")
+monadClass_RDR		= clsQual pREL_BASE SLIT("Monad")
+monadPlusClass_RDR	= clsQual pREL_BASE SLIT("MonadPlus")
+functorClass_RDR	= clsQual pREL_BASE SLIT("Functor")
+showClass_RDR		= clsQual pREL_BASE SLIT("Show")
+realClass_RDR		= clsQual pREL_NUM  SLIT("Real")
+integralClass_RDR	= clsQual pREL_NUM  SLIT("Integral")
+fractionalClass_RDR	= clsQual pREL_NUM  SLIT("Fractional")
+floatingClass_RDR	= clsQual pREL_NUM  SLIT("Floating")
+realFracClass_RDR	= clsQual pREL_NUM  SLIT("RealFrac")
+realFloatClass_RDR	= clsQual pREL_NUM  SLIT("RealFloat")
+readClass_RDR		= clsQual pREL_READ SLIT("Read")
+ixClass_RDR		= clsQual iX	    SLIT("Ix")
+ccallableClass_RDR	= clsQual pREL_GHC  SLIT("CCallable")
+creturnableClass_RDR	= clsQual pREL_GHC  SLIT("CReturnable")
 
-fromInt_RDR	   = varQual (pREL_BASE, SLIT("fromInt"))
-fromInteger_RDR	   = varQual (pREL_BASE, SLIT("fromInteger"))
-minus_RDR	   = varQual (pREL_BASE, SLIT("-"))
-succ_RDR	   = varQual (pREL_BASE, SLIT("succ"))
-pred_RDR	   = varQual (pREL_BASE, SLIT("pred"))
-toEnum_RDR	   = varQual (pREL_BASE, SLIT("toEnum"))
-fromEnum_RDR	   = varQual (pREL_BASE, SLIT("fromEnum"))
-enumFrom_RDR	   = varQual (pREL_BASE, SLIT("enumFrom"))
-enumFromTo_RDR	   = varQual (pREL_BASE, SLIT("enumFromTo"))
-enumFromThen_RDR   = varQual (pREL_BASE, SLIT("enumFromThen"))
-enumFromThenTo_RDR = varQual (pREL_BASE, SLIT("enumFromThenTo"))
+fromInt_RDR	   = varQual pREL_BASE SLIT("fromInt")
+fromInteger_RDR	   = varQual pREL_BASE SLIT("fromInteger")
+minus_RDR	   = varQual pREL_BASE SLIT("-")
+succ_RDR	   = varQual pREL_BASE SLIT("succ")
+pred_RDR	   = varQual pREL_BASE SLIT("pred")
+toEnum_RDR	   = varQual pREL_BASE SLIT("toEnum")
+fromEnum_RDR	   = varQual pREL_BASE SLIT("fromEnum")
+enumFrom_RDR	   = varQual pREL_BASE SLIT("enumFrom")
+enumFromTo_RDR	   = varQual pREL_BASE SLIT("enumFromTo")
+enumFromThen_RDR   = varQual pREL_BASE SLIT("enumFromThen")
+enumFromThenTo_RDR = varQual pREL_BASE SLIT("enumFromThenTo")
 
-thenM_RDR	   = varQual (pREL_BASE,    SLIT(">>="))
-returnM_RDR	   = varQual (pREL_BASE,    SLIT("return"))
-failM_RDR	   = varQual (pREL_BASE,    SLIT("fail"))
+thenM_RDR	   = varQual pREL_BASE SLIT(">>=")
+returnM_RDR	   = varQual pREL_BASE SLIT("return")
+failM_RDR	   = varQual pREL_BASE SLIT("fail")
 
-fromRational_RDR   = varQual (pREL_NUM,     SLIT("fromRational"))
-negate_RDR	   = varQual (pREL_BASE, SLIT("negate"))
-eq_RDR		   = varQual (pREL_BASE, SLIT("=="))
-ne_RDR		   = varQual (pREL_BASE, SLIT("/="))
-le_RDR		   = varQual (pREL_BASE, SLIT("<="))
-lt_RDR		   = varQual (pREL_BASE, SLIT("<"))
-ge_RDR		   = varQual (pREL_BASE, SLIT(">="))
-gt_RDR		   = varQual (pREL_BASE, SLIT(">"))
-ltTag_RDR	   = varQual (pREL_BASE,  SLIT("LT"))
-eqTag_RDR	   = varQual (pREL_BASE,  SLIT("EQ"))
-gtTag_RDR	   = varQual (pREL_BASE,  SLIT("GT"))
-max_RDR		   = varQual (pREL_BASE, SLIT("max"))
-min_RDR		   = varQual (pREL_BASE, SLIT("min"))
-compare_RDR	   = varQual (pREL_BASE, SLIT("compare"))
-minBound_RDR	   = varQual (pREL_BASE, SLIT("minBound"))
-maxBound_RDR	   = varQual (pREL_BASE, SLIT("maxBound"))
-false_RDR	   = varQual (pREL_BASE,  SLIT("False"))
-true_RDR	   = varQual (pREL_BASE,  SLIT("True"))
-and_RDR		   = varQual (pREL_BASE,  SLIT("&&"))
-not_RDR		   = varQual (pREL_BASE,  SLIT("not"))
-compose_RDR	   = varQual (pREL_BASE, SLIT("."))
-append_RDR	   = varQual (pREL_BASE, SLIT("++"))
-map_RDR		   = varQual (pREL_BASE, SLIT("map"))
-concat_RDR	   = varQual (pREL_LIST, SLIT("concat"))
-filter_RDR	   = varQual (pREL_LIST, SLIT("filter"))
-zip_RDR		   = varQual (pREL_LIST, SLIT("zip"))
+fromRational_RDR   = varQual pREL_NUM  SLIT("fromRational")
+negate_RDR	   = varQual pREL_BASE SLIT("negate")
+eq_RDR		   = varQual pREL_BASE SLIT("==")
+ne_RDR		   = varQual pREL_BASE SLIT("/=")
+le_RDR		   = varQual pREL_BASE SLIT("<=")
+lt_RDR		   = varQual pREL_BASE SLIT("<")
+ge_RDR		   = varQual pREL_BASE SLIT(">=")
+gt_RDR		   = varQual pREL_BASE SLIT(">")
+ltTag_RDR	   = dataQual pREL_BASE SLIT("LT")
+eqTag_RDR	   = dataQual pREL_BASE SLIT("EQ")
+gtTag_RDR	   = dataQual pREL_BASE SLIT("GT")
+max_RDR		   = varQual pREL_BASE SLIT("max")
+min_RDR		   = varQual pREL_BASE SLIT("min")
+compare_RDR	   = varQual pREL_BASE SLIT("compare")
+minBound_RDR	   = varQual pREL_BASE SLIT("minBound")
+maxBound_RDR	   = varQual pREL_BASE SLIT("maxBound")
+false_RDR	   = dataQual pREL_BASE SLIT("False")
+true_RDR	   = dataQual pREL_BASE SLIT("True")
+and_RDR		   = varQual pREL_BASE SLIT("&&")
+not_RDR		   = varQual pREL_BASE SLIT("not")
+compose_RDR	   = varQual pREL_BASE SLIT(".")
+append_RDR	   = varQual pREL_BASE SLIT("++")
+map_RDR		   = varQual pREL_BASE SLIT("map")
+concat_RDR	   = varQual mONAD     SLIT("concat")
+filter_RDR	   = varQual mONAD     SLIT("filter")
+zip_RDR		   = varQual pREL_LIST SLIT("zip")
 
-showList___RDR     = varQual (pREL_BASE,  SLIT("showList__"))
-showsPrec_RDR	   = varQual (pREL_BASE, SLIT("showsPrec"))
-showList_RDR	   = varQual (pREL_BASE, SLIT("showList"))
-showSpace_RDR	   = varQual (pREL_BASE,  SLIT("showSpace"))
-showString_RDR	   = varQual (pREL_BASE, SLIT("showString"))
-showParen_RDR	   = varQual (pREL_BASE, SLIT("showParen"))
+showList___RDR     = varQual pREL_BASE  SLIT("showList__")
+showsPrec_RDR	   = varQual pREL_BASE SLIT("showsPrec")
+showList_RDR	   = varQual pREL_BASE SLIT("showList")
+showSpace_RDR	   = varQual pREL_BASE SLIT("showSpace")
+showString_RDR	   = varQual pREL_BASE SLIT("showString")
+showParen_RDR	   = varQual pREL_BASE SLIT("showParen")
 
-range_RDR	   = varQual (iX,   SLIT("range"))
-index_RDR	   = varQual (iX,   SLIT("index"))
-inRange_RDR	   = varQual (iX,   SLIT("inRange"))
+range_RDR	   = varQual iX   SLIT("range")
+index_RDR	   = varQual iX   SLIT("index")
+inRange_RDR	   = varQual iX   SLIT("inRange")
 
-readsPrec_RDR	   = varQual (pREL_READ, SLIT("readsPrec"))
-readList_RDR	   = varQual (pREL_READ, SLIT("readList"))
-readParen_RDR	   = varQual (pREL_READ, SLIT("readParen"))
-lex_RDR		   = varQual (pREL_READ,  SLIT("lex"))
-readList___RDR     = varQual (pREL_READ,  SLIT("readList__"))
+readsPrec_RDR	   = varQual pREL_READ SLIT("readsPrec")
+readList_RDR	   = varQual pREL_READ SLIT("readList")
+readParen_RDR	   = varQual pREL_READ SLIT("readParen")
+lex_RDR		   = varQual pREL_READ SLIT("lex")
+readList___RDR     = varQual pREL_READ SLIT("readList__")
 
-plus_RDR	   = varQual (pREL_BASE, SLIT("+"))
-times_RDR	   = varQual (pREL_BASE, SLIT("*"))
-mkInt_RDR	   = varQual (pREL_BASE, SLIT("I#"))
+plus_RDR	   = varQual pREL_BASE SLIT("+")
+times_RDR	   = varQual pREL_BASE SLIT("*")
+mkInt_RDR	   = dataQual pREL_BASE SLIT("I#")
 
-error_RDR	   = varQual (pREL_ERR, SLIT("error"))
-assert_RDR         = varQual (pREL_GHC, SLIT("assert"))
-assertErr_RDR      = varQual (pREL_ERR, SLIT("assertError"))
+error_RDR	   = varQual pREL_ERR SLIT("error")
+assert_RDR         = varQual pREL_GHC SLIT("assert")
+assertErr_RDR      = varQual pREL_ERR SLIT("assertError")
 
 eqH_Char_RDR	= prelude_primop CharEqOp
 ltH_Char_RDR	= prelude_primop CharLtOp
@@ -571,10 +573,12 @@ minusH_RDR	= prelude_primop IntSubOp
 
 \begin{code}
 mkTupConRdrName :: Int -> RdrName 
-mkTupConRdrName arity = varQual (mkTupNameStr arity)
+mkTupConRdrName arity = case mkTupNameStr arity of
+			  (mod, occ) -> dataQual mod occ
 
 mkUbxTupConRdrName :: Int -> RdrName
-mkUbxTupConRdrName arity = varQual (mkUbxTupNameStr arity)
+mkUbxTupConRdrName arity = case mkUbxTupNameStr arity of
+				(mod, occ) -> dataQual mod occ
 \end{code}
 
 
@@ -702,3 +706,18 @@ noDictClassKeys 	-- These classes are used only for type annotations;
 			-- they are not implemented by dictionaries, ever.
   = cCallishClassKeys
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Local helpers}
+%*									*
+%************************************************************************
+
+\begin{code}
+varQual  = mkPreludeQual varName
+dataQual = mkPreludeQual dataName
+tcQual   = mkPreludeQual tcName
+clsQual  = mkPreludeQual clsName
+\end{code}
+

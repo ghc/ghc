@@ -29,7 +29,6 @@ import Demand		( Demand )
 import CallConv		( CallConv, pprCallConv )
 
 -- others:
-import Name		( NamedThing )
 import Outputable	
 import SrcLoc		( SrcLoc )
 import Util
@@ -72,7 +71,7 @@ data HsDecl name pat
 
 \begin{code}
 #ifdef DEBUG
-hsDeclName :: (NamedThing name, Outputable name, Outputable pat)
+hsDeclName :: (Outputable name, Outputable pat)
 	   => HsDecl name pat -> name
 #endif
 hsDeclName (TyClD decl)				    = tyClDeclName decl
@@ -92,7 +91,7 @@ tyClDeclName (ClassDecl _ name _ _ _ _ _ _ _) = name
 \end{code}
 
 \begin{code}
-instance (NamedThing name, Outputable name, Outputable pat)
+instance (Outputable name, Outputable pat)
 	=> Outputable (HsDecl name pat) where
 
     ppr (TyClD dcl)  = ppr dcl
@@ -107,11 +106,11 @@ instance (NamedThing name, Outputable name, Outputable pat)
 
 #ifdef DEBUG
 -- hsDeclName needs more context when DEBUG is on
-instance (NamedThing name, Outputable name, Outputable pat, Eq name)
+instance (Outputable name, Outputable pat, Eq name)
       => Eq (HsDecl name pat) where
    d1 == d2 = hsDeclName d1 == hsDeclName d2
 	
-instance (NamedThing name, Outputable name, Outputable pat, Ord name)
+instance (Outputable name, Outputable pat, Ord name)
       => Ord (HsDecl name pat) where
 	d1 `compare` d2 = hsDeclName d1 `compare` hsDeclName d2
 #else
@@ -183,7 +182,7 @@ isClassDecl other			  = False
 \end{code}
 
 \begin{code}
-instance (NamedThing name, Outputable name, Outputable pat)
+instance (Outputable name, Outputable pat)
 	      => Outputable (TyClDecl name pat) where
 
     ppr (TySynonym tycon tyvars mono_ty src_loc)
@@ -241,7 +240,7 @@ data SpecDataSig name
 		(HsType name)
 		SrcLoc
 
-instance (NamedThing name, Outputable name)
+instance (Outputable name)
 	      => Outputable (SpecDataSig name) where
 
     ppr (SpecDataSig tycon ty _)
@@ -286,7 +285,7 @@ data BangType name
 \end{code}
 
 \begin{code}
-instance (NamedThing name, Outputable name) => Outputable (ConDecl name) where
+instance (Outputable name) => Outputable (ConDecl name) where
     ppr (ConDecl con tvs cxt con_details  loc)
       = sep [pprForAll tvs, pprContext cxt, ppr_con_details con con_details]
 
@@ -338,7 +337,7 @@ data InstDecl name pat
 \end{code}
 
 \begin{code}
-instance (NamedThing name, Outputable name, Outputable pat)
+instance (Outputable name, Outputable pat)
 	      => Outputable (InstDecl name pat) where
 
     ppr (InstDecl inst_ty binds uprags dfun_name src_loc)
@@ -367,7 +366,7 @@ data DefaultDecl name
   = DefaultDecl	[HsType name]
 		SrcLoc
 
-instance (NamedThing name, Outputable name)
+instance (Outputable name)
 	      => Outputable (DefaultDecl name) where
 
     ppr (DefaultDecl tys src_loc)
@@ -390,7 +389,7 @@ data ForeignDecl name =
 	CallConv
 	SrcLoc
 
-instance (NamedThing name, Outputable name)
+instance (Outputable name)
 	      => Outputable (ForeignDecl name) where
 
     ppr (ForeignDecl nm imp_exp ty ext_name cconv src_loc)
@@ -440,7 +439,7 @@ data IfaceSig name
 		[HsIdInfo name]
 		SrcLoc
 
-instance (NamedThing name, Outputable name) => Outputable (IfaceSig name) where
+instance (Outputable name) => Outputable (IfaceSig name) where
     ppr (IfaceSig var ty _ _)
       = hang (hsep [ppr var, dcolon])
 	     4 (ppr ty)

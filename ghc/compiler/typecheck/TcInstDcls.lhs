@@ -183,8 +183,16 @@ tcInstDecl1 unf_env mod_name (InstDecl poly_ty binds uprags (Just dfun_name) src
     in
 
 	-- Check for respectable instance type, and context
-    scrutiniseInstanceHead clas inst_tys	`thenNF_Tc_`
-    mapNF_Tc scrutiniseInstanceConstraint theta	`thenNF_Tc_`
+	-- but only do this for non-imported instance decls.
+	-- Imported ones should have been checked already, and may indeed
+	-- contain something illegal in normal Haskell, notably
+	--	instance CCallable [Char] 
+    (if isLocallyDefined dfun_name then
+	scrutiniseInstanceHead clas inst_tys	`thenNF_Tc_`
+	mapNF_Tc scrutiniseInstanceConstraint theta
+     else
+	returnNF_Tc []
+     )						`thenNF_Tc_`
 
 	-- Make the dfun id and constant-method ids
     let

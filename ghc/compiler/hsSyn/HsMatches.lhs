@@ -19,7 +19,6 @@ import HsTypes		( HsTyVar, HsType )
 import Type		( Type )
 import SrcLoc		( SrcLoc )
 import Outputable
-import Name		( NamedThing )
 \end{code}
 
 %************************************************************************
@@ -90,12 +89,12 @@ getMatchLoc (Match _ _ _ (GRHSs (GRHS _ loc : _) _ _)) = loc
 
 We know the list must have at least one @Match@ in it.
 \begin{code}
-pprMatches :: (NamedThing id, Outputable id, Outputable pat)
+pprMatches :: (Outputable id, Outputable pat)
 	   => (Bool, SDoc) -> [Match id pat] -> SDoc
 pprMatches print_info matches = vcat (map (pprMatch print_info) matches)
 
 
-pprMatch :: (NamedThing id, Outputable id, Outputable pat)
+pprMatch :: (Outputable id, Outputable pat)
 	   => (Bool, SDoc) -> Match id pat -> SDoc
 pprMatch print_info@(is_case, name) (Match _ pats maybe_ty grhss)
   = maybe_name <+> sep [sep (map ppr pats), 
@@ -109,7 +108,7 @@ pprMatch print_info@(is_case, name) (Match _ pats maybe_ty grhss)
 			Nothing -> empty
 
 
-pprGRHSs :: (NamedThing id, Outputable id, Outputable pat)
+pprGRHSs :: (Outputable id, Outputable pat)
 	 => Bool -> GRHSs id pat -> SDoc
 pprGRHSs is_case (GRHSs grhss binds maybe_ty)
   = vcat (map (pprGRHS is_case) grhss)
@@ -118,7 +117,7 @@ pprGRHSs is_case (GRHSs grhss binds maybe_ty)
      else text "where" $$ nest 4 (pprDeeper (ppr binds)))
 
 
-pprGRHS :: (NamedThing id, Outputable id, Outputable pat)
+pprGRHS :: (Outputable id, Outputable pat)
 	=> Bool -> GRHS id pat -> SDoc
 
 pprGRHS is_case (GRHS [ExprStmt expr _] locn)

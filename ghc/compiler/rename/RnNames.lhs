@@ -11,7 +11,7 @@ module RnNames (
 #include "HsVersions.h"
 
 import CmdLineOpts    ( opt_NoImplicitPrelude, opt_WarnDuplicateExports, 
-			opt_SourceUnchanged
+			opt_SourceUnchanged, opt_WarnUnusedBinds
 		      )
 
 import HsSyn	( HsModule(..), ImportDecl(..), HsDecl(..), TyClDecl(..),
@@ -20,14 +20,12 @@ import HsSyn	( HsModule(..), ImportDecl(..), HsDecl(..), TyClDecl(..),
 		  FixitySig(..), Sig(..),
 		  collectTopBinders
 		)
-import RdrHsSyn	( RdrName(..), RdrNameIE, RdrNameImportDecl,
-		  RdrNameHsModule, RdrNameHsDecl,
-		  rdrNameOcc, ieOcc
+import RdrHsSyn	( RdrNameIE, RdrNameImportDecl,
+		  RdrNameHsModule, RdrNameHsDecl
 		)
 import RnIfaces	( getInterfaceExports, getDeclBinders, getImportedFixities, 
 		  recordSlurp, checkUpToDate, loadHomeInterface
 		)
-import BasicTypes ( IfaceFlavour(..) )
 import RnEnv
 import RnMonad
 
@@ -36,7 +34,9 @@ import PrelMods
 import UniqFM	( lookupUFM )
 import Bag	( bagToList )
 import Maybes	( maybeToBool )
+import NameSet
 import Name
+import RdrName	( RdrName, rdrNameOcc, mkRdrQual, mkRdrUnqual )
 import SrcLoc	( SrcLoc )
 import NameSet	( elemNameSet, emptyNameSet )
 import Outputable
@@ -70,16 +70,17 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
       fixRn (\ ~(rec_rn_env, _) ->
 	let
 	   rec_unqual_fn :: Name -> Bool	-- Is this chap in scope unqualified?
-	   rec_unqual_fn = mkPrintUnqualFn rec_rn_env
+	   rec_unqual_fn = unQualInScope rec_rn_env
 	in
+	setOmitQualFn rec_unqual_fn		$
+
 		-- PROCESS LOCAL DECLS
 		-- Do these *first* so that the correct provenance gets
 		-- into the global name cache.
 	importsFromLocalDecls this_mod rec_exp_fn decls	`thenRn` \ (local_gbl_env, local_mod_avails) ->
 
 		-- PROCESS IMPORT DECLS
-	mapAndUnzipRn (importsFromImportDecl this_mod rec_unqual_fn)
-		      all_imports			`thenRn` \ (imp_gbl_envs, imp_avails_s) ->
+	mapAndUnzipRn importsFromImportDecl all_imports	`thenRn` \ (imp_gbl_envs, imp_avails_s) ->
 
 		-- COMBINE RESULTS
 		-- We put the local env second, so that a local provenance
@@ -147,13 +148,12 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
 
 		 | otherwise		   = [ImportDecl pRELUDE 
 							 False		{- Not qualified -}
-							 HiFile		{- Not source imported -}
 							 Nothing	{- No "as" -}
 							 Nothing	{- No import list -}
 							 mod_loc]
     
     explicit_prelude_import
-      = not (null [ () | (ImportDecl mod qual _ _ _ _) <- imports, mod == pRELUDE ])
+      = not (null [ () | (ImportDecl mod qual _ _ _) <- imports, mod == pRELUDE ])
 \end{code}
 	
 \begin{code}
@@ -181,15 +181,13 @@ checkEarlyExit mod
 \end{code}
 	
 \begin{code}
-importsFromImportDecl :: Module			-- The module being compiled
-		      -> (Name -> Bool)		-- True => print unqualified
-		      -> RdrNameImportDecl
+importsFromImportDecl :: RdrNameImportDecl
 		      -> RnMG (GlobalRdrEnv, 
 			       ExportAvails) 
 
-importsFromImportDecl this_mod rec_unqual_fn (ImportDecl imp_mod qual_only as_source as_mod import_spec iloc)
+importsFromImportDecl (ImportDecl imp_mod qual_only as_mod import_spec iloc)
   = pushSrcLocRn iloc $
-    getInterfaceExports imp_mod as_source		`thenRn` \ avails ->
+    getInterfaceExports imp_mod 	`thenRn` \ avails ->
 
     if null avails then
 	-- If there's an error in getInterfaceExports, (e.g. interface
@@ -206,12 +204,6 @@ importsFromImportDecl this_mod rec_unqual_fn (ImportDecl imp_mod qual_only as_so
 	home_modules = [name | avail <- filtered_avails,
 				-- Doesn't take account of hiding, but that doesn't matter
 		
-				-- Drop NotAvailables.  
-				-- Happens if filterAvail finds something missing
-			       case avail of
-				  NotAvailable -> False
-				  other        -> True,
-			
 			       let name = availName avail,
 			       not (isLocallyDefined name || nameModule name == imp_mod)
 				-- Don't try to load the module being compiled
@@ -231,13 +223,8 @@ importsFromImportDecl this_mod rec_unqual_fn (ImportDecl imp_mod qual_only as_so
 	--	(b) the print-unqualified field
 	-- But don't fiddle with wired-in things or we get in a twist
     let
-	improve_prov name | isWiredInName name = name
-			  | otherwise	       = setNameProvenance name (mk_new_prov name)
-
-	is_explicit name = name `elemNameSet` explicits
-	mk_new_prov name = NonLocalDef (UserImport imp_mod iloc (is_explicit name))
-				       as_source
-				       (rec_unqual_fn name)
+	improve_prov name = setNameImportReason name (UserImport imp_mod iloc (is_explicit name))
+	is_explicit name  = name `elemNameSet` explicits
     in
     qualifyImports imp_mod 
 		   (not qual_only)	-- Maybe want unqualified names
@@ -301,10 +288,10 @@ getLocalDeclBinders new_name (ForD (ForeignDecl nm kind _ dyn _ loc))
   = returnRn []
 
 getLocalDeclBinders new_name decl
-  = getDeclBinders new_name decl	`thenRn` \ avail ->
-    case avail of
-	NotAvailable -> returnRn []		-- Instance decls and suchlike
-	other	     -> returnRn [avail]
+  = getDeclBinders new_name decl	`thenRn` \ maybe_avail ->
+    case maybe_avail of
+	Nothing    -> returnRn []		-- Instance decls and suchlike
+	Just avail -> returnRn [avail]
 
 binds_haskell_name (FoImport _) _   = True
 binds_haskell_name FoLabel      _   = True
@@ -328,9 +315,11 @@ fixitiesFromLocalDecls gbl_env decls
     fix_decl acc (FixitySig rdr_name fixity loc)
 	= 	-- Check for fixity decl for something not declared
 	  case lookupRdrEnv gbl_env rdr_name of {
-	    Nothing   -> pushSrcLocRn loc 				$
-			 addWarnRn (unusedFixityDecl rdr_name fixity)	`thenRn_`
-			 returnRn acc ;
+	    Nothing | opt_WarnUnusedBinds 
+		    -> pushSrcLocRn loc (addWarnRn (unusedFixityDecl rdr_name fixity))	`thenRn_`
+		       returnRn acc 
+		    | otherwise -> returnRn acc ;
+	
 	    Just (name:_) ->
 
 		-- Check for duplicate fixity decl
@@ -366,15 +355,18 @@ filterImports mod Nothing imports
   = returnRn (imports, [], emptyNameSet)
 
 filterImports mod (Just (want_hiding, import_items)) avails
-  = mapRn check_item import_items		`thenRn` \ item_avails ->
+  = mapMaybeRn check_item import_items		`thenRn` \ avails_w_explicits ->
+    let
+	(item_avails, explicits_s) = unzip avails_w_explicits
+	explicits		   = foldl addListToNameSet emptyNameSet explicits_s
+    in
     if want_hiding 
     then	
 	-- All imported; item_avails to be hidden
 	returnRn (avails, item_avails, emptyNameSet)
     else
 	-- Just item_avails imported; nothing to be hidden
-	returnRn (item_avails, [], availsToNameSet item_avails)
-
+	returnRn (item_avails, [], explicits)
   where
     import_fm :: FiniteMap OccName AvailInfo
     import_fm = listToFM [ (nameOccName name, avail) 
@@ -382,35 +374,44 @@ filterImports mod (Just (want_hiding, import_items)) avails
 			   name  <- availNames avail]
 	-- Even though availNames returns data constructors too,
 	-- they won't make any difference because naked entities like T
-	-- in an import list map to TCOccs, not VarOccs.
+	-- in an import list map to TcOccs, not VarOccs.
 
     check_item item@(IEModuleContents _)
       = addErrRn (badImportItemErr mod item)	`thenRn_`
-	returnRn NotAvailable
+	returnRn Nothing
 
     check_item item
       | not (maybeToBool maybe_in_import_avails) ||
-	(case filtered_avail of { NotAvailable -> True; other -> False })
+	not (maybeToBool maybe_filtered_avail)
       = addErrRn (badImportItemErr mod item)	`thenRn_`
-	returnRn NotAvailable
+	returnRn Nothing
 
       | dodgy_import = addWarnRn (dodgyImportWarn mod item)	`thenRn_`
-		       returnRn filtered_avail
+		       returnRn (Just (filtered_avail, explicits))
 
-      | otherwise    = returnRn filtered_avail
+      | otherwise    = returnRn (Just (filtered_avail, explicits))
 		
       where
-	maybe_in_import_avails = lookupFM import_fm (ieOcc item)
+ 	wanted_occ	       = rdrNameOcc (ieName item)
+	maybe_in_import_avails = lookupFM import_fm wanted_occ
+
 	Just avail	       = maybe_in_import_avails
-	filtered_avail	       = filterAvail item avail
-	dodgy_import 	       = case (item, avail) of
-				   (IEThingAll _, AvailTC _ [n]) -> True
-					-- This occurs when you import T(..), but
-					-- only export T abstractly.  The single [n]
-					-- in the AvailTC is the type or class itself
+	maybe_filtered_avail   = filterAvail item avail
+	Just filtered_avail    = maybe_filtered_avail
+	explicits	       | dot_dot   = [availName filtered_avail]
+			       | otherwise = availNames filtered_avail
+
+	dot_dot = case item of 
+		    IEThingAll _    -> True
+		    other	    -> False
+
+	dodgy_import = case (item, avail) of
+			  (IEThingAll _, AvailTC _ [n]) -> True
+				-- This occurs when you import T(..), but
+				-- only export T abstractly.  The single [n]
+				-- in the AvailTC is the type or class itself
 					
-				   other -> False
-					
+			  other -> False
 \end{code}
 
 
@@ -469,16 +470,14 @@ qualifyImports this_mod unqual_imp as_mod hides
 	| unqual_imp = env2
 	| otherwise  = env1
 	where
-	  env1 = addOneToGlobalRdrEnv env  (Qual qual_mod occ err_hif) better_name
-	  env2 = addOneToGlobalRdrEnv env1 (Unqual occ) 	       better_name
+	  env1 = addOneToGlobalRdrEnv env  (mkRdrQual qual_mod occ) better_name
+	  env2 = addOneToGlobalRdrEnv env1 (mkRdrUnqual occ) 	    better_name
 	  occ         = nameOccName name
 	  better_name = improve_prov name
 
     del_avail env avail = foldl delOneFromGlobalRdrEnv env rdr_names
 			where
-			  rdr_names = map (Unqual . nameOccName) (availNames avail)
-			
-err_hif = error "qualifyImports: hif"	-- Not needed in key to mapping
+			  rdr_names = map (mkRdrUnqual . nameOccName) (availNames avail)
 \end{code}
 
 
@@ -585,7 +584,7 @@ exportsFromAvail this_mod (Just export_items)
 #endif
 
 	| not enough_avail
-	= failWithRn acc (exportItemErr ie export_avail)
+	= failWithRn acc (exportItemErr ie)
 
 	| otherwise	-- Phew!  It's OK!  Now to check the occurrence stuff!
 	= check_occs ie occs export_avail	`thenRn` \ occs' ->
@@ -595,10 +594,11 @@ exportsFromAvail this_mod (Just export_items)
 	  rdr_name	  = ieName ie
           maybe_in_scope  = lookupFM global_name_env rdr_name
 	  Just (name:dup_names) = maybe_in_scope
-	  maybe_avail     = lookupUFM entity_avail_env name
-	  Just avail      = maybe_avail
- 	  export_avail    = filterAvail ie avail
-	  enough_avail	  = case export_avail of {NotAvailable -> False; other -> True}
+	  maybe_avail        = lookupUFM entity_avail_env name
+	  Just avail         = maybe_avail
+ 	  maybe_export_avail = filterAvail ie avail
+	  enough_avail	     = maybeToBool maybe_export_avail
+	  Just export_avail  = maybe_export_avail
 
 add_avail avails avail = addToNameEnv_C plusAvail avails (availName avail) avail
 
@@ -646,13 +646,8 @@ dodgyImportWarn mod (IEThingAll tc)
 modExportErr mod
   = hsep [ ptext SLIT("Unknown module in export list: module"), quotes (pprModule mod)]
 
-exportItemErr export_item NotAvailable
-  = sep [ ptext SLIT("Export item not in scope:"), quotes (ppr export_item)]
-
-exportItemErr export_item avail
-  = hang (ptext SLIT("Export item not fully in scope:"))
-	   4 (vcat [hsep [ptext SLIT("Wanted:   "), ppr export_item],
-		    hsep [ptext SLIT("Available:"), ppr (ieOcc export_item), pprAvail avail]])
+exportItemErr export_item
+  = sep [ ptext SLIT("Bad export item"), quotes (ppr export_item)]
 
 exportClashErr occ_name ie1 ie2
   = hsep [ptext SLIT("The export items"), quotes (ppr ie1), ptext SLIT("and"), quotes (ppr ie2),

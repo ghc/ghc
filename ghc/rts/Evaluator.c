@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/01/26 11:12:41 $
+ * $Revision: 1.5 $
+ * $Date: 1999/01/27 14:51:18 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -320,7 +320,7 @@ static inline StgPtr grabHpNonUpd( nat size )
 /* --------------------------------------------------------------------------
  * Manipulate "update frame" list:
  * o Update frames           (based on stg_do_update and friends in Updates.hc)
- * o Error handling/catching (based on catchZh_fast and friends in Prims.hc)
+ * o Error handling/catching (based on catchzh_fast and friends in Prims.hc)
  * o Seq frames              (based on seq_frame_entry in Prims.hc)
  * o Stop frames
  * ------------------------------------------------------------------------*/
@@ -1340,8 +1340,8 @@ enterLoop:
                     }
                 case i_PACK_INT:
                     {
-                        StgClosure* o = stgCast(StgClosure*,grabHpNonUpd(IZh_sizeW));
-                        SET_HDR(o,&IZh_con_info,??);
+                        StgClosure* o = stgCast(StgClosure*,grabHpNonUpd(Izh_sizeW));
+                        SET_HDR(o,&Izh_con_info,??);
                         payloadWord(o,0) = PopTaggedInt();
                         IF_DEBUG(evaluator,
                                  fprintf(stderr,"\tBuilt "); 
@@ -1385,8 +1385,8 @@ enterLoop:
                     }
                 case i_PACK_INT64:
                     {
-                        StgClosure* o = stgCast(StgClosure*,grabHpNonUpd(I64Zh_sizeW));
-                        SET_HDR(o,&I64Zh_con_info,??);
+                        StgClosure* o = stgCast(StgClosure*,grabHpNonUpd(I64zh_sizeW));
+                        SET_HDR(o,&I64zh_con_info,??);
                         ASSIGN_Int64(&payloadWord(o,0),PopTaggedInt64());
                         IF_DEBUG(evaluator,
                                  fprintf(stderr,"\tBuilt "); 
@@ -1436,9 +1436,9 @@ enterLoop:
                     }
                 case i_PACK_WORD:
                     {
-                        StgClosure* o = stgCast(StgClosure*,grabHpNonUpd(WZh_sizeW));
+                        StgClosure* o = stgCast(StgClosure*,grabHpNonUpd(Wzh_sizeW));
 
-                        SET_HDR(o,&WZh_con_info,??);
+                        SET_HDR(o,&Wzh_con_info,??);
                         payloadWord(o,0) = PopTaggedWord();
                         IF_DEBUG(evaluator,
                                  fprintf(stderr,"\tBuilt "); 
@@ -1473,8 +1473,8 @@ enterLoop:
                     }
                 case i_PACK_ADDR:
                     {
-                        StgClosure* o = stgCast(StgClosure*,grabHpNonUpd(AZh_sizeW));
-                        SET_HDR(o,&AZh_con_info,??);
+                        StgClosure* o = stgCast(StgClosure*,grabHpNonUpd(Azh_sizeW));
+                        SET_HDR(o,&Azh_con_info,??);
                         payloadPtr(o,0) = PopTaggedAddr();
                         IF_DEBUG(evaluator,
                                  fprintf(stderr,"\tBuilt "); 
@@ -1508,8 +1508,8 @@ enterLoop:
                     }
                 case i_PACK_CHAR:
                     {
-                        StgClosure* o = stgCast(StgClosure*,grabHpNonUpd(CZh_sizeW));
-                        SET_HDR(o,&CZh_con_info,??);
+                        StgClosure* o = stgCast(StgClosure*,grabHpNonUpd(Czh_sizeW));
+                        SET_HDR(o,&Czh_con_info,??);
                         payloadWord(o,0) = PopTaggedChar();
                         PushPtr(stgCast(StgPtr,o));
                         IF_DEBUG(evaluator,
@@ -1542,8 +1542,8 @@ enterLoop:
                     }
                 case i_PACK_FLOAT:
                     {
-                        StgClosure* o = stgCast(StgClosure*,grabHpNonUpd(FZh_sizeW));
-                        SET_HDR(o,&FZh_con_info,??);
+                        StgClosure* o = stgCast(StgClosure*,grabHpNonUpd(Fzh_sizeW));
+                        SET_HDR(o,&Fzh_con_info,??);
                         ASSIGN_FLT(&payloadWord(o,0),PopTaggedFloat());
                         IF_DEBUG(evaluator,
                                  fprintf(stderr,"\tBuilt "); 
@@ -1576,8 +1576,8 @@ enterLoop:
                     }
                 case i_PACK_DOUBLE:
                     {
-                        StgClosure* o = stgCast(StgClosure*,grabHpNonUpd(DZh_sizeW));
-                        SET_HDR(o,&DZh_con_info,??);
+                        StgClosure* o = stgCast(StgClosure*,grabHpNonUpd(Dzh_sizeW));
+                        SET_HDR(o,&Dzh_con_info,??);
                         ASSIGN_DBL(&payloadWord(o,0),PopTaggedDouble());
                         IF_DEBUG(evaluator,
                                  fprintf(stderr,"\tBuilt "); 
@@ -1606,7 +1606,7 @@ enterLoop:
                     }
                 case i_PACK_STABLE:
                     {
-                        StgClosure* o = stgCast(StgClosure*,grabHpNonUpd(StableZh_sizeW));
+                        StgClosure* o = stgCast(StgClosure*,grabHpNonUpd(Stablezh_sizeW));
                         SET_HDR(o,&StablePtr_con_info,??);
                         payloadWord(o,0) = PopTaggedStablePtr();
                         IF_DEBUG(evaluator,
@@ -1834,35 +1834,35 @@ enterLoop:
                         case i_intToAddr:       OP_I_A((StgAddr)x);  break;  /*  ToDo */
                         case i_addrToInt:       OP_A_I((StgInt)x);   break;  /* ToDo */
 
-                        case i_indexCharOffAddr:   OP_AI_C(indexCharOffAddrZh(r,x,y));      break;
-                        case i_readCharOffAddr:    OP_AI_C(indexCharOffAddrZh(r,x,y));      break;
-                        case i_writeCharOffAddr:   OP_AIC_(writeCharOffAddrZh(x,y,z));      break;
+                        case i_indexCharOffAddr:   OP_AI_C(indexCharOffAddrzh(r,x,y));      break;
+                        case i_readCharOffAddr:    OP_AI_C(indexCharOffAddrzh(r,x,y));      break;
+                        case i_writeCharOffAddr:   OP_AIC_(writeCharOffAddrzh(x,y,z));      break;
 										            
-                        case i_indexIntOffAddr:    OP_AI_I(indexIntOffAddrZh(r,x,y));       break;
-                        case i_readIntOffAddr:     OP_AI_I(indexIntOffAddrZh(r,x,y));       break;
-                        case i_writeIntOffAddr:    OP_AII_(writeIntOffAddrZh(x,y,z));       break;
+                        case i_indexIntOffAddr:    OP_AI_I(indexIntOffAddrzh(r,x,y));       break;
+                        case i_readIntOffAddr:     OP_AI_I(indexIntOffAddrzh(r,x,y));       break;
+                        case i_writeIntOffAddr:    OP_AII_(writeIntOffAddrzh(x,y,z));       break;
 #ifdef PROVIDE_INT64									    
-                        case i_indexInt64OffAddr:  OP_AI_z(indexInt64OffAddrZh(r,x,y));     break;
-                        case i_readInt64OffAddr:   OP_AI_z(indexInt64OffAddrZh(r,x,y));     break;
-                        case i_writeInt64OffAddr:  OP_AIz_(writeInt64OffAddrZh(x,y,z));     break;
+                        case i_indexInt64OffAddr:  OP_AI_z(indexInt64OffAddrzh(r,x,y));     break;
+                        case i_readInt64OffAddr:   OP_AI_z(indexInt64OffAddrzh(r,x,y));     break;
+                        case i_writeInt64OffAddr:  OP_AIz_(writeInt64OffAddrzh(x,y,z));     break;
 #endif											    
 											    
-                        case i_indexAddrOffAddr:   OP_AI_A(indexAddrOffAddrZh(r,x,y));      break;
-                        case i_readAddrOffAddr:    OP_AI_A(indexAddrOffAddrZh(r,x,y));      break;
-                        case i_writeAddrOffAddr:   OP_AIA_(writeAddrOffAddrZh(x,y,z));      break;
+                        case i_indexAddrOffAddr:   OP_AI_A(indexAddrOffAddrzh(r,x,y));      break;
+                        case i_readAddrOffAddr:    OP_AI_A(indexAddrOffAddrzh(r,x,y));      break;
+                        case i_writeAddrOffAddr:   OP_AIA_(writeAddrOffAddrzh(x,y,z));      break;
 											    
-                        case i_indexFloatOffAddr:  OP_AI_F(indexFloatOffAddrZh(r,x,y));     break;
-                        case i_readFloatOffAddr:   OP_AI_F(indexFloatOffAddrZh(r,x,y));     break;
-                        case i_writeFloatOffAddr:  OP_AIF_(writeFloatOffAddrZh(x,y,z));     break;
+                        case i_indexFloatOffAddr:  OP_AI_F(indexFloatOffAddrzh(r,x,y));     break;
+                        case i_readFloatOffAddr:   OP_AI_F(indexFloatOffAddrzh(r,x,y));     break;
+                        case i_writeFloatOffAddr:  OP_AIF_(writeFloatOffAddrzh(x,y,z));     break;
 											   
-                        case i_indexDoubleOffAddr: OP_AI_D(indexDoubleOffAddrZh(r,x,y));    break;
-                        case i_readDoubleOffAddr:  OP_AI_D(indexDoubleOffAddrZh(r,x,y));    break;
-                        case i_writeDoubleOffAddr: OP_AID_(writeDoubleOffAddrZh(x,y,z));    break;
+                        case i_indexDoubleOffAddr: OP_AI_D(indexDoubleOffAddrzh(r,x,y));    break;
+                        case i_readDoubleOffAddr:  OP_AI_D(indexDoubleOffAddrzh(r,x,y));    break;
+                        case i_writeDoubleOffAddr: OP_AID_(writeDoubleOffAddrzh(x,y,z));    break;
 
 #ifdef PROVIDE_STABLE
-                        case i_indexStableOffAddr: OP_AI_s(indexStablePtrOffAddrZh(r,x,y)); break;
-                        case i_readStableOffAddr:  OP_AI_s(indexStablePtrOffAddrZh(r,x,y)); break;
-                        case i_writeStableOffAddr: OP_AIs_(writeStablePtrOffAddrZh(x,y,z)); break;
+                        case i_indexStableOffAddr: OP_AI_s(indexStablePtrOffAddrzh(r,x,y)); break;
+                        case i_readStableOffAddr:  OP_AI_s(indexStablePtrOffAddrzh(r,x,y)); break;
+                        case i_writeStableOffAddr: OP_AIs_(writeStablePtrOffAddrzh(x,y,z)); break;
 #endif
 
 #endif /* PROVIDE_ADDR */
@@ -2263,35 +2263,35 @@ enterLoop:
                         /* Most of these generate alignment warnings on Sparcs and similar architectures.
 	                 * These are harmless and are caused by the cast to C* in BYTE_ARR_CTS.
 	                 */
-                        case i_indexCharArray:   OP_mI_ty(Char,"indexCharArray",    indexCharArrayZh(r,x,i)); break;
-                        case i_readCharArray:    OP_mI_ty(Char,"readCharArray",     readCharArrayZh(r,x,i));  break;
-                        case i_writeCharArray:   OP_mIty_(Char,"writeCharArray",    writeCharArrayZh(x,i,z)); break;
+                        case i_indexCharArray:   OP_mI_ty(Char,"indexCharArray",    indexCharArrayzh(r,x,i)); break;
+                        case i_readCharArray:    OP_mI_ty(Char,"readCharArray",     readCharArrayzh(r,x,i));  break;
+                        case i_writeCharArray:   OP_mIty_(Char,"writeCharArray",    writeCharArrayzh(x,i,z)); break;
 
-                        case i_indexIntArray:    OP_mI_ty(Int,"indexIntArray",      indexIntArrayZh(r,x,i)); break;
-                        case i_readIntArray:     OP_mI_ty(Int,"readIntArray",       readIntArrayZh(r,x,i));  break;
-                        case i_writeIntArray:    OP_mIty_(Int,"writeIntArray",      writeIntArrayZh(x,i,z)); break;
+                        case i_indexIntArray:    OP_mI_ty(Int,"indexIntArray",      indexIntArrayzh(r,x,i)); break;
+                        case i_readIntArray:     OP_mI_ty(Int,"readIntArray",       readIntArrayzh(r,x,i));  break;
+                        case i_writeIntArray:    OP_mIty_(Int,"writeIntArray",      writeIntArrayzh(x,i,z)); break;
 #ifdef PROVIDE_INT64
-                        case i_indexInt64Array:  OP_mI_ty(Int64,"indexInt64Array",  indexInt64ArrayZh(r,x,i)); break;
-                        case i_readInt64Array:   OP_mI_ty(Int64,"readInt64Array",   readInt64ArrayZh(r,x,i));  break;
-                        case i_writeInt64Array:  OP_mIty_(Int64,"writeInt64Array",  writeInt64ArrayZh(x,i,z)); break;
+                        case i_indexInt64Array:  OP_mI_ty(Int64,"indexInt64Array",  indexInt64Arrayzh(r,x,i)); break;
+                        case i_readInt64Array:   OP_mI_ty(Int64,"readInt64Array",   readInt64Arrayzh(r,x,i));  break;
+                        case i_writeInt64Array:  OP_mIty_(Int64,"writeInt64Array",  writeInt64Arrayzh(x,i,z)); break;
 #endif
 #ifdef PROVIDE_ADDR
-                        case i_indexAddrArray:   OP_mI_ty(Addr,"indexAddrArray",   indexAddrArrayZh(r,x,i)); break;
-                        case i_readAddrArray:    OP_mI_ty(Addr,"readAddrArray",    readAddrArrayZh(r,x,i));  break;
-                        case i_writeAddrArray:   OP_mIty_(Addr,"writeAddrArray",   writeAddrArrayZh(x,i,z)); break;
+                        case i_indexAddrArray:   OP_mI_ty(Addr,"indexAddrArray",   indexAddrArrayzh(r,x,i)); break;
+                        case i_readAddrArray:    OP_mI_ty(Addr,"readAddrArray",    readAddrArrayzh(r,x,i));  break;
+                        case i_writeAddrArray:   OP_mIty_(Addr,"writeAddrArray",   writeAddrArrayzh(x,i,z)); break;
 #endif
-                        case i_indexFloatArray:  OP_mI_ty(Float,"indexFloatArray",  indexFloatArrayZh(r,x,i)); break;
-                        case i_readFloatArray:   OP_mI_ty(Float,"readFloatArray",   readFloatArrayZh(r,x,i));  break;
-                        case i_writeFloatArray:  OP_mIty_(Float,"writeFloatArray",  writeFloatArrayZh(x,i,z)); break;
+                        case i_indexFloatArray:  OP_mI_ty(Float,"indexFloatArray",  indexFloatArrayzh(r,x,i)); break;
+                        case i_readFloatArray:   OP_mI_ty(Float,"readFloatArray",   readFloatArrayzh(r,x,i));  break;
+                        case i_writeFloatArray:  OP_mIty_(Float,"writeFloatArray",  writeFloatArrayzh(x,i,z)); break;
 
-                        case i_indexDoubleArray: OP_mI_ty(Double,"indexDoubleArray", indexDoubleArrayZh(r,x,i)); break;
-                        case i_readDoubleArray:  OP_mI_ty(Double,"readDoubleArray",  readDoubleArrayZh(r,x,i));  break;
-                        case i_writeDoubleArray: OP_mIty_(Double,"writeDoubleArray", writeDoubleArrayZh(x,i,z)); break;
+                        case i_indexDoubleArray: OP_mI_ty(Double,"indexDoubleArray", indexDoubleArrayzh(r,x,i)); break;
+                        case i_readDoubleArray:  OP_mI_ty(Double,"readDoubleArray",  readDoubleArrayzh(r,x,i));  break;
+                        case i_writeDoubleArray: OP_mIty_(Double,"writeDoubleArray", writeDoubleArrayzh(x,i,z)); break;
 
 #ifdef PROVIDE_STABLE
-                        case i_indexStableArray: OP_mI_ty(StablePtr,"indexStableArray", indexStablePtrArrayZh(r,x,i)); break;
-                        case i_readStableArray:  OP_mI_ty(StablePtr,"readStableArray",  readStablePtrArrayZh(r,x,i));  break;
-                        case i_writeStableArray: OP_mIty_(StablePtr,"writeStableArray", writeStablePtrArrayZh(x,i,z)); break;
+                        case i_indexStableArray: OP_mI_ty(StablePtr,"indexStableArray", indexStablePtrArrayzh(r,x,i)); break;
+                        case i_readStableArray:  OP_mI_ty(StablePtr,"readStableArray",  readStablePtrArrayzh(r,x,i));  break;
+                        case i_writeStableArray: OP_mIty_(StablePtr,"writeStableArray", writeStablePtrArrayzh(x,i,z)); break;
 #endif
 
 #endif /* PROVIDE_ARRAY */

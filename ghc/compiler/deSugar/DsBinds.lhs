@@ -153,7 +153,7 @@ addAutoScc auto_scc_candidate pair@(bndr, core_expr)
  | auto_scc_candidate && worthSCC core_expr && 
    (opt_AutoSccsOnAllToplevs || (isExported bndr && opt_AutoSccsOnExportedToplevs))
      = getModuleAndGroupDs `thenDs` \ (mod,grp) ->
-       returnDs (bndr, Note (SCC (mkAutoCC bndr mod grp IsNotCafCC)) core_expr)
+       returnDs (bndr, Note (SCC (mkAutoCC bndr mod grp NotCafCC)) core_expr)
  | otherwise 
      = returnDs pair
 

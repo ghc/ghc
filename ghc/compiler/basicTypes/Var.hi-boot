@@ -1,8 +1,10 @@
 _interface_ Var 1
 _exports_
-Var Var Id ;
+Var Var Id setIdName ;
 _declarations_
 
 -- Used by Name
 1 type Id = Var ;
 1 data Var ;
+1 setIdName _:_ Id -> Name.Name -> Id ;;
+

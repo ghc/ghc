@@ -22,7 +22,7 @@ import DsUtils		( EquationInfo(..),
 import Id		( idType )
 import DataCon		( DataCon, isTupleCon, isUnboxedTupleCon,
 			  dataConSourceArity )
-import Name             ( Name, mkLocalName, getOccName, isConSymOcc, getName, varOcc )
+import Name             ( Name, mkLocalName, getOccName, isDataSymOcc, getName, mkSrcVarOcc )
 import Type		( Type, 
                           isUnboxedType, 
                           splitTyConApp_maybe
@@ -48,6 +48,7 @@ import TysWiredIn	( nilDataCon, consDataCon,
 			)
 import Unique		( unboundKey )
 import TyCon            ( tyConDataCons )
+import SrcLoc		( noSrcLoc )
 import UniqSet
 import Outputable
 
@@ -390,7 +391,8 @@ make_row_vars used_lits (EqnInfo _ _ pats _ ) =
   where new_var = hash_x
 
 hash_x = mkLocalName unboundKey {- doesn't matter much -}
-		     (varOcc SLIT("#x"))
+		     (mkSrcVarOcc SLIT("#x"))
+		     noSrcLoc
 
 make_row_vars_for_constructor :: EquationInfo -> [WarningPat]
 make_row_vars_for_constructor (EqnInfo _ _ pats _ ) = take (length (tail pats)) (repeat new_wild_pat)
@@ -511,8 +513,7 @@ contructors until the [] to know taht we need to use the second case,
 not the second.
 
 \begin{code}
-
-isInfixCon con = isConSymOcc (getOccName con)
+isInfixCon con = isDataSymOcc (getOccName con)
 
 is_nil (ConPatIn con []) = con == getName nilDataCon
 is_nil _                 = False

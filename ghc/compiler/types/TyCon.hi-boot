@@ -1,9 +1,11 @@
 _interface_ TyCon 1
 _exports_
-TyCon TyCon isTupleTyCon isUnboxedTupleTyCon isFunTyCon;
+TyCon TyCon isTupleTyCon isUnboxedTupleTyCon isFunTyCon setTyConName ;
 _declarations_
 1 data TyCon;
 1 isTupleTyCon _:_ TyCon -> PrelBase.Bool ;;
 1 isUnboxedTupleTyCon _:_ TyCon -> PrelBase.Bool ;;
 1 isFunTyCon _:_ TyCon -> PrelBase.Bool ;;
+1 setTyConName _:_ TyCon -> Name.Name -> TyCon ;;
+
 

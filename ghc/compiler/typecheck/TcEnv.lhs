@@ -21,7 +21,7 @@ module TcEnv(
 	tcLookupValueByKey, tcLookupValueByKeyMaybe,
 	explicitLookupValueByKey, explicitLookupValue,
 
-	newLocalIds, newLocalId, newSpecPragmaId,
+	newLocalId, newSpecPragmaId,
 	tcGetGlobalTyVars, tcExtendGlobalTyVars,
 
 	badCon, badPrimOp
@@ -54,9 +54,8 @@ import TcMonad
 
 import BasicTypes	( Arity )
 import IdInfo		( noIdInfo )
-import Name		( Name, OccName, nameOccName, occNameString, mkLocalName,
+import Name		( Name, OccName, nameOccName, getSrcLoc,
 			  maybeWiredInTyConName, maybeWiredInIdName, isLocallyDefined,
-			  isSysLocalName,
 			  NamedThing(..)
 			)
 import Unique		( pprUnique10, Unique, Uniquable(..) )
@@ -66,6 +65,7 @@ import Unique		( Uniquable(..) )
 import Util		( zipEqual, zipWith3Equal, mapAccumL )
 import Bag		( bagToList )
 import Maybes		( maybeToBool )
+import SrcLoc		( SrcLoc )
 import FastString	( FastString )
 import Outputable
 \end{code}
@@ -399,24 +399,15 @@ tcAddImportedIdInfo unf_env id
 %************************************************************************
 
 \begin{code}
-newLocalId :: OccName -> TcType -> NF_TcM s TcId
-newLocalId name ty
+newLocalId :: OccName -> TcType -> SrcLoc -> NF_TcM s TcId
+newLocalId name ty loc
   = tcGetUnique		`thenNF_Tc` \ uniq ->
-    returnNF_Tc (mkUserLocal name uniq ty)
-
-newLocalIds :: [OccName] -> [TcType] -> NF_TcM s [TcId]
-newLocalIds names tys
-  = tcGetUniques (length names) `thenNF_Tc` \ uniqs ->
-    let
-	new_ids            = zipWith3Equal "newLocalIds" mk_id names uniqs tys
-	mk_id name uniq ty = mkUserLocal name uniq ty
-    in
-    returnNF_Tc new_ids
+    returnNF_Tc (mkUserLocal name uniq ty loc)
 
 newSpecPragmaId :: Name -> TcType -> NF_TcM s TcId
 newSpecPragmaId name ty 
   = tcGetUnique		`thenNF_Tc` \ uniq ->
-    returnNF_Tc (mkSpecPragmaId (nameOccName name) uniq ty)
+    returnNF_Tc (mkSpecPragmaId (nameOccName name) uniq ty (getSrcLoc name))
 \end{code}
 
 

@@ -1017,7 +1017,7 @@ wrongArgsCtxt too_many_or_few fun args
     the_app = foldl HsApp fun args	-- Used in error messages
 
 appCtxt fun args
-  = ptext SLIT("In the application") <+> (ppr the_app)
+  = ptext SLIT("In the application") <+> quotes (ppr the_app)
   where
     the_app = foldl HsApp fun args	-- Used in error messages
 

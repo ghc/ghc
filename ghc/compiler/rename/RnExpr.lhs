@@ -26,7 +26,7 @@ import RnHsSyn
 import RnMonad
 import RnEnv
 import CmdLineOpts	( opt_GlasgowExts )
-import BasicTypes	( Fixity(..), FixityDirection(..), IfaceFlavour(..) )
+import BasicTypes	( Fixity(..), FixityDirection(..) )
 import PrelInfo		( numClass_RDR, fractionalClass_RDR, eqClass_RDR, 
 			  ccallableClass_RDR, creturnableClass_RDR, 
 			  monadClass_RDR, enumClass_RDR, ordClass_RDR,
@@ -256,12 +256,7 @@ grubby_seqNameSet ns result | isNullUFM ns = result
 			    | otherwise    = result
 \end{code}
 
-Variables. We look up the variable and return the resulting name.  The
-interesting question is what the free-variable set should be.  We
-don't want to return imported or prelude things as free vars.  So we
-look at the Name returned from the lookup, and make it part of the
-free-var set iff if it's a LocallyDefined Name.
-\end{itemize}
+Variables. We look up the variable and return the resulting name. 
 
 \begin{code}
 rnExpr :: RdrNameHsExpr -> RnMS s (RenamedHsExpr, FreeVars)
@@ -274,13 +269,11 @@ rnExpr (HsVar v)
 	returnRn (expr, emptyUniqSet)
     else
         -- The normal case
-       returnRn (HsVar name, if isLocallyDefined name
-			     then unitNameSet name
-			     else emptyUniqSet)
+       returnRn (HsVar name, unitFV name)
 
 rnExpr (HsLit lit) 
   = litOccurrence lit		`thenRn_`
-    returnRn (HsLit lit, emptyNameSet)
+    returnRn (HsLit lit, emptyFVs)
 
 rnExpr (HsLam match)
   = rnMatch match	`thenRn` \ (match', fvMatch) ->
@@ -437,7 +430,7 @@ rnRbinds str rbinds
     rn_rbind (field, expr, pun)
       = lookupGlobalOccRn field	`thenRn` \ fieldname ->
 	rnExpr expr		`thenRn` \ (expr', fvExpr) ->
-	returnRn ((fieldname, expr', pun), fvExpr)
+	returnRn ((fieldname, expr', pun), fvExpr `addOneFV` fieldname)
 
 rnRpats rpats
   = mapRn field_dup_err dup_fields 	`thenRn_`
@@ -451,7 +444,7 @@ rnRpats rpats
     rn_rpat (field, pat, pun)
       = lookupGlobalOccRn field	`thenRn` \ fieldname ->
 	rnPat pat		`thenRn` \ (pat', fvs) ->
-	returnRn ((fieldname, pat', pun), fvs)
+	returnRn ((fieldname, pat', pun), fvs `addOneFV` fieldname)
 \end{code}
 
 %************************************************************************
@@ -476,7 +469,7 @@ rnStmts :: RnExprTy s
 	-> RnMS s ([RenamedStmt], FreeVars)
 
 rnStmts rn_expr []
-  = returnRn ([], emptyNameSet)
+  = returnRn ([], emptyFVs)
 
 rnStmts rn_expr (stmt:stmts)
   = rnStmt rn_expr stmt				$ \ stmt' ->
@@ -745,18 +738,14 @@ litOccurrence (HsLitLit _)
 \begin{code}
 mkAssertExpr :: RnMS s RenamedHsExpr
 mkAssertExpr =
-  newImportedGlobalName mod occ HiFile `thenRn` \ name ->
-  addOccurrenceName name	       `thenRn_`
-  getSrcLocRn                          `thenRn` \ sloc ->
+  newImportedGlobalFromRdrName assertErr_RDR	`thenRn` \ name ->
+  addOccurrenceName name				`thenRn_`
+  getSrcLocRn           				`thenRn` \ sloc ->
   let
    expr = HsApp (HsVar name)
 	        (HsLit (HsString (_PK_ (showSDoc (ppr sloc)))))
   in
   returnRn expr
-
-  where
-   mod = rdrNameModule assertErr_RDR
-   occ = rdrNameOcc assertErr_RDR
 \end{code}
 
 %************************************************************************

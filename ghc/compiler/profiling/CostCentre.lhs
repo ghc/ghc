@@ -5,7 +5,9 @@
 
 \begin{code}
 module CostCentre (
-	CostCentre, CcKind, IsDupdCC{-ToDo:rm-}, IsCafCC(..),
+	CostCentre(..), CcName, IsDupdCC(..), IsCafCC(..), IsDictCC(..),
+		-- All abstract except to friend: ParseIface.y
+
 	CostCentreStack,
 	noCCS, subsumedCCS, currentCCS, overheadCCS, dontCareCCS,
 	noCostCentre, noCCAttached,
@@ -17,18 +19,18 @@ module CostCentre (
 	isSccCountCostCentre,
 	sccAbleCostCentre,
 	ccFromThisModule,
-	ccMentionsId,
 
-	pprCostCentreDecl, pprCostCentreStackDecl,
+	pprCostCentreDecl, pprCostCentreStackDecl, pprCostCentreCore,
 
 	cmpCostCentre	-- used for removing dups in a list
     ) where
 
 #include "HsVersions.h"
 
-import Var		( externallyVisibleId, Id )
-import CStrings		( stringToC )
-import Name		( Module, getOccString, moduleString, identToC, pprModule )
+import Var		( Id )
+import Name		( UserFS, EncodedFS, encodeFS, decode,
+			  Module, getOccName, occNameFS, pprModule, moduleUserString
+			)
 import Outputable	
 import Util	        ( thenCmp )
 \end{code}
@@ -99,33 +101,39 @@ data CostCentre
   = NoCostCentre	-- Having this constructor avoids having
 			-- to use "Maybe CostCentre" all the time.
 
-  | NormalCC	CcKind		-- CcKind will include a cost-centre name
-		Module		-- Name of module defining this CC.
-		Group	  	-- "Group" that this CC is in.
-		IsDupdCC	-- see below
-		IsCafCC		-- see below
+  | NormalCC {  
+		cc_name :: CcName,		-- Name of the cost centre itself
+		cc_mod  :: Module,		-- Name of module defining this CC.
+		cc_grp  :: Group,	  	-- "Group" that this CC is in.
+		cc_is_dict :: IsDictCC,		-- see below
+		cc_is_dupd :: IsDupdCC,		-- see below
+		cc_is_caf  :: IsCafCC		-- see below
+    }
 
-  | AllCafsCC	Module		-- Ditto for CAFs.
-		Group	 	-- We record module and group names.
+  | AllCafsCC {	
+		cc_mod  :: Module,		-- Name of module defining this CC.
+		cc_grp  :: Group	  	-- "Group" that this CC is in
 			-- Again, one "big" CAF cc per module, where all
 			-- CAF costs are attributed unless the user asked for
 			-- per-individual-CAF cost attribution.
+    }
 
-  | AllDictsCC	Module		-- Ditto for dictionaries.
-		Group		-- We record module and group names.
+  | AllDictsCC {
+		cc_mod  :: Module,		-- Name of module defining this CC.
+		cc_grp  :: Group,	  	-- "Group" that this CC is in.
 			-- Again, one "big" DICT cc per module, where all
 			-- DICT costs are attributed unless the user asked for
 			-- per-individual-DICT cost attribution.
-		IsDupdCC -- see below
+		cc_is_dupd :: IsDupdCC
+    }
 
-data CcKind
-  = UserCC  FAST_STRING	-- Supplied by user: String is the cc name
-  | AutoCC  Id		-- CC -auto-magically inserted for that Id
-  | DictCC  Id
+type CcName = EncodedFS
+
+data IsDictCC = DictCC | VanillaCC
 
 data IsDupdCC
-  = AnOriginalCC	-- This says how the CC is *used*.  Saying that
-  | ADupdCC		-- it is ADupdCC doesn't make it a different
+  = OriginalCC	-- This says how the CC is *used*.  Saying that
+  | DupdCC		-- it is DupdCC doesn't make it a different
 			-- CC, just that it a sub-expression which has
 			-- been moved ("dupd") into a different scope.
 			--
@@ -134,14 +142,12 @@ data IsDupdCC
 			-- "original" one.
 			--
 			-- In the papers, it's called "SCCsub",
-			--  i.e. SCCsub CC == SCC ADupdCC,
+			--  i.e. SCCsub CC == SCC DupdCC,
 			-- but we are trying to avoid confusion between
 			-- "subd" and "subsumed".  So we call the former
 			-- "dupd".
 
-data IsCafCC
-  = IsCafCC
-  | IsNotCafCC
+data IsCafCC = CafCC | NotCafCC
 \end{code}
 
 WILL: Would there be any merit to recording ``I am now using a
@@ -191,61 +197,64 @@ currentOrSubsumedCCS _			= False
 Building cost centres
 
 \begin{code}
-mkUserCC :: FAST_STRING -> Module -> Group -> CostCentre
+mkUserCC :: UserFS -> Module -> Group -> CostCentre
 
 mkUserCC cc_name module_name group_name
-  = NormalCC (UserCC cc_name) module_name group_name
-	     AnOriginalCC IsNotCafCC{-might be changed-}
+  = NormalCC { cc_name = encodeFS cc_name,
+	       cc_mod =  module_name, cc_grp = group_name,
+	       cc_is_dict = VanillaCC, cc_is_dupd = OriginalCC, cc_is_caf = NotCafCC {-might be changed-}
+    }
 
 mkDictCC, mkAutoCC :: Id -> Module -> Group -> IsCafCC -> CostCentre
 
 mkDictCC id module_name group_name is_caf
-  = NormalCC (DictCC id) module_name group_name
-	     AnOriginalCC is_caf
+  = NormalCC { cc_name = occNameFS (getOccName id),
+	       cc_mod =  module_name, cc_grp = group_name,
+	       cc_is_dict = DictCC, cc_is_dupd = OriginalCC, cc_is_caf = is_caf
+    }
 
 mkAutoCC id module_name group_name is_caf
-  = NormalCC (AutoCC id) module_name group_name
-	     AnOriginalCC is_caf
+  = NormalCC { cc_name = occNameFS (getOccName id), 
+	       cc_mod =  module_name, cc_grp = group_name,
+	       cc_is_dict = VanillaCC, cc_is_dupd = OriginalCC, cc_is_caf = is_caf
+    }
 
-mkAllCafsCC  m g   = AllCafsCC  m g
-mkAllDictsCC m g is_dupd
-  = AllDictsCC m g (if is_dupd then ADupdCC else AnOriginalCC)
+mkAllCafsCC  m g	  = AllCafsCC  { cc_mod = m, cc_grp = g }
+mkAllDictsCC m g is_dupd  = AllDictsCC { cc_mod = m, cc_grp = g, 
+					 cc_is_dupd = if is_dupd then DupdCC else OriginalCC }
 
 mkSingletonCCS :: CostCentre -> CostCentreStack
 mkSingletonCCS cc = SingletonCCS cc
 
 cafifyCC, dupifyCC  :: CostCentre -> CostCentre
 
-cafifyCC cc@(AllDictsCC _ _ _) = cc -- ToDo ???
-cafifyCC (NormalCC kind m g is_dupd is_caf)
-  = ASSERT(not_a_calf_already is_caf)
-    NormalCC kind m g is_dupd IsCafCC
+cafifyCC cc@(AllDictsCC {}) = cc
+cafifyCC cc@(NormalCC {cc_is_caf = is_caf})
+  = ASSERT(not_a_caf_already is_caf)
+    cc {cc_is_caf = CafCC}
   where
-    not_a_calf_already IsCafCC = False
-    not_a_calf_already _       = True
+    not_a_caf_already CafCC = False
+    not_a_caf_already _       = True
 cafifyCC cc = pprPanic "cafifyCC" (ppr cc)
 
-dupifyCC (AllDictsCC m g _) = AllDictsCC m g ADupdCC
-dupifyCC (NormalCC kind m g is_dupd is_caf)
-  = NormalCC kind m g ADupdCC is_caf
-dupifyCC cc = pprPanic "dupifyCC" (ppr cc)
+dupifyCC cc = cc {cc_is_dupd = DupdCC}
 
 isEmptyCC, isCafCC, isDictCC, isDupdCC :: CostCentre -> Bool
 
 isEmptyCC (NoCostCentre)		= True
 isEmptyCC _				= False
 
-isCafCC (AllCafsCC _ _)		   = True
-isCafCC (NormalCC _ _ _ _ IsCafCC) = True
-isCafCC _		           = False
+isCafCC (AllCafsCC {})		         = True
+isCafCC (NormalCC {cc_is_caf = CafCC}) = True
+isCafCC _		                 = False
 
-isDictCC (AllDictsCC _ _ _)		= True
-isDictCC (NormalCC (DictCC _) _ _ _ _)  = True
-isDictCC _				= False
+isDictCC (AllDictsCC {})	          = True
+isDictCC (NormalCC {cc_is_dict = DictCC}) = True
+isDictCC _			          = False
 
-isDupdCC (AllDictsCC _ _ ADupdCC)   = True
-isDupdCC (NormalCC _ _ _ ADupdCC _) = True
-isDupdCC _		            = False
+isDupdCC (AllDictsCC {cc_is_dupd = DupdCC}) = True
+isDupdCC (NormalCC   {cc_is_dupd = DupdCC}) = True
+isDupdCC _		                     = False
 
 isSccCountCostCentre :: CostCentre -> Bool
   -- Is this a cost-centre which records scc counts
@@ -268,18 +277,7 @@ sccAbleCostCentre cc | isCafCC cc = False
 		     | otherwise  = True
 
 ccFromThisModule :: CostCentre -> Module -> Bool
-
-ccFromThisModule (NormalCC _ m _ _ _) mod_name = m == mod_name
-ccFromThisModule (AllCafsCC  m _)     mod_name = m == mod_name
-ccFromThisModule (AllDictsCC m _ _)   mod_name = m == mod_name
-\end{code}
-
-\begin{code}
-ccMentionsId :: CostCentre -> Maybe Id
-
-ccMentionsId (NormalCC (AutoCC id) _ _ _ _) = Just id
-ccMentionsId (NormalCC (DictCC id) _ _ _ _) = Just id
-ccMentionsId other			    = Nothing
+ccFromThisModule cc m = cc_mod cc == m
 \end{code}
 
 \begin{code}
@@ -291,13 +289,14 @@ instance Ord CostCentre where
 
 cmpCostCentre :: CostCentre -> CostCentre -> Ordering
 
-cmpCostCentre (AllCafsCC  m1 _)   (AllCafsCC  m2 _)   = m1 `compare` m2
-cmpCostCentre (AllDictsCC m1 _ _) (AllDictsCC m2 _ _) = m1 `compare` m2
+cmpCostCentre (AllCafsCC  {cc_mod = m1}) (AllCafsCC  {cc_mod = m2}) = m1 `compare` m2
+cmpCostCentre (AllDictsCC {cc_mod = m1}) (AllDictsCC {cc_mod = m2}) = m1 `compare` m2
 
-cmpCostCentre (NormalCC k1 m1 _ _ c1) (NormalCC k2 m2 _ _ c2)
+cmpCostCentre (NormalCC {cc_name = n1, cc_mod =  m1, cc_is_caf = c1}) 
+	      (NormalCC {cc_name = n2, cc_mod =  m2, cc_is_caf = c2}) 
     -- first key is module name, then we use "kinds" (which include
     -- names) and finally the caf flag
-  = (m1 `compare` m2) `thenCmp` (k1 `cmp_kind` k2) `thenCmp` (c1 `cmp_caf` c2)
+  = (m1 `compare` m2) `thenCmp` (n1 `compare` n2) `thenCmp` (c1 `cmp_caf` c2)
 
 cmpCostCentre other_1 other_2
   = let
@@ -306,28 +305,14 @@ cmpCostCentre other_1 other_2
     in
     if tag1 _LT_ tag2 then LT else GT
   where
-    tag_CC (NormalCC _ _ _ _ _) = (ILIT(1) :: FAST_INT)
-    tag_CC (AllCafsCC  _ _)   	= ILIT(2)
-    tag_CC (AllDictsCC _ _ _) 	= ILIT(3)
+    tag_CC (NormalCC   {}) = (ILIT(1) :: FAST_INT)
+    tag_CC (AllCafsCC  {}) = ILIT(2)
+    tag_CC (AllDictsCC {}) = ILIT(3)
 
-cmp_kind (UserCC n1) (UserCC n2) = n1 `compare` n2
-cmp_kind (AutoCC i1) (AutoCC i2) = i1 `compare` i2
-cmp_kind (DictCC i1) (DictCC i2) = i1 `compare` i2
-cmp_kind other_1     other_2
-  = let
-	tag1 = tag_CcKind other_1
-	tag2 = tag_CcKind other_2
-    in
-    if tag1 _LT_ tag2 then LT else GT
-  where
-    tag_CcKind (UserCC _) = (ILIT(1) :: FAST_INT)
-    tag_CcKind (AutoCC _) = ILIT(2)
-    tag_CcKind (DictCC _) = ILIT(3)
-
-cmp_caf IsNotCafCC IsCafCC     = LT
-cmp_caf IsNotCafCC IsNotCafCC  = EQ
-cmp_caf IsCafCC    IsCafCC     = EQ
-cmp_caf IsCafCC    IsNotCafCC  = GT
+cmp_caf NotCafCC CafCC     = LT
+cmp_caf NotCafCC NotCafCC  = EQ
+cmp_caf CafCC    CafCC     = EQ
+cmp_caf CafCC    NotCafCC  = GT
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -346,26 +331,18 @@ instance Outputable CostCentreStack where
 		OverheadCCS	-> ptext SLIT("CCS_OVERHEAD")
 		DontCareCCS	-> ptext SLIT("CCS_DONTZuCARE")
 		SubsumedCCS	-> ptext SLIT("CCS_SUBSUMED")
-		SingletonCCS cc -> 
-			getPprStyle $ \sty ->
-			if (codeStyle sty) 
-			    then ptext SLIT("CCS_") <> 
-				 ptext (identToC (costCentreStr cc))
-			    else ptext SLIT("CCS.") <> text (costCentreStr cc)
+		SingletonCCS cc -> ptext SLIT("CCS_") <> ppr cc
 
 pprCostCentreStackDecl :: CostCentreStack -> SDoc
-
 pprCostCentreStackDecl ccs@(SingletonCCS cc)
   = let
-       (mod_name, grp_name, is_subsumed, externally_visible) = get_cc_info cc
+       is_subsumed = ccSubsumed cc
     in
     hcat [ ptext SLIT("CCS_DECLARE"), char '(',
     	   ppr ccs,	 	comma,	-- better be codeStyle
     	   ppCostCentreLbl cc, 	comma,
     	   ptext is_subsumed, 	comma,
-    	   if externally_visible
-       		then empty 
-       		else ptext SLIT("static"),
+	   empty,	-- Now always externally visible
     	   text ");"
 	 ]
 
@@ -391,39 +368,48 @@ by costCentreName.
 instance Outputable CostCentre where
   ppr cc = getPprStyle $ \ sty ->
 	   if codeStyle sty
-		then ppCostCentreLbl cc
-		else
-	   if ifaceStyle sty
-		then ppCostCentreIface cc
-		else text (costCentreStr cc)
+  	   then ppCostCentreLbl cc
+	   else text (costCentreUserName cc)
 
-ppCostCentreLbl cc   = ptext SLIT("CC_") <> ptext (identToC (costCentreStr cc))
-ppCostCentreIface cc = doubleQuotes (text (costCentreStr cc))
-ppCostCentreName cc  = doubleQuotes (text (stringToC (costCentreName cc)))
+-- Printing in an interface file or in Core generally
+pprCostCentreCore (AllCafsCC {cc_mod = m, cc_grp = g})
+  = text "__sccC" <+> braces (pprModule m <+> doubleQuotes (ptext g))
+pprCostCentreCore (AllDictsCC {cc_mod = m, cc_grp = g, cc_is_dupd = dup})
+  = text "__sccD" <+> braces (pprModule m <+> doubleQuotes (ptext g) <+> pp_dup dup)
+pprCostCentreCore (NormalCC {cc_name = n, cc_mod = m, cc_grp = g,
+			     cc_is_dict = dic, cc_is_caf = caf, cc_is_dupd = dup})
+  = text "__scc" <+> braces (hsep [
+	ptext n,
+	pprModule m,	
+	doubleQuotes (ptext g),
+	pp_dict dic,
+	pp_dup dup,
+	pp_caf caf
+    ])
 
-costCentreStr (NoCostCentre)		= "NO_CC"
-costCentreStr (AllCafsCC m _) 		= "CAFs."  ++ moduleString m
-costCentreStr (AllDictsCC m _ d) 	= "DICTs." ++ moduleString m
-costCentreStr (NormalCC kind mod_name grp_name is_dupd is_caf)
-  =  case is_caf of { IsCafCC -> "CAF:";   _ -> "" }
-  ++ moduleString mod_name
-  ++ case kind of { UserCC name -> _UNPK_ name;
-		    AutoCC id   -> getOccString id ++ "/AUTO";
-		    DictCC id   -> getOccString id ++ "/DICT"
-		  }
-  -- ToDo: group name
-  ++ case is_dupd of { ADupdCC -> "/DUPD";   _ -> "" }
+pp_dict DictCC = text "__A"
+pp_dict other  = empty
 
--- This is the name to go in the cost centre declaration
-costCentreName (NoCostCentre)		= "NO_CC"
-costCentreName (AllCafsCC _ _)		= "CAFs_in_..."
-costCentreName (AllDictsCC _ _ _)	= "DICTs_in_..."
-costCentreName (NormalCC kind mod_name grp_name is_dupd is_caf)
-  =  case is_caf of { IsCafCC -> "CAF:";   _ -> "" }
-  ++ case kind of { UserCC name -> _UNPK_ name;
-		    AutoCC id   -> getOccString id;
-		    DictCC id   -> getOccString id
-		  }
+pp_dup DupdCC = char '!'
+pp_dup other   = empty
+
+pp_caf CafCC = text "__C"
+pp_caf other   = empty
+
+
+-- Printing as a C label
+ppCostCentreLbl (NoCostCentre)		  	     = text "CC_NONE"
+ppCostCentreLbl (AllCafsCC  {cc_mod = m}) 	     = text "CC_CAFs_"  <> pprModule m
+ppCostCentreLbl (AllDictsCC {cc_mod = m}) 	     = text "CC_DICTs_" <> pprModule m
+ppCostCentreLbl (NormalCC {cc_name = n, cc_mod = m}) = text "CC_" <> pprModule m <> ptext n
+
+-- This is the name to go in the user-displayed string, 
+-- recorded in the cost centre declaration
+costCentreUserName (NoCostCentre)  = "NO_CC"
+costCentreUserName (AllCafsCC {})  = "CAFs_in_..."
+costCentreUserName (AllDictsCC {}) = "DICTs_in_..."
+costCentreUserName (NormalCC {cc_name = name, cc_is_caf = is_caf})
+  =  case is_caf of { CafCC -> "CAF:";   _ -> "" } ++ decode (_UNPK_ name)
 \end{code}
 
 Cost Centre Declarations
@@ -437,47 +423,23 @@ pprCostCentreDecl is_local cc
   = if is_local then
 	hcat [
 	    ptext SLIT("CC_DECLARE"),char '(',
-	    cc_ident, 		  comma,
-	    ppCostCentreName cc,  comma,
-	    doubleQuotes (pprModule mod_name), comma,
-	    doubleQuotes (ptext grp_name),     comma,
-	    ptext is_subsumed,    comma,
-	    if externally_visible
-	       then empty 
-	       else ptext SLIT("static"),
+	    cc_ident, 		  				comma,
+	    text (costCentreUserName cc),			comma,
+	    doubleQuotes (text (moduleUserString mod_name)),	comma,
+	    doubleQuotes (ptext grp_name),			comma,
+	    ptext is_subsumed,					comma,
+	    empty,	-- Now always externally visible
 	    text ");"]
     else
 	hcat [ ptext SLIT("CC_EXTERN"),char '(', cc_ident, text ");" ]
   where
-    cc_ident = ppCostCentreLbl cc
+    cc_ident    = ppCostCentreLbl cc
+    mod_name 	= cc_mod cc
+    grp_name 	= cc_grp cc
+    is_subsumed = ccSubsumed cc
 
-    (mod_name, grp_name, is_subsumed, externally_visible)
-      = get_cc_info cc
-
-
-get_cc_info :: CostCentre -> 
-	(Module,			-- module 
-	 Group,				-- group name
-	 FAST_STRING,			-- subsumed value
-	 Bool)				-- externally visible
-	  
-get_cc_info cc
-  = case cc of
-	  AllCafsCC m g -> (m, g, cc_IS_CAF, True)
-
-	  AllDictsCC m g _ -> (m, g, cc_IS_DICT, True)
-
-	  NormalCC (DictCC i) m g is_dupd is_caf
-	    -> (m, g, cc_IS_DICT, externallyVisibleId i)
-
-	  NormalCC x m g is_dupd is_caf
-	    -> (m, g, do_caf is_caf,
-		case x of { UserCC _ -> True; AutoCC i -> externallyVisibleId i})
-      where
-	cc_IS_CAF      = SLIT("CC_IS_CAF")
-	cc_IS_DICT     = SLIT("CC_IS_DICT")
-	cc_IS_BORING   = SLIT("CC_IS_BORING")
-
-	do_caf IsCafCC	     = cc_IS_CAF
-	do_caf IsNotCafCC    = cc_IS_BORING
+ccSubsumed :: CostCentre -> FAST_STRING		-- subsumed value
+ccSubsumed cc | isCafCC  cc = SLIT("CC_IS_CAF")
+	      | isDictCC cc = SLIT("CC_IS_DICT")
+	      | otherwise   = SLIT("CC_IS_BORING")
 \end{code}

@@ -31,7 +31,7 @@ thenUgn x y stuff
     y z stuff
 
 initUgn :: UgnM a -> IO a
-initUgn action = action (SLIT(""),mkModule "",noSrcLoc)
+initUgn action = action (SLIT(""),mkSrcModule "",noSrcLoc)
 
 ioToUgnM :: IO a -> UgnM a
 ioToUgnM x stuff = x

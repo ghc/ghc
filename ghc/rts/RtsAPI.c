@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.2 1998/12/02 13:28:38 simonm Exp $
+ * $Id: RtsAPI.c,v 1.3 1999/01/27 14:51:21 simonpj Exp $
  *
  * API for invoking Haskell functions via the RTS
  *
@@ -18,7 +18,7 @@ HaskellObj
 rts_mkChar (char c)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
-  p->header.info = &CZh_con_info;
+  p->header.info = &Czh_con_info;
   p->payload[0]  = (StgClosure *)((StgInt)c);
   return p;
 }
@@ -27,7 +27,7 @@ HaskellObj
 rts_mkInt (int i)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
-  p->header.info = &IZh_con_info;
+  p->header.info = &Izh_con_info;
   p->payload[0]  = (StgClosure *)(StgInt)i;
   return p;
 }
@@ -40,7 +40,7 @@ rts_mkInt8 (int i)
      instead of the one for Int8, but the types have identical
      representation.
   */
-  p->header.info = &IZh_con_info;
+  p->header.info = &Izh_con_info;
   /* Make sure we mask out the bits above the lowest 8 */
   p->payload[0]  = (StgClosure *)(StgInt)((unsigned)i & 0xff);
   return p;
@@ -54,7 +54,7 @@ rts_mkInt16 (int i)
      instead of the one for Int8, but the types have identical
      representation.
   */
-  p->header.info = &IZh_con_info;
+  p->header.info = &Izh_con_info;
   /* Make sure we mask out the relevant bits */
   p->payload[0]  = (StgClosure *)(StgInt)((unsigned)i & 0xffff);
   return p;
@@ -65,7 +65,7 @@ rts_mkInt32 (int i)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   /* see mk_Int8 comment */
-  p->header.info = &IZh_con_info;
+  p->header.info = &Izh_con_info;
   p->payload[0]  = (StgClosure *)(StgInt)i;
   return p;
 }
@@ -76,7 +76,7 @@ rts_mkInt64 (long long int i)
   long long *tmp;
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,2));
   /* see mk_Int8 comment */
-  p->header.info = &I64Zh_con_info;
+  p->header.info = &I64zh_con_info;
   tmp  = (long long*)&(p->payload[0]);
   *tmp = (StgInt64)i;
   return p;
@@ -86,7 +86,7 @@ HaskellObj
 rts_mkWord (unsigned int i)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
-  p->header.info = &WZh_con_info;
+  p->header.info = &Wzh_con_info;
   p->payload[0]  = (StgClosure *)(StgWord)i;
   return p;
 }
@@ -96,7 +96,7 @@ rts_mkWord8 (unsigned int w)
 {
   /* see rts_mkInt* comments */
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
-  p->header.info = &WZh_con_info;
+  p->header.info = &Wzh_con_info;
   p->payload[0]  = (StgClosure *)(StgWord)(w & 0xff);
   return p;
 }
@@ -106,7 +106,7 @@ rts_mkWord16 (unsigned int w)
 {
   /* see rts_mkInt* comments */
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
-  p->header.info = &WZh_con_info;
+  p->header.info = &Wzh_con_info;
   p->payload[0]  = (StgClosure *)(StgWord)(w & 0xffff);
   return p;
 }
@@ -116,7 +116,7 @@ rts_mkWord32 (unsigned int w)
 {
   /* see rts_mkInt* comments */
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
-  p->header.info = &WZh_con_info;
+  p->header.info = &Wzh_con_info;
   p->payload[0]  = (StgClosure *)(StgWord)w;
   return p;
 }
@@ -125,11 +125,11 @@ HaskellObj
 rts_mkWord64 (unsigned long long w)
 {
   unsigned long long *tmp;
-  extern StgInfoTable W64Zh_con_info;
+  extern StgInfoTable W64zh_con_info;
 
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,2));
   /* see mk_Int8 comment */
-  p->header.info = &W64Zh_con_info;
+  p->header.info = &W64zh_con_info;
   tmp  = (unsigned long long*)&(p->payload[0]);
   *tmp = (StgNat64)w;
   return p;
@@ -139,7 +139,7 @@ HaskellObj
 rts_mkFloat (float f)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
-  p->header.info = &FZh_con_info;
+  p->header.info = &Fzh_con_info;
   ASSIGN_FLT((P_)p->payload, (StgFloat)f);
   return p;
 }
@@ -148,7 +148,7 @@ HaskellObj
 rts_mkDouble (double d)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,sizeofW(StgDouble)));
-  p->header.info = &DZh_con_info;
+  p->header.info = &Dzh_con_info;
   ASSIGN_DBL((P_)p->payload, (StgDouble)d);
   return p;
 }
@@ -166,7 +166,7 @@ HaskellObj
 rts_mkAddr (void *a)
 {
   StgClosure *p = (StgClosure *)allocate(sizeofW(StgHeader)+1);
-  p->header.info = &AZh_con_info;
+  p->header.info = &Azh_con_info;
   p->payload[0]  = (StgClosure *)a;
   return p;
 }
@@ -207,7 +207,7 @@ rts_apply (HaskellObj f, HaskellObj arg)
 char
 rts_getChar (HaskellObj p)
 {
-  if (p->header.info == &CZh_con_info || p->header.info == &CZh_static_info) {
+  if (p->header.info == &Czh_con_info || p->header.info == &Czh_static_info) {
     return (char)(StgWord)(p->payload[0]);
   } else {
     barf("getChar: not a Char");
@@ -217,7 +217,7 @@ rts_getChar (HaskellObj p)
 int
 rts_getInt (HaskellObj p)
 {
-  if (p->header.info == &IZh_con_info || p->header.info == &IZh_static_info) {
+  if (p->header.info == &Izh_con_info || p->header.info == &Izh_static_info) {
     return (int)(p->payload[0]);
   } else {
     barf("getInt: not an Int");
@@ -227,7 +227,7 @@ rts_getInt (HaskellObj p)
 unsigned int
 rts_getWord (HaskellObj p)
 {
-  if (p->header.info == &WZh_con_info || p->header.info == &WZh_static_info) {
+  if (p->header.info == &Wzh_con_info || p->header.info == &Wzh_static_info) {
     return (unsigned int)(p->payload[0]);
   } else {
     barf("getWord: not a Word");
@@ -237,7 +237,7 @@ rts_getWord (HaskellObj p)
 float
 rts_getFloat (HaskellObj p)
 {
-  if (p->header.info == &FZh_con_info || p->header.info == &FZh_static_info) {
+  if (p->header.info == &Fzh_con_info || p->header.info == &Fzh_static_info) {
     return (float)(PK_FLT((P_)p->payload));
   } else {
     barf("getFloat: not a Float");
@@ -247,7 +247,7 @@ rts_getFloat (HaskellObj p)
 double
 rts_getDouble (HaskellObj p)
 {
-  if (p->header.info == &DZh_con_info || p->header.info == &DZh_static_info) {
+  if (p->header.info == &Dzh_con_info || p->header.info == &Dzh_static_info) {
     return (double)(PK_DBL((P_)p->payload));
   } else {
     barf("getDouble: not a Double");
@@ -268,7 +268,7 @@ rts_getStablePtr (HaskellObj p)
 void *
 rts_getAddr (HaskellObj p)
 {
-  if (p->header.info == &AZh_con_info || p->header.info == &AZh_static_info) {
+  if (p->header.info == &Azh_con_info || p->header.info == &Azh_static_info) {
     return (void *)(p->payload[0]);
   } else {
     barf("getAddr: not an Addr");

@@ -295,7 +295,7 @@ creategid(i)
 {
   switch(i) {
     case ARROWGID:
-      return(mkgid(i,install_literal("->")));
+      return(mkgid(i,install_literal("(->)")));
     case NILGID:
       return(mkgid(i,install_literal("[]")));
     case UNITGID:

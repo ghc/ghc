@@ -17,7 +17,7 @@ module Id (
 	recordSelectorFieldLabel,
 
 	-- Modifying an Id
-	setIdName, setIdUnique, setIdType, setIdInfo, mkIdVisible,
+	setIdName, setIdUnique, setIdType, setIdInfo,
 
 	-- Predicates
 	omitIfaceSigForId,
@@ -70,12 +70,13 @@ import IdInfo
 import Demand		( Demand )
 import Name	 	( Name, OccName, Module,
 			  mkSysLocalName, mkLocalName,
-			  isWiredInName, mkNameVisible
+			  isWiredInName
 			) 
 import Const		( Con(..) )
 import PrimRep		( PrimRep )
 import PrimOp		( PrimOp )
 import FieldLabel	( FieldLabel(..) )
+import SrcLoc		( SrcLoc )
 import Unique		( Unique, mkBuiltinUnique, getBuiltinUniques )
 import Outputable
 
@@ -109,11 +110,11 @@ mkUserId name ty = mkVanillaId name ty
 
 -- SysLocal: for an Id being created by the compiler out of thin air...
 -- UserLocal: an Id with a name the user might recognize...
-mkUserLocal :: OccName     -> Unique -> Type -> Id
+mkUserLocal :: OccName     -> Unique -> Type -> SrcLoc -> Id
 mkSysLocal  :: FAST_STRING -> Unique -> Type -> Id
 
-mkSysLocal  fs uniq ty  = mkVanillaId (mkSysLocalName uniq fs)  ty
-mkUserLocal occ uniq ty = mkVanillaId (mkLocalName    uniq occ) ty
+mkSysLocal  fs uniq ty      = mkVanillaId (mkSysLocalName uniq fs)      ty
+mkUserLocal occ uniq ty loc = mkVanillaId (mkLocalName    uniq occ loc) ty
 \end{code}
 
 Make some local @Ids@ for a template @CoreExpr@.  These have bogus
@@ -171,11 +172,6 @@ omitIfaceSigForId id
 		-- the instance decl
 
 	other	       -> False	-- Don't omit!
-\end{code}
-
-\begin{code}
-mkIdVisible :: Module -> Id -> Id
-mkIdVisible mod id = setIdName id (mkNameVisible mod (idName id))
 \end{code}
 
 %************************************************************************

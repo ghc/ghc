@@ -68,6 +68,7 @@ import Unique		( Unique, Uniquable(..),
 import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply )
 import Constants	( tARGET_MIN_INT, tARGET_MAX_INT )
 import Util		( mapAccumL )
+import SrcLoc		( noSrcLoc )
 import Bag
 import Maybes
 import IO		( hPutStr, stderr )
@@ -323,7 +324,8 @@ tidyNestedBndr env@(tidy_env, var_env) id
   = 	-- Non-top-level variables
     let 
 	-- Give the Id a fresh print-name, *and* rename its type
-	name'        	  = mkLocalName (getUnique id) occ'
+	-- The SrcLoc isn't important now, though we could extract it from the Id
+	name'        	  = mkLocalName (getUnique id) occ' noSrcLoc
 	(tidy_env', occ') = tidyOccName tidy_env (getOccName id)
         ty'          	  = tidyType env (idType id)
 	id'          	  = mkUserId name' ty'

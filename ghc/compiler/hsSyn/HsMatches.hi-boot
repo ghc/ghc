@@ -4,6 +4,6 @@ HsMatches Match GRHSs pprMatch pprMatches pprGRHSs ;
 _declarations_
 1 data Match a b ;
 1 data GRHSs a b ;
-1 pprGRHSs _:_ _forall_ [i p] {Name.NamedThing i, Outputable.Outputable i, Outputable.Outputable p} => PrelBase.Bool -> HsMatches.GRHSs i p -> Outputable.SDoc ;;
-1 pprMatch _:_ _forall_ [i p] {Name.NamedThing i, Outputable.Outputable i, Outputable.Outputable p} => (PrelBase.Bool, Outputable.SDoc) -> HsMatches.Match i p -> Outputable.SDoc ;;
-1 pprMatches _:_ _forall_ [i p] {Name.NamedThing i, Outputable.Outputable i, Outputable.Outputable p} => (PrelBase.Bool, Outputable.SDoc) -> [HsMatches.Match i p] -> Outputable.SDoc ;;
+1 pprGRHSs _:_ _forall_ [i p] {Outputable.Outputable i, Outputable.Outputable p} => PrelBase.Bool -> HsMatches.GRHSs i p -> Outputable.SDoc ;;
+1 pprMatch _:_ _forall_ [i p] {Outputable.Outputable i, Outputable.Outputable p} => (PrelBase.Bool, Outputable.SDoc) -> HsMatches.Match i p -> Outputable.SDoc ;;
+1 pprMatches _:_ _forall_ [i p] {Outputable.Outputable i, Outputable.Outputable p} => (PrelBase.Bool, Outputable.SDoc) -> [HsMatches.Match i p] -> Outputable.SDoc ;;

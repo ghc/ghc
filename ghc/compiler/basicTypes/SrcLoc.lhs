@@ -28,6 +28,7 @@ module SrcLoc (
 
 #include "HsVersions.h"
 
+import Util		( thenCmp )
 import Outputable
 import FastString	( unpackFS )
 import GlaExts		( Int(..), (+#) )
@@ -49,19 +50,6 @@ data SrcLoc
 		FAST_INT
 
   | UnhelpfulSrcLoc FAST_STRING	-- Just a general indication
-
-instance Ord SrcLoc where
-  compare NoSrcLoc NoSrcLoc           = EQ
-  compare NoSrcLoc _	              = GT
-  compare (UnhelpfulSrcLoc _) (UnhelpfulSrcLoc _) = EQ
-  compare (UnhelpfulSrcLoc _) _       = GT
-  compare _ NoSrcLoc                  = LT
-  compare _ (UnhelpfulSrcLoc _)       = LT
-  compare (SrcLoc _ y1) (SrcLoc _ y2) = compare IBOX(y1) IBOX(y2) 
-
-instance Eq SrcLoc where
-  (==) x y = compare x y == EQ
-  
 \end{code}
 
 Note that an entity might be imported via more than one route, and
@@ -102,6 +90,29 @@ incSrcLine loc  	= loc
 %************************************************************************
 
 \begin{code}
+-- SrcLoc is an instance of Ord so that we can sort error messages easily
+instance Eq SrcLoc where
+  loc1 == loc2 = case loc1 `cmpSrcLoc` loc2 of
+		   EQ    -> True
+		   other -> False
+
+instance Ord SrcLoc where
+  compare = cmpSrcLoc
+
+cmpSrcLoc NoSrcLoc NoSrcLoc = EQ
+cmpSrcLoc NoSrcLoc other    = LT
+
+cmpSrcLoc (UnhelpfulSrcLoc s1) (UnhelpfulSrcLoc s2) = s1 `compare` s2
+cmpSrcLoc (UnhelpfulSrcLoc s1) other		    = GT
+
+cmpSrcLoc (SrcLoc s1 l1) NoSrcLoc	     = GT
+cmpSrcLoc (SrcLoc s1 l1) (UnhelpfulSrcLoc _) = LT
+cmpSrcLoc (SrcLoc s1 l1) (SrcLoc s2 l2)      = (s1 `compare` s2) `thenCmp` (l1 `cmpline` l2)
+					     where
+				  		l1 `cmpline` l2 | l1 <#  l2 = LT
+								| l1 ==# l2 = EQ
+								| otherwise = GT 
+					  
 instance Outputable SrcLoc where
     ppr (SrcLoc src_path src_line)
       = getPprStyle $ \ sty ->

@@ -22,7 +22,7 @@ import Name		( Module, moduleString )
 import Bag		( isEmptyBag, unionBags )
 import CmdLineOpts	( opt_SccGroup, opt_SccProfilingOn )
 import CoreLint		( beginPass, endPass )
-import ErrUtils		( doIfSet )
+import ErrUtils		( doIfSet, pprBagOfWarnings )
 import Outputable
 import UniqSupply	( splitUniqSupply, UniqSupply )
 \end{code}
@@ -41,7 +41,7 @@ deSugar :: UniqSupply		-- name supply
 deSugar us global_val_env mod_name all_binds fo_decls = do
 	beginPass "Desugar"
 	-- Do desugaring
-	let (core_prs, ds_warns) = initDs us1 global_val_env module_and_group 
+	let (core_prs, ds_warns1) = initDs us1 global_val_env module_and_group 
 				            (dsMonoBinds opt_SccProfilingOn all_binds [])
             ds_binds' = [Rec core_prs]
 
@@ -50,9 +50,11 @@ deSugar us global_val_env mod_name all_binds fo_decls = do
 
   	    ds_binds  = fi_binds ++ ds_binds' ++ fe_binds
 
+	    ds_warns = ds_warns1 `unionBags` ds_warns2
+
 	 -- Display any warnings
-        doIfSet (not (isEmptyBag (ds_warns `unionBags` ds_warns2)))
-		(printErrs (pprDsWarnings ds_warns))
+        doIfSet (not (isEmptyBag ds_warns))
+		(printErrs (pprBagOfWarnings ds_warns))
 
 	 -- Lint result if necessary
         endPass "Desugar" opt_D_dump_ds ds_binds

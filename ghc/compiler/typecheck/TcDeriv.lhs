@@ -11,7 +11,7 @@ module TcDeriv ( tcDeriving ) where
 #include "HsVersions.h"
 
 import HsSyn		( HsBinds(..), MonoBinds(..), collectMonoBinders )
-import RdrHsSyn		( RdrName, RdrNameMonoBinds )
+import RdrHsSyn		( RdrNameMonoBinds )
 import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds )
 import CmdLineOpts	( opt_D_dump_deriv )
 
@@ -39,6 +39,7 @@ import Name		( isLocallyDefined, getSrcLoc,
 			  Name, Module, NamedThing(..),
 			  OccName, nameOccName
 			)
+import RdrName		( RdrName )
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
 import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,

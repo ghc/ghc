@@ -378,7 +378,7 @@ sameNoOfArgs matches = length (nub (map args_in_match matches)) == 1
 
 \begin{code}
 matchCtxt CaseAlt match
-  = hang (ptext SLIT("In a \"case\" branch:"))
+  = hang (ptext SLIT("In a case alternative:"))
 	 4 (pprMatch (True,empty) {-is_case-} match)
 
 matchCtxt (FunRhs fun) match

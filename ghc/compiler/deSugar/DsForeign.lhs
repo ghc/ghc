@@ -22,11 +22,12 @@ import TcHsSyn		( TypecheckedForeignDecl )
 import CoreUtils	( coreExprType )
 import Const		( Con(..), mkMachInt )
 import DataCon		( DataCon, dataConId )
-import Id		( Id, idType, idName, 
-			  mkIdVisible, mkWildId
-			)
+import Id		( Id, idType, idName, mkWildId, mkUserId )
 import Const		( Literal(..) )
-import Name		( getOccString, NamedThing(..) )
+import Name		( mkGlobalName, nameModule, nameOccName, getOccString, 
+			  mkForeignExportOcc,
+			  NamedThing(..), Provenance(..), ExportFlag(..)
+			)
 import PrelVals		( realWorldPrimId )
 import PrelInfo		( deRefStablePtr_NAME, bindIO_NAME, makeStablePtr_NAME )
 import Type		( splitAlgTyConApp_maybe, 
@@ -203,6 +204,13 @@ The function that does most of the work for 'foreign export' declarations.
 (see below for the boilerplate code a 'foreign export' declaration expands
  into.)
 
+For each 'foreign export foo' in a module M we generate:
+
+* a C function 'foo', which calls
+* a Haskell stub 'M.$ffoo', which calls
+
+the user-written Haskell function 'M.foo'.
+
 \begin{code}
 dsFExport :: Id
 	  -> Type		-- Type of foreign export.
@@ -215,7 +223,17 @@ dsFExport :: Id
 		 , SDoc
 		 )
 dsFExport i ty ext_name cconv isDyn =
-     newSysLocalDs  helper_ty			        `thenDs` \ f_helper ->
+     getUniqueDs					`thenDs` \ uniq ->
+     getSrcLocDs					`thenDs` \ src_loc ->
+     let
+	f_helper_glob = mkUserId helper_name helper_ty
+		      where
+			name	    = idName i
+			mod	    = nameModule name
+			occ	    = mkForeignExportOcc (nameOccName name)
+			prov	    = LocalDef src_loc Exported
+			helper_name = mkGlobalName uniq mod occ prov
+     in
      newSysLocalsDs fe_arg_tys				`thenDs` \ fe_args ->
      (if isDyn then 
         newSysLocalDs stbl_ptr_ty			`thenDs` \ stbl_ptr ->
@@ -268,7 +286,6 @@ dsFExport i ty ext_name cconv isDyn =
 	  ExtName fs _ -> fs
 	  Dynamic      -> panic "dsFExport: Dynamic - shouldn't ever happen."
 
-      f_helper_glob    = mkIdVisible mod f_helper
       (h_stub, c_stub) = fexportEntry c_nm f_helper_glob wrapper_arg_tys the_result_ty cconv isDyn
      in
      returnDs (NonRec f_helper_glob the_body, h_stub, c_stub)

@@ -19,6 +19,8 @@ module TyCon(
 	mkKindCon,
 	mkSuperKindCon,
 
+	setTyConName,
+
 	tyConKind,
 	tyConUnique,
 	tyConTyVars,
@@ -224,6 +226,8 @@ mkSynTyCon name kind arity tyvars rhs
 	tyConTyVars = tyvars,
 	synTyConDefn = rhs
     }
+
+setTyConName tc name = tc {tyConName = name, tyConUnique = nameUnique name}
 \end{code}
 
 \begin{code}

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.8 1999/01/26 11:12:52 simonm Exp $
+ * $Id: StgMiscClosures.hc,v 1.9 1999/01/27 14:51:22 simonpj Exp $
  *
  * Entry code for various built-in closure types.
  *
@@ -407,25 +407,25 @@ VEC_POLY_INFO_TABLE(ret_bco,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO)
 
 #ifndef COMPILER
 
-INFO_TABLE_CONSTR(CZh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgChar),0,CONSTR,const,EF_,0,0);
-INFO_TABLE_CONSTR(IZh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgInt),0,CONSTR,const,EF_,0,0);
-INFO_TABLE_CONSTR(I64Zh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgInt64),0,CONSTR,const,EF_,0,0);
-INFO_TABLE_CONSTR(FZh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgFloat),0,CONSTR,const,EF_,0,0);
-INFO_TABLE_CONSTR(DZh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgDouble),0,CONSTR,const,EF_,0,0);
-INFO_TABLE_CONSTR(AZh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgAddr),0,CONSTR,const,EF_,0,0);
-INFO_TABLE_CONSTR(WZh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgWord),0,CONSTR,const,EF_,0,0);
+INFO_TABLE_CONSTR(Czh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgChar),0,CONSTR,const,EF_,0,0);
+INFO_TABLE_CONSTR(Izh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgInt),0,CONSTR,const,EF_,0,0);
+INFO_TABLE_CONSTR(I64zh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgInt64),0,CONSTR,const,EF_,0,0);
+INFO_TABLE_CONSTR(Fzh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgFloat),0,CONSTR,const,EF_,0,0);
+INFO_TABLE_CONSTR(Dzh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgDouble),0,CONSTR,const,EF_,0,0);
+INFO_TABLE_CONSTR(Azh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgAddr),0,CONSTR,const,EF_,0,0);
+INFO_TABLE_CONSTR(Wzh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgWord),0,CONSTR,const,EF_,0,0);
 INFO_TABLE_CONSTR(StablePtr_con_info,Hugs_CONSTR_entry,0,sizeofW(StgStablePtr),0,CONSTR,const,EF_,0,0);
 
-/* These might seem redundant but {I,C}Zh_static_info are used in
+/* These might seem redundant but {I,C}zh_static_info are used in
  * {INT,CHAR}LIKE and the rest are used in RtsAPI.c
  */
-INFO_TABLE_CONSTR(CZh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgChar),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
-INFO_TABLE_CONSTR(IZh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgInt),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
-INFO_TABLE_CONSTR(I64Zh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgInt64),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
-INFO_TABLE_CONSTR(FZh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgFloat),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
-INFO_TABLE_CONSTR(DZh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgDouble),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
-INFO_TABLE_CONSTR(AZh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgAddr),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
-INFO_TABLE_CONSTR(WZh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgWord),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
+INFO_TABLE_CONSTR(Czh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgChar),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
+INFO_TABLE_CONSTR(Izh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgInt),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
+INFO_TABLE_CONSTR(I64zh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgInt64),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
+INFO_TABLE_CONSTR(Fzh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgFloat),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
+INFO_TABLE_CONSTR(Dzh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgDouble),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
+INFO_TABLE_CONSTR(Azh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgAddr),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
+INFO_TABLE_CONSTR(Wzh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgWord),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
 INFO_TABLE_CONSTR(StablePtr_static_info,Hugs_CONSTR_entry,0,sizeofW(StgStablePtr),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
 
 #endif /* !defined(COMPILER) */
@@ -440,14 +440,14 @@ INFO_TABLE_CONSTR(StablePtr_static_info,Hugs_CONSTR_entry,0,sizeofW(StgStablePtr
 
 #define CHARLIKE_HDR(n)						\
 	{							\
-	  STATIC_HDR(CZh_static_info, /* C# */     		\
+	  STATIC_HDR(Czh_static_info, /* C# */     		\
 			 CCS_DONTZuCARE),			\
           data : n						\
 	}
 					     
 #define INTLIKE_HDR(n)						\
 	{							\
-	  STATIC_HDR(IZh_static_info,  /* I# */    		\
+	  STATIC_HDR(Izh_static_info,  /* I# */    		\
 			 CCS_DONTZuCARE),			\
           data : n						\
 	}

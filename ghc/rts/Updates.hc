@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.7 1999/01/21 10:31:53 simonm Exp $
+ * $Id: Updates.hc,v 1.8 1999/01/27 14:51:23 simonpj Exp $
  *
  * Code to perform updates.
  *
@@ -501,8 +501,8 @@ STGFUN(seq_entry)
    Exception Primitives
    -------------------------------------------------------------------------- */
 
-FN_(catchZh_fast);
-FN_(raiseZh_fast);
+FN_(catchzh_fast);
+FN_(raisezh_fast);
 
 #define CATCH_FRAME_ENTRY_TEMPLATE(label,ret) 	\
    FN_(label);					\
@@ -554,17 +554,17 @@ STGFUN(catch_entry)
   FB_
   R2.cl = payloadCPtr(R1.cl,1); /* h */
   R1.cl = payloadCPtr(R1.cl,0); /* x */
-  JMP_(catchZh_fast);
+  JMP_(catchzh_fast);
   FE_
 }
 
-FN_(catchZh_fast)
+FN_(catchzh_fast)
 {
   StgCatchFrame *fp;
   FB_
 
     /* args: R1 = m, R2 = k */
-    STK_CHK_GEN(sizeofW(StgCatchFrame), R1_PTR | R2_PTR, catchZh_fast, );
+    STK_CHK_GEN(sizeofW(StgCatchFrame), R1_PTR | R2_PTR, catchzh_fast, );
     Sp -= sizeofW(StgCatchFrame);
     fp = (StgCatchFrame *)Sp;
     SET_HDR(fp,(StgInfoTable *)&catch_frame_info,CCCS);
@@ -585,7 +585,7 @@ FN_(catchZh_fast)
  *
  *   raise = {err} \n {} -> raise#{err}
  *
- * It is used in raiseZh_fast to update thunks on the update list
+ * It is used in raisezh_fast to update thunks on the update list
  * -------------------------------------------------------------------------- */
 
 INFO_TABLE(raise_info,raise_entry,1,0,FUN,const,EF_,0,0);
@@ -593,11 +593,11 @@ STGFUN(raise_entry)
 {
   FB_
   R1.cl = R1.cl->payload[0];
-  JMP_(raiseZh_fast);
+  JMP_(raisezh_fast);
   FE_
 }
 
-FN_(raiseZh_fast)
+FN_(raisezh_fast)
 {
   StgClosure *handler;
   StgUpdateFrame *p;
@@ -634,10 +634,10 @@ FN_(raiseZh_fast)
 	break;
 
       case STOP_FRAME:
-	barf("raiseZh_fast: STOP_FRAME");
+	barf("raisezh_fast: STOP_FRAME");
 
       default:
-	barf("raiseZh_fast: weird activation record");
+	barf("raisezh_fast: weird activation record");
       }
       
       break;

@@ -16,12 +16,11 @@ import IO		( Handle, hPutStr, openFile,
 			  hClose, hPutStrLn, IOMode(..) )
 
 import HsSyn
-import RdrHsSyn		( RdrName(..) )
-import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..), IfaceFlavour(..),
+import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..),
   			  StrictnessMark(..) 
 			)
 import RnMonad
-import RnEnv		( availName, ifaceFlavour )
+import RnEnv		( availName )
 
 import TcInstUtil	( InstInfo(..) )
 import WorkWrap		( getWorkerIdAndCons )
@@ -43,10 +42,11 @@ import CoreSyn		( CoreExpr, CoreBind, Bind(..) )
 import CoreUtils	( exprSomeFreeVars )
 import CoreUnfold	( calcUnfoldingGuidance, UnfoldingGuidance(..), 
 			  Unfolding, okToUnfoldInHiFile )
-import Name		( isLocallyDefined, isWiredInName, modAndOcc, nameModule,
-			  OccName, pprOccName, pprModule, isExported, moduleString,
+import Name		( isLocallyDefined, isWiredInName, nameRdrName, nameModule,
+			  isExported,
 			  Name, NamedThing(..)
 			)
+import OccName		( OccName, pprOccName, moduleString, pprModule, pprModuleBoot )
 import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
 			  tyConTheta, tyConTyVars, tyConDataCons
 			)
@@ -146,9 +146,9 @@ ifaceDecls (Just hdl)
 ifaceImports if_hdl import_usages
   = hPutCol if_hdl upp_uses (sortLt lt_imp_vers import_usages)
   where
-    upp_uses (m, hif, mv, whats_imported)
+    upp_uses (m, mv, whats_imported)
       = ptext SLIT("import ") <>
-	hsep [pprModule m, pp_hif hif, int mv, dcolon,
+	hsep [pprModule m, pprModuleBoot m, int mv, dcolon,
 	      upp_import_versions whats_imported
 	] <> semi
 
@@ -176,7 +176,6 @@ ifaceExports if_hdl avails
     export_fm :: FiniteMap Module [AvailInfo]
     export_fm = foldr insert emptyFM avails
 
-    insert NotAvailable efm = efm
     insert avail efm = addToFM_C (++) efm mod [avail] 
 		     where
 		       mod = nameModule (availName avail)
@@ -185,14 +184,10 @@ ifaceExports if_hdl avails
     do_one_module :: (Module, [AvailInfo]) -> SDoc
     do_one_module (mod_name, avails@(avail1:_))
 	= ptext SLIT("__export ") <>
-	  hsep [pp_hif (ifaceFlavour (availName avail1)), 
+	  hsep [pprModuleBoot (nameModule (availName avail1)), 
 		pprModule mod_name,
 		hsep (map upp_avail (sortLt lt_avail avails))
 	  ] <> semi
-
--- The "!" indicates that the exported things came from a hi-boot interface 
-pp_hif HiFile     = empty
-pp_hif HiBootFile = char '!'
 
 ifaceFixities if_hdl [] = return ()
 ifaceFixities if_hdl fixities 
@@ -561,7 +556,6 @@ When printing export lists, we print like this:
 
 \begin{code}
 upp_avail :: AvailInfo -> SDoc
-upp_avail NotAvailable      = empty
 upp_avail (Avail name)      = pprOccName (getOccName name)
 upp_avail (AvailTC name []) = empty
 upp_avail (AvailTC name ns) = hcat [pprOccName (getOccName name), bang, upp_export ns']
@@ -600,13 +594,13 @@ lt_avail :: AvailInfo -> AvailInfo -> Bool
 a1 `lt_avail` a2 = availName a1 `lt_name` availName a2
 
 lt_name :: Name -> Name -> Bool
-n1 `lt_name` n2 = modAndOcc n1 < modAndOcc n2
+n1 `lt_name` n2 = nameRdrName n1 < nameRdrName n2
 
 lt_lexical :: NamedThing a => a -> a -> Bool
 lt_lexical a1 a2 = getName a1 `lt_name` getName a2
 
 lt_imp_vers :: ImportVersion a -> ImportVersion a -> Bool
-lt_imp_vers (m1,_,_,_) (m2,_,_,_) = m1 < m2
+lt_imp_vers (m1,_,_) (m2,_,_) = m1 < m2
 
 sort_versions vs = sortLt lt_vers vs
 

@@ -156,7 +156,7 @@ tcFExport fo@(ForeignDecl nm imp_exp hs_ty ext_nm cconv src_loc) =
 	  -- than its declared/inferred type. Hence the need
 	  -- to create a local binding which will call the exported function
 	  -- at a particular type (and, maybe, overloading).
-	newLocalId (nameOccName nm) sig_tc_ty	`thenNF_Tc` \ i ->
+	newLocalId (nameOccName nm) sig_tc_ty src_loc	`thenNF_Tc` \ i ->
 	let
 	    bind  = VarMonoBind i rhs
 	in

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.3 1999/01/26 11:12:56 simonm Exp $
+ * $Id: Prelude.h,v 1.4 1999/01/27 14:51:14 simonpj Exp $
  *
  * Prelude identifiers that we sometimes need to refer to in the RTS.
  *
@@ -16,20 +16,20 @@ extern const StgClosure PrelBase_False_static_closure;
 extern const StgClosure PrelMain_mainIO_closure;
 extern const StgClosure PrelPack_unpackCString_closure;
 
-extern const StgInfoTable PrelBase_CZh_static_info;
-extern const StgInfoTable PrelBase_IZh_static_info;
-extern const StgInfoTable PrelBase_FZh_static_info;
-extern const StgInfoTable PrelBase_DZh_static_info;
-extern const StgInfoTable PrelAddr_AZh_static_info;
-extern const StgInfoTable PrelAddr_WZh_static_info;
-extern const StgInfoTable PrelBase_CZh_con_info;
-extern const StgInfoTable PrelBase_IZh_con_info;
-extern const StgInfoTable PrelBase_FZh_con_info;
-extern const StgInfoTable PrelBase_DZh_con_info;
-extern const StgInfoTable PrelAddr_AZh_con_info;
-extern const StgInfoTable PrelAddr_WZh_con_info;
-extern const StgInfoTable PrelAddr_I64Zh_con_info;
-extern const StgInfoTable PrelAddr_W64Zh_con_info;
+extern const StgInfoTable PrelBase_Czh_static_info;
+extern const StgInfoTable PrelBase_Izh_static_info;
+extern const StgInfoTable PrelBase_Fzh_static_info;
+extern const StgInfoTable PrelBase_Dzh_static_info;
+extern const StgInfoTable PrelAddr_Azh_static_info;
+extern const StgInfoTable PrelAddr_Wzh_static_info;
+extern const StgInfoTable PrelBase_Czh_con_info;
+extern const StgInfoTable PrelBase_Izh_con_info;
+extern const StgInfoTable PrelBase_Fzh_con_info;
+extern const StgInfoTable PrelBase_Dzh_con_info;
+extern const StgInfoTable PrelAddr_Azh_con_info;
+extern const StgInfoTable PrelAddr_Wzh_con_info;
+extern const StgInfoTable PrelAddr_I64zh_con_info;
+extern const StgInfoTable PrelAddr_W64zh_con_info;
 extern const StgInfoTable PrelStable_StablePtr_static_info;
 extern const StgInfoTable PrelStable_StablePtr_con_info;
 
@@ -37,51 +37,52 @@ extern const StgInfoTable PrelStable_StablePtr_con_info;
  * module these names are defined in.
  */
 
-#define Nil_closure           PrelBase_Z91Z93_static_closure
-#define Unit_closure          PrelBase_Z40Z41_static_closure
+#define Nil_closure           PrelBase_ZMZN_static_closure
+#define Unit_closure          PrelBase_Z0T_static_closure
 #define True_closure          PrelBase_True_static_closure
 #define False_closure         PrelBase_False_static_closure
-#define CZh_static_info       PrelBase_CZh_static_info
-#define IZh_static_info       PrelBase_IZh_static_info
-#define FZh_static_info       PrelBase_FZh_static_info
-#define DZh_static_info       PrelBase_DZh_static_info
-#define AZh_static_info       PrelAddr_AZh_static_info
-#define WZh_static_info       PrelAddr_WZh_static_info
-#define CZh_con_info          PrelBase_CZh_con_info
-#define IZh_con_info          PrelBase_IZh_con_info
-#define FZh_con_info          PrelBase_FZh_con_info
-#define DZh_con_info          PrelBase_DZh_con_info
-#define AZh_con_info          PrelAddr_AZh_con_info
-#define WZh_con_info          PrelAddr_WZh_con_info
-#define W64Zh_con_info        PrelAddr_W64Zh_con_info
-#define I64Zh_con_info        PrelAddr_I64Zh_con_info
+#define Czh_static_info       PrelBase_Czh_static_info
+#define Izh_static_info       PrelBase_Izh_static_info
+#define Fzh_static_info       PrelBase_Fzh_static_info
+#define Dzh_static_info       PrelBase_Dzh_static_info
+#define Azh_static_info       PrelAddr_Azh_static_info
+#define Wzh_static_info       PrelAddr_Wzh_static_info
+#define Czh_con_info          PrelBase_Czh_con_info
+#define Izh_con_info          PrelBase_Izh_con_info
+#define Fzh_con_info          PrelBase_Fzh_con_info
+#define Dzh_con_info          PrelBase_Dzh_con_info
+#define Azh_con_info          PrelAddr_Azh_con_info
+#define Wzh_con_info          PrelAddr_Wzh_con_info
+#define W64zh_con_info        PrelAddr_W64zh_con_info
+#define I64zh_con_info        PrelAddr_I64zh_con_info
 #define StablePtr_static_info PrelStable_StablePtr_static_info
 #define StablePtr_con_info    PrelStable_StablePtr_con_info
+
 #define mainIO_closure        PrelMain_mainIO_closure
 #define unpackCString_closure PrelPack_unpackCString_closure
 
 #else /* INTERPRETER, I guess */
 
-extern const StgInfoTable CZh_con_info;
-extern const StgInfoTable IZh_con_info;
-extern const StgInfoTable I64Zh_con_info;
-extern const StgInfoTable FZh_con_info;
-extern const StgInfoTable DZh_con_info;
-extern const StgInfoTable AZh_con_info;
-extern const StgInfoTable WZh_con_info;
+extern const StgInfoTable Czh_con_info;
+extern const StgInfoTable Izh_con_info;
+extern const StgInfoTable I64zh_con_info;
+extern const StgInfoTable Fzh_con_info;
+extern const StgInfoTable Dzh_con_info;
+extern const StgInfoTable Azh_con_info;
+extern const StgInfoTable Wzh_con_info;
 extern const StgInfoTable StablePtr_con_info;
 
-extern const StgInfoTable CZh_static_info;
-extern const StgInfoTable IZh_static_info;
-extern const StgInfoTable I64Zh_static_info;
-extern const StgInfoTable FZh_static_info;
-extern const StgInfoTable DZh_static_info;
-extern const StgInfoTable AZh_static_info;
-extern const StgInfoTable WZh_static_info;
+extern const StgInfoTable Czh_static_info;
+extern const StgInfoTable Izh_static_info;
+extern const StgInfoTable I64zh_static_info;
+extern const StgInfoTable Fzh_static_info;
+extern const StgInfoTable Dzh_static_info;
+extern const StgInfoTable Azh_static_info;
+extern const StgInfoTable Wzh_static_info;
 extern const StgInfoTable StablePtr_static_info;
 
-#define W64Zh_con_info        I64Zh_con_info
-#define W64Zh_static_info     I64Zh_con_info
+#define W64zh_con_info        I64zh_con_info
+#define W64zh_static_info     I64zh_con_info
 
 #endif
 

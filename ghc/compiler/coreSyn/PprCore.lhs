@@ -16,6 +16,7 @@ module PprCore (
 #include "HsVersions.h"
 
 import CoreSyn
+import CostCentre	( pprCostCentreCore )
 import Id		( idType, idInfo, getInlinePragma, getIdDemandInfo, Id )
 import Var		( isTyVar )
 import IdInfo		( ppIdInfo )
@@ -89,8 +90,8 @@ pprGenericEnv = initCoreEnv (\site -> ppr)
 \begin{code}
 initCoreEnv pbdr
   = initPprEnv
-	(Just ppr)		-- Constants
-	(Just ppr)		-- Cost centres
+	(Just ppr)			-- Constants
+	(Just pprCostCentreCore)	-- Cost centres
 
 	(Just ppr) 		-- tyvar occs
 	(Just pprParendType)    -- types
@@ -235,8 +236,7 @@ ppr_expr pe (Let bind expr)
 		NonRec _ _ -> SLIT("let {")
 
 ppr_expr pe (Note (SCC cc) expr)
-  = sep [hsep [ptext SLIT("__scc"), pSCC pe cc],
-	 ppr_parend_expr pe expr ]
+  = sep [pSCC pe cc, ppr_expr pe expr]
 
 #ifdef DEBUG
 ppr_expr pe (Note (Coerce to_ty from_ty) expr)
@@ -272,7 +272,7 @@ ppr_case_pat pe con args
   where
     ppr_bndr = pBndr pe CaseBind
 
-ppr_arg pe (Type ty) = ptext SLIT("__a") <+> pTy pe ty
+ppr_arg pe (Type ty) = ptext SLIT("@") <+> pTy pe ty
 ppr_arg pe expr      = ppr_parend_expr pe expr
 
 arrow = ptext SLIT("->")
@@ -289,7 +289,7 @@ pprCoreBinder LetBind binder
     sig     = pprTypedBinder binder
     pragmas = ppIdInfo (idInfo binder)
 
--- Lambda bound type variables are preceded by "__a"
+-- Lambda bound type variables are preceded by "@"
 pprCoreBinder LambdaBind bndr = pprTypedBinder bndr
 
 -- Case bound things don't get a signature or a herald
@@ -304,7 +304,7 @@ pprUntypedBinder binder
   | otherwise      = pprIdBndr binder
 
 pprTypedBinder binder
-  | isTyVar binder  = ptext SLIT("__a") <+> pprTyVarBndr binder
+  | isTyVar binder  = ptext SLIT("@") <+> pprTyVarBndr binder
   | otherwise	    = pprIdBndr binder <+> dcolon <+> pprParendType (idType binder)
 	-- The space before the :: is important; it helps the lexer
 	-- when reading inferfaces.  Otherwise it would lex "a::b" as one thing.

@@ -17,7 +17,7 @@ import BasicTypes	( Fixity(..), FixityDirection(..) )
 import HsTypes		( HsType )
 
 -- others:
-import Name		( Name, NamedThing(..), isSymOcc )
+import Name		( Name, isLexId ) 
 import Outputable	
 import PprType		( pprType, pprParendType )
 import Type		( Type )
@@ -184,13 +184,13 @@ A @Dictionary@, unless of length 0 or 1, becomes a tuple.  A
 \end{verbatim}
 
 \begin{code}
-instance (NamedThing id, Outputable id, Outputable pat) =>
+instance (Outputable id, Outputable pat) =>
 		Outputable (HsExpr id pat) where
     ppr expr = pprExpr expr
 \end{code}
 
 \begin{code}
-pprExpr :: (NamedThing id, Outputable id, Outputable pat)
+pprExpr :: (Outputable id, Outputable pat)
         => HsExpr id pat -> SDoc
 
 pprExpr e = pprDeeper (ppr_expr e)
@@ -223,10 +223,15 @@ ppr_expr (OpApp e1 op fixity e2)
       = hang (pprExpr op) 4 (sep [pp_e1, pp_e2])
 
     pp_infixly v
-      = sep [pp_e1, hsep [pp_v, pp_e2]]
+      = sep [pp_e1, hsep [pp_v_op, pp_e2]]
       where
-        pp_v | isSymOcc (getOccName v) = ppr v
-	     | otherwise	       = char '`' <> ppr v <> char '`'
+	pp_v = ppr v
+        pp_v_op | isLexId (_PK_ (showSDoc pp_v)) = char '`' <> pp_v <> char '`'
+	        | otherwise	       	         = pp_v 
+	-- Put it in backquotes if it's not an operator already
+	-- We use (showSDoc pp_v), rather than isSymOcc (getOccName v) simply so
+	-- that we don't need NamedThing in the context of all these funcions.
+	-- Gruesome, but simple.
 
 ppr_expr (NegApp e _)
   = char '-' <+> pprParendExpr e
@@ -348,7 +353,7 @@ ppr_expr (DictApp expr dnames)
 
 Parenthesize unless very simple:
 \begin{code}
-pprParendExpr :: (NamedThing id, Outputable id, Outputable pat)
+pprParendExpr :: (Outputable id, Outputable pat)
 	      => HsExpr id pat -> SDoc
 
 pprParendExpr expr
@@ -375,7 +380,7 @@ pprParendExpr expr
 %************************************************************************
 
 \begin{code}
-pp_rbinds :: (NamedThing id, Outputable id, Outputable pat)
+pp_rbinds :: (Outputable id, Outputable pat)
 	      => SDoc 
 	      -> HsRecordBinds id pat -> SDoc
 
@@ -435,7 +440,7 @@ data Stmt id pat
 \end{code}
 
 \begin{code}
-instance (NamedThing id, Outputable id, Outputable pat) =>
+instance (Outputable id, Outputable pat) =>
 		Outputable (Stmt id pat) where
     ppr stmt = pprStmt stmt
 
@@ -470,7 +475,7 @@ data ArithSeqInfo id pat
 \end{code}
 
 \begin{code}
-instance (NamedThing id, Outputable id, Outputable pat) =>
+instance (Outputable id, Outputable pat) =>
 		Outputable (ArithSeqInfo id pat) where
     ppr (From e1)		= hcat [ppr e1, pp_dotdot]
     ppr (FromThen e1 e2)	= hcat [ppr e1, comma, space, ppr e2, pp_dotdot]

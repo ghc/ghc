@@ -40,31 +40,26 @@ module RdrHsSyn (
 	RdrNameInstancePragmas,
 	extractHsTyVars, extractHsCtxtTyVars, extractPatsTyVars,
 
-	RdrName(..),
-	qual, varQual, tcQual, varUnqual,
-	dummyRdrVarName, dummyRdrTcName,
-	isUnqual, isQual,
-	rdrNameOcc, rdrNameModule, ieOcc,
-	cmpRdr,
 	mkOpApp, mkClassDecl
-
     ) where
 
 #include "HsVersions.h"
 
 import HsSyn
-import BasicTypes	( IfaceFlavour(..), Unused )
-import Name		( NamedThing(..), 
-			  Module, pprModule, mkModuleFS,
-			  OccName, srcTCOcc, srcVarOcc, isTvOcc,
-			  pprOccName, mkClassTyConOcc, mkClassDataConOcc
-			)
-import PrelMods		( mkTupNameStr, mkUbxTupNameStr )
+import Name		( mkClassTyConOcc, mkClassDataConOcc )
+import RdrName		( RdrName, isRdrTyVar, mkRdrUnqual, rdrNameOcc )
 import Util		( thenCmp )
 import HsPragmas	( GenPragmas, ClassPragmas, DataPragmas, ClassOpPragmas, InstancePragmas )
 import List		( nub )
 import Outputable
 \end{code}
+
+ 
+%************************************************************************
+%*									*
+\subsection{Type synonyms}
+%*									*
+%************************************************************************
 
 \begin{code}
 type RdrNameArithSeqInfo	= ArithSeqInfo		RdrName RdrNamePat
@@ -99,6 +94,13 @@ type RdrNameGenPragmas		= GenPragmas		RdrName
 type RdrNameInstancePragmas	= InstancePragmas	RdrName
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{A few functions over HsSyn at RdrName}
+%*									*
+%************************************************************************
+
 @extractHsTyVars@ looks just for things that could be type variables.
 It's used when making the for-alls explicit.
 
@@ -125,8 +127,8 @@ extract_ty (HsForAllTy tvs ctxt ty) acc = acc ++
 				        where
 				          locals = map getTyVarName tvs
 
-insertTV name@(Unqual occ) acc | isTvOcc occ = name : acc
-insertTV other 	           acc 		     = acc
+insertTV name   acc | isRdrTyVar name = name : acc
+insertTV other  acc 		      = acc
 
 extractPatsTyVars :: [RdrNamePat] -> [RdrName]
 extractPatsTyVars pats = nub (foldr extract_pat [] pats)
@@ -156,92 +158,18 @@ mkOpApp e1 op e2 = OpApp e1 (HsVar op) (error "mkOpApp:fixity") e2
 \end{code}
 
 mkClassDecl builds a RdrClassDecl, filling in the names for tycon and datacon
-by deriving them from the name of the class.
+by deriving them from the name of the class.  We fill in the names for the
+tycon and datacon corresponding to the class, by deriving them from the
+name of the class itself.  This saves recording the names in the interface
+file (which would be equally godd).
 
 \begin{code}
 mkClassDecl cxt cname tyvars sigs mbinds prags loc
   = ClassDecl cxt cname tyvars sigs mbinds prags tname dname loc
   where
-  -- The datacon and tycon are called "_DC" and "_TC", where the class is C
-  -- This prevents name clashes with user-defined tycons or datacons C
-    (dname, tname) = case cname of
-	  	       Qual m occ hif -> (Qual m (mkClassDataConOcc occ) hif,
-					  Qual m (mkClassTyConOcc   occ) hif)
-		       Unqual occ     -> (Unqual (mkClassDataConOcc occ),
-					  Unqual (mkClassTyConOcc   occ))
+    cls_occ = rdrNameOcc cname
+    dname   = mkRdrUnqual (mkClassDataConOcc cls_occ)
+    tname   = mkRdrUnqual (mkClassTyConOcc   cls_occ)
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection[RdrName]{The @RdrName@ datatype; names read from files}
-%*									*
-%************************************************************************
-
-\begin{code}
-data RdrName
-  = Unqual OccName
-  | Qual   Module OccName IfaceFlavour	-- HiBootFile for M!.t (interface files only), 
-					-- HiFile for the common M.t
-
--- These ones are used for making RdrNames for known-key things,
--- Or in code constructed from derivings
-qual     (m,n) = Qual m n HiFile
-tcQual   (m,n) = Qual m (srcTCOcc n) HiFile
-varQual  (m,n) = Qual m (srcVarOcc n) HiFile
-varUnqual n    = Unqual (srcVarOcc n)
-
-	-- This guy is used by the reader when HsSyn has a slot for
-	-- an implicit name that's going to be filled in by
-	-- the renamer.  We can't just put "error..." because
-	-- we sometimes want to print out stuff after reading but
-	-- before renaming
-dummyRdrVarName = Unqual (srcVarOcc SLIT("V-DUMMY"))
-dummyRdrTcName  = Unqual (srcVarOcc SLIT("TC-DUMMY"))
-
-
-isUnqual (Unqual _)   = True
-isUnqual (Qual _ _ _) = False
-
-isQual (Unqual _)   = False
-isQual (Qual _ _ _) = True
-
-
-cmpRdr (Unqual  n1) (Unqual  n2)     = n1 `compare` n2
-cmpRdr (Unqual  n1) (Qual m2 n2 _)   = LT
-cmpRdr (Qual m1 n1 _) (Unqual  n2)   = GT
-cmpRdr (Qual m1 n1 _) (Qual m2 n2 _) = (n1 `compare` n2) `thenCmp` (m1 `compare` m2)
-				   -- always compare module-names *second*
-
-rdrNameOcc :: RdrName -> OccName
-rdrNameOcc (Unqual occ)   = occ
-rdrNameOcc (Qual _ occ _) = occ
-
-rdrNameModule :: RdrName -> Module
-rdrNameModule (Qual m _ _) = m
-
-ieOcc :: RdrNameIE -> OccName
-ieOcc ie = rdrNameOcc (ieName ie)
-
-instance Show RdrName where -- debugging
-    showsPrec p rn = showsPrecSDoc p (ppr rn)
-
-instance Eq RdrName where
-    a == b = case (a `compare` b) of { EQ -> True;  _ -> False }
-    a /= b = case (a `compare` b) of { EQ -> False; _ -> True }
-
-instance Ord RdrName where
-    a <= b = case (a `compare` b) of { LT -> True;	EQ -> True;  GT -> False }
-    a <	 b = case (a `compare` b) of { LT -> True;	EQ -> False; GT -> False }
-    a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
-    a >	 b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
-    compare a b = cmpRdr a b
-
-instance Outputable RdrName where
-    ppr (Unqual n)   = pprOccName n
-    ppr (Qual m n _) = hcat [pprModule m, char '.', pprOccName n]
-
-instance NamedThing RdrName where		-- Just so that pretty-printing of expressions works
-    getOccName = rdrNameOcc
-    getName = panic "no getName for RdrNames"
-\end{code}
 

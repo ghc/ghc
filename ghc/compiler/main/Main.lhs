@@ -372,7 +372,7 @@ ppSourceStats short (HsModule name version exports imports decls src_loc)
     sig_info (InlineSig _ _)      = (0,0,0,1)
     sig_info _                    = (0,0,0,0)
 
-    import_info (ImportDecl _ qual _ as spec _)
+    import_info (ImportDecl _ qual as spec _)
 	= add6 (1, qual_info qual, as_info as, 0,0,0) (spec_info spec)
     qual_info False  = 0
     qual_info True   = 1

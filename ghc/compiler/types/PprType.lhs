@@ -163,9 +163,9 @@ ppr_ty env ctxt_prec ty@(ForAllTy _ _)
   = getPprStyle $ \ sty -> 
     maybeParen ctxt_prec fUN_PREC $
     if ifaceStyle sty then
-       sep [ ptext SLIT("__forall"), brackets pp_tyvars, pp_ctxt, pp_body ]
+       sep [ ptext SLIT("__forall") <+> brackets pp_tyvars, pp_ctxt, pp_body ]
     else
-       sep [ ptext SLIT("forall"), pp_tyvars <> ptext SLIT("."), pp_maybe_ctxt, pp_body ]
+       sep [ ptext SLIT("forall") <+> pp_tyvars <> ptext SLIT("."), pp_maybe_ctxt, pp_body ]
   where		
     (tyvars, rho_ty) = splitForAllTys ty
     (theta, body_ty) = splitRhoTy rho_ty

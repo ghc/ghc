@@ -31,10 +31,10 @@ import Demand		( Demand, wwLazy, wwPrim, wwStrict )
 import Var		( TyVar )
 import CallConv		( CallConv, pprCallConv )
 import PprType		( pprParendType )
-import OccName		( OccName, pprOccName, varOcc )
-import TyCon		( TyCon )
-import Type		( mkForAllTys, mkForAllTy, mkFunTy, mkFunTys, 
-			  mkTyConApp, typePrimRep,
+import OccName		( OccName, pprOccName, mkSrcVarOcc )
+import TyCon		( TyCon, tyConArity )
+import Type		( mkForAllTys, mkForAllTy, mkFunTy, mkFunTys, mkTyVarTys,
+			  mkTyConTy, mkTyConApp, typePrimRep,
 			  splitAlgTyConApp, Type, isUnboxedTupleType, 
 			  splitAlgTyConApp_maybe
 			)
@@ -819,10 +819,10 @@ data PrimOpInfo
 		[Type] 
 		Type 
 
-mkDyadic str  ty = Dyadic  (varOcc str) ty
-mkMonadic str ty = Monadic (varOcc str) ty
-mkCompare str ty = Compare (varOcc str) ty
-mkGenPrimOp str tvs tys ty = GenPrimOp (varOcc str) tvs tys ty
+mkDyadic str  ty = Dyadic  (mkSrcVarOcc str) ty
+mkMonadic str ty = Monadic (mkSrcVarOcc str) ty
+mkCompare str ty = Compare (mkSrcVarOcc str) ty
+mkGenPrimOp str tvs tys ty = GenPrimOp (mkSrcVarOcc str) tvs tys ty
 \end{code}
 
 Utility bits:
@@ -1244,82 +1244,51 @@ primOpInfo (ReadByteArrayOp kind)
 	s = alphaTy; s_tv = alphaTyVar
 
 	op_str	       = _PK_ ("read" ++ primRepString kind ++ "Array#")
-	relevant_type  = assoc "primOpInfo{ReadByteArrayOp}" tbl kind
+	(tvs, prim_ty) = mkPrimTyApp betaTyVars kind
 	state          = mkStatePrimTy s
-
-        tvs
-	  | kind == StablePtrRep = [s_tv, betaTyVar]
-	  | otherwise	         = [s_tv]
     in
-    mkGenPrimOp op_str tvs
+    mkGenPrimOp op_str (s_tv:tvs)
 	[mkMutableByteArrayPrimTy s, intPrimTy, state]
-	(unboxedPair [state, relevant_type])
-  where
-    tbl = [ (CharRep,	 charPrimTy),
-	    (IntRep,	 intPrimTy),
-	    (WordRep,	 wordPrimTy),
-	    (AddrRep,	 addrPrimTy),
-	    (FloatRep,	 floatPrimTy),
-	    (StablePtrRep, mkStablePtrPrimTy betaTy),
-	    (DoubleRep,  doublePrimTy) ]
-
-  -- How come there's no Word byte arrays? ADR
+	(unboxedPair [state, prim_ty])
 
 primOpInfo (WriteByteArrayOp kind)
   = let
 	s = alphaTy; s_tv = alphaTyVar
 	op_str = _PK_ ("write" ++ primRepString kind ++ "Array#")
-	prim_ty = mkTyConApp (primRepTyCon kind) []
-
-        (the_prim_ty, tvs)
-	  | kind == StablePtrRep = (mkStablePtrPrimTy betaTy, [s_tv, betaTyVar])
-	  | otherwise		 = (prim_ty, [s_tv])
-
+	(tvs, prim_ty) = mkPrimTyApp betaTyVars kind
     in
-    mkGenPrimOp op_str tvs
-	[mkMutableByteArrayPrimTy s, intPrimTy, the_prim_ty, mkStatePrimTy s]
+    mkGenPrimOp op_str (s_tv:tvs)
+	[mkMutableByteArrayPrimTy s, intPrimTy, prim_ty, mkStatePrimTy s]
 	(mkStatePrimTy s)
 
 primOpInfo (IndexByteArrayOp kind)
   = let
 	op_str = _PK_ ("index" ++ primRepString kind ++ "Array#")
-
-        (prim_tycon_args, tvs)
-	  | kind == StablePtrRep = ([alphaTy], [alphaTyVar])
-	  | otherwise	         = ([],[])
+        (tvs, prim_ty) = mkPrimTyApp alphaTyVars kind
     in
-    mkGenPrimOp op_str tvs [byteArrayPrimTy, intPrimTy] 
-	(mkTyConApp (primRepTyCon kind) prim_tycon_args)
+    mkGenPrimOp op_str tvs [byteArrayPrimTy, intPrimTy] prim_ty
 
 primOpInfo (IndexOffForeignObjOp kind)
   = let
 	op_str = _PK_ ("index" ++ primRepString kind ++ "OffForeignObj#")
-
-        (prim_tycon_args, tvs)
-	  | kind == StablePtrRep = ([alphaTy], [alphaTyVar])
-	  | otherwise	         = ([], [])
+        (tvs, prim_ty) = mkPrimTyApp alphaTyVars kind
     in
-    mkGenPrimOp op_str tvs [foreignObjPrimTy, intPrimTy] 
-	(mkTyConApp (primRepTyCon kind) prim_tycon_args)
+    mkGenPrimOp op_str tvs [foreignObjPrimTy, intPrimTy] prim_ty
 
 primOpInfo (IndexOffAddrOp kind)
   = let
 	op_str = _PK_ ("index" ++ primRepString kind ++ "OffAddr#")
-
-        (prim_tycon_args, tvs)
-	  | kind == StablePtrRep = ([alphaTy], [alphaTyVar])
-	  | otherwise	         = ([], [])
+        (tvs, prim_ty) = mkPrimTyApp alphaTyVars kind
     in
-    mkGenPrimOp op_str tvs [addrPrimTy, intPrimTy] 
-	(mkTyConApp (primRepTyCon kind) prim_tycon_args)
+    mkGenPrimOp op_str tvs [addrPrimTy, intPrimTy] prim_ty
 
 primOpInfo (WriteOffAddrOp kind)
   = let
 	s = alphaTy; s_tv = alphaTyVar
 	op_str = _PK_ ("write" ++ primRepString kind ++ "OffAddr#")
-	prim_ty = mkTyConApp (primRepTyCon kind) []
+        (tvs, prim_ty) = mkPrimTyApp betaTyVars kind
     in
-    mkGenPrimOp op_str [s_tv]
+    mkGenPrimOp op_str (s_tv:tvs)
 	[addrPrimTy, intPrimTy, prim_ty, mkStatePrimTy s]
 	(mkStatePrimTy s)
 
@@ -2063,6 +2032,15 @@ commutableOp _		  = False
 
 Utils:
 \begin{code}
+mkPrimTyApp :: [TyVar] -> PrimRep -> ([TyVar], Type)
+	-- CharRep       -->  ([],  Char#)
+	-- StablePtrRep  -->  ([a], StablePtr# a)
+mkPrimTyApp tvs kind
+  = (forall_tvs, mkTyConApp tycon (mkTyVarTys forall_tvs))
+  where
+    tycon      = primRepTyCon kind
+    forall_tvs = take (tyConArity tycon) tvs
+
 dyadic_fun_ty  ty = mkFunTys [ty, ty] ty
 monadic_fun_ty ty = mkFunTy  ty ty
 compare_fun_ty ty = mkFunTys [ty, ty] boolTy

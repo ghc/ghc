@@ -22,7 +22,7 @@ module HsSyn (
 	module HsMatches,
 	module HsPat,
 	module HsTypes,
-	Fixity, NewOrData, IfaceFlavour,
+	Fixity, NewOrData, 
 
 	collectTopBinders, collectMonoBinders
      ) where
@@ -39,13 +39,13 @@ import HsMatches
 import HsPat
 import HsTypes
 import HsCore
-import BasicTypes	( Fixity, Version, NewOrData, IfaceFlavour )
+import BasicTypes	( Fixity, Version, NewOrData )
 
 -- others:
 import Outputable
 import SrcLoc		( SrcLoc )
 import Bag
-import Name		( Module, NamedThing, pprModule )
+import OccName		( Module, pprModule )
 \end{code}
 
 All we actually declare here is the top-level structure for a module.
@@ -66,7 +66,7 @@ data HsModule name pat
 \end{code}
 
 \begin{code}
-instance (NamedThing name, Outputable name, Outputable pat)
+instance (Outputable name, Outputable pat)
 	=> Outputable (HsModule name pat) where
 
     ppr (HsModule name iface_version exports imports

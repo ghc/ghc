@@ -20,7 +20,6 @@ import PprCore		()	   -- Instances for Outputable
 
 --others:
 import Id		( Id )
-import Name		( OccName, NamedThing(..) )
 import BasicTypes	( RecFlag(..), Fixity )
 import Outputable	
 import Bag
@@ -63,7 +62,7 @@ nullBinds (MonoBind b _ _)	= nullMonoBinds b
 \end{code}
 
 \begin{code}
-instance (Outputable pat, NamedThing id, Outputable id) =>
+instance (Outputable pat, Outputable id) =>
 		Outputable (HsBinds id pat) where
     ppr binds = ppr_binds binds
 
@@ -166,14 +165,15 @@ andMonoBindList binds = foldr AndMonoBinds EmptyMonoBinds binds
 \end{code}
 
 \begin{code}
-instance (NamedThing id, Outputable id, Outputable pat) =>
+instance (Outputable id, Outputable pat) =>
 		Outputable (MonoBinds id pat) where
     ppr mbind = ppr_monobind mbind
 
 
+ppr_monobind :: (Outputable id, Outputable pat) => MonoBinds id pat -> SDoc
 ppr_monobind EmptyMonoBinds = empty
 ppr_monobind (AndMonoBinds binds1 binds2)
-      = ($$) (ppr_monobind binds1) (ppr_monobind binds2)
+      = ppr_monobind binds1 $$ ppr_monobind binds2
 
 ppr_monobind (PatMonoBind pat grhss locn)
       = sep [ppr pat, nest 4 (pprGRHSs False grhss)]
@@ -189,11 +189,12 @@ ppr_monobind (CoreMonoBind name expr)
       = sep [ppr name <+> equals, nest 4 (ppr expr)]
 
 ppr_monobind (AbsBinds tyvars dictvars exports val_binds)
-     = ($$) (sep [ptext SLIT("AbsBinds"),
-		  brackets (interpp'SP tyvars),
-		  brackets (interpp'SP dictvars),
-		  brackets (interpp'SP exports)])
-	       (nest 4 (ppr val_binds))
+     = sep [ptext SLIT("AbsBinds"),
+	    brackets (interpp'SP tyvars),
+	    brackets (interpp'SP dictvars),
+	    brackets (interpp'SP exports)]
+       $$
+       nest 4 (ppr val_binds)
 \end{code}
 
 %************************************************************************
@@ -260,7 +261,7 @@ nonFixitySigs sigs = filter not_fix sigs
 \end{code}
 
 \begin{code}
-instance (NamedThing name, Outputable name) => Outputable (Sig name) where
+instance (Outputable name) => Outputable (Sig name) where
     ppr sig = ppr_sig sig
 
 instance Outputable name => Outputable (FixitySig name) where
@@ -271,7 +272,7 @@ ppr_sig (Sig var ty _)
       = sep [ppr var <+> dcolon, nest 4 (ppr ty)]
 
 ppr_sig (ClassOpSig var _ ty _)
-      = sep [ppr (getOccName var) <+> dcolon, nest 4 (ppr ty)]
+      = sep [ppr var <+> dcolon, nest 4 (ppr ty)]
 
 ppr_sig (SpecSig var ty using _)
       = sep [ hsep [text "{-# SPECIALIZE", ppr var, dcolon],

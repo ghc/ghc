@@ -24,7 +24,7 @@ module PrelMods
 
 #include "HsVersions.h"
 
-import OccName	( Module, mkModule )
+import OccName	( Module, mkSrcModule )
 import Util	( nOfThem )
 import Panic	( panic )
 \end{code}
@@ -35,35 +35,34 @@ pREL_BASE, pREL_NUM, pREL_LIST, pREL_TUP, pREL_ADDR, pREL_READ      :: Module
 pREL_PACK, pREL_CONC, pREL_IO_BASE, pREL_ST, pREL_ARR	  	    :: Module	
 pREL_FOREIGN, pREL_STABLE					    :: Module
 
+pRELUDE	     = mkSrcModule "Prelude"
+pREL_GHC     = mkSrcModule "PrelGHC"	   -- Primitive types and values
+pREL_BASE    = mkSrcModule "PrelBase"
+pREL_READ    = mkSrcModule "PrelRead"
+pREL_NUM     = mkSrcModule "PrelNum"
+pREL_LIST    = mkSrcModule "PrelList"
+pREL_TUP     = mkSrcModule "PrelTup"
+pREL_PACK    = mkSrcModule "PrelPack"
+pREL_CONC    = mkSrcModule "PrelConc"
+pREL_IO_BASE = mkSrcModule "PrelIOBase"
+pREL_ST	     = mkSrcModule "PrelST"
+pREL_ARR     = mkSrcModule "PrelArr"
+pREL_FOREIGN = mkSrcModule "PrelForeign"
+pREL_STABLE  = mkSrcModule "PrelStable"
+pREL_ADDR    = mkSrcModule "PrelAddr"
+pREL_ERR     = mkSrcModule "PrelErr"
 
-pRELUDE	     = mkModule "Prelude"
-pREL_GHC     = mkModule "PrelGHC"	   -- Primitive types and values
-pREL_BASE    = mkModule "PrelBase"
-pREL_READ    = mkModule "PrelRead"
-pREL_NUM     = mkModule "PrelNum"
-pREL_LIST    = mkModule "PrelList"
-pREL_TUP     = mkModule "PrelTup"
-pREL_PACK    = mkModule "PrelPack"
-pREL_CONC    = mkModule "PrelConc"
-pREL_IO_BASE = mkModule "PrelIOBase"
-pREL_ST	     = mkModule "PrelST"
-pREL_ARR     = mkModule "PrelArr"
-pREL_FOREIGN = mkModule "PrelForeign"
-pREL_STABLE  = mkModule "PrelStable"
-pREL_ADDR    = mkModule "PrelAddr"
-pREL_ERR     = mkModule "PrelErr"
+mONAD	     = mkSrcModule "Monad"
+rATIO	     = mkSrcModule "Ratio"
+iX	     = mkSrcModule "Ix"
 
-mONAD	     = mkModule "Monad"
-rATIO	     = mkModule "Ratio"
-iX	     = mkModule "Ix"
-
-pREL_MAIN    = mkModule "PrelMain"
-mAIN	     = mkModule "Main"
+pREL_MAIN    = mkSrcModule "PrelMain"
+mAIN	     = mkSrcModule "Main"
 
 iNT, wORD   :: Module
 
-iNT	     = mkModule "Int"
-wORD	     = mkModule "Word"
+iNT	     = mkSrcModule "Int"
+wORD	     = mkSrcModule "Word"
 
 \end{code}
 

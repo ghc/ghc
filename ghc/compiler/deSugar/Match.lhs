@@ -95,34 +95,32 @@ dsShadowWarn ctx@(DsMatchContext kind _ _) qs = dsWarn warn
 	where
 	  warn | length qs > maximum_output
                = pp_context ctx (ptext SLIT("are overlapped"))
-		      8    (\ f -> vcat (map (ppr_eqn f kind) (take maximum_output qs)) $$
+		            (\ f -> vcat (map (ppr_eqn f kind) (take maximum_output qs)) $$
 			    ptext SLIT("..."))
 	       | otherwise
                = pp_context ctx (ptext SLIT("are overlapped"))
-	             8     (\ f -> vcat $ map (ppr_eqn f kind) qs)
+	                    (\ f -> vcat $ map (ppr_eqn f kind) qs)
 
 
 dsIncompleteWarn :: DsMatchContext -> [ExhaustivePat] -> DsM ()
 dsIncompleteWarn ctx@(DsMatchContext kind _ _) pats = dsWarn warn 
 	where
-	  warn | length pats > maximum_output
-               = pp_context ctx (ptext SLIT("are non-exhaustive"))
-                    8 (\ f -> hang (ptext SLIT("Patterns not recognized:"))
-                        4 (vcat (map (ppr_incomplete_pats kind)
-				     (take maximum_output pats))
-		            $$ ptext SLIT("...")))
-	       | otherwise
-               = pp_context ctx (ptext SLIT("are non-exhaustive"))
-                    8 (\ f -> hang (ptext SLIT("Patterns not recognized:"))
-                                 4 (vcat $ map (ppr_incomplete_pats kind) pats))
+	  warn = pp_context ctx (ptext SLIT("are non-exhaustive"))
+                    	    (\f -> hang (ptext SLIT("Patterns not matched:"))
+		                   4 ((vcat $ map (ppr_incomplete_pats kind)
+						  (take maximum_output pats))
+		                      $$ dots))
 
-pp_context NoMatchContext msg ind rest_of_msg_fun
-  = dontAddErrLoc "" (ptext SLIT("Some match(es)") <+> hang msg ind (rest_of_msg_fun id))
+	  dots | length pats > maximum_output = ptext SLIT("...")
+	       | otherwise                    = empty
 
-pp_context (DsMatchContext kind pats loc) msg ind rest_of_msg_fun
+pp_context NoMatchContext msg rest_of_msg_fun
+  = dontAddErrLoc "" (ptext SLIT("Some match(es)") <+> hang msg 8 (rest_of_msg_fun id))
+
+pp_context (DsMatchContext kind pats loc) msg rest_of_msg_fun
   = case pp_match kind pats of
       (ppr_match, pref) ->
-          addErrLocHdrLine loc message (nest ind (rest_of_msg_fun pref))
+          addErrLocHdrLine loc message (nest 8 (rest_of_msg_fun pref))
 	where
 	  message = ptext SLIT("Pattern match(es)") <+> msg <+> ppr_match <> char ':'
  where

@@ -8,8 +8,7 @@ module HsImpExp where
 
 #include "HsVersions.h"
 
-import BasicTypes	( IfaceFlavour(..) )
-import Name		( Module, NamedThing, pprModule )
+import OccName		( Module, pprModule, moduleIfaceFlavour, bootFlavour )
 import Outputable
 import SrcLoc		( SrcLoc )
 \end{code}
@@ -25,22 +24,20 @@ One per \tr{import} declaration in a module.
 data ImportDecl name
   = ImportDecl	  Module			-- module name
 		  Bool				-- True => qualified
-		  IfaceFlavour			-- True => source imported module 
-						--    (current interpretation: ignore ufolding info)
 		  (Maybe Module)		-- as Module
 		  (Maybe (Bool, [IE name]))	-- (True => hiding, names)
 		  SrcLoc
 \end{code}
 
 \begin{code}
-instance (NamedThing name, Outputable name) => Outputable (ImportDecl name) where
-    ppr (ImportDecl mod qual as_source as spec _)
-      = hang (hsep [ptext SLIT("import"), pp_src as_source, 
+instance (Outputable name) => Outputable (ImportDecl name) where
+    ppr (ImportDecl mod qual as spec _)
+      = hang (hsep [ptext SLIT("import"), pp_src, 
                     pp_qual qual, pprModule mod, pp_as as])
 	     4 (pp_spec spec)
       where
-	pp_src HiFile     = empty
-	pp_src HiBootFile = ptext SLIT("{-# SOURCE #-}")
+	pp_src | bootFlavour (moduleIfaceFlavour mod) = ptext SLIT("{-# SOURCE #-}")
+	       | otherwise			      = empty
 
 	pp_qual False   = empty
 	pp_qual True	= ptext SLIT("qualified")
@@ -79,7 +76,7 @@ ieName (IEThingAll  n)   = n
 \end{code}
 
 \begin{code}
-instance (NamedThing name, Outputable name) => Outputable (IE name) where
+instance (Outputable name) => Outputable (IE name) where
     ppr (IEVar	        var)	= ppr var
     ppr (IEThingAbs	thing)	= ppr thing
     ppr (IEThingAll	thing)	= hcat [ppr thing, text "(..)"]

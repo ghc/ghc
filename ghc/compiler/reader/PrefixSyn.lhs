@@ -23,6 +23,7 @@ module PrefixSyn (
 
 import HsSyn
 import RdrHsSyn
+import RdrName		( RdrName )
 import Panic		( panic )
 import Char		( isDigit, ord )
 

@@ -26,7 +26,7 @@ import RnHsSyn
 import RnMonad
 import RnExpr		( rnMatch, rnGRHSs, rnPat, checkPrecMatch )
 import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, lookupOccRn, lookupGlobalOccRn,
-			  isUnboundName, warnUnusedBinds,
+			  isUnboundName, warnUnusedLocalBinds,
 			  FreeVars, emptyFVs, plusFV, plusFVs, unitFV
 			)
 import CmdLineOpts	( opt_WarnMissingSigs )
@@ -220,7 +220,7 @@ rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
 	all_fvs        = result_fvs `plusFV` bind_fvs
 	unused_binders = nameSetToList (binder_set `minusNameSet` all_fvs)
     in
-    warnUnusedBinds unused_binders	`thenRn_`
+    warnUnusedLocalBinds unused_binders	`thenRn_`
     returnRn (result, delListFromNameSet all_fvs new_mbinders)
   where
     mbinders_w_srclocs = bagToList (collectMonoBinders mbinds)
@@ -251,7 +251,7 @@ rn_mono_binds top_lev binders mbinds sigs
 	 -- Rename the bindings, returning a MonoBindsInfo
 	 -- which is a list of indivisible vertices so far as
 	 -- the strongly-connected-components (SCC) analysis is concerned
-    renameSigs top_lev False binders sigs	`thenRn` \ siglist ->
+    renameSigs top_lev False binders sigs	`thenRn` \ (siglist, sig_fvs) ->
     flattenMonoBinds siglist mbinds		`thenRn` \ mbinds_info ->
 
 	 -- Do the SCC analysis
@@ -262,7 +262,7 @@ rn_mono_binds top_lev binders mbinds sigs
 	 -- Deal with bound and free-var calculation
 	rhs_fvs = plusFVs [fvs | (_,fvs,_,_) <- mbinds_info]
     in
-    returnRn (final_binds, rhs_fvs)
+    returnRn (final_binds, rhs_fvs `plusFV` sig_fvs)
 \end{code}
 
 @flattenMonoBinds@ is ever-so-slightly magical in that it sticks
@@ -361,6 +361,9 @@ rnMethodBinds mbind@(PatMonoBind other_pat _ locn)
 -- acct in the dependency analysis (or we get an
 -- unexpected out-of-scope error)! WDP 95/07
 
+-- This is only necessary for the dependency analysis.  The free vars
+-- of the types in the signatures is gotten from renameSigs
+
 sig_fv (SpecSig _ _ (Just blah) _) acc = acc `plusFV` unitFV blah
 sig_fv _			   acc = acc
 \end{code}
@@ -441,11 +444,11 @@ renameSigs :: TopLevelFlag
 					-- hence SPECIALISE instance prags ok
 	    -> NameSet			-- Set of names bound in this group
 	    -> [RdrNameSig]
-	    -> RnMS s [RenamedSig]		 -- List of Sig constructors
+	    -> RnMS s ([RenamedSig], FreeVars)		 -- List of Sig constructors
 
 renameSigs top_lev inst_decl binders sigs
   =	 -- Rename the signatures
-    mapRn renameSig sigs   	`thenRn` \ sigs' ->
+    mapAndUnzipRn renameSig sigs   	`thenRn` \ (sigs', fvs_s) ->
 
 	-- Check for (a) duplicate signatures
 	--	     (b) signatures for things not in this group
@@ -472,46 +475,54 @@ renameSigs top_lev inst_decl binders sigs
     )							`thenRn_`
     mapRn (addWarnRn.missingSigWarn) un_sigd_binders	`thenRn_`
 
-    returnRn sigs' -- bad ones and all:
-		   -- we need bindings of *some* sort for every name
+    returnRn (sigs', plusFVs fvs_s)	-- bad ones and all:
+			 		-- we need bindings of *some* sort for every name
 
+-- We use lookupOccRn in the signatures, which is a little bit unsatisfactory
+-- becuase this won't work for:
+--	instance Foo T where
+--	  {-# INLINE op #-}
+--	  Baz.op = ...
+-- We'll just rename the INLINE prag to refer to whatever other 'op'
+-- is in scope.  (I'm assuming that Baz.op isn't in scope unqualified.)
+-- Doesn't seem worth much trouble to sort this.
 
 renameSig (Sig v ty src_loc)
   = pushSrcLocRn src_loc $
-    lookupBndrRn v				`thenRn` \ new_v ->
-    rnHsSigType (quotes (ppr v)) ty		`thenRn` \ (new_ty,_) ->
-    returnRn (Sig new_v new_ty src_loc)
+    lookupOccRn v				`thenRn` \ new_v ->
+    rnHsSigType (quotes (ppr v)) ty		`thenRn` \ (new_ty,fvs) ->
+    returnRn (Sig new_v new_ty src_loc, fvs)
 
 renameSig (SpecInstSig ty src_loc)
   = pushSrcLocRn src_loc $
-    rnHsSigType (text "A SPECIALISE instance pragma") ty	`thenRn` \ (new_ty, _) ->
-    returnRn (SpecInstSig new_ty src_loc)
+    rnHsSigType (text "A SPECIALISE instance pragma") ty	`thenRn` \ (new_ty, fvs) ->
+    returnRn (SpecInstSig new_ty src_loc, fvs)
 
 renameSig (SpecSig v ty using src_loc)
   = pushSrcLocRn src_loc $
-    lookupBndrRn v			`thenRn` \ new_v ->
-    rnHsSigType (quotes (ppr v)) ty	`thenRn` \ (new_ty,_) ->
-    rn_using using			`thenRn` \ new_using ->
-    returnRn (SpecSig new_v new_ty new_using src_loc)
+    lookupOccRn v			`thenRn` \ new_v ->
+    rnHsSigType (quotes (ppr v)) ty	`thenRn` \ (new_ty,fvs1) ->
+    rn_using using			`thenRn` \ (new_using,fvs2) ->
+    returnRn (SpecSig new_v new_ty new_using src_loc, fvs1 `plusFV` fvs2)
   where
-    rn_using Nothing  = returnRn Nothing
+    rn_using Nothing  = returnRn (Nothing, emptyFVs)
     rn_using (Just x) = lookupOccRn x `thenRn` \ new_x ->
-			returnRn (Just new_x)
+			returnRn (Just new_x, unitFV new_x)
 
 renameSig (InlineSig v src_loc)
   = pushSrcLocRn src_loc $
-    lookupBndrRn v		`thenRn` \ new_v ->
-    returnRn (InlineSig new_v src_loc)
+    lookupOccRn v		`thenRn` \ new_v ->
+    returnRn (InlineSig new_v src_loc, emptyFVs)
 
 renameSig (FixSig (FixitySig v fix src_loc))
   = pushSrcLocRn src_loc $
-    lookupBndrRn v		`thenRn` \ new_v ->
-    returnRn (FixSig (FixitySig new_v fix src_loc))
+    lookupOccRn v		`thenRn` \ new_v ->
+    returnRn (FixSig (FixitySig new_v fix src_loc), emptyFVs)
 
 renameSig (NoInlineSig v src_loc)
   = pushSrcLocRn src_loc $
-    lookupBndrRn v		`thenRn` \ new_v ->
-    returnRn (NoInlineSig new_v src_loc)
+    lookupOccRn v		`thenRn` \ new_v ->
+    returnRn (NoInlineSig new_v src_loc, emptyFVs)
 \end{code}
 
 Checking for distinct signatures; oh, so boring

@@ -69,12 +69,16 @@ tcVarPat :: (Name -> Maybe TcId) -- Info about signatures; gives the *monomorphi
 
 tcVarPat sig_fn binder_name pat_ty
  = case sig_fn binder_name of
-	Nothing -> newLocalId (getOccName binder_name) pat_ty		`thenNF_Tc` \ bndr_id ->
+	Nothing -> 	-- Need to make a new, monomorphic, Id
+			-- The binder_name is already being used for the polymorphic Id
+		   newLocalId (getOccName binder_name) pat_ty loc	`thenNF_Tc` \ bndr_id ->
 		   returnTc bndr_id
 
-	Just bndr_id -> tcAddSrcLoc (getSrcLoc binder_name) 		$
-			unifyTauTy (idType bndr_id) pat_ty 		`thenTc_`
+	Just bndr_id -> tcAddSrcLoc loc				$
+			unifyTauTy (idType bndr_id) pat_ty 	`thenTc_`
 			returnTc bndr_id
+ where
+   loc = getSrcLoc binder_name
 \end{code}
 
 

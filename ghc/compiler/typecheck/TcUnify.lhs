@@ -24,7 +24,7 @@ import Type	( Type(..), tyVarsOfType, funTyCon,
 		)
 import TyCon	( TyCon, isTupleTyCon, isUnboxedTupleTyCon, 
 		  tyConArity )
-import Name	( isSysLocalName )
+import Name	( isSystemName )
 import Var	( TyVar, tyVarKind, varName )
 import VarEnv	
 import VarSet	( varSetElems )
@@ -141,7 +141,7 @@ uTys _ (FunTy fun1 arg1) _ (FunTy fun2 arg2)
 	-- Type constructors must match
 uTys ps_ty1 (TyConApp con1 tys1) ps_ty2 (TyConApp con2 tys2)
   = checkTcM (cons_match && length tys1 == length tys2) 
-	     (failWithTcM (unifyMisMatch ps_ty1 ps_ty2))		`thenTc_`
+	     (unifyMisMatch ps_ty1 ps_ty2)			`thenTc_`
     unifyTauTyLists tys1 tys2
   where
 	-- The AnyBox wild card matches anything
@@ -156,21 +156,21 @@ uTys ps_ty1 (TyConApp con1 tys1) ps_ty2 (TyConApp con2 tys2)
 uTys ps_ty1 (AppTy s1 t1) ps_ty2 ty2
   = case splitAppTy_maybe ty2 of
 	Just (s2,t2) -> uTys s1 s1 s2 s2	`thenTc_`    uTys t1 t1 t2 t2
-	Nothing      -> failWithTcM (unifyMisMatch ps_ty1 ps_ty2)
+	Nothing      -> unifyMisMatch ps_ty1 ps_ty2
 
 	-- Now the same, but the other way round
 	-- Don't swap the types, because the error messages get worse
 uTys ps_ty1 ty1 ps_ty2 (AppTy s2 t2)
   = case splitAppTy_maybe ty1 of
 	Just (s1,t1) -> uTys s1 s1 s2 s2	`thenTc_`    uTys t1 t1 t2 t2
-	Nothing      -> failWithTcM (unifyMisMatch ps_ty1 ps_ty2)
+	Nothing      -> unifyMisMatch ps_ty1 ps_ty2
 
 	-- Not expecting for-alls in unification
 	-- ... but the error message from the unifyMisMatch more informative
 	-- than a panic message!
 
 	-- Anything else fails
-uTys ps_ty1 ty1 ps_ty2 ty2  = failWithTcM (unifyMisMatch ps_ty1 ps_ty2)
+uTys ps_ty1 ty1 ps_ty2 ty2  = unifyMisMatch ps_ty1 ps_ty2
 \end{code}
 
 Notes on synonyms
@@ -272,8 +272,8 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2@(TyVarTy tv2)
 	Nothing -> checkKinds swapped tv1 ty2			`thenTc_`
 
 			-- Try to update sys-y type variables in preference to sig-y ones
-			-- (the latter respond False to isSysLocalName)
-		   if isSysLocalName (varName tv2) then
+			-- (the latter respond False to isSystemName)
+		   if isSystemName (varName tv2) then
 			tcPutTyVar tv2 (TyVarTy tv1)				`thenNF_Tc_`
 			returnTc ()
 		   else
@@ -472,11 +472,16 @@ unifyKindCtxt swapped tv1 ty2 tidy_env	-- not swapped => tv1 expected, ty2 infer
     pp2 = ppr ty2'
 
 unifyMisMatch ty1 ty2
-  = (env2, hang (ptext SLIT("Couldn't match"))
-	      4 (sep [quotes (ppr tidy_ty1), ptext SLIT("against"), quotes (ppr tidy_ty2)]))
-  where
-    (env1, tidy_ty1) = tidyOpenType emptyTidyEnv ty1
-    (env2, tidy_ty2) = tidyOpenType env1         ty2
+  = zonkTcType ty1	`thenNF_Tc` \ ty1' ->
+    zonkTcType ty2	`thenNF_Tc` \ ty2' ->
+    let
+    	(env, [tidy_ty1, tidy_ty2]) = tidyOpenTypes emptyTidyEnv [ty1',ty2']
+	msg = hang (ptext SLIT("Couldn't match"))
+		   4 (sep [quotes (ppr tidy_ty1), 
+			   ptext SLIT("against"), 
+			   quotes (ppr tidy_ty2)])
+    in
+    failWithTcM (env, msg)
 
 unifyOccurCheck tyvar ty
   = (env2, hang (ptext SLIT("Occurs check: cannot construct the infinite type:"))

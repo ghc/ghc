@@ -20,7 +20,7 @@ import TysWiredIn
 -- others:
 import CoreSyn		-- quite a bit
 import IdInfo		-- quite a bit
-import Name		( mkWiredInIdName, varOcc, Module )
+import Name		( mkWiredInIdName, mkSrcVarOcc, Module )
 import Type		
 import Var		( TyVar )
 import Demand		( wwStrict )
@@ -159,7 +159,7 @@ pcMiscPrelId :: Unique{-IdKey-} -> Module -> FAST_STRING -> Type -> IdInfo -> Id
 
 pcMiscPrelId key mod str ty info
   = let
-	name = mkWiredInIdName key mod (varOcc str) imp
+	name = mkWiredInIdName key mod (mkSrcVarOcc str) imp
 	imp  = mkVanillaId name ty `setIdInfo` info -- the usual case...
     in
     imp

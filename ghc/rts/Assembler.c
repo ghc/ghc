@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:28:09 $
+ * $Revision: 1.3 $
+ * $Date: 1999/01/27 14:51:16 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -632,42 +632,42 @@ AsmVar asmBox( AsmBCO bco, AsmRep rep )
     switch (rep) {
     case CHAR_REP:
             asmInstr(bco,i_PACK_CHAR);
-            grabHpNonUpd(bco,CZh_sizeW);
+            grabHpNonUpd(bco,Czh_sizeW);
             break;
     case INT_REP:
             asmInstr(bco,i_PACK_INT);
-            grabHpNonUpd(bco,IZh_sizeW);
+            grabHpNonUpd(bco,Izh_sizeW);
             break;
 #ifdef PROVIDE_INT64
     case INT64_REP:
             asmInstr(bco,i_PACK_INT64);
-            grabHpNonUpd(bco,I64Zh_sizeW);
+            grabHpNonUpd(bco,I64zh_sizeW);
             break;
 #endif
 #ifdef PROVIDE_WORD
     case WORD_REP:
             asmInstr(bco,i_PACK_WORD);
-            grabHpNonUpd(bco,WZh_sizeW);
+            grabHpNonUpd(bco,Wzh_sizeW);
             break;
 #endif
 #ifdef PROVIDE_ADDR
     case ADDR_REP:
             asmInstr(bco,i_PACK_ADDR);
-            grabHpNonUpd(bco,AZh_sizeW);
+            grabHpNonUpd(bco,Azh_sizeW);
             break;
 #endif
     case FLOAT_REP:
             asmInstr(bco,i_PACK_FLOAT);
-            grabHpNonUpd(bco,FZh_sizeW);
+            grabHpNonUpd(bco,Fzh_sizeW);
             break;
     case DOUBLE_REP:
             asmInstr(bco,i_PACK_DOUBLE);
-            grabHpNonUpd(bco,DZh_sizeW);
+            grabHpNonUpd(bco,Dzh_sizeW);
             break;
 #ifdef PROVIDE_STABLE
     case STABLE_REP:
             asmInstr(bco,i_PACK_STABLE);
-            grabHpNonUpd(bco,StableZh_sizeW);
+            grabHpNonUpd(bco,Stablezh_sizeW);
             break;
 #endif
 

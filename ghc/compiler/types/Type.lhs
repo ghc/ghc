@@ -64,13 +64,13 @@ import {-# SOURCE #-}	PprType( pprType )	-- Only called in debug messages
 
 -- friends:
 import Var	( Id, TyVar, IdOrTyVar,
-		  tyVarKind, isId, idType, setVarOcc
+		  tyVarKind, tyVarName, isId, idType, setTyVarName
 		)
 import VarEnv
 import VarSet
 
 import Name	( NamedThing(..), Provenance(..), ExportFlag(..),
-		  mkWiredInTyConName, mkGlobalName, tcOcc,
+		  mkWiredInTyConName, mkGlobalName, mkLocalName, mkKindOccFS, tcName,
 		  tidyOccName, TidyOccEnv
 		)
 import NameSet
@@ -86,7 +86,7 @@ import TyCon	( TyCon, KindCon,
 
 -- others
 import BasicTypes 	( Unused )
-import SrcLoc		( mkBuiltinSrcLoc )
+import SrcLoc		( mkBuiltinSrcLoc, noSrcLoc )
 import PrelMods		( pREL_GHC )
 import Maybes		( maybeToBool )
 import PrimRep		( PrimRep(..), isFollowableRep )
@@ -219,7 +219,7 @@ sk = KX		-- A kind
    | sk -> sk	-- In ptic (BX -> KX)
 
 \begin{code}
-mk_kind_name key str = mkGlobalName key pREL_GHC (tcOcc str)
+mk_kind_name key str = mkGlobalName key pREL_GHC (mkKindOccFS tcName str)
 				    (LocalDef mkBuiltinSrcLoc NotExported)
 	-- mk_kind_name is a bit of a hack
 	-- The LocalDef means that we print the name without
@@ -300,7 +300,7 @@ hasMoreBoxityInfo k1 k2
 We define a few wired-in type constructors here to avoid module knots
 
 \begin{code}
-funTyConName = mkWiredInTyConName funTyConKey pREL_GHC SLIT("->") funTyCon
+funTyConName = mkWiredInTyConName funTyConKey pREL_GHC SLIT("(->)") funTyCon
 funTyCon = mkFunTyCon funTyConName (mkArrowKinds [boxedTypeKind, boxedTypeKind] boxedTypeKind)
 \end{code}
 
@@ -842,12 +842,17 @@ tidyTyVar env@(tidy_env, subst) tyvar
 
 	Nothing -> 	-- Make a new nice name for it
 
-		case tidyOccName tidy_env (getOccName tyvar) of
+		case tidyOccName tidy_env (getOccName name) of
 		    (tidy', occ') -> 	-- New occname reqd
 				((tidy', subst'), tyvar')
 			      where
 				subst' = extendVarEnv subst tyvar tyvar'
-				tyvar' = setVarOcc tyvar occ'
+				tyvar' = setTyVarName tyvar name'
+				name'  = mkLocalName (getUnique name) occ' noSrcLoc
+					-- Note: make a *user* tyvar, so it printes nicely
+					-- Could extract src loc, but no need.
+  where
+    name = tyVarName tyvar
 
 tidyTyVars env tyvars = mapAccumL tidyTyVar env tyvars
 

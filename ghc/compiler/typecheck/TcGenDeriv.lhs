@@ -31,17 +31,18 @@ import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..),
 			  HsBinds(..), StmtCtxt(..),
 			  unguardedRHS, mkSimpleMatch
 			)
-import RdrHsSyn		( RdrName(..), varUnqual, mkOpApp,
-			  RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat
-			)
-import BasicTypes	( IfaceFlavour(..), RecFlag(..) )
+import RdrHsSyn		( mkOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat )
+import RdrName		( RdrName, mkSrcUnqual )
+import BasicTypes	( RecFlag(..) )
 import FieldLabel       ( fieldLabelName )
 import DataCon		( isNullaryDataCon, dataConTag,
 			  dataConRawArgTys, fIRST_TAG,
 			  DataCon, ConTag,
 			  dataConFieldLabels )
 import Name		( getOccString, getOccName, getSrcLoc, occNameString, 
-			  modAndOcc, OccName, Name )
+			  nameRdrName, varName,
+			  OccName, Name, NamedThing(..), NameSpace
+			)
 
 import PrimOp		( PrimOp(..) )
 import PrelInfo		-- Lots of RdrNames
@@ -1239,7 +1240,8 @@ genOpApp e1 op e2 = mkOpApp e1 op e2
 \end{code}
 
 \begin{code}
-qual_orig_name n = case modAndOcc n of { (m,n) -> Qual m n HiFile }
+qual_orig_name n = nameRdrName (getName n)
+varUnqual n      = mkSrcUnqual varName n
 
 a_RDR		= varUnqual SLIT("a")
 b_RDR		= varUnqual SLIT("b")

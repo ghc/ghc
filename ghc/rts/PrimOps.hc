@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.8 1999/01/26 16:16:25 simonm Exp $
+ * $Id: PrimOps.hc,v 1.9 1999/01/27 14:51:20 simonpj Exp $
  *
  * Primitive functions / data
  *
@@ -26,8 +26,8 @@
    for these.
 */
 
-W_ GHC_ZcCCallable_static_info[0];
-W_ GHC_ZcCReturnable_static_info[0];
+W_ GHC_ZCCCallable_static_info[0];
+W_ GHC_ZCCReturnable_static_info[0];
 
 #ifndef aix_TARGET_OS /* AIX gives link errors with this as a const (RO assembler section) */
 const 
@@ -186,12 +186,12 @@ const
 #define BYTES_TO_STGWORDS(n) ((n) + sizeof(W_) - 1)/sizeof(W_)
 
 #define newByteArray(ty,scale)				\
- FN_(new##ty##ArrayZh_fast)				\
+ FN_(new##ty##Arrayzh_fast)				\
  {							\
    W_ stuff_size, size, n;				\
    StgArrWords* p;					\
    FB_							\
-     MAYBE_GC(NO_PTRS,new##ty##ArrayZh_fast);		\
+     MAYBE_GC(NO_PTRS,new##ty##Arrayzh_fast);		\
      n = R1.w;						\
      stuff_size = BYTES_TO_STGWORDS(n*scale);		\
      size = sizeofW(StgArrWords)+ stuff_size;		\
@@ -212,7 +212,7 @@ newByteArray(Float,  sizeof(StgFloat));
 newByteArray(Double, sizeof(StgDouble));
 newByteArray(StablePtr, sizeof(StgStablePtr));
 
-FN_(newArrayZh_fast)
+FN_(newArrayzh_fast)
 {
   W_ size, n, init;
   StgMutArrPtrs* arr;
@@ -220,7 +220,7 @@ FN_(newArrayZh_fast)
   FB_
     n = R1.w;
 
-    MAYBE_GC(R2_PTR,newArrayZh_fast);
+    MAYBE_GC(R2_PTR,newArrayzh_fast);
 
     size = sizeofW(StgMutArrPtrs) + n;
     arr = (StgMutArrPtrs *)RET_STGCALL1(P_, allocate, size);
@@ -240,13 +240,13 @@ FN_(newArrayZh_fast)
   FE_
 }
 
-FN_(newMutVarZh_fast)
+FN_(newMutVarzh_fast)
 {
   StgMutVar* mv;
   /* Args: R1.p = initialisation value */
   FB_
 
-  HP_CHK_GEN(sizeofW(StgMutVar), R1_PTR, newMutVarZh_fast,);
+  HP_CHK_GEN(sizeofW(StgMutVar), R1_PTR, newMutVarzh_fast,);
   TICK_ALLOC_PRIM(sizeofW(StgHeader)+1,1, 0); /* hack, dependent on rep. */
   CCS_ALLOC(CCCS,sizeofW(StgMutVar));
 
@@ -265,14 +265,14 @@ FN_(newMutVarZh_fast)
    -------------------------------------------------------------------------- */
 
 #ifndef PAR
-FN_(makeForeignObjZh_fast)
+FN_(makeForeignObjzh_fast)
 {
   /* R1.p = ptr to foreign object,
   */
   StgForeignObj *result;
   FB_
 
-  HP_CHK_GEN(sizeofW(StgForeignObj), NO_PTRS, makeForeignObjZh_fast,);
+  HP_CHK_GEN(sizeofW(StgForeignObj), NO_PTRS, makeForeignObjzh_fast,);
   TICK_ALLOC_PRIM(sizeofW(StgHeader),
 		  sizeofW(StgForeignObj)-sizeofW(StgHeader), 0);
   CCS_ALLOC(CCCS,sizeofW(StgForeignObj)); /* ccs prof */
@@ -294,7 +294,7 @@ FN_(makeForeignObjZh_fast)
 
 #ifndef PAR
 
-FN_(mkWeakZh_fast)
+FN_(mkWeakzh_fast)
 {
   /* R1.p = key
      R2.p = value
@@ -303,7 +303,7 @@ FN_(mkWeakZh_fast)
   StgWeak *w;
   FB_
 
-  HP_CHK_GEN(sizeofW(StgWeak), R1_PTR|R2_PTR|R3_PTR, mkWeakZh_fast,);
+  HP_CHK_GEN(sizeofW(StgWeak), R1_PTR|R2_PTR|R3_PTR, mkWeakzh_fast,);
   TICK_ALLOC_PRIM(sizeofW(StgHeader)+1,  // +1 is for the link field
 		  sizeofW(StgWeak)-sizeofW(StgHeader)-1, 0);
   CCS_ALLOC(CCCS,sizeofW(StgWeak)); /* ccs prof */
@@ -324,7 +324,7 @@ FN_(mkWeakZh_fast)
   FE_
 }
 
-FN_(deRefWeakZh_fast)
+FN_(deRefWeakzh_fast)
 {
   /* R1.p = weak ptr
    */
@@ -347,7 +347,7 @@ FN_(deRefWeakZh_fast)
    Arbitrary-precision Integer operations.
    -------------------------------------------------------------------------- */
 
-FN_(int2IntegerZh_fast)
+FN_(int2Integerzh_fast)
 {
    /* arguments: R1 = Int# */
 
@@ -356,7 +356,7 @@ FN_(int2IntegerZh_fast)
    FB_
 
    val = R1.i;
-   HP_CHK_GEN(sizeofW(StgArrWords)+1, NO_PTRS, int2IntegerZh_fast,);
+   HP_CHK_GEN(sizeofW(StgArrWords)+1, NO_PTRS, int2Integerzh_fast,);
    TICK_ALLOC_PRIM(sizeofW(StgArrWords),1,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+1); /* ccs prof */
 
@@ -384,7 +384,7 @@ FN_(int2IntegerZh_fast)
    FE_
 }
 
-FN_(word2IntegerZh_fast)
+FN_(word2Integerzh_fast)
 {
    /* arguments: R1 = Word# */
 
@@ -394,7 +394,7 @@ FN_(word2IntegerZh_fast)
    FB_
 
    val = R1.w;
-   HP_CHK_GEN(sizeofW(StgArrWords)+1, NO_PTRS, word2IntegerZh_fast,)
+   HP_CHK_GEN(sizeofW(StgArrWords)+1, NO_PTRS, word2Integerzh_fast,)
    TICK_ALLOC_PRIM(sizeofW(StgArrWords),1,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+1); /* ccs prof */
 
@@ -418,13 +418,13 @@ FN_(word2IntegerZh_fast)
    FE_
 }
 
-FN_(addr2IntegerZh_fast)
+FN_(addr2Integerzh_fast)
 {
   MP_INT result;
   char *str;
   FB_
 
-  MAYBE_GC(NO_PTRS,addr2IntegerZh_fast);
+  MAYBE_GC(NO_PTRS,addr2Integerzh_fast);
 
   /* args:   R1 :: Addr# */
   str = R1.a;
@@ -445,7 +445,7 @@ FN_(addr2IntegerZh_fast)
 
 #ifdef SUPPORT_LONG_LONGS
 
-FN_(int64ToIntegerZh_fast)
+FN_(int64ToIntegerzh_fast)
 {
    /* arguments: L1 = Int64# */
 
@@ -464,7 +464,7 @@ FN_(int64ToIntegerZh_fast)
        /* minimum is one word */
        words_needed = 1;
    }
-   HP_CHK_GEN(sizeofW(StgArrWords)+words_needed, NO_PTRS, int64ToIntegerZh_fast,)
+   HP_CHK_GEN(sizeofW(StgArrWords)+words_needed, NO_PTRS, int64ToIntegerzh_fast,)
    TICK_ALLOC_PRIM(sizeofW(StgArrWords),words_needed,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+words_needed); /* ccs prof */
 
@@ -502,7 +502,7 @@ FN_(int64ToIntegerZh_fast)
    FE_
 }
 
-FN_(word64ToIntegerZh_fast)
+FN_(word64ToIntegerzh_fast)
 {
    /* arguments: L1 = Word64# */
 
@@ -518,7 +518,7 @@ FN_(word64ToIntegerZh_fast)
    } else {
       words_needed = 1;
    }
-   HP_CHK_GEN(sizeofW(StgArrWords)+words_needed, NO_PTRS, word64ToIntegerZh_fast,)
+   HP_CHK_GEN(sizeofW(StgArrWords)+words_needed, NO_PTRS, word64ToIntegerzh_fast,)
    TICK_ALLOC_PRIM(sizeofW(StgArrWords),words_needed,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+words_needed); /* ccs prof */
 
@@ -634,16 +634,16 @@ FN_(name)								\
   FE_									\
 }
 
-GMP_TAKE2_RET1(plusIntegerZh_fast,  mpz_add);
-GMP_TAKE2_RET1(minusIntegerZh_fast, mpz_sub);
-GMP_TAKE2_RET1(timesIntegerZh_fast, mpz_mul);
-GMP_TAKE2_RET1(gcdIntegerZh_fast,   mpz_gcd);
+GMP_TAKE2_RET1(plusIntegerzh_fast,  mpz_add);
+GMP_TAKE2_RET1(minusIntegerzh_fast, mpz_sub);
+GMP_TAKE2_RET1(timesIntegerzh_fast, mpz_mul);
+GMP_TAKE2_RET1(gcdIntegerzh_fast,   mpz_gcd);
 
-GMP_TAKE2_RET2(quotRemIntegerZh_fast, mpz_tdiv_qr);
-GMP_TAKE2_RET2(divModIntegerZh_fast,  mpz_fdiv_qr);
+GMP_TAKE2_RET2(quotRemIntegerzh_fast, mpz_tdiv_qr);
+GMP_TAKE2_RET2(divModIntegerzh_fast,  mpz_fdiv_qr);
 
 #ifndef FLOATS_AS_DOUBLES
-FN_(decodeFloatZh_fast)
+FN_(decodeFloatzh_fast)
 { 
   MP_INT mantissa;
   I_ exponent;
@@ -654,7 +654,7 @@ FN_(decodeFloatZh_fast)
   /* arguments: F1 = Float# */
   arg = F1;
 
-  HP_CHK_GEN(sizeof(StgArrWords)+1, NO_PTRS, decodeFloatZh_fast,);
+  HP_CHK_GEN(sizeof(StgArrWords)+1, NO_PTRS, decodeFloatzh_fast,);
   TICK_ALLOC_PRIM(sizeofW(StgArrWords),1,0);
   CCS_ALLOC(CCCS,sizeofW(StgArrWords)+1); /* ccs prof */
 
@@ -677,7 +677,7 @@ FN_(decodeFloatZh_fast)
 #define DOUBLE_MANTISSA_SIZE (sizeof(StgDouble)/sizeof(W_))
 #define ARR_SIZE (sizeof(StgArrWords) + DOUBLE_MANTISSA_SIZE)
 
-FN_(decodeDoubleZh_fast)
+FN_(decodeDoublezh_fast)
 { MP_INT mantissa;
   I_ exponent;
   StgDouble arg;
@@ -687,7 +687,7 @@ FN_(decodeDoubleZh_fast)
   /* arguments: D1 = Double# */
   arg = D1;
 
-  HP_CHK_GEN(ARR_SIZE, NO_PTRS, decodeDoubleZh_fast,);
+  HP_CHK_GEN(ARR_SIZE, NO_PTRS, decodeDoublezh_fast,);
   TICK_ALLOC_PRIM(sizeof(StgArrWords),DOUBLE_MANTISSA_SIZE,0);
   CCS_ALLOC(CCCS,ARR_SIZE); /* ccs prof */
 
@@ -710,14 +710,14 @@ FN_(decodeDoubleZh_fast)
  * Concurrency primitives
  * -------------------------------------------------------------------------- */
 
-FN_(forkZh_fast)
+FN_(forkzh_fast)
 {
   FB_
   /* args: R1 = closure to spark */
   
   if (closure_SHOULD_SPARK(stgCast(StgClosure*,R1.p))) {
 
-    MAYBE_GC(R1_PTR, forkZh_fast);
+    MAYBE_GC(R1_PTR, forkzh_fast);
 
     /* create it right now, return ThreadID in R1 */
     R1.t = RET_STGCALL2(StgTSO *, createIOThread, 
@@ -731,7 +731,7 @@ FN_(forkZh_fast)
   FE_
 }
 
-FN_(killThreadZh_fast)
+FN_(killThreadzh_fast)
 {
   FB_
   /* args: R1.p = TSO to kill */
@@ -752,14 +752,14 @@ FN_(killThreadZh_fast)
   FE_
 }
 
-FN_(newMVarZh_fast)
+FN_(newMVarzh_fast)
 {
   StgMVar *mvar;
 
   FB_
   /* args: none */
 
-  HP_CHK_GEN(sizeofW(StgMVar), NO_PTRS, newMVarZh_fast,);
+  HP_CHK_GEN(sizeofW(StgMVar), NO_PTRS, newMVarzh_fast,);
   TICK_ALLOC_PRIM(sizeofW(StgMutVar)-1, // consider head,tail,link as admin wds
 	 	  1, 0);
   CCS_ALLOC(CCCS,sizeofW(StgMVar)); /* ccs prof */
@@ -774,7 +774,7 @@ FN_(newMVarZh_fast)
   FE_
 }
 
-FN_(takeMVarZh_fast)
+FN_(takeMVarzh_fast)
 {
   StgMVar *mvar;
   StgClosure *val;
@@ -796,7 +796,7 @@ FN_(takeMVarZh_fast)
     CurrentTSO->link = (StgTSO *)&END_TSO_QUEUE_closure;
     mvar->tail = CurrentTSO;
 
-    BLOCK(R1_PTR, takeMVarZh_fast);
+    BLOCK(R1_PTR, takeMVarzh_fast);
   }
 
   SET_INFO(mvar,&EMPTY_MVAR_info);
@@ -808,7 +808,7 @@ FN_(takeMVarZh_fast)
   FE_
 }
 
-FN_(putMVarZh_fast)
+FN_(putMVarzh_fast)
 {
   StgMVar *mvar;
   StgTSO *tso;
@@ -849,13 +849,13 @@ FN_(putMVarZh_fast)
    Stable pointer primitives
    -------------------------------------------------------------------------  */
 
-FN_(makeStableNameZh_fast)
+FN_(makeStableNamezh_fast)
 {
   StgWord index;
   StgStableName *sn_obj;
   FB_
 
-  HP_CHK_GEN(sizeofW(StgStableName), R1_PTR, makeStableNameZh_fast,);
+  HP_CHK_GEN(sizeofW(StgStableName), R1_PTR, makeStableNamezh_fast,);
   TICK_ALLOC_PRIM(sizeofW(StgHeader), 
 		  sizeofW(StgStableName)-sizeofW(StgHeader), 0);
   CCS_ALLOC(CCCS,sizeofW(StgStableName)); /* ccs prof */

@@ -116,7 +116,7 @@ stgMassageForProfiling mod_name grp_name us stg_binds
 	-- Top level CAF without a cost centre attached
 	-- Attach CAF cc (collect if individual CAF ccs)
       = (if opt_AutoSccsOnIndividualCafs 
-		then let cc = mkAutoCC binder mod_name grp_name IsCafCC
+		then let cc = mkAutoCC binder mod_name grp_name CafCC
 			 ccs = mkSingletonCCS cc
 		     in
 		     collectCC  cc  `thenMM_`

@@ -20,7 +20,7 @@ module DsMonad (
 	ValueEnv,
 	dsWarn, 
 	DsWarnings,
-	DsMatchContext(..), DsMatchKind(..), pprDsWarnings
+	DsMatchContext(..), DsMatchKind(..)
     ) where
 
 #include "HsVersions.h"
@@ -28,7 +28,7 @@ module DsMonad (
 import Bag		( emptyBag, snocBag, bagToList, Bag )
 import ErrUtils 	( WarnMsg, pprBagOfErrors )
 import HsSyn		( OutPat )
-import Id		( mkUserLocal, mkSysLocal, setIdUnique, Id )
+import Id		( mkSysLocal, setIdUnique, Id )
 import Name		( Module, Name, maybeWiredInIdName )
 import Var		( TyVar, setTyVarUnique )
 import VarEnv
@@ -234,7 +234,4 @@ data DsMatchKind
   | ListCompMatch
   | LetMatch
   deriving ()
-
-pprDsWarnings :: DsWarnings -> SDoc
-pprDsWarnings warns = pprBagOfErrors warns
 \end{code}
