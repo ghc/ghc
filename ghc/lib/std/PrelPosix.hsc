@@ -195,7 +195,7 @@ tcSetAttr fd options p_tios = do
      c_sigprocmask prel_sig_setmask p_old_sigset nullPtr
 
 foreign import ccall "prel_lflag" c_lflag :: Ptr Termios -> IO CTcflag
-foreign import ccall "prel_poke_lflag" c_lflag :: Ptr Termios -> CTcflag -> IO ()
+foreign import ccall "prel_poke_lflag" poke_c_lflag :: Ptr Termios -> CTcflag -> IO ()
 foreign import ccall "prel_ptr_c_cc" ptr_c_cc  :: Ptr Termios -> IO Word8
 
 foreign import ccall "prel_echo"      unsafe prel_echo :: CInt
