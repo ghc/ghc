@@ -30,6 +30,7 @@ import ByteCodeAsm	( CompiledByteCode(..), bcoFreeNames, UnlinkedBCO(..))
 
 import Packages
 import DriverState	( v_Library_paths, v_Opt_l, v_Ld_inputs, getStaticOpts, v_ExplicitPackages )
+import DriverUtil	( getFileSuffix )
 #ifdef darwin_TARGET_OS
 import DriverState	( v_Cmdline_frameworks, v_Framework_paths )
 #endif
@@ -211,8 +212,10 @@ reallyInitDynLinker
 	; let minus_ls = [ lib | '-':'l':lib <- opt_l ]
 
 	   	-- (d) Link .o files from the command-line
-	; lib_paths    <- readIORef v_Library_paths
-	; cmdline_objs <- readIORef v_Ld_inputs
+	; lib_paths <- readIORef v_Library_paths
+	; cmdline_ld_inputs <- readIORef v_Ld_inputs
+
+	; let (cmdline_libs, cmdline_objs) = partition libish cmdline_ld_inputs
 
 	   	-- (e) Link any MacOS frameworks
 #ifdef darwin_TARGET_OS	
@@ -224,6 +227,7 @@ reallyInitDynLinker
 #endif
 		-- Finally do (c),(d),(e)	
         ; let cmdline_lib_specs = map Object    cmdline_objs
+			       ++ map DLLPath   cmdline_libs
 			       ++ map DLL       minus_ls 
 			       ++ map Framework frameworks
 	; if null cmdline_lib_specs then return ()
@@ -236,6 +240,15 @@ reallyInitDynLinker
 	; if succeeded ok then maybePutStrLn dflags "done"
 	  else throwDyn (InstallationError "linking extra libraries/objects failed")
 	}}
+
+libish :: String -> Bool
+libish f = getFileSuffix f `elem` dynlib_suffixes
+
+#ifdef mingw32_TARGET_OS
+dynlib_suffixes = ["dll", "DLL"]
+#else
+dynlib_suffixes = ["so"]
+#endif
 
 preloadLib :: DynFlags -> [String] -> [String] -> LibrarySpec -> IO ()
 preloadLib dflags lib_paths framework_paths lib_spec
@@ -251,7 +264,13 @@ preloadLib dflags lib_paths framework_paths lib_spec
                    case maybe_errstr of
                       Nothing -> maybePutStrLn dflags "done"
                       Just mm -> preloadFailed mm lib_paths lib_spec
-                   
+
+	  DLLPath dll_path
+	     -> do maybe_errstr <- loadDLL dll_path
+                   case maybe_errstr of
+                      Nothing -> maybePutStrLn dflags "done"
+                      Just mm -> preloadFailed mm lib_paths lib_spec
+
 #ifdef darwin_TARGET_OS
 	  Framework framework
              -> do maybe_errstr <- loadFramework framework_paths framework
@@ -675,6 +694,9 @@ data LibrarySpec
 			--  loadDLL is platform-specific and adds the lib/.so/.DLL
 			--  suffixes platform-dependently
 
+   | DLLPath FilePath   -- Absolute or relative pathname to a dynamic library
+			-- (ends with .dll or .so).
+
    | Framework String	-- Only used for darwin, but does no harm
 
 -- If this package is already part of the GHCi binary, we'll already
@@ -695,6 +717,7 @@ partOfGHCi
 
 showLS (Object nm)    = "(static) " ++ nm
 showLS (DLL nm)       = "(dynamic) " ++ nm
+showLS (DLLPath nm)   = "(dynamic) " ++ nm
 showLS (Framework nm) = "(framework) " ++ nm
 
 linkPackages :: DynFlags -> [PackageName] -> IO ()
