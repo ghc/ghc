@@ -1,18 +1,23 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[DsListComp]{Desugaring list comprehensions}
+\section[DsListComp]{Desugaring list comprehensions and array comprehensions}
 
 \begin{code}
-module DsListComp ( dsListComp ) where
+module DsListComp ( dsListComp, dsPArrComp ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-} DsExpr ( dsExpr, dsLet )
 
 import BasicTypes	( Boxity(..) )
-import HsSyn		( OutPat(..), HsExpr(..), Stmt(..), HsMatchContext(..), HsDoContext(..) )
-import TcHsSyn		( TypecheckedStmt, TypecheckedPat, TypecheckedHsExpr, outPatType )
+import DataCon		( dataConId )
+import TyCon		( tyConName )
+import HsSyn		( OutPat(..), HsExpr(..), Stmt(..),
+			  HsMatchContext(..), HsDoContext(..),
+			  collectHsOutBinders )
+import TcHsSyn		( TypecheckedStmt, TypecheckedPat, TypecheckedHsExpr,
+			  outPatType )
 import CoreSyn
 
 import DsMonad		-- the monadery used in the desugarer
@@ -22,12 +27,18 @@ import CmdLineOpts	( opt_FoldrBuildOn )
 import CoreUtils	( exprType, mkIfThenElse )
 import Id		( idType )
 import Var              ( Id )
-import Type		( mkTyVarTy, mkFunTys, mkFunTy, Type )
+import Type		( mkTyVarTy, mkFunTys, mkFunTy, Type,
+			  splitTyConApp_maybe )
 import TysPrim		( alphaTyVar )
-import TysWiredIn	( nilDataCon, consDataCon, unitDataConId, mkListTy, mkTupleTy )
+import TysWiredIn	( nilDataCon, consDataCon, unitDataConId, unitTy,
+			  mkListTy, mkTupleTy, intDataCon )
 import Match		( matchSimply )
-import PrelNames	( foldrName, buildName )
+import PrelNames	( trueDataConName, falseDataConName, foldrName,
+			  buildName, replicatePName, mapPName, filterPName,
+			  zipPName, crossPName, parrTyConName ) 
+import PrelInfo		( pAT_ERROR_ID )
 import SrcLoc		( noSrcLoc )
+import Panic		( panic )
 \end{code}
 
 List comprehensions may be desugared in one of two ways: ``ordinary''
@@ -319,4 +330,146 @@ dfListComp c_id n_id (BindStmt pat list1 locn : quals)
     )
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection[DsPArrComp]{Desugaring of array comprehensions}
+%*									*
+%************************************************************************
 
+\begin{code}
+
+-- entry point for desugaring a parallel array comprehension
+--
+--   [:e | qss:] = <<[:e | qss:]>> () [:():]
+--
+dsPArrComp      :: [TypecheckedStmt] 
+	        -> Type		    -- Don't use; called with `undefined' below
+	        -> DsM CoreExpr
+dsPArrComp qs _  =
+  dsLookupGlobalValue replicatePName			  `thenDs` \repP ->
+  let unitArray = mkApps (Var repP) [Type unitTy, 
+				     mkConApp intDataCon [mkIntLit 1], 
+				     mkTupleExpr []]
+  in
+  dePArrComp qs (TuplePat [] Boxed) unitArray
+
+-- the work horse
+--
+dePArrComp :: [TypecheckedStmt] 
+	   -> TypecheckedPat		-- the current generator pattern
+	   -> CoreExpr			-- the current generator expression
+	   -> DsM CoreExpr
+--
+--  <<[:e' | :]>> pa ea = mapP (\pa -> e') ea
+--
+dePArrComp [ResultStmt e' _] pa cea =
+  dsLookupGlobalValue mapPName				  `thenDs` \mapP    ->
+  let ty = parrElemType cea
+  in
+  deLambda ty pa e'					  `thenDs` \(clam, 
+								     ty'e') ->
+  returnDs $ mkApps (Var mapP) [Type ty, Type ty'e', clam, cea]
+--
+--  <<[:e' | b, qs:]>> pa ea = <<[:e' | qs:]>> pa (filterP (\pa -> b) ea)
+--
+dePArrComp (ExprStmt b _ _ : qs) pa cea =
+  dsLookupGlobalValue filterPName			  `thenDs` \filterP  ->
+  let ty = parrElemType cea
+  in
+  deLambda ty pa b					  `thenDs` \(clam,_) ->
+  dePArrComp qs pa (mkApps (Var filterP) [Type ty, clam, cea])
+--
+--  <<[:e' | p <- e, qs:]>> pa ea = 
+--    let ef = filterP (\x -> case x of {p -> True; _ -> False}) e
+--    in
+--    <<[:e' | qs:]>> (pa, p) (crossP ea ef)
+--
+dePArrComp (BindStmt p e _ : qs) pa cea =
+  dsLookupGlobalValue falseDataConName			  `thenDs` \falseId ->
+  dsLookupGlobalValue trueDataConName			  `thenDs` \trueId ->
+  dsLookupGlobalValue filterPName			  `thenDs` \filterP ->
+  dsLookupGlobalValue crossPName			  `thenDs` \crossP  ->
+  dsExpr e						  `thenDs` \ce      ->
+  let ty'cea = parrElemType cea
+      ty'ce  = parrElemType ce
+      false  = Var falseId
+      true   = Var trueId
+  in
+  newSysLocalDs ty'ce					  `thenDs` \v       ->
+  matchSimply (Var v) (DoCtxt PArrComp) p true false      `thenDs` \pred    ->
+  let cef    = mkApps (Var filterP) [Type ty'ce, mkLams [v] pred, ce]
+      ty'cef = ty'ce				-- filterP preserves the type
+      pa'    = TuplePat [pa, p] Boxed
+  in
+  dePArrComp qs pa' (mkApps (Var crossP) [Type ty'cea, Type ty'cef, cea, cef])
+--
+--  <<[:e' | let ds, qs:]>> pa ea = 
+--    <<[:e' | qs:]>> (pa, (x_1, ..., x_n)) 
+--		      (mapP (\v@pa -> (v, let ds in (x_1, ..., x_n))) ea)
+--  where
+--    {x_1, ..., x_n} = DV (ds)		-- Defined Variables
+--
+dePArrComp (LetStmt ds : qs) pa cea =
+  dsLookupGlobalValue mapPName				  `thenDs` \mapP    ->
+  let xs     = collectHsOutBinders ds
+      ty'cea = parrElemType cea
+  in
+  newSysLocalDs ty'cea					  `thenDs` \v       ->
+  dsLet ds (mkTupleExpr xs)				  `thenDs` \clet    ->
+  newSysLocalDs (exprType clet)				  `thenDs` \let'v   ->
+  let projBody = mkDsLet (NonRec let'v clet) $ mkTupleExpr [v, let'v]
+      errTy    = exprType projBody
+      errMsg   = "DsListComp.dePArrComp: internal error!"
+  in
+  mkErrorAppDs pAT_ERROR_ID errTy errMsg                  `thenDs` \cerr    ->
+  matchSimply (Var v) (DoCtxt PArrComp) pa projBody cerr  `thenDs` \ccase   ->
+  let pa'    = TuplePat [pa, TuplePat (map VarPat xs) Boxed] Boxed
+      proj   = mkLams [v] ccase
+  in
+  dePArrComp qs pa' (mkApps (Var mapP) [Type ty'cea, proj, cea])
+--
+--  <<[:e' | qs | qss:]>> pa ea = 
+--    <<[:e' | qss:]>> (pa, (x_1, ..., x_n)) 
+--		       (zipP ea <<[:(x_1, ..., x_n) | qs:]>>)
+--    where
+--      {x_1, ..., x_n} = DV (qs)
+--
+dePArrComp (ParStmtOut []             : qss2) pa cea = dePArrComp qss2 pa cea
+dePArrComp (ParStmtOut ((xs, qs):qss) : qss2) pa cea =
+  dsLookupGlobalValue zipPName				  `thenDs` \zipP    ->
+  let pa'     = TuplePat [pa, TuplePat (map VarPat xs) Boxed] Boxed
+      ty'cea  = parrElemType cea
+      resStmt = ResultStmt (ExplicitTuple (map HsVar xs) Boxed) noSrcLoc
+  in
+  dsPArrComp (qs ++ [resStmt]) undefined		  `thenDs` \cqs     ->
+  let ty'cqs = parrElemType cqs
+      cea'   = mkApps (Var zipP) [Type ty'cea, Type ty'cqs, cea, cqs]
+  in
+  dePArrComp (ParStmtOut qss : qss2) pa' cea'
+
+-- generate Core corresponding to `\p -> e'
+--
+deLambda        :: Type			-- type of the argument
+		-> TypecheckedPat	-- argument pattern
+		-> TypecheckedHsExpr	-- body
+		-> DsM (CoreExpr, Type)
+deLambda ty p e  =
+  newSysLocalDs ty					  `thenDs` \v       ->
+  dsExpr e						  `thenDs` \ce      ->
+  let errTy    = exprType ce
+      errMsg   = "DsListComp.deLambda: internal error!"
+  in
+  mkErrorAppDs pAT_ERROR_ID errTy errMsg                  `thenDs` \cerr    ->
+  matchSimply (Var v) (DoCtxt PArrComp) p ce cerr	  `thenDs` \res	    ->
+  returnDs (mkLams [v] res, errTy)
+
+-- obtain the element type of the parallel array produced by the given Core
+-- expression
+--
+parrElemType   :: CoreExpr -> Type
+parrElemType e  = 
+  case splitTyConApp_maybe (exprType e) of
+    Just (tycon, [ty]) | tyConName tycon == parrTyConName -> ty
+    _							  -> panic
+      "DsListComp.parrElemType: not a parallel array type"
+\end{code}

@@ -81,9 +81,10 @@ happyError buf PState{ loc = loc } = PFailed (srcParseErr buf loc)
 loadPackageConfig :: FilePath -> IO [PackageConfig]
 loadPackageConfig conf_filename = do
    buf <- hGetStringBuffer False conf_filename
-   case parse buf PState{ bol = 0#, atbol = 1#,
-	 	          context = [], glasgow_exts = 0#,
-  			  loc = mkSrcLoc (_PK_ conf_filename) 1 } of
+   let loc  = mkSrcLoc (_PK_ conf_filename) 1
+       exts = ExtFlags {glasgowExtsEF = False,
+			parrEF	      = False}
+   case parse buf (mkPState loc exts) of
 	PFailed err -> do
 	    freeStringBuffer buf
             throwDyn (InstallationError (showSDoc err))

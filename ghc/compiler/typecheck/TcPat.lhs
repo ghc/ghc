@@ -27,8 +27,9 @@ import TcMType 		( tcInstTyVars, newTyVarTy, getTcTyVar, putTcTyVar )
 import TcType		( TcType, TcTyVar, TcSigmaType,
 			  mkTyConApp, mkClassPred, liftedTypeKind, tcGetTyVar_maybe,
 			  isHoleTyVar, openTypeKind )
-import TcUnify		( tcSub, unifyTauTy, unifyListTy, unifyTupleTy, 
-			  mkCoercion, idCoercion, isIdCoercion, (<$>), PatCoFn )
+import TcUnify		( tcSub, unifyTauTy, unifyListTy, unifyPArrTy,
+			  unifyTupleTy,  mkCoercion, idCoercion, isIdCoercion,
+			  (<$>), PatCoFn )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 
 import TysWiredIn	( stringTy )
@@ -159,7 +160,7 @@ tcPat tc_bndr (SigPatIn pat sig) pat_ty
 
 %************************************************************************
 %*									*
-\subsection{Explicit lists and tuples}
+\subsection{Explicit lists, parallel arrays, and tuples}
 %*									*
 %************************************************************************
 
@@ -169,6 +170,12 @@ tcPat tc_bndr pat_in@(ListPatIn pats) pat_ty
     unifyListTy pat_ty				`thenTc` \ elem_ty ->
     tcPats tc_bndr pats (repeat elem_ty)	`thenTc` \ (pats', lie_req, tvs, ids, lie_avail) ->
     returnTc (ListPat elem_ty pats', lie_req, tvs, ids, lie_avail)
+
+tcPat tc_bndr pat_in@(PArrPatIn pats) pat_ty
+  = tcAddErrCtxt (patCtxt pat_in)		$
+    unifyPArrTy pat_ty				`thenTc` \ elem_ty ->
+    tcPats tc_bndr pats (repeat elem_ty)	`thenTc` \ (pats', lie_req, tvs, ids, lie_avail) ->
+    returnTc (PArrPat elem_ty pats', lie_req, tvs, ids, lie_avail)
 
 tcPat tc_bndr pat_in@(TuplePatIn pats boxity) pat_ty
   = tcAddErrCtxt (patCtxt pat_in)	$

@@ -54,7 +54,7 @@ import TysPrim	  ( charPrimTy, intPrimTy, floatPrimTy,
 		    doublePrimTy, addrPrimTy
 		  )
 import TysWiredIn ( charTy, stringTy, intTy, integerTy,
-		    mkListTy, mkTupleTy, unitTy )
+		    mkListTy, mkPArrTy, mkTupleTy, unitTy )
 import CoreSyn    ( Expr )
 import Var	  ( isId )
 import BasicTypes ( RecFlag(..), Boxity(..), IPName(..), ipNameName )
@@ -161,6 +161,7 @@ outPatType (LazyPat pat)	= outPatType pat
 outPatType (AsPat var pat)	= idType var
 outPatType (ConPat _ ty _ _ _)	= ty
 outPatType (ListPat ty _)	= mkListTy ty
+outPatType (PArrPat ty _)	= mkPArrTy ty
 outPatType (TuplePat pats box)	= mkTupleTy box (length pats) (map outPatType pats)
 outPatType (RecPat _ ty _ _ _)  = ty
 outPatType (SigPat _ ty _)	= ty
@@ -190,6 +191,7 @@ collectTypedPatBinders (AsPat a pat)	       = a : collectTypedPatBinders pat
 collectTypedPatBinders (SigPat pat _ _)	       = collectTypedPatBinders pat
 collectTypedPatBinders (ConPat _ _ _ _ pats)   = concat (map collectTypedPatBinders pats)
 collectTypedPatBinders (ListPat t pats)        = concat (map collectTypedPatBinders pats)
+collectTypedPatBinders (PArrPat t pats)        = concat (map collectTypedPatBinders pats)
 collectTypedPatBinders (TuplePat pats _)       = concat (map collectTypedPatBinders pats)
 collectTypedPatBinders (RecPat _ _ _ _ fields) = concat (map (\ (f,pat,_) -> collectTypedPatBinders pat)
 							  fields)
@@ -493,6 +495,11 @@ zonkExpr (ExplicitList ty exprs)
     mapNF_Tc zonkExpr exprs	`thenNF_Tc` \ new_exprs ->
     returnNF_Tc (ExplicitList new_ty new_exprs)
 
+zonkExpr (ExplicitPArr ty exprs)
+  = zonkTcTypeToType ty		`thenNF_Tc` \ new_ty ->
+    mapNF_Tc zonkExpr exprs	`thenNF_Tc` \ new_exprs ->
+    returnNF_Tc (ExplicitPArr new_ty new_exprs)
+
 zonkExpr (ExplicitTuple exprs boxed)
   = mapNF_Tc zonkExpr exprs  	`thenNF_Tc` \ new_exprs ->
     returnNF_Tc (ExplicitTuple new_exprs boxed)
@@ -514,11 +521,17 @@ zonkExpr (RecordUpdOut expr in_ty out_ty dicts rbinds)
 
 zonkExpr (ExprWithTySig _ _) = panic "zonkExpr:ExprWithTySig"
 zonkExpr (ArithSeqIn _)      = panic "zonkExpr:ArithSeqIn"
+zonkExpr (PArrSeqIn _)       = panic "zonkExpr:PArrSeqIn"
 
 zonkExpr (ArithSeqOut expr info)
   = zonkExpr expr	`thenNF_Tc` \ new_expr ->
     zonkArithSeq info	`thenNF_Tc` \ new_info ->
     returnNF_Tc (ArithSeqOut new_expr new_info)
+
+zonkExpr (PArrSeqOut expr info)
+  = zonkExpr expr	`thenNF_Tc` \ new_expr ->
+    zonkArithSeq info	`thenNF_Tc` \ new_info ->
+    returnNF_Tc (PArrSeqOut new_expr new_info)
 
 zonkExpr (HsCCall fun args may_gc is_casm result_ty)
   = mapNF_Tc zonkExpr args 	`thenNF_Tc` \ new_args ->
@@ -666,6 +679,11 @@ zonkPat (ListPat ty pats)
   = zonkTcTypeToType ty	`thenNF_Tc` \ new_ty ->
     zonkPats pats		`thenNF_Tc` \ (new_pats, ids) ->
     returnNF_Tc (ListPat new_ty new_pats, ids)
+
+zonkPat (PArrPat ty pats)
+  = zonkTcTypeToType ty	`thenNF_Tc` \ new_ty ->
+    zonkPats pats		`thenNF_Tc` \ (new_pats, ids) ->
+    returnNF_Tc (PArrPat new_ty new_pats, ids)
 
 zonkPat (TuplePat pats boxed)
   = zonkPats pats   		`thenNF_Tc` \ (new_pats, ids) ->

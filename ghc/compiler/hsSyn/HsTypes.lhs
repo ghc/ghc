@@ -43,9 +43,9 @@ import Var		( TyVar, tyVarKind )
 import Subst		( substTyWith )
 import PprType		( {- instance Outputable Kind -}, pprParendKind )
 import BasicTypes	( Boxity(..), Arity, IPName, tupleParens )
-import PrelNames	( mkTupConRdrName, listTyConKey, usOnceTyConKey, usManyTyConKey, hasKey,
-			  usOnceTyConName, usManyTyConName
-			)
+import PrelNames	( mkTupConRdrName, listTyConKey, parrTyConKey,
+			  usOnceTyConKey, usManyTyConKey, hasKey,
+			  usOnceTyConName, usManyTyConName )
 import FiniteMap
 import Util		( eqListBy, lengthIs )
 import Outputable
@@ -97,6 +97,8 @@ data HsType name
 			(HsType name)
 
   | HsListTy		(HsType name)	-- Element type
+
+  | HsPArrTy		(HsType name)	-- Elem. type of parallel array: [:t:]
 
   | HsTupleTy		(HsTupCon name)
 			[HsType name]	-- Element types (length gives arity)
@@ -275,6 +277,9 @@ ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)
 
 ppr_mono_ty ctxt_prec (HsTupleTy con tys) = hsTupParens con (interpp'SP tys)
 ppr_mono_ty ctxt_prec (HsListTy ty)	  = brackets (ppr_mono_ty pREC_TOP ty)
+ppr_mono_ty ctxt_prec (HsPArrTy ty)	  = pabrackets (ppr_mono_ty pREC_TOP ty)
+  where
+    pabrackets p = ptext SLIT("[:") <> p <> ptext SLIT(":]")
 
 ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty)
   = maybeParen (ctxt_prec >= pREC_CON)
@@ -344,6 +349,7 @@ toHsType ty@(TyConApp tc tys)	-- Must be saturated because toHsType's arg is of 
   | not saturated	       = generic_case
   | isTupleTyCon tc	       = HsTupleTy (HsTupCon (getName tc) (tupleTyConBoxity tc) (tyConArity tc)) tys'
   | tc `hasKey` listTyConKey   = HsListTy (head tys')
+  | tc `hasKey` parrTyConKey   = HsPArrTy (head tys')
   | tc `hasKey` usOnceTyConKey = hsUsOnce_Name		 -- must print !, . unqualified
   | tc `hasKey` usManyTyConKey = hsUsMany_Name		 -- must print !, . unqualified
   | otherwise		       = generic_case
@@ -447,6 +453,9 @@ eq_hsType env (HsTupleTy c1 tys1) (HsTupleTy c2 tys2)
   = (c1 == c2) && eq_hsTypes env tys1 tys2
 
 eq_hsType env (HsListTy ty1) (HsListTy ty2)
+  = eq_hsType env ty1 ty2
+
+eq_hsType env (HsPArrTy ty1) (HsPArrTy ty2)
   = eq_hsType env ty1 ty2
 
 eq_hsType env (HsAppTy fun_ty1 arg_ty1) (HsAppTy fun_ty2 arg_ty2)

@@ -12,7 +12,7 @@ module HsPat (
 	failureFreePat, isWildPat, 
 	patsAreAllCons, isConPat, 
 	patsAreAllLits,	isLitPat,
-	collectPatBinders, collectPatsBinders,
+	collectPatBinders, collectOutPatBinders, collectPatsBinders,
 	collectSigTysFromPat, collectSigTysFromPats
     ) where
 
@@ -66,6 +66,8 @@ data InPat name
 
   | ListPatIn	    [InPat name]	-- syntactic list
 					-- must have >= 1 elements
+  | PArrPatIn	    [InPat name]	-- syntactic parallel array
+					-- must have >= 1 elements
   | TuplePatIn	    [InPat name] Boxity	-- tuple (boxed?)
 
   | RecPatIn	    name 		-- record
@@ -94,6 +96,9 @@ data OutPat id
 				-- of type t -> typeof(p)
 
   | ListPat		 	-- Syntactic list
+		    Type	-- The type of the elements
+   	    	    [OutPat id]
+  | PArrPat		 	-- Syntactic parallel array
 		    Type	-- The type of the elements
    	    	    [OutPat id]
 
@@ -158,6 +163,7 @@ pprInPat (LazyPatIn pat)      = char '~' <> ppr pat
 pprInPat (AsPatIn name pat)   = parens (hcat [ppr name, char '@', ppr pat])
 pprInPat (ParPatIn pat)	      = parens (pprInPat pat)
 pprInPat (ListPatIn pats)     = brackets (interpp'SP pats)
+pprInPat (PArrPatIn pats)     = pabrackets (interpp'SP pats)
 pprInPat (TuplePatIn pats bx) = tupleParens bx (interpp'SP pats)
 pprInPat (NPlusKPatIn n k _)  = parens (hcat [ppr n, char '+', ppr k])
 pprInPat (NPatIn l)	      = ppr l
@@ -179,6 +185,11 @@ pprInPat (RecPatIn con rpats)
     pp_rpat (v, p, _)    = hsep [ppr v, char '=', ppr p]
 
 pprInPat (TypePatIn ty) = ptext SLIT("{|") <> ppr ty <> ptext SLIT("|}")
+
+-- add parallel array brackets around a document
+--
+pabrackets   :: SDoc -> SDoc
+pabrackets p  = ptext SLIT("[:") <> p <> ptext SLIT(":]")
 \end{code}
 
 \begin{code}
@@ -210,6 +221,7 @@ pprOutPat (ConPat name ty tyvars dicts pats)
       _ -> hsep [ppr name, interppSP tyvars, interppSP dicts, interppSP pats]
 
 pprOutPat (ListPat ty pats)      = brackets (interpp'SP pats)
+pprOutPat (PArrPat ty pats)      = pabrackets (interpp'SP pats)
 pprOutPat (TuplePat pats boxity) = tupleParens boxity (interpp'SP pats)
 
 pprOutPat (RecPat con ty tvs dicts rpats)
@@ -278,6 +290,7 @@ failureFreePat (AsPat _ pat)		  = failureFreePat pat
 failureFreePat (ConPat con tys _ _ pats)  = only_con con && all failureFreePat pats
 failureFreePat (RecPat con _ _ _ fields)  = only_con con && and [ failureFreePat pat | (_,pat,_) <- fields ]
 failureFreePat (ListPat _ _)		  = False
+failureFreePat (PArrPat _ _)		  = False
 failureFreePat (TuplePat pats _)	  = all failureFreePat pats
 failureFreePat (DictPat _ _)		  = True
 failureFreePat other_pat		  = False   -- Literals, NPat
@@ -295,6 +308,7 @@ patsAreAllCons pat_list = all isConPat pat_list
 isConPat (AsPat _ pat)		= isConPat pat
 isConPat (ConPat _ _ _ _ _)	= True
 isConPat (ListPat _ _)		= True
+isConPat (PArrPat _ _)		= True
 isConPat (TuplePat _ _)		= True
 isConPat (RecPat _ _ _ _ _)	= True
 isConPat (DictPat ds ms)	= (length ds + length ms) > 1
@@ -318,6 +332,9 @@ collected is important; see @HsBinds.lhs@.
 collectPatBinders :: InPat a -> [a]
 collectPatBinders pat = collect pat []
 
+collectOutPatBinders :: OutPat a -> [a]
+collectOutPatBinders pat = collectOut pat []
+
 collectPatsBinders :: [InPat a] -> [a]
 collectPatsBinders pats = foldr collect [] pats
 
@@ -333,11 +350,31 @@ collect (ConPatIn c pats)   	 bndrs = foldr collect bndrs pats
 collect (ConOpPatIn p1 c f p2)   bndrs = collect p1 (collect p2 bndrs)
 collect (ParPatIn  pat)     	 bndrs = collect pat bndrs
 collect (ListPatIn pats)    	 bndrs = foldr collect bndrs pats
+collect (PArrPatIn pats)    	 bndrs = foldr collect bndrs pats
 collect (TuplePatIn pats _)  	 bndrs = foldr collect bndrs pats
 collect (RecPatIn c fields) 	 bndrs = foldr (\ (f,pat,_) bndrs -> collect pat bndrs) bndrs fields
 -- Generics
 collect (TypePatIn ty)           bndrs = bndrs
 -- assume the type variables do not need to be bound
+
+-- collect the bounds *value* variables in renamed patterns; type variables
+-- are *not* collected
+--
+collectOut (WildPat _)	      	    bndrs = bndrs
+collectOut (VarPat var)      	    bndrs = var : bndrs
+collectOut (LazyPat pat)     	    bndrs = collectOut pat bndrs
+collectOut (AsPat a pat)     	    bndrs = a : collectOut pat bndrs
+collectOut (ListPat _ pats)  	    bndrs = foldr collectOut bndrs pats
+collectOut (PArrPat _ pats)  	    bndrs = foldr collectOut bndrs pats
+collectOut (TuplePat pats _) 	    bndrs = foldr collectOut bndrs pats
+collectOut (ConPat _ _ _ ds pats)   bndrs = ds ++ foldr collectOut bndrs pats
+collectOut (RecPat _ _ _ ds fields) bndrs = ds ++ foldr comb bndrs fields
+  where
+    comb (_, pat, _) bndrs = collectOut pat bndrs
+collectOut (LitPat _ _)	      	    bndrs = bndrs
+collectOut (NPat _ _ _)		    bndrs = bndrs
+collectOut (NPlusKPat n _ _ _ _)    bndrs = n : bndrs
+collectOut (DictPat ids1 ids2)      bndrs = ids1 ++ ids2 ++ bndrs
 \end{code}
 
 \begin{code}
@@ -359,6 +396,7 @@ collect_pat (ConPatIn c pats)      acc = foldr collect_pat acc pats
 collect_pat (ConOpPatIn p1 c f p2) acc = collect_pat p1 (collect_pat p2 acc)
 collect_pat (ParPatIn  pat)        acc = collect_pat pat acc
 collect_pat (ListPatIn pats)       acc = foldr collect_pat acc pats
+collect_pat (PArrPatIn pats)       acc = foldr collect_pat acc pats
 collect_pat (TuplePatIn pats _)    acc = foldr collect_pat acc pats
 collect_pat (RecPatIn c fields)    acc = foldr (\ (f,pat,_) acc -> collect_pat pat acc) acc fields
 -- Generics

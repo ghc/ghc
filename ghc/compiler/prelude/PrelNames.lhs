@@ -148,7 +148,11 @@ knownKeyNames
 	returnMName,
 	failMName,
 	fromRationalName,
-    
+
+        -- not class methods, but overloaded (for parallel arrays)
+	enumFromToPName,
+	enumFromThenToPName,
+
 	deRefStablePtrName,
 	newStablePtrName,
 	bindIOName,
@@ -171,6 +175,20 @@ knownKeyNames
 	buildName,
 	augmentName,
 
+        -- Parallel array operations
+	nullPName,
+	lengthPName,
+	replicatePName,
+	mapPName,
+	filterPName,
+	zipPName,
+	crossPName,
+	indexPName,
+	toPName,
+	bpermutePName,
+	bpermuteDftPName,
+	indexOfPName,
+
 	-- FFI primitive types that are not wired-in.
 	int8TyConName,
 	int16TyConName,
@@ -190,7 +208,19 @@ knownKeyNames
 	assertName,
 	runSTRepName,
 	printName,
-	splitIdName, fstIdName, sndIdName	-- Used by splittery
+	splitName, fstName, sndName,	-- Used by splittery
+
+	-- Others (needed for flattening and not mentioned before)
+	andName,
+	orName,
+	eqCharName, 
+	eqIntName,
+	eqFloatName, 
+	eqDoubleName, 
+	neqCharName, 
+	neqIntName,
+	neqFloatName, 
+	neqDoubleName
     ]
 \end{code}
 
@@ -210,6 +240,7 @@ pREL_SHOW_Name    = mkModuleName "PrelShow"
 pREL_READ_Name    = mkModuleName "PrelRead"
 pREL_NUM_Name     = mkModuleName "PrelNum"
 pREL_LIST_Name    = mkModuleName "PrelList"
+pREL_PARR_Name    = mkModuleName "PrelPArr"
 pREL_TUP_Name     = mkModuleName "PrelTup"
 pREL_PACK_Name    = mkModuleName "PrelPack"
 pREL_CONC_Name    = mkModuleName "PrelConc"
@@ -364,8 +395,8 @@ nilDataConName 	  = dataQual pREL_BASE_Name SLIT("[]") nilDataConKey
 consDataConName	  = dataQual pREL_BASE_Name SLIT(":") consDataConKey
 
 -- PrelTup
-fstIdName	  = varQual pREL_TUP_Name SLIT("fst") fstIdKey
-sndIdName	  = varQual pREL_TUP_Name SLIT("snd") sndIdKey
+fstName		  = varQual pREL_TUP_Name SLIT("fst") fstIdKey
+sndName		  = varQual pREL_TUP_Name SLIT("snd") sndIdKey
 
 -- Generics
 crossTyConName     = tcQual   pREL_BASE_Name SLIT(":*:") crossTyConKey
@@ -377,14 +408,25 @@ genUnitTyConName   = tcQual   pREL_BASE_Name SLIT("Unit") genUnitTyConKey
 genUnitDataConName = dataQual pREL_BASE_Name SLIT("Unit") genUnitDataConKey
 
 -- Random PrelBase functions
-unsafeCoerceName  = varQual pREL_BASE_Name SLIT("unsafeCoerce") unsafeCoerceIdKey
+unsafeCoerceName  = varQual pREL_BASE_Name SLIT("unsafeCoerce") 
+							     unsafeCoerceIdKey
 otherwiseIdName   = varQual pREL_BASE_Name SLIT("otherwise") otherwiseIdKey
-appendName	  = varQual pREL_BASE_Name SLIT("++") appendIdKey
-foldrName	  = varQual pREL_BASE_Name SLIT("foldr") foldrIdKey
-mapName	   	  = varQual pREL_BASE_Name SLIT("map") mapIdKey
-buildName	  = varQual pREL_BASE_Name SLIT("build") buildIdKey
-augmentName	  = varQual pREL_BASE_Name SLIT("augment") augmentIdKey
-eqStringName	  = varQual pREL_BASE_Name SLIT("eqString") eqStringIdKey
+appendName	  = varQual pREL_BASE_Name SLIT("++")	     appendIdKey
+foldrName	  = varQual pREL_BASE_Name SLIT("foldr")     foldrIdKey
+mapName	   	  = varQual pREL_BASE_Name SLIT("map")	     mapIdKey
+buildName	  = varQual pREL_BASE_Name SLIT("build")     buildIdKey
+augmentName	  = varQual pREL_BASE_Name SLIT("augment")   augmentIdKey
+eqStringName	  = varQual pREL_BASE_Name SLIT("eqString")  eqStringIdKey
+andName		  = varQual pREL_BASE_Name SLIT("&&")	     andIdKey
+orName		  = varQual pREL_BASE_Name SLIT("||")	     orIdKey
+eqCharName	  = varQual pREL_GHC_Name  SLIT("eqChar#")   eqCharIdKey
+eqIntName	  = varQual pREL_GHC_Name  SLIT("==#")       eqIntIdKey
+eqFloatName	  = varQual pREL_GHC_Name  SLIT("eqFloat#")  eqFloatIdKey
+eqDoubleName	  = varQual pREL_GHC_Name  SLIT("==##")	     eqDoubleIdKey
+neqCharName	  = varQual pREL_GHC_Name  SLIT("neqChar#")  neqCharIdKey
+neqIntName	  = varQual pREL_GHC_Name  SLIT("/=#")       neqIntIdKey
+neqFloatName	  = varQual pREL_GHC_Name  SLIT("neqFloat#") neqFloatIdKey
+neqDoubleName	  = varQual pREL_GHC_Name  SLIT("/=##")	     neqDoubleIdKey
 
 -- Strings
 unpackCStringName       = varQual pREL_BASE_Name SLIT("unpackCString#") unpackCStringIdKey
@@ -455,6 +497,10 @@ enumFromToName	   = varQual pREL_ENUM_Name SLIT("enumFromTo") enumFromToClassOpK
 enumFromThenName   = varQual pREL_ENUM_Name SLIT("enumFromThen") enumFromThenClassOpKey
 enumFromThenToName = varQual pREL_ENUM_Name SLIT("enumFromThenTo") enumFromThenToClassOpKey
 
+-- Overloaded via Class Enum
+enumFromToPName	   = varQual pREL_PARR_Name SLIT("enumFromToP") enumFromToPIdKey
+enumFromThenToPName= varQual pREL_PARR_Name SLIT("enumFromThenToP") enumFromThenToPIdKey
+
 -- Class Bounded
 boundedClassName  = clsQual pREL_ENUM_Name SLIT("Bounded") boundedClassKey
 
@@ -462,6 +508,23 @@ boundedClassName  = clsQual pREL_ENUM_Name SLIT("Bounded") boundedClassKey
 concatName	  = varQual pREL_LIST_Name SLIT("concat") concatIdKey
 filterName	  = varQual pREL_LIST_Name SLIT("filter") filterIdKey
 zipName	   	  = varQual pREL_LIST_Name SLIT("zip") zipIdKey
+
+-- parallel array types and functions
+parrTyConName	  = tcQual  pREL_PARR_Name SLIT("[::]")       parrTyConKey
+parrDataConName   = dataQual pREL_PARR_Name SLIT("PArr")      parrDataConKey
+nullPName	  = varQual pREL_PARR_Name SLIT("nullP")      nullPIdKey
+lengthPName	  = varQual pREL_PARR_Name SLIT("lengthP")    lengthPIdKey
+replicatePName	  = varQual pREL_PARR_Name SLIT("replicateP") replicatePIdKey
+mapPName	  = varQual pREL_PARR_Name SLIT("mapP")       mapPIdKey
+filterPName	  = varQual pREL_PARR_Name SLIT("filterP")    filterPIdKey
+zipPName	  = varQual pREL_PARR_Name SLIT("zipP")       zipPIdKey
+crossPName	  = varQual pREL_PARR_Name SLIT("crossP")     crossPIdKey
+indexPName	  = varQual pREL_PARR_Name SLIT("!:")	      indexPIdKey
+toPName	          = varQual pREL_PARR_Name SLIT("toP")	      toPIdKey
+bpermutePName     = varQual pREL_PARR_Name SLIT("bpermuteP")  bpermutePIdKey
+bpermuteDftPName  = varQual pREL_PARR_Name SLIT("bpermuteDftP") 
+							      bpermuteDftPIdKey
+indexOfPName      = varQual pREL_PARR_Name SLIT("indexOfP")   indexOfPIdKey
 
 -- IOBase things
 ioTyConName	  = tcQual   pREL_IO_BASE_Name SLIT("IO") ioTyConKey
@@ -500,7 +563,7 @@ funPtrDataConName = dataQual pREL_PTR_Name SLIT("FunPtr") funPtrDataConKey
 byteArrayTyConName	  = tcQual pREL_BYTEARR_Name  SLIT("ByteArray") byteArrayTyConKey
 mutableByteArrayTyConName = tcQual pREL_BYTEARR_Name  SLIT("MutableByteArray") mutableByteArrayTyConKey
 
--- Forign objects and weak pointers
+-- Foreign objects and weak pointers
 foreignObjTyConName   = tcQual   fOREIGNOBJ_Name SLIT("ForeignObj") foreignObjTyConKey
 foreignObjDataConName = dataQual fOREIGNOBJ_Name SLIT("ForeignObj") foreignObjDataConKey
 foreignPtrTyConName   = tcQual   pREL_FOREIGN_Name SLIT("ForeignPtr") foreignPtrTyConKey
@@ -516,7 +579,7 @@ getTagName	   = varQual pREL_GHC_Name SLIT("getTag#") getTagIdKey
 runSTRepName	   = varQual pREL_ST_Name  SLIT("runSTRep") runSTRepIdKey
 
 -- The "split" Id for splittable implicit parameters
-splitIdName = varQual pREL_SPLIT_Name SLIT("split") splitIdKey
+splitName          = varQual pREL_SPLIT_Name SLIT("split") splitIdKey
 \end{code}
 
 %************************************************************************
@@ -588,6 +651,7 @@ populate the occurrence list above.
 funTyCon_RDR  		= nameRdrName funTyConName
 nilCon_RDR    		= nameRdrName nilDataConName
 listTyCon_RDR 		= nameRdrName listTyConName
+parrTyCon_RDR 		= nameRdrName parrTyConName
 ioTyCon_RDR		= nameRdrName ioTyConName
 intTyCon_RDR 		= nameRdrName intTyConName
 eq_RDR 			= nameRdrName eqName
@@ -767,6 +831,9 @@ crossTyConKey		      		= mkPreludeTyConUnique 79
 plusTyConKey		      		= mkPreludeTyConUnique 80
 genUnitTyConKey				= mkPreludeTyConUnique 81
 
+-- Parallel array type constructor
+parrTyConKey				= mkPreludeTyConUnique 82
+
 unitTyConKey = mkTupleTyConUnique Boxed 0
 \end{code}
 
@@ -803,6 +870,9 @@ crossDataConKey		      		= mkPreludeDataConUnique 20
 inlDataConKey		      		= mkPreludeDataConUnique 21
 inrDataConKey		      		= mkPreludeDataConUnique 22
 genUnitDataConKey			= mkPreludeDataConUnique 23
+
+-- Data constructor for parallel arrays
+parrDataConKey				= mkPreludeDataConUnique 24
 \end{code}
 
 %************************************************************************
@@ -868,6 +938,35 @@ runSTRepIdKey		      = mkPreludeMiscIdUnique 54
 
 dollarMainKey		      = mkPreludeMiscIdUnique 55
 runMainKey		      = mkPreludeMiscIdUnique 56
+
+andIdKey		      = mkPreludeMiscIdUnique 57
+orIdKey			      = mkPreludeMiscIdUnique 58
+eqCharIdKey		      = mkPreludeMiscIdUnique 59
+eqIntIdKey		      = mkPreludeMiscIdUnique 60
+eqFloatIdKey		      = mkPreludeMiscIdUnique 61
+eqDoubleIdKey		      = mkPreludeMiscIdUnique 62
+neqCharIdKey		      = mkPreludeMiscIdUnique 63
+neqIntIdKey		      = mkPreludeMiscIdUnique 64
+neqFloatIdKey		      = mkPreludeMiscIdUnique 65
+neqDoubleIdKey		      = mkPreludeMiscIdUnique 66
+
+-- NB: Currently a gap of four slots
+
+-- Parallel array functions
+nullPIdKey	              = mkPreludeMiscIdUnique 70
+lengthPIdKey		      = mkPreludeMiscIdUnique 71
+replicatePIdKey		      = mkPreludeMiscIdUnique 72
+mapPIdKey		      = mkPreludeMiscIdUnique 73
+filterPIdKey		      = mkPreludeMiscIdUnique 74
+zipPIdKey		      = mkPreludeMiscIdUnique 75
+crossPIdKey		      = mkPreludeMiscIdUnique 76
+indexPIdKey		      = mkPreludeMiscIdUnique 77
+toPIdKey		      = mkPreludeMiscIdUnique 78
+enumFromToPIdKey              = mkPreludeMiscIdUnique 79
+enumFromThenToPIdKey          = mkPreludeMiscIdUnique 80
+bpermutePIdKey		      = mkPreludeMiscIdUnique 81
+bpermuteDftPIdKey	      = mkPreludeMiscIdUnique 82
+indexOfPIdKey		      = mkPreludeMiscIdUnique 83
 \end{code}
 
 Certain class operations from Prelude classes.  They get their own

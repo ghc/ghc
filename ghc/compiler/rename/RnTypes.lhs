@@ -115,6 +115,10 @@ rnHsType doc (HsListTy ty)
   = rnHsType doc ty				`thenRn` \ ty' ->
     returnRn (HsListTy ty')
 
+rnHsType doc (HsPArrTy ty)
+  = rnHsType doc ty				`thenRn` \ ty' ->
+    returnRn (HsPArrTy ty')
+
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
 rnHsType doc (HsTupleTy (HsTupCon _ boxity arity) tys)

@@ -49,7 +49,7 @@ import TyCon		( TyCon, isSynTyCon, tyConKind )
 import Class		( classTyCon )
 import Name		( Name )
 import NameSet
-import TysWiredIn	( mkListTy, mkTupleTy, genUnitTyCon )
+import TysWiredIn	( mkListTy, mkPArrTy, mkTupleTy, genUnitTyCon )
 import BasicTypes	( Boxity(..) )
 import SrcLoc		( SrcLoc )
 import Util		( lengthIs )
@@ -267,6 +267,10 @@ kcHsType (HsListTy ty)
   = kcLiftedType ty		`thenTc` \ tau_ty ->
     returnTc liftedTypeKind
 
+kcHsType (HsPArrTy ty)
+  = kcLiftedType ty		`thenTc` \ tau_ty ->
+    returnTc liftedTypeKind
+
 kcHsType (HsTupleTy (HsTupCon _ boxity _) tys)
   = mapTc kcTypeType tys	`thenTc_`
     returnTc (case boxity of
@@ -399,6 +403,10 @@ tc_type ty@(HsTyVar name)
 tc_type (HsListTy ty)
   = tc_type ty	`thenTc` \ tau_ty ->
     returnTc (mkListTy tau_ty)
+
+tc_type (HsPArrTy ty)
+  = tc_type ty	`thenTc` \ tau_ty ->
+    returnTc (mkPArrTy tau_ty)
 
 tc_type (HsTupleTy (HsTupCon _ boxity arity) tys)
   = ASSERT( tys `lengthIs` arity )

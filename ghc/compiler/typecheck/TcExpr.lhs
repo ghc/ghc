@@ -16,8 +16,8 @@ import TcHsSyn		( TcExpr, TcRecordBinds, simpleHsLitTy  )
 
 import TcMonad
 import TcUnify		( tcSub, tcGen, (<$>),
-			  unifyTauTy, unifyFunTy, unifyListTy, unifyTupleTy
-			)
+			  unifyTauTy, unifyFunTy, unifyListTy, unifyPArrTy,
+			  unifyTupleTy )
 import BasicTypes	( RecFlag(..),  isMarkedStrict )
 import Inst		( InstOrigin(..), 
 			  LIE, mkLIE, emptyLIE, unitLIE, plusLIE, plusLIEs,
@@ -52,11 +52,12 @@ import Name		( Name )
 import TyCon		( TyCon, tyConTyVars, isAlgTyCon, tyConDataCons )
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
 import VarSet		( elemVarSet )
-import TysWiredIn	( boolTy, mkListTy, listTyCon )
+import TysWiredIn	( boolTy, mkListTy, mkPArrTy, listTyCon, parrTyCon )
 import PrelNames	( cCallableClassName, 
 			  cReturnableClassName, 
 			  enumFromName, enumFromThenName, 
 			  enumFromToName, enumFromThenToName,
+			  enumFromToPName, enumFromThenToPName,
 			  thenMName, failMName, returnMName, ioTyConName
 			)
 import Outputable
@@ -323,6 +324,15 @@ tcMonoExpr in_expr@(ExplicitList _ exprs) res_ty	-- Non-empty list
       = tcAddErrCtxt (listCtxt expr) $
 	tcMonoExpr expr elt_ty
 
+tcMonoExpr in_expr@(ExplicitPArr _ exprs) res_ty	-- maybe empty
+  = unifyPArrTy res_ty                        `thenTc` \ elt_ty ->  
+    mapAndUnzipTc (tc_elt elt_ty) exprs	      `thenTc` \ (exprs', lies) ->
+    returnTc (ExplicitPArr elt_ty exprs', plusLIEs lies)
+  where
+    tc_elt elt_ty expr
+      = tcAddErrCtxt (parrCtxt expr) $
+	tcMonoExpr expr elt_ty
+
 tcMonoExpr (ExplicitTuple exprs boxity) res_ty
   = unifyTupleTy boxity (length exprs) res_ty	`thenTc` \ arg_tys ->
     mapAndUnzipTc (\ (expr, arg_ty) -> tcMonoExpr expr arg_ty)
@@ -541,6 +551,36 @@ tcMonoExpr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
     returnTc (ArithSeqOut (HsVar (instToId eft))
 			  (FromThenTo expr1' expr2' expr3'),
 	      lie1 `plusLIE` lie2 `plusLIE` lie3 `plusLIE` unitLIE eft)
+
+tcMonoExpr in_expr@(PArrSeqIn seq@(FromTo expr1 expr2)) res_ty
+  = tcAddErrCtxt (parrSeqCtxt in_expr) $
+    unifyPArrTy  res_ty         			`thenTc`    \ elt_ty ->  
+    tcMonoExpr expr1 elt_ty				`thenTc`    \ (expr1',lie1) ->
+    tcMonoExpr expr2 elt_ty				`thenTc`    \ (expr2',lie2) ->
+    tcLookupGlobalId enumFromToPName			`thenNF_Tc` \ sel_id ->
+    newMethod (PArrSeqOrigin seq) sel_id [elt_ty]	`thenNF_Tc` \ enum_from_to ->
+
+    returnTc (PArrSeqOut (HsVar (instToId enum_from_to))
+			 (FromTo expr1' expr2'),
+	      lie1 `plusLIE` lie2 `plusLIE` unitLIE enum_from_to)
+
+tcMonoExpr in_expr@(PArrSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
+  = tcAddErrCtxt  (parrSeqCtxt in_expr) $
+    unifyPArrTy  res_ty         			`thenTc`    \ elt_ty ->  
+    tcMonoExpr expr1 elt_ty				`thenTc`    \ (expr1',lie1) ->
+    tcMonoExpr expr2 elt_ty				`thenTc`    \ (expr2',lie2) ->
+    tcMonoExpr expr3 elt_ty				`thenTc`    \ (expr3',lie3) ->
+    tcLookupGlobalId enumFromThenToPName		`thenNF_Tc` \ sel_id ->
+    newMethod (PArrSeqOrigin seq) sel_id [elt_ty]	`thenNF_Tc` \ eft ->
+
+    returnTc (PArrSeqOut (HsVar (instToId eft))
+			 (FromThenTo expr1' expr2' expr3'),
+	      lie1 `plusLIE` lie2 `plusLIE` lie3 `plusLIE` unitLIE eft)
+
+tcMonoExpr (PArrSeqIn _) _ 
+  = panic "TcExpr.tcMonoExpr: Infinite parallel array!"
+    -- the parser shouldn't have generated it and the renamer shouldn't have
+    -- let it through
 \end{code}
 
 %************************************************************************
@@ -688,6 +728,27 @@ tcExpr_id expr         = newTyVarTy openTypeKind	`thenNF_Tc` \ id_ty ->
 %************************************************************************
 
 \begin{code}
+-- I don't like this lumping together of do expression and list/array
+-- comprehensions; creating the monad instances is entirely pointless in the
+-- latter case; I'll leave the list case as it is for the moment, but handle
+-- arrays extra (would be better to handle arrays and lists together, though)
+-- -=chak
+--
+tcDoStmts PArrComp stmts src_loc res_ty
+  =
+    ASSERT( not (null stmts) )
+    tcAddSrcLoc src_loc	$
+
+    unifyPArrTy res_ty			      `thenTc` \elt_ty              ->
+    let tc_ty = mkTyConTy parrTyCon
+	m_ty  = (mkPArrTy, elt_ty)
+    in
+    tcStmts (DoCtxt PArrComp) m_ty stmts      `thenTc` \(stmts', stmts_lie) ->
+    returnTc (HsDoOut PArrComp stmts'
+		      undefined undefined undefined  -- don't touch!
+		      res_ty src_loc,
+	      stmts_lie)
+
 tcDoStmts do_or_lc stmts src_loc res_ty
   =	-- get the Monad and MonadZero classes
 	-- create type consisting of a fresh monad tyvar
@@ -697,9 +758,13 @@ tcDoStmts do_or_lc stmts src_loc res_ty
 	-- If it's a comprehension we're dealing with, 
 	-- force it to be a list comprehension.
 	-- (as of Haskell 98, monad comprehensions are no more.)
+	-- Similarily, array comprehensions must involve parallel arrays types
+	--   -=chak
     (case do_or_lc of
        ListComp -> unifyListTy res_ty			`thenTc` \ elt_ty ->
 		   returnNF_Tc (mkTyConTy listTyCon, (mkListTy, elt_ty))
+
+       PArrComp -> panic "TcExpr.tcDoStmts: How did we get here?!?"
 
        _	-> newTyVarTy (mkArrowKind liftedTypeKind liftedTypeKind)	`thenNF_Tc` \ m_ty ->
 		   newTyVarTy liftedTypeKind 					`thenNF_Tc` \ elt_ty ->
@@ -874,6 +939,9 @@ Boring and alphabetical:
 arithSeqCtxt expr
   = hang (ptext SLIT("In an arithmetic sequence:")) 4 (ppr expr)
 
+parrSeqCtxt expr
+  = hang (ptext SLIT("In a parallel array sequence:")) 4 (ppr expr)
+
 caseCtxt expr
   = hang (ptext SLIT("In the case expression:")) 4 (ppr expr)
 
@@ -886,6 +954,9 @@ exprSigCtxt expr
 
 listCtxt expr
   = hang (ptext SLIT("In the list element:")) 4 (ppr expr)
+
+parrCtxt expr
+  = hang (ptext SLIT("In the parallel array element:")) 4 (ppr expr)
 
 predCtxt expr
   = hang (ptext SLIT("In the predicate expression:")) 4 (ppr expr)

@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.85 2002/01/25 10:28:14 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.86 2002/02/11 08:20:41 chak Exp $
 --
 -- Driver flags
 --
@@ -198,6 +198,7 @@ static_flags =
   ,  ( "gransim"	, NoArg (addNoDups v_Ways	WayGran) )
   ,  ( "smp"		, NoArg (addNoDups v_Ways	WaySMP) )
   ,  ( "debug"		, NoArg (addNoDups v_Ways	WayDebug) )
+  ,  ( "ndp"		, NoArg (addNoDups v_Ways	WayNDP) )
  	-- ToDo: user ways
 
 	------ Debugging ----------------------------------------------------
@@ -393,6 +394,7 @@ dynamic_flags = [
   ,  ( "ddump-hi-diffs",         NoArg (setDynFlag Opt_D_dump_hi_diffs) )
   ,  ( "ddump-hi",               NoArg (setDynFlag Opt_D_dump_hi) )
   ,  ( "ddump-minimal-imports",  NoArg (setDynFlag Opt_D_dump_minimal_imports) )
+  ,  ( "ddump-vect",         	 NoArg (setDynFlag Opt_D_dump_vect) )
   ,  ( "dcore-lint",       	 NoArg (setDynFlag Opt_DoCoreLinting) )
   ,  ( "dstg-lint",        	 NoArg (setDynFlag Opt_DoStgLinting) )
   ,  ( "dusagesp-lint",        	 NoArg (setDynFlag Opt_DoUSPLinting) )
@@ -444,6 +446,7 @@ fFlags = [
   ( "warn-unused-matches",       	Opt_WarnUnusedMatches ),
   ( "warn-deprecations",         	Opt_WarnDeprecations ),
   ( "glasgow-exts", 		 	Opt_GlasgowExts ),
+  ( "parr",				Opt_PArr ),
   ( "allow-overlapping-instances", 	Opt_AllowOverlappingInstances ),
   ( "allow-undecidable-instances", 	Opt_AllowUndecidableInstances ),
   ( "allow-incoherent-instances", 	Opt_AllowIncoherentInstances ),

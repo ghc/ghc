@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.83 2002/02/04 03:40:32 chak Exp $
+$Id: Parser.y,v 1.84 2002/02/11 08:20:44 chak Exp $
 
 Haskell grammar.
 
@@ -18,9 +18,9 @@ import RdrHsSyn
 import Lex
 import ParseUtil
 import RdrName
-import PrelNames	( mAIN_Name, unitTyCon_RDR, funTyCon_RDR, listTyCon_RDR,
-			  tupleTyCon_RDR, unitCon_RDR, nilCon_RDR, tupleCon_RDR
-			)
+import PrelNames	( mAIN_Name, unitTyCon_RDR, funTyCon_RDR, 
+			  listTyCon_RDR, parrTyCon_RDR, tupleTyCon_RDR, 
+			  unitCon_RDR, nilCon_RDR, tupleCon_RDR )
 import ForeignCall	( Safety(..), CExportSpec(..), CCallSpec(..), 
 			  CCallConv(..), CCallTarget(..), defaultCCallConv,
 			  DNCallSpec(..) )
@@ -175,6 +175,8 @@ Conflicts: 21 shift/reduce, -=chak[4Feb2]
  vccurly	{ ITvccurly } -- virtual close curly (from layout)
  '['		{ ITobrack }
  ']'		{ ITcbrack }
+ '[:'		{ ITopabrack }
+ ':]'		{ ITcpabrack }
  '('		{ IToparen }
  ')'		{ ITcparen }
  '(#'		{ IToubxparen }
@@ -662,6 +664,7 @@ atype :: { RdrNameHsType }
 	| '(' type ',' types ')'	{ HsTupleTy (mkHsTupCon tcName Boxed  ($2:$4)) ($2 : reverse $4) }
 	| '(#' types '#)'		{ HsTupleTy (mkHsTupCon tcName Unboxed     $2) (reverse $2)	 }
 	| '[' type ']'			{ HsListTy $2 }
+	| '[:' type ':]'		{ HsPArrTy $2 }
 	| '(' ctype ')'		        { $2 }
 -- Generics
         | INTEGER                       { HsNumTy $1 }
@@ -883,6 +886,7 @@ aexp1	:: { RdrNameHsExpr }
 	| '(' exp ',' texps ')'		{ ExplicitTuple ($2 : reverse $4) Boxed}
 	| '(#' texps '#)'		{ ExplicitTuple (reverse $2)      Unboxed }
 	| '[' list ']'                  { $2 }
+	| '[:' parr ':]'                { $2 }
 	| '(' infixexp qop ')'		{ (SectionL $2 (HsVar $3))  }
 	| '(' qopm infixexp ')'		{ (SectionR $2 $3) }
 	| qvar '@' aexp			{ EAsPat $1 $3 }
@@ -930,6 +934,35 @@ pquals :: { [[RdrNameStmt]] }
 quals :: { [RdrNameStmt] }
 	: quals ',' stmt		{ $3 : $1 }
 	| stmt				{ [$1] }
+
+-----------------------------------------------------------------------------
+-- Parallel array expressions
+
+-- The rules below are little bit contorted; see the list case for details.
+-- Note that, in contrast to lists, we only have finite arithmetic sequences.
+-- Moreover, we allow explicit arrays with no element (represented by the nil
+-- constructor in the list case).
+
+parr :: { RdrNameHsExpr }
+	: 				{ ExplicitPArr placeHolderType [] }
+	| exp				{ ExplicitPArr placeHolderType [$1] }
+	| lexps 			{ ExplicitPArr placeHolderType 
+						       (reverse $1) }
+	| exp '..' exp	 		{ PArrSeqIn (FromTo $1 $3) }
+	| exp ',' exp '..' exp		{ PArrSeqIn (FromThenTo $1 $3 $5) }
+	| exp srcloc pquals		{% let {
+					     body [qs] = qs;
+					     body  qss = [ParStmt 
+							   (map reverse qss)]}
+					   in
+					   returnP $ 
+					     HsDo PArrComp 
+						  (reverse (ResultStmt $1 $2 
+							    : body $3))
+						  $2
+					}
+
+-- We are reusing `lexps' and `pquals' from the list case.
 
 -----------------------------------------------------------------------------
 -- Case alternatives
@@ -1047,6 +1080,7 @@ gtycon 	:: { RdrName }
 	| '(' ')'			{ unitTyCon_RDR }
 	| '(' '->' ')'			{ funTyCon_RDR }
 	| '[' ']'			{ listTyCon_RDR }
+	| '[:' ':]'			{ parrTyCon_RDR }
 	| '(' commas ')'		{ tupleTyCon_RDR $2 }
 
 gcon 	:: { RdrName }
@@ -1054,6 +1088,7 @@ gcon 	:: { RdrName }
 	| '[' ']'		{ nilCon_RDR }
 	| '(' commas ')'	{ tupleCon_RDR $2 }
  	| qcon			{ $1 }
+-- the case of '[:' ':]' is part of the production `parr'
 
 var 	:: { RdrName }
 	: varid			{ $1 }

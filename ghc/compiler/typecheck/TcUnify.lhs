@@ -11,7 +11,7 @@ module TcUnify (
 
 	-- Various unifications
   unifyTauTy, unifyTauTyList, unifyTauTyLists, 
-  unifyFunTy, unifyListTy, unifyTupleTy,
+  unifyFunTy, unifyListTy, unifyPArrTy, unifyTupleTy,
   unifyKind, unifyKinds, unifyOpenTypeKind,
 
 	-- Coercions
@@ -51,7 +51,7 @@ import TcMType		( getTcTyVar, putTcTyVar, tcInstType,
 			  newTyVarTy, newTyVarTys, newBoxityVar, newHoleTyVarTy,
 			  zonkTcType, zonkTcTyVars, zonkTcTyVar )
 import TcSimplify	( tcSimplifyCheck )
-import TysWiredIn	( listTyCon, mkListTy, mkTupleTy )
+import TysWiredIn	( listTyCon, parrTyCon, mkListTy, mkPArrTy, mkTupleTy )
 import TcEnv		( TcTyThing(..), tcExtendGlobalTyVars, tcGetGlobalTyVars, tcLEnvElts )
 import TyCon		( tyConArity, isTupleTyCon, tupleTyConBoxity )
 import PprType		( pprType )
@@ -733,6 +733,26 @@ unifyListTy ty
 unify_list_ty_help ty	-- Revert to ordinary unification
   = newTyVarTy liftedTypeKind		`thenNF_Tc` \ elt_ty ->
     unifyTauTy ty (mkListTy elt_ty)	`thenTc_`
+    returnTc elt_ty
+
+-- variant for parallel arrays
+--
+unifyPArrTy :: TcType              -- expected list type
+	    -> TcM TcType	   -- list element type
+
+unifyPArrTy ty@(TyVarTy tyvar)
+  = getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
+    case maybe_ty of
+      Just ty' -> unifyPArrTy ty'
+      _        -> unify_parr_ty_help ty
+unifyPArrTy ty
+  = case tcSplitTyConApp_maybe ty of
+      Just (tycon, [arg_ty]) | tycon == parrTyCon -> returnTc arg_ty
+      _  					  -> unify_parr_ty_help ty
+
+unify_parr_ty_help ty	-- Revert to ordinary unification
+  = newTyVarTy liftedTypeKind		`thenNF_Tc` \ elt_ty ->
+    unifyTauTy ty (mkPArrTy elt_ty)	`thenTc_`
     returnTc elt_ty
 \end{code}
 

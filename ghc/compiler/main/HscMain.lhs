@@ -45,7 +45,7 @@ import Id		( idName )
 import IdInfo		( CafInfo(..), CgInfoEnv, CgInfo(..) )
 import StringBuffer	( hGetStringBuffer, freeStringBuffer )
 import Parser
-import Lex		( PState(..), ParseResult(..) )
+import Lex		( PState(..), ParseResult(..), ExtFlags(..), mkPState )
 import SrcLoc		( mkSrcLoc )
 import Finder		( findModule )
 import Rename		( checkOldIface, renameModule, closeIfaceDecls )
@@ -57,6 +57,7 @@ import MkIface		( mkFinalIface )
 import TcModule
 import InstEnv		( emptyInstEnv )
 import Desugar
+import Flattening       ( flatten, flattenExpr )
 import SimplCore
 import CoreUtils	( coreBindsSize )
 import CoreTidy		( tidyCorePgm )
@@ -245,6 +246,13 @@ hscRecomp ghci_mode dflags have_object
              <- _scc_ "DeSugar" 
 		deSugar dflags pcs_tc hst this_mod print_unqual tc_result
 
+ 	    -------------------
+ 	    -- FLATTENING
+ 	    -------------------
+	; flat_details
+	     <- _scc_ "Flattening"
+		flatten dflags pcs_tc hst ds_details
+
 	; pcs_middle
 	    <- _scc_ "pcs_middle"
 	        if ghci_mode == OneShot 
@@ -271,7 +279,7 @@ hscRecomp ghci_mode dflags have_object
  	    -------------------
 	; simpl_details
 	     <- _scc_     "Core2Core"
-		core2core dflags pcs_middle hst dont_discard ds_details
+		core2core dflags pcs_middle hst dont_discard flat_details
 
  	    -------------------
  	    -- TIDY
@@ -411,12 +419,11 @@ myParseModule dflags src_filename
 
       buf <- hGetStringBuffer True{-expand tabs-} src_filename
 
-      let glaexts | dopt Opt_GlasgowExts dflags = 1#
-	          | otherwise 		        = 0#
+      let exts = ExtFlags {glasgowExtsEF = dopt Opt_GlasgowExts dflags,
+			   parrEF	 = dopt Opt_PArr	dflags}
+	  loc  = mkSrcLoc (_PK_ src_filename) 1
 
-      case parseModule buf PState{ bol = 0#, atbol = 1#,
-	 		           context = [], glasgow_exts = glaexts,
-  			           loc = mkSrcLoc (_PK_ src_filename) 1 } of {
+      case parseModule buf (mkPState loc exts) of {
 
 	PFailed err -> do { hPutStrLn stderr (showSDoc err);
                             freeStringBuffer buf;
@@ -549,8 +556,11 @@ hscStmt dflags hst hit pcs0 icontext stmt just_expr
 		-- Desugar it
 	  ds_expr <- deSugarExpr dflags pcs2 hst iNTERACTIVE print_unqual tc_expr
 	
+		-- Flatten it
+	; flat_expr <- flattenExpr dflags pcs2 hst ds_expr
+
 		-- Simplify it
-	; simpl_expr <- simplifyExpr dflags pcs2 hst ds_expr
+	; simpl_expr <- simplifyExpr dflags pcs2 hst flat_expr
 
 		-- Tidy it (temporary, until coreSat does cloning)
 	; tidy_expr <- tidyCoreExpr simpl_expr
@@ -582,12 +592,11 @@ hscParseStmt dflags str
 
       buf <- stringToStringBuffer str
 
-      let glaexts | dopt Opt_GlasgowExts dflags = 1#
-       	          | otherwise  	                = 0#
+      let exts = ExtFlags {glasgowExtsEF = dopt Opt_GlasgowExts dflags,
+			   parrEF	 = dopt Opt_PArr	dflags}
+	  loc  = mkSrcLoc SLIT("<interactive>") 1
 
-      case parseStmt buf PState{ bol = 0#, atbol = 1#,
-	 		         context = [], glasgow_exts = glaexts,
-			         loc = mkSrcLoc SLIT("<interactive>") 1 } of {
+      case parseStmt buf (mkPState loc exts) of {
 
 	PFailed err -> do { hPutStrLn stderr (showSDoc err);
 --	Not yet implemented in <4.11    freeStringBuffer buf;
@@ -667,13 +676,11 @@ hscThing dflags hst hit pcs0 ic str
 myParseIdentifier dflags str
   = do buf <- stringToStringBuffer str
  
-       let glaexts | dopt Opt_GlasgowExts dflags = 1#
-		   | otherwise			 = 0#
+       let exts = ExtFlags {glasgowExtsEF = dopt Opt_GlasgowExts dflags,
+			    parrEF	  = dopt Opt_PArr	 dflags}
+	   loc  = mkSrcLoc SLIT("<interactive>") 1
 
-       case parseIdentifier buf 
-		PState{ bol = 0#, atbol = 1#,
- 		        context = [], glasgow_exts = glaexts,
-		        loc = mkSrcLoc SLIT("<interactive>") 1 } of
+       case parseIdentifier buf (mkPState loc exts) of
 
 	  PFailed err -> do { hPutStrLn stderr (showSDoc err);
            		      freeStringBuffer buf;

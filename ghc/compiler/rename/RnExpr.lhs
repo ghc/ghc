@@ -28,18 +28,21 @@ import RnTypes		( rnHsTypeFVs )
 import RnHiFiles	( lookupFixityRn )
 import CmdLineOpts	( DynFlag(..), opt_IgnoreAsserts )
 import Literal		( inIntRange, inCharRange )
-import BasicTypes	( Fixity(..), FixityDirection(..), IPName(..), defaultFixity, negateFixity )
+import BasicTypes	( Fixity(..), FixityDirection(..), IPName(..),
+			  defaultFixity, negateFixity )
 import PrelNames	( hasKey, assertIdKey, 
 			  eqClassName, foldrName, buildName, eqStringName,
 			  cCallableClassName, cReturnableClassName, 
 			  monadClassName, enumClassName, ordClassName,
-			  ratioDataConName, splitIdName, fstIdName, sndIdName,
+			  ratioDataConName, splitName, fstName, sndName,
 			  ioDataConName, plusIntegerName, timesIntegerName,
-			  assertErr_RDR
-			)
+			  assertErr_RDR,
+			  replicatePName, mapPName, filterPName,
+			  falseDataConName, trueDataConName, crossPName,
+			  zipPName, lengthPName, indexPName, toPName,
+			  enumFromToPName, enumFromThenToPName )
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
-			  floatPrimTyCon, doublePrimTyCon
-			)
+			  floatPrimTyCon, doublePrimTyCon )
 import TysWiredIn	( intTyCon )
 import Name		( NamedThing(..), mkSysLocalName, nameSrcLoc )
 import NameSet
@@ -131,6 +134,13 @@ rnPat (ParPatIn pat)
 rnPat (ListPatIn pats)
   = mapFvRn rnPat pats			`thenRn` \ (patslist, fvs) ->
     returnRn (ListPatIn patslist, fvs `addOneFV` listTyCon_name)
+
+rnPat (PArrPatIn pats)
+  = mapFvRn rnPat pats			`thenRn` \ (patslist, fvs) ->
+    returnRn (PArrPatIn patslist, 
+	      fvs `plusFV` implicit_fvs `addOneFV` parrTyCon_name)
+  where
+    implicit_fvs = mkFVs [lengthPName, indexPName]
 
 rnPat (TuplePatIn pats boxed)
   = mapFvRn rnPat pats					   `thenRn` \ (patslist, fvs) ->
@@ -278,7 +288,7 @@ rnExpr (HsIPVar v)
   = newIPName v			`thenRn` \ name ->
     let 
 	fvs = case name of
-		Linear _  -> mkFVs [splitIdName, fstIdName, sndIdName]
+		Linear _  -> mkFVs [splitName, fstName, sndName]
 		Dupable _ -> emptyFVs 
     in   
     returnRn (HsIPVar name, fvs)
@@ -381,15 +391,23 @@ rnExpr e@(HsDo do_or_lc stmts src_loc)
     }					`thenRn_`
     returnRn (HsDo do_or_lc stmts' src_loc, fvs `plusFV` implicit_fvs)
   where
-    implicit_fvs = mkFVs [foldrName, buildName, monadClassName]
+    implicit_fvs = case do_or_lc of
+      PArrComp -> mkFVs [replicatePName, mapPName, filterPName,
+			 falseDataConName, trueDataConName, crossPName,
+			 zipPName]
+      _        -> mkFVs [foldrName, buildName, monadClassName]
 	-- Monad stuff should not be necessary for a list comprehension
 	-- but the typechecker looks up the bind and return Ids anyway
 	-- Oh well.
 
-
 rnExpr (ExplicitList _ exps)
   = rnExprs exps		 	`thenRn` \ (exps', fvs) ->
     returnRn  (ExplicitList placeHolderType exps', fvs `addOneFV` listTyCon_name)
+
+rnExpr (ExplicitPArr _ exps)
+  = rnExprs exps		 	`thenRn` \ (exps', fvs) ->
+    returnRn  (ExplicitPArr placeHolderType exps', 
+	       fvs `addOneFV` toPName `addOneFV` parrTyCon_name)
 
 rnExpr (ExplicitTuple exps boxity)
   = rnExprs exps	 			`thenRn` \ (exps', fvs) ->
@@ -443,6 +461,28 @@ rnExpr (ArithSeqIn seq)
        rnExpr expr2	`thenRn` \ (expr2', fvExpr2) ->
        returnRn (FromTo expr1' expr2', fvExpr1 `plusFV` fvExpr2)
 
+    rn_seq (FromThenTo expr1 expr2 expr3)
+     = rnExpr expr1	`thenRn` \ (expr1', fvExpr1) ->
+       rnExpr expr2	`thenRn` \ (expr2', fvExpr2) ->
+       rnExpr expr3	`thenRn` \ (expr3', fvExpr3) ->
+       returnRn (FromThenTo expr1' expr2' expr3',
+		  plusFVs [fvExpr1, fvExpr2, fvExpr3])
+
+rnExpr (PArrSeqIn seq)
+  = rn_seq seq	 		       `thenRn` \ (new_seq, fvs) ->
+    returnRn (PArrSeqIn new_seq, 
+	      fvs `plusFV` mkFVs [enumFromToPName, enumFromThenToPName])
+  where
+
+    -- the parser shouldn't generate these two
+    --
+    rn_seq (From     _  ) = panic "RnExpr.rnExpr: Infinite parallel array!"
+    rn_seq (FromThen _ _) = panic "RnExpr.rnExpr: Infinite parallel array!"
+
+    rn_seq (FromTo expr1 expr2)
+     = rnExpr expr1	`thenRn` \ (expr1', fvExpr1) ->
+       rnExpr expr2	`thenRn` \ (expr2', fvExpr2) ->
+       returnRn (FromTo expr1' expr2', fvExpr1 `plusFV` fvExpr2)
     rn_seq (FromThenTo expr1 expr2 expr3)
      = rnExpr expr1	`thenRn` \ (expr1', fvExpr1) ->
        rnExpr expr2	`thenRn` \ (expr2', fvExpr2) ->

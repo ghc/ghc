@@ -52,7 +52,7 @@ import NameSet		( NameSet, mkNameSet, elemNameSet )
 import Class		( classBigSig )
 import FunDeps		( oclose, grow, improve, pprEquationDoc )
 import PrelInfo		( isNumericClass, isCreturnableClass, isCcallishClass, 
-			  splitIdName, fstIdName, sndIdName )
+			  splitName, fstName, sndName )
 
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
 import TysWiredIn	( unitTy, pairTyCon )
@@ -1192,8 +1192,8 @@ split n split_id avail wanted
 		    returnNF_Tc (andMonoBindList binds', concat rhss')
 
 	  do_one rhs = tcGetUnique 			`thenNF_Tc` \ uniq -> 
-		       tcLookupGlobalId fstIdName	`thenNF_Tc` \ fst_id -> 
-		       tcLookupGlobalId sndIdName	`thenNF_Tc` \ snd_id -> 
+		       tcLookupGlobalId fstName		`thenNF_Tc` \ fst_id ->
+		       tcLookupGlobalId sndName		`thenNF_Tc` \ snd_id ->
 		       let 
 			  x = mkUserLocal occ uniq pair_ty loc
 		       in
@@ -1416,7 +1416,7 @@ isAvailable avails wanted = lookupFM avails wanted
 addLinearAvailable :: Avails -> Avail -> Inst -> NF_TcM (Avails, [Inst])
 addLinearAvailable avails avail wanted
   | need_split avail
-  = tcLookupGlobalId splitIdName		`thenNF_Tc` \ split_id ->
+  = tcLookupGlobalId splitName			`thenNF_Tc` \ split_id ->
     newMethodAtLoc (instLoc wanted) split_id 
 		   [linearInstType wanted]	`thenNF_Tc` \ (split_inst,_) ->
     returnNF_Tc (addToFM avails wanted (Linear 2 split_inst avail), [split_inst])

@@ -44,23 +44,24 @@ import MkId		( rebuildConArgs )
 import Id		( idType, Id, mkWildId )
 import Literal		( Literal(..), inIntRange, tARGET_MAX_INT )
 import TyCon		( isNewTyCon, tyConDataCons, isRecursiveTyCon )
-import DataCon		( DataCon, dataConStrictMarks, dataConId )
-import Type		( mkFunTy, isUnLiftedType, Type )
+import DataCon		( DataCon, dataConStrictMarks, dataConId,
+			  dataConSourceArity )
+import Type		( mkFunTy, isUnLiftedType, Type, splitTyConApp )
 import TcType		( tcTyConAppTyCon, isIntTy, isFloatTy, isDoubleTy )
 import TysPrim		( intPrimTy, charPrimTy, floatPrimTy, doublePrimTy )
 import TysWiredIn	( nilDataCon, consDataCon, 
                           tupleCon,
 			  unitDataConId, unitTy,
                           charTy, charDataCon, 
-                          intDataCon, smallIntegerDataCon, 
+                          intTy, intDataCon, smallIntegerDataCon, 
 			  floatDataCon, 
                           doubleDataCon,
-			  stringTy
-			)
+			  stringTy, isPArrFakeCon )
 import BasicTypes	( Boxity(..) )
 import UniqSet		( mkUniqSet, minusUniqSet, isEmptyUniqSet, UniqSet )
 import PrelNames	( unpackCStringName, unpackCStringUtf8Name, 
-			  plusIntegerName, timesIntegerName )
+			  plusIntegerName, timesIntegerName, 
+			  lengthPName, indexPName )
 import Outputable
 import UnicodeUtil      ( stringToUtf8 )
 import Util             ( isSingleton )
@@ -265,6 +266,9 @@ mkCoAlgCaseMatchResult var match_alts
   = ASSERT( null (tail match_alts) && null (tail arg_ids) )
     mkCoLetsMatchResult [NonRec arg_id newtype_rhs] match_result
 
+  | isPArrFakeAlts match_alts	-- Sugared parallel array; use a literal case 
+  = MatchResult CanFail mk_parrCase
+
   | otherwise			-- Datatype case; use a case
   = MatchResult fail_flag mk_case
   where
@@ -309,6 +313,72 @@ mkCoAlgCaseMatchResult var match_alts
     un_mentioned_constructors
         = mkUniqSet data_cons `minusUniqSet` mkUniqSet [ con | (con, _, _) <- match_alts]
     exhaustive_case = isEmptyUniqSet un_mentioned_constructors
+
+	-- Stuff for parallel arrays
+	-- 
+	-- * the following is to desugar cases over fake constructors for
+	--   parallel arrays, which are introduced by `tidy1' in the `PArrPat'
+	--   case
+	--
+	-- Concerning `isPArrFakeAlts':
+	--
+	-- * it is *not* sufficient to just check the type of the type
+	--   constructor, as we have to be careful not to confuse the real
+	--   representation of parallel arrays with the fake constructors;
+	--   moreover, a list of alternatives must not mix fake and real
+	--   constructors (this is checked earlier on)
+	--
+	-- FIXME: We actually go through the whole list and make sure that
+	--	  either all or none of the constructors are fake parallel
+	--	  array constructors.  This is to spot equations that mix fake
+	--	  constructors with the real representation defined in
+	--	  `PrelPArr'.  It would be nicer to spot this situation
+	--	  earlier and raise a proper error message, but it can really
+	--	  only happen in `PrelPArr' anyway.
+	--
+    isPArrFakeAlts [(dcon, _, _)]      = isPArrFakeCon dcon
+    isPArrFakeAlts ((dcon, _, _):alts) = 
+      case (isPArrFakeCon dcon, isPArrFakeAlts alts) of
+        (True , True ) -> True
+        (False, False) -> False
+	_	       -> 
+	  panic "DsUtils: You may not mix `[:...:]' with `PArr' patterns"
+    --
+    mk_parrCase fail = 		   
+      dsLookupGlobalValue lengthPName			`thenDs` \lengthP  ->
+      unboxAlt						`thenDs` \alt      ->
+      returnDs (Case (len lengthP) (mkWildId intTy) [alt])
+      where
+	elemTy      = case splitTyConApp (idType var) of
+		        (_, [elemTy]) -> elemTy
+		        _	        -> panic panicMsg
+        panicMsg    = "DsUtils.mkCoAlgCaseMatchResult: not a parallel array?"
+	len lengthP = mkApps (Var lengthP) [Type elemTy, Var var]
+	--
+	unboxAlt = 
+	  newSysLocalDs intPrimTy			`thenDs` \l	   ->
+	  dsLookupGlobalValue indexPName		`thenDs` \indexP   ->
+	  mapDs (mkAlt indexP) match_alts               `thenDs` \alts     ->
+	  returnDs (DataAlt intDataCon, [l], (Case (Var l) wild (dft : alts)))
+          where
+	    wild = mkWildId intPrimTy
+	    dft  = (DEFAULT, [], fail)
+	--
+	-- each alternative matches one array length (corresponding to one
+	-- fake array constructor), so the match is on a literal; each
+	-- alternative's body is extended by a local binding for each
+	-- constructor argument, which are bound to array elements starting
+	-- with the first
+	--
+	mkAlt indexP (con, args, MatchResult _ bodyFun) = 
+	  bodyFun fail					`thenDs` \body     ->
+	  returnDs (LitAlt lit, [], mkDsLets binds body)
+	  where
+	    lit   = MachInt $ toInteger (dataConSourceArity con)
+	    binds = [NonRec arg (indexExpr i) | (i, arg) <- zip [1..] args]
+	    --
+	    indexExpr i = mkApps (Var indexP) [Type elemTy, Var var, toInt i]
+	    toInt     i = mkConApp intDataCon [Lit $ MachInt i]
 \end{code}
 
 

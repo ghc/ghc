@@ -1,4 +1,4 @@
-{-	Notes about the syntax of interface files
+{-	Notes about the syntax of interface files		  -*-haskell-*-
 	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The header
 ~~~~~~~~~~
@@ -166,6 +166,8 @@ import FastString	( tailFS )
  '|}'		{ ITccurlybar } 			-- special symbols
  '['		{ ITobrack }
  ']'		{ ITcbrack }
+ '[:'		{ ITopabrack }
+ ':]'		{ ITcpabrack }
  '('		{ IToparen }
  ')'		{ ITcparen }
  '(#'		{ IToubxparen }
@@ -388,10 +390,10 @@ maybe_idinfo  : {- empty -} 	{ \_ -> [] }
     -}
 
 pragma	:: { Maybe (ParseResult [HsIdInfo RdrName]) }
-pragma	: src_loc PRAGMA	{ Just (parseIdInfo $2 PState{ bol = 0#, atbol = 1#,
-							context = [],
-							glasgow_exts = 1#,
-							loc = $1 })
+pragma	: src_loc PRAGMA	{ let exts = ExtFlags {glasgowExtsEF = True,
+						       parrEF	     = True}
+				  in
+				  Just (parseIdInfo $2 (mkPState $1 exts))
 				}
 
 -----------------------------------------------------------------------------
@@ -401,10 +403,9 @@ pragma	: src_loc PRAGMA	{ Just (parseIdInfo $2 PState{ bol = 0#, atbol = 1#,
 rules_and_deprecs_part :: { () -> ([RdrNameRuleDecl], IfaceDeprecs) }
 rules_and_deprecs_part
   : {- empty -}		{ \_ -> ([], Nothing) }
-  | src_loc PRAGMA	{ \_ -> case parseRules $2 PState{ bol = 0#, atbol = 1#,
-							   context = [],
-							   glasgow_exts = 1#,
-							   loc = $1 } of
+  | src_loc PRAGMA	{ \_ -> let exts = ExtFlags {glasgowExtsEF = True,
+						     parrEF	   = True}
+				in case parseRules $2 (mkPState $1 exts) of
 					POk _ rds   -> rds
 					PFailed err -> pprPanic "Rules/Deprecations parse failed" err
 			}
@@ -557,6 +558,7 @@ atype		:  qtc_name 			  	{ HsTyVar $1 }
 		|  '(' types2 ')'	  		{ HsTupleTy (mkHsTupCon tcName Boxed   $2) $2 }
 		|  '(#' types0 '#)'			{ HsTupleTy (mkHsTupCon tcName Unboxed $2) $2 }
 		|  '[' type ']'		  		{ HsListTy  $2 }
+		|  '[:' type ':]'			{ HsPArrTy $2 }
 		|  '{' qcls_name atypes '}'		{ mkHsDictTy $2 $3 }
 		|  '{' ipvar_name '::' type '}'		{ mkHsIParamTy $2 $4 }
 		|  '(' type ')'		  		{ $2 }
@@ -586,6 +588,7 @@ tatype		:  qtc_name 			  	{ HsTyVar $1 }
 		|  '(' types2 ')'	  		{ HsTupleTy (mkHsTupCon tcName Boxed   $2) $2 }
 		|  '(#' types0 '#)'			{ HsTupleTy (mkHsTupCon tcName Unboxed $2) $2 }
 		|  '[' type ']'		  		{ HsListTy  $2 }
+		|  '[:' type ':]'			{ HsPArrTy $2 }
 		|  '{' qcls_name atypes '}'		{ mkHsDictTy $2 $3 }
 		|  '{' ipvar_name '::' type '}'		{ mkHsIParamTy $2 $4 }
 		|  '(' type ')'		  		{ $2 }

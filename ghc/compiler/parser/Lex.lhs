@@ -23,7 +23,7 @@ module Lex (
 
 	-- Monad for parser
 	Token(..), lexer, ParseResult(..), PState(..),
-	checkVersion, 
+	checkVersion, ExtFlags(..), mkPState, 
 	StringBuffer,
 
 	P, thenP, thenP_, returnP, mapP, failP, failMsgP,
@@ -55,6 +55,7 @@ import GlaExts
 import Ctype
 import Char		( chr, ord )
 import PrelRead 	( readRational__ ) -- Glasgow non-std
+import PrelBits		( Bits(..) )	   -- non-std
 \end{code}
 
 %************************************************************************
@@ -192,6 +193,8 @@ data Token
   | ITccurlybar                 -- |}, for type applications
   | ITvccurly
   | ITobrack
+  | ITopabrack			-- [:, for parallel arrays with -fparr
+  | ITcpabrack			-- :], for parallel arrays with -fparr
   | ITcbrack
   | IToparen
   | ITcparen
@@ -387,7 +390,8 @@ The lexical analyser
 
 Lexer state:
 
-	- (glaexts) lexing an interface file or -fglasgow-exts
+	- (exts)  lexing a source with extensions, eg, an interface file or 
+		  with -fglasgow-exts
 	- (bol)   pointer to beginning of line (for column calculations)
 	- (buf)   pointer to beginning of token
 	- (buf)   pointer to current char
@@ -397,7 +401,7 @@ Lexer state:
 lexer :: (Token -> P a) -> P a
 lexer cont buf s@(PState{
 		    loc = loc,
-		    glasgow_exts = glaexts,
+		    extsBitmap = exts,
 		    bol = bol,
 		    atbol = atbol,
 		    context = ctx
@@ -444,7 +448,7 @@ lexer cont buf s@(PState{
 			          (map toUpper (lexemeToString buf2)) in
 		  case lookupUFM pragmaKeywordsFM lexeme of
 			-- ignore RULES pragmas when -fglasgow-exts is off
-			Just ITrules_prag | not (flag glaexts) ->
+			Just ITrules_prag | not (glaExtsEnabled exts) ->
 			   skip_to_end (stepOnBy# buf 2#) s'
 			Just ITline_prag -> 
 			   line_prag skip_to_end buf2 s'
@@ -481,7 +485,7 @@ lexer cont buf s@(PState{
 		       atbol = atbol}
 
 	      	 is_a_token | atbol /=# 0# = lexBOL cont buf s'
-	      		    | otherwise    = lexToken cont glaexts buf s'
+	      		    | otherwise    = lexToken cont exts buf s'
 
 -- {-# LINE .. #-} pragmas.  yeuch.
 line_prag cont buf s@PState{loc=loc} =
@@ -541,7 +545,7 @@ skipNestedComment' orig_loc cont buf = loop buf
 lexBOL :: (Token -> P a) -> P a
 lexBOL cont buf s@(PState{
 		    loc = loc,
-		    glasgow_exts = glaexts,
+		    extsBitmap = exts,
 		    bol = bol,
 		    atbol = atbol,
 		    context = ctx
@@ -553,7 +557,7 @@ lexBOL cont buf s@(PState{
 	        --trace ("col = " ++ show (I# col) ++ ", layout: inserting ';'") $
 		cont ITsemi buf s{atbol = 0#}
 	else
-		lexToken cont glaexts buf s{atbol = 0#}
+		lexToken cont exts buf s{atbol = 0#}
   where
 	col = currentIndex# buf -# bol
 
@@ -572,18 +576,21 @@ lexBOL cont buf s@(PState{
 
 
 lexToken :: (Token -> P a) -> Int# -> P a
-lexToken cont glaexts buf =
+lexToken cont exts buf =
 -- trace "lexToken" $
   case currentChar# buf of
 
     -- special symbols ----------------------------------------------------
-    '('# | flag glaexts && lookAhead# buf 1# `eqChar#` '#'# 
+    '('# | glaExtsEnabled exts && lookAhead# buf 1# `eqChar#` '#'# 
 		-> cont IToubxparen (setCurrentPos# buf 2#)
 	 | otherwise
 		-> cont IToparen (incLexeme buf)
 
     ')'# -> cont ITcparen    (incLexeme buf)
-    '['# -> cont ITobrack    (incLexeme buf)
+    '['# | parrEnabled exts && lookAhead# buf 1# `eqChar#` ':'# ->
+	    cont ITopabrack  (setCurrentPos# buf 2#)
+	 | otherwise -> 
+	    cont ITobrack    (incLexeme buf)
     ']'# -> cont ITcbrack    (incLexeme buf)
     ','# -> cont ITcomma     (incLexeme buf)
     ';'# -> cont ITsemi      (incLexeme buf)
@@ -592,26 +599,31 @@ lexToken cont glaexts buf =
 		(_:ctx') -> cont ITccurly (incLexeme buf) s{context=ctx'}
 		_  	 -> lexError "too many '}'s" buf s
     '|'# -> case lookAhead# buf 1# of
-	         '}'#  | flag glaexts -> cont ITccurlybar 
-                                              (setCurrentPos# buf 2#)
-                 _                    -> lex_sym cont (incLexeme buf)
+	         '}'#  | glaExtsEnabled exts -> cont ITccurlybar 
+                                                     (setCurrentPos# buf 2#)
+                 _                           -> lex_sym cont (incLexeme buf)
+    ':'# -> case lookAhead# buf 1# of
+	         ']'#  | parrEnabled exts    -> cont ITcpabrack
+                                                     (setCurrentPos# buf 2#)
+                 _                           -> lex_sym cont (incLexeme buf)
 
                 
     '#'# -> case lookAhead# buf 1# of
-		')'#  | flag glaexts -> cont ITcubxparen (setCurrentPos# buf 2#)
+		')'#  | glaExtsEnabled exts 
+		     -> cont ITcubxparen (setCurrentPos# buf 2#)
 		'-'# -> case lookAhead# buf 2# of
 			   '}'# -> cont ITclose_prag (setCurrentPos# buf 3#)
 			   _    -> lex_sym cont (incLexeme buf)
 		_    -> lex_sym cont (incLexeme buf)
 
-    '`'# | flag glaexts && lookAhead# buf 1# `eqChar#` '`'#
+    '`'# | glaExtsEnabled exts && lookAhead# buf 1# `eqChar#` '`'#
 		-> lex_cstring cont (setCurrentPos# buf 2#)
 	 | otherwise
 	   	-> cont ITbackquote (incLexeme buf)
 
-    '{'# ->	-- look for "{-##" special iface pragma
+    '{'# ->	-- look for "{-##" special iface pragma   -- for Emacs: -}
             case lookAhead# buf 1# of
-           '|'# | flag glaexts 
+           '|'# | glaExtsEnabled exts 
                 -> cont ITocurlybar (setCurrentPos# buf 2#)
 	   '-'# -> case lookAhead# buf 2# of
 		    '#'# -> case lookAhead# buf 3# of
@@ -626,11 +638,11 @@ lexToken cont glaexts buf =
 	   _ -> (layoutOff `thenP_` cont ITocurly)  (incLexeme buf) 
 
     -- strings/characters -------------------------------------------------
-    '\"'#{-"-} -> lex_string cont glaexts [] (incLexeme buf)
-    '\''#      -> lex_char (char_end cont) glaexts (incLexeme buf)
+    '\"'#{-"-} -> lex_string cont exts [] (incLexeme buf)
+    '\''#      -> lex_char (char_end cont) exts (incLexeme buf)
 
     -- strictness and cpr pragmas and __scc treated specially.
-    '_'# | flag glaexts ->
+    '_'# | glaExtsEnabled exts ->
 	 case lookAhead# buf 1# of
 	   '_'# -> case lookAhead# buf 2# of
 	   	    'S'# -> 
@@ -642,15 +654,15 @@ lexToken cont glaexts buf =
 	   	    's'# -> 
 			case prefixMatch (stepOnBy# buf 3#) "cc" of
 		               Just buf' -> lex_scc cont (stepOverLexeme buf')
-		     	       Nothing   -> lex_id cont glaexts buf
-		    _ -> lex_id cont glaexts buf
-	   _    -> lex_id cont glaexts buf
+		     	       Nothing   -> lex_id cont exts buf
+		    _ -> lex_id cont exts buf
+	   _    -> lex_id cont exts buf
 
 	-- Hexadecimal and octal constants
     '0'# | (ch `eqChar#` 'x'# || ch `eqChar#` 'X'#) && is_hexdigit ch2
-		-> readNum (after_lexnum cont glaexts) buf' is_hexdigit 16 hex
+		-> readNum (after_lexnum cont exts) buf' is_hexdigit 16 hex
 	 | (ch `eqChar#` 'o'# || ch `eqChar#` 'O'#) && is_octdigit ch2
-		-> readNum (after_lexnum cont glaexts) buf' is_octdigit  8 oct_or_dec
+		-> readNum (after_lexnum cont exts) buf' is_octdigit  8 oct_or_dec
 	where ch   = lookAhead# buf 1#
 	      ch2  = lookAhead# buf 2#
 	      buf' = setCurrentPos# buf 2#
@@ -662,14 +674,14 @@ lexToken cont glaexts buf =
 	       trace "lexIface: misplaced NUL?" $ 
 	       cont (ITunknown "\NUL") (stepOn buf)
 
-    '?'# | flag glaexts && is_lower (lookAhead# buf 1#) ->
+    '?'# | glaExtsEnabled exts && is_lower (lookAhead# buf 1#) ->
 	    lex_ip ITdupipvarid cont (incLexeme buf)
-    '%'# | flag glaexts && is_lower (lookAhead# buf 1#) ->
+    '%'# | glaExtsEnabled exts && is_lower (lookAhead# buf 1#) ->
 	    lex_ip ITsplitipvarid cont (incLexeme buf)
-    c | is_digit  c -> lex_num cont glaexts 0 buf
+    c | is_digit  c -> lex_num cont exts 0 buf
       | is_symbol c -> lex_sym cont buf
-      | is_upper  c -> lex_con cont glaexts buf
-      | is_ident  c -> lex_id  cont glaexts buf
+      | is_upper  c -> lex_con cont exts buf
+      | is_ident  c -> lex_id  cont exts buf
       | otherwise   -> lexError "illegal character" buf
 
 -- Int# is unlifted, and therefore faster than Bool for flags.
@@ -693,51 +705,51 @@ lex_prag cont buf
 -------------------------------------------------------------------------------
 -- Strings & Chars
 
-lex_string cont glaexts s buf
+lex_string cont exts s buf
   = case currentChar# buf of
 	'"'#{-"-} -> 
 	   let buf' = incLexeme buf
                s' = mkFastStringNarrow (map chr (reverse s)) 
            in case currentChar# buf' of
-		'#'# | flag glaexts -> if all (<= 0xFF) s
+		'#'# | glaExtsEnabled exts -> if all (<= 0xFF) s
                     then cont (ITprimstring s') (incLexeme buf')
                     else lexError "primitive string literal must contain only characters <= \'\\xFF\'" buf'
 		_                   -> cont (ITstring s') buf'
 
 	-- ignore \& in a string, deal with string gaps
 	'\\'# | next_ch `eqChar#` '&'# 
-		-> lex_string cont glaexts s buf'
+		-> lex_string cont exts s buf'
 	      | is_space next_ch
-		-> lex_stringgap cont glaexts s (incLexeme buf)
+		-> lex_stringgap cont exts s (incLexeme buf)
 
 	    where next_ch = lookAhead# buf 1#
 		  buf' = setCurrentPos# buf 2#
 
-	_ -> lex_char (lex_next_string cont s) glaexts buf
+	_ -> lex_char (lex_next_string cont s) exts buf
 
-lex_stringgap cont glaexts s buf
+lex_stringgap cont exts s buf
   = let buf' = incLexeme buf in
     case currentChar# buf of
-	'\n'# -> \st@PState{loc = loc} -> lex_stringgap cont glaexts s buf' 
+	'\n'# -> \st@PState{loc = loc} -> lex_stringgap cont exts s buf' 
 		  st{loc = incSrcLine loc}
-	'\\'# -> lex_string cont glaexts s buf'
-	c | is_space c -> lex_stringgap cont glaexts s buf'
+	'\\'# -> lex_string cont exts s buf'
+	c | is_space c -> lex_stringgap cont exts s buf'
 	other -> charError buf'
 
-lex_next_string cont s glaexts c buf = lex_string cont glaexts (c:s) buf
+lex_next_string cont s exts c buf = lex_string cont exts (c:s) buf
 
 lex_char :: (Int# -> Int -> P a) -> Int# -> P a
-lex_char cont glaexts buf
+lex_char cont exts buf
   = case currentChar# buf of
-	'\\'# -> lex_escape (cont glaexts) (incLexeme buf)
-	c | is_any c -> cont glaexts (I# (ord# c)) (incLexeme buf)
+	'\\'# -> lex_escape (cont exts) (incLexeme buf)
+	c | is_any c -> cont exts (I# (ord# c)) (incLexeme buf)
 	other -> charError buf
 
-char_end cont glaexts c buf
+char_end cont exts c buf
   = case currentChar# buf of
 	'\''# -> let buf' = incLexeme buf in
 		 case currentChar# buf' of
-			'#'# | flag glaexts 
+			'#'# | glaExtsEnabled exts 
 				-> cont (ITprimchar c) (incLexeme buf')
 			_   	-> cont (ITchar c) buf'
 	_     -> charError buf
@@ -892,7 +904,7 @@ lex_scc cont buf =
 -- Numbers
 
 lex_num :: (Token -> P a) -> Int# -> Integer -> P a
-lex_num cont glaexts acc buf =
+lex_num cont exts acc buf =
  case scanNumLit acc buf of
      (acc',buf') ->
        case currentChar# buf' of
@@ -919,18 +931,18 @@ lex_num cont glaexts acc buf =
 		    v = readRational__ (lexemeToString l)
 
 		in case currentChar# l of -- glasgow exts only
-		      '#'# | flag glaexts -> let l' = incLexeme l in
+		      '#'# | glaExtsEnabled exts -> let l' = incLexeme l in
 			      case currentChar# l' of
 				'#'# -> cont (ITprimdouble v) (incLexeme l')
 				_    -> cont (ITprimfloat  v) l'
 		      _ -> cont (ITrational v) l
 
-         _ -> after_lexnum cont glaexts acc' buf'
+         _ -> after_lexnum cont exts acc' buf'
 		
-after_lexnum cont glaexts i buf
+after_lexnum cont exts i buf
   = case currentChar# buf of
-	'#'# | flag glaexts -> cont (ITprimint i) (incLexeme buf)
-	_    -> cont (ITinteger i) buf
+	'#'# | glaExtsEnabled exts -> cont (ITprimint i) (incLexeme buf)
+	_                          -> cont (ITinteger i) buf
 
 -----------------------------------------------------------------------------
 -- C "literal literal"s  (i.e. things like ``NULL'', ``stdout'' etc.)
@@ -953,11 +965,11 @@ lex_ip ip_constr cont buf =
    buf' -> cont (ip_constr (tailFS lexeme)) buf'
 	where lexeme = lexemeToFastString buf'
 
-lex_id cont glaexts buf =
+lex_id cont exts buf =
  let buf1 = expandWhile# is_ident buf in
  seq buf1 $
 
- case (if flag glaexts 
+ case (if glaExtsEnabled exts 
 	then expandWhile# (eqChar# '#'#) buf1 -- slurp trailing hashes
 	else buf1) 				of { buf' ->
 
@@ -970,7 +982,7 @@ lex_id cont glaexts buf =
 
  let var_token = cont (ITvarid lexeme) buf' in
 
- if not (flag glaexts)
+ if not (glaExtsEnabled exts)
    then var_token
    else
 
@@ -996,11 +1008,11 @@ lex_sym cont buf =
 -- The argument buf is the StringBuffer representing the lexeme
 -- identified so far, where the next character is upper-case.
 
-lex_con cont glaexts buf =
+lex_con cont exts buf =
  -- trace ("con: "{-++unpackFS lexeme-}) $
  let empty_buf = stepOverLexeme buf in
- case expandWhile# is_ident empty_buf    of { buf1 ->
- case slurp_trailing_hashes buf1 glaexts of { con_buf ->
+ case expandWhile# is_ident empty_buf of { buf1 ->
+ case slurp_trailing_hashes buf1 exts of { con_buf ->
 
  let all_buf = mergeLexemes buf con_buf
      
@@ -1014,13 +1026,13 @@ lex_con cont glaexts buf =
  in
 
  case currentChar# all_buf of
-     '.'# -> maybe_qualified cont glaexts all_lexeme 
+     '.'# -> maybe_qualified cont exts all_lexeme 
 		(incLexeme all_buf) just_a_conid
      _    -> just_a_conid
   }}
 
 
-maybe_qualified cont glaexts mod buf just_a_conid =
+maybe_qualified cont exts mod buf just_a_conid =
  -- trace ("qid: "{-++unpackFS lexeme-}) $
  case currentChar# buf of
   '['# -> 	-- Special case for []
@@ -1031,7 +1043,7 @@ maybe_qualified cont glaexts mod buf just_a_conid =
   '('# ->  -- Special case for (,,,)
 	   -- This *is* necessary to deal with e.g. "instance C PrelBase.(,,)"
     case lookAhead# buf 1# of
-     '#'# | flag glaexts -> case lookAhead# buf 2# of
+     '#'# | glaExtsEnabled exts -> case lookAhead# buf 2# of
 		','# -> lex_ubx_tuple cont mod (setCurrentPos# buf 3#) 
 				just_a_conid
 		_    -> just_a_conid
@@ -1041,14 +1053,14 @@ maybe_qualified cont glaexts mod buf just_a_conid =
 
   '-'# -> case lookAhead# buf 1# of
             '>'# -> cont (ITqconid (mod,SLIT("(->)"))) (setCurrentPos# buf 2#)
-            _    -> lex_id3 cont glaexts mod buf just_a_conid
+            _    -> lex_id3 cont exts mod buf just_a_conid
 
-  _    -> lex_id3 cont glaexts mod buf just_a_conid
+  _    -> lex_id3 cont exts mod buf just_a_conid
 
 
-lex_id3 cont glaexts mod buf just_a_conid
+lex_id3 cont exts mod buf just_a_conid
   | is_upper (currentChar# buf) =
-     lex_con cont glaexts buf
+     lex_con cont exts buf
 
   | is_symbol (currentChar# buf) =
      let 
@@ -1075,7 +1087,7 @@ lex_id3 cont glaexts mod buf just_a_conid
     	    then just_a_conid
     	    else
 
-     case slurp_trailing_hashes buf1 glaexts of { buf' ->
+     case slurp_trailing_hashes buf1 exts of { buf' ->
 
      let
       lexeme	  = lexemeToFastString buf'
@@ -1091,9 +1103,9 @@ lex_id3 cont glaexts mod buf just_a_conid
 			   -> just_a_conid	   -- avoid M.where etc.
      }}}
 
-slurp_trailing_hashes buf glaexts
-  | flag glaexts = expandWhile# (`eqChar#` '#'#) buf
-  | otherwise    = buf
+slurp_trailing_hashes buf exts
+  | glaExtsEnabled exts = expandWhile# (`eqChar#` '#'#) buf
+  | otherwise		= buf
 
 
 mk_var_token pk_str
@@ -1204,11 +1216,11 @@ data ParseResult a
   | PFailed Message
 
 data PState = PState { 
-	loc           :: SrcLoc,
-	glasgow_exts  :: Int#,
-	bol           :: Int#,
-	atbol         :: Int#,
-	context	      :: [LayoutContext]
+	loc        :: SrcLoc,
+	extsBitmap :: Int#,	-- bitmap that determines permitted extensions
+	bol        :: Int#,
+	atbol      :: Int#,
+	context	   :: [LayoutContext]
      }
 
 type P a = StringBuffer		-- Input string
@@ -1355,6 +1367,48 @@ checkVersion mb@(Just v) buf s@(PState{loc = loc})
 checkVersion mb@Nothing  buf s@(PState{loc = loc})
  | "hi-boot" `isSuffixOf` (_UNPK_ (srcLocFile loc)) = POk s ()
  | otherwise = PFailed (ifaceVersionErr mb loc ([]::[Token]){-Todo-})
+
+
+-- for reasons of efficiency, flags indicating language extensions (eg,
+-- -fglasgow-exts or -fparr) are represented by a bitmap stored in an unboxed
+-- integer
+
+glaExtsBit, ffiBit, parrBit :: Int
+glaExtsBit = 0
+ffiBit	   = 1	-- FIXME: not used yet; still part of `glaExtsBit'
+parrBit	   = 2
+
+glaExtsEnabled, ffiEnabled, parrEnabled :: Int# -> Bool
+glaExtsEnabled flags = testBit (I# flags) glaExtsBit
+ffiEnabled     flags = testBit (I# flags) ffiBit
+parrEnabled    flags = testBit (I# flags) parrBit
+
+-- convenient record-based bitmap for the interface to the rest of the world
+--
+data ExtFlags = ExtFlags {
+		  glasgowExtsEF :: Bool,
+--		  ffiEF		:: Bool,  -- commented out to avoid warnings
+		  parrEF	:: Bool	  -- while not used yet
+		}
+
+-- create a parse state
+--
+mkPState          :: SrcLoc -> ExtFlags -> PState
+mkPState loc exts  = PState {
+		       loc        = loc,
+		       extsBitmap = case bitmap of {I# bits -> bits},
+		       bol	  = 0#,
+		       atbol      = 1#,
+		       context    = []
+		     }
+		     where
+		       bitmap =     glaExtsBit `setBitIf` glasgowExtsEF exts
+--			        .|. ffiBit     `setBitIf` ffiEF		exts
+				.|. parrBit    `setBitIf` parrEF	exts
+                       --
+		       b `setBitIf` cond | cond      = bit b
+					 | otherwise = 0
+
 
 -----------------------------------------------------------------
 

@@ -10,6 +10,7 @@ module RnEnv where		-- Export everything
 
 import {-# SOURCE #-} RnHiFiles
 
+import FlattenInfo      ( namesNeededForFlattening )
 import HsSyn
 import RdrHsSyn		( RdrNameIE, RdrNameHsType, extractHsTyRdrTyVars )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
@@ -439,6 +440,9 @@ ubiquitousNames
 	-- Add occurrences for very frequently used types.
 	--  	 (e.g. we don't want to be bothered with making funTyCon a
 	--	  free var at every function application!)
+  `plusFV`
+    namesNeededForFlattening
+        -- this will be empty unless flattening is activated
 
 checkMain ghci_mode mod_name gbl_env
 	-- LOOKUP main IF WE'RE IN MODULE Main
@@ -447,7 +451,8 @@ checkMain ghci_mode mod_name gbl_env
 	-- so that the type checker will find them
 	--
 	-- We have to return the main_name separately, because it's a
-	-- bona fide 'use', and should be recorded as such, but the others aren't
+	-- bona fide 'use', and should be recorded as such, but the others
+	-- aren't 
   | mod_name /= mAIN_Name
   = returnRn (Nothing, emptyFVs, emptyFVs)
 

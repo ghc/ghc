@@ -1070,5 +1070,3 @@ nonBoxedPrimCCallErr clas inst_ty
   = hang (ptext SLIT("Unacceptable instance type for ccall-ish class"))
 	 4 (pprClassPred clas [inst_ty])
 \end{code}
-
-

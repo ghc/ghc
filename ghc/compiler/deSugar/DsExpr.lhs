@@ -32,7 +32,7 @@ import DsMonad
 import DsBinds		( dsMonoBinds, AutoScc(..) )
 import DsGRHSs		( dsGuarded )
 import DsCCall		( dsCCall, resultWrapper )
-import DsListComp	( dsListComp )
+import DsListComp	( dsListComp, dsPArrComp )
 import DsUtils		( mkErrorAppDs, mkStringLit, mkStringLitFS, 
 			  mkConsExpr, mkNilExpr, mkIntegerLit
 			)
@@ -49,7 +49,7 @@ import TyCon		( tyConDataCons )
 import TysWiredIn	( tupleCon, listTyCon, charDataCon, intDataCon )
 import BasicTypes	( RecFlag(..), Boxity(..), ipNameName )
 import Maybes		( maybeToBool )
-import PrelNames	( hasKey, ratioTyConKey )
+import PrelNames	( hasKey, ratioTyConKey, toPName )
 import Util		( zipEqual, zipWithEqual )
 import Outputable
 
@@ -262,27 +262,26 @@ dsExpr (HsWith expr binds)
         = dsExpr e	`thenDs` \ e' ->
 	  returnDs (Let (NonRec (ipNameName n) e') body)
 
-dsExpr (HsDoOut do_or_lc stmts return_id then_id fail_id result_ty src_loc)
-  | maybeToBool maybe_list_comp
+-- We need the `ListComp' form to use `deListComp' (rather than the "do" form)
+-- because the interpretation of `stmts' depends on what sort of thing it is.
+--
+dsExpr (HsDoOut ListComp stmts return_id then_id fail_id result_ty src_loc)
   =	-- Special case for list comprehensions
     putSrcLocDs src_loc $
     dsListComp stmts elt_ty
-
-  | otherwise
-  = putSrcLocDs src_loc $
-    dsDo do_or_lc stmts return_id then_id fail_id result_ty
   where
-    maybe_list_comp 
-	= case (do_or_lc, tcSplitTyConApp_maybe result_ty) of
-	    (ListComp, Just (tycon, [elt_ty]))
-		  | tycon == listTyCon
-		 -> Just elt_ty
-	    other -> Nothing
-	-- We need the ListComp form to use deListComp (rather than the "do" form)
-	-- because the interpretation of ExprStmt depends on what sort of thing
-	-- it is.
+    (_, [elt_ty]) = tcSplitTyConApp result_ty
 
-    Just elt_ty = maybe_list_comp
+dsExpr (HsDoOut DoExpr   stmts return_id then_id fail_id result_ty src_loc)
+  = putSrcLocDs src_loc $
+    dsDo DoExpr stmts return_id then_id fail_id result_ty
+
+dsExpr (HsDoOut PArrComp stmts return_id then_id fail_id result_ty src_loc)
+  =	-- Special case for array comprehensions
+    putSrcLocDs src_loc $
+    dsPArrComp stmts elt_ty
+  where
+    (_, [elt_ty]) = tcSplitTyConApp result_ty
 
 dsExpr (HsIf guard_expr then_expr else_expr src_loc)
   = putSrcLocDs src_loc $
@@ -319,6 +318,21 @@ dsExpr (ExplicitList ty xs)
 		go xs					`thenDs` \ core_xs ->
 		returnDs (mkConsExpr ty core_x core_xs)
 
+-- we create a list from the array elements and convert them into a list using
+-- `PrelPArr.toP'
+--
+-- * the main disadvantage to this scheme is that `toP' traverses the list
+--   twice: once to determine the length and a second time to put to elements
+--   into the array; this inefficiency could be avoided by exposing some of
+--   the innards of `PrelPArr' to the compiler (ie, have a `PrelPArrBase') so
+--   that we can exploit the fact that we already know the length of the array
+--   here at compile time
+--
+dsExpr (ExplicitPArr ty xs)
+  = dsLookupGlobalValue toPName				`thenDs` \toP      ->
+    dsExpr (ExplicitList ty xs)				`thenDs` \coreList ->
+    returnDs (mkApps (Var toP) [Type ty, coreList])
+
 dsExpr (ExplicitTuple expr_list boxity)
   = mapDs dsExpr expr_list	  `thenDs` \ core_exprs  ->
     returnDs (mkConApp (tupleCon boxity (length expr_list))
@@ -347,6 +361,24 @@ dsExpr (ArithSeqOut expr (FromThenTo from thn two))
     dsExpr thn		  `thenDs` \ thn2 ->
     dsExpr two		  `thenDs` \ two2 ->
     returnDs (mkApps expr2 [from2, thn2, two2])
+
+dsExpr (PArrSeqOut expr (FromTo from two))
+  = dsExpr expr		  `thenDs` \ expr2 ->
+    dsExpr from		  `thenDs` \ from2 ->
+    dsExpr two		  `thenDs` \ two2 ->
+    returnDs (mkApps expr2 [from2, two2])
+
+dsExpr (PArrSeqOut expr (FromThenTo from thn two))
+  = dsExpr expr		  `thenDs` \ expr2 ->
+    dsExpr from		  `thenDs` \ from2 ->
+    dsExpr thn		  `thenDs` \ thn2 ->
+    dsExpr two		  `thenDs` \ two2 ->
+    returnDs (mkApps expr2 [from2, thn2, two2])
+
+dsExpr (PArrSeqOut expr _)
+  = panic "DsExpr.dsExpr: Infinite parallel array!"
+    -- the parser shouldn't have generated it and the renamer and typechecker
+    -- shouldn't have let it through
 \end{code}
 
 \noindent
@@ -512,6 +544,7 @@ dsExpr (DictApp expr dicts)	-- becomes a curried application
 dsExpr (HsDo _ _ _)	    = panic "dsExpr:HsDo"
 dsExpr (ExprWithTySig _ _)  = panic "dsExpr:ExprWithTySig"
 dsExpr (ArithSeqIn _)	    = panic "dsExpr:ArithSeqIn"
+dsExpr (PArrSeqIn _)	    = panic "dsExpr:PArrSeqIn"
 #endif
 
 \end{code}
@@ -534,7 +567,7 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 	(_, b_ty) = tcSplitAppTy result_ty	-- result_ty must be of the form (m b)
 	is_do	  = case do_or_lc of
 			DoExpr   -> True
-			ListComp -> False
+			_	 -> False
 	
 	-- For ExprStmt, see the comments near HsExpr.Stmt about 
 	-- exactly what ExprStmts mean!

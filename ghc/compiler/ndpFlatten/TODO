@@ -1,0 +1,202 @@
+	           TODO List for Flattening Support in GHC	     -*-text-*-
+		   =======================================
+
+Middle-End Related
+~~~~~~~~~~~~~~~~~~
+
+Flattening Transformation
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Complete and test
+
+* Complete the analysis
+
+* Type transformation: The idea solution would probably be if we can add some
+  generic machinery, so that we can define all the rules for handling the type
+  and value transformations in a library.  (The PrelPArr for WayNDP.)
+
+
+Library Related
+~~~~~~~~~~~~~~~
+
+* Problem with re-exporting PrelPArr from Prelude is that it would also be
+  visible when -pparr is not given.  There should be a mechanism to implicitly
+  import more than one module (like PERVASIVE modules in M3)
+
+* We need a PrelPArr-like library for when flattening is used, too.  In fact,
+  we need some library routines that are on the level of merely vectorised
+  code (eg, for the dummy default vectors), and then, all the `PArrays' stuff
+  implementing fast unboxed arrays and fusion.
+
+* Enum is a problem.  Ideally, we would like `enumFromToP' and
+  `enumFromThenToP' to be members of `Enum'.  On the other hand, we really do
+  not want to change `Enum'.  The solution for the moment is to define
+
+    enumFromTo x y       = mapP toEnum [:fromEnum x .. fromEnum y:]
+    enumFromThenTo x y z = mapP toEnum [:fromEnum x, fromEnum y .. fromEnum z:]
+
+  like the Haskell Report does for the list versions.  This is hopefully
+  efficient enough as array fusion should fold the two traversals into one.
+  [DONE]
+
+
+DOCU that should go into the Commentary
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The type constructor [::]
+-------------------------
+
+The array type constructor [::] is quite similar to [] (list constructor) in
+that GHC has to know about it (in TysWiredIn); however, there are some
+differences:
+
+* [::] is an abstract type, whereas [] is not
+
+* if flattening is switched on, all occurences of the type are actually
+  removed by appropriate program transformations.
+
+The module PrelPArr that actually implements nested parallel arrays.  [::] is
+eliminated only if in addition to array support, flattening is activated.  It
+is just an option rather than the only method to implement those arrays.
+
+  Flags: -fparr	      -- syntactic support for parallel arrays (via `PrelPArr')
+			 * Dynamic hsc option; can be reversed with -fno-parr
+	 -fflatten    -- flattening transformation
+			 * Static hsc option
+	 -ndp	      -- this a way option, which implies -fparr and -fflatten
+			 (way options are handled by the driver and are not
+			 directly seen by hsc)
+	 -ddump-vect  -- dump Core after vectorisation
+		         * Dynamic hsc option
+
+* PrelPArr implements array variants of the Prelude list functions plus some
+  extra functions (also, some list functions (eg, those generating infinite
+  lists) have been left out.
+
+* prelude/PrelNames has been extended with all the names from PrelPArr that
+  need to be known inside the compiler
+
+* The variable GhcSupportsPArr, which can be set in build.mk decides whether
+  `PrelPArr' is to be compiled or not.  (We probably need to supress compiling
+  PrelPArr in WayNDP, or rather replace it with a different PrelPArr.)
+
+* Say something about `TysWiredIn.parrTyCon' as soon as we know how it
+  actually works... 
+
+Parser and AST Notes:
+- Parser and AST is quite straight forward.  Essentially, the list cases
+  duplicated with a name containing `PArr' or `parr' and modified to fit the
+  slightly different semantics (ie, finite length, strict).
+- The value and pattern `[::]' is an empty explicit parallel array (ie,
+  something of the form `ExplicitPArr ty []' in the AST).  This is in contrast
+  to lists, which use the nil-constructor instead.  In the case of parallel
+  arrays, using a constructor would be rather awkward, as it is not a
+  constructor-based type.
+- Thus, array patterns have the general form `[:p1, p2, ..., pn:]', where n >=
+  0.  Thus, two array patterns overlap iff they have the same length.
+- The type constructor for parallel is internally represented as a
+  `TyCon.AlgTyCon' with a wired in definition in `TysWiredIn'.  
+
+Desugarer Notes:
+- Desugaring of patterns involving parallel arrays:
+  * In Match.tidy1, we use fake array constructors; ie, any pattern `[:p1, ...,
+    pn:]' is replaces by the expression `MkPArr<n> p1 ... pn', where
+    `MkPArr<n>' is the n-ary array constructor.  These constructors are fake,
+    because they are never used to actually represent array values; in fact,
+    they are removed again before pattern compilation is finished.  However,
+    the use of these fake constructors implies that we need not modify large
+    parts of the machinery of the pattern matching compiler, as array patterns
+    are handled like any other constructor pattern.
+  * Check.simplify_pat introduces the same fake constructors as Match.tidy1
+    and removed again by Check.make_con.
+  * In DsUtils.mkCoAlgCaseMatchResult, we catch the case of array patterns and
+    generate code as the following example illustrates, where the LHS is the
+    code that would be produced if array construtors would really exist:
+
+      case v of pa {
+	MkPArr1 x1       -> e1
+	MkPArr2 x2 x3 x4 -> e2
+	DFT	         -> e3
+      }
+
+    =>
+
+      case lengthP v of
+        Int# i# -> 
+	  case i# of l {
+	    1   -> let x1 = v!:0                       in e1
+	    3   -> let x2 = v!:0; x2 = v!:1; x3 = v!:2 in e2
+	    DFT ->					      e3
+	  }
+  * The desugaring of array comprehensions is in `DsListComp', but follows
+    rules that are different from that for translating list comprehensions.
+    Denotationally, it boils down to the same, but the operational
+    requirements for an efficient implementation of array comprehensions are
+    rather different.
+
+    [:e | qss:] = <<[:e | qss:]>> () [:():]
+
+    <<[:e' |           :]>> pa ea = mapP (\pa -> e') ea
+    <<[:e' | b     , qs:]>> pa ea = <<[:e' | qs:]>> pa (filterP (\pa -> b) ea)
+    <<[:e' | p <- e, qs:]>> pa ea = 
+      let ef = filterP (\x -> case x of {p -> True; _ -> False}) e
+      in
+      <<[:e' | qs:]>> (pa, p) (crossP ea ef)
+    <<[:e' | let ds, qs:]>> pa ea = 
+      <<[:e' | qs:]>> (pa, (x_1, ..., x_n)) 
+		      (mapP (\v@pa -> (v, let ds in (x_1, ..., x_n))) ea)
+    where
+      {x_1, ..., x_n} = DV (ds)		-- Defined Variables
+    <<[:e' | qs | qss:]>>   pa ea = 
+      <<[:e' | qss:]>> (pa, (x_1, ..., x_n)) 
+		       (zipP ea <<[:(x_1, ..., x_n) | qs:]>>)
+    where
+      {x_1, ..., x_n} = DV (qs)
+
+    Moreover, we have
+
+      crossP       :: [:a:] -> [:b:] -> [:(a, b):]
+      crossP a1 a2  = let
+			len1 = lengthP a1
+			len2 = lengthP a2
+			x1   = concatP $ mapP (replicateP len2) a1
+			x2   = concatP $ replicateP len1 a2
+		      in
+		      zipP x1 x2
+
+    For a more efficient implementation of `crossP', see `PrelPArr'.
+
+    Optimisations: 
+    - In the `p <- e' rule, if `pa = ()', drop it and simplify the `crossP ea
+      e' to `e'.
+    - We assume that fusion will optimise sequences of array processing
+      combinators.
+    - Do we want to have the following function?
+
+        mapFilterP :: (a -> Maybe b) -> [:a:] -> [:b:]
+
+      Even with fusion `(mapP (\p -> e) . filterP (\p -> b))' may still result
+      in redundant pattern matching operations.  (Let's wait with this until
+      we have seen what the Simplifier does to the generated code.)
+
+Flattening Notes:
+* The story about getting access to all the names like "fst" etc that we need
+  to generate during flattening is quite involved.  To have a reasonable
+  chance to get at the stuff, we need to put flattening inbetween the
+  desugarer and the simplifier as an extra pass in HscMain.hscMain.  After
+  that point, the persistent compiler state is zapped (for heap space
+  reduction reasons, I guess) and nothing remains of the imported interfaces
+  in one shot mode.
+
+  Moreover, to get the Ids that we need into the type environment, we need to
+  force the renamer to include them.  This is done in
+  RnEnv.getImplicitModuleFVs, which computes all implicitly imported names.
+  We let it add the names from FlattenInfo.namesNeededForFlattening.
+
+  Given all these arrangements, FlattenMonad can obtain the needed Ids from
+  the persistent compiler state without much further hassle.
+
+  [It might be worthwhile to document in the non-Flattening part of the
+  Commentary that the persistent compiler state is zapped after desugaring and
+  how the free variables determined by the renamer imply which names are
+  imported.] 

@@ -101,6 +101,10 @@ data HsExpr id pat
 		PostTcType	-- Gives type of components of list
 		[HsExpr id pat]
 
+  | ExplicitPArr		-- syntactic parallel array: [:e1, ..., en:]
+		PostTcType	-- type of elements of the parallel array
+		[HsExpr id pat]
+
   | ExplicitTuple		-- tuple
 		[HsExpr id pat]
 				-- NB: Unit is ExplicitTuple []
@@ -135,6 +139,11 @@ data HsExpr id pat
   | ArithSeqIn				-- arithmetic sequence
 		(ArithSeqInfo id pat)
   | ArithSeqOut
+		(HsExpr id pat)		-- (typechecked, of course)
+		(ArithSeqInfo id pat)
+  | PArrSeqIn           		-- arith. sequence for parallel array
+		(ArithSeqInfo id pat)	-- [:e1..e2:] or [:e1, e2..e3:]
+  | PArrSeqOut
 		(HsExpr id pat)		-- (typechecked, of course)
 		(ArithSeqInfo id pat)
 
@@ -305,6 +314,9 @@ ppr_expr (HsDoOut do_or_list_comp stmts _ _ _ _ _) = pprDo do_or_list_comp stmts
 ppr_expr (ExplicitList _ exprs)
   = brackets (fsep (punctuate comma (map ppr_expr exprs)))
 
+ppr_expr (ExplicitPArr _ exprs)
+  = pabrackets (fsep (punctuate comma (map ppr_expr exprs)))
+
 ppr_expr (ExplicitTuple exprs boxity)
   = tupleParens boxity (sep (punctuate comma (map ppr_expr exprs)))
 
@@ -326,6 +338,11 @@ ppr_expr (ArithSeqIn info)
   = brackets (ppr info)
 ppr_expr (ArithSeqOut expr info)
   = brackets (ppr info)
+
+ppr_expr (PArrSeqIn info)
+  = pabrackets (ppr info)
+ppr_expr (PArrSeqOut expr info)
+  = pabrackets (ppr info)
 
 ppr_expr EWildPat = char '_'
 ppr_expr (ELazyPat e) = char '~' <> pprParendExpr e
@@ -363,7 +380,11 @@ ppr_expr (DictApp expr dnames)
 	 4 (brackets (interpp'SP dnames))
 
 ppr_expr (HsType id) = ppr id
-    
+
+-- add parallel array brackets around a document
+--
+pabrackets   :: SDoc -> SDoc
+pabrackets p  = ptext SLIT("[:") <> p <> ptext SLIT(":]")    
 \end{code}
 
 Parenthesize unless very simple:
@@ -382,6 +403,7 @@ pprParendExpr expr
       HsVar _		    -> pp_as_was
       HsIPVar _		    -> pp_as_was
       ExplicitList _ _      -> pp_as_was
+      ExplicitPArr _ _      -> pp_as_was
       ExplicitTuple _ _	    -> pp_as_was
       HsPar _		    -> pp_as_was
 
@@ -589,6 +611,7 @@ depends on the context.  Consider the following contexts:
 		E :: rhs_ty
 	  Translation: E
 
+Array comprehensions are handled like list comprehensions -=chak
 
 \begin{code}
 consLetStmt :: HsBinds id pat -> [Stmt id pat] -> [Stmt id pat]
@@ -610,14 +633,20 @@ pprStmt (ParStmt stmtss)
 pprStmt (ParStmtOut stmtss)
  = hsep (map (\stmts -> ptext SLIT("| ") <> ppr stmts) stmtss)
 
-pprDo :: (Outputable id, Outputable pat) => HsDoContext -> [Stmt id pat] -> SDoc
+pprDo :: (Outputable id, Outputable pat) 
+      => HsDoContext -> [Stmt id pat] -> SDoc
 pprDo DoExpr stmts   = hang (ptext SLIT("do")) 2 (vcat (map ppr stmts))
-pprDo ListComp stmts = brackets $
-		       hang (pprExpr expr <+> char '|')
-			  4 (interpp'SP quals)
-		     where
-		       ResultStmt expr _ = last stmts	-- Last stmt should
-		       quals	         = init stmts	-- be an ResultStmt
+pprDo ListComp stmts = pprComp brackets   stmts
+pprDo PArrComp stmts = pprComp pabrackets stmts
+
+pprComp :: (Outputable id, Outputable pat) 
+	=> (SDoc -> SDoc) -> [Stmt id pat] -> SDoc
+pprComp brack stmts = brack $
+		      hang (pprExpr expr <+> char '|')
+			 4 (interpp'SP quals)
+		    where
+		      ResultStmt expr _ = last stmts  -- Last stmt should
+		      quals	        = init stmts  -- be an ResultStmt
 \end{code}
 
 %************************************************************************
@@ -667,7 +696,9 @@ data HsMatchContext id	-- Context of a Match or Stmt
   | RecUpd		-- Record update
   deriving ()
 
-data HsDoContext = ListComp | DoExpr
+data HsDoContext = ListComp 
+		 | DoExpr 
+		 | PArrComp	-- parallel array comprehension
 \end{code}
 
 \begin{code}
@@ -691,7 +722,10 @@ pprMatchContext RecUpd	     	  = ptext SLIT("In a record-update construct")
 pprMatchContext PatBindRhs   	  = ptext SLIT("In a pattern binding")
 pprMatchContext LambdaExpr   	  = ptext SLIT("In a lambda abstraction")
 pprMatchContext (DoCtxt DoExpr)   = ptext SLIT("In a 'do' expression pattern binding")
-pprMatchContext (DoCtxt ListComp) = ptext SLIT("In a 'list comprehension' pattern binding")
+pprMatchContext (DoCtxt ListComp) = 
+  ptext SLIT("In a 'list comprehension' pattern binding")
+pprMatchContext (DoCtxt PArrComp) = 
+  ptext SLIT("In an 'array comprehension' pattern binding")
 
 -- Used to generate the string for a *runtime* error message
 matchContextErrString (FunRhs fun)    	= "function " ++ showSDoc (ppr fun)
@@ -701,4 +735,5 @@ matchContextErrString RecUpd	      	= "record update"
 matchContextErrString LambdaExpr      	=  "lambda"
 matchContextErrString (DoCtxt DoExpr)   = "'do' expression"
 matchContextErrString (DoCtxt ListComp) = "list comprehension"
+matchContextErrString (DoCtxt PArrComp) = "array comprehension"
 \end{code}

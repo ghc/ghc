@@ -23,7 +23,7 @@ module HsSyn (
 	module HsTypes,
 	Fixity, NewOrData, 
 
-	collectHsBinders, collectLocatedHsBinders, 
+	collectHsBinders, collectHsOutBinders, collectLocatedHsBinders, 
 	collectMonoBinders, collectLocatedMonoBinders,
 	collectSigTysFromMonoBinds,
 	hsModuleName, hsModuleImports
@@ -132,6 +132,15 @@ collectHsBinders (MonoBind b _ _)
 collectHsBinders (ThenBinds b1 b2)
  = collectHsBinders b1 ++ collectHsBinders b2
 
+-- corresponds to `collectHsBinders', but operates on renamed patterns
+--
+collectHsOutBinders :: HsBinds name (OutPat name) -> [name]
+collectHsOutBinders EmptyBinds = []
+collectHsOutBinders (MonoBind b _ _) 
+ = collectMonoOutBinders b
+collectHsOutBinders (ThenBinds b1 b2)
+ = collectHsOutBinders b1 ++ collectHsOutBinders b2
+
 collectLocatedMonoBinders :: MonoBinds name (InPat name) -> [(name,SrcLoc)]
 collectLocatedMonoBinders binds
   = go binds []
@@ -147,6 +156,17 @@ collectMonoBinders binds
   where
     go EmptyMonoBinds	       acc = acc
     go (PatMonoBind pat _ loc) acc = collectPatBinders pat ++ acc
+    go (FunMonoBind f _ _ loc) acc = f : acc
+    go (AndMonoBinds bs1 bs2)  acc = go bs1 (go bs2 acc)
+
+-- corresponds to `collectMonoBinders', but operates on renamed patterns
+--
+collectMonoOutBinders :: MonoBinds name (OutPat name) -> [name]
+collectMonoOutBinders binds
+  = go binds []
+  where
+    go EmptyMonoBinds	       acc = acc
+    go (PatMonoBind pat _ loc) acc = collectOutPatBinders pat ++ acc
     go (FunMonoBind f _ _ loc) acc = f : acc
     go (AndMonoBinds bs1 bs2)  acc = go bs1 (go bs2 acc)
 \end{code}

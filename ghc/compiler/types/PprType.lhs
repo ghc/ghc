@@ -151,9 +151,17 @@ ppr_ty ctxt_prec ty@(TyConApp tycon tys)
     [ty] <- tys
   = brackets (ppr_ty tOP_PREC ty)
 
+	-- PARALLEL ARRAY CASE
+  | tycon `hasKey` parrTyConKey,
+    [ty] <- tys
+  = pabrackets (ppr_ty tOP_PREC ty)
+
 	-- GENERAL CASE
   | otherwise
   = ppr_tc_app ctxt_prec tycon tys
+
+  where
+    pabrackets p = ptext SLIT("[:") <> p <> ptext SLIT(":]")
 
 
 ppr_ty ctxt_prec ty@(ForAllTy _ _)

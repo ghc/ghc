@@ -559,15 +559,14 @@ readIface file_path
 	Left io_error  -> bale_out (text (show io_error)) ;
 	Right contents -> 
 
-    case parseIface contents init_parser_state of
+    case parseIface contents (mkPState loc exts) of
 	POk _ iface          -> returnRn (Right iface)
 	PFailed err 	     -> bale_out err
     }
   where
-    init_parser_state = PState{ bol = 0#, atbol = 1#,
-				context = [],
-				glasgow_exts = 1#,
-				loc = mkSrcLoc (mkFastString file_path) 1 }
+    exts = ExtFlags {glasgowExtsEF = True,
+		     parrEF	   = True}
+    loc  = mkSrcLoc (mkFastString file_path) 1
 
     bale_out err = returnRn (Left (badIfaceFile file_path err))
 \end{code}

@@ -24,7 +24,8 @@ import MatchCon		( matchConFamily )
 import MatchLit		( matchLiterals )
 import PrelInfo		( pAT_ERROR_ID )
 import TcType		( mkTyVarTys, Type, tcTyConAppArgs, tcEqType )
-import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy, tupleCon )
+import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy,
+			  tupleCon, parrFakeCon, mkPArrTy )
 import BasicTypes	( Boxity(..) )
 import UniqSet
 import ErrUtils		( addWarnLocHdrLine, dontAddErrLoc )
@@ -314,7 +315,8 @@ Replace the `as' pattern @x@@p@ with the pattern p and a binding @x = v@.
 \item
 Removing lazy (irrefutable) patterns (you don't want to know...).
 \item
-Converting explicit tuple- and list-pats into ordinary @ConPats@.
+Converting explicit tuple-, list-, and parallel-array-pats into ordinary
+@ConPats@. 
 \item
 Convert the literal pat "" to [].
 \end{itemize}
@@ -440,6 +442,15 @@ tidy1 v (ListPat ty pats) match_result
       = foldr (\ x -> \y -> ConPat consDataCon list_ty [] [] [x, y])
 	      (ConPat nilDataCon  list_ty [] [] [])
 	      pats
+
+-- introduce fake parallel array constructors to be able to handle parallel
+-- arrays with the existing machinery for constructor pattern
+--
+tidy1 v (PArrPat ty pats) match_result
+  = returnDs (parrConPat, match_result)
+  where
+    arity      = length pats
+    parrConPat = ConPat (parrFakeCon arity) (mkPArrTy ty) [] [] pats
 
 tidy1 v (TuplePat pats boxity) match_result
   = returnDs (tuple_ConPat, match_result)

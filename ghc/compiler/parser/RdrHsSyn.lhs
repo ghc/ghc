@@ -143,6 +143,7 @@ extract_tys tys = foldr extract_ty [] tys
 
 extract_ty (HsAppTy ty1 ty2)          acc = extract_ty ty1 (extract_ty ty2 acc)
 extract_ty (HsListTy ty)              acc = extract_ty ty acc
+extract_ty (HsPArrTy ty)              acc = extract_ty ty acc
 extract_ty (HsTupleTy _ tys)          acc = foldr extract_ty acc tys
 extract_ty (HsFunTy ty1 ty2)          acc = extract_ty ty1 (extract_ty ty2 acc)
 extract_ty (HsPredTy p)		      acc = extract_pred p acc

@@ -58,6 +58,7 @@ PrelIO_HC_OPTS       += -fno-ignore-asserts
 # Special options
 PrelStorable_HC_OPTS = -monly-3-regs
 PrelCError_HC_OPTS   = +RTS -K4m -RTS
+PrelPArr_HC_OPTS     = -fparr
 
 #-----------------------------------------------------------------------------
 # 	Dependency generation

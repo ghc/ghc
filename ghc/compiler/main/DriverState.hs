@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.66 2002/01/04 16:02:04 simonmar Exp $
+-- $Id: DriverState.hs,v 1.67 2002/02/11 08:20:41 chak Exp $
 --
 -- Settings for the driver
 --
@@ -573,6 +573,7 @@ data WayName
   | WayPar
   | WayGran
   | WaySMP
+  | WayNDP
   | WayDebug
   | WayUser_a
   | WayUser_b
@@ -598,7 +599,9 @@ GLOBAL_VAR(v_Ways, [] ,[WayName])
 allowed_combination way = way `elem` combs
   where  -- the sub-lists must be ordered according to WayName, 
          -- because findBuildTag sorts them
-    combs                = [ [WayProf,WayUnreg], [WayProf,WaySMP] ]
+    combs                = [ [WayProf, WayUnreg], 
+			     [WayProf, WaySMP]  ,
+			     [WayProf, WayNDP]  ]
 
 findBuildTag :: IO [String]  -- new options
 findBuildTag = do
@@ -702,6 +705,10 @@ way_details =
 	, "-optl-pthread"
 	, "-optc-DSMP"
 	, "-fvia-C" ]),
+
+    (WayNDP, Way  "ndp" "Nested data parallelism"
+	[ "-fparr"
+	, "-fflatten"]),
 
     (WayUser_a,  Way  "a"  "User way 'a'"  ["$WAY_a_REAL_OPTS"]),	
     (WayUser_b,  Way  "b"  "User way 'b'"  ["$WAY_b_REAL_OPTS"]),	

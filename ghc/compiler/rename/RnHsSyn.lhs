@@ -11,7 +11,7 @@ module RnHsSyn where
 import HsSyn
 import HsCore
 import Class		( FunDep, DefMeth(..) )
-import TysWiredIn	( tupleTyCon, listTyCon, charTyCon )
+import TysWiredIn	( tupleTyCon, listTyCon, parrTyCon, charTyCon )
 import Name		( Name, getName, isTyVarName )
 import NameSet
 import BasicTypes	( Boxity )
@@ -56,9 +56,10 @@ type RenamedDeprecation		= DeprecDecl		Name
 These free-variable finders returns tycons and classes too.
 
 \begin{code}
-charTyCon_name, listTyCon_name :: Name
+charTyCon_name, listTyCon_name, parrTyCon_name :: Name
 charTyCon_name    = getName charTyCon
 listTyCon_name    = getName listTyCon
+parrTyCon_name    = getName parrTyCon
 
 tupleTyCon_name :: Boxity -> Int -> Name
 tupleTyCon_name boxity n = getName (tupleTyCon boxity n)
@@ -75,6 +76,7 @@ extractHsTyNames ty
   where
     get (HsAppTy ty1 ty2)      = get ty1 `unionNameSets` get ty2
     get (HsListTy ty)          = unitNameSet listTyCon_name `unionNameSets` get ty
+    get (HsPArrTy ty)          = unitNameSet parrTyCon_name `unionNameSets` get ty
     get (HsTupleTy con tys)    = hsTupConFVs con `unionNameSets` extractHsTyNames_s tys
     get (HsFunTy ty1 ty2)      = get ty1 `unionNameSets` get ty2
     get (HsPredTy p)	       = extractHsPredTyNames p

@@ -67,6 +67,7 @@ module CmdLineOpts (
 	opt_Parallel,
 	opt_SMP,
 	opt_RuntimeTypes,
+	opt_Flatten,
 
 	-- optimisation opts
 	opt_NoMethodSharing,
@@ -255,6 +256,7 @@ data DynFlag
    | Opt_D_dump_simpl_stats
    | Opt_D_dump_tc_trace
    | Opt_D_dump_BCOs
+   | Opt_D_dump_vect
    | Opt_D_source_stats
    | Opt_D_verbose_core2core
    | Opt_D_verbose_stg2stg
@@ -287,6 +289,7 @@ data DynFlag
    | Opt_AllowIncoherentInstances
    | Opt_NoMonomorphismRestriction
    | Opt_GlasgowExts
+   | Opt_PArr			       -- syntactic support for parallel arrays
    | Opt_Generics
    | Opt_NoImplicitPrelude 
 
@@ -565,6 +568,7 @@ opt_MaxContextReductionDepth	= lookup_def_int "-fcontext-stack" mAX_CONTEXT_REDU
 opt_NumbersStrict		= lookUp  SLIT("-fnumbers-strict")
 opt_Parallel			= lookUp  SLIT("-fparallel")
 opt_SMP				= lookUp  SLIT("-fsmp")
+opt_Flatten			= lookUp  SLIT("-fflatten")
 
 -- optimisation opts
 opt_NoMethodSharing		= lookUp  SLIT("-fno-method-sharing")
@@ -645,6 +649,7 @@ isStaticHscFlag f =
 	"fnumbers-strict",
 	"fparallel",
 	"fsmp",
+	"fflatten",
 	"fsemi-tagging",
 	"ffoldr-build-on",
 	"flet-no-escape",

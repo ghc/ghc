@@ -40,6 +40,7 @@ module Unique (
 	mkTupleTyConUnique, mkTupleDataConUnique,
 	mkPreludeMiscIdUnique, mkPreludeDataConUnique,
 	mkPreludeTyConUnique, mkPreludeClassUnique,
+	mkPArrDataConUnique,
 
 	mkBuiltinUnique,
 	mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3
@@ -321,6 +322,10 @@ isTupleKey u = case unpkUnique u of
 
 mkPrimOpIdUnique op		= mkUnique '9' op
 mkPreludeMiscIdUnique i		= mkUnique '0' i
+
+-- No numbers left anymore, so I pick something different for the character
+-- tag 
+mkPArrDataConUnique a	        = mkUnique ':' (2*a)
 
 -- The "tyvar uniques" print specially nicely: a, b, c, etc.
 -- See pprUnique for details

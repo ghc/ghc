@@ -226,6 +226,8 @@ checkPat e [] = case e of
 	HsPar e		   -> checkPat e [] `thenP` (returnP . ParPatIn)
 	ExplicitList _ es  -> mapP (\e -> checkPat e []) es `thenP` \ps ->
 			      returnP (ListPatIn ps)
+	ExplicitPArr _ es  -> mapP (\e -> checkPat e []) es `thenP` \ps ->
+			      returnP (PArrPatIn ps)
 
 	ExplicitTuple es b -> mapP (\e -> checkPat e []) es `thenP` \ps ->
 			      returnP (TuplePatIn ps b)

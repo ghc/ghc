@@ -8,8 +8,9 @@ module SimplCore ( core2core, simplifyExpr ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..), SimplifierMode(..),
-			  DynFlags, DynFlag(..), dopt, dopt_CoreToDo
+import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..),
+			  SimplifierMode(..), DynFlags, DynFlag(..), dopt,
+			  dopt_CoreToDo
 			)
 import CoreSyn
 import CoreFVs		( ruleRhsFreeVars )

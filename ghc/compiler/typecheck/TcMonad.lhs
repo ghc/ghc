@@ -659,6 +659,7 @@ data InstOrigin
   | PatOrigin RenamedPat
 
   | ArithSeqOrigin RenamedArithSeqInfo -- [x..], [x..y] etc
+  | PArrSeqOrigin  RenamedArithSeqInfo -- [:x..y:] and [:x,y..z:]
 
   | SignatureOrigin		-- A dict created from a type signature
   | Rank2Origin			-- A dict created when typechecking the argument
@@ -715,6 +716,8 @@ pprInstLoc (orig, locn, ctxt)
 	= hsep [ptext SLIT("the pattern"), quotes (ppr pat)]
     pp_orig (ArithSeqOrigin seq)
 	= hsep [ptext SLIT("the arithmetic sequence"), quotes (ppr seq)]
+    pp_orig (PArrSeqOrigin seq)
+	= hsep [ptext SLIT("the parallel array sequence"), quotes (ppr seq)]
     pp_orig (SignatureOrigin)
 	=  ptext SLIT("a type signature")
     pp_orig (Rank2Origin)

@@ -142,6 +142,8 @@ untidy b (ConPatIn name pats)  =
 untidy b (ConOpPatIn pat1 name fixity pat2) = 
        pars b (ConOpPatIn (untidy_pars pat1) name fixity (untidy_pars pat2)) 
 untidy _ (ListPatIn pats)  = ListPatIn (map untidy_no_pars pats) 
+untidy _ (PArrPatIn pats)  = 
+       panic "Check.untidy: Shouldn't get a parallel array here!"
 untidy _ (TuplePatIn pats boxed) = TuplePatIn (map untidy_no_pars pats) boxed
 
 untidy _ pat = pprPanic "Check.untidy: SigPatIn" (ppr pat)
@@ -523,12 +525,26 @@ make_con (ConPat id _ _ _ _) (p:q:ps, constraints)
     where name   = getName id
           fixity = panic "Check.make_con: Guessing fixity"
 
-make_con (ConPat id _ _ _ pats) (ps,constraints) 
+make_con (ConPat id _ _ _ pats) (ps, constraints) 
       | isTupleTyCon tc = (TuplePatIn pats_con (tupleTyConBoxity tc) : rest_pats, constraints) 
       | otherwise       = (ConPatIn name pats_con		     : rest_pats, constraints)
     where name      = getName id
 	  (pats_con, rest_pats) = splitAtList pats ps
 	  tc	    = dataConTyCon id
+
+-- reconstruct parallel array pattern
+--
+-- * don't check for the type only; we need to make sure that we are really
+--   dealing with one of the fake constructors and not with the real
+--   representation 
+--
+make_con (ConPat id _ _ _ pats) (ps, constraints) 
+  | isPArrFakeCon id = (PArrPatIn patsCon     : restPats, constraints) 
+  | otherwise        = (ConPatIn name patsCon : restPats, constraints)
+  where 
+    name                = getName id
+    (patsCon, restPats) = splitAtList pats ps
+    tc	                = dataConTyCon id
 	  
 
 make_whole_con :: DataCon -> WarningPat
@@ -575,6 +591,13 @@ simplify_pat (ListPat ty ps) = foldr (\ x -> \y -> ConPat consDataCon list_ty []
 	                             (map simplify_pat ps)
                              where list_ty = mkListTy ty
 
+-- introduce fake parallel array constructors to be able to handle parallel
+-- arrays with the existing machinery for constructor pattern
+--
+simplify_pat (PArrPat ty ps)
+  = ConPat (parrFakeCon arity) (mkPArrTy ty) [] [] (map simplify_pat ps)
+  where
+    arity = length ps
 
 simplify_pat (TuplePat ps boxity)
   = ConPat (tupleCon boxity arity)
