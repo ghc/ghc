@@ -70,6 +70,16 @@ the thread.  The target thread will stop whatever it was doing (even
 if it was blocked on an <tt/MVar/ or other computation) and handle the
 exception.
 
+One important property of <tt/raiseInThread/ (and therefore
+<tt/killThread/) is that they are <em/synchronous/.  This means that
+after performing a <tt/raiseInThread/ operation, the calling thread
+can be certain that the target thread has received the exception.  In
+other words, the target thread cannot perform any more processing
+unless it handles the exception that has just been raised in it.  This
+is a useful property to know when dealing with race conditions: eg. if
+there are two threads that can kill each other, it is guaranteed that
+only one of the threads will get to kill the other.
+
 The <tt/ThreadId/ for the current thread can be obtained with
 <tt/myThreadId/:
 
