@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: IO.hs,v 1.3 2002/02/05 17:32:27 simonmar Exp $
+-- $Id: IO.hs,v 1.4 2002/02/12 10:51:06 simonmar Exp $
 --
 -- The standard IO library.
 --
@@ -92,6 +92,11 @@ module System.IO (
     hGetBuf,		       -- :: Handle -> Ptr a -> Int -> IO Int
  
     fixIO,		       -- :: (a -> IO a) -> IO a
+
+    hSetEcho,			-- :: Handle -> Bool -> IO ()
+    hGetEcho,			-- :: Handle -> IO Bool
+
+    hIsTerminalDevice,	 	-- :: Handle -> IO Bool
   ) where
 
 #ifdef __GLASGOW_HASKELL__
