@@ -510,9 +510,6 @@ AC_PROG_CPP
 
 dnl ** does the C compiler support the following options?
 FPTOOLS_CC_FLAG(-mwin32,CC_SUPPORTS_MWIN32)
-if test -n "$CC_SUPPORS_MWIN32"; then
-  AC_MSG_ERROR([A mingwin gcc is required to build GHC on Windows.])
-fi
 FPTOOLS_CC_FLAG(-mno-cygwin,CC_SUPPORTS_MNO_CYGWIN)
 
 EXTRA_CC_OPTS="$CC_SUPPORTS_MNO_CYGWIN $CC_SUPPORTS_MWIN32"
