@@ -29,9 +29,9 @@ import Control.Exception       ( bracket )
 import Control.Monad           ( when )
 import System.Environment (getEnv)
 import System.FilePath
-import System.IO
-import Foreign
-import Foreign.C
+import System.IO (IOMode(..), openBinaryFile, hGetBuf, hPutBuf, hClose)
+import System.IO.Error		( try )
+import Foreign.Marshal.Alloc	( allocaBytes )
 import System.Directory(doesFileExist, doesDirectoryExist, getPermissions, setPermissions, createDirectory)
 #if defined(__GLASGOW_HASKELL__)
 import GHC.IOBase ( IOException(..) )
