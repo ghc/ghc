@@ -1019,17 +1019,21 @@ pprInstr g@(GABS sz src dst)
    = pprG g (hcat [gtab, gpush src 0, text " ; fabs ; ", gpop dst 1])
 pprInstr g@(GNEG sz src dst)
    = pprG g (hcat [gtab, gpush src 0, text " ; fchs ; ", gpop dst 1])
-pprInstr g@(GSQRT sz src dst)
-   = pprG g (hcat [gtab, gpush src 0, text " ; fsqrt ; ", gpop dst 1])
-pprInstr g@(GSIN sz src dst)
-   = pprG g (hcat [gtab, gpush src 0, text " ; fsin ; ", gpop dst 1])
-pprInstr g@(GCOS sz src dst)
-   = pprG g (hcat [gtab, gpush src 0, text " ; fcos ; ", gpop dst 1])
 
+pprInstr g@(GSQRT sz src dst)
+   = pprG g (hcat [gtab, gpush src 0, text " ; fsqrt"] $$ 
+             hcat [gtab, gcoerceto sz, gpop dst 1])
+pprInstr g@(GSIN sz src dst)
+   = pprG g (hcat [gtab, gpush src 0, text " ; fsin"] $$ 
+             hcat [gtab, gcoerceto sz, gpop dst 1])
+pprInstr g@(GCOS sz src dst)
+   = pprG g (hcat [gtab, gpush src 0, text " ; fcos"] $$ 
+             hcat [gtab, gcoerceto sz, gpop dst 1])
 pprInstr g@(GTAN sz src dst)
    = pprG g (hcat [gtab, text "ffree %st(6) ; ",
                    gpush src 0, text " ; fptan ; ", 
-                   text " fstp %st(0) ; ", gpop dst 1])
+                   text " fstp %st(0)"] $$
+             hcat [gtab, gcoerceto sz, gpop dst 1])
 
 pprInstr g@(GADD sz src1 src2 dst)
    = pprG g (hcat [gtab, gpush src1 0, 
@@ -1054,6 +1058,11 @@ pprInstr GFREE
           ]
 
 --------------------------
+
+-- coerce %st(0) to the specified size
+gcoerceto DF = empty
+gcoerceto  F = text "subl $4,%esp ; fstps (%esp) ; flds (%esp) ; addl $4,%esp ; "
+
 gpush reg offset
    = hcat [text "ffree %st(7) ; fld ", greg reg offset]
 gpop reg offset

@@ -28,7 +28,9 @@ All these bugs are for x86; I don't know about sparc/alpha.
 
    Currently, implementation of GITOF et al use the stack, so are
    incompatible with current ccall implementation.  When the latter
-   is fixed, GITOF et al should present no problem.
+   is fixed, GITOF et al should present no problem.  Same issue
+   applies to GCOS, GSIN, GTAN, GSQRT if they have to truncate their
+   result to 32-bit float.
 
 -- nofib/real/hidden gets slightly different FP answers from the
    via-C route; possibly due to exp/log not being done in-line.
