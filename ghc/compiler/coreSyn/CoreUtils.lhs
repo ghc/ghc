@@ -333,10 +333,11 @@ exprIsAtom other      = False
 
 
 \begin{code}
-exprIsDupable (Type _)	     = True
-exprIsDupable (Var v)	     = True
-exprIsDupable (Lit lit)      = litIsDupable lit
-exprIsDupable (Note _ e)     = exprIsDupable e
+exprIsDupable (Type _)	     	= True
+exprIsDupable (Var v)	     	= True
+exprIsDupable (Lit lit)      	= litIsDupable lit
+exprIsDupable (Note InlineMe e) = True
+exprIsDupable (Note _ e)        = exprIsDupable e
 exprIsDupable expr	     
   = go expr 0
   where
@@ -383,6 +384,7 @@ exprIsCheap :: CoreExpr -> Bool
 exprIsCheap (Lit lit) 		  = True
 exprIsCheap (Type _)        	  = True
 exprIsCheap (Var _)         	  = True
+exprIsCheap (Note InlineMe e)  	  = True
 exprIsCheap (Note _ e)      	  = exprIsCheap e
 exprIsCheap (Lam x e)       	  = if isId x then True else exprIsCheap e
 exprIsCheap (Case e _ alts)       = exprIsCheap e && 
@@ -518,9 +520,11 @@ as values, even if their arguments are non-trivial;
 	      map (...redex...)		is a value
 Because `seq` on such things completes immediately
 
-A worry: constructors with unboxed args:
+A possible worry: constructors with unboxed args:
 		C (f x :: Int#)
-Suppose (f x) diverges; then C (f x) is not a value.
+Suppose (f x) diverges; then C (f x) is not a value.  True, but
+this form is illegal (see the invariants in CoreSyn).  Args of unboxed
+type must be ok-for-speculation (or trivial).
 
 \begin{code}
 exprIsValue :: CoreExpr -> Bool		-- True => Value-lambda, constructor, PAP
