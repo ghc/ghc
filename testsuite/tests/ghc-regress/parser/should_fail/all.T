@@ -27,3 +27,4 @@ test "read020" { vtcf("") }
 -- on this example.
 test "read021" { vtcf("") }
 test "read022" { vtcf("") }
+test "read023" { vtcf("") }
