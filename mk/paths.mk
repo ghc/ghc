@@ -166,7 +166,10 @@ EXCLUDED_DERIVED_SRCS = $(patsubst %.hsc, %.hs, $(EXCLUDED_HSC_SRCS)) \
 			$(patsubst %.y,   %.hs, $(EXCLUDED_HAPPY_Y_SRCS)) \
 			$(patsubst %.ly,  %.hs, $(EXCLUDED_HAPPY_LY_SRCS)) \
 			$(patsubst %.hs,  %.hc, $(EXCLUDED_HS_SRCS)) \
-			$(patsubst %.lhs, %.hc, $(EXCLUDED_LHS_SRCS))
+			$(patsubst %.lhs, %.hc, $(EXCLUDED_LHS_SRCS)) \
+			$(patsubst %.hs,  %_stub.c, $(EXCLUDED_HS_SRCS)) \
+			$(patsubst %.lhs, %_stub.c, $(EXCLUDED_LHS_SRCS))
+
 # Exclude _hsc.c files; they get built as part of the cbits library,
 # not part of the main library
 
@@ -181,7 +184,13 @@ HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_SRCS)))
 
 HSC_C_OBJS  = $(addsuffix _hsc.$(way_)o,$(basename $(filter %.hsc,$(SRCS))))
 
-C_SRCS      = $(filter %.c,$(SRCS))
+
+# Always remove $(EXCLUDED_C_SRCS) from C_SRCS
+EXCLUDED_C_SRCS = $(patsubst %.lhs, %_stub.c, $(HS_SRCS)) \
+		  $(patsubst %.hs,  %_stub.c, $(HS_SRCS))
+
+
+C_SRCS      = $(filter-out $(EXCLUDED_C_SRCS),$(filter %.c,$(SRCS)))
 C_OBJS      = $(addsuffix .$(way_)o,$(basename $(C_SRCS)))
 
 # SCRIPT_SRCS:  list of raw script files (in literate form)
