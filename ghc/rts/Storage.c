@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.47 2001/08/09 12:12:23 sewardj Exp $
+ * $Id: Storage.c,v 1.48 2001/08/09 12:46:06 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -153,6 +153,7 @@ initStorage( void )
       stp->scavenged_large_objects = NULL;
       stp->n_scavenged_large_blocks = 0;
       stp->is_compacted = 0;
+      stp->bitmap = NULL;
     }
   }
   
