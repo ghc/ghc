@@ -1,7 +1,6 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: PrelPosix.hsc,v 1.14 2001/09/26 10:35:41 simonmar Exp $
 --
 -- POSIX support layer for the standard libraries
 --
@@ -78,17 +77,19 @@ fdFileSize fd =
 data FDType  = Directory | Stream | RegularFile
 	       deriving (Eq)
 
+-- NOTE: On Win32 platforms, this will only work with file descriptors
+-- referring to file handles. i.e., it'll fail for socket FDs.
 fdType :: Int -> IO FDType
 fdType fd = 
   allocaBytes (#const sizeof(struct stat)) $ \ p_stat -> do
-    throwErrnoIfMinus1Retry "fileSize" $
+    throwErrnoIfMinus1Retry "fdType" $
 	c_fstat (fromIntegral fd) p_stat
     c_mode <- (#peek struct stat, st_mode) p_stat :: IO CMode
     case () of
       _ | s_isdir c_mode 	 	     -> return Directory
         | s_isfifo c_mode || s_issock c_mode -> return Stream
-	| s_isreg c_mode 		     -> return RegularFile
-	| otherwise			     -> ioException ioe_unknownfiletype
+        | s_isreg c_mode 		     -> return RegularFile
+        | otherwise			     -> ioException ioe_unknownfiletype
 
 ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
 			"unknown file type" Nothing
