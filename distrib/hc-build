@@ -26,9 +26,9 @@ touch ghc/compiler/parser/Parser.hs
 
 echo "*** Building hsc..."
 ./configure --enable-hc-boot $configopts        || exit 1
-make boot all                                   || exit 1
+gmake boot all                                   || exit 1
 
 echo "*** Building library..."
 echo "GhcWithHscBuiltViaC=NO" >>mk/build.mk
-make -C ghc/lib clean boot all			|| exit 1
-make -C hslibs  clean boot all
+gmake -C ghc/lib clean boot all			|| exit 1
+gmake -C hslibs  clean boot all

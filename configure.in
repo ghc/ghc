@@ -164,6 +164,15 @@ i[[3456]]86-*-netbsd*)
         HostVendor_CPP='unknown'
         HostOS_CPP='netbsd'
         ;;
+i[[3456]]86-*-openbsd*)
+	HostPlatform=i386-unknown-openbsd # hack again
+	TargetPlatform=i386-unknown-openbsd
+	BuildPlatform=i386-unknown-openbsd
+        HostPlatform_CPP='i386_unknown_openbsd'
+        HostArch_CPP='i386'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='openbsd'
+        ;;
 i[[3456]]86-*-solaris2*)
 	HostPlatform=i386-unknown-solaris2 # hack again
 	TargetPlatform=i386-unknown-solaris2

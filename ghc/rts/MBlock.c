@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.15 2000/04/03 15:24:21 rrt Exp $
+ * $Id: MBlock.c,v 1.16 2000/08/04 23:31:44 lewie Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -50,6 +50,8 @@
 #elif netbsd_TARGET_OS
 /* NetBSD i386 shared libs are at 0x40000000
  */
+#define ASK_FOR_MEM_AT 0x50000000
+#elif openbsd_TARGET_OS
 #define ASK_FOR_MEM_AT 0x50000000
 #elif linux_TARGET_OS
 /* Any ideas?

@@ -95,6 +95,12 @@ you will screw up the layout where they are used in case expressions!
 # define IF_OS_netbsd(x,y) y
 #endif
 -- - - - - - - - - - - - - - - - - - - - - - 
+#if openbsd_TARGET_OS
+# define IF_OS_openbsd(x,y) x
+#else
+# define IF_OS_openbsd(x,y) y
+#endif
+-- - - - - - - - - - - - - - - - - - - - - - 
 #if linux_TARGET_OS
 # define IF_OS_linux(x,y) x
 #else
