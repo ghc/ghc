@@ -255,7 +255,7 @@ mkTyConGenericBinds tycon
 		loc
 	`AndMonoBinds`
     FunMonoBind to_RDR False 
-		[mkSimpleHsAlt (VarPat to_arg) to_body] loc
+		[mkSimpleHsAlt to_pat to_body] loc
   where
     loc	     = getSrcLoc tycon
     datacons = tyConDataCons tycon
@@ -263,7 +263,7 @@ mkTyConGenericBinds tycon
 
     -- Recurse over the sum first
     from_alts :: [FromAlt]
-    (from_alts, to_arg, to_body) = mk_sum_stuff init_us datacons
+    (from_alts, to_pat, to_body) = mk_sum_stuff init_us datacons
     init_us = 1::Int		-- Unique supply
 
 ----------------------------------------------------
@@ -273,7 +273,7 @@ mkTyConGenericBinds tycon
 mk_sum_stuff :: US 			-- Base for generating unique names
 	     -> [DataCon]	 	-- The data constructors
 	     -> ([FromAlt],			-- Alternatives for the T->Trep "from" function
-		 RdrName, HsExpr RdrName)	-- Arg and body of the Trep->T "to" function
+		 InPat RdrName, HsExpr RdrName)	-- Arg and body of the Trep->T "to" function
 
 -- For example, given
 --	data T = C | D Int Int Int
@@ -286,7 +286,7 @@ mk_sum_stuff :: US 			-- Base for generating unique names
 --			   cd)
 
 mk_sum_stuff us [datacon]
-   = ([from_alt], to_arg, to_body_fn app_exp)
+   = ([from_alt], to_pat, to_body_fn app_exp)
    where
      n_args = dataConSourceArity datacon	-- Existentials already excluded
 
@@ -297,19 +297,19 @@ mk_sum_stuff us [datacon]
      app_exp      = mkHsVarApps datacon_rdr datacon_vars
      from_alt     = (mkConPat datacon_rdr datacon_vars, from_alt_rhs)
 
-     (_, from_alt_rhs, to_arg, to_body_fn) = mk_prod_stuff us' datacon_vars
+     (_, from_alt_rhs, to_pat, to_body_fn) = mk_prod_stuff us' datacon_vars
 
 mk_sum_stuff us datacons
   = (wrap inlDataCon_RDR l_from_alts ++ wrap inrDataCon_RDR r_from_alts,
-     to_arg,
+     VarPat to_arg,
      HsCase (HsVar to_arg) 
-	    [mkSimpleHsAlt (mkConPat inlDataCon_RDR [l_to_arg]) l_to_body,
-	     mkSimpleHsAlt (mkConPat inrDataCon_RDR [r_to_arg]) r_to_body]
+	    [mkSimpleHsAlt (ConPatIn inlDataCon_RDR (PrefixCon [l_to_pat])) l_to_body,
+	     mkSimpleHsAlt (ConPatIn inrDataCon_RDR (PrefixCon [r_to_pat])) r_to_body]
 	    generatedSrcLoc)
   where
     (l_datacons, r_datacons)		= splitInHalf datacons
-    (l_from_alts, l_to_arg, l_to_body)	= mk_sum_stuff us' l_datacons
-    (r_from_alts, r_to_arg, r_to_body)	= mk_sum_stuff us' r_datacons
+    (l_from_alts, l_to_pat, l_to_body)	= mk_sum_stuff us' l_datacons
+    (r_from_alts, r_to_pat, r_to_body)	= mk_sum_stuff us' r_datacons
 
     to_arg = mkGenericLocal us
     us'	   = us+1
@@ -328,14 +328,15 @@ mk_prod_stuff :: US			-- Base for unique names
 					-- 	Please bind these in the to_body_fn 
 	      -> (US,			-- Depleted unique-name supply
 		  HsExpr RdrName, 			-- from-rhs: puts together the representation from the arg_ids
-		  RdrName,				-- to_arg: 
+		  InPat RdrName,			-- to_pat: 
 		  HsExpr RdrName -> HsExpr RdrName)	-- to_body_fn: takes apart the representation
 
 -- For example:
 -- mk_prod_stuff abc [a,b,c] = ( a :*: (b :*: c),
---			         \x -> case abc of { a :*: bc ->
---			 	       case bc  of { b :*: c  -> 
---				       x)
+--				 abc,
+--			         \<body-code> -> case abc of { a :*: bc ->
+--				 	         case bc  of { b :*: c  -> 
+--					         <body-code> )
 
 -- We need to use different uniques in the branches 
 -- because the returned to_body_fns are nested.  
@@ -344,24 +345,32 @@ mk_prod_stuff :: US			-- Base for unique names
 mk_prod_stuff us []		-- Unit case
   = (us+1,
      HsVar genUnitDataCon_RDR,
-     mkGenericLocal us,
+     SigPatIn (VarPat (mkGenericLocal us)) 
+	      (HsTyVar (getRdrName genUnitTyConName)),
+	-- Give a signature to the pattern so we get 
+	--	data S a = Nil | S a
+	--	toS = \x -> case x of { Inl (g :: Unit) -> Nil
+	--				Inr x -> S x }
+	-- The (:: Unit) signature ensures that we'll infer the right
+	-- type for toS. If we leave it out, the type is too polymorphic
+
      \x -> x)
 
 mk_prod_stuff us [arg_var]	-- Singleton case
-  = (us, HsVar arg_var, arg_var, \x -> x)
+  = (us, HsVar arg_var, VarPat arg_var, \x -> x)
 
 mk_prod_stuff us arg_vars	-- Two or more
   = (us'', 
      HsVar crossDataCon_RDR `HsApp` l_alt_rhs `HsApp` r_alt_rhs,
-     to_arg, 
+     VarPat to_arg, 
      \x -> HsCase (HsVar to_arg)
-		  [mkSimpleHsAlt (mkConPat crossDataCon_RDR [l_to_arg, r_to_arg])
+		  [mkSimpleHsAlt (ConPatIn crossDataCon_RDR (PrefixCon [l_to_pat, r_to_pat]))
 				 (l_to_body_fn (r_to_body_fn x))] generatedSrcLoc)
   where
     to_arg = mkGenericLocal us
     (l_arg_vars, r_arg_vars) 		      = splitInHalf arg_vars
-    (us',  l_alt_rhs, l_to_arg, l_to_body_fn) = mk_prod_stuff (us+1)  l_arg_vars
-    (us'', r_alt_rhs, r_to_arg, r_to_body_fn) = mk_prod_stuff us' r_arg_vars
+    (us',  l_alt_rhs, l_to_pat, l_to_body_fn) = mk_prod_stuff (us+1)  l_arg_vars
+    (us'', r_alt_rhs, r_to_pat, r_to_body_fn) = mk_prod_stuff us' r_arg_vars
 
 
 splitInHalf :: [a] -> ([a],[a])
