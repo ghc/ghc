@@ -24,8 +24,8 @@ sub postprocessHiFile {
     local($new_hi) = "$Tmp_prefix.hi-new";
     local($show_hi_diffs) = $HiDiff_flag && ! $HiOnStdout && ! $going_interactive && -f $hifile_target;
 
-#    print STDERR "*** New hi file follows...\n";
-#    print STDERR `$Cat $hsc_hi`;
+    print STDERR "*** New hi file follows...\n" if $Verbose;
+    system("$Cat $hsc_hi 1>&2") if $Verbose;
 
     &constructNewHiFile($hsc_hi, $hifile_target, $new_hi, $show_hi_diffs);
 
@@ -51,7 +51,7 @@ sub postprocessHiFile {
     # if we produced an interface file "no matter what",
     # print what we got on stderr (ToDo: honor -ohi flag)
     if ( $HiOnStdout ) {
-	print STDERR `$Cat $new_hi`;
+        system("$Cat $new_hi 1>&2") if $Verbose;
     } else {
 	&run_something("$Cmp -s $hifile_target $new_hi || ( $Rm $hifile_target && $Cp $new_hi $hifile_target )",
 	   "Replace .$HiSuffix file, if changed");
