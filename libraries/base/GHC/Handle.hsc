@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: Handle.hsc,v 1.3 2001/07/31 12:47:13 simonmar Exp $
+-- $Id: Handle.hsc,v 1.4 2001/07/31 12:48:55 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -1163,7 +1163,6 @@ hSetBinaryMode handle bin =
        throwErrnoIfMinus1_ "hSetBinaryMode"
           (setmode (fromIntegral (haFD handle_)) flg)
        return handle_{haIsBin=bin}
-  return ()
 
 foreign import "setmode" setmode :: CInt -> CInt -> IO CInt
 #else
