@@ -13,6 +13,15 @@ deSugar/should_compile/ds054
 lib/IO/hReady001
 		-- IO.hReady doesn't detect the end of a file
 
+lib/IO/openFile005, openFile007, readFile001 [Windows]
+                -- file locking is broken on Windows
+
+lib/IOExts/hTell001, hTell002 [Windows]
+		-- seeking on text handles not implemented on Windows
+
+lib/net/net001 [Windows]
+                -- getProtocolByName seems not to be working on Windows
+
 parser/should_fail/read002
 		-- we don't disallow certain characters in strings (eg. newline)
 
