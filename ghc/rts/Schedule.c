@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.177 2003/10/01 10:57:42 wolfgang Exp $
+ * $Id: Schedule.c,v 1.178 2003/10/01 21:16:12 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1639,10 +1639,8 @@ isThreadBound(StgTSO* tso USED_IN_THREADED_RTS)
  * Singleton fork(). Do not copy any running threads.
  * ------------------------------------------------------------------------- */
 
-#ifdef THREADED_RTS
 static void 
 deleteThreadImmediately(StgTSO *tso);
-#endif
 
 StgInt
 forkProcess(HsStablePtr *entry)
@@ -1687,9 +1685,11 @@ forkProcess(HsStablePtr *entry)
       stgFree(m);
     }
     
+#ifdef RTS_SUPPORTS_THREADS
     resetTaskManagerAfterFork();      // tell startTask() and friends that
     startingWorkerThread = rtsFalse;  // we have no worker threads any more
     resetWorkerWakeupPipeAfterFork();
+#endif
     
     rc = rts_evalStableIO(entry, NULL);  // run the action
     rts_checkSchedStatus("forkProcess",rc);
@@ -3141,6 +3141,7 @@ interruptStgRts(void)
 {
     interrupted    = 1;
     context_switch = 1;
+    wakeBlockedWorkerThread();
 }
 
 /* -----------------------------------------------------------------------------
@@ -3460,7 +3461,6 @@ deleteThread(StgTSO *tso)
   raiseAsync(tso,NULL);
 }
 
-#ifdef THREADED_RTS
 static void 
 deleteThreadImmediately(StgTSO *tso)
 { // for forkProcess only:
@@ -3476,7 +3476,6 @@ deleteThreadImmediately(StgTSO *tso)
     unblockThread(tso);
   tso->what_next = ThreadKilled;
 }
-#endif
 
 void
 raiseAsyncWithLock(StgTSO *tso, StgClosure *exception)
