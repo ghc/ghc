@@ -172,13 +172,18 @@ hsTupParens (HsTupCon _ b _) p = tupleParens b p
 --
 -- A valid type must have one for-all at the top of the type, or of the fn arg types
 
-mkHsForAllTy (Just []) [] ty = ty	-- Explicit for-all with no tyvars
-mkHsForAllTy mtvs1     [] (HsForAllTy mtvs2 ctxt ty) = mkHsForAllTy (mtvs1 `plus` mtvs2) ctxt ty
-						     where
-						       mtvs1       `plus` Nothing     = mtvs1
-						       Nothing     `plus` mtvs2       = mtvs2 
-						       (Just tvs1) `plus` (Just tvs2) = Just (tvs1 ++ tvs2)
-mkHsForAllTy tvs ctxt ty = HsForAllTy tvs ctxt ty
+mkHsForAllTy mtvs []   ty = mk_forall_ty mtvs ty
+mkHsForAllTy mtvs ctxt ty = HsForAllTy mtvs ctxt ty
+
+-- mk_forall_ty makes a pure for-all type (no context)
+mk_forall_ty (Just []) ty 			  = ty	-- Explicit for-all with no tyvars
+mk_forall_ty mtvs1     (HsParTy ty)		  = mk_forall_ty mtvs1 ty
+mk_forall_ty mtvs1     (HsForAllTy mtvs2 ctxt ty) = mkHsForAllTy (mtvs1 `plus` mtvs2) ctxt ty
+mk_forall_ty mtvs1     ty			  = HsForAllTy mtvs1 [] ty
+
+mtvs1       `plus` Nothing     = mtvs1
+Nothing     `plus` mtvs2       = mtvs2 
+(Just tvs1) `plus` (Just tvs2) = Just (tvs1 ++ tvs2)
 
 mkHsDictTy cls tys = HsPredTy (HsClassP cls tys)
 mkHsIParamTy v ty  = HsPredTy (HsIParam v ty)
@@ -306,7 +311,7 @@ ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)
 	p2 = ppr_mono_ty pREC_TOP ty2
     in
     maybeParen (ctxt_prec >= pREC_FUN)
-	       (sep [p1, (<>) (ptext SLIT("-> ")) p2])
+	       (sep [p1, ptext SLIT("->") <+> p2])
 
 ppr_mono_ty ctxt_prec (HsTupleTy con tys) = hsTupParens con (interpp'SP tys)
 ppr_mono_ty ctxt_prec (HsKindSig ty kind) = parens (ppr_mono_ty pREC_TOP ty <+> dcolon <+> pprKind kind)
