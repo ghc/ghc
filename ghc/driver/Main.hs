@@ -1854,6 +1854,7 @@ opts =
 
   ,  ( "fasm"		   , OptPrefix (\_ -> writeIORef hsc_lang HscAsm) )
 
+  ,  ( "fvia-c"		   , NoArg (writeIORef hsc_lang HscC) )
   ,  ( "fvia-C"		   , NoArg (writeIORef hsc_lang HscC) )
 
   ,  ( "fno-asm-mangling"  , NoArg (writeIORef do_asm_mangling False) )
