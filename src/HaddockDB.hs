@@ -1,7 +1,7 @@
 --
 -- Haddock - A Haskell Documentation Tool
 --
--- (c) Simon Marlow 2002
+-- (c) Simon Marlow 2003
 --
 
 module HaddockDB (ppDocBook) where

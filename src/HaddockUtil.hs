@@ -2,7 +2,7 @@
 -- Haddock - A Haskell Documentation Tool
 --
 -- (c) The University of Glasgow 2001-2002
--- (c) Simon Marlow 2002
+-- (c) Simon Marlow 2003
 --
 
 module HaddockUtil (
