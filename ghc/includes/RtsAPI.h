@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.34 2003/02/06 09:56:07 simonmar Exp $
+ * $Id: RtsAPI.h,v 1.35 2003/08/22 22:38:02 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -116,7 +116,7 @@ rts_evalIO ( HaskellObj p, /*out*/HaskellObj *ret );
 #if defined(COMPILING_RTS_MAIN)
 /* Used by the RTS' main() only */
 SchedulerStatus 
-rts_mainEvalIO ( HaskellObj p, /*out*/HaskellObj *ret );
+rts_mainLazyIO ( HaskellObj p, /*out*/HaskellObj *ret );
 #endif
 
 SchedulerStatus
