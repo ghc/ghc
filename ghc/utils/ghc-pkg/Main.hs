@@ -626,19 +626,28 @@ updatePackageDB
 	-> IO [InstalledPackageInfo]
 updatePackageDB db_stack pkgs new_pkg = do
   let
-	-- we update dependencies without version numbers to
-	-- match the actual versions of the relevant packages instaled.
+	-- The input package spec is allowed to give a package dependency
+	-- without a version number; e.g.
+	--	depends: base
+	-- Here, we update these dependencies without version numbers to
+	-- match the actual versions of the relevant packages installed.
 	updateDeps p = p{depends = map resolveDep (depends p)}
 
-	resolveDep pkgid
-	   | realVersion pkgid  = pkgid
-	   | otherwise		= lookupDep (pkgName pkgid)
---	   = pkgid
+	resolveDep dep_pkgid
+	   | realVersion dep_pkgid  = dep_pkgid
+	   | otherwise		    = lookupDep dep_pkgid
 
-	lookupDep name
-	   = my_head "dep" [ pid | p <- concat (map snd db_stack), 
+	lookupDep dep_pkgid
+	   = let 
+		name = pkgName dep_pkgid
+	     in
+	     case [ pid | p <- concat (map snd db_stack), 
 			  let pid = package p,
-			  pkgName pid == name ]
+			  pkgName pid == name ] of
+		(pid:_) -> pid		-- Found installed package,
+					-- replete with its version
+		[]	-> dep_pkgid	-- No installed package; use 
+					-- the version-less one
 
 	is_exposed = exposed new_pkg
 	pkgid      = package new_pkg
