@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.109 2000/11/06 08:15:20 simonpj Exp $
+# $Id: Makefile,v 1.110 2000/11/07 14:01:53 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -91,7 +91,7 @@ $(HS_PROG) :: $(HS_SRCS)
 DIRS = \
   utils basicTypes types hsSyn prelude rename typecheck deSugar coreSyn \
   specialise simplCore stranal stgSyn simplStg codeGen absCSyn main \
-  profiling parser usageSP cprAnalysis javaGen compMan ghci
+  profiling parser usageSP cprAnalysis javaGen compMan
 
 ifeq ($(GhcWithNativeCodeGen),YES)
 DIRS += nativeGen
@@ -212,7 +212,7 @@ nativeGen/MachCode_HC_OPTS 	= -H10m
 # Avoids Bug in 3.02, it seems
 usageSP/UsageSPInf_HC_OPTS	= -Onot
 
-prelude/PrimOp_HC_OPTS 		= -H12m -K3m
+prelude/PrimOp_HC_OPTS 		= -H12m -K3m -no-recomp
 
 # because the NCG can't handle the 64-bit math in here
 prelude/PrelRules_HC_OPTS	= -fvia-C
