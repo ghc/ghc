@@ -168,7 +168,7 @@ instance Bits Word where
 "fromIntegral/Int->Word"  fromIntegral = \(I# x#) -> W# (int2Word# x#)
 "fromIntegral/Word->Int"  fromIntegral = \(W# x#) -> I# (word2Int# x#)
 "fromIntegral/Word->Word" fromIntegral = id :: Word -> Word
-    #-}
+  #-}
 
 ------------------------------------------------------------------------
 -- type Word8
@@ -265,9 +265,11 @@ instance Bits Word8 where
     isSigned _                = False
 
 {-# RULES
-"fromIntegral/a->Word8" fromIntegral = \x -> case fromIntegral x of W# x# -> W8# (wordToWord8# x#)
-"fromIntegral/Word8->a" fromIntegral = \(W8# x#) -> fromIntegral (W# x#)
-    #-}
+"fromIntegral/Word8->Word8"   fromIntegral = id :: Word8 -> Word8
+"fromIntegral/Word8->Integer" fromIntegral = toInteger :: Word8 -> Integer
+"fromIntegral/a->Word8"       fromIntegral = \x -> case fromIntegral x of W# x# -> W8# (wordToWord8# x#)
+"fromIntegral/Word8->a"       fromIntegral = \(W8# x#) -> fromIntegral (W# x#)
+  #-}
 
 ------------------------------------------------------------------------
 -- type Word16
@@ -364,9 +366,12 @@ instance Bits Word16 where
     isSigned _                = False
 
 {-# RULES
-"fromIntegral/a->Word16" fromIntegral = \x -> case fromIntegral x of W# x# -> W16# (wordToWord16# x#)
-"fromIntegral/Word16->a" fromIntegral = \(W16# x#) -> fromIntegral (W# x#)
-    #-}
+"fromIntegral/Word8->Word16"   fromIntegral = \(W8# x#) -> W16# x#
+"fromIntegral/Word16->Word16"  fromIntegral = id :: Word16 -> Word16
+"fromIntegral/Word16->Integer" fromIntegral = toInteger :: Word16 -> Integer
+"fromIntegral/a->Word16"       fromIntegral = \x -> case fromIntegral x of W# x# -> W16# (wordToWord16# x#)
+"fromIntegral/Word16->a"       fromIntegral = \(W16# x#) -> fromIntegral (W# x#)
+  #-}
 
 ------------------------------------------------------------------------
 -- type Word32
@@ -496,9 +501,13 @@ instance Bits Word32 where
     isSigned _                = False
 
 {-# RULES
-"fromIntegral/a->Word32" fromIntegral = \x -> case fromIntegral x of W# x# -> W32# (wordToWord32# x#)
-"fromIntegral/Word32->a" fromIntegral = \(W32# x#) -> fromIntegral (W# x#)
-    #-}
+"fromIntegral/Word8->Word32"   fromIntegral = \(W8# x#) -> W32# x#
+"fromIntegral/Word16->Word32"  fromIntegral = \(W16# x#) -> W32# x#
+"fromIntegral/Word32->Word32"  fromIntegral = id :: Word32 -> Word32
+"fromIntegral/Word32->Integer" fromIntegral = toInteger :: Word32 -> Integer
+"fromIntegral/a->Word32"       fromIntegral = \x -> case fromIntegral x of W# x# -> W32# (wordToWord32# x#)
+"fromIntegral/Word32->a"       fromIntegral = \(W32# x#) -> fromIntegral (W# x#)
+  #-}
 
 ------------------------------------------------------------------------
 -- type Word64
@@ -616,7 +625,7 @@ foreign import "stg_shiftRL64"     unsafe shiftRL64#     :: Word64# -> Int# -> W
 "fromIntegral/Word64->Int"    fromIntegral = \(W64# x#) -> I#   (word2Int# (word64ToWord# x#))
 "fromIntegral/Word64->Word"   fromIntegral = \(W64# x#) -> W#   (word64ToWord# x#)
 "fromIntegral/Word64->Word64" fromIntegral = id :: Word64 -> Word64
-    #-}
+  #-}
 
 #else
 
@@ -695,7 +704,7 @@ instance Bits Word64 where
 {-# RULES
 "fromIntegral/a->Word64" fromIntegral = \x -> case fromIntegral x of W# x# -> W64# x#
 "fromIntegral/Word64->a" fromIntegral = \(W64# x#) -> fromIntegral (W# x#)
-    #-}
+  #-}
 
 #endif
 
