@@ -216,7 +216,7 @@ ppr_expr (HsVar v)
   | isOperator v = parens (ppr v)
   | otherwise    = ppr v
 
-ppr_expr (HsIPVar v)     = {- char '?' <> -} ppr v
+ppr_expr (HsIPVar v)     = char '?' <> ppr v
 ppr_expr (HsLit lit)     = ppr lit
 ppr_expr (HsOverLit lit) = ppr lit
 
