@@ -133,7 +133,7 @@ foreach $lib ( @Syslibs ) {
     if (!$Include_prelude) {
        push(@Ignore_dirs,$dir);
     } else {
-       push(@Import_dirs, @dirs);
+       push(@Import_dirs, $dir);
     }
 }
 
