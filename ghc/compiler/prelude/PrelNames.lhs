@@ -42,21 +42,9 @@ module PrelNames (
 	-----------------------------------------------------------
 	module PrelNames,	-- A huge bunch of (a) Names,  e.g. intTyConName
 				--		   (b) Uniques e.g. intTyConKey
+				--		   (c) Groups of classes and types
+				--		   (d) miscellaneous things
 				-- So many that we export them all
-
-	-----------------------------------------------------------
-	basicKnownKeyNames, 
-	mkTupNameStr, isBuiltInSyntaxName,
-
-	------------------------------------------------------------
-	-- Goups of classes and types
-	needsDataDeclCtxtClassKeys, cCallishClassKeys, noDictClassKeys,
-	fractionalClassKeys, numericClassKeys, standardClassKeys,
-	derivableClassKeys,	-- things are needed as a result of a 
-				-- deriving(C) clause
-	numericTyKeys, cCallishTyKeys,
-
-	mkUnboundName, isUnboundName
     ) where
 
 #include "HsVersions.h"
