@@ -3,8 +3,8 @@
 module TH_spliceDecl1
 where
 
-import Language.Haskell.THSyntax
+import Language.Haskell.TH
 
 
 -- splice a simple data declaration
-$(return [DataD [] "T" [] [NormalC "C" []] []])
+$(return [DataD [] (mkName "T") [] [NormalC (mkName "C") []] []])

@@ -3,7 +3,7 @@
 module TH_spliceExpr1
 where
 
-import Language.Haskell.THSyntax
+import Language.Haskell.TH
 
 foo :: Int
 foo = $( [| ((+) $ 2) $ 2 |] )

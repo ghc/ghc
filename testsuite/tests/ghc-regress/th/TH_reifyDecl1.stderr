@@ -1,0 +1,30 @@
+
+TH_reifyDecl1.hs:33: data TH_reifyDecl1.T = TH_reifyDecl1.A | TH_reifyDecl1.B
+
+TH_reifyDecl1.hs:33:
+    data TH_reifyDecl1.R a_1627393115 = TH_reifyDecl1.C a_1627393115
+				  | TH_reifyDecl1.D
+
+TH_reifyDecl1.hs:33:
+    data TH_reifyDecl1.List a_1627393111 = TH_reifyDecl1.Nil
+				     | TH_reifyDecl1.Cons a_1627393111 TH_reifyDecl1.List a_1627393111
+
+TH_reifyDecl1.hs:33:
+    data TH_reifyDecl1.Tree a_1627393107 = TH_reifyDecl1.Leaf
+				     | TH_reifyDecl1.:+: TH_reifyDecl1.Tree a_1627393107 TH_reifyDecl1.Tree a_1627393107
+
+TH_reifyDecl1.hs:33: type TH_reifyDecl1.IntList = GHC.Base.[] GHC.Base.Int
+
+TH_reifyDecl1.hs:33:
+    newtype TH_reifyDecl1.Length = TH_reifyDecl1.Length GHC.Base.Int
+
+TH_reifyDecl1.hs:33:
+    Constructor from TH_reifyDecl1.Tree: TH_reifyDecl1.Leaf :: forall a_1627393107 . TH_reifyDecl1.Tree a_1627393107
+
+TH_reifyDecl1.hs:33:
+    Class op from TH_reifyDecl1.C: TH_reifyDecl1.m :: forall a_1627393101 . (TH_reifyDecl1.C a_1627393101) => a_1627393101 ->
+													  GHC.Base.Int
+			       infixl 3 TH_reifyDecl1.m
+Loading package base ... linking ... done.
+Loading package haskell98 ... linking ... done.
+Loading package haskell-src ... linking ... done.

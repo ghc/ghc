@@ -1,29 +1,28 @@
 {-# OPTIONS -fglasgow-exts #-}
 -- test the representation of unboxed literals
 
-module Main
-where
+module Main where
 
 import GHC.Base
 import GHC.Float
-import Language.Haskell.THSyntax
+import Language.Haskell.TH
 import Text.PrettyPrint
 import System.IO
 
 main :: IO ()
 main = do putStrLn $ show $ $( do e <- [| I# 20# |]
-                                  qIO $ putStrLn $ show e
-                                  qIO $ putStrLn $ render $ pprExp e
-				  qIO $ hFlush stdout
+                                  runIO $ putStrLn $ show e
+                                  runIO $ putStrLn $ render $ pprExp e
+				  runIO $ hFlush stdout
                                   return e )
           putStrLn $ show $ $( do e <- [| F# 12.3# |]
-                                  qIO $ putStrLn $ show e
-                                  qIO $ putStrLn $ render $ pprExp e
-				  qIO $ hFlush stdout
+                                  runIO $ putStrLn $ show e
+                                  runIO $ putStrLn $ render $ pprExp e
+				  runIO $ hFlush stdout
                                   return e )
           putStrLn $ show $ $( do e <- [| D# 24.6## |]
-                                  qIO $ putStrLn $ show e
-                                  qIO $ putStrLn $ render $ pprExp e
-				  qIO $ hFlush stdout
+                                  runIO $ putStrLn $ show e
+                                  runIO $ putStrLn $ render $ pprExp e
+				  runIO $ hFlush stdout
                                   return e )
 

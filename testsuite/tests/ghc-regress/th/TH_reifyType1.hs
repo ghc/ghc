@@ -3,11 +3,11 @@
 module TH_reifyType1
 where
 
-import Language.Haskell.THSyntax
+import Language.Haskell.TH
 
 foo :: Int -> Int
 foo x = x + 1
 
-type_foo :: TypeQ
-type_foo = reifyType foo
+type_foo :: InfoQ
+type_foo = reify 'foo
 

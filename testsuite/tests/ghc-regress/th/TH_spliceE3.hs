@@ -3,7 +3,7 @@
 module TH_repE1
 where
 
-import Language.Haskell.THSyntax
+import Language.Haskell.TH
 
 $( do let emptyListExpr :: ExpQ
           emptyListExpr = [| [] |]

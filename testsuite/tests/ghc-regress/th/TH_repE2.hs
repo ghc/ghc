@@ -3,7 +3,7 @@
 module Main
 where
 
-import Language.Haskell.THSyntax
+import Language.Haskell.TH
 
 main :: IO ()
 main = mapM_ putStrLn [show an_integral, show an_int, show an_integer,

@@ -3,9 +3,9 @@
 module TH_spliceDecl3
 where
 
-import Language.Haskell.THSyntax
+import Language.Haskell.TH
 import TH_spliceDecl3_Lib
 
 data T = C
 
-$(do {d <- reifyDecl T; rename' d})
+$(do { TyConI d <- reify ''T; rename' d})

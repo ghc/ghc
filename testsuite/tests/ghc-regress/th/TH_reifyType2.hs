@@ -3,7 +3,7 @@
 module TH_reifyType1
 where
 
-import Language.Haskell.THSyntax
+import Language.Haskell.TH
 
-type_length :: TypeQ
-type_length = reifyType length
+type_length :: InfoQ
+type_length = reify 'length

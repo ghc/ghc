@@ -7,14 +7,10 @@ setTestOpts(only_ways(['normal']));
 test('TH_repE1', normal, compile, [''])
 test('TH_repE2', normal, compile_and_run, [''])
 test('TH_repE3', normal, compile, [''])
-test('TH_spliceE3', normal, compile, [''])
 test('TH_repPrim', normal, compile, [''])
 test('TH_repPrimOutput', normal, compile_and_run, [''])
 
 test('TH_reifyDecl1', normal, compile, [''])
-test('TH_reifyDecl2', normal, compile, [''])
-test('TH_reifyDecl3', normal, compile, [''])
-test('TH_reifyDecl4', normal, compile, [''])
 
 test('TH_reifyType1', normal, compile, [''])
 test('TH_reifyType2', normal, compile, [''])
@@ -23,7 +19,10 @@ test('TH_spliceDecl1', normal, compile, ['-v0'])
 test('TH_spliceDecl2', normal, compile, ['-v0'])
 test('TH_spliceDecl3', normal, multimod_compile, ['TH_spliceDecl3', '-v0'])
 
+test('TH_spliceE1', normal, compile_and_run, [''])
 test('TH_spliceExpr1', normal, compile, ['-v0'])
+test('TH_spliceE3', normal, compile, [''])
+test('TH_spliceE4', normal, compile_and_run, [''])
 
 test('TH_bracket1', normal, compile, [''])
 test('TH_bracket2', normal, compile, [''])
