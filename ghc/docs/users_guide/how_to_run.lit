@@ -440,6 +440,11 @@ warnings:
 
 Turns off all warnings, including the standard ones.
 
+\item[\tr{-w}:]
+\index{-w option}
+
+Synonym for \tr{-Wnot}.
+
 \item[\tr{-W}:]
 \index{-W option}
 
@@ -516,6 +521,17 @@ class declaration has no default declaration for them.
 Have the renamer report which locally defined names are not
 used/exported.  This option is not currently supported.
 
+\item[\tr{-fwarn-duplicate-exports}:]
+\index{-fwarn-duplicate-exports option}
+\index{export lists, duplicates}
+
+Have the compiler warn about duplicate entries in export lists. This
+is useful information if you maintain large export lists, and want to
+avoid the continued export of a definition after you've deleted (one)
+mention of it in the export list.
+
+This option is on by default.
+
 \end{description}
 
 If you would like GHC to check that every top-level value has a type
@@ -537,11 +553,21 @@ sanity, not yours.)
 When compiling a Haskell module, GHC may produce several files of
 output (usually two).
 
-One file is usually an {\em interface file}.  If compiling
-\tr{bar/Foo.hs}, the interface file would normally be \tr{bar/Foo.hi}.
+One file is usually an {\em interface file}.  The name of the
+interface file follows the Haskell {\em module} name, i.e., if
+compiling \tr{bar/Foo.hs}, and it implements \tr{module Bar ...}, the
+interface file would normally be \tr{bar/Bar.hi}.  
+
 The interface output may be directed to another file
-\tr{bar2/Wurble.iface} with the option
-\tr{-ohi bar2/Wurble.iface}\index{-ohi <file> option} (not recommended).
+\tr{bar2/Wurble.iface} with the option \tr{-ohi
+bar2/Wurble.iface}\index{-ohi <file> option} (not recommended).
+
+NOTE: Having the name of the interface file follow the module name
+and not the file name, means that working with tools such as
+\tr{make(1)} become harder. \tr{make} implicitly assumes that any
+output files produced by processing a translation unit will have file
+names that can be derived from the file name of the translation unit.
+For instance, pattern rules becomes unusable.
 
 To avoid generating an interface file at all, use a \tr{-nohi}
 option.\index{-nohi option}
