@@ -233,6 +233,7 @@ GhcLibsWithReadline=NO
 # (no path == in standard include path)
 #
 ReadlineIncludePath=
+HaveLibReadline=@HaveLibReadline@
 
 # Strip local symbols from libraries?  This can make the libraries smaller,
 # but makes debugging somewhat more difficult.  Doesn't work with all ld's.

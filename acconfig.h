@@ -63,6 +63,9 @@
 /* Define if you support the production (and use) of Win32 DLLs. */
 #undef HAVE_WIN32_DLL_SUPPORT
 
+/* Define if you have and want to use readline in Hugs. */
+#undef HAVE_LIBREADLINE
+
 /* Define if C Symbols have a leading underscore added by the compiler */
 #undef LEADING_UNDERSCORE
 
