@@ -25,7 +25,7 @@ import Literal		( Literal(..), literalPrimRep )
 import PrimRep		( PrimRep(..) )
 import CoreFVs		( freeVars )
 import Type		( typePrimRep )
-import DataCon		( dataConTag, fIRST_TAG, dataConTyCon )
+import DataCon		( dataConTag, fIRST_TAG, dataConTyCon, dataConWrapId )
 import TyCon		( TyCon, tyConFamilySize )
 import Class		( Class, classTyCon )
 import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem )
@@ -76,7 +76,8 @@ byteCodeGen dflags binds local_tycons local_classes
             getBind (NonRec bndr rhs) = [(bndr, freeVars rhs)]
             getBind (Rec binds)       = [(bndr, freeVars rhs) | (bndr,rhs) <- binds]
             final_state = runBc (BcM_State [] 0) 
-                                (mapBc schemeR flatBinds `thenBc_` returnBc ())
+                                (mapBc (schemeR True) flatBinds
+					`thenBc_` returnBc ())
             (BcM_State proto_bcos final_ctr) = final_state
 
         dumpIfSet_dyn dflags Opt_D_dump_BCOs
@@ -102,7 +103,7 @@ coreExprToBCOs dflags expr
 
       let (BcM_State all_proto_bcos final_ctr) 
              = runBc (BcM_State [] 0) 
-                     (schemeR (invented_id, freeVars expr))
+                     (schemeR True (invented_id, freeVars expr))
       dumpIfSet_dyn dflags Opt_D_dump_BCOs
          "Proto-bcos" (vcat (intersperse (char ' ') (map ppr all_proto_bcos)))
 
@@ -182,9 +183,10 @@ mkProtoBCO nm instrs_ordlist origin
 -- Compile code for the right hand side of a let binding.
 -- Park the resulting BCO in the monad.  Also requires the
 -- variable to which this value was bound, so as to give the
--- resulting BCO a name.
-schemeR :: (Id, AnnExpr Id VarSet) -> BcM ()
-schemeR (nm, rhs) 
+-- resulting BCO a name.  Bool indicates top-levelness.
+
+schemeR :: Bool -> (Id, AnnExpr Id VarSet) -> BcM ()
+schemeR is_top (nm, rhs) 
 {-
    | trace (showSDoc (
               (char ' '
@@ -195,7 +197,7 @@ schemeR (nm, rhs)
    = undefined
 -}
    | otherwise
-   = schemeR_wrk rhs nm (collect [] rhs)
+   = schemeR_wrk is_top rhs nm (collect [] rhs)
 
 
 collect xs (_, AnnNote note e)
@@ -205,7 +207,14 @@ collect xs (_, AnnLam x e)
 collect xs not_lambda
    = (reverse xs, not_lambda)
 
-schemeR_wrk original_body nm (args, body)
+schemeR_wrk is_top original_body nm (args, body)
+   | Just dcon <- maybe_toplevel_null_con_rhs
+   = trace ("nullary constructor! " ++ showSDocDebug (ppr nm)) (
+     emitBc (mkProtoBCO (getName nm) (toOL [PACK dcon 0, ENTER])
+                                     (Right original_body))
+     )
+
+   | otherwise
    = let fvs       = filter (not.isTyVar) (varSetElems (fst original_body))
          all_args  = reverse args ++ fvs
          szsw_args = map taggedIdSizeW all_args
@@ -214,7 +223,23 @@ schemeR_wrk original_body nm (args, body)
          argcheck  = unitOL (ARGCHECK szw_args)
      in
      schemeE szw_args 0 p_init body 		`thenBc` \ body_code ->
-     emitBc (mkProtoBCO (getName nm) (appOL argcheck body_code) (Right original_body))
+     emitBc (mkProtoBCO (getName nm) (appOL argcheck body_code) 
+                                     (Right original_body))
+
+     where
+        maybe_toplevel_null_con_rhs
+           | is_top && null args
+           = case snd body of
+                AnnVar v_wrk 
+                   -> case isDataConId_maybe v_wrk of
+                         Nothing -> Nothing
+                         Just dc_wrk |  nm == dataConWrapId dc_wrk
+                                     -> Just dc_wrk
+                                     |  otherwise 
+                                     -> Nothing
+                other -> Nothing
+           | otherwise
+           = Nothing
 
 -- Let szsw be the sizes in words of some items pushed onto the stack,
 -- which has initial depth d'.  Return the values which the stack environment
@@ -284,7 +309,7 @@ schemeE d s p (fvs, AnnLet binds b)
          allocCode = toOL (map ALLOC sizes)
      in
      schemeE d' s p' b   				`thenBc`  \ bodyCode ->
-     mapBc schemeR (zip xs rhss) 			`thenBc_`
+     mapBc (schemeR False) (zip xs rhss)		`thenBc_`
      returnBc (allocCode `appOL` thunkCode `appOL` bodyCode)
 
 
@@ -359,13 +384,17 @@ schemeE d s p other
                (pprCoreExpr (deAnnotate other))
 
 
--- Compile code to do a tail call.  If the function eventually
--- to be called is a constructor, split the args into ptrs and
--- non-ptrs, and push the nonptrs, then the ptrs, and then do PACK.
--- *** This assumes that the root expression passed in represents
--- a saturated constructor call.  ***
+-- Compile code to do a tail call.  Three cases:
 --
--- Otherwise, just push the args right-to-left, SLIDE and ENTER.
+-- 1.  A nullary constructor.  Push its closure on the stack 
+--     and SLIDE and RETURN.
+--
+-- 2.  Application of a non-nullary constructor, by defn saturated.
+--     Split the args into ptrs and non-ptrs, and push the nonptrs, 
+--     then the ptrs, and then do PACK and RETURN.
+--
+-- 3.  Otherwise, it must be a function call.  Push the args
+--     right to left, SLIDE and ENTER.
 
 schemeT :: Int 		-- Stack depth
         -> Sequel 	-- Sequel depth
@@ -374,9 +403,18 @@ schemeT :: Int 		-- Stack depth
         -> BCInstrList
 
 schemeT d s p app
-   = --trace ("schemeT: env in = \n" ++ showSDocDebug (ppBCEnv p)) (
-     code
-     --)
+--   | trace ("schemeT: env in = \n" ++ showSDocDebug (ppBCEnv p)) False
+--   = panic "schemeT ?!?!"
+
+   -- Handle case 1
+   | is_con_call && null args_r_to_l
+   = (PUSH_G (getName con) `consOL` mkSLIDE 1 (d-s))
+     `snocOL` ENTER
+
+   -- Cases 2 and 3
+   | otherwise
+   = code
+
      where
          -- Extract the args (R->L) and fn
          (args_r_to_l_raw, fn) = chomp app
@@ -395,6 +433,7 @@ schemeT d s p app
          -- args appropriately.
          maybe_dcon  = isDataConId_maybe fn
          is_con_call = case maybe_dcon of Nothing -> False; Just _ -> True
+         (Just con)  = maybe_dcon
 
          args_final_r_to_l
             | not is_con_call
