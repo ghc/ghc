@@ -5,7 +5,7 @@ maintainer:	glasgow-haskell-users@haskell.org
 exposed:	True
 
 exposed-modules:
-		BasicTypes,
+	BasicTypes,
 	DataCon,
 	Demand,
 	FieldLabel,
@@ -133,7 +133,6 @@ exposed-modules:
 	HscMain,
 	HscStats,
 	HscTypes,
-	Main,
 	PackageConfig,
 	Packages,
 	ParsePkgConf,
