@@ -1,7 +1,7 @@
 /* 
  * (c) The University of Glasgow 2002
  *
- * $Id: system.c,v 1.6 2002/03/26 21:02:19 sof Exp $
+ * $Id: system.c,v 1.7 2003/02/04 11:55:54 simonmar Exp $
  *
  * system Runtime Support
  */
@@ -14,6 +14,14 @@
 #if defined(mingw32_TARGET_OS)
 #include <windows.h>
 #include <stdlib.h>
+#endif
+
+#ifdef HAVE_VFORK_H
+#include <vfork.h>
+#endif
+
+#ifdef HAVE_VFORK
+#define fork vfork
 #endif
 
 HsInt
