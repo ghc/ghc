@@ -3291,6 +3291,109 @@ instances is most interesting.
 </sect1>
 <!-- ==================== End of type system extensions =================  -->
   
+<!-- ====================== Generalised algebraic data types =======================  -->
+
+<sect1 id="gadt">
+<title>Generalised Algebraic Data Types</title>
+
+<para>Generalised Algebraic Data Types (GADTs) generalise ordinary algebraic data types by allowing you
+to give the type signatures of constructors explicitly.  For example:
+<programlisting>
+  data Term a where
+      Lit    :: Int -> Term Int
+      Succ   :: Term Int -> Term Int
+      IsZero :: Term Int -> Term Bool	
+      If     :: Term Bool -> Term a -> Term a -> Term a
+      Pair   :: Term a -> Term b -> Term (a,b)
+</programlisting>
+Notice that the return type of the constructors is not always <literal>Term a</literal>, as is the
+case with ordinary vanilla data types.  Now we can write a well-typed <literal>eval</literal> function
+for these <literal>Terms</literal>:
+<programlisting>
+  eval :: Term a -> a
+  eval (Lit i) 	    = i
+  eval (Succ t)     = 1 + eval t
+  eval (IsZero i)   = eval i == 0
+  eval (If b e1 e2) = if eval b then eval e1 else eval e2
+  eval (Pair e1 e2) = (eval e2, eval e2)
+</programlisting>
+These and many other examples are given in papers by Hongwei Xi, and Tim Sheard.
+</para>
+<para> The extensions to GHC are these:
+<itemizedlist>
+<listitem><para>
+  Data type declarations have a 'where' form, as exemplified above.  The type signature of
+each constructor is independent, and is implicitly univerally quantified as usual. Unlike a normal
+Haskell data type declaration, the type variable(s) in the "<literal>data Term a where</literal>" header 
+have no scope.  Indeed, one can write a kind signature instead:
+<programlisting>
+  data Term :: * -> * where ...
+</programlisting>
+or even a mixture of the two:
+<programlisting>
+  data Foo a :: (* -> *) -> * where ...
+</programlisting>
+The type variables (if given) may be explicitly kinded, so we could also write the header for <literal>Foo</literal>
+like this:
+<programlisting>
+  data Foo a (b :: * -> *) where ...
+</programlisting>
+</para></listitem>
+
+<listitem><para>
+There are no restrictions on the type of the data constructor, except that the result
+type must begin with the type constructor being defined.  For example, in the <literal>Term</literal> data
+type above, the type of each constructor must end with <literal> ... -> Term ...</literal>.
+</para></listitem>
+
+<listitem><para>
+You cannot use a <literal>deriving</literal> clause on a GADT-style data type declaration,
+nor can you use record syntax.  (It's not clear what these constructs would mean.  For example,
+the record selectors might ill-typed.)  However, you can use strictness annotations, in the obvious places
+in the constructor type:
+<programlisting>
+  data Term a where
+      Lit    :: !Int -> Term Int
+      If     :: Term Bool -> !(Term a) -> !(Term a) -> Term a
+      Pair   :: Term a -> Term b -> Term (a,b)
+</programlisting>
+</para></listitem>
+
+<listitem><para>
+Pattern matching causes type refinement.  For example, in the right hand side of the equation
+<programlisting>
+  eval :: Term a -> a
+  eval (Lit i) =  ...
+</programlisting>
+the type <literal>a</literal> is refined to <literal>Int</literal>.  (That's the whole point!)
+A precise specification of the type rules is beyond what this user manual aspires to, but there is a paper
+about the ideas: "Wobbly types: practical type inference for generalised algebraic data types", on Simon PJ's home page.</para>
+
+<para> The general principle is this: <emphasis>type refinement is only carried out based on user-supplied type annotations</emphasis>.
+So if no type signature is supplied for <literal>eval</literal>, no type refinement happens, and lots of obscure error messages will
+occur.  However, the refinement is quite general.  For example, if we had:
+<programlisting>
+  eval :: Term a -> a -> a
+  eval (Lit i) j =  i+j
+</programlisting>
+the pattern match causes the type <literal>a</literal> to be refined to <literal>Int</literal> (because of the type
+of the constructor <literal>Lit</literal>, and that refinement also applies to the type of <literal>j</literal>, and
+the result type of the <literal>case</literal> expression.  Hence the addition <literal>i+j</literal> is legal.
+</para>
+</listitem>
+</itemizedlist>
+</para>
+
+<para>Notice that GADTs generalise existential types.  For example, these two declarations are equivalent:
+<programlisting>
+  data T a = forall b. MkT b (b->a)
+  data T' a where { MKT :: b -> (b->a) -> T a }
+</programlisting>
+</para>
+</sect1>
+
+<!-- ====================== End of Generalised algebraic data types =======================  -->
+
 <!-- ====================== TEMPLATE HASKELL =======================  -->
 
 <sect1 id="template-haskell">
