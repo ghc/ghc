@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.4 1999/01/15 17:57:10 simonm Exp $
+ * $Id: Sanity.c,v 1.5 1999/01/18 15:18:06 simonm Exp $
  *
  * Sanity checking code for the heap and stack.
  *
@@ -193,6 +193,16 @@ checkClosure( StgClosure* p )
 	    }
 	    return bco_sizeW(bco);
 	}
+
+    case MVAR:
+      { 
+	StgMVar *mvar = (StgMVar *)p;
+	ASSERT(LOOKS_LIKE_PTR(mvar->head));
+	ASSERT(LOOKS_LIKE_PTR(mvar->tail));
+	ASSERT(LOOKS_LIKE_PTR(mvar->value));
+	return sizeofW(StgMVar);
+      }
+
     case FUN:
     case THUNK:
     case CONSTR:
@@ -205,7 +215,6 @@ checkClosure( StgClosure* p )
     case BLACKHOLE:
     case BLACKHOLE_BQ:
     case FOREIGN:
-    case MVAR:
     case MUT_VAR:
     case CONSTR_INTLIKE:
     case CONSTR_CHARLIKE:
@@ -331,7 +340,8 @@ checkHeap(bdescr *bd, StgPtr start)
         /* This is the smallest size of closure that can live in the heap. */
         ASSERT( size >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
 	p += size;
-	while (*p == 0) { p++; } /* skip over slop */
+	while (p < bd->free &&
+	       *p && !LOOKS_LIKE_GHC_INFO(*p)) { p++; } /* skip over slop */
       }
       bd = bd->link;
       if (bd != NULL) {
