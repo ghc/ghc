@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- "Scrap your boilerplate" --- Generic programming in Haskell 
+-- \"Scrap your boilerplate\" --- Generic programming in Haskell 
 -- See <http://www.cs.vu.nl/boilerplate/>.
 --
 -----------------------------------------------------------------------------

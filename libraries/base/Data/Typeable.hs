@@ -15,8 +15,8 @@
 -- an unsafe cast is guarded by a test for type (representation)
 -- equivalence. The module Data.Dynamic uses Typeable for an
 -- implementation of dynamics. The module Data.Generics uses Typeable
--- and type-safe cast (but not dynamics) to support the "Scrap your
--- boilerplate" style of generic programming.
+-- and type-safe cast (but not dynamics) to support the \"Scrap your
+-- boilerplate\" style of generic programming.
 --
 -----------------------------------------------------------------------------
 
