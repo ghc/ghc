@@ -670,9 +670,12 @@ tidyLetBndr env (id,rhs)
     -- so it gets propagated to the usage sites.
     new_var_env = extendVarEnv var_env id final_id
 
+-- Non-top-level variables
 tidyIdBndr :: TidyEnv -> Id -> (TidyEnv, Id)
 tidyIdBndr env@(tidy_env, var_env) id
-  = 	-- Non-top-level variables
+  = -- do this pattern match strictly, otherwise we end up holding on to
+    -- stuff in the OccName.
+    case tidyOccName tidy_env (getOccName id) of { (tidy_env', occ') -> 
     let 
 	-- Give the Id a fresh print-name, *and* rename its type
 	-- The SrcLoc isn't important now, 
@@ -680,12 +683,12 @@ tidyIdBndr env@(tidy_env, var_env) id
 	-- 
 	-- All nested Ids now have the same IdInfo, namely none,
 	-- which should save some space.
-	(tidy_env', occ') = tidyOccName tidy_env (getOccName id)
         ty'          	  = tidyType env (idType id)
 	id'          	  = mkUserLocal occ' (idUnique id) ty' noSrcLoc
 	var_env'	  = extendVarEnv var_env id id'
     in
      ((tidy_env', var_env'), id')
+   }
 \end{code}
 
 \begin{code}
