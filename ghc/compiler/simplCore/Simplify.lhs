@@ -18,7 +18,10 @@ IMPORT_DELOOPER(SmplLoop)		-- paranoia checking
 import BinderInfo
 import CmdLineOpts	( SimplifierSwitch(..) )
 import ConFold		( completePrim )
-import CoreUnfold	( Unfolding, SimpleUnfolding, mkFormSummary, exprIsTrivial, whnfOrBottom, FormSummary(..) )
+import CoreUnfold	( Unfolding, SimpleUnfolding, mkFormSummary, 
+			  exprIsTrivial, whnfOrBottom, inlineUnconditionally,
+			  FormSummary(..)
+			)
 import CostCentre 	( isSccCountCostCentre, cmpCostCentre, costsAreSubsumed, useCurrentCostCentre )
 import CoreSyn
 import CoreUtils	( coreExprType, nonErrorRHSs, maybeErrorApp,
@@ -888,7 +891,7 @@ Notice that let to case occurs only if x is used strictly in its body
 -- Dead code is now discarded by the occurrence analyser,
 
 simplNonRec env binder@(id,occ_info) rhs body_c body_ty
-  | inlineUnconditionally ok_to_dup occ_info
+  | inlineUnconditionally ok_to_dup id occ_info
   = 	-- The binder is used in definitely-inline way in the body
 	-- So add it to the environment, drop the binding, and continue
     body_c (extendEnvGivenInlining env id occ_info rhs)
@@ -1150,9 +1153,16 @@ simplRec env pairs body_c body_ty
 simplRecursiveGroup env new_ids []
   = returnSmpl ([], env)
 
-simplRecursiveGroup env (new_id : new_ids) ((binder@(_, occ_info), rhs) : pairs)
-  | inlineUnconditionally ok_to_dup occ_info
+simplRecursiveGroup env (new_id : new_ids) ((binder@(id, occ_info), rhs) : pairs)
+  | inlineUnconditionally ok_to_dup id occ_info
   = 	-- Single occurrence, so drop binding and extend env with the inlining
+	-- This is a little delicate, because what if the unique occurrence
+	-- is *before* this binding?  This'll never happen, because
+	-- either it'll be marked "never inline" or else its occurrence will
+	-- occur after its binding in the group.
+	--
+	-- If these claims aren't right Core Lint will spot an unbound
+	-- variable.  A quick fix is to delete this clause for simplRecursiveGroup
     let
 	new_env = extendEnvGivenInlining env new_id occ_info rhs
     in
@@ -1274,7 +1284,7 @@ floatBind env top_level bind
 leakFree (id,_) rhs = case getIdArity id of
 			ArityAtLeast n | n > 0 -> True
 			ArityExactly n | n > 0 -> True
-			other	               -> whnfOrBottom rhs
+			other	               -> whnfOrBottom (mkFormSummary rhs)
 \end{code}
 
 
