@@ -35,12 +35,12 @@ import HsSyn		( HsExpr(..), OutPat(..), HsLit(..), Fixity,
 			  Match, HsBinds, Stmt, DoOrListComp, HsType, ArithSeqInfo )
 import TcHsSyn		( SYN_IE(TypecheckedPat) )
 import DsHsSyn		( outPatType, collectTypedPatBinders )
+import CmdLineOpts      ( opt_PprUserLength )
 import CoreSyn
 
 import DsMonad
 
 import CoreUtils	( coreExprType, mkCoreIfThenElse )
-import PprStyle		( PprStyle(..) )
 import PrelVals		( iRREFUT_PAT_ERROR_ID, voidId )
 import Pretty		( Doc, hcat, text )
 import Id		( idType, dataConArgTys, 
@@ -62,9 +62,8 @@ import Util		( panic, assertPanic{-, pprTrace ToDo:rm-} )
 import Unique		( Unique )
 import Usage		( SYN_IE(UVar) )
 import SrcLoc		( SrcLoc {- instance Outputable -} )
-#if __GLASGOW_HASKELL__ >= 202
+
 import Outputable
-#endif
 
 \end{code}
 
@@ -346,7 +345,7 @@ mkErrorAppDs :: Id 		-- The error function
 mkErrorAppDs err_id ty msg
   = getSrcLocDs			`thenDs` \ src_loc ->
     let
-	full_msg = show (hcat [ppr PprForUser src_loc, text "|", text msg])
+	full_msg = show (hcat [ppr (PprForUser opt_PprUserLength) src_loc, text "|", text msg])
 	msg_lit  = NoRepStr (_PK_ full_msg)
     in
     returnDs (mkApp (Var err_id) [] [ty] [LitArg msg_lit])
@@ -402,7 +401,7 @@ mkSelectorBinds pat val_expr
     is_var_pat (VarPat v) = True
     is_var_pat other      = False -- Even wild-card patterns aren't acceptable
 
-    pat_string = show (ppr PprForUser pat)
+    pat_string = show (ppr (PprForUser opt_PprUserLength) pat)
 \end{code}
 
 

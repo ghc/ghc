@@ -29,7 +29,7 @@ module DsMonad (
 IMP_Ubiq()
 
 import Bag		( emptyBag, snocBag, bagToList, Bag )
-import CmdLineOpts	( opt_SccGroup )
+import CmdLineOpts	( opt_SccGroup, opt_PprUserLength )
 import CoreSyn		( SYN_IE(CoreExpr) )
 import CoreUtils	( substCoreExpr )
 import HsSyn		( OutPat )
@@ -38,8 +38,7 @@ import Id		( mkSysLocal, mkIdWithNewUniq,
 			  SYN_IE(Id)
 			)
 import PprType		( GenType, GenTyVar )
-import PprStyle		( PprStyle(..) )
-import Outputable	( pprQuote, Outputable(..) )
+import Outputable	( pprQuote, Outputable(..), PprStyle(..) )
 import Pretty
 import SrcLoc		( noSrcLoc, SrcLoc )
 import TcHsSyn		( SYN_IE(TypecheckedPat) )
@@ -251,7 +250,7 @@ pprDsWarnings sty warns
 							Incomplete -> ptext SLIT("possibly incomplete")]
 
     pp_warn (flavour, DsMatchContext kind pats loc)
-       = hang (hcat [ppr PprForUser loc, ptext SLIT(": ")])
+       = hang (hcat [ppr (PprForUser opt_PprUserLength) loc, ptext SLIT(": ")])
 	     4 (hang msg
 		     4 (pp_match kind pats))
        where
