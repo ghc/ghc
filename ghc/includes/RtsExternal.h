@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsExternal.h,v 1.7 2005/01/10 18:44:40 wolfgang Exp $
+ * $Id: RtsExternal.h,v 1.8 2005/01/31 12:55:50 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2004
  *
@@ -62,6 +62,12 @@ extern StgRegTable * resumeThread  ( StgInt );
 extern void*  createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr,
                              char *typeString);
 extern void   freeHaskellFunctionPtr(void* ptr);
+
+#if defined(mingw32_HOST_OS)
+extern int stg_InstallConsoleEvent(int action, StgStablePtr *handler);
+#else
+extern int stg_sig_install (int, int, StgStablePtr *, void *);
+#endif
 
 /* -----------------------------------------------------------------------------
    Storage manager stuff exported
