@@ -8,14 +8,22 @@ At various places in the back end, we want to be to tag things with a
 types.
 
 \begin{code}
-module PrimRep (
-	PrimRep(..),
-
-	separateByPtrFollowness, isFollowableRep, isFloatingRep,
-	getPrimRepSize, retPrimRepSize,
-	showPrimRep,  ppPrimRep,
-	guessPrimRep, decodePrimRep
-    ) where
+module PrimRep 
+      (
+	PrimRep(..)
+      , separateByPtrFollowness
+      , isFollowableRep
+      , isFloatingRep
+      , is64BitRep
+      , getPrimRepSize
+      , getPrimRepSizeInBytes
+      , retPrimRepSize
+      , showPrimRep
+      , showPrimRepToUser
+      , ppPrimRep
+      , guessPrimRep
+      , decodePrimRep
+      ) where
 
 #include "HsVersions.h"
 
@@ -23,6 +31,9 @@ import Util
 import Outputable
 
 -- Oh dear.
+-- NOTE: we have to reach out and grab this header file
+-- in our current source/build tree, and not the one supplied
+-- by whoever's compiling us.
 #include "../../includes/GhcConstants.h"
 \end{code}
 
@@ -48,6 +59,8 @@ data PrimRep
   | AddrRep		--	   addresses ("C pointers")
   | FloatRep		--	   floats
   | DoubleRep		--	   doubles
+  | Word64Rep	        --    guaranteed to be 64 bits (no more, no less.)
+  | Int64Rep	        --    guaranteed to be 64 bits (no more, no less.)
 
   | ForeignObjRep	-- This has to be a special kind because ccall
 			-- generates special code when passing/returning
@@ -123,12 +136,26 @@ isFloatingRep :: PrimRep -> Bool
 isFloatingRep DoubleRep = True
 isFloatingRep FloatRep  = True
 isFloatingRep other     = False
+
 \end{code}
+
+\begin{code}
+is64BitRep :: PrimRep -> Bool
+
+is64BitRep Int64Rep  = True
+is64BitRep Word64Rep = True
+is64BitRep other     = False
+
+\end{code}
+
+
 
 \begin{code}
 getPrimRepSize :: PrimRep -> Int
 
 getPrimRepSize DoubleRep  = DOUBLE_SIZE	-- "words", of course
+getPrimRepSize Word64Rep  = WORD64_SIZE
+getPrimRepSize Int64Rep   = INT64_SIZE
 --getPrimRepSize FloatRep = 1
 --getPrimRepSize CharRep  = 1	-- ToDo: count in bytes?
 --getPrimRepSize ArrayRep = 1	-- Listed specifically for *documentation*
@@ -137,6 +164,27 @@ getPrimRepSize VoidRep	  = 0
 getPrimRepSize other	  = 1
 
 retPrimRepSize = getPrimRepSize RetRep
+
+-- size in bytes, ToDo: cpp in the right vals.
+-- (used in some settings to figure out how many bytes
+-- we have to push onto the stack when calling external
+-- entry points (e.g., stdcalling on win32))
+getPrimRepSizeInBytes :: PrimRep -> Int
+getPrimRepSizeInBytes pr =
+ case pr of
+    CharRep        ->    1
+    IntRep         ->    4
+    AddrRep        ->    4
+    FloatRep       ->    4
+    DoubleRep      ->    8
+    Word64Rep      ->    8
+    Int64Rep       ->    8
+    ForeignObjRep  ->    4
+    StablePtrRep   ->    4
+    ArrayRep       ->    4
+    ByteArrayRep   ->    4
+    _		   ->   panic "getPrimRepSize: ouch - this wasn't supposed to happen!"
+
 \end{code}
 
 %************************************************************************
@@ -150,6 +198,7 @@ instance Outputable PrimRep where
     ppr kind = text (showPrimRep kind)
 
 showPrimRep  :: PrimRep -> String
+showPrimRepToUser :: PrimRep -> String
 -- dumping PrimRep tag for unfoldings
 ppPrimRep  :: PrimRep -> SDoc
 
@@ -166,7 +215,9 @@ ppPrimRep k =
      RetRep        -> 'R'
      CharRep       -> 'C'
      IntRep        -> 'I'
+     Int64Rep      -> 'i'
      WordRep       -> 'W'
+     Word64Rep     -> 'w'
      AddrRep       -> 'A'
      FloatRep      -> 'F'
      DoubleRep     -> 'D'
@@ -190,6 +241,8 @@ showPrimRep CostCentreRep = "CostCentre"
 showPrimRep CharRep	  = "StgChar"
 showPrimRep IntRep	  = "I_"	-- short for StgInt
 showPrimRep WordRep	  = "W_"	-- short for StgWord
+showPrimRep Int64Rep      = "LI_"       -- short for StgLongInt
+showPrimRep Word64Rep     = "LW_"       -- short for StgLongWord
 showPrimRep AddrRep	  = "StgAddr"
 showPrimRep FloatRep	  = "StgFloat"
 showPrimRep DoubleRep	  = "StgDouble"
@@ -198,6 +251,23 @@ showPrimRep ByteArrayRep  = "StgByteArray"
 showPrimRep StablePtrRep  = "StgStablePtr"
 showPrimRep ForeignObjRep  = "StgPtr" -- see comment below
 showPrimRep VoidRep	  = "!!VOID_KIND!!"
+
+showPrimRepToUser pr =
+  case pr of
+    CharRep       -> "StgChar"
+    IntRep        -> "StgInt"
+    WordRep       -> "StgWord"
+    Int64Rep      -> "StgInt64"
+    Word64Rep     -> "StgWord64"
+    AddrRep       -> "StgAddr"
+    FloatRep      -> "StgFloat"
+    DoubleRep     -> "StgDouble"
+    ArrayRep      -> "StgArray"
+    ByteArrayRep  -> "StgByteArray"
+    StablePtrRep  -> "StgStablePtr"
+    ForeignObjRep -> "StgPtr"
+    _		  -> panic ("showPrimRepToUser: " ++ showPrimRep pr)
+    
 
 decodePrimRep ch =
  case ch of
@@ -209,6 +279,8 @@ decodePrimRep ch =
      'C' -> CharRep       
      'I' -> IntRep        
      'W' -> WordRep       
+     'i' -> Int64Rep        
+     'w' -> Word64Rep       
      'A' -> AddrRep       
      'F' -> FloatRep      
      'D' -> DoubleRep     
@@ -219,12 +291,14 @@ decodePrimRep ch =
      'V' -> VoidRep
      _   -> panic "decodePrimRep"
 
-guessPrimRep "D_"	     = DataPtrRep
+guessPrimRep "D_"	    = DataPtrRep
 guessPrimRep "StgRetAddr"   = RetRep
-guessPrimRep "StgChar"	     = CharRep
-guessPrimRep "I_"	     = IntRep
-guessPrimRep "W_"	     = WordRep
-guessPrimRep "StgAddr"	     = AddrRep
+guessPrimRep "StgChar"	    = CharRep
+guessPrimRep "I_"	    = IntRep
+guessPrimRep "LI_"	    = Int64Rep
+guessPrimRep "W_"	    = WordRep
+guessPrimRep "LW_"	    = Word64Rep
+guessPrimRep "StgAddr"	    = AddrRep
 guessPrimRep "StgFloat"     = FloatRep
 guessPrimRep "StgDouble"    = DoubleRep
 guessPrimRep "StgArray"     = ArrayRep
