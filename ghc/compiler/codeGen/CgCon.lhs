@@ -45,7 +45,8 @@ import ClosureInfo	( mkConLFInfo, mkLFArgument,
 import CostCentre	( currentOrSubsumedCCS, dontCareCCS, CostCentreStack,
 			  currentCCS )
 import DataCon		( DataCon, dataConName, dataConTag, 
-			  isUnboxedTupleCon, isNullaryDataCon, dataConId, dataConWrapId
+			  isUnboxedTupleCon, isNullaryDataCon, dataConId, 
+			  dataConWrapId, dataConRepArity
 			)
 import Id		( Id, idName, idPrimRep )
 import Literal		( Literal(..) )
@@ -69,6 +70,7 @@ cgTopRhsCon :: Id		-- Name of thing bound to this RHS
 	    -> FCode (Id, CgIdInfo)
 cgTopRhsCon id con args
   = ASSERT(not (isDllConApp con args))	-- checks for litlit args too
+    ASSERT(length args == dataConRepArity con)
     let
 	name          = idName id
     	closure_label = mkClosureLabel name
@@ -269,7 +271,8 @@ sure the @amodes@ passed don't conflict with each other.
 cgReturnDataCon :: DataCon -> [CAddrMode] -> Code
 
 cgReturnDataCon con amodes
-  = getEndOfBlockInfo	`thenFC` \ (EndOfBlockInfo args_sp sequel) ->
+  = ASSERT(length amodes == dataConRepArity con)
+    getEndOfBlockInfo	`thenFC` \ (EndOfBlockInfo args_sp sequel) ->
 
     case sequel of
 
