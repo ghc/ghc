@@ -2,21 +2,25 @@
 	    ==============================================
 
 We are pleased to announce a new release of the Glasgow Haskell
-Compiler (GHC), version 4.01.  The source distribution is freely
+Compiler (GHC), version 4.02.  The source distribution is freely
 available via the World-Wide Web and through anon. FTP; details below.
 
 Haskell is "the" standard lazy functional programming language; the
-current language version is 1.4, agreed in April, 1997.  Haskell
-related information is available from the Haskell home page at
+current language version is Haskell 98, agreed in December 1998.
+Haskell related information is available from the Haskell home page at
 
 	http://haskell.org/
 
 + What's new
 =============
 
-GHC 4.02 fixes several bugs in 4.01 and adds one new feature: scoped
-type variables.  Some Haskell 98 features are also now supported,
-including lazy name clash detection and scoped infix declarations.
+GHC 4.02 fixes several bugs in 4.01 and adds the following features:
+
+	* Full Haskell 98 language support,
+
+	* Scoped type variables,
+
+	* A new generational garbage collector.
 
 The following things have not been fixed yet:
 
@@ -25,8 +29,10 @@ The following things have not been fixed yet:
 
 	* The profiler is still flaky.
 
-	* The garbage collector is still a two-space copying collector.  We're
-	  working on a generational collector right now.
+As usual, see the release notes (on the web page) for full details.
+
+A source distribution and binaries for common architectures are
+available from the web page.
 
 + Mailing lists
 ================
@@ -87,4 +93,4 @@ haven't been tested due to lack of time/hardware:
 The installer's guide included in distribution gives a complete
 run-down of what-ports-work; an on-line version can be found at
 
-   http://www.dcs.gla.ac.uk/fp/software/ghc/4.01/installation_guide/installing_toc.html
+   http://www.dcs.gla.ac.uk/fp/software/ghc/4.02/installation_guide/installing_toc.html
