@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.23 2004/08/13 13:09:18 simonmar Exp $
+# $Id: Makefile,v 1.24 2004/09/19 09:15:03 panne Exp $
 #
 
 TOP = ..
@@ -30,10 +30,11 @@ all :: $(H_CONFIG)
 gmp.h : $(FPTOOLS_TOP)/ghc/rts/gmp/gmp.h
 	$(CP) $< $@
 
-# The fptools configure script creates the configuration header file 
-# and puts it in fptools/mk/config.h. We copy it down to here, prepending
-# some make variables specifying cpp platform variables.
-#
+# The fptools configure script creates the configuration header file and puts it
+# in fptools/mk/config.h. We copy it down to here (without any PACKAGE_FOO
+# definitions to avoid clashes), prepending some make variables specifying cpp
+# platform variables.
+
 $(H_CONFIG) : $(FPTOOLS_TOP)/mk/config.h $(FPTOOLS_TOP)/mk/config.mk
 
 $(H_CONFIG) :
@@ -72,7 +73,8 @@ endif
 	@echo "#define $(HostVendor_CPP)_HOST_VENDOR	1" >> $@
 	@echo "#define $(TargetVendor_CPP)_TARGET_VENDOR  1" >> $@
 	@echo "#define $(BuildVendor_CPP)_BUILD_VENDOR 	1" >> $@
-	@cat $(FPTOOLS_TOP)/mk/config.h >> $@
+#	Turn '#define PACKAGE_FOO "blah"' into '/* #undef PACKAGE_FOO */'.
+	@sed 's,^\([	 ]*\)#[	 ]*define[	 ][	 ]*\(PACKAGE_BUGREPORT\|PACKAGE_NAME\|PACKAGE_STRING\|PACKAGE_TARNAME\|PACKAGE_VERSION\)[	 ].*$$,\1/* #undef \2 */,' $(FPTOOLS_TOP)/mk/config.h >> $@
 	@echo "#endif /* __GHCCONFIG_H__ */"          >> $@
 	@echo "Done."
 
