@@ -73,7 +73,11 @@ static unsigned char __obscure_ccall_ret_code [] =
 
 #if defined(alpha_TARGET_ARCH)
 /* To get the definition of PAL_imb: */
-#include <machine/pal.h>
+# if defined(linux_TARGET_OS)
+#  include <asm/pal.h>
+# else
+#  include <machine/pal.h>
+# endif
 #endif
 
 #if defined(ia64_TARGET_ARCH)

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.37 2003/04/01 15:05:22 sof Exp $
+ * $Id: Signals.c,v 1.38 2003/09/21 13:22:03 igloo Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -19,7 +19,11 @@
 #include "StablePriv.h"
 
 #ifdef alpha_TARGET_ARCH
-# include <machine/fpu.h>
+# if defined(linux_TARGET_OS)
+#  include <asm/fpu.h>
+# else
+#  include <machine/fpu.h>
+# endif
 #endif
 
 #ifdef HAVE_UNISTD_H

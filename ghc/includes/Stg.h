@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.55 2003/08/22 22:24:16 sof Exp $
+ * $Id: Stg.h,v 1.56 2003/09/21 13:22:01 igloo Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -35,6 +35,10 @@
 
 /* Configuration */
 #include "config.h"
+
+/* This needs to be up near the top as the register line on alpha needs
+ * to be before all procedures */
+#include "TailCalls.h"
 
 #if __GNUC__ >= 3
 /* Assume that a flexible array member at the end of a struct
@@ -183,7 +187,6 @@ typedef StgWord64       LW_;
 #include "SMP.h"
 #include "MachRegs.h"
 #include "Regs.h"
-#include "TailCalls.h"
 #include "Block.h"
 
 /* RTS public interface */

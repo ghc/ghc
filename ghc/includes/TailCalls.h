@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TailCalls.h,v 1.13 2003/08/29 16:00:26 simonmar Exp $
+ * $Id: TailCalls.h,v 1.14 2003/09/21 13:22:02 igloo Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -98,7 +98,9 @@ extern void __DISCARD__(void);
 
 #ifdef alpha_TARGET_ARCH
 
+#ifdef IN_STG_CODE
 register void *_procedure __asm__("$27");
+#endif
 
 #define JMP_(cont)				\
     do { _procedure = (void *)(cont);		\
