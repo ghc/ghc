@@ -137,6 +137,7 @@ import Data.Bits
 import Data.Int
 import Data.Monoid
 import qualified Data.IntSet as IntSet
+import Data.Typeable
 
 {-
 -- just for testing
@@ -966,6 +967,13 @@ showMap (x:xs)
     
     showElem (k,x)  = shows k . showString ":=" . shows x
   
+{--------------------------------------------------------------------
+  Typeable
+--------------------------------------------------------------------}
+
+#include "Typeable.h"
+INSTANCE_TYPEABLE1(IntMap,intMapTc,"IntMap")
+
 {--------------------------------------------------------------------
   Debugging
 --------------------------------------------------------------------}

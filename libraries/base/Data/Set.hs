@@ -114,6 +114,7 @@ module Data.Set  (
 import Prelude hiding (filter,foldr,foldl,null,map)
 import Data.Monoid
 import qualified Data.List as List
+import Data.Typeable
 
 {-
 -- just for testing
@@ -506,6 +507,13 @@ showSet (x:xs)
     showTail []     = showChar '}'
     showTail (x:xs) = showChar ',' . shows x . showTail xs
     
+
+{--------------------------------------------------------------------
+  Typeable/Data
+--------------------------------------------------------------------}
+
+#include "Typeable.h"
+INSTANCE_TYPEABLE1(Set,setTc,"Set")
 
 {--------------------------------------------------------------------
   Utility functions that return sub-ranges of the original

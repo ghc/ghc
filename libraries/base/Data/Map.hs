@@ -151,6 +151,7 @@ import Prelude hiding (lookup,map,filter,foldr,foldl,null)
 import Data.Monoid
 import qualified Data.Set as Set
 import qualified Data.List as List
+import Data.Typeable
 
 {-
 -- for quick check
@@ -1374,6 +1375,12 @@ node           = "+--"
 withBar bars   = "|  ":bars
 withEmpty bars = "   ":bars
 
+{--------------------------------------------------------------------
+  Typeable
+--------------------------------------------------------------------}
+
+#include "Typeable.h"
+INSTANCE_TYPEABLE2(Map,mapTc,"Map")
 
 {--------------------------------------------------------------------
   Assertions

@@ -95,6 +95,7 @@ import Data.Int
 
 import qualified Data.List as List
 import Data.Monoid
+import Data.Typeable
 
 {-
 -- just for testing
@@ -579,6 +580,13 @@ showSet (x:xs)
   where
     showTail []     = showChar '}'
     showTail (x:xs) = showChar ',' . shows x . showTail xs
+
+{--------------------------------------------------------------------
+  Typeable
+--------------------------------------------------------------------}
+
+#include "Typeable.h"
+INSTANCE_TYPEABLE0(IntSet,intSetTc,"IntSet")
 
 {--------------------------------------------------------------------
   Debugging
