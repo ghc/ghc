@@ -1,0 +1,5 @@
+
+tcfail109.hs:16:
+    No instance for (Eq Stupid)
+    arising from the instance declaration at tcfail109.hs:16
+    In the instance declaration for `Collects Bool Stupid'
