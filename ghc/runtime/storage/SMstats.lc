@@ -238,21 +238,21 @@ pagefaults(STG_NO_ARGS)
     sprintf(proc,"/proc/%d", getpid()); /* ToDo: this string is static 
     					   per process, optimise? */
 
-    while ((fd = open(proc, O_RDONLY)) != 0) {
+    while ((fd = open(proc, O_RDONLY)) == -1 ) {
       if ( errno != EINTR ) {
 	     fflush(stdout);
 	     fprintf(stderr,"pagefaults: open() failed\n");
 	     EXIT(EXIT_FAILURE);
 	}
     }
-    while (ioctl(fd, PIOCUSAGE, &prusage) != 0 ) {
+    while (ioctl(fd, PIOCUSAGE, &prusage) == -1 ) {
       if (errno != EINTR) {
 	     fflush(stdout);
 	     fprintf(stderr,"pagefaults: ioctl() failed\n");
              EXIT(EXIT_FAILURE);
 	}
     }
-    while ((close(fd)) != 0) {
+    while ((close(fd)) == -1 ) {
       if (errno != EINTR) {
 	    fflush(stdout);
 	    fprintf(stderr, "pagefaults: close() failed\n");
