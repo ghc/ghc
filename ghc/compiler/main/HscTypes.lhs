@@ -11,7 +11,7 @@ module HscTypes (
 	ModDetails(..),	
 	ModGuts(..), ModImports(..), ForeignStubs(..),
 
-	ModSummary(..), showModMsg,
+	ModSummary(..), showModMsg, isBootSummary,
 	msHsFilePath, msHiFilePath, msObjFilePath, 
 
 	HscSource(..), isHsBoot, hscSourceString,	-- Re-exported from DriverPhases
@@ -907,6 +907,8 @@ msHsFilePath  ms = expectJust "msHsFilePath" (ml_hs_file  (ms_location ms))
 msHiFilePath  ms = ml_hi_file  (ms_location ms)
 msObjFilePath ms = ml_obj_file (ms_location ms)
 
+isBootSummary :: ModSummary -> Bool
+isBootSummary ms = isHsBoot (ms_hsc_src ms)
 
 instance Outputable ModSummary where
    ppr ms

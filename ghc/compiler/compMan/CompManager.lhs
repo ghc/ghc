@@ -59,11 +59,11 @@ import Packages		( isHomePackage )
 import DriverPipeline	( CompResult(..), preprocess, compile, link )
 import HscMain		( newHscEnv )
 import DriverState	( v_Output_file, v_NoHsMain, v_MainModIs )
-import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, isHaskellSrcFilename )
+import DriverPhases	( HscSource(..), hscSourceString, isHaskellSrcFilename )
 import Finder		( findModule, findLinkable, addHomeModuleToFinder,
 			  flushFinderCache, mkHomeModLocation, FindResult(..), cantFindError )
 import HscTypes		( ModSummary(..), HomeModInfo(..), ModIface(..), msHsFilePath,
-			  HscEnv(..), GhciMode(..), 
+			  HscEnv(..), GhciMode(..), isBootSummary,
 			  InteractiveContext(..), emptyInteractiveContext, 
 			  HomePackageTable, emptyHomePackageTable, IsBootInterface,
 			  Linkable(..), isObjectLinkable )
@@ -550,20 +550,20 @@ cmLoadModules cmstate1 mg2unsorted
         let hpt1      = hsc_HPT hsc_env
         let ghci_mode = hsc_mode   hsc_env -- this never changes
         let dflags    = hsc_dflags hsc_env -- this never changes
+        let verb      = verbosity dflags
 
+	-- The "bad" boot modules are the ones for which we have
+	-- B.hs-boot in the module graph, but no B.hs
+        let all_home_mods = [ms_mod s | s <- mg2unsorted, not (isBootSummary s)]
+	    bad_boot_mods = [s 	      | s <- mg2unsorted, isBootSummary s,
+					not (ms_mod s `elem` all_home_mods)]
+	
+	if not (null bad_boot_mods) 
+	  then do { mapM reportBadBootMod bad_boot_mods
+		  ; return (cmstate1, Failed, []) }
+	  else do
+			      
         -- Do the downsweep to reestablish the module graph
-        let verb = verbosity dflags
-
-	-- Find out if we have a Main module
-	mb_main_mod <- readIORef v_MainModIs
-        let 
-	    main_mod = mb_main_mod `orElse` "Main"
-	    a_root_is_Main 
-               = any ((==main_mod).moduleUserString.ms_mod) 
-                     mg2unsorted
-
-        let mg2unsorted_names = map ms_mod mg2unsorted
-
         -- mg2 should be cycle free; but it includes hi-boot ModSummary nodes
         let mg2 :: [SCC ModSummary]
 	    mg2 = cmTopSort False mg2unsorted
@@ -580,7 +580,7 @@ cmLoadModules cmstate1 mg2unsorted
 	-- See getValidLinkables below for details.
 	(valid_old_linkables, new_linkables)
 	    <- getValidLinkables ghci_mode (hptLinkables hpt1)
-		  mg2unsorted_names mg2_with_srcimps
+		  all_home_mods mg2_with_srcimps
 
 	-- putStrLn (showSDoc (vcat [ppr valid_old_linkables, ppr new_linkables]))
 
@@ -606,7 +606,7 @@ cmLoadModules cmstate1 mg2unsorted
 	-- mg2_with_srcimps has no hi-boot nodes, 
 	-- and hence neither does stable_mods 
         stable_summaries <- preUpsweep valid_old_linkables
-		 		       mg2unsorted_names [] mg2_with_srcimps
+		 		       all_home_mods [] mg2_with_srcimps
         let stable_mods      = map ms_mod stable_summaries
 	    stable_linkables = filter (\m -> linkableModule m `elem` stable_mods) 
 				      valid_old_linkables
@@ -675,11 +675,9 @@ cmLoadModules cmstate1 mg2unsorted
            do when (verb >= 2) $ 
 		 hPutStrLn stderr "Upsweep completely successful."
 
-	      -- clean up after ourselves
+	      -- Clean up after ourselves
 	      cleanTempFilesExcept dflags (ppFilesFromSummaries modsDone)
 
-	      ofile <- readIORef v_Output_file
-	      no_hs_main <- readIORef v_NoHsMain
 
 	      -- Issue a warning for the confusing case where the user
 	      -- said '-o foo' but we're not going to do any linking.
@@ -687,10 +685,21 @@ cmLoadModules cmstate1 mg2unsorted
 	      -- called Main, or (b) the user said -no-hs-main, indicating
 	      -- that main() is going to come from somewhere else.
 	      --
-	      let do_linking = a_root_is_Main || no_hs_main
+	      ofile       <- readIORef v_Output_file
+	      no_hs_main  <- readIORef v_NoHsMain
+	      mb_main_mod <- readIORef v_MainModIs
+	      let 
+	 	main_mod = mb_main_mod `orElse` "Main"
+		a_root_is_Main 
+               	    = any ((==main_mod).moduleUserString.ms_mod) 
+                    	  mg2unsorted
+		do_linking = a_root_is_Main || no_hs_main
+
 	      when (ghci_mode == Batch && isJust ofile && not do_linking
 		     && verb > 0) $
-	         hPutStrLn stderr ("Warning: output was redirected with -o, but no output will be generated\nbecause there is no " ++ main_mod ++ " module.")
+	         hPutStrLn stderr ("Warning: output was redirected with -o, " ++
+				   "but no output will be generated\n" ++
+				   "because there is no " ++ main_mod ++ " module.")
 
 	      -- link everything together
               linkresult <- link ghci_mode dflags do_linking (hsc_HPT hsc_env3)
@@ -727,6 +736,11 @@ cmLoadModules cmstate1 mg2unsorted
 					cm_hsc = hsc_env3 { hsc_HPT = hpt4 } }
 	      cmLoadFinish Failed linkresult cmstate3
 
+reportBadBootMod :: ModSummary -> IO ()
+reportBadBootMod s
+  = hPutStrLn stderr $ showSDoc $
+    ptext SLIT("Module") <+> quotes (ppr (ms_mod s)) <+>
+	ptext SLIT("is {-# SOURCE #-} imported, but nowhere imported ordinarily")
 
 -- Finish up after a cmLoad.
 
@@ -1006,7 +1020,7 @@ upsweep_mods hsc_env oldUI@(old_hpt, old_linkables) cleanup
 			-- to the main Haskell source file. 
 			-- For the interface, the HPT entry is probaby for the main Haskell
 			-- source file.  Deleting it would force 
-		      oldUI1 | isHsBoot (ms_hsc_src mod) = oldUI
+		      oldUI1 | isBootSummary mod = oldUI
 			     | otherwise
 			     = (delModuleEnv old_hpt this_mod, 
 				  delModuleLinkable old_linkables this_mod)
@@ -1034,10 +1048,10 @@ upsweep_mod hsc_env (old_hpt, old_linkables) summary
 	-- Otherwise the hs-boot file will always be recompiled
             mb_old_iface 
 		= case lookupModuleEnv old_hpt this_mod of
-		     Nothing	 				  -> Nothing
-		     Just hm_info | isHsBoot (ms_hsc_src summary) -> Just iface
-				  | not (mi_boot iface) 	  -> Just iface
-				  | otherwise		  	  -> Nothing
+		     Nothing	 			  -> Nothing
+		     Just hm_info | isBootSummary summary -> Just iface
+				  | not (mi_boot iface)   -> Just iface
+				  | otherwise		  -> Nothing
 				   where 
 				     iface = hm_iface hm_info
 
@@ -1104,7 +1118,7 @@ cmTopSort drop_hs_boot_nodes summaries
 		     out_edge_keys hs_boot_key (ms_srcimps s) ++
 		     out_edge_keys HsSrcFile   (ms_imps s)    )
 		| s <- summaries
-		, not (ms_hsc_src s == HsBootFile && drop_hs_boot_nodes) ]
+		, not (isBootSummary s && drop_hs_boot_nodes) ]
 		-- Drop the hi-boot ones if told to do so
 
 	key_map :: NodeMap Int
@@ -1132,8 +1146,8 @@ cmTopSort drop_hs_boot_nodes summaries
 -- unchanged.
 --
 -- The returned list of [ModSummary] nodes has one node for each home-package
--- module.  The imports of these nodes are all there, including the imports
--- of non-home-package modules.
+-- module, plus one for any hs-boot files.  The imports of these nodes 
+-- are all there, including the imports of non-home-package modules.
 
 cmDownsweep :: DynFlags
 	    -> [FilePath]	-- Roots
