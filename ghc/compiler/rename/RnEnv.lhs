@@ -30,8 +30,8 @@ import TyCon		( TyCon )
 import TysWiredIn	( tupleTyCon, listTyCon, charTyCon, intTyCon )
 import FiniteMap
 import Outputable
-import Unique		( Unique, unboundKey )
-import UniqFM           ( Uniquable(..), listToUFM, plusUFM_C )
+import Unique		( Unique, Uniquable(..), unboundKey )
+import UniqFM           ( listToUFM, plusUFM_C )
 import Maybes		( maybeToBool )
 import UniqSupply
 import SrcLoc		( SrcLoc, noSrcLoc )

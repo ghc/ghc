@@ -28,7 +28,7 @@ import {-# SOURCE #-} Name
 
 import Maybes		( maybeToBool )
 import UniqFM
-import Unique		( Unique )
+import Unique		( Unique, Uniquable(..) )
 import SrcLoc		( SrcLoc )
 import Outputable	( PprStyle, Outputable(..) )
 import Pretty		( Doc )

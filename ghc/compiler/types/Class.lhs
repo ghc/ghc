@@ -48,7 +48,6 @@ import Maybes		( assocMaybe )
 import Name		( changeUnique, Name, OccName, occNameString )
 import Outputable
 import Unique		-- Keys for built-in classes
-import UniqFM           ( Uniquable(..) )
 import Pretty		( Doc, hsep, ptext )
 import SrcLoc		( SrcLoc )
 import Util

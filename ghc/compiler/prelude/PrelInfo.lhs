@@ -60,7 +60,7 @@ import TyCon		( tyConDataCons, mkFunTyCon, TyCon )
 import Type
 import Bag
 import Unique		-- *Key stuff
-import UniqFM		( UniqFM, listToUFM, Uniquable(..) ) 
+import UniqFM		( UniqFM, listToUFM ) 
 import Util		( isIn )
 \end{code}
 

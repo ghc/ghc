@@ -21,7 +21,7 @@ Haskell).
 --<mkdependHS:friends> UniqSupply
 
 module Unique (
-	Unique,
+	Unique, Uniquable(..),
 	u2i,				-- hack: used in UniqFM
 
 	pprUnique, pprUnique10, showUnique,
@@ -236,10 +236,6 @@ import PrelBase ( Char(..) )
 
 IMP_Ubiq(){-uitous-}
 
-#if __GLASGOW_HASKELL__ >= 202
-import {-# SOURCE #-} UniqFM ( Uniquable(..) )
-#endif
-
 import Outputable
 import Pretty
 import Util
@@ -255,9 +251,14 @@ The @Chars@ are ``tag letters'' that identify the @UniqueSupply@.
 Fast comparison is everything on @Uniques@:
 
 \begin{code}
-u2i :: Unique -> FAST_INT
-
 data Unique = MkUnique Int#
+
+class Uniquable a where
+    uniqueOf :: a -> Unique
+\end{code}
+
+\begin{code}
+u2i :: Unique -> FAST_INT
 u2i (MkUnique i) = i
 \end{code}
 

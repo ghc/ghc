@@ -29,9 +29,8 @@ import PrelInfo		( cCallishClassKeys )
 import TyCon		( TyCon )
 import Name		( Name, OccName, isTvOcc, getOccName )
 import TysWiredIn	( mkListTy, mkTupleTy )
-import Unique		( Unique )
+import Unique		( Unique, Uniquable(..) )
 import Pretty
-import UniqFM           ( Uniquable(..) )
 import Util		( zipWithEqual, zipLazy, panic{-, pprPanic ToDo:rm-} )
 
 

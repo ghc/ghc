@@ -3,7 +3,6 @@ Things which are ubiquitous in the GHC compiler.
 \begin{code}
 interface Ubiq where
 
---import PreludePS(_PackedString)
 import FastString(FastString)
 
 import BasicTypes	( Module(..), Arity(..) )

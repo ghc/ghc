@@ -14,7 +14,7 @@ import Name		--( Name{-instance Eq/Outputable-}, nameUnique )
 import Type		( SYN_IE(Type) )
 
 import Outputable
-import UniqFM           ( Uniquable(..) )
+import Unique           ( Uniquable(..) )
 \end{code}
 
 \begin{code}

@@ -53,8 +53,7 @@ import Outputable	( PprStyle(..) )
 import Pretty		( Doc )
 import PrimRep          ( PrimRep )
 import StgSyn		( SYN_IE(StgArg), SYN_IE(StgLiveVars), GenStgArg(..) )
-import Unique           ( Unique )
-import UniqFM           ( Uniquable(..) )
+import Unique           ( Unique, Uniquable(..) )
 import Util		( zipWithEqual, panic )
 \end{code}
 

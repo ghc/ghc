@@ -53,8 +53,7 @@ import IOBase
 import IOHandle
 import ST
 import STBase
-import {-# SOURCE #-} Unique  ( mkUniqueGrimily, Unique )
-import {-# SOURCE #-} UniqFM  ( Uniquable(..) )
+import {-# SOURCE #-} Unique  ( mkUniqueGrimily, Unique, Uniquable(..) )
 #if __GLASGOW_HASKELL__ == 202
 import PrelBase ( Char (..) )
 #endif

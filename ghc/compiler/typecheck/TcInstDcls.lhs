@@ -86,16 +86,15 @@ import Pretty
 import TyCon		( isSynTyCon, isDataTyCon, derivedClasses )
 import Type		( GenType(..), SYN_IE(ThetaType), mkTyVarTys, isPrimType,
 			  splitSigmaTy, splitAppTys, isTyVarTy, matchTy, mkSigmaTy,
-			  getTyCon_maybe, maybeAppTyCon, SYN_IE(Type),
+			  getTyCon_maybe, maybeAppTyCon, SYN_IE(Type), getTyVar,
 			  maybeBoxedPrimType, maybeAppDataTyCon, splitRhoTy, eqTy
 			)
 import TyVar		( GenTyVar, SYN_IE(GenTyVarSet), tyVarSetToList, 
 		          mkTyVarSet, unionTyVarSets, SYN_IE(TyVar) )
 import TysPrim		( byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 import TysWiredIn	( stringTy )
-import Unique		( Unique, cCallableClassKey, cReturnableClassKey )
-import UniqFM           ( Uniquable(..) )
-import Util		( zipEqual, panic, pprPanic, pprTrace
+import Unique		( Unique, cCallableClassKey, cReturnableClassKey, Uniquable(..) )
+import Util		( zipEqual, panic, pprPanic, pprTrace, removeDups, Ord3(..),
 #if __GLASGOW_HASKELL__ < 202
 		          , trace 
 #endif
@@ -665,8 +664,9 @@ scrutiniseInstanceType dfun_name clas inst_tau
   = returnTc (inst_tycon,arg_tys)
 
 	-- TYVARS CHECK
-  | not (all isTyVarTy arg_tys ||
-	 opt_GlasgowExts)
+  | not (opt_GlasgowExts ||
+	 (all isTyVarTy arg_tys && null tyvar_dups)
+    )
   = failTc (instTypeErr inst_tau)
 
   	-- DERIVING CHECK
@@ -692,6 +692,7 @@ scrutiniseInstanceType dfun_name clas inst_tau
     (possible_tycon, arg_tys) = splitAppTys inst_tau
     inst_tycon_maybe	      = getTyCon_maybe possible_tycon
     inst_tycon 		      = expectJust "tcInstDecls1:inst_tycon" inst_tycon_maybe
+    (_, tyvar_dups)	      = removeDups cmp (map (getTyVar "tcInstDecls1:getTyVarTy") arg_tys)
 
 -- These conditions come directly from what the DsCCall is capable of.
 -- Totally grotesque.  Green card should solve this.
@@ -727,11 +728,11 @@ creturnable_type ty = maybeToBool (maybeBoxedPrimType ty) ||
 
 instTypeErr ty sty
   = case ty of
-      SynTy tc _ _ -> hcat [ptext SLIT("The type synonym `"), ppr sty tc, rest_of_msg]
-      TyVarTy tv   -> hcat [ptext SLIT("The type variable `"), ppr sty tv, rest_of_msg]
-      other	   -> hcat [ptext SLIT("The type `"), ppr sty ty, rest_of_msg]
+      SynTy tc _ _ -> hsep [ptext SLIT("The type synonym"), ppr sty tc, rest_of_msg]
+      TyVarTy tv   -> hsep [ptext SLIT("The type variable"), ppr sty tv, rest_of_msg]
+      other	   -> hsep [ptext SLIT("The type"), ppr sty ty, rest_of_msg]
   where
-    rest_of_msg = ptext SLIT("' cannot be used as an instance type.")
+    rest_of_msg = ptext SLIT("cannot be used as an instance type")
 
 instBndrErr bndr clas sty
   = hsep [ptext SLIT("Class"), ppr sty clas, ptext SLIT("does not have a method"), ppr sty bndr]

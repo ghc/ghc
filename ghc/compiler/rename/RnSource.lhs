@@ -51,7 +51,7 @@ import PrelInfo		( derivingOccurrences, evalClass_RDR, numClass_RDR, allClass_NA
 import ListSetOps	( unionLists, minusList )
 import Maybes		( maybeToBool, catMaybes )
 import Bag		( emptyBag, unitBag, consBag, unionManyBags, unionBags, listToBag, bagToList )
-import Outputable	( PprStyle(..), Outputable(..){-instances-} )
+import Outputable	( PprStyle(..), Outputable(..){-instances-}, pprQuote )
 import Pretty
 import SrcLoc		( SrcLoc )
 import Unique		( Unique )
@@ -705,17 +705,17 @@ classTyVarNotInOpTyErr clas_tyvar sig sty
 		       ptext SLIT("does not appear in method signature")])
 	 4 (ppr sty sig)
 
-dupClassAssertWarn ctxt dups sty
-  = hang (hcat [ptext SLIT("Duplicate class assertion `"), 
-		       ppr sty dups, 
-		       ptext SLIT("' in context:")])
-	 4 (ppr sty ctxt)
+dupClassAssertWarn ctxt ((clas,ty) : dups) sty
+  = hang (hcat [ptext SLIT("Duplicated class assertion"), 
+		       pprQuote sty $ \ sty -> ppr sty clas <+> ppr sty ty,
+		       ptext SLIT("in context:")])
+	 4 (pprContext sty ctxt)
 
 badDataCon name sty
-   = hsep [ptext SLIT("Illegal data constructor name:"), ppr sty name]
+   = hsep [ptext SLIT("Illegal data constructor name"), ppr sty name]
 
 allOfNonTyVar ty sty
-  = hsep [ptext SLIT("`All' applied to a non-type variable:"), ppr sty ty]
+  = hsep [ptext SLIT("`All' applied to a non-type variable"), ppr sty ty]
 
 ctxtErr1 doc tyvars sty
   = hsep [ptext SLIT("Context constrains in-scope type variable(s)"), 

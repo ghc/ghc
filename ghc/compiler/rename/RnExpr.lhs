@@ -143,17 +143,27 @@ rnPat (RecPatIn con rpats)
 ************************************************************************
 
 \begin{code}
-rnMatch :: RdrNameMatch -> RnMS s (RenamedMatch, FreeVars)
+rnMatch, rnMatch1 :: RdrNameMatch -> RnMS s (RenamedMatch, FreeVars)
 
-rnMatch (PatMatch pat match)
-  = bindLocalsRn "pattern" binders	$ \ new_binders ->
-    rnPat pat				`thenRn` \ pat' ->
-    rnMatch match			`thenRn` \ (match', fvMatch) ->
-    returnRn (PatMatch pat' match', fvMatch `minusNameSet` mkNameSet new_binders)
+-- The only tricky bit here is that we want to do a single
+-- bindLocalsRn for all the matches together, so that we spot
+-- the repeated variable in
+--	f x x = 1
+
+rnMatch match
+  = bindLocalsRn "pattern" (get_binders	match) 	$ \ new_binders ->
+    rnMatch1 match				`thenRn` \ (match', fvs) ->
+    returnRn (match', fvs `minusNameSet` mkNameSet new_binders)
  where
-    binders = collectPatBinders pat
+    get_binders (GRHSMatch _)	     = []
+    get_binders (PatMatch pat match) = collectPatBinders pat ++ get_binders match
 
-rnMatch (GRHSMatch grhss_and_binds)
+rnMatch1 (PatMatch pat match)
+  = rnPat pat				`thenRn` \ pat' ->
+    rnMatch1 match			`thenRn` \ (match', fvs) ->
+    returnRn (PatMatch pat' match', fvs)
+
+rnMatch1 (GRHSMatch grhss_and_binds)
   = rnGRHSsAndBinds grhss_and_binds `thenRn` \ (grhss_and_binds', fvs) ->
     returnRn (GRHSMatch grhss_and_binds', fvs)
 \end{code}

@@ -54,9 +54,8 @@ import Outputable	( PprStyle(..), codeStyle, userStyle, ifaceStyle,
 			  ifPprShowAll, interpp'SP, Outputable(..) )
 import PprEnv
 import Pretty
-import UniqFM		( addToUFM_Directly, lookupUFM_Directly{-, ufmToList ToDo:rm-},
-			  Uniquable(..) )
-import Unique	--TEMP:	( pprUnique10, pprUnique, incrUnique, listTyConKey )
+import UniqFM		( addToUFM_Directly, lookupUFM_Directly )
+import Unique		( Uniquable(..), pprUnique10, pprUnique, incrUnique, listTyConKey )
 import Util
 \end{code}
 

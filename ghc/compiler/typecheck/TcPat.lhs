@@ -64,7 +64,7 @@ tcPat :: RenamedPat -> TcM s (TcPat s, LIE s, TcType s)
 
 \begin{code}
 tcPat (VarPatIn name)
-  = tcLookupLocalValueOK ("tcPat1:"{-++show (ppr PprDebug name)-}) name	`thenNF_Tc` \ id ->
+  = tcLookupLocalValueOK "tcPat1:" name		`thenNF_Tc` \ id ->
     returnTc (VarPat (TcId id), emptyLIE, idType id)
 
 tcPat (LazyPatIn pat)

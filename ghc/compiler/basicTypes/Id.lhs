@@ -203,7 +203,8 @@ import UniqFM
 import UniqSet		-- practically all of it
 import Unique		( getBuiltinUniques, pprUnique, showUnique,
 			  incrUnique, 
-			  Unique{-instance Ord3-}
+			  Unique{-instance Ord3-},
+			  Uniquable(..)
 			)
 import Outputable	( ifPprDebug, Outputable(..), PprStyle(..) )
 import Util	{-	( mapAccumL, nOfThem, zipEqual, assoc,

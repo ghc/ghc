@@ -73,8 +73,7 @@ import Type		( typePrimRep,
 			  maybeAppSpecDataTyConExpandingDicts,
 			  SYN_IE(Type)
 			)
-import Unique           ( Unique )
-import UniqFM           ( Uniquable(..) )
+import Unique           ( Unique, Uniquable(..) )
 import Util		( sortLt, isIn, isn'tIn, zipEqual,
 			  pprError, panic, assertPanic
 			)

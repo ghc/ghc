@@ -42,8 +42,7 @@ import UniqSet		( SYN_IE(UniqSet), emptyUniqSet,
 			  unionManyUniqSets, uniqSetToList ) 
 import SrcLoc		( SrcLoc )
 import TyCon		( TyCon, SYN_IE(Arity) )
-import Unique		( Unique )
-import UniqFM           ( Uniquable(..) )
+import Unique		( Unique, Uniquable(..) )
 import Util		( panic{-, pprTrace-} )
 
 \end{code}

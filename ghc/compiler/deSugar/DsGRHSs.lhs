@@ -38,8 +38,7 @@ import PrelVals		( nON_EXHAUSTIVE_GUARDS_ERROR_ID )
 import Outputable	( PprStyle(..) )
 import SrcLoc		( SrcLoc{-instance-} )
 import Type             ( SYN_IE(Type) )
-import Unique		( Unique, otherwiseIdKey )
-import UniqFM           ( Uniquable(..) )
+import Unique		( Unique, otherwiseIdKey, Uniquable(..) )
 import Util		( panic )
 \end{code}
 

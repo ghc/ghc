@@ -72,10 +72,10 @@ import Pretty
 import Lex		( isLexSym, isLexConId )
 import SrcLoc		( noSrcLoc, SrcLoc )
 import Usage            ( SYN_IE(UVar), SYN_IE(Usage) )
-import Unique		( pprUnique, showUnique, Unique )
+import Unique		( pprUnique, showUnique, Unique, Uniquable(..) )
 import UniqSet		( UniqSet(..), emptyUniqSet, unitUniqSet, unionUniqSets, uniqSetToList, isEmptyUniqSet,
 		 	  unionManyUniqSets, minusUniqSet, mkUniqSet, elementOfUniqSet, addListToUniqSet, addOneToUniqSet )
-import UniqFM		( UniqFM, Uniquable(..) )
+import UniqFM		( UniqFM )
 import Util		--( cmpPString, panic, assertPanic {-, pprTrace ToDo:rm-} )
 
 \end{code}

@@ -118,7 +118,7 @@ ppr_forall sty ctxt_prec tvs ctxt ty
 pprContext :: (Outputable name) => PprStyle -> (Context name) -> Doc
 pprContext sty []	        = empty
 pprContext sty context
-  = hsep [braces (hsep (punctuate comma (map ppr_assert context)))]
+  = pprQuote sty $ \ sty -> parens (hsep (punctuate comma (map ppr_assert context)))
   where
     ppr_assert (clas, ty) = hsep [ppr sty clas, ppr sty ty]
 \end{code}

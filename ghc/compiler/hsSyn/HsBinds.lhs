@@ -196,17 +196,17 @@ ppr_monobind sty (AndMonoBinds binds1 binds2)
       = ($$) (ppr_monobind sty binds1) (ppr_monobind sty binds2)
 
 ppr_monobind sty (PatMonoBind pat grhss_n_binds locn)
-      = hang (ppr sty pat) 4 (pprGRHSsAndBinds sty False grhss_n_binds)
+      = sep [ppr sty pat, nest 4 (pprGRHSsAndBinds sty False grhss_n_binds)]
 
 ppr_monobind sty (FunMonoBind fun inf matches locn)
       = pprMatches sty (False, ppr sty fun) matches
       -- ToDo: print infix if appropriate
 
 ppr_monobind sty (VarMonoBind name expr)
-      = hang (hsep [ppr sty name, equals]) 4 (pprExpr sty expr)
+      = sep [ppr sty name <+> equals, nest 4 (pprExpr sty expr)]
 
 ppr_monobind sty (CoreMonoBind name expr)
-      = hang (hsep [ppr sty name, equals]) 4 (ppr sty expr)
+      = sep [ppr sty name <+> equals, nest 4 (ppr sty expr)]
 
 ppr_monobind sty (AbsBinds tyvars dictvars exports val_binds)
      = ($$) (sep [ptext SLIT("AbsBinds"),

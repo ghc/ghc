@@ -49,10 +49,9 @@ IMPORT_DELOOPER(TyLoop) ( SYN_IE(Type), GenType,
 			  --LATER: specMaybeTysSuffix
 			)
 #else
-import {-# SOURCE #-} Type  ( Type  )
+import {-# SOURCE #-} Type  ( Type, splitSigmaTy, splitFunTy  )
 import {-# SOURCE #-} Class ( Class )
 import {-# SOURCE #-} Id    ( Id, isNullaryDataCon, idType )
-import {-# SOURCE #-} Type  ( splitSigmaTy, splitFunTy  )
 import {-# SOURCE #-} TysWiredIn ( tupleCon )
 #endif
 
@@ -63,8 +62,7 @@ import Kind		( Kind, mkBoxedTypeKind, mkArrowKind, resultKind, argKind )
 
 import Maybes
 import Name		( Name, nameUnique, mkWiredInTyConName, NamedThing(getName) )
-import Unique		( Unique, funTyConKey )
-import UniqFM           ( Uniquable(..) )
+import Unique		( Unique, funTyConKey, Uniquable(..) )
 import Pretty		( Doc )
 import PrimRep		( PrimRep(..) )
 import PrelMods		( gHC__, pREL_TUP, pREL_BASE )

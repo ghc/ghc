@@ -52,7 +52,7 @@ import Name		( Name, OccName(..), getSrcLoc, occNameString,
 			  NamedThing(..)
 			)
 import Pretty
-import Unique		( pprUnique10{-, pprUnique ToDo:rm-}, Unique )
+import Unique		( pprUnique10{-, pprUnique ToDo:rm-}, Unique, Uniquable(..) )
 import UniqFM	     
 import Util		( zipEqual, zipWithEqual, zipWith3Equal, zipLazy,
 			  panic, pprPanic, pprTrace

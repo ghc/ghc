@@ -418,7 +418,7 @@ hcat = foldr (<>)  empty
 hsep = foldr (<+>) empty
 vcat = foldr ($$)  empty
 
-hang d1 n d2 = d1 $$ (nest n d2)
+hang d1 n d2 = sep [d1, nest n d2]
 
 punctuate p []     = []
 punctuate p (d:ds) = go d ds

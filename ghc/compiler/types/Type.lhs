@@ -74,7 +74,6 @@ import Name	( NamedThing(..),
 import Maybes	( maybeToBool, assocMaybe )
 import PrimRep	( PrimRep(..) )
 import Unique	-- quite a few *Keys
-import UniqFM   ( Uniquable(..) )
 import Util	( thenCmp, zipEqual, assoc,
 		  panic, panic#, assertPanic, pprPanic,
 		  Ord3(..){-instances-}

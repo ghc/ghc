@@ -83,9 +83,8 @@ import TyVar		( nullTyVarEnv, addOneToTyVarEnv, growTyVarEnvList,
 			  SYN_IE(TyVarEnv), GenTyVar{-instance Eq-} ,
 			  SYN_IE(TyVar)
 			)
-import Unique		( Unique{-instance Outputable-} )
-import UniqFM		( addToUFM_C, ufmToList, Uniquable(..)
-			)
+import Unique		( Unique{-instance Outputable-}, Uniquable(..) )
+import UniqFM		( addToUFM_C, ufmToList	)
 import Usage		( SYN_IE(UVar), GenUsage{-instances-} )
 import Util		( SYN_IE(Eager), appEager, returnEager, runEager,
 			  zipEqual, thenCmp, cmpList, panic, panic#, assertPanic, Ord3(..) )

@@ -61,8 +61,7 @@ import Type		( mkFunTy, mkTyVarTy, mkTyVarTys, mkDictTy,
 			)
 import TysWiredIn	( stringTy )
 import TyVar		( unitTyVarSet, GenTyVar, SYN_IE(TyVar) )
-import Unique		( Unique )
-import UniqFM		( Uniquable(..) )
+import Unique		( Unique, Uniquable(..) )
 import Util
 
 

@@ -38,8 +38,7 @@ import Name		( mkSysLocalName, changeUnique, Name, NamedThing(..) )
 import Pretty		( Doc, (<>), ptext )
 import Outputable	( PprStyle(..), Outputable(..) )
 import SrcLoc		( noSrcLoc, SrcLoc )
-import Unique		( showUnique, mkAlphaTyVarUnique, Unique )
-import UniqFM           ( Uniquable(..) )
+import Unique		( showUnique, mkAlphaTyVarUnique, Unique, Uniquable(..) )
 import Util		( panic, Ord3(..) )
 \end{code}
 
