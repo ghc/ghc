@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.h,v 1.8 2001/07/23 17:23:19 simonmar Exp $
+ * $Id: Stable.h,v 1.9 2001/10/23 11:28:02 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -24,12 +24,11 @@
 extern StgPtr         deRefStablePtr(StgStablePtr stable_ptr);
 extern void           freeStablePtr(StgStablePtr sp);
 extern StgStablePtr   splitStablePtr(StgStablePtr sp);
+extern StgStablePtr   getStablePtr(StgPtr p);
 
 /* -----------------------------------------------------------------------------
    PRIVATE from here.
    -------------------------------------------------------------------------- */
-
-extern StgStablePtr getStablePtr(StgPtr p);
 
 typedef struct { 
   StgPtr  addr;			/* Haskell object, free list, or NULL */
