@@ -44,7 +44,7 @@ module TcType (
   tcEqType, tcEqTypes, tcEqPred, tcCmpType, tcCmpTypes, tcCmpPred,
   isSigmaTy, isOverloadedTy, 
   isDoubleTy, isFloatTy, isIntTy,
-  isIntegerTy, isAddrTy, isBoolTy, isUnitTy, isForeignPtrTy, 
+  isIntegerTy, isAddrTy, isBoolTy, isUnitTy,
   isTauTy, tcIsTyVarTy, tcIsForAllTy,
   allDistinctTyVars,
 
@@ -699,7 +699,6 @@ isOverloadedTy _		   = False
 \begin{code}
 isFloatTy      = is_tc floatTyConKey
 isDoubleTy     = is_tc doubleTyConKey
-isForeignPtrTy = is_tc foreignPtrTyConKey
 isIntegerTy    = is_tc integerTyConKey
 isIntTy        = is_tc intTyConKey
 isAddrTy       = is_tc addrTyConKey
@@ -830,7 +829,7 @@ legalFEArgTyCon :: TyCon -> Bool
 -- bytearrays from a _ccall_ / foreign declaration
 -- (or be passed them as arguments in foreign exported functions).
 legalFEArgTyCon tc
-  | getUnique tc `elem` [ foreignObjTyConKey, foreignPtrTyConKey,
+  | getUnique tc `elem` [ foreignObjTyConKey, 
 			  byteArrayTyConKey, mutableByteArrayTyConKey ] 
   = False
   -- It's also illegal to make foreign exports that take unboxed
@@ -841,7 +840,7 @@ legalFEArgTyCon tc
 legalFIResultTyCon :: DynFlags -> TyCon -> Bool
 legalFIResultTyCon dflags tc
   | getUnique tc `elem`
-	[ foreignObjTyConKey, foreignPtrTyConKey,
+	[ foreignObjTyConKey,
 	  byteArrayTyConKey, mutableByteArrayTyConKey ]  = False
   | tc == unitTyCon = True
   | otherwise	    = marshalableTyCon dflags tc
@@ -849,7 +848,7 @@ legalFIResultTyCon dflags tc
 legalFEResultTyCon :: TyCon -> Bool
 legalFEResultTyCon tc
   | getUnique tc `elem` 
-	[ foreignObjTyConKey, foreignPtrTyConKey,
+	[ foreignObjTyConKey,
 	  byteArrayTyConKey, mutableByteArrayTyConKey ]  = False
   | tc == unitTyCon = True
   | otherwise       = boxedMarshalableTyCon tc
@@ -874,7 +873,6 @@ boxedMarshalableTyCon tc
 			 , floatTyConKey, doubleTyConKey
 			 , addrTyConKey, ptrTyConKey, funPtrTyConKey
 			 , charTyConKey, foreignObjTyConKey
-			 , foreignPtrTyConKey
 			 , stablePtrTyConKey
 			 , byteArrayTyConKey, mutableByteArrayTyConKey
 			 , boolTyConKey
