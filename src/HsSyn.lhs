@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.14 2002/07/25 14:37:29 simonmar Exp $
+% $Id: HsSyn.lhs,v 1.15 2002/08/02 09:25:23 simonmar Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -31,7 +31,7 @@ module HsSyn (
     unit_tycon, fun_tycon, list_tycon, tuple_tycon,
 
     GenDoc(..), Doc, DocMarkup(..),
-    markup, mapIdent, 
+    markup, mapIdent, idMarkup,
     docAppend, docParagraph,
   ) where
 
@@ -432,16 +432,14 @@ markup m (DocCodeBlock d)	= markupCodeBlock m (markup m d)
 markup m (DocURL url)		= markupURL m url
 markup m (DocAName ref)		= markupAName m ref
 
--- | Since marking up is just a matter of mapping 'Doc' into some
--- other type, we can \'rename\' documentation by marking up 'Doc' into
--- the same thing, modifying only the identifiers embedded in it.
-mapIdent :: (a -> GenDoc b) -> DocMarkup a (GenDoc b)
-mapIdent f = Markup {
+-- | The identity markup
+idMarkup :: DocMarkup a (GenDoc a)
+idMarkup = Markup {
   markupEmpty         = DocEmpty,
   markupString        = DocString,
   markupParagraph     = DocParagraph,
   markupAppend        = DocAppend,
-  markupIdentifier    = f,
+  markupIdentifier    = DocIdentifier,
   markupModule        = DocModule,
   markupEmphasis      = DocEmphasis,
   markupMonospaced    = DocMonospaced,
@@ -451,6 +449,12 @@ mapIdent f = Markup {
   markupURL	      = DocURL,
   markupAName	      = DocAName
   }
+
+-- | Since marking up is just a matter of mapping 'Doc' into some
+-- other type, we can \'rename\' documentation by marking up 'Doc' into
+-- the same thing, modifying only the identifiers embedded in it.
+mapIdent :: (a -> GenDoc b) -> DocMarkup a (GenDoc b)
+mapIdent f = idMarkup{ markupIdentifier = f }
 
 -- -----------------------------------------------------------------------------
 -- ** Smart constructors

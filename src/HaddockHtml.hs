@@ -860,6 +860,7 @@ ppHsModule mdl = anchor ! [href ((moduleHtmlFile fp modname) ++ ref)] << toHtml 
 
 -- -----------------------------------------------------------------------------
 -- * Doc Markup
+
 htmlMarkup :: DocMarkup [HsQName] Html
 htmlMarkup = Markup {
   markupParagraph     = paragraph,
@@ -880,9 +881,22 @@ htmlMarkup = Markup {
 -- If the doc is a single paragraph, don't surround it with <P> (this causes
 -- ugly extra whitespace with some browsers).
 docToHtml :: Doc -> Html
-docToHtml (DocParagraph d) = docToHtml d
-docToHtml (DocCodeBlock d) = docToHtml (DocMonospaced d)
-docToHtml doc              = markup htmlMarkup doc
+docToHtml doc = markup htmlMarkup (unParagraph (markup htmlCleanup doc))
+
+-- If there is a single paragraph, then surrounding it with <P>..</P>
+-- can add too much whitespace in some browsers (eg. IE).  However if
+-- we have multiple paragraphs, then we want the extra whitespace to
+-- separate them.  So we catch the single paragraph case and transform it
+-- here.
+unParagraph (DocParagraph d) = d
+unParagraph (DocCodeBlock d) = (DocMonospaced d)
+unParagraph doc              = doc
+
+htmlCleanup :: DocMarkup [HsQName] Doc
+htmlCleanup = idMarkup { 
+  markupUnorderedList = DocUnorderedList . map unParagraph,
+  markupOrderedList   = DocOrderedList   . map unParagraph
+  } 
 
 -- -----------------------------------------------------------------------------
 -- * Misc
