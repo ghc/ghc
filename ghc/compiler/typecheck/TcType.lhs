@@ -122,7 +122,7 @@ import Type		(	-- Re-exports
 			  liftedTypeKind, openTypeKind, mkArrowKind,
 			  mkArrowKinds, mkForAllTy, mkForAllTys,
 			  defaultKind, isTypeKind, isAnyTypeKind,
-			  mkFunTy, mkFunTys, zipFunTys, isTyVarTy,
+			  mkFunTy, mkFunTys, zipFunTys, 
 			  mkTyConApp, mkGenTyConApp, mkAppTy,
 			  mkAppTys, mkSynTy, applyTy, applyTys,
 			  mkTyVarTy, mkTyVarTys, mkTyConTy, mkPredTy,
