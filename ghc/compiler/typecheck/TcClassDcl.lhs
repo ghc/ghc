@@ -50,7 +50,8 @@ import Id		( Id, idType, idName, setIdLocalExported, setInlinePragma )
 import Name		( Name, NamedThing(..) )
 import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, plusNameEnv )
 import NameSet		( emptyNameSet, unitNameSet )
-import OccName		( mkClassTyConOcc, mkClassDataConOcc, mkWorkerOcc, mkSuperDictSelOcc )
+import OccName		( mkClassTyConOcc, mkClassDataConOcc, mkWorkerOcc, 
+			  mkSuperDictSelOcc, reportIfUnused )
 import Outputable
 import Var		( TyVar )
 import CmdLineOpts
@@ -549,7 +550,9 @@ mkDefMethRhs origin clas inst_tys sel_id loc NoDefMeth
   =  	-- No default method
 	-- Warn only if -fwarn-missing-methods
     doptM Opt_WarnMissingMethods 		`thenM` \ warn -> 
-    warnTc (isInstDecl origin && warn)
+    warnTc (isInstDecl origin
+	   && warn
+	   && reportIfUnused (getOccName sel_id))
    	   (omittedMethodWarn sel_id)		`thenM_`
     returnM error_rhs
   where

@@ -23,6 +23,7 @@ module OccName (
 	mkGenOcc1, mkGenOcc2, mkLocalOcc,
 	
 	isTvOcc, isTcOcc, isDataOcc, isDataSymOcc, isSymOcc, isValOcc,
+	reportIfUnused,
 
 	occNameFS, occNameString, occNameUserString, occNameSpace, occNameFlavour, 
 	setOccNameSpace,
@@ -255,6 +256,17 @@ isDataOcc other		       = False
 isSymOcc (OccName DataName s) = isLexConSym (decodeFS s)
 isSymOcc (OccName VarName s)  = isLexSym (decodeFS s)
 \end{code}
+
+
+\begin{code}
+reportIfUnused :: OccName -> Bool
+  -- Haskell 98 encourages compilers to suppress warnings about
+  -- unused names in a pattern if they start with "_".
+reportIfUnused occ = case occNameUserString occ of
+			('_' : _) -> False
+			zz_other  -> True
+\end{code}
+
 
 
 %************************************************************************

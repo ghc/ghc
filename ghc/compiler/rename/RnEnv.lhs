@@ -29,11 +29,12 @@ import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
 			  lookupFixity
 			)
 import TcRnMonad
-import Name		( Name, getName, getSrcLoc, nameIsLocalOrFrom, isWiredInName,
-			  mkInternalName, mkExternalName, mkIPName, nameSrcLoc,
-			  nameOccName, setNameSrcLoc, nameModule	)
+import Name		( Name, getName, nameIsLocalOrFrom, 
+			  isWiredInName, mkInternalName, mkExternalName, mkIPName, 
+			  nameSrcLoc, nameOccName, setNameSrcLoc, nameModule	)
 import NameSet
-import OccName		( OccName, tcName, isDataOcc, occNameUserString, occNameFlavour )
+import OccName		( OccName, tcName, isDataOcc, occNameUserString, occNameFlavour,
+			  reportIfUnused )
 import Module		( Module, ModuleName, moduleName, mkHomeModule,
 			  lookupModuleEnv, lookupModuleEnvByName, extendModuleEnv_C )
 import PrelNames	( mkUnboundName, intTyConName, 
@@ -994,12 +995,8 @@ warnUnusedBinds names
    groups = equivClasses cmp (filter reportable names)
    (_,prov1) `cmp` (_,prov2) = prov1 `compare` prov2
  
+   reportable (name,_) = reportIfUnused (nameOccName name)
 
-   reportable (name,_) = case occNameUserString (nameOccName name) of
-				('_' : _) -> False
-				zz_other  -> True
-	-- Haskell 98 encourages compilers to suppress warnings about
-	-- unused names in a pattern if they start with "_".
 
 -------------------------
 
@@ -1010,7 +1007,7 @@ warnUnusedGroup names
     sep [msg <> colon, nest 4 (fsep (punctuate comma (map (ppr.fst) names)))]
   where
     (name1, prov1) = head names
-    loc1  	   = getSrcLoc name1
+    loc1  	   = nameSrcLoc name1
     (def_loc, msg) = case prov1 of
 			LocalDef 			   -> (loc1, unused_msg)
 			NonLocalDef (UserImport mod loc _) -> (loc,  imp_from mod)
