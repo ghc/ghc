@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.3 1999/02/05 16:02:43 simonm Exp $
+ * $Id: HeapStackCheck.hc,v 1.4 1999/03/16 13:20:15 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -803,6 +803,13 @@ FN_(stg_gen_yield)
   FB_
   SAVE_EVERYTHING;
   YIELD_GENERIC
+  FE_
+}
+
+FN_(stg_yield_noregs)
+{
+  FB_
+  YIELD_GENERIC  
   FE_
 }
 

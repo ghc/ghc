@@ -274,6 +274,8 @@ about using it this way?? ADR)
     -- concurrency
     | ForkOp
     | KillThreadOp
+    | YieldOp
+    | MyThreadIdOp
     | DelayOp
     | WaitReadOp
     | WaitWriteOp
@@ -525,23 +527,25 @@ tagOf_PrimOp SeqOp			      = ILIT(220)
 tagOf_PrimOp ParOp			      = ILIT(221)
 tagOf_PrimOp ForkOp			      = ILIT(222)
 tagOf_PrimOp KillThreadOp		      = ILIT(223)
-tagOf_PrimOp DelayOp			      = ILIT(224)
-tagOf_PrimOp WaitReadOp			      = ILIT(225)
-tagOf_PrimOp WaitWriteOp		      = ILIT(226)
-tagOf_PrimOp ParGlobalOp		      = ILIT(227)
-tagOf_PrimOp ParLocalOp			      = ILIT(228)
-tagOf_PrimOp ParAtOp			      = ILIT(229)
-tagOf_PrimOp ParAtAbsOp			      = ILIT(230)
-tagOf_PrimOp ParAtRelOp			      = ILIT(231)
-tagOf_PrimOp ParAtForNowOp		      = ILIT(232)
-tagOf_PrimOp CopyableOp			      = ILIT(233)
-tagOf_PrimOp NoFollowOp			      = ILIT(234)
-tagOf_PrimOp NewMutVarOp		      = ILIT(235)
-tagOf_PrimOp ReadMutVarOp		      = ILIT(236)
-tagOf_PrimOp WriteMutVarOp		      = ILIT(237)
-tagOf_PrimOp SameMutVarOp		      = ILIT(238)
-tagOf_PrimOp CatchOp			      = ILIT(239)
-tagOf_PrimOp RaiseOp			      = ILIT(240)
+tagOf_PrimOp YieldOp			      = ILIT(224)
+tagOf_PrimOp MyThreadIdOp		      = ILIT(225)
+tagOf_PrimOp DelayOp			      = ILIT(226)
+tagOf_PrimOp WaitReadOp			      = ILIT(227)
+tagOf_PrimOp WaitWriteOp		      = ILIT(228)
+tagOf_PrimOp ParGlobalOp		      = ILIT(229)
+tagOf_PrimOp ParLocalOp			      = ILIT(230)
+tagOf_PrimOp ParAtOp			      = ILIT(231)
+tagOf_PrimOp ParAtAbsOp			      = ILIT(232)
+tagOf_PrimOp ParAtRelOp			      = ILIT(233)
+tagOf_PrimOp ParAtForNowOp		      = ILIT(234)
+tagOf_PrimOp CopyableOp			      = ILIT(235)
+tagOf_PrimOp NoFollowOp			      = ILIT(236)
+tagOf_PrimOp NewMutVarOp		      = ILIT(237)
+tagOf_PrimOp ReadMutVarOp		      = ILIT(238)
+tagOf_PrimOp WriteMutVarOp		      = ILIT(239)
+tagOf_PrimOp SameMutVarOp		      = ILIT(240)
+tagOf_PrimOp CatchOp			      = ILIT(241)
+tagOf_PrimOp RaiseOp			      = ILIT(242)
 
 tagOf_PrimOp op = pprPanic# "tagOf_PrimOp: pattern-match" (ppr op)
 --panic# "tagOf_PrimOp: pattern-match"
@@ -802,6 +806,8 @@ allThePrimOps
     	ParOp,
     	ForkOp,
 	KillThreadOp,
+	YieldOp,
+	MyThreadIdOp,
 	DelayOp,
 	WaitReadOp,
 	WaitWriteOp
@@ -1530,9 +1536,21 @@ primOpInfo ForkOp
 
 -- killThread# :: ThreadId# -> State# RealWorld -> State# RealWorld
 primOpInfo KillThreadOp
-  = mkGenPrimOp SLIT("killThread#") [] 
-	[threadIdPrimTy, realWorldStatePrimTy]
+  = mkGenPrimOp SLIT("killThread#") [alphaTyVar] 
+	[threadIdPrimTy, alphaTy, realWorldStatePrimTy]
 	realWorldStatePrimTy
+
+-- yield# :: State# RealWorld -> State# RealWorld
+primOpInfo YieldOp
+  = mkGenPrimOp SLIT("yield#") [] 
+	[realWorldStatePrimTy]
+	realWorldStatePrimTy
+
+-- myThreadId# :: State# RealWorld -> (# State# RealWorld, ThreadId# #)
+primOpInfo MyThreadIdOp
+  = mkGenPrimOp SLIT("myThreadId#") [] 
+	[realWorldStatePrimTy]
+	(unboxedPair [realWorldStatePrimTy, threadIdPrimTy])
 \end{code}
 
 ************************************************************************
@@ -1860,6 +1878,7 @@ primOpOutOfLine op
 	NewMVarOp		-> True
 	ForkOp			-> True
 	KillThreadOp		-> True
+	YieldOp			-> True
 	CCallOp _ _ may_gc@True _ -> True	-- _ccall_GC_
 	  -- the next one doesn't perform any heap checks,
 	  -- but it is of such an esoteric nature that
@@ -1934,6 +1953,7 @@ primOpHasSideEffects WaitWriteOp       = True
 primOpHasSideEffects ParOp	       = True
 primOpHasSideEffects ForkOp	       = True
 primOpHasSideEffects KillThreadOp      = True
+primOpHasSideEffects YieldOp	       = True
 primOpHasSideEffects SeqOp	       = True
 
 primOpHasSideEffects MakeForeignObjOp  = True

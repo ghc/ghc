@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.15 1999/03/08 16:41:42 sof Exp $
+ * $Id: Schedule.c,v 1.16 1999/03/16 13:20:16 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -71,6 +71,11 @@ StgTSO   *MainTSO;
 #define MIN_STACK_WORDS (RESERVED_STACK_WORDS + sizeofW(StgStopFrame) + 2)
 
 /* -----------------------------------------------------------------------------
+ * Static functions
+ * -------------------------------------------------------------------------- */
+static void unblockThread(StgTSO *tso);
+
+/* -----------------------------------------------------------------------------
    Create a new thread.
 
    The new thread starts with the given stack size.  Before the
@@ -104,8 +109,8 @@ initThread(StgTSO *tso, nat stack_size)
 {
   SET_INFO(tso,&TSO_info);
   tso->whatNext     = ThreadEnterGHC;
-  tso->state        = tso_state_runnable;
   tso->id           = next_thread_id++;
+  tso->blocked_on   = NULL;
 
   tso->splim        = (P_)&(tso->stack) + RESERVED_STACK_WORDS;
   tso->stack_size   = stack_size;
@@ -139,166 +144,12 @@ initThread(StgTSO *tso, nat stack_size)
 }
 
 /* -----------------------------------------------------------------------------
-   Delete a thread - reverting all blackholes to (something
-   equivalent to) their former state.
-
-   We create an AP_UPD for every UpdateFrame on the stack.
-   Entering one of these AP_UPDs pushes everything from the corresponding
-   update frame upwards onto the stack.  (Actually, it pushes everything
-   up to the next update frame plus a pointer to the next AP_UPD
-   object.  Entering the next AP_UPD object pushes more onto the
-   stack until we reach the last AP_UPD object - at which point
-   the stack should look exactly as it did when we killed the TSO
-   and we can continue execution by entering the closure on top of
-   the stack.   
-   -------------------------------------------------------------------------- */
-
-void deleteThread(StgTSO *tso)
-{
-    StgUpdateFrame* su = tso->su;
-    StgPtr          sp = tso->sp;
-
-    /* Thread already dead? */
-    if (tso->whatNext == ThreadComplete || tso->whatNext == ThreadKilled) {
-      return;
-    }
-
-    IF_DEBUG(scheduler, belch("Killing thread %ld.", tso->id));
-
-    tso->whatNext = ThreadKilled; /* changed to ThreadComplete in schedule() */
-    tso->link = END_TSO_QUEUE; /* Just to be on the safe side... */
-
-    /* Threads that finish normally leave Su pointing to the word
-     * beyond the top of the stack, and Sp pointing to the last word
-     * on the stack, which is the return value of the thread.
-     */
-    if ((P_)tso->su >= tso->stack + tso->stack_size
-	|| get_itbl(tso->su)->type == STOP_FRAME) {
-      return;
-    }
-      
-    IF_DEBUG(scheduler,
-             fprintf(stderr, "Freezing TSO stack\n");
-             printTSO(tso);
-             );
-
-    /* The stack freezing code assumes there's a closure pointer on
-     * the top of the stack.  This isn't always the case with compiled
-     * code, so we have to push a dummy closure on the top which just
-     * returns to the next return address on the stack.
-     */
-    if ( LOOKS_LIKE_GHC_INFO((void*)*sp) ) {
-      *(--sp) = (W_)&dummy_ret_closure;
-    }
-
-    while (1) {
-      int words = (stgCast(StgPtr,su) - stgCast(StgPtr,sp)) - 1;
-      nat i;
-      StgAP_UPD* ap = stgCast(StgAP_UPD*,allocate(AP_sizeW(words)));
-      TICK_ALLOC_THK(words+1,0);
-
-      /* First build an AP_UPD consisting of the stack chunk above the
-       * current update frame, with the top word on the stack as the
-       * fun field.
-       */
-      ASSERT(words >= 0);
-
-      /*      if (words == 0) {  -- optimisation
-	ap = stgCast(StgAP_UPD*,*stgCast(StgPtr*,sp)++);
-      } else */ {
-	ap->n_args = words;
-	ap->fun    = stgCast(StgClosure*,*stgCast(StgPtr*,sp)++);
-	for(i=0; i < (nat)words; ++i) {
-	  payloadWord(ap,i) = *sp++;
-	}
-      }
-
-      switch (get_itbl(su)->type) {
-	
-      case UPDATE_FRAME:
-	{
-	  SET_HDR(ap,&AP_UPD_info,su->header.prof.ccs /* ToDo */); 
-	  
-	  IF_DEBUG(scheduler,
-		   fprintf(stderr,  "Updating ");
-		   printPtr(stgCast(StgPtr,su->updatee)); 
-		   fprintf(stderr,  " with ");
-		   printObj(stgCast(StgClosure*,ap));
-		   );
-
-	  /* Replace the updatee with an indirection - happily
-	   * this will also wake up any threads currently
-	   * waiting on the result.
-	   */
-	  UPD_IND(su->updatee,ap);  /* revert the black hole */
-	  su = su->link;
-	  sp += sizeofW(StgUpdateFrame) -1;
-	  sp[0] = stgCast(StgWord,ap); /* push onto stack */
-	  break;
-	}
-      
-      case CATCH_FRAME:
-	{
-	  StgCatchFrame *cf = (StgCatchFrame *)su;
-	  StgClosure* o;
-	    
-	  /* We want a PAP, not an AP_UPD.  Fortunately, the
-	   * layout's the same.
-	   */
-	  SET_HDR(ap,&PAP_info,su->header.prof.ccs /* ToDo */);
-	  
-	  /* now build o = FUN(catch,ap,handler) */
-	  o = stgCast(StgClosure*, allocate(sizeofW(StgClosure)+2));
-	  TICK_ALLOC_THK(2,0);
-	  SET_HDR(o,&catch_info,su->header.prof.ccs /* ToDo */);
-	  payloadCPtr(o,0) = stgCast(StgClosure*,ap);
-	  payloadCPtr(o,1) = cf->handler;
-	  
-	  IF_DEBUG(scheduler,
-		   fprintf(stderr,  "Built ");
-		   printObj(stgCast(StgClosure*,o));
-		   );
-	  
-	  /* pop the old handler and put o on the stack */
-	  su = cf->link;
-	  sp += sizeofW(StgCatchFrame) - 1;
-	  sp[0] = (W_)o;
-	  break;
-	}
-	
-      case SEQ_FRAME:
-	{
-	  StgSeqFrame *sf = (StgSeqFrame *)su;
-	  StgClosure* o;
-	  
-	  SET_HDR(ap,&PAP_info,su->header.prof.ccs /* ToDo */);
-	  
-	  /* now build o = FUN(seq,ap) */
-          o = stgCast(StgClosure*, allocate(sizeofW(StgClosure)+1));
-	  TICK_ALLOC_THK(1,0);
-	  SET_HDR(o,&seq_info,su->header.prof.ccs /* ToDo */);
-	  payloadCPtr(o,0) = stgCast(StgClosure*,ap);
-	  
-	  IF_DEBUG(scheduler,
-		   fprintf(stderr,  "Built ");
-		   printObj(stgCast(StgClosure*,o));
-		   );
-	    
-	  /* pop the old handler and put o on the stack */
-	  su = sf->link;
-	  sp += sizeofW(StgSeqFrame) - 1;
-	  sp[0] = (W_)o;
-	  break;
-	}
-      
-      case STOP_FRAME:
-	return;
-	
-      default:
-	barf("freezeTSO");
-      }
-    }
-}
+ * initScheduler()
+ *
+ * Initialise the scheduler.  This resets all the queues - if the
+ * queues contained any threads, they'll be garbage collected at the
+ * next pass.
+ * -------------------------------------------------------------------------- */
 
 void initScheduler(void)
 {
@@ -425,7 +276,7 @@ SchedulerStatus schedule(StgTSO *main, StgClosure **ret_val)
 	  LoadThreadState();
 	  /* CHECK_SENSIBLE_REGS(); */
 	  {
-	      StgClosure* c = stgCast(StgClosure*,*Sp);
+	      StgClosure* c = (StgClosure *)Sp[0];
 	      Sp += 1;
 	      ret = enter(c);
 	  }	
@@ -533,7 +384,6 @@ SchedulerStatus schedule(StgTSO *main, StgClosure **ret_val)
 
     case ThreadFinished:
       IF_DEBUG(scheduler,belch("Thread %ld finished\n", t->id));
-      deleteThread(t);
       t->whatNext = ThreadComplete;
       break;
 
@@ -736,6 +586,7 @@ void awaken_blocked_queue(StgTSO *q)
     tso = q;
     q = tso->link;
     PUSH_ON_RUN_QUEUE(tso);
+    tso->blocked_on = NULL;
     IF_DEBUG(scheduler,belch("Waking up thread %ld", tso->id));
   }
 }
@@ -745,9 +596,278 @@ void awaken_blocked_queue(StgTSO *q)
    - usually called inside a signal handler so it mustn't do anything fancy.   
    -------------------------------------------------------------------------- */
 
-void interruptStgRts(void)
+void
+interruptStgRts(void)
 {
     interrupted    = 1;
     context_switch = 1;
 }
 
+/* -----------------------------------------------------------------------------
+   Unblock a thread
+
+   This is for use when we raise an exception in another thread, which
+   may be blocked.
+   -------------------------------------------------------------------------- */
+
+static void
+unblockThread(StgTSO *tso)
+{
+  StgTSO *t, **last;
+
+  if (tso->blocked_on == NULL) {
+    return;  /* not blocked */
+  }
+
+  switch (get_itbl(tso->blocked_on)->type) {
+
+  case MVAR:
+    {
+      StgTSO *last_tso = END_TSO_QUEUE;
+      StgMVar *mvar = (StgMVar *)(tso->blocked_on);
+
+      last = &mvar->head;
+      for (t = mvar->head; t != END_TSO_QUEUE; 
+	   last = &t->link, last_tso = t, t = t->link) {
+	if (t == tso) {
+	  *last = tso->link;
+	  if (mvar->tail == tso) {
+	    mvar->tail = last_tso;
+	  }
+	  break;
+	}
+      }
+    }
+
+  case BLACKHOLE_BQ:
+    {
+      StgBlockingQueue *bq = (StgBlockingQueue *)(tso->blocked_on);
+
+      last = &bq->blocking_queue;
+      for (t = bq->blocking_queue; t != END_TSO_QUEUE; 
+	   last = &t->link, t = t->link) {
+	if (t == tso) {
+	  *last = tso->link;
+	  break;
+	}
+      }
+    }
+
+  default:
+    barf("unblockThread");
+  }
+
+  tso->link = END_TSO_QUEUE;
+  tso->blocked_on = NULL;
+}
+
+/* -----------------------------------------------------------------------------
+ * raiseAsync()
+ *
+ * The following function implements the magic for raising an
+ * asynchronous exception in an existing thread.
+ *
+ * We first remove the thread from any queue on which it might be
+ * blocked.  The possible blockages are MVARs and BLACKHOLE_BQs.
+ *
+ * We strip the stack down to the innermost CATCH_FRAME, building
+ * thunks in the heap for all the active computations, so they can 
+ * be restarted if necessary.  When we reach a CATCH_FRAME, we build
+ * an application of the handler to the exception, and push it on
+ * the top of the stack.
+ * 
+ * How exactly do we save all the active computations?  We create an
+ * AP_UPD for every UpdateFrame on the stack.  Entering one of these
+ * AP_UPDs pushes everything from the corresponding update frame
+ * upwards onto the stack.  (Actually, it pushes everything up to the
+ * next update frame plus a pointer to the next AP_UPD object.
+ * Entering the next AP_UPD object pushes more onto the stack until we
+ * reach the last AP_UPD object - at which point the stack should look
+ * exactly as it did when we killed the TSO and we can continue
+ * execution by entering the closure on top of the stack.
+ *
+ * We can also kill a thread entirely - this happens if either (a) the 
+ * exception passed to raiseAsync is NULL, or (b) there's no
+ * CATCH_FRAME on the stack.  In either case, we strip the entire
+ * stack and replace the thread with a zombie.
+ *
+ * -------------------------------------------------------------------------- */
+ 
+void 
+deleteThread(StgTSO *tso)
+{
+  raiseAsync(tso,NULL);
+}
+
+void
+raiseAsync(StgTSO *tso, StgClosure *exception)
+{
+  StgUpdateFrame* su = tso->su;
+  StgPtr          sp = tso->sp;
+  
+  /* Thread already dead? */
+  if (tso->whatNext == ThreadComplete || tso->whatNext == ThreadKilled) {
+    return;
+  }
+
+  IF_DEBUG(scheduler, belch("Raising exception in thread %ld.", tso->id));
+
+  /* Remove it from any blocking queues */
+  unblockThread(tso);
+
+  /* The stack freezing code assumes there's a closure pointer on
+   * the top of the stack.  This isn't always the case with compiled
+   * code, so we have to push a dummy closure on the top which just
+   * returns to the next return address on the stack.
+   */
+  if ( LOOKS_LIKE_GHC_INFO((void*)*sp) ) {
+    *(--sp) = (W_)&dummy_ret_closure;
+  }
+
+  while (1) {
+    int words = ((P_)su - (P_)sp) - 1;
+    nat i;
+    StgAP_UPD * ap;
+
+    /* If we find a CATCH_FRAME, and we've got an exception to raise,
+     * then build PAP(handler,exception), and leave it on top of
+     * the stack ready to enter.
+     */
+    if (get_itbl(su)->type == CATCH_FRAME && exception != NULL) {
+      StgCatchFrame *cf = (StgCatchFrame *)su;
+      /* we've got an exception to raise, so let's pass it to the
+       * handler in this frame.
+       */
+      ap = (StgAP_UPD *)allocate(sizeofW(StgPAP) + 1);
+      TICK_ALLOC_THK(2,0);
+      SET_HDR(ap,&PAP_info,cf->header.prof.ccs);
+	      
+      ap->n_args = 1;
+      ap->fun = cf->handler;
+      ap->payload[0] = (P_)exception;
+
+      /* sp currently points to the word above the CATCH_FRAME on the
+       * stack.  Replace the CATCH_FRAME with a pointer to the new handler
+       * application.
+       */
+      sp += sizeofW(StgCatchFrame);
+      sp[0] = (W_)ap;
+      tso->su = cf->link;
+      tso->sp = sp;
+      tso->whatNext = ThreadEnterGHC;
+      /* wake up the thread */
+      if (tso->link == END_TSO_QUEUE) {
+	PUSH_ON_RUN_QUEUE(tso);
+      }
+      return;
+    }
+
+    /* First build an AP_UPD consisting of the stack chunk above the
+     * current update frame, with the top word on the stack as the
+     * fun field.
+     */
+    ap = (StgAP_UPD *)allocate(AP_sizeW(words));
+    TICK_ALLOC_THK(words+1,0);
+    
+    ASSERT(words >= 0);
+    
+    ap->n_args = words;
+    ap->fun    = (StgClosure *)sp[0];
+    sp++;
+    for(i=0; i < (nat)words; ++i) {
+      ap->payload[i] = (P_)*sp++;
+    }
+    
+    switch (get_itbl(su)->type) {
+      
+    case UPDATE_FRAME:
+      {
+	SET_HDR(ap,&AP_UPD_info,su->header.prof.ccs /* ToDo */); 
+	
+	IF_DEBUG(scheduler,
+		 fprintf(stderr,  "Updating ");
+		 printPtr((P_)su->updatee); 
+		 fprintf(stderr,  " with ");
+		 printObj((StgClosure *)ap);
+		 );
+	
+	/* Replace the updatee with an indirection - happily
+	 * this will also wake up any threads currently
+	 * waiting on the result.
+	 */
+	UPD_IND(su->updatee,ap);  /* revert the black hole */
+	su = su->link;
+	sp += sizeofW(StgUpdateFrame) -1;
+	sp[0] = (W_)ap; /* push onto stack */
+	break;
+      }
+      
+    case CATCH_FRAME:
+      {
+	StgCatchFrame *cf = (StgCatchFrame *)su;
+	StgClosure* o;
+	
+	/* We want a PAP, not an AP_UPD.  Fortunately, the
+	 * layout's the same.
+	 */
+	SET_HDR(ap,&PAP_info,su->header.prof.ccs /* ToDo */);
+	
+	/* now build o = FUN(catch,ap,handler) */
+	o = (StgClosure *)allocate(sizeofW(StgClosure)+2);
+	TICK_ALLOC_THK(2,0);
+	SET_HDR(o,&catch_info,su->header.prof.ccs /* ToDo */);
+	o->payload[0] = (StgClosure *)ap;
+	o->payload[1] = cf->handler;
+	
+	IF_DEBUG(scheduler,
+		 fprintf(stderr,  "Built ");
+		 printObj((StgClosure *)o);
+		 );
+	
+	/* pop the old handler and put o on the stack */
+	su = cf->link;
+	sp += sizeofW(StgCatchFrame) - 1;
+	sp[0] = (W_)o;
+	break;
+      }
+      
+    case SEQ_FRAME:
+      {
+	StgSeqFrame *sf = (StgSeqFrame *)su;
+	StgClosure* o;
+	
+	SET_HDR(ap,&PAP_info,su->header.prof.ccs /* ToDo */);
+	
+	/* now build o = FUN(seq,ap) */
+	o = (StgClosure *)allocate(sizeofW(StgClosure)+1);
+	TICK_ALLOC_THK(1,0);
+	SET_HDR(o,&seq_info,su->header.prof.ccs /* ToDo */);
+	payloadCPtr(o,0) = (StgClosure *)ap;
+	
+	IF_DEBUG(scheduler,
+		 fprintf(stderr,  "Built ");
+		 printObj((StgClosure *)o);
+		 );
+	
+	/* pop the old handler and put o on the stack */
+	su = sf->link;
+	sp += sizeofW(StgSeqFrame) - 1;
+	sp[0] = (W_)o;
+	break;
+      }
+      
+    case STOP_FRAME:
+      /* We've stripped the entire stack, the thread is now dead. */
+      sp += sizeofW(StgStopFrame) - 1;
+      sp[0] = (W_)exception;	/* save the exception */
+      tso->whatNext = ThreadKilled;
+      tso->su = (StgUpdateFrame *)(sp+1);
+      tso->sp = sp;
+      return;
+      
+    default:
+      barf("raiseAsync");
+    }
+  }
+  barf("raiseAsync");
+}

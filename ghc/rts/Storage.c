@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.16 1999/03/02 19:50:12 sof Exp $
+ * $Id: Storage.c,v 1.17 1999/03/16 13:20:18 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -254,8 +254,10 @@ newCAF(StgClosure* caf)
     
     info = get_itbl(caf);
     ASSERT(info->type == IND_STATIC);
+#if 0
     STATIC_LINK2(info,caf) = caf_list;
     caf_list = caf;
+#endif
   }
 #endif
 }

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.21 1999/03/05 10:21:27 sof Exp $
+ * $Id: PrimOps.hc,v 1.22 1999/03/16 13:20:15 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -19,6 +19,8 @@
 #include "Storage.h"
 #include "BlockAlloc.h" /* tmp */
 #include "StablePriv.h"
+#include "HeapStackCheck.h"
+#include "StgRun.h"
 
 /* ** temporary **
 
@@ -397,7 +399,7 @@ FN_(int2Integerzh_fast)
    TICK_ALLOC_PRIM(sizeofW(StgArrWords),1,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+1); /* ccs prof */
 
-   p = stgCast(StgArrWords*,Hp)-1;
+   p = (StgArrWords *)Hp - 1;
    SET_ARR_HDR(p, &ARR_WORDS_info, CCCS, 1);
 
    /* mpz_set_si is inlined here, makes things simpler */
@@ -434,7 +436,7 @@ FN_(word2Integerzh_fast)
    TICK_ALLOC_PRIM(sizeofW(StgArrWords),1,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+1); /* ccs prof */
 
-   p = stgCast(StgArrWords*,Hp)-1;
+   p = (StgArrWords *)Hp - 1;
    SET_ARR_HDR(p, &ARR_WORDS_info, CCCS, 1);
 
    if (val != 0) {
@@ -507,7 +509,7 @@ FN_(int64ToIntegerzh_fast)
    TICK_ALLOC_PRIM(sizeofW(StgArrWords),words_needed,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+words_needed); /* ccs prof */
 
-   p = stgCast(StgArrWords*,(Hp-words_needed+1))-1;
+   p = (StgArrWords *)(Hp-words_needed+1) - 1;
    SET_ARR_HDR(p, &ARR_WORDS_info, CCCS, words_needed);
 
    if ( val < 0LL ) {
@@ -558,7 +560,7 @@ FN_(word64ToIntegerzh_fast)
    TICK_ALLOC_PRIM(sizeofW(StgArrWords),words_needed,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+words_needed); /* ccs prof */
 
-   p = stgCast(StgArrWords*,(Hp-words_needed+1))-1;
+   p = (StgArrWords *)(Hp-words_needed+1) - 1;
    SET_ARR_HDR(p, &ARR_WORDS_info, CCCS, words_needed);
 
    hi = (W_)((LW_)val / 0x100000000ULL);
@@ -686,7 +688,7 @@ FN_(decodeFloatzh_fast)
 
   /* Be prepared to tell Lennart-coded __decodeFloat	*/
   /* where mantissa._mp_d can be put (it does not care about the rest) */
-  p = stgCast(StgArrWords*,Hp)-1;
+  p = (StgArrWords *)Hp - 1;
   SET_ARR_HDR(p,&ARR_WORDS_info,CCCS,1)
   mantissa._mp_d = (void *)BYTE_ARR_CTS(p);
 
@@ -719,7 +721,7 @@ FN_(decodeDoublezh_fast)
 
   /* Be prepared to tell Lennart-coded __decodeDouble	*/
   /* where mantissa.d can be put (it does not care about the rest) */
-  p = stgCast(StgArrWords*,Hp-ARR_SIZE+1);
+  p = (StgArrWords *)(Hp-ARR_SIZE+1);
   SET_ARR_HDR(p, &ARR_WORDS_info, CCCS, DOUBLE_MANTISSA_SIZE);
   mantissa._mp_d = (void *)BYTE_ARR_CTS(p);
 
@@ -741,7 +743,7 @@ FN_(forkzh_fast)
   FB_
   /* args: R1 = closure to spark */
   
-  if (closure_SHOULD_SPARK(stgCast(StgClosure*,R1.p))) {
+  if (closure_SHOULD_SPARK(R1.cl)) {
 
     MAYBE_GC(R1_PTR, forkzh_fast);
 
@@ -757,21 +759,44 @@ FN_(forkzh_fast)
   FE_
 }
 
+FN_(yieldzh_fast)
+{
+  FB_
+  JMP_(stg_yield_noregs)
+  FE_
+}
+
 FN_(killThreadzh_fast)
 {
   FB_
-  /* args: R1.p = TSO to kill */
+  /* args: R1.p = TSO to kill, R2.p = Exception */
 
   /* The thread is dead, but the TSO sticks around for a while.  That's why
    * we don't have to explicitly remove it from any queues it might be on.
    */
-  STGCALL1(deleteThread, (StgTSO *)R1.p);
 
-  /* We might have killed ourselves.  In which case, better return to the
-   * scheduler...
+  /* We might have killed ourselves.  In which case, better be *very*
+   * careful.  If the exception killed us, then return to the scheduler.
+   * If the exception went to a catch frame, we'll just continue from
+   * the handler.
    */
-  if ((StgTSO *)R1.p == CurrentTSO) {
-	JMP_(stg_stop_thread_entry); /* leave semi-gracefully */
+  if (R1.t == CurrentTSO) {
+	SaveThreadState();	/* inline! */
+	STGCALL2(raiseAsync, R1.t, R2.cl);
+	if (CurrentTSO->whatNext == ThreadKilled) {
+		R1.w = ThreadYielding;
+		JMP_(StgReturn);
+	}
+	LoadThreadState();
+	if (CurrentTSO->whatNext == ThreadEnterGHC) {
+		R1.w = Sp[0];
+		Sp++;
+		JMP_(GET_ENTRY(R1.cl));
+	} else {
+	  	barf("killThreadzh_fast");
+	}
+  } else {
+	STGCALL2(raiseAsync, R1.t, R2.cl);
   }
 
   JMP_(ENTRY_CODE(Sp[0]));

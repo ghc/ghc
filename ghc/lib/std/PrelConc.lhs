@@ -9,27 +9,31 @@ Basic concurrency stuff
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
 
-module PrelConc (
+module PrelConc
 
-		-- Thread Ids
-	ThreadId,
+	-- Thread Ids
+	( ThreadId	-- abstract
 
-		-- Forking and suchlike
-	forkIO,	
-	killThread,
-	par, fork, seq,
+	-- Forking and suchlike
+	, forkIO	-- :: IO () -> IO ThreadId
+	, myThreadId 	-- :: IO ThreadId
+	, killThread	-- :: ThreadId -> IO ()
+	, raiseInThread -- :: ThreadId -> Exception -> IO ()
+	, par  		-- :: a -> b -> b
+	, fork  	-- :: a -> b -> b
+	, seq  		-- :: a -> b -> b
 	{-threadDelay, threadWaitRead, threadWaitWrite,-}
 
-  		-- MVars
-	MVar
-     , newMVar
-     , newEmptyMVar
-     , takeMVar
-     , putMVar
-     , readMVar
-     , swapMVar
-       -- use with care (see comment.)
-     , isEmptyMVar
+	-- MVars
+	, MVar		-- abstract
+	, newMVar 	-- :: a -> IO (MVar a)
+	, newEmptyMVar  -- :: IO (MVar a)
+	, takeMVar 	-- :: MVar a -> IO a
+	, putMVar  	-- :: MVar a -> a -> IO ()
+	, readMVar 	-- :: MVar a -> IO a
+	, swapMVar 	-- :: MVar a -> a -> IO a
+	, isEmptyMVar	-- :: MVar a -> IO Bool
+
     ) where
 
 import PrelBase
@@ -37,6 +41,7 @@ import PrelErr ( parError, seqError )
 import PrelST	  	( liftST )
 import PrelIOBase	( IO(..), MVar(..), unsafePerformIO )
 import PrelBase		( Int(..) )
+import PrelException    ( Exception(..), AsyncException(..) )
 
 infixr 0 `par`, `fork`
 \end{code}
@@ -49,8 +54,8 @@ infixr 0 `par`, `fork`
 
 \begin{code}
 data ThreadId = ThreadId ThreadId#
--- ToDo: data ThreadId = ThreadId (WeakPair ThreadId# ())
--- But since ThreadId# is unlifted, the WeakPair type must use open
+-- ToDo: data ThreadId = ThreadId (Weak ThreadId#)
+-- But since ThreadId# is unlifted, the Weak type must use open
 -- type variables.
 
 forkIO :: IO () -> IO ThreadId
@@ -59,7 +64,15 @@ forkIO action = IO $ \ s ->
 
 killThread :: ThreadId -> IO ()
 killThread (ThreadId id) = IO $ \ s ->
-   case (killThread# id s) of s1 -> (# s1, () #)
+   case (killThread# id (AsyncException ThreadKilled) s) of s1 -> (# s1, () #)
+
+raiseInThread :: ThreadId -> Exception -> IO ()
+raiseInThread (ThreadId id) ex = IO $ \ s ->
+   case (killThread# id ex s) of s1 -> (# s1, () #)
+
+myThreadId :: IO ThreadId
+myThreadId = IO $ \s ->
+   case (myThreadId# s) of (# s1, id #) -> (# s1, ThreadId id #)
 
 -- "seq" is defined a bit wierdly (see below)
 --

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.5 1999/03/02 19:44:22 sof Exp $
+ * $Id: TSO.h,v 1.6 1999/03/16 13:20:10 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -81,9 +81,8 @@ typedef struct StgTSO_ {
   struct StgTSO_*    link;
   StgMutClosure *    mut_link;	/* TSO's are mutable of course! */
   StgTSOWhatNext     whatNext;
-  StgTSOState        state;	/* necessary? */
+  StgClosure *       blocked_on;
   StgThreadID        id;
-  /* Exception Handlers */
   StgTSOTickyInfo    ticky; 
   StgTSOProfInfo     prof;
   StgTSOParInfo      par;
@@ -101,6 +100,44 @@ typedef struct StgTSO_ {
 
 extern DLL_IMPORT_RTS StgTSO      *CurrentTSO;
 
+/* -----------------------------------------------------------------------------
+   Invariants:
+
+   An active thread has the following properties:
+
+      tso->stack < tso->sp < tso->stack+tso->stack_size
+      tso->stack_size <= tso->max_stack_size
+      tso->splim == tso->stack + RESERVED_STACK_WORDS;
+      
+      RESERVED_STACK_WORDS is large enough for any heap-check or
+      stack-check failure.
+
+      The size of the TSO struct plus the stack is either
+        (a) smaller than a block, or
+	(b) a multiple of BLOCK_SIZE
+
+      tso->link
+          == END_TSO_QUEUE  , iff the thread is currently running.
+          == (StgTSO *)     , otherwise, and it is linked onto either:
+
+          - the runnable_queue       tso->blocked_on == END_TSO_QUEUE
+          - the blocked_queue	     tso->blocked_on == END_TSO_QUEUE
+          - a BLACKHOLE_BQ,          tso->blocked_on == the BLACKHOLE_BQ
+          - an MVAR,                 tso->blocked_on == the MVAR
+				
+   A zombie thread has the following properties:
+      
+      tso->whatNext == ThreadComplete or ThreadKilled
+      tso->link     ==  (could be on some queue somewhere)
+      tso->su       ==  tso->stack + tso->stack_size
+      tso->sp       ==  tso->stack + tso->stack_size - 1 (i.e. top stack word)
+      tso->sp[0]    ==  return value of thread, if whatNext == ThreadComplete,
+                        exception             , if whatNext == ThreadKilled
+
+      (tso->sp is left pointing at the top word on the stack so that
+      the return value or exception will be retained by a GC).
+
+   ---------------------------------------------------------------------------- */
 
 /* Workaround for a bug/quirk in gcc on certain architectures.
  * symptom is that (&tso->stack - &tso->header) /=  sizeof(StgTSO)

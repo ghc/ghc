@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.4 1999/03/02 20:04:04 sof Exp $
+ * $Id: Schedule.h,v 1.5 1999/03/16 13:20:17 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -19,10 +19,9 @@ void    initScheduler(void);
  */
 
 void    awaken_blocked_queue(StgTSO *tso);
-
 void    initThread(StgTSO *tso, nat stack_size);
-
 void    interruptStgRts(void);
+void    raiseAsync(StgTSO *tso, StgClosure *exception);
 
 extern  nat context_switch;
 

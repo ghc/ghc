@@ -25,7 +25,9 @@ __export PrelGHC
 
   -- Concurrency primitives
   ThreadIdzh
+  myThreadIdzh
   forkzh
+  yieldzh
   killThreadzh
   delayzh
   waitReadzh

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.52 1999/03/15 16:53:11 simonm Exp $
+ * $Id: GC.c,v 1.53 1999/03/16 13:20:13 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1803,6 +1803,9 @@ scavenge(step *step)
 	evac_gen = 0;
 	/* chase the link field for any TSOs on the same queue */
 	(StgClosure *)tso->link = evacuate((StgClosure *)tso->link);
+	if (tso->blocked_on) {
+	  tso->blocked_on = evacuate(tso->blocked_on);
+	}
 	/* scavenge this thread's stack */
 	scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
 	evac_gen = saved_evac_gen;
@@ -2143,19 +2146,14 @@ scavenge_mutable_list(generation *gen)
       }
 
     case TSO:
-      /* follow ptrs and remove this from the mutable list */
       { 
 	StgTSO *tso = (StgTSO *)p;
 
-	/* Don't bother scavenging if this thread is dead 
-	 */
-	if (!(tso->whatNext == ThreadComplete ||
-	      tso->whatNext == ThreadKilled)) {
-	  /* Don't need to chase the link field for any TSOs on the
-	   * same queue. Just scavenge this thread's stack 
-	   */
-	  scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
+	(StgClosure *)tso->link = evacuate((StgClosure *)tso->link);
+	if (tso->blocked_on) {
+	  tso->blocked_on = evacuate(tso->blocked_on);
 	}
+	scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
 
 	/* Don't take this TSO off the mutable list - it might still
 	 * point to some younger objects (because we set evac_gen to 0
@@ -2527,6 +2525,9 @@ scavenge_large(step *step)
 	tso = (StgTSO *)p;
 	/* chase the link field for any TSOs on the same queue */
 	(StgClosure *)tso->link = evacuate((StgClosure *)tso->link);
+	if (tso->blocked_on) {
+	  tso->blocked_on = evacuate(tso->blocked_on);
+	}
 	/* scavenge this thread's stack */
 	scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
 	continue;

@@ -35,6 +35,7 @@ EXTFUN(stg_gen_chk_ret);
 EXTFUN(stg_gen_chk);
 EXTFUN(stg_gen_hp);
 EXTFUN(stg_gen_yield);
+EXTFUN(stg_yield_noregs);
 EXTFUN(stg_yield_to_Hugs);
 EXTFUN(stg_gen_block);
 EXTFUN(stg_block_1);

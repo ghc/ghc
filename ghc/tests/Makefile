@@ -5,6 +5,7 @@ SUBDIRS = \
 	array \
 	ccall \
 	codeGen \
+	concurrent \
 	deSugar \
 	deriving \
 	lib \

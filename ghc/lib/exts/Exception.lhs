@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Exception.lhs,v 1.5 1999/01/19 09:57:12 sof Exp $
+% $Id: Exception.lhs,v 1.6 1999/03/16 13:20:11 simonm Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -36,6 +36,7 @@ module Exception (
 	-- Throwing exceptions
 
 	throw,		-- :: Exception -> a
+	raiseInThread,	-- :: ThreadId -> Exception -> a
 
 	-- Dynamic exceptions
 
@@ -58,6 +59,7 @@ import Prelude        hiding (catch)
 import Prelude hiding (catch)
 import PrelGHC (catch#)
 import PrelException hiding (catch)
+import PrelConc ( raiseInThread )
 #endif
 
 import Dynamic

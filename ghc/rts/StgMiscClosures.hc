@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.17 1999/03/15 16:30:29 simonm Exp $
+ * $Id: StgMiscClosures.hc,v 1.18 1999/03/16 13:20:17 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -146,6 +146,7 @@ STGFUN(BLACKHOLE_entry)
     /* Put ourselves on the blocking queue for this black hole */
     CurrentTSO->link = (StgTSO *)&END_TSO_QUEUE_closure;
     ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
+    CurrentTSO->blocked_on = R1.cl;
     recordMutable((StgMutClosure *)R1.cl);
 
     /* stg_gen_block is too heavyweight, use a specialised one */
@@ -160,6 +161,7 @@ STGFUN(BLACKHOLE_BQ_entry)
     TICK_ENT_BH();
 
     /* Put ourselves on the blocking queue for this black hole */
+    CurrentTSO->blocked_on = R1.cl;
     CurrentTSO->link = ((StgBlockingQueue *)R1.p)->blocking_queue;
     ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
 
@@ -180,6 +182,7 @@ STGFUN(CAF_BLACKHOLE_entry)
     /* Put ourselves on the blocking queue for this black hole */
     CurrentTSO->link = (StgTSO *)&END_TSO_QUEUE_closure;
     ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
+    CurrentTSO->blocked_on = R1.cl;
     recordMutable((StgMutClosure *)R1.cl);
 
     /* stg_gen_block is too heavyweight, use a specialised one */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.23 1999/03/05 10:21:29 sof Exp $
+ * $Id: PrimOps.h,v 1.24 1999/03/16 13:20:09 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -702,8 +702,11 @@ EF_(makeStableNamezh_fast);
    -------------------------------------------------------------------------- */
 
 EF_(forkzh_fast);
+EF_(yieldzh_fast);
 EF_(killThreadzh_fast);
 EF_(seqzh_fast);
+
+#define myThreadIdzh(t) (t = CurrentTSO)
 
 /* Hmm, I'll think about these later. */
 /* -----------------------------------------------------------------------------
