@@ -30,6 +30,7 @@ IMP_Ubiq(){-uitous-}
 import StgSyn
 
 import FiniteMap	( emptyFM, plusFM_C, unitFM, fmToList, FiniteMap )
+import Id (SYN_IE(Id))
 \end{code}
 
 \begin{code}
