@@ -547,8 +547,8 @@ standard source distribution.
 <Para>
 Autoconf builds the <Command>configure</Command> script from
 <Filename>configure.in</Filename> and <Filename>aclocal.m4</Filename>.
-If you modify either of these files, you'll need Autoconf to rebuild
-<Filename>configure</Filename>.
+If you modify either of these files, you'll need
+<command>autoconf</command> to rebuild <Filename>configure</Filename>.
 </Para>
 
 </ListItem></VarListEntry>
@@ -879,89 +879,133 @@ You set the configuration using a three-step process.
 <VarListEntry>
 <Term>Step 1: get ready for configuration.</Term>
 <ListItem>
-<Para>
-Change directory to
-<Constant>&dollar;(FPTOOLS&lowbar;TOP)</Constant> and issue the command <Command>autoconf</Command><IndexTerm><Primary>autoconf</Primary></IndexTerm> (with
-no arguments). This GNU program converts <Filename><Constant>&dollar;(FPTOOLS&lowbar;TOP)</Constant>/configure.in</Filename>
-to a shell script called <Filename><Constant>&dollar;(FPTOOLS&lowbar;TOP)</Constant>/configure</Filename>.
-</Para>
+	      <para>Change directory to
+              <Constant>&dollar;(FPTOOLS&lowbar;TOP)</Constant> and
+              issue the command
+              <Command>autoconf</Command><IndexTerm><Primary>autoconf</Primary></IndexTerm>
+              (with no arguments). This GNU program converts
+              <Filename><Constant>&dollar;(FPTOOLS&lowbar;TOP)</Constant>/configure.in</Filename>
+              to a shell script called
+              <Filename><Constant>&dollar;(FPTOOLS&lowbar;TOP)</Constant>/configure</Filename>.
+              </Para>
 
-<para>
-Some projects, including GHC, have their own configure script.  If
-there's an
-<Constant>&dollar;(FPTOOLS&lowbar;TOP)/&lt;project&gt;/configure.in</Constant>,
-then you need to run <command>autoconf</command> in that directory too.
-</para>
+	      <para>Some projects, including GHC, have their own
+              configure script.  If there's an
+              <Constant>&dollar;(FPTOOLS&lowbar;TOP)/&lt;project&gt;/configure.in</Constant>,
+              then you need to run <command>autoconf</command> in that
+              directory too.</para>
 
-<Para>
-Both these steps are completely platform-independent; they just mean
-that the human-written file (<Filename>configure.in</Filename>) can be short, although
-the resulting shell script, <Command>configure</Command>, and <Filename>mk/config.h.in</Filename>, are
-long.
-</Para>
+	      <para>Both these steps are completely
+              platform-independent; they just mean that the
+              human-written file (<Filename>configure.in</Filename>)
+              can be short, although the resulting shell script,
+              <Command>configure</Command>, and
+              <Filename>mk/config.h.in</Filename>, are long.</para>
 
-<Para>
-In case you don't have <Command>autoconf</Command> we distribute the results,
-<Command>configure</Command>, and <Filename>mk/config.h.in</Filename>, with the source distribution.  They
-aren't kept in the repository, though.
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term>Step 2: system configuration.</Term>
-<ListItem>
-<Para>
-Runs the newly-created <Command>configure</Command> script, thus:
+	      <Para>In case you don't have <Command>autoconf</Command>
+              we distribute the results, <Command>configure</Command>,
+              and <Filename>mk/config.h.in</Filename>, with the source
+              distribution.  They aren't kept in the repository,
+              though.</Para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>Step 2: system configuration.</term>
+	    <listitem>
+	      <para>Runs the newly-created
+	      <Command>configure</Command> script, thus:</para>
 
 <ProgramListing>
-./configure
+./configure <optional><parameter>args</parameter></optional>
 </ProgramListing>
 
-<Command>configure</Command>'s mission is to scurry round your
-computer working out what architecture it has, what operating system,
-whether it has the <Function>vfork</Function> system call, where
-<Command>yacc</Command> is kept, whether <Command>gcc</Command> is
-available, where various obscure <Literal>&num;include</Literal> files
-are, whether it's a leap year, and what the systems manager had for
-lunch.  It communicates these snippets of information in two ways:
-</Para>
+	      <para><Command>configure</Command>'s mission is to
+              scurry round your computer working out what architecture
+              it has, what operating system, whether it has the
+              <Function>vfork</Function> system call, where
+              <Command>yacc</Command> is kept, whether
+              <Command>gcc</Command> is available, where various
+              obscure <Literal>&num;include</Literal> files are,
+              whether it's a leap year, and what the systems manager
+              had for lunch.  It communicates these snippets of
+              information in two ways:</para>
 
-<Para>
+	      <itemizedlist>
+		<listitem>
 
-<ItemizedList>
-<ListItem>
+		  <para>It translates
+                  <Filename>mk/config.mk.in</Filename><IndexTerm><Primary>config.mk.in</Primary></IndexTerm>
+                  to
+                  <Filename>mk/config.mk</Filename><IndexTerm><Primary>config.mk</Primary></IndexTerm>,
+                  substituting for things between
+                  ``<Literal>@</Literal>'' brackets.  So,
+                  ``<Literal>@HaveGcc@</Literal>'' will be replaced by
+                  ``<Literal>YES</Literal>'' or
+                  ``<Literal>NO</Literal>'' depending on what
+                  <Command>configure</Command> finds.
+                  <Filename>mk/config.mk</Filename> is included by
+                  every Makefile (directly or indirectly), so the
+                  configuration information is thereby communicated to
+                  all Makefiles.</para>
+		</ListItem>
 
-<Para>
- It translates <Filename>mk/config.mk.in</Filename><IndexTerm><Primary>config.mk.in</Primary></IndexTerm> to
-<Filename>mk/config.mk</Filename><IndexTerm><Primary>config.mk</Primary></IndexTerm>, substituting for things between
-``<Literal>@</Literal>'' brackets.  So, ``<Literal>@HaveGcc@</Literal>'' will be replaced by
-``<Literal>YES</Literal>'' or ``<Literal>NO</Literal>'' depending on what <Command>configure</Command> finds.
-<Filename>mk/config.mk</Filename> is included by every Makefile (directly or indirectly),
-so the configuration information is thereby communicated to all
-Makefiles.
+		<listitem>
+		  <para> It translates
+                  <Filename>mk/config.h.in</Filename><IndexTerm><Primary>config.h.in</Primary></IndexTerm>
+                  to
+                  <Filename>mk/config.h</Filename><IndexTerm><Primary>config.h</Primary></IndexTerm>.
+                  The latter is <Literal>&num;include</Literal>d by
+                  various C programs, which can thereby make use of
+                  configuration information.</para>
+		</listitem>
+	      </itemizedlist>
 
-</Para>
-</ListItem>
-<ListItem>
+	      <para><command>configure</command> takes some optional
+	      arguments.  Use <literal>./configure --help</literal> to
+	      get a list of the available arguments.  Here are some of
+	      the ones you might need:</para>
 
-<Para>
- It translates <Filename>mk/config.h.in</Filename><IndexTerm><Primary>config.h.in</Primary></IndexTerm> to
-<Filename>mk/config.h</Filename><IndexTerm><Primary>config.h</Primary></IndexTerm>.  The latter is <Literal>&num;include</Literal>d by various C
-programs, which can thereby make use of configuration information.
+	      <variablelist>
+		<varlistentry>
+		  <term><literal>--with-ghc=<parameter>path</parameter></literal></term>
+		  <indexterm><primary><literal>--with-ghc</literal></primary>
+		  </indexterm>
+		  <listitem>
+		    <para>Specifies the path to an installed GHC which
+		    you would like to use.  This compiler will be used
+		    for compiling GHC-specific code (eg. GHC itself).
+		    This option <emphasis>cannot</emphasis> be
+		    specified using <filename>build.mk</filename> (see
+		    later), because <command>configure</command> needs
+		    to auto-detect the version of GHC you're using.
+		    The default is to look for a compiler named
+		    <literal>ghc</literal> in your path.</para>
+		  </listitem>
+		</varlistentry>
+		  
+		<varlistentry>
+		  <term><literal>--with-hc=<parameter>path</parameter></literal></term>
+		  <indexterm><primary><literal>--with-hhc</literal></primary>
+		  </indexterm>
+		  <listitem>
+		    <para>Specifies the path to any installed Haskell
+		    compiler.  This compiler will be used for
+		    compiling generic Haskell code.  The default is to
+		    use <literal>ghc</literal>.</para>
+		  </listitem>
+		</varlistentry>
+	      </variablelist>
 
-</Para>
-</ListItem>
+	      <para><command>configure</command> caches the results of
+              its run in <Filename>config.cache</Filename>.  Quite
+              often you don't want that; you're running
+              <Command>configure</Command> a second time because
+              something has changed.  In that case, simply delete
+              <Filename>config.cache</Filename>.</para>
+	    </listitem>
+	  </varlistentry>
 
-</ItemizedList>
-
-</Para>
-
-<Para>
-<Command>configure</Command> caches the results of its run in <Filename>config.cache</Filename>.  Quite
-often you don't want that; you're running <Command>configure</Command> a second time
-because something has changed.  In that case, simply delete
-<Filename>config.cache</Filename>.
-</Para>
-</ListItem></VarListEntry>
 <VarListEntry>
 <Term>Step 3: build configuration.</Term>
 <ListItem>
