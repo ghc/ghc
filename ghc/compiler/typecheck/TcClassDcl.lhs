@@ -336,7 +336,13 @@ tcMethodBind
 
 tcMethodBind xtve inst_tyvars inst_theta avail_insts prags
 	     (sel_id, meth_id, meth_bind)
-  =  	-- Check the bindings; first adding inst_tyvars to the envt
+  = recoverM (returnM emptyBag) $
+	-- If anything fails, recover returning no bindings.
+	-- This is particularly useful when checking the default-method binding of
+	-- a class decl. If we don't recover, we don't add the default method to
+	-- the type enviroment, and we get a tcLookup failure on $dmeth later.
+
+    	-- Check the bindings; first adding inst_tyvars to the envt
 	-- so that we don't quantify over them in nested places
      mkTcSig meth_id 				`thenM` \ meth_sig ->
 
