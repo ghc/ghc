@@ -133,7 +133,10 @@ tcMatch :: [(Name,Id)]
 	-> TcM (TcMatch, LIE)
 
 tcMatch xve1 match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty ctxt
-  = tcMatchPats pats expected_ty tc_grhss	`thenTc` \ ((pats', grhss'), lie, ex_binds) ->
+  = tcAddSrcLoc (getMatchLoc match)		$	-- At one stage I removed this;
+    tcAddErrCtxt (matchCtxt ctxt match)		$	-- I'm not sure why, so I put it back
+    
+    tcMatchPats pats expected_ty tc_grhss	`thenTc` \ ((pats', grhss'), lie, ex_binds) ->
     returnTc (Match [] pats' Nothing (glue_on Recursive ex_binds grhss'), lie)
 
   where

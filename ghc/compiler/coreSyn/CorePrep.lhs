@@ -169,7 +169,7 @@ corePrepArg env arg dem
 	     mkNonRec v dem floats arg'	`thenUs` \ floats' -> 
 	     returnUs (floats', Var v)
 
-needs_binding | opt_KeepStgTypes = exprIsAtom
+needs_binding | opt_RuntimeTypes = exprIsAtom
 	      | otherwise	 = exprIsTrivial
 
 -- version that doesn't consider an scc annotation to be trivial.

@@ -403,7 +403,7 @@ stgRhsArity :: StgRhs -> Int
 stgRhsArity (StgRhsClosure _ _ _ _ bndrs _) = count isId bndrs
   -- The arity never includes type parameters, so
   -- when keeping type arguments and binders in the Stg syntax 
-  -- (opt_KeepStgTypes) we have to fliter out the type binders.
+  -- (opt_RuntimeTypes) we have to fliter out the type binders.
 stgRhsArity (StgRhsCon _ _ _) = 0
 \end{code}
 

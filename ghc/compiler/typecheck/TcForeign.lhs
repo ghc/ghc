@@ -45,9 +45,10 @@ import TysWiredIn	( isFFIArgumentTy, isFFIImportResultTy,
 			  isFFILabelTy
 			)
 import Type             ( Type )
-import ForeignCall	( CCallSpec(..), CExportSpec(..), CCallTarget(..), isDynamicTarget )
+import ForeignCall	( CCallSpec(..), CExportSpec(..), CCallTarget(..), isDynamicTarget, isCasmTarget )
 import CStrings		( CLabelString, isCLabelString )
 import PrelNames	( hasKey, ioTyConKey )
+import CmdLineOpts	( dopt_HscLang, HscLang(..) )
 import Outputable
 
 \end{code}
@@ -95,15 +96,17 @@ tcFImport fo@(ForeignImport nm hs_ty imp_decl src_loc)
 ------------ Checking types for foreign import ----------------------
 \begin{code}
 tcCheckFIType _ _ _ (DNImport _)
-  = returnNF_Tc ()	-- No error checking yet
+  = checkCg checkDotNet
 
 tcCheckFIType sig_ty arg_tys res_ty (LblImport _)
-  = check (isFFILabelTy sig_ty) (illegalForeignTyErr empty sig_ty)
+  = checkCg checkCOrAsm		`thenNF_Tc_`
+    check (isFFILabelTy sig_ty) (illegalForeignTyErr empty sig_ty)
 
 tcCheckFIType sig_ty arg_tys res_ty (CDynImport _)
   = 	-- Foreign export dynamic
    	-- The first (and only!) arg has got to be a function type
 	-- and it must return IO t; result type is IO Addr
+    checkCg checkCOrAsm		`thenNF_Tc_`
     case arg_tys of
 	[arg1_ty] -> checkForeignArgs isFFIExternalTy arg1_tys			`thenNF_Tc_`
 		     checkForeignRes nonIOok  isFFIExportResultTy res1_ty	`thenNF_Tc_`
@@ -114,7 +117,8 @@ tcCheckFIType sig_ty arg_tys res_ty (CDynImport _)
 
 tcCheckFIType sig_ty arg_tys res_ty (CImport (CCallSpec target _ safety))
   | isDynamicTarget target	-- Foreign import dynamic
-  = case arg_tys of		-- The first arg must be Addr
+  = checkCg checkCOrAsm		`thenNF_Tc_`
+    case arg_tys of		-- The first arg must be Addr
       []     		-> check False (illegalForeignTyErr empty sig_ty)
       (arg1_ty:arg_tys) -> getDOptsTc							`thenNF_Tc` \ dflags ->
 			   check (isFFIDynArgumentTy arg1_ty)
@@ -123,15 +127,21 @@ tcCheckFIType sig_ty arg_tys res_ty (CImport (CCallSpec target _ safety))
 			   checkForeignRes nonIOok (isFFIImportResultTy dflags) res_ty
 
   | otherwise 		-- Normal foreign import
-  = getDOptsTc							`thenNF_Tc` \ dflags ->
+  = checkCg (if isCasmTarget target
+	     then checkC else checkCOrAsm)			`thenNF_Tc_`
     checkCTarget target						`thenNF_Tc_`
+    getDOptsTc							`thenNF_Tc` \ dflags ->
     checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys	`thenNF_Tc_`
     checkForeignRes nonIOok (isFFIImportResultTy dflags) res_ty
 
 -- This makes a convenient place to check
 -- that the C identifier is valid for C
-checkCTarget (StaticTarget str) | not (isCLabelString str) = addErrTc (badCName str)
-checkCTarget other					   = returnNF_Tc ()
+checkCTarget (StaticTarget str) 
+  = checkCg checkCOrAsm 	`thenNF_Tc_`
+    check (isCLabelString str) (badCName str)
+
+checkCTarget (CasmTarget _)
+  = checkCg checkC
 \end{code}
 
 
@@ -222,6 +232,24 @@ checkForeignRes non_io_result_ok pred_res_ty ty =
 		 (illegalForeignTyErr result ty)
 \end{code}
 
+\begin{code} 
+checkDotNet HscILX = Nothing
+checkDotNet other  = Just (text "requires .NET code generation (-filx)")
+
+checkC HscC  = Nothing
+checkC other = Just (text "requires C code generation (-fvia-C)")
+			   
+checkCOrAsm HscC   = Nothing
+checkCOrAsm HscAsm = Nothing
+checkCOrAsm other  = Just (text "via-C or native code generation (-fvia-C)")
+
+checkCg check
+ = getDOptsTc		`thenNF_Tc` \ dflags ->
+   case check (dopt_HscLang dflags) of
+	Nothing  -> returnNF_Tc ()
+	Just err -> addErrTc (text "Illegal foreign declaration:" <+> err)
+\end{code} 
+			   
 Warnings
 
 \begin{code}

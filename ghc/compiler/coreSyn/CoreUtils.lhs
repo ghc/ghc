@@ -19,7 +19,7 @@ module CoreUtils (
 	exprIsValue,exprOkForSpeculation, exprIsBig, 
 	exprIsConApp_maybe, exprIsAtom,
 	idAppIsBottom, idAppIsCheap,
-	exprArity, isRuntimeVar, isRuntimeArg, 
+	exprArity, 
 
 	-- Expr transformation
 	etaReduce, etaExpand,
@@ -67,7 +67,6 @@ import CostCentre	( CostCentre )
 import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply )
 import Outputable
 import TysPrim		( alphaTy )	-- Debugging only
-import CmdLineOpts	( opt_KeepStgTypes )
 \end{code}
 
 
@@ -413,7 +412,7 @@ exprIsCheap other_expr
 	
     go (App f a) n_args args_cheap 
 	| not (isRuntimeArg a) = go f n_args 	  args_cheap
-	| otherwise   = go f (n_args + 1) (exprIsCheap a && args_cheap)
+	| otherwise            = go f (n_args + 1) (exprIsCheap a && args_cheap)
 
     go other   n_args args_cheap = False
 
@@ -483,7 +482,7 @@ exprOkForSpeculation other_expr
 	
     go (App f a) n_args args_ok 
 	| not (isRuntimeArg a) = go f n_args 	  args_ok
-	| otherwise   = go f (n_args + 1) (exprOkForSpeculation a && args_ok)
+	| otherwise            = go f (n_args + 1) (exprOkForSpeculation a && args_ok)
 
     go other n_args args_ok = False
 \end{code}
@@ -540,7 +539,7 @@ exprIsValue other_expr
 	
     go (App f a) n_args
 	| not (isRuntimeArg a) = go f n_args
-	| otherwise   = go f (n_args + 1) 
+	| otherwise   	       = go f (n_args + 1) 
 
     go (Note _ f) n_args = go f n_args
 
@@ -557,20 +556,7 @@ idAppIsValue id n_val_args
 	-- then we could get an infinite loop...
 \end{code}
 
-@isRuntimeVar v@ returns if (Lam v _) really becomes a lambda at runtime,
-i.e. if type applications are actual lambdas because types are kept around
-at runtime.
-
 \begin{code}
-isRuntimeVar :: Var -> Bool
-isRuntimeVar v = opt_KeepStgTypes || isId v
-isRuntimeArg :: CoreExpr -> Bool
-isRuntimeArg v = opt_KeepStgTypes || isTypeArg v
-\end{code}
-
-\begin{code}
-
-
 exprIsConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
 exprIsConApp_maybe (Note InlineMe expr) = exprIsConApp_maybe expr
     -- We ignore InlineMe notes in case we have
@@ -720,15 +706,6 @@ exprEtaExpandArity e
 	    -- giving just
 	    --	f = \x -> e
 	    -- A Bad Idea
-
-min_zero :: [Int] -> Int	-- Find the minimum, but zero is the smallest
-min_zero (x:xs) = go x xs
-		where
-		  go 0   xs		    = 0		-- Nothing beats zero
-		  go min []	  	    = min
-		  go min (x:xs) | x < min   = go x xs
-				| otherwise = go min xs 
-
 \end{code}
 
 

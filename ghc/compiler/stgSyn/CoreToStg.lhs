@@ -31,7 +31,7 @@ import Maybes		( maybeToBool )
 import Name		( getOccName, isExternallyVisibleName, isDllName )
 import OccName		( occNameUserString )
 import BasicTypes       ( TopLevelFlag(..), isNotTopLevel, Arity )
-import CmdLineOpts	( DynFlags, opt_KeepStgTypes )
+import CmdLineOpts	( DynFlags, opt_RuntimeTypes )
 import FastTypes	hiding ( fastOr )
 import Outputable
 
@@ -512,7 +512,7 @@ coreToStgApp maybe_thunk_body f args
             -- e.g. (f :: a -> int) (x :: a) 
             -- Here the free variables are "f", "x" AND the type variable "a"
             -- coreToStgArgs will deal with the arguments recursively
-            if opt_KeepStgTypes then
+            if opt_RuntimeTypes then
 	      fvs `unionFVInfo` tyvarFVInfo (tyVarsOfType (varType f))
 	    else fvs
 
@@ -579,7 +579,7 @@ coreToStgArgs []
 
 coreToStgArgs (Type ty : args)	-- Type argument
   = coreToStgArgs args	`thenLne` \ (args', fvs) ->
-    if opt_KeepStgTypes then
+    if opt_RuntimeTypes then
  	returnLne (StgTypeArg ty : args', fvs `unionFVInfo` tyvarFVInfo (tyVarsOfType ty))
     else
     returnLne (args', fvs)
@@ -970,7 +970,7 @@ minusFVBinders :: [Id] -> FreeVarsInfo -> FreeVarsInfo
 minusFVBinders vs fv = foldr minusFVBinder fv vs
 
 minusFVBinder :: Id -> FreeVarsInfo -> FreeVarsInfo
-minusFVBinder v fv | isId v && opt_KeepStgTypes
+minusFVBinder v fv | isId v && opt_RuntimeTypes
 		   = (fv `delVarEnv` v) `unionFVInfo` 
 		     tyvarFVInfo (tyVarsOfType (idType v))
 		   | otherwise = fv `delVarEnv` v
@@ -993,7 +993,7 @@ allFreeIds :: FreeVarsInfo -> [Id]	-- Non-top-level things only
 allFreeIds fvs = [id | (id,_,_) <- rngVarEnv fvs, isId id]
 
 -- Non-top-level things only, both type variables and ids (type variables
--- only if opt_KeepStgTypes.
+-- only if opt_RuntimeTypes.
 getFVs :: FreeVarsInfo -> [Var]	
 getFVs fvs = [id | (id,NotTopLevelBound,_) <- rngVarEnv fvs]
 
@@ -1009,7 +1009,7 @@ Misc.
 \begin{code}
 filterStgBinders :: [Var] -> [Var]
 filterStgBinders bndrs
-  | opt_KeepStgTypes = bndrs
+  | opt_RuntimeTypes = bndrs
   | otherwise	     = filter isId bndrs
 \end{code}
 
@@ -1121,7 +1121,7 @@ rhsIsNonUpd :: CoreExpr -> Bool
 -- This function has to line up with what the update flag
 -- for the StgRhs gets set to in mkStgRhs (above)
 --
--- When opt_KeepStgTypes is on, we keep type lambdas and treat
+-- When opt_RuntimeTypes is on, we keep type lambdas and treat
 -- them as making the RHS re-entrant (non-updatable).
 rhsIsNonUpd (Lam b e)          = isRuntimeVar b || rhsIsNonUpd e
 rhsIsNonUpd (Note (SCC _) e)   = False

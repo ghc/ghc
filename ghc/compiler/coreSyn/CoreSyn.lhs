@@ -22,7 +22,7 @@ module CoreSyn (
 	coreExprCc,
 	flattenBinds, 
 
-	isValArg, isTypeArg, valArgCount, valBndrCount,
+	isValArg, isTypeArg, valArgCount, valBndrCount, isRuntimeArg, isRuntimeVar,
 
 	-- Unfoldings
 	Unfolding(..),	UnfoldingGuidance(..), 	-- Both abstract everywhere but in CoreUnfold.lhs
@@ -49,6 +49,7 @@ module CoreSyn (
 
 #include "HsVersions.h"
 
+import CmdLineOpts	( opt_RuntimeTypes )
 import CostCentre	( CostCentre, noCostCentre )
 import Var		( Var, Id, TyVar, isTyVar, isId )
 import Type		( Type, mkTyVarTy, seqType )
@@ -489,6 +490,22 @@ coreExprCc other               = noCostCentre
 \subsection{Predicates}
 %*									*
 %************************************************************************
+
+@isRuntimeVar v@ returns if (Lam v _) really becomes a lambda at runtime,
+i.e. if type applications are actual lambdas because types are kept around
+at runtime.  
+
+Similarly isRuntimeArg.  
+
+\begin{code}
+isRuntimeVar :: Var -> Bool
+isRuntimeVar | opt_RuntimeTypes = \v -> True
+	     | otherwise	= \v -> isId v
+
+isRuntimeArg :: CoreExpr -> Bool
+isRuntimeArg | opt_RuntimeTypes = \e -> True
+	     | otherwise	= \e -> isValArg e
+\end{code}
 
 \begin{code}
 isValArg (Type _) = False

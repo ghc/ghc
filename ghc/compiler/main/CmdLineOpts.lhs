@@ -59,7 +59,7 @@ module CmdLineOpts (
 	opt_Parallel,
 	opt_SMP,
 	opt_NoMonomorphismRestriction,
-	opt_KeepStgTypes,
+	opt_RuntimeTypes,
 
 	-- optimisation opts
 	opt_NoMethodSharing,
@@ -515,7 +515,7 @@ opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
 opt_NoHiCheck                   = lookUp  SLIT("-fno-hi-version-check")
 opt_OmitBlackHoling		= lookUp  SLIT("-dno-black-holing")
 opt_OmitInterfacePragmas	= lookUp  SLIT("-fomit-interface-pragmas")
-opt_KeepStgTypes		= lookUp  SLIT("-fkeep-stg-types")
+opt_RuntimeTypes		= lookUp  SLIT("-fruntime-types")
 
 -- Simplifier switches
 opt_SimplNoPreInlining		= lookUp  SLIT("-fno-pre-inlining")

@@ -503,7 +503,7 @@ ilxExpr (IlxEEnv env _) (StgConApp data_con args) sequel
   = text " /* ilxExpr:StgConApp */ " <+>  ilxConApp env data_con args $$ ilxSequel sequel
 
 -- ilxExpr eenv (StgPrimApp primop args _) sequel
-ilxExpr (IlxEEnv env _) (StgOpApp (StgFCallOp fcall) args ret_ty) sequel
+ilxExpr (IlxEEnv env _) (StgOpApp (StgFCallOp fcall _) args ret_ty) sequel
   = ilxFCall env fcall args ret_ty $$ ilxSequel sequel
 
 ilxExpr (IlxEEnv env _) (StgOpApp (StgPrimOp primop) args ret_ty) sequel
@@ -737,7 +737,7 @@ ilxFunApp env fun args tail_call
 	  Just (place, StgRhsClosure  _ _ fvs _ args _)  -> Just (place,fun,args,fvs)
 	  _ ->  trace (show fun ++ " --> " ++ show (arityLowerBound (idArityInfo fun)))  Nothing 
 
-type KnownClosure = Maybe (Place	-- Of the binding site of the function
+type KnownClosure = Maybe (  IlxEnv	-- Of the binding site of the function
 			   , Id		-- The function
 			   , [Var]	-- Binders
 			   , [Var])	-- Free vars of the closure
@@ -1569,7 +1569,7 @@ ilxConApp env data_con args
 -- Base the higher-kinded checks off a corresponding list of formals.
 splitTyArgs :: [Var] 		-- Formals
 	    -> [StgArg]		-- Actuals
-	    -> ([StgArg], [StgArg])
+	    -> ([Type], [StgArg])
 splitTyArgs (htv:ttv) (StgTypeArg h:t) 
    | isIlxTyVar htv = ((h:l), r) 
    | otherwise = trace "splitTyArgs: threw away higher kinded type arg" (l, r) 
@@ -1577,11 +1577,11 @@ splitTyArgs (htv:ttv) (StgTypeArg h:t)
 splitTyArgs _ l = ([],l)
  
 -- Split some type arguments off, where none should be higher kinded
-splitTyArgs1 :: [StgArg] -> ([StgArg], [StgArg])
-splitTyArgs1 args = span is_type_arg args
-		  where
-		    is_type_arg (StgTypeArg _) = True
-		    is_type_arg other	       = False
+splitTyArgs1 :: [StgArg] -> ([Type], [StgArg])
+splitTyArgs1 (StgTypeArg ty : args) = (ty:tys, args')
+				    where
+				      (tys, args') = splitTyArgs1 args
+splitTyArgs1 args		    = ([], args)
 
 ilxConRef env data_con
     = pprId data_con <> pprValArgTys ilxTypeL env' (map deepIlxRepType (filter (not . isVoidIlxRepType) arg_tys))
@@ -2291,10 +2291,10 @@ ilxFCall env (CCall (CCallSpec (StaticTarget c) cconv gc)) args ret_ty
 	   | otherwise		     = ilxTypeR env (deepIlxRepType ret_ty)
     (ty_args,tm_args) = splitTyArgs1 args 
 
-ilxFCall env (CCall (DNCallSpec call_instr)) args ret_ty
+ilxFCall env (DNCall (DNCallSpec call_instr)) args ret_ty
   = ilxComment (text "IL call") <+> 
     vcat [vcat (ilxMapPlaceArgs 0 pushILArg env tm_args), 
-	  text call_instr
+	  ptext call_instr
 		-- In due course we'll need to pass the type arguments
 		-- and to do that we'll need to have more than just a string
 		-- for call_instr
@@ -2303,7 +2303,7 @@ ilxFCall env (CCall (DNCallSpec call_instr)) args ret_ty
     (ty_args,tm_args) = splitTyArgs1 args 
 
 pushILArg env arg | isUnLiftedType (stgArgType arg) = pushArg env arg
-		  | otherwise			    = pushArg env arg <+> error "call ilxFunAppArgs"
+		  | otherwise			    = pushArg env arg <+> text "EVAL!"
 
 hasTyCon (TyConApp tc _) tc2 = tc == tc2
 hasTyCon _  _ = False
