@@ -26,7 +26,6 @@ module Data.Generics.Shortcuts (
 import Data.Generics.Basics
 import Data.Generics.Aliases
 import Data.Generics.Types
-import Data.Types
 
 
 -----------------------------------------------------------------------------

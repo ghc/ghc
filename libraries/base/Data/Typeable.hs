@@ -40,22 +40,20 @@ module Data.Typeable
 	mkFunTy,	-- :: TypeRep -> TypeRep   -> TypeRep
 	applyTy,	-- :: TypeRep -> TypeRep   -> Maybe TypeRep
 
-	-- 
-	-- let fTy = mkTyCon "Foo" in show (mkAppTy (mkTyCon ",,")
-	--                                 [fTy,fTy,fTy])
-	-- 
-	-- returns "(Foo,Foo,Foo)"
-	--
-	-- The TypeRep Show instance promises to print tuple types
-	-- correctly. Tuple type constructors are specified by a 
-	-- sequence of commas, e.g., (mkTyCon ",,,,") returns
-	-- the 5-tuple tycon.
+	-- * Types as values
+	TypeVal,		-- view type "a" as "a -> ()"
+	typeVal,		-- :: TypeVal a
+	typeValOf,		-- :: a -> TypeVal a
+	undefinedType,		-- :: TypeVal a -> a
+	withType,		-- :: a -> TypeVal a -> a
+	argType,		-- :: (a -> b) -> TypeVal a
+	resType,		-- :: (a -> b) -> TypeVal b
+	TypeFun			-- functions on types
 
   ) where
 
 
 import qualified Data.HashTable as HT
-import Data.Types
 import Data.Maybe
 import Data.Either
 import Data.Int
@@ -101,6 +99,7 @@ import NHC.IOExtras (IORef,newIORef,readIORef,writeIORef,unsafePerformIO)
 --
 -------------------------------------------------------------
 
+
 -- | A concrete representation of a (monomorphic) type.  'TypeRep'
 -- supports reasonably efficient equality.
 data TypeRep = TypeRep !Key TyCon [TypeRep] 
@@ -118,6 +117,16 @@ instance Eq TyCon where
 
 #endif
 
+	-- 
+	-- let fTy = mkTyCon "Foo" in show (mkAppTy (mkTyCon ",,")
+	--                                 [fTy,fTy,fTy])
+	-- 
+	-- returns "(Foo,Foo,Foo)"
+	--
+	-- The TypeRep Show instance promises to print tuple types
+	-- correctly. Tuple type constructors are specified by a 
+	-- sequence of commas, e.g., (mkTyCon ",,,,") returns
+	-- the 5-tuple tycon.
 
 ----------------- Construction --------------------
 
@@ -313,6 +322,65 @@ instance ( Typeable a
 instance (Typeable a, Typeable b) => Typeable (a -> b) where
   typeOf f = mkFunTy (typeOf ((undefined :: (a -> b) -> a) f))
 		     (typeOf ((undefined :: (a -> b) -> b) f))
+
+
+-------------------------------------------------------------
+--
+--	Types as values
+--
+-------------------------------------------------------------
+
+{- 
+
+This group provides a style of encoding types as values and using
+them. This style is seen as an alternative to the pragmatic style used
+in Data.Typeable.typeOf and elsewhere, i.e., simply use an "undefined"
+to denote a type argument. This pragmatic style suffers from lack
+of robustness: one feels tempted to pattern match on undefineds.
+Maybe Data.Typeable.typeOf etc. should be rewritten accordingly.
+
+-}
+
+
+-- | Type as values to stipulate use of undefineds
+type TypeVal a = a -> ()
+
+
+-- | The value that denotes a type
+typeVal :: TypeVal a
+typeVal = const ()
+
+
+-- | Map a value to its type
+typeValOf :: a -> TypeVal a
+typeValOf _ = typeVal
+
+
+-- | Stipulate this idiom!
+undefinedType :: TypeVal a -> a
+undefinedType _ = undefined
+
+
+-- | Constrain a type
+withType :: a -> TypeVal a -> a
+withType x _ = x
+
+
+-- | The argument type of a function
+argType :: (a -> b) -> TypeVal a
+argType _ = typeVal
+
+
+-- | The result type of a function
+resType :: (a -> b) -> TypeVal b
+resType _ = typeVal
+
+
+-- Type functions,
+-- i.e., functions mapping types to values
+--
+type TypeFun a r = TypeVal a -> r
+
 
 
 -------------------------------------------------------

@@ -25,7 +25,6 @@ module Data.Generics.Types (
 ------------------------------------------------------------------------------
 
 
-import Data.Types
 import Data.Generics.Basics
 import Data.Generics.Aliases
 import Data.Generics.Counts
