@@ -878,6 +878,7 @@ SGML_PDF  = $(SGML_DOC).pdf
 SGML_RTF  = $(SGML_DOC).rtf
 SGML_HTML = $(SGML_DOC).html
 # HTML output goes in a subdirectory on its own.
+SGML_TEXT = $(SGML_DOC).txt
 
 $(SGML_DVI) $(SGML_PS) $(SGML_INFO) $(SGML_HTML) $(SGML_TEXT) :: $(SGML_SRCS)
 
@@ -886,8 +887,11 @@ ps   :: $(SGML_PS)
 pdf  :: $(SGML_PDF)
 rtf  :: $(SGML_RTF)
 html :: $(SGML_HTML)
+txt  :: $(SGML_TEXT)
 
-CLEAN_FILES += $(SGML_TEXT) $(SGML_PS) $(SGML_DVI) $(SGML_PDF) $(SGML_RTF) $(SGML_HTML)
+CLEAN_FILES += $(SGML_TEXT) $(SGML_PS) $(SGML_DVI) $(SGML_PDF) $(SGML_RTF) $(SGML_HTML) $(SGML_DOC)-*.html
+# can't use $(SGML_SRCS) here, it was maybe used elsewhere
+MOSTLY_CLEAN_FILES += $(patsubst %.vsgml, %.sgml, $(VSGML_SRCS))
 
 clean ::
 	$(RM) -rf $(SGML_DOC)
@@ -1047,7 +1051,7 @@ endif	# if way
 
 ifneq "$(SUBDIRS)" ""
 
-all docs runtests boot TAGS clean veryclean maintainer-clean install info ::
+all docs runtests boot TAGS clean veryclean maintainer-clean install info html ps dvi txt::
 	@echo "------------------------------------------------------------------------"
 	@echo "===fptools== Recursively making \`$@' in $(SUBDIRS) ..."
 	@echo "PWD = $(shell pwd)"
