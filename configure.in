@@ -847,6 +847,14 @@ else
 fi
 AC_SUBST(LibsReadline)
 
+if test "$HaveLibReadline"; then
+  AC_CHECK_LIB(readline, rl_erase_empty_line,
+    [AC_DEFINE(HAVE_READLINE_4, 1)],
+    [AC_DEFINE(HAVE_READLINE_4, 0)])
+else
+  AC_DEFINE(HAVE_READLINE_4, 0)
+fi
+
 dnl ** check for math library
 FPTOOLS_CHECK_LIBM()
 AC_SUBST(LIBM)
