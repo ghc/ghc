@@ -926,6 +926,10 @@ HAPPY_VERSION		= @HappyVersion@
 #
 GHC_HAPPY_OPTS		= -agc
 
+# Temp. to work around performance problems in the HEAD around 8/12/2003,
+# A Happy compiled with this compiler needs more stack.
+SRC_HAPPY_OPTS		= +RTS -K2m -RTS
+
 #
 # Alex
 #
