@@ -351,6 +351,13 @@ printClosure( StgClosure *obj )
           }
 #endif  
 
+    case MVAR:
+        {
+	  StgMVar* mv = (StgMVar*)obj;
+	  debugBelch("MVAR(head=%p, link=%p, tail=%p, value=%p)\n", mv->head, mv->mut_link, mv->tail, mv->value);
+          break;
+        }
+
     case MUT_VAR:
         {
 	  StgMutVar* mv = (StgMutVar*)obj;
