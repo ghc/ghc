@@ -516,9 +516,6 @@ data Option
  	      String  -- the filepath/filename portion
  | Option     String
  
-showOptions :: [Option] -> String
-showOptions ls = unwords (map (quote.showOpt) ls)
-
 showOpt (FileOption pre f) = pre ++ dosifyPath f
 showOpt (Option "") = ""
 showOpt (Option s)  = s
@@ -707,7 +704,23 @@ runSomething :: String		-- For -v message
 runSomething phase_name pgm args
  = traceCmd phase_name (concat (intersperse " " (pgm:quoteargs))) $
    do
-#ifndef mingw32_HOST_OS
+#ifdef mingw32_HOST_OS
+          let showOptions :: [Option] -> String
+              showOptions ls = unwords (map (quote . showOpt) ls)
+
+              quote :: String -> String
+              quote "" = ""
+              quote s  = "\"" ++ escapeDoubleQuotes s ++ "\""
+
+              escapeDoubleQuotes :: String -> String
+              escapeDoubleQuotes ""            = ""
+              escapeDoubleQuotes ('\\':'"':cs) = '\\':'"':escapeDoubleQuotes cs
+              escapeDoubleQuotes (     '"':cs) = '\\':'"':escapeDoubleQuotes cs
+              escapeDoubleQuotes (c       :cs) = c       :escapeDoubleQuotes cs
+
+          -- The pgm is already in native format (appropriate dir separators)
+          exit_code <- rawSystem (pgm ++ ' ':showOptions args)
+#else
           mpid <- forkProcess
           exit_code <- case mpid of
             Nothing -> do -- Child
@@ -727,17 +740,12 @@ runSomething phase_name pgm args
 #endif
 
               return res
-#else
-          exit_code <- rawSystem cmd_line
 #endif
-	  when (exit_code /= ExitSuccess)
-	    $ throwDyn (PhaseFailed phase_name exit_code)
+	  when (exit_code /= ExitSuccess) $
+	     throwDyn (PhaseFailed phase_name exit_code)
           return ()	
   where
-	-- The pgm is already in native format (appropriate dir separators)
-    cmd_line = pgm ++ ' ':showOptions args
-                -- unwords (pgm : dosifyPaths (map quote args))
-    quoteargs = filter (not.null) (map showOpt args)
+    quoteargs = filter (not . null) (map showOpt args)
 
 traceCmd :: String -> String -> IO () -> IO ()
 -- a) trace the command (at two levels of verbosity)
@@ -882,9 +890,5 @@ getProcessID = System.Posix.Internals.c_getpid >>= return . fromIntegral
 getProcessID :: IO Int
 getProcessID = Posix.getProcessID
 #endif
-
-quote :: String -> String
-quote "" = ""
-quote s  = "\"" ++ s ++ "\""
 
 \end{code}
