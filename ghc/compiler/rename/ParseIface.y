@@ -601,9 +601,8 @@ mod_name	:: { ModuleName }
 
 
 ---------------------------------------------------
-var_fs		:: { EncodedFS }
+var_fs          :: { EncodedFS }
 		: VARID			{ $1 }
-		| '!'	  		{ SLIT("!") }
 		| 'as'			{ SLIT("as") }
 		| 'qualified'		{ SLIT("qualified") }
 		| 'hiding'		{ SLIT("hiding") }
@@ -694,7 +693,7 @@ qcls_name	:: { RdrName }
 
 ---------------------------------------------------
 tv_name		:: { RdrName }
-		:  VARID 		{ mkRdrUnqual (mkSysOccFS tvName $1) }
+		:  var_fs 		{ mkRdrUnqual (mkSysOccFS tvName $1) }
 
 tv_bndr		:: { HsTyVarBndr RdrName }
 		:  tv_name '::' akind	{ IfaceTyVar $1 $3 }
