@@ -104,8 +104,7 @@ LIBOBJS = \
 #
 # stuff you get for free in a source distribution
 # 
-SRC_DIST_FILES += rename/ParseIface.hs \
- rename/ParseType.hs rename/ParseUnfolding.hs \
+SRC_DIST_FILES += \
  parser/U_tree.c parser/tree.h parser/tree.c \
  parser/hsparser.tab.c parser/hsparser.tab.h \
  parser/hslexer.c
