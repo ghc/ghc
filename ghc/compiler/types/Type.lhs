@@ -11,7 +11,7 @@ module Type (
 	getFunTy_maybe, getFunTyExpandingDicts_maybe,
 	mkTyConTy, getTyCon_maybe, applyTyCon,
 	mkSynTy,
-	mkForAllTy, mkForAllTys, getForAllTy_maybe, getForAllTyExpandingDicts_maybe, splitForAllTy,
+	mkForAllTy, mkForAllTys, getForAllTy_maybe, getForAllTyExpandingDicts_maybe, splitForAllTy, splitForAllTyExpandingDicts,
 	mkForAllUsageTy, getForAllUsageTy,
 	applyTy,
 #ifdef DEBUG
@@ -47,10 +47,10 @@ IMPORT_DELOOPER(TyLoop)
 --IMPORT_DELOOPER(PrelLoop)  -- for paranoia checking
 
 -- friends:
-import Class	--( classSig, classOpLocalType, GenClass{-instances-} )
+import Class	( classSig, classOpLocalType, GenClass{-instances-} )
 import Kind	( mkBoxedTypeKind, resultKind, notArrowKind, Kind )
 import TyCon	( mkFunTyCon, isFunTyCon, isEnumerationTyCon, isTupleTyCon, maybeTyConSingleCon,
-		  isPrimTyCon, isDataTyCon, isSynTyCon, maybeNewTyCon, isNewTyCon,
+		  isPrimTyCon, isAlgTyCon, isDataTyCon, isSynTyCon, maybeNewTyCon, isNewTyCon,
 		  tyConKind, tyConDataCons, getSynTyConDefn, TyCon )
 import TyVar	( tyVarKind, GenTyVar{-instances-}, SYN_IE(GenTyVarSet),
 		  emptyTyVarSet, unionTyVarSets, minusTyVarSet,
@@ -423,13 +423,21 @@ getForAllTyExpandingDicts_maybe (ForAllTy tyvar t) = Just(tyvar,t)
 getForAllTyExpandingDicts_maybe ty@(DictTy _ _ _)  = getForAllTyExpandingDicts_maybe (expandTy ty)
 getForAllTyExpandingDicts_maybe _		   = Nothing
 
-splitForAllTy :: GenType t u-> ([t], GenType t u)
+splitForAllTy :: GenType t u -> ([t], GenType t u)
 splitForAllTy t = go t t []
 	       where
 			-- See notes on type synonyms above
 		    go syn_t (ForAllTy tv t) tvs = go t t (tv:tvs)
 		    go syn_t (SynTy _ _ t)   tvs = go syn_t t tvs
 		    go syn_t t	             tvs = (reverse tvs, syn_t)
+
+splitForAllTyExpandingDicts :: Type -> ([TyVar], Type)
+splitForAllTyExpandingDicts ty
+  = go [] ty
+  where
+    go tvs ty = case getForAllTyExpandingDicts_maybe ty of
+			Just (tv, ty') -> go (tv:tvs) ty'
+			Nothing	       -> (reverse tvs, ty)
 \end{code}
 
 \begin{code}
@@ -473,6 +481,8 @@ getAppTyCon ty
 
 Applied data tycons (give back constrs)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Nota Bene: all these functions suceed for @newtype@ applications too!
+
 \begin{code}
 maybeAppDataTyCon
 	:: GenType (GenTyVar any) uvar
@@ -493,8 +503,7 @@ maybe_app_data_tycon expand ty
 	(app_ty, arg_tys) = splitAppTys expanded_ty
     in
     case (getTyCon_maybe app_ty) of
-	Just tycon |  --pprTrace "maybe_app:" (hsep [ppr PprDebug (isDataTyCon tycon), ppr PprDebug (notArrowKind (typeKind expanded_ty))]) $
-		      isDataTyCon tycon && 
+	Just tycon |  isAlgTyCon tycon && 			-- NB "Alg"; succeeds for newtype too
 		      notArrowKind (typeKind expanded_ty)
 			-- Must be saturated for ty to be a data type
 		   -> Just (tycon, arg_tys, tyConDataCons tycon)
@@ -528,8 +537,8 @@ get_app_data_tycon maybe ty
 maybeBoxedPrimType :: Type -> Maybe (Id, Type)
 
 maybeBoxedPrimType ty
-  = case (maybeAppDataTyCon ty) of		-- Data type,
-      Just (tycon, tys_applied, [data_con]) 	-- with exactly one constructor
+  = case (maybeAppDataTyCon ty) of					-- Data type,
+      Just (tycon, tys_applied, [data_con]) | isDataTyCon tycon 	-- with exactly one constructor
         -> case (dataConArgTys data_con tys_applied) of
 	     [data_con_arg_ty]		    	-- Applied to exactly one type,
 	        | isPrimType data_con_arg_ty 	-- which is primitive
