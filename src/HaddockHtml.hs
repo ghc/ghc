@@ -257,35 +257,36 @@ ppPrologue title (Just doc) =
 ppModuleTree :: String -> [ModuleTree] -> HtmlTable
 ppModuleTree _ ts = 
   tda [theclass "section1"] << toHtml "Modules" </>
-  pad_td Nothing << vanillaTable << htmlTable
+  pad_td Nothing << fst (genTable empty 0 ts)
   where
-    genTable htmlTable id []     = (htmlTable,id)
-    genTable htmlTable id (x:xs) = genTable (htmlTable </> u) id' xs      
+    genTable html id []     = (html,id)
+    genTable html id (x:xs) = genTable (html +++ u) id' xs      
       where
         (u,id') = mkNode [] x id
 
-    (htmlTable,_) = genTable emptyTable 0 ts
-
-mkNode :: [String] -> ModuleTree -> Int -> (HtmlTable,Int)
+mkNode :: [String] -> ModuleTree -> Int -> (Html,Int)
 mkNode ss (Node s leaf pkg short ts) id = htmlNode
   where
     htmlNode = case ts of
-      [] -> ( pad_td (Just 1.25) << htmlModule  <-> shortDescr <-> htmlPkg,id)
-      _  -> ((pad_td Nothing<< (collapsebutton id_s +++ htmlModule) <-> shortDescr <-> htmlPkg) </> 
-                (pad_td (Just 2) << sub_tree), id')
+      [] -> (node  << (htmlModule +++ shortDescr +++ htmlPkg), id)
+      _  -> (cnode << (collapsebutton id_s +++ htmlModule +++ shortDescr
+			 +++ htmlPkg +++ sub_tree), id')
 
-    shortDescr :: HtmlTable
+    node  = thediv ! [theclass "node"]
+    cnode = thediv ! [theclass "cnode"]
+
+    shortDescr :: Html
     shortDescr = case short of
-	Nothing -> td empty
-	Just doc -> tda [theclass "rdoc"] (docToHtml doc)
+	Nothing  -> empty
+	Just doc -> thespan ! [theclass "rdoc"] << (docToHtml doc)
 
     htmlModule 
       | leaf      = ppHsModule mdl
       | otherwise = toHtml s
 
     htmlPkg = case pkg of
-      Nothing -> tda [width "1"] << empty
-      Just p  -> td << toHtml p
+      Nothing -> empty
+      Just p  -> thespan ! [theclass "pkg"] << toHtml p
 
     mdl = foldr (++) "" (s' : map ('.':) ss')
     (s':ss') = reverse (s:ss)
@@ -293,13 +294,13 @@ mkNode ss (Node s leaf pkg short ts) id = htmlNode
     
     id_s = "n:" ++ show id
     
-    (sub_tree,id') = genSubTree emptyTable (id+1) ts
+    (sub_tree,id') = genSubTree empty (id+1) ts
     
-    genSubTree :: HtmlTable -> Int -> [ModuleTree] -> (Html,Int)
-    genSubTree htmlTable id [] = (sub_tree,id)
+    genSubTree :: Html -> Int -> [ModuleTree] -> (Html,Int)
+    genSubTree html id [] = (sub_tree,id)
       where
-        sub_tree = collapsed vanillaTable id_s htmlTable
-    genSubTree htmlTable id (x:xs) = genSubTree (htmlTable </> u) id' xs      
+        sub_tree = collapsed thediv id_s html
+    genSubTree html id (x:xs) = genSubTree (html +++ u) id' xs      
       where
         (u,id') = mkNode (s:ss) x id
 

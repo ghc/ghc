@@ -38,6 +38,21 @@ SPAN.keyword { text-decoration: underline; }
 /* Resize the buttom image to match the text size */
 IMG.coll { width : 0.75em; height: 0.75em; margin-bottom: 0; margin-right: 0.5em }
 
+/* --------- Contents page ---------- */
+
+DIV.node {
+  padding-left: 3em;
+}
+
+DIV.cnode {
+  padding-left: 1.75em;
+}
+
+SPAN.pkg {
+  position: absolute;
+  left: 50em;
+}
+
 /* --------- Documentation elements ---------- */
 
 TD.children {
