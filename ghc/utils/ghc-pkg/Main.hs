@@ -387,8 +387,10 @@ listPackages db_confs = do
 		text (db_name ++ ":") $$ nest 4 packages
 		)
 	   where packages = fsep (punctuate comma (map pp_pkg pkg_confs))
-		 pp_pkg = text . showPackageId . package
-
+		 pp_pkg p
+		   | exposed p = doc
+		   | otherwise = parens doc
+		   where doc = text (showPackageId (package p))
 
 -- -----------------------------------------------------------------------------
 -- Describe
