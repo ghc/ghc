@@ -423,7 +423,7 @@ findPackages db_stack pkgid
 	 -- multiple packages.  So eg. "Cabal-*" matches all Cabal packages,
 	 -- but "Cabal" matches just one Cabal package - if there are more,
 	 -- you get an error.
-	ps | pkgVersion pkgid == globVersion
+	ps | versionTags (pkgVersion pkgid) == versionTags globVersion
 	   -> return ps
 	   | otherwise
 	   -> die ("package " ++ showPackageId pkgid ++ 
