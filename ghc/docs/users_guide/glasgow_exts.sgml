@@ -3218,6 +3218,9 @@ Template Meta-programming for Haskell</ulink>", in
 Proc Haskell Workshop 2002.
 </para>
 
+<para> The first example from that paper is set out below as a worked example to help get you started. 
+</para>
+
 <para>
 The documentation here describes the realisation in GHC.  (It's rather sketchy just now;
 Tim Sheard is going to expand it.)
@@ -3299,6 +3302,73 @@ Tim Sheard is going to expand it.)
 	or file-at-a-time).  There used to be a restriction to the former two, but that restriction 
 	has been lifted.
 </para>
+</sect2>
+ 
+<sect2>  <title> A Template Haskell Worked Example </title>
+<para>To help you get over the confidence barrier, try out this skeletal worked example.
+  First cut and paste the two modules below into "Main.hs" and "Printf.hs":</para>
+
+<programlisting>
+{- Main.hs -}
+module Main where
+
+-- Import our template "pr"
+import Printf ( pr )
+
+-- The splice operator $ takes the Haskell source code
+-- generated at compile time by "pr" and splices it into
+-- the argument of "putStrLn".
+main = putStrLn ( $(pr "Hello") )
+</programlisting>
+
+<programlisting>
+{- Printf.hs -}
+module Printf where
+
+-- Skeletal printf from the paper.
+-- It needs to be in a separate module to the one where
+-- you intend to use it.
+
+-- Import some Template Haskell syntax
+import Language.Haskell.THSyntax
+
+-- Describe a format string
+data Format = D | S | L String
+
+-- Parse a format string.  This is left largely to you
+-- as we are here interested in building our first ever
+-- Template Haskell program and not in building printf.
+parse :: String -> [Format]
+parse s   = [ L s ]
+
+-- Generate Haskell source code from a parsed representation
+-- of the format string.  This code will be spliced into
+-- the module which calls "pr", at compile time.
+gen :: [Format] -> Expr
+gen [D]   = [| \n -> show n |]
+gen [S]   = [| \s -> s |]
+gen [L s] = string s
+
+-- Here we generate the Haskell code for the splice
+-- from an input format string.
+pr :: String -> Expr
+pr s      = gen (parse s)
+</programlisting>
+
+<para>Now run the compiler (here we are using a "stage three" build of GHC, at a Cygwin prompt on Windows):
+</para>
+<programlisting>
+stage3/ghc/compiler/ghc-inplace --make -fglasgow-exts -package haskell-src main.hs -o main.exe
+</programlisting>
+
+<para>Run "main.exe" and here is your output:
+</para>
+
+<programlisting>
+$ ./main
+Hello
+</programlisting>
+
 </sect2>
  
 </sect1>
