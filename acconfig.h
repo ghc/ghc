@@ -348,17 +348,20 @@
 /* The value of EXDEV.  */
 #undef CCONST_EXDEV
 
-/* Define if code lives before data in memory */
-#undef CODE_BEFORE_DATA
-
 /* Define if time.h or sys/time.h define the altzone variable */
 #undef HAVE_ALTZONE
 
 /* Define if you have /bin/sh */
 #undef HAVE_BIN_SH
 
+/* Define if the HaskellSupport.framework is installed (Mac OS X only) */
+#undef HAVE_FRAMEWORK_HASKELLSUPPORT
+
 /* Define if you have the GetModuleFileName function.  */
 #undef HAVE_GETMODULEFILENAME
+
+/* Define if in_addr_t is available */
+#undef HAVE_IN_ADDR_T
 
 /* Define if you need -ldl to get dlopen() */
 #undef HAVE_LIBDL
@@ -374,7 +377,7 @@
 
 /* Define if RTLD_GLOBAL is available */
 #undef HAVE_RTLDGLOBAL
- 
+
 /* Define if RTLD_LOCAL is available */
 #undef HAVE_RTLDLOCAL
 
@@ -382,12 +385,6 @@
 #undef HAVE_RTLDNEXT
 
 /* Define if we can see RTLD_NOW in dlfcn.h */
-#undef HAVE_RTLDNOW
-
-/* Define if RTLD_GLOBAL is available */
-#undef HAVE_RTLDGLOBAL
-
-/* Define if RTLD_NOW is available */
 #undef HAVE_RTLDNOW
 
 /* Define if usleep returns void */
@@ -414,6 +411,9 @@
 /* Define if readline has version >= 4.2. */
 #undef HAVE_READLINE_4_2
 
+/* Define if you have the sigpoll() function */
+#undef HAVE_SIGPOLL
+
 /* Define if time.h or sys/time.h define the timezone variable */
 #undef HAVE_TIMEZONE
 
@@ -428,9 +428,6 @@
 
 /* Define to Haskell type for cc_t */
 #undef HTYPE_CC_T
-
-/* Define to Haskell type for blkcnt_t */
-#undef HTYPE_BLKCNT_T
 
 /* Define to Haskell type for char */
 #undef HTYPE_CHAR
@@ -461,7 +458,7 @@
 
 /* Define to Haskell type for GLclampd */
 #undef HTYPE_GLCLAMPD
- 
+
 /* Define to Haskell type for GLclampf */
 #undef HTYPE_GLCLAMPF
 
