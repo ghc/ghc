@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureTypes.h,v 1.3 1999/01/13 17:25:52 simonm Exp $
+ * $Id: ClosureTypes.h,v 1.4 1999/01/14 16:57:07 simonm Exp $
  * 
  * Closure Type Constants
  *
@@ -42,23 +42,21 @@
 #define RET_VEC_BIG	        26
 #define RET_DYN		        27
 #define UPDATE_FRAME	        28
-#define UPDATE_STATIC_FRAME     29
-#define CATCH_FRAME	        30
-#define STOP_FRAME	        31
-#define SEQ_FRAME	        32
-#define BLACKHOLE	        33
-#define BLACKHOLE_STATIC        34
-#define MVAR		        35
-#define ARR_WORDS	        36
-#define MUT_ARR_WORDS	        37
-#define MUT_ARR_PTRS	        38
-#define MUT_ARR_PTRS_FROZEN     39
-#define MUT_VAR		        40
-#define WEAK		        41
-#define FOREIGN		        42
-#define TSO		        43
-#define BLOCKED_FETCH	        44
-#define FETCH_ME                45
-#define EVACUATED               46
+#define CATCH_FRAME	        29
+#define STOP_FRAME	        30
+#define SEQ_FRAME	        31
+#define BLACKHOLE	        32
+#define MVAR		        33
+#define ARR_WORDS	        34
+#define MUT_ARR_WORDS	        35
+#define MUT_ARR_PTRS	        36
+#define MUT_ARR_PTRS_FROZEN     37
+#define MUT_VAR		        38
+#define WEAK		        49
+#define FOREIGN		        40
+#define TSO		        41
+#define BLOCKED_FETCH	        42
+#define FETCH_ME                43
+#define EVACUATED               44
 
 #endif CLOSURETYPES_H
