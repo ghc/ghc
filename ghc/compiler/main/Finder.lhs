@@ -43,7 +43,7 @@ GLOBAL_VAR(v_HomeDirCache,   Nothing,  Maybe (FiniteMap String FilePath))
 
 
 initFinder :: PackageConfigInfo -> IO ()
-initFinder (PackageConfigInfo pkgs) = do
+initFinder pkgs = do
   -- expunge our home cache
   writeIORef v_HomeDirCache Nothing
   -- lazilly fill in the package cache

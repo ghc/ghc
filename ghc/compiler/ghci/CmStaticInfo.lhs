@@ -4,7 +4,7 @@
 \section[CmStaticInfo]{Session-static info for the Compilation Manager}
 
 \begin{code}
-module CmStaticInfo ( Package(..), PackageConfigInfo(..), mkPCI )
+module CmStaticInfo ( Package(..), PackageConfigInfo(..) )
 where
 
 #include "HsVersions.h"
@@ -13,7 +13,7 @@ import Monad
 \end{code}
 
 \begin{code}
-newtype PackageConfigInfo = PackageConfigInfo [Package]
+type PackageConfigInfo = [Package]
 
 -- copied from the driver
 data Package
@@ -31,7 +31,4 @@ data Package
         extra_ld_opts   :: [String]
      }
   deriving Read
-
-mkPCI :: [Package] -> IO PackageConfigInfo
-mkPCI = return . PackageConfigInfo
 \end{code}

@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.13 2000/10/27 13:50:25 sewardj Exp $
+-- $Id: Main.hs,v 1.14 2000/10/27 14:36:36 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -15,6 +15,7 @@ module Main (main) where
 
 #include "HsVersions.h"
 
+import CompManager
 import DriverPipeline
 import DriverState
 import DriverFlags
@@ -24,7 +25,7 @@ import DriverPhases	( Phase(..) )
 import CmdLineOpts	( HscLang(..), DynFlags(..), v_Static_hsc_opts )
 import TmpFiles
 import Finder		( initFinder )
-import CmStaticInfo	( mkPCI )
+import CmStaticInfo
 import Config
 import Util
 import Panic
@@ -147,7 +148,8 @@ main =
 	-- read the package configuration
    conf_file <- readIORef v_Path_package_config
    contents <- readFile conf_file
-   writeIORef v_Package_details (read contents)
+   let pkg_details = read contents	-- ToDo: faster
+   writeIORef v_Package_details pkg_details
 
 	-- find the phase to stop after (i.e. -E, -C, -c, -S flags)
    (flags2, mode, stop_flag) <- getGhcMode argv'
@@ -162,8 +164,11 @@ main =
 
 	-- find the build tag, and re-process the build-specific options
    more_opts <- findBuildTag
-   _ <- processArgs static_flags more_opts []
- 
+   left_over <- processArgs static_flags more_opts []
+   if not (null left_over) 
+	then throwDyn (OtherError "non-static flag in way-specific options")
+	else do
+
 	-- give the static flags to hsc
    static_opts <- buildStaticHscOpts
    writeIORef v_Static_hsc_opts static_opts
@@ -192,14 +197,13 @@ main =
 		  flags = [] }
 
 	-- the rest of the arguments are "dynamic"
-   srcs <- processArgs dynamic_flags non_static []
+   srcs <- processArgs dynamic_flags (non_static ++ warn_opts) []
 	-- save the "initial DynFlags" away
    dyn_flags <- readIORef v_DynFlags
    writeIORef v_InitDynFlags dyn_flags
 
     	-- complain about any unknown flags
-   let unknown_flags = [ f | ('-':f) <- srcs ]
-   mapM unknownFlagErr unknown_flags
+   mapM unknownFlagErr [ f | ('-':f) <- srcs ]
 
 	-- get the -v flag
    verb <- readIORef v_Verbose
@@ -212,15 +216,14 @@ main =
    when verb (hPutStrLn stderr ("Using package config file: " ++ conf_file))
 
 	-- initialise the finder
-   pkg_details <- readIORef v_Package_details
-   pci         <- mkPCI pkg_details
-   initFinder pci
+   initFinder pkg_details
 
 	-- mkdependHS is special
    when (mode == DoMkDependHS) beginMkDependHS
 
-	-- make is special
-   when (mode == DoMake) beginMake
+	-- make/interactive require invoking the compilation manager
+   if (mode == DoMake)        then beginMake srcs        else do
+   if (mode == DoInteractive) then beginInteractive srcs else do
 
 	-- for each source file, find which phases to run
    pipelines <- mapM (genPipeline mode stop_flag) srcs
@@ -233,9 +236,9 @@ main =
 
    if null srcs then throwDyn (UsageError "no input files") else do
 
-	-- save the flag state, because this could be modified by OPTIONS pragmas
-	-- during the compilation, and we'll need to restore it before starting
-	-- the next compilation.
+	-- save the flag state, because this could be modified by OPTIONS 
+	-- pragmas during the compilation, and we'll need to restore it
+	-- before starting the next compilation.
    saved_driver_state <- readIORef v_Driver_state
 
    let compileFile (src, phases) = do
@@ -258,4 +261,12 @@ setTopDir args = do
     some -> writeIORef v_TopDir (drop 2 (last some)))
   return others
 
-beginMake = panic "`ghc --make' unimplemented"
+beginMake [] = throwDyn (UsageError "no input files")
+beginMake (_:_:_) = throwDyn (UsageError "only one module allowed with --make")
+{-
+beginMake [mod] = do
+  state <- cmInit ""{-ToDo:remove-} pkg_details
+  cmLoadModule state (mkModuleName mod)
+-}
+
+beginInteractive srcs = panic "`ghc --interactive' unimplemented"
