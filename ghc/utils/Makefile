@@ -9,7 +9,8 @@ SUBDIRS = hp2ps		\
 	  parallel      \
 	  stat2resid	\
 	  prof          \
-	  unlit
+	  unlit         \
+	  genprimopcode
 endif
 
 # hstags died when the new parser was introduced.
