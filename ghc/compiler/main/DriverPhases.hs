@@ -1,11 +1,13 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.10 2001/06/14 15:42:35 simonpj Exp $
+-- $Id: DriverPhases.hs,v 1.11 2001/06/22 13:28:44 rrt Exp $
 --
 -- GHC Driver
 --
 -- (c) Simon Marlow 2000
 --
 -----------------------------------------------------------------------------
+
+#include "../includes/config.h"
 
 module DriverPhases (
    Phase(..),
@@ -17,8 +19,6 @@ module DriverPhases (
    objish_file, objish_suffix,
    cish_file, cish_suffix
  ) where
-
-#include "../includes/config.h"
 
 import DriverUtil
 
