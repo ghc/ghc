@@ -161,9 +161,10 @@ tcRnModule hsc_env (L loc (HsModule maybe_mod exports
    do { 	-- Deal with imports; sets tcg_rdr_env, tcg_imports
 	(rdr_env, imports) <- rnImports import_decls ;
 
-		-- In one-shot mode, record boot-file info in the EPS
-	ifM (isOneShot (hsc_mode hsc_env)) $
-	    updateEps_ (\eps -> eps { eps_is_boot = imp_dep_mods imports }) ;
+		-- Record boot-file info in the EPS, so that it's 
+		-- visible to loadHiBootInterface in tcRnSrcDecls,
+		-- and any other incrementally-performed imports
+	updateEps_ (\eps -> eps { eps_is_boot = imp_dep_mods imports }) ;
 
 		-- Update the gbl env
 	updGblEnv ( \ gbl -> gbl { tcg_rdr_env = rdr_env,

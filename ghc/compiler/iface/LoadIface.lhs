@@ -108,6 +108,8 @@ loadHiBootInterface
   = do 	{ eps <- getEps
 	; mod <- getModule
 
+	; traceIf (text "loadBootIface" <+> ppr mod)
+
 	-- We're read all the direct imports by now, so eps_is_boot will
 	-- record if any of our imports mention us by way of hi-boot file
 	; case lookupModuleEnv (eps_is_boot eps) mod of {
@@ -196,6 +198,8 @@ loadInterface doc_str mod_name from
   = do	{ 	-- Read the state
 	  (eps,hpt) <- getEpsAndHpt
 
+	; traceIf (text "Considering whether to load" <+> ppr mod_name <+> ppr from)
+
 		-- Check whether we have the interface already
 	; case lookupIfaceByModName hpt (eps_PIT eps) mod_name of {
 	    Just iface 
@@ -267,8 +271,6 @@ loadInterface doc_str mod_name from
 	; let {	final_iface = iface {	mi_decls = panic "No mi_decls in PIT",
 					mi_insts = panic "No mi_insts in PIT",
 					mi_rules = panic "No mi_rules in PIT" } }
-
-	; traceIf (text "Extending PTE" <+> ppr (map fst (concat new_eps_decls)))
 
 	; updateEps_  $ \ eps -> 
 		eps {	eps_PIT   = extendModuleEnv (eps_PIT eps) mod final_iface,

@@ -115,7 +115,8 @@ tcTyAndClassDecls boot_names decls
   = do	{ 	-- First check for cyclic type synonysm or classes
 		-- See notes with checkCycleErrs
 	  checkCycleErrs decls
-
+	; mod <- getModule
+	; traceTc (text "tcTyAndCl" <+> ppr mod <+> ppr boot_names)
 	; (syn_tycons, alg_tyclss) <- fixM (\ ~(rec_syn_tycons, rec_alg_tyclss) ->
 	  do	{ let {	-- Calculate variances and rec-flag
 		      ; (syn_decls, alg_decls) = partition (isSynDecl . unLoc) decls }

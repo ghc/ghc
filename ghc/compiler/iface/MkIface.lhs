@@ -858,14 +858,15 @@ checkVersions source_unchanged iface
 
 	-- Source code unchanged and no errors yet... carry on 
 
-	-- First put the dependent-module info in the envt, just temporarily,
+	-- First put the dependent-module info, read from the old interface, into the envt, 
 	-- so that when we look for interfaces we look for the right one (.hi or .hi-boot)
+	-- 
 	-- It's just temporary because either the usage check will succeed 
 	-- (in which case we are done with this module) or it'll fail (in which
 	-- case we'll compile the module from scratch anyhow).
-	; mode <- getGhciMode
-	; ifM (isOneShot mode) 
-	      (updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps })
+	--	
+	-- We do this regardless of compilation mode
+	; updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps }
 
 	; checkList [checkModUsage u | u <- mi_usages iface]
     }
