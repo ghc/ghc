@@ -20,7 +20,7 @@ import PprCore
 import CoreUtils	( exprIsValue, exprArity )
 import DataCon		( dataConTyCon )
 import TyCon		( isProductTyCon, isRecursiveTyCon )
-import Id		( Id, idType, idDemandInfo, 
+import Id		( Id, idType, idDemandInfo, idInlinePragma,
 			  isDataConId, isGlobalId, idArity,
 			  idNewStrictness, idNewStrictness_maybe, getNewStrictness, setIdNewStrictness,
 			  idNewDemandInfo, setIdNewDemandInfo, newStrictnessFromOld )
@@ -32,7 +32,7 @@ import UniqFM		( plusUFM_C, addToUFM_Directly, lookupUFM_Directly,
 import Type		( isUnLiftedType )
 import CoreLint		( showPass, endPass )
 import Util		( mapAndUnzip, mapAccumL, mapAccumR )
-import BasicTypes	( Arity, TopLevelFlag(..), isTopLevel )
+import BasicTypes	( Arity, TopLevelFlag(..), isTopLevel, isNeverActive )
 import Maybes		( orElse, expectJust )
 import Outputable
 \end{code}
@@ -79,13 +79,17 @@ dmdAnalTopBind :: SigEnv
 	       -> (SigEnv, CoreBind)
 dmdAnalTopBind sigs (NonRec id rhs)
   = let
-	(sigs', _, (id', rhs')) = dmdAnalRhs TopLevel sigs (id, rhs)
+	(    _, _, (_,   rhs1)) = dmdAnalRhs TopLevel sigs (id, rhs)
+	(sigs2, _, (id2, rhs2)) = dmdAnalRhs TopLevel sigs (id, rhs1)
+		-- Do two passes to improve CPR information
+		-- See the comments with mkSigTy.ignore_cpr_info below
     in
-    (sigs', NonRec id' rhs')    
+    (sigs2, NonRec id2 rhs2)    
 
 dmdAnalTopBind sigs (Rec pairs)
   = let
 	(sigs', _, pairs')  = dmdFix TopLevel sigs pairs
+		-- We get two iterations automatically
     in
     (sigs', Rec pairs')
 \end{code}
@@ -100,7 +104,7 @@ dmdAnalTopRhs rhs
   where
     arity	   = exprArity rhs
     (rhs_ty, rhs') = dmdAnal emptySigEnv (vanillaCall arity) rhs
-    (_, sig)	   = mkSigTy rhs rhs_ty
+    sig		   = mkTopSigTy rhs rhs_ty
 \end{code}
 
 %************************************************************************
@@ -192,9 +196,21 @@ dmdAnal sigs dmd (Case scrut case_bndr [alt@(DataAlt dc,bndrs,rhs)])
     isProductTyCon tycon,
     not (isRecursiveTyCon tycon)
   = let
-	(alt_ty, alt')		 = dmdAnalAlt sigs dmd alt
-	(alt_ty1, case_bndr')    = annotateBndr alt_ty case_bndr
-	(_, bndrs', _)		 = alt'
+	sigs_alt	      = extendSigEnv NotTopLevel sigs case_bndr case_bndr_sig
+	(alt_ty, alt')	      = dmdAnalAlt sigs_alt dmd alt
+	(alt_ty1, case_bndr') = annotateBndr alt_ty case_bndr
+	(_, bndrs', _)	      = alt'
+	case_bndr_sig	      = StrictSig (mkDmdType emptyVarEnv [] RetCPR)
+		-- Inside the alternative, the case binder has the CPR property.
+		-- Meaning that a case on it will successfully cancel.
+		-- Example:
+		--	f True  x = case x of y { I# x' -> if x' ==# 3 then y else I# 8 }
+		--	f False x = I# 3
+		--	
+		-- We want f to have the CPR property:
+		--	f b x = case fw b x of { r -> I# r }
+		--	fw True  x = case x of y { I# x' -> if x' ==# 3 then x' else 8 }
+		--	fw False x = 3
 
 	-- Figure out whether the demand on the case binder is used, and use
 	-- that to set the scrut_dmd.  This is utterly essential.
@@ -215,11 +231,11 @@ dmdAnal sigs dmd (Case scrut case_bndr [alt@(DataAlt dc,bndrs,rhs)])
 	-- The insight is, of course, that a demand on y is a demand on the
 	-- scrutinee, so we need to `both` it with the scrut demand
 
-        scrut_dmd 		 = mkSeq Drop [idNewDemandInfo b | b <- bndrs', isId b]
+        scrut_dmd 	   = mkSeq Drop [idNewDemandInfo b | b <- bndrs', isId b]
 				   `both`
-				   idNewDemandInfo case_bndr'
+			     idNewDemandInfo case_bndr'
 
-	(scrut_ty, scrut')       = dmdAnal sigs scrut_dmd scrut
+	(scrut_ty, scrut') = dmdAnal sigs scrut_dmd scrut
     in
     (alt_ty1 `bothType` scrut_ty, Case scrut' case_bndr' [alt'])
 
@@ -342,12 +358,13 @@ dmdAnalRhs :: TopLevelFlag
 dmdAnalRhs top_lvl sigs (id, rhs)
  = (sigs', lazy_fv, (id', rhs'))
  where
-  arity		    = exprArity rhs   -- The idArity may not be up to date
-  (rhs_ty, rhs')    = dmdAnal sigs (vanillaCall arity) rhs
-  (lazy_fv, sig_ty) = WARN( arity /= dmdTypeDepth rhs_ty, ppr id )
-		      mkSigTy rhs rhs_ty
-  id'		    = id `setIdNewStrictness` sig_ty
-  sigs'		    = extendSigEnv top_lvl sigs id sig_ty
+  arity		     = idArity id   -- The idArity should be up to date
+				    -- The simplifier was run just beforehand
+  (rhs_dmd_ty, rhs') = dmdAnal sigs (vanillaCall arity) rhs
+  (lazy_fv, sig_ty)  = WARN( arity /= dmdTypeDepth rhs_dmd_ty, ppr id )
+		       mkSigTy id rhs rhs_dmd_ty
+  id'		     = id `setIdNewStrictness` sig_ty
+  sigs'		     = extendSigEnv top_lvl sigs id sig_ty
 \end{code}
 
 %************************************************************************
@@ -357,9 +374,45 @@ dmdAnalRhs top_lvl sigs (id, rhs)
 %************************************************************************
 
 \begin{code}
-mkSigTy :: CoreExpr -> DmdType -> (DmdEnv, StrictSig)
--- Take a DmdType and turn it into a StrictSig
-mkSigTy rhs (DmdType fv dmds res) 
+mkTopSigTy :: CoreExpr -> DmdType -> StrictSig
+	-- Take a DmdType and turn it into a StrictSig
+	-- NB: not used for never-inline things; hence False
+mkTopSigTy rhs dmd_ty = snd (mk_sig_ty False False rhs dmd_ty)
+
+mkSigTy :: Id -> CoreExpr -> DmdType -> (DmdEnv, StrictSig)
+mkSigTy id rhs dmd_ty = mk_sig_ty (isNeverActive (idInlinePragma id))
+				  (isStrictDmd (idNewDemandInfo id))
+				  rhs dmd_ty
+
+mk_sig_ty never_inline strictly_demanded rhs (DmdType fv dmds res) 
+  | never_inline && not (isBotRes res)
+	-- 			HACK ALERT
+	-- Don't strictness-analyse NOINLINE things.  Why not?  Because
+	-- the NOINLINE says "don't expose any of the inner workings at the call 
+	-- site" and the strictness is certainly an inner working.
+	--
+	-- More concretely, the demand analyser discovers the following strictness
+	-- for unsafePerformIO:  C(U(AV))
+	-- But then consider
+	--	unsafePerformIO (\s -> let r = f x in 
+	--			       case writeIORef v r s of (# s1, _ #) ->
+	--			       (# s1, r #)
+	-- The strictness analyser will find that the binding for r is strict,
+	-- (becuase of uPIO's strictness sig), and so it'll evaluate it before 
+	-- doing the writeIORef.  This actually makes tests/lib/should_run/memo002
+	-- get a deadlock!  
+	--
+	-- Solution: don't expose the strictness of unsafePerformIO.
+	--
+	-- But we do want to expose the strictness of error functions, 
+	-- which are also often marked NOINLINE
+	--	{-# NOINLINE foo #-}
+	--	foo x = error ("wubble buggle" ++ x)
+	-- So (hack, hack) we only drop the strictness for non-bottom things
+	-- This is all very unsatisfactory.
+  = (deferEnv fv, topSig)
+
+  | otherwise
   = (lazy_fv, mkStrictSig dmd_ty)
   where
     dmd_ty = DmdType strict_fv final_dmds res'
@@ -402,22 +455,43 @@ mkSigTy rhs (DmdType fv dmds res)
 	-- Set the unpacking strategy
 	
     res' = case res of
-		RetCPR | not (exprIsValue rhs) -> TopRes
-		other	 		       -> res
+		RetCPR | ignore_cpr_info -> TopRes
+		other	 		 -> res
+    ignore_cpr_info = is_thunk && not strictly_demanded
+    is_thunk	    = not (exprIsValue rhs)
 	-- If the rhs is a thunk, we forget the CPR info, because
 	-- it is presumably shared (else it would have been inlined, and 
 	-- so we'd lose sharing if w/w'd it into a function.
 	--
-	--	DONE IN OLD CPR ANALYSER, BUT NOT YET HERE
-	-- Also, if the strictness analyser has figured out that it's strict,
-	-- the let-to-case transformation will happen, so again it's good.
-	-- (CPR analysis runs before the simplifier has had a chance to do
-	--  the let-to-case transform.)
+	-- Also, if the strictness analyser has figured out (in a previous iteration)
+	-- that it's strict, the let-to-case transformation will happen, so again 
+	-- it's good.
 	-- This made a big difference to PrelBase.modInt, which had something like
 	--	modInt = \ x -> let r = ... -> I# v in
 	--			...body strict in r...
 	-- r's RHS isn't a value yet; but modInt returns r in various branches, so
 	-- if r doesn't have the CPR property then neither does modInt
+	-- Another case I found in practice (in Complex.magnitude), looks like this:
+	-- 		let k = if ... then I# a else I# b
+	--		in ... body strict in k ....
+	-- (For this example, it doesn't matter whether k is returned as part of
+	-- the overall result.)  Left to itself, the simplifier will make a join
+	-- point thus:
+	--		let $j k = ...body strict in k...
+	--		if ... then $j (I# a) else $j (I# b)
+	-- 
+	--
+	-- The difficulty with this is that we need the strictness type to
+	-- look at the body... but we now need the body to calculate the demand
+	-- on the variable, so we can decide whether its strictness type should
+	-- have a CPR in it or not.  Simple solution: 
+	--	a) use strictness info from the previous iteration
+	--	b) make sure we do at least 2 iterations, by doing a second
+	--	   round for top-level non-recs.  Top level recs will get at
+	--	   least 2 iterations except for totally-bottom functions
+	--	   which aren't very interesting anyway.
+	--
+	-- NB: strictly_demanded is never true of a top-level Id, or of a recursive Id.
 \end{code}
 
 The unpack strategy determines whether we'll *really* unpack the argument,
@@ -663,11 +737,14 @@ vanillaCall 0 = Eval
 vanillaCall n = Call (vanillaCall (n-1))
 
 deferType :: DmdType -> DmdType
-deferType (DmdType fv _ _) = DmdType (mapVarEnv defer fv) [] TopRes
+deferType (DmdType fv _ _) = DmdType (deferEnv fv) [] TopRes
 	-- Notice that we throw away info about both arguments and results
 	-- For example,   f = let ... in \x -> x
 	-- We don't want to get a stricness type V->T for f.
 	-- Peter??
+
+deferEnv :: DmdEnv -> DmdEnv
+deferEnv fv = mapVarEnv defer fv
 
 ---------------
 bothLazy :: Demand -> Demand
