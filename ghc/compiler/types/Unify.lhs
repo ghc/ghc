@@ -265,6 +265,9 @@ unify subst ty1 ty2 = -- pprTrace "unify" (ppr subst <+> pprParendType ty1 <+> p
 unify_ subst (TyVarTy tv1) ty2  = uVar False subst tv1 ty2
 unify_ subst ty1 (TyVarTy tv2)  = uVar True  subst tv2 ty1
 
+unify_ subst (NoteTy _ ty1) ty2  = unify subst ty1 ty2
+unify_ subst ty1 (NoteTy _ ty2)  = unify subst ty1 ty2
+
 unify_ subst (PredTy p1) (PredTy p2) = unify_pred subst p1 p2
 
 unify_ subst t1@(TyConApp tyc1 tys1) t2@(TyConApp tyc2 tys2) 
