@@ -18,6 +18,7 @@ module MachOp 	(
 	MachOp(..), 
 	pprMachOp,
 	isCommutableMachOp,
+	isAssociativeMachOp,
 	isComparisonMachOp,
 	resultRepOfMachOp,
 	machOpArgReps,
@@ -490,6 +491,27 @@ isCommutableMachOp mop =
 	MO_Or _			-> True
 	MO_Xor _		-> True
 	_other			-> False
+
+-- ----------------------------------------------------------------------------
+-- isAssociativeMachOp
+
+{- |
+Returns 'True' if the MachOp is associative (i.e. @(x+y)+z == x+(y+z)@)
+This is used in the platform-independent Cmm optimisations.
+
+If in doubt, return 'False'.  This generates worse code on the
+native routes, but is otherwise harmless.
+-}
+isAssociativeMachOp :: MachOp -> Bool
+isAssociativeMachOp mop = 
+  case mop of
+	MO_Add r 	-> not (isFloatingRep r)
+	MO_Sub r 	-> not (isFloatingRep r)
+	MO_Mul r	-> not (isFloatingRep r)
+	MO_And _	-> True
+	MO_Or _		-> True
+	MO_Xor _	-> True
+	_other		-> False
 
 -- ----------------------------------------------------------------------------
 -- isComparisonMachOp

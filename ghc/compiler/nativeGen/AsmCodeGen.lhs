@@ -375,7 +375,8 @@ cmmToCmm (CmmProc info lbl params blocks) =
   CmmProc info lbl params (map cmmBlockConFold (cmmPeep blocks))
 
 cmmBlockConFold :: CmmBasicBlock -> CmmBasicBlock
-cmmBlockConFold (BasicBlock id stmts) = BasicBlock id (map cmmStmtConFold stmts)
+cmmBlockConFold (BasicBlock id stmts) = 
+  BasicBlock id (map cmmStmtConFold stmts)
 
 cmmStmtConFold stmt
    = case stmt of
@@ -553,9 +554,6 @@ cmmMachOpFold mop args@[CmmLit (CmmInt x xrep), CmmLit (CmmInt y _)]
 cmmMachOpFold op [x@(CmmLit _), y]
    | not (isLit y) && isCommutableMachOp op 
    = cmmMachOpFold op [y, x]
-   where 
-    isLit (CmmLit _) = True
-    isLit _          = False
 
 -- Turn (a+b)+c into a+(b+c) where possible.  Because literals are
 -- moved to the right, it is more likely that we will find
@@ -564,16 +562,15 @@ cmmMachOpFold op [x@(CmmLit _), y]
 --
 -- ToDo: this appears to introduce a quadratic behaviour due to the
 -- nested cmmMachOpFold.  Can we fix this?
+--
+-- Why do we check isLit arg1?  If arg1 is a lit, it means that arg2
+-- is also a lit (otherwise arg1 would be on the right).  If we
+-- put arg1 on the left of the rearranged expression, we'll get into a
+-- loop:  (x1+x2)+x3 => x1+(x2+x3)  => (x2+x3)+x1 => x2+(x3+x1) ...
+--
 cmmMachOpFold mop1 [CmmMachOp mop2 [arg1,arg2], arg3]
-   | mop1 == mop2 && isAssociative mop1
+   | mop1 == mop2 && isAssociativeMachOp mop1 && not (isLit arg1)
    = cmmMachOpFold mop1 [arg1, cmmMachOpFold mop2 [arg2,arg3]]
-   where
-	isAssociative (MO_Add _) = True
-	isAssociative (MO_Mul _) = True
-	isAssociative (MO_And _) = True
-	isAssociative (MO_Or  _) = True
-	isAssociative (MO_Xor _) = True
-	isAssociative _          = False
 
 -- Make a RegOff if we can
 cmmMachOpFold (MO_Add _) [CmmReg reg, CmmLit (CmmInt n rep)]
@@ -812,6 +809,9 @@ inlineExpr u a other_expr = other_expr
 -- Utils
 
 bind f x = x $! f
+
+isLit (CmmLit _) = True
+isLit _          = False
 
 isComparisonExpr :: CmmExpr -> Bool
 isComparisonExpr (CmmMachOp op _) = isComparisonMachOp op
