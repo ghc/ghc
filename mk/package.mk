@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.23 2003/03/31 12:42:04 simonmar Exp $
+# $Id: package.mk,v 1.24 2003/05/16 10:14:20 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -88,7 +88,11 @@ endif
 # The interface files are put inside the $(libdir), since they
 # might (potentially) be platform specific..
 
-ifacedir = $(libdir)/imports/$(PACKAGE)
+ifeq "$(HIERARCHICAL_LIB)" "YES"
+ifacedir = $(libdir)/imports
+else
+ifacedir = $(libdir)/hslibs-imports/$(PACKAGE)
+endif
 
 # If the lib consists of a hierachy of modules, we must retain the directory
 # structure when we install the interfaces.
