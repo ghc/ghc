@@ -3650,6 +3650,13 @@ $ make install</screen>
       <sect3>
 	<title>Cross-compiling to produce an unregisterised GHC</title>
 
+	<para>NOTE!  These instructions apply to GHC 6.4 and (hopefully)
+	  later.  If you need instructions for an earlier version of GHC, try
+	  to get hold of the version of this document that was current at the
+	  time.  It should be available from the appropriate download page on
+	  the <ulink
+	    url="http://www.haskell.org/ghc/">GHC&nbsp;homepage</ulink>.</para>  
+
 	<para>In this section, we explain how to bootstrap GHC on a
 	new platform, using unregisterised intermediate C files.  We
 	haven't put a great deal of effort into automating this
@@ -3689,7 +3696,7 @@ $ ./configure --enable-hc-boot --enable-hc-boot-unregisterised</screen>
   
 	    <listitem>
 <screen>$ cd <replaceable>T</replaceable>/ghc/includes
-$ make config.h</screen>
+$ make ghcconfig.h</screen>
 	    </listitem>
 	  </itemizedlist>
 	  </listitem>
@@ -3714,13 +3721,15 @@ $ ./configure</screen>
 	      with the following contents:</para>
 
 <programlisting>GhcUnregisterised = YES
-GhcLibHcOpts = -O -H32m -keep-hc-files
+GhcLibHcOpts = -O -fvia-C -keep-hc-files
 GhcLibWays =
 SplitObjs = NO
 GhcWithNativeCodeGen = NO
 GhcWithInterpreter = NO
-GhcStage1HcOpts = -O -H32m -fasm
+GhcStage1HcOpts = -O -fasm
 GhcStage2HcOpts = -O -fvia-C -keep-hc-files</programlisting>
+SRC_HC_OPTS += -H32m
+GhcBootLibs = YES
 	    </listitem>
 
 	    <listitem>
@@ -3746,7 +3755,7 @@ GhcStage2HcOpts = -O -fvia-C -keep-hc-files</programlisting>
 
 	    <listitem>
 	      <para>Copy
-	      <filename><replaceable>T</replaceable>/ghc/includes/config.h</filename>
+	      <filename><replaceable>T</replaceable>/ghc/includes/ghcconfig.h</filename>
 	      to
 	      <filename><replaceable>H</replaceable>/ghc/includes</filename>.
 	      Note that we are building on the host machine, using the
@@ -3757,9 +3766,9 @@ GhcStage2HcOpts = -O -fvia-C -keep-hc-files</programlisting>
 	    </listitem>
 
 	      <listitem>
-		<para>Touch <literal>config.h</literal>, just to make
+		<para>Touch <literal>ghcconfig.h</literal>, just to make
 		sure it doesn't get replaced during the build:</para>
-<screen>$ touch <replaceable>H</replaceable>/ghc/includes/config.h</screen>
+<screen>$ touch <replaceable>H</replaceable>/ghc/includes/ghcconfig.h</screen>
 	      </listitem>
 
 	    <listitem>
