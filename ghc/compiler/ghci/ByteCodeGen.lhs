@@ -13,8 +13,8 @@ module ByteCodeGen ( UnlinkedBCO, UnlinkedBCOExpr, ItblEnv, ClosureEnv, HValue,
 
 import Outputable
 import Name		( Name, getName, mkSysLocalName )
-import Id		( Id, idType, isDataConId_maybe, mkVanillaId,
-			  isPrimOpId_maybe, idPrimRep )
+import Id		( Id, idType, isDataConId_maybe, isPrimOpId_maybe,
+			  idPrimRep, mkSysLocal, idName )
 import OrdList		( OrdList, consOL, snocOL, appOL, unitOL, 
 			  nilOL, toOL, concatOL, fromOL )
 import FiniteMap	( FiniteMap, addListToFM, listToFM,
