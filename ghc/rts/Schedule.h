@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.34 2002/06/19 20:45:15 sof Exp $
+ * $Id: Schedule.h,v 1.35 2002/07/25 18:37:00 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -183,14 +183,16 @@ typedef struct StgMainThread_ {
  */
 extern StgMainThread *main_threads;
 
+void printAllThreads(void);
+#ifdef COMPILING_SCHEDULER
+static void printThreadBlockage(StgTSO *tso);
+static void printThreadStatus(StgTSO *tso);
+#endif
 /* debugging only 
  */
 #ifdef DEBUG
-void printThreadBlockage(StgTSO *tso);
-void printThreadStatus(StgTSO *tso);
-void printAllThreads(void);
-#endif
 void print_bq (StgClosure *node);
+#endif
 #if defined(PAR)
 void print_bqe (StgBlockingQueueElement *bqe);
 #endif

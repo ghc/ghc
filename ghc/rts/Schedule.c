@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.150 2002/07/19 18:45:21 sof Exp $
+ * $Id: Schedule.c,v 1.151 2002/07/25 18:36:59 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -84,6 +84,7 @@
 #include "StgRun.h"
 #include "StgStartup.h"
 #include "Hooks.h"
+#define COMPILING_SCHEDULER
 #include "Schedule.h"
 #include "StgMiscClosures.h"
 #include "Storage.h"
@@ -3549,11 +3550,12 @@ detectBlackHoles( void )
 //@subsection Debugging Routines
 
 /* -----------------------------------------------------------------------------
-   Debugging: why is a thread blocked
+ * Debugging: why is a thread blocked
+ * [Also provides useful information when debugging threaded programs
+ *  at the Haskell source code level, so enable outside of DEBUG. --sof 7/02]
    -------------------------------------------------------------------------- */
 
-#ifdef DEBUG
-
+static
 void
 printThreadBlockage(StgTSO *tso)
 {
@@ -3601,6 +3603,7 @@ printThreadBlockage(StgTSO *tso)
   }
 }
 
+static
 void
 printThreadStatus(StgTSO *tso)
 {
@@ -3627,15 +3630,15 @@ printAllThreads(void)
   ullong_format_string(TIME_ON_PROC(CurrentProc), 
 		       time_string, rtsFalse/*no commas!*/);
 
-  sched_belch("all threads at [%s]:", time_string);
+  fprintf(stderr, "all threads at [%s]:\n", time_string);
 # elif defined(PAR)
   char time_string[TIME_STR_LEN], node_str[NODE_STR_LEN];
   ullong_format_string(CURRENT_TIME,
 		       time_string, rtsFalse/*no commas!*/);
 
-  sched_belch("all threads at [%s]:", time_string);
+  fprintf(stderr,"all threads at [%s]:\n", time_string);
 # else
-  sched_belch("all threads:");
+  fprintf(stderr,"all threads:\n");
 # endif
 
   for (t = all_threads; t != END_TSO_QUEUE; t = t->global_link) {
@@ -3647,6 +3650,8 @@ printAllThreads(void)
   }
 }
     
+#ifdef DEBUG
+
 /* 
    Print a whole blocking queue attached to node (debugging only).
 */
