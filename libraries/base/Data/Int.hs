@@ -25,7 +25,8 @@ module Data.Int
 	) where
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Int
+import GHC.Base	( Int )
+import GHC.Int	( Int8, Int16, Int32, Int64 )
 #endif
 
 {- $notes
