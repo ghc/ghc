@@ -35,6 +35,7 @@ import ErrUtils		( dumpIfSet_dyn, showPass )
 import Outputable
 import Pretty		( Mode(..), printDoc )
 import Module		( Module )
+import ListSetOps	( removeDupsEq )
 
 import Monad		( when )
 import IO
@@ -117,14 +118,16 @@ outputC dflags filenm flat_absC
        c_includes <- getPackageCIncludes pkg_configs
        let cmdline_includes = cmdlineHcIncludes dflags -- -#include options
        
-	   ffi_decl_headers = case foreign_stubs of
-				NoStubs 		-> []
-				ForeignStubs _ _ fdhs _ -> fdhs 
+	   ffi_decl_headers 
+	      = case foreign_stubs of
+		  NoStubs 		  -> []
+		  ForeignStubs _ _ fdhs _ -> map unpackFS (fst (removeDupsEq fdhs))
+			-- Remove duplicates, because distinct foreign import decls
+			-- may cite the same #include.  Order doesn't matter.
 
            all_headers =  c_includes
 		       ++ reverse cmdline_includes
-		       ++ reverse (map unpackFS ffi_decl_headers)
-			   -- reverse correct?
+		       ++ ffi_decl_headers
 
        let cc_injects = unlines (map mk_include all_headers)
        	   mk_include h_file = 
