@@ -45,7 +45,12 @@ module TcMonad(
 
 IMP_Ubiq(){-uitous-}
 
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(TcMLoop) ( TcEnv, initEnv, TcMaybe )  -- We need the type TcEnv and an initial Env
+#else
+import {-# SOURCE #-} TcEnv  ( TcEnv, initEnv )
+import {-# SOURCE #-} TcType ( TcMaybe )
+#endif
 
 import Type		( SYN_IE(Type), GenType )
 import TyVar		( SYN_IE(TyVar), GenTyVar )
