@@ -1,20 +1,23 @@
 
 module Main where
 
-import RunOneTest 	( OneTest(..), t_root_of, run_one_test, splitPathname )
-import CmdSyntax	( Var, Result(..), Expr(..), officialMsg, panic )
+import CmdSyntax	( Var, TestName, Result(..), Expr(..), 
+			  officialMsg, panic,
+			  isJust, isNothing, unJust,
+			  isLeft, isRight, unLeft, unRight )
+import CmdSemantics	( parseOneTFile, processParsedTFile )
 import Directory
 import System
 import List
+import Monad		( when )
 
 --import IOExts(trace)
 
-findTests :: FilePath        -- name of root dir of tests
-          -> IO [OneTest]    -- descriptions of all tests to run
+findTFiles :: FilePath        -- name of root dir of tests
+           -> IO [FilePath]   -- full pathnames of all .T files
 
-findTests root_in
-   = snarf ((reverse . dropWhile (== '/') . reverse) root_in)
-           "."
+findTFiles root_in
+   = snarf ((reverse . dropWhile (== '/') . reverse) root_in) "."
      where
         snarf root dir
            = do --putStr "snarf: "
@@ -31,21 +34,20 @@ findTests root_in
 
                 tagged_contents <- mapM tag_subdir dir_contents
                 --print tagged_contents
-                let tests_in_this_dir
-                       = mk_tests_in_this_dir
-                            this_dir
-                            [f | (False, f) <- tagged_contents,
-                                 f `hasSuffix` ".T"]
-                            [f | (False, f) <- tagged_contents,
-                                 any (f `hasSuffix`) [".hs"]]
+                let tfiles_in_this_dir
+                       =  [this_dir ++ "/" ++ f 
+                          | (False, f) <- tagged_contents,
+                                          f `hasSuffix` ".T"]
                 --print tests_in_this_dir
                 let subdir_names
                        = [ f | (True, f) <- tagged_contents ]
-                subdir_testss
+                subdir_tfiless
                    <- mapM (\d -> snarf root (dir++"/"++d)) subdir_names
-                let subdir_tests 
-                       = tests_in_this_dir ++ concat subdir_testss
-                return subdir_tests
+                let all_tfiless 
+                       = tfiles_in_this_dir ++ concat subdir_tfiless
+                return 
+                   (map scrub all_tfiless)
+
 
 hasSuffix :: String -> String -> Bool
 hasSuffix str suff 
@@ -59,47 +61,6 @@ scrub :: String -> String
 scrub []               = []
 scrub ('/':'.':'/':cs) = scrub ('/':cs)
 scrub (c:cs)           = c : scrub cs
-
-
-mk_tests_in_this_dir :: FilePath -> [String] -> [String] -> [OneTest]
-mk_tests_in_this_dir this_dir tfiles srcs
-   | "default.T" `notElem` tfiles
-   = map (Precisely . mkFullPath) tfiles
-   | otherwise
-   = -- Precisely of all T files, except default.T
-     --    and Default for all sources which don't have a 
-     --    corresponding T file
-     let all_ts_except = filter (/= "default.T") tfiles
-         precisely = map (Precisely . mkFullPath) all_ts_except
-         all_ts_except_roots = map getRoot all_ts_except
-         unescorted_sources
-             = filter (\src -> getRoot src `notElem` all_ts_except_roots) srcs
-         defaulted = map (Defaulted (mkFullPath "default.T")) unescorted_sources
-     in
-         --trace ("srcs = " ++ show srcs ++ "\n"
-         --       ++ "ue srcs = " ++ show unescorted_sources ++ "\n"
-         --       ++ "a_t_exc = " ++ show all_ts_except_roots) 
-         (sortBy cmp_rootname (defaulted ++ precisely))
-     where
-        getRoot str 
-           | '.' `elem` str 
-           = (reverse . drop 1 . dropWhile (/= '.') . reverse) str
-           | otherwise
-           = panic "Main.mk_tests_in_this_dir.getRoot"
-
-        mkFullPath str
-           = scrub (this_dir ++ "/" ++ str)
-
-        cmp_rootname td1 td2 = compare (t_root_of td1) (t_root_of td2)
-
-run_multiple_tests :: [(Var,String)] 		-- default var binds
-                   -> [OneTest] 		-- paths to test dirs
-                   -> IO [(OneTest, 
-                           Maybe (Result, Result))]
-run_multiple_tests base_varenv tests_to_run
-   = mapM f tests_to_run
-     where f a_test = do res <- run_one_test a_test base_varenv
-                         return (a_test, res)
 
 
 usage
@@ -129,8 +90,9 @@ main_really arg_ws0
               conf = unJust maybe_conf
               (confdir, conffile) = splitPathname conf
               root_dir = head arg_ws2
-              base_varenv = [("tool", tool), ("confdir", confdir), 
-                             ("conffile", conffile)]
+              base_genv = [("tool", tool), 
+                           ("confdir", confdir), 
+                           ("conffilename", conffile)]
 
         ; conf_ok <- doesFileExist conf
         ; if    not conf_ok
@@ -138,28 +100,52 @@ main_really arg_ws0
                    exitWith (ExitFailure 1)
            else 
 
-     do { all_tests <- findTests root_dir
+     do { -- Find all the .T files
+        ; all_tfiles <- findTFiles root_dir
         ; putStr "\n"
-        ; officialMsg ("Found " ++ show (length all_tests) ++ " tests:")
+        ; officialMsg ("Found " ++ show (length all_tfiles) ++ " tfiles:")
         ; putStr "\n"
-        ; putStrLn (unlines (map show all_tests))
-        ; all_results <- run_multiple_tests base_varenv all_tests
+        ; putStrLn (unlines (map show all_tfiles))
+        -- Parse them all
+        ; all_parsed 
+             <- mapM (\tfpath -> parseOneTFile
+                                    (addTVars base_genv tfpath) tfpath)
+                     all_tfiles
+        ; let parse_fails = filter isLeft all_parsed
+        ; when (not (null parse_fails)) (
+             do officialMsg ("Parse errors for the following .T files:")
+                putStr (unlines (map unLeft parse_fails))
+          )
+        ; let parsed_ok = map unRight (filter isRight all_parsed)
+        -- Run all the tests in each successfully-parsed .T file.   
+        ; resultss 
+             <- mapM ( \ (path,topdefs) -> processParsedTFile 
+                                              (addTVars base_genv path)
+                                              topdefs) 
+                     parsed_ok
+        ; let results = concat resultss
         ; putStr "\n"
         ; officialMsg ("All done.")
-        -- ; putStr ("\n" ++ ((unlines . map show) all_results))
-        ; putStr ("\n" ++ executive_summary all_results)
+        -- ; putStr ("\n" ++ ((unlines . map show) results))
+        ; putStr ("\n" ++ executive_summary results)
         ; putStr "\n"
         -- ; exitWith ExitSuccess
      }}}
 
+addTVars some_genv tfpath
+   = case splitPathname tfpath of
+         (tfdir, tfname) -> ("testdir", tfdir) 
+                            : ("testfilename", tfname) 
+                            : some_genv
 
 -- Summarise overall outcome
-executive_summary :: [(OneTest, Maybe (Result, Result))] -> String
+executive_summary :: [(TestName, Either String (Result, Result))] 
+                  -> String
 executive_summary outcomes
-   = let n_cands    = length outcomes
-         meta_fails = filter is_meta_fail outcomes
+   = let n_cands     = length outcomes
+         meta_fails  = filter is_meta_fail outcomes
          outcomes_ok = filter (not.is_meta_fail) outcomes
-         skipped    = filter is_skip       outcomes_ok
+         skipped     = filter is_skip       outcomes_ok
 
          p_p = filter (got ((== Pass), (== Pass))) outcomes_ok
          p_f = filter (got ((== Pass), (== Fail))) outcomes_ok
@@ -208,24 +194,24 @@ executive_summary outcomes
             = "\nThe following tests had framework failures:\n"
               ++ unlines (map (("   "++).show.fst) meta_fails)
 
-         ppTest (test, Just (exp,act))
+         ppTest (test, Right (exp,act))
              = "   exp:" ++ show exp ++ ", act:" ++ show act 
                ++ "    " ++ show test
 
-         is_meta_fail (_, Nothing) = True
-         is_meta_fail other        = False
+         is_meta_fail (_, Left _) = True
+         is_meta_fail other       = False
 
-         got (f1,f2) (_, Just (r1,r2)) = f1 r1 && f2 r2
+         got (f1,f2) (_, Right (r1,r2)) = f1 r1 && f2 r2
          got (f1,f2) other             = False
 
-         is_skip (_, Just (Skipped, Skipped)) = True
-         is_skip (_, Just (r1, r2))
+         is_skip (_, Right (Skipped, Skipped)) = True
+         is_skip (_, Right (r1, r2))
             | r1 == Skipped || r2 == Skipped 
             = panic "is_skip"
          is_skip other = False
 
-         is_exp_unk (_, Just (Unknown, Unknown)) = True
-         is_exp_unk other                        = False
+         is_exp_unk (_, Right (Unknown, Unknown)) = True
+         is_exp_unk other                         = False
      in
          summary ++ unexpected_summary ++ metafail_summary
 
@@ -240,7 +226,25 @@ fish strs prefix
             [m] -> (unmatched, Just (drop n_prefix m))
             _   -> (strs,      Nothing)
 
-isNothing Nothing  = True
-isNothing (Just _) = False
 
-unJust (Just x) = x
+-- (eg) "foo/bar/xyzzy.ext" --> ("foo/bar", "xyzzy.ext")
+splitPathname :: String -> (String, String)
+splitPathname full
+   | '/' `notElem` full = (".", full)
+   | otherwise
+   = let full_r = reverse full
+         f_r    = takeWhile (/= '/') full_r
+         p_r    = drop (1 + length f_r) full_r
+     in  if null p_r then (".", reverse f_r)
+                     else (reverse p_r, reverse f_r)
+
+
+-- (eg) "foo/bar/xyzzy.ext" --> ("foo/bar", "xyzzy", "ext")
+--splitPathname3 full
+--   = let (dir, base_and_ext) = splitPathname full
+--     in  if '.' `elem` base_and_ext
+--         then let r_bande = reverse base_and_ext
+--                  r_ext = takeWhile (/= '.') r_bande
+--                  r_root = drop (1 + length r_ext) r_bande
+--              in  (dir, reverse r_root, reverse r_ext)
+--         else (dir, base_and_ext, "")

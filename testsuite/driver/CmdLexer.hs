@@ -46,7 +46,7 @@ data Lexeme
    | L_Def			-- def
    | L_Print			-- print
    | L_Run			-- run
-   | L_HasValue			-- hasvalue
+   | L_Defined			-- defined
    | L_Contents			-- contents
      deriving (Eq, Show)
 
@@ -121,6 +121,7 @@ tokenise_wrk n (c:cs)
          kw x = (Tok bomb n x) : tokenise_wrk n rest
      in  case str of
             "framefail"    -> kw L_Framefail
+            "defined"      -> kw L_Defined
             "contents"     -> kw L_Contents
             "def"          -> kw L_Def
             "run"          -> kw L_Run

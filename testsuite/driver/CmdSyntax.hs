@@ -1,10 +1,11 @@
 
-module CmdSyntax ( Var, MacroName, MacroDef(..),
+module CmdSyntax ( Var, MacroName, TestName, MacroDef(..),
                    TopDef(..), Stmt(..), Expr(..),
                    Op(..), Result(..),
-                   panic, officialMsg, my_system
---                   isExpect, isWhen, isSkipWhen, isCompileOnly, 
---                   isAssign 
+                   panic, officialMsg, my_system,
+                   isJust, isNothing, unJust,
+                   isTInclude, isTTest, isTMacroDef,
+                   isLeft, isRight, unLeft, unRight
                  )
 where
 
@@ -24,6 +25,20 @@ my_system s
         exit_code <- system s
         --putStrLn (show exit_code)
         return exit_code
+
+isJust (Just _) = True
+isJust Nothing  = False
+isNothing = not . isJust
+
+unJust (Just x) = x
+
+isLeft (Left _)  = True
+isLeft (Right _) = False
+isRight = not . isLeft
+
+unLeft  (Left x)  = x
+unRight (Right x) = x
+
 
 ---------------------------------------------------------------------
 -- command abs syntax
@@ -47,7 +62,7 @@ data Expr
    | EMacro     MacroName [Expr]
    | ECond      Expr Expr (Maybe Expr)
    | EOtherwise
-   | EHasValue  Expr
+   | EDefined   Var
    | EFFail     Expr
      deriving Show
 
@@ -65,8 +80,7 @@ data Stmt
      deriving Show
 
 data TopDef
-   = TStmt      Stmt
-   | TInclude   Expr
+   = TInclude   Expr
    | TMacroDef  MacroName MacroDef
    | TTest      TestName [Stmt]
      deriving Show
@@ -74,13 +88,15 @@ data TopDef
 data Op
    = OpAnd | OpOr | OpAppend | OpEq | OpNEq | OpContains | OpLacks
      deriving (Eq, Show)
-{-
-isExpect (Expect _)     = True ; isExpect other = False
-isWhen   (When _ _)     = True ; isWhen other = False
-isSkipWhen (SkipWhen _) = True ; isSkipWhen other = False
-isCompileOnly CompileOnly = True ; isCompileOnly other = False
-isAssign (Assign _ _) = True; isAssign other = False
--}
+
+isTInclude (TInclude _) = True
+isTInclude other        = False
+
+isTTest (TTest _ _) = True
+isTTest other       = False
+
+isTMacroDef (TMacroDef _ _) = True
+isTMacroDef other           = False
 
 data Result
    = Pass 		-- test passed

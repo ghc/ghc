@@ -1,10 +1,10 @@
 
-module CmdSemantics ( doOneTest )
+module CmdSemantics ( parseOneTFile, processParsedTFile )
 where
 
 import CmdSyntax
 import CmdLexer		( isVarChar )
-import CmdParser	( Parser, pExpr, pStmt, pFile, parseStringWith )
+import CmdParser	( parseScript )
 import Monad		( when )
 import Directory	( doesFileExist )
 import System		( ExitCode(..) )
@@ -28,56 +28,78 @@ myMatchRegexp rx str
          else Just (matchedAny result)
 
 ---------------------------------------------------------------------
--- A monad to propagate failure inside the evaluator.
+-- A monad to carry around the EvalEnv.
 
-data EvalResult a
-   = FrameFail  String			-- failure; act like "throw"
-   | Results    (Maybe Result,
-                 Maybe Result)		-- final result; ditto
-   | Value      a			-- value; keep going
-
-type IOE a 
-   = EvalEnv -> IO (EvalEnv, EvalResult a)
-
-getEvalEnv :: IOE EvalEnv
-getEvalEnv p = return (p, Value p)
-
-setEvalEnv :: EvalEnv -> IOE ()
-setEvalEnv p pnew = return (pnew, Value ())
-
-returnE :: a -> IOE a
-returnE x p = return (p, Value x)
-
-failE :: String -> IOE a
-failE str p = return (p, FrameFail str)
-
-resultsE :: (Just Result, Just Result) -> IOE a
-resultsE (r1,r2) p = return (p, Results (r1,r2))
-
-thenE_ :: IOE a -> IOE b -> IOE b
-thenE_ x y p
-   = do (p2, xv) <- x p
-        case xv of
-           Value     xok -> y p2
-           FrameFail str -> return (p2, FrameFail str)
-           Results   rs  -> return (p2, Results rs)
+type IOE a  = EvalEnv -> IO (EvalEnv, a)
 
 thenE :: IOE a -> (a -> IOE b) -> IOE b
 thenE x y p
    = do (p2, xv) <- x p
-        case xv of
-           Value     xok -> y xok p2
-           FrameFail str -> return (p2, FrameFail str)
-           Results   rs  -> return (p2, Results rs)
+        y xv p2
 
-mapE :: (a -> IOE b) -> [a] -> IOE [b]
-mapE f [] = returnE []
-mapE f (x:xs) = f x       `thenE` \ x_done ->
-                mapE f xs `thenE` \ xs_done ->
-                returnE (x_done:xs_done)
+thenE_ :: IOE a -> IOE b -> IOE b
+thenE_ x y p
+   = do (p2, xv) <- x p
+        y p2
 
-ioToE :: IO a -> IOE a
-ioToE io p
+returnE :: a -> IOE a
+returnE x p = return (p, x)
+
+getEvalEnv :: IOE EvalEnv
+getEvalEnv p = return (p, p)
+
+setEvalEnv :: EvalEnv -> IOE ()
+setEvalEnv p pnew = return (pnew, ())
+
+
+---------------------------------------------------------------------
+-- Enhanced version of IOE, which propagates failure values immediately.
+
+data EvalResult a
+   = FrameFail  String			-- failure; act like "throw"
+   | Results    (Result, Result)	-- final result (exp,act); ditto
+   | Value      a			-- value; keep going
+
+
+type IOEV a = IOE (EvalResult a)
+
+returnEV :: a -> IOE (EvalResult a)
+returnEV x p = return (p, Value x)
+
+failEV :: String -> IOE (EvalResult a)
+failEV str p = return (p, FrameFail str)
+
+resultsEV :: (Result, Result) -> IOE (EvalResult a)
+resultsEV (r1,r2) p = return (p, Results (r1,r2))
+
+thenEV :: IOEV a -> (a -> IOEV b) -> IOEV b
+thenEV x y
+   = x 						`thenE` \ res_x ->
+     case res_x of
+        Value x_ok  -> y x_ok
+        FrameFail s -> failEV s
+        Results rs  -> resultsEV rs
+
+thenEV_ :: IOEV a -> IOEV b -> IOEV b
+thenEV_ x y
+   = x 						`thenE` \ res_x ->
+     case res_x of
+        Value x_ok  -> y
+        FrameFail s -> failEV s
+        Results rs  -> resultsEV rs
+
+mapEV :: (a -> IOEV b) -> [a] -> IOEV [b]
+mapEV f []     = returnEV []
+mapEV f (x:xs) = f x       			`thenEV` \ x_done ->
+                mapEV f xs 			`thenEV` \ xs_done ->
+                returnEV (x_done:xs_done)
+
+whenEV :: Bool -> IOEV () -> IOEV ()
+whenEV b act
+   = if b then act else returnEV ()
+
+ioToEV :: IO a -> IOEV a
+ioToEV io p
    = do r <- io
         return (p, Value r)
 
@@ -99,26 +121,57 @@ data EvalEnv
 				-- expected and actual results
      }
 
-addLocalVarBind :: Var -> String -> IOE ()
+-- Record in the environment an expected or actual result.
+-- Complain about duplicate assignments.
+-- If the assignment now means that both an expected and actual
+-- result is available, terminate computation and return these
+-- results to the top level of the driver.
+setResult :: Bool -> Result -> IOEV ()
+setResult is_actual res
+   = getEvalEnv					`thenE` \ p ->
+     results p					`bind` \ (r_exp, r_act) ->
+     (is_actual && isJust r_act)		`bind` \ dup_act ->
+     ((not is_actual) && isJust r_exp)		`bind` \ dup_exp ->
+     if dup_act || dup_exp
+     then failEV "duplicate assignment of expected or actual outcome"
+     else
+     (if is_actual then (r_exp, Just res)
+                   else (Just res, r_act))	`bind` \ (new_exp, new_act) ->
+     if   isJust new_exp && isJust new_act
+     then resultsEV (unJust new_exp, unJust new_act)
+     else 
+     setEvalEnv (p{results = (new_exp, new_act)})
+						`thenE_`
+     returnEV ()
+
+
+addLocalVarBind :: Var -> String -> IOEV ()
 addLocalVarBind v s
-   = getEvalEnv				`thenE` \ p ->
+   = getEvalEnv					`thenE` \ p ->
      if   v `elem` map fst (globals p)
-     then failE (isGlobalVar v)
+     then failEV (isGlobalVar v)
      else setEvalEnv (p{ globals = (v,s):(globals p) })
+						`thenE_`
+          returnEV ()
 
-lookupVar :: Var -> IOE String
+lookupVar_maybe :: Var -> IOE (Maybe String)
+lookupVar_maybe v
+   = getEvalEnv					`thenE` \ p ->
+     returnE (lookup v (locals p ++ globals p))
+
+lookupVar :: Var -> IOEV String
 lookupVar v 
-   = getEvalEnv				`thenE` \ p ->
-     case lookup v (locals p ++ globals p) of
-        Just xx -> returnE xx
-        Nothing -> failE (missingVar v)
+   = lookupVar_maybe v				`thenE` \ maybe_v ->
+     case maybe_v of
+        Just xx -> returnEV xx
+        Nothing -> failEV (missingVar v)
 
-lookupMacro :: MacroName -> IOE MacroDef
+lookupMacro :: MacroName -> IOEV MacroDef
 lookupMacro mnm
-   = getEvalEnv				`thenE` \ p ->
+   = getEvalEnv					`thenE` \ p ->
      case lookup mnm (mdefs p) of
-        Just mdef -> returnE mdef
-        Nothing   -> failE (missingMacro mnm)
+        Just mdef -> returnEV mdef
+        Nothing   -> failEV (missingMacro mnm)
 
 initialEnv global_env macro_env
    = EvalEnv{ globals=global_env, mdefs=macro_env,
@@ -126,92 +179,95 @@ initialEnv global_env macro_env
 
 getLocalEnv :: IOE [(Var,String)]
 getLocalEnv
-   = getEvalEnv				`thenE` \ p ->
+   = getEvalEnv					`thenE` \ p ->
      returnE (locals p)
 
 setLocalEnv :: [(Var,String)] -> IOE ()
 setLocalEnv l_env
-   = getEvalEnv 			`thenE` \ p ->
+   = getEvalEnv 				`thenE` \ p ->
      setEvalEnv (p{locals=l_env})
 
+
 ---------------------------------------------------------------------
--- Top-level stuff.
-{-
-data TopRes
-   = TopRes EvalEnv		-- accumulated so far
-            (Maybe Result)	-- expected
-            (Maybe Result)	-- actual
-            [TopDef]		-- topdefs from include clauses?
+-- Run all the tests defined in a parsed .T file.
 
-doTopDef :: EvalEnv -> TopDef -> IOE TopRes
-doTopDef p (TStmt stmt)
-   = doStmt p stmt			`thenE` \ (p_new, _) ->
-     returnE (TopRes p_new Nothing Nothing [])
-doTopDef p (TSkip expr)
-   = evalExprToBool p expr		`thenE` \ do_skip ->
-     (if do_skip then Just Skipped else Nothing)
-					`bind`  \ maybe_skipped ->
-     returnE (TopRes p Nothing maybe_skipped [])
-doTopDef p (TResult res when_expr)
-   = evalExprToBool p when_expr		`thenE` \ expr_bool ->
-     (if expr_bool then Just res else Nothing)
-					`bind` \ maybe_result ->
-     returnE (TopRes p Nothing maybe_result [])
-doTopDef p (TExpect res)
-   = returnE (TopRes p (Just res) Nothing [])
-doTopDef p (TInclude expr)
-   = evalExpr p expr			`thenE` \ filename ->
-     readFileE p filename		`thenE` \ contents ->
-     case parseStringWith ("file `" ++ filename ++ "'")
-                          contents pFile of
-             Left errmsg -> failE errmsg
-             Right more_topdefs 
-                -> returnE (TopRes p Nothing Nothing more_topdefs)
-doTopDef p (TMacroDef mnm mdef)
-   = addMacroBindToEnv p mnm mdef	`bind`  \ p_new ->
-     returnE (TopRes p_new Nothing Nothing [])
+processParsedTFile :: [(Var,String)]
+                   -> [TopDef]
+                   -> IO [(TestName,
+                             (Either String{-framefail-} 
+                                     (Result, Result){-outcomes-})
+                         )]
+processParsedTFile global_env topdefs
+   = do let tests = filter isTTest     topdefs
+        let macs  = filter isTMacroDef topdefs
+        let incls = filter isTInclude  topdefs
+        let macro_env = map (\(TMacroDef mnm mrhs) -> (mnm,mrhs)) macs
+        let doOne (TTest tname stmts)
+               = do r <- doOneTest (("testname", tname):global_env)
+                                   macro_env stmts
+                    return (tname, r)
+        all_done <- mapM doOne tests
+        return all_done
 
--- Process top defs until either 
--- * One expected and one actual result are available
--- * We run out of topdefs
--- With the additional complication that we should stop as
--- soon as a `skip' actual result appears, regardless of 
--- whether we have an actual result.
+        
+---------------------------------------------------------------------
+-- Parsing a complete .T file and the transitive closure of its includes.
 
-doTopDefs :: EvalEnv -> [TopDef] -> ([Result], [Result]) 
-          -> IOE (Result, Result)
+parseOneTFile :: [(Var,String)]		-- global var env
+              -> FilePath		-- the T file to parse
+              -> IO (Either String{-complaint of some sort-}
+                            (FilePath, [TopDef]))
 
-doTopDefs p tds (_, (Skipped:_))
-   = returnE (Skipped, Skipped)
-doTopDefs p tds (e:exs, a:acts)
-   = returnE (e, a)
-doTopDefs p [] (exs, acts)
-   | null exs
-   = failE "No `expect' clauses found"
-   | null acts
-   = failE "Evaluation completed, but no actual result determined"
-doTopDefs p (td:tds) (exs, acts)
-   = doTopDef p td 			`thenE` \ td_result ->
-     case td_result of
-        TopRes p_new maybe_exp maybe_act new_tds
-           -> doTopDefs p_new (new_tds ++ tds)
-                              (exs  ++ listify maybe_exp,
-                               acts ++ listify maybe_act)
-              where listify (Just x) = [x]
-                    listify Nothing  = []
+parseOneTFile global_env tfile
+   = do { have_f <- doesFileExist tfile
+        ; if not have_f
+           then return (Left ("can't open script file `" ++ tfile ++ "'"))
+           else 
+     do { f_cts <- readFile tfile
+        ; let p_result = parseScript tfile f_cts
+        ; case p_result of {
+              Left errmsg -> return (Left errmsg) ;
+              Right topdefs -> 
+     do { -- filter out the includes and recurse on them
+          let here_topdefs  = filter isTInclude topdefs
+        ; let here_includes = filter (not.isTInclude) topdefs
+        ; incl_paths
+             <- mapM ( \i -> case i of 
+                                TInclude expr -> evalIncludeExpr global_env expr
+                     ) here_includes
+        ; let bad_incl_exprs = filter isLeft incl_paths
+        ; if not (null bad_incl_exprs)
+            then case head bad_incl_exprs of
+                    Left moanage -> return (Left moanage)
+            else 
+     do { let names_to_include = map unRight incl_paths
+        ; incl_topdefss <- mapM (parseOneTFile global_env) names_to_include
+        ; let failed_includes = filter isLeft incl_topdefss
+        ; if not (null failed_includes)
+            then return (head failed_includes)
+            else 
+     do { let more_topdefs = concatMap (snd.unRight) incl_topdefss
+        ; return (Right (tfile, here_topdefs ++ more_topdefs))
+     }}}}}}
 
 
--- Run the whole show, given some initial topdefs
-doEval :: FilePath -> [(Var,String)] -> [TopDef] 
-       -> IO (Maybe (Result, Result))
-doEval test_dir init_var_binds tds
-   = do outcome <- doTopDefs (initEvalEnv test_dir init_var_binds) tds ([],[])
-        case outcome of
-           Left err       -> do officialMsg err
-                                return Nothing
-           Right res_pair -> return (Just res_pair)
--}
+-- Simplistically evaluate an expression, using just the global
+-- value env.  Used for evaluating the args of include statements.
+evalIncludeExpr :: [(Var,String)] 
+                -> Expr 
+                -> IO (Either String{-errmsg-} String{-result-})
+evalIncludeExpr global_env expr
+   = do let initial_env = initialEnv global_env []
+        (final_env, res) <- evalExpr expr initial_env
+        case res of
+           FrameFail msg -> return (Left ("invalid include expr: " ++ msg))
+           Value v       -> return (Right v)
+           Results ress  -> panic "evalIncludeExpr"
+        
+          
 
+---------------------------------------------------------------------
+-- Running a single test.
 
 -- Run the whole show for a given test, stopping when:
 -- * A framework failure occurs
@@ -219,80 +275,93 @@ doEval test_dir init_var_binds tds
 -- * We run out of statements and neither of the above two
 --   apply.  This also counts as a framework failure.
 
-doOneTest :: [(Var,String)]
-          -> [(MacroName, MacroDef)]
-          -> [Stmt]
+doOneTest :: [(Var,String)]		-- global var env
+          -> [(MacroName, MacroDef)]	-- macro env
+          -> [Stmt]			-- stmts for this test
           -> IO (Either String{-framefail-} 
                         (Result, Result){-outcomes-})
 
 doOneTest global_env code_env stmts
    = do let initial_env = initialEnv global_env code_env
         res <- doStmts stmts initial_env
-        case res of
+        case snd res of
            FrameFail msg   -> return (Left msg)
-           Value ()        -> inconclusive
-           Results (Just r_expected, Just r_actual)
-              -> return (Right (r_expected, r_actual))
-           Results other   -> inconclusive
+           Value _         -> inconclusive
+           Results ress    -> return (Right ress)
      where
         inconclusive 
            = return (Left ("test completed but actual/expected " ++ 
                            "results not determined"))
 
 
-doStmts :: [Stmt] -> IOE ()
-doStmts []     = returnE ()
-doStmts (s:ss) = doStmt s `thenE_` doStmts ss
+-- Run a bunch of statements, and return either Nothing if 
+-- there was no return statement, or the value computed by said.
+doStmts :: [Stmt] -> IOEV (Maybe String)
+doStmts []     = returnEV Nothing
+doStmts (s:ss) = doStmt s `thenEV` \ maybe_v ->
+                 case maybe_v of 
+                    Just xx -> returnEV (Just xx)
+                    Nothing -> doStmts ss
 
 
-doStmt :: Stmt -> IOE ()
-
+doStmt :: Stmt -> IOEV (Maybe String)
 doStmt (SAssign v expr)
-   = evalExpr expr			`thenE`  \ str ->
-     addLocalVarBind v str
+   = evalExpr expr				`thenEV`  \ str ->
+     addLocalVarBind v str			`thenEV_`
+     returnEV Nothing
 doStmt (SPrint expr)
-   = evalExpr expr			`thenE` \ str ->
-     ioToE (putStrLn str)
+   = evalExpr expr				`thenEV` \ str ->
+     ioToEV (putStrLn str)			`thenEV_`
+     returnEV Nothing
 doStmt (SCond c t maybe_f)
-   = evalExprToBool c			`thenE` \ c_bool ->
+   = evalExprToBool c				`thenEV` \ c_bool ->
      if   c_bool
      then doStmts t
      else case maybe_f of
-             Nothing -> returnE ()
+             Nothing -> returnEV Nothing
              Just f  -> doStmts f
 doStmt (SRun var expr)
-   = evalExpr expr			`thenE` \ cmd_to_run ->
-     systemE cmd_to_run			`thenE` \ exit_code ->
-     addLocalVarBind var (show exit_code)
+   = evalExpr expr				`thenEV` \ cmd_to_run ->
+     systemEV cmd_to_run			`thenEV` \ exit_code ->
+     addLocalVarBind var (show exit_code)	`thenEV_`
+     returnEV Nothing
 
 doStmt (SFFail expr)
-   = evalExpr expr			`thenE` \ res ->
-     failE ("user-frame-fail: " ++ res)
+   = evalExpr expr				`thenEV` \ res ->
+     failEV ("user-frame-fail: " ++ res)
 doStmt (SResult res expr)
-   = evalExprToBool expr		`thenE` \ b ->
-     if b then resultsE res else returnE ()
+   = evalExprToBool expr			`thenEV` \ b ->
+     whenEV b (setResult True{-actual-} res)	`thenEV_`
+     returnEV Nothing
+doStmt (SExpect res)
+   = setResult False{-expected-} res		`thenEV_`
+     returnEV Nothing
 
 doStmt (SMacro mnm args)
-   = runMacro True mnm args
+   = runMacro mnm args				`thenEV` \ maybe_v ->
+     case maybe_v of
+        Nothing -> returnEV Nothing
+        Just _  -> failEV (hasValue mnm)
 
 doStmt (SReturn expr)
-   = evalExpr expr			`thenE` \ res ->
-     returnE res
+   = evalExpr expr				`thenEV` \ res ->
+     returnEV (Just res)
 
-runMacro mnm args nuke_return_value
-   = lookupMacro mnm			`thenE` \ mdef ->
+runMacro :: MacroName -> [Expr] -> IOEV (Maybe String)
+runMacro mnm args
+   = lookupMacro mnm				`thenEV` \ mdef ->
      case mdef of { MacroDef formals stmts ->
-     length formals			`bind` \ n_formals ->
-     length args			`bind` \ n_args ->
+     length formals				`bind` \ n_formals ->
+     length args				`bind` \ n_args ->
      if   n_formals /= n_args
-     then failE (arityErr mnm n_formals n_args)
-     else mapE evalExpr args		`thenE` \ arg_vals ->
-          zip formals arg_vals		`bind`  \ new_local_env ->
-          getLocalEnv			`thenE` \ our_local_env ->
-          setLocalEnv new_local_env	`thenE_`
-          doStmts stmts			`thenE` \ () ->
-          setLocalEnv our_local_env	`thenE_`
-          returnE ()
+     then failEV (arityErr mnm n_formals n_args)
+     else mapEV evalExpr args			`thenEV` \ arg_vals ->
+          zip formals arg_vals			`bind`  \ new_local_env ->
+          getLocalEnv				`thenE` \ our_local_env ->
+          setLocalEnv new_local_env		`thenE_`
+          doStmts stmts				`thenEV` \ res ->
+          setLocalEnv our_local_env		`thenE_`
+          returnEV res
      }
 
 
@@ -326,186 +395,119 @@ noValue mnm
    = "Macro `" ++ mnm ++ "' used in context expecting a value"
 
 
-evalExpr :: Expr -> IOE String
-evalExpr e = undefined
+evalOpExpr :: Op -> String -> String -> IOEV String
 
-evalExprToBool :: Expr -> IOE Bool
-evalExprToBool e = undefined
-
-systemE :: String -> IOE Int
-systemE = undefined
-
-{-
-evalOpExpr :: Op -> String -> String -> IOE String
-
-evalOpExpr OpAppend s1 s2 = returnE (s1 ++ s2)
-evalOpExpr OpEq     s1 s2 = returnE (fromBool (s1 == s2))
-evalOpExpr OpNEq    s1 s2 = returnE (fromBool (s1 /= s2))
+evalOpExpr OpAppend s1 s2 = returnEV (s1 ++ s2)
+evalOpExpr OpEq     s1 s2 = returnEV (fromBool (s1 == s2))
+evalOpExpr OpNEq    s1 s2 = returnEV (fromBool (s1 /= s2))
 evalOpExpr OpContains s rx 
    = case myMatchRegexp rx s of
-        Nothing -> failE (regExpErr rx)
-        Just bb -> returnE (fromBool bb)
+        Nothing -> failEV (regExpErr rx)
+        Just bb -> returnEV (fromBool bb)
 evalOpExpr OpLacks s rx 
    = case myMatchRegexp rx s of
-        Nothing -> failE (regExpErr rx)
-        Just bb -> returnE (fromBool (not bb))
+        Nothing -> failEV (regExpErr rx)
+        Just bb -> returnEV (fromBool (not bb))
 
 
-doStmts p []
-   = returnE (p, Nothing)
-doStmts p (s:ss)
-   = doStmt p s `thenE` \ (p_s, maybe_ret) -> 
-     case maybe_ret of
-        Just xx -> returnE (p_s, maybe_ret)
-        Nothing -> doStmts p_s ss
-
-
-evalExpr :: Expr -> IOE String
+evalExpr :: Expr -> IOEV String
 evalExpr (EOp op e1 e2)
    | op `elem` [OpEq, OpNEq, OpAppend, OpContains, OpLacks]
-   = evalExpr e1 			`thenE` \ e1s ->
-     evalExpr e2 			`thenE` \ e2s ->
+   = evalExpr e1 				`thenEV` \ e1s ->
+     evalExpr e2 				`thenEV` \ e2s ->
      evalOpExpr op e1s e2s
 evalExpr (EOp OpOr e1 e2)
-   = evalExprToBool e1			`thenE` \ b1 ->
-     if b1 then returnE (fromBool True)
-           else evalExprToBool e2	`thenE` \ b2 ->
-                returnE (fromBool b2)
+   = evalExprToBool e1				`thenEV` \ b1 ->
+     if b1 then returnEV (fromBool True)
+           else evalExprToBool e2		`thenEV` \ b2 ->
+                returnEV (fromBool b2)
 evalExpr (EOp OpAnd e1 e2)
-   = evalExprToBool e1			`thenE` \ b1 ->
-     if not b1 then returnE (fromBool False)
-               else evalExprToBool p e2	`thenE` \ b2 ->
-                    returnE (fromBool b2)
+   = evalExprToBool e1				`thenEV` \ b1 ->
+     if not b1 then returnEV (fromBool False)
+               else evalExprToBool e2		`thenEV` \ b2 ->
+                    returnEV (fromBool b2)
 evalExpr (EString str)
-   = returnE str
+   = returnEV str
 evalExpr (EBool b)
-   = returnE (fromBool b)
+   = returnEV (fromBool b)
 evalExpr (EContents expr)
-   = evalExpr expr 			`thenE` \ filename ->
-     readFileE filename
+   = evalExpr expr 				`thenEV` \ filename ->
+     readFileEV filename
 evalExpr (EExists expr)
-   = evalExpr expr 			`thenE` \ filename ->
-     doesFileExistE filename		`thenE` \ b ->
-     returnE (fromBool b)
-evalExpr (EHasValue expr)
-   = evalExpr expr			`thenE` \ str ->
-     returnE (fromBool (not (null str)))
+   = evalExpr expr 				`thenEV` \ filename ->
+     doesFileExistEV filename			`thenEV` \ b ->
+     returnEV (fromBool b)
+evalExpr (EDefined v)
+   | null v || head v /= '$'
+   = panic "evalExpr(EDefined): not a var"
+	-- This is a panic because the lexer+parser should have
+	-- conspired to ensure this
+   | otherwise
+   = lookupVar_maybe v				`thenE` \ maybe_v ->
+     returnEV (fromBool (isJust maybe_v))
 evalExpr EOtherwise
-   = returnE (fromBool True)
+   = returnEV (fromBool True)
 evalExpr (ECond c t maybe_f)
-   = evalExprToBool c			`thenE` \ c_bool ->
+   = evalExprToBool c				`thenEV` \ c_bool ->
      if   c_bool
      then evalExpr t
      else case maybe_f of
-             Nothing -> returnE ""
+             Nothing -> returnEV ""
              Just f  -> evalExpr f
 evalExpr (EVar v)
    = lookupVar v
 evalExpr (EFFail expr)
-   = evalExpr expr			`thenE` \ res ->
-     failE ("user-frame-fail: " ++ res)
+   = evalExpr expr				`thenEV` \ res ->
+     failEV ("user-frame-fail: " ++ res)
 
 evalExpr (EMacro mnm args)
-   = evalMacroUse mnm args		`thenE` \ (p_new, maybe_res) ->
-     case maybe_res of
-        Nothing -> failE (noValue mnm)
-        Just vv -> returnE vv
-
-
-evalMacroUse :: EvalEnv -> MacroName -> [Expr] 
-             -> IOE (EvalEnv, Maybe String)
-evalMacroUse p mnm args
-   = lookupMacro p mnm 			`thenE` \ macro ->
-     case macro of { MacroDef formals stmts ->
-     if   length formals /= length args
-     then failE (arityErr mnm (length formals) (length args))
-     else 
-     mapE (evalExpr p) args		`thenE` \ arg_ress ->
-     zip formals arg_ress		`bind`  \ subst_env ->
-     map (substStmt subst_env) stmts	`bind`  \ stmts2 ->
-     doStmts p stmts2			`thenE` \ pair ->
-     returnE pair
-     }
-
-substStmt :: [(Var,String)] -> Stmt -> Stmt
-substStmt env stmt
-   = case stmt of
-        SAssign v e -> SAssign v (se e)
-        SPrint e    -> SPrint (se e)
-        SCond c ts Nothing -> SCond (se c) (map ss ts) Nothing
-        SCond c ts (Just fs) -> SCond (se c) (map ss ts) (Just (map ss fs))
-        SRun v e -> SRun v (se e)
-        SReturn e -> SReturn (se e)
-        SMacro mnm es -> SMacro mnm (map se es)
-        SFFail e -> SFFail (se e)
-     where
-        se = substExpr env
-        ss = substStmt env
-
-substExpr env expr
-   = case expr of
-        EOp op a1 a2 -> EOp op (se a1) (se a2)
-        EVar v -> case lookup v env of
-                     Just str -> EString str
-                     Nothing -> EVar v
-        EString str -> EString str
-        EBool b -> EBool b
-        EContents e -> EContents (se e)
-        EExists e -> EExists (se e)
-        EMacro mnm es -> EMacro mnm (map se es)
-        ECond c t Nothing  -> ECond (se c) (se t) Nothing
-        ECond c t (Just f) -> ECond (se c) (se t) (Just (se f))
-        EOtherwise -> EOtherwise
-        EHasValue e -> EHasValue (se e)
-        EFFail e -> EFFail (se e)
-     where
-        se = substExpr env
-        ss = substStmt env
-
+   = runMacro mnm args				`thenEV` \ maybe_v ->
+     case maybe_v of
+        Nothing -> failEV (noValue mnm)
+        Just xx -> returnEV xx
 
 -------------------------
 
 -- Does filename exist?
-doesFileExistE :: EvalEnv -> String -> IOE Bool
-doesFileExistE p filename
-   = ioToE (doesFileExist filename)	`thenE` \ b ->
-     returnE b
+doesFileExistEV :: String -> IOEV Bool
+doesFileExistEV filename
+   = ioToEV (doesFileExist filename)		`thenEV` \ b ->
+     returnEV b
 
 
 -- If filename doesn't contain any slashes, stick $testdir/ on
 -- the front of it.
-readFileE :: EvalEnv -> String -> IOE String
-readFileE p filename0
-   = qualify filename0 			`thenE` \ filename ->
-     ioToE (doesFileExist filename) 	`thenE` \ exists ->
+readFileEV :: String -> IOEV String
+readFileEV filename
+   = --qualify filename0 			`thenE` \ filename ->
+     ioToEV (doesFileExist filename) 		`thenEV` \ exists ->
      if   not exists 
-     then failE (cantOpen filename)
-     else ioToE (readFile filename) 	`thenE` \ contents ->
-     returnE contents
-     where
-        qualify fn 
-           | '/' `elem` fn 
-           = returnE fn
-           | otherwise 
-           = lookupVar p "testdir"	`thenE` \ testdir ->
-             returnE (testdir ++ "/" ++ fn)
+     then failEV (cantOpen filename)
+     else ioToEV (readFile filename) 		`thenEV` \ contents ->
+     returnEV contents
+--     where
+--        qualify fn 
+--           | '/' `elem` fn 
+--           = returnE fn
+--           | otherwise 
+--           = lookupVar p "testdir"	`thenE` \ testdir ->
+--             returnE (testdir ++ "/" ++ fn)
 
 
 
-systemE :: String -> IOE Int
-systemE str
-   = ioToE (my_system str) 		`thenE` \ ret_code ->
+systemEV :: String -> IOEV Int
+systemEV str
+   = ioToEV (my_system str) 			`thenEV` \ ret_code ->
      case ret_code of
-        ExitSuccess   -> returnE 0
-        ExitFailure m -> returnE m
+        ExitSuccess   -> returnEV 0
+        ExitFailure m -> returnEV m
 
 ---------------------------
 
-evalExprToBool :: EvalEnv -> Expr -> IOE Bool
-evalExprToBool p e
-   = evalExpr p e			`thenE` \ e_eval ->
+evalExprToBool :: Expr -> IOEV Bool
+evalExprToBool e
+   = evalExpr e					`thenEV` \ e_eval ->
      case e_eval of
-        "True"  -> returnE True
-        "False" -> returnE False
-        other   -> failE (notABool other)
--}
+        "True"  -> returnEV True
+        "False" -> returnEV False
+        other   -> failEV (notABool other)

@@ -1,6 +1,5 @@
 
-module CmdParser ( Parser, parseStringWith,
-                   pExpr, pStmt, pFile ) 
+module CmdParser ( parseScript )
 where
 
 import CmdSyntax
@@ -14,6 +13,14 @@ import NonStdTrace(trace)
 #else
 import IOExts(trace)
 #endif
+
+
+---------------------------------------------------------------------
+-- Top level parser
+
+parseScript :: String -> String -> Either String [TopDef]
+parseScript fname fcontents 
+   = parseStringWith fname fcontents pFile
 
 ---------------------------------------------------------------------
 -- Parse a string with an arbitrary parser.
@@ -101,7 +108,7 @@ pExpr0
         p5 (\_ c _ t e -> ECond c t e)
            (pKW L_If) pExpr (pKW L_Then) pExpr (pMaybeElse pExpr),
         pConstKW L_Otherwise EOtherwise,
-        p2 (\c expr -> EHasValue expr) (pKW L_HasValue) pExpr,
+        p2 (\d var -> EDefined var) (pKW L_Defined) pVar,
         p2 (\ff expr -> EFFail expr) (pKW L_Framefail) pExpr,
         pInParens pExpr
      ]
