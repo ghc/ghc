@@ -117,11 +117,11 @@ pprBasicBlock (BasicBlock (BlockId id) instrs) =
 pprUserReg :: Reg -> Doc
 pprUserReg = pprReg IF_ARCH_i386(I32,) IF_ARCH_x86_64(I64,)
 
-pprReg :: IF_ARCH_i386(MachRep ->, IF_ARCH_x86_64(MachRep ->,)) Reg -> Doc
+pprReg :: IF_ARCH_i386(MachRep ->,) IF_ARCH_x86_64(MachRep ->,) Reg -> Doc
 
-pprReg IF_ARCH_i386(s, IF_ARCH_x86_64(s,)) r
+pprReg IF_ARCH_i386(s,) IF_ARCH_x86_64(s,) r
   = case r of
-      RealReg i      -> ppr_reg_no IF_ARCH_i386(s, IF_ARCH_x86_64(s,)) i
+      RealReg i      -> ppr_reg_no IF_ARCH_i386(s,) IF_ARCH_x86_64(s,) i
       VirtualRegI  u  -> text "%vI_" <> asmSDoc (pprUnique u)
       VirtualRegHi u  -> text "%vHi_" <> asmSDoc (pprUnique u)
       VirtualRegF  u  -> text "%vF_" <> asmSDoc (pprUnique u)
@@ -263,8 +263,9 @@ pprReg IF_ARCH_i386(s, IF_ARCH_x86_64(s,)) r
 	22 -> SLIT("%xmm6");   23 -> SLIT("%xmm7");
 	24 -> SLIT("%xmm8");   25 -> SLIT("%xmm9");
 	26 -> SLIT("%xmm10");  27 -> SLIT("%xmm11");
-	28 -> SLIT("%xmm12");  28 -> SLIT("%xmm13");
-	30 -> SLIT("%xmm13");  31 -> SLIT("%xmm15")
+	28 -> SLIT("%xmm12");  29 -> SLIT("%xmm13");
+	30 -> SLIT("%xmm14");  31 -> SLIT("%xmm15");
+	_  -> SLIT("very naughty x86_64 register")
       })
 #endif
 
@@ -640,15 +641,10 @@ pprSectionHeader RelocatableReadOnlyData
 	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
 	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
 	,IF_ARCH_i386(SLIT(".section .rodata\n\t.align 4")
-	,IF_ARCH_x86_64(SLIT(".text\n\t.align 8")
+	,IF_ARCH_x86_64(SLIT(".section .rodata\n\t.align 8")
         ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const_data\n.align 2"),
                                       SLIT(".data\n\t.align 2"))
 	,)))))
-	-- the assembler on x86_64/Linux refuses to generate code for
-	--   .quad  x - y
-	-- where x is in the text section and y in the rodata section.
-	-- It works if y is in the text section, though.  This is probably
-	-- going to cause difficulties for PIC, I imagine.
 pprSectionHeader UninitialisedData
     = ptext
 	 IF_ARCH_alpha(SLIT("\t.bss\n\t.align 3")
@@ -741,7 +737,28 @@ pprDataItem lit
 #endif
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 	ppr_item I16  x = [ptext SLIT("\t.word\t") <> pprImm imm]
+#endif
+#if i386_TARGET_ARCH
 	ppr_item I64  x = [ptext SLIT("\t.quad\t") <> pprImm imm]
+#endif
+#if x86_64_TARGET_ARCH
+	-- x86_64: binutils can't handle the R_X86_64_PC64 relocation
+	-- type, which means we can't do pc-relative 64-bit addresses.
+	-- Fortunately we're assuming the small memory model, in which
+	-- all such offsets will fit into 32 bits, so we have to stick
+	-- to 32-bit offset fields and modify the RTS appropriately
+	-- (see InfoTables.h).
+	-- 
+	ppr_item I64  x 
+	   | isRelativeReloc x =
+		[ptext SLIT("\t.long\t") <> pprImm imm,
+		 ptext SLIT("\t.long\t0")]
+	   | otherwise =
+		[ptext SLIT("\t.quad\t") <> pprImm imm]
+	   where
+		isRelativeReloc (CmmLabelOff _ _)       = True
+		isRelativeReloc (CmmLabelDiffOff _ _ _) = True
+		isRelativeReloc _ = False
 #endif
 #if powerpc_TARGET_ARCH
 	ppr_item I16 x = [ptext SLIT("\t.short\t") <> pprImm imm]
