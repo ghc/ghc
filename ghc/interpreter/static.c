@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.20 $
- * $Date: 1999/12/10 15:59:50 $
+ * $Revision: 1.21 $
+ * $Date: 2000/01/07 15:31:12 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -469,6 +469,7 @@ Pair importSpec; {
     } else {
         imports = resolveImportList(m, impList);
     }
+
     for(; nonNull(imports); imports=tl(imports)) {
         Cell e = hd(imports);
         if (!cellIsMember(e,hidden))
@@ -485,6 +486,7 @@ Cell e; {
     switch (whatIs(e)) {
       case NAME  : importName(source,e); 
                    break;
+      case TUPLE:
       case TYCON : importTycon(source,e); 
                    break;
       case CLASS : importClass(source,e);

@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.21 $
- * $Date: 2000/01/07 10:29:59 $
+ * $Revision: 1.22 $
+ * $Date: 2000/01/07 15:31:12 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1066,7 +1066,7 @@ Void finishGHCModule ( Cell root )
                c = findQualTyconWithoutConsultingExportList ( q );
                if (isNull(c)) goto notfound;
                fprintf(stderr, "   type %s\n", textToStr(textOf(ex)) );
-               module(mod).exports = cons(c, module(mod).exports);
+               module(mod).exports = cons(pair(c,NIL), module(mod).exports);
                addTycon(c);
                break;
 
@@ -1087,7 +1087,7 @@ Void finishGHCModule ( Cell root )
                      original (defining) module.
 		  */
                   if (abstract) {
-                     module(mod).exports = cons(c, module(mod).exports);
+                     module(mod).exports = cons(pair(c,NIL), module(mod).exports);
                      addTycon(c);
                      fprintf ( stderr, "(abstract) ");
 		  } else {
@@ -1101,7 +1101,7 @@ Void finishGHCModule ( Cell root )
                         c = findQualNameWithoutConsultingExportList ( q );
                         fprintf(stderr, "%s ", textToStr(name(c).text));
                         assert(nonNull(c));
-                        module(mod).exports = cons(c, module(mod).exports);
+                        /* module(mod).exports = cons(c, module(mod).exports); */
                         addName(c);
                      }
                   }
@@ -1120,7 +1120,7 @@ Void finishGHCModule ( Cell root )
                      c = findQualNameWithoutConsultingExportList ( q );
                      fprintf(stderr, "%s ", textToStr(name(c).text));
                      if (isNull(c)) goto notfound;
-                     module(mod).exports = cons(c, module(mod).exports);
+                     /* module(mod).exports = cons(c, module(mod).exports); */
                      addName(c);
                   }
                   fprintf(stderr, "}\n" );
