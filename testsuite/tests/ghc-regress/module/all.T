@@ -151,3 +151,7 @@ test('mod129', normal, compile, [''])
 test('mod130', normal, compile_fail, [''])
 test('mod131', normal, multimod_compile_fail, ['mod131', '-v0'])
 test('mod132', normal, multimod_compile_fail, ['mod132', '-v0'])
+
+
+# After here we have GHC-only tests (the ones above are copied from Hugs
+test('mod200', normal, compile, [''])
