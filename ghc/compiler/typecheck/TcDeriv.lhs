@@ -35,11 +35,13 @@ import Id		( mkVanillaId )
 import DataCon		( dataConArgTys, isNullaryDataCon )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool )
+import Module		( Module )
 import Name		( isLocallyDefined, getSrcLoc,
-			  Name, Module, NamedThing(..),
+			  Name, NamedThing(..),
 			  OccName, nameOccName
 			)
 import RdrName		( RdrName )
+import RnMonad		( Fixities )
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
 import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
@@ -185,12 +187,13 @@ context to the instance decl.  The "offending classes" are
 
 \begin{code}
 tcDeriving  :: Module			-- name of module under scrutiny
+	    -> Fixities			-- for the deriving code (Show/Read.)
 	    -> RnNameSupply		-- for "renaming" bits of generated code
 	    -> Bag InstInfo		-- What we already know about instances
 	    -> TcM s (Bag InstInfo,	-- The generated "instance decls".
 		      RenamedHsBinds)	-- Extra generated bindings
 
-tcDeriving modname rn_name_supply inst_decl_infos_in
+tcDeriving modname fixs rn_name_supply inst_decl_infos_in
   = recoverTc (returnTc (emptyBag, EmptyBinds)) $
 
   	-- Fish the "deriving"-related information out of the TcEnv
@@ -217,7 +220,7 @@ tcDeriving modname rn_name_supply inst_decl_infos_in
     let
 	extra_mbind_list = map gen_tag_n_con_monobind nm_alist_etc
 	extra_mbinds     = foldr AndMonoBinds EmptyMonoBinds extra_mbind_list
-	method_binds_s   = map gen_bind new_inst_infos
+	method_binds_s   = map (gen_bind fixs) new_inst_infos
 	mbinders	 = bagToList (collectMonoBinders extra_mbinds)
 	
 	-- Rename to get RenamedBinds.
@@ -553,10 +556,14 @@ the renamer.  What a great hack!
 -- Generate the method bindings for the required instance
 -- (paired with class name, as we need that when generating dict
 --  names.)
-gen_bind :: InstInfo -> ({-class-}OccName, {-tyCon-}OccName, RdrNameMonoBinds)
-gen_bind (InstInfo clas _ [ty] _ _ _ _ _)
+gen_bind :: Fixities -> InstInfo -> ({-class-}OccName, {-tyCon-}OccName, RdrNameMonoBinds)
+gen_bind fixities (InstInfo clas _ [ty] _ _ _ _ _)
   | not from_here 
   = (clas_nm, tycon_nm, EmptyMonoBinds)
+  |  ckey == showClassKey 
+  = (clas_nm, tycon_nm, gen_Show_binds fixities tycon)
+  |  ckey == readClassKey 
+  = (clas_nm, tycon_nm, gen_Read_binds fixities tycon)
   | otherwise
   = (clas_nm, tycon_nm,
      assoc "gen_bind:bad derived class"
@@ -564,17 +571,16 @@ gen_bind (InstInfo clas _ [ty] _ _ _ _ _)
 	   ,(ordClassKey,     gen_Ord_binds)
 	   ,(enumClassKey,    gen_Enum_binds)
 	   ,(boundedClassKey, gen_Bounded_binds)
-	   ,(showClassKey,    gen_Show_binds)
-	   ,(readClassKey,    gen_Read_binds)
 	   ,(ixClassKey,      gen_Ix_binds)
 	   ]
-	   (classKey clas) 
+	   ckey
 	   tycon)
   where
       clas_nm     = nameOccName (getName clas)
       tycon_nm    = nameOccName (getName tycon)
       from_here   = isLocallyDefined tycon
       (tycon,_,_) = splitAlgTyConApp ty	
+      ckey	  = classKey clas
 	    
 
 gen_inst_info :: Module					-- Module name

@@ -24,7 +24,7 @@ import TcHsSyn		( TcMonoBinds,
 import TcBinds		( tcPragmaSigs )
 import TcClassDcl	( tcMethodBind, badMethodErr )
 import TcMonad
-import RnMonad		( RnNameSupply )
+import RnMonad		( RnNameSupply, Fixities )
 import Inst		( Inst, InstOrigin(..),
 			  newDicts, LIE, emptyLIE, plusLIE, plusLIEs )
 import TcDeriv		( tcDeriving )
@@ -45,9 +45,8 @@ import Var		( setIdInfo, idName, idType, Id, TyVar )
 import DataCon		( isNullaryDataCon, dataConArgTys, dataConId )
 import Maybes 		( maybeToBool, catMaybes, expectJust )
 import MkId		( mkDictFunId )
-import Name		( nameOccName, isLocallyDefined, Module,
-			  NamedThing(..)
-			)
+import Module		( Module )
+import Name		( nameOccName, isLocallyDefined, NamedThing(..)	)
 import PrelVals		( eRROR_ID )
 import PprType		( pprConstraint )
 import SrcLoc		( SrcLoc )
@@ -143,11 +142,12 @@ and $dbinds_super$ bind the superclass dictionaries sd1 \ldots sdm.
 tcInstDecls1 :: ValueEnv		-- Contains IdInfo for dfun ids
 	     -> [RenamedHsDecl]
 	     -> Module			-- module name for deriving
+	     -> Fixities
 	     -> RnNameSupply			-- for renaming derivings
 	     -> TcM s (Bag InstInfo,
 		       RenamedHsBinds)
 
-tcInstDecls1 unf_env decls mod_name rn_name_supply
+tcInstDecls1 unf_env decls mod_name fixs rn_name_supply
   = 	-- Do the ordinary instance declarations
     mapNF_Tc (tcInstDecl1 unf_env mod_name) 
 	     [inst_decl | InstD inst_decl <- decls]	`thenNF_Tc` \ inst_info_bags ->
@@ -157,7 +157,7 @@ tcInstDecls1 unf_env decls mod_name rn_name_supply
 	-- Handle "derived" instances; note that we only do derivings
 	-- for things in this module; we ignore deriving decls from
 	-- interfaces!
-    tcDeriving mod_name rn_name_supply decl_inst_info
+    tcDeriving mod_name fixs rn_name_supply decl_inst_info
 		    	`thenTc` \ (deriv_inst_info, deriv_binds) ->
 
     let

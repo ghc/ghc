@@ -42,13 +42,14 @@ import TcType		( TcType, typeToTcType,
 			  newTyVarTy
 			)
 
-import RnMonad		( RnNameSupply )
+import RnMonad		( RnNameSupply, getIfaceFixities, Fixities, InterfaceDetails )
 import Bag		( isEmptyBag )
 import ErrUtils		( Message,
 			  pprBagOfErrors, dumpIfSet
 			)
 import Id		( Id, idType )
-import Name		( Name, nameUnique, isLocallyDefined, pprModule, NamedThing(..) )
+import Module           ( pprModule )
+import Name		( Name, nameUnique, isLocallyDefined, NamedThing(..) )
 import TyCon		( TyCon, tyConKind )
 import DataCon		( dataConId )
 import Class		( Class, classSelIds, classTyCon )
@@ -85,11 +86,13 @@ type TcResults
 typecheckModule
 	:: UniqSupply
 	-> RnNameSupply
+	-> InterfaceDetails
 	-> RenamedHsModule
 	-> IO (Maybe TcResults)
 
-typecheckModule us rn_name_supply mod
-  = initTc us initEnv (tcModule rn_name_supply mod)	>>= \ (maybe_result, warns, errs) ->
+typecheckModule us rn_name_supply iface_det mod
+  = initTc us initEnv (tcModule rn_name_supply (getIfaceFixities iface_det) mod)
+		    	>>= \ (maybe_result, warns, errs) ->
 		
     print_errs warns	>>
     print_errs errs	>>
@@ -118,10 +121,11 @@ print_errs errs
 The internal monster:
 \begin{code}
 tcModule :: RnNameSupply	-- for renaming derivings
+	 -> Fixities		-- needed for Show/Read derivings.
 	 -> RenamedHsModule	-- input
 	 -> TcM s TcResults	-- output
 
-tcModule rn_name_supply
+tcModule rn_name_supply fixities
 	(HsModule mod_name verion exports imports decls src_loc)
   = tcAddSrcLoc src_loc $	-- record where we're starting
 
@@ -142,7 +146,7 @@ tcModule rn_name_supply
     
 		    -- Typecheck the instance decls, includes deriving
 		tcSetEnv env (
-		tcInstDecls1 unf_env decls mod_name rn_name_supply
+		tcInstDecls1 unf_env decls mod_name fixities rn_name_supply
 		)				`thenTc` \ (inst_info, deriv_binds) ->
     
     		buildInstanceEnvs inst_info	`thenNF_Tc` \ inst_mapper ->

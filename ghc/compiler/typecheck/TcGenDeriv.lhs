@@ -33,7 +33,8 @@ import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..),
 			)
 import RdrHsSyn		( mkOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat )
 import RdrName		( RdrName, mkSrcUnqual )
-import BasicTypes	( RecFlag(..) )
+import RnMonad		( Fixities )
+import BasicTypes	( RecFlag(..), Fixity(..), FixityDirection(..) )
 import FieldLabel       ( fieldLabelName )
 import DataCon		( isNullaryDataCon, dataConTag,
 			  dataConRawArgTys, fIRST_TAG,
@@ -57,7 +58,7 @@ import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy,
 import Util		( mapAccumL, zipEqual, zipWithEqual,
 			  zipWith3Equal, nOfThem )
 import Panic		( panic, assertPanic )
-import Maybes		( maybeToBool )
+import Maybes		( maybeToBool, assocMaybe )
 import List		( partition, intersperse )
 \end{code}
 
@@ -758,12 +759,10 @@ gen_Ix_binds tycon
 %*									*
 %************************************************************************
 
-Ignoring all the infix-ery mumbo jumbo (ToDo)
-
 \begin{code}
-gen_Read_binds :: TyCon -> RdrNameMonoBinds
+gen_Read_binds :: Fixities -> TyCon -> RdrNameMonoBinds
 
-gen_Read_binds tycon
+gen_Read_binds fixities tycon
   = reads_prec `AndMonoBinds` read_list
   where
     tycon_loc = getSrcLoc tycon
@@ -781,50 +780,73 @@ gen_Read_binds tycon
 	)
       where
 	read_con data_con   -- note: "b" is the string being "read"
-	  = let
-		data_con_RDR = qual_orig_name data_con
-		data_con_str= occNameUserString (getOccName data_con)
-		con_arity   = argFieldCount data_con
-		con_expr    = mk_easy_App data_con_RDR as_needed
-		nullary_con = con_arity == 0
-		labels      = dataConFieldLabels data_con
-		lab_fields  = length labels
+	  = HsApp (
+	      readParen_Expr read_paren_arg $ HsPar $
+		 HsLam (mk_easy_Match tycon_loc [c_Pat] [] $
+		        HsDo ListComp stmts tycon_loc)
+	      ) (HsVar b_RDR)
+         where
+  	   data_con_RDR = qual_orig_name data_con
+	   data_con_str = occNameUserString (getOccName data_con)
+	   con_arity    = argFieldCount data_con
+	   con_expr     = mk_easy_App data_con_RDR as_needed
+	   nullary_con  = con_arity == 0
+	   labels       = dataConFieldLabels data_con
+	   lab_fields   = length labels
+	   dc_nm	= getName data_con
+	   is_infix     = isInfixOccName data_con_str
 
-		as_needed   = take con_arity as_RDRs
-		bs_needed   
-		 | lab_fields == 0 = take con_arity bs_RDRs
-		 | otherwise       = take (4*lab_fields + 1) bs_RDRs
-				       -- (label, '=' and field)*n, (n-1)*',' + '{' + '}'
-		con_qual
-                  = BindStmt
-		          (TuplePatIn [LitPatIn (mkHsString data_con_str), 
-				       d_Pat] True)
-		          (HsApp (HsVar lex_RDR) c_Expr)
-		          tycon_loc
+  	   as_needed   = take con_arity as_RDRs
+	   bs_needed   
+	     | is_infix        = take (1 + con_arity) bs_RDRs
+	     | lab_fields == 0 = take con_arity bs_RDRs
+	     | otherwise       = take (4*lab_fields + 1) bs_RDRs
+			          -- (label, '=' and field)*n, (n-1)*',' + '{' + '}'
 
-		str_qual str res draw_from
-                  = BindStmt
-		       (TuplePatIn [LitPatIn (mkHsString str), VarPatIn res] True)
-		       (HsApp (HsVar lex_RDR) draw_from)
-		       tycon_loc
+	   (as1:as2:_)     = as_needed
+	   (bs1:bs2:bs3:_) = bs_needed
+
+	   con_qual 
+	     | not is_infix =
+                 BindStmt
+		  (TuplePatIn [LitPatIn (mkHsString data_con_str), d_Pat] True)
+	          (HsApp (HsVar lex_RDR) c_Expr)
+	          tycon_loc
+	     | otherwise    =
+                 BindStmt
+		  (TuplePatIn [LitPatIn (mkHsString data_con_str), VarPatIn bs2] True)
+	          (HsApp (HsVar lex_RDR) (HsVar bs1))
+	          tycon_loc
+	        
+
+	   str_qual str res draw_from =
+               BindStmt
+		  (TuplePatIn [LitPatIn (mkHsString str), VarPatIn res] True)
+		  (HsApp (HsVar lex_RDR) draw_from)
+		  tycon_loc
   
-		read_label f
-		  = let nm = occNameUserString (getOccName (fieldLabelName f))
-		    in 
-			[str_qual nm, str_qual "="] 
+	   read_label f = [str_qual nm, str_qual "="] 
 			    -- There might be spaces between the label and '='
+		where
+		  nm = occNameUserString (getOccName (fieldLabelName f))
 
-		field_quals
-		  | lab_fields == 0 =
-    		     snd (mapAccumL mk_qual 
-				    d_Expr 
-				    (zipWithEqual "as_needed" 
-						  (\ con_field draw_from -> (mk_read_qual con_field,
-									     draw_from))
-						  as_needed bs_needed))
-                  | otherwise =
-		     snd $
-		     mapAccumL mk_qual d_Expr
+	   field_quals
+	      | is_infix  =
+    		  snd (mapAccumL mk_qual_infix
+				 c_Expr
+				 [ (mk_read_qual lp as1, bs1, bs2)
+				 , (mk_read_qual rp as2, bs3, bs3)
+				 ])
+	      | lab_fields == 0 =  -- common case.
+    		  snd (mapAccumL mk_qual 
+				 c_Expr 
+				 (zipWithEqual "as_needed" 
+					       (\ con_field draw_from -> (mk_read_qual 10 con_field,
+									  draw_from))
+						as_needed bs_needed))
+              | otherwise =
+		  snd $
+		  mapAccumL mk_qual c_Expr
 			(zipEqual "bs_needed"	     
 			   ((str_qual "{":
 			     concat (
@@ -835,36 +857,41 @@ gen_Read_binds tycon
 				    -- The labels
 				(map read_label labels)
 				    -- The fields
-				(map mk_read_qual as_needed))) ++ [str_qual "}"])
+				(map (mk_read_qual 10) as_needed))) ++ [str_qual "}"])
 			    bs_needed)
 
-		mk_qual draw_from (f, str_left)
-		  = (HsVar str_left,	-- what to draw from down the line...
-		     f str_left draw_from)
+	   mk_qual_infix draw_from (f, str_left, str_left2) =
+	        (HsVar str_left2,	-- what to draw from down the line...
+		 f str_left draw_from)
 
-		mk_read_qual con_field res draw_from =
-		  BindStmt
-		   (TuplePatIn [VarPatIn con_field, VarPatIn res] True)
-		   (HsApp (HsApp (HsVar readsPrec_RDR) (HsLit (HsInt 10))) draw_from)
-		   tycon_loc
+	   mk_qual draw_from (f, str_left) =
+	        (HsVar str_left,	-- what to draw from down the line...
+		 f str_left draw_from)
 
-		result_expr = ExplicitTuple [con_expr, if null bs_needed 
-						       then d_Expr 
-						       else HsVar (last bs_needed)] True
+	   mk_read_qual p con_field res draw_from =
+	      BindStmt
+		 (TuplePatIn [VarPatIn con_field, VarPatIn res] True)
+		 (HsApp (HsApp (HsVar readsPrec_RDR) (HsLit (HsInt p))) draw_from)
+		 tycon_loc
 
-		stmts = con_qual:field_quals ++ [ReturnStmt result_expr]
+ 	   result_expr = ExplicitTuple [con_expr, if null bs_needed 
+						    then d_Expr 
+						    else HsVar (last bs_needed)] True
+
+           [lp,rp] = getLRPrecs fixities dc_nm
+
+           quals
+	    | is_infix  = let (h:t) = field_quals in (h:con_qual:t)
+	    | otherwise = con_qual:field_quals
+
+	   stmts = quals ++ [ReturnStmt result_expr]
 		
-		read_paren_arg
-		  = if nullary_con then -- must be False (parens are surely optional)
-		       false_Expr
-		    else -- parens depend on precedence...
-		       HsPar (genOpApp a_Expr gt_RDR (HsLit (HsInt 9)))
-	    in
-	    HsApp (
-	      readParen_Expr read_paren_arg $ HsPar $
-		 HsLam (mk_easy_Match tycon_loc [c_Pat] [] $
-		        HsDo ListComp stmts tycon_loc)
-	      ) (HsVar b_RDR)
+	   paren_prec_limit
+	     | not is_infix  = 9
+	     | otherwise     = getFixity fixities dc_nm
+
+	   read_paren_arg  = -- parens depend on precedence...
+	     HsPar (genOpApp a_Expr gt_RDR (HsLit (HsInt paren_prec_limit)))
 
 \end{code}
 
@@ -874,12 +901,10 @@ gen_Read_binds tycon
 %*									*
 %************************************************************************
 
-Ignoring all the infix-ery mumbo jumbo (ToDo)
-
 \begin{code}
-gen_Show_binds :: TyCon -> RdrNameMonoBinds
+gen_Show_binds :: Fixities -> TyCon -> RdrNameMonoBinds
 
-gen_Show_binds tycon
+gen_Show_binds fixs_assoc tycon
   = shows_prec `AndMonoBinds` show_list
   where
     tycon_loc = getSrcLoc tycon
@@ -887,54 +912,75 @@ gen_Show_binds tycon
     show_list = mk_easy_FunMonoBind tycon_loc showList_RDR [] []
 		  (HsApp (HsVar showList___RDR) (HsPar (HsApp (HsVar showsPrec_RDR) (HsLit (HsInt 0)))))
     -----------------------------------------------------------------------
-    shows_prec
-      = mk_FunMonoBind tycon_loc showsPrec_RDR (map pats_etc (tyConDataCons tycon))
+    shows_prec = mk_FunMonoBind tycon_loc showsPrec_RDR (map pats_etc (tyConDataCons tycon))
       where
 	pats_etc data_con
-	  = let
-		data_con_RDR = qual_orig_name data_con
-		con_arity    = argFieldCount data_con
-		bs_needed    = take con_arity bs_RDRs
-		con_pat      = ConPatIn data_con_RDR (map VarPatIn bs_needed)
-		nullary_con  = con_arity == 0
-                labels       = dataConFieldLabels data_con
-		lab_fields   = length labels
+	  | nullary_con =  -- skip the showParen junk...
+	     ASSERT(null bs_needed)
+	     ([a_Pat, con_pat], show_con)
+	  | otherwise   =
+	     ([a_Pat, con_pat],
+		  showParen_Expr (HsPar (genOpApp a_Expr gt_RDR (HsLit (HsInt paren_prec_limit))))
+				 (HsPar (nested_compose_Expr show_thingies)))
+	    where
+	     data_con_RDR = qual_orig_name data_con
+	     con_arity    = argFieldCount data_con
+	     bs_needed    = take con_arity bs_RDRs
+	     con_pat      = ConPatIn data_con_RDR (map VarPatIn bs_needed)
+	     nullary_con  = con_arity == 0
+             labels       = dataConFieldLabels data_con
+	     lab_fields   = length labels
 
-		show_con
-		  = let nm = occNameUserString (getOccName data_con)
-			space_ocurly_maybe
-                          | nullary_con     = ""
-			  | lab_fields == 0 = " "
-			  | otherwise       = "{"
+             dc_occ_nm    = occNameUserString (getOccName data_con)
+	     dc_nm	  = getName data_con
 
-		    in
-			mk_showString_app (nm ++ space_ocurly_maybe)
+	     is_infix     = isInfixOccName dc_occ_nm
 
-		show_all con fs
-		  = let
-                        ccurly_maybe 
-                          | lab_fields > 0  = [mk_showString_app "}"]
-                          | otherwise       = []
-		    in
-			con:fs ++ ccurly_maybe
 
-		show_thingies = show_all show_con real_show_thingies_with_labs
+	     show_con
+	       | is_infix  = mk_showString_app (' ':dc_occ_nm)
+	       | otherwise =
+	         let 
+	          space_ocurly_maybe
+                    | nullary_con     = ""
+		    | lab_fields == 0 = " "
+		    | otherwise       = "{"
+		 in
+		 mk_showString_app (dc_occ_nm ++ space_ocurly_maybe)
+
+	     show_all con fs@(x:xs)
+		| is_infix  = x:con:xs
+		| otherwise = 
+		  let
+                    ccurly_maybe 
+                      | lab_fields > 0  = [mk_showString_app "}"]
+                      | otherwise       = []
+		  in
+		  con:fs ++ ccurly_maybe
+
+	     show_thingies = show_all show_con real_show_thingies_with_labs
                 
-		show_label l 
-		  = let nm = occNameUserString (getOccName (fieldLabelName l)) 
-		    in
-		    mk_showString_app (nm ++ "=")
+	     show_label l  = mk_showString_app (nm ++ "=")
+		 where
+		   nm = occNameUserString (getOccName (fieldLabelName l))
+		
 
-                mk_showString_app str = HsApp (HsVar showString_RDR)
-					      (HsLit (mkHsString str))
+             mk_showString_app str = HsApp (HsVar showString_RDR)
+					   (HsLit (mkHsString str))
 
-		real_show_thingies =
+             prec_cons = getLRPrecs fixs_assoc dc_nm
+
+             real_show_thingies
+		| is_infix  = 
+		     [ HsApp (HsApp (HsVar showsPrec_RDR) (HsLit (HsInt p))) (HsVar b)
+		     | (p,b) <- zip prec_cons bs_needed ]
+		| otherwise =
 		     [ HsApp (HsApp (HsVar showsPrec_RDR) (HsLit (HsInt 10))) (HsVar b)
 		     | b <- bs_needed ]
 
-                real_show_thingies_with_labs
-		 | lab_fields == 0 = intersperse (HsVar showSpace_RDR) real_show_thingies
-		 | otherwise       = --Assumption: no of fields == no of labelled fields 
+             real_show_thingies_with_labs
+		| lab_fields == 0 = intersperse (HsVar showSpace_RDR) real_show_thingies
+		| otherwise       = --Assumption: no of fields == no of labelled fields 
 				     --            (and in same order)
 		    concat $
 		    intersperse ([mk_showString_app ","]) $ -- Using SLIT()s containing ,s spells trouble.
@@ -943,16 +989,51 @@ gen_Show_binds tycon
 				 (map show_label labels) 
 				 real_show_thingies
 			       
+	     (con_left_assoc, con_right_assoc) = isLRAssoc fixs_assoc dc_nm
 
-	    in
-	    if nullary_con then  -- skip the showParen junk...
-		ASSERT(null bs_needed)
-		([a_Pat, con_pat], show_con)
-	    else
-		([a_Pat, con_pat],
-		    showParen_Expr (HsPar (genOpApp a_Expr ge_RDR (HsLit (HsInt 10))))
-				   (HsPar (nested_compose_Expr show_thingies)))
+	     paren_prec_limit
+		| not is_infix = 9
+		| otherwise    = getFixity fixs_assoc dc_nm
+
 \end{code}
+
+\begin{code}
+getLRPrecs :: Fixities -> Name -> [Integer]
+getLRPrecs fixs_assoc nm = [lp, rp]
+    where
+     ( con_left_assoc, con_right_assoc) = isLRAssoc fixs_assoc nm
+     paren_prec_limit = 9
+
+     lp
+      | con_left_assoc = paren_prec_limit
+      | otherwise      = paren_prec_limit + 1
+		  
+     rp
+      | con_right_assoc = paren_prec_limit
+      | otherwise       = paren_prec_limit + 1
+		  
+
+getFixity :: Fixities -> Name -> Integer
+getFixity fixs_assoc nm =
+  case assocMaybe fixs_assoc nm of
+     Nothing	       -> 9
+     Just (Fixity x _) -> fromInt x + 1
+
+isLRAssoc :: Fixities -> Name -> (Bool, Bool)
+isLRAssoc fixs_assoc nm =
+     case assocMaybe fixs_assoc nm of
+       Just (Fixity _ InfixL) -> (True, False)
+       Just (Fixity _ InfixR) -> (False, True)
+       _		      -> (False, False)
+
+isInfixOccName :: String -> Bool
+isInfixOccName str = 
+   case str of
+     (':':_) -> True
+     _       -> False
+
+\end{code}
+
 
 %************************************************************************
 %*									*
