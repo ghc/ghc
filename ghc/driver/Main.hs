@@ -1242,7 +1242,7 @@ run_pipeline last_phase do_linking use_ofile orig_basename (phase, input_fn)
 		Ln -> True
 		Mangle | keep_raw_s -> True -- first enhancement :)
 		As | keep_s  -> True
-		Cc | keep_hc -> True
+		HCc | keep_hc -> True
 		_other -> False
 
      output_fn <- 
