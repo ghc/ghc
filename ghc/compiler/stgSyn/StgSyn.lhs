@@ -607,7 +607,7 @@ pprStgArg :: (Outputable bdee) => GenStgArg bdee -> SDoc
 
 pprStgArg (StgVarArg var) = ppr var
 pprStgArg (StgLitArg con) = ppr con
-pprStgARg (StgTypeArg ty) = char '@' <+> ppr ty
+pprStgArg (StgTypeArg ty) = char '@' <+> ppr ty
 \end{code}
 
 \begin{code}
