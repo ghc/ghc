@@ -148,7 +148,8 @@ tags:
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>--cc=PROG</literal></term>
+	  <term><literal>-c PROG</literal> or
+	  <literal>--cc=PROG</literal></term>
 	  <listitem>
 	    <para>The C compiler to use (default:
 	    <command>ghc</command>)</para>
@@ -156,7 +157,8 @@ tags:
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>--ld=PROG</literal></term>
+	  <term><literal>-l PROG</literal> or
+	  <literal>--ld=PROG</literal></term>
 	  <listitem>
 	    <para>The linker to use (default:
 	    <command>gcc</command>).</para>
@@ -164,7 +166,8 @@ tags:
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>--cflag=FLAG</literal></term>
+	  <term><literal>-C FLAG</literal> or
+	  <literal>--cflag=FLAG</literal></term>
 	  <listitem>
 	    <para>An extra flag to pass to the C compiler.</para>
 	  </listitem>
@@ -178,17 +181,46 @@ tags:
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>--lflag=FLAG</literal></term>
+	  <term><literal>-L FLAG</literal> or
+	  <literal>--lflag=FLAG</literal></term>
 	  <listitem>
 	    <para>An extra flag to pass to the linker.</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>--include=FILE</literal></term>
+	  <term><literal>-i FILE</literal> or
+	  <literal>--include=FILE</literal></term>
 	  <listitem>
 	    <para>As if the appropriate <literal>#include</literal>
             directive was placed in the source.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>-D NAME[=VALUE]</literal> or
+	  <literal>--define=NAME[=VALUE]</literal></term>
+	  <listitem>
+	    <para>As if the appropriate <literal>#define</literal>
+            directive was placed in the source.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>-o FILE</literal> or
+	  <literal>--output=FILE</literal></term>
+	  <listitem>
+	    <para>Name of the Haskell file.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>-s FILE</literal> or
+	  <literal>--support=FILE</literal></term>
+	  <listitem>
+	    <para>Basename of the C file and C header
+	    (with <literal>.c</literal>, <literal>.h</literal>
+	    suffixes removed).</para>
 	  </listitem>
 	</varlistentry>
 
@@ -198,10 +230,18 @@ tags:
 	    <para>Display a summary of the available flags.</para>
 	  </listitem>
 	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>--version</literal></term>
+	  <listitem>
+	    <para>Output version information.</para>
+	  </listitem>
+	</varlistentry>
       </variablelist>
 
-      <para>The input file should end with .hsc. Output files get
-      names with the <literal>*.hsc</literal> pattern replaced:</para>
+      <para>The input file should end with .hsc. Output files by
+      default get names with the <literal>*.hsc</literal> pattern
+      replaced:</para>
 
       <informaltable>
 	<tgroup cols=2>

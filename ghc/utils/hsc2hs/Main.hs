@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.27 2001/03/29 00:01:18 qrczak Exp $
+-- $Id: Main.hs,v 1.28 2001/03/29 08:03:21 qrczak Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -30,11 +30,19 @@ data Flag
     | LinkFlag  String
     | NoCompile
     | Include   String
+    | Define    String (Maybe String)
+    | Output    String
+    | Support   String
 
 include :: String -> Flag
 include s@('\"':_) = Include s
 include s@('<' :_) = Include s
 include s          = Include ("\""++s++"\"")
+
+define :: String -> Flag
+define s = case break (== '=') s of
+    (name, [])      -> Define name Nothing
+    (name, _:value) -> Define name (Just value)
 
 options :: [OptDescr Flag]
 options = [
@@ -45,8 +53,11 @@ options = [
     Option "I" []             (ReqArg (CompFlag . ("-I"++))
                                                  "DIR")  "passed to the C compiler",
     Option "L" ["lflag"]      (ReqArg LinkFlag   "FLAG") "flag to pass to the linker",
-    Option ""  ["no-compile"] (NoArg  NoCompile)         "stop after writing HsMake*.c",
+    Option ""  ["no-compile"] (NoArg  NoCompile)         "stop after writing *_make.c",
     Option "i" ["include"]    (ReqArg include    "FILE") "as if placed in the source",
+    Option "D" ["define"]     (ReqArg define "NAME[=VALUE]") "as if placed in the source",
+    Option "o" ["output"]     (ReqArg Output     "FILE") "name of main output file",
+    Option "s" ["support"]    (ReqArg Support    "FILE") "basename of support output files (with .h, .c removed)",
     Option ""  ["help"]       (NoArg  Help)              "display this help and exit",
     Option ""  ["version"]    (NoArg  Version)           "output version information and exit"]
 
@@ -402,48 +413,61 @@ splitExt name =
             (restBase, restExt) = splitExt rest
 
 output :: [Flag] -> String -> [Token] -> IO ()
-output flags name toks = let
-    (dir,  file) = splitName name
-    (base, ext)  = splitExt  file
-    cProgName    = dir++"HsMake"++base++".c"
-    oProgName    = dir++"HsMake"++base++".o"
-    progName     = dir++"HsMake"++base
-    outHsName
-        | not (null ext) && last ext == 'c' = dir++base++init ext
-        | ext == ".hs"                      = dir++base++"_out.hs"
-        | otherwise                         = dir++base++".hs"
-    outHName     = dir++"Hs"++base++".h"
-    outCName     = dir++"Hs"++base++".c"
+output flags name toks = do
     
-    execProgName
-        | null dir  = "./"++progName
-        | otherwise = progName
+    let (dir,  file) = splitName name
+        (base, ext)  = splitExt  file
     
-    specials = [(pos, key, arg) | Special pos key arg <- toks]
+    (outName, outDir, outBase) <- case [f | Output f <- flags] of
+        []
+            | not (null ext) &&
+              last ext == 'c'   -> return (dir++base++init ext,  dir, base)
+            | ext == ".hs"      -> return (dir++base++"_out.hs", dir, base)
+            | otherwise         -> return (dir++base++".hs",     dir, base)
+        [f] -> let
+            (dir',  file') = splitName f
+            (base', _)     = splitExt file'
+            in return (f, dir', base')
+        _ -> onlyOne "output file"
     
-    needsC = any (\(_, key, _) -> key == "def") specials
-    needsH = needsC
+    supportDirBase <- case [f | Support f <- flags] of
+        []  -> return (outDir++"Hs"++outBase)
+        [f] -> return f
+        _   -> onlyOne "support file"
     
-    includeGuard = map fixChar outHName
-        where
-        fixChar c | isAlphaNum c = toUpper c
-                  | otherwise    = '_'
+    let cProgName    = outDir++outBase++"_make.c"
+        oProgName    = outDir++outBase++"_make.o"
+        progName     = outDir++outBase++"_make"
+        outHName     = supportDirBase++".h"
+        outCName     = supportDirBase++".c"
     
-    in do
+    let execProgName
+            | null dir  = "./"++progName
+            | otherwise = progName
+    
+    let specials = [(pos, key, arg) | Special pos key arg <- toks]
+    
+    let needsC = any (\(_, key, _) -> key == "def") specials
+        needsH = needsC
+    
+    let includeGuard = map fixChar outHName
+            where
+            fixChar c | isAlphaNum c = toUpper c
+                      | otherwise    = '_'
     
     compiler <- case [c | Compiler c <- flags] of
         []  -> return "ghc"
         [c] -> return c
         _   -> onlyOne "compiler"
+    
     linker <- case [l | Linker l <- flags] of
         []  -> return defaultCompiler
         [l] -> return l
         _   -> onlyOne "linker"
     
     writeFile cProgName $
-        concat ["#include \""++t++"\"\n" | Template t <- flags]++
-        concat ["#include "++f++"\n"     | Include  f <- flags]++
-        outHeaderCProg specials++
+        concatMap outFlagHeaderCProg flags++
+        concatMap outHeaderCProg specials++
         "\nint main (void)\n{\n"++
         outHeaderHs flags (if needsH then Just outHName else Nothing) specials++
         outHsLine (SourcePos name 0)++
@@ -473,7 +497,7 @@ output flags name toks = let
         _                 -> return ()
     removeFile oProgName
     
-    system (execProgName++" >"++outHsName)
+    system (execProgName++" >"++outName)
     removeFile progName
     
     when needsH $ writeFile outHName $
@@ -487,7 +511,7 @@ output flags name toks = let
         \#undef HsChar\n\
         \#define HsChar int\n\
         \#endif\n"++
-        concat ["#include "++n++"\n" | Include n <- flags]++
+        concatMap outFlagH flags++
         concatMap outTokenH specials++
         "#endif\n"
     
@@ -500,25 +524,31 @@ onlyOne what = do
     putStrLn ("Only one "++what++" may be specified")
     exitFailure
 
-outHeaderCProg :: [(SourcePos, String, String)] -> String
-outHeaderCProg =
-    concatMap $ \(pos, key, arg) -> case key of
-        "include"           -> outCLine pos++"#include "++arg++"\n"
-        "define"            -> outCLine pos++"#define "++arg++"\n"
-        "undef"             -> outCLine pos++"#undef "++arg++"\n"
-        "def"               -> case arg of
-            's':'t':'r':'u':'c':'t':' ':_ -> outCLine pos++arg++"\n"
-            't':'y':'p':'e':'d':'e':'f':' ':_ -> outCLine pos++arg++"\n"
-            _ -> ""
-        _ | conditional key -> outCLine pos++"#"++key++" "++arg++"\n"
-        "let"               -> case break (== '=') arg of
-            (_,      "")     -> ""
-            (header, _:body) -> case break isSpace header of
-                (name, args) ->
-                    outCLine pos++
-                    "#define hsc_"++name++"("++dropWhile isSpace args++") \
-                    \printf ("++joinLines body++");\n"
+outFlagHeaderCProg :: Flag -> String
+outFlagHeaderCProg (Template t)          = "#include \""++t++"\"\n"
+outFlagHeaderCProg (Include  f)          = "#include "++f++"\n"
+outFlagHeaderCProg (Define   n Nothing)  = "#define "++n++"\n"
+outFlagHeaderCProg (Define   n (Just v)) = "#define "++n++" "++v++"\n"
+outFlagHeaderCProg _                     = ""
+
+outHeaderCProg :: (SourcePos, String, String) -> String
+outHeaderCProg (pos, key, arg) = case key of
+    "include"           -> outCLine pos++"#include "++arg++"\n"
+    "define"            -> outCLine pos++"#define "++arg++"\n"
+    "undef"             -> outCLine pos++"#undef "++arg++"\n"
+    "def"               -> case arg of
+        's':'t':'r':'u':'c':'t':' ':_ -> outCLine pos++arg++"\n"
+        't':'y':'p':'e':'d':'e':'f':' ':_ -> outCLine pos++arg++"\n"
         _ -> ""
+    _ | conditional key -> outCLine pos++"#"++key++" "++arg++"\n"
+    "let"               -> case break (== '=') arg of
+        (_,      "")     -> ""
+        (header, _:body) -> case break isSpace header of
+            (name, args) ->
+                outCLine pos++
+                "#define hsc_"++name++"("++dropWhile isSpace args++") \
+                \printf ("++joinLines body++");\n"
+    _ -> ""
     where
     joinLines = concat . intersperse " \\\n" . lines
 
@@ -528,18 +558,20 @@ outHeaderHs flags inH toks =
     \    printf (\"{-# OPTIONS -optc-D__GLASGOW_HASKELL__=%d #-}\\n\", \
     \__GLASGOW_HASKELL__);\n\
     \#endif\n"++
-    includeH++
-    concatMap outSpecial toks
+    case inH of
+        Nothing -> concatMap outFlag flags++concatMap outSpecial toks
+        Just f  -> outOption ("-#include \""++f++"\"")
     where
+    outFlag (Include f)          = outOption ("-#include "++f)
+    outFlag (Define  n Nothing)  = outOption ("-optc-D"++n)
+    outFlag (Define  n (Just v)) = outOption ("-optc-D"++n++"="++v)
+    outFlag _                    = ""
     outSpecial (pos, key, arg) = case key of
-        "include" -> case inH of
-            Nothing -> outOption ("-#include "++arg)
-            Just _  -> ""
-        "define" -> case inH of
-            Nothing | goodForOptD arg -> outOption ("-optc-D"++toOptD arg)
-            _ -> ""
-        _ | conditional key -> outCLine pos++"#"++key++" "++arg++"\n"
-        _ -> ""
+        "include"                  -> outOption ("-#include "++arg)
+        "define" | goodForOptD arg -> outOption ("-optc-D"++toOptD arg)
+                 | otherwise       -> ""
+        _ | conditional key        -> outCLine pos++"#"++key++" "++arg++"\n"
+        _                          -> ""
     goodForOptD arg = case arg of
         ""              -> True
         c:_ | isSpace c -> True
@@ -548,11 +580,6 @@ outHeaderHs flags inH toks =
     toOptD arg = case break isSpace arg of
         (name, "")      -> name
         (name, _:value) -> name++'=':dropWhile isSpace value
-    includeH = concat [
-        outOption ("-#include "++name++"")
-        | name <- case inH of
-            Nothing   -> [name | Include name <- flags]
-            Just name -> ["\""++name++"\""]]
     outOption s = "    printf (\"{-# OPTIONS %s #-}\\n\", \""++
                   showCString s++"\");\n"
 
@@ -597,6 +624,12 @@ outEnum arg =
                                 cName++");\n"
                         in this++enums rest
                 in enums afterF
+
+outFlagH :: Flag -> String
+outFlagH (Include  f)          = "#include "++f++"\n"
+outFlagH (Define   n Nothing)  = "#define "++n++"\n"
+outFlagH (Define   n (Just v)) = "#define "++n++" "++v++"\n"
+outFlagH _                     = ""
 
 outTokenH :: (SourcePos, String, String) -> String
 outTokenH (pos, key, arg) =
