@@ -17,7 +17,7 @@ import CmdLineOpts	( DynFlags, DynFlag(..), opt_MaxWorkerArgs )
 import NewDemand	-- All of it
 import CoreSyn
 import PprCore	
-import CoreUtils	( exprIsValue, exprArity )
+import CoreUtils	( exprIsValue, exprIsTrivial, exprArity )
 import DataCon		( dataConTyCon )
 import TyCon		( isProductTyCon, isRecursiveTyCon )
 import Id		( Id, idType, idInlinePragma,
@@ -415,7 +415,9 @@ dmdAnalRhs top_lvl rec_flag sigs (id, rhs)
   arity		     = idArity id   -- The idArity should be up to date
 				    -- The simplifier was run just beforehand
   (rhs_dmd_ty, rhs') = dmdAnal sigs (vanillaCall arity) rhs
-  (lazy_fv, sig_ty)  = WARN( arity /= dmdTypeDepth rhs_dmd_ty, ppr id )
+  (lazy_fv, sig_ty)  = WARN( arity /= dmdTypeDepth rhs_dmd_ty && not (exprIsTrivial rhs), ppr id )
+				-- The RHS can be eta-reduced to just a variable, 
+				-- in which case we should not complain. 
 		       mkSigTy top_lvl rec_flag id rhs rhs_dmd_ty
   id'		     = id `setIdNewStrictness` sig_ty
   sigs'		     = extendSigEnv top_lvl sigs id sig_ty
