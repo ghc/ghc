@@ -1,5 +1,3 @@
-{-# OPTIONS -fasm #-}
-
 -- !!! Test passing doubles to a ccall
 
 import Foreign
