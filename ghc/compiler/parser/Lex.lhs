@@ -526,9 +526,8 @@ lexToken cont glaexts buf =
 		(_:ctx') -> cont ITccurly (incLexeme buf) s{context=ctx'}
 		_ -> lexError "too many '}'s" buf s
 
-    '#'# | flag glaexts 
-	 -> case lookAhead# buf 1# of
-		')'# -> cont ITcubxparen (setCurrentPos# buf 2#)
+    '#'# -> case lookAhead# buf 1# of
+		')'#  | flag glaexts -> cont ITcubxparen (setCurrentPos# buf 2#)
 		'-'# -> case lookAhead# buf 2# of
 			   '}'# -> cont ITclose_prag (setCurrentPos# buf 3#)
 			   _    -> lex_sym cont (incLexeme buf)
@@ -606,7 +605,7 @@ flag _  = True
 lex_prag cont buf
   = case expandWhile# is_space buf of { buf1 ->
     case expandWhile# is_ident (stepOverLexeme buf1) of { buf2 -> 
-    let lexeme = lexemeToFastString buf2 in
+    let lexeme = mkFastString (map toUpper (lexemeToString buf2)) in
     case lookupUFM pragmaKeywordsFM lexeme of
 	Just kw -> cont kw (mergeLexemes buf buf2)
 	Nothing -> panic "lex_prag"
