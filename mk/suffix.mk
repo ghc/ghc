@@ -195,10 +195,6 @@ endif
 #-----------------------------------------------------------------------------
 # SGML suffix rules
 #
-%.sgml : %.vsgml
-	@$(RM) $@
-	expand $< | $(SGMLVERB) > $@
-
 %.dvi : %.sgml
 	@$(RM) $@
 	$(SGML2DVI) $(SGML2DVI_OPTS) $<
