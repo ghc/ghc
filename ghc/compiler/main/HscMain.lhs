@@ -296,7 +296,7 @@ myParseModule dflags src_filename
   			           loc = mkSrcLoc (_PK_ src_filename) 1 } of {
 
 	PFailed err -> do { hPutStrLn stderr (showSDoc err);
-			    freeStringBuffer buf;
+--	Not yet implemented in <4.11		    freeStringBuffer buf;
                             return Nothing };
 
 	POk _ rdr_module@(HsModule mod_name _ _ _ _ _ _) -> do {
@@ -470,7 +470,7 @@ hscParseExpr dflags str
 			         loc = mkSrcLoc SLIT("<no file>") 0 } of {
 
 	PFailed err -> do { hPutStrLn stderr (showSDoc err);
-			    freeStringBuffer buf;
+--	Not yet implemented in <4.11		    freeStringBuffer buf;
                             return Nothing };
 
 	POk _ rdr_expr -> do {
