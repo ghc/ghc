@@ -46,15 +46,16 @@ import UniqSupply	( mkSplitUniqSupply )
 
 import Bag		( emptyBag )
 import Outputable
-import StgInterp	( stgToInterpSyn )
+#ifdef GHCI
+import StgInterp	( stgToInterpSyn, ItblEnv )
+import InterpSyn	( UnlinkedIBind )
+#endif
 import HscStats		( ppSourceStats )
 import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
 			  PersistentRenamerState(..), ModuleLocation(..),
 			  HomeSymbolTable, 
 			  OrigNameEnv(..), PackageRuleBase, HomeIfaceTable, 
 			  typeEnvClasses, typeEnvTyCons, emptyIfaceTable )
-import InterpSyn	( UnlinkedIBind )
-import StgInterp	( ItblEnv )
 import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
 import OccName		( OccName )
 import Name		( Name, nameModule, nameOccName, getName  )
