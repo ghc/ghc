@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.12 1999/04/27 10:59:30 sewardj Exp $
+ * $Id: ClosureMacros.h,v 1.13 1999/04/27 12:25:23 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -336,6 +336,12 @@ SET_STATIC_HDR(PrelBase_CZh_closure,PrelBase_CZh_info,costCentreStack,const);
 
 #define CHARLIKE_CLOSURE(n) ((P_)&CHARLIKE_closure[n])
 #define INTLIKE_CLOSURE(n)  ((P_)&INTLIKE_closure[(n)-MIN_INTLIKE])
+
+/* -----------------------------------------------------------------------------
+   Closure Tables (for enumerated data types)
+   -------------------------------------------------------------------------- */
+
+#define CLOSURE_TBL(lbl) const StgClosure *lbl[] = {
 
 /* -----------------------------------------------------------------------------
    Payload access
