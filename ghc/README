@@ -38,16 +38,25 @@ problem.
 
 Current GHC team:
 
-    Simon Peyton Jones	( simonpj@microsoft.com)    [our Fearless Leader]
-    Simon Marlow	(simonmar@microsoft.com)    [hired hand]
-    Julian Seward       (v-julsew@microsoft.com)    [hired hand]
-    Reuben Thomas	(v-reubth@microsoft.com)    [hired hand]
+    Simon Peyton Jones	<simonpj@microsoft.com>     [our Fearless Leader]
+    Simon Marlow	<simonmar@microsoft.com>    [hired hand]
+    Julian Seward       <v-julsew@microsoft.com>    [hired hand]
+    Reuben Thomas	<v-reubth@microsoft.com>    [hired hand]
+
+Additional Contributors (in alphabetical order):
+
+    Manuel Chakravarty   <chak@cse.unsw.edu.au>
+    Sigbjorn Finne	 <sof@microsoft.com>
+    Kevin Glynn		 <keving@cs.mu.oz.au>
+    Jeff Lewis		 <jlewis@cse.ogi.edu>
+    Hans Wolfgang Lloidl <hwloidl@cee.hw.ac.uk>
+    Sven Panne		 <Sven.Panne@informatik.uni-muenchen.de>
+    Keith Wansborough    <Keith.Wansbrough@cl.cam.ac.uk>
 
 Past contributors and/or continuing advisors (all @dcs.gla.ac.uk):
 
-    Sigbjorn Finne	(v-sfinne@microsoft.com)    [hired hand]
+    Juan Quintela       (quintela)
     Thomas Nordin       (nordin)    [@cse.ogi.edu; Green Card Hero]
-    Hans Wolfgang Loidl (hwloidl)   [PhD student]
     Patrick Sansom	(sansom)    [hired hand, Bidirectional Analyses]
     Phil Trinder	(trinder)   [hired hand, Parade]
     Andy Gill		(andy)	    [ex-PhD student; at OGI]
@@ -58,7 +67,7 @@ Past contributors and/or continuing advisors (all @dcs.gla.ac.uk):
     Darren Moffat	(moffatd)   [slave, summer '95; at MoD]
     Will Partain	(partain)   [GRASP/AQUA; touring with Johnny Cash]
     Bryan O'Sullivan	(bos)	    [visiting slave, summer '94; at Sun]
-    Alastair Reid	(areid)	    [GHCI god, at Yale]
+    Alastair Reid	(areid)	    [GHCI, STG/Hugs etc.]
     Andr\'e Santos	(andre)	    [PhD student; back in Brazil]
     David N Turner	(dnt)	    [Linear Types; at An-Teallach]
     Phil Wadler		(wadler)    [GRASP; at Lucent]
