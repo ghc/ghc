@@ -1161,15 +1161,33 @@ run_BCO:
 	    int o_itbl                = BCO_NEXT;
 	    void(*marshall_fn)(void*) = (void (*)(void*))BCO_LIT(o_itbl);
 
-	    // Shift the stack pointer down to the next relevant stack
-	    // frame during the call.  See comment in ByteCodeGen.lhs.
-	    Sp += stk_offset;
+	    // There are a bunch of non-ptr words on the stack (the
+	    // ccall args, the ccall fun address and space for the
+	    // result), which we need to cover with an info table
+	    // since we might GC during this call.
+	    //
+	    // We know how many (non-ptr) words there are before the
+	    // next valid stack frame: it is the stk_offset arg to the
+	    // CCALL instruction.   So we build a RET_DYN stack frame
+	    // on the stack frame to describe this chunk of stack.
+	    //
+	    Sp -= RET_DYN_SIZE + sizeofW(StgRetDyn);
+	    ((StgRetDyn *)Sp)->liveness = ALL_NON_PTRS | N_NONPTRS(stk_offset);
+	    ((StgRetDyn *)Sp)->info = (StgInfoTable *)&stg_gc_gen_info;
+
 	    SAVE_STACK_POINTERS;
 	    tok = suspendThread(&cap->r,rtsFalse);
-	    marshall_fn ( (void*)(& Sp[-stk_offset] ) );
+
+	    // Careful: suspendThread might have shifted the stack
+	    // around (stack squeezing), so we have to grab the real
+	    // Sp out of the TSO to find the ccall args again:
+	    marshall_fn ( (void*)(cap->r.rCurrentTSO->sp + RET_DYN_SIZE
+		+ sizeofW(StgRetDyn)) );
+
+	    // And restart the thread again, popping the RET_DYN frame.
 	    cap = (Capability *)((void *)resumeThread(tok,rtsFalse) - sizeof(StgFunTable));
 	    LOAD_STACK_POINTERS;
-	    Sp -= stk_offset;
+	    Sp += RET_DYN_SIZE + sizeofW(StgRetDyn);
 	    goto nextInsn;
 	}
 

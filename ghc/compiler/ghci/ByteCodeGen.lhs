@@ -953,8 +953,7 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
          depth, and we RETURN.
 
          This arrangement makes it simple to do f-i-dynamic since the Addr#
-         value is the first arg anyway.  It also has the virtue that the
-         stack is GC-understandable at all times.
+         value is the first arg anyway.
 
          The marshalling code is generated specifically for this
          call site, and so knows exactly the (Haskell) stack
@@ -1015,13 +1014,9 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
          recordMallocBc addr_of_marshaller	`thenBc_`
      let
 	 -- Offset of the next stack frame down the stack.  The CCALL
- 	 -- instruction will temporarily shift the stack pointer up by
-	 -- this much during the call, and shift it down again afterwards.
-	 -- This is so that we don't have to worry about constructing
-	 -- a bitmap to describe the stack layout of the call: the
-	 -- contents of this part of the stack are irrelevant anyway,
-	 -- it is only used to communicate the arguments to the
-	 -- marshalling code.
+ 	 -- instruction needs to describe the chunk of stack containing
+	 -- the ccall args to the GC, so it needs to know how large it
+	 -- is.  See comment in Interpreter.c with the CCALL instruction.
 	 stk_offset   = d_after_r - s
 
          -- do the call
