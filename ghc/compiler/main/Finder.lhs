@@ -7,6 +7,7 @@
 module Finder (
     initFinder, 	-- :: [PackageConfig] -> IO (), 
     findModule,		-- :: ModuleName -> IO (Maybe (Module, ModuleLocation))
+    findPackageModule,	-- :: ModuleName -> IO (Maybe (Module, ModuleLocation))
     mkHomeModuleLocn,	-- :: ModuleName -> String -> Maybe FilePath 
 			--	-> IO ModuleLocation
     emptyHomeDirCache,	-- :: IO ()
@@ -52,7 +53,7 @@ findModule name
   = do	{ j <- maybeHomeModule name
 	; case j of
 	    Just home_module -> return (Just home_module)
-	    Nothing	     -> maybePackageModule name
+	    Nothing	     -> findPackageModule name
 	}
 
 maybeHomeModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
@@ -139,8 +140,8 @@ mkHomeModuleLocn mod_name basename maybe_source_fn = do
 	))
 
 
-maybePackageModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
-maybePackageModule mod_name = do
+findPackageModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
+findPackageModule mod_name = do
   pkgs <- getPackageInfo
 
   -- hi-suffix for packages depends on the build tag.
