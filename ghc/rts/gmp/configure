@@ -4450,9 +4450,21 @@ for tmp_fn in ${gmp_mpn_functions} ; do
 
   found=no
   for tmp_dir in $path; do
+
+# SLPJ trace
+# We get stuck sometimes
+	echo "  ...dir $tmp_dir..." 1>&6
     for tmp_base in $tmp_fn $tmp_mulfunc; do
+
+# SLPJ trace
+# We get stuck sometimes
+	echo "   ...base $tmp_base..." 1>&6
       for tmp_ext in asm S s c; do
         tmp_file=$srcdir/mpn/$tmp_dir/$tmp_base.$tmp_ext
+
+# SLPJ trace
+# We get stuck sometimes
+	echo "   ...$tmp_file..." 1>&6
 
         if test -f $tmp_file; then
           found=yes
