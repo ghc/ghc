@@ -52,9 +52,7 @@ import ParserCoreUtils ( getCoreModuleName )
 import EXCEPTION
 import DATA_IOREF	( readIORef, writeIORef )
 
-#ifdef GHCI
-import Time 		( getClockTime )
-#endif
+import Time 		( ClockTime )
 import Directory
 import System
 import IO
@@ -99,6 +97,7 @@ preprocess filename =
 compile :: HscEnv
 	-> Module
 	-> ModLocation
+	-> ClockTime		   -- timestamp of original source file
 	-> Bool			   -- True <=> source unchanged
 	-> Bool			   -- True <=> have object
         -> Maybe ModIface          -- old interface, if available
@@ -116,7 +115,7 @@ data CompResult
    | CompErrs 
 
 
-compile hsc_env this_mod location
+compile hsc_env this_mod location src_timestamp
 	source_unchanged have_object 
 	old_iface = do 
 
@@ -182,8 +181,13 @@ compile hsc_env this_mod location
 		HscInterpreted -> 
 		    case maybe_interpreted_code of
 #ifdef GHCI
-		       Just comp_bc -> do tm <- getClockTime 
-                                          return ([BCOs comp_bc], tm)
+		       Just comp_bc -> return ([BCOs comp_bc], src_timestamp)
+			-- Why do we use the timestamp of the source file here,
+			-- rather than the current time?  This works better in
+			-- the case where the local clock is out of sync
+			-- with the filesystem's clock.  It's just as accurate:
+			-- if the source is modified, then the linkable will
+			-- be out of date.
 #endif
 		       Nothing -> panic "compile: no interpreted code"
 

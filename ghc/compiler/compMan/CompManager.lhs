@@ -948,7 +948,8 @@ upsweep_mod hsc_env oldUI summary1 reachable_inc_me
 	       | otherwise = False
 
         compresult <- compile hsc_env_strictDC this_mod location 
-			      source_unchanged have_object mb_old_iface
+			(ms_hs_date summary1) 
+			source_unchanged have_object mb_old_iface
 
         case compresult of
 
