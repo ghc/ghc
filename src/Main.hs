@@ -170,16 +170,13 @@ mkInterface mod_map filename
      qual_local_names   = map (Qual mod) locally_defined_names
      unqual_local_names = map UnQual     locally_defined_names
 
-     local_env = listToFM (zip unqual_local_names qual_local_names ++
-			   zip qual_local_names   qual_local_names)
+     local_orig_env = listToFM (zip unqual_local_names qual_local_names ++
+			        zip qual_local_names   qual_local_names)
 	 -- both qualified and unqualifed names are in scope for local things
 
      -- build the orig_env, which maps names to *original* names (so we can
      -- find the original declarations & docs for things).
-     (ext_orig_envs, ext_import_envs) 
-	= unzip (map (buildEnv mod_map mod exported_names) imps)
-     orig_env   = foldr plusFM local_env ext_orig_envs  
-     import_env = foldr plusFM local_env ext_import_envs  
+     orig_env = local_orig_env `plusFM` buildOrigEnv mod_map imps
 
      -- convert names in source code to original, fully qualified, names
      (orig_exports, missing_names1) 
@@ -192,9 +189,15 @@ mkInterface mod_map filename
      orig_decl_map = listToFM [ (n,d) | d <- orig_decls, n <- declBinders d ]
 
      -- gather up a list of entities that are exported (original names)
-     exported_names = exportedNames mod mod_map orig_decls
+     (exported_names, exported_visible_names)
+	 = exportedNames mod mod_map orig_decls
 			locally_defined_names orig_exports
 			orig_decl_map options
+
+     -- build the import env, which maps original names to import names
+     local_import_env = listToFM (zip qual_local_names qual_local_names)
+     import_env = local_import_env `plusFM`
+		   buildImportEnv mod_map mod exported_visible_names imps
 
   let
      final_decls = concat (map expandDecl orig_decls)
@@ -354,14 +357,16 @@ exportedNames :: Module -> ModuleMap -> [HsDecl] -> [HsName]
 	-> Maybe [HsExportSpec]
 	-> FiniteMap HsName HsDecl
 	-> [DocOption]
-	-> [HsQName]
+	-> ([HsQName], [HsQName])
 
-exportedNames mod mod_scope decls local_names maybe_exps decl_map options
-  | Nothing <- maybe_exps 	    = all_local_names
-  | OptIgnoreExports `elem` options = all_local_names
-  | Just expspecs <- maybe_exps     = concat (map extract expspecs)
+exportedNames mod mod_map decls local_names maybe_exps decl_map options
+  | Nothing <- maybe_exps 	    = all_local_names_pr
+  | OptIgnoreExports `elem` options = all_local_names_pr
+  | Just expspecs <- maybe_exps     = 
+	(concat (map extract expspecs), concat (map extract_vis expspecs))
  where
   all_local_names = map (Qual mod) local_names
+  all_local_names_pr = (all_local_names,all_local_names)
 
   extract e = 
    case e of
@@ -375,10 +380,26 @@ exportedNames mod mod_scope decls local_names maybe_exps decl_map options
     HsEModuleContents m
 	| m == mod  -> map (Qual mod) local_names
 	| otherwise ->
-	  case lookupFM mod_scope m of
+	  case lookupFM mod_map m of
 	    Just iface -> eltsFM (iface_env iface)
 	    Nothing    -> trace ("Warning: module not found: " ++ show m) $ []
     _ -> []
+
+  -- Just the names that will be visible in the documentation
+  -- (ie. omit names exported via a 'module M' export, if we are just
+  -- going to cross-reference the module).
+  extract_vis e = 
+   case e of
+    HsEModuleContents m
+	| m == mod  -> map (Qual mod) local_names
+	| otherwise ->
+	  case lookupFM mod_map m of
+	    Just iface
+		| OptHide `elem` iface_options iface -> eltsFM (iface_env iface)
+		| otherwise -> []
+	    Nothing
+		-> trace ("Warning: module not found: " ++ show m) $ []
+    _ -> extract e
 
   export_lookup :: HsQName -> Maybe HsDecl
   export_lookup (UnQual n)
@@ -386,7 +407,7 @@ exportedNames mod mod_scope decls local_names maybe_exps decl_map options
   export_lookup (Qual m n)
 	| m == mod  = lookupFM decl_map n
 	| otherwise
-	    = case lookupFM mod_scope m of
+	    = case lookupFM mod_map m of
 		Just iface -> lookupFM (iface_decls iface) n
 		Nothing    -> trace ("Warning: module not found: " ++ show m) 
 				Nothing
@@ -394,33 +415,40 @@ exportedNames mod mod_scope decls local_names maybe_exps decl_map options
 -- -----------------------------------------------------------------------------
 -- Building name environments
 
-buildEnv :: ModuleMap -> Module -> [HsQName] -> HsImportDecl
-   -> ( FiniteMap HsQName HsQName, 	-- source name ==> orig name
-        FiniteMap HsQName HsQName	-- orig name ==> import name
-      )
-buildEnv mod_map this_mod exported_names (HsImportDecl _ mod qual maybe_as _)
-   = case lookupFM mod_map mod of
-       Nothing    -> trace ("Warning: module not found: " ++ show mod) 
-			(emptyFM, emptyFM)
-       Just iface -> 
-	  let env = fmToList (iface_env iface) in
-	  ( listToFM (concat (map orig_map env))
-	  , listToFM (map import_map env)
-  	  )
+buildOrigEnv :: ModuleMap -> [HsImportDecl] -> FiniteMap HsQName HsQName
+buildOrigEnv mod_map imp_decls
+  = foldr plusFM emptyFM (map build imp_decls)
   where
+  build (HsImportDecl _ mod qual maybe_as _)
+    = case lookupFM mod_map mod of
+       Nothing -> 
+	  trace ("Warning: module not found: " ++ show mod) $ emptyFM
+       Just iface -> 
+	  listToFM (concat (map orig_map (fmToList (iface_env iface))))
+    where
 	-- bring both qualified and unqualified names into scope, unless
 	-- the import was 'qualified'.
-     orig_map (nm,qnm)
-	| qual      = [ (Qual qual_module nm, qnm) ]
-	| otherwise = [ (UnQual nm, qnm), (Qual qual_module nm, qnm) ]
+	orig_map (nm,qnm)
+	  | qual      = [ (Qual qual_module nm, qnm) ]
+	  | otherwise = [ (UnQual nm, qnm), (Qual qual_module nm, qnm) ]
 
-     qual_module
-	| Just m <- maybe_as = m
-	| otherwise          = mod
+        qual_module
+	  | Just m <- maybe_as = m
+	  | otherwise          = mod
 
-     import_map (nm,qnm) = (qnm, maps_to)
-	where maps_to | qnm `elem` exported_names = Qual this_mod nm
-		      | otherwise = Qual mod nm
+buildImportEnv :: ModuleMap -> Module -> [HsQName] -> [HsImportDecl]
+	-> FiniteMap HsQName HsQName
+buildImportEnv mod_map this_mod exported_names imp_decls
+  = foldr plusFM emptyFM (map build imp_decls)
+  where
+  build (HsImportDecl _ mod qual maybe_as _)
+    = case lookupFM mod_map mod of
+       Nothing    -> emptyFM
+       Just iface -> listToFM (map import_map (fmToList (iface_env iface)))
+    where
+	import_map (nm,qnm) = (qnm, maps_to)
+ 	  where maps_to | qnm `elem` exported_names = Qual this_mod nm
+		        | otherwise = Qual mod nm
 
 -- -----------------------------------------------------------------------------
 -- Expand multiple type signatures
