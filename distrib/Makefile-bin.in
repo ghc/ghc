@@ -178,11 +178,15 @@ config-pkgs ::
 
 
 mk-version-symlinks ::
-	@for i in $(VERSION_SYMLINKS_FOR) ""; do \
-	  if [ "x$$i" != "x" ]; then \
-	     echo "Symlinking $$i to $$i-$(version)"; \
-	     (cd bin/$(platform)/$(package)-$(version); $(RM) $$i-$(version); $(LN_S) $$i $$i-$(version) ); \
-	  fi;\
+	@for i in $(VERSION_SYMLINKS_FOR) ""; do 	\
+	  if [ "x$$i" != "x" ]; then 			\
+	     echo "Symlinking $$i to $$i-$(version)"; 	\
+	     (cd bin/$(platform)/$(package)-$(version); \
+	      $(RM)   $$i-$(version); 			\
+              $(MV)   $$i $$i-$(version); 		\
+	      $(LN_S) $$i-$(version) $$i		\
+	     );				 		\
+	  fi;						\
 	done
 
 in-place ::
