@@ -372,6 +372,9 @@ tcTyClDecl1 calc_vrcs calc_isrec
   ; want_generic <- doptM Opt_Generics
   ; tycon <- fixM (\ tycon -> do 
 	{ unbox_strict <- doptM Opt_UnboxStrictFields
+	; gla_exts <- doptM Opt_GlasgowExts
+	; checkTc (gla_exts || h98_syntax) (badGadtDecl tc_name)
+
 	; data_cons <- mappM (addLocM (tcConDecl unbox_strict new_or_data tycon tvs')) cons
 	; let tc_rhs = case new_or_data of
 			DataType -> mkDataTyConRhs stupid_theta data_cons
@@ -385,6 +388,9 @@ tcTyClDecl1 calc_vrcs calc_isrec
   where
     arg_vrcs = calc_vrcs tc_name
     is_rec   = calc_isrec tc_name
+    h98_syntax = case cons of 	-- All constructors have same shape
+			L _ (GadtDecl {}) : _ -> False
+			other -> True
 
 tcTyClDecl1 calc_vrcs calc_isrec 
   (ClassDecl {tcdLName = L _ class_name, tcdTyVars = tvs, 
@@ -727,4 +733,8 @@ exRecConErr name
 badDataConTyCon data_con
   = hang (ptext SLIT("Data constructor does not return its parent type:"))
        2 (ppr data_con)
+
+badGadtDecl tc_name
+  = vcat [ ptext SLIT("Illegal generalised algebraic data declaration for") <+> quotes (ppr tc_name)
+	 , nest 2 (parens $ ptext SLIT("Use -fglasgow-exts to allow GADTs")) ]
 \end{code}
