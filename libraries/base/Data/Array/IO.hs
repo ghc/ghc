@@ -24,15 +24,14 @@ module Data.Array.IO (
    -- * Overloaded mutable array interface
    module Data.Array.MArray,
 
-#ifdef __GLASGOW_HASKELL__
    -- * Doing I\/O with @IOUArray@s
    hGetArray,		-- :: Handle -> IOUArray Int Word8 -> Int -> IO Int
    hPutArray,		-- :: Handle -> IOUArray Int Word8 -> Int -> IO ()
-#endif
  ) where
 
 import Prelude
 
+import Data.Array.Base
 import Data.Array.IO.Internals
 import Data.Array		( Array )
 import Data.Array.MArray
@@ -42,11 +41,14 @@ import Data.Word
 #ifdef __GLASGOW_HASKELL__
 import Foreign
 import Foreign.C
-import Data.Array.Base
 
 import GHC.Arr
 import GHC.IOBase
 import GHC.Handle
+#else
+import Data.Char
+import System.IO
+import System.IO.Error
 #endif
 
 #ifdef __GLASGOW_HASKELL__
@@ -116,7 +118,7 @@ unsafeThawIOUArray arr = stToIO $ do
 -- hGetArray
 
 -- | Reads a number of 'Word8's from the specified 'Handle' directly
--- into an array (GHC only).
+-- into an array.
 hGetArray
  	:: Handle		-- ^ Handle to read from
 	-> IOUArray Int Word8	-- ^ Array in which to place the values
@@ -171,7 +173,7 @@ readChunk fd is_stream ptr init_off bytes = loop init_off bytes
 -- ---------------------------------------------------------------------------
 -- hPutArray
 
--- | Writes an array of 'Word8' to the specified 'Handle' (GHC only).
+-- | Writes an array of 'Word8' to the specified 'Handle'.
 hPutArray
 	:: Handle			-- ^ Handle to write to
 	-> IOUArray Int Word8		-- ^ Array to write from
@@ -222,4 +224,37 @@ illegalBufferSize handle fn sz =
 			    ("illegal buffer size " ++ showsPrec 9 (sz::Int) [])
 			    Nothing)
 
-#endif /* __GLASGOW_HASKELL__ */
+#else /* !__GLASGOW_HASKELL__ */
+hGetArray :: Handle -> IOUArray Int Word8 -> Int -> IO Int
+hGetArray handle arr count
+  | count < 0 || count > rangeSize (bounds arr)
+  = illegalBufferSize handle "hGetArray" count
+  | otherwise = get 0
+ where
+  get i | i == count = return i
+	| otherwise = do
+		error_or_c <- try (hGetChar handle)
+		case error_or_c of
+		    Left ex
+			| isEOFError ex -> return i
+			| otherwise -> ioError ex
+		    Right c -> do
+			unsafeWrite arr i (fromIntegral (ord c))
+			get (i+1)
+
+hPutArray :: Handle -> IOUArray Int Word8 -> Int -> IO ()
+hPutArray handle arr count
+  | count < 0 || count > rangeSize (bounds arr)
+  = illegalBufferSize handle "hPutArray" count
+  | otherwise = put 0
+ where
+  put i | i == count = return ()
+	| otherwise = do
+		w <- unsafeRead arr i
+		hPutChar handle (chr (fromIntegral w))
+		put (i+1)
+
+illegalBufferSize :: Handle -> String -> Int -> IO a
+illegalBufferSize _ fn sz = ioError $
+	userError (fn ++ ": illegal buffer size " ++ showsPrec 9 (sz::Int) [])
+#endif /* !__GLASGOW_HASKELL__ */
