@@ -769,11 +769,13 @@ x = nfib 25
       <para>In particular, constructors are <emphasis>not</emphasis>
       retainers.</para>
 
-      <para>An object A is retained by an object B if object A can be
-      reached by recursively following pointers starting from object
-      B but not meeting any other retainers on the way.  Each object
-      has one or more retainers, collectively called its
-      <firstterm>retainer set</firstterm>.</para>
+      <para>An object B retains object A if (i) B is a retainer object and
+     (ii) object A can be reached by recursively following pointers
+     starting from object B, but not meeting any other retainer
+     objects on the way. Each live object is retained by one or more
+     retainer objects, collectively called its retainer set, or its
+      <firstterm>retainer set</firstterm>, or its
+      <firstterm>retainers</firstterm>.</para>
 
       <para>When retainer profiling is requested by giving the program
       the <option>-hr</option> option, a graph is generated which is
