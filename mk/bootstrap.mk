@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.21 2002/08/12 14:40:25 sof Exp $
+# $Id: bootstrap.mk,v 1.22 2002/08/14 14:06:25 sof Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -55,6 +55,10 @@ endif
 
 ifeq "$(sparc_TARGET_ARCH)" "1"
 PLATFORM_HC_BOOT_CC_OPTS += -w
+endif
+
+ifeq "$(BootingFromUnregisterisedHc)" "YES"
+PLATFORM_HC_BOOT_CC_OPTS +=-DNO_REGS -DUSE_MINIINTERPRETER
 endif
 
 PLATFORM_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt) 
