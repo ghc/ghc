@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.74 2002/02/14 11:56:05 njn Exp $
+ * $Id: StgMiscClosures.hc,v 1.75 2002/04/19 10:15:22 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -683,13 +683,7 @@ NON_ENTERABLE_ENTRY_CODE(WEAK);
 // we set the size of a DEAD_WEAK to 4 non-pointers, rather than its
 // usual 1.
 
-#ifdef PROFILING
-#define DEAD_WEAK_PAYLOAD_WORDS 4
-#else
-#define DEAD_WEAK_PAYLOAD_WORDS 1
-#endif
-
-INFO_TABLE_CONSTR(stg_DEAD_WEAK_info,stg_DEAD_WEAK_entry,0,DEAD_WEAK_PAYLOAD_WORDS,0,CONSTR,,EF_,"DEAD_WEAK","DEAD_WEAK");
+INFO_TABLE_CONSTR(stg_DEAD_WEAK_info,stg_DEAD_WEAK_entry,0,4,0,CONSTR,,EF_,"DEAD_WEAK","DEAD_WEAK");
 NON_ENTERABLE_ENTRY_CODE(DEAD_WEAK);
 
 /* -----------------------------------------------------------------------------
