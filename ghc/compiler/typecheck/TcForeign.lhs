@@ -39,6 +39,8 @@ import TysWiredIn	( isFFIArgumentTy, isFFIImportResultTy,
 			  isFFIExternalTy, isFFIDynArgumentTy, isFFIDynResultTy,
 			  isFFILabelTy
 			)
+import PrimRep		( getPrimRepSize )
+import Type		( typePrimRep )
 import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe, tcSplitForAllTys )
 import ForeignCall	( CCallSpec(..), CExportSpec(..), CCallTarget(..), isDynamicTarget, isCasmTarget )
 import CStrings		( CLabelString, isCLabelString )
@@ -105,7 +107,8 @@ tcCheckFIType sig_ty arg_tys res_ty (CDynImport _)
     case arg_tys of
 	[arg1_ty] -> checkForeignArgs isFFIExternalTy arg1_tys			`thenNF_Tc_`
 		     checkForeignRes nonIOok  isFFIExportResultTy res1_ty	`thenNF_Tc_`
-		     checkForeignRes mustBeIO isFFIDynResultTy	  res_ty
+		     checkForeignRes mustBeIO isFFIDynResultTy	  res_ty	`thenNF_Tc_`
+		     checkFEDArgs arg1_tys
 		  where
 		     (arg1_tys, res1_ty) = tcSplitFunTys arg1_ty
         other -> addErrTc (illegalForeignTyErr empty sig_ty)
@@ -137,6 +140,27 @@ checkCTarget (StaticTarget str)
 
 checkCTarget (CasmTarget _)
   = checkCg checkC
+\end{code}
+
+On a SPARC, with foreign export dynamic, due to a giant hack when building
+adjustor thunks, we only allow 16 bytes of arguments!
+
+So for example, args (Int,Double,Int) would be OK (1+2+1)
+as would (Int,Int,Int,Int) (1+1+1+1) but not (Int,Double,Double) (1+2+2).
+
+The check is needed for both via-C and native-code routes
+
+\begin{code}
+#include "nativeGen/NCG.h"
+#if sparc_TARGET_ARCH
+checkFEDArgs arg_tys
+  = check (words_of_args <= 4) err
+  where
+    words_of_args = sum (map (getPrimRepSize . typePrimRep) arg_tys)
+    err = ptext SLIT("On SPARC, I can only handle 4 words of arguments to foreign export dynamic")
+#else
+checkFEDArgs arg_tys = returnNF_Tc ()
+#endif
 \end{code}
 
 
