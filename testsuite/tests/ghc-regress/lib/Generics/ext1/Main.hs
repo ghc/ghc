@@ -23,7 +23,7 @@ newtype CONST c a = CONST { unCONST :: c }
 
 -- Extension of a query with a para. poly. list case
 extListQ' :: Data d
-          => (forall d. Data d => d -> q)
+          => (d -> q)
           -> (forall d. [d] -> q)
           -> d -> q
 extListQ' def ext d =
@@ -41,18 +41,18 @@ t2 = foo1 [True,True] -- should count as 2
 
 -- Infeasible extension of a query with a data-polymorphic list case
 extListQ'' :: Data d
-           => (forall d. Data d => d -> q)
+           => (d -> q)
            -> (forall d. Data d => [d] -> q)
            -> d -> q
 extListQ'' def ext d =
   if isList d
-    then undefined -- hard to avoid an amigious type
+    then undefined -- hard to avoid an ambiguous type
     else def d 
 
 
 -- Test extListQ from Data.Generics.Aliases
 foo2 :: Data a => a -> Int
-foo2 = const 0 `extListQ` list
+foo2 = const 0 `ext1Q` list
  where
   list :: Data a => [a] -> Int
   list l = foldr (+) 0 $ map glength l

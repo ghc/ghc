@@ -37,22 +37,18 @@ type Reference = ()
 type Misc      = ()
 
 
--- No attributes
-noAttrs = []
-
-
 -- Trealisation
 data2content :: Data a => a -> [Content]
-data2content =            element
-               `extListQ` list
-               `extQ`     string 
-               `extQ`     float
+data2content =         element
+               `ext1Q` list
+               `extQ`  string 
+               `extQ`  float
 
  where
 
   -- Handle an element
   element x = [CElem (Elem (elemtype x)
-                           noAttrs 
+                           [] -- no attributes 
                            (concat (gmapQ data2content x)))]
 
   -- A special case for lists
@@ -70,10 +66,10 @@ data2content =            element
 
 -- Determine element type
 elemtype :: Data a => a -> String
-elemtype = unqualify
-         . tyconString
-         . typerepTyCon 
-         . typeOf
+elemtype = unqualify 	 -- remove module prefix
+         . tyconString   -- turn into string
+         . typerepTyCon  -- extract type constructor
+         . typeOf	 -- query type of term
 
 
 -- Remove *.*.*... before name
@@ -89,10 +85,10 @@ content2data = result
  where
  
   -- Case-discriminating worker
-  result =            element
-           `extListR` list
-           `extR`     string
-           `extR`     float
+  result =         element
+           `ext1R` list
+           `extR`  string
+           `extR`  float
 
 
   -- Determine type of data to be constructed
@@ -105,7 +101,7 @@ content2data = result
   element = do c <- readX
                case c of
                  (CElem (Elem x as cs))
-                    |    as == noAttrs
+                    |    as == [] -- no attributes
                       && x  == elemtype myType
                    -> alts cs
                  _ -> mzero
@@ -157,10 +153,9 @@ content2data = result
 -----------------------------------------------------------------------------
 
 -- Type constructor
-newtype ReadX a = ReadX ([Content] -> Maybe ([Content], a))
-
--- Unwrap constructor
-unReadX (ReadX x) = x
+newtype ReadX a =
+        ReadX { unReadX :: [Content]
+                        -> Maybe ([Content], a) }
 
 -- Run a computation
 runReadX x y = case unReadX x y of 

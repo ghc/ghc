@@ -22,7 +22,7 @@ data Dec  = Nodec
           | Manydecs Dec Dec
             deriving (Show, Typeable, Data)
 
-data Id = A | B | C
+data Id = A | B
           deriving (Show, Typeable, Data)
 
 data Type = Int | Bool

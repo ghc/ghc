@@ -172,25 +172,24 @@ readBin = result
                      con <- str2con (map (chr . bin2nat) str)
                      return (fromConstr con)
 
-  -- Get the datatype for the type at hand
-  myDataTypeOf :: DataType
-  myDataTypeOf = dataTypeOf (get result)
-   where
-    get :: ReadB a -> a
-    get _ = undefined
+  -- Determine result type
+  myDataType = dataTypeOf (getArg result)
+     where
+      getArg :: ReadB a -> a
+      getArg = undefined
 
   -- Obtain the maximum index for the type at hand
   max :: Int
-  max = maxConIndex myDataTypeOf
+  max = maxConIndex myDataType
 
   -- Convert a bit stream into a constructor 
   bin2con :: Bin -> Constr
-  bin2con bin = indexCon myDataTypeOf ((bin2nat bin) + 1)
+  bin2con bin = indexCon myDataType ((bin2nat bin) + 1)
 
   -- Convert string to constructor; could fail
   str2con :: String -> ReadB Constr
   str2con = maybe mzero return
-                . stringCon myDataTypeOf
+                . stringCon myDataType
 
 
 
