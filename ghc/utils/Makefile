@@ -8,7 +8,7 @@ else
 ifeq "$(BootingFromHc)" "YES"
 SUBDIRS = hp2ps parallel stat2resid prof unlit
 else
-SUBDIRS = ghc-pkg hp2ps hsc2hs parallel stat2resid prof unlit genprimopcode
+SUBDIRS = hasktags ghc-pkg hp2ps hsc2hs parallel stat2resid prof unlit genprimopcode
 endif
 endif
 
