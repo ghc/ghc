@@ -1299,6 +1299,8 @@ void newArrZh_init PROTO((P_ result, I_ n, P_ init));
 \begin{code}
 ED_(PrelBase_Z91Z93_closure);
 
+#define sameMVarZh(r,a,b)	r=(I_)((a)==(b))
+
 #define newSynchVarZh(r, hp) 				\
 {							\
   ALLOC_PRIM(MUTUPLE_HS,3,0,MUTUPLE_HS+3) /* ticky ticky */; \

@@ -88,6 +88,9 @@ writes.
 \begin{code}
 --Defined in IOBase to avoid cycle: data MVar a = MVar (SynchVar# RealWorld a)
 
+instance Eq (MVar a) where
+	(MVar mvar1#) == (MVar mvar2#) = sameMVar# mvar1# mvar2#
+
 newEmptyMVar  :: IO (MVar a)
 
 newEmptyMVar = IO $ \ s# ->

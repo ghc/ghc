@@ -153,6 +153,7 @@ data PrimOp
     | SizeofByteArrayOp   | SizeofMutableByteArrayOp
 
     | NewSynchVarOp -- for MVars and IVars
+    | SameMVarOp
     | TakeMVarOp | PutMVarOp
     | ReadIVarOp | WriteIVarOp
 
@@ -453,6 +454,7 @@ tagOf_PrimOp ParAtRelOp			      = ILIT(190)
 tagOf_PrimOp ParAtForNowOp		      = ILIT(191)
 tagOf_PrimOp CopyableOp			      = ILIT(192)
 tagOf_PrimOp NoFollowOp			      = ILIT(193)
+tagOf_PrimOp SameMVarOp			      = ILIT(194)
 
 tagOf_PrimOp _ = panic# "tagOf_PrimOp: pattern-match"
 
@@ -628,6 +630,7 @@ allThePrimOps
 	SizeofByteArrayOp,
 	SizeofMutableByteArrayOp,
     	NewSynchVarOp,
+        SameMVarOp,
 	ReadArrayOp,
 	TakeMVarOp,
 	PutMVarOp,
@@ -1145,6 +1148,14 @@ primOpInfo NewSynchVarOp
     } in
     AlgResult SLIT("newSynchVar#") [s_tv, elt_tv] [mkStatePrimTy s]
 				stateAndSynchVarPrimTyCon [s, elt]
+
+primOpInfo SameMVarOp
+  = let {
+	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar;
+	mvar_ty = mkSynchVarPrimTy s elt
+    } in
+    AlgResult SLIT("sameMVar#") [s_tv, elt_tv] [mvar_ty, mvar_ty]
+	boolTyCon []
 
 primOpInfo TakeMVarOp
   = let {
