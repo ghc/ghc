@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.18 $
- * $Date: 2001/02/12 12:44:11 $
+ * $Revision: 1.19 $
+ * $Date: 2001/02/13 11:11:06 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -562,7 +562,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  ap = (StgAP_UPD*)allocate_UPD(request);
                  StackWord(-1) = (W_)ap;
                  ap->n_args = n_payload;
-                 SET_HDR(ap, &stg_AP_UPD_info, ??)
+                 SET_HDR(ap, &stg_AP_UPD_info, CCS_SYSTEM/*ToDo*/)
                  iSp --;
                  goto nextInsn;
               }
