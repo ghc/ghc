@@ -271,6 +271,7 @@ mkBits findLabel st proto_insns
           = do st_I1 <- addToSS st_I0 (getName dcon)
                return (sizeSS st_I0, (st_i0,st_l0,st_p0,st_I1))
 
+       literal st (MachWord w)   = int st (fromIntegral w)
        literal st (MachInt j)    = int st (fromIntegral j)
        literal st (MachFloat r)  = float st (fromRational r)
        literal st (MachDouble r) = double st (fromRational r)
@@ -281,6 +282,7 @@ mkBits findLabel st proto_insns
             where
                ret_itbl_addr = case pk of
                                   PtrRep    -> stg_ctoi_ret_R1p_info
+                                  WordRep   -> stg_ctoi_ret_R1n_info
                                   IntRep    -> stg_ctoi_ret_R1n_info
                                   AddrRep   -> stg_ctoi_ret_R1n_info
                                   CharRep   -> stg_ctoi_ret_R1n_info

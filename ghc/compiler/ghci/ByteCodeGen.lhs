@@ -330,7 +330,7 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
         scrut_primrep = typePrimRep (idType bndr)
         isAlgCase
            = case scrut_primrep of
-                CharRep -> False ; AddrRep -> False
+                CharRep -> False ; AddrRep -> False ; WordRep -> False
                 IntRep -> False ; FloatRep -> False ; DoubleRep -> False
                 PtrRep -> True
                 other  -> pprPanic "ByteCodeGen.schemeE" (ppr other)
@@ -621,6 +621,7 @@ pushAtom True d p (AnnLit lit)
 
 pushAtom False d p (AnnLit lit)
    = case lit of
+        MachWord w   -> code WordRep
         MachInt i    -> code IntRep
         MachFloat r  -> code FloatRep
         MachDouble r -> code DoubleRep
