@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: Handle.hs,v 1.4 2002/02/07 11:13:30 simonmar Exp $
+-- $Id: Handle.hs,v 1.5 2002/02/27 14:32:23 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -29,7 +29,7 @@ module GHC.Handle (
   hClose, hClose_help,
 
   HandlePosn(..), hGetPosn, hSetPosn,
-  SeekMode(..), hSeek,
+  SeekMode(..), hSeek, hTell,
 
   hIsOpen, hIsClosed, hIsReadable, hIsWritable, hGetBuffering, hIsSeekable,
   hSetEcho, hGetEcho, hIsTerminalDevice,
@@ -962,32 +962,9 @@ type HandlePosition = Integer
 -- position of `hdl' to a previously obtained position `p'.
 
 hGetPosn :: Handle -> IO HandlePosn
-hGetPosn handle =
-    wantSeekableHandle "hGetPosn" handle $ \ handle_ -> do
-
-#if defined(mingw32_TARGET_OS)
-	-- urgh, on Windows we have to worry about \n -> \r\n translation, 
-	-- so we can't easily calculate the file position using the
-	-- current buffer size.  Just flush instead.
-      flushBuffer handle_
-#endif
-      let fd = fromIntegral (haFD handle_)
-      posn <- fromIntegral `liftM`
-	        throwErrnoIfMinus1Retry "hGetPosn"
-		   (c_lseek fd 0 sEEK_CUR)
-
-      let ref = haBuffer handle_
-      buf <- readIORef ref
-
-      let real_posn 
-	   | bufferIsWritable buf = posn + fromIntegral (bufWPtr buf)
-	   | otherwise = posn - fromIntegral (bufWPtr buf - bufRPtr buf)
-#     ifdef DEBUG_DUMP
-      puts ("\nhGetPosn: (fd, posn, real_posn) = " ++ show (fd, posn, real_posn) ++ "\n")
-      puts ("   (bufWPtr, bufRPtr) = " ++ show (bufWPtr buf, bufRPtr buf) ++ "\n")
-#     endif
-      return (HandlePosn handle real_posn)
-
+hGetPosn handle = do
+    posn <- hTell handle
+    return (HandlePosn handle posn)
 
 hSetPosn :: HandlePosn -> IO () 
 hSetPosn (HandlePosn h i) = hSeek h AbsoluteSeek i
@@ -1060,6 +1037,34 @@ hSeek handle mode offset =
     new_buf <- flushReadBuffer (haFD handle_) buf
     writeIORef ref new_buf
     do_seek
+
+
+hTell :: Handle -> IO Integer
+hTell handle = 
+    wantSeekableHandle "hGetPosn" handle $ \ handle_ -> do
+
+#if defined(mingw32_TARGET_OS)
+	-- urgh, on Windows we have to worry about \n -> \r\n translation, 
+	-- so we can't easily calculate the file position using the
+	-- current buffer size.  Just flush instead.
+      flushBuffer handle_
+#endif
+      let fd = fromIntegral (haFD handle_)
+      posn <- fromIntegral `liftM`
+	        throwErrnoIfMinus1Retry "hGetPosn"
+		   (c_lseek fd 0 sEEK_CUR)
+
+      let ref = haBuffer handle_
+      buf <- readIORef ref
+
+      let real_posn 
+	   | bufferIsWritable buf = posn + fromIntegral (bufWPtr buf)
+	   | otherwise = posn - fromIntegral (bufWPtr buf - bufRPtr buf)
+#     ifdef DEBUG_DUMP
+      puts ("\nhGetPosn: (fd, posn, real_posn) = " ++ show (fd, posn, real_posn) ++ "\n")
+      puts ("   (bufWPtr, bufRPtr) = " ++ show (bufWPtr buf, bufRPtr buf) ++ "\n")
+#     endif
+      return real_posn
 
 -- -----------------------------------------------------------------------------
 -- Handle Properties

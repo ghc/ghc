@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: IO.hs,v 1.4 2002/02/12 10:51:06 simonmar Exp $
+-- $Id: IO.hs,v 1.5 2002/02/27 14:32:23 simonmar Exp $
 --
 -- The standard IO library.
 --
@@ -37,6 +37,7 @@ module System.IO (
     hGetPosn,		       -- :: Handle -> IO HandlePosn
     hSetPosn,		       -- :: HandlePosn -> IO ()
     hSeek,		       -- :: Handle -> SeekMode -> Integer -> IO ()
+    hTell,		       -- :: Handle -> IO Integer
     hWaitForInput,	       -- :: Handle -> Int -> IO Bool
     hReady,		       -- :: Handle -> IO Bool
     hGetChar,		       -- :: Handle -> IO Char
