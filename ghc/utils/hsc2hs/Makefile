@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.36 2002/10/29 04:01:01 mthomas Exp $
+# $Id: Makefile,v 1.37 2003/02/07 22:26:08 sof Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -56,7 +56,7 @@ ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 extra_flags=$(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS)))
 endif
 
-HSC2HS_EXTRA="--cc=$(CC) $(extra_flags) --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(FPTOOLS_TOP_ABS)/$(INCLUDE_DIR)"
+HSC2HS_EXTRA="--cc=$(CC) --ld=$(CC) $(extra_flags) --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(FPTOOLS_TOP_ABS)/$(INCLUDE_DIR)"
 endif
 
 $(SCRIPT_PROG) : Makefile
