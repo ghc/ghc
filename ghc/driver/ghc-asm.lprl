@@ -164,11 +164,11 @@ sub init_TARGET_STUFF {
     $T_HDR_consist  = "\.text\n";
     $T_HDR_closure  = "\.data\n\t\.align 4\n"; # ToDo: change align?
     $T_HDR_srt      = "\.data\n\t\.align 4\n"; # ToDo: change align?
-    $T_HDR_info	    = "\.text\n\t\.align 16\n"; # NB: requires padding
+    $T_HDR_info	    = "\.text\n\t\.align 4\n"; # NB: requires padding
     $T_HDR_entry    = "\.text\n"; # no .align so we're right next to _info (arguably wrong...?)
-    $T_HDR_fast	    = "\.text\n\t\.align 16\n";
-    $T_HDR_vector   = "\.text\n\t\.align 16\n"; # NB: requires padding
-    $T_HDR_direct   = "\.text\n\t\.align 16\n";
+    $T_HDR_fast	    = "\.text\n\t\.align 4\n";
+    $T_HDR_vector   = "\.text\n\t\.align 4\n"; # NB: requires padding
+    $T_HDR_direct   = "\.text\n\t\.align 4\n";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^m68k-.*-sunos4/ ) {
