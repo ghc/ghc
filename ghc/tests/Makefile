@@ -2,6 +2,7 @@ TOP = .
 include $(TOP)/mk/boilerplate.mk
 
 SUBDIRS = \
+	array \
 	ccall \
 	codeGen \
 	deSugar \
