@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.33 2001/08/17 10:10:15 rrt Exp $
+# $Id: Makefile,v 1.34 2001/12/02 15:47:08 panne Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -18,6 +18,6 @@ endif
 # -----------------------------------------------------------------------------
 # Installation
 
-INSTALL_DATAS += lockFile.h
+INSTALL_DATAS += HsStd.h lockFile.h
 
 include $(TOP)/mk/target.mk
