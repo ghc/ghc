@@ -30,7 +30,7 @@ module HscTypes (
 
 	ImportedModuleInfo, WhetherHasOrphans, ImportVersion, WhatsImported(..),
 	PersistentRenamerState(..), IsBootInterface, DeclsMap,
-	IfaceInsts, IfaceRules, GatedDecl, GatedDecls, IsExported,
+	IfaceInsts, IfaceRules, GatedDecl, GatedDecls, GateFn, IsExported,
 	NameSupply(..), OrigNameCache, OrigIParamCache,
 	Avails, AvailEnv, GenAvailInfo(..), AvailInfo, RdrAvailInfo, 
 	PersistentCompilerState(..),
@@ -599,7 +599,13 @@ type IfaceInsts = GatedDecls RdrNameInstDecl
 type IfaceRules = GatedDecls RdrNameRuleDecl
 
 type GatedDecls d = (Bag (GatedDecl d), Int)	-- The Int says how many have been sucked in
-type GatedDecl  d = ([Name], (Module, d))
+type GatedDecl  d = (GateFn, (Module, d))
+type GateFn       = (Name -> Bool) -> Bool	-- Returns True <=> gate is open
+						-- The (Name -> Bool) fn returns True for visible Names
+	-- For example, suppose this is in an interface file
+	--	instance C T where ...
+	-- We want to slurp this decl if both C and T are "visible" in 
+	-- the importing module.  See "The gating story" in RnIfaces for details.
 \end{code}
 
 

@@ -14,9 +14,9 @@ import RnExpr
 import HsSyn
 import HscTypes		( GlobalRdrEnv )
 import HsTypes		( hsTyVarNames, pprHsContext )
-import RdrName		( RdrName, isRdrDataCon, elemRdrEnv )
+import RdrName		( RdrName, isRdrDataCon, isRdrTyVar, elemRdrEnv )
 import RdrHsSyn		( RdrNameContext, RdrNameHsType, RdrNameConDecl, RdrNameTyClDecl,
-			  extractRuleBndrsTyVars, extractHsTyRdrTyVars,
+			  extractRuleBndrsTyVars, extractSomeHsTyRdrNames,
 			  extractHsCtxtRdrTyVars, extractGenericPatTyVars
 			)
 import RnHsSyn
@@ -552,7 +552,7 @@ rnHsType doc (HsForAllTy Nothing ctxt ty)
 	-- over FV(T) \ {in-scope-tyvars} 
   = getLocalNameEnv		`thenRn` \ name_env ->
     let
-	mentioned_in_tau  = extractHsTyRdrTyVars ty
+	mentioned_in_tau  = extractSomeHsTyRdrNames isRdrTyVar ty
 	mentioned_in_ctxt = extractHsCtxtRdrTyVars ctxt
 	mentioned	  = nub (mentioned_in_tau ++ mentioned_in_ctxt)
 	forall_tyvars	  = filter (not . (`elemRdrEnv` name_env)) mentioned
@@ -564,7 +564,7 @@ rnHsType doc (HsForAllTy (Just forall_tyvars) ctxt tau)
 	-- Check that the forall'd tyvars are actually 
 	-- mentioned in the type, and produce a warning if not
   = let
-	mentioned_in_tau		= extractHsTyRdrTyVars tau
+	mentioned_in_tau		= extractSomeHsTyRdrNames isRdrTyVar tau
 	mentioned_in_ctxt		= extractHsCtxtRdrTyVars ctxt
 	mentioned			= nub (mentioned_in_tau ++ mentioned_in_ctxt)
 	forall_tyvar_names		= hsTyVarNames forall_tyvars

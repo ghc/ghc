@@ -16,7 +16,7 @@ module RdrName (
 
 	-- Destruction
 	rdrNameModule, rdrNameOcc, setRdrNameOcc,
-	isRdrDataCon, isRdrTyVar, isQual, isUnqual, isOrig,
+	isRdrDataCon, isRdrTyVar, isRdrTc, isQual, isUnqual, isOrig,
 
 	-- Environment
 	RdrNameEnv, 
@@ -33,7 +33,7 @@ import OccName	( NameSpace, tcName,
 		  OccName, UserFS, EncodedFS,
 		  mkSysOccFS,
 		  mkOccFS, mkVarOcc,
-		  isDataOcc, isTvOcc, mkWorkerOcc
+		  isDataOcc, isTvOcc, isTcOcc, mkWorkerOcc
 		)
 import Module   ( ModuleName,
 		  mkSysModuleNameFS, mkModuleNameFS
@@ -134,6 +134,7 @@ dummyRdrTcName  = RdrName Unqual (mkOccFS tcName SLIT("TC-DUMMY"))
 \begin{code}
 isRdrDataCon (RdrName _ occ) = isDataOcc occ
 isRdrTyVar   (RdrName _ occ) = isTvOcc occ
+isRdrTc      (RdrName _ occ) = isTcOcc occ
 
 isUnqual (RdrName Unqual _) = True
 isUnqual other		    = False

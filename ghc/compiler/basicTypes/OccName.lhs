@@ -20,7 +20,7 @@ module OccName (
  	mkDerivedTyConOcc, mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc,
 	mkGenOcc1, mkGenOcc2, 
 	
-	isTvOcc, isDataOcc, isDataSymOcc, isSymOcc, isValOcc,
+	isTvOcc, isTcOcc, isDataOcc, isDataSymOcc, isSymOcc, isValOcc,
 
 	occNameFS, occNameString, occNameUserString, occNameSpace, occNameFlavour, 
 	setOccNameSpace,
@@ -219,10 +219,13 @@ occNameFlavour (OccName sp _) = nameSpaceString sp
 \end{code}
 
 \begin{code}
-isTvOcc, isDataSymOcc, isSymOcc :: OccName -> Bool
+isTvOcc, isDataSymOcc, isSymOcc, isTcOcc :: OccName -> Bool
 
 isTvOcc (OccName TvName _) = True
 isTvOcc other              = False
+
+isTcOcc (OccName TcClsName _) = True
+isTcOcc other                 = False
 
 isValOcc (OccName VarName  _) = True
 isValOcc (OccName DataName _) = True

@@ -11,8 +11,7 @@ module RnHiFiles (
 
 	lookupFixityRn, 
 
-	getTyClDeclBinders, 
-	removeContext	 	-- removeContext probably belongs somewhere else
+	getTyClDeclBinders
    ) where
 
 #include "HsVersions.h"
@@ -29,11 +28,11 @@ import HscTypes		( ModuleLocation(..),
 			  AvailInfo, GenAvailInfo(..), Avails, Deprecations(..)
 			 )
 import HsSyn		( TyClDecl(..), InstDecl(..),
-			  HsType(..), FixitySig(..), RuleDecl(..),
+			  HsType(..), HsPred(..), FixitySig(..), RuleDecl(..),
 			  tyClDeclNames, tyClDeclSysNames
 			)
 import RdrHsSyn		( RdrNameTyClDecl, RdrNameInstDecl, RdrNameRuleDecl,
-			  extractHsTyRdrNames 
+			  extractSomeHsTysRdrNames 
 			)
 import BasicTypes	( Version, defaultFixity )
 import RnEnv
@@ -45,7 +44,7 @@ import Name		( Name {-instance NamedThing-},
 			 )
 import NameEnv
 import Module
-import RdrName		( rdrNameOcc )
+import RdrName		( rdrNameOcc, isRdrTc )
 import SrcLoc		( mkSrcLoc )
 import Maybes		( maybeToBool, orElse )
 import StringBuffer     ( hGetStringBuffer )
@@ -362,23 +361,43 @@ loadInstDecl mod insts decl@(InstDecl inst_ty _ _ _ _)
 	--		instance Foo a => Baz (T a) where ...
 	--
 	-- Here the gates are Baz and T, but *not* Foo.
+	-- 
+	-- HOWEVER: functional dependencies make things more complicated
+	--	class C a b | a->b where ...
+	--	instance C Foo Baz where ...
+	-- Here, the gates are really only C and Foo, *not* Baz.
+	-- That is, if C and Foo are visible, even if Baz isn't, we must
+	-- slurp the decl.
+	--
+	-- Rather than take fundeps into account "properly", we just slurp
+	-- if C is visible and *any one* of the Names in the types
+	-- This is a slightly brutal approximation, but most instance decls
+	-- are regular H98 ones and it's perfect for them.
     let 
-	munged_inst_ty = removeContext inst_ty
-	free_names     = extractHsTyRdrNames munged_inst_ty
+	(cls_name,tys) = get_head inst_ty
+	free_ty_names  = extractSomeHsTysRdrNames isRdrTc tys
     in
-    mapRn lookupIfaceName free_names	`thenRn` \ gate_names ->
-    returnRn ((gate_names, (mod, decl)) `consBag` insts)
+    lookupIfaceName cls_name			`thenRn` \ cls_name' ->
+    mapRn lookupIfaceName free_ty_names		`thenRn` \ free_ty_names' ->
+    let
+	gate_fn vis_fn = vis_fn cls_name' && any vis_fn free_ty_names'
+	-- Here is the implementation of HOWEVER above
+    in
+    returnRn ((gate_fn, (mod, decl)) `consBag` insts)
 
 
 -- In interface files, the instance decls now look like
 --	forall a. Foo a -> Baz (T a)
 -- so we have to strip off function argument types as well
 -- as the bit before the '=>' (which is always empty in interface files)
-removeContext (HsForAllTy tvs cxt ty) = HsForAllTy tvs [] (removeFuns ty)
-removeContext ty		      = removeFuns ty
+--
+-- The parser ensures the type will have the right shape.
+-- (e.g. see ParseUtil.checkInstType)
 
-removeFuns (HsFunTy _ ty) = removeFuns ty
-removeFuns ty		    = ty
+get_head (HsForAllTy tvs cxt ty)        = get_head ty
+get_head (HsFunTy _ ty)			= get_head ty
+get_head (HsPredTy (HsClassP cls tys))	= (cls,tys)
+
 
 
 -----------------------------------------------------
@@ -401,7 +420,7 @@ loadRule :: Module -> RdrNameRuleDecl -> RnM d (GatedDecl RdrNameRuleDecl)
 -- needed.  We can refine this later.
 loadRule mod decl@(IfaceRule _ _ var _ _ src_loc)
   = lookupIfaceName var		`thenRn` \ var_name ->
-    returnRn ([var_name], (mod, decl))
+    returnRn (\vis_fn -> vis_fn var_name, (mod, decl))
 
 
 -----------------------------------------------------

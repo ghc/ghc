@@ -26,6 +26,7 @@ import RnHsSyn
 import RnMonad
 import RnEnv
 import RnHiFiles	( lookupFixityRn )
+import RdrName		( isRdrTyVar )
 import CmdLineOpts	( DynFlag(..), opt_IgnoreAsserts )
 import Literal		( inIntRange, inCharRange )
 import BasicTypes	( Fixity(..), FixityDirection(..), defaultFixity, negateFixity )
@@ -209,7 +210,7 @@ bindPatSigTyVars :: [RdrNameHsType]
 bindPatSigTyVars tys thing_inside
   = getLocalNameEnv			`thenRn` \ name_env ->
     let
-	tyvars_in_sigs = extractHsTysRdrTyVars tys
+	tyvars_in_sigs = extractSomeHsTysRdrNames isRdrTyVar tys
 	forall_tyvars  = filter (not . (`elemFM` name_env)) tyvars_in_sigs
 	doc_sig        = text "In a pattern type-signature"
     in

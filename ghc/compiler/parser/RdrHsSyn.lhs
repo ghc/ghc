@@ -43,8 +43,8 @@ module RdrHsSyn (
 	RdrMatch(..),
 	SigConverter,
 
-	extractHsTyRdrNames, 
-	extractHsTyRdrTyVars, extractHsTysRdrTyVars,
+	extractHsTyRdrNames,  extractSomeHsTyRdrNames, 
+	extractHsTysRdrNames, extractSomeHsTysRdrNames, 
 	extractRuleBndrsTyVars,
 	extractHsCtxtRdrTyVars, extractGenericPatTyVars,
  
@@ -126,14 +126,17 @@ type RdrNameHsRecordBinds	= HsRecordBinds		RdrName RdrNamePat
 It's used when making the for-alls explicit.
 
 \begin{code}
-extractHsTyRdrNames :: HsType RdrName -> [RdrName]
+extractHsTyRdrNames :: RdrNameHsType -> [RdrName]
 extractHsTyRdrNames ty = nub (extract_ty ty [])
 
-extractHsTyRdrTyVars	 :: RdrNameHsType -> [RdrName]
-extractHsTyRdrTyVars ty =  filter isRdrTyVar (extractHsTyRdrNames ty)
+extractHsTysRdrNames :: [RdrNameHsType] -> [RdrName]
+extractHsTysRdrNames tys = nub (extract_tys tys)
 
-extractHsTysRdrTyVars	  :: [RdrNameHsType] -> [RdrName]
-extractHsTysRdrTyVars tys =  filter isRdrTyVar (nub (extract_tys tys))
+extractSomeHsTyRdrNames	 :: (RdrName -> Bool) -> RdrNameHsType -> [RdrName]
+extractSomeHsTyRdrNames ok ty = nub (filter ok (extract_ty ty []))
+
+extractSomeHsTysRdrNames :: (RdrName -> Bool) -> [RdrNameHsType] -> [RdrName]
+extractSomeHsTysRdrNames ok tys = nub (filter ok (extract_tys tys))
 
 extractRuleBndrsTyVars :: [RuleBndr RdrName] -> [RdrName]
 extractRuleBndrsTyVars bndrs = filter isRdrTyVar (nub (foldr go [] bndrs))

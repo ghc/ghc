@@ -457,8 +457,9 @@ decl slurped in during an earlier compilation, like this:
 
 In the module being compiled we might need (Baz (Maybe T)), where T
 is defined in this module, and hence we need (Foo T).  So @Foo@ becomes
-a gate.  But there's no way to 'see' that, so we simply treat all 
-previously-loaded classes as gates.
+a gate.  But there's no way to 'see' that, so 
+
+	we simply treat all previously-loaded classes as gates.
 
 Consructors and class operations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -483,6 +484,8 @@ vars of the source program, and extracts from the decl the gate names.
 
 \begin{code}
 getGates :: FreeVars		-- Things mentioned in the source program
+				-- Used for the cunning "constructors and 
+				-- class ops" story described 10 lines above.
 	 -> RenamedTyClDecl
 	 -> FreeVars
 
@@ -658,9 +661,9 @@ selectGated available (decl_bag, n_slurped)
   = case foldrBag select ([], emptyBag) decl_bag of
 	(decls, new_bag) -> (decls, (new_bag, n_slurped + length decls))
   where
-    select (reqd, decl) (yes, no)
-	| all available reqd = (decl:yes, no)
-	| otherwise	     = (yes,      (reqd,decl) `consBag` no)
+    select (gate_fn, decl) (yes, no)
+	| gate_fn available  = (decl:yes, no)
+	| otherwise	     = (yes,      (gate_fn,decl) `consBag` no)
 \end{code}
 
 
