@@ -1,0 +1,6 @@
+
+tcfail128.hs:18:15:
+    Ambiguous type variable `b' in the constraint:
+      `Data.Array.Base.MArray b FlatVector IO'
+	arising from use of `thaw' at tcfail128.hs:18:15-18
+    Probable fix: add a type signature that fixes these type variable(s)

@@ -2,20 +2,20 @@
 tcfail067.hs:12:15:
     No instance for (Ord a)
       arising from use of `SubRange' at tcfail067.hs:12:15-43
-    Probable fix: Add (Ord a) to the type signature(s) for `subRangeValue'
+    Probable fix: add (Ord a) to the type signature(s) for `subRangeValue'
     In the definition of `subRangeValue':
 	subRangeValue (SubRange (lower, upper) value) = value
 
 tcfail067.hs:15:10:
     No instance for (Ord a)
       arising from use of `SubRange' at tcfail067.hs:15:10-25
-    Probable fix: Add (Ord a) to the type signature(s) for `subRange'
+    Probable fix: add (Ord a) to the type signature(s) for `subRange'
     In the definition of `subRange': subRange (SubRange r value) = r
 
 tcfail067.hs:46:11:
     Could not deduce (Ord a) from the context (Show a)
       arising from use of `SubRange' at tcfail067.hs:46:11-39
-    Probable fix: Add (Ord a) to the type signature(s) for `showRange'
+    Probable fix: add (Ord a) to the type signature(s) for `showRange'
     In the definition of `showRange':
 	showRange (SubRange (lower, upper) value)
 		    = (show value) ++ (" :" ++ ((show lower) ++ (".." ++ (show upper))))
@@ -24,15 +24,15 @@ tcfail067.hs:60:0:
     Could not deduce (Show (SubRange a)) from the context (Num a)
       arising from the superclasses of an instance declaration at tcfail067.hs:60:0
     Probable fix:
-      Add (Show (SubRange a)) to the instance declaration superclass context
-      Or add an instance declaration for (Show (SubRange a))
+      add (Show (SubRange a)) to the instance declaration superclass context
+      or add an instance declaration for (Show (SubRange a))
     In the instance declaration for `Num (SubRange a)'
 
 tcfail067.hs:61:11:
     Could not deduce (Ord a)
       from the context (Num (SubRange a), Num a, Eq (SubRange a), Show (SubRange a))
       arising from use of `numSubRangeNegate' at tcfail067.hs:61:11-27
-    Probable fix: Add (Ord a) to the class or instance method `negate'
+    Probable fix: add (Ord a) to the class or instance method `negate'
     In the definition of `negate': negate = numSubRangeNegate
     In the definition for method `negate'
     In the instance declaration for `Num (SubRange a)'
@@ -41,7 +41,7 @@ tcfail067.hs:65:18:
     Could not deduce (Ord a)
       from the context (Num (SubRange a), Num a, Eq (SubRange a), Show (SubRange a))
       arising from use of `SubRange' at tcfail067.hs:65:18-25
-    Probable fix: Add (Ord a) to the class or instance method `fromInteger'
+    Probable fix: add (Ord a) to the class or instance method `fromInteger'
     In the definition of `fromInteger':
 	fromInteger a = SubRange (fromInteger a, fromInteger a) (fromInteger a)
     In the definition for method `fromInteger'
@@ -50,7 +50,7 @@ tcfail067.hs:65:18:
 tcfail067.hs:74:4:
     Could not deduce (Ord a) from the context (Num a)
       arising from use of `SubRange' at tcfail067.hs:74:4-11
-    Probable fix: Add (Ord a) to the type signature(s) for `numSubRangeBinOp'
+    Probable fix: add (Ord a) to the type signature(s) for `numSubRangeBinOp'
     In the definition of `numSubRangeBinOp':
 	numSubRangeBinOp op a b
 			   = SubRange (result, result) result

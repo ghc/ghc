@@ -1,4 +1,4 @@
-
+ 
 test('tcfail001', normal, compile_fail, [''])
 test('tcfail002', normal, compile_fail, [''])
 test('tcfail003', normal, compile_fail, [''])
@@ -113,3 +113,4 @@ test('tcfail124', only_compiler_types(['ghc']), compile_fail, [''])
 test('tcfail125', normal, compile_fail, [''])
 test('tcfail126', normal, compile_fail, [''])
 test('tcfail127', normal, compile_fail, [''])
+test('tcfail128', normal, compile_fail, [''])

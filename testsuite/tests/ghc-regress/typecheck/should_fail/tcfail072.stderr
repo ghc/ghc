@@ -1,8 +1,10 @@
 
 tcfail072.hs:23:12:
-    Ambiguous type variable `p' in the top-level constraint:
+    Ambiguous type variable `p' in the constraint:
       `Ord p' arising from use of `g' at tcfail072.hs:23:12
+    Probable fix: add a type signature that fixes these type variable(s)
 
 tcfail072.hs:23:12:
-    Ambiguous type variable `q' in the top-level constraint:
+    Ambiguous type variable `q' in the constraint:
       `Ord q' arising from use of `g' at tcfail072.hs:23:12
+    Probable fix: add a type signature that fixes these type variable(s)
