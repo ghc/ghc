@@ -86,8 +86,7 @@ module TcType (
   Kind, 	-- Stuff to do with kinds is insensitive to pre/post Tc
   unliftedTypeKind, liftedTypeKind, openTypeKind, mkArrowKind, mkArrowKinds, 
   isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind, 
-  isSubKind, defaultKind, 
-  isArgTypeKind, isOpenTypeKind, 
+  isArgTypeKind, isSubKind, defaultKind, 
 
   Type, PredType(..), ThetaType, 
   mkForAllTy, mkForAllTys, 
