@@ -45,7 +45,8 @@ import TcRnMonad
 import IfaceEnv		( lookupOrig )
 import Class		( Class, classExtraBigSig )
 import TyCon		( TyCon, AlgTyConRhs(..), tyConTyVars, getSynTyConDefn, 
-			  isSynTyCon, isNewTyCon, tyConDataCons, algTyConRhs )
+			  isSynTyCon, isNewTyCon, tyConDataCons, algTyConRhs, isPrimTyCon, isFunTyCon,
+			  tyConArity, isUnLiftedTyCon )
 import DataCon		( DataCon, dataConTyCon, dataConOrigArgTys, dataConStrictMarks, 
 			  dataConName, dataConFieldLabels, dataConWrapId, dataConIsInfix, 
 			  isVanillaDataCon )
@@ -540,8 +541,8 @@ reifyThing (AGlobal (AnId id))
 	    other	     -> return (TH.VarI     v ty Nothing fix)
     }
 
-reifyThing (AGlobal (ATyCon tc))   = do { dec <- reifyTyCon tc;  return (TH.TyConI dec) }
-reifyThing (AGlobal (AClass cls))  = do { dec <- reifyClass cls; return (TH.ClassI dec) }
+reifyThing (AGlobal (ATyCon tc))  = reifyTyCon tc
+reifyThing (AGlobal (AClass cls)) = reifyClass cls
 reifyThing (AGlobal (ADataCon dc))
   = do	{ let name = dataConName dc
 	; ty <- reifyType (idType (dataConWrapId dc))
@@ -561,25 +562,27 @@ reifyThing (ATyVar tv)
 	; return (TH.TyVarI (reifyName tv) ty2) }
 
 ------------------------------
-reifyTyCon :: TyCon -> TcM TH.Dec
+reifyTyCon :: TyCon -> TcM TH.Info
 reifyTyCon tc
+  | isFunTyCon tc  = return (TH.PrimTyConI (reifyName tc) 2 		  False)
+  | isPrimTyCon tc = return (TH.PrimTyConI (reifyName tc) (tyConArity tc) (isUnLiftedTyCon tc))
   | isSynTyCon tc
   = do	{ let (tvs, rhs) = getSynTyConDefn tc
 	; rhs' <- reifyType rhs
-	; return (TH.TySynD (reifyName tc) (reifyTyVars tvs) rhs') }
+	; return (TH.TyConI $ TH.TySynD (reifyName tc) (reifyTyVars tvs) rhs') }
 
 reifyTyCon tc
   = case algTyConRhs tc of
       NewTyCon data_con _ _ 
 	-> do	{ con <- reifyDataCon data_con
-		; return (TH.NewtypeD [] (reifyName tc) (reifyTyVars (tyConTyVars tc))
-				      con [{- Don't know about deriving -}]) }
+		; return (TH.TyConI $ TH.NewtypeD [] (reifyName tc) (reifyTyVars (tyConTyVars tc))
+				      		  con [{- Don't know about deriving -}]) }
 
       DataTyCon mb_cxt cons _
 	-> do	{ cxt <- reifyCxt (mb_cxt `orElse` [])
 		; cons <- mapM reifyDataCon (tyConDataCons tc)
-		; return (TH.DataD cxt (reifyName tc) (reifyTyVars (tyConTyVars tc))
-				      cons [{- Don't know about deriving -}]) }
+		; return (TH.TyConI $ TH.DataD cxt (reifyName tc) (reifyTyVars (tyConTyVars tc))
+				      	       cons [{- Don't know about deriving -}]) }
 
 reifyDataCon :: DataCon -> TcM TH.Con
 reifyDataCon dc
@@ -604,11 +607,11 @@ reifyDataCon dc
 		<+> quotes (ppr dc))
 
 ------------------------------
-reifyClass :: Class -> TcM TH.Dec
+reifyClass :: Class -> TcM TH.Info
 reifyClass cls 
   = do	{ cxt <- reifyCxt theta
 	; ops <- mapM reify_op op_stuff
-	; return (TH.ClassD cxt (reifyName cls) (reifyTyVars tvs) fds' ops) }
+	; return (TH.ClassI $ TH.ClassD cxt (reifyName cls) (reifyTyVars tvs) fds' ops) }
   where
     (tvs, fds, theta, _, op_stuff) = classExtraBigSig cls
     fds' = map reifyFunDep fds
