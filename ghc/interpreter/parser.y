@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.26 $
- * $Date: 2000/03/22 18:14:22 $
+ * $Revision: 1.27 $
+ * $Date: 2000/04/04 17:35:04 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -442,6 +442,14 @@ topModule : TMODULE modname expspec WHERE '{' modBody end
                                               $2,
                                               singleton(ap(MODULEENT,$2)),
                                               $5)));}
+
+          | begin modBody end           {ConId fakeNm = mkCon(module(
+                                            moduleBeingParsed).text);
+                                         $$ = gc2(ap(M_MODULE,
+                                            	  ztriple(fakeNm,
+                                                  singleton(ap(MODULEENT,fakeNm)), 
+                                                  $2)));}
+
           | TMODULE error               {syntaxError("module definition");}
           ;
 
@@ -1264,6 +1272,10 @@ varid1    : VARID                       {$$ = gc1($1);}
           ;
 
 /*- Tricks to force insertion of leading and closing braces ---------------*/
+
+begin     : error                       {yyerrok; 
+                                         if (offsideON) goOffside(startColumn);}
+          ;
 
 end       : '}'                         {$$ = $1;}
           | error                       {yyerrok; 

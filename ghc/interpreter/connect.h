@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.35 $
- * $Date: 2000/04/04 15:41:56 $
+ * $Revision: 1.36 $
+ * $Date: 2000/04/04 17:35:04 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -326,6 +326,9 @@ extern Int    cutoff;                   /* Constraint Cutoff depth         */
 extern List   diVars;                   /* deriving: cache of names        */
 extern Int    diNum;                    /* also for deriving               */
 extern List   cfunSfuns;                /* List of (Cfun,[SelectorVar])    */
+
+extern Module moduleBeingParsed;        /* so the parser (topModule) knows */
+
 
 #if USE_PREPROCESSOR
 extern String preprocessor;             /* preprocessor command            */

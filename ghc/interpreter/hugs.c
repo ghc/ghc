@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.56 $
- * $Date: 2000/04/04 17:07:15 $
+ * $Revision: 1.57 $
+ * $Date: 2000/04/04 17:35:04 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -108,14 +108,9 @@ static Bool   lastWasObject = FALSE;
        Bool   debugSC       = FALSE;
        Bool   combined      = FALSE;
 
-       char* currentFile;               /* Name of current file, or NULL   */
-static char  currentFileName[1000];     /* name is stored here if it exists*/
-
-
-
-static Text   evalModule  = 0;          /* Name of module we eval exprs in */
-static String currProject = 0;          /* Name of current project file    */
-static Bool   projectLoaded = FALSE;    /* TRUE => project file loaded     */
+       Module moduleBeingParsed;        /* so the parser (topModule) knows */
+static char*  currentFile;              /* Name of current file, or NULL   */       
+static char   currentFileName[1000];    /* name is stored here if it exists*/
 
 static Bool   autoMain   = FALSE;
 static String lastEdit   = 0;           /* Name of script to edit (if any) */
@@ -823,12 +818,14 @@ static void setCurrentFile ( Module mod )
    assert(isModule(mod));
    strncpy(currentFileName, textToStr(module(mod).text), 990);
    strcat(currentFileName, textToStr(module(mod).srcExt));
-   currentFile = currentFileName;
+   currentFile       = currentFileName;
+   moduleBeingParsed = mod;
 }
 
 static void clearCurrentFile ( void )
 {
-   currentFile = NULL;
+   currentFile       = NULL;
+   moduleBeingParsed = NIL;
 }
 
 static void ppMG ( void )
