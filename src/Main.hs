@@ -1146,7 +1146,7 @@ getBaseDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
   where
     rootDir s = reverse (dropList "/haddock.exe" (reverse (normalisePath s)))
 
-foreign import stdcall "GetModuleFileNameA" unsafe
+foreign import stdcall unsafe "GetModuleFileNameA" 
   getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
 #else
 getBaseDir :: IO (Maybe String) = do return Nothing
