@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.57 2000/06/04 20:32:49 panne Exp $
+ * $Id: PrimOps.h,v 1.58 2000/07/20 17:06:41 rrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -382,24 +382,24 @@ typedef union {
 /* The rest are all out-of-line: -------- */
 
 /* Integer arithmetic */
-EF_(plusIntegerzh_fast);
-EF_(minusIntegerzh_fast);
-EF_(timesIntegerzh_fast);
-EF_(gcdIntegerzh_fast);
-EF_(quotRemIntegerzh_fast);
-EF_(quotIntegerzh_fast);
-EF_(remIntegerzh_fast);
-EF_(divExactIntegerzh_fast);
-EF_(divModIntegerzh_fast);
+ERTSF_(plusIntegerzh_fast);
+ERTSF_(minusIntegerzh_fast);
+ERTSF_(timesIntegerzh_fast);
+ERTSF_(gcdIntegerzh_fast);
+ERTSF_(quotRemIntegerzh_fast);
+ERTSF_(quotIntegerzh_fast);
+ERTSF_(remIntegerzh_fast);
+ERTSF_(divExactIntegerzh_fast);
+ERTSF_(divModIntegerzh_fast);
 
 /* Conversions */
-EF_(int2Integerzh_fast);
-EF_(word2Integerzh_fast);
-EF_(addr2Integerzh_fast);
+ERTSF_(int2Integerzh_fast);
+ERTSF_(word2Integerzh_fast);
+ERTSF_(addr2Integerzh_fast);
 
 /* Floating-point decodings */
-EF_(decodeFloatzh_fast);
-EF_(decodeDoublezh_fast);
+ERTSF_(decodeFloatzh_fast);
+ERTSF_(decodeDoublezh_fast);
 
 /* -----------------------------------------------------------------------------
    Word64 PrimOps.
@@ -445,8 +445,8 @@ EF_(decodeDoublezh_fast);
 }
 
 /* Conversions */
-EF_(int64ToIntegerzh_fast);
-EF_(word64ToIntegerzh_fast);
+ERTSF_(int64ToIntegerzh_fast);
+ERTSF_(word64ToIntegerzh_fast);
 
 /* The rest are (way!) out of line, implemented via C entry points.
  */
@@ -583,7 +583,7 @@ extern I_ resetGenSymZh(void);
 
 #define unsafeFreezzeByteArrayzh(r,a)	r=(a)
 
-EF_(unsafeThawArrayzh_fast);
+ERTSF_(unsafeThawArrayzh_fast);
 
 #define sizzeofByteArrayzh(r,a) \
      r = (((StgArrWords *)(a))->words * sizeof(W_))
@@ -592,14 +592,14 @@ EF_(unsafeThawArrayzh_fast);
 
 /* and the out-of-line ones... */
 
-EF_(newCharArrayzh_fast);
-EF_(newIntArrayzh_fast);
-EF_(newWordArrayzh_fast);
-EF_(newAddrArrayzh_fast);
-EF_(newFloatArrayzh_fast);
-EF_(newDoubleArrayzh_fast);
-EF_(newStablePtrArrayzh_fast);
-EF_(newArrayzh_fast);
+ERTSF_(newCharArrayzh_fast);
+ERTSF_(newIntArrayzh_fast);
+ERTSF_(newWordArrayzh_fast);
+ERTSF_(newAddrArrayzh_fast);
+ERTSF_(newFloatArrayzh_fast);
+ERTSF_(newDoubleArrayzh_fast);
+ERTSF_(newStablePtrArrayzh_fast);
+ERTSF_(newArrayzh_fast);
 
 /* encoding and decoding of floats/doubles. */
 
@@ -612,10 +612,10 @@ EF_(newArrayzh_fast);
 #ifdef FLOATS_AS_DOUBLES
 #define decodeFloatzh_fast decodeDoublezh_fast
 #else
-EF_(decodeFloatzh_fast);
+ERTSF_(decodeFloatzh_fast);
 #endif
 
-EF_(decodeDoublezh_fast);
+ERTSF_(decodeDoublezh_fast);
 
 /* grimy low-level support functions defined in StgPrimFloat.c */
 
@@ -642,7 +642,7 @@ extern StgInt    isFloatNegativeZero(StgFloat f);
    newMutVar is out of line.
    -------------------------------------------------------------------------- */
 
-EF_(newMutVarzh_fast);
+ERTSF_(newMutVarzh_fast);
 
 #define readMutVarzh(r,a)	 r=(P_)(((StgMutVar *)(a))->var)
 #define writeMutVarzh(a,v)       (P_)(((StgMutVar *)(a))->var)=(v)
@@ -657,26 +657,26 @@ EF_(newMutVarzh_fast);
 
 /* Assume external decl of EMPTY_MVAR_info is in scope by now */
 #define isEmptyMVarzh(r,a)       r=(I_)((GET_INFO((StgMVar*)(a))) == &EMPTY_MVAR_info )
-EF_(newMVarzh_fast);
-EF_(takeMVarzh_fast);
-EF_(tryTakeMVarzh_fast);
-EF_(putMVarzh_fast);
+ERTSF_(newMVarzh_fast);
+ERTSF_(takeMVarzh_fast);
+ERTSF_(tryTakeMVarzh_fast);
+ERTSF_(putMVarzh_fast);
 
 
 /* -----------------------------------------------------------------------------
    Delay/Wait PrimOps
    -------------------------------------------------------------------------- */
 
-EF_(waitReadzh_fast);
-EF_(waitWritezh_fast);
-EF_(delayzh_fast);
+ERTSF_(waitReadzh_fast);
+ERTSF_(waitWritezh_fast);
+ERTSF_(delayzh_fast);
 
 /* -----------------------------------------------------------------------------
    Primitive I/O, error-handling PrimOps
    -------------------------------------------------------------------------- */
 
-EF_(catchzh_fast);
-EF_(raisezh_fast);
+ERTSF_(catchzh_fast);
+ERTSF_(raisezh_fast);
 
 extern void stg_exit(I_ n)  __attribute__ ((noreturn));
 
@@ -686,7 +686,7 @@ extern void stg_exit(I_ n)  __attribute__ ((noreturn));
 
 #ifndef PAR
 
-EF_(makeStableNamezh_fast);
+ERTSF_(makeStableNamezh_fast);
 
 #define stableNameToIntzh(r,s)   (r = ((StgStableName *)s)->sn)
 
@@ -710,12 +710,12 @@ EF_(makeStableNamezh_fast);
    Concurrency/Exception PrimOps.
    -------------------------------------------------------------------------- */
 
-EF_(forkzh_fast);
-EF_(yieldzh_fast);
-EF_(killThreadzh_fast);
-EF_(seqzh_fast);
-EF_(blockAsyncExceptionszh_fast);
-EF_(unblockAsyncExceptionszh_fast);
+ERTSF_(forkzh_fast);
+ERTSF_(yieldzh_fast);
+ERTSF_(killThreadzh_fast);
+ERTSF_(seqzh_fast);
+ERTSF_(blockAsyncExceptionszh_fast);
+ERTSF_(unblockAsyncExceptionszh_fast);
 
 #define myThreadIdzh(t) (t = CurrentTSO)
 
@@ -831,8 +831,8 @@ extern int cmp_thread(const StgTSO *tso1, const StgTSO *tso2);
 
 #ifndef PAR
 
-EF_(mkWeakzh_fast);
-EF_(finalizzeWeakzh_fast);
+ERTSF_(mkWeakzh_fast);
+ERTSF_(finalizzeWeakzh_fast);
 
 #define deRefWeakzh(code,val,w)				\
   if (((StgWeak *)w)->header.info == &WEAK_info) {	\
@@ -855,7 +855,7 @@ EF_(finalizzeWeakzh_fast);
 
 #define ForeignObj_CLOSURE_DATA(c)  (((StgForeignObj *)c)->data)
 
-EF_(mkForeignObjzh_fast);
+ERTSF_(mkForeignObjzh_fast);
 
 #define writeForeignObjzh(res,datum) \
    (ForeignObj_CLOSURE_DATA(res) = (P_)(datum))
