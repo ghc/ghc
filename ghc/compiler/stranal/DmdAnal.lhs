@@ -627,10 +627,11 @@ lub Abs Abs 	     = Abs
 lub Abs (Seq k _ ds) = Seq k Defer ds	-- Very important ('radicals' example)
 lub Abs d 	     = Lazy
 
-lub Eval Abs	        = Lazy
-lub Eval Lazy	        = Lazy
-lub Eval (Seq k Now ds) = Seq Keep Now ds
-lub Eval d    	        = Eval
+lub Eval Abs	          = Lazy
+lub Eval Lazy	          = Lazy
+lub Eval (Seq k Now   ds) = Seq Keep Now ds
+lub Eval (Seq k Defer ds) = Lazy
+lub Eval d    	          = Eval
 
 lub (Call d1) (Call d2) = Call (lub d1 d2)
 
