@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelIO.hsc,v 1.11 2001/08/23 10:36:50 sewardj Exp $
+-- $Id: PrelIO.hsc,v 1.12 2001/09/14 14:51:06 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -22,7 +22,6 @@ module PrelIO where
 import PrelBase
 
 import PrelPosix
-import PrelMarshalAlloc
 import PrelMarshalUtils
 import PrelStorable
 import PrelCError
@@ -498,7 +497,12 @@ writeLines hdl Buffer{ bufBuf=raw, bufSize=len } s =
 	return ()
    shoveString n (c:cs) = do
 	n' <- writeCharIntoBuffer raw n c
-	shoveString n' cs
+	if (c == '\n') 
+	   then do 
+		new_buf <- commitBuffer hdl raw len n' True{-needs flush-} False
+		writeBlocks hdl new_buf cs
+	   else	
+		shoveString n' cs
   in
   shoveString 0 s
 
