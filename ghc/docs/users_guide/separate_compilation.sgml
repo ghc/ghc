@@ -948,6 +948,32 @@ newtype GHC.IOBase.IO a
 	  <literal>instances</literal> or derive them automatically.
 </para>
 	</listitem>
+
+<listitem> <para>For <literal>data</literal> or <literal>newtype</literal> declaration, you may omit all
+the constructors, thus:
+<ProgramListing>
+module A where
+  data TA
+</ProgramListing>
+      (You must write all the type parameters, but omit the
+      '=' and everything that follows it.)  In a <emphasis>source</emphasis> program
+	  this would declare TA to have no constructors (a GHC extension: see <xref linkend="nullary-types">),
+	  but in an hi-boot file it means "I don't know or care what the construtors are".
+	    This is the most common form of data type declaration, because it's easy to get right.</para>
+	  <para>
+	  You <emphasis>can</emphasis> also write out the constructors but, if you do so, you must write
+	  it out precisely as in its real definition. 
+	    It is especially delicate if you use a strictness annotation "!", 
+	  with or without an <literal>{-# UNPACK #-}</literal> pragma.  In a source file
+	  GHC may or may not choose to unbox the argument, but in an hi-boot file it's
+	  assumed that you express the <emphasis>outcome</emphasis> of this decision.  
+	    (So in the cases where GHC decided not to unpack, you must not use the pragma.)
+	    Tread with care.</para>
+	</listitem>
+
+<listitem> <para>For <literal>class</literal> declaration, you may not specify any class
+operations.  We could lift this restriction if it became tiresome.</para>
+</listitem>
       </itemizedlist>
 
       <para>Notice that we only put the declaration for the newtype
@@ -955,18 +981,6 @@ newtype GHC.IOBase.IO a
       not the signature for <Function>f</Function>, since
       <Function>f</Function> isn't used by <literal>B</literal>.</para>
 
-      <para>If you want an <literal>hi-boot</literal> file to export a
-      data type, but you don't want to give its constructors (because
-      the constructors aren't used by the SOURCE-importing module),
-      you can write simply:</para>
-
-<ProgramListing>
-module A where
-data TA
-</ProgramListing>
-
-      <para>(You must write all the type parameters, but leave out the
-      '=' and everything that follows it.)</para>
     </sect2>
 
 

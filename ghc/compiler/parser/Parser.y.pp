@@ -327,10 +327,12 @@ ifacedecl :: { HsDecl RdrName }
                 { SigD (Sig $1 $3) }
  	| 'type' syn_hdr '=' ctype	
  		{ let (tc,tvs) = $2 in TyClD (TySynonym tc tvs $4) }
-	| 'data' tycl_hdr
-		{ TyClD (mkTyData DataType (unLoc $2) [] Nothing) }
-	| 'newtype' tycl_hdr
+	| 'data' tycl_hdr constrs	-- No deriving in hi-boot
+		{ TyClD (mkTyData DataType (unLoc $2) (reverse (unLoc $3)) Nothing) }
+	| 'newtype' tycl_hdr 		-- Constructor is optional
 		{ TyClD (mkTyData NewType (unLoc $2) [] Nothing) }
+	| 'newtype' tycl_hdr '=' newconstr
+		{ TyClD (mkTyData NewType (unLoc $2) [$4] Nothing) }
 	| 'class' tycl_hdr fds
 		{ TyClD (mkClassDecl (unLoc $2) (unLoc $3) [] emptyBag) }
 

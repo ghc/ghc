@@ -51,7 +51,7 @@ module RdrHsSyn (
 import HsSyn		-- Lots of it
 import IfaceType
 import HscTypes		( ModIface(..), emptyModIface, mkIfaceVerCache )
-import IfaceSyn		( IfaceDecl(..), IfaceIdInfo(..) )
+import IfaceSyn		( IfaceDecl(..), IfaceIdInfo(..), IfaceConDecl(..) )
 import RdrName		( RdrName, isRdrTyVar, mkUnqual, rdrNameOcc, 
 			  isRdrTyVar, isRdrDataCon, isUnqual, getRdrName, isQual,
 			  setRdrNameSpace, rdrNameModule )
@@ -64,7 +64,7 @@ import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
 			  DNCallSpec(..), DNKind(..))
 import OccName  	( OccName, srcDataName, varName, isDataOcc, isTcOcc, 
 			  occNameUserString, isValOcc )
-import BasicTypes	( initialVersion )
+import BasicTypes	( initialVersion, StrictnessMark(..) )
 import TyCon		( DataConDetails(..) )
 import Module		( ModuleName )
 import SrcLoc
@@ -246,7 +246,8 @@ hsIfaceDecl (TyClD decl@(TyData {}))
 	        ifName = rdrNameOcc (tcdName decl), 
 	        ifTyVars = hsIfaceTvs (tcdTyVars decl), 
 		ifCtxt = hsIfaceCtxt (unLoc (tcdCtxt decl)),
-		ifCons = Unknown, ifRec = NonRecursive,
+		ifCons = hsIfaceCons (tcdCons decl), 
+		ifRec = NonRecursive,
 		ifVrcs = [], ifGeneric = False }
 	-- I'm not sure that [] is right for ifVrcs, but
 	-- since we don't use them I'm not going to fiddle
@@ -260,6 +261,35 @@ hsIfaceDecl (TyClD decl@(ClassDecl {}))
 		 ifRec = NonRecursive, ifVrcs = [] }
 
 hsIfaceDecl decl = pprPanic "hsIfaceDecl" (ppr decl)
+
+hsIfaceCons :: [LConDecl RdrName] -> DataConDetails IfaceConDecl
+hsIfaceCons cons
+  | null cons 	-- data T a, meaning "constructors unspecified", not "no constructors"
+  = Unknown	
+  | otherwise	-- data T a = C1 | C2 
+  = DataCons (map (hsIfaceCon . unLoc) cons)
+
+hsIfaceCon :: ConDecl RdrName -> IfaceConDecl
+hsIfaceCon (ConDecl lname ex_tvs ex_ctxt details)
+  = IfaceConDecl (get_occ lname)
+		 (hsIfaceTvs ex_tvs)
+		 (hsIfaceCtxt (unLoc ex_ctxt))
+		 (map (hsIfaceLType . getBangType       . unLoc) args)
+		 (map (hsStrictMark . getBangStrictness . unLoc) args)
+		 flds
+  where
+    (args, flds) = case details of
+			PrefixCon args -> (args, [])
+			InfixCon a1 a2 -> ([a1,a2], [])
+			RecCon fs      -> (map snd fs, map (get_occ . fst) fs)
+    get_occ lname = rdrNameOcc (unLoc lname)
+
+hsStrictMark :: HsBang -> StrictnessMark
+-- Warning: in source files the {-# UNPACK #-} pragma (HsUnbox) is a request
+-- 	    but in an hi-boot file it's interpreted as the Truth!
+hsStrictMark HsNoBang = NotMarkedStrict
+hsStrictMark HsStrict = MarkedStrict
+hsStrictMark HsUnbox  = MarkedUnboxed
 
 hsIfaceName rdr_name	-- Qualify unqualifed occurrences
 				-- with the module name
