@@ -3,43 +3,49 @@ module LexCore where
 import ParserCoreUtils
 import Ratio
 import Char
+import Numeric( readFloat )
 
 isNameChar c = isAlpha c || isDigit c || (c == '_') || (c == '\'') 
 isKeywordChar c = isAlpha c || (c == '_') 
 
 lexer :: (Token -> P a) -> P a 
-lexer cont [] = cont TKEOF []
-lexer cont ('\n':cs) = \line -> lexer cont cs (line+1)
+lexer cont [] 		= cont TKEOF []
+lexer cont ('\n':cs) 	= \line -> lexer cont cs (line+1)
 lexer cont ('-':'>':cs) = cont TKrarrow cs
+
 lexer cont (c:cs) 
-      | isSpace c = lexer cont cs
+      | isSpace c		= lexer cont cs
       | isLower c || (c == '_') = lexName cont TKname (c:cs)
-      | isUpper c = lexName cont TKcname (c:cs)
+      | isUpper c 		= lexName cont TKcname (c:cs)
       | isDigit c || (c == '-') = lexNum cont (c:cs)
-lexer cont ('%':cs) = lexKeyword cont cs
-lexer cont ('\'':cs) = lexChar cont cs
-lexer cont ('\"':cs) = lexString [] cont cs 
-lexer cont ('#':cs) = cont TKhash cs
-lexer cont ('(':cs) = cont TKoparen cs
-lexer cont (')':cs) = cont TKcparen cs
-lexer cont ('{':cs) = cont TKobrace cs
-lexer cont ('}':cs) = cont TKcbrace cs
-lexer cont ('=':cs) = cont TKeq cs
+
+lexer cont ('%':cs)  	= lexKeyword cont cs
+lexer cont ('\'':cs) 	= lexChar cont cs
+lexer cont ('\"':cs) 	= lexString [] cont cs 
+lexer cont ('#':cs) 	= cont TKhash cs
+lexer cont ('(':cs) 	= cont TKoparen cs
+lexer cont (')':cs) 	= cont TKcparen cs
+lexer cont ('{':cs) 	= cont TKobrace cs
+lexer cont ('}':cs) 	= cont TKcbrace cs
+lexer cont ('=':cs)     = cont TKeq cs
 lexer cont (':':':':cs) = cont TKcoloncolon cs
-lexer cont ('*':cs) = cont TKstar cs
-lexer cont ('.':cs) = cont TKdot cs
-lexer cont ('\\':cs) = cont TKlambda cs
-lexer cont ('@':cs) = cont TKat cs
-lexer cont ('?':cs) = cont TKquestion cs
-lexer cont (';':cs) = cont TKsemicolon cs
-lexer cont (c:cs) = failP "invalid character" [c]
+lexer cont ('*':cs) 	= cont TKstar cs
+lexer cont ('.':cs) 	= cont TKdot cs
+lexer cont ('\\':cs)    = cont TKlambda cs
+lexer cont ('@':cs) 	= cont TKat cs
+lexer cont ('?':cs) 	= cont TKquestion cs
+lexer cont (';':cs) 	= cont TKsemicolon cs
+lexer cont (c:cs) 	= failP "invalid character" [c]
+
+
 
 lexChar cont ('\\':'x':h1:h0:'\'':cs)
 	| isHexEscape [h1,h0] =  cont (TKchar (hexToChar h1 h0)) cs
-lexChar cont ('\\':cs) = failP "invalid char character" ('\\':(take 10 cs))
-lexChar cont ('\'':cs) = failP "invalid char character" ['\'']
-lexChar cont ('\"':cs) = failP "invalid char character" ['\"']
+lexChar cont ('\\':cs) 	 = failP "invalid char character" ('\\':(take 10 cs))
+lexChar cont ('\'':cs) 	 = failP "invalid char character" ['\'']
+lexChar cont ('\"':cs) 	 = failP "invalid char character" ['\"']
 lexChar cont (c:'\'':cs) = cont (TKchar c) cs
+
 
 lexString s cont ('\\':'x':h1:h0:cs) 
 	| isHexEscape [h1,h0] = lexString (s++[hexToChar h1 h0]) cont cs
@@ -50,23 +56,20 @@ lexString s cont (c:cs) = lexString (s++[c]) cont cs
 
 isHexEscape = all (\c -> isHexDigit c && (isDigit c || isLower c))
 
-hexToChar h1 h0 = 
-	chr(
-	(digitToInt h1) * 16 + 
-	(digitToInt h0))
+hexToChar h1 h0 = chr (digitToInt h1 * 16 + digitToInt h0)
 
 
 lexNum cont cs =
   case cs of
-     ('-':cs) ->  f (-1) cs
-     _ -> f 1 cs
+     ('-':cs) -> f (-1) cs
+     _ 	      -> f 1 cs
  where f sgn cs = 
          case span isDigit cs of
-          (digits,'.':c:rest) | isDigit c -> 
-	     cont (TKrational (numer % denom)) rest'
-	       where (fpart,rest') = span isDigit (c:rest)
-		     denom = 10^(length fpart)
-		     numer = sgn * ((read digits) * denom + (read fpart))
+          (digits,'.':c:rest) 
+		| isDigit c -> cont (TKrational r) rest'
+	        where ((r,rest'):_) = readFloat (digits ++ ('.':c:rest))
+		-- When reading a floating-point number, which is
+		-- a bit comlicated, use the Haskell 98 library function
           (digits,rest) -> cont (TKinteger (sgn * (read digits))) rest
 
 lexName cont cstr cs = cont (cstr name) rest

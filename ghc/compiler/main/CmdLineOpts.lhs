@@ -78,7 +78,6 @@ module CmdLineOpts (
 	opt_StgDoLetNoEscapes,
 	opt_UnfoldCasms,
 	opt_CprOff,
-        opt_UsageSPOn,
 	opt_UnboxStrictFields,
 	opt_SimplNoPreInlining,
 	opt_SimplDoEtaReduction,
@@ -186,7 +185,6 @@ data CoreToDo		-- These are diff core-to-core passes,
   | CoreDoWorkerWrapper
   | CoreDoSpecialising
   | CoreDoSpecConstr
-  | CoreDoUSPInf
   | CoreDoOldStrictness
   | CoreDoGlomBinds
   | CoreCSE
@@ -250,7 +248,6 @@ data DynFlag
    | Opt_D_dump_tc
    | Opt_D_dump_types
    | Opt_D_dump_rules
-   | Opt_D_dump_usagesp
    | Opt_D_dump_cse
    | Opt_D_dump_worker_wrapper
    | Opt_D_dump_rn_trace
@@ -269,7 +266,6 @@ data DynFlag
    | Opt_D_dump_minimal_imports
    | Opt_DoCoreLinting
    | Opt_DoStgLinting
-   | Opt_DoUSPLinting
 
    | Opt_WarnIsError		-- -Werror; makes warnings fatal
    | Opt_WarnDuplicateExports
@@ -594,7 +590,6 @@ opt_CprOff			= lookUp  FSLIT("-fcpr-off")
 opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold" (10::Int)
 opt_StgDoLetNoEscapes		= lookUp  FSLIT("-flet-no-escape")
 opt_UnfoldCasms		        = lookUp  FSLIT("-funfold-casms-in-hi-file")
-opt_UsageSPOn           	= lookUp  FSLIT("-fusagesp-on")
 opt_UnboxStrictFields		= lookUp  FSLIT("-funbox-strict-fields")
 opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
 
@@ -671,7 +666,6 @@ isStaticHscFlag f =
 	"ffoldr-build-on",
 	"flet-no-escape",
 	"funfold-casms-in-hi-file",
-	"fusagesp-on",
 	"funbox-strict-fields",
 	"femit-extern-decls",
 	"fglobalise-toplev-names",

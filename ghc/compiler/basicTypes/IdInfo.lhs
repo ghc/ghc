@@ -80,7 +80,7 @@ module IdInfo (
 
 
 import CoreSyn
-import Type		( Type, usOnce, eqUsage )
+import Type		( Type )
 import PrimOp	 	( PrimOp )
 import NameEnv		( NameEnv, lookupNameEnv )
 import Name		( Name )
@@ -94,7 +94,6 @@ import BasicTypes	( OccInfo(..), isFragileOcc, isDeadOcc, seqOccInfo, isLoopBrea
 import DataCon		( DataCon )
 import ForeignCall	( ForeignCall )
 import FieldLabel	( FieldLabel )
-import Type		( usOnce )
 import Demand		hiding( Demand, seqDemand )
 import qualified Demand
 import NewDemand
@@ -642,42 +641,28 @@ instance Show CprInfo where
 %************************************************************************
 
 If the @Id@ is a lambda-bound variable then it may have lambda-bound
-var info.  The usage analysis (UsageSP) detects whether the lambda
-binding this var is a ``one-shot'' lambda; that is, whether it is
-applied at most once.
+var info.  Sometimes we know whether the lambda binding this var is a
+``one-shot'' lambda; that is, whether it is applied at most once.
 
 This information may be useful in optimisation, as computations may
 safely be floated inside such a lambda without risk of duplicating
 work.
 
 \begin{code}
-data LBVarInfo
-  = NoLBVarInfo
-
-  | LBVarInfo Type		-- The lambda that binds this Id has this usage
-				--   annotation (i.e., if ==usOnce, then the
-				--   lambda is applied at most once).
-				-- The annotation's kind must be `$'
-				-- HACK ALERT! placing this info here is a short-term hack,
-				--   but it minimises changes to the rest of the compiler.
-				--   Hack agreed by SLPJ/KSW 1999-04.
+data LBVarInfo = NoLBVarInfo 
+	       | IsOneShotLambda	-- The lambda is applied at most once).
 
 seqLBVar l = l `seq` ()
 \end{code}
 
 \begin{code}
-hasNoLBVarInfo NoLBVarInfo = True
-hasNoLBVarInfo other       = False
+hasNoLBVarInfo NoLBVarInfo     = True
+hasNoLBVarInfo IsOneShotLambda = False
 
 noLBVarInfo = NoLBVarInfo
 
--- not safe to print or parse LBVarInfo because it is not really a
--- property of the definition, but a property of the context.
 pprLBVarInfo NoLBVarInfo     = empty
-pprLBVarInfo (LBVarInfo u)   | u `eqUsage` usOnce
-                             = ptext SLIT("OneShot")
-                             | otherwise
-                             = empty
+pprLBVarInfo IsOneShotLambda = ptext SLIT("OneShot")
 
 instance Outputable LBVarInfo where
     ppr = pprLBVarInfo

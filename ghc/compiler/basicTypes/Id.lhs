@@ -92,7 +92,7 @@ import Var		( Id, DictId,
 			)
 import qualified Var	( mkLocalId, mkGlobalId, mkSpecPragmaId )
 import Type		( Type, typePrimRep, addFreeTyVars, 
-                          usOnce, eqUsage, seqType, splitTyConApp_maybe )
+                          seqType, splitTyConApp_maybe )
 
 import IdInfo 
 
@@ -463,13 +463,12 @@ idLBVarInfo :: Id -> LBVarInfo
 idLBVarInfo id = lbvarInfo (idInfo id)
 
 isOneShotLambda :: Id -> Bool
-isOneShotLambda id = analysis
-  where analysis = case idLBVarInfo id of
-                     LBVarInfo u    | u `eqUsage` usOnce      -> True
-                     other                                    -> False
+isOneShotLambda id = case idLBVarInfo id of
+                       IsOneShotLambda  -> True
+                       NoLBVarInfo      -> False
 
 setOneShotLambda :: Id -> Id
-setOneShotLambda id = modifyIdInfo (`setLBVarInfo` LBVarInfo usOnce) id
+setOneShotLambda id = modifyIdInfo (`setLBVarInfo` IsOneShotLambda) id
 
 clearOneShotLambda :: Id -> Id
 clearOneShotLambda id 

@@ -140,12 +140,6 @@ ppr_ty ctxt_prec ty@(TyConApp tycon tys)
 	other	       -> maybeParen ctxt_prec tYCON_PREC 
 				     (ppr tycon <+> ppr_ty tYCON_PREC ty)
 
-	-- USAGE CASE
-  | (tycon `hasKey` usOnceTyConKey || tycon `hasKey` usManyTyConKey),
-    null tys
-  =	-- For usages (! and .), always print bare OccName, without pkg/mod/uniq
-    ppr (getOccName (tyConName tycon))
-	
 	-- TUPLE CASE (boxed and unboxed)
   |  isTupleTyCon tycon,
       tys `lengthIs` tyConArity tycon 	-- No magic if partially applied

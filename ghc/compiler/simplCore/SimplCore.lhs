@@ -43,7 +43,6 @@ import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
 import Specialise	( specProgram)
 import SpecConstr	( specConstrProgram)
-import UsageSPInf       ( doUsageSPInf )
 import DmdAnal		( dmdAnalPgm )
 import WorkWrap	        ( wwTopBinds )
 #ifdef OLD_STRICTNESS
@@ -173,8 +172,6 @@ doCorePass dfs rb us binds CoreDoOldStrictness
 #endif
 doCorePass dfs rb us binds CoreDoPrintCore	        
    = _scc_ "PrintCore"     noStats dfs (printCore binds)
-doCorePass dfs rb us binds CoreDoUSPInf             
-   = _scc_ "CoreUsageSPInf" noStats dfs (doUsageSPInf dfs us binds)
 doCorePass dfs rb us binds CoreDoGlomBinds	        
    = noStats dfs (glomBinds dfs binds)
 doCorePass dfs rb us binds (CoreDoRuleCheck phase pat)

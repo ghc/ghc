@@ -96,7 +96,7 @@ module TcType (
 
   tidyTopType, tidyType, tidyPred, tidyTypes, tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
   tidyTyVarBndr, tidyOpenTyVar, tidyOpenTyVars,
-  typeKind, eqKind, eqUsage,
+  typeKind, eqKind,
 
   tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta
   ) where
@@ -127,7 +127,7 @@ import Type		(	-- Re-exports
 			  tidyTopType, tidyType, tidyPred, tidyTypes,
 			  tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
 			  tidyTyVarBndr, tidyOpenTyVar,
-			  tidyOpenTyVars, eqKind, eqUsage,
+			  tidyOpenTyVars, eqKind, 
 			  hasMoreBoxityInfo, liftedBoxity,
 			  superBoxity, typeKind, superKind, repType
 			)
@@ -449,8 +449,7 @@ The type of a method for class C is always of the form:
 where sig_ty is the type given by the method's signature, and thus in general
 is a ForallTy.  At the point that splitMethodTy is called, it is expected
 that the outer Forall has already been stripped off.  splitMethodTy then
-returns (C a1..an, sig_ty') where sig_ty' is sig_ty with any Notes or
-Usages stripped off.
+returns (C a1..an, sig_ty') where sig_ty' is sig_ty with any Notes stripped off.
 
 \begin{code}
 tcSplitMethodTy :: Type -> (PredType, Type)

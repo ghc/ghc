@@ -18,11 +18,6 @@ module TypeRep (
 	liftedTypeKind, unliftedTypeKind, openTypeKind,	-- :: KX
 	mkArrowKind, mkArrowKinds,			-- :: KX -> KX -> KX
 
-        usageKindCon,					-- :: KX
-        usageTypeKind,					-- :: KX
-        usOnceTyCon, usManyTyCon,			-- :: $
-        usOnce, usMany,					-- :: $
-
 	funTyCon
     ) where
 
@@ -41,7 +36,6 @@ import Binary
 -- others
 import PrelNames	( superKindName, superBoxityName, liftedConName, 
 			  unliftedConName, typeConName, openKindConName, 
-			  usageKindConName, usOnceTyConName, usManyTyConName,
 			  funTyConName
 			)
 \end{code}
@@ -242,8 +236,6 @@ kind :: KX = kind -> kind
            | Type liftedness	-- (Type *) is printed as just *
 				-- (Type #) is printed as just #
 
-           | UsageKind		-- Printed '$'; used for usage annotations
-
            | OpenKind		-- Can be lifted or unlifted
 				-- Printed '?'
 
@@ -302,7 +294,7 @@ unliftedBoxityCon = mkKindCon unliftedConName superBoxity
 \end{code}
 
 ------------------------------------------
-Define kinds: Type, Type *, Type #, OpenKind, and UsageKind
+Define kinds: Type, Type *, Type #, OpenKind
 
 \begin{code}
 typeCon :: KindCon	-- :: BX -> KX
@@ -315,9 +307,6 @@ unliftedTypeKind = TyConApp typeCon [unliftedBoxity]
 
 openKindCon     = mkKindCon openKindConName superKind
 openTypeKind    = TyConApp openKindCon []
-
-usageKindCon     = mkKindCon usageKindConName superKind
-usageTypeKind    = TyConApp usageKindCon []
 \end{code}
 
 ------------------------------------------
@@ -338,7 +327,6 @@ Binary kinds for interface files
 instance Binary Kind where
   put_ bh k@(TyConApp tc [])
 	| tc == openKindCon  = putByte bh 0
-	| tc == usageKindCon = putByte bh 1
   put_ bh k@(TyConApp tc [TyConApp bc _])
 	| tc == typeCon && bc == liftedBoxityCon   = putByte bh 2
 	| tc == typeCon && bc == unliftedBoxityCon = putByte bh 3
@@ -349,7 +337,6 @@ instance Binary Kind where
 	b <- getByte bh
 	case b of 
 	  0 -> return openTypeKind
-	  1 -> return usageTypeKind
 	  2 -> return liftedTypeKind
 	  3 -> return unliftedTypeKind
 	  _ -> do f <- get bh; a <- get bh; return (FunTy f a)
@@ -374,17 +361,4 @@ funTyCon = mkFunTyCon funTyConName (mkArrowKinds [liftedTypeKind, liftedTypeKind
 	-- a prefix way, thus:  (->) Int# Int#.  And this is unusual.
 \end{code}
 
-------------------------------------------
-Usage tycons @.@ and @!@
-
-The usage tycons are of kind usageTypeKind (`$').  The types contain
-no values, and are used purely for usage annotation.  
-
-\begin{code}
-usOnceTyCon     = mkKindCon usOnceTyConName usageTypeKind
-usOnce          = TyConApp usOnceTyCon []
-
-usManyTyCon     = mkKindCon usManyTyConName usageTypeKind
-usMany          = TyConApp usManyTyCon []
-\end{code}
 

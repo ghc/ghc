@@ -8,7 +8,6 @@ module HsTypes (
 	  HsType(..), HsTyVarBndr(..), HsTyOp(..),
 	, HsContext, HsPred(..)
 	, HsTupCon(..), hsTupParens, mkHsTupCon,
-        , hsUsOnce, hsUsMany
 
 	, mkHsForAllTy, mkHsDictTy, mkHsIParamTy
 	, hsTyVarName, hsTyVarNames, replaceTyVarName
@@ -47,8 +46,7 @@ import Subst		( substTyWith )
 import PprType		( {- instance Outputable Kind -}, pprParendKind, pprKind )
 import BasicTypes	( Boxity(..), Arity, IPName, tupleParens )
 import PrelNames	( listTyConKey, parrTyConKey,
-			  usOnceTyConKey, usManyTyConKey, hasKey, unboundKey,
-			  usOnceTyConName, usManyTyConName )
+			  hasKey, unboundKey )
 import SrcLoc		( noSrcLoc )
 import Util		( eqListBy, lengthIs )
 import FiniteMap
@@ -142,15 +140,6 @@ data HsTyOp name = HsArrow | HsTyOp name
 	-- Function arrows from *source* get read in as HsOpTy t1 HsArrow t2
 	-- But when we generate or parse interface files, we use HsFunTy.
 	-- This keeps interfaces a bit smaller, because there are a lot of arrows
-
------------------------
-hsUsOnce, hsUsMany :: HsType RdrName
-hsUsOnce = HsTyVar (mkUnqual tvName FSLIT("."))  -- deep magic
-hsUsMany = HsTyVar (mkUnqual tvName FSLIT("!"))  -- deep magic
-
-hsUsOnce_Name, hsUsMany_Name :: HsType Name
-hsUsOnce_Name = HsTyVar usOnceTyConName
-hsUsMany_Name = HsTyVar usManyTyConName
 
 -----------------------
 data HsTupCon = HsTupCon Boxity Arity
@@ -428,8 +417,6 @@ toHsType ty@(TyConApp tc tys)	-- Must be saturated because toHsType's arg is of 
   | isTupleTyCon tc	       = HsTupleTy (HsTupCon (tupleTyConBoxity tc) (tyConArity tc)) tys'
   | tc `hasKey` listTyConKey   = HsListTy (head tys')
   | tc `hasKey` parrTyConKey   = HsPArrTy (head tys')
-  | tc `hasKey` usOnceTyConKey = hsUsOnce_Name		 -- must print !, . unqualified
-  | tc `hasKey` usManyTyConKey = hsUsMany_Name		 -- must print !, . unqualified
   | otherwise		       = generic_case
   where
      generic_case = foldl HsAppTy (HsTyVar (getName tc)) tys'

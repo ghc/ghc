@@ -20,11 +20,6 @@ module Type (
 	isTypeKind, isAnyTypeKind,
 	funTyCon,
 
-        usageKindCon,					-- :: KX
-        usageTypeKind,					-- :: KX
-        usOnceTyCon, usManyTyCon,			-- :: $
-        usOnce, usMany,					-- :: $
-
         -- exports from this module:
         hasMoreBoxityInfo, defaultKind,
 
@@ -67,7 +62,7 @@ module Type (
 	tidyTopType,   tidyPred,
 
 	-- Comparison
-	eqType, eqKind, eqUsage, 
+	eqType, eqKind, 
 
 	-- Seq
 	seqType, seqTypes
@@ -875,7 +870,6 @@ I don't think this is harmful, but it's soemthing to watch out for.
 \begin{code}
 eqType t1 t2 = eq_ty emptyVarEnv t1 t2
 eqKind  = eqType	-- No worries about looking 
-eqUsage = eqType	-- through source types for these two
 
 -- Look through Notes
 eq_ty env (NoteTy _ t1)       t2	  	  = eq_ty env t1 t2

@@ -440,14 +440,11 @@ dollarMainName = varQual mAIN_Name FSLIT("$main") dollarMainKey
 runIOName      = varQual pREL_TOP_HANDLER_Name FSLIT("runIO") runMainKey
 
 -- Stuff from GHC.Prim
-usOnceTyConName  = kindQual FSLIT(".") usOnceTyConKey
-usManyTyConName  = kindQual FSLIT("!") usManyTyConKey
 superKindName    = kindQual FSLIT("KX") kindConKey
 superBoxityName  = kindQual FSLIT("BX") boxityConKey
 liftedConName    = kindQual FSLIT("*") liftedConKey
 unliftedConName  = kindQual FSLIT("#") unliftedConKey
 openKindConName  = kindQual FSLIT("?") anyBoxConKey
-usageKindConName = kindQual FSLIT("$") usageConKey
 typeConName	 = kindQual FSLIT("Type") typeConKey
 
 funTyConName	    	      = tcQual  gHC_PRIM_Name FSLIT("(->)")  funTyConKey
@@ -806,11 +803,6 @@ threadIdPrimTyConKey			= mkPreludeTyConUnique 72
 bcoPrimTyConKey				= mkPreludeTyConUnique 73
 ptrTyConKey				= mkPreludeTyConUnique 74
 funPtrTyConKey				= mkPreludeTyConUnique 75
-
--- Usage type constructors
-usageConKey				= mkPreludeTyConUnique 76
-usOnceTyConKey				= mkPreludeTyConUnique 77
-usManyTyConKey				= mkPreludeTyConUnique 78
 
 -- Generic Type Constructors
 crossTyConKey		      		= mkPreludeTyConUnique 79

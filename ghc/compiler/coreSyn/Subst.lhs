@@ -751,7 +751,6 @@ substIdInfo subst is_fragile_occ info
   | otherwise     = Just (info `setOccInfo`    	  (if zap_occ then NoOccInfo else old_occ)
 			       `setSpecInfo`   	  substRules  subst old_rules
 			       `setWorkerInfo` 	  substWorker subst old_wrkr
-			       `setLBVarInfo`  	  substLBVar  subst old_lbv
 			       `setUnfoldingInfo` noUnfolding)
 			-- setSpecInfo does a seq
 			-- setWorkerInfo does a seq
@@ -759,14 +758,12 @@ substIdInfo subst is_fragile_occ info
     nothing_to_do = not zap_occ && 
 		    isEmptyCoreRules old_rules &&
 		    not (workerExists old_wrkr) &&
-		    hasNoLBVarInfo old_lbv &&
 		    not (hasUnfolding (unfoldingInfo info))
     
     zap_occ   = is_fragile_occ old_occ
     old_occ   = occInfo info
     old_rules = specInfo info
     old_wrkr  = workerInfo info
-    old_lbv   = lbvarInfo info
 
 ------------------
 substIdType :: Subst -> Id -> Id
@@ -831,10 +828,4 @@ substVarSet subst fvs
 			    DoneEx expr	    -> exprFreeVars expr
 			    DoneTy ty  	    -> tyVarsOfType ty 
 			    ContEx se' expr -> substVarSet (setSubstEnv subst se') (exprFreeVars expr)
-
-------------------
-substLBVar subst NoLBVarInfo    = NoLBVarInfo
-substLBVar subst (LBVarInfo ty) = ty1 `seq` LBVarInfo ty1
-				where
-				  ty1 = substTy subst ty
 \end{code}

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.110 2003/01/09 11:39:20 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.111 2003/02/04 15:09:40 simonpj Exp $
 --
 -- Driver flags
 --
@@ -319,9 +319,6 @@ static_flags =
   ,  ( "frule-check", 
 		SepArg (\s -> writeIORef v_RuleCheck (Just s)) )
 
-  ,  ( "fusagesp"	   , NoArg (do writeIORef v_UsageSPInf True
-				       add v_Opt_C "-fusagesp-on") )
-
   ,  ( "fexcess-precision" , NoArg (do writeIORef v_Excess_precision True
 				       add v_Opt_C "-fexcess-precision"))
 
@@ -397,7 +394,6 @@ dynamic_flags = [
   ,  ( "ddump-tc",           	 NoArg (setDynFlag Opt_D_dump_tc) )
   ,  ( "ddump-types",        	 NoArg (setDynFlag Opt_D_dump_types) )
   ,  ( "ddump-rules",        	 NoArg (setDynFlag Opt_D_dump_rules) )
-  ,  ( "ddump-usagesp",      	 NoArg (setDynFlag Opt_D_dump_usagesp) )
   ,  ( "ddump-cse",          	 NoArg (setDynFlag Opt_D_dump_cse) )
   ,  ( "ddump-worker-wrapper",   NoArg (setDynFlag Opt_D_dump_worker_wrapper) )
   ,  ( "dshow-passes",           NoArg (setVerbosity "2") )
@@ -417,7 +413,6 @@ dynamic_flags = [
   ,  ( "ddump-vect",         	 NoArg (setDynFlag Opt_D_dump_vect) )
   ,  ( "dcore-lint",       	 NoArg (setDynFlag Opt_DoCoreLinting) )
   ,  ( "dstg-lint",        	 NoArg (setDynFlag Opt_DoStgLinting) )
-  ,  ( "dusagesp-lint",        	 NoArg (setDynFlag Opt_DoUSPLinting) )
 
 	------ Machine dependant (-m<blah>) stuff ---------------------------
 

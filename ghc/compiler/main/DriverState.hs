@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.89 2002/12/19 18:43:53 wolfgang Exp $
+-- $Id: DriverState.hs,v 1.90 2003/02/04 15:09:40 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -191,7 +191,6 @@ setOptLevel n = do
 GLOBAL_VAR(v_minus_o2_for_C,            False, Bool)
 GLOBAL_VAR(v_MaxSimplifierIterations,   4,     Int)
 GLOBAL_VAR(v_StgStats,                  False, Bool)
-GLOBAL_VAR(v_UsageSPInf,  	     	False, Bool)  -- Off by default
 GLOBAL_VAR(v_Strictness,  		True,  Bool)
 GLOBAL_VAR(v_CSE,         		True,  Bool)
 GLOBAL_VAR(v_RuleCheck,       		Nothing,  Maybe String)
@@ -230,7 +229,6 @@ buildCoreToDo :: IO [CoreToDo]
 buildCoreToDo = do
    opt_level  <- readIORef v_OptLevel
    max_iter   <- readIORef v_MaxSimplifierIterations
-   usageSP    <- readIORef v_UsageSPInf
    strictness <- readIORef v_Strictness
    cse        <- readIORef v_CSE
    rule_check <- readIORef v_RuleCheck
@@ -277,10 +275,6 @@ buildCoreToDo = do
 	   MaxSimplifierIterations max_iter
 	],
 	case rule_check of { Just pat -> CoreDoRuleCheck 2 pat; Nothing -> CoreDoNothing },
-
-	-- infer usage information here in case we need it later.
-        -- (add more of these where you need them --KSW 1999-04)
-        if usageSP then CoreDoUSPInf else CoreDoNothing,
 
 	CoreDoSimplify (SimplPhase 1) [
 		-- Need inline-phase2 here so that build/augment get 
