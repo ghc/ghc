@@ -91,7 +91,7 @@ rawSystem(HsAddr cmd, HsAddr args)
 
     switch(pid = fork()) {
     case -1:
-	if (errno != EINTR) {
+	{
 	    return -1;
 	}
     case 0:
