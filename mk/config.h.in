@@ -141,8 +141,11 @@
 /* Define if readline plus any additional libs needed for it exist */
 #undef HAVE_READLINE_LIBS
 
-/* Define if readline has version >= 4.x. */
+/* Define if readline has version >= 4.0. */
 #undef HAVE_READLINE_4
+
+/* Define if readline has version >= 4.2. */
+#undef HAVE_READLINE_4_2
 
 /* Define if time.h or sys/time.h define the timezone variable */
 #undef HAVE_TIMEZONE

@@ -851,8 +851,12 @@ if test "$HaveLibReadline"; then
   AC_CHECK_LIB(readline, rl_erase_empty_line,
     [AC_DEFINE(HAVE_READLINE_4, 1)],
     [AC_DEFINE(HAVE_READLINE_4, 0)])
+  AC_CHECK_LIB(readline, rl_free_undo_list,
+    [AC_DEFINE(HAVE_READLINE_4_2, 1)],
+    [AC_DEFINE(HAVE_READLINE_4_2, 0)])
 else
   AC_DEFINE(HAVE_READLINE_4, 0)
+  AC_DEFINE(HAVE_READLINE_4_2, 0)
 fi
 
 dnl ** check for math library
