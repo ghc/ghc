@@ -744,7 +744,7 @@ warnUnusedGroup emit_warning names
 
     reportable name = case occNameUserString (nameOccName name) of
 			('_' : _) -> False
-			_other	  -> True
+			zz_other  -> True
 	-- Haskell 98 encourages compilers to suppress warnings about
 	-- unused names in a pattern if they start with "_".
 \end{code}

@@ -172,8 +172,8 @@ cprAnalExpr rho e@(Var v)
                               case (maybeUnfoldingTemplate.getIdUnfolding) v of
                                 Just e ->  if isCon e then snd $ cprAnalExpr rho e 
 					   else ids_inf
-                                _other -> ids_inf
-                         _other -> ids_inf
+                                zz_other -> ids_inf
+                         zz_other -> ids_inf
 
 -- Return constructor with decorated arguments.  If constructor 
 -- has product type then this is a manifest constructor (hooray!)
@@ -309,10 +309,10 @@ pinCPR v e av = case av of
     addCpr = (setIdCprInfo v).absToCprInfo
     v_type = varType v
     -- Split argument types and result type from v's type
-    (_, argtys, _result_type) = splitTypeToFunArgAndRes v_type
+    (_, argtys, zz_result_type) = splitTypeToFunArgAndRes v_type
     v_is_fn = argtys /= []
     -- val_binders are the explicit lambdas at the head of the expression
-    (binders,_stripped_exp) = collectBinders e
+    (binders,zz_stripped_exp) = collectBinders e
     val_binders = filter (not.isTyVar) binders
 
 filterAbsTuple :: (AbsVal, Type) -> AbsVal

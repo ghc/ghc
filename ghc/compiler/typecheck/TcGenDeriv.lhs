@@ -784,7 +784,7 @@ gen_Read_binds fixities tycon
 	    read_con_comprehensions
 	      = map read_con (tyConDataCons tycon)
 	in
-	mk_easy_FunMonoBind tycon_loc readsPrec_RDR [_a_Pat, b_Pat] [] (
+	mk_easy_FunMonoBind tycon_loc readsPrec_RDR [zz_a_Pat, b_Pat] [] (
 	      foldr1 append_Expr read_con_comprehensions
 	)
       where
@@ -916,7 +916,7 @@ gen_Read_binds fixities tycon
 
 	   read_paren_arg   -- parens depend on precedence...
 	    | nullary_con  = false_Expr -- it's optional.
-	    | otherwise    = HsPar (genOpApp _a_Expr gt_RDR (HsLit (HsInt paren_prec_limit)))
+	    | otherwise    = HsPar (genOpApp zz_a_Expr gt_RDR (HsLit (HsInt paren_prec_limit)))
 \end{code}
 
 %************************************************************************
@@ -1369,7 +1369,7 @@ genOpApp e1 op e2 = mkOpApp e1 op e2
 qual_orig_name n = nameRdrName (getName n)
 varUnqual n      = mkSrcUnqual varName n
 
-_a_RDR		= varUnqual SLIT("_a")
+zz_a_RDR	= varUnqual SLIT("_a")
 a_RDR		= varUnqual SLIT("a")
 b_RDR		= varUnqual SLIT("b")
 c_RDR		= varUnqual SLIT("c")
@@ -1387,7 +1387,7 @@ cs_RDRs		= [ varUnqual (_PK_ ("c"++show i)) | i <- [(1::Int) .. ] ]
 
 mkHsString s = HsString (_PK_ s)
 
-_a_Expr		= HsVar _a_RDR
+zz_a_Expr	= HsVar zz_a_RDR
 a_Expr		= HsVar a_RDR
 b_Expr		= HsVar b_RDR
 c_Expr		= HsVar c_RDR
@@ -1403,7 +1403,7 @@ tagToEnum_Expr 	= HsVar tagToEnumH_RDR
 con2tag_Expr tycon = HsVar (con2tag_RDR tycon)
 
 wildPat		= WildPatIn
-_a_Pat		= VarPatIn _a_RDR
+zz_a_Pat	= VarPatIn zz_a_RDR
 a_Pat		= VarPatIn a_RDR
 b_Pat		= VarPatIn b_RDR
 c_Pat		= VarPatIn c_RDR
