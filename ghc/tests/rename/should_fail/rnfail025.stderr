@@ -1,5 +1,2 @@
 
 rnfail025.hs:3: Variable not in scope: `sig_without_a_defn'
-
-Compilation had errors
-

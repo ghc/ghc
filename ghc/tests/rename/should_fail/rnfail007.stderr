@@ -1,5 +1,2 @@
 
-rnfail007.hs:3: Variable not in scope: `Main.main'
-
-Compilation had errors
-
+rnfail007.hs:3: Variable not in scope: `main'

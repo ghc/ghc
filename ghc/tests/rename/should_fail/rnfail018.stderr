@@ -6,6 +6,3 @@ rnfail018.hs:12: Type variable not in scope: `m'
 rnfail018.hs:12: Type variable not in scope: `m'
 
 rnfail018.hs:12: Type variable not in scope: `a'
-
-Compilation had errors
-

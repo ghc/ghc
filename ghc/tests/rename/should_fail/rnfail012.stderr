@@ -1,8 +1,5 @@
 
 rnfail012.hs:2:
-    Multiple declarations of `A'
-	defined at rnfail012.hs:2
-	defined at rnfail012.hs:8
-
-Compilation had errors
-
+    Multiple declarations of `Main.A'
+	rnfail012.hs:2
+	rnfail012.hs:8

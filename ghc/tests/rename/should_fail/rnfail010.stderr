@@ -1,8 +1,5 @@
 
 rnfail010.hs:2:
-    Multiple declarations of `f'
-	defined at rnfail010.hs:2
-	defined at rnfail010.hs:6
-
-Compilation had errors
-
+    Multiple declarations of `Main.f'
+	rnfail010.hs:2
+	rnfail010.hs:6

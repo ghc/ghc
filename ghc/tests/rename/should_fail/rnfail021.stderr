@@ -1,6 +1,3 @@
 
 rnfail021.hs:5:
-    Invalid use of qualified name `Baz.f' in the binding for `Baz.f'
-
-Compilation had errors
-
+    Invalid use of qualified name `Baz.f' in its declaration
