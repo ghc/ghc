@@ -771,7 +771,14 @@ linkPackage dflags pkg
 	-- See comments with partOfGHCi
 	when (Packages.name pkg `notElem` partOfGHCi) $ do
 	    loadFrameworks pkg
-	    mapM_ (load_dyn dirs) dlls
+            -- When a library A needs symbols from a library B, the order in
+            -- extra_libraries/extra_ld_opts is "-lA -lB", because that's the
+            -- way ld expects it for static linking. Dynamic linking is a
+            -- different story: When A has no dependency information for B,
+            -- dlopen-ing A with RTLD_NOW (see addDLL in Linker.c) will fail
+            -- when B has not been loaded before. In a nutshell: Reverse the
+            -- order of DLLs for dynamic linking.
+	    mapM_ (load_dyn dirs) (reverse dlls)
 	
 	-- After loading all the DLLs, we can load the static objects.
 	mapM_ loadObj objs
