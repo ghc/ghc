@@ -1,0 +1,950 @@
+////////////////////////////////////////////////////////////////////////////////
+//
+//  IIIIIII SSSSSS
+//    II    SS                          InstallShield (R)
+//    II    SSSSSS      (c) 1996-1997, InstallShield Software Corporation
+//    II        SS      (c) 1990-1996, InstallShield Corporation
+//  IIIIIII SSSSSS                     All Rights Reserved.
+//
+//
+//  This code is generated as a starting setup template.  You should
+//  modify it to provide all necessary steps for your setup.
+//
+//
+//    File Name:  Setup.rul
+//
+//  Description:  InstallShield script
+//
+//     Comments:  This template script performs a basic setup on a
+//                Windows 95 or Windows NT 4.0 platform. With minor
+//                modifications, this template can be adapted to create
+//                new, customized setups.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+
+  // Include header file
+#include "ifx.h"
+
+////////////////////// string defines ////////////////////////////
+
+#define UNINST_LOGFILE_NAME      "Uninst.isu"
+
+//////////////////// installation declarations ///////////////////
+
+  // ----- DLL prototypes -----
+
+
+     // your DLL prototypes
+
+
+  // ---- script prototypes -----
+
+     // generated
+     prototype ShowDialogs();
+     prototype MoveFileData();
+     prototype HandleMoveDataError( NUMBER );
+     prototype ProcessBeforeDataMove();
+     prototype ProcessAfterDataMove();
+     prototype SetupRegistry();
+     prototype SetupFolders();
+     prototype CleanUpInstall();
+     prototype SetupInstall();
+     prototype SetupScreen();
+     prototype CheckListScreen();
+     prototype CheckRequirements();
+     prototype DialogShowSdWelcome();
+     prototype DialogShowSdShowInfoList();
+     prototype DialogShowSdAskDestPath();
+     prototype DialogShowSdSetupType();
+     prototype DialogShowSdComponentDialog2();
+     prototype DialogShowSdSelectFolder();
+     prototype DialogShowSdFinishReboot();
+
+     // your prototypes
+     prototype MyParsePath ( STRING );
+     prototype ForwardSlashify ( STRING, BYREF STRING );
+     prototype CreateExecPerlScript ( STRING, STRING );
+     prototype DropSuffix ( STRING, BYREF STRING );
+     prototype BaseName   ( STRING, BYREF STRING );
+
+  // ----- global variables ------
+
+     // generated
+     BOOL        bWinNT, bIsShellExplorer, bInstallAborted, bIs32BitSetup;
+     STRING      svDir;
+     STRING      svName, svCompany, svSerial;
+     STRING      szAppPath;
+     STRING      svSetupType;
+     LIST        listPath;
+
+
+     // your global variables
+     //STRING      szRawCpp
+     STRING      szPerlPath;
+     STRING      szBinDir, szBinDirUnslashed,
+                 szLibDir, szLibDirUnslashed,
+                 szDataDir, szLibExecDir;
+
+
+///////////////////////////////////////////////////////////////////////////////
+//
+//   MAIN PROGRAM
+//
+//      The setup begins here by hiding the visible setup
+//      window.  This is done to allow all the titles, images, etc. to
+//      be established before showing the main window.  The following
+//      logic then performs the setup in a series of steps.
+//
+///////////////////////////////////////////////////////////////////////////////
+program
+    Disable( BACKGROUND );
+
+    CheckRequirements();
+
+    SetupInstall();
+
+    SetupScreen();
+
+    if (ShowDialogs()<0) goto end_install;
+
+    if (ProcessBeforeDataMove()<0) goto end_install;
+
+    if (MoveFileData()<0) goto end_install;
+
+    if (ProcessAfterDataMove()<0) goto end_install;
+
+    if (SetupRegistry()<0) goto end_install;
+
+    if (SetupFolders()<0) goto end_install;
+
+    CheckListScreen();
+    
+  end_install:
+
+    CleanUpInstall();
+
+     // If an unrecoverable error occurred, clean up the partial installation.
+     // Otherwise, exit normally.
+
+    if (bInstallAborted) then
+        abort;
+    endif;
+
+endprogram
+
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Function:  ShowDialogs                                                    //
+//                                                                           //
+//  Purpose:  This function manages the display and navigation               //
+//            the standard dialogs that exist in a setup.                    //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+function ShowDialogs()
+    NUMBER  nResult;
+ begin
+
+    Dlg_Start:
+        // beginning of dialogs label
+
+    Dlg_SdWelcome:
+        nResult = DialogShowSdWelcome();
+        if (nResult = BACK) goto Dlg_Start;
+
+    Dlg_SdShowInfoList:
+        nResult = DialogShowSdShowInfoList();
+        if (nResult = BACK) goto Dlg_SdWelcome;
+
+    Dlg_SdAskDestPath:
+        nResult = DialogShowSdAskDestPath();
+        if (nResult = BACK) goto Dlg_SdShowInfoList;
+
+    Dlg_SdSetupType:
+        nResult = DialogShowSdSetupType();
+        if (nResult = BACK) goto Dlg_SdAskDestPath;
+
+    Dlg_SdComponentDialog2:
+        if ((nResult = BACK) && (svSetupType != "Custom") && (svSetupType != "")) then
+           goto Dlg_SdSetupType;
+        endif;
+        nResult = DialogShowSdComponentDialog2();
+        if (nResult = BACK) goto Dlg_SdSetupType;
+
+    Dlg_SdSelectFolder:
+        //nResult = DialogShowSdSelectFolder();
+        //if (nResult = BACK) goto Dlg_SdComponentDialog2;
+
+    return 0;
+
+ end;
+
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Function: ProcessBeforeDataMove                                           //
+//                                                                           //
+//  Purpose: This function performs any necessary operations prior to the    //
+//           actual data move operation.                                     //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+function ProcessBeforeDataMove()
+    STRING svLogFile;
+    NUMBER nResult;
+ begin
+
+  InstallationInfo( @COMPANY_NAME, @PRODUCT_NAME, @PRODUCT_VERSION, @PRODUCT_KEY );
+
+  svLogFile = UNINST_LOGFILE_NAME;
+
+  nResult = DeinstallStart( svDir, svLogFile, @UNINST_KEY, 0 );
+  if (nResult < 0) then
+      MessageBox( @ERROR_UNINSTSETUP, WARNING );
+  endif;
+
+  szAppPath = TARGETDIR; // TODO : if your application .exe is in a subdir of TARGETDIR then add subdir
+
+  if ((bIs32BitSetup) && (bIsShellExplorer)) then
+      RegDBSetItem( REGDB_APPPATH, szAppPath );
+      RegDBSetItem( REGDB_APPPATH_DEFAULT, szAppPath ^ @PRODUCT_KEY );
+      RegDBSetItem( REGDB_UNINSTALL_NAME, @UNINST_DISPLAY_NAME );
+  endif;
+  // TODO : update any items you want to process before moving the data
+  //
+
+  ComponentSetTarget( MEDIA, "<DOCDIR>", TARGETDIR ^ "\\doc" );
+
+  return 0;
+ end;
+
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Function:  MoveFileData                                                   //
+//                                                                           //
+//  Purpose:  This function handles the data movement for                    //
+//            the setup.                                                     //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+function MoveFileData()
+    NUMBER nResult, nDisk;
+ begin
+
+  nDisk = 1;
+  SetStatusWindow( 0, "" );
+  Disable( DIALOGCACHE );
+  Enable( STATUS );
+  StatusUpdate( ON, 100 );
+  nResult = ComponentMoveData( MEDIA, nDisk, 0 );
+
+  HandleMoveDataError( nResult );
+
+  Disable( STATUS );
+
+  return nResult;
+
+ end;
+
+
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Function: HandleMoveDataError                                             //
+//                                                                           //
+//  Purpose: This function handles the error (if any) during the move data   //
+//           operation.                                                      //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+function HandleMoveDataError( nResult )
+    STRING szErrMsg, svComponent , svFileGroup , svFile;
+ begin
+
+  svComponent = "";
+  svFileGroup = "";
+  svFile = "";
+
+  switch (nResult)
+  case 0:
+       return 0;
+  default:
+       ComponentError ( MEDIA , svComponent , svFileGroup , svFile , nResult );
+       szErrMsg = @ERROR_MOVEDATA  + "\n\n" +
+                  @ERROR_COMPONENT + " " + svComponent + "\n" +
+                  @ERROR_FILEGROUP + " " + svFileGroup + "\n" +
+                  @ERROR_FILE      + " " + svFile;
+       SprintfBox( SEVERE, @TITLE_CAPTIONBAR, szErrMsg, nResult );
+       bInstallAborted = TRUE;
+       return nResult;
+  endswitch;
+
+ end;
+
+
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Function: ProcessAfterDataMove                                            //
+//                                                                           //
+//  Purpose: This function performs any necessary operations needed after    //
+//           all data has been moved.                                        //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+function ProcessAfterDataMove()
+  STRING szPath, szGcc, szGccDir;
+  STRING szTemp, szRes, szPathEntry, szDrive;
+  NUMBER nvSize,nvType, nResult, nPos, nSuccess;
+  LIST   listDirs;
+ begin
+
+  RegDBSetDefaultRoot ( HKEY_LOCAL_MACHINE );
+  RegDBGetKeyValueEx ( "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" ,
+                       "path" , nvType, szPath , nvSize );
+
+  // Spin through path looking for perl.exe.
+  // Our task is made considerably harder since the
+  // the free version of InstallShield doesn't support
+  // functions such as StrGetTokens() or ParsePath().
+  // TODO: Convert this back to IS Prof Edn
+
+  MyParsePath ( szPath );
+  nResult = ListGetFirstString ( listPath, szPathEntry);
+  szPathEntry = ""; szPerlPath="";
+  while ( nResult != END_OF_LIST )
+     if ( FindFile (szPathEntry, "perl.exe", szRes ) = 0 ) then
+       szPerlPath = szPathEntry + "/" + szRes;
+       nResult = END_OF_LIST;
+     else
+       nResult = ListGetNextString ( listPath, szPathEntry );
+     endif;
+  endwhile;
+  if ( StrCompare ( szPerlPath, "" ) = 0 ) then
+    // If not found in global env. block, look in the
+    // user-specific part.
+    RegDBSetDefaultRoot ( HKEY_CURRENT_USER );
+    RegDBGetKeyValueEx ( "Environment", "path", nvType, szPath, nvSize);
+    MyParsePath ( szPath );
+    nResult = ListGetFirstString ( listPath, szPathEntry);
+    szPathEntry = ""; szPerlPath="";
+    while ( nResult != END_OF_LIST )
+      if ( FindFile (szPathEntry, "perl.exe", szRes ) = 0 ) then
+        szPerlPath = szPathEntry + "/" + szRes;
+        nResult = END_OF_LIST;
+      else
+        nResult = ListGetNextString ( listPath, szPathEntry );
+      endif;
+    endwhile;
+  endif;
+
+  if ( StrCompare ( szPerlPath, "" ) = 0 ) then
+     // Default it to /bin/perl
+     MessageBox ("Unable to find perl in your PATH. Not to worry, this installer includes a version that should be useable." +
+                 "When the installer has finished, please copy it from the bin/ directory of the ghc installation to /bin/perl",
+                 INFORMATION);
+     szPerlPath = "/bin/perl.exe";
+  else
+     // strip initial drive spec.
+     GetDir ( szPerlPath, szTemp);
+     ForwardSlashify ( szTemp, szPerlPath );
+  endif;
+  DropSuffix (szPerlPath, szTemp);
+  szPerlPath = szTemp;
+
+  ListDestroy (listPath);
+
+  return 0;
+ end;
+
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Function: SetupRegistry                                                   //
+//                                                                           //
+//  Purpose: This function makes the registry entries for this setup.        //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+function SetupRegistry()
+ NUMBER nResult,nWays,i;
+ STRING szProjectDir, szProjectVersionDir, szTargetDir;
+ STRING szSyslib, szWay, szSyslibsDir;
+ STRING szLib, szSyslibsKey;
+ //LIST   syslib_list, way_list;
+ begin
+
+  // TODO : Add all your registry entry keys here
+  //
+  //
+
+  nResult = CreateRegistrySet( "" );
+
+  // By now, we will have had the following Registry
+  // entries generated (see ProcessBeforeDataMove() ):
+  //
+  // HK_L_M\Software\Glasgow University\GHC\<version no.>
+  //
+  // For GHC, we store and use the install info inside
+  //  HK_L_M\Software\Haskell\GHC (== %ROOT%)
+
+  // So, we perform the following tasks here:
+  //
+  //  * Checks to see if %ROOT% is defined.
+  //    If not, creates it.
+  //  * Checks for %ROOT%\Version is defined.
+  //  * Create %ROOT%\<version>.
+  //  * Create %ROOT%\<version>\libdir
+  //    (This key will be given a value later.)
+  //  * Create %ROOT%\syslib\  and fill it in
+  //    with the syslibs that has been installed.
+  //  * %ROOT%\syslib\name\<way>
+  //    is added for each kind (e.g., seq, conc)
+  //    syslib we're installing.
+
+  // When we eventually reach the end, the registry
+  // should be ready for use by the installed app.
+
+  // Check to see if we've already installed
+  // a version of GHC on this box..
+  RegDBSetDefaultRoot ( HKEY_LOCAL_MACHINE );
+
+  szProjectDir = @HASKELL_REG_ROOT ^ @PRODUCT_NAME;
+
+  // check whether we've already got the Registry sub-tree we're
+  // about to add to. If not, then we create it
+  // level-by-level, so as to ensure that the uninstaller
+  // can clean up after us.
+  if ( RegDBKeyExist ( @HASKELL_REG_ROOT ) < 0) then
+     RegDBCreateKeyEx (@HASKELL_REG_ROOT, "");
+  endif;
+  if ( RegDBKeyExist  ( szProjectDir ) < 0 ) then
+     RegDBCreateKeyEx ( szProjectDir, "");
+  endif;
+
+  // Note: we overwrite any existing value.
+  RegDBSetKeyValueEx( szProjectDir, "Version", REGDB_STRING,
+                       @PRODUCT_KEY, -1);
+
+  szProjectVersionDir = szProjectDir ^ @PRODUCT_KEY;
+
+  if ( RegDBKeyExist ( szProjectVersionDir ) < 0) then
+     RegDBCreateKeyEx ( szProjectVersionDir, "");
+  endif;
+
+  // Here starts the GHC specific part
+
+  ForwardSlashify (TARGETDIR, szTargetDir);
+  // fill in the all-important path to where the archives
+  // and interface files have been parked.
+  szLibDir = szTargetDir + "/lib";
+  szLibDirUnslashed = TARGETDIR ^ "\\lib";
+  RegDBSetKeyValueEx ( szProjectVersionDir, "libdir", REGDB_STRING,
+                       szLibDir , -1);
+  // libexecdir
+  szLibExecDir = szTargetDir + "/lib";
+  RegDBSetKeyValueEx ( szProjectVersionDir, "libexecdir", REGDB_STRING,
+                       szLibExecDir , -1);
+  // bindir
+  szBinDir = szTargetDir + "/bin";
+  szBinDirUnslashed = TARGETDIR ^ "\\bin";
+  RegDBSetKeyValueEx ( szProjectVersionDir, "bindir", REGDB_STRING,
+                       szBinDir , -1);
+  
+  return 0;
+ end;
+
+
+///////////////////////////////////////////////////////////////////////////////
+//
+// Function: SetupFolders
+//
+//  Purpose: This function creates all the folders and shortcuts for the
+//           setup.  This includes program groups and items for Windows 3.1.
+//
+///////////////////////////////////////////////////////////////////////////////
+function SetupFolders()
+ NUMBER nResult;
+ begin
+
+
+  // TODO : Add all your folder (program group) along with shortcuts (program items)
+  //
+  //
+  //    CreateProgramFolder, AddFolderIcon....
+  //
+
+  CreateExecPerlScript ( szBinDirUnslashed, "ghc-" + @PRODUCT_VERSION );
+  CreateExecPerlScript ( szBinDirUnslashed, "stat2resid" );
+  CreateExecPerlScript ( szLibDirUnslashed, "hscpp" );
+  CreateExecPerlScript ( szLibDirUnslashed, "mkdependHS" );
+
+  VarSave (SRCTARGETDIR);
+  SRCDIR = szBinDirUnslashed;
+  TARGETDIR = szBinDirUnslashed;
+  CopyFile( "ghc-" + @PRODUCT_VERSION, "ghc");
+  VarRestore (SRCTARGETDIR);
+
+  nResult = CreateShellObjects( "" );
+
+  return nResult;
+ end;
+
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Function: CleanUpInstall                                                  //
+//                                                                           //
+//  Purpose: This cleans up the setup.  Anything that should                 //
+//           be released or deleted at the end of the setup should           //
+//           be done here.                                                   //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+function CleanUpInstall()
+ begin
+
+
+  if (bInstallAborted) then
+      return 0;
+  endif;
+
+  DialogShowSdFinishReboot();
+
+  if (BATCH_INSTALL) then // ensure locked files are properly written
+      CommitSharedFiles(0);
+  endif;
+
+  return 0;
+ end;
+
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Function: SetupInstall                                                    //
+//                                                                           //
+//  Purpose: This will setup the installation.  Any general initialization   //
+//           needed for the installation should be performed here.           //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+function SetupInstall()
+
+ begin
+
+  Enable( CORECOMPONENTHANDLING );
+
+  bInstallAborted = FALSE;
+
+  GetDisk(WINDIR, svDir);
+
+  if (bIs32BitSetup) then
+      svDir = svDir + "\\" ^ @PRODUCT_NAME_SHORT ^ @PRODUCT_KEY;
+  else
+      // We're (=>ghc) 32 through and through, but for the sake of
+      // completenes.
+      svDir = svDir + "\\" ^ @PRODUCT_NAME_SHORT ^ @PRODUCT_NAME16;
+  endif;
+
+  TARGETDIR  = svDir;
+
+  SdProductName( @PRODUCT_NAME );
+
+  Enable( DIALOGCACHE );
+
+  return 0;
+ end;
+
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Function:  SetupScreen                                                    //
+//                                                                           //
+//  Purpose:  This function establishes  the screen look.  This includes     //
+//            colors, fonts, and text to be displayed.                       //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+function SetupScreen()
+ begin
+
+  SetColor ( BACKGROUND, BLUE );
+  Enable( FULLWINDOWMODE );
+  Enable( INDVFILESTATUS );
+
+  SetTitle( @TITLE_MAIN, 24, WHITE );
+
+  SetTitle( @TITLE_CAPTIONBAR, 0, BACKGROUNDCAPTION ); // Caption bar text.
+
+  Enable( BACKGROUND );
+
+  Delay( 1 );
+ end;
+
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Function:  CheckRequirements                                              //
+//                                                                           //
+//  Purpose:  This function checks all minimum requirements for the          //
+//            application being installed.  If any fail, then the user       //
+//            is informed and the setup is terminated.                       //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+function CheckRequirements()
+    NUMBER  nvDx, nvDy, nvResult;
+    STRING  svResult;
+
+ begin
+
+  bWinNT           = FALSE;
+  bIsShellExplorer = FALSE;
+
+  // Check screen resolution.
+  GetExtents( nvDx, nvDy );
+
+  if (nvDy < 480) then
+      MessageBox( @ERROR_VGARESOLUTION, WARNING );
+      abort;
+  endif;
+
+  // set 'setup' operation mode
+  bIs32BitSetup = TRUE;
+  GetSystemInfo( ISTYPE, nvResult, svResult );
+  if (nvResult = 16) then
+      bIs32BitSetup = FALSE; // running 16-bit setup
+      return 0; // no additional information required
+  endif;
+
+  // --- 32-bit testing after this point ---
+
+  // Determine the target system's operating system.
+  GetSystemInfo( OS, nvResult, svResult );
+
+  if (nvResult =  IS_WINDOWSNT) then
+      // Running Windows NT.
+      bWinNT = TRUE;
+
+      // Check to see if the shell being used is EXPLORER shell.
+      if (GetSystemInfo( OSMAJOR, nvResult, svResult ) = 0) then
+          if (nvResult >= 4) then
+              bIsShellExplorer = TRUE;
+          endif;
+      endif;
+
+  elseif (nvResult = IS_WINDOWS95 ) then
+      bIsShellExplorer = TRUE;
+
+  endif;
+
+end;
+
+
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Function: DialogShowSdWelcome                                             //
+//                                                                           //
+//  Purpose: This function handles the standard welcome dialog.              //
+//                                                                           //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+function DialogShowSdWelcome()
+    NUMBER nResult;
+    STRING szTitle, szMsg;
+ begin
+
+  szTitle = "";
+  szMsg   = "";
+  nResult = SdWelcome( szTitle, szMsg );
+
+  return nResult;
+ end;
+                         
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Function: DialogShowSdShowInfoList                                        //
+//                                                                           //
+//  Purpose: This function displays the general information list dialog.     //
+//                                                                           //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+function DialogShowSdShowInfoList()
+    NUMBER nResult;
+    LIST   list;
+    STRING szTitle, szMsg, szFile;
+ begin
+
+  szFile = SUPPORTDIR ^ "announce";
+
+  list = ListCreate( STRINGLIST );
+  ListReadFromFile( list, szFile );
+  szTitle  = "";
+  szMsg    = " ";
+  nResult  = SdShowInfoList( szTitle, szMsg, list );
+
+  ListDestroy( list );
+
+  return nResult;
+ end;
+
+
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Function: DialogShowSdAskDestPath                                         //
+//                                                                           //
+//  Purpose: This function asks the user for the destination directory.      //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+function DialogShowSdAskDestPath()
+    NUMBER nResult;
+    STRING szTitle, szMsg;
+ begin
+
+  szTitle = "";
+  szMsg   = "WARNING! The path must not contain spaces.";
+  nResult = SdAskDestPath( szTitle, szMsg, svDir, 0 );
+
+  TARGETDIR = svDir;
+
+  return nResult;
+ end;
+
+
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Function: DialogShowSdSetupType                                           //
+//                                                                           //
+//  Purpose: This function displays the standard setup type dialog.          //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+function DialogShowSdSetupType()
+    NUMBER nResult, nType;
+    STRING szTitle, szMsg;
+ begin
+
+  switch (svSetupType)
+  case "Typical":
+       nType = TYPICAL;
+  case "Custom":
+       nType = CUSTOM;
+  case "Compact":
+       nType = COMPACT;
+  case "":
+       svSetupType = "Typical";
+       nType = TYPICAL;
+  endswitch;
+
+  szTitle = "";
+  szMsg   = "";
+  nResult = SetupType( szTitle, szMsg, "", nType, 0 );
+
+  switch (nResult)
+  case COMPACT:
+       svSetupType = "Compact";
+  case TYPICAL:
+       svSetupType = "Typical";
+  case CUSTOM:
+       svSetupType = "Custom";
+  endswitch;
+
+  return nResult;
+ end;
+
+
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Function: DialogShowSdComponentDialog2                                    //
+//                                                                           //
+//  Purpose: This function displays the custom component dialog.             //
+//                                                                           //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+function DialogShowSdComponentDialog2()
+    NUMBER nResult;
+    STRING szTitle, szMsg;
+ begin
+
+  if ((svSetupType != "Custom") && (svSetupType != "")) then
+      return 0;
+  endif;
+
+  szTitle  = "";
+  szMsg    = "";
+  nResult  = SdComponentDialog2( szTitle, szMsg, svDir, "" );
+
+  return nResult;
+ end;
+
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Function: CheckListScreen                                                 //
+//                                                                           //
+//  Purpose: Show a check-list of post-install user actions.                 //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+function CheckListScreen()   
+	BOOL bDone;
+	NUMBER nCmdValue;
+ begin   
+ 	EzDefineDialog("CHECKLIST", "", "", 30001);
+
+    bDone = FALSE;   
+    while (bDone=FALSE)   
+       nCmdValue = WaitOnDialog("CHECKLIST");   
+          switch (nCmdValue)      
+              case DLG_INIT:               
+              // Process the Next button.         
+              case SD_PBUT_CONTINUE:         
+                  bDone = TRUE;           
+              // Process the Cancel button.         
+              case SD_PBUT_EXITSETUP:
+                  bDone = TRUE;            
+              // Process the close dialog box button.
+              case DLG_CLOSE:         
+                  bDone = TRUE;         
+              // Process dialog box errors.            
+              case DLG_ERR:
+                  MessageBox("Internal dialog box error", SEVERE);         
+                  bDone = TRUE;         
+          endswitch;            
+    endwhile;           
+    // Identify the end of dialog box processing.  
+    EndDialog("CHECKLIST");   
+    // Free the dialog box and list from memory.
+    ReleaseDialog("CHECKLIST");   
+ end;                    
+
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// Function: DialogShowSdFinishReboot                                        //
+//                                                                           //
+//  Purpose: This function will show the last dialog of the product.         //
+//           It will allow the user to reboot and/or show some readme text.  //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+function DialogShowSdFinishReboot()
+    NUMBER nResult, nDefOptions;
+    STRING szTitle, szMsg1, szMsg2, szOption1, szOption2;
+    NUMBER bOpt1, bOpt2;
+ begin
+
+  if (!BATCH_INSTALL) then
+      bOpt1 = FALSE;
+      bOpt2 = FALSE;
+      szMsg1 = "";
+      szMsg2 = "";
+      szOption1 = "";
+      szOption2 = "";
+      szTitle = "Installation is now complete.";
+      nResult = SdFinish( szTitle, szMsg1, szMsg2, szOption1, szOption2, bOpt1, bOpt2 );
+      return 0;
+  else
+      nDefOptions = SYS_BOOTMACHINE;
+      szTitle     = "";
+      szMsg1      = "";
+      szMsg2      = "";
+      nResult     = SdFinishReboot( szTitle, szMsg1, nDefOptions, szMsg2, 0 );
+      return nResult;
+  endif;
+ end;
+
+function MyParsePath(szPath)
+  STRING szTmp,szPth;
+  NUMBER nPos;
+ begin
+   szPth = szPath;
+   listPath = ListCreate( STRINGLIST );
+
+   // Man, all I want is map. Please? :-)
+   nPos = StrFind ( szPth, ";");
+   while ( nPos > 0 )
+    StrSub ( szTmp, szPth, 0, nPos);
+    ListAddString ( listPath, szTmp, AFTER );
+    StrSub ( szTmp, szPth, nPos + 1, StrLength ( szPth) - nPos );
+    szPth = szTmp;
+    nPos = StrFind ( szPth, ";" );
+   endwhile;
+
+  return 0;
+ end;
+
+ function ForwardSlashify ( szStr , theRes )
+   NUMBER nPos;
+   STRING szTemp, szRes;
+ begin
+  // Tortuous piece of code to convert backslashes into
+  // forward ones.
+  nPos = StrFind ( szStr, "\\");
+  szRes="";
+  while ( nPos >= 0 )
+    StrSub ( szTemp, szStr, 0, nPos);
+    szRes = szRes + szTemp + "/";
+    StrSub ( szTemp, szStr, nPos + 1, StrLength ( szStr) - nPos );
+    szStr = szTemp;
+    nPos = StrFind ( szStr, "\\" );
+  endwhile;
+  StrSub ( szTemp, szStr, 0, StrLength (szStr));
+  szRes = szRes + szTemp;
+  theRes = szRes;
+  return 0;
+ end;
+
+ function CreateExecPerlScript ( szPath, szFileName )
+    NUMBER nResult, writeHandle, readHandle;
+    STRING szLine;
+ begin
+   VarSave (SRCTARGETDIR);
+   SRCDIR = szPath;
+   TARGETDIR = szPath;
+   DeleteFile ( szFileName + ".bak");
+   RenameFile ( szFileName, szFileName + ".bak");
+   VarRestore (SRCTARGETDIR);
+
+   OpenFileMode (FILE_MODE_APPEND);
+   if ( CreateFile ( writeHandle, szPath, szFileName ) < 0 ) then
+      MessageBox ("CreateFile " + szPath ^ szFileName + " failed", INFORMATION);
+   endif;
+   // append
+   WriteLine (writeHandle, "#!" + szPerlPath );
+   WriteLine (writeHandle, "$libdir='" + szLibDir + "';");
+   WriteLine (writeHandle, "$bindir='" + szBinDir + "';");
+   WriteLine (writeHandle, "$libexecdir='" + szLibExecDir + "';");
+   WriteLine (writeHandle, "$datadir='" + szDataDir + "';");
+   WriteLine (writeHandle, "$SED='sed';");
+   WriteLine (writeHandle, "$TMPDIR='C:/TEMP';");
+   WriteLine (writeHandle, "$RAWCPP='gcc -E';");
+   // For the benefit of mkdependHS, which doesn't get this prepended
+   WriteLine (writeHandle, "$INSTALLING=1;");
+
+   OpenFileMode (FILE_MODE_NORMAL);
+   if ( OpenFile ( readHandle, szPath, szFileName + ".bak") < 0 ) then
+      MessageBox ("OpenFile " + szPath ^ szFileName + ".bak failed", INFORMATION);
+   endif;
+
+   // copy the template over.
+   nResult = GetLine ( readHandle, szLine);
+   while ( nResult >= 0 )
+     WriteLine ( writeHandle, szLine);
+     nResult = GetLine ( readHandle, szLine);
+   endwhile;
+   if ( CloseFile( readHandle ) < 0 ) then
+       MessageBox ( "CloseFile " + szPath ^ szFileName + ".bak failed",
+                    INFORMATION);
+   endif;
+   if ( CloseFile( writeHandle ) < 0 ) then
+       MessageBox ( "CloseFile " + szPath ^ szFileName + " failed",
+                    INFORMATION);
+   endif;
+   // There's no way to set the 'x' bit using
+   // SetFileInfo(), but luckily it is not needed to run #! scripts
+   // under cygwin.
+   SetFileInfo ( szPath ^ szFileName, FILE_ATTRIBUTE, FILE_ATTR_NORMAL, "");     
+   // Delete the .bak file
+   DeleteFile ( szPath ^ szFileName + ".bak");
+   
+   return 0;
+ end;
+
+ function DropSuffix ( szInp, szOut )
+   NUMBER nResult, nLen;
+   STRING szTemp, szTemp2;
+ begin
+    nLen = 0;
+    szTemp2 = szInp;
+    nResult = StrFind ( szTemp2 , ".");
+    while ( nResult >= 0 )
+       nLen = nLen + nResult;
+       StrSub ( szTemp, szTemp2, nResult + 1, StrLength ( szTemp2) - nResult );
+       szTemp2 = szTemp;
+       nResult = StrFind ( szTemp2, "." );
+       if ( nResult >= 0 ) then
+          nLen = nLen + 1;  // incl the previous . if there's more.
+       endif;
+    endwhile;
+    StrSub ( szOut, szInp, 0, nLen);
+    return 0;
+ end;
