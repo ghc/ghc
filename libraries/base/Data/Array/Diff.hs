@@ -83,10 +83,7 @@ import Data.Array.IO
 import Foreign.Ptr        ( Ptr, FunPtr )
 import Foreign.StablePtr  ( StablePtr )
 import Data.Int           ( Int8,  Int16,  Int32,  Int64 )
-#ifdef __GLASGOW_HASKELL__
-import Data.Word          ( Word )
-#endif
-import Data.Word          ( Word8, Word16, Word32, Word64 )
+import Data.Word          ( Word, Word8, Word16, Word32, Word64 )
 
 import System.IO.Unsafe	  ( unsafePerformIO )
 import Control.Exception  ( evaluate )
