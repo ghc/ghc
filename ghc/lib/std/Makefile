@@ -109,16 +109,13 @@ CLEAN_FILES += PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
 # 
 # So, we copy out PrelMain.lhs to ".." and build it there &
 # copy the gen'ed object file back in again.
-#
-# Note the patsubst hack (see fptools/mk/target.mk and search for
-# odir for details)
 # 
 ifeq "$(way)" "dll"
-GhcLibHcOpts = -O
+SplitObjs = NO
 PrelMain.dll_o : PrelMain.lhs
 	$(RM) ../PrelMain.lhs
 	$(CP) PrelMain.lhs ../
-	$(MAKE) -C .. PrelMain.dll_o way=dll HC=std/$(GHC_INPLACE) HC_OPTS="$(filter-out -fcompiling-prelude, $(patsubst -odir,,$(HC_OPTS)))"
+	$(MAKE) -C .. PrelMain.dll_o way=dll HC=std/$(GHC_INPLACE) HC_OPTS="$(filter-out -fcompiling-prelude, $(HC_OPTS))"
 	$(MV) ../PrelMain.dll_o .
 	$(RM) ../PrelMain.lhs ../PrelMain.dll_hi
 endif
