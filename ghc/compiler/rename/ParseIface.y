@@ -206,7 +206,8 @@ iface		: '__interface' package mod_name
 		  instance_decl_part
 		  decls_part
 		  rules_and_deprecs_part
-		  { ParsedIface {
+		  { let (rules,deprecs) = $14 () in
+		    ParsedIface {
 			pi_mod  = mkModule $3 $2,	-- Module itself
 			pi_vers = $4, 			-- Module version
 			pi_orphan  = $6,
@@ -215,8 +216,8 @@ iface		: '__interface' package mod_name
 			pi_fixity  = $11,		-- Fixies
 			pi_insts   = $12,		-- Local instances
 			pi_decls   = $13,		-- Decls
-		 	pi_rules   = (snd $5,fst $14),	-- Rules 
-		 	pi_deprecs = snd $14		-- Deprecations 
+		 	pi_rules   = (snd $5,rules),	-- Rules 
+		 	pi_deprecs = deprecs		-- Deprecations 
 		   } }
 
 -- Versions for exports and rules (optional)
@@ -363,8 +364,8 @@ maybe_idinfo  :: { RdrName -> [HsIdInfo RdrName] }
 maybe_idinfo  : {- empty -} 	{ \_ -> [] }
 	      | pragma		{ \x -> if opt_IgnoreIfacePragmas then [] 
 					else case $1 of
-						POk _ id_info -> id_info
-						PFailed err -> pprPanic "IdInfo parse failed" 
+						Just (POk _ id_info) -> id_info
+						Just (PFailed err) -> pprPanic "IdInfo parse failed" 
 								        (vcat [ppr x, err])
 				}
     {-
@@ -384,33 +385,32 @@ maybe_idinfo  : {- empty -} 	{ \_ -> [] }
        dates from a time where we picked up a .hi file first if it existed.]
     -}
 
-pragma	:: { ParseResult [HsIdInfo RdrName] }
-pragma	: src_loc PRAGMA	{ parseIdInfo $2 PState{ bol = 0#, atbol = 1#,
+pragma	:: { Maybe (ParseResult [HsIdInfo RdrName]) }
+pragma	: src_loc PRAGMA	{ Just (parseIdInfo $2 PState{ bol = 0#, atbol = 1#,
 							context = [],
 							glasgow_exts = 1#,
-							loc = $1 }
+							loc = $1 })
 				}
 
 -----------------------------------------------------------------------------
 
-rules_and_deprecs_part :: { ([RdrNameRuleDecl], IfaceDeprecs) }
-rules_and_deprecs_part : {- empty -}	{ ([], Nothing) }
-		       | rules_prag	{ case $1 of
-					     POk _ rds -> rds
-					     PFailed err -> pprPanic "Rules/Deprecations parse failed" err
-					}
-
-rules_prag :: { ParseResult ([RdrNameRuleDecl], IfaceDeprecs) }
-rules_prag : src_loc PRAGMA	{ parseRules $2 PState{ bol = 0#, atbol = 1#,
-							context = [],
-							glasgow_exts = 1#,
-							loc = $1 }
-				}
+-- This production is lifted so that it doesn't get eagerly parsed when we
+-- use happy --strict.
+rules_and_deprecs_part :: { () -> ([RdrNameRuleDecl], IfaceDeprecs) }
+rules_and_deprecs_part
+  : {- empty -}		{ \_ -> ([], Nothing) }
+  | src_loc PRAGMA	{ \_ -> case parseRules $2 PState{ bol = 0#, atbol = 1#,
+							   context = [],
+							   glasgow_exts = 1#,
+							   loc = $1 } of
+					POk _ rds   -> rds
+					PFailed err -> pprPanic "Rules/Deprecations parse failed" err
+			}
 
 rules_and_deprecs :: { ([RdrNameRuleDecl], IfaceDeprecs) }
 rules_and_deprecs : rule_prag deprec_prag	{ ($1, $2) }
 
- 
+
 -----------------------------------------------------------------------------
 
 rule_prag :: { [RdrNameRuleDecl] }
