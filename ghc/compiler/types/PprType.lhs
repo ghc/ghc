@@ -22,7 +22,7 @@ import TypeRep		( Type(..), TyNote(..), Kind, liftedTypeKind ) -- friend
 import Type		( PredType(..), ThetaType,
 			  splitPredTy_maybe,
 			  splitForAllTys, splitSigmaTy, splitRhoTy,
-			  isDictTy, splitTyConApp_maybe, splitFunTy_maybe,
+			  isPredTy, isDictTy, splitTyConApp_maybe, splitFunTy_maybe,
                           predRepTy, isUTyVar
 			)
 import Var		( TyVar, tyVarKind )
@@ -189,8 +189,10 @@ ppr_ty ctxt_prec (FunTy ty1 ty2)
   -- so we mustn't use splitFunTys here.
   = maybeParen ctxt_prec fUN_PREC $
     sep [ ppr_ty fUN_PREC ty1
-        , ptext SLIT("->") <+> ppr_ty tOP_PREC ty2
+        , ptext arrow <+> ppr_ty tOP_PREC ty2
         ]
+  where arrow | isPredTy ty1 = SLIT("=>")
+	      | otherwise    = SLIT("->")
 
 ppr_ty ctxt_prec (AppTy ty1 ty2)
   = maybeParen ctxt_prec tYCON_PREC $
