@@ -36,7 +36,9 @@ module BasicTypes(
 	InsideLam, insideLam, notInsideLam,
 	OneBranch, oneBranch, notOneBranch,
 
-        EP(..)
+        EP(..),
+
+        GhciMode(..)
    ) where
 
 #include "HsVersions.h"
@@ -198,6 +200,17 @@ isRec NonRecursive = False
 isNonRec :: RecFlag -> Bool
 isNonRec Recursive    = False
 isNonRec NonRecursive = True
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[Interactive/Batch]{Interactive/Batch flag}
+%*									*
+%************************************************************************
+
+\begin{code} 
+data GhciMode = Batch
+              | Interactive
 \end{code}
 
 %************************************************************************

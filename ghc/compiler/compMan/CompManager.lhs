@@ -14,6 +14,7 @@ where
 
 import List		( nub )
 import Maybe		( catMaybes, maybeToList, fromMaybe )
+import Maybes		( maybeToBool )
 import Outputable
 import UniqFM		( emptyUFM, lookupUFM, addToUFM, delListFromUFM )
 import Digraph		( SCC(..), stronglyConnComp, flattenSCC, flattenSCCs )
@@ -28,13 +29,17 @@ import CmSummarise	( summarise, ModSummary(..),
 			  name_of_summary, deps_of_summary,
 			  mimp_name, ms_get_imports )
 import Module		( ModuleName, moduleName, packageOfModule, 
-			  isModuleInThisPackage, PackageName )
+			  isModuleInThisPackage, PackageName, moduleEnvElts )
 import CmStaticInfo	( Package(..), PackageConfigInfo )
 import DriverPipeline 	( compile, preprocess, doLink, CompResult(..) )
 import HscTypes		( HomeSymbolTable, HomeIfaceTable, 
-			  PersistentCompilerState )
+			  PersistentCompilerState, ModDetails(..) )
+import Name		( lookupNameEnv )
+import PrelNames	( mainName )
 import HscMain		( initPersistentCompilerState )
 import Finder		( findModule, emptyHomeDirCache )
+import BasicTypes	( GhciMode(..) )
+import Util		( unJust )
 \end{code}
 
 
@@ -163,11 +168,13 @@ cmLoadModule cmstate1 modname
 
         -- Try and do linking in some form, depending on whether the
         -- upsweep was completely or only partially successful.
+        let ghci_mode = Batch  -- ToDo: fix!
 
         if upsweepOK
 
          then 
            do putStrLn "UPSWEEP COMPLETELY SUCCESSFUL"
+              let someone_exports_main = any exports_main (moduleEnvElts hst3)
               let mods_to_relink = upwards_closure mg2 
                                       (map modname_of_linkable newLis)
               pkg_linkables <- find_pkg_linkables_for pcii
@@ -177,7 +184,8 @@ cmLoadModule cmstate1 modname
               let sccs_to_relink = group_uis ui3 mg2 mods_to_relink
               let all_to_relink  = map AcyclicSCC pkg_linkables 
                                    ++ sccs_to_relink
-              linkresult <- link doLink True pcii all_to_relink pls1
+              linkresult <- link doLink ghci_mode someone_exports_main
+                                 pcii all_to_relink pls1
               case linkresult of
                  LinkErrs _ _
                     -> panic "cmLoadModule: link failed (1)"
@@ -197,7 +205,7 @@ cmLoadModule cmstate1 modname
               let sccs_to_relink = group_uis ui3 mg2 mods_to_relink
               let all_to_relink  = map AcyclicSCC pkg_linkables 
                                    ++ sccs_to_relink
-              linkresult <- link doLink False pcii all_to_relink pls1
+              linkresult <- link doLink ghci_mode False pcii all_to_relink pls1
               let (hst4, hit4, ui4) 
                      = removeFromTopLevelEnvs mods_to_relink (hst3,hit3,ui3)
               case linkresult of
@@ -210,6 +218,9 @@ cmLoadModule cmstate1 modname
                                  = CmState { pcms=pcms4, pcs=pcs3, pls=pls4 }
                           return (cmstate4, Just modname)
 
+exports_main :: ModDetails -> Bool
+exports_main md
+   = maybeToBool (lookupNameEnv (md_types md) mainName)
 
 -- Given a (home) module graph and a bunch of names of (home) modules
 -- within that graph, return the names of any packages needed by the

@@ -20,6 +20,7 @@ import Outputable	( SDoc )
 import Digraph		( SCC(..), flattenSCC, flattenSCCs )
 import Outputable
 import Panic		( panic )
+import BasicTypes	( GhciMode(..) )
 
 #include "HsVersions.h"
 \end{code}
@@ -100,7 +101,8 @@ emptyPLS = return (PersistentLinkerState {})
 -- between CmLink and DriverPipeline.  Same deal as with
 -- CmSummarise.summarise.
 link :: ([String] -> IO ()) 
-     -> Bool			-- was the upsweep completely successful?
+     -> GhciMode		-- interactive or batch
+     -> Bool			-- attempt linking in batch mode?
      -> PackageConfigInfo 
      -> [SCC Linkable] 
      -> PersistentLinkerState 
@@ -112,22 +114,31 @@ link :: ([String] -> IO ())
 -- For the moment, in the batch linker, we don't bother to
 -- tell doLink which packages to link -- it just tries all that
 -- are available.
-link doLink upsweep_complete_success pci groups pls1
-   | upsweep_complete_success
-   = do putStrLn "Hello from the Linker!"
+-- batch_attempt_linking should only be *looked at* in 
+-- batch mode.  It should only be True if the upsweep was
+-- successful and someone exports main, i.e., we have good
+-- reason to believe that linking will succeed.
+link doLink Batch batch_attempt_linking pci groups pls1
+   | batch_attempt_linking
+   = do putStrLn "LINK(batch): linkables are ..."
         putStrLn (showSDoc (vcat (map ppLinkableSCC groups)))
         let o_files = concatMap getOfiles (flattenSCCs groups)
         doLink o_files
-        putStrLn "Bye-bye from the Linker!"        
+	-- doLink only returns if it succeeds
+        putStrLn "LINK(batch): done"
         return (LinkOK pls1)
    | otherwise
-   = do putStrLn "LINKER: upsweep (partially?) failed; not doing batch linking"
+   = do putStrLn "LINKER(batch): upsweep (partially?) failed OR main not exported;"
+        putStrLn "               -- not doing linking"
         return (LinkOK pls1)
    where
       getOfiles (LP _)    = []
       getOfiles (LM _ us) = map nameOfObject (filter isObject us)
 
-   
+link doLink Interactive batch_attempt_linking pci groups pls1
+   = do putStrLn "LINKER(interactive): not yet implemented"
+        return (LinkOK pls1)
+
 
 ppLinkableSCC :: SCC Linkable -> SDoc
 ppLinkableSCC = ppr . flattenSCC
