@@ -1,7 +1,7 @@
 /* 
  * (c) The GHC Team 2003
  *
- * $Id: forkOS.c,v 1.1 2003/09/21 22:20:57 wolfgang Exp $
+ * $Id: forkOS.c,v 1.2 2003/09/23 16:18:03 sof Exp $
  *
  * Helper function for Control.Concurrent.forkOS
  */
@@ -34,6 +34,11 @@ forkOS_createThread ( HsStablePtr entry )
 
 #elif defined(HAVE_WINDOWS_H)
 #include <windows.h>
+/* For reasons not yet clear, the entire contents of process.h is protected 
+ * by __STRICT_ANSI__ not being defined.
+ */
+#undef __STRICT_ANSI__
+#include <process.h>
 
 static unsigned __stdcall
 forkOS_createThreadWrapper ( void * entry )
@@ -47,12 +52,13 @@ forkOS_createThreadWrapper ( void * entry )
 int
 forkOS_createThread ( HsStablePtr entry )
 {
+    unsigned long pId;
     return (_beginthreadex ( NULL,  /* default security attributes */
 			   0,
 			   forkOS_createThreadWrapper,
 			   (void*)entry,
 			   0,
-			   (unsigned*)pId) == 0);
+			   (unsigned*)&pId) == 0);
 }
 
 #else
