@@ -2,13 +2,20 @@
 <!-- FFI docs as a chapter -->
 
 <chapter id="ffi">
-<title>Foreign function interface (FFI)</title>
+ <title>
+Foreign function interface (FFI)
+ </title>
 
   <para>GHC (mostly) conforms to the Haskell 98 Foreign Function Interface
-  Addendum 1.0, whose definition is available from <ulink
-  url="http://haskell.org/"><literal>http://haskell.org/</literal></ulink >.
-  The FFI support in GHC diverges from the Addendum in the following ways:
-  </para>
+  Addendum 1.0, whose definition is available from <ulink url="http://haskell.org/"><literal>http://haskell.org/</literal></ulink>.</para>
+
+  <para>To enable FFI support in GHC, give the <option>-fffi</option><indexterm><primary><option>-fffi</option></primary>
+    </indexterm>flag, or
+the <option>-fglasgow-exts</option><indexterm><primary><option>-fglasgow-exts</option></primary>
+    </indexterm> flag which implies <option>-fffi</option>
+.</para>
+
+  <para>The FFI support in GHC diverges from the Addendum in the following ways:</para>
 
   <itemizedlist>
     <listitem>
@@ -18,8 +25,7 @@
 
     <listitem>
       <para>GHC implements a number of GHC-specific extensions to the FFI
-      Addendum.  These extensions are described in <xref
-      linkend="sec-ffi-ghcexts"/>, but please note that programs using
+      Addendum.  These extensions are described in <xref linkend="sec-ffi-ghcexts" />, but please note that programs using
       these features are not portable.  Hence, these features should be
       avoided where possible.</para>
     </listitem>
