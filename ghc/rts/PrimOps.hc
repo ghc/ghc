@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.23 1999/03/17 13:19:22 simonm Exp $
+ * $Id: PrimOps.hc,v 1.24 1999/03/22 09:24:45 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -762,7 +762,7 @@ FN_(forkzh_fast)
 FN_(yieldzh_fast)
 {
   FB_
-  JMP_(stg_yield_noregs)
+  JMP_(stg_yield_noregs);
   FE_
 }
 
