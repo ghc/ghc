@@ -32,7 +32,7 @@ import CmdLineOpts
 import Maybes		( maybeToBool )
 import ErrUtils		( doIfSet, dumpIfSet )
 import Outputable
-import IO		( IOMode(..), hPutStr, hClose, openFile	)
+import IO
 \end{code}
 
 
