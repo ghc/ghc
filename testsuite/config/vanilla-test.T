@@ -53,12 +53,13 @@ def guess_compiler_flags()
 def simple_build_Main_WRK ( $_extra_args, $compile_only ) 
 {
    $flags = guess_compiler_flags()
-   $errname = qualify("comp.stderr")
-   $exename = qualify("")  -- ie, the exe name == the test name
-   $srcname = qualify("hs")
+   $errname = testnameWith("comp.stderr")
+   $srcname = testnameWith("hs")
    rm_or_fail($errname)
-   rm_or_fail($exename)
-   $cmd = $tool ++ " " ++ $flags ++ " " ++ $_extra_args ++ " "
+   rm_or_fail($testname)
+
+   $cmd = "cd " ++ $testdir ++ " && " ++ 
+	  $tool ++ " " ++ $flags ++ " " ++ $_extra_args ++ " "
 	  ++ (if defined $extra_hc_flags
 		  then $extra_hc_flags 
 		  else "")
@@ -66,7 +67,7 @@ def simple_build_Main_WRK ( $_extra_args, $compile_only )
 		  then " -C "
 	     	  else if $compile_only 
                   	then " -c " 
-                  	else " -o " ++ $exename ++ " ")
+                  	else " -o " ++ $testname ++ " ")
           ++ $srcname ++ " &> " ++ $errname
    $res = runCmd($cmd)
    return $res
