@@ -1,6 +1,7 @@
 
-tcfail042.hs:15:
+tests/ghc-regress/typecheck/should_fail/tcfail042.hs:15:
     Could not deduce `Num a' from the context (Eq a, Show a)
     Probable fix:
 	Add `Num a' to the instance declaration context
-    arising from an instance declaration at tcfail042.hs:15
+    arising from the instance declaration at tests/ghc-regress/typecheck/should_fail/tcfail042.hs:15
+    In the instance declaration for `Bar [a]'

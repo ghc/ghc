@@ -1,8 +1,8 @@
 
-tcfail034.hs:17:
+tests/ghc-regress/typecheck/should_fail/tcfail034.hs:17:
     Could not deduce `Integral a' from the context (Num a, Eq a)
     Probable fix:
-	Add `Integral a' to the type signature(s) for {test}
-    arising from use of `mod' at tcfail034.hs:17
+	Add `Integral a' to the type signature(s) for test
+    arising from use of `mod' at tests/ghc-regress/typecheck/should_fail/tcfail034.hs:17
     In the first argument of `(==)', namely `(x `mod` 3)'
-    in the definition of function `test': (x `mod` 3) == 0
+    In the definition of `test': (x `mod` 3) == 0

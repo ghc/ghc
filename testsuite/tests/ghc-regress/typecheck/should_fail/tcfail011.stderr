@@ -1,2 +1,3 @@
 
-tcfail011.hs:3: Variable not in scope: `y'
+tests/ghc-regress/typecheck/should_fail/tcfail011.hs:3:
+    Variable not in scope: `y'

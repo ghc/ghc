@@ -1,2 +1,3 @@
 
-tcfail077.hs:8: Variable not in scope: `op2'
+tests/ghc-regress/typecheck/should_fail/tcfail077.hs:8:
+    Variable not in scope: `op2'

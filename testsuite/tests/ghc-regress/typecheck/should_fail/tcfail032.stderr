@@ -1,5 +1,5 @@
 
-tcfail032.hs:14:
+tests/ghc-regress/typecheck/should_fail/tcfail032.hs:14:
     Inferred type is less polymorphic than expected
 	Quantified type variable `a' escapes
 	It is mentioned in the environment
@@ -10,3 +10,4 @@ tcfail032.hs:14:
     When checking an expression type signature
     In an expression with a type signature:
 	  x :: forall a. (Eq a) => a -> Int
+    In the definition of `f': (x :: forall a. (Eq a) => a -> Int)

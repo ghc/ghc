@@ -1,11 +1,7 @@
 
-tcfail001.hs:8:
-    Warning: Duplicate class assertion `A a' in the context:
-		 (A a, A a) => ...
-
-tcfail001.hs:9:
+tests/ghc-regress/typecheck/should_fail/tcfail001.hs:9:
     Couldn't match `[a]' against `t -> t1'
 	Expected type: [a]
 	Inferred type: t -> t1
-    In an equation for function `op': op [] = []
+    In the definition of `op': op [] = []
     In the definition for method `op'

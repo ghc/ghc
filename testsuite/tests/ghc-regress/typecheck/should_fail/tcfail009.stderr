@@ -1,6 +1,7 @@
 
-tcfail009.hs:3:
+tests/ghc-regress/typecheck/should_fail/tcfail009.hs:3:
     Couldn't match `Integer' against `Int'
 	Expected type: Integer
 	Inferred type: Int
     In an expression with a type signature: 2 :: Integer
+    In an arithmetic sequence: [(1 :: Int) .. (2 :: Integer)]

@@ -8,4 +8,6 @@ typecheck/should_compile tc056,tc115,tc116: stderr not checked
 typecheck/should_fail
    Data82.hs Digraph.hs Digraph.stderr Inst82_1.hs Inst82_2.hs   
    have not been assimilated.
+   (are needed by tcfail082 but am not sure how to do multi-module
+    tests yet)
 

@@ -1,8 +1,9 @@
 
-tcfail065.hs:28:
+tests/ghc-regress/typecheck/should_fail/tcfail065.hs:28:
     Inferred type is less polymorphic than expected
-	Quantified type variable `x' is unified with `x'
+	Quantified type variable `x' is unified with another quantified type variable `x'
     Signature type:     forall x. x -> X x1 -> X x1
     Type to generalise: x -> X x -> X x
     When checking the type signature for `setX'
+    When generalising the type(s) for setX
     In the definition for method `setX'

@@ -1,7 +1,7 @@
 
-tcfail090.hs:8:
+tests/ghc-regress/typecheck/should_fail/tcfail090.hs:8:
     Couldn't match `#' against `*'
     When matching types `ByteArray#' and `a'
 	Expected type: ByteArray#
 	Inferred type: a
-    in the definition of function `die': undefined
+    In the definition of `die': undefined

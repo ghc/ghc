@@ -1,5 +1,5 @@
 
-tcfail018.hs:5:
+tests/ghc-regress/typecheck/should_fail/tcfail018.hs:5:
     No instance for `Num [t]'
-    arising from the literal `1' at tcfail018.hs:5
-    in a pattern binding: 1
+    arising from the literal `1' at tests/ghc-regress/typecheck/should_fail/tcfail018.hs:5
+    In a pattern binding: 1

@@ -1,5 +1,5 @@
 
-tcfail089.hs:10:
+tests/ghc-regress/typecheck/should_fail/tcfail089.hs:10:
     `++' is not a data constructor
     In the pattern: "hd" ++ _
-    In an equation for function `compute': compute ("hd" ++ _) = "_"
+    In the definition of `compute': compute ("hd" ++ _) = "_"
