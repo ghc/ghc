@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.145 2004/02/15 13:29:44 krasimir Exp $
+ * $Id: Linker.c,v 1.146 2004/03/22 11:06:18 simonmar Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -948,7 +948,7 @@ loadObj( char *path )
    int r, n;
 #ifdef USE_MMAP
    int fd, pagesize;
-   void *map_addr;
+   void *map_addr = NULL;
 #else
    FILE *f;
 #endif
