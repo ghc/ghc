@@ -13,11 +13,11 @@ import HsSyn
 
 import Maybe	( fromJust, isJust )
 import FiniteMap
+import List 	( sortBy )
+import Char	( toUpper, toLower )
+import Monad	( when )
 
-import Html	hiding (text, above, beside, aboves, 
-			besides, (</>), (<->), td, 
-			renderHtml, renderMessage, renderHtml')
-import qualified HtmlBlockTable as BT
+import Html
 import qualified Html
 
 -- -----------------------------------------------------------------------------
@@ -25,14 +25,17 @@ import qualified Html
 
 ppHtml :: String -> Maybe String -> [(Module, Interface)] -> IO ()
 ppHtml title source_url ifaces =  do
-  ppHtmlIndex title source_url (map fst ifaces)
+  ppHtmlContents title source_url (map fst ifaces)
+  ppHtmlIndex title ifaces
   mapM_ (ppHtmlModule title source_url) ifaces
 
 moduleHtmlFile :: String -> FilePath
 moduleHtmlFile mod = mod ++ ".html" -- ToDo: Z-encode filename?
 
-indexHtmlFile = "index.html"
-styleSheetFile = "haddock.css"
+contentsHtmlFile = "index.html"
+indexHtmlFile    = "doc-index.html"
+styleSheetFile   = "haddock.css"
+subIndexHtmlFile k a = "doc-index-" ++ k:a:".html"
 
 footer = 
   tda [theclass "botbar"] << 
@@ -42,35 +45,39 @@ footer =
 	)
    
 
+src_button source_url mod file
+  | Just u <- source_url = 
+	let src_url = if (last u == '/') then u ++ file else u ++ '/':file
+	in
+	(tda [theclass "topbut", nowrap] <<
+  	   anchor ! [href src_url] << toHtml "Source code")
+  | otherwise =
+	Html.emptyTable
+  
+
+parent_button mod = 
+  case span (/= '.') (reverse mod) of
+   (m, '.':rest) -> 
+       (tda [theclass "topbut", nowrap] <<
+  	 anchor ! [href (moduleHtmlFile (reverse rest))] << toHtml "Parent")
+   _ -> 
+	Html.emptyTable
+
+contentsButton = tda [theclass "topbut", nowrap] <<
+  	 	    anchor ! [href contentsHtmlFile] << toHtml "Contents"
+
+indexButton = tda [theclass "topbut", nowrap] <<
+  	 	    anchor ! [href indexHtmlFile] << toHtml "Index"
+
 simpleHeader title = 
   (tda [theclass "topbar"] << 
      vanillaTable << (
        (td << 
   	image ! [src "haskell_icon.gif", width "16", height 16, alt " " ]
        ) <->
-       (tda [theclass "title"] << toHtml title)
+       (tda [theclass "title"] << toHtml title) <->
+	contentsButton <-> indexButton
    ))
-
-buttons1 source_url mod file
-  | Just u <- source_url = 
-	let src_url = if (last u == '/') then u ++ file else u ++ '/':file
-	in
-	(tda [theclass "topbut", nowrap] <<
-  	   anchor ! [href src_url] << toHtml "Source code") <-> buttons2 mod
-  | otherwise =
-	buttons2 mod
-  
-
-buttons2 mod = 
-  case span (/= '.') (reverse mod) of
-   (m, '.':rest) -> 
-       (tda [theclass "topbut", nowrap] <<
-  	 anchor ! [href (moduleHtmlFile (reverse rest))] << toHtml "Parent") <->
-	contentsButton
-   _ -> cell contentsButton
-
-contentsButton = (tda [theclass "topbut", nowrap] <<
-  	 	    anchor ! [href indexHtmlFile] << toHtml "Contents")
 
 pageHeader mod iface title source_url =
   (tda [theclass "topbar"] << 
@@ -79,7 +86,10 @@ pageHeader mod iface title source_url =
   	image ! [src "haskell_icon.gif", width "16", height 16, alt " "]
        ) <->
        (tda [theclass "title"] << toHtml title) <->
-	buttons1 source_url mod (iface_filename iface)
+	src_button source_url mod (iface_filename iface) <->
+	parent_button mod <->
+	contentsButton <->
+	indexButton
     )
    ) </>
    tda [theclass "modulebar"] <<
@@ -104,27 +114,27 @@ pageHeader mod iface title source_url =
     )
 
 -- ---------------------------------------------------------------------------
--- Generate the module index
+-- Generate the module contents
 
-ppHtmlIndex :: String -> Maybe String -> [Module] -> IO ()
-ppHtmlIndex title source_url mods = do
+ppHtmlContents :: String -> Maybe String -> [Module] -> IO ()
+ppHtmlContents title source_url mods = do
   let tree = mkModuleTree mods  
       html = 
 	header (thetitle (toHtml title) +++
-		mylink ! [href styleSheetFile, 
+		thelink ! [href styleSheetFile, 
 		  rel "stylesheet", thetype "text/css"]) +++
         body <<  
 	  table ! [width "100%", cellpadding 0, cellspacing 1] << (
    	    simpleHeader title </>
-	    td << (ppModuleTree title tree) </>
+	    ppModuleTree title tree </>
 	    footer
 	  )
-  writeFile indexHtmlFile (renderHtml html)
+  writeFile contentsHtmlFile (renderHtml html)
 
-ppModuleTree :: String -> [ModuleTree] -> Html
+ppModuleTree :: String -> [ModuleTree] -> HtmlTable
 ppModuleTree title ts = 
-  h1 << toHtml "Modules" +++
-  table ! [cellpadding 0, cellspacing 2] << aboves (map (mkNode []) ts)
+  tda [theclass "section1"] << toHtml "Modules" </>
+  td <<  table ! [cellpadding 0, cellspacing 2] << aboves (map (mkNode []) ts)
 
 mkNode :: [String] -> ModuleTree -> HtmlTable
 mkNode ss (Node s leaf []) =
@@ -163,13 +173,104 @@ splitModule (Module mod) = split mod
      			(s1, _) -> [s1]
 
 -- ---------------------------------------------------------------------------
+-- Generate the index
+
+ppHtmlIndex :: String -> [(Module,Interface)] -> IO ()
+ppHtmlIndex title ifaces = do
+  let html = 
+	header (thetitle (toHtml (title ++ " (Index)")) +++
+		thelink ! [href styleSheetFile, 
+		  rel "stylesheet", thetype "text/css"]) +++
+        body <<  
+	  table ! [width "100%", cellpadding 0, cellspacing 1] << (
+	    simpleHeader title </>
+	    tda [theclass "section1"] << toHtml "Type/Class Index" </>
+	    index_html tycls_index 't' </>
+	    tda [theclass "section1"] << toHtml "Function/Constructor Index" </>
+	    index_html var_index 'v'
+	   )
+
+  when split_indices
+    (do mapM_ (do_sub_index "Type/Class" tycls_index 't') ['A'..'Z'] 
+        mapM_ (do_sub_index "Function/Constructor" var_index 'v') ['A'..'Z'] 
+    )
+
+  writeFile indexHtmlFile (renderHtml html)
+
+ where
+  split_indices = length tycls_index > 50 || length var_index > 50
+
+  index_html this_ix kind
+    | split_indices = 
+	td << table ! [cellpadding 0, cellspacing 5] <<
+	    besides [ td << anchor ! [href (subIndexHtmlFile kind c)] <<
+			 toHtml [c]
+		    | c <- ['A'..'Z'] ]
+   | otherwise =
+	td << table ! [cellpadding 0, cellspacing 5] <<
+	  aboves (map indexElt this_ix) 
+ 	
+  do_sub_index descr this_ix kind c
+    = writeFile (subIndexHtmlFile kind c) (renderHtml html)
+    where 
+      html = header (thetitle (toHtml (title ++ " (" ++ descr ++ "Index)")) +++
+		thelink ! [href styleSheetFile, 
+		  rel "stylesheet", thetype "text/css"]) +++
+             body <<  
+	      table ! [width "100%", cellpadding 0, cellspacing 1] << (
+	        simpleHeader title </>
+	        tda [theclass "section1"] << 
+	      	toHtml (descr ++ " Index (" ++ c:")") </>
+	        td << table ! [cellpadding 0, cellspacing 5] <<
+	      	  aboves (map indexElt index_part) 
+	       )
+
+      index_part = [(n,stuff) | (n,stuff) <- this_ix, n `nameBeginsWith` c]
+
+  tycls_index = index isTyClsName
+  var_index   = index (not.isTyClsName)
+
+  isTyClsName (HsTyClsName _) = True
+  isTyClsName _ = False
+
+  index :: (HsName -> Bool) -> [(HsName, [(Module,Bool)])]
+  index f = sortBy cmp (fmToList (full_index f))
+    where cmp (n1,_) (n2,_) = n1 `compare` n2
+    
+  iface_indices f = map (getIfaceIndex f) ifaces
+  full_index f = foldr1 (plusFM_C (++)) (iface_indices f)
+
+  getIfaceIndex f (mod,iface) = listToFM
+    [ (name, [(mod, mod == mod')]) 
+    | (name, Qual mod' _) <- fmToList (iface_env iface),
+      f name ]
+
+  indexElt :: (HsName, [(Module,Bool)]) -> HtmlTable
+  indexElt (nm, entries) = 
+     td << ppHsName nm
+     <-> td << (hsep [ if defining then
+			 bold << anchor ! [href (linkId mod nm)] << toHtml mod
+		       else
+			 anchor ! [href (linkId mod nm)] << toHtml mod
+	             | (Module mod, defining) <- entries ])
+     where
+	defining_mods = [ m | (Module m, True) <- entries ]
+
+nameBeginsWith (HsTyClsName id) c = idBeginsWith id c
+nameBeginsWith (HsVarName   id) c = idBeginsWith id c
+
+idBeginsWith (HsIdent   s) c = head s `elem` [toLower c, toUpper c]
+idBeginsWith (HsSymbol  s) c = head s `elem` [toLower c, toUpper c]
+idBeginsWith (HsSpecial s) c = head s `elem` [toLower c, toUpper c]
+
+-- ---------------------------------------------------------------------------
 -- Generate the HTML page for a module
 
 ppHtmlModule :: String -> Maybe String -> (Module,Interface) -> IO ()
 ppHtmlModule title source_url (Module mod,iface) = do
   let html = 
 	header (thetitle (toHtml mod) +++
-		mylink ! [href styleSheetFile, 
+		thelink ! [href styleSheetFile, 
 		  rel "stylesheet", thetype "text/css"]) +++
         body <<  
 	  table ! [width "100%", cellpadding 0, cellspacing 1] << (
@@ -181,19 +282,19 @@ ppHtmlModule title source_url (Module mod,iface) = do
 
 ifaceToHtml :: String -> Interface -> HtmlTable
 ifaceToHtml mod iface
-  | null exports = td << noHtml
+  | null exports = Html.emptyTable
   | otherwise =
-    td << table ! [width "100%", cellpadding 0, cellspacing 15] << body1
+    td << table ! [width "100%", cellpadding 0, cellspacing 15] << 
+	(body1 </> body2)
  where exports = iface_exports iface
        doc_map = iface_name_docs iface
 
        body1
          | Just doc <- iface_doc iface
          = (tda [theclass "section1"] << toHtml "Description") </>
-	   docBox (markup htmlMarkup doc) </>
-	   body2
+	   docBox (markup htmlMarkup doc)
 	 | otherwise
-	 = body2
+	 = Html.emptyTable
 
        body2 =
          (tda [theclass "section1"] << toHtml "Synopsis") </>
@@ -205,7 +306,7 @@ ifaceToHtml mod iface
 
 processExport :: FiniteMap HsName Doc -> Bool -> ExportItem -> HtmlTable
 processExport doc_map summary (ExportGroup lev doc)
-  | summary   = td << noHtml
+  | summary   = Html.emptyTable
   | otherwise = ppDocGroup lev (markup htmlMarkup doc)
 processExport doc_map summary (ExportDecl decl)
   = doDecl doc_map summary decl
@@ -260,7 +361,7 @@ doDecl doc_map summary decl = do_decl decl
 	= ppHsClassDecl doc_map summary decl
 
      do_decl (HsDocGroup lev str) 
-	= if summary then td << noHtml else ppDocGroup lev str
+	= if summary then Html.emptyTable else ppDocGroup lev str
 
      do_decl _ = error (show decl)
 
@@ -556,8 +657,6 @@ ubxParenList = ubxparens . hsep . punctuate comma
 ubxparens p = toHtml "(#" +++ p +++ toHtml "#)"
 
 text   = strAttr "TEXT"
-div    = tag "DIV"
-mylink = itag "LINK"
 
 declBox :: Html -> HtmlTable
 declBox html = tda [theclass "decl"] << html
@@ -566,48 +665,3 @@ docBox :: Html -> HtmlTable
 docBox html = tda [theclass "doc"] << html
 
 vanillaTable = table ! [width "100%", cellpadding 0, cellspacing 0, border 0]
-
-renderHtml :: (HTML html) => html -> String
-renderHtml theHtml =
-      renderMessage ++ 
-         foldr (.) id (map (renderHtml' 0)
-                           (getHtmlElements (tag "HTML" << theHtml))) "\n"
-
-renderMessage =
-      "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\" \"http://www.w3.org/TR/html4/loose.dtd\">\n" ++
-      "<!--Rendered using the Haskell Html Library v0.2-->\n"
-
-renderHtml' :: Int -> HtmlElement -> ShowS
-renderHtml' _ (HtmlString str) = (++) str
-renderHtml' n (HtmlTag
-              { markupTag = name,
-                markupContent = html,
-                markupAttrs = markupAttrs })
-      = if isNoHtml html && elem name myValidHtmlITags
-        then renderTag True name markupAttrs n
-        else (renderTag True name markupAttrs n
-             . foldr (.) id (map (renderHtml' (n+2)) (getHtmlElements html))
-             . renderTag False name [] n)
-
-myValidHtmlITags = "LINK" : validHtmlITags
-
--- -----------------------------------------------------------------------------
--- a "better" implementation of the table combinators (less confusing, anyhow)
-
-td :: Html -> HtmlTable
-td = cell . Html.td
-
-tda :: [HtmlAttr] -> Html -> HtmlTable
-tda as = cell . (Html.td ! as)
-
-above  a b = combine BT.above a b
-beside a b = combine BT.beside a b
-
-infixr 3 </>  -- combining table cells 
-infixr 4 <->  -- combining table cells
-(</>) = above
-(<->) = beside
-
-aboves  = foldr1 above
-besides = foldr1 beside
-
