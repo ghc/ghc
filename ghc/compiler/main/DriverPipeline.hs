@@ -1054,7 +1054,7 @@ compile ghci_mode summary source_unchanged have_object
 
    -- -no-recomp should also work with --make
    do_recomp <- readIORef v_Recomp
-   let source_unchanged' = source_unchanged && not do_recomp
+   let source_unchanged' = source_unchanged && do_recomp
 
    -- run the compiler
    hsc_result <- hscMain ghci_mode dyn_flags'
