@@ -355,9 +355,9 @@ ifaceToHtml mod iface
 
 ppModuleContents :: [ExportItem] -> HtmlTable
 ppModuleContents exports
-  | null sections = Html.emptyTable
-  | otherwise     = tda [theclass "section4"] << bold << toHtml "Contents"
-  		     </> td << dlist << concatHtml sections
+  | length sections < 2 = Html.emptyTable
+  | otherwise           = tda [theclass "section4"] << bold << toHtml "Contents"
+  		           </> td << dlist << concatHtml sections
  where
   (sections, _leftovers{-should be []-}) = process 0 exports
 
