@@ -15,7 +15,7 @@ include $(TOP)/mk/boilerplate.mk
 ifeq "$(GhcWithHscBuiltViaC)" "YES"
 SUBDIRS = std exts
 else
-ifneq "$(TargetPlatform)" "i386-unknown-mingw32"
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 SUBDIRS = std exts concurrent posix misc
 else
 SUBDIRS = std exts concurrent misc
