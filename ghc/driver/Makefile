@@ -1,14 +1,12 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.34 2000/06/14 11:07:47 simonmar Exp $
+# $Id: Makefile,v 1.35 2000/06/14 13:14:42 simonmar Exp $
 #
 
 TOP=..
 CURRENT_DIR=ghc/driver
 include $(TOP)/mk/boilerplate.mk
 
-ifneq "$(GhcWithHscBuiltViaC)" "YES"
-HC=$(WithGhcHc)
-else
+ifeq "$(GhcWithHscBuiltViaC)" "YES"
 HC=$(GHC_INPLACE)
 endif
 
