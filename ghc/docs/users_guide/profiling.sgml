@@ -131,7 +131,7 @@ MAIN                     MAIN             0   0.0   0.0        0     1
     <programlisting>
 main = print (f 25 + g 25)
 f n  = nfib n
-g n  = nfib (n/2)
+g n  = nfib (n `div` 2)
 nfib n = if n < 2 then 1 else nfib (n-1) + nfib (n-2)
 </programlisting>
 
@@ -756,6 +756,20 @@ hp2ps [flags] [&lt;file&gt;[.hp]]
 	</listItem>
       </varListEntry>
 
+      <varListEntry>
+	<term><Option>-c</Option></Term>
+	<listItem>
+	  <para>Generate colour output.</para>
+	</listItem>
+      </varListEntry>
+      
+      <varListEntry>
+	<term><Option>-y</Option></Term>
+	<listItem>
+	  <para>Ignore marks.</para>
+	</listItem>
+      </varListEntry>
+      
       <varListEntry>
 	<term><Option>-?</Option></Term>
 	<listItem>
