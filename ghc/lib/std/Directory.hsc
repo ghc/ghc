@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: Directory.hsc,v 1.15 2001/08/21 08:53:22 simonmar Exp $
+-- $Id: Directory.hsc,v 1.16 2001/08/29 10:19:31 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2000
 --
@@ -23,12 +23,13 @@ are relative to the current directory.
 
 module Directory 
    ( 
-      Permissions               -- abstract
-      
-    , readable                  -- :: Permissions -> Bool
-    , writable                  -- :: Permissions -> Bool
-    , executable                -- :: Permissions -> Bool
-    , searchable                -- :: Permissions -> Bool
+      Permissions		-- instance of (Eq, Ord, Read, Show)
+	( Permissions
+        , readable              -- :: Permissions -> Bool
+        , writable              -- :: Permissions -> Bool
+        , executable            -- :: Permissions -> Bool
+        , searchable            -- :: Permissions -> Bool
+	)
 
     , createDirectory		-- :: FilePath -> IO ()
     , removeDirectory		-- :: FilePath -> IO ()
