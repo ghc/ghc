@@ -41,7 +41,12 @@ module Maybes (
 
 CHK_Ubiq()			-- debugging consistency check
 
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER( SpecLoop )	-- Specialisation
+#else
+import {-# SOURCE #-} Name
+#endif
+
 import Unique  (Unique)		-- only for specialising
 
 #else
