@@ -190,7 +190,7 @@ addToClockTime  :: TimeDiff  -> ClockTime -> ClockTime
 addToClockTime (TimeDiff year mon day hour min sec psec) 
 	       (TOD c_sec c_psec) = unsafePerformPrimIO $
     allocWords (``sizeof(time_t)'') >>= \ res ->
-    _ccall_ toClockSec year mon day hour min sec 1 res 
+    _ccall_ toClockSec year mon day hour min sec 0 res 
 				    >>= \ ptr@(A# ptr#) ->
     if ptr /= ``NULL'' then
        let
@@ -282,13 +282,15 @@ toClockTime (CalendarTime year mon mday hour min sec psec wday yday tzname tz is
     else
         unsafePerformPrimIO (
 	    allocWords (``sizeof(time_t)'') >>= \ res ->
-	    _ccall_ toClockSec year mon mday hour min sec tz res
+	    _ccall_ toClockSec year mon mday hour min sec isDst res
 						    >>= \ ptr@(A# ptr#) ->
             if ptr /= ``NULL'' then
 		returnPrimIO (TOD (int2Integer# (indexIntOffAddr# ptr# 0#)) psec)
 	    else
 		error "Time.toClockTime: can't perform conversion"
         )
+    where
+     isDst = if isdst then (1::Int) else 0
 
 bottom :: (Int,Int)
 bottom = error "Time.bottom"
