@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelStorable.lhs,v 1.3 2001/02/28 00:01:03 qrczak Exp $
+% $Id: PrelStorable.lhs,v 1.4 2001/03/13 21:21:27 qrczak Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -18,7 +18,8 @@ module PrelStorable
 	     peekByteOff,    -- :: Ptr b -> Int      -> IO a
 	     pokeByteOff,    -- :: Ptr b -> Int -> a -> IO ()
 	     peek,           -- :: Ptr a             -> IO a
-	     poke)           -- :: Ptr a        -> a -> IO ()
+	     poke,           -- :: Ptr a        -> a -> IO ()
+	     destruct)       -- :: Ptr a             -> IO ()
         ) where
 \end{code}
 
@@ -64,6 +65,10 @@ class Storable a where
    peek        :: Ptr a      -> IO a
    poke        :: Ptr a -> a -> IO ()
 
+   -- free memory associated with the object
+   -- (except the object pointer itself)
+   destruct    :: Ptr a -> IO ()
+
    -- circular default instances
    peekElemOff = peekElemOff_ undefined
       where peekElemOff_ :: a -> Ptr a -> Int -> IO a
@@ -75,6 +80,8 @@ class Storable a where
 
    peek ptr = peekElemOff ptr 0
    poke ptr = pokeElemOff ptr 0
+
+   destruct _ = return ()
 \end{code}
 
 System-dependent, but rather obvious instances
