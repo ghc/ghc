@@ -141,7 +141,7 @@ Converting byte arrays into list of chars:
 
 \begin{code}
 unpackCStringBA :: ByteArray Int -> [Char]
-unpackCStringBA (ByteArray (l@(I# l#),u@(I# u#)) bytes) 
+unpackCStringBA (ByteArray l@(I# l#) u@(I# u#) bytes) 
  | l > u     = []
  | otherwise = unpackCStringBA# bytes (u# -# l# +# 1#)
 
@@ -160,7 +160,7 @@ unpackCStringBA# bytes len
 	ch = indexCharArray# bytes nh
 
 unpackNBytesBA :: ByteArray Int -> Int -> [Char]
-unpackNBytesBA (ByteArray (l,u) bytes) i
+unpackNBytesBA (ByteArray l u bytes) i
  = unpackNBytesBA# bytes len#
    where
     len# = case max 0 (min i len) of I# v# -> v#
@@ -190,7 +190,7 @@ Converting a list of chars into a packed @ByteArray@ representation.
 
 \begin{code}
 packCString#	     :: [Char]          -> ByteArray#
-packCString# str = case (packString str) of { ByteArray _ bytes -> bytes }
+packCString# str = case (packString str) of { ByteArray _ _ bytes -> bytes }
 
 packString :: [Char] -> ByteArray Int
 packString str = runST (packStringST str)
@@ -232,18 +232,18 @@ freeze_ps_array :: MutableByteArray s Int -> Int# -> ST s (ByteArray Int)
 
 new_ps_array size = ST $ \ s ->
     case (newCharArray# size s)	  of { (# s2#, barr# #) ->
-    (# s2#, MutableByteArray bot barr# #) }
+    (# s2#, MutableByteArray bot bot barr# #) }
   where
     bot = error "new_ps_array"
 
-write_ps_array (MutableByteArray _ barr#) n ch = ST $ \ s# ->
+write_ps_array (MutableByteArray _ _ barr#) n ch = ST $ \ s# ->
     case writeCharArray# barr# n ch s#	of { s2#   ->
     (# s2#, () #) }
 
 -- same as unsafeFreezeByteArray
-freeze_ps_array (MutableByteArray _ arr#) len# = ST $ \ s# ->
+freeze_ps_array (MutableByteArray _ _ arr#) len# = ST $ \ s# ->
     case unsafeFreezeByteArray# arr# s# of { (# s2#, frozen# #) ->
-    (# s2#, ByteArray (0,I# len#) frozen# #) }
+    (# s2#, ByteArray 0 (I# len#) frozen# #) }
 \end{code}
 
 

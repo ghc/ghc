@@ -104,7 +104,7 @@ unpackNBytesBAIO ba l = unpackNBytesAccBAIO ba l []
 -- note: no bounds checking!
 unpackNBytesAccBAIO :: ByteArray Int -> Int -> [Char] -> IO [Char]
 unpackNBytesAccBAIO _ 0  rest = return rest
-unpackNBytesAccBAIO (ByteArray _ ba) (I# len#) rest = unpack rest (len# -# 1#)
+unpackNBytesAccBAIO (ByteArray _ _ ba) (I# len#) rest = unpack rest (len# -# 1#)
   where
     unpack acc i# 
       | i# <# 0#   = return acc

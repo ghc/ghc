@@ -210,10 +210,9 @@ cvtUnsigned arr = primReadInt64Array arr 0
 malloc1 :: IO (MutableByteArray RealWorld Int)
 malloc1 = IO $ \ s# ->
   case newIntArray# 1# s# of 
-   (# s2#, barr# #) -> (# s2#, MutableByteArray bottom barr# #)
-
-bottom :: (Int,Int)
-bottom = error "Time.bottom"
+   (# s2#, barr# #) -> (# s2#, MutableByteArray bot bot barr# #)
+  where 
+	bot = error "Time.malloc1"
 
    --  The C routine fills in an unsigned word.  We don't have 
    --	`unsigned2Integer#,' so we freeze the data bits and use them 
@@ -221,7 +220,7 @@ bottom = error "Time.bottom"
    --	although (J# 1# (ptr to 0#)) is probably acceptable to gmp.
 
 cvtUnsigned :: MutableByteArray RealWorld Int -> IO Integer
-cvtUnsigned (MutableByteArray _ arr#) = IO $ \ s# ->
+cvtUnsigned (MutableByteArray _ _ arr#) = IO $ \ s# ->
   case readIntArray# arr# 0# s# of 
     (# s2#, r# #) | r# ==# 0#  -> (# s2#, 0 #)
    	          | otherwise  ->
@@ -428,7 +427,7 @@ allocWords :: Int -> IO (MutableByteArray RealWorld Int)
 allocWords (I# size#) = IO $ \ s# ->
     case newIntArray# size# s# of 
       (# s2#, barr# #) -> 
-	(# s2#, MutableByteArray bot barr# #)
+	(# s2#, MutableByteArray bot bot barr# #)
   where
     bot = error "Time.allocWords"
 #endif

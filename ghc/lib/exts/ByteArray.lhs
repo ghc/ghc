@@ -37,8 +37,8 @@ import Ix
 
 \begin{code}
 indexStablePtrArray    :: Ix ix => ByteArray ix -> ix -> (StablePtr a)
-indexStablePtrArray (ByteArray ixs barr#) n
-  = case (index ixs n)	    	    	of { I# n# ->
+indexStablePtrArray (ByteArray l u barr#) n
+  = case (index (l,u) n)    	    	of { I# n# ->
     case indexStablePtrArray# barr# n# 	of { r# ->
     (StablePtr r#)}}
 \end{code}
@@ -47,12 +47,12 @@ The size returned is in bytes.
 
 \begin{code}
 sizeofByteArray :: Ix ix => ByteArray ix -> Int
-sizeofByteArray (ByteArray _ arr#) = 
+sizeofByteArray (ByteArray _ _ arr#) = 
   case (sizeofByteArray# arr#) of
     i# -> (I# i#)
 
 boundsOfByteArray :: Ix ix => ByteArray ix -> (ix, ix)
-boundsOfByteArray (ByteArray     ixs _) = ixs
+boundsOfByteArray (ByteArray     l u _) = (l,u)
 \end{code}
 
 \begin{code}

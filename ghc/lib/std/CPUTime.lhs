@@ -62,7 +62,7 @@ getCPUTime = do
 getCPUTime :: IO Integer
 getCPUTime =
     stToIO (newIntArray ((0::Int),3))	>>= \ marr ->
-    stToIO (unsafeFreezeByteArray marr)	>>= \ barr@(ByteArray _ frozen#) ->
+    stToIO (unsafeFreezeByteArray marr)	>>= \ barr@(ByteArray _ _ frozen#) ->
     primGetCPUTime barr		        >>= \ rc ->
     if rc /= 0 then
         return ((fromIntegral (I# (indexIntArray# frozen# 0#)) * 1000000000 + 

@@ -109,7 +109,7 @@ getGroups = do
        else
 	 syserr "getGroups"
   where
-    extract (ByteArray _ barr#) (I# n#) =
+    extract (ByteArray _ _ barr#) (I# n#) =
         case indexIntArray# barr# n# of
 	  r# -> (I# r#)
 #endif

@@ -26,7 +26,7 @@ digest :: String -> IO String
 digest str = do
   ps   <- stToIO (packStringST str)
   ba   <- digestPS ps
-  let (ByteArray _ ba#) = ba
+  let (ByteArray _ _ ba#) = ba
   baToString ba# 16# 0#
  where
   baToString ba# n# i#

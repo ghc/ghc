@@ -149,8 +149,8 @@ comparePS (PS  bs1 len1 has_null1) (PS  bs2 len2 has_null2)
     else		    GT
     ))
   where
-    ba1 = ByteArray (0, I# (len1 -# 1#)) bs1
-    ba2 = ByteArray (0, I# (len2 -# 1#)) bs2
+    ba1 = ByteArray 0 (I# (len1 -# 1#)) bs1
+    ba2 = ByteArray 0 (I# (len2 -# 1#)) bs2
 
 comparePS (PS  bs1 len1 has_null1) (CPS bs2 _)
   | not has_null1
@@ -162,7 +162,7 @@ comparePS (PS  bs1 len1 has_null1) (CPS bs2 _)
     else		    GT
     ))
   where
-    ba1 = ByteArray (0, I# (len1 -# 1#)) bs1
+    ba1 = ByteArray 0 (I# (len1 -# 1#)) bs1
     ba2 = A# bs2
 
 comparePS (CPS bs1 len1) (CPS bs2 _)
@@ -242,7 +242,7 @@ packNCharsST (I# length#) str =
    -- fill in packed string from "str"
  fill_in ch_array 0# str   >>
    -- freeze the puppy:
- freeze_ps_array ch_array length# >>= \ (ByteArray _ frozen#) ->
+ freeze_ps_array ch_array length# >>= \ (ByteArray _ _ frozen#) ->
  let has_null = byteArrayHasNUL# frozen# length# in
  return (PS frozen# length# has_null)
  where
@@ -256,13 +256,14 @@ packNCharsST (I# length#) str =
    fill_in arr_in# (idx +# 1#) cs
 
 byteArrayToPS :: ByteArray Int -> PackedString
-byteArrayToPS (ByteArray ixs@(_, ix_end) frozen#) =
+byteArrayToPS (ByteArray l u frozen#) =
  let
+  ixs = (l,u)
   n# = 
    case (
 	 if null (range ixs)
 	  then 0
-	  else ((index ixs ix_end) + 1)
+	  else ((index ixs u) + 1)
         ) of { I# x -> x }
  in
  PS frozen# n# (byteArrayHasNUL# frozen# n#)
@@ -270,13 +271,14 @@ byteArrayToPS (ByteArray ixs@(_, ix_end) frozen#) =
 -- byteArray is zero-terminated, make everything upto it
 -- a packed string.
 cByteArrayToPS :: ByteArray Int -> PackedString
-cByteArrayToPS (ByteArray ixs@(_, ix_end) frozen#) =
+cByteArrayToPS (ByteArray l u frozen#) =
  let
+  ixs = (l,u)
   n# = 
    case (
 	 if null (range ixs)
 	  then 0
-	  else ((index ixs ix_end) + 1)
+	  else ((index ixs u) + 1)
         ) of { I# x -> x }
   len# = findNull 0#
 
@@ -290,11 +292,11 @@ cByteArrayToPS (ByteArray ixs@(_, ix_end) frozen#) =
  PS frozen# len# False
 
 unsafeByteArrayToPS :: ByteArray a -> Int -> PackedString
-unsafeByteArrayToPS (ByteArray _ frozen#) (I# n#)
+unsafeByteArrayToPS (ByteArray _ _ frozen#) (I# n#)
   = PS frozen# n# (byteArrayHasNUL# frozen# n#)
 
 psToByteArray	 :: PackedString -> ByteArray Int
-psToByteArray (PS bytes n _) = ByteArray (0, I# (n -# 1#)) bytes
+psToByteArray (PS bytes n _) = ByteArray 0 (I# (n -# 1#)) bytes
 
 psToByteArray (CPS addr len#)
   = let
@@ -302,7 +304,7 @@ psToByteArray (CPS addr len#)
 	byte_array_form = packCBytes len (A# addr)
     in
     case byte_array_form of { PS bytes _ _ ->
-    ByteArray (0, len - 1) bytes }
+    ByteArray 0 (len - 1) bytes }
 
 -- isCString is useful when passing PackedStrings to the
 -- outside world, and need to figure out whether you can
@@ -389,7 +391,7 @@ Output a packed string via a handle:
 \begin{code}
 hPutPS :: Handle -> PackedString -> IO ()
 hPutPS handle (CPS a# len#)    = hPutBuf    handle (A# a#) (I# len#)
-hPutPS handle (PS  ba# len# _) = hPutBufBA  handle (ByteArray bottom ba#) (I# len#)
+hPutPS handle (PS  ba# len# _) = hPutBufBA  handle (ByteArray bottom bottom ba#) (I# len#)
   where
     bottom = error "hPutPS"
 \end{code}
@@ -404,9 +406,9 @@ hGetPS hdl len@(I# len#)
  | otherwise   =
     -- Allocate an array for system call to store its bytes into.
    stToIO (new_ps_array len# )		 >>= \ ch_arr ->
-   stToIO (freeze_ps_array ch_arr len#)  >>= \ (ByteArray _ frozen#) ->
+   stToIO (freeze_ps_array ch_arr len#)  >>= \ (ByteArray _ _ frozen#) ->
    let
-    byte_array = ByteArray (0, I# len#) frozen#
+    byte_array = ByteArray 0 (I# len#) frozen#
    in
    hFillBufBA hdl byte_array len >>= \  (I# read#) ->
    if read# ==# 0# then -- EOF or other error
@@ -462,7 +464,7 @@ byteArrayHasNUL# bs len
     if res ==# 0# then False else True
     ))
   where
-    ba = ByteArray (0, I# (len -# 1#)) bs
+    ba = ByteArray 0 (I# (len -# 1#)) bs
 
 -----------------------
 
@@ -515,7 +517,7 @@ mapPS f xs =
      runST (
        new_ps_array (length +# 1#)         >>= \ ps_arr ->
        whizz ps_arr length 0#              >>
-       freeze_ps_array ps_arr length       >>= \ (ByteArray _ frozen#) ->
+       freeze_ps_array ps_arr length       >>= \ (ByteArray _ _ frozen#) ->
        let has_null = byteArrayHasNUL# frozen# length in
        return (PS frozen# length has_null))
   where
@@ -570,7 +572,7 @@ filterPS pred ps =
        else
          new_ps_array (len_filtered# +# 1#)   >>= \ ps_arr ->
          copy_arr ps_arr rle 0# 0#            >>
-         freeze_ps_array ps_arr len_filtered# >>= \ (ByteArray _ frozen#) ->
+         freeze_ps_array ps_arr len_filtered# >>= \ (ByteArray _ _ frozen#) ->
          let has_null = byteArrayHasNUL# frozen# len_filtered# in
          return (PS frozen# len_filtered# has_null))
   where
@@ -745,7 +747,7 @@ reversePS ps =
     runST (
       new_ps_array (length +# 1#)    >>= \ arr# -> -- incl NUL byte!
       fill_in arr# (length -# 1#) 0# >>
-      freeze_ps_array arr# length    >>= \ (ByteArray _ frozen#) ->
+      freeze_ps_array arr# length    >>= \ (ByteArray _ _ frozen#) ->
       let has_null = byteArrayHasNUL# frozen# length in
       return (PS frozen# length has_null))
  where
@@ -772,7 +774,7 @@ concatPS pss
     runST (
     new_ps_array (tot_len# +# 1#)   >>= \ arr# -> -- incl NUL byte!
     packum arr# pss 0#		    >>
-    freeze_ps_array arr# tot_len#   >>= \ (ByteArray _ frozen#) ->
+    freeze_ps_array arr# tot_len#   >>= \ (ByteArray _ _ frozen#) ->
 
     let has_null = byteArrayHasNUL# frozen# tot_len# in
 	  
@@ -875,7 +877,7 @@ substrPS# ps s e
   = runST (
 	new_ps_array (result_len# +# 1#)   >>= \ ch_arr -> -- incl NUL byte!
 	fill_in ch_arr 0#	           >>
-	freeze_ps_array ch_arr result_len# >>= \ (ByteArray _ frozen#) ->
+	freeze_ps_array ch_arr result_len# >>= \ (ByteArray _ _ frozen#) ->
 
 	let has_null = byteArrayHasNUL# frozen# result_len# in
 	  
@@ -927,7 +929,7 @@ packCBytesST (I# length#) (A# addr) =
    -- fill in packed string from "addr"
   fill_in ch_array 0#   >>
    -- freeze the puppy:
-  freeze_ps_array ch_array length# >>= \ (ByteArray _ frozen#) ->
+  freeze_ps_array ch_array length# >>= \ (ByteArray _ _ frozen#) ->
   let has_null = byteArrayHasNUL# frozen# length# in
   return (PS frozen# length# has_null)
   where

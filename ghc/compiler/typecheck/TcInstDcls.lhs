@@ -565,13 +565,13 @@ ccallable_type   ty = isUnLiftedType ty ||				-- Allow CCallable Int# etc
 		      byte_arr_thing
   where
     byte_arr_thing = case splitProductType_maybe ty of
-			Just (tycon, ty_args, data_con, [data_con_arg_ty1, data_con_arg_ty2]) ->
-				maybeToBool maybe_arg2_tycon &&
-				(arg2_tycon == byteArrayPrimTyCon ||
-				 arg2_tycon == mutableByteArrayPrimTyCon)
+			Just (tycon, ty_args, data_con, [data_con_arg_ty1, data_con_arg_ty2, data_con_arg_ty3]) ->
+				maybeToBool maybe_arg3_tycon &&
+				(arg3_tycon == byteArrayPrimTyCon ||
+				 arg3_tycon == mutableByteArrayPrimTyCon)
 			     where
-				maybe_arg2_tycon    = splitTyConApp_maybe data_con_arg_ty2
-				Just (arg2_tycon,_) = maybe_arg2_tycon
+				maybe_arg3_tycon    = splitTyConApp_maybe data_con_arg_ty3
+				Just (arg3_tycon,_) = maybe_arg3_tycon
 
 			other -> False
 

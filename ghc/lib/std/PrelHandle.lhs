@@ -1022,7 +1022,7 @@ reportStackOverflow bombOut = do
 reportError :: Bool -> String -> IO ()
 reportError bombOut str = do
    (hFlush stdout) `catchException` (\ _ -> return ())
-   let bs@(ByteArray (_,len) _) = packString str
+   let bs@(ByteArray _ len _) = packString str
    writeErrString addrOf_ErrorHdrHook bs len
    if bombOut then
      stg_exit 1

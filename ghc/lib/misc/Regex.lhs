@@ -62,7 +62,7 @@ createPatBuffer :: Bool -> IO PatBuffer
 
 createPatBuffer insensitive
  =  _casm_ ``%r = (int)sizeof(struct re_pattern_buffer);'' >>= \ sz ->
-    stToIO (newCharArray (0::Int,sz))	>>= \ (MutableByteArray _ pbuf#) ->
+    stToIO (newCharArray (0::Int,sz))	>>= \ (MutableByteArray _ _ pbuf#) ->
     let
 	 pbuf = PatBuffer# pbuf#
     in

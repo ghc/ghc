@@ -107,7 +107,7 @@ not supported.
 
 \begin{code}
 sizeofMutableByteArray :: Ix ix => MutableByteArray s ix -> Int
-sizeofMutableByteArray (MutableByteArray _ arr#) = 
+sizeofMutableByteArray (MutableByteArray _ _ arr#) = 
   case (sizeofMutableByteArray# arr#) of
     i# -> (I# i#)
 
@@ -115,28 +115,28 @@ sizeofMutableByteArray (MutableByteArray _ arr#) =
 
 \begin{code}
 newStablePtrArray :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
-newStablePtrArray ixs = ST $ \ s# ->
+newStablePtrArray ixs@(l,u) = ST $ \ s# ->
     case rangeSize ixs              of { I# n# ->
     case (newStablePtrArray# n# s#) of { (# s2#, barr# #) ->
-    (# s2#, (MutableByteArray ixs barr#) #) }}
+    (# s2#, (MutableByteArray l u barr#) #) }}
 
 readStablePtrArray    :: Ix ix => MutableByteArray s ix -> ix -> ST s (StablePtr a)
-readStablePtrArray (MutableByteArray ixs barr#) n = ST $ \ s# ->
-    case (index ixs n)	    	    	  of { I# n# ->
+readStablePtrArray (MutableByteArray l u barr#) n = ST $ \ s# ->
+    case (index (l,u) n)    	    	  of { I# n# ->
     case readStablePtrArray# barr# n# s#  of { (# s2#, r# #) ->
     (# s2# , (StablePtr r#) #) }}
 
 writeStablePtrArray    :: Ix ix => MutableByteArray s ix -> ix -> StablePtr a  -> ST s () 
-writeStablePtrArray (MutableByteArray ixs barr#) n (StablePtr sp#) = ST $ \ s# ->
-    case (index ixs n)	    	    	       of { I# n# ->
+writeStablePtrArray (MutableByteArray l u barr#) n (StablePtr sp#) = ST $ \ s# ->
+    case (index (l,u) n)    	    	       of { I# n# ->
     case writeStablePtrArray# barr# n# sp# s#  of { s2#   ->
     (# s2# , () #) }}
 
 freezeStablePtrArray    :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
-freezeStablePtrArray (MutableByteArray ixs arr#) = ST $ \ s# ->
-    case rangeSize ixs     of { I# n# ->
+freezeStablePtrArray (MutableByteArray l u arr#) = ST $ \ s# ->
+    case rangeSize (l,u)   of { I# n# ->
     case freeze arr# n# s# of { (# s2# , frozen# #) ->
-    (# s2# , ByteArray ixs frozen# #) }}
+    (# s2# , ByteArray l u frozen# #) }}
   where
     freeze  :: MutableByteArray# s	-- the thing
 	    -> Int#			-- size of thing to be frozen
@@ -174,14 +174,14 @@ readWord8Array  :: (Ix ix) => MutableByteArray s ix -> ix -> ST s Word8
 readWord16Array :: (Ix ix) => MutableByteArray s ix -> ix -> ST s Word16
 readWord32Array :: (Ix ix) => MutableByteArray s ix -> ix -> ST s Word32
 
-readWord8Array (MutableByteArray ixs arr#) n = ST $ \ s# ->
-    case (index ixs n)	    	    of { I# n# ->
+readWord8Array (MutableByteArray l u arr#) n = ST $ \ s# ->
+    case (index (l,u) n)	    	    of { I# n# ->
     case readCharArray# arr# n# s#  of { (# s2# , r# #) ->
     (# s2# , intToWord8 (I# (ord# r#)) #) }}
 
 
-readWord16Array (MutableByteArray ixs arr#) n = ST $ \ s# ->
-    case (index ixs n)	    	                    of { I# n# ->
+readWord16Array (MutableByteArray l u arr#) n = ST $ \ s# ->
+    case (index (l,u) n)	    	                    of { I# n# ->
     case readWordArray# arr# (n# `quotInt#` 2#) s#  of { (# s2# , w# #) -> 
     case n# `remInt#` 2# of
       0# -> (# s2# , wordToWord16 (W# w#) #)           
@@ -190,8 +190,8 @@ readWord16Array (MutableByteArray ixs arr#) n = ST $ \ s# ->
               -- take the upper 16 bits.
     }}
 
-readWord32Array (MutableByteArray ixs arr#) n = ST $ \ s# ->
-    case (index ixs n)	    	        of { I# n# ->
+readWord32Array (MutableByteArray l u arr#) n = ST $ \ s# ->
+    case (index (l,u) n)	    	        of { I# n# ->
     case readWordArray# arr# n# s#      of { (# s2# , w# #) ->
     (# s2# , wordToWord32 (W# w#) #) }}
 
@@ -211,13 +211,13 @@ writeWord8Array  :: (Ix ix) => MutableByteArray s ix -> ix -> Word8  -> ST s ()
 writeWord16Array :: (Ix ix) => MutableByteArray s ix -> ix -> Word16 -> ST s ()
 writeWord32Array :: (Ix ix) => MutableByteArray s ix -> ix -> Word32 -> ST s ()
 
-writeWord8Array (MutableByteArray ixs arr#) n w = ST $ \ s# ->
-    case (index ixs n) of 
+writeWord8Array (MutableByteArray l u arr#) n w = ST $ \ s# ->
+    case (index (l,u) n) of 
       I# n# -> case writeCharArray# arr# n# (chr# (word2Int# (word8ToWord# w))) s#  of 
                     s2# -> (# s2# , () #)
 
-writeWord16Array (MutableByteArray ixs arr#) n w = ST $ \ s# ->
-    case (index ixs n) of 
+writeWord16Array (MutableByteArray l u arr#) n w = ST $ \ s# ->
+    case (index (l,u) n) of 
       I# n# -> 
 	 let
           w# = 
@@ -236,8 +236,8 @@ writeWord16Array (MutableByteArray ixs arr#) n w = ST $ \ s# ->
               case writeWordArray# arr# (n# `quotInt#` 2#) (w# `or#` (v# `and#` mask )) s2#  of 
                s3# -> (# s3# , () #) 
 
-writeWord32Array (MutableByteArray ixs arr#) n w = ST $ \ s# ->
-    case (index ixs n) of 
+writeWord32Array (MutableByteArray l u arr#) n w = ST $ \ s# ->
+    case (index (l,u) n) of 
       I# n# ->
         case writeWordArray# arr# n# w# s#  of 
           s2# -> (# s2# , () #) 
@@ -267,13 +267,13 @@ readInt8Array  :: (Ix ix) => MutableByteArray s ix -> ix -> ST s Int8
 readInt16Array :: (Ix ix) => MutableByteArray s ix -> ix -> ST s Int16
 readInt32Array :: (Ix ix) => MutableByteArray s ix -> ix -> ST s Int32
 
-readInt8Array (MutableByteArray ixs arr#) n = ST $ \ s# ->
-    case (index ixs n)	    	    of { I# n# ->
+readInt8Array (MutableByteArray l u arr#) n = ST $ \ s# ->
+    case (index (l,u) n)	    	    of { I# n# ->
     case readCharArray# arr# n# s#  of { (# s2# , r# #) ->
     (# s2# , intToInt8 (I# (ord# r#)) #) }}
 
-readInt16Array (MutableByteArray ixs arr#) n = ST $ \ s# ->
-    case (index ixs n) of 
+readInt16Array (MutableByteArray l u arr#) n = ST $ \ s# ->
+    case (index (l,u) n) of 
      I# n# ->
        case readIntArray# arr# (n# `quotInt#` 2#) s#  of 
         (# s2# , i# #) -> 
@@ -281,8 +281,8 @@ readInt16Array (MutableByteArray ixs arr#) n = ST $ \ s# ->
 	     0# -> (# s2# , intToInt16 (I# i#) #)
 	     1# -> (# s2# , intToInt16 (I# (word2Int# (shiftRL# (int2Word# i#) 16# ))) #)
 
-readInt32Array (MutableByteArray ixs arr#) n = ST $ \ s# ->
-    case (index ixs n) of 
+readInt32Array (MutableByteArray l u arr#) n = ST $ \ s# ->
+    case (index (l,u) n) of 
       I# n# -> case readIntArray# arr# n# s# of
                  (# s2# , i# #) -> (# s2# , intToInt32 (I# i#) #)
 
@@ -300,16 +300,16 @@ writeInt8Array  :: (Ix ix) => MutableByteArray s ix -> ix -> Int8  -> ST s ()
 writeInt16Array :: (Ix ix) => MutableByteArray s ix -> ix -> Int16 -> ST s ()
 writeInt32Array :: (Ix ix) => MutableByteArray s ix -> ix -> Int32 -> ST s ()
 
-writeInt8Array (MutableByteArray ixs arr#) n i = ST $ \ s# ->
-    case (index ixs n) of
+writeInt8Array (MutableByteArray l u arr#) n i = ST $ \ s# ->
+    case (index (l,u) n) of
       I# n# ->
         case writeCharArray# arr# n# ch s#  of 
            s2# -> (# s2# , () #) 
   where
    ch = chr# (int8ToInt# i)
 
-writeInt16Array (MutableByteArray ixs arr#) n i = ST $ \ s# ->
-    case (index ixs n) of
+writeInt16Array (MutableByteArray l u arr#) n i = ST $ \ s# ->
+    case (index (l,u) n) of
       I# n# ->
 	 let
           i# = 
@@ -330,8 +330,8 @@ writeInt16Array (MutableByteArray ixs arr#) n i = ST $ \ s# ->
               case writeIntArray# arr# (n# `quotInt#` 2#) w' s2#  of
                 s2# -> (# s2# , () #) 
 
-writeInt32Array (MutableByteArray ixs arr#) n i = ST $ \ s# ->
-   case (index ixs n) of
+writeInt32Array (MutableByteArray l u arr#) n i = ST $ \ s# ->
+   case (index (l,u) n) of
      I# n# ->
         case writeIntArray# arr# n# i# s#  of 
           s2# -> (# s2# , () #) 
@@ -357,13 +357,13 @@ writeInt64Array mb n w = do
 \begin{code}
 {-# SPECIALIZE boundsOfMutableByteArray :: MutableByteArray s Int -> IPr #-}
 boundsOfMutableByteArray :: Ix ix => MutableByteArray s ix -> (ix, ix)
-boundsOfMutableByteArray (MutableByteArray ixs _) = ixs
+boundsOfMutableByteArray (MutableByteArray l u _) = (l,u)
 
 \end{code}
 
 \begin{code}
 thawByteArray :: Ix ix => ByteArray ix -> ST s (MutableByteArray s ix)
-thawByteArray (ByteArray ixs barr#) =
+thawByteArray (ByteArray l u barr#) =
      {- 
         The implementation is made more complex by the
         fact that the indexes are in units of whatever
@@ -375,8 +375,8 @@ thawByteArray (ByteArray ixs barr#) =
        mapM_ (\ idx@(I# idx#) -> 
                  writeCharArray marr idx (C# (indexCharArray# barr# idx#)))
   	     [0..]
-       let (MutableByteArray _ arr#) = marr
-       return (MutableByteArray ixs arr#) 
+       let (MutableByteArray _ _ arr#) = marr
+       return (MutableByteArray l u arr#) 
 
 {-
   in-place conversion of immutable arrays to mutable ones places
@@ -385,8 +385,8 @@ thawByteArray (ByteArray ixs barr#) =
   thaw it (and, subsequently mutate it, I suspect.)
 -}
 unsafeThawByteArray :: Ix ix => ByteArray ix -> ST s (MutableByteArray s ix)
-unsafeThawByteArray (ByteArray ixs barr#) = ST $ \ s# ->
+unsafeThawByteArray (ByteArray l u barr#) = ST $ \ s# ->
    case unsafeThawByteArray# barr# s# of
-      (# s2#, arr# #) -> (# s2#, MutableByteArray ixs arr# #)
+      (# s2#, arr# #) -> (# s2#, MutableByteArray l u arr# #)
 
 \end{code}

@@ -100,7 +100,7 @@ instance  Ix Int  where
     index b i | inRange b i =  unsafeIndex b i
 	      | otherwise   =  indexError b i "Int"
 
-    inRange (m,n) i	=  m <= i && i <= n
+    inRange (I# m,I# n) (I# i) =  m <=# i && i <=# n
 
 
 ----------------------------------------------------------------------

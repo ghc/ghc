@@ -136,13 +136,13 @@ unboxArg arg
 
   -- Byte-arrays, both mutable and otherwise; hack warning
   | is_product_type &&
-    length data_con_arg_tys == 2 &&
-    maybeToBool maybe_arg2_tycon &&
-    (arg2_tycon ==  byteArrayPrimTyCon ||
-     arg2_tycon ==  mutableByteArrayPrimTyCon)
+    length data_con_arg_tys == 3 &&
+    maybeToBool maybe_arg3_tycon &&
+    (arg3_tycon ==  byteArrayPrimTyCon ||
+     arg3_tycon ==  mutableByteArrayPrimTyCon)
     -- and, of course, it is an instance of CCallable
   = newSysLocalDs arg_ty		`thenDs` \ case_bndr ->
-    newSysLocalsDs data_con_arg_tys	`thenDs` \ vars@[ixs_var, arr_cts_var] ->
+    newSysLocalsDs data_con_arg_tys	`thenDs` \ vars@[l_var, r_var, arr_cts_var] ->
     returnDs (Var arr_cts_var,
 	      \ body -> Case arg case_bndr [(DataCon data_con,vars,body)]
     )
@@ -167,10 +167,11 @@ unboxArg arg
     maybe_product_type 			   	  = splitProductType_maybe arg_ty
     is_product_type			   	  = maybeToBool maybe_product_type
     Just (tycon, _, data_con, data_con_arg_tys)   = maybe_product_type
-    (data_con_arg_ty1 : data_con_arg_ty2 : _)	  = data_con_arg_tys
+    (data_con_arg_ty1 : data_con_arg_ty2 : data_con_arg_ty3 :_)
+	  = data_con_arg_tys
 
-    maybe_arg2_tycon = splitTyConApp_maybe data_con_arg_ty2
-    Just (arg2_tycon,_) = maybe_arg2_tycon
+    maybe_arg3_tycon = splitTyConApp_maybe data_con_arg_ty3
+    Just (arg3_tycon,_) = maybe_arg3_tycon
 
 can'tSeeDataConsPanic thing ty
   = pprPanic

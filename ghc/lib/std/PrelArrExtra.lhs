@@ -22,10 +22,10 @@ import PrelGHC
 freezeFloatArray  :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
 freezeDoubleArray :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
 
-freezeFloatArray (MutableByteArray ixs arr#) = ST $ \ s# ->
-    case rangeSize ixs     of { I# n# ->
+freezeFloatArray (MutableByteArray l u arr#) = ST $ \ s# ->
+    case rangeSize (l,u)   of { I# n# ->
     case freeze arr# n# s# of { (# s2#, frozen# #) ->
-    (# s2#, ByteArray ixs frozen# #) }}
+    (# s2#, ByteArray l u frozen# #) }}
   where
     freeze  :: MutableByteArray# s	-- the thing
 	    -> Int#			-- size of thing to be frozen
@@ -52,10 +52,10 @@ freezeFloatArray (MutableByteArray ixs arr#) = ST $ \ s# ->
 	      copy (cur# +# 1#) from# to# s3#
 	      }}
 
-freezeDoubleArray (MutableByteArray ixs arr#) = ST $ \ s# ->
-    case rangeSize ixs     of { I# n# ->
+freezeDoubleArray (MutableByteArray l u arr#) = ST $ \ s# ->
+    case rangeSize (l,u)   of { I# n# ->
     case freeze arr# n# s# of { (# s2#, frozen# #) ->
-    (# s2#, ByteArray ixs frozen# #) }}
+    (# s2#, ByteArray l u frozen# #) }}
   where
     freeze  :: MutableByteArray# s	-- the thing
 	    -> Int#			-- size of thing to be frozen

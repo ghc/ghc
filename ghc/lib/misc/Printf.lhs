@@ -173,7 +173,7 @@ dfmt c{-e,f, or g-} prec d
 	    sprintf_fmt  = "%1" ++ (if prec < 0 then "" else '.':itos prec) ++ [c]
 	in
 	_ccall_ sprintf sprintf_here sprintf_fmt d >>
-	stToIO (freezeCharArray sprintf_here)	   >>= \ (ByteArray _ arr#) ->
+	stToIO (freezeCharArray sprintf_here)	   >>= \ (ByteArray _ _ arr#) ->
 	let
             unpack :: Int# -> [Char]
             unpack nh = case (ord# (indexCharArray# arr# nh)) of
