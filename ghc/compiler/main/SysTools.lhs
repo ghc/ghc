@@ -68,7 +68,7 @@ import DriverPhases     ( isHaskellUserSrcFilename )
 import Config
 import Outputable
 import Panic		( GhcException(..) )
-import Util		( global, notNull )
+import Util		( global, notNull, toArgs )
 import CmdLineOpts	( dynFlag, verbosity )
 
 import EXCEPTION	( throwDyn )
@@ -81,7 +81,7 @@ import IO		( try, catch,
 			  openFile, hPutStrLn, hPutStr, hClose, hFlush, IOMode(..),
 			  stderr )
 import Directory	( doesFileExist, removeFile )
-import List             ( intersperse, partition )
+import List             ( partition )
 
 #include "../includes/config.h"
 
@@ -727,8 +727,14 @@ runSomething :: String		-- For -v message
 
 runSomething phase_name pgm args = do
   let real_args = filter notNull (map showOpt args)
-  traceCmd phase_name (concat (intersperse " " (pgm:real_args))) $ do
-  exit_code <- rawSystem pgm real_args
+    -- Don't assume that 'pgm' contains the program path only,
+    -- but split it up and shift any arguments over to the arg vector.
+  let (real_pgm, argv) =
+        case toArgs pgm of
+	  []     -> (pgm, real_args) -- let rawSystem be the bearer of bad news..
+	  (x:xs) -> (x, xs ++ real_args)
+  traceCmd phase_name (unwords (pgm:real_args)) $ do
+  exit_code <- rawSystem real_pgm argv
   if (exit_code /= ExitSuccess)
 	then throwDyn (PhaseFailed phase_name exit_code)
 	else return ()
@@ -783,10 +789,9 @@ foreign import ccall "rawSystem" unsafe
 -- a single string.  Command-line parsing is done by the executable
 -- itself.
 rawSystem cmd args = do
-  let cmdline = {-translate-} cmd ++ concat (map ((' ':) . translate) args)
-	-- Urk, don't quote/escape the command name on Windows, because the
-	-- compiler is exceedingly naughty and sometimes uses 'perl "..."' 
-	-- as the command name.
+	-- NOTE: 'cmd' is assumed to contain the application to run _only_,
+	-- as it'll be quoted surrounded in quotes here.
+  let cmdline = translate cmd ++ concat (map ((' ':) . translate) args)
   withCString cmdline $ \pcmdline -> do
     status <- throwErrnoIfMinus1 "rawSystem" (c_rawSystem pcmdline)
     case status of
@@ -794,6 +799,7 @@ rawSystem cmd args = do
        n  -> return (ExitFailure n)
 
 translate :: String -> String
+translate str@('"':_) = str -- already escaped.
 translate str = '"' : foldr escape "\"" str
   where escape '"'  str = '\\' : '"'  : str
 	escape '\\' str = '\\' : '\\' : str
