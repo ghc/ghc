@@ -19,7 +19,7 @@ module CoreUnfold (
 	noUnfolding, mkTopUnfolding, mkUnfolding, mkCompulsoryUnfolding, seqUnfolding,
 	mkOtherCon, otherCons,
 	unfoldingTemplate, maybeUnfoldingTemplate,
-	isEvaldUnfolding, isCheapUnfolding,
+	isEvaldUnfolding, isCheapUnfolding, isCompulsoryUnfolding,
 	hasUnfolding, hasSomeUnfolding,
 
 	couldBeSmallEnoughToInline, 
@@ -145,6 +145,10 @@ isEvaldUnfolding other			          = False
 isCheapUnfolding :: Unfolding -> Bool
 isCheapUnfolding (CoreUnfolding _ _ is_cheap _ _) = is_cheap
 isCheapUnfolding other				  = False
+
+isCompulsoryUnfolding :: Unfolding -> Bool
+isCompulsoryUnfolding (CompulsoryUnfolding _) = True
+isCompulsoryUnfolding other		      = False
 
 hasUnfolding :: Unfolding -> Bool
 hasUnfolding (CoreUnfolding _ _ _ _ _) = True

@@ -51,10 +51,11 @@ module SimplMonad (
 #include "HsVersions.h"
 
 import Const		( Con(DEFAULT) )
-import Id		( Id, mkSysLocal, isConstantId )
+import Id		( Id, mkSysLocal, getIdUnfolding )
 import IdInfo		( InlinePragInfo(..) )
 import Demand		( Demand )
 import CoreSyn
+import CoreUnfold	( isCompulsoryUnfolding )
 import PprCore		()	-- Instances
 import Rules		( RuleBase )
 import CostCentre	( CostCentreStack, subsumedCCS )
@@ -744,7 +745,8 @@ environment seems like wild overkill.
 \begin{code}
 switchOffInlining :: SimplM a -> SimplM a
 switchOffInlining m env us sc
-  = m (env { seBlackList = \v -> (v `isInScope` subst) || not (isLocallyDefined v) 
+  = m (env { seBlackList = \v -> not (isCompulsoryUnfolding (getIdUnfolding v)) &&
+				 ((v `isInScope` subst) || not (isLocallyDefined v))
 	   }) us sc
 	-- Black list anything that is in scope or imported.
 	-- The in-scope thing arranges *not* to black list inlinings that are
@@ -758,6 +760,12 @@ switchOffInlining m env us sc
 	--	       to inline them
 	-- But that failed because if we inline (say) [] in build's rhs, then
 	-- the exported thing doesn't match rules
+	--
+	-- But we must inline primops (which have compulsory unfoldings) in the
+	-- last phase of simplification, because they don't have bindings.
+	-- The simplifier now *never* inlines blacklisted things (even if they
+	-- have compulsory unfoldings) so we must not black-list compulsory
+	-- unfoldings inside INLINE prags.
   where
     subst	   = seSubst env
     old_black_list = seBlackList env

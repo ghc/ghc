@@ -690,7 +690,6 @@ sub setupOptimiseFlags {
     = (	
 	'-fsimplify',
 	  '[', 
-		'-finline-phase2',
 	 	$Oopt_MaxSimplifierIterations,
 	  ']',
 
