@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.112 2003/01/26 12:56:00 panne Exp $
+dnl $Id: aclocal.m4,v 1.113 2003/01/27 16:41:18 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -1081,8 +1081,9 @@ AC_DEFUN(FPTOOLS_HAVE_OPENGL,
 
 dnl Check for Mesa first if we were asked to.
   AC_ARG_ENABLE(Mesa,
-                AC_HELP_STRING([--enable-Mesa],
-                               [Prefer Mesa over a vendor's native OpenGL library (default=no)]),
+[  --enable-mesa
+	Prefer Mesa over a vendor's native OpenGL library (default=no)
+],
                 use_Mesa=$enableval,
                 use_Mesa=no)
 
@@ -1165,7 +1166,7 @@ dnl and GL_X_LIBS.
        fi
      fi
   fi
-  AC_MSG_NOTICE([It looks like GL version ${fptools_gl_version}])
+  echo "It looks like GL version ${fptools_gl_version}"
 
   dnl TODO: Cache the results of the tests for the imaging subset.
 
@@ -1228,7 +1229,7 @@ dnl and GL_X_LIBS.
        fi
      fi
   fi
-  AC_MSG_NOTICE([It looks like GLU version ${fptools_glu_version}])
+  echo "It looks like GLU version ${fptools_glu_version}"
 
   FPTOOLS_SEARCH_LIBS([#include <GL/glx.h>],  glXWaitX,      $GLX_search_list, have_GLX=yes,  have_GLX=no)
   FPTOOLS_SEARCH_LIBS([#include <GL/glut.h>], glutMainLoop,  glut32 glut,      have_glut=yes, have_glut=no)
@@ -1275,7 +1276,7 @@ fi
 
 dnl
 dnl Check to see whether CC (gcc) supports a particular option.
-dnl 
+dnl
 AC_DEFUN(FPTOOLS_CC_FLAG,
 [
 AC_CACHE_CHECK([whether $CC accepts $1], [ac_cv_cc_$2],
