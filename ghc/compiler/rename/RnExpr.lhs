@@ -172,7 +172,7 @@ rnMatch match@(Match _ pats maybe_rhs_sig grhss)
 	-- Note that we do a single bindLocalsRn for all the
 	-- matches together, so that we spot the repeated variable in
 	--	f x x = 1
-    bindLocalsFVRn "pattern" (collectPatsBinders pats) 	$ \ new_binders ->
+    bindLocalsFVRn "a pattern" (collectPatsBinders pats) $ \ new_binders ->
 
     mapAndUnzipRn rnPat pats		`thenRn` \ (pats', pat_fvs_s) ->
     rnGRHSs grhss			`thenRn` \ (grhss', grhss_fvs) ->
@@ -484,7 +484,7 @@ rnStmt :: RnExprTy s -> RdrNameStmt
 rnStmt rn_expr (BindStmt pat expr src_loc) thing_inside
   = pushSrcLocRn src_loc $
     rn_expr expr		 			`thenRn` \ (expr', fv_expr) ->
-    bindLocalsFVRn "pattern in do binding" binders	$ \ new_binders ->
+    bindLocalsFVRn "a pattern in do binding" binders	$ \ new_binders ->
     rnPat pat					 	`thenRn` \ (pat', fv_pat) ->
     thing_inside (BindStmt pat' expr' src_loc)		`thenRn` \ (result, fvs) -> 
     returnRn (result, fv_expr `plusFV` fvs `plusFV` fv_pat)

@@ -156,7 +156,7 @@ printSDoc d sty = printDoc PageMode stdout (d sty)
 printErrs :: SDoc -> IO ()
 printErrs doc = printDoc PageMode stderr (final_doc user_style)
 	      where
-		final_doc = doc $$ text ""
+		final_doc = doc 	-- $$ text ""
 		user_style = mkUserStyle (PartWay opt_PprUserLength)
 
 printDump :: SDoc -> IO ()

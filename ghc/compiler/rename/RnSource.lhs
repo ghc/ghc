@@ -677,7 +677,7 @@ rnCoreExpr (UfApp fun arg)
 
 rnCoreExpr (UfCase scrut bndr alts) 
   = rnCoreExpr scrut			`thenRn` \ scrut' ->
-    bindLocalsRn "UfCase" [bndr]	$ \ [bndr'] ->
+    bindLocalsRn "a UfCase" [bndr]	$ \ [bndr'] ->
     mapRn rnCoreAlt alts		`thenRn` \ alts' ->
     returnRn (UfCase scrut' bndr' alts')
 
@@ -715,7 +715,7 @@ rnCoreBndr (UfValBinder name ty) thing_inside
     str = "unfolding id"
     
 rnCoreBndr (UfTyBinder name kind) thing_inside
-  = bindLocalsRn "unfolding tyvar" [name] $ \ [name'] ->
+  = bindLocalsRn "an unfolding tyvar" [name] $ \ [name'] ->
     thing_inside (UfTyBinder name' kind)
     
 rnCoreBndrs bndrs thing_inside		-- Expect them all to be ValBinders
@@ -730,9 +730,9 @@ rnCoreBndrs bndrs thing_inside		-- Expect them all to be ValBinders
 
 \begin{code}
 rnCoreAlt (con, bndrs, rhs)
-  = rnUfCon con				`thenRn` \ con' ->
-    bindLocalsRn "unfolding alt" bndrs	$ \ bndrs' ->
-    rnCoreExpr rhs			`thenRn` \ rhs' ->
+  = rnUfCon con					`thenRn` \ con' ->
+    bindLocalsRn "an unfolding alt" bndrs	$ \ bndrs' ->
+    rnCoreExpr rhs				`thenRn` \ rhs' ->
     returnRn (con', bndrs', rhs')
 
 

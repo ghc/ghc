@@ -76,7 +76,7 @@ instance (Outputable name, Outputable pat)
 	      Nothing -> hsep [ptext SLIT("module"), pprModule name, ptext SLIT("where")]
 	      Just es -> vcat [
 			    hsep [ptext SLIT("module"), pprModule name, lparen],
-			    nest 8 (interpp'SP es),
+			    nest 8 (fsep (punctuate comma (map ppr es))),
 			    nest 4 (ptext SLIT(") where"))
 			  ],
 	    pp_nonnull imports,

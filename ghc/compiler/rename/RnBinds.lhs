@@ -207,7 +207,7 @@ rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
   =	-- Extract all the binders in this group,
 	-- and extend current scope, inventing new names for the new binders
 	-- This also checks that the names form a set
-    bindLocatedLocalsRn (text "binding group") mbinders_w_srclocs		$ \ new_mbinders ->
+    bindLocatedLocalsRn (text "a binding group") mbinders_w_srclocs		$ \ new_mbinders ->
     let
 	binder_set = mkNameSet new_mbinders
     in
