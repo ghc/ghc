@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.11 1999/03/09 14:24:46 sewardj Exp $
+ * $Id: Closures.h,v 1.12 1999/03/25 13:01:44 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -277,7 +277,7 @@ typedef struct _StgDeadWeak {	/* Weak v */
  */
  
 typedef struct {
-  StgHeader      header;
+  const struct _StgInfoTable* info;
   StgWord        liveness;
   StgWord        ret_addr;
   StgWord        payload[0];
