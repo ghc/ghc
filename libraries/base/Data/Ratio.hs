@@ -39,7 +39,10 @@ import Prelude
 import GHC.Real		-- The basic defns for Ratio
 #endif
 
-#ifndef __HUGS__
+#ifdef __HUGS__
+import Hugs.Prelude(Ratio(..), (%), numerator, denominator)
+#endif
+
 -- -----------------------------------------------------------------------------
 -- approxRational
 
@@ -77,4 +80,3 @@ approxRational rat eps	=  simplest (rat-eps) (rat+eps)
 					   nd''       =  simplest' d' r' d r
 					   n''        =  numerator nd''
 					   d''        =	 denominator nd''
-#endif  /* __HUGS__ */
