@@ -925,11 +925,11 @@ Nevertheless, they can be useful when defining "phantom types".</para>
 </sect3>
 
 <sect3 id="infix-tycons">
-<title>Infix type constructors and classes</title>
+<title>Infix type constructors, classes, and type variables</title>
 
 <para>
-GHC allows type constructors and classes to be operators, and to be written infix, very much 
-like expressions.  More specifically:
+GHC allows type constructors, classes, and type variables to be operators, and
+to be written infix, very much like expressions.  More specifically:
 <itemizedlist>
 <listitem><para>
   A type constructor or class can be an operator, beginning with a colon; e.g. <literal>:*:</literal>.
@@ -955,6 +955,21 @@ like expressions.  More specifically:
   </screen>
   </para></listitem>
 <listitem><para>
+  A type variable can be an (unqualified) operator e.g. <literal>+</literal>.
+  The lexical syntax is the same as that for variable operators, excluding "(.)",
+  "(!)", and "(*)".  In a binding position, the operator must be
+  parenthesised.  For example:
+<programlisting>
+   type T (+) = Int + Int
+   f :: T Either
+   f = Left 3
+ 
+   liftA2 :: Arrow (~>)
+	  => (a -> b -> c) -> (e ~> a) -> (e ~> b) -> (e ~> c)
+   liftA2 = ...
+</programlisting>
+  </para></listitem>
+<listitem><para>
   Back-quotes work
   as for expressions, both for type constructors and type variables;  e.g. <literal>Int `Either` Bool</literal>, or
   <literal>Int `a` Bool</literal>.  Similarly, parentheses work the same; e.g.  <literal>(:*:) Int Bool</literal>.
@@ -972,14 +987,6 @@ like expressions.  More specifically:
   </para></listitem>
 <listitem><para>
   Function arrow is <literal>infixr</literal> with fixity 0.  (This might change; I'm not sure what it should be.)
-  </para></listitem>
-<listitem><para>
-  The only thing that differs between operators in types and operators in expressions is that
-  ordinary non-constructor operators, such as <literal>+</literal> and <literal>*</literal>
-  are not allowed in types. Reason: the uniform thing to do would be to make them type
-  variables, but that's not very useful.  A less uniform but more useful thing would be to
-  allow them to be type <emphasis>constructors</emphasis>.  But that gives trouble in export
-  lists.  So for now we just exclude them.
   </para></listitem>
 
 </itemizedlist>
