@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.17 2000/08/17 15:21:55 rrt Exp $
+ * $Id: MBlock.c,v 1.18 2000/09/06 11:12:07 rrt Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -174,7 +174,8 @@ getMBlocks(nat n)
   if ( (base_non_committed == 0) || 
        (next_request + size > base_non_committed + SIZE_RESERVED_POOL) ) {
 #ifdef ENABLE_WIN32_DLL_SUPPORT
-    barf("2nd Windows monster block required; I can only cope with 1!");
+    if (base_non_committed)
+        barf("Windows programs can only use 128Mb of heap; sorry!");
 #endif
     base_non_committed = VirtualAlloc ( NULL
                                       , SIZE_RESERVED_POOL
