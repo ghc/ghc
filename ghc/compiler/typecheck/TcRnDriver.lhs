@@ -21,7 +21,8 @@ import {-# SOURCE #-} TcSplice ( tcSpliceDecls )
 
 import CmdLineOpts	( DynFlag(..), opt_PprStyle_Debug, dopt )
 import DriverState	( v_MainModIs, v_MainFunIs )
-import HsSyn
+import HsSyn		( HsModule(..), HsExtCore(..), HsGroup(..), LHsDecl, SpliceDecl(..), HsBind(..),
+			  nlHsApp, nlHsVar )
 import RdrHsSyn		( findSplice )
 
 import PrelNames	( runIOName, rootMainName, mAIN_Name,
@@ -67,9 +68,9 @@ import HscTypes		( ModGuts(..), HscEnv(..),
 			  emptyFixityEnv
 			)
 #ifdef GHCI
-import HsSyn		( HsStmtContext(..), 
-			  Stmt(..), 
-			  collectStmtsBinders, mkSimpleMatch, placeHolderType )
+import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), HsBindGroup(..), LStmt, LHsExpr,
+			  collectStmtsBinders, mkSimpleMatch, placeHolderType,
+			  nlLetStmt, nlExprStmt, nlBindStmt, nlResultStmt, nlVarPat )
 import RdrName		( GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..),
 			  Provenance(..), ImportSpec(..),
 			  lookupLocalRdrEnv, extendLocalRdrEnv )
