@@ -15,7 +15,7 @@ import VarEnv
 import TyCon	( TyCon,  tyConPrimRep, isUnboxedTupleTyCon, tyConDataCons, 
 		  newTyConRep, tyConTyVars, isDataTyCon, isAlgTyCon, tyConArity
 		)
-import Class	( Class,  classTyCon )
+import Class	( Class )
 import Type	( liftedTypeKind, openTypeKind, unliftedTypeKind,
 		  isUnLiftedType, isTyVarTy, mkTyVarTy, predRepTy,
 		  splitForAllTys, splitFunTys, applyTy, applyTys
