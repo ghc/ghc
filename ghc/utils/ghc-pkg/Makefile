@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.12 2001/10/12 14:28:46 rrt Exp $
+# $Id: Makefile,v 1.13 2001/10/23 16:31:37 rrt Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -10,13 +10,14 @@ INSTALLING=1
 # -----------------------------------------------------------------------------
 # ghc-pkg.bin
 
-HS_PROG           = ghc-pkg.bin
 SRC_HC_OPTS      += -cpp -DPKG_TOOL -DWANT_PRETTY -package lang \
 		    -package util -package text
 
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+HS_PROG           = ghc-pkg.bin
 INSTALL_LIBEXECS += $(HS_PROG)
 else
+HS_PROG           = ghc-pkg.exe
 INSTALL_PROGS    += $(HS_PROG)
 SRC_HC_OPTS      += -package win32
 endif
@@ -38,7 +39,9 @@ GHCPKGBIN=$(FPTOOLS_TOP_ABS)/ghc/utils/ghc-pkg/$(HS_PROG)
 PKGCONF=$(FPTOOLS_TOP_ABS)/ghc/driver/package.conf.inplace
 endif
 
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 INSTALLED_SCRIPT_PROG  = ghc-pkg-$(ProjectVersion)
+endif
 INPLACE_SCRIPT_PROG    = ghc-pkg-inplace
 
 SCRIPT_OBJS	  = ghc-pkg.sh
@@ -51,7 +54,9 @@ PKGCONFOPT 	  = -f $(PKGCONF)
 
 ifeq "$(INSTALLING)" "1"
 SCRIPT_PROG 	=  $(INSTALLED_SCRIPT_PROG)
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 LINK 		=  ghc-pkg
+endif
 else
 SCRIPT_PROG 	=  $(INPLACE_SCRIPT_PROG)
 endif
