@@ -1,11 +1,11 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.4 2000/06/12 16:26:59 panne Exp $
+# $Id: Makefile,v 1.5 2000/06/12 17:01:57 panne Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/should_run.mk
 
-HC_OPTS += -dcore-lint -fglasgow-exts
+SRC_HC_OPTS += -dcore-lint -fglasgow-exts
 
 callback_HC_OPTS += -fvia-C
 

@@ -1,11 +1,11 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.21 2000/06/12 16:27:00 panne Exp $
+# $Id: Makefile,v 1.22 2000/06/12 17:01:58 panne Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/should_run.mk
 
-HC_OPTS += -dcore-lint
+SRC_HC_OPTS += -dcore-lint
 
 packedstring001_HC_OPTS = -package lang
 exceptions001_HC_OPTS   = -fglasgow-exts -fno-warn-missing-methods

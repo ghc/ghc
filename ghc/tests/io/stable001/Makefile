@@ -1,9 +1,9 @@
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
-HC_OPTS += -fglasgow-exts
+SRC_HC_OPTS += -fglasgow-exts
 include $(TOP)/mk/should_run.mk
 
-HC_OPTS += -dcore-lint
+SRC_HC_OPTS += -dcore-lint
 
 .PRECIOUS: %.o %.bin
 include $(TOP)/mk/target.mk

@@ -1,7 +1,7 @@
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
-HC_OPTS += -fglasgow-exts
+SRC_HC_OPTS += -fglasgow-exts
 
 CC = $(HC)
 

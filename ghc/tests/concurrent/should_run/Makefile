@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.7 2000/06/12 16:27:00 panne Exp $
+# $Id: Makefile,v 1.8 2000/06/12 17:01:57 panne Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -14,6 +14,6 @@ include $(TOP)/mk/should_run.mk
 conc009_RUNTEST_OPTS = -x 1
 conc021_RUNTEST_OPTS = -x 250
 
-HC_OPTS += -dcore-lint -package concurrent -fglasgow-exts
+SRC_HC_OPTS += -dcore-lint -package concurrent -fglasgow-exts
 
 include $(TOP)/mk/target.mk
