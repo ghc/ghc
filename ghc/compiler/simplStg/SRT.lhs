@@ -12,9 +12,10 @@ module SRT( computeSRTs ) where
 #include "HsVersions.h"
 
 import StgSyn
-import Id        ( Id )
-import VarSet	( varSetElems )
-import Util	( mapAccumL )
+import Id        	( Id )
+import VarSet
+import BasicTypes	( TopLevelFlag(..), isTopLevel )
+import Util		( mapAccumL )
 
 #ifdef DEBUG
 import Outputable
@@ -81,20 +82,29 @@ type SrtIds    = [Id]  -- An *reverse-ordered* list of the Ids needed in the SRT
 srtTopBind :: StgBinding -> (StgBinding, SrtIds)
 
 srtTopBind bind
-  = srtBind 0 bind	=: \ (bind', srt, off) ->
-    (bind', reverse srt)	-- The 'reverse' is because the SRT is 
-				-- built up reversed, for efficiency's sake
+  = srtBind TopLevel 0 bind	=: \ (bind', srt, off) ->
+    if isConBind bind'
+	then (bind', [])	   -- Don't need an SRT for a static constructor
+	else (bind', reverse srt)  -- The 'reverse' is because the SRT is 
+				   -- built up reversed, for efficiency's sake
 
-srtBind :: SrtOffset -> StgBinding -> (StgBinding, SrtIds, SrtOffset)
+isConBind (StgNonRec _ _ r) = isConRhs r
+isConBind (StgRec _ bs)     = all isConRhs (map snd bs)
 
-srtBind off (StgNonRec (SRTEntries rhs_cafs) binder rhs) 
+isConRhs (StgRhsCon _ _ _) = True
+isConRhs _		   = False
+
+srtBind :: TopLevelFlag -> SrtOffset -> StgBinding
+        -> (StgBinding, SrtIds, SrtOffset)
+
+srtBind top off (StgNonRec (SRTEntries rhs_cafs) binder rhs) 
   = (StgNonRec srt_info binder new_rhs, this_srt, body_off)
   where
     (new_rhs,  rhs_srt,  rhs_off)  = srtRhs off rhs
     (srt_info, this_srt, body_off) = constructSRT rhs_cafs rhs_srt off rhs_off
     
 
-srtBind off (StgRec (SRTEntries rhss_cafs) pairs)
+srtBind top off (StgRec (SRTEntries rhss_cafs) pairs)
   = (StgRec srt_info new_pairs, this_srt, body_off)
   where
     ((rhss_off, rhss_srt), new_pairs) = mapAccumL do_bind (off, []) pairs
@@ -103,8 +113,17 @@ srtBind off (StgRec (SRTEntries rhss_cafs) pairs)
 	= srtRhs off rhs		=: \(rhs', srt', off') ->
 	  ((off', srt'++srt), (bndr, rhs'))
 
+    non_caf_binders = [ b | (b, rhs) <- pairs, not (caf_rhs rhs) ]
+
+    filtered_rhss_cafs
+	| isTopLevel top = filterVarSet (`notElem` non_caf_binders) rhss_cafs
+	| otherwise      = rhss_cafs
+
     (srt_info, this_srt, body_off)
-	 = constructSRT rhss_cafs rhss_srt off rhss_off
+	 = constructSRT filtered_rhss_cafs rhss_srt off rhss_off
+
+caf_rhs (StgRhsClosure _ _ free_vars _ [] body) = True
+caf_rhs _ = False
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -148,12 +167,12 @@ srtExpr off (StgCase scrut live1 live2 uniq (SRTEntries cafs_in_alts) alts)
     case_off)
 
 srtExpr off (StgLet bind body)
-  = srtBind off bind		=: \ (bind', bind_srt, body_off) ->
+  = srtBind NotTopLevel off bind =: \ (bind', bind_srt, body_off) ->
     srtExpr body_off body	=: \ (body', expr_srt, let_off) ->
     (StgLet bind' body', expr_srt ++ bind_srt, let_off)
      
 srtExpr off (StgLetNoEscape live1 live2 bind body)
-  = srtBind off bind		=: \ (bind', bind_srt, body_off) ->
+  = srtBind NotTopLevel off bind =: \ (bind', bind_srt, body_off) ->
     srtExpr body_off body	=: \ (body', expr_srt, let_off) ->
     (StgLetNoEscape live1 live2 bind' body', expr_srt ++ bind_srt, let_off)
 
