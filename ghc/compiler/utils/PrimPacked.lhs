@@ -9,6 +9,8 @@ GHC internally, the code generator and the prelude
 libraries.
 
 \begin{code}
+#include "HsVersions.h"
+
 module PrimPacked
        (
         strLength,          -- :: _Addr -> Int
@@ -30,8 +32,17 @@ module PrimPacked
         indexCharOffFO#     -- :: ForeignObj# -> Int# -> Char#
        ) where
 
+#if __GLASGOW_HASKELL__ <= 201
 import PreludeGlaST
 import PreludeGlaMisc
+#else
+import GlaExts
+import Foreign
+import GHC
+import ArrBase
+import ST
+import STBase
+#endif
 
 \end{code} 
 
@@ -159,18 +170,21 @@ new_ps_array	:: Int# -> _ST s (_MutableByteArray s Int)
 write_ps_array	:: _MutableByteArray s Int -> Int# -> Char# -> _ST s () 
 freeze_ps_array :: _MutableByteArray s Int -> _ST s (_ByteArray Int)
 
-new_ps_array size (S# s) =
+new_ps_array size =
+    MkST ( \ (S# s) ->
     case (newCharArray# size s)	  of { StateAndMutableByteArray# s2# barr# ->
-    (_MutableByteArray (0,I# (size -# 1#)) barr#, S# s2#)}
+    (_MutableByteArray (0, max 0 (I# (size -# 1#))) barr#, S# s2#)})
 
-write_ps_array (_MutableByteArray _ barr#) n ch (S# s#) =
+write_ps_array (_MutableByteArray _ barr#) n ch =
+    MkST ( \ (S# s#) ->
     case writeCharArray# barr# n ch s#	of { s2#   ->
-    ((), S# s2#)}
+    ((), S# s2#)})
 
 -- same as unsafeFreezeByteArray
-freeze_ps_array (_MutableByteArray ixs arr#) (S# s#) =
+freeze_ps_array (_MutableByteArray ixs arr#) =
+    MkST ( \ (S# s#) ->
     case unsafeFreezeByteArray# arr# s# of { StateAndByteArray# s2# frozen# ->
-    (_ByteArray ixs frozen#, S# s2#) }
+    (_ByteArray ixs frozen#, S# s2#) })
 \end{code}
 
 Compare two equal-length strings for equality:
@@ -182,6 +196,7 @@ eqStrPrefix a# barr# len# =
    _ccall_ strncmp (A# a#) (_ByteArray bottom barr#) (I# len#) `thenPrimIO` \ (I# x#) ->
    returnPrimIO (x# ==# 0#))
   where
+   bottom :: (Int,Int)
    bottom = error "eqStrPrefix"
 
 eqCharStrPrefix :: Addr# -> Addr# -> Int# -> Bool
@@ -190,6 +205,7 @@ eqCharStrPrefix a1# a2# len# =
    _ccall_ strncmp (A# a1#) (A# a2#) (I# len#) `thenPrimIO` \ (I# x#) ->
    returnPrimIO (x# ==# 0#))
   where
+   bottom :: (Int,Int)
    bottom = error "eqStrPrefix"
 
 eqStrPrefixBA :: ByteArray# -> ByteArray# -> Int# -> Int# -> Bool
@@ -202,6 +218,7 @@ eqStrPrefixBA b1# b2# start# len# =
           (I# len#)                  `thenPrimIO` \ (I# x#) ->
    returnPrimIO (x# ==# 0#))
   where
+   bottom :: (Int,Int)
    bottom = error "eqStrPrefixBA"
 
 eqCharStrPrefixBA :: Addr# -> ByteArray# -> Int# -> Int# -> Bool
@@ -214,6 +231,7 @@ eqCharStrPrefixBA a# b2# start# len# =
           (I# len#)                  `thenPrimIO` \ (I# x#) ->
    returnPrimIO (x# ==# 0#))
   where
+   bottom :: (Int,Int)
    bottom = error "eqCharStrPrefixBA"
 
 eqStrPrefixFO :: ForeignObj# -> ByteArray# -> Int# -> Int# -> Bool
@@ -226,6 +244,7 @@ eqStrPrefixFO fo# barr# start# len# =
           (I# len#)                  `thenPrimIO` \ (I# x#) ->
    returnPrimIO (x# ==# 0#))
   where
+   bottom :: (Int,Int)
    bottom = error "eqStrPrefixFO"
 \end{code}
 

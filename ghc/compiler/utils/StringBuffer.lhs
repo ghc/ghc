@@ -6,6 +6,8 @@
 Buffers for scanning string input stored in external arrays.
 
 \begin{code}
+#include "HsVersions.h"
+
 module StringBuffer
        (
         StringBuffer,
@@ -58,8 +60,18 @@ module StringBuffer
        ) where
 
 import Ubiq
+#if __GLASGOW_HASKELL__ <= 200
 import PreludeGlaST
 import PreludeGlaMisc
+#else
+import GlaExts
+import Foreign
+import IOBase
+import IOHandle
+import ST
+import STBase
+import Char (isDigit)
+#endif
 import PrimPacked
 import FastString
 import HandleHack
@@ -87,29 +99,29 @@ hGetStringBuffer fname =
       -- Allocate an array for system call to store its bytes into.
       -- ToDo: make it robust
 --    _trace (show (len_i::Int)+1) 
-    (_casm_ `` %r=(char *)malloc(sizeof(char)*(int)%0); '' (len_i::Int))  `thenPrimIO` \ arr@(A# a#) ->
+    (_casm_ `` %r=(char *)malloc(sizeof(char)*(int)%0); '' (len_i::Int))  `CCALL_THEN` \ arr@(A# a#) ->
     if addr2Int# a# ==# 0# then
-       failWith (UserError ("hGetStringBuffer: Could not allocate "++show len_i ++ " bytes"))
+       failWith MkIOError(hndl,UserError,("hGetStringBuffer: Could not allocate "++show len_i ++ " bytes"))
     else
 
 --   _casm_ `` %r=NULL; ''		                     `thenPrimIO` \ free_p ->
 --    makeForeignObj arr free_p		                     `thenPrimIO` \ fo@(_ForeignObj fo#) ->
-     _readHandle hndl        >>= \ _hndl ->
-     _writeHandle hndl _hndl >>
-     let ptr = _filePtr _hndl in
-     _ccall_ fread arr (1::Int) len_i ptr                     `thenPrimIO` \  (I# read#) ->
+     _readHandle hndl        >>= \ hndl_ ->
+     _writeHandle hndl hndl_ >>
+     let ptr = _filePtr hndl_ in
+     _ccall_ fread arr (1::Int) len_i ptr                     `CCALL_THEN` \  (I# read#) ->
 --      _trace ("DEBUG: opened " ++ fname ++ show (I# read#)) $
      hClose hndl		     >>
      if read# ==# 0# then -- EOF or other error
-        failWith (UserError "hGetStringBuffer: EOF reached or some other error")
+        failWith MkIOError(hndl,UserError,"hGetStringBuffer: EOF reached or some other error")
      else
         -- Add a sentinel NUL
-        _casm_ `` ((char *)%0)[(int)%1]=(char)0; '' arr (I# (read# -# 1#)) `thenPrimIO` \ () ->
+        _casm_ `` ((char *)%0)[(int)%1]=(char)0; '' arr (I# (read# -# 1#)) `CCALL_THEN` \ () ->
         return (StringBuffer a# read# 0# 0#)
 
 freeStringBuffer :: StringBuffer -> IO ()
 freeStringBuffer (StringBuffer a# _ _ _) =
- _casm_ `` free((char *)%0); '' (A# a#) `thenPrimIO` \ () ->
+ _casm_ `` free((char *)%0); '' (A# a#) `CCALL_THEN` \ () ->
  return ()
 
 unsafeWriteBuffer :: StringBuffer -> Int# -> Char# -> StringBuffer
@@ -249,8 +261,21 @@ untilEndOfString# (StringBuffer fo l# s# c#) =
    case indexCharOffAddr# fo c# of
     '\"'# ->
        case indexCharOffAddr# fo (c# -# 1#) of
-	'\\'# -> --escaped, false alarm.
-            loop (c# +# 1#) 
+	'\\'# ->       
+                  -- looks like an escaped something or other to me,
+		  -- better count the number of "\\"s that are immediately
+		  -- preceeding to decide if the " is escaped.
+	      let
+	       odd_slashes flg i# =
+	        case indexCharOffAddr# fo i# of
+	         '\\'# -> odd_slashes (not flg) (i# -# 1#)
+	         _     -> flg
+              in
+	      if odd_slashes True (c# -# 1#) then
+	          -- odd number, " is ecaped.
+		  loop (c# +# 1#)
+	      else  -- a real end of string delimiter after all.
+		  StringBuffer fo l# s# c#
         _ -> StringBuffer fo l# s# c#
     _ -> loop (c# +# 1#)
 
@@ -263,8 +288,11 @@ untilEndOfChar# (StringBuffer fo l# s# c#) =
    case indexCharOffAddr# fo c# of
     '\''# ->
        case indexCharOffAddr# fo (c# -# 1#) of
-	'\\'# -> --escaped, false alarm.
-            loop (c# +# 1#) 
+	'\\'# ->
+	   case indexCharOffAddr# fo (c# -# 2#) of 	
+	     '\\'# -> -- end of char
+		   StringBuffer fo l# s# c#
+             _ -> loop (c# +# 1#) -- false alarm
         _ -> StringBuffer fo l# s# c#
     _ -> loop (c# +# 1#)
 

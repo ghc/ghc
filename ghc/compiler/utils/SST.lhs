@@ -21,8 +21,13 @@ module SST(
 #endif
   ) where
 
-#if __GLASGOW_HASKELL__ >= 200
+#if __GLASGOW_HASKELL__ == 201
 import GHCbase
+#elif __GLASGOW_HASKELL__ >= 202
+import GlaExts
+import STBase
+import ArrBase
+import ST
 #else
 import PreludeGlaST ( MutableVar(..), _MutableArray(..), ST(..) )
 #endif
