@@ -1,3 +1,5 @@
+{-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
+
 module Main (main) where
 
 import IOExts ( unsafePerformIO )
