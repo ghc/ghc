@@ -1118,15 +1118,27 @@ repListTyCon = rep2 listTyConName []
 
 repLiteral :: HsLit -> DsM (Core M.Lit)
 repLiteral lit 
-  = do { lit_expr <- dsLit lit; rep2 lit_name [lit_expr] }
+  = do lit' <- case lit of
+                   HsIntPrim i -> return $ HsInteger i
+                   HsInt i -> return $ HsInteger i
+                   HsFloatPrim r -> do rat_ty <- lookupType rationalTyConName
+                                       return $ HsRat r rat_ty
+                   HsDoublePrim r -> do rat_ty <- lookupType rationalTyConName
+                                        return $ HsRat r rat_ty
+                   _ -> return lit
+       lit_expr <- dsLit lit'
+       rep2 lit_name [lit_expr]
   where
     lit_name = case lit of
-		 HsInteger _ -> integerLName
-		 HsInt     _ -> integerLName
-		 HsChar _    -> charLName
-		 HsString _  -> stringLName
-		 HsRat _ _   -> rationalLName
-		 other 	     -> uh_oh
+		 HsInteger _    -> integerLName
+		 HsInt     _    -> integerLName
+		 HsIntPrim _    -> intPrimLName
+		 HsFloatPrim _  -> floatPrimLName
+		 HsDoublePrim _ -> doublePrimLName
+		 HsChar _       -> charLName
+		 HsString _     -> stringLName
+		 HsRat _ _      -> rationalLName
+		 other 	        -> uh_oh
     uh_oh = pprPanic "DsMeta.repLiteral: trying to represent exotic literal"
 		    (ppr lit)
 
@@ -1200,7 +1212,8 @@ templateHaskellNames :: NameSet
 -- The names that are implicitly mentioned by ``bracket''
 -- Should stay in sync with the import list of DsMeta
 templateHaskellNames
-  = mkNameSet [ integerLName, charLName, stringLName, rationalLName,
+  = mkNameSet [ intPrimLName, floatPrimLName, doublePrimLName,
+        integerLName, charLName, stringLName, rationalLName,
 		plitName, pvarName, ptupName, 
 		pconName, ptildeName, paspatName, pwildName, 
                 varName, conName, litName, appName, infixEName, lamName,
@@ -1236,6 +1249,9 @@ thModule = mkThPkgModule mETA_META_Name
 mk_known_key_name space str uniq 
   = mkKnownKeyExternalName thModule (mkOccFS space str) uniq 
 
+intPrimLName   = varQual FSLIT("intPrimL")      intPrimLIdKey
+floatPrimLName  = varQual FSLIT("floatPrimL")   floatPrimLIdKey
+doublePrimLName = varQual FSLIT("doublePrimL")  doublePrimLIdKey
 integerLName   = varQual FSLIT("integerL")      integerLIdKey
 charLName      = varQual FSLIT("charL")         charLIdKey
 stringLName    = varQual FSLIT("stringL")       stringLIdKey
@@ -1459,6 +1475,10 @@ recUpdIdKey     = mkPreludeMiscIdUnique 271
 precIdKey       = mkPreludeMiscIdUnique 272
 fieldKey        = mkPreludeMiscIdUnique 273
 fieldPKey       = mkPreludeMiscIdUnique 274
+
+intPrimLIdKey    = mkPreludeMiscIdUnique 275
+floatPrimLIdKey  = mkPreludeMiscIdUnique 276
+doublePrimLIdKey = mkPreludeMiscIdUnique 277
 
 -- %************************************************************************
 -- %*									*

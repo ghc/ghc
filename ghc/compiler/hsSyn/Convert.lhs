@@ -258,8 +258,11 @@ cvtOverLit (Rational r) = mkHsFractional r
 -- Similarly 3.5 for fractionals
 
 cvtLit :: Lit -> HsLit
-cvtLit (Char c)	  = HsChar (ord c)
-cvtLit (String s) = HsString (mkFastString s)
+cvtLit (IntPrim i)    = HsIntPrim i
+cvtLit (FloatPrim f)  = HsFloatPrim f
+cvtLit (DoublePrim f) = HsDoublePrim f
+cvtLit (Char c)       = HsChar (ord c)
+cvtLit (String s)     = HsString (mkFastString s)
 
 cvtp :: Meta.Pat -> Hs.Pat RdrName
 cvtp (Plit l)
