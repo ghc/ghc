@@ -39,9 +39,6 @@ import UniqSupply	( initUs_, splitUniqSupply, uniqFromSupply, uniqsFromSupply,
 import Unique		( Unique )
 import Util		( zipWithEqual )
 import Name		( Name )
-import Name		( lookupNameEnv )
-import HscTypes		( HomeSymbolTable, PersistentCompilerState(..), 
-			  TyThing(..), TypeEnv, lookupType )
 import CmdLineOpts	( DynFlags )
 
 infixr 9 `thenDs`
@@ -71,26 +68,13 @@ type DsWarnings = Bag WarnMsg           -- The desugarer reports matches which a
 
 initDs  :: DynFlags
 	-> UniqSupply
-	-> (HomeSymbolTable, PersistentCompilerState, TypeEnv)
+	-> (Name -> Id)
 	-> Module   -- module name: for profiling
 	-> DsM a
 	-> (a, DsWarnings)
 
-initDs dflags init_us (hst,pcs,local_type_env) mod action
+initDs dflags init_us lookup mod action
   = action dflags init_us lookup noSrcLoc mod emptyBag
-  where
-	-- This lookup is used for well-known Ids, 
-	-- such as fold, build, cons etc, so the chances are
-	-- it'll be found in the package symbol table.  That's
-	-- why we don't merge all these tables
-    pte = pcs_PTE pcs
-    lookup n = case lookupType hst pte n of {
-		 Just (AnId v) -> v ;
-		 other -> 
-	       case lookupNameEnv local_type_env n of
-		 Just (AnId v) -> v ;
-		 other	       -> pprPanic "initDS: lookup:" (ppr n)
-               }
 
 thenDs :: DsM a -> (a -> DsM b) -> DsM b
 andDs  :: (a -> a -> a) -> DsM a -> DsM a -> DsM a

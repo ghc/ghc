@@ -65,9 +65,6 @@ Outside-world interface:
 -- Convenient type synonyms first:
 data TcResults
   = TcResults {
-	tc_pcs	   :: PersistentCompilerState,	-- Augmented with imported information,
-						-- (but not stuff from this module)
-
 	-- All these fields have info *just for this module*
 	tc_env	   :: TypeEnv,			-- The top level TypeEnv
 	tc_insts   :: [DFunId],			-- Instances
@@ -79,20 +76,23 @@ data TcResults
 ---------------
 typecheckModule
 	:: DynFlags
-	-> Module
 	-> PersistentCompilerState
 	-> HomeSymbolTable
 	-> ModIface		-- Iface for this module
 	-> PrintUnqualified	-- For error printing
 	-> [RenamedHsDecl]
-	-> IO (Maybe TcResults)
+	-> IO (Maybe (PersistentCompilerState, TcResults))
+			-- The new PCS is Augmented with imported information,
+						-- (but not stuff from this module)
 
-typecheckModule dflags this_mod pcs hst mod_iface unqual decls
+
+typecheckModule dflags pcs hst mod_iface unqual decls
   = do	{ maybe_tc_result <- typecheck dflags pcs hst unqual $
-			    tcModule pcs hst get_fixity this_mod decls
+			     tcModule pcs hst get_fixity this_mod decls
 	; printTcDump dflags maybe_tc_result
 	; return maybe_tc_result }
   where
+    this_mod   = mi_module   mod_iface
     fixity_env = mi_fixities mod_iface
 
     get_fixity :: Name -> Maybe Fixity
@@ -121,8 +121,8 @@ typecheck :: DynFlags
 	  -> TcM r
 	  -> IO (Maybe r)
 
-typecheck dflags pcs hst unqual thing_inside
-  = do	{ showPass dflags "Typechecker";
+typecheck dflags pcs hst unqual thing_inside 
+ = do	{ showPass dflags "Typechecker";
 	; env <- initTcEnv hst (pcs_PTE pcs)
 
 	; (maybe_tc_result, (warns,errs)) <- initTc dflags env thing_inside
@@ -143,7 +143,7 @@ tcModule :: PersistentCompilerState
 	 -> (Name -> Maybe Fixity)
 	 -> Module
 	 -> [RenamedHsDecl]
-	 -> TcM TcResults
+	 -> TcM (PersistentCompilerState, TcResults)
 
 tcModule pcs hst get_fixity this_mod decls
   = 		 -- Type-check the type and class decls
@@ -283,8 +283,8 @@ tcModule pcs hst get_fixity this_mod decls
 		    }
     in  
 --  traceTc (text "Tc10")		`thenNF_Tc_`
-    returnTc (TcResults { tc_pcs     = final_pcs,
-			  tc_env     = local_type_env,
+    returnTc (final_pcs,
+	      TcResults { tc_env     = local_type_env,
 			  tc_binds   = all_binds', 
 			  tc_insts   = map iDFunId local_inst_info,
 			  tc_fords   = foi_decls ++ foe_decls',
@@ -305,7 +305,7 @@ get_binds decls = foldr ThenBinds EmptyBinds [binds | ValD binds <- decls]
 
 \begin{code}
 printTcDump dflags Nothing = return ()
-printTcDump dflags (Just results)
+printTcDump dflags (Just (_, results))
   = do dumpIfSet_dyn dflags Opt_D_dump_types 
                      "Type signatures" (dump_sigs results)
        dumpIfSet_dyn dflags Opt_D_dump_tc    

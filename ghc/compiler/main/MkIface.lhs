@@ -103,7 +103,7 @@ mkModDetails type_env dfun_ids tidy_binds stg_ids orphan_rules
 	--	a) the orphan rules
 	--	b) rules embedded in the top-level Ids
     rule_dcls | opt_OmitInterfacePragmas = []
-	      | otherwise		  = getRules orphan_rules tidy_binds (mkVarSet final_ids)
+	      | otherwise		 = getRules orphan_rules tidy_binds (mkVarSet final_ids)
 
     orphan_rule_ids = unionVarSets [ ruleSomeFreeVars interestingId rule 
 				   | (_, rule) <- orphan_rules]

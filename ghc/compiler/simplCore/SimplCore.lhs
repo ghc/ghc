@@ -4,7 +4,7 @@
 \section[SimplCore]{Driver for simplifying @Core@ programs}
 
 \begin{code}
-module SimplCore ( core2core ) where
+module SimplCore ( core2core, simplifyExpr ) where
 
 #include "HsVersions.h"
 
@@ -15,13 +15,15 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..),
 import CoreLint		( showPass, endPass )
 import CoreSyn
 import CoreFVs		( ruleRhsFreeVars )
-import HscTypes		( PackageRuleBase, HomeSymbolTable, IsExported, ModDetails(..) )
+import HscTypes		( PersistentCompilerState(..),
+			  PackageRuleBase, HomeSymbolTable, IsExported, ModDetails(..)
+			)
 import CSE		( cseProgram )
 import Rules		( RuleBase, emptyRuleBase, ruleBaseFVs, ruleBaseIds, 
 			  extendRuleBaseList, addRuleBaseFVs )
 import Module		( moduleEnvElts )
 import CoreUnfold
-import PprCore		( pprCoreBindings, pprIdCoreRule )
+import PprCore		( pprCoreBindings, pprIdCoreRule, pprCoreExpr )
 import OccurAnal	( occurAnalyseBinds )
 import CoreUtils	( etaReduceExpr, coreBindsSize )
 import Simplify		( simplTopBinds, simplExpr )
@@ -56,16 +58,18 @@ import List             ( partition )
 
 \begin{code}
 core2core :: DynFlags		-- includes spec of what core-to-core passes to do
-	  -> PackageRuleBase	-- Rule-base accumulated from imported packages
+	  -> PersistentCompilerState
 	  -> HomeSymbolTable
 	  -> IsExported
 	  -> [CoreBind]		-- Binds in
 	  -> [IdCoreRule]	-- Rules in
 	  -> IO ([CoreBind], [IdCoreRule])  -- binds, local orphan rules out
 
-core2core dflags pkg_rule_base hst is_exported binds rules
+core2core dflags pcs hst is_exported binds rules
   = do
-        let core_todos = dopt_CoreToDo dflags
+        let core_todos    = dopt_CoreToDo dflags
+	let pkg_rule_base = pcs_rules pcs		-- Rule-base accumulated from imported packages
+
 	us <-  mkSplitUniqSupply 's'
 	let (cp_us, ru_us) = splitUniqSupply us
 
@@ -88,6 +92,28 @@ core2core dflags pkg_rule_base hst is_exported binds rules
         -- We only return local orphan rules, i.e., local rules not attached to an Id
 	-- The bindings cotain more rules, embedded in the Ids
 	return (processed_binds, orphan_rules)
+
+
+simplifyExpr :: DynFlags		-- includes spec of what core-to-core passes to do
+	     -> PersistentCompilerState
+	     -> HomeSymbolTable
+	     -> CoreExpr
+	     -> IO CoreExpr
+simplifyExpr dflags pcs hst expr
+  = do	{
+	; us <-  mkSplitUniqSupply 's'
+
+	; let (expr', counts) = initSmpl dflags sw_chkr us emptyVarSet black_list_all 	
+		                         (simplExpr expr)
+
+	; dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplfied expression"
+			(pprCoreExpr expr')
+
+	; return expr'
+	}
+  where
+    sw_chkr any	     = SwBool False	-- A bit bogus
+    black_list_all v = True		-- Black list everything
 
 
 doCorePasses :: DynFlags

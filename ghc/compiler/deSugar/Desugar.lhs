@@ -4,18 +4,18 @@
 \section[Desugar]{@deSugar@: the main function}
 
 \begin{code}
-module Desugar ( deSugar ) where
+module Desugar ( deSugar, deSugarExpr ) where
 
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt, opt_SccProfilingOn )
 import HsSyn		( MonoBinds, RuleDecl(..), RuleBndr(..), 
 			  HsExpr(..), HsBinds(..), MonoBinds(..) )
-import TcHsSyn		( TypecheckedRuleDecl )
+import TcHsSyn		( TypecheckedRuleDecl, TypecheckedHsExpr )
 import TcModule		( TcResults(..) )
 import Id		( Id )
 import CoreSyn
-import PprCore		( pprIdCoreRule )
+import PprCore		( pprIdCoreRule, pprCoreExpr )
 import Subst		( substExpr, mkSubst, mkInScopeSet )
 import DsMonad
 import DsExpr		( dsExpr )
@@ -25,6 +25,7 @@ import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
 				-- depends on DsExpr.hi-boot.
 import Module		( Module )
 import Id		( Id )
+import Name		( lookupNameEnv )
 import VarEnv
 import VarSet
 import Bag		( isEmptyBag )
@@ -32,7 +33,7 @@ import CoreLint		( showPass, endPass )
 import ErrUtils		( doIfSet, pprBagOfWarnings )
 import Outputable
 import UniqSupply	( mkSplitUniqSupply )
-import HscTypes		( HomeSymbolTable )
+import HscTypes		( HomeSymbolTable, PersistentCompilerState(..), TyThing(..), lookupType,  )
 \end{code}
 
 %************************************************************************
@@ -46,14 +47,13 @@ start.
 
 \begin{code}
 deSugar :: DynFlags
+	-> PersistentCompilerState -> HomeSymbolTable
 	-> Module -> PrintUnqualified
-	-> HomeSymbolTable
         -> TcResults
 	-> IO ([CoreBind], [(Id,CoreRule)], SDoc, SDoc, [CoreBndr])
 
-deSugar dflags mod_name unqual hst
-        (TcResults {tc_env   = global_val_env,
-		    tc_pcs   = pcs,
+deSugar dflags pcs hst mod_name unqual
+        (TcResults {tc_env   = local_type_env,
 		    tc_binds = all_binds,
 		    tc_rules = rules,
 		    tc_fords = fo_decls})
@@ -61,7 +61,7 @@ deSugar dflags mod_name unqual hst
 	; us <- mkSplitUniqSupply 'd'
 
 	-- Do desugaring
-	; let (result, ds_warns) = initDs dflags us (hst,pcs,global_val_env) mod_name
+	; let (result, ds_warns) = initDs dflags us lookup mod_name
 					  (dsProgram mod_name all_binds rules fo_decls)    
 	      (ds_binds, ds_rules, _, _, _) = result
 
@@ -79,8 +79,47 @@ deSugar dflags mod_name unqual hst
         ; return result
 	}
 
--- deSugarExpr dflags unqual hst tc_expr
---  = do	{
+  where
+	-- The lookup function passed to initDs is used for well-known Ids, 
+	-- such as fold, build, cons etc, so the chances are
+	-- it'll be found in the package symbol table.  That's
+	-- why we don't merge all these tables
+    pte      = pcs_PTE pcs
+    lookup n = case lookupType hst pte n of {
+		 Just (AnId v) -> v ;
+		 other -> 
+	       case lookupNameEnv local_type_env n of
+		 Just (AnId v) -> v ;
+		 other	       -> pprPanic "Desugar: lookup:" (ppr n)
+               }
+
+deSugarExpr :: DynFlags
+	    -> PersistentCompilerState -> HomeSymbolTable
+	    -> Module -> PrintUnqualified
+ 	    -> TypecheckedHsExpr
+	    -> IO CoreExpr
+deSugarExpr dflags pcs hst mod_name unqual tc_expr
+  = do	{ showPass dflags "Desugar"
+	; us <- mkSplitUniqSupply 'd'
+
+	-- Do desugaring
+	; let (core_expr, ds_warns) = initDs dflags us lookup mod_name (dsExpr tc_expr)    
+
+	-- Display any warnings
+        ; doIfSet (not (isEmptyBag ds_warns))
+		  (printErrs unqual (pprBagOfWarnings ds_warns))
+
+	-- Dump output
+        ; let do_dump_ds = dopt Opt_D_dump_ds dflags
+	; doIfSet do_dump_ds (printDump (pprCoreExpr core_expr))
+
+        ; return core_expr
+	}
+  where
+    pte      = pcs_PTE pcs
+    lookup n = case lookupType hst pte n of
+		 Just (AnId v) -> v 
+		 other	       -> pprPanic "Desugar: lookup:" (ppr n)
 
 dsProgram mod_name all_binds rules fo_decls
   = dsMonoBinds auto_scc all_binds []	`thenDs` \ core_prs ->

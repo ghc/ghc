@@ -120,7 +120,6 @@ hscNoRecomp dflags location maybe_checked_iface hst hit pcs_ch
       let old_iface = case maybe_checked_iface of 
                          Just old_if -> old_if
                          Nothing -> panic "hscNoRecomp:old_iface"
-          this_mod = mi_module old_iface
       ;
       -- CLOSURE
       (pcs_cl, closure_errs, cl_hs_decls) 
@@ -130,14 +129,13 @@ hscNoRecomp dflags location maybe_checked_iface hst hit pcs_ch
       else do {
 
       -- TYPECHECK
-      maybe_tc_result <- typecheckModule dflags this_mod pcs_cl hst 
+      maybe_tc_result <- typecheckModule dflags pcs_cl hst 
 					 old_iface alwaysQualify cl_hs_decls;
       case maybe_tc_result of {
          Nothing -> return (HscFail pcs_cl);
-         Just tc_result -> do {
+         Just (pcs_tc, tc_result) -> do {
 
-      let pcs_tc      = tc_pcs tc_result
-          env_tc      = tc_env tc_result
+      let env_tc      = tc_env tc_result
           local_insts = tc_insts tc_result
           local_rules = tc_rules tc_result
       ;
@@ -175,28 +173,27 @@ hscRecomp dflags location maybe_checked_iface hst hit pcs_ch
       	     <- renameModule dflags hit hst pcs_ch this_mod rdr_module
       	; case maybe_rn_result of {
       	     Nothing -> return (HscFail pcs_rn);
-      	     Just (print_unqualified, is_exported, new_iface, rn_hs_decls) -> do {
+      	     Just (print_unqualified, (is_exported, new_iface, rn_hs_decls)) -> do {
     
  	    -------------------
  	    -- TYPECHECK
  	    -------------------
-	; maybe_tc_result <- typecheckModule dflags this_mod pcs_rn hst new_iface 
+	; maybe_tc_result <- typecheckModule dflags pcs_rn hst new_iface 
 					     print_unqualified rn_hs_decls
 	; case maybe_tc_result of {
       	     Nothing -> do { hPutStrLn stderr "Typecheck failed" 
  			   ; return (HscFail pcs_rn) } ;
-      	     Just tc_result -> do {
+      	     Just (pcs_tc, tc_result) -> do {
     
-	; let pcs_tc        = tc_pcs tc_result
-      	      env_tc        = tc_env tc_result
+	; let env_tc        = tc_env tc_result
       	      local_insts   = tc_insts tc_result
 
  	    -------------------
  	    -- DESUGAR, SIMPLIFY, TIDY-CORE
  	    -------------------
       	  -- We grab the the unfoldings at this point.
-	; simpl_result <- dsThenSimplThenTidy dflags (pcs_rules pcs_tc) this_mod 
- 					      print_unqualified is_exported tc_result hst
+	; simpl_result <- dsThenSimplThenTidy dflags pcs_tc hst this_mod 
+ 					      print_unqualified is_exported tc_result
 	; let (tidy_binds, orphan_rules, foreign_stuff) = simpl_result
       	    
  	    -------------------
@@ -316,16 +313,16 @@ restOfCodeGeneration dflags toInterp this_mod imported_module_names cost_centre_
                        (ppr nm)
 
 
-dsThenSimplThenTidy dflags rule_base this_mod print_unqual is_exported tc_result hst
+dsThenSimplThenTidy dflags pcs hst this_mod print_unqual is_exported tc_result
  = do --------------------------  Desugaring ----------------
       -- _scc_     "DeSugar"
       (desugared, rules, h_code, c_code, fe_binders) 
-         <- deSugar dflags this_mod print_unqual hst tc_result
+         <- deSugar dflags pcs hst this_mod print_unqual tc_result
 
       --------------------------  Main Core-language transformations ----------------
       -- _scc_     "Core2Core"
       (simplified, orphan_rules) 
-         <- core2core dflags rule_base hst is_exported desugared rules
+         <- core2core dflags pcs hst is_exported desugared rules
 
       -- Do the final tidy-up
       (tidy_binds, tidy_orphan_rules) 
@@ -375,6 +372,7 @@ hscExpr
 
 hscExpr dflags hst hit pcs this_module expr
   = do	{ 	-- Parse it
+	  let unqual = unQualInScope 
 	; maybe_parsed <- myParseExpr dflags expr
 	; case maybe_parsed of {
       	     Nothing -> return (HscFail pcs_ch);
@@ -384,13 +382,22 @@ hscExpr dflags hst hit pcs this_module expr
 	  (new_pcs, maybe_renamed_expr) <- renameExpr dflags hit hst pcs this_module parsed_expr ;
 	; case maybe_renamed_expr of {
 		Nothing -> FAIL
-		Just renamed_expr -> 
+		Just (print_unqual, rn_expr) -> 
 
 		-- Typecheck it
-	  maybe_tc_expr <- typecheckExpr dflags pcs hst unqual renamed_expr 
+	  maybe_tc_expr <- typecheckExpr dflags pcs hst print_unqual rn_expr 
 	; case maybe_tc_expr of
 		Nothing -> FAIL
-		Just typechecked_expr ->
+		Just tc_expr ->
+
+		-- Desugar it
+	; ds_expr <- deSugarExpr dflags pcs hst this_module print_unqual tc_expr
+	
+		-- Simplify it
+	; simpl_expr <- simplifyExpr dflags pcs hst ds_expr
+
+	; return I'M NOT SURE
+	}
 
 	
 

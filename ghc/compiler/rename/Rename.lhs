@@ -87,15 +87,12 @@ renameModule :: DynFlags
 	     -> HomeIfaceTable -> HomeSymbolTable
 	     -> PersistentCompilerState 
 	     -> Module -> RdrNameHsModule 
-	     -> IO (PersistentCompilerState, Maybe (PrintUnqualified, IsExported, ModIface, [RenamedHsDecl]))
+	     -> IO (PersistentCompilerState, Maybe (PrintUnqualified, (IsExported, ModIface, [RenamedHsDecl])))
 	-- Nothing => some error occurred in the renamer
 
 renameModule dflags hit hst pcs this_module rdr_module
-  = renameSource dflags hit hst pcs this_module get_unqual $
+  = renameSource dflags hit hst pcs this_module $
     rename this_module rdr_module
-  where
-    get_unqual (Just (unqual, _, _, _)) = unqual
-    get_unqual Nothing			= alwaysQualify
 \end{code}
 
 
@@ -104,16 +101,16 @@ renameExpr :: DynFlags
 	   -> HomeIfaceTable -> HomeSymbolTable
 	   -> PersistentCompilerState 
 	   -> Module -> RdrNameHsExpr
-	   -> IO (PersistentCompilerState, Maybe RenamedHsExpr)
+	   -> IO (PersistentCompilerState, Maybe (PrintUnqualified, RenamedHsExpr))
 
 renameExpr dflags hit hst pcs this_module expr
   | Just iface <- lookupModuleEnv hit this_module
   = do	{ let rdr_env      = mi_globals iface
-	; let get_unqual _ = unQualInScope rdr_env
+	; let print_unqual = unQualInScope rdr_env
 	  
-	; renameSource dflags hit hst pcs this_module get_unqual $
+	; renameSource dflags hit hst pcs this_module $
 	  initRnMS rdr_env emptyLocalFixityEnv SourceMode $
-	  (rnExpr expr `thenRn` \ (e,_) -> returnRn (Just e))
+	  (rnExpr expr `thenRn` \ (e,_) -> returnRn (Just (print_unqual, e)))
 	}
 
   | otherwise
@@ -134,19 +131,22 @@ renameSource :: DynFlags
 	     -> HomeIfaceTable -> HomeSymbolTable
 	     -> PersistentCompilerState 
 	     -> Module 
-	     -> (Maybe r -> PrintUnqualified)
-	     -> RnMG (Maybe r)
-	     -> IO (PersistentCompilerState, Maybe r)
+	     -> RnMG (Maybe (PrintUnqualified, r))
+	     -> IO (PersistentCompilerState, Maybe (PrintUnqualified, r))
 	-- Nothing => some error occurred in the renamer
 
-renameSource dflags hit hst old_pcs this_module get_unqual thing_inside
+renameSource dflags hit hst old_pcs this_module thing_inside
   = do	{ showPass dflags "Renamer"
 
 		-- Initialise the renamer monad
 	; (new_pcs, msgs, maybe_rn_stuff) <- initRn dflags hit hst old_pcs this_module thing_inside
 
 	 	-- Print errors from renaming
-	;  printErrorsAndWarnings (get_unqual maybe_rn_stuff) msgs ;
+	;  let print_unqual = case maybe_rn_stuff of
+				Just (unqual, _) -> unqual
+				Nothing		 -> alwaysQualify
+
+	;  printErrorsAndWarnings print_unqual msgs ;
 
 		-- Return results.  No harm in updating the PCS
 	; if errorsFound msgs then
@@ -157,7 +157,7 @@ renameSource dflags hit hst old_pcs this_module get_unqual thing_inside
 \end{code}
 
 \begin{code}
-rename :: Module -> RdrNameHsModule -> RnMG (Maybe (PrintUnqualified, IsExported, ModIface, [RenamedHsDecl]))
+rename :: Module -> RdrNameHsModule -> RnMG (Maybe (PrintUnqualified, (IsExported, ModIface, [RenamedHsDecl])))
 rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec loc)
   = pushSrcLocRn loc		$
 
@@ -249,7 +249,7 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
 		      imports global_avail_env
 		      source_fvs export_avails rn_imp_decls 	`thenRn_`
 
-    returnRn (Just (print_unqualified, is_exported, mod_iface, final_decls))
+    returnRn (Just (print_unqualified, (is_exported, mod_iface, final_decls)))
   where
     mod_name = moduleName this_module
 \end{code}
