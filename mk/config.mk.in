@@ -346,6 +346,10 @@ ReadlineIncludePath=
 # Math library
 LIBM=@LIBM@
 
+# Build the ObjectIO ?
+#
+GhcLibsWithObjectIO=@GhcLibsWithObjectIO@
+
 # Build the Haskell OpenGL/GLUT binding?
 #
 GhcLibsWithHOpenGL=@GhcLibsWithHOpenGL@
