@@ -494,7 +494,12 @@ deriving_occ_info
 			 showParen_RDR, showSpace_RDR, showList___RDR])
     , (readClassKey,	[intTyCon_RDR, numClass_RDR, ordClass_RDR, append_RDR, 
 			 lex_RDR, readParen_RDR, readList___RDR])
-    , (ixClassKey,	[intTyCon_RDR, numClass_RDR, and_RDR, map_RDR, enumFromTo_RDR])
+    , (ixClassKey,	[intTyCon_RDR, numClass_RDR, and_RDR, map_RDR, enumFromTo_RDR, 
+			 returnM_RDR, zeroM_RDR])
+			     -- the last two are needed to force returnM, thenM and zeroM
+			     -- in before typechecking the list(monad) comprehension
+			     -- generated for derived Ix instances (range method)
+			     -- of single constructor types.  -- SOF 8/97
     ]
 	-- intTyCon: Practically any deriving needs Int, either for index calculations, 
 	--		or for taggery.
