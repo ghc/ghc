@@ -3,8 +3,6 @@ if [ ! -f "$DOCBOOK_CATALOG" ] ; then
   exit 1
 fi
 
-TMPFN=`echo $1 | sed 's/\.sgml//'`
-
 # Dave Mason's option to specify a different stylesheet
 case $1 in
     -d) DB_STYLESHEET=$2
@@ -29,18 +27,27 @@ then
   fi
   if echo $1 | egrep -i '\.sgml$|\.sgm$' >/dev/null 2>&1
   then
-    output="`echo $1 | sed 's,\.sgml$,.pdf,;s,\.sgm$,.pdf,'`"
+    output="`echo $1 | sed 's,\.sgml$,,;s,\.sgm$,,'`"
   fi
 fi
 
-$JADE -t tex -d ${DB_STYLESHEET}\#print -o ${TMPFN}.tex -c $DOCBOOK_CATALOG $1
+# assumption: openjade and pdfjadetex is installed in the same dir.
+PDFJADETEX=`dirname $JADE`/pdfjadetex
 
-pdf$JADEtex $TMPFN
+$JADE -t tex -d ${DB_STYLESHEET}\#print -o ${output}.tex -c $DOCBOOK_CATALOG $1
 
+${PDFJADETEX} ${output}
+
+# See if running pdfjadetex twice cures the problem.
 if egrep '^LaTeX Warning: There were undefined references.$' ${TMPFN}.log >/dev/null 2>&1
 then
-  pdfjadetex $TMPFN
-  pdfjadetex $TMPFN
+  ${PDFJADETEX} ${output}
+  ${PDFJADETEX} ${output}
 fi
+
+# clean out 
+rm -f ${output}.log
+rm -f ${output}.aux
+rm -f ${output}.tex
 
 exit 0
