@@ -1,0 +1,12 @@
+setTestOpts(only_ways(['normal']));
+
+test('gadt1', normal, compile, [''])
+test('gadt2', normal, compile_and_run, [''])
+test('gadt3', normal, compile, [''])
+test('gadt4', normal, compile_and_run, [''])
+test('gadt5', normal, compile_and_run, [''])
+test('red-black', normal, compile, [''])
+test('type-rep', normal, compile_and_run, [''])
+test('equal', normal, compile, [''])
+test('nbe', normal, compile, [''])
+test('while', normal, compile_and_run, [''])
