@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.44 1999/02/26 13:36:12 simonm Exp $
+ * $Id: GC.c,v 1.45 1999/02/26 17:46:08 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -758,6 +758,16 @@ traverse_weak_ptr_list(void)
       w = (StgWeak *)((StgEvacuated *)w)->evacuee;
       *last_w = w;
     }
+
+    /* There might be a DEAD_WEAK on the list if finalizeWeak# was
+     * called on a live weak pointer object.  Just remove it.
+     */
+    if (w->header.info == &DEAD_WEAK_info) {
+      next_w = ((StgDeadWeak *)w)->link;
+      *last_w = next_w;
+      continue;
+    }
+
     ASSERT(get_itbl(w)->type == WEAK);
 
     /* Now, check whether the key is reachable.

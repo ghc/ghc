@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.9 1999/02/19 18:26:04 sewardj Exp $
+ * $Id: Closures.h,v 1.10 1999/02/26 17:46:04 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -264,6 +264,11 @@ typedef struct _StgWeak {	/* Weak v */
   StgClosure *finalizer;
   struct _StgWeak *link;
 } StgWeak;
+
+typedef struct _StgDeadWeak {	/* Weak v */
+  StgHeader header;
+  struct _StgWeak *link;
+} StgDeadWeak;
 
 /* Dynamic stack frames - these have a liveness mask in the object
  * itself, rather than in the info table.  Useful for generic heap

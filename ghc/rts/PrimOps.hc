@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.17 1999/02/26 12:46:48 simonm Exp $
+ * $Id: PrimOps.hc,v 1.18 1999/02/26 17:46:09 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -348,10 +348,11 @@ FN_(finalizzeWeakzh_fast)
 {
   /* R1.p = weak ptr
    */
-  StgWeak *w;
+  StgDeadWeak *w;
+  StgClosure *f;
   FB_
   TICK_RET_UNBOXED_TUP(0);
-  w = (StgWeak *)R1.p;
+  w = (StgDeadWeak *)R1.p;
 
   /* already dead? */
   if (w->header.info == &DEAD_WEAK_info) {
@@ -360,12 +361,14 @@ FN_(finalizzeWeakzh_fast)
 
   /* kill it */
   w->header.info = &DEAD_WEAK_info;
+  f = ((StgWeak *)w)->finalizer;
+  w->link = ((StgWeak *)w)->link;
 
   /* return the finalizer */
-  if (w->finalizer == &NO_FINALIZER_closure) {
+  if (f == &NO_FINALIZER_closure) {
       RET_NP(0,&NO_FINALIZER_closure);
   } else {
-      RET_NP(1,w->finalizer);
+      RET_NP(1,f);
   }
   FE_
 }
