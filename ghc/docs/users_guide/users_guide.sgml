@@ -2,6 +2,7 @@
         <!ENTITY license        SYSTEM "license.sgml">
         <!ENTITY intro          SYSTEM "intro.sgml" >
         <!ENTITY relnotes       SYSTEM "4-04-notes.sgml" >
+        <!ENTITY installing     SYSTEM "installing.sgml" >
         <!ENTITY using          SYSTEM "using.sgml" >
         <!ENTITY runtime        SYSTEM "runtime_control.sgml" >
         <!ENTITY prof           SYSTEM "profiling.sgml" >
@@ -28,6 +29,7 @@
 
 &license
 &intro
+&installing
 &using
 &prof
 &sooner
