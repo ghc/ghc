@@ -29,6 +29,7 @@ import Type		( Type )
 import PrelNames	( iNTERACTIVE )
 import StringBuffer	( stringToStringBuffer )
 import Name		( Name )
+import CoreLint		( lintUnfolding )
 #endif
 
 import HsSyn
@@ -39,7 +40,7 @@ import IdInfo		( CafInfo(..), CgInfoEnv, CgInfo(..) )
 import StringBuffer	( hGetStringBuffer, freeStringBuffer )
 import Parser
 import Lex		( ParseResult(..), ExtFlags(..), mkPState )
-import SrcLoc		( mkSrcLoc )
+import SrcLoc		( mkSrcLoc, noSrcLoc )
 import TcRnDriver	( checkOldIface, tcRnModule, tcRnExtCore, tcRnIface )
 import RnEnv		( extendOrigNameCache )
 import Rules		( emptyRuleBase )
@@ -638,8 +639,9 @@ compileExpr :: HscEnv
 	    -> IO HValue
 
 compileExpr hsc_env pcs this_mod rdr_env type_env tc_expr
-  = do	{ let dflags = hsc_dflags hsc_env
-
+  = do	{ let { dflags  = hsc_dflags hsc_env ;
+		lint_on = dopt Opt_DoCoreLinting dflags }
+	      
 	 	-- Desugar it
 	; ds_expr <- deSugarExpr hsc_env pcs this_mod rdr_env type_env tc_expr
 	
@@ -654,6 +656,15 @@ compileExpr hsc_env pcs this_mod rdr_env type_env tc_expr
 
 		-- Prepare for codegen
 	; prepd_expr <- corePrepExpr dflags tidy_expr
+
+		-- Lint if necessary
+		-- ToDo: improve SrcLoc
+	; if lint_on then 
+		case lintUnfolding noSrcLoc [] prepd_expr of
+		   Just err -> pprPanic "compileExpr" err
+		   Nothing  -> return ()
+	  else
+		return ()
 
 		-- Convert to BCOs
 	; bcos <- coreExprToBCOs dflags prepd_expr
