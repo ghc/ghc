@@ -13,7 +13,8 @@ DYN_LOADABLE_BITS = \
 	ghc-consist.prl \
 	ghc-split.prl
 
-SCRIPT_PROG = ghc
+SCRIPT_PROG = ghc-$(GhcProjectVersion)
+SCRIPT_LINK = ghc
 SCRIPT_OBJS = ghc.prl
  
 INTERP=perl
