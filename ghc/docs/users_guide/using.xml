@@ -660,6 +660,39 @@ ghc -c Foo.hs</screen>
 	</listitem>
       </varlistentry>
 
+      <varlistentry>
+	<term><option>-ferror-spans</option>
+          <indexterm><primary><option>-ferror-spans</option></primary>
+	  </indexterm>
+        </term>
+	<listitem>
+	  <para>Causes GHC to emit the full source span of the
+	  syntactic entity relating to an error message.  Normally, GHC
+	  emits the source location of the start of the syntactic
+	  entity only.</para>
+
+	  <para>For example:</para>
+
+<screen>test.hs:3:6: parse error on input `where'</screen>
+
+	  <para>becomes:</para>
+
+<screen>test296.hs:3:6-10: parse error on input `where'</screen>
+
+	  <para>And multi-line spans are possible too:</para>
+
+<screen>test.hs:(5,4)-(6,7):
+    Conflicting definitions for `a'
+    Bound at: test.hs:5:4
+              test.hs:6:7
+    In the binding group for: a, b, a</screen>
+
+	  <para>Note that line numbers start counting at one, but
+	  column numbers start at zero.  This choice was made to
+	  follow existing convention (i.e. this is how Emacs does
+	  it).</para>
+	</listitem>
+      </varlistentry>
     </variablelist>
   </sect1>
 
@@ -1790,7 +1823,7 @@ ordinary Haskell 98, when translated to External Core, uses things like rank-2 t
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
-     ;;; mode: xml ***
+     ;;; mode: sgml ***
      ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter") ***
      ;;; End: ***
  -->

@@ -69,6 +69,12 @@
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
+	    <row>
+	      <entry><option>-ferror-spans</option></entry>
+	      <entry>output full span in error messages</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
 	  </tbody>
 	</tgroup>
       </informaltable>
