@@ -275,7 +275,7 @@ pprCoreBinder LetBind binder
     pragmas = ppIdInfo binder (idInfo binder)
 
 -- Lambda bound type variables are preceded by "@"
-pprCoreBinder LambdaBind bndr = pprTypedBinder bndr
+pprCoreBinder LambdaBind bndr = parens (pprTypedBinder bndr)
 
 -- Case bound things don't get a signature or a herald
 pprCoreBinder CaseBind bndr = pprUntypedBinder bndr
@@ -287,12 +287,6 @@ pprUntypedBinder binder
 pprTypedBinder binder
   | isTyVar binder  = ptext SLIT("@") <+> pprTyVarBndr binder
   | otherwise	    = pprIdBndr binder <+> dcolon <+> pprType (idType binder)
-	-- The space before the :: is important; it helps the lexer
-	-- when reading inferfaces.  Otherwise it would lex "a::b" as one thing.
-	--
-	-- It's important that the type is parenthesised too, at least when
-	-- printing interfaces, because we get \ x::(a->b) y::(c->d) -> ...
-	--	[Jun 2002: interfaces are now binary, so this doesn't matter]
 
 pprTyVarBndr :: TyVar -> SDoc
 pprTyVarBndr tyvar
