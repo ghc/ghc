@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.101 2001/04/02 14:18:05 simonmar Exp $
+ * $Id: GC.c,v 1.102 2001/04/03 16:35:12 sewardj Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1487,6 +1487,11 @@ loop:
 	goto selector_loop;
 
       case THUNK_SELECTOR:
+#         if 0
+          /* Disabled 03 April 2001 by JRS; it seems to cause the GC (or
+             something) to go into an infinite loop when the nightly
+             stage2 compiles PrelTup.lhs. */
+
 	  /* we can't recurse indefinitely in evacuate(), so set a
 	   * limit on the number of times we can go around this
 	   * loop.
@@ -1502,6 +1507,7 @@ loop:
 	      }
 	  }
 	  /* otherwise, fall through... */
+#         endif
 
       case AP_UPD:
       case THUNK:
