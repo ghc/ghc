@@ -161,9 +161,9 @@ foreach $sf (@Src_files) {
     # builds up @Depend_lines
     print STDERR "Here we go for source file: $sf\n" if $Verbose;
     ($bf = $sf) =~ s/\.l?hs$//;
-    push(@Depend_lines, "$bf$Obj_suffix $bf.hi : $sf\n");
+    push(@Depend_lines, "$bf.$Obj_suffix $bf.hi : $sf\n");
     foreach $suff (@File_suffix) {
-        push(@Depend_lines, "$bf$suff$Obj_suffix : $sf\n");
+        push(@Depend_lines, "$bf.$suff\_$Obj_suffix : $sf\n");
     }
 
     # if it's a literate file, .lhs, then we de-literatize it:
@@ -362,18 +362,18 @@ sub slurp_file_for_imports {
 		$int_file = $follow_file;
 
 		if ( $int_file !~ /\.(l?hs|hi)$/ ) {
-		    push(@Depend_lines, "$bf$Obj_suffix : $int_file\n");
+		    push(@Depend_lines, "$bf.$Obj_suffix : $int_file\n");
 		    foreach $suff (@File_suffix) {
-			push(@Depend_lines, "$bf$suff$Obj_suffix : $int_file\n");
+			push(@Depend_lines, "$bf.$suff\_$Obj_suffix : $int_file\n");
 		    }
 
 		} else {
 		    $int_file =~ s/\.l?hs$//;
 		    $int_file =~ s/\.hi$//;
 
-		    push(@Depend_lines, "$bf$Obj_suffix : $int_file.hi\n");
+		    push(@Depend_lines, "$bf.$Obj_suffix : $int_file.hi\n");
 		    foreach $suff (@File_suffix) {
-			push(@Depend_lines, "$bf$suff$Obj_suffix : $int_file$suff.hi\n");
+			push(@Depend_lines, "$bf.$suff\_$Obj_suffix : $int_file.$suff\_hi\n");
 		    }
 		}
 	    }
