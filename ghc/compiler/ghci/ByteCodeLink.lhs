@@ -24,7 +24,7 @@ import FiniteMap	( FiniteMap, addListToFM, filterFM,
 import CoreSyn
 import Literal		( Literal(..) )
 import PrimOp		( PrimOp, primOpOcc )
-import PrimRep		( PrimRep(..) )
+import PrimRep		( PrimRep(..), isFollowableRep )
 import Constants	( wORD_SIZE )
 import Module		( ModuleName, moduleName, moduleNameFS )
 import Linker		( lookupSymbol )
@@ -369,7 +369,6 @@ mkBits findLabel st proto_insns
             where
                ret_itbl_addr 
                   = case pk of
-                       PtrRep    -> stg_ctoi_ret_R1p_info
                        WordRep   -> stg_ctoi_ret_R1n_info
                        IntRep    -> stg_ctoi_ret_R1n_info
                        AddrRep   -> stg_ctoi_ret_R1n_info
@@ -377,7 +376,11 @@ mkBits findLabel st proto_insns
                        FloatRep  -> stg_ctoi_ret_F1_info
                        DoubleRep -> stg_ctoi_ret_D1_info
                        VoidRep   -> stg_ctoi_ret_V_info
-                       other     -> pprPanic "ByteCodeLink.ctoi_itbl" (ppr pk)
+                       other | isFollowableRep pk -> stg_ctoi_ret_R1p_info
+				-- Includes ArrayRep, ByteArrayRep, as well as
+				-- the obvious PtrRep
+			     | otherwise
+			     -> pprPanic "ByteCodeLink.ctoi_itbl" (ppr pk)
 
        itoc_itbl st pk
           = addr st ret_itbl_addr
@@ -390,9 +393,10 @@ mkBits findLabel st proto_insns
                        AddrRep   -> stg_gc_unbx_r1_info
                        FloatRep  -> stg_gc_f1_info
                        DoubleRep -> stg_gc_d1_info
-                       VoidRep   -> nullPtr
-                       -- Interpreter.c spots this special case
-                       other     -> pprPanic "ByteCodeLink.itoc_itbl" (ppr pk)
+                       VoidRep   -> nullPtr	-- Interpreter.c spots this special case
+                       other | isFollowableRep pk -> stg_gc_unpt_r1_info
+			     | otherwise
+			    -> pprPanic "ByteCodeLink.itoc_itbl" (ppr pk)
                      
 foreign label "stg_ctoi_ret_R1p_info" stg_ctoi_ret_R1p_info :: Ptr ()
 foreign label "stg_ctoi_ret_R1n_info" stg_ctoi_ret_R1n_info :: Ptr ()
@@ -401,6 +405,7 @@ foreign label "stg_ctoi_ret_D1_info"  stg_ctoi_ret_D1_info :: Ptr ()
 foreign label "stg_ctoi_ret_V_info"   stg_ctoi_ret_V_info :: Ptr ()
 
 foreign label "stg_gc_unbx_r1_info" stg_gc_unbx_r1_info :: Ptr ()
+foreign label "stg_gc_unpt_r1_info" stg_gc_unpt_r1_info :: Ptr ()
 foreign label "stg_gc_f1_info"      stg_gc_f1_info :: Ptr ()
 foreign label "stg_gc_d1_info"      stg_gc_d1_info :: Ptr ()
 

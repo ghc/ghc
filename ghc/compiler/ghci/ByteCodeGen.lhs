@@ -26,7 +26,7 @@ import Literal		( Literal(..), literalPrimRep )
 import PrimRep		( PrimRep(..) )
 import PrimOp		( PrimOp(..) )
 import CoreFVs		( freeVars )
-import Type		( typePrimRep, splitTyConApp_maybe, isTyVarTy )
+import Type		( typePrimRep, isUnLiftedType, splitTyConApp_maybe, isTyVarTy )
 import DataCon		( dataConTag, fIRST_TAG, dataConTyCon, 
                           dataConWrapId, isUnboxedTupleCon )
 import TyCon		( TyCon(..), tyConFamilySize, isDataTyCon, tyConDataCons,
@@ -115,7 +115,7 @@ coreExprToBCOs dflags expr
 
       -- create a totally bogus name for the top-level BCO; this
       -- should be harmless, since it's never used for anything
-      let invented_id   = mkSysLocal FSLIT("Expr-Top-Level") 
+      let invented_id   = mkSysLocal FSLIT("ExprTopLevel") 
 				(mkPseudoUnique3 0) 
 				(panic "invented_id's type")
       let invented_name = idName invented_id
@@ -288,18 +288,20 @@ schemeE d s p e@(fvs, AnnApp f a)
    = schemeT d s p (fvs, AnnApp f a)
 
 schemeE d s p e@(fvs, AnnVar v)
-   | isFollowableRep v_rep
-   =  -- Ptr-ish thing; push it in the normal way
+   | not (isUnLiftedType v_type)
+   =  -- Lifted-type thing; push it in the normal way
      schemeT d s p (fvs, AnnVar v)
 
    | otherwise
-   = -- returning an unboxed value.  Heave it on the stack, SLIDE, and RETURN.
+   = -- Returning an unlifted value.  
+     -- Heave it on the stack, SLIDE, and RETURN.
      pushAtom True d p (AnnVar v)	`thenBc` \ (push, szw) ->
      returnBc (push 			-- value onto stack
                `appOL`  mkSLIDE szw (d-s) 	-- clear to sequel
                `snocOL` RETURN v_rep)	-- go
    where
-      v_rep = typePrimRep (idType v)
+      v_type = idType v
+      v_rep = typePrimRep v_type
 
 schemeE d s p (fvs, AnnLit literal)
    = pushAtom True d p (AnnLit literal)	`thenBc` \ (push, szw) ->
@@ -484,25 +486,30 @@ schemeE d s p (fvs_case, AnnCase (fvs_scrut, scrut) bndr
 
 
 
-{- Convert case .... of (# VoidRep'd-thing, a #) -> ...
-      as
-   case .... of a -> ...
-   Use  a  as the name of the binder too.
-
-   Also    case .... of (# a #) -> ...
-      to
-   case .... of a -> ...
--}
 schemeE d s p (fvs, AnnCase scrut bndr [(DataAlt dc, [bind1, bind2], rhs)])
    | isUnboxedTupleCon dc && VoidRep == typePrimRep (idType bind1)
+	-- Convert 
+	--	case .... of x { (# VoidRep'd-thing, a #) -> ... }
+	-- to
+	-- 	case .... of a { DEFAULT -> ... }
+	-- becuse the return convention for both are identical.
+	--
+	-- Note that it does not matter losing the void-rep thing from the
+	-- envt (it won't be bound now) because we never look such things up.
+
    = --trace "automagic mashing of case alts (# VoidRep, a #)" (
-     schemeE d s p (fvs, AnnCase scrut bind2 [(DEFAULT, [bind2], rhs)])
+     schemeE d s p (fvs, AnnCase scrut bind2 [(DEFAULT, [], rhs)])
+	-- Note: 
      --)
 
 schemeE d s p (fvs, AnnCase scrut bndr [(DataAlt dc, [bind1], rhs)])
    | isUnboxedTupleCon dc
+	-- Similarly, convert
+	--	case .... of x { (# a #) -> ... }
+	-- to
+	--	case .... of a { DEFAULT -> ... }
    = --trace "automagic mashing of case alts (# a #)" (
-     schemeE d s p (fvs, AnnCase scrut bind1 [(DEFAULT, [bind1], rhs)])
+     schemeE d s p (fvs, AnnCase scrut bind1 [(DEFAULT, [], rhs)])
      --)
 
 schemeE d s p (fvs, AnnCase scrut bndr alts)
@@ -522,13 +529,13 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
         isAlgCase
            | scrut_primrep == PtrRep
            = True
-           | scrut_primrep `elem`
-             [CharRep, AddrRep, WordRep, IntRep, FloatRep, DoubleRep,
-              VoidRep, Int8Rep, Int16Rep, Int32Rep, Int64Rep,
-              Word8Rep, Word16Rep, Word32Rep, Word64Rep]
-           = False
-           | otherwise
-           =  pprPanic "ByteCodeGen.schemeE" (ppr scrut_primrep)
+	   | otherwise
+           = WARN( scrut_primrep `elem` bad_reps,
+		   text "Dire warning: strange rep in primitive case:" <+> ppr bndr )
+			-- We don't expect to see any of these
+	     False
+	   where
+	     bad_reps = [CodePtrRep, DataPtrRep, RetRep, CostCentreRep]
 
         -- given an alt, return a discr and code for it.
         codeAlt alt@(discr, binds_f, rhs)
