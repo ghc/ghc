@@ -89,7 +89,10 @@ might have to perform a DynamicReturn (just Bool at the moment).
 ED_RO_(PrelBase_False_inregs_info);
 ED_RO_(PrelBase_True_inregs_info);
 
-const W_ PrelBase_Bool_itblvtbl[] = {
+#ifndef aix_TARGET_OS /* AIX gives link errors with this as a const (RO assembler section) */
+const 
+#endif 
+      W_ PrelBase_Bool_itblvtbl[] = {
     (W_) PrelBase_False_inregs_info,
     (W_) PrelBase_True_inregs_info
 };
