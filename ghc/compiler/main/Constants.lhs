@@ -43,6 +43,7 @@ module Constants (
 	mAX_Vanilla_REG,
 	mAX_Float_REG,
 	mAX_Double_REG,
+	mAX_Long_REG,
 
     	mIN_MP_INT_SIZE,
 	mP_STRUCT_SIZE,
@@ -173,4 +174,5 @@ uF_COST_CENTRE = (UF_COST_CENTRE::Int)
 mAX_Vanilla_REG	= (MAX_VANILLA_REG :: Int)
 mAX_Float_REG	= (MAX_FLOAT_REG :: Int)
 mAX_Double_REG	= (MAX_DOUBLE_REG :: Int)
+mAX_Long_REG    = (MAX_LONG_REG   :: Int)
 \end{code}
