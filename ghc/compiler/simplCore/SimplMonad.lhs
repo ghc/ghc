@@ -682,6 +682,8 @@ settings:
 	SimplGently	(a) Simplifying before specialiser/full laziness
 			(b) Simplifiying inside INLINE pragma
 			(c) Simplifying the LHS of a rule
+			(d) Simplifying a GHCi expression or Template 
+				Haskell splice
 
 	SimplPhase n	Used at all other times
 
@@ -692,6 +694,12 @@ because doing so inhibits floating
     ==> ...(case (case x of I# x# -> fw x#) of ...)...
     ==> ...(case x of I# x# -> case fw x# of ...)...
 and now the redex (f x) isn't floatable any more.
+
+The no-inling thing is also important for Template Haskell.  You might be 
+compiling in one-shot mode with -O2; but when TH compiles a splice before
+running it, we don't want to use -O2.  Indeed, we don't want to inline
+anything, because the byte-code interpreter might get confused about 
+unboxed tuples and suchlike.
 
 INLINE pragmas
 ~~~~~~~~~~~~~~

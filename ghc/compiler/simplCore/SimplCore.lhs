@@ -118,7 +118,7 @@ simplifyExpr dflags expr
 
 	; us <-  mkSplitUniqSupply 's'
 
-	; let env	       = emptySimplEnv (SimplPhase 0) [] emptyVarSet
+	; let env	       = emptySimplEnv SimplGently [] emptyVarSet
 	      (expr', _counts) = initSmpl dflags us (simplExprGently env expr)
 
 	; dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
@@ -362,6 +362,11 @@ simplExprGently :: SimplEnv -> CoreExpr -> SimplM CoreExpr
 --	alone leaves tons of crud.
 -- Used (a) for user expressions typed in at the interactive prompt
 --	(b) the LHS and RHS of a RULE
+--
+-- The name 'Gently' suggests that the SimplifierMode is SimplGently,
+-- and in fact that is so.... but the 'Gently' in simplExprGently doesn't
+-- enforce that; it just simplifies the expression twice
+
 simplExprGently env expr
   = simplExpr env (occurAnalyseGlobalExpr expr) 	`thenSmpl` \ expr1 ->
     simplExpr env (occurAnalyseGlobalExpr expr1)
