@@ -42,7 +42,7 @@ extern nat rts_n_free_capabilities;
 extern nat rts_n_waiting_workers; /* used by Task.c to determine */
 
 extern void grabReturnCapability(Mutex* pMutex, Capability** pCap);
-extern void yieldToReturningWorker(Mutex* pMutex, Capability* cap);
+extern void yieldToReturningWorker(Mutex* pMutex, Capability** pCap);
 extern void waitForWorkCapability(Mutex* pMutex, Capability** pCap, rtsBool runnable);
 
 static inline nat getFreeCapabilities (void)

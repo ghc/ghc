@@ -259,24 +259,14 @@ grabReturnCapability(Mutex* pMutex, Capability** pCap)
  *                 been given back.
  */
 void
-yieldToReturningWorker(Mutex* pMutex, Capability* cap)
+yieldToReturningWorker(Mutex* pMutex, Capability** pCap)
 {
   if ( rts_n_waiting_workers > 0 && noCapabilities() ) {
     IF_DEBUG(scheduler,
 	     fprintf(stderr,"worker thread (%ld): giving up RTS token\n", osThreadId()));
-    releaseCapability(cap);
-    RELEASE_LOCK(pMutex);
-    yieldThread();
-    /* At this point, pMutex has been given up & we've 
-     * forced a thread context switch. Guaranteed to be
-     * enough for the signalled worker thread to race
-     * ahead of us?
-     */
-
-    /* Re-grab the mutex */
-    ACQUIRE_LOCK(pMutex);
+    releaseCapability(*pCap);
     /* And wait for work */
-    waitForWorkCapability(pMutex, cap, rtsFalse);
+    waitForWorkCapability(pMutex, pCap, rtsFalse);
   }
   return;
 }
