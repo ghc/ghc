@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.30 2003/09/21 22:20:56 wolfgang Exp $
+ * $Id: Weak.c,v 1.31 2003/10/24 09:00:59 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -106,6 +106,7 @@ scheduleFinalizers(StgWeak *list)
     arr = (StgMutArrPtrs *)allocate(sizeofW(StgMutArrPtrs) + n);
     TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);
     SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_info, CCS_SYSTEM);
+    arr->mut_link = NULL;
     arr->ptrs = n;
 
     n = 0;
