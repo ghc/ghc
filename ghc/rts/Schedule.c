@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.12 1999/02/26 16:46:50 simonm Exp $
+ * $Id: Schedule.c,v 1.13 1999/03/02 20:04:03 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -25,6 +25,13 @@
 #include "Signals.h"
 #include "Profiling.h"
 #include "Sanity.h"
+
+#ifdef HAVE_WINDOWS_H
+#include <windows.h>
+#endif
+
+#define IS_CHARLIKE_CLOSURE(p)  ( stgCast(StgPtr,p) >= stgCast(StgPtr,CHARLIKE_closure) && stgCast(char*,p) <= (stgCast(char*,CHARLIKE_closure) + 255 * sizeof(StgIntCharlikeClosure)))
+#define IS_INTLIKE_CLOSURE(p)  ( stgCast(StgPtr,p) >= stgCast(StgPtr,INTLIKE_closure) && stgCast(char*,p) <= (stgCast(char*,INTLIKE_closure) + 32 * sizeof(StgIntCharlikeClosure)))
 
 StgTSO *run_queue_hd, *run_queue_tl;
 StgTSO *blocked_queue_hd, *blocked_queue_tl;
@@ -187,7 +194,7 @@ void deleteThread(StgTSO *tso)
      * code, so we have to push a dummy closure on the top which just
      * returns to the next return address on the stack.
      */
-    if (LOOKS_LIKE_GHC_INFO(*sp)) {
+    if ( LOOKS_LIKE_GHC_INFO(*sp) ) {
       *(--sp) = (W_)&dummy_ret_closure;
     }
 
@@ -542,10 +549,11 @@ SchedulerStatus schedule(StgTSO *main, StgClosure **ret_val)
     }
 
     /* check for signals each time around the scheduler */
+#ifndef __MINGW32__
     if (signals_pending()) {
       start_signal_handlers();
     }
-
+#endif
     /* If our main thread has finished or been killed, return.
      * If we were re-entered as a result of a _ccall_gc, then
      * pop the blocked thread off the ccalling_threads stack back
