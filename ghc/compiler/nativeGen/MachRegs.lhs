@@ -372,6 +372,10 @@ Intel x86 architecture:
   fp registers, and 3-operand insns for them, and we translate this into
   real stack-based x86 fp code after register allocation.
 
+The fp registers are all Double registers; we don't have any RcFloat class
+regs.  @regClass@ barfs if you give it a VirtualRegF, and mkVReg above should
+never generate them.
+
 \begin{code}
 #if i386_TARGET_ARCH
 
@@ -394,8 +398,9 @@ fake5 = RealReg 13
 
 regClass (RealReg i)     = if i < 8 then RcInteger else RcDouble
 regClass (VirtualRegI u) = RcInteger
-regClass (VirtualRegF u) = RcFloat
 regClass (VirtualRegD u) = RcDouble
+regClass (VirtualRegF u) = pprPanic "regClass(x86):VirtualRegF" 
+                                    (ppr (VirtualRegF u))
 
 regNames 
    = ["%eax", "%ebx", "%ecx", "%edx", "%esi", "%edi", "%ebp", "%esp", 
@@ -470,29 +475,6 @@ f0  = RealReg (fReg 0)
 f1  = RealReg (fReg 1)
 
 #endif
-
--------------------------------
-callClobberedRegs :: [Reg]
-callClobberedRegs
-  =
-#if alpha_TARGET_ARCH
-    [0, 1, 2, 3, 4, 5, 6, 7, 8,
-     16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
-     fReg 0, fReg 1, fReg 10, fReg 11, fReg 12, fReg 13, fReg 14, fReg 15,
-     fReg 16, fReg 17, fReg 18, fReg 19, fReg 20, fReg 21, fReg 22, fReg 23,
-     fReg 24, fReg 25, fReg 26, fReg 27, fReg 28, fReg 29, fReg 30]
-#endif {- alpha_TARGET_ARCH -}
-#if i386_TARGET_ARCH
-    -- caller-saves registers
-    [eax,ecx,edx,fake0,fake1,fake2,fake3,fake4,fake5]
-#endif {- i386_TARGET_ARCH -}
-#if sparc_TARGET_ARCH
-    map RealReg 
-        ( oReg 7 :
-          [oReg i | i <- [0..5]] ++
-          [gReg i | i <- [1..7]] ++
-          [fReg i | i <- [0..31]] )
-#endif {- sparc_TARGET_ARCH -}
 \end{code}
 
 Redefine the literals used for machine-registers with non-numeric
@@ -650,7 +632,7 @@ baseRegOffset Hp		     = OFFSET_Hp
 baseRegOffset HpLim		     = OFFSET_HpLim
 baseRegOffset CurrentTSO	     = OFFSET_CurrentTSO
 baseRegOffset CurrentNursery	     = OFFSET_CurrentNursery
-#ifdef DEBUG
+#ifdef NCG_DEBUG
 baseRegOffset BaseReg		     = panic "baseRegOffset:BaseReg"
 baseRegOffset CurCostCentre	     = panic "baseRegOffset:CurCostCentre"
 baseRegOffset VoidReg		     = panic "baseRegOffset:VoidReg"
@@ -828,10 +810,37 @@ allMachRegNos
                      ++ [nCG_FirstFloatReg .. f31]),
                    )))
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
+-- i.e., these are the regs for which we are prepared to allow the
+-- register allocator to attempt to map VRegs to.
 allocatableRegs :: [Reg]
 allocatableRegs
    = let isFree (RealReg (I# i)) = _IS_TRUE_(freeReg i)
      in  filter isFree (map RealReg allMachRegNos)
+
+-------------------------------
+-- these are the regs which we cannot assume stay alive over a
+-- C call.  
+callClobberedRegs :: [Reg]
+callClobberedRegs
+  =
+#if alpha_TARGET_ARCH
+    [0, 1, 2, 3, 4, 5, 6, 7, 8,
+     16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+     fReg 0, fReg 1, fReg 10, fReg 11, fReg 12, fReg 13, fReg 14, fReg 15,
+     fReg 16, fReg 17, fReg 18, fReg 19, fReg 20, fReg 21, fReg 22, fReg 23,
+     fReg 24, fReg 25, fReg 26, fReg 27, fReg 28, fReg 29, fReg 30]
+#endif {- alpha_TARGET_ARCH -}
+#if i386_TARGET_ARCH
+    -- caller-saves registers
+    map RealReg [eax,ecx,edx,fake0,fake1,fake2,fake3,fake4,fake5]
+#endif {- i386_TARGET_ARCH -}
+#if sparc_TARGET_ARCH
+    map RealReg 
+        ( oReg 7 :
+          [oReg i | i <- [0..5]] ++
+          [gReg i | i <- [1..7]] ++
+          [fReg i | i <- [0..31]] )
+#endif {- sparc_TARGET_ARCH -}
 
 -------------------------------
 -- argRegs is the set of regs which are read for an n-argument call to C.
@@ -865,8 +874,6 @@ argRegs 5 = map (RealReg . oReg) [0,1,2,3,4]
 argRegs 6 = map (RealReg . oReg) [0,1,2,3,4,5]
 argRegs _ = panic "MachRegs.argRegs(sparc): don't know about >6 arguments!"
 #endif {- sparc_TARGET_ARCH -}
-
-
 
 -------------------------------
 -- all of the arg regs ??

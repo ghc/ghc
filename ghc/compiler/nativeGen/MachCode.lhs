@@ -509,6 +509,19 @@ getRegister leaf
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if i386_TARGET_ARCH
 
+getRegister (StFloat f)
+  = getNatLabelNCG 	    	    `thenNat` \ lbl ->
+    let code dst = toOL [
+    	    SEGMENT DataSegment,
+	    LABEL lbl,
+	    DATA F [ImmFloat f],
+	    SEGMENT TextSegment,
+	    GLD F (ImmAddr (ImmCLbl lbl) 0) dst
+	    ]
+    in
+    returnNat (Any FloatRep code)
+
+
 getRegister (StDouble d)
 
   | d == 0.0
@@ -2382,7 +2395,7 @@ genCCall fn cconv kind args
 	      _   -> ImmLab False (ptext fn)
 
     arg_size DF = 8
-    arg_size F  = 8
+    arg_size F  = 4
     arg_size _  = 4
 
     ------------
@@ -2399,7 +2412,7 @@ genCCall fn cconv kind args
                         code `appOL`
                         toOL [SUB L (OpImm (ImmInt 8)) (OpReg esp),
                               DELTA (delta-size),
-                              GST DF reg (AddrBaseIndex (Just esp) 
+                              GST sz reg (AddrBaseIndex (Just esp) 
                                                         Nothing 
                                                         (ImmInt 0))]
                        )
@@ -2987,7 +3000,7 @@ trivialFCode pk instr x y
              code2 `snocOL`
              instr (primRepToSize pk) tmp1 src2 dst
     in
-    returnNat (Any DoubleRep code__2)
+    returnNat (Any pk code__2)
 
 
 -------------

@@ -95,7 +95,7 @@ nativeCodeGen absC us
          insn_sdoc         = my_vcat insn_sdocs
          stix_sdoc         = vcat stix_sdocs
 
-#        if 1 /* ifdef NCG_DEBUG */
+#        ifdef NCG_DEBUG
          my_trace m x = trace m x
          my_vcat sds = vcat (intersperse (char ' ' 
                                           $$ ptext SLIT("# ___ncg_debug_marker")

@@ -222,7 +222,7 @@ doGeneralAlloc all_regs reserve_regs instrs
               ++ " using " 
               ++ showSDoc (hsep (map ppr reserve_regs))
 
-#        if 1 /* ifdef DEBUG */
+#        ifdef NCG_DEBUG
          maybetrace msg x = trace msg x
 #        else
          maybetrace msg x = x
@@ -320,9 +320,10 @@ patchInstr vreg_to_slot_map (delta,ctr) instr
         mkTmpReg vreg
            | isVirtualReg vreg
            = case [vi | (vreg', vi) <- vreg_env, vreg' == vreg] of
-                [i] -> if   regClass vreg == RcInteger
-                       then VirtualRegI (mkPseudoUnique3 i)
-                       else VirtualRegF (mkPseudoUnique3 i)
+                [i] -> case regClass vreg of
+                          RcInteger -> VirtualRegI (mkPseudoUnique3 i)
+                          RcFloat   -> VirtualRegF (mkPseudoUnique3 i)
+                          RcDouble  -> VirtualRegD (mkPseudoUnique3 i)
                 _   -> pprPanic "patchInstr: unmapped VReg" (ppr vreg)
            | otherwise
            = vreg
