@@ -12,3 +12,4 @@ test "dsrun004" { vtr("", "", "") }
 test "dsrun005" { vtr("", "", "1") }
 test "dsrun006" { vtr("", "", "") }
 test "dsrun007" { vtr("", "", "1") }
+test "dsrun008" { vtr("", "", "1") }
