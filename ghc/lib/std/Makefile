@@ -25,11 +25,7 @@ HC = $(GHC)
 #
 
 LIBRARY = libHS$(_way).a
-HS_SRCS = $(wildcard *.lhs)
-HS_OBJS = $(HS_SRCS:.lhs=.$(way_)o)
 LIBOBJS = $(HS_OBJS)
-HS_IFACES= $(HS_SRCS:.lhs=.$(way_)hi) PrelGHC.$(way_)hi
-
 
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options

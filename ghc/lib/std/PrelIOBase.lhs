@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.14 1999/11/22 15:55:51 simonmar Exp $
+% $Id: PrelIOBase.lhs,v 1.15 1999/11/26 16:26:32 simonmar Exp $
 % 
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
@@ -11,7 +11,7 @@ concretely; the @IO@ module itself exports abstractly.
 
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude -#include "cbits/stgio.h" #-}
-#include "cbits/error.h"
+#include "cbits/stgerror.h"
 
 #ifndef __HUGS__ /* Hugs just includes this in PreludeBuiltin so no header needed */
 module PrelIOBase where
