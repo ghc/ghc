@@ -131,9 +131,31 @@ free of side effects and independent of its environment.
 If the I\/O computation wrapped in 'unsafePerformIO'
 performs side effects, then the relative order in which those side
 effects take place (relative to the main I\/O trunk, or other calls to
-'unsafePerformIO') is indeterminate.  
+'unsafePerformIO') is indeterminate.  You have to be careful when 
+writing and compiling modules that use 'unsafePerformIO':
+  * Use @{-# NOINLINE foo #-}@ as a pragma on any function @foo@
+	that calls 'unsafePerformIO'.  If the call is inlined,
+	the I/O may be performed more than once.
 
-However, it is less well known that
+  * Use the compiler flag @-fno-cse@ to prevent common sub-expression
+	elimination being performed on the module, which might combine
+	two side effects that were meant to be separate.  A good example
+	is using multiple global variables (like @test@ in the example below).
+
+  * Make sure that the either you switch off let-floating, or that the 
+	call to 'unsafePerformIO' cannot float outside a lambda.  For example, 
+	if you say:
+	@
+	   f x = unsafePerformIO (newIORef [])
+	@
+	you may get only one reference cell shared between all calls to @f@.
+	Better would be
+	@
+	   f x = unsafePerformIO (newIORef [x])
+	@
+	because now it can't float outside the lambda.
+
+It is less well known that
 'unsafePerformIO' is not type safe.  For example:
 
 >     test :: IORef [a]
