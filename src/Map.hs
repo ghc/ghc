@@ -10,7 +10,6 @@ module Map (
 ) where
 
 import Prelude hiding ( lookup )
-import qualified Set
 
 #if __GLASGOW_HASKELL__ < 503
 import FiniteMap
