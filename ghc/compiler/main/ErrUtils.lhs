@@ -9,7 +9,7 @@ module ErrUtils (
 	Messages, errorsFound, emptyMessages,
 
 	addShortErrLocLine, addShortWarnLocLine,
-	addErrLocHdrLine, addWarnLocHdrLine, dontAddErrLoc,
+	addErrLocHdrLine, addWarnLocHdrLine, 
 
 	printErrorsAndWarnings, pprBagOfErrors, pprBagOfWarnings,
 
@@ -69,9 +69,6 @@ addErrLocHdrLine locn hdr msg
 
 addWarnLocHdrLine locn hdr msg
   = mkWarnDoc locn (hdr $$ msg)
-
-dontAddErrLoc :: Message -> ErrMsg
-dontAddErrLoc msg = (noSrcLoc, msg defaultErrStyle)
 
 mkErrDoc locn msg
   | isGoodSrcLoc locn = hang (ppr locn <> colon) 4 msg
