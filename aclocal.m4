@@ -1,4 +1,4 @@
-# $Id: aclocal.m4,v 1.17 1998/02/12 12:37:22 simonm Exp $
+# $Id: aclocal.m4,v 1.18 1998/02/12 22:25:13 sof Exp $
 #
 # Extra autoconf macros for the Glasgow fptools
 #
@@ -274,7 +274,8 @@ AC_DEFUN(AC_PROG_GNUCPP,
 [if test "$HaveGcc" = "YES"; then
 	echo > conftest.c
 	gcc -v -E conftest.c >/dev/null 2>conftest.out
-	echo '/(\S+(\/|\\\\)cpp)/ && print "[$]1";' > conftest.pl
+	# \x5c = backslash
+	echo 'tr/\x5c/\//; /(\S+\/cpp)/ && print "[$]1";' > conftest.pl
 	ac_cv_gnu_cpp="`eval $PerlCmd -n conftest.pl conftest.out`"
 	rm -fr conftest*
  else
