@@ -204,7 +204,8 @@ $white_no_nl+ 				;
 }
 
 <0,glaexts> {
-  "(|" / { ifExtension arrowsEnabled }  { special IToparenbar }
+  "(|" / { ifExtension arrowsEnabled `alexAndPred` notFollowedBySymbol }
+					{ special IToparenbar }
   "|)" / { ifExtension arrowsEnabled }  { special ITcparenbar }
 }
 
@@ -214,7 +215,7 @@ $white_no_nl+ 				;
 }
 
 <glaexts> {
-  "(#"					{ token IToubxparen }
+  "(#" / { notFollowedBySymbol }	{ token IToubxparen }
   "#)"					{ token ITcubxparen }
   "{|"					{ token ITocurlybar }
   "|}"					{ token ITccurlybar }
@@ -580,6 +581,9 @@ pop_and :: Action -> Action
 pop_and act loc end buf len = do popLexState; act loc end buf len
 
 notFollowedBy char _ _ _ (_,buf) = atEnd buf || currentChar buf /= char
+
+notFollowedBySymbol _ _ _ (_,buf)
+  = atEnd buf || currentChar buf `notElem` "!#$%&*+./<=>?@\\^|-~"
 
 ifExtension pred bits _ _ _ = pred bits
 
