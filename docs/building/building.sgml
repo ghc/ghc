@@ -3829,7 +3829,13 @@ GhcStage2HcOpts = -O -fvia-C -keep-hc-files
 	      <itemizedlist>
 		<listitem>
 		  <para>change <literal>TARGETPLATFORM</literal>
-                  appropriately.</para>
+                  appropriately, and set the variables involving
+                  <literal>TARGET</literal> to the correct values for
+                  the target platform.  This step is necessary because
+                  currently <literal>configure</literal> doesn't cope
+                  with specifying different values for the
+                  <literal>--host</literal> and
+                  <literal>--target</literal> flags.</para>
 		</listitem>
 		<listitem>
 		  <para>copy <literal>LeadingUnderscore</literal>
@@ -3837,7 +3843,7 @@ GhcStage2HcOpts = -O -fvia-C -keep-hc-files
 		</listitem>
 	      </itemizedlist>
 	    </listitem>
-	    
+
 	    <listitem>
 	      <para>Copy
 	      <filename><replaceable>T</replaceable>/ghc/includes/config.h</filename>
