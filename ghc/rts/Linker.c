@@ -2042,7 +2042,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
                *pP = S - ((UInt32)pP) - 4;
                break;
             default:
-               debugBelch(("%s: unhandled PEi386 relocation type %d",
+               debugBelch("%s: unhandled PEi386 relocation type %d",
 		     oc->fileName, reltab_j->Type);
                return 0;
          }
