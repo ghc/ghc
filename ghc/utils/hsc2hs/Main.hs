@@ -1,7 +1,7 @@
 {-# OPTIONS -fffi #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.53 2004/02/15 12:20:26 panne Exp $
+-- $Id: Main.hs,v 1.54 2004/03/03 17:11:51 simonpj Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -520,7 +520,8 @@ output flags name toks = do
             fixChar c | isAlphaNum c = toUpper c
                       | otherwise    = '_'
 
-          -- try locating GHC..on Win32, look in the vicinity of hsc2hs.
+        -- Try locating GHC..on Win32, look in the vicinity of hsc2hs.
+	-- Returns a native-format path
         locateGhc def = do
 	    mb <- getExecDir "bin/hsc2hs.exe"
 	    case mb of
@@ -532,6 +533,16 @@ output flags name toks = do
 		  then return ghc_path
 		  else return def
     
+	-- On a Win32 installation we execute the hsc2hs binary directly, 
+	-- with no --cc flags, so we'll call locateGhc here, which will
+	-- succeed, via getExecDir.
+	--
+	-- On a Unix installation, we'll run the wrapper script hsc2hs.sh 
+	-- (called plain hsc2hs in the installed tree), which will pass
+	-- a suitable C compiler via --cc
+	--
+	-- The in-place installation always uses the wrapper script,
+	-- (called hsc2hs-inplace, generated from hsc2hs.sh)
     compiler <- case [c | Compiler c <- flags] of
         []  -> locateGhc "ghc"
         [c] -> return c
