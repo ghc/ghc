@@ -141,9 +141,9 @@ module System.IO (
 
     -- * Binary input and output
 
-#if !defined(__NHC__)
     openBinaryFile,	       -- :: FilePath -> IOMode -> IO Handle
     hSetBinaryMode,	       -- :: Handle -> Bool -> IO ()
+#if !defined(__NHC__)
     hPutBuf,		       -- :: Handle -> Ptr a -> Int -> IO ()
     hGetBuf,		       -- :: Handle -> Ptr a -> Int -> IO Int
 #endif
@@ -209,6 +209,8 @@ import IO
   , FilePath                  -- :: String
   )
 import NHC.IOExtras (fixIO)
+openBinaryFile = openFile
+hSetBinaryMode _ _ = return ()
 #endif
 
 import System.IO.Error (
