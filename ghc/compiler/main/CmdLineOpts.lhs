@@ -266,7 +266,7 @@ data DynFlag
    | Opt_WarnUnusedImports
    | Opt_WarnUnusedMatches
    | Opt_WarnDeprecations
-   | Opt_WarnMisc
+   | Opt_WarnDodgyImports
 
    -- language opts
    | Opt_AllowOverlappingInstances
@@ -675,7 +675,7 @@ minusWOpts
 	Opt_WarnUnusedMatches,
 	Opt_WarnUnusedImports,
 	Opt_WarnIncompletePatterns,
-	Opt_WarnMisc
+	Opt_WarnDodgyImports
       ]
 
 minusWallOpts

@@ -474,7 +474,7 @@ filterImports iface imp_spec (Just (want_hiding, import_items)) total_avails
 	  Just avail@(AvailTC _ [n]) -> 	-- This occurs when you import T(..), but
 						-- only export T abstractly.  The single [n]
 						-- in the AvailTC is the type or class itself
-					ifOptM Opt_WarnMisc (addWarn (dodgyImportWarn tc))	`thenM_`
+					ifOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn tc)) `thenM_`
 		     	 		succeed_with False avail
 	  Just avail 		     -> succeed_with False avail
 
