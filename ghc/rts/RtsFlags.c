@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.46 2001/08/08 14:14:08 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.47 2001/08/10 15:25:49 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -774,9 +774,6 @@ error = rtsTrue;
 	      /* =========== PROFILING ========================== */
 
 	      case 'P': /* detailed cost centre profiling (time/alloc) */
-		COST_CENTRE_USING_BUILD_ONLY(
-		RtsFlags.CcFlags.doCostCentres = COST_CENTRES_VERBOSE;
-		)
 	      case 'p': /* cost centre profiling (time/alloc) */
 		COST_CENTRE_USING_BUILD_ONLY(
 		switch (rts_argv[arg][2]) {
@@ -787,8 +784,14 @@ error = rtsTrue;
 		    RtsFlags.CcFlags.doCostCentres = COST_CENTRES_ALL;
 		    break;
 		  default:
-		    RtsFlags.CcFlags.doCostCentres = COST_CENTRES_SUMMARY;
-		    break;
+		      if (rts_argv[arg][1] == 'P') {
+			  RtsFlags.CcFlags.doCostCentres =
+			      COST_CENTRES_VERBOSE;
+		      } else {
+			  RtsFlags.CcFlags.doCostCentres =
+			      COST_CENTRES_SUMMARY;
+		      }
+		      break;
 		}
 		) break;
 
