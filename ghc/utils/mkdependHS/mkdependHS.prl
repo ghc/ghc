@@ -254,6 +254,8 @@ sub mangle_command_line_args {
 	    push(@Syslibs, &grab_arg_arg($_,''));
 	} elsif ( /^-fglasgow-exts$/ ) {
 	    push(@Syslibs, 'exts');
+	} elsif ( /^-concurrent$/ ) {
+	    push(@Syslibs, 'concurrent');
 	} elsif ($Dashdashes_seen != 1) { # not between -- ... --
 	    if ( /^-v$/ ) {
 		$Verbose++;
