@@ -6,9 +6,9 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (requires universal quantification for runST)
 --
--- $Id: Lazy.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: Lazy.hs,v 1.2 2001/07/03 11:37:49 simonmar Exp $
 --
 -- This module presents an identical interface to Control.Monad.ST,
 -- but the underlying implementation of the state thread is lazy.

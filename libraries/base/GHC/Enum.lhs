@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Enum.lhs,v 1.1 2001/06/28 14:15:03 simonmar Exp $
+% $Id: Enum.lhs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -21,7 +21,7 @@ module GHC.Enum(
 
 import {-# SOURCE #-} GHC.Err ( error )
 import GHC.Base
-import GHC.Tup	()	-- To make sure we look for the .hi file
+import Data.Tuple	()	-- To make sure we look for the .hi file
 
 default ()		-- Double isn't available yet
 \end{code}

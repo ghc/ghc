@@ -6,9 +6,9 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  non-portable (requires universal quantification for runST)
 --
--- $Id: ST.hs,v 1.2 2001/06/29 09:41:37 simonmar Exp $
+-- $Id: ST.hs,v 1.3 2001/07/03 11:37:49 simonmar Exp $
 --
 -- The State Transformer Monad, ST
 --
@@ -29,6 +29,7 @@ module Control.Monad.ST
 
 import Prelude
 
+import Control.Monad.Fix
 import Data.Dynamic
 
 #ifdef __GLASGOW_HASKELL__
@@ -39,6 +40,9 @@ import GHC.IOBase 	( IO(..), stToIO )
 unsafeIOToST        :: IO a -> ST s a
 unsafeIOToST (IO io) = ST $ \ s -> (unsafeCoerce# io) s
 #endif
+
+instance MonadFix (ST s) where
+	mfix = fixST
 
 -- ---------------------------------------------------------------------------
 -- Typeable instance

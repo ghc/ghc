@@ -5,10 +5,10 @@
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
--- Stability   :  provisional
+-- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Info.hs,v 1.1 2001/06/28 14:15:04 simonmar Exp $
+-- $Id: Info.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
 --
 -- Misc information about the characteristics of the host 
 -- architecture/machine lucky enough to run your program.

@@ -5,7 +5,7 @@
 --	primitive operations and types that GHC knows about.
 ---------------------------------------------------------------------------
 
-__interface "rts" GHCziPrim 1 0 where
+__interface "core" GHCziPrim 1 0 where
 
 __export GHCziPrim
 

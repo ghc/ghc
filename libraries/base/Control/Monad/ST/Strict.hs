@@ -6,9 +6,9 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (requires universal quantification for runST)
 --
--- $Id: Strict.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: Strict.hs,v 1.2 2001/07/03 11:37:49 simonmar Exp $
 --
 -- The strict ST monad (identical to Control.Monad.ST)
 --

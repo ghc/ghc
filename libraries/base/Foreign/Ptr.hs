@@ -6,10 +6,10 @@
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
 -- 
 -- Maintainer  :  ffi@haskell.org
--- Stability   :  experimental
--- Portability :  non-portable
+-- Stability   :  provisional
+-- Portability :  portable
 --
--- $Id: Ptr.hs,v 1.1 2001/06/28 14:15:03 simonmar Exp $
+-- $Id: Ptr.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
 --
 -- Pointer types.
 --

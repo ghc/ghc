@@ -6,10 +6,10 @@
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
 -- 
 -- Maintainer  :  ffi@haskell.org
--- Stability   :  experimental
--- Portability :  non-portable
+-- Stability   :  provisional
+-- Portability :  portable
 --
--- $Id: Foreign.hs,v 1.1 2001/06/28 14:15:01 simonmar Exp $
+-- $Id: Foreign.hs,v 1.2 2001/07/03 11:37:49 simonmar Exp $
 --
 -- A collection of data types, classes, and functions for interfacing
 -- with another programming language. This is only a convenience module

@@ -1,3 +1,4 @@
+{-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
 -- 
 -- Module      :  Control.Monad.Fix
@@ -7,9 +8,9 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable (reqruires multi-param type classes)
+-- Portability :  portable
 --
--- $Id: Fix.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: Fix.hs,v 1.2 2001/07/03 11:37:49 simonmar Exp $
 --
 -- The Fix monad.
 --
@@ -28,11 +29,13 @@ module Control.Monad.Fix (
 	fix	-- :: (a -> a) -> a
   ) where
 
-import Prelude
-
-import System.IO
-import Control.Monad.ST
-
+#ifdef __GLASGOW_HASKELL__
+-- MonadFix is needed by System.IO, so it is below the Prelude.
+import Control.Monad
+import GHC.Base
+import GHC.Err
+import Data.Maybe
+#endif
 
 fix :: (a -> a) -> a
 fix f = let x = f x in x
@@ -41,12 +44,6 @@ class (Monad m) => MonadFix m where
 	mfix :: (a -> m a) -> m a
 
 -- Perhaps these should live beside (the ST & IO) definition.
-instance MonadFix IO where
-	mfix = fixIO
-
-instance MonadFix (ST s) where
-	mfix = fixST
-
 instance MonadFix Maybe where
 	mfix f = let
 		a = f $ case a of

@@ -6,9 +6,9 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  portable
 --
--- $Id: IORef.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: IORef.hs,v 1.2 2001/07/03 11:37:49 simonmar Exp $
 --
 -- Mutable references in the IO monad.
 --

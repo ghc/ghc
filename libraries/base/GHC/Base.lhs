@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Base.lhs,v 1.1 2001/06/28 14:15:03 simonmar Exp $
+% $Id: Base.lhs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -27,7 +27,7 @@ GHC.Prim		Has no implementation.  It defines built-in things, and
 GHC.Base	Classes: Eq, Ord, Functor, Monad
 		Types:   list, (), Int, Bool, Ordering, Char, String
 
-GHC.Tup		Types: tuples, plus instances for GHC.Base classes
+Data.Tup	Types: tuples, plus instances for GHC.Base classes
 
 GHC.Show	Class: Show, plus instances for GHC.Base/GHC.Tup types
 

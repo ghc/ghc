@@ -7,9 +7,9 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  portable
 --
--- $Id: PackedString.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: PackedString.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
 --
 -- The PackedString type, and associated operations.
 -- GHC implementation by Bryan O'Sullivan.

@@ -1,10 +1,18 @@
--- -----------------------------------------------------------------------------
--- $Id: Directory.hsc,v 1.1 2001/06/28 14:15:04 simonmar Exp $
+-----------------------------------------------------------------------------
+-- 
+-- Module      :  System.IO.Directory
+-- Copyright   :  (c) The University of Glasgow 2001
+-- License     :  BSD-style (see the file libraries/core/LICENSE)
+-- 
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  provisional
+-- Portability :  portable
 --
--- (c) The University of Glasgow, 1994-2000
+-- $Id: Directory.hsc,v 1.2 2001/07/03 11:37:51 simonmar Exp $
 --
-
--- The Directory Interface
+-- System-independent interface to directory manipulation.
+--
+-----------------------------------------------------------------------------
 
 {-
 A directory contains a series of entries, each of which is a named
@@ -23,12 +31,13 @@ are relative to the current directory.
 
 module System.IO.Directory 
    ( 
-      Permissions               -- abstract
-      
-    , readable                  -- :: Permissions -> Bool
-    , writable                  -- :: Permissions -> Bool
-    , executable                -- :: Permissions -> Bool
-    , searchable                -- :: Permissions -> Bool
+      Permissions(
+	Permissions,
+	readable,		-- :: Permissions -> Bool 
+	writable,		-- :: Permissions -> Bool
+	executable,		-- :: Permissions -> Bool
+	searchable		-- :: Permissions -> Bool
+     ),
 
     , createDirectory		-- :: FilePath -> IO ()
     , removeDirectory		-- :: FilePath -> IO ()

@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.1 2001/06/28 14:15:01 simonmar Exp $
+# $Id: Makefile,v 1.2 2001/07/03 11:37:49 simonmar Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -40,7 +40,7 @@ ALL_HS_SRCS = $(wildcard $(patsubst %, %/*.hs, . $(ALL_DIRS)))
 ALL_LHS_SRCS += $(wildcard GHC/*.lhs)
 ALL_HS_OBJS = $(patsubst %.hs, %.o, $(ALL_HS_SRCS)) \
 	$(patsubst %.lhs, %.o, $(ALL_LHS_SRCS))
-
+ALL_HS_HIS = $(patsubst %.o, %.hi, $(ALL_HS_OBJS))
 
 srcs : $(HS_SRCS) GHC/Prim.$(way_)hi
 
@@ -50,18 +50,18 @@ GHC/IO.hs : GHC/Handle.hs
 GHC/Prim.$(way_)hi : GHC/Prim.hi-boot
 	cp $< $@
 
-SRC_HC_OPTS += -cpp -fglasgow-exts -fvia-C -I$(FPTOOLS_TOP)/ghc/includes -Iinclude -package-name std -H128m $(GhcLibHcOpts)
+SRC_HC_OPTS += -cpp -fglasgow-exts -fvia-C -I$(FPTOOLS_TOP)/ghc/includes -Iinclude -package-name core -H128m $(GhcLibHcOpts)
 
 LIBNAME = libHScore$(_way).a
 
-CLEAN_FILES += $(ALL_HS_OBJS)
+CLEAN_FILES += $(ALL_HS_OBJS) $(ALL_HS_HIS)
 
 all :: $(LIBNAME)
 
-lib : srcs
+$(ALL_HS_OBJS) : srcs
 	$(GHC_INPLACE) $(HC_OPTS) --make $(ALL_HS_SRCS) $(ALL_LHS_SRCS)
 
-$(LIBNAME) : lib
+$(LIBNAME) : $(ALL_HS_OBJS)
 	$(RM) $@
 	$(AR) $(AR_OPTS) $@ $(ALL_HS_OBJS)
 	$(RANLIB) $@

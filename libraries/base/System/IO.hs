@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: IO.hs,v 1.1 2001/06/28 14:15:04 simonmar Exp $
+-- $Id: IO.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
 --
 -- The standard IO library.
 --
@@ -67,7 +67,7 @@ module System.IO (
     -- Non-standard extension (but will hopefully become standard with 1.5) is
     -- to export the Prelude io functions via IO (in addition to exporting them
     -- from the prelude...for now.) 
-    IO,
+    IO,			       -- instance MonadFix
     FilePath,		       -- :: String
     IOError,
     ioError,		       -- :: IOError -> IO a
@@ -107,6 +107,13 @@ import GHC.Show
 #endif
 
 import Data.Dynamic
+import Control.Monad.Fix
+
+-- -----------------------------------------------------------------------------
+-- MonadFix instance
+
+instance MonadFix IO where
+	mfix = fixIO
 
 -- -----------------------------------------------------------------------------
 -- Typeable instance for Handle

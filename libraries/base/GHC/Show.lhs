@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Show.lhs,v 1.1 2001/06/28 14:15:03 simonmar Exp $
+% $Id: Show.lhs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -34,7 +34,6 @@ module GHC.Show
 
 import {-# SOURCE #-} GHC.Err ( error )
 import GHC.Base
-import GHC.Tup
 import GHC.Maybe
 import GHC.List	( (!!), break, dropWhile
 #ifdef USE_REPORT_PRELUDE

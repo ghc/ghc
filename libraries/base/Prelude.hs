@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Prelude.hs,v 1.1 2001/06/28 14:15:01 simonmar Exp $
+-- $Id: Prelude.hs,v 1.2 2001/07/03 11:37:49 simonmar Exp $
 --
 -- Standard module imported by default into Haskell modules.
 --
@@ -57,7 +57,7 @@ module Prelude (
     Rational,
     []((:), []),
     
-    module GHC.Tup,
+    module Data.Tuple,
         -- Includes tuple types + fst, snd, curry, uncurry
     ()(..),		-- The unit type
     (->),		-- functions
@@ -83,7 +83,7 @@ module Prelude (
     (&&), (||), not, otherwise,
     subtract, even, odd, gcd, lcm, (^), (^^), 
     fromIntegral, realToFrac,
-    --exported by GHC.Tup: fst, snd, curry, uncurry,
+    --exported by Data.Tuple: fst, snd, curry, uncurry,
     id, const, (.), flip, ($), until,
     asTypeOf, error, undefined,
     seq, ($!)
@@ -98,6 +98,7 @@ import Data.List
 import Data.Either
 import Data.Maybe
 import Data.Bool
+import Data.Tuple
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
@@ -108,7 +109,6 @@ import GHC.Enum
 import GHC.Num
 import GHC.Real
 import GHC.Float
-import GHC.Tup
 import GHC.Show
 import GHC.Conc
 import GHC.Err   ( error, undefined )

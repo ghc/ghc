@@ -7,6 +7,6 @@
 --	because it's wired into the compiler
 ---------------------------------------------------------------------------
 
-__interface "std" GHCziErr 1 where
+__interface "core" GHCziErr 1 where
 __export GHCziErr error parError;
 
