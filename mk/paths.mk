@@ -288,7 +288,7 @@ endif
 
 DIST_CLEAN_FILES 	+= .depend* *.hp *.prof
 
-MAINTAINER_CLEAN_FILES 	+= $(BOOT_SRCS) $(DERIVED_HAPPY_SRCS)
+MAINTAINER_CLEAN_FILES 	+= $(BOOT_SRCS) $(DERIVED_HAPPY_SRCS) $(DERIVED_ALEX_SRCS)
 
 #
 # `Standard' set of files to clean out.
