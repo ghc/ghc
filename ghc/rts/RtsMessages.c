@@ -11,6 +11,10 @@
 
 #include <stdio.h>
 
+#ifdef HAVE_WINDOWS_H
+#include <windows.h>
+#endif
+
 /* -----------------------------------------------------------------------------
    General message generation functions
 
@@ -21,9 +25,9 @@
    -------------------------------------------------------------------------- */
 
 // Default to the stdio implementation of these hooks.
-RtsMsgFunction *fatalInternalErrorFn = stdioFatalInternalErrorFn;
-RtsMsgFunction *debugMsgFn           = stdioDebugMsgFn;
-RtsMsgFunction *errorMsgFn           = stdioErrorMsgFn;
+RtsMsgFunction *fatalInternalErrorFn = rtsFatalInternalErrorFn;
+RtsMsgFunction *debugMsgFn           = rtsDebugMsgFn;
+RtsMsgFunction *errorMsgFn           = rtsErrorMsgFn;
 
 void
 barf(char *s, ...)
@@ -76,38 +80,117 @@ vdebugBelch(char *s, va_list ap)
    stdio versions of the message functions
    -------------------------------------------------------------------------- */
 
-void 
-stdioFatalInternalErrorFn(char *s, va_list ap)
+#define BUFSIZE 512
+
+#if defined(cygwin32_TARGET_OS) || defined (mingw32_TARGET_OS)
+static int
+isGUIApp()
 {
-  /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-  if (prog_argv != NULL && prog_name != NULL) {
-    fprintf(stderr, "%s: internal error: ", prog_name);
-  } else {
-    fprintf(stderr, "internal error: ");
+  PIMAGE_DOS_HEADER pDOSHeader;
+  PIMAGE_NT_HEADERS pPEHeader;
+
+  pDOSHeader = (PIMAGE_DOS_HEADER) GetModuleHandleA(NULL);
+  if (pDOSHeader->e_magic != IMAGE_DOS_SIGNATURE)
+    return 0;
+
+  pPEHeader = (PIMAGE_NT_HEADERS) ((char *)pDOSHeader + pDOSHeader->e_lfanew);
+  if (pPEHeader->Signature != IMAGE_NT_SIGNATURE)
+    return 0;
+
+  return (pPEHeader->OptionalHeader.Subsystem == IMAGE_SUBSYSTEM_WINDOWS_GUI);
+}
+#endif
+
+void
+rtsFatalInternalErrorFn(char *s, va_list ap)
+{
+#if defined(cygwin32_TARGET_OS) || defined (mingw32_TARGET_OS)
+  if (isGUIApp())
+  {
+     char title[BUFSIZE], message[BUFSIZE];
+     int r;
+
+	 r = vsnprintf(title,   BUFSIZE, "%s: internal error", prog_name);
+	 if (r > 0 && r < BUFSIZE) {
+		 strcpy(title, "internal error");
+     }
+
+	 r = vsnprintf(message, BUFSIZE, s, ap);
+	 if (r > 0 && r < BUFSIZE) {
+	   MessageBox(NULL /* hWnd */,
+         message,
+         title,
+         MB_OK | MB_ICONERROR | MB_TASKMODAL
+         );
+     };
   }
-  vfprintf(stderr, s, ap);
-  fprintf(stderr, "\n");
-  fprintf(stderr, "    Please report this as a bug to glasgow-haskell-bugs@haskell.org,\n    or http://www.sourceforge.net/projects/ghc/\n");
-  fflush(stderr);
+  else
+#endif
+  {
+     /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
+     if (prog_argv != NULL && prog_name != NULL) {
+       fprintf(stderr, "%s: internal error: ", prog_name);
+     } else {
+       fprintf(stderr, "internal error: ");
+     }
+     vfprintf(stderr, s, ap);
+     fprintf(stderr, "\n");
+     fprintf(stderr, "    Please report this as a bug to glasgow-haskell-bugs@haskell.org,\n    or http://www.sourceforge.net/projects/ghc/\n");
+     fflush(stderr);
+  }
+
   stg_exit(EXIT_INTERNAL_ERROR);
 }
 
 void
-stdioErrorMsgFn(char *s, va_list ap)
+rtsErrorMsgFn(char *s, va_list ap)
 {
-  /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-  if (prog_argv != NULL && prog_name != NULL) {
-    fprintf(stderr, "%s: ", prog_name);
-  } 
-  vfprintf(stderr, s, ap);
-  fprintf(stderr, "\n");
+#if defined(cygwin32_TARGET_OS) || defined (mingw32_TARGET_OS)
+  if (isGUIApp())
+  {
+     char buf[BUFSIZE];
+     int r;
+
+	 r = vsnprintf(buf, BUFSIZE, s, ap);
+	 if (r > 0 && r < BUFSIZE) {
+		MessageBox(NULL /* hWnd */,
+              buf,
+              prog_name,
+              MB_OK | MB_ICONERROR | MB_TASKMODAL
+              );
+     }
+  }
+  else
+#endif
+  {
+     /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
+     if (prog_argv != NULL && prog_name != NULL) {
+       fprintf(stderr, "%s: ", prog_name);
+     }
+     vfprintf(stderr, s, ap);
+     fprintf(stderr, "\n");
+  }
 }
 
 void
-stdioDebugMsgFn(char *s, va_list ap)
+rtsDebugMsgFn(char *s, va_list ap)
 {
-  /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-  vfprintf(stderr, s, ap);
-  fflush(stderr);
-}
+#if defined(cygwin32_TARGET_OS) || defined (mingw32_TARGET_OS)
+  if (isGUIApp())
+  {
+     char buf[BUFSIZE];
+	 int r;
 
+	 r = vsnprintf(buf, BUFSIZE, s, ap);
+	 if (r > 0 && r < BUFSIZE) {
+       OutputDebugString(buf);
+     }
+  }
+  else
+#endif
+  {
+     /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
+     vfprintf(stderr, s, ap);
+     fflush(stderr);
+  }
+}

@@ -26,7 +26,7 @@
  * barf() invokes (*fatalInternalErrorFn)().  This function is not
  * expected to return.
  */
-extern void barf(char *s, ...) 
+extern void barf(char *s, ...)
    GNUC3_ATTRIBUTE(__noreturn__);
 
 extern void vbarf(char *s, va_list ap)
@@ -66,8 +66,8 @@ extern RtsMsgFunction *errorMsgFn;
 
 /* Default stdio implementation of the message hooks: */
 
-extern RtsMsgFunction stdioFatalInternalErrorFn;
-extern RtsMsgFunction stdioDebugMsgFn;
-extern RtsMsgFunction stdioErrorMsgFn;
+extern RtsMsgFunction rtsFatalInternalErrorFn;
+extern RtsMsgFunction rtsDebugMsgFn;
+extern RtsMsgFunction rtsErrorMsgFn;
 
 #endif // RTSMESSAGES_H
