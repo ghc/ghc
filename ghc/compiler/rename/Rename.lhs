@@ -688,8 +688,7 @@ printMinimalImports :: Module 	-- This module
 		    -> FiniteMap ModuleName AvailEnv	-- Minimal imports
 		    -> RnMG ()
 printMinimalImports this_mod unqual imps
-  = doptRn Opt_D_dump_minimal_imports		`thenRn` \ dump_minimal ->
-    if not dump_minimal then returnRn () else
+  = ifOptRn Opt_D_dump_minimal_imports 		$
 
     mapRn to_ies (fmToList imps)		`thenRn` \ mod_ies ->
     ioToRnM (do { h <- openFile filename WriteMode ;

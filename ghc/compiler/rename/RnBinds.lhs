@@ -167,16 +167,16 @@ rnTopMonoBinds mbinds sigs
 	bndr_name_set = mkNameSet binder_names
     in
     renameSigsFVs (okBindSig bndr_name_set) sigs 	`thenRn` \ (siglist, sig_fvs) ->
-    doptRn Opt_WarnMissingSigs				`thenRn` \ warnMissing ->
-    let
-	type_sig_vars	= [n | Sig n _ _ <- siglist]
-	un_sigd_binders | warnMissing = nameSetToList (delListFromNameSet 
-                                                          bndr_name_set type_sig_vars)
-			| otherwise   = []
-    in
-    mapRn_ missingSigWarn un_sigd_binders	`thenRn_`
 
-    rn_mono_binds siglist mbinds		   `thenRn` \ (final_binds, bind_fvs) ->
+    ifOptRn Opt_WarnMissingSigs (
+	let
+	    type_sig_vars   = [n | Sig n _ _ <- siglist]
+	    un_sigd_binders = nameSetToList (delListFromNameSet bndr_name_set type_sig_vars)
+	in
+        mapRn_ missingSigWarn un_sigd_binders
+    )						`thenRn_`
+
+    rn_mono_binds siglist mbinds		`thenRn` \ (final_binds, bind_fvs) ->
     returnRn (final_binds, bind_fvs `plusFV` sig_fvs)
   where
     binder_rdr_names = collectMonoBinders mbinds

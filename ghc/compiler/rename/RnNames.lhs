@@ -161,9 +161,10 @@ importsFromImportDecl this_mod_name (ImportDecl imp_mod_name from qual_only as_m
     else
 
 	-- Complain if we import a deprecated module
-    (case deprecs of	
-	DeprecAll txt -> addWarnRn (moduleDeprec imp_mod_name txt)
-	other	      -> returnRn ()
+    ifOptRn Opt_WarnDeprecations	(
+       case deprecs of	
+	  DeprecAll txt -> addWarnRn (moduleDeprec imp_mod_name txt)
+	  other	        -> returnRn ()
     )							`thenRn_`
 
 	-- Filter the imports according to the import list
@@ -323,7 +324,7 @@ filterImports mod from (Just (want_hiding, import_items)) total_avails
 	  Just avail@(AvailTC _ [n]) -> 	-- This occurs when you import T(..), but
 						-- only export T abstractly.  The single [n]
 						-- in the AvailTC is the type or class itself
-					addWarnRn (dodgyImportWarn mod item)	`thenRn_`
+					ifOptRn opt_WarnMisc (addWarnRn (dodgyImportWarn mod item))	`thenRn_`
 		     	 		returnRn [(avail, [availName avail])]
 	  Just avail 		     -> returnRn [(avail, [availName avail])]
 

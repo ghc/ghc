@@ -93,14 +93,10 @@ ioToRnM_no_fail io rn_down g_down
      (\ err -> panic "ioToRnM_no_fail: the I/O operation failed!")
 	    
 traceRn :: SDoc -> RnM d ()
-traceRn msg
-   = doptRn Opt_D_dump_rn_trace `thenRn` \b ->
-     if b then putDocRn msg else returnRn ()
+traceRn msg = ifOptRn Opt_D_dump_rn_trace (putDocRn msg)
 
 traceHiDiffsRn :: SDoc -> RnM d ()
-traceHiDiffsRn msg
-   = doptRn Opt_D_dump_hi_diffs `thenRn` \b ->
-     if b then putDocRn msg else returnRn ()
+traceHiDiffsRn msg = ifOptRn Opt_D_dump_hi_diffs (putDocRn msg)
 
 putDocRn :: SDoc -> RnM d ()
 putDocRn msg = ioToRnM (printErrs alwaysQualify msg)	`thenRn_`
@@ -574,6 +570,11 @@ checkErrsRn (RnDown {rn_errs = errs_var}) l_down
 doptRn :: DynFlag -> RnM d Bool
 doptRn dflag (RnDown { rn_dflags = dflags}) l_down
    = return (dopt dflag dflags)
+
+ifOptRn :: DynFlag -> RnM d a -> RnM d ()
+ifOptRn dflag thing_inside down@(RnDown { rn_dflags = dflags}) l_down
+  | dopt dflag dflags = thing_inside down l_down >> return ()
+  | otherwise	      = return ()
 
 getDOptsRn :: RnM d DynFlags
 getDOptsRn (RnDown { rn_dflags = dflags}) l_down

@@ -633,13 +633,17 @@ rnForAll doc forall_tyvars ctxt ty
 rnContext :: SDoc -> RdrNameContext -> RnMS RenamedContext
 rnContext doc ctxt
   = mapRn rn_pred ctxt		`thenRn` \ theta ->
-    let
-	(_, dups) = removeDupsEq theta
-		-- We only have equality, not ordering
-    in
+
 	-- Check for duplicate assertions
 	-- If this isn't an error, then it ought to be:
-    mapRn (addWarnRn . dupClassAssertWarn theta) dups		`thenRn_`
+    ifOptRn Opt_WarnMisc (
+        let
+	    (_, dups) = removeDupsEq theta
+		-- We only have equality, not ordering
+        in
+        mapRn (addWarnRn . dupClassAssertWarn theta) dups
+    )				`thenRn_`
+
     returnRn theta
   where
    	--Someone discovered that @CCallable@ and @CReturnable@
@@ -854,11 +858,9 @@ badDataCon name
    = hsep [ptext SLIT("Illegal data constructor name"), quotes (ppr name)]
 
 forAllWarn doc ty tyvar
-  = doptRn Opt_WarnUnusedMatches `thenRn` \ warn_unused -> case () of
-    () | not warn_unused -> returnRn ()
-       | otherwise
-       -> getModeRn		`thenRn` \ mode ->
-          case mode of {
+  = ifOptRn Opt_WarnUnusedMatches 	$
+    getModeRn				`thenRn` \ mode ->
+    case mode of {
 #ifndef DEBUG
 	     InterfaceMode -> returnRn () ; -- Don't warn of unused tyvars in interface files
 		                            -- unless DEBUG is on, in which case it is slightly

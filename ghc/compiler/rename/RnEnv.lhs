@@ -494,12 +494,11 @@ bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
 	-- Check for duplicate names
     checkDupOrQualNames doc_str rdr_names_w_loc	`thenRn_`
 
-    doptRn Opt_WarnNameShadowing 		`thenRn` \ warn_shadow ->
-
     	-- Warn about shadowing, but only in source modules
     (case mode of
-	SourceMode | warn_shadow -> mapRn_ (check_shadow name_env) rdr_names_w_loc
-	other				   -> returnRn ()
+	SourceMode -> ifOptRn Opt_WarnNameShadowing	$
+		      mapRn_ (check_shadow name_env) rdr_names_w_loc
+	other	   -> returnRn ()
     )					`thenRn_`
 	
     newLocalsRn rdr_names_w_loc		`thenRn` \ names ->
@@ -915,9 +914,7 @@ mapFvRn f xs = mapRn f xs	`thenRn` \ stuff ->
 \begin{code}
 warnUnusedModules :: [ModuleName] -> RnM d ()
 warnUnusedModules mods
-  = doptRn Opt_WarnUnusedImports `thenRn` \ warn ->
-    if warn then mapRn_ (addWarnRn . unused_mod) mods
-	    else returnRn ()
+  = ifOptRn Opt_WarnUnusedImports (mapRn_ (addWarnRn . unused_mod) mods)
   where
     unused_mod m = vcat [ptext SLIT("Module") <+> quotes (ppr m) <+> 
 			   text "is imported, but nothing from it is used",
@@ -926,19 +923,14 @@ warnUnusedModules mods
 
 warnUnusedImports :: [(Name,Provenance)] -> RnM d ()
 warnUnusedImports names
-  = doptRn Opt_WarnUnusedImports `thenRn` \ warn ->
-    if warn then warnUnusedBinds names else returnRn ()
+  = ifOptRn Opt_WarnUnusedImports (warnUnusedBinds names)
 
 warnUnusedLocalBinds, warnUnusedMatches :: [Name] -> RnM d ()
 warnUnusedLocalBinds names
-  = doptRn Opt_WarnUnusedBinds `thenRn` \ warn ->
-    if warn then warnUnusedBinds [(n,LocalDef) | n<-names]
-	    else returnRn ()
+  = ifOptRn Opt_WarnUnusedBinds (warnUnusedBinds [(n,LocalDef) | n<-names])
 
 warnUnusedMatches names
-  = doptRn Opt_WarnUnusedMatches `thenRn` \ warn ->
-    if warn then warnUnusedGroup [(n,LocalDef) | n<-names]
-	    else returnRn ()
+  = ifOptRn Opt_WarnUnusedMatches (warnUnusedGroup [(n,LocalDef) | n<-names])
 
 -------------------------
 
@@ -1012,8 +1004,7 @@ dupNamesErr descriptor ((name,loc) : dup_things)
 
 warnDeprec :: Name -> DeprecTxt -> RnM d ()
 warnDeprec name txt
-  = doptRn Opt_WarnDeprecations				`thenRn` \ warn_drs ->
-    if not warn_drs then returnRn () else
+  = ifOptRn Opt_WarnDeprecations	$
     addWarnRn (sep [ text (occNameFlavour (nameOccName name)) <+> 
 		     quotes (ppr name) <+> text "is deprecated:", 
 		     nest 4 (ppr txt) ])
