@@ -284,7 +284,7 @@ ppr_expr pe expr@(Lam _ _)
     in
     hang (hsep [pp_vars SLIT("/u\\") (pUVar    pe) uvars,
 		pp_vars SLIT("_/\\_")  (pTyVarB  pe) tyvars,
-		pp_vars SLIT("\\")   (pMajBndr pe) vars])
+		pp_vars SLIT("\\")   (pMajndr pe) vars])
 	 4 (ppr_expr pe body)
   where
     pp_vars lam pp [] = empty
@@ -423,22 +423,7 @@ Other printing bits-and-bobs used with the general @pprCoreBinding@
 and @pprCoreExpr@ functions.
 
 \begin{code}
-pprBigCoreBinder sty binder
-  = vcat [sig, pragmas, ppr sty binder]
-  where
-    sig = ifnotPprShowAll sty (
-	    hsep [ppr sty binder, ppDcolon, ppr sty (idType binder)])
-
-{- Having the type come on a separate line does not look "right" to me (doesn't
-   save too much space either), so I've replaced it with a one-line version. -- SOF
-
-	    hang (hsep [ppr sty binder, ppDcolon])
-		 4 (ppr sty (idType binder)))
--}
-
-    pragmas =
-	ifnotPprForUser sty
-	 (ppIdInfo sty False{-no specs, thanks-} (getIdInfo binder))
+pprBigCoreBinder sty binder = pprTypedCoreBinder sty binder
 
 pprBabyCoreBinder sty binder
   = hsep [ppr sty binder, pp_strictness]
@@ -446,9 +431,7 @@ pprBabyCoreBinder sty binder
     pp_strictness = ppStrictnessInfo sty (getIdStrictness binder)
 
 pprTypedCoreBinder sty binder
-  = hcat [ppr sty binder, ppDcolon, pprParendGenType sty (idType binder)]
-
-ppDcolon = ptext SLIT(" :: ")
+  = hsep [ppr sty binder, ptext SLIT("::"), pprParendGenType sty (idType binder)]
 		-- The space before the :: is important; it helps the lexer
 		-- when reading inferfaces.  Otherwise it would lex "a::b" as one thing.
 \end{code}
