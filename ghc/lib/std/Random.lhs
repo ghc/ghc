@@ -39,7 +39,6 @@ import PrelNumExtra ( float2Double, double2Float )
 import PrelBase
 import PrelArr
 import Time (getClockTime, ClockTime(..))
-#else
 #endif
 import Char ( isSpace, chr, ord )
 \end{code}
@@ -267,14 +266,18 @@ stdSplit std@(StdGen s1 _) = (std, unsafePerformIO (mkStdRNG (fromInt s1)))
 
 \begin{code}
 #ifdef __HUGS__
--- TODO: Hugs/setStdGen
-setStdGen :: StdGen -> IO ()
-setStdGen sgen = error "not currently implemented in Stg Hugs"
 
--- TODO: Hugs/getStdGen
+setStdGen :: StdGen -> IO ()
+setStdGen sgen = writeIORef theStdGen sgen
+
 getStdGen :: IO StdGen
-getStdGen = error "not currently implemented in Stg Hugs"
+getStdGen  = readIORef theStdGen
+
+theStdGen :: IORef StdGen
+theStdGen  = primRunST (newIORef (createStdGen 0))
+
 #else
+
 global_rng :: MutableVar RealWorld StdGen
 global_rng = unsafePerformIO $ do
    rng <- mkStdRNG 0
@@ -285,6 +288,7 @@ setStdGen sgen = stToIO (writeVar global_rng sgen)
 
 getStdGen :: IO StdGen
 getStdGen = stToIO (readVar global_rng)
+
 #endif
 
 
