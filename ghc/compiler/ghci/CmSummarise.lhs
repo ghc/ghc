@@ -6,7 +6,8 @@
 \begin{code}
 module CmSummarise ( ModImport(..), mi_name,
                      ModSummary(..), summarise, ms_get_imports,
-		     name_of_summary, deps_of_summary )
+		     name_of_summary, deps_of_summary,
+		     getImports )
 where
 
 #include "HsVersions.h"
