@@ -184,6 +184,9 @@ dsExpr (HsLitOut (HsString str) _)
   = returnDs (mkLit (NoRepStr str stringTy))
 
 dsExpr (HsLitOut (HsLitLit str) ty)
+  | isUnLiftedType ty
+  = returnDs (mkLit (MachLitLit str ty))
+  | otherwise
   = case (maybeBoxedPrimType ty) of
       Just (boxing_data_con, prim_ty) ->
 	    returnDs ( mkConApp boxing_data_con [mkLit (MachLitLit str prim_ty)] )
