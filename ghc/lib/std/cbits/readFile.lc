@@ -158,7 +158,7 @@ StgInt len;
 
     while ((count = read(fd, p, len)) < len) {
 	if ( count == 0 ) { /* EOF */
-	    return total_count;
+	    break;
 	} else if ( count == -1 && errno == EAGAIN) {
 	    errno = 0;
 	    return FILEOBJ_BLOCKED_READ;
@@ -172,6 +172,7 @@ StgInt len;
 	p += count;
     }
 
+    total_count += count;
     fo->bufWPtr = total_count;
     fo->bufRPtr = 0;
     return total_count;
