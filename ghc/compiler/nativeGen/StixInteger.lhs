@@ -5,7 +5,8 @@
 \begin{code}
 module StixInteger (
 	gmpTake1Return1, gmpTake2Return1, gmpTake2Return2, gmpCompare,
-	gmpInteger2Int, gmpInt2Integer, gmpString2Integer,
+	gmpInteger2Int, gmpInteger2Word,
+	gmpInt2Integer, gmpString2Integer,
 	encodeFloatingKind, decodeFloatingKind
     ) where
 
@@ -205,6 +206,25 @@ gmpInteger2Int res args@(chp, caa,csa,cda)
     	(a1,a2,a3) = toStruct hp (aa,sa,da)
     	mpz_get_si = StCall SLIT("mpz_get_si") IntRep [hp]
     	r1 = StAssign IntRep result mpz_get_si
+    in
+    returnUs (\xs -> a1 : a2 : a3 : r1 : xs)
+
+gmpInteger2Word
+    :: CAddrMode    	    -- result
+    -> (CAddrMode, CAddrMode,CAddrMode,CAddrMode) -- alloc hp + argument (3 parts)
+    -> UniqSM StixTreeList
+
+gmpInteger2Word res args@(chp, caa,csa,cda)
+  = let
+	result	= amodeToStix res
+	hp	= amodeToStix chp
+	aa	= amodeToStix caa
+	sa	= amodeToStix csa
+	da	= amodeToStix cda
+
+    	(a1,a2,a3) = toStruct hp (aa,sa,da)
+    	mpz_get_ui = StCall SLIT("mpz_get_ui") IntRep [hp]
+    	r1 = StAssign WordRep result mpz_get_ui
     in
     returnUs (\xs -> a1 : a2 : a3 : r1 : xs)
 

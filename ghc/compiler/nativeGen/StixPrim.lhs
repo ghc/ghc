@@ -109,6 +109,9 @@ primCode [res] IntegerCmpOp args@[hp, aa1,sa1,da1, aa2,sa2,da2]
 primCode [res] Integer2IntOp arg@[hp, aa,sa,da]
   = gmpInteger2Int res (hp, aa,sa,da)
 
+primCode [res] Integer2WordOp arg@[hp, aa,sa,da]
+  = gmpInteger2Word res (hp, aa,sa,da)
+
 primCode [res] FloatEncodeOp args@[hp, aa,sa,da, expon]
   = encodeFloatingKind FloatRep res (hp, aa,sa,da, expon)
 

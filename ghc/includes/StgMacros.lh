@@ -819,6 +819,17 @@ Coercions:
   (dr) = (B_)(hp);		/* dr is an StgByteArray */			\
 }
 
+#define integer2WordZh(r, hp, aa,sa,da)						\
+{ MP_INT arg;									\
+  /* Does not allocate memory */						\
+										\
+  arg.alloc	= (aa);								\
+  arg.size	= (sa);								\
+  arg.d		= (unsigned long int *) (BYTE_ARR_CTS(da));			\
+										\
+  (r) = SAFESTGCALL1(I_,(void *, MP_INT *),mpz_get_ui,&arg);			\
+}
+
 \end{code}
 
 Then there are a few oddments to make life easier:

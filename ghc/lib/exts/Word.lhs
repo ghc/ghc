@@ -29,13 +29,11 @@ module Word
 	, intToWord32    -- :: Int    -> Word32
 	) where
 
-import PrelBase
-import PrelNum
-import PrelRead
+import GlaExts
 import Ix
 import Bits
-import PrelGHC
 import CCall
+import Numeric (readDec)
 
 -----------------------------------------------------------------------------
 -- The "official" coercion functions
@@ -122,7 +120,7 @@ instance Num Word8 where
       x' = word2Int# x
   abs x         = x
   signum        = signumReal
-  fromInteger (J# a# s# d#) = W8# (intToWord8# (integer2Int# a# s# d#))
+  fromInteger (J# a# s# d#) = W8# (wordToWord8# (integer2Word# a# s# d#))
   fromInt       = intToWord8
 
 instance Bounded Word8 where
@@ -265,7 +263,7 @@ instance Num Word16 where
         x' = word2Int# x
   abs x         = x
   signum        = signumReal
-  fromInteger (J# a# s# d#) = W16# (intToWord16# (integer2Int# a# s# d#))
+  fromInteger (J# a# s# d#) = W16# (wordToWord16# (integer2Word# a# s# d#))
   fromInt       = intToWord16
 
 instance Bounded Word16 where
@@ -391,7 +389,7 @@ instance Num Word32 where
 #endif
   abs x           = x
   signum          = signumReal
-  fromInteger (J# a# s# d#) = W32# (intToWord32# (integer2Int# a# s# d#))
+  fromInteger (J# a# s# d#) = W32# (integer2Word# a# s# d#)
   fromInt (I# x)  = W32# (intToWord32# x)
     -- ToDo: restrict fromInt{eger} range.
 
