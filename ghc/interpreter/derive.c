@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: derive.c,v $
- * $Revision: 1.7 $
- * $Date: 1999/10/15 21:41:04 $
+ * $Revision: 1.8 $
+ * $Date: 1999/11/01 04:17:37 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -340,19 +340,22 @@ Int  n; {
     Cell ls   = h;
     Cell us   = h;
     Cell is   = h;
+    Cell js   = h;
     Cell pr   = NIL;
     Cell pats = NIL;
+    
     Int  i;
 
     for (i=0; i<n; ++i, vs=tl(vs)) {    /* build three patterns for values */
         ls = ap(ls,hd(vs));             /* of the datatype concerned       */
         us = ap(us,hd(vs=tl(vs)));
         is = ap(is,hd(vs=tl(vs)));
+	js = ap(js,hd(vs));		/* ... and one expression	   */
     }
     pr   = ap2(mkTuple(2),ls,us);       /* Build (ls,us)                   */
     pats = cons(pr,cons(is,NIL));       /* Build [(ls,us),is]              */
 
-    return cons(prodRange(line,singleton(pr),ls,us,is),
+    return cons(prodRange(line,singleton(pr),ls,us,js),
            cons(prodIndex(line,pats,ls,us,is),
            cons(prodInRange(line,pats,ls,us,is),
            NIL)));
@@ -544,10 +547,11 @@ Int  a; {
             if (defaultSyntax(name(h).text)==APPLIC) {
                 rhs = ap(showsBQ,
                          ap2(nameComp,
-                             ap(nameApp,mkStr(name(h).text)),
+  			     ap(nameApp,mkStr(fixLitText(name(h).text))),
                              ap(showsBQ,rhs)));
             } else {
-                rhs = ap2(nameComp,ap(nameApp,mkStr(name(h).text)),rhs);
+		rhs = ap2(nameComp,
+			  ap(nameApp,mkStr(fixLitText(name(h).text))),rhs);
             }
 
             rhs = ap2(nameComp,

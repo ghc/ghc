@@ -54,8 +54,7 @@ void nh_write ( FILE* f, int c )
    errno = 0;
    fputc(c,f);
    if (f==stderr) { fflush(f); } 
-   else if (f==stdin && isspace(c)) { fflush(f); };
-
+   if (f==stdout) { fflush(f); } 
 }
 
 int nh_read ( FILE* f )
@@ -95,4 +94,23 @@ int nh_getenv ( int p )
    return (int)getenv ( (const char *)p );
 }
 
+#if 0
+int prog_argc;
+char** prog_argv;
 
+int nh_init_args ( int  argc, char *argv[] ) 
+{
+  prog_argc = argc;
+  prog_argv = argv;
+}
+
+int nh_argc ( void )
+{
+  return prog_argc;
+}
+
+int nh_argvb ( int argno, int offset )
+{
+  return prog_argv[argno][offset];
+}
+#endif
