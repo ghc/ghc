@@ -14,15 +14,15 @@ module TcInstDcls (
 import HsSyn		( HsDecl(..), InstDecl(..),
 			  HsBinds(..), MonoBinds(..),
 			  HsExpr(..), InPat(..), HsLit(..), Sig(..),
-			  collectMonoBinders, andMonoBindList
+			  andMonoBindList
 			)
 import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl )
 import TcHsSyn		( TcMonoBinds,
 			  maybeBoxedPrimType
 			)
 
-import TcBinds		( tcPragmaSigs )
-import TcClassDcl	( tcMethodBind, badMethodErr )
+import TcBinds		( tcSpecSigs )
+import TcClassDcl	( tcMethodBind, checkFromThisClass )
 import TcMonad
 import RnMonad		( RnNameSupply, Fixities )
 import Inst		( Inst, InstOrigin(..),
@@ -37,17 +37,18 @@ import TcSimplify	( tcSimplifyAndCheck )
 import TcType		( TcTyVar, zonkTcTyVarBndr )
 
 import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
-			  foldBag, bagToList, Bag
+			  foldBag, Bag
 			)
 import CmdLineOpts	( opt_GlasgowExts, opt_AllowUndecidableInstances )
 import Class		( classBigSig, Class )
-import Var		( setIdInfo, idName, idType, Id, TyVar )
+import Var		( idName, idType, Id, TyVar )
 import DataCon		( isNullaryDataCon, dataConArgTys, dataConId )
 import Maybes 		( maybeToBool, catMaybes, expectJust )
 import MkId		( mkDictFunId )
-import Module		( Module )
-import Name		( nameOccName, isLocallyDefined, NamedThing(..)	)
-import PrelVals		( eRROR_ID )
+import Module		( ModuleName )
+import Name		( isLocallyDefined, NamedThing(..)	)
+import NameSet		( emptyNameSet )
+import PrelInfo		( eRROR_ID )
 import PprType		( pprConstraint )
 import SrcLoc		( SrcLoc )
 import TyCon		( isSynTyCon, isDataTyCon, tyConDerivings )
@@ -55,9 +56,9 @@ import Type		( Type, isUnLiftedType, mkTyVarTys,
 			  splitSigmaTy, isTyVarTy,
 			  splitTyConApp_maybe, splitDictTy_maybe, unUsgTy,
 			  splitAlgTyConApp_maybe,
-			  tyVarsOfTypes, substTopTheta
+			  tyVarsOfTypes
 			)
-import VarEnv		( zipVarEnv )
+import Subst		( mkTopTyVarSubst, substTheta )
 import VarSet		( mkVarSet, varSetElems )
 import TysPrim		( byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 import TysWiredIn	( stringTy )
@@ -141,7 +142,7 @@ and $dbinds_super$ bind the superclass dictionaries sd1 \ldots sdm.
 \begin{code}
 tcInstDecls1 :: ValueEnv		-- Contains IdInfo for dfun ids
 	     -> [RenamedHsDecl]
-	     -> Module			-- module name for deriving
+	     -> ModuleName			-- module name for deriving
 	     -> Fixities
 	     -> RnNameSupply			-- for renaming derivings
 	     -> TcM s (Bag InstInfo,
@@ -149,7 +150,7 @@ tcInstDecls1 :: ValueEnv		-- Contains IdInfo for dfun ids
 
 tcInstDecls1 unf_env decls mod_name fixs rn_name_supply
   = 	-- Do the ordinary instance declarations
-    mapNF_Tc (tcInstDecl1 unf_env mod_name) 
+    mapNF_Tc (tcInstDecl1 unf_env) 
 	     [inst_decl | InstD inst_decl <- decls]	`thenNF_Tc` \ inst_info_bags ->
     let
 	decl_inst_info = unionManyBags inst_info_bags
@@ -166,9 +167,9 @@ tcInstDecls1 unf_env decls mod_name fixs rn_name_supply
     returnTc (full_inst_info, deriv_binds)
 
 
-tcInstDecl1 :: ValueEnv -> Module -> RenamedInstDecl -> NF_TcM s (Bag InstInfo)
+tcInstDecl1 :: ValueEnv -> RenamedInstDecl -> NF_TcM s (Bag InstInfo)
 
-tcInstDecl1 unf_env mod_name (InstDecl poly_ty binds uprags (Just dfun_name) src_loc)
+tcInstDecl1 unf_env (InstDecl poly_ty binds uprags dfun_name src_loc)
   = 	-- Prime error recovery, set source location
     recoverNF_Tc (returnNF_Tc emptyBag)	$
     tcAddSrcLoc src_loc			$
@@ -194,7 +195,7 @@ tcInstDecl1 unf_env mod_name (InstDecl poly_ty binds uprags (Just dfun_name) src
 	returnNF_Tc []
      )						`thenNF_Tc_`
 
-	-- Make the dfun id and constant-method ids
+	-- Make the dfun id
     let
 	dfun_id = mkDictFunId dfun_name clas tyvars inst_tys theta
 
@@ -331,11 +332,11 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 	 op_sel_ids, defm_ids)  = classBigSig clas
 
 	-- Instantiate the theta found in the original instance decl
-	inst_decl_theta' = substTopTheta (zipVarEnv inst_tyvars (mkTyVarTys inst_tyvars'))
-					 inst_decl_theta
+	inst_decl_theta' = substTheta (mkTopTyVarSubst inst_tyvars (mkTyVarTys inst_tyvars'))
+				      inst_decl_theta
 
          -- Instantiate the super-class context with inst_tys
-	sc_theta' = substTopTheta (zipVarEnv class_tyvars inst_tys') sc_theta
+	sc_theta' = substTheta (mkTopTyVarSubst class_tyvars inst_tys') sc_theta
     in
 	 -- Create dictionary Ids from the specified instance contexts.
     newDicts origin sc_theta'		`thenNF_Tc` \ (sc_dicts,        sc_dict_ids) ->
@@ -344,15 +345,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
     newDicts origin [(clas,inst_tys')]	`thenNF_Tc` \ (this_dict,       [this_dict_id]) ->
 
 	 -- Check that all the method bindings come from this class
-    let
-	check_from_this_class (bndr, loc)
-	  | nameOccName bndr `elem` sel_names = returnNF_Tc ()
-	  | otherwise			      = tcAddSrcLoc loc $
-						addErrTc (badMethodErr bndr clas)
-	sel_names = map getOccName op_sel_ids
-	bndrs = bagToList (collectMonoBinders monobinds)
-    in
-    mapNF_Tc check_from_this_class bndrs		`thenNF_Tc_`
+    checkFromThisClass clas op_sel_ids monobinds	`thenNF_Tc_`
 
     tcExtendTyVarEnvForMeths inst_tyvars inst_tyvars' (
  	tcExtendGlobalValEnv (catMaybes defm_ids) (
@@ -363,13 +356,14 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 		       (op_sel_ids `zip` defm_ids)
     ))		 	`thenTc` \ (method_binds_s, insts_needed_s, meth_lies_w_ids) ->
 
-	-- Deal with SPECIALISE instance pragmas
+	-- Deal with SPECIALISE instance pragmas by making them
+	-- look like SPECIALISE pragmas for the dfun
     let
-	dfun_prags = [Sig (idName dfun_id) ty loc | SpecInstSig ty loc <- uprags]
+	dfun_prags = [SpecSig (idName dfun_id) ty loc | SpecInstSig ty loc <- uprags]
     in
     tcExtendGlobalValEnv [dfun_id] (
-	tcPragmaSigs dfun_prags
-    )					`thenTc` \ (prag_info_fn, prag_binds, prag_lie) ->
+	tcSpecSigs dfun_prags
+    )					`thenTc` \ (prag_binds, prag_lie) ->
 
 	-- Check the overloading constraints of the methods and superclasses
 
@@ -459,13 +453,12 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 	dict_bind    = VarMonoBind this_dict_id dict_rhs
 	method_binds = andMonoBindList method_binds_s
 
-	final_dfun_id = setIdInfo dfun_id (prag_info_fn (idName dfun_id))
-				-- Pretty truesome
 	main_bind
 	  = AbsBinds
 		 zonked_inst_tyvars
 		 dfun_arg_dicts_ids
-		 [(inst_tyvars', final_dfun_id, this_dict_id)] 
+		 [(inst_tyvars', dfun_id, this_dict_id)] 
+		 emptyNameSet		-- No inlines (yet)
 		 (lie_binds1	`AndMonoBinds` 
 		  lie_binds2	`AndMonoBinds`
 		  method_binds	`AndMonoBinds`

@@ -4,7 +4,9 @@
 \section[TcClassDcl]{Typechecking class declarations}
 
 \begin{code}
-module TcClassDcl ( kcClassDecl, tcClassDecl1, tcClassDecls2, tcMethodBind, badMethodErr ) where
+module TcClassDcl ( kcClassDecl, tcClassDecl1, tcClassDecls2, 
+		    tcMethodBind, checkFromThisClass
+		  ) where
 
 #include "HsVersions.h"
 
@@ -12,10 +14,10 @@ import HsSyn		( HsDecl(..), TyClDecl(..), Sig(..), MonoBinds(..),
 			  InPat(..), HsBinds(..), GRHSs(..),
 			  HsExpr(..), HsLit(..), HsType(..), pprClassAssertion,
 			  unguardedRHS, andMonoBinds, andMonoBindList, getTyVarName,
-			  isClassDecl, isClassOpSig
+			  isClassDecl, isClassOpSig, collectMonoBinders
 			)
 import HsPragmas	( ClassPragmas(..) )
-import BasicTypes	( NewOrData(..), TopLevelFlag(..), RecFlag(..), StrictnessMark(..) )
+import BasicTypes	( NewOrData(..), TopLevelFlag(..), RecFlag(..) )
 import RnHsSyn		( RenamedTyClDecl, RenamedClassPragmas,
 			  RenamedClassOpSig, RenamedMonoBinds,
 			  RenamedContext, RenamedHsDecl, RenamedSig
@@ -27,7 +29,7 @@ import TcEnv		( TcId, ValueEnv, TcTyThing(..), tcAddImportedIdInfo,
 			  tcLookupClass, tcLookupTy, tcExtendTyVarEnvForMeths, tcExtendGlobalTyVars,
 			  tcExtendLocalValEnv
 			)
-import TcBinds		( tcBindWithSigs, tcPragmaSigs )
+import TcBinds		( tcBindWithSigs, tcSpecSigs )
 import TcUnify		( unifyKinds )
 import TcMonad
 import TcMonoType	( tcHsType, tcHsTopType, tcExtendTopTyVarScope, 
@@ -35,21 +37,20 @@ import TcMonoType	( tcHsType, tcHsTopType, tcExtendTopTyVarScope,
 			)
 import TcSimplify	( tcSimplifyAndCheck, bindInstsOfLocalFuns )
 import TcType		( TcType, TcTyVar, tcInstTyVars, zonkTcTyVarBndr, tcGetTyVar )
-import PrelVals		( nO_METHOD_BINDING_ERROR_ID )
+import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
 import FieldLabel	( firstFieldLabelTag )
-import Bag		( unionManyBags )
+import Bag		( unionManyBags, bagToList )
 import Class		( mkClass, classBigSig, Class )
 import CmdLineOpts      ( opt_GlasgowExts, opt_WarnMissingMethods )
-import MkId		( mkSuperDictSelId, mkDataConId,
-			  mkMethodSelId, mkDefaultMethodId
-			)
-import DataCon		( mkDataCon )
+import MkId		( mkDictSelId, mkDataConId, mkDefaultMethodId )
+import DataCon		( mkDataCon, notMarkedStrict )
 import Id		( Id,
 			  getIdUnfolding, idType, idName
 			)
 import CoreUnfold	( getUnfoldingTemplate )
 import IdInfo
-import Name		( Name, isLocallyDefined, NamedThing(..) )
+import Name		( Name, nameOccName, isLocallyDefined, NamedThing(..) )
+import NameSet		( emptyNameSet )
 import Outputable
 import Type		( mkFunTy, mkTyVarTy, mkTyVarTys, mkDictTy,
 			  mkSigmaTy, mkForAllTys, Type, ThetaType,
@@ -62,12 +63,6 @@ import Unique		( Unique, Uniquable(..) )
 import Util
 import Maybes		( seqMaybe )
 import FiniteMap        ( lookupWithDefaultFM )
-
-
--- import TcPragmas	( tcGenPragmas, tcClassOpPragmas )
-tcGenPragmas ty id ps = returnNF_Tc noIdInfo
-tcClassOpPragmas ty sel def spec ps = returnNF_Tc (spec `setSpecInfo` noIdInfo, 
-						   noIdInfo)
 \end{code}
 
 
@@ -114,7 +109,7 @@ Death to "ExpandingDicts".
 \begin{code}
 kcClassDecl (ClassDecl	context class_name
 			tyvar_names class_sigs def_methods pragmas 
-			tycon_name datacon_name src_loc)
+			tycon_name datacon_name sc_sel_names src_loc)
   =         -- CHECK ARITY 1 FOR HASKELL 1.4
     checkTc (opt_GlasgowExts || length tyvar_names == 1)
 	    (classArityErr class_name)		`thenTc_`
@@ -146,7 +141,7 @@ kcClassDecl (ClassDecl	context class_name
 tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
       	     (ClassDecl context class_name
 			tyvar_names class_sigs def_methods pragmas 
-			tycon_name datacon_name src_loc)
+			tycon_name datacon_name sc_sel_names src_loc)
   = 	-- LOOK THINGS UP IN THE ENVIRONMENT
     tcLookupTy class_name				`thenTc` \ (class_kind, _, AClass rec_class) ->
     tcExtendTopTyVarScope class_kind tyvar_names	$ \ tyvars _ ->
@@ -154,7 +149,7 @@ tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
 	
 	-- CHECK THE CONTEXT
 --  traceTc (text "tcClassCtxt" <+> ppr class_name)	`thenTc_`
-    tcClassContext class_name rec_class tyvars context pragmas	
+    tcClassContext class_name rec_class tyvars context sc_sel_names
 						`thenTc` \ (sc_theta, sc_tys, sc_sel_ids) ->
 --  traceTc (text "tcClassCtxt done" <+> ppr class_name)	`thenTc_`
 
@@ -178,7 +173,7 @@ tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
 			other -> DataType
 
         dict_con = mkDataCon datacon_name
-			   [NotMarkedStrict | _ <- dict_component_tys]
+			   [notMarkedStrict | _ <- dict_component_tys]
 			   [{- No labelled fields -}]
 		      	   tyvars
 		      	   [{-No context-}]
@@ -209,12 +204,12 @@ tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
 \begin{code}
 tcClassContext :: Name -> Class -> [TyVar]
 	       -> RenamedContext 	-- class context
-	       -> RenamedClassPragmas	-- pragmas for superclasses  
+	       -> [Name]		-- Names for superclass selectors
 	       -> TcM s (ThetaType,	-- the superclass context
 			 [Type],	-- types of the superclass dictionaries
 		         [Id])  	-- superclass selector Ids
 
-tcClassContext class_name rec_class rec_tyvars context pragmas
+tcClassContext class_name rec_class rec_tyvars context sc_sel_names
   = 	-- Check the context.
 	-- The renamer has already checked that the context mentions
 	-- only the type variable of the class decl.
@@ -230,31 +225,19 @@ tcClassContext class_name rec_class rec_tyvars context pragmas
 
     let
        sc_tys = [mkDictTy sc tys | (sc,tys) <- sc_theta]
+       sc_sel_ids = zipWithEqual "tcClassContext" mk_super_id sc_sel_names sc_tys
     in
-
-	-- Make super-class selector ids
-	-- We number them off, 1, 2, 3 etc so that we can construct
-	-- names for the selectors.  Thus
-	--	class (C a, C b) => D a b where ...
-	-- gives superclass selectors
-	--	D_sc1, D_sc2
-	-- (We used to call them D_C, but now we can have two different
-	--  superclasses both called C!)
-    mapTc mk_super_id (sc_theta `zip` [firstFieldLabelTag..])	`thenTc` \ sc_sel_ids ->
-
 	-- Done
     returnTc (sc_theta, sc_tys, sc_sel_ids)
 
   where
     rec_tyvar_tys = mkTyVarTys rec_tyvars
 
-    mk_super_id ((super_class, tys), index)
-        = tcGetUnique			`thenNF_Tc` \ uniq ->
-	  let
-		ty = mkForAllTys rec_tyvars $
-		     mkFunTy (mkDictTy rec_class rec_tyvar_tys) (mkDictTy super_class tys)
-	  in
-	  returnTc (mkSuperDictSelId uniq rec_class index ty)
+    mk_super_id name dict_ty
+        = mkDictSelId name rec_class ty
+        where
+	  ty = mkForAllTys rec_tyvars $
+	       mkFunTy (mkDictTy rec_class rec_tyvar_tys) dict_ty
 
     check_constraint (c, tys) = checkTc (all is_tyvar tys)
 					(superClassErr class_name (c, tys))
@@ -290,7 +273,7 @@ tcClassSig rec_env rec_clas rec_clas_tyvars
 			        local_ty
 
 	-- Build the selector id and default method id
-	sel_id      = mkMethodSelId op_name rec_clas global_ty
+	sel_id      = mkDictSelId op_name rec_clas global_ty
 	maybe_dm_id = case maybe_dm_name of
 			   Nothing      -> Nothing
 			   Just dm_name -> let 
@@ -347,7 +330,7 @@ tcClassDecl2 :: RenamedTyClDecl		-- The class declaration
 	     -> NF_TcM s (LIE, TcMonoBinds)
 
 tcClassDecl2 (ClassDecl context class_name
-			tyvar_names class_sigs default_binds pragmas _ _ src_loc)
+			tyvar_names class_sigs default_binds pragmas _ _ _ src_loc)
 
   | not (isLocallyDefined class_name)
   = returnNF_Tc (emptyLIE, EmptyMonoBinds)
@@ -362,19 +345,15 @@ tcClassDecl2 (ClassDecl context class_name
 	(tyvars, sc_theta, sc_sel_ids, op_sel_ids, defm_ids) = classBigSig clas
 
 	-- The selector binds are already in the selector Id's unfoldings
---	sel_binds = [ CoreMonoBind sel_id (getUnfoldingTemplate (getIdUnfolding sel_id))
---		    | sel_id <- sc_sel_ids ++ op_sel_ids, 
---		      isLocallyDefined sel_id
---		    ]
---
---    	final_sel_binds = andMonoBindList sel_binds
+	sel_binds = [ CoreMonoBind sel_id (getUnfoldingTemplate (getIdUnfolding sel_id))
+		    | sel_id <- sc_sel_ids ++ op_sel_ids 
+		    ]
     in
 	-- Generate bindings for the default methods
     tcDefaultMethodBinds clas default_binds		`thenTc` \ (const_insts, meth_binds) ->
 
-    returnTc (const_insts, meth_binds)
---	      final_sel_binds `AndMonoBinds` meth_binds)
--- Leave 'em out for now.  They always get inlined anyway.  SLPJ June '98
+    returnTc (const_insts,
+	      meth_binds `AndMonoBinds` andMonoBindList sel_binds)
 \end{code}
 
 %************************************************************************
@@ -458,7 +437,10 @@ tcDefaultMethodBinds
 
 tcDefaultMethodBinds clas default_binds
   = 	-- Construct suitable signatures
-    tcInstTyVars tyvars		`thenNF_Tc` \ (clas_tyvars, inst_tys, inst_env) ->
+    tcInstTyVars tyvars		`thenNF_Tc` \ (clas_tyvars, inst_tys, _) ->
+
+	-- Check that the default bindings come from this class
+    checkFromThisClass clas op_sel_ids default_binds	`thenNF_Tc_`
 
 	-- Typecheck the default bindings
     let
@@ -497,6 +479,7 @@ tcDefaultMethodBinds clas default_binds
 		 	clas_tyvars'
 			[this_dict_id]
 			abs_bind_stuff
+			emptyNameSet	-- No inlines (yet)
 			(dict_binds `andMonoBinds` andMonoBindList defm_binds)
     in
     returnTc (const_lie, full_binds)
@@ -510,6 +493,21 @@ tcDefaultMethodBinds clas default_binds
 
     origin = ClassDeclOrigin
 \end{code}
+
+\begin{code}
+checkFromThisClass :: Class -> [Id] -> RenamedMonoBinds -> NF_TcM s ()
+checkFromThisClass clas op_sel_ids mono_binds
+  = mapNF_Tc check_from_this_class bndrs	`thenNF_Tc_`
+    returnNF_Tc ()
+  where
+    check_from_this_class (bndr, loc)
+	  | nameOccName bndr `elem` sel_names = returnNF_Tc ()
+	  | otherwise			      = tcAddSrcLoc loc $
+						addErrTc (badMethodErr bndr clas)
+    sel_names = map getOccName op_sel_ids
+    bndrs = bagToList (collectMonoBinders mono_binds)
+\end{code}
+    
 
 @tcMethodBind@ is used to type-check both default-method and
 instance-decl method declarations.  We must type-check methods one at a
@@ -565,20 +563,19 @@ tcMethodBind clas origin inst_tyvars inst_tys inst_theta
    warnTc (opt_WarnMissingMethods && no_user_bind && no_user_default)
 	  (omittedMethodWarn sel_id clas)		`thenNF_Tc_`
 
-	-- Check the pragmas
-   tcExtendLocalValEnv [(meth_name, meth_id)] (
-	tcPragmaSigs meth_prags
-   )						`thenTc` \ (prag_info_fn, prag_binds1, prag_lie) ->
-
 	-- Check the bindings; first add inst_tyvars to the envt
 	-- so that we don't quantify over them in nested places
 	-- The *caller* put the class/inst decl tyvars into the envt
    tcExtendGlobalTyVars (mkVarSet inst_tyvars) (
      tcAddErrCtxt (methodCtxt sel_id)		$
-     tcBindWithSigs NotTopLevel meth_bind [sig_info]
-		    NonRecursive prag_info_fn 	
+     tcBindWithSigs NotTopLevel meth_bind 
+		    [sig_info] meth_prags NonRecursive 
    )						`thenTc` \ (binds, insts, _) ->
 
+
+   tcExtendLocalValEnv [(meth_name, meth_id)] (
+	tcSpecSigs meth_prags
+   )						`thenTc` \ (prag_binds1, prag_lie) ->
 
 	-- The prag_lie for a SPECIALISE pragma will mention the function
 	-- itself, so we have to simplify them away right now lest they float
@@ -615,8 +612,8 @@ tcMethodBind clas origin inst_tyvars inst_tys inst_theta
 	-- Find the prags for this method, and replace the
 	-- selector name with the method name
    find_prags meth_name [] = []
-   find_prags meth_name (SpecSig name ty spec loc : prags)
-	| name == sel_name = SpecSig meth_name ty spec loc : find_prags meth_name prags
+   find_prags meth_name (SpecSig name ty loc : prags)
+	| name == sel_name = SpecSig meth_name ty loc : find_prags meth_name prags
    find_prags meth_name (InlineSig name loc : prags)
 	| name == sel_name = InlineSig meth_name loc : find_prags meth_name prags
    find_prags meth_name (NoInlineSig name loc : prags)

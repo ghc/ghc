@@ -4,10 +4,10 @@
 \section[TcMonoType]{Typechecking user-specified @MonoTypes@}
 
 \begin{code}
-module TcMonoType ( tcHsType, tcHsTypeKind, tcHsTopType, tcHsTopBoxedType,
+module TcMonoType ( tcHsType, tcHsTypeKind, tcHsTopType, tcHsTopBoxedType, tcHsTopTypeKind,
 		    tcContext, tcHsTyVar, kcHsTyVar,
 		    tcExtendTyVarScope, tcExtendTopTyVarScope,
-		    TcSigInfo(..), tcTySig, mkTcSig, noSigs, maybeSig,
+		    TcSigInfo(..), tcTySig, mkTcSig, maybeSig,
 		    checkSigTyVars, sigCtxt, sigPatCtxt
 	          ) where
 
@@ -33,9 +33,10 @@ import Type		( Type, ThetaType,
 			  mkSigmaTy, mkDictTy, mkTyConApp, mkAppTys, splitForAllTys, splitRhoTy,
 			  boxedTypeKind, unboxedTypeKind, tyVarsOfType,
 			  mkArrowKinds, getTyVar_maybe, getTyVar,
-		  	  tidyOpenType, tidyOpenTypes, tidyTyVar, fullSubstTy
+		  	  tidyOpenType, tidyOpenTypes, tidyTyVar
 			)
-import Id		( mkUserId, idName, idType, idFreeTyVars )
+import Subst		( mkTopTyVarSubst, substTy )
+import Id		( mkVanillaId, idName, idType, idFreeTyVars )
 import Var		( TyVar, mkTyVar )
 import VarEnv
 import VarSet
@@ -94,6 +95,13 @@ tcHsTopType ty
   = -- tcAddErrCtxt (typeCtxt ty)		$
     tc_type ty				`thenTc` \ ty' ->
     forkNF_Tc (zonkTcTypeToType ty')
+
+tcHsTopTypeKind :: RenamedHsType -> TcM s (TcKind, Type)
+tcHsTopTypeKind ty
+  = -- tcAddErrCtxt (typeCtxt ty)		$
+    tc_type_kind ty				`thenTc` \ (kind, ty') ->
+    forkNF_Tc (zonkTcTypeToType ty')		`thenTc` \ zonked_ty ->
+    returnNF_Tc (kind, zonked_ty)
 
 tcHsTopBoxedType :: RenamedHsType -> TcM s Type
 tcHsTopBoxedType ty
@@ -159,19 +167,17 @@ tc_type_kind (MonoUsgTy usg ty)
 tc_type_kind (HsForAllTy (Just tv_names) context ty)
   = tcExtendTyVarScope tv_names		$ \ tyvars -> 
     tcContext context			`thenTc` \ theta ->
-    case theta of
-	[]    -> 	-- No context, so propagate body type
-		 tc_type_kind ty	`thenTc` \ (kind, tau) ->
-		 returnTc (kind, mkSigmaTy tyvars [] tau)
-
-	other -> 	-- Context; behave like a function type
-			-- This matters.  Return-unboxed-tuple analysis can
-			-- give overloaded functions like
-			--	f :: forall a. Num a => (# a->a, a->a #)
-			-- And we want these to get through the type checker
-
-		 tc_type ty		`thenTc` \ tau ->
-		 returnTc (boxedTypeKind, mkSigmaTy tyvars theta tau)
+    tc_type_kind ty			`thenTc` \ (kind, tau) ->
+    let
+	body_kind | null theta = kind
+		  | otherwise  = boxedTypeKind
+		-- Context behaves like a function type
+		-- This matters.  Return-unboxed-tuple analysis can
+		-- give overloaded functions like
+		--	f :: forall a. Num a => (# a->a, a->a #)
+		-- And we want these to get through the type checker
+    in
+    returnTc (body_kind, mkSigmaTy tyvars theta tau)
 \end{code}
 
 Help functions for type applications
@@ -358,10 +364,6 @@ maybeSig [] name = Nothing
 maybeSig (sig@(TySigInfo sig_name _ _ _ _ _ _ _) : sigs) name
   | name == sig_name = Just sig
   | otherwise	     = maybeSig sigs name
-
--- This little helper is useful to pass to tcPat
-noSigs :: Name -> Maybe TcId
-noSigs name = Nothing
 \end{code}
 
 
@@ -371,7 +373,7 @@ tcTySig :: RenamedSig -> TcM s TcSigInfo
 tcTySig (Sig v ty src_loc)
  = tcAddSrcLoc src_loc $
    tcHsType ty					`thenTc` \ sigma_tc_ty ->
-   mkTcSig (mkUserId v sigma_tc_ty) src_loc	`thenNF_Tc` \ sig -> 
+   mkTcSig (mkVanillaId v sigma_tc_ty) src_loc	`thenNF_Tc` \ sig -> 
    returnTc sig
 
 mkTcSig :: TcId -> SrcLoc -> NF_TcM s TcSigInfo
@@ -391,7 +393,8 @@ mkTcSig poly_id src_loc
 
    let
      tyvar_tys' = mkTyVarTys tyvars'
-     rho' = fullSubstTy (zipVarEnv tyvars tyvar_tys') emptyVarSet rho
+     rho' = substTy (mkTopTyVarSubst tyvars tyvar_tys') rho
+	-- mkTopTyVarSubst because the tyvars' are fresh
      (theta', tau') = splitRhoTy rho'
 	-- This splitRhoTy tries hard to make sure that tau' is a type synonym
 	-- wherever possible, which can improve interface files.
