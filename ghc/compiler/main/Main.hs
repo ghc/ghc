@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.44 2001/01/03 11:48:06 simonmar Exp $
+-- $Id: Main.hs,v 1.45 2001/01/09 17:16:36 rrt Exp $
 --
 -- GHC Driver program
 --
@@ -256,7 +256,7 @@ main =
 	-- sanity checking
    o_file <- readIORef v_Output_file
    ohi    <- readIORef v_Output_hi
-   if length srcs > 1 && (isJust ohi || (isJust o_file && mode /= DoLink))
+   if length srcs > 1 && (isJust ohi || (isJust o_file && mode /= DoLink && mode /= DoMkDLL))
 	then throwDyn (UsageError "can't apply -o or -ohi options to multiple source files")
 	else do
 
@@ -282,7 +282,7 @@ main =
 	  -- rest of compilation
 	  dyn_flags <- readIORef v_DynFlags
 	  phases <- genPipeline mode stop_flag True (hscLang dyn_flags) pp
-	  r <- pipeLoop phases pp (mode==DoLink) True{-use -o flag-}
+	  r <- pipeLoop phases pp (mode==DoLink || mode==DoMkDLL) True{-use -o flag-}
 			basename suffix
 	  return r
 
@@ -290,6 +290,7 @@ main =
 
    when (mode == DoMkDependHS) endMkDependHS
    when (mode == DoLink) (doLink o_files)
+   when (mode == DoMkDLL) (doMkDLL o_files)
 
 	-- grab the last -B option on the command line, and
 	-- set topDir to its value.

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.21 2001/01/08 12:31:34 rrt Exp $
+-- $Id: DriverState.hs,v 1.22 2001/01/09 17:16:35 rrt Exp $
 --
 -- Settings for the driver
 --
@@ -654,6 +654,7 @@ GLOBAL_VAR(v_Pgm_m,   error "pgm_m", String)
 GLOBAL_VAR(v_Pgm_s,   error "pgm_s", String)
 GLOBAL_VAR(v_Pgm_a,   cGCC,          String)
 GLOBAL_VAR(v_Pgm_l,   cGCC,          String)
+GLOBAL_VAR(v_Pgm_dll, cMkDLL,        String)
 
 GLOBAL_VAR(v_Opt_dep,    [], [String])
 GLOBAL_VAR(v_Anti_opt_C, [], [String])

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.46 2001/01/03 14:28:26 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.47 2001/01/09 17:16:35 rrt Exp $
 --
 -- GHC Driver
 --
@@ -19,12 +19,14 @@ module DriverPipeline (
    preprocess, compile, CompResult(..),
 
 	-- batch-mode linking interface
-   doLink
+   doLink,
+        -- DLL building
+   doMkDLL
   ) where
 
 #include "HsVersions.h"
 
-import CmStaticInfo ( GhciMode(..) )
+import CmStaticInfo
 import CmTypes
 import GetImports
 import DriverState
@@ -53,12 +55,15 @@ import IO
 import Monad
 import Maybe
 
+import PackedString
+import MatchPS
+
 -----------------------------------------------------------------------------
 -- GHC modes of operation
 
 data GhcMode
   = DoMkDependHS			-- ghc -M
-  | DoMkDLL				-- ghc -mk-dll
+  | DoMkDLL				-- ghc --mk-dll
   | StopBefore Phase			-- ghc -E | -C | -S | -c
   | DoMake				-- ghc --make
   | DoInteractive			-- ghc --interactive
@@ -69,6 +74,7 @@ GLOBAL_VAR(v_GhcMode, error "todo", GhcMode)
 
 modeFlag :: String -> Maybe GhcMode
 modeFlag "-M" 		 = Just $ DoMkDependHS
+modeFlag "--mk-dll"      = Just $ DoMkDLL
 modeFlag "-E" 		 = Just $ StopBefore Hsc
 modeFlag "-C" 		 = Just $ StopBefore HCc
 modeFlag "-S" 		 = Just $ StopBefore As
@@ -88,7 +94,7 @@ getGhcMode flags
 	([(flag,one)], rest) -> return (rest, one, flag)
 	(_    , _   ) -> 
 	  throwDyn (OtherError 
-		"only one of the flags -M, -E, -C, -S, -c, --make, --interactive is allowed")
+		"only one of the flags -M, -E, -C, -S, -c, --make, --interactive, -mk-dll is allowed")
 
 -----------------------------------------------------------------------------
 -- genPipeline
@@ -703,9 +709,8 @@ doLink o_files = do
 #ifdef mingw32_TARGET_OS
     let extra_os = if static || no_hs_main
                    then []
---                   else [ head (lib_paths (head rts_pkg)) ++ "/Main.dll_o",
---                          head (lib_paths (head std_pkg)) ++ "/PrelMain.dll_o" ]
-		     else []
+                   else [ head (library_dirs (head rts_pkg)) ++ "/Main.dll_o",
+                          head (library_dirs (head std_pkg)) ++ "/PrelMain.dll_o" ]
 #endif
     (md_c_flags, _) <- machdepCCOpts
     runSomething "Linker"
@@ -728,6 +733,74 @@ doLink o_files = do
 #else
 	 ++ [ "-u PrelMain_mainIO_closure" , "-u __init_PrelMain"]
 #endif
+	)
+       )
+
+-----------------------------------------------------------------------------
+-- Making a DLL
+
+-- only for Win32, but bits that are #ifdefed in doLn are still #ifdefed here
+-- in a vain attempt to aid future portability
+doMkDLL :: [String] -> IO ()
+doMkDLL o_files = do
+    ln <- readIORef v_Pgm_dll
+    verb <- getVerbFlag
+    static <- readIORef v_Static
+    let imp = if static then "" else "_imp"
+    no_hs_main <- readIORef v_NoHsMain
+
+    o_file <- readIORef v_Output_file
+    let output_fn = case o_file of { Just s -> s; Nothing -> "HSdll.dll"; }
+
+    pkg_lib_paths <- getPackageLibraryPath
+    let pkg_lib_path_opts = map ("-L"++) pkg_lib_paths
+
+    lib_paths <- readIORef v_Library_paths
+    let lib_path_opts = map ("-L"++) lib_paths
+
+    pkg_libs <- getPackageLibraries
+    let pkg_lib_opts = map (\lib -> "-l" ++ lib ++ imp) pkg_libs
+
+    libs <- readIORef v_Cmdline_libraries
+    let lib_opts = map ("-l"++) (reverse libs)
+	 -- reverse because they're added in reverse order from the cmd line
+
+    pkg_extra_ld_opts <- getPackageExtraLdOpts
+
+	-- probably _stub.o files
+    extra_ld_inputs <- readIORef v_Ld_inputs
+
+	-- opts from -optdll-<blah>
+    extra_ld_opts <- getStaticOpts v_Opt_dll
+
+    rts_pkg <- getPackageDetails ["rts"]
+    std_pkg <- getPackageDetails ["std"]
+#ifdef mingw32_TARGET_OS
+    let extra_os = if static || no_hs_main
+                   then []
+                   else [ head (library_dirs (head rts_pkg)) ++ "/Main.dll_o",
+                          head (library_dirs (head std_pkg)) ++ "/PrelMain.dll_o" ]
+#endif
+    (md_c_flags, _) <- machdepCCOpts
+    runSomething "DLL creator"
+       (unwords
+	 ([ ln, verb, "-o", output_fn ]
+	 ++ md_c_flags
+	 ++ o_files
+#ifdef mingw32_TARGET_OS
+	 ++ extra_os
+	 ++ [ "--target=i386-mingw32" ]
+#endif
+	 ++ extra_ld_inputs
+	 ++ lib_path_opts
+	 ++ lib_opts
+	 ++ pkg_lib_path_opts
+	 ++ pkg_lib_opts
+	 ++ pkg_extra_ld_opts
+         ++ (case findPS (packString (concat extra_ld_opts)) (packString "--def") of
+               Nothing -> [ "--export-all" ]
+	       Just _  -> [ "" ])
+	 ++ extra_ld_opts
 	)
        )
 
