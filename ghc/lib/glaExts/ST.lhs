@@ -19,6 +19,8 @@ module ST (
 
 	thenST, seqST, returnST, listST, fixST, runST, unsafeInterleaveST,
         mapST, mapAndUnzipST,
+         -- the lazy variant
+	returnLazyST, thenLazyST, seqLazyST,
 
 	MutableVar,
 	newVar, readVar, writeVar, sameVar,
@@ -81,3 +83,30 @@ sameMutableByteArray (MutableByteArray _ arr1#) (MutableByteArray _ arr2#)
   = sameMutableByteArray# arr1# arr2#
 \end{code}
 
+Lazy monad combinators, the @Monad@ instance for @ST@
+uses the strict variant:
+
+\begin{code}
+returnLazyST :: a -> ST s a
+returnLazyST a = ST (\ s -> (a, s))
+
+thenLazyST :: ST s a -> (a -> ST s b) -> ST s b
+thenLazyST m k
+ = ST $ \ s ->
+   let 
+     (ST m_a) = m
+     (r, new_s) = m_a s
+     (ST k_a) = k r
+   in  
+   k_a new_s
+
+seqLazyST :: ST s a -> ST s b -> ST s b
+seqLazyST m k
+ = ST $ \ s ->
+   let
+    (ST m_a) = m
+    (_, new_s) = m_a s
+    (ST k_a) = k
+   in  
+   k_a new_s
+\end{code}
