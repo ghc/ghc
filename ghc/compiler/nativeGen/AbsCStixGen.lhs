@@ -469,6 +469,8 @@ Finally, all of the disgusting AbstractC macros.
  gencode (CCallProfCCMacro macro _)
   = returnUs (\xs -> StComment macro : xs)
 
+ gencode CCallTypedef{} = returnUs id
+
  gencode other
   = pprPanic "AbsCStixGen.gencode" (dumpRealC other)
 
