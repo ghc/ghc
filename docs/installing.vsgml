@@ -677,32 +677,14 @@ be less than 32 characters long.
 <tag>GNU C (@gcc@):</tag>
 <nidx>pre-supposed: GCC (GNU C compiler)</nidx>
 <nidx>GCC (GNU C compiler), pre-supposed</nidx>
-Version 2.7.2.x is known to work.
+
+Versions 2.7.2.x, 2.8.1 and egcs 1.1.2 are known to work.  Use other
+versions at your own risk!
 
 If your GCC dies with ``internal error'' on some GHC source file,
 please let us know, so we can report it and get things improved.
 (Exception: on @iX86@ boxes---you may need to fiddle with GHC's
 @-monly-N-regs@ option; see the User's Guide)
-
-<nidx/EGCS/ EGCS (the Enhanced GNU Compiler Suite) may or may not
-work, we haven't tested it fully yet.
-
-<tag>PVM version 3:</tag>
-<nidx>pre-supposed: PVM3 (Parallel Virtual Machine)</nidx>
-<nidx>PVM3 (Parallel Virtual Machine), pre-supposed</nidx>
-
-PVM is the Parallel Virtual Machine on which Parallel Haskell programs
-run.  (You only need this if you plan to run Parallel Haskell.
-Concurent Haskell, which runs concurrent threads on a uniprocessor
-doesn't need it.)  Underneath PVM, you can have (for example) a
-network of workstations (slow) or a multiprocessor box (faster).
-
-The current version of PVM is 3.3.11; we use 3.3.7.  It is readily
-available on the net; I think I got it from @research.att.com@, in
-@netlib@.
-
-A PVM installation is slightly quirky, but easy to do.  Just follow
-the @Readme@ instructions.
 
 <tag>@xargs@ on Solaris2:</tag>
 <nidx>xargs, presupposed (Solaris only)</nidx>
@@ -725,34 +707,13 @@ library.
 <nidx>pre-supposed: Autoconf</nidx>
 <nidx>Autoconf, pre-supposed</nidx>
 
-GNU Autoconf is used to build the @configure@ script from
-@configure.in@ in a source distribution.  If you modify
-@configure.in@, you'll need @autoconf@ to regenerate @configure@.
+GNU Autoconf is needed if you intend to build from the CVS sources, it
+is <em/not/ needed if you just intend to build a standard source
+distribution.
 
-<tag>@bash@ (Parallel Haskell only):</tag>
-<nidx>bash, presupposed (Parallel Haskell only)</nidx>
-Sadly, the @gr2ps@ script, used to convert ``parallelism profiles''
-to PostScript, is written in Bash (GNU's Bourne Again shell).
-This bug will be fixed (someday).
-
-<tag>Flex:</tag> 
-<nidx>pre-supposed: flex</nidx> 
-<nidx>flex, pre-supposed</nidx>
-
-This is a quite-a-bit-better-than-Lex lexer.  Used to build GHC's
-lexer, and a couple of utilities in @glafp-utils@.  On our machines,
-the version in @/bin@ doesn't work; you need the GNU version.  Find
-out by saying @flex --version@ (our current version is 2.5.4, but
-maybe earlier ones will work).  If it doesn't know about the
-@--version@ flag, it ain't the right @flex@.
-
-<tag>Yacc:</tag>
-<nidx>pre-supposed: non-worthless Yacc</nidx>
-<nidx>Yacc, pre-supposed</nidx>
-
-If you mess with the Haskell parser, you'll need a Yacc that can cope.
-The unbundled @/usr/lang/yacc@ is OK; the GNU @bison@ is OK; Berkeley
-yacc, @byacc@, is not OK.
+Autoconf builds the @configure@ script from @configure.in@ and
+@aclocal.m4@.  If you modify either of these files, you'll need
+Autoconf to rebuild @configure@.
 
 <tag>@sed@</tag>
 <nidx>pre-supposed: sed</nidx>
@@ -763,13 +724,41 @@ build-configuration stuff needs it.  GNU sed version 2.0.4 is no good!
 It has a bug in it that is tickled by the build-configuration.  2.0.5
 is ok. Others are probably ok too (assuming we don't create too
 elaborate configure scripts..)
-
 </descrip>
 
 One @fptools@ project is worth a quick note at this point, because it
 is useful for all the others: @glafp-utils@ contains several utilities
 which aren't particularly Glasgow-ish, but Occasionally Indispensable.
 Like @lndir@ for creating symbolic link trees.
+
+<sect1> Tools for building parallel GHC (GPH)
+<label id="pre-supposed-gph-tools">
+<p>
+
+<descrip>
+<tag>PVM version 3:</tag>
+<nidx>pre-supposed: PVM3 (Parallel Virtual Machine)</nidx>
+<nidx>PVM3 (Parallel Virtual Machine), pre-supposed</nidx>
+
+PVM is the Parallel Virtual Machine on which Parallel Haskell programs
+run.  (You only need this if you plan to run Parallel Haskell.
+Concurent Haskell, which runs concurrent threads on a uniprocessor
+doesn't need it.)  Underneath PVM, you can have (for example) a
+network of workstations (slow) or a multiprocessor box (faster).
+
+The current version of PVM is 3.3.11; we use 3.3.7.  It is readily
+available on the net; I think I got it from @research.att.com@, in
+@netlib@.
+
+A PVM installation is slightly quirky, but easy to do.  Just follow
+the @Readme@ instructions.
+
+<tag>@bash@:</tag>
+<nidx>bash, presupposed (Parallel Haskell only)</nidx>
+Sadly, the @gr2ps@ script, used to convert ``parallelism profiles''
+to PostScript, is written in Bash (GNU's Bourne Again shell).
+This bug will be fixed (someday).
+</descrip>
 
 <sect1> Tools for building the Documentation
 <label id="pre-supposed-doc-tools">
@@ -800,6 +789,20 @@ documentation.  We recomment teTeX, which includes just about
 everything you need.
 </descrip>
 
+<sect1> Other useful tools
+<label id="pre-supposed-other-tools">
+<p>
+
+<descrip>
+<tag>Flex:</tag> 
+<nidx>pre-supposed: flex</nidx> 
+<nidx>flex, pre-supposed</nidx>
+
+This is a quite-a-bit-better-than-Lex lexer.  Used to build a couple
+of utilities in @glafp-utils@.  Depending on your operating system,
+the supplied @lex@ may or may not work; you should get the GNU
+version.
+</descrip>
 
 <sect>Building from source
 <label id="sec:building-from-source">
