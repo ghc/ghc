@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.113 2002/10/25 15:23:06 simonpj Exp $
+$Id: Parser.y,v 1.114 2002/12/10 16:28:48 igloo Exp $
 
 Haskell grammar.
 
@@ -1021,8 +1021,11 @@ aexp2	:: { RdrNameHsExpr }
 	| srcloc '[t|' ctype '|]'       { HsBracket (TypBr $3) $1 }                       
 	| srcloc '[p|' infixexp '|]'    {% checkPattern $1 $3 `thenP` \p ->
 					   returnP (HsBracket (PatBr p) $1) }
-	| srcloc '[d|' cvtopdecls '|]'	{ HsBracket (DecBr (mkGroup $3)) $1 }
+	| srcloc '[d|' cvtopbody '|]'	{ HsBracket (DecBr (mkGroup $3)) $1 }
 
+cvtopbody :: { [RdrNameHsDecl] }
+	:  '{'            cvtopdecls '}'		{ $2 }
+	|      layout_on  cvtopdecls close		{ $2 }
 
 texps :: { [RdrNameHsExpr] }
 	: texps ',' exp			{ $3 : $1 }
