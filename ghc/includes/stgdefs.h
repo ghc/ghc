@@ -50,13 +50,16 @@ void _stgAssert PROTO((char *, unsigned int));
 #undef _POSIX_C_SOURCE
 #else
 #define _POSIX_SOURCE 1
+#ifndef irix_TARGET_OS
 #define _POSIX_C_SOURCE 199301L
-/* Alphas set _POSIX_VERSION (unistd.h) */
-/* ditto _POSIX2_C_VERSION
-	 _POSIX2_VERSION
-	 _POSIX_4SOURCE
-*/
-
+#else
+/* defines contributed by Tomasz Cholewo <tjchol01@mecca.spd.louisville.edu>
+   ( this is with gcc-2.7.2 for irix-6.{2.3} ) .. hopefully they will not
+   upset anything under irix5 ..
+   */
+#define _POSIX_C_SOURCE 199309L
+#define __EXTENSIONS__
+#endif
 /* Bogus use of non-existent variable POSIX_C_SOURCE in the supplied header files
    for gcc-2.7.1 on Solaris forces us to define it: (this strikes when using st_atime
    and friends in <sys/stat.h> )
