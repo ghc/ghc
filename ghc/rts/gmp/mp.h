@@ -94,6 +94,7 @@ typedef __mpz_struct MINT;
 extern "C" {
 #endif
 
+#define mp_set_memory_functions __gmp_set_memory_functions
 void mp_set_memory_functions _PROTO ((void *(*) (size_t),
                                       void *(*) (void *, size_t, size_t),
                                       void (*) (void *, size_t)));

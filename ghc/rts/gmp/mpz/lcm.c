@@ -1,6 +1,6 @@
 /* mpz/lcm.c:   Calculate the least common multiple of two integers.
 
-Copyright (C) 1996 Free Software Foundation, Inc.
+Copyright (C) 1996, 2000 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
@@ -37,6 +37,9 @@ mpz_lcm (r, u, v)
 {
   mpz_t g;
   mp_size_t usize, vsize, size;
+  TMP_DECL (marker);
+
+  TMP_MARK (marker);
 
   usize = ABS (SIZ (u));
   vsize = ABS (SIZ (v));
@@ -53,4 +56,6 @@ mpz_lcm (r, u, v)
   mpz_gcd (g, u, v);
   mpz_divexact (g, u, g);
   mpz_mul (r, g, v);
+
+  TMP_FREE (marker);
 }

@@ -1,7 +1,7 @@
 /* mpz_fdiv_r_2exp -- Divide a integer by 2**CNT and produce a remainder.
 
-Copyright (C) 1991, 1993, 1994, 1995, 1998, 1999 Free Software Foundation,
-Inc.
+Copyright (C) 1991, 1993, 1994, 1995, 1998, 1999, 2000 Free Software
+Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
@@ -83,10 +83,13 @@ mpz_fdiv_r_2exp (res, in, cnt)
     {
       /* Result should be 2^CNT - RES */
       mpz_t tmp;
+      TMP_DECL (marker);
+      TMP_MARK (marker);
       MPZ_TMP_INIT (tmp, cnt/BITS_PER_MP_LIMB + 2);
       mpz_set_ui (tmp, 1L);
       mpz_mul_2exp (tmp, tmp, cnt);
       mpz_sub (res, tmp, res);
+      TMP_FREE (marker);
     }
 }
 

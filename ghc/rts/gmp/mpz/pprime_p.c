@@ -181,8 +181,8 @@ mpz_millerrabin (n, reps)
   mpz_powm (y, x, nm1, n);
   if (mpz_cmp_ui (y, 1L) != 0)
     {
-      return 0;
       TMP_FREE (marker);
+      return 0;
     }
 
   MPZ_TMP_INIT (q, SIZ (n));

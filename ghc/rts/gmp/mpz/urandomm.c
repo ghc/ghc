@@ -39,6 +39,9 @@ mpz_urandomm (rop, rstate, n)
   mp_ptr tp;
   mp_size_t nbits, size;
   int count;
+  TMP_DECL (marker);
+
+  TMP_MARK (marker);
 
   /* FIXME: Should check for n == 0 and report error */
 
@@ -70,4 +73,6 @@ mpz_urandomm (rop, rstate, n)
   while (mpz_cmp (t, p) >= 0);
 
   mpz_mod (rop, t, n);
+
+  TMP_FREE (marker);
 }
