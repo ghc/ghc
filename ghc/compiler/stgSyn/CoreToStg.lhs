@@ -257,7 +257,7 @@ mkTopStgRhs is_static rhs_fvs srt binder_info (StgConApp con args)
   = StgRhsCon noCCS con args
 
 mkTopStgRhs is_static rhs_fvs srt binder_info rhs
-  = ASSERT( not is_static )
+  = ASSERT2( not is_static, ppr rhs )
     StgRhsClosure noCCS binder_info
 		  (getFVs rhs_fvs)		 
 	          Updatable
