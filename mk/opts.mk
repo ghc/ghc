@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.27 2001/10/23 15:37:09 rrt Exp $
+# 	$Id: opts.mk,v 1.28 2002/01/30 12:13:59 simonmar Exp $
 #
 #################################################################################
 
@@ -100,3 +100,6 @@ SGML2HTML_OPTS     = $(SRC_SGML2HTML_OPTS) $(WAY$(_way)_SGML2HTML_OPTS) $(EXTRA_
 UNLIT_OPTS         = $(SRC_UNLIT_OPTS) $(WAY$(_way)_UNLIT_OPTS) $(EXTRA_UNLIT_OPTS)
 YACC_OPTS          = $(SRC_YACC_OPTS) $(WAY$(_way)_YACC_OPTS) $(EXTRA_YACC_OPTS)
 ZIP_OPTS           = $(SRC_ZIP_OPTS) $(EXTRA_ZIP_OPTS)
+
+# Version of CC_OPTS to use when GHC is the C compiler
+GHC_CC_OPTS 	   = $(addprefix -optc, $(CC_OPTS))
