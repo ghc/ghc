@@ -43,12 +43,6 @@ i2w_s x = (x :: Int#)
 %*									*
 %************************************************************************
 
-%************************************************************************
-%*									*
-\subsubsection[UniqSupply-type]{@UniqSupply@ type and operations}
-%*									*
-%************************************************************************
-
 A value of type @UniqSupply@ is unique, and it can
 supply {\em one} distinct @Unique@.  Also, from the supply, one can
 also manufacture an arbitrary number of further @UniqueSupplies@,
