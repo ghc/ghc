@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.7 1999/01/25 11:55:06 sof Exp $
+ * $Id: MBlock.c,v 1.8 1999/01/26 10:41:20 sof Exp $
  *
  * MegaBlock Allocator Interface.  This file contains all the dirty
  * architecture-dependent hackery required to get a chunk of aligned
@@ -31,7 +31,7 @@
 #include <fcntl.h>
 #endif
 
-#if cygwin32_TARGET_OS
+#if HAVE_WINDOWS_H
 #include <windows.h>
 #endif
 
@@ -73,7 +73,6 @@ getMBlock(void)
 }
 
 #ifndef _WIN32
-
 void *
 getMBlocks(nat n)
 {
