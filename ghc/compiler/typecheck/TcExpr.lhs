@@ -185,7 +185,15 @@ tcExpr (HsLit lit@(HsString str)) res_ty
 tcExpr (HsPar expr) res_ty -- preserve parens so printing needn't guess where they go
   = tcExpr expr res_ty
 
-tcExpr (NegApp expr neg) res_ty = tcExpr (HsApp neg expr) res_ty
+-- perform the negate *before* overloading the integer, since the case
+-- of minBound on Ints fails otherwise.  Could be done elsewhere, but
+-- convenient to do it here.
+
+tcExpr (NegApp (HsLit (HsInt i)) neg) res_ty
+  = tcExpr (HsLit (HsInt (-i))) res_ty
+
+tcExpr (NegApp expr neg) res_ty 
+  = tcExpr (HsApp neg expr) res_ty
 
 tcExpr (HsLam match) res_ty
   = tcMatchExpected [] res_ty match	`thenTc` \ (match',lie) ->
