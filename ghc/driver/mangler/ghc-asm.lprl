@@ -1443,7 +1443,7 @@ sub rev_tbl {
 		    local ($sign, $base, $digits) = ($1, $2, $3);
 		    $base = (10, 8, 16)[length $base];
 		    local ($hi, $lo) = (0, 0);
-		    foreach $i (split //, $digits) {
+		    foreach $i (split(//, $digits)) {
 			$j = $lo * $base + $i;
 			$lo = $j % 4294967296;
 			$hi = $hi * $base + ($j - $lo) / 4294967296;
