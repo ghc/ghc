@@ -1,6 +1,6 @@
 __interface MyList 1 0 where
-import PrelBase 29 :: addr2Integer 8 foldr 1 int2Integer 8 integer_0 8 integer_1 8 integer_2 8 integer_m1 8;
-import PrelPack 28 :: packCString# 1 unpackAppendCString# 1 unpackCString# 1 unpackFoldrCString# 1 unpackNBytes# 9;
-__instimport IO ; __instimport PrelAddr ; __instimport PrelArr ; __instimport PrelBounded ; __instimport PrelCCall ; __instimport PrelConc ; __instimport PrelForeign ; __instimport PrelIOBase ; __instimport PrelNum ; __instimport PrelNumExtra ; __instimport PrelTup ;
-__export MyList MyList{Empty :::};
-1 data MyList a = Empty |  ::: (MyList a) (MyList a) ;
+import PrelBase 16 :: addr2Integer 1 foldr 1 int2Integer 1 integer_0 1 integer_1 1 integer_2 1 integer_m1 1;
+import PrelPack 15 :: packCStringzh 1 unpackAppendCStringzh 1 unpackCStringzh 1 unpackFoldrCStringzh 1 unpackNByteszh 1;
+__instimport IO ; __instimport PrelAddr ; __instimport PrelArr ; __instimport PrelBounded ; __instimport PrelCCall ; __instimport PrelConc ; __instimport PrelForeign ; __instimport PrelIOBase ; __instimport PrelNum ; __instimport PrelNumExtra ; __instimport PrelStable ; __instimport PrelTup ;
+__export MyList MyList{Empty ZCZCZC};
+2 data MyList a = Empty |  ZCZCZC (MyList a) (MyList a) ;

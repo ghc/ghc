@@ -1,10 +1,8 @@
-
 read014.hs:2: Warning: definition but no type signature for `ng1'
 
 read014.hs:4: Warning: Defined but not used: x
 
 read014.hs:8: Warning: Defined but not used: x
-
 
 
 read014.hs:8:
