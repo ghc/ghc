@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.25 1998/08/14 15:24:10 simonm Exp $
+dnl $Id: aclocal.m4,v 1.26 1998/08/16 16:25:21 sof Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -394,5 +394,27 @@ AC_LANG_RESTORE
 AC_MSG_RESULT($fptools_cv_have_long_long)
 if test "$fptools_cv_have_long_long" = yes; then
 AC_DEFINE(HAVE_LONG_LONG)
+fi
+])
+
+dnl *** Can we open files in binary mode? ***
+dnl 
+AC_DEFUN(FPTOOLS_O_BINARY,
+[
+AC_REQUIRE([AC_PROG_CC])
+AC_MSG_CHECKING(whether we can open files in binary mode)
+AC_CACHE_VAL(fptools_cv_have_o_binary,
+[
+AC_LANG_SAVE
+AC_LANG_C
+AC_TRY_COMPILE(,[#include <fcntl.h>
+x = O_BINARY;],
+fptools_cv_have_o_binary=yes,
+fptools_cv_have_o_binary=no)
+AC_LANG_RESTORE
+])
+AC_MSG_RESULT($fptools_cv_have_o_binary)
+if test "$fptools_cv_have_o_binary" = yes; then
+AC_DEFINE(HAVE_O_BINARY)
 fi
 ])

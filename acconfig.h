@@ -36,6 +36,9 @@
 /* Define if C compiler supports long long types */
 #undef HAVE_LONG_LONG
 
+/* Define if fcntl.h defines O_BINARY */
+#undef HAVE_O_BINARY
+
 /* Define if C Symbols have a leading underscore added by the compiler */
 #undef LEADING_UNDERSCORE
 
