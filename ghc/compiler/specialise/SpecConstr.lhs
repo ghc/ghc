@@ -500,7 +500,6 @@ spec_one env fn rhs (pats, n)
 	spec_id   = mkUserLocal spec_occ spec_uniq (exprType spec_rhs) fn_loc
 	rule      = Rule rule_name pat_fvs pats (mkVarApps (Var spec_id) bndrs)
     in
-    pprTrace "SpecConstr" (pprCoreRule (ppr fn) rule)	$
     returnUs (rule, (spec_id, spec_rhs))
 \end{code}
 
