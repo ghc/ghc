@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.93 2002/04/10 11:43:43 stolz Exp $
+ * $Id: PrimOps.h,v 1.94 2002/06/03 11:31:55 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -77,6 +77,9 @@ typedef union {
 /* Careful: the carry calculation above is extremely delicate.  Make sure
  * you test it thoroughly after changing it.
  */
+
+#undef C
+#undef R
 
 #else
 
