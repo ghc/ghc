@@ -3,7 +3,8 @@
 --
 module ShouldFail where
 
-import ST
+import GHC.Arr
+import Control.Monad.ST	( runST )
 
 type IndTree s t = STArray s (Int,Int) t
 
