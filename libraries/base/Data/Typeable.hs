@@ -488,7 +488,7 @@ class Typeable1 t where
 class Typeable2 t where
   typeOf2 :: t a b -> TyCon
 
-
+#ifndef __NHC__
 -- | Instance for lists
 instance Typeable1 [] where
   typeOf1 _ = typerepTyCon (typeOf (undefined::[()]))
@@ -512,7 +512,7 @@ instance Typeable2 Either where
 -- | Instance for functions
 instance Typeable2 (->) where
   typeOf2 _ = typerepTyCon (typeOf (undefined::() -> ()))
-
+#endif
 
 -- | Cast for * -> *
 cast1 :: (Typeable1 t, Typeable1 t') => c (t a) -> Maybe (c (t' a)) 
