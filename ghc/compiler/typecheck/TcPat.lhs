@@ -20,7 +20,7 @@ import Inst		( InstOrigin(..),
 import Id		( Id, idType, mkLocalId )
 import Name		( Name )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
-import TcEnv		( newLocalName, tcExtendIdEnv1, tcExtendTyVarEnv3,
+import TcEnv		( newLocalName, tcExtendIdEnv1, tcExtendTyVarEnv2,
 			  tcLookupClass, tcLookupDataCon, tcLookupId )
 import TcMType 		( newTyFlexiVarTy, arityErr, tcSkolTyVars, readMetaTyVar )
 import TcType		( TcType, TcTyVar, TcSigmaType, TcTauType, zipTopTvSubst,
@@ -248,7 +248,7 @@ tc_pat ctxt (SigPatIn pat sig) pat_ty thing_inside
 	; let tv_binds = [(tv, substTyVar subst  tv) | tv <- sig_tvs]
 	      sig_ty'  = substTy subst sig_ty
 	; (pat', tvs, res) 
-	      <- tcExtendTyVarEnv3 tv_binds $
+	      <- tcExtendTyVarEnv2 tv_binds $
 		 tc_lpat ctxt pat (Check sig_ty') thing_inside
 
 	; return (SigPatOut pat' sig_ty, tvs, res) }

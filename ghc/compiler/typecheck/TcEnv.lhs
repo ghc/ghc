@@ -17,7 +17,7 @@ module TcEnv(
 	
 	-- Local environment
 	tcExtendKindEnv,
-	tcExtendTyVarEnv, tcExtendTyVarEnv3, 
+	tcExtendTyVarEnv, tcExtendTyVarEnv2, 
 	tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2, 
 	tcLookup, tcLookupLocated, tcLookupLocalIds,
 	tcLookupId, tcLookupTyVar,
@@ -250,8 +250,8 @@ tcExtendTyVarEnv :: [TyVar] -> TcM r -> TcM r
 tcExtendTyVarEnv tvs thing_inside
   = tc_extend_tv_env [ATyVar tv (mkTyVarTy tv) | tv <- tvs] thing_inside
 
-tcExtendTyVarEnv3 :: [(TyVar,TcType)] -> TcM r -> TcM r
-tcExtendTyVarEnv3 ty_pairs thing_inside
+tcExtendTyVarEnv2 :: [(TyVar,TcType)] -> TcM r -> TcM r
+tcExtendTyVarEnv2 ty_pairs thing_inside
   = tc_extend_tv_env [ATyVar tv1 ty2 | (tv1,ty2) <- ty_pairs] thing_inside
 
 tc_extend_tv_env binds thing_inside
