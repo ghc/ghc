@@ -1,0 +1,11 @@
+
+rnfail026.hs:16:
+    Couldn't match `* -> *' against `*'
+	Expected kind: (* -> *) -> *
+	Inferred kind: * -> *
+    When checking kinds in `Monad (forall a. (Eq a) => Set a)'
+    In the instance declaration for `Monad (forall a. (Eq a) => Set a)'
+
+rnfail026.hs:19:
+    Illegal polymorphic type: forall a. [a]
+    In the instance declaration for `Eq (forall a. [a])'
