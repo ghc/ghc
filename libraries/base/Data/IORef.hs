@@ -20,6 +20,7 @@ module Data.IORef
         readIORef,	      -- :: IORef a -> IO a
         writeIORef,	      -- :: IORef a -> a -> IO ()
 	modifyIORef,	      -- :: IORef a -> (a -> a) -> IO ()
+	atomicModifyIORef,    -- :: IORef a -> (a -> (a,b)) -> IO ()
 
 #if !defined(__PARALLEL_HASKELL__) && defined(__GLASGOW_HASKELL__)
 	mkWeakIORef,          -- :: IORef a -> IO () -> IO (Weak (IORef a))
@@ -33,7 +34,7 @@ import Hugs.IORef
 #endif
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Base		( mkWeak# )
+import GHC.Base		( mkWeak#, atomicModifyMutVar# )
 import GHC.STRef
 import GHC.IOBase
 #if !defined(__PARALLEL_HASKELL__)
@@ -64,6 +65,19 @@ mkWeakIORef r@(IORef (STRef r#)) f = IO $ \s ->
 -- |Mutate the contents of an 'IORef'
 modifyIORef :: IORef a -> (a -> a) -> IO ()
 modifyIORef ref f = writeIORef ref . f =<< readIORef ref
+
+-- |Atomically modifies the contents of an 'IORef'.
+--
+-- This function is useful for using 'IORef' in a safe way in a multithreaded
+-- program.  If you only have one 'IORef', then using 'atomicModifyIORef' to
+-- access and modify it will prevent race conditions.
+--
+-- Extending the atomicity to multiple 'IORef's is problematic, so it
+-- is recommended that if you need to do anything more complicated
+-- then using 'MVar' instead is a good idea.
+--
+atomicModifyIORef :: IORef a -> (a -> (a,b)) -> IO b
+atomicModifyIORef (IORef (STRef r#)) f = IO $ \s -> atomicModifyMutVar# r# f s
 
 #ifndef __NHC__
 #include "Dynamic.h"
