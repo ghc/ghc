@@ -3770,6 +3770,7 @@ foo% make install
 
 	    <listitem>
 <screen>
+$ cd <replaceable>T</replaceable>
 $ ./configure --enable-hc-boot --enable-hc-boot-unregisterised
 </screen>
 
