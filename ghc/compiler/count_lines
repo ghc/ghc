@@ -38,7 +38,7 @@ foreach $f ( @ARGV ) {
     } else {
 	print STDERR "not counted in a directory: $f\n";
 	$ModCount{$f} += $cnt;
-	$ModComments{$mod} += $comments;
+	$ModComments{$f} += $comments;
     }
 }
 
