@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.75 2002/04/19 10:15:22 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.76 2002/04/19 10:22:58 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -677,11 +677,10 @@ NON_ENTERABLE_ENTRY_CODE(EVACUATED);
 INFO_TABLE(stg_WEAK_info,stg_WEAK_entry,0,4,WEAK,,EF_,"WEAK","WEAK");
 NON_ENTERABLE_ENTRY_CODE(WEAK);
 
-// XXX! The garbage collector replaces a WEAK with a DEAD_WEAK
-// in-place, which causes problems if the heap is scanned linearly
-// after GC (certain kinds of profiling do this).  So when profiling,
-// we set the size of a DEAD_WEAK to 4 non-pointers, rather than its
-// usual 1.
+// It's important when turning an existing WEAK into a DEAD_WEAK
+// (which is what finalizeWeak# does) that we don't lose the link
+// field and break the linked list of weak pointers.  Hence, we give
+// DEAD_WEAK 4 non-pointer fields, the same as WEAK.
 
 INFO_TABLE_CONSTR(stg_DEAD_WEAK_info,stg_DEAD_WEAK_entry,0,4,0,CONSTR,,EF_,"DEAD_WEAK","DEAD_WEAK");
 NON_ENTERABLE_ENTRY_CODE(DEAD_WEAK);
