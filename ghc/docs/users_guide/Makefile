@@ -6,6 +6,7 @@ install :: html dvi info
 endif
 
 SGML_DOC = users_guide
+INSTALL_SGML_DOC = users_guide
 
 # Generating index is semi-automatic, you need to:
 # 
