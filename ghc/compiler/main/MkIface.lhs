@@ -487,7 +487,7 @@ pprIface iface
 
 	, pprFixities (mi_fixities iface) (dcl_tycl decls)
 	, pprIfaceDecls (vers_decls version_info) decls
-	, pprDeprecs (mi_deprecs iface)
+	, pprRulesAndDeprecs (dcl_rules decls) (mi_deprecs iface)
 	]
   where
     version_info = mi_version iface
@@ -550,7 +550,6 @@ pprUsage (m, has_orphans, is_boot, whats_imported)
 pprIfaceDecls version_map decls
   = vcat [ vcat [ppr i <+> semi | i <- dcl_insts decls]
 	 , vcat (map ppr_decl (dcl_tycl decls))
-	 , pprRules (dcl_rules decls)
 	 ]
   where
     ppr_decl d  = ppr_vers d <+> ppr d <> semi
@@ -568,15 +567,21 @@ pprFixities fixity_map decls
 	   (n,_) <- tyClDeclNames d, 
 	   Just fix <- [lookupNameEnv fixity_map n]] <> semi
 
-pprRules []    = empty
-pprRules rules = hsep [ptext SLIT("{-## __R"), vcat (map ppr rules), ptext SLIT("##-}")]
+-- Disgusting to print these two together, but that's 
+-- the way the interface parser currently expects them.
+pprRulesAndDeprecs [] NoDeprecs = empty
+pprRules rules deprecs
+  = ptext SLIT("{-##") <+> (pp_rules rules $$ pp_deprecs deprecs) <+> ptext SLIT("##-}")
+  where
+    pp_rules []    = empty
+    pp_rules rules = ptext SLIT("__R") <+> vcat (map ppr rules)
 
-pprDeprecs NoDeprecs = empty
-pprDeprecs deprecs   = ptext SLIT("{-## __D") <+> guts <+> ptext SLIT("##-}")
-		     where
-		       guts = case deprecs of
-				DeprecAll txt  -> doubleQuotes (ptext txt)
-				DeprecSome env -> pp_deprecs env
+    ppr_deprecs NoDeprecs = empty
+    ppr_deprecs deprecs   = ptext SLIT("__D") <+> guts
+			  where
+			    guts = case deprecs of
+					DeprecAll txt  -> doubleQuotes (ptext txt)
+					DeprecSome env -> pp_deprecs env
 
 pp_deprecs env = vcat (punctuate semi (map pp_deprec (nameEnvElts env)))
 	       where
