@@ -67,7 +67,6 @@ import OccName		( mkClassTyConOcc, mkClassDataConOcc, mkWorkerOcc,
                           mkSuperDictSelOcc, mkDefaultMethodOcc, mkGenOcc1,
 			  mkGenOcc2, 
                       	)
-import PrelNames	( negate_RDR )
 import RdrName		( RdrName, isRdrTyVar, mkRdrUnqual, rdrNameOcc,
 			)
 import List		( nub )
@@ -270,9 +269,9 @@ mkHsNegApp (HsLit (HsIntPrim i))    = HsLit (HsIntPrim (-i))
 mkHsNegApp (HsLit (HsFloatPrim i))  = HsLit (HsFloatPrim (-i))  
 mkHsNegApp (HsLit (HsDoublePrim i)) = HsLit (HsDoublePrim (-i)) 
 
-mkHsNegApp (HsOverLit (HsIntegral   i n)) = HsOverLit (HsIntegral   (-i) n)
-mkHsNegApp (HsOverLit (HsFractional f n)) = HsOverLit (HsFractional (-f) n)
-mkHsNegApp expr 			  = NegApp expr negate_RDR
+mkHsNegApp (HsOverLit (HsIntegral   i)) = HsOverLit (HsIntegral   (-i))
+mkHsNegApp (HsOverLit (HsFractional f)) = HsOverLit (HsFractional (-f))
+mkHsNegApp expr 			= NegApp expr
 \end{code}
 
 A useful function for building @OpApps@.  The operator is always a
