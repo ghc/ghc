@@ -1,6 +1,6 @@
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
-SGML_DOC = building ffi-art
+SUBDIRS = building ffi-art docbook-cheat-sheet
 
 include $(TOP)/mk/target.mk
