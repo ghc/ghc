@@ -50,7 +50,7 @@ import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace,
 import Outputable
 import Maybes		( isNothing, catMaybes, mapCatMaybes, seqMaybe )
 import SrcLoc		( noSrcLoc, Located(..), mkGeneralSrcSpan,
-			  unLoc, noLoc, srcLocSpan, SrcSpan )
+			  unLoc, noLoc, srcLocSpan, combineSrcSpans, SrcSpan )
 import BasicTypes	( DeprecTxt )
 import ListSetOps	( removeDups )
 import Util		( sortLe, notNull, isSingleton )
@@ -1002,17 +1002,15 @@ exportClashErr global_env name1 name2 ie1 ie2
 	     []	     -> pprPanic "exportClashErr" (ppr name)
 
 addDupDeclErr :: [Name] -> TcRn ()
-addDupDeclErr (n:ns)
-  = addErrAt (srcLocSpan (nameSrcLoc n)) $
-    vcat [ptext SLIT("Multiple declarations of") <+> quotes (ppr n),
-	  nest 2 (ptext SLIT("other declarations at:")),
-	  nest 4 (vcat (map ppr sorted_locs))]
+addDupDeclErr names
+  = addErrAt big_loc $
+    vcat [ptext SLIT("Multiple declarations of") <+> quotes (ppr name1),
+	  ptext SLIT("Declared at:") <+> vcat (map ppr sorted_locs)]
   where
-    sorted_locs = sortLe occ'ed_before (map nameSrcLoc ns)
-    occ'ed_before a b = case compare a b of
-			  LT -> True
-			  EQ -> True
-			  GT -> False
+    locs    = map nameSrcLoc names
+    big_loc = foldr1 combineSrcSpans (map srcLocSpan locs)
+    name1   = head names
+    sorted_locs = sortLe (<=) (sortLe (<=) locs)
 
 dupExportWarn occ_name ie1 ie2
   = hsep [quotes (ppr occ_name), 

@@ -831,6 +831,7 @@ rnMDoStmts stmts
     in
     returnM stmts_w_fvs
   where
+
     doc = text "In a recursive mdo-expression"
 
 

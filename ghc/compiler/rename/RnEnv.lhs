@@ -56,6 +56,7 @@ import BasicTypes	( IPName, mapIPName )
 import SrcLoc		( SrcSpan, srcSpanStart, Located(..), eqLocated, unLoc,
 			  srcLocSpan, getLoc, combineSrcSpans, srcSpanStartLine, srcSpanEndLine )
 import Outputable
+import Util		( sortLe )
 import ListSetOps	( removeDups )
 import List		( nubBy )
 import CmdLineOpts
@@ -759,5 +760,6 @@ dupNamesErr descriptor located_names
     big_loc   = foldr1 combineSrcSpans locs
     one_line  = srcSpanStartLine big_loc == srcSpanEndLine big_loc
     locations | one_line  = empty 
-	      | otherwise = ptext SLIT("Bound at:") <+> vcat (map ppr locs)
+	      | otherwise = ptext SLIT("Bound at:") <+> 
+			    vcat (map ppr (sortLe (<=) locs))
 \end{code}
