@@ -280,14 +280,20 @@ installHandler int handler maybe_mask = do
 	(#const STG_SIG_IGN) -> return Ignore
 	(#const STG_SIG_ERR) -> throwErrno "installHandler"
 	(#const STG_SIG_HAN) -> do
-		osptr <- peek p_sp
-        	m     <- deRefStablePtr osptr
+        	m <- peekHandler p_sp
 		return (Catch m)
+	(#const STG_SIG_RST) -> do
+        	m <- peekHandler p_sp
+		return (CatchOnce m)
 
     install'' m p_sp mask int reset = do
       sptr <- newStablePtr m
       poke p_sp sptr
       stg_sig_install int reset p_sp mask
+
+    peekHandler p_sp = do
+      osptr <- peek p_sp
+      deRefStablePtr osptr
 
 foreign import ccall unsafe
   stg_sig_install :: CInt -> CInt -> Ptr (StablePtr (IO ())) -> Ptr CSigset
