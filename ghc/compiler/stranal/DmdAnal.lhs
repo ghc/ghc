@@ -387,7 +387,7 @@ dmdAnalRhs top_lvl sigs (id, rhs)
 				    -- The simplifier was run just beforehand
   (rhs_dmd_ty, rhs') = dmdAnal sigs (vanillaCall arity) rhs
   (lazy_fv, sig_ty)  = WARN( arity /= dmdTypeDepth rhs_dmd_ty, ppr id )
-		       mkSigTy id rhs rhs_dmd_ty
+		       mkSigTy top_lvl id rhs rhs_dmd_ty
   id'		     = id `setIdNewStrictness` sig_ty
   sigs'		     = extendSigEnv top_lvl sigs id sig_ty
 \end{code}
@@ -404,17 +404,23 @@ mkTopSigTy :: CoreExpr -> DmdType -> StrictSig
 	-- NB: not used for never-inline things; hence False
 mkTopSigTy rhs dmd_ty = snd (mk_sig_ty False False rhs dmd_ty)
 
-mkSigTy :: Id -> CoreExpr -> DmdType -> (DmdEnv, StrictSig)
-mkSigTy id rhs dmd_ty = mk_sig_ty (isNeverActive (idInlinePragma id))
-				  ok_to_keep_cpr_info
-				  rhs dmd_ty
+mkSigTy :: TopLevelFlag -> Id -> CoreExpr -> DmdType -> (DmdEnv, StrictSig)
+mkSigTy top_lvl id rhs dmd_ty 
+  = mk_sig_ty never_inline thunk_cpr_ok rhs dmd_ty
   where
-    ok_to_keep_cpr_info = case idNewDemandInfo_maybe id of
-			    Nothing  -> True	-- Is the case the first time round
-			    Just dmd -> isStrictDmd dmd
+    never_inline = isNeverActive (idInlinePragma id)
+    maybe_id_dmd = idNewDemandInfo_maybe id
+	-- Is Nothing the first time round
+
+    thunk_cpr_ok
+	| isTopLevel top_lvl       = False	-- Top level things don't get
+						-- their demandInfo set at all
+	| Just dmd <- maybe_id_dmd = isStrictDmd dmd
+	| otherwise 		   = True	-- Optimistic, first time round
+						-- See notes below
 \end{code}
 
-The ok_to_keep_cpr_info stuff [CPR-AND-STRICTNESS]
+The thunk_cpr_ok stuff [CPR-AND-STRICTNESS]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If the rhs is a thunk, we usually forget the CPR info, because
 it is presumably shared (else it would have been inlined, and 
@@ -455,7 +461,7 @@ have a CPR in it or not.  Simple solution:
 
 NB: strictly_demanded is never true of a top-level Id, or of a recursive Id.
 
-The Nothing case in ok_to_keep_cpr_info [CPR-AND-STRICTNESS]
+The Nothing case in thunk_cpr_ok [CPR-AND-STRICTNESS]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Demand info now has a 'Nothing' state, just like strictness info.
 The analysis works from 'dangerous' towards a 'safe' state; so we 
@@ -473,7 +479,7 @@ In the first iteration we'd have no demand info for x, so assume
 not-demanded; then we'd get TopRes for f's CPR info.  Next iteration
 we'd see that t was demanded, and so give it the CPR property, but
 by now f has TopRes, so it will stay TopRes.  
-
+ever_in
 Instead, with the Nothing setting the first time round, we say
 'yes t is demanded' the first time.  
 
@@ -484,7 +490,7 @@ by dmdAnalTopBind.
 
 
 \begin{code}
-mk_sig_ty never_inline ok_to_keep_cpr_info rhs (DmdType fv dmds res) 
+mk_sig_ty never_inline thunk_cpr_ok rhs (DmdType fv dmds res) 
   | never_inline && not (isBotRes res)
 	-- 			HACK ALERT
 	-- Don't strictness-analyse NOINLINE things.  Why not?  Because
@@ -555,7 +561,7 @@ mk_sig_ty never_inline ok_to_keep_cpr_info rhs (DmdType fv dmds res)
     res' = case res of
 		RetCPR | ignore_cpr_info -> TopRes
 		other	 		 -> res
-    ignore_cpr_info = not (exprIsValue rhs || ok_to_keep_cpr_info)
+    ignore_cpr_info = not (exprIsValue rhs || thunk_cpr_ok)
 \end{code}
 
 The unpack strategy determines whether we'll *really* unpack the argument,
