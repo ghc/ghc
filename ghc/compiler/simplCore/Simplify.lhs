@@ -20,8 +20,9 @@ import SimplUtils	( mkCase, tryRhsTyLam, tryEtaExpansion,
 			  contResultType, discardInline, countArgs, contIsDupable,
 			  getContArgs, interestingCallContext, interestingArg, isStrictType
 			)
-import Var		( mkSysTyVar, tyVarKind )
+import Var		( mkSysTyVar, tyVarKind, mustHaveLocalBinding )
 import VarEnv
+import Literal		( Literal )
 import Id		( Id, idType, idInfo, isDataConId, hasNoBinding,
 			  idUnfolding, setIdUnfolding, isExportedId, isDeadBinder,
 			  idDemandInfo, setIdInfo,
@@ -39,7 +40,6 @@ import DataCon		( dataConNumInstArgs, dataConRepStrictness,
 			)
 import CoreSyn
 import PprCore		( pprParendExpr, pprCoreExpr )
-import CoreFVs		( mustHaveLocalBinding )
 import CoreUnfold	( mkOtherCon, mkUnfolding, otherCons,
 			  callSiteInline
 			)
@@ -53,9 +53,9 @@ import Rules		( lookupRule )
 import CostCentre	( currentCCS )
 import Type		( mkTyVarTys, isUnLiftedType, seqType,
 			  mkFunTy, splitTyConApp_maybe, tyConAppArgs,
-			  funResultTy
+			  funResultTy, splitFunTy_maybe, splitFunTy
 			)
-import Subst		( mkSubst, substTy, substEnv,
+import Subst		( mkSubst, substTy, substEnv, substExpr,
 			  isInScope, lookupIdSubst, simplIdInfo
 			)
 import TyCon		( isDataTyCon, tyConDataConsIfAvailable	)
@@ -188,18 +188,19 @@ simplExprC expr cont = simplExprF expr cont	`thenSmpl` \ (floats, (_, body)) ->
 simplExprF :: InExpr -> SimplCont -> SimplM OutExprStuff
 	-- Simplify an expression, returning floated binds
 
-simplExprF (Var v) cont
-  = simplVar v cont
-
-simplExprF (Lit lit) (Select _ bndr alts se cont)
-  = knownCon (Lit lit) (LitAlt lit) [] bndr alts se cont
-
-simplExprF (Lit lit) cont
-  = rebuild (Lit lit) cont
+simplExprF (Var v)	    cont = simplVar v cont
+simplExprF (Lit lit)	    cont = simplLit lit cont
+simplExprF expr@(Lam _ _)   cont = simplLam expr cont
+simplExprF (Note note expr) cont = simplNote note expr cont
 
 simplExprF (App fun arg) cont
   = getSubstEnv		`thenSmpl` \ se ->
     simplExprF fun (ApplyTo NoDup arg se cont)
+
+simplExprF (Type ty) cont
+  = ASSERT( case cont of { Stop _ _ -> True; ArgOf _ _ _ -> True; other -> False } )
+    simplType ty	`thenSmpl` \ ty' ->
+    rebuild (Type ty') cont
 
 simplExprF (Case scrut bndr alts) cont
   = getSubstEnv			`thenSmpl` \ subst_env ->
@@ -215,7 +216,6 @@ simplExprF (Case scrut bndr alts) cont
 				 (mkStop (contResultType cont)))	`thenSmpl` \ case_expr' ->
 	rebuild case_expr' cont
 
-
 simplExprF (Let (Rec pairs) body) cont
   = simplRecIds (map fst pairs) 		$ \ bndrs' -> 
 	-- NB: bndrs' don't have unfoldings or spec-envs
@@ -223,95 +223,38 @@ simplExprF (Let (Rec pairs) body) cont
 
     simplRecBind False pairs bndrs' (simplExprF body cont)
 
-simplExprF expr@(Lam _ _) cont = simplLam expr cont
-
-simplExprF (Type ty) cont
-  = ASSERT( case cont of { Stop _ _ -> True; ArgOf _ _ _ -> True; other -> False } )
-    simplType ty	`thenSmpl` \ ty' ->
-    rebuild (Type ty') cont
-
--- Comments about the Coerce case
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- It's worth checking for a coerce in the continuation,
--- in case we can cancel them.  For example, in the initial form of a worker
--- we may find 	(coerce T (coerce S (\x.e))) y
--- and we'd like it to simplify to e[y/x] in one round of simplification
-
-simplExprF (Note (Coerce to from) e) (CoerceIt outer_to cont)
-  = simplType from		`thenSmpl` \ from' ->
-    if outer_to == from' then
-	-- The coerces cancel out
-	simplExprF e cont
-    else
-	-- They don't cancel, but the inner one is redundant
-	simplExprF e (CoerceIt outer_to cont)
-
-simplExprF (Note (Coerce to from) e) cont
-  = simplType to		`thenSmpl` \ to' ->
-    simplExprF e (CoerceIt to' cont)
-
--- hack: we only distinguish subsumed cost centre stacks for the purposes of
--- inlining.  All other CCCSs are mapped to currentCCS.
-simplExprF (Note (SCC cc) e) cont
-  = setEnclosingCC currentCCS $
-    simplExpr e 	`thenSmpl` \ e ->
-    rebuild (mkSCC cc e) cont
-
-simplExprF (Note InlineCall e) cont
-  = simplExprF e (InlinePlease cont)
-
---	 Comments about the InlineMe case 
---	 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Don't inline in the RHS of something that has an
--- inline pragma.  But be careful that the InScopeEnv that
--- we return does still have inlinings on!
--- 
--- It really is important to switch off inlinings.  This function
--- may be inlinined in other modules, so we don't want to remove
--- (by inlining) calls to functions that have specialisations, or
--- that may have transformation rules in an importing scope.
--- E.g. 	{-# INLINE f #-}
--- 		f x = ...g...
--- and suppose that g is strict *and* has specialisations.
--- If we inline g's wrapper, we deny f the chance of getting
--- the specialised version of g when f is inlined at some call site
--- (perhaps in some other module).
-
--- It's also important not to inline a worker back into a wrapper.
--- A wrapper looks like
---	wraper = inline_me (\x -> ...worker... )
--- Normally, the inline_me prevents the worker getting inlined into
--- the wrapper (initially, the worker's only call site!).  But,
--- if the wrapper is sure to be called, the strictness analyser will
--- mark it 'demanded', so when the RHS is simplified, it'll get an ArgOf
--- continuation.  That's why the keep_inline predicate returns True for
--- ArgOf continuations.  It shouldn't do any harm not to dissolve the
--- inline-me note under these circumstances
-
-simplExprF (Note InlineMe e) cont
-  | keep_inline cont		-- Totally boring continuation
-  =				-- Don't inline inside an INLINE expression
-    setBlackList noInlineBlackList (simplExpr e)	`thenSmpl` \ e' ->
-    rebuild (mkInlineMe e') cont
-
-  | otherwise  	-- Dissolve the InlineMe note if there's
-		-- an interesting context of any kind to combine with
-		-- (even a type application -- anything except Stop)
-  = simplExprF e cont
-  where
-    keep_inline (Stop _ _)    = True		-- See notes above
-    keep_inline (ArgOf _ _ _) = True		-- about this predicate
-    keep_inline other	      = False
-
 -- A non-recursive let is dealt with by simplNonRecBind
 simplExprF (Let (NonRec bndr rhs) body) cont
   = getSubstEnv			`thenSmpl` \ se ->
     simplNonRecBind bndr rhs se (contResultType cont)	$
     simplExprF body cont
-\end{code}
 
 
 ---------------------------------
+simplType :: InType -> SimplM OutType
+simplType ty
+  = getSubst	`thenSmpl` \ subst ->
+    let
+	new_ty = substTy subst ty
+    in
+    seqType new_ty `seq`  
+    returnSmpl new_ty
+
+---------------------------------
+simplLit :: Literal -> SimplCont -> SimplM OutExprStuff
+
+simplLit lit (Select _ bndr alts se cont)
+  = knownCon (Lit lit) (LitAlt lit) [] bndr alts se cont
+
+simplLit lit cont = rebuild (Lit lit) cont
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Lambdas}
+%*									*
+%************************************************************************
 
 \begin{code}
 simplLam fun cont
@@ -397,16 +340,107 @@ mkLamBndrZapper fun cont
 \end{code}
 
 
----------------------------------
+%************************************************************************
+%*									*
+\subsection{Notes}
+%*									*
+%************************************************************************
+
 \begin{code}
-simplType :: InType -> SimplM OutType
-simplType ty
-  = getSubst	`thenSmpl` \ subst ->
+simplNote (Coerce to from) body cont
+  = getInScope			`thenSmpl` \ in_scope ->
     let
-	new_ty = substTy subst ty
+	addCoerce s1 k1 (CoerceIt t1 cont)
+		-- 	coerce T1 S1 (coerce S1 K1 e)
+		-- ==>
+		--	e, 			if T1=K1
+		--	coerce T1 K1 e,		otherwise
+		--
+		-- For example, in the initial form of a worker
+		-- we may find 	(coerce T (coerce S (\x.e))) y
+		-- and we'd like it to simplify to e[y/x] in one round 
+		-- of simplification
+	  | t1 == k1  = cont		 	-- The coerces cancel out
+	  | otherwise = CoerceIt t1 cont	-- They don't cancel, but 
+						-- the inner one is redundant
+
+	addCoerce t1t2 s1s2 (ApplyTo dup arg arg_se cont)
+	  | Just (s1, s2) <- splitFunTy_maybe s1s2
+		--	(coerce (T1->T2) (S1->S2) F) E
+		-- ===> 
+		--	coerce T2 S2 (F (coerce S1 T1 E))
+		--
+		-- t1t2 must be a function type, T1->T2
+		-- but s1s2 might conceivably not be
+		--
+		-- When we build the ApplyTo we can't mix the out-types
+		-- with the InExpr in the argument, so we simply substitute
+		-- to make it all consistent.  This isn't a common case.
+	  = let 
+		(t1,t2) = splitFunTy t1t2
+		new_arg = mkCoerce s1 t1 (substExpr (mkSubst in_scope arg_se) arg)
+	    in
+	    ApplyTo dup new_arg emptySubstEnv (addCoerce t2 s2 cont)
+			
+	addCoerce to' _ cont = CoerceIt to' cont
     in
-    seqType new_ty `seq`  
-    returnSmpl new_ty
+    simplType to		`thenSmpl` \ to' ->
+    simplType from		`thenSmpl` \ from' ->
+    simplExprF body (addCoerce to' from' cont)
+
+		
+-- Hack: we only distinguish subsumed cost centre stacks for the purposes of
+-- inlining.  All other CCCSs are mapped to currentCCS.
+simplNote (SCC cc) e cont
+  = setEnclosingCC currentCCS $
+    simplExpr e 	`thenSmpl` \ e ->
+    rebuild (mkSCC cc e) cont
+
+simplNote InlineCall e cont
+  = simplExprF e (InlinePlease cont)
+
+--	 Comments about the InlineMe case 
+--	 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Don't inline in the RHS of something that has an
+-- inline pragma.  But be careful that the InScopeEnv that
+-- we return does still have inlinings on!
+-- 
+-- It really is important to switch off inlinings.  This function
+-- may be inlinined in other modules, so we don't want to remove
+-- (by inlining) calls to functions that have specialisations, or
+-- that may have transformation rules in an importing scope.
+-- E.g. 	{-# INLINE f #-}
+-- 		f x = ...g...
+-- and suppose that g is strict *and* has specialisations.
+-- If we inline g's wrapper, we deny f the chance of getting
+-- the specialised version of g when f is inlined at some call site
+-- (perhaps in some other module).
+
+-- It's also important not to inline a worker back into a wrapper.
+-- A wrapper looks like
+--	wraper = inline_me (\x -> ...worker... )
+-- Normally, the inline_me prevents the worker getting inlined into
+-- the wrapper (initially, the worker's only call site!).  But,
+-- if the wrapper is sure to be called, the strictness analyser will
+-- mark it 'demanded', so when the RHS is simplified, it'll get an ArgOf
+-- continuation.  That's why the keep_inline predicate returns True for
+-- ArgOf continuations.  It shouldn't do any harm not to dissolve the
+-- inline-me note under these circumstances
+
+simplNote InlineMe e cont
+  | keep_inline cont		-- Totally boring continuation
+  =				-- Don't inline inside an INLINE expression
+    setBlackList noInlineBlackList (simplExpr e)	`thenSmpl` \ e' ->
+    rebuild (mkInlineMe e') cont
+
+  | otherwise  	-- Dissolve the InlineMe note if there's
+		-- an interesting context of any kind to combine with
+		-- (even a type application -- anything except Stop)
+  = simplExprF e cont
+  where
+    keep_inline (Stop _ _)    = True		-- See notes above
+    keep_inline (ArgOf _ _ _) = True		-- about this predicate
+    keep_inline other	      = False
 \end{code}
 
 
