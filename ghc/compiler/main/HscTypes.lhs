@@ -150,24 +150,8 @@ mkIfaceDecls tycls rules insts
 		 dcl_rules = sortLt lt_rule rules,
 		 dcl_insts = insts }
   where
-    d1 `lt_tycl` d2 = nameOccName (tyClDeclName      d1) < nameOccName (tyClDeclName      d2)
-    r1 `lt_rule` r2 = nameOccName (ifaceRuleDeclName r1) < nameOccName (ifaceRuleDeclName r2)
-
-	-- I wanted to sort just by the Name, but there's a problem: we are comparing
-	-- the old version of an interface with the new version.  The latter will use
-	-- local names like 'lvl23' that were constructed not by the renamer but by
-	-- the simplifier.  So the unqiues aren't going to line up.
-	--
-	-- It's ok to compare by OccName because this comparison only drives the
-	-- computation of new version numbers.
-	--
-	-- Better solutions: 	Compare in a way that is insensitive to the name used
-	--			for local things.  This would decrease the wobbles due
-	--			to 'lvl23' changing to 'lvl24'.
-	--
-	-- NB: there's a related comparision on MkIface.diffDecls!  
-
-
+    d1 `lt_tycl` d2 = tyClDeclName      d1 < tyClDeclName      d2
+    r1 `lt_rule` r2 = ifaceRuleDeclName r1 < ifaceRuleDeclName r2
 
 
 -- typechecker should only look at this, not ModIface

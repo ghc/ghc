@@ -195,8 +195,8 @@ importsFromLocalDecls this_mod decls
 	unqual_imp = True	-- Want unqualified names
 	mk_prov n  = LocalDef	-- Provenance is local
 	hides	   = []		-- Hide nothing
-	gbl_env    = mkGlobalRdrEnv mod_name unqual_imp [] mk_prov avails
-	exports    = mkExportAvails mod_name unqual_imp gbl_env    avails
+	gbl_env    = mkGlobalRdrEnv mod_name unqual_imp hides mk_prov avails
+	exports    = mkExportAvails mod_name unqual_imp gbl_env       avails
     in
     returnRn (gbl_env, exports)
 

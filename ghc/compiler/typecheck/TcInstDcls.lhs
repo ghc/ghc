@@ -33,7 +33,7 @@ import TcEnv		( TcEnv, tcExtendGlobalValEnv,
  			  InstInfo(..), pprInstInfo, simpleInstInfoTyCon, simpleInstInfoTy, 
 			  newDFunName, tcExtendTyVarEnv
 			)
-import InstEnv		( InstEnv, extendInstEnv, pprInstEnv )
+import InstEnv		( InstEnv, extendInstEnv )
 import TcMonoType	( tcTyVars, tcHsSigType, kcHsSigType )
 import TcSimplify	( tcSimplifyAndCheck )
 import TcType		( zonkTcSigTyVars )

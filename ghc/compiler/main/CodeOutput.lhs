@@ -22,6 +22,7 @@ import qualified PrintJava
 import TyCon		( TyCon )
 import Id		( Id )
 import CoreSyn		( CoreBind )
+import OccurAnal	( occurAnalyseBinds )
 import StgSyn		( StgBinding )
 import AbsCSyn		( AbstractC )
 import PprAbsC		( dumpRealC, writeRealC )
@@ -135,7 +136,9 @@ outputJava dflags filenm mod tycons core_binds
   = doOutput filenm (\ f -> printForUser f alwaysQualify pp_java)
 	-- User style printing for now to keep indentation
   where
-    java_code = javaGen mod [{- Should be imports-}] tycons core_binds
+    occ_anal_binds = occurAnalyseBinds core_binds
+	-- Make sure we have up to date dead-var information
+    java_code = javaGen mod [{- Should be imports-}] tycons occ_anal_binds
     pp_java   = PrintJava.compilationUnit java_code
 \end{code}
 

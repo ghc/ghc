@@ -21,7 +21,7 @@ import IdInfo		( ArityInfo(..), OccInfo(..) )
 import PrimOp		( PrimOp(..), ccallMayGC )
 import TysWiredIn       ( isForeignObjTy )
 import Maybes		( maybeToBool, orElse )
-import Name		( isLocalName, getOccName )
+import Name		( getOccName )
 import OccName		( occNameUserString )
 import BasicTypes       ( Arity )
 import Outputable

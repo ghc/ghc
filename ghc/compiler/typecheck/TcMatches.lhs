@@ -284,7 +284,7 @@ tcStmts :: StmtCtxt
         -> TcM (([TcStmt], [(Name, TcId)]), LIE)
 
 tcStmts do_or_lc m elt_ty loc (ParStmtOut bndrstmtss : stmts)
-  = let (bndrss, stmtss) = unzip bndrstmtss in
+  = let stmtss = map snd bndrstmtss in
     mapAndUnzip3Tc (tcParStep loc) stmtss	`thenTc` \ (stmtss', val_envs, lies) ->
     let outstmts = zip (map (map snd) val_envs) stmtss'
 	lie = plusLIEs lies

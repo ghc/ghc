@@ -32,7 +32,7 @@ import Var	( TyVar )
 import VarEnv
 import VarSet
 
-import Name	( Name, tcName )
+import Name	( Name )
 import TyCon	( TyCon, KindCon, mkFunTyCon, mkKindCon, mkSuperKindCon )
 import Class	( Class )
 

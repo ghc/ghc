@@ -69,8 +69,6 @@ within one @MonoBinds@, so that unique-Int plumbing is done explicitly
 
 \begin{code}
 type VertexTag	= Int
-type Cycle	= [VertexTag]
-type Edge	= (VertexTag, VertexTag)
 \end{code}
 
 %************************************************************************

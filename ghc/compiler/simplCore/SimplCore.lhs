@@ -105,8 +105,8 @@ simplifyExpr dflags pcs hst expr
 
 	; us <-  mkSplitUniqSupply 's'
 
-	; let (expr', counts) = initSmpl dflags sw_chkr us emptyVarSet black_list_all 	
-		                         (simplExpr expr)
+	; let (expr', _counts) = initSmpl dflags sw_chkr us emptyVarSet black_list_all 	
+		                          (simplExpr expr)
 
 	; dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplfied expression"
 			(pprCoreExpr expr')

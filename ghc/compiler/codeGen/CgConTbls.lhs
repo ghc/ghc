@@ -13,7 +13,6 @@ import CgMonad
 
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts )
 import CgTailCall	( performReturn, mkStaticAlgReturnCode )
-import CLabel		( mkConEntryLabel )
 import ClosureInfo	( layOutStaticClosure, layOutDynCon,
 			  mkConLFInfo, ClosureInfo
 			)

@@ -136,7 +136,7 @@ deListComp (ParStmtOut bndrstmtss : quals) list
     in
     newSysLocalDs zipTy		`thenDs` \ zipFn ->
     let target = mkConsExpr retTy (mkTupleExpr as) (foldl App (Var zipFn) (map Var as's))
-	zipExp = mkLet zipFn (zip4 (map fst bndrstmtss) ass as as's) exps target
+	zipExp = mkLet zipFn (zip4 bndrss ass as as's) exps target
     in
     deBindComp pat zipExp quals list
   where (bndrss, stmtss) = unzip bndrstmtss

@@ -111,7 +111,6 @@ at @Level 0 0@.
 
 \begin{code}
 type LevelledExpr  = TaggedExpr Level
-type LevelledArg   = TaggedArg	Level
 type LevelledBind  = TaggedBind Level
 
 tOP_LEVEL = Level 0 0

@@ -502,7 +502,7 @@ mkWWcpr body_ty ReturnsCPR
 		\ body     -> Case body     work_wild [(DataAlt data_con,    args, ubx_tup_app)],
 		ubx_tup_ty)
     where
-      (tycon, tycon_arg_tys, data_con, con_arg_tys) = splitProductType "mkWWcpr" body_ty
+      (_, tycon_arg_tys, data_con, con_arg_tys) = splitProductType "mkWWcpr" body_ty
       n_con_args  = length con_arg_tys
       con_arg_ty1 = head con_arg_tys
 \end{code}

@@ -20,7 +20,7 @@ import OrdList		( OrdList, nilOL, isNilOL, unitOL, appOL, toOL,
 			  snocOL, consOL, concatOL )
 import AbsCUtils	( magicIdPrimRep )
 import CallConv		( CallConv )
-import CLabel		( isAsmTemp, CLabel, pprCLabel_asm, labelDynamic )
+import CLabel		( isAsmTemp, CLabel, labelDynamic )
 import Maybes		( maybeToBool, expectJust )
 import PrimRep		( isFloatingRep, PrimRep(..) )
 import PrimOp		( PrimOp(..) )
@@ -28,7 +28,7 @@ import CallConv		( cCallConv )
 import Stix		( getNatLabelNCG, StixTree(..),
 			  StixReg(..), CodeSegment(..), 
                           DestInfo, hasDestInfo,
-                          pprStixTree, ppStixReg,
+                          pprStixTree, 
                           NatM, thenNat, returnNat, mapNat, 
                           mapAndUnzipNat, mapAccumLNat,
                           getDeltaNat, setDeltaNat
@@ -2203,7 +2203,6 @@ genCondJump lbl bool
     let
     	code   = condCode condition
     	cond   = condName condition
-	target = ImmCLbl lbl
     in
     returnNat (code `snocOL` JXX cond lbl)
 

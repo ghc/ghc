@@ -562,7 +562,7 @@ rnStmt :: RnExprTy -> RdrNameStmt
 
 rnStmt rn_expr (ParStmt stmtss) thing_inside
   = mapFvRn (rnStmts rn_expr) stmtss	`thenRn` \ (bndrstmtss, fv_stmtss) ->
-    let (binderss, stmtss') = unzip bndrstmtss
+    let binderss = map fst bndrstmtss
 	checkBndrs all_bndrs bndrs
 	  = checkRn (null (intersectBy eqOcc all_bndrs bndrs)) err `thenRn_`
 	    returnRn (bndrs ++ all_bndrs)

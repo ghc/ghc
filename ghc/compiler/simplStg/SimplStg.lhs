@@ -24,8 +24,8 @@ import CmdLineOpts	( DynFlags, DynFlag(..), dopt,
 			)
 import Id		( Id )
 import Module		( Module )
-import ErrUtils		( doIfSet_dyn, dumpIfSet_dyn )
-import UniqSupply	( splitUniqSupply, UniqSupply )
+import ErrUtils		( doIfSet_dyn, dumpIfSet_dyn, showPass )
+import UniqSupply	( mkSplitUniqSupply, splitUniqSupply, UniqSupply )
 import IO		( hPutStr, stdout )
 import Outputable
 \end{code}
@@ -42,19 +42,20 @@ stg2stg :: DynFlags		-- includes spec of what stg-to-stg passes to do
 	      [CostCentreStack]))  -- pre-defined "singleton" cost centre stacks
 
 stg2stg dflags module_name us binds
-  = case (splitUniqSupply us)	of { (us4now, us4later) ->
+  = do	{ showPass dflags "Stg2Stg"
+	; us <- mkSplitUniqSupply 'g'
 
-    doIfSet_dyn dflags Opt_D_verbose_stg2stg (printDump (text "VERBOSE STG-TO-STG:")) >>
+	; doIfSet_dyn dflags Opt_D_verbose_stg2stg 
+		      (printDump (text "VERBOSE STG-TO-STG:"))
 
-    end_pass us4now "Core2Stg" ([],[],[]) binds
-		>>= \ (binds', us, ccs) ->
+	; (binds', us', ccs) <- end_pass us "Core2Stg" ([],[],[]) binds
 
-	-- Do the main business!
-    foldl_mn do_stg_pass (binds', us, ccs) (dopt_StgToDo dflags)
-		>>= \ (processed_binds, _, cost_centres) ->
+		-- Do the main business!
+	; (processed_binds, _, cost_centres) 
+		<- foldl_mn do_stg_pass (binds', us', ccs)
+			    (dopt_StgToDo dflags)
 
-	-- 	Do essential wind-up
-
+		-- Do essential wind-up
 	-- Essential wind-up: part (b), do setStgVarInfo. It has to
 	-- happen regardless, because the code generator uses its
 	-- decorations.
@@ -66,15 +67,13 @@ stg2stg dflags module_name us binds
 	-- correct, which is done by satStgRhs.
 	--
 
-    let
-	annotated_binds = setStgVarInfo opt_StgDoLetNoEscapes processed_binds
-	srt_binds       = computeSRTs annotated_binds
-    in
+	; let annotated_binds = setStgVarInfo opt_StgDoLetNoEscapes processed_binds
+	      srt_binds       = computeSRTs annotated_binds
 
-    dumpIfSet_dyn dflags Opt_D_dump_stg "STG syntax:" 
-	      (pprStgBindingsWithSRTs srt_binds)	>>
+	; dumpIfSet_dyn dflags Opt_D_dump_stg "STG syntax:" 
+	     		(pprStgBindingsWithSRTs srt_binds)
 
-    return (srt_binds, cost_centres)
+	; return (srt_binds, cost_centres)
    }
 
   where

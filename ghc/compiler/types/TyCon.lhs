@@ -387,7 +387,9 @@ isRecursiveTyCon other				      = False
 
 \begin{code}
 tyConDataCons :: TyCon -> [DataCon]
-tyConDataCons tycon = ASSERT2( not (null cons), ppr tycon ) cons
+tyConDataCons tycon = ASSERT2( not (null cons), ppr tycon ) 
+		      ASSERT2( length cons == tyConFamilySize tycon, ppr tycon )
+		      cons
 		    where
 		      cons = tyConDataConsIfAvailable tycon
 

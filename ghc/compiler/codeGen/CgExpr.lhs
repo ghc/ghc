@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.39 2000/11/15 17:07:34 simonpj Exp $
+% $Id: CgExpr.lhs,v 1.40 2000/11/24 09:51:38 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -39,12 +39,11 @@ import ClosureInfo	( mkClosureLFInfo, mkSelectorLFInfo,
 import CostCentre	( sccAbleCostCentre, isSccCountCostCentre )
 import Id		( idPrimRep, idType, Id )
 import VarSet
-import DataCon		( dataConTyCon )
 import PrimOp		( primOpOutOfLine, getPrimOpResultInfo, PrimOp(..), PrimOpResultInfo(..) )
 import PrimRep		( PrimRep(..), isFollowableRep )
 import TyCon		( maybeTyConSingleCon,
 			  isUnboxedTupleTyCon, isEnumerationTyCon )
-import Type		( Type, typePrimRep, splitTyConApp, tyConAppTyCon, repType )
+import Type		( Type, typePrimRep, tyConAppArgs, tyConAppTyCon, repType )
 import Maybes		( maybeToBool )
 import ListSetOps	( assocMaybe )
 import Unique		( mkBuiltinUnique )
@@ -462,10 +461,10 @@ primRetUnboxedTuple op args res_ty
       allocate some temporaries for the return values.
     -}
     let
-      (tc,ty_args) = splitTyConApp (repType res_ty)
-      prim_reps    = map typePrimRep ty_args
-      temp_uniqs   = map mkBuiltinUnique [ n_args .. n_args + length ty_args - 1]
-      temp_amodes  = zipWith CTemp temp_uniqs prim_reps
+      ty_args     = tyConAppArgs (repType res_ty)
+      prim_reps   = map typePrimRep ty_args
+      temp_uniqs  = map mkBuiltinUnique [ n_args .. n_args + length ty_args - 1]
+      temp_amodes = zipWith CTemp temp_uniqs prim_reps
     in
     returnUnboxedTuple temp_amodes (absC (COpStmt temp_amodes op arg_temps []))
 \end{code}

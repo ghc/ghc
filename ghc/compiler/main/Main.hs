@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.32 2000/11/22 17:51:16 simonmar Exp $
+-- $Id: Main.hs,v 1.33 2000/11/24 09:51:39 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -15,11 +15,14 @@ module Main (main) where
 
 #include "HsVersions.h"
 
-import CompManager
-import Interpreter
+
 #ifdef GHCI
+import Interpreter
 import InteractiveUI
+import Dynamic
 #endif
+
+import CompManager
 import DriverPipeline
 import DriverState
 import DriverFlags
@@ -28,12 +31,13 @@ import DriverUtil
 import Panic
 import DriverPhases	( Phase(..) )
 import CmdLineOpts	( HscLang(..), DynFlags(..), v_Static_hsc_opts )
-import Module		( mkModuleName )
 import TmpFiles
 import Finder		( initFinder )
 import CmStaticInfo
 import Config
 import Util
+
+
 
 import Concurrent
 #ifndef mingw32_TARGET_OS
@@ -42,7 +46,6 @@ import Posix
 import Directory
 import IOExts
 import Exception
-import Dynamic
 
 import IO
 import Monad

@@ -256,11 +256,16 @@ isLocalId :: Id -> Bool
 -- True of Ids that are locally defined, but are not constants
 -- like data constructors, record selectors, and the like. 
 -- See comments with CoreFVs.isLocalVar
-isLocalId id = case idFlavour id of
-		 VanillaId    -> True
-		 ExportedId   -> True
-		 SpecPragmaId -> True
-		 other	      -> False
+isLocalId id 
+#ifdef DEBUG
+  | not (isId id) = pprTrace "isLocalid" (ppr id) False
+  | otherwise
+#endif
+  = case idFlavour id of
+	 VanillaId    -> True
+	 ExportedId   -> True
+	 SpecPragmaId -> True
+	 other	      -> False
 \end{code}
 
 

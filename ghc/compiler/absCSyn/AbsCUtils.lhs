@@ -111,7 +111,7 @@ mkAlgAltsCSwitch scrutinee tagged_alts deflt_absc
    -- it's ok to convert one of the alts into a default if we don't already have
    -- one, because this is an algebraic case and we're guaranteed that the tag 
    -- will match one of the branches.
-   ((tag,first_alt):rest) = tagged_alts
+   ((_,first_alt):rest) = tagged_alts
 
    -- Adjust the tags in the switch to start at zero.
    -- This is the convention used by primitive ops which return algebraic

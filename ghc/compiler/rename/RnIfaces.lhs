@@ -322,10 +322,6 @@ rnIfaceTyClDecl (mod, decl) = initIfaceRnMS mod (rnTyClDecl decl)	`thenRn` \ dec
 
 
 \begin{code}
-getSlurped
-  = getIfacesRn 	`thenRn` \ ifaces ->
-    returnRn (iSlurp ifaces)
-
 recordSlurp ifaces@(Ifaces { iDecls = (decls_map, n_slurped),
 			     iSlurp = slurped_names, 
 			     iVSlurp = (imp_mods, imp_names) })

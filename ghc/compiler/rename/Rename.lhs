@@ -38,7 +38,7 @@ import RnEnv		( availsToNameSet, availName, mkIfaceGlobalRdrEnv,
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
 			  moduleNameUserString, moduleName,
-			  moduleEnvElts, lookupModuleEnv
+			  moduleEnvElts
 			)
 import Name		( Name, NamedThing(..), getSrcLoc,
 			  nameIsLocalOrFrom, nameOccName, nameModule,

@@ -25,7 +25,6 @@ import DriverPipeline
 import GetImports
 import HscTypes		( HomeSymbolTable, HomeIfaceTable, 
 			  PersistentCompilerState, ModDetails(..) )
-import Type		( Type )
 import Name		( lookupNameEnv )
 import Module
 import PrelNames	( mainName )
@@ -48,6 +47,7 @@ import CmdLineOpts	( DynFlags(..) )
 import Interpreter	( HValue )
 import HscMain		( hscExpr, hscTypeExpr )
 import RdrName
+import Type		( Type )
 import PrelGHC		( unsafeCoerce# )
 #endif
 

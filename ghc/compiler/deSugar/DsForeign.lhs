@@ -29,8 +29,7 @@ import Name		( mkGlobalName, nameModule, nameOccName, getOccString,
 			  mkForeignExportOcc, isLocalName,
 			  NamedThing(..),
 			)
-import Type		( repType,
-			  splitTyConApp_maybe, tyConAppTyCon, splitFunTys, splitForAllTys,
+import Type		( splitTyConApp_maybe, tyConAppTyCon, splitFunTys, splitForAllTys,
 			  Type, mkFunTys, mkForAllTys, mkTyConApp,
 			  mkFunTy, splitAppTy, applyTy, funResultTy
 			)
