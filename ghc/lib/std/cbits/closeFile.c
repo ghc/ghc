@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: closeFile.c,v 1.4 1999/05/05 10:33:14 sof Exp $
+ * $Id: closeFile.c,v 1.5 1999/07/03 18:45:04 sof Exp $
  *
  * hClose Runtime Support
  */
@@ -9,7 +9,11 @@
 #include "Rts.h"
 #include "stgio.h"
 
-#ifdef HAVE_WINSOCK_H
+#if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__)
+#define USE_WINSOCK
+#endif
+
+#ifdef USE_WINSOCK
 #include <winsock.h>
 #endif
 
@@ -70,7 +74,7 @@ StgInt flush_buf;
       /* Regardless of success or otherwise, the fd field gets smashed. */
       while ( (rc = 
 	        (
-#ifdef HAVE_WINSOCK_H
+#ifdef USE_WINSOCK
 	          fo->flags & FILEOBJ_WINSOCK ?
 		  closesocket(fo->fd) :
                   close(fo->fd))) != 0 ) {

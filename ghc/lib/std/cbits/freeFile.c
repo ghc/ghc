@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: freeFile.c,v 1.4 1999/05/05 10:33:15 sof Exp $
+ * $Id: freeFile.c,v 1.5 1999/07/03 18:45:04 sof Exp $
  *
  * Giving up files
  */
@@ -10,7 +10,11 @@
 #include "stgio.h"
 #include "fileObject.h"
 
-#ifdef HAVE_WINSOCK_H
+#if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__)
+#define USE_WINSOCK
+#endif
+
+#ifdef USE_WINSOCK
 #include <winsock.h>
 #endif
 
@@ -68,10 +72,10 @@ StgForeignPtr ptr;
        flushFile(ptr);
     }
 
+#ifdef USE_WINSOCK
     if ( fo->flags & FILEOBJ_WINSOCK )
       /* Sigh - the cleanup call at the end will do this for us */
       return;
-#ifdef HAVE_WINSOCK_H
     rc = ( fo->flags & FILEOBJ_WINSOCK ? closesocket(fo->fd) : close(fo->fd) );
 #else
     rc = close(fo->fd);

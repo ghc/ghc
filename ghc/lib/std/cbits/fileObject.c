@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: fileObject.c,v 1.3 1999/05/05 10:33:14 sof Exp $
+ * $Id: fileObject.c,v 1.4 1999/07/03 18:45:04 sof Exp $
  *
  * hPutStr Runtime Support
  */
@@ -12,7 +12,11 @@
 
 #include <stdio.h>
 
-#ifdef HAVE_WINSOCK_H
+#if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__)
+#define USE_WINSOCK
+#endif
+
+#ifdef USE_WINSOCK
 #include <winsock.h>
 #endif
 
@@ -181,7 +185,7 @@ IOFileObject* fo;
 
   if ((count = 
          (
-#ifdef HAVE_WINSOCK_H
+#ifdef USE_WINSOCK
 	   fo->flags & FILEOBJ_WINSOCK ?
 	   recv(fo->fd, p, len, 0) :
 	   read(fo->fd, p, len))) <= 0 ) {

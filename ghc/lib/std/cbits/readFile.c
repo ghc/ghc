@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: readFile.c,v 1.5 1999/07/01 13:12:09 simonmar Exp $
+ * $Id: readFile.c,v 1.6 1999/07/03 18:45:04 sof Exp $
  *
  * hGetContents Runtime Support
  */
@@ -9,7 +9,11 @@
 #include "Rts.h"
 #include "stgio.h"
 
-#ifdef HAVE_WINSOCK_H
+#if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__)
+#define USE_WINSOCK
+#endif
+
+#ifdef USE_WINSOCK
 #include <winsock.h>
 #endif
 
@@ -78,7 +82,7 @@ StgForeignPtr ptr;
 
     while ((count =
 	     (
-#ifdef HAVE_WINSOCK_H
+#ifdef USE_WINSOCK
 	       fo->flags & FILEOBJ_WINSOCK ?
 	         recv(fd, fo->buf, fo->bufSize, 0) :
 	         read(fd, fo->buf, fo->bufSize))) <= 0 ) {
@@ -171,7 +175,7 @@ StgInt len;
 
     while ((count =
              (
-#ifdef HAVE_WINSOCK_H
+#ifdef USE_WINSOCK
 	       fo->flags & FILEOBJ_WINSOCK ?
 	         recv(fd, p, len, 0) :
 	         read(fd, p, len))) <= 0 ) {
@@ -318,7 +322,7 @@ StgForeignPtr ptr;
 
     while ( (count = 
 	       (
-#ifdef HAVE_WINSOCK_H
+#ifdef USE_WINSOCK
 	         fo->flags & FILEOBJ_WINSOCK ?
 		 recv(fo->fd, &c, 1, 0) :
 		 read(fo->fd, &c, 1))) <= 0 ) {

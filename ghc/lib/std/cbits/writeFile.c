@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: writeFile.c,v 1.4 1999/05/05 10:33:17 sof Exp $
+ * $Id: writeFile.c,v 1.5 1999/07/03 18:45:04 sof Exp $
  *
  * hPutStr Runtime Support
  */
@@ -9,7 +9,11 @@
 #include "Rts.h"
 #include "stgio.h"
 
-#ifdef HAVE_WINSOCK_H
+#if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__)
+#define USE_WINSOCK
+#endif
+
+#ifdef USE_WINSOCK
 #include <winsock.h>
 #endif
 
@@ -54,7 +58,7 @@ StgInt bytes;
 
     while ((count = 
 	       (
-#ifdef HAVE_WINSOCK_H
+#ifdef USE_WINSOCK
 	         fo->flags & FILEOBJ_WINSOCK ?
 		 send(fo->fd, fo->buf, bytes, 0) :
 		 write(fo->fd, fo->buf, bytes))) < bytes) {
@@ -123,7 +127,7 @@ StgInt  len;
     /* Disallow short writes */
     while ((count = 
                (
-#ifdef HAVE_WINSOCK_H
+#ifdef USE_WINSOCK
 	         fo->flags & FILEOBJ_WINSOCK ?
 		 send(fo->fd,  (char*)buf, (int)len, 0) :
 		 write(fo->fd, (char*)buf, (int)len))) < len ) {
