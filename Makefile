@@ -324,13 +324,14 @@ DIST_CLEAN_FILES += config.cache config.status
 # make sure it gets built early on.
 #
 ifeq "$(HAPPY)" "$(FPTOOLS_TOP_ABS)/happy/src/happy-inplace"
-all :: $(FPTOOLS_TOP_ABS)/happy/src/happy-inplace
+build : $(FPTOOLS_TOP_ABS)/happy/src/happy-inplace
 
 $(FPTOOLS_TOP_ABS)/happy/src/happy-inplace : glafp-utils
 	$(MAKE) -C happy boot all
 endif
 
-all ::
+# Build all projects that we know about
+build :
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS); do \
 	   if [ -d $$i ]; then \
@@ -341,13 +342,9 @@ all ::
 	      fi; \
 	done
 
-boot ::
-	@echo "Please use \`make all' only from the top-level, or \`make boot' followed"
-	@echo "by \`make all' in an individual project subdirectory (ghc, hslibs etc.)."
+ifeq "$(findstring ghc, $(SUBDIRS))" "ghc"
 
-bootstrap : bootstrap2
-bootstrap2 : all stage2
-bootstrap3 : bootstrap2 stage3
+stage1 : build
 
 stage2 :
 	$(MAKE) -C ghc/compiler boot stage=2
@@ -357,11 +354,35 @@ stage3 :
 	$(MAKE) -C ghc/compiler boot stage=3
 	$(MAKE) -C ghc/compiler stage=3
 
+bootstrap  : bootstrap2
+bootstrap2 : stage1 stage2
+bootstrap3 : stage1 stage2 stage3
+
+all :: bootstrap
+
+# We want to install the stage 2 bootstrapped compiler by default, but we let
+# the user override this by saying 'make install stage=1', for example.
+ifeq "$(stage)" ""
+INSTALL_STAGE = stage=2
+endif
+
+else # Not building GHC
+
+all :: build
+
+INSTALL_STAGE =
+
+endif
+
+boot ::
+	@echo "Please use \`make all' only from the top-level, or \`make boot' followed"
+	@echo "by \`make all' in an individual project subdirectory (ghc, hslibs etc.)."
+
 install ::
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(filter-out $(ProjectsDontInstall), $(SUBDIRS)); do \
 	   if [ -d $$i ]; then \
-	      $(MAKE) -C $$i install; \
+	      $(MAKE) -C $$i $(INSTALL_STAGE) install; \
 	      if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
 	      fi; \
 	done
@@ -370,7 +391,7 @@ install-docs ::
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(filter-out $(ProjectsDontInstall), $(SUBDIRS)); do \
 	   if [ -d $$i ]; then \
-	      $(MAKE) -C $$i install-docs; \
+	      $(MAKE) -C $$i $(INSTALL_STAGE) install-docs; \
 	      if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
 	      fi; \
 	done
