@@ -44,6 +44,9 @@ module Foreign.Marshal.Array (
   withArray,      -- :: Storable a =>      [a] -> (Ptr a -> IO b) -> IO b
   withArray0,     -- :: Storable a => a -> [a] -> (Ptr a -> IO b) -> IO b
 
+  withArrayLen,   -- :: Storable a =>      [a] -> (Int -> Ptr a -> IO b) -> IO b
+  withArrayLen0,  -- :: Storable a => a -> [a] -> (Int -> Ptr a -> IO b) -> IO b
+
   -- ** Copying
 
   -- | (argument order: destination, source)
@@ -189,22 +192,33 @@ newArray0 marker vals  = do
 
 -- |Temporarily store a list of storable values in memory
 --
-withArray        :: Storable a => [a] -> (Ptr a -> IO b) -> IO b
-withArray vals f  =
+withArray :: Storable a => [a] -> (Ptr a -> IO b) -> IO b
+withArray vals = withArrayLen vals . const
+
+-- |Like 'withArray', but the action gets the number of values
+-- as an additional parameter
+--
+withArrayLen :: Storable a => [a] -> (Int -> Ptr a -> IO b) -> IO b
+withArrayLen vals f  =
   allocaArray len $ \ptr -> do
       pokeArray ptr vals
-      res <- f ptr
+      res <- f len ptr
       return res
   where
     len = length vals
 
 -- |Like 'withArray', but a terminator indicates where the array ends
 --
-withArray0               :: Storable a => a -> [a] -> (Ptr a -> IO b) -> IO b
-withArray0 marker vals f  =
+withArray0 :: Storable a => a -> [a] -> (Ptr a -> IO b) -> IO b
+withArray0 marker vals = withArrayLen0 marker vals . const
+
+-- |Like 'withArrayLen', but a terminator indicates where the array ends
+--
+withArrayLen0 :: Storable a => a -> [a] -> (Int -> Ptr a -> IO b) -> IO b
+withArrayLen0 marker vals f  =
   allocaArray0 len $ \ptr -> do
       pokeArray0 marker ptr vals
-      res <- f ptr
+      res <- f len ptr
       return res
   where
     len = length vals
