@@ -38,7 +38,8 @@ module Id (
 
 
 	-- One shot lambda stuff
-	isOneShotBndr, isOneShotLambda, setOneShotLambda, clearOneShotLambda,
+	isOneShotBndr, isOneShotLambda, isStateHackType,
+	setOneShotLambda, clearOneShotLambda,
 
 	-- IdInfo stuff
 	setIdUnfolding,
@@ -459,15 +460,16 @@ idLBVarInfo id = lbvarInfo (idInfo id)
 isOneShotBndr :: Id -> Bool
 -- This one is the "business end", called externally.
 -- Its main purpose is to encapsulate the Horrible State Hack
-isOneShotBndr id = isOneShotLambda id || (isStateHack id)
+isOneShotBndr id = isOneShotLambda id || (isStateHackType (idType id))
 
-isStateHack id 
+isStateHackType :: Type -> Bool
+isStateHackType ty
   | opt_NoStateHack 
   = False
   | otherwise
-  = case splitTyConApp_maybe (idType id) of
-	Just (tycon,_) | tycon == statePrimTyCon -> True
-        other                                    -> False
+  = case splitTyConApp_maybe ty of
+	Just (tycon,_) -> tycon == statePrimTyCon
+        other          -> False
 	-- This is a gross hack.  It claims that 
 	-- every function over realWorldStatePrimTy is a one-shot
 	-- function.  This is pretty true in practice, and makes a big

@@ -321,13 +321,28 @@ primOpIsCheap
 @primOpIsCheap@, as used in \tr{SimplUtils.lhs}.  For now (HACK
 WARNING), we just borrow some other predicates for a
 what-should-be-good-enough test.  "Cheap" means willing to call it more
-than once.  Evaluation order is unaffected.
+than once, and/or push it inside a lambda.  The latter could change the
+behaviour of 'seq' for primops that can fail, so we don't treat them as cheap.
 
 \begin{code}
 primOpIsCheap :: PrimOp -> Bool
-primOpIsCheap op = False
-	-- March 2001: be less eager to inline PrimOps
-	-- Was: not (primOpHasSideEffects op || primOpOutOfLine op)
+primOpIsCheap op = primOpOkForSpeculation op
+-- In March 2001, we changed this to 
+--	primOpIsCheap op = False
+-- thereby making *no* primops seem cheap.  But this killed eta
+-- expansion on case (x ==# y) of True -> \s -> ... 
+-- which is bad.  In particular a loop like
+--	doLoop n = loop 0
+--     where
+--         loop i | i == n    = return ()
+--                | otherwise = bar i >> loop (i+1)
+-- allocated a closure every time round because it doesn't eta expand.
+-- 
+-- The problem that originally gave rise to the change was
+--	let x = a +# b *# c in x +# x
+-- were we don't want to inline x. But primopIsCheap doesn't control
+-- that (it's exprIsDupable that does) so the problem doesn't occur
+-- even if primOpIsCheap sometimes says 'True'.
 \end{code}
 
 primOpIsDupable

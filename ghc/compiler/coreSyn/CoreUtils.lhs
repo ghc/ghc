@@ -51,7 +51,7 @@ import DataCon		( DataCon, dataConRepArity, dataConArgTys,
 import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idNewStrictness, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo,
-			  isOneShotBndr, isDataConWorkId_maybe, mkSysLocal,
+			  isOneShotBndr, isStateHackType, isDataConWorkId_maybe, mkSysLocal,
 			  isDataConWorkId, isBottomingId
 			)
 import IdInfo		( GlobalIdDetails(..), megaSeqIdInfo )
@@ -770,15 +770,25 @@ arityType (Note n e) = arityType e
 --  | otherwise = ATop
 
 arityType (Var v) 
-  = mk (idArity v)
+  = mk (idArity v) (arg_tys (idType v))
   where
-    mk :: Arity -> ArityType
-    mk 0 | isBottomingId v  = ABot
-         | otherwise	    = ATop
-    mk n 		    = AFun False (mk (n-1))
+    mk :: Arity -> [Type] -> ArityType
+	-- The argument types are only to steer the "state hack"
+	-- Consider case x of
+	--		True  -> foo
+	--		False -> \(s:RealWorld) -> e
+	-- where foo has arity 1.  Then we want the state hack to
+	-- apply to foo too, so we can eta expand the case.
+    mk 0 tys | isBottomingId v  = ABot
+             | otherwise	= ATop
+    mk n (ty:tys) = AFun (isStateHackType ty) (mk (n-1) tys)
+    mk n []       = AFun False		      (mk (n-1) [])
 
-			-- When the type of the Id encodes one-shot-ness,
-			-- use the idinfo here
+    arg_tys :: Type -> [Type]	-- Ignore for-alls
+    arg_tys ty 
+	| Just (_, ty')  <- splitForAllTy_maybe ty = arg_tys ty'
+	| Just (arg,res) <- splitFunTy_maybe ty    = arg : arg_tys res
+	| otherwise				   = []
 
 	-- Lambdas; increase arity
 arityType (Lam x e) | isId x    = AFun (isOneShotBndr x) (arityType e)
