@@ -16,7 +16,6 @@ An example that provokes the error is
 --------------------------------------------------------
 
 \begin{code}
-{-# OPTIONS -#include "hs_ctype.h" #-}
 module Lex (
 
 	srcParseErr,
