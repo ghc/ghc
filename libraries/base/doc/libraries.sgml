@@ -906,7 +906,7 @@ import Text.HTML.Internals -- The non-abstract library
       </listitem>
       <listitem>
 	<para>Manage any discussion related to the library (which can
-	take place on <email>libraries.haskell.org</email> if
+	take place on <email>libraries@haskell.org</email> if
 	necessary), and summarise the results.  Make final decisions,
 	and implement them.</para>
       </listitem>
@@ -1017,7 +1017,7 @@ import Text.HTML.Internals -- The non-abstract library
 -- Stability   :  experimental | provisional | stable
 -- Portability :  portable | non-portable (<replaceable>reason(s)</replaceable>)
 --
--- $Id: libraries.sgml,v 1.7 2002/02/12 15:17:34 simonmar Exp $
+-- $Id: libraries.sgml,v 1.8 2002/06/11 10:53:03 simonmar Exp $
 --
 -- <replaceable>Description</replaceable>
 -----------------------------------------------------------------------------
@@ -1027,7 +1027,7 @@ import Text.HTML.Internals -- The non-abstract library
 
       <variablelist>
 	<varlistentry>
-	  <term><literal>$Id: libraries.sgml,v 1.7 2002/02/12 15:17:34 simonmar Exp $</literal></term>
+	  <term><literal>$Id: libraries.sgml,v 1.8 2002/06/11 10:53:03 simonmar Exp $</literal></term>
 	  <listitem>
 	    <para>is optional, but usually included if the module is
 	    under CVS or RCS control.</para>
