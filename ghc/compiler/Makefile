@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.75 2000/04/21 14:35:46 simonpj Exp $
+# $Id: Makefile,v 1.76 2000/05/08 17:24:10 panne Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -66,7 +66,7 @@ endif
 
 HS_OBJS  = \
   $(patsubst %.hc, %.o, $(HCS)) \
-  parser/ctypes.o parser/hschooks.o
+  parser/hschooks.o
 
 
 DESTDIR       = $(INSTALL_LIBRARY_DIR_GHC)
@@ -74,7 +74,7 @@ DESTDIR       = $(INSTALL_LIBRARY_DIR_GHC)
 #
 # Add misc .c helper code (used by the frontend.)
 #
-C_SRCS += parser/ctypes.c parser/hschooks.c
+C_SRCS += parser/hschooks.c
 
 #
 # Big Fudge to get around inherent problem that Makefile setup
@@ -227,10 +227,6 @@ SRC_C_OPTS     += -O -I. -IcodeGen
 parser/hschooks.o : parser/hschooks.c
 	@$(RM) $@
 	$(HC) -c -o $@ $(HC_OPTS) parser/hschooks.c
-
-parser/ctypes.o : parser/ctypes.c
-	@$(RM) $@
-	$(HC) -c -o $@ $(HC_OPTS) parser/ctypes.c
 
 
 # Interface-file parser uses Happy
