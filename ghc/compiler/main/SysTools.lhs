@@ -55,7 +55,14 @@ import IO		( hPutStr, hPutChar, hPutStrLn, hFlush, stderr )
 import Directory	( doesFileExist, removeFile )
 import IOExts		( IORef, readIORef, writeIORef )
 import Monad		( when, unless )
-import System           ( system, ExitCode(..), exitWith )
+import System		( system, ExitCode(..), exitWith )
+import CString
+
+#if __GLASGOW_HASKELL__ < 500
+import Addr
+import Storable
+import Int
+#endif
 
 #include "../includes/config.h"
 
@@ -631,10 +638,9 @@ slash s1 s2 = s1 ++ ('/' : s2)
 #ifdef mingw32_TARGET_OS
 foreign import "_getpid" getProcessID :: IO Int -- relies on Int == Int32 on Windows
 
-getExecDir :: IO (Maybe String)
-getExecDir = return Nothing
-{-
+#if __GLASGOW_HASKELL__ >= 500
 foreign import stdcall "GetCurrentDirectoryA" getCurrentDirectory :: Int32 -> CString -> IO Int32
+getExecDir :: IO (Maybe String)
 getExecDir = do len <- getCurrentDirectory 0 nullAddr
 		buf <- mallocArray (fromIntegral len)
 		ret <- getCurrentDirectory len buf
@@ -642,7 +648,17 @@ getExecDir = do len <- getCurrentDirectory 0 nullAddr
 		            else do s <- peekCString buf
 				    destructArray (fromIntegral len) buf
 				    return (Just s)
--}
+#else
+foreign import stdcall "GetCurrentDirectoryA" getCurrentDirectory :: Int32 -> Addr -> IO Int32
+getExecDir :: IO (Maybe String)
+getExecDir = do len <- getCurrentDirectory 0 nullAddr
+		buf <- malloc (fromIntegral len)
+		ret <- getCurrentDirectory len buf
+		if ret == 0 then return Nothing
+		            else do s <- unpackCStringIO buf
+				    free buf
+				    return (Just s)
+#endif
 #else
 getProcessID :: IO Int
 getProcessID = Posix.getProcessID
