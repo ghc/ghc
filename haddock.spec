@@ -55,13 +55,13 @@ should all be ok).
 %setup -n haddock-%{version}
 
 %build
-./configure --prefix=${RPM_BUILD_ROOT}/%{prefix}
+./configure --prefix=%{prefix}
 make
-(cd haddock/src && sed 's{".*//{"/{' <haddock >tmp.$$ && cat tmp.$$ >haddock)
+(cd haddock/doc ; make dvi ps html ; gzip -f -9 *.dvi *.ps )
 
 %install
 rm -rf ${RPM_BUILD_ROOT}
-make install
+make prefix=${RPM_BUILD_ROOT}%{prefix} install
 
 %clean
 rm -rf ${RPM_BUILD_ROOT}
@@ -70,10 +70,16 @@ rm -rf ${RPM_BUILD_ROOT}
 %files
 %defattr(-,root,root)
 %doc haddock/README
-%{prefix}/bin/*
-%{prefix}/lib/*
+%doc haddock/doc/haddock
+%doc haddock/doc/haddock.dvi.gz
+%doc haddock/doc/haddock.ps.gz
+%{prefix}/lib/haddock-%{version}
+%{prefix}/bin/haddock
+%{prefix}/bin/haddock-%{version}
 
 %changelog
 
 * Wed May 01 2002 Tom Moertel <tom-rpms@moertel.com>
 - Created spec file
+* Sun Jun 23 2002 Sven Panne <sven_panne@yahoo.com>
+- Cleaned up build root handling and added more docs
