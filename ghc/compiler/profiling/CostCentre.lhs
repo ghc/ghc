@@ -291,19 +291,15 @@ instance Outputable CostCentreStack where
 		NoCCS		-> ptext SLIT("NO_CCS")
 		CurrentCCS	-> ptext SLIT("CCCS")
 		OverheadCCS	-> ptext SLIT("CCS_OVERHEAD")
-		DontCareCCS	-> ptext SLIT("CCS_DONTZuCARE")
+		DontCareCCS	-> ptext SLIT("CCS_DONT_CARE")
 		SubsumedCCS	-> ptext SLIT("CCS_SUBSUMED")
 		SingletonCCS cc -> ppr cc <> ptext SLIT("_ccs")
 
 pprCostCentreStackDecl :: CostCentreStack -> SDoc
 pprCostCentreStackDecl ccs@(SingletonCCS cc)
-  = let
-       is_subsumed = ccSubsumed cc
-    in
-    hcat [ ptext SLIT("CCS_DECLARE"), char '(',
+  = hcat [ ptext SLIT("CCS_DECLARE"), char '(',
     	   ppr ccs,	 	comma,	-- better be codeStyle
     	   ppCostCentreLbl cc, 	comma,
-    	   ptext is_subsumed, 	comma,
 	   empty,	-- Now always externally visible
     	   text ");"
 	 ]
