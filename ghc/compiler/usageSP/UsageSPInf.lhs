@@ -39,7 +39,8 @@ import UniqSupply       ( UniqSupply, UniqSM,
 import Outputable
 import Maybes           ( expectJust )
 import List             ( unzip4 )
-import CmdLineOpts	( opt_D_dump_usagesp, opt_DoUSPLinting )
+import CmdLineOpts	( opt_D_dump_usagesp, opt_DoUSPLinting, opt_UsageSPOn )
+import CoreLint		( beginPass, endPass )
 import ErrUtils		( doIfSet, dumpIfSet )
 import PprCore          ( pprCoreBindings )
 \end{code}
@@ -91,36 +92,42 @@ monad.
 doUsageSPInf :: UniqSupply
              -> [CoreBind]
              -> RuleBase
-             -> IO ([CoreBind], Maybe RuleBase)
+             -> IO [CoreBind]
 
 doUsageSPInf us binds local_rules
-                      = do
-                           let binds1      = doUnAnnotBinds binds
+  | not opt_UsageSPOn
+  = do { printErrs (text "WARNING: ignoring requested -fusagesp pass; requires -fusagesp-on") ;
+	 return binds
+    }
+      
+  | otherwise
+  = do
+        let binds1 = doUnAnnotBinds binds
 
-                           dumpIfSet opt_D_dump_usagesp "UsageSPInf unannot'd" $
+	beginPass "UsageSPInf"
+
+        dumpIfSet opt_D_dump_usagesp "UsageSPInf unannot'd" $
                              pprCoreBindings binds1
 
-                           let ((binds2,ucs,_),_)
-                                      = initUs us (uniqSMMToUs (usgInfBinds emptyVarEnv binds1))
+        let ((binds2,ucs,_),_) = initUs us (uniqSMMToUs (usgInfBinds emptyVarEnv binds1))
 
-                           dumpIfSet opt_D_dump_usagesp "UsageSPInf annot'd" $
-                             pprCoreBindings binds2
-
-                           let ms     = solveUCS ucs
-                               s      = case ms of
-                                          Just s  -> s
-                                          Nothing -> panic "doUsageSPInf: insol. conset!"
-                               binds3 = appUSubstBinds s binds2
-
-                           doIfSet opt_DoUSPLinting $
-                             do doLintUSPAnnotsBinds binds3     -- lint check 1
-                                doLintUSPConstBinds  binds3     -- lint check 2 (force solution)
-                                doCheckIfWorseUSP binds binds3  -- check for worsening of usages
-
-                           dumpIfSet opt_D_dump_usagesp "UsageSPInf" $
-                             pprCoreBindings binds3
-
-                           return (binds3, Nothing)
+        dumpIfSet opt_D_dump_usagesp "UsageSPInf annot'd" $
+          pprCoreBindings binds2
+	
+        let ms     = solveUCS ucs
+            s      = case ms of
+                       Just s  -> s
+                       Nothing -> panic "doUsageSPInf: insol. conset!"
+            binds3 = appUSubstBinds s binds2
+	
+        doIfSet opt_DoUSPLinting $
+          do doLintUSPAnnotsBinds binds3     -- lint check 1
+             doLintUSPConstBinds  binds3     -- lint check 2 (force solution)
+             doCheckIfWorseUSP binds binds3  -- check for worsening of usages
+	
+        endPass "UsageSPInf" opt_D_dump_usagesp binds3
+	
+        return binds3
 \end{code}
 
 ======================================================================

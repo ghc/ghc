@@ -72,16 +72,14 @@ tidyCorePgm us module_name binds_in rulebase_in
   = do
 	beginPass "Tidy Core"
 
-        (binds_in1,mrulebase_in1) <- if opt_UsageSPOn
-                                     then _scc_ "CoreUsageSPInf"
-                                          doUsageSPInf us binds_in rulebase_in
-                                     else return (binds_in,Nothing)
+        binds_in1 <- if opt_UsageSPOn
+                     then _scc_ "CoreUsageSPInf"
+                                doUsageSPInf us binds_in rulebase_in
+                     else return binds_in
 
-	let rulebase_in1            = maybe rulebase_in id mrulebase_in1
-
-            (tidy_env1, binds_out)  = mapAccumL (tidyBind (Just module_name))
+	let (tidy_env1, binds_out)  = mapAccumL (tidyBind (Just module_name))
                                                 init_tidy_env binds_in1
-	    rules_out	  	    = tidyProtoRules tidy_env1 (mk_local_protos rulebase_in1)
+	    rules_out	  	    = tidyProtoRules tidy_env1 (mk_local_protos rulebase_in)
 
 	endPass "Tidy Core" (opt_D_dump_simpl || opt_D_verbose_core2core) binds_out
 	return (binds_out, rules_out)
