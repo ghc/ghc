@@ -608,22 +608,23 @@ tcApp :: RenamedHsExpr -> [RenamedHsExpr]   -- Function and args
 
 tcApp fun args res_ty
   = 	-- First type-check the function
-    tcExpr_id fun  			`thenTc` \ (fun', lie_fun, fun_ty) ->
+    tcExpr_id fun  				`thenTc` \ (fun', lie_fun, fun_ty) ->
 
     tcAddErrCtxt (tooManyArgsCtxt fun) (
 	split_fun_ty fun_ty (length args)
-    )							`thenTc` \ (expected_arg_tys, actual_result_ty) ->
+    )						`thenTc` \ (expected_arg_tys, actual_result_ty) ->
 
 	-- Unify with expected result before type-checking the args
-    unifyTauTy res_ty actual_result_ty			`thenTc_`
+    unifyTauTy res_ty actual_result_ty		`thenTc_`
 
 	-- Now typecheck the args
-    mapAndUnzipTc tcArg (zipEqual "tcApp" args expected_arg_tys)	`thenTc` \ (args', lie_args_s) ->
+    mapAndUnzipTc (tcArg fun)
+	  (zip3 args expected_arg_tys [1..])	`thenTc` \ (args', lie_args_s) ->
 
     -- Check that the result type doesn't have any nested for-alls.
     -- For example, a "build" on its own is no good; it must be applied to something.
     checkTc (isTauTy actual_result_ty)
-	    (lurkingRank2Err fun fun_ty) `thenTc_`
+	    (lurkingRank2Err fun fun_ty)	`thenTc_`
 
     returnTc (fun', args', lie_fun `plusLIE` plusLIEs lie_args_s)
 
@@ -644,10 +645,17 @@ split_fun_ty fun_ty n
 \end{code}
 
 \begin{code}
-tcArg :: (RenamedHsExpr, TcType s)	-- Actual argument and expected arg type
+tcArg :: RenamedHsExpr			-- The function (for error messages)
+      -> (RenamedHsExpr, TcType s, Int)	-- Actual argument and expected arg type
       -> TcM s (TcExpr s, LIE s)	-- Resulting argument and LIE
+tcArg the_fun (arg, expected_arg_ty, arg_no)
+  = tcAddErrCtxt (funAppCtxt the_fun arg arg_no) $
+    tcPolyExpr arg expected_arg_ty
 
-tcArg (arg,expected_arg_ty)
+
+-- tcPolyExpr is like tcExpr, except that the expected type
+-- can be a polymorphic one.
+tcPolyExpr arg expected_arg_ty
   | not (maybeToBool (getForAllTy_maybe expected_arg_ty))
   = 	-- The ordinary, non-rank-2 polymorphic case
     tcExpr arg expected_arg_ty
@@ -947,7 +955,7 @@ tcRecordBinds expected_record_ty rbinds
 	  Just (record_ty, field_ty) = getFunTy_maybe tau
 	in
 	unifyTauTy expected_record_ty record_ty		`thenTc_`
-	tcArg (rhs, field_ty)				`thenTc` \ (rhs', lie) ->
+	tcPolyExpr rhs field_ty				`thenTc` \ (rhs', lie) ->
 	returnTc ((RealId sel_id, rhs', pun_flag), lie)
 
 badFields rbinds data_con
@@ -1015,11 +1023,6 @@ sectionRAppCtxt expr sty
 sectionLAppCtxt expr sty
   = hang (ptext SLIT("In the left section")) 4 (ppr sty expr)
 
-funAppCtxt fun arg_no arg sty
-  = hang (hsep [ ptext SLIT("In the"), speakNth arg_no, ptext SLIT("argument of"), 
-		    ppr sty fun <> text ", namely"])
-	 4 (ppr sty arg)
-
 stmtCtxt do_or_lc stmt sty
   = hang (ptext SLIT("In a") <+> whatever <> colon)
          4 (ppr sty stmt)
@@ -1032,6 +1035,11 @@ stmtCtxt do_or_lc stmt sty
 tooManyArgsCtxt f sty
   = hang (ptext SLIT("Too many arguments in an application of the function"))
 	 4 (ppr sty f)
+
+funAppCtxt fun arg arg_no sty
+  = hang (hsep [ptext SLIT("In the"), speakNth arg_no, ptext SLIT("argument of"), 
+		ppr sty fun <> text ", namely"])
+	 4 (ppr sty arg)
 
 lurkingRank2Err fun fun_ty sty
   = hang (hsep [ptext SLIT("Illegal use of"), ppr sty fun])
