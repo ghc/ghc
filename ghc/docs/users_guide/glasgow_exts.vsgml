@@ -1,5 +1,5 @@
 % 
-% $Id: glasgow_exts.vsgml,v 1.16 1999/08/26 15:59:07 simonmar Exp $
+% $Id: glasgow_exts.vsgml,v 1.17 1999/10/28 07:53:13 simonpj Exp $
 %
 % GHC Language Extensions.
 %
@@ -2013,7 +2013,7 @@ The programmer can specify rewrite rules as part of the source program
 Here is an example:
 <tscreen><verb>
   {-# RULES
-	"map/map"	forall f,g,xs. map f (map g) xs = map (f.g) xs
+	"map/map"	forall f g xs. map f (map g xs) = map (f.g) xs
   #-}
 </verb></tscreen>
 
@@ -2022,27 +2022,29 @@ Here is an example:
 
 From a syntactic point of view:
 <itemize>
-<item> Each rule has a name, enclosed in double quotes.
+<item> Each rule has a name, enclosed in double quotes.  The name itself has
+no significance at all.  It is only used when reporting how many times the rule fired.
 <item> There may be zero or more rules in a @RULES@ pragma.
 <item> Layout applies in a @RULES@ pragma.  Currently no new indentation level
 is set, so you must lay out your rules starting in the same column as the
 enclosing definitions.
 <item> Each variable mentioned in a rule must either be in scope (e.g. @map@),
 or bound by the @forall@ (e.g. @f@, @g@, @xs@).  The variables bound by
-the @forall@ are called the <em>pattern</em> variables.
+the @forall@ are called the <em>pattern</em> variables.  They are separated
+by spaces, just like in a type @forall@.
 <item> A pattern variable may optionally have a type signature.
-If its type is polymorphic, it <em>must</em> have a type signature.
+If the type of the pattern variable is polymorphic, it <em>must</em> have a type signature.
 For example, here is the @foldr/build@ rule:
 <tscreen><verb>
-  "fold/build" 	forall k,z,g::forall b. (a->b->b) -> b -> b . 
+  "fold/build" 	forall k z (g::forall b. (a->b->b) -> b -> b) . 
 		foldr k z (build g) = g k z
 </verb></tscreen>
-
+Since @g@ has a polymorphic type, it must have a type signature.
 
 <item> The left hand side of a rule must consist of a top-level variable applied
 to arbitrary expressions.  For example, this is <em>not</em> OK:
 <tscreen><verb>
-  "wrong1"   forall e1,e2.  case True of { True -> e1; False -> e2 } = e1
+  "wrong1"   forall e1 e2.  case True of { True -> e1; False -> e2 } = e1
   "wrong2"   forall f.      f True = True
 </verb></tscreen>
 In @"wrong1"@, the LHS is not an application; in @"wrong1"@, the LHS has a pattern variable
@@ -2078,6 +2080,8 @@ terminating.  For example:
   "loop" 	forall x,y.  f x y = f y x
 </verb></tscreen>
 This rule will cause the compiler to go into an infinite loop.
+
+<item> If more than one rule matches a call, GHC will choose one arbitrarily to apply.
 
 <item> GHC currently uses a very simple, syntactic, matching algorithm
 for matching a rule LHS with an expression.  It seeks a substitution
@@ -2179,12 +2183,45 @@ a lot which are not included, please tell us.
 If you want to write your own good consumers or producers, look at the
 Prelude definitions of the above functions to see how to do so.
 
+<sect2>Specialisation
+<p>
+
+Rewrite rules can be used to get the same effect as a feature
+present in earlier version of GHC:
+<tscreen><verb>
+  {-# SPECIALIZE fromIntegral :: Int8 -> Int16 = int8ToInt16 #-}
+</verb></tscreen>
+This told GHC to use @int8ToInt16@ instead of @fromIntegral@ whenever
+the latter was called with type @Int8 -> Int16@.  That is, rather than
+specialising the original definition of @fromIntegral@ the programmer is
+promising that it is safe to use @int8ToInt16@ instead.
+
+This feature is no longer in GHC.  But rewrite rules let you do the
+same thing:
+<tscreen><verb>
+  {-# RULES
+    "fromIntegral/Int8/Int16" fromIntegral = int8ToInt16
+  #-}
+</verb></tscreen>
+This slightly odd-looking rule instructs GHC to replace @fromIntegral@
+by @int8ToInt16@ <em>whenever the types match</em>.  Speaking more operationally,
+GHC adds the type and dictionary applications to get the typed rule
+<tscreen><verb>
+	forall (d1::Integral Int8) (d2::Num Int16) .
+		fromIntegral Int8 Int16 d1 d2 = int8ToInt16
+</verb></tscreen>
+What is more,
+this rule does not need to be in the same file as fromIntegral,
+unlike the @SPECIALISE@ pragmas which currently do (so that they
+have an original definition available to specialise).
+
 <sect2>Controlling what's going on
 <p>
 
 <itemize>
 <item> Use @-ddump-rules@ to see what transformation rules GHC is using.
 <item> Use @-ddump-simpl-stats@ to see what rules are being fired.
+If you add @-dppr-debug@ you get a more detailed listing.
 <item> The defintion of (say) @build@ in @PrelBase.lhs@ looks llike this:
 <tscreen><verb>
 	build 	:: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
