@@ -98,7 +98,7 @@ import Type		( usOnce, usMany )
 import Demand		hiding( Demand )
 import qualified Demand
 import NewDemand	( Demand(..), Keepity(..), DmdResult(..),
-			  lazyDmd, topDmd, dmdTypeDepth,
+			  lazyDmd, topDmd, dmdTypeDepth, isStrictDmd,
 			  StrictSig, mkStrictSig, mkTopDmdType
 			)
 import Outputable	
@@ -289,7 +289,7 @@ setStrictnessInfo info st = st `seq` info { strictnessInfo = st }
 	-- Try to avoid spack leaks by seq'ing
 
 setUnfoldingInfo  info uf 
-  | isEvaldUnfolding uf && isStrict (demandInfo info)
+  | isEvaldUnfolding uf
 	-- If the unfolding is a value, the demand info may
 	-- go pear-shaped, so we nuke it.  Example:
 	--	let x = (a,b) in
@@ -299,7 +299,7 @@ setUnfoldingInfo  info uf
 	--	let x = (a,b) in h a b x
 	-- and now x is not demanded (I'm assuming h is lazy)
 	-- This really happens.  The solution here is a bit ad hoc...
-  = info { unfoldingInfo = uf, demandInfo = wwLazy }
+  = info { unfoldingInfo = uf, newDemandInfo = Lazy }
 
   | otherwise
 	-- We do *not* seq on the unfolding info, For some reason, doing so 
@@ -754,12 +754,12 @@ part of an unsaturated lambda
 
 \begin{code}
 zapLamInfo :: IdInfo -> Maybe IdInfo
-zapLamInfo info@(IdInfo {occInfo = occ, demandInfo = demand})
-  | is_safe_occ && not (isStrict demand)
+zapLamInfo info@(IdInfo {occInfo = occ, newDemandInfo = demand})
+  | is_safe_occ && not (isStrictDmd demand)
   = Nothing
   | otherwise
   = Just (info {occInfo = safe_occ,
-		demandInfo = wwLazy})
+		newDemandInfo = Lazy})
   where
 	-- The "unsafe" occ info is the ones that say I'm not in a lambda
 	-- because that might not be true for an unsaturated lambda
@@ -774,9 +774,9 @@ zapLamInfo info@(IdInfo {occInfo = occ, demandInfo = demand})
 
 \begin{code}
 zapDemandInfo :: IdInfo -> Maybe IdInfo
-zapDemandInfo info@(IdInfo {demandInfo = demand})
-  | not (isStrict demand) = Nothing
-  | otherwise		  = Just (info {demandInfo = wwLazy})
+zapDemandInfo info@(IdInfo {newDemandInfo = demand})
+  | not (isStrictDmd demand) = Nothing
+  | otherwise		     = Just (info {newDemandInfo = Lazy})
 \end{code}
 
 
