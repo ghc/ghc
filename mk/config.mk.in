@@ -41,14 +41,48 @@
 
 # A "platform" is the GNU cpu-type/manufacturer/operating-system target machine
 # specifier.  E.g. sparc-sun-solaris2
+#
+# Build  platform: the platform on which we are doing this build
+# Host   platform: the platform on which these binaries will run
+# Target platform: the platform for which this compiler will generate code
+#
+# We don't support build & host being different, because the build
+# process creates binaries that are run during the build, and also
+# installed.
+#
+# If host & target are different, then we are building a compiler
+# which will generate intermediate .hc files to port to the target
+# architecture for bootstrapping.  The libraries and stage 2 compiler
+# will be built as HC files for the target system, and likely won't
+# build on this host platform.
+#
+# Guidelines for when to use HOST vs. TARGET:
+#
+#  - In the build system (Makefile, foo.mk), normally we should test
+#    $(HOSTPLATFORM).  There are some cases (eg. installation), where
+#    we expect $(HOSTPLATFORM)==$(TARGETPLATFORM), so in those cases it
+#    doesn't matter which is used.
+#
+#  - In the compiler itself, we should test HOST or TARGET depending
+#    on whether the conditional relates to the code being generated, or
+#    the platform on which the compiler is running.  For stage 2,
+#    HOSTPLATFORM should be reset to be TARGETPLATFORM (we currently
+#    don't do this, but we should).
+#
+#  - In the RTS and library code, we should be testing TARGET only.
+#
+# NOTE: cross-compiling is not well supported by the build system.
+# You have to do a lot of work by hand to cross compile: see the
+# section on "Porting GHC" in the Building Guide.
 
 HOSTPLATFORM			= @HostPlatform@
 TARGETPLATFORM			= @TargetPlatform@
-BUILDPLATFORM			= @HostPlatform@
+BUILDPLATFORM			= @BuildPlatform@
 
 # Hack alert:
-# in one or two places, we need to get at the OS version (major and perhaps even minor),
-# HostOS_Full is the OS name reported by AC_CANONICAL_SYSTEM.
+# in one or two places, we need to get at the OS version (major and
+# perhaps even minor), HostOS_Full is the OS name reported by
+# AC_CANONICAL_SYSTEM.
 #
 HostPlatform_CPP		= @HostPlatform_CPP@
 HostArch_CPP			= @HostArch_CPP@
@@ -56,25 +90,31 @@ HostOS_CPP			= @HostOS_CPP@
 HostOS_Full			= @HostOS_Full@
 HostVendor_CPP	                = @HostVendor_CPP@
 
-#
-# ToDo: check if these can be purged now. -- sof
-#
+TargetPlatform_CPP		= @TargetPlatform_CPP@
+TargetArch_CPP			= @TargetArch_CPP@
+TargetOS_CPP			= @TargetOS_CPP@
+TargetVendor_CPP                = @TargetVendor_CPP@
 
-@HostPlatform_CPP@_HOST        = 1
-@HostPlatform_CPP@_TARGET      = 1
-@HostPlatform_CPP@_BUILD       = 1
+BuildPlatform_CPP		= @BuildPlatform_CPP@
+BuildArch_CPP			= @BuildArch_CPP@
+BuildOS_CPP			= @BuildOS_CPP@
+BuildVendor_CPP                 = @BuildVendor_CPP@
 
-@HostArch_CPP@_HOST_ARCH       = 1
-@HostArch_CPP@_TARGET_ARCH	= 1
-@HostArch_CPP@_BUILD_ARCH      = 1
+@HostPlatform_CPP@_HOST           = 1
+@TargetPlatform_CPP@_TARGET       = 1
+@BuildPlatform_CPP@_BUILD         = 1
 
-@HostOS_CPP@_HOST_OS           = 1
-@HostOS_CPP@_TARGET_OS         = 1
-@HostOS_CPP@_BUILD_OS          = 1
+@HostArch_CPP@_HOST_ARCH          = 1
+@TargetArch_CPP@_TARGET_ARCH      = 1
+@BuildArch_CPP@_BUILD_ARCH        = 1
 
-@HostVendor_CPP@_HOST_VENDOR    = 1
-@HostVendor_CPP@_TARGET_VENDOR  = 1
-@HostVendor_CPP@_BUILD_VENDOR   = 1
+@HostOS_CPP@_HOST_OS              = 1
+@TargetOS_CPP@_TARGET_OS          = 1
+@BuildOS_CPP@_BUILD_OS            = 1
+
+@HostVendor_CPP@_HOST_VENDOR      = 1
+@TargetVendor_CPP@_TARGET_VENDOR  = 1
+@BuildVendor_CPP@_BUILD_VENDOR    = 1
 
 # Leading underscores on symbol names in object files
 # Valid options: YES/NO
