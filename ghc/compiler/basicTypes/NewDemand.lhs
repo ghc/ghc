@@ -66,9 +66,11 @@ instance Outputable DmdType where
   ppr (DmdType fv ds res) 
     = hsep [text "DmdType",
 	    hcat (map ppr ds) <> ppr res,
-	    braces (fsep (map pp_elt (ufmToList fv)))]
+	    if null fv_elts then empty
+	    else braces (fsep (map pp_elt fv_elts))]
     where
       pp_elt (uniq, dmd) = ppr uniq <> text "->" <> ppr dmd
+      fv_elts = ufmToList fv
 
 instance Outputable DmdResult where
   ppr TopRes = empty	  -- Keep these distinct from Demand letters
