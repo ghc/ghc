@@ -145,6 +145,9 @@ isArgTypeKind other	       = False
 isOpenTypeKind :: Kind -> Bool
 -- True of any sub-kind of OpenTypeKind (i.e. anything except arrow)
 isOpenTypeKind (FunKind _ _) = False
+isOpenTypeKind (KindVar _)   = False	-- This is a conservative answer
+					-- It matters in the call to isSubKind in
+					-- checkExpectedKind.
 isOpenTypeKind other	     = True
 
 isSubKind :: Kind -> Kind -> Bool
@@ -154,9 +157,8 @@ isSubKind UnliftedTypeKind UnliftedTypeKind = True
 isSubKind UbxTupleKind     UbxTupleKind     = True
 isSubKind k1 		   OpenTypeKind     = isOpenTypeKind k1
 isSubKind k1 		   ArgTypeKind      = isArgTypeKind k1
-isSubKind (FunKind a1 r1) (FunKind a2 r2)
-  = (a2 `isSubKind` a1) && (r1 `isSubKind` r2)
-isSubKind k1 k2 = False
+isSubKind (FunKind a1 r1) (FunKind a2 r2)   = (a2 `isSubKind` a1) && (r1 `isSubKind` r2)
+isSubKind k1		  k2		    = False
 
 defaultKind :: Kind -> Kind
 -- Used when generalising: default kind '?' and '??' to '*'
