@@ -78,6 +78,9 @@ import PrelBase ( Char(..) )
 # if __GLASGOW_HASKELL__ >= 206
 import PackBase 
 # endif
+# if __GLASGOW_HASKELL__ >= 209
+import Addr
+# endif
 #endif
 import PrimPacked
 import FastString

@@ -41,6 +41,10 @@ import ST
 import ArrBase
 import Maybe
 
+# if __GLASGOW_HASKELL__ >= 209
+import GlaExts ( thenST, returnST )
+# endif
+
 #else
 
 #define ARR_ELT 	(:=)

@@ -47,13 +47,21 @@ type SST s r = State# s -> SST_R s r
 sstToST :: SST s r -> ST s r
 stToSST :: ST s r -> SST s r
 
-#if __GLASGOW_HASKELL__ >= 200
+#if __GLASGOW_HASKELL__ >= 200 && __GLASGOW_HASKELL__ < 209
 
 sstToST sst = ST $ \ (S# s) ->
    case sst s of SST_R r s' -> (r, S# s')
 
 stToSST (ST st) = \ s ->
    case st (S# s) of (r, S# s') -> SST_R r s'
+
+#elif __GLASGOW_HASKELL__ >= 209
+
+sstToST sst = ST $ \ s ->
+   case sst s of SST_R r s' -> STret s' r
+
+stToSST (ST st) = \ s ->
+   case st s of STret s' r -> SST_R r s'
 
 #else
 sstToST sst (S# s)

@@ -35,6 +35,10 @@ module Outputable (
 #if __GLASGOW_HASKELL__ >= 202
 import IO
 import GlaExts
+# if __GLASGOW_HASKELL__ >= 209
+import Addr
+# endif
+
 #else
 import Ubiq		( Uniquable(..), Unique, Name )	-- FastString mentions it; todo: rm
 

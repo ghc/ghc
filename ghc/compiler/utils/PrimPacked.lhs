@@ -52,6 +52,10 @@ import PrelBase ( Char(..) )
 import PackBase
 # endif
 
+# if __GLASGOW_HASKELL__ >= 209
+import Addr
+# endif
+
 #endif
 
 \end{code} 
@@ -73,21 +77,19 @@ Copying a char string prefix into a byte array,
 NULs.
 
 \begin{code}
+
 copyPrefixStr :: _Addr -> Int -> _ByteArray Int
 copyPrefixStr (A# a) len@(I# length#) =
- unsafePerformPrimIO (
+ unsafePerformST (
   {- allocate an array that will hold the string
     (not forgetting the NUL at the end)
   -}
-  (new_ps_array (length# +# 1#))             `thenPrimIO` \ ch_array ->
-{- Revert back to Haskell-only solution for the moment.
-   _ccall_ memcpy ch_array (A# a) len        `thenPrimIO`  \ () ->
-   write_ps_array ch_array length# (chr# 0#) `seqPrimIO`
--}
+  new_ps_array (length# +# 1#)               `thenStrictlyST` \ ch_array ->
    -- fill in packed string from "addr"
-  fill_in ch_array 0#			     `seqPrimIO`
+  fill_in ch_array 0#			     `thenStrictlyST` \ _ ->
    -- freeze the puppy:
-  freeze_ps_array ch_array)
+  freeze_ps_array ch_array		     `thenStrictlyST` \ barr ->
+  returnStrictlyST barr )
   where
     fill_in :: _MutableByteArray s Int -> Int# -> _ST s ()
 
@@ -119,7 +121,7 @@ Copying a sub-string out of a ForeignObj
 \begin{code}
 copySubStrFO :: _ForeignObj -> Int -> Int -> _ByteArray Int
 copySubStrFO (_ForeignObj fo) (I# start#) len@(I# length#) =
- unsafePerformPrimIO (
+ unsafePerformST (
   {- allocate an array that will hold the string
     (not forgetting the NUL at the end)
   -}
@@ -159,7 +161,7 @@ addrOffset# a# i# =
 
 copySubStrBA :: _ByteArray Int -> Int -> Int -> _ByteArray Int
 copySubStrBA (_ByteArray _ barr#) (I# start#) len@(I# length#) =
- unsafePerformPrimIO (
+ unsafePerformST (
   {- allocate an array that will hold the string
     (not forgetting the NUL at the end)
   -}
@@ -190,20 +192,20 @@ write_ps_array	:: _MutableByteArray s Int -> Int# -> Char# -> _ST s ()
 freeze_ps_array :: _MutableByteArray s Int -> _ST s (_ByteArray Int)
 
 new_ps_array size =
-    MkST ( \ (S# s) ->
-    case (newCharArray# size s)	  of { StateAndMutableByteArray# s2# barr# ->
-    (_MutableByteArray (0, max 0 (I# (size -# 1#))) barr#, S# s2#)})
+    MkST ( \ STATE_TOK(s#) ->
+    case (newCharArray# size s#)  of { StateAndMutableByteArray# s2# barr# ->
+    ST_RET(_MutableByteArray (0, max 0 (I# (size -# 1#))) barr#, STATE_TOK(s2#))})
 
 write_ps_array (_MutableByteArray _ barr#) n ch =
-    MkST ( \ (S# s#) ->
+    MkST ( \ STATE_TOK(s#) ->
     case writeCharArray# barr# n ch s#	of { s2#   ->
-    ((), S# s2#)})
+    ST_RET((), STATE_TOK(s2#) )})
 
 -- same as unsafeFreezeByteArray
 freeze_ps_array (_MutableByteArray ixs arr#) =
-    MkST ( \ (S# s#) ->
+    MkST ( \ STATE_TOK(s#) ->
     case unsafeFreezeByteArray# arr# s# of { StateAndByteArray# s2# frozen# ->
-    (_ByteArray ixs frozen#, S# s2#) })
+    ST_RET((_ByteArray ixs frozen#), STATE_TOK(s2#))})
 \end{code}
 
 Compare two equal-length strings for equality:

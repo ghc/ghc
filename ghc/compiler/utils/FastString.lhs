@@ -60,6 +60,14 @@ import PrelBase ( Char (..) )
 #if __GLASGOW_HASKELL__ >= 206
 import PackBase
 #endif
+#if __GLASGOW_HASKELL__ >= 209
+import Addr
+import IORef
+# define newVar   newIORef
+# define readVar  readIORef
+# define writeVar writeIORef
+#endif
+
 #endif
 
 import PrimPacked
@@ -179,26 +187,32 @@ data FastStringTable =
     Int#
     (MutableArray# _RealWorld [FastString])
 
+#if __GLASGOW_HASKELL__ < 209
 type FastStringTableVar = MutableVar _RealWorld FastStringTable
+#else
+type FastStringTableVar = IORef FastStringTable
+#endif
 
 string_table :: FastStringTableVar
 string_table = 
  unsafePerformPrimIO (
-   newArray (0::Int,hASH_TBL_SIZE) [] `thenPrimIO` \ (_MutableArray _ arr#) ->
+   ST_TO_PrimIO (newArray (0::Int,hASH_TBL_SIZE) []) `thenPrimIO` \ (_MutableArray _ arr#) ->
    newVar (FastStringTable 0# arr#))
 
 lookupTbl :: FastStringTable -> Int# -> PrimIO [FastString]
 lookupTbl (FastStringTable _ arr#) i# =
-  MkST ( \ (S# s#) ->
+  ST_TO_PrimIO (
+  MkST ( \ STATE_TOK(s#) ->
   case readArray# arr# i# s# of { StateAndPtr# s2# r ->
-    (r, S# s2#) })
+    ST_RET(r, STATE_TOK(s2#)) }))
 
 updTbl :: FastStringTableVar -> FastStringTable -> Int# -> [FastString] -> PrimIO ()
-updTbl (_MutableArray _ var#) (FastStringTable uid# arr#) i# ls =
- MkST ( \ (S# s#) ->
+updTbl ref (FastStringTable uid# arr#) i# ls =
+ ST_TO_PrimIO (
+ MkST ( \ STATE_TOK(s#) ->
  case writeArray# arr# i# ls s# of { s2# ->
- case writeArray# var# 0# (FastStringTable (uid# +# 1#) arr#) s2# of { s3# ->
-  ((), S# s3#) }})
+  ST_RET((), STATE_TOK(s2#)) })) `thenPrimIO` \ _ ->
+ writeVar ref (FastStringTable (uid# +# 1#) arr#)
 
 mkFastString# :: Addr# -> Int# -> FastString
 mkFastString# a# len# =
