@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.44 2000/12/06 13:19:49 simonmar Exp $
+% $Id: CgClosure.lhs,v 1.45 2001/03/06 10:13:35 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -45,14 +45,14 @@ import CLabel		( CLabel, mkClosureLabel, mkFastEntryLabel,
 import ClosureInfo	-- lots and lots of stuff
 import CmdLineOpts	( opt_GranMacros, opt_SccProfilingOn, opt_DoTickyProfiling )
 import CostCentre	
-import Id		( Id, idName, idType, idPrimRep, setIdName )
-import Name		( Name, isLocalName, globaliseName )
+import Id		( Id, idName, idType, idPrimRep )
+import Name		( Name, isLocalName )
 import Module		( Module, pprModule )
 import ListSetOps	( minusList )
 import PrimRep		( PrimRep(..) )
 import PprType          ( showTypeCategory )
 import Util		( isIn )
-import CmdLineOpts	( opt_SccProfilingOn, opt_EnsureSplittableC )
+import CmdLineOpts	( opt_SccProfilingOn )
 import Outputable
 
 import Name             ( nameOccName )
