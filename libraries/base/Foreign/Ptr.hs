@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Ptr.hs,v 1.5 2002/03/14 12:09:50 simonmar Exp $
+-- $Id: Ptr.hs,v 1.6 2002/03/20 15:38:36 simonmar Exp $
 --
 -- Pointer types.
 --
@@ -67,5 +67,5 @@ instance Show (Ptr a) where
 #endif
 #endif
 
-foreign import "freeHaskellFunctionPtr" unsafe
+foreign import ccall unsafe "freeHaskellFunctionPtr"
     freeHaskellFunPtr :: FunPtr a -> IO ()
