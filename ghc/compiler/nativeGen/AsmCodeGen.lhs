@@ -115,12 +115,12 @@ codeGen stixFinal
                              dynamic_codes
         text_prealloc  = vcat (intersperse (char ' ' $$ char ' ') docs_prealloc)
     in
-    -- trace (showSDoc text_prealloc) (
+    --trace (showSDoc text_prealloc) (
     returnUs (vcat (intersperse (char ' ' 
                                  $$ ptext SLIT("# ___stg_split_marker")
                                  $$ char ' ') 
                     docs))
-    -- )
+    --)
 \end{code}
 
 Top level code generator for a chunk of stix code.  For this part of
@@ -199,6 +199,7 @@ stixPeep :: [StixTree] -> [StixTree]
 -- second assignment would be substituted for, giving nonsense
 -- code.  As far as I can see, StixTemps are only ever assigned
 -- to once.  It would be nice to be sure!
+{-
 stixPeep ( t1@(StAssign pka (StReg (StixTemp u pk)) rhs)
          : t2
          : ts )
@@ -210,6 +211,12 @@ stixPeep ( t1@(StAssign pka (StReg (StixTemp u pk)) rhs)
 stixPeep (t1:t2:ts) = t1 : stixPeep (t2:ts)
 stixPeep [t1]       = [t1]
 stixPeep []         = []
+-}
+
+-- disable stix inlining until we figure out how to fix the
+-- latent bugs in the register allocator which are exposed by
+-- the inliner.
+stixPeep = id
 \end{code}
 
 For most nodes, just optimize the children.
