@@ -612,7 +612,7 @@ wlkBinding binding
       U_fobind id ty ext_name unsafe_flag cconv imp_exp srcline ->
 	mkSrcLocUgn        srcline		   $ \ src_loc ->
 	wlkVarId id				   `thenUgn` \ h_id ->
-	wlkHsType ty				   `thenUgn` \ h_ty ->
+	wlkHsSigType ty				   `thenUgn` \ h_ty ->
 	wlkExtName ext_name			   `thenUgn` \ h_ext_name ->
 	rdCallConv cconv		           `thenUgn` \ h_cconv ->
 	rdForKind imp_exp (cvFlag unsafe_flag)    `thenUgn` \ h_imp_exp ->
