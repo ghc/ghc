@@ -1,6 +1,8 @@
 module Main ( main ) where
 
-import GHC.Base
+import Foreign
+import Foreign.C
+import GHC.Exts
 
 data CList = CNil | CCons Int# CList
 
@@ -22,4 +24,7 @@ main = case (clen list4) of
       list4	= mk 4#
 
 finish :: Int# -> IO ()
-finish n = _ccall_ putchar (C# (chr# n)) >> return ()
+finish n = c_putchar (castCharToCChar (C# (chr# n))) >> return ()
+
+foreign import ccall unsafe "putchar"
+  c_putchar :: CChar -> IO CInt
