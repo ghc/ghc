@@ -380,7 +380,9 @@ and terminals will normally be line-buffered.
 \begin{code}
 data BufferMode  
  = NoBuffering | LineBuffering | BlockBuffering (Maybe Int)
-   deriving (Eq, Ord, {-ToDo: Read,-} Show)
+   deriving (Eq, Ord, Show)
+   {- Read instance defined in IO. -}
+
 \end{code}
 
 \begin{code}
