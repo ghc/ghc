@@ -892,7 +892,7 @@ hGetEcho handle = do
 hIsTerminalDevice :: Handle -> IO Bool
 hIsTerminalDevice handle = do
     withHandle handle $ \ handle_ -> do
-    case haType__ handle_ of 
+     case haType__ handle_ of 
        ErrorHandle theError ->  do 
             writeHandle handle handle_
 	    ioError theError
@@ -916,8 +916,8 @@ hConnectTo :: Handle -> Handle -> IO ()
 hConnectTo hW hR = hConnectHdl_ hW hR 0{-connect regardless-}
 
 hConnectHdl_ :: Handle -> Handle -> Int -> IO ()
-hConnectHdl_ hW hR is_tty = 
-  wantRWHandle "hConnectTo" hW $ \ hW_ -> do
+hConnectHdl_ hW hR is_tty =
+  wantRWHandle "hConnectTo" hW $ \ hW_ ->
   wantRWHandle "hConnectTo" hR $ \ hR_ -> do
   CCALL(setConnectedTo) (haFO__ hR_) (haFO__ hW_) is_tty  -- ConcHask: SAFE, won't block
   writeHandle hR hR_
@@ -1049,7 +1049,7 @@ the Handle contains..
 
 \begin{code}
 getHandleFd :: Handle -> IO Int
-getHandleFd handle = do
+getHandleFd handle =
     withHandle handle $ \ handle_ -> do
     case (haType__ handle_) of
       ErrorHandle theError -> do

@@ -252,7 +252,7 @@ character is available.
 
 \begin{code}
 hLookAhead :: Handle -> IO Char
-hLookAhead handle = do
+hLookAhead handle =
     wantReadableHandle "hLookAhead" handle $ \ handle_ -> do
     let fo = haFO__ handle_
     intc    <- mayBlock fo (CCALL(fileLookAhead) fo)  -- ConcHask: UNSAFE, may block
