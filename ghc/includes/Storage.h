@@ -234,6 +234,10 @@ recordMutable(StgClosure *p)
 
 void revertCAFs( void );
 
+    // set to disable CAF garbage collection in GHCi.
+    // (needed when dynamic libraries are used).
+extern rtsBool keepCAFs;
+
 /* -----------------------------------------------------------------------------
    DEBUGGING predicates for pointers
 
@@ -393,6 +397,7 @@ extern StgClosure * RTS_VAR(scavenged_static_objects);
 extern StgWeak    * RTS_VAR(old_weak_ptr_list);
 extern StgWeak    * RTS_VAR(weak_ptr_list);
 extern StgClosure * RTS_VAR(caf_list);
+extern StgClosure * RTS_VAR(revertible_caf_list);
 extern StgTSO     * RTS_VAR(resurrected_threads);
 
 #endif // STORAGE_H

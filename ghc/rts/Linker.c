@@ -803,6 +803,24 @@ addDLL( char *dll_name )
    void *hdl;
    char *errmsg;
 
+   // *** HACK
+   // If we load libHSbase_cbits_dyn.[so|dylib],
+   // then we know that we need to activate another newCAF
+   // related hack in Storage.c because we can't redirect
+   // newCAF to newDynCAF with the system dynamic linker.
+#ifdef OBJFORMAT_MACHO
+   const char *hsbase = "/libHSbase_cbits_dyn.dylib";
+#else
+   const char *hsbase = "/libHSbase_cbits_dyn.so";
+#endif
+   int namelen = strlen(dll_name);
+   int baselen = strlen(hsbase);
+   if(namelen > baselen && !strcmp(dll_name + namelen - baselen, hsbase))
+   {
+      keepCAFs = rtsTrue;
+   }
+   // *** END HACK.
+
    initLinker();
 
    hdl= dlopen(dll_name, RTLD_NOW | RTLD_GLOBAL);

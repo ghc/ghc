@@ -3849,14 +3849,14 @@ revertCAFs( void )
 {
     StgIndStatic *c;
 
-    for (c = (StgIndStatic *)caf_list; c != NULL; 
+    for (c = (StgIndStatic *)revertible_caf_list; c != NULL; 
 	 c = (StgIndStatic *)c->static_link) 
     {
 	SET_INFO(c, c->saved_info);
 	c->saved_info = NULL;
 	// could, but not necessary: c->static_link = NULL; 
     }
-    caf_list = NULL;
+    revertible_caf_list = NULL;
 }
 
 void
@@ -3865,6 +3865,11 @@ markCAFs( evac_fn evac )
     StgIndStatic *c;
 
     for (c = (StgIndStatic *)caf_list; c != NULL; 
+	 c = (StgIndStatic *)c->static_link) 
+    {
+	evac(&c->indirectee);
+    }
+    for (c = (StgIndStatic *)revertible_caf_list; c != NULL; 
 	 c = (StgIndStatic *)c->static_link) 
     {
 	evac(&c->indirectee);

@@ -28,6 +28,8 @@
 #include <string.h>
 
 StgClosure    *caf_list         = NULL;
+StgClosure    *revertible_caf_list = NULL;
+rtsBool       keepCAFs;
 
 bdescr *small_alloc_list;	/* allocate()d small objects */
 bdescr *pinned_object_block;    /* allocate pinned objects into this block */
@@ -197,6 +199,7 @@ initStorage( void )
 
   weak_ptr_list = NULL;
   caf_list = NULL;
+  revertible_caf_list = NULL;
    
   /* initialise the allocate() interface */
   small_alloc_list = NULL;
@@ -259,19 +262,37 @@ exitStorage (void)
 void
 newCAF(StgClosure* caf)
 {
-  /* Put this CAF on the mutable list for the old generation.
-   * This is a HACK - the IND_STATIC closure doesn't really have
-   * a mut_link field, but we pretend it has - in fact we re-use
-   * the STATIC_LINK field for the time being, because when we
-   * come to do a major GC we won't need the mut_link field
-   * any more and can use it as a STATIC_LINK.
-   */
   ACQUIRE_SM_LOCK;
 
-  ((StgIndStatic *)caf)->saved_info = NULL;
-
-  recordMutableGen(caf, oldest_gen);
-
+  if(keepCAFs)
+  {
+    // HACK:
+    // If we are in GHCi _and_ we are using dynamic libraries,
+    // then we can't redirect newCAF calls to newDynCAF (see below),
+    // so we make newCAF behave almost like newDynCAF.
+    // The dynamic libraries might be used by both the interpreted
+    // program and GHCi itself, so they must not be reverted.
+    // This also means that in GHCi with dynamic libraries, CAFs are not
+    // garbage collected. If this turns out to be a problem, we could
+    // do another hack here and do an address range test on caf to figure
+    // out whether it is from a dynamic library.
+    ((StgIndStatic *)caf)->saved_info  = (StgInfoTable *)caf->header.info;
+    ((StgIndStatic *)caf)->static_link = caf_list;
+    caf_list = caf;
+  }
+  else
+  {
+    /* Put this CAF on the mutable list for the old generation.
+    * This is a HACK - the IND_STATIC closure doesn't really have
+    * a mut_link field, but we pretend it has - in fact we re-use
+    * the STATIC_LINK field for the time being, because when we
+    * come to do a major GC we won't need the mut_link field
+    * any more and can use it as a STATIC_LINK.
+    */
+    ((StgIndStatic *)caf)->saved_info = NULL;
+    recordMutableGen(caf, oldest_gen);
+  }
+  
   RELEASE_SM_LOCK;
 
 #ifdef PAR
@@ -288,6 +309,8 @@ newCAF(StgClosure* caf)
 // object code in GHCi.  In this case we want to retain *all* CAFs in
 // the object code, because they might be demanded at any time from an
 // expression evaluated on the command line.
+// Also, GHCi might want to revert CAFs, so we add these to the
+// revertible_caf_list.
 //
 // The linker hackily arranges that references to newCaf from dynamic
 // code end up pointing to newDynCAF.
@@ -297,8 +320,8 @@ newDynCAF(StgClosure *caf)
     ACQUIRE_SM_LOCK;
 
     ((StgIndStatic *)caf)->saved_info  = (StgInfoTable *)caf->header.info;
-    ((StgIndStatic *)caf)->static_link = caf_list;
-    caf_list = caf;
+    ((StgIndStatic *)caf)->static_link = revertible_caf_list;
+    revertible_caf_list = caf;
 
     RELEASE_SM_LOCK;
 }
