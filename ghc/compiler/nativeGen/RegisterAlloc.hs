@@ -441,11 +441,13 @@ genRaInsn block_live new_instrs instr r_dying w_dying = do
     -- in
 
     -- (a) save any temporaries which will be clobbered by this instruction
-    (clobber_saves, assig_adj) <- saveClobberedTemps real_written r_dying
+    clobber_saves <- saveClobberedTemps real_written r_dying
 
-    -- freeregs <- getFreeRegsR
-    -- assig <- getAssigR
-    -- pprTrace "raInsn" (docToSDoc (pprInstr instr) $$ ppr r_dying <+> ppr w_dying $$ ppr virt_read <+> ppr virt_written $$ text (show freeregs) $$ ppr assig) $ do
+    {-
+    freeregs <- getFreeRegsR
+    assig <- getAssigR
+    pprTrace "raInsn" (docToSDoc (pprInstr instr) $$ ppr r_dying <+> ppr w_dying $$ ppr virt_read <+> ppr virt_written $$ text (show freeregs) $$ ppr assig) $ do
+    -}
 
     -- (b), (c) allocate real regs for all regs read by this instruction.
     (r_spills, r_allocd) <- 
@@ -463,7 +465,7 @@ genRaInsn block_live new_instrs instr r_dying w_dying = do
     releaseRegs r_dying
 
     -- (f) Mark regs which are clobbered as unallocatable
-    clobberRegs real_written assig_adj
+    clobberRegs real_written
 
     -- (g) Allocate registers for temporaries *written* (only)
     (w_spills, w_allocd) <- 
@@ -529,12 +531,10 @@ for allocateRegs on the temps *written*,
 saveClobberedTemps
    :: [RegNo]		   -- real registers clobbered by this instruction
    -> [Reg]		   -- registers which are no longer live after this insn
-   -> RegM ( 
-	[Instr], 	   -- return: instructions to spill any temps that will
-	[(Unique,Loc)] 	   -- be clobbered, and adjustments to make to the 
-        ) 		   -- assignment after reading has taken place.
+   -> RegM [Instr] 	   -- return: instructions to spill any temps that will
+		 	   -- be clobbered.
 
-saveClobberedTemps [] _ = return ([],[]) -- common case
+saveClobberedTemps [] _ = return [] -- common case
 saveClobberedTemps clobbered dying =  do
   assig <- getAssigR
   let
@@ -542,26 +542,36 @@ saveClobberedTemps clobbered dying =  do
 				   reg `elem` clobbered,
 				   temp `notElem` map getUnique dying  ]
   -- in
-  (instrs,assig_adj,assig') <- clobber assig [] [] to_spill
+  (instrs,assig') <- clobber assig [] to_spill
   setAssigR assig'
-  return (instrs,assig_adj)
+  return instrs
  where
-  clobber assig instrs adj [] = return (instrs,adj,assig)
-  clobber assig instrs adj ((temp,reg):rest)
+  clobber assig instrs [] = return (instrs,assig)
+  clobber assig instrs ((temp,reg):rest)
     = do
-      (spill,slot) <- spillR (RealReg reg)
-      clobber (addToUFM assig temp (InBoth reg slot)) 
-	 (spill:instrs) ((temp,InMem slot):adj) rest
 	--ToDo: copy it to another register if possible
+      (spill,slot) <- spillR (RealReg reg)
+      clobber (addToUFM assig temp (InBoth reg slot)) (spill:instrs) rest
 
-
-clobberRegs :: [RegNo] -> [(Unique,Loc)] -> RegM ()
-clobberRegs [] _ = return () -- common case
-clobberRegs clobbered assig_adj = do
+clobberRegs :: [RegNo] -> RegM ()
+clobberRegs [] = return () -- common case
+clobberRegs clobbered = do
   freeregs <- getFreeRegsR
   setFreeRegsR (foldl allocateReg freeregs clobbered)
   assig <- getAssigR
-  setAssigR (addListToUFM assig assig_adj)
+  setAssigR $! clobber assig (ufmToList assig)
+ where
+    -- if the temp was InReg and clobbered, then we will have
+    -- saved it in saveClobberedTemps above.  So the only case
+    -- we have to worry about here is InBoth.  Note that this
+    -- also catches temps which were loaded up during allocation
+    -- of read registers, not just those saved in saveClobberedTemps.
+  clobber assig [] = assig
+  clobber assig ((temp, InBoth reg slot) : rest)
+	| reg `elem` clobbered
+	= clobber (addToUFM assig temp (InMem slot)) rest
+  clobber assig (entry:rest)
+	= clobber assig rest 
 
 -- -----------------------------------------------------------------------------
 -- allocateRegsAndSpill
