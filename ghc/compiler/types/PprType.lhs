@@ -36,6 +36,7 @@ import TyCon		( TyCon, isPrimTyCon, isTupleTyCon, tupleTyConBoxity,
 import CmdLineOpts	( opt_PprStyle_RawTypes )
 import Maybes		( maybeToBool )
 import Name		( getOccString, getOccName )
+import OccName		( occNameUserString )
 import Outputable
 import Unique		( Uniquable(..) )
 import Util             ( lengthIs )
@@ -254,7 +255,7 @@ getTyDescription ty
       TyVarTy _	       	     -> "*"
       AppTy fun _      	     -> getTyDescription fun
       FunTy _ res      	     -> '-' : '>' : fun_result res
-      TyConApp tycon _ 	     -> getOccString tycon
+      TyConApp tycon _ 	     -> occNameUserString (getOccName tycon)
       NoteTy (FTVNote _) ty  -> getTyDescription ty
       NoteTy (SynNote ty1) _ -> getTyDescription ty1
       SourceTy sty	     -> getSourceTyDescription sty
