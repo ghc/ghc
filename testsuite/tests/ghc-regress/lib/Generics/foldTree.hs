@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts -fallow-overlapping-instances #-}
+{-# OPTIONS -fglasgow-exts #-}
 
 {-
 
@@ -21,8 +21,6 @@ term components that relate to the type parameter of a parameterised
 datatype. The consequence of this is illustrated below as well.
 Sec. 6.3 in "Scrap Your Boilerplate ..." discusses such `type
 distinctions' as well.
-
-Contributed by Ralf Laemmel, ralf@cwi.nl
 
 -}
 

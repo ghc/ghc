@@ -1,6 +1,6 @@
-{-# OPTIONS -fglasgow-exts -fallow-overlapping-instances -fallow-undecidable-instances #-}
+{-# OPTIONS -fglasgow-exts -fallow-undecidable-instances #-}
 
-{-:q
+{-
 
 
 We provide an illustrative ScrapYourBoilerplate example for a nested
@@ -9,7 +9,7 @@ instances by the deriving mechanism but we show the intended
 definitions. The overall conclusion is that nested datatypes do not
 pose any challenge for the ScrapYourBoilerplate scheme. Well, this is
 maybe not quite true because it seems like we need to allow
-undecidable instances (in GHC 6.1).
+undecidable instances.
 
 -}
 
@@ -27,12 +27,9 @@ nestTc = mkTyCon "Nest"
 
 
 -- The Typeable instance for the nested datatype    
-instance Typeable a => Typeable (Nest a)
+instance Typeable1 Nest
   where
-    typeOf n = mkAppTy nestTc [typeOf (paratype n)]
-      where
-	paratype :: Nest a -> a
-	paratype _ = undefined
+    typeOf1 n = mkTyConApp nestTc []
 
 
 -- The Data instance for the nested datatype

@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts -fallow-overlapping-instances #-}
+{-# OPTIONS -fglasgow-exts #-}
 
 {-
 
