@@ -610,6 +610,10 @@ ifeq "$(HAPPY)" ""
 HAPPY			= $(HAPPY_PREFIX)happy
 endif
 
+ifeq ($(Ghc2_0),NO)
+SRC_HAPPY_OPTS		= -1.2
+endif
+
 #
 # Stuff from fptools/literate
 #
