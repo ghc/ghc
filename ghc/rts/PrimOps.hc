@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.78 2001/03/26 13:43:05 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.79 2001/07/06 14:11:38 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -808,6 +808,38 @@ FN_(yieldzh_fast)
   FE_
 }
 
+/* -----------------------------------------------------------------------------
+ * MVar primitives
+ *
+ * take & putMVar work as follows.  Firstly, an important invariant:
+ *
+ *    If the MVar is full, then the blocking queue contains only
+ *    threads blocked on putMVar, and if the MVar is empty then the
+ *    blocking queue contains only threads blocked on takeMVar.
+ *
+ * takeMvar:
+ *    MVar empty : then add ourselves to the blocking queue
+ *    MVar full  : remove the value from the MVar, and
+ *                 blocking queue empty     : return
+ *                 blocking queue non-empty : perform the first blocked putMVar
+ *                                            from the queue, and wake up the
+ *                                            thread (MVar is now full again)
+ *
+ * putMVar is just the dual of the above algorithm.
+ *
+ * How do we "perform a putMVar"?  Well, we have to fiddle around with
+ * the stack of the thread waiting to do the putMVar.  See
+ * stg_block_putmvar and stg_block_takemvar in HeapStackCheck.c for
+ * the stack layout, and the PerformPut and PerformTake macros below.
+ *
+ * It is important that a blocked take or put is woken up with the
+ * take/put already performed, because otherwise there would be a
+ * small window of vulnerability where the thread could receive an
+ * exception and never perform its take or put, and we'd end up with a
+ * deadlock.
+ *
+ * -------------------------------------------------------------------------- */
+
 FN_(newMVarzh_fast)
 {
   StgMVar *mvar;
@@ -829,6 +861,18 @@ FN_(newMVarzh_fast)
   RET_P(mvar);
   FE_
 }
+
+#define PerformTake(tso, value) ({			\
+    (tso)->sp[1] = (W_)value;				\
+    (tso)->sp[0] = (W_)&stg_gc_unpt_r1_ret_info;	\
+  })
+
+#define PerformPut(tso) ({				\
+    StgClosure *val = (StgClosure *)(tso)->sp[2];	\
+    (tso)->sp[2] = (W_)&stg_gc_noregs_ret_info;		\
+    (tso)->sp += 2;					\
+    val;						\
+  })
 
 FN_(takeMVarzh_fast)
 {
@@ -865,16 +909,21 @@ FN_(takeMVarzh_fast)
     /* unlock the MVar */
     mvar->header.info = &stg_EMPTY_MVAR_info;
 #endif
-    BLOCK(R1_PTR, takeMVarzh_fast);
+    JMP_(stg_block_takemvar);
   }
 
+  /* we got the value... */
   val = mvar->value;
-  mvar->value = (StgClosure *)&stg_END_TSO_QUEUE_closure;
 
-  /* wake up the first thread on the queue
-   */
   if (mvar->head != (StgTSO *)&stg_END_TSO_QUEUE_closure) {
+      /* There are putMVar(s) waiting... 
+       * wake up the first thread on the queue
+       */
       ASSERT(mvar->head->why_blocked == BlockedOnMVar);
+
+      /* actually perform the putMVar for the thread that we just woke up */
+      mvar->value = PerformPut(mvar->head);
+
 #if defined(GRAN) || defined(PAR)
       /* ToDo: check 2nd arg (mvar) is right */
       mvar->head = RET_STGCALL2(StgTSO *,unblockOne,mvar->head,mvar);
@@ -884,15 +933,23 @@ FN_(takeMVarzh_fast)
       if (mvar->head == (StgTSO *)&stg_END_TSO_QUEUE_closure) {
 	  mvar->tail = (StgTSO *)&stg_END_TSO_QUEUE_closure;
       }
+#ifdef SMP
+      /* unlock in the SMP case */
+      SET_INFO(mvar,&stg_FULL_MVAR_info);
+#endif
+      TICK_RET_UNBOXED_TUP(1);
+      RET_P(val);
+  } else {
+      /* No further putMVars, MVar is now empty */
+
+      /* do this last... we might have locked the MVar in the SMP case,
+       * and writing the info pointer will unlock it.
+       */
+      SET_INFO(mvar,&stg_EMPTY_MVAR_info);
+      mvar->value = (StgClosure *)&stg_END_TSO_QUEUE_closure;
+      TICK_RET_UNBOXED_TUP(1);
+      RET_P(val);
   }
-
-  /* do this last... we might have locked the MVar in the SMP case,
-   * and writing the info pointer will unlock it.
-   */
-  SET_INFO(mvar,&stg_EMPTY_MVAR_info);
-
-  TICK_RET_UNBOXED_TUP(1);
-  RET_P(val);
   FE_
 }
 
@@ -916,21 +973,28 @@ FN_(tryTakeMVarzh_fast)
   if (info == &stg_EMPTY_MVAR_info) {
 
 #ifdef SMP
-    /* unlock the MVar */
-    mvar->header.info = &stg_EMPTY_MVAR_info;
+      /* unlock the MVar */
+      SET_INFO(mvar,&stg_EMPTY_MVAR_info);
 #endif
 
-    /* HACK: we need a pointer to pass back, so we abuse NO_FINALIZER_closure */
-    RET_NP(0, &stg_NO_FINALIZER_closure);
+      /* HACK: we need a pointer to pass back, 
+       * so we abuse NO_FINALIZER_closure
+       */
+      RET_NP(0, &stg_NO_FINALIZER_closure);
   }
 
+  /* we got the value... */
   val = mvar->value;
-  mvar->value = (StgClosure *)&stg_END_TSO_QUEUE_closure;
 
-  /* wake up the first thread on the queue
-   */
   if (mvar->head != (StgTSO *)&stg_END_TSO_QUEUE_closure) {
+      /* There are putMVar(s) waiting... 
+       * wake up the first thread on the queue
+       */
       ASSERT(mvar->head->why_blocked == BlockedOnMVar);
+
+      /* actually perform the putMVar for the thread that we just woke up */
+      mvar->value = PerformPut(mvar->head);
+
 #if defined(GRAN) || defined(PAR)
       /* ToDo: check 2nd arg (mvar) is right */
       mvar->head = RET_STGCALL2(StgTSO *,unblockOne,mvar->head,mvar);
@@ -940,15 +1004,23 @@ FN_(tryTakeMVarzh_fast)
       if (mvar->head == (StgTSO *)&stg_END_TSO_QUEUE_closure) {
 	  mvar->tail = (StgTSO *)&stg_END_TSO_QUEUE_closure;
       }
+#ifdef SMP
+      /* unlock in the SMP case */
+      SET_INFO(mvar,&stg_FULL_MVAR_info);
+#endif
+      TICK_RET_UNBOXED_TUP(1);
+      RET_P(val);
+  } else {
+      /* No further putMVars, MVar is now empty */
+
+      /* do this last... we might have locked the MVar in the SMP case,
+       * and writing the info pointer will unlock it.
+       */
+      SET_INFO(mvar,&stg_EMPTY_MVAR_info);
+      mvar->value = (StgClosure *)&stg_END_TSO_QUEUE_closure;
+      TICK_RET_UNBOXED_TUP(1);
+      RET_P(val);
   }
-
-  /* do this last... we might have locked the MVar in the SMP case,
-   * and writing the info pointer will unlock it.
-   */
-  SET_INFO(mvar,&stg_EMPTY_MVAR_info);
-
-  TICK_RET_UNBOXED_TUP(1);
-  RET_NP(1,val);
   FE_
 }
 
@@ -981,34 +1053,42 @@ FN_(putMVarzh_fast)
 
 #ifdef SMP
     /* unlock the MVar */
-    mvar->header.info = &stg_FULL_MVAR_info;
+    SET_INFO(mvar,&stg_FULL_MVAR_info);
 #endif
-    BLOCK( R1_PTR | R2_PTR, putMVarzh_fast );
+    JMP_(stg_block_putmvar);
   }
   
-  mvar->value = R2.cl;
-
-  /* wake up the first thread on the queue, it will continue with the
-   * takeMVar operation and mark the MVar empty again.
-   */
   if (mvar->head != (StgTSO *)&stg_END_TSO_QUEUE_closure) {
-    ASSERT(mvar->head->why_blocked == BlockedOnMVar);
+      /* There are takeMVar(s) waiting: wake up the first one
+       */
+      ASSERT(mvar->head->why_blocked == BlockedOnMVar);
+
+      /* actually perform the takeMVar */
+      PerformTake(mvar->head, R2.cl);
+      
 #if defined(GRAN) || defined(PAR)
-    /* ToDo: check 2nd arg (mvar) is right */
-    mvar->head = RET_STGCALL2(StgTSO *,unblockOne,mvar->head,mvar);
+      /* ToDo: check 2nd arg (mvar) is right */
+      mvar->head = RET_STGCALL2(StgTSO *,unblockOne,mvar->head,mvar);
 #else
-    mvar->head = RET_STGCALL1(StgTSO *,unblockOne,mvar->head);
+      mvar->head = RET_STGCALL1(StgTSO *,unblockOne,mvar->head);
 #endif
-    if (mvar->head == (StgTSO *)&stg_END_TSO_QUEUE_closure) {
-      mvar->tail = (StgTSO *)&stg_END_TSO_QUEUE_closure;
-    }
+      if (mvar->head == (StgTSO *)&stg_END_TSO_QUEUE_closure) {
+	  mvar->tail = (StgTSO *)&stg_END_TSO_QUEUE_closure;
+      }
+#ifdef SMP
+      /* unlocks the MVar in the SMP case */
+      SET_INFO(mvar,&stg_EMPTY_MVAR_info);
+#endif
+      JMP_(ENTRY_CODE(Sp[0]));
+  } else {
+      /* No further takes, the MVar is now full. */
+      mvar->value = R2.cl;
+      /* unlocks the MVar in the SMP case */
+      SET_INFO(mvar,&stg_FULL_MVAR_info);
+      JMP_(ENTRY_CODE(Sp[0]));
   }
 
-  /* unlocks the MVar in the SMP case */
-  SET_INFO(mvar,&stg_FULL_MVAR_info);
-
-  /* ToDo: yield here for better communication performance? */
-  JMP_(ENTRY_CODE(Sp[0]));
+  /* ToDo: yield afterward for better communication performance? */
   FE_
 }
 
@@ -1038,29 +1118,37 @@ FN_(tryPutMVarzh_fast)
     RET_N(0);
   }
   
-  mvar->value = R2.cl;
-
-  /* wake up the first thread on the queue, it will continue with the
-   * takeMVar operation and mark the MVar empty again.
-   */
   if (mvar->head != (StgTSO *)&stg_END_TSO_QUEUE_closure) {
-    ASSERT(mvar->head->why_blocked == BlockedOnMVar);
+      /* There are takeMVar(s) waiting: wake up the first one
+       */
+      ASSERT(mvar->head->why_blocked == BlockedOnMVar);
+
+      /* actually perform the takeMVar */
+      PerformTake(mvar->head, R2.cl);
+      
 #if defined(GRAN) || defined(PAR)
-    /* ToDo: check 2nd arg (mvar) is right */
-    mvar->head = RET_STGCALL2(StgTSO *,unblockOne,mvar->head,mvar);
+      /* ToDo: check 2nd arg (mvar) is right */
+      mvar->head = RET_STGCALL2(StgTSO *,unblockOne,mvar->head,mvar);
 #else
-    mvar->head = RET_STGCALL1(StgTSO *,unblockOne,mvar->head);
+      mvar->head = RET_STGCALL1(StgTSO *,unblockOne,mvar->head);
 #endif
-    if (mvar->head == (StgTSO *)&stg_END_TSO_QUEUE_closure) {
-      mvar->tail = (StgTSO *)&stg_END_TSO_QUEUE_closure;
-    }
+      if (mvar->head == (StgTSO *)&stg_END_TSO_QUEUE_closure) {
+	  mvar->tail = (StgTSO *)&stg_END_TSO_QUEUE_closure;
+      }
+#ifdef SMP
+      /* unlocks the MVar in the SMP case */
+      SET_INFO(mvar,&stg_EMPTY_MVAR_info);
+#endif
+      JMP_(ENTRY_CODE(Sp[0]));
+  } else {
+      /* No further takes, the MVar is now full. */
+      mvar->value = R2.cl;
+      /* unlocks the MVar in the SMP case */
+      SET_INFO(mvar,&stg_FULL_MVAR_info);
+      JMP_(ENTRY_CODE(Sp[0]));
   }
 
-  /* unlocks the MVar in the SMP case */
-  SET_INFO(mvar,&stg_FULL_MVAR_info);
-
-  /* ToDo: yield here for better communication performance? */
-  RET_N(1);
+  /* ToDo: yield afterward for better communication performance? */
   FE_
 }
 

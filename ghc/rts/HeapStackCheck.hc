@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.16 2001/03/23 16:36:21 simonmar Exp $
+ * $Id: HeapStackCheck.hc,v 1.17 2001/07/06 14:11:38 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -123,7 +123,6 @@
   CurrentTSO->what_next = ThreadEnterGHC;\
   R1.i = ThreadBlocked;			\
   JMP_(StgReturn);
-
 
 /* -----------------------------------------------------------------------------
    Heap Checks
@@ -663,11 +662,11 @@ EXTFUN(stg_gc_noregs)
 
 /*-- R1 is boxed/unpointed -------------------------------------------------- */
 
-INFO_TABLE_SRT_BITMAP(stg_gc_unpt_r1_info, stg_gc_unpt_r1_entry, 0/*BITMAP*/, 
+INFO_TABLE_SRT_BITMAP(stg_gc_unpt_r1_ret_info, stg_gc_unpt_r1_ret, 0/*BITMAP*/, 
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
 		      RET_SMALL,, EF_, 0, 0);
 
-EXTFUN(stg_gc_unpt_r1_entry)
+EXTFUN(stg_gc_unpt_r1_ret)
 {
   FB_
   R1.w = Sp[0];
@@ -681,19 +680,19 @@ EXTFUN(stg_gc_unpt_r1)
   FB_
   Sp -= 2;
   Sp[1] = R1.w;
-  Sp[0] = (W_)&stg_gc_unpt_r1_info;
+  Sp[0] = (W_)&stg_gc_unpt_r1_ret_info;
   GC_GENERIC
   FE_
 }
 
 /*-- R1 is unboxed -------------------------------------------------- */
 
-INFO_TABLE_SRT_BITMAP(stg_gc_unbx_r1_info, stg_gc_unbx_r1_entry, 1/*BITMAP*/,
+INFO_TABLE_SRT_BITMAP(stg_gc_unbx_r1_ret_info, stg_gc_unbx_r1_ret, 1/*BITMAP*/,
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
 		      RET_SMALL,, EF_, 0, 0);
 /* the 1 is a bitmap - i.e. 1 non-pointer word on the stack. */
 
-EXTFUN(stg_gc_unbx_r1_entry)
+EXTFUN(stg_gc_unbx_r1_ret)
 {
   FB_
   R1.w = Sp[0];
@@ -707,18 +706,18 @@ EXTFUN(stg_gc_unbx_r1)
   FB_
   Sp -= 2;
   Sp[1] = R1.w;
-  Sp[0] = (W_)&stg_gc_unbx_r1_info;
+  Sp[0] = (W_)&stg_gc_unbx_r1_ret;
   GC_GENERIC
   FE_
 }
 
 /*-- F1 contains a float ------------------------------------------------- */
 
-INFO_TABLE_SRT_BITMAP(stg_gc_f1_info, stg_gc_f1_entry, 1/*BITMAP*/,
+INFO_TABLE_SRT_BITMAP(stg_gc_f1_ret_info, stg_gc_f1_ret, 1/*BITMAP*/,
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
 		      RET_SMALL,, EF_, 0, 0);
 
-EXTFUN(stg_gc_f1_entry)
+EXTFUN(stg_gc_f1_ret)
 {
   FB_
   F1 = PK_FLT(Sp);
@@ -732,7 +731,7 @@ EXTFUN(stg_gc_f1)
   FB_
   Sp -= 2;
   ASSIGN_FLT(Sp+1, F1);
-  Sp[0] = (W_)&stg_gc_f1_info;
+  Sp[0] = (W_)&stg_gc_f1_ret_info;
   GC_GENERIC
   FE_
 }
@@ -747,11 +746,11 @@ EXTFUN(stg_gc_f1)
 #  define DBL_BITMAP 3
 #endif 
 
-INFO_TABLE_SRT_BITMAP(stg_gc_d1_info, stg_gc_d1_entry, DBL_BITMAP,
+INFO_TABLE_SRT_BITMAP(stg_gc_d1_ret_info, stg_gc_d1_ret, DBL_BITMAP,
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
 		      RET_SMALL,, EF_, 0, 0);
 
-EXTFUN(stg_gc_d1_entry)
+EXTFUN(stg_gc_d1_ret)
 {
   FB_
   D1 = PK_DBL(Sp);
@@ -765,7 +764,7 @@ EXTFUN(stg_gc_d1)
   FB_
   Sp -= 1 + sizeofW(StgDouble);
   ASSIGN_DBL(Sp+1,D1);
-  Sp[0] = (W_)&stg_gc_d1_info;
+  Sp[0] = (W_)&stg_gc_d1_ret_info;
   GC_GENERIC
   FE_
 }
@@ -800,11 +799,11 @@ EXTFUN(stg_gc_d1)
 
 /*---- R1 contains a pointer: ------ */
 
-INFO_TABLE_SRT_BITMAP(stg_gc_ut_1_0_info, stg_gc_ut_1_0_entry, 1/*BITMAP*/, 
+INFO_TABLE_SRT_BITMAP(stg_gc_ut_1_0_ret_info, stg_gc_ut_1_0_ret, 1/*BITMAP*/, 
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
 		      RET_SMALL,, EF_, 0, 0);
 
-EXTFUN(stg_gc_ut_1_0_entry)
+EXTFUN(stg_gc_ut_1_0_ret)
 {
   FB_
   R1.w = Sp[1];
@@ -819,18 +818,18 @@ EXTFUN(stg_gc_ut_1_0)
   Sp -= 3;
   Sp[2] = R1.w;
   Sp[1] = R2.w;
-  Sp[0] = (W_)&stg_gc_ut_1_0_info;
+  Sp[0] = (W_)&stg_gc_ut_1_0_ret_info;
   GC_GENERIC
   FE_
 }
 
 /*---- R1 contains a non-pointer: ------ */
 
-INFO_TABLE_SRT_BITMAP(stg_gc_ut_0_1_info, stg_gc_ut_0_1_entry, 3/*BITMAP*/, 
+INFO_TABLE_SRT_BITMAP(stg_gc_ut_0_1_ret_info, stg_gc_ut_0_1_ret, 3/*BITMAP*/, 
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
 		      RET_SMALL,, EF_, 0, 0);
 
-EXTFUN(stg_gc_ut_0_1_entry)
+EXTFUN(stg_gc_ut_0_1_ret)
 {
   FB_
   R1.w = Sp[1];
@@ -843,7 +842,7 @@ EXTFUN(stg_gc_ut_0_1)
 {
   FB_
   Sp -= 3;
-  Sp[0] = (W_)&stg_gc_ut_0_1_info;
+  Sp[0] = (W_)&stg_gc_ut_0_1_ret_info;
   Sp[1] = R2.w;
   Sp[2] = R1.w;
   GC_GENERIC
@@ -1213,5 +1212,73 @@ FN_(stg_block_1)
   Sp--;
   Sp[0] = R1.w;
   BLOCK_ENTER;
+  FE_
+}
+
+/* -----------------------------------------------------------------------------
+ * takeMVar/putMVar-specific blocks
+ *
+ * Stack layout for a thread blocked in takeMVar:
+ *      
+ *       ret. addr
+ *       ptr to MVar   (R1)
+ *       stg_block_takemvar_ret
+ *
+ * Stack layout for a thread blocked in putMVar:
+ *      
+ *       ret. addr
+ *       ptr to Value  (R2)
+ *       ptr to MVar   (R1)
+ *       stg_block_putmvar_ret
+ *
+ * See PrimOps.hc for a description of the workings of take/putMVar.
+ * 
+ * -------------------------------------------------------------------------- */
+
+INFO_TABLE_SRT_BITMAP(stg_block_takemvar_ret_info,  stg_block_takemvar_ret,
+		      0/*BITMAP*/, 0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		      RET_SMALL,, IF_, 0, 0);
+
+IF_(stg_block_takemvar_ret)
+{
+  FB_
+  R1.w = Sp[0];
+  Sp++;
+  JMP_(takeMVarzh_fast);
+  FE_
+}
+
+FN_(stg_block_takemvar)
+{
+  FB_
+  Sp -= 2;
+  Sp[1] = R1.w;
+  Sp[0] = (W_)&stg_block_takemvar_ret;
+  BLOCK_GENERIC;
+  FE_
+}
+
+INFO_TABLE_SRT_BITMAP(stg_block_putmvar_ret_info,  stg_block_putmvar_ret,
+		      0/*BITMAP*/, 0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		      RET_SMALL,, IF_, 0, 0);
+
+IF_(stg_block_putmvar_ret)
+{
+  FB_
+  R2.w = Sp[1];
+  R1.w = Sp[0];
+  Sp += 2;
+  JMP_(putMVarzh_fast);
+  FE_
+}
+
+FN_(stg_block_putmvar)
+{
+  FB_
+  Sp -= 3;
+  Sp[2] = R2.w;
+  Sp[1] = R1.w;
+  Sp[0] = (W_)&stg_block_putmvar_ret;
+  BLOCK_GENERIC;
   FE_
 }
