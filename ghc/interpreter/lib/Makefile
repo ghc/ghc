@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.11 2000/04/06 00:01:27 andy Exp $ 
+# $Id: Makefile,v 1.12 2000/04/10 02:28:08 andy Exp $ 
 # -------------------------------------------------------------------------- #
 
 TOP = ../..
@@ -67,7 +67,7 @@ LIBS =  $(PRELUDE) \
 all :: $(LIBS)
 
 
-HUGSCPP = ../../utils/hscpp/hscpp -D__HUGS__ -DUSE_REPORT_PRELUDE -D__HASKELL98__
+HUGSCPP = ../../utils/hscpp/hscpp -D__HUGS__ -D__HASKELL98__
 
 %.lhs :: $(GHC_LIB_DIR)/std/%.lhs
 	$(HUGSCPP) -I../../includes $< > $*.lhs
