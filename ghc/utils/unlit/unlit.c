@@ -69,7 +69,7 @@
 #endif
 
 typedef enum { START, BLANK, TEXT, DEFN, BEGIN, /*PSEUDO,*/ END, HASH, SHEBANG } line;
-#define isWhitespace(c)  (c==' '  || c=='\t')
+#define isWhitespace(c)  (c==' '  || c=='\t' || c=='\r')
 #define isLineTerm(c)    (c=='\n' || c==EOF)
 
 static int noisy  = 1;   /* 0 => keep quiet about errors, 1 => report errors */
