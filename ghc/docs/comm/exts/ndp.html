@@ -108,7 +108,7 @@ apat  -> '[:' pat1 ',' ... ',' patk ':]'	     (array pattern, k >= 0)
       defines the type <code>[::]</code> and operations to create, process,
       and inspect parallel arrays.  The type as well as the names of some of
       the operations are also hardwired in <a
-      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/prelude/TysWiredIn.lhs"><code>TysWiredIn<code></a>
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/prelude/TysWiredIn.lhs"><code>TysWiredIn</code></a>
       (see the definition of <code>parrTyCon</code> in this module) and <a
       href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/prelude/PrelNames.lhs"><code>PrelNames</code></a>.
       This is again very much like the case of lists, where the type is
@@ -170,7 +170,7 @@ apat  -> '[:' pat1 ',' ... ',' patk ':]'	     (array pattern, k >= 0)
     <p>
       The solution to this is an (unlimited) set of <em>fake</em> constructors
       for parallel arrays, courtesy of <a
-      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/prelude/TysWiredIn.lhs"><code>TysWiredIn<code></a><code>.parrFakeCon</code>.  
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/prelude/TysWiredIn.lhs"><code>TysWiredIn</code></a><code>.parrFakeCon</code>.  
       In other words, any pattern of the form <code>[:<i>p<sub>1</sub></i>,
       ..., <i>p<sub>n</sub></i>:]</code> is transformed into 
     <blockquote>
