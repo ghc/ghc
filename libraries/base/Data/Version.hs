@@ -37,13 +37,15 @@ import Prelude -- necessary to get dependencies right
 -- of GHC.  In which case, we might need to pick up ReadP from 
 -- Distribution.Compat.ReadP, because the version in 
 -- Text.ParserCombinators.ReadP doesn't have all the combinators we need.
-#if __GLASGOW_HASKELL__ <= 602
-import Distribution.Compat.ReadP
-#else
+#if __GLASGOW_HASKELL__ >= 603 || __HUGS__
 import Text.ParserCombinators.ReadP
+#else
+import Distribution.Compat.ReadP
 #endif
 
-#if __GLASGOW_HASKELL__ < 602
+#if !__GLASGOW_HASKELL__
+import Data.Typeable 	( Typeable, TyCon, mkTyCon, mkTyConApp )
+#elif __GLASGOW_HASKELL__ < 602
 import Data.Dynamic	( Typeable(..), TyCon, mkTyCon, mkAppTy )
 #else
 import Data.Typeable 	( Typeable )
@@ -102,7 +104,13 @@ data Version =
 #endif
 	)
 
-#if __GLASGOW_HASKELL__ < 602
+#if !__GLASGOW_HASKELL__
+versionTc :: TyCon
+versionTc = mkTyCon "Version"
+
+instance Typeable Version where
+  typeOf _ = mkTyConApp versionTc []
+#elif __GLASGOW_HASKELL__ < 602
 versionTc :: TyCon
 versionTc = mkTyCon "Version"
 
@@ -132,7 +140,7 @@ showVersion (Version branch tags)
 
 -- | A parser for versions in the format produced by 'showVersion'.
 --
-#if __GLASGOW_HASKELL__ <= 602
+#if __GLASGOW_HASKELL__ <= 602 && !__HUGS__
 parseVersion :: ReadP r Version
 #else
 parseVersion :: ReadP Version
