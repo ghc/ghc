@@ -6,7 +6,7 @@
 \begin{code}
 module Rules (
 	RuleBase, emptyRuleBase, 
-	extendRuleBase, extendRuleBaseList, 
+	extendRuleBaseList, 
 	ruleBaseIds, getLocalRules,
 	pprRuleBase, ruleCheckProgram,
 

@@ -10,7 +10,7 @@ module NewDemand(
 	isTop, isAbsent, seqDemand,
 
 	DmdType(..), topDmdType, botDmdType, mkDmdType, mkTopDmdType, 
-		dmdTypeDepth, dmdTypeRes, seqDmdType,
+		dmdTypeDepth, seqDmdType,
 	DmdEnv, emptyDmdEnv,
 	DmdResult(..), retCPR, isBotRes, returnsCPR, resTypeArgDmd,
 	
@@ -18,7 +18,7 @@ module NewDemand(
 
 	StrictSig(..), mkStrictSig, topSig, botSig, cprSig,
         isTopSig,
-	splitStrictSig, strictSigResInfo,
+	splitStrictSig,
 	pprIfaceStrictSig, appIsBottom, isBottomingSig, seqStrictSig,
      ) where
 
@@ -242,9 +242,6 @@ mkTopDmdType ds res = DmdType emptyDmdEnv ds res
 
 dmdTypeDepth :: DmdType -> Arity
 dmdTypeDepth (DmdType _ ds _) = length ds
-
-dmdTypeRes :: DmdType -> DmdResult
-dmdTypeRes (DmdType _ _ res_ty) = res_ty
 \end{code}
 
 
@@ -294,9 +291,6 @@ mkStrictSig dmd_ty = StrictSig dmd_ty
 
 splitStrictSig :: StrictSig -> ([Demand], DmdResult)
 splitStrictSig (StrictSig (DmdType _ dmds res)) = (dmds, res)
-
-strictSigResInfo :: StrictSig -> DmdResult
-strictSigResInfo (StrictSig (DmdType _ _ res)) = res
 
 isTopSig (StrictSig ty) = isTopDmdType ty
 

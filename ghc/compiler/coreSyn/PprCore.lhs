@@ -9,9 +9,9 @@
 
 \begin{code}
 module PprCore (
-	pprCoreExpr, pprParendExpr, pprIdBndr,
+	pprCoreExpr, pprParendExpr,
 	pprCoreBinding, pprCoreBindings, pprCoreAlt,
-	pprIdRules, pprCoreRule
+	pprIdRules
     ) where
 
 #include "HsVersions.h"

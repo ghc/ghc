@@ -9,8 +9,7 @@
 
 \begin{code}
 module CoreTidy (
-	tidyBind, tidyExpr, 
-	tidyBndr, tidyBndrs, tidyVarOcc,
+	tidyExpr, tidyVarOcc,
 	tidyIdRules, pprTidyIdRules
     ) where
 

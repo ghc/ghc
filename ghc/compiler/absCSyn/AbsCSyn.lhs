@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.55 2003/07/28 16:05:30 simonmar Exp $
+% $Id: AbsCSyn.lhs,v 1.56 2003/11/17 14:47:53 simonmar Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -40,8 +40,6 @@ import FastString
 @AbstractC@ is a list of Abstract~C statements, but the data structure
 is tree-ish, for easier and more efficient putting-together.
 \begin{code}
-absCNop = AbsCNop
-
 data AbstractC
   = AbsCNop
   | AbsCStmts		AbstractC AbstractC
@@ -461,9 +459,6 @@ type HeapOffset = Int			-- ToDo: remove
 
 type VirtualHeapOffset	= HeapOffset
 type VirtualSpOffset	= Int
-
-type HpRelOffset	= HeapOffset
-type SpRelOffset	= Int
 \end{code}
 
 %************************************************************************

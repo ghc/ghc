@@ -30,12 +30,12 @@ module StgSyn (
 	StgOp(..),
 
 	-- SRTs
-	SRT(..), noSRT, nonEmptySRT,
+	SRT(..),
 
 	-- utils
-	stgBindHasCafRefs,  stgArgHasCafRefs, stgRhsArity, getArgPrimRep, 
+	stgArgHasCafRefs,
 	isDllConApp, isStgTypeArg,
-	stgArgType, stgBinders,
+	stgArgType,
 
 	pprStgBinding, pprStgBindings, pprStgBindingsWithSRTs
 
@@ -85,10 +85,6 @@ There is one SRT for each group of bindings.
 data GenStgBinding bndr occ
   = StgNonRec	bndr (GenStgRhs bndr occ)
   | StgRec	[(bndr, GenStgRhs bndr occ)]
-
-stgBinders :: GenStgBinding bndr occ -> [bndr]
-stgBinders (StgNonRec b _) = [b]
-stgBinders (StgRec bs)     = map fst bs
 \end{code}
 
 %************************************************************************
@@ -105,9 +101,6 @@ data GenStgArg occ
 \end{code}
 
 \begin{code}
-getArgPrimRep (StgVarArg local) = idPrimRep local
-getArgPrimRep (StgLitArg lit)	= literalPrimRep lit
-
 isStgTypeArg (StgTypeArg _) = True
 isStgTypeArg other	    = False
 
@@ -403,19 +396,6 @@ The second flavour of right-hand-side is for constructors (simple but important)
 \end{code}
 
 \begin{code}
-stgRhsArity :: StgRhs -> Int
-stgRhsArity (StgRhsClosure _ _ _ _ _ bndrs _) = count isId bndrs
-  -- The arity never includes type parameters, so
-  -- when keeping type arguments and binders in the Stg syntax 
-  -- (opt_RuntimeTypes) we have to fliter out the type binders.
-stgRhsArity (StgRhsCon _ _ _) = 0
-\end{code}
-
-\begin{code}
-stgBindHasCafRefs :: GenStgBinding bndr Id -> Bool
-stgBindHasCafRefs (StgNonRec _ rhs) = rhsHasCafRefs rhs
-stgBindHasCafRefs (StgRec binds)    = any rhsHasCafRefs (map snd binds)
-
 rhsHasCafRefs (StgRhsClosure _ _ _ upd srt _ _) 
   = isUpdatable upd || nonEmptySRT srt
 rhsHasCafRefs (StgRhsCon _ _ args)
