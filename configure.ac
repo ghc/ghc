@@ -105,12 +105,12 @@ alpha*-unknown-freebsd*)
         HostVendor_CPP='unknown'
         HostOS_CPP='freebsd'
         ;;
-amd64*-unknown-openbsd*)
-	HostPlatform=amd64-unknown-openbsd
-	TargetPlatform=amd64-unknown-openbsd
-	BuildPlatform=amd64-unknown-openbsd
-        HostPlatform_CPP='amd64_unknown_openbsd'
-        HostArch_CPP='amd64'
+amd64*-*-openbsd*)
+	HostPlatform=x86_64-unknown-openbsd
+	TargetPlatform=x86_64-unknown-openbsd
+	BuildPlatform=x86_64-unknown-openbsd
+        HostPlatform_CPP='x86_64_unknown_openbsd'
+        HostArch_CPP='x86_64'
         HostVendor_CPP='unknown'
         HostOS_CPP='openbsd'
         ;;
