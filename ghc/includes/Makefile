@@ -55,6 +55,9 @@ $(H_CONFIG) :
 	@echo >> $@
 	@echo "#define $(HostOS_CPP)_HOST_OS		1" >> $@
 	@echo "#define $(HostOS_CPP)_TARGET_OS		1" >> $@  
+	@echo "#ifndef $(HostPlaform_GNU)_TARGET_OS	 " >> $@  
+	@echo "#define $(HostPlaform_GNU)_TARGET_OS	1" >> $@  
+	@echo "#endif 	 				 " >> $@  
 	@echo "#define $(HostOS_CPP)_BUILD_OS 		1" >> $@
 	@echo >> $@
 	@echo "#define $(HostVendor_CPP)_HOST_VENDOR	1" >> $@
