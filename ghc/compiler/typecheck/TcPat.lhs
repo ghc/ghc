@@ -323,9 +323,15 @@ tcPat tc_bndr pat@(NPatIn over_lit mb_neg) pat_ty
 	      emptyBag, emptyBag, emptyLIE)
   where
     origin = PatOrigin pat
-    lit' = case over_lit of
-		HsIntegral i _   -> HsInteger i
-		HsFractional f _ -> HsRat f pat_ty
+
+	-- The literal in an NPatIn is always positive...
+	-- But in NPat, the literal is used to find identical patterns
+	-- 	so we must negate the literal when necessary!
+    lit' = case (over_lit, mb_neg) of
+	     (HsIntegral i _, Nothing)   -> HsInteger i
+	     (HsIntegral i _, Just _)    -> HsInteger (-i)
+	     (HsFractional f _, Nothing) -> HsRat f pat_ty
+	     (HsFractional f _, Just _)  -> HsRat (-f) pat_ty
 \end{code}
 
 %************************************************************************
