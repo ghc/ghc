@@ -199,10 +199,10 @@ freeStringBuffer :: StringBuffer -> IO ()
 
 #if __GLASGOW_HASKELL__ >= 411
 stringToStringBuffer str =
-  do let sz@(I# sz#) = length str + 1
-     (Ptr a#) <- mallocBytes sz
+  do let sz@(I# sz#) = length str
+     (Ptr a#) <- mallocBytes (sz+1)
      fill_in str (A# a#)
-     writeCharOffAddr (A# a#) (sz-1) '\0'		-- sentinel
+     writeCharOffAddr (A# a#) sz '\0'		-- sentinel
      return (StringBuffer a# sz# 0# 0#)
  where
   fill_in [] _ = return ()
