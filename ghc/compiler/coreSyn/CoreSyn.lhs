@@ -26,7 +26,7 @@ module CoreSyn (
 
 	-- Unfoldings
 	Unfolding(..),	UnfoldingGuidance(..), 	-- Both abstract everywhere but in CoreUnfold.lhs
-	noUnfolding, mkOtherCon,
+	noUnfolding, evaldUnfolding, mkOtherCon,
 	unfoldingTemplate, maybeUnfoldingTemplate, otherCons, 
 	isValueUnfolding, isEvaldUnfolding, isCheapUnfolding, isCompulsoryUnfolding,
 	hasUnfolding, hasSomeUnfolding, neverUnfold,
@@ -268,8 +268,10 @@ data UnfoldingGuidance
 				-- a context (case (thing args) of ...),
 				-- (where there are the right number of arguments.)
 
-noUnfolding = NoUnfolding
-mkOtherCon  = OtherCon
+noUnfolding    = NoUnfolding
+evaldUnfolding = OtherCon []
+
+mkOtherCon = OtherCon
 
 seqUnfolding :: Unfolding -> ()
 seqUnfolding (CoreUnfolding e top b1 b2 g)

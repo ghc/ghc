@@ -358,7 +358,7 @@ mkWWstr_one arg
 	-- of dropping seqs in the worker
       Eval (Poly Abs)
 	-> let
-		arg_w_unf = arg `setIdUnfolding` mkOtherCon []
+		arg_w_unf = arg `setIdUnfolding` evaldUnfolding
 		-- Tell the worker arg that it's sure to be evaluated
 		-- so that internal seqs can be dropped
 	   in

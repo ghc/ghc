@@ -214,6 +214,8 @@ mkDataConIds wrap_name wkr_name data_con
     wkr_info  = noCafIdInfo
 	        `setArityInfo`		wkr_arity
 	        `setAllStrictnessInfo`	Just wkr_sig
+		`setUnfoldingInfo`      evaldUnfolding	-- Record that it's evaluated,
+							-- even if arity = 0
 
     wkr_sig = mkStrictSig (mkTopDmdType (replicate wkr_arity topDmd) cpr_info)
 	-- Notice that we do *not* say the worker is strict
@@ -891,8 +893,8 @@ This comes up in strictness analysis
 \begin{code}
 realWorldPrimId	-- :: State# RealWorld
   = pcMiscPrelId realWorldName realWorldStatePrimTy
-		 (noCafIdInfo `setUnfoldingInfo` mkOtherCon [])
-	-- The mkOtherCon makes it look that realWorld# is evaluated
+		 (noCafIdInfo `setUnfoldingInfo` evaldUnfolding)
+	-- The evaldUnfolding makes it look that realWorld# is evaluated
 	-- which in turn makes Simplify.interestingArg return True,
 	-- which in turn makes INLINE things applied to realWorld# likely
 	-- to be inlined

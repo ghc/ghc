@@ -17,7 +17,7 @@ module CoreUnfold (
 	Unfolding, UnfoldingGuidance,	-- Abstract types
 
 	noUnfolding, mkTopUnfolding, mkUnfolding, mkCompulsoryUnfolding, seqUnfolding,
-	mkOtherCon, otherCons,
+	evaldUnfolding, mkOtherCon, otherCons,
 	unfoldingTemplate, maybeUnfoldingTemplate,
 	isEvaldUnfolding, isValueUnfolding, isCheapUnfolding, isCompulsoryUnfolding,
 	hasUnfolding, hasSomeUnfolding, neverUnfold,
