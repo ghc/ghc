@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.56 2002/01/15 05:39:15 sof Exp $
+# $Id: Makefile,v 1.57 2002/01/24 00:53:18 sof Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -70,6 +70,12 @@ endif
 
 ifeq "$(way)" "mp"
 SRC_HC_OPTS += -I$$PVM_ROOT/include
+endif
+
+
+ifeq "$(way)" "s"
+SRC_HC_OPTS += -DSMP
+SRC_CC_OPTS += -DSMP
 endif
 
 #-----------------------------------------------------------------------------
