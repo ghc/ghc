@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.117 2000/11/22 10:13:43 sewardj Exp $
+# $Id: Makefile,v 1.118 2000/12/11 16:42:26 sewardj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -164,7 +164,7 @@ space:= $(empty) $(empty)
 
 SRC_HC_OPTS += \
   -cpp -fglasgow-exts \
-  -Rghc-timing -I. -IcodeGen -InativeGen -Iparser \
+  -I. -IcodeGen -InativeGen -Iparser \
   -i$(subst $(space),:,$(DIRS)) 
 
 ghc_407_at_least = $(shell expr "$(GhcMinVersion)" \>= 7)
@@ -282,7 +282,7 @@ endif
 #	We need -optC here because the driver before 3.02 didn't understand
 #	the -funfolding flags.
 
-utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs -optC-funfolding-interface-threshold7
+utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs -funfolding-interface-threshold7
 
 # Strictness analyser misbehaving in 2.10, fails to terminate on
 # UpdAnal.lhs due to weird recursive datatype.  Bug was exposed by a

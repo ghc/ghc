@@ -801,7 +801,10 @@ evalP (ConAppGen itbl args) de
 			let c' = setDoubleOffClosure c off d#
 			in c' `seq` loop c' (off +# 2#) as }
 
-evalP (PrimOpP IntEqOp [e1,e2]) de = unsafeCoerce# (evalI e1 de ==# evalI e2 de)
+evalP (PrimOpP IntEqOp [e1,e2]) de 
+    = case evalI e1 de of 
+         i1# -> case evalI e2 de of 
+                   i2# -> unsafeCoerce# (i1# ==# i2#)
 
 evalP (PrimOpP primop _) de
    = error ("evalP: unhandled primop: " ++ showSDoc (ppr primop))

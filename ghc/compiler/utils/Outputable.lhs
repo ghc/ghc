@@ -7,9 +7,6 @@ Defines classes for pretty-printing and forcing, both forms of
 ``output.''
 
 \begin{code}
-{-# OPTIONS -fno-prune-tydecls #-}
--- Hopefully temporary; 3.02 complained about not being able
--- to see the consructors for ForeignObj
 
 module Outputable (
 	Outputable(..),			-- Class

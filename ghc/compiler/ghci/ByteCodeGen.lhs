@@ -71,17 +71,21 @@ data BCInstr
    | PUSH_LL   Int Int{-2 offsets-}
    | PUSH_LLL  Int Int Int{-3 offsets-}
    | PUSH_G    Name
-   | PUSH_AS   Name	-- push alts and BCO_ptr_ret_info
-   | PUSHT_I   Int
-   | PUSHT_F   Float
-   | PUSHT_D   Double
-   | PUSHU_I   Int
-   | PUSHU_F   Float
-   | PUSHU_D   Double
+   | PUSH_AS   Name Int	-- push alts and BCO_ptr_ret_info
+			-- Int is lit pool offset for itbl
+   | PUSH_LIT  Int	-- push literal word from offset pool
+   | PUSH_TAG  Int      -- push this tag on the stack
+
+--   | PUSHT_I   Int
+--   | PUSHT_F   Float
+--  | PUSHT_D   Double
+--   | PUSHU_I   Int
+--   | PUSHU_F   Float
+--   | PUSHU_D   Double
    | SLIDE     Int{-this many-} Int{-down by this much-}
    -- To do with the heap
-   | ALLOC     Int
-   | MKAP      Int{-place ptr to heap this far down stack-} Int{-# words-}
+   | ALLOC     Int	-- make an AP_UPD with this many payload words, zeroed
+   | MKAP      Int{-ptr to AP_UPD is this far down stack-} Int{-# words-}
    | UNPACK    Int	-- unpack N ptr words from t.o.s Constr
    | UNPACK_I  Int	-- unpack and tag an Int, from t.o.s Constr @ offset
    | UNPACK_F  Int	-- unpack and tag a Float, from t.o.s Constr @ offset
@@ -933,7 +937,7 @@ mkALit a
    
 
 
-#include "../rts/Bytecodes.h"
+#include "Bytecodes.h"
 
 i_ARGCHECK = (bci_ARGCHECK :: Int)
 i_PUSH_L   = (bci_PUSH_L   :: Int)

@@ -1,6 +1,6 @@
-{-# OPTIONS -W -fno-warn-incomplete-patterns #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.35 2000/11/24 17:09:52 simonmar Exp $
+-- $Id: Main.hs,v 1.36 2000/12/11 16:42:26 sewardj Exp $
 --
 -- GHC Driver program
 --

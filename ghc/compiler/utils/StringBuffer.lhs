@@ -6,7 +6,7 @@
 Buffers for scanning string input stored in external arrays.
 
 \begin{code}
-{-# OPTIONS -fno-prune-tydecls #-}
+
 module StringBuffer
        (
         StringBuffer,

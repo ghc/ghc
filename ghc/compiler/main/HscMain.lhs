@@ -72,6 +72,7 @@ import Module		( Module, lookupModuleEnvByName )
 import Monad		( when )
 import Maybe		( isJust )
 import IO
+import List		( intersperse )
 \end{code}
 
 
@@ -372,7 +373,7 @@ myCoreToStg dflags this_mod tidy_binds
       -- thoroughout code generation
 
       --let bcos = byteCodeGen tidy_binds
-      --putStrLn (showSDoc (vcat (map ppr bcos)))
+      --putStrLn ("\n\n" ++ showSDocDebug (vcat (intersperse (char ' ') (map ppr bcos))))
 
       -- _scc_     "Core2Stg"
       stg_binds <- coreToStg dflags this_mod tidy_binds
