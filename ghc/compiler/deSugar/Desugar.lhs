@@ -30,7 +30,7 @@ import VarEnv
 import VarSet
 import Bag		( isEmptyBag )
 import CoreLint		( showPass, endPass )
-import ErrUtils		( doIfSet, pprBagOfWarnings )
+import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings )
 import Outputable
 import UniqSupply	( mkSplitUniqSupply )
 import HscTypes		( HomeSymbolTable, PersistentCompilerState(..), TyThing(..), lookupType,  )
@@ -110,8 +110,7 @@ deSugarExpr dflags pcs hst mod_name unqual tc_expr
 		  (printErrs unqual (pprBagOfWarnings ds_warns))
 
 	-- Dump output
-        ; let do_dump_ds = dopt Opt_D_dump_ds dflags
-	; doIfSet do_dump_ds (printDump (pprCoreExpr core_expr))
+	; dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared" (pprCoreExpr core_expr)
 
         ; return core_expr
 	}
