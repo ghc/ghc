@@ -455,18 +455,16 @@ text processing.  It is pretty easy to install.
 </para>
 
 <para>
-Perl&nbsp;5 is required.  For Win32 platforms, we strongly suggest you
-pick up a port of Perl&nbsp;5 for <Literal>cygwin32</Literal>, as the
-common Hip/ActiveWare port of Perl is Not Cool Enough for our
-purposes.
+Perl&nbsp;5 is required.  For Win32 platforms, you should use the binary
+supplied in the InstallShield (copy it to <filename>cygwin/bin</filename>).
+The Cygwin-supplied Perl seems not to work (it has problems with line
+endings).
 </para>
 
 <para>
 Perl should be put somewhere so that it can be invoked by the
-<Literal>&num;!</Literal> script-invoking mechanism. (I believe
-<Filename>/usr/bin/perl</Filename> is preferred; we use
-<Filename>/usr/local/bin/perl</Filename> at Glasgow.)  The full
-pathname should may need to be less than 32 characters long on some
+<Literal>&num;!</Literal> script-invoking mechanism. The full
+pathname may need to be less than 32 characters long on some
 systems.
 </para>
 
