@@ -35,9 +35,9 @@ import TcType		( TcKind, TcTyVar, TcThetaType, TcTauType,
 			)
 import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToIdBndr,
 			  instFunDeps, instFunDepsOfTheta )
-import FunDeps		( tyVarFunDep, oclose )
+import FunDeps		( oclose )
 import TcUnify		( unifyKind, unifyOpenTypeKind )
-import Type		( Type, Kind, PredType(..), ThetaType,
+import Type		( Type, Kind, PredType(..), ThetaType, SigmaType, TauType,
 			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy,
                           zipFunTys, hoistForAllTys,
 			  mkSigmaTy, mkPredTy, mkTyConApp,
@@ -190,7 +190,7 @@ kcHsType (HsListTy ty)
   = kcBoxedType ty		`thenTc` \ tau_ty ->
     returnTc boxedTypeKind
 
-kcHsType (HsTupleTy (HsTupCon _ boxity) tys)
+kcHsType (HsTupleTy (HsTupCon _ boxity _) tys)
   = mapTc kcTypeType tys	`thenTc_`
     returnTc (case boxity of
 		  Boxed   -> boxedTypeKind
@@ -345,9 +345,10 @@ tc_type wimp_out (HsListTy ty)
   = tc_arg_type wimp_out ty	`thenTc` \ tau_ty ->
     returnTc (mkListTy tau_ty)
 
-tc_type wimp_out (HsTupleTy (HsTupCon _ boxity) tys)
-  = mapTc tc_tup_arg tys	`thenTc` \ tau_tys ->
-    returnTc (mkTupleTy boxity (length tys) tau_tys)
+tc_type wimp_out (HsTupleTy (HsTupCon _ boxity arity) tys)
+  = ASSERT( arity == length tys )
+    mapTc tc_tup_arg tys	`thenTc` \ tau_tys ->
+    returnTc (mkTupleTy boxity arity tau_tys)
   where
     tc_tup_arg = case boxity of
 		   Boxed   -> tc_arg_type wimp_out
@@ -547,6 +548,9 @@ and then we don't need to check for ambiguity either,
 because the test can't fail (see is_ambig).
 
 \begin{code}
+checkAmbiguity :: RecFlag -> Bool
+	       -> [TyVar] -> ThetaType -> TauType
+	       -> TcM SigmaType
 checkAmbiguity wimp_out is_source_polytype forall_tyvars theta tau
   | isRec wimp_out = returnTc sigma_ty
   | otherwise      = mapTc_ check_pred theta	`thenTc_`
@@ -555,8 +559,7 @@ checkAmbiguity wimp_out is_source_polytype forall_tyvars theta tau
     sigma_ty	      = mkSigmaTy forall_tyvars theta tau
     tau_vars	      = tyVarsOfType tau
     fds		      = instFunDepsOfTheta theta
-    tvFundep	      = tyVarFunDep fds
-    extended_tau_vars = oclose tvFundep tau_vars
+    extended_tau_vars = oclose fds tau_vars
 
     is_ambig ct_var   = (ct_var `elem` forall_tyvars) &&
 		        not (ct_var `elemUFM` extended_tau_vars)

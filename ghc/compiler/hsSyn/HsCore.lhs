@@ -45,7 +45,7 @@ import PrimOp		( PrimOp(CCallOp) )
 import Demand		( StrictnessInfo )
 import Literal		( Literal, maybeLitLit )
 import PrimOp		( CCall, pprCCallOp )
-import DataCon		( dataConTyCon )
+import DataCon		( dataConTyCon, dataConSourceArity )
 import TyCon		( isTupleTyCon, tupleTyConBoxity )
 import Type		( Kind )
 import FiniteMap	( lookupFM )
@@ -134,7 +134,7 @@ toUfBind (Rec prs)    = UfRec [(toUfBndr b, toUfExpr r) | (b,r) <- prs]
 toUfAlt (c,bs,r) = (toUfCon c, map getName bs, toUfExpr r)
 
 ---------------------
-toUfCon (DataAlt dc) | isTupleTyCon tc = UfTupleAlt (HsTupCon (getName dc) (tupleTyConBoxity tc))
+toUfCon (DataAlt dc) | isTupleTyCon tc = UfTupleAlt (mk_hs_tup_con tc dc)
 		     | otherwise       = UfDataAlt (getName dc)
 		     where
 		       tc = dataConTyCon dc
@@ -143,6 +143,9 @@ toUfCon (LitAlt l)   = case maybeLitLit l of
 			 Just (s,ty) -> UfLitLitAlt s (toHsType ty)
 			 Nothing     -> UfLitAlt l
 toUfCon DEFAULT	     = UfDefault
+
+---------------------
+mk_hs_tup_con tc dc = HsTupCon (getName dc) (tupleTyConBoxity tc) (dataConSourceArity dc)
 
 ---------------------
 toUfBndr x | isId x    = UfValBinder (getName x) (toHsType (varType x))
@@ -154,7 +157,7 @@ toUfApp (Var v) as
   = case isDataConId_maybe v of
 	-- We convert the *worker* for tuples into UfTuples
 	Just dc |  isTupleTyCon tc && saturated 
-		-> UfTuple (HsTupCon (getName dc) (tupleTyConBoxity tc)) tup_args
+		-> UfTuple (mk_hs_tup_con tc dc) tup_args
 	  where
 	    val_args  = dropWhile isTypeArg as
 	    saturated = length val_args == idArity v

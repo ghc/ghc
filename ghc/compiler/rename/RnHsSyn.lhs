@@ -77,8 +77,7 @@ extractHsTyNames ty
   where
     get (HsAppTy ty1 ty2)      = get ty1 `unionNameSets` get ty2
     get (HsListTy ty)          = unitNameSet listTyCon_name `unionNameSets` get ty
-    get (HsTupleTy (HsTupCon n _) tys) = unitNameSet n
-				   	 `unionNameSets` extractHsTyNames_s tys
+    get (HsTupleTy con tys)    = hsTupConFVs con `unionNameSets` extractHsTyNames_s tys
     get (HsFunTy ty1 ty2)      = get ty1 `unionNameSets` get ty2
     get (HsPredTy p)	       = extractHsPredTyNames p
     get (HsOpTy ty1 tycon ty2) = get ty1 `unionNameSets` get ty2 `unionNameSets`
@@ -205,7 +204,7 @@ ufConFVs other		    = emptyFVs
 ufNoteFVs (UfCoerce ty) = extractHsTyNames ty
 ufNoteFVs note		= emptyFVs
 
-hsTupConFVs (HsTupCon n _) = unitFV n
+hsTupConFVs (HsTupCon n _ _) = unitFV n
 \end{code}
 
 %************************************************************************

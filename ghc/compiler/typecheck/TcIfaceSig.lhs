@@ -32,8 +32,9 @@ import WorkWrap		( mkWrapper )
 import Id		( Id, mkId, mkVanillaId, isDataConWrapId_maybe )
 import MkId		( mkCCallOpId )
 import IdInfo
-import DataCon		( dataConSig, dataConArgTys )
+import DataCon		( DataCon, dataConId, dataConSig, dataConArgTys )
 import Type		( mkTyVarTys, splitAlgTyConApp_maybe )
+import TysWiredIn	( tupleCon )
 import Var		( mkTyVar, tyVarKind )
 import Name		( Name )
 import Demand		( wwLazy )
@@ -205,14 +206,16 @@ tcCoreExpr (UfCCall cc ty)
     tcGetUnique		`thenNF_Tc` \ u ->
     returnTc (Var (mkCCallOpId u cc ty'))
 
-tcCoreExpr (UfTuple (HsTupCon name _) args) 
-  = tcVar name			`thenTc` \ con_id ->
-    mapTc tcCoreExpr args	`thenTc` \ args' ->
+tcCoreExpr (UfTuple (HsTupCon _ boxity arity) args) 
+  = mapTc tcCoreExpr args	`thenTc` \ args' ->
     let
 	-- Put the missing type arguments back in
 	con_args = map (Type . exprType) args' ++ args'
     in
     returnTc (mkApps (Var con_id) con_args)
+  where
+    con_id = dataConId (tupleCon boxity arity)
+    
 
 tcCoreExpr (UfLam bndr body)
   = tcCoreLamBndr bndr 		$ \ bndr' ->
@@ -320,13 +323,9 @@ tcCoreAlt scrut_ty (UfLitLitAlt str ty, names, rhs)
 -- A case alternative is made quite a bit more complicated
 -- by the fact that we omit type annotations because we can
 -- work them out.  True enough, but its not that easy!
-tcCoreAlt scrut_ty alt@(UfDataAlt con_name, names, rhs)
-  = tcVar con_name		`thenTc` \ con_id ->
+tcCoreAlt scrut_ty alt@(con, names, rhs)
+  = tcConAlt con	`thenTc` \ con ->
     let
-	con = case isDataConWrapId_maybe con_id of
-		Just con -> con
-		Nothing  -> pprPanic "tcCoreAlt" (ppr con_id)
-
 	(main_tyvars, _, ex_tyvars, _, _, _) = dataConSig con
 
 	(_, inst_tys, cons) = case splitAlgTyConApp_maybe scrut_ty of
@@ -339,7 +338,7 @@ tcCoreAlt scrut_ty alt@(UfDataAlt con_name, names, rhs)
 	arg_ids
 #ifdef DEBUG
 		| length id_names /= length arg_tys
-		= pprPanic "tcCoreAlts" (ppr (con_name, names, rhs) $$
+		= pprPanic "tcCoreAlts" (ppr (con, names, rhs) $$
 					 (ppr main_tyvars <+> ppr ex_tyvars) $$
 					 ppr arg_tys)
 		| otherwise
@@ -351,6 +350,17 @@ tcCoreAlt scrut_ty alt@(UfDataAlt con_name, names, rhs)
     tcExtendGlobalValEnv arg_ids		$
     tcCoreExpr rhs					`thenTc` \ rhs' ->
     returnTc (DataAlt con, ex_tyvars' ++ arg_ids, rhs')
+
+
+tcConAlt :: UfConAlt Name -> TcM DataCon
+tcConAlt (UfTupleAlt (HsTupCon _ boxity arity))
+  = returnTc (tupleCon boxity arity)
+
+tcConAlt (UfDataAlt con_name)
+  = tcVar con_name	`thenTc` \ con_id ->
+    returnTc (case isDataConWrapId_maybe con_id of
+		    Just con -> con
+		    Nothing  -> pprPanic "tcCoreAlt" (ppr con_id))
 \end{code}
 
 \begin{code}

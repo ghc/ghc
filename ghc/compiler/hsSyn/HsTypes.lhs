@@ -38,7 +38,7 @@ import OccName		( NameSpace, tvName )
 import Var		( TyVar, tyVarKind )
 import Subst		( mkTyVarSubst, substTy )
 import PprType		( {- instance Outputable Kind -}, pprParendKind )
-import BasicTypes	( Boxity(..), tupleParens )
+import BasicTypes	( Boxity(..), Arity, tupleParens )
 import PrelNames	( mkTupConRdrName, listTyConKey, usOnceTyConKey, usManyTyConKey, hasKey,
 			  usOnceTyConName, usManyTyConName
 			)
@@ -92,16 +92,18 @@ hsUsOnce_Name = HsTyVar usOnceTyConName
 hsUsMany_Name = HsTyVar usManyTyConName
 
 -----------------------
-data HsTupCon name = HsTupCon name Boxity
+data HsTupCon name = HsTupCon name Boxity Arity
 
 instance Eq name => Eq (HsTupCon name) where
-  (HsTupCon _ b1) == (HsTupCon _ b2) = b1==b2
+  (HsTupCon _ b1 a1) == (HsTupCon _ b2 a2) = b1==b2 && a1==a2
    
 mkHsTupCon :: NameSpace -> Boxity -> [a] -> HsTupCon RdrName
-mkHsTupCon space boxity args = HsTupCon (mkTupConRdrName space boxity (length args)) boxity
+mkHsTupCon space boxity args = HsTupCon (mkTupConRdrName space boxity arity) boxity arity
+			     where
+			       arity = length args
 
 hsTupParens :: HsTupCon name -> SDoc -> SDoc
-hsTupParens (HsTupCon _ b) p = tupleParens b p
+hsTupParens (HsTupCon _ b _) p = tupleParens b p
 
 -----------------------
 -- Combine adjacent for-alls. 
@@ -304,7 +306,7 @@ toHsType (PredTy p)		  = HsPredTy (toHsPred p)
 
 toHsType ty@(TyConApp tc tys)	-- Must be saturated because toHsType's arg is of kind *
   | not saturated	       = generic_case
-  | isTupleTyCon tc	       = HsTupleTy (HsTupCon (getName tc) (tupleTyConBoxity tc)) tys'
+  | isTupleTyCon tc	       = HsTupleTy (HsTupCon (getName tc) (tupleTyConBoxity tc) (tyConArity tc)) tys'
   | tc `hasKey` listTyConKey   = HsListTy (head tys')
   | tc `hasKey` usOnceTyConKey = hsUsOnce_Name		 -- must print !, . unqualified
   | tc `hasKey` usManyTyConKey = hsUsMany_Name		 -- must print !, . unqualified

@@ -14,7 +14,7 @@ import RnExpr
 import HsSyn
 import HscTypes		( GlobalRdrEnv )
 import HsTypes		( hsTyVarNames, pprHsContext )
-import RdrName		( RdrName, isRdrDataCon, rdrNameOcc, mkRdrNameWkr, elemRdrEnv )
+import RdrName		( RdrName, isRdrDataCon, rdrNameOcc, elemRdrEnv )
 import RdrHsSyn		( RdrNameContext, RdrNameHsType, RdrNameConDecl, RdrNameTyClDecl,
 			  extractRuleBndrsTyVars, extractHsTyRdrTyVars,
 			  extractHsCtxtRdrTyVars, extractGenericPatTyVars
@@ -34,12 +34,14 @@ import RnEnv		( lookupTopBndrRn, lookupOccRn, newIPName, lookupIfaceName,
 import RnMonad
 
 import Class		( FunDep, DefMeth (..) )
+import DataCon		( dataConId )
 import Name		( Name, OccName, nameOccName, NamedThing(..) )
 import NameSet
 import PrelInfo		( derivableClassKeys, cCallishClassKeys )
 import PrelNames	( deRefStablePtr_RDR, newStablePtr_RDR,
 			  bindIO_RDR, returnIO_RDR
 			)
+import TysWiredIn	( tupleCon )
 import List		( partition, nub )
 import Outputable
 import SrcLoc		( SrcLoc )
@@ -612,13 +614,13 @@ rnHsType doc (HsListTy ty)
 
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
-rnHsType doc (HsTupleTy (HsTupCon _ boxity) tys)
+rnHsType doc (HsTupleTy (HsTupCon _ boxity arity) tys)
 	-- Don't do lookupOccRn, because this is built-in syntax
 	-- so it doesn't need to be in scope
   = mapRn (rnHsType doc) tys	  	`thenRn` \ tys' ->
-    returnRn (HsTupleTy (HsTupCon n' boxity) tys')
+    returnRn (HsTupleTy (HsTupCon tup_name boxity arity) tys')
   where
-    n' = tupleTyCon_name boxity (length tys)
+    tup_name = tupleTyCon_name boxity arity
   
 
 rnHsType doc (HsAppTy ty1 ty2)
@@ -631,20 +633,6 @@ rnHsType doc (HsPredTy pred)
     returnRn (HsPredTy pred')
 
 rnHsTypes doc tys = mapRn (rnHsType doc) tys
-\end{code}
-
-\begin{code}
--- We use lookupOcc here because this is interface file only stuff
--- and we need the workers...
-rnHsTupCon (HsTupCon n boxity)
-  = lookupOccRn n	`thenRn` \ n' ->
-    returnRn (HsTupCon n' boxity)
-
-rnHsTupConWkr (HsTupCon n boxity)
-	-- Tuple construtors are for the *worker* of the tuple
-	-- Going direct saves needless messing about 
-  = lookupOccRn (mkRdrNameWkr n)	`thenRn` \ n' ->
-    returnRn (HsTupCon n' boxity)
 \end{code}
 
 \begin{code}
@@ -749,10 +737,12 @@ rnCoreExpr (UfCCall cc ty)
   = rnHsType (text "ccall") ty	`thenRn` \ ty' ->
     returnRn (UfCCall cc ty')
 
-rnCoreExpr (UfTuple con args) 
-  = rnHsTupConWkr con			`thenRn` \ con' ->
-    mapRn rnCoreExpr args		`thenRn` \ args' ->
-    returnRn (UfTuple con' args')
+rnCoreExpr (UfTuple (HsTupCon _ boxity arity) args) 
+  = mapRn rnCoreExpr args		`thenRn` \ args' ->
+    returnRn (UfTuple (HsTupCon tup_name boxity arity) args')
+  where
+    tup_name = getName (dataConId (tupleCon boxity arity))
+	-- Get the *worker* name and use that
 
 rnCoreExpr (UfApp fun arg)
   = rnCoreExpr fun		`thenRn` \ fun' ->
@@ -810,7 +800,7 @@ rnCoreBndrs (b:bs) thing_inside = rnCoreBndr b		$ \ name' ->
 
 \begin{code}
 rnCoreAlt (con, bndrs, rhs)
-  = rnUfCon con bndrs			`thenRn` \ con' ->
+  = rnUfCon con 			`thenRn` \ con' ->
     bindCoreLocalsRn bndrs		$ \ bndrs' ->
     rnCoreExpr rhs			`thenRn` \ rhs' ->
     returnRn (con', bndrs', rhs')
@@ -824,22 +814,22 @@ rnNote UfInlineCall = returnRn UfInlineCall
 rnNote UfInlineMe   = returnRn UfInlineMe
 
 
-rnUfCon UfDefault _
+rnUfCon UfDefault
   = returnRn UfDefault
 
-rnUfCon (UfTupleAlt tup_con) bndrs
-  = rnHsTupCon tup_con 		`thenRn` \ (HsTupCon con' _) -> 
-    returnRn (UfDataAlt con')
-	-- Makes the type checker a little easier
+rnUfCon (UfTupleAlt (HsTupCon _ boxity arity))
+  = returnRn (UfTupleAlt (HsTupCon tup_name boxity arity))
+  where
+    tup_name = getName (tupleCon boxity arity)
 
-rnUfCon (UfDataAlt con) _
+rnUfCon (UfDataAlt con)
   = lookupOccRn con		`thenRn` \ con' ->
     returnRn (UfDataAlt con')
 
-rnUfCon (UfLitAlt lit) _
+rnUfCon (UfLitAlt lit)
   = returnRn (UfLitAlt lit)
 
-rnUfCon (UfLitLitAlt lit ty) _
+rnUfCon (UfLitLitAlt lit ty)
   = rnHsType (text "litlit") ty		`thenRn` \ ty' ->
     returnRn (UfLitLitAlt lit ty')
 \end{code}
