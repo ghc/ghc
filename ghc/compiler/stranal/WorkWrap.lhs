@@ -190,7 +190,7 @@ tryWW	:: Bool				-- True <=> a non-recursive binding
 					-- if two, then a worker and a
 					-- wrapper.
 tryWW non_rec fn_id rhs
-  | not (isNeverInlinePrag inline_prag) 
+  | isNeverInlinePrag inline_prag
   = 	-- Don't split things that will never be inlined
     returnUs [ (fn_id, rhs) ]
 

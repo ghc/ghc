@@ -145,6 +145,9 @@ replaceTyVarName (IfaceTyVar n k) n' = IfaceTyVar n' k
 %*									*
 %************************************************************************
 
+NB: these types get printed into interface files, so 
+    don't change the printing format lightly
+
 \begin{code}
 instance (Outputable name) => Outputable (HsType name) where
     ppr ty = pprHsType ty

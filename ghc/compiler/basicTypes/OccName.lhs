@@ -66,19 +66,7 @@ type EncodedString = String	-- Encoded form
 
 
 pprEncodedFS :: EncodedFS -> SDoc
-pprEncodedFS fs
-  = getPprStyle 	$ \ sty ->
-    if userStyle sty then
-	let
-	    s = decode (_UNPK_ fs)
-	    c = head s
-	in
-	if startsVarSym c || startsConSym c then
-		parens (text s)
-	else
-		text s 
-    else
-	ptext fs
+pprEncodedFS fs = ptext fs
 \end{code}
 
 %************************************************************************
