@@ -1148,8 +1148,7 @@ ppr_amode (CJoinPoint _)
   = panic "ppr_amode: CJoinPoint"
 
 ppr_amode (CMacroExpr pk macro as)
-  = parens (pprPrimKind pk) <> 
-    parens (ptext (cExprMacroText macro) <> 
+  = parens (ptext (cExprMacroText macro) <> 
 	    parens (hcat (punctuate comma (map pprAmode as))))
 \end{code}
 
