@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.75 $
- * $Date: 2000/05/09 17:38:19 $
+ * $Revision: 1.76 $
+ * $Date: 2000/05/10 09:02:25 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -20,6 +20,7 @@
 #include "object.h"
 #include <setjmp.h>
 #include "Stg.h"
+#include "Storage.h"      /* for MarkRoot */
 
 /*#define DEBUG_SHOWUSE*/
 
@@ -493,7 +494,7 @@ static Bool debugStorageExtra = FALSE;
          assert(n < TAB_BASE_ADDR+tab_size);                            \
          assert(tab_name[n-TAB_BASE_ADDR].inUse);                       \
          tab_name[n-TAB_BASE_ADDR].inUse = FALSE;                       \
-         if (!debugStorageExtra) {                                      \
+         if (1 || (!debugStorageExtra)) {                               \
             tab_name[n-TAB_BASE_ADDR].nextFree = free_list;             \
             free_list = n;                                              \
          }                                                              \
