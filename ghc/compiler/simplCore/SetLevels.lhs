@@ -7,27 +7,27 @@
 			Overview
 		***************************
 
-* We attach binding levels to Core bindings, in preparation for floating
-  outwards (@FloatOut@).
+1. We attach binding levels to Core bindings, in preparation for floating
+   outwards (@FloatOut@).
 
-* We also let-ify many expressions (notably case scrutinees), so they
-  will have a fighting chance of being floated sensible.
+2. We also let-ify many expressions (notably case scrutinees), so they
+   will have a fighting chance of being floated sensible.
 
-* We clone the binders of any floatable let-binding, so that when it is
-  floated out it will be unique.  (This used to be done by the simplifier
-  but the latter now only ensures that there's no shadowing.)
-  NOTE: Very tiresomely, we must apply this substitution to
-	the rules stored inside a variable too.
+3. We clone the binders of any floatable let-binding, so that when it is
+   floated out it will be unique.  (This used to be done by the simplifier
+   but the latter now only ensures that there's no shadowing.)
+   NOTE: Very tiresomely, we must apply this substitution to
+	 the rules stored inside a variable too.
 
-  We do *not* clone top-level bindings, because some of them must not change,
-  but we *do* clone bindings that are heading for the top level
+   We do *not* clone top-level bindings, because some of them must not change,
+   but we *do* clone bindings that are heading for the top level
 
-* In the expression
+4. In the expression
 	case x of wild { p -> ...wild... }
-  we substitute x for wild in the RHS of the case alternatives:
+   we substitute x for wild in the RHS of the case alternatives:
 	case x of wild { p -> ...x... }
-  This means that a sub-expression involving x is not "trapped" inside the RHS.
-  And it's not inconvenient because we already have a substitution.
+   This means that a sub-expression involving x is not "trapped" inside the RHS.
+   And it's not inconvenient because we already have a substitution.
 
 \begin{code}
 module SetLevels (
@@ -526,6 +526,7 @@ type LevelEnv = (Bool, 				-- True <=> Float lambdas too
 	         IdEnv ([Var], LevelledExpr))	-- Domain is pre-cloned Ids
 	-- We clone let-bound variables so that they are still
 	-- distinct when floated out; hence the SubstEnv/IdEnv.
+        -- (see point 3 of the module overview comment).
 	-- We also use these envs when making a variable polymorphic
 	-- because we want to float it out past a big lambda.
 	--
@@ -551,13 +552,32 @@ floatLams :: LevelEnv -> Bool
 floatLams (float_lams, _, _, _) = float_lams
 
 extendLvlEnv :: LevelEnv -> [(Var,Level)] -> LevelEnv
-	-- Used when *not* cloning
+-- Used when *not* cloning
 extendLvlEnv (float_lams, lvl_env, subst_env, id_env) prs
-  = (float_lams, foldl add lvl_env prs, subst_env, id_env)
+  = (float_lams,
+     foldl add_lvl lvl_env prs,
+     foldl del_subst subst_env prs,
+     foldl del_id id_env prs)
   where
-    add env (v,l) = extendVarEnv env v l
+    add_lvl   env (v,l) = extendVarEnv env v l
+    del_subst env (v,_) = delSubstEnv env v
+    del_id    env (v,_) = delVarEnv env v
+  -- We must remove any clone for this variable name in case of
+  -- shadowing.  This bit me in the following case (in
+  -- nofib/real/gg/Spark.hs):
+  -- 
+  --   case ds of wild {
+  --     ... -> case e of wild {
+  --              ... -> ... wild ...
+  --            }
+  --   }
+  -- 
+  -- The inside occurrence of @wild@ was being replaced with @ds@,
+  -- incorrectly, because the SubstEnv was still lying around.  Ouch!
+  -- KSW 2000-07.
 
 -- extendCaseBndrLvlEnv adds the mapping case-bndr->scrut-var if it can
+-- (see point 4 of the module overview comment)
 extendCaseBndrLvlEnv env scrut case_bndr lvl
   = case scrut of
 	Var v -> extendCloneLvlEnv lvl env [(case_bndr, v)]
