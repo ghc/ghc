@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.73 2004/03/18 13:52:09 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.74 2004/03/22 11:48:30 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -594,7 +594,7 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 # define TICKY_BUILD_ONLY(x) x
 #else
 # define TICKY_BUILD_ONLY(x) \
-prog_belch("GHC not built for: ticky-ticky stats"); \
+prog_belch("not built for: ticky-ticky stats"); \
 error = rtsTrue;
 #endif
 
@@ -602,7 +602,7 @@ error = rtsTrue;
 # define COST_CENTRE_USING_BUILD_ONLY(x) x
 #else
 # define COST_CENTRE_USING_BUILD_ONLY(x) \
-prog_belch("GHC not built for: -prof or -parallel"); \
+prog_belch("not built for: -prof or -parallel"); \
 error = rtsTrue;
 #endif
 
@@ -610,7 +610,7 @@ error = rtsTrue;
 # define PROFILING_BUILD_ONLY(x)   x
 #else
 # define PROFILING_BUILD_ONLY(x) \
-prog_belch("GHC not built for: -prof"); \
+prog_belch("not built for: -prof"); \
 error = rtsTrue;
 #endif
 
@@ -618,7 +618,7 @@ error = rtsTrue;
 # define SMP_BUILD_ONLY(x)      x
 #else
 # define SMP_BUILD_ONLY(x) \
-prog_belch("GHC not built for: -smp"); \
+prog_belch("not built for: -smp"); \
 error = rtsTrue;
 #endif
 
@@ -626,7 +626,7 @@ error = rtsTrue;
 # define PAR_BUILD_ONLY(x)      x
 #else
 # define PAR_BUILD_ONLY(x) \
-prog_belch("GHC not built for: -parallel"); \
+prog_belch("not built for: -parallel"); \
 error = rtsTrue;
 #endif
 
@@ -634,7 +634,7 @@ error = rtsTrue;
 # define PAR_OR_SMP_BUILD_ONLY(x)      x
 #else
 # define PAR_OR_SMP_BUILD_ONLY(x) \
-prog_belch("GHC not built for: -parallel or -smp"); \
+prog_belch("not built for: -parallel or -smp"); \
 error = rtsTrue;
 #endif
 
@@ -642,7 +642,7 @@ error = rtsTrue;
 # define GRAN_BUILD_ONLY(x)     x
 #else
 # define GRAN_BUILD_ONLY(x) \
-prog_belch("GHC not built for: -gransim"); \
+prog_belch("not built for: -gransim"); \
 error = rtsTrue;
 #endif
 
