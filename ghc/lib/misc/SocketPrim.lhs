@@ -545,6 +545,7 @@ data SocketOption
     | NoDelay       {- TCP_NODELAY  -}
 --    | Linger        {- SO_LINGER    -}
 #if 0
+    | ReusePort     {- SO_REUSEPORT -}	-- BSD only?
     | RecvLowWater  {- SO_RCVLOWAT  -}
     | SendLowWater  {- SO_SNDLOWAT  -}
     | RecvTimeOut   {- SO_RCVTIMEO  -}
@@ -568,6 +569,7 @@ packSocketOption so =
     MaxSegment    -> ``TCP_MAXSEG''
     NoDelay       -> ``TCP_NODELAY''
 #if 0
+    ReusePort     -> ``SO_REUSEPORT''	-- BSD only?
     RecvLowWater  -> ``SO_RCVLOWAT''
     SendLowWater  -> ``SO_SNDLOWAT''
     RecvTimeOut   -> ``SO_RCVTIMEO''
