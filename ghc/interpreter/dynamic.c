@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: dynamic.c,v $
- * $Revision: 1.10 $
- * $Date: 1999/10/26 17:27:39 $
+ * $Revision: 1.11 $
+ * $Date: 1999/10/28 14:32:06 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -22,31 +22,25 @@
 
 #include <windows.h>
 
-ObjectFile loadLibrary(fn)
-String fn; {
-    return LoadLibrary(fn);
-}
-
-void* lookupSymbol(file,symbol)
-ObjectFile file;
+void* getDLLSymbol(line,dll0,symbol)  /* load dll and lookup symbol */
+Int    line;
+String dll0;
 String symbol; {
-    return GetProcAddress(file,symbol);
-}
-
-const char *dlerror(void)
-{
-   return "<unknown>";
-}
-
-void* getDLLSymbol(dll,symbol)  /* load dll and lookup symbol */
-String dll;
-String symbol; {
-    ObjectFile instance = LoadLibrary(dll);
+    void*      sym;
+    char       dll[1000];
+    ObjectFile instance;
+    if (strlen(dll0) > 996) {
+       ERRMSG(line) "Excessively long library name:\n%s\n",dll
+       EEND;
+    }
+    strcpy(dll,dll0);
+    strcat(dll, ".dll");
+    instance = LoadLibrary(dll);
     if (NULL == instance) {
         /* GetLastError allegedly provides more detail - in practice,
 	 * it tells you nothing more.
          */
-        ERRMSG(0) "Error while importing DLL \"%s\"", dll
+        ERRMSG(line) "Can't open library \"%s\"", dll
         EEND;
     }
     return GetProcAddress(instance,symbol);
@@ -67,37 +61,35 @@ Bool stdcallAllowed ( void )
 #include <stdio.h>
 #include <dlfcn.h>
 
-ObjectFile loadLibrary(fn)
-String fn; {
-    return dlopen(fn,RTLD_NOW | RTLD_GLOBAL);
-}
-
-void* lookupSymbol(file,symbol)
-ObjectFile file;
+void* getDLLSymbol(line,dll0,symbol)  /* load dll and lookup symbol */
+Int    line;
+String dll0;
 String symbol; {
-    return dlsym(file,symbol);
-}
-
-void* getDLLSymbol(dll,symbol)  /* load dll and lookup symbol */
-String dll;
-String symbol; {
+    void*      sym;
+    char       dll[1000];
+    ObjectFile instance;
+    if (strlen(dll0) > 996) {
+       ERRMSG(line) "Excessively long library name:\n%s\n",dll
+       EEND;
+    }
+    strcpy(dll,dll0);
+    strcat(dll, ".so");
 #ifdef RTLD_NOW
-    ObjectFile instance = dlopen(dll,RTLD_NOW);
+    instance = dlopen(dll,RTLD_NOW);
 #elif defined RTLD_LAZY /* eg SunOS4 doesn't have RTLD_NOW */
-    ObjectFile instance = dlopen(dll,RTLD_LAZY);
+    instance = dlopen(dll,RTLD_LAZY);
 #else /* eg FreeBSD doesn't have RTLD_LAZY */
-    ObjectFile instance = dlopen(dll,1);
+    instance = dlopen(dll,1);
 #endif
-    void *sym;
 
     if (NULL == instance) {
-	ERRMSG(0) "Error while importing DLL \"%s\":\n%s\n", dll, dlerror()
+	ERRMSG(line) "Can't open library \"%s\":\n      %s\n",dll,dlerror()
         EEND;
     }
     if ((sym = dlsym(instance,symbol)))
         return sym;
 
-    ERRMSG(0) "Error loading sym:\n%s\n", dlerror()
+    ERRMSG(line) "Can't find symbol \"%s\" in library \"%s\"",symbol,dll
     EEND;
 }
 
@@ -115,13 +107,14 @@ Bool stdcallAllowed ( void )
 
 #include <dl.h>
 
-void* getDLLSymbol(dll,symbol)  /* load dll and lookup symbol */
-String dll;
+void* getDLLSymbol(line,dll0,symbol)  /* load dll and lookup symbol */
+Int    line;
+String dll0;
 String symbol; {
     ObjectFile instance = shl_load(dll,BIND_IMMEDIATE,0L);
     void* r;
     if (NULL == instance) {
-        ERRMSG(0) "Error while importing DLL \"%s\"", dll
+        ERRMSG(line) "Error while importing DLL \"%s\"", dll
         EEND;
     }
     return (0 == shl_findsym(&instance,symbol,TYPE_PROCEDURE,&r)) ? r : 0;
@@ -139,13 +132,14 @@ Bool stdcallAllowed ( void )
 
 #else /* Dynamic loading not available */
 
-void* getDLLSymbol(dll,symbol)  /* load dll and lookup symbol */
-String dll;
+void* getDLLSymbol(line,dll0,symbol)  /* load dll and lookup symbol */
+Int    line;
+String dll0;
 String symbol; {
 #if 1 /* very little to choose between these options */
     return 0;
 #else
-    ERRMSG(0) "This Hugs build does not support dynamic loading\n"
+    ERRMSG(line) "This Hugs build does not support dynamic loading\n"
     EEND;
 #endif
 }

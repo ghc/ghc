@@ -1703,24 +1703,24 @@ data IOResult  = IOResult  deriving (Show)
 
 type FILE_STAR = Int   -- FILE *
 
-foreign import "nHandle.so" "nh_stdin"  nh_stdin  :: IO FILE_STAR
-foreign import "nHandle.so" "nh_stdout" nh_stdout :: IO FILE_STAR
-foreign import "nHandle.so" "nh_stderr" nh_stderr :: IO FILE_STAR
-foreign import "nHandle.so" "nh_write"  nh_write  :: FILE_STAR -> Int -> IO ()
-foreign import "nHandle.so" "nh_read"   nh_read   :: FILE_STAR -> IO Int
-foreign import "nHandle.so" "nh_open"   nh_open   :: Addr -> Int -> IO FILE_STAR
-foreign import "nHandle.so" "nh_flush"  nh_flush  :: FILE_STAR -> IO ()
-foreign import "nHandle.so" "nh_close"  nh_close  :: FILE_STAR -> IO ()
-foreign import "nHandle.so" "nh_errno"  nh_errno  :: IO Int
+foreign import "nHandle" "nh_stdin"  nh_stdin  :: IO FILE_STAR
+foreign import "nHandle" "nh_stdout" nh_stdout :: IO FILE_STAR
+foreign import "nHandle" "nh_stderr" nh_stderr :: IO FILE_STAR
+foreign import "nHandle" "nh_write"  nh_write  :: FILE_STAR -> Int -> IO ()
+foreign import "nHandle" "nh_read"   nh_read   :: FILE_STAR -> IO Int
+foreign import "nHandle" "nh_open"   nh_open   :: Addr -> Int -> IO FILE_STAR
+foreign import "nHandle" "nh_flush"  nh_flush  :: FILE_STAR -> IO ()
+foreign import "nHandle" "nh_close"  nh_close  :: FILE_STAR -> IO ()
+foreign import "nHandle" "nh_errno"  nh_errno  :: IO Int
 
-foreign import "nHandle.so" "nh_malloc" nh_malloc :: Int -> IO Addr
-foreign import "nHandle.so" "nh_free"   nh_free   :: Addr -> IO ()
-foreign import "nHandle.so" "nh_store"  nh_store  :: Addr -> Int -> IO ()
-foreign import "nHandle.so" "nh_load"   nh_load   :: Addr -> IO Int
+foreign import "nHandle" "nh_malloc" nh_malloc :: Int -> IO Addr
+foreign import "nHandle" "nh_free"   nh_free   :: Addr -> IO ()
+foreign import "nHandle" "nh_store"  nh_store  :: Addr -> Int -> IO ()
+foreign import "nHandle" "nh_load"   nh_load   :: Addr -> IO Int
 
-foreign import "nHandle.so" "nh_argc"   nh_argc   :: IO Int
-foreign import "nHandle.so" "nh_argvb"  nh_argvb  :: Int -> Int -> IO Int
-foreign import "nHandle.so" "nh_getenv" nh_getenv :: Addr -> IO Addr
+foreign import "nHandle" "nh_argc"   nh_argc   :: IO Int
+foreign import "nHandle" "nh_argvb"  nh_argvb  :: Int -> Int -> IO Int
+foreign import "nHandle" "nh_getenv" nh_getenv :: Addr -> IO Addr
 
 copy_String_to_cstring :: String -> IO Addr
 copy_String_to_cstring s

@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.12 $
- * $Date: 1999/10/27 11:57:32 $
+ * $Revision: 1.13 $
+ * $Date: 1999/10/28 14:32:07 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -874,7 +874,8 @@ Void implementForeignImport ( Name n )
 
     {
         Pair    extName = name(n).defn;
-        void*   funPtr  = getDLLSymbol(textToStr(textOf(fst(extName))),
+        void*   funPtr  = getDLLSymbol(name(n).line,
+                                       textToStr(textOf(fst(extName))),
                                        textToStr(textOf(snd(extName))));
         List extra_args = doubleton(mkPtr(descriptor),mkPtr(funPtr));
         StgRhs rhs = makeStgPrim(n,addState,extra_args,descriptor->arg_tys,
