@@ -18,9 +18,12 @@ module CmLink ( Linkable(..),  Unlinked(..),
   ) where
 
 
+#ifdef GHCI
+import ByteCodeLink	( linkIModules, linkIExpr )
+#endif
+
 import Interpreter
 import DriverPipeline
-import ByteCodeLink	( linkIModules, linkIExpr )
 import CmTypes
 import CmStaticInfo	( GhciMode(..) )
 import Outputable	( SDoc )
