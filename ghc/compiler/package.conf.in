@@ -1,10 +1,18 @@
-Package {
-        name           = PACKAGE,
-	auto	       = False,
+name:		PACKAGE
+version:	VERSION
+license:	BSD3
+maintainer:	glasgow-haskell-users@haskell.org
+exposed:	True
+
+exposed-modules:
+    GHC
+    
+hidden-modules:
+
 #ifdef INSTALLING
-	import_dirs    = [ "$libdir/ghc-package" ],
+import-dirs:	"$libdir/ghc-package"
 #else
-	import_dirs    = [ FPTOOLS_TOP_ABS"/ghc/compiler/stage1/utils",
+import-dirs:   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/utils",
 			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/basicTypes",
 			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/types",
 			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/hsSyn",
@@ -25,25 +33,19 @@ Package {
 			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/cprAnalysis",
 			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/compMan",
 			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/ndpFlatten",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/cbits",
 			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/iface",
 			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/cmm",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/nativeGen" ],
-#endif
-        source_dirs    = [],
-#ifdef INSTALLING
-        library_dirs   = [ "$libdir" ],
-#else
-        library_dirs   = [ FPTOOLS_TOP_ABS"/ghc/compiler" ],
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/nativeGen"
 #endif
 
-        hs_libraries    = [ LIBRARY ],
-	extra_libraries = [],
-        c_includes      = [],
-        package_deps    = [ "base", "haskell98" ],
-		/* PACKAGE_DEPS doesn't work quite right here - it leaves
-		   a trailing comma */
-        extra_ghc_opts  = [],
-        extra_cc_opts   = [],
-        extra_ld_opts   = []
-}
+#ifdef INSTALLING
+library-dirs: "$libdir",
+#else
+library-dirs: FPTOOLS_TOP_ABS"/ghc/compiler"
+#endif
+
+hs-libraries: LIBRARY
+
+extra-libraries:
+
+package_deps: "base", "haskell98"

@@ -742,6 +742,7 @@ coreSyn/CorePrep_HC_OPTS += -auto-all
 ifeq "$(BuildPackageGHC)" "YES"
 
 PACKAGE = ghc
+VERSION = 6.4
 STANDALONE_PACKAGE = YES
 PACKAGE_DEPS =
 
