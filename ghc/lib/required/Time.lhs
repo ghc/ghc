@@ -32,9 +32,9 @@ import STBase
 import UnsafeST	( unsafePerformPrimIO )
 import ST
 import Ix
-import Foreign( Addr(..) )
-import Char (intToDigit)
-import PackedString (unpackPS, packCBytesST)
+import Foreign  ( Addr(..) )
+import Char     ( intToDigit )
+import PackBase ( unpackCString )
 import Locale
 
 \end{code}
@@ -76,9 +76,7 @@ instance Show ClockTime where
 	    allocChars 32		>>= \ buf ->
 	    _ccall_ showTime (I# s#) (ByteArray bottom d#) buf
 					>>= \ str ->
-            _ccall_ strlen str		>>= \ len ->
-            packCBytesST len str	>>= \ ps ->
-            return (unpackPS ps)
+	    return (unpackCString str)
 
     showList = showList__ (showsPrec 0)
 \end{code}
@@ -247,10 +245,11 @@ toCalendarTime (TOD sec@(J# a# s# d#) psec) = unsafePerformPrimIO $
 	_casm_ ``%r = ((struct tm *)%0)->tm_isdst;'' tm	>>= \ isdst ->
 	_ccall_ ZONE tm					>>= \ zone ->
 	_ccall_ GMTOFF tm				>>= \ tz ->
-        _ccall_ strlen zone				>>= \ len ->
-        packCBytesST len zone				>>= \ tzname ->
+	let
+	 tzname = unpackCString zone
+	in
         returnPrimIO (CalendarTime (1900+year) mon mday hour min sec psec 
-                      (toEnum wday) yday (unpackPS tzname) tz (isdst /= 0))
+                      (toEnum wday) yday tzname tz (isdst /= 0))
 
 toUTCTime :: ClockTime -> CalendarTime
 toUTCTime  (TOD sec@(J# a# s# d#) psec) = unsafePerformPrimIO (

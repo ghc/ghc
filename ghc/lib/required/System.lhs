@@ -14,7 +14,7 @@ import Prelude
 import Foreign		( Addr )
 import IOBase		( IOError(..), IOErrorType(..), thenIO_Prim, constructErrorAndFail )
 import ArrBase		( indexAddrOffAddr )
-import PackedString	( unpackCString )
+import PackBase    	( unpackCString )
 
 \end{code}
 
