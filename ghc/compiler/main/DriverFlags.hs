@@ -627,9 +627,6 @@ machdepCCOpts
       --     This is completely optional.
        = return ( ["-no-cpp-precomp","-mdynamic-no-pic"], [] )
 
-   | prefixMatch "powerpc" cTARGETPLATFORM || prefixMatch "rs6000" cTARGETPLATFORM
-	= return ( ["-static"], ["-finhibit-size-directive"] )
-
    | otherwise
 	= return ( [], [] )
 
