@@ -8,7 +8,7 @@ module ErrUtils (
 	Message, mkLocMessage, printError,
 
 	ErrMsg, WarnMsg,
-	errMsgSpans, errMsgContext, errMsgShortDoc, errMsgExtraInfo,
+	errMsgSpans, errMsgShortDoc, errMsgExtraInfo,
 	Messages, errorsFound, emptyMessages,
 	mkErrMsg, mkWarnMsg, mkPlainErrMsg, mkLongErrMsg,
 	printErrorsAndWarnings, pprBagOfErrors, pprBagOfWarnings,
@@ -40,7 +40,7 @@ import CmdLineOpts	( DynFlags(..), DynFlag(..), dopt,
 import List             ( replicate, sortBy )
 import System		( ExitCode(..), exitWith )
 import DATA_IOREF
-import IO		( hPutStr, stderr, stdout )
+import IO		( hPutStrLn, stderr, stdout )
 
 
 -- -----------------------------------------------------------------------------
@@ -170,7 +170,7 @@ doIfSet_dyn dflags flag action | dopt flag dflags = action
 
 \begin{code}
 showPass :: DynFlags -> String -> IO ()
-showPass dflags what = compilationPassMsg dflags ("*** "++what++":\n")
+showPass dflags what = compilationPassMsg dflags ("*** "++what++":")
 
 dumpIfSet :: Bool -> String -> SDoc -> IO ()
 dumpIfSet flag hdr doc
@@ -234,7 +234,7 @@ debugTraceMsg :: DynFlags -> String -> IO ()
 debugTraceMsg dflags msg
   = ifVerbose dflags 2 (putMsg msg)
 
-GLOBAL_VAR(msgHandler, hPutStr stderr, (String -> IO ()))
+GLOBAL_VAR(msgHandler, hPutStrLn stderr, (String -> IO ()))
 
 setMsgHandler :: (String -> IO ()) -> IO ()
 setMsgHandler handle_msg = writeIORef msgHandler handle_msg
