@@ -351,7 +351,7 @@ doesLibExistIn lib d
 checkGHCiLib :: [String] -> String -> String -> String -> Bool -> IO ()
 checkGHCiLib dirs batch_lib_dir batch_lib_file lib auto_build = do
   let ghci_lib_file = lib ++ ".o"
-  bs <- mapM (\d -> doesFileExist (d ++ '/':ghci_lib_file)) dirs
+  bs <- mapM (doesLibExistIn ghci_lib_file) dirs
   case [ dir | (exists,dir) <- zip bs dirs, exists ] of
         [] | auto_build -> 
 		autoBuildGHCiLib batch_lib_dir batch_lib_file ghci_lib_file
