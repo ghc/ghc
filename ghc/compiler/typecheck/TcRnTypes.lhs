@@ -521,9 +521,14 @@ plusImportAvails
 		   dep_pkgs   = nub (dpkgs1 ++ dpkgs2)	 }
   where
     plus_mod_dep (m1, orphan1, boot1) (m2, orphan2, boot2) 
-	= ASSERT( m1 == m2 && orphan1 == orphan2 )
-	  (m1, orphan1, boot1 && boot2)
+	= WARN( not (m1 == m2 && (boot1 || boot2 || orphan1 == orphan2)), 
+	        (ppr m1 <+> ppr m2) $$ (ppr orphan1 <+> ppr orphan2) $$ (ppr boot1 <+> ppr boot2) )
+		-- Check mod-names match, and orphan-hood matches; but a boot interface
+		-- might not know about orphan hood, so only check the orphan match
+		-- if both are non-boot interfaces
+	  (m1, orphan1 || orphan2, boot1 && boot2)
 	-- If either side can "see" a non-hi-boot interface, use that
+	-- Similarly orphan-hood (see note about about why orphan1 and 2 might differ)
 \end{code}
 
 %************************************************************************
