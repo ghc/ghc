@@ -237,6 +237,7 @@ data Cond
   | VC
   | VS
 #endif
+    deriving Eq  -- to make an assertion work
 \end{code}
 
 \begin{code}
