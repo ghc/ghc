@@ -1,179 +1,457 @@
-# Makefile for GNU MP/mpz functions
-# Copyright (C) 1991, 1993, 1994, 1996 Free Software Foundation, Inc.
+# Makefile.in generated automatically by automake 1.4a from Makefile.am
 
+# Copyright (C) 1994, 1995-8, 1999 Free Software Foundation, Inc.
+# This Makefile.in is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY, to the extent permitted by law; without
+# even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE.
+
+SHELL = @SHELL@
+
+srcdir = @srcdir@
+top_srcdir = @top_srcdir@
+VPATH = @srcdir@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+
+bindir = @bindir@
+sbindir = @sbindir@
+libexecdir = @libexecdir@
+datadir = @datadir@
+sysconfdir = @sysconfdir@
+sharedstatedir = @sharedstatedir@
+localstatedir = @localstatedir@
+libdir = @libdir@
+infodir = @infodir@
+mandir = @mandir@
+includedir = @includedir@
+oldincludedir = /usr/include
+
+DESTDIR =
+
+pkgdatadir = $(datadir)/@PACKAGE@
+pkglibdir = $(libdir)/@PACKAGE@
+pkgincludedir = $(includedir)/@PACKAGE@
+
+top_builddir = ..
+
+ACLOCAL = @ACLOCAL@
+AUTOCONF = @AUTOCONF@
+AUTOMAKE = @AUTOMAKE@
+AUTOHEADER = @AUTOHEADER@
+
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
+INSTALL_SCRIPT = @INSTALL_SCRIPT@
+INSTALL_STRIP_FLAG =
+transform = @program_transform_name@
+
+NORMAL_INSTALL = :
+PRE_INSTALL = :
+POST_INSTALL = :
+NORMAL_UNINSTALL = :
+PRE_UNINSTALL = :
+POST_UNINSTALL = :
+
+@SET_MAKE@
+build_alias = @build_alias@
+build_triplet = @build@
+host_alias = @host_alias@
+host_triplet = @host@
+target_alias = @target_alias@
+target_triplet = @target@
+AMDEP = @AMDEP@
+AMTAR = @AMTAR@
+AR = @AR@
+AS = @AS@
+AWK = @AWK@
+CALLING_CONVENTIONS_OBJS = @CALLING_CONVENTIONS_OBJS@
+CC = @CC@
+CCAS = @CCAS@
+CPP = @CPP@
+CXX = @CXX@
+CXXCPP = @CXXCPP@
+DEPDIR = @DEPDIR@
+DLLTOOL = @DLLTOOL@
+EXEEXT = @EXEEXT@
+LIBTOOL = @LIBTOOL@
+LN_S = @LN_S@
+M4 = @M4@
+MAINT = @MAINT@
+MAKEINFO = @MAKEINFO@
+OBJDUMP = @OBJDUMP@
+OBJEXT = @OBJEXT@
+PACKAGE = @PACKAGE@
+RANLIB = @RANLIB@
+SPEED_CYCLECOUNTER_OBJS = @SPEED_CYCLECOUNTER_OBJS@
+STRIP = @STRIP@
+U = @U@
+VERSION = @VERSION@
+gmp_srclinks = @gmp_srclinks@
+install_sh = @install_sh@
+mpn_objects = @mpn_objects@
+mpn_objs_in_libgmp = @mpn_objs_in_libgmp@
+
+# Copyright (C) 1996, 1998, 1999, 2000 Free Software Foundation, Inc.
+#
 # This file is part of the GNU MP Library.
-
+#
 # The GNU MP Library is free software; you can redistribute it and/or modify
-# it under the terms of the GNU Library General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or (at your
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation; either version 2.1 of the License, or (at your
 # option) any later version.
-
+#
 # The GNU MP Library is distributed in the hope that it will be useful, but
 # WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
 # License for more details.
-
-# You should have received a copy of the GNU Library General Public License
+#
+# You should have received a copy of the GNU Lesser General Public License
 # along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
 # the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 # MA 02111-1307, USA.
 
-srcdir = .
 
-CC = gcc
+AUTOMAKE_OPTIONS = gnu no-dependencies
 
-# If you cross compile on a machine with the same sizes of the integral
-# types ("int", "long int", "short int", and "char") define this as the
-# local compiler.  Otherwise, you need to look for the uses of LOCAL_CC below,
-# and handle those cases manually.
-LOCAL_CC = $(CC)
-CFLAGS = -g -O
-AR = ar
-AR_FLAGS = rc
-SHELL = /bin/sh
+SUBDIRS = tests
 
-#### host and target specific makefile fragments come in here.
-###
+INCLUDES = -I$(top_srcdir) -DOPERATION_$*
 
-MPZ_SRCS = init.c set.c set_ui.c set_si.c set_str.c set_d.c set_f.c set_q.c \
-  iset.c iset_ui.c iset_si.c iset_str.c iset_d.c clear.c \
-  get_ui.c get_si.c get_str.c get_d.c size.c sizeinbase.c \
-  add.c add_ui.c sub.c sub_ui.c mul.c mul_ui.c \
-  gcd.c gcd_ui.c gcdext.c sqrt.c sqrtrem.c powm.c powm_ui.c \
-  cmp.c cmp_ui.c cmp_si.c mul_2exp.c fdiv_q_2exp.c fdiv_r_2exp.c \
-  tdiv_q_2exp.c tdiv_r_2exp.c abs.c neg.c com.c and.c ior.c \
-  inp_raw.c inp_str.c out_raw.c out_str.c \
-  perfsqr.c random.c random2.c pow_ui.c ui_pow_ui.c setbit.c \
-  clrbit.c fac_ui.c pprime_p.c realloc.c getlimbn.c popcount.c hamdist.c \
-  cdiv_qr.c cdiv_q.c cdiv_r.c cdiv_qr_ui.c cdiv_q_ui.c cdiv_r_ui.c cdiv_ui.c \
-  fdiv_qr.c fdiv_q.c fdiv_r.c fdiv_qr_ui.c fdiv_q_ui.c fdiv_r_ui.c fdiv_ui.c \
-  tdiv_qr.c tdiv_q.c tdiv_r.c tdiv_qr_ui.c tdiv_q_ui.c tdiv_r_ui.c \
-  mod.c divexact.c array_init.c scan0.c scan1.c \
-  jacobi.c legendre.c invert.c
-MPZ_OBJS = init.o set.o set_ui.o set_si.o set_str.o set_d.o set_f.o set_q.o \
-  iset.o iset_ui.o iset_si.o iset_str.o iset_d.o clear.o \
-  get_ui.o get_si.o get_str.o get_d.o size.o sizeinbase.o \
-  add.o add_ui.o sub.o sub_ui.o mul.o mul_ui.o \
-  gcd.o gcd_ui.o gcdext.o sqrt.o sqrtrem.o powm.o powm_ui.o \
-  cmp.o cmp_ui.o cmp_si.o mul_2exp.o fdiv_q_2exp.o fdiv_r_2exp.o \
-  tdiv_q_2exp.o tdiv_r_2exp.o abs.o neg.o com.o and.o ior.o \
-  inp_raw.o inp_str.o out_raw.o out_str.o \
-  perfsqr.o random.o random2.o pow_ui.o ui_pow_ui.o setbit.o \
-  clrbit.o fac_ui.o pprime_p.o realloc.o getlimbn.o popcount.o hamdist.o \
-  cdiv_qr.o cdiv_q.o cdiv_r.o cdiv_qr_ui.o cdiv_q_ui.o cdiv_r_ui.o cdiv_ui.o \
-  fdiv_qr.o fdiv_q.o fdiv_r.o fdiv_qr_ui.o fdiv_q_ui.o fdiv_r_ui.o fdiv_ui.o \
-  tdiv_qr.o tdiv_q.o tdiv_r.o tdiv_qr_ui.o tdiv_q_ui.o tdiv_r_ui.o \
-  mod.o divexact.o array_init.o scan0.o scan1.o \
-  jacobi.o legendre.o invert.o
+noinst_LTLIBRARIES = libmpz.la
+libmpz_la_SOURCES = \
+  abs.c add.c add_ui.c addmul_ui.c and.c array_init.c \
+  bin_ui.c bin_uiui.c cdiv_q.c \
+  cdiv_q_ui.c cdiv_qr.c cdiv_qr_ui.c cdiv_r.c cdiv_r_ui.c cdiv_ui.c \
+  clear.c clrbit.c cmp.c cmp_si.c cmp_ui.c cmpabs.c cmpabs_ui.c com.c \
+  divexact.c dump.c fac_ui.c fdiv_q.c fdiv_q_2exp.c fdiv_q_ui.c \
+  fdiv_qr.c fdiv_qr_ui.c fdiv_r.c fdiv_r_2exp.c fdiv_r_ui.c fdiv_ui.c \
+  fib_ui.c fits_sint_p.c fits_slong_p.c fits_sshort_p.c fits_uint_p.c \
+  fits_ulong_p.c fits_ushort_p.c gcd.c gcd_ui.c gcdext.c get_d.c get_si.c \
+  get_str.c get_ui.c getlimbn.c hamdist.c init.c inp_raw.c inp_str.c \
+  invert.c ior.c iset.c iset_d.c iset_si.c iset_str.c iset_ui.c \
+  jacobi.c kronsz.c kronuz.c kronzs.c kronzu.c \
+  lcm.c legendre.c mod.c mul.c mul_2exp.c neg.c nextprime.c \
+  out_raw.c out_str.c perfpow.c perfsqr.c popcount.c pow_ui.c powm.c \
+  powm_ui.c pprime_p.c random.c random2.c realloc.c remove.c root.c rrandomb.c \
+  scan0.c scan1.c set.c set_d.c set_f.c set_q.c set_si.c set_str.c \
+  set_ui.c setbit.c size.c sizeinbase.c sqrt.c sqrtrem.c sub.c \
+  sub_ui.c swap.c tdiv_ui.c tdiv_q.c tdiv_q_2exp.c tdiv_q_ui.c tdiv_qr.c \
+  tdiv_qr_ui.c tdiv_r.c tdiv_r_2exp.c tdiv_r_ui.c tstbit.c ui_pow_ui.c \
+  urandomb.c urandomm.c xor.c
 
-INCLUDES = -I. -I.. -I../mpn -I$(srcdir)/..
 
-libmpz.a: Makefile $(MPZ_OBJS)
-	rm -f $@
-	$(AR) $(AR_FLAGS) $@ $(MPZ_OBJS)
+EXTRA_DIST = mul_siui.c
+nodist_libmpz_la_SOURCES = mul_si.c mul_ui.c
+CLEANFILES = $(nodist_libmpz_la_SOURCES)
+subdir = mpz
+mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
+CONFIG_HEADER = ../config.h
+CONFIG_CLEAN_FILES = 
+LTLIBRARIES =  $(noinst_LTLIBRARIES)
 
+
+DEFS = @DEFS@ -I. -I$(srcdir) -I..
+CPPFLAGS = @CPPFLAGS@
+LDFLAGS = @LDFLAGS@
+LIBS = @LIBS@
+libmpz_la_LDFLAGS = 
+libmpz_la_LIBADD = 
+am_libmpz_la_OBJECTS =  abs.lo add.lo add_ui.lo addmul_ui.lo and.lo \
+array_init.lo bin_ui.lo bin_uiui.lo cdiv_q.lo cdiv_q_ui.lo cdiv_qr.lo \
+cdiv_qr_ui.lo cdiv_r.lo cdiv_r_ui.lo cdiv_ui.lo clear.lo clrbit.lo \
+cmp.lo cmp_si.lo cmp_ui.lo cmpabs.lo cmpabs_ui.lo com.lo divexact.lo \
+dump.lo fac_ui.lo fdiv_q.lo fdiv_q_2exp.lo fdiv_q_ui.lo fdiv_qr.lo \
+fdiv_qr_ui.lo fdiv_r.lo fdiv_r_2exp.lo fdiv_r_ui.lo fdiv_ui.lo \
+fib_ui.lo fits_sint_p.lo fits_slong_p.lo fits_sshort_p.lo \
+fits_uint_p.lo fits_ulong_p.lo fits_ushort_p.lo gcd.lo gcd_ui.lo \
+gcdext.lo get_d.lo get_si.lo get_str.lo get_ui.lo getlimbn.lo \
+hamdist.lo init.lo inp_raw.lo inp_str.lo invert.lo ior.lo iset.lo \
+iset_d.lo iset_si.lo iset_str.lo iset_ui.lo jacobi.lo kronsz.lo \
+kronuz.lo kronzs.lo kronzu.lo lcm.lo legendre.lo mod.lo mul.lo \
+mul_2exp.lo neg.lo nextprime.lo out_raw.lo out_str.lo perfpow.lo \
+perfsqr.lo popcount.lo pow_ui.lo powm.lo powm_ui.lo pprime_p.lo \
+random.lo random2.lo realloc.lo remove.lo root.lo rrandomb.lo scan0.lo \
+scan1.lo set.lo set_d.lo set_f.lo set_q.lo set_si.lo set_str.lo \
+set_ui.lo setbit.lo size.lo sizeinbase.lo sqrt.lo sqrtrem.lo sub.lo \
+sub_ui.lo swap.lo tdiv_ui.lo tdiv_q.lo tdiv_q_2exp.lo tdiv_q_ui.lo \
+tdiv_qr.lo tdiv_qr_ui.lo tdiv_r.lo tdiv_r_2exp.lo tdiv_r_ui.lo \
+tstbit.lo ui_pow_ui.lo urandomb.lo urandomm.lo xor.lo
+nodist_libmpz_la_OBJECTS =  mul_si.lo mul_ui.lo
+libmpz_la_OBJECTS =  $(am_libmpz_la_OBJECTS) $(nodist_libmpz_la_OBJECTS)
+COMPILE = $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+CFLAGS = @CFLAGS@
+CCLD = $(CC)
+LINK = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+DIST_SOURCES =  $(libmpz_la_SOURCES)
+DIST_COMMON =  README Makefile.am Makefile.in
+
+
+DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
+
+GZIP_ENV = --best
+depcomp = 
+SOURCES = $(libmpz_la_SOURCES) $(nodist_libmpz_la_SOURCES)
+OBJECTS = $(am_libmpz_la_OBJECTS) $(nodist_libmpz_la_OBJECTS)
+
+all: all-redirect
+.SUFFIXES:
+.SUFFIXES: .c .lo .o .obj
+$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ Makefile.am $(top_srcdir)/configure.in $(ACLOCAL_M4) 
+	cd $(top_srcdir) && $(AUTOMAKE) --gnu mpz/Makefile
+
+Makefile: $(srcdir)/Makefile.in  $(top_builddir)/config.status
+	cd $(top_builddir) \
+	  && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+
+
+mostlyclean-noinstLTLIBRARIES:
+
+clean-noinstLTLIBRARIES:
+	-test -z "$(noinst_LTLIBRARIES)" || rm -f $(noinst_LTLIBRARIES)
+
+distclean-noinstLTLIBRARIES:
+
+maintainer-clean-noinstLTLIBRARIES:
+
+mostlyclean-compile:
+	-rm -f *.o core *.core
+	-rm -f *.$(OBJEXT)
+
+clean-compile:
+
+distclean-compile:
+	-rm -f *.tab.c
+
+maintainer-clean-compile:
+
+mostlyclean-libtool:
+	-rm -f *.lo
+
+clean-libtool:
+	-rm -rf .libs _libs
+
+distclean-libtool:
+
+maintainer-clean-libtool:
+
+libmpz.la: $(libmpz_la_OBJECTS) $(libmpz_la_DEPENDENCIES)
+	$(LINK)  $(libmpz_la_LDFLAGS) $(libmpz_la_OBJECTS) $(libmpz_la_LIBADD) $(LIBS)
 .c.o:
-	$(CC) -c $(INCLUDES) $(CFLAGS) $(XCFLAGS) $<
+	$(COMPILE) -c $<
+.c.obj:
+	$(COMPILE) -c `cygpath -w $<`
+.c.lo:
+	$(LTCOMPILE) -c -o $@ $<
 
-clean mostlyclean:
-	rm -f *.o libmpz.a
+# This directory's subdirectories are mostly independent; you can cd
+# into them and run `make' without going through this Makefile.
+# To change the values of `make' variables: instead of editing Makefiles,
+# (1) if the variable is set in `config.status', edit `config.status'
+#     (which will cause the Makefiles to be regenerated when you run `make');
+# (2) otherwise, pass the desired values on the `make' command line.
 
-distclean maintainer-clean: clean
-	rm -f Makefile config.status
+all-recursive install-data-recursive install-exec-recursive \
+installdirs-recursive install-recursive uninstall-recursive  \
+check-recursive installcheck-recursive info-recursive dvi-recursive:
+	@set fnord $(MAKEFLAGS); amf=$$2; \
+	dot_seen=no; \
+	target=`echo $@ | sed s/-recursive//`; \
+	list='$(SUBDIRS)'; for subdir in $$list; do \
+	  echo "Making $$target in $$subdir"; \
+	  if test "$$subdir" = "."; then \
+	    dot_seen=yes; \
+	    local_target="$$target-am"; \
+	  else \
+	    local_target="$$target"; \
+	  fi; \
+	  (cd $$subdir && $(MAKE) $(AM_MAKEFLAGS) $$local_target) \
+	   || case "$$amf" in *=*) exit 1;; *k*) fail=yes;; *) exit 1;; esac; \
+	done; \
+	if test "$$dot_seen" = "no"; then \
+	  $(MAKE) $(AM_MAKEFLAGS) "$$target-am" || exit 1; \
+	fi; test -z "$$fail"
 
-Makefile: $(srcdir)/Makefile.in
-	$(SHELL) ./config.status
+mostlyclean-recursive clean-recursive distclean-recursive \
+maintainer-clean-recursive:
+	@set fnord $(MAKEFLAGS); amf=$$2; \
+	dot_seen=no; \
+	rev=''; list='$(SUBDIRS)'; for subdir in $$list; do \
+	  rev="$$subdir $$rev"; \
+	  if test "$$subdir" = "."; then dot_seen=yes; else :; fi; \
+	done; \
+	test "$$dot_seen" = "no" && rev=". $$rev"; \
+	target=`echo $@ | sed s/-recursive//`; \
+	for subdir in $$rev; do \
+	  echo "Making $$target in $$subdir"; \
+	  if test "$$subdir" = "."; then \
+	    local_target="$$target-am"; \
+	  else \
+	    local_target="$$target"; \
+	  fi; \
+	  (cd $$subdir && $(MAKE) $(AM_MAKEFLAGS) $$local_target) \
+	   || case "$$amf" in *=*) exit 1;; *k*) fail=yes;; *) exit 1;; esac; \
+	done && test -z "$$fail"
+tags-recursive:
+	list='$(SUBDIRS)'; for subdir in $$list; do \
+	  test "$$subdir" = . || (cd $$subdir && $(MAKE) $(AM_MAKEFLAGS) tags); \
+	done
 
-H = $(srcdir)/../gmp.h $(srcdir)/../gmp-impl.h ../mpn/gmp-mparam.h
+tags: TAGS
 
-abs.o: $(srcdir)/abs.c $(H)
-add.o: $(srcdir)/add.c $(H)
-add_ui.o: $(srcdir)/add_ui.c $(H)
-and.o: $(srcdir)/and.c $(H)
-array_init.o: $(srcdir)/array_init.c $(H)
-cdiv_q.o: $(srcdir)/cdiv_q.c $(H)
-cdiv_q_ui.o: $(srcdir)/cdiv_q_ui.c $(H)
-cdiv_qr.o: $(srcdir)/cdiv_qr.c $(H)
-cdiv_qr_ui.o: $(srcdir)/cdiv_qr_ui.c $(H)
-cdiv_r.o: $(srcdir)/cdiv_r.c $(H)
-cdiv_r_ui.o: $(srcdir)/cdiv_r_ui.c $(H)
-cdiv_ui.o: $(srcdir)/cdiv_ui.c $(H)
-clear.o: $(srcdir)/clear.c $(H)
-clrbit.o: $(srcdir)/clrbit.c $(H)
-cmp.o: $(srcdir)/cmp.c $(H)
-cmp_si.o: $(srcdir)/cmp_si.c $(H)
-cmp_ui.o: $(srcdir)/cmp_ui.c $(H)
-com.o: $(srcdir)/com.c $(H)
-fdiv_q_2exp.o: $(srcdir)/fdiv_q_2exp.c $(H)
-fdiv_r_2exp.o: $(srcdir)/fdiv_r_2exp.c $(H)
-divexact.o: $(srcdir)/divexact.c $(H) $(srcdir)/../longlong.h
-fac_ui.o: $(srcdir)/fac_ui.c $(H) $(srcdir)/../longlong.h
-fdiv_q.o: $(srcdir)/fdiv_q.c $(H)
-fdiv_q_ui.o: $(srcdir)/fdiv_q_ui.c $(H)
-fdiv_qr.o: $(srcdir)/fdiv_qr.c $(H)
-fdiv_qr_ui.o: $(srcdir)/fdiv_qr_ui.c $(H)
-fdiv_r.o: $(srcdir)/fdiv_r.c $(H)
-fdiv_r_ui.o: $(srcdir)/fdiv_r_ui.c $(H)
-fdiv_ui.o: $(srcdir)/fdiv_ui.c $(H)
-gcd.o: $(srcdir)/gcd.c $(H) $(srcdir)/../longlong.h
-gcd_ui.o: $(srcdir)/gcd_ui.c $(H)
-gcdext.o: $(srcdir)/gcdext.c $(H)
-get_d.o: $(srcdir)/get_d.c $(H)
-get_si.o: $(srcdir)/get_si.c $(H)
-get_str.o: $(srcdir)/get_str.c $(H)
-get_ui.o: $(srcdir)/get_ui.c $(H)
-getlimbn.o: $(srcdir)/getlimbn.c $(H)
-hamdist.o: $(srcdir)/hamdist.c $(H)
-init.o: $(srcdir)/init.c $(H)
-inp_raw.o: $(srcdir)/inp_raw.c $(H)
-inp_str.o: $(srcdir)/inp_str.c $(H)
-invert.o: $(srcdir)/invert.c $(H)
-ior.o: $(srcdir)/ior.c $(H)
-iset.o: $(srcdir)/iset.c $(H)
-iset_d.o: $(srcdir)/iset_d.c $(H)
-iset_si.o: $(srcdir)/iset_si.c $(H)
-iset_str.o: $(srcdir)/iset_str.c $(H)
-iset_ui.o: $(srcdir)/iset_ui.c $(H)
-jacobi.o: $(srcdir)/jacobi.c $(H)
-legendre.o: $(srcdir)/legendre.c $(H)
-mod.o: $(srcdir)/mod.c $(H)
-tdiv_q_2exp.o: $(srcdir)/tdiv_q_2exp.c $(H)
-tdiv_r_2exp.o: $(srcdir)/tdiv_r_2exp.c $(H)
-mul.o: $(srcdir)/mul.c $(H)
-mul_2exp.o: $(srcdir)/mul_2exp.c $(H)
-mul_ui.o: $(srcdir)/mul_ui.c $(H)
-neg.o: $(srcdir)/neg.c $(H)
-out_raw.o: $(srcdir)/out_raw.c $(H)
-out_str.o: $(srcdir)/out_str.c $(H)
-perfsqr.o: $(srcdir)/perfsqr.c $(H)
-popcount.o: $(srcdir)/popcount.c $(H)
-pow_ui.o: $(srcdir)/pow_ui.c $(H) $(srcdir)/../longlong.h
-powm.o: $(srcdir)/powm.c $(H) $(srcdir)/../longlong.h
-powm_ui.o: $(srcdir)/powm_ui.c $(H) $(srcdir)/../longlong.h
-pprime_p.o: $(srcdir)/pprime_p.c $(H)
-random.o: $(srcdir)/random.c $(H) $(srcdir)/../urandom.h
-random2.o: $(srcdir)/random2.c $(H)
-realloc.o: $(srcdir)/realloc.c $(H)
-scan0.o: $(srcdir)/scan0.c $(H)
-scan1.o: $(srcdir)/scan1.c $(H)
-set.o: $(srcdir)/set.c $(H)
-set_d.o: $(srcdir)/set_d.c $(H)
-set_f.o: $(srcdir)/set_f.c $(H)
-set_q.o: $(srcdir)/set_q.c $(H)
-set_si.o: $(srcdir)/set_si.c $(H)
-set_str.o: $(srcdir)/set_str.c $(H) $(srcdir)/../longlong.h
-set_ui.o: $(srcdir)/set_ui.c $(H)
-setbit.o: $(srcdir)/setbit.c $(H)
-size.o: $(srcdir)/size.c $(H)
-sizeinbase.o: $(srcdir)/sizeinbase.c $(H) $(srcdir)/../longlong.h
-sqrt.o: $(srcdir)/sqrt.c $(H)
-sqrtrem.o: $(srcdir)/sqrtrem.c $(H)
-sub.o: $(srcdir)/sub.c $(H)
-sub_ui.o: $(srcdir)/sub_ui.c $(H)
-tdiv_q.o: $(srcdir)/tdiv_q.c $(H) $(srcdir)/../longlong.h
-tdiv_q_ui.o: $(srcdir)/tdiv_q_ui.c $(H)
-tdiv_qr.o: $(srcdir)/tdiv_qr.c $(H) $(srcdir)/../longlong.h $(srcdir)/dmincl.c $(H)
-tdiv_qr_ui.o: $(srcdir)/tdiv_qr_ui.c $(H)
-tdiv_r.o: $(srcdir)/tdiv_r.c $(H) $(srcdir)/../longlong.h $(srcdir)/dmincl.c $(H)
-tdiv_r_ui.o: $(srcdir)/tdiv_r_ui.c $(H)
-ui_pow_ui.o: $(srcdir)/ui_pow_ui.c $(H) $(srcdir)/../longlong.h
+ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
+	list='$(SOURCES) $(HEADERS) $(TAGS_FILES)'; \
+	unique=`for i in $$list; do \
+	    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
+	  done | \
+	  $(AWK) '    { files[$$0] = 1; } \
+	       END { for (i in files) print i; }'`; \
+	mkid -f$$here/ID $$unique $(LISP)
+
+TAGS: tags-recursive $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
+		$(TAGS_FILES) $(LISP)
+	tags=; \
+	here=`pwd`; \
+	list='$(SUBDIRS)'; for subdir in $$list; do \
+   if test "$$subdir" = .; then :; else \
+	    test -f $$subdir/TAGS && tags="$$tags -i $$here/$$subdir/TAGS"; \
+   fi; \
+	done; \
+	list='$(SOURCES) $(HEADERS) $(TAGS_FILES)'; \
+	unique=`for i in $$list; do \
+	    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
+	  done | \
+	  $(AWK) '    { files[$$0] = 1; } \
+	       END { for (i in files) print i; }'`; \
+	test -z "$(ETAGS_ARGS)$$unique$(LISP)$$tags" \
+	  || etags $(ETAGS_ARGS) $$tags  $$unique $(LISP)
+
+mostlyclean-tags:
+
+clean-tags:
+
+distclean-tags:
+	-rm -f TAGS ID
+
+maintainer-clean-tags:
+
+distdir = $(top_builddir)/$(PACKAGE)-$(VERSION)/$(subdir)
+
+distdir: $(DISTFILES)
+	@for file in $(DISTFILES); do \
+	  d=$(srcdir); \
+	  if test -d $$d/$$file; then \
+	    cp -pR $$d/$$file $(distdir); \
+	  else \
+	    test -f $(distdir)/$$file \
+	    || cp -p $$d/$$file $(distdir)/$$file || :; \
+	  fi; \
+	done
+	for subdir in $(SUBDIRS); do \
+	  if test "$$subdir" = .; then :; else \
+	    test -d $(distdir)/$$subdir \
+	    || mkdir $(distdir)/$$subdir \
+	    || exit 1; \
+	    (cd $$subdir && $(MAKE) $(AM_MAKEFLAGS) top_distdir=../$(top_distdir) distdir=../$(distdir)/$$subdir distdir) \
+	      || exit 1; \
+	  fi; \
+	done
+info-am:
+info: info-recursive
+dvi-am:
+dvi: dvi-recursive
+check-am: all-am
+check: check-recursive
+installcheck-am:
+installcheck: installcheck-recursive
+install-exec-am:
+install-exec: install-exec-recursive
+
+install-data-am:
+install-data: install-data-recursive
+
+install-am: all-am
+	@$(MAKE) $(AM_MAKEFLAGS) install-exec-am install-data-am
+install: install-recursive
+uninstall-am:
+uninstall: uninstall-recursive
+all-am: Makefile $(LTLIBRARIES)
+all-redirect: all-recursive
+install-strip:
+	$(MAKE) $(AM_MAKEFLAGS) INSTALL_STRIP_FLAG=-s install
+installdirs: installdirs-recursive
+installdirs-am:
+
+
+mostlyclean-generic:
+
+clean-generic:
+	-test -z "$(CLEANFILES)" || rm -f $(CLEANFILES)
+
+distclean-generic:
+	-rm -f Makefile $(CONFIG_CLEAN_FILES)
+	-rm -f config.cache config.log stamp-h stamp-h[0-9]*
+
+maintainer-clean-generic:
+	-rm -f Makefile.in
+mostlyclean-am:  mostlyclean-noinstLTLIBRARIES mostlyclean-compile \
+		mostlyclean-libtool mostlyclean-tags \
+		mostlyclean-generic
+
+mostlyclean: mostlyclean-recursive
+
+clean-am:  clean-noinstLTLIBRARIES clean-compile clean-libtool \
+		clean-tags clean-generic mostlyclean-am
+
+clean: clean-recursive
+
+distclean-am:  distclean-noinstLTLIBRARIES distclean-compile \
+		distclean-libtool distclean-tags distclean-generic \
+		clean-am
+	-rm -f libtool
+
+distclean: distclean-recursive
+
+maintainer-clean-am:  maintainer-clean-noinstLTLIBRARIES \
+		maintainer-clean-compile maintainer-clean-libtool \
+		maintainer-clean-tags maintainer-clean-generic \
+		distclean-am
+	@echo "This command is intended for maintainers to use;"
+	@echo "it deletes files that may require special tools to rebuild."
+
+maintainer-clean: maintainer-clean-recursive
+
+.PHONY: mostlyclean-noinstLTLIBRARIES distclean-noinstLTLIBRARIES \
+clean-noinstLTLIBRARIES maintainer-clean-noinstLTLIBRARIES \
+mostlyclean-compile distclean-compile clean-compile \
+maintainer-clean-compile mostlyclean-libtool distclean-libtool \
+clean-libtool maintainer-clean-libtool install-recursive \
+uninstall-recursive install-data-recursive uninstall-data-recursive \
+install-exec-recursive uninstall-exec-recursive installdirs-recursive \
+uninstalldirs-recursive all-recursive check-recursive \
+installcheck-recursive info-recursive dvi-recursive \
+mostlyclean-recursive distclean-recursive clean-recursive \
+maintainer-clean-recursive tags tags-recursive mostlyclean-tags \
+distclean-tags clean-tags maintainer-clean-tags distdir info-am info \
+dvi-am dvi check check-am installcheck-am installcheck install-exec-am \
+install-exec install-data-am install-data install-am install \
+uninstall-am uninstall all-redirect all-am all install-strip \
+installdirs-am installdirs mostlyclean-generic distclean-generic \
+clean-generic maintainer-clean-generic clean mostlyclean distclean \
+maintainer-clean
+
+
+mul_si.c: $(srcdir)/mul_siui.c
+	cp $(srcdir)/mul_siui.c mul_si.c
+mul_ui.c: $(srcdir)/mul_siui.c
+	cp $(srcdir)/mul_siui.c mul_ui.c
+
+# Tell versions [3.59,3.63) of GNU make to not export all variables.
+# Otherwise a system limit (for SysV at least) may be exceeded.
+.NOEXPORT:
