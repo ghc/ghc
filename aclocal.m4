@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.109 2002/12/11 16:37:16 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.110 2002/12/19 11:28:58 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -703,7 +703,6 @@ dnl    This is set up so that the argument can be a shell variable.
 dnl
 AC_DEFUN(FPTOOLS_CHECK_CCONST,
 [
-eval "def_name=CCONST_$1"
 eval "cv_name=ac_cv_cconst_$1"
 AC_MSG_CHECKING(value of $1)
 AC_CACHE_VAL($cv_name,
@@ -721,7 +720,7 @@ eval "$cv_name=-1",
 eval "$cv_name=-1")])dnl
 eval "fptools_check_cconst_result=`echo '$'{$cv_name}`"
 AC_MSG_RESULT($fptools_check_cconst_result)
-AC_DEFINE_UNQUOTED($def_name, $fptools_check_cconst_result)
+AC_DEFINE_UNQUOTED(CCONST_$1, $fptools_check_cconst_result)
 unset fptools_check_cconst_result
 ])
 
