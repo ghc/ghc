@@ -73,9 +73,9 @@ short_usage = do
   exitWith ExitSuccess
    
 long_usage = do
-  let usage_filename = "ghc-usage.txt"
-      usage_dir = findFile usage_filename cGHC_DRIVER_DIR
-  usage <- readFile (usage_dir ++ "/" ++ usage_filename)
+  let usage_file = "ghc-usage.txt"
+      usage_path = findFile usage_file (cGHC_DRIVER_DIR ++ '/':usage_file)
+  usage <- readFile usage_path
   dump usage
   exitWith ExitSuccess
   where
