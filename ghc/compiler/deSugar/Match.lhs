@@ -222,7 +222,7 @@ Now {\em unmix} the equations into {\em blocks} [w/ local function
 patterns in column~1, or they all have constructor patterns in ...
 (see ``the mixture rule'' in SLPJ).
 \item
-Call @matchUnmixedEqns@ on each block of equations; it will do the
+Call @matchEqnBlock@ on each block of equations; it will do the
 appropriate thing for each kind of column-1 pattern, usually ending up
 in a recursive call to @match@.
 \end{enumerate}
@@ -271,7 +271,8 @@ match vars@(v:vs) eqns_info
     let
 	tidy_eqns_blks = unmix_eqns tidy_eqns_info
     in
-    match_unmixed_eqn_blks vars tidy_eqns_blks
+    mapDs (matchEqnBlock vars) tidy_eqns_blks	`thenDs` \ match_results ->
+    returnDs (foldr1 combineMatchResults match_results)
   where
     unmix_eqns []    = []
     unmix_eqns [eqn] = [ [eqn] ]
@@ -286,22 +287,6 @@ match vars@(v:vs) eqns_info
 	unmixed_rest = unmix_eqns (eq2:eqs)
 
 	x `tack_onto` xss   = ( x : head xss) : tail xss
-
-    -----------------------------------------------------------------------
-    -- loop through the blocks:
-    -- subsequent blocks create a "fail expr" for the first one...
-    match_unmixed_eqn_blks :: [Id]
-			   -> [ [EquationInfo] ]	-- List of eqn BLOCKS
-			   -> DsM MatchResult
-
-    match_unmixed_eqn_blks vars [] = panic "match_unmixed_eqn_blks"
-
-    match_unmixed_eqn_blks vars [eqn_blk] = matchUnmixedEqns vars eqn_blk 
-
-    match_unmixed_eqn_blks vars (eqn_blk:eqn_blks) 
-      = matchUnmixedEqns vars eqn_blk    	`thenDs` \ match_result1 ->  -- try to match with first blk
-	match_unmixed_eqn_blks vars eqn_blks 	`thenDs` \ match_result2 ->
-	returnDs (combineMatchResults match_result1 match_result2)
 \end{code}
 
 Tidy up the leftmost pattern in an @EquationInfo@, given the variable @v@
@@ -358,20 +343,37 @@ tidyEqnInfo v (EqnInfo n ctx (pat : pats) match_result)
   = tidy1 v pat match_result	`thenDs` \ (pat', match_result') ->
     returnDs (EqnInfo n ctx (pat' : pats) match_result')
 
-tidy1 :: Id 					-- The Id being scrutinised
-      -> TypecheckedPat 			-- The pattern against which it is to be matched
-      -> MatchResult				-- Current thing do do after matching
-      -> DsM (TypecheckedPat, 			-- Equivalent pattern
-	      MatchResult)			-- Augmented thing to do afterwards
-						-- The augmentation usually takes the form
-						-- of new bindings to be added to the front
+-------------------------------------------------------
+--	(pat', mr') = tidy1 v pat mr
+-- tidies the *outer level only* of pat, giving pat'
+-- It eliminates many pattern forms (as-patterns, variable patterns,
+-- list patterns, etc) yielding one of:
+--	WildPat
+--	ConPat
+--	LitPat
+--	NPat
+--	NPlusKPat
+--
 
+
+tidy1 :: Id 			-- The Id being scrutinised
+      -> TypecheckedPat 	-- The pattern against which it is to be matched
+      -> MatchResult		-- Current thing do do after matching
+      -> DsM (TypecheckedPat, 	-- Equivalent pattern
+	      MatchResult)	-- Augmented thing to do afterwards
+				-- The augmentation usually takes the form
+				-- of new bindings to be added to the front
+
+	-- case v of { x -> mr[] }
+	-- = case v of { _ -> let x=v in mr[] }
 tidy1 v (VarPat var) match_result
   = returnDs (WildPat (idType var), match_result')
   where
     match_result' | v == var  = match_result
 		  | otherwise = adjustMatchResult (bindNonRec var (Var v)) match_result
 
+	-- case v of { x@p -> mr[] }
+	-- = case v of { p -> let x=v in mr[] }
 tidy1 v (AsPat var pat) match_result
   = tidy1 v pat match_result'
   where
@@ -545,20 +547,20 @@ Presumably just a variant on the constructor case (as it is now).
 %* match on an unmixed block: the real business				*
 %*									*
 %************************************************************************
-\subsection[matchUnmixedEqns]{@matchUnmixedEqns@: getting down to business}
+\subsection[matchEqnBlock]{@matchEqnBlock@: getting down to business}
 
-The function @matchUnmixedEqns@ is where the matching stuff sets to
+The function @matchEqnBlock@ is where the matching stuff sets to
 work a block of equations, to which the mixture rule has been applied.
 Its arguments and results are the same as for the ``top-level'' @match@.
 
 \begin{code}
-matchUnmixedEqns :: [Id]
-		  -> [EquationInfo]
-		  -> DsM MatchResult
+matchEqnBlock :: [Id]
+	      -> [EquationInfo]
+	      -> DsM MatchResult
 
-matchUnmixedEqns [] _ = panic "matchUnmixedEqns: no names"
+matchEqnBlock [] _ = panic "matchEqnBlock: no names"
 
-matchUnmixedEqns all_vars@(var:vars) eqns_info 
+matchEqnBlock all_vars@(var:vars) eqns_info 
   | isWildPat first_pat
   = ASSERT( all isWildPat column_1_pats )	-- Sanity check
   	-- Real true variables, just like in matchVar, SLPJ p 94
