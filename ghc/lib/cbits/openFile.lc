@@ -67,7 +67,15 @@ StgByteArray how;
 		ghc_errtype = ERR_NOSUCHTHING;
 		ghc_errstr = "file does not exist";
 		return NULL;
-	    }
+	    } else {
+		/* If it is a dangling symlink, break off now, too. */
+		struct stat st;
+		if ( lstat(file,&st) == 0) {
+		   ghc_errtype = ERR_NOSUCHTHING;
+		   ghc_errstr = "dangling symlink";
+		   return NULL;
+		}
+            }
 	    /* Now try to create it */
 	    while ((fd = open(file, oflags | O_CREAT | O_EXCL, 0666)) < 0) {
 		if (errno == EEXIST) {
