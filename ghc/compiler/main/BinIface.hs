@@ -344,7 +344,7 @@ instance Binary ParsedIface where
 	pkg_name    <- get bh
 	module_ver  <- get bh
 	orphan      <- get bh
-	usages	    <- {-# SCC "bin_usages" #-} get bh
+	usages	    <- {-# SCC "bin_usages" #-} lazyGet bh
 	exports	    <- {-# SCC "bin_exports" #-} get bh
         tycl_decls  <- {-# SCC "bin_tycldecls" #-} get bh
 	fixities    <- {-# SCC "bin_fixities" #-} get bh
