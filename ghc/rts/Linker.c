@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.43 2001/06/06 14:03:41 sewardj Exp $
+ * $Id: Linker.c,v 1.44 2001/06/22 12:35:28 rrt Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -1204,7 +1204,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       COFF_section* sectab_i
          = (COFF_section*)
            myindex ( sizeof_COFF_section, sectab, i );
-      IF_DEBUG(linker, belchf("section name = %s\n", sectab_i->Name ));
+      IF_DEBUG(linker, belch("section name = %s\n", sectab_i->Name ));
 
 #if 0
       /* I'm sure this is the Right Way to do it.  However, the 
