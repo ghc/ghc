@@ -33,7 +33,6 @@ module Module
 
     , moduleString		-- :: Module -> EncodedString
     , moduleUserString		-- :: Module -> UserString
-    , moduleName		-- :: Module -> ModuleName
 
     , mkVanillaModule	        -- :: ModuleName -> Module
     , mkPrelModule		-- :: UserString -> Module

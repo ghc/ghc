@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.13 2000/11/14 16:28:38 simonmar Exp $
+-- $Id: DriverState.hs,v 1.14 2000/11/16 11:39:37 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -439,56 +439,53 @@ addPackage package
 
 getPackageImportPath   :: IO [String]
 getPackageImportPath = do
-  ps <- readIORef v_Packages
-  ps' <- getPackageDetails ps
-  return (nub (concat (map import_dirs ps')))
+  ps <- getPackageInfo
+  return (nub (concat (map import_dirs ps)))
 
 getPackageIncludePath   :: IO [String]
 getPackageIncludePath = do
-  ps <- readIORef v_Packages 
-  ps' <- getPackageDetails ps
-  return (nub (filter (not.null) (concatMap include_dirs ps')))
+  ps <- getPackageInfo
+  return (nub (filter (not.null) (concatMap include_dirs ps)))
 
 	-- includes are in reverse dependency order (i.e. rts first)
 getPackageCIncludes   :: IO [String]
 getPackageCIncludes = do
-  ps <- readIORef v_Packages
-  ps' <- getPackageDetails ps
-  return (reverse (nub (filter (not.null) (concatMap c_includes ps'))))
+  ps <- getPackageInfo
+  return (reverse (nub (filter (not.null) (concatMap c_includes ps))))
 
 getPackageLibraryPath  :: IO [String]
 getPackageLibraryPath = do
-  ps <- readIORef v_Packages
-  ps' <- getPackageDetails ps
-  return (nub (concat (map library_dirs ps')))
+  ps <- getPackageInfo
+  return (nub (concat (map library_dirs ps)))
 
 getPackageLibraries    :: IO [String]
 getPackageLibraries = do
-  ps <- readIORef v_Packages
-  ps' <- getPackageDetails ps
+  ps <- getPackageInfo
   tag <- readIORef v_Build_tag
   let suffix = if null tag then "" else '_':tag
   return (concat (
-	map (\p -> map (++suffix) (hs_libraries p) ++ extra_libraries p) ps'
+	map (\p -> map (++suffix) (hs_libraries p) ++ extra_libraries p) ps
      ))
 
 getPackageExtraGhcOpts :: IO [String]
 getPackageExtraGhcOpts = do
-  ps <- readIORef v_Packages
-  ps' <- getPackageDetails ps
-  return (concatMap extra_ghc_opts ps')
+  ps <- getPackageInfo
+  return (concatMap extra_ghc_opts ps)
 
 getPackageExtraCcOpts  :: IO [String]
 getPackageExtraCcOpts = do
-  ps <- readIORef v_Packages
-  ps' <- getPackageDetails ps
-  return (concatMap extra_cc_opts ps')
+  ps <- getPackageInfo
+  return (concatMap extra_cc_opts ps)
 
 getPackageExtraLdOpts  :: IO [String]
 getPackageExtraLdOpts = do
+  ps <- getPackageInfo
+  return (concatMap extra_ld_opts ps)
+
+getPackageInfo :: IO [Package]
+getPackageInfo = do
   ps <- readIORef v_Packages
-  ps' <- getPackageDetails ps
-  return (concatMap extra_ld_opts ps')
+  getPackageDetails ps
 
 getPackageDetails :: [String] -> IO [Package]
 getPackageDetails ps = do

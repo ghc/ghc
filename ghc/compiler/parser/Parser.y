@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.47 2000/11/07 15:21:40 simonmar Exp $
+$Id: Parser.y,v 1.48 2000/11/16 11:39:37 simonmar Exp $
 
 Haskell grammar.
 
@@ -9,7 +9,7 @@ Author(s): Simon Marlow, Sven Panne 1997, 1998, 1999
 -}
 
 {
-module Parser ( parse ) where
+module Parser ( ParseStuff(..), parse ) where
 
 import HsSyn
 import HsTypes		( mkHsTupCon )
@@ -113,6 +113,8 @@ Conflicts: 14 shift/reduce
  '{-# DEPRECATED'  { ITdeprecated_prag }
  '#-}'		   { ITclose_prag }
 
+ '__expr'	{ ITexpr }
+
 {-
  '__interface'	{ ITinterface }			-- interface keywords
  '__export'	{ IT__export }
@@ -200,6 +202,13 @@ Conflicts: 14 shift/reduce
 %name parse
 %tokentype { Token }
 %%
+
+-----------------------------------------------------------------------------
+-- Entry points
+
+parse   :: { ParseStuff }
+	:  module				{ PModule $1 }
+	|  '__expr' exp				{ PExpr   $2 }
 
 -----------------------------------------------------------------------------
 -- Module Header
@@ -1096,6 +1105,8 @@ commas :: { Int }
 -----------------------------------------------------------------------------
 
 {
+data ParseStuff = PModule RdrNameHsModule | PExpr RdrNameHsExpr
+
 happyError :: P a
 happyError buf PState{ loc = loc } = PFailed (srcParseErr buf loc)
 }

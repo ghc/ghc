@@ -123,6 +123,7 @@ data Token
   | ITccallconv
 
   | ITinterface			-- interface keywords
+  | ITexpr
   | IT__export
   | ITdepends
   | IT__forall
@@ -295,6 +296,7 @@ ghcExtensionKeywordsFM = listToUFM $
 
 	-- interface keywords
         ("__interface",		ITinterface),
+        ("__expr",		ITexpr),
 	("__export",		IT__export),
 	("__depends",		ITdepends),
 	("__forall",		IT__forall),

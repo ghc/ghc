@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.22 2000/11/15 10:49:54 sewardj Exp $
+-- $Id: Main.hs,v 1.23 2000/11/16 11:39:37 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -16,6 +16,7 @@ module Main (main) where
 #include "HsVersions.h"
 
 import CompManager
+import InteractiveUI
 import DriverPipeline
 import DriverState
 import DriverFlags
@@ -281,25 +282,12 @@ beginMake pkg_details mods
 	 _     -> throwDyn (UsageError "only one module allowed with --make")
 
 beginInteractive pkg_details mods
-  = do case mods of
-	 []    -> return ()
-	 [mod] -> do state <- cmInit pkg_details Interactive
-		     cmLoadModule state (mkModuleName mod)
-		     return ()
-	 _     -> throwDyn (UsageError 
+  = do state <- cmInit pkg_details Interactive
+       case mods of
+	   []    -> return ()
+	   [mod] -> do cmLoadModule state (mkModuleName mod); return ()
+	   _     -> throwDyn (UsageError 
 				"only one module allowed with --interactive")
-       interactiveUI
+       interactiveUI state
 
-interactiveUI :: IO ()
-interactiveUI = do
-   hPutStr stdout ghciWelcomeMsg
-   throwDyn (OtherError "GHCi not implemented yet")
-
-ghciWelcomeMsg = "\ 
-\ _____  __   __  ____          ------------------------------------------------\n\ 
-\(|	 ||   || (|  |)         GHCi: GHC Interactive, version 5.00		\n\ 
-\||  __  ||___|| ||        ()   For Haskell 98.                    		\n\ 
-\||   |) ||---|| ||       //    http://www.haskell.org/ghc         		\n\ 
-\||   || ||   || ||      //     Bug reports to: glasgow-haskell-bugs@haskell.org\n\ 
-\(|___|| ||   || (|__|) (|      ________________________________________________\n"
 

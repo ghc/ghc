@@ -18,6 +18,7 @@ import Interpreter
 import CmStaticInfo	( PackageConfigInfo, GhciMode(..) )
 import Module		( ModuleName, PackageName )
 import Outputable	( SDoc )
+import FiniteMap
 import Digraph		( SCC(..), flattenSCC )
 import Outputable
 import Panic		( panic )
@@ -144,7 +145,6 @@ link doLink Batch batch_attempt_linking linkables pls1
 link doLink Interactive batch_attempt_linking linkables pls1
    = do putStrLn "LINKER(interactive): not yet implemented"
         return (LinkOK pls1)
-
 
 ppLinkableSCC :: SCC Linkable -> SDoc
 ppLinkableSCC = ppr . flattenSCC

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.6 2000/11/10 14:29:21 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.7 2000/11/16 11:39:37 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -70,6 +70,7 @@ instance Typeable BarfKind where
 
 -----------------------------------------------------------------------------
 -- Reading OPTIONS pragmas
+
 getOptionsFromSource 
 	:: String		-- input file
 	-> IO [String]		-- options, if any

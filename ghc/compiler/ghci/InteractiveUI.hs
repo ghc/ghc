@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.1 2000/11/16 10:48:22 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.2 2000/11/16 11:39:37 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -7,14 +7,20 @@
 --
 -----------------------------------------------------------------------------
 
-module InteractiveUI where
+module InteractiveUI (interactiveUI) where
 
 import CompManager
+import CmStaticInfo
+import DriverUtil
+import DriverState
+import Linker
 import Module
 import Panic
 import Util
 
+import Exception
 import Readline
+import IOExts
 
 import System
 import Directory
@@ -61,9 +67,14 @@ helpText = "\
 
 interactiveUI :: CmState -> IO ()
 interactiveUI st = do
-   hPutStr stdout ghciWelcomeMsg
+   hPutStrLn stdout ghciWelcomeMsg
    hFlush stdout
    hSetBuffering stdout NoBuffering
+
+   -- link in the available packages
+   pkgs <- getPackageInfo
+   linkPackages (reverse pkgs)
+
 #ifndef NO_READLINE
    Readline.initialize
 #endif
@@ -108,7 +119,7 @@ specialCommand str = do
 			    	       " matches multiple commands (" ++ 
 	         	     	       foldr1 (\a b -> a ++ ',':b) (map fst cs) ++ ")")
 
-noArgs c = io (hPutStr stdout ("command `:" ++ c ++ "' takes no arguments"))
+noArgs c = io (hPutStrLn stdout ("command `:" ++ c ++ "' takes no arguments"))
 
 -----------------------------------------------------------------------------
 -- Commands
@@ -131,7 +142,7 @@ reloadModule :: String -> GHCi ()
 reloadModule "" = do
   state <- getGHCiState
   case target state of
-	Nothing -> io (hPutStr stdout "no current target")
+	Nothing -> io (putStr "no current target\n")
 	Just path -> do (new_cmstate, mod) <- io (cmLoadModule (cmstate state) (mkModuleName path))
   			setGHCiState state{cmstate=new_cmstate}  
 reloadModule _ = noArgs ":reload"
@@ -169,4 +180,34 @@ setGHCiState s = GHCi $ \_ -> return (s,())
 
 io m = GHCi $ \s -> m >>= \a -> return (s,a)
 
-myCatch (GHCi m) h = GHCi $ \s -> catch (m s) (\e -> unGHCi (h e) s)
+myCatch (GHCi m) h = GHCi $ \s -> Exception.catch (m s) (\e -> unGHCi (h e) s)
+
+-----------------------------------------------------------------------------
+-- package loader
+
+linkPackages :: [Package] -> IO ()
+linkPackages pkgs = mapM_ linkPackage pkgs
+
+linkPackage :: Package -> IO ()
+-- ignore rts and gmp for now (ToDo; better?)
+linkPackage pkg | name pkg `elem` ["rts", "gmp"] = return ()
+linkPackage pkg = do
+  putStr ("Loading package " ++ name pkg ++ " ... ")
+  let dirs = library_dirs pkg
+  let objs = map (++".o") (hs_libraries pkg ++ extra_libraries pkg)
+  mapM (linkOneObj dirs) objs
+  putStr "resolving ... "
+  resolveObjs
+  putStrLn "done."
+
+linkOneObj dirs obj = do
+  filename <- findFile dirs obj
+  loadObj filename
+
+findFile [] obj = throwDyn (OtherError ("can't find " ++ obj))
+findFile (d:ds) obj = do
+  let path = d ++ '/':obj
+  b <- doesFileExist path
+  if b then return path else findFile ds obj
+
+

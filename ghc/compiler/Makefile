@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.113 2000/11/10 14:29:20 simonmar Exp $
+# $Id: Makefile,v 1.114 2000/11/16 11:39:36 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -175,12 +175,12 @@ SRC_HC_OPTS += \
 ghc_407_at_least = $(shell expr "$(GhcMinVersion)" \>= 7)
 ifeq "$(ghc_407_at_least)" "1"
 ifneq "$(mingw32_TARGET_OS)" "1"
-SRC_HC_OPTS += -package concurrent -package posix -package text
+SRC_HC_OPTS += -package concurrent -package posix -package text -package util
 else
-SRC_HC_OPTS += -package concurrent -package text
+SRC_HC_OPTS += -package concurrent -package text -package util
 endif
 else
-SRC_HC_OPTS += -syslib concurrent -syslib posix -syslib misc
+SRC_HC_OPTS += -syslib concurrent -syslib posix -syslib misc -syslib util
 endif
 
 SRC_CC_OPTS += -Iparser -I. -I$(TOP)/includes -O

@@ -14,7 +14,7 @@ import IO		( hPutStrLn, stderr )
 import HsSyn
 
 import StringBuffer	( hGetStringBuffer )
-import Parser		( parse )
+import Parser
 import Lex		( PState(..), ParseResult(..) )
 import SrcLoc		( mkSrcLoc )
 
@@ -263,7 +263,8 @@ myParseModule dflags src_filename
 
 	PFailed err -> do { hPutStrLn stderr (showSDoc err);
                             return Nothing };
-	POk _ rdr_module@(HsModule mod_name _ _ _ _ _ _) -> do {
+
+	POk _ (PModule rdr_module@(HsModule mod_name _ _ _ _ _ _)) -> do {
 
       dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr rdr_module) ;
       

@@ -10,46 +10,12 @@ module Linker (
    unloadObj,    -- :: String -> IO ()
    lookupSymbol, -- :: String -> IO (Maybe Addr)
    resolveObjs,  -- :: IO ()
-   linkPrelude -- tmp
   )  where
 
-import IO
-import Exception
 import Addr
 import PrelByteArr
 import PrelPack 	(packString)
 import Panic		( panic )
-
-#if __GLASGOW_HASKELL__ <= 408
-loadObj      = bogus "loadObj"
-unloadObj    = bogus "unloadObj"
-lookupSymbol = bogus "lookupSymbol"
-resolveObjs  = bogus "resolveObjs"
-linkPrelude  = bogus "linkPrelude"
-bogus f = panic ("Linker." ++ f ++ ": this hsc was built without an interpreter.")
-
-#else
-
-linkPrelude = do
-  hPutStr stderr "Loading HSstd_cbits.o..."
-  loadObj "/home/simonmar/builds/i386-unknown-linux-boot/ghc/lib/std/cbits/HSstd_cbits.o"
-  hPutStr stderr "done.\n"
-  hPutStr stderr "Resolving..."
-  resolveObjs
-  hPutStr stderr "done.\n"
-  hPutStr stderr "Loading HSstd.o..."
-  loadObj "/home/simonmar/builds/i386-unknown-linux-boot/ghc/lib/std/HSstd.o"
-  hPutStr stderr "done.\n"
-  hPutStr stderr "Resolving..."
-  resolveObjs
-  hPutStr stderr "done.\n"
-{-
-  hPutStr stderr "Unloading HSstd.o..."
-  unloadObj "/home/simonmar/builds/i386-unknown-linux-boot/ghc/lib/std/HSstd.o"
-  hPutStr stderr "done.\n"
-  unloadObj "/home/simonmar/builds/i386-unknown-linux-boot/ghc/lib/std/cbits/HSstd_cbits.o"
-  hPutStr stderr "done.\n"
--}
 
 -- ---------------------------------------------------------------------------
 -- RTS Linker Interface
@@ -64,19 +30,19 @@ lookupSymbol str = do
 loadObj str = do
    r <- c_loadObj (packString str)
    if (r == 0)
-	then error "loadObj: failed"
+	then panic "loadObj: failed"
 	else return ()
 
 unloadObj str = do
    r <- c_unloadObj (packString str)
    if (r == 0)
-	then error "unloadObj: failed"
+	then panic "unloadObj: failed"
 	else return ()
 
 resolveObjs = do
    r <- c_resolveObjs
    if (r == 0)
-	then error "resolveObjs: failed"
+	then panic "resolveObjs: failed"
 	else return ()
 
 
@@ -93,6 +59,4 @@ foreign import "unloadObj" unsafe
 
 foreign import "resolveObjs" unsafe
    c_resolveObjs :: IO Int
-
-#endif /* __GLASGOW_HASKELL__ <= 408 */
 \end{code}
