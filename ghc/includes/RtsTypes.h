@@ -11,7 +11,11 @@
 #ifndef RTS_TYPES_H
 #define RTS_TYPES_H
 
+#if SIZEOF_VOID_P == 8
+typedef unsigned long nat;           /* at least 32 bits (like int) */
+#else
 typedef unsigned int  nat;           /* at least 32 bits (like int) */
+#endif
 typedef unsigned long lnat;          /* at least 32 bits            */
 typedef unsigned long long ullong;   /* at least 32 bits            */
 
