@@ -31,7 +31,7 @@ import SrcLoc		( mkSrcLoc )
 import Rename		( checkOldIface, renameModule, closeIfaceDecls )
 import Rules		( emptyRuleBase )
 import PrelInfo		( wiredInThingEnv, wiredInThings )
-import PrelNames	( knownKeyNames )
+import PrelNames	( vanillaSyntaxMap, knownKeyNames )
 import MkIface		( completeIface, mkModDetailsFromIface, mkModDetails,
 			  writeIface, pprIface )
 import TcModule
@@ -157,7 +157,7 @@ hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
 
       -- TYPECHECK
       maybe_tc_result <- typecheckModule dflags pcs_cl hst 
-					 old_iface alwaysQualify cl_hs_decls
+					 old_iface alwaysQualify (vanillaSyntaxMap, cl_hs_decls)
 					 False{-don't check for Main.main-};
       case maybe_tc_result of {
          Nothing -> return (HscFail pcs_cl);
@@ -248,10 +248,13 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -------------------
  	    -- CONVERT TO STG and COMPLETE CODE GENERATION
  	    -------------------
+	      -- Do saturation and convert to A-normal form
+	; saturated <- coreSatPgm dflags tidy_binds
+
 	; (maybe_stub_h_filename, maybe_stub_c_filename, maybe_bcos)
       	     <- restOfCodeGeneration dflags toInterp this_mod
  		   (map ideclName (hsModuleImports rdr_module))
-      		   foreign_stuff env_tc tidy_binds
+      		   foreign_stuff env_tc saturated
       		   hit (pcs_PIT pcs_simpl)       
 
       	  -- and the answer is ...
@@ -318,13 +321,9 @@ simplThenTidy dflags pcs hst this_mod dont_discard binds rules
       (simplified, orphan_rules) 
          <- core2core dflags pcs hst dont_discard binds rules
 
-      -- Do saturation and convert to A-normal form
-      -- NOTE: subsequent passes may not transform the syntax, only annotate it
-      saturated <- coreSatPgm dflags simplified
-
       -- Do the final tidy-up
       (pcs', tidy_binds, tidy_orphan_rules) 
-         <- tidyCorePgm dflags this_mod pcs saturated orphan_rules
+         <- tidyCorePgm dflags this_mod pcs simplified orphan_rules
       
       return (pcs', tidy_binds, tidy_orphan_rules)
 
@@ -432,7 +431,7 @@ hscExpr dflags wrap_io hst hit pcs0 this_module expr
 
 		-- Typecheck it
 	maybe_tc_return
-	   <- typecheckExpr dflags wrap_io pcs1 hst print_unqual this_module rn_expr;
+	   <- typecheckExpr dflags wrap_io syn_map pcs1 hst print_unqual this_module rn_expr;
 	case maybe_tc_return of {
 		Nothing -> return ({-WAS:pcs1-} pcs0, Nothing);
 		Just (pcs2, tc_expr, ty) -> do

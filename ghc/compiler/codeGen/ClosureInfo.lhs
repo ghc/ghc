@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.44 2000/12/06 13:19:49 simonmar Exp $
+% $Id: ClosureInfo.lhs,v 1.45 2001/02/20 09:38:59 simonpj Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -85,8 +85,7 @@ import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon,
 			)
 import TyCon		( isBoxedTupleTyCon )
 import IdInfo		( ArityInfo(..) )
-import Name		( Name, isExternallyVisibleName, nameUnique, 
-			  getOccName )
+import Name		( Name, nameUnique, getOccName )
 import OccName		( occNameUserString )
 import PprType		( getTyDescription )
 import PrimRep		( getPrimRepSize, separateByPtrFollowness, PrimRep )
@@ -830,13 +829,11 @@ staticClosureRequired
 	-> StgBinderInfo
 	-> LambdaFormInfo
 	-> Bool
-staticClosureRequired binder (StgBinderInfo arg_occ unsat_occ _ _ _)
+staticClosureRequired binder bndr_info
 		      (LFReEntrant _ top_level _ _ _ _)	-- It's a function
   = ASSERT( isTopLevel top_level )
 	-- Assumption: it's a top-level, no-free-var binding
-    arg_occ 		-- There's an argument occurrence
-    || unsat_occ	-- There's an unsaturated call
-    || isExternallyVisibleName binder
+	not (satCallsOnly bndr_info)
 
 staticClosureRequired binder other_binder_info other_lf_info = True
 
@@ -845,27 +842,20 @@ slowFunEntryCodeRequired	-- Assumption: it's a function, not a thunk.
 	-> StgBinderInfo
 	-> EntryConvention
 	-> Bool
-slowFunEntryCodeRequired binder (StgBinderInfo arg_occ unsat_occ _ _ _) entry_conv
-  = arg_occ 		-- There's an argument occurrence
-    || unsat_occ	-- There's an unsaturated call
-    || isExternallyVisibleName binder
+slowFunEntryCodeRequired binder bndr_info entry_conv
+  =    not (satCallsOnly bndr_info)
     || (case entry_conv of { DirectEntry _ _ _ -> False; other -> True })
 	    {- The last case deals with the parallel world; a function usually
 	       as a DirectEntry convention, but if it doesn't we must generate slow-entry code -}
-
-slowFunEntryCodeRequired binder NoStgBinderInfo _ = True
 
 funInfoTableRequired
 	:: Name
 	-> StgBinderInfo
 	-> LambdaFormInfo
 	-> Bool
-funInfoTableRequired  binder (StgBinderInfo arg_occ unsat_occ _ _ _)
-		     (LFReEntrant _ top_level _ _ _ _)
+funInfoTableRequired binder bndr_info (LFReEntrant _ top_level _ _ _ _)
   =    isNotTopLevel top_level
-    || arg_occ 		-- There's an argument occurrence
-    || unsat_occ	-- There's an unsaturated call
-    || isExternallyVisibleName binder
+    || not (satCallsOnly bndr_info)
 
 funInfoTableRequired other_binder_info binder other_lf_info = True
 \end{code}

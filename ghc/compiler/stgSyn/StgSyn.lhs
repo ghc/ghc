@@ -18,9 +18,8 @@ module StgSyn (
 
 	UpdateFlag(..), isUpdatable,
 
-	StgBinderInfo(..),
-	stgArgOcc, stgUnsatOcc, stgStdHeapOcc, stgNoUpdHeapOcc,
-	stgNormalOcc, stgFakeFunAppOcc,
+	StgBinderInfo,
+	noBinderInfo, stgSatOcc, stgUnsatOcc, satCallsOnly,
 	combineStgBinderInfo,
 
 	-- a set of synonyms for the most common (only :-) parameterisation
@@ -385,43 +384,26 @@ Here's the @StgBinderInfo@ type, and its combining op:
 \begin{code}
 data StgBinderInfo
   = NoStgBinderInfo
-  | StgBinderInfo
-	Bool		-- At least one occurrence as an argument
+  | SatCallsOnly	-- All occurrences are *saturated* *function* calls
+			-- This means we don't need to build an info table and 
+			-- slow entry code for the thing
+			-- Thunks never get this value
 
-	Bool		-- At least one occurrence in an unsaturated application
+noBinderInfo = NoStgBinderInfo
+stgUnsatOcc  = NoStgBinderInfo
+stgSatOcc    = SatCallsOnly
 
-	Bool		-- This thing (f) has at least occurrence of the form:
-			--    x = [..] \u [] -> f a b c
-			-- where the application is saturated
-
-	Bool		-- Ditto for non-updatable x.
-
-	Bool		-- At least one fake application occurrence, that is
-			-- an StgApp f args where args is an empty list
-			-- This is due to the fact that we do not have a
-			-- StgVar constructor.
-			-- Used by the lambda lifter.
-			-- True => "at least one unsat app" is True too
-
-stgArgOcc        = StgBinderInfo True  False False False False
-stgUnsatOcc      = StgBinderInfo False True  False False False
-stgStdHeapOcc    = StgBinderInfo False False True  False False
-stgNoUpdHeapOcc  = StgBinderInfo False False False True  False
-stgNormalOcc     = StgBinderInfo False False False False False
--- [Andre] can't think of a good name for the last one.
-stgFakeFunAppOcc = StgBinderInfo False True  False False True
+satCallsOnly :: StgBinderInfo -> Bool
+satCallsOnly SatCallsOnly    = True
+satCallsOnly NoStgBinderInfo = False
 
 combineStgBinderInfo :: StgBinderInfo -> StgBinderInfo -> StgBinderInfo
+combineStgBinderInfo SatCallsOnly SatCallsOnly = SatCallsOnly
+combineStgBinderInfo info1 info2 	       = NoStgBinderInfo
 
-combineStgBinderInfo NoStgBinderInfo info2 = info2
-combineStgBinderInfo info1 NoStgBinderInfo = info1
-combineStgBinderInfo (StgBinderInfo arg1 unsat1 std_heap1 upd_heap1 fkap1)
-		     (StgBinderInfo arg2 unsat2 std_heap2 upd_heap2 fkap2)
-  = StgBinderInfo (arg1      || arg2)
-		  (unsat1    || unsat2)
-		  (std_heap1 || std_heap2)
-		  (upd_heap1 || upd_heap2)
-		  (fkap1     || fkap2)
+--------------
+pp_binder_info NoStgBinderInfo = empty
+pp_binder_info SatCallsOnly    = ptext SLIT("sat-only")
 \end{code}
 
 %************************************************************************
@@ -764,21 +746,6 @@ pprStgRhs (StgRhsCon cc con args)
 
 pprMaybeSRT (NoSRT) = empty
 pprMaybeSRT srt     = ptext SLIT(" srt: ") <> pprSRT srt
-
---------------
-
-pp_binder_info NoStgBinderInfo = empty
-
--- cases so boring that we print nothing
-pp_binder_info (StgBinderInfo True b c d e) = empty
-
--- general case
-pp_binder_info (StgBinderInfo a b c d e)
-  = getPprStyle $ \ sty -> 
-    if userStyle sty then
-       empty
-    else
-       parens (hsep (punctuate comma (map ppr [a,b,c,d,e])))
 \end{code}
 
 Collect @IdInfo@ stuff that is most easily just snaffled straight

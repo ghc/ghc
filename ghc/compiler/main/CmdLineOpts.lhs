@@ -52,6 +52,7 @@ module CmdLineOpts (
 	opt_Parallel,
 	opt_SMP,
 	opt_NoMonomorphismRestriction,
+	opt_KeepStgTypes,
 
 	-- optimisation opts
 	opt_NoMethodSharing,
@@ -236,6 +237,7 @@ data DynFlag
    | Opt_D_dump_stranal
    | Opt_D_dump_tc
    | Opt_D_dump_types
+   | Opt_D_dump_tc_trace
    | Opt_D_dump_rules
    | Opt_D_dump_usagesp
    | Opt_D_dump_cse
@@ -450,7 +452,7 @@ opt_UnboxStrictFields		= lookUp  SLIT("-funbox-strict-fields")
 {-
    The optional '-inpackage=P' flag tells what package
    we are compiling this module for.
-   The Prelude, for example is compiled with '-package prelude'
+   The Prelude, for example is compiled with '-inpackage prelude'
 -}
 opt_InPackage			= case lookup_str "-inpackage=" of
 				    Just p  -> _PK_ p
@@ -466,6 +468,7 @@ opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
 opt_NoHiCheck                   = lookUp  SLIT("-fno-hi-version-check")
 opt_OmitBlackHoling		= lookUp  SLIT("-dno-black-holing")
 opt_OmitInterfacePragmas	= lookUp  SLIT("-fomit-interface-pragmas")
+opt_KeepStgTypes		= lookUp  SLIT("-fkeep-stg-types")
 
 -- Simplifier switches
 opt_SimplNoPreInlining		= lookUp SLIT("-fno-pre-inlining")
@@ -532,6 +535,7 @@ isStaticHscFlag f =
 	"fno-method-sharing",
         "fno-monomorphism-restriction",
 	"fomit-interface-pragmas",
+	"fkeep-stg-types",
 	"fno-pre-inlining",
 	"fdo-eta-reduction",
 	"fdo-lambda-eta-expansion",

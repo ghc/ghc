@@ -14,7 +14,7 @@ module CoreUtils (
 	exprType, coreAltsType, 
 	exprIsBottom, exprIsDupable, exprIsTrivial, exprIsCheap, 
 	exprIsValue,exprOkForSpeculation, exprIsBig, 
-	exprIsConApp_maybe,
+	exprIsConApp_maybe, exprIsAtom,
 	idAppIsBottom, idAppIsCheap,
 	exprArity,
 
@@ -266,6 +266,15 @@ exprIsTrivial (App e arg)     	       = isTypeArg arg && exprIsTrivial e
 exprIsTrivial (Note _ e)      	       = exprIsTrivial e
 exprIsTrivial (Lam b body) | isTyVar b = exprIsTrivial body
 exprIsTrivial other	      	       = False
+
+exprIsAtom :: CoreExpr -> Bool
+-- Used to decide whether to let-binding an STG argument
+-- when compiling to ILX => type applications are not allowed
+exprIsAtom (Var v)    = True	-- primOpIsDupable?
+exprIsAtom (Lit lit)  = True
+exprIsAtom (Type ty)  = True
+exprIsAtom (Note _ e) = exprIsAtom e
+exprIsAtom other      = False
 \end{code}
 
 

@@ -10,19 +10,22 @@ module CoreSat (
 
 #include "HsVersions.h"
 
-import CoreUtils
-import CoreFVs
-import CoreLint
+import CoreUtils( exprIsTrivial, exprIsAtom, exprType, exprIsValue, etaExpand )
+import CoreFVs	( exprFreeVars )
+import CoreLint	( endPass )
 import CoreSyn
-import Type
-import Demand
-import Var 	( TyVar, setTyVarUnique )
+import Type	( Type, applyTy, splitFunTy_maybe, isTyVarTy,
+		  isUnLiftedType, isUnboxedTupleType, repType,	
+		  uaUTy, usOnce, usMany, seqType )
+import Demand	( Demand, isStrict, wwLazy, StrictnessInfo(..) )
+import Var 	( Id, TyVar, setTyVarUnique )
 import VarSet
-import IdInfo
-import Id
-import PrimOp
+import IdInfo	( IdFlavour(..) )
+import Id	( mkSysLocal, idType, idStrictness, idFlavour, idDemandInfo, idArity )
+
 import UniqSupply
 import Maybes
+import OrdList
 import ErrUtils
 import CmdLineOpts
 import Outputable
@@ -32,34 +35,44 @@ import Outputable
 -- Overview
 -- ---------------------------------------------------------------------------
 
+MAJOR CONSTRAINT: 
+	By the time this pass happens, we have spat out tidied Core into
+	the interface file, including all IdInfo.  
+
+	So we must not change the arity of any top-level function,
+	because we've already fixed it and put it out into the interface file.
+
+	It's ok to introduce extra bindings, which don't appear in the
+	interface file.  We don't put arity info on these extra bindings,
+	because they are never fully applied, so there's no chance of
+	compiling just-a-fast-entry point for them.
+
 Most of the contents of this pass used to be in CoreToStg.  The
 primary goals here are:
 
-1.  Get the program into "A-normal form". In particular:
+1.  Saturate constructor and primop applications.
 
-	f E	   ==>  let x = E in f x
-		OR ==>  case E of x -> f x
+2.  Convert to A-normal form:
 
+    * Use case for strict arguments:
+	f E ==> case E of x -> f x
+    	(where f is strict)
 
-    if E is a non-trivial expression.
-    Which transformation is used depends on whether f is strict or not.
-    [Previously the transformation to case used to be done by the
-     simplifier, but it's better done here.  It does mean that f needs
-     to have its strictness info correct!.]
+    * Use let for non-trivial lazy arguments
+	f E ==> let x = E in f x
+	(were f is lazy and x is non-trivial)
 
-2.  Similarly, convert any unboxed lets into cases.
-    [I'm experimenting with leaving 'ok-for-speculation' rhss in let-form
-     right up to this point.]
+3.  Similarly, convert any unboxed lets into cases.
+    [I'm experimenting with leaving 'ok-for-speculation' 
+     rhss in let-form right up to this point.]
 
-    This is all done modulo type applications and abstractions, so that
-    when type erasure is done for conversion to STG, we don't end up with
-    any trivial or useless bindings.
-  
-3.  Ensure that lambdas only occur as the RHS of a binding
+4.  Ensure that lambdas only occur as the RHS of a binding
     (The code generator can't deal with anything else.)
 
-4.  Saturate constructor and primop applications.
-
+This is all done modulo type applications and abstractions, so that
+when type erasure is done for conversion to STG, we don't end up with
+any trivial or useless bindings.
+  
 
 
 -- -----------------------------------------------------------------------------
@@ -71,7 +84,7 @@ coreSatPgm :: DynFlags -> [CoreBind] -> IO [CoreBind]
 coreSatPgm dflags binds 
   = do	showPass dflags "CoreSat"
 	us <- mkSplitUniqSupply 's'
-	let new_binds = initUs_ us (coreSatBinds binds)
+	let new_binds = initUs_ us (coreSatTopBinds binds)
         endPass dflags "CoreSat" Opt_D_dump_sat new_binds
 
 coreSatExpr :: DynFlags -> CoreExpr -> IO CoreExpr
@@ -80,66 +93,68 @@ coreSatExpr dflags expr
        us <- mkSplitUniqSupply 's'
        let new_expr = initUs_ us (coreSatAnExpr expr)
        dumpIfSet_dyn dflags Opt_D_dump_sat "Saturated/Normal form syntax:" 
-	  (ppr new_expr)
+		     (ppr new_expr)
        return new_expr
 
 -- ---------------------------------------------------------------------------
 -- Dealing with bindings
 -- ---------------------------------------------------------------------------
 
-data FloatingBind
-   = RecF [(Id, CoreExpr)]
-   | NonRecF Id
-	     CoreExpr		-- *Can* be a Lam
-	     RhsDemand
-	     [FloatingBind]
+data FloatingBind = FloatBind CoreBind
+		  | FloatCase Id CoreExpr
 
-coreSatBinds :: [CoreBind] -> UniqSM [CoreBind]
-coreSatBinds [] = returnUs []
-coreSatBinds (b:bs)
-  = coreSatBind b	`thenUs` \ float ->
-    coreSatBinds bs 	`thenUs` \ new_bs ->
-    case float of
-	NonRecF bndr rhs dem floats 
-		-> ASSERT2( not (isStrictDem dem) && 
-			    not (isUnLiftedType (idType bndr)),
-			    ppr b )		-- No top-level cases!
-
-		   mkBinds floats rhs		`thenUs` \ new_rhs ->
-		   returnUs (NonRec bndr new_rhs : new_bs)
-				-- Keep all the floats inside...
-				-- Some might be cases etc
-				-- We might want to revisit this decision
-
-	RecF prs -> returnUs (Rec prs : new_bs)
-
-coreSatBind :: CoreBind -> UniqSM FloatingBind
-coreSatBind (NonRec binder rhs)
-  = coreSatExprFloat rhs		`thenUs` \ (floats, new_rhs) ->
-    returnUs (NonRecF binder new_rhs (bdrDem binder) floats)
-coreSatBind (Rec pairs)
-  = mapUs do_rhs pairs 			`thenUs` \ new_rhss ->
-    returnUs (RecF (binders `zip` new_rhss))
+coreSatTopBinds :: [CoreBind] -> UniqSM [CoreBind]
+-- Very careful to preserve the arity of top-level functions
+coreSatTopBinds bs
+  = mapUs do_bind bs
   where
-    binders = map fst pairs
-    do_rhs (bndr,rhs) = 
-	coreSatExprFloat rhs		`thenUs` \ (floats, new_rhs) ->
-	mkBinds floats new_rhs		`thenUs` \ new_rhs' ->
-		-- NB: new_rhs' might still be a Lam (and we want that)
-	returnUs new_rhs'
+    do_bind (NonRec b r) = coreSatAnExpr r	`thenUs` \ r' ->
+			   returnUs (NonRec b r')
+    do_bind (Rec prs)	 = mapUs do_pair prs	`thenUs` \ prs' ->
+			   returnUs (Rec prs')
+    do_pair (b,r) 	 = coreSatAnExpr r	`thenUs` \ r' ->
+			   returnUs (b, r')
+
+
+coreSatBind :: CoreBind -> UniqSM (OrdList FloatingBind)
+-- Used for non-top-level bindings
+-- We return a *list* of bindings because we may start with
+--	x* = f (g y)
+-- where x is demanded, in which case we want to finish with
+--	a = g y
+--	x* = f a
+-- And then x will actually end up case-bound
+
+coreSatBind (NonRec binder rhs)
+  = coreSatExprFloat rhs	`thenUs` \ (floats, new_rhs) ->
+    mkNonRec binder new_rhs (bdrDem binder) floats
+	-- NB: if there are any lambdas at the top of the RHS,
+	-- the floats will be empty, so the arity won't be affected
+
+coreSatBind (Rec pairs)
+  = mapUs do_rhs pairs 			`thenUs` \ new_pairs ->
+    returnUs (unitOL (FloatBind (Rec new_pairs)))
+  where
+    do_rhs (bndr,rhs) =	coreSatAnExpr rhs	`thenUs` \ new_rhs' ->
+			returnUs (bndr,new_rhs')
+
 
 -- ---------------------------------------------------------------------------
 -- Making arguments atomic (function args & constructor args)
 -- ---------------------------------------------------------------------------
 
 -- This is where we arrange that a non-trivial argument is let-bound
-coreSatArg :: CoreArg -> RhsDemand -> UniqSM ([FloatingBind], CoreArg)
+coreSatArg :: CoreArg -> RhsDemand -> UniqSM (OrdList FloatingBind, CoreArg)
 coreSatArg arg dem
   = coreSatExprFloat arg		`thenUs` \ (floats, arg') ->
-    if exprIsTrivial arg'
+    if needs_binding arg'
 	then returnUs (floats, arg')
 	else newVar (exprType arg')	`thenUs` \ v ->
-	     returnUs ([NonRecF v arg' dem floats], Var v)
+	     mkNonRec v arg' dem floats	`thenUs` \ floats' -> 
+	     returnUs (floats', Var v)
+
+needs_binding | opt_KeepStgTypes = exprIsAtom
+	      | otherwise	 = exprIsTrivial
 
 -- ---------------------------------------------------------------------------
 -- Dealing with expressions
@@ -151,7 +166,7 @@ coreSatAnExpr expr
     mkBinds floats expr
 
 
-coreSatExprFloat :: CoreExpr -> UniqSM ([FloatingBind], CoreExpr)
+coreSatExprFloat :: CoreExpr -> UniqSM (OrdList FloatingBind, CoreExpr)
 -- If
 --	e  ===>  (bs, e')
 -- then	
@@ -162,31 +177,33 @@ coreSatExprFloat :: CoreExpr -> UniqSM ([FloatingBind], CoreExpr)
 
 coreSatExprFloat (Var v)
   = maybeSaturate v (Var v) 0 (idType v) `thenUs` \ app ->
-    returnUs ([], app)
+    returnUs (nilOL, app)
 
 coreSatExprFloat (Lit lit)
-  = returnUs ([], Lit lit)
+  = returnUs (nilOL, Lit lit)
 
 coreSatExprFloat (Let bind body)
-  = coreSatBind bind			`thenUs` \ new_bind ->
+  = coreSatBind bind			`thenUs` \ new_binds ->
     coreSatExprFloat body		`thenUs` \ (floats, new_body) ->
-    returnUs (new_bind:floats, new_body)
+    returnUs (new_binds `appOL` floats, new_body)
 
 coreSatExprFloat (Note n@(SCC _) expr)
   = coreSatAnExpr expr			`thenUs` \ expr ->
     deLam expr				`thenUs` \ expr ->
-    returnUs ([], Note n expr)
+    returnUs (nilOL, Note n expr)
 
 coreSatExprFloat (Note other_note expr)
   = coreSatExprFloat expr		`thenUs` \ (floats, expr) ->
     returnUs (floats, Note other_note expr)
 
 coreSatExprFloat expr@(Type _)
-  = returnUs ([], expr)
+  = returnUs (nilOL, expr)
 
-coreSatExprFloat (Lam v e)
-  = coreSatAnExpr e			`thenUs` \ e' ->
-    returnUs ([], Lam v e')
+coreSatExprFloat expr@(Lam _ _)
+  = coreSatAnExpr body			`thenUs` \ body' ->
+    returnUs (nilOL, mkLams bndrs body')
+  where
+    (bndrs,body) = collectBinders expr
 
 coreSatExprFloat (Case scrut bndr alts)
   = coreSatExprFloat scrut		`thenUs` \ (floats, scrut) ->
@@ -194,8 +211,8 @@ coreSatExprFloat (Case scrut bndr alts)
     returnUs (floats, Case scrut bndr alts)
   where
     sat_alt (con, bs, rhs)
-	  = coreSatAnExpr rhs	  	 `thenUs` \ rhs ->
-	    deLam rhs			 `thenUs` \ rhs ->
+	  = coreSatAnExpr rhs	  	`thenUs` \ rhs ->
+	    deLam rhs			`thenUs` \ rhs ->
 	    returnUs (con, bs, rhs)
 
 coreSatExprFloat expr@(App _ _)
@@ -213,19 +230,19 @@ coreSatExprFloat expr@(App _ _)
 
     -- Deconstruct and rebuild the application, floating any non-atomic
     -- arguments to the outside.  We collect the type of the expression,
-    -- the head of the applicaiton, and the number of actual value arguments,
+    -- the head of the application, and the number of actual value arguments,
     -- all of which are used to possibly saturate this application if it
     -- has a constructor or primop at the head.
 
     collect_args
 	:: CoreExpr
-	-> Int				-- current app depth
-	-> UniqSM (CoreExpr,		-- the rebuilt expression
-		   (CoreExpr,Int),	-- the head of the application,
+	-> Int				  -- current app depth
+	-> UniqSM (CoreExpr,		  -- the rebuilt expression
+		   (CoreExpr,Int),	  -- the head of the application,
 				          -- and no. of args it was applied to
-		   Type,		-- type of the whole expr
-		   [FloatingBind],	-- any floats we pulled out
-		   [Demand])		-- remaining argument demands
+		   Type,		  -- type of the whole expr
+		   OrdList FloatingBind,  -- any floats we pulled out
+		   [Demand])		  -- remaining argument demands
 
     collect_args (App fun arg@(Type arg_ty)) depth
         = collect_args fun depth   `thenUs` \ (fun',hd,fun_ty,floats,ss) ->
@@ -241,10 +258,10 @@ coreSatExprFloat expr@(App _ _)
                                  splitFunTy_maybe fun_ty
 	  in
 	  coreSatArg arg (mkDemTy ss1 arg_ty) `thenUs` \ (fs, arg') ->
-	  returnUs (App fun' arg', hd, res_ty, fs ++ floats, ss_rest)
+	  returnUs (App fun' arg', hd, res_ty, fs `appOL` floats, ss_rest)
 
     collect_args (Var v) depth
-	= returnUs (Var v, (Var v, depth), idType v, [], stricts)
+	= returnUs (Var v, (Var v, depth), idType v, nilOL, stricts)
 	where
 	  stricts = case idStrictness v of
 			StrictnessInfo demands _ 
@@ -268,11 +285,12 @@ coreSatExprFloat expr@(App _ _)
 
 	-- non-variable fun, better let-bind it
     collect_args fun depth
-	= newVar ty		 	`thenUs` \ fn_id ->
-          coreSatExprFloat fun	  	`thenUs` \ (fun_floats, fun) ->
-	  returnUs (Var fn_id, (Var fn_id, depth), ty, 
-		    [NonRecF fn_id fun onceDem fun_floats], [])
-        where ty = exprType fun
+	= coreSatExprFloat fun	  		`thenUs` \ (fun_floats, fun) ->
+	  newVar ty		 		`thenUs` \ fn_id ->
+          mkNonRec fn_id fun onceDem fun_floats	`thenUs` \ floats ->
+	  returnUs (Var fn_id, (Var fn_id, depth), ty, floats, [])
+        where
+	  ty = exprType fun
 
     ignore_note	InlineCall = True
     ignore_note	InlineMe   = True
@@ -313,132 +331,80 @@ maybeSaturate fn expr n_args ty
 		   returnUs (etaExpand excess_arity us expr ty)
 
 -- ---------------------------------------------------------------------------
--- Eliminate Lam as a non-rhs (STG doesn't have such a thing)
--- ---------------------------------------------------------------------------
-
-deLam (Note n e)
-  = deLam e `thenUs` \ e ->
-    returnUs (Note n e)
-
-   -- types will all disappear, so that's ok
-deLam (Lam x e) | isTyVar x
-  = deLam e `thenUs` \ e ->
-    returnUs (Lam x e)
-
-deLam expr@(Lam _ _) 
-	-- Try for eta reduction
-  | Just e <- eta body
-  = returnUs e		
-
-	-- Eta failed, so let-bind the lambda
-  | otherwise
-  = newVar (exprType expr) `thenUs` \ fn ->
-    returnUs (Let (NonRec fn expr) (Var fn))
-
-  where
-    (bndrs, body) = collectBinders expr
-
-    eta expr@(App _ _)
-	| ok_to_eta_reduce f &&
-	  n_remaining >= 0 &&
-	  and (zipWith ok bndrs last_args) &&
-	  not (any (`elemVarSet` fvs_remaining) bndrs)
-	= Just remaining_expr
-	where
-	  (f, args) = collectArgs expr
-	  remaining_expr = mkApps f remaining_args
-	  fvs_remaining = exprFreeVars remaining_expr
-	  (remaining_args, last_args) = splitAt n_remaining args
-	  n_remaining = length args - length bndrs
-
-	  ok bndr (Var arg) = bndr == arg
-	  ok bndr other	    = False
-
-	  -- we can't eta reduce something which must be saturated.
-	  ok_to_eta_reduce (Var f)
-		 = case idFlavour f of
-		      PrimOpId op  -> False
-		      DataConId dc -> False
-		      other 	   -> True
-	  ok_to_eta_reduce _ = False --safe. ToDo: generalise
-
-    eta (Let bind@(NonRec b r) body)
-	| not (any (`elemVarSet` fvs) bndrs)
-		 = case eta body of
-			Just e -> Just (Let bind e)
-			Nothing -> Nothing
-	where fvs = exprFreeVars r
-
-    eta _ = Nothing
-
-deLam expr = returnUs expr
-
--- ---------------------------------------------------------------------------
 -- Precipitating the floating bindings
 -- ---------------------------------------------------------------------------
 
-mkBinds :: [FloatingBind] -> CoreExpr -> UniqSM CoreExpr
-mkBinds []     body = returnUs body
-mkBinds (b:bs) body 
-  = deLam body   	`thenUs` \ body' ->
-    go (b:bs) body'
-  where
-    go []     body = returnUs body
-    go (b:bs) body = go bs body 	`thenUs` \ body' ->
-		     mkBind  b body'
-
--- body can't be Lam
-mkBind (RecF prs) body = returnUs (Let (Rec prs) body)
-
-mkBind (NonRecF bndr rhs dem floats) body
-#ifdef DEBUG
-  -- We shouldn't get let or case of the form v=w
-  = if exprIsTrivial rhs 
-	then pprTrace "mkBind" (ppr bndr <+> ppr rhs)
-	     (mk_let bndr rhs dem floats body)
-	else mk_let bndr rhs dem floats body
-
-mk_let bndr rhs dem floats body
-#endif
-  | isUnLiftedType bndr_rep_ty
+-- mkNonrec is used for local bindings only, not top level
+mkNonRec bndr rhs dem floats
+  |  isUnLiftedType bndr_rep_ty
+  || isStrictDem dem && not (exprIsValue rhs)
   = ASSERT( not (isUnboxedTupleType bndr_rep_ty) )
-    mkBinds floats (Case rhs bndr [(DEFAULT, [], body)])
-
-  | is_whnf
-  = if is_strict then
-	-- Strict let with WHNF rhs
-	mkBinds floats $
-	Let (NonRec bndr rhs) body
-    else
-	-- Lazy let with WHNF rhs; float until we find a strict binding
-	let
-	    (floats_out, floats_in) = splitFloats floats
-	in
-	mkBinds floats_in rhs	`thenUs` \ new_rhs ->
-	mkBinds floats_out $
-	Let (NonRec bndr new_rhs) body
-
-  | otherwise 	-- Not WHNF
-  = if is_strict then
-	-- Strict let with non-WHNF rhs
-	mkBinds floats (Case rhs bndr [(DEFAULT, [], body)])
-    else
-	-- Lazy let with non-WHNF rhs, so keep the floats in the RHS
-	mkBinds floats rhs		`thenUs` \ new_rhs ->
-	returnUs (Let (NonRec bndr new_rhs) body)
-	
+    returnUs (floats `snocOL` FloatCase bndr rhs)
   where
     bndr_rep_ty = repType (idType bndr)
-    is_strict   = isStrictDem dem
-    is_whnf     = exprIsValue rhs
 
-splitFloats fs@(NonRecF _ _ dem _ : _) 
-  | isStrictDem dem = ([], fs)
+mkNonRec bndr rhs dem floats
+  = mkBinds floats rhs	`thenUs` \ rhs' ->
+    returnUs (unitOL (FloatBind (NonRec bndr rhs')))
 
-splitFloats (f : fs) = case splitFloats fs of
-		  	     (fs_out, fs_in) -> (f : fs_out, fs_in)
+mkBinds :: OrdList FloatingBind -> CoreExpr -> UniqSM CoreExpr
+mkBinds binds body 
+  | isNilOL binds = returnUs body
+  | otherwise	  = deLam body		`thenUs` \ body' ->
+		    returnUs (foldOL mk_bind body' binds)
+  where
+    mk_bind (FloatCase bndr rhs) body = Case rhs bndr [(DEFAULT, [], body)]
+    mk_bind (FloatBind bind)     body = Let bind body
 
-splitFloats [] = ([], [])
+-- ---------------------------------------------------------------------------
+-- Eliminate Lam as a non-rhs (STG doesn't have such a thing)
+-- We arrange that they only show up as the RHS of a let(rec)
+-- ---------------------------------------------------------------------------
+
+deLam :: CoreExpr -> UniqSM CoreExpr	
+-- Remove top level lambdas by let-bindinig
+deLam expr 
+  | null bndrs = returnUs expr
+  | otherwise  = case tryEta bndrs body of
+		   Just no_lam_result -> returnUs no_lam_result
+		   Nothing	      -> newVar (exprType expr) `thenUs` \ fn ->
+					 returnUs (Let (NonRec fn expr) (Var fn))
+  where
+    (bndrs,body) = collectBinders expr
+
+tryEta bndrs expr@(App _ _)
+  | ok_to_eta_reduce f &&
+    n_remaining >= 0 &&
+    and (zipWith ok bndrs last_args) &&
+    not (any (`elemVarSet` fvs_remaining) bndrs)
+  = Just remaining_expr
+  where
+    (f, args) = collectArgs expr
+    remaining_expr = mkApps f remaining_args
+    fvs_remaining = exprFreeVars remaining_expr
+    (remaining_args, last_args) = splitAt n_remaining args
+    n_remaining = length args - length bndrs
+
+    ok bndr (Var arg) = bndr == arg
+    ok bndr other	    = False
+
+	  -- we can't eta reduce something which must be saturated.
+    ok_to_eta_reduce (Var f)
+	 = case idFlavour f of
+	      PrimOpId op  -> False
+	      DataConId dc -> False
+	      other 	   -> True
+    ok_to_eta_reduce _ = False --safe. ToDo: generalise
+
+tryEta bndrs (Let bind@(NonRec b r) body)
+  | not (any (`elemVarSet` fvs) bndrs)
+  = case tryEta bndrs body of
+	Just e -> Just (Let bind e)
+	Nothing -> Nothing
+  where
+    fvs = exprFreeVars r
+
+tryEta bndrs _ = Nothing
 
 -- -----------------------------------------------------------------------------
 -- Demands

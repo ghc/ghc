@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.40 2000/11/24 09:51:38 simonpj Exp $
+% $Id: CgExpr.lhs,v 1.41 2001/02/20 09:38:59 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -434,7 +434,8 @@ cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot rec binder
 -- It's easy; just behave as if it was an StgRhsClosure with a ConApp inside!
 cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot rec binder
     	    	 (StgRhsCon cc con args)
-  = cgLetNoEscapeClosure binder cc stgArgOcc{-safe-} NoSRT full_live_in_rhss rhs_eob_info maybe_cc_slot rec
+  = cgLetNoEscapeClosure binder cc noBinderInfo{-safe-} NoSRT 
+			 full_live_in_rhss rhs_eob_info maybe_cc_slot rec
 	[] 	--No args; the binder is data structure, not a function
 	(StgConApp con args)
 \end{code}

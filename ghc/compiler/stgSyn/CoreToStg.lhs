@@ -20,6 +20,7 @@ import StgSyn
 import Type
 import TyCon		( isAlgTyCon )
 import Id
+import Var		( Var )
 import IdInfo
 import DataCon
 import CostCentre	( noCCS )
@@ -30,14 +31,14 @@ import IdInfo		( OccInfo(..) )
 import PrimOp		( PrimOp(..), ccallMayGC )
 import TysPrim		( foreignObjPrimTyCon )
 import Maybes		( maybeToBool, orElse )
-import Name		( getOccName )
+import Name		( getOccName, isExternallyVisibleName )
 import Module		( Module )
 import OccName		( occNameUserString )
 import BasicTypes       ( TopLevelFlag(..), isNotTopLevel )
-import CmdLineOpts	( DynFlags )
+import CmdLineOpts	( DynFlags, opt_KeepStgTypes )
 import Outputable
 
-infixr 9 `thenLne`, `thenLne_`
+infixr 9 `thenLne`
 \end{code}
 
 %************************************************************************
@@ -160,37 +161,32 @@ coreToStgRhs
 
 coreToStgRhs scope_fv_info top (binder, rhs)
   = coreToStgExpr rhs  `thenLne` \ (new_rhs, rhs_fvs, rhs_escs) ->
-    case new_rhs of
+    returnLne (mkStgRhs top rhs_fvs binder_info new_rhs, 
+	       rhs_fvs, rhs_escs)
+  where
+    binder_info = lookupFVInfo scope_fv_info binder
 
-	   StgLam _ bndrs body
-	       -> let binder_info = lookupFVInfo scope_fv_info binder
-		  in  returnLne (StgRhsClosure noCCS
-					       binder_info
-					       noSRT
-					       (getFVs rhs_fvs)		 
-					       ReEntrant
-					       bndrs
-					       body,
-				rhs_fvs, rhs_escs)
+mkStgRhs :: TopLevelFlag -> FreeVarsInfo -> StgBinderInfo
+	 -> StgExpr -> StgRhs
+
+mkStgRhs top rhs_fvs binder_info (StgLam _ bndrs body)
+  = StgRhsClosure noCCS binder_info noSRT
+		  (getFVs rhs_fvs)		 
+		  ReEntrant
+		  bndrs body
 	
-	   StgConApp con args
-            | isNotTopLevel top || not (isDllConApp con args)
-	       -> returnLne (StgRhsCon noCCS con args, rhs_fvs, rhs_escs)
+mkStgRhs top rhs_fvs binder_info (StgConApp con args)
+  | isNotTopLevel top || not (isDllConApp con args)
+  = StgRhsCon noCCS con args
 
-	   _other_expr
-	       -> let binder_info = lookupFVInfo scope_fv_info binder
-		  in  returnLne (StgRhsClosure noCCS
-					       binder_info
-					       noSRT
-					       (getFVs rhs_fvs)		 
-					       (updatable [] new_rhs)
-					       []
-					       new_rhs,
-				 rhs_fvs, rhs_escs
-				)
-
-updatable args body   | null args && isPAP body  = ReEntrant
-		      | otherwise                = Updatable
+mkStgRhs top rhs_fvs binder_info rhs
+  = StgRhsClosure noCCS binder_info noSRT
+		  (getFVs rhs_fvs)		 
+	          (updatable [] rhs)
+	          [] rhs
+  where
+    updatable args body | null args && isPAP body  = ReEntrant
+		        | otherwise                = Updatable
 {- ToDo:
           upd = if isOnceDem dem
       		    then (if isNotTop toplev 
@@ -233,41 +229,14 @@ any top-level PAPs.
 \begin{code}
 isPAP (StgApp f args) = idArity f > length args
 isPAP _ 	      = False
+\end{code}
 
--- ---------------------------------------------------------------------------
--- Atoms
--- ---------------------------------------------------------------------------
-
-coreToStgAtoms	:: [CoreArg] -> LneM ([StgArg], FreeVarsInfo)
-coreToStgAtoms atoms
-  = let val_atoms = filter isValArg atoms in
-    mapAndUnzipLne coreToStgAtom val_atoms `thenLne` \ (args', fvs_lists) ->
-    returnLne (args', unionFVInfos fvs_lists)
-  where
-    coreToStgAtom e 
-	= coreToStgExpr e `thenLne` \ (expr, fvs, escs) ->
-	  case expr of
-	     StgApp v []      -> returnLne (StgVarArg v, fvs)
-	     StgConApp con [] -> returnLne (StgVarArg (dataConWrapId con), fvs)
-	     StgLit lit       -> returnLne (StgLitArg lit, fvs)
-	     _ -> pprPanic "coreToStgAtom" (ppr expr)
 
 -- ---------------------------------------------------------------------------
 -- Expressions
 -- ---------------------------------------------------------------------------
 
-{-
-@varsExpr@ carries in a monad-ised environment, which binds each
-let(rec) variable (ie non top level, not imported, not lambda bound,
-not case-alternative bound) to:
-	- its STG arity, and
-	- its set of live vars.
-For normal variables the set of live vars is just the variable
-itself.	 For let-no-escaped variables, the set of live vars is the set
-live at the moment the variable is entered.  The set is guaranteed to
-have no further let-no-escaped vars in it.
--}
-
+\begin{code}
 coreToStgExpr
   	:: CoreExpr
 	-> LneM (StgExpr,	-- Decorated STG expr
@@ -286,19 +255,17 @@ on these components, but it in turn is not scrutinised as the basis for any
 decisions.  Hence no black holes.
 
 \begin{code}
-coreToStgExpr (Lit l)	 	= returnLne (StgLit l, emptyFVInfo, emptyVarSet)
-
-coreToStgExpr (Var v)
-  = coreToStgApp Nothing v []
+coreToStgExpr (Lit l) = returnLne (StgLit l, emptyFVInfo, emptyVarSet)
+coreToStgExpr (Var v) = coreToStgApp Nothing v []
 
 coreToStgExpr expr@(App _ _)
-  = let (f, args) = myCollectArgs expr
-    in
-    coreToStgApp Nothing (shouldBeVar f) args
+  = coreToStgApp Nothing f args
+  where
+    (f, args) = myCollectArgs expr
 
 coreToStgExpr expr@(Lam _ _)
   = let (args, body) = myCollectBinders expr 
-	args' = filter isId args
+	args'	     = filterStgBinders args
     in
     extendVarEnvLne [ (a, LambdaBound) | a <- args' ] $
     coreToStgExpr body  `thenLne` \ (body, body_fvs, body_escs) ->
@@ -322,15 +289,15 @@ coreToStgExpr (Note other_note expr)
 -- Cases require a little more real work.
 
 coreToStgExpr (Case scrut bndr alts)
-  = getVarsLiveInCont					`thenLne` \ live_in_cont ->
+  = getVarsLiveInCont				`thenLne` \ live_in_cont ->
     extendVarEnvLne [(bndr, CaseBound)]	$
-    vars_alts (findDefault alts)			`thenLne` \ (alts2, alts_fvs, alts_escs) ->
-    lookupLiveVarsForSet alts_fvs			`thenLne` \ alts_lvs ->
+    vars_alts (findDefault alts)		`thenLne` \ (alts2, alts_fvs, alts_escs) ->
+    lookupLiveVarsForSet alts_fvs		`thenLne` \ alts_lvs ->
     let
 	-- determine whether the default binder is dead or not
-	bndr'= if (bndr `elementOfFVInfo` alts_fvs) 
-		  then bndr `setIdOccInfo` NoOccInfo
-		  else bndr `setIdOccInfo` IAmDead
+	bndr' = bndr `setIdOccInfo` occ_info
+	occ_info | bndr `elementOfFVInfo` alts_fvs = NoOccInfo
+		 | otherwise			   = IAmDead
 
 	 -- for a _ccall_GC_, some of the *arguments* need to live across the
 	 -- call (see findLiveArgs comments.), so we annotate them as being live
@@ -338,7 +305,7 @@ coreToStgExpr (Case scrut bndr alts)
 	mb_live_across_case =
 	  case scrut of
 	    -- ToDo: Notes?
-	    e@(App _ _) | (Var v, args) <- myCollectArgs e,
+	    e@(App _ _) | (v, args) <- myCollectArgs e,
 			  PrimOpId (CCallOp ccall) <- idFlavour v,
 			  ccallMayGC ccall
 			  -> Just (filterVarSet isForeignObjArg (exprFreeVars e))
@@ -409,7 +376,7 @@ coreToStgExpr (Case scrut bndr alts)
 	vars_alg_alt (DataAlt con, binders, rhs)
 	  = let
 		-- remove type variables
-		binders' = filter isId binders
+		binders' = filterStgBinders binders
 	    in	
 	    extendVarEnvLne [(b, CaseBound) | b <- binders']	$
 	    coreToStgExpr rhs	`thenLne` \ (rhs2, rhs_fvs, rhs_escs) ->
@@ -431,7 +398,6 @@ coreToStgExpr (Case scrut bndr alts)
      	vars_deflt (Just rhs)
      	   = coreToStgExpr rhs	`thenLne` \ (rhs2, rhs_fvs, rhs_escs) ->
      	     returnLne (StgBindDefault rhs2, rhs_fvs, rhs_escs)
-
 \end{code}
 
 Lets not only take quite a bit of work, but this is where we convert
@@ -511,7 +477,10 @@ mkStgPrimAlts ty alts deflt
 \end{code}
 
 
-Applications:
+-- ---------------------------------------------------------------------------
+-- Applications
+-- ---------------------------------------------------------------------------
+
 \begin{code}
 coreToStgApp
 	 :: Maybe UpdateFlag		-- Just upd <=> this application is
@@ -524,43 +493,36 @@ coreToStgApp
 
 coreToStgApp maybe_thunk_body f args
   = getVarsLiveInCont		`thenLne` \ live_in_cont ->
-    coreToStgAtoms args		`thenLne` \ (args', args_fvs) ->
+    coreToStgArgs args		`thenLne` \ (args', args_fvs) ->
     lookupVarLne f		`thenLne` \ how_bound ->
 
     let
 	n_args		 = length args
 	not_letrec_bound = not (isLetrecBound how_bound)
-	f_arity          = idArity f
 	fun_fvs	 	 = singletonFVInfo f how_bound fun_occ
 
+	-- Mostly, the arity info of a function is in the fn's IdInfo
+	-- But new bindings introduced by CoreSat may not have no
+	-- arity info; it would do us no good anyway.  For example:
+	--	let f = \ab -> e in f
+	-- No point in having correct arity info for f!
+	-- Hence the hasArity stuff below.
+	f_arity_info     = idArityInfo f
+	f_arity		 = arityLowerBound f_arity_info		-- Zero if no info
+
 	fun_occ 
-	  | not_letrec_bound = NoStgBinderInfo		-- Uninteresting variable
-		
-		-- Otherwise it is letrec bound; must have its arity
-	  | n_args == 0 = stgFakeFunAppOcc	-- Function Application
-						-- with no arguments.
-						-- used by the lambda lifter.
-	  | f_arity > n_args = stgUnsatOcc	-- Unsaturated
+	 | not_letrec_bound		    = noBinderInfo	-- Uninteresting variable
+	 | f_arity > 0 && f_arity <= n_args = stgSatOcc		-- Saturated or over-saturated function call
+	 | otherwise			    = stgUnsatOcc	-- Unsaturated function or thunk
 
-	  | f_arity == n_args &&
-	    maybeToBool maybe_thunk_body   	-- Exactly saturated,
-						-- and rhs of thunk
-	  = case maybe_thunk_body of
-		Just Updatable   -> stgStdHeapOcc
-		Just SingleEntry -> stgNoUpdHeapOcc
-		other		 -> panic "coreToStgApp"
+	fun_escs
+	 | not_letrec_bound  = emptyVarSet	-- Only letrec-bound escapees are interesting
+	 | hasArity f_arity_info &&
+	   f_arity == n_args = emptyVarSet	-- A function *or thunk* with an exactly
+						-- saturated call doesn't escape
+						-- (let-no-escape applies to 'thunks' too)
 
-	  | otherwise =  stgNormalOcc
-				-- Record only that it occurs free
-
-	myself = unitVarSet f
-
-	fun_escs | not_letrec_bound  = emptyVarSet
-			-- Only letrec-bound escapees are interesting
-		 | f_arity == n_args = emptyVarSet
-		  	-- Function doesn't escape
-		 | otherwise 	     = myself
-			-- Inexact application; it does escape
+	 | otherwise 	     = unitVarSet f	-- Inexact application; it does escape
 
 	-- At the moment of the call:
 
@@ -572,12 +534,6 @@ coreToStgApp maybe_thunk_body f args
 	--	   live vars should already include those of the
 	--	   continuation, but it does no harm to just union the
 	--	   two regardless.
-
-	-- XXX not needed?
-	-- live_at_call
-	--   = live_in_cont `unionVarSet` case how_bound of
-	-- 			      LetrecBound _ lvs -> lvs `minusVarSet` myself
-	--			   other	     -> emptyVarSet
 
 	app = case idFlavour f of
       		DataConId dc -> StgConApp dc args'
@@ -592,6 +548,37 @@ coreToStgApp maybe_thunk_body f args
 				-- All the free vars of the args are disqualified
 				-- from being let-no-escaped.
     )
+
+
+
+-- ---------------------------------------------------------------------------
+-- Argument lists
+-- This is the guy that turns applications into A-normal form
+-- ---------------------------------------------------------------------------
+
+coreToStgArgs :: [CoreArg] -> LneM ([StgArg], FreeVarsInfo)
+coreToStgArgs []
+  = returnLne ([], emptyFVInfo)
+
+coreToStgArgs (Type ty : args)	-- Type argument
+  = coreToStgArgs args	`thenLne` \ (args', fvs) ->
+    if opt_KeepStgTypes then
+ 	returnLne (StgTypeArg ty : args', fvs `unionFVInfo` tyvarFVInfo (tyVarsOfType ty))
+    else
+    returnLne (args', fvs)
+
+coreToStgArgs (arg : args)	-- Non-type argument
+  = coreToStgArgs args	`thenLne` \ (stg_args, args_fvs) ->
+    coreToStgExpr arg	`thenLne` \ (arg', arg_fvs, escs) ->
+    let
+	fvs = args_fvs `unionFVInfo` arg_fvs
+	stg_arg = case arg' of
+		       StgApp v []      -> StgVarArg v
+		       StgConApp con [] -> StgVarArg (dataConWrapId con)
+		       StgLit lit       -> StgLitArg lit
+		       _ 		-> pprPanic "coreToStgArgs" (ppr arg)
+    in
+    returnLne (stg_arg : stg_args, fvs)
 
 
 -- ---------------------------------------------------------------------------
@@ -663,7 +650,7 @@ coreToStgLet let_no_escape bind body
 	let_escs = (real_bind_escs `unionVarSet` body_escs) `minusVarSet` set_of_binders
 
 	all_escs = bind_escs `unionVarSet` body_escs	-- Still includes binders of
-						-- this let(rec)
+							-- this let(rec)
 
 	no_binder_escapes = isEmptyVarSet (set_of_binders `intersectVarSet` all_escs)
 
@@ -754,7 +741,7 @@ There's a lot of stuff to pass around, so we use this @LneM@ monad to
 help.  All the stuff here is only passed {\em down}.
 
 \begin{code}
-type LneM a = IdEnv HowBound
+type LneM a =  IdEnv HowBound
 	    -> StgLiveVars		-- vars live in continuation
 	    -> a
 
@@ -770,12 +757,16 @@ isLetrecBound (LetrecBound _ _) = True
 isLetrecBound other		= False
 \end{code}
 
-For a let(rec)-bound variable, x,  we record what varibles are live if
-x is live.  For "normal" variables that is just x alone.  If x is
-a let-no-escaped variable then x is represented by a code pointer and
-a stack pointer (well, one for each stack).  So all of the variables
-needed in the execution of x are live if x is, and are therefore recorded
-in the LetrecBound constructor; x itself *is* included.
+For a let(rec)-bound variable, x, we record StgLiveVars, the set of
+variables that are live if x is live.  For "normal" variables that is
+just x alone.  If x is a let-no-escaped variable then x is represented
+by a code pointer and a stack pointer (well, one for each stack).  So
+all of the variables needed in the execution of x are live if x is,
+and are therefore recorded in the LetrecBound constructor; x itself
+*is* included.
+
+The set of live variables is guaranteed ot have no further let-no-escaped
+variables in it.
 
 The std monad functions:
 \begin{code}
@@ -783,7 +774,6 @@ initLne :: LneM a -> a
 initLne m = m emptyVarEnv emptyVarSet
 
 {-# INLINE thenLne #-}
-{-# INLINE thenLne_ #-}
 {-# INLINE returnLne #-}
 
 returnLne :: a -> LneM a
@@ -791,13 +781,7 @@ returnLne e env lvs_cont = e
 
 thenLne :: LneM a -> (a -> LneM b) -> LneM b
 thenLne m k env lvs_cont
-  = case (m env lvs_cont) of
-      m_result -> k m_result env lvs_cont
-
-thenLne_ :: LneM a -> LneM b -> LneM b
-thenLne_ m k env lvs_cont
-  = case (m env lvs_cont) of
-      _ -> k env lvs_cont
+  = k (m env lvs_cont) env lvs_cont
 
 mapLne  :: (a -> LneM b)   -> [a] -> LneM [b]
 mapLne f [] = returnLne []
@@ -823,13 +807,14 @@ mapAndUnzip3Lne f (x:xs)
     returnLne (r1:rs1, r2:rs2, r3:rs3)
 
 fixLne :: (a -> LneM a) -> LneM a
-fixLne expr env lvs_cont = result
+fixLne expr env lvs_cont
+  = result
   where
     result = expr result env lvs_cont
---  ^^^^^^ ------ ^^^^^^
 \end{code}
 
 Functions specific to this monad:
+
 \begin{code}
 getVarsLiveInCont :: LneM StgLiveVars
 getVarsLiveInCont env lvs_cont = lvs_cont
@@ -878,18 +863,21 @@ lookupLiveVarsForSet fvs env lvs_cont
 %************************************************************************
 
 \begin{code}
-type FreeVarsInfo = IdEnv (Id, Bool, StgBinderInfo)
-			-- If f is mapped to NoStgBinderInfo, that means
-			-- that f *is* mentioned (else it wouldn't be in the
-			-- IdEnv at all), but only in a saturated applications.
-			--
-			-- All case/lambda-bound things are also mapped to
-			-- NoStgBinderInfo, since we aren't interested in their
-			-- occurence info.
-			--
-			-- The Bool is True <=> the Id is top level letrec bound
+type FreeVarsInfo = VarEnv (Var, Bool, StgBinderInfo)
+	-- If f is mapped to noBinderInfo, that means
+	-- that f *is* mentioned (else it wouldn't be in the
+	-- IdEnv at all), but only in a saturated applications.
+	--
+	-- All case/lambda-bound things are also mapped to
+	-- noBinderInfo, since we aren't interested in their
+	-- occurence info.
+	--
+	-- The Bool is True <=> the Id is top level letrec bound
+	--
+	-- For ILX we track free var info for type variables too;
+	-- hence VarEnv not IdEnv
 
-type EscVarsSet   = IdSet
+type EscVarsSet = IdSet
 \end{code}
 
 \begin{code}
@@ -900,6 +888,11 @@ singletonFVInfo :: Id -> HowBound -> StgBinderInfo -> FreeVarsInfo
 singletonFVInfo id ImportBound		     info = emptyVarEnv
 singletonFVInfo id (LetrecBound top_level _) info = unitVarEnv id (id, top_level, info)
 singletonFVInfo id other		     info = unitVarEnv id (id, False,     info)
+
+tyvarFVInfo :: TyVarSet -> FreeVarsInfo
+tyvarFVInfo tvs = foldVarSet add emptyFVInfo tvs
+	        where
+		  add tv fvs = extendVarEnv fvs tv (tv, False, noBinderInfo)
 
 unionFVInfo :: FreeVarsInfo -> FreeVarsInfo -> FreeVarsInfo
 unionFVInfo fv1 fv2 = plusVarEnv_C plusFVInfo fv1 fv2
@@ -914,8 +907,12 @@ elementOfFVInfo :: Id -> FreeVarsInfo -> Bool
 elementOfFVInfo id fvs = maybeToBool (lookupVarEnv fvs id)
 
 lookupFVInfo :: FreeVarsInfo -> Id -> StgBinderInfo
-lookupFVInfo fvs id = case lookupVarEnv fvs id of
-			Nothing         -> NoStgBinderInfo
+-- Find how the given Id is used.
+-- Externally visible things may be used any old how
+lookupFVInfo fvs id 
+  | isExternallyVisibleName (idName id) = noBinderInfo
+  | otherwise = case lookupVarEnv fvs id of
+			Nothing         -> noBinderInfo
 			Just (_,_,info) -> info
 
 getFVs :: FreeVarsInfo -> [Id]	-- Non-top-level things only
@@ -930,13 +927,16 @@ plusFVInfo (id1,top1,info1) (id2,top2,info2)
 \end{code}
 
 Misc.
+\begin{code}
+filterStgBinders :: [Var] -> [Var]
+filterStgBinders bndrs
+  | opt_KeepStgTypes = bndrs
+  | otherwise	     = filter isId bndrs
+\end{code}
+
 
 \begin{code}
-shouldBeVar (Note _ e) = shouldBeVar e
-shouldBeVar (Var v)    = v
-shouldBeVar e = pprPanic "shouldBeVar" (ppr e)
-
--- ignore all notes except SCC
+	-- Ignore all notes except SCC
 myCollectBinders expr
   = go [] expr
   where
@@ -945,12 +945,15 @@ myCollectBinders expr
     go bs (Note _ e)         = go bs e
     go bs e	             = (reverse bs, e)
 
-myCollectArgs :: Expr b -> (Expr b, [Arg b])
+myCollectArgs :: CoreExpr -> (Id, [CoreArg])
+	-- We assume that we only have variables
+	-- in the function position by now
 myCollectArgs expr
   = go expr []
   where
+    go (Var v)          as = (v, as)
     go (App f a) as        = go f (a:as)
-    go (Note (SCC _) e) as = panic "CoreToStg.myCollectArgs"
-    go (Note n e) as       = go e as
-    go e 	 as        = (e, as)
+    go (Note (SCC _) e) as = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
+    go (Note n e)       as = go e as
+    go _		as = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
 \end{code}
