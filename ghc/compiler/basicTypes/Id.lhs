@@ -30,8 +30,8 @@ module Id (
 	isPrimOpId, isPrimOpId_maybe, 
 	isFCallId, isFCallId_maybe,
 	isDataConWorkId, isDataConWorkId_maybe, 
-	isBottomingId,
-	hasNoBinding,
+	isBottomingId, idIsFrom,
+	hasNoBinding, 
 
 	-- Inline pragma stuff
 	idInlinePragma, setInlinePragma, modifyInlinePragma, 
@@ -98,10 +98,11 @@ import qualified Demand	( Demand )
 #endif
 import DataCon		( isUnboxedTupleCon )
 import NewDemand	( Demand, StrictSig, topDmd, topSig, isBottomingSig )
-import Name	 	( Name, OccName,
+import Name	 	( Name, OccName, nameIsLocalOrFrom, 
 			  mkSystemName, mkSystemNameEncoded, mkInternalName,
 			  getOccName, getSrcLoc
 			) 
+import Module		( Module )
 import OccName		( EncodedFS, mkWorkerOcc )
 import PrimRep		( PrimRep )
 import FieldLabel	( FieldLabel )
@@ -295,6 +296,9 @@ isImplicitId id
 		-- The dfun id is not an implicit Id; it must *not* be omitted, because 
 		-- it carries version info for the instance decl
 	other		-> False
+
+idIsFrom :: Module -> Id -> Bool
+idIsFrom mod id = nameIsLocalOrFrom mod (idName id)
 \end{code}
 
 \begin{code}
