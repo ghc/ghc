@@ -495,7 +495,8 @@
 	    </row>
 	    <row>
 	      <entry><option>-fimplicit-params</option></entry>
-	      <entry>Enable Implicit Parameters</entry>
+	      <entry>Enable Implicit Parameters.
+	      Implied by <option>-fglasgow-exts</option>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-fno-implicit-params</option></entry>
 	    </row>
@@ -518,8 +519,16 @@
 	      <entry><option>-fmonomorphism-restriction</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-fscoped-type-variables</option></entry>
+	      <entry>Enable lexically-scoped type variables.
+	      Implied by <option>-fglasgow-exts</option>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-scoped-type-variables</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-fth</option></entry>
-	      <entry>Enable Template Haskell</entry>
+	      <entry>Enable Template Haskell. 
+		Implied by <option>-fglasgow-exts</option>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-fno-th</option></entry>
 	    </row>

@@ -23,7 +23,7 @@ import RdrName		( GlobalRdrEnv, emptyGlobalRdrEnv,
 import Name		( Name, isInternalName )
 import Type		( Type )
 import NameEnv		( extendNameEnvList )
-import InstEnv		( InstEnv, emptyInstEnv, extendInstEnv )
+import InstEnv		( InstEnv, emptyInstEnv, extendInstEnvList )
 
 import VarSet		( emptyVarSet )
 import VarEnv		( TidyEnv, emptyTidyEnv, emptyVarEnv )
@@ -85,7 +85,7 @@ initTc hsc_env mod do_this
 		tcg_default  = Nothing,
 		tcg_type_env = emptyNameEnv,
 		tcg_type_env_var = type_env_var,
-		tcg_inst_env  = mkImpInstEnv hsc_env,
+		tcg_inst_env  = mkHomePackageInstEnv hsc_env,
 		tcg_inst_uses = dfuns_var,
 		tcg_th_used   = th_var,
 		tcg_exports  = emptyNameSet,
@@ -145,15 +145,15 @@ initTcPrintErrors env mod todo = do
   printErrorsAndWarnings msgs
   return res
 
-mkImpInstEnv :: HscEnv -> InstEnv
+mkHomePackageInstEnv :: HscEnv -> InstEnv
 -- At the moment we (wrongly) build an instance environment from all the
 -- home-package modules we have already compiled.
 -- We should really only get instances from modules below us in the 
 -- module import tree.
-mkImpInstEnv (HscEnv {hsc_dflags = dflags, hsc_HPT = hpt})
+mkHomePackageInstEnv (HscEnv {hsc_HPT = hpt})
   = foldModuleEnv (add . md_insts . hm_details) emptyInstEnv hpt
   where
-    add dfuns inst_env = foldl extendInstEnv inst_env dfuns
+    add dfuns inst_env = extendInstEnvList inst_env dfuns
 
 -- mkImpTypeEnv makes the imported symbol table
 mkImpTypeEnv :: ExternalPackageState -> HomePackageTable

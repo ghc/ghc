@@ -21,16 +21,16 @@ import TcHsSyn		( TcId, TcDictBinds, zonkId, mkHsLet )
 
 import TcRnMonad
 import Inst		( InstOrigin(..), newDictsAtLoc, newIPDict, instToId )
-import TcEnv		( tcExtendIdEnv, tcExtendIdEnv2, newLocalName, tcLookupLocalIds )
+import TcEnv		( tcExtendIdEnv, tcExtendIdEnv2, tcExtendTyVarEnv, newLocalName, tcLookupLocalIds )
 import TcUnify		( Expected(..), tcInfer, checkSigTyVars, sigCtxt )
 import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyRestricted, 
 			  tcSimplifyToDicts, tcSimplifyIPs )
 import TcHsType		( tcHsSigType, UserTypeCtxt(..), tcAddLetBoundTyVars,
-			  TcSigInfo(..), TcSigFun, mkTcSig, lookupSig
+			  TcSigInfo(..), TcSigFun, lookupSig
 			)
 import TcPat		( tcPat, PatCtxt(..) )
 import TcSimplify	( bindInstsOfLocalFuns )
-import TcMType		( newTyFlexiVarTy, tcSkolType, zonkQuantifiedTyVar, zonkTcTypes )
+import TcMType		( newTyFlexiVarTy, tcSkolSigType, zonkQuantifiedTyVar, zonkTcTypes )
 import TcType		( TcTyVar, SkolemInfo(SigSkol), 
 			  TcTauType, TcSigmaType, 
 			  TvSubstEnv, mkTvSubst, substTheta, substTy, 
@@ -38,14 +38,13 @@ import TcType		( TcTyVar, SkolemInfo(SigSkol),
 			  mkForAllTy, isUnLiftedType, tcGetTyVar_maybe, 
 			  mkTyVarTys )
 import Unify		( tcMatchPreds )
-import Kind		( argTypeKind, isUnliftedTypeKind )
+import Kind		( argTypeKind )
 import VarEnv		( lookupVarEnv ) 
 import TysPrim		( alphaTyVar )
 import Id		( mkLocalId, mkSpecPragmaId, setInlinePragma )
 import Var		( idType, idName )
 import Name		( Name )
 import NameSet
-import Var		( tyVarKind )
 import VarSet
 import SrcLoc		( Located(..), unLoc, noLoc, getLoc )
 import Bag
@@ -435,22 +434,24 @@ tcMonoBinds :: LHsBinds Name
 	    -> TcSigFun -> RecFlag
 	    -> TcM (LHsBinds TcId, [MonoBindInfo])
 
-type MonoBindInfo = (Name, Maybe TcSigInfo, TcId)
-	-- Type signature (if any), and
-	-- the monomorphic bound things
-
-bndrNames :: [MonoBindInfo] -> [Name]
-bndrNames mbi = [n | (n,_,_) <- mbi]
-
-getMonoType :: MonoBindInfo -> TcTauType
-getMonoType (_,_,mono_id) = idType mono_id
-
 tcMonoBinds binds lookup_sig is_rec
   = do	{ tc_binds <- mapBagM (wrapLocM (tcLhs lookup_sig)) binds
-	; let mono_info = getMonoBindInfo tc_binds
-	; binds' <- tcExtendIdEnv2 (rhsEnvExtension mono_info) $
+
+	-- Bring (a) the scoped type variables, and (b) the Ids, into scope for the RHSs
+	-- For (a) it's ok to bring them all into scope at once, even
+	-- though each type sig should scope only over its own RHS,
+	-- because the renamer has sorted all that out.
+	; let mono_info  = getMonoBindInfo tc_binds
+	      rhs_tvs    = [ tv | (_, Just sig, _) <- mono_info, tv <- sig_tvs sig ]
+	      rhs_id_env = map mk mono_info 	-- A binding for each term variable
+
+	; binds' <- tcExtendTyVarEnv rhs_tvs    $
+		    tcExtendIdEnv2   rhs_id_env $
 		    mapBagM (wrapLocM tcRhs) tc_binds
 	; return (binds', mono_info) }
+   where
+    mk (name, Just sig, _)       = (name, sig_id sig)	-- Use the type sig if there is one
+    mk (name, Nothing,  mono_id) = (name, mono_id)	-- otherwise use a monomorphic version
 
 ------------------------
 -- tcLhs typechecks the LHS of the bindings, to construct the environment in which
@@ -471,6 +472,16 @@ tcMonoBinds binds lookup_sig is_rec
 data TcMonoBind		-- Half completed; LHS done, RHS not done
   = TcFunBind  MonoBindInfo  (Located TcId) Bool (MatchGroup Name) 
   | TcPatBind [MonoBindInfo] (LPat TcId) (GRHSs Name) TcSigmaType
+
+type MonoBindInfo = (Name, Maybe TcSigInfo, TcId)
+	-- Type signature (if any), and
+	-- the monomorphic bound things
+
+bndrNames :: [MonoBindInfo] -> [Name]
+bndrNames mbi = [n | (n,_,_) <- mbi]
+
+getMonoType :: MonoBindInfo -> TcTauType
+getMonoType (_,_,mono_id) = idType mono_id
 
 tcLhs :: TcSigFun -> HsBind Name -> TcM TcMonoBind
 tcLhs lookup_sig (FunBind (L nm_loc name) inf matches)
@@ -505,7 +516,7 @@ tcLhs lookup_sig bind@(PatBind pat grhss _)
 
 -------------------
 tcRhs :: TcMonoBind -> TcM (HsBind TcId)
-tcRhs (TcFunBind _ fun'@(L _ mono_id) inf matches)
+tcRhs (TcFunBind info fun'@(L _ mono_id) inf matches)
   = do	{ matches' <- tcMatchesFun (idName mono_id) matches 
 				   (Check (idType mono_id))
 	; return (FunBind fun' inf matches') }
@@ -523,15 +534,6 @@ getMonoBindInfo tc_binds
   where
     get_info (TcFunBind info _ _ _)  rest = info : rest
     get_info (TcPatBind infos _ _ _) rest = infos ++ rest
-
----------------------
-rhsEnvExtension :: [MonoBindInfo] -> [(Name, TcId)]
--- Environment for RHS of definitions: use type sig if there is one
-rhsEnvExtension mono_info
-  = map mk mono_info
-  where
-    mk (name, Just sig, _)       = (name, sig_id sig)
-    mk (name, Nothing,  mono_id) = (name, mono_id)
 \end{code}
 
 
@@ -548,42 +550,47 @@ tcTySigs :: [LSig Name] -> TcM [TcSigInfo]
 -- all the right hand sides agree a common vocabulary for their type
 -- constraints
 tcTySigs [] = return []
-tcTySigs (L span (Sig (L _ name) ty) : sigs)
-  = do  { 	-- Typecheck the first signature
-	; sigma1 <- setSrcSpan span $
-		    tcHsSigType (FunSigCtxt name) ty
-	; let id1 = mkLocalId name sigma1
-	; tc_sig1 <- mkTcSig id1
 
-	; tc_sigs <- mapM (tcTySig tc_sig1) sigs
-	; return (tc_sig1 : tc_sigs) }
+tcTySigs sigs
+  = do	{ (tc_sig1 : tc_sigs) <- mappM tcTySig sigs
+	; tc_sigs' 	      <- mapM (checkSigCtxt tc_sig1) tc_sigs
+        ; return (tc_sig1 : tc_sigs') }
 
-tcTySig sig1 (L span (Sig (L _ name) ty))
+tcTySig :: LSig Name -> TcM TcSigInfo
+tcTySig (L span (Sig (L _ name) ty))
   = setSrcSpan span		$
     do	{ sigma_ty <- tcHsSigType (FunSigCtxt name) ty
-	; (tvs, theta, tau) <- tcSkolType rigid_info sigma_ty
-	; let poly_id  = mkLocalId name sigma_ty
-	      bale_out = failWithTc $
-		         sigContextsErr (sig_id sig1) name sigma_ty 
-
-	-- Try to match the context of this signature with 
-	-- that of the first signature
-	; case tcMatchPreds tvs theta (sig_theta sig1) of { 
-	    Nothing   -> bale_out
-	;   Just tenv -> do
-	; case check_tvs tenv tvs of
-	    Nothing   -> bale_out
-	    Just tvs' -> do {
-
-	  let subst  = mkTvSubst tenv
-	      theta' = substTheta subst theta
-	      tau'   = substTy subst tau
+	; let rigid_info = SigSkol name
+	      poly_id    = mkLocalId name sigma_ty
+	; (tvs, theta, tau) <- tcSkolSigType rigid_info sigma_ty
 	; loc <- getInstLoc (SigOrigin rigid_info)
-	; return (TcSigInfo { sig_id = poly_id, sig_tvs = tvs', 
-			      sig_theta = theta', sig_tau = tau', 
-			      sig_loc = loc }) }}}
+	; return (TcSigInfo { sig_id = poly_id, sig_tvs = tvs, 
+			      sig_theta = theta, sig_tau = tau, 
+			      sig_loc = loc }) }
+
+checkSigCtxt :: TcSigInfo -> TcSigInfo -> TcM TcSigInfo
+checkSigCtxt sig1 sig@(TcSigInfo { sig_tvs = tvs, sig_theta = theta, sig_tau = tau })
+  = 	-- Try to match the context of this signature with 
+	-- that of the first signature
+    case tcMatchPreds (sig_tvs sig) (sig_theta sig) (sig_theta sig1) of {
+	Nothing   -> bale_out ;
+	Just tenv ->
+
+    case check_tvs tenv tvs of {
+	Nothing   -> bale_out ;
+	Just tvs' -> 
+
+    let 
+	subst  = mkTvSubst tenv
+    in
+    return (sig { sig_tvs   = tvs', 
+		  sig_theta = substTheta subst theta, 
+		  sig_tau   = substTy subst tau }) }}
+
   where
-    rigid_info = SigSkol name
+    bale_out =	setSrcSpan (instLocSrcSpan (sig_loc sig)) $
+	 	failWithTc $
+		sigContextsErr (sig_id sig1) (sig_id sig)
 
 	-- Rather tedious check that the type variables
 	-- have been matched only with another type variable,
@@ -832,10 +839,10 @@ valSpecSigCtxt v ty
 	 nest 4 (ppr v <+> dcolon <+> ppr ty)]
 
 -----------------------------------------------
-sigContextsErr id1 name ty
+sigContextsErr id1 id2
   = vcat [ptext SLIT("Mis-match between the contexts of the signatures for"), 
 	  nest 2 (vcat [ppr id1 <+> dcolon <+> ppr (idType id1),
-			ppr name <+> dcolon <+> ppr ty]),
+			ppr id2 <+> dcolon <+> ppr (idType id2)]),
 	  ptext SLIT("The signature contexts in a mutually recursive group should all be identical")]
 
 

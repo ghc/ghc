@@ -219,6 +219,28 @@ documentation</ulink> describes all the libraries that come with GHC.
       </varlistentry>
 
       <varlistentry>
+	<term><option>-fimplicit-params</option></term>
+	<listitem>
+	  <para>Enables implicit parameters (see <xref
+	  linkend="implicit-parameters"/>).  Currently also implied by 
+	  <option>-fglasgow-exts</option>.</para>
+
+	  <para>Syntax stolen:
+	  <literal>?<replaceable>varid</replaceable></literal>,
+	  <literal>%<replaceable>varid</replaceable></literal>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-fscoped-type-variables</option></term>
+	<listitem>
+	  <para>Enables lexically-scoped type variables (see <xref
+	  linkend="scoped-type-variables"/>).  Implied by
+	  <option>-fglasgow-exts</option>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-fth</option></term>
 	<listitem>
 	  <para>Enables Template Haskell (see <xref
@@ -230,19 +252,6 @@ documentation</ulink> describes all the libraries that come with GHC.
 	  <literal>[d|</literal>, <literal>[t|</literal>,
 	  <literal>$(</literal>,
 	  <literal>$<replaceable>varid</replaceable></literal>.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><option>-fimplicit-params</option></term>
-	<listitem>
-	  <para>Enables implicit parameters (see <xref
-	  linkend="implicit-parameters"/>).  Currently also implied by 
-	  <option>-fglasgow-exts</option>.</para>
-
-	  <para>Syntax stolen:
-	  <literal>?<replaceable>varid</replaceable></literal>,
-	  <literal>%<replaceable>varid</replaceable></literal>.</para>
 	</listitem>
       </varlistentry>
 

@@ -13,7 +13,6 @@ module Unify (
 
 #include "HsVersions.h"
 
-import Type		( pprParendType )
 import Var		( Var, TyVar, tyVarKind )
 import VarEnv
 import VarSet
@@ -100,7 +99,7 @@ tcMatchTyX menv subst ty1 ty2 = match menv subst ty1 ty2	-- Rename for export
 Now the internals of matching
 
 \begin{code}
-match :: MatchEnv	-- For the ost part this is pushed downwards
+match :: MatchEnv	-- For the most part this is pushed downwards
       -> TvSubstEnv 	-- Substitution so far:
 			--   Domain is subset of template tyvars
 			--   Free vars of range is subset of 
@@ -118,6 +117,8 @@ match menv subst (TyVarTy tv1) ty2
   = case lookupVarEnv subst tv1' of
 	Nothing | any (inRnEnvR rn_env) (varSetElems (tyVarsOfType ty2))
 		-> Nothing	-- Occurs check
+		| not (typeKind ty2 `isSubKind` tyVarKind tv1)
+		-> Nothing	-- Kind mis-match
 		| otherwise
 		-> Just (extendVarEnv subst tv1 ty2)
 

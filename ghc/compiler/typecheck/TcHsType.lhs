@@ -41,8 +41,7 @@ import TcUnify		( unifyFunKind, checkExpectedKind )
 import TcType		( Type, PredType(..), ThetaType, 
 			  SkolemInfo(SigSkol), MetaDetails(Flexi),
 			  TcType, TcTyVar, TcKind, TcThetaType, TcTauType,
-			  mkTyVarTy, mkFunTy, 
-		 	  mkForAllTys, mkFunTys, tcEqType, isPredTy,
+		 	  mkForAllTys, mkFunTys, tcEqType, isPredTy, mkFunTy, 
 			  mkSigmaTy, mkPredTy, mkGenTyConApp, mkTyConApp, mkAppTys, 
 			  tcSplitFunTy_maybe, tcSplitForAllTys )
 import Kind 		( Kind, isLiftedTypeKind, liftedTypeKind, ubxTupleKind, 

@@ -20,7 +20,7 @@ import TcEnv		( newDFunName, pprInstInfoDetails,
 			  tcLookupClass, tcLookupTyCon, tcExtendTyVarEnv
 			)
 import TcGenDeriv	-- Deriv stuff
-import InstEnv		( simpleDFunClassTyCon, extendInstEnv )
+import InstEnv		( simpleDFunClassTyCon, extendInstEnvList )
 import TcHsType		( tcHsDeriv )
 import TcSimplify	( tcSimplifyDeriv )
 
@@ -723,7 +723,7 @@ extendLocalInstEnv :: [DFunId] -> TcM a -> TcM a
 -- for functional dependency errors -- that'll happen in TcInstDcls
 extendLocalInstEnv dfuns thing_inside
  = do { env <- getGblEnv
-      ; let  inst_env' = foldl extendInstEnv (tcg_inst_env env) dfuns 
+      ; let  inst_env' = extendInstEnvList (tcg_inst_env env) dfuns 
 	     env'      = env { tcg_inst_env = inst_env' }
       ; setGblEnv env' thing_inside }
 \end{code}

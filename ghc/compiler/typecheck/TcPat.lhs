@@ -42,7 +42,7 @@ import DataCon		( DataCon, dataConTyCon, isVanillaDataCon, dataConInstOrigArgTys
 import PrelNames	( eqStringName, eqName, geName, negateName, minusName, 
 			  integralClassName )
 import BasicTypes	( isBoxed )
-import SrcLoc		( Located(..), SrcSpan, noLoc, unLoc, getLoc )
+import SrcLoc		( Located(..), SrcSpan, noLoc, unLoc )
 import Maybes		( catMaybes )
 import ErrUtils		( Message )
 import Outputable

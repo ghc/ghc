@@ -9,7 +9,7 @@ The bits common to TcInstDcls and TcDeriv.
 module InstEnv (
 	DFunId, InstEnv,
 
-	emptyInstEnv, extendInstEnv,
+	emptyInstEnv, extendInstEnv, extendInstEnvList,
 	lookupInstEnv, instEnvElts,
 	classInstances, simpleDFunClassTyCon, checkFunDeps
     ) where
@@ -68,6 +68,9 @@ classInstances (pkg_ie, home_ie) cls
     get env = case lookupUFM env cls of
 		Just (ClsIE insts _) -> insts
 		Nothing		     -> []
+
+extendInstEnvList :: InstEnv -> [DFunId] -> InstEnv
+extendInstEnvList inst_env dfuns = foldl extendInstEnv inst_env dfuns
 
 extendInstEnv :: InstEnv -> DFunId -> InstEnv
 extendInstEnv inst_env dfun_id

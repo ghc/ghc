@@ -13,14 +13,14 @@ import TcBinds		( tcSpecSigs )
 import TcClassDcl	( tcMethodBind, mkMethodBind, badMethodErr, 
 			  tcClassDecl2, getGenericInstances )
 import TcRnMonad       
-import TcMType		( tcSkolType, checkValidTheta, checkValidInstHead, instTypeErr, 
+import TcMType		( tcSkolSigType, checkValidTheta, checkValidInstHead, instTypeErr, 
 			  checkAmbiguity, SourceTyCtxt(..) )
-import TcType		( mkClassPred, tcSplitForAllTys, tyVarsOfType, 
-			  tcSplitSigmaTy, getClassPredTys, tcSplitPredTy_maybe, mkTyVarTys,
+import TcType		( mkClassPred, tyVarsOfType, 
+			  tcSplitSigmaTy, getClassPredTys, tcSplitDFunHead, mkTyVarTys,
 			  SkolemInfo(InstSkol), tcSplitDFunTy, pprClassPred )
 import Inst		( tcInstClassOp, newDicts, instToId, showLIE, tcExtendLocalInstEnv )
 import TcDeriv		( tcDeriving )
-import TcEnv		( tcExtendGlobalValEnv, tcExtendTyVarEnv2,
+import TcEnv		( tcExtendGlobalValEnv, tcExtendTyVarEnv,
  			  InstInfo(..), InstBindings(..), 
 			  newDFunName, tcExtendIdEnv
 			)
@@ -313,20 +313,18 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
     recoverM (returnM emptyLHsBinds)		$
     setSrcSpan (srcLocSpan (getSrcLoc dfun_id))	$
     addErrCtxt (instDeclCtxt2 (idType dfun_id))	$
+
+	-- Instantiate the instance decl with skolem constants 
     let
-	rigid_info	 = InstSkol dfun_id
-	inst_ty 	 = idType dfun_id
-	(inst_tyvars, _) = tcSplitForAllTys inst_ty
-		-- The tyvars of the instance decl scope over the 'where' part
+	rigid_info = InstSkol dfun_id
+	inst_ty    = idType dfun_id
+    in
+    tcSkolSigType rigid_info inst_ty	`thenM` \ (inst_tyvars', dfun_theta', inst_head') ->
+		-- These inst_tyvars' scope over the 'where' part
 		-- Those tyvars are inside the dfun_id's type, which is a bit
 		-- bizarre, but OK so long as you realise it!
-    in
-
-	-- Instantiate the instance decl with tc-style type variables
-    tcSkolType rigid_info inst_ty	`thenM` \ (inst_tyvars', dfun_theta', inst_head') ->
     let
-	Just pred         = tcSplitPredTy_maybe inst_head'
-	(clas, inst_tys') = getClassPredTys pred
+	(clas, inst_tys') = tcSplitDFunHead inst_head'
         (class_tyvars, sc_theta, _, op_items) = classBigSig clas
 
         -- Instantiate the super-class context with inst_tys
@@ -334,9 +332,9 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
 	origin	  = SigOrigin rigid_info
     in
 	 -- Create dictionary Ids from the specified instance contexts.
-    newDicts InstScOrigin sc_theta'	`thenM` \ sc_dicts ->
-    newDicts origin dfun_theta'		`thenM` \ dfun_arg_dicts ->
-    newDicts origin [pred] 		`thenM` \ [this_dict] ->
+    newDicts InstScOrigin sc_theta'			`thenM` \ sc_dicts ->
+    newDicts origin dfun_theta'				`thenM` \ dfun_arg_dicts ->
+    newDicts origin [mkClassPred clas inst_tys'] 	`thenM` \ [this_dict] ->
 		-- Default-method Ids may be mentioned in synthesised RHSs,
 		-- but they'll already be in the environment.
 
@@ -345,7 +343,7 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
     let		-- These insts are in scope; quite a few, eh?
 	avail_insts = [this_dict] ++ dfun_arg_dicts ++ sc_dicts
     in
-    tcMethods origin clas inst_tyvars inst_tyvars' 
+    tcMethods origin clas inst_tyvars' 
 	      dfun_theta' inst_tys' avail_insts 
 	      op_items binds		`thenM` \ (meth_ids, meth_binds) ->
 
@@ -364,10 +362,9 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
 		       other		    -> []
 	spec_prags = [ L loc (SpecSig (L loc (idName dfun_id)) ty)
 		     | L loc (SpecInstSig ty) <- uprags ]
-	xtve = inst_tyvars `zip` inst_tyvars'
     in
     tcExtendGlobalValEnv [dfun_id] (
-	tcExtendTyVarEnv2 xtve		$
+	tcExtendTyVarEnv inst_tyvars'	$
 	tcSpecSigs spec_prags
     )					`thenM` \ prag_binds ->
 
@@ -428,7 +425,7 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
 	     sc_binds_outer)
 
 
-tcMethods origin clas inst_tyvars inst_tyvars' dfun_theta' inst_tys' 
+tcMethods origin clas inst_tyvars' dfun_theta' inst_tys' 
 	  avail_insts op_items (VanillaInst monobinds uprags)
   = 	-- Check that all the method bindings come from this class
     let
@@ -474,8 +471,7 @@ tcMethods origin clas inst_tyvars inst_tyvars' dfun_theta' inst_tys'
 	-- looks like 'op at Int'.  But they are not the same.
     let
 	all_insts      = avail_insts ++ catMaybes meth_insts
-	xtve	       = inst_tyvars `zip` inst_tyvars'
-	tc_method_bind = tcMethodBind xtve inst_tyvars' dfun_theta' all_insts uprags 
+	tc_method_bind = tcMethodBind inst_tyvars' dfun_theta' all_insts uprags 
 	meth_ids       = [meth_id | (_,meth_id,_) <- meth_infos]
     in
 
@@ -485,7 +481,7 @@ tcMethods origin clas inst_tyvars inst_tyvars' dfun_theta' inst_tys'
 
 
 -- Derived newtype instances
-tcMethods origin clas inst_tyvars inst_tyvars' dfun_theta' inst_tys' 
+tcMethods origin clas inst_tyvars' dfun_theta' inst_tys' 
 	  avail_insts op_items (NewTypeDerived rep_tys)
   = getInstLoc origin				`thenM` \ inst_loc ->
     mapAndUnzip3M (do_one inst_loc) op_items	`thenM` \ (meth_ids, meth_binds, rhs_insts) ->
@@ -512,8 +508,11 @@ tcMethods origin clas inst_tyvars inst_tyvars' dfun_theta' inst_tys'
 	  return (meth_id, noLoc (VarBind meth_id (nlHsVar (instToId rhs_inst))), rhs_inst)
 
 	-- Instantiate rep_tys with the relevant type variables
+	-- This looks a bit odd, because inst_tyvars' are the skolemised version
+	-- of the type variables in the instance declaration; but rep_tys doesn't
+	-- have the skolemised version, so we substitute them in here
     rep_tys' = substTys subst rep_tys
-    subst    = zipTvSubst inst_tyvars (mkTyVarTys inst_tyvars')
+    subst    = zipTvSubst inst_tyvars' (mkTyVarTys inst_tyvars')
 \end{code}
 
 Note: [Superclass loops]

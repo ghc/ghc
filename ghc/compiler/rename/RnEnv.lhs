@@ -18,7 +18,7 @@ module RnEnv (
 	newLocalsRn, newIPNameRn,
 	bindLocalNames, bindLocalNamesFV,
 	bindLocatedLocalsFV, bindLocatedLocalsRn,
-	bindPatSigTyVars, bindPatSigTyVarsFV,
+	bindSigTyVarsFV, bindPatSigTyVars, bindPatSigTyVarsFV,
 	bindTyVarsRn, extendTyVarEnvFVRn,
 	bindLocalFixities,
 
@@ -45,7 +45,7 @@ import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
 import HsTypes		( replaceTyVarName )
 import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity )
 import TcRnMonad
-import Name		( Name, nameIsLocalOrFrom, mkInternalName, isInternalName,
+import Name		( Name, nameIsLocalOrFrom, mkInternalName, 
 			  nameSrcLoc, nameOccName, nameModule, nameParent, isExternalName )
 import NameSet
 import OccName		( tcName, isDataOcc, occNameFlavour, reportIfUnused )
@@ -557,15 +557,16 @@ bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
 		   (enclosed_scope names)
 
 
+bindLocalNames :: [Name] -> RnM a -> RnM a
 bindLocalNames names enclosed_scope
   = getLocalRdrEnv 		`thenM` \ name_env ->
     setLocalRdrEnv (extendLocalRdrEnv name_env names)
 		    enclosed_scope
 
+bindLocalNamesFV :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
 bindLocalNamesFV names enclosed_scope
-  = bindLocalNames names $
-    enclosed_scope `thenM` \ (thing, fvs) ->
-    returnM (thing, delListFromNameSet fvs names)
+  = do	{ (result, fvs) <- bindLocalNames names enclosed_scope
+	; returnM (result, delListFromNameSet fvs names) }
 
 
 -------------------------------------
@@ -579,15 +580,10 @@ bindLocatedLocalsFV doc rdr_names enclosed_scope
     returnM (thing, delListFromNameSet fvs names)
 
 -------------------------------------
-extendTyVarEnvFVRn :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
-	-- This tiresome function is used only in rnSourceDecl on InstDecl
-extendTyVarEnvFVRn tyvars enclosed_scope
-  = bindLocalNames tyvars enclosed_scope 	`thenM` \ (thing, fvs) -> 
-    returnM (thing, delListFromNameSet fvs tyvars)
-
 bindTyVarsRn :: SDoc -> [LHsTyVarBndr RdrName]
 	      -> ([LHsTyVarBndr Name] -> RnM a)
 	      -> RnM a
+-- Haskell-98 binding of type variables; e.g. within a data type decl
 bindTyVarsRn doc_str tyvar_names enclosed_scope
   = let
 	located_tyvars = hsLTyVarLocNames tyvar_names
@@ -601,19 +597,22 @@ bindPatSigTyVars :: [LHsType RdrName] -> ([Name] -> RnM a) -> RnM a
   -- Find the type variables in the pattern type 
   -- signatures that must be brought into scope
 bindPatSigTyVars tys thing_inside
-  = getLocalRdrEnv		`thenM` \ name_env ->
-    let
-	located_tyvars  = nubBy eqLocated [ tv | ty <- tys,
-				    tv <- extractHsTyRdrTyVars ty,
-				    not (unLoc tv `elemLocalRdrEnv` name_env)
-			 ]
+  = do 	{ scoped_tyvars <- doptM Opt_ScopedTypeVariables
+	; if not scoped_tyvars then 
+		thing_inside []
+	  else 
+    do 	{ name_env <- getLocalRdrEnv
+	; let locd_tvs  = [ tv | ty <- tys
+			       , tv <- extractHsTyRdrTyVars ty
+			       , not (unLoc tv `elemLocalRdrEnv` name_env) ]
+	      nubbed_tvs = nubBy eqLocated locd_tvs
 		-- The 'nub' is important.  For example:
 		--	f (x :: t) (y :: t) = ....
 		-- We don't want to complain about binding t twice!
 
-	doc_sig        = text "In a pattern type-signature"
-    in
-    bindLocatedLocalsRn doc_sig located_tyvars thing_inside
+	; bindLocatedLocalsRn doc_sig nubbed_tvs thing_inside }}
+  where
+    doc_sig = text "In a pattern type-signature"
 
 bindPatSigTyVarsFV :: [LHsType RdrName]
 		   -> RnM (a, FreeVars)
@@ -622,6 +621,35 @@ bindPatSigTyVarsFV tys thing_inside
   = bindPatSigTyVars tys	$ \ tvs ->
     thing_inside		`thenM` \ (result,fvs) ->
     returnM (result, fvs `delListFromNameSet` tvs)
+
+bindSigTyVarsFV :: [LSig Name]
+		-> RnM (a, FreeVars)
+	  	-> RnM (a, FreeVars)
+-- Bind the top-level forall'd type variables in the sigs.
+-- E.g 	f :: a -> a
+--	f = rhs
+--	The 'a' scopes over the rhs
+--
+-- NB: there'll usually be just one (for a function binding)
+--     but if there are many, one may shadow the rest; too bad!
+--	e.g  x :: [a] -> [a]
+--	     y :: [(a,a)] -> a
+--	     (x,y) = e
+--      In e, 'a' will be in scope, and it'll be the one from 'y'!
+bindSigTyVarsFV sigs thing_inside
+  = do	{ scoped_tyvars <- doptM Opt_ScopedTypeVariables
+	; if not scoped_tyvars then 
+		thing_inside 
+	  else
+		bindLocalNamesFV tvs thing_inside }
+  where
+    tvs = [ hsLTyVarName ltv 
+	  | L _ (Sig _ (L _ (HsForAllTy _ ltvs _ _))) <- sigs, ltv <- ltvs ]
+				
+
+extendTyVarEnvFVRn :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
+	-- This function is used only in rnSourceDecl on InstDecl
+extendTyVarEnvFVRn tyvars thing_inside = bindLocalNamesFV tyvars thing_inside
 
 -------------------------------------
 checkDupNames :: SDoc

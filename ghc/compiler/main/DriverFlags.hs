@@ -467,6 +467,7 @@ fFlags = [
   ( "parr",				Opt_PArr ),
   ( "th",				Opt_TH ),
   ( "implicit-prelude",  		Opt_ImplicitPrelude ),
+  ( "scoped-type-variables",  		Opt_ScopedTypeVariables ),
   ( "monomorphism-restriction",		Opt_MonomorphismRestriction ),
   ( "implicit-params",			Opt_ImplicitParams ),
   ( "allow-overlapping-instances", 	Opt_AllowOverlappingInstances ),
@@ -485,7 +486,7 @@ fFlags = [
   ( "unbox-strict-fields",		Opt_UnboxStrictFields )
   ]
 
-glasgowExtsFlags = [ Opt_GlasgowExts, Opt_FFI, Opt_TH, Opt_ImplicitParams ]
+glasgowExtsFlags = [ Opt_GlasgowExts, Opt_FFI, Opt_TH, Opt_ImplicitParams, Opt_ScopedTypeVariables ]
 
 isFFlag f = f `elem` (map fst fFlags)
 getFFlag f = fromJust (lookup f fFlags)

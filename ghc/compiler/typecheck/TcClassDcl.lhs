@@ -20,7 +20,7 @@ import RnEnv		( lookupTopBndrRn, lookupImportedName )
 
 import Inst		( Inst, InstOrigin(..), instToId, newDicts, newDictsAtLoc, newMethod )
 import TcEnv		( tcLookupLocatedClass, tcExtendIdEnv2, 
-			  tcExtendTyVarEnv2,
+			  tcExtendTyVarEnv, 
 			  InstInfo(..), pprInstInfoDetails,
 			  simpleInstInfoTyCon, simpleInstInfoTy,
 			  InstBindings(..), newDFunName
@@ -29,7 +29,7 @@ import TcBinds		( tcMonoBinds, tcSpecSigs )
 import TcHsType		( TcSigInfo(..), mkTcSig, tcHsKindedType, tcHsSigType )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
 import TcUnify		( checkSigTyVars, sigCtxt )
-import TcMType		( tcSkolTyVars, UserTypeCtxt( GenPatCtxt ) )
+import TcMType		( tcSkolSigTyVars, UserTypeCtxt( GenPatCtxt ) )
 import TcType		( Type, SkolemInfo(ClsSkol, InstSkol), 
 			  TcType, TcThetaType, TcTyVar, mkTyVarTys,
 			  mkClassPred, tcSplitSigmaTy, tcSplitFunTys,
@@ -51,7 +51,6 @@ import NameSet		( emptyNameSet, unitNameSet, nameSetToList )
 import OccName		( reportIfUnused, mkDefaultMethodOcc )
 import RdrName		( RdrName, mkDerivedRdrName )
 import Outputable
-import Var		( TyVar )
 import PrelNames	( genericTyConNames )
 import CmdLineOpts
 import UnicodeUtil	( stringToUtf8 )
@@ -263,19 +262,17 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
     
 tcDefMeth clas tyvars binds_in prags sel_id
   = do	{ dm_name <- lookupTopBndrRn (mkDefMethRdrName sel_id)
-	; let rigid_info = ClsSkol clas
-	; clas_tyvars <- tcSkolTyVars rigid_info tyvars
-	; let
+	; let	rigid_info  = ClsSkol clas
+		clas_tyvars = tcSkolSigTyVars rigid_info tyvars
 		inst_tys    = mkTyVarTys clas_tyvars
 		dm_ty       = idType sel_id	-- Same as dict selector!
 	        theta       = [mkClassPred clas inst_tys]
 		local_dm_id = mkDefaultMethodId dm_name dm_ty
-		xtve 	    = tyvars `zip` clas_tyvars
 		origin 	    = SigOrigin rigid_info
 
 	; (_, meth_info) <- mkMethodBind origin clas inst_tys binds_in (sel_id, DefMeth)
 	; [this_dict] <- newDicts origin theta
-	; (defm_bind, insts_needed) <- getLIE (tcMethodBind xtve clas_tyvars theta 
+	; (defm_bind, insts_needed) <- getLIE (tcMethodBind clas_tyvars theta 
 							    [this_dict] prags meth_info)
     
 	; addErrCtxt (defltMethCtxt clas) $ do
@@ -322,11 +319,11 @@ type MethodSpec = (Id, 			-- Global selector Id
 		   LHsBind Name)	-- Binding for the method
 
 tcMethodBind 
-	:: [(TyVar,TcTyVar)]	-- Bindings for type environment
-	-> [TcTyVar]		-- Instantiated type variables for the
+	:: [TcTyVar]		-- Skolemised type variables for the
 				--  	enclosing class/instance decl. 
 				--  	They'll be signature tyvars, and we
 				--  	want to check that they don't get bound
+				-- Also they are scoped, so we bring them into scope
 				-- Always equal the range of the type envt
 	-> TcThetaType		-- Available theta; it's just used for the error message
 	-> [Inst]		-- Available from context, used to simplify constraints 
@@ -335,7 +332,7 @@ tcMethodBind
 	-> MethodSpec		-- Details of this method
 	-> TcM (LHsBinds Id)
 
-tcMethodBind xtve inst_tyvars inst_theta avail_insts prags
+tcMethodBind inst_tyvars inst_theta avail_insts prags
 	     (sel_id, meth_id, meth_bind)
   = recoverM (returnM emptyLHsBinds) $
 	-- If anything fails, recover returning no bindings.
@@ -349,7 +346,7 @@ tcMethodBind xtve inst_tyvars inst_theta avail_insts prags
      let lookup_sig name = ASSERT( name == idName meth_id ) 
 			   Just meth_sig
      in
-     tcExtendTyVarEnv2 xtve (
+     tcExtendTyVarEnv inst_tyvars (
 	addErrCtxt (methodCtxt sel_id)			$
 	getLIE 						$
 	tcMonoBinds (unitBag meth_bind) lookup_sig NonRecursive

@@ -29,7 +29,7 @@ import HscTypes		( ExternalPackageState(..), EpsStats(..), PackageInstEnv,
 			  ModIface(..), ModDetails(..), ModGuts,
 			  mkTypeEnv, extendTypeEnv, 
 			  lookupTypeEnv, lookupType, typeEnvIds )
-import InstEnv		( extendInstEnv )
+import InstEnv		( extendInstEnvList )
 import CoreSyn
 import PprCore		( pprIdRules )
 import Rules		( extendRuleBaseList )
@@ -436,7 +436,7 @@ loadImportedInsts cls tys
 	-- And put them in the package instance environment
 	; updateEps ( \ eps ->
 	    let 
-		inst_env' = foldl extendInstEnv (eps_inst_env eps) dfuns
+		inst_env' = extendInstEnvList (eps_inst_env eps) dfuns
 	    in
 	    (eps { eps_inst_env = inst_env' }, inst_env')
 	)}}

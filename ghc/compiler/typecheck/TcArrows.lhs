@@ -19,7 +19,7 @@ import TcMatches ( TcStmtCtxt(..), tcMatchPats, matchCtxt, tcStmts,
 import TcType	( TcType, TcTauType, TcRhoType, mkFunTys, mkTyConApp,
 		  mkTyVarTy, mkAppTys, tcSplitTyConApp_maybe, tcEqType, 
 		  SkolemInfo(..) )
-import TcMType	( newTyFlexiVarTy, newTyFlexiVarTys, tcSkolTyVar, zonkTcType )
+import TcMType	( newTyFlexiVarTy, newTyFlexiVarTys, tcSkolTyVars, zonkTcType )
 import TcBinds	( tcBindsAndThen )
 import TcSimplify ( tcSimplifyCheck )
 import TcUnify	( Expected(..), checkSigTyVarsWrt, zapExpectedTo )
@@ -244,7 +244,7 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
   = addErrCtxt (cmdCtxt cmd)	$
     do	{ cmds_w_tys <- zipWithM new_cmd_ty cmd_args [1..]
 	; span       <- getSrcSpanM
-	; w_tv       <- tcSkolTyVar (ArrowSkol span) alphaTyVar
+	; [w_tv]     <- tcSkolTyVars (ArrowSkol span) [alphaTyVar]
 	; let w_ty = mkTyVarTy w_tv 	-- Just a convenient starting point
 
 		--  a ((w,t1) .. tn) t

@@ -54,9 +54,9 @@ import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType,
 		  zonkTcThetaType, tcInstTyVar, tcInstType, tcInstTyVars
 		)
 import TcType	( Type, TcType, TcThetaType, TcTyVarSet, TcTyVar,
-		  PredType(..), typeKind,
+		  PredType(..), typeKind, mkSigmaTy,
 		  tcSplitForAllTys, tcSplitForAllTys, 
-		  tcSplitPhiTy, tcIsTyVarTy, tcSplitDFunTy,
+		  tcSplitPhiTy, tcIsTyVarTy, tcSplitDFunTy, tcSplitDFunHead,
 		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
 		  tcIsTyVarTy, mkPredTy, mkTyVarTy, mkTyVarTys,
 		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,
@@ -79,7 +79,7 @@ import Name	( Name, mkMethodOcc, getOccName, getSrcLoc, nameModule,
 		  isInternalName, setNameUnique, mkSystemNameEncoded )
 import NameSet	( addOneToNameSet )
 import Literal	( inIntRange )
-import Var	( TyVar, tyVarKind )
+import Var	( TyVar, tyVarKind, setIdType )
 import VarEnv	( TidyEnv, emptyTidyEnv, lookupVarEnv )
 import VarSet	( elemVarSet, emptyVarSet, unionVarSet, mkVarSet )
 import TysWiredIn ( floatDataCon, doubleDataCon )
@@ -566,10 +566,15 @@ addInst :: DynFlags -> InstEnv -> DFunId -> TcM InstEnv
 -- Check that the proposed new instance is OK, 
 -- and then add it to the home inst env
 addInst dflags home_ie dfun
-  = do	{ 	-- Load imported instances, so that we report
+  = do	{ 	-- Instantiate the dfun type so that we extend the instance
+		-- envt with completely fresh template variables
+	  (tvs', theta', tau') <- tcInstType (idType dfun)
+	; let	(cls, tys') = tcSplitDFunHead tau'
+		dfun' 	    = setIdType dfun (mkSigmaTy tvs' theta' tau')	    
+
+		-- Load imported instances, so that we report
 		-- duplicates correctly
-	  let (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun)
-	; pkg_ie  <- loadImportedInsts cls tys
+	; pkg_ie  <- loadImportedInsts cls tys'
 
 		-- Check functional dependencies
 	; case checkFunDeps (pkg_ie, home_ie) dfun of
@@ -577,13 +582,9 @@ addInst dflags home_ie dfun
 		Nothing    -> return ()
 
 		-- Check for duplicate instance decls
-		-- We instantiate the dfun type because the instance lookup
-		-- requires nice fresh types in the thing to be looked up
-	; (tvs', _, tenv) <- tcInstTyVars tvs
-	; let { tys' = substTys tenv tys
-	      ; (matches, _) = lookupInstEnv dflags (pkg_ie, home_ie) cls tys'
+	; let { (matches, _) = lookupInstEnv dflags (pkg_ie, home_ie) cls tys'
 	      ;	dup_dfuns = [dup_dfun | (_, (_, dup_tys, dup_dfun)) <- matches,
-			  		isJust (tcMatchTys (mkVarSet tvs) tys' dup_tys)] }
+			  		isJust (tcMatchTys (mkVarSet tvs') tys' dup_tys)] }
 		-- Find memebers of the match list which 
 		-- dfun itself matches. If the match is 2-way, it's a duplicate
 	; case dup_dfuns of
@@ -591,7 +592,7 @@ addInst dflags home_ie dfun
 	    []           -> return ()
 
 		-- OK, now extend the envt
-	; return (extendInstEnv home_ie dfun) }
+	; return (extendInstEnv home_ie dfun') }
 
 
 traceDFuns dfuns

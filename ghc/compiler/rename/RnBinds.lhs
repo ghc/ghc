@@ -27,7 +27,7 @@ import RnExpr		( rnMatchGroup, rnMatch, rnGRHSs, checkPrecMatch )
 import RnEnv		( bindLocatedLocalsRn, lookupLocatedBndrRn, 
 			  lookupLocatedInstDeclBndr,
 			  lookupLocatedSigOccRn, bindPatSigTyVars, bindPatSigTyVarsFV,
-			  bindLocalFixities,
+			  bindLocalFixities, bindSigTyVarsFV, 
 			  warnUnusedLocalBinds, mapFvRn, extendTyVarEnvFVRn,
 			)
 import CmdLineOpts	( DynFlag(..) )
@@ -298,7 +298,9 @@ mkBindVertex sigs (L loc (PatBind pat grhss ty))
 	names_bound_here = mkNameSet (collectPatBinders pat')
     in
     sigsForMe names_bound_here sigs	`thenM` \ sigs_for_me ->
-    rnGRHSs PatBindRhs grhss		`thenM` \ (grhss', fvs) ->
+    bindSigTyVarsFV sigs_for_me (
+        rnGRHSs PatBindRhs grhss
+    )					`thenM` \ (grhss', fvs) ->
     returnM 
 	(names_bound_here, fvs `plusFV` pat_fvs,
 	  L loc (PatBind pat' grhss' ty), sigs_for_me
@@ -312,7 +314,9 @@ mkBindVertex sigs (L loc (FunBind name inf matches))
 	names_bound_here = unitNameSet plain_name
     in
     sigsForMe names_bound_here sigs			`thenM` \ sigs_for_me ->
-    rnMatchGroup (FunRhs plain_name) matches		`thenM` \ (new_matches, fvs) ->
+    bindSigTyVarsFV sigs_for_me (
+    	rnMatchGroup (FunRhs plain_name) matches
+    )							`thenM` \ (new_matches, fvs) ->
     checkPrecMatch inf plain_name new_matches		`thenM_`
     returnM
       (unitNameSet plain_name, fvs,

@@ -275,6 +275,7 @@ data DynFlag
    | Opt_ImplicitParams
    | Opt_Generics
    | Opt_ImplicitPrelude 
+   | Opt_ScopedTypeVariables
 
    -- optimisation opts
    | Opt_Strictness

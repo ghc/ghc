@@ -92,7 +92,6 @@ import Maybes		( orElse )
 import Outputable
 import SrcLoc		( SrcSpan )
 import UniqSupply	( UniqSupply )
-import Maybe		( fromJust )
 import FastString	( FastString )
 
 import DATA_IOREF	( IORef, readIORef )

@@ -60,7 +60,7 @@ module TcType (
   getClassPredTys_maybe, getClassPredTys, 
   isClassPred, isTyVarClassPred, 
   mkDictTy, tcSplitPredTy_maybe, 
-  isPredTy, isDictTy, tcSplitDFunTy, predTyUnique, 
+  isPredTy, isDictTy, tcSplitDFunTy, tcSplitDFunHead, predTyUnique, 
   mkClassPred, isInheritablePred, isLinearPred, isIPPred, mkPredName, 
 
   ---------------------------------
@@ -485,9 +485,14 @@ tcIsTyVarTy ty = maybeToBool (tcGetTyVar_maybe ty)
 tcSplitDFunTy :: Type -> ([TyVar], [PredType], Class, [Type])
 -- Split the type of a dictionary function
 tcSplitDFunTy ty 
-  = case tcSplitSigmaTy ty       of { (tvs, theta, tau) ->
-    case tcSplitPredTy_maybe tau of { Just (ClassP clas tys) -> 
+  = case tcSplitSigmaTy ty   of { (tvs, theta, tau) ->
+    case tcSplitDFunHead tau of { (clas, tys) -> 
     (tvs, theta, clas, tys) }}
+
+tcSplitDFunHead :: Type -> (Class, [Type])
+tcSplitDFunHead tau  
+  = case tcSplitPredTy_maybe tau of 
+	Just (ClassP clas tys) -> (clas, tys)
 \end{code}
 
 

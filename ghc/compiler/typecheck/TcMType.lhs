@@ -21,7 +21,8 @@ module TcMType (
   --------------------------------
   -- Instantiation
   tcInstTyVar, tcInstTyVars, tcInstType, 
-  tcSkolTyVar, tcSkolTyVars, tcSkolType,
+  tcSkolType, tcSkolTyVars,
+  tcSkolSigType, tcSkolSigTyVars,
 
   --------------------------------
   -- Checking type validity
@@ -80,6 +81,7 @@ import Name		( Name, setNameUnique, mkSysTvName )
 import VarSet
 import VarEnv
 import CmdLineOpts	( dopt, DynFlag(..) )
+import UniqSupply	( uniqsFromSupply )
 import Util		( nOfThem, isSingleton, equalLength, notNull )
 import ListSetOps	( removeDups )
 import SrcLoc		( unLoc )
@@ -185,49 +187,57 @@ tcInstType :: TcType -> TcM ([TcTyVar], TcThetaType, TcType)
 -- tcInstType instantiates the outer-level for-alls of a TcType with
 -- fresh (mutable) type variables, splits off the dictionary part, 
 -- and returns the pieces.
-tcInstType ty
-  = case tcSplitForAllTys ty of
-	([],     rho) -> 	-- There may be overloading despite no type variables;
-				-- 	(?x :: Int) => Int -> Int
-			 let
-			   (theta, tau) = tcSplitPhiTy rho
-			 in
-			 returnM ([], theta, tau)
+tcInstType ty = tc_inst_type (mappM tcInstTyVar) ty
 
-	(tyvars, rho) -> tcInstTyVars tyvars		`thenM` \ (tyvars', _, tenv) ->
-			 let
-			   (theta, tau) = tcSplitPhiTy (substTy tenv rho)
-			 in
-			 returnM (tyvars', theta, tau)
 
 ---------------------------------------------
--- Similar functions but for skolem constants
+tcSkolType :: SkolemInfo -> TcType -> TcM ([TcTyVar], TcThetaType, TcType)
+-- Instantiate a type with fresh skolem constants
+tcSkolType info ty = tc_inst_type (tcSkolTyVars info) ty
 
 tcSkolTyVars :: SkolemInfo -> [TyVar] -> TcM [TcTyVar]
-tcSkolTyVars info tyvars = mappM (tcSkolTyVar info) tyvars
-  
-tcSkolTyVar :: SkolemInfo -> TyVar -> TcM TcTyVar
-tcSkolTyVar info tyvar
-  = do	{ uniq <- newUnique
-	; let name = setNameUnique (tyVarName tyvar) uniq
-		-- See Note [TyVarName]
-	; return (mkTcTyVar name (tyVarKind tyvar) 
-			    (SkolemTv info)) }
+tcSkolTyVars info tyvars
+  = do	{ us <- newUniqueSupply
+	; return (zipWith skol_tv tyvars (uniqsFromSupply us)) }
+  where
+    skol_tv tv uniq = mkTcTyVar (setNameUnique (tyVarName tv) uniq)
+				(tyVarKind tv) (SkolemTv info)
+	-- See Note [TyVarName]
+			    
 
-tcSkolType :: SkolemInfo -> TcType -> TcM ([TcTyVar], TcThetaType, TcType)
-tcSkolType info ty
+---------------------------------------------
+tcSkolSigType :: SkolemInfo -> Type -> TcM ([TcTyVar], TcThetaType, TcType)
+-- Instantiate a type signature with skolem constants, but 
+-- do *not* give them fresh names, because we want the name to
+-- be in the type environment -- it is lexically scoped.
+tcSkolSigType info ty
+  = tc_inst_type (\tvs -> return (tcSkolSigTyVars info tvs)) ty
+
+tcSkolSigTyVars :: SkolemInfo -> [TyVar] -> [TcTyVar]
+tcSkolSigTyVars info tyvars = [ mkTcTyVar (tyVarName tv) (tyVarKind tv) (SkolemTv info) 
+			      | tv <- tyvars ]
+
+-----------------------
+tc_inst_type :: ([TyVar] -> TcM [TcTyVar]) 		-- How to instantiate the type variables
+	     -> TcType 					-- Type to instantiate
+	     -> TcM ([TcTyVar], TcThetaType, TcType)	-- Result
+tc_inst_type inst_tyvars ty
   = case tcSplitForAllTys ty of
-	([],     rho) -> let
+	([],     rho) -> let	-- There may be overloading despite no type variables;
+				-- 	(?x :: Int) => Int -> Int
 			   (theta, tau) = tcSplitPhiTy rho
 			 in
-			 returnM ([], theta, tau)
+			 return ([], theta, tau)
 
-	(tyvars, rho) -> tcSkolTyVars info tyvars	`thenM` \ tyvars' ->
-			 let
-			   tenv = zipTopTvSubst tyvars (mkTyVarTys tyvars')
-			   (theta, tau) = tcSplitPhiTy (substTy tenv rho)
-			 in
-			 returnM (tyvars', theta, tau)
+	(tyvars, rho) -> do { tyvars' <- inst_tyvars tyvars
+
+			    ; let  tenv = zipTopTvSubst tyvars (mkTyVarTys tyvars')
+				-- Either the tyvars are freshly made, by inst_tyvars,
+				-- or (in the call from tcSkolSigType) any nested foralls
+				-- have different binders.  Either way, zipTopTvSubst is ok
+
+			    ; let  (theta, tau) = tcSplitPhiTy (substTy tenv rho)
+			    ; return (tyvars', theta, tau) }
 \end{code}
 
 

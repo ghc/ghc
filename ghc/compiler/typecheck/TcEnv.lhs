@@ -17,7 +17,7 @@ module TcEnv(
 	
 	-- Local environment
 	tcExtendKindEnv,
-	tcExtendTyVarEnv, tcExtendTyVarEnv2, tcExtendTyVarEnv3, 
+	tcExtendTyVarEnv, tcExtendTyVarEnv3, 
 	tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2, 
 	tcLookup, tcLookupLocated, tcLookupLocalIds,
 	tcLookupId, tcLookupTyVar,
@@ -249,10 +249,6 @@ tcExtendKindEnv things thing_inside
 tcExtendTyVarEnv :: [TyVar] -> TcM r -> TcM r
 tcExtendTyVarEnv tvs thing_inside
   = tc_extend_tv_env [ATyVar tv (mkTyVarTy tv) | tv <- tvs] thing_inside
-
-tcExtendTyVarEnv2 :: [(TyVar,TcTyVar)] -> TcM r -> TcM r
-tcExtendTyVarEnv2 tv_pairs thing_inside
-  = tc_extend_tv_env [ATyVar tv1 (mkTyVarTy tv2) | (tv1,tv2) <- tv_pairs] thing_inside
 
 tcExtendTyVarEnv3 :: [(TyVar,TcType)] -> TcM r -> TcM r
 tcExtendTyVarEnv3 ty_pairs thing_inside
@@ -559,8 +555,8 @@ as well as explicit user written ones.
 \begin{code}
 data InstInfo
   = InstInfo {
-      iDFunId :: DFunId,		-- The dfun id
-      iBinds  :: InstBindings
+      iDFunId :: DFunId,		-- The dfun id.  Its forall'd type variables 
+      iBinds  :: InstBindings		-- scope over the stuff in InstBindings!
     }
 
 data InstBindings
