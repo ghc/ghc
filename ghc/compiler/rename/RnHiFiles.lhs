@@ -596,7 +596,7 @@ readIface wanted_mod file_path
 noIfaceErr mod_name boot_file
   = ptext SLIT("Could not find interface file for") <+> quotes (ppr mod_name)
 	-- We used to print the search path, but we can't do that
-	-- now, becuase it's hidden inside the finder.
+	-- now, because it's hidden inside the finder.
 	-- Maybe the finder should expose more functions.
 
 badIfaceFile file err

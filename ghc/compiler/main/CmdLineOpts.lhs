@@ -12,7 +12,7 @@ module CmdLineOpts (
 	SwitchResult(..),
 	HscLang(..),
 	DynFlag(..),	-- needed non-abstractly by DriverFlags
-	DynFlags(..),
+	DynFlags,	-- abstract
 
 	intSwitchSet,
 	switchIsOn,
@@ -27,6 +27,7 @@ module CmdLineOpts (
 	-- other dynamic flags
 	dopt_CoreToDo,
 	dopt_StgToDo,
+	dopt_HscLang,
 
 	-- profiling opts
 	opt_AutoSccsOnAllToplevs,
@@ -291,11 +292,10 @@ dopt_StgToDo :: DynFlags -> StgToDo
 dopt_StgToDo = stgToDo
 
 data HscLang
-  = HscC
-  | HscAsm
-  | HscJava
+  = HscC     String   -- String is the filename to put output into
+  | HscAsm   String   -- ditto
+  | HscJava  String   -- ditto
   | HscInterpreter
-  deriving Eq
 
 dopt_HscLang :: DynFlags -> HscLang
 dopt_HscLang = hscLang

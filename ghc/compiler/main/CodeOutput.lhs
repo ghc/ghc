@@ -29,8 +29,11 @@ import PprAbsC		( dumpRealC, writeRealC )
 import UniqSupply	( UniqSupply )
 import Module		( Module )
 import CmdLineOpts
-import ErrUtils		( dumpIfSet )
+import ErrUtils		( dumpIfSet_dyn )
 import Outputable
+import CmdLineOpts	( DynFlags(..), HscLang(..) )
+import TmpFiles		( newTmpName )
+
 import IO		( IOMode(..), hClose, openFile, Handle )
 \end{code}
 
@@ -42,7 +45,8 @@ import IO		( IOMode(..), hClose, openFile, Handle )
 %************************************************************************
 
 \begin{code}
-codeOutput :: Module
+codeOutput :: DynFlags
+	   -> Module
 	   -> [TyCon] -> [Class]	-- Local tycons and classes
 	   -> [CoreBind]		-- Core bindings
 	   -> [(StgBinding,[Id])]	-- The STG program with SRTs
@@ -50,30 +54,32 @@ codeOutput :: Module
 	   -> SDoc		-- Header file prototype for foreign exported functions
 	   -> AbstractC		-- Compiled abstract C
 	   -> UniqSupply
-	   -> IO ()
-codeOutput mod_name tycons classes core_binds stg_binds 
+	   -> IO (Maybe FilePath, Maybe FilePath)
+codeOutput dflags mod_name tycons classes core_binds stg_binds 
 	   c_code h_code flat_abstractC ncg_uniqs
   = -- You can have C (c_output) or assembly-language (ncg_output),
     -- but not both.  [Allowing for both gives a space leak on
     -- flat_abstractC.  WDP 94/10]
 
-    do  {
-	outputForeignStubs c_code h_code ;
-	case opt_OutputLanguage of {
-	  Nothing     -> return ()	-- No -olang=xxx flag; so no-op
-	; Just "asm"  -> outputAsm flat_abstractC ncg_uniqs	
-	; Just "C"    -> outputC flat_abstractC	
-	; Just "java" -> outputJava mod_name tycons core_binds
-	; Just foo    -> pprPanic "Don't understand output language" (quotes (text foo))
-	} }
+    -- Dunno if the above comment is still meaningful now.  JRS 001024.
 
+    do stub_names <- outputForeignStubs c_code h_code
+       case dopt_HscLang dflags of
+          HscInterpreter -> return stub_names
+          HscAsm  filenm -> outputAsm dflags filenm flat_abstractC ncg_uniqs
+                            >> return stub_names
+          HscC    filenm -> outputC dflags filenm flat_abstractC	
+                            >> return stub_names
+          HscJava filenm -> outputJava dflags filenm mod_name tycons core_binds
+                            >> return stub_names
 
 doOutput :: (Handle -> IO ()) -> IO ()
-doOutput io_action
-  = (do	handle <- openFile opt_OutputFile WriteMode
+doOutput filenm io_action
+  = (do	handle <- openFile filenm WriteMode
 	io_action handle
 	hClose handle)
-    `catch` (\err -> pprPanic "Failed to open or write code output file" (text opt_OutputFile))
+    `catch` (\err -> pprPanic "Failed to open or write code output file" 
+			      (text filenm))
 \end{code}
 
 
@@ -84,10 +90,9 @@ doOutput io_action
 %************************************************************************
 
 \begin{code}
-outputC flat_absC
-  = do 
-       dumpIfSet opt_D_dump_realC "Real C" (dumpRealC flat_absC)
-       doOutput (\ h -> writeRealC h flat_absC)
+outputC dflags filenm flat_absC
+  = do dumpIfSet_dyn Opt_D_dump_realC dflags "Real C" (dumpRealC flat_absC)
+       doOutput filenm (\ h -> writeRealC h flat_absC)
 \end{code}
 
 
@@ -98,12 +103,13 @@ outputC flat_absC
 %************************************************************************
 
 \begin{code}
-outputAsm flat_absC ncg_uniqs
+outputAsm dflags filenm flat_absC ncg_uniqs
+
 #ifndef OMIT_NATIVE_CODEGEN
 
-  = do dumpIfSet opt_D_dump_stix "Final stix code" stix_final
-       dumpIfSet opt_D_dump_asm "Asm code" ncg_output_d
-       doOutput ( \f -> printForAsm f ncg_output_d)
+  = do dumpIfSet_dyn Opt_D_dump_stix dflags "Final stix code" stix_final
+       dumpIfSet_dyn Opt_D_dump_asm dflags "Asm code" ncg_output_d
+       doOutput filenm ( \f -> printForAsm f ncg_output_d)
   where
     (stix_final, ncg_output_d) = nativeCodeGen flat_absC ncg_uniqs
 
@@ -123,8 +129,8 @@ outputAsm flat_absC ncg_uniqs
 %************************************************************************
 
 \begin{code}
-outputJava mod tycons core_binds
-  = doOutput (\ f -> printForUser f pp_java)
+outputJava dflags filenm mod tycons core_binds
+  = doOutput filenm (\ f -> printForUser f pp_java)
 	-- User style printing for now to keep indentation
   where
     java_code = javaGen mod [{- Should be imports-}] tycons core_binds
@@ -139,13 +145,21 @@ outputJava mod tycons core_binds
 %************************************************************************
 
 \begin{code}
-outputForeignStubs c_code h_code
+outputForeignStubs dflags c_code h_code
   = do
-	dumpIfSet opt_D_dump_foreign "Foreign export header file" stub_h_output_d
-	outputForeignStubs_help True{-.h output-} opt_ProduceExportHStubs stub_h_output_w
+	dumpIfSet_dyn Opt_D_dump_foreign dflags 
+                      "Foreign export header file" stub_h_output_d
 
-	dumpIfSet opt_D_dump_foreign "Foreign export stubs" stub_c_output_d
-	outputForeignStubs_help False{-not .h-}   opt_ProduceExportCStubs stub_c_output_w
+	maybe_stub_h_file
+           <- outputForeignStubs_help True{-.h output-} stub_h_output_w
+
+	dumpIfSet_dyn Opt_D_dump_foreign dflags 
+                      "Foreign export stubs" stub_c_output_d
+
+        maybe_stub_c_file
+           <- outputForeignStubs_help False{-not .h-} stub_c_output_w
+
+        return (maybe_stub_h_file, maybe_stub_c_file)
   where
     -- C stubs for "foreign export"ed functions.
     stub_c_output_d = pprCode CStyle c_code
@@ -159,14 +173,19 @@ outputForeignStubs c_code h_code
 -- Don't use doOutput for dumping the f. export stubs
 -- since it is more than likely that the stubs file will
 -- turn out to be empty, in which case no file should be created.
-outputForeignStubs_help is_header switch ""      = return ()
+outputForeignStubs_help is_header switch ""      = return Nothing
 outputForeignStubs_help is_header switch doc_str =
   case switch of
-    Nothing    -> return ()
-    Just fname -> writeFile fname (include_prefix ++ doc_str)
- where
-  include_prefix
-   | is_header   = "#include \"Rts.h\"\n"
-   | otherwise   = "#include \"RtsAPI.h\"\n"
+    Nothing    -> return Nothing
+    Just fname -> newTempName suffix >>= \ fname ->
+                  writeFile fname (include_prefix ++ doc_str) >>
+                  return (Just suffix)
+  where
+    suffix
+       | is_header   = "h_stub"
+       | otherwise   = "c_stub"
+    include_prefix
+       | is_header   = "#include \"Rts.h\"\n"
+       | otherwise   = "#include \"RtsAPI.h\"\n"
 \end{code}
 
