@@ -8,6 +8,7 @@ module AsmCodeGen ( nativeCodeGen ) where
 #include "HsVersions.h"
 
 import IO		( Handle )
+import List		( intersperse )
 
 import MachMisc
 import MachRegs
@@ -104,9 +105,10 @@ codeGen :: [[StixTree]] -> UniqSM SDoc
 codeGen stixFinal
   = mapUs genMachCode stixFinal	`thenUs` \ dynamic_codes ->
     let
-	static_instrs = scheduleMachCode dynamic_codes
+	static_instrss = scheduleMachCode dynamic_codes
+        docs           = map (vcat . map pprInstr) static_instrss       
     in
-    returnUs (vcat (map pprInstr static_instrs))
+    returnUs (vcat (intersperse (char ' ' $$ char ' ') docs))
 \end{code}
 
 Top level code generator for a chunk of stix code:
@@ -124,10 +126,10 @@ exposed via the OrdList, but more might occur, so further analysis
 might be needed.
 
 \begin{code}
-scheduleMachCode :: [InstrList] -> [Instr]
+scheduleMachCode :: [InstrList] -> [[Instr]]
 
 scheduleMachCode
-  = concat . map (runRegAllocate freeRegsState reservedRegs)
+  = map (runRegAllocate freeRegsState reservedRegs)
   where
     freeRegsState = mkMRegsState (extractMappedRegNos freeRegs)
 \end{code}
