@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.59 2000/09/14 08:17:54 simonpj Exp $
+-- $Id: Main.hs,v 1.60 2000/09/14 09:58:00 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -1400,23 +1400,16 @@ run_pipeline ((phase, keep, o_suffix):phases)
 	input_fn do_linking use_ofile orig_basename orig_suffix
   = do
 
-     output_fn <- 
-	(if null phases && not do_linking && use_ofile
-	    then do o_file <- readIORef output_file
-		    case o_file of 
-		        Just s  -> return s
-			Nothing -> do
-			    f <- odir_ify (orig_basename ++ '.':o_suffix)
-			    osuf_ify f
+     output_fn <- outputFileName (null phases) o_suffix
 
-	    else if keep == Persistent
-			then odir_ify (orig_basename ++ '.':o_suffix)
-			else do filename <- newTempName o_suffix
-				add files_to_clean filename
-				return filename
-	)
-
-     run_phase phase orig_basename orig_suffix input_fn output_fn
+     carry_on <- run_phase phase orig_basename orig_suffix input_fn output_fn
+	-- sometimes we bail out early, eg. when the compiler's recompilation
+	-- checker has determined that recompilation isn't necessary.
+     if not carry_on 
+	then do let (_,_,final_suffix) = last phases
+	        ofile <- outputFileName True final_suffix
+		return ofile
+	else do -- carry on ...
 
 	-- sadly, ghc -E is supposed to write the file to stdout.  We
 	-- generate <file>.cpp, so we also have to cat the file here.
@@ -1426,6 +1419,21 @@ run_pipeline ((phase, keep, o_suffix):phases)
 
      run_pipeline phases output_fn do_linking use_ofile orig_basename orig_suffix
 
+  where
+     outputFileName last_phase suffix
+  	= if last_phase && not do_linking && use_ofile
+	    then do o_file <- readIORef output_file
+		    case o_file of 
+		        Just s  -> return s
+			Nothing -> do
+			    f <- odir_ify (orig_basename ++ '.':suffix)
+			    osuf_ify f
+
+	    else if keep == Persistent
+			then odir_ify (orig_basename ++ '.':suffix)
+			else do filename <- newTempName o_suffix
+				add files_to_clean filename
+				return filename
 
 -- find a temporary name that doesn't already exist.
 newTempName :: String -> IO String
@@ -1627,6 +1635,7 @@ run_phase Unlit _basename _suff input_fn output_fn
        run_something "Literate pre-processor"
 	  ("echo '# 1 \"" ++input_fn++"\"' > "++output_fn++" && "
 	   ++ unlit ++ ' ':input_fn ++ " - >> " ++ output_fn)
+       return True
 
 -------------------------------------------------------------------------------
 -- Cpp phase 
@@ -1664,6 +1673,7 @@ run_phase Cpp _basename _suff input_fn output_fn
 	           ("echo '{-# LINE 1 \""  ++ input_fn ++ "\" -}' > " 
 		    ++ output_fn ++ " && cat " ++ input_fn
 		    ++ " >> " ++ output_fn)
+       return True
 
 -----------------------------------------------------------------------------
 -- MkDependHS phase
@@ -1702,7 +1712,7 @@ run_phase MkDependHS basename suff input_fn _output_fn = do
 
    mapM genDep [ d | Just d <- deps ]
 
-   return ()
+   return True
 
 -- add the lines to dep_makefile:
 	   -- always:
@@ -1804,6 +1814,12 @@ run_phase Hsc	basename suff input_fn output_fn
 		    ++ stat_opts
 		 )))
 
+  -- check whether compilation was performed, bail out if not
+	b <- doesFileExist output_fn
+	if not b && not (null source_unchanged) -- sanity
+		then return False
+		else do -- carry on...
+
   -- Generate -Rghc-timing info
 	when (timing) (
   	    run_something "Generate timing stats"
@@ -1839,6 +1855,7 @@ run_phase Hsc	basename suff input_fn output_fn
 
 		add ld_inputs (basename++"_stub.o")
 	 )
+	return True
 
 -----------------------------------------------------------------------------
 -- Cc phase
@@ -1913,6 +1930,7 @@ run_phase cc_phase _basename _suff input_fn output_fn
 		   ++ pkg_extra_cc_opts
 --		   ++ [">", ccout]
 		   ))
+	return True
 
 	-- ToDo: postprocess the output from gcc
 
@@ -1933,6 +1951,7 @@ run_phase Mangle _basename _suff input_fn output_fn
 		  ++ [ input_fn, output_fn ]
 		  ++ machdep_opts
 		))
+       return True
 
 -----------------------------------------------------------------------------
 -- Splitting phase
@@ -1962,6 +1981,7 @@ run_phase SplitMangle _basename _suff input_fn _output_fn
 	s <- readFile n_files
 	let n = read s :: Int
 	writeIORef n_split_files n
+	return True
 
 -----------------------------------------------------------------------------
 -- As phase
@@ -1977,6 +1997,7 @@ run_phase As _basename _suff input_fn output_fn
 		       ++ cmdline_include_flags
 		       ++ [ "-c", input_fn, "-o",  output_fn ]
 		    ))
+	return True
 
 run_phase SplitAs basename _suff _input_fn _output_fn
   = do  as <- readIORef pgm_a
@@ -2001,6 +2022,7 @@ run_phase SplitAs basename _suff _input_fn _output_fn
 			    ))
 	
 	mapM_ assemble_file [1..n]
+	return True
 
 -----------------------------------------------------------------------------
 -- Linking
