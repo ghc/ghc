@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.4 1999/05/05 10:33:13 sof Exp $
+# $Id: Makefile,v 1.5 1999/09/12 16:27:00 sof Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -13,6 +13,7 @@ C_OBJS  = $(C_SRCS:.c=.o)
 LIBOBJS = $(C_OBJS)
 SRC_CC_OPTS += -O -I$(GHC_INCLUDE_DIR) $(GhcLibCcOpts)
 
+
 DLL_NAME = HScbits.dll
 DLL_IMPLIB_NAME = libHScbits_imp.a
 SRC_BLD_DLL_OPTS += --export-all --output-def=HScbits.def
@@ -24,5 +25,10 @@ SRC_BLD_DLL_OPTS += -lwinmm -lwsock32 -lHSrts_imp -lgmp -L. -L../../../rts/gmp -
 CC=$(HC)
 
 SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
+
+ifeq "$(EnableWin32DLLs)" "YES"
+INSTALL_PROGS  += $(DLL_NAME)
+INSTALL_LIBS += $(patsubst %.a, %_imp.a, $(LIBRARY))
+endif
 
 include $(TOP)/mk/target.mk
