@@ -20,8 +20,8 @@
         <literal>&lt;pass&gt;</literal> (may be common enough to need
         a short form&hellip;).  You can get all of these at once
         (<emphasis>lots</emphasis> of output) by using
-        <option>-ddump-all</option>, or most of them with
-        <option>-ddump-most</option>.  Some of the most useful ones
+        <option>-v5</option>, or most of them with
+        <option>-v4</option>.  Some of the most useful ones
         are:</para>
 
 	  <variablelist>
