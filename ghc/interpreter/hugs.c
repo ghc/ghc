@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.55 $
- * $Date: 2000/04/04 15:41:56 $
+ * $Revision: 1.56 $
+ * $Date: 2000/04/04 17:07:15 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -211,7 +211,6 @@ static List /*CONID*/ initialize(argc,argv)  /* Interpreter initialization */
 Int    argc;
 String argv[]; {
    Int    i;
-   String proj        = 0;
    char   argv_0_orig[1000];
    List   initialModules;
 
@@ -791,7 +790,7 @@ static String modeToString ( Cell mode )
    switch (mode) {
       case FM_SOURCE: return "source";
       case FM_OBJECT: return "object";
-      case FM_EITHER: return "either";
+      case FM_EITHER: return "source or object";
       default: internal("modeToString");
    }
 }
@@ -825,6 +824,11 @@ static void setCurrentFile ( Module mod )
    strncpy(currentFileName, textToStr(module(mod).text), 990);
    strcat(currentFileName, textToStr(module(mod).srcExt));
    currentFile = currentFileName;
+}
+
+static void clearCurrentFile ( void )
+{
+   currentFile = NULL;
 }
 
 static void ppMG ( void )
@@ -938,11 +942,11 @@ static void mgFromList ( List /* of CONID */ modgList )
       usesT = NIL;
       for (u = module(mod).uses; nonNull(u); u=tl(u))
          usesT = cons(textOf(hd(u)),usesT);
+
       /* artifically give all modules a dependency on Prelude */
-#if 0
       if (mT != textPrelude && mT != textPrimPrel)
          usesT = cons(textPrelude,usesT);
-#endif
+
       adjList = cons(pair(mT,usesT),adjList);
    }
 
@@ -1055,7 +1059,15 @@ static void processModule ( Module m )
    startModule(m);
    tree = unap(M_MODULE,module(m).tree);
    modNm = zfst3(tree);
-   assert(textOf(modNm)==module(m).text);  /* wrong, but ... */
+
+   if (textOf(modNm) != module(m).text) {
+      ERRMSG(0) "Module name \"%s\" does not match file name \"%s%s\"",
+                textToStr(textOf(modNm)), 
+                textToStr(module(m).text),
+                textToStr(module(m).srcExt)
+      EEND;
+   }
+
    setExportList(zsnd3(tree));
    topEnts = zthd3(tree);
 
@@ -1192,6 +1204,7 @@ static Module parseModuleOrInterface ( ConId mc, Cell modeRequest )
 
   cant_find:
    if (path) free(path);
+   clearCurrentFile();
    ERRMSG(0) 
       "Can't find %s for module \"%s\"",
       modeToString(modeRequest), textToStr(mt)
@@ -1261,7 +1274,6 @@ static void achieveTargetModules ( Bool loadingThePrelude )
    Bool oiAvail; Time oiTime; Long oSize; Long iSize;
 
    volatile Time oisTime;
-   volatile Bool sourceIsLatest;
    volatile Bool out_of_date;
    volatile List ood_new;
    volatile List us;
@@ -1386,10 +1398,10 @@ static void achieveTargetModules ( Bool loadingThePrelude )
    */
    toChase = dupList(targetModules);
    for (t = toChase; nonNull(t); t=tl(t)) {
-      Cell mode = (loadingThePrelude && combined)  
-                  ? FM_OBJECT 
-                  : ( (loadingThePrelude && !combined) 
-                      ? FM_SOURCE 
+      Cell mode = (!combined) 
+                  ? FM_SOURCE
+                  : ( (loadingThePrelude && combined) 
+                      ? FM_OBJECT
                       : FM_EITHER );
       hd(t) = zpair(hd(t), mode);
    } 
@@ -1409,6 +1421,7 @@ static void achieveTargetModules ( Bool loadingThePrelude )
          mod = findModule(textOf(mc));
          assert(nonNull(mod));
          if (!compatibleNewMode(mode,module(mod).mode)) {
+            clearCurrentFile();
             ERRMSG(0)
                "module %s: %s required, but %s is more recent",
                textToStr(textOf(mc)), modeToString(mode),
@@ -1565,8 +1578,9 @@ static Bool loadThePrelude ( void )
 }
 
 
-static void refreshActions ( ConId nextCurrMod )
+static void refreshActions ( ConId nextCurrMod, Bool cleanAfter )
 {
+   List t;
    ConId tryFor = mkCon(module(currentModule).text);
    achieveTargetModules(FALSE);
    if (nonNull(nextCurrMod))
@@ -1576,6 +1590,15 @@ static void refreshActions ( ConId nextCurrMod )
    /* combined mode kludge, to get Prelude rather than PrelHugs */
    if (combined && textOf(tryFor)==findText("PrelHugs"))
       tryFor = mkCon(findText("Prelude"));
+
+   if (cleanAfter) {
+   /* delete any targetModules which didn't actually get loaded  */
+   t = targetModules;
+   targetModules = NIL;
+   for (; nonNull(t); t=tl(t))
+      if (elemMG(hd(t)))
+         targetModules = cons(hd(t),targetModules);
+   }
 
    setCurrModule ( findModule(textOf(tryFor)) );
    Printf("Hugs session for:\n");
@@ -1592,8 +1615,9 @@ static void addActions ( List extraModules /* :: [CONID] */ )
          targetModules = cons(extra,targetModules);
    }
    refreshActions ( isNull(extraModules) 
-                    ? NIL 
-                    : hd(reverse(extraModules)) 
+                       ? NIL 
+                       : hd(reverse(extraModules)),
+                    TRUE
                   );
 }
 
@@ -1609,8 +1633,9 @@ static void loadActions ( List loadModules /* :: [CONID] */ )
          targetModules = cons(load,targetModules);
    }
    refreshActions ( isNull(loadModules) 
-                    ? NIL 
-                    : hd(reverse(loadModules)) 
+                       ? NIL 
+                       : hd(reverse(loadModules)),
+                    TRUE
                   );
 }
 
@@ -2408,7 +2433,7 @@ String argv[]; {
                           addActions(modConIds);
                           modConIds = NIL;
                           break;
-            case RELOAD : refreshActions(NIL);
+            case RELOAD : refreshActions(NIL,FALSE);
                           break;
             case SETMODULE :
                           setModule();
@@ -2571,7 +2596,6 @@ static Void local stopAnyPrinting() {  /* terminate printing of expression,*/
 
 Cell errAssert(l)   /* message to use when raising asserts, etc */
 Int l; {
-  char tmp[100];
   Cell str;
   if (currentFile) {
     str = mkStr(findText(currentFile));
