@@ -16,7 +16,6 @@ An example that provokes the error is
 --------------------------------------------------------
 
 \begin{code}
-{-# OPTIONS -#include "ctypes.h" #-}
 
 module Lex (
 
@@ -55,12 +54,7 @@ import FastString
 import StringBuffer
 import GlaExts
 import ST		( runST )
-
-#if __GLASGOW_HASKELL__ >= 303
-import Bits
-import Word
-#endif
-
+import Ctypes
 import Char		( chr )
 import Addr
 import PrelRead 	( readRational__ ) -- Glasgow non-std
@@ -868,33 +862,6 @@ lex_cstring cont buf =
 				(setCurrentPos# buf' (negateInt# 2#))))
            	   (mergeLexemes buf buf')
    Nothing   -> lexError "unterminated ``" buf
-
-------------------------------------------------------------------------------
--- Character Classes
-
-is_ident, is_symbol, is_any, is_upper, is_digit :: Char# -> Bool
-
-{-# INLINE is_ctype #-}
-#if __GLASGOW_HASKELL__ >= 303
-is_ctype :: Word8 -> Char# -> Bool
-is_ctype mask = \c ->
-   (indexWord8OffAddr (``char_types'' :: Addr) (ord (C# c)) .&. mask) /= 0
-#else
-is_ctype :: Int -> Char# -> Bool
-is_ctype (I# mask) = \c ->
-    let (A# ctype) = ``char_types'' :: Addr
-	flag_word  = int2Word# (ord# (indexCharOffAddr# ctype (ord# c)))
-    in
-	(flag_word `and#` (int2Word# mask)) `neWord#` (int2Word# 0#)
-#endif
-
-is_ident  = is_ctype 1
-is_symbol = is_ctype 2
-is_any    = is_ctype 4
-is_space  = is_ctype 8
-is_lower  = is_ctype 16
-is_upper  = is_ctype 32
-is_digit  = is_ctype 64
 
 -----------------------------------------------------------------------------
 -- identifiers, symbols etc.
