@@ -67,8 +67,16 @@ null (_:_)              =  False
 -- of the more general genericLength, the result type of which may be
 -- any kind of number.
 length                  :: [a] -> Int
+#ifdef USE_REPORT_PRELUDE
 length []               =  0
 length (_:l)            =  1 + length l
+#else
+length l                =  len l 0#
+  where
+    len :: [a] -> Int# -> Int
+    len []     a# = I# a#
+    len (_:xs) a# = len xs (a# +# 1#)
+#endif
 
 -- foldl, applied to a binary operator, a starting value (typically the
 -- left-identity of the operator), and a list, reduces the list using
@@ -142,7 +150,7 @@ cycle xs                =  xs' where xs' = xs ++ xs'
 -- or xs itself if n > length xs.  drop n xs returns the suffix of xs
 -- after the first n elements, or [] if n > length xs.  splitAt n xs
 -- is equivalent to (take n xs, drop n xs).
-
+#ifdef USE_REPORT_PRELUDE
 take                   :: Int -> [a] -> [a]
 take 0 _               =  []
 take _ []              =  []
@@ -161,36 +169,115 @@ splitAt _ []              =  ([],[])
 splitAt n (x:xs) | n > 0  =  (x:xs',xs'') where (xs',xs'') = splitAt (n-1) xs
 splitAt _     _           =  error "PreludeList.splitAt: negative argument"
 
+#else /* hack away */
+take	:: Int -> [b] -> [b]
+take (I# n#) xs = takeUInt n# xs
+
+-- The general code for take, below, checks n <= maxInt
+-- No need to check for maxInt overflow when specialised
+-- at type Int or Int# since the Int must be <= maxInt
+
+takeUInt :: Int# -> [b] -> [b]
+takeUInt n xs
+  | n >=# 0#  =  take_unsafe_UInt n xs
+  | otherwise =  error "take{PreludeList}: negative index"
+
+take_unsafe_UInt 0# _     = []
+take_unsafe_UInt _  []	  = []
+take_unsafe_UInt m (x:xs) = x : take_unsafe_UInt (m -# 1#) xs
+
+drop		:: Int -> [b] -> [b]
+drop (I# n#) xs
+  | n# <# 0#	= error "drop{PreludeList}: negative index"
+  | otherwise	= drop# n# xs
+    where
+	drop# :: Int# -> [a] -> [a]
+	drop# 0# xs      = xs
+	drop# _  []	 = []
+	drop# m# (_:xs)  = drop# (m# -# 1#) xs
+
+splitAt	:: Int -> [b] -> ([b], [b])
+splitAt (I# n#) xs
+  | n# <# 0#	= error "splitAt{PreludeList}: negative index"
+  | otherwise	= splitAt# n# xs
+    where
+	splitAt# :: Int# -> [a] -> ([a], [a])
+	splitAt# 0# xs	   = ([], xs)
+	splitAt# _  []	   = ([], [])
+	splitAt# m# (x:xs) = (x:xs', xs'')
+	  where
+	    (xs', xs'') = splitAt# (m# -# 1#) xs
+
+#endif /* USE_REPORT_PRELUDE */
+
 span, break             :: (a -> Bool) -> [a] -> ([a],[a])
 span p []               =  ([],[])
 span p xs@(x:xs')
          | p x          =  let (ys,zs) = span p xs' in (x:ys,zs)
          | otherwise    =  ([],xs)
+
+#ifdef USE_REPORT_PRELUDE
 break p                 =  span (not . p)
+#else
+-- HBC version (stolen)
+break p []		=  ([],[])
+break p xs@(x:xs')
+	   | p x	=  ([],xs)
+	   | otherwise	=  let (ys,zs) = break p xs' in (x:ys,zs)
+#endif
 
 -- reverse xs returns the elements of xs in reverse order.  xs must be finite.
 reverse                 :: [a] -> [a]
+#ifdef USE_REPORT_PRELUDE
 reverse                 =  foldl (flip (:)) []
+#else
+reverse l =  rev l []
+  where
+    rev []     a = a
+    rev (x:xs) a = rev xs (x:a)
+#endif
 
 -- and returns the conjunction of a Boolean list.  For the result to be
 -- True, the list must be finite; False, however, results from a False
 -- value at a finite index of a finite or infinite list.  or is the
 -- disjunctive dual of and.
 and, or                 :: [Bool] -> Bool
+#ifdef USE_REPORT_PRELUDE
 and                     =  foldr (&&) True
 or                      =  foldr (||) False
+#else
+and []		=  True
+and (x:xs)	=  x && and xs
+or []		=  False
+or (x:xs)	=  x || or xs
+#endif
 
 -- Applied to a predicate and a list, any determines if any element
 -- of the list satisfies the predicate.  Similarly, for all.
 any, all                :: (a -> Bool) -> [a] -> Bool
+#ifdef USE_REPORT_PRELUDE
 any p                   =  or . map p
 all p                   =  and . map p
+#else
+any p []	= False
+any p (x:xs)	= p x || any p xs
+all p []	=  True
+all p (x:xs)	=  p x && all p xs
+#endif
 
 -- elem is the list membership predicate, usually written in infix form,
 -- e.g., x `elem` xs.  notElem is the negation.
 elem, notElem           :: (Eq a) => a -> [a] -> Bool
+#ifdef USE_REPORT_PRELUDE
 elem x                  =  any (== x)
 notElem x               =  all (/= x)
+#else
+elem _ []	= False
+elem x (y:ys)	= x==y || elem x ys
+
+notElem	x []	=  True
+notElem x (y:ys)=  x /= y && notElem x ys
+#endif
 
 -- lookup key assocs looks up a key in an association list.
 lookup                  :: (Eq a) => a -> [(a,b)] -> Maybe b
@@ -201,8 +288,19 @@ lookup key ((x,y):xys)
 
 -- sum and product compute the sum or product of a finite list of numbers.
 sum, product            :: (Num a) => [a] -> a
+#ifdef USE_REPORT_PRELUDE
 sum                     =  foldl (+) 0  
 product                 =  foldl (*) 1
+#else
+sum	l	= sum' l 0
+  where
+    sum' []     a = a
+    sum' (x:xs) a = sum' xs (a+x)
+product	l	= prod l 1
+  where
+    prod []     a = a
+    prod (x:xs) a = prod xs (a*x)
+#endif
 
 -- maximum and minimum return the maximum or minimum value from a list,
 -- which must be non-empty, finite, and of an ordered type.
@@ -290,9 +388,26 @@ words s			=  case dropWhile {-partain:Char.-}isSpace s of
                                              break {-partain:Char.-}isSpace s'
 
 unlines			:: [String] -> String
+#ifdef USE_REPORT_PRELUDE
 unlines			=  concatMap (++ "\n")
+#else
+-- HBC version (stolen)
+-- here's a more efficient version
+unlines [] = []
+unlines (l:ls) = l ++ '\n' : unlines ls
+
+#endif
 
 unwords			:: [String] -> String
+#ifdef USE_REPORT_PRELUDE
 unwords []		=  ""
 unwords ws		=  foldr1 (\w s -> w ++ ' ':s) ws
+#else
+-- HBC version (stolen)
+-- here's a more efficient version
+unwords []		=  ""
+unwords [w]		= w
+unwords (w:ws)		= w ++ ' ' : unwords ws
+#endif
+
 \end{code}
