@@ -35,7 +35,7 @@ import NameSet
 import OccName		( OccName, occNameUserString, occNameFlavour )
 import Module		( ModuleName, moduleName, mkVanillaModule, 
 			  mkSysModuleNameFS, moduleNameFS, WhereFrom(..) )
-import TysWiredIn	( unitTyCon, intTyCon, boolTyCon )
+import TysWiredIn	( unitTyCon, intTyCon, boolTyCon, integerTyCon )
 import Type		( funTyCon )
 import PrelNames	( mkUnboundName, syntaxList, SyntaxMap,	vanillaSyntaxMap,
 			  derivingOccurrences,
@@ -399,8 +399,8 @@ ubiquitousNames
 	-- Virtually every program has error messages in it somewhere
 
   `plusFV`
-    mkFVs (map getName [unitTyCon, funTyCon, boolTyCon, intTyCon])
-	-- Add occurrences for Int, and (), because they
+    mkFVs (map getName [unitTyCon, funTyCon, boolTyCon, intTyCon, integerTyCon])
+	-- Add occurrences for Integer, and (), because they
 	-- are the types to which ambigious type variables may be defaulted by
 	-- the type checker; so they won't always appear explicitly.
 	-- [The () one is a GHC extension for defaulting CCall results.]
