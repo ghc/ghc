@@ -1,6 +1,8 @@
 
 module Prims where
 
+import Prelude hiding (head)
+
 one = one
 
 head (x:xs) = x
