@@ -530,7 +530,7 @@ fprint_ccs(FILE *fp, CostCentreStack *ccs, nat max_length)
 	return;
     }
 
-    fprintf(fp, "(%d)", ccs->ccsID);
+    fprintf(fp, "(%ld)", ccs->ccsID);
 
     p = buf;
     buf_end = buf + max_length + 1;
@@ -745,14 +745,14 @@ dumpCensus( Census *census )
 
 #ifdef PROFILING
     if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
-	fprintf(hp_file, "VOID\t%u\n", census->void_total * sizeof(W_));
-	fprintf(hp_file, "LAG\t%u\n", 
+	fprintf(hp_file, "VOID\t%lu\n", census->void_total * sizeof(W_));
+	fprintf(hp_file, "LAG\t%lu\n", 
 		(census->not_used - census->void_total) * sizeof(W_));
-	fprintf(hp_file, "USE\t%u\n", 
+	fprintf(hp_file, "USE\t%lu\n", 
 		(census->used - census->drag_total) * sizeof(W_));
-	fprintf(hp_file, "INHERENT_USE\t%u\n", 
+	fprintf(hp_file, "INHERENT_USE\t%lu\n", 
 		census->prim * sizeof(W_));
-	fprintf(hp_file, "DRAG\t%u\n", census->drag_total *
+	fprintf(hp_file, "DRAG\t%lu\n", census->drag_total *
 		sizeof(W_));
 	printSample(rtsFalse, census->time);
 	return;
@@ -831,7 +831,7 @@ dumpCensus( Census *census )
 	}
 #endif
 
-	fprintf(hp_file, "\t%d\n", count * sizeof(W_));
+	fprintf(hp_file, "\t%ld\n", count * sizeof(W_));
     }
 
     printSample(rtsFalse, census->time);
