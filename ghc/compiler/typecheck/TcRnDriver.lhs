@@ -478,24 +478,28 @@ tcRnThing hsc_env pcs ictxt rdr_name
 	-- constructor and type class identifiers.
     let { rdr_names = dataTcOccs rdr_name } ;
 
-    (msgs_s, mb_names) <- initRnInteractive ictxt
-			    (mapAndUnzipM (tryTc . lookupOccRn) rdr_names) ;
-    let { names = catMaybes mb_names } ;
+	-- results :: [(Messages, Maybe Name)]
+    results <- initRnInteractive ictxt
+			    (mapM (tryTc . lookupOccRn) rdr_names) ;
 
-    if null names then
-	do { addMessages (head msgs_s) ; failM }
-    else do {
+	-- The successful lookups will be (Just name)
+    let { (warns_s, good_names) = unzip [ (msgs, name) 
+					| (msgs, Just name) <- results] ;
+	  errs_s = [msgs | (msgs, Nothing) <- results] } ;
 
-	-- Add deprecation warnings
-    mapM_ addMessages msgs_s ;	
-
+	-- Fail if nothing good happened, else add warnings
+    if null good_names then	-- Fail
+	do { addMessages (head errs_s) ; failM }
+      else 			-- Add deprecation warnings
+	mapM_ addMessages warns_s ;
+	
 	-- Slurp in the supporting declarations
-    tcg_env <- importSupportingDecls (mkFVs names) ;
+    tcg_env <- importSupportingDecls (mkFVs good_names) ;
     setGblEnv tcg_env $ do {
 
 	-- And lookup up the entities
-    mapM tcLookupGlobal names
-    }}}
+    mapM tcLookupGlobal good_names
+    }}
 \end{code}
 
 
@@ -543,10 +547,17 @@ tcRnExtCore hsc_env pcs
 				      (rnSrcDecls local_group) ;
    failIfErrsM ;
 
- 	-- Get the supporting decls, and typecheck them all together
-	-- so that any mutually recursive types are done right
-   extra_decls <- slurpImpDecls fvs ;
-   tcg_env <- typecheckIfaceDecls (rn_local_decls `addImpDecls` extra_decls) ;
+ 	-- Get the supporting decls
+   rn_imp_decls <- slurpImpDecls fvs ;
+   let { rn_decls = rn_local_decls `addImpDecls` rn_imp_decls } ;
+
+	-- Dump trace of renaming part
+   rnDump (ppr rn_decls) ;
+   rnStats rn_imp_decls ;
+
+	-- Typecheck them all together so that
+	-- any mutually recursive types are done right
+   tcg_env <- typecheckIfaceDecls rn_decls ;
    setGblEnv tcg_env $ do {
    
 	-- Now the core bindings
