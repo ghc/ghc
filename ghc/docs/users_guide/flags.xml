@@ -8,7 +8,9 @@
     (if available).</para>
 
     <sect2>
-      <title>Help and verbosity options (<xref linkend="options-help"/>)</title>
+      <title>Help and verbosity options</title>
+
+      <para><xref linkend="options-help"/></para>
 
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
@@ -81,8 +83,10 @@
 
     </sect2>
     <sect2>
-      <title>Which phases to run (<xref linkend="options-order"/>)</title>
+      <title>Which phases to run</title>
       
+      <para><xref linkend="options-order"/></para>
+
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
@@ -124,8 +128,10 @@
     </sect2>
 
      <sect2>
-      <title>Alternative modes of operation (<xref linkend="modes"/>)</title>
+      <title>Alternative modes of operation</title>
       
+      <para><xref linkend="modes"/></para>
+
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
@@ -173,8 +179,10 @@
     </sect2>
 
     <sect2>
-      <title>Redirecting output (<xref linkend="options-output"/>)</title>
+      <title>Redirecting output</title>
       
+      <para><xref linkend="options-output"/></para>
+
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
@@ -234,7 +242,9 @@
     </sect2>
 
     <sect2>
-      <title>Keeping intermediate files (<xref linkend="keeping-intermediates"/>)</title>
+      <title>Keeping intermediate files</title>
+      
+      <para><xref linkend="keeping-intermediates"/></para>
       
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
@@ -277,8 +287,10 @@
     </sect2>
 
     <sect2>
-      <title>Temporary files (<xref linkend="temp-files"/>)</title>
+      <title>Temporary files</title>
       
+      <para><xref linkend="temp-files"/></para>
+
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
@@ -302,7 +314,9 @@
     </sect2>
 
     <sect2>
-      <title>Finding imports (<xref linkend="search-path"/>)</title>
+      <title>Finding imports</title>
+
+      <para><xref linkend="search-path"/></para>
 
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
@@ -335,7 +349,9 @@
     </sect2>
 
     <sect2>
-      <title>Interface file options (<xref linkend="hi-options"/>)</title>
+      <title>Interface file options</title>
+
+      <para><xref linkend="hi-options"/></para>
 
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
@@ -381,7 +397,9 @@
     </sect2>
     
     <sect2>
-      <title>Recompilation checking (<xref linkend="recomp"/>)</title>
+      <title>Recompilation checking</title>
+
+      <para><xref linkend="recomp"/></para>
 
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
@@ -408,8 +426,10 @@
     </sect2>
 
     <sect2>
-      <title>Interactive-mode options (<xref linkend="ghci-dot-files"/>)</title>
+      <title>Interactive-mode options</title>
       
+      <para><xref linkend="ghci-dot-files"/></para>
+
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
@@ -439,7 +459,10 @@
     </sect2>
 
     <sect2>
-      <title>Packages (<xref linkend="packages"/>)</title>
+      <title>Packages</title>
+
+      <para><xref linkend="packages"/></para>
+
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
@@ -487,7 +510,9 @@
     </sect2>
 
     <sect2>
-      <title>Language options (<xref linkend="options-language"/>)</title>
+      <title>Language options</title>
+
+      <para><xref linkend="options-language"/></para>
 
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
@@ -600,8 +625,10 @@
     </sect2>
 
     <sect2>
-      <title>Warnings (<xref linkend="options-sanity"/>)</title>
+      <title>Warnings</title>
       
+      <para>(<xref linkend="options-sanity"/></para>
+
     <informaltable>
       <tgroup cols="3" align="left" colsep="1" rowsep="1">
 	<thead>
@@ -765,7 +792,9 @@
 
     </sect2>
     <sect2>
-      <title>Optimisation levels (<xref linkend="options-optimise"/>)</title>
+      <title>Optimisation levels</title>
+
+      <para><xref linkend="options-optimise"/></para>
 
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
@@ -796,7 +825,9 @@
 	      
     </sect2>
     <sect2>
-      <title>Individual optimisations (<xref linkend="options-f"/>)</title>
+      <title>Individual optimisations</title>
+
+      <para><xref linkend="options-f"/></para>
 
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
@@ -992,7 +1023,9 @@
     </sect2>
 
     <sect2>
-      <title>Profiling options (<xref linkend="profiling"/>)</title>
+      <title>Profiling options</title>
+      
+      <para><xref linkend="profiling"/></para>
 
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
@@ -1049,7 +1082,9 @@
     </sect2>
 
     <sect2>
-      <title>Parallelism options (<xref linkend="sec-using-parallel"/>)</title>
+      <title>Parallelism options</title>
+
+      <para><xref linkend="sec-using-parallel"/></para>
 
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
@@ -1086,7 +1121,9 @@
     </sect2>
 
     <sect2>
-      <title>C pre-processor options (<xref linkend="c-pre-processor"/>)</title>
+      <title>C pre-processor options</title>
+
+      <para><xref linkend="c-pre-processor"/></para>
 
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
@@ -1130,7 +1167,9 @@
     </sect2>
 
     <sect2>
-      <title>C compiler options (<xref linkend="options-C-compiler"/>)</title>
+      <title>C compiler options</title>
+
+      <para><xref linkend="options-C-compiler"/></para>
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
@@ -1155,7 +1194,9 @@
     </sect2>
 
     <sect2>
-      <title>Code generation options (<xref linkend="options-codegen"/>)</title>
+      <title>Code generation options</title>
+
+      <para><xref linkend="options-codegen"/></para>
 
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
@@ -1192,7 +1233,9 @@
     </sect2>
 
     <sect2>
-      <title>Linking options (<xref linkend="options-linker"/>)</title>
+      <title>Linking options</title>
+
+      <para><xref linkend="options-linker"/></para>
 
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
@@ -1293,7 +1336,9 @@
     </sect2>
 
     <sect2>
-      <title>Replacing phases (<xref linkend="replacing-phases"/>)</title>
+      <title>Replacing phases</title>
+
+      <para><xref linkend="replacing-phases"/></para>
 
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
@@ -1370,7 +1415,9 @@
     </sect2>
 
     <sect2>
-      <title>Forcing options to particular phases (<xref linkend="forcing-options-through"/>)</title>
+      <title>Forcing options to particular phases</title>
+
+      <para><xref linkend="forcing-options-through"/></para>
 
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
@@ -1439,8 +1486,10 @@
     </sect2>
 
     <sect2>
-      <title>Platform-specific options (<xref linkend="options-platform"/>)</title>
+      <title>Platform-specific options</title>
       
+      <para><xref linkend="options-platform"/></para>
+
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
 	  <thead>
@@ -1471,7 +1520,9 @@
 
          
     <sect2>
-      <title>External core file options (<xref linkend="ext-core"/>)</title>
+      <title>External core file options</title>
+
+      <para><xref linkend="ext-core"/></para>
 
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
@@ -1497,7 +1548,9 @@
 	
 
     <sect2>
-      <title>Compiler debugging options (<xref linkend="options-debugging"/>)</title>
+      <title>Compiler debugging options</title>
+
+      <para><xref linkend="options-debugging"/></para>
 
       <informaltable>
 	<tgroup cols="3" align="left" colsep="1" rowsep="1">
