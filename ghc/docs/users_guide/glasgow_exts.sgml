@@ -2187,6 +2187,8 @@ Here, the type variable <literal>a</literal> scopes over the right hand side of 
 just like <literal>x</literal> does; while the type variable <literal>b</literal> scopes over the
 body of the <literal>let</literal>, and all the other definitions in the <literal>let</literal>,
 just like <literal>p</literal> and <literal>q</literal> do.
+Indeed, the newly bound type variables also scope over any ordinary, separate
+type signatures in the <literal>let</literal> group.
 </para>
 </listitem>
 
