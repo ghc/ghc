@@ -1,5 +1,10 @@
-module PrelMain where
+module Main where
 
 -- !!! test for uncaught exception
 
-mainIO = error "wurble"
+foreign export foo :: Int -> IO Int
+foreign import ccall unsafe "foo" foo_imported :: Int -> IO Int
+
+foo n = error "wurble"
+
+main = foo_imported 3

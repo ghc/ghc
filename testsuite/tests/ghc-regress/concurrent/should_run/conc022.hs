@@ -4,9 +4,9 @@ import Concurrent
 import Exception
 import IO
 
-import PrelIOBase
-import PrelConc
-import PrelGHC
+import GHC.Exts		( fork# )
+import GHC.IOBase	( IO(..) )
+import GHC.Conc		( ThreadId(..) )
 
 main = do
   m <- newEmptyMVar

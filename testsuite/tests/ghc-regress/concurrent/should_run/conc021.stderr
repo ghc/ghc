@@ -1,1 +1,1 @@
-conc021: main thread exited (uncaught exception)
+conc021: fatal error: foo: uncaught exception
