@@ -1,7 +1,7 @@
 {-# OPTIONS -fglasgow-exts #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.29 2002/10/27 10:38:32 mthomas Exp $
+-- $Id: Main.hs,v 1.30 2002/10/29 10:50:53 simonpj Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -34,8 +34,13 @@ import ParsePkgConfLite
 #include "../../includes/config.h"
 
 #ifdef mingw32_HOST_OS
-import Foreign.C.String
 import Foreign
+
+#if __GLASGOW_HASKELL__ >= 504
+import Foreign.C.String
+#else
+import CString
+#endif
 #endif
 
 main = do

@@ -1,7 +1,7 @@
 {-# OPTIONS -fglasgow-exts #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.42 2002/10/28 10:11:17 simonpj Exp $
+-- $Id: Main.hs,v 1.43 2002/10/29 10:50:54 simonpj Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -27,9 +27,15 @@ import List          (intersperse)
 #include "../../includes/config.h"
 
 #ifdef mingw32_HOST_OS
-import Foreign.C.String
 import Foreign
+
+#if __GLASGOW_HASKELL__ >= 504
+import Foreign.C.String
+#else
+import CString
 #endif
+#endif
+
 
 
 version :: String
