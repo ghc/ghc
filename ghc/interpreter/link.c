@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.33 $
- * $Date: 2000/01/11 15:40:57 $
+ * $Revision: 1.34 $
+ * $Date: 2000/01/11 17:09:38 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -512,18 +512,24 @@ Int what; {
         case MARK    : 
                        break;
 
-        case POSTPREL: 
+        case POSTPREL: {
+           Module modulePrelBase = findModule(findText("PrelBase"));
+           assert(nonNull(modulePrelBase));
 #if 1
-	  fprintf(stderr, "linkControl(POSTPREL)\n");
+	   fprintf(stderr, "linkControl(POSTPREL)\n");
 #if 1
-          setCurrModule(modulePrelude);
-          linkPreludeTC();
-          linkPreludeCM();
-          linkPreludeNames();
+           setCurrModule(modulePrelude);
+           linkPreludeTC();
+           linkPreludeCM();
+           linkPreludeNames();
+           name(nameNil).stgVar
+              = mkCPtr(lookupOTabName(modulePrelBase, "PrelBase_ZMZN_closure"));
+           name(nameCons).stgVar 
+              = mkCPtr(lookupOTabName(modulePrelBase, "PrelBase_ZC_closure"));
 #endif
 #endif
-          break;
-
+           break;
+        }
         case PREPREL : 
 
            if (combined) {
