@@ -757,17 +757,11 @@ sub mangle_asm {
 		} else {
 		    print STDERR "$Pgm: unknown epilogue mangling? $TargetPlatform\n";
 		}
-		# HWL HACK: dont die, just print a warning
-		#print stderr "HWL: this should die! Epilogue junk?: $e\n" if $e =~ /^\t[^\.]/
-		#    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
 
-		# ** FIXME:
-		# ** chak:
-		#   Commented this out, because it complains about junk that
-		#   is later removed in the FUNNY#END#THING loop - but as I am
-		#   not sure how this could ever have worked, there may be a 
-		#   better solution...
-		#die "Epilogue junk?: $e\n" if $e =~ /^\t[^\.\n]/
+		# --- Can't test for residual epilogue junk reliably because
+		# --- there might be some directives left over that we're going
+		# --- to move to the next chunk (see below).
+		# die "Epilogue junk?: $e\n" if $e =~ /^\t[^\.\n]/
 		#    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
 
 		# glue together what's left
