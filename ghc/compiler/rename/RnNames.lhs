@@ -42,7 +42,6 @@ import Name	( Name, ExportFlag(..), ImportReason(..), Provenance(..),
 		)
 import RdrName	( RdrName, rdrNameOcc, setRdrNameOcc, mkRdrQual, mkRdrUnqual, isQual, isUnqual )
 import OccName	( setOccNameSpace, dataName )
-import SrcLoc	( SrcLoc )
 import NameSet	( elemNameSet, emptyNameSet )
 import Outputable
 import Maybes	( maybeToBool, catMaybes, mapMaybe )

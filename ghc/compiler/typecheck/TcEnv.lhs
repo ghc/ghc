@@ -61,7 +61,6 @@ import Class	( Class, ClassOpItem, ClassContext, classTyCon )
 
 import TcMonad
 
-import BasicTypes	( Arity )
 import IdInfo		( vanillaIdInfo )
 import Name		( Name, OccName, Provenance(..), ExportFlag(..), NamedThing(..), 
 			  nameOccName, nameModule, getSrcLoc, mkGlobalName,
