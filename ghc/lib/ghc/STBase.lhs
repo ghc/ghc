@@ -54,33 +54,6 @@ returnST = return
 thenST   = (>>=)
 seqST	 = (>>)
 
--- not sure whether to 1.3-ize these or what...
-{-# INLINE returnStrictlyST #-}
-{-# INLINE thenStrictlyST #-}
-{-# INLINE seqStrictlyST #-}
-
-{-# GENERATE_SPECS returnStrictlyST a #-}
-returnStrictlyST :: a -> ST s a
-
-{-# GENERATE_SPECS thenStrictlyST a b #-}
-thenStrictlyST :: ST s a -> (a -> ST s b) -> ST s b
-
-{-# GENERATE_SPECS seqStrictlyST a b #-}
-seqStrictlyST :: ST s a -> ST s b -> ST s b
-
-returnStrictlyST a = ST $ \ s@(S# _) -> (a, s)
-
-thenStrictlyST (ST m) k = ST $ \ s ->	-- @(S# _)   Omitted SLPJ [May95] no need to evaluate the state
-    case (m s) of { (r, new_s) ->
-    case (k r) of { ST k2     ->
-    (k2 new_s) }}
-
-seqStrictlyST (ST m) (ST k) = ST $ \ s ->	-- @(S# _)   Omitted SLPJ [May95] no need to evaluate the state
-    case (m s) of { (_, new_s) ->
-    (k new_s) }
-
--- BUILT-IN: runST (see Builtin.hs)
-
 unsafeInterleaveST :: ST s a -> ST s a    -- ToDo: put in state-interface.tex
 unsafeInterleaveST (ST m) = ST $ \ s ->
     let

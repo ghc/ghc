@@ -367,9 +367,10 @@ lex (c:s) | isSingle c = [([c],s)]
               isSym c    =  c `elem` "!@#$%&*+./<=>?\\^|:-~"
               isIdChar c =  isAlphanum c || c `elem` "_'"
 
-              lexFracExp ('.':s) = [('.':ds++e,u) | (ds,t) <- lexDigits s,
-                                                    (e,u)  <- lexExp t]
-              lexFracExp s       = [("",s)]
+              lexFracExp ('.':c:cs) | isDigit c
+				    = [('.':ds++e,u) | (ds,t) <- lexDigits (c:cs),
+                                                       (e,u)  <- lexExp t]
+              lexFracExp s          = [("",s)]
 
               lexExp (e:s) | e `elem` "eE"
                        = [(e:c:ds,u) | (c:t)  <- [s], c `elem` "+-",

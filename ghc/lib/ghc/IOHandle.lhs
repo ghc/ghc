@@ -10,7 +10,7 @@ which are supported for them.
 \begin{code}
 #include "error.h"
 
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fno-implicit-prelude -#include "cbits/stgio.h" #-}
 
 module IOHandle where
 
@@ -23,7 +23,11 @@ import IOBase
 import PrelTup
 import PrelBase
 import GHC
-
+import Foreign  ( makeForeignObj )
+import PrelList (span)
+#if defined(__CONCURRENT_HASKELL__)
+import ConcBase
+#endif
 \end{code}
 
 
@@ -33,43 +37,28 @@ import GHC
 %*							*
 %*********************************************************
 
+The @Handle@ and @Handle__@ types are defined in @IOBase@.
+
 \begin{code}
 type FilePath = String
-
-#if defined(__CONCURRENT_HASKELL__)
-type Handle = MVar Handle__
-
-newHandle   = newMVar
-readHandle  = takeMVar
-writeHandle = putMVar
-
-#else
-type Handle = MutableVar RealWorld Handle__
-
-newHandle v     = stToIO (newVar   v)
-readHandle h    = stToIO (readVar  h)
-writeHandle h v = stToIO (writeVar h v)
-
-#endif {- __CONCURRENT_HASKELL__ -}
-
-data Handle__
-  = ErrorHandle		IOError
-  | ClosedHandle
-  | SemiClosedHandle	Addr (Addr, Int)
-  | ReadHandle		Addr (Maybe BufferMode) Bool
-  | WriteHandle		Addr (Maybe BufferMode) Bool
-  | AppendHandle	Addr (Maybe BufferMode) Bool
-  | ReadWriteHandle	Addr (Maybe BufferMode) Bool
-
-instance Eq Handle{-partain:????-}
 
 {-# INLINE newHandle   #-}
 {-# INLINE readHandle  #-}
 {-# INLINE writeHandle #-}
-
 newHandle   :: Handle__ -> IO Handle
 readHandle  :: Handle   -> IO Handle__
 writeHandle :: Handle -> Handle__ -> IO ()
+
+#if defined(__CONCURRENT_HASKELL__)
+newHandle   = newMVar
+readHandle  = takeMVar
+writeHandle = putMVar
+#else 
+newHandle v     = stToIO (newVar   v)
+readHandle h    = stToIO (readVar  h)
+writeHandle h v = stToIO (writeVar h v)
+#endif
+
 \end{code}
 
 %*********************************************************
@@ -79,7 +68,7 @@ writeHandle :: Handle -> Handle__ -> IO ()
 %*********************************************************
 
 \begin{code}
-filePtr :: Handle__ -> Addr
+filePtr :: Handle__ -> ForeignObj
 filePtr (SemiClosedHandle fp _)  = fp
 filePtr (ReadHandle fp _ _)	 = fp
 filePtr (WriteHandle fp _ _)	 = fp
@@ -127,7 +116,8 @@ stdin = unsafePerformPrimIO (
     _ccall_ getLock (``stdin''::Addr) 0		>>= \ rc ->
     (case rc of
        0 -> new_handle ClosedHandle
-       1 -> new_handle (ReadHandle ``stdin'' Nothing False)
+       1 -> makeForeignObj (``stdin''::Addr) (``&freeStdChannel''::Addr) >>= \ fp ->
+	    new_handle (ReadHandle fp Nothing False)
        _ -> constructError "stdin"		>>= \ ioError -> 
             new_handle (ErrorHandle ioError)
     )						>>= \ handle ->
@@ -140,7 +130,8 @@ stdout = unsafePerformPrimIO (
     _ccall_ getLock (``stdout''::Addr) 1	>>= \ rc ->
     (case rc of
        0 -> new_handle ClosedHandle
-       1 -> new_handle (WriteHandle ``stdout'' Nothing False)
+       1 -> makeForeignObj (``stdout''::Addr) (``&freeStdChannel''::Addr) >>= \ fp ->
+	    new_handle (WriteHandle fp Nothing False)
        _ -> constructError "stdout"		>>= \ ioError -> 
             new_handle (ErrorHandle ioError)
     )						>>= \ handle ->
@@ -153,7 +144,8 @@ stderr = unsafePerformPrimIO (
     _ccall_ getLock (``stderr''::Addr) 1	>>= \ rc ->
     (case rc of
        0 -> new_handle ClosedHandle
-       1 -> new_handle (WriteHandle ``stderr'' (Just NoBuffering) False)	
+       1 -> makeForeignObj (``stderr''::Addr) (``&freeStdChannel''::Addr) >>= \ fp ->
+            new_handle (WriteHandle fp (Just NoBuffering) False)	
        _ -> constructError "stderr"		>>= \ ioError -> 
             new_handle (ErrorHandle ioError)
     )						>>= \ handle ->
@@ -176,18 +168,19 @@ data IOMode      =  ReadMode | WriteMode | AppendMode | ReadWriteMode
 openFile :: FilePath -> IOMode -> IO Handle
 
 openFile f m = 
-    stToIO (_ccall_ openFile f m')		    >>= \ ptr ->
+    stToIO (_ccall_ openFile f m')		             >>= \ ptr ->
     if ptr /= ``NULL'' then
-        newHandle (htype ptr Nothing False)
+        stToIO (makeForeignObj ptr ((``&freeFile'')::Addr))  >>= \ fp ->
+        newHandle (htype fp Nothing False)
     else
-	stToIO (constructError "openFile")	    >>= \ ioError -> 
+	stToIO (constructError "openFile")	    >>= \ ioError@(IOError hn iot msg) -> 
 	let
 	    improved_error -- a HACK, I guess
-	      = case ioError of
-		  AlreadyExists    msg -> AlreadyExists	   (msg ++ ": " ++ f)
-		  NoSuchThing      msg -> NoSuchThing	   (msg ++ ": " ++ f)
-		  PermissionDenied msg -> PermissionDenied (msg ++ ": " ++ f)
-		  _		       -> ioError
+	      = case iot of
+		  AlreadyExists    -> IOError hn AlreadyExists    (msg ++ ": " ++ f)
+		  NoSuchThing      -> IOError hn NoSuchThing      (msg ++ ": " ++ f)
+		  PermissionDenied -> IOError hn PermissionDenied (msg ++ ": " ++ f)
+		  _		   -> ioError
 	in
         fail improved_error
   where
@@ -238,20 +231,28 @@ hClose handle =
       ErrorHandle ioError ->
 	  fail ioError
       ClosedHandle -> 
-	  fail (IllegalOperation "handle is closed")
+	  ioe_closedHandle handle
       SemiClosedHandle fp (buf,_) ->
           (if buf /= ``NULL'' then
 	      _ccall_ free buf
            else			    
               returnPrimIO ())			    `thenIO_Prim` \ () ->
-          if fp /= ``NULL'' then
-              _ccall_ closeFile fp		    `thenIO_Prim` \ rc ->
-              if rc == 0 then 
+	      _casm_ `` %r = (char *)%0; '' fp      `thenIO_Prim` \ fp_a ->
+              if fp_a /= (``NULL''::Addr) then -- Under what condition can this be NULL?
+                _ccall_ closeFile fp		    `thenIO_Prim` \ rc ->
+	          {- We explicitly close a file object so that we can be told
+	             if there were any errors. Note that after @hClose@
+	             has been performed, the ForeignObj embedded in the Handle
+                     is still lying around in the heap, so care is taken
+                     to avoid closing the file object when the ForeignObj
+	             is finalised. (see freeFile()) -}
+                if rc == 0 then 
 	          return ()
-              else
+                else
 	          constructErrorAndFail "hClose"
-          else			    
-              return ()
+
+              else			    
+                  return ()
       other -> 
           _ccall_ closeFile (filePtr other)	    `thenIO_Prim` \ rc ->
           if rc == 0 then 
@@ -285,10 +286,10 @@ hFileSize handle =
 	  fail ioError
       ClosedHandle -> 
 	  writeHandle handle htype			    >>
-          fail (IllegalOperation "handle is closed")
+	  ioe_closedHandle handle
       SemiClosedHandle _ _ -> 
 	  writeHandle handle htype			    >>
-          fail (IllegalOperation "handle is closed")
+	  ioe_closedHandle handle
       other ->
           -- HACK!  We build a unique MP_INT of the right shape to hold
           -- a single unsigned word, and we let the C routine change the data bits
@@ -322,16 +323,16 @@ hIsEOF handle =
 	  fail ioError
       ClosedHandle -> 
 	  writeHandle handle htype		    >>
-          fail (IllegalOperation "handle is closed")
+	  ioe_closedHandle handle
       SemiClosedHandle _ _ -> 
 	  writeHandle handle htype		    >>
-          fail (IllegalOperation "handle is closed")
+	  ioe_closedHandle handle
       WriteHandle _ _ _ -> 
 	  writeHandle handle htype		    >>
-          fail (IllegalOperation "handle is not open for reading")
+          fail (IOError (Just handle) IllegalOperation "handle is not open for reading")
       AppendHandle _ _ _ -> 
 	  writeHandle handle htype		    >>
-          fail (IllegalOperation "handle is not open for reading")
+          fail (IOError (Just handle) IllegalOperation "handle is not open for reading")
       other -> 
           _ccall_ fileEOF (filePtr other)	    `thenIO_Prim` \ rc ->
 	  writeHandle handle (markHandle htype)	    >>
@@ -351,62 +352,26 @@ isEOF = hIsEOF stdin
 %*********************************************************
 
 Three kinds of buffering are supported: line-buffering, 
-block-buffering or no-buffering.  These modes have the following effects.
-For output, items are written out from the internal buffer 
-according to the buffer mode:
-\begin{itemize}
-\item[line-buffering]  the entire output buffer is written
-out whenever a newline is output, the output buffer overflows, 
-a flush is issued, or the handle is closed.
+block-buffering or no-buffering.  See @IOBase@ for definition
+and further explanation of what the type represent.
 
-\item[block-buffering] the entire output buffer is written out whenever 
-it overflows, a flush is issued, or the handle
-is closed.
-
-\item[no-buffering] output is written immediately, and never stored
-in the output buffer.
-\end{itemize}
-
-The output buffer is emptied as soon as it has been written out.
-
-Similarly, input occurs according to the buffer mode for handle {\em hdl}.
-\begin{itemize}
-\item[line-buffering] when the input buffer for {\em hdl} is not empty,
-the next item is obtained from the buffer;
-otherwise, when the input buffer is empty,
-characters up to and including the next newline
-character are read into the buffer.  No characters
-are available until the newline character is
-available.
-\item[block-buffering] when the input buffer for {\em hdl} becomes empty,
-the next block of data is read into this buffer.
-\item[no-buffering] the next input item is read and returned.
-\end{itemize}
-For most implementations, physical files will normally be block-buffered 
-and terminals will normally be line-buffered.
-
-\begin{code}
-data BufferMode  =  NoBuffering | LineBuffering | BlockBuffering (Maybe Int)
-                    deriving (Eq, Ord, Read, Show)
-\end{code}
-
-Computation $hSetBuffering hdl mode$ sets the mode of buffering for
+Computation @hSetBuffering hdl mode@ sets the mode of buffering for
 handle {\em hdl} on subsequent reads and writes.
 
 \begin{itemize}
 \item
-If {\em mode} is $LineBuffering$, line-buffering should be
+If {\em mode} is @LineBuffering@, line-buffering should be
 enabled if possible.
 \item
-If {\em mode} is $BlockBuffering$ {\em size}, then block-buffering
+If {\em mode} is @BlockBuffering@ {\em size}, then block-buffering
 should be enabled if possible.  The size of the buffer is {\em n} items
-if {\em size} is $Just${\em n} and is otherwise implementation-dependent.
+if {\em size} is @Just@~{\em n} and is otherwise implementation-dependent.
 \item
-If {\em mode} is $NoBuffering$, then buffering is disabled if possible.
+If {\em mode} is @NoBuffering@, then buffering is disabled if possible.
 \end{itemize}
 
-If the buffer mode is changed from $BlockBuffering$ or $LineBuffering$
-to $NoBuffering$, then any items in the output buffer are written to
+If the buffer mode is changed from @BlockBuffering@ or @LineBuffering@
+to @NoBuffering@, then any items in the output buffer are written to
 the device, and any items in the input buffer are discarded.  The
 default buffering mode when a handle is opened is
 implementation-dependent and may depend on the object which is
@@ -418,12 +383,14 @@ hSetBuffering :: Handle -> BufferMode -> IO ()
 hSetBuffering handle mode =
     case mode of
       (BlockBuffering (Just n)) 
-        | n <= 0 -> fail (InvalidArgument "illegal buffer size")
+        | n <= 0 -> fail (IOError (Just handle) InvalidArgument "illegal buffer size")
       other ->
 	  readHandle handle			    >>= \ htype ->
           if isMarked htype then
               writeHandle handle htype		    >>
-              fail (UnsupportedOperation "can't set buffering for a dirty handle")
+              fail (IOError (Just handle) 
+			    UnsupportedOperation 
+			    "can't set buffering for a dirty handle")
           else
               case htype of
 	        ErrorHandle ioError ->
@@ -431,10 +398,10 @@ hSetBuffering handle mode =
 	            fail ioError
                 ClosedHandle ->
 		    writeHandle handle htype	    >>
-		    fail (IllegalOperation "handle is closed")
+	            ioe_closedHandle handle
                 SemiClosedHandle _ _ ->
 		    writeHandle handle htype	    >>
-		    fail (IllegalOperation "handle is closed")
+	            ioe_closedHandle handle
                 other ->
                     _ccall_ setBuffering (filePtr other) bsize
 						    `thenIO_Prim` \ rc -> 
@@ -460,7 +427,7 @@ hSetBuffering handle mode =
               BlockBuffering Nothing -> -2
               BlockBuffering (Just n) -> n
 
-    hcon :: Handle__ -> (Addr -> (Maybe BufferMode) -> Bool -> Handle__)
+    hcon :: Handle__ -> (ForeignObj -> (Maybe BufferMode) -> Bool -> Handle__)
     hcon (ReadHandle _ _ _) = ReadHandle
     hcon (WriteHandle _ _ _) = WriteHandle
     hcon (AppendHandle _ _ _) = AppendHandle
@@ -480,10 +447,10 @@ hFlush handle =
 	  fail ioError
       ClosedHandle ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       SemiClosedHandle _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       other ->
 	  _ccall_ flushFile (filePtr other)	    `thenIO_Prim` \ rc ->
 	  writeHandle handle (markHandle htype)   >>
@@ -524,10 +491,10 @@ hGetPosn handle =
 	  fail ioError
       ClosedHandle ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       SemiClosedHandle _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       other -> 
           _ccall_ getFilePosn (filePtr other)      `thenIO_Prim` \ posn ->
           writeHandle handle htype		    >>
@@ -545,13 +512,13 @@ hSetPosn (HandlePosn handle posn) =
 	  fail ioError
       ClosedHandle ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       SemiClosedHandle _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       AppendHandle _ _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is not seekable")
+	  fail (IOError (Just handle) IllegalOperation "handle is not seekable")
       other -> 
 	  _ccall_ setFilePosn (filePtr other) posn `thenIO_Prim` \ rc ->
 	  writeHandle handle (markHandle htype)    >>
@@ -591,13 +558,13 @@ hSeek handle mode offset@(J# _ s# d#) =
 	  fail ioError
       ClosedHandle ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       SemiClosedHandle _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       AppendHandle _ _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is not seekable")
+	  fail (IOError (Just handle) IllegalOperation "handle is not seekable")
       other -> 
 	  _ccall_ seekFile (filePtr other) whence (I# s#) (ByteArray (0,0) d#)
                                         	    `thenIO_Prim` \ rc ->
@@ -671,10 +638,10 @@ hIsReadable handle =
           fail ioError
       ClosedHandle ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       SemiClosedHandle _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       other ->
 	  writeHandle handle htype		    >>
 	  return (isReadable other)
@@ -692,10 +659,10 @@ hIsWritable handle =
           fail ioError
       ClosedHandle ->
 	  writeHandle handle htype	    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       SemiClosedHandle _ _ ->
 	  writeHandle handle htype	    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       other ->
 	  writeHandle handle htype	    >>
 	  return (isWritable other)
@@ -735,10 +702,10 @@ hIsBlockBuffered handle =
           fail ioError
       ClosedHandle ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       SemiClosedHandle _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       other ->
           getBufferMode other			    `thenIO_Prim` \ other ->
           case bufferMode other of
@@ -760,10 +727,10 @@ hIsLineBuffered handle =
           fail ioError
       ClosedHandle ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       SemiClosedHandle _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       other ->
 	  getBufferMode other			    `thenIO_Prim` \ other ->
           case bufferMode other of
@@ -785,10 +752,10 @@ hIsNotBuffered handle =
           fail ioError
       ClosedHandle ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       SemiClosedHandle _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       other ->
 	  getBufferMode other			    `thenIO_Prim` \ other ->
           case bufferMode other of
@@ -802,23 +769,23 @@ hIsNotBuffered handle =
 		constructErrorAndFail "hIsNotBuffered"
 
 hGetBuffering :: Handle -> IO BufferMode
-hGetBuffering hndl =
-    readHandle hndl				    >>= \ htype ->
+hGetBuffering handle =
+    readHandle handle				    >>= \ htype ->
     case htype of 
       ErrorHandle ioError ->
-	  writeHandle hndl htype		    >>
+	  writeHandle handle htype		    >>
           fail ioError
       ClosedHandle ->
-	  writeHandle hndl htype		    >>
-	  fail (IllegalOperation "handle is closed")
+	  writeHandle handle htype		    >>
+          ioe_closedHandle handle
       SemiClosedHandle _ _ ->
-	  writeHandle hndl htype		    >>
-	  fail (IllegalOperation "handle is closed")
+	  writeHandle handle htype		    >>
+          ioe_closedHandle handle
       other ->
 	  getBufferMode other			    `thenIO_Prim` \ other ->
           case bufferMode other of
             Just v ->
-	        writeHandle hndl other	            >>
+	        writeHandle handle other            >>
                 return v
     	    Nothing -> 
 		constructErrorAndFail "hGetBuffering"
@@ -832,10 +799,10 @@ hIsSeekable handle =
           fail ioError
       ClosedHandle ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       SemiClosedHandle _ _ ->
 	  writeHandle handle htype		    >>
-	  fail (IllegalOperation "handle is closed")
+          ioe_closedHandle handle
       AppendHandle _ _ _ ->
 	  writeHandle handle htype		    >>
 	  return False
@@ -859,10 +826,28 @@ These two functions are meant to get things out of @IOErrors@.  They don't!
 
 \begin{code}
 ioeGetFileName        :: IOError -> Maybe FilePath
+ioeGetErrorString     :: IOError -> String
 ioeGetHandle          :: IOError -> Maybe Handle
 
+ioeGetHandle   (IOError h _ _)   = h
+ioeGetErrorString (IOError _ iot str) =
+ case iot of
+   EOF -> "end of file"
+   _   -> str
 
-ioeGetHandle   _ = Nothing -- a stub, essentially
-ioeGetFileName _ = Nothing -- a stub, essentially
+ioeGetFileName (IOError _ _ str) = 
+ case span (/=':') str of
+   (fs,[]) -> Nothing
+   (fs,_)  -> Just fs
+
 \end{code}
 
+Internal function for creating an @IOError@ representing the
+access of a closed file.
+
+\begin{code}
+
+ioe_closedHandle :: Handle -> IO a
+ioe_closedHandle h = fail (IOError (Just h) IllegalOperation "handle is closed")
+
+\end{code}

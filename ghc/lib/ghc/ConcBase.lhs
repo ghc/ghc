@@ -7,6 +7,7 @@
 Basic concurrency stuff
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
 module ConcBase(
 		-- Forking and suchlike
 	ST,	forkST,
@@ -19,14 +20,14 @@ module ConcBase(
 	MVar, newMVar, newEmptyMVar, takeMVar, putMVar, readMVar, swapMVar
     ) where
 
-import Prelude
+import PrelBase
 import STBase	( PrimIO(..), ST(..), State(..), StateAndPtr#(..) )
-import IOBase	( IO(..) )
+import IOBase	( IO(..), MVar(..) )
 import GHCerr	( parError )
 import PrelBase	( Int(..) )
 import GHC	( fork#, delay#, waitRead#, waitWrite#,
 		  SynchVar#, newSynchVar#, takeMVar#, putMVar#,
-		  State#, RealWorld
+		  State#, RealWorld, par#
 		)
 
 infixr 0 `par`, `fork`
@@ -90,7 +91,7 @@ are allowed, but there must be at least one read between any two
 writes.
 
 \begin{code}
-data MVar a = MVar (SynchVar# RealWorld a)
+--Defined in IOBase to avoid cycle: data MVar a = MVar (SynchVar# RealWorld a)
 
 newEmptyMVar  :: IO (MVar a)
 

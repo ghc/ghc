@@ -11,7 +11,7 @@ GHC
   ->
 
   Void
-  void
+-- void CAF is defined in PrelBase
 
 -- I/O primitives
   RealWorld
@@ -20,7 +20,13 @@ GHC
 
   fork#
   delay# 
-  
+  seq#
+  par#
+  parGlobal#
+  parLocal#
+  parAt#
+  parAtForNow#
+
   SynchVar#
   newSynchVar#
   takeMVar#
@@ -162,6 +168,7 @@ GHC
   MutableByteArray#
   
   sameMutableArray#
+  sameMutableByteArray#
   
   newArray#
   newCharArray#
@@ -177,12 +184,12 @@ GHC
   indexDoubleArray#
   indexAddrArray#
   
-  indexOffAddr#
-  indexCharOffAddr#
-  indexIntOffAddr#
-  indexFloatOffAddr#
-  indexDoubleOffAddr#
-  indexAddrOffAddr#
+--  indexOffAddr#
+indexCharOffAddr#
+indexIntOffAddr#
+indexFloatOffAddr#
+indexDoubleOffAddr#
+indexAddrOffAddr#
   
   writeArray#
   writeCharArray#

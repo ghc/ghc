@@ -1,13 +1,15 @@
 %
 % (c) The AQUA Project, Glasgow University, 1994-1996
 %
-
 \section[ArrBase]{Module @ArrBase@}
+
+Array implementation, @ArrBase@ exports the basic array
+types and operations.
 
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
 
-module  ArrBase where
+module ArrBase where
 
 import {-# SOURCE #-}	IOBase	( error )
 import Ix
@@ -52,6 +54,9 @@ data Ix ix => Array ix elt		= Array     	   (ix,ix) (Array# elt)
 data Ix ix => ByteArray ix      	= ByteArray	   (ix,ix) ByteArray#
 data Ix ix => MutableArray     s ix elt = MutableArray     (ix,ix) (MutableArray# s elt)
 data Ix ix => MutableByteArray s ix     = MutableByteArray (ix,ix) (MutableByteArray# s)
+
+-- A one-element mutable array:
+type MutableVar s a = MutableArray s Int a
 \end{code}
 
 
@@ -93,10 +98,10 @@ arrEleBottom = error "(Array.!): undefined array element"
 
 fill_it_in :: Ix ix => MutableArray s ix elt -> [(ix, elt)] -> ST s ()
 fill_it_in arr lst
-  = foldr fill_one_in (returnStrictlyST ()) lst
+  = foldr fill_one_in (returnST ()) lst
   where  -- **** STRICT **** (but that's OK...)
     fill_one_in (i, v) rst
-      = writeArray arr i v `seqStrictlyST` rst
+      = writeArray arr i v `seqST` rst
 
 -----------------------------------------------------------------------
 -- these also go better with magic: (//), accum, accumArray
@@ -104,9 +109,9 @@ fill_it_in arr lst
 old_array // ivs
   = runST (
 	-- copy the old array:
-	thawArray old_array		    `thenStrictlyST` \ arr ->	
+	thawArray old_array		    `thenST` \ arr ->	
 	-- now write the new elements into the new array:
-	fill_it_in arr ivs		    `seqStrictlyST`
+	fill_it_in arr ivs		    `seqST`
 	freezeArray arr
     )
   where
@@ -116,17 +121,17 @@ zap_with_f :: Ix ix => (elt -> elt2 -> elt) -> MutableArray s ix elt -> [(ix,elt
 -- zap_with_f: reads an elem out first, then uses "f" on that and the new value
 
 zap_with_f f arr lst
-  = foldr zap_one (returnStrictlyST ()) lst
+  = foldr zap_one (returnST ()) lst
   where
     zap_one (i, new_v) rst
-      = readArray  arr i		 `thenStrictlyST`  \ old_v ->
-	writeArray arr i (f old_v new_v) `seqStrictlyST`
+      = readArray  arr i		 `thenST`  \ old_v ->
+	writeArray arr i (f old_v new_v) `seqST`
 	rst
 
 accum f old_array ivs
   = runST (
 	-- copy the old array:
-	thawArray old_array		    `thenStrictlyST` \ arr ->	
+	thawArray old_array		    `thenST` \ arr ->	
 
 	-- now zap the elements in question with "f":
 	zap_with_f f arr ivs		>>
@@ -448,7 +453,7 @@ freezeArray (MutableArray ixs@(ix_start, ix_end) arr#) = ST $ \ (S# s#) ->
 	copy cur# end# from# to# s#
 	  | cur# ==# end#
 	    = StateAndMutableArray# s# to#
-	  | True
+	  | otherwise
 	    = case readArray#  from# cur#     s#  of { StateAndPtr# s1# ele ->
 	      case writeArray# to#   cur# ele s1# of { s2# ->
 	      copy (cur# +# 1#) end# from# to# s2#
@@ -481,7 +486,7 @@ freezeCharArray (MutableByteArray ixs@(ix_start, ix_end) arr#) = ST $ \ (S# s#) 
 	copy cur# end# from# to# s#
 	  | cur# ==# end#
 	    = StateAndMutableByteArray# s# to#
-	  | True
+	  | otherwise
 	    = case (readCharArray#  from# cur#     s#)  of { StateAndChar# s1# ele ->
 	      case (writeCharArray# to#   cur# ele s1#) of { s2# ->
 	      copy (cur# +# 1#) end# from# to# s2#
@@ -514,7 +519,7 @@ freezeIntArray (MutableByteArray ixs@(ix_start, ix_end) arr#) = ST $ \ (S# s#) -
 	copy cur# end# from# to# s#
 	  | cur# ==# end#
 	    = StateAndMutableByteArray# s# to#
-	  | True
+	  | otherwise
 	    = case (readIntArray#  from# cur#     s#)  of { StateAndInt# s1# ele ->
 	      case (writeIntArray# to#   cur# ele s1#) of { s2# ->
 	      copy (cur# +# 1#) end# from# to# s2#
@@ -547,7 +552,7 @@ freezeAddrArray (MutableByteArray ixs@(ix_start, ix_end) arr#) = ST $ \ (S# s#) 
 	copy cur# end# from# to# s#
 	  | cur# ==# end#
 	    = StateAndMutableByteArray# s# to#
-	  | True
+	  | otherwise
 	    = case (readAddrArray#  from# cur#     s#)  of { StateAndAddr# s1# ele ->
 	      case (writeAddrArray# to#   cur# ele s1#) of { s2# ->
 	      copy (cur# +# 1#) end# from# to# s2#
@@ -580,7 +585,7 @@ freezeFloatArray (MutableByteArray ixs@(ix_start, ix_end) arr#) = ST $ \ (S# s#)
 	copy cur# end# from# to# s#
 	  | cur# ==# end#
 	    = StateAndMutableByteArray# s# to#
-	  | True
+	  | otherwise
 	    = case (readFloatArray#  from# cur#     s#)  of { StateAndFloat# s1# ele ->
 	      case (writeFloatArray# to#   cur# ele s1#) of { s2# ->
 	      copy (cur# +# 1#) end# from# to# s2#
@@ -613,7 +618,7 @@ freezeDoubleArray (MutableByteArray ixs@(ix_start, ix_end) arr#) = ST $ \ (S# s#
 	copy cur# end# from# to# s#
 	  | cur# ==# end#
 	    = StateAndMutableByteArray# s# to#
-	  | True
+	  | otherwise
 	    = case (readDoubleArray#  from# cur#     s#)  of { StateAndDouble# s1# ele ->
 	      case (writeDoubleArray# to#   cur# ele s1#) of { s2# ->
 	      copy (cur# +# 1#) end# from# to# s2#
@@ -670,7 +675,7 @@ thawArray (Array ixs@(ix_start, ix_end) arr#) = ST $ \ (S# s#) ->
 	copy cur# end# from# to# s#
 	  | cur# ==# end#
 	    = StateAndMutableArray# s# to#
-	  | True
+	  | otherwise
 	    = case indexArray#  from# cur#       of { Lift ele ->
 	      case writeArray# to#   cur# ele s# of { s1# ->
 	      copy (cur# +# 1#) end# from# to# s1#

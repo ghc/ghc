@@ -12,9 +12,12 @@ We cannot define these functions in a module where they might be used
 with what the typechecker figures out.
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
 module GHCerr where
 
-import Prelude
+--import Prelude
+import PrelBase
+import PrelList ( span )
 import IOBase
 
 ---------------------------------------------------------------
@@ -27,13 +30,20 @@ augment = error "GHCbase.augment"
 --{-# GENERATE_SPECS build a #-}
 --build 		:: ((a -> [a] -> [a]) -> [a] -> [a]) -> [a]
 --build g 	= g (:) []
+\end{code}
 
 
----------------------------------------------------------------
--- Used for compiler-generated error message;
--- encoding saves bytes of string junk.
+Used for compiler-generated error message;
+encoding saves bytes of string junk.
 
+\begin{code}
 absentErr, parError :: a
+
+absentErr = error "Oops! The program has entered an `absent' argument!\n"
+parError  = error "Oops! Entered GHCerr.parError (a GHC bug -- please report it!)\n"
+\end{code}
+
+\begin{code}
 irrefutPatError
  , noDefaultMethodError
  , noExplicitMethodError
@@ -42,31 +52,43 @@ irrefutPatError
  , recConError
  , recUpdError :: String -> a
 
-absentErr = error "Oops! The program has entered an `absent' argument!\n"
-parError  = error "Oops! Entered GHCerr.parError (a GHC bug -- please report it!)\n"
-
 noDefaultMethodError     s = error ("noDefaultMethodError:"++s)
 noExplicitMethodError    s = error ("No default method for class operation "++s)
+irrefutPatError		 s = error (untangle s "Irrefutable pattern failed for pattern")
+nonExhaustiveGuardsError s = error (untangle s "Non-exhaustive guards in")
+patError 		 s = error (untangle s "Non-exhaustive patterns in")
+recConError 		 s = error (untangle s "Missing field in record construction:")
+recUpdError 		 s = error (untangle s "Record to doesn't contain field(s) to be updated")
+\end{code}
 
-irrefutPatError s	    = patError__ (untangle s "irrefutable pattern")
-nonExhaustiveGuardsError s  = patError__ (untangle s "non-exhaustive guards")
-patError s		    = patError__ (untangle s "pattern-matching")
 
-patError__ = error__ (\ x -> _ccall_ PatErrorHdrHook x)
+(untangle coded message) expects "coded" to be of the form 
 
-recConError s = error (untangle s "record constructor")
-recUpdError s = error (untangle s "record update")
+	"location|details"
 
-untangle coded in_str
-  =  "In "     ++ in_str
-  ++ (if null msg then "" else (": " ++ msg))
-  ++ "; at "   ++ file
-  ++ ", line " ++ line
+It prints
+
+	location message details
+
+\begin{code}
+untangle coded message
+  =  location
+  ++ ": " 
+  ++ message
+  ++ details
   ++ "\n"
   where
-    (file,line,msg)
-      = case (span not_bar coded) of { (f, (_:rest)) ->
-	case (span not_bar rest)  of { (l, (_:m)) ->
-	(f,l,m) }}
+    (location, details)
+      = case (span not_bar coded) of { (location, rest) ->
+	case rest of
+	  ('|':details) -> (location, ' ' : details)
+	  _	        -> (location, "")
+	}
     not_bar c = c /= '|'
 \end{code}
+
+-- This local variant of "error" calls PatErrorHdrHook instead of ErrorHdrHook,
+-- but the former does exactly the same as the latter, so I nuked it.
+--		SLPJ Jan 97
+-- patError__ = error__ (\ x -> _ccall_ PatErrorHdrHook x)
+

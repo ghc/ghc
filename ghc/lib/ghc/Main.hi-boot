@@ -10,4 +10,4 @@ _interface_ Main 1
 _exports_
 Main main ;
 _declarations_
-1 main :: IOBase.IO PrelBase.();;
+1 main _:_ IOBase.IO PrelBase.();;

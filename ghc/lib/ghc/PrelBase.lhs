@@ -7,7 +7,11 @@
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
 
-module PrelBase where
+module PrelBase(
+	module PrelBase,
+	module GHC		-- Re-export GHC, to avoid lots of people having
+				-- to import it explicitly
+  ) where
 
 import {-# SOURCE #-}	IOBase	( error )	
 import GHC
@@ -148,11 +152,7 @@ class  Show a  where
     showsPrec :: Int -> a -> ShowS
     showList  :: [a] -> ShowS
 
-    showList [] = showString "[]"
-    showList (x:xs)
-                = showChar '[' . shows x . showl xs
-                  where showl []     = showChar ']'
-                        showl (x:xs) = showString ", " . shows x . showl xs
+    showList ls = showList__ (showsPrec 0) ls 
 \end{code}
 
 %*********************************************************
@@ -168,8 +168,7 @@ data [] a = [] | a : [a]  -- do explicitly: deriving (Eq, Ord)
 instance (Eq a) => Eq [a]  where
     []     == []     = True	
     (x:xs) == (y:ys) = x == y && xs == ys
-    []     == ys     = False			
-    xs     == []     = False			
+    xs     == ys     = False			
     xs     /= ys     = if (xs == ys) then False else True
 
 instance (Ord a) => Ord [a] where
@@ -195,6 +194,7 @@ instance Functor [] where
 
 instance  Monad []  where
     m >>= k             = foldr ((++) . k) [] m
+    m >> k              = foldr ((++) . (\ _ -> k)) [] m
     return x            = [x]
 
 instance  MonadZero []  where
@@ -205,7 +205,7 @@ instance  MonadPlus []  where
 
 instance  (Show a) => Show [a]  where
     showsPrec p         = showList
-    showList		= showList__ (showsPrec 0)
+    showList  ls	= showList__ (showsPrec 0) ls
 \end{code}
 
 \end{code}
@@ -253,9 +253,12 @@ dropWhile p xs@(x:xs')
 The type @Void@ is built in, but it needs a @Show@ instance.
 
 \begin{code}
+void :: Void
+void = error "You tried to evaluate void"
+
 instance  Show Void  where
     showsPrec p f  =  showString "<<void>>"
-    showList	   = showList__ (showsPrec 0)
+    showList ls    = showList__ (showsPrec 0) ls
 \end{code}
 
 
@@ -272,8 +275,8 @@ data  Bool  =  False | True	deriving (Eq, Ord, Enum, Bounded, Show {- Read -})
 
 (&&), (||)		:: Bool -> Bool -> Bool
 True  && x		=  x
-False && _		=  False
-True  || _		=  True
+False && x		=  False
+True  || x		=  True
 False || x		=  x
 
 not			:: Bool -> Bool
@@ -294,6 +297,10 @@ otherwise 		=  True
 \begin{code}
 data  Maybe a  =  Nothing | Just a	deriving (Eq, Ord, Show {- Read -})
 
+maybe :: b -> (a -> b) -> Maybe a -> b
+maybe n f Nothing  = n
+maybe n f (Just x) = f x
+
 instance  Functor Maybe  where
     map f Nothing       = Nothing
     map f (Just a)      = Just (f a)
@@ -301,6 +308,10 @@ instance  Functor Maybe  where
 instance  Monad Maybe  where
     (Just x) >>= k      = k x
     Nothing  >>= k      = Nothing
+
+    (Just x) >>  k      = k
+    Nothing  >>  k      = Nothing
+
     return              = Just
 
 instance  MonadZero Maybe  where
@@ -328,7 +339,6 @@ it here seems more direct.
 \begin{code}
 data  ()  =  ()  --easier to do explicitly: deriving (Eq, Ord, Enum, Show, Bounded)
 		 -- (avoids weird-named functions, e.g., con2tag_()#
-
 instance Eq () where
     () == () = True
     () /= () = False
@@ -357,6 +367,7 @@ instance Bounded () where
 
 instance  Show ()  where
     showsPrec p () = showString "()"
+    showList ls    = showList__ (showsPrec 0) ls
 \end{code}
 
 %*********************************************************
@@ -398,11 +409,12 @@ data Char = C# Char#	deriving (Eq, Ord)
 
 instance  Enum Char  where
     toEnum   (I# i) | i >=# 0# && i <=# 255# =  C# (chr# i)
-		    | otherwise = error "Prelude.Enum.Char.toEnum:out of range"
+		    | otherwise = error ("Prelude.Enum.Char.toEnum:out of range: " ++ show (I# i))
     fromEnum (C# c)     	 =  I# (ord# c)
 
     enumFrom (C# c)			   =  eftt (ord# c)  1# 		  255#
     enumFromThen (C# c1) (C# c2)	   =  eftt (ord# c1) (ord# c2 -# ord# c1) 255#
+    enumFromTo (C# c1) (C# c2)             =  eftt (ord# c1) 1#                   (ord# c2)
     enumFromThenTo (C# c1) (C# c2) (C# c3) =  eftt (ord# c1) (ord# c2 -# ord# c1) (ord# c3)
 
 eftt :: Int# -> Int# -> Int# -> [Char]
@@ -428,9 +440,10 @@ instance  Show Char  where
 
 
 \begin{code}
-isAscii, isControl, isPrint, isSpace, isUpper,
+isAscii, isLatin1, isControl, isPrint, isSpace, isUpper,
  isLower, isAlpha, isDigit, isOctDigit, isHexDigit, isAlphanum :: Char -> Bool
 isAscii c	 	=  fromEnum c < 128
+isLatin1 c              =  c <= '\xff'
 isControl c		=  c < ' ' || c >= '\DEL' && c <= '\x9f'
 isPrint c		=  not (isControl c)
 
@@ -455,19 +468,19 @@ isUpper c		=  c >= 'A' && c <= 'Z' ||
 isLower c		=  c >= 'a' && c <= 'z' ||
                            c >= '\xDF' && c <= '\xF6' ||
                            c >= '\xF8' && c <= '\xFF'
-isAlpha c		=  isUpper c || isLower c
+isAlpha c		=  isLower c || isUpper c
 isDigit c		=  c >= '0' && c <= '9'
 isOctDigit c		=  c >= '0' && c <= '7'
 isHexDigit c		=  isDigit c || c >= 'A' && c <= 'F' ||
                                         c >= 'a' && c <= 'f'
 isAlphanum c		=  isAlpha c || isDigit c
 
--- These almost work for ISO-Latin-1 (except for =DF <-> =FF)
+-- Case-changing operations
 
 toUpper, toLower	:: Char -> Char
-toUpper c | isLower c	=  toEnum (fromEnum c - fromEnum 'a'
-                                              + fromEnum 'A')
-	  | otherwise	=  c
+toUpper c | isLower c	&& c /= '\xDF' && c /= '\xFF'
+ =  toEnum (fromEnum c - fromEnum 'a' + fromEnum 'A')
+  | otherwise	=  c
 
 toLower c | isUpper c	=  toEnum (fromEnum c - fromEnum 'A' 
                                               + fromEnum 'a')
@@ -491,19 +504,22 @@ asciiTab = -- Using an array drags in the array module.  listArray ('\NUL', ' ')
 data Int = I# Int#
 
 instance Eq Int where
-    (I# x) == (I# y) = x ==# y
+    (==) x y = x `eqInt` y
+    (/=) x y = x `neInt` y
 
 instance Ord Int where
-    (I# x) `compare` (I# y) | x <# y    = LT
-			    | x ==# y   = EQ
-			    | otherwise = GT
+    compare x y = compareInt x y 
 
-    (I# x) <  (I# y) = x <#  y
-    (I# x) <= (I# y) = x <=# y
-    (I# x) >= (I# y) = x >=# y
-    (I# x) >  (I# y) = x >#  y
+    (<)  x y = ltInt x y
+    (<=) x y = leInt x y
+    (>=) x y = geInt x y
+    (>)  x y = gtInt x y
+    max x y = case (compareInt x y) of { LT -> y ; EQ -> x ; GT -> x }
+    min x y = case (compareInt x y) of { LT -> x ; EQ -> x ; GT -> y }
 
-
+(I# x) `compareInt` (I# y) | x <# y    = LT
+			   | x ==# y   = EQ
+			   | otherwise = GT
 
 instance  Enum Int  where
     toEnum   x = x
@@ -523,6 +539,7 @@ instance  Enum Int  where
 	                    where en' m n = m : en' (m `plusInt` n) n
     enumFromThenTo n m p =  takeWhile (if m >= n then (<= p) else (>= p))
 				      (enumFromThen n m)
+
 
 instance  Bounded Int where
     minBound =  negate 2147483647   -- **********************
@@ -546,7 +563,7 @@ instance  Num Int  where
 
 instance  Show Int  where
     showsPrec p n = showSignedInt p n
-    showList      = showList__ (showsPrec 0) 
+    showList ls   = showList__ (showsPrec 0)  ls
 \end{code}
 
 
@@ -576,7 +593,8 @@ data Integer	= J# Int# Int# ByteArray#
 \begin{code}
 instance  Show (a -> b)  where
     showsPrec p f  =  showString "<<function>>"
-    showList	   = showList__ (showsPrec 0)
+    showList ls	   = showList__ (showsPrec 0) ls
+
 
 -- identity function
 id			:: a -> a
@@ -624,6 +642,7 @@ asTypeOf		=  const
 \begin{code}
 data Addr = A# Addr# 	deriving (Eq, Ord) -- Glasgow extension
 data Word = W# Word# 	deriving (Eq, Ord) -- Glasgow extension
+data ForeignObj = ForeignObj ForeignObj#   -- another one
 
 data Lift a = Lift a
 {-# GENERATE_SPECS data a :: Lift a #-}
@@ -727,6 +746,9 @@ Definitions of the boxed PrimOps; these will be
 used in the case of partial applications, etc.
 
 \begin{code}
+{-# INLINE eqInt #-}
+{-# INLINE neInt #-}
+
 plusInt	(I# x) (I# y) = I# (x +# y)
 minusInt(I# x) (I# y) = I# (x -# y)
 timesInt(I# x) (I# y) = I# (x *# y)
