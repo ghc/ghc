@@ -39,9 +39,12 @@ module Text.ParserCombinators.ReadP
   skipSpaces, -- :: ReadP ()
   choice,     -- :: [ReadP a] -> ReadP a
   
-  -- * Conversions
+  -- * Running a parser
   readP_to_S, -- :: ReadP a -> ReadS a
   readS_to_P, -- :: ReadS a -> ReadP a
+  
+  -- * Properties
+  -- $properties
   )
  where
 
@@ -146,12 +149,17 @@ run _            _     = []
 -- Operations over ReadP
 
 get :: ReadP Char
+-- ^ Consumes and returns the next character.
+--   Fails if there is no input left.
 get = R Get
 
 look :: ReadP String
+-- ^ Look-ahead: returns the part of the input that is left, without
+--   consuming it.
 look = R Look
 
 pfail :: ReadP a
+-- ^ Always fails.
 pfail = R (\_ -> Fail)
 
 (+++) :: ReadP a -> ReadP a -> ReadP a
@@ -168,7 +176,7 @@ R f <++ q =
  where
   probe (Get f)        (c:s) n = probe (f c) s (n+#1#)
   probe (Look f)       s     n = probe (f s) s n
-  probe p@(Result _ _) s     n = discard n >> R (p >>=)
+  probe p@(Result _ _) _     n = discard n >> R (p >>=)
   probe (Final r)      _     _ = R (Final r >>=)
   probe _              _     _ = q
 
@@ -193,19 +201,24 @@ gather (R m) =
 -- Derived operations
 
 satisfy :: (Char -> Bool) -> ReadP Char
+-- ^ Consumes and returns the next character, if it satisfies the
+--   specified predicate.
 satisfy p = do c <- get; if p c then return c else pfail
 
 char :: Char -> ReadP Char
+-- ^ Parses and returns the specified character.
 char c = satisfy (c ==)
 
 string :: String -> ReadP String
-string s = scan s
+-- ^ Parses and returns the specified string.
+string this = do s <- look; scan this s
  where
-  scan []     = do return s
-  scan (c:cs) = do char c; scan cs
+  scan []     _               = do return this
+  scan (x:xs) (y:ys) | x == y = do get; scan xs ys
+  scan _      _               = do pfail
 
 munch :: (Char -> Bool) -> ReadP String
--- (munch p) parses the first zero or more characters satisfying p
+-- ^ Parses the first zero or more characters satisfying the predicate.
 munch p =
   do s <- look
      scan s
@@ -214,17 +227,19 @@ munch p =
   scan _            = do return ""
 
 munch1 :: (Char -> Bool) -> ReadP String
--- (munch p) parses the first one or more characters satisfying p
+-- ^ Parses the first one or more characters satisfying the predicate.
 munch1 p =
   do c <- get
      if p c then do s <- munch p; return (c:s) else pfail
 
 choice :: [ReadP a] -> ReadP a
+-- ^ Combines all parsers in the specified list.
 choice []     = pfail
 choice [p]    = p
 choice (p:ps) = p +++ choice ps
 
 skipSpaces :: ReadP ()
+-- ^ Skips all whitespace.
 skipSpaces =
   do s <- look
      skip s
@@ -236,53 +251,106 @@ skipSpaces =
 -- Converting between ReadP and Read
 
 readP_to_S :: ReadP a -> ReadS a
+-- ^ Converts a parser into a Haskell ReadS-style function.
+--   This is the main way in which you can \"run\" a 'ReadP' parser:
+--   the expanded type is
+-- @ readP_to_S :: ReadP a -> String -> [(String,String)] @
 readP_to_S (R f) = run (f return)
 
 readS_to_P :: ReadS a -> ReadP a
+-- ^ Converts a Haskell ReadS-style function into a parser.
+--   Warning: This introduces local backtracking in the resulting
+--   parser, and therefore a possible inefficiency.
 readS_to_P r =
   R (\k -> Look (\s -> final [bs'' | (a,s') <- r s, bs'' <- run (k a) s']))
 
 -- ---------------------------------------------------------------------------
--- QuickCheck properties that are supposed to hold
+-- QuickCheck properties that hold for the combinators
 
-{-
-type Bag a = [a]
+{- $properties
+The following are QuickCheck specifications of what the combinators do.
+These can be seen as formal specifications of the behavior of the
+combinators.
 
-(=~) :: Ord a => Bag a -> Bag a -> Bool
-xs =~ ys = sort xs == sort ys
+We use bags to give semantics to the combinators.
+@
+  type Bag a = [a]
+@
+Equality on bags does not care about the order of elements.
+@
+  (=~) :: Ord a => Bag a -> Bag a -> Bool
+  xs =~ ys = sort xs == sort ys
+@
+A special equality operator to avoid unresolved overloading
+when testing the properties.
+@
+  (=~.) :: Bag (Int,String) -> Bag (Int,String) -> Bool
+  (=~.) = (=~)
+@
+Here follow the properties:
+@
+  prop_Get_Nil =
+    readP_to_S get [] =~ []
 
-prop_Get_Nil =
-  readP_to_S get [] =~ []
-  
-prop_Get_Cons c s =
-  readP_to_S get (c:s) =~ [(c,s)]
-  
-prop_Look s =
-  readP_to_S look s =~ [(s,s)]
-  
-prop_Fail s =
-  readP_to_S pfail s =~ ([] :: Bag (Int,String))
-  
-prop_Return x s =
-  readP_to_S (return x) s =~ ([(x,s)] :: Bag (Int,String))
-  
-prop_ReadS r s =
-  readP_to_S (readS_to_P r) s =~ (r s :: Bag (Int,String))
-  
-prop_Bind p k s =
-  readP_to_S ((p :: ReadP Int) >>= k) s =~
-    ([ ys'' | (x,s') <- readP_to_S p s, ys'' <- readP_to_S (k x) s' ]
-      :: Bag (Int,String)
-      )
+  prop_Get_Cons c s =
+    readP_to_S get (c:s) =~ [(c,s)]
 
-prop_Plus p q s =
-  readP_to_S ((p :: ReadP Int) +++ q) s =~
-    (readP_to_S p s ++ readP_to_S q s)
+  prop_Look s =
+    readP_to_S look s =~ [(s,s)]
 
-prop_LeftPlus p q s =
-  readP_to_S ((p :: ReadP Int) <++ q) s =~
-    (readP_to_S p s +<+ readP_to_S q s)
- where
-  [] +<+ ys = ys
-  xs +<+ _  = xs
+  prop_Fail s =
+    readP_to_S pfail s =~. []
+
+  prop_Return x s =
+    readP_to_S (return x) s =~. [(x,s)]
+
+  prop_Bind p k s =
+    readP_to_S (p >>= k) s =~.
+      [ ys''
+      | (x,s') <- readP_to_S p s
+      , ys''   <- readP_to_S (k (x::Int)) s'
+      ]
+
+  prop_Plus p q s =
+    readP_to_S (p +++ q) s =~.
+      (readP_to_S p s ++ readP_to_S q s)
+
+  prop_LeftPlus p q s =
+    readP_to_S (p <++ q) s =~.
+      (readP_to_S p s +<+ readP_to_S q s)
+   where
+    [] +<+ ys = ys
+    xs +<+ _  = xs
+
+  prop_Gather s =
+    forAll readPWithoutReadS $ \p -> 
+      readP_to_S (gather p) s =~
+        [ ((pre,x::Int),s')
+        | (x,s') <- readP_to_S p s
+        , let pre = take (length s - length s') s
+        ]
+
+  prop_String_Yes this s =
+    readP_to_S (string this) (this ++ s) =~
+      [(this,s)]
+
+  prop_String_Maybe this s =
+    readP_to_S (string this) s =~
+      [(this, drop (length this) s) | this `isPrefixOf` s]
+
+  prop_Munch p s =
+    readP_to_S (munch p) s =~
+      [(takeWhile p s, dropWhile p s)]
+
+  prop_Munch1 p s =
+    readP_to_S (munch1 p) s =~
+      [(res,s') | let (res,s') = (takeWhile p s, dropWhile p s), not (null res)]
+
+  prop_Choice ps s =
+    readP_to_S (choice ps) s =~.
+      readP_to_S (foldr (+++) pfail ps) s
+
+  prop_ReadS r s =
+    readP_to_S (readS_to_P r) s =~. r s
+@
 -}
