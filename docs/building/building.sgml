@@ -3653,9 +3653,6 @@ extra-bin/
   perl56.dll
 gcc-lib/
   Mingwin gcc binaries, libraries and headers
-imports/
-  com/
-    imports for HDirect's com library
 include/
   Mingwin includes
 </screen>
