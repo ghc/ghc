@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.4 1999/01/15 17:57:04 simonm Exp $
+ * $Id: Updates.h,v 1.5 1999/01/18 15:21:42 simonm Exp $
  *
  * Definitions related to updates.
  *
@@ -38,7 +38,7 @@ extern void awaken_blocked_queue(StgTSO *q);
 
 #define AWAKEN_BQ(closure)						\
      	if (closure->header.info == &BLACKHOLE_BQ_info) {		\
-		StgTSO *bq = ((StgBlackHole *)closure)->blocking_queue;	\
+		StgTSO *bq = ((StgBlockingQueue *)closure)->blocking_queue;\
 		if (bq != (StgTSO *)&END_TSO_QUEUE_closure) {		\
 			STGCALL1(awaken_blocked_queue, bq);		\
 		}							\

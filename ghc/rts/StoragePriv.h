@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.3 1999/01/13 17:25:48 simonm Exp $
+ * $Id: StoragePriv.h,v 1.4 1999/01/18 15:21:40 simonm Exp $
  *
  * Internal Storage Manger Interface
  *
@@ -63,12 +63,6 @@ typedef struct _step {
   StgPtr  scan;			/* scan pointer in current block */
   bdescr *new_large_objects;    /* large objects collected so far */
   bdescr *scavenged_large_objects; /* live large objects after GC (dbl link) */
-
-#ifdef DEBUG
-  /* for sanity checking: */
-  bdescr *old_scan_bd;
-  StgPtr  old_scan;
-#endif
 } step;
 
 typedef struct _generation {
@@ -77,6 +71,9 @@ typedef struct _generation {
   nat n_steps;			/* number of steps */
   nat max_blocks;		/* max blocks in step 0 */
   StgMutClosure *mut_list;      /* mutable objects in this generation (not G0)*/
+
+  /* temporary use during GC: */
+  StgMutClosure *saved_mut_list;
 
   /* stats information */
   nat collections;

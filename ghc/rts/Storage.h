@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.3 1999/01/13 17:25:48 simonm Exp $
+ * $Id: Storage.h,v 1.4 1999/01/18 15:21:40 simonm Exp $
  *
  * External Storage Manger Interface
  *
@@ -117,7 +117,7 @@ updateWithIndirection(StgClosure *p1, StgClosure *p2)
 
    -------------------------------------------------------------------------- */
 
-StgCAF* enteredCAFs;
+extern StgCAF* enteredCAFs;
 
 #endif STORAGE_H
 

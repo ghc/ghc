@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.5 1999/01/15 17:57:11 simonm Exp $
+ * $Id: StgMiscClosures.hc,v 1.6 1999/01/18 15:21:39 simonm Exp $
  *
  * Entry code for various built-in closure types.
  *
@@ -9,6 +9,8 @@
 #include "RtsUtils.h"
 #include "StgMiscClosures.h"
 #include "HeapStackCheck.h"   /* for stg_gen_yield */
+#include "Storage.h"
+#include "StoragePriv.h"
 
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
@@ -137,10 +139,12 @@ STGFUN(BLACKHOLE_entry)
 {
   FB_
     /* Change the BLACKHOLE into a BLACKHOLE_BQ */
-    ((StgBlackHole *)R1.p)->header.info = &BLACKHOLE_BQ_info;
+    ((StgBlockingQueue *)R1.p)->header.info = &BLACKHOLE_BQ_info;
     /* Put ourselves on the blocking queue for this black hole */
     CurrentTSO->link = (StgTSO *)&END_TSO_QUEUE_closure;
-    ((StgBlackHole *)R1.p)->blocking_queue = CurrentTSO;
+    ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
+    ((StgBlockingQueue *)R1.p)->mut_link = NULL;
+    recordMutable((StgMutClosure *)R1.cl);
 
     /* stg_gen_block is too heavyweight, use a specialised one */
     BLOCK_NP(1);
@@ -152,8 +156,8 @@ STGFUN(BLACKHOLE_BQ_entry)
 {
   FB_
     /* Put ourselves on the blocking queue for this black hole */
-    CurrentTSO->link = ((StgBlackHole *)R1.p)->blocking_queue;
-    ((StgBlackHole *)R1.p)->blocking_queue = CurrentTSO;
+    CurrentTSO->link = ((StgBlockingQueue *)R1.p)->blocking_queue;
+    ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
 
     /* stg_gen_block is too heavyweight, use a specialised one */
     BLOCK_NP(1);
@@ -166,10 +170,12 @@ STGFUN(CAF_BLACKHOLE_entry)
 {
   FB_
     /* Change the BLACKHOLE into a BLACKHOLE_BQ */
-    ((StgBlackHole *)R1.p)->header.info = &BLACKHOLE_BQ_info;
+    ((StgBlockingQueue *)R1.p)->header.info = &BLACKHOLE_BQ_info;
     /* Put ourselves on the blocking queue for this black hole */
     CurrentTSO->link = (StgTSO *)&END_TSO_QUEUE_closure;
-    ((StgBlackHole *)R1.p)->blocking_queue = CurrentTSO;
+    ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
+    ((StgBlockingQueue *)R1.p)->mut_link = NULL;
+    recordMutable((StgMutClosure *)R1.cl);
 
     /* stg_gen_block is too heavyweight, use a specialised one */
     BLOCK_NP(1);
@@ -345,6 +351,7 @@ FN_(dummy_ret_entry)
   ret_addr = Sp[0];
   Sp++;
   JMP_(ENTRY_CODE(ret_addr));
+  FE_
 }
 SET_STATIC_HDR(dummy_ret_closure,dummy_ret_info,CCS_DONTZuCARE,,EI_)
 };

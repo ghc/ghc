@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.10 1999/01/18 12:23:04 simonm Exp $
+ * $Id: GC.c,v 1.11 1999/01/18 15:21:37 simonm Exp $
  *
  * Two-space garbage collector
  *
@@ -250,21 +250,11 @@ void GarbageCollect(void (*get_roots)(void))
       step->to_blocks = 0;
       step->new_large_objects = NULL;
       step->scavenged_large_objects = NULL;
-#ifdef DEBUG
-      /* retain these so we can sanity-check later on */
-      step->old_scan    = step->scan;
-      step->old_scan_bd = step->scan_bd;
-#endif
     }
   }
 
   /* -----------------------------------------------------------------------
-   * follow all the roots that the application knows about.
-   */
-  evac_gen = 0;
-  get_roots();
-
-  /* follow all the roots that we know about:
+   * follow all the roots that we know about:
    *   - mutable lists from each generation > N
    * we want to *scavenge* these roots, not evacuate them: they're not
    * going to move in this GC.
@@ -277,23 +267,26 @@ void GarbageCollect(void (*get_roots)(void))
    */
   { 
     StgMutClosure *tmp, **pp;
-    for (g = RtsFlags.GcFlags.generations-1; g > N; g--) {
-      /* the act of scavenging the mutable list for this generation
-       * might place more objects on the mutable list itself.  So we
-       * place the current mutable list in a temporary, scavenge it,
-       * and then append it to the new list.
-       */
-      tmp = generations[g].mut_list;
+    for (g = N+1; g < RtsFlags.GcFlags.generations; g++) {
+      generations[g].saved_mut_list = generations[g].mut_list;
       generations[g].mut_list = END_MUT_LIST;
-      tmp = scavenge_mutable_list(tmp, g);
+    }
 
+    for (g = RtsFlags.GcFlags.generations-1; g > N; g--) {
+      tmp = scavenge_mutable_list(generations[g].saved_mut_list, g);
       pp = &generations[g].mut_list;
       while (*pp != END_MUT_LIST) {
 	   pp = &(*pp)->mut_link;
       }
       *pp = tmp;
     }
-  }  
+  }
+
+  /* follow all the roots that the application knows about.
+   */
+  evac_gen = 0;
+  get_roots();
+
   /* And don't forget to mark the TSO if we got here direct from
    * Haskell! */
   if (CurrentTSO) {
@@ -550,8 +543,8 @@ void GarbageCollect(void (*get_roots)(void))
   }
   for (g = N+1; g < RtsFlags.GcFlags.generations; g++) {
     for (s = 0; s < generations[g].n_steps; s++) {
-      IF_DEBUG(sanity, checkHeap(generations[g].steps[s].old_scan_bd,
-				 generations[g].steps[s].old_scan));
+      IF_DEBUG(sanity, checkHeap(generations[g].steps[s].blocks,
+				 generations[g].steps[s].blocks->start));
       IF_DEBUG(sanity, checkChain(generations[g].steps[s].large_objects));
     }
   }
@@ -710,7 +703,7 @@ static inline void addBlock(step *step)
 }
 
 static __inline__ StgClosure *
-copy(StgClosure *src, W_ size, bdescr *bd)
+copy(StgClosure *src, nat size, bdescr *bd)
 {
   step *step;
   P_ to, from, dest;
@@ -737,6 +730,35 @@ copy(StgClosure *src, W_ size, bdescr *bd)
   for(to = dest, from = (P_)src; size>0; --size) {
     *to++ = *from++;
   }
+  return (StgClosure *)dest;
+}
+
+/* Special version of copy() for when we only want to copy the info
+ * pointer of an object, but reserve some padding after it.  This is
+ * used to optimise evacuation of BLACKHOLEs.
+ */
+
+static __inline__ StgClosure *
+copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, bdescr *bd)
+{
+  step *step;
+  P_ dest, to, from;
+
+  step = bd->step->to;
+  if (step->gen->no < evac_gen) {
+    step = &generations[evac_gen].steps[0];
+  }
+
+  if (step->hp + size_to_reserve >= step->hpLim) {
+    addBlock(step);
+  }
+
+  dest = step->hp;
+  step->hp += size_to_reserve;
+  for(to = dest, from = (P_)src; size_to_copy>0; --size_to_copy) {
+    *to++ = *from++;
+  }
+  
   return (StgClosure *)dest;
 }
 
@@ -944,12 +966,14 @@ loop:
 
   case CAF_BLACKHOLE:
   case BLACKHOLE:
+    to = copyPart(q,BLACKHOLE_sizeW(),sizeofW(StgHeader),bd);
+    upd_evacuee(q,to);
+    return to;
+
   case BLACKHOLE_BQ:
-    /* ToDo: don't need to copy all the blackhole, some of it is
-     * just padding.
-     */
     to = copy(q,BLACKHOLE_sizeW(),bd); 
     upd_evacuee(q,to);
+    evacuate_mutable((StgMutClosure *)to);
     return to;
 
   case THUNK_SELECTOR:
@@ -1149,8 +1173,7 @@ loop:
       /* Large TSOs don't get moved, so no relocation is required.
        */
       if (size >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
-	evacuate_large((P_)q, rtsFalse);
-	tso->mut_link = NULL;	/* see below */
+	evacuate_large((P_)q, rtsTrue);
 	return q;
 
       /* To evacuate a small TSO, we need to relocate the update frame
@@ -1169,14 +1192,7 @@ loop:
 	relocate_TSO(tso, new_tso);
 	upd_evacuee(q,(StgClosure *)new_tso);
 
-	/* don't evac_mutable - these things are marked mutable as
-	 * required.  We *do* need to zero the mut_link field, though:
-	 * this TSO might have been on the mutable list for this
-	 * generation, but we're collecting this generation anyway so
-	 * we didn't follow the mutable list.
-	 */
-	new_tso->mut_link = NULL;
-
+	evacuate_mutable((StgMutClosure *)new_tso);
 	return (StgClosure *)new_tso;
       }
     }
@@ -1375,9 +1391,13 @@ scavenge(step *step)
 
     case BLACKHOLE_BQ:
       { 
-	StgBlackHole *bh = (StgBlackHole *)p;
+	StgBlockingQueue *bh = (StgBlockingQueue *)p;
 	(StgClosure *)bh->blocking_queue = 
 	  evacuate((StgClosure *)bh->blocking_queue);
+	if (failed_to_evac) {
+	  failed_to_evac = rtsFalse;
+	  evacuate_mutable((StgMutClosure *)bh);
+	}
 	p += BLACKHOLE_sizeW();
 	break;
       }
@@ -1548,14 +1568,6 @@ scavenge_one(StgPtr p)
   case CAF_BLACKHOLE:
   case BLACKHOLE:
       break;
-
-  case BLACKHOLE_BQ:
-    { 
-      StgBlackHole *bh = (StgBlackHole *)p;
-      (StgClosure *)bh->blocking_queue = 
-	evacuate((StgClosure *)bh->blocking_queue);
-      break;
-    }
 
   case THUNK_SELECTOR:
     { 
@@ -1744,6 +1756,15 @@ scavenge_mutable_list(StgMutClosure *p, nat gen)
       }
       continue;
       
+    case BLACKHOLE_BQ:
+      { 
+	StgBlockingQueue *bh = (StgBlockingQueue *)p;
+	(StgClosure *)bh->blocking_queue = 
+	  evacuate((StgClosure *)bh->blocking_queue);
+	prev = &p->mut_link;
+	break;
+      }
+
     default:
       /* shouldn't have anything else on the mutables list */
       barf("scavenge_mutable_object: non-mutable object?");
@@ -1913,19 +1934,29 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	  continue;
 	} else {
 	  bdescr *bd = Bdescr((P_)frame->updatee);
-	  ASSERT(type == BLACKHOLE || 
-		 type == CAF_BLACKHOLE ||
-		 type == BLACKHOLE_BQ);
 	  if (bd->gen->no > N) { 
 	    if (bd->gen->no < evac_gen) {
 	      failed_to_evac = rtsTrue;
 	    }
 	    continue;
 	  }
-	  to = copy(frame->updatee, BLACKHOLE_sizeW(), bd);
-	  upd_evacuee(frame->updatee,to);
-	  frame->updatee = to;
-	  continue;
+	  switch (type) {
+	  case BLACKHOLE:
+	  case CAF_BLACKHOLE:
+	    to = copyPart(frame->updatee, BLACKHOLE_sizeW(), 
+			  sizeofW(StgHeader), bd);
+	    upd_evacuee(frame->updatee,to);
+	    frame->updatee = to;
+	    continue;
+	  case BLACKHOLE_BQ:
+	    to = copy(frame->updatee, BLACKHOLE_sizeW(), bd);
+	    upd_evacuee(frame->updatee,to);
+	    frame->updatee = to;
+	    evacuate_mutable((StgMutClosure *)to);
+	    continue;
+	  default:
+	    barf("scavenge_stack: UPDATE_FRAME updatee");
+	  }
 	}
       }
 
@@ -2233,7 +2264,7 @@ static void
 threadLazyBlackHole(StgTSO *tso)
 {
   StgUpdateFrame *update_frame;
-  StgBlackHole *bh;
+  StgBlockingQueue *bh;
   StgPtr stack_end;
 
   stack_end = &tso->stack[tso->stack_size];
@@ -2247,7 +2278,7 @@ threadLazyBlackHole(StgTSO *tso)
       break;
 
     case UPDATE_FRAME:
-      bh = stgCast(StgBlackHole*,update_frame->updatee);
+      bh = (StgBlockingQueue *)update_frame->updatee;
 
       /* if the thunk is already blackholed, it means we've also
        * already blackholed the rest of the thunks on this stack,
@@ -2383,12 +2414,12 @@ threadSqueezeStack(StgTSO *tso)
 	/* Sigh.  It has one.  Don't lose those threads! */
 	  if (GET_INFO(updatee_keep) == BLACKHOLE_BQ_info) {
 	  /* Urgh.  Two queues.  Merge them. */
-	  P_ keep_tso = ((StgBlackHole *)updatee_keep)->blocking_queue;
+	  P_ keep_tso = ((StgBlockingQueue *)updatee_keep)->blocking_queue;
 	  
 	  while (keep_tso->link != END_TSO_QUEUE) {
 	    keep_tso = keep_tso->link;
 	  }
-	  keep_tso->link = ((StgBlackHole *)updatee_bypass)->blocking_queue;
+	  keep_tso->link = ((StgBlockingQueue *)updatee_bypass)->blocking_queue;
 
 	} else {
 	  /* For simplicity, just swap the BQ for the BH */
@@ -2416,7 +2447,7 @@ threadSqueezeStack(StgTSO *tso)
       /* Do lazy black-holing.
        */
       if (is_update_frame) {
-	StgBlackHole *bh = (StgBlackHole *)frame->updatee;
+	StgBlockingQueue *bh = (StgBlockingQueue *)frame->updatee;
 	if (bh->header.info != &BLACKHOLE_info
 	    && bh->header.info != &BLACKHOLE_BQ_info
 	    && bh->header.info != &CAF_BLACKHOLE_info

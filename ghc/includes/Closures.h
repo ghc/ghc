@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.3 1999/01/13 17:25:53 simonm Exp $
+ * $Id: Closures.h,v 1.4 1999/01/18 15:21:41 simonm Exp $
  *
  * Closures
  *
@@ -180,7 +180,8 @@ typedef struct StgCAF_ {
 typedef struct {
     StgHeader  header;
     struct StgTSO_ *blocking_queue;
-} StgBlackHole;
+    StgMutClosure *mut_link;
+} StgBlockingQueue;
 
 typedef struct {
     StgHeader  header;

@@ -1,6 +1,6 @@
 /* -*- mode: hugs-c; -*- */
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.3 1999/01/15 17:57:09 simonm Exp $
+ * $Id: Printer.c,v 1.4 1999/01/18 15:21:38 simonm Exp $
  *
  * Copyright (c) 1994-1998.
  *
@@ -141,7 +141,7 @@ void printClosure( StgClosure *obj )
         }
     case CAF_BLACKHOLE:
             fprintf(stderr,"CAF_BH("); 
-            printPtr((StgPtr)stgCast(StgBlackHole*,obj)->blocking_queue);
+            printPtr((StgPtr)stgCast(StgBlockingQueue*,obj)->blocking_queue);
             fprintf(stderr,")\n"); 
             break;
     case BLACKHOLE:
@@ -149,7 +149,7 @@ void printClosure( StgClosure *obj )
             break;
     case BLACKHOLE_BQ:
             fprintf(stderr,"BQ("); 
-            printPtr((StgPtr)stgCast(StgBlackHole*,obj)->blocking_queue);
+            printPtr((StgPtr)stgCast(StgBlockingQueue*,obj)->blocking_queue);
             fprintf(stderr,")\n"); 
             break;
     case CONSTR:

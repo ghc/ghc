@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.4 1999/01/15 17:57:03 simonm Exp $
+ * $Id: InfoTables.h,v 1.5 1999/01/18 15:21:42 simonm Exp $
  * 
  * Info Tables
  *
@@ -202,7 +202,7 @@ typedef enum {
 #define FLAGS_FOREIGN		   (_HNF|     _NS|              _UPT     )	
 #define FLAGS_WEAK		   (_HNF|     _NS|              _UPT     )	
 #define FLAGS_BLACKHOLE		   ( 	      _NS|              _UPT     )	
-#define FLAGS_BLACKHOLE_BQ	   ( 	      _NS|              _UPT     )	
+#define FLAGS_BLACKHOLE_BQ	   ( 	      _NS|         _MUT|_UPT     )	
 #define FLAGS_MVAR		   (_HNF|     _NS|         _MUT|_UPT     )	
 #define FLAGS_FETCH_ME		   (_HNF|     _NS                        )	
 #define FLAGS_TSO                  (_HNF|     _NS|         _MUT|_UPT     )
