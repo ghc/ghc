@@ -48,7 +48,7 @@ echo "*** Building compiler..."
 
 $MAKE -C glafp-utils boot all
 $MAKE -C ghc boot
-$MAKE -C libraries boot all
+$MAKE -C libraries boot all GhcBootLibs=YES
 $MAKE -C ghc all
 
 MAKEFLAGS=
@@ -86,8 +86,8 @@ $MAKE -C ghc/rts      boot && $MAKE -C ghc/rts      all
 # Now build a new set of libraries
 $MAKE -C libraries boot all
 
-# Build ghc/lib
-$MAKE -C ghc/lib clean && $MAKE -C ghc/lib boot all
+# Build all of ghc/lib
+$MAKE -C ghc/lib clean && $MAKE -C ghc/utils boot all
 
 # Build all of ghc/utils
 $MAKE -C ghc/utils clean && $MAKE -C ghc/utils boot all
