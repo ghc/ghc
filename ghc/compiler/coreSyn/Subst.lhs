@@ -60,7 +60,8 @@ import UniqSet		( elemUniqSet_Directly )
 import UniqSupply	( UniqSupply, uniqFromSupply, splitUniqSupply )
 import Var		( Var, Id, TyVar, isTyVar )
 import Outputable
-import PprCore		()	-- Instances
+import PprCore		()		-- Instances
+import UniqFM		( ufmToList )	-- Yuk (add a new op to VarEnv)
 import Util		( mapAccumL, foldl2, seqList, ($!) )
 \end{code}
 
@@ -168,7 +169,17 @@ data Subst = Subst InScopeSet		-- In scope
 	--
 	-- INVARIANT 2: No variable is both in scope and in the domain of the substitution
 	--		Equivalently, the substitution is idempotent
-	--
+	--	[Sep 2000: Lies, all lies.  The substitution now does contain
+	--		   mappings x77 -> DoneId x77 occ
+	--		   to record x's occurrence information.]
+	-- 	[Also watch out: the substitution can contain x77 -> DoneEx (Var x77)
+	--	 Consider let x = case k of I# x77 -> ... in
+	--		  let y = case k of I# x77 -> ... in ...
+	--	 and suppose the body is strict in both x and y.  Then the simplifier
+	--	 will pull the first (case k) to the top; so the second (case k) will
+	--	 cancel out, mapping x77 to, well, x77!  But one is an in-Id and the 
+	--	 other is an out-Id. So the substitution is idempotent in the sense
+	--	 that we *must not* repeatedly apply it.]
 
 type IdSubst    = Subst
 \end{code}
@@ -180,7 +191,7 @@ The general plan about the substitution and in-scope set for Ids is as follows
   That is added back in later.  So new_id is the minimal thing it's 
   correct to substitute.
 
-* substId adds a binding (DoneVar new_id occ) to the substitution if 
+* substId adds a binding (DoneId new_id occ) to the substitution if 
 	EITHER the Id's unique has changed
 	OR     the Id has interesting occurrence information
   So in effect you can only get to interesting occurrence information
@@ -321,6 +332,25 @@ setSubstEnv :: Subst 		-- Take in-scope part from here
 setSubstEnv (Subst in_scope1 _) env2 = Subst in_scope1 env2
 \end{code}
 
+Pretty printing, for debugging only
+
+\begin{code}
+instance Outputable SubstResult where
+  ppr (DoneEx e)   = ptext SLIT("DoneEx") <+> ppr e
+  ppr (DoneId v _) = ptext SLIT("DoneId") <+> ppr v
+  ppr (ContEx _ e) = ptext SLIT("ContEx") <+> ppr e
+  ppr (DoneTy t)   = ptext SLIT("DoneTy") <+> ppr t
+
+instance Outputable SubstEnv where
+  ppr se = brackets (fsep (punctuate comma (map ppr_elt (ufmToList (substEnvEnv se)))))
+	where
+	   ppr_elt (uniq,sr) = ppr uniq <+> ptext SLIT("->") <+> ppr sr
+
+instance Outputable Subst where
+  ppr (Subst (InScope in_scope _) se) 
+	=  ptext SLIT("<InScope =") <+> braces   (fsep (map ppr (rngVarEnv in_scope)))
+	$$ ptext SLIT(" Subst   =") <+> ppr se <> char '>'
+\end{code}
 
 %************************************************************************
 %*									*

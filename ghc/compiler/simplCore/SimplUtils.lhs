@@ -24,7 +24,7 @@ import CmdLineOpts	( switchIsOn, SimplifierSwitch(..),
 import CoreSyn
 import CoreUnfold	( isValueUnfolding )
 import CoreUtils	( exprIsTrivial, cheapEqExpr, exprType, exprIsCheap, exprEtaExpandArity, bindNonRec )
-import Subst		( InScopeSet, mkSubst, substBndrs, substBndr, substIds, lookupIdSubst )
+import Subst		( InScopeSet, mkSubst, substBndrs, substBndr, substIds, substExpr )
 import Id		( Id, idType, isId, idName, 
 			  idOccInfo, idUnfolding, idStrictness,
 			  mkId, idInfo
@@ -265,27 +265,24 @@ interestingArg :: InScopeSet -> InExpr -> SubstEnv -> Bool
 	-- (i.e. they are probably lambda bound): f x y z
 	-- There is little point in inlining f here.
 interestingArg in_scope arg subst
-  = analyse arg
+  = analyse (substExpr (mkSubst in_scope subst) arg)
+	-- 'analyse' only looks at the top part of the result
+	-- and substExpr is lazy, so this isn't nearly as brutal
+	-- as it looks.
   where
-    analyse (Var v)
-	= case lookupIdSubst (mkSubst in_scope subst) v of
-	    ContEx subst arg -> interestingArg in_scope arg subst
-	    DoneEx arg	     -> analyse arg
-	    DoneId v' _      -> hasSomeUnfolding (idUnfolding v')
+    analyse (Var v)	      = hasSomeUnfolding (idUnfolding v)
 				-- Was: isValueUnfolding (idUnfolding v')
 				-- But that seems over-pessimistic
-
-	-- NB: it's too pessimistic to return False for ContEx/DoneEx
-	-- Consider 	let x = 3 in f x
-	-- The substitution will contain (x -> ContEx 3)
-	-- It's also too optimistic to return True for the ContEx/DoneEx case
-	-- Consider (\x. f x y) y
-	-- The substitution will contain (x -> ContEx y).
-
     analyse (Type _)	      = False
     analyse (App fn (Type _)) = analyse fn
     analyse (Note _ a)	      = analyse a
     analyse other	      = True
+	-- Consider 	let x = 3 in f x
+	-- The substitution will contain (x -> ContEx 3), and we want to
+	-- to say that x is an interesting argument.
+	-- But consider also (\x. f x y) y
+	-- The substitution will contain (x -> ContEx y), and we want to say
+	-- that x is not interesting (assuming y has no unfolding)
 \end{code}
 
 Comment about interestingCallContext
