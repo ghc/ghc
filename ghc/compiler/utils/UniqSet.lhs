@@ -20,7 +20,11 @@ module UniqSet (
 	isEmptyUniqSet, filterUniqSet, sizeUniqSet
     ) where
 
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER( SpecLoop )
+#else
+import {-# SOURCE #-} Name
+#endif
 
 import Maybes		( maybeToBool )
 import UniqFM
