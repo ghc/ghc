@@ -548,10 +548,8 @@ $ ghci Main.hs
       <indexterm><primary>packages</primary><secondary>with GHCi</secondary></indexterm>
 
       <para>GHCi can make use of all the packages that come with GHC,
-      but note: packages <emphasis>must</emphasis> be specified on the
-      GHCi command line, you can't add extra packages after GHCi has
-      started up.  For example, to start up GHCi with the
-      <literal>text</literal> package loaded:</para>
+      For example, to start up GHCi with the <literal>text</literal>
+      package loaded:</para>
 
 <screen>
 $ ghci -package text
@@ -572,6 +570,17 @@ Prelude>
       <literal>text</literal> package makes use of one or more of the
       modules in <literal>lang</literal>, and therefore has a
       dependency on it.</para>
+
+      <para>The following command works to load new packages into a
+      running GHCi:</para>
+
+<screen>
+Prelude> :set -package <replaceable>name</replaceable>
+</screen>
+
+      <para>But note that doing this will cause all currently loaded
+      modules to be unloaded, and you'll be dumped back into the
+      Prelude.</para>
     </sect2>
 
     <sect2>
@@ -883,15 +892,16 @@ Prelude> :set -fno-glasgow-exts
       <para><xref linkend="flag-reference"> lists the reverse for each
       option where applicable.</para>
 
-      <para>Certain static options (<option>-I</option>,
-      <option>-i</option>, and <option>-l</option> in particular) will
-      also work, but may not take effect until the next reload.</para>
+      <para>Certain static options (<option>-package</option>,
+      <option>-I</option>, <option>-i</option>, and
+      <option>-l</option> in particular) will also work, but some may
+      not take effect until the next reload.</para>
       <indexterm><primary>static</primary><secondary>options</secondary></indexterm>
     </sect2>
   </sect1>
 
   <sect1>
-    <title>The <filename>.ghci</filename> file</title> 
+    <title>The <filename>.ghci</filename> file</title>
     <indexterm><primary><filename>.ghci</filename></primary><secondary>file</secondary>
     </indexterm>
     <indexterm><primary>startup</primary><secondary>files, GHCi</secondary>
