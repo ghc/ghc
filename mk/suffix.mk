@@ -30,19 +30,6 @@ endif
 #-----------------------------------------------------------------------------
 # Haskell Suffix Rules
 
-HC_SPLIT_PRE= \
- $(RM) $@ ; if [ ! -d $(basename $@) ]; then mkdir $(basename $@); else \
- $(FIND) $(basename $@) -name '*.$(way_)o' -print | xargs $(RM) __rm_food ; fi
-HC_SPLIT_POST  = touch $@
-
-ifeq "$(SplitObjs)" "YES"
-HC_PRE__  = $(HC_SPLIT_PRE) ;
-HC_POST__ = $(HC_SPLIT_POST) ;
-endif
-
-SRC_HC_POST_OPTS += $(HC_POST__)
-SRC_HC_PRE_OPTS  += $(HC_PRE__)
-
 %.$(way_)o : %.hs
 	$(HC_PRE_OPTS)
 	$(HC) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@))
