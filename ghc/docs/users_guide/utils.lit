@@ -17,70 +17,108 @@ with the Great Haskell Programming Task.
 %*                                                                      *
 %************************************************************************
 
-It is reasonably straightforward to set up a \tr{Makefile} to use with
-GHC, assuming you name your source files the same as your modules.
-Thus:
+You run @mkdependHS@ like this:
 \begin{verbatim}
-HC      = ghc
-HCFLAGS = -recomp -cpp -hi-diffs $(EXTRA_HC_OPTS)
-
-SRCS = Main.lhs Foo.lhs Bar.lhs
-OBJS = Main.o   Foo.o   Bar.o
-
-.SUFFIXES : .o .hi .lhs
-.o.hi:
-	@:
-.lhs.o:
-        $(RM) $@
-        $(HC) -c $< $(HCFLAGS)
-
-cool_pgm : $(OBJS)
-        $(RM) $@
-        $(HC) -o $@ $(HCFLAGS) $(OBJS)
+  mkdependHS [mkdependHS options] [-- GHC options --] srcfile1 [srcfile2 ...]
 \end{verbatim}
-
-Note the cheesy \tr{.o.hi} rule: It records the dependency of the
-interface (\tr{.hi}) file on the source.  The rule says a \tr{.hi}
-file can be made from a \tr{.o} file by doing... nothing.  Which is
-true.
-
-(Sophisticated \tr{make} variants may achieve some of the above more
-elegantly.  What we've shown should work with any \tr{make}.)
-
-The only thing lacking in the above \tr{Makefile} is interface-file
-dependencies.  If \tr{Foo.lhs} imports module \tr{Bar} and the
-\tr{Bar} interface changes, then \tr{Foo.lhs} needs to be recompiled.
-
-Putting dependencies of the form \tr{Foo.o : Bar.hi} into your
-\tr{Makefile} by hand is rather error-prone.  Don't worry---never
-fear, \tr{mkdependHS} is here! (and is distributed as part of GHC)
-Add the following to your \tr{Makefile}:
+or
 \begin{verbatim}
-depend :
-        mkdependHS -- $(HCFLAGS) -- $(SRCS)
+  ghc -M [mkdependHS options(prefix with -optdep)] [ GHC options ] srcfile1 [srcfile2 ...]
 \end{verbatim}
-
-Now, before you start compiling, and any time you change the
-\tr{imports} in your program, do \tr{make depend} before you do
-\tr{make cool_pgm}.  \tr{mkdependHS} will append the needed
-dependencies to your \tr{Makefile}.
-
-Please note the use of the recompilation checker (the \tr{-recomp}
-\index{-recomp option} flag).  Without it, your dependencies will be
-{\em inadequate} to cope with the Haskell~1.3 module system!  See
-\sectionref{recomp} for more details about the recompilation checker!
-
-A few caveats about this simple scheme: (a)~You may need to compile
-some modules explicitly to create their interfaces in the first place
-(e.g., \tr{make Bar.o} to create \tr{Bar.hi}).  (b)~You may have to
-type \tr{make} more than once for the dependencies to have full
-effect.  However, a \tr{make} run that does nothing {\em does} mean
-``everything's up-to-date.''  (c) This scheme will work with
-mutually-recursive modules but, again, it may take multiple
-iterations to ``settle.''
-
 To see \tr{mkdependHS}'s command-line flags, give it a duff flag,
 e.g., \tr{mkdependHS -help}.
+
+In general, if module @A@ contains the line
+\begin{verbatim}
+	import B ...blah...
+\end{verbatim}
+then @mkdependHS@ will generate a dependency line of the form:
+\begin{verbatim}
+	A.o : B.hi
+\end{verbatim}
+If module @A@ contains the line 
+\begin{verbatim}
+	import {-# SOURCE #-} B ...blah...
+\end{verbatim}
+then @mkdependHS@ will generate a dependency line of the form:
+\begin{verbatim}
+	A.o : B.hi-boot
+\end{verbatim}
+(See \Sectionref{hi-boot} for details of @.hi-boot@ files.)
+If @A@ imports multiple modules, then there will be multiple lines with @A.o@ as the
+target.
+
+By default, @mkdependHS@ generates all the dependencies, and then
+concatenates them onto the end of
+@makefile@ (or @Makefile@ if @makefile@ doesn't exist) bracketed by
+the lines "@# DO NOT DELETE: Beginning of Haskell dependencies@" and
+"@# DO NOT DELETE: End of Haskell dependencies@".  If these lines
+already exist in the @makefile@, @mkdependHS@ deletes the old
+dependencies first.
+
+@mkdependHS@ takes GHC options between @--@ brackets.
+It understands the following ones. Any options between @--@ brackets
+that it doesn't understand are simply ignored; this way you can feed your
+Makefile's standard GHC options to @mkdependHS@ un-filtered.
+\begin{description}
+
+\item[@-D<blah>@]	A cpp @#define@; usual meaning.
+
+\item[@-i<dirs>@]	Add @<dirs>@ (colon-separated) to list of directories
+		to search for "import"ed modules.
+
+\item[@-I<dir>@]	Add @<dir>@ to list of directories to search for
+		.h files (i.e., usual meaning).
+
+\item[@-syslib <blah>@] This program uses this GHC system library; take
+		appropriate action (e.g., recognise when they are
+		"import"ing a module from that library).
+
+\item[@-ignore <mod>@]
+\end{description}
+
+Here are the @mkdependHS@-specific options (not between @--@'s):
+\begin{description}
+\item[@-v@]	Be verbose.
+\item[@-v -v@]	Be very verbose.
+\item[@-f blah@]
+	Use @blah@ as the makefile, rather than @makefile@
+	or @Makefile@.  If @blah@ doesn't exist, @mkdependHS@ creates it.
+	We often use @-f .depend@ to put the dependencies in @.depend@ and
+	then @include@ the file @.depend@ into @Makefilpe@.
+
+\item[@-o <osuf>@]	
+	Use @.<osuf>@ as the "target file" suffix ( default: @o@).
+	Multiple @-o@ flags are permitted (GHC2.05 onwards).  Thus "@-o hc -o o@"
+	will generate dependencies for @.hc@ and @.o@ files.
+
+\item[@-s <suf>@]	
+		Make extra dependencies that declare that files with
+		suffix @.<suf>_<osuf>@ depend on interface files with suffix @.<suf>_hi@, or
+		(for @{-# SOURCE #-}@ imports) on @.hi-boot@.
+		Multiple @-s@ flags are permitted.
+		For example, "@-o hc -s a -s b@" will
+		make dependencies for @.hc@ on @.hi@, @.a_hc@ on @.a_hi@, and @.b_hc@ on @.b_hi@.
+		(Useful in conjunction with NoFib "ways".)  
+
+\item[@--exclude-module=<file>@] 
+                Regard @<file>@ as "stable"; i.e., exclude it from having
+		dependencies on it.
+
+\item[@-x@]      same as @--exclude-module@
+
+\item[@--exclude-directory=<dirs>@] 
+                Regard the colon-separated list of directories @<dirs>@ as containing stable,
+                don't generate any dependencies on modules therein.
+
+\item[@-Xdirs@]      same as @--exclude-directory@.
+
+\item[@--include-module=<file>@]
+                Regard @<file>@ as not "stable"; i.e., generate dependencies
+                on it (if any). This option is normally used in conjunction 
+                with the @--exclude-directory@ option.
+\end{description}
+
 
 %************************************************************************
 %*                                                                      *
