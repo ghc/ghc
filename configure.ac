@@ -105,6 +105,24 @@ alpha*-unknown-freebsd*)
         HostVendor_CPP='unknown'
         HostOS_CPP='freebsd'
         ;;
+arm*-linux*)
+        HostPlatform=arm-unknown-linux # hack again
+        TargetPlatform=arm-unknown-linux
+        BuildPlatform=arm-unknown-linux
+        HostPlatform_CPP='arm_unknown_linux'                 
+        HostArch_CPP='arm'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='linux'
+        ;;
+hppa*-*-linux*)
+        HostPlatform=hppa-unknown-linux # hack again
+        TargetPlatform=hppa-unknown-linux
+        BuildPlatform=hppa-unknown-linux
+        HostPlatform_CPP='hppa_unknown_linux'                
+        HostArch_CPP='hppa'
+        HostVendor_CPP='unknown'                             
+        HostOS_CPP='linux'
+        ;;
 hppa1.1-hp-hpux*)
 	HostPlatform=hppa1.1-hp-hpux  # canonicalise for our purposes (hack)
 	TargetPlatform=hppa1.1-hp-hpux
@@ -215,6 +233,15 @@ x86_64-*-linux*)
         HostVendor_CPP='unknown'
         HostOS_CPP='linux'
 	;;
+m68k-*-linux*)
+        HostPlatform=m68k-unknown-linux # hack again
+        TargetPlatform=m68k-unknown-linux                    
+        BuildPlatform=m68k-unknown-linux
+        HostPlatform_CPP='m68k_unknown_linux'
+        HostArch_CPP='m68k'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='linux'
+        ;;
 m68k-next-nextstep2)
         HostPlatform_CPP='m68k_next_nextstep2'
         HostArch_CPP='m68k'
@@ -262,6 +289,15 @@ m68k-sun-sunos4*)
         HostArch_CPP='m68k'
         HostVendor_CPP='sun'
         HostOS_CPP='sunos4'
+        ;;
+mips-*-linux*)
+        HostPlatform=mips-unknown-linux # hack again
+        TargetPlatform=mips-unknown-linux
+        BuildPlatform=mips-unknown-linux
+        HostPlatform_CPP='mips_unknown_linux'
+        HostArch_CPP='mips'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='linux'
         ;;
 mips-dec-ultrix*)
         HostPlatform_CPP='mips_dec_ultrix'
@@ -312,6 +348,15 @@ powerpc-unknown-linux*)
         HostPlatform_CPP='powerpc_unknown_linux'
         HostArch_CPP='powerpc'
         HostVendor_CPP='unknown'
+        HostOS_CPP='linux'
+        ;;
+s390-ibm-linux*)
+       HostPlatform=s390-ibm-linux
+       TargetPlatform=s390-ibm-linux #hack
+       BuildPlatform=s390-ibm-linux #hack
+        HostPlatform_CPP='s390_ibm_linux'
+        HostArch_CPP='s390'
+        HostVendor_CPP='ibm'
         HostOS_CPP='linux'
         ;;
 sparc-sun-sunos4*)
