@@ -269,6 +269,16 @@ foreign import "isatty" unsafe
 foreign import "close" unsafe
    c_close :: CInt -> IO CInt
 
+#ifdef mingw32_TARGET_OS
+closeFd :: Bool -> CInt -> IO CInt
+closeFd isStream fd 
+  | isStream  = c_closesocket fd
+  | otherwise = c_close fd
+
+foreign import "closesocket" unsafe
+   c_closesocket :: CInt -> IO CInt
+#endif
+
 foreign import "lseek" unsafe
    c_lseek :: CInt -> COff -> CInt -> IO COff
 
