@@ -3153,13 +3153,26 @@ declaration (after expansion of any type synonyms)
   newtype T v1...vn = T' (S t1...tk vk+1...vn) deriving (c1...cm) 
 </programlisting> 
 
-where <literal>S</literal> is a type constructor, <literal>t1...tk</literal> are 
-types,
-<literal>vk+1...vn</literal> are type variables which do not occur in any of
-the <literal>ti</literal>, and the <literal>ci</literal> are partial applications of
-classes of the form <literal>C t1'...tj'</literal>.  The derived instance
-declarations are, for each <literal>ci</literal>,
-
+where 
+ <itemizedlist>
+<listitem><para>
+  <literal>S</literal> is a type constructor, 
+</para></listitem>
+<listitem><para>
+  <literal>t1...tk</literal> are types,
+</para></listitem>
+<listitem><para>
+  <literal>vk+1...vn</literal> are type variables which do not occur in any of
+  the <literal>ti</literal>, and
+</para></listitem>
+<listitem><para>
+  the <literal>ci</literal> are partial applications of
+  classes of the form <literal>C t1'...tj'</literal>, where the arity of <literal>C</literal>
+  is exactly <literal>j+1</literal>.  That is, <literal>C</literal> lacks exactly one type argument.
+</para></listitem>
+</itemizedlist>
+Then, for each <literal>ci</literal>, the derived instance
+declaration is:
 <programlisting> 
   instance ci (S t1...tk vk+1...v) => ci (T v1...vp)
 </programlisting>
