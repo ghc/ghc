@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.18 $
- * $Date: 2000/01/05 19:10:21 $
+ * $Revision: 1.19 $
+ * $Date: 2000/01/06 14:17:16 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -478,41 +478,6 @@ Bool ifentityAllTypesKnown ( Cell entity, ZPair aktys_mod )
 }
 
 
-#if 0
-I hope this can be nuked.
-/* Kludge.  Stuff imported from PrelGHC isn't referred to in a 
-   qualified way, so arrange it so it is.
-*/
-QualId magicRequalify ( ConId id )
-{
-   Text tid;
-   Text tmid;
-   assert(isCon(id));
-   tid = textOf(id);
-
-   fprintf ( stderr, "$--$--$--$--$--$ magicRequalify: %s",
-             textToStr(tid) );
-
-   if (tid == findText("[]")) {
-      tmid = findText("PrelList");
-   } else 
-   if (tid == findText("Ratio")) {
-      tmid = findText("PrelNum");
-   } else
-   if (tid == findText("Char")) {
-      tmid = findText("PrelGHC");
-   } else {
-      fprintf(stderr, "??? \n");
-      return id;
-   }
-
-   fprintf ( stderr, " -> %s.%s\n",
-             textToStr(tmid), textToStr(tid) );
-   return mkQualId ( mkCon(tmid), id );
-}
-#endif
-
-
 /* ifTypeDoesntRefUnknownTycon :: I_IMPORT..I_VALUE -> (([QualId], ConId)) -> Bool */
 /* mod is the current module being processed -- so we can qualify unqual'd
    names.  Strange calling convention for aktys and mod is so we can call this
@@ -590,11 +555,12 @@ Void processInterfaces ( void )
     List ifaces       = NIL;  /* :: List I_INTERFACE */
     List iface_sizes  = NIL;  /* :: List Int         */
     List iface_onames = NIL;  /* :: List Text        */
-#if 0
+
+    if (isNull(ifaces_outstanding)) return;
+
     fprintf ( stderr, 
               "processInterfaces: %d interfaces to process\n", 
               length(ifaces_outstanding) );
-#endif
 
     /* unzip3 ifaces_outstanding into ifaces, iface_sizes, iface_onames */
     for (xs = ifaces_outstanding; nonNull(xs); xs=tl(xs)) {
@@ -630,9 +596,7 @@ Void processInterfaces ( void )
 
        /* Have we reached a fixed point? */
        i = length(all_known_types);
-#if 0
        printf ( "\n============= %d known types =============\n", i );
-#endif
        if (num_known_types == i) break;
        num_known_types = i;
 
@@ -745,7 +709,7 @@ fprintf(stderr, "abstractify newtype %s\n", textToStr(textOf(getIEntityName(ent)
        be value defns, classes and instances which refer to unknown types.
        Delete iteratively until a fixed point is reached.
     */
-printf("\n");
+    printf("\n");
 
     num_known_types = 999999999;
     while (TRUE) {
@@ -762,9 +726,7 @@ printf("\n");
 
        /* Have we reached a fixed point? */
        i = length(all_known_types);
-#if 0
        printf ( "\n------------- %d known types -------------\n", i );
-#endif
        if (num_known_types == i) break;
        num_known_types = i;
 
@@ -871,11 +833,9 @@ printf("\n");
           }
        }       
     }
-#if 0
 
     fprintf(stderr, "\n=========================================================\n");
     fprintf(stderr, "=========================================================\n");
-#endif
 
     /* Traverse again the decl lists of the modules, this time 
        calling the finishGHC* functions.  But don't process
@@ -936,10 +896,9 @@ printf("\n");
           }
        }       
     }
-#if 0
     fprintf(stderr, "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
     fprintf(stderr, "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
-#endif
+
     /* Build the module(m).export lists for each module, by running
        through the export lists in the iface.  Also, do the implicit
        'import Prelude' thing.  And finally, do the object code 
