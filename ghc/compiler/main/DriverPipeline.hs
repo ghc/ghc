@@ -1082,13 +1082,14 @@ staticLink dflags o_files dep_packages = do
     pkg_framework_paths <- getPackageFrameworkPath dflags dep_packages
     let pkg_framework_path_opts = map ("-F"++) pkg_framework_paths
 
-    framework_paths <- readIORef v_Framework_paths
-    let framework_path_opts = map ("-F"++) framework_paths
+    let framework_paths = frameworkPaths dflags
+        framework_path_opts = map ("-F"++) framework_paths
 
     pkg_frameworks <- getPackageFrameworks dflags dep_packages
     let pkg_framework_opts = concat [ ["-framework", fw] | fw <- pkg_frameworks ]
-    frameworks <- readIORef v_Cmdline_frameworks
-    let framework_opts = concat [ ["-framework", fw] | fw <- reverse frameworks ]
+    
+    let frameworks = cmdlineFrameworks dflags
+        framework_opts = concat [ ["-framework", fw] | fw <- reverse frameworks ]
 	 -- reverse because they're added in reverse order from the cmd line
 #endif
 

@@ -215,8 +215,8 @@ reallyInitDynLinker dflags
 
 	   	-- (e) Link any MacOS frameworks
 #ifdef darwin_TARGET_OS	
-	; framework_paths <- readIORef v_Framework_paths
-	; frameworks      <- readIORef v_Cmdline_frameworks
+	; let framework_paths = frameworkPaths dflags
+	; let frameworks      = cmdlineFrameworks dflags
 #else
 	; let frameworks      = []
 	; let framework_paths = []
