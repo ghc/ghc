@@ -717,9 +717,23 @@ Options other than the above can be forced through to the C
 pre-processor with the \tr{-opt} flags (see
 \sectionref{forcing-options-through}).
 
-A small word of warning: \tr{-cpp} is not friendly to
-``string gaps''.\index{-cpp vs string gaps}\index{string gaps vs -cpp}
+A small word of warning: \tr{-cpp} is not friendly to ``string
+gaps''.\index{-cpp vs string gaps}\index{string gaps vs -cpp}.  In
+other words, strings such as the following:
 
+\begin{verbatim}
+	strmod = "\
+	\ p \
+	\ "
+\end{verbatim}
+
+don't work with \tr{-cpp}; \tr{/usr/bin/cpp} elides the
+backslash-newline pairs.
+
+However, it appears that if you add a space at the end of the line,
+then \tr{cpp} (at least GNU \tr{cpp} and possibly other \tr{cpp}s)
+leaves the backslash-space pairs alone and the string gap works as
+expected.
 
 %************************************************************************
 %*                                                                      *
