@@ -862,7 +862,7 @@ INFO_TABLE_RET( stg_block_async, 0/*framesize*/, 0/*bitmap*/, RET_SMALL )
 
     ares = StgTSO_block_info(CurrentTSO);
     len = StgAsyncIOResult_len(ares);
-    errC = StgAsyncIOResult_errC(ares);
+    errC = StgAsyncIOResult_errCode(ares);
     StgTSO_block_info(CurrentTSO) = NULL;
     foreign "C" free(ares);
     R1 = len;
