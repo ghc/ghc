@@ -54,7 +54,7 @@ import PrelNames	( mkUnboundName, rOOT_MAIN_Name, iNTERACTIVE, consDataConKey, h
 import UniqSupply
 import BasicTypes	( IPName, mapIPName )
 import SrcLoc		( SrcSpan, srcSpanStart, Located(..), eqLocated, unLoc,
-			  srcLocSpan )
+			  srcLocSpan, getLoc, combineSrcSpans, srcSpanStartLine, srcSpanEndLine )
 import Outputable
 import ListSetOps	( removeDups )
 import List		( nubBy )
@@ -747,9 +747,17 @@ badOrigBinding name
   = ptext SLIT("Illegal binding of built-in syntax:") <+> ppr (rdrNameOcc name)
 	-- The rdrNameOcc is because we don't want to print Prelude.(,)
 
-dupNamesErr descriptor (L loc name : dup_things)
-  = setSrcSpan loc $
-    addErr ((ptext SLIT("Conflicting definitions for") <+> quotes (ppr name))
-	      $$ 
-	      descriptor)
+dupNamesErr :: SDoc -> [Located RdrName] -> RnM ()
+dupNamesErr descriptor located_names
+  = setSrcSpan big_loc $
+    addErr (vcat [ptext SLIT("Conflicting definitions for") <+> quotes (ppr name1),
+		  locations,
+		  descriptor])
+  where
+    L _ name1 = head located_names
+    locs      = map getLoc located_names
+    big_loc   = foldr1 combineSrcSpans locs
+    one_line  = srcSpanStartLine big_loc == srcSpanEndLine big_loc
+    locations | one_line  = empty 
+	      | otherwise = ptext SLIT("Bound at:") <+> vcat (map ppr locs)
 \end{code}
