@@ -219,8 +219,9 @@ ppHtmlContents odir doctitle maybe_package maybe_html_help_format maybe_index_ur
   let tree = mkModuleTree [(mod,iface_package iface) | (mod,iface) <- mdls]
       html = 
 	header 
-		((thetitle (toHtml doctitle)) +++
-		 (thelink ! [href cssFile, rel "stylesheet", thetype "text/css"]) +++
+		(documentCharacterEncoding +++
+		 thetitle (toHtml doctitle) +++
+		 styleSheet +++
 		 (script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
         body << vanillaTable << (
    	    simpleHeader doctitle Nothing maybe_index_url </>
@@ -262,7 +263,7 @@ mkNode ss (Node s leaf pkg ts) id = htmlNode
   where
     htmlNode = case ts of
       [] -> ( pad_td 15 << htmlModule                           <-> htmlPkg,id)
-      _  -> ((pad_td  0 << (collapsebutton id_s +++ htmlModule) <-> htmlPkg) </> 
+      _  -> ((pad_td  0 << (collapsebutton id_s +++ toHtml " " +++ htmlModule) <-> htmlPkg) </> 
                 (pad_td 20 << sub_tree), id')
 
     htmlModule 
@@ -277,7 +278,7 @@ mkNode ss (Node s leaf pkg ts) id = htmlNode
     (s':ss') = reverse (s:ss)
 	 -- reconstruct the module name
     
-    id_s = show id
+    id_s = "n:" ++ show id
     
     (sub_tree,id') = genSubTree emptyTable (id+1) ts
     
@@ -304,9 +305,9 @@ ppHtmlIndex :: FilePath
             -> IO ()
 ppHtmlIndex odir doctitle maybe_package maybe_html_help_format maybe_contents_url ifaces = do
   let html = 
-	header (thetitle (toHtml (doctitle ++ " (Index)")) +++
-		thelink ! [href cssFile, 
-		  rel "stylesheet", thetype "text/css"]) +++
+	header (documentCharacterEncoding +++
+		thetitle (toHtml (doctitle ++ " (Index)")) +++
+		styleSheet) +++
         body << vanillaTable << (
 	    simpleHeader doctitle maybe_contents_url Nothing </>
 	    index_html
@@ -347,9 +348,9 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format maybe_contents_ur
     = unless (null index_part) $
         writeFile (pathJoin [odir, subIndexHtmlFile c]) (renderHtml html)
     where 
-      html = header (thetitle (toHtml (doctitle ++ " (Index)")) +++
-		thelink ! [href cssFile, 
-		  rel "stylesheet", thetype "text/css"]) +++
+      html = header (documentCharacterEncoding +++
+		thetitle (toHtml (doctitle ++ " (Index)")) +++
+		styleSheet) +++
              body << vanillaTable << (
 	        simpleHeader doctitle maybe_contents_url Nothing </>
 		indexInitialLetterLinks </>
@@ -424,9 +425,9 @@ ppHtmlModule
 ppHtmlModule odir doctitle source_url 
   maybe_contents_url maybe_index_url (Module mdl,iface) = do
   let html = 
-	header (thetitle (toHtml mdl) +++
-		thelink ! [href cssFile,
-		  rel "stylesheet", thetype "text/css"] +++
+	header (documentCharacterEncoding +++
+		thetitle (toHtml mdl) +++
+		styleSheet +++
 		(script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
         body << vanillaTable << (
 	    pageHeader mdl iface doctitle source_url 
@@ -1150,7 +1151,7 @@ namedAnchor n = anchor ! [name (escapeStr n)]
 --
 collapsebutton :: String -> Html
 collapsebutton id = 
-  image ! [ src plusFile, theclass "coll", onclick ("toggle(this,'" ++ id ++ "')") ]
+  image ! [ src plusFile, theclass "coll", onclick ("toggle(this,'" ++ id ++ "')"), alt "show/hide" ]
 
 collapsed :: String -> Html -> Html
 collapsed id html =
@@ -1166,3 +1167,10 @@ linkedAnchor frag = anchor ! [href hr]
    where hr | null frag = ""
             | otherwise = '#': escapeStr frag
 
+documentCharacterEncoding :: Html
+documentCharacterEncoding =
+   meta ! [httpequiv "Content-Type", content "text/html; charset=UTF-8"]
+
+styleSheet :: Html
+styleSheet =
+   thelink ! [href cssFile, rel "stylesheet", thetype "text/css"]
