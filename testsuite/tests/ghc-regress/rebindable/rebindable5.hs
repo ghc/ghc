@@ -81,7 +81,12 @@ module Main where
 		negate :: a -> a;
 		};
 
-	instance HasNegate a where
+	instance HasNegate Integer where
+		{
+		negate a = a; -- don't actually negate
+		};
+
+	instance HasNegate Rational where
 		{
 		negate a = a; -- don't actually negate
 		};
@@ -91,7 +96,12 @@ module Main where
 		(-) :: a -> a -> a;
 		};
 
-	instance HasMinus a where
+	instance HasMinus Rational where
+		{
+		(-) x y = y; -- changed function
+		};
+
+	instance HasMinus Integer where
 		{
 		(-) x y = y; -- changed function
 		};
