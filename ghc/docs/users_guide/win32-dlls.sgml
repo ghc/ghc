@@ -266,7 +266,7 @@ single module tree in the DLL).
 Compile this up:
 
 <Screen>
-gcc -c dllMain.c
+ghc -c dllMain.c
 </Screen>
 </Para>
 </ListItem>
