@@ -34,6 +34,10 @@ import Data.Maybe ( isJust, maybeToList )
 import System.Console.GetOpt ( getOpt, usageInfo, ArgOrder(..), OptDescr(..), ArgDescr(..) )
 import System.Environment ( getArgs )
 import System.IO ( stderr, IOMode(..), openFile, hClose, hGetContents, hPutStrLn )
+#if defined(mingw32_HOST_OS)
+import Foreign
+import Foreign.C
+#endif
 
 -----------------------------------------------------------------------------
 -- Top-level stuff
