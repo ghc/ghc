@@ -220,7 +220,7 @@ isEOFBin (BinIO _ ix_r h) = hIsEOF h
 writeBinMem :: BinHandle -> FilePath -> IO ()
 writeBinMem (BinIO _ _ _) _ = error "Data.Binary.writeBinMem: not a memory handle"
 writeBinMem (BinMem _ ix_r sz_r arr_r) fn = do
-  h <- openFile fn WriteMode
+  h <- openFileEx fn (BinaryMode WriteMode)
   arr <- readIORef arr_r
   ix  <- readFastMutInt ix_r
   hPutArray h arr ix
@@ -234,7 +234,7 @@ writeBinMem (BinMem _ ix_r sz_r arr_r) fn = do
 
 readBinMem :: FilePath -> IO BinHandle
 readBinMem filename = do
-  h <- openFile filename ReadMode
+  h <- openFileEx filename (BinaryMode ReadMode)
   filesize' <- hFileSize h
   let filesize = fromIntegral filesize'
   arr <- newArray_ (0,filesize-1)
