@@ -958,6 +958,16 @@ seqPred (IParam n ty)  = n  `seq` seqType ty
 Comparison; don't use instances so that we know where it happens.
 Look through newtypes but not usage types.
 
+Note that eqType can respond 'False' for partial applications of newtypes.
+Consider
+	newtype Parser m a = MkParser (Foogle m a)
+
+Does 	
+	Monad (Parser m) `eqType` Monad (Foogle m)
+
+Well, yes, but eqType won't see that they are the same. 
+I don't think this is harmful, but it's soemthing to watch out for.
+
 \begin{code}
 eqType t1 t2 = eq_ty emptyVarEnv t1 t2
 eqKind  = eqType	-- No worries about looking 
