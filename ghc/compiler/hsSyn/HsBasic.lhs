@@ -48,7 +48,10 @@ data HsLit
 				-- also: "overloaded" type; but
 				-- must resolve to boxed-primitive!
 				-- (WDP 94/10)
+	deriving Eq
 \end{code}
+
+ToDo: an improved Eq instance JJQC 30-Nov-1997
 
 \begin{code}
 negLiteral (HsInt  i) = HsInt  (-i)
