@@ -97,6 +97,7 @@ module Test (
 -}
 
 	p,
+	f',
    ) where
 
 import Hidden
@@ -378,3 +379,7 @@ foreign import ccall unsafe
 
 -- | We should be able to escape this: \#\#\#
 p :: Int
+
+-- | a function with a prime can be referred to as 'f'' 
+-- but f' doesn't get link'd 'f\''
+f' :: Int
