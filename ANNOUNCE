@@ -1,8 +1,8 @@
-	     The Glasgow Haskell Compiler -- version 2.06
+	     The Glasgow Haskell Compiler -- version 2.07
 	    ==============================================
 
 We are pleased to announce a new release of the Glasgow Haskell
-Compiler (GHC), version 2.06. Source distribution is freely available
+Compiler (GHC), version 2.07. Source distribution is freely available
 via the World-Wide Web and through anon. FTP; details below.
 
 Haskell is "the" standard lazy functional programming language; the
@@ -14,16 +14,8 @@ related information is available from the Haskell home page at
 + What's new
 =============
 
-Release 2.06 represent work done through August '97.
-
-Highlights of this release:
-
-	* All bugs reported since the release of 2.05 have been fixed.
-	* GHC's interface file parser now uses the latest version of 
-	  Happy, and as a result we've included Happy in the distribution.
-
-A detailed list of changes can be found in the release notes in the
-GHC User's Guide.
+Release 2.07 is a bug-fix release.  It addresses all of the
+bootstrapping/building/installation problems in 2.06.
 
 + Mailing lists
 ================
