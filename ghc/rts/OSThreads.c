@@ -178,10 +178,10 @@ signalCondition ( Condition* pCond )
 rtsBool
 waitCondition ( Condition* pCond, Mutex* pMut )
 {
-  ReleaseMutex(*pMut);
+  RELEASE_LOCK(*pMut);
   WaitForSingleObject(*pCond, INFINITE);
   /* Hmm..use WaitForMultipleObjects() ? */
-  WaitForSingleObject(*pMut, INFINITE);
+  ACQUIRE_LOCK(*pMut, INFINITE);
   return rtsTrue;
 }
 
