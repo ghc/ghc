@@ -1,40 +1,78 @@
 <!-- FFI docs as a chapter -->
 
 <Chapter id="ffi">
-<Title>Foreign function interface</Title>
+<Title>Foreign function interface (FFI)</Title>
 
-  <para>The foreign function interface consists of the following
-  components:</para>
+  <para>GHC (mostly) conforms to the Haskell 98 Foreign Function Interface
+  Addendum 1.0, whose definition is available from <ULink
+  URL="http://haskell.org/"><literal>http://haskell.org/</literal></ULink >.
+  The FFI support in GHC diverges from the Addendum in the following ways:
+  </para>
 
   <itemizedlist>
     <listitem>
-      <para>The Foreign Function Interface language specification
-      (which constitutes most of this Chapter, beginning with <xref
-      linkend="sec-ffi-intro">).  You must use the
-      <option>-fglasgow-exts</option> command-line option to make GHC
-      understand the <literal>foreign</literal> declarations defined
-      by the FFI.</para>
+      <para>The routines <literal>hs_init()</literal>,
+      <literal>hs_exit()</literal>, and <literal>hs_set_argv()</literal> from
+      Chapter 6.1 of the Addendum are not supported yet.</para>
     </listitem>
 
     <listitem>
-      <para>Several library modules which provide access to types used
-      by foreign languages and utilties for marshalling values to and
-      from foreign functions, and for converting errors in the foreign
-      language into Haskell IO errors.  See <xref linkend="sec-Foreign"> for
-      more details.  </para>
+      <para>Syntactic forms and library functions proposed in earlier versions
+      of the FFI are still supported for backwards compatibility.</para>
+    </listitem>
+
+    <listitem>
+      <para>GHC implements a number of GHC-specific extensions to the FFI
+      Addendum.  These extensions are described in <xref
+      linkend="sec-ffi-ghcexts">, but please note that programs using
+      these features are not portable.  Hence, these features should be
+      avoided where possible.</para>
     </listitem>
   </itemizedlist>
 
-&ffi-body;
+  <para>The FFI libraries are documented in <xref
+  linkend="sec-Foreign">.</para>
 
-  <sect1 id="ffi-ghc">
+
+  <sect1 id="sec-ffi-ghcexts">
+    <title>GHC extensions to the FFI Addendum</title>
+
+    <para>The FFI features that are described in this section are specific to
+    GHC.  Avoid them where possible to not compromise the portability of the
+    resulting code.</para>
+
+    <sect2>
+      <title>Arrays</title>
+
+      <para>The types <literal>ByteArray</literal> and
+      <literal>MutableByteArray</literal> may be used as basic foreign types
+      (see FFI Addendum, Section 3.2).  In C land, they map to
+      <literal>(char *)</literal>.</para>
+    </sect2>
+
+    <sect2>
+      <title>Unboxed types</title>
+
+      <para>The following unboxed types may be used as basic foreign types
+      (see FFI Addendum, Section 3.2): <literal>Int#</literal>,
+      <literal>Word#</literal>, <literal>Char#</literal>,
+      <literal>Float#</literal>, <literal>Double#</literal>,
+      <literal>Addr#</literal>, <literal>StablePtr# a</literal>,
+      <literal>MutableByteArray#</literal>, <literal>ForeignObj#</literal>,
+      and <literal>ByteArray#</literal>.</para>
+    </sect2>
+
+  </sect1>
+
+  <sect1 id="sec-ffi-ghc">
     <title>Using the FFI with GHC</title>
 
     <para>The following sections also give some hints and tips on the
     use of the foreign function interface in GHC.</para>
 
     <sect2 id="foreign-export-ghc">
-      <title>Using <literal>foreign export</literal> with GHC</title>
+      <title>Using <literal>foreign export</literal> and <literal>foreign
+      import ccall "wrapper"</literal> with GHC</title>
 
       <indexterm><primary><literal>foreign export
       </literal></primary><secondary>with GHC</secondary>
@@ -42,7 +80,7 @@
 
       <para>When GHC compiles a module (say <filename>M.hs</filename>)
       which uses <literal>foreign export</literal> or <literal>foreign
-      export dynamic</literal>, it generates two
+      import "wrapper"</literal>, it generates two
       additional files, <filename>M_stub.c</filename> and
       <filename>M_stub.h</filename>.  GHC will automatically compile
       <filename>M_stub.c</filename> to generate
@@ -57,7 +95,7 @@
 <programlisting>
 module Foo where
 
-foreign export foo :: Int -> IO Int
+foreign export ccall foo :: Int -> IO Int
 
 foo :: Int -> IO Int
 foo n = return (length (f n))
@@ -162,24 +200,23 @@ int main(int argc, char *argv[])
       </sect3>
 
       <sect3 id="foreign-export-dynamic-ghc">
-	<title>Using <literal>foreign export dynamic</literal> with
+	<title>Using <literal>foreign import ccall "wrapper"</literal> with
 	GHC</title>
 
-	<indexterm><primary><literal>foreign export
-	dynamic</literal></primary><secondary>with GHC</secondary>
+	<indexterm><primary><literal>foreign import
+	ccall "wrapper"</literal></primary><secondary>with GHC</secondary>
 	</indexterm>
 
-	<para>When <literal>foreign export dynamic</literal> is used
-        in a Haskell module, The C stub file
-        <filename>M_stub.c</filename> generated by GHC contains small
-        helper functions used by the code generated for the
-        <literal>foreign export dynamic</literal>, so it must be
-        linked in to the final program.  When linking the program,
-        remember to include <filename>M_stub.o</filename> in the final
-        link command line, or you'll get link errors for the missing
-        function(s) (this isn't necessary when building your program
-        with <literal>ghc &ndash;&ndash;make</literal>, as GHC will automatically
-        link in the correct bits).</para>
+	<para>When <literal>foreign import ccall "wrapper"</literal> is used
+        in a Haskell module, The C stub file <filename>M_stub.c</filename>
+        generated by GHC contains small helper functions used by the code
+        generated for the imported wrapper, so it must be linked in to the
+        final program.  When linking the program, remember to include
+        <filename>M_stub.o</filename> in the final link command line, or
+        you'll get link errors for the missing function(s) (this isn't
+        necessary when building your program with <literal>ghc
+        &ndash;&ndash;make</literal>, as GHC will automatically link in the
+        correct bits).</para>
       </sect3>
     </sect2>
     
@@ -209,8 +246,8 @@ HsInt        lookupEFS (HsForeignObj a, HsInt i);
 </programlisting>
 
       <para>The types <literal>HsInt</literal>,
-      <literal>HsForeignObj</literal> etc. are described in <xref
-      linkend="sec-ffi-mapping-table">.</para>
+      <literal>HsForeignObj</literal> etc. are described in the H98 FFI
+      Addendum.</para>
 
       <para>Note that this approach is only
       <emphasis>essential</emphasis> for returning

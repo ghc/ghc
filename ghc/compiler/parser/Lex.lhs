@@ -268,27 +268,36 @@ isSpecial ITccallconv   = True
 isSpecial ITstdcallconv = True
 isSpecial _             = False
 
--- IMPORTANT: Keep this in synch with ParseIface.y's var_fs production! (SUP)
+-- the bitmap provided as the third component indicates whether the
+-- corresponding extension keyword is valid under the extension options
+-- provided to the compiler; if the extension corresponding to *any* of the
+-- bits set in the bitmap is enabled, the keyword is valid (this setup
+-- facilitates using a keyword in two different extensions that can be
+-- activated independently)
+--
 ghcExtensionKeywordsFM = listToUFM $
-	map (\ (x,y) -> (mkFastString x,y))
-     [	( "forall",	ITforall ),
-	( "foreign",	ITforeign ),
-	( "export",	ITexport ),
-	( "label",	ITlabel ),
-	( "dynamic",	ITdynamic ),
-	( "safe",	ITsafe ),
-	( "threadsafe",	ITthreadsafe ),
-	( "unsafe",	ITunsafe ),
-	( "with",	ITwith ),
-	( "stdcall",    ITstdcallconv),
-	( "ccall",      ITccallconv),
-	( "dotnet",     ITdotnet),
-        ("_ccall_",	ITccall (False, False, PlayRisky)),
-        ("_ccall_GC_",	ITccall (False, False, PlaySafe False)),
-        ("_casm_",	ITccall (False, True,  PlayRisky)),
-        ("_casm_GC_",	ITccall (False, True,  PlaySafe False))
+	map (\(x, y, z) -> (mkFastString x, (y, z)))
+     [	( "forall",	ITforall,	 bit glaExtsBit),
+	( "foreign",	ITforeign,	 bit ffiBit),
+	( "export",	ITexport,	 bit ffiBit),
+	( "label",	ITlabel,	 bit ffiBit),
+	( "dynamic",	ITdynamic,	 bit ffiBit),
+	( "safe",	ITsafe,		 bit ffiBit),
+	( "threadsafe",	ITthreadsafe,	 bit ffiBit),
+	( "unsafe",	ITunsafe,	 bit ffiBit),
+	( "with",	ITwith,		 bit withBit),
+	( "stdcall",    ITstdcallconv,	 bit ffiBit),
+	( "ccall",      ITccallconv,	 bit ffiBit),
+	( "dotnet",     ITdotnet,	 bit ffiBit),
+        ("_ccall_",	ITccall (False, False, PlayRisky),
+					 bit glaExtsBit),
+        ("_ccall_GC_",	ITccall (False, False, PlaySafe False),
+					 bit glaExtsBit),
+        ("_casm_",	ITccall (False, True,  PlayRisky),
+					 bit glaExtsBit),
+        ("_casm_GC_",	ITccall (False, True,  PlaySafe False),
+					 bit glaExtsBit)
      ]
-
 
 haskellKeySymsFM = listToUFM $
 	map (\ (x,y) -> (mkFastString x,y))
@@ -879,13 +888,10 @@ lex_id cont exts buf =
 
  let var_token = cont (ITvarid lexeme) buf' in
 
- if not (glaExtsEnabled exts)
-   then var_token
-   else
-
  case lookupUFM ghcExtensionKeywordsFM lexeme of {
-	Just kwd_token -> cont kwd_token buf';
-	Nothing        -> var_token
+    Just (kwd_token, validExts) 
+      | validExts .&. (I# exts) /= 0 -> cont kwd_token buf';
+    _				     -> var_token
 
  }}}
 
@@ -1197,12 +1203,14 @@ popContext = \ buf s@(PState{ context = ctx, loc = loc }) ->
 
 glaExtsBit, ffiBit, parrBit :: Int
 glaExtsBit = 0
-ffiBit	   = 1	-- FIXME: not used yet; still part of `glaExtsBit'
+ffiBit	   = 1
 parrBit	   = 2
+withBit	   = 3
 
 glaExtsEnabled, ffiEnabled, parrEnabled :: Int# -> Bool
 glaExtsEnabled flags = testBit (toInt32 flags) glaExtsBit
 ffiEnabled     flags = testBit (toInt32 flags) ffiBit
+withEnabled    flags = testBit (toInt32 flags) withBit
 parrEnabled    flags = testBit (toInt32 flags) parrBit
 
 toInt32 :: Int# -> Int32
@@ -1210,30 +1218,36 @@ toInt32 x# = fromIntegral (I# x#)
 
 -- convenient record-based bitmap for the interface to the rest of the world
 --
+-- NB: `glasgowExtsEF' implies `ffiEF' (see `mkPState' below)
+--
 data ExtFlags = ExtFlags {
 		  glasgowExtsEF :: Bool,
---		  ffiEF		:: Bool,  -- commented out to avoid warnings
-		  parrEF	:: Bool	  -- while not used yet
+		  ffiEF		:: Bool,
+		  withEF	:: Bool,
+		  parrEF	:: Bool
 		}
 
 -- create a parse state
 --
 mkPState          :: SrcLoc -> ExtFlags -> PState
-mkPState loc exts  = PState {
-		       loc        = loc,
-		       extsBitmap = case (fromIntegral bitmap) of {I# bits -> bits},
-		       bol	  = 0#,
-		       atbol      = 1#,
-		       context    = []
-		     }
-		     where
-		       bitmap =     glaExtsBit `setBitIf` glasgowExtsEF exts
---			        .|. ffiBit     `setBitIf` ffiEF		exts
-				.|. parrBit    `setBitIf` parrEF	exts
-                       --
-		       setBitIf :: Int -> Bool -> Int32
-		       b `setBitIf` cond | cond      = bit b
-					 | otherwise = 0
+mkPState loc exts  = 
+  PState {
+    loc        = loc,
+      extsBitmap = case (fromIntegral bitmap) of {I# bits -> bits},
+      bol	  = 0#,
+      atbol      = 1#,
+      context    = []
+    }
+    where
+      bitmap =     glaExtsBit `setBitIf` glasgowExtsEF     exts
+	       .|. ffiBit     `setBitIf` (ffiEF	           exts
+					  || glasgowExtsEF exts)
+	       .|. withBit    `setBitIf` withEF		   exts
+	       .|. parrBit    `setBitIf` parrEF		   exts
+      --
+      setBitIf :: Int -> Bool -> Int32
+      b `setBitIf` cond | cond      = bit b
+			| otherwise = 0
 
 -----------------------------------------------------------------------------
 

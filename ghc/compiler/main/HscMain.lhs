@@ -499,6 +499,8 @@ myParseModule dflags src_filename
       buf <- hGetStringBuffer src_filename
 
       let exts = ExtFlags {glasgowExtsEF = dopt Opt_GlasgowExts dflags,
+			   ffiEF	 = dopt Opt_FFI		dflags,
+			   withEF	 = dopt Opt_With	dflags,
 			   parrEF	 = dopt Opt_PArr	dflags}
 	  loc  = mkSrcLoc (mkFastString src_filename) 1
 
@@ -672,6 +674,8 @@ hscParseStmt dflags str
       buf <- stringToStringBuffer str
 
       let exts = ExtFlags {glasgowExtsEF = dopt Opt_GlasgowExts dflags,
+			   ffiEF	 = dopt Opt_FFI		dflags,
+			   withEF	 = dopt Opt_With	dflags,
 			   parrEF	 = dopt Opt_PArr	dflags}
 	  loc  = mkSrcLoc FSLIT("<interactive>") 1
 
@@ -756,6 +760,8 @@ myParseIdentifier dflags str
   = do buf <- stringToStringBuffer str
  
        let exts = ExtFlags {glasgowExtsEF = dopt Opt_GlasgowExts dflags,
+			    ffiEF	  = dopt Opt_FFI	 dflags,
+			    withEF	  = dopt Opt_With	 dflags,
 			    parrEF	  = dopt Opt_PArr	 dflags}
 	   loc  = mkSrcLoc FSLIT("<interactive>") 1
 

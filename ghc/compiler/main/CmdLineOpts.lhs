@@ -292,7 +292,9 @@ data DynFlag
    | Opt_AllowIncoherentInstances
    | Opt_NoMonomorphismRestriction
    | Opt_GlasgowExts
+   | Opt_FFI
    | Opt_PArr			       -- syntactic support for parallel arrays
+   | Opt_With			       -- deprecated keyword for implicit parms
    | Opt_Generics
    | Opt_NoImplicitPrelude 
 

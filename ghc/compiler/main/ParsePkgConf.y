@@ -83,6 +83,8 @@ loadPackageConfig conf_filename = do
    buf <- hGetStringBuffer conf_filename
    let loc  = mkSrcLoc (mkFastString conf_filename) 1
        exts = ExtFlags {glasgowExtsEF = False,
+		        ffiEF	      = False,
+			withEF	      = False,
 			parrEF	      = False}
    case parse buf (mkPState loc exts) of
 	PFailed err -> do

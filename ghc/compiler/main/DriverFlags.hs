@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.93 2002/05/11 10:02:22 panne Exp $
+-- $Id: DriverFlags.hs,v 1.94 2002/05/15 08:59:59 chak Exp $
 --
 -- Driver flags
 --
@@ -457,6 +457,9 @@ fFlags = [
   ( "warn-unused-matches",       	Opt_WarnUnusedMatches ),
   ( "warn-deprecations",         	Opt_WarnDeprecations ),
   ( "glasgow-exts", 		 	Opt_GlasgowExts ),
+  ( "fi",				Opt_FFI ),  -- support `-ffi'...
+  ( "ffi",				Opt_FFI ),  -- ...and also `-fffi'
+  ( "with",				Opt_With ), -- with keyword
   ( "parr",				Opt_PArr ),
   ( "allow-overlapping-instances", 	Opt_AllowOverlappingInstances ),
   ( "allow-undecidable-instances", 	Opt_AllowUndecidableInstances ),

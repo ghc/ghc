@@ -597,6 +597,8 @@ readIface file_path
 
   where
     exts = ExtFlags {glasgowExtsEF = True,
+		     ffiEF	   = True,
+		     withEF	   = True,
 		     parrEF	   = True}
     loc  = mkSrcLoc (mkFastString file_path) 1
 

@@ -436,6 +436,19 @@
 	      <entry><option>-fno-glasgow-exts</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-ffi</option> or <option>-fffi</option></entry>
+	      <entry>Enable foreign function interface (implied by
+	      <option>-fglasgow-exts</option>)</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-ffi</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-fwith</option></entry>
+	      <entry>Enable deprecated <literal>with</literal> keyword</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-with</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-fignore-asserts</option></entry>
 	      <entry>Ignore assertions</entry>
 	      <entry>dynamic</entry>

@@ -52,6 +52,30 @@ program), you may wish to check if there are libraries that provide a
       </varlistentry>
 
       <varlistentry>
+	<term><option>-ffi</option> and <option>-fffi</option>:</term>
+	<indexterm><primary><option>-ffi</option></primary></indexterm>
+	<indexterm><primary><option>-fffi</option></primary></indexterm>
+	<listitem>
+	  <para>This option enables the language extension defined in the
+	  Haskell 98 Foreign Function Interface Addendum plus deprecated
+	  syntax of previous versions of the FFI for backwards
+	  compatibility.</para> 
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-fwith</option>:</term>
+	<indexterm><primary><option>-fwith</option></primary></indexterm>
+	<listitem>
+	  <para>This option enables the deprecated <literal>with</literal>
+	  keyword for implicit parameters; it is merely provided for backwards
+	  compatibility.
+          It is independent of the <option>-fglasgow-exts</option>
+          flag. </para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-fno-monomorphism-restriction</option>:</term>
 	<indexterm><primary><option>-fno-monomorphism-restriction</option></primary></indexterm>
 	<listitem>
