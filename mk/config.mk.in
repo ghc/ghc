@@ -663,7 +663,11 @@ CONTEXT_DIFF		= @ContextDiffCmd@
 CP			= cp
 CPP			= @CPP@
 CTAGS 			= $(ETAGS)
-RAWCPP                  = $(CPP) -undef -traditional
+#
+# RAWCPP_FLAGS are the flags to give to cpp (viz, gcc -E) to persuade it to
+# behave plausibly on Haskell sources.
+#
+RAWCPP_FLAGS            = -undef -traditional
 FIND			= @FindCmd@
 INSTALL			= @INSTALL@
 #

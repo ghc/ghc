@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.169 2001/07/04 15:51:23 simonpj Exp $
+# $Id: Makefile,v 1.170 2001/07/05 13:31:09 sewardj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -46,7 +46,7 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cGhcWithNativeCodeGen = \"$(GhcWithNativeCodeGen)\"" >> $(CONFIG_HS)
 	@echo "cGhcUnregisterised    = \"$(GhcUnregisterised)\"" >> $(CONFIG_HS)
 	@echo "cLeadingUnderscore    = \"$(LeadingUnderscore)\"" >> $(CONFIG_HS)
-	@echo "cRAWCPP               = \"$(GHC_RAWCPP)\"" >> $(CONFIG_HS)
+	@echo "cRAWCPP_FLAGS         = \"$(RAWCPP_FLAGS)\"" >> $(CONFIG_HS)
 	@echo "cGCC                  = \"$(WhatGccIsCalled)\"" >> $(CONFIG_HS)
 	@echo "cMKDLL                = \"$(BLD_DLL)\"" >> $(CONFIG_HS)
 	@echo "cGHC_DRIVER_DIR       = \"$(GHC_DRIVER_DIR)\"" >> $(CONFIG_HS)

@@ -197,7 +197,8 @@ initSysTools minusB_args
 		--	for "in-place" it is the root of the build tree
 		-- NB: top_dir is assumed to be in standard Unix format '/' separated
 
-	; let installed_bin pgm   =  pgmPath (top_dir `slash` "bin") pgm
+	; let installed, installed_bin :: FilePath -> FilePath
+              installed_bin pgm   =  pgmPath (top_dir `slash` "extra-bin") pgm
 	      installed     file  =  pgmPath top_dir file
 	      inplace dir   pgm   =  pgmPath (top_dir `slash` dir) pgm
 
@@ -236,15 +237,23 @@ initSysTools minusB_args
 	-- 	so when "installed" we look in TopDir/bin
 	-- When "in-place" we look wherever the build-time configure 
 	--	script found them
-	; let cpp_path 	| am_installed = installed cRAWCPP
-		       	| otherwise    = cRAWCPP
-	      gcc_path 	| am_installed = installed cGCC
+	-- When "install" we tell gcc where its specs file + exes are (-B)
+	--	and also some places to pick up include files.  We need
+	--	to be careful to put all necessary exes in the -B place
+	--	(as, ld, cc1, etc) since if they don't get found there, gcc
+	--	then tries to run unadorned "as", "ld", etc, and will
+	--	pick up whatever happens to be lying around in the path,
+	--	possibly including those from a cygwin install on the target,
+	--	which is exactly what we're trying to avoid.
+	; let gcc_path 	| am_installed = installed_bin ("gcc -B" ++ installed "lib/gcc-lib/" 
+                                         ++ " -I" ++ installed "include/w32api:" 
+                                                  ++ installed "include/mingw")
 		       	| otherwise    = cGCC
-	      perl_path | am_installed = installed cGHC_PERL
+	      perl_path | am_installed = installed_bin cGHC_PERL
 		        | otherwise    = cGHC_PERL
 
 	-- 'touch' is a GHC util for Windows, and similarly unlit, mangle
-	; let touch_path  | am_installed = installed cGHC_TOUCHY
+	; let touch_path  | am_installed = installed_bin cGHC_TOUCHY
 		       	  | otherwise    = inplace cGHC_TOUCHY_DIR cGHC_TOUCHY
 
 	-- On Win32 we don't want to rely on #!/bin/perl, so we prepend 
@@ -258,8 +267,7 @@ initSysTools minusB_args
 	-- On Unix, the "standard" tools are assumed to be
 	-- in the same place whether we are running "in-place" or "installed"
 	-- That place is wherever the build-time configure script found them.
-	; let	cpp_path   = cRAWCPP
-		gcc_path   = cGCC
+	; let   gcc_path   = cGCC
 		touch_path = cGHC_TOUCHY
 		mkdll_path = panic "Can't build DLLs on a non-Win32 system"
 
@@ -270,6 +278,9 @@ initSysTools minusB_args
 	; let split_path  = split_script
 	      mangle_path = mangle_script
 #endif
+
+	-- cpp is derived from gcc on all platforms
+        ; let cpp_path  = gcc_path ++ " -E " ++ cRAWCPP_FLAGS
 
 	-- For all systems, copy and remove are provided by the host
 	-- system; architecture-specific stuff is done when building Config.hs
