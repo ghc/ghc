@@ -1,0 +1,11 @@
+In order to get a build tree into a state in which it can be used to
+make an InstallShield, the following steps must be performed; these
+should be put into the build system itself (under make install) so
+that this "laying on of hands" is unnecessary.
+
+1. cp ghc/compiler/ghc-x.yy ghc/compiler/ghc.exe
+2. strip ghc/compiler/ghc.exe ghc/driver/ghci/ghci.exe hslibs/tools/*/*.exe
+3. cp ghc/utils/ghc-pkg/ghc-pkg.bin ghc/utils/ghc-pkg/ghc-pkg.exe
+4. strip ghc/utils/*/*.exe
+5. (cd docs/building && ps2pdf building.ps building.pdf)
+6. (cd ghc/docs/set && ps2pdf set.ps set.pdf)
