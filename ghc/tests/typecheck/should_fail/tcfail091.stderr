@@ -1,0 +1,4 @@
+
+tcfail091.hs:8:
+    Illegal superclass constraint `?imp :: Int' in declaration for class `C'
+    In the class declaration for `C'
