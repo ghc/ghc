@@ -118,7 +118,7 @@ and hence the default mechanism would resolve the "a".
 module TcSimplify (
 	tcSimplify, tcSimplifyAndCheck, tcSimplifyToDicts, 
 	tcSimplifyTop, tcSimplifyThetas, tcSimplifyCheckThetas,
-	bindInstsOfLocalFuns
+	bindInstsOfLocalFuns, partitionPredsOfLIE
     ) where
 
 #include "HsVersions.h"
@@ -137,9 +137,11 @@ import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  instToId, instBindingRequired, instCanBeGeneralised,
 			  newDictFromOld,
 			  getDictClassTys, getIPs,
+			  getDictPred_maybe, getMethodTheta_maybe,
 			  instLoc, pprInst, zonkInst, tidyInst, tidyInsts,
 			  Inst, LIE, pprInsts, pprInstsInFull,
-			  mkLIE, emptyLIE, plusLIE, lieToList
+			  mkLIE, emptyLIE, unitLIE, consLIE, plusLIE,
+			  lieToList, listToLIE
 			)
 import TcEnv		( tcGetGlobalTyVars )
 import TcType		( TcType, TcTyVarSet, typeToTcType )
@@ -163,6 +165,7 @@ import CmdLineOpts	( opt_GlasgowExts )
 import Outputable
 import Util
 import List		( partition )
+import Maybes		( maybeToBool )
 \end{code}
 
 
@@ -336,13 +339,57 @@ tcSimplifyToDicts wanted_lie
     returnTc (mkLIE irreds, binds)
   where
     -- see comment on wanteds in tcSimplify
-    wanteds = filter notFunDep (lieToList wanted_lie)
+    -- ZZ waitaminute - doesn't appear that any funDeps should even be here...
+    -- wanteds = filter notFunDep (lieToList wanted_lie)
+    wanteds = lieToList wanted_lie
 
 	-- Reduce methods and lits only; stop as soon as we get a dictionary
     try_me inst	| isDict inst = DontReduce
 		| otherwise   = ReduceMe AddToIrreds
 \end{code}
 
+The following function partitions a LIE by a predicate defined
+over `Pred'icates (an unfortunate overloading of terminology!).
+This means it sometimes has to split up `Methods', in which case
+a binding is generated.
+
+It is used in `with' bindings to extract from the LIE the implicit
+parameters being bound.
+
+\begin{code}
+partitionPredsOfLIE pred lie
+  = foldlTc (partPreds pred) (emptyLIE, emptyLIE, EmptyMonoBinds) insts
+  where insts = lieToList lie
+
+-- warning: the term `pred' is overloaded here!
+partPreds pred (lie1, lie2, binds) inst
+  | maybeToBool maybe_pred
+  = if pred p then
+	returnTc (consLIE inst lie1, lie2, binds)
+    else
+	returnTc (lie1, consLIE inst lie2, binds)
+    where maybe_pred = getDictPred_maybe inst
+	  Just p = maybe_pred
+
+-- the assumption is that those satisfying `pred' are being extracted,
+-- so we leave the method untouched when nothing satisfies `pred'
+partPreds pred (lie1, lie2, binds1) inst
+  | maybeToBool maybe_theta
+  = if any pred theta then
+	zonkInst inst				`thenTc` \ inst' ->
+	tcSimplifyToDicts (unitLIE inst')	`thenTc` \ (lie3, binds2) ->
+	partitionPredsOfLIE pred lie3		`thenTc` \ (lie1', lie2', EmptyMonoBinds) ->
+	returnTc (lie1 `plusLIE` lie1',
+		  lie2 `plusLIE` lie2',
+		  binds1 `AndMonoBinds` binds2)
+    else
+	returnTc (lie1, consLIE inst lie2, binds1)
+    where maybe_theta = getMethodTheta_maybe inst
+	  Just theta = maybe_theta
+
+partPreds pred (lie1, lie2, binds) inst
+  = returnTc (lie1, consLIE inst lie2, binds)
+\end{code}
 
 
 %************************************************************************

@@ -305,6 +305,14 @@ instance (Outputable a, Outputable b, Outputable c) => Outputable (a, b, c) wher
 		   ppr y <> comma,
 		   ppr z ])
 
+instance (Outputable a, Outputable b, Outputable c, Outputable d) =>
+	 Outputable (a, b, c, d) where
+    ppr (x,y,z,w) =
+      parens (sep [ppr x <> comma,
+		   ppr y <> comma,
+		   ppr z <> comma,
+		   ppr w])
+
 instance Outputable FastString where
     ppr fs = text (unpackFS fs)		-- Prints an unadorned string,
 					-- no double quotes or anything

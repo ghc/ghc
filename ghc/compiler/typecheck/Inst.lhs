@@ -18,10 +18,10 @@ module Inst (
 	newIPDict, instOverloadedFun,
 
 	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, instLoc, getDictClassTys,
+	getDictPred_maybe, getMethodTheta_maybe,
 	getFunDeps, getFunDepsOfLIE,
 	getIPs, getIPsOfLIE,
 	getAllFunDeps, getAllFunDepsOfLIE,
-	partitionLIEbyMeth,
 
 	lookupInst, lookupSimpleInst, LookupInstResult(..),
 
@@ -84,7 +84,6 @@ import Unique	( fromRationalClassOpKey, rationalTyConKey,
 		  fromIntClassOpKey, fromIntegerClassOpKey, Unique
 		)
 import Maybes	( expectJust )
-import List	( partition )
 import Maybe	( catMaybes )
 import Util	( thenCmp, zipWithEqual, mapAccumL )
 import Outputable
@@ -250,6 +249,12 @@ instLoc (Method u _ _ _ _   loc) = loc
 instLoc (LitInst u lit ty   loc) = loc
 instLoc (FunDep _ _	    loc) = loc
 
+getDictPred_maybe (Dict _ p _) = Just p
+getDictPred_maybe _	       = Nothing
+
+getMethodTheta_maybe (Method _ _ _ theta _ _) = Just theta
+getMethodTheta_maybe _			      = Nothing
+
 getDictClassTys (Dict u (Class clas tys) _) = (clas, tys)
 
 getFunDeps (FunDep clas fds _) = Just (clas, fds)
@@ -271,31 +276,6 @@ getAllFunDeps (FunDep clas fds _) = fds
 getAllFunDeps inst = map (\(n,ty) -> ([], [ty])) (getIPs inst)
 
 getAllFunDepsOfLIE lie = concat (map getAllFunDeps (lieToList lie))
-
-partitionLIEbyMeth pred lie
-  = foldlTc (partMethod pred) (emptyLIE, emptyLIE) insts
-  where insts = lieToList lie
-
-partMethod pred (ips, lie) d@(Dict _ p _)
-  = if pred p then
-	returnTc (consLIE d ips, lie)
-    else
-	returnTc (ips, consLIE d lie)
-
-partMethod pred (ips, lie) m@(Method u id tys theta tau loc@(_,sloc,_))
-  = let (ips_, theta_) = partition pred theta in
-    if null ips_ then
-	returnTc (ips, consLIE m lie)
-    else if null theta_ then
-	returnTc (consLIE m ips, lie)
-    else
-	zonkPreds theta_ `thenTc` \ theta_' ->
-	newDictsAtLoc loc theta_'	    `thenTc` \ (new_dicts, _) ->
-	returnTc (consLIE m ips,
-		  plusLIE (listToLIE new_dicts) lie)
-
-partMethod pred (ips, lie) inst@(LitInst u lit ty loc)
-  = returnTc (ips, consLIE inst lie)
 
 tyVarsOfInst :: Inst -> TcTyVarSet
 tyVarsOfInst (Dict _ pred _)         = tyVarsOfPred pred

@@ -22,10 +22,10 @@ import BasicTypes	( RecFlag(..) )
 
 import Inst		( Inst, InstOrigin(..), OverloadedLit(..),
 			  LIE, emptyLIE, unitLIE, consLIE, plusLIE, plusLIEs,
-			  lieToList, listToLIE, tyVarsOfLIE, zonkLIE,
+			  lieToList, listToLIE,
 			  newOverloadedLit, newMethod, newIPDict,
 			  instOverloadedFun, newDicts, newClassDicts,
-			  partitionLIEbyMeth, getIPsOfLIE, instToId, ipToId
+			  getIPsOfLIE, instToId, ipToId
 			)
 import TcBinds		( tcBindsAndThen )
 import TcEnv		( tcInstId,
@@ -37,7 +37,7 @@ import TcEnv		( tcInstId,
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcStmts )
 import TcMonoType	( tcHsType, checkSigTyVars, sigCtxt )
 import TcPat		( badFieldCon )
-import TcSimplify	( tcSimplify, tcSimplifyAndCheck )
+import TcSimplify	( tcSimplify, tcSimplifyAndCheck, partitionPredsOfLIE )
 import TcType		( TcType, TcTauType,
 			  tcInstTyVars,
 			  tcInstTcType, tcSplitRhoTy,
@@ -731,16 +731,14 @@ Implicit Parameter bindings.
 tcMonoExpr (HsWith expr binds) res_ty
   = tcMonoExpr expr res_ty		`thenTc` \ (expr', lie) ->
     tcIPBinds binds			`thenTc` \ (binds', types, lie2) ->
-    partitionLIEbyMeth isBound lie	`thenTc` \ (ips, lie') ->
-    zonkLIE ips				`thenTc` \ ips' ->
-    tcSimplify (text "tcMonoExpr With") (tyVarsOfLIE ips') ips'
-					`thenTc` \ res@(_, dict_binds, _) ->
+    partitionPredsOfLIE isBound lie	`thenTc` \ (ips, lie', dict_binds) ->
+    pprTrace "tcMonoExpr With" (ppr (ips, lie', dict_binds)) $
     let expr'' = if nullMonoBinds dict_binds
 		 then expr'
 		 else HsLet (mkMonoBind (revBinds dict_binds) [] NonRecursive)
 			    expr'
     in
-    tcCheckIPBinds binds' types ips'	`thenTc_`
+    tcCheckIPBinds binds' types ips	`thenTc_`
     returnTc (HsWith expr'' binds', lie' `plusLIE` lie2)
   where isBound p
 	  = case ipName_maybe p of

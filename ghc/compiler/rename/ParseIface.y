@@ -36,6 +36,7 @@ import Maybes
 import Outputable
 
 import GlaExts
+import FastString	( tailFS )
 
 #if __HASKELL1__ > 4
 import Ratio ( (%) )
@@ -454,7 +455,7 @@ context_list1	: class					{ [$1] }
 
 class		:: { HsPred RdrName }
 class		:  qcls_name atypes			{ (HsPClass $1 $2) }
-		|  IPVARID '::' type			{ (HsPIParam (mkSysUnqual ipName $1) $3) }
+		|  ipvar_name '::' type			{ (HsPIParam $1 $3) }
 
 types0		:: { [RdrNameHsType] 			{- Zero or more -}  }	
 types0		:  {- empty -}				{ [ ] }
@@ -482,7 +483,7 @@ atype		:  qtc_name 			  	{ MonoTyVar $1 }
 		|  '(#' types0 '#)'			{ MonoTupleTy $2 False{-unboxed-} }
 		|  '[' type ']'		  		{ MonoListTy  $2 }
 		|  '{' qcls_name atypes '}'		{ MonoDictTy $2 $3 }
-		|  '{' IPVARID '::' type '}'		{ MonoIParamTy (mkSysUnqual ipName $2) $4 }
+		|  '{' ipvar_name '::' type '}'		{ MonoIParamTy $2 $4 }
 		|  '(' type ')'		  		{ $2 }
 
 -- This one is dealt with via qtc_name
@@ -527,6 +528,9 @@ var_name	:  var_occ		{ mkRdrUnqual $1 }
 qvar_name	:: { RdrName }
 qvar_name	:  var_name		{ $1 }
 		|  qvar_fs      	{ mkSysQual varName $1 }
+
+ipvar_name	:: { RdrName }
+		:  IPVARID		{ mkSysUnqual ipName (tailFS $1) }
 
 var_names	:: { [RdrName] }
 var_names	: 			{ [] }

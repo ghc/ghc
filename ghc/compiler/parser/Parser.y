@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.26 2000/02/28 21:59:32 lewie Exp $
+$Id: Parser.y,v 1.27 2000/03/02 22:51:30 lewie Exp $
 
 Haskell grammar.
 
@@ -28,6 +28,7 @@ import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..) )
 import Panic
 
 import GlaExts
+import FastString	( tailFS )
 
 #include "HsVersions.h"
 }
@@ -514,7 +515,7 @@ ctype	:: { RdrNameHsType }
 
 type :: { RdrNameHsType }
 	: btype '->' type		{ MonoFunTy $1 $3 }
-	| IPVARID '::' type		{ MonoIParamTy (mkSrcUnqual ipName $1) $3 }
+	| ipvar '::' type		{ MonoIParamTy $1 $3 }
 	| btype				{ $1 }
 
 btype :: { RdrNameHsType }
@@ -716,7 +717,7 @@ aexp	:: { RdrNameHsExpr }
 
 aexp1	:: { RdrNameHsExpr }
 	: qvar				{ HsVar $1 }
-	| IPVARID			{ HsIPVar (mkSrcUnqual ipName $1) }
+	| ipvar				{ HsIPVar $1 }
 	| gcon				{ HsVar $1 }
   	| literal			{ HsLit $1 }
 	| '(' exp ')'			{ HsPar $2 }
@@ -863,7 +864,7 @@ dbinds 	:: { [(RdrName, RdrNameHsExpr)] }
 	| {- empty -}			{ [] }
 
 dbind	:: { (RdrName, RdrNameHsExpr) }
-dbind	: IPVARID '=' exp		{ (mkSrcUnqual ipName $1, $3) }
+dbind	: ipvar '=' exp			{ ($1, $3) }
 
 -----------------------------------------------------------------------------
 -- Variables, Constructors and Operators.
@@ -881,6 +882,9 @@ var 	:: { RdrName }
 qvar 	:: { RdrName }
 	: qvarid		{ $1 }
 	| '(' qvarsym ')'	{ $2 }
+
+ipvar	:: { RdrName }
+	: IPVARID		{ (mkSrcUnqual ipName (tailFS $1)) }
 
 con	:: { RdrName }
 	: conid			{ $1 }
