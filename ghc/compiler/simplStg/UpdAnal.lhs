@@ -15,23 +15,20 @@
 > IMP_Ubiq(){-uitous-}
 >
 > import StgSyn
+> import Id		( SYN_IE(IdEnv), growIdEnv, addOneToIdEnv, combineIdEnvs, nullIdEnv, 
+>			  unitIdEnv, mkIdEnv, rngIdEnv, lookupIdEnv, 
+>			  SYN_IE(IdSet),
+>			  getIdUpdateInfo, addIdUpdateInfo, mkSysLocal, idType, isImportedId,
+>			  externallyVisibleId,
+>			  SYN_IE(Id), GenId
+>			)
+> import IdInfo		( UpdateInfo, SYN_IE(UpdateSpec), mkUpdateInfo, updateInfoMaybe )
+> import Type		( splitFunTy, splitSigmaTy )
+> import UniqSet
+> import Unique		( getBuiltinUniques )
+> import SrcLoc		( noSrcLoc )
 > import Util		( panic )
 >
-> updateAnalyse :: [StgBinding] -> [StgBinding] {- Exported -}
-> updateAnalyse = panic "UpdAnal.updateAnalyse"
->
-> {- LATER: to end of file:
-> --import Type		( splitFunTy, splitSigmaTy, Class, TyVarTemplate,
-> --			  SYN_IE(TauType)
-> --			)
-> --import Id
-> --import IdInfo
-> --import Pretty
-> --import SrcLoc 	( noSrcLoc )
-> --import StgSyn
-> --import UniqSet
-> --import Unique 	( getBuiltinUniques )
-> --import Util
 
 %-----------------------------------------------------------------------------
 \subsection{Reverse application}
@@ -511,6 +508,5 @@ suffice for now.
 >		 		addIdUpdateInfo v
 >					(mkUpdateInfo (mkUpdateSpec v c))
 >		| otherwise    = v
-> -}
 
 %-----------------------------------------------------------------------------
