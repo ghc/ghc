@@ -52,7 +52,7 @@ import GHC.IOBase            ( IO, IORef, newIORef, readIORef, writeIORef, )
 import GHC.List              ( elem, length )
 import GHC.Num               ( Num(..) )
 #else
-import Data.IORef            ( IORef, newIORef, readIORef, modifyIORef )
+import Data.IORef            ( IORef, newIORef, readIORef, writeIORef )
 #if defined(__NHC__)
 import IO                    ( bracket )
 #else
