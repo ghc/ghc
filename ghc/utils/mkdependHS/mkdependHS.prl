@@ -192,6 +192,7 @@ foreach $sf (@Src_files) {
     }
     &slurp_file_for_imports($file_to_read, $sf);
 
+    # Delete the temporary.
     if ( $sf =~ /\.l(hs|y)$/ ) {
 	unlink "$Tmp_prefix.hs";
     }
@@ -273,7 +274,7 @@ sub mangle_command_line_args {
             
 	    } elsif ( /^-(x|-exclude-module=)(.*)/ ) { 
 		local($thing) = &grab_arg_arg($1,$2);
-		$IgnoreMe{$thing} = 'y';
+		$IgnoreMe{$thing} = 'Y';
 	    } elsif ( /^-(X|-exclude-directory=)(.*)/ ) { 
 		foreach $d ( split(/:/,&grab_arg_arg($1, $2)) ) {
                    push(@Ignore_dirs,"$d");
@@ -356,7 +357,7 @@ sub preprocess_import_dirs {
             next unless /(.*)\.(hi|l?hs|l?y)$/;
             #don't tag it twice or overwrite it with a diff. value
             next if $IgnoreMe{$1};
-            print STDERR "Module $d/$1.$2 will be ignored\n" if $Verbose;
+            print STDERR "Module $d will be ignored\n" if $Verbose;
 
             $IgnoreMe{$1} = 'y';
         }
@@ -372,6 +373,14 @@ sub slurp_file_for_imports {
     local($last_seen_dir) = $orig_src_file;
     $last_seen_dir =~ s/\/[^\/]+$//; # strip to dir name
     $last_seen_dir = '.' if ($last_seen_dir eq $orig_src_file);
+
+    local($mod_name) = $orig_src_file;
+
+    $mod_name =~ s/.*\/([^\/]+)$/$1/g;
+    $mod_name =~ s/^([^.]+)\.(.*)$/$1/;
+
+    print STDERR "Warning: processing module $mod_name, which I was supposed to ignore.\n"
+    	if ( $IgnoreMe{$mod_name} eq 'Y' && $Warnings );
 
     &process_dependency('import',0,'Prelude') if ($Include_prelude);
 
@@ -422,7 +431,11 @@ sub process_dependency {
   local($todo,$source,$modname) = @_;
 
   if ($todo eq 'import') {
-    if ( $ModuleIn{$modname} ) {
+    if ( $IgnoreMe{$modname} eq 'Y' ) {
+         # user specifically asked for this module
+	 # to be ignored.
+	 $follow_file = '__ignore__';
+    } elsif ( $ModuleIn{$modname} ) {
         $follow_file = "$ModuleIn{$modname}/$modname.hi";
     } else { # hard way
 	$follow_file =
