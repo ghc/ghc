@@ -378,8 +378,9 @@ $(SCRIPT_PROG) :: $(SCRIPT_OBJS)
 	@echo Creating $@...
 ifeq "$(INTERP)" "perl"
 ifneq "$(BIN_DIST)" "1"
-	@echo "eval 'exec perl -S $$$""0 $$""{1+\"$$$""@\"}'"  > $@
-	@echo "      if $$""running_under_some_shell;"     >> $@
+	@echo "#!/bin/sh -- # to stop perl from looping " > $@
+	@echo "eval 'exec perl -S $$$""0 $$""{1+\"$$$""@\"}'"  >> $@
+	@echo "      if $$""running_under_some_shell;"         >> $@
 else
 	@touch $@
 endif
@@ -464,7 +465,8 @@ ifeq "$(INTERP)" "perl"
 ifneq "$(BIN_DIST)" "1"
 	@for i in $(INSTALL_SCRIPTS); do \
 	   $(RM) $$i.tmp; \
-	   echo "eval 'exec $(PERL) -S $$$""0 $$""{1+\"$$$""@\"}'"  > $$i.tmp ; \
+	   @echo "#!/bin/sh -- # to stop perl from looping "        > $$i.tmp ; \
+	   echo "eval 'exec $(PERL) -S $$$""0 $$""{1+\"$$$""@\"}'" >> $$i.tmp ; \
 	   echo "      if $$""running_under_some_shell;"           >> $$i.tmp ; \
 	   echo $$"bindir='$(bindir)';"                            >> $$i.tmp ; \
 	   echo $$"libdir='$(libdir)';"                            >> $$i.tmp ; \
@@ -494,7 +496,8 @@ ifeq "$(INTERP)" "perl"
 ifneq "$(BIN_DIST)" "1"
 	@for i in $(INSTALL_LIB_SCRIPTS); do \
 	   $(RM) $$i.tmp; \
-	   echo "eval 'exec $(PERL) -S $$$""0 $$""{1+\"$$$""@\"}'"  > $$i.tmp ; \
+	   @echo "#!/bin/sh -- # to stop perl from looping "        > $$i.tmp ; \
+	   echo "eval 'exec $(PERL) -S $$$""0 $$""{1+\"$$$""@\"}'" >> $$i.tmp ; \
 	   echo "      if $$""running_under_some_shell;"           >> $$i.tmp ; \
 	   echo $$"bindir='$(bindir)';"                            >> $$i.tmp ; \
 	   echo $$"libdir='$(libdir)';"                            >> $$i.tmp ; \
@@ -524,7 +527,8 @@ ifeq "$(INTERP)" "perl"
 ifneq "$(BIN_DIST)" "1"
 	@for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
 	   $(RM) $$i.tmp; \
-	   echo "eval 'exec $(PERL) -S $$$""0 $$""{1+\"$$$""@\"}'"  > $$i.tmp ; \
+	   @echo "#!/bin/sh -- # to stop perl from looping "        > $$i.tmp ; \
+	   echo "eval 'exec $(PERL) -S $$$""0 $$""{1+\"$$$""@\"}'" >> $$i.tmp ; \
 	   echo "      if $$""running_under_some_shell;"           >> $$i.tmp ; \
 	   echo $$"bindir='$(bindir)';"                            >> $$i.tmp ; \
 	   echo $$"libdir='$(libdir)';"                            >> $$i.tmp ; \
