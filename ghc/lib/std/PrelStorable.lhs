@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelStorable.lhs,v 1.5 2001/04/13 21:37:43 panne Exp $
+% $Id: PrelStorable.lhs,v 1.6 2001/04/14 22:28:22 qrczak Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -24,7 +24,6 @@ module PrelStorable
 \end{code}
 
 \begin{code}
-import Char		( chr, ord )
 import Monad		( liftM )
 
 #ifdef __GLASGOW_HASKELL__

@@ -466,7 +466,6 @@ foreign import "stg_remInt64"      unsafe remInt64#      :: Int64# -> Int64# -> 
 foreign import "stg_intToInt64"    unsafe intToInt64#    :: Int# -> Int64#
 foreign import "stg_int64ToInt"    unsafe int64ToInt#    :: Int64# -> Int#
 foreign import "stg_wordToWord64"  unsafe wordToWord64#  :: Word# -> Word64#
-foreign import "stg_word64ToWord"  unsafe word64ToWord#  :: Word64# -> Word#
 foreign import "stg_int64ToWord64" unsafe int64ToWord64# :: Int64# -> Word64#
 foreign import "stg_word64ToInt64" unsafe word64ToInt64# :: Word64# -> Int64#
 foreign import "stg_and64"         unsafe and64#         :: Word64# -> Word64# -> Word64#

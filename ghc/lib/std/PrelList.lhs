@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelList.lhs,v 1.23 2001/02/26 09:29:32 simonpj Exp $
+% $Id: PrelList.lhs,v 1.24 2001/04/14 22:28:22 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -515,7 +515,7 @@ I'm going to leave it though.
 zip takes two lists and returns a list of corresponding pairs.  If one
 input list is short, excess elements of the longer list are discarded.
 zip3 takes three lists and returns a list of triples.  Zips for larger
-tuples are in the List library
+tuples are in the List module.
 
 \begin{code}
 ----------------------------------------------

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelNum.lhs,v 1.38 2001/03/29 13:55:01 simonmar Exp $
+% $Id: PrelNum.lhs,v 1.39 2001/04/14 22:28:22 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -437,11 +437,11 @@ jtos n cs
     | otherwise = jtos' n cs
     where
     jtos' :: Integer -> String -> String
-    jtos' n cs
-        | n < 10    = case unsafeChr (ord '0' + fromInteger n) of
-            c@(C# _) -> c:cs
+    jtos' n' cs'
+        | n' < 10    = case unsafeChr (ord '0' + fromInteger n') of
+            c@(C# _) -> c:cs'
         | otherwise = case unsafeChr (ord '0' + fromInteger r) of
-            c@(C# _) -> jtos' q (c:cs)
+            c@(C# _) -> jtos' q (c:cs')
         where
-        (q,r) = n `quotRemInteger` 10
+        (q,r) = n' `quotRemInteger` 10
 \end{code}

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.44 2001/04/03 15:05:52 simonmar Exp $
+% $Id: PrelBase.lhs,v 1.45 2001/04/14 22:28:22 qrczak Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -632,7 +632,7 @@ gtInt, geInt, eqInt, neInt, ltInt, leInt :: Int -> Int -> Bool
 
 #if WORD_SIZE_IN_BYTES == 4
 {-# RULES
-"intToInt32#" forall x#. intToInt32# x# = x#
+"intToInt32#"   forall x#. intToInt32#   x# = x#
 "wordToWord32#" forall x#. wordToWord32# x# = x#
      #-}
 #endif
