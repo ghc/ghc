@@ -34,7 +34,10 @@ module Foo (
 	f, g,
 
 	-- * Auxiliary stuff
-	-- $aux
+
+	-- $aux1
+
+	-- $aux2
    ) where
 
 
@@ -138,6 +141,8 @@ h :: Int
 h = 42
 
 
--- $aux This is some documentation that is attached to a name ($aux)
+-- $aux1 This is some documentation that is attached to a name ($aux1)
 -- rather than a source declaration.  The documentation may be
 -- referred to in the export list using its name.
+
+-- $aux2 This is some documentation that is attached to a name ($aux2)
