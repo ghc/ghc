@@ -1,8 +1,8 @@
-	     The Glasgow Haskell Compiler -- version 4.04
+	     The Glasgow Haskell Compiler -- version 4.06
 	    ==============================================
 
 We are pleased to announce a new release of the Glasgow Haskell
-Compiler (GHC), version 4.04.  The source distribution is freely
+Compiler (GHC), version 4.06.  The source distribution is freely
 available via the World-Wide Web and through anon. FTP; details below.
 
 Haskell is "the" standard lazy functional programming language; the
@@ -18,16 +18,33 @@ GHC's Web page lives at
 + What's new
 =============
 
-   - GHC is now officially Open Source, see the LICENSE file in the
-     distribution for details.
+This should be a stable release. We have not made major changes
+since 4.04 to the core compiler, but we have fixed lots of bugs.
+We believe that 4.06 is in a nice stable well-tested state.  (Ha!)
 
-   - Rewrite rules can be specified in the source using the RULES
-     pragma.  This is used for automatic fusion of common list functions.
+Apart from that, there are the following changes
 
-   - Performance tuning: compiled programs now allocate 30% less
-     and run 20% faster on average compared to GHC 4.02.
+   - Major library reorganisation.  All libraries, except the ones that
+     are part of the Haskell 98 *language* specification, have moved to
+     fptools/hslibs/.  The hslibs tree is independent of GHC, shared between
+     GHC, Hugs, and (we hope) other Haskell implementations.  
+     The idea is to make it easier for people to contribute and maintain 
+     libraries.
 
-   - GHC now uses a Happy parser instead of the old yacc/lex one.
+     The hslibs/ tree is organised in a Java-like fashion.  Details in 
+     the new Library guide.  <url please>
+
+     Existing programs that use the -syslib flag may need to change which
+     syslibs they include.
+
+   - Support for "foreign export dynamic".
+
+   - Clean up of concurrent I/O system; in particular, I/O is now non-blocking,
+     except (alas) on stdout/stderr for tiresome reasons.
+
+   - Some refinements to the exceptions mechanism <url please>
+
+   - More performance tuning: compiled programs now allocate 10% less than 4.04
 
 For full details see the release notes:
 
