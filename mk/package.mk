@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.45 2005/01/23 17:05:31 panne Exp $
+# $Id: package.mk,v 1.46 2005/02/08 10:21:36 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -166,6 +166,14 @@ SRC_HC_OPTS 	+= $(GhcLibHcOpts)
 SRC_HC_OPTS     += $(patsubst %, -package %, $(PACKAGE_DEPS))
 endif
 
+#	-fgenerics switches on generation of support code for 
+#		derivable type classes.  This is now off by default,
+#		but we switch it on for the libraries so that we generate
+#		the code in case someone importing wants it.
+ifeq "$(NON_HS_PACKAGE)" ""
+SRC_HC_OPTS	+= -fgenerics
+endif
+
 LIBRARY      	= libHS$(PACKAGE)$(_way).a
 
 ifeq "$(WAYS)" ""
@@ -220,6 +228,9 @@ else
 INSTALL_IFACES += $(HS_IFACES)
 endif
 
+# install library (could be implicitly specified or explicitly, like libHS*_cbits.a)
+INSTALL_LIBS  += $(LIBRARY)
+
 # -----------------------------------------------------------------------------
 # Dependencies
 
@@ -232,11 +243,6 @@ SRC_MKDEPENDC_OPTS += $(addprefix -I,$(ALL_DIRS))
 ifeq "$(STANDALONE_PACKAGE)" "NO"
 SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 endif
-
-endif # $(PACKAGE) /= ""
-
-# install library (could be implicitly specified or explicitly, like libHS*_cbits.a)
-INSTALL_LIBS  += $(LIBRARY)
 
 #--------------------------------------------------------------
 # Building dynamically-linkable libraries for GHCi
@@ -255,8 +261,8 @@ ifeq "$(way)" ""
 ifeq "$(GhcWithInterpreter)" "YES"
 
 GHCI_LIBRARY = $(patsubst lib%.a,%.o,$(LIBRARY))
-
 INSTALL_LIBS += $(GHCI_LIBRARY)
+
 CLEAN_FILES  += $(GHCI_LIBRARY)
 
 all :: $(GHCI_LIBRARY)
@@ -380,3 +386,5 @@ endif # NO_HADDOCK_DOCS
 # -----------------------------------------------------------------------------
 
 endif # $(LIBRARY) /= ""
+endif # $(PACKAGE) /= ""
+
