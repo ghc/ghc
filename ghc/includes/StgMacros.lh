@@ -458,6 +458,7 @@ I_ stg_div PROTO((I_ a, I_ b));
 #define ZdZh(r,a,b)		r=ULTRASAFESTGCALL2(I_,(void *, I_, I_),stg_div,(a),(b))
 #define remIntZh(r,a,b)		r=(a)%(b)
 #define negateIntZh(r,a)	r=-(a)
+
 /* Ever used ? -- SOF */
 #define absIntZh(a)		r=(( (a) >= 0 ) ? (a) : (-(a)))
 \end{code}
@@ -478,14 +479,18 @@ I_ stg_div PROTO((I_ a, I_ b));
 #define notZh(r,a)	r=~(a)
 
 #define shiftLZh(r,a,b)	  r=(a)<<(b)
-#define shiftRAZh(r,a,b)  r=(a)>>(b)
 #define shiftRLZh(r,a,b)  r=(a)>>(b)
 #define iShiftLZh(r,a,b)  r=(a)<<(b)
+/* Right shifting of signed quantities is not portable in C, so
+   the behaviour you'll get from using these primops depends
+   on the whatever your C compiler is doing. ToDo: fix. -- sof 8/98
+*/
 #define iShiftRAZh(r,a,b) r=(a)>>(b)
 #define iShiftRLZh(r,a,b) r=(a)>>(b)
 
 #define int2WordZh(r,a) r=(W_)(a)
 #define word2IntZh(r,a) r=(I_)(a)
+
 \end{code}
 
 %************************************************************************
@@ -566,6 +571,65 @@ I_ stg_div PROTO((I_ a, I_ b));
 /* Power: **## */
 #define ZtZtZhZh(r,a,b)	r=(StgDouble) SAFESTGCALL2(StgDouble,(void *, StgDouble,StgDouble),pow,a,b)
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsubsection[StgMacros-64-primops]{Primitive @Int64#@ and @Word64#@ ops}
+%*									*
+%************************************************************************
+
+Apart from the Integer casting primops, all primops over 64-bit (i.e., long long)
+@Int64#@ and @Word64#@s are defined out-of-line. We just give the prototype
+of these primops here:
+
+\begin{code}
+#ifdef HAVE_LONG_LONG
+I_ stg_gtWord64 PROTO((StgWord64, StgWord64));
+I_ stg_geWord64 PROTO((StgWord64, StgWord64));
+I_ stg_eqWord64 PROTO((StgWord64, StgWord64));
+I_ stg_neWord64 PROTO((StgWord64, StgWord64));
+I_ stg_ltWord64 PROTO((StgWord64, StgWord64));
+I_ stg_leWord64 PROTO((StgWord64, StgWord64));
+
+I_ stg_gtInt64 PROTO((StgInt64, StgInt64));
+I_ stg_geInt64 PROTO((StgInt64, StgInt64));
+I_ stg_eqInt64 PROTO((StgInt64, StgInt64));
+I_ stg_neInt64 PROTO((StgInt64, StgInt64));
+I_ stg_ltInt64 PROTO((StgInt64, StgInt64));
+I_ stg_leInt64 PROTO((StgInt64, StgInt64));
+
+LW_ stg_remWord64 PROTO((StgWord64, StgWord64));
+LW_ stg_quotWord64 PROTO((StgWord64, StgWord64));
+
+LI_ stg_remInt64 PROTO((StgInt64, StgInt64));
+LI_ stg_quotInt64 PROTO((StgInt64, StgInt64));
+LI_ stg_negateInt64 PROTO((StgInt64));
+LI_ stg_plusInt64 PROTO((StgInt64, StgInt64));
+LI_ stg_minusInt64 PROTO((StgInt64, StgInt64));
+LI_ stg_timesInt64 PROTO((StgInt64, StgInt64));
+
+LW_ stg_and64 PROTO((StgWord64, StgWord64));
+LW_ stg_or64 PROTO((StgWord64, StgWord64));
+LW_ stg_xor64 PROTO((StgWord64, StgWord64));
+LW_ stg_not64 PROTO((StgWord64));
+
+LW_ stg_shiftL64 PROTO((StgWord64, StgInt));
+LW_ stg_shiftRL64 PROTO((StgWord64, StgInt));
+LI_ stg_iShiftL64 PROTO((StgInt64, StgInt));
+LI_ stg_iShiftRL64 PROTO((StgInt64, StgInt));
+LI_ stg_iShiftRA64 PROTO((StgInt64, StgInt));
+
+LI_ stg_intToInt64 PROTO((StgInt));
+I_ stg_int64ToInt PROTO((StgInt64));
+LW_ stg_int64ToWord64 PROTO((StgInt64));
+
+LW_ stg_wordToWord64 PROTO((StgWord));
+W_ stg_word64ToWord PROTO((StgWord64));
+LI_ stg_word64ToInt64 PROTO((StgWord64));
+#endif
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -830,6 +894,70 @@ Coercions:
   (r) = SAFESTGCALL1(I_,(void *, MP_INT *),mpz_get_ui,&arg);			\
 }
 
+#define integerToInt64Zh(r, hp, aa,sa,da)					\
+{ unsigned long int* d;								\
+  StgInt64 res;									\
+  /* Allocates memory. Chummy with gmp rep. */				        \
+										\
+  d		= (unsigned long int *) (BYTE_ARR_CTS(da));			\
+										\
+  if ( (aa) == 0)      { (res)=(LI_)0; }					\
+  else if ( (aa) == 1) { (res)=(LI_)d[0]; }				        \
+  else		       { (res)=(LI_)d[0] + (LI_)d[1] * 0x100000000LL; }         \
+  (r)=(LI_)( (sa) < 0 ? -res : res);					        \
+}
+
+#define integerToWord64Zh(r, hp, aa,sa,da)					\
+{ unsigned long int* d;								\
+  StgWord64 res;								\
+  /* Allocates memory. Chummy with gmp rep. */				        \
+										\
+  d		= (unsigned long int *) (BYTE_ARR_CTS(da));			\
+										\
+  if ( (aa) == 0)      { (res)=(LW_)0; }					\
+  else if ( (aa) == 1) { (res)=(LW_)d[0]; }				        \
+  else		       { (res)=(LW_)d[0] + (LW_)d[1] * 0x100000000ULL; }        \
+  (r) = (res);									\
+}
+
+#define int64ToIntegerZh(ar,sr,dr, hp, li)					\
+{ StgInt64 val; /* to snaffle arg to avoid aliasing */				\
+  StgWord hi;								\
+  int neg=0;								\
+										\
+  val = (li);  /* snaffle... */							\
+										\
+  SET_DATA_HDR((hp),ArrayOfData_info,CCC,DATA_VHS+MIN_MP_INT_SIZE,0);		\
+										\
+  if ( val < 0LL ) {								\
+    neg = 1;									\
+    val = -val;									\
+  }										\
+  hi = (W_)((LW_)val / 0x100000000ULL);						\
+  if ((LW_)(val) >= 0x100000000ULL)  { (sr) = 2; (ar) = 2; (hp)[DATA_HS] =  ((W_)val); (hp)[DATA_HS+1] = (hi); } \
+  else if ((val) != 0) { (sr) =	1; (ar) = 1; (hp)[DATA_HS] =  ((W_)val);  }     \
+  else /* val==0 */    { (sr) =	0; (ar) = 1; }					\
+  (sr) = ( neg ? -(sr) : (sr) );						\
+  (dr) = (B_)(hp);		/* dr is an StgByteArray */			\
+}
+
+#define word64ToIntegerZh(ar,sr,dr, hp, lw)					\
+{ StgWord64 val; /* to snaffle arg to avoid aliasing */				\
+  StgWord hi;									\
+										\
+  val = (lw);  /* snaffle... */							\
+										\
+  SET_DATA_HDR((hp),ArrayOfData_info,CCC,DATA_VHS+MIN_MP_INT_SIZE,0);		\
+										\
+  hi = (W_)((LW_)val / 0x100000000ULL);						\
+  if ((val) >= 0x100000000ULL ) { (sr) = 2; (ar) = 2; (hp)[DATA_HS] =  ((W_)val); (hp)[DATA_HS+1] = (hi); } \
+  else if ((val) != 0)          { (sr) = 1; (ar) = 1; (hp)[DATA_HS] =  ((W_)val); } \
+  else /* val==0 */             { (sr) = 0; (ar) = 1; }				\
+  (dr) = (B_)(hp);		/* dr is an StgByteArray */			\
+}
+
+
+
 \end{code}
 
 Then there are a few oddments to make life easier:
@@ -1092,6 +1220,47 @@ PK_FLT(W_ p_src[])
 #endif /* __GNUC__ */
 
 #endif /* not __m68k__ */
+
+extern STG_INLINE
+void
+ASSIGN_Word64(W_ p_dest[], StgWord64 src)
+{
+    word64_thing y;
+    y.w = src;
+    p_dest[0] = y.wu.dhi;
+    p_dest[1] = y.wu.dlo;
+}
+
+extern STG_INLINE
+StgWord64
+PK_Word64(W_ p_src[])
+{
+    word64_thing y;
+    y.wu.dhi = p_src[0];
+    y.wu.dlo = p_src[1];
+    return(y.w);
+}
+
+extern STG_INLINE
+void
+ASSIGN_Int64(W_ p_dest[], StgInt64 src)
+{
+    int64_thing y;
+    y.i = src;
+    p_dest[0] = y.iu.dhi;
+    p_dest[1] = y.iu.dlo;
+}
+
+extern STG_INLINE
+StgInt64
+PK_Int64(W_ p_src[])
+{
+    int64_thing y;
+    y.iu.dhi = p_src[0];
+    y.iu.dlo = p_src[1];
+    return(y.i);
+}
+
 \end{code}
 
 %************************************************************************
@@ -1157,6 +1326,8 @@ of one ptr (not bytes).
 #define readCharArrayZh(r,a,i)	 indexCharOffAddrZh(r,BYTE_ARR_CTS(a),i)
 #define readIntArrayZh(r,a,i)	 indexIntOffAddrZh(r,BYTE_ARR_CTS(a),i)
 #define readWordArrayZh(r,a,i)	 indexWordOffAddrZh(r,BYTE_ARR_CTS(a),i)
+#define readInt64ArrayZh(r,a,i)	 indexInt64OffAddrZh(r,BYTE_ARR_CTS(a),i)
+#define readWord64ArrayZh(r,a,i) indexWord64OffAddrZh(r,BYTE_ARR_CTS(a),i)
 #define readAddrArrayZh(r,a,i)	 indexAddrOffAddrZh(r,BYTE_ARR_CTS(a),i)
 #define readFloatArrayZh(r,a,i)	 indexFloatOffAddrZh(r,BYTE_ARR_CTS(a),i)
 #define readDoubleArrayZh(r,a,i) indexDoubleOffAddrZh(r,BYTE_ARR_CTS(a),i)
@@ -1167,6 +1338,8 @@ of one ptr (not bytes).
 #define writeCharArrayZh(a,i,v)	  ((C_ *)(BYTE_ARR_CTS(a)))[i] = (v)
 #define writeIntArrayZh(a,i,v)	  ((I_ *)(BYTE_ARR_CTS(a)))[i] = (v)
 #define writeWordArrayZh(a,i,v)	  ((W_ *)(BYTE_ARR_CTS(a)))[i] = (v)
+#define writeInt64ArrayZh(a,i,v)  ((LI_ *)(BYTE_ARR_CTS(a)))[i] = (v)
+#define writeWord64ArrayZh(a,i,v) ((LW_ *)(BYTE_ARR_CTS(a)))[i] = (v)
 #define writeAddrArrayZh(a,i,v)	  ((PP_)(BYTE_ARR_CTS(a)))[i] = (v)
 #define writeFloatArrayZh(a,i,v)  \
 	ASSIGN_FLT((P_) (((StgFloat *)(BYTE_ARR_CTS(a))) + i),v)
@@ -1181,6 +1354,8 @@ of one ptr (not bytes).
 #define indexAddrArrayZh(r,a,i)	  indexAddrOffAddrZh(r,BYTE_ARR_CTS(a),i)
 #define indexFloatArrayZh(r,a,i)  indexFloatOffAddrZh(r,BYTE_ARR_CTS(a),i)
 #define indexDoubleArrayZh(r,a,i) indexDoubleOffAddrZh(r,BYTE_ARR_CTS(a),i)
+#define indexInt64ArrayZh(r,a,i)  indexInt64OffAddrZh(r,BYTE_ARR_CTS(a),i)
+#define indexWord64ArrayZh(r,a,i) indexWord64OffAddrZh(r,BYTE_ARR_CTS(a),i)
 
 #define indexCharOffForeignObjZh(r,fo,i)   indexCharOffAddrZh(r,ForeignObj_CLOSURE_DATA(fo),i)
 #define indexIntOffForeignObjZh(r,fo,i)    indexIntOffAddrZh(r,ForeignObj_CLOSURE_DATA(fo),i)
@@ -1188,6 +1363,8 @@ of one ptr (not bytes).
 #define indexAddrOffForeignObjZh(r,fo,i)   indexAddrOffAddrZh(r,ForeignObj_CLOSURE_DATA(fo),i)
 #define indexFloatOffForeignObjZh(r,fo,i)  indexFloatOffAddrZh(r,ForeignObj_CLOSURE_DATA(fo),i)
 #define indexDoubleOffForeignObjZh(r,fo,i) indexDoubleOffAddrZh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexInt64OffForeignObjZh(r,fo,i)  indexInt64OffAddrZh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexWord64OffForeignObjZh(r,fo,i) indexWord64OffAddrZh(r,ForeignObj_CLOSURE_DATA(fo),i)
 
 #define indexCharOffAddrZh(r,a,i)   r= ((C_ *)(a))[i]
 #define indexIntOffAddrZh(r,a,i)    r= ((I_ *)(a))[i]
@@ -1195,6 +1372,18 @@ of one ptr (not bytes).
 #define indexAddrOffAddrZh(r,a,i)   r= ((PP_)(a))[i]
 #define indexFloatOffAddrZh(r,a,i)  r= PK_FLT((P_) (((StgFloat *)(a)) + i))
 #define indexDoubleOffAddrZh(r,a,i) r= PK_DBL((P_) (((StgDouble *)(a)) + i))
+#define indexInt64OffAddrZh(r,a,i)  r= ((LI_ *)(a))[i]
+#define indexWord64OffAddrZh(r,a,i) r= ((LW_ *)(a))[i]
+
+#define writeCharOffAddrZh(a,i,v)    ((C_ *)(a))[i] = (v)
+#define writeIntOffAddrZh(a,i,v)     ((I_ *)(a))[i] = (v)
+#define writeWordOffAddrZh(a,i,v)    ((W_ *)(a))[i] = (v)
+#define writeAddrOffAddrZh(a,i,v)    ((PP_)(a))[i] = (v)
+#define writeFloatOffAddrZh(a,i,v)   ASSIGN_FLT((P_) (((StgFloat *)(a)) + i),v)
+#define writeDoubleOffAddrZh(a,i,v)  ASSIGN_DBL((P_) (((StgDouble *)(a)) + i),v)
+#define writeInt64OffAddrZh(a,i,v)   ((LI_ *)(a))[i] = (v)
+#define writeWord64OffAddrZh(a,i,v)  ((LW_ *)(a))[i] = (v)
+
 
 /* Freezing arrays-of-ptrs requires changing an info table, for the
    benefit of the generational collector.  It needs to scavenge mutable
@@ -1242,6 +1431,8 @@ For char arrays, the size is in {\em BYTES}.
 #define newCharArrayZh(r,liveness,n)	newByteArray(r,liveness,(n) * sizeof(C_))
 #define newIntArrayZh(r,liveness,n)	newByteArray(r,liveness,(n) * sizeof(I_))
 #define newWordArrayZh(r,liveness,n)	newByteArray(r,liveness,(n) * sizeof(W_))
+#define newInt64ArrayZh(r,liveness,n)	newByteArray(r,liveness,(n) * sizeof(LI_))
+#define newWord64ArrayZh(r,liveness,n)	newByteArray(r,liveness,(n) * sizeof(LW_))
 #define newAddrArrayZh(r,liveness,n)	newByteArray(r,liveness,(n) * sizeof(P_))
 #define newFloatArrayZh(r,liveness,n)	newByteArray(r,liveness,(n) * sizeof(StgFloat))
 #define newDoubleArrayZh(r,liveness,n)	newByteArray(r,liveness,(n) * sizeof(StgDouble))
@@ -1675,6 +1866,7 @@ EXTFUN(__std_entry_error__);
 	 JMP_(ErrorIO_innards); \
     } while(0)
 
+/* These are now, I believe, unused. (8/98 SOF) */
 #if !defined(CALLER_SAVES_SYSTEM)
 /* can use the macros */
 #define stg_getc(stream)	getc((FILE *) (stream))
@@ -1784,6 +1976,9 @@ EXTFUN(stopEnterFloatDirectReturn);
 EXTFUN(startEnterFloat);
 
 void enterStablePtr PROTO((StgStablePtr stableIndex, StgFunPtr startCode));
+
+char* createAdjustor PROTO((int cc,StgStablePtr hptr, StgFunPtr wptr));
+void freeAdjustor PROTO((void* ptr));
 
 #endif /* !PAR */
 
@@ -2116,6 +2311,7 @@ to be `standard' format, return register then liveness mask. -- SOF 4/96)
 #ifndef PAR
 
 StgInt eqForeignObj PROTO((StgForeignObj p1, StgForeignObj p2));
+StgInt eqStablePtr  PROTO((StgStablePtr  p1, StgStablePtr p2));
 
 #define makeForeignObjZh(r, liveness, mptr, finalise)    \
 do {							 \
