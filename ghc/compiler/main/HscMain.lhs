@@ -78,6 +78,8 @@ import IOExts		( newIORef, readIORef, writeIORef, unsafePerformIO )
 import Monad		( when )
 import Maybe		( isJust, fromJust )
 import IO
+
+import MkExternalCore	( emitExternalCore )
 \end{code}
 
 
@@ -290,6 +292,7 @@ hscRecomp ghci_mode dflags have_object
 	--	tidy_details
 	--	new_iface		
 
+	; emitExternalCore dflags new_iface tidy_details 
  	    -------------------
  	    -- PREPARE FOR CODE GENERATION
  	    -------------------
@@ -424,6 +427,8 @@ myCoreToStg dflags this_mod tidy_binds
    where
       stgBindPairs (StgNonRec _ b r) = [(b,r)]
       stgBindPairs (StgRec    _ prs) = prs
+
+
 \end{code}
 
 

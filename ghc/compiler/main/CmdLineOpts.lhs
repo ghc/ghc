@@ -100,7 +100,8 @@ module CmdLineOpts (
 	opt_NoPruneTyDecls,
 	opt_NoPruneDecls,
 	opt_Static,
-	opt_Unregisterised
+	opt_Unregisterised,
+	opt_EmitExternalCore
     ) where
 
 #include "HsVersions.h"
@@ -294,6 +295,7 @@ data DynFlags = DynFlags {
   hscOutName 		:: String,  	-- name of the output file
   hscStubHOutName	:: String,  	-- name of the .stub_h output file
   hscStubCOutName	:: String,  	-- name of the .stub_c output file
+  extCoreName		:: String,	-- name of the .core output file
   verbosity  		:: Int,	 	-- verbosity level
   cppFlag    		:: Bool,	-- preprocess with cpp?
   stolen_x86_regs	:: Int,		
@@ -315,6 +317,7 @@ defaultDynFlags = DynFlags {
   hscLang = HscC, 
   hscOutName = "", 
   hscStubHOutName = "", hscStubCOutName = "",
+  extCoreName = "",
   verbosity = 0, 
   cppFlag		= False,
   stolen_x86_regs	= 4,
@@ -540,6 +543,7 @@ opt_NoPruneDecls		= lookUp  SLIT("-fno-prune-decls")
 opt_NoPruneTyDecls		= lookUp  SLIT("-fno-prune-tydecls")
 opt_Static			= lookUp  SLIT("-static")
 opt_Unregisterised		= lookUp  SLIT("-funregisterised")
+opt_EmitExternalCore		= lookUp  SLIT("-fext-core")
 \end{code}
 
 %************************************************************************
@@ -589,7 +593,8 @@ isStaticHscFlag f =
 	"fno-prune-decls",
 	"fno-prune-tydecls",
 	"static",
-	"funregisterised"
+	"funregisterised",
+	"fext-core"
 	]
   || any (flip prefixMatch f) [
 	"fcontext-stack",

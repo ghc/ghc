@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.73 2001/05/31 11:32:25 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.74 2001/06/01 17:14:08 apt Exp $
 --
 -- GHC Driver
 --
@@ -500,7 +500,8 @@ run_phase Hsc basename suff input_fn output_fn
 
         let dyn_flags' = dyn_flags { hscOutName = output_fn,
 		   		     hscStubCOutName = basename ++ "_stub.c",
-				     hscStubHOutName = basename ++ "_stub.h" }
+				     hscStubHOutName = basename ++ "_stub.h",
+				     extCoreName = basename ++ ".core" }
 
   -- run the compiler!
         pcs <- initPersistentCompilerState
@@ -1011,7 +1012,8 @@ compile ghci_mode summary source_unchanged have_object
 
    let dyn_flags' = dyn_flags { hscOutName = output_fn,
 				hscStubCOutName = basename ++ "_stub.c",
-				hscStubHOutName = basename ++ "_stub.h" }
+				hscStubHOutName = basename ++ "_stub.h",
+				extCoreName = basename ++ ".core" }
 
    -- figure out which header files to #include in a generated .hc file
    c_includes <- getPackageCIncludes

@@ -77,7 +77,9 @@ main = getArgs >>= \args ->
 
                       "--make-haskell-wrappers" 
                          -> putStr (gen_wrappers p_o_specs)
-
+			
+		      "--make-latex-table"
+			 -> putStr (gen_latex_table p_o_specs)
                    )
 
 
@@ -93,12 +95,31 @@ known_args
        "--primop-primop-info",
        "--primop-tag",
        "--primop-list",
-       "--make-haskell-wrappers"
+       "--make-haskell-wrappers",
+       "--make-latex-table"
      ]
 
 ------------------------------------------------------------------
 -- Code generators -----------------------------------------------
 ------------------------------------------------------------------
+
+gen_latex_table (Info defaults pos)
+   = "\\begin{tabular}{|l|l|}\n"
+     ++ "\\hline\nName &\t Type\\\\\n\\hline\n"
+     ++ (concat (map f pos))
+     ++ "\\end{tabular}"
+     where 
+       f spec = "@" ++ (encode (name spec)) ++ "@ &\t@" ++ (pty (ty spec)) ++ "@\\\\\n"
+       encode s = s
+       pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
+       pty t = pbty t
+       pbty (TyApp tc ts) = (encode tc) ++ (concat (map (' ':) (map paty ts)))
+       pbty (TyUTup ts) = (mkUtupnm (length ts)) ++ (concat (map (' ':) (map paty ts)))
+       pbty t = paty t
+       paty (TyVar tv) = encode tv
+       paty t = "(" ++ pty t ++ ")"
+       mkUtupnm 1 = "ZL#z32U#ZR"
+       mkUtupnm n = "Z" ++ (show (n-1)) ++ "U"
 
 gen_wrappers (Info defaults pos)
    = "module PrelPrimopWrappers where\n" 
