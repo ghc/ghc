@@ -14,7 +14,7 @@ module Stix (
 	fixedHS, arrWordsHS, arrPtrsHS,
 
         NatM, initNat, thenNat, returnNat, 
-        mapNat, mapAndUnzipNat,
+        mapNat, mapAndUnzipNat, mapAccumLNat,
         getUniqueNat, getDeltaNat, setDeltaNat,
         NatM_State, mkNatM_State,
         uniqOfNatM_State, deltaOfNatM_State,
@@ -361,6 +361,18 @@ mapAndUnzipNat f (x:xs)
   = f x		    	`thenNat` \ (r1,  r2)  ->
     mapAndUnzipNat f xs	`thenNat` \ (rs1, rs2) ->
     returnNat (r1:rs1, r2:rs2)
+
+mapAccumLNat :: (acc -> x -> NatM (acc, y))
+                -> acc
+	        -> [x]
+	        -> NatM (acc, [y])
+
+mapAccumLNat f b []
+  = returnNat (b, [])
+mapAccumLNat f b (x:xs)
+  = f b x   	        	    `thenNat` \ (b__2, x__2) ->
+    mapAccumLNat f b__2 xs   	    `thenNat` \ (b__3, xs__2) ->
+    returnNat (b__3, x__2:xs__2)
 
 
 getUniqueNat :: NatM Unique

@@ -29,10 +29,13 @@ import CallConv		( cCallConv )
 import Stix		( getNatLabelNCG, StixTree(..),
 			  StixReg(..), CodeSegment(..), 
                           pprStixTrees, ppStixReg,
-                          NatM, thenNat, returnNat, mapNat, mapAndUnzipNat,
+                          NatM, thenNat, returnNat, mapNat, 
+                          mapAndUnzipNat, mapAccumLNat,
                           getDeltaNat, setDeltaNat
 			)
 import Outputable
+
+infixr 3 `bind`
 
 \end{code}
 
@@ -45,7 +48,6 @@ order.
 
 type InstrBlock = OrdList Instr
 
-infixr 3 `bind`
 x `bind` f = f x
 
 \end{code}
@@ -870,7 +872,7 @@ getRegister leaf
 getRegister (StDouble d)
   = getNatLabelNCG 	    	    `thenNat` \ lbl ->
     getNewRegNCG PtrRep    	    `thenNat` \ tmp ->
-    let code dst = mkSeqInstrs [
+    let code dst = toOL [
     	    SEGMENT DataSegment,
 	    LABEL lbl,
 	    DATA DF [ImmDouble d],
@@ -1028,7 +1030,7 @@ getRegister (StInd pk mem)
     	code = amodeCode amode
     	src   = amodeAddr amode
     	size = primRepToSize pk
-    	code__2 dst = code . mkSeqInstr (LD size src dst)
+    	code__2 dst = code `snocOL` LD size src dst
     in
     	returnNat (Any pk code__2)
 
@@ -1036,14 +1038,14 @@ getRegister (StInt i)
   | fits13Bits i
   = let
     	src = ImmInt (fromInteger i)
-    	code dst = mkSeqInstr (OR False g0 (RIImm src) dst)
+    	code dst = unitOL (OR False g0 (RIImm src) dst)
     in
     	returnNat (Any IntRep code)
 
 getRegister leaf
   | maybeToBool imm
   = let
-    	code dst = mkSeqInstrs [
+    	code dst = toOL [
     	    SETHI (HI imm__2) dst,
     	    OR False dst (RIImm (LO imm__2)) dst]
     in
@@ -1225,11 +1227,11 @@ getAmode (StPrim IntAddOp [x, y])
     getRegister x    	    	`thenNat` \ register1 ->
     getRegister y    	    	`thenNat` \ register2 ->
     let
-    	code1 = registerCode register1 tmp1 []
+    	code1 = registerCode register1 tmp1
     	reg1  = registerName register1 tmp1
-    	code2 = registerCode register2 tmp2 []
+    	code2 = registerCode register2 tmp2
     	reg2  = registerName register2 tmp2
-    	code__2 = asmSeqThen [code1, code2]
+    	code__2 = code1 `appOL` code2
     in
     returnNat (Amode (AddrRegReg reg1 reg2) code__2)
 
@@ -1237,7 +1239,7 @@ getAmode leaf
   | maybeToBool imm
   = getNewRegNCG PtrRep    	    `thenNat` \ tmp ->
     let
-    	code = mkSeqInstr (SETHI (HI imm__2) tmp)
+    	code = unitOL (SETHI (HI imm__2) tmp)
     in
     returnNat (Amode (AddrRegImm tmp (LO imm__2)) code)
   where
@@ -1519,7 +1521,7 @@ condIntCode cond x (StInt y)
 	code = registerCode register tmp
 	src1 = registerName register tmp
     	src2 = ImmInt (fromInteger y)
-	code__2 = code . mkSeqInstr (SUB False True src1 (RIImm src2) g0)
+	code__2 = code `snocOL` SUB False True src1 (RIImm src2) g0
     in
     returnNat (CondCode False cond code__2)
 
@@ -1529,12 +1531,12 @@ condIntCode cond x y
     getNewRegNCG IntRep		`thenNat` \ tmp1 ->
     getNewRegNCG IntRep		`thenNat` \ tmp2 ->
     let
-	code1 = registerCode register1 tmp1 []
+	code1 = registerCode register1 tmp1
 	src1  = registerName register1 tmp1
-	code2 = registerCode register2 tmp2 []
+	code2 = registerCode register2 tmp2
 	src2  = registerName register2 tmp2
-	code__2 = asmSeqThen [code1, code2] .
-    	    	mkSeqInstr (SUB False True src1 (RIReg src2) g0)
+	code__2 = code1 `appOL` code2 `snocOL`
+    	    	  SUB False True src1 (RIReg src2) g0
     in
     returnNat (CondCode False cond code__2)
 
@@ -1548,7 +1550,7 @@ condFltCode cond x y
      	    	        	`thenNat` \ tmp2 ->
     getNewRegNCG DoubleRep	`thenNat` \ tmp ->
     let
-    	promote x = asmInstr (FxTOy F DF x tmp)
+    	promote x = FxTOy F DF x tmp
 
     	pk1   = registerRep register1
     	code1 = registerCode register1 tmp1
@@ -1560,14 +1562,14 @@ condFltCode cond x y
 
     	code__2 =
 		if pk1 == pk2 then
-    	            asmSeqThen [code1 [], code2 []] .
-    	    	    mkSeqInstr (FCMP True (primRepToSize pk1) src1 src2)
+    	            code1 `appOL` code2 `snocOL`
+    	    	    FCMP True (primRepToSize pk1) src1 src2
     	    	else if pk1 == FloatRep then
-    	    	    asmSeqThen [code1 (promote src1), code2 []] .
-    	    	    mkSeqInstr (FCMP True DF tmp src2)
+    	    	    code1 `snocOL` promote src1 `appOL` code2 `snocOL`
+    	    	    FCMP True DF tmp src2
     	    	else
-    	    	    asmSeqThen [code1 [], code2 (promote src2)] .
-    	    	    mkSeqInstr (FCMP True DF src1 tmp)
+    	    	    code1 `appOL` code2 `snocOL` promote src2 `snocOL`
+    	    	    FCMP True DF src1 tmp
     in
     returnNat (CondCode True cond code__2)
 
@@ -1724,12 +1726,12 @@ assignIntCode pk (StInd _ dst) src
     getAmode dst    	    	    `thenNat` \ amode ->
     getRegister src	    	    	    `thenNat` \ register ->
     let
-    	code1   = amodeCode amode []
+    	code1   = amodeCode amode
     	dst__2  = amodeAddr amode
-    	code2   = registerCode register tmp []
+    	code2   = registerCode register tmp
     	src__2  = registerName register tmp
     	sz      = primRepToSize pk
-    	code__2 = asmSeqThen [code1, code2] . mkSeqInstr (ST sz src__2 dst__2)
+    	code__2 = code1 `appOL` code2 `snocOL` ST sz src__2 dst__2
     in
     returnNat code__2
 
@@ -1741,7 +1743,7 @@ assignIntCode pk dst src
     	code    = registerCode register2 dst__2
     	src__2  = registerName register2 dst__2
     	code__2 = if isFixed register2
-		  then code . mkSeqInstr (OR False g0 (RIReg src__2) dst__2)
+		  then code `snocOL` OR False g0 (RIReg src__2) dst__2
     	    	  else code
     in
     returnNat code__2
@@ -1846,18 +1848,17 @@ assignFltCode pk (StInd _ dst) src
     	sz      = primRepToSize pk
     	dst__2  = amodeAddr amode
 
-    	code1   = amodeCode amode []
-    	code2   = registerCode register tmp1 []
+    	code1   = amodeCode amode
+    	code2   = registerCode register tmp1
 
     	src__2  = registerName register tmp1
     	pk__2   = registerRep register
     	sz__2   = primRepToSize pk__2
 
-    	code__2 = asmSeqThen [code1, code2] ++
-	    if pk == pk__2 then
-		    mkSeqInstr (ST sz src__2 dst__2)
-	    else
-		mkSeqInstrs [FxTOy sz__2 sz src__2 tmp1, ST sz tmp1 dst__2]
+    	code__2 = code1 `appOL` code2 `appOL`
+	    if   pk == pk__2 
+            then unitOL (ST sz src__2 dst__2)
+	    else toOL [FxTOy sz__2 sz src__2 tmp1, ST sz tmp1 dst__2]
     in
     returnNat code__2
 
@@ -1882,9 +1883,9 @@ assignFltCode pk dst src
 
 	code__2 = 
 	        if pk /= pk__2 then
-		     code . mkSeqInstr (FxTOy sz__2 sz src__2 dst__2)
+		     code `snocOL` FxTOy sz__2 sz src__2 dst__2
     	    	else if isFixed register2 then
-		     code . mkSeqInstr (FMOV sz src__2 dst__2)
+		     code `snocOL` FMOV sz src__2 dst__2
     	    	else
 		     code
     in
@@ -1964,8 +1965,8 @@ genJump tree
 #if sparc_TARGET_ARCH
 
 genJump (StCLbl lbl)
-  | isAsmTemp lbl = returnInstrs [BI ALWAYS False target, NOP]
-  | otherwise     = returnInstrs [CALL target 0 True, NOP]
+  | isAsmTemp lbl = returnNat (toOL [BI ALWAYS False target, NOP])
+  | otherwise     = returnNat (toOL [CALL target 0 True, NOP])
   where
     target = ImmCLbl lbl
 
@@ -1976,7 +1977,7 @@ genJump tree
     	code   = registerCode register tmp
     	target = registerName register tmp
     in
-    returnSeq code [JMP (AddrRegReg target g0), NOP]
+    returnNat (code `snocOL` JMP (AddrRegReg target g0) `snocOL` NOP)
 
 #endif {- sparc_TARGET_ARCH -}
 \end{code}
@@ -2177,11 +2178,13 @@ genCondJump lbl bool
     	cond   = condName condition
 	target = ImmCLbl lbl
     in
-    returnSeq code (
-    if condFloat condition then
-	[NOP, BF cond False target, NOP]
-    else
-	[BI cond False target, NOP]
+    returnNat (
+       code `appOL` 
+       toOL (
+         if   condFloat condition 
+         then [NOP, BF cond False target, NOP]
+         else [BI cond False target, NOP]
+       )
     )
 
 #endif {- sparc_TARGET_ARCH -}
@@ -2369,9 +2372,9 @@ genCCall fn cconv kind args
     let
     	nRegs = length allArgRegs - length unused
     	call = CALL fn__2 nRegs False
-    	code = asmSeqThen (map ($ []) argCode)
+    	code = concatOL argCode
     in
-    	returnSeq code [call, NOP]
+    	returnNat (code `snocOL` call `snocOL` NOP)
   where
     -- function names that begin with '.' are assumed to be special
     -- internally generated names like '.mul,' which don't get an
@@ -2410,25 +2413,36 @@ genCCall fn cconv kind args
 	    src  = registerName register reg
 	    pk   = registerRep register
 	in
-	returnNat (case pk of
+	returnNat (
+         case pk of
 	    DoubleRep ->
 		case dsts of
-		    [] -> (([], offset + 1), code . mkSeqInstrs [
+		   [] -> ( ([], offset + 1), 
+                            code `snocOL`
 			    -- conveniently put the second part in the right stack
 			    -- location, and load the first part into %o5
-			    ST DF src (spRel (offset - 1)),
-			    LD W (spRel (offset - 1)) dst])
-		    (dst__2:dsts__2) -> ((dsts__2, offset), code . mkSeqInstrs [
-			    ST DF src (spRel (-2)),
-			    LD W (spRel (-2)) dst,
-			    LD W (spRel (-1)) dst__2])
-	    FloatRep -> ((dsts, offset), code . mkSeqInstrs [
-			    ST F src (spRel (-2)),
-			    LD W (spRel (-2)) dst])
-	    _ -> ((dsts, offset), if isFixed register then
-				  code . mkSeqInstr (OR False g0 (RIReg src) dst)
-				  else code))
-
+			    ST DF src (spRel (offset - 1)) `snocOL`
+			    LD W (spRel (offset - 1)) dst
+                         )
+		   (dst__2:dsts__2) 
+                       -> ( (dsts__2, offset), 
+                            code `snocOL`
+			    ST DF src (spRel (-2)) `snocOL`
+			    LD W (spRel (-2)) dst `snocOL`
+			    LD W (spRel (-1)) dst__2
+                          )
+	    FloatRep 
+               -> ( (dsts, offset), 
+                    code `snocOL`
+	            ST F src (spRel (-2)) `snocOL`
+	            LD W (spRel (-2)) dst
+                  )
+	    _  -> ( (dsts, offset), 
+                    if   isFixed register 
+                    then code `snocOL` OR False g0 (RIReg src) dst
+		    else code
+                  )
+        )
     -- Once we have run out of argument registers, we move to the
     -- stack...
 
@@ -2443,7 +2457,8 @@ genCCall fn cconv kind args
 	    sz    = primRepToSize pk
 	    words = if pk == DoubleRep then 2 else 1
 	in
-	returnNat (([], offset + words), code . mkSeqInstr (ST sz src (spRel offset)))
+	returnNat ( ([], offset + words), 
+                    code `snocOL` ST sz src (spRel offset) )
 
 #endif {- sparc_TARGET_ARCH -}
 \end{code}
@@ -2517,7 +2532,7 @@ condIntReg EQQ x (StInt 0)
     let
 	code = registerCode register tmp
 	src  = registerName register tmp
-	code__2 dst = code . mkSeqInstrs [
+	code__2 dst = code `appOL` toOL [
     	    SUB False True g0 (RIReg src) g0,
     	    SUB True False g0 (RIImm (ImmInt (-1))) dst]
     in
@@ -2529,11 +2544,11 @@ condIntReg EQQ x y
     getNewRegNCG IntRep		`thenNat` \ tmp1 ->
     getNewRegNCG IntRep		`thenNat` \ tmp2 ->
     let
-    	code1 = registerCode register1 tmp1 []
+    	code1 = registerCode register1 tmp1
     	src1  = registerName register1 tmp1
-    	code2 = registerCode register2 tmp2 []
+    	code2 = registerCode register2 tmp2
     	src2  = registerName register2 tmp2
-    	code__2 dst = asmSeqThen [code1, code2] . mkSeqInstrs [
+    	code__2 dst = code1 `appOL` code2 `appOL` toOL [
     	    XOR False src1 (RIReg src2) dst,
     	    SUB False True g0 (RIReg dst) g0,
     	    SUB True False g0 (RIImm (ImmInt (-1))) dst]
@@ -2546,7 +2561,7 @@ condIntReg NE x (StInt 0)
     let
     	code = registerCode register tmp
     	src  = registerName register tmp
-    	code__2 dst = code . mkSeqInstrs [
+    	code__2 dst = code `appOL` toOL [
     	    SUB False True g0 (RIReg src) g0,
     	    ADD True False g0 (RIImm (ImmInt 0)) dst]
     in
@@ -2558,11 +2573,11 @@ condIntReg NE x y
     getNewRegNCG IntRep        	`thenNat` \ tmp1 ->
     getNewRegNCG IntRep        	`thenNat` \ tmp2 ->
     let
-	code1 = registerCode register1 tmp1 []
+	code1 = registerCode register1 tmp1
 	src1  = registerName register1 tmp1
-	code2 = registerCode register2 tmp2 []
+	code2 = registerCode register2 tmp2
 	src2  = registerName register2 tmp2
-	code__2 dst = asmSeqThen [code1, code2] . mkSeqInstrs [
+	code__2 dst = code1 `appOL` code2 `appOL` toOL [
     	    XOR False src1 (RIReg src2) dst,
     	    SUB False True g0 (RIReg dst) g0,
     	    ADD True False g0 (RIImm (ImmInt 0)) dst]
@@ -2576,7 +2591,7 @@ condIntReg cond x y
     let
 	code = condCode condition
 	cond = condName condition
-	code__2 dst = code . mkSeqInstrs [
+	code__2 dst = code `appOL` toOL [
 	    BI cond False (ImmCLbl lbl1), NOP,
 	    OR False g0 (RIImm (ImmInt 0)) dst,
 	    BI ALWAYS False (ImmCLbl lbl2), NOP,
@@ -2593,7 +2608,7 @@ condFltReg cond x y
     let
     	code = condCode condition
     	cond = condName condition
-    	code__2 dst = code . mkSeqInstrs [
+    	code__2 dst = code `appOL` toOL [
     	    NOP,
 	    BF cond False (ImmCLbl lbl1), NOP,
 	    OR False g0 (RIImm (ImmInt 0)) dst,
@@ -2917,7 +2932,7 @@ trivialCode instr x (StInt y)
     	code = registerCode register tmp
     	src1 = registerName register tmp
     	src2 = ImmInt (fromInteger y)
-    	code__2 dst = code . mkSeqInstr (instr src1 (RIImm src2) dst)
+    	code__2 dst = code `snocOL` instr src1 (RIImm src2) dst
     in
     returnNat (Any IntRep code__2)
 
@@ -2927,12 +2942,12 @@ trivialCode instr x y
     getNewRegNCG IntRep		`thenNat` \ tmp1 ->
     getNewRegNCG IntRep		`thenNat` \ tmp2 ->
     let
-    	code1 = registerCode register1 tmp1 []
+    	code1 = registerCode register1 tmp1
     	src1  = registerName register1 tmp1
-    	code2 = registerCode register2 tmp2 []
+    	code2 = registerCode register2 tmp2
     	src2  = registerName register2 tmp2
-    	code__2 dst = asmSeqThen [code1, code2] .
-    	    	     mkSeqInstr (instr src1 (RIReg src2) dst)
+    	code__2 dst = code1 `appOL` code2 `snocOL`
+    	    	      instr src1 (RIReg src2) dst
     in
     returnNat (Any IntRep code__2)
 
@@ -2946,7 +2961,7 @@ trivialFCode pk instr x y
      	    	        	`thenNat` \ tmp2 ->
     getNewRegNCG DoubleRep   	`thenNat` \ tmp ->
     let
-    	promote x = asmInstr (FxTOy F DF x tmp)
+    	promote x = FxTOy F DF x tmp
 
     	pk1   = registerRep register1
     	code1 = registerCode register1 tmp1
@@ -2958,14 +2973,14 @@ trivialFCode pk instr x y
 
     	code__2 dst =
     	    	if pk1 == pk2 then
-    	            asmSeqThen [code1 [], code2 []] .
-    	    	    mkSeqInstr (instr (primRepToSize pk) src1 src2 dst)
+    	            code1 `appOL` code2 `snocOL`
+    	    	    instr (primRepToSize pk) src1 src2 dst
     	    	else if pk1 == FloatRep then
-    	    	    asmSeqThen [code1 (promote src1), code2 []] .
-    	    	    mkSeqInstr (instr DF tmp src2 dst)
+    	    	    code1 `snocOL` promote src1 `appOL` code2 `snocOL`
+    	    	    instr DF tmp src2 dst
     	    	else
-    	    	    asmSeqThen [code1 [], code2 (promote src2)] .
-    	    	    mkSeqInstr (instr DF src1 tmp dst)
+    	    	    code1 `appOL` code2 `snocOL` promote src2 `snocOL`
+    	    	    instr DF src1 tmp dst
     in
     returnNat (Any (if pk1 == pk2 then pk1 else DoubleRep) code__2)
 
@@ -2976,7 +2991,7 @@ trivialUCode instr x
     let
     	code = registerCode register tmp
     	src  = registerName register tmp
-    	code__2 dst = code . mkSeqInstr (instr (RIReg src) dst)
+    	code__2 dst = code `snocOL` instr (RIReg src) dst
     in
     returnNat (Any IntRep code__2)
 
@@ -2987,7 +3002,7 @@ trivialUFCode pk instr x
     let
     	code = registerCode register tmp
     	src  = registerName register tmp
-    	code__2 dst = code . mkSeqInstr (instr src dst)
+    	code__2 dst = code `snocOL` instr src dst
     in
     returnNat (Any pk code__2)
 
@@ -3105,7 +3120,7 @@ coerceInt2FP pk x
     	code = registerCode register reg
     	src  = registerName register reg
 
-    	code__2 dst = code . mkSeqInstrs [
+    	code__2 dst = code `appOL` toOL [
     	    ST W src (spRel (-2)),
     	    LD W (spRel (-2)) dst,
     	    FxTOy W (primRepToSize pk) dst dst]
@@ -3122,7 +3137,7 @@ coerceFP2Int x
     	src  = registerName register reg
     	pk   = registerRep  register
 
-    	code__2 dst = code . mkSeqInstrs [
+    	code__2 dst = code `appOL` toOL [
     	    FxTOy (primRepToSize pk) W src tmp,
     	    ST W tmp (spRel (-2)),
     	    LD W (spRel (-2)) dst]
@@ -3186,11 +3201,11 @@ chrCode (StInd pk mem)
     	src_off = addrOffset src 3
     	src__2  = case src_off of Just x -> x
     	code__2 dst = if maybeToBool src_off then
-    	    	    	code . mkSeqInstr (LD BU src__2 dst)
+    	    	    	code `snocOL` LD BU src__2 dst
     	    	    else
-    	    	    	code . mkSeqInstrs [
-    	    	    	    LD (primRepToSize pk) src dst,
-    	    	    	    AND False dst (RIImm (ImmInt 255)) dst]
+    	    	    	code `snocOL`
+    	    	    	LD (primRepToSize pk) src dst  `snocOL`
+    	    	    	AND False dst (RIImm (ImmInt 255)) dst
     in
     returnNat (Any pk code__2)
 
@@ -3200,7 +3215,7 @@ chrCode x
     let
     	code = registerCode register reg
     	src  = registerName register reg
-    	code__2 dst = code . mkSeqInstr (AND False src (RIImm (ImmInt 255)) dst)
+    	code__2 dst = code `snocOL` AND False src (RIImm (ImmInt 255)) dst
     in
     returnNat (Any IntRep code__2)
 

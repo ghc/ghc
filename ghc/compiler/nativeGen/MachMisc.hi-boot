@@ -5,4 +5,4 @@ _declarations_
 1 fixedHdrSize _:_ PrelBase.Int ;;
 2 fmtAsmLbl _:_ PrelBase.String -> PrelBase.String ;;
 1 underscorePrefix _:_ PrelBase.Bool ;;
-1 data Instr;
+1 data Instr ;;

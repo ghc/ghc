@@ -33,7 +33,7 @@ module MachMisc (
 #if i386_TARGET_ARCH
 #endif
 #if sparc_TARGET_ARCH
-	, RI(..), riZero
+	RI(..), riZero
 #endif
     ) where
 
