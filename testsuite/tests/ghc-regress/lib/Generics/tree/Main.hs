@@ -2,8 +2,8 @@
 
 {-
 
-This examples serialisation and de-serialisation,
-but we replace *series* by *trees*.
+This example illustrates serialisation and de-serialisation,
+but we replace *series* by *trees* so to say.
 
 -}
 
@@ -30,13 +30,23 @@ gdetree = gdefault `extR` string
     string (Node x []) = Just x
     gdefault (Node x ts) = res
       where
-        res    = maybe Nothing (kids . fromConstr) con
-        ta     = fromJust res
-        con    = stringCon (dataTypeOf ta) x
+
+	-- a helper for type capture
+        res  = maybe Nothing (kids . fromConstr) con
+
+	-- the type to constructed
+        ta   = fromJust res
+
+	-- construct constructor
+        con  = stringCon (dataTypeOf ta) x
+
+        -- recursion per kid with accumulation
+        perkid ts = const (tail ts, gdetree (head ts)) 
+
+        -- recurse into kids
         kids x =
           do guard (glength x == length ts)
-             x' <- gzipWithM (\t -> const (gdetree t)) ts x
-             return x'
+             snd (gmapAccumM perkid ts x)
 
 
 -- Main function for testing

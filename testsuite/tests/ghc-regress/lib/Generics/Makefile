@@ -35,8 +35,8 @@ clean:
 	find . -depth -name "*.interp.*" -exec rm -rf \{\} \;
 	find . -depth -name "*.run.*"    -exec rm -rf \{\} \;
 	rm -f bits/bits
-	rm -f gzip/gzip
-	rm -f freeNames/freeNames
+	rm -f ext1/ext1
+	rm -f findepth/findepth
 	rm -f findepth/findepth
 	rm -f geq/geq
 	rm -f gmapQ-assoc
