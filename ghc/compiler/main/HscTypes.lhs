@@ -15,7 +15,7 @@ module HscTypes (
 
 	InstEnv, 
 
-		-- Provenance
+	-- Provenance
 	Provenance(..), ImportReason(..), PrintUnqualified,
         pprProvenance, hasBetterProv
 
@@ -25,7 +25,8 @@ module HscTypes (
 
 import Name		( Name, NameEnv, NamedThing,
 			  unitNameEnv, extendNameEnv, plusNameEnv, 
-			  lookupNameEnv, emptyNameEnv, getName, nameModule )
+			  lookupNameEnv, emptyNameEnv, getName, nameModule,
+			  nameSrcLoc )
 import Module		( Module, ModuleName,
 			  extendModuleEnv, lookupModuleEnv )
 import Class		( Class )
@@ -50,6 +51,8 @@ import NameSet		( NameSet )
 import Type		( Type )
 import VarSet		( TyVarSet )
 import Panic		( panic )
+import Outputable
+import SrcLoc		( SrcLoc, isGoodSrcLoc )
 \end{code}
 
 %************************************************************************
@@ -432,6 +435,16 @@ data Provenance
 	ImportReason
 	PrintUnqualified
 
+{-
+Moved here from Name.
+pp_prov (LocalDef _ Exported)          = char 'x'
+pp_prov (LocalDef _ NotExported)       = char 'l'
+pp_prov (NonLocalDef ImplicitImport _) = char 'j'
+pp_prov (NonLocalDef (UserImport _ _ True ) _) = char 'I'	-- Imported by name
+pp_prov (NonLocalDef (UserImport _ _ False) _) = char 'i'	-- Imported by ..
+pp_prov SystemProv	     	       = char 's'
+-}
+
 data ImportReason
   = UserImport Module SrcLoc Bool	-- Imported from module M on line L
 					-- Note the M may well not be the defining module
@@ -463,7 +476,7 @@ hasBetterProv (NonLocalDef (UserImport _ _ True) _) _				   = True
 hasBetterProv (NonLocalDef (UserImport _ _ _   ) _) (NonLocalDef ImplicitImport _) = True
 hasBetterProv _					    _				   = False
 
-pprNameProvenance :: Name -> Provenance -> SDoc
+pprProvenance :: Name -> Provenance -> SDoc
 pprProvenance name LocalDef   	       = ptext SLIT("defined at") <+> ppr (nameSrcLoc name)
 pprProvenance name (NonLocalDef why _) = sep [ppr_reason why, 
 					      nest 2 (parens (ppr_defn (nameSrcLoc name)))]
