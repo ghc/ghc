@@ -1,24 +1,19 @@
 
-include ($confdir ++ "/../vanilla-test.T")
+def f( opts ):
+  opts.compile_to_hc = 1
+  opts.omit_ways = ['optasm']
+  opts.extra_hc_opts = '-fglasgow-exts'
 
--- Args to vtc are: extra compile flags
+setTestOpts(f)
 
--- Use this itsy helper fn to pass in an extra flag
-def myvtc($extra_comp_args)
-{
-   vtc(" -fglasgow-exts " ++ $extra_comp_args)
-}
-
-$compile_to_hc = "True"
-
-test "cc001" { myvtc("") }
-test "cc002" { myvtc("") }
-test "cc003" { myvtc("") }
-test "cc004" { myvtc("") }
-test "cc005" { myvtc("") }
-test "cc006" { myvtc("-fno-prune-tydecls") }
-test "cc007" { myvtc("") }
-test "cc008" { myvtc("") }
-test "cc009" { myvtc("") }
-test "cc010" { myvtc("") }
-test "cc011" { myvtc("") }
+test('cc001', normal, compile, [''])
+test('cc002', normal, compile, [''])
+test('cc003', normal, compile, [''])
+test('cc004', normal, compile, [''])
+test('cc005', normal, compile, [''])
+test('cc006', normal, compile, [''])
+test('cc007', normal, compile, [''])
+test('cc008', normal, compile, [''])
+test('cc009', normal, compile, [''])
+test('cc010', normal, compile, [''])
+test('cc011', normal, compile, [''])

@@ -1,4 +1,1 @@
-
-include ($confdir ++ "/../vanilla-test.T")
-
-test "CPUTime001" { vtr("","","") }
+test('CPUTime001', normal, compile_and_run, [''])

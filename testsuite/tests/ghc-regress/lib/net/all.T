@@ -1,5 +1,4 @@
-include ($confdir ++ "/../vanilla-test.T")
 
-test "net001"	{ vtr("-package concurrent -package net","","") }
-test "uri001"	{ vtr("-package network","","") }
-test "net002"   { vtr("-package net", "3", "") }
+test('net001', normal, compile_and_run, [ '-package concurrent -package net'])
+test('uri001', normal, compile_and_run, ['-package network'])
+test('net002', extra_run_opts('3'), compile_and_run, ['-package net'])

@@ -1,10 +1,6 @@
 
-include ($confdir ++ "/../vanilla-test.T")
-
--- Args to vtcf are: extra compile flags
-
-test "drvfail001" { vtcf("") }
-test "drvfail002" { vtcf("") }
-test "drvfail003" { vtcf("") }
-test "drvfail004" { vtcf("") }
-test "drvfail007" { vtcf("") }
+test('drvfail001', normal, compile_fail, [''])
+test('drvfail002', normal, compile_fail, [''])
+test('drvfail003', normal, compile_fail, [''])
+test('drvfail004', normal, compile_fail, [''])
+test('drvfail007', normal, compile_fail, [''])

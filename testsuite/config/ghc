@@ -1,0 +1,17 @@
+# Testsuite configuration setup for GHC
+#
+# This file is Python source
+#
+config.compiler_type         = 'ghc'
+config.compiler              = 'ghc'
+config.compiler_always_flags = ['-no-recomp', '-dcore-lint']
+
+config.compile_ways	     = ['normal', 'opt', 'optasm']
+config.run_ways		     = ['normal', 'opt', 'optasm']
+
+config.way_flags	     = { 'normal' : [],
+		   		 'opt'    : ['-O'],
+		   		 'optasm' : ['-O -fasm'],
+		   		 'prof'   : ['-O -prof -auto-all'],
+		   		 'unreg'  : ['-unreg']
+		 		}

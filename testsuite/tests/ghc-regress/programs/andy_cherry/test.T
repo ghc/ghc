@@ -1,11 +1,4 @@
 
-include ($confdir ++ "/../multimod-test.T")
-
--- Args to mtr are: extra compile flags
---                  extra run flags
---                  expected process return value, if not zero
-
--- The program wants to read stuff from its own directory,
--- so we pass it the test dir as its single argument.
-test "andy_cherry" { mtr("-package lang -cpp", ".", "") }
+test('andy_cherry', extra_run_opts('.'), multimod_compile_and_run, \
+	['Main', '-package lang -cpp'])
 

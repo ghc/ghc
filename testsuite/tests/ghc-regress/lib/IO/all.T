@@ -1,53 +1,51 @@
-include ($confdir ++ "/../vanilla-test.T")
 
-test "IOError001"	{ $stdin = "IOError001.hs" 
-			  vtr("","","") }
-test "IOError002" 	{ vtr("","","") }
-test "finalization001" 	{ vtr("","","") }
-test "hClose001" 	{ vtr("","","") }
-test "hFileSize001" 	{ vtr("","","") }
-test "hFileSize002" 	{ vtr("","","") }
-test "hFlush001" 	{ vtr("","","") }
-test "hGetBuffering001" { $stdin = "hGetBuffering001.hs" 
-			  vtr("","","") }
-test "hGetChar001" 	{ vtr("","","") }
-test "hGetLine001" 	{ $stdin = "hGetLine001.hs"
-			  vtr("-cpp","","") }
-test "hGetLine002" 	{ vtr("","","") }
-test "hGetLine003" 	{ vtr("","","") }
-test "hGetPosn001" 	{ vtr("-cpp","","") }
-test "hIsEOF001" 	{ vtr("","","") }
-test "hIsEOF002" 	{ vtr("-cpp","","") }
+def expect_fail_if_windows( opts ):
+   return expect_fail_if_platform("i386-unknown-mingw32");
 
--- hReady doesn't work at the end of a file in GHC
-test "hReady001" 	{ $expect = "fail"
-			  vtr("-cpp","","") }
+test('IOError001',      set_stdin('IOError001.hs'), compile_and_run, [''])
+test('IOError002',      normal, compile_and_run, [''])
+test('finalization001', normal, compile_and_run, [''])
+test('hClose001',       normal, compile_and_run, [''])
+test('hFileSize001',    normal, compile_and_run, [''])
+test('hFileSize002',    normal, compile_and_run, [''])
+test('hFlush001',       normal, compile_and_run, [''])
+test('hGetBuffering001', set_stdin('hGetBuffering001.hs'), compile_and_run, [''])
+test('hGetChar001', normal, compile_and_run, [''])
+test('hGetLine001', set_stdin('hGetLine001.hs'), compile_and_run, ['-cpp'])
+test('hGetLine002', normal, compile_and_run, [''])
+test('hGetLine003', normal, compile_and_run, [''])
+test('hGetPosn001', normal, compile_and_run, ['-cpp'])
+test('hIsEOF001',   normal, compile_and_run, [''])
+test('hIsEOF002',   normal, compile_and_run, ['-cpp'])
 
-test "hSeek001" 	{ vtr("-cpp","","") }
-test "hSeek002" 	{ vtr("-cpp","","") }
-test "hSeek003" 	{ vtr("-cpp","","") }
-test "hSeek004" 	{ vtr("-cpp","","") }
-test "hSetBuffering002" { $stdin = "hSetBuffering002.hs" 
-			  vtr("","","") }
-test "hSetBuffering003" { $stdin = "hSetBuffering003.hs" 
-			  vtr("","","") }
-test "ioeGetErrorString001" { vtr("-cpp","","") }
-test "ioeGetFileName001" { vtr("-cpp","","") }
-test "ioeGetHandle001"	{ vtr("-cpp","","") }
-test "isEOF001" 	{ vtr("","","") }
-test "misc001" 		{ vtr("","misc001.hs misc001.out","") }
-test "openFile001" 	{ vtr("","","") }
-test "openFile002" 	{ vtr("","","1") }
-test "openFile003" 	{ vtr("","","") }
-test "openFile004" 	{ vtr("","","") }
-test "openFile005" 	{ if $platform == "i386-unknown-mingw32" then $expect = "fail" fi
-                          vtr("","","") }
-test "openFile006" 	{ vtr("","","") }
-test "openFile007" 	{ if $platform == "i386-unknown-mingw32" then $expect = "fail" fi
-                          vtr("","","") }
-test "putStr001" 	{ vtr("","","") }
-test "readFile001" 	{ if $platform == "i386-unknown-mingw32" then $expect = "fail" fi
-                          vtr("","","") }
-test "readwrite001" 	{ vtr("-cpp","","") }
-test "readwrite002" 	{ $stdin = "readwrite002.hs" 
-			  vtr("-cpp","","") }
+# hReady doesn't work at the end of a file in GHC
+test('hReady001', expect_fail, compile_and_run, ['-cpp'])
+
+test('hSeek001', normal, compile_and_run, ['-cpp'])
+test('hSeek002', normal, compile_and_run, ['-cpp'])
+test('hSeek003', normal, compile_and_run, ['-cpp'])
+test('hSeek004', normal, compile_and_run, ['-cpp'])
+
+test('hSetBuffering002', set_stdin('hSetBuffering002.hs'), compile_and_run, [''])
+
+test('hSetBuffering003', set_stdin('hSetBuffering003.hs'), compile_and_run, [''])
+
+test('ioeGetErrorString001', normal, compile_and_run, ['-cpp'])
+test('ioeGetFileName001',    normal, compile_and_run, ['-cpp'])
+test('ioeGetHandle001',      normal, compile_and_run, ['-cpp'])
+test('isEOF001',     normal, compile_and_run, [''])
+
+test('misc001', extra_run_opts('misc001.hs misc001.out'), \
+	compile_and_run, [''])
+
+test('openFile001',  normal, compile_and_run, [''])
+test('openFile002',  exit_code(1), compile_and_run, [''])
+test('openFile003',  normal, compile_and_run, [''])
+test('openFile004',  normal, compile_and_run, [''])
+test('openFile005',  expect_fail_if_windows, compile_and_run, [''])
+test('openFile006',  normal, compile_and_run, [''])
+test('openFile007',  expect_fail_if_windows, compile_and_run, [''])
+test('putStr001',    normal, compile_and_run, [''])
+test('readFile001',  expect_fail_if_windows, compile_and_run, [''])
+test('readwrite001', normal, compile_and_run, ['-cpp'])
+test('readwrite002', set_stdin('readwrite002.hs'), compile_and_run, ['-cpp'])

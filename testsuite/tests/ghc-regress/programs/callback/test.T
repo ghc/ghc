@@ -1,9 +1,3 @@
 
-include ($confdir ++ "/../multimod-test.T")
-
--- Args to mtr are: extra compile flags
---                  extra run flags
---                  expected process return value, if not zero
-
-test "callback" { mtr("-fglasgow-exts -package lang -fvia-C", "", "") }
-
+test('callback', omit_ways(['optasm']), multimod_compile_and_run, \
+	['Main', '-fglasgow-exts -package lang -fvia-C'])

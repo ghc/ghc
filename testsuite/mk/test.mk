@@ -15,14 +15,32 @@
 #
 # -----------------------------------------------------------------------------
 
+ifeq "$(PYTHON)" ""
+$(error Python must be installed in order to use the testsuite)
+endif
+
 # ghastly hack, because the driver requires that $tool be an absolute path name.
 GHC_INPLACE_ABS	= $(FPTOOLS_TOP_ABS)/ghc/compiler/ghc-inplace
 
 EXTRA_HC_OPTS += -D$(HostPlatform_CPP)
   # ideally TargetPlatform_CPP, but that doesn't exist; they're always the same anyway
-RUNTESTS     = $(TOP)/driver/runtests
-RUNTEST_OPTS =  --config=$(CONFIG) tool=$(GHC_INPLACE_ABS) extra_hc_flags="$(EXTRA_HC_OPTS)" $(EXTRA_RUNTEST_OPTS)
-CONFIG       = $(TOP)/config/msrc/cam-02-unx.T
+RUNTESTS     = $(TOP)/driver/runtests.py
+CONFIG       = $(TOP)/config/ghc
+
+# can be overriden from the command line
+TEST_HC = $(GHC_INPLACE_ABS)
+
+RUNTEST_OPTS = \
+	--config=$(CONFIG) \
+	-e config.compiler=\"$(TEST_HC)\" \
+	-e config.compiler_always_flags.append"(\"$(EXTRA_HC_OPTS)\")" \
+	-e config.platform=\"$(TARGETPLATFORM)\" \
+	$(EXTRA_RUNTEST_OPTS)
+
+ifeq "$(filter p, $(GhcLibWays))" "p"
+RUNTEST_OPTS += -e config.compile_ways.append"(\"prof\")"
+RUNTEST_OPTS += -e config.run_ways.append"(\"prof\")"
+endif
 
 TESTS	     = 
 TEST	     = 
@@ -30,11 +48,15 @@ TEST	     =
 all :: test
 
 test:
-	$(RUNTESTS) $(RUNTEST_OPTS) platform=$(TARGETPLATFORM) $(TEST) $(TESTS)
+	$(PYTHON) $(RUNTESTS) $(RUNTEST_OPTS) \
+		$(patsubst %, --only=%, $(TEST)) \
+		$(patsubst %, --only=%, $(TESTS))
 
-verbose:
-	$(RUNTESTS) $(RUNTEST_OPTS) platform=$(TARGETPLATFORM) verbose= $(TEST) $(TESTS)
+verbose: test
 
 accept:
-	$(RUNTESTS) $(RUNTEST_OPTS) platform=$(TARGETPLATFORM) verbose= accept= $(TEST) $(TESTS)
+	$(PYTHON) $(RUNTESTS) $(RUNTEST_OPTS) \
+		$(patsubst %, --only=%, $(TEST)) \
+		$(patsubst %, --only=%, $(TESTS)) \
+		-e config.accept=1
 

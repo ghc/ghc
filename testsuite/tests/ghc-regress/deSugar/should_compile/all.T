@@ -1,65 +1,60 @@
+# Just do the normal way...
+def f( opts ):
+  opts.only_ways = ['normal']
 
-include ($confdir ++ "/../vanilla-test.T")
+setTestOpts(f)
 
--- Args to vtc are: extra compile flags
-
--- Use this itsy helper fn to pass in an extra flag
---def myvtc($extra_comp_args)
---{
---   vtc(" -fno-warn-incomplete-patterns " ++ $extra_comp_args)
---}
-
-test "ds-wildcard" { vtc("") }
-test "ds001" { vtc("") }
-test "ds002" { vtc("") }
-test "ds003" { vtc("") }
-test "ds004" { vtc("") }
-test "ds005" { vtc("") }
-test "ds006" { vtc("") }
-test "ds007" { vtc("") }
-test "ds008" { vtc("") }
-test "ds009" { vtc("") }
-test "ds010" { vtc("") }
-test "ds011" { vtc("") }
-test "ds012" { vtc("") }
-test "ds013" { vtc("") }
-test "ds014" { vtc("") }
-test "ds015" { vtc("") }
-test "ds016" { vtc("") }
-test "ds017" { vtc("") }
-test "ds018" { vtc("") }
-test "ds019" { vtc("") }
-test "ds020" { vtc("") }
-test "ds021" { vtc("") }
-test "ds022" { vtc("") }
-test "ds023" { vtc("") }
-test "ds024" { vtc("") }
-test "ds025" { vtc("") }
-test "ds026" { vtc("") }
-test "ds027" { vtc("") }
-test "ds028" { vtc("") }
-test "ds029" { vtc("") }
-test "ds030" { vtc("") }
-test "ds031" { vtc("") }
-test "ds032" { vtc("") }
-test "ds033" { vtc("") }
-test "ds034" { vtc("") }
-test "ds035" { vtc("-fglasgow-exts -package lang") }
-test "ds036" { vtc("") }
-test "ds037" { vtc("") }
-test "ds038" { vtc("") }
-test "ds039" { vtc("") }
-test "ds040" { vtc("") }
-test "ds041" { vtc("") }
-test "ds042" { vtc("") }
-test "ds043" { vtc("") }
-test "ds044" { vtc("") }
-test "ds045" { vtc("") }
-test "ds046" { vtc("-O -funbox-strict-fields") }
-test "ds047" { vtc("") }
-test "ds048" { vtc("") }
-test "ds049" { vtc("-fvia-C -package lang") }
-test "ds050" { vtc("-fglasgow-exts") }
-test "ds051" { vtc("") }
-test "ds052" { $expect = "fail" vtc("") }
-test "ds053" { $expect = "fail" vtc("") }
+test('ds-wildcard', normal, compile, [''])
+test('ds001', normal, compile, [''])
+test('ds002', normal, compile, [''])
+test('ds003', normal, compile, [''])
+test('ds004', normal, compile, [''])
+test('ds005', normal, compile, [''])
+test('ds006', normal, compile, [''])
+test('ds007', normal, compile, [''])
+test('ds008', normal, compile, [''])
+test('ds009', normal, compile, [''])
+test('ds010', normal, compile, [''])
+test('ds011', normal, compile, [''])
+test('ds012', normal, compile, [''])
+test('ds013', normal, compile, [''])
+test('ds014', normal, compile, [''])
+test('ds015', normal, compile, [''])
+test('ds016', normal, compile, [''])
+test('ds017', normal, compile, [''])
+test('ds018', normal, compile, [''])
+test('ds019', normal, compile, [''])
+test('ds020', normal, compile, [''])
+test('ds021', normal, compile, [''])
+test('ds022', normal, compile, [''])
+test('ds023', normal, compile, [''])
+test('ds024', normal, compile, [''])
+test('ds025', normal, compile, [''])
+test('ds026', normal, compile, [''])
+test('ds027', normal, compile, [''])
+test('ds028', normal, compile, [''])
+test('ds029', normal, compile, [''])
+test('ds030', normal, compile, [''])
+test('ds031', normal, compile, [''])
+test('ds032', normal, compile, [''])
+test('ds033', normal, compile, [''])
+test('ds034', normal, compile, [''])
+test('ds035', normal, compile, ['-fglasgow-exts -package lang'])
+test('ds036', normal, compile, [''])
+test('ds037', normal, compile, [''])
+test('ds038', normal, compile, [''])
+test('ds039', normal, compile, [''])
+test('ds040', normal, compile, [''])
+test('ds041', normal, compile, [''])
+test('ds042', normal, compile, [''])
+test('ds043', normal, compile, [''])
+test('ds044', normal, compile, [''])
+test('ds045', normal, compile, [''])
+test('ds046', normal, compile, ['-funbox-strict-fields'])
+test('ds047', normal, compile, [''])
+test('ds048', normal, compile, [''])
+test('ds049', normal, compile, ['-package lang'])
+test('ds050', normal, compile, ['-fglasgow-exts'])
+test('ds051', normal, compile, [''])
+test('ds052', expect_fail, compile, [''])
+test('ds053', expect_fail, compile, [''])

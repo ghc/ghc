@@ -1,16 +1,14 @@
+# Args to compile_and_run are:
+#	extra compile flags
+#	extra run flags
+#	expected process return value, if not zero
 
-include ($confdir ++ "/../vanilla-test.T")
-
--- Args to vt are: extra compile flags
---                 extra run flags
---                 expected process return value, if not zero
-
-test "dsrun001" { vtr("", "", "") }
-test "dsrun002" { vtr("", "", "") }
-test "dsrun003" { vtr("", "", "") }
-test "dsrun004" { vtr("", "", "") }
-test "dsrun005" { vtr("", "", "1") }
-test "dsrun006" { vtr("", "", "") }
-test "dsrun007" { vtr("", "", "1") }
-test "dsrun008" { vtr("", "", "1") }
-test "dsrun009" { vtr("", "", "") }
+test('dsrun001', normal, compile_and_run, [''])
+test('dsrun002', normal, compile_and_run, [''])
+test('dsrun003', normal, compile_and_run, [''])
+test('dsrun004', normal, compile_and_run, [''])
+test('dsrun005', exit_code(1), compile_and_run, [''])
+test('dsrun006', normal, compile_and_run, [''])
+test('dsrun007', exit_code(1), compile_and_run, [''])
+test('dsrun008', exit_code(1), compile_and_run, [''])
+test('dsrun009', normal, compile_and_run, [''])

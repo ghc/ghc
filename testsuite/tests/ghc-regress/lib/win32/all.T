@@ -1,16 +1,12 @@
--- This isn't a very good test to run automatically at the moment, since
--- it doesn't terminate
+# This isn't a very good test to run automatically at the moment, since
+# it doesn't terminate
 
-include ($confdir ++ "/../vanilla-test.T")
+def set_opts( opts ):
+  opts.extra_hc_opts = '-package lang -package win32'
+  opts.skip = 1
 
--- Use this itsy helper fn to pass in an extra flag
-def myvtr($extra_comp_args, $a, $b)
-{
-   -- Only run the tests on Windows...no, let's not as it will
-   -- only block an automatic testrun.
-   skip when True || ($platform /= "i386-unknown-mingw32" && 
-	     $platform /= "i386-unknown-cygwin32")
-   vtr("-package lang -package win32 " ++ $extra_comp_args, $a, $b)
-}
+#  if config.platform != "i386-unknown-mingw32" and \
+#     config.platform != "i386-unknown-cygwin32":
+#	  opts.skip = 1
 
-test "win32001"     { myvtr("","","") }
+test('win32001', set_opts, compile_and_run, [''])

@@ -1,23 +1,22 @@
 
-include ($confdir ++ "/../vanilla-test.T")
+# Args to compile_and_run are:
+#		extra compile flags
+#               extra run flags
+#               expected process return value, if not zero
 
--- Args to vt are: extra compile flags
---                 extra run flags
---                 expected process return value, if not zero
-
-test "arr001" { vtr("", "", "") }
-test "arr002" { vtr("", "", "") }
-test "arr003" { vtr("", "", "1") }
-test "arr004" { vtr("", "", "1") }
-test "arr005" { vtr("", "", "") }
-test "arr006" { vtr("", "", "") }
-test "arr007" { vtr("", "", "1") }
-test "arr008" { vtr("", "", "1") }
-test "arr009" { vtr("", "", "") }
-test "arr010" { vtr("", "", "") }
-test "arr011" { vtr("", "", "") }
-test "arr012" { vtr("", "", "") }
-test "arr013" { vtr("", "", "") }
-test "arr014" { vtr("-package lang", "", "") }
-test "arr015" { vtr("", "", "") }
-test "arr016" { vtr("-fglasgow-exts", "", "") }
+test('arr001', normal, compile_and_run, [''])
+test('arr002', normal, compile_and_run, [''])
+test('arr003', exit_code(1), compile_and_run, [''])
+test('arr004', exit_code(1), compile_and_run, [''])
+test('arr005', normal, compile_and_run, [''])
+test('arr006', normal, compile_and_run, [''])
+test('arr007', exit_code(1), compile_and_run, [''])
+test('arr008', exit_code(1), compile_and_run, [''])
+test('arr009', normal, compile_and_run, [''])
+test('arr010', normal, compile_and_run, [''])
+test('arr011', normal, compile_and_run, [''])
+test('arr012', normal, compile_and_run, [''])
+test('arr013', normal, compile_and_run, [''])
+test('arr014', normal, compile_and_run, ['-package lang'])
+test('arr015', normal, compile_and_run, [''])
+test('arr016', normal, compile_and_run, ['-fglasgow-exts'])

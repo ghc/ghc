@@ -1,43 +1,41 @@
 
-include ($confdir ++ "/../vanilla-test.T")
+test('read001', normal, compile, [''])
+test('read002', normal, compile, [''])
+test('read003', normal, compile, [''])
+test('read004', normal, compile, [''])
+test('read005', normal, compile, [''])
 
-test "read001" { vtc("") }
-test "read002" { vtc("") }
-test "read003" { vtc("") }
-test "read004" { vtc("") }
-test "read005" { vtc("") }
+# these two are really a multi-module test, order is important
+test('read006', normal, compile, [''])
+test('read007', normal, compile, [''])
 
--- these two are really a multi-module test, order is important
-test "read006" { vtc("") }
-test "read007" { vtc("") }
+test('read008', normal, compile, [''])
+test('read009', normal, compile, [''])
+test('read010', normal, compile, [''])
+test('read011', normal, compile, [''])
 
-test "read008" { vtc("") }
-test "read009" { vtc("") }
-test "read010" { vtc("") }
-test "read011" { vtc("") }
+# these two are really a multi-module test, order is important
+test('read012', omit_ways(['optasm']), compile, ['-fvia-C -funfold-casms-in-hi-file -fglasgow-exts'])
+test('read013', normal, compile, ['-fglasgow-exts'])
 
--- these two are really a multi-module test, order is important
-test "read012" { vtc("-fvia-C -O -funfold-casms-in-hi-file -fglasgow-exts") }
-test "read013" { vtc("-O -fglasgow-exts") }
-
-test "read014" { vtc("-Wall") }
-test "read015" { vtc("") }
-test "read016" { vtc("") }
-test "read017" { vtc("") }
-test "read018" { vtc("") }
-test "read019" { vtc("") }
-test "read020" { vtc("") }
-test "read021" { vtc("") }
-test "read022" { vtc("-fglasgow-exts") }
-test "read023" { vtc("") }
-test "read024" { vtc("-fglasgow-exts") }
-test "read025" { vtc("") }
-test "read026" { vtc("") }
-test "read027" { vtc("") }
-test "read028" { vtc("") }
-test "read029" { vtc("") }
-test "read030" { vtc("") }
-test "read031" { vtc("") }
-test "read032" { vtc("") }
-test "read033" { vtc("") }
-test "read034" { vtc("") }
+test('read014', normal, compile, ['-Wall'])
+test('read015', normal, compile, [''])
+test('read016', normal, compile, [''])
+test('read017', normal, compile, [''])
+test('read018', normal, compile, [''])
+test('read019', normal, compile, [''])
+test('read020', normal, compile, [''])
+test('read021', normal, compile, [''])
+test('read022', normal, compile, ["-fglasgow-exts"])
+test('read023', normal, compile, [''])
+test('read024', normal, compile, ["-fglasgow-exts"])
+test('read025', normal, compile, [''])
+test('read026', normal, compile, [''])
+test('read027', normal, compile, [''])
+test('read028', normal, compile, [''])
+test('read029', normal, compile, [''])
+test('read030', normal, compile, [''])
+test('read031', normal, compile, [''])
+test('read032', normal, compile, [''])
+test('read033', normal, compile, [''])
+test('read034', normal, compile, [''])

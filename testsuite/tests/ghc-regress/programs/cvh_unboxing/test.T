@@ -1,9 +1,4 @@
 
-include ($confdir ++ "/../multimod-test.T")
-
--- Args to mtr are: extra compile flags
---                  extra run flags
---                  expected process return value, if not zero
-
-test "cvh_unboxing" { mtr("-fglasgow-exts", "", "") }
+test('cvh_unboxing', normal, multimod_compile_and_run, \
+	['Main', '-fglasgow-exts'])
 

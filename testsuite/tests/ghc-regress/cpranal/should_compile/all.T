@@ -1,7 +1,8 @@
+# Just do the opt way...
+def f( opts ):
+  opts.only_ways = ['opt']
 
-include ($confdir ++ "/../vanilla-test.T")
+setTestOpts(f)
 
--- Args to vtc are: extra compile flags
-
-test "Cpr001_imp" { vtc("-O") }
-test "Cpr001"     { vtc("-O") }
+test('Cpr001_imp', normal, compile, [''])
+test('Cpr001', normal, compile, [''])

@@ -1,17 +1,12 @@
-
-include ($confdir ++ "/../vanilla-test.T")
-
--- Args to vtc are: extra compile flags
-
-test "drv001" { vtc("") }
-test "drv002" { vtc("") }
-test "drv003" { vtc("") }
-test "drv004" { vtc("") }
-test "drv005" { vtc("") }
-test "drv006" { vtc("") }
-test "drv007" { vtc("") }
-test "drv008" { vtc("") }
-test "drv009" { vtc("") }
-test "drv010" { vtc("") }
-test "drv011" { vtc("") }
+test('drv001', normal, compile, [''])
+test('drv002', normal, compile, [''])
+test('drv003', normal, compile, [''])
+test('drv004', normal, compile, [''])
+test('drv005', normal, compile, [''])
+test('drv006', normal, compile, [''])
+test('drv007', normal, compile, [''])
+test('drv008', normal, compile, [''])
+test('drv009', normal, compile, [''])
+test('drv010', normal, compile, [''])
+test('drv011', normal, compile, [''])
 

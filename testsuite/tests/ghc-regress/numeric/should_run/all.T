@@ -1,26 +1,31 @@
+# Args to compile_and_run are:
+#	extra compile flags
+#	extra run flags
+#	expected process return value, if not zero
 
-include ($confdir ++ "/../vanilla-test.T")
+test('arith001', normal, compile_and_run, [''])
+test('arith002', normal, compile_and_run, [''])
+test('arith003', normal, compile_and_run, [''])
+test('arith004', normal, compile_and_run, [''])
+test('arith005', normal, compile_and_run, [''])
+test('arith006', normal, compile_and_run, ['-package lang'])
+test('arith007', normal, compile_and_run, [''])
 
--- Args to vt are: extra compile flags
---                 extra run flags
---                 expected process return value, if not zero
+# This test generates slightly different results with the NCG on x86,
+# because of the extra precision when floating point computations are
+# done in registers rather than going via memory.
+test('arith008', expect_fail_for(['optasm']), compile_and_run, [''])
 
-test "arith001" { vtr("", "", "") }
-test "arith002" { vtr("", "", "") }
-test "arith003" { vtr("", "", "") }
-test "arith004" { vtr("", "", "") }
-test "arith005" { vtr("", "", "") }
-test "arith006" { vtr("-package lang", "", "") }
-test "arith007" { vtr("", "", "") }
-test "arith008" { vtr("", "", "") }
-test "arith009" { vtr("", "", "") }
-test "arith010" { vtr("-package lang", "", "") }
-test "arith011" { vtr("-package lang", "", "") }
-test "arith012" { vtr("-package lang", "", "") }
-test "arith013" { vtr("", "", "") }
-test "arith014" { vtr("", "", "") }
-test "arith015" { vtr("", "", "") }
-test "num009" { vtr("", "", "") }
-test "num010" { vtr("", "", "") }
-test "num011" { vtr("", "", "") }
-test "arith016" { vtr("-fglasgow-exts", "", "") }
+test('arith009', normal, compile_and_run, [''])
+test('arith010', normal, compile_and_run, ['-package lang'])
+test('arith011', normal, compile_and_run, ['-package lang'])
+
+test('arith012', expect_fail_for(['optasm']), compile_and_run, ['-package lang'])
+
+test('arith013', normal, compile_and_run, [''])
+test('arith014', normal, compile_and_run, [''])
+test('arith015', normal, compile_and_run, [''])
+test('num009',   normal, compile_and_run, [''])
+test('num010',   normal, compile_and_run, [''])
+test('num011',   normal, compile_and_run, [''])
+test('arith016', normal, compile_and_run, ['-fglasgow-exts'])

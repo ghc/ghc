@@ -1,28 +1,26 @@
+# Args to compile_and_run are:
+#	extra compile flags
+#	extra run flags
+#	expected process return value, if not zero
 
-include ($confdir ++ "/../vanilla-test.T")
-
--- Args to vt are: extra compile flags
---                 extra run flags
---                 expected process return value, if not zero
-
-test "tcrun001" { vtr("", "", "") }
-test "tcrun002" { vtr("", "", "") }
-test "tcrun003" { vtr("-fglasgow-exts", "", "") }
-test "tcrun004" { vtr("-fglasgow-exts", "", "") }
-test "tcrun005" { vtr("", "", "") }
-test "tcrun006" { vtr("", "", "") }
-test "tcrun007" { vtr("", "", "") }
-test "tcrun008" { vtr("", "", "") }
-test "tcrun009" { vtr("", "", "") }
-test "tcrun010" { vtr("", "", "") }
-test "tcrun011" { vtr("", "", "") }
-test "tcrun012" { vtr("", "", "") }
-test "tcrun013" { vtr("", "", "") }
-test "tcrun014" { vtr("", "", "") }
-test "tcrun015" { vtr("-O", "", "") }
-test "tcrun016" { vtr("", "", "") }
-test "tcrun017" { vtr("", "", "") }
-test "tcrun018" { vtr("", "", "") }
-test "tcrun019" { vtr("", "", "") }
-test "tcrun020" { vtr("", "", "") }
-test "tcrun021" { vtr("-package data", "", "") }
+test('tcrun001', normal, compile_and_run, [''])
+test('tcrun002', normal, compile_and_run, [''])
+test('tcrun003', normal, compile_and_run, ['-fglasgow-exts'])
+test('tcrun004', normal, compile_and_run, ['-fglasgow-exts'])
+test('tcrun005', normal, compile_and_run, [''])
+test('tcrun006', normal, compile_and_run, [''])
+test('tcrun007', normal, compile_and_run, [''])
+test('tcrun008', normal, compile_and_run, [''])
+test('tcrun009', normal, compile_and_run, [''])
+test('tcrun010', normal, compile_and_run, [''])
+test('tcrun011', normal, compile_and_run, [''])
+test('tcrun012', normal, compile_and_run, [''])
+test('tcrun013', normal, compile_and_run, [''])
+test('tcrun014', normal, compile_and_run, [''])
+test('tcrun015', normal, compile_and_run, ['-O'])
+test('tcrun016', normal, compile_and_run, [''])
+test('tcrun017', normal, compile_and_run, [''])
+test('tcrun018', normal, compile_and_run, [''])
+test('tcrun019', normal, compile_and_run, [''])
+test('tcrun020', normal, compile_and_run, [''])
+test('tcrun021', normal, compile_and_run, ['-package data'])

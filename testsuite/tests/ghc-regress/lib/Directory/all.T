@@ -1,7 +1,4 @@
-
-include ($confdir ++ "/../vanilla-test.T")
-
-test "currentDirectory001"     { vtr("","","") }
-test "directory001"            { vtr("","","") }
-test "getDirectoryContents001" { vtr("","","") }
-test "getPermissions001"       { vtr("-cpp","","") }
+test('currentDirectory001',     normal, compile_and_run, [''])
+test('directory001',            normal, compile_and_run, [''])
+test('getDirectoryContents001', normal, compile_and_run, [''])
+test('getPermissions001',       normal, compile_and_run, ['-cpp'])

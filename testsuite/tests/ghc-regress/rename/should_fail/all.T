@@ -1,44 +1,40 @@
 
-include ($confdir ++ "/../vanilla-test.T")
+test('rnfail001', normal, compile_fail, [''])
+test('rnfail002', normal, compile_fail, [''])
+test('rnfail003', normal, compile_fail, [''])
+test('rnfail004', normal, compile_fail, [''])
+test('rnfail007', normal, compile_fail, [''])
+test('rnfail008', normal, compile_fail, [''])
+test('rnfail009', normal, compile_fail, [''])
+test('rnfail010', normal, compile_fail, [''])
+test('rnfail011', normal, compile_fail, [''])
+test('rnfail012', normal, compile_fail, [''])
+test('rnfail013', normal, compile_fail, [''])
+test('rnfail014', normal, compile_fail, [''])
+test('rnfail015', normal, compile_fail, [''])
+test('rnfail016', normal, compile_fail, [''])
+test('rnfail017', normal, compile_fail, [''])
+test('rnfail018', normal, compile_fail, [''])
+test('rnfail019', normal, compile_fail, [''])
+test('rnfail020', normal, compile_fail, [''])
+test('rnfail021', normal, compile_fail, [''])
+test('rnfail022', normal, compile_fail, [''])
+test('rnfail023', normal, compile_fail, [''])
+test('rnfail024', normal, compile_fail, [''])
+test('rnfail025', normal, compile_fail, [''])
+test('rnfail026', normal, compile_fail, [''])
+test('rnfail027', normal, compile_fail, [''])
+test('rnfail028', normal, compile_fail, [''])
+test('rnfail029', normal, compile_fail, [''])
+test('rnfail030', normal, compile_fail, [''])
+test('rnfail031', normal, compile_fail, [''])
+test('rnfail032', normal, compile_fail, [''])
+test('rnfail033', normal, compile_fail, [''])
+test('rnfail034', expect_fail, compile_fail, [''])
+test('rnfail035', normal, compile_fail, [''])
 
--- Args to vtcf are: extra compile flags
+# these two are really a single multi-module test
+test('Rn037Help', normal, compile, [''])
+test('rnfail037', normal, compile_fail, [''])
 
-test "rnfail001" { vtcf("") }
-test "rnfail002" { vtcf("") }
-test "rnfail003" { vtcf("") }
-test "rnfail004" { vtcf("") }
-test "rnfail007" { vtcf("") }
-test "rnfail008" { vtcf("") }
-test "rnfail009" { vtcf("") }
-test "rnfail010" { vtcf("") }
-test "rnfail011" { vtcf("") }
-test "rnfail012" { vtcf("") }
-test "rnfail013" { vtcf("") }
-test "rnfail014" { vtcf("") }
-test "rnfail015" { vtcf("") }
-test "rnfail016" { vtcf("") }
-test "rnfail017" { vtcf("") }
-test "rnfail018" { vtcf("") }
-test "rnfail019" { vtcf("") }
-test "rnfail020" { vtcf("") }
-test "rnfail021" { vtcf("") }
-test "rnfail022" { vtcf("") }
-test "rnfail023" { vtcf("") }
-test "rnfail024" { vtcf("") }
-test "rnfail025" { vtcf("") }
-test "rnfail026" { vtcf("") }
-test "rnfail027" { vtcf("") }
-test "rnfail028" { vtcf("") }
-test "rnfail029" { vtcf("") }
-test "rnfail030" { vtcf("") }
-test "rnfail031" { vtcf("") }
-test "rnfail032" { vtcf("") }
-test "rnfail033" { vtcf("") }
-test "rnfail034" { $expect = "fail" vtcf("") }
-test "rnfail035" { vtcf("") }
-
--- these two are really a multi-module tests
-test "Rn037Help" { vtc("") }
-test "rnfail037" { vtcf("") }
-
-test "rnfail038" { vtcf("") }
+test('rnfail038', normal, compile_fail, [''])

@@ -1,9 +1,13 @@
+# Args to compile_and_run are:
+#	extra compile flags
+#	extra run flags
+#	expected process return value, if not zero
 
-include ($confdir ++ "/../vanilla-test.T")
+# Only compile with optimisation
+def f( opts ):
+  opts.only_ways = ['opt']
 
--- Args to vt are: extra compile flags
---                 extra run flags
---                 expected process return value, if not zero
+setTestOpts(f)
 
-test "simplrun001" { vtr("-O", "", "") }
-test "simplrun002" { vtr("-O", "", "") }
+test('simplrun001', normal, compile_and_run, [''])
+test('simplrun002', normal, compile_and_run, [''])

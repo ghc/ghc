@@ -1,9 +1,4 @@
 
-include ($confdir ++ "/../multimod-test.T")
-
--- Args to mtr are: extra compile flags
---                  extra run flags
---                  expected process return value, if not zero
-
-test "fast2haskell" { mtr("-fglasgow-exts -package lang", "", "") }
+test('fast2haskell', normal, multimod_compile_and_run, \
+	['Main', '-fglasgow-exts -package lang'])
 

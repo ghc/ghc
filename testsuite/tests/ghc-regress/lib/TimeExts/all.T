@@ -1,3 +1,1 @@
-include ($confdir ++ "/../vanilla-test.T")
-
-test "timeexts001"	{ vtr("-package lang","","") }
+test('timeexts001', normal, compile_and_run, ['-package lang'])

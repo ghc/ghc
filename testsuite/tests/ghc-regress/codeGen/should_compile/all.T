@@ -1,7 +1,2 @@
-
-include ($confdir ++ "/../vanilla-test.T")
-
--- Args to vtc are: extra compile flags
-
-test "cg001" { vtc("") }
-test "cg002" { vtc("") }
+test('cg001', normal, compile, [''])
+test('cg002', normal, compile, [''])

@@ -1,4 +1,3 @@
-
 ----------------------------- SYNTAX ------------------------------
 
 TFILE    ::= TOPDEF *
@@ -22,15 +21,17 @@ STMT     ::= VAR = EXPR
            | expect RESULT
            | framefail EXPR
 
+RESULT	 ::= pass | fail | unknown
+
 VAR      ::= $identifier
 MNAME    ::= identifier
 STRING   ::= "a string"
 
 EXPR     ::= EXPR9 || ... || EXPR9
-EXPR8    ::= EXPR7 && ... && EXPR7
-EXPR7    ::= EXPR1 OP EXPR1
-           | EXPR1 | EXPR7
-           | EXPR1
+EXPR9    ::= EXPR8 && ... && EXPR8
+EXPR8    ::= EXPR0 OP EXPR0
+           | EXPR0 "|" EXPR8
+           | EXPR0
 
 OP       ::=    == or /= or contains or lacks or ++
 
@@ -43,9 +44,9 @@ EXPR0    ::= VAR
            | if EXPR then EXPR else EXPR fi
            | otherwise
            | defined VAR
-           | contents EXPR
-           | exists EXPR
-           | framefail EXPR
+           | contents EXPR0
+           | exists EXPR0
+           | framefail EXPR0
            | ( EXPR )
 
 

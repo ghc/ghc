@@ -1,108 +1,101 @@
 
-include ($confdir ++ "/../vanilla-test.T")
+test('tcfail001', normal, compile_fail, [''])
+test('tcfail002', normal, compile_fail, [''])
+test('tcfail003', normal, compile_fail, [''])
+test('tcfail004', normal, compile_fail, [''])
+test('tcfail005', normal, compile_fail, [''])
+test('tcfail006', normal, compile_fail, [''])
+test('tcfail007', normal, compile_fail, [''])
+test('tcfail008', normal, compile_fail, [''])
+test('tcfail009', normal, compile_fail, [''])
+test('tcfail010', normal, compile_fail, [''])
+test('tcfail011', normal, compile_fail, [''])
+test('tcfail012', normal, compile_fail, [''])
+test('tcfail013', normal, compile_fail, [''])
+test('tcfail014', normal, compile_fail, [''])
+test('tcfail015', normal, compile_fail, [''])
+test('tcfail016', normal, compile_fail, [''])
+test('tcfail017', normal, compile_fail, [''])
+test('tcfail018', normal, compile_fail, [''])
+test('tcfail019', normal, compile_fail, [''])
+test('tcfail020', normal, compile_fail, [''])
+test('tcfail021', normal, compile_fail, [''])
+test('tcfail023', normal, compile_fail, [''])
+test('tcfail027', normal, compile_fail, [''])
+test('tcfail028', normal, compile_fail, [''])
+test('tcfail029', normal, compile_fail, [''])
+test('tcfail030', normal, compile_fail, [''])
+test('tcfail031', normal, compile_fail, [''])
+test('tcfail032', normal, compile_fail, [''])
+test('tcfail033', normal, compile_fail, [''])
+test('tcfail034', normal, compile_fail, [''])
+test('tcfail035', normal, compile_fail, [''])
+test('tcfail036', normal, compile_fail, [''])
+test('tcfail037', normal, compile_fail, [''])
+test('tcfail038', normal, compile_fail, [''])
+test('tcfail040', normal, compile_fail, [''])
+test('tcfail042', normal, compile_fail, [''])
+test('tcfail043', normal, compile_fail, [''])
+test('tcfail044', normal, compile_fail, [''])
+test('tcfail045', normal, compile_fail, ['-fglasgow-exts -package lang'])
+test('tcfail046', normal, compile_fail, [''])
+test('tcfail047', normal, compile_fail, [''])
+test('tcfail048', normal, compile_fail, [''])
+test('tcfail049', normal, compile_fail, [''])
+test('tcfail050', normal, compile_fail, [''])
+test('tcfail051', normal, compile_fail, [''])
+test('tcfail052', normal, compile_fail, [''])
+test('tcfail053', normal, compile_fail, [''])
+test('tcfail054', normal, compile_fail, [''])
+test('tcfail055', normal, compile_fail, [''])
+test('tcfail056', normal, compile_fail, [''])
+test('tcfail057', normal, compile_fail, [''])
+test('tcfail058', normal, compile_fail, [''])
+test('tcfail061', normal, compile_fail, [''])
+test('tcfail062', normal, compile_fail, [''])
+test('tcfail063', normal, compile_fail, [''])
+test('tcfail065', normal, compile_fail, [''])
+test('tcfail067', normal, compile_fail, [''])
+test('tcfail068', normal, compile_fail, ['-fglasgow-exts -package lang'])
+test('tcfail069', normal, compile_fail, [''])
+test('tcfail070', normal, compile_fail, [''])
+test('tcfail071', normal, compile_fail, [''])
+test('tcfail072', normal, compile_fail, [''])
+test('tcfail073', normal, compile_fail, [''])
+test('tcfail075', normal, compile_fail, [''])
+test('tcfail076', normal, compile_fail, [''])
+test('tcfail077', normal, compile_fail, [''])
+test('tcfail078', normal, compile_fail, [''])
+test('tcfail079', normal, compile_fail, [''])
+test('tcfail080', expect_fail, compile_fail, ['-fglasgow-exts -package lang'])
+test('tcfail082', normal, compile_fail, [''])
+test('tcfail083', normal, compile_fail, [''])
+test('tcfail084', normal, compile_fail, [''])
+test('tcfail085', normal, compile_fail, [''])
+test('tcfail086', normal, compile_fail, [''])
+test('tcfail087', normal, compile_fail, [''])
+test('tcfail088', normal, compile_fail, [''])
+test('tcfail089', normal, compile_fail, [''])
+test('tcfail090', normal, compile_fail, [''])
+test('tcfail091', normal, compile_fail, [''])
+test('tcfail092', normal, compile_fail, [''])
+test('tcfail093', normal, compile_fail, [''])
+test('tcfail094', normal, compile_fail, [''])
+test('tcfail095', normal, compile_fail, [''])
+test('tcfail096', normal, compile_fail, [''])
+test('tcfail097', normal, compile_fail, [''])
 
--- Args to vtcf are: extra compile flags
+# The compiler should reject tc098, but it doesn't.  Hence
+# this is an expected failure.
+test('tcfail098', expect_fail, compile_fail, [''])
 
-test "tcfail001" { vtcf("") }
-test "tcfail002" { vtcf("") }
-test "tcfail003" { vtcf("") }
-test "tcfail004" { vtcf("") }
-test "tcfail005" { vtcf("") }
-test "tcfail006" { vtcf("") }
-test "tcfail007" { vtcf("") }
-test "tcfail008" { vtcf("") }
-test "tcfail009" { vtcf("") }
-test "tcfail010" { vtcf("") }
-test "tcfail011" { vtcf("") }
-test "tcfail012" { vtcf("") }
-test "tcfail013" { vtcf("") }
-test "tcfail014" { vtcf("") }
-test "tcfail015" { vtcf("") }
-test "tcfail016" { vtcf("") }
-test "tcfail017" { vtcf("") }
-test "tcfail018" { vtcf("") }
-test "tcfail019" { vtcf("") }
-test "tcfail020" { vtcf("") }
-test "tcfail021" { vtcf("") }
-test "tcfail023" { vtcf("") }
-test "tcfail027" { vtcf("") }
-test "tcfail028" { vtcf("") }
-test "tcfail029" { vtcf("") }
-test "tcfail030" { vtcf("") }
-test "tcfail031" { vtcf("") }
-test "tcfail032" { vtcf("") }
-test "tcfail033" { vtcf("") }
-test "tcfail034" { vtcf("") }
-test "tcfail035" { vtcf("") }
-test "tcfail036" { vtcf("") }
-test "tcfail037" { vtcf("") }
-test "tcfail038" { vtcf("") }
-test "tcfail040" { vtcf("") }
-test "tcfail042" { vtcf("") }
-test "tcfail043" { vtcf("") }
-test "tcfail044" { vtcf("") }
-test "tcfail045" { vtcf("-fglasgow-exts -package lang") }
-test "tcfail046" { vtcf("") }
-test "tcfail047" { vtcf("") }
-test "tcfail048" { vtcf("") }
-test "tcfail049" { vtcf("") }
-test "tcfail050" { vtcf("") }
-test "tcfail051" { vtcf("") }
-test "tcfail052" { vtcf("") }
-test "tcfail053" { vtcf("") }
-test "tcfail054" { vtcf("") }
-test "tcfail055" { vtcf("") }
-test "tcfail056" { vtcf("") }
-test "tcfail057" { vtcf("") }
-test "tcfail058" { vtcf("") }
-test "tcfail061" { vtcf("") }
-test "tcfail062" { vtcf("") }
-test "tcfail063" { vtcf("") }
-test "tcfail065" { vtcf("") }
-test "tcfail067" { vtcf("") }
-test "tcfail068" { vtcf("-fglasgow-exts -package lang") }
-test "tcfail069" { vtcf("") }
-test "tcfail070" { vtcf("") }
-test "tcfail071" { vtcf("") }
-test "tcfail072" { vtcf("") }
-test "tcfail073" { vtcf("") }
-test "tcfail075" { vtcf("") }
-test "tcfail076" { vtcf("") }
-test "tcfail077" { vtcf("") }
-test "tcfail078" { vtcf("") }
-test "tcfail079" { vtcf("") }
-test "tcfail080" { $expect = "fail" 
-                   vtcf("-fglasgow-exts -package lang") }
-test "tcfail082" { vtcf("") }
-test "tcfail083" { vtcf("") }
-test "tcfail084" { vtcf("") }
-test "tcfail085" { vtcf("") }
-test "tcfail086" { vtcf("") }
-test "tcfail087" { vtcf("") }
-test "tcfail088" { vtcf("") }
-test "tcfail089" { vtcf("-O") }
-test "tcfail090" { vtcf("") }
-test "tcfail091" { vtcf("") }
-test "tcfail092" { vtcf("") }
-test "tcfail093" { vtcf("") }
-test "tcfail094" { vtcf("") }
-test "tcfail095" { vtcf("") }
-test "tcfail096" { vtcf("") }
-test "tcfail097" { vtcf("") }
-
--- The compiler should reject tc098, but it doesn't.  Hence
--- this is an expected failure.
-test "tcfail098" { $expect = "fail" 
-                   vtcf("") }
-
-test "tcfail099" { vtcf("") }
-
-test "tcfail100" { vtcf("") }
-test "tcfail101" { vtcf("") }
-test "tcfail102" { vtcf("") }
-test "tcfail103" { vtcf("") }
-test "tcfail104" { vtcf("") }
-test "tcfail105" { vtcf("") }
-test "tcfail106" { vtcf("") }
-test "tcfail107" { vtcf("") }
-test "tcfail108" { vtcf("") }
+test('tcfail099', normal, compile_fail, [''])
+test('tcfail100', normal, compile_fail, [''])
+test('tcfail101', normal, compile_fail, [''])
+test('tcfail102', normal, compile_fail, [''])
+test('tcfail103', normal, compile_fail, [''])
+test('tcfail104', normal, compile_fail, [''])
+test('tcfail105', normal, compile_fail, [''])
+test('tcfail106', normal, compile_fail, [''])
+test('tcfail107', normal, compile_fail, [''])
+test('tcfail108', normal, compile_fail, [''])

@@ -1,14 +1,9 @@
+def f( opts ):
+  opts.extra_hc_opts = '-fglasgow-exts -package lang'
 
-include ($confdir ++ "/../vanilla-test.T")
+setTestOpts(f)
 
--- Args to vtcf are: extra compile flags
-
-def myvtcf ( $args )
-{
-   vtcf ( " -fglasgow-exts -package lang " ++ $args)
-}
-
-test "cc001" { myvtcf("") }
-test "cc002" { myvtcf("") }
-test "cc004" { myvtcf("") }
-test "cc005" { myvtcf("") }
+test('cc001', normal, compile_fail, [''])
+test('cc002', normal, compile_fail, [''])
+test('cc004', normal, compile_fail, [''])
+test('cc005', normal, compile_fail, [''])

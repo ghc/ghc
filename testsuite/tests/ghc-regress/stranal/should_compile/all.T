@@ -1,25 +1,19 @@
+# Only compile with optimisation
+def f( opts ):
+  opts.only_ways = ['opt']
 
-include ($confdir ++ "/../vanilla-test.T")
+setTestOpts(f)
 
--- Args to vtc are: extra compile flags
-
--- Use this itsy helper fn to pass in an extra flag
-def myvtc($extra_comp_args)
-{
-   vtc(" -O " ++ $extra_comp_args)
-}
-
-
-test "default" { myvtc("") }
-test "fact"    { myvtc("") }
-test "fun"     { myvtc("") }
-test "goo"     { myvtc("") }
-test "ins"     { myvtc("") }
-test "map"     { myvtc("") }
-test "sim"     { myvtc("") }
-test "str001"  { myvtc("") }
-test "str002"  { myvtc("") }
-test "syn"     { myvtc("") }
-test "test"    { myvtc("") }
-test "tst"     { myvtc("") }
-test "unu"     { myvtc("") }
+test('default', normal, compile, [''])
+test('fact', normal, compile, [''])
+test('fun', normal, compile, [''])
+test('goo', normal, compile, [''])
+test('ins', normal, compile, [''])
+test('map', normal, compile, [''])
+test('sim', normal, compile, [''])
+test('str001', normal, compile, [''])
+test('str002', normal, compile, [''])
+test('syn', normal, compile, [''])
+test('test', normal, compile, [''])
+test('tst', normal, compile, [''])
+test('unu', normal, compile, [''])

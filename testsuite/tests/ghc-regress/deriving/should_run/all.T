@@ -1,17 +1,15 @@
+# Args to vt are:
+#	extra compile flags
+#	extra run flags
+#	expected process return value, if not zero
 
-include ($confdir ++ "/../vanilla-test.T")
-
--- Args to vt are: extra compile flags
---                 extra run flags
---                 expected process return value, if not zero
-
-test "drvrun001" { vtr("", "", "") }
-test "drvrun002" { vtr("", "", "") }
-test "drvrun003" { vtr("", "", "") }
-test "drvrun004" { vtr("", "", "") }
-test "drvrun005" { vtr("", "", "") }
-test "drvrun006" { vtr("", "", "") }
-test "drvrun007" { vtr("", "", "") }
-test "drvrun008" { vtr("-funbox-strict-fields", "", "") }
-test "drvrun009" { vtr("", "", "") }
-test "drvrun010" { vtr("", "", "") }
+test('drvrun001', normal, compile_and_run, [''])
+test('drvrun002', normal, compile_and_run, [''])
+test('drvrun003', normal, compile_and_run, [''])
+test('drvrun004', normal, compile_and_run, [''])
+test('drvrun005', normal, compile_and_run, [''])
+test('drvrun006', normal, compile_and_run, [''])
+test('drvrun007', normal, compile_and_run, [''])
+test('drvrun008', normal, compile_and_run, ['-funbox-strict-fields'])
+test('drvrun009', normal, compile_and_run, [''])
+test('drvrun010', normal, compile_and_run, [''])

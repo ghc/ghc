@@ -1,164 +1,160 @@
+# Args to vtc are: extra compile flags
 
-include ($confdir ++ "/../vanilla-test.T")
+def f( opts ):
+  opts.extra_hc_opts = '-fno-warn-incomplete-patterns'
 
--- Args to vtc are: extra compile flags
+setTestOpts(f)
 
--- Use this itsy helper fn to pass in an extra flag
-def myvtc($extra_comp_args)
-{
-   vtc(" -fno-warn-incomplete-patterns " ++ $extra_comp_args)
-}
-
-test "tc001" { myvtc("") }
-test "tc002" { myvtc("") }
-test "tc003" { myvtc("") }
-test "tc004" { myvtc("") }
-test "tc005" { myvtc("") }
-test "tc006" { myvtc("") }
-test "tc007" { myvtc("") }
-test "tc008" { myvtc("") }
-test "tc009" { myvtc("") }
-test "tc010" { myvtc("") }
-test "tc011" { myvtc("") }
-test "tc012" { myvtc("") }
-test "tc013" { myvtc("") }
-test "tc014" { myvtc("") }
-test "tc015" { myvtc("") }
-test "tc016" { myvtc("") }
-test "tc017" { myvtc("") }
-test "tc018" { myvtc("") }
-test "tc019" { myvtc("-fglasgow-exts") }
-test "tc020" { myvtc("") }
-test "tc021" { myvtc("") }
-test "tc022" { myvtc("") }
-test "tc023" { myvtc("") }
-test "tc024" { myvtc("") }
-test "tc025" { myvtc("") }
-test "tc026" { myvtc("") }
-test "tc027" { myvtc("") }
-test "tc028" { myvtc("") }
-test "tc029" { myvtc("") }
-test "tc030" { myvtc("") }
-test "tc031" { myvtc("") }
-test "tc032" { myvtc("") }
-test "tc033" { myvtc("") }
-test "tc034" { myvtc("") }
-test "tc035" { myvtc("") }
-test "tc036" { myvtc("") }
-test "tc037" { myvtc("") }
-test "tc038" { myvtc("") }
-test "tc039" { myvtc("") }
-test "tc040" { myvtc("") }
-test "tc041" { myvtc("") }
-test "tc042" { myvtc("") }
-test "tc043" { myvtc("") }
-test "tc044" { myvtc("") }
-test "tc045" { myvtc("") }
-test "tc046" { myvtc("") }
-test "tc047" { myvtc("") }
-test "tc048" { myvtc("") }
-test "tc049" { myvtc("") }
-test "tc050" { myvtc("") }
-test "tc051" { myvtc("") }
-test "tc052" { myvtc("") }
-test "tc053" { myvtc("") }
-test "tc054" { myvtc("") }
-test "tc055" { myvtc("") }
-test "tc056" { myvtc("") }
-test "tc057" { myvtc("") }
-test "tc058" { myvtc("") }
-test "tc059" { myvtc("") }
-test "tc060" { myvtc("") }
-test "tc061" { myvtc("") }
-test "tc062" { myvtc("") }
-test "tc063" { myvtc("") }
-test "tc064" { myvtc("") }
-test "tc065" { myvtc("-package lang -package data") }
-test "tc066" { myvtc("") }
-test "tc067" { myvtc("") }
-test "tc068" { myvtc("") }
-test "tc069" { myvtc("") }
-test "tc070" { myvtc("") }
-test "tc073" { myvtc("") }
-test "tc074" { myvtc("") }
-test "tc076" { myvtc("") }
-test "tc077" { myvtc("") }
-test "tc078" { myvtc("") }
-test "tc079" { myvtc("") }
-test "tc080" { myvtc("") }
-test "tc081" { myvtc("") }
-test "tc082" { myvtc("") }
-test "tc084" { myvtc("") }
-test "tc085" { myvtc("-package lang") }
-test "tc086" { myvtc("") }
-test "tc087" { myvtc("-fglasgow-exts") }
-test "tc088" { myvtc("-package lang") }
-test "tc089" { myvtc("") }
-test "tc090" { myvtc("") }
-test "tc091" { myvtc("") }
-test "tc092" { myvtc("") }
-test "tc093" { myvtc("") }
-test "tc094" { myvtc("") }
-test "tc095" { myvtc("") }
-test "tc096" { myvtc("") }
-test "tc097" { myvtc("-fglasgow-exts") }
-test "tc098" { myvtc("") }
-test "tc099" { myvtc("") }
-test "tc100" { myvtc("-O") }
-test "tc101" { myvtc("") }
-test "tc102" { myvtc("") }
-test "tc103" { myvtc("") }
-test "tc104" { myvtc("") }
-test "tc105" { myvtc("") }
-test "tc106" { myvtc("") }
-test "tc107" { myvtc("") }
-test "tc108" { myvtc("-fglasgow-exts") }
-test "tc109" { myvtc("") }
-test "tc111" { myvtc("") }
-test "tc112" { myvtc("") }
-test "tc113" { myvtc("") }
-test "tc114" { myvtc("") }
-test "tc115" { myvtc("") }
-test "tc116" { myvtc("") }
-test "tc117" { myvtc("") }
-test "tc118" { myvtc("") }
-test "tc119" { myvtc("") }
-test "tc120" { myvtc("") }
-test "tc121" { myvtc("") }
-test "tc122" { myvtc("") }
-test "tc123" { myvtc("") }
-test "tc124" { myvtc("") }
-test "tc125" { myvtc("") }
-test "tc126" { myvtc("") }
-test "tc127" { myvtc("") }
-test "tc128" { myvtc("") }
-test "tc129" { myvtc("") }
-test "tc130" { myvtc("") }
-test "tc131" { myvtc("") }
-test "tc132" { myvtc("-package lang") }
-test "tc133" { myvtc("") }
-test "tc134" { myvtc("") }
-test "tc135" { myvtc("") }
-test "tc136" { myvtc("") }
-test "tc137" { myvtc("") }
-test "tc140" { myvtc("") }
-test "tc141" { myvtc("") }
-test "tc142" { myvtc("") }
-test "tc143" { myvtc("") }
-test "tc144" { myvtc("") }
-test "tc145" { myvtc("") }
-test "tc146" { myvtc("") }
-test "tc147" { myvtc("") }
-test "tc148" { myvtc("") }
-test "tc149" { myvtc("") }
-test "tc150" { myvtc("") }
-test "tc151" { myvtc("") }
-test "tc152" { myvtc("") }
-test "tc153" { myvtc("") }
-test "tc154" { myvtc("") }
-test "tc155" { myvtc("") }
-test "tc156" { myvtc("") }
-test "tc157" { myvtc("") }
-test "tc158" { myvtc("") }
-test "tc159" { myvtc("") }
-test "tc160" { myvtc("") }
+test('tc001', normal, compile, [''])
+test('tc002', normal, compile, [''])
+test('tc003', normal, compile, [''])
+test('tc004', normal, compile, [''])
+test('tc005', normal, compile, [''])
+test('tc006', normal, compile, [''])
+test('tc007', normal, compile, [''])
+test('tc008', normal, compile, [''])
+test('tc009', normal, compile, [''])
+test('tc010', normal, compile, [''])
+test('tc011', normal, compile, [''])
+test('tc012', normal, compile, [''])
+test('tc013', normal, compile, [''])
+test('tc014', normal, compile, [''])
+test('tc015', normal, compile, [''])
+test('tc016', normal, compile, [''])
+test('tc017', normal, compile, [''])
+test('tc018', normal, compile, [''])
+test('tc019', normal, compile, ['-fglasgow-exts'])
+test('tc020', normal, compile, [''])
+test('tc021', normal, compile, [''])
+test('tc022', normal, compile, [''])
+test('tc023', normal, compile, [''])
+test('tc024', normal, compile, [''])
+test('tc025', normal, compile, [''])
+test('tc026', normal, compile, [''])
+test('tc027', normal, compile, [''])
+test('tc028', normal, compile, [''])
+test('tc029', normal, compile, [''])
+test('tc030', normal, compile, [''])
+test('tc031', normal, compile, [''])
+test('tc032', normal, compile, [''])
+test('tc033', normal, compile, [''])
+test('tc034', normal, compile, [''])
+test('tc035', normal, compile, [''])
+test('tc036', normal, compile, [''])
+test('tc037', normal, compile, [''])
+test('tc038', normal, compile, [''])
+test('tc039', normal, compile, [''])
+test('tc040', normal, compile, [''])
+test('tc041', normal, compile, [''])
+test('tc042', normal, compile, [''])
+test('tc043', normal, compile, [''])
+test('tc044', normal, compile, [''])
+test('tc045', normal, compile, [''])
+test('tc046', normal, compile, [''])
+test('tc047', normal, compile, [''])
+test('tc048', normal, compile, [''])
+test('tc049', normal, compile, [''])
+test('tc050', normal, compile, [''])
+test('tc051', normal, compile, [''])
+test('tc052', normal, compile, [''])
+test('tc053', normal, compile, [''])
+test('tc054', normal, compile, [''])
+test('tc055', normal, compile, [''])
+test('tc056', normal, compile, [''])
+test('tc057', normal, compile, [''])
+test('tc058', normal, compile, [''])
+test('tc059', normal, compile, [''])
+test('tc060', normal, compile, [''])
+test('tc061', normal, compile, [''])
+test('tc062', normal, compile, [''])
+test('tc063', normal, compile, [''])
+test('tc064', normal, compile, [''])
+test('tc065', normal, compile, ['-package lang -package data'])
+test('tc066', normal, compile, [''])
+test('tc067', normal, compile, [''])
+test('tc068', normal, compile, [''])
+test('tc069', normal, compile, [''])
+test('tc070', normal, compile, [''])
+test('tc073', normal, compile, [''])
+test('tc074', normal, compile, [''])
+test('tc076', normal, compile, [''])
+test('tc077', normal, compile, [''])
+test('tc078', normal, compile, [''])
+test('tc079', normal, compile, [''])
+test('tc080', normal, compile, [''])
+test('tc081', normal, compile, [''])
+test('tc082', normal, compile, [''])
+test('tc084', normal, compile, [''])
+test('tc085', normal, compile, ['-package lang'])
+test('tc086', normal, compile, [''])
+test('tc087', normal, compile, ['-fglasgow-exts'])
+test('tc088', normal, compile, ['-package lang'])
+test('tc089', normal, compile, [''])
+test('tc090', normal, compile, [''])
+test('tc091', normal, compile, [''])
+test('tc092', normal, compile, [''])
+test('tc093', normal, compile, [''])
+test('tc094', normal, compile, [''])
+test('tc095', normal, compile, [''])
+test('tc096', normal, compile, [''])
+test('tc097', normal, compile, ['-fglasgow-exts'])
+test('tc098', normal, compile, [''])
+test('tc099', normal, compile, [''])
+test('tc100', normal, compile, [''])
+test('tc101', normal, compile, [''])
+test('tc102', normal, compile, [''])
+test('tc103', normal, compile, [''])
+test('tc104', normal, compile, [''])
+test('tc105', normal, compile, [''])
+test('tc106', normal, compile, [''])
+test('tc107', normal, compile, [''])
+test('tc108', normal, compile, ['-fglasgow-exts'])
+test('tc109', normal, compile, [''])
+test('tc111', normal, compile, [''])
+test('tc112', normal, compile, [''])
+test('tc113', normal, compile, [''])
+test('tc114', normal, compile, [''])
+test('tc115', normal, compile, [''])
+test('tc116', normal, compile, [''])
+test('tc117', normal, compile, [''])
+test('tc118', normal, compile, [''])
+test('tc119', normal, compile, [''])
+test('tc120', normal, compile, [''])
+test('tc121', normal, compile, [''])
+test('tc122', normal, compile, [''])
+test('tc123', normal, compile, [''])
+test('tc124', normal, compile, [''])
+test('tc125', normal, compile, [''])
+test('tc126', normal, compile, [''])
+test('tc127', normal, compile, [''])
+test('tc128', normal, compile, [''])
+test('tc129', normal, compile, [''])
+test('tc130', normal, compile, [''])
+test('tc131', normal, compile, [''])
+test('tc132', normal, compile, ['-package lang'])
+test('tc133', normal, compile, [''])
+test('tc134', normal, compile, [''])
+test('tc135', normal, compile, [''])
+test('tc136', normal, compile, [''])
+test('tc137', normal, compile, [''])
+test('tc140', normal, compile, [''])
+test('tc141', normal, compile, [''])
+test('tc142', normal, compile, [''])
+test('tc143', normal, compile, [''])
+test('tc144', normal, compile, [''])
+test('tc145', normal, compile, [''])
+test('tc146', normal, compile, [''])
+test('tc147', normal, compile, [''])
+test('tc148', normal, compile, [''])
+test('tc149', normal, compile, [''])
+test('tc150', normal, compile, [''])
+test('tc151', normal, compile, [''])
+test('tc152', normal, compile, [''])
+test('tc153', normal, compile, [''])
+test('tc154', normal, compile, [''])
+test('tc155', normal, compile, [''])
+test('tc156', normal, compile, [''])
+test('tc157', normal, compile, [''])
+test('tc158', normal, compile, [''])
+test('tc159', normal, compile, [''])
+test('tc160', normal, compile, [''])

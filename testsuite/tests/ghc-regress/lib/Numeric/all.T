@@ -1,15 +1,8 @@
-
-include ($confdir ++ "/../vanilla-test.T")
-
--- Args to vt are: extra compile flags
---                 extra run flags
---                 expected process return value, if not zero
-
-test "num001" { vtr("", "", "") }
-test "num002" { vtr("", "", "") }
-test "num003" { vtr("", "", "") }
-test "num004" { vtr("", "", "") }
-test "num005" { vtr("", "", "") }
-test "num006" { vtr("-package lang", "", "") }
-test "num007" { vtr("", "", "") }
-test "num008" { vtr("", "", "") }
+test('num001', normal, compile_and_run, [''])
+test('num002', normal, compile_and_run, [''])
+test('num003', normal, compile_and_run, [''])
+test('num004', normal, compile_and_run, [''])
+test('num005', normal, compile_and_run, [''])
+test('num006', normal, compile_and_run, ['-package lang'])
+test('num007', normal, compile_and_run, [''])
+test('num008', normal, compile_and_run, [''])

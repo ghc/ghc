@@ -1,9 +1,3 @@
 
-include ($confdir ++ "/../multimod-test.T")
-
--- Args to mtr are: extra compile flags
---                  extra run flags
---                  expected process return value, if not zero
-
-test "lex" { mtr("", "", "") }
+test('lex', normal, multimod_compile_and_run, [''])
 

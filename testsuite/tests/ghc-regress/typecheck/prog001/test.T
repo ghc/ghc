@@ -1,5 +1,3 @@
 
-include ($confdir ++ "/../multimod-test.T")
-
-test "typecheck.prog001" { mtc("C", "-fglasgow-exts") }
-
+test('typecheck.prog001', normal, multimod_compile, \
+	['C', '-v0 -fglasgow-exts'])

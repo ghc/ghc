@@ -1,5 +1,3 @@
-include ($confdir ++ "/../vanilla-test.T")
-
-test "time002"	{ vtr("","","") }
-test "time003"	{ vtr("","","") }
-test "time004"	{ vtr("","","") }
+test('time002', normal, compile_and_run, [''])
+test('time003', normal, compile_and_run, [''])
+test('time004', normal, compile_and_run, [''])

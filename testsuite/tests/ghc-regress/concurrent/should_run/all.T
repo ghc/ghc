@@ -1,55 +1,51 @@
+# Args to compile_and_run are:
+#	extra compile flags
+#	extra run flags
+#	expected process return value, if not zero
 
-include ($confdir ++ "/../vanilla-test.T")
+def f( opts ):
+  opts.extra_hc_opts = '-fglasgow-exts'
 
--- Args to vtr are: extra compile flags
---                  extra run flags
---                  expected process return value, if not zero
---                  whether to normalise (depathify) stderr output
+setTestOpts(f)
 
-def myvtr ( $args_c, $args_r, $ret_res )
-{
-   vtr ( " -fglasgow-exts " ++ $args_c,
-         $args_r, $ret_res )
-}
+test('conc001', normal, compile_and_run, [''])
+test('conc002', normal, compile_and_run, [''])
+test('conc003', normal, compile_and_run, [''])
+test('conc004', normal, compile_and_run, [''])
+test('conc005', normal, compile_and_run, ['-package concurrent'])
+test('conc006', normal, compile_and_run, [''])
+test('conc007', extra_run_opts('+RTS -H128M -RTS'), compile_and_run, [''])
+test('conc008', normal, compile_and_run, [''])
+test('conc009', exit_code(1), compile_and_run, [''])
+test('conc010', normal, compile_and_run, [''])
+test('conc012', normal, compile_and_run, [''])
+test('conc013', normal, compile_and_run, [''])
+test('conc014', normal, compile_and_run, [''])
+test('conc015', normal, compile_and_run, [''])
+test('conc016', normal, compile_and_run, [''])
+test('conc017', normal, compile_and_run, [''])
+test('conc018', normal, compile_and_run, [''])
+test('conc019', normal, compile_and_run, [''])
+test('conc020', normal, compile_and_run, [''])
+test('conc021', exit_code(1), compile_and_run, [''])
+test('conc022', normal, compile_and_run, [''])
+test('conc023', normal, compile_and_run, [''])
+test('conc024', normal, compile_and_run, [''])
+test('conc025', normal, compile_and_run, [''])
+test('conc026', normal, compile_and_run, [''])
+test('conc027', normal, compile_and_run, [''])
+test('conc028', normal, compile_and_run, [''])
+test('conc029', normal, compile_and_run, [''])
+test('conc030', extra_run_opts('+RTS -K2M -RTS'), compile_and_run, [''])
+test('conc031', normal, compile_and_run, [''])
+test('conc032', normal, compile_and_run, [''])
+test('conc033', normal, compile_and_run, [''])
+test('conc034', extra_run_opts('+RTS -C0 -RTS'), compile_and_run, [''])
+test('conc035', normal, compile_and_run, [''])
+test('conc036', normal, compile_and_run, [''])
 
-test "conc001" { myvtr("", "", "") }
-test "conc002" { myvtr("", "", "") }
-test "conc003" { myvtr("", "", "") }
-test "conc004" { myvtr("", "", "") }
-test "conc005" { myvtr("-package concurrent", "", "") }
-test "conc006" { myvtr("", "", "") }
-test "conc007" { myvtr("", "+RTS -H128M -RTS", "") }
-test "conc008" { myvtr("", "", "") }
-test "conc009" { myvtr("", "", "1") }
-test "conc010" { myvtr("", "", "") }
-test "conc012" { myvtr("", "", "") }
-test "conc013" { myvtr("", "", "") }
-test "conc014" { myvtr("", "", "") }
-test "conc015" { myvtr("", "", "") }
-test "conc016" { myvtr("", "", "") }
-test "conc017" { myvtr("", "", "") }
-test "conc018" { myvtr("", "", "") }
-test "conc019" { myvtr("", "", "") }
-test "conc020" { myvtr("", "", "") }
-test "conc021" { $normalise_errmsg = True myvtr("", "", "1") }
-test "conc022" { myvtr("", "", "") }
-test "conc023" { myvtr("", "", "") }
-test "conc024" { myvtr("", "", "") }
-test "conc025" { myvtr("", "", "") }
-test "conc026" { myvtr("", "", "") }
-test "conc027" { myvtr("", "", "") }
-test "conc028" { myvtr("", "", "") }
-test "conc029" { myvtr("", "", "") }
-test "conc030" { myvtr("", "+RTS -K2M -RTS", "") }
-test "conc031" { myvtr("", "", "") }
-test "conc032" { myvtr("", "", "") }
-test "conc033" { myvtr("", "", "") }
-test "conc034" { myvtr("", "+RTS -C0 -RTS", "") }
-test "conc035" { myvtr("", "", "") }
-test "conc036" { myvtr("", "", "") }
+# These two depend on $(GhcThreadedRts) at the moment, so until we can find
+# a way to turn them off when $(GhcThreadedRts) == NO, disable them by default:
 
--- These two depend on $(GhcThreadedRts) at the moment, so until we can find
--- a way to turn them off when $(GhcThreadedRts) == NO, disable them by default:
---
--- test "conc037" { myvtr("", "", "") }
--- test "conc038" { myvtr("", "", "") }
+test('conc037', skip, compile_and_run, [''])
+test('conc038', skip, compile_and_run, [''])
