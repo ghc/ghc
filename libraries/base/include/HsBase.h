@@ -494,11 +494,7 @@ INLINE mode_t __hscore_S_IXUSR() { return S_IXUSR; }
 INLINE HsAddr
 __hscore_d_name( struct dirent* d )
 {
-#if defined(STRUCT_DIRENT_FLAT_LAYOUT)
-  return (HsAddr)(&d->d_name);
-#else
   return (HsAddr)(d->d_name);
-#endif
 }
 
 INLINE HsInt
