@@ -992,12 +992,6 @@ AC_HEADER_TIME
 dnl dynamic loading include files
 AC_CHECK_HEADERS(dlfcn.h dl.h) 
 
-dnl ** check for farcalloc (in bcc)
-AC_CHECK_HEADER(alloc.h,[AC_CHECK_FUNCS(farcalloc)])
-
-dnl ** check for valloc (in sunos, solaris, mips, amiga, next, minix, ultrix)
-AC_CHECK_HEADER(malloc.h,[AC_CHECK_FUNCS(valloc)])
-
 dnl ** check for POSIX regex
 HavePosixRegex=NO
 AC_CHECK_HEADERS(regex.h,[AC_CHECK_FUNCS(regcomp, [HavePosixRegex=YES])])
@@ -1159,15 +1153,7 @@ if test "$ac_cv_type_signal" = void; then
 fi
 
 dnl ** check for more functions
-AC_CHECK_FUNCS([setenv unsetenv])
-dnl Note: The following test would make sense but the respective code
-dnl doesn't use HAVE_BLAH #ifdefs yet.
-dnl AC_CHECK_FUNCS([strcasecmp _stricmp], [break])
-dnl AC_CHECK_FUNCS([snprintf _snprintf], [break])  
-
-
-dnl ** check for specific library functions that we are interested in
-AC_CHECK_FUNCS(access ftime getclock getpagesize getrusage gettimeofday mktime mprotect readlink setitimer stat lstat siginterrupt symlink sysconf timelocal times vadvise localtime_r gmtime_r readdir_r getgrgid_r getgrnam_r getpwuid_r getpwnam_r)
+AC_CHECK_FUNCS([ftime getclock getgrgid_r getgrnam_r getpagesize getpwnam_r getpwuid_r getrusage gettimeofday gmtime_r localtime_r lstat readdir_r readlink setenv setitimer siginterrupt symlink sysconf times unsetenv])
 
 dnl ** Solaris2 needs additionl flag for getpw*_r()
 case "$TargetPlatform" in
@@ -1302,7 +1288,6 @@ else
     	 AC_DEFINE([HAVE_LIBDL], [1], [Define to 1 if you need -ldl to get dlopen().])
     	 LIBS="$LIBS -ldl"], 
     	[HaveLibDL=NO])
-    AC_CHECK_FUNCS(dlopen)
     AC_SUBST(HaveLibDL)
 
     dnl ** sometimes RTLD_NEXT is hidden in #ifdefs we really don't wan to set
