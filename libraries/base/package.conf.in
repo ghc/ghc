@@ -180,7 +180,7 @@ hs-libraries:   "HSbase"
 hs-libraries:	"HSbase1", "HSbase2", "HSbase3"
 #endif
 
-extra-libs:  "HSbase_cbits"
+extra-libraries:  "HSbase_cbits"
 #if defined(mingw32_HOST_OS) || defined(__MINGW32__) || defined(_MSC_VER)
 	     , "wsock32", "msvcrt", "kernel32", "user32", "shell32"
 #endif
@@ -188,10 +188,10 @@ extra-libs:  "HSbase_cbits"
 include-dirs:		INCLUDE_DIR
 includes:		HsBase.h
 depends:	 	rts
-extra-hugs-opts:
-extra-cc-opts:
-extra-ld-opts:
+hugs-options:
+cc-options:
+ld-options:
 framework-dirs:
-extra-frameworks:
+frameworks:
 haddock-interfaces:	HADDOCK_IFACE
 haddock-html:		HTML_DIR
