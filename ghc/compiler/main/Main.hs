@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.40 2000/12/18 15:18:11 simonmar Exp $
+-- $Id: Main.hs,v 1.41 2000/12/20 10:33:25 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -91,7 +91,9 @@ import Maybe
 
 main =
   -- top-level exception handler: any unrecognised exception is a compiler bug.
-  handle (\exception -> hPutStr stderr (show (Panic (show exception)))) $ do
+  handle (\exception -> do hPutStr stderr (show (Panic (show exception)))
+			   exitWith (ExitFailure 1)
+         ) $ do
 
   -- all error messages are propagated as exceptions
   handleDyn (\dyn -> case dyn of
@@ -99,7 +101,7 @@ main =
 			  Interrupted -> exitWith (ExitFailure 1)
 			  _ -> do hPutStrLn stderr (show (dyn :: GhcException))
 			          exitWith (ExitFailure 1)
-	      ) $ do
+	    ) $ do
 
    -- make sure we clean up after ourselves
    later (do  forget_it <- readIORef v_Keep_tmp_files
