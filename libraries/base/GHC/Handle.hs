@@ -22,7 +22,8 @@ module GHC.Handle (
   wantWritableHandle, wantReadableHandle, wantSeekableHandle,
   
   newEmptyBuffer, allocateBuffer, readCharFromBuffer, writeCharIntoBuffer,
-  flushWriteBufferOnly, flushWriteBuffer, flushReadBuffer, fillReadBuffer,
+  flushWriteBufferOnly, flushWriteBuffer, flushReadBuffer, 
+  fillReadBuffer, fillReadBufferWithoutBlocking,
   readRawBuffer, readRawBufferPtr,
   writeRawBuffer, writeRawBufferPtr,
   unlockFile,
@@ -493,6 +494,22 @@ fillReadBufferLoop fd is_line is_stream buf b w size = do
      	     else return buf{ bufRPtr=0, bufWPtr=w+res' }
  
 
+fillReadBufferWithoutBlocking :: FD -> Bool -> Buffer -> IO Buffer
+fillReadBufferWithoutBlocking fd is_stream
+      buf@Buffer{ bufBuf=b, bufRPtr=r, bufWPtr=w, bufSize=size } =
+  -- buffer better be empty:
+  assert (r == 0 && w == 0) $ do
+#ifdef DEBUG_DUMP
+  puts ("fillReadBufferLoopNoBlock: bytes = " ++ show bytes ++ "\n")
+#endif
+  res <- readRawBufferNoBlock "fillReadBuffer" fd is_stream b
+  		       0 (fromIntegral size)
+  let res' = fromIntegral res
+#ifdef DEBUG_DUMP
+  puts ("fillReadBufferLoopNoBlock:  res' = " ++ show res' ++ "\n")
+#endif
+  return buf{ bufRPtr=0, bufWPtr=res' }
+ 
 -- Low level routines for reading/writing to (raw)buffers:
 
 #ifndef mingw32_TARGET_OS
@@ -501,6 +518,12 @@ readRawBuffer loc fd is_stream buf off len =
   throwErrnoIfMinus1RetryMayBlock loc
 	    (read_rawBuffer fd is_stream buf off len)
 	    (threadWaitRead fd)
+
+readRawBufferNoBlock :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
+readRawBufferNoBlock loc fd is_stream buf off len = 
+  throwErrnoIfMinus1RetryOnBlock loc
+	    (read_rawBuffer fd is_stream buf off len)
+	    (return 0)
 
 readRawBufferPtr :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
 readRawBufferPtr loc fd is_stream buf off len = 
@@ -1440,6 +1463,23 @@ puts :: String -> IO ()
 puts s = withCString s $ \cstr -> do write_rawBuffer 1 False cstr 0 (fromIntegral (length s))
 				     return ()
 #endif
+
+-- -----------------------------------------------------------------------------
+-- utils
+
+throwErrnoIfMinus1RetryOnBlock  :: String -> IO CInt -> IO CInt -> IO CInt
+throwErrnoIfMinus1RetryOnBlock loc f on_block  = 
+  do
+    res <- f
+    if (res :: CInt) == -1
+      then do
+	err <- getErrno
+	if err == eINTR
+	  then throwErrnoIfMinus1RetryOnBlock loc f on_block
+          else if err == eWOULDBLOCK || err == eAGAIN
+	         then do on_block
+                 else throwErrno loc
+      else return res
 
 -- -----------------------------------------------------------------------------
 -- wrappers to platform-specific constants:
