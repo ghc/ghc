@@ -89,6 +89,10 @@ instance Show (FunPtr a) where
    showsPrec p = showsPrec p . castFunPtrToPtr
 #endif
 
+-- | Release the storage associated with the given 'FunPtr', which
+-- must have been obtained from a wrapper stub.  This should be called
+-- whenever the return value from a foreign import wrapper function is
+-- no longer required; otherwise, the storage it uses will leak.
 foreign import ccall unsafe "freeHaskellFunctionPtr"
     freeHaskellFunPtr :: FunPtr a -> IO ()
 #endif
