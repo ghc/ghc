@@ -23,7 +23,7 @@ module Subst (
 	bindSubst, unBindSubst, bindSubstList, unBindSubstList,
 
 	-- Binders
-	simplBndr, simplBndrs, simplLetId, simplIdInfo,
+	simplBndr, simplBndrs, simplLetId, simplLamBndr, simplIdInfo,
 	substAndCloneId, substAndCloneIds, substAndCloneRecIds,
 
 	-- Type stuff
@@ -31,7 +31,7 @@ module Subst (
 	substTyWith, substTy, substTheta,
 
 	-- Expression stuff
-	substExpr, substIdInfo
+	substExpr
     ) where
 
 #include "HsVersions.h"
@@ -39,18 +39,19 @@ module Subst (
 import CmdLineOpts	( opt_PprStyle_Debug )
 import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr,
 			  CoreRules(..), CoreRule(..), 
-			  isEmptyCoreRules, seqRules, hasUnfolding, noUnfolding
+			  isEmptyCoreRules, seqRules, hasUnfolding, noUnfolding, hasSomeUnfolding,
+			  Unfolding(..)
 			)
 import CoreFVs		( exprFreeVars )
 import TypeRep		( Type(..), TyNote(..) )  -- friend
 import Type		( ThetaType, SourceType(..), PredType,
-			  tyVarsOfType, tyVarsOfTypes, mkAppTy, mkUTy, isUTy,
-			  getTyVar_maybe
+			  tyVarsOfType, tyVarsOfTypes, mkAppTy, mkUTy, isUTy
 			)
 import VarSet
 import VarEnv
 import Var		( setVarUnique, isId, mustHaveLocalBinding )
 import Id		( idType, idInfo, setIdInfo, setIdType, 
+			  idUnfolding, setIdUnfolding,
 			  idOccInfo, maybeModifyIdInfo )
 import IdInfo		( IdInfo, vanillaIdInfo,
 			  occInfo, isFragileOcc, setOccInfo, 
@@ -383,11 +384,19 @@ mkTopTyVarSubst :: [TyVar] -> [Type] -> Subst
 mkTopTyVarSubst tyvars tys = Subst emptyInScopeSet (zip_ty_env tyvars tys emptySubstEnv)
 
 zip_ty_env []       []       env = env
-zip_ty_env (tv:tvs) (ty:tys) env 
-  | Just tv' <- getTyVar_maybe ty, tv==tv' = zip_ty_env tvs tys env
-	-- Shortcut for the (I think not uncommon) case where we are
-	-- making an identity substitution
-  | otherwise = zip_ty_env tvs tys (extendSubstEnv env tv (DoneTy ty))
+zip_ty_env (tv:tvs) (ty:tys) env = zip_ty_env tvs tys (extendSubstEnv env tv (DoneTy ty))
+	-- There used to be a special case for when 
+	--	ty == TyVarTy tv
+	-- (a not-uncommon case) in which case the substitution was dropped.
+	-- But the type-tidier changes the print-name of a type variable without
+	-- changing the unique, and that led to a bug.   Why?  Pre-tidying, we had 
+	-- a type {Foo t}, where Foo is a one-method class.  So Foo is really a newtype.
+	-- And it happened that t was the type variable of the class.  Post-tiding, 
+	-- it got turned into {Foo t2}.  The ext-core printer expanded this using
+	-- sourceTypeRep, but that said "Oh, t == t2" because they have the same unique,
+	-- and so generated a rep type mentioning t not t2.  
+	--
+	-- Simplest fix is to nuke the "optimisation"
 \end{code}
 
 substTy works with general Substs, so that it can be called from substExpr too.
@@ -557,6 +566,23 @@ simplBndr subst bndr
 
 simplBndrs :: Subst -> [Var] -> (Subst, [Var])
 simplBndrs subst bndrs = mapAccumL simplBndr subst bndrs
+
+simplLamBndr :: Subst -> Var -> (Subst, Var)
+-- Used for lambda binders.  These sometimes have unfoldings added by
+-- the worker/wrapper pass that must be preserved, becuase they can't
+-- be reconstructed from context.  For example:
+--	f x = case x of (a,b) -> fw a b x
+--	fw a b x{=(a,b)} = ...
+-- The "{=(a,b)}" is an unfolding we can't reconstruct otherwise.
+simplLamBndr subst bndr
+  | not (isId bndr && hasSomeUnfolding old_unf)
+  = simplBndr subst bndr	-- Normal case
+  | otherwise
+  = (subst', bndr' `setIdUnfolding` substUnfolding subst old_unf)
+  where
+    old_unf = idUnfolding bndr
+    (subst', bndr') = subst_id isFragileOcc subst subst bndr
+		
 
 simplLetId :: Subst -> Id -> (Subst, Id)
 -- Clone Id if necessary
@@ -735,6 +761,7 @@ substIdInfo subst is_fragile_occ info
     old_wrkr  = workerInfo info
     old_lbv   = lbvarInfo info
 
+------------------
 substIdType :: Subst -> Id -> Id
 substIdType subst@(Subst in_scope env) id
   |  noTypeSubst env || isEmptyVarSet (tyVarsOfType old_ty) = id
@@ -745,6 +772,7 @@ substIdType subst@(Subst in_scope env) id
   where
     old_ty = idType id
 
+------------------
 substWorker :: Subst -> WorkerInfo -> WorkerInfo
 	-- Seq'ing on the returned WorkerInfo is enough to cause all the 
 	-- substitutions to happen completely
@@ -760,6 +788,13 @@ substWorker subst (HasWorker w a)
 	(ContEx se1 e)    -> WARN( True, text "substWorker: ContEx" <+> ppr w <+> ppr e)
 				  NoWorker	-- Ditto
 			
+------------------
+substUnfolding subst NoUnfolding     		 = NoUnfolding
+substUnfolding subst (OtherCon cons) 		 = OtherCon cons
+substUnfolding subst (CompulsoryUnfolding rhs)   = CompulsoryUnfolding (substExpr subst rhs)
+substUnfolding subst (CoreUnfolding rhs t v w g) = CoreUnfolding (substExpr subst rhs) t v w g
+
+------------------
 substRules :: Subst -> CoreRules -> CoreRules
 	-- Seq'ing on the returned CoreRules is enough to cause all the 
 	-- substitutions to happen completely
@@ -780,6 +815,7 @@ substRules subst (Rules rules rhs_fvs)
 	where
 	  (subst', tpl_vars') = substBndrs subst tpl_vars
 
+------------------
 substVarSet subst fvs 
   = foldVarSet (unionVarSet . subst_fv subst) emptyVarSet fvs
   where
@@ -789,6 +825,7 @@ substVarSet subst fvs
 			    DoneTy ty  	    -> tyVarsOfType ty 
 			    ContEx se' expr -> substVarSet (setSubstEnv subst se') (exprFreeVars expr)
 
+------------------
 substLBVar subst NoLBVarInfo    = NoLBVarInfo
 substLBVar subst (LBVarInfo ty) = ty1 `seq` LBVarInfo ty1
 				where
