@@ -4,64 +4,63 @@
   <indexterm><primary>GHC, using</primary></indexterm>
   <indexterm><primary>using GHC</primary></indexterm>
 
-    <para>GHC can work in one of three &ldquo;modes&rdquo;:</para>
+  <para>GHC can work in one of three &ldquo;modes&rdquo;:</para>
 
-    <variablelist>
-      <varlistentry>
-	<term><cmdsynopsis><command>ghc</command>
-	    <arg choice=plain>--interactive</arg>
-	  </cmdsynopsis></term>
-	<indexterm><primary>interactive mode</primary>
-	</indexterm>
-	<indexterm><primary>ghci</primary>
-	</indexterm>
-	<listitem>
-	  <para>Interactive mode, which is also available as
-	  <command>ghci</command>.  Interactive mode is described in
-	  more detail in <xref linkend="ghci">.</para>
-	</listitem>
-      </varlistentry>
+  <variablelist>
+    <varlistentry>
+      <term><cmdsynopsis><command>ghc</command>
+	  <arg choice=plain>--interactive</arg>
+	</cmdsynopsis></term>
+      <indexterm><primary>interactive mode</primary>
+      </indexterm>
+      <indexterm><primary>ghci</primary>
+      </indexterm>
+      <listitem>
+	<para>Interactive mode, which is also available as
+	<command>ghci</command>.  Interactive mode is described in
+	more detail in <xref linkend="ghci">.</para>
+      </listitem>
+    </varlistentry>
 
-      <varlistentry>
-	<term><cmdsynopsis><command>ghc</command>
-	    <arg choice=plain>--make</arg>
-	  </cmdsynopsis></term>
-	<indexterm><primary>make mode</primary>
-	</indexterm>
-	<indexterm><primary><option>--make</option></primary>
-	</indexterm>
-	<listitem>
-	  <para>In this mode, GHC will build a multi-module Haskell
-	  program automatically, figuring out dependencies for itself.
-	  If you have a straightforward Haskell program, this is
-	  likely to be much easier, and faster, than using
-	  <command>make</command>.</para>
-	</listitem>
-      </varlistentry>
+    <varlistentry>
+      <term><cmdsynopsis><command>ghc</command>
+	  <arg choice=plain>--make</arg>
+	</cmdsynopsis></term>
+      <indexterm><primary>make mode</primary>
+      </indexterm>
+      <indexterm><primary><option>--make</option></primary>
+      </indexterm>
+      <listitem>
+	<para>In this mode, GHC will build a multi-module Haskell
+	program automatically, figuring out dependencies for itself.
+	If you have a straightforward Haskell program, this is likely
+	to be much easier, and faster, than using
+	<command>make</command>.</para>
+      </listitem>
+    </varlistentry>
 
-      <varlistentry>
-	<term><cmdsynopsis>
-	    <command>ghc</command>
-	    <group>
-	      <arg>-E</arg>
-	      <arg>-C</arg>
-	      <arg>-S</arg>
-	      <arg>-c</arg>
-	    </group>
-	  </cmdsynopsis></term>
-	<indexterm><primary><option>-E</option></primary>
-	<indexterm><primary><option>-C</option></primary>
-	<indexterm><primary><option>-S</option></primary>
-	<indexterm><primary><option>-c</option></primary>
-	</indexterm>
-	<listitem>
-	  <para>This is the traditional batch-compiler mode, in which
+    <varlistentry>
+      <term><cmdsynopsis>
+	  <command>ghc</command>
+	  <group>
+	    <arg>-E</arg>
+	    <arg>-C</arg>
+	    <arg>-S</arg>
+	    <arg>-c</arg>
+	  </group>
+	</cmdsynopsis></term>
+      <indexterm><primary><option>-E</option></primary></indexterm>
+      <indexterm><primary><option>-C</option></primary></indexterm>
+      <indexterm><primary><option>-S</option></primary></indexterm>
+      <indexterm><primary><option>-c</option></primary></indexterm>
+      <listitem>
+	<para>This is the traditional batch-compiler mode, in which
 	  GHC can compile source files one at a time, or link objects
 	  together into an executable.</para>
-	</listitem>
-      </varlistentry>
-    </variablelist>
-
+      </listitem>
+    </varlistentry>
+  </variablelist>
+  
   <sect1>
     <title>Options overview</title>
     
