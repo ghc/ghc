@@ -59,16 +59,7 @@ import FiniteMap	( FiniteMap, fmToList, emptyFM, lookupFM,
 import Maybes		( maybeToBool, catMaybes )
 import Outputable
 import IO		( openFile, IOMode(..) )
-import HscTypes		( PersistentCompilerState, HomeIfaceTable, HomeSymbolTable, 
-			  ModIface(..), WhatsImported(..), 
-			  VersionInfo(..), ImportVersion, IsExported,
-			  IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
-			  GlobalRdrEnv, GlobalRdrElt(..), pprGlobalRdrEnv,
-			  AvailEnv, GenAvailInfo(..), AvailInfo, 
-			  Provenance(..), ImportReason(..), initialVersionInfo,
-			  Deprecations(..), GhciMode(..),
-			  LocalRdrEnv
-			 )
+import HscTypes		-- lots of it
 import List		( partition, nub )
 \end{code}
 
@@ -99,23 +90,23 @@ renameModule dflags hit hst pcs this_module rdr_module
 renameStmt :: DynFlags
 	   -> HomeIfaceTable -> HomeSymbolTable
 	   -> PersistentCompilerState 
-	   -> Module			-- current context (scope to compile in)
 	   -> Module			-- current module
-	   -> LocalRdrEnv		-- current context (temp bindings)
+	   -> InteractiveContext
 	   -> RdrNameStmt		-- parsed stmt
 	   -> IO ( PersistentCompilerState, 
 		   PrintUnqualified,
 		   Maybe ([Name], (RenamedStmt, [RenamedHsDecl]))
                  )
 
-renameStmt dflags hit hst pcs scope_module this_module local_env stmt
+renameStmt dflags hit hst pcs this_module ic stmt
   = renameSource dflags hit hst pcs this_module $
+    extendTypeEnvRn (ic_type_env ic)		$ 
 
 	-- load the context module
-    loadContextModule scope_module $ \ (rdr_env, print_unqual) ->
+    loadContextModule (ic_module ic) $ \ (rdr_env, print_unqual) ->
 
 	-- Rename the stmt
-    initRnMS rdr_env local_env emptyLocalFixityEnv CmdLineMode (
+    initRnMS rdr_env (ic_rn_env ic) emptyLocalFixityEnv CmdLineMode (
 	rnStmt stmt	$ \ stmt' ->
 	returnRn (([], stmt'), emptyFVs)
     )					`thenRn` \ ((binders, stmt), fvs) -> 
@@ -157,21 +148,21 @@ renameRdrName
 	   :: DynFlags
 	   -> HomeIfaceTable -> HomeSymbolTable
 	   -> PersistentCompilerState 
-	   -> Module			-- current context (scope to compile in)
 	   -> Module			-- current module
-	   -> LocalRdrEnv		-- current context (temp bindings)
+	   -> InteractiveContext
 	   -> [RdrName]			-- name to rename
 	   -> IO ( PersistentCompilerState, 
 		   PrintUnqualified,
 		   Maybe ([Name], [RenamedHsDecl])
                  )
 
-renameRdrName dflags hit hst pcs scope_module this_module local_env rdr_names = 
-  renameSource dflags hit hst pcs this_module $
-  loadContextModule scope_module $ \ (rdr_env, print_unqual) ->
+renameRdrName dflags hit hst pcs this_module ic rdr_names = 
+  renameSource dflags hit hst pcs this_module 	$
+  extendTypeEnvRn (ic_type_env ic)		$ 
+  loadContextModule (ic_module ic) $ \ (rdr_env, print_unqual) ->
 
   -- rename the rdr_name
-  initRnMS rdr_env local_env emptyLocalFixityEnv CmdLineMode
+  initRnMS rdr_env (ic_rn_env ic) emptyLocalFixityEnv CmdLineMode
 	(mapRn (tryRn.lookupOccRn) rdr_names)	`thenRn` \ maybe_names ->
   let 
 	ok_names = [ a | Right a <- maybe_names ]

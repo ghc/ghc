@@ -29,8 +29,6 @@ import HscTypes		( InteractiveContext(..) )
 import PrelNames	( iNTERACTIVE )
 import StringBuffer	( stringToStringBuffer )
 import FastString       ( mkFastString )
-import Char		( isUpper )
-import DriverUtil	( split_longest_prefix )
 #endif
 
 import HsSyn
@@ -499,13 +497,7 @@ A naked expression returns a singleton Name [it].
 
 \begin{code}
 hscStmt dflags hst hit pcs0 icontext stmt just_expr
-   = let 
-	InteractiveContext { 
-	     ic_rn_env   = rn_env, 
-	     ic_type_env = type_env,
-	     ic_module   = scope_mod } = icontext
-     in
-     do { maybe_stmt <- hscParseStmt dflags stmt
+   =  do { maybe_stmt <- hscParseStmt dflags stmt
 	; case maybe_stmt of
       	     Nothing -> return (pcs0, Nothing)
       	     Just parsed_stmt -> do {
@@ -521,8 +513,8 @@ hscStmt dflags hst hit pcs0 icontext stmt just_expr
 
 		-- Rename it
 	  (pcs1, print_unqual, maybe_renamed_stmt)
-		 <- renameStmt dflags hit hst pcs0 scope_mod 
-				iNTERACTIVE rn_env parsed_stmt
+		 <- renameStmt dflags hit hst pcs0 
+			iNTERACTIVE icontext parsed_stmt
 
 	; case maybe_renamed_stmt of
 		Nothing -> return (pcs0, Nothing)
@@ -532,9 +524,9 @@ hscStmt dflags hst hit pcs0 icontext stmt just_expr
 	  maybe_tc_return <- 
 	    if just_expr 
 		then case rn_stmt of { (ExprStmt e _ _, decls) -> 
-		     typecheckExpr dflags pcs1 hst type_env
+		     typecheckExpr dflags pcs1 hst (ic_type_env icontext)
 			   print_unqual iNTERACTIVE (e,decls) }
-		else typecheckStmt dflags pcs1 hst type_env
+		else typecheckStmt dflags pcs1 hst (ic_type_env icontext)
 			   print_unqual iNTERACTIVE bound_names rn_stmt
 
 	; case maybe_tc_return of
@@ -621,12 +613,7 @@ hscThing -- like hscStmt, but deals with a single identifier
 	  [TyThing] )
 
 hscThing dflags hst hit pcs0 icontext str
-   = do let 
-	  InteractiveContext {
-	     ic_rn_env   = rn_env,
-	     ic_module   = scope_mod } = icontext
-
-	maybe_rdr_name <- myParseIdentifier dflags str
+   = do maybe_rdr_name <- myParseIdentifier dflags str
 	case maybe_rdr_name of {
 	  Nothing -> return (pcs0, []);
 	  Just rdr_name -> do
@@ -643,8 +630,7 @@ hscThing dflags hst hit pcs0 icontext str
 		tccls_name = setRdrNameOcc rdr_name tccls_occ
 
 	(pcs, unqual, maybe_rn_result) <- 
-	   renameRdrName dflags hit hst pcs0 scope_mod scope_mod 
-		rn_env rdr_names
+	   renameRdrName dflags hit hst pcs0 iNTERACTIVE icontext rdr_names
 
 	case maybe_rn_result of {
 	     Nothing -> return (pcs, []);

@@ -65,6 +65,7 @@ import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import SrcLoc		( SrcLoc, generatedSrcLoc, noSrcLoc )
 import Unique		( Unique )
 import FiniteMap	( FiniteMap )
+import Maybes		( seqMaybe )
 import Bag		( Bag, emptyBag, isEmptyBag, snocBag )
 import UniqSupply
 import Outputable
@@ -624,6 +625,11 @@ getHomeIfaceTableRn down l_down = return (rn_hit down)
 
 getTypeEnvRn :: RnM d (Name -> Maybe TyThing)
 getTypeEnvRn down l_down = return (rn_done down)
+
+extendTypeEnvRn :: NameEnv TyThing -> RnM d a -> RnM d a
+extendTypeEnvRn env inside down l_down
+  = inside down{rn_done=new_rn_done} l_down
+  where new_rn_done = \nm -> lookupNameEnv env nm `seqMaybe` rn_done down nm
 \end{code}
 
 %================
