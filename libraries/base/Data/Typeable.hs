@@ -527,6 +527,7 @@ INSTANCE_TYPEABLE0(TypeRep,typeRepTc,"TypeRep")
 
 #ifdef __GLASGOW_HASKELL__
 INSTANCE_TYPEABLE0(Word,wordTc,"Word" )
+INSTANCE_TYPEABLE1(MVar,mvarTc,"MVar" )
 #endif
 
 ---------------------------------------------
