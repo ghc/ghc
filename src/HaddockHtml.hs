@@ -18,7 +18,10 @@ import FiniteMap
 import List 	( sortBy )
 import Char	( toUpper, toLower )
 import Monad	( when )
+
+#ifdef __GLASGOW_HASKELL__
 import IOExts
+#endif
 
 import Html
 import qualified Html
