@@ -20,6 +20,7 @@ module OccurAnal (
 import BinderInfo
 import CmdLineOpts	( opt_D_dump_occur_anal, SimplifierSwitch(..) )
 import CoreSyn
+import CoreUtils	( idSpecVars )
 import Digraph		( stronglyConnCompR, SCC(..) )
 import Id		( idWantsToBeINLINEd, addNoInlinePragma, nukeNoInlinePragma,
 			  omitIfaceSigForId, isSpecPragmaId, getIdSpecialisation,
@@ -32,7 +33,6 @@ import Id		( idWantsToBeINLINEd, addNoInlinePragma, nukeNoInlinePragma,
 			  delOneFromIdEnv, delManyFromIdEnv, isNullIdEnv, 
 			  mapIdEnv, lookupIdEnv, elemIdEnv, addOneToIdEnv
 			)
-import Specialise       ( idSpecVars )
 import SpecEnv		( isEmptySpecEnv )
 import Name		( isExported, isLocallyDefined )
 import Type		( splitFunTy_maybe, splitForAllTys )
