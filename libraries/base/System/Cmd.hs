@@ -72,13 +72,87 @@ system cmd =
 
 foreign import ccall unsafe "systemCmd" primSystem :: CString -> IO Int
 
+
+------------------------------------------------------------------------
+--
+--			rawSystem
+--
+------------------------------------------------------------------------
+
 {- | 
-The same as 'system', but bypasses the shell (GHC only).
-Will behave more portably between systems,
-because there is no interpretation of shell metasyntax.
+The computation @rawSystem cmd args@ runs the operating system command
+whose file name is @cmd@, passing it the arguments @args@.  It
+bypasses the shell, so that @cmd@ should see precisely the argument
+strings @args@, with no funny escaping or shell meta-syntax expansion.
+(Unix users will recognise this behaviour 
+as @execvp@, and indeed that's how it's implemented.)
+It will therefore behave more portably between operating systems than @system@.
+
+The return codes are the same as for @system@.
 -}
 
 rawSystem :: FilePath -> [String] -> IO ExitCode
+
+{- -------------------------------------------------------------------------
+ 	IMPORTANT IMPLEMENTATION NOTES
+   (see also libraries/base/cbits/rawSystem.c)
+
+On Unix, rawSystem is easy to implement: use execvp.
+
+On Windows it's more tricky.  We use CreateProcess, passing a single
+command-line string (lpCommandLine) as its argument.  (CreateProcess
+is well documented on http://msdn.microsoft/com.)
+
+  - It parses the beginning of the string to find the command. If the
+	file name has embedded spaces, it must be quoted, using double
+	quotes thus 
+		"foo\this that\cmd" arg1 arg2
+
+  - The invoked command can in turn access the entire lpCommandLine string,
+	and the C runtime does indeed do so, parsing it to generate the 
+	traditional argument vector argv[0], argv[1], etc.  Again, to
+	break it into argument items, any spaces must be quoted using
+	double quote thus
+		cmd "this is arg 1" "this is arg 2"
+
+What if an argument itself contains double-quotes? (File names can't
+can't, on Windows.)  Then the quote must be escaped with a backslash.
+If we call Create Process with this lpArgument:
+	cmd "Foo=\"baz\"" arg2
+then cmd will see argv[1] as
+	Foo="baz"
+However, experiments show that backslashes themselves must *not* be escaped.
+That is, to get a backslash in an argument, just put backslash, even inside
+quotes.  For eaxmple, this works fine to show the contents of the file
+foo\baz
+	cat "foo\baz"
+If you escape the backslash, thus
+	cat "foo\\baz"
+then @cat@ will see argument foo\\baz, and on WinME/98/95 you'll get
+"can't find file foo\\baz".  (As it happens, WinNT/XP commands don't
+mind double backslashes, but it's still a bug, given rawSystem's claim
+to pass exactly args to the command.)
+
+BOTTOM LINE: 
+	1 We wrap the command, and each argument, in quotes
+	2 Inside the quotes, we escape any double-quote characters
+		(but nothing else)
+	3 Then concatenate all these quoted things together, separated with 
+		spaces
+
+Steps 1,2 are done by the function 'translate' below.
+
+Question: how do you get the string \" into an argument?  Turns out that
+the argument "\\"" does not do the job.  (This turns into a single \.)
+Puzzling but probably not important in practice.
+
+Note: CreateProcess does have a separate argument (lpApplicationName)
+with which you can specify the command, but we have to slap the
+command into lpCommandLine anyway, so that argv[0] is what a C program
+expects (namely the application name).  So it seems simpler to just
+use lpCommandLine alone, which CreateProcess supports.
+
+----------------------------------------------------------------------------- -}
 
 #ifndef mingw32_TARGET_OS
 
@@ -113,7 +187,6 @@ translate :: String -> String
 translate str@('"':_) = str -- already escaped.
 translate str = '"' : foldr escape "\"" str
   where escape '"'  str = '\\' : '"'  : str
-	escape '\\' str = '\\' : '\\' : str
 	escape c    str = c : str
 
 foreign import ccall unsafe "rawSystem"
