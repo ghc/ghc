@@ -38,7 +38,7 @@ import Type		( unUsgTy, repType,
 			  mkTyVarTy, mkFunTy, splitAppTy, applyTy, funResultTy
 			)
 import PprType		( {- instance Outputable Type -} )
-import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
+import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..), dynamicTarget )
 import Var		( TyVar )
 import TysPrim		( realWorldStatePrimTy, addrPrimTy )
 import TysWiredIn	( unitTy, addrTy, stablePtrTyCon,
@@ -141,14 +141,13 @@ dsFImport fn_id ty may_not_gc ext_name cconv
     mapAndUnzipDs unboxArg (map Var args)	`thenDs` \ (val_args, arg_wrappers) ->
     boxResult io_res_ty				`thenDs` \ (ccall_result_ty, res_wrapper) ->
 
-    (case ext_name of
-       Dynamic       -> getUniqueDs `thenDs` \ u -> 
-			returnDs (DynamicTarget u)
-       ExtName fs _  -> returnDs (StaticTarget fs))	`thenDs` \ lbl ->
-
     getUniqueDs						`thenDs` \ ccall_uniq ->
     getUniqueDs						`thenDs` \ work_uniq ->
     let
+	lbl = case ext_name of
+		Dynamic	     -> dynamicTarget
+	        ExtName fs _ -> StaticTarget fs
+
 	-- Build the worker
 	work_arg_ids  = [v | Var v <- val_args]		-- All guaranteed to be vars
 	worker_ty     = mkForAllTys tvs (mkFunTys (map idType work_arg_ids) ccall_result_ty)

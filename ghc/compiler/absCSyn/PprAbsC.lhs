@@ -46,7 +46,7 @@ import Name		( NamedThing(..) )
 import DataCon		( DataCon{-instance NamedThing-}, dataConWrapId )
 import Maybes		( maybeToBool, catMaybes )
 import PrimOp		( primOpNeedsWrapper, pprPrimOp, pprCCallOp, 
-			  PrimOp(..), CCall(..), CCallTarget(..) )
+			  PrimOp(..), CCall(..), CCallTarget(..), isDynamicTarget )
 import PrimRep		( isFloatingRep, PrimRep(..), getPrimRepSize, showPrimRep )
 import SMRep		( pprSMRep )
 import Unique		( pprUnique, Unique{-instance NamedThing-} )
@@ -821,42 +821,30 @@ pprCCall call@(CCall op_str is_asm may_gc cconv) args results vol_regs
 	  [amode]  -> text (showPrimRep (getAmodeRep amode))
 	  _	   -> panic "pprCCall: ccall_res_ty"
 
-    ccall_fun_ty = 
-       ptext SLIT("_ccall_fun_ty") <>
-       case op_str of
-         DynamicTarget u -> ppr u
-	 _     		 -> empty
-
     (declare_local_vars, local_vars, assign_results)
       = ppr_casm_results non_void_results
 
-    (StaticTarget asm_str) = op_str
-    is_dynamic = 
-       case op_str of
-         StaticTarget _  -> False
-	 DynamicTarget _ -> True
-
     casm_str = if is_asm then _UNPK_ asm_str else ccall_str
+    StaticTarget asm_str = op_str	-- Must be static if it's a casm
 
     -- Remainder only used for ccall
 
-    fun_name 
-      | is_dynamic = parens (parens (ccall_fun_ty) <> text "%0")
-      | otherwise  = ptext asm_str
+    fun_name = case op_str of
+		 DynamicTarget u -> parens (parens (ptext SLIT("_ccall_fun_ty") <> ppr u) <> text "%0")
+		 StaticTarget st -> pprCLabelString st
 
     ccall_str = showSDoc
 	(hcat [
 		if null non_void_results
 		  then empty
 		  else text "%r = ",
-		lparen, fun_name, lparen,
+		lparen, parens fun_name, lparen,
 		  hcat (punctuate comma ccall_fun_args),
 		text "));"
 	])
 
-    ccall_fun_args
-     | is_dynamic = tail ccall_args
-     | otherwise  = ccall_args
+    ccall_fun_args | isDynamicTarget op_str = tail ccall_args
+		   | otherwise 		    = ccall_args
 
     ccall_args    = zipWith (\ _ i -> char '%' <> int i) non_void_args [0..]
 

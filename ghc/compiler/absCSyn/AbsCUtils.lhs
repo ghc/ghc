@@ -29,7 +29,7 @@ import UniqSupply	( uniqFromSupply, uniqsFromSupply, splitUniqSupply,
 			  UniqSupply )
 import CmdLineOpts      ( opt_OutputLanguage, opt_EmitCExternDecls )
 import Maybes		( maybeToBool )
-import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
+import PrimOp		( PrimOp(..), CCall(..), isDynamicTarget )
 import Panic		( panic )
 
 infixr 9 `thenFlt`
@@ -331,16 +331,16 @@ flatAbsC (CSwitch discrim alts deflt)
       = flatAbsC absC	`thenFlt` \ (alt_heres, alt_tops) ->
 	returnFlt ( (tag, alt_heres), alt_tops )
 
-flatAbsC stmt@(COpStmt results (CCallOp ccall) args vol_regs)
+flatAbsC stmt@(COpStmt results (CCallOp ccall@(CCall target is_asm _ _)) args vol_regs)
   | isCandidate && opt_OutputLanguage == Just "C"	-- Urgh
   = returnFlt (stmt, tdef)
+  | otherwise
+  = returnFlt (stmt, AbsCNop)
   where
-    (isCandidate, isDyn) =
-      case ccall of 
-        CCall (DynamicTarget _) _ _ _      -> (True, True)
-	CCall (StaticTarget _) is_asm _ _  -> (opt_EmitCExternDecls && not is_asm, False)
+    isCandidate = is_dynamic || opt_EmitCExternDecls && not is_asm
+    is_dynamic  = isDynamicTarget target
 
-    tdef = CCallTypedef isDyn ccall results args
+    tdef = CCallTypedef is_dynamic ccall results args
 
 flatAbsC stmt@(CSimultaneous abs_c)
   = flatAbsC abs_c		`thenFlt` \ (stmts_here, tops) ->

@@ -19,7 +19,8 @@ module PrimOp (
 
 	pprPrimOp,
 
-	CCall(..), CCallTarget(..), ccallMayGC, ccallIsCasm, pprCCallOp
+	CCall(..), CCallTarget(..), ccallMayGC, ccallIsCasm, pprCCallOp,
+	isDynamicTarget, dynamicTarget, setCCallUnique
     ) where
 
 #include "HsVersions.h"
@@ -2418,13 +2419,34 @@ data CCallTarget
 				--   (unique is used to generate a 'typedef' to cast
 				--    the function pointer if compiling the ccall# down to
 				--    .hc code - can't do this inline for tedious reasons.)
-  deriving( Eq )
+
+instance Eq CCallTarget where
+  (StaticTarget l1) == (StaticTarget l2) = l1 == l2
+  (DynamicTarget _) == (DynamicTarget _) = True	
+	-- Ignore the arbitrary unique; this is important when comparing
+	-- a dynamic ccall read from an interface file A.hi with the
+	-- one constructed from A.hs, when deciding whether the interface
+	-- has changed
+  t1 == t2 = False
 
 ccallMayGC :: CCall -> Bool
 ccallMayGC (CCall _ _ may_gc _) = may_gc
 
 ccallIsCasm :: CCall -> Bool
 ccallIsCasm (CCall _ c_asm _ _) = c_asm
+
+isDynamicTarget (DynamicTarget _) = True
+isDynamicTarget (StaticTarget _)  = False
+
+dynamicTarget :: CCallTarget
+dynamicTarget = DynamicTarget (panic "Unique in DynamicTarget not yet set")
+	-- The unique is really only to do with code generation, so it
+	-- is only set in CoreToStg; before then it's just an error message
+
+setCCallUnique :: CCall -> Unique -> CCall
+setCCallUnique (CCall (DynamicTarget _) is_asm may_gc cconv) uniq
+  = CCall (DynamicTarget uniq) is_asm may_gc cconv
+setCCallUnique ccall uniq = ccall
 \end{code}
 
 \begin{code}

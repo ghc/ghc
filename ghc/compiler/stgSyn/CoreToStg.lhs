@@ -33,7 +33,7 @@ import Demand		( Demand, isStrict, wwStrict, wwLazy )
 import Name	        ( Name, nameModule, isLocallyDefinedName, setNameUnique )
 import Literal	        ( Literal(..) )
 import VarEnv
-import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..), primOpUsg )
+import PrimOp		( PrimOp(..), setCCallUnique, primOpUsg )
 import Type		( isUnLiftedType, isUnboxedTupleType, Type, splitFunTy_maybe,
                           UsageAnn(..), tyUsg, applyTy, mkUsgTy, repType, seqType,
 			  splitRepFunTys, mkFunTys
@@ -657,11 +657,14 @@ mkStgApp env fn args ty
 	-> saturate fn_alias args ty	$ \ args' ty' ->
 	   returnUs (StgConApp dc args')
 
-      PrimOpId (CCallOp (CCall (DynamicTarget _) a b c))
+      PrimOpId (CCallOp ccall)
 		-- Sigh...make a guaranteed unique name for a dynamic ccall
+		-- Done here, not earlier, because it's a code-gen thing
 	-> saturate fn_alias args ty	$ \ args' ty' ->
-	   getUniqueUs   		`thenUs` \ u ->
-           returnUs (StgPrimApp (CCallOp (CCall (DynamicTarget u) a b c)) args' ty')
+           returnUs (StgPrimApp (CCallOp ccall') args' ty')
+	where
+	   ccall' = setCCallUnique ccall (idUnique fn)	
+			-- The particular unique doesn't matter
 
       PrimOpId op 
 	-> saturate fn_alias args ty	$ \ args' ty' ->
