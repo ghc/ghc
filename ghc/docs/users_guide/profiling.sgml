@@ -594,6 +594,75 @@ $ ghcprof &lt;prog&gt;.prof
       </varListEntry>
 
       <varlistentry>
+	<term><Option>-h&lt;filtering-options&gt;</Option>:</Term>
+	<indexterm><primary><option>-h&lt;filtering-options&gt
+                           </option></primary></indexterm>
+	<indexterm><primary>heap profile filtering options</primary></indexterm>
+	<listItem>
+	  <Para>It's often useful to select just some subset of the
+          heap when profiling.  To do this, the following filters are
+          available.  You may use multiple filters, in which case a
+          closure has to satisfy all filters to appear in the final
+          profile.  Filtering criterion are independent of what it is
+          you ask to see.  So, for example, you can specify a profile
+          by closure description (<Literal>-hD</literal>) but ask to
+          filter closures by producer module (<Literal>-hm{...}</literal>).
+          </para>
+
+          <Para>Available filters are:</para>
+
+	  <variableList>
+
+	    <varListEntry>
+	      <term><Option>-hc{cc1, cc2 .. ccN}</Option>:</Term>
+	      <listItem>
+		<Para>Restrict to one of the specified cost centers.
+		Since GHC deals in cost center stacks, the specified
+		cost centers pertain to the top stack element.  For
+		example, <Literal>-hc{Wurble,Burble}</literal> selects
+		all cost center stacks whose top element is
+		<Literal>Wurble</literal> or
+		<Literal>Burble</literal>.
+              </para>
+	      </listItem>
+	    </varListEntry>
+
+	    <varListEntry>
+	      <term><Option>-hm{module1, module2 .. moduleN}</Option>:</Term>
+	      <listItem>
+		<Para>Restrict to closures produced by functions in
+		one of the specified modules.
+		</Para>
+	      </listItem>
+	    </varListEntry>
+
+	    <varListEntry>
+	      <term><Option>-hd{descr1, descr2 .. descrN}</Option>:</Term>
+	      <listItem>
+		<Para>Restrict to closures whose description-string is
+		one of the specified descriptions.  Description
+		strings are pretty arcane.  An easy way to find
+		plausible strings to specify is to first do a
+		<Literal>-hD</literal> profile and then inspect the
+		description-strings which appear in the resulting profile.
+		</Para>
+	      </listItem>
+	    </varListEntry>
+
+	    <varListEntry>
+	      <term><Option>-hy{type1, type2 .. typeN}</Option>:</Term>
+	      <listItem>
+		<Para>Restrict to closures having one of the specified
+		types.
+                </Para>
+	      </listItem>
+	    </varListEntry>
+	  </variableList>
+
+	</listItem>
+      </varListEntry>
+
+      <varlistentry>
 	<term><option>-hx</option>:</term>
 	<indexterm><primary><option>-hx</option></primary></indexterm>
 	<listitem>
