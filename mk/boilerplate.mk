@@ -34,12 +34,16 @@ $(TOP)/mk/config.mk : $(TOP)/mk/config.mk.in $(TOP)/mk/config.h.in $(TOP)/config
 		echo "You haven't run $(FPTOOLS_TOP)/configure yet."; \
 		exit 1; \
 	fi
-	@echo "Running $(FPTOOLS_TOP)/config.status to update configuration info..."
+	@if test $(FPTOOLS_TOP)/configure -nt $(FPTOOLS_TOP)/mk/config.mk; then \
+		echo "configure changed, reconfiguring with same settings..."; \
+		( cd $(FPTOOLS_TOP) && ./config.status --recheck ); \
+	fi
+	@echo "Running $(FPTOOLS_TOP)/config.status to update configuration info...";
 	@( cd $(FPTOOLS_TOP) && ./config.status )
 
 $(TOP)/configure : $(TOP)/configure.ac $(TOP)/aclocal.m4
-	@echo "Regenerating $(FPTOOLS_TOP)/configure..."
-	@( cd $(FPTOOLS_TOP) && $(MAKE) -f Makefile.config ./configure )
+	@echo "Running autoreconf in $(FPTOOLS_TOP)  ..."
+	@( cd $(FPTOOLS_TOP) && autoreconf )
 
 # -----------------------------------------------------------------------------
 # Misc bits
