@@ -434,16 +434,16 @@ FPTOOLS_TOP_ABS_UNIX    = @hardtop@
 prefix			= @prefix@
 exec_prefix		= @exec_prefix@
 bindir			= @bindir@
-datadir			= @datadir@
+datadir			= @datadir@/$(ProjectNameShort)-$(ProjectVersion)
+
 #sysconfdir		= @datadir@
 #sharedstatedir		= @sharedstatedir@
 #localstatedir		= @localstatedir@
-libdir			= @libdir@
+libdir			= @libdir@/$(ProjectNameShort)-$(ProjectVersion)
 includedir		= @includedir@
 oldincludedir		= @oldincludedir@
 mandir			= @mandir@
 
-#UNUSED, see below: libexecdir              = @libexecdir@
 #UNUSED:infodir		= @infodir@
 #UNUSED:srcdir          = @srcdir@
 

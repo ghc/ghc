@@ -32,9 +32,7 @@ TOP:=$(GHC_TOP)
 -include $(TOP)/mk/suffix.mk
 
 # -----------------------------------------------------------------
-# Override $(libdir) and $(datadir), so GHC stuff gets installed 
-# into a suitable subdirectory of $(libdir).
+# Override $(libexecdir): we like our binaries in a subdirectory
+# of $(libdir).
 
-libdir     := $(libdir)/$(ProjectNameShort)-$(ProjectVersion)
 libexecdir := $(libdir)/bin
-datadir    := $(datadir)/$(ProjectNameShort)-$(ProjectVersion)
