@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.23 $
- * $Date: 1999/12/20 16:55:27 $
+ * $Revision: 1.24 $
+ * $Date: 2000/01/05 18:05:34 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -523,6 +523,11 @@ break;
                //        = addWiredInBoxingTycon("PrelConc","ThreadId","ThreadId#"
                //                                ,1,0,THREADID_REP);
 
+               setCurrModule(modulePrelude);
+
+               typeArrow = addPrimTycon(findText("(->)"),
+                                        pair(STAR,pair(STAR,STAR)),
+                                        2,DATATYPE,NIL);
            } else {
 
                modulePrelude = newModule(textPrelude);

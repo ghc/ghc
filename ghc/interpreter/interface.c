@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.16 $
- * $Date: 2000/01/05 15:57:40 $
+ * $Revision: 1.17 $
+ * $Date: 2000/01/05 18:05:33 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1267,6 +1267,52 @@ Void finishGHCImports ( ConId nm, List syms )
  * Vars (values)
  * ------------------------------------------------------------------------*/
 
+/* convert a leading run of DICTAPs into Hugs' internal Qualtype form, viz:
+   { C1 a } -> { C2 b } -> T            into
+   ap(QUALTYPE, ( [(C1,a),(C2,b)], T ))
+*/
+static Type dictapsToQualtype ( Type ty )
+{
+   List pieces = NIL;
+   List preds, dictaps;
+
+   /* break ty into pieces at the top-level arrows */
+   while (isAp(ty) && isAp(fun(ty)) && fun(fun(ty))==typeArrow) {
+      pieces = cons ( arg(fun(ty)), pieces );
+      ty     = arg(ty);
+   }
+   pieces = cons ( ty, pieces );
+   pieces = reverse ( pieces );
+
+   dictaps = NIL;
+   while (nonNull(pieces) && whatIs(hd(pieces))==DICTAP) {
+      dictaps = cons ( hd(pieces), dictaps );
+      pieces = tl(pieces);
+   }
+
+   /* dictaps holds the predicates, backwards */
+   /* pieces holds the remainder of the type, forwards */
+   assert(nonNull(pieces));
+   pieces = reverse(pieces);
+   ty = hd(pieces);
+   pieces = tl(pieces);
+   for (; nonNull(pieces); pieces=tl(pieces)) 
+      ty = fn(hd(pieces),ty);
+
+   preds = NIL;
+   for (; nonNull(dictaps); dictaps=tl(dictaps)) {
+      Cell da = hd(dictaps);
+      QualId cl = fst(unap(DICTAP,da));
+      Cell   arg = snd(unap(DICTAP,da));
+      preds = cons ( pair(cl,arg), preds );
+   }
+
+   if (nonNull(preds)) ty = ap(QUAL, pair(preds,ty));
+   return ty;
+}
+
+
+
 void startGHCValue ( Int line, VarId vid, Type ty )
 {
     Name   n;
@@ -1283,6 +1329,12 @@ void startGHCValue ( Int line, VarId vid, Type ty )
         EEND;
     }
     n = newName(v,NIL);
+
+    /* convert a leading run of DICTAPs into Hugs' internal Qualtype form, viz:
+       { C1 a } -> { C2 b } -> T            into
+       ap(QUALTYPE, ( [(C1,a),(C2,b)], T ))
+    */
+    ty = dictapsToQualtype(ty);
 
     tvs = ifTyvarsIn(ty);
     for (tmp=tvs; nonNull(tmp); tmp=tl(tmp))
@@ -1407,7 +1459,7 @@ List  constrs0;  /* [((ConId,[((Type,VarId,Int))]))]  */
         /* make resTy the result type of the constr, T v1 ... vn */
         resTy = tycon;
         for (tmp=ktyvars; nonNull(tmp); tmp=tl(tmp))
-           resTy = ap(resTy,fst(hd(tmp)));
+           resTy = ap(resTy,zfst(hd(tmp)));
 
         /* for each constructor ... */
         for (constrs=constrs0; nonNull(constrs); constrs=tl(constrs)) {
@@ -2049,7 +2101,7 @@ static Type conidcellsToTycons ( Int line, Type type )
       case QUAL:
          return pair(QUAL,pair(conidcellsToTycons(line,fst(snd(type))),
                                conidcellsToTycons(line,snd(snd(type)))));
-      case DICTAP: /* :: ap(DICTAP, pair(Class,[Type]))
+      case DICTAP: /* :: ap(DICTAP, pair(Class,Type))
                       Not sure if this is really the right place to
                       convert it to the form Hugs wants, but will do so anyway.
                     */
@@ -2057,10 +2109,8 @@ static Type conidcellsToTycons ( Int line, Type type )
 	{
            Class cl   = fst(unap(DICTAP,type));
            List  args = snd(unap(DICTAP,type));
-           if (length(args) != 1) 
-              internal("conidcellsToTycons: DICTAP: multiparam ap");
            return
-              conidcellsToTycons(line,pair(cl,hd(args)));
+              conidcellsToTycons(line,pair(cl,args));
         }
       case UNBOXEDTUP:
          return ap(UNBOXEDTUP, conidcellsToTycons(line, snd(type)));
@@ -2108,6 +2158,8 @@ static Bool allTypesKnown ( Type  type,
          /* fall through */
       case QUALIDENT:
          if (isNull(qualidIsMember(type,aktys))) goto missing;
+         return TRUE;
+      case TYCON:
          return TRUE;
 
       default: 

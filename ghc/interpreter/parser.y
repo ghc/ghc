@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.20 $
- * $Date: 2000/01/05 13:53:36 $
+ * $Revision: 1.21 $
+ * $Date: 2000/01/05 18:05:34 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -227,9 +227,9 @@ ifCtxInst /* __forall [a b] =>     :: [((VarId,Kind))] */
           : ALL ifForall IMPLIES        {$$=gc3($2);}
           |                             {$$=gc0(NIL);}
           ;
-ifInstHd /* { Class aType }    :: (ConId, Type) */
+ifInstHd /* { Class aType }    :: ((ConId, Type)) */
           : '{' ifQCon ifAType '}'      {$$=gc4(ap(DICTAP,
-                                                zpair($2,singleton($3))));}
+                                                zpair($2,$3)));}
           ;
 
 ifInstHdL /* { C a1 } -> { C2 a2 } -> ... -> { Cn an } :: Type */
@@ -356,13 +356,10 @@ ifAType   : ifQTCName                   { $$ = gc1($1); }
           | '(' ifTypeL2 ')'            { $$ = gc3(buildTuple(reverse($2))); }
           | '[' ifType ']'              { $$ = gc3(ap(mkCon(tycon(typeList).text),
                                                       $2));}
-          | '{' ifQTCName ifATypes '}'  { $$ = gc4(ap(DICTAP,
+          | '{' ifQTCName ifAType '}'   { $$ = gc4(ap(DICTAP,
                                                       pair($2,$3))); }
           | '(' ifType ')'              { $$ = gc3($2); }
           | UTL ifTypeL UTR             { $$ = gc3(ap(UNBOXEDTUP,$2)); }
-          ;
-ifATypes  :                             { $$ = gc0(NIL);         }
-          | ifAType ifATypes            { $$ = gc2(cons($1,$2)); }
           ;
 
 
