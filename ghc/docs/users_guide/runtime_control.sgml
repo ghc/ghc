@@ -483,26 +483,24 @@
     <para>Owing to the vagaries of DLL linking, these hooks don't work
     under Windows when the program is built dynamically.</para>
 
-    <para>The function
-    <Function>defaultsHook</Function><indexterm><primary><function>defaultHook</function></primary></indexterm>
-    lets you change various RTS options.  The commonest use for this
-    is to give your program a default heap and/or stack size that is
-    greater than the default.  For example, to set 
-    <literal>-M128m -K1m</literal>:</para>
+    <para>The hook <literal>ghc_rts_opts</literal><indexterm><primary><literal>ghc_rts_opts</literal></primary>
+      </indexterm>lets you set RTS
+    options permanently for a given program.  A common use for this is
+    to give your program a default heap and/or stack size that is
+    greater than the default.  For example, to set <literal>-H128m
+    -K1m</literal>, place the following definition in a C source
+    file:</para>
 
 <programlisting>
-#include "Rts.h"
-#include "RtsFlags.h"
-void defaultsHook (void) {
-   RtsFlags.GcFlags.maxStkSize  =  1000002 / sizeof(W_);
-   RtsFlags.GcFlags.maxHeapSize =  128*1024*1024 / BLOCK_SIZE_W;
-}
+char *ghc_rts_opts = "-H128m -K1m";
 </programlisting>
 
-    <para>Don't use powers of two for heap/stack sizes: these are more
-    likely to interact badly with direct-mapped caches.  The full set
-    of flags is defined in <Filename>ghc/rts/RtsFlags.h</Filename> the
-    the GHC source tree.</para>
+    <para>Compile the C file, and include the object file on the
+    command line when you link your Haskell program.</para>
+
+    <para>These flags are interpreted first, before any RTS flags from
+    the <literal>GHCRTS</literal> environment variable and any flags
+    on the command line.</para>
 
     <para>You can also change the messages printed when the runtime
     system &ldquo;blows up,&rdquo; e.g., on stack overflow.  The hooks
@@ -573,54 +571,10 @@ void defaultsHook (void) {
       </varlistentry>
     </variablelist>
 
-    <para>For example, here is the &ldquo;hooks&rdquo; code used by
-    GHC itself:</para>
-
-<programlisting>
-#include "Rts.h"
-#include "../rts/RtsFlags.h"
-#include "HsFFI.h"
-
-void
-defaultsHook (void)
-{
-    RtsFlags.GcFlags.heapSizeSuggestion = 6*1024*1024 / BLOCK_SIZE;
-    RtsFlags.GcFlags.maxStkSize         = 8*1024*1024 / sizeof(W_);
-    RtsFlags.GcFlags.giveStats = COLLECT_GC_STATS;
-    RtsFlags.GcFlags.statsFile = stderr;
-}
-
-void
-ErrorHdrHook (long fd)
-{
-    char msg[]="\n";
-    write(fd,msg,1);
-}
-
-void
-PatErrorHdrHook (long fd)
-{
-    const char msg[]="\n*** Pattern-matching error within GHC!\n\nThis is a compiler bug; please report it to glasgow-haskell-bugs@haskell.org.\n\nFail:";
-    write(fd,msg,sizeof(msg)-1);
-}
-
-void
-PreTraceHook (long fd)
-{
-    const char msg[]="\n";
-    write(fd,msg,sizeof(msg)-1);
-}
-
-void
-PostTraceHook (long fd)
-{
-#if 0
-    const char msg[]="\n";
-    write(fd,msg,sizeof(msg)-1);
-#endif
-}
-</programlisting>
-
+    <para>For examples of the use of these hooks, see GHC's own
+    versions in the file
+    <filename>ghc/compiler/parser/hschooks.c</filename> in a GHC
+    source tree.</para>
   </sect2>
 </sect1>
 
