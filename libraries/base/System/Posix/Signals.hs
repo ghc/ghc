@@ -117,34 +117,62 @@ type Signal = CInt
 nullSignal :: Signal
 nullSignal = 0
 
-sigABRT   = CONST_SIGABRT   :: CInt
-sigALRM   = CONST_SIGALRM   :: CInt
-sigBUS    = CONST_SIGBUS    :: CInt
-sigCHLD   = CONST_SIGCHLD   :: CInt
-sigCONT   = CONST_SIGCONT   :: CInt
-sigFPE    = CONST_SIGFPE    :: CInt
-sigHUP    = CONST_SIGHUP    :: CInt
-sigILL    = CONST_SIGILL    :: CInt
-sigINT    = CONST_SIGINT    :: CInt
-sigKILL   = CONST_SIGKILL   :: CInt
-sigPIPE   = CONST_SIGPIPE   :: CInt
-sigQUIT   = CONST_SIGQUIT   :: CInt
-sigSEGV   = CONST_SIGSEGV   :: CInt
-sigSTOP   = CONST_SIGSTOP   :: CInt
-sigTERM   = CONST_SIGTERM   :: CInt
-sigTSTP   = CONST_SIGTSTP   :: CInt
-sigTTIN   = CONST_SIGTTIN   :: CInt
-sigTTOU   = CONST_SIGTTOU   :: CInt
-sigUSR1   = CONST_SIGUSR1   :: CInt
-sigUSR2   = CONST_SIGUSR2   :: CInt
-sigPOLL   = CONST_SIGPOLL   :: CInt
-sigPROF   = CONST_SIGPROF   :: CInt
-sigSYS    = CONST_SIGSYS    :: CInt
-sigTRAP   = CONST_SIGTRAP   :: CInt
-sigURG    = CONST_SIGURG    :: CInt
-sigVTALRM = CONST_SIGVTALRM :: CInt
-sigXCPU   = CONST_SIGXCPU   :: CInt
-sigXFSZ   = CONST_SIGXFSZ   :: CInt
+sigABRT   :: CInt
+sigABRT   = CONST_SIGABRT
+sigALRM   :: CInt
+sigALRM   = CONST_SIGALRM
+sigBUS    :: CInt
+sigBUS    = CONST_SIGBUS
+sigCHLD   :: CInt
+sigCHLD   = CONST_SIGCHLD
+sigCONT   :: CInt
+sigCONT   = CONST_SIGCONT
+sigFPE    :: CInt
+sigFPE    = CONST_SIGFPE
+sigHUP    :: CInt
+sigHUP    = CONST_SIGHUP
+sigILL    :: CInt
+sigILL    = CONST_SIGILL
+sigINT    :: CInt
+sigINT    = CONST_SIGINT
+sigKILL   :: CInt
+sigKILL   = CONST_SIGKILL
+sigPIPE   :: CInt
+sigPIPE   = CONST_SIGPIPE
+sigQUIT   :: CInt
+sigQUIT   = CONST_SIGQUIT
+sigSEGV   :: CInt
+sigSEGV   = CONST_SIGSEGV
+sigSTOP   :: CInt
+sigSTOP   = CONST_SIGSTOP
+sigTERM   :: CInt
+sigTERM   = CONST_SIGTERM
+sigTSTP   :: CInt
+sigTSTP   = CONST_SIGTSTP
+sigTTIN   :: CInt
+sigTTIN   = CONST_SIGTTIN
+sigTTOU   :: CInt
+sigTTOU   = CONST_SIGTTOU
+sigUSR1   :: CInt
+sigUSR1   = CONST_SIGUSR1
+sigUSR2   :: CInt
+sigUSR2   = CONST_SIGUSR2
+sigPOLL   :: CInt
+sigPOLL   = CONST_SIGPOLL
+sigPROF   :: CInt
+sigPROF   = CONST_SIGPROF
+sigSYS    :: CInt
+sigSYS    = CONST_SIGSYS
+sigTRAP   :: CInt
+sigTRAP   = CONST_SIGTRAP
+sigURG    :: CInt
+sigURG    = CONST_SIGURG
+sigVTALRM :: CInt
+sigVTALRM = CONST_SIGVTALRM
+sigXCPU   :: CInt
+sigXCPU   = CONST_SIGXCPU
+sigXFSZ   :: CInt
+sigXFSZ   = CONST_SIGXFSZ
 
 internalAbort ::Signal
 internalAbort = sigABRT

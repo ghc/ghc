@@ -28,7 +28,7 @@ import System.IO (hPutStrLn,stderr)
 #endif
 
 -- | 'putTraceMsg' function outputs the trace message from IO monad.
--- Usually the output stream is 'stderr' but if the function is called
+-- Usually the output stream is 'System.IO.stderr' but if the function is called
 -- from Windows GUI application then the output will be directed to the Windows
 -- debug console.
 putTraceMsg :: String -> IO ()
