@@ -1,6 +1,6 @@
 /*
  *
- * $Id: ghci.c,v 1.2 2001/08/01 21:55:04 sof Exp $
+ * $Id: ghci.c,v 1.3 2001/08/02 01:01:46 sof Exp $
  *
  * ghci wrapper - invokes ghc.exe with the added command-line
  *                option "--interactive".
@@ -26,7 +26,7 @@
  *     as the .rc file):
  *
  *         MSVC:    rc /I. ghci.rc /o ghci.res
- *         mingw:   windres -o ghci.res -o ghci.rc -O coff
+ *         mingw:   windres -o ghci.res -i ghci.rc -O coff
  *
  *   * Add the resulting .res file to the link line of the wrapper:
  *
