@@ -8,8 +8,8 @@ SRCS	= \
 	Data/Either.hs Data/FiniteMap.hs Data/IORef.hs Data/Int.hs \
 	Data/Ix.hs Data/List.hs Data/Maybe.hs Data/PackedString.hs \
 	Data/Ratio.hs Data/Set.hs Data/Tuple.hs Data/Word.hs Data/Array.hs \
-	Control/Monad.hs Data/HashTable.hs Data/Dynamic.hs Data/Monoid.hs \
-	Data/Tree.hs Control/Monad/Fix.hs Control/Monad/Trans.hs \
+	Data/HashTable.hs Data/Dynamic.hs Data/Monoid.hs Data/Tree.hs \
+	Control/Monad.hs Control/Monad/Fix.hs Control/Monad/Trans.hs \
 	Control/Arrow.hs Debug/Trace.hs \
 	NHC/SizedTypes.hs \
 	System/IO.hs System/IO/Error.hs System/IO/Unsafe.hs \
@@ -60,6 +60,7 @@ $(OBJDIR)/Data/Set.$O: $(OBJDIR)/Data/Maybe.$O $(OBJDIR)/Data/FiniteMap.$O
 $(OBJDIR)/Data/Array.$O: $(OBJDIR)/Data/Ix.$O
 $(OBJDIR)/Data/Dynamic.$O: $(OBJDIR)/Foreign/Ptr.$O \
 	$(OBJDIR)/Foreign/StablePtr.$O $(OBJDIR)/Data/HashTable.$O
+$(OBJDIR)/Data/HashTable.$O: $(OBJDIR)/Control/Monad.$O
 $(OBJDIR)/Data/Int.$O: $(OBJDIR)/NHC/SizedTypes.$O
 $(OBJDIR)/Data/Word.$O: $(OBJDIR)/NHC/SizedTypes.$O
 $(OBJDIR)/NHC/SizedTypes.$O: $(OBJDIR)/Data/Bits.$O
@@ -108,6 +109,7 @@ Data/FiniteMap.$C: Data/Maybe.$C
 Data/Set.$C:       Data/Maybe.$C Data/FiniteMap.$C
 Data/Array.$C:     Data/Ix.$C
 Data/Dynamic.$C:   Foreign/Ptr.$C Data/HashTable.$C
+Data/HashTable.$C: Control/Monad.$C
 Data/Int.$C:       NHC/SizedTypes.$C
 Data/Word.$C:      NHC/SizedTypes.$C
 NHC/SizedTypes.$C: Data/Bits.$C
