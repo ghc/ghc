@@ -717,8 +717,9 @@ initExternalPackageState
 	where
 	   gated_decl = (gate_fn, (mod, IfaceRuleOut rdr_name rule))
 	   mod	      = nameModule name
-	   rdr_name   = nameRdrName name
-	   gate_fn vis_fn = vis_fn name	-- Load the rule whenever name is visible
+	   rdr_name   = nameRdrName name	-- Seems a bit of a hack to go back
+						-- to the RdrName
+	   gate_fn vis_fn = vis_fn name		-- Load the rule whenever name is visible
 
 initOrigNames :: OrigNameCache
 initOrigNames 

@@ -840,6 +840,7 @@ data RuleDecl name
 	name			-- Head of LHS
 	CoreRule
 
+isSrcRule :: RuleDecl name -> Bool
 isSrcRule (HsRule _ _ _ _ _ _) = True
 isSrcRule other		       = False
 

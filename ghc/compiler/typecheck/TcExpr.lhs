@@ -12,8 +12,7 @@ module TcExpr ( tcExpr, tcExpr_id, tcMonoExpr ) where
 import {-# SOURCE #-}	TcSplice( tcSpliceExpr, tcBracket )
 import HsSyn		( HsReify(..), ReifyFlavour(..) )
 import TcType		( isTauTy )
-import TcEnv		( bracketOK, tcMetaTy, tcLookupGlobal,
-			  checkWellStaged, metaLevel )
+import TcEnv		( bracketOK, tcMetaTy, checkWellStaged, metaLevel )
 import TcSimplify	( tcSimplifyBracket )
 import Name		( isExternalName )
 import qualified DsMeta
