@@ -210,8 +210,7 @@ killThreadzh_fast
    {						\
       W_ rval;					\
       rval = Sp(0);				\
-      Sp_adj(1);				\
-      Sp = Sp + SIZEOF_StgCatchFrame - WDS(1);  \
+      Sp = Sp + SIZEOF_StgCatchFrame;		\
       Sp(0) = rval;				\
       jump ret;					\
    }
