@@ -30,7 +30,9 @@
 
 ProcHandle
 runProcess (char *const args[], char *workingDirectory, char **environment, 
-	    int fdStdInput, int fdStdOutput, int fdStdError)
+	    int fdStdInput, int fdStdOutput, int fdStdError,
+	    int set_inthandler, long inthandler, 
+	    int set_quithandler, long quithandler)
 {
     int pid;
     struct sigaction dfl;
@@ -48,27 +50,18 @@ runProcess (char *const args[], char *workingDirectory, char **environment,
 	    chdir (workingDirectory);
 	}
 	
-	/*
-	 * Restore SIGINT and SIGQUIT to default actions
-	 *
-	 * Glyn Clemments writes:
-	 * For your purposes, runProcess + waitForProcess is probably
-	 * the way to go. Except that runProcess appears to be missing
-	 * the usual signal handling. system() ignores SIGINT and
-	 * SIGQUIT in the parent, and resets them to their defaults in
-	 * the child; it also blocks SIGCHLD in the parent. runProcess
-	 * may need to do something similar; it should probably at
-	 * least reset SIGINT and SIGQUIT in the child, in case they
-	 * are ignored in the parent. The parent can set up its own
-	 * signal handling, but the only place it can control the
-	 * child's signal handling is between the fork() and the
-	 * exec(), so if runProcess doesn't do it, it won't get done.
+	/* Set the SIGINT/SIGQUIT signal handlers in the child, if requested 
 	 */
-        dfl.sa_handler = SIG_DFL;
         (void)sigemptyset(&dfl.sa_mask);
         dfl.sa_flags = 0;
-	(void)sigaction(SIGINT, &dfl, NULL);
-	(void)sigaction(SIGQUIT,  &dfl, NULL);
+	if (set_inthandler) {
+	    dfl.sa_handler = (void *)inthandler;
+	    (void)sigaction(SIGINT, &dfl, NULL);
+	}
+	if (set_quithandler) {
+	    dfl.sa_handler = (void *)quithandler;
+	    (void)sigaction(SIGQUIT,  &dfl, NULL);
+	}
 
 	dup2 (fdStdInput,  STDIN_FILENO);
 	dup2 (fdStdOutput, STDOUT_FILENO);

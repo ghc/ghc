@@ -665,44 +665,6 @@ extern void __hscore_set_saved_termios(int fd, void* ts);
 
 INLINE int __hscore_hs_fileno (FILE *f) { return fileno (f); }
 
-#if !defined(mingw32_HOST_OS) && !defined(_MSC_VER)
-INLINE int __hsposix_SIGABRT()   { return SIGABRT; }
-INLINE int __hsposix_SIGALRM()   { return SIGALRM; }
-INLINE int __hsposix_SIGBUS()    { return SIGBUS; }
-INLINE int __hsposix_SIGCHLD()   { return SIGCHLD; }
-INLINE int __hsposix_SIGCONT()   { return SIGCONT; }
-INLINE int __hsposix_SIGFPE()    { return SIGFPE; }
-INLINE int __hsposix_SIGHUP()    { return SIGHUP; }
-INLINE int __hsposix_SIGILL()    { return SIGILL; }
-INLINE int __hsposix_SIGINT()    { return SIGINT; }
-INLINE int __hsposix_SIGKILL()   { return SIGKILL; }
-INLINE int __hsposix_SIGPIPE()   { return SIGPIPE; }
-INLINE int __hsposix_SIGQUIT()   { return SIGQUIT; }
-INLINE int __hsposix_SIGSEGV()   { return SIGSEGV; }
-INLINE int __hsposix_SIGSTOP()   { return SIGSTOP; }
-INLINE int __hsposix_SIGTERM()   { return SIGTERM; }
-INLINE int __hsposix_SIGTSTP()   { return SIGTSTP; }
-INLINE int __hsposix_SIGTTIN()   { return SIGTTIN; }
-INLINE int __hsposix_SIGTTOU()   { return SIGTTOU; }
-INLINE int __hsposix_SIGUSR1()   { return SIGUSR1; }
-INLINE int __hsposix_SIGUSR2()   { return SIGUSR2; }
-#ifdef SIGPOLL
-INLINE int __hsposix_SIGPOLL()   { return SIGPOLL; }
-#endif
-INLINE int __hsposix_SIGPROF()   { return SIGPROF; }
-INLINE int __hsposix_SIGSYS()    { return SIGSYS; }
-INLINE int __hsposix_SIGTRAP()   { return SIGTRAP; }
-INLINE int __hsposix_SIGURG()    { return SIGURG; }
-INLINE int __hsposix_SIGVTALRM() { return SIGVTALRM; }
-INLINE int __hsposix_SIGXCPU()   { return SIGXCPU; }
-INLINE int __hsposix_SIGXFSZ()   { return SIGXFSZ; }
-
-INLINE int __hsposix_SIG_BLOCK()   { return SIG_BLOCK; }
-INLINE int __hsposix_SIG_UNBLOCK() { return SIG_UNBLOCK; }
-INLINE int __hsposix_SIG_SETMASK() { return SIG_SETMASK; }
-
-#endif /* mingw32_HOST_OS */
-
 INLINE int __hscore_open(char *file, int how, mode_t mode) {
 #ifdef mingw32_HOST_OS
 	if ((how & O_WRONLY) || (how & O_RDWR) || (how & O_APPEND))

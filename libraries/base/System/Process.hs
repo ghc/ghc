@@ -51,14 +51,12 @@ import System.Process.Internals
 
 import Foreign
 import Foreign.C 
-import Data.Maybe	( fromMaybe )
 import System.IO 	( IOMode(..), Handle )
 import System.Exit	( ExitCode(..) )
-import Control.Exception ( handle, throwIO )
 
 import System.Posix.Internals
-import GHC.IOBase	( haFD, FD, Exception(..), IOException(..) )
-import GHC.Handle 	( stdin, stdout, stderr, withHandle_, openFd )
+import GHC.IOBase	( FD )
+import GHC.Handle 	( openFd )
 
 -- ----------------------------------------------------------------------------
 -- runCommand
@@ -72,9 +70,10 @@ runCommand
 runCommand string = do
   (cmd,args) <- commandToProcess string
 #if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
-  runProcess1 "runCommand" cmd args Nothing Nothing Nothing Nothing Nothing
+  runProcessPosix "runCommand" cmd args Nothing Nothing Nothing Nothing Nothing
+	Nothing Nothing
 #else
-  runProcess1 "runCommand" cmd [] Nothing Nothing Nothing Nothing Nothing args
+  runProcessWin32 "runCommand" cmd [] Nothing Nothing Nothing Nothing Nothing args
 #endif
 
 -- ----------------------------------------------------------------------------
@@ -100,33 +99,9 @@ runProcess
 #if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 
 runProcess cmd args mb_cwd mb_env mb_stdin mb_stdout mb_stderr
- = runProcess1 "runProcess" cmd args mb_cwd mb_env mb_stdin mb_stdout mb_stderr
-
-runProcess1 fun cmd args mb_cwd mb_env mb_stdin mb_stdout mb_stderr
- = withFilePathException cmd $
-     withHandle_ fun (fromMaybe stdin  mb_stdin)  $ \hndStdInput  ->
-     withHandle_ fun (fromMaybe stdout mb_stdout) $ \hndStdOutput ->
-     withHandle_ fun (fromMaybe stderr mb_stderr) $ \hndStdError ->
-     maybeWith withCEnvironment mb_env $ \pEnv ->
-     maybeWith withCString mb_cwd $ \pWorkDir ->
-     withMany withCString (cmd:args) $ \cstrs ->
-     withArray0 nullPtr cstrs $ \pargs -> do
-         ph <- throwErrnoIfMinus1 fun
-		(c_runProcess pargs pWorkDir pEnv 
-			(haFD hndStdInput)
-			(haFD hndStdOutput)
-			(haFD hndStdError))
-	 return (ProcessHandle ph)
-
-foreign import ccall unsafe "runProcess" 
-  c_runProcess
-        :: Ptr CString			-- args
-        -> CString			-- working directory (or NULL)
-        -> Ptr CString			-- env (or NULL)
-        -> FD				-- stdin
-        -> FD				-- stdout
-        -> FD				-- stderr
-        -> IO PHANDLE
+ = runProcessPosix "runProcess" cmd args mb_cwd mb_env 
+	mb_stdin mb_stdout mb_stderr
+	Nothing Nothing
 
 #else
 
@@ -134,7 +109,7 @@ runProcess cmd args mb_cwd mb_env mb_stdin mb_stdout mb_stderr =
   runProcess1 "runProcess" cmd args mb_cwd mb_env 
 	mb_stdin mb_stdout mb_stderr ""
 
-runProcess1 fun cmd args mb_cwd mb_env
+runProcessWin32 fun cmd args mb_cwd mb_env
 	mb_stdin mb_stdout mb_stderr extra_cmdline
  = withFilePathException cmd $
      withHandle_ fun (fromMaybe stdin  mb_stdin)  $ \hndStdInput  ->
@@ -332,74 +307,6 @@ getProcessExitCode (ProcessHandle handle) =
       else if code == 0
              then return (Just ExitSuccess)
              else return (Just (ExitFailure (fromIntegral code)))
-
--- ----------------------------------------------------------------------------
--- commandToProcess
-
-{- | Turns a shell command into a raw command.  Usually this involves
-     wrapping it in an invocation of the shell.
-
-   There's a difference in the signature of commandToProcess between
-   the Windows and Unix versions.  On Unix, exec takes a list of strings,
-   and we want to pass our command to /bin/sh as a single argument.  
-
-   On Windows, CreateProcess takes a single string for the command,
-   which is later decomposed by cmd.exe.  In this case, we just want
-   to prepend @\"c:\WINDOWS\CMD.EXE \/c\"@ to our command line.  The
-   command-line translation that we normally do for arguments on
-   Windows isn't required (or desirable) here.
--}
-
-#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
-
-commandToProcess
-  :: String
-  -> IO (FilePath,[String])
-commandToProcess string = return ("/bin/sh", ["-c", string])
-
-#else
-
-commandToProcess
-  :: String
-  -> IO (FilePath,String)
-commandToProcess string = do
-  sysDir <- allocaBytes 1024 (\pdir -> c_getSystemDirectory pdir 1024 >> peekCString pdir)
-  return (sysDir ++ "\\CMD.EXE", "/c " ++ string)
-	-- We don't want to put the cmd into a single
-	-- argument, because cmd.exe will not try to split it up.  Instead,
-	-- we just tack the command on the end of the cmd.exe command line,
-	-- which partly works.  There seem to be some quoting issues, but
-	-- I don't have the energy to find+fix them right now (ToDo). --SDM
-
-foreign import stdcall unsafe "GetSystemDirectoryA" 
-  c_getSystemDirectory 
-        :: CString 
-        -> CInt 
-        -> IO CInt
-
-#endif
-
--- ----------------------------------------------------------------------------
--- Utils
-
-withFilePathException :: FilePath -> IO a -> IO a
-withFilePathException fpath act = handle mapEx act
-  where
-    mapEx (IOException (IOError h iot fun str _)) = ioError (IOError h iot fun str (Just fpath))
-    mapEx e                                       = throwIO e
-
-#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
-withCEnvironment :: [(String,String)] -> (Ptr CString  -> IO a) -> IO a
-withCEnvironment env act =
-  let env' = map (\(name, val) -> name ++ ('=':val)) env 
-  in withMany withCString env' (\pEnv -> withArray0 nullPtr pEnv act)
-#else
-withCEnvironment :: [(String,String)] -> (Ptr () -> IO a) -> IO a
-withCEnvironment env act =
-  let env' = foldr (\(name, val) env -> name ++ ('=':val)++'\0':env) "\0" env 
-  in withCString env' (act . castPtr)
-#endif
-
 
 -- ----------------------------------------------------------------------------
 -- Interface to C bits

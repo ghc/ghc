@@ -24,6 +24,10 @@ import System.Exit 	( ExitCode )
 #ifdef __GLASGOW_HASKELL__
 import System.Process
 import GHC.IOBase	( ioException, IOException(..), IOErrorType(..) )
+#if !defined(mingw32_HOST_OS)
+import System.Process.Internals
+import System.Posix.Signals
+#endif
 #endif
 
 #ifdef __HUGS__
@@ -60,9 +64,28 @@ passes the command to the Windows command interpreter (@CMD.EXE@ or
 #ifdef __GLASGOW_HASKELL__
 system :: String -> IO ExitCode
 system "" = ioException (IOError Nothing InvalidArgument "system" "null command" Nothing)
-system cmd = do
-  p <- runCommand cmd
+system str = do
+#if mingw32_HOST_OS
+  p <- runCommand str
   waitForProcess p
+#else
+  -- The POSIX version of system needs to do some manipulation of signal
+  -- handlers.  Since we're going to be synchronously waiting for the child,
+  -- we want to ignore ^C in the parent, but handle it the default way
+  -- in the child (using SIG_DFL isn't really correct, it should be the
+  -- original signal handler, but the GHC RTS will have already set up
+  -- its own handler and we don't want to use that).
+  old_int  <- installHandler sigINT  Ignore Nothing
+  old_quit <- installHandler sigQUIT Ignore Nothing
+  (cmd,args) <- commandToProcess str
+  p <- runProcessPosix "runCommand" cmd args Nothing Nothing 
+		Nothing Nothing Nothing
+		(Just defaultSignal) (Just defaultSignal)
+  r <- waitForProcess p
+  installHandler sigINT  old_int Nothing
+  installHandler sigQUIT old_quit Nothing
+  return r
+#endif  /* mingw32_HOST_OS */
 #endif  /* __GLASGOW_HASKELL__ */
 
 {-|
@@ -76,8 +99,22 @@ The return codes and possible failures are the same as for 'system'.
 rawSystem :: String -> [String] -> IO ExitCode
 #ifdef __GLASGOW_HASKELL__
 rawSystem cmd args = do
+
+#if mingw32_HOST_OS
   p <- runProcess cmd args Nothing Nothing Nothing Nothing Nothing
   waitForProcess p
+#else
+  old_int  <- installHandler sigINT  Ignore Nothing
+  old_quit <- installHandler sigQUIT Ignore Nothing
+  p <- runProcessPosix "rawSystem" cmd args Nothing Nothing 
+		Nothing Nothing Nothing
+		(Just defaultSignal) (Just defaultSignal)
+  r <- waitForProcess p
+  installHandler sigINT  old_int Nothing
+  installHandler sigQUIT old_quit Nothing
+  return r
+#endif
+
 #else /* ! __GLASGOW_HASKELL__ */
 -- crude fallback implementation: could do much better than this under Unix
 rawSystem cmd args = system (unwords (map translate (cmd:args)))

@@ -15,7 +15,9 @@ typedef long ProcHandle;
 
 extern ProcHandle runProcess( char *const args[], 
 			      char *workingDirectory, char **environment, 
-			      int fdStdInput, int fdStdOutput, int fdStdError);
+			      int fdStdInput, int fdStdOutput, int fdStdError,
+			      int set_inthandler, long inthandler, 
+			      int set_quithandler, long quithandler);
 
 extern ProcHandle runInteractiveProcess( char *const args[], 
 					 char *workingDirectory, 
