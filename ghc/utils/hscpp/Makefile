@@ -3,7 +3,11 @@ include $(TOP)/mk/boilerplate.mk
 
 SCRIPT_PROG=hscpp
 SCRIPT_OBJS=hscpp.prl
-SCRIPT_SUBST_VARS=RAWCPP
+SCRIPT_SUBST_VARS=
+
+ifneq "$(BIN_DIST)" "1"
+SCRIPT_SUBST_VARS += RAWCPP
+endif
 
 # Note: might be overridden from cmd-line (see install rule below)
 INSTALLING=0
