@@ -25,6 +25,10 @@ stat_exit
 #define _INCLUDE_HPUX_SOURCE
 #endif
 
+#ifdef solaris2_TARGET_OS
+#define __EXTENSIONS__
+#endif
+
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
@@ -67,7 +71,6 @@ stat_exit
  from getrusage() for Solaris   -- SOF
 */
 #if solaris2_TARGET_OS
-#undef __STRICT_ANSI__  /* oh, dear */
 #include <sys/fcntl.h>
 #include <sys/signal.h>
 #include <sys/procfs.h>
