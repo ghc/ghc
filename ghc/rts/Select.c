@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.1 1999/08/25 16:37:42 simonmar Exp $
+ * $Id: Select.c,v 1.2 1999/09/13 08:28:45 sof Exp $
  *
  * (c) The GHC Team 1995-1999
  *
@@ -34,6 +34,15 @@ nat ticks_since_select = 0;
 void
 awaitEvent(rtsBool wait)
 {
+#ifdef mingw32_TARGET_OS
+/*
+ * Win32 doesn't support select(). ToDo: use MsgWaitForMultipleObjects()
+ * to achieve (similar) effect.
+ *
+ */
+    return;
+#else
+
     StgTSO *tso, *prev, *next;
     rtsBool ready;
     fd_set rfd,wfd;
@@ -171,4 +180,5 @@ awaitEvent(rtsBool wait)
       prev->link = END_TSO_QUEUE;
       blocked_queue_tl = prev;
     }
+#endif
 }
