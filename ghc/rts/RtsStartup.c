@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.77 2003/09/25 15:14:41 panne Exp $
+ * $Id: RtsStartup.c,v 1.78 2003/09/26 12:12:35 panne Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -81,14 +81,14 @@ static void *saved_termios[3] = {NULL,NULL,NULL};
 void*
 __hscore_get_saved_termios(int fd)
 {
-  return (0 <= fd && fd < sizeof(saved_termios) / sizeof(*saved_termios)) ?
+  return (0 <= fd && fd < (int)(sizeof(saved_termios) / sizeof(*saved_termios))) ?
     saved_termios[fd] : NULL;
 }
 
 void
 __hscore_set_saved_termios(int fd, void* ts)
 {
-  if (0 <= fd && fd < sizeof(saved_termios) / sizeof(*saved_termios)) {
+  if (0 <= fd && fd < (int)(sizeof(saved_termios) / sizeof(*saved_termios))) {
     saved_termios[fd] = ts;
   }
 }
