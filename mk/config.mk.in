@@ -456,7 +456,11 @@ datadir			= @datadir@
 #sysconfdir		= @datadir@
 #sharedstatedir		= @sharedstatedir@
 #localstatedir		= @localstatedir@
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 libdir			= @libdir@
+else
+libdir                  = @prefix@
+endif
 includedir		= @includedir@
 oldincludedir		= @oldincludedir@
 mandir			= @mandir@
@@ -468,8 +472,10 @@ mandir			= @mandir@
 # override libdir and datadir to put project-specific stuff in
 # a subdirectory with the version number included.
 #
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 libdir     := $(if $(ProjectNameShort),$(libdir)/$(ProjectNameShort)-$(ProjectVersion),$(libdir))
 datadir    := $(if $(ProjectNameShort),$(datadir)/$(ProjectNameShort)-$(ProjectVersion),$(datadir))
+endif
 
 # 
 # Default values for most of the above are only set if
