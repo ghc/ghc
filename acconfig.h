@@ -96,6 +96,63 @@
 /* Define if you support the production (and use) of Win32 DLLs. */
 #undef HAVE_WIN32_DLL_SUPPORT
 
+/* Define to Haskell type for char */
+#undef HTYPE_CHAR
+
+/* Define to Haskell type for clock_t */
+#undef HTYPE_CLOCK_T
+
+/* Define to Haskell type for signed double */
+#undef HTYPE_DOUBLE
+
+/* Define to Haskell type for float */
+#undef HTYPE_FLOAT
+
+/* Define to Haskell type for int */
+#undef HTYPE_INT
+
+/* Define to Haskell type for long */
+#undef HTYPE_LONG
+
+/* Define to Haskell type for long long */
+#undef HTYPE_LONG_LONG
+
+/* Define to Haskell type for ptrdiff_t */
+#undef HTYPE_PTRDIFF_T
+
+/* Define to Haskell type for short */
+#undef HTYPE_SHORT
+
+/* Define to Haskell type for sig_atomic_t */
+#undef HTYPE_SIG_ATOMIC_T
+
+/* Define to Haskell type for signed char */
+#undef HTYPE_SIGNED_CHAR
+
+/* Define to Haskell type for size_t */
+#undef HTYPE_SIZE_T
+
+/* Define to Haskell type for time_t */
+#undef HTYPE_TIME_T
+
+/* Define to Haskell type for unsigned char */
+#undef HTYPE_UNSIGNED_CHAR
+
+/* Define to Haskell type for unsigned int */
+#undef HTYPE_UNSIGNED_INT
+
+/* Define to Haskell type for unsigned long */
+#undef HTYPE_UNSIGNED_LONG
+
+/* Define to Haskell type for unsigned long long */
+#undef HTYPE_UNSIGNED_LONG_LONG
+
+/* Define to Haskell type for unsigned short */
+#undef HTYPE_UNSIGNED_SHORT
+
+/* Define to Haskell type for wchar_t */
+#undef HTYPE_WCHAR_T
+
 /* Define if C Symbols have a leading underscore added by the compiler */
 #undef LEADING_UNDERSCORE
 
