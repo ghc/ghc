@@ -1077,7 +1077,7 @@ CompilePreludishly(ghc/FiniteMap,lhs,	-ighc -fhaskell-1.3)
 CompilePreludishly(ghc/ListSetOps,lhs,	)
 CompilePreludishly(ghc/Maybes,lhs,	-fhaskell-1.3)
 CompilePreludishly(ghc/PackedString,lhs,)
-CompilePreludishly(ghc/Regex,lhs,	-fhaskell-1.3 '-#include"ghcRegex.h"')
+CompilePreludishly(ghc/Regex,lhs,	-fhaskell-1.3 '-#include"ghcRegex.h"' -monly-4-regs)
 CompilePreludishly(ghc/MatchPS,lhs,	-ighc -fhaskell-1.3)
 CompilePreludishly(ghc/Pretty,lhs,	-ighc -fhaskell-1.3)
 #if GhcWithReadline == YES

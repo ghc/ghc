@@ -405,11 +405,12 @@ gets whatever it's after.
         REAL_NAME(f) "_wrapper:\n"	    	\
         "\tmovl %%esp,80(%%ebx)\n"	    	\
         "\tmovl 100(%%ebx),%%esp\n"		\
-        "\tmovl %%eax,%0" : "=r" (args));	\
-    __asm__ volatile (				\
-	"movl %%esp,%0\n"			\
+        "\tmovl %%eax,%0\n"			\
+	"\tincl _SP_stack_ptr\n"		\
+	"\tmovl _SP_stack_ptr,%%eax\n"		\
+	"\tmovl %%esp,_SP_stack(,%%eax,4)\n"	\
 	"\tsubl $64,%%esp"			\
-	: "=r" (SP_stack[++SP_stack_ptr]));	\
+	: "=r" (args));				\
     SaveAllStgContext();
 
 #define WRAPPER_RETURN(x)			\

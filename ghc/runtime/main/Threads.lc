@@ -2195,7 +2195,7 @@ PROC p;
 #if defined(GRAN)
 I_ do_gr_sim = 0;
 FILE *gr_file = NULL;
-char gr_filename[32];
+char gr_filename[STATS_FILENAME_MAXLEN];
 
 init_gr_simulation(rts_argc,rts_argv,prog_argc,prog_argv)
 char *prog_argv[], *rts_argv[];
@@ -2206,7 +2206,7 @@ int prog_argc, rts_argc;
     if(do_gr_sim)
       { 
         char *extension = do_gr_binary? "gb": "gr";
-        sprintf(gr_filename, "%0.28s.%0.2s", prog_argv[0],extension);
+        sprintf(gr_filename, GR_FILENAME_FMT, prog_argv[0],extension);
 
         if ((gr_file = fopen(gr_filename,"w")) == NULL ) 
           {
@@ -2326,9 +2326,9 @@ static void
 init_qp_profiling(STG_NO_ARGS)
 {
     I_ i;
-    char qp_filename[32];
+    char qp_filename[STATS_FILENAME_MAXLEN];
 
-    sprintf(qp_filename, "%0.24s.qp", prog_argv[0]);
+    sprintf(qp_filename, QP_FILENAME_FMT, prog_argv[0]);
     if ((qp_file = fopen(qp_filename,"w")) == NULL ) {
         fprintf(stderr, "Can't open quasi-parallel profile report file %s\n", 
             qp_filename);
@@ -3646,9 +3646,9 @@ static void
 init_qp_profiling(STG_NO_ARGS)
 {
     I_ i;
-    char qp_filename[32];
+    char qp_filename[STATS_FILENAME_MAXLEN];
 
-    sprintf(qp_filename, "%0.24s.qp", prog_argv[0]);
+    sprintf(qp_filename, QP_FILENAME_FMT, prog_argv[0]);
     if ((qp_file = fopen(qp_filename,"w")) == NULL ) {
 	fprintf(stderr, "Can't open quasi-parallel profile report file %s\n", 
     	    qp_filename);

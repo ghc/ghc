@@ -676,8 +676,8 @@ char *argv[], *rts_argv[];
 		    tickyfile = fopen(stats_filename,"w");
 		}
 		if (tickyfile == NULL) {
-		    fprintf(stderr, "Can't open tickyfile %s (default %0.24s.ticky)\n",
-				rts_argv[arg]+2, argv[0]);
+		    fprintf(stderr, "Can't open tickyfile %s\n",
+				rts_argv[arg]+2);
 		    error = 1;
 		} else {
 		    /* Write argv and rtsv into start of ticky file */
@@ -709,7 +709,7 @@ char *argv[], *rts_argv[];
 		    main_statsfile = fopen(stats_filename,"w");
 		}
 		if (main_statsfile == NULL) {
-		    fprintf(stderr, "Can't open statsfile %s (default %0.24s.stat)\n", rts_argv[arg]+2, argv[0]);
+		    fprintf(stderr, "Can't open statsfile %s\n", rts_argv[arg]+2);
 		    error = 1;
 		} else {
 		    /* Write argv and rtsv into start of stats file */

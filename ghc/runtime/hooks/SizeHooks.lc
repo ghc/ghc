@@ -1,0 +1,8 @@
+\begin{code}
+#include "rtsdefs.h"
+#include "storage/SMinternal.h" /* DEFAULT_* here */
+
+I_   SM_word_heap_size   = DEFAULT_HEAP_SIZE;
+StgFloat SM_pc_free_heap = DEFAULT_PC_FREE;
+I_   SM_word_stk_size    = DEFAULT_STACKS_SIZE;
+\end{code}

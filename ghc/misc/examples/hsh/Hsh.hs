@@ -159,6 +159,7 @@ parseCommand = getTokens []
   where
     getTokens :: [String] -> String -> IO [String]
     getTokens ts "" = return (reverse ts)
+    getTokens ts (c:cs) | isSpace c = getTokens ts cs
     getTokens ts s = 
 	getToken s				>>= \ (t, s') ->
 	getTokens (t:ts) s'
@@ -166,7 +167,6 @@ parseCommand = getTokens []
     getToken :: String -> IO (String, String)
     getToken (c:cs)
       | c == '<' || c == '>' = return ([c], cs)
-      | isSpace c = getToken cs
       | c == '"' || c == '\'' = accumQuote c "" cs
       | otherwise = accumToken [c] cs
 

@@ -433,7 +433,7 @@ TIME v;
 
 \begin{code}
 #ifdef GRAN
-char gr_filename[32]; /*ToDo: magic short filename constant????? WDP 95/07 */
+char gr_filename[STATS_FILENAME_MAXLEN];
 I_ do_gr_sim = 0;
 
 int
@@ -446,7 +446,7 @@ int prog_argc, rts_argc;
     if (do_gr_sim) {
 	char *extension = do_gr_binary ? "gb" : "gr";
 
-	sprintf(gr_filename, "%0.28s.%0.2s", prog_argv[0], extension);
+	sprintf(gr_filename, GR_FILENAME_FMT, prog_argv[0], extension);
 
 	if ((gr_file = fopen(gr_filename, "w")) == NULL) {
 	    fprintf(stderr, "Can't open granularity simulation report file %s\n", gr_filename);
@@ -536,7 +536,7 @@ end_gr_simulation(STG_NO_ARGS)
 #endif /* GRAN */
 
 #ifdef PAR
-char gr_filename[50]; /*ToDo: (small) magic constant alert!!!! WDP 95/07 */
+char gr_filename[STATS_FILENAME_MAXLEN];
 
 I_ do_gr_profile = 0;
 I_ do_sp_profile = 0;
@@ -551,7 +551,7 @@ int prog_argc, rts_argc;
 
     char *extension = do_gr_binary ? "gb" : "gr";
 
-    sprintf(gr_filename, "%0.28s.%03d.%0.2s", prog_argv[0], thisPE, extension);
+    sprintf(gr_filename, GR_FILENAME_FMT_GUM, prog_argv[0], thisPE, extension);
 
     if ((gr_file = fopen(gr_filename, "w")) == NULL) {
 	fprintf(stderr, "Can't open activity report file %s\n", gr_filename);

@@ -292,8 +292,12 @@ P_ closure;
 
 	    if (IS_THUNK(info) && IS_UPDATABLE(info)) {
 #ifdef DEBUG
-		P_ rbh = convertToRBH(closure);
+		P_ rbh =
+#else
+		(void)
 #endif
+		convertToRBH(closure);
+
 		ASSERT(rbh != NULL);
 	    }
 	}

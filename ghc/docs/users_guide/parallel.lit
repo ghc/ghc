@@ -487,11 +487,14 @@ The above will create files named \tr{<something>.prof} and/or
 \tr{<something>.time} {\em in your home directory}.  You can
 process the \tr{.time} files into PostScript using \tr{hp2ps},
 \index{hp2ps}
-as described elsewhere in this guide.  The only thing is:
-because of the weird file names, you probably need to use
-\tr{hp2ps} as a filter; so:
+as described elsewhere in this guide.
+
+Because of the weird file names, you probably need to use
+\tr{hp2ps} as a filter.  Also, you probably want to give \tr{hp2ps}
+a \tr{-t0} flag, so that no ``inconsequential'' data is ignored---in
+parallel-land it's all consequential.  So:
 \begin{verbatim}
-% hp2ps < fooo.001.time > temp.ps
+% hp2ps -t0 < fooo.001.time > temp.ps
 \end{verbatim}
 
 %$$ The first line of the
@@ -536,6 +539,21 @@ because of the weird file names, you probably need to use
 %$$ GHC amber queue, so there is no point in using the verbose (\tr{-qv})
 %$$ option if you are only interested in using the \tr{hbcpp} profiling
 %$$ tools.
+
+%************************************************************************
+%*                                                                      *
+\subsubsection{Other useful info about running parallel programs}
+%*                                                                      *
+%************************************************************************
+
+The ``garbage-collection statistics'' RTS options can be useful
+for seeing what parallel programs are doing.  If you do either
+\tr{+RTS -Sstderr}\index{-Sstderr RTS option} or \tr{+RTS -sstderr},
+then you'll get mutator, garbage-collection, etc., times on standard
+error which, for PVM programs, appears in \tr{/tmp/pvml.nnn}.
+
+Whether doing \tr{+RTS -Sstderr} or not, a handy way to watch
+what's happening overall is: \tr{tail -f /tmp/pvml.nnn}.
 
 %************************************************************************
 %*                                                                      *

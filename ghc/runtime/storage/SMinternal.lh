@@ -73,6 +73,10 @@ extern char *xmalloc PROTO((size_t));
 
 /************************ Default HEAP and STACK sizes **********************/
 
+/* A user can change these main defaults with a
+   "hooks" file equiv to runtime/hooks/SizeHooks.lc.
+*/
+
 #define DEFAULT_STACKS_SIZE  	 0x10002  /* 2^16 = 16Kwords = 64Kbytes */
 
 #define DEFAULT_HEAP_SIZE  	 0x100002 /* 2^20 = 1Mwords = 4Mbytes  */

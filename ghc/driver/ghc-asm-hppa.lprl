@@ -81,7 +81,7 @@ sub mangle_asm {
 	    # duplicated from the bottom
 	    $chk[$i] .= $_;
 
-	} elsif ( /^\L\$C(\d+)$/ ) {
+	} elsif ( /^L\$C(\d+)$/ ) {
 	    $chk[++$i] .= $_;
 	    $chkcat[$i] = 'literal';
 	    $chksymb[$i] = $1;
@@ -353,7 +353,7 @@ sub mangle_asm {
     		# teach it to drop through to the fast entry point:
 		$c = $chk[$slowchk{$symb}];
     	    	if ( defined($fastchk{$symb}) ) {
-    		    $c =~ s/^\s+ldil.*\n\s+ldo.*\n\s+bv.*\n(.*\n)?\s+\.EXIT/\1\t.EXIT/;
+    		    $c =~ s/^\s+ldil.*\n\s+ldo.*\n\s+bv.*\n(.*\n)?\s+\.EXIT/$1\t.EXIT/;
     	    	}
 
 		print OUTASM "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";

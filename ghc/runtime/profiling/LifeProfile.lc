@@ -157,7 +157,7 @@ life_profile_finish(alloc, prog_argv)
     StgChar *prog_argv[];
 {
     I_ report, i;
-    StgChar life_filename[32];
+    StgChar life_filename[STATS_FILENAME_MAXLEN];
     FILE *life_file;
     W_ total_life, total_upd, total_interval,
             accum_life, accum_upd;
@@ -177,7 +177,7 @@ life_profile_finish(alloc, prog_argv)
     life_older += prev_older;
 
     /* Produce liftime reports */
-    sprintf(life_filename, "%0.24s.life", prog_argv[0]);
+    sprintf(life_filename, LIFE_FILENAME_FMT, prog_argv[0]);
     if ( (life_file = fopen(life_filename,"w")) == NULL ) {
 	fprintf(stderr, "Can't open life profile report file %s\n", life_filename);
     }

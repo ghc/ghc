@@ -16,7 +16,7 @@
 #endif
 /* A patchlevel change is something *very minor* */
 #ifndef ProjectPatchLevel
-#define ProjectPatchLevel patchlevel 0
+#define ProjectPatchLevel patchlevel 1
 #endif
 /* GhcBuildeeVersion is something CPP-testable (ProjectVersion * 100) */
 #ifndef GhcBuildeeVersion

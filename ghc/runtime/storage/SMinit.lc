@@ -19,17 +19,18 @@ A filehandle to which any storage-manager statistics should be written.
 /* global vars to hold some storage-mgr details; */
 /* decls for these are in SMinternal.h           */
 I_   SM_force_gc       = 0;
-I_   SM_word_heap_size = DEFAULT_HEAP_SIZE;
-I_   SM_alloc_min      = 0;
-StgFloat SM_pc_free_heap   = DEFAULT_PC_FREE;
 I_   SM_alloc_size     = 0;
+I_   SM_alloc_min      = 0;
 I_   SM_major_gen_size = 0;
-I_   SM_word_stk_size  = DEFAULT_STACKS_SIZE;
 FILE *SM_statsfile = NULL;
 I_   SM_trace = 0;
 I_   SM_stats_summary = 0;
 I_   SM_stats_verbose = 0;
 I_   SM_ring_bell = 0;
+
+/*To SizeHooks: I_   SM_word_heap_size = DEFAULT_HEAP_SIZE; */
+/*To SizeHooks: StgFloat SM_pc_free_heap = DEFAULT_PC_FREE; */
+extern I_ SM_word_stk_size; /*To SizeHooks: = DEFAULT_STACKS_SIZE; */
 
 I_ MaxResidency = 0;     /* in words; for stats only */
 I_ ResidencySamples = 0; /* for stats only */
