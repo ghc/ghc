@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.33 1998/11/24 11:22:47 sof Exp $
+dnl $Id: aclocal.m4,v 1.34 1998/11/24 21:28:00 reid Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -470,7 +470,7 @@ for i in etext _etext __etext; do
   fi
 done
 if test "$not_done" = 1; then
-FPTOOLS_IN_SCOPE(etext asm("etext"),etext,fptools_cv_end_of_text);
+FPTOOLS_IN_SCOPE(etext asm("etext"),etext,fptools_cv_end_of_text)
 if test "$fptools_cv_end_of_text" = yes; then
   AC_DEFINE(TEXT_SECTION_END_MARKER_DECL, etext asm("etext"))
   AC_DEFINE(TEXT_SECTION_END_MARKER, etext)
@@ -496,7 +496,7 @@ for i in end _end __end; do
   fi
 done
 if test "$not_done" = 1; then
-FPTOOLS_IN_SCOPE(end asm("end"),end,fptools_cv_end_of_data);
+FPTOOLS_IN_SCOPE(end asm("end"),end,fptools_cv_end_of_data)
 if test "$fptools_cv_end_of_data" = yes; then
   AC_DEFINE(DATA_SECTION_END_MARKER_DECL, end asm("end"))
   AC_DEFINE(DATA_SECTION_END_MARKER, end)
