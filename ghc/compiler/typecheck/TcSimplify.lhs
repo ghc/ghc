@@ -26,7 +26,7 @@ import TcHsSyn		( TcId, TcDictBinds, mkHsApp, mkHsTyApp, mkHsDictApp )
 
 import TcRnMonad
 import Inst		( lookupInst, LookupInstResult(..),
-			  tyVarsOfInst, fdPredsOfInsts, fdPredsOfInst, newDicts,
+			  tyVarsOfInst, fdPredsOfInsts, newDicts, 
 			  isDict, isClassDict, isLinearInst, linearInstType,
 			  isStdClassTyVarDict, isMethodFor, isMethod,
 			  instToId, tyVarsOfInsts,  cloneDict,
@@ -1532,16 +1532,19 @@ tcImprove :: Avails -> TcM Bool		-- False <=> no change
 tcImprove avails
  =  tcGetInstEnvs 			`thenM` \ inst_envs -> 
     let
-	preds = [ (pred, pp_loc)
+	preds = [ (dictPred inst, pp_loc)
 		| inst <- keysFM avails,
-		  let pp_loc = pprInstLoc (instLoc inst),
-		  pred <- fdPredsOfInst inst
+		  isDict inst,
+		  let pp_loc = pprInstLoc (instLoc inst)
 		]
 		-- Avails has all the superclasses etc (good)
 		-- It also has all the intermediates of the deduction (good)
 		-- It does not have duplicates (good)
 		-- NB that (?x::t1) and (?x::t2) will be held separately in avails
 		--    so that improve will see them separate
+		--
+		-- Notice that we only look at dicts; LitInsts and Methods will have
+		-- been squished, so their dicts will be in Avails too
 	eqns = improve get_insts preds
 	get_insts clas = classInstances inst_envs clas
      in
@@ -1552,10 +1555,11 @@ tcImprove avails
         mappM_ unify eqns	`thenM_`
 	returnM False
   where
-    unify ((qtvs, t1, t2), doc)
+    unify ((qtvs, pairs), doc)
 	 = addErrCtxt doc				$
 	   tcInstTyVars VanillaTv (varSetElems qtvs)	`thenM` \ (_, _, tenv) ->
-	   unifyTauTy (substTy tenv t1) (substTy tenv t2)
+	   mapM_ (unif_pr tenv) pairs
+    unif_pr tenv (ty1,ty2) =  unifyTauTy (substTy tenv ty1) (substTy tenv ty2)
 \end{code}
 
 The main context-reduction function is @reduce@.  Here's its game plan.

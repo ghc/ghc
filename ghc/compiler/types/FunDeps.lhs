@@ -19,7 +19,7 @@ import Class		( Class, FunDep, classTvsFds )
 import Subst		( mkSubst, emptyInScopeSet, substTy )
 import TcType		( Type, ThetaType, PredType(..), 
 			  predTyUnique, mkClassPred, tyVarsOfTypes, tyVarsOfPred,
-			  unifyTyListsX, unifyExtendTysX, tcEqType
+			  unifyTyListsX, unifyExtendTyListsX, tcEqType
 			)
 import VarSet
 import VarEnv
@@ -147,24 +147,32 @@ grow preds fixed_tvs
 
 \begin{code}
 ----------
-type Equation = (TyVarSet, Type, Type)	-- These two types should be equal, for some
-					-- substitution of the tyvars in the tyvar set
-	-- To "execute" the equation, make fresh type variable for each tyvar in the set,
-	-- instantiate the two types with these fresh variables, and then unify.
-	--
-	-- For example, ({a,b}, (a,Int,b), (Int,z,Bool))
-	-- We unify z with Int, but since a and b are quantified we do nothing to them
-	-- We usually act on an equation by instantiating the quantified type varaibles
-	-- to fresh type variables, and then calling the standard unifier.
-	-- 
-	-- INVARIANT: they aren't already equal
-	--
+type Equation = (TyVarSet, [(Type, Type)])
+-- These pairs of types should be equal, for some
+-- substitution of the tyvars in the tyvar set
+-- INVARIANT: corresponding types aren't already equal
 
+-- It's important that we have a *list* of pairs of types.  Consider
+-- 	class C a b c | a -> b c where ...
+--	instance C Int x x where ...
+-- Then, given the constraint (C Int Bool v) we should improve v to Bool,
+-- via the equation ({x}, [(Bool,x), (v,x)])
+-- This would not happen if the class had looked like
+--	class C a b c | a -> b, a -> c
+
+-- To "execute" the equation, make fresh type variable for each tyvar in the set,
+-- instantiate the two types with these fresh variables, and then unify.
+--
+-- For example, ({a,b}, (a,Int,b), (Int,z,Bool))
+-- We unify z with Int, but since a and b are quantified we do nothing to them
+-- We usually act on an equation by instantiating the quantified type varaibles
+-- to fresh type variables, and then calling the standard unifier.
 
 pprEquationDoc (eqn, doc) = vcat [pprEquation eqn, nest 2 doc]
 
-pprEquation (qtvs, t1, t2) = ptext SLIT("forall") <+> braces (pprWithCommas ppr (varSetElems qtvs))
-			     			  <+> ppr t1 <+> ptext SLIT(":=:") <+> ppr t2
+pprEquation (qtvs, pairs) 
+  = vcat [ptext SLIT("forall") <+> braces (pprWithCommas ppr (varSetElems qtvs)),
+	  nest 2 (vcat [ ppr t1 <+> ptext SLIT(":=:") <+> ppr t2 | (t1,t2) <- pairs])]
 
 ----------
 improve :: InstEnv Id		-- Gives instances for given class
@@ -221,7 +229,7 @@ checkGroup :: InstEnv Id -> [(PredType,SDoc)] -> [(Equation, SDoc)]
 
 checkGroup inst_env (p1@(IParam _ ty, _) : ips)
   = 	-- For implicit parameters, all the types must match
-    [ ((emptyVarSet, ty, ty'), mkEqnMsg p1 p2) 
+    [ ((emptyVarSet, [(ty,ty')]), mkEqnMsg p1 p2) 
     | p2@(IParam _ ty', _) <- ips, not (ty `tcEqType` ty')]
 
 checkGroup inst_env clss@((ClassP cls _, _) : _)
@@ -296,17 +304,24 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
 -- unifyTyListsX will only bind variables in qtvs, so it's OK!
   = case unifyTyListsX qtvs ls1 ls2 of
 	Nothing   -> []
-	Just unif -> -- pprTrace "checkFD" (vcat [ppr_fd fd,
-		     --			       ppr (varSetElems qtvs) <+> (ppr ls1 $$ ppr ls2),
-		     --			       ppr unif]) $ 
-		     [ (qtvs', substTy full_unif r1, substTy full_unif r2)
-		     | (r1,r2) <- rs1 `zip` rs2,
-		       not (maybeToBool (unifyExtendTysX qtvs unif r1 r2))]
-			-- Don't include any equations that already hold
-			-- taking account of the fact that any qtvs that aren't 
-			-- already instantiated can be instantiated to anything at all
-			-- NB: qtvs, not qtvs' because unifyExtendTysX only tries to
+	Just unif | maybeToBool (unifyExtendTyListsX qtvs unif rs1 rs2)
+			-- Don't include any equations that already hold. 
+			-- Reason: then we know if any actual improvement has happened,
+			-- 	   in which case we need to iterate the solver
+			-- In making this check we must taking account of the fact that any 
+			-- qtvs that aren't already instantiated can be instantiated to anything 
+			-- at all
+			-- NB: qtvs, not qtvs' because unifyExtendTyListsX only tries to
 			--     look template tyvars up in the substitution
+		  -> []
+
+		  | otherwise	-- Aha!  A useful equation
+		  -> [ (qtvs', map (substTy full_unif) rs1 `zip` map (substTy full_unif) rs2)]
+			-- We could avoid this substTy stuff by producing the eqn
+			-- (qtvs, ls1++rs1, ls2++rs2)
+			-- which will re-do the ls1/ls2 unification when the equation is
+			-- executed.  What we're doing instead is recording the partial
+			-- work of the ls1/ls2 unification leaving a smaller unification problem
 		  where
 		    full_unif = mkSubst emptyInScopeSet unif
 			-- No for-alls in sight; hmm

@@ -79,7 +79,7 @@ module TcType (
 
   ---------------------------------
   -- Unifier and matcher  
-  unifyTysX, unifyTyListsX, unifyExtendTysX,
+  unifyTysX, unifyTyListsX, unifyExtendTyListsX,
   matchTy, matchTys, match,
 
   --------------------------------
@@ -966,7 +966,6 @@ isByteArrayLikeTyCon tc =
 %************************************************************************
 
 Unify types with an explicit substitution and no monad.
-Ignore usage annotations.
 
 \begin{code}
 type MySubst
@@ -980,13 +979,14 @@ unifyTysX :: TyVarSet		-- Template tyvars
 unifyTysX tmpl_tyvars ty1 ty2
   = uTysX ty1 ty2 (\(_,s) -> Just s) (tmpl_tyvars, emptySubstEnv)
 
-unifyExtendTysX :: TyVarSet		-- Template tyvars
-		-> TyVarSubstEnv	-- Substitution to start with
-		-> Type
-	        -> Type
-        	-> Maybe TyVarSubstEnv	-- Extended substitution
-unifyExtendTysX tmpl_tyvars subst ty1 ty2
-  = uTysX ty1 ty2 (\(_,s) -> Just s) (tmpl_tyvars, subst)
+unifyExtendTyListsX 
+	:: TyVarSet		-- Template tyvars
+	-> TyVarSubstEnv	-- Substitution to start with
+	-> [Type]
+	-> [Type]
+        -> Maybe TyVarSubstEnv	-- Extended substitution
+unifyExtendTyListsX tmpl_tyvars subst tys1 tys2
+  = uTyListsX tys1 tys2 (\(_,s) -> Just s) (tmpl_tyvars, subst)
 
 unifyTyListsX :: TyVarSet -> [Type] -> [Type]
               -> Maybe TyVarSubstEnv
