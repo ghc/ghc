@@ -47,7 +47,7 @@ test "cg039" { vtr("", "", "") }
 test "cg040" { vtr("", "", "") }
 test "cg042" { vtr("-package lang -fglasgow-exts", "", "") }
 test "cg043" { vtr("", "", "") }
-test "cg044" { vtr("-package lang", "", "" ) }
+test "cg044" { vtr("-cpp -package lang", "", "" ) }
 
 -- -O is tmporary, until we fix the problems with seq#...
 test "cg045" { vtr( "-O", "", "1") }

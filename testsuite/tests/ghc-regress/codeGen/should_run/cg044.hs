@@ -5,6 +5,18 @@ import Char
 import ST
 import MutableArray
 
+reverse_if_bigendian :: [a] -> [a]
+#ifdef sparc_sun_solaris2
+reverse_if_bigendian = reverse
+#endif
+#ifdef i386_unknown_linux
+reverse_if_bigendian = id
+#endif
+#ifdef i386_unknown_mingw32
+reverse_if_bigendian = id
+#endif
+
+
 main :: IO ()
 main = do
  sequence_ (map putStrLn double_tests)
@@ -28,7 +40,7 @@ double_numbers :: [Double]
 double_numbers =
       [ 0
       , encodeFloat 0 0     -- 0 using encodeFloat method
-      , mkDouble (map chr [0,0,0,0,0,0, 0xf0, 0x7f])  -- +inf
+      , mkDouble (map chr (reverse_if_bigendian [0,0,0,0,0,0, 0xf0, 0x7f]))  -- +inf
       , encodeFloat 1 2047  -- +Inf 
       , encodeFloat 1 2048
       , encodeFloat 1  2047		  -- signalling NaN
