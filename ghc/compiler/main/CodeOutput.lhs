@@ -24,19 +24,18 @@ import qualified PrintJava
 import OccurAnal	( occurAnalyseBinds )
 #endif
 
+import Packages		( PackageConfig(name), packageNameString )
+import DriverState	( getExplicitPackagesAnd, getPackageCIncludes )
 import FastString	( unpackFS )
-import DriverState	( v_HCHeader )
-import Id		( Id )
-import StgSyn		( StgBinding )
 import AbsCSyn		( AbstractC )
 import PprAbsC		( dumpRealC, writeRealC )
-import HscTypes		( ModGuts(..), ModGuts, ForeignStubs(..), typeEnvTyCons )
+import HscTypes		( ModGuts(..), ModGuts, ForeignStubs(..), 
+			  typeEnvTyCons, Dependencies(..) )
 import CmdLineOpts
 import ErrUtils		( dumpIfSet_dyn, showPass )
 import Outputable
 import Pretty		( Mode(..), printDoc )
 import CmdLineOpts	( DynFlags, HscLang(..), dopt_OutName )
-import DATA_IOREF	( readIORef, writeIORef )
 import Monad		( when )
 import IO
 \end{code}
@@ -51,15 +50,16 @@ import IO
 \begin{code}
 codeOutput :: DynFlags
 	   -> ModGuts
-	   -> [(StgBinding,[Id])]	-- The STG program with SRTs
 	   -> AbstractC			-- Compiled abstract C
 	   -> IO (Bool{-stub_h_exists-}, Bool{-stub_c_exists-})
+
 codeOutput dflags 
 	   (ModGuts {mg_module = mod_name,
 		     mg_types  = type_env,
 		     mg_foreign = foreign_stubs,
+		     mg_deps	= deps,
 		     mg_binds   = core_binds})
-	   stg_binds flat_abstractC
+	   flat_abstractC
   = let
 	tycons = typeEnvTyCons type_env
     in
@@ -71,27 +71,26 @@ codeOutput dflags
 
     do	{ showPass dflags "CodeOutput"
 	; let filenm = dopt_OutName dflags 
-	; stub_names <- outputForeignStubs dflags foreign_stubs
-	; case dopt_HscLang dflags of
-             HscInterpreted -> return stub_names
-             HscAsm         -> outputAsm dflags filenm flat_abstractC
-          		       >> return stub_names
-             HscC           -> outputC dflags filenm flat_abstractC stub_names
-          		       >> return stub_names
+	; stubs_exist <- outputForeignStubs dflags foreign_stubs
+	; case dopt_HscLang dflags of {
+             HscInterpreted -> return ();
+             HscAsm         -> outputAsm dflags filenm flat_abstractC;
+             HscC           -> outputC dflags filenm flat_abstractC stubs_exist
+					deps foreign_stubs;
              HscJava        -> 
 #ifdef JAVA
-			       outputJava dflags filenm mod_name tycons core_binds
-          		       >> return stub_names
+			       outputJava dflags filenm mod_name tycons core_binds;
 #else
-                               panic "Java support not compiled into this ghc"
+                               panic "Java support not compiled into this ghc";
 #endif
 	     HscILX         -> 
 #ifdef ILX
-	                       outputIlx dflags filenm mod_name tycons stg_binds
-			       >> return stub_names
+	                       outputIlx dflags filenm mod_name tycons stg_binds;
 #else
-                               panic "ILX support not compiled into this ghc"
+                               panic "ILX support not compiled into this ghc";
 #endif
+	  }
+	; return stubs_exist
 	}
 
 doOutput :: String -> (Handle -> IO ()) -> IO ()
@@ -106,11 +105,38 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 %************************************************************************
 
 \begin{code}
-outputC dflags filenm flat_absC (stub_h_exists, _)
+outputC dflags filenm flat_absC 
+	(stub_h_exists, _) dependencies (ForeignStubs _ _ ffi_decl_headers _ ) 
   = do dumpIfSet_dyn dflags Opt_D_dump_realC "Real C" (dumpRealC flat_absC)
-       header <- readIORef v_HCHeader
+
+       -- figure out which header files to #include in the generated .hc file:
+       --
+       --   * extra_includes from packages
+       --   * -#include options from the cmdline and OPTIONS pragmas
+       --   * the _stub.h file, if there is one.
+       --
+       let packages = dep_pkgs dependencies
+       pkg_configs <- getExplicitPackagesAnd packages
+       let pkg_names = map name pkg_configs
+
+       c_includes <- getPackageCIncludes pkg_configs
+       let cmdline_includes = cmdlineHcIncludes dflags -- -#include options
+       
+           all_headers =  c_includes
+		       ++ reverse cmdline_includes
+		       ++ reverse (map unpackFS ffi_decl_headers)
+			   -- reverse correct?
+
+       let cc_injects = unlines (map mk_include all_headers)
+       	   mk_include h_file = 
+       	    case h_file of 
+       	       '"':_{-"-} -> "#include "++h_file
+       	       '<':_      -> "#include "++h_file
+       	       _          -> "#include \""++h_file++"\""
+
        doOutput filenm $ \ h -> do
-	  hPutStr h header
+	  hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
+	  hPutStr h cc_injects
 	  when stub_h_exists $ 
 	     hPutStrLn h ("#include \"" ++ (hscStubHOutName dflags) ++ "\"")
 	  writeRealC h flat_absC
@@ -189,20 +215,11 @@ outputIlx dflags filename mod tycons stg_binds
 %************************************************************************
 
 \begin{code}
-    -- Turn the list of headers requested in foreign import
-    -- declarations into a string suitable for emission into generated
-    -- C code...
-mkForeignHeaders headers
-  = unlines 
-  . map (\fname -> "#include \"" ++ unpackFS fname ++ "\"")
-  . reverse 
-  $ headers
-
 outputForeignStubs :: DynFlags -> ForeignStubs
 		   -> IO (Bool, 	-- Header file created
 			  Bool)		-- C file created
 outputForeignStubs dflags NoStubs = return (False, False)
-outputForeignStubs dflags (ForeignStubs h_code c_code hdrs _)
+outputForeignStubs dflags (ForeignStubs h_code c_code _ _)
   = do
 	dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export header file" stub_h_output_d
@@ -214,15 +231,9 @@ outputForeignStubs dflags (ForeignStubs h_code c_code hdrs _)
 	dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export stubs" stub_c_output_d
 
-	  -- Extend the list of foreign headers (used in outputC)
-        fhdrs <- readIORef v_HCHeader
-	let new_fhdrs = fhdrs ++ mkForeignHeaders hdrs
-        writeIORef v_HCHeader new_fhdrs
-
 	stub_c_file_exists
            <- outputForeignStubs_help (hscStubCOutName dflags) stub_c_output_w
 		("#define IN_STG_CODE 0\n" ++ 
-		 new_fhdrs ++
 		 "#include \"RtsAPI.h\"\n" ++
 		 cplusplus_hdr)
 		 cplusplus_ftr

@@ -5,7 +5,6 @@
 
 \begin{code}
 module Finder (
-    initFinder, 	-- :: [PackageConfig] -> IO (), 
     flushFinderCache,	-- :: IO ()
 
     findModule,		-- :: ModuleName -> IO (Maybe (Module, ModLocation))
@@ -51,9 +50,6 @@ import Monad
 -- 
 -- It does *not* know which particular package a module lives in, because
 -- that information is only contained in the interface file.
-
-initFinder :: [PackageConfig] -> IO ()
-initFinder pkgs = return ()
 
 -- -----------------------------------------------------------------------------
 -- The finder's cache

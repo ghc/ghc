@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.115 2002/12/17 13:50:29 simonmar Exp $
+-- $Id: Main.hs,v 1.116 2002/12/18 16:29:30 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -23,21 +23,21 @@ import DriverPhases( objish_file )
 #endif
 
 
-import Finder		( initFinder )
 import CompManager	( cmInit, cmLoadModules, cmDepAnal )
 import HscTypes		( GhciMode(..) )
 import Config		( cBooterVersion, cGhcUnregisterised, cProjectVersion )
 import SysTools		( getPackageConfigPath, initSysTools, cleanTempFiles )
-import Packages		( showPackages )
+import Packages		( showPackages, getPackageConfigMap )
 
 import DriverPipeline	( staticLink, doMkDLL, genPipeline, pipeLoop )
 import DriverState	( buildCoreToDo, buildStgToDo,
-			  findBuildTag, getPackageInfo, getPackageConfigMap,
+			  findBuildTag, 
 			  getPackageExtraGhcOpts, unregFlags, 
 			  v_GhcMode, v_GhcModeFlag, GhcMode(..),
 			  v_Keep_tmp_files, v_Ld_inputs, v_Ways, 
 			  v_OptLevel, v_Output_file, v_Output_hi, 
-			  readPackageConf, verifyOutputFiles, v_NoLink
+			  readPackageConf, verifyOutputFiles, v_NoLink,
+			  v_Build_tag
 			)
 import DriverFlags	( buildStaticHscOpts,
 			  dynamic_flags, processArgs, static_flags)
@@ -201,9 +201,13 @@ main =
    -- by module basis, using only the -fvia-C and -fasm flags.  If the global
    -- HscLang is not HscC or HscAsm, -fvia-C and -fasm have no effect.
    dyn_flags <- getDynFlags
+   build_tag <- readIORef v_Build_tag
    let lang = case mode of 
 		 DoInteractive  -> HscInterpreted
-		 _other         -> hscLang dyn_flags
+		 _other | build_tag /= "" -> HscC
+			| otherwise       -> hscLang dyn_flags
+		-- for ways other that the normal way, we must 
+		-- compile via C.
 
    setDynFlags (dyn_flags{ coreToDo = core_todo,
 			   stgToDo  = stg_todo,
@@ -245,10 +249,6 @@ main =
 
    when (verb >= 3) 
 	(hPutStrLn stderr ("Hsc static flags: " ++ unwords static_opts))
-
-	-- initialise the finder
-   pkg_avails <- getPackageInfo
-   initFinder pkg_avails
 
 	-- mkdependHS is special
    when (mode == DoMkDependHS) beginMkDependHS
@@ -304,10 +304,15 @@ main =
 
    o_files <- mapM compileFile srcs
 
-   omit_linking <- readIORef v_NoLink
-
    when (mode == DoMkDependHS) endMkDependHS
-   when (mode == DoLink && not omit_linking) (staticLink o_files)
+
+   omit_linking <- readIORef v_NoLink
+   when (mode == DoLink && not omit_linking) 
+	(staticLink o_files [basePackage, haskell98Package])
+		-- we always link in the base package in one-shot linking.
+		-- any other packages required must be given using -package
+		-- options on the command-line.
+
    when (mode == DoMkDLL) (doMkDLL o_files)
 
 

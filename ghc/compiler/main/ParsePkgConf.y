@@ -52,6 +52,11 @@ field	:: { PackageConfig -> PackageConfig }
 		   "name" -> returnP (\ p -> p{name = unpackFS $3});
 		   _      -> happyError } }
 			
+        | VARID '=' bool
+		{\p -> case unpackFS $1 of {
+		   	"auto" -> p{auto = $3};
+		   	_      -> p } }
+
 	| VARID '=' strlist		
 		{\p -> case unpackFS $1 of
 		        "import_dirs"     -> p{import_dirs     = $3}
@@ -76,6 +81,12 @@ strlist :: { [String] }
 strs	:: { [String] }
 	: STRING			{ [ unpackFS $1 ] }
 	| strs ',' STRING		{ unpackFS $3 : $1 }
+
+bool    :: { Bool }
+	: CONID				{% case unpackFS $1 of {
+					    "True"  -> returnP True;
+					    "False" -> returnP False;
+					    _       -> happyError } }
 
 {
 happyError :: P a

@@ -61,9 +61,8 @@ import Monad
 import Maybe
 
 
------------------------------------------------------------------------------
---			Pre process
------------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
+-- Pre-process
 
 -- Just preprocess a file, put the result in a temp. file (used by the
 -- compilation manager during the summary phase).
@@ -79,9 +78,8 @@ preprocess filename =
      	                     False{-no linking-} False{-no -o flag-}
      return fn
 
------------------------------------------------------------------------------
---			Compile
------------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
+-- Compile
 
 -- Compile a single module, under the control of the compilation manager.
 --
@@ -124,7 +122,6 @@ compile ghci_mode this_mod location
 
    dyn_flags <- restoreDynFlags		-- Restore to the state of the last save
 
-
    showPass dyn_flags 
 	(showSDoc (text "Compiling" <+> ppr this_mod))
 
@@ -166,20 +163,6 @@ compile ghci_mode this_mod location
 				hscStubCOutName = basename ++ "_stub.c",
 				hscStubHOutName = basename ++ "_stub.h",
 				extCoreName = basename ++ ".hcr" }
-
-   -- figure out which header files to #include in a generated .hc file
-   c_includes <- getPackageCIncludes
-   cmdline_includes <- dynFlag cmdlineHcIncludes -- -#include options
-
-   let cc_injects = unlines (map mk_include 
-                                 (c_includes ++ reverse cmdline_includes))
-       mk_include h_file = 
-	case h_file of 
-           '"':_{-"-} -> "#include "++h_file
-           '<':_      -> "#include "++h_file
-           _          -> "#include \""++h_file++"\""
-
-   writeIORef v_HCHeader cc_injects
 
    -- -no-recomp should also work with --make
    do_recomp <- readIORef v_Recomp
@@ -251,14 +234,13 @@ compileStub dflags stub_c_exists
 	return (Just stub_o)
 
 
------------------------------------------------------------------------------
---			Link
------------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
+-- Link
 
 link :: GhciMode		-- interactive or batch
      -> DynFlags		-- dynamic flags
      -> Bool			-- attempt linking in batch mode?
-     -> [Linkable]
+     -> HomePackageTable	-- what to link
      -> IO SuccessFlag
 
 -- For the moment, in the batch linker, we don't bother to tell doLink
@@ -268,40 +250,28 @@ link :: GhciMode		-- interactive or batch
 -- exports main, i.e., we have good reason to believe that linking
 -- will succeed.
 
--- There will be (ToDo: are) two lists passed to link.  These
--- correspond to
---
---	1. The list of all linkables in the current home package.  This is
---	   used by the batch linker to link the program, and by the interactive
---	   linker to decide which modules from the previous link it can
---	   throw away.
---	2. The list of modules on which we just called "compile".  This list
---	   is used by the interactive linker to decide which modules need
---	   to be actually linked this time around (or unlinked and re-linked
---	   if the module was recompiled).
+#ifdef GHCI
+link Interactive dflags batch_attempt_linking hpt
+    = do -- Not Linking...(demand linker will do the job)
+	 return Succeeded
+#endif
 
-link mode dflags batch_attempt_linking linkables
-   = do let verb = verbosity dflags
+link Batch dflags batch_attempt_linking hpt
+   | batch_attempt_linking
+   = do 
+	let 
+	    home_mod_infos = moduleEnvElts hpt
+
+	    -- the packages we depend on
+	    pkg_deps  = concatMap (dep_pkgs . mi_deps . hm_iface) home_mod_infos
+
+	    -- the linkables to link
+	    linkables = map hm_linkable home_mod_infos
+
         when (verb >= 3) $ do
 	     hPutStrLn stderr "link: linkables are ..."
              hPutStrLn stderr (showSDoc (vcat (map ppr linkables)))
 
-	res <- link' mode dflags batch_attempt_linking linkables
-
-        when (verb >= 3) (hPutStrLn stderr "link: done")
-
-	return res
-
-#ifdef GHCI
-link' Interactive dflags batch_attempt_linking linkables
-    = do showPass dflags "Not Linking...(demand linker will do the job)"
-	 -- linkModules dflags linkables
-	 return Succeeded
-#endif
-
-link' Batch dflags batch_attempt_linking linkables
-   | batch_attempt_linking
-   = do 
 	-- check for the -no-link flag
 	omit_linking <- readIORef v_NoLink
 	if omit_linking 
@@ -313,8 +283,13 @@ link' Batch dflags batch_attempt_linking linkables
 	when (verb >= 1) $
              hPutStrLn stderr "Linking ..."
 
+	let getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
+	    obj_files = concatMap getOfiles linkables
+
 	-- Don't showPass in Batch mode; doLink will do that for us.
-        staticLink (concatMap getOfiles linkables)
+        staticLink obj_files pkg_deps
+
+        when (verb >= 3) (hPutStrLn stderr "link: done")
 
 	-- staticLink only returns if it succeeds
         return Succeeded
@@ -326,13 +301,12 @@ link' Batch dflags batch_attempt_linking linkables
         return Succeeded
    where
       verb = verbosity dflags
-      getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
+      
 
 
 
------------------------------------------------------------------------------
---			genPipeline: Pipeline construction
------------------------------------------------------------------------------
+-- --------------------------------------------------------------------------
+-- genPipeline: Pipeline construction
 
 -- Herein is all the magic about which phases to run in which order, whether
 -- the intermediate files should be in TMPDIR or in the current directory,
@@ -635,7 +609,8 @@ run_phase Cpp basename suff input_fn output_fn
        	    hs_src_cpp_opts <- readIORef v_Hs_source_cpp_opts
 
 	    cmdline_include_paths <- readIORef v_Include_paths
-	    pkg_include_dirs <- getPackageIncludePath
+
+	    pkg_include_dirs <- getPackageIncludePath []
 	    let include_paths = foldr (\ x xs -> "-I" : x : xs) []
 				  (cmdline_include_paths ++ pkg_include_dirs)
 
@@ -760,20 +735,6 @@ run_phase Hsc basename suff input_fn output_fn
 	paths <- readIORef v_Include_paths
 	writeIORef v_Include_paths (current_dir : paths)
 	
-  -- figure out which header files to #include in a generated .hc file
-	c_includes <- getPackageCIncludes
-	cmdline_includes <- dynFlag cmdlineHcIncludes -- -#include options
-
-	let cc_injects = unlines (map mk_include 
-				 (c_includes ++ reverse cmdline_includes))
-	    mk_include h_file = 
-		case h_file of 
-		   '"':_{-"-} -> "#include "++h_file
-		   '<':_      -> "#include "++h_file
-		   _          -> "#include \""++h_file++"\""
-
-	writeIORef v_HCHeader cc_injects
-
   -- gather the imports and module name
         (srcimps,imps,mod_name) <- 
             if extcoreish_suffix suff
@@ -877,10 +838,13 @@ run_phase cc_phase basename suff input_fn output_fn
 
         let hcc = cc_phase == HCc
 
-		-- add package include paths even if we're just compiling
-		-- .c files; this is the Value Add(TM) that using
-		-- ghc instead of gcc gives you :)
-        pkg_include_dirs <- getPackageIncludePath
+	-- HC files have the dependent packages stamped into them
+	pkgs <- if hcc then getHCFilePackages input_fn else return []
+
+	-- add package include paths even if we're just compiling .c
+	-- files; this is the Value Add(TM) that using ghc instead of
+	-- gcc gives you :)
+        pkg_include_dirs <- getPackageIncludePath pkgs
         let include_paths = foldr (\ x xs -> "-I" : x : xs) []
 			      (cmdline_include_paths ++ pkg_include_dirs)
 
@@ -893,7 +857,7 @@ run_phase cc_phase basename suff input_fn output_fn
 	let opt_flag | o2        = "-O2"
 		     | otherwise = "-O"
 
-	pkg_extra_cc_opts <- getPackageExtraCcOpts
+	pkg_extra_cc_opts <- getPackageExtraCcOpts pkgs
 
 	split_objs <- readIORef v_Split_object_files
 	let split_opt | hcc && split_objs = [ "-DUSE_SPLIT_MARKERS" ]
@@ -1132,38 +1096,66 @@ mk_pvm_wrapper_script pvm_executable pvm_executable_base sysMan = unlines $
 
 checkProcessArgsResult flags basename suff
   = do when (notNull flags) (throwDyn (ProgramError (
-           basename ++ "." ++ suff 
-           ++ ": static flags are not allowed in {-# OPTIONS #-} pragmas:\n\t" 
-           ++ unwords flags)) (ExitFailure 1))
+	  showSDoc (hang (text basename <> text ('.':suff) <> char ':')
+		      4 (text "unknown flags in  {-# OPTIONS #-} pragma:" <+>
+			  hsep (map text flags)))
+	)))
+
+-----------------------------------------------------------------------------
+-- Look for the /* GHC_PACKAGES ... */ comment at the top of a .hc file
+
+getHCFilePackages :: FilePath -> IO [PackageName]
+getHCFilePackages filename =
+  EXCEPTION.bracket (openFile filename ReadMode) hClose $ \h -> do
+    l <- hGetLine h
+    case l of
+      '/':'*':' ':'G':'H':'C':'_':'P':'A':'C':'K':'A':'G':'E':'S':rest ->
+	  return (map mkPackageName (words rest))
+      _other ->
+	  return []
 
 -----------------------------------------------------------------------------
 -- Static linking, of .o files
 
-staticLink :: [String] -> IO ()
-staticLink o_files = do
+-- The list of packages passed to link is the list of packages on
+-- which this program depends, as discovered by the compilation
+-- manager.  It is combined with the list of packages that the user
+-- specifies on the command line with -package flags.  
+--
+-- In one-shot linking mode, we can't discover the package
+-- dependencies (because we haven't actually done any compilation or
+-- read any interface files), so the user must explicitly specify all
+-- the packages.
+
+staticLink :: [FilePath] -> [PackageName] -> IO ()
+staticLink o_files dep_packages = do
     verb       <- getVerbFlag
     static     <- readIORef v_Static
     no_hs_main <- readIORef v_NoHsMain
 
+    -- get the full list of packages to link with, by combining the
+    -- explicit packages with the auto packages and all of their
+    -- dependencies, and eliminating duplicates.
+
     o_file <- readIORef v_Output_file
     let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
 
-    pkg_lib_paths <- getPackageLibraryPath
+    pkg_lib_paths <- getPackageLibraryPath dep_packages
     let pkg_lib_path_opts = map ("-L"++) pkg_lib_paths
 
     lib_paths <- readIORef v_Library_paths
     let lib_path_opts = map ("-L"++) lib_paths
 
-    pkg_link_opts <- getPackageLinkOpts
+    pkg_link_opts <- getPackageLinkOpts dep_packages
 
 #ifdef darwin_TARGET_OS
-    pkg_framework_paths <- getPackageFrameworkPath
+    pkg_framework_paths <- getPackageFrameworkPath dep_packages
     let pkg_framework_path_opts = map ("-F"++) pkg_framework_paths
 
     framework_paths <- readIORef v_Framework_paths
     let framework_path_opts = map ("-F"++) framework_paths
 
-    pkg_frameworks <- getPackageFrameworks
+    pkg_frameworks <- getPackageFrameworks dep_packages
     let pkg_framework_opts = map ("-framework " ++) pkg_frameworks
 
     frameworks <- readIORef v_Cmdline_frameworks
@@ -1229,13 +1221,13 @@ doMkDLL o_files = do
     o_file <- readIORef v_Output_file
     let output_fn = case o_file of { Just s -> s; Nothing -> "HSdll.dll"; }
 
-    pkg_lib_paths <- getPackageLibraryPath
+    pkg_lib_paths <- getPackageLibraryPath []
     let pkg_lib_path_opts = map ("-L"++) pkg_lib_paths
 
     lib_paths <- readIORef v_Library_paths
     let lib_path_opts = map ("-L"++) lib_paths
 
-    pkg_link_opts <- getPackageLinkOpts
+    pkg_link_opts <- getPackageLinkOpts []
 
 	-- probably _stub.o files
     extra_ld_inputs <- readIORef v_Ld_inputs

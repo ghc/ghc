@@ -330,7 +330,7 @@ hscFrontEnd hsc_env pcs_ch location = do {
  	    -- PARSE
  	    -------------------
 	; maybe_parsed <- myParseModule (hsc_dflags hsc_env) 
-                             (expectJust "hscRecomp:hspp" (ml_hspp_file location))
+                             (expectJust "hscFrontEnd:hspp" (ml_hspp_file location))
 
 	; case maybe_parsed of {
       	     Nothing -> return (Left (HscFail pcs_ch));
@@ -344,7 +344,7 @@ hscFrontEnd hsc_env pcs_ch location = do {
 	; case maybe_tc_result of {
       	     Nothing -> return (Left (HscFail pcs_ch));
       	     Just tc_result -> do {
-    
+
  	    -------------------
  	    -- DESUGAR
  	    -------------------
@@ -393,8 +393,7 @@ hscBackEnd dflags cg_info_ref prepd_result
 			  
 	    ------------------  Code output -----------------------
 	    (stub_h_exists, stub_c_exists)
-		     <- codeOutput dflags prepd_result
-				   stg_binds abstractC
+		     <- codeOutput dflags prepd_result abstractC
 			      
 	    return (stub_h_exists, stub_c_exists, Nothing)
 

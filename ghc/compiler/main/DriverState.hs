@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.87 2002/12/17 13:50:29 simonmar Exp $
+-- $Id: DriverState.hs,v 1.88 2002/12/18 16:29:28 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -12,16 +12,13 @@ module DriverState where
 #include "../includes/config.h"
 #include "HsVersions.h"
 
-import SysTools		( getTopDir )
 import ParsePkgConf	( loadPackageConfig )
-import Packages		( PackageConfig(..), PackageConfigMap, 
-			  PackageName, mkPackageName, packageNameString,
-			  packageDependents,
-			  mungePackagePaths, emptyPkgMap, extendPkgMap, lookupPkg,
-			  basePackage, rtsPackage, haskell98Package  )
+import SysTools		( getTopDir )
+import Packages
 import CmdLineOpts
 import DriverPhases
 import DriverUtil
+import UniqFM		( eltsUFM )
 import Util
 import Config
 import Panic
@@ -32,8 +29,8 @@ import EXCEPTION
 import List
 import Char  
 import Monad
-import Maybe     ( fromJust, isJust )
-import Directory ( doesDirectoryExist )
+import Maybe		( fromJust, isJust )
+import Directory	( doesDirectoryExist )
 
 -----------------------------------------------------------------------------
 -- non-configured things
@@ -452,91 +449,102 @@ addToDirList ref path
     splitUp xs = return (split split_marker xs)
 #endif
 
-GLOBAL_VAR(v_HCHeader, "", String)
-
------------------------------------------------------------------------------
--- Packages
-
-------------------------
--- The PackageConfigMap is read in from the configuration file
--- It doesn't change during a run
-GLOBAL_VAR(v_Package_details, emptyPkgMap, PackageConfigMap)
+-- ----------------------------------------------------------------------------
+-- Loading the package config file
 
 readPackageConf :: String -> IO ()
 readPackageConf conf_file = do
   proto_pkg_configs <- loadPackageConfig conf_file
   top_dir 	    <- getTopDir
-  old_pkg_map 	    <- readIORef v_Package_details
-
   let pkg_configs = mungePackagePaths top_dir proto_pkg_configs
-      new_pkg_map = extendPkgMap old_pkg_map pkg_configs
-   
-  writeIORef v_Package_details new_pkg_map
+  extendPackageConfigMap pkg_configs
 
-getPackageConfigMap :: IO PackageConfigMap
-getPackageConfigMap = readIORef v_Package_details
+mungePackagePaths :: String -> [PackageConfig] -> [PackageConfig]
+-- Replace the string "$libdir" at the beginning of a path
+-- with the current libdir (obtained from the -B option).
+mungePackagePaths top_dir ps = map munge_pkg ps
+ where 
+  munge_pkg p = p{ import_dirs  = munge_paths (import_dirs p),
+		   include_dirs = munge_paths (include_dirs p),
+    		   library_dirs = munge_paths (library_dirs p),
+		   framework_dirs = munge_paths (framework_dirs p) }
+
+  munge_paths = map munge_path
+
+  munge_path p 
+	  | Just p' <- my_prefix_match "$libdir" p = top_dir ++ p'
+	  | otherwise				   = p
 
 
-------------------------
--- The package list reflects what was given as command-line options,
--- 	plus their dependent packages.
--- It is maintained in dependency order;
--- 	earlier ones depend on later ones, but not vice versa
-GLOBAL_VAR(v_Packages, initPackageList, [PackageName])
+-- -----------------------------------------------------------------------------
+-- The list of packages requested on the command line
 
-getPackages :: IO [PackageName]
-getPackages = readIORef v_Packages
+-- The package list reflects what packages were given as command-line options,
+-- plus their dependent packages.  It is maintained in dependency order;
+-- earlier packages may depend on later ones, but not vice versa
+GLOBAL_VAR(v_ExplicitPackages, initPackageList, [PackageName])
 
-initPackageList = [haskell98Package,
-		   basePackage,
-		   rtsPackage]
+initPackageList = [rtsPackage]
 
+-- add a package requested from the command-line
 addPackage :: String -> IO ()
-addPackage package
-  = do	{ pkg_details <- getPackageConfigMap
- 	; ps  <- readIORef v_Packages
-	; ps' <- add_package pkg_details ps (mkPackageName package)
+addPackage package = do
+  pkg_details <- getPackageConfigMap
+  ps  <- readIORef v_ExplicitPackages
+  ps' <- add_package pkg_details ps (mkPackageName package)
 		-- Throws an exception if it fails
-	; writeIORef v_Packages ps' }
+  writeIORef v_ExplicitPackages ps'
 
+-- internal helper
 add_package :: PackageConfigMap -> [PackageName]
 	    -> PackageName -> IO [PackageName]
 add_package pkg_details ps p	
   | p `elem` ps	-- Check if we've already added this package
   = return ps
   | Just details <- lookupPkg pkg_details p
-  = do	{	-- Add the package's dependents first
-	  ps' <- foldM	(add_package pkg_details) ps 
-			(packageDependents details)
-	; return (p : ps') }
-
+  -- Add the package's dependents also
+  = do ps' <- foldM (add_package pkg_details) ps (packageDependents details)
+       return (p : ps')
   | otherwise
   = throwDyn (CmdLineError ("unknown package name: " ++ packageNameString p))
 
-getPackageImportPath   :: IO [String]
+
+-- -----------------------------------------------------------------------------
+-- Extracting information from the packages in scope
+
+-- Many of these functions take a list of packages: in those cases,
+-- the list is expected to contain the "dependent packages",
+-- i.e. those packages that were found to be depended on by the
+-- current module/program.  These can be auto or non-auto packages, it
+-- doesn't really matter.  The list is always combined with the list
+-- of explicit (command-line) packages to determine which packages to
+-- use.
+
+getPackageImportPath :: IO [String]
 getPackageImportPath = do
-  ps <- getPackageInfo
+  ps <- getExplicitAndAutoPackageConfigs
+		  -- import dirs are always derived from the 'auto' 
+		  -- packages as well as the explicit ones
   return (nub (filter notNull (concatMap import_dirs ps)))
 
-getPackageIncludePath   :: IO [String]
-getPackageIncludePath = do
-  ps <- getPackageInfo
+getPackageIncludePath :: [PackageName] -> IO [String]
+getPackageIncludePath pkgs = do
+  ps <- getExplicitPackagesAnd pkgs
   return (nub (filter notNull (concatMap include_dirs ps)))
 
 	-- includes are in reverse dependency order (i.e. rts first)
-getPackageCIncludes   :: IO [String]
-getPackageCIncludes = do
-  ps <- getPackageInfo
-  return (reverse (nub (filter notNull (concatMap c_includes ps))))
+getPackageCIncludes :: [PackageConfig] -> IO [String]
+getPackageCIncludes pkg_configs = do
+  return (reverse (nub (filter notNull (concatMap c_includes pkg_configs))))
 
-getPackageLibraryPath  :: IO [String]
-getPackageLibraryPath = do
-  ps <- getPackageInfo
+getPackageLibraryPath :: [PackageName] -> IO [String]
+getPackageLibraryPath pkgs = do 
+  ps <- getExplicitPackagesAnd pkgs
   return (nub (filter notNull (concatMap library_dirs ps)))
 
-getPackageLinkOpts :: IO [String]
-getPackageLinkOpts = do
-  ps <- getPackageInfo
+getPackageLinkOpts :: [PackageName] -> IO [String]
+getPackageLinkOpts pkgs = do
+  ps <- getExplicitPackagesAnd pkgs
   tag <- readIORef v_Build_tag
   static <- readIORef v_Static
   let 
@@ -580,35 +588,42 @@ getPackageLinkOpts = do
 
 getPackageExtraGhcOpts :: IO [String]
 getPackageExtraGhcOpts = do
-  ps <- getPackageInfo
+  ps <- getExplicitAndAutoPackageConfigs
   return (concatMap extra_ghc_opts ps)
 
-getPackageExtraCcOpts  :: IO [String]
-getPackageExtraCcOpts = do
-  ps <- getPackageInfo
+getPackageExtraCcOpts :: [PackageName] -> IO [String]
+getPackageExtraCcOpts pkgs = do
+  ps <- getExplicitPackagesAnd pkgs
   return (concatMap extra_cc_opts ps)
 
 #ifdef darwin_TARGET_OS
-getPackageFrameworkPath  :: IO [String]
+getPackageFrameworkPath  :: [PackageName] -> IO [String]
 getPackageFrameworkPath = do
-  ps <- getPackageInfo
+  ps <- getExplicitPackagesAnd pkgs
   return (nub (filter notNull (concatMap framework_dirs ps)))
 
-getPackageFrameworks  :: IO [String]
-getPackageFrameworks = do
-  ps <- getPackageInfo
+getPackageFrameworks  :: [PackageName] -> IO [String]
+getPackageFrameworks pkgs = do
+  ps <- getExplicitPackagesAnd pkgs
   return (concatMap extra_frameworks ps)
 #endif
 
-getPackageInfo :: IO [PackageConfig]
-getPackageInfo = do ps <- getPackages  
-		    getPackageDetails ps
+-- -----------------------------------------------------------------------------
+-- Package Utils
 
-getPackageDetails :: [PackageName] -> IO [PackageConfig]
-getPackageDetails ps = do
-  pkg_details <- getPackageConfigMap
-  return [ pkg | Just pkg <- map (lookupPkg pkg_details) ps ]
+getExplicitPackagesAnd :: [PackageName] -> IO [PackageConfig]
+getExplicitPackagesAnd pkg_names = do
+  pkg_map <- getPackageConfigMap
+  expl <- readIORef v_ExplicitPackages
+  all_pkgs <- foldM (add_package pkg_map) expl pkg_names
+  getPackageDetails all_pkgs
 
+-- return all packages, including both the auto packages and the explicit ones
+getExplicitAndAutoPackageConfigs :: IO [PackageConfig]
+getExplicitAndAutoPackageConfigs = do
+  pkg_map <- getPackageConfigMap
+  let auto_packages = [ mkPackageName (name p) | p <- eltsUFM pkg_map, auto p ]
+  getExplicitPackagesAnd auto_packages
 
 -----------------------------------------------------------------------------
 -- Ways

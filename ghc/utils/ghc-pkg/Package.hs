@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Package.hs,v 1.5 2002/09/09 12:10:01 simonmar Exp $
+-- $Id: Package.hs,v 1.6 2002/12/18 16:29:34 simonmar Exp $
 --
 -- Package configuration defn.
 -----------------------------------------------------------------------------
@@ -27,6 +27,7 @@ import Pretty
 data PackageConfig
    = Package {
 	name            :: String,
+	auto		:: Bool,
 	import_dirs     :: [String],
 	source_dirs     :: [String],
 	library_dirs    :: [String],
@@ -45,6 +46,7 @@ data PackageConfig
 defaultPackageConfig
    = Package {
 	name = error "defaultPackage",
+	auto = False,
 	import_dirs     = [],
 	source_dirs     = [],
 	library_dirs    = [],
@@ -76,6 +78,7 @@ dumpPkgGuts pkg =
    text "Package" $$ nest 3 (braces (
       sep (punctuate comma [
          text "name = " <> text (show (name pkg)),
+	 text "auto = " <> text (show (auto pkg)),
          dumpField "import_dirs"     (import_dirs     pkg),
          dumpField "source_dirs"     (source_dirs     pkg),
          dumpField "library_dirs"    (library_dirs    pkg),

@@ -48,6 +48,11 @@ field	:: { PackageConfig -> PackageConfig }
 		   "name" -> p{name = $3}
 		   _      -> error "unknown key in config file" }
 			
+        | VARID '=' bool
+		{\p -> case $1 of {
+		   	"auto" -> p{auto = $3};
+		   	_      -> p } }
+
 	| VARID '=' strlist		
 		{\p -> case $1 of
 		        "import_dirs"     -> p{import_dirs     = $3}
@@ -73,6 +78,11 @@ strs	:: { [String] }
 	: STRING			{ [ $1 ] }
 	| strs ',' STRING		{ $3 : $1 }
 
+bool    :: { Bool }
+	: CONID				{% case $1 of {
+					    "True"  -> True;
+					    "False" -> False;
+					    _       -> error ("unknown constructor in config file: " ++ $1) } }
 {
 data Token =
 	ITocurly

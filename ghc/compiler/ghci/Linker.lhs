@@ -30,8 +30,7 @@ import ByteCodeItbls	( ItblEnv )
 import ByteCodeAsm	( CompiledByteCode(..), bcoFreeNames, UnlinkedBCO(..))
 
 import Packages
-import DriverState	( v_Library_paths, v_Opt_l, getPackageConfigMap,
-			  getStaticOpts )
+import DriverState	( v_Library_paths, v_Opt_l, getStaticOpts )
 import Finder		( findModule, findLinkable )
 import HscTypes
 import Name		( Name,  nameModule, isExternalName )
@@ -224,8 +223,8 @@ getLinkDeps hpt pit mods
 	} ;
 	
 	-- 3.  For each dependent module, find its linkable
-	--     This will either be in the HPT or (in the case of one-shot compilation)
-	--     we may need to use maybe_getFileLinkable
+	--     This will either be in the HPT or (in the case of one-shot
+	--     compilation) we may need to use maybe_getFileLinkable
 	lnks_needed <- mapM get_linkable mods_needed ;
 
 	return (lnks_needed, pkgs_needed) }

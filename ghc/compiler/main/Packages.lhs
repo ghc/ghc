@@ -7,36 +7,33 @@
 module Packages (
 	PackageConfig(..), 
 	defaultPackageConfig,
-	mungePackagePaths, packageDependents, 
+	packageDependents, 
 	showPackages,
 
 	PackageName,		-- Instance of Outputable
 	mkPackageName, packageNameString,
-	basePackage, rtsPackage, haskell98Package, thPackage,	-- :: PackageName
+	basePackage, rtsPackage, haskell98Package, thPackage, -- :: PackageName
 
-	PackageConfigMap, emptyPkgMap, extendPkgMap, lookupPkg
+	PackageConfigMap, emptyPkgMap, lookupPkg,
+	extendPackageConfigMap, getPackageDetails, getPackageConfigMap,
     )
 where
 
 #include "HsVersions.h"
 
-import Pretty
-
 import CmdLineOpts	( dynFlag, verbosity )
-import DriverUtil	( my_prefix_match )
 import ErrUtils		( dumpIfSet )
 import Outputable	( docToSDoc )
 import FastString
 import UniqFM
-\end{code}
+import Util
+import Pretty
 
-%*********************************************************
-%*						 	 *
-\subsection{Basic data types}
-%*							 *
-%*********************************************************
+import DATA_IOREF
 
-\begin{code}
+-- -----------------------------------------------------------------------------
+-- The PackageConfig type
+
 #define WANT_PRETTY
 #define INTERNAL_PRETTY
 -- Yes, do generate pretty-printing stuff for packages, and use our
@@ -44,14 +41,13 @@ import UniqFM
 
 -- There's a blob of code shared with ghc-pkg, 
 -- so we just include it from there 
--- Primarily it defines
---	PackageConfig (a record)
---	PackageName   (FastString)
+-- Primarily it defines	PackageConfig (a record)
 
 #include "../utils/ghc-pkg/Package.hs"
-\end{code}
 
-\begin{code}
+-- -----------------------------------------------------------------------------
+-- Package names
+
 type PackageName = FastString	-- No encoding at all
 
 mkPackageName :: String -> PackageName
@@ -70,14 +66,14 @@ packageDependents :: PackageConfig -> [PackageName]
 -- Impedence matcher, because PackageConfig has Strings 
 -- not PackageNames at the moment.  Sigh.
 packageDependents pkg = map mkPackageName (package_deps pkg)
-\end{code}
 
-A PackageConfigMap maps a PackageName to a PackageConfig
+-- -----------------------------------------------------------------------------
+-- A PackageConfigMap maps a PackageName to a PackageConfig
 
-\begin{code}
 type PackageConfigMap = UniqFM PackageConfig
 
 lookupPkg    :: PackageConfigMap -> PackageName -> Maybe PackageConfig
+
 emptyPkgMap  :: PackageConfigMap
 
 emptyPkgMap  = emptyUFM
@@ -88,40 +84,26 @@ extendPkgMap pkg_map new_pkgs
   = foldl add pkg_map new_pkgs
   where
     add pkg_map p = addToUFM pkg_map (mkFastString (name p)) p
-\end{code}
 
-%*********************************************************
-%*						 	 *
-\subsection{Load the config file}
-%*							 *
-%*********************************************************
+GLOBAL_VAR(v_Package_details, emptyPkgMap, PackageConfigMap)
 
-\begin{code}
-mungePackagePaths :: String -> [PackageConfig] -> [PackageConfig]
--- Replace the string "$libdir" at the beginning of a path
--- with the current libdir (obtained from the -B option).
-mungePackagePaths top_dir ps = map munge_pkg ps
- where 
-  munge_pkg p = p{ import_dirs  = munge_paths (import_dirs p),
-		   include_dirs = munge_paths (include_dirs p),
-    		   library_dirs = munge_paths (library_dirs p),
-		   framework_dirs = munge_paths (framework_dirs p) }
+getPackageConfigMap :: IO PackageConfigMap
+getPackageConfigMap = readIORef v_Package_details
 
-  munge_paths = map munge_path
+extendPackageConfigMap :: [PackageConfig] -> IO ()
+extendPackageConfigMap pkg_configs = do
+  old_pkg_map <- readIORef v_Package_details
+  writeIORef v_Package_details (extendPkgMap old_pkg_map pkg_configs)
 
-  munge_path p 
-	  | Just p' <- my_prefix_match "$libdir" p = top_dir ++ p'
-	  | otherwise				   = p
-\end{code}
+getPackageDetails :: [PackageName] -> IO [PackageConfig]
+getPackageDetails ps = do
+  pkg_details <- getPackageConfigMap
+  return [ pkg | Just pkg <- map (lookupPkg pkg_details) ps ]
 
 
-%*********************************************************
-%*						 	 *
-\subsection{Display results}
-%*							 *
-%*********************************************************
+-- -----------------------------------------------------------------------------
+-- Displaying packages
 
-\begin{code}
 showPackages :: PackageConfigMap -> IO ()
 -- Show package info on console, if verbosity is >= 3
 showPackages pkg_map
@@ -131,4 +113,5 @@ showPackages pkg_map
 	}
   where
     ps = eltsUFM pkg_map
+
 \end{code}

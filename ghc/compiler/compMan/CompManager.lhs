@@ -571,7 +571,7 @@ cmLoadModules cmstate1 dflags mg2unsorted
 		    valid_old_linkables
 
         when (verb >= 2) $
-           putStrLn (showSDoc (text "Stable modules:" 
+           hPutStrLn stderr (showSDoc (text "Stable modules:" 
                                <+> sep (map (text.moduleNameUserString) stable_mods)))
 
 	-- Unload any modules which are going to be re-linked this
@@ -646,7 +646,7 @@ cmLoadModules cmstate1 dflags mg2unsorted
 	         hPutStrLn stderr "Warning: output was redirected with -o, but no output will be generated\nbecause there is no Main module."
 
 	      -- link everything together
-              linkresult <- link ghci_mode dflags a_root_is_Main (hptLinkables hpt3)
+              linkresult <- link ghci_mode dflags a_root_is_Main hpt3 
 
 	      cmLoadFinish Succeeded linkresult 
 			   hpt3 modsDone ghci_mode pcs3
@@ -673,7 +673,7 @@ cmLoadModules cmstate1 dflags mg2unsorted
 	      cleanTempFilesExcept verb (ppFilesFromSummaries mods_to_keep)
 
 	      -- Link everything together
-              linkresult <- link ghci_mode dflags False (hptLinkables hpt4)
+              linkresult <- link ghci_mode dflags False hpt4
 
 	      cmLoadFinish Failed linkresult 
 			   hpt4 mods_to_keep ghci_mode pcs3
