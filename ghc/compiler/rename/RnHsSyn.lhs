@@ -10,7 +10,7 @@ module RnHsSyn where
 
 import HsSyn
 import HsCore
-import Class		( FunDep, DefMeth(..) )
+import Class		( FunDep )
 import TysWiredIn	( tupleTyCon, listTyCon, charTyCon )
 import Name		( Name, getName, isTyVarName )
 import NameSet
