@@ -1036,7 +1036,7 @@ all docs runtests boot TAGS clean veryclean maintainer-clean install info ::
 	  echo " in $(shell pwd)/$$i"; \
 	  echo "------------------------------------------------------------------------"; \
 	  $(MAKE) --no-print-directory -C $$i $(MFLAGS) $@; \
-	  if [ $$? -eq 0 ] ;  then true; else exit $$x_on_err; fi; \
+	  if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
 	done
 	@echo "------------------------------------------------------------------------"
 	@echo "===fptools== Finished making \`$@' in $(SUBDIRS) ..."
