@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.96 2001/02/11 17:51:07 simonmar Exp $
+ * $Id: GC.c,v 1.97 2001/03/02 14:28:44 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -3342,7 +3342,10 @@ threadSqueezeStack(StgTSO *tso)
        * sorted out?  oh yes: we aren't counting each enter properly
        * in this case.  See the log somewhere.  KSW 1999-04-21
        */
-      UPD_IND_NOLOCK(updatee_bypass, updatee_keep); /* this wakes the threads up */
+      if (updatee_bypass != updatee_keep) {
+	  /* this wakes the threads up */
+	  UPD_IND_NOLOCK(updatee_bypass, updatee_keep);
+      }
       
       sp = (P_)frame - 1;	/* sp = stuff to slide */
       displacement += sizeofW(StgUpdateFrame);
