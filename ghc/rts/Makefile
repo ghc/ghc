@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.74 2002/08/09 20:59:41 sof Exp $
+# $Id: Makefile,v 1.75 2002/08/09 22:13:51 sof Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -21,9 +21,7 @@ TOP=..
 # set of suffix rules for compiling C code, using $(HC) rather than $(CC)
 # and prepending "-optc" to $(CC_OPTS).  NB. must be done before including
 # boilerplate.mk below.
-ifneq "$(BootingFromHc)" "YES"
-UseGhcForCc = YES
-endif
+UseGhcForCc = $(shell if (test "x$(BootingFromHc)" = "xYES"); then echo YES; else echo NO; fi)
 
 include $(TOP)/mk/boilerplate.mk
 
