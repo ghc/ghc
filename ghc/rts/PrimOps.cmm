@@ -316,6 +316,7 @@ finalizzeWeakzh_fast
   LDV_RECORD_CREATE(w);
 
   f = StgWeak_finalizer(w);
+  StgDeadWeak_link(w) = StgWeak_link(w);
 
   /* return the finalizer */
   if (f == stg_NO_FINALIZER_closure) {
