@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.48 2001/01/16 21:05:51 qrczak Exp $
+-- $Id: DriverPipeline.hs,v 1.49 2001/01/19 15:26:37 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -322,7 +322,7 @@ run_phase Cpp basename suff input_fn output_fn
                           ++ ": static flags are not allowed in {-# OPTIONS #-} pragmas:\n\t" 
                           ++ unwords unhandled_flags)) (ExitFailure 1))
 
-       do_cpp <- readState cpp_flag
+       do_cpp <- dynFlag cppFlag
        if do_cpp
           then do
        	    cpp <- readIORef v_Pgm_P
@@ -525,7 +525,7 @@ run_phase cc_phase _basename _suff input_fn output_fn
 							++ pkg_include_dirs)
 
 	c_includes <- getPackageCIncludes
-	cmdline_includes <- readState cmdline_hc_includes -- -#include options
+	cmdline_includes <- dynFlag cmdlineHcIncludes -- -#include options
 
 	let cc_injects | hcc = unlines (map mk_include 
 					(c_includes ++ reverse cmdline_includes))
@@ -588,7 +588,7 @@ run_phase Mangle _basename _suff input_fn output_fn
        mangler_opts <- getOpts opt_m
        machdep_opts <-
 	 if (prefixMatch "i386" cTARGETPLATFORM)
-	    then do n_regs <- readState stolen_x86_regs
+	    then do n_regs <- dynFlag stolen_x86_regs
 		    return [ show n_regs ]
 	    else return []
        runSomething "Assembly Mangler"
@@ -811,13 +811,11 @@ doMkDLL o_files = do
 preprocess :: FilePath -> IO FilePath
 preprocess filename =
   ASSERT(haskellish_file filename) 
-  do init_driver_state <- readIORef v_InitDriverState
-     writeIORef v_Driver_state init_driver_state
-
+  do init_dyn_flags <- readIORef v_InitDynFlags
+     writeIORef v_DynFlags init_dyn_flags
      pipeline <- genPipeline (StopBefore Hsc) ("preprocess") False 
 			defaultHscLang filename
      runPipeline pipeline filename False{-no linking-} False{-no -o flag-}
-
 
 -----------------------------------------------------------------------------
 -- Compile a single module, under the control of the compilation manager.
@@ -858,8 +856,6 @@ data CompResult
 compile ghci_mode summary source_unchanged old_iface hst hit pcs = do 
    init_dyn_flags <- readIORef v_InitDynFlags
    writeIORef v_DynFlags init_dyn_flags
-   init_driver_state <- readIORef v_InitDriverState
-   writeIORef v_Driver_state init_driver_state
 
    showPass init_dyn_flags 
 	(showSDoc (text "Compiling" <+> ppr (name_of_summary summary)))

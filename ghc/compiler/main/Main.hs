@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.47 2001/01/16 12:41:03 simonmar Exp $
+-- $Id: Main.hs,v 1.48 2001/01/19 15:26:37 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -17,7 +17,6 @@ module Main (main) where
 
 
 #ifdef GHCI
-import Interpreter
 import InteractiveUI
 #endif
 
@@ -34,13 +33,12 @@ import DriverMkDepend
 import DriverUtil
 import Panic
 import DriverPhases	( Phase(..), haskellish_file )
-import CmdLineOpts	( HscLang(..), DynFlags(..), v_Static_hsc_opts )
+import CmdLineOpts
 import TmpFiles
 import Finder		( initFinder )
 import CmStaticInfo
 import Config
 import Util
-
 
 
 import Concurrent
@@ -206,18 +204,17 @@ main =
 			       | otherwise       -> defaultHscLang
 
    writeIORef v_DynFlags 
-	DynFlags{ coreToDo = core_todo,
-		  stgToDo  = stg_todo,
-                  hscLang  = lang,
-		  -- leave out hscOutName for now
-                  hscOutName = panic "Main.main:hscOutName not set",
+	defaultDynFlags{ coreToDo = core_todo,
+		  	 stgToDo  = stg_todo,
+                  	 hscLang  = lang,
+		  	 -- leave out hscOutName for now
+                  	 hscOutName = panic "Main.main:hscOutName not set",
 
-		  verbosity = case mode of
-				DoInteractive -> 1
-				DoMake	      -> 1
-				_other        -> 0,
-
-		  flags = [] }
+		  	 verbosity = case mode of
+					DoInteractive -> 1
+					DoMake	      -> 1
+					_other        -> 0,
+			}
 
 	-- the rest of the arguments are "dynamic"
    srcs <- processArgs dynamic_flags (way_non_static ++ 
@@ -228,12 +225,6 @@ main =
 
     	-- complain about any unknown flags
    mapM unknownFlagErr [ f | f@('-':_) <- srcs ]
-
-	-- save the flag state, because this could be modified by OPTIONS 
-	-- pragmas during the compilation, and we'll need to restore it
-	-- before starting the next compilation.
-   saved_driver_state <- readIORef v_Driver_state
-   writeIORef v_InitDriverState saved_driver_state
 
    verb <- dynFlag verbosity
 
@@ -270,7 +261,6 @@ main =
    if null srcs then throwDyn (UsageError "no input files") else do
 
    let compileFile src = do
-	  writeIORef v_Driver_state saved_driver_state
 	  writeIORef v_DynFlags init_dyn_flags
 
 	  -- We compile in two stages, because the file may have an

@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.39 2001/01/12 11:04:45 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.40 2001/01/19 15:26:37 simonmar Exp $
 --
 -- Driver flags
 --
@@ -310,7 +310,8 @@ static_flags =
 
 -- v_InitDynFlags 
 --	is the "baseline" dynamic flags, initialised from
--- 	the defaults and command line options.
+-- 	the defaults and command line options, and updated by the
+--	':s' command in GHCi.
 --
 -- v_DynFlags
 --	is the dynamic flags for the current compilation.  It is reset
@@ -332,6 +333,19 @@ dynFlag f = do dflags <- readIORef v_DynFlags; return (f dflags)
 
 setDynFlag f   = updDynFlags (\dfs -> dfs{ flags = f : flags dfs })
 unSetDynFlag f = updDynFlags (\dfs -> dfs{ flags = filter (/= f) (flags dfs) })
+
+addOpt_L     a = updDynFlags (\s -> s{opt_L =  a : opt_L s})
+addOpt_P     a = updDynFlags (\s -> s{opt_P =  a : opt_P s})
+addOpt_c     a = updDynFlags (\s -> s{opt_c =  a : opt_c s})
+addOpt_a     a = updDynFlags (\s -> s{opt_a =  a : opt_a s})
+addOpt_m     a = updDynFlags (\s -> s{opt_m =  a : opt_m s})
+
+addCmdlineHCInclude a = 
+   updDynFlags (\s -> s{cmdlineHcIncludes =  a : cmdlineHcIncludes s})
+
+	-- we add to the options from the front, so we need to reverse the list
+getOpts :: (DynFlags -> [a]) -> IO [a]
+getOpts opts = dynFlag opts >>= return . reverse
 
 -- we can only change HscC to HscAsm and vice-versa with dynamic flags 
 -- (-fvia-C and -fasm).
@@ -358,7 +372,7 @@ getVerbFlag = do
 
 dynamic_flags = [
 
-     ( "cpp",		NoArg  (updateState (\s -> s{ cpp_flag = True })) )
+     ( "cpp",		NoArg  (updDynFlags (\s -> s{ cppFlag = True })) )
   ,  ( "#include",	HasArg (addCmdlineHCInclude) )
 
   ,  ( "v",		OptPrefix (setVerbosity) )
@@ -418,9 +432,9 @@ dynamic_flags = [
 
 	------ Machine dependant (-m<blah>) stuff ---------------------------
 
-  ,  ( "monly-2-regs", 	NoArg (updateState (\s -> s{stolen_x86_regs = 2}) ))
-  ,  ( "monly-3-regs", 	NoArg (updateState (\s -> s{stolen_x86_regs = 3}) ))
-  ,  ( "monly-4-regs", 	NoArg (updateState (\s -> s{stolen_x86_regs = 4}) ))
+  ,  ( "monly-2-regs", 	NoArg (updDynFlags (\s -> s{stolen_x86_regs = 2}) ))
+  ,  ( "monly-3-regs", 	NoArg (updDynFlags (\s -> s{stolen_x86_regs = 3}) ))
+  ,  ( "monly-4-regs", 	NoArg (updDynFlags (\s -> s{stolen_x86_regs = 4}) ))
 
         ------ Compiler flags -----------------------------------------------
 
@@ -538,3 +552,53 @@ runSomething phase_name cmd
 	then throwDyn (PhaseFailed phase_name exit_code)
 	else do when (verb >= 3) (hPutStr stderr "\n")
 	        return ()
+
+-----------------------------------------------------------------------------
+-- Via-C compilation stuff
+
+-- flags returned are: ( all C compilations
+--		       , registerised HC compilations
+--		       )
+
+machdepCCOpts 
+   | prefixMatch "alpha"   cTARGETPLATFORM  
+	= return ( ["-static"], [] )
+
+   | prefixMatch "hppa"    cTARGETPLATFORM  
+        -- ___HPUX_SOURCE, not _HPUX_SOURCE, is #defined if -ansi!
+        -- (very nice, but too bad the HP /usr/include files don't agree.)
+	= return ( ["-static", "-D_HPUX_SOURCE"], [] )
+
+   | prefixMatch "m68k"    cTARGETPLATFORM
+      -- -fno-defer-pop : for the .hc files, we want all the pushing/
+      --    popping of args to routines to be explicit; if we let things
+      --    be deferred 'til after an STGJUMP, imminent death is certain!
+      --
+      -- -fomit-frame-pointer : *don't*
+      --     It's better to have a6 completely tied up being a frame pointer
+      --     rather than let GCC pick random things to do with it.
+      --     (If we want to steal a6, then we would try to do things
+      --     as on iX86, where we *do* steal the frame pointer [%ebp].)
+	= return ( [], ["-fno-defer-pop", "-fno-omit-frame-pointer"] )
+
+   | prefixMatch "i386"    cTARGETPLATFORM  
+      -- -fno-defer-pop : basically the same game as for m68k
+      --
+      -- -fomit-frame-pointer : *must* in .hc files; because we're stealing
+      --   the fp (%ebp) for our register maps.
+	= do n_regs <- dynFlag stolen_x86_regs
+	     sta    <- readIORef v_Static
+	     return ( [ if sta then "-DDONT_WANT_WIN32_DLL_SUPPORT" else "",
+                        if suffixMatch "mingw32" cTARGETPLATFORM then "-mno-cygwin" else "" ],
+		      [ "-fno-defer-pop", "-fomit-frame-pointer",
+	                "-DSTOLEN_X86_REGS="++show n_regs ]
+		    )
+
+   | prefixMatch "mips"    cTARGETPLATFORM
+	= return ( ["static"], [] )
+
+   | prefixMatch "powerpc" cTARGETPLATFORM || prefixMatch "rs6000" cTARGETPLATFORM
+	= return ( ["static"], ["-finhibit-size-directive"] )
+
+   | otherwise
+	= return ( [], [] )

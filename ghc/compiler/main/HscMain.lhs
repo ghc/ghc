@@ -342,8 +342,7 @@ restOfCodeGeneration dflags toInterp this_mod imported_module_names
 
       --------------------------  Code output -------------------------------
       (maybe_stub_h_name, maybe_stub_c_name)
-         <- _scc_ "CodeOutput"
-	     codeOutput dflags this_mod local_tycons
+         <- codeOutput dflags this_mod local_tycons
                        tidy_binds stg_binds
                        c_code h_code abstractC
 

@@ -281,18 +281,40 @@ data DynFlag
    deriving (Eq)
 
 data DynFlags = DynFlags {
-  coreToDo   :: [CoreToDo],
-  stgToDo    :: [StgToDo],
-  hscLang    :: HscLang,
-  hscOutName :: String,  -- name of the file in which to place output
-  verbosity  :: Int,	 -- verbosity level
-  flags      :: [DynFlag]
+  coreToDo   		:: [CoreToDo],
+  stgToDo    		:: [StgToDo],
+  hscLang    		:: HscLang,
+  hscOutName 		:: String,  	-- name of the output file
+  verbosity  		:: Int,	 	-- verbosity level
+  cppFlag    		:: Bool,	-- preprocess with cpp?
+  stolen_x86_regs	:: Int,		
+  cmdlineHcIncludes	:: [String],	-- -#includes
+
+  -- options for particular phases
+  opt_L			:: [String],
+  opt_P			:: [String],
+  opt_c			:: [String],
+  opt_a			:: [String],
+  opt_m			:: [String],
+
+  -- hsc dynamic flags
+  flags      		:: [DynFlag]
  }
 
 defaultDynFlags = DynFlags {
   coreToDo = [], stgToDo = [], 
-  hscLang = HscC, hscOutName = "", 
-  verbosity = 0, flags = []
+  hscLang = HscC, 
+  hscOutName = "", 
+  verbosity = 0, 
+  cppFlag		= False,
+  stolen_x86_regs	= 4,
+  cmdlineHcIncludes	= [],
+  opt_L			= [],
+  opt_P			= [],
+  opt_c			= [],
+  opt_a			= [],
+  opt_m			= [],
+  flags = []
   }
 
 {- 

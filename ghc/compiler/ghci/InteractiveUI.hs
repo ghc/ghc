@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.29 2001/01/18 16:30:00 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.30 2001/01/19 15:26:37 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -351,12 +351,16 @@ setOptions str
        mapM setOpt plus_opts
 
        -- now, the GHC flags
-       io (do leftovers <- processArgs static_flags minus_opts []
+       io (do -- first, static flags
+	      leftovers <- processArgs static_flags minus_opts []
+
+	      -- then, dynamic flags
 	      dyn_flags <- readIORef v_InitDynFlags
 	      writeIORef v_DynFlags dyn_flags
 	      leftovers <- processArgs dynamic_flags leftovers []
 	      dyn_flags <- readIORef v_DynFlags
 	      writeIORef v_InitDynFlags dyn_flags
+
               if (not (null leftovers))
 		 then throwDyn (OtherError ("unrecognised flags: " ++ 
 						unwords leftovers))
