@@ -52,7 +52,9 @@ void nh_write ( FILE* f, int c )
 {
    errno = 0;
    fputc(c,f);
-   fflush(f);
+   if (f==stderr) { fflush(f); } 
+   else if (f==stdin && isspace(c)) { fflush(f); };
+
 }
 
 int nh_read ( FILE* f )
@@ -69,7 +71,6 @@ int nh_errno ( void )
 int nh_malloc ( int n )
 {
    char* p = malloc(n);
-   assert(p);
    return (int)p;
 }
 

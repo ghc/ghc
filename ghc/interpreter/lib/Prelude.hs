@@ -1612,13 +1612,12 @@ catch m k
        e2ioe other        = IOError (show other)
 
 putChar :: Char -> IO ()
-putChar c = nh_stdout >>= \h -> nh_write h (primCharToInt c)
+putChar c = nh_stdout >>= \h -> nh_write h c
 
 putStr :: String -> IO ()
-putStr s = --mapM_ putChar s -- correct, but slow
-           nh_stdout >>= \h -> 
-           let loop []     = return ()
-               loop (c:cs) = nh_write h (primCharToInt c) >> loop cs
+putStr s = nh_stdout >>= \h -> 
+           let loop []     = nh_flush h
+               loop (c:cs) = nh_write h c >> loop cs
            in  loop s
 
 putStrLn :: String -> IO ()
@@ -1652,7 +1651,7 @@ readFile fname
      nh_open ptr 0                 >>= \h ->
      nh_free ptr                   >>
      nh_errno                      >>= \errno ->
-     if   (h == 0 || errno /= 0)
+     if   (isNullAddr h || errno /= 0)
      then (ioError.IOError) ("readFile: can't open file " ++ fname)
      else readfromhandle h
 
@@ -1662,7 +1661,7 @@ writeFile fname contents
      nh_open ptr 1                 >>= \h ->
      nh_free ptr                   >>
      nh_errno                      >>= \errno ->
-     if   (h == 0 || errno /= 0)
+     if   (isNullAddr h || errno /= 0)
      then (ioError.IOError) ("writeFile: can't create file " ++ fname)
      else writetohandle fname h contents
 
@@ -1672,7 +1671,7 @@ appendFile fname contents
      nh_open ptr 2                 >>= \h ->
      nh_free ptr                   >>
      nh_errno                      >>= \errno ->
-     if   (h == 0 || errno /= 0)
+     if   (isNullAddr h || errno /= 0)
      then (ioError.IOError) ("appendFile: can't open file " ++ fname)
      else writetohandle fname h contents
 
@@ -1703,12 +1702,12 @@ instance Show Exception where
 
 data IOResult  = IOResult  deriving (Show)
 
-type FILE_STAR = Int   -- FILE *
+type FILE_STAR = Addr   -- FILE *
 
 foreign import "nHandle" "nh_stdin"  nh_stdin  :: IO FILE_STAR
 foreign import "nHandle" "nh_stdout" nh_stdout :: IO FILE_STAR
 foreign import "nHandle" "nh_stderr" nh_stderr :: IO FILE_STAR
-foreign import "nHandle" "nh_write"  nh_write  :: FILE_STAR -> Int -> IO ()
+foreign import "nHandle" "nh_write"  nh_write  :: FILE_STAR -> Char -> IO ()
 foreign import "nHandle" "nh_read"   nh_read   :: FILE_STAR -> IO Int
 foreign import "nHandle" "nh_open"   nh_open   :: Addr -> Int -> IO FILE_STAR
 foreign import "nHandle" "nh_flush"  nh_flush  :: FILE_STAR -> IO ()
@@ -1717,18 +1716,15 @@ foreign import "nHandle" "nh_errno"  nh_errno  :: IO Int
 
 foreign import "nHandle" "nh_malloc" nh_malloc :: Int -> IO Addr
 foreign import "nHandle" "nh_free"   nh_free   :: Addr -> IO ()
-foreign import "nHandle" "nh_store"  nh_store  :: Addr -> Int -> IO ()
-foreign import "nHandle" "nh_load"   nh_load   :: Addr -> IO Int
-
---foreign import "nHandle" "nh_argc"   nh_argc   :: IO Int
---foreign import "nHandle" "nh_argvb"  nh_argvb  :: Int -> Int -> IO Int
+foreign import "nHandle" "nh_store"  nh_store  :: Addr -> Char -> IO ()
+foreign import "nHandle" "nh_load"   nh_load   :: Addr -> IO Char
 foreign import "nHandle" "nh_getenv" nh_getenv :: Addr -> IO Addr
 
 copy_String_to_cstring :: String -> IO Addr
 copy_String_to_cstring s
    = nh_malloc (1 + length s) >>= \ptr0 -> 
-     let loop ptr []     = nh_store ptr 0 >> return ptr0
-         loop ptr (c:cs) = nh_store ptr (primCharToInt c) >> loop (incAddr ptr) cs
+     let loop ptr []     = nh_store ptr (chr 0) >> return ptr0
+         loop ptr (c:cs) = nh_store ptr c       >> loop (incAddr ptr) cs
      in
          if   isNullAddr ptr0
          then error "copy_String_to_cstring: malloc failed"
@@ -1737,10 +1733,10 @@ copy_String_to_cstring s
 copy_cstring_to_String :: Addr -> IO String
 copy_cstring_to_String ptr
    = nh_load ptr >>= \ci ->
-     if   ci == 0 
+     if   ci == '\0' 
      then return []
      else copy_cstring_to_String (incAddr ptr) >>= \cs -> 
-          return ((primIntToChar ci) : cs)
+          return (ci : cs)
 
 readfromhandle :: FILE_STAR -> IO String
 readfromhandle h
@@ -1758,8 +1754,7 @@ writetohandle fname h []
      then return ()
      else error ( "writeFile/appendFile: error closing file " ++ fname)
 writetohandle fname h (c:cs)
-   = nh_write h (primCharToInt c) >> 
-     writetohandle fname h cs
+   = nh_write h c >> writetohandle fname h cs
 
 primGetRawArgs :: IO [String]
 primGetRawArgs
