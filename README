@@ -28,7 +28,6 @@ In addition, the following directories contain project-independent bits:
 Quick start:  the following is *supposed* to work
 
 	$ ./configure
-	$ make boot
 	$ make
 	$ make install
 

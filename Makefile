@@ -282,5 +282,36 @@ DIST_CLEAN_FILES += config.cache config.status
 
 MAINTAINER_CLEAN_FILES += configure
 
+ifeq "$(ProjectsToBuild)" ""
+Projects = $(AllProjects)
+else
+Projects = $(filter $(ProjectsToBuild), $(AllProjects))
+endif
+
+all ::
+	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
+	for i in $(Projects); do \
+	   if [ -d $$i ]; then \
+	      $(MAKE) -C $$i boot all; \
+	      if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
+	      fi; \
+	done
+
+boot ::
+	@echo "Please use \`make all' only from the top-level, or \`make boot' followed"
+	@echo "by \`make all' in an individual project subdirectory (ghc, hslibs etc.)."
+
+install ::
+	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
+	for i in $(filter-out $(ProjectsDontInstall), $(AllProjects)); do \
+	   if [ -d $$i ]; then \
+	      $(MAKE) -C $$i boot all; \
+	      if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
+	      fi; \
+	done
+
+NO_ALL_TARGETS=YES
 include $(TOP)/mk/target.mk
+
+# -----------------------------------------------------------------------------
 

@@ -79,7 +79,14 @@
 
 ifneq "$(SUBDIRS)" ""
 
-all docs runtests boot TAGS clean distclean mostlyclean maintainer-clean install html ps dvi txt::
+# we override the boot & all targets in the top level Makefile
+ifneq "$(NO_ALL_TARGETS)" "YES"
+ALL     = all
+BOOT    = boot
+INSTALL = install
+endif
+
+$(ALL) docs runtests $(BOOT) TAGS clean distclean mostlyclean maintainer-clean $(INSTALL) html ps dvi txt::
 	@echo "------------------------------------------------------------------------"
 	@echo "===fptools== Recursively making \`$@' in $(SUBDIRS) ..."
 	@echo "PWD = $(shell pwd)"

@@ -97,29 +97,24 @@ exeext=@exeext@
 #
 ################################################################################
 
-#
-# What parts to build: An fptools build tree does not have to be built
-# all in one go. By setting the list of ProjectsToBuild in build.mk you can
-# control which projects are built.
-#
-# Caution: the projects are built in the order given here, so if some
-# projects use others you must list them in the correct order.
-#
-# Generally: 	* glafp-utils should be first
-#		* happy next
-#		* ghc next
-#		then it's up to you
-
+# build the libs first if we're bootstrapping from .hc files
 ifeq "$(GhcWithHscBuiltViaC)" "YES"
-# need hslibs/lang first if we're bootstrapping
-ProjectsToBuild   = glafp-utils hslibs ghc
+AllProjects = glafp-utils hslibs ghc green-card happy hdirect hood nofib
 else
-ProjectsToBuild   = glafp-utils ghc hslibs
+AllProjects = glafp-utils ghc hslibs green-card happy hdirect hood nofib
 endif
+
 #
-# Make a distinction between building and installing
+# (OPTIONAL) set ProjectsToBuild to a list of projects to be built.  If this
+# list is empty, then all projects present in the source tree will be built.
 #
-ProjectsToInstall = glafp-utils ghc hslibs
+ProjectsToBuild =
+
+#
+# set ProjectsDontInstall to a list of projects which are normally built but
+# not installed.
+#
+ProjectsDontInstall = glafp-utils nofib
 
 #
 # Should the various project tests directories be built?
