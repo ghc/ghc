@@ -9,6 +9,8 @@ pass when
    $tool contains "ghc"
    && contents("puns.comp.stdout") contains "parse error on input"
 
--- put a pass clause here for NHC
+pass when 
+   $tool contains "nhc"
+   && contents("puns.comp.stdout") contains "Named field puns"
 
 fail when otherwise
