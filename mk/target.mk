@@ -62,6 +62,14 @@
 # Compiler produced files that are targets of the source's imports.
 MKDEPENDHS_OBJ_SUFFICES=o
 
+# HC_OPTS sometimes contains $*, which will expand to nothing in the depend
+# rule below.  So we replace $* with a dummy value for passing to mkdependHS
+# and hope it works.  
+#
+# This crops up with GhcLibHcOpts which ends in '-split_objs -odir $*'
+
+MKDEPENDHS_HC_OPTS = $(patsubst $*,dollar_star,$(HC_OPTS))
+
 depend :: $(MKDEPENDHS_SRCS) $(MKDEPENDC_SRCS)
 	@$(RM) .depend
 	@touch .depend
@@ -72,19 +80,8 @@ ifneq "$(MKDEPENDC_SRCS)" ""
 	$(MKDEPENDC) -f .depend $(MKDEPENDC_OPTS) -- $(CC_OPTS) -- $(MKDEPENDC_SRCS)
 endif
 ifneq "$(MKDEPENDHS_SRCS)" ""
-	@if ( echo $(notdir $(MKDEPENDHS)) | grep ghc >/dev/null 2>&1 ); then \
-	   echo $(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-optdep-o -optdep$(obj)) $(MKDEPENDHS_OPTS) $(HC_OPTS) $(MKDEPENDHS_SRCS) ; \
-	   $(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-optdep-o -optdep$(obj)) $(MKDEPENDHS_OPTS) $(HC_OPTS) $(MKDEPENDHS_SRCS) ; \
-	else \
-	   echo $(MKDEPENDHS) -f .depend $(MKDEPENDHS_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(HC_OPTS) -- $(MKDEPENDHS_SRCS) ; \
-	   $(MKDEPENDHS) -f .depend $(MKDEPENDHS_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(HC_OPTS) -- $(MKDEPENDHS_SRCS) ; \
-	fi
+	$(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-optdep-o -optdep$(obj)) $(MKDEPENDHS_OPTS) $(MKDEPENDHS_HC_OPTS) $(MKDEPENDHS_SRCS)
 endif
-#
-# The above decides whether to invoke the computation of dependencies
-# the ghc-0.xx or the ghc-2.x way by looking for "ghc" in the name of
-# of the `make depend' script. Not bulletproof this.
-#
 
 ##################################################################
 # 			boot
