@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.3 2001/03/27 09:38:26 simonmar Exp $
+# $Id: bootstrap.mk,v 1.4 2001/03/27 09:44:56 simonmar Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -7,8 +7,8 @@
 TOP_SAVED := $(TOP)
 TOP:=$(TOP)/ghc
 
-include $(FPTOOLS_TOP_ABS)/ghc/mk/version.mk
-include $(FPTOOLS_TOP_ABS)/ghc/mk/paths.mk
+include $(TOP)/mk/version.mk
+include $(TOP)/mk/paths.mk
 
 # Reset TOP
 TOP:=$(TOP_SAVED)
@@ -48,15 +48,15 @@ PLATFORM_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 
 HC_BOOT_CC_OPTS = $(PLATFORM_HC_BOOT_CC_OPTS) -D__GLASGOW_HASKELL__=411 $(CC_OPTS)
 
-SRC_CC_OPTS += -I$(FPTOOLS_TOP_ABS)/ghc/includes -I$(FPTOOLS_TOP_ABS)/ghc/lib/std/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/lang/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/posix/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/util/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/text/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/hssource/cbits
+SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR) -I$(GHC_LIB_DIR)/std/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/lang/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/posix/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/util/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/text/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/hssource/cbits
 
 # -----------------------------------------------------------------------------
 # Linking: we have to give all the libraries explicitly.
 
 HC_BOOT_LD_OPTS =				\
-   -L$(FPTOOLS_TOP_ABS)/ghc/rts			\
-   -L$(FPTOOLS_TOP_ABS)/ghc/lib/std		\
-   -L$(FPTOOLS_TOP_ABS)/ghc/lib/std/cbits	\
+   -L$(GHC_RUNTIME_DIR)				\
+   -L$(GHC_LIB_DIR)/std				\
+   -L$(GHC_LIB_DIR)/std/cbits			\
    -L$(FPTOOLS_TOP_ABS)/hslibs/lang		\
    -L$(FPTOOLS_TOP_ABS)/hslibs/lang/cbits	\
    -L$(FPTOOLS_TOP_ABS)/hslibs/concurrent	\
