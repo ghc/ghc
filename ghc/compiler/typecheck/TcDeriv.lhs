@@ -34,7 +34,8 @@ import Id		( dataConArgTys, isNullaryDataCon, mkDictFunId )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool )
 import Name		( isLocallyDefined, getSrcLoc, Provenance, 
-			  Name{--O only-}, Module, NamedThing(..)
+			  Name{--O only-}, Module, NamedThing(..),
+			  OccName, nameOccName
 			)
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
 import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
@@ -228,9 +229,11 @@ tcDeriving modname rn_name_supply inst_decl_infos_in
 			mapRn rn_one method_binds_s		`thenRn` \ dfun_names_w_method_binds ->
 			returnRn (dfun_names_w_method_binds, rn_extra_binds)
 		  )
-	rn_one meth_binds = newDfunName Nothing mkGeneratedSrcLoc	`thenRn` \ dfun_name ->
-			    rnMethodBinds meth_binds			`thenRn` \ rn_meth_binds ->
-			    returnRn (dfun_name, rn_meth_binds)
+	rn_one (cl_nm, tycon_nm, meth_binds) 
+	        = newDfunName cl_nm tycon_nm
+		              Nothing mkGeneratedSrcLoc	        `thenRn` \ dfun_name ->
+		  rnMethodBinds meth_binds			`thenRn` \ rn_meth_binds ->
+		  returnRn (dfun_name, rn_meth_binds)
 
 	really_new_inst_infos = map (gen_inst_info modname)
 			  	    (new_inst_infos `zip` dfun_names_w_method_binds)
@@ -570,24 +573,29 @@ the renamer.  What a great hack!
 
 \begin{code}
 -- Generate the method bindings for the required instance
-gen_bind :: InstInfo -> RdrNameMonoBinds
+-- (paired with class name, as we need that when generating dict
+--  names.)
+gen_bind :: InstInfo -> ({-class-}OccName, {-tyCon-}OccName, RdrNameMonoBinds)
 gen_bind (InstInfo clas _ [ty] _ _ _ _ _ _)
   | not from_here 
-  = EmptyMonoBinds
+  = (clas_nm, tycon_nm, EmptyMonoBinds)
   | otherwise
-  = assoc "gen_inst_info:bad derived class"
-	  [(eqClassKey,	     gen_Eq_binds)
-	  ,(ordClassKey,     gen_Ord_binds)
-	  ,(enumClassKey,    gen_Enum_binds)
-	  ,(evalClassKey,    gen_Eval_binds)
-	  ,(boundedClassKey, gen_Bounded_binds)
-	  ,(showClassKey,    gen_Show_binds)
-	  ,(readClassKey,    gen_Read_binds)
-	  ,(ixClassKey,	     gen_Ix_binds)
-	  ]
-	  (classKey clas) 
-	  tycon
+  = (clas_nm, tycon_nm,
+     assoc "gen_bind:bad derived class"
+	   [(eqClassKey,      gen_Eq_binds)
+	   ,(ordClassKey,     gen_Ord_binds)
+	   ,(enumClassKey,    gen_Enum_binds)
+	   ,(evalClassKey,    gen_Eval_binds)
+	   ,(boundedClassKey, gen_Bounded_binds)
+	   ,(showClassKey,    gen_Show_binds)
+	   ,(readClassKey,    gen_Read_binds)
+	   ,(ixClassKey,      gen_Ix_binds)
+	   ]
+	   (classKey clas) 
+	   tycon)
   where
+      clas_nm     = nameOccName (getName clas)
+      tycon_nm    = nameOccName (getName tycon)
       from_here   = isLocallyDefined tycon
       (tycon,_,_) = splitAlgTyConApp ty	
 	    

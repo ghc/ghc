@@ -40,7 +40,7 @@ import TysWiredIn	( boolTyCon )
 import SrcLoc		( SrcLoc, mkGeneratedSrcLoc )
 import Unique		( Unique )
 import UniqFM		( UniqFM )
-import FiniteMap	( FiniteMap, emptyFM, bagToFM, lookupFM )
+import FiniteMap	( FiniteMap, emptyFM, bagToFM, lookupFM, addToFM )
 import Bag		( Bag, mapBag, emptyBag, isEmptyBag, snocBag )
 import UniqSet
 import UniqSupply
@@ -93,7 +93,7 @@ type SSTRWRef a = SSTRef RealWorld a		-- ToDo: there ought to be a standard defn
 	-- Common part
 data RnDown s = RnDown
 		  SrcLoc
-		  (SSTRef s RnNameSupply)
+		  (SSTRef s (GenRnNameSupply s))
 		  (SSTRef s (Bag WarnMsg, Bag ErrMsg))
 		  (SSTRef s ([Occurrence],[Occurrence]))	-- Occurrences: compulsory and optional resp
 
@@ -138,10 +138,16 @@ type FreeVars	= NameSet
 ===================================================
 
 \begin{code}
-type RnNameSupply = (UniqSupply, Int, FiniteMap (Module,OccName) Name)
+type RnNameSupply = GenRnNameSupply RealWorld
+
+type GenRnNameSupply s
+ = ( UniqSupply
+   , FiniteMap FAST_STRING (SSTRef s Int)
+   , FiniteMap (Module,OccName) Name
+   )
 	-- Ensures that one (m,n) pair gets one unique
-	-- The Int is used to give a number to each instance declaration;
-	-- it's really a separate name supply.
+	-- The finite map on FAST_STRINGS is used to give a per-class unique to each
+	-- instance declaration; it's really a separate name supply.
 
 data RnEnv     	= RnEnv GlobalNameEnv FixityEnv
 emptyRnEnv	= RnEnv emptyNameEnv  emptyFixityEnv
@@ -279,10 +285,10 @@ initRn :: Module -> UniqSupply -> SearchPath -> SrcLoc
 
 initRn mod us dirs loc do_rn
   = sstToIO $
-    newMutVarSST (us, 1, builtins)	`thenSST` \ names_var ->
-    newMutVarSST (emptyBag,emptyBag)	`thenSST` \ errs_var ->
-    newMutVarSST (emptyIfaces mod)	`thenSST` \ iface_var -> 
-    newMutVarSST initOccs		`thenSST` \ occs_var ->
+    newMutVarSST (us, emptyFM, builtins) `thenSST` \ names_var ->
+    newMutVarSST (emptyBag,emptyBag)	 `thenSST` \ errs_var ->
+    newMutVarSST (emptyIfaces mod)	 `thenSST` \ iface_var -> 
+    newMutVarSST initOccs		 `thenSST` \ occs_var ->
     let
 	rn_down = RnDown loc names_var errs_var occs_var
 	g_down  = GDown dirs iface_var
@@ -331,7 +337,7 @@ once you must either split it, or install a fresh unique supply.
 
 \begin{code}
 renameSourceCode :: Module 
-		 -> RnNameSupply 
+		 -> RnNameSupply
 	         -> RnMS RealWorld r
 	         -> r
 
@@ -482,21 +488,34 @@ getSrcLocRn (RnDown loc names_var errs_var occs_var) l_down
 ================  Name supply =====================
 
 \begin{code}
-getNameSupplyRn :: RnM s d RnNameSupply
+getNameSupplyRn :: RnM s d (GenRnNameSupply s)
 getNameSupplyRn (RnDown loc names_var errs_var occs_var) l_down
   = readMutVarSST names_var
 
-setNameSupplyRn :: RnNameSupply -> RnM s d ()
+setNameSupplyRn :: GenRnNameSupply s -> RnM s d ()
 setNameSupplyRn names' (RnDown loc names_var errs_var occs_var) l_down
   = writeMutVarSST names_var names'
 
--- The "instance-decl unique supply", inst, is just an integer that's used to
--- give a unique number for each instance declaration.
-newInstUniq :: RnM s d Int
-newInstUniq (RnDown loc names_var errs_var occs_var) l_down
-  = readMutVarSST names_var				`thenSST` \ (us, inst, cache) ->
-    writeMutVarSST names_var (us, inst+1, cache)	`thenSST_` 
-    returnSST inst
+-- The "instance-decl unique supply", inst, is really a map from class names
+-- to unique supplies. Having per-class unique numbers for instance decls helps
+-- the recompilation checker.
+newInstUniq :: FAST_STRING -> RnM s d Int
+newInstUniq cname (RnDown loc names_var errs_var occs_var) l_down
+  = readMutVarSST names_var				`thenSST` \ (us, mapInst, cache) ->
+    case lookupFM mapInst cname of
+      Just class_us ->
+         readMutVarSST  class_us       `thenSST`  \ v ->
+	 writeMutVarSST class_us (v+1) `thenSST_`
+         returnSST v
+      Nothing -> -- first time caller gets to add a unique supply
+                 -- to the finite map for that class.
+        newMutVarSST 1 `thenSST` \ class_us ->
+	let 
+	  mapInst' = addToFM mapInst cname class_us
+	in
+	writeMutVarSST names_var (us, mapInst', cache)	`thenSST_` 
+        returnSST 0
+
 \end{code}
 
 ================  Occurrences =====================

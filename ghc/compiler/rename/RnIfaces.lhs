@@ -157,22 +157,22 @@ count_decls decls
 \begin{code}
 loadInterface :: SDoc -> Module -> IfaceFlavour -> RnMG Ifaces
 loadInterface doc_str load_mod as_source
-  = getIfacesRn 		`thenRn` \ ifaces ->
-    let
+ = getIfacesRn 		`thenRn` \ ifaces ->
+   let
 	Ifaces this_mod mod_map decls 
 	       all_names imp_names (insts, tycls_names) 
 	       deferred_data_decls inst_mods = ifaces
-    in
+   in
 	-- CHECK WHETHER WE HAVE IT ALREADY
-    case lookupFM mod_map load_mod of {
+   case lookupFM mod_map load_mod of {
 	Just (hif, _, _, _) | hif `as_good_as` as_source
 			    -> 	-- Already in the cache; don't re-read it
 				returnRn ifaces ;
 	other ->
 
 	-- READ THE MODULE IN
-    findAndReadIface doc_str load_mod as_source	`thenRn` \ read_result ->
-    case read_result of {
+   findAndReadIface doc_str load_mod as_source	`thenRn` \ read_result ->
+   case read_result of {
 	-- Check for not found
 	Nothing -> 	-- Not found, so add an empty export env to the Ifaces map
 			-- so that we don't look again
@@ -1003,7 +1003,13 @@ readIface file_path
 	     failWithRn Nothing (cannaeReadFile file_path err)
 \end{code}
 
-mkSearchPath takes a string consisting of a colon-separated list
+%*********************************************************
+%*						 	 *
+\subsection{Utils}
+%*							 *
+%*********************************************************
+
+@mkSearchPath@ takes a string consisting of a colon-separated list
 of directories and corresponding suffixes, and turns it into a list
 of (directory, suffix) pairs.  For example:
 

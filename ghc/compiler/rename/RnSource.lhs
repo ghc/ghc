@@ -27,7 +27,7 @@ import RnMonad
 
 import Name		( Name, OccName(..), occNameString, prefixOccName,
 			  ExportFlag(..), Provenance(..), NameSet,
-			  elemNameSet
+			  elemNameSet, nameOccName, NamedThing(..)
 			)
 import FiniteMap	( lookupFM )
 import Id		( GenId{-instance NamedThing-} )
@@ -240,9 +240,36 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun src_loc))
     checkDupNames meth_doc meth_names 		`thenRn_`
     rnMethodBinds mbinds			`thenRn` \ mbinds' ->
     mapRn rn_uprag uprags			`thenRn` \ new_uprags ->
+   
+    let
+     -- We use the class name and the name of the first
+     -- type constructor the class is applied to.
+     (cl_nm, tycon_nm) = mkDictPrefix inst_ty'
+     
+     mkDictPrefix (MonoDictTy cl tys) = 
+        case tys of
+	  []     -> (c_nm, nilOccName )
+	  (ty:_) -> (c_nm, getInstHeadTy ty)
+	where
+	 c_nm = nameOccName (getName cl)
 
-    newDfunName maybe_dfun src_loc		`thenRn` \ dfun_name ->
-    addOccurrenceName dfun_name			`thenRn_`
+     mkDictPrefix (HsPreForAllTy _ ty) = mkDictPrefix ty
+     mkDictPrefix (HsForAllTy _ _ ty)  = mkDictPrefix ty  -- can this 
+     mkDictPrefix _		       = (nilOccName, nilOccName)
+
+     getInstHeadTy t 
+      = case t of
+          MonoTyVar tv    -> nameOccName (getName tv)
+          MonoTyApp t _   -> getInstHeadTy t
+	  _		  -> nilOccName
+	    -- I cannot see how the rest of HsType constructors
+	    -- can occur, but this isn't really a failure condition,
+	    -- so we return silently.
+
+     nilOccName = (VarOcc _NIL_) -- ToDo: add OccName constructor fun for this.
+    in
+    newDfunName cl_nm tycon_nm maybe_dfun src_loc  `thenRn` \ dfun_name ->
+    addOccurrenceName dfun_name			   `thenRn_`
 			-- The dfun is not optional, because we use its version number
 			-- to identify the version of the instance declaration
 

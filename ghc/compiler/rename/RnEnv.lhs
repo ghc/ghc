@@ -19,7 +19,7 @@ import BasicTypes	( Fixity(..), FixityDirection(..), IfaceFlavour(..) )
 import RnMonad
 import ErrUtils         ( ErrMsg )
 import Name		( Name, OccName(..), Provenance(..), ExportFlag(..), NamedThing(..),
-			  occNameFlavour, getSrcLoc,
+			  occNameFlavour, getSrcLoc, occNameString,
 			  NameSet, emptyNameSet, addListToNameSet, nameSetToList,
 			  mkLocalName, mkGlobalName, modAndOcc,
 			  nameOccName, setNameProvenance, isVarOcc, getNameProvenance,
@@ -35,6 +35,7 @@ import SrcLoc		( SrcLoc, noSrcLoc )
 import Outputable
 import Util		( removeDups )
 import List		( nub )
+import Char	        ( isAlphanum )
 \end{code}
 
 
@@ -136,19 +137,42 @@ newLocallyDefinedGlobalName mod occ rec_exp_fn loc
 -- When renaming derived definitions we are in *interface* mode (because we can trip
 -- over original names), but we still want to make the Dfun locally-defined.
 -- So we can't use whether or not we're in source mode to decide the locally-defined question.
-newDfunName :: Maybe RdrName -> SrcLoc -> RnMS s Name
-newDfunName Nothing src_loc			-- Local instance decls have a "Nothing"
+newDfunName :: OccName -> OccName -> Maybe RdrName -> SrcLoc -> RnMS s Name
+newDfunName _ _ (Just n) src_loc			-- Imported ones have "Just n"
   = getModuleRn		`thenRn` \ mod_name ->
-    newInstUniq		`thenRn` \ inst_uniq ->
+    newImportedGlobalName mod_name (rdrNameOcc n) HiFile {- Correct? -} 
+newDfunName cl_nm tycon_nm Nothing src_loc		-- Local instance decls have a "Nothing"
+  = getModuleRn		`thenRn` \ mod_name ->
+    newInstUniq name	`thenRn` \ inst_uniq ->
     let
-	dfun_occ = VarOcc (_PK_ ("$d" ++ show inst_uniq))
+     dfun_occ = VarOcc (_PK_ ("$d" ++ (_UNPK_ name) ++ show inst_uniq))
     in
     newLocallyDefinedGlobalName mod_name dfun_occ 
 				(\_ -> Exported) src_loc
+   where
+       {-
+	     Dictionary names have the following form
 
-newDfunName (Just n) src_loc			-- Imported ones have "Just n"
-  = getModuleRn		`thenRn` \ mod_name ->
-    newImportedGlobalName mod_name (rdrNameOcc n) HiFile {- Correct? -} 
+	       $d<class><tycon><n>    
+
+	     where "n" is a positive number, and "tycon" is the
+	     name of the type constructor for which a "class"
+	     instance is derived.
+		     
+	     Prefixing dictionary names with their class and instance
+	     types improves the behaviour of the recompilation checker.
+	     (fewer recompilations required should an instance or type
+	      declaration be added to a module.)
+      -}
+     -- We're dropping the modids on purpose.
+     tycon_nm_str    = occNameString tycon_nm
+     cl_nm_str       = occNameString cl_nm
+
+      -- give up on any type constructor that starts with a
+      -- non-alphanumeric char (e.g., [] (,*)
+     name
+      | (_NULL_ tycon_nm_str) || not (isAlphanum (_HEAD_ (tycon_nm_str))) = cl_nm_str
+      | otherwise = cl_nm_str _APPEND_ tycon_nm_str
 
 
 newLocalNames :: [(RdrName,SrcLoc)] -> RnM s d [Name]
