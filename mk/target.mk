@@ -876,12 +876,16 @@ SGML_TEXT = $(SGML_DOC).txt
 
 else # no SGML_DOC
 
+ifeq "$(VSGML_SRCS)" ""
 VSGML_SRCS = $(wildcard *.vsgml)
+endif
 
+ifeq "$(SGML_SRCS)" ""
 ifneq "$(VSGML_SRCS)" ""
 SGML_SRCS  = $(addsuffix .sgml, $(basename $(VSGML_SRCS)))
 else
 SGML_SRCS  = $(wildcard *.sgml)
+endif
 endif
 
 SGML_DVI  = $(addsuffix  .dvi, $(basename $(SGML_SRCS)))
