@@ -45,7 +45,10 @@ clean:
 	rm -f gshow/gshow
 	rm -f gzip/gzip
 	rm -f local-quantors
+	rm -f mega-model/mega-model
 	rm -f newtype
+	rm -f perm
+	rm -f hlist
 	rm -f typecase1
 	rm -f typecase2
 	rm -f paradise/paradise
