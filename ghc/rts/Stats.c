@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.40 2001/11/27 16:35:57 simonmar Exp $
+ * $Id: Stats.c,v 1.41 2001/11/28 14:29:59 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -749,7 +749,9 @@ stat_exit(int alloc)
 	}
 
 	fflush(sf);
-	fclose(sf);
+	if (sf != stderr) {
+	    fclose(sf);
+	}
     }
 }
 
