@@ -8,13 +8,18 @@
 
 module Argv ( argv ) where
 
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 200
 import PreludeGlaST	( indexAddrOffAddr )
+#endif
 
 CHK_Ubiq() -- debugging consistency check
 
-#if __GLASGOW_HASKELL__ >= 200
+#if __GLASGOW_HASKELL__ == 201
 # define ADDR	    GHCbase.Addr
 # define PACK_STR   packCString
+#elif __GLASGOW_HASKELL__ >= 202
+# define ADDR	    GlaExts.Addr
+# define PACK_STR   mkFastCharString
 #else
 # define ADDR	    _Addr
 # define PACK_STR   mkFastCharString
