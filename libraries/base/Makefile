@@ -122,6 +122,16 @@ SRC_HADDOCK_OPTS += -t "Haskell Hierarchical Libraries ($(PACKAGE) package)" \
 
 # -----------------------------------------------------------------------------
 
+GHC/ForeignPtr.o Data/Array/IO/Internals.o Data/Array/Base.o \
+  Data/Generics/Instances.o Data/Complex.o Data/Array.o Data/STRef.o \
+  Data/Dynamic.o Data/Typeable.o Data/PackedString.o System/Mem/Weak.o \
+  System/Mem/StableName.o System/Posix/Types.o Control/Monad/ST.o \
+  Control/Exception.o Foreign/C/Types.o Foreign/ForeignPtr.o: include/Typeable.h
+
+System/Posix/Types.o Foreign/C/Types.o: include/CTypes.h
+
+# -----------------------------------------------------------------------------
+
 include $(TOP)/mk/target.mk
 
 ifeq "$(OBJECT_FILEFORMAT)" "PEi"
