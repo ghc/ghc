@@ -25,9 +25,7 @@ module CompManager (
     cmSetContext,  -- :: CmState -> DynFlags -> [String] -> [String] -> IO CmState
     cmGetContext,  -- :: CmState -> IO ([String],[String])
 
-    cmInfoThing,   -- :: CmState -> DynFlags -> String
-		   --	-> IO (CmState, [(TyThing,Fixity)])
-
+    cmInfoThing,    -- :: CmState -> String -> IO (CmState, [(TyThing,Fixity)])
     cmBrowseModule, -- :: CmState -> IO [TyThing]
 
     CmRunResult(..),
