@@ -1,0 +1,159 @@
+CVS Cheat Sheet for fptools hackers.
+------------------------------------
+
+At Glasgow, we use CVS (Concurrent Version System) to keep track of
+our sources for various software projects.  CVS lets several people
+work on the same software at the same time, allowing changes to be
+checked in incrementally.
+
+The full documentation for CVS is online, in info format (use 'info
+cvs' or run emacs and type C-h i).  A good source of tips is the CVS
+FAQ, in /local/doc/gnu/CVS.FAQ.
+
+This note is supposed to be a set of guidelines for how to use CVS at
+Glasgow, and will probably evolve in time.  The main thing to remember
+is that most mistakes can be undone, but if there's anything you're
+not sure about feel free to bug the local CVS meister (namely Me
+<simonm@dcs.gla.ac.uk>).
+
+The following guidelines should mean we don't step on each other's
+toes too much.  Ok, here's what you do:
+
+* Firstly, identify which areas of the source tree you'll be working
+  on.  The directory structure looks like this:
+
+	fptools/ghc		GHC
+	fptools/hslibs		Haskell Libraries
+	fptools/happy		Happy
+	fptools/haggis		Haggis
+	fptools/green-card	Green Card
+	fptools/nofib		Nofib test suite
+	fptools/common-rts	GHC/Hugs combined run-time system
+
+  For each directory, there's a mailing list: fp-cvs-ghc,
+  fp-cvs-hslibs etc.  Everyone on the mailing list is sent a message
+  automatically by CVS whenever someone checks in a change, this helps
+  to keep track of what's going on when several people are working on
+  related stuff.  Ask the CVS meister to put you on the relevant
+  mailing lists.
+
+* Create a .cvsrc file.  Mine looks like this:
+
+	checkout -P
+	release -d
+	update -P
+	diff -c
+
+  It just gives default flags for some of the CVS commands.  For instance,
+  the -P flag to 'checkout' says prune empty directories, which is
+  normally what you want.
+
+* Check out your sources.  The Approved Way (at least by me) to do
+  this is as follows:
+
+	$ CVSROOT=/local/fp/src/cvsroot
+	$ export CVSROOT
+
+	or, if you're using csh or tcsh:
+		$ setenv CVSROOT=/local/fp/src/cvsroot
+
+	$ cvs checkout fpconfig
+
+  At this point you have a new directory called 'fptools' which contains
+  the basic stuff for the fptools suite - including the configuration
+  files and literate programming tools.
+
+	$ mv fptools <directory>
+
+  You can call the fptools directory whatever you like, CVS won't mind.
+
+	$ cd <directory>
+	$ cvs checkout ghc hslibs happy
+
+  The second command here checks out the relevant modules you want to
+  work on.  For a GHC build, for instance, you need at least ghc and
+  hslibs.
+
+* Build the software, if necessary.  Unless you're just working on
+  documentation, you'll probably want to build the software in order
+  to test any changes you make.  For GHC, instructions can be found
+  in the GHC installation guide, online in info format.
+
+* Make changes.  Preferably small ones first.
+
+* Test them.  You can see exactly what changes you've made by using
+  the 'cvs diff' command.  For example,
+
+	$ cvs diff
+
+  lists all the changes (using the 'diff' command) in and below the
+  current directory.  In emacs, C-c C-v C-= runs 'cvs diff' on the current
+  buffer and shows you the results.
+
+* Before checking in a change, you need to update your source tree:
+
+	$ cd fptools
+	$ cvs update
+
+  This pulls in any changes that other people have made, and merges them 
+  with yours.  If there are any conflicts, CVS will tell you, and you'll 
+  have to resolve them before you can check your changes in.  The 
+  documentation describes what to do in the event of a conflict.
+
+  It's not always necessary to do a full cvs update before checking in
+  a change, since CVS will always tell you if you try to check in a file
+  that someone else has changed.  However, you should still update
+  at regular intervals to avoid making changes that don't work in
+  conjuction with changes that someone else made.  Keeping an eye on
+  what goes by on the mailing list can help here.
+
+* When you're happy that your change isn't going to break anything,
+  check it in.  For a one-file change:
+
+	$ cvs commit <filename>
+
+  CVS will then pop up an editor for you to enter a "commit message",
+  this is just a short description of what your change does, and will
+  be kept in the history of the file.  
+
+  If you're using emacs, simply load up the file into a buffer and type
+  C-x C-q, and emacs will prompt for a commit message and then check in
+  the file for you.
+
+  For a multiple-file change, things are a bit trickier.  There are 
+  several ways to do this, but this is the way I find easiest.  
+  First type the commit message into a temporary file.  Then either
+
+	$ cvs commit -F <commit-message> <file_1> .... <file_n>
+
+  or, if nothing else has changed in this part of the source tree,
+
+	$ cvs commit -F <commit-message> <directory>
+
+  where <directory> is a common parent directory for all your changes, 
+  and <commit-message> is the name of the file containing the commit
+  message.
+
+  Shortly afterwards, you'll get some mail from the relevant mailing
+  list saying which files changed, and giving the commit message.  
+  For a multiple-file change, you should still get only *one* message.
+
+* As a general rule: commit changes in small units, preferably
+  addressing one issue or implementing a single feature.  Provide a 
+  descriptive log message so that the repository records exactly which 
+  changes were required to implement a given feature/fix a bug.  I've 
+  found this *very* useful in the past for finding out when a particular
+  bug was introduced: you can just wind back the CVS tree until
+  the bug disappears.
+
+* Keep the sources at least *buildable* at any given time.  No
+  doubt bugs will creep in, but it's quite easy to ensure that any
+  change made at least leaves the tree in a buildable state.  We do
+  nightly builds of GHC to keep an eye on what things work/don't work
+  each day and how we're doing in relation to previous verions.  This
+  idea is truely wrecked if the compiler won't build in the first place!
+
+Ok, that'll do for now.
+
+Simon Marlow <simonm@dcs.gla.ac.uk>
+
