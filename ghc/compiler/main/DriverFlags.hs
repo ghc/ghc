@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.12 2000/10/27 14:46:37 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.13 2000/10/27 15:11:37 sewardj Exp $
 --
 -- Driver flags
 --
@@ -14,6 +14,7 @@ module DriverFlags where
 import PackageMaintenance
 import DriverState
 import DriverUtil
+import TmpFiles 	( v_TmpDir )
 import CmdLineOpts
 import Config
 import Util

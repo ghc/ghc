@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: TmpFiles.hs,v 1.6 2000/10/27 14:56:00 sewardj Exp $
+-- $Id: TmpFiles.hs,v 1.7 2000/10/27 15:11:37 sewardj Exp $
 --
 -- Temporary file management
 --
@@ -12,7 +12,8 @@ module TmpFiles (
    initTempFileStorage,  -- :: IO ()
    cleanTempFiles,       -- :: IO ()
    newTempName,		 -- :: Suffix -> IO FilePath
-   addFilesToClean	 -- :: [FilePath] -> IO ()
+   addFilesToClean,	 -- :: [FilePath] -> IO ()
+   v_TmpDir
  ) where
 
 -- main
