@@ -258,8 +258,18 @@ arg/result types); unify them with the args/result; and store them for
 later use.
 
 \begin{code}
-tcMonoExpr (HsCCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
-  = 	-- Get the callable and returnable classes.
+tcMonoExpr e0@(HsCCall lbl args may_gc is_casm ignored_fake_result_ty) res_ty
+
+  = getDOptsTc				`thenNF_Tc` \ dflags ->
+
+    checkTc (not (is_casm && dopt_HscLang dflags /= HscC)) 
+        (vcat [text "_casm_ is only supported when compiling via C (-fvia-C).",
+               text "Either compile with -fvia-C, or, better, rewrite your code",
+               text "to use the foreign function interface.  _casm_s are deprecated",
+               text "and support for them may one day disappear."])
+					`thenTc_`
+
+    -- Get the callable and returnable classes.
     tcLookupClass cCallableClassName	`thenNF_Tc` \ cCallableClass ->
     tcLookupClass cReturnableClassName	`thenNF_Tc` \ cReturnableClass ->
     tcLookupTyCon ioTyConName		`thenNF_Tc` \ ioTyCon ->
@@ -293,7 +303,7 @@ tcMonoExpr (HsCCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
 	-- constraints on the argument and result types.
     mapNF_Tc new_arg_dict (zipEqual "tcMonoExpr:CCall" args arg_tys)	`thenNF_Tc` \ ccarg_dicts_s ->
     newDicts result_origin [mkClassPred cReturnableClass [result_ty]]	`thenNF_Tc` \ ccres_dict ->
-    returnTc (HsCCall lbl args' may_gc is_asm io_result_ty,
+    returnTc (HsCCall lbl args' may_gc is_casm io_result_ty,
 	      mkLIE (ccres_dict ++ concat ccarg_dicts_s) `plusLIE` args_lie)
 \end{code}
 
