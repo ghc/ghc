@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.15 2002/07/02 08:41:28 simonmar Exp $
+# $Id: package.mk,v 1.16 2002/07/23 10:12:01 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -145,9 +145,9 @@ HTML_DOC = $(HTML_DIR)/index.html
 ifneq "$(HS_PPS)" ""
 html :: $(HTML_DOC)
 
-$(HTML_DOC) : $(HS_PPS) $(HADDOCK_INPLACE)
+$(HTML_DOC) : $(HS_PPS)
 	@$(INSTALL_DIR) $(HTML_DIR)
-	$(HADDOCK_INPLACE) $(HADDOCK_OPTS) -h -o $(HTML_DIR) $(HS_PPS) \
+	$(HADDOCK) $(HADDOCK_OPTS) -h -o $(HTML_DIR) $(HS_PPS) \
 		--dump-interface=$(PACKAGE).haddock \
 		$(foreach pkg, $(PACKAGE_DEPS), \
 		   --read-interface=../$(pkg),../$(pkg)/$(pkg).haddock)
