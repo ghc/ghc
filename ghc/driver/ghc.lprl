@@ -271,7 +271,6 @@ Warning packages that are controlled by -W and -Wall.  The 'standard'
 warnings that you get all the time are
 	
 	-fwarn-overlapping-patterns
-	-fwarn-incomplete-patterns
 	-fwarn-missing-methods
 
 these are turned off by -Wnot.
