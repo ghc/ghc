@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.4 1999/01/15 17:32:22 simonm Exp $
+ * $Id: PrimOps.hc,v 1.5 1999/01/21 10:31:47 simonm Exp $
  *
  * Primitive functions / data
  *
@@ -196,8 +196,10 @@ const
      stuff_size = BYTES_TO_STGWORDS(n*scale);		\
      size = sizeofW(StgArrWords)+ stuff_size;		\
      p = (StgArrWords *)RET_STGCALL1(P_,allocate,size);	\
+     TICK_ALLOC_PRIM(sizeofW(StgArrWords),stuff_size,0); \
      SET_HDR(p, &MUT_ARR_WORDS_info, CCCS);		\
      p->words = stuff_size;				\
+     TICK_RET_UNBOXED_TUP(1)				\
      RET_P(p);						\
    FE_							\
  }
@@ -222,6 +224,7 @@ FN_(newArrayZh_fast)
 
     size = sizeofW(StgMutArrPtrs) + n;
     arr = (StgMutArrPtrs *)RET_STGCALL1(P_, allocate, size);
+    TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);
 
     SET_HDR(arr,&MUT_ARR_PTRS_info,CCCS);
     arr->ptrs = n;
@@ -232,6 +235,7 @@ FN_(newArrayZh_fast)
 	*p = (W_)init;
     }
 
+    TICK_RET_UNBOXED_TUP(1);
     RET_P(arr);
   FE_
 }
@@ -243,15 +247,15 @@ FN_(newMutVarZh_fast)
   FB_
 
   HP_CHK_GEN(sizeofW(StgMutVar), R1_PTR, newMutVarZh_fast,);
-  TICK_ALLOC_PRIM(sizeofW(StgMutVar),wibble,wibble,wibble)
+  TICK_ALLOC_PRIM(sizeofW(StgHeader)+1,1, 0); /* hack, dependent on rep. */
   CCS_ALLOC(CCCS,sizeofW(StgMutVar));
 
-  mv = stgCast(StgMutVar*,Hp-sizeofW(StgMutVar)+1);
+  mv = (StgMutVar *)(Hp-sizeofW(StgMutVar)+1);
   SET_HDR(mv,&MUT_VAR_info,CCCS);
   mv->var = R1.cl;
 
+  TICK_RET_UNBOXED_TUP(1);
   RET_P(mv);
-
   FE_
 }
 
@@ -269,7 +273,8 @@ FN_(makeForeignObjZh_fast)
   FB_
 
   HP_CHK_GEN(sizeofW(StgForeignObj), NO_PTRS, makeForeignObjZh_fast,);
-  TICK_ALLOC_PRIM(sizeofW(StgForeignObj),wibble,wibble,wibble)
+  TICK_ALLOC_PRIM(sizeofW(StgHeader),
+		  sizeofW(StgForeignObj)-sizeofW(StgHeader), 0);
   CCS_ALLOC(CCCS,sizeofW(StgForeignObj)); /* ccs prof */
 
   result = (StgForeignObj *) (Hp + 1 - sizeofW(StgForeignObj));
@@ -277,6 +282,7 @@ FN_(makeForeignObjZh_fast)
   result->data = R1.p;
 
   /* returns (# s#, ForeignObj# #) */
+  TICK_RET_UNBOXED_TUP(1);
   RET_P(result);
   FE_
 }
@@ -298,7 +304,8 @@ FN_(mkWeakZh_fast)
   FB_
 
   HP_CHK_GEN(sizeofW(StgWeak), R1_PTR|R2_PTR|R3_PTR, mkWeakZh_fast,);
-  TICK_ALLOC_PRIM(sizeofW(StgWeak),wibble,wibble,wibble);
+  TICK_ALLOC_PRIM(sizeofW(StgHeader)+1,  // +1 is for the link field
+		  sizeofW(StgWeak)-sizeofW(StgHeader)-1, 0);
   CCS_ALLOC(CCCS,sizeofW(StgWeak)); /* ccs prof */
 
   w = (StgWeak *) (Hp + 1 - sizeofW(StgWeak));
@@ -312,6 +319,7 @@ FN_(mkWeakZh_fast)
   weak_ptr_list = w;
   IF_DEBUG(weak, fprintf(stderr,"New weak pointer at %p\n",w));
 
+  TICK_RET_UNBOXED_TUP(1);
   RET_P(w);
   FE_
 }
@@ -323,6 +331,7 @@ FN_(deRefWeakZh_fast)
   StgWeak *w;
   FB_
   
+  TICK_RET_UNBOXED_TUP(2);
   w = (StgWeak *)R1.p;
   if (w->header.info == &WEAK_info) {
 	RET_NP(1, w->value);
@@ -347,8 +356,8 @@ FN_(int2IntegerZh_fast)
    FB_
 
    val = R1.i;
-   HP_CHK_GEN(sizeofW(StgArrWords)+1, NO_PTRS, int2IntegerZh_fast,)
-   TICK_ALLOC_PRIM(sizeofW(StgArrWords)+1,wibble,wibble,wibble)
+   HP_CHK_GEN(sizeofW(StgArrWords)+1, NO_PTRS, int2IntegerZh_fast,);
+   TICK_ALLOC_PRIM(sizeofW(StgArrWords),1,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+1); /* ccs prof */
 
    p = stgCast(StgArrWords*,Hp)-1;
@@ -370,6 +379,7 @@ FN_(int2IntegerZh_fast)
 		 data  :: ByteArray# 
 	       #)
    */
+   TICK_RET_UNBOXED_TUP(3);
    RET_NNP(1,s,p);
    FE_
 }
@@ -385,7 +395,7 @@ FN_(word2IntegerZh_fast)
 
    val = R1.w;
    HP_CHK_GEN(sizeofW(StgArrWords)+1, NO_PTRS, word2IntegerZh_fast,)
-   TICK_ALLOC_PRIM(sizeofW(StgArrWords)+1,wibble,wibble,wibble)
+   TICK_ALLOC_PRIM(sizeofW(StgArrWords),1,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+1); /* ccs prof */
 
    p = stgCast(StgArrWords*,Hp)-1;
@@ -403,6 +413,7 @@ FN_(word2IntegerZh_fast)
 		 data  :: ByteArray# 
 	       #)
    */
+  TICK_RET_UNBOXED_TUP(3);
    RET_NNP(1,s,p);
    FE_
 }
@@ -422,6 +433,7 @@ FN_(addr2IntegerZh_fast)
   if (RET_STGCALL3(int, mpz_init_set_str,&result,(str),/*base*/10))
       abort();
 
+  TICK_RET_UNBOXED_TUP(3);
   RET_NNP(result._mp_alloc, result._mp_size, 
 	  result._mp_d - sizeofW(StgArrWords));
   FE_
@@ -453,7 +465,7 @@ FN_(int64ToIntegerZh_fast)
        words_needed = 1;
    }
    HP_CHK_GEN(sizeofW(StgArrWords)+words_needed, NO_PTRS, int64ToIntegerZh_fast,)
-   TICK_ALLOC_PRIM(sizeofW(StgArrWords)+words_needed,wibble,wibble,wibble)
+   TICK_ALLOC_PRIM(sizeofW(StgArrWords),words_needed,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+words_needed); /* ccs prof */
 
    p = stgCast(StgArrWords*,Hp)-1;
@@ -484,6 +496,7 @@ FN_(int64ToIntegerZh_fast)
 		 data  :: ByteArray# 
 	       #)
    */
+   TICK_RET_UNBOXED_TUP(3);
    RET_NNP(a,s,p);
    FE_
 }
@@ -505,7 +518,7 @@ FN_(word64ToIntegerZh_fast)
       words_needed = 1;
    }
    HP_CHK_GEN(sizeofW(StgArrWords)+words_needed, NO_PTRS, word64ToIntegerZh_fast,)
-   TICK_ALLOC_PRIM(sizeofW(StgArrWords)+words_needed,wibble,wibble,wibble)
+   TICK_ALLOC_PRIM(sizeofW(StgArrWords),words_needed,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+words_needed); /* ccs prof */
 
    p = stgCast(StgArrWords*,Hp)-1;
@@ -531,6 +544,7 @@ FN_(word64ToIntegerZh_fast)
 		 data  :: ByteArray# 
 	       #)
    */
+   TICK_RET_UNBOXED_TUP(3);
    RET_NNP(a,s,p);
    FE_
 }
@@ -571,6 +585,7 @@ FN_(name)								\
   /* Perform the operation */						\
   STGCALL3(mp_fun,&result,&arg1,&arg2);					\
 									\
+  TICK_RET_UNBOXED_TUP(3);						\
   RET_NNP(result._mp_alloc, 						\
 	  result._mp_size, 						\
           result._mp_d-sizeofW(StgArrWords));				\
@@ -609,6 +624,7 @@ FN_(name)								\
   /* Perform the operation */						\
   STGCALL4(mp_fun,&result1,&result2,&arg1,&arg2);			\
 									\
+  TICK_RET_UNBOXED_TUP(6);						\
   RET_NNPNNP(result1._mp_alloc,						\
 	     result1._mp_size, 						\
              result1._mp_d-sizeofW(StgArrWords),			\
@@ -639,7 +655,7 @@ FN_(decodeFloatZh_fast)
   arg = F1;
 
   HP_CHK_GEN(sizeof(StgArrWords)+1, NO_PTRS, decodeFloatZh_fast,);
-  TICK_ALLOC_PRIM(sizeofW(StgArrWords)+1,wibble,wibble,wibble)
+  TICK_ALLOC_PRIM(sizeofW(StgArrWords),1,0);
   CCS_ALLOC(CCCS,sizeofW(StgArrWords)+1); /* ccs prof */
 
   /* Be prepared to tell Lennart-coded __decodeFloat	*/
@@ -652,6 +668,7 @@ FN_(decodeFloatZh_fast)
   STGCALL3(__decodeFloat,&mantissa,&exponent,arg);
 
   /* returns: (R1 = Int# (expn), R2 = Int#, R3 = Int#, R4 = ByteArray#) */
+  TICK_RET_UNBOXED_TUP(4);
   RET_NNNP(exponent,mantissa._mp_alloc,mantissa._mp_size,p);
   FE_
 }
@@ -671,7 +688,7 @@ FN_(decodeDoubleZh_fast)
   arg = D1;
 
   HP_CHK_GEN(ARR_SIZE, NO_PTRS, decodeDoubleZh_fast,);
-  TICK_ALLOC_PRIM(ARR_SIZE,wibble,wibble,wibble)
+  TICK_ALLOC_PRIM(sizeof(StgArrWords),DOUBLE_MANTISSA_SIZE,0);
   CCS_ALLOC(CCCS,ARR_SIZE); /* ccs prof */
 
   /* Be prepared to tell Lennart-coded __decodeDouble	*/
@@ -684,6 +701,7 @@ FN_(decodeDoubleZh_fast)
   STGCALL3(__decodeDouble,&mantissa,&exponent,arg);
 
   /* returns: (R1 = Int# (expn), R2 = Int#, R3 = Int#, R4 = ByteArray#) */
+  TICK_RET_UNBOXED_TUP(4);
   RET_NNNP(exponent,mantissa._mp_alloc,mantissa._mp_size,p);
   FE_
 }
@@ -709,8 +727,7 @@ FN_(forkZh_fast)
     context_switch = 1;
   }
   
-  JMP_(*Sp);
-
+  JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
 
@@ -743,7 +760,8 @@ FN_(newMVarZh_fast)
   /* args: none */
 
   HP_CHK_GEN(sizeofW(StgMVar), NO_PTRS, newMVarZh_fast,);
-  TICK_ALLOC_PRIM(sizeofW(StgMVar),wibble,wibble,wibble)
+  TICK_ALLOC_PRIM(sizeofW(StgMutVar)-1, // consider head,tail,link as admin wds
+	 	  1, 0);
   CCS_ALLOC(CCCS,sizeofW(StgMVar)); /* ccs prof */
   
   mvar = (StgMVar *) (Hp - sizeofW(StgMVar) + 1);
@@ -751,15 +769,15 @@ FN_(newMVarZh_fast)
   mvar->head = mvar->tail = (StgTSO *)&END_TSO_QUEUE_closure;
   mvar->value = (StgClosure *)&END_TSO_QUEUE_closure;
 
-  R1.p = (P_)mvar;
-
-  JMP_(ENTRY_CODE(Sp[0]));
+  TICK_RET_UNBOXED_TUP(1);
+  RET_P(mvar);
   FE_
 }
 
 FN_(takeMVarZh_fast)
 {
   StgMVar *mvar;
+  StgClosure *val;
 
   FB_
   /* args: R1 = MVar closure */
@@ -782,10 +800,11 @@ FN_(takeMVarZh_fast)
   }
 
   SET_INFO(mvar,&EMPTY_MVAR_info);
-  R1.cl = mvar->value;
+  val = mvar->value;
   mvar->value = (StgClosure *)&END_TSO_QUEUE_closure;
 
-  JMP_(ENTRY_CODE(Sp[0]));
+  TICK_RET_UNBOXED_TUP(1);
+  RET_P(val);
   FE_
 }
 
@@ -822,7 +841,7 @@ FN_(putMVarZh_fast)
   }
 
   /* ToDo: yield here for better communication performance? */
-  JMP_(ENTRY_CODE(*Sp));
+  JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
 

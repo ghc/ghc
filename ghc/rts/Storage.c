@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.5 1999/01/19 17:06:05 simonm Exp $
+ * $Id: Storage.c,v 1.6 1999/01/21 10:31:51 simonm Exp $
  *
  * Storage manager front end
  *
@@ -248,7 +248,7 @@ allocate(nat n)
   bdescr *bd;
   StgPtr p;
 
-  TICK_ALLOC_PRIM(n,wibble,wibble,wibble)
+  TICK_ALLOC_HEAP(n);
   CCS_ALLOC(CCCS,n);
 
   /* big allocation (>LARGE_OBJECT_THRESHOLD) */

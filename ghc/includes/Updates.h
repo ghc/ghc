@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.5 1999/01/18 15:21:42 simonm Exp $
+ * $Id: Updates.h,v 1.6 1999/01/21 10:31:45 simonm Exp $
  *
  * Definitions related to updates.
  *
@@ -25,7 +25,6 @@
  */
 
 #define UPD_IND(updclosure, heapptr)                            \
-        TICK_UPDATED_SET_UPDATED(updclosure);		        \
         AWAKEN_BQ(updclosure);                                  \
 	updateWithIndirection((StgClosure *)updclosure,         \
 			      (StgClosure *)heapptr);

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.22 1999/01/15 15:57:36 simonm Exp $
+% $Id: CgClosure.lhs,v 1.23 1999/01/21 10:31:55 simonm Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -371,12 +371,15 @@ closureCodeBody binder_info srt closure_info cc all_args body
 
 	fast_entry_code
 	  = profCtrC SLIT("TICK_ENT_FUN_DIRECT") [
-		    CLbl (mkRednCountsLabel name) PtrRep,
+		    mkIntCLit stg_arity		-- total # of args
+
+		{-  CLbl (mkRednCountsLabel name) PtrRep,
 		    CString (_PK_ (showSDoc (ppr name))),
 		    mkIntCLit stg_arity,	-- total # of args
 		    mkIntCLit sp_stk_args,	-- # passed on stk
 		    CString (_PK_ (map (showTypeCategory . idType) all_args)),
 		    CString SLIT(""), CString SLIT("")
+		-}
 
 -- Nuked for now; see comment at end of file
 --		    CString (_PK_ (show_wrapper_name wrapper_maybe)),

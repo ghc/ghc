@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.4 1999/01/13 17:25:44 simonm Exp $
+ * $Id: Schedule.c,v 1.5 1999/01/21 10:31:50 simonm Exp $
  *
  * Scheduler
  *
@@ -92,6 +92,7 @@ createThread(nat stack_size)
   }
 
   tso = (StgTSO *)allocate(stack_size);
+  TICK_ALLOC_TSO(stack_size-sizeofW(StgTSO),0);
   
   initThread(tso, stack_size - TSO_STRUCT_SIZEW);
   return tso;
@@ -192,6 +193,7 @@ void deleteThread(StgTSO *tso)
       int words = (stgCast(StgPtr,su) - stgCast(StgPtr,sp)) - 1;
       nat i;
       StgAP_UPD* ap = stgCast(StgAP_UPD*,allocate(AP_sizeW(words)));
+      TICK_ALLOC_THK(words+1,0);
 
       /* First build an AP_UPD consisting of the stack chunk above the
        * current update frame, with the top word on the stack as the
@@ -245,6 +247,7 @@ void deleteThread(StgTSO *tso)
 	  
 	  /* now build o = FUN(catch,ap,handler) */
 	  o = stgCast(StgClosure*, allocate(sizeofW(StgClosure)+2));
+	  TICK_ALLOC_THK(2,0);
 	  SET_HDR(o,&catch_info,su->header.prof.ccs /* ToDo */);
 	  payloadCPtr(o,0) = stgCast(StgClosure*,ap);
 	  payloadCPtr(o,1) = cf->handler;
@@ -270,6 +273,7 @@ void deleteThread(StgTSO *tso)
 	  
 	  /* now build o = FUN(seq,ap) */
           o = stgCast(StgClosure*, allocate(sizeofW(StgClosure)+1));
+	  TICK_ALLOC_THK(1,0);
 	  SET_HDR(o,&seq_info,su->header.prof.ccs /* ToDo */);
 	  payloadCPtr(o,0) = stgCast(StgClosure*,ap);
 	  
@@ -678,6 +682,7 @@ threadStackOverflow(StgTSO *tso)
   IF_DEBUG(scheduler, fprintf(stderr,"increasing stack size from %d words to %d.\n", tso->stack_size, new_stack_size));
 
   dest = (StgTSO *)allocate(new_tso_size);
+  TICK_ALLOC_TSO(new_tso_size-sizeofW(StgTSO),0);
 
   /* copy the TSO block and the old stack into the new area */
   memcpy(dest,tso,TSO_STRUCT_SIZE);

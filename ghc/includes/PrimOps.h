@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.7 1999/01/19 09:49:55 simonm Exp $
+ * $Id: PrimOps.h,v 1.8 1999/01/21 10:31:42 simonm Exp $
  *
  * Macros for primitive operations in STG-ish C code.
  *
@@ -278,7 +278,7 @@ typedef union {
   arg2._mp_size	= (s2);							\
   arg2._mp_d	= (unsigned long int *) (BYTE_ARR_CTS(d2));		\
 									\
-  (r) = RET_PRIM_STGCALL2(I_,mpz_cmp,&arg1,&arg2);				\
+  (r) = RET_PRIM_STGCALL2(I_,mpz_cmp,&arg1,&arg2);			\
 }
 
 /* A glorious hack: calling mpz_neg would entail allocation and

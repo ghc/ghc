@@ -344,6 +344,7 @@ cgReturnDataCon con amodes all_zero_size_args
 			ASSERT(not (isUnboxedTupleCon con))
 			buildDynCon binder currentCCS con amodes all_zero_size_args
 								`thenFC` \ idinfo ->
+		  	profCtrC SLIT("TICK_RET_NEW") [mkIntCLit (length amodes)] `thenC`
 			idInfoToAmode PtrRep idinfo		`thenFC` \ amode ->
 			performReturn (move_to_reg amode node)  jump_to_join_point
 
@@ -361,6 +362,9 @@ cgReturnDataCon con amodes all_zero_size_args
 		  let (ret_regs, leftovers) = 
 			 assignRegs [] (map getAmodeRep amodes)
 		  in
+		  profCtrC SLIT("TICK_RET_UNBOXED_TUP") 
+				[mkIntCLit (length amodes)] `thenC`
+
 		  doTailCall amodes ret_regs 
 			mkUnboxedTupleReturnCode
 			(length leftovers)  {- fast args arity -}
@@ -385,7 +389,7 @@ cgReturnDataCon con amodes all_zero_size_args
 
 
 			-- RETURN
-		  profCtrC SLIT("TICK_RET_CON") [mkIntCLit (length amodes)] `thenC`
+		  profCtrC SLIT("TICK_RET_NEW") [mkIntCLit (length amodes)] `thenC`
 		  -- could use doTailCall here.
 		  performReturn (move_to_reg amode node) 
 			(mkStaticAlgReturnCode con)

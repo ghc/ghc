@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.2 1998/12/02 13:28:41 simonm Exp $
+ * $Id: RtsStartup.c,v 1.3 1999/01/21 10:31:49 simonm Exp $
  *
  * Main function for a standalone Haskell program.
  *
@@ -14,6 +14,7 @@
 #include "Schedule.h"   /* initScheduler */
 #include "Stats.h"      /* initStats */
 #include "Weak.h"
+#include "Ticky.h"
 
 #if defined(PROFILING)
 # include "ProfRTS.h"
@@ -132,8 +133,7 @@ shutdownHaskell(void)
 #endif
 
 #if defined(TICKY_TICKY)
-  #error FixMe.
-  if (RTSflags.TickyFlags.showTickyStats) PrintTickyInfo();
+  if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
 #endif
 
   /*

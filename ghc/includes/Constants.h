@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.2 1998/12/02 13:21:03 simonm Exp $
+ * $Id: Constants.h,v 1.3 1999/01/21 10:31:41 simonm Exp $
  *
  * Constants
  *
@@ -21,7 +21,7 @@
 #define STD_HDR_SIZE   1
 #define PROF_HDR_SIZE  1
 #define GRAN_HDR_SIZE  1
-#define TICKY_HDR_SIZE 1
+#define TICKY_HDR_SIZE 0
 
 #define ARR_HDR_SIZE   1
 
@@ -33,13 +33,13 @@
   
    NOTE: keep these in line with the real definitions in InfoTables.h
 
-   NOTE: the PROF, GRAN and TICKY values are *wrong*  (ToDo)
+   NOTE: the PROF, and GRAN values are *wrong*  (ToDo)
    -------------------------------------------------------------------------- */
 
 #define STD_ITBL_SIZE   3
 #define PROF_ITBL_SIZE  1
 #define GRAN_ITBL_SIZE  1
-#define TICKY_ITBL_SIZE 1
+#define TICKY_ITBL_SIZE 0
 
 /* -----------------------------------------------------------------------------
    Minimum closure sizes

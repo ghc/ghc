@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.3 1999/01/18 14:37:43 sof Exp $
+ * $Id: Stg.h,v 1.4 1999/01/21 10:31:43 simonm Exp $
  *
  * Top-level include file for everything STG-ish.  
  *
@@ -90,7 +90,7 @@
 #include "StgProf.h"
 #include "PrimOps.h"
 #include "Updates.h"
-#include "Ticky.h"
+#include "StgTicky.h"
 #include "CCall.h"
 
 /* Built-in entry points */
@@ -106,10 +106,27 @@ extern int    prog_argc;
 extern char **environ;
 
 /* Creating and destroying an adjustor thunk.
-   I cannot make myself creating a separate .h file
+   I cannot make myself create a separate .h file
    for these two (sof.)
 */
 extern void* createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr);
 extern void  freeHaskellFunctionPtr(void* ptr);
+
+/* -----------------------------------------------------------------------------
+   Assertions and Debuggery
+   -------------------------------------------------------------------------- */
+
+#ifndef DEBUG
+#define ASSERT(predicate) /* nothing */
+#else
+
+void _stgAssert (char *, unsigned int);
+
+#define ASSERT(predicate)			\
+	if (predicate)				\
+	    /*null*/;				\
+	else					\
+	    _stgAssert(__FILE__, __LINE__)
+#endif /* DEBUG */
 
 #endif /* STG_H */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.3 1999/01/13 17:25:54 simonm Exp $
+ * $Id: Rts.h,v 1.4 1999/01/21 10:31:43 simonm Exp $
  *
  * Top-level include file for the RTS itself
  *
@@ -44,20 +44,6 @@ typedef enum {
 /* -----------------------------------------------------------------------------
    Assertions and Debuggery
    -------------------------------------------------------------------------- */
-
-#ifndef DEBUG
-#define ASSERT(predicate) /* nothing */
-#else
-
-void _stgAssert (char *, unsigned int);
-
-#define ASSERT(predicate)			\
-	if (predicate)				\
-	    /*null*/;				\
-	else					\
-	    _stgAssert(__FILE__, __LINE__)
-
-#endif /* DEBUG */
 
 #ifndef DEBUG
 #define IF_DEBUG(c,s)  doNothing()

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.17 1998/12/18 17:40:53 simonpj Exp $
+% $Id: CgTailCall.lhs,v 1.18 1999/01/21 10:31:57 simonm Exp $
 %
 %********************************************************
 %*							*
@@ -306,6 +306,8 @@ returnUnboxedTuple amodes before_jump
 
     let (ret_regs, leftovers) = assignRegs [] (map getAmodeRep amodes)
     in
+
+    profCtrC SLIT("TICK_RET_UNBOXED_TUP") [mkIntCLit (length amodes)] `thenC`
 
     doTailCall amodes ret_regs
 		mkUnboxedTupleReturnCode

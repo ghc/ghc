@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.2 1998/12/02 13:21:35 simonm Exp $
+ * $Id: StgMacros.h,v 1.3 1999/01/21 10:31:43 simonm Exp $
  *
  * Macros used for writing STG-ish C code.
  *
@@ -156,17 +156,19 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 	if ((Hp += headroom) > HpLim) {				\
 	    EXTFUN(stg_chk_##layout);			 	\
 	    tag_assts						\
-	    (r) = (P_)ret;                                       	\
+	    (r) = (P_)ret;                                     	\
 	    JMP_(stg_chk_##layout);			   	\
-	}
+	}							\
+        TICK_ALLOC_HEAP(headroom);
 
 #define HP_STK_CHK(stk_headroom,hp_headroom,ret,r,layout,tag_assts) \
 	if (Sp - stk_headroom < SpLim || (Hp += hp_headroom) > HpLim) {	\
 	    EXTFUN(stg_chk_##layout);			 	\
 	    tag_assts						\
-	    (r) = (P_)ret;                                       	\
+	    (r) = (P_)ret;	                               	\
 	    JMP_(stg_chk_##layout);			   	\
-	}
+	}							\
+        TICK_ALLOC_HEAP(hp_headroom);
 
 /* -----------------------------------------------------------------------------
    A Heap Check in a case alternative are much simpler: everything is
@@ -195,21 +197,24 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 	    EXTFUN(stg_gc_enter_##ptrs);			\
             tag_assts						\
 	    JMP_(stg_gc_enter_##ptrs);				\
-	}
+	}							\
+        TICK_ALLOC_HEAP(headroom);
 
 #define HP_CHK_SEQ_NP(headroom,ptrs,tag_assts)			\
 	if ((Hp += (headroom)) > HpLim) {			\
 	    EXTFUN(stg_gc_seq_##ptrs);				\
             tag_assts						\
 	    JMP_(stg_gc_seq_##ptrs);				\
-	}
+	}							\
+        TICK_ALLOC_HEAP(headroom);
 
 #define HP_STK_CHK_NP(stk_headroom, hp_headroom, ptrs, tag_assts) \
 	if ((Sp - (stk_headroom)) < SpLim || (Hp += (hp_headroom)) > HpLim) { \
 	    EXTFUN(stg_gc_enter_##ptrs);		 	\
             tag_assts						\
 	    JMP_(stg_gc_enter_##ptrs);			   	\
-	}
+	}							\
+        TICK_ALLOC_HEAP(hp_headroom);
 
 /* Heap checks for branches of a primitive case / unboxed tuple return */
 
@@ -218,7 +223,8 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 	    EXTFUN(lbl);					\
             tag_assts						\
 	    JMP_(lbl);						\
-	}
+	}							\
+        TICK_ALLOC_HEAP(headroom);
 
 #define HP_CHK_NOREGS(headroom,tag_assts) \
     GEN_HP_CHK_ALT(headroom,stg_gc_noregs,tag_assts);
@@ -295,30 +301,32 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 #define R7_PTR	  1<<6
 #define R8_PTR	  1<<7
 
-#define HP_CHK_GEN(headroom,liveness,reentry,tag_assts) \
-   if ((Hp += (headroom)) > HpLim ) {	\
-	EF_(stg_gen_chk);		\
-        tag_assts			\
-	R9.w = (W_)LIVENESS_MASK(liveness); \
-        R10.w = (W_)reentry;		\
-        JMP_(stg_gen_chk);		\
-   }
+#define HP_CHK_GEN(headroom,liveness,reentry,tag_assts)	\
+   if ((Hp += (headroom)) > HpLim ) {			\
+	EF_(stg_gen_chk);				\
+        tag_assts					\
+	R9.w = (W_)LIVENESS_MASK(liveness);		\
+        R10.w = (W_)reentry;				\
+        JMP_(stg_gen_chk);				\
+   }							\
+   TICK_ALLOC_HEAP(headroom);
 
-#define STK_CHK_GEN(headroom,liveness,reentry,tag_assts) \
-   if ((Sp - (headroom)) < SpLim) {	\
-	EF_(stg_gen_chk);		\
-        tag_assts			\
-	R9.w = (W_)LIVENESS_MASK(liveness); \
-        R10.w = (W_)reentry;		\
-        JMP_(stg_gen_chk);		\
-   }
+#define STK_CHK_GEN(headroom,liveness,reentry,tag_assts)	\
+   if ((Sp - (headroom)) < SpLim) {				\
+	EF_(stg_gen_chk);					\
+        tag_assts						\
+	R9.w = (W_)LIVENESS_MASK(liveness);			\
+        R10.w = (W_)reentry;					\
+        JMP_(stg_gen_chk);					\
+   }								\
+   TICK_ALLOC_HEAP(headroom);
 
-#define MAYBE_GC(liveness,reentry)	\
-   if (doYouWantToGC()) {		\
-	EF_(stg_gen_hp);		\
-	R9.w = (W_)LIVENESS_MASK(liveness); \
-        R10.w = (W_)reentry;		\
-        JMP_(stg_gen_hp);		\
+#define MAYBE_GC(liveness,reentry)		\
+   if (doYouWantToGC()) {			\
+	EF_(stg_gen_hp);			\
+	R9.w = (W_)LIVENESS_MASK(liveness);	\
+        R10.w = (W_)reentry;			\
+        JMP_(stg_gen_hp);			\
    }
 
 /* -----------------------------------------------------------------------------

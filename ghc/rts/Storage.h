@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.4 1999/01/18 15:21:40 simonm Exp $
+ * $Id: Storage.h,v 1.5 1999/01/21 10:31:52 simonm Exp $
  *
  * External Storage Manger Interface
  *
@@ -25,6 +25,10 @@ extern void exitStorage(void);
    StgPtr allocate(int n)       Allocates a chunk of contiguous store
    				n words long, returning a pointer to
 				the first word.  Always succeeds.
+				
+				Don't forget to TICK_ALLOC_XXX(...)
+				after calling allocate, for the
+				benefit of the ticky-ticky profiler.
 
    rtsBool doYouWantToGC(void)  Returns True if the storage manager is
    				ready to perform a GC, False otherwise.
@@ -89,12 +93,6 @@ extern StgClosure *MarkRoot(StgClosure *p);
 
 extern void recordMutable(StgMutClosure *p);
 
-#ifdef TICKY_TICKY
-#error updateWithIndirection: maybe permanent indirection?
-# define Ind_info_TO_USE ((AllFlags.doUpdEntryCounts) ? &IND_PERM_info : &IND_info
-)
-#endif
-
 static inline void
 updateWithIndirection(StgClosure *p1, StgClosure *p2) 
 {
@@ -104,11 +102,13 @@ updateWithIndirection(StgClosure *p1, StgClosure *p2)
   if (bd->gen->no == 0) {
     SET_INFO(p1,&IND_info);
     ((StgInd *)p1)->indirectee = p2;
+    TICK_UPD_NEW_IND();
   } else {
     SET_INFO(p1,&IND_OLDGEN_info);
     ((StgIndOldGen *)p1)->indirectee = p2;
     ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_list;
     bd->gen->mut_list = (StgMutClosure *)p1;
+    TICK_UPD_OLD_IND();
   }
 }
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.2 1998/12/02 13:28:41 simonm Exp $
+ * $Id: RtsUtils.c,v 1.3 1999/01/21 10:31:49 simonm Exp $
  *
  * General utility functions used in the RTS.
  *
@@ -11,6 +11,7 @@
 #include "Hooks.h"
 #include "Main.h"
 #include "RtsUtils.h"
+#include "Ticky.h"
 
 #ifdef HAVE_TIME_H
 #include <time.h>
@@ -114,7 +115,7 @@ stackOverflow(nat max_stack_size)
     StackOverflowHook(max_stack_size * sizeof(W_)); /*msg*/
 
 #if defined(TICKY_TICKY)
-    if (RTSflags.TickyFlags.showTickyStats) PrintTickyInfo();
+    if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
 #endif
 
     stg_exit(EXIT_FAILURE);
@@ -128,7 +129,7 @@ heapOverflow(void)
 		  RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE);
 
 #if defined(TICKY_TICKY)
-    if (Rtsflags.TickyFlags.showTickyStats) PrintTickyInfo();
+    if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
 #endif
 
     stg_exit(EXIT_FAILURE);

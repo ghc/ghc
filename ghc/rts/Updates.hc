@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.6 1999/01/15 17:57:11 simonm Exp $
+ * $Id: Updates.hc,v 1.7 1999/01/21 10:31:53 simonm Exp $
  *
  * Code to perform updates.
  *
@@ -273,11 +273,11 @@ EXTFUN(stg_update_PAP)
 	  JMP_(stg_gc_entertop);
 	}
 
-	TICK_ALLOC_UPD_PAP(DYN_HS, NArgWords, 0, PapSize);
+	TICK_ALLOC_UPD_PAP(1/*fun*/ + Words, 0);
 #ifdef PROFILING
 	CCS_ALLOC(CCS_pap, PapSize);
 #endif
-    
+
 	PapClosure = (StgPAP *)(Hp + 1 - PapSize); /* The new PapClosure */
 
 	SET_HDR(PapClosure,&PAP_info,CCS_pap);
@@ -335,7 +335,7 @@ EXTFUN(stg_update_PAP)
       UPD_IND(Updatee,PapClosure);
       
       if (Words != 0) {
-	TICK_UPD_PAP_IN_NEW(NArgWords);
+	TICK_UPD_PAP_IN_NEW(Words+1);
 	
       } else {
 	TICK_UPD_PAP_IN_PLACE();
@@ -418,7 +418,7 @@ STGFUN(AP_UPD_entry)
   PUSH_UPD_FRAME(R1.p, 0);
   Sp -= sizeofW(StgUpdateFrame) + Words;
 
-  TICK_ENT_PAP(ap);  /* ToDo: TICK_ENT_AP_UPD */
+  TICK_ENT_AP_UPD(ap);
 
   /* Enter PAP cost centre -- lexical scoping only */
   ENTER_CCS_PAP_CL(ap);   /* ToDo: ENTER_CC_AP_UPD_CL */
@@ -571,6 +571,7 @@ FN_(catchZh_fast)
     fp -> handler = R2.cl;
     fp -> link = Su;
     Su = (StgUpdateFrame *)fp;
+    TICK_CATCHF_PUSHED();
     TICK_ENT_VIA_NODE();
     JMP_(ENTRY_CODE(*R1.p));         
     

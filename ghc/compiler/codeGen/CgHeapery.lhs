@@ -1,14 +1,14 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.11 1998/12/18 17:40:51 simonpj Exp $
+% $Id: CgHeapery.lhs,v 1.12 1999/01/21 10:31:56 simonm Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
 \begin{code}
 module CgHeapery (
 	fastEntryChecks, altHeapCheck, thunkChecks,
-	allocHeap, allocDynClosure
+	allocDynClosure
 
         -- new functions, basically inserting macro calls into Code -- HWL
         ,fetchAndReschedule, yield
@@ -436,10 +436,8 @@ allocDynClosure closure_info use_cc blame_cc amodes_with_offsets
     in
 	-- SAY WHAT WE ARE ABOUT TO DO
     profCtrC (allocProfilingMsg closure_info)
-			   [mkIntCLit fixedHdrSize,
-			    mkIntCLit (closureGoodStuffSize closure_info),
-			    mkIntCLit slop_size,
-			    mkIntCLit closure_size]	`thenC`
+			   [mkIntCLit (closureGoodStuffSize closure_info),
+			    mkIntCLit slop_size]	`thenC`
 
 	-- GENERATE THE CODE
     absC ( mkAbstractCs (
@@ -467,28 +465,4 @@ cInitHdr closure_info amode cc
   | opt_SccProfilingOn = CInitHdr closure_info amode cc
   | otherwise          = CInitHdr closure_info amode (panic "absent cc")
 	
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Allocate uninitialized heap space}
-%*									*
-%************************************************************************
-
-\begin{code}
-allocHeap :: HeapOffset		-- Size of the space required
-	  -> FCode CAddrMode	-- Addr mode for first word of object
-
-allocHeap space
-  = getVirtAndRealHp				`thenFC` \ (virtHp, realHp) ->
-    let block_start = virtHp + 1
-    in
-    	-- We charge the allocation to "PRIM" (which is probably right)
-    profCtrC SLIT("ALLOC_PRIM2") [mkIntCLit space]	`thenC`
-
-	-- BUMP THE VIRTUAL HEAP POINTER
-    setVirtHp (virtHp + space)	 		`thenC`
-
-	-- RETURN PTR TO START OF OBJECT
-    returnFC (CAddr (hpRel realHp block_start))
 \end{code}

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.6 1999/01/18 15:21:39 simonm Exp $
+ * $Id: StgMiscClosures.hc,v 1.7 1999/01/21 10:31:51 simonm Exp $
  *
  * Entry code for various built-in closure types.
  *
@@ -111,8 +111,6 @@ INFO_TABLE(CAF_ENTERED_info,CAF_ENTERED_entry,2,1,CAF_ENTERED,const,EF_,0,0);
 STGFUN(CAF_ENTERED_entry)
 {
     FB_
-    TICK_ENT_CAF_ENTERED(Node);	/* tick */
-
     R1.p = (P_) ((StgCAF*)R1.p)->value; /* just a fancy indirection */
     TICK_ENT_VIA_NODE();
     JMP_(GET_ENTRY(R1.cl));
@@ -138,6 +136,8 @@ INFO_TABLE(BLACKHOLE_info, BLACKHOLE_entry,0,2,BLACKHOLE,const,EF_,0,0);
 STGFUN(BLACKHOLE_entry)
 {
   FB_
+    TICK_ENT_BH();
+
     /* Change the BLACKHOLE into a BLACKHOLE_BQ */
     ((StgBlockingQueue *)R1.p)->header.info = &BLACKHOLE_BQ_info;
     /* Put ourselves on the blocking queue for this black hole */
@@ -155,6 +155,8 @@ INFO_TABLE(BLACKHOLE_BQ_info, BLACKHOLE_BQ_entry,1,1,BLACKHOLE_BQ,const,EF_,0,0)
 STGFUN(BLACKHOLE_BQ_entry)
 {
   FB_
+    TICK_ENT_BH();
+
     /* Put ourselves on the blocking queue for this black hole */
     CurrentTSO->link = ((StgBlockingQueue *)R1.p)->blocking_queue;
     ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
@@ -169,6 +171,8 @@ INFO_TABLE(CAF_BLACKHOLE_info, CAF_BLACKHOLE_entry,0,2,CAF_BLACKHOLE,const,EF_,0
 STGFUN(CAF_BLACKHOLE_entry)
 {
   FB_
+    TICK_ENT_BH();
+
     /* Change the BLACKHOLE into a BLACKHOLE_BQ */
     ((StgBlockingQueue *)R1.p)->header.info = &BLACKHOLE_BQ_info;
     /* Put ourselves on the blocking queue for this black hole */

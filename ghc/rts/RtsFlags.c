@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.5 1999/01/19 17:06:04 simonm Exp $
+ * $Id: RtsFlags.c,v 1.6 1999/01/21 10:31:48 simonm Exp $
  *
  * Functions for parsing the argument list.
  *
@@ -190,8 +190,6 @@ void initRtsFlagsDefaults(void)
 #ifdef TICKY_TICKY
     RtsFlags.TickyFlags.showTickyStats	= rtsFalse;
     RtsFlags.TickyFlags.tickyFile	= NULL;
-
-    AllFlags.doUpdEntryCounts		= rtsTrue; /*ToDo:move? */
 #endif
 }
 

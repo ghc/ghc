@@ -1,5 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.2 1998/12/02 13:28:30 simonm Exp $
+ * $Id: Main.c,v 1.3 1999/01/21 10:31:47 simonm Exp $
+ *
+ * (c) The GHC Team 1998-1999
  *
  * Main function for a standalone Haskell program.
  *
@@ -7,6 +9,7 @@
 
 #include "Rts.h"
 #include "RtsAPI.h"
+#include "RtsFlags.h"
 #include "Schedule.h"  /* for MainTSO */
 #include "RtsUtils.h"
 
@@ -35,14 +38,18 @@ int main(int argc, char *argv[])
     startupHaskell(argc,argv);
 
 #ifndef PAR
-    MainTSO = createIOThread(BLOCK_SIZE_W,(StgClosure *)&mainIO_closure);
+    MainTSO = createIOThread(stg_max(BLOCK_SIZE_W,
+				     RtsFlags.GcFlags.initialStkSize),
+			     (StgClosure *)&mainIO_closure);
     status = schedule(MainTSO,NULL);
 #else
     if (IAmMainThread == rtsTrue) {
     /*Just to show we're alive */
       fprintf(stderr, "Main Thread Started ...\n");
      
-      MainTSO = createIOThread(BLOCK_SIZE_W,(StgClosure *)&mainIO_closure);
+      MainTSO = createIOThread(stg_max(BLOCK_SIZE_W,
+				       RtsFlags.GcFlags.initialStkSize),
+			       (StgClosure *)&mainIO_closure);
       status = schedule(MainTSO,NULL);
     } else {
       WaitForPEOp(PP_FINISH,SysManTask);
