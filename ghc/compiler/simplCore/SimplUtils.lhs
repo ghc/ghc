@@ -41,7 +41,7 @@ import Type		( Type, seqType,
 			  splitRepFunTys, isStrictType
 			)
 import OccName		( UserFS )
-import TyCon		( tyConDataConsIfAvailable, isDataTyCon )
+import TyCon		( tyConDataConsIfAvailable, isAlgTyCon, isNewTyCon )
 import DataCon		( dataConRepArity, dataConSig, dataConArgTys )
 import Var		( mkSysTyVar, tyVarKind )
 import Util		( lengthExceeds, mapAccumL )
@@ -886,12 +886,14 @@ mkAlts scrut case_bndr alts@((con1,bndrs1,rhs1) : con_alts)
 
 mkAlts scrut case_bndr alts
   | Just (tycon, inst_tys) <- splitTyConApp_maybe (idType case_bndr),
-    isDataTyCon tycon,			-- It's a data type
+    isAlgTyCon tycon,	-- It's a data type, tuple, or unboxed tuples.  
+			-- We aren't expecting any newtypes at this point.
     (alts_no_deflt, Just rhs) <- findDefault alts,
 		-- There is a DEFAULT case
     [missing_con] <- filter is_missing (tyConDataConsIfAvailable tycon)
 		-- There is just one missing constructor!
-  = tick (FillInCaseDefault case_bndr)	`thenSmpl_`
+  = ASSERT( not (isNewTyCon tycon) )
+    tick (FillInCaseDefault case_bndr)	`thenSmpl_`
     getUniquesSmpl 			`thenSmpl` \ tv_uniqs ->
     getUniquesSmpl 			`thenSmpl` \ id_uniqs ->
     let

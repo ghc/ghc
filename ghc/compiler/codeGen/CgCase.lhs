@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.53 2001/09/26 15:11:50 simonpj Exp $
+% $Id: CgCase.lhs,v 1.54 2001/10/11 14:31:45 sewardj Exp $
 %
 %********************************************************
 %*							*
@@ -396,17 +396,22 @@ cgEvalAlts cc_slot bndr srt alts
 		Just spec_tycon = maybe_tycon
     	in
 
-    	-- deal with the unboxed tuple case
+    	-- Deal with the unboxed tuple case
     	if is_alg && isUnboxedTupleTyCon spec_tycon then
-	    case alts of 
-         	[alt] -> let lbl = mkReturnInfoLabel uniq in
-			 cgUnboxedTupleAlt uniq cc_slot True alt
-				`thenFC` \ abs_c ->
-		  	 getSRTInfo srt		 `thenFC` \ srt_info -> 
-		  	 absC (CRetDirect uniq abs_c srt_info
-					liveness_mask) `thenC`
-		  	returnFC (CaseAlts (CLbl lbl RetRep) Nothing)
-	 	_ -> panic "cgEvalAlts: dodgy case of unboxed tuple type"
+		-- By now, the simplifier should have have turned it
+		-- into 	case e of (# a,b #) -> e
+		-- There shouldn't be a 
+		--		case e of DEFAULT -> e
+	    ASSERT2( case (alts, deflt) of { ([_],StgNoDefault) -> True; other -> False },
+		     text "cgEvalAlts: dodgy case of unboxed tuple type" )
+	    let
+		alt = head alts
+         	lbl = mkReturnInfoLabel uniq
+ 	    in
+	    cgUnboxedTupleAlt uniq cc_slot True alt		`thenFC` \ abs_c ->
+	    getSRTInfo srt				 	`thenFC` \ srt_info -> 
+	    absC (CRetDirect uniq abs_c srt_info liveness_mask) `thenC`
+	    returnFC (CaseAlts (CLbl lbl RetRep) Nothing)
 
     	-- normal algebraic (or polymorphic) case alternatives
     	else let
