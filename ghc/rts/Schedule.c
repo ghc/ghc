@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.143 2002/05/11 13:58:18 sof Exp $
+ * $Id: Schedule.c,v 1.144 2002/05/18 05:28:15 ken Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -3746,6 +3746,7 @@ sched_belch(char *s, ...)
 #endif
   vfprintf(stderr, s, ap);
   fprintf(stderr, "\n");
+  va_end(ap);
 }
 
 #endif /* DEBUG */

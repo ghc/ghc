@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.24 2002/02/14 16:55:07 sof Exp $
+ * $Id: RtsUtils.c,v 1.25 2002/05/18 05:28:14 ken Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -49,6 +49,7 @@ void barf(char *s, ...)
   fprintf(stderr, "\n");
   fflush(stderr);
   stg_exit(EXIT_INTERNAL_ERROR);
+  va_end(ap);
 }
 
 void prog_belch(char *s, ...)
@@ -61,6 +62,7 @@ void prog_belch(char *s, ...)
   } 
   vfprintf(stderr, s, ap);
   fprintf(stderr, "\n");
+  va_end(ap);
 }
 
 void belch(char *s, ...)
@@ -70,6 +72,7 @@ void belch(char *s, ...)
   /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
   vfprintf(stderr, s, ap);
   fprintf(stderr, "\n");
+  va_end(ap);
 }
 
 /* result-checking malloc wrappers. */
