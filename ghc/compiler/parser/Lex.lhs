@@ -643,7 +643,7 @@ lexToken cont glaexts buf =
 	    lex_ip cont (incLexeme buf)
     c | is_digit  c -> lex_num cont glaexts 0 buf
       | is_symbol c -> lex_sym cont buf
-      | is_upper  c -> lex_con cont glaexts buf buf
+      | is_upper  c -> lex_con cont glaexts buf
       | is_ident  c -> lex_id  cont glaexts buf
       | otherwise   -> lexError "illegal character" buf
 
@@ -951,31 +951,34 @@ lex_sym cont buf =
 
 
 -- lex_con recursively collects components of a qualified identifer.
--- The argument modbuf is the StringBuffer representing the lexeme
--- identified so far.  The buf argument is an empty StringBuffer pointing
--- to the next character to be examined.
+-- The argument buf is the StringBuffer representing the lexeme
+-- identified so far, where the next character is upper-case.
 
-lex_con cont glaexts modbuf buf =
+lex_con cont glaexts buf =
  -- trace ("con: "{-++unpackFS lexeme-}) $
- case expandWhile# is_ident buf          of { buf1 ->
- case slurp_trailing_hashes buf1 glaexts of { buf' ->
+ let empty_buf = stepOverLexeme buf in
+ case expandWhile# is_ident empty_buf    of { buf1 ->
+ case slurp_trailing_hashes buf1 glaexts of { con_buf ->
 
- case currentChar# buf' of
-     '.'# -> maybe_qualified cont glaexts modbuf' mod_lexeme 
-		(incLexeme buf') just_a_conid
+ let all_buf = mergeLexemes buf con_buf
+     
+     con_lexeme = lexemeToFastString con_buf
+     mod_lexeme = lexemeToFastString (decLexeme buf)
+     all_lexeme = lexemeToFastString all_buf
+
+     just_a_conid
+	| emptyLexeme buf = cont (ITconid con_lexeme)               all_buf
+	| otherwise 	  = cont (ITqconid (mod_lexeme,con_lexeme)) all_buf
+ in
+
+ case currentChar# all_buf of
+     '.'# -> maybe_qualified cont glaexts all_lexeme 
+		(incLexeme all_buf) just_a_conid
      _    -> just_a_conid
-  where 
-    mod_lexeme = lexemeToFastString modbuf'
-    modbuf'    = mergeLexemes modbuf buf'
-
-    just_a_conid
-	| emptyLexeme modbuf = cont (ITconid mod_lexeme) buf'
-	| otherwise 	     = cont (ITqconid (lexemeToFastString modbuf,
-					       lexemeToFastString buf')) buf'
   }}
 
 
-maybe_qualified cont glaexts modbuf mod buf just_a_conid =
+maybe_qualified cont glaexts mod buf just_a_conid =
  -- trace ("qid: "{-++unpackFS lexeme-}) $
  case currentChar# buf of
   '['# -> 	-- Special case for []
@@ -996,14 +999,14 @@ maybe_qualified cont glaexts modbuf mod buf just_a_conid =
 
   '-'# -> case lookAhead# buf 1# of
             '>'# -> cont (ITqconid (mod,SLIT("(->)"))) (setCurrentPos# buf 2#)
-            _    -> lex_id3 cont glaexts modbuf mod buf just_a_conid
+            _    -> lex_id3 cont glaexts mod buf just_a_conid
 
-  _    -> lex_id3 cont glaexts modbuf mod buf just_a_conid
+  _    -> lex_id3 cont glaexts mod buf just_a_conid
 
 
-lex_id3 cont glaexts modbuf mod buf just_a_conid
+lex_id3 cont glaexts mod buf just_a_conid
   | is_upper (currentChar# buf) =
-     lex_con cont glaexts modbuf (stepOverLexeme buf)
+     lex_con cont glaexts buf
 
   | is_symbol (currentChar# buf) =
      let 
