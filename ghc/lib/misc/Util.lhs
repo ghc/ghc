@@ -87,12 +87,9 @@ module Util (
 	, assertPanic
 #endif {- COMPILING_GHC -}
 
-	, unvectorize        
-
     ) where
 
 import List(zipWith4)
-import PackedString ( unpackCStringIO )
 import Addr
 
 infixr 9 `thenCmp`
@@ -811,18 +808,3 @@ assertPanic file line = panic ("ASSERT failed! file "++file++", line "++show lin
 #endif {- COMPILING_GHC -}
 \end{code}
 
-Turn a NULL-terminated vector of null-terminated strings into a string list
-(ToDo: create a module of common marshaling functions)
-
-\begin{code}
-unvectorize :: Addr -> Int -> IO [String]
-unvectorize ptr n
-  | str == ``NULL'' = return []
-  | otherwise = do
-	x  <- unpackCStringIO str
-	xs <- unvectorize ptr (n+1)
-	return (x : xs)
-  where
-   str = indexAddrOffAddr ptr n
-
-\end{code}
