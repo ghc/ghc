@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: SchedAPI.h,v 1.16 2002/12/11 15:36:39 simonmar Exp $
+ * $Id: SchedAPI.h,v 1.17 2002/12/27 12:33:21 panne Exp $
  *
  * (c) The GHC Team 1998-2002
  *
@@ -96,10 +96,5 @@ extern int  howManyThreadsAvail ( void );
  * Run until there are no more threads.
  */
 extern void finishAllThreads ( void );
-
-/*
- * Reverting CAFs
- */
-extern void RevertCAFs ( void );
 
 #endif
