@@ -26,13 +26,13 @@ import TcHsSyn		( TcMonoBinds )
 
 import Inst		( Inst, InstOrigin(..), instToId, newDicts, newMethod )
 import TcEnv		( TyThingDetails(..), 
-			  tcLookupClass, tcExtendTyVarEnv2, 
-			  tcExtendTyVarEnv
+			  tcLookupClass, tcExtendLocalValEnv2,
+			  tcExtendTyVarEnv2, tcExtendTyVarEnv
 			)
 import TcTyDecls	( tcMkDataCon )
-import TcBinds		( tcMonoBinds )
+import TcBinds		( tcMonoBinds, tcSpecSigs )
 import TcMonoType	( TcSigInfo(..), tcHsType, tcHsTheta, mkTcSig )
-import TcSimplify	( tcSimplifyCheck )
+import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
 import TcUnify		( checkSigTyVars, sigCtxt )
 import TcMType		( tcInstTyVars )
 import TcType		( Type, TyVarDetails(..), TcType, TcThetaType, TcTyVar, 
@@ -452,12 +452,13 @@ tcMethodBind xtve inst_tyvars inst_theta avail_insts prags
 	     (sel_id, meth_id, meth_bind)
   =  	-- Check the bindings; first adding inst_tyvars to the envt
 	-- so that we don't quantify over them in nested places
-    mkTcSig meth_id 				`thenM` \ meth_sig ->
+     mkTcSig meth_id 				`thenM` \ meth_sig ->
 
      tcExtendTyVarEnv2 xtve (
-	addErrCtxt (methodCtxt sel_id)		$
-	getLIE (tcMonoBinds meth_bind [meth_sig] NonRecursive)
-     )						`thenM` \ ((meth_bind, _), meth_lie) ->
+	addErrCtxt (methodCtxt sel_id)			$
+	getLIE 						$
+	tcMonoBinds meth_bind [meth_sig] NonRecursive
+     )							`thenM` \ ((meth_bind,_), meth_lie) ->
 
 	-- Now do context reduction.   We simplify wrt both the local tyvars
 	-- and the ones of the class/instance decl, so that there is
@@ -483,16 +484,21 @@ tcMethodBind xtve inst_tyvars inst_theta avail_insts prags
      checkSigTyVars all_tyvars			`thenM` \ all_tyvars' ->
 
      let
+	sel_name = idName sel_id
+	inline_prags  = [ (is_inl, phase)
+		        | InlineSig is_inl name phase _ <- prags, 
+		          name == sel_name ]
+	spec_prags = [ prag 
+		     | prag@(SpecSig name _ _) <- prags, 
+		       name == sel_name]
+	
 		-- Attach inline pragmas as appropriate
 	(final_meth_id, inlines) 
-	   | (InlineSig inl _ phase _ : _) <- filter is_inline prags
+	   | ((is_inline, phase) : _) <- inline_prags
 	   = (meth_id `setInlinePragma` phase,
-	      if inl then unitNameSet (idName meth_id) else emptyNameSet)
+	      if is_inline then unitNameSet (idName meth_id) else emptyNameSet)
 	   | otherwise
 	   = (meth_id, emptyNameSet)
-
-	is_inline (InlineSig _ name _ _) = name == idName sel_id
-	is_inline other		         = False
 
 	meth_tvs'      = take (length meth_tvs) all_tyvars'
 	poly_meth_bind = AbsBinds meth_tvs'
@@ -500,8 +506,20 @@ tcMethodBind xtve inst_tyvars inst_theta avail_insts prags
      				  [(meth_tvs', final_meth_id, local_meth_id)]
 				  inlines
 				  (lie_binds `andMonoBinds` meth_bind)
+
      in
-     returnM poly_meth_bind
+	-- Deal with specialisation pragmas
+	-- The sel_name is what appears in the pragma
+     tcExtendLocalValEnv2 [(sel_name, final_meth_id)] (
+	getLIE (tcSpecSigs spec_prags)			`thenM` \ (spec_binds1, prag_lie) ->
+     
+	     -- The prag_lie for a SPECIALISE pragma will mention the function itself, 
+	     -- so we have to simplify them away right now lest they float outwards!
+	bindInstsOfLocalFuns prag_lie [final_meth_id]	`thenM` \ spec_binds2 ->
+	returnM (spec_binds1 `andMonoBinds` spec_binds2)
+     )							`thenM` \ spec_binds ->
+
+     returnM (poly_meth_bind `andMonoBinds` spec_binds)
 
 
 mkMethodBind :: InstOrigin
