@@ -949,6 +949,7 @@ runMainKey		      = mkPreludeMiscIdUnique 56
 andIdKey		      = mkPreludeMiscIdUnique 57
 orIdKey			      = mkPreludeMiscIdUnique 58
 thenIOIdKey		      = mkPreludeMiscIdUnique 59
+lazyIdKey		      = mkPreludeMiscIdUnique 60
 
 -- Parallel array functions
 nullPIdKey	              = mkPreludeMiscIdUnique 70

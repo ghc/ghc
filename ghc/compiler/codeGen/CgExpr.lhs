@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.48 2002/04/29 14:03:41 simonmar Exp $
+% $Id: CgExpr.lhs,v 1.49 2002/06/18 13:58:23 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -150,9 +150,7 @@ cgExpr x@(StgOpApp op@(StgPrimOp primop) args res_ty)
   = tailCallPrimOp primop args
 
   | otherwise
-  = ASSERT(primop /= SeqOp) -- can't handle SeqOp
-
-    getArgAmodes args	`thenFC` \ arg_amodes ->
+  = getArgAmodes args	`thenFC` \ arg_amodes ->
 
     case (getPrimOpResultInfo primop) of
 

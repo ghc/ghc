@@ -12,10 +12,11 @@ import CoreSyn
 import CoreUnfold	( certainlyWillInline )
 import CoreLint		( showPass, endPass )
 import CoreUtils	( exprType, exprIsValue )
-import Id		( Id, idType, isOneShotLambda,
+import Id		( Id, idType, isOneShotLambda, 
 			  setIdNewStrictness, mkWorkerId,
 			  setIdWorkerInfo, setInlinePragma,
 			  idInfo )
+import MkId		( lazyIdKey, lazyIdUnfolding )
 import Type		( Type )
 import IdInfo		( WorkerInfo(..), arityInfo,
 			  newDemandInfo, newStrictnessInfo, unfoldingInfo, inlinePragInfo
@@ -24,6 +25,7 @@ import NewDemand        ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..),
 			  Demands(..), mkTopDmdType, isBotRes, returnsCPR, topSig, isAbsent
 			)
 import UniqSupply	( UniqSupply, initUs_, returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
+import Unique		( hasKey )
 import BasicTypes	( RecFlag(..), isNonRec, Activation(..) )
 import VarEnv		( isEmptyVarEnv )
 import Maybes		( orElse )
@@ -127,9 +129,16 @@ matching by looking for strict arguments of the correct type.
 \begin{code}
 wwExpr :: CoreExpr -> UniqSM CoreExpr
 
-wwExpr e@(Type _)   = returnUs e
-wwExpr e@(Var _)    = returnUs e
-wwExpr e@(Lit _)    = returnUs e
+wwExpr e@(Type _)   	      = returnUs e
+wwExpr e@(Lit _)    	      = returnUs e
+wwExpr e@(Note InlineMe expr) = returnUs expr
+	-- Don't w/w inside InlineMe's
+
+wwExpr e@(Var v)
+  | v `hasKey` lazyIdKey = returnUs lazyIdUnfolding
+  | otherwise            = returnUs e
+	-- Inline 'lazy' after strictness analysis
+	-- (but not inside InlineMe's)
 
 wwExpr (Lam binder expr)
   = wwExpr expr			`thenUs` \ new_expr ->

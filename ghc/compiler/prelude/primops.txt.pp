@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.19 2002/05/01 13:16:04 simonmar Exp $
+-- $Id: primops.txt.pp,v 1.20 2002/06/18 13:58:24 simonpj Exp $
 --
 -- Primitive Operations
 --
@@ -1533,14 +1533,6 @@ primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
 ------------------------------------------------------------------------
 section "Parallelism"
 ------------------------------------------------------------------------
-
-primop  SeqOp "seq#" GenPrimOp
-   a -> Int#
-   with
-   usage            = { mangle  SeqOp [mkO] mkR }
-   strictness       = { \ arity -> mkStrictSig (mkTopDmdType [evalDmd] TopRes) }
-      -- Seq is strict in its argument; see notes in ConFold.lhs
-   has_side_effects = True
 
 primop  ParOp "par#" GenPrimOp
    a -> Int#

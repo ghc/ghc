@@ -64,7 +64,7 @@ The goal of this pass is to prepare for code generation.
 4.  Ensure that lambdas only occur as the RHS of a binding
     (The code generator can't deal with anything else.)
 
-5.  Do the seq/par munging.  See notes with mkCase below.
+5.  [Not any more; nuked Jun 2002] Do the seq/par munging.
 
 6.  Clone all local Ids.
     This means that all such Ids are unique, rather than the 
@@ -359,7 +359,7 @@ corePrepExprFloat env (Case scrut bndr alts)
   = corePrepExprFloat env scrut		`thenUs` \ (floats, scrut') ->
     cloneBndr env bndr			`thenUs` \ (env', bndr') ->
     mapUs (sat_alt env') alts		`thenUs` \ alts' ->
-    returnUs (floats, mkCase scrut' bndr' alts')
+    returnUs (floats, Case scrut' bndr' alts')
   where
     sat_alt env (con, bs, rhs)
 	  = cloneBndrs env bs		`thenUs` \ (env', bs') ->
@@ -532,7 +532,7 @@ mkBinds binds body
   | otherwise	  = deLam body		`thenUs` \ body' ->
 		    returnUs (foldrOL mk_bind body' binds)
   where
-    mk_bind (FloatCase bndr rhs _) body = mkCase rhs bndr [(DEFAULT, [], body)]
+    mk_bind (FloatCase bndr rhs _) body = Case rhs bndr [(DEFAULT, [], body)]
     mk_bind (FloatLet bind)        body = Let bind body
 
 etaExpandRhs bndr rhs
@@ -632,55 +632,6 @@ tryEta bndrs (Let bind@(NonRec b r) body)
     fvs = exprFreeVars r
 
 tryEta bndrs _ = Nothing
-\end{code}
-
-
--- -----------------------------------------------------------------------------
--- 	Do the seq and par transformation
--- -----------------------------------------------------------------------------
-
-Here we do two pre-codegen transformations:
-
-1.	case seq# a of {
-	  0 	  -> seqError ...
-	  DEFAULT -> rhs }
-  ==>
-	case a of { DEFAULT -> rhs }
-
-
-2.	case par# a of {
-	  0 	  -> parError ...
-	  DEFAULT -> rhs }
-  ==>
-	case par# a of {
-	  DEFAULT -> rhs }
-
-NB:	seq# :: a -> Int#	-- Evaluate value and return anything
-	par# :: a -> Int#	-- Spark value and return anything
-
-These transformations can't be done earlier, or else we might
-think that the expression was strict in the variables in which 
-rhs is strict --- but that would defeat the purpose of seq and par.
-
-
-\begin{code}
-mkCase scrut@(Var fn `App` Type ty `App` arg) bndr alts@(deflt_alt@(DEFAULT,_,rhs) : con_alts)
-			-- DEFAULT alt is always first
-  = case isPrimOpId_maybe fn of
-	Just ParOp -> Case scrut bndr     [deflt_alt]
-	Just SeqOp -> Case arg   new_bndr [deflt_alt]
-	other	   -> Case scrut bndr alts
-  where
-	-- The binder shouldn't be used in the expression!
-    new_bndr = ASSERT2( not (bndr `elemVarSet` exprFreeVars rhs), ppr bndr )
-	       setIdType bndr (exprType arg)
-	-- NB:  SeqOp :: forall a. a -> Int#
-	-- So bndr has type Int# 
-	-- But now we are going to scrutinise the SeqOp's argument directly,
-	-- so we must change the type of the case binder to match that
-	-- of the argument expression e.
-
-mkCase scrut bndr alts = Case scrut bndr alts
 \end{code}
 
 

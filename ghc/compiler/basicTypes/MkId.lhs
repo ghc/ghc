@@ -25,6 +25,7 @@ module MkId (
 	-- And some particular Ids; see below for why they are wired in
 	wiredInIds, ghcPrimIds,
 	unsafeCoerceId, realWorldPrimId, voidArgId, nullAddrId, seqId,
+	lazyId, lazyIdUnfolding, lazyIdKey,
 
 	mkRuntimeErrorApp,
 	rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID, rUNTIME_ERROR_ID,
@@ -128,7 +129,9 @@ wiredInIds
     nON_EXHAUSTIVE_GUARDS_ERROR_ID,
     nO_METHOD_BINDING_ERROR_ID,
     pAT_ERROR_ID,
-    rEC_CON_ERROR_ID
+    rEC_CON_ERROR_ID,
+
+    lazyId
     ] ++ ghcPrimIds
 
 -- These Ids are exported from GHC.Prim
@@ -838,6 +841,23 @@ seqId
 		      (mkFunTy alphaTy (mkFunTy betaTy betaTy))
     [x,y] = mkTemplateLocals [alphaTy, betaTy]
     rhs = mkLams [alphaTyVar,betaTyVar,x,y] (Case (Var x) x [(DEFAULT, [], Var y)])
+
+-- lazy :: forall a?. a? -> a?	 (i.e. works for unboxed types too)
+-- Used to lazify pseq:		pseq a b = a `seq` lazy b
+-- No unfolding: it gets "inlined" by the worker/wrapper pass
+-- Also, no strictness: by being a built-in Id, it overrides all
+-- the info in PrelBase.hi.  This is important, because the strictness
+-- analyser will spot it as strict!
+lazyId
+  = pcMiscPrelId lazyIdKey pREL_BASE FSLIT("lazy") ty info
+  where
+    info = noCafIdInfo
+    ty  = mkForAllTys [alphaTyVar] (mkFunTy alphaTy alphaTy)
+
+lazyIdUnfolding :: CoreExpr	-- Used to expand LazyOp after strictness anal
+lazyIdUnfolding = mkLams [openAlphaTyVar,x] (Var x)
+		where
+		  [x] = mkTemplateLocals [openAlphaTy]
 \end{code}
 
 @getTag#@ is another function which can't be defined in Haskell.  It needs to
