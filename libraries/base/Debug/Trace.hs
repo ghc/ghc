@@ -23,6 +23,8 @@ import System.IO.Unsafe
 
 #ifdef __GLASGOW_HASKELL__
 import Foreign.C.String
+#else
+import System.IO (hPutStrLn,stderr)
 #endif
 
 -- | 'putTraceMsg' function outputs the trace message from IO monad.
@@ -32,8 +34,7 @@ import Foreign.C.String
 putTraceMsg :: String -> IO ()
 putTraceMsg msg = do
 #ifndef __GLASGOW_HASKELL__
-    hPutStr handle msg
-    hPutChar handle '\n'
+    hPutStrLn stderr msg
 #else
     withCString "%s\n" $ \cfmt ->
      withCString msg  $ \cmsg ->
