@@ -324,6 +324,15 @@ URK!  Let's not do this. So this is illegal:
 	f :: Int -> Int
 	f x = x + ?y
 
+There's a nasty corner case when the monomorphism restriction bites:
+
+	f = x + ?y
+
+The argument above suggests that we must generalise over the ?y parameter, 
+but the monomorphism restriction says that we can't.  The current 
+implementation chooses to let the monomorphism restriction 'win' in this
+case, but it's not clear what the Right Thing is.
+
 BOTTOM LINE: you *must* quantify over implicit parameters.
 
 
