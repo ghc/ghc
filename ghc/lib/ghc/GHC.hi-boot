@@ -27,6 +27,8 @@ GHC
   parGlobal#
   parLocal#
   parAt#
+  parAtAbs#
+  parAtRel#
   parAtForNow#
 
   SynchVar#
@@ -222,4 +224,6 @@ indexDoubleOffForeignObj#
   StablePtr#
   makeStablePtr#
   deRefStablePtr#
+
+  reallyUnsafePtrEquality#
 ;
