@@ -93,7 +93,7 @@ type EncodedString = String	-- Encoded form
 pprEncodedFS :: EncodedFS -> SDoc
 pprEncodedFS fs
   = getPprStyle 	$ \ sty ->
-    if userStyle sty
+    if userStyle sty || dumpStyle sty
 	-- ftext (decodeFS fs) would needlessly pack the string again
 	then text (decode (unpackFS fs))
         else ftext fs
