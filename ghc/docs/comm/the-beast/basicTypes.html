@@ -1,0 +1,53 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+  <head>
+    <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=ISO-8859-1">
+    <title>The GHC Commentary - The Basics</title>
+  </head>
+
+  <body BGCOLOR="FFFFFF">
+    <h1>The GHC Commentary - The Basics</h1>
+    <p>
+      The directory <a
+	href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/basicTypes/"><code>fptools/ghc/compiler/basicTypes/</code></a> 
+      contains modules that define some of the essential types definition for
+      the compiler - such as, identifiers, variables, modules, and unique
+      names.
+
+    <h4><code>Id</code>s</h4>
+    <p>
+      An <code>Id</code> (defined in <a
+	href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/basicTypes/Id.lhs"><code>Id.lhs</code></a>
+      essentially records information about value and data constructor
+      identifiers -- to be precise, in the case of data constructors, two
+      <code>Id</code>s are used to represent the worker and wrapper functions
+      for the data constructor, respectively.  The information maintained in
+      the <code>Id</code> abstraction includes among other items strictness,
+      occurrence, specialisation, and unfolding information.
+    <p>
+      Due to the way <code>Id</code>s are used for data constructors,
+      all <code>Id</code>s are represented as variables, which contain a
+      <code>varInfo</code> field of abstract type <code><a
+	href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/basicTypes/IdInfo.lhs">IdInfo</a>.IdInfo</code>.  
+      This is where the information about <code>Id</code>s is really stored.
+      The following is a (currently, partial) list of the various items in an
+      <code>IdInfo</code>:
+    <p>
+    <dl>
+      <dt><a name="occInfo">Occurence information</a>
+      <dd>The <code>OccInfo</code> data type is defined in the module <a
+	href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/basicTypes/BasicTypes.lhs"><code>BasicTypes.lhs</code></a>.
+	Apart from the trivial <code>NoOccInfo</code>, it distinguishes
+	between variables that do not occur at all (<code>IAmDead</code>),
+	occur just once (<code>OneOcc</code>), or a <a
+	  href="simplifier.html#loopBreaker">loop breakers</a>
+	(<code>IAmALoopBreaker</code>).
+    </dl>
+
+    <p><small>
+<!-- hhmts start -->
+Last modified: Wed Aug  8 19:23:01 EST 2001
+<!-- hhmts end -->
+    </small>
+  </body>
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+  <head>
+    <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=ISO-8859-1">
+    <title>The GHC Commentary - Cunning Prelude Code</title>
+  </head>
+
+  <body BGCOLOR="FFFFFF">
+    <h1>The GHC Commentary - Cunning Prelude Code</h1>
+    <p>
+      GHC's uses a many optimsations and GHC specific techniques (unboxed
+      values, RULES pragmas, and so on) to make the heavily used Prelude code
+      as fast as possible.
+
+    <h4>fold/build</h4>
+    <p>
+      There is a lot of magic in <a
+	href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/lib/std/PrelBase.lhs"><code>PrelBase.lhs</code></a> -
+      among other things, the <a
+	href="http://haskell.cs.yale.edu/ghc/docs/latest/set/rewrite-rules.html">RULES
+      pragmas</a> implementing the <a
+	href="http://research.microsoft.com/Users/simonpj/Papers/deforestation-short-cut.ps.Z">fold/build</a>
+	optimisation.  The code for <code>map</code> is
+      a good example for how it all works.  In the prelude code for version
+      4.08.1 it reads as follows:
+    <blockquote><pre>
+map :: (a -> b) -> [a] -> [b]
+map = mapList
+
+-- Note eta expanded
+mapFB ::  (elt -> lst -> lst) -> (a -> elt) -> a -> lst -> lst
+mapFB c f x ys = c (f x) ys
+
+mapList :: (a -> b) -> [a] -> [b]
+mapList _ []     = []
+mapList f (x:xs) = f x : mapList f xs
+
+{-# RULES
+"map"	  forall f xs.  map f xs	       = build (\c n -> foldr (mapFB c f) n xs)
+"mapFB"	  forall c f g. mapFB (mapFB c f) g    = mapFB c (f.g) 
+"mapList" forall f.	foldr (mapFB (:) f) [] = mapList f
+ #-}</pre>
+    </blockquote>
+    <p>
+      This code is structured as it is, because the "map" rule first
+      <em>breaks</em> the map <em>open,</em> which exposes it to the various
+      foldr/build rules, and if no foldr/build rule matches, the "mapList"
+      rule <em>closes</em> it again in a later phase of optimisation - after
+      build was inlined.  As a consequence, the whole thing depends a bit on
+      the timing of the various optimsations (the map might be closed again
+      before any of the foldr/build rules fires).  To make the timing
+      deterministic, <code>build</code> gets a <code>{-# INLINE 2 build
+      #-}</code> pragma, which delays <code>build</code>'s inlining, and thus,
+      the closing of the map.
+
+    <p><small>
+<!-- hhmts start -->
+Last modified: Wed Aug  8 19:31:18 EST 2001
+<!-- hhmts end -->
+    </small>
+  </body>
+</html>

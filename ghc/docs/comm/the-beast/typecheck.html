@@ -1,0 +1,96 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+  <head>
+    <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=ISO-8859-1">
+    <title>The GHC Commentary - Checking Types</title>
+  </head>
+
+  <body BGCOLOR="FFFFFF">
+    <h1>The GHC Commentary - Checking Types</h1>
+    <p>
+      Probably the most important phase in the frontend is the type checker,
+      which is located at <a
+	href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/"><code>fptools/ghc/compiler/typecheck/</code>.</a>
+
+    <h4>Type Checking Environment</h4>
+    <p>
+      During type checking, GHC maintains a <em>type environment</em> whose
+      details are fixed in <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcEnv.lhs"><code>TcEnv.lhs</code>.</a>
+      Among other things, the environment contains all imported and local
+      instances as well as a list of <em>global</em> entities (imported and
+      local types and classes together with imported identifiers) and
+      <em>local</em> entities (locally defined identifiers).  This environment
+      is threaded through the type checking monad.
+
+    <h4>Expressions</h4>
+    <p>
+      Expressions are type checked by <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcExpr.lhs"><code>TcExpr.lhs</code>.</a>  
+    <p>
+      Usage occurences of identifiers are processed by the function
+      <code>tcId</code> whose main purpose is to <a href="#inst">instantiate
+      overloaded identifiers.</a> It essentially calls
+      <code>TcInst.instOverloadedFun</code> once for each universally
+      quantified set of type constraints.  It should be noted that overloaded
+      identifiers are replaced by new names that are first defined in the LIE
+      (Local Instance Environment?) and later promoted into top-level
+      bindings.
+      
+    <h4><a name="inst">Handling of Dictionaries and Method Instances</a></h4>
+    <p>
+      GHC implements overloading using so-called <em>dictionaries.</em> A
+      dictionary is a tuple of functions -- one function for each method in
+      the class of which the dictionary implements an instance.  During type
+      checking, GHC replaces each type constraint of a function with one
+      additional argument.  At runtime, the extended function gets passed a
+      matching class dictionary by way of these additional arguments.
+      Whenever the function needs to call a method of such a class, it simply
+      extracts it from the dictionary.
+    <p>
+      This sounds simple enough; however, the actual implementation is a bit
+      more tricky as it wants to keep track of all the instances at which
+      overloaded functions are used in a module.  This information is useful
+      to optimise the code.  The implementation is the module <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/Inst.lhs"><code>Inst.lhs</code>.</a>
+    <p>
+      The function <code>instOverloadedFun</code> is invoked for each
+      overloaded usage occurence of an identifier, where overloaded means that
+      the type of the idendifier contains a non-trivial type constraint.  It
+      proceeds in two steps: (1) Allocation of a method instance
+      (<code>newMethodWithGivenTy</code>) and (2) instantiation of functional
+      dependencies.  The former implies allocating a new unique identifier,
+      which replaces the original (overloaded) identifier at the currently
+      type-checked usage occurrence.
+    <p>
+      The new identifier (after being threaded through the LIE) eventually
+      will be bound by a top-level binding whose rhs contains a partial
+      application of the original overloaded identifier.  This papp applies
+      the overloaded function to the dictionaries needed for the current
+      instance.  In GHC lingo, this is called a <em>method.</em>  Before
+      becoming a top-level binding, the method is first represented as a value
+      of type <code>Inst.Inst</code>, which makes it easy to fold multiple
+      instances of the same identifier at the same types into one global
+      definition.  (And probably other things, too, which I haven't
+      investigated yet.)
+
+    <p>
+      <strong>Note:</strong> As of 13 January 2001 (wrt. to the code in the
+      CVS HEAD), the above mechanism interferes badly with RULES pragmas
+      defined over overloaded functions.  During instantiation, a new name is
+      created for an overloaded function partially applied to the dictionaries
+      needed in a usage position of that function.  As the rewrite rule,
+      however, mentions the original overloaded name, it won't fire anymore
+      -- unless later phases remove the intermediate definition again.  The
+      latest CVS version of GHC has an option
+      <code>-fno-method-sharing</code>, which avoids sharing instantiation
+      stubs.  This is usually/often/sometimes sufficient to make the rules
+      fire again.
+
+    <p><small>
+<!-- hhmts start -->
+Last modified: Wed Aug  8 19:24:09 EST 2001
+<!-- hhmts end -->
+    </small>
+  </body>
+</html>
