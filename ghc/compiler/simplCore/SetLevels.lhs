@@ -309,6 +309,23 @@ lvlExpr ctxt_lvl env expr@(_, AnnLam bndr rhs)
 	-- but not nearly so much now non-recursive newtypes are transparent.
 	-- [See SetLevels rev 1.50 for a version with this approach.]
 
+lvlExpr ctxt_lvl env (_, AnnLet (AnnNonRec bndr rhs) body)
+  | isUnLiftedType (idType bndr)
+	-- Treat unlifted let-bindings (let x = b in e) just like (case b of x -> e)
+	-- That is, leave it exactly where it is
+	-- We used to float unlifted bindings too (e.g. to get a cheap primop
+	-- outside a lambda (to see how, look at lvlBind in rev 1.58)
+	-- but an unrelated change meant that these unlifed bindings
+	-- could get to the top level which is bad.  And there's not much point;
+	-- unlifted bindings are always cheap, and so hardly worth floating.
+  = lvlExpr ctxt_lvl env rhs		`thenLvl` \ rhs' ->
+    lvlExpr incd_lvl env' body		`thenLvl` \ body' ->
+    returnLvl (Let (NonRec bndr' rhs') body')
+  where
+    incd_lvl = incMinorLvl ctxt_lvl
+    bndr' = TB bndr incd_lvl
+    env'  = extendLvlEnv env [bndr']
+
 lvlExpr ctxt_lvl env (_, AnnLet bind body)
   = lvlBind NotTopLevel ctxt_lvl env bind	`thenLvl` \ (bind', new_env) ->
     lvlExpr ctxt_lvl new_env body		`thenLvl` \ body' ->
@@ -335,6 +352,13 @@ lvlExpr ctxt_lvl env (_, AnnCase expr case_bndr alts)
 @lvlMFE@ is just like @lvlExpr@, except that it might let-bind
 the expression, so that it can itself be floated.
 
+[NOTE: unlifted MFEs]
+We don't float unlifted MFEs, which potentially loses big opportunites.
+For example:
+	\x -> f (h y)
+where h :: Int -> Int# is expensive. We'd like to float the (h y) outside
+the \x, but we don't because it's unboxed.  Possible solution: box it.
+
 \begin{code}
 lvlMFE ::  Bool			-- True <=> strict context [body of case or let]
 	-> Level		-- Level of innermost enclosing lambda/tylam
@@ -345,8 +369,9 @@ lvlMFE ::  Bool			-- True <=> strict context [body of case or let]
 lvlMFE strict_ctxt ctxt_lvl env (_, AnnType ty)
   = returnLvl (Type ty)
 
+
 lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
-  |  isUnLiftedType ty			-- Can't let-bind it
+  |  isUnLiftedType ty			-- Can't let-bind it; see [NOTE: unlifted MFEs]
   || isInlineCtxt ctxt_lvl		-- Don't float out of an __inline__ context
   || exprIsTrivial expr			-- Never float if it's trivial
   || not good_destination
@@ -420,7 +445,7 @@ lvlBind :: TopLevelFlag		-- Used solely to decide whether to clone
 	-> LvlM (LevelledBind, LevelEnv)
 
 lvlBind top_lvl ctxt_lvl env (AnnNonRec bndr rhs@(rhs_fvs,_))
-  | isInlineCtxt ctxt_lvl	-- Don't do anything inside InlineMe
+  | isInlineCtxt ctxt_lvl		-- Don't do anything inside InlineMe
   = lvlExpr ctxt_lvl env rhs			`thenLvl` \ rhs' ->
     returnLvl (NonRec (TB bndr ctxt_lvl) rhs', env)
 
@@ -439,12 +464,7 @@ lvlBind top_lvl ctxt_lvl env (AnnNonRec bndr rhs@(rhs_fvs,_))
   where
     bind_fvs = rhs_fvs `unionVarSet` idFreeVars bndr
     abs_vars = abstractVars dest_lvl env bind_fvs
-
-    dest_lvl | isUnLiftedType (idType bndr) = destLevel env bind_fvs False `maxLvl` Level 1 0
-	     | otherwise		    = destLevel env bind_fvs (isFunction rhs)
-	-- Hack alert!  We do have some unlifted bindings, for cheap primops, and 
-	-- it is ok to float them out; but not to the top level.  If they would otherwise
-	-- go to the top level, we pin them inside the topmost lambda
+    dest_lvl = destLevel env bind_fvs (isFunction rhs)
 \end{code}
 
 
