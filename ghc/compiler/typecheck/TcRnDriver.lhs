@@ -49,7 +49,7 @@ import TcExpr 		( tcInferRho )
 import TcRnMonad
 import TcMType		( newTyVarTy, zonkTcType )
 import TcType		( Type, liftedTypeKind, 
-			  tyVarsOfType, tcFunResultTy,
+			  tyVarsOfType, tcFunResultTy, tidyTopType,
 			  mkForAllTys, mkFunTys, mkTyConApp, tcSplitForAllTys
 			)
 import TcMatches	( tcStmtsAndThen )
@@ -651,7 +651,7 @@ tc_rn_src_decls ds
 
 	setEnvs tc_envs $
 
-	-- If there is no splice, we're nearlydone
+	-- If there is no splice, we're nearly done
 	case group_tail of {
 	   Nothing -> do { 	-- Last thing: check for `main'
 			   (tcg_env, main_fvs) <- checkMain ;
@@ -1205,8 +1205,8 @@ pprTcGblEnv (TcGblEnv { tcg_type_env = type_env,
 	 , ppr_insts dfun_ids
 	 , vcat (map ppr rules)
 	 , ppr_gen_tycons (typeEnvTyCons type_env)
-	 , ppr (moduleEnvElts (imp_dep_mods imports))
-	 , ppr (imp_dep_pkgs imports)]
+	 , ptext SLIT("Dependent modules:") <+> ppr (moduleEnvElts (imp_dep_mods imports))
+	 , ptext SLIT("Dependent packages:") <+> ppr (imp_dep_pkgs imports)]
 
 pprModGuts :: ModGuts -> SDoc
 pprModGuts (ModGuts { mg_types = type_env,
@@ -1239,7 +1239,7 @@ ppr_sigs ids
    	-- Convert to HsType so that we get source-language style printing
 	-- And sort by RdrName
   = vcat $ map ppr_sig $ sortLt lt_sig $
-    [ (getRdrName id, toHsType (idType id))
+    [ (getRdrName id, toHsType (tidyTopType (idType id)))
     | id <- ids ]
   where
     lt_sig (n1,_) (n2,_) = n1 < n2

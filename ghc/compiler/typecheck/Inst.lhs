@@ -56,7 +56,7 @@ import TcType	( Type, TcType, TcThetaType, TcTyVarSet,
 		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
 		  tcIsTyVarTy, mkPredTy, mkTyVarTy, mkTyVarTys,
 		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,
-		  isClassPred, isTyVarClassPred, isLinearPred, predHasFDs,
+		  isClassPred, isTyVarClassPred, isLinearPred, 
 		  getClassPredTys, getClassPredTys_maybe, mkPredName,
 		  isInheritablePred, isIPPred, 
 		  tidyType, tidyTypes, tidyFreeTyVars, tcSplitSigmaTy
@@ -101,11 +101,14 @@ dictPred inst		  = pprPanic "dictPred" (ppr inst)
 getDictClassTys (Dict _ pred _) = getClassPredTys pred
 
 -- fdPredsOfInst is used to get predicates that contain functional 
--- dependencies; i.e. should participate in improvement
-fdPredsOfInst (Dict _ pred _) | predHasFDs pred = [pred]
-			      | otherwise	= []
-fdPredsOfInst (Method _ _ _ theta _ _) = filter predHasFDs theta
-fdPredsOfInst other		       = []
+-- dependencies *or* might do so.  The "might do" part is because
+-- a constraint (C a b) might have a superclass with FDs
+-- Leaving these in is really important for the call to fdPredsOfInsts
+-- in TcSimplify.inferLoop, because the result is fed to 'grow',
+-- which is supposed to be conservative
+fdPredsOfInst (Dict _ pred _) 	       = [pred]
+fdPredsOfInst (Method _ _ _ theta _ _) = theta
+fdPredsOfInst other		       = []	-- LitInsts etc
 
 fdPredsOfInsts :: [Inst] -> [PredType]
 fdPredsOfInsts insts = concatMap fdPredsOfInst insts

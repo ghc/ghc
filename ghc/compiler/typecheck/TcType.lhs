@@ -61,7 +61,7 @@ module TcType (
   ---------------------------------
   -- Predicate types  
   getClassPredTys_maybe, getClassPredTys, 
-  isPredTy, isClassPred, isTyVarClassPred, predHasFDs,
+  isPredTy, isClassPred, isTyVarClassPred, 
   mkDictTy, tcSplitPredTy_maybe, 
   isDictTy, tcSplitDFunTy, predTyUnique, 
   mkClassPred, isInheritablePred, isLinearPred, isIPPred, mkPredName, 
@@ -540,12 +540,6 @@ tcSplitPredTy_maybe other	      	    = Nothing
 predTyUnique :: PredType -> Unique
 predTyUnique (IParam n _)      = getUnique (ipNameName n)
 predTyUnique (ClassP clas tys) = getUnique clas
-
-predHasFDs :: PredType -> Bool
--- True if the predicate has functional depenencies; 
--- I.e. should participate in improvement
-predHasFDs (IParam _ _)   = True
-predHasFDs (ClassP cls _) = classHasFDs cls
 
 mkPredName :: Unique -> SrcLoc -> SourceType -> Name
 mkPredName uniq loc (ClassP cls tys) = mkInternalName uniq (mkDictOcc (getOccName cls)) loc

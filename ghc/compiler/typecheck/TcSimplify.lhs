@@ -569,6 +569,7 @@ inferLoop doc tau_tvs wanteds
 	  | isClassDict inst 		  = DontReduceUnlessConstant	-- Dicts
 	  | otherwise	    		  = ReduceMe 			-- Lits and Methods
     in
+    traceTc (text "infloop" <+> vcat [ppr tau_tvs', ppr wanteds', ppr preds, ppr (grow preds tau_tvs'), ppr qtvs])	`thenM_`
 		-- Step 2
     reduceContext doc try_me [] wanteds'    `thenM` \ (no_improvement, frees, binds, irreds) ->
 
