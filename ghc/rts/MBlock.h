@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.h,v 1.16 2002/11/22 06:54:05 matthewc Exp $
+ * $Id: MBlock.h,v 1.17 2003/07/30 10:38:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -69,11 +69,6 @@ extern StgWord8 mblock_map[];
 					&& mblock_map[MBLOCK_MAP_ENTRY(p)])
 # define MARK_HEAP_ALLOCED(p)	((MBLOCK_MAP_ENTRY(p) < MBLOCK_MAP_SIZE) \
 					&& (mblock_map[MBLOCK_MAP_ENTRY(p)] = 1))
-
-#elif defined(TEXT_BEFORE_HEAP)
-/* Fall back to old method - assume heap above HEAP_BASE */
-# define HEAP_ALLOCED(p)	((StgPtr)(p) >= (StgPtr)(HEAP_BASE))
-# define MARK_HEAP_ALLOCED(p)	do {} while(0)
 
 #else
 # error HEAP_ALLOCED not defined
