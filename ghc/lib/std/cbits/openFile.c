@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: openFile.c,v 1.12 1999/11/26 16:25:56 simonmar Exp $
+ * $Id: openFile.c,v 1.13 1999/12/08 14:04:32 simonmar Exp $
  *
  * openFile Runtime Support
  */
@@ -46,6 +46,7 @@ StgInt rd;
     fo->buf      = NULL;
     fo->bufWPtr  = 0;
     fo->bufRPtr  = 0;
+    fo->bufStart = 0;
     fo->flags    = FILEOBJ_STD | ( rd ? FILEOBJ_READ : FILEOBJ_WRITE);
     fo->connectedTo = NULL;
  
