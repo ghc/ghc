@@ -24,7 +24,7 @@ Options recognised wherever they occur (mkdependHS or GHC):
 		to search for "import"ed modules
     -I<dir>	Add <dir> to list of directories to search for
 		.h files (i.e., usual meaning)
-    -syslib <blah> This program uses this GHC system library; take
+    -package <blah> This program uses this GHC system library; take
 		appropriate action (e.g., recognise when they are
 		"import"ing a module from that library).
 
@@ -52,7 +52,7 @@ mkdependHS-specific options (not between --'s):
     --include-prelude
 		Regard prelude libraries as unstable, i.e., generate dependencies
 		on prelude modules. This option is normally only used by the
-                various system libraries. If a -syslib option is used, dependencies
+                various system libraries. If a -package option is used, dependencies
                 will also be generated on the library's interfaces.
     --include-module=<file> 
                 Regard <file> as not "stable"; i.e., generate dependencies
@@ -230,7 +230,9 @@ sub mangle_command_line_args {
 	    $Import_dirs = "$1:$Import_dirs";
 	} elsif ( /^-I/ ) {
 	    $Include_dirs .= " $_";
-	} elsif ( /^-syslib$/ ) {
+	} elsif ( /^-syslib$/ ) { # deprecated, use -syslib
+	    push(@Syslibs, &grab_arg_arg(*Args,$_,''));
+	} elsif ( /^-package$/ ) {
 	    push(@Syslibs, &grab_arg_arg(*Args,$_,''));
 	} elsif ( /^-fglasgow-exts$/ ) {
 	    push(@Syslibs, 'lang');
