@@ -658,6 +658,8 @@ rnTopSrcDecls group
 						  tcg_imports gbl }) 
 		     $ do {
 
+	failIfErrsM ;	-- No point in continuing if (say) we have duplicate declarations
+
 		-- Rename the source decls
 	(tcg_env, rn_src_decls, src_fvs) <- initRn SourceMode (rnSrcDecls group) ;
 	setGblEnv tcg_env $ do {
