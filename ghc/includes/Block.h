@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Block.h,v 1.15 2003/11/12 17:27:00 sof Exp $
+ * $Id: Block.h,v 1.16 2003/11/26 12:14:26 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -76,9 +76,14 @@ typedef struct _bdescr {
 #define BDESCR_SHIFT 5
 #endif
 
+// Block contains objects evacuated during this GC
 #define BF_EVACUATED 1
+// Block is a large object
 #define BF_LARGE     2
+// Block is pinned
 #define BF_PINNED    4
+// Block is part of a compacted generation
+#define BF_COMPACTED 8
 
 /* Finding the block descriptor for a given block -------------------------- */
 

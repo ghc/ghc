@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.163 2003/11/12 17:49:07 sof Exp $
+ * $Id: GC.c,v 1.164 2003/11/26 12:14:26 simonmar Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -752,6 +752,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 		// onto the front of the now-compacted existing blocks.
 		for (bd = stp->to_blocks; bd != NULL; bd = bd->link) {
 		    bd->flags &= ~BF_EVACUATED;	// now from-space 
+		    bd->flags |= BF_COMPACTED;  // compacted next time
 		}
 		// tack the new blocks on the end of the existing blocks
 		if (stp->blocks == NULL) {
@@ -1375,7 +1376,7 @@ isAlive(StgClosure *p)
     }
 
     // check the mark bit for compacted steps
-    if (bd->step->is_compacted && is_marked((P_)p,bd)) {
+    if ((bd->flags & BF_COMPACTED) && is_marked((P_)p,bd)) {
 	return p;
     }
 
@@ -1700,7 +1701,7 @@ loop:
     /* If the object is in a step that we're compacting, then we
      * need to use an alternative evacuate procedure.
      */
-    if (bd->step->is_compacted) {
+    if (bd->flags & BF_COMPACTED) {
 	if (!is_marked((P_)q,bd)) {
 	    mark((P_)q,bd);
 	    if (mark_stack_full()) {
@@ -2017,6 +2018,7 @@ eval_thunk_selector( nat field, StgSelector * p )
     StgInfoTable *info;
     const StgInfoTable *info_ptr;
     StgClosure *selectee;
+    bdescr *bd;
     
     selectee = p->selectee;
 
@@ -2043,17 +2045,32 @@ selector_loop:
     // eval_thunk_selector().  There are various ways this could
     // happen:
     //
-    // - following an IND_STATIC
+    // 1. following an IND_STATIC
     //
-    // - when the old generation is compacted, the mark phase updates
-    //   from-space pointers to be to-space pointers, and we can't
-    //   reliably tell which we're following (eg. from an IND_STATIC).
+    // 2. when the old generation is compacted, the mark phase updates
+    //    from-space pointers to be to-space pointers, and we can't
+    //    reliably tell which we're following (eg. from an IND_STATIC).
     // 
-    // So we use the block-descriptor test to find out if we're in
-    // to-space.
+    // 3. compacting GC again: if we're looking at a constructor in
+    //    the compacted generation, it might point directly to objects
+    //    in to-space.  We must bale out here, otherwise doing the selection
+    //    will result in a to-space pointer being returned.
     //
+    //  (1) is dealt with using a BF_EVACUATED test on the
+    //  selectee. (2) and (3): we can tell if we're looking at an
+    //  object in the compacted generation that might point to
+    //  to-space objects by testing that (a) it is BF_COMPACTED, (b)
+    //  the compacted generation is being collected, and (c) the
+    //  object is marked.  Only a marked object may have pointers that
+    //  point to to-space objects, because that happens when
+    //  scavenging.
+    //
+    bd = Bdescr((StgPtr)selectee);
     if (HEAP_ALLOCED(selectee) &&
-	Bdescr((StgPtr)selectee)->flags & BF_EVACUATED) {
+	((bd->flags & BF_EVACUATED) 
+	 || ((bd->flags & BF_COMPACTED) &&
+	     bd->gen_no <= N &&
+	     is_marked((P_)selectee,bd)))) {
 	goto bale_out;
     }
 
