@@ -512,7 +512,7 @@ run_phase Hsc basename suff input_fn output_fn
         let dyn_flags' = dyn_flags { hscOutName = output_fn,
 		   		     hscStubCOutName = basename ++ "_stub.c",
 				     hscStubHOutName = basename ++ "_stub.h",
-				     extCoreName = basename ++ ".core" }
+				     extCoreName = basename ++ ".hcr" }
 
   -- run the compiler!
         pcs <- initPersistentCompilerState
@@ -1036,7 +1036,7 @@ compile ghci_mode summary source_unchanged have_object
    let dyn_flags' = dyn_flags { hscOutName = output_fn,
 				hscStubCOutName = basename ++ "_stub.c",
 				hscStubHOutName = basename ++ "_stub.h",
-				extCoreName = basename ++ ".core" }
+				extCoreName = basename ++ ".hcr" }
 
    -- figure out which header files to #include in a generated .hc file
    c_includes <- getPackageCIncludes
