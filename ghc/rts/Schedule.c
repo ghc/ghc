@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.196 2004/05/06 12:20:04 wolfgang Exp $
+ * $Id: Schedule.c,v 1.197 2004/05/27 15:18:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -395,7 +395,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 
 #endif
 
-     IF_DEBUG(scheduler, printAllThreads());
+//     IF_DEBUG(scheduler, printAllThreads());
 
 #if defined(RTS_SUPPORTS_THREADS)
       // Yield the capability to higher-priority tasks if necessary.
@@ -897,23 +897,35 @@ run_thread:
     /* Run the current thread 
      */
     prev_what_next = t->what_next;
+
+    errno = t->saved_errno;
+
     switch (prev_what_next) {
+
     case ThreadKilled:
     case ThreadComplete:
 	/* Thread already finished, return to scheduler. */
 	ret = ThreadFinished;
 	break;
+
     case ThreadRunGHC:
-	errno = t->saved_errno;
 	ret = StgRun((StgFunPtr) stg_returnToStackTop, &cap->r);
-	t->saved_errno = errno;
 	break;
+
     case ThreadInterpret:
 	ret = interpretBCO(cap);
 	break;
+
     default:
       barf("schedule: invalid what_next field");
     }
+
+    // The TSO might have moved, so find the new location:
+    t = cap->r.rCurrentTSO;
+
+    // And save the current errno in this thread.
+    t->saved_errno = errno;
+
     /* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
     
     /* Costs for the scheduler are assigned to CCS_SYSTEM */
@@ -929,7 +941,6 @@ run_thread:
 #elif !defined(GRAN) && !defined(PAR)
     IF_DEBUG(scheduler,fprintf(stderr,"sched: "););
 #endif
-    t = cap->r.rCurrentTSO;
     
 #if defined(PAR)
     /* HACK 675: if the last thread didn't yield, make sure to print a 
