@@ -164,9 +164,9 @@ getOpt' ordering optDescr (arg:args) = procNextOpt opt ordering
          procNextOpt (NonOpt x)   RequireOrder      = ([],x:rest,us,[])
          procNextOpt (NonOpt x)   Permute           = (os,x:xs,us,es)
          procNextOpt (NonOpt x)   (ReturnInOrder f) = (f x :os, xs,us,es)
-         procNextOpt EndOfOpts    RequireOrder      = ([],rest,us,[])
-         procNextOpt EndOfOpts    Permute           = ([],rest,us,[])
-         procNextOpt EndOfOpts    (ReturnInOrder f) = (map f rest,[],us,[])
+         procNextOpt EndOfOpts    RequireOrder      = ([],rest,[],[])
+         procNextOpt EndOfOpts    Permute           = ([],rest,[],[])
+         procNextOpt EndOfOpts    (ReturnInOrder f) = (map f rest,[],[],[])
          procNextOpt (OptErr e)   _                 = (os,xs,us,e:es)
 
          (opt,rest) = getNext arg args optDescr
