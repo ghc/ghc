@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachDeps.h,v 1.4 2000/01/25 14:39:14 panne Exp $
+ * $Id: MachDeps.h,v 1.5 2001/07/19 09:01:40 simonmar Exp $
  *
  * (c) The GRASP/AQUA Project, Glasgow University, 1998
  * (c) The GHC Team, 1998-1999
@@ -21,13 +21,8 @@
 #define INT_SIZE_IN_BYTES	SIZEOF_LONG
 #define WORD_SIZE_IN_BYTES	SIZEOF_LONG
 
-#if SIZEOF_DOUBLE == SIZEOF_VOID_P
-#define FLOAT_SIZE_IN_BYTES 	SIZEOF_DOUBLE
-#define DOUBLE_SIZE_IN_BYTES	SIZEOF_DOUBLE
-#else
 #define FLOAT_SIZE_IN_BYTES 	SIZEOF_FLOAT
 #define DOUBLE_SIZE_IN_BYTES	SIZEOF_DOUBLE
-#endif
 
 #define SIZEOF_INT8             SIZEOF_CHAR
 #define ALIGNMENT_INT8          ALIGNMENT_CHAR
