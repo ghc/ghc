@@ -465,10 +465,78 @@ sort = sortBy compare
 sortBy cmp = foldr (insertBy cmp) []
 #else
 
-sortBy cmp l = qsort cmp l []
-sort l = qsort compare l []
+sortBy cmp l = mergesort cmp l
+sort l = mergesort compare l
 
--- rest is not exported:
+{-
+Quicksort replaced by mergesort, 14/5/2002.
+
+From: Ian Lynagh <igloo@earth.li>
+
+I am curious as to why the List.sort implementation in GHC is a
+quicksort algorithm rather than an algorithm that guarantees n log n
+time in the worst case? I have attached a mergesort implementation along
+with a few scripts to time it's performance, the results of which are
+shown below (* means it didn't finish successfully - in all cases this
+was due to a stack overflow).
+
+If I heap profile the random_list case with only 10000 then I see
+random_list peaks at using about 2.5M of memory, whereas in the same
+program using List.sort it uses only 100k.
+
+Input style     Input length     Sort data     Sort alg    User time
+stdin           10000            random_list   sort        2.82
+stdin           10000            random_list   mergesort   2.96
+stdin           10000            sorted        sort        31.37
+stdin           10000            sorted        mergesort   1.90
+stdin           10000            revsorted     sort        31.21
+stdin           10000            revsorted     mergesort   1.88
+stdin           100000           random_list   sort        *
+stdin           100000           random_list   mergesort   *
+stdin           100000           sorted        sort        *
+stdin           100000           sorted        mergesort   *
+stdin           100000           revsorted     sort        *
+stdin           100000           revsorted     mergesort   *
+func            10000            random_list   sort        0.31
+func            10000            random_list   mergesort   0.91
+func            10000            sorted        sort        19.09
+func            10000            sorted        mergesort   0.15
+func            10000            revsorted     sort        19.17
+func            10000            revsorted     mergesort   0.16
+func            100000           random_list   sort        3.85
+func            100000           random_list   mergesort   *
+func            100000           sorted        sort        5831.47
+func            100000           sorted        mergesort   2.23
+func            100000           revsorted     sort        5872.34
+func            100000           revsorted     mergesort   2.24
+-}
+
+mergesort :: (a -> a -> Ordering) -> [a] -> [a]
+mergesort cmp = mergesort' cmp . map wrap
+
+mergesort' :: (a -> a -> Ordering) -> [[a]] -> [a]
+mergesort' cmp [] = []
+mergesort' cmp [xs] = xs
+mergesort' cmp xss = mergesort' cmp (merge_pairs cmp xss)
+
+merge_pairs :: (a -> a -> Ordering) -> [[a]] -> [[a]]
+merge_pairs cmp [] = []
+merge_pairs cmp [xs] = [xs]
+merge_pairs cmp (xs:ys:xss) = merge cmp xs ys : merge_pairs cmp xss
+
+merge :: (a -> a -> Ordering) -> [a] -> [a] -> [a]
+merge cmp xs [] = xs
+merge cmp [] ys = ys
+merge cmp (x:xs) (y:ys)
+ = case x `cmp` y of
+	LT -> x : merge cmp    xs (y:ys)
+	_  -> y : merge cmp (x:xs)   ys
+
+wrap :: a -> [a]
+wrap x = [x]
+
+{-
+OLD: qsort version
 
 -- qsort is stable and does not concatenate.
 qsort :: (a -> a -> Ordering) -> [a] -> [a] -> [a]
@@ -500,6 +568,7 @@ rqpart cmp x (y:ys) rle rgt r =
     case cmp y x of
 	GT -> rqpart cmp x ys rle (y:rgt) r
     	_  -> rqpart cmp x ys (y:rle) rgt r
+-}
 
 #endif /* USE_REPORT_PRELUDE */
 
