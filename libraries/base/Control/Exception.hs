@@ -118,8 +118,7 @@ import GHC.IOBase	( IO(..) )
 #endif
 
 #ifdef __HUGS__
-import Hugs.Exception	hiding ( evaluate )
-import qualified Hugs.Exception as ExceptionBase
+import Hugs.Exception	as ExceptionBase
 #endif
 
 import Prelude 		hiding ( catch )
@@ -241,7 +240,7 @@ evaluate a = IO $ \s -> case a `seq` () of () -> (# s, a #)
 	-- 	a `seq` (# s, a #)
 	-- because we can't have an unboxed tuple as a function argument
 #elif defined(__HUGS__)
-evaluate = ExceptionBase.evaluate
+evaluate a = a `seq` return a	-- dummy implementation: to be fixed
 #endif
 
 -----------------------------------------------------------------------------
