@@ -535,7 +535,7 @@ the InstallShield.
 </Para>
 
 <Para>
-An installation of GHC requires about 70M of disk space.
+An installation of GHC requires about 140M of disk space.
 To run GHC comfortably, your machine should have at least
 64M of memory.
 </Para>
@@ -546,16 +546,22 @@ To run GHC comfortably, your machine should have at least
 <Para>
 Download the latest GHC distribution (ghc-5.02 InstallShield installer, 27M)
 from <ULink
-URL="http://www.haskell.org/ghc/download_ghc_502.html">haskell.org</ULink>
-It is packaged up using an installer that should be familiar-looking to
-Windows users.
+URL="http://www.haskell.org/ghc/download_ghc_502.html">haskell.org</ULink>.
 </Para>
 
 <Para>
 When the installer has completed, make sure you add the location of the
-ghc <Filename>bin/</Filename> directory to your path (e.g.
-<Filename>C:/ghc/ghc-5.02/bin</Filename>).
-You need to do this in order to bring the various GHC binaries into scope.
+ghc <Filename>bin/</Filename> directory to your path, as directed in the
+final dialog of the installer. You need to do this in order to bring the
+various GHC binaries into scope.
+</Para>
+
+<Para>
+You can freely move the GHC tree once you've installed it just by copying
+the <Filename>ghc-x.yy</Filename> directory. You might want to do this in
+order to use GHC with tools that don't like spaces in paths (GHC is
+installed in <Filename>&bsol;Program Files&bsol;Glasgow Haskell
+Compiler</Filename> by default.
 </Para>
 
 <Para>
