@@ -688,4 +688,4 @@ instance Binary FastString where
 
   get bh = do 
 	j <- get bh
-	case getUserData bh of (_, _, _, arr) -> return (arr ! j)
+	case getUserData bh of (_, _, _, arr) -> return $! (arr ! j)
