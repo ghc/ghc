@@ -40,23 +40,23 @@ infixl 9  !, //
 {-# INLINE assocs #-}
 #endif
 
-{-# GENERATE_SPECS listArray a{~,Int,IPr} b{} #-}
+{-# SPECIALISE listArray :: (Int,Int) -> [b] -> Array Int b #-}
 listArray	      :: (Ix a) => (a,a) -> [b] -> Array a b
 listArray b vs	      =  array b (zipWith (\ a b -> (a,b)) (range b) vs)
 
-{-# GENERATE_SPECS indices a{~,Int,IPr} b{} #-}
+{-# SPECIALISE indices :: Array Int b -> [Int] #-}
 indices		      :: (Ix a) => Array a b -> [a]
 indices		      =  range . bounds
 
-{-# GENERATE_SPECS elems a{~,Int,IPr} b{} #-}
+{-# SPECIALISE elems :: Array Int b -> [b] #-}
 elems		      :: (Ix a) => Array a b -> [b]
 elems a               =  [a!i | i <- indices a]
 
-{-# GENERATE_SPECS assocs a{~,Int,IPr} b{} #-}
+{-# SPECIALISE assocs :: Array Int b -> [(Int,b)] #-}
 assocs		      :: (Ix a) => Array a b -> [(a,b)]
 assocs a              =  [(i, a!i) | i <- indices a]
 
-{-# GENERATE_SPECS amap a{~,Int,IPr} b{} c{} #-}
+{-# SPECIALISE amap :: (b -> c) -> Array Int b -> Array Int c #-}
 amap		      :: (Ix a) => (b -> c) -> Array a b -> Array a c
 amap f a              =  array b [(i, f (a!i)) | i <- range b]
                          where b = bounds a
