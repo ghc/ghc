@@ -1,5 +1,5 @@
 % 
-% $Id: glasgow_exts.vsgml,v 1.18 1999/11/01 16:06:34 simonpj Exp $
+% $Id: glasgow_exts.vsgml,v 1.19 1999/11/12 12:51:50 simonpj Exp $
 %
 % GHC Language Extensions.
 %
@@ -1516,6 +1516,25 @@ because the <tt>data</tt> version does carry an implementation cost,
 but single-field existentially quantified constructors aren't much
 use.  So the simple restriction (no existential stuff on <tt>newtype</tt>)
 stands, unless there are convincing reasons to change it.
+
+
+<item> You can't use <tt>deriving</tt> to define instances of a
+data type with existentially quantified data constructors.
+
+Reason: in most cases it would not make sense. For example:#
+<tscreen><verb>
+  data T = forall a. MkT [a] deriving( Eq )
+</verb></tscreen>
+To derive <tt>Eq</tt> in the standard way we would need to have equality
+between the single component of two <tt>MkT</tt> constructors:
+<tscreen><verb>
+  instance Eq T where
+    (MkT a) == (MkT b) = ???
+</verb></tscreen>
+But <tt>a</tt> and <tt>b</tt> have distinct types, and so can't be compared.
+It's just about possible to imagine examples in which the derived instance
+would make sense, but it seems altogether simpler simply to prohibit such
+declarations.  Define your own instances!
 </itemize>
 
 
