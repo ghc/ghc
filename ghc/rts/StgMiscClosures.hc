@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.71 2001/12/10 18:07:35 sof Exp $
+ * $Id: StgMiscClosures.hc,v 1.72 2002/01/22 13:54:23 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -295,7 +295,7 @@ STGFUN(stg_IND_entry)
     TICK_ENT_IND(Node);	/* tick */
     R1.p = (P_) ((StgInd*)R1.p)->indirectee;
     TICK_ENT_VIA_NODE();
-    JMP_(ENTRY_CODE(*R1.p));
+    JMP_(GET_ENTRY(R1.cl));
     FE_
 }
 
@@ -306,7 +306,7 @@ STGFUN(stg_IND_STATIC_entry)
     TICK_ENT_IND(Node);	/* tick */
     R1.p = (P_) ((StgIndStatic*)R1.p)->indirectee;
     TICK_ENT_VIA_NODE();
-    JMP_(ENTRY_CODE(*R1.p));
+    JMP_(GET_ENTRY(R1.cl));
     FE_
 }
 
@@ -350,7 +350,7 @@ STGFUN(stg_IND_PERM_entry)
     TICK_ENT_VIA_NODE();
 #endif
 
-    JMP_(ENTRY_CODE(*R1.p));
+    JMP_(GET_ENTRY(R1.cl));
     FE_
 }  
 
@@ -361,7 +361,7 @@ STGFUN(stg_IND_OLDGEN_entry)
     TICK_ENT_IND(Node);	/* tick */
     R1.p = (P_) ((StgInd*)R1.p)->indirectee;
     TICK_ENT_VIA_NODE();
-    JMP_(ENTRY_CODE(*R1.p));
+    JMP_(GET_ENTRY(R1.cl));
     FE_
 }
 
@@ -391,7 +391,7 @@ STGFUN(stg_IND_OLDGEN_PERM_entry)
 
     R1.p = (P_) ((StgInd*)R1.p)->indirectee;
     TICK_ENT_VIA_NODE();
-    JMP_(ENTRY_CODE(*R1.p));
+    JMP_(GET_ENTRY(R1.cl));
     FE_
 }
 

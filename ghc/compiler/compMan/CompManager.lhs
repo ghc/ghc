@@ -22,7 +22,7 @@ module CompManager (
 #ifdef GHCI
     cmModuleIsInterpreted, -- :: CmState -> String -> IO Bool
 
-    cmSetContext,  -- :: CmState -> [String] -> [String] -> IO CmState
+    cmSetContext,  -- :: CmState -> DynFlags -> [String] -> [String] -> IO CmState
     cmGetContext,  -- :: CmState -> IO ([String],[String])
 
     cmInfoThing,   -- :: CmState -> DynFlags -> String -> IO (Maybe TyThing)
@@ -36,8 +36,9 @@ module CompManager (
 
     cmTypeOfName,  -- :: CmState -> Name -> IO (Maybe String)
 
+    HValue,
     cmCompileExpr, -- :: CmState -> DynFlags -> String 
-		   -- 	-> IO (CmState, Maybe HValue)#endif
+		   --	-> IO (CmState, Maybe HValue)
 #endif
   )
 where
@@ -246,7 +247,6 @@ cmInfoThing cmstate dflags id
 data CmRunResult
   = CmRunOk [Name] 		-- names bound by this evaluation
   | CmRunFailed 
-  | CmRunDeadlocked		-- statement deadlocked
   | CmRunException Exception	-- statement raised an exception
 
 cmRunStmt :: CmState -> DynFlags -> String -> IO (CmState, CmRunResult)		
@@ -291,10 +291,6 @@ cmRunStmt cmstate@CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls, ic=icontext }
 		either_hvals <- sandboxIO thing_to_run
 		case either_hvals of
 		   Left err
-			| err == dEADLOCKED
-			-> return ( cmstate{ pcs=new_pcs, ic=new_ic }, 
-				    CmRunDeadlocked )
-			| otherwise
 			-> do hPutStrLn stderr ("unknown failure, code " ++ show err)
 			      return ( cmstate{ pcs=new_pcs, ic=new_ic }, CmRunFailed )
 
@@ -314,9 +310,9 @@ cmRunStmt cmstate@CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls, ic=icontext }
 				     CmRunOk names)
 
 -- We run the statement in a "sandbox", which amounts to calling into
--- the RTS to request a new main thread.  The main benefit is that we
--- get to detect a deadlock this way, but also there's no danger that
--- exceptions raised by the expression can affect the interpreter.
+-- the RTS to request a new main thread.  The main benefit is that
+-- there's no danger that exceptions raised by the expression can
+-- affect the interpreter.
 
 sandboxIO :: IO a -> IO (Either Int (Either Exception a))
 sandboxIO thing = do
@@ -331,9 +327,6 @@ sandboxIO thing = do
 		return (Right result)
 	else do
 		return (Left (fromIntegral stat))
-
--- ToDo: slurp this in from ghc/includes/RtsAPI.h somehow
-dEADLOCKED = 4 :: Int
 
 foreign import "rts_evalStableIO"  {- safe -}
   rts_evalStableIO :: StablePtr (IO a) -> Ptr (StablePtr a) -> IO CInt

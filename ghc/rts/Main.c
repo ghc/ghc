@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.31 2001/09/04 18:29:21 ken Exp $
+ * $Id: Main.c,v 1.32 2002/01/22 13:54:22 simonmar Exp $
  *
  * (c) The GHC Team 1998-2000
  *
@@ -109,10 +109,6 @@ int main(int argc, char *argv[])
 
     /* check the status of the entire Haskell computation */
     switch (status) {
-    case Deadlock:
-      prog_belch("no threads to run:  infinite loop or deadlock?");
-      exit_status = EXIT_DEADLOCK;
-      break;
     case Killed:
       prog_belch("main thread exited (uncaught exception)");
       exit_status = EXIT_KILLED;

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.30 2001/10/23 11:30:07 simonmar Exp $
+ * $Id: RtsAPI.c,v 1.31 2002/01/22 13:54:22 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -479,8 +479,6 @@ rts_checkSchedStatus ( char* site, SchedulerStatus rc )
 	barf("%s: uncaught exception",site);
     case Interrupted:
 	barf("%s: interrupted", site);
-    case Deadlock:
-	barf("%s: no threads to run:  infinite loop or deadlock?", site);
     default:
 	barf("%s: Return code (%d) not ok",(site),(rc));	
     }

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.110 2001/12/18 12:33:45 simonmar Exp $
+ * $Id: Schedule.c,v 1.111 2002/01/22 13:54:22 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -579,26 +579,46 @@ schedule( void )
 	if (blocked_queue_hd == END_TSO_QUEUE
 	    && run_queue_hd == END_TSO_QUEUE
 	    && sleeping_queue == END_TSO_QUEUE) {
+
 	    IF_DEBUG(scheduler, sched_belch("still deadlocked, checking for black holes..."));
 	    detectBlackHoles();
+
+	    // No black holes, so probably a real deadlock.  Send the
+	    // current main thread the Deadlock exception (or in the SMP
+	    // build, send *all* main threads the deadlock exception,
+	    // since none of them can make progress).
 	    if (run_queue_hd == END_TSO_QUEUE) {
-		StgMainThread *m = main_threads;
+		StgMainThread *m;
 #ifdef SMP
-		for (; m != NULL; m = m->link) {
-		    deleteThread(m->tso);
-		    m->ret = NULL;
-		    m->stat = Deadlock;
-		    pthread_cond_broadcast(&m->wakeup);
+		for (m = main_threads; m != NULL; m = m->link) {
+		    switch (m->tso->why_blocked) {
+		    case BlockedOnBlackHole:
+			raiseAsync(m->tso, (StgClosure *)NonTermination_closure);
+			break;
+		    case BlockedOnException:
+		    case BlockedOnMVar:
+			raiseAsync(m->tso, (StgClosure *)Deadlock_closure);
+			break;
+		    default:
+			barf("deadlock: main thread blocked in a strange way");
+		    }
 		}
-		main_threads = NULL;
 #else
-		deleteThread(m->tso);
-		m->ret = NULL;
-		m->stat = Deadlock;
-		main_threads = m->link;
-		return;
+		m = main_threads;
+		switch (m->tso->why_blocked) {
+		case BlockedOnBlackHole:
+		    raiseAsync(m->tso, (StgClosure *)NonTermination_closure);
+		    break;
+		case BlockedOnException:
+		case BlockedOnMVar:
+		    raiseAsync(m->tso, (StgClosure *)Deadlock_closure);
+		    break;
+		default:
+		    barf("deadlock: main thread blocked in a strange way");
+		}
 #endif
 	    }
+	    ASSERT( run_queue_hd != END_TSO_QUEUE );
 	}
     }
 #elif defined(PAR)

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.24 2001/10/29 11:33:37 simonmar Exp $
+ * $Id: RtsAPI.h,v 1.25 2002/01/22 13:54:22 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -23,8 +23,7 @@ typedef enum {
     NoStatus,    /* not finished yet */
     Success,	 /* completed successfully */
     Killed,	 /* uncaught exception */
-    Interrupted, /* stopped in response to a call to interruptStgRts */
-    Deadlock	 /* no threads to run, but main thread hasn't finished */
+    Interrupted  /* stopped in response to a call to interruptStgRts */
 } SchedulerStatus;
 
 typedef StgClosure *HaskellObj;

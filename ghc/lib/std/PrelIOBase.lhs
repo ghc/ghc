@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.45 2001/11/26 20:04:00 sof Exp $
+% $Id: PrelIOBase.lhs,v 1.46 2002/01/22 13:54:22 simonmar Exp $
 % 
 % (c) The University of Glasgow, 1994-2001
 %
@@ -393,7 +393,8 @@ data Exception
   | DynException	Dynamic		-- Dynamic exceptions
   | AsyncException	AsyncException	-- Externally generated errors
   | BlockedOnDeadMVar			-- Blocking on a dead MVar
-  | NonTermination
+  | NonTermination			-- Cyclic data dependency or other loop
+  | Deadlock				-- no threads can run (raised in main thread)
   | UserError		String
 
 data ArithException
@@ -457,6 +458,7 @@ instance Show Exception where
   showsPrec _ (AsyncException e)	 = shows e
   showsPrec _ (BlockedOnDeadMVar)	 = showString "thread blocked indefinitely"
   showsPrec _ (NonTermination)           = showString "<<loop>>"
+  showsPrec _ (Deadlock)                 = showString "<<deadlock>>"
   showsPrec _ (UserError err)            = showString err
 
 -- -----------------------------------------------------------------------------

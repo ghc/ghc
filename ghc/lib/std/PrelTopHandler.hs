@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "PrelIOUtils.h" #-}
 -- -----------------------------------------------------------------------------
 --
--- (c) The University of Glasgow, 1994-
+-- (c) The University of Glasgow, 1994-2002
 --
 -- PrelTopHandler
 --
@@ -41,6 +41,9 @@ real_handler ex =
 	-- only the main thread gets ExitException exceptions
 	ExitException ExitSuccess     -> shutdownHaskellAndExit 0
 	ExitException (ExitFailure n) -> shutdownHaskellAndExit n
+
+	Deadlock    -> reportError True 
+			  "no threads to run:  infinite loop or deadlock?"
 
 	ErrorCall s -> reportError True s
 	other       -> reportError True (showsPrec 0 other "\n")

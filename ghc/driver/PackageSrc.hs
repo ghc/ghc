@@ -133,6 +133,7 @@ package_details installing
          , "PrelIOBase_heapOverflow_closure"
          , "PrelIOBase_NonTermination_closure"
          , "PrelIOBase_BlockedOnDeadMVar_closure"
+         , "PrelIOBase_Deadlock_closure"
          , "PrelWeak_runFinalizzerBatch_closure"
          , "__stginit_Prelude"
          ])
