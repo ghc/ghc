@@ -4,7 +4,7 @@
 \section[TcExpr]{Typecheck an expression}
 
 \begin{code}
-module TcExpr ( tcExpr, tcId ) where
+module TcExpr ( tcExpr, tcPolyExpr, tcId ) where
 
 #include "HsVersions.h"
 
@@ -361,14 +361,14 @@ tcMonoExpr (CCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
     let
 	io_result_ty = mkTyConApp ioTyCon [result_ty]
     in
-    case tyConDataCons ioTyCon of { [ioDataCon] ->
     unifyTauTy res_ty io_result_ty		`thenTc_`
 
 	-- Construct the extra insts, which encode the
 	-- constraints on the argument and result types.
-    mapNF_Tc new_arg_dict (zipEqual "tcMonoExpr:CCall" args ty_vars)    `thenNF_Tc` \ ccarg_dicts_s ->
-    newDicts result_origin [(cReturnableClass, [result_ty])]	    `thenNF_Tc` \ (ccres_dict, _) ->
+    mapNF_Tc new_arg_dict (zipEqual "tcMonoExpr:CCall" args ty_vars)   `thenNF_Tc` \ ccarg_dicts_s ->
+    newDicts result_origin [(cReturnableClass, [result_ty])]	       `thenNF_Tc` \ (ccres_dict, _) ->
 
+    case tyConDataCons ioTyCon of { [ioDataCon] ->
     returnTc (HsApp (HsVar (RealId ioDataCon) `TyApp` [result_ty])
 		    (CCall lbl args' may_gc is_asm io_result_ty),
 		      -- do the wrapping in the newtype constructor here
