@@ -10,17 +10,23 @@
 --
 -- Multi-way trees (/aka/ rose trees) and forests.
 --
--- Also included are neat presentations for trees and forests.
---
 -----------------------------------------------------------------------------
 
 module Data.Tree(
 	Tree(..), Forest,
+	drawTree, drawForest,
 	flatten, levels,
     ) where
 
 -- | Multi-way trees, also known as /rose trees/.
 data Tree a   = Node a (Forest a) -- ^ a value and zero or more child trees.
+#ifndef __HADDOCK__
+  deriving (Eq, Read, Show)
+#else /* __HADDOCK__ (which can't figure these out by itself) */
+instance Eq a => Eq (Tree a)
+instance Read a => Read (Tree a)
+instance Show a => Show (Tree a)
+#endif
 type Forest a = [Tree a]
 
 instance Functor Tree where
@@ -29,22 +35,13 @@ instance Functor Tree where
 mapTree              :: (a -> b) -> (Tree a -> Tree b)
 mapTree f (Node x ts) = Node (f x) (map (mapTree f) ts)
 
--- explicit instance for Haddock's benefit
-instance Eq a => Eq (Tree a) where
-  Node x ts == Node x' ts'  =  x == x' && ts == ts'
+-- | Neat 2-dimensional drawing of a tree.
+drawTree :: Show a => Tree a -> String
+drawTree  = unlines . draw . mapTree show
 
-instance Show a => Show (Tree a) where
-  show = showTree
-  showList ts s = showForest ts ++ s
-
-showTree :: Show a => Tree a -> String
-showTree  = drawTree . mapTree show
-
-showForest :: Show a => Forest a -> String
-showForest  = unlines . map showTree
-
-drawTree :: Tree String -> String
-drawTree  = unlines . draw
+-- | Neat 2-dimensional drawing of a forest.
+drawForest :: Show a => Forest a -> String
+drawForest  = unlines . map drawTree
 
 draw :: Tree String -> [String]
 draw (Node x ts0) = grp this (space (length this)) (stLoop ts0)
