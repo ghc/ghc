@@ -685,6 +685,12 @@ magicIdRegMaybe (VanillaReg _ ILIT(7)) 	= Just (FixedReg ILIT(REG_R7))
 #ifdef REG_R8 
 magicIdRegMaybe (VanillaReg _ ILIT(8)) 	= Just (FixedReg ILIT(REG_R8))
 #endif
+#ifdef REG_R9 
+magicIdRegMaybe (VanillaReg _ ILIT(9)) 	= Just (FixedReg ILIT(REG_R9))
+#endif
+#ifdef REG_R10 
+magicIdRegMaybe (VanillaReg _ ILIT(10))	= Just (FixedReg ILIT(REG_R10))
+#endif
 #ifdef REG_F1
 magicIdRegMaybe (FloatReg ILIT(1))	= Just (FixedReg ILIT(REG_F1))
 #endif				 	
