@@ -240,12 +240,14 @@ instance Ppr Con where
 
 ------------------------------
 pprVarStrictType :: (Name, Strict, Type) -> Doc
+-- Slight infelicity: with print non-atomic type with parens
 pprVarStrictType (v, str, t) = ppr v <+> text "::" <+> pprStrictType (str, t)
 
 ------------------------------
 pprStrictType :: (Strict, Type) -> Doc
-pprStrictType (IsStrict, t) = char '!' <> ppr t
-pprStrictType (NotStrict, t) = ppr t
+-- Prints with parens if not already atomic
+pprStrictType (IsStrict, t) = char '!' <> pprParendType t
+pprStrictType (NotStrict, t) = pprParendType t
 
 ------------------------------
 pprParendType :: Type -> Doc
