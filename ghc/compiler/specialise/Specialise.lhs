@@ -9,7 +9,7 @@ module Specialise ( specProgram ) where
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlags, DynFlag(..) )
-import Id		( Id, idName, idType, mkUserLocal, isDataConWrapId )
+import Id		( Id, idName, idType, mkUserLocal ) 
 import TcType		( Type, mkTyVarTy, tcSplitSigmaTy, 
 			  tyVarsOfTypes, tyVarsOfTheta, isClassPred,
 			  mkForAllTys, tcCmpType
@@ -787,8 +787,6 @@ specDefn subst calls (fn, rhs)
   |  rhs_tyvars `lengthIs` n_tyvars 	-- Rhs of fn's defn has right number of big lambdas
   && rhs_bndrs  `lengthAtLeast` n_dicts	-- and enough dict args
   && notNull calls_for_me		-- And there are some calls to specialise
-  && not (isDataConWrapId fn)		-- And it's not a data con wrapper, which have
-					-- stupid overloading that simply discard the dictionary
 
 -- At one time I tried not specialising small functions
 -- but sometimes there are big functions marked INLINE
