@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.87 2002/04/10 11:43:45 stolz Exp $
+ * $Id: Linker.c,v 1.88 2002/04/23 17:33:54 ken Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -1705,7 +1705,7 @@ findElfSection ( void* objImage, Elf32_Word sh_type )
           && i != ehdr->e_shstrndx
 	  /* Ignore string tables named .stabstr, as they contain
              debugging info. */
-          && 0 != strncmp(".stabstr", sh_strtab + shdr[i].sh_name, 8)
+          && 0 != memcmp(".stabstr", sh_strtab + shdr[i].sh_name, 8)
          ) {
          ptr = ehdrC + shdr[i].sh_offset;
          break;
@@ -1815,7 +1815,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
           && i != ehdr->e_shstrndx
 	  /* Ignore string tables named .stabstr, as they contain
              debugging info. */
-          && 0 != strncmp(".stabstr", sh_strtab + shdr[i].sh_name, 8)
+          && 0 != memcmp(".stabstr", sh_strtab + shdr[i].sh_name, 8)
          ) {
          IF_DEBUG(linker,belch("   section %d is a normal string table", i ));
          strtab = ehdrC + shdr[i].sh_offset;
@@ -2272,7 +2272,7 @@ ocResolve_ELF ( ObjectCode* oc )
          relocation entries that, when done, make the stabs debugging
          info point at the right places.  We ain't interested in all
          dat jazz, mun. */
-      if (0 == strncmp(".rel.stab", sh_strtab + shdr[shnum].sh_name, 9))
+      if (0 == memcmp(".rel.stab", sh_strtab + shdr[shnum].sh_name, 9))
          continue;
 
       if (shdr[shnum].sh_type == SHT_REL ) {
