@@ -109,6 +109,9 @@ renameDecl decl
 	    ctxt <- mapM renamePred ctxt
 	    asst <- renamePred asst
 	    return (HsInstDecl loc ctxt asst decls)
+	HsDocCommentNamed loc name doc -> do
+	    doc <- renameDoc doc
+	    return (HsDocCommentNamed loc name doc)
 	_ -> 
 	    return decl
 
