@@ -56,6 +56,17 @@ type binding;
 		    gibindsource : long;
 		    gibindline	 : long; >;
 
+        /* FFI declarations */
+
+	fobind  : < gfobind_id   : qid;
+		    gfobind_ty   : ttype;
+		    gfobind_ext  : maybe;
+		    gfobind_flag : long;
+		    gfobind_cc   : long;
+		    gfobind_kind : long;
+		    gfobind_line : long; >;
+		    
+
 	/* user-specified pragmas:XXXX */
 
 	vspec_uprag : <	gvspec_id   : qid;

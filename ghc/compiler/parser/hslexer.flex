@@ -399,6 +399,14 @@ NL  	    	    	[\n\r]
 <GlaExt>"_ccall_GC_"		{ RETURN(CCALL_GC); }
 <GlaExt>"_casm_"		{ RETURN(CASM); }
 <GlaExt>"_casm_GC_"		{ RETURN(CASM_GC); }
+<GlaExt>"foreign"		{ RETURN(FOREIGN); }
+<GlaExt>"export"		{ RETURN(EXPORT); }
+<GlaExt>"unsafe"		{ RETURN(UNSAFE); }
+<GlaExt>"_stdcall"		{ RETURN(STDCALL); }
+<GlaExt>"_ccall"		{ RETURN(C_CALL); }
+<GlaExt>"_pascal"	        { RETURN(PASCAL); }
+<GlaExt>"_fastcall"	        { RETURN(FASTCALL); }
+<GlaExt>"dynamic"	        { RETURN(DYNAMIC); }
 
 %{
     /* 

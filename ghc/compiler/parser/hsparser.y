@@ -161,7 +161,8 @@ BOOLEAN pat_check=TRUE;
 
 %token  SCC
 %token	CCALL		CCALL_GC	CASM		CASM_GC
-
+%token  EXPORT          UNSAFE          STDCALL		C_CALL  
+%token  PASCAL		FASTCALL	FOREIGN         DYNAMIC
 
 /**********************************************************************
 *                                                                     *
@@ -239,7 +240,8 @@ BOOLEAN pat_check=TRUE;
   		gdrhs gdpat valrhs
   		lampats	cexps gd
 
-%type <umaybe>  maybeexports impspec deriving
+%type <umaybe>  maybeexports impspec deriving 
+		ext_name
 
 %type <uliteral> lit_constant
 
@@ -261,10 +263,10 @@ BOOLEAN pat_check=TRUE;
 		qvar qcon qvarop qconop qop
 		qvark qconk qtycon qtycls
 		gcon gconk gtycon itycon qop1 qvarop1 
-		ename iname 
+		ename iname
 
 %type <ubinding>  topdecl topdecls letdecls
-		  typed datad newtd classd instd defaultd
+		  typed datad newtd classd instd defaultd foreignd
 		  decl decls valdef instdef instdefs
  		  maybe_where cbody rinst type_and_maybe_id
 
@@ -284,6 +286,7 @@ BOOLEAN pat_check=TRUE;
 %type <uentid>	  export import
 
 %type <ulong>     commas importkey get_line_no
+		  unsafe_flag callconv
 
 /**********************************************************************
 *                                                                     *
@@ -482,6 +485,7 @@ topdecl	:  typed				{ $$ = $1; FN = NULL; SAMEFN = 0; }
 	|  classd 				{ $$ = $1; FN = NULL; SAMEFN = 0; }
 	|  instd 				{ $$ = $1; FN = NULL; SAMEFN = 0; }
 	|  defaultd 				{ $$ = $1; FN = NULL; SAMEFN = 0; }
+	|  foreignd				{ $$ = $1; FN = NULL; SAMEFN = 0; }
 	|  decl 				{ $$ = $1; }
 	;
 
@@ -539,6 +543,27 @@ rinst	:  /* empty */			  			{ $$ = mknullbind(); }
 defaultd:  defaultkey OPAREN types CPAREN       { $$ = mkdbind($3,startlineno); }
 	|  defaultkey OPAREN CPAREN		{ $$ = mkdbind(Lnil,startlineno); }
 	;
+
+/* FFI primitive declarations - GHC/Hugs specific */
+foreignd:  foreignkey IMPORT callconv ext_name unsafe_flag qvarid DCOLON sigtype { $$ = mkfobind($6,$8,$4,$5,$3,FOREIGN_IMPORT,startlineno); }
+        |  foreignkey EXPORT callconv ext_name qvarid DCOLON sigtype             { $$ = mkfobind($5,$7,$4,0,$3,FOREIGN_EXPORT,startlineno); }
+	;
+
+callconv: STDCALL 	{ $$ = CALLCONV_STDCALL;  }
+	| C_CALL        { $$ = CALLCONV_CCALL;    }
+	| PASCAL        { $$ = CALLCONV_PASCAL;   }
+	| FASTCALL      { $$ = CALLCONV_FASTCALL; }
+	;
+
+ext_name: STRING	{ $$ = mkjust(lsing($1)); }
+	| STRING STRING { $$ = mkjust(mklcons ($1,lsing($2))); }
+        | DYNAMIC       { $$ = mknothing();   }
+
+unsafe_flag: UNSAFE	{ $$ = 1; }
+	   | /*empty*/  { $$ = 0; }
+	   ;
+
+
 
 decls	: decl
 	| decls SEMI decl
@@ -1430,6 +1455,9 @@ instkey	:   INSTANCE	{ setstartlineno();
 
 defaultkey: DEFAULT	{ setstartlineno(); }
 	;
+
+foreignkey: FOREIGN	         { setstartlineno();  }
+	  ;
 
 classkey:   CLASS	{ setstartlineno();
 			  if(etags)

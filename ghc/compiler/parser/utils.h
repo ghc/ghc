@@ -114,6 +114,15 @@ void	precparse PROTO((tree));
 void	checkprec PROTO((tree, qid, BOOLEAN));
 */
 
+/* FFI predefines */
+#define CALLCONV_STDCALL  0
+#define CALLCONV_CCALL    1
+#define CALLCONV_PASCAL   2
+#define CALLCONV_FASTCALL 3
+
+#define FOREIGN_IMPORT    0
+#define FOREIGN_EXPORT    1
+
 BOOLEAN	isconstr PROTO((char *));
 void	setstartlineno PROTO((void));
 
