@@ -11,7 +11,7 @@ import TcMonad
 import TcType		( zonkTcType, zonkTcTypes )
 import TcUnify		( unifyTauTyLists )
 import Inst		( Inst, LookupInstResult(..),
-			  lookupInst, isDict, getDictClassTys, getFunDeps,
+			  lookupInst, isDict, getDictClassTys, getFunDepsOfLIE,
 			  zonkLIE {- for debugging -} )
 import VarSet		( emptyVarSet )
 import VarEnv		( emptyVarEnv )
@@ -19,15 +19,12 @@ import FunDeps		( instantiateFdClassTys )
 import Bag		( bagToList )
 import Outputable
 import List		( elemIndex )
-import Maybe		( catMaybes )
 \end{code}
 
 Improvement goes here.
 
 \begin{code}
-tcImprove lie
-  = let cfdss = catMaybes (map getFunDeps (bagToList lie)) in
-    iterImprove cfdss
+tcImprove lie = iterImprove (getFunDepsOfLIE lie)
 
 iterImprove cfdss
   = instImprove cfdss			`thenTc` \ change1 ->

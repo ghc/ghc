@@ -209,6 +209,9 @@ instance Outputable (UniqFM a) where
 	ppr (LeafUFM x a) = text "LeafUFM " <+> int IBOX(x)
 	ppr (EmptyUFM)    = empty
 -}
+-- and when not debugging the package itself...
+instance Outputable a => Outputable (UniqFM a) where
+    ppr ufm = ppr (ufmToList ufm)
 \end{code}
 
 %************************************************************************

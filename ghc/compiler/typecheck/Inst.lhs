@@ -16,14 +16,14 @@ module Inst (
 	newDictFromOld, newDicts, newDictsAtLoc, 
 	newMethod, newMethodWithGivenTy, newOverloadedLit, instOverloadedFun,
 
-	tyVarsOfInst, instLoc, getDictClassTys, getFunDeps,
+	tyVarsOfInst, instLoc, getDictClassTys, getFunDeps, getFunDepsOfLIE,
 
 	lookupInst, lookupSimpleInst, LookupInstResult(..),
 
 	isDict, isTyVarDict, isStdClassTyVarDict, isMethodFor, notFunDep,
 	instBindingRequired, instCanBeGeneralised,
 
-	zonkInst, zonkFunDeps, instToId, instToIdBndr,
+	zonkInst, zonkFunDeps, zonkTvFunDeps, instToId, instToIdBndr,
 
 	InstOrigin(..), InstLoc, pprInstLoc
     ) where
@@ -39,7 +39,7 @@ import TcMonad
 import TcEnv	( TcIdSet, tcLookupValueByKey, tcLookupTyConByKey )
 import TcType	( TcThetaType,
 		  TcType, TcTauType, TcTyVarSet,
-		  zonkTcType, zonkTcTypes, 
+		  zonkTcTyVars, zonkTcType, zonkTcTypes, 
 		  zonkTcThetaType
 		)
 import Bag
@@ -76,6 +76,7 @@ import Unique	( fromRationalClassOpKey, rationalTyConKey,
 		  fromIntClassOpKey, fromIntegerClassOpKey, Unique
 		)
 import Maybes	( expectJust )
+import Maybe	( catMaybes )
 import Util	( thenCmp, zipWithEqual, mapAccumL )
 import Outputable
 \end{code}
@@ -232,6 +233,8 @@ getDictClassTys (Dict u clas tys _) = (clas, tys)
 getFunDeps (FunDep clas fds _) = Just (clas, fds)
 getFunDeps _ = Nothing
 
+getFunDepsOfLIE lie = catMaybes (map getFunDeps (bagToList lie))
+
 tyVarsOfInst :: Inst -> TcTyVarSet
 tyVarsOfInst (Dict _ _ tys _)        = tyVarsOfTypes  tys
 tyVarsOfInst (Method _ id tys _ _ _) = tyVarsOfTypes tys `unionVarSet` idFreeTyVars id
@@ -338,8 +341,10 @@ instOverloadedFun orig (HsVar v) arg_tys theta tau
 
 instFunDeps orig theta
   = tcGetInstLoc orig	`thenNF_Tc` \ loc ->
-    let ifd (clas, tys) = FunDep clas (instantiateFdClassTys clas tys) loc in
-    returnNF_Tc (map ifd theta)
+    let ifd (clas, tys) =
+	    let fds = instantiateFdClassTys clas tys in
+	    if null fds then Nothing else Just (FunDep clas fds loc)
+    in returnNF_Tc (catMaybes (map ifd theta))
 
 newMethodWithGivenTy orig id tys theta tau
   = tcGetInstLoc orig	`thenNF_Tc` \ loc ->
@@ -454,6 +459,13 @@ zonkFunDeps fds = mapNF_Tc zonkFd fds
     = zonkTcTypes ts1			`thenNF_Tc` \ ts1' ->
       zonkTcTypes ts2			`thenNF_Tc` \ ts2' ->
       returnNF_Tc (ts1', ts2')
+
+zonkTvFunDeps fds = mapNF_Tc zonkFd fds
+  where
+  zonkFd (tvs1, tvs2)
+    = zonkTcTyVars tvs1			`thenNF_Tc` \ tvs1' ->
+      zonkTcTyVars tvs2			`thenNF_Tc` \ tvs2' ->
+      returnNF_Tc (tvs1', tvs2')
 \end{code}
 
 
@@ -482,7 +494,7 @@ pprInst (Method u id tys _ _ loc)
 	  show_uniq u]
 
 pprInst (FunDep clas fds loc)
-  = ptext SLIT("fundep!")
+  = hsep [ppr clas, ppr fds]
 
 tidyInst :: TidyEnv -> Inst -> (TidyEnv, Inst)
 tidyInst env (LitInst u lit ty loc)

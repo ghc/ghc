@@ -1,13 +1,15 @@
 It's better to read it as: "if we know these, then we're going to know these"
 
 \begin{code}
-module FunDeps(oclose, instantiateFdClassTys, pprFundeps) where
+module FunDeps(oclose, instantiateFdClassTys, tyVarFunDep, pprFundeps) where
 
 #include "HsVersions.h"
 
 import Class		(classTvsFds)
+import Type		(tyVarsOfType)
 import Outputable	(interppSP, ptext, empty, hsep, punctuate, comma)
-import UniqSet		(elementOfUniqSet, addOneToUniqSet )
+import UniqSet		(elementOfUniqSet, addOneToUniqSet,
+			 uniqSetToList, unionManyUniqSets)
 import List		(elemIndex)
 
 oclose fds vs =
@@ -43,6 +45,12 @@ instantiateFdClassTys clas ts =
 lookupInstTys tyvars ts = map (lookupInstTy tyvars ts)
 lookupInstTy tyvars ts u = ts !! i
     where Just i = elemIndex u tyvars
+
+tyVarFunDep fdtys =
+    map (\(xs, ys) -> (unionMap getTyVars xs, unionMap getTyVars ys)) fdtys
+    where
+	getTyVars ty = tyVarsOfType ty
+	unionMap f xs = uniqSetToList (unionManyUniqSets (map f xs))
 
 pprFundeps [] = empty
 pprFundeps fds = hsep (ptext SLIT("|") : punctuate comma (map ppr_fd fds))

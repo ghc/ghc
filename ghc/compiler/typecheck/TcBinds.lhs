@@ -20,7 +20,8 @@ import TcHsSyn		( TcHsBinds, TcMonoBinds, TcId, zonkId, mkHsLet )
 
 import TcMonad
 import Inst		( Inst, LIE, emptyLIE, mkLIE, plusLIE, plusLIEs, InstOrigin(..),
-			  newDicts, tyVarsOfInst, instToId,
+			  newDicts, tyVarsOfInst, instToId, getFunDepsOfLIE,
+			  zonkFunDeps
 			)
 import TcEnv		( tcExtendLocalValEnv,
 			  newSpecPragmaId, newLocalId,
@@ -53,6 +54,7 @@ import Type		( mkTyVarTy, tyVarsOfTypes, mkTyConApp,
 			  mkDictTy, splitRhoTy, mkForAllTy, isUnLiftedType, 
 			  isUnboxedType, unboxedTypeKind, boxedTypeKind
 			)
+import FunDeps		( tyVarFunDep, oclose )
 import Var		( TyVar, tyVarKind )
 import VarSet
 import Bag
@@ -533,22 +535,27 @@ getTyVarsToGen is_unrestricted mono_id_tys lie
   = tcGetGlobalTyVars			`thenNF_Tc` \ free_tyvars ->
     zonkTcTypes mono_id_tys		`thenNF_Tc` \ zonked_mono_id_tys ->
     let
-	tyvars_to_gen = tyVarsOfTypes zonked_mono_id_tys `minusVarSet` free_tyvars
+	body_tyvars = tyVarsOfTypes zonked_mono_id_tys `minusVarSet` free_tyvars
     in
     if is_unrestricted
     then
-	returnNF_Tc (emptyVarSet, tyvars_to_gen)
+	let fds = concatMap snd (getFunDepsOfLIE lie) in
+	zonkFunDeps fds		`thenNF_Tc` \ fds' ->
+	let tvFundep = tyVarFunDep fds'
+	    extended_tyvars = oclose tvFundep body_tyvars in
+	-- pprTrace "gTVTG" (ppr (lie, body_tyvars, extended_tyvars)) $
+	returnNF_Tc (emptyVarSet, extended_tyvars)
     else
 	-- This recover and discard-errs is to avoid duplicate error
 	-- messages; this, after all, is an "extra" call to tcSimplify
-	recoverNF_Tc (returnNF_Tc (emptyVarSet, tyvars_to_gen))		$
+	recoverNF_Tc (returnNF_Tc (emptyVarSet, body_tyvars))		$
 	discardErrsTc							$
 
-	tcSimplify (text "getTVG") NotTopLevel tyvars_to_gen lie    `thenTc` \ (_, _, constrained_dicts) ->
+	tcSimplify (text "getTVG") NotTopLevel body_tyvars lie    `thenTc` \ (_, _, constrained_dicts) ->
 	let
 	  -- ASSERT: dicts_sig is already zonked!
 	    constrained_tyvars    = foldrBag (unionVarSet . tyVarsOfInst) emptyVarSet constrained_dicts
-	    reduced_tyvars_to_gen = tyvars_to_gen `minusVarSet` constrained_tyvars
+	    reduced_tyvars_to_gen = body_tyvars `minusVarSet` constrained_tyvars
         in
         returnTc (constrained_tyvars, reduced_tyvars_to_gen)
 \end{code}
