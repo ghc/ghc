@@ -1,0 +1,9 @@
+A set of example programs for handling external core format.
+
+In particular, typechecker and interpreter give a precise semantics.
+
+All can be built using, e.g.,
+
+happy -o Parser.hs Parser.y
+ghc --make -package text -fglasgow-exts  -o Driver Driver.hs
+
