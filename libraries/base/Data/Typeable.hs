@@ -39,13 +39,13 @@ module Data.Typeable
 	mkTyConApp,	-- :: TyCon   -> [TypeRep] -> TypeRep
 	mkAppTy,	-- :: TypeRep -> TypeRep   -> TypeRep
 	mkFunTy,	-- :: TypeRep -> TypeRep   -> TypeRep
-	splitTyConApp,	-- :: TypeRep -> (TyCon, [TypeRep])
-	funResultTy,	-- :: TypeRep -> TypeRep   -> Maybe TypeRep
 
 	-- * Observation of type representations
-	typerepTyCon,	-- :: TypeRep -> TyCon
-	typerepArgs,	-- :: TypeRep -> [TypeRep]
-	tyconString,	-- :: TyCon   -> String
+	splitTyConApp,	-- :: TypeRep -> (TyCon, [TypeRep])
+	funResultTy,	-- :: TypeRep -> TypeRep   -> Maybe TypeRep
+	typeRepTyCon,	-- :: TypeRep -> TyCon
+	typeRepArgs,	-- :: TypeRep -> [TypeRep]
+	tyConString,	-- :: TyCon   -> String
 
 	-- * The other Typeable classes
 	-- | /Note:/ The general instances are provided for GHC only.
@@ -211,16 +211,16 @@ mkTyCon str = TyCon (mkTyConKey str) str
 ----------------- Observation ---------------------
 
 -- | Observe the type constructor of a type representation
-typerepTyCon :: TypeRep -> TyCon
-typerepTyCon (TypeRep _ tc _) = tc
+typeRepTyCon :: TypeRep -> TyCon
+typeRepTyCon (TypeRep _ tc _) = tc
 
 -- | Observe the argument types of a type representation
-typerepArgs :: TypeRep -> [TypeRep]
-typerepArgs (TypeRep _ _ args) = args
+typeRepArgs :: TypeRep -> [TypeRep]
+typeRepArgs (TypeRep _ _ args) = args
 
 -- | Observe string encoding of a type representation
-tyconString :: TyCon   -> String
-tyconString  (TyCon _ str) = str
+tyConString :: TyCon   -> String
+tyConString  (TyCon _ str) = str
 
 ----------------- Showing TypeReps --------------------
 
