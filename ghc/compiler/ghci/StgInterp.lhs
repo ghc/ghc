@@ -248,9 +248,9 @@ repOfStgExpr stgexpr
         other 
            -> pprPanic "repOfStgExpr" (ppr other)
      where
-        altRhss (StgAlgAlts ty alts def)
+        altRhss (StgAlgAlts tycon alts def)
            = [rhs | (dcon,bndrs,uses,rhs) <- alts] ++ defRhs def
-        altRhss (StgPrimAlts ty alts def)
+        altRhss (StgPrimAlts tycon alts def)
            = [rhs | (lit,rhs) <- alts] ++ defRhs def
         defRhs StgNoDefault 
            = []
@@ -322,7 +322,7 @@ stg2expr ie stgexpr
                               (map doPrimAlt alts) 
                               (def2expr def)
 
-        StgCase scrut live liveR bndr srt (StgAlgAlts ty alts def)
+        StgCase scrut live liveR bndr srt (StgAlgAlts tycon alts def)
            |  repOfStgExpr scrut == RepP
            -> mkCaseAlg (repOfStgExpr stgexpr) 
                         bndr (stg2expr ie scrut) 

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.37 2000/11/07 13:12:22 simonpj Exp $
+% $Id: CgExpr.lhs,v 1.38 2000/11/15 14:37:08 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -315,7 +315,7 @@ mkRhsClosure	bndr cc	bi srt
 		[]			-- A thunk
 		body@(StgCase (StgApp scrutinee [{-no args-}])
 		      _ _ _ _   -- ignore uniq, etc.
-		      (StgAlgAlts case_ty
+		      (StgAlgAlts (Just tycon)
 		  	 [(con, params, use_mask,
 			    (StgApp selectee [{-no args-}]))]
 		  	 StgNoDefault))
@@ -332,7 +332,6 @@ mkRhsClosure	bndr cc	bi srt
     Just the_offset 	  = maybe_offset
     offset_into_int       = the_offset - fixedHdrSize
     is_single_constructor = maybeToBool (maybeTyConSingleCon tycon)
-    tycon		  = dataConTyCon con
 \end{code}
 
 

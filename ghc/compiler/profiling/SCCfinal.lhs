@@ -192,19 +192,19 @@ stgMassageForProfiling mod_name us stg_binds
 	do_alts alts		`thenMM` \ alts' ->
 	returnMM (StgCase expr' fv1 fv2 bndr srt alts')
       where
-	do_alts (StgAlgAlts ty alts def) 
+	do_alts (StgAlgAlts tycon alts def) 
 	  = mapMM do_alt alts 	`thenMM` \ alts' ->
 	    do_deflt def	`thenMM` \ def' ->
-	    returnMM (StgAlgAlts ty alts' def')
+	    returnMM (StgAlgAlts tycon alts' def')
 	  where
 	    do_alt (id, bs, use_mask, e)
 	      = do_expr e `thenMM` \ e' ->
 		returnMM (id, bs, use_mask, e')
 
-	do_alts (StgPrimAlts ty alts def) 
+	do_alts (StgPrimAlts tycon alts def) 
 	  = mapMM do_alt alts	`thenMM` \ alts' ->
 	    do_deflt def	`thenMM` \ def' ->
-	    returnMM (StgPrimAlts ty alts' def')
+	    returnMM (StgPrimAlts tycon alts' def')
 	  where
 	    do_alt (l,e)
 	      = do_expr e `thenMM` \ e' ->

@@ -32,7 +32,7 @@ module StgSyn (
 	SRT(..), noSRT,
 
 	pprStgBinding, pprStgBindings, pprStgBindingsWithSRTs,
-	getArgPrimRep,
+	getArgPrimRep, pprStgAlts,
 	isLitLitArg, isDllConApp, isStgTypeArg,
 	stgArity, stgArgType,
 	collectFinalStgBinders
@@ -52,6 +52,7 @@ import DataCon		( DataCon, dataConName )
 import PrimOp		( PrimOp )
 import Outputable
 import Type             ( Type )
+import TyCon            ( TyCon )
 import UniqSet		( isEmptyUniqSet, uniqSetToList, UniqSet )
 \end{code}
 
@@ -432,9 +433,33 @@ combineStgBinderInfo (StgBinderInfo arg1 unsat1 std_heap1 upd_heap1 fkap1)
 
 Just like in @CoreSyntax@ (except no type-world stuff).
 
+* Algebraic cases are done using
+	StgAlgAlts (Just tc) alts deflt
+
+* Polymorphic cases, or case of a function type, are done using
+	StgAlgAlts Nothing [] (StgBindDefault e)
+
+* Primitive cases are done using 
+	StgPrimAlts tc alts deflt
+
+We thought of giving polymorphic cases their own constructor,
+but we get a bit more code sharing this way
+
+The type constructor in StgAlgAlts/StgPrimAlts is guaranteed not
+to be abstract; that is, we can see its representation.  This is
+important because the code generator uses it to determine return
+conventions etc.  But it's not trivial where there's a moduule loop 
+involved, because some versions of a type constructor might not have
+all the constructors visible.  So mkStgAlgAlts (in CoreToStg) ensures
+that it gets the TyCon from the constructors or literals (which are
+guaranteed to have the Real McCoy) rather than from the scrutinee type.
+
 \begin{code}
 data GenStgCaseAlts bndr occ
-  = StgAlgAlts	Type	-- so we can find out things about constructor family
+  = StgAlgAlts	(Maybe TyCon)			-- Just tc => scrutinee type is 
+						--	      an algebraic data type
+						-- Nothing => scrutinee type is a type
+						--	      variable or function type
 		[(DataCon,			-- alts: data constructor,
 		  [bndr],			-- constructor's parameters,
 		  [Bool],			-- "use mask", same length as
@@ -443,7 +468,8 @@ data GenStgCaseAlts bndr occ
 						-- used in the ...
 		  GenStgExpr bndr occ)]	-- ...right-hand side.
 		(GenStgCaseDefault bndr occ)
-  | StgPrimAlts	Type	-- so we can find out things about constructor family
+
+  | StgPrimAlts	TyCon
 		[(Literal,			-- alts: unboxed literal,
 		  GenStgExpr bndr occ)]	-- rhs.
 		(GenStgCaseDefault bndr occ)
@@ -695,31 +721,32 @@ pprStgExpr (StgCase expr lvs_whole lvs_rhss bndr srt alts)
 		    ptext SLIT("]; rhs lvs: ["), interppSP (uniqSetToList lvs_rhss),
 		    ptext SLIT("]; "),
 		    pprMaybeSRT srt])),
-	   nest 2 (ppr_alts alts),
+	   nest 2 (pprStgAlts alts),
 	   char '}']
   where
-    ppr_default StgNoDefault = empty
-    ppr_default (StgBindDefault expr)
-      = hang (hsep [ptext SLIT("DEFAULT"), ptext SLIT("->")]) 4 (ppr expr)
+    pp_ty (StgAlgAlts  maybe_tycon _ _) = ppr maybe_tycon
+    pp_ty (StgPrimAlts tycon       _ _) = ppr tycon
 
-    pp_ty (StgAlgAlts  ty _ _) = ppr ty
-    pp_ty (StgPrimAlts ty _ _) = ppr ty
-
-    ppr_alts (StgAlgAlts ty alts deflt)
+pprStgAlts (StgAlgAlts _ alts deflt)
       = vcat [ vcat (map (ppr_bxd_alt) alts),
-		   ppr_default deflt ]
+	       pprStgDefault deflt ]
       where
 	ppr_bxd_alt (con, params, use_mask, expr)
 	  = hang (hsep [ppr con, interppSP params, ptext SLIT("->")])
 		   4 ((<>) (ppr expr) semi)
 
-    ppr_alts (StgPrimAlts ty alts deflt)
+pprStgAlts (StgPrimAlts _ alts deflt)
       = vcat [ vcat (map (ppr_ubxd_alt) alts),
-		   ppr_default deflt ]
+	       pprStgDefault deflt ]
       where
 	ppr_ubxd_alt (lit, expr)
 	  = hang (hsep [ppr lit, ptext SLIT("->")])
 		 4 ((<>) (ppr expr) semi)
+
+pprStgDefault StgNoDefault	    = empty
+pprStgDefault (StgBindDefault expr) = hang (hsep [ptext SLIT("DEFAULT"), ptext SLIT("->")]) 
+					 4 (ppr expr)
+
 \end{code}
 
 \begin{code}

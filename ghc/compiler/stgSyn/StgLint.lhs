@@ -19,7 +19,7 @@ import Literal		( literalType, Literal )
 import Maybes		( catMaybes )
 import Name		( getSrcLoc )
 import ErrUtils		( ErrMsg, Message, addErrLocHdrLine, pprBagOfErrors, dontAddErrLoc )
-import Type		( mkFunTys, splitFunTys, splitAlgTyConApp_maybe, 
+import Type		( mkFunTys, splitFunTys, splitAlgTyConApp_maybe, splitTyConApp_maybe,
 			  isUnLiftedType, isTyVarTy, splitForAllTys, Type
 			)
 import TyCon		( TyCon )
@@ -196,8 +196,13 @@ lintStgExpr (StgSCC _ expr)	= lintStgExpr expr
 
 lintStgExpr e@(StgCase scrut _ _ bndr _ alts)
   = lintStgExpr scrut		`thenMaybeL` \ _ ->
-    checkTys (idType bndr) scrut_ty (mkDefltMsg bndr) `thenL_`
 
+    (case alts of
+	StgPrimAlts tc _ _	 -> check_bndr tc
+	StgAlgAlts (Just tc) _ _ -> check_bndr tc
+	StgAlgAlts Nothing   _ _ -> returnL ()
+    )							`thenL_`
+	
     (trace (showSDoc (ppr e)) $ 
 	-- we only allow case of tail-call or primop.
     (case scrut of
@@ -206,12 +211,13 @@ lintStgExpr e@(StgCase scrut _ _ bndr _ alts)
 	other -> addErrL (mkCaseOfCaseMsg e))   `thenL_`
 
     addInScopeVars [bndr] (lintStgAlts alts scrut_ty)
-  )
+    )
   where
-    scrut_ty = get_ty alts
-
-    get_ty (StgAlgAlts  ty _ _) = ty
-    get_ty (StgPrimAlts ty _ _) = ty
+    scrut_ty	  = idType bndr
+    bad_bndr      = mkDefltMsg bndr
+    check_bndr tc = case splitTyConApp_maybe scrut_ty of
+			Just (bndr_tc, _) -> checkL (tc == bndr_tc) bad_bndr
+			Nothing		  -> addErrL bad_bndr
 \end{code}
 
 \begin{code}

@@ -161,15 +161,15 @@ liftExpr (StgCase scrut lv1 lv2 bndr srt alts)
     lift_alts alts	`thenLM` \ (alts', alts_info) ->
     returnLM (StgCase scrut' lv1 lv2 bndr srt alts', scrut_info `unionLiftInfo` alts_info)
   where
-    lift_alts (StgAlgAlts ty alg_alts deflt)
+    lift_alts (StgAlgAlts tycon alg_alts deflt)
 	= mapAndUnzipLM lift_alg_alt alg_alts	`thenLM` \ (alg_alts', alt_infos) ->
 	  lift_deflt deflt			`thenLM` \ (deflt', deflt_info) ->
-	  returnLM (StgAlgAlts ty alg_alts' deflt', foldr unionLiftInfo deflt_info alt_infos)
+	  returnLM (StgAlgAlts tycon alg_alts' deflt', foldr unionLiftInfo deflt_info alt_infos)
 
-    lift_alts (StgPrimAlts ty prim_alts deflt)
+    lift_alts (StgPrimAlts tycon prim_alts deflt)
 	= mapAndUnzipLM lift_prim_alt prim_alts	`thenLM` \ (prim_alts', alt_infos) ->
 	  lift_deflt deflt			`thenLM` \ (deflt', deflt_info) ->
-	  returnLM (StgPrimAlts ty prim_alts' deflt', foldr unionLiftInfo deflt_info alt_infos)
+	  returnLM (StgPrimAlts tycon prim_alts' deflt', foldr unionLiftInfo deflt_info alt_infos)
 
     lift_alg_alt (con, args, use_mask, rhs)
 	= liftExpr rhs		`thenLM` \ (rhs', rhs_info) ->

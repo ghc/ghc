@@ -31,6 +31,7 @@ import PrelIOBase	( fixIO )	-- Should be in GlaExts
 import IOBase		( fixIO )
 #endif
 import IOExts		( IORef, newIORef, readIORef, writeIORef, unsafePerformIO )
+import IO		( hPutStr, stderr )
 	
 import HsSyn		
 import RdrHsSyn
@@ -46,7 +47,7 @@ import HscTypes		( AvailEnv, lookupType,
 			  RdrAvailInfo )
 import BasicTypes	( Version, defaultFixity )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine,
-			  pprBagOfErrors, Message, Messages, errorsFound,
+			  Message, Messages, errorsFound, warningsFound,
 			  printErrorsAndWarnings
 			)
 import RdrName		( RdrName, dummyRdrVarName, rdrNameModule, rdrNameOcc,
@@ -182,6 +183,9 @@ type LocalFixityEnv = NameEnv RenamedFixitySig
 	-- We keep the whole fixity sig so that we
 	-- can report line-number info when there is a duplicate
 	-- fixity declaration
+
+emptyLocalFixityEnv :: LocalFixityEnv
+emptyLocalFixityEnv = emptyNameEnv
 
 lookupLocalFixity :: LocalFixityEnv -> Name -> Fixity
 lookupLocalFixity env name
@@ -365,6 +369,9 @@ initRn dflags hit hst pcs mod do_rn
 	
 	return (new_pcs, (warns, errs), res)
 
+initRnMS :: GlobalRdrEnv -> LocalFixityEnv -> RnMode
+	 -> RnMS a -> RnM d a
+
 initRnMS rn_env fixity_env mode thing_inside rn_down g_down
 	-- The fixity_env appears in both the rn_fixenv field
 	-- and in the HIT.  See comments with RnHiFiles.lookupFixityRn
@@ -376,11 +383,11 @@ initRnMS rn_env fixity_env mode thing_inside rn_down g_down
 
 initIfaceRnMS :: Module -> RnMS r -> RnM d r
 initIfaceRnMS mod thing_inside 
-  = initRnMS emptyRdrEnv emptyNameEnv InterfaceMode $
+  = initRnMS emptyRdrEnv emptyLocalFixityEnv InterfaceMode $
     setModuleRn mod thing_inside
 \end{code}
 
-@renameSourceCode@ is used to rename stuff ``out-of-line'';
+@renameDerivedCode@ is used to rename stuff ``out-of-line'';
 that is, not as part of the main renamer.
 Sole examples: derived definitions,
 which are only generated in the type checker.
@@ -389,52 +396,54 @@ The @NameSupply@ includes a @UniqueSupply@, so if you call it more than
 once you must either split it, or install a fresh unique supply.
 
 \begin{code}
-renameSourceCode :: DynFlags 
-		 -> Module
-		 -> PersistentRenamerState
-	         -> RnMS r
-	         -> r
+renameDerivedCode :: DynFlags 
+		  -> Module
+		  -> PersistentRenamerState
+	          -> RnMS r
+	          -> r
 
-renameSourceCode dflags mod prs m
-  = unsafePerformIO (
+renameDerivedCode dflags mod prs thing_inside
+  = unsafePerformIO $
 	-- It's not really unsafe!  When renaming source code we
 	-- only do any I/O if we need to read in a fixity declaration;
 	-- and that doesn't happen in pragmas etc
 
-        mkSplitUniqSupply 'r'				>>= \ new_us ->
-	newIORef (new_us, origNames (prsOrig prs), 
-			  origIParam (prsOrig prs))	>>= \ names_var ->
-	newIORef (emptyBag,emptyBag)			>>= \ errs_var ->
-    	let
-	    rn_down = RnDown { rn_dflags = dflags,
-			       rn_loc = generatedSrcLoc, rn_ns = names_var,
-			       rn_errs = errs_var, 
-			       rn_mod = mod, 
-			       rn_done   = bogus "rn_done",	rn_hit    = bogus "rn_hit",
-			       rn_ifaces = bogus "rn_ifaces"
-			     }
-	    s_down = SDown { rn_mode = InterfaceMode,
+    do	{ us <- mkSplitUniqSupply 'r'
+	; names_var <- newIORef (us, origNames (prsOrig prs), 
+				 origIParam (prsOrig prs))
+	; errs_var <- newIORef (emptyBag,emptyBag)
+
+    	; let rn_down = RnDown { rn_dflags = dflags,
+			       	 rn_loc    = generatedSrcLoc, rn_ns = names_var,
+			       	 rn_errs   = errs_var, 
+			       	 rn_mod    = mod, 
+			       	 rn_done   = bogus "rn_done",	
+				 rn_hit    = bogus "rn_hit",
+			       	 rn_ifaces = bogus "rn_ifaces"
+			       }
+	; let s_down = SDown { rn_mode = InterfaceMode,
 			       -- So that we can refer to PrelBase.True etc
-			     rn_genv = emptyRdrEnv, rn_lenv = emptyRdrEnv,
-			     rn_fixenv = emptyNameEnv }
-	in
-	m rn_down s_down			>>= \ result ->
-	
-	readIORef errs_var			>>= \ (warns,errs) ->
+			       rn_genv = emptyRdrEnv, rn_lenv = emptyRdrEnv,
+			       rn_fixenv = emptyLocalFixityEnv }
 
-	(if not (isEmptyBag errs) then
-		pprTrace "Urk! renameSourceCode found errors" (display errs) 
-#ifdef DEBUG
-	 else if not (isEmptyBag warns) then
-		pprTrace "Note: renameSourceCode found warnings" (display warns)
-#endif
-	 else
-		id) $
+	; result <- thing_inside rn_down s_down
+	; messages <- readIORef errs_var
 
-	return result
-    )
+	; if bad messages then
+		do { hPutStr stderr "Urk!  renameDerivedCode found errors or warnings"
+		   ; printErrorsAndWarnings alwaysQualify messages
+		   }
+	   else
+		return()
+
+	; return result
+	}
   where
-    display errs = pprBagOfErrors errs
+#ifdef DEBUG
+    bad messages = errorsFound messages || warningsFound messages
+#else
+    bad messages = errorsFound messages
+#endif
 
 bogus s = panic ("rnameSourceCode: " ++ s)  -- Used for unused record fields
 

@@ -4,21 +4,22 @@
 \section[Rename]{Renaming and dependency analysis passes}
 
 \begin{code}
-module Rename ( renameModule, closeIfaceDecls, checkOldIface ) where
+module Rename ( renameModule, renameExpr, closeIfaceDecls, checkOldIface ) where
 
 #include "HsVersions.h"
 
 import HsSyn
-import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, RdrNameDeprecation, 
+import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, RdrNameDeprecation, RdrNameHsExpr,
 			  RdrNameTyClDecl, RdrNameRuleDecl, RdrNameInstDecl, RdrNameImportDecl
 			)
 import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, RenamedRuleDecl, RenamedInstDecl,
-			  extractHsTyNames, 
+			  extractHsTyNames, RenamedHsExpr,
 			  instDeclFVs, tyClDeclFVs, ruleDeclFVs
 			)
 
 import CmdLineOpts	( DynFlags, DynFlag(..) )
 import RnMonad
+import RnExpr		( rnExpr )
 import RnNames		( getGlobalNames, exportsFromAvail )
 import RnSource		( rnSourceDecls, rnTyClDecl, rnIfaceRuleDecl, rnInstDecl )
 import RnIfaces		( slurpImpDecls, mkImportInfo, 
@@ -34,7 +35,7 @@ import RnEnv		( availsToNameSet, availName,
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
 			  moduleNameUserString, moduleName,
-			  moduleEnvElts
+			  moduleEnvElts, lookupModuleEnv
 			)
 import Name		( Name, NamedThing(..), getSrcLoc,
 			  nameIsLocalOrFrom, nameOccName, nameModule,
@@ -74,9 +75,10 @@ import List		( partition, nub )
 
 
 
+
 %*********************************************************
 %*						 	 *
-\subsection{The main function: rename}
+\subsection{The two main wrappers}
 %*							 *
 %*********************************************************
 
@@ -88,20 +90,63 @@ renameModule :: DynFlags
 	     -> IO (PersistentCompilerState, Maybe (PrintUnqualified, IsExported, ModIface, [RenamedHsDecl]))
 	-- Nothing => some error occurred in the renamer
 
-renameModule dflags hit hst old_pcs this_module rdr_module
+renameModule dflags hit hst pcs this_module rdr_module
+  = renameSource dflags hit hst pcs this_module get_unqual $
+    rename this_module rdr_module
+  where
+    get_unqual (Just (unqual, _, _, _)) = unqual
+    get_unqual Nothing			= alwaysQualify
+\end{code}
+
+
+\begin{code}
+renameExpr :: DynFlags
+	   -> HomeIfaceTable -> HomeSymbolTable
+	   -> PersistentCompilerState 
+	   -> Module -> RdrNameHsExpr
+	   -> IO (PersistentCompilerState, Maybe RenamedHsExpr)
+
+renameExpr dflags hit hst pcs this_module expr
+  | Just iface <- lookupModuleEnv hit this_module
+  = do	{ let rdr_env      = mi_globals iface
+	; let get_unqual _ = unQualInScope rdr_env
+	  
+	; renameSource dflags hit hst pcs this_module get_unqual $
+	  initRnMS rdr_env emptyLocalFixityEnv SourceMode $
+	  (rnExpr expr `thenRn` \ (e,_) -> returnRn (Just e))
+	}
+
+  | otherwise
+  = do	{ printErrs alwaysQualify (ptext SLIT("renameExpr: Bad module context") <+> ppr this_module)
+	; return (pcs, Nothing)
+	}
+\end{code}
+
+
+%*********************************************************
+%*						 	 *
+\subsection{The main function: rename}
+%*							 *
+%*********************************************************
+
+\begin{code}
+renameSource :: DynFlags
+	     -> HomeIfaceTable -> HomeSymbolTable
+	     -> PersistentCompilerState 
+	     -> Module 
+	     -> (Maybe r -> PrintUnqualified)
+	     -> RnMG (Maybe r)
+	     -> IO (PersistentCompilerState, Maybe r)
+	-- Nothing => some error occurred in the renamer
+
+renameSource dflags hit hst old_pcs this_module get_unqual thing_inside
   = do	{ showPass dflags "Renamer"
 
 		-- Initialise the renamer monad
-	; (new_pcs, msgs, maybe_rn_stuff) <- initRn dflags hit hst old_pcs this_module 
-						    (rename this_module rdr_module)
-
-	; let print_unqualified = case maybe_rn_stuff of
-				    Just (unqual, _, _, _) -> unqual
-				    Nothing	           -> alwaysQualify
-
+	; (new_pcs, msgs, maybe_rn_stuff) <- initRn dflags hit hst old_pcs this_module thing_inside
 
 	 	-- Print errors from renaming
-	;  printErrorsAndWarnings print_unqualified msgs ;
+	;  printErrorsAndWarnings (get_unqual maybe_rn_stuff) msgs ;
 
 		-- Return results.  No harm in updating the PCS
 	; if errorsFound msgs then

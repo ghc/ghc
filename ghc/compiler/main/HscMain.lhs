@@ -359,6 +359,34 @@ myCoreToStg dflags this_mod tidy_binds
 
 %************************************************************************
 %*									*
+\subsection{Compiling an expression}
+%*									*
+%************************************************************************
+
+hscExpr
+  :: DynFlags
+  -> HomeSymbolTable	
+  -> HomeIfaceTable
+  -> PersistentCompilerState    -- IN: persistent compiler state
+  -> Module			-- Context for compiling
+  -> String			-- The expression
+  -> IO HscResult
+
+hscExpr dflags hst hit pcs this_module expr
+  = do	{ 	-- Parse it
+	; maybe_parsed <- myParseExpr dflags expr
+	; case maybe_parsed of {
+      	     Nothing -> return (HscFail pcs_ch);
+      	     Just parsed_expr -> do {
+
+		-- Rename it
+	  (new_pcs, maybe_renamed_expr) <- renameExpr dflags hit hst pcs this_module parsed_expr ;
+	  case maybe_renamed_expr of {
+		Nothing -> 
+
+
+%************************************************************************
+%*									*
 \subsection{Initial persistent state}
 %*									*
 %************************************************************************

@@ -5,7 +5,7 @@
 
 \begin{code}
 module ErrUtils (
-	ErrMsg, WarnMsg, Message, Messages, errorsFound,
+	ErrMsg, WarnMsg, Message, Messages, errorsFound, warningsFound,
 
 	addShortErrLocLine, addShortWarnLocLine,
 	addErrLocHdrLine, dontAddErrLoc,
@@ -66,6 +66,9 @@ type Messages = (Bag WarnMsg, Bag ErrMsg)
 
 errorsFound :: Messages -> Bool
 errorsFound (warns, errs) = not (isEmptyBag errs)
+
+warningsFound :: Messages -> Bool
+warningsFound (warns, errs) = not (isEmptyBag warns)
 
 printErrorsAndWarnings :: PrintUnqualified -> Messages -> IO ()
 	-- Don't print any warnings if there are errors

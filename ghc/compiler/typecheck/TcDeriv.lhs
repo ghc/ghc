@@ -26,8 +26,7 @@ import TcSimplify	( tcSimplifyThetas )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
 import RnEnv		( bindLocatedLocalsRn )
-import RnMonad		( --RnNameSupply, 
-			  renameSourceCode, thenRn, mapRn, returnRn )
+import RnMonad		( renameDerivedCode, thenRn, mapRn, returnRn )
 import HscTypes		( DFunId, PersistentRenamerState )
 
 import BasicTypes	( Fixity )
@@ -224,7 +223,7 @@ tcDeriving prs mod inst_env_in get_fixity tycl_decls
 	-- The only tricky bit is that the extra_binds must scope over the
 	-- method bindings for the instances.
 	(rn_method_binds_s, rn_extra_binds)
-		= renameSourceCode dflags mod prs (
+		= renameDerivedCode dflags mod prs (
 			bindLocatedLocalsRn (ptext (SLIT("deriving"))) mbinders	$ \ _ ->
 			rnTopMonoBinds extra_mbinds []		`thenRn` \ (rn_extra_binds, _) ->
 			mapRn rn_meths method_binds_s		`thenRn` \ rn_method_binds_s ->

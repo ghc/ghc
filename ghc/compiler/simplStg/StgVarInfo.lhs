@@ -332,7 +332,7 @@ varsExpr (StgCase scrut _ _ bndr srt alts)
       )
     )
   where
-    vars_alts (StgAlgAlts ty alts deflt)
+    vars_alts (StgAlgAlts tycon alts deflt)
       = mapAndUnzip3Lne vars_alg_alt alts
 			`thenLne` \ (alts2,  alts_fvs_list,  alts_escs_list) ->
 	let
@@ -341,7 +341,7 @@ varsExpr (StgCase scrut _ _ bndr srt alts)
 	in
 	vars_deflt deflt `thenLne` \ (deflt2, deflt_fvs, deflt_escs) ->
 	returnLne (
-	    StgAlgAlts ty alts2 deflt2,
+	    StgAlgAlts tycon alts2 deflt2,
 	    alts_fvs  `unionFVInfo`   deflt_fvs,
 	    alts_escs `unionVarSet` deflt_escs
 	)
@@ -361,7 +361,7 @@ varsExpr (StgCase scrut _ _ bndr srt alts)
 							-- any of these binders
 	    ))
 
-    vars_alts (StgPrimAlts ty alts deflt)
+    vars_alts (StgPrimAlts tycon alts deflt)
       = mapAndUnzip3Lne vars_prim_alt alts
 			`thenLne` \ (alts2,  alts_fvs_list,  alts_escs_list) ->
 	let
@@ -370,7 +370,7 @@ varsExpr (StgCase scrut _ _ bndr srt alts)
 	in
 	vars_deflt deflt `thenLne` \ (deflt2, deflt_fvs, deflt_escs) ->
 	returnLne (
-	    StgPrimAlts ty alts2 deflt2,
+	    StgPrimAlts tycon alts2 deflt2,
 	    alts_fvs  `unionFVInfo`   deflt_fvs,
 	    alts_escs `unionVarSet` deflt_escs
 	)

@@ -25,13 +25,14 @@ import Id		( Id, mkSysLocal, idType, idStrictness, isExportedId,
 			  idFlavour
 			)
 import IdInfo		( StrictnessInfo(..), IdFlavour(..) )
-import DataCon		( dataConWrapId )
+import DataCon		( dataConWrapId, dataConTyCon )
+import TyCon		( isAlgTyCon )
 import Demand		( Demand, isStrict, wwLazy )
 import Name	        ( setNameUnique )
 import VarEnv
 import PrimOp		( PrimOp(..), setCCallUnique )
 import Type		( isUnLiftedType, isUnboxedTupleType, Type, splitFunTy_maybe,
-                          applyTy, repType, seqType,
+                          applyTy, repType, seqType, splitTyConApp_maybe,
 			  splitRepFunTys, mkFunTys,
                           uaUTy, usOnce, usMany, isTyVarTy
 			)
@@ -585,8 +586,6 @@ coreExprToStgFloat env (Case scrut bndr alts)
     default_to_stg env (Just rhs)
       = coreExprToStg env rhs	`thenUs` \ stg_rhs ->
 	returnUs (StgBindDefault stg_rhs)
-		-- The binder is used for prim cases and not otherwise
-		-- (hack for old code gen)
 \end{code}
 
 
@@ -652,9 +651,27 @@ newLocalIds top_lev env (b:bs)
 %************************************************************************
 
 \begin{code}
-mkStgAlgAlts  ty alts deflt = seqType ty `seq` StgAlgAlts  ty alts deflt
-mkStgPrimAlts ty alts deflt = seqType ty `seq` StgPrimAlts ty alts deflt
-mkStgLam ty bndrs body	    = seqType ty `seq` StgLam ty bndrs body
+-- There are two things going on in mkStgAlgAlts
+-- a)	We pull out the type constructor for the case, from the data
+-- 	constructor, if there is one.  See notes with the StgAlgAlts data type
+-- b) 	We force the type constructor to avoid space leaks
+
+mkStgAlgAlts ty alts deflt 
+  = case alts of
+		-- Get the tycon from the data con
+	(dc, _, _, _):_ -> StgAlgAlts (Just (dataConTyCon dc)) alts deflt
+
+		-- Otherwise just do your best
+	[] -> case splitTyConApp_maybe (repType ty) of
+		Just (tc,_) | isAlgTyCon tc -> StgAlgAlts (Just tc) alts deflt
+		other		 	    -> StgAlgAlts Nothing alts deflt
+
+mkStgPrimAlts ty alts deflt 
+  = case splitTyConApp_maybe ty of
+	Just (tc,_) -> StgPrimAlts tc alts deflt
+	Nothing	    -> pprPanic "mkStgAlgAlts" (ppr ty)
+
+mkStgLam ty bndrs body = seqType ty `seq` StgLam ty bndrs body
 
 mkStgApp :: StgEnv -> Id -> [StgArg] -> Type -> UniqSM StgExpr
 	-- The type is the type of the entire application
@@ -800,7 +817,7 @@ mk_stg_let bndr rhs dem floats body
 #endif
   | isUnLiftedType bndr_rep_ty			-- Use a case/PrimAlts
   = ASSERT( not (isUnboxedTupleType bndr_rep_ty) )
-    mkStgCase rhs bndr (StgPrimAlts bndr_rep_ty [] (StgBindDefault body))	`thenUs` \ expr' ->
+    mkStgCase rhs bndr (mkStgPrimAlts bndr_rep_ty [] (StgBindDefault body))	`thenUs` \ expr' ->
     mkStgBinds floats expr'
 
   | is_whnf
@@ -820,7 +837,7 @@ mk_stg_let bndr rhs dem floats body
   | otherwise 	-- Not WHNF
   = if is_strict then
 	-- Strict let with non-WHNF rhs
-	mkStgCase rhs bndr (StgAlgAlts bndr_rep_ty [] (StgBindDefault body))	`thenUs` \ expr' ->
+	mkStgCase rhs bndr (mkStgAlgAlts bndr_rep_ty [] (StgBindDefault body))	`thenUs` \ expr' ->
 	mkStgBinds floats expr'
     else
 	-- Lazy let with non-WHNF rhs, so keep the floats in the RHS
@@ -895,15 +912,15 @@ way to enforce ordering  --SDM.
 \begin{code}
 -- Discard alernatives in case (par# ..) of 
 mkStgCase scrut@(StgPrimApp ParOp _ _) bndr
-	  (StgPrimAlts ty _ deflt@(StgBindDefault _))
-  = returnUs (StgCase scrut bOGUS_LVs bOGUS_LVs bndr noSRT (StgPrimAlts ty [] deflt))
+	  (StgPrimAlts tycon _ deflt@(StgBindDefault _))
+  = returnUs (StgCase scrut bOGUS_LVs bOGUS_LVs bndr noSRT (StgPrimAlts tycon [] deflt))
 
 mkStgCase (StgPrimApp SeqOp [scrut] _) bndr 
 	  (StgPrimAlts _ _ deflt@(StgBindDefault rhs))
   = mkStgCase scrut_expr new_bndr new_alts
   where
-    new_alts | isUnLiftedType scrut_ty = WARN( True, text "mkStgCase" ) StgPrimAlts scrut_ty [] deflt
-	     | otherwise	       = StgAlgAlts  scrut_ty [] deflt
+    new_alts | isUnLiftedType scrut_ty = WARN( True, text "mkStgCase" ) mkStgPrimAlts scrut_ty [] deflt
+	     | otherwise	       = mkStgAlgAlts scrut_ty [] deflt
     scrut_ty = stgArgType scrut
     new_bndr = setIdType bndr scrut_ty
 	-- NB:  SeqOp :: forall a. a -> Int#

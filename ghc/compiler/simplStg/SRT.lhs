@@ -349,7 +349,7 @@ Case Alternatives
 srtCaseAlts :: UniqFM CafInfo -> (UniqSet Id, UniqFM (UniqSet Id))
 	-> Int -> StgCaseAlts -> (StgCaseAlts, UniqSet Id, [Id], Int)
 
-srtCaseAlts rho cont off (StgAlgAlts  t alts dflt) =
+srtCaseAlts rho cont off (StgAlgAlts t alts dflt) =
    srtAlgAlts rho cont off alts [] emptyUniqSet []  
 				  =: \(alts, alts_g, alts_srt, off) ->
    srtDefault rho cont off dflt	  =: \(dflt, dflt_g, dflt_srt, off) ->

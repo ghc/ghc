@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.49 2000/11/10 15:12:51 simonpj Exp $
+% $Id: CgCase.lhs,v 1.50 2000/11/15 14:37:08 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -48,18 +48,13 @@ import CLabel		( mkVecTblLabel, mkClosureTblLabel,
 import ClosureInfo	( mkLFArgument )
 import CmdLineOpts	( opt_SccProfilingOn )
 import Id		( Id, idPrimRep, isDeadBinder )
-import DataCon		( DataCon, dataConTag, fIRST_TAG, ConTag,
-			  isUnboxedTupleCon )
+import DataCon		( DataCon, dataConTag, fIRST_TAG, ConTag )
 import VarSet		( varSetElems )
 import Literal		( Literal )
 import PrimOp		( primOpOutOfLine, PrimOp(..) )
 import PrimRep		( getPrimRepSize, retPrimRepSize, PrimRep(..)
 			)
-import TyCon		( TyCon, isEnumerationTyCon, isUnboxedTupleTyCon,
-			  isFunTyCon, isPrimTyCon,
-			)
-import Type		( Type, typePrimRep, splitAlgTyConApp, 
-			  splitTyConApp_maybe, repType )
+import TyCon		( isEnumerationTyCon, isUnboxedTupleTyCon, tyConPrimRep	)
 import Unique           ( Unique, Uniquable(..), newTagUnique )
 import Maybes		( maybeToBool )
 import Util
@@ -148,8 +143,8 @@ CoreToStg), so we just change its tag to 'C' (for 'case') to ensure it
 doesn't clash with anything else.
 
 \begin{code}
-cgCase (StgPrimApp op args res_ty)
-         live_in_whole_case live_in_alts bndr srt (StgAlgAlts ty alts deflt)
+cgCase (StgPrimApp op args _)
+       live_in_whole_case live_in_alts bndr srt (StgAlgAlts (Just tycon) alts deflt)
   | isEnumerationTyCon tycon
   = getArgAmodes args `thenFC` \ arg_amodes ->
 
@@ -180,39 +175,44 @@ cgCase (StgPrimApp op args res_ty)
 						`thenC`
 
 	-- compile the alts
-    cgAlgAlts NoGC uniq Nothing{-cc_slot-} False{-no semi-tagging-}
+    cgAlgAlts NoGC (getUnique bndr) Nothing{-cc_slot-} False{-no semi-tagging-}
 		False{-not poly case-} alts deflt
                 False{-don't emit yield-}  	`thenFC` \ (tagged_alts, deflt_c) ->
 
 	-- Do the switch
     absC (mkAlgAltsCSwitch tag_amode tagged_alts deflt_c)
-
-   where
-	(Just (tycon,_)) = splitTyConApp_maybe res_ty
-	uniq = getUnique bndr
 \end{code}
 
 Special case #2: inline PrimOps.
 
 \begin{code}
-cgCase (StgPrimApp op args res_ty) 
-	live_in_whole_case live_in_alts bndr srt alts
+cgCase (StgPrimApp op args _) 
+       live_in_whole_case live_in_alts bndr srt alts
   | not (primOpOutOfLine op)
   =
 	-- Get amodes for the arguments and results
     getArgAmodes args			`thenFC` \ arg_amodes ->
-    let
-	result_amodes = getPrimAppResultAmodes (getUnique bndr) alts
-    in
-	-- Perform the operation
     getVolatileRegs live_in_alts        `thenFC` \ vol_regs ->
 
-    absC (COpStmt result_amodes op
-		 arg_amodes -- note: no liveness arg
-		 vol_regs) 		`thenC`
+    case alts of 
+      StgPrimAlts tycon alts deflt	-- PRIMITIVE ALTS
+	-> absC (COpStmt [CTemp (getUnique bndr) (tyConPrimRep tycon)]
+		  	 op
+			 arg_amodes	-- note: no liveness arg
+		 	 vol_regs) 		`thenC`
+	   cgPrimInlineAlts bndr tycon alts deflt
 
-	-- Scrutinise the result
-    cgInlineAlts bndr alts
+      StgAlgAlts (Just tycon) [(_, args, _, rhs)] StgNoDefault 
+	|  isUnboxedTupleTyCon tycon	-- UNBOXED TUPLE ALTS
+	-> 	-- no heap check, no yield, just get in there and do it.
+	   absC (COpStmt [ CTemp (getUnique arg) (idPrimRep arg) | arg <- args ]
+		 	 op
+			 arg_amodes	 -- note: no liveness arg
+			 vol_regs) 		`thenC`
+	   mapFCs bindNewToTemp args `thenFC` \ _ ->
+	   cgExpr rhs
+
+      other -> pprPanic "cgCase: case of primop has strange alts" (pprStgAlts alts)
 \end{code}
 
 TODO: Case-of-case of primop can probably be done inline too (but
@@ -229,7 +229,7 @@ eliminate a heap check altogether.
 
 \begin{code}
 cgCase (StgApp v []) live_in_whole_case live_in_alts bndr srt
-			(StgPrimAlts ty alts deflt)
+			(StgPrimAlts tycon alts deflt)
 
   = 
     getCAddrMode v		`thenFC` \amode ->
@@ -252,7 +252,8 @@ we can reuse/trim the stack slot holding the variable (if it is in one).
 
 \begin{code}
 cgCase (StgApp fun args)
-	live_in_whole_case live_in_alts bndr srt alts@(StgAlgAlts ty _ _)
+	live_in_whole_case live_in_alts bndr srt alts 	-- @(StgAlgAlts _ _ _)
+							-- SLPJ: Surely PrimAlts is ok too?
   =
     getCAddrModeAndInfo fun		`thenFC` \ (fun_amode, lf_info) ->
     getArgAmodes args			`thenFC` \ arg_amodes ->
@@ -265,24 +266,12 @@ cgCase (StgApp fun args)
     allocStackTop retPrimRepSize	`thenFC` \_ ->
 
     forkEval alts_eob_info nopC (
-	        deAllocStackTop retPrimRepSize `thenFC` \_ ->
-		cgEvalAlts maybe_cc_slot bndr srt alts) 
+	     deAllocStackTop retPrimRepSize `thenFC` \_ ->
+	     cgEvalAlts maybe_cc_slot bndr srt alts) 
 					 `thenFC` \ scrut_eob_info ->
 
-    let real_scrut_eob_info =
-		if not_con_ty
- 	   		then reserveSeqFrame scrut_eob_info
-	   		else scrut_eob_info
-    in
-
-    setEndOfBlockInfo real_scrut_eob_info (
-      tailCallFun fun fun_amode lf_info arg_amodes save_assts
-      )
-
-  where
-     not_con_ty = case (getScrutineeTyCon ty) of
-      			Just _ -> False
-		        other  -> True
+    setEndOfBlockInfo (maybeReserveSeqFrame alts scrut_eob_info)	$
+    tailCallFun fun fun_amode lf_info arg_amodes save_assts
 \end{code}
 
 Note about return addresses: we *always* push a return address, even
@@ -311,26 +300,15 @@ cgCase expr live_in_whole_case live_in_alts bndr srt alts
 
     -- generate code for the alts
     forkEval alts_eob_info
-    	(
-	 nukeDeadBindings live_in_alts `thenC` 
+    	(nukeDeadBindings live_in_alts `thenC` 
 	 allocStackTop retPrimRepSize   -- space for retn address 
 	 `thenFC` \_ -> nopC
 	 )
 	(deAllocStackTop retPrimRepSize `thenFC` \_ ->
 	 cgEvalAlts maybe_cc_slot bndr srt alts) `thenFC` \ scrut_eob_info ->
 
-    let real_scrut_eob_info =
-		if not_con_ty
- 	   		then reserveSeqFrame scrut_eob_info
-	   		else scrut_eob_info
-    in
-
-    setEndOfBlockInfo real_scrut_eob_info (cgExpr expr)
-
-  where
-     not_con_ty = case (getScrutineeTyCon (alts_ty alts)) of
-      			Just _ -> False
-		        other  -> True
+    setEndOfBlockInfo (maybeReserveSeqFrame alts scrut_eob_info) $
+    cgExpr expr
 \end{code}
 
 There's a lot of machinery going on behind the scenes to manage the
@@ -368,51 +346,10 @@ don't follow the layout of closures when we're profiling.  The CCS
 could be anywhere within the record).
 
 \begin{code}
-alts_ty (StgAlgAlts ty _ _) = ty
-alts_ty (StgPrimAlts ty _ _) = ty
+-- We need to reserve a seq frame for a polymorphic case
+maybeReserveSeqFrame (StgAlgAlts Nothing _ _) scrut_eob_info = reserveSeqFrame scrut_eob_info
+maybeReserveSeqFrame other		      scrut_eob_info = scrut_eob_info
 \end{code}
-
-%************************************************************************
-%*									*
-\subsection[CgCase-primops]{Primitive applications}
-%*									*
-%************************************************************************
-
-Get result amodes for a primitive operation, in the case wher GC can't happen.
-The  amodes are returned in canonical order, ready for the prim-op!
-
-	Alg case: temporaries named as in the alternatives,
-		  plus (CTemp u) for the tag (if needed)
-	Prim case: (CTemp u)
-
-This is all disgusting, because these amodes must be consistent with those
-invented by CgAlgAlts.
-
-\begin{code}
-getPrimAppResultAmodes
-	:: Unique
-	-> StgCaseAlts
-	-> [CAddrMode]
-
-getPrimAppResultAmodes uniq (StgAlgAlts ty alts some_default)
-
-  | isUnboxedTupleTyCon tycon = 
-	case alts of 
-	    [(con, args, use_mask, rhs)] -> 
-		[ CTemp (getUnique arg) (idPrimRep arg) | arg <- args ]
-	    _ -> panic "getPrimAppResultAmodes: case of unboxed tuple has multiple branches"
-
-  | otherwise = pprPanic "getPrimAppResultAmodes: case of primop has strange type:" (ppr ty)
-
-  where (tycon, _, _) = splitAlgTyConApp ty
-
--- The situation is simpler for primitive results, because there is only
--- one!
-
-getPrimAppResultAmodes uniq (StgPrimAlts ty _ _)
-  = [CTemp uniq (typePrimRep ty)]
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -442,7 +379,7 @@ cgEvalAlts cc_slot bndr srt alts
     case alts of
 
       -- algebraic alts ...
-      (StgAlgAlts ty alts deflt) ->
+      StgAlgAlts maybe_tycon alts deflt ->
 
 	   -- bind the default binder (it covers all the alternatives)
     	bindNewToReg bndr node mkLFArgument	 `thenC`
@@ -456,9 +393,8 @@ cgEvalAlts cc_slot bndr srt alts
 	--
 	-- which is worse than having the alt code in the switch statement
 
-    	let	tycon_info   	= getScrutineeTyCon ty
-		is_alg		= maybeToBool tycon_info
-		Just spec_tycon = tycon_info
+    	let	is_alg		= maybeToBool maybe_tycon
+		Just spec_tycon = maybe_tycon
     	in
 
     	-- deal with the unboxed tuple case
@@ -498,13 +434,13 @@ cgEvalAlts cc_slot bndr srt alts
       	returnFC (CaseAlts return_vec semi_tagged_stuff)
 
       -- primitive alts...
-      (StgPrimAlts ty alts deflt) ->
+      StgPrimAlts tycon alts deflt ->
 
 	-- Restore the cost centre
-	restoreCurrentCostCentre cc_slot 	`thenFC` \ cc_restore ->
+	restoreCurrentCostCentre cc_slot	 	`thenFC` \ cc_restore ->
 
     	-- Generate the switch
-    	getAbsC (cgPrimEvalAlts bndr ty alts deflt)  	`thenFC` \ abs_c ->
+    	getAbsC (cgPrimEvalAlts bndr tycon alts deflt) 	`thenFC` \ abs_c ->
 
     	-- Generate the labelled block, starting with restore-cost-centre
     	getSRTLabel 					`thenFC` \srt_label ->
@@ -516,37 +452,11 @@ cgEvalAlts cc_slot bndr srt alts
 \end{code}
 
 
-\begin{code}
-cgInlineAlts :: Id
-    	     -> StgCaseAlts
-    	     -> Code
-\end{code}
-
 HWL comment on {\em GrAnSim\/}  (adding GRAN_YIELDs for context switch): If
 we  do  an inlining of the  case  no separate  functions  for returning are
 created, so we don't have to generate a GRAN_YIELD in that case.  This info
 must be  propagated  to cgAlgAltRhs (where the  GRAN_YIELD  macro might  be
 emitted). Hence, the new Bool arg to cgAlgAltRhs.
-
-First case: primitive op returns an unboxed tuple.
-
-\begin{code}
-cgInlineAlts bndr (StgAlgAlts ty [alt@(con,args,use_mask,rhs)] StgNoDefault)
-  | isUnboxedTupleCon con
-  = -- no heap check, no yield, just get in there and do it.
-    mapFCs bindNewToTemp args `thenFC` \ _ ->
-    cgExpr rhs
-
-  | otherwise
-  = panic "cgInlineAlts: single alternative, not an unboxed tuple"
-\end{code}
-
-Third (real) case: primitive result type.
-
-\begin{code}
-cgInlineAlts bndr (StgPrimAlts ty alts deflt)
-  = cgPrimInlineAlts bndr ty alts deflt
-\end{code}
 
 %************************************************************************
 %*									*
@@ -743,18 +653,19 @@ the maximum stack depth encountered down any branch.
 As usual, no binders in the alternatives are yet bound.
 
 \begin{code}
-cgPrimInlineAlts bndr ty alts deflt
+cgPrimInlineAlts bndr tycon alts deflt
   = cgPrimAltsWithDefault bndr NoGC (CTemp uniq kind) alts deflt []
   where
 	uniq = getUnique bndr
-	kind = typePrimRep ty
+	kind = tyConPrimRep tycon
 
-cgPrimEvalAlts bndr ty alts deflt
+cgPrimEvalAlts bndr tycon alts deflt
   = cgPrimAltsWithDefault bndr GCMayHappen (CReg reg) alts deflt [reg]
   where
-	reg  = WARN( case kind of { PtrRep -> True; other -> False }, text "cgPrimEE" <+> ppr bndr <+> ppr ty  )
+	reg  = WARN( case kind of { PtrRep -> True; other -> False }, 
+		     text "cgPrimEE" <+> ppr bndr <+> ppr tycon  )
 	       dataReturnConvPrim kind
-	kind = typePrimRep ty
+	kind = tyConPrimRep tycon
 
 cgPrimAltsWithDefault bndr gc_flag scrutinee alts deflt regs
   = 	-- first bind the default if necessary
@@ -981,16 +892,4 @@ possibleHeapCheck GCMayHappen is_alg regs tags lbl code
   = altHeapCheck is_alg regs tags AbsCNop lbl code
 possibleHeapCheck NoGC	_ _ tags lbl code 
   = code
-\end{code}
-
-\begin{code}
-getScrutineeTyCon :: Type -> Maybe TyCon
-getScrutineeTyCon ty =
-   case splitTyConApp_maybe (repType ty) of
-	Nothing -> Nothing
-	Just (tc,_) -> 
-		if isFunTyCon tc  then Nothing else     -- not interested in funs
-		if isPrimTyCon tc then Just tc else	-- return primitive tycons
-			-- otherwise (algebraic tycons) check the no. of constructors
-		Just tc
 \end{code}
