@@ -1,0 +1,114 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+  <head>
+    <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=ISO-8859-1">
+    <title>The GHC Commentary - The Real Story about Variables, Ids, TyVars, and the like</title>
+  </head>
+
+  <body BGCOLOR="FFFFFF">
+    <h1>The GHC Commentary - The Glorious Renamer</h1>
+    <p>
+
+(This section is, like most of the Commentary, rather incomplete.)
+<p>
+The <em>renamer</em> sits between the parser and the typechecker.
+Roughly speaking, It has the type:
+<pre>
+   HsModule RdrName -> HsModule Name
+</pre>
+That is, it converts all the <tt>RdrNames</tt> to <tt>Names</tt>.
+
+<h2> OccNames, RdrNames, and Names </h2>
+
+A <tt>RdrNames</tt> is pretty much just a string (for an unqualified name
+like "<tt>f</tt>") or a pair of strings (for a qualified name like "<tt>M.f</tt>").
+Well, not quite just strings, because in Haskell a name like "C" could mean a type 
+constructor or data constructor, depending on context.  So GHC defines a type 
+<tt>OccName</tt> (defined in <tt>basicTypes/OccName.lhs</tt>) that is a pair of
+a <tt>FastString</tt> and a <tt>NameSpace</tt> indicating which name space the
+name is drawn from:
+<pre>
+    data OccName = OccName NameSpace EncodedFS
+</pre>
+The <tt>EncodedFS</tt> is a synonym for <tt>FastString</tt> indicating that the
+string is Z-encoded.  (Details in <tt>OccName.lhs</tt>.)
+<p>
+The name spaces are:
+<ul>
+<li> <tt>VarName</tt>: ordinary variables
+<li> <tt>TvName</tt>: type variables
+<li> <tt>DataName</tt>: data constructors
+<li> <tt>TcClsName</tt>: type constructors and classes (in Haskell they share a name space)
+</ul>
+So a <tt>RdrName</tt> is defined thus:
+<pre>
+    data RdrName = RdrName Qual OccName
+    
+    data Qual = Unqual
+    
+	      | Qual ModuleName     -- A qualified name written by the user in source code
+				    -- The module isn't necessarily the module where
+				    -- the thing is defined; just the one from which it
+				    -- is imported
+    
+	      | Orig ModuleName	    -- This is an *original* name; the module is the place
+				    -- where the thing was defined
+</pre>
+The <tt>OrigName</tt> variant is used internally; it allows GHC to speak of <tt>RdrNames</tt>
+that refer to the original name of the thing.
+
+<p>
+On the other hand, a <tt>Name</tt>:
+<ul>
+<li> Contains the <em>original name</em> for the thing.   
+<li> Contains a <tt>Unique</tt> that makes it easy to compare names for equality quickly.
+<li> Contains a <tt>SrcLoc</tt> saying where the name was bound.
+</ul>
+The <em>original name</em> of an entity (type constructor, class, function etc) is
+the (module,name) pair describing where the thing was originally defined.  So for example,
+if we have
+<pre>
+  module M where
+    f = e1
+    g = e2
+
+  module A where
+    import qualified M as Q
+    import M
+    a = Q.f + g
+</pre>
+then the RdrNames for "a", "Q.f" and "g" get replaced by the Names
+"A.a", "M.f", and "M.g" respectively.
+<p>
+<tt>Names</tt> come in two flavours: Local and Global.  The Global kind contain
+both a <tt>Module</tt> and an <tt>OccName</tt>
+Not all Names are qualifed.  Local (e.g. lambda-bound) names are given Local Names
+
+<h2> Rebindable syntax </h2>
+
+In Haskell when one writes "3" one gets "fromInteger 3", where
+"fromInteger" comes from the Prelude (regardless of whether the
+Prelude is in scope).  If you want to completely redefine numbers,
+that becomes inconvenient.  So GHC lets you say
+"-fno-implicit-prelude"; in that case, the "fromInteger" comes from
+whatever is in scope.  (This is documented in the User Guide.)
+<p>
+This feature is implemented as follows (I always forget).
+<ul>
+<li> Four HsSyn constructs (NegApp, NPlusKPat, HsIntegral, HsFractional) 
+contain a <tt>Name</tt> (i.e. it is not parameterised).
+<li> When the parser builds these constructs, it puts in the built-in Prelude
+Name (e.g. PrelNum.fromInteger).
+<li> When the renamer encounters these constructs, it calls <tt>RnEnv.lookupSyntaxName</tt>.
+This checks for <tt>-fno-implicit-prelude</tt>; if not, it just returns the same Name;
+otherwise it takes the occurrence name of the Name, turns it into an unqualified RdrName, and looks
+it up in the environment.  The returned name is plugged back into the construct.
+<li> The typechecker uses the Name to generate the appropriate typing constraints.
+</ul>
+
+<!-- hhmts start -->
+Last modified: Tue Nov 13 14:11:35 EST 2001
+<!-- hhmts end -->
+    </small>
+  </body>
+</html>
