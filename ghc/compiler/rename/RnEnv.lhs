@@ -763,8 +763,15 @@ mapFvRn f xs = mapRn f xs	`thenRn` \ stuff ->
 
 
 \begin{code}
-warnUnusedLocalBinds, warnUnusedImports, warnUnusedMatches :: [Name] -> RnM d ()
+warnUnusedModules :: [ModuleName] -> RnM d ()
+warnUnusedModules mods
+  | not opt_WarnUnusedImports = returnRn ()
+  | otherwise 		      = mapRn_ (addWarnRn . unused_mod) mods
+  where
+    unused_mod m = ptext SLIT("Module") <+> quotes (ppr m) <+> 
+		   ptext SLIT("is imported, but nothing from it is used")
 
+warnUnusedLocalBinds, warnUnusedImports, warnUnusedMatches :: [Name] -> RnM d ()
 warnUnusedImports names
   | not opt_WarnUnusedImports
   = returnRn () 	-- Don't force names unless necessary

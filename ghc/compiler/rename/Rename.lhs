@@ -24,7 +24,8 @@ import RnIfaces		( getImportedInstDecls, importDecl, getImportVersions, getInter
 			  getImportedRules, loadHomeInterface, getSlurped, removeContext
 			)
 import RnEnv		( availName, availsToNameSet, unitAvailEnv, availEnvElts, plusAvailEnv, 
-			  warnUnusedImports, warnUnusedLocalBinds, lookupImplicitOccRn, pprAvail,
+			  warnUnusedImports, warnUnusedLocalBinds, warnUnusedModules,
+			  lookupImplicitOccRn, pprAvail,
 			  FreeVars, plusFVs, plusFV, unitFV, emptyFVs, isEmptyFVs
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
@@ -46,10 +47,10 @@ import Type		( namesOfType, funTyCon )
 import ErrUtils		( printErrorsAndWarnings, dumpIfSet, ghcExit )
 import BasicTypes	( NewOrData(..) )
 import Bag		( isEmptyBag, bagToList )
-import FiniteMap	( FiniteMap, eltsFM, fmToList, emptyFM, addToFM_C )
+import FiniteMap	( FiniteMap, eltsFM, fmToList, emptyFM, lookupFM, addToFM_C )
 import UniqSupply	( UniqSupply )
 import UniqFM		( lookupUFM )
-import Maybes		( maybeToBool )
+import Maybes		( maybeToBool, expectJust )
 import Outputable
 import IO		( openFile, IOMode(..) )
 \end{code}
@@ -146,11 +147,6 @@ rename this_mod@(HsModule mod_name vers _ imports local_decls mod_deprec loc)
     getImportVersions mod_name export_env	`thenRn` \ my_usages ->
     getNameSupplyRn				`thenRn` \ name_supply ->
 
-	-- REPORT UNUSED NAMES
-    reportUnusedNames mod_name gbl_env global_avail_env
-		      export_env
-		      source_fvs			`thenRn_`
-
 	-- RETURN THE RENAMED MODULE
     let
 	has_orphans        = any isOrphanDecl rn_local_decls
@@ -161,7 +157,13 @@ rename this_mod@(HsModule mod_name vers _ imports local_decls mod_deprec loc)
 			          mod_deprec
 			          loc
     in
-    rnDump rn_imp_decls	rn_all_decls		`thenRn` \ dump_action ->
+	-- REPORT UNUSED NAMES, AND DEBUG DUMP 
+    reportUnusedNames mod_name direct_import_mods
+		      gbl_env global_avail_env
+		      export_env
+		      source_fvs			`thenRn_`
+    rnDump rn_imp_decls	rn_all_decls			`thenRn` \ dump_action ->
+
     returnRn (Just (mkThisModule mod_name,
 		    renamed_module, 
 		    (InterfaceDetails has_orphans my_usages export_env deprecs),
@@ -528,8 +530,12 @@ getInstDeclGates other				    = emptyFVs
 %*********************************************************
 
 \begin{code}
-reportUnusedNames :: ModuleName -> GlobalRdrEnv -> AvailEnv -> ExportEnv -> NameSet -> RnMG ()
-reportUnusedNames mod_name gbl_env avail_env (ExportEnv export_avails _ _) mentioned_names
+reportUnusedNames :: ModuleName -> [ModuleName] 
+		  -> GlobalRdrEnv -> AvailEnv
+		  -> ExportEnv -> NameSet -> RnMG ()
+reportUnusedNames mod_name direct_import_mods 
+		  gbl_env avail_env 
+		  (ExportEnv export_avails _ _) mentioned_names
   = let
 	used_names = mentioned_names `unionNameSets` availsToNameSet export_avails
 
@@ -565,28 +571,42 @@ reportUnusedNames mod_name gbl_env avail_env (ExportEnv export_avails _ _) menti
 	   nameSetToList (defined_names `minusNameSet` really_used_names)
 
 	-- Filter out the ones only defined implicitly
-	bad_locals = [n | n <- defined_but_not_used, isLocallyDefined		  n]
-	bad_imps   = [n | n <- defined_but_not_used, isUserImportedExplicitlyName n]
+	bad_locals     = [n | n <- defined_but_not_used, isLocallyDefined	      n]
+	bad_imp_names  = [n | n <- defined_but_not_used, isUserImportedExplicitlyName n,
+						         not (module_unused n)]
 
 	deprec_used deprec_env = [ (n,txt)
                                  | n <- nameSetToList mentioned_names,
                                    not (isLocallyDefined n),
                                    Just txt <- [lookupNameEnv deprec_env n] ]
 
-	minimal_imports :: FiniteMap Module AvailEnv
+	minimal_imports :: FiniteMap ModuleName AvailEnv
 	minimal_imports = foldNameSet add emptyFM really_used_names
 	add n acc = case maybeUserImportedFrom n of
 			Nothing -> acc
-			Just m  -> addToFM_C plusAvailEnv acc m
+			Just m  -> addToFM_C plusAvailEnv acc (moduleName m)
 					     (unitAvailEnv (mk_avail n))
 	mk_avail n = case lookupNameEnv avail_env n of
 			Just (AvailTC m _) | n==m      -> AvailTC n [n]
 					   | otherwise -> AvailTC m [n,m]
 			Just avail	   -> Avail n
 			Nothing		   -> pprPanic "mk_avail" (ppr n)
+
+	-- unused_imp_mods are the directly-imported modules 
+	-- that are not mentioned in minimal_imports
+	unused_imp_mods = [m | m <- direct_import_mods, 
+				not (maybeToBool (lookupFM minimal_imports m))]
+
+	module_unused :: Name -> Bool
+	-- Name is imported from a module that's completely unused,
+	-- so don't report stuff about the name (the module covers it)
+	module_unused n = moduleName (expectJust "module_unused" (maybeUserImportedFrom n))
+			  `elem` unused_imp_mods
+				-- module_unused is only called if it's user-imported
     in
+    warnUnusedModules unused_imp_mods				`thenRn_`
     warnUnusedLocalBinds bad_locals				`thenRn_`
-    warnUnusedImports bad_imps					`thenRn_`
+    warnUnusedImports bad_imp_names				`thenRn_`
     printMinimalImports mod_name minimal_imports		`thenRn_`
     getIfacesRn							`thenRn` \ ifaces ->
     (if opt_WarnDeprecations
@@ -613,7 +633,7 @@ printMinimalImports mod_name imps
 			    parens (fsep (punctuate comma (map ppr ies)))
 
     to_ies (mod, avail_env) = mapRn to_ie (availEnvElts avail_env)	`thenRn` \ ies ->
-			      returnRn (moduleName mod, ies)
+			      returnRn (mod, ies)
 
     to_ie :: AvailInfo -> RnMG (IE Name)
     to_ie (Avail n)       = returnRn (IEVar n)
