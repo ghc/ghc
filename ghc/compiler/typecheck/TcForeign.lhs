@@ -37,7 +37,7 @@ import PrimRep		( getPrimRepSize, isFloatingRep )
 import Module		( Module )
 import Type		( typePrimRep )
 import OccName		( mkForeignExportOcc )
-import Name		( NamedThing(..), mkGlobalName )
+import Name		( NamedThing(..), mkExternalName )
 import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,
 			  tcSplitForAllTys, 
 			  isFFIArgumentTy, isFFIImportResultTy, 
@@ -221,7 +221,7 @@ tcFExport mod fo@(ForeignExport nm hs_ty spec isDeprec src_loc) =
 
    tcGetUnique				`thenNF_Tc` \ uniq ->
    let
-        gnm  = mkGlobalName uniq mod (mkForeignExportOcc (getOccName nm)) src_loc
+        gnm  = mkExternalName uniq mod (mkForeignExportOcc (getOccName nm)) src_loc
 	id   = setIdLocalExported (mkLocalId gnm sig_ty)
 	bind = VarMonoBind id rhs
    in

@@ -29,7 +29,7 @@ import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
 import RnMonad
 import Name		( Name, 
 			  getSrcLoc, nameIsLocalOrFrom,
-			  mkLocalName, mkGlobalName,
+			  mkInternalName, mkExternalName,
 			  mkIPName, nameOccName, nameModule_maybe,
 			  setNameModuleAndLoc
 			)
@@ -118,7 +118,7 @@ newTopBinder mod rdr_name loc
 	Nothing -> let
 			(us', us1) = splitUniqSupply (nsUniqs name_supply)
 			uniq   	   = uniqFromSupply us1
-			new_name   = mkGlobalName uniq mod occ loc
+			new_name   = mkExternalName uniq mod occ loc
 			new_cache  = addToFM cache key new_name
 		   in
 		   setNameSupplyRn (name_supply {nsUniqs = us', nsNames = new_cache})	`thenRn_`
@@ -161,7 +161,7 @@ newGlobalName mod_name occ
 		     (us', us1) = splitUniqSupply (nsUniqs name_supply)
 		     uniq   	= uniqFromSupply us1
 		     mod        = mkVanillaModule mod_name
-		     name       = mkGlobalName uniq mod occ noSrcLoc
+		     name       = mkExternalName uniq mod occ noSrcLoc
 		     new_cache  = addToFM cache key name
 
 newIPName rdr_name_ip
@@ -528,7 +528,7 @@ newLocalsRn rdr_names_w_loc
     let
 	(us', us1) = splitUniqSupply (nsUniqs name_supply)
 	uniqs	   = uniqsFromSupply us1
-	names	   = [ mkLocalName uniq (rdrNameOcc rdr_name) loc
+	names	   = [ mkInternalName uniq (rdrNameOcc rdr_name) loc
 		     | ((rdr_name,loc), uniq) <- rdr_names_w_loc `zip` uniqs
 		     ]
     in
@@ -584,7 +584,7 @@ bindCoreLocalRn rdr_name enclosed_scope
     let
 	(us', us1) = splitUniqSupply (nsUniqs name_supply)
 	uniq	   = uniqFromSupply us1
-	name	   = mkLocalName uniq (rdrNameOcc rdr_name) loc
+	name	   = mkInternalName uniq (rdrNameOcc rdr_name) loc
     in
     setNameSupplyRn (name_supply {nsUniqs = us'})	`thenRn_`
     let

@@ -44,7 +44,7 @@ import VarEnv
 import VarSet		( varSetElems )
 import Literal		( Literal )
 import Maybes		( catMaybes, maybeToBool, seqMaybe )
-import Name		( isLocalName, NamedThing(..) )
+import Name		( isInternalName, NamedThing(..) )
 #ifdef DEBUG
 import PprAbsC		( pprAmode )
 #endif
@@ -259,7 +259,7 @@ getCAddrModeAndInfo id
 	case maybe_cg_id_info of
 
 		-- Nothing => not in the environment, so should be imported
-	  Nothing | isLocalName name -> cgLookupPanic id
+	  Nothing | isInternalName name -> cgLookupPanic id
 		  | otherwise	     -> returnFC (id, global_amode, mkLFImported id)
 
 	  Just (MkCgIdInfo id' volatile_loc stable_loc lf_info)

@@ -49,7 +49,7 @@ import Id		( idName )
 import MkId		( seqId )
 import Name		( Name, OccName, NamedThing(..), 
 			  nameOccName, nameRdrName,
-			  decode, mkLocalName, mkKnownKeyGlobal
+			  decode, mkInternalName
 			)
 import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv,
 			  extendNameEnvList )

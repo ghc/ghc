@@ -45,7 +45,7 @@ import CoreSyn		( CoreRule(..), IdCoreRule )
 import CoreFVs		( ruleLhsFreeNames )
 import CoreUnfold	( neverUnfold, unfoldingTemplate )
 import PprCore		( pprIdCoreRule )
-import Name		( getName, nameModule, toRdrName, isGlobalName, 
+import Name		( getName, nameModule, toRdrName, isExternalName, 
 			  nameIsLocalOrFrom, Name, NamedThing(..) )
 import NameEnv
 import NameSet
@@ -513,10 +513,10 @@ dump_types dfun_ids type_env
     ids = [id | id <- typeEnvIds type_env, want_sig id]
     want_sig id | opt_PprStyle_Debug = True
 	        | otherwise	     = isLocalId id && 
-				       isGlobalName (idName id) && 
+				       isExternalName (idName id) && 
 				       not (id `elem` dfun_ids)
 	-- isLocalId ignores data constructors, records selectors etc
-	-- The isGlobalName ignores local dictionary and method bindings
+	-- The isExternalName ignores local dictionary and method bindings
 	-- that the type checker has invented.  User-defined things have
 	-- Global names.
 

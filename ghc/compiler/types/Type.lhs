@@ -89,7 +89,7 @@ import Var	( TyVar, tyVarKind, tyVarName, setTyVarName )
 import VarEnv
 import VarSet
 
-import Name	( NamedThing(..), mkLocalName, tidyOccName )
+import Name	( NamedThing(..), mkInternalName, tidyOccName )
 import Class	( classTyCon )
 import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
 		  isUnboxedTupleTyCon, isUnLiftedTyCon,
@@ -650,7 +650,7 @@ tidyTyVarBndr (tidy_env, subst) tyvar
 		    where
 			subst' = extendVarEnv subst tyvar tyvar'
 			tyvar' = setTyVarName tyvar name'
-			name'  = mkLocalName (getUnique name) occ' noSrcLoc
+			name'  = mkInternalName (getUnique name) occ' noSrcLoc
 				-- Note: make a *user* tyvar, so it printes nicely
 				-- Could extract src loc, but no need.
   where

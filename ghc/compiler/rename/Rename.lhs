@@ -46,7 +46,7 @@ import Module           ( Module, ModuleName, WhereFrom(..),
 			  moduleNameUserString, moduleName,
 			  moduleEnvElts
 			)
-import Name		( Name, nameModule, isGlobalName )
+import Name		( Name, nameModule, isExternalName )
 import NameEnv
 import NameSet
 import RdrName		( foldRdrEnv, isQual )
@@ -422,10 +422,10 @@ rename ghci_mode this_module
     	-- simplification), and retain them all in the TypeEnv so they are
     	-- available from the command line.
 	--
-	-- isGlobalName separates the user-defined top-level names from those
+	-- isExternalName separates the user-defined top-level names from those
 	-- introduced by the type checker.
 	dont_discard :: Name -> Bool
-	dont_discard | ghci_mode == Interactive = isGlobalName
+	dont_discard | ghci_mode == Interactive = isExternalName
 		     | otherwise 		= (`elemNameSet` exported_names)
 
 	exported_names    = availsToNameSet export_avails

@@ -53,7 +53,7 @@ import DataCon		( DataCon )
 import TyCon		( TyCon, DataConDetails )
 import Class		( Class, ClassOpItem )
 import Name		( Name, NamedThing(..), 
-			  getSrcLoc, mkLocalName, isLocalName, nameIsLocalOrFrom
+			  getSrcLoc, mkInternalName, isInternalName, nameIsLocalOrFrom
 			)
 import NameEnv		( NameEnv, lookupNameEnv, nameEnvElts, elemNameEnv,
 			  extendNameEnvList, emptyNameEnv, plusNameEnv )
@@ -137,8 +137,8 @@ initTcEnv hst pte
 		      	 tcTyVars = gtv_var
 	 })}
   where
-    lookup name | isLocalName name = Nothing
-		| otherwise	   = lookupType hst pte name
+    lookup name | isInternalName name = Nothing
+		| otherwise	      = lookupType hst pte name
 
 
 tcEnvClasses env = typeEnvClasses (tcGEnv env)
@@ -230,18 +230,18 @@ Constructing new Ids
 newLocalName :: Name -> NF_TcM Name
 newLocalName name	-- Make a clone
   = tcGetUnique		`thenNF_Tc` \ uniq ->
-    returnNF_Tc (mkLocalName uniq (getOccName name) (getSrcLoc name))
+    returnNF_Tc (mkInternalName uniq (getOccName name) (getSrcLoc name))
 \end{code}
 
 Make a name for the dict fun for an instance decl.
 It's a *local* name for the moment.  The CoreTidy pass
-will globalise it.
+will externalise it.
 
 \begin{code}
 newDFunName :: Class -> [Type] -> SrcLoc -> NF_TcM Name
 newDFunName clas (ty:_) loc
   = tcGetUnique			`thenNF_Tc` \ uniq ->
-    returnNF_Tc (mkLocalName uniq (mkDFunOcc dfun_string) loc)
+    returnNF_Tc (mkInternalName uniq (mkDFunOcc dfun_string) loc)
   where
 	-- Any string that is somewhat unique will do
     dfun_string = occNameString (getOccName clas) ++ occNameString (getDFunTyKey ty)

@@ -41,7 +41,7 @@ import ParseIface	( parseIface )
 
 import PrelNames	( gHC_PRIM_Name, gHC_PRIM )
 import Name		( Name {-instance NamedThing-}, 
-			  nameModule, isLocalName, nameIsLocalOrFrom
+			  nameModule, isInternalName, nameIsLocalOrFrom
 			 )
 import NameEnv
 import NameSet
@@ -80,7 +80,7 @@ import List		( isSuffixOf )
 \begin{code}
 loadHomeInterface :: SDoc -> Name -> RnM d ModIface
 loadHomeInterface doc_str name
-  = ASSERT2( not (isLocalName name), ppr name <+> parens doc_str )
+  = ASSERT2( not (isInternalName name), ppr name <+> parens doc_str )
     loadInterface doc_str (moduleName (nameModule name)) ImportBySystem
 
 loadOrphanModules :: [ModuleName] -> RnM d ()

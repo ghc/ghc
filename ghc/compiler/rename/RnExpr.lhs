@@ -44,7 +44,7 @@ import PrelNames	( hasKey, assertIdKey,
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
 			  floatPrimTyCon, doublePrimTyCon )
 import TysWiredIn	( intTyCon )
-import Name		( NamedThing(..), mkSysLocalName, nameSrcLoc )
+import Name		( NamedThing(..), mkSystemName, nameSrcLoc )
 import NameSet
 import UniqFM		( isNullUFM )
 import UniqSet		( emptyUniqSet )
@@ -906,7 +906,7 @@ mkAssertExpr =
   if opt_IgnoreAsserts then
     getUniqRn				`thenRn` \ uniq ->
     let
-     vname = mkSysLocalName uniq FSLIT("v")
+     vname = mkSystemName uniq FSLIT("v")
      expr  = HsLam ignorePredMatch
      loc   = nameSrcLoc vname
      ignorePredMatch = mkSimpleMatch [WildPatIn, VarPatIn vname] (HsVar vname) placeHolderType loc

@@ -42,7 +42,7 @@ import DataCon		( dataConTyCon )
 import TyCon		( visibleDataCons, isSynTyCon, getSynTyConDefn, tyConClass_maybe, tyConName )
 import Class		( className )
 import Name		( Name {-instance NamedThing-}, nameOccName,
-			  nameModule, isLocalName, NamedThing(..)
+			  nameModule, isInternalName, NamedThing(..)
 			 )
 import NameEnv 		( elemNameEnv, delFromNameEnv, lookupNameEnv )
 import NameSet
@@ -380,7 +380,7 @@ recordDeclSlurp ifaces@(Ifaces { iDecls  = (decls_map, n_slurped),
 				 iSlurp  = slurped_names, 
 				 iVSlurp = vslurp })
 	    avail
-  = ASSERT2( not (isLocalName (availName avail)), ppr avail )
+  = ASSERT2( not (isInternalName (availName avail)), ppr avail )
     ifaces { iDecls = (new_decls_map, n_slurped+1),
 	     iSlurp  = new_slurped_names, 
 	     iVSlurp = updateVSlurp vslurp (availName avail) }

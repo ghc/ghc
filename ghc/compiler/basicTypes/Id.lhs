@@ -101,7 +101,7 @@ import IdInfo
 import qualified Demand	( Demand )
 import NewDemand	( Demand, StrictSig, topSig, isBottomingSig )
 import Name	 	( Name, OccName,
-			  mkSysLocalName, mkLocalName,
+			  mkSystemName, mkInternalName,
 			  getOccName, getSrcLoc
 			) 
 import OccName		( EncodedFS, UserFS, mkWorkerOcc )
@@ -165,8 +165,8 @@ mkVanillaGlobal :: Name -> Type -> IdInfo -> Id
 
 -- for SysLocal, we assume the base name is already encoded, to avoid
 -- re-encoding the same string over and over again.
-mkSysLocal  fs uniq ty      = mkLocalId (mkSysLocalName uniq fs)      ty
-mkUserLocal occ uniq ty loc = mkLocalId (mkLocalName    uniq occ loc) ty
+mkSysLocal  fs uniq ty      = mkLocalId (mkSystemName uniq fs)      ty
+mkUserLocal occ uniq ty loc = mkLocalId (mkInternalName    uniq occ loc) ty
 mkVanillaGlobal 	    = mkGlobalId VanillaGlobal
 \end{code}
 
@@ -180,11 +180,11 @@ mkWildId :: Type -> Id
 mkWildId ty = mkSysLocal FSLIT("wild") (mkBuiltinUnique 1) ty
 
 mkWorkerId :: Unique -> Id -> Type -> Id
--- A worker gets a local name.  CoreTidy will globalise it if necessary.
+-- A worker gets a local name.  CoreTidy will externalise it if necessary.
 mkWorkerId uniq unwrkr ty
   = mkLocalId wkr_name ty
   where
-    wkr_name = mkLocalName uniq (mkWorkerOcc (getOccName unwrkr)) (getSrcLoc unwrkr)
+    wkr_name = mkInternalName uniq (mkWorkerOcc (getOccName unwrkr)) (getSrcLoc unwrkr)
 
 -- "Template locals" typically used in unfoldings
 mkTemplateLocals :: [Type] -> [Id]

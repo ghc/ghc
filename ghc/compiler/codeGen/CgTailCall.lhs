@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.31 2001/10/25 05:07:32 sof Exp $
+% $Id: CgTailCall.lhs,v 1.32 2002/03/14 15:27:17 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -345,7 +345,7 @@ tailCallFun
 tailCallFun fun fun_amode lf_info arg_amodes pending_assts
   = nodeMustPointToIt lf_info			`thenFC` \ node_points ->
 	-- we use the name of fun', the Id from the environment, rather than
-	-- fun from the STG tree, in case it is a top-level name that we globalised
+	-- fun from the STG tree, in case it is a top-level name that we externalised
 	-- (see cgTopRhsClosure).
     getEntryConvention (idName fun) lf_info
 	(map getAmodeRep arg_amodes)		`thenFC` \ entry_conv ->

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.50 2001/12/12 18:12:45 sewardj Exp $
+% $Id: CLabel.lhs,v 1.51 2002/03/14 15:27:15 simonpj Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -84,7 +84,7 @@ import CStrings		( pp_cSEP )
 import DataCon		( ConTag )
 import Module		( moduleName, moduleNameFS, 
 			  Module, isHomeModule )
-import Name		( Name, getName, isDllName, isExternallyVisibleName )
+import Name		( Name, getName, isDllName, isExternalName )
 import TyCon		( TyCon )
 import Unique		( pprUnique, Unique )
 import PrimOp		( PrimOp )
@@ -335,7 +335,7 @@ externallyVisibleCLabel (ModuleInitLabel _)= True
 externallyVisibleCLabel (RtsLabel RtsModuleRegd) = False --hack
 externallyVisibleCLabel (RtsLabel _)	   = True
 externallyVisibleCLabel (ForeignLabel _ _) = True
-externallyVisibleCLabel (IdLabel id _)     = isExternallyVisibleName id
+externallyVisibleCLabel (IdLabel id _)     = isExternalName id
 externallyVisibleCLabel (CC_Label _)	   = False -- not strictly true
 externallyVisibleCLabel (CCS_Label _)	   = False -- not strictly true
 \end{code}

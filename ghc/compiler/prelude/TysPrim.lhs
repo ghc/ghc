@@ -50,7 +50,7 @@ module TysPrim(
 #include "HsVersions.h"
 
 import Var		( TyVar, mkTyVar )
-import Name		( Name, mkLocalName )
+import Name		( Name, mkInternalName )
 import OccName		( mkVarOcc )
 import PrimRep		( PrimRep(..) )
 import TyCon		( TyCon, ArgVrcs, mkPrimTyCon, mkLiftedPrimTyCon )
@@ -115,7 +115,7 @@ alphaTyVars is a list of type variables for use in templates:
 
 \begin{code}
 tyVarList :: Kind -> [TyVar]
-tyVarList kind = [ mkTyVar (mkLocalName (mkAlphaTyVarUnique u) 
+tyVarList kind = [ mkTyVar (mkInternalName (mkAlphaTyVarUnique u) 
 				(mkVarOcc (mkFastString name))
 			 	noSrcLoc) kind
 	         | u <- [2..],

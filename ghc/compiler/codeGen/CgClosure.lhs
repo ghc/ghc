@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.55 2002/02/14 11:56:03 njn Exp $
+% $Id: CgClosure.lhs,v 1.56 2002/03/14 15:27:17 simonpj Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -46,7 +46,7 @@ import ClosureInfo	-- lots and lots of stuff
 import CmdLineOpts	( opt_GranMacros, opt_SccProfilingOn, opt_DoTickyProfiling )
 import CostCentre	
 import Id		( Id, idName, idType, idPrimRep )
-import Name		( Name, isLocalName )
+import Name		( Name, isInternalName )
 import Module		( Module, pprModule )
 import ListSetOps	( minusList )
 import PrimRep		( PrimRep(..) )
@@ -449,7 +449,7 @@ closureCodeBody binder_info closure_info cc all_args body
 -- give the module name even for *local* things.   We print
 -- just "x (M)" rather that "M.x" to distinguish them from the global kind.
 ppr_for_ticky_name mod_name name
-  | isLocalName name = showSDocDebug (ppr name <+> (parens (ppr mod_name)))
+  | isInternalName name = showSDocDebug (ppr name <+> (parens (ppr mod_name)))
   | otherwise	     = showSDocDebug (ppr name)
 \end{code}
 

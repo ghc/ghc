@@ -26,7 +26,7 @@ import OccName          ( dataName, tcClsName,
 import Type		( Type )
 import Id		( Id, idName, setGlobalIdDetails )
 import IdInfo		( GlobalIdDetails(VanillaGlobal) )
-import Name		( isLocalName )
+import Name		( isInternalName )
 import NameEnv		( lookupNameEnv )
 import Module		( lookupModuleEnv )
 import RdrName		( rdrEnvElts )
@@ -673,7 +673,7 @@ hscThing dflags hst hit pcs0 ic str
 	     Nothing -> return (pcs, []);
 	     Just pcs ->
 		let do_lookup n
-			| isLocalName n = lookupNameEnv (ic_type_env ic) n
+			| isInternalName n = lookupNameEnv (ic_type_env ic) n
 			| otherwise     = lookupType hst (pcs_PTE pcs) n
 		
 		    maybe_ty_things = map do_lookup names

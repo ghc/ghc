@@ -16,7 +16,7 @@ module ByteCodeLink ( UnlinkedBCO, UnlinkedBCOExpr, assembleBCO,
 #include "HsVersions.h"
 
 import Outputable
-import Name		( Name, getName, nameModule, toRdrName, isGlobalName )
+import Name		( Name, getName, nameModule, toRdrName, isExternalName )
 import RdrName		( rdrNameOcc, rdrNameModule )
 import OccName		( occNameString )
 import FiniteMap	( FiniteMap, addListToFM, filterFM,
@@ -103,7 +103,7 @@ linkSomeBCOs toplevs_only ie ce_in ul_bcos
                                in  mapM (linkBCO ie ce_out) ul_bcos )
 
         let ce_all_additions = zip nms hvals
-            ce_top_additions = filter (isGlobalName.fst) ce_all_additions
+            ce_top_additions = filter (isExternalName.fst) ce_all_additions
             ce_additions     = if toplevs_only then ce_top_additions 
                                                else ce_all_additions
             ce_out = -- make sure we're not inserting duplicate names into the 
@@ -153,7 +153,7 @@ data HValue     = HValue  -- dummy type, actually a pointer to some Real Code.
 -- the command line).
 filterNameMap :: [ModuleName] -> FiniteMap Name a -> FiniteMap Name a
 filterNameMap mods env 
-   = filterFM (\n _ -> isGlobalName n 
+   = filterFM (\n _ -> isExternalName n 
 			&& moduleName (nameModule n) `elem` mods) env
 \end{code}
 
@@ -603,7 +603,7 @@ lookupCE ce (Left nm)
    = case lookupFM ce nm of
         Just aa -> return aa
         Nothing 
-           -> ASSERT2(isGlobalName nm, ppr nm)
+           -> ASSERT2(isExternalName nm, ppr nm)
 	      do let sym_to_find = nameToCLabel nm "closure"
                  m <- lookupSymbol sym_to_find
                  case m of

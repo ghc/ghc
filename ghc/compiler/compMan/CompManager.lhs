@@ -75,7 +75,7 @@ import HscMain		( initPersistentCompilerState )
 #endif
 import HscTypes
 import Name		( Name, NamedThing(..), nameRdrName, nameModule,
-			  isHomePackageName, isGlobalName )
+			  isHomePackageName, isExternalName )
 import NameEnv
 import Rename		( mkGlobalContext )
 import RdrName		( emptyRdrEnv )
@@ -253,7 +253,7 @@ cmInfoThing cmstate dflags id
 
      getFixity :: PersistentCompilerState -> Name -> Fixity
      getFixity pcs name
-	| isGlobalName name,
+	| isExternalName name,
 	  Just iface  <- lookupModuleEnv iface_table (nameModule name),
 	  Just fixity <- lookupNameEnv (mi_fixities iface) name
 	  = fixity

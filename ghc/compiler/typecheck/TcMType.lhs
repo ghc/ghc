@@ -75,8 +75,8 @@ import PrelNames	( cCallableClassKey, cReturnableClassKey, hasKey )
 import ForeignCall	( Safety(..) )
 import FunDeps		( grow )
 import PprType		( pprPred, pprSourceType, pprTheta, pprClassPred )
-import Name		( Name, NamedThing(..), setNameUnique, mkSysLocalName,
-			  mkLocalName, mkDerivedTyConOcc
+import Name		( Name, NamedThing(..), setNameUnique, mkSystemName,
+			  mkInternalName, mkDerivedTyConOcc
 			)
 import VarSet
 import BasicTypes	( Boxity(Boxed) )
@@ -99,7 +99,7 @@ import Outputable
 newTyVar :: Kind -> NF_TcM TcTyVar
 newTyVar kind
   = tcGetUnique 	`thenNF_Tc` \ uniq ->
-    tcNewMutTyVar (mkSysLocalName uniq FSLIT("t")) kind VanillaTv
+    tcNewMutTyVar (mkSystemName uniq FSLIT("t")) kind VanillaTv
 
 newTyVarTy  :: Kind -> NF_TcM TcType
 newTyVarTy kind
@@ -108,7 +108,7 @@ newTyVarTy kind
 
 newHoleTyVarTy :: NF_TcM TcType
   = tcGetUnique 	`thenNF_Tc` \ uniq ->
-    tcNewMutTyVar (mkSysLocalName uniq FSLIT("h")) openTypeKind HoleTv	`thenNF_Tc` \ tv ->
+    tcNewMutTyVar (mkSystemName uniq FSLIT("h")) openTypeKind HoleTv	`thenNF_Tc` \ tv ->
     returnNF_Tc (TyVarTy tv)
 
 newTyVarTys :: Int -> Kind -> NF_TcM [TcType]
@@ -117,7 +117,7 @@ newTyVarTys n kind = mapNF_Tc newTyVarTy (nOfThem n kind)
 newKindVar :: NF_TcM TcKind
 newKindVar
   = tcGetUnique 							`thenNF_Tc` \ uniq ->
-    tcNewMutTyVar (mkSysLocalName uniq FSLIT("k")) superKind VanillaTv	`thenNF_Tc` \ kv ->
+    tcNewMutTyVar (mkSystemName uniq FSLIT("k")) superKind VanillaTv	`thenNF_Tc` \ kv ->
     returnNF_Tc (TyVarTy kv)
 
 newKindVars :: Int -> NF_TcM [TcKind]
@@ -126,7 +126,7 @@ newKindVars n = mapNF_Tc (\ _ -> newKindVar) (nOfThem n ())
 newBoxityVar :: NF_TcM TcKind
 newBoxityVar
   = tcGetUnique 							  `thenNF_Tc` \ uniq ->
-    tcNewMutTyVar (mkSysLocalName uniq FSLIT("bx")) superBoxity VanillaTv  `thenNF_Tc` \ kv ->
+    tcNewMutTyVar (mkSystemName uniq FSLIT("bx")) superBoxity VanillaTv  `thenNF_Tc` \ kv ->
     returnNF_Tc (TyVarTy kv)
 \end{code}
 
@@ -162,7 +162,7 @@ tcInstTyVar tv_details tyvar
 	-- that two different tyvars will print the same way 
 	-- in an error message.  -dppr-debug will show up the difference
 	-- Better watch out for this.  If worst comes to worst, just
-	-- use mkSysLocalName.
+	-- use mkSystemName.
     in
     tcNewMutTyVar name (tyVarKind tyvar) tv_details
 
@@ -382,7 +382,7 @@ mkArbitraryType tv
 		-- I dread to think what will happen if this gets out into an 
 		-- interface file.  Catastrophe likely.  Major sigh.
 
-    tc_name = mkLocalName (getUnique tv) (mkDerivedTyConOcc (getOccName tv)) noSrcLoc
+    tc_name = mkInternalName (getUnique tv) (mkDerivedTyConOcc (getOccName tv)) noSrcLoc
 
 -- zonkTcTyVarToTyVar is applied to the *binding* occurrence 
 -- of a type variable, at the *end* of type checking.  It changes

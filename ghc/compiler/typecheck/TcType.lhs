@@ -132,7 +132,7 @@ import VarSet
 
 -- others:
 import CmdLineOpts	( DynFlags, DynFlag( Opt_GlasgowExts ), dopt )
-import Name		( Name, NamedThing(..), mkLocalName, getSrcLoc )
+import Name		( Name, NamedThing(..), mkInternalName, getSrcLoc )
 import OccName		( OccName, mkDictOcc )
 import NameSet
 import PrelNames	-- Lots (e.g. in isFFIArgumentTy)
@@ -517,8 +517,8 @@ predHasFDs (IParam _ _)   = True
 predHasFDs (ClassP cls _) = classHasFDs cls
 
 mkPredName :: Unique -> SrcLoc -> SourceType -> Name
-mkPredName uniq loc (ClassP cls tys) = mkLocalName uniq (mkDictOcc (getOccName cls)) loc
-mkPredName uniq loc (IParam ip ty)   = mkLocalName uniq (getOccName (ipNameName ip)) loc
+mkPredName uniq loc (ClassP cls tys) = mkInternalName uniq (mkDictOcc (getOccName cls)) loc
+mkPredName uniq loc (IParam ip ty)   = mkInternalName uniq (getOccName (ipNameName ip)) loc
 \end{code}
 
 

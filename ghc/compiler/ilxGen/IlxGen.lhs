@@ -27,7 +27,7 @@ import PrimOp		( PrimOp(..) )
 import ForeignCall	( CCallConv(..), ForeignCall(..), CCallSpec(..), CCallTarget(..), DNCallSpec(..) )
 import TysWiredIn	( mkTupleTy, tupleCon )
 import PrimRep		( PrimRep(..) )
-import Name		( nameModule, nameOccName, isGlobalName, isLocalName, NamedThing(getName) )
+import Name		( nameModule, nameOccName, isExternalName, isInternalName, NamedThing(getName) )
 import Subst   		( substTyWith )
 
 import Module		( Module, PackageName, ModuleName, moduleName, 
@@ -157,7 +157,7 @@ importsVars env vs = foldR (importsVar env) vs
 importsVar env v = importsName env (idName v). importsType env (idType v)
 
 importsName env n
-   | isLocalName n = importsNone
+   | isInternalName n = importsNone
    | ilxEnvModule env == nameModule n = importsNone
    | isHomeModule (nameModule n) =  addModuleImpInfo (moduleName (nameModule n))
 -- See HACK below
@@ -187,7 +187,7 @@ importsTypeArgs2 env tys = foldR (importsType2 env) tys
 importsDataCon env dcon = importsTyCon env (dataConTyCon dcon)
 
 importsTyCon env tc | (not (isDataTyCon tc) || 
-                   isLocalName (getName tc) || 
+                   isInternalName (getName tc) || 
                    ilxEnvModule env == nameModule (getName tc)) = importsNone
 importsTyCon env tc | otherwise = importsName env (getName tc) . addTyConImpInfo tc .
 				    foldR (importsTyConDataCon env) (tyConDataCons tc)
@@ -210,7 +210,7 @@ importsTyConDataConType2 _ _ = panic "IlxGen.lhs: importsTyConDataConType2 ty"
 importsTyConDataConTypeArgs2 env tys = foldR (importsTyConDataConType2 env) tys
 
 importsTyConDataConTypeTyCon env tc | (not (isDataTyCon tc) || 
-                   isLocalName (getName tc) || 
+                   isInternalName (getName tc) || 
                    ilxEnvModule env == nameModule (getName tc)) = importsNone
 importsTyConDataConTypeTyCon env tc | otherwise = importsName env (getName tc)
 
@@ -1124,7 +1124,7 @@ pushLit env (MachAddr w) = text "ldc.i4" <+> integer w <+> text "conv.i"
 pushLit env (MachLabel l) = trace "WARNING: Cannot compile MachLabel to ILX in IlxGen.lhs" (text "// MachLabel!!!  Not valid in ILX!!")
 
 pprIlxTopVar env v
-  | isGlobalName n = (nameReference env n) <> pprId (nameModule n) <> text "::" <> singleQuotes (ppr (nameModule n) <> text "_" <> ppr (nameOccName n))
+  | isExternalName n = (nameReference env n) <> pprId (nameModule n) <> text "::" <> singleQuotes (ppr (nameModule n) <> text "_" <> ppr (nameOccName n))
   | otherwise	   = pprId (nameOccName n)
   where
     n = idName v
@@ -1458,7 +1458,7 @@ line = text "// ----------------------------------"
 hscOptionQual = text ".i_"
 
 nameReference env n
-  | isLocalName n = empty
+  | isInternalName n = empty
   | ilxEnvModule env == nameModule n  = text ""
   | isHomeModule (nameModule n)   = moduleNameReference (moduleName (nameModule n))
 -- HACK: no Vanilla modules should be around, but they are!!  This

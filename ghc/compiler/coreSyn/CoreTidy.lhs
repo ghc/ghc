@@ -29,8 +29,8 @@ import Id		( idType, idInfo, idName, isExportedId,
 import IdInfo		{- loads of stuff -}
 import NewDemand	( isBottomingSig, topSig )
 import BasicTypes	( isNeverActive )
-import Name		( getOccName, nameOccName, mkLocalName, mkGlobalName, 
-		  	  localiseName, isGlobalName, nameSrcLoc
+import Name		( getOccName, nameOccName, mkInternalName, mkExternalName, 
+		  	  localiseName, isExternalName, nameSrcLoc
 			)
 import NameEnv		( filterNameEnv )
 import OccName		( TidyOccEnv, initTidyOccEnv, tidyOccName )
@@ -157,7 +157,7 @@ tidyCorePgm dflags mod pcs cg_info_env
 		init_tidy_env = (orig_ns, initTidyOccEnv avoids, emptyVarEnv)
 		avoids	      = [getOccName name | bndr <- typeEnvIds env_tc,
 						   let name = idName bndr,
-						   isGlobalName name]
+						   isExternalName name]
 		-- In computing our "avoids" list, we must include
 		--	all implicit Ids
 		--	all things with global names (assigned once and for
@@ -177,7 +177,7 @@ tidyCorePgm dflags mod pcs cg_info_env
 	; let final_ids  = [ id 
 			   | bind <- tidy_binds
 			   , id <- bindersOf bind
-			   , isGlobalName (idName id)]
+			   , isExternalName (idName id)]
 
 		-- Dfuns are local Ids that might have
 		-- changed their unique during tidying
@@ -518,7 +518,7 @@ tidyTopIdInfo tidy_env is_external idinfo unfold_info arity cg_info
 -- This is where we set names to local/global based on whether they really are 
 -- externally visible (see comment at the top of this module).  If the name
 -- was previously local, we have to give it a unique occurrence name if
--- we intend to globalise it.
+-- we intend to externalise it.
 tidyTopName mod ns occ_env external name
   | global && internal = (ns, occ_env, localiseName name)
 
@@ -529,22 +529,22 @@ tidyTopName mod ns occ_env external name
 
   | local  && internal = (ns_w_local, occ_env', new_local_name)
 	-- Even local, internal names must get a unique occurrence, because
-	-- if we do -split-objs we globalise the name later, in the code generator
+	-- if we do -split-objs we externalise the name later, in the code generator
 	--
 	-- Similarly, we must make sure it has a system-wide Unique, because
 	-- the byte-code generator builds a system-wide Name->BCO symbol table
 
   | local  && external = case lookupFM ns_names key of
 			   Just orig -> (ns,	      occ_env', orig)
-			   Nothing   -> (ns_w_global, occ_env', new_global_name)
-	-- If we want to globalise a currently-local name, check
+			   Nothing   -> (ns_w_global, occ_env', new_external_name)
+	-- If we want to externalise a currently-local name, check
 	-- whether we have already assigned a unique for it.
 	-- If so, use it; if not, extend the table (ns_w_global).
 	-- This is needed when *re*-compiling a module in GHCi; we want to
 	-- use the same name for externally-visible things as we did before.
 
   where
-    global	     = isGlobalName name
+    global	     = isExternalName name
     local	     = not global
     internal	     = not external
 
@@ -556,11 +556,11 @@ tidyTopName mod ns occ_env external name
     uniq	     = uniqFromSupply us1
     loc		     = nameSrcLoc name
 
-    new_local_name   = mkLocalName  uniq     occ' loc
-    new_global_name  = mkGlobalName uniq mod occ' loc  
+    new_local_name     = mkInternalName  uniq     occ' loc
+    new_external_name  = mkExternalName uniq mod occ' loc  
 
     ns_w_local	     = ns { nsUniqs = us2 }
-    ns_w_global	     = ns { nsUniqs = us2, nsNames = addToFM ns_names key new_global_name }
+    ns_w_global	     = ns { nsUniqs = us2, nsNames = addToFM ns_names key new_external_name }
 
 
 ------------  Worker  --------------

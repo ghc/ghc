@@ -40,7 +40,7 @@ import CmdLineOpts	( DynFlags, DynFlag(..),
 			  opt_SccProfilingOn, opt_EnsureSplittableC )
 import CostCentre       ( CollectedCCs )
 import Id               ( Id, idName, setIdName )
-import Name		( nameSrcLoc, nameOccName, nameUnique, isLocalName, mkGlobalName )
+import Name		( nameSrcLoc, nameOccName, nameUnique, isInternalName, mkExternalName )
 import OccName		( mkLocalOcc )
 import Module           ( Module )
 import PrimRep		( PrimRep(..) )
@@ -182,14 +182,14 @@ variable.
 cgTopBinding :: (StgBinding,[Id]) -> Code
 cgTopBinding (StgNonRec srt_info id rhs, srt)
   = absC maybeSplitCode	  	`thenC`
-    maybeGlobaliseId id		`thenFC` \ id' ->
+    maybeExternaliseId id		`thenFC` \ id' ->
     let
 	srt_label = mkSRTLabel (idName id')
     in
     mkSRT srt_label srt [] 	`thenC`
     setSRTLabel srt_label (
     cgTopRhs id' rhs srt_info  	`thenFC` \ (id, info) ->
-    addBindC id info	-- Add the un-globalised Id to the envt, so we
+    addBindC id info	-- Add the un-externalised Id to the envt, so we
 			-- find it when we look up occurrences
     )
 
@@ -198,7 +198,7 @@ cgTopBinding (StgRec srt_info pairs, srt)
     let
         (bndrs, rhss) = unzip pairs
     in
-    mapFCs maybeGlobaliseId bndrs	`thenFC` \ bndrs'@(id:_) ->
+    mapFCs maybeExternaliseId bndrs	`thenFC` \ bndrs'@(id:_) ->
     let
 	srt_label = mkSRTLabel (idName id)
 	pairs'    = zip bndrs' rhss
@@ -218,7 +218,7 @@ mkSRT lbl ids these
     absC (CSRT lbl (map (mkClosureLabel . idName) ids))
   where
 	-- sigh, better map all the ids against the environment in case they've
-	-- been globalised (see maybeGlobaliseId below).
+	-- been externalised (see maybeExternaliseId below).
     remap id = case filter (==id) these of
 		[] ->  getCAddrModeAndInfo id 
 				`thenFC` \ (id, _, _) -> returnFC id
@@ -230,7 +230,7 @@ mkSRT lbl ids these
 
 cgTopRhs :: Id -> StgRhs -> SRT -> FCode (Id, CgIdInfo)
 	-- The Id is passed along for setting up a binding...
-	-- It's already been globalised if necessary
+	-- It's already been externalised if necessary
 
 cgTopRhs bndr (StgRhsCon cc con args) srt
   = forkStatics (cgTopRhsCon bndr con args srt)
@@ -250,17 +250,17 @@ cgTopRhs bndr (StgRhsClosure cc bi fvs upd_flag args body) srt
 %*									*
 %************************************************************************
 
-If we're splitting the object, we need to globalise all the top-level names
-(and then make sure we only use the globalised one in any C label we use
+If we're splitting the object, we need to externalise all the top-level names
+(and then make sure we only use the externalised one in any C label we use
 which refers to this name).
 
 \begin{code}
-maybeGlobaliseId :: Id -> FCode Id
-maybeGlobaliseId id
-  | opt_EnsureSplittableC, 	-- Globalise the name for -split-objs
-    isLocalName name
+maybeExternaliseId :: Id -> FCode Id
+maybeExternaliseId id
+  | opt_EnsureSplittableC, 	-- Externalise the name for -split-objs
+    isInternalName name
   = moduleName				 `thenFC` \ mod ->
-    returnFC (setIdName id (mkGlobalName uniq mod new_occ (nameSrcLoc name)))
+    returnFC (setIdName id (mkExternalName uniq mod new_occ (nameSrcLoc name)))
   | otherwise		
   = returnFC id
   where

@@ -19,7 +19,7 @@ import DsUtils		( EquationInfo(..), MatchResult(..), EqnSet,
 import Id		( idType )
 import DataCon		( DataCon, dataConTyCon, dataConArgTys,
 			  dataConSourceArity, dataConFieldLabels )
-import Name             ( Name, mkLocalName, getOccName, isDataSymOcc, getName, mkVarOcc )
+import Name             ( Name, mkInternalName, getOccName, isDataSymOcc, getName, mkVarOcc )
 import TcType		( mkTyVarTys )
 import TysPrim		( charPrimTy )
 import TysWiredIn
@@ -375,7 +375,7 @@ make_row_vars used_lits (EqnInfo _ _ pats _ ) =
    (VarPatIn new_var:takeList (tail pats) (repeat new_wild_pat),[(new_var,used_lits)])
   where new_var = hash_x
 
-hash_x = mkLocalName unboundKey {- doesn't matter much -}
+hash_x = mkInternalName unboundKey {- doesn't matter much -}
 		     (mkVarOcc SLIT("#x"))
 		     noSrcLoc
 

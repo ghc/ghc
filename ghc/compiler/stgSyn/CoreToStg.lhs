@@ -30,7 +30,7 @@ import VarSet
 import VarEnv
 import DataCon		( dataConWrapId )
 import Maybes		( maybeToBool )
-import Name		( getOccName, isExternallyVisibleName, isDllName )
+import Name		( getOccName, isExternalName, isDllName )
 import OccName		( occNameUserString )
 import BasicTypes       ( TopLevelFlag(..), isNotTopLevel, Arity )
 import CmdLineOpts	( DynFlags, opt_RuntimeTypes )
@@ -991,7 +991,7 @@ lookupFVInfo :: FreeVarsInfo -> Id -> StgBinderInfo
 -- Find how the given Id is used.
 -- Externally visible things may be used any old how
 lookupFVInfo fvs id 
-  | isExternallyVisibleName (idName id) = noBinderInfo
+  | isExternalName (idName id) = noBinderInfo
   | otherwise = case lookupVarEnv fvs id of
 			Nothing         -> noBinderInfo
 			Just (_,_,info) -> info

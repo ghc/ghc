@@ -49,7 +49,7 @@ import Unique	  ( Unique, Uniquable(..), hasKey,
 		  ) 
 import BasicTypes ( Boxity(..), Arity )
 import UniqFM	  ( UniqFM, listToUFM )
-import Name	  ( Name, mkLocalName, mkKnownKeyGlobal, nameRdrName )
+import Name	  ( Name, mkInternalName, mkKnownKeyExternalName, nameRdrName )
 import RdrName    ( rdrNameOcc )
 import SrcLoc     ( builtinSrcLoc, noSrcLoc )
 import Util	  ( nOfThem )
@@ -66,14 +66,14 @@ import Panic	  ( panic )
 This *local* name is used by the interactive stuff
 
 \begin{code}
-itName uniq = mkLocalName uniq (mkOccFS varName FSLIT("it")) noSrcLoc
+itName uniq = mkInternalName uniq (mkOccFS varName FSLIT("it")) noSrcLoc
 \end{code}
 
 \begin{code}
 -- mkUnboundName makes a place-holder Name; it shouldn't be looked at except possibly
 -- during compiler debugging.
 mkUnboundName :: RdrName -> Name
-mkUnboundName rdr_name = mkLocalName unboundKey (rdrNameOcc rdr_name) builtinSrcLoc
+mkUnboundName rdr_name = mkInternalName unboundKey (rdrNameOcc rdr_name) builtinSrcLoc
 
 isUnboundName :: Name -> Bool
 isUnboundName name = name `hasKey` unboundKey
@@ -690,12 +690,12 @@ minus_RDR		= nameRdrName minusName
 All these are original names; hence mkOrig
 
 \begin{code}
-varQual  mod str uq = mkKnownKeyGlobal (varQual_RDR  mod str) uq
-dataQual mod str uq = mkKnownKeyGlobal (dataQual_RDR mod str) uq
-tcQual   mod str uq = mkKnownKeyGlobal (tcQual_RDR   mod str) uq
-clsQual  mod str uq = mkKnownKeyGlobal (clsQual_RDR  mod str) uq
+varQual  mod str uq = mkKnownKeyExternalName (varQual_RDR  mod str) uq
+dataQual mod str uq = mkKnownKeyExternalName (dataQual_RDR mod str) uq
+tcQual   mod str uq = mkKnownKeyExternalName (tcQual_RDR   mod str) uq
+clsQual  mod str uq = mkKnownKeyExternalName (clsQual_RDR  mod str) uq
 
-kindQual str uq = mkLocalName uq (mkKindOccFS tcName str) builtinSrcLoc
+kindQual str uq = mkInternalName uq (mkKindOccFS tcName str) builtinSrcLoc
 	-- Kinds are not z-encoded in interface file, hence mkKindOccFS
 	-- And they don't come from any particular module; indeed we always
 	-- want to print them unqualified.  Hence the LocalName

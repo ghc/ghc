@@ -49,7 +49,7 @@ import Java
 import Literal	( Literal(..) )
 import Id	( Id, isDataConId_maybe, isId, idName, isDeadBinder, idPrimRep
 		, isPrimOpId_maybe )
-import Name	( NamedThing(..), getOccString, isGlobalName, isLocalName
+import Name	( NamedThing(..), getOccString, isExternalName, isInternalName
 		, nameModule )
 import PrimRep  ( PrimRep(..) )
 import DataCon	( DataCon, dataConRepArity, dataConRepArgTys, dataConId )
@@ -220,7 +220,7 @@ java_top_bind bndr rhs
 
 \begin{code}
 javaVar :: Id -> Expr
-javaVar v | isGlobalName (idName v) = mkNew (javaIdType v) []
+javaVar v | isExternalName (idName v) = mkNew (javaIdType v) []
 	  | otherwise	  	    =   Var (javaName v)
 
 javaLit :: Literal.Literal -> Expr
@@ -724,7 +724,7 @@ withType (Name n _) t = Name n t
 -- using the same string as the Id.
 javaName :: Id -> Name
 javaName n 
-  | isGlobalName (idName n) = error "useing javaName on global"
+  | isExternalName (idName n) = error "useing javaName on global"
   | otherwise = Name (getOccString n)
 		     (primRepToType (idPrimRep n))
 
@@ -734,7 +734,7 @@ javaName n
 
 javaIdTypeName :: Id -> TypeName
 javaIdTypeName n
-    | isLocalName n' = renameForKeywords n'
+    | isInternalName n' = renameForKeywords n'
     | otherwise      = moduleString (nameModule n') ++ "." ++ renameForKeywords n'
   where
 	     n' = getName n

@@ -18,7 +18,7 @@ import DataCon          ( DataCon, dataConOrigArgTys, dataConWrapId, dataConId, 
 import TyCon            ( TyCon, tyConTyVars, tyConDataCons_maybe, 
 			  tyConGenInfo, isNewTyCon, newTyConRep, isBoxedTupleTyCon
 			)
-import Name		( Name, mkSysLocalName )
+import Name		( Name, mkSystemName )
 import CoreSyn          ( mkLams, Expr(..), CoreExpr, AltCon(..), 
 			  mkConApp, Alt, mkTyApps, mkVarApps )
 import CoreUtils	( exprArity )
@@ -535,7 +535,7 @@ bimapTuple eps
 
 -------------------
 genericNames :: [Name]
-genericNames = [mkSysLocalName (mkBuiltinUnique i) (_PK_ ('g' : show i)) | i <- [1..]]
+genericNames = [mkSystemName (mkBuiltinUnique i) (_PK_ ('g' : show i)) | i <- [1..]]
 (g1:g2:g3:_) = genericNames
 
 mk_hs_lam pats body = HsPar (HsLam (mkSimpleMatch pats body placeHolderType builtinSrcLoc))

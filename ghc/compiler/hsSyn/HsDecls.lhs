@@ -238,7 +238,7 @@ Source code:
 	instance Foo [Bool] where ...
     These might both be dFooList
 
-  - The CoreTidy phase globalises the name, and ensures the occurrence name is
+  - The CoreTidy phase externalises the name, and ensures the occurrence name is
     unique (this isn't special to dict funs).  So we'd get dFooList and dFooList1.
 
   - We can take this relaxed approach (changing the occurrence name later) 
