@@ -146,16 +146,16 @@ rm -rf ${RPM_BUILD_ROOT}
 
 %files doc
 %defattr(-,root,root)
-%doc docs/building/building
+%doc docs/building/building-html
 %doc docs/building/building.ps
-%doc docs/docbook-cheat-sheet/docbook-cheat-sheet
+%doc docs/docbook-cheat-sheet/docbook-cheat-sheet-html
 %doc docs/docbook-cheat-sheet/docbook-cheat-sheet.ps
 %doc ghc/docs/ext-core/core.ps
 %doc ghc/docs/storage-mgt/ldv.ps
 %doc ghc/docs/storage-mgt/rp.ps
 %doc ghc/docs/storage-mgt/sm.ps
-%doc ghc/docs/users_guide/users_guide
+%doc ghc/docs/users_guide/users_guide-html
 %doc ghc/docs/users_guide/users_guide.ps
-%doc hslibs/doc/hslibs
+%doc hslibs/doc/hslibs-html
 %doc hslibs/doc/hslibs.ps
 %doc html/*
