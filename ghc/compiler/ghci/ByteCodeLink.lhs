@@ -28,7 +28,7 @@ import PrimRep		( PrimRep(..) )
 import Constants	( wORD_SIZE )
 import Module		( ModuleName, moduleName, moduleNameFS )
 import Linker		( lookupSymbol )
-import FastString	( FastString(..) )
+import FastString	( FastString(..), unpackFS )
 import ByteCodeInstr	( BCInstr(..), ProtoBCO(..) )
 import ByteCodeItbls	( ItblEnv, ItblPtr )
 import FiniteMap

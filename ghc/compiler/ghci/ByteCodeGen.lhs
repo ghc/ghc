@@ -42,7 +42,7 @@ import PrimRep		( isFollowableRep )
 import CmdLineOpts	( DynFlags, DynFlag(..) )
 import ErrUtils		( showPass, dumpIfSet_dyn )
 import Unique		( mkPseudoUnique3 )
-import FastString	( FastString(..) )
+import FastString	( FastString(..), unpackFS )
 import Panic		( GhcException(..) )
 import PprType		( pprType )
 import SMRep		( arrWordsHdrSize, arrPtrsHdrSize )
@@ -1192,8 +1192,6 @@ pushAtom False d p (AnnLit lit)
         pushStr s 
            = let getMallocvilleAddr
                     = case s of
-                         CharStr s i -> returnBc (Ptr s)
-
                          FastString _ l ba -> 
                             -- sigh, a string in the heap is no good to us.
                             -- We need a static C pointer, since the type of 
