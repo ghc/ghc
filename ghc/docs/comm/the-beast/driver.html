@@ -113,16 +113,16 @@
       RTS to HSstd.  This case is coped with by the <code>-no-hs-main</code>
       flag, which suppresses passing the corresonding <code>-u</code> option
       to the linker -- although in some versions of the compiler (e.g., 5.00.2)
-      it didn't work.  In addition, the driver arranges that the C program 
-      providing the <code>main()</code> that we want to use appears in the 
-      link line after the RTS.  Therefore, the RTS's main is never used and
+      it didn't work.  In addition, the driver generally places the C program 
+      providing the <code>main()</code> that we want to use before the RTS
+      on the link line.  Therefore, the RTS's main is never used and
       without the <code>-u</code> the label <code>__init_PrelMain</code> 
       will not be linked.
     </p>
     
     <p><small>
 <!-- hhmts start -->
-Last modified: Fri Aug 24 16:16:10 EST 2001
+Last modified: Fri Aug 24 23:12:33 EST 2001
 <!-- hhmts end -->
     </small>
   </body>
