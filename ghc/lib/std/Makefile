@@ -189,12 +189,15 @@ PrelGHC.ilx: PrelGHC.ilx.pp
 
 PrelGHC.il: PrelGHC.ilx
 #	sed -e "s/'PrelBase.dll'/'PrelBase.$(way_)o'/g" $< > $@.tmp
-	$(ILX2IL) --module --assembly-name std.dll -o $@ $<
-	$(ILASM) /QUIET /DLL /OUT=$@ $@.il
+	$(ILX2IL) --module --assembly-name std.dll --add-suffix-to-assembly msilxlib --suffix-to-add .mono -o $@ $<
 #	mv $@.tmp $@
 
-std.$(way_)mvl: $(HS_IL)
-	((ILSDK_HOME=c:\\devel\\fcom $(ILVALID) c:\\devel\\fcom\\bin\\msilxlib$(ilx2il_suffix).ilo $(HS_IL)) 2>&1) | tee $@
+PrelGHC.$(way_)o: PrelGHC.il
+	$(ILASM) /QUIET /DLL /OUT=$@ $<
+
+std.$(way_)mvl: $(HS_IL) PrelGHC.$(way_)o
+	((ILSDK_HOME=c:\\devel\\fcom $(ILVALID) c:\\devel\\fcom\\bin\\msilxlib.mono.ilo std.dll $(HS_IL)) 2>&1) | tee $@
+# .mono should be $(ilx2il_suffix), but that doesn't work at the moment
 
 std.$(way_)vlb: std.dll
 	mkvlb.exe -V -o $@.tmp std
