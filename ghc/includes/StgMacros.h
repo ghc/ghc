@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.43 2001/11/23 11:58:00 simonmar Exp $
+ * $Id: StgMacros.h,v 1.44 2001/12/10 17:55:40 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -228,7 +228,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
     GEN_HP_CHK_ALT(headroom,stg_gc_d1,tag_assts);
 
 #define HP_CHK_L1(headroom,tag_assts)       \
-    GEN_HP_CHK_ALT(headroom,stg_gc_d1,tag_assts);
+    GEN_HP_CHK_ALT(headroom,stg_gc_l1,tag_assts);
 
 #define HP_CHK_UT_ALT(headroom, ptrs, nptrs, r, ret, tag_assts) \
     GEN_HP_CHK_ALT(headroom, stg_gc_ut_##ptrs##_##nptrs, \

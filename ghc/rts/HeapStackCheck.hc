@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.19 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: HeapStackCheck.hc,v 1.20 2001/12/10 17:55:40 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -765,6 +765,39 @@ EXTFUN(stg_gc_d1)
   Sp -= 1 + sizeofW(StgDouble);
   ASSIGN_DBL(Sp+1,D1);
   Sp[0] = (W_)&stg_gc_d1_ret_info;
+  GC_GENERIC
+  FE_
+}
+
+/*-- L1 contains an int64 ------------------------------------------------- */
+
+/* we support int64s of either 1 or 2 words in size */
+
+#if SIZEOF_VOID_P == 8
+#  define LLI_BITMAP 1
+#else
+#  define LLI_BITMAP 3
+#endif 
+
+INFO_TABLE_SRT_BITMAP(stg_gc_l1_ret_info, stg_gc_l1_ret, LLI_BITMAP,
+		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		      RET_SMALL,, EF_, 0, 0);
+
+EXTFUN(stg_gc_l1_ret)
+{
+  FB_
+  L1 = PK_Int64(Sp);
+  Sp += sizeofW(StgWord64);
+  JMP_(ENTRY_CODE(Sp[0]));
+  FE_
+}
+
+EXTFUN(stg_gc_l1)
+{
+  FB_
+  Sp -= 1 + sizeofW(StgWord64);
+  ASSIGN_Int64(Sp+1,L1);
+  Sp[0] = (W_)&stg_gc_l1_ret_info;
   GC_GENERIC
   FE_
 }
