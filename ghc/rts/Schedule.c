@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.172 2003/07/12 00:09:15 sof Exp $
+ * $Id: Schedule.c,v 1.173 2003/08/15 12:43:57 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1513,7 +1513,7 @@ forkProcess(StgTSO* tso)
     
   } else { /* child */
   /* wipe all other threads */
-  run_queue_hd = run_queue_tl = tso;
+  run_queue_hd = run_queue_tl = END_TSO_QUEUE;
   tso->link = END_TSO_QUEUE;
 
   /* When clearing out the threads, we need to ensure
