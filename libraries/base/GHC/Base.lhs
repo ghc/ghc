@@ -86,7 +86,7 @@ Other Prelude modules are much easier with fewer complex dependencies.
 module GHC.Base
 	(
 	module GHC.Base,
-	module GHC.Prim,		-- Re-export GHC.Prim and GHC.Err, to avoid lots
+	module GHC.Prim,	-- Re-export GHC.Prim and GHC.Err, to avoid lots
 	module GHC.Err          -- of people having to import it explicitly
   ) 
 	where
@@ -595,6 +595,11 @@ id x			=  x
 lazy :: a -> a
 lazy x = x
 
+-- Assertion function. This simply ignores its boolean argument.
+-- The compiler may rewrite it to (assertError line)
+assert :: Bool -> a -> a
+assert pred r = r
+ 
 -- constant function
 const			:: a -> b -> a
 const x _		=  x

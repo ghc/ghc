@@ -15,7 +15,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.List (
-   [] (..),
+   -- [] (..),		-- Not Haskell 98; built in syntax
 
    map, (++), filter, concat,
    head, last, tail, init, null, length, (!!), 

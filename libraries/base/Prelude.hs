@@ -24,12 +24,12 @@ module Prelude (
     Ordering(..), 
     Char, String, Int, Integer, Float, Double, IO,
     Rational,
-    []((:), []),
+    -- []((:), []),	-- Not legal Haskell 98; available through built-in syntax
     
     module Data.Tuple,
         -- Includes tuple types + fst, snd, curry, uncurry
-    ()(..),		-- The unit type
-    (->),		-- functions
+    -- ()(..),		-- Not legal Haskell 98
+    -- (->),		-- ... available through built-in syntax
     
     -- * Basic type classes
     Eq(..),

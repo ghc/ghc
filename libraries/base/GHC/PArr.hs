@@ -72,7 +72,7 @@
 --
 
 module GHC.PArr (
-  [::],			-- abstract
+  -- [::],		-- Built-in syntax
 
   mapP,			-- :: (a -> b) -> [:a:] -> [:b:]
   (+:+),		-- :: [:a:] -> [:a:] -> [:a:]
