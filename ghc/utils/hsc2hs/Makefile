@@ -10,6 +10,9 @@ INCLUDE_DIR=ghc/includes
 
 INSTALLING=1
 
+SRC_HC_OPTS += -i$(GHC_LIB_COMPAT_DIR)
+SRC_LD_OPTS += -L$(GHC_LIB_COMPAT_DIR) -lghccompat
+
 HS_PROG           = hsc2hs-bin
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 HS_PROG           = hsc2hs$(exeext)

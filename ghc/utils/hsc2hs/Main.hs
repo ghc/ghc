@@ -1,7 +1,7 @@
 {-# OPTIONS -fffi -cpp #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.60 2004/08/13 13:11:21 simonmar Exp $
+-- $Id: Main.hs,v 1.61 2005/01/05 10:26:45 simonmar Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -16,6 +16,8 @@ import System.Console.GetOpt
 #else
 import GetOpt
 #endif
+
+import Compat.RawSystem 	( rawSystem )
 
 import System        (getProgName, getArgs, ExitCode(..), exitWith, system)
 import Directory     (removeFile,doesFileExist)
@@ -570,22 +572,24 @@ output flags name toks = do
 
 
     
-    compilerStatus <- systemL beVerbose $
-        compiler++
-        " -c"++
-        concat [" "++f | CompFlag f <- flags]++
-        " "++cProgName++
-        " -o "++oProgName
+    compilerStatus <- rawSystemL beVerbose compiler
+	(  ["-c"]
+        ++ [f | CompFlag f <- flags]
+        ++ [cProgName]
+        ++ ["-o", oProgName]
+	)
+
     case compilerStatus of
         e@(ExitFailure _) -> exitWith e
         _                 -> return ()
     removeFile cProgName
     
-    linkerStatus <- systemL beVerbose $
-        linker++
-        concat [" "++f | LinkFlag f <- flags]++
-        " "++oProgName++
-        " -o "++progName
+    linkerStatus <- rawSystemL beVerbose linker
+        (  [f | LinkFlag f <- flags]
+        ++ [oProgName]
+        ++ ["-o", progName]
+	)
+
     case linkerStatus of
         e@(ExitFailure _) -> exitWith e
         _                 -> return ()
@@ -617,6 +621,11 @@ output flags name toks = do
         concatMap outTokenC specials
 	-- NB. outHFile not outHName; works better when processed
 	-- by gcc or mkdependC.
+
+rawSystemL :: Bool -> String -> [String] -> IO ExitCode
+rawSystemL flg prog args = do
+  when flg $ hPutStrLn stderr ("Executing: " ++ prog ++ concat (map (' ':) args))
+  rawSystem prog args
 
 systemL :: Bool -> String -> IO ExitCode
 systemL flg s = do
