@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.26 2001/11/03 00:29:13 sof Exp $
+# $Id: Makefile,v 1.27 2001/12/26 23:08:07 sof Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -12,7 +12,7 @@ INSTALLING=1
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 HS_PROG           = hsc2hs-bin
 else
-HS_PROG           = hsc2hs
+HS_PROG           = hsc2hs$(exeext)
 endif
 SRC_HC_OPTS      += -package util -cpp
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
