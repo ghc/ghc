@@ -121,9 +121,9 @@ SetPSColour(shade)
 {
     if (cflag) {
 	fprintf(psfp, "%f %f %f setrgbcolor\n",
-		extract_colour(shade,    100),
-		extract_colour(shade,  10000),
-		extract_colour(shade,1000000));
+		extract_colour(shade, (intish)100),
+		extract_colour(shade, (intish)10000),
+		extract_colour(shade, (intish)1000000));
     } else {
 	fprintf(psfp, "%f setgray\n", shade);
     }
