@@ -40,10 +40,10 @@ mkRegex s = unsafePerformIO (RE.regcomp s RE.regExtended)
 -- case-sensitve options can be changed from the default settings.
 mkRegexWithOpts
    :: String  -- ^ The regular expression to compile
-   -> Bool    -- ^ 'True' @<=>@ \'@^@\' and \'@$@\' match the beginning and 
-	      -- end of individual lines respectively, and \'.\' does /not/
+   -> Bool    -- ^ 'True' @\<=>@ '@^@' and '@$@' match the beginning and 
+	      -- end of individual lines respectively, and '.' does /not/
 	      -- match the newline character.
-   -> Bool    -- ^ 'True' @<=>@ matching is case-sensitive
+   -> Bool    -- ^ 'True' @\<=>@ matching is case-sensitive
    -> Regex   -- ^ Returns: the compiled regular expression
 
 mkRegexWithOpts s single_line case_sensitive
