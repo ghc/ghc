@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.24 2000/04/14 15:18:07 sewardj Exp $
+ * $Id: Storage.c,v 1.25 2000/04/26 11:54:28 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -439,6 +439,7 @@ allocate(nat n)
      * (eg. running threads), so garbage collecting early won't make
      * much difference.
      */
+    alloc_blocks += req_blocks;
     RELEASE_LOCK(&sm_mutex);
     return bd->start;
 
@@ -712,8 +713,8 @@ extern void
 checkSanity(nat N)
 {
   nat g, s;
-fprintf(stderr, "--- checkSanity %d\n", N );
-  if (0&&RtsFlags.GcFlags.generations == 1) {
+
+  if (RtsFlags.GcFlags.generations == 1) {
     checkHeap(g0s0->to_space, NULL);
     checkChain(g0s0->large_objects);
   } else {
