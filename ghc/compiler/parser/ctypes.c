@@ -21,7 +21,7 @@ const unsigned char char_types[] =
     C_Any | C_Space,		/* \n */
     C_Any | C_Space,		/* \v */
     C_Any | C_Space,		/* \f */
-    0,				/* \015 */
+    C_Any | C_Space,		/* ^M */
     0,				/* \016 */
     0,				/* \017 */
     0,				/* \020 */
