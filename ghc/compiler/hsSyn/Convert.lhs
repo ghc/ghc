@@ -10,7 +10,7 @@ module Convert( convertToHsExpr, convertToHsDecls, convertToHsType ) where
 
 #include "HsVersions.h"
 
-import Language.Haskell.TH as TH
+import Language.Haskell.TH as TH hiding (sigP)
 import Language.Haskell.TH.Syntax as TH
 
 import HsSyn as Hs
@@ -262,9 +262,10 @@ cvtguard :: TH.Body -> [LGRHS RdrName]
 cvtguard (GuardedB pairs) = map cvtpair pairs
 cvtguard (NormalB e) 	 = [noLoc (GRHS [  nlResultStmt (cvtl e) ])]
 
-cvtpair :: (TH.Exp,TH.Exp) -> LGRHS RdrName
-cvtpair (x,y) = noLoc (GRHS [nlBindStmt truePat (cvtl x),
-		      	nlResultStmt (cvtl y)])
+cvtpair :: (TH.Guard,TH.Exp) -> LGRHS RdrName
+cvtpair (NormalG x,y) = noLoc (GRHS [nlBindStmt truePat (cvtl x),
+                               nlResultStmt (cvtl y)])
+cvtpair (PatG x,y) = noLoc (GRHS (cvtstmts x ++ [nlResultStmt (cvtl y)]))
 
 cvtOverLit :: Lit -> HsOverLit
 cvtOverLit (IntegerL i)  = mkHsIntegral i
@@ -292,11 +293,14 @@ cvtp (TH.VarP s)     = Hs.VarPat(vName s)
 cvtp (TupP [p])   = cvtp p
 cvtp (TupP ps)    = TuplePat (map cvtlp ps) Boxed
 cvtp (ConP s ps)  = ConPatIn (noLoc (cName s)) (PrefixCon (map cvtlp ps))
+cvtp (InfixP p1 s p2)
+                  = ConPatIn (noLoc (cName s)) (InfixCon (cvtlp p1) (cvtlp p2))
 cvtp (TildeP p)   = LazyPat (cvtlp p)
 cvtp (TH.AsP s p) = AsPat (noLoc (vName s)) (cvtlp p)
 cvtp TH.WildP   = WildPat void
 cvtp (RecP c fs)  = ConPatIn (noLoc (cName c)) $ Hs.RecCon (map (\(s,p) -> (noLoc (vName s),cvtlp p)) fs)
 cvtp (ListP ps)   = ListPat (map cvtlp ps) void
+cvtp (SigP p t)   = SigPatIn (cvtlp p) (cvtType t)
 
 -----------------------------------------------------------
 --	Types and type variables

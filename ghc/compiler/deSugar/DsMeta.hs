@@ -566,13 +566,21 @@ repGuards ::  [LGRHS Name] ->  DsM (Core TH.BodyQ)
 repGuards [L _ (GRHS [L _ (ResultStmt e)])]
   = do {a <- repLE e; repNormal a }
 repGuards other 
-  = do { zs <- mapM process other; 
-	 repGuarded (nonEmptyCoreList (map corePair zs)) }
+  = do { zs <- mapM process other;
+     let {(xs, ys) = unzip zs};
+	 gd <- repGuarded (nonEmptyCoreList ys);
+     wrapGenSyns (concat xs) gd }
   where 
+    process :: LGRHS Name -> DsM ([GenSymBind], (Core (TH.Q (TH.Guard, TH.Exp))))
+    process (L _ (GRHS [])) = panic "No guards in guarded body"
     process (L _ (GRHS [L _ (ExprStmt e1 ty),
 			L _ (ResultStmt e2)]))
-           = do { x <- repLE e1; y <- repLE e2; return (x, y) }
-    process other = panic "Non Haskell 98 guarded body"
+           = do { x <- repLNormalGE e1 e2;
+                  return ([], x) }
+    process (L _ (GRHS ss))
+           = do (gs, ss') <- repLSts ss
+                g <- repPatGE (nonEmptyCoreList ss')
+                return (gs, g)
 
 repFields :: [(Located Name, LHsExpr Name)] -> DsM (Core [TH.FieldExp])
 repFields flds = do
@@ -633,6 +641,7 @@ repSts (ExprStmt e ty : ss) =
       ; z <- repNoBindSt e2 
       ; (ss2,zs) <- repSts ss
       ; return (ss2, z : zs) }
+repSts [] = panic "repSts ran out of statements"      
 repSts other = panic "Exotic Stmt in meta brackets"      
 
 
@@ -754,14 +763,14 @@ repLambda z = panic "Can't represent a guarded lambda in Template Haskell"
 -- variable should already appear in the environment.
 
 -- Process a list of patterns
-repLPs :: [LPat Name] -> DsM (Core [TH.Pat])
+repLPs :: [LPat Name] -> DsM (Core [TH.PatQ])
 repLPs ps = do { ps' <- mapM repLP ps ;
-		 coreList patTyConName ps' }
+		 coreList patQTyConName ps' }
 
-repLP :: LPat Name -> DsM (Core TH.Pat)
+repLP :: LPat Name -> DsM (Core TH.PatQ)
 repLP (L _ p) = repP p
 
-repP :: Pat Name -> DsM (Core TH.Pat)
+repP :: Pat Name -> DsM (Core TH.PatQ)
 repP (WildPat _)     = repPwild 
 repP (LitPat l)      = do { l2 <- repLiteral l; repPlit l2 }
 repP (VarPat x)      = do { x' <- lookupBinder x; repPvar x' }
@@ -777,12 +786,15 @@ repP (ConPatIn dc details)
          RecCon pairs -> do { vs <- sequence $ map lookupLOcc (map fst pairs)
                             ; ps <- sequence $ map repLP (map snd pairs)
                             ; fps <- zipWithM (\x y -> rep2 fieldPatName [unC x,unC y]) vs ps
-                            ; fps' <- coreList fieldPatTyConName fps
+                            ; fps' <- coreList fieldPatQTyConName fps
                             ; repPrec con_str fps' }
-         InfixCon p1 p2 -> do { qs <- repLPs [p1,p2]; repPcon con_str qs }
+         InfixCon p1 p2 -> do { p1' <- repLP p1;
+                                p2' <- repLP p2;
+                                repPinfix p1' con_str p2' }
    }
 repP (NPatIn l (Just _)) = panic "Can't cope with negative overloaded patterns yet (repP (NPatIn _ (Just _)))"
 repP (NPatIn l Nothing) = do { a <- repOverloadedLiteral l; repPlit a }
+repP (SigPatIn p t)  = do { p' <- repLP p; t' <- repLTy t; repPsig p' t' }
 repP other = panic "Exotic pattern inside meta brackets"
 
 ----------------------------------------------------------
@@ -955,32 +967,38 @@ rep2 n xs = do { id <- dsLookupGlobalId n
 -- %*********************************************************************
 
 --------------- Patterns -----------------
-repPlit   :: Core TH.Lit -> DsM (Core TH.Pat) 
+repPlit   :: Core TH.Lit -> DsM (Core TH.PatQ) 
 repPlit (MkC l) = rep2 litPName [l]
 
-repPvar :: Core TH.Name -> DsM (Core TH.Pat)
+repPvar :: Core TH.Name -> DsM (Core TH.PatQ)
 repPvar (MkC s) = rep2 varPName [s]
 
-repPtup :: Core [TH.Pat] -> DsM (Core TH.Pat)
+repPtup :: Core [TH.PatQ] -> DsM (Core TH.PatQ)
 repPtup (MkC ps) = rep2 tupPName [ps]
 
-repPcon   :: Core TH.Name -> Core [TH.Pat] -> DsM (Core TH.Pat)
+repPcon   :: Core TH.Name -> Core [TH.PatQ] -> DsM (Core TH.PatQ)
 repPcon (MkC s) (MkC ps) = rep2 conPName [s, ps]
 
-repPrec   :: Core TH.Name -> Core [(TH.Name,TH.Pat)] -> DsM (Core TH.Pat)
+repPrec   :: Core TH.Name -> Core [(TH.Name,TH.PatQ)] -> DsM (Core TH.PatQ)
 repPrec (MkC c) (MkC rps) = rep2 recPName [c,rps]
 
-repPtilde :: Core TH.Pat -> DsM (Core TH.Pat)
+repPinfix :: Core TH.PatQ -> Core TH.Name -> Core TH.PatQ -> DsM (Core TH.PatQ)
+repPinfix (MkC p1) (MkC n) (MkC p2) = rep2 infixPName [p1, n, p2]
+
+repPtilde :: Core TH.PatQ -> DsM (Core TH.PatQ)
 repPtilde (MkC p) = rep2 tildePName [p]
 
-repPaspat :: Core TH.Name -> Core TH.Pat -> DsM (Core TH.Pat)
+repPaspat :: Core TH.Name -> Core TH.PatQ -> DsM (Core TH.PatQ)
 repPaspat (MkC s) (MkC p) = rep2 asPName [s, p]
 
-repPwild  :: DsM (Core TH.Pat)
+repPwild  :: DsM (Core TH.PatQ)
 repPwild = rep2 wildPName []
 
-repPlist :: Core [TH.Pat] -> DsM (Core TH.Pat)
+repPlist :: Core [TH.PatQ] -> DsM (Core TH.PatQ)
 repPlist (MkC ps) = rep2 listPName [ps]
+
+repPsig :: Core TH.PatQ -> Core TH.TypeQ -> DsM (Core TH.PatQ)
+repPsig (MkC p) (MkC t) = rep2 sigPName [p, t]
 
 --------------- Expressions -----------------
 repVarOrCon :: Name -> Core TH.Name -> DsM (Core TH.ExpQ)
@@ -999,7 +1017,7 @@ repLit (MkC c) = rep2 litEName [c]
 repApp :: Core TH.ExpQ -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
 repApp (MkC x) (MkC y) = rep2 appEName [x,y] 
 
-repLam :: Core [TH.Pat] -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
+repLam :: Core [TH.PatQ] -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
 repLam (MkC ps) (MkC e) = rep2 lamEName [ps, e]
 
 repTup :: Core [TH.ExpQ] -> DsM (Core TH.ExpQ)
@@ -1042,14 +1060,26 @@ repSectionR :: Core TH.ExpQ -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
 repSectionR (MkC x) (MkC y) = rep2 sectionRName [x,y]
 
 ------------ Right hand sides (guarded expressions) ----
-repGuarded :: Core [(TH.ExpQ, TH.ExpQ)] -> DsM (Core TH.BodyQ)
+repGuarded :: Core [TH.Q (TH.Guard, TH.Exp)] -> DsM (Core TH.BodyQ)
 repGuarded (MkC pairs) = rep2 guardedBName [pairs]
 
 repNormal :: Core TH.ExpQ -> DsM (Core TH.BodyQ)
 repNormal (MkC e) = rep2 normalBName [e]
 
+------------ Guards ----
+repLNormalGE :: LHsExpr Name -> LHsExpr Name -> DsM (Core (TH.Q (TH.Guard, TH.Exp)))
+repLNormalGE g e = do g' <- repLE g
+                      e' <- repLE e
+                      repNormalGE g' e'
+
+repNormalGE :: Core TH.ExpQ -> Core TH.ExpQ -> DsM (Core (TH.Q (TH.Guard, TH.Exp)))
+repNormalGE (MkC g) (MkC e) = rep2 normalGEName [g, e]
+
+repPatGE :: Core [TH.StmtQ] -> DsM (Core (TH.Q (TH.Guard, TH.Exp)))
+repPatGE (MkC ss) = rep2 patGEName [ss]
+
 ------------- Stmts -------------------
-repBindSt :: Core TH.Pat -> Core TH.ExpQ -> DsM (Core TH.StmtQ)
+repBindSt :: Core TH.PatQ -> Core TH.ExpQ -> DsM (Core TH.StmtQ)
 repBindSt (MkC p) (MkC e) = rep2 bindSName [p,e]
 
 repLetSt :: Core [TH.DecQ] -> DsM (Core TH.StmtQ)
@@ -1072,14 +1102,14 @@ repFromThenTo :: Core TH.ExpQ -> Core TH.ExpQ -> Core TH.ExpQ -> DsM (Core TH.Ex
 repFromThenTo (MkC x) (MkC y) (MkC z) = rep2 fromThenToEName [x,y,z]
 
 ------------ Match and Clause Tuples -----------
-repMatch :: Core TH.Pat -> Core TH.BodyQ -> Core [TH.DecQ] -> DsM (Core TH.MatchQ)
+repMatch :: Core TH.PatQ -> Core TH.BodyQ -> Core [TH.DecQ] -> DsM (Core TH.MatchQ)
 repMatch (MkC p) (MkC bod) (MkC ds) = rep2 matchName [p, bod, ds]
 
-repClause :: Core [TH.Pat] -> Core TH.BodyQ -> Core [TH.DecQ] -> DsM (Core TH.ClauseQ)
+repClause :: Core [TH.PatQ] -> Core TH.BodyQ -> Core [TH.DecQ] -> DsM (Core TH.ClauseQ)
 repClause (MkC ps) (MkC bod) (MkC ds) = rep2 clauseName [ps, bod, ds]
 
 -------------- Dec -----------------------------
-repVal :: Core TH.Pat -> Core TH.BodyQ -> Core [TH.DecQ] -> DsM (Core TH.DecQ)
+repVal :: Core TH.PatQ -> Core TH.BodyQ -> Core [TH.DecQ] -> DsM (Core TH.DecQ)
 repVal (MkC p) (MkC b) (MkC ds) = rep2 valDName [p, b, ds]
 
 repFun :: Core TH.Name -> Core [TH.ClauseQ] -> DsM (Core TH.DecQ)  
@@ -1267,8 +1297,8 @@ templateHaskellNames = [
     charLName, stringLName, integerLName, intPrimLName,
     floatPrimLName, doublePrimLName, rationalLName,
     -- Pat
-    litPName, varPName, tupPName, conPName, tildePName,
-    asPName, wildPName, recPName, listPName,
+    litPName, varPName, tupPName, conPName, tildePName, infixPName,
+    asPName, wildPName, recPName, listPName, sigPName,
     -- FieldPat
     fieldPatName,
     -- Match
@@ -1285,6 +1315,8 @@ templateHaskellNames = [
     fieldExpName,
     -- Body
     guardedBName, normalBName,
+    -- Guard
+    normalGEName, patGEName,
     -- Stmt
     bindSName, letSName, noBindSName, parSName,
     -- Dec
@@ -1315,7 +1347,8 @@ templateHaskellNames = [
     clauseQTyConName, expQTyConName, fieldExpTyConName, stmtQTyConName,
     decQTyConName, conQTyConName, strictTypeQTyConName,
     varStrictTypeQTyConName, typeQTyConName, expTyConName, decTyConName,
-    typeTyConName, matchTyConName, clauseTyConName]
+    typeTyConName, matchTyConName, clauseTyConName, patQTyConName,
+    fieldPatQTyConName]
 
 tH_SYN_Name = mkModuleName "Language.Haskell.TH.Syntax"
 tH_LIB_Name = mkModuleName "Language.Haskell.TH.Lib"
@@ -1373,11 +1406,13 @@ litPName   = libFun FSLIT("litP")   litPIdKey
 varPName   = libFun FSLIT("varP")   varPIdKey
 tupPName   = libFun FSLIT("tupP")   tupPIdKey
 conPName   = libFun FSLIT("conP")   conPIdKey
+infixPName = libFun FSLIT("infixP") infixPIdKey
 tildePName = libFun FSLIT("tildeP") tildePIdKey
 asPName    = libFun FSLIT("asP")    asPIdKey
 wildPName  = libFun FSLIT("wildP")  wildPIdKey
 recPName   = libFun FSLIT("recP")   recPIdKey
 listPName  = libFun FSLIT("listP")  listPIdKey
+sigPName   = libFun FSLIT("sigP")   sigPIdKey
 
 -- type FieldPat = ...
 fieldPatName = libFun FSLIT("fieldPat") fieldPatIdKey
@@ -1421,6 +1456,10 @@ fieldExpName = libFun FSLIT("fieldExp") fieldExpIdKey
 -- data Body = ...
 guardedBName = libFun FSLIT("guardedB") guardedBIdKey
 normalBName  = libFun FSLIT("normalB")  normalBIdKey
+
+-- data Guard = ...
+normalGEName = libFun FSLIT("normalGE") normalGEIdKey
+patGEName    = libFun FSLIT("patGE")    patGEIdKey
 
 -- data Stmt = ...
 bindSName   = libFun FSLIT("bindS")   bindSIdKey
@@ -1484,6 +1523,8 @@ conQTyConName           = libTc FSLIT("ConQ")          conQTyConKey
 strictTypeQTyConName    = libTc FSLIT("StrictTypeQ")    strictTypeQTyConKey
 varStrictTypeQTyConName = libTc FSLIT("VarStrictTypeQ") varStrictTypeQTyConKey
 typeQTyConName          = libTc FSLIT("TypeQ")          typeQTyConKey
+patQTyConName           = libTc FSLIT("PatQ")           patQTyConKey
+fieldPatQTyConName      = libTc FSLIT("FieldPatQ")      fieldPatQTyConKey
 
 --	TyConUniques available: 100-119
 -- 	Check in PrelNames if you want to change this
@@ -1506,7 +1547,9 @@ varStrictTypeQTyConKey  = mkPreludeTyConUnique 114
 strictTypeQTyConKey     = mkPreludeTyConUnique 115
 fieldExpTyConKey        = mkPreludeTyConUnique 116
 fieldPatTyConKey        = mkPreludeTyConUnique 117
-nameTyConKey             = mkPreludeTyConUnique 118
+nameTyConKey            = mkPreludeTyConUnique 118
+patQTyConKey            = mkPreludeTyConUnique 119
+fieldPatQTyConKey       = mkPreludeTyConUnique 120
 
 -- 	IdUniques available: 200-399
 -- 	If you want to change this, make sure you check in PrelNames
@@ -1537,11 +1580,13 @@ litPIdKey         = mkPreludeMiscIdUnique 220
 varPIdKey         = mkPreludeMiscIdUnique 221
 tupPIdKey         = mkPreludeMiscIdUnique 222
 conPIdKey         = mkPreludeMiscIdUnique 223
+infixPIdKey       = mkPreludeMiscIdUnique 312
 tildePIdKey       = mkPreludeMiscIdUnique 224
 asPIdKey          = mkPreludeMiscIdUnique 225
 wildPIdKey        = mkPreludeMiscIdUnique 226
 recPIdKey         = mkPreludeMiscIdUnique 227
 listPIdKey        = mkPreludeMiscIdUnique 228
+sigPIdKey         = mkPreludeMiscIdUnique 229
 
 -- type FieldPat = ...
 fieldPatIdKey       = mkPreludeMiscIdUnique 230
@@ -1583,6 +1628,10 @@ fieldExpIdKey       = mkPreludeMiscIdUnique 265
 -- data Body = ...
 guardedBIdKey     = mkPreludeMiscIdUnique 266
 normalBIdKey      = mkPreludeMiscIdUnique 267
+
+-- data Guard = ...
+normalGEIdKey     = mkPreludeMiscIdUnique 310
+patGEIdKey        = mkPreludeMiscIdUnique 311
 
 -- data Stmt = ...
 bindSIdKey       = mkPreludeMiscIdUnique 268
