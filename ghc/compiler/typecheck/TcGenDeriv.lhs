@@ -878,7 +878,7 @@ gen_Show_binds tycon
 		 | otherwise       = --Assumption: no of fields == no of labelled fields 
 				     --            (and in same order)
 		    concat $
-		    intersperse ([mk_showString_app (_CONS_ ',' SLIT(" "))]) $ -- Using SLIT()s containing ,s spells trouble.
+		    intersperse ([mk_showString_app (_CONS_ ',' _NIL_)]) $ -- Using SLIT()s containing ,s spells trouble.
 		    zipWithEqual "gen_Show_binds"
 				 (\ a b -> [a,b])
 				 (map show_label labels) 
