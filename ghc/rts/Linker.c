@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.49 2001/06/29 16:17:28 sewardj Exp $
+ * $Id: Linker.c,v 1.50 2001/07/17 03:53:25 qrczak Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -331,41 +331,6 @@ typedef struct _RtsSymbolVal {
 #define RTS_LONG_LONG_SYMS /* nothing */
 #else
 #define RTS_LONG_LONG_SYMS			\
-      SymX(stg_gtWord64)			\
-      SymX(stg_geWord64)			\
-      SymX(stg_eqWord64)			\
-      SymX(stg_neWord64)			\
-      SymX(stg_ltWord64)			\
-      SymX(stg_leWord64)			\
-      SymX(stg_gtInt64)				\
-      SymX(stg_geInt64)				\
-      SymX(stg_eqInt64)				\
-      SymX(stg_neInt64)				\
-      SymX(stg_ltInt64)				\
-      SymX(stg_leInt64)				\
-      SymX(stg_remWord64)			\
-      SymX(stg_quotWord64)			\
-      SymX(stg_remInt64)			\
-      SymX(stg_quotInt64)			\
-      SymX(stg_negateInt64)			\
-      SymX(stg_plusInt64)			\
-      SymX(stg_minusInt64)			\
-      SymX(stg_timesInt64)			\
-      SymX(stg_and64)				\
-      SymX(stg_or64)				\
-      SymX(stg_xor64)				\
-      SymX(stg_not64)				\
-      SymX(stg_shiftL64)			\
-      SymX(stg_shiftRL64)			\
-      SymX(stg_iShiftL64)			\
-      SymX(stg_iShiftRL64)			\
-      SymX(stg_iShiftRA64)			\
-      SymX(stg_intToInt64)			\
-      SymX(stg_int64ToInt)			\
-      SymX(stg_int64ToWord64)			\
-      SymX(stg_wordToWord64)			\
-      SymX(stg_word64ToWord)			\
-      SymX(stg_word64ToInt64) 			\
       SymX(int64ToIntegerzh_fast)		\
       SymX(word64ToIntegerzh_fast)
 #endif /* SUPPORT_LONG_LONGS */
