@@ -88,3 +88,5 @@ test "tcfail093" { vtcf("") }
 test "tcfail094" { vtcf("") }
 test "tcfail095" { vtcf("") }
 test "tcfail096" { vtcf("") }
+test "tcfail097" { vtcf("") }
+test "tcfail098" { vtcf("") }
