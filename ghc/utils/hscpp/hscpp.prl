@@ -36,8 +36,6 @@ open(INPIPE, "$Cpp @args - <$file |")
 
 while (<INPIPE>) {
 
-    print STDERR $_;
-
 # line directives come in flavo[u]rs:
 #   s/^#\s*line\s+\d+$/\{\-# LINE \-\}/;   IGNORE THIS ONE FOR NOW
     s/^#\s*line\s+(\d+)\s+(\".+\")$/\{\-# LINE \1 \2 \-\}/;
