@@ -9,6 +9,7 @@ module CodeOutput( codeOutput ) where
 #include "HsVersions.h"
 
 #ifndef OMIT_NATIVE_CODEGEN
+import UniqSupply	( mkSplitUniqSupply )
 import AsmCodeGen	( nativeCodeGen )
 #endif
 
