@@ -176,7 +176,7 @@ data PrimOp
     | TakeMVarOp 
     | PutMVarOp
     | SameMVarOp
-    | TakeMaybeMVarOp 
+    | TryTakeMVarOp 
     | IsEmptyMVarOp
 
     -- exceptions
@@ -460,7 +460,7 @@ tagOf_PrimOp NewMVarOp			      = ILIT(217)
 tagOf_PrimOp TakeMVarOp		    	      = ILIT(218)
 tagOf_PrimOp PutMVarOp		    	      = ILIT(219)
 tagOf_PrimOp SameMVarOp		    	      = ILIT(220)
-tagOf_PrimOp TakeMaybeMVarOp	    	      = ILIT(221)
+tagOf_PrimOp TryTakeMVarOp	    	      = ILIT(221)
 tagOf_PrimOp IsEmptyMVarOp	    	      = ILIT(222)
 tagOf_PrimOp MkForeignObjOp		      = ILIT(223)
 tagOf_PrimOp WriteForeignObjOp		      = ILIT(224)
@@ -751,7 +751,7 @@ allThePrimOps		-- Except CCall, which is really a family of primops
 	TakeMVarOp,
 	PutMVarOp,
 	SameMVarOp,
-	TakeMaybeMVarOp,
+	TryTakeMVarOp,
 	IsEmptyMVarOp,
 	MkForeignObjOp,
 	WriteForeignObjOp,
@@ -1523,12 +1523,12 @@ primOpInfo SameMVarOp
     in
     mkGenPrimOp SLIT("sameMVar#") [s_tv, elt_tv] [mvar_ty, mvar_ty] boolTy
 
-primOpInfo TakeMaybeMVarOp
+primOpInfo TryTakeMVarOp
   = let
 	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar
 	state = mkStatePrimTy s
     in
-    mkGenPrimOp SLIT("takeMaybeMVar#") [s_tv, elt_tv]
+    mkGenPrimOp SLIT("tryTakeMVar#") [s_tv, elt_tv]
 	[mkMVarPrimTy s elt, state]
 	(unboxedTriple [state, intPrimTy, elt])
 
@@ -1914,7 +1914,7 @@ perform a heap check or they block.
 primOpOutOfLine op
   = case op of
     	TakeMVarOp    		     -> True
-    	TakeMaybeMVarOp		     -> True
+    	TryTakeMVarOp		     -> True
 	PutMVarOp     		     -> True
 	DelayOp       		     -> True
 	WaitReadOp    		     -> True
@@ -2079,7 +2079,7 @@ primOpHasSideEffects UnsafeFreezeByteArrayOp	= True
 primOpHasSideEffects UnsafeThawArrayOp		= True
 
 primOpHasSideEffects TakeMVarOp        = True
-primOpHasSideEffects TakeMaybeMVarOp   = True
+primOpHasSideEffects TryTakeMVarOp     = True
 primOpHasSideEffects PutMVarOp         = True
 primOpHasSideEffects DelayOp           = True
 primOpHasSideEffects WaitReadOp        = True
@@ -2244,7 +2244,7 @@ primOpUsg op
       TakeMVarOp           -> mangle [mkM, mkP          ] mkM
       PutMVarOp            -> mangle [mkM, mkM, mkP     ] mkR
       SameMVarOp           -> mangle [mkP, mkP          ] mkM
-      TakeMaybeMVarOp      -> mangle [mkM, mkP          ] mkM
+      TryTakeMVarOp        -> mangle [mkM, mkP          ] mkM
       IsEmptyMVarOp        -> mangle [mkP, mkP          ] mkM
 
       ForkOp               -> mangle [mkO, mkP          ] mkR

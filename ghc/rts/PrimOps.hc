@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.51 2000/04/12 17:11:38 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.52 2000/05/10 11:02:00 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -888,7 +888,7 @@ FN_(takeMVarzh_fast)
   FE_
 }
 
-FN_(takeMaybeMVarzh_fast)
+FN_(tryTakeMVarzh_fast)
 {
   StgMVar *mvar;
   StgClosure *val;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.52 2000/04/13 15:37:11 panne Exp $
+ * $Id: PrimOps.h,v 1.53 2000/05/10 11:02:00 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -662,7 +662,7 @@ EF_(newMutVarzh_fast);
 #define isEmptyMVarzh(r,a)       r=(I_)((GET_INFO((StgMVar*)(a))) == &EMPTY_MVAR_info )
 EF_(newMVarzh_fast);
 EF_(takeMVarzh_fast);
-EF_(takeMaybeMVarzh_fast);
+EF_(tryTakeMVarzh_fast);
 EF_(putMVarzh_fast);
 
 

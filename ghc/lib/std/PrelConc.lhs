@@ -33,7 +33,7 @@ module PrelConc
 	, putMVar  	-- :: MVar a -> a -> IO ()
 	, readMVar 	-- :: MVar a -> IO a
 	, swapMVar 	-- :: MVar a -> a -> IO a
-	, takeMaybeMVar -- :: MVar a -> IO (Maybe a)
+	, tryTakeMVar   -- :: MVar a -> IO (Maybe a)
 	, isEmptyMVar	-- :: MVar a -> IO Bool
 
     ) where
@@ -147,10 +147,10 @@ swapMVar mvar new =
     putMVar mvar new	>>
     return old
 
--- takeMaybeMVar is a non-blocking takeMVar
-takeMaybeMVar :: MVar a -> IO (Maybe a)
-takeMaybeMVar (MVar m) = IO $ \ s ->
-    case takeMaybeMVar# m s of
+-- tryTakeMVar is a non-blocking takeMVar
+tryTakeMVar :: MVar a -> IO (Maybe a)
+tryTakeMVar (MVar m) = IO $ \ s ->
+    case tryTakeMVar# m s of
 	(# s, 0#, _ #) -> (# s, Nothing #)	-- MVar is empty
 	(# s, _,  a #) -> (# s, Just a  #)	-- MVar is full
 
@@ -161,7 +161,7 @@ takeMaybeMVar (MVar m) = IO $ \ s ->
  the MVar may have been filled (or emptied) - so be extremely
  careful when using this operation.  
 
- Use takeMaybeMVar instead if possible.
+ Use tryTakeMVar instead if possible.
 
  If you can re-work your abstractions to avoid having to
  depend on isEmptyMVar, then you're encouraged to do so,
