@@ -6,7 +6,7 @@ include ($confdir ++ "/../vanilla-test.T")
 -- Use this itsy helper fn to pass in an extra flag
 def myvtc($extra_comp_args)
 {
-   vtc(" -fglasgow-exts -package lang " ++ $extra_comp_args)
+   vtc(" -fglasgow-exts " ++ $extra_comp_args)
 }
 
 $compile_to_hc = "True"

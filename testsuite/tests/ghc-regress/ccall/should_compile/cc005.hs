@@ -1,11 +1,11 @@
 -- !!! cc005 -- foreign export declarations
 module ShouldCompile (d8) where
 
-import Foreign
-import GlaExts
-import Int
-import Word
-
+import GHC.Ptr   --import Foreign
+                 --import GlaExts
+                 --import Int
+                 --import Word
+type Addr = Ptr ()
 foreign import ccall "wrapper" d8  :: (Int -> IO ())  -> IO Addr
 
 -- exporting functions

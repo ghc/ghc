@@ -1,8 +1,8 @@
 -- !!! cc009 -- foreign label returning newtype of Addr
 module ShouldCompile where
 
-import Addr
+import Foreign
+type Addr = Ptr ()
+newtype NPtr a = NPtr Addr
 
-newtype Ptr a = Ptr Addr
-
-foreign import ccall "&" foo :: Ptr Int
+foreign import ccall "&" foo :: NPtr Int

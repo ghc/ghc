@@ -3,10 +3,10 @@
 module ShouldCompile where
 
 import Foreign
-import CCall
-
+import GHC.Base --CCall
+import Foreign.ForeignPtr
 -- Test returning results
-
+type ForeignObj = ForeignPtr ()
 a :: IO Int
 a = _ccall_ a
 

@@ -1,8 +1,8 @@
 -- !!! cc008 -- foreign export dynamic returning newtype of Addr
 module ShouldCompile where
 
-import Addr
+import Foreign
+type Addr = Ptr ()
+newtype NPtr a = NPtr Addr
 
-newtype Ptr a = Ptr Addr
-
-foreign import ccall "wrapper" mkFoo :: IO () -> IO (Ptr Int)
+foreign import ccall "wrapper" mkFoo :: IO () -> IO (NPtr Int)
