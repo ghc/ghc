@@ -1,0 +1,10 @@
+
+You need to have a fptools/mk/build.mk which looks like this in 
+order to build Hugs which has a hope of working in combined mode.
+
+WithGhcHc=ghc-4.06      # or whatever; version not v. important
+GhcLibWays=u            # essential
+GhcHcOpts=-DDEBUG -fasm-x86    # -fasm-x86 is optional
+GhcRtsHcOpts=-optc-DDEBUG -optc-D__HUGS__ -unreg -optc-g
+GhcRtsCcOpts=-optc-DDEBUG -optc-g -optc-D__HUGS__
+SplitObjs=NO            # essential
