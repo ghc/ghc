@@ -24,7 +24,7 @@ import TcMonad
 import TcMonoType	( tcAddScopedTyVars, tcHsSigType, UserTypeCtxt(..) )
 import Inst		( LIE, isEmptyLIE, plusLIE, emptyLIE, plusLIEs, lieToList )
 import TcEnv		( TcId, tcLookupLocalIds, tcExtendLocalValEnv, tcExtendGlobalTyVars )
-import TcPat		( tcPat, tcMonoPatBndr, polyPatSig )
+import TcPat		( tcPat, tcMonoPatBndr )
 import TcMType		( newTyVarTy )
 import TcType		( TcType, TcTyVar, tyVarsOfType,
 			  mkFunTy, isOverloadedTy, liftedTypeKind, openTypeKind  )

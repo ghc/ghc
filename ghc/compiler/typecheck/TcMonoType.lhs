@@ -35,7 +35,6 @@ import TcUnify		( unifyKind, unifyOpenTypeKind )
 import TcType		( Type, Kind, SourceType(..), ThetaType, TyVarDetails(..),
 			  TcTyVar, TcKind, TcThetaType, TcTauType,
 			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy,
-			  tcSplitForAllTys, tcSplitRhoTy, 
 		 	  hoistForAllTys, zipFunTys, 
 			  mkSigmaTy, mkPredTy, mkTyConApp, mkAppTys, 
 			  liftedTypeKind, unliftedTypeKind, mkArrowKind,
@@ -43,7 +42,6 @@ import TcType		( Type, Kind, SourceType(..), ThetaType, TyVarDetails(..),
 			)
 import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToId )
 
-import Subst		( mkTopTyVarSubst, substTy )
 import Id		( mkLocalId, idName, idType )
 import Var		( TyVar, mkTyVar, tyVarKind )
 import ErrUtils		( Message )

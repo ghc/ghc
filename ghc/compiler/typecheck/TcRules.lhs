@@ -11,20 +11,17 @@ module TcRules ( tcIfaceRules, tcSourceRules ) where
 import HsSyn		( RuleDecl(..), RuleBndr(..), collectRuleBndrSigTys )
 import CoreSyn		( CoreRule(..) )
 import RnHsSyn		( RenamedRuleDecl )
-import HscTypes		( PackageRuleBase )
 import TcHsSyn		( TypecheckedRuleDecl, mkHsLet )
 import TcMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyInferCheck )
 import TcMType		( newTyVarTy )
 import TcType		( tyVarsOfTypes, openTypeKind )
-import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar, tcDelay )
+import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..), tcAddScopedTyVars )
 import TcExpr		( tcExpr )
-import TcEnv		( RecTcEnv, tcExtendLocalValEnv, isLocalThing, tcLookupId )
+import TcEnv		( RecTcEnv, tcExtendLocalValEnv, tcLookupId )
 import Inst		( LIE, plusLIEs, emptyLIE, instToId )
 import Id		( idName, idType, mkLocalId )
-import Module		( Module )
-import List		( partition )
 import Outputable
 \end{code}
 

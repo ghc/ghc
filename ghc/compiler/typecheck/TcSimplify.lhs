@@ -25,7 +25,7 @@ import TcHsSyn		( TcExpr, TcId,
 			)
 
 import TcMonad
-import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
+import Inst		( lookupInst, LookupInstResult(..),
 			  tyVarsOfInst, predsOfInsts, predsOfInst, newDicts,
 			  isDict, isClassDict, isLinearInst, linearInstType,
 			  isStdClassTyVarDict, isMethodFor, isMethod,
@@ -41,11 +41,10 @@ import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv, tcLookupGlobalId )
 import InstEnv		( lookupInstEnv, classInstEnv, InstLookupResult(..) )
 import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, checkAmbiguity )
-import TcType		( TcTyVar, TcTyVarSet, ThetaType, PredType, 
+import TcType		( TcTyVar, TcTyVarSet, ThetaType, 
 			  mkClassPred, isOverloadedTy, mkTyConApp,
 			  mkTyVarTy, tcGetTyVar, isTyVarClassPred, mkTyVarTys,
-			  tyVarsOfPred, getClassPredTys_maybe, isClassPred, isIPPred,
-			  inheritablePred, predHasFDs )
+			  tyVarsOfPred, isIPPred, inheritablePred, predHasFDs )
 import Id		( idType, mkUserLocal )
 import Var		( TyVar )
 import Name		( getOccName, getSrcLoc )
