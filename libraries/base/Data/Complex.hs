@@ -43,9 +43,7 @@ module Data.Complex
 
 import Prelude
 
-#ifndef __NHC__
 import Data.Typeable
-#endif
 
 #ifdef __HUGS__
 import Hugs.Prelude(Num(fromInt), Fractional(fromDouble))
