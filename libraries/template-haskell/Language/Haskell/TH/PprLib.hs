@@ -6,6 +6,7 @@ module Language.Haskell.TH.PprLib (
 
 	-- * The document type
         Doc,            -- Abstract, instance of Show
+        PprM,
 
 	-- * Primitive Documents
         empty,

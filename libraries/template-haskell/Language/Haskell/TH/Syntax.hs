@@ -36,7 +36,7 @@ module Language.Haskell.TH.Syntax(
 	-- Internal functions
 	returnQ, bindQ, sequenceQ,
 	NameFlavour(..), NameSpace (..), 
-	mkNameG_v, mkNameG_d, mkNameG_tc, mkNameL, mkNameU,
+	mkNameG_v, mkNameG_d, mkNameG_tc, Uniq, mkNameL, mkNameU,
  	tupleTypeName, tupleDataName,
 	OccName, mkOccName, occString,
 	ModName, mkModName, modString
@@ -350,6 +350,7 @@ mkNameG :: NameSpace -> String -> String -> Name	-- Used for 'x etc, but not ava
 mkNameG ns mod occ 					-- to the programmer
   = Name (mkOccName occ) (NameG ns (mkModName mod))
 
+mkNameG_v, mkNameG_tc, mkNameG_d :: String -> String -> Name
 mkNameG_v  = mkNameG VarName
 mkNameG_tc = mkNameG TcClsName
 mkNameG_d  = mkNameG DataName
@@ -467,7 +468,10 @@ data Info
 data Fixity 	     = Fixity Int FixityDirection deriving( Eq )
 data FixityDirection = InfixL | InfixR | InfixN   deriving( Eq )
 
+maxPrecedence :: Int
 maxPrecedence = (9::Int)
+
+defaultFixity :: Fixity
 defaultFixity = Fixity maxPrecedence InfixL
 
 
