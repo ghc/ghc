@@ -1057,7 +1057,9 @@ dnl and GL_X_LIBS/GLUT_X_LIBS.
     GL_CFLAGS=
   fi
 
-  LIBS="$GLUT_X_LIBS"
+  dnl Keep the GL/GLU/GLX libs, but expand the rest to what GLUT needs.
+  dnl (Some systems, like OpenBSD, need the GL/GLU libs.)
+  LIBS=`echo "$LIBS" | sed "s@$GL_X_LIBS@$GLUT_X_LIBS@"`
 
   FPTOOLS_SEARCH_LIBS([#include <GL/glut.h>], glutMainLoop,  glut32 glut,      have_glut=yes, have_glut=no)
 
