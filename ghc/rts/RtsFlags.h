@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.30 2000/12/19 12:50:37 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.31 2001/03/14 11:18:18 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -92,7 +92,6 @@ struct PROFILING_FLAGS {
 # define HEAP_BY_MOD		2
 # define HEAP_BY_DESCR		4
 # define HEAP_BY_TYPE		5
-# define HEAP_BY_TIME		6
 
     rtsBool		showCCSOnException;
   
@@ -100,7 +99,12 @@ struct PROFILING_FLAGS {
 # define MODchar   'M'
 # define DESCRchar 'D'
 # define TYPEchar  'Y'
-# define TIMEchar  'T'
+
+    char*               modSelector;
+    char*               descrSelector;
+    char*               typeSelector;
+    char*               ccSelector;
+
 };
 #elif defined(DEBUG)
 # define NO_HEAP_PROFILING	0

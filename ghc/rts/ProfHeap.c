@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.20 2000/12/11 12:36:59 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.21 2001/03/14 11:18:18 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -172,7 +172,28 @@ initHeapProfiling(void)
         return 0;
     }
 
-    fprintf(hp_file, "JOB \"%s\"\n", prog_argv[0]);
+    fprintf(hp_file, "JOB \"%s", prog_argv[0]);
+
+#   ifdef PROFILING
+    switch (RtsFlags.ProfFlags.doHeapProfile) {
+       case HEAP_BY_CCS:   fprintf(hp_file, " -h%c", CCchar); break;
+       case HEAP_BY_MOD:   fprintf(hp_file, " -h%c", MODchar); break;
+       case HEAP_BY_DESCR: fprintf(hp_file, " -h%c", DESCRchar); break;
+       case HEAP_BY_TYPE:  fprintf(hp_file, " -h%c", TYPEchar); break;
+       default: /* nothing */
+    }
+    if (RtsFlags.ProfFlags.ccSelector)
+       fprintf(hp_file, " -hc{%s}", RtsFlags.ProfFlags.ccSelector);
+    if (RtsFlags.ProfFlags.modSelector)
+       fprintf(hp_file, " -hm{%s}", RtsFlags.ProfFlags.modSelector);
+    if (RtsFlags.ProfFlags.descrSelector)
+       fprintf(hp_file, " -hd{%s}", RtsFlags.ProfFlags.descrSelector);
+    if (RtsFlags.ProfFlags.typeSelector)
+       fprintf(hp_file, " -hy{%s}", RtsFlags.ProfFlags.typeSelector);
+#   endif /* PROFILING */
+
+    fprintf(hp_file, "\"\n" );
+
     fprintf(hp_file, "DATE \"%s\"\n", time_str());
 
     fprintf(hp_file, "SAMPLE_UNIT \"seconds\"\n");
@@ -285,9 +306,8 @@ static void
 fprint_data(FILE *fp)
 {
     nat i;
-    
     for (i = 0; i < SYMBOL_HASH_SIZE; i++) {
-	if (symbol_hash[i].data) {
+	if (symbol_hash[i].data > 0) {
 	    fprintf(fp, "   %s %d\n", symbol_hash[i].name, symbol_hash[i].data);
 	}
     }
@@ -433,7 +453,62 @@ reportCCSResid(FILE *fp, CostCentreStack *ccs)
     }
   }
 }
-#endif
+
+static
+rtsBool str_matches_selector ( char* str, char* sel )
+{
+   char* p;
+   /* fprintf(stderr, "str_matches_selector %s %s\n", str, sel); */
+   while (1) {
+      /* Compare str against wherever we've got to in sel. */
+      p = str;
+      while (*p != '\0' && *sel != ',' && *sel != '\0' && *p == *sel) {
+         p++; sel++;
+      }
+      /* Match if all of str used and have reached the end of a sel
+         fragment. */
+      if (*p == '\0' && (*sel == ',' || *sel == '\0'))
+         return rtsTrue;
+
+      /* No match.  Advance sel to the start of the next elem. */
+      while (*sel != ',' && *sel != '\0') sel++;
+      if (*sel == ',') sel++;
+
+      /* Run out of sel ?? */
+      if (*sel == '\0') return rtsFalse;
+   }
+}
+
+/* Figure out whether a closure should be counted in this census, by
+   testing against all the specified constraints. */
+static
+rtsBool satisfies_constraints ( StgClosure* p )
+{
+   rtsBool b;
+   if (RtsFlags.ProfFlags.modSelector) {
+      b = str_matches_selector( ((StgClosure *)p)->header.prof.ccs->cc->module,
+                                RtsFlags.ProfFlags.modSelector );
+      if (!b) return rtsFalse;
+   }
+   if (RtsFlags.ProfFlags.descrSelector) {
+      b = str_matches_selector( (get_itbl((StgClosure *)p))->prof.closure_desc,
+                                RtsFlags.ProfFlags.descrSelector );
+      if (!b) return rtsFalse;
+   }
+   if (RtsFlags.ProfFlags.typeSelector) {
+      b = str_matches_selector( (get_itbl((StgClosure *)p))->prof.closure_type,
+                                RtsFlags.ProfFlags.typeSelector );
+      if (!b) return rtsFalse;
+   }
+   if (RtsFlags.ProfFlags.ccSelector) {
+      b = str_matches_selector( ((StgClosure *)p)->header.prof.ccs->cc->label,
+                                RtsFlags.ProfFlags.ccSelector );
+      if (!b) return rtsFalse;
+   }
+   return rtsTrue;
+}
+#endif /* PROFILING */
+
 
 void
 heapCensus(void)
@@ -572,27 +647,30 @@ heapCensus(void)
       }
 #endif
 
-#ifdef PROFILING      
-      switch (RtsFlags.ProfFlags.doHeapProfile) {
-      case HEAP_BY_CCS:
-	  ((StgClosure *)p)->header.prof.ccs->mem_resid += size;
-	  break;
-      case HEAP_BY_MOD:
-	  strToCtr(((StgClosure *)p)->header.prof.ccs->cc->module)
-	      ->mem_resid += size;
-	  break;
-      case HEAP_BY_DESCR:
-	  strToCtr(get_itbl(((StgClosure *)p))->prof.closure_desc)->mem_resid 
-	      += size;
-	  break;
-      case HEAP_BY_TYPE:
-	  strToCtr(get_itbl(((StgClosure *)p))->prof.closure_type)->mem_resid
-	      += size;
-	  break;
-      default:
-	  barf("heapCensus; doHeapProfile");
-  }
-#endif
+#     ifdef PROFILING
+      if (satisfies_constraints((StgClosure*)p)) {
+         switch (RtsFlags.ProfFlags.doHeapProfile) {
+            case HEAP_BY_CCS:
+	       ((StgClosure *)p)->header.prof.ccs->mem_resid += size;
+               break;
+            case HEAP_BY_MOD:
+               strToCtr(((StgClosure *)p)->header.prof.ccs->cc->module)
+                  ->mem_resid += size;
+               break;
+            case HEAP_BY_DESCR:
+               strToCtr(get_itbl(((StgClosure *)p))->prof.closure_desc)->mem_resid 
+                  += size;
+               break;
+            case HEAP_BY_TYPE:
+               strToCtr(get_itbl(((StgClosure *)p))->prof.closure_type)->mem_resid
+                  += size;
+               break;
+            default:
+               barf("heapCensus; doHeapProfile");
+         }
+      }
+#     endif
+
       p += size;
     }
     bd = bd->link;

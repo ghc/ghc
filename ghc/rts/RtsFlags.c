@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.36 2001/01/24 15:41:30 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.37 2001/03/14 11:18:18 sewardj Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -238,10 +238,14 @@ void initRtsFlagsDefaults(void)
 #endif /* PROFILING or PAR */
 
 #ifdef PROFILING
-    RtsFlags.ProfFlags.doHeapProfile = rtsFalse;
+    RtsFlags.ProfFlags.doHeapProfile      = rtsFalse;
     RtsFlags.ProfFlags.showCCSOnException = rtsFalse;
+    RtsFlags.ProfFlags.modSelector        = NULL;
+    RtsFlags.ProfFlags.descrSelector      = NULL;
+    RtsFlags.ProfFlags.typeSelector       = NULL;
+    RtsFlags.ProfFlags.ccSelector         = NULL;
 #elif defined(DEBUG)
-    RtsFlags.ProfFlags.doHeapProfile = rtsFalse;
+    RtsFlags.ProfFlags.doHeapProfile      = rtsFalse;
 #endif
 
     RtsFlags.ConcFlags.ctxtSwitchTime	= CS_MIN_MILLISECS;  /* In milliseconds */
@@ -383,13 +387,19 @@ usage_text[] = {
 "  -px      Time/allocation profile (XML)  (output file <program>.prof)",
 "  -p<sort> Time/allocation profile        (output file <program>.prof)",
 "             sort: T = time (default), A = alloc, C = cost centre label",
-"  -P<sort> More detailed Time/Allocation profile"
+"  -P<sort> More detailed Time/Allocation profile",
+
 # if defined(PROFILING)
 "",
 "  -hx            Heap residency profile (XML)  (output file <program>.prof)",
 "  -h<break-down> Heap residency profile (text) (output file <program>.prof)",
 "     break-down: C = cost centre stack (default), M = module",
 "                 D = closure description, Y = type description",
+"  A subset of closures may be selected thusly:",
+"    -hc{cc, cc ...} specific cost centre(s) (NOT STACKS!)",
+"    -hm{mod,mod...} all cost centres from the specified modules(s)",
+"    -hd{des,des...} closures with specified closure descriptions",
+"    -hy{typ,typ...} closures with specified type descriptions",
 "",
 "  -xc      Show current cost centre stack on raising an exception",
 # endif
@@ -747,11 +757,44 @@ error = rtsTrue;
 		  case TYPEchar:
 		    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_TYPE;
 		    break;
+                  case 'c': /* cost centre label select */
+                  case 'm': /* cost centre module select */
+                  case 'd': /* closure descr select */
+                  case 'y': /* closure type select */
+                    {char *left  = strchr(rts_argv[arg], '{');
+                     char *right = strrchr(rts_argv[arg], '}');
+                     if (! left || ! right ||
+                          strrchr(rts_argv[arg], '{') != left ||
+                           strchr(rts_argv[arg], '}') != right) {
+                        prog_belch(
+                           "Invalid heap profiling selection bracketing\n   %s\n", 
+                           rts_argv[arg]);
+                        error = rtsTrue;
+                     } else {
+                        *right = '\0';
+                        switch (rts_argv[arg][2]) {
+                          case 'c': /* cost centre label select */
+                            RtsFlags.ProfFlags.ccSelector = left + 1;
+                            break;
+                          case 'm': /* cost centre module select */
+                            RtsFlags.ProfFlags.modSelector = left + 1;
+                            break;
+                          case 'd': /* closure descr select */
+                            RtsFlags.ProfFlags.descrSelector = left + 1;
+                            break;
+                          case 'y': /* closure type select */
+                            RtsFlags.ProfFlags.typeSelector = left + 1;
+                            break;
+                        }
+                     }
+                    }
+                    break;
 		  default:
 		    prog_belch("invalid heap profile option: %s",rts_argv[arg]);
 		    error = rtsTrue;
 		}
 		) 
+
 #endif
 	        break;
 
