@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.25 2001/06/27 06:17:22 sof Exp $
+# 	$Id: opts.mk,v 1.26 2001/08/15 09:22:19 rrt Exp $
 #
 #################################################################################
 
@@ -80,6 +80,9 @@ GC_CPP_OPTS += -P -E -x c -traditional -D__GLASGOW_HASKELL__
 HC_OPTS            = $(SRC_HC_OPTS) $(WAY$(_way)_HC_OPTS) $($*_HC_OPTS) $(EXTRA_HC_OPTS)
 HC_POST_OPTS       = $(SRC_HC_POST_OPTS) $(WAY$(_way)_HC_POST_OPTS) $($*_HC_POST_OPTS) $(EXTRA_HC_POST_OPTS)
 HC_PRE_OPTS        = $(SRC_HC_PRE_OPTS) $(WAY$(_way)_HC_PRE_OPTS) $($*_HC_PRE_OPTS) $(EXTRA_HC_PRE_OPTS)
+
+ILX2IL_OPTS        = $(SRC_ILX2IL_OPTS) $(WAY$(_way)_ILX2IL_OPTS) $($*_ILX2IL_OPTS) $(EXTRA_ILX2IL_OPTS)
+ILASM_OPTS         = $(SRC_ILASM_OPTS) $(WAY$(_way)_ILASM_OPTS) $($*_ILASM_OPTS) $(EXTRA_ILASM_OPTS)
 
 RUNTEST_OPTS       = $(SRC_RUNTEST_OPTS) $(WAY$(_way)_RUNTEST_OPTS) \
                      $($*_RUNTEST_OPTS) $(EXTRA_RUNTEST_OPTS)
