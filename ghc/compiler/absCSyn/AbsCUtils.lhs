@@ -27,7 +27,7 @@ import AbsCSyn
 import Digraph		( stronglyConnComp, SCC(..) )
 import HeapOffs		( possiblyEqualHeapOffset )
 import Id		( fIRST_TAG, ConTag )
-import Literal		( literalPrimRep, Literal(..) )
+import Literal		( literalPrimRep, Literal(..), mkMachWord )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import Unique		( Unique{-instance Eq-} )
 import UniqSupply	( getUnique, getUniques, splitUniqSupply, UniqSupply )
@@ -109,8 +109,7 @@ mkAlgAltsCSwitch scrutinee tagged_alts deflt_absc
 
    -- We also need to convert to Literals to keep the CSwitch happy
    adjust tagged_alts
-     = [ (MachInt (toInteger (tag - fIRST_TAG)) False{-unsigned-}, abs_c)
-       | (tag, abs_c) <- tagged_alts ]
+     = [ (mkMachWord (fromInt (tag - fIRST_TAG)), abs_c) | (tag, abs_c) <- tagged_alts ]
 \end{code}
 
 %************************************************************************
@@ -122,9 +121,10 @@ mkAlgAltsCSwitch scrutinee tagged_alts deflt_absc
 \begin{code}
 magicIdPrimRep BaseReg		    = PtrRep
 magicIdPrimRep StkOReg		    = PtrRep
-magicIdPrimRep (VanillaReg kind _) = kind
+magicIdPrimRep (VanillaReg kind _)  = kind
 magicIdPrimRep (FloatReg _)	    = FloatRep
 magicIdPrimRep (DoubleReg _)	    = DoubleRep
+magicIdPrimRep (LongReg kind _)	    = kind
 magicIdPrimRep TagReg		    = IntRep
 magicIdPrimRep RetReg		    = RetRep
 magicIdPrimRep SpA		    = PtrRep
@@ -391,7 +391,7 @@ flatAbsC (CRetVector tbl_label stuff deflt)
     do_alt deflt_amode Nothing    = returnFlt (deflt_amode, AbsCNop)
     do_alt deflt_amode (Just alt) = flatAmode alt
 
-    bogus_default_label = panic "flatAbsC: CRetVector: default needed and not available"
+    bogus_default_label = panic ("flatAbsC: CRetVector: default needed and not available")
 
 
 flatAbsC (CRetUnVector label amode)
