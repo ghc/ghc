@@ -1,6 +1,28 @@
 
-Cannot generalise these overloadings (in a _ccall_):
-    `PrelGHC.CReturnable a' arising from the result of the _ccall_ to `f' at cc004.hs:8
+cc004.hs:8:
+    Ambiguous type variable(s) `a' in the constraint `Num a'
+    arising from use of `+' at cc004.hs:8
+    In the first argument of `return', namely `(a + 1)'
+    In the right-hand side of a lambda abstraction: return (a + 1)
 
-Cannot generalise these overloadings (in a _ccall_):
-    `PrelGHC.CReturnable a' arising from the result of the _ccall_ to `f' at cc004.hs:15
+cc004.hs:8:
+    Ambiguous type variable(s) `a'
+	in the constraint `PrelGHC.CReturnable a'
+    arising from the result of the _ccall_ to `f' at cc004.hs:8
+    In the first argument of `thenADR', namely `_ccall_ f'
+    In the right-hand side of an equation for `foo':
+	(_ccall_ f) `thenADR` (\ a -> return (a + 1))
+
+cc004.hs:15:
+    Ambiguous type variable(s) `a' in the constraint `Num a'
+    arising from use of `+' at cc004.hs:15
+    In the first argument of `return', namely `(a + 1)'
+    In the right-hand side of a lambda abstraction: return (a + 1)
+
+cc004.hs:15:
+    Ambiguous type variable(s) `a'
+	in the constraint `PrelGHC.CReturnable a'
+    arising from the result of the _ccall_ to `f' at cc004.hs:15
+    In the first argument of `thenADR', namely `_ccall_ f'
+    In the right-hand side of an equation for `bar':
+	(_ccall_ f) `thenADR` (\ a -> return (a + 1))
