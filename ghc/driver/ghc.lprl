@@ -360,7 +360,7 @@ require special handling.
 # We need to look in ghc/ and glaExts/ when searching for implicitly needed .hi files, but 
 # we should really *not* look there for explicitly imported modules.
 
-$GhcVersionInfo  = int ($PROJECTVERSION * 100);
+$GhcVersionInfo  = int($PROJECTVERSION * 100  + .5); # i.e., round (X.Y * 100)
 $Haskell1Version = 4; # i.e., Haskell 1.4
 @Cpp_define	 = ();
 
@@ -952,6 +952,8 @@ if ( $OptLevel <= 0 ) {
 } else { # -Ofile, then...
 
     &add_Hsc_flags( @HsC_minusO3_flags );
+    push(@HsC_flags, $Oopt_FinalStgProfilingMassage) if $Oopt_FinalStgProfilingMassage;
+
     push(@CcBoth_flags, ($MinusO2ForC) ? '-O2' : '-O');	# possibly to be elaborated...
 }
 
@@ -1314,8 +1316,8 @@ if ($#Input_file < 0 && $#Link_file < 0) {
     @Input_file = ( '-' );
 
     open(INF, "> $Tmp_prefix.hs") || &tidy_up_and_die(1,"Can't open $Tmp_prefix.hs\n");
-    print STDERR "Enter your Haskell program, end with ^D (on a line of its own):\n";
-    while (<>) { print INF $_; }
+    print STDERR "Enter your Haskell program, end with ^D (on a line of its own):\n" if -t;
+    while (<STDIN>) { print INF $_; }
     close(INF) || &tidy_up_and_die(1,"Failed writing to $Tmp_prefix.hs\n");
 }
 
@@ -1536,7 +1538,7 @@ Again, we'll do the post-recompilation-checker parts of this later.
     local($is_hc_file) = 1; #Is the C code .hc or .c? Assume .hc for now
 
     # OK, let's strip off some literate junk..
-    if ($ifile =~ /\.lhs$/) {
+    if ($do_lit2pgm) {
         &runLit2pgm($in_lit2pgm, $lit2pgm_hscpp)
     } else {
         $lit2pgm_hscpp = $ifile;
@@ -1547,7 +1549,8 @@ Again, we'll do the post-recompilation-checker parts of this later.
 
     # Scan the top of the de-litted file for {-# OPTIONS #-} pragmas
     &check_for_source_options($lit2pgm_hscpp,$ifile);
-    # options found in the source file take a back seat, i.e., we scan
+
+    # Options found in the source file take a back seat, i.e., we scan
     # them first. Only process the command line again if source file
     # contained anything of interest *or* there's more than one
     # input file (we have to reset the options).
@@ -1700,8 +1703,12 @@ Finally, decide what to queue up for linker input.
 sub runLit2pgm {
     local($in_lit2pgm, $lit2pgm_hscpp) = @_;
 
-    local($to_do) = "echo '#line 1 \"$in_lit2pgm\"' > $lit2pgm_hscpp && ".
-		    "$Unlit @Unlit_flags $in_lit2pgm -  >> $lit2pgm_hscpp";
+    local($to_do) = "";
+
+    # Only add #line pragma if we're going to need it.
+    $to_do  = "echo '#line 1 \"$in_lit2pgm\"' > $lit2pgm_hscpp && " if ($HsCpp ne $Cat);
+    $to_do .= "$Unlit @Unlit_flags $in_lit2pgm -  >> $lit2pgm_hscpp";
+     
     @Files_to_tidy = ( $lit2pgm_hscpp );
 
     &run_something($to_do, 'literate pre-processor');
@@ -1712,17 +1719,23 @@ sub runLit2pgm {
 sub runHscpp {
     local($in_lit2pgm, $lit2pgm_hscpp, $hscpp_hsc) = @_;
 
-    local($to_do);
+    local($to_do) = "";
+
+    # Strictly speaking, echoing of the following line pragma is only required
+    # on non-delit'ed input, as we've already added it during de-lit. However,
+    # hscpp will then add a {-# LINE 1 "$lit2pgm_hsc" -} to the top of the file,
+    # which is not very informative (but harmless). Hence, we uniformly have
+    # {-# LINE 1 "$in_lit2pgm" #-} as the first line to all cpp'ed hsc input.
+    #
+    $to_do = "echo '{-# LINE 1 \"$in_lit2pgm\" -}' > $hscpp_hsc && ";
 
     if ($HsCpp eq $Cat) {
-	$to_do = "echo '#line 1 \"$in_lit2pgm\"' > $hscpp_hsc && ".
-			"$HsCpp $lit2pgm_hscpp >> $hscpp_hsc";
+	$to_do .= "$HsCpp $lit2pgm_hscpp >> $hscpp_hsc";
 	@Files_to_tidy = ( $hscpp_hsc );
 	&run_something($to_do, 'Ineffective C pre-processor');
     } else {
 	local($includes) = '-I' . join(' -I',@Include_dir);
-	$to_do = "echo '#line 1 \"$in_lit2pgm\"' > $hscpp_hsc && ".
-			"$HsCpp $Verbose $genSPECS_flag @HsCpp_flags -D__HASKELL1__=$Haskell1Version -D__GLASGOW_HASKELL__=$GhcVersionInfo $includes $lit2pgm_hscpp >> $hscpp_hsc";
+	$to_do .= "$HsCpp $Verbose $genSPECS_flag @HsCpp_flags -D__HASKELL1__=$Haskell1Version -D__GLASGOW_HASKELL__=$GhcVersionInfo $includes $lit2pgm_hscpp >> $hscpp_hsc";
 	@Files_to_tidy = ( $hscpp_hsc );
 	&run_something($to_do, 'Haskellised C pre-processor');
     }
@@ -1756,7 +1769,7 @@ sub runHscAndProcessInterfaces {
      $i_atime,$i_mtime,$i_ctime,$i_blksize,$i_blocks) = stat($ifile);
 
     # The informational messages below are now conditional on -v being set -- SOF
-    if ( ! -f $ofile_target ) {
+    if ( $ofile_target ne "_stdin.s" && ! -f $ofile_target ) {
         print STDERR "$Pgm:compile:Output file $ofile_target doesn't exist\n" if $Verbose;
 	$source_unchanged = 0;
     }
@@ -1764,7 +1777,7 @@ sub runHscAndProcessInterfaces {
     ($o_dev,$o_ino,$o_mode,$o_nlink,$o_uid,$o_gid,$o_rdev,$o_size,
      $o_atime,$o_mtime,$o_ctime,$o_blksize,$o_blocks) = stat(_); # stat info from -f test
 
-    if ( ! -f $hifile_target ) {
+    if ( $hifile_target ne "_stdout" && ! -f $hifile_target ) {
         print STDERR "$Pgm:compile:Interface file $hifile_target doesn't exist\n" if $Verbose;
 	$source_unchanged = 0;
     }
@@ -1772,7 +1785,7 @@ sub runHscAndProcessInterfaces {
     ($hi_dev,$hi_ino,$hi_mode,$hi_nlink,$hi_uid,$hi_gid,$hi_rdev,$hi_size,
      $hi_atime,$hi_mtime,$hi_ctime,$hi_blksize,$hi_blocks) = stat(_); # stat info from -f test
 
-    if ($i_mtime > $o_mtime) {
+    if ( $ofile_target ne "_stdin.s" && $i_mtime > $o_mtime) {
     	print STDERR "$Pgm:recompile:Input file $ifile newer than $ofile_target\n" if $Verbose;
 	$source_unchanged = 0;
     }
@@ -2426,7 +2439,10 @@ sub check_for_source_options {
         elsif ( /^$/ ) { # ignore empty lines
            ;
         }
-        elsif ( /^#line.+$/ ) { # ignore comment lines
+        elsif ( /^#line.+$/ ) { # ignore comment lines (unused..ToDo: rm )
+           ;
+        }
+        elsif ( /^{-# LINE.+$/ ) { # ignore line pragmas
            ;
         }
         else { # stop looking, something non-empty / not
