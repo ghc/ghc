@@ -199,7 +199,7 @@ ppr_expr (HsLam match)
 
 ppr_expr expr@(HsApp e1 e2)
   = let (fun, args) = collect_args expr [] in
-    (pprExpr fun) <+> (sep (map pprExpr args))
+    (ppr_expr fun) <+> (sep (map ppr_expr args))
   where
     collect_args (HsApp fun arg) args = collect_args fun (arg:args)
     collect_args fun		 args = (fun, args)
@@ -248,19 +248,19 @@ ppr_expr (SectionR op expr)
       = parens (sep [ppr v, pp_expr])
 
 ppr_expr (HsCase expr matches _)
-  = sep [ sep [ptext SLIT("case"), nest 4 (ppr_expr expr), ptext SLIT("of")],
+  = sep [ sep [ptext SLIT("case"), nest 4 (pprExpr expr), ptext SLIT("of")],
 	    nest 2 (pprMatches (True, empty) matches) ]
 
 ppr_expr (HsIf e1 e2 e3 _)
-  = sep [hsep [ptext SLIT("if"), nest 2 (ppr_expr e1), ptext SLIT("then")],
-	   nest 4 (ppr_expr e2),
+  = sep [hsep [ptext SLIT("if"), nest 2 (pprExpr e1), ptext SLIT("then")],
+	   nest 4 (pprExpr e2),
 	   ptext SLIT("else"),
-	   nest 4 (ppr_expr e3)]
+	   nest 4 (pprExpr e3)]
 
 -- special case: let ... in let ...
 ppr_expr (HsLet binds expr@(HsLet _ _))
   = sep [hang (ptext SLIT("let")) 2 (hsep [ppr binds, ptext SLIT("in")]),
-	 ppr_expr expr]
+	 pprExpr expr]
 
 ppr_expr (HsLet binds expr)
   = sep [hang (ptext SLIT("let")) 2 (ppr binds),
@@ -270,13 +270,13 @@ ppr_expr (HsDo do_or_list_comp stmts _)            = pprDo do_or_list_comp stmts
 ppr_expr (HsDoOut do_or_list_comp stmts _ _ _ _ _) = pprDo do_or_list_comp stmts
 
 ppr_expr (ExplicitList exprs)
-  = brackets (fsep (punctuate comma (map pprExpr exprs)))
+  = brackets (fsep (punctuate comma (map ppr_expr exprs)))
 ppr_expr (ExplicitListOut ty exprs)
-  = hcat [ brackets (fsep (punctuate comma (map pprExpr exprs))),
+  = hcat [ brackets (fsep (punctuate comma (map ppr_expr exprs))),
 	   ifNotPprForUser ((<>) space (parens (pprGenType ty))) ]
 
 ppr_expr (ExplicitTuple exprs)
-  = parens (sep (punctuate comma (map pprExpr exprs)))
+  = parens (sep (punctuate comma (map ppr_expr exprs)))
 
 ppr_expr (HsCon con_id tys args)
   = ppr con_id <+> sep (map pprParendGenType tys ++
@@ -291,7 +291,7 @@ ppr_expr (RecordUpdOut aexp _ _ rbinds)
   = pp_rbinds (pprParendExpr aexp) rbinds
 
 ppr_expr (ExprWithTySig expr sig)
-  = hang (nest 2 (pprExpr expr) <+> ptext SLIT("::"))
+  = hang (nest 2 (ppr_expr expr) <+> ptext SLIT("::"))
 	 4 (ppr sig)
 
 ppr_expr (ArithSeqIn info)
@@ -310,24 +310,24 @@ ppr_expr (HsSCC label expr)
 
 ppr_expr (TyLam tyvars expr)
   = hang (hsep [ptext SLIT("/\\"), interppSP tyvars, ptext SLIT("->")])
-	 4 (pprExpr expr)
+	 4 (ppr_expr expr)
 
 ppr_expr (TyApp expr [ty])
-  = hang (pprExpr expr) 4 (pprParendGenType ty)
+  = hang (ppr_expr expr) 4 (pprParendGenType ty)
 
 ppr_expr (TyApp expr tys)
-  = hang (pprExpr expr)
+  = hang (ppr_expr expr)
 	 4 (brackets (interpp'SP tys))
 
 ppr_expr (DictLam dictvars expr)
   = hang (hsep [ptext SLIT("\\{-dict-}"), interppSP dictvars, ptext SLIT("->")])
-	 4 (pprExpr expr)
+	 4 (ppr_expr expr)
 
 ppr_expr (DictApp expr [dname])
-  = hang (pprExpr expr) 4 (ppr dname)
+  = hang (ppr_expr expr) 4 (ppr dname)
 
 ppr_expr (DictApp expr dnames)
-  = hang (pprExpr expr)
+  = hang (ppr_expr expr)
 	 4 (brackets (interpp'SP dnames))
 
 \end{code}

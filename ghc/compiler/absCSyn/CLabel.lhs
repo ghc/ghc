@@ -57,8 +57,8 @@ import CStrings		( pp_cSEP )
 import Id		( externallyVisibleId, cmpId_withSpecDataCon,
 			  isDataCon, isDictFunId,
 			  isDefaultMethodId_maybe,
-			  isSuperDictSelId_maybe, fIRST_TAG,
-			  ConTag, GenId{-instance Outputable-},
+			  fIRST_TAG,
+			  ConTag,
 			  Id
 			)
 import Maybes		( maybeToBool )

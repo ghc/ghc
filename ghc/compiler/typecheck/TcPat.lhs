@@ -24,13 +24,14 @@ import TcEnv		( TcIdOcc(..), tcLookupGlobalValue, tcLookupGlobalValueByKey,
 import TcType 		( TcType, TcMaybe, newTyVarTy, newTyVarTys )
 import Unify 		( unifyTauTy, unifyTauTyList, unifyTauTyLists )
 
+import Maybes		( maybeToBool )
 import Bag		( Bag )
 import CmdLineOpts	( opt_IrrefutableTuples )
 import Id		( GenId, idType, Id )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind )
 import PprType		( GenType, GenTyVar )
 import Type		( splitFunTys, splitRhoTy,
-			  splitFunTy_maybe,
+			  splitFunTy_maybe, splitAlgTyConApp_maybe,
 			  Type, GenType
 			)
 import TyVar		( GenTyVar )

@@ -278,7 +278,7 @@ addErrTc err_msg down env
     listNF_Tc ctxt down env	`thenSST` \ ctxt_msgs ->
     let
 	err = addShortErrLocLine loc $
-	      hang err_msg 4 (vcat (ctxt_to_use ctxt_msgs))
+	      vcat (err_msg : ctxt_to_use ctxt_msgs)
     in
     writeMutVarSST errs_var (warns, errs `snocBag` err)	`thenSST_`
     returnSST ()
@@ -294,7 +294,7 @@ warnTc warn_if_true warn_msg down env
 	listNF_Tc ctxt down env	`thenSST` \ ctxt_msgs ->
 	let
 	    warn = addShortWarnLocLine loc $
-	           hang warn_msg 4 (vcat (ctxt_to_use ctxt_msgs))
+	           vcat (warn_msg : ctxt_to_use ctxt_msgs)
 	in
 	writeMutVarSST errs_var (warns `snocBag` warn, errs) 	`thenSST_`
     	returnSST ()

@@ -48,10 +48,10 @@ import Util	( removeDups )
 
 \begin{code}
 getGlobalNames :: RdrNameHsModule
-	       -> RnMG (Maybe (ExportEnv, RnEnv, NameSet, Name -> PrintUnqualified))
-			-- The NameSet is the set of names that are
-			--	either locally defined,
-			--	or explicitly imported
+	       -> RnMG (Maybe (ExportEnv, 
+			       RnEnv, 
+			       FiniteMap Name HowInScope, 	-- Locally defined or explicitly imported 
+			       Name -> PrintUnqualified))
 			-- Nothing => no need to recompile
 
 getGlobalNames m@(HsModule this_mod _ exports imports _ _ mod_loc)
@@ -60,7 +60,7 @@ getGlobalNames m@(HsModule this_mod _ exports imports _ _ mod_loc)
 	-- PROCESS LOCAL DECLS
 	-- Do these *first* so that the correct provenance gets
 	-- into the global name cache.
-      importsFromLocalDecls rec_exp_fn m	`thenRn` \ (local_rn_env, local_mod_avails, local_avails) ->
+      importsFromLocalDecls rec_exp_fn m	`thenRn` \ (local_rn_env, local_mod_avails, local_info) ->
 
 	-- PROCESS IMPORT DECLS
       mapAndUnzip3Rn importsFromImportDecl all_imports
@@ -98,15 +98,11 @@ getGlobalNames m@(HsModule this_mod _ exports imports _ _ mod_loc)
 	 export_avails :: ExportAvails
 	 export_avails = foldr plusExportAvails local_mod_avails imp_avails_s
 
-	 explicit_names :: NameSet 	-- locally defined or explicitly imported
-	 explicit_names = foldr add_on emptyNameSet (local_avails : explicit_imports_s)
-	 add_on avails names = foldr (unionNameSets . mkNameSet . availNames) names avails
+	 explicit_info :: FiniteMap Name HowInScope  -- Locally defined or explicitly imported
+	 explicit_info = foldr plusFM local_info explicit_imports_s
       in
       exportsFromAvail this_mod exports export_avails rn_env	
 							`thenRn` \ (export_fn, export_env) ->
-
-	-- RECORD THAT LOCALLY DEFINED THINGS ARE AVAILABLE
-      mapRn (recordSlurp Nothing Compulsory) local_avails	`thenRn_`
 
         -- BUILD THE "IMPORT FN".  It just tells whether a name is in
 	-- scope in an unqualified form.
@@ -114,7 +110,7 @@ getGlobalNames m@(HsModule this_mod _ exports imports _ _ mod_loc)
 	  print_unqual = mkImportFn imp_rn_env
       in   
 
-      returnRn (export_fn, Just (export_env, rn_env, explicit_names, print_unqual))
+      returnRn (export_fn, Just (export_env, rn_env, explicit_info, print_unqual))
     )							`thenRn` \ (_, result) ->
     returnRn result
   where
@@ -167,7 +163,9 @@ checkEarlyExit mod
 	
 \begin{code}
 importsFromImportDecl :: RdrNameImportDecl
-		      -> RnMG (RnEnv, ExportAvails, [AvailInfo])
+		      -> RnMG (RnEnv, 
+			       ExportAvails, 
+			       FiniteMap Name HowInScope)  -- Records the explicitly-imported things
 
 importsFromImportDecl (ImportDecl mod qual_only as_source as_mod import_spec loc)
   = pushSrcLocRn loc $
@@ -175,6 +173,10 @@ importsFromImportDecl (ImportDecl mod qual_only as_source as_mod import_spec loc
     filterImports mod import_spec avails	`thenRn` \ (filtered_avails, hides, explicits) ->
     let
 	how_in_scope = FromImportDecl mod loc
+	explicit_info = listToFM [(name, how_in_scope) 
+				 | avail <- explicits,
+				   name  <- availNames avail
+				 ]
     in
     qualifyImports mod 
 		   True 		-- Want qualified names
@@ -184,14 +186,27 @@ importsFromImportDecl (ImportDecl mod qual_only as_source as_mod import_spec loc
 		   filtered_avails (\n -> how_in_scope)
 		   [ (occ,(fixity,how_in_scope)) | (occ,fixity) <- fixities ]
 							`thenRn` \ (rn_env, mod_avails) ->
-    returnRn (rn_env, mod_avails, explicits)
+    returnRn (rn_env, mod_avails, explicit_info)
 \end{code}
 
 
 \begin{code}
 importsFromLocalDecls rec_exp_fn (HsModule mod _ _ _ fix_decls decls _)
   = foldlRn getLocalDeclBinders [] decls		`thenRn` \ avails ->
+
+	-- Record that locally-defined things are available
+    mapRn (recordSlurp Nothing Compulsory) avails	`thenRn_`
+
+	-- Fixities
     mapRn fixityFromFixDecl fix_decls			`thenRn` \ fixities ->
+
+	-- Record where the available stuff came from
+    let
+	explicit_info = listToFM [(name, FromLocalDefn (getSrcLoc name))
+				 | avail <- avails,
+				   name  <- availNames avail
+				 ]
+    in
     qualifyImports mod 
 		   False	-- Don't want qualified names
 		   True		-- Want unqualified names
@@ -200,7 +215,7 @@ importsFromLocalDecls rec_exp_fn (HsModule mod _ _ _ fix_decls decls _)
 		   avails (\n -> FromLocalDefn (getSrcLoc n))
 		   fixities
 							`thenRn` \ (rn_env, mod_avails) ->
-    returnRn (rn_env, mod_avails, avails)
+    returnRn (rn_env, mod_avails, explicit_info)
   where
     newLocalName rdr_name loc
       = newLocallyDefinedGlobalName mod (rdrNameOcc rdr_name) rec_exp_fn loc

@@ -23,7 +23,7 @@ import Inst		( Inst, InstOrigin(..), LIE, emptyLIE, plusLIE, newDicts, newMethod
 import TcEnv		( TcIdOcc(..), tcAddImportedIdInfo,
 			  tcLookupClass, tcLookupTyVar, 
 			  tcExtendGlobalTyVars )
-import TcBinds		( tcBindWithSigs, checkSigTyVars, sigCtxt, sigThetaCtxt, TcSigInfo(..) )
+import TcBinds		( tcBindWithSigs, checkSigTyVars, sigCtxt, TcSigInfo(..) )
 import TcKind		( unifyKinds, TcKind )
 import TcMonad
 import TcMonoType	( tcHsType, tcContext )
@@ -181,7 +181,14 @@ tcClassContext rec_class rec_tyvars context pragmas
     in
 
 	-- Make super-class selector ids
-    mapTc mk_super_id sc_theta		`thenTc` \ sc_sel_ids ->
+	-- We number them off, 1, 2, 3 etc so that we can construct
+	-- names for the selectors.  Thus
+	--	class (C a, C b) => D a b where ...
+	-- gives superclass selectors
+	--	D_sc1, D_sc2
+	-- (We used to call them D_C, but now we can have two different
+	--  superclasses both called C!)
+    mapTc mk_super_id (sc_theta `zip` [1..])	`thenTc` \ sc_sel_ids ->
 
 	-- Done
     returnTc (sc_theta, sc_tys, sc_sel_ids)
@@ -189,13 +196,13 @@ tcClassContext rec_class rec_tyvars context pragmas
   where
     rec_tyvar_tys = mkTyVarTys rec_tyvars
 
-    mk_super_id (super_class, tys)
+    mk_super_id ((super_class, tys), index)
         = tcGetUnique			`thenNF_Tc` \ uniq ->
 	  let
 		ty = mkForAllTys rec_tyvars $
 		     mkFunTy (mkDictTy rec_class rec_tyvar_tys) (mkDictTy super_class tys)
 	  in
-	  returnTc (mkSuperDictSelId uniq rec_class super_class ty)
+	  returnTc (mkSuperDictSelId uniq rec_class index ty)
 
 
 tcClassSig :: TcEnv s			-- Knot tying only!
@@ -428,9 +435,9 @@ tcDefaultMethodBinds clas default_binds
 	avail_insts = this_dict
     in
     tcAddErrCtxt (classDeclCtxt clas) $
-    tcAddErrCtxtM (sigThetaCtxt avail_insts) $
     mapNF_Tc zonkSigTyVar clas_tyvars		`thenNF_Tc` \ clas_tyvars' ->
-    tcSimplifyAndCheck (text "classDecl")
+    tcSimplifyAndCheck
+	(ptext SLIT("class") <+> ppr clas)
 	(mkTyVarSet clas_tyvars')
 	avail_insts
 	(unionManyBags insts_needed)		`thenTc` \ (const_lie, dict_binds) ->

@@ -26,7 +26,7 @@ import CoreUtils	( coreExprType, squashableDictishCcExpr )
 import FiniteMap	( addListToFM_C, FiniteMap )
 import Kind		( mkBoxedTypeKind, isBoxedTypeKind )
 import Id		( idType, isDefaultMethodId_maybe, toplevelishId,
-			  isSuperDictSelId_maybe, isBottomingId,
+			  isBottomingId,
 			   isDataCon,
 			  isImportedId, mkIdWithNewUniq,
 			  dataConTyCon, applyTypeEnvToId,

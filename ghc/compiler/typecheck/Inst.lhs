@@ -632,7 +632,7 @@ data InstOrigin s
 \begin{code}
 pprOrigin :: Inst s -> SDoc
 pprOrigin inst
-  = hsep [text "arising from", pp_orig orig <> comma, text "at", ppr locn]
+  = hsep [text "arising from", pp_orig orig, text "at", ppr locn]
   where
     (orig, locn) = case inst of
 			Dict _ _ _       orig loc -> (orig,loc)
@@ -659,11 +659,11 @@ pprOrigin inst
 	=  ptext SLIT("a class declaration")
     pp_orig (InstanceSpecOrigin clas ty)
 	= hsep [text "a SPECIALIZE instance pragma; class",
-	       ppr clas, text "type:", ppr ty]
+	        quotes (ppr clas), text "type:", ppr ty]
     pp_orig (ValSpecOrigin name)
-	= hsep [ptext SLIT("a SPECIALIZE user-pragma for"), ppr name]
+	= hsep [ptext SLIT("a SPECIALIZE user-pragma for"), quotes (ppr name)]
     pp_orig (CCallOrigin clabel Nothing{-ccall result-})
-	= hsep [ptext SLIT("the result of the _ccall_ to"), text clabel]
+	= hsep [ptext SLIT("the result of the _ccall_ to"), quotes (text clabel)]
     pp_orig (CCallOrigin clabel (Just arg_expr))
 	= hsep [ptext SLIT("an argument in the _ccall_ to"), quotes (text clabel) <> comma, 
 		text "namely", quotes (ppr arg_expr)]

@@ -24,18 +24,18 @@ import CoreSyn
 import Literal
 import CoreUnfold	( mkUnfolding, PragmaInfo(..) )
 import TysWiredIn	( tupleCon )
-import Id		( GenId, mkTemplateLocals, idType,
+import Id		( mkTemplateLocals, idType,
 			  dataConStrictMarks, dataConFieldLabels, dataConArgTys,
 			  recordSelectorFieldLabel, dataConSig,
 			  StrictnessMark(..),
-			  isAlgCon, isMethodSelId_maybe, isSuperDictSelId_maybe,
+			  isAlgCon, isDictSelId_maybe,
 			  isRecordSelector, isPrimitiveId_maybe, 
 			  addIdUnfolding, addIdArity,
 			  Id
 			)
 import IdInfo		( ArityInfo, exactArity )
 import Class		( classBigSig, classTyCon )
-import TyCon		( isNewTyCon, tyConDataCons )
+import TyCon		( isNewTyCon, tyConDataCons, isDataTyCon )
 import FieldLabel	( FieldLabel )
 import PrelVals		( pAT_ERROR_ID )
 import Maybes
@@ -179,20 +179,35 @@ addStandardIdInfo sel_id
 %*									*
 %************************************************************************
 
+Selecting a field for a dictionary.  If there is just one field, then
+there's nothing to do.
+
 \begin{code}
 addStandardIdInfo sel_id
-  | maybeToBool maybe_sc_sel_id
-  = sel_id `addIdUnfolding` (mk_selector_unfolding cls sel_id)
+  | maybeToBool maybe_dict_sel_id
+  = sel_id `addIdUnfolding` unfolding
   where
-    maybe_sc_sel_id    = isSuperDictSelId_maybe sel_id
-    Just (cls, _) = maybe_sc_sel_id
+    maybe_dict_sel_id = isDictSelId_maybe sel_id
+    Just clas 	    = maybe_dict_sel_id
 
-addStandardIdInfo sel_id
-  | maybeToBool maybe_meth_sel_id
-  = sel_id `addIdUnfolding` (mk_selector_unfolding cls sel_id)
-  where
-    maybe_meth_sel_id  = isMethodSelId_maybe sel_id
-    Just cls = maybe_meth_sel_id
+    unfolding = mkUnfolding IWantToBeINLINEd {- Always inline selectors -} rhs
+	-- The always-inline thing means we don't need any other IdInfo
+
+    (tyvars, _, sc_sel_ids, op_sel_ids, defms) = classBigSig clas
+
+    tycon      = classTyCon clas
+    [data_con] = tyConDataCons tycon
+    tyvar_tys  = mkTyVarTys tyvars
+    arg_tys    = dataConArgTys data_con tyvar_tys
+    the_arg_id = assoc "StdIdInfo:mk_sel" ((sc_sel_ids ++ op_sel_ids) `zip` arg_ids) sel_id
+
+    (dict_id:arg_ids) = mkTemplateLocals (mkDictTy clas tyvar_tys : arg_tys)
+
+    rhs | isNewTyCon tycon = mkLam tyvars [dict_id] $
+			     Coerce (CoerceOut data_con) (head arg_tys) (Var dict_id)
+	| otherwise	   = mkLam tyvars [dict_id] $
+			     Case (Var dict_id) $
+			     AlgAlts [(data_con, arg_ids, Var the_arg_id)] NoDefault
 \end{code}
 
 
@@ -235,34 +250,3 @@ addStandardIdInfo id
   = pprTrace "addStandardIdInfo missing:" (ppr id) id
 \end{code}
 
-
-%************************************************************************
-%*									*
-\subsection{Dictionary selector help function
-%*									*
-%************************************************************************
-
-Selecting a field for a dictionary.  If there is just one field, then
-there's nothing to do.
-
-\begin{code}
-mk_selector_unfolding clas sel_id
-  = mkUnfolding IWantToBeINLINEd {- Always inline selectors -} rhs
-	-- The always-inline thing means we don't need any other IdInfo
-  where
-    (tyvars, _, sc_sel_ids, op_sel_ids, defms) = classBigSig clas
-
-    tycon      = classTyCon clas
-    [data_con] = tyConDataCons tycon
-    tyvar_tys  = mkTyVarTys tyvars
-    arg_tys    = dataConArgTys data_con tyvar_tys
-    the_arg_id = assoc "StdIdInfo:mk_sel" ((sc_sel_ids ++ op_sel_ids) `zip` arg_ids) sel_id
-
-    (dict_id:arg_ids) = mkTemplateLocals (mkDictTy clas tyvar_tys : arg_tys)
-
-    rhs | isNewTyCon tycon = mkLam tyvars [dict_id] $
-			     Coerce (CoerceOut data_con) (head arg_tys) (Var dict_id)
-	| otherwise	   = mkLam tyvars [dict_id] $
-			     Case (Var dict_id) $
-			     AlgAlts [(data_con, arg_ids, Var the_arg_id)] NoDefault
-\end{code}

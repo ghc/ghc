@@ -38,7 +38,8 @@ import SimplMonad
 import SimplVar		( completeVar )
 import Unique		( Unique )
 import SimplUtils
-import Type		( mkTyVarTy, mkTyVarTys, mkAppTy, applyTy, mkFunTys, splitAlgTyConApp_maybe,
+import Type		( mkTyVarTy, mkTyVarTys, mkAppTy, applyTy, applyTys,
+			  mkFunTys, splitAlgTyConApp_maybe,
 			  splitFunTys, splitFunTy_maybe, isUnpointedType
 			)
 import TysPrim		( realWorldStatePrimTy )
@@ -507,7 +508,7 @@ simplRhsExpr env binder@(id,occ_info) rhs new_id
     mapSmpl cloneTyVarSmpl tyvars			`thenSmpl` \ tyvars' ->
     let
 	new_tys  = mkTyVarTys tyvars'
-	body_ty  = foldl applyTy rhs_ty new_tys
+	body_ty  = applyTys rhs_ty new_tys
 	lam_env  = extendTyEnvList rhs_env (zipEqual "simplRhsExpr" tyvars new_tys)
     in
 	-- Deal with the little lambda part

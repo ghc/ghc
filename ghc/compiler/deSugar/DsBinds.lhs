@@ -37,6 +37,7 @@ import Type		( mkTyVarTy, isDictTy, instantiateTy
 			)
 import TyVar		( zipTyVarEnv )
 import TysPrim		( voidTy )
+import Outputable	( assertPanic )
 \end{code}
 
 %************************************************************************

@@ -17,6 +17,7 @@ import {-# SOURCE #-} CgExpr ( cgExpr )
 import CgMonad
 import AbsCSyn
 import StgSyn
+import BasicTypes	( TopLevelFlag(..) )
 
 import AbsCUtils	( mkAbstractCs, getAmodeRep )
 import CgBindery	( getCAddrMode, getArgAmodes,
@@ -98,17 +99,11 @@ cgTopRhsClosure name cc binder_info args body lf_info
     							`thenC`
 
 	-- BUILD VAP INFO TABLES IF NECESSARY
-	-- Don't build Vap info tables etc for
-	-- a function whose result is an unboxed type,
-	-- because we can never have thunks with such a type.
-    (if closureReturnsUnpointedType closure_info then
-	nopC
-    else
-	let
+    let
 	    bind_the_fun = addBindC name cg_id_info	-- It's global!
-	in
-	cgVapInfoTables True {- Top level -} bind_the_fun binder_info name args lf_info
-    ) `thenC`
+    in
+    cgVapInfoTables TopLevel bind_the_fun binder_info name args lf_info
+    							 `thenC`
 
 	-- BUILD THE OBJECT (IF NECESSARY)
     (if staticClosureRequired name binder_info lf_info
@@ -250,14 +245,8 @@ cgRhsClosure binder cc binder_info fvs args body lf_info
     )	`thenC`
 
 	-- BUILD VAP INFO TABLES IF NECESSARY
-	-- Don't build Vap info tables etc for
-	-- a function whose result is an unboxed type,
-	-- because we can never have thunks with such a type.
-    (if closureReturnsUnpointedType closure_info then
-	nopC
-    else
-	cgVapInfoTables False {- Not top level -} nopC binder_info binder args lf_info
-    ) `thenC`
+    cgVapInfoTables NotTopLevel nopC binder_info binder args lf_info
+    							`thenC`
 
 	-- BUILD THE OBJECT
     let
@@ -295,10 +284,34 @@ cgVapInfoTables top_level perhaps_bind_the_fun binder_info fun args lf_info
     )
 
   where
-    fun_in_payload = not top_level
+    fun_in_payload = case top_level of
+			TopLevel    -> False
+			NotTopLevel -> True
+			
 
 cgVapInfoTable perhaps_bind_the_fun upd_flag fun args fun_in_payload fun_lf_info
-  = let
+  | closureReturnsUnpointedType closure_info
+	-- Don't build Vap info tables etc for
+	-- a function whose result is an unboxed type,
+	-- because we can never have thunks with such a type.
+  = nopC
+
+  | otherwise
+  = forkClosureBody (
+
+		-- Bind the fvs; if the fun is not in the payload, then bind_the_fun tells
+		-- how to bind it.  If it is in payload it'll be bound by payload_bind_details.
+	    perhaps_bind_the_fun 		`thenC`
+	    mapCs bind_fv payload_bind_details	`thenC`
+
+		-- Generate the info table and code
+	    closureCodeBody NoStgBinderInfo
+			    closure_info
+			    useCurrentCostCentre
+			    [] 	-- No args; it's a thunk
+			    vap_entry_rhs
+    )
+  where
 	-- The vap_entry_rhs is a manufactured STG expression which
 	-- looks like the RHS of any binding which is going to use the vap-entry
 	-- point of the function.  Each of these bindings will look like:
@@ -341,23 +354,6 @@ cgVapInfoTable perhaps_bind_the_fun upd_flag fun args fun_in_payload fun_lf_info
 		-- Id is just used for label construction, which is OK.
 
 	bind_fv ((id,lf_info), offset) = bindNewToNode id offset lf_info
-    in
-
-	-- BUILD ITS INFO TABLE AND CODE
-    forkClosureBody (
-
-		-- Bind the fvs; if the fun is not in the payload, then bind_the_fun tells
-		-- how to bind it.  If it is in payload it'll be bound by payload_bind_details.
-	    perhaps_bind_the_fun 		`thenC`
-	    mapCs bind_fv payload_bind_details	`thenC`
-
-		-- Generate the info table and code
-	    closureCodeBody NoStgBinderInfo
-			    closure_info
-			    useCurrentCostCentre
-			    [] 	-- No args; it's a thunk
-			    vap_entry_rhs
-    )
 \end{code}
 %************************************************************************
 %*									*

@@ -233,6 +233,9 @@ tcInstSigType ty_to_inst
   where
     bind_fn = inst_sig_tyvar	-- Note: inst_sig_tyvar, not inst_tyvar
 				-- I don't think that can lead to strange error messages
+				-- of the form can't match (T a) against (T a)
+				-- See notes with inst_tyvar
+
     occ_fn env tyvar = case lookupTyVarEnv env tyvar of
 			 Just ty -> returnNF_Tc ty
 			 Nothing -> panic "tcInstType:2"-- (vcat [ppr ty_to_inst, 

@@ -263,10 +263,10 @@ rn_mono_binds top_lev binders mbinds sigs
 	 -- which is a list of indivisible vertices so far as
 	 -- the strongly-connected-components (SCC) analysis is concerned
     rnBindSigs top_lev binders sigs	`thenRn` \ siglist ->
-    flattenMonoBinds 0 siglist mbinds	`thenRn` \ (_, mbinds_info) ->
+    flattenMonoBinds siglist mbinds	`thenRn` \ mbinds_info ->
 
 	 -- Do the SCC analysis
-    let edges	    = mkEdges mbinds_info
+    let edges	    = mkEdges (mbinds_info `zip` [0..])
 	scc_result  = stronglyConnComp edges
 	final_binds = foldr1 ThenBinds (map reconstructCycle scc_result)
 
@@ -280,19 +280,18 @@ rn_mono_binds top_lev binders mbinds sigs
 unique ``vertex tags'' on its output; minor plumbing required.
 
 \begin{code}
-flattenMonoBinds :: Int				-- Next free vertex tag
-		 -> [RenamedSig]		-- Signatures
+flattenMonoBinds :: [RenamedSig]		-- Signatures
 		 -> RdrNameMonoBinds
 		 -> RnMS s (Int, [FlatMonoBindsInfo])
 
-flattenMonoBinds uniq sigs EmptyMonoBinds = returnRn (uniq, [])
+flattenMonoBinds sigs EmptyMonoBinds = returnRn []
 
-flattenMonoBinds uniq sigs (AndMonoBinds bs1 bs2)
-  = flattenMonoBinds uniq  sigs bs1	`thenRn` \ (uniq1, flat1) ->
-    flattenMonoBinds uniq1 sigs bs2	`thenRn` \ (uniq2, flat2) ->
-    returnRn (uniq2, flat1 ++ flat2)
+flattenMonoBinds sigs (AndMonoBinds bs1 bs2)
+  = flattenMonoBinds sigs bs1	`thenRn` \ flat1 ->
+    flattenMonoBinds sigs bs2	`thenRn` \ flat2 ->
+    returnRn (flat1 ++ flat2)
 
-flattenMonoBinds uniq sigs (PatMonoBind pat grhss_and_binds locn)
+flattenMonoBinds sigs (PatMonoBind pat grhss_and_binds locn)
   = pushSrcLocRn locn		 	$
     rnPat pat				`thenRn` \ pat' ->
     rnGRHSsAndBinds grhss_and_binds	`thenRn` \ (grhss_and_binds', fvs) ->
@@ -303,17 +302,14 @@ flattenMonoBinds uniq sigs (PatMonoBind pat grhss_and_binds locn)
 	sigs_for_me      = filter ((`elemNameSet` names_bound_here) . sig_name) sigs
 	sigs_fvs         = foldr sig_fv emptyNameSet sigs_for_me
     in
-    returnRn (
-	uniq + 1,
-	[(uniq,
-	  names_bound_here,
+    returnRn 
+	[(names_bound_here,
 	  fvs `unionNameSets` sigs_fvs,
 	  PatMonoBind pat' grhss_and_binds' locn,
 	  sigs_for_me
 	 )]
-    )
 
-flattenMonoBinds uniq sigs (FunMonoBind name inf matches locn)
+flattenMonoBinds sigs (FunMonoBind name inf matches locn)
   = pushSrcLocRn locn				 $
     mapRn (checkPrecMatch inf name) matches	`thenRn_`
     lookupBndrRn name				`thenRn` \ name' ->
@@ -323,15 +319,12 @@ flattenMonoBinds uniq sigs (FunMonoBind name inf matches locn)
 	sigs_for_me = filter ((name' ==) . sig_name) sigs
 	sigs_fvs    = foldr sig_fv emptyNameSet sigs_for_me
     in
-    returnRn (
-      uniq + 1,
-      [(uniq,
-	unitNameSet name',
+    returnRn
+      [(unitNameSet name',
 	fvs `unionNameSets` sigs_fvs,
 	FunMonoBind name' inf new_matches locn,
 	sigs_for_me
 	)]
-    )
 \end{code}
 
 
@@ -417,23 +410,21 @@ renamed.
 
 \begin{code}
 type FlatMonoBindsInfo
-  = (VertexTag,			-- Identifies the vertex
-     NameSet,			-- Set of names defined in this vertex
+  = (NameSet,			-- Set of names defined in this vertex
      NameSet,			-- Set of names used in this vertex
-     RenamedMonoBinds,		-- Binding for this vertex (always just one binding, either fun or pat)
+     RenamedMonoBinds,
      [RenamedSig])		-- Signatures, if any, for this vertex
 
-
-mkEdges :: [FlatMonoBindsInfo] -> [(FlatMonoBindsInfo, VertexTag, [VertexTag])]
+mkEdges :: [(FlatMonoBindsInfo, VertexTag)] -> [(FlatMonoBindsInfo, VertexTag, [VertexTag])]
 
 mkEdges flat_info
   = [ (info, tag, dest_vertices (nameSetToList names_used))
-    | info@(tag, names_defined, names_used, mbind, sigs) <- flat_info
+    | (info@(names_defined, names_used, mbind, sigs), tag) <- flat_info
     ]
   where
  	 -- An edge (v,v') indicates that v depends on v'
     dest_vertices src_mentions = [ target_vertex
-			         | (target_vertex, names_defined, _, _, _) <- flat_info,
+			         | ((names_defined, _, _, _), target_vertex) <- flat_info,
 				   mentioned_name <- src_mentions,
 				   mentioned_name `elemNameSet` names_defined
 			         ]

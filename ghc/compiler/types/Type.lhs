@@ -14,7 +14,8 @@ module Type (
 
 	mkSynTy, isSynTy,
 
-	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, applyTy,
+	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
+	applyTy, applyTys,
 
 	TauType, RhoType, SigmaType, ThetaType,
 	isTauTy,
@@ -56,7 +57,7 @@ import BasicTypes ( Unused )
 import Maybes	( maybeToBool, assocMaybe )
 import PrimRep	( PrimRep(..) )
 import Unique	-- quite a few *Keys
-import Util	( thenCmp, panic )
+import Util	( thenCmp, panic, assertPanic )
 \end{code}
 
 
@@ -255,7 +256,7 @@ splitAlgTyConApp (TyConApp tc tys) = ASSERT( isAlgTyCon tc && tyConArity tc == l
 splitAlgTyConApp (SynTy _ ty)      = splitAlgTyConApp ty
 \end{code}
 
-y"Dictionary" types are just ordinary data types, but you can
+"Dictionary" types are just ordinary data types, but you can
 tell from the type constructor whether it's a dictionary or not.
 
 \begin{code}
@@ -346,6 +347,15 @@ applyTy :: GenType flexi -> GenType flexi -> GenType flexi
 applyTy (SynTy _ fun)    arg = applyTy fun arg
 applyTy (ForAllTy tv ty) arg = instantiateTy (mkTyVarEnv [(tv,arg)]) ty
 applyTy other		 arg = panic "applyTy"
+
+applyTys :: GenType flexi -> [GenType flexi] -> GenType flexi
+applyTys fun_ty arg_tys
+ = go [] fun_ty arg_tys
+ where
+   go env ty               []         = instantiateTy (mkTyVarEnv env) ty
+   go env (SynTy _ fun)    args       = go env fun args
+   go env (ForAllTy tv ty) (arg:args) = go ((tv,arg):env) ty args
+   go env other            args       = panic "applyTys"
 \end{code}
 
 

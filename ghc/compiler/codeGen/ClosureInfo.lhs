@@ -96,7 +96,8 @@ import PrelInfo		( maybeCharLikeTyCon, maybeIntLikeTyCon )
 import PrimRep		( getPrimRepSize, separateByPtrFollowness, PrimRep )
 import SMRep		-- all of it
 import TyCon		( TyCon, isNewTyCon )
-import Type		( isUnpointedType, splitForAllTys, splitFunTys, mkFunTys, splitAlgTyConApp_maybe,
+import Type		( isUnpointedType, splitForAllTys, splitFunTys, mkFunTys,
+			  splitAlgTyConApp_maybe, applyTys,
 			  Type
 			)
 import Util		( isIn, mapAccumL )
@@ -1130,11 +1131,10 @@ fun_result_ty arity ty
       Nothing -> pprPanic "fun_result_ty:" (hsep [int arity,
 						  ppr ty])
 
-      Just (tycon, _, [con]) | isNewTyCon tycon
+      Just (tycon, tycon_arg_tys, [con]) | isNewTyCon tycon
 	   -> fun_result_ty (arity - n_arg_tys) rep_ty
 	   where
-	      ([rep_ty], _) = splitFunTys rho_ty
-	      (_, rho_ty)   = splitForAllTys (idType con)
+	      ([rep_ty], _) = splitFunTys (applyTys (idType con) tycon_arg_tys)
   where
      (_, rho_ty)	= splitForAllTys ty
      (arg_tys, res_ty)  = splitFunTys rho_ty

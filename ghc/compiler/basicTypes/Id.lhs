@@ -64,10 +64,9 @@ module Id (
 	isDictFunId,
 	isImportedId,
 	isRecordSelector,
-	isMethodSelId_maybe,
+	isDictSelId_maybe,
 	isNullaryDataCon,
 	isSpecPragmaId,
-	isSuperDictSelId_maybe,
 	isPrimitiveId_maybe,
 	isSysLocalId,
 	isTupleCon,
@@ -246,18 +245,8 @@ data IdDetails
 
   ---------------- Things to do with overloading
 
-  | SuperDictSelId		-- Selector for superclass dictionary
-		Class		-- The class (input dict)
-		Class		-- The superclass (result dict)
-
-  | MethodSelId	Class		-- An overloaded class operation, with
-				-- a fully polymorphic type.  Its code
-				-- just selects a method from the
-				-- dictionary.
-
-	-- NB: The IdInfo for a MethodSelId has all the info about its
-	-- related "constant method Ids", which are just
-	-- specialisations of this general one.
+  | DictSelId			-- Selector that extracts a method or superclass from a dictionary
+		Class		-- The class
 
   | DefaultMethodId		-- Default method for a particular class op
 		Class		-- same class, <blah-blah> info as MethodSelId
@@ -478,8 +467,7 @@ toplevelishId (Id _ _ _ details _ _)
     chk (TupleConId _)    	    = True
     chk (RecordSelId _)   	    = True
     chk ImportedId	    	    = True
-    chk (SuperDictSelId _ _)	    = True
-    chk (MethodSelId _)		    = True
+    chk (DictSelId _)		    = True
     chk (DefaultMethodId _)         = True
     chk (DictFunId     _ _)	    = True
     chk (SpecId unspec _ _)	    = toplevelishId unspec
@@ -496,8 +484,7 @@ idHasNoFreeTyVars (Id _ _ _ details _ info)
     chk (TupleConId _)    	  = True
     chk (RecordSelId _)   	  = True
     chk ImportedId	    	  = True
-    chk (SuperDictSelId _ _)	  = True
-    chk (MethodSelId _)		  = True
+    chk (DictSelId _)		  = True
     chk (DefaultMethodId _)       = True
     chk (DictFunId     _ _)	  = True
     chk (SpecId _     _   no_free_tvs) = no_free_tvs
@@ -530,8 +517,7 @@ omitIfaceSigForId (Id _ name _ details _ _)
         (AlgConId _ _ _ _ _ _ _ _ _) -> True
         (TupleConId _)    	  -> True
         (RecordSelId _)   	  -> True
-        (SuperDictSelId _ _)	  -> True
-        (MethodSelId _)		  -> True
+        (DictSelId _)		  -> True
 
 	other			  -> False	-- Don't omit!
 		-- NB DefaultMethodIds are not omitted
@@ -555,8 +541,8 @@ isSpecId_maybe (Id _ _ _ (SpecId unspec ty_maybes _) _ _)
 isSpecId_maybe other_id
   = Nothing
 
-isMethodSelId_maybe (Id _ _ _ (MethodSelId cls) _ _) = Just cls
-isMethodSelId_maybe _				     = Nothing
+isDictSelId_maybe (Id _ _ _ (DictSelId cls) _ _) = Just cls
+isDictSelId_maybe _				 = Nothing
 
 isDefaultMethodId (Id _ _ _ (DefaultMethodId _) _ _) = True
 isDefaultMethodId other				     = False
@@ -567,9 +553,6 @@ isDefaultMethodId_maybe other = Nothing
 
 isDictFunId (Id _ _ _ (DictFunId _ _) _ _) = True
 isDictFunId other		    	   = False
-
-isSuperDictSelId_maybe (Id _ _ _ (SuperDictSelId c sc) _ _) = Just (c, sc)
-isSuperDictSelId_maybe other_id				  = Nothing
 
 isWrapperId id = workerExists (getIdStrictness id)
 
@@ -660,20 +643,26 @@ idPrimRep i = typePrimRep (idType i)
 %************************************************************************
 
 \begin{code}
-mkSuperDictSelId u clas sc ty
+mkSuperDictSelId :: Unique -> Class -> Int -> Type -> Id
+	-- The Int is an arbitrary tag to say which superclass is selected
+	-- So, for 
+	--	class (C a, C b) => Foo a b where ...
+	-- we get superclass selectors
+	--	Foo_sc1, Foo_sc2
+
+mkSuperDictSelId u clas index ty
   = addStandardIdInfo $
     Id u name ty details NoPragmaInfo noIdInfo
   where
     name    = mkCompoundName name_fn u (getName clas)
-    details = SuperDictSelId clas sc
-    name_fn clas_str = SLIT("scsel_") _APPEND_ clas_str _APPEND_ mod _APPEND_ occNameString occ
-    (mod,occ) = modAndOcc sc
+    details = DictSelId clas
+    name_fn clas_str = clas_str _APPEND_ SLIT("_sc") _APPEND_ (_PK_ (show index))
 
 	-- For method selectors the clean thing to do is
 	-- to give the method selector the same name as the class op itself.
-mkMethodSelId op_name rec_c ty
+mkMethodSelId op_name clas ty
   = addStandardIdInfo $
-    Id (uniqueOf op_name) op_name ty (MethodSelId rec_c) NoPragmaInfo noIdInfo
+    Id (uniqueOf op_name) op_name ty (DictSelId clas) NoPragmaInfo noIdInfo
 
 mkDefaultMethodId dm_name rec_c ty
   = Id (uniqueOf dm_name) dm_name ty (DefaultMethodId rec_c) NoPragmaInfo noIdInfo
@@ -951,8 +940,7 @@ dataConFieldLabels x@(Id _ _ _ idt _ _) =
       SpecPragmaId _  _ -> "sp"
       ImportedId -> "i"
       RecordSelId _ -> "r"
-      SuperDictSelId _ _ -> "sc"
-      MethodSelId _ -> "m"
+      DictSelId _ -> "m"
       DefaultMethodId _ -> "d"
       DictFunId _ _ -> "di"
       SpecId _ _ _ -> "spec"))

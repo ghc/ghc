@@ -380,6 +380,7 @@ uTysX :: Type -> Type
       -> Subst
       -> Maybe Subst
 
+uTysX (SynTy _ ty1) ty2 k subst = uTysX ty1 ty2 k subst
 uTysX ty1 (SynTy _ ty2) k subst = uTysX ty1 ty2 k subst
 
 	-- Variables; go for uVar

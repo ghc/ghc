@@ -12,7 +12,7 @@ import CmdLineOpts	( opt_WarnNameShadowing, opt_WarnUnusedMatches,
 			  opt_WarnUnusedBinds, opt_WarnUnusedImports )
 import HsSyn
 import RdrHsSyn		( RdrName(..), RdrNameIE,
-			  rdrNameOcc, isQual, qual
+			  rdrNameOcc, isQual, qual, isClassDataConRdrName
 			)
 import HsTypes		( getTyVarName, replaceTyVarName )
 import BasicTypes	( Fixity(..), FixityDirection(..), IfaceFlavour(..) )
@@ -466,14 +466,14 @@ plusRnEnv (RnEnv n1 f1) (RnEnv n2 f2)
 \begin{code}
 plusGlobalNameEnvRn :: GlobalNameEnv -> GlobalNameEnv -> RnM s d GlobalNameEnv
 plusGlobalNameEnvRn env1 env2
-  = mapRn (addErrRn.nameClashErr) (conflictsFM conflicting_name env1 env2)		`thenRn_`
+  = mapRn addNameClashErrRn (conflictsFM conflicting_name env1 env2)		`thenRn_`
     returnRn (env1 `plusFM` env2)
 
 addOneToGlobalNameEnv :: GlobalNameEnv -> RdrName -> (Name, HowInScope) -> RnM s d GlobalNameEnv
 addOneToGlobalNameEnv env rdr_name name
  = case lookupFM env rdr_name of
 	Just name2 | conflicting_name name name2
-		   -> addErrRn (nameClashErr (rdr_name, (name, name2)))	`thenRn_`
+		   -> addNameClashErrRn (rdr_name, (name, name2)))	`thenRn_`
 		      returnRn env
 
 	other      -> returnRn (addToFM env rdr_name name)
@@ -702,10 +702,18 @@ warnUnusedNames names
 
 unusedNameWarn name = quotes (ppr name) <+> ptext SLIT("is bound but not used")
 
-nameClashErr (rdr_name, ((_,how_in_scope1), (_, how_in_scope2)))
-  = hang (hsep [ptext SLIT("Conflicting definitions for"), quotes (ppr rdr_name)])
-	4 (vcat [ppr how_in_scope1,
-		 ppr how_in_scope2])
+addNameClashErrRn (rdr_name, ((_,how_in_scope1), (_, how_in_scope2)))
+  | isClassDataConRdrName rdr_name 
+	-- Nasty hack to prevent error messages complain about conflicts for ":C",
+	-- where "C" is a class.  There'll be a message about C, and :C isn't 
+	-- the programmer's business.  There may be a better way to filter this
+	-- out, but I couldn't get up the energy to find it.
+  = returnRn ()
+
+  | otherwise
+  = addErrRn (hang (hsep [ptext SLIT("Conflicting definitions for"), quotes (ppr rdr_name)])
+	      4 (vcat [ppr how_in_scope1,
+		       ppr how_in_scope2])
 
 fixityClashErr (rdr_name, ((_,how_in_scope1), (_, how_in_scope2)))
   = hang (hsep [ptext SLIT("Conflicting fixities for"), quotes (ppr rdr_name)])

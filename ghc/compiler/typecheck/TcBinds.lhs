@@ -6,7 +6,7 @@
 \begin{code}
 module TcBinds ( tcBindsAndThen, tcTopBindsAndThen,
 	         tcPragmaSigs, checkSigTyVars, tcBindWithSigs, 
-		 sigCtxt, sigThetaCtxt, TcSigInfo(..) ) where
+		 sigCtxt, TcSigInfo(..) ) where
 
 #include "HsVersions.h"
 
@@ -38,7 +38,7 @@ import TcPat		( tcPat )
 import TcSimplify	( bindInstsOfLocalFuns )
 import TcType		( TcType, TcThetaType, TcTauType, 
 			  TcTyVarSet, TcTyVar,
-			  newTyVarTy, newTcTyVar, tcInstSigType,
+			  newTyVarTy, newTcTyVar, tcInstSigType, tcInstSigTcType,
 			  zonkTcType, zonkTcTypes, zonkTcThetaType, zonkTcTyVar
 			)
 import Unify		( unifyTauTy, unifyTauTyLists )
@@ -311,9 +311,9 @@ tcBindWithSigs top_lvl binder_names mbind tc_ty_sigs is_rec prag_info_fn
 		-- Check that the needed dicts can be expressed in
 		-- terms of the signature ones
 	    tcAddErrCtxt  (bindSigsCtxt tysig_names) $
-	    tcAddErrCtxtM (sigThetaCtxt dicts_sig) $
 	    tcSimplifyAndCheck
-		(text "tcBinds2" <+> ppr binder_names)
+		(ptext SLIT("type signature for") <+> 
+		 hsep (punctuate comma (map (quotes . ppr) binder_names)))
 	    	real_tyvars_to_gen givens lie		`thenTc` \ (lie_free, dict_binds) ->
 
 	    returnTc (lie_free, dict_binds, dict_ids)
@@ -626,14 +626,26 @@ tcTySig :: (Name -> PragmaInfo)
 tcTySig prag_info_fn (Sig v ty src_loc)
  = tcAddSrcLoc src_loc $
    tcHsType ty			`thenTc` \ sigma_ty ->
-   tcInstSigType sigma_ty	`thenNF_Tc` \ sigma_ty' ->
+
+	-- Convert from Type to TcType	
+   tcInstSigType sigma_ty	`thenNF_Tc` \ sigma_tc_ty ->
    let
-     poly_id = mkUserId v sigma_ty' (prag_info_fn v)
-     (tyvars', theta', tau') = splitSigmaTy sigma_ty'
+     poly_id = mkUserId v sigma_tc_ty (prag_info_fn v)
+   in
+	-- Instantiate this type
+	-- It's important to do this even though in the error-free case
+	-- we could just split the sigma_tc_ty (since the tyvars don't
+	-- unified with anything).  But in the case of an error, when
+	-- the tyvars *do* get unified with something, we want to carry on
+	-- typechecking the rest of the program with the function bound
+	-- to a pristine type, namely sigma_tc_ty
+   tcInstSigTcType sigma_tc_ty	`thenNF_Tc` \ (tyvars, rho) ->
+   let
+     (theta, tau) = splitRhoTy rho
 	-- This splitSigmaTy tries hard to make sure that tau' is a type synonym
 	-- wherever possible, which can improve interface files.
    in
-   returnTc (TySigInfo v poly_id tyvars' theta' tau' src_loc)
+   returnTc (TySigInfo v poly_id tyvars theta tau src_loc)
 \end{code}
 
 @checkSigMatch@ does the next step in checking signature matching.
@@ -981,10 +993,6 @@ badMatchErr sig_ty inferred_ty
 -----------------------------------------------
 sigCtxt id 
   = sep [ptext SLIT("When checking the type signature for"), quotes (ppr id)]
-
-sigThetaCtxt dicts_sig
-  = mapNF_Tc zonkInst (bagToList dicts_sig)	`thenNF_Tc` \ dicts' ->
-    returnNF_Tc (ptext SLIT("Available context:") <+> pprInsts dicts')
 
 bindSigsCtxt ids
   = ptext SLIT("When checking the type signature(s) for") <+> pprQuotedList ids

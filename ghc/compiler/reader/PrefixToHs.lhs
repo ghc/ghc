@@ -123,6 +123,7 @@ cvMonoBindsAndSigs sf sig_cvtr fb
 	}
 
     mangle_bind (b_acc, s_acc) other = (b_acc, s_acc)
+	-- Ignore class decls, instance decls etc
 \end{code}
 
 \begin{code}
@@ -200,4 +201,5 @@ cvOtherDecls b
     go acc (RdrInstDecl d)	  = InstD d : acc 
     go acc (RdrDefaultDecl d)     = DefD d  : acc
     go acc other		  = acc
+	-- Ignore value bindings
 \end{code}

@@ -15,14 +15,14 @@ import HsSyn		( HsLit(..), OutPat(..), HsExpr(..), Fixity,
 			  Match, HsBinds, DoOrListComp, HsType, ArithSeqInfo )
 import TcHsSyn		( TypecheckedHsExpr, TypecheckedPat )
 import CoreSyn		( CoreExpr, CoreBinding, GenCoreExpr(..), GenCoreBinding(..) )
-import Id		( GenId {- instance Eq -}, Id )
+import Id		( Id )
 
 import DsMonad
 import DsUtils
 
 import Literal		( mkMachInt, Literal(..) )
 import Maybes		( catMaybes )
-import Type		( Type )
+import Type		( Type, isUnpointedType )
 import Util		( panic, assertPanic )
 \end{code}
 

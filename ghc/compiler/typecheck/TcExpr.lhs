@@ -26,7 +26,7 @@ import BasicTypes	( RecFlag(..) )
 import Inst		( Inst, InstOrigin(..), OverloadedLit(..),
 			  LIE, emptyLIE, plusLIE, plusLIEs, newOverloadedLit,
 			  newMethod, newMethodWithGivenTy, newDicts )
-import TcBinds		( tcBindsAndThen, checkSigTyVars, sigThetaCtxt )
+import TcBinds		( tcBindsAndThen, checkSigTyVars )
 import TcEnv		( TcIdOcc(..), tcInstId,
 			  tcLookupLocalValue, tcLookupGlobalValue, tcLookupClassByKey,
 			  tcLookupGlobalValueByKey, newMonoIds,
@@ -578,12 +578,11 @@ tcExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
 
 	-- Check overloading constraints
    newDicts SignatureOrigin sig_theta'		`thenNF_Tc` \ (sig_dicts, _) ->
-   tcAddErrCtxtM (sigThetaCtxt sig_dicts)	(
-     tcSimplifyAndCheck
-        (text "expr ty sig")
+   tcSimplifyAndCheck
+        (ptext SLIT("the type signature") <+> quotes (ppr sigma_sig))
 	(mkTyVarSet zonked_sig_tyvars)
 	sig_dicts lie				
-   )						`thenTc_`
+   						`thenTc_`
 
 	-- Now match the signature type with res_ty.
 	-- We must not do this earlier, because res_ty might well
@@ -694,12 +693,13 @@ tcArg :: RenamedHsExpr			-- The function (for error messages)
 
 tcArg the_fun (arg, expected_arg_ty, arg_no)
   = tcAddErrCtxt (funAppCtxt the_fun arg arg_no) $
-    tcPolyExpr arg expected_arg_ty
+    tcPolyExpr (ptext SLIT("argument type of") <+> quotes (ppr the_fun))
+	       arg expected_arg_ty
 
 
 -- tcPolyExpr is like tcExpr, except that the expected type
 -- can be a polymorphic one.
-tcPolyExpr arg expected_arg_ty
+tcPolyExpr str arg expected_arg_ty
   | not (maybeToBool (splitForAllTy_maybe expected_arg_ty))
   = 	-- The ordinary, non-rank-2 polymorphic case
     tcExpr arg expected_arg_ty
@@ -741,8 +741,8 @@ tcPolyExpr arg expected_arg_ty
     newDicts Rank2Origin sig_theta		`thenNF_Tc` \ (sig_dicts, dict_ids) ->
 	-- ToDo: better origin
 
-    tcAddErrCtxtM (sigThetaCtxt sig_dicts) $
-    tcSimplifyAndCheck (text "rank2")
+    tcSimplifyAndCheck 
+		str
 		(mkTyVarSet zonked_sig_tyvars)
 		sig_dicts lie_arg		`thenTc` \ (free_insts, inst_binds) ->
 
@@ -999,7 +999,8 @@ tcRecordBinds expected_record_ty rbinds
 	  Just (record_ty, field_ty) = splitFunTy_maybe tau
 	in
 	unifyTauTy expected_record_ty record_ty		`thenTc_`
-	tcPolyExpr rhs field_ty				`thenTc` \ (rhs', lie) ->
+	tcPolyExpr (ptext SLIT("type of field") <+> quotes (ppr field_label))
+		   rhs field_ty				`thenTc` \ (rhs', lie) ->
 	returnTc ((RealId sel_id, rhs', pun_flag), lie)
 
 badFields rbinds data_con
@@ -1083,7 +1084,7 @@ wrongArgsCtxt too_many_or_few fun args
   = hang (ptext SLIT("Probable cause:") <+> ppr fun
 		    <+> ptext SLIT("is applied to") <+> text too_many_or_few 
 		    <+> ptext SLIT("arguments in the call"))
-	 4 (ppr the_app)
+	 4 (parens (ppr the_app))
   where
     the_app = foldl HsApp fun args	-- Used in error messages
 

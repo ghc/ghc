@@ -48,7 +48,7 @@ module RdrHsSyn (
 	isUnqual, isQual,
 	showRdr, rdrNameOcc, rdrNameModule, ieOcc,
 	cmpRdr, prefixRdrName,
-	mkOpApp, mkClassDecl
+	mkOpApp, mkClassDecl, isClassDataConRdrName
 
     ) where
 
@@ -166,6 +166,17 @@ mkClassDecl cxt cname tyvars sigs mbinds prags loc
 					    where
 					       s1 = SLIT(":") _APPEND_ s
 
+-- This nasty little function tests for whether a RdrName was 
+-- constructed by the above process.  It's used only for filtering
+-- out duff error messages.  Maybe there's a tidier way of doing this
+-- but I can't work up the energy to find it.
+
+isClassDataConRdrName rdr_name
+ = case rdrNameOcc rdr_name of
+	TCOcc s -> case _UNPK_ s of
+			':' : c : _ -> isUpper c
+			other	    -> False
+	other -> False
 \end{code}
 
 %************************************************************************

@@ -96,15 +96,7 @@ tc_hs_type_kind (HsForAllTy tv_names context ty)
 
 -- for unfoldings, and instance decls, only:
 tc_hs_type_kind (MonoDictTy class_name tys)
-  = mapAndUnzipTc tc_hs_type_kind tys	`thenTc` \ (arg_kinds, arg_tys) ->
-    tcLookupClass class_name		`thenTc` \ (class_kinds, clas) ->
-    let
-	arity  = length class_kinds
-	n_args = length arg_kinds
-	err = arityErr "Class" class_name arity n_args
-    in
-    checkTc (arity == n_args) err	`thenTc_`
-    unifyKinds class_kinds arg_kinds	`thenTc_`
+  = tcClassAssertion (class_name, tys)	`thenTc` \ (clas, arg_tys) ->
     returnTc (mkBoxedTypeKind, mkDictTy clas arg_tys)
 \end{code}
 
@@ -167,34 +159,44 @@ Contexts
 \begin{code}
 
 tcContext :: RenamedContext -> TcM s ThetaType
-tcContext context = tcAddErrCtxt (thetaCtxt context) $
-		    mapTc tcClassAssertion context
+tcContext context
+  = tcAddErrCtxt (thetaCtxt context) $
+
+  	--Someone discovered that @CCallable@ and @CReturnable@
+	-- could be used in contexts such as:
+	--	foo :: CCallable a => a -> PrimIO Int
+	-- Doing this utterly wrecks the whole point of introducing these
+	-- classes so we specifically check that this isn't being done.
+	--
+	-- We *don't* do this check in tcClassAssertion, because that's
+	-- called when checking a HsDictTy, and we don't want to reject
+	--	instance CCallable Int 
+	-- etc. Ugh!
+    mapTc check_naughty context `thenTc_`
+
+    mapTc tcClassAssertion context
+
+ where
+   check_naughty (class_name, _) 
+     = checkTc (not (uniqueOf class_name `elem` cCallishClassKeys))
+	       (naughtyCCallContextErr class_name)
 
 tcClassAssertion (class_name, tys)
-  = checkTc (canBeUsedInContext class_name)
-	    (naughtyCCallContextErr class_name)	`thenTc_`
-
-    tcLookupClass class_name		`thenTc` \ (class_kinds, clas) ->
+  = tcLookupClass class_name		`thenTc` \ (class_kinds, clas) ->
     mapAndUnzipTc tc_hs_type_kind tys	`thenTc` \ (ty_kinds, tc_tys) ->
 
+	-- Check with kind mis-match
+    let
+	arity = length class_kinds
+	n_tys = length ty_kinds
+	err   = arityErr "Class" class_name arity n_tys
+    in
+    checkTc (arity == n_tys) err	`thenTc_`
     unifyKinds class_kinds ty_kinds	`thenTc_`
 
     returnTc (clas, tc_tys)
 \end{code}
 
-HACK warning: Someone discovered that @CCallable@ and @CReturnable@
-could be used in contexts such as:
-\begin{verbatim}
-foo :: CCallable a => a -> PrimIO Int
-\end{verbatim}
-
-Doing this utterly wrecks the whole point of introducing these
-classes so we specifically check that this isn't being done.
-
-\begin{code}
-canBeUsedInContext :: Name -> Bool
-canBeUsedInContext n = not (uniqueOf n `elem` cCallishClassKeys)
-\end{code}
 
 Type variables, with knot tying!
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

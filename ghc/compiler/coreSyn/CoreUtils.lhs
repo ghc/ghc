@@ -39,7 +39,7 @@ import TyVar		( cloneTyVar,
 			  TyVar, GenTyVar
 			)
 import Type		( mkFunTy, mkForAllTy, mkTyVarTy,
-			  splitFunTy_maybe, applyTy, isUnpointedType,
+			  splitFunTy_maybe, applyTys, isUnpointedType,
 			  splitSigmaTy, splitFunTys, instantiateTy,
 			  Type
 			)
@@ -94,11 +94,11 @@ coreExprType (Lam (TyBinder tyvar) expr)
   = mkForAllTy tyvar (coreExprType expr)
 
 coreExprType (App expr (TyArg ty))
-  = 
---  pprTrace "appTy1" (hsep [ppr fun_ty, space, ppr ty]) $
-    applyTy fun_ty ty
+  = 	-- Gather type args; more efficient to instantiate the type all at once
+    go expr [ty]
   where
-    fun_ty = coreExprType expr
+    go (App expr (TyArg ty)) tys = go expr (ty:tys)
+    go expr		     tys = applyTys (coreExprType expr) tys
 
 coreExprType (App expr val_arg)
   = ASSERT(isValArg val_arg)
@@ -127,11 +127,19 @@ default_ty (BindDefault _ rhs) = coreExprType rhs
 \end{code}
 
 \begin{code}
-applyTypeToArgs op_ty args	    = foldl applyTypeToArg op_ty args
+applyTypeToArgs op_ty (TyArg ty : args)
+  =	-- Accumulate type arguments so we can instantiate all at once
+    applyTypeToArgs (applyTys op_ty tys) rest_args
+  where
+    (tys, rest_args)         = go [ty] args
+    go tys (TyArg ty : args) = go (ty:tys) args
+    go tys rest_args	     = (reverse tys, rest_args)
 
-applyTypeToArg op_ty (TyArg ty)     = applyTy op_ty ty
-applyTypeToArg op_ty val_or_lit_arg = case (splitFunTy_maybe op_ty) of
-					Just (_, res_ty) -> res_ty
+applyTypeToArgs op_ty (val_or_lit_arg:args)
+  = case (splitFunTy_maybe op_ty) of
+	Just (_, res_ty) -> applyTypeToArgs res_ty args
+
+applyTypeToArgs op_ty [] = op_ty
 \end{code}
 
 coreExprCc gets the cost centre enclosing an expression, if any.

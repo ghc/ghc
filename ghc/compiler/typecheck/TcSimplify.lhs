@@ -184,54 +184,14 @@ tcSimplify
 	:: SDoc 
 	-> TopLevelFlag
 	-> TcTyVarSet s			-- ``Local''  type variables
+					-- ASSERT: this tyvar set is already zonked
 	-> LIE s			-- Wanted
 	-> TcM s (LIE s,			-- Free
 		  TcDictBinds s,		-- Bindings
 		  LIE s)			-- Remaining wanteds; no dups
 
-tcSimplify str top_lvl local_tvs wanteds
-  = tcSimpl str top_lvl local_tvs Nothing wanteds
-\end{code}
-
-@tcSimplifyAndCheck@ is similar to the above, except that it checks
-that there is an empty wanted-set at the end.  It may still return
-some of constant insts, which have to be resolved finally at the end.
-
-\begin{code}
-tcSimplifyAndCheck
-	 :: SDoc 
-	 -> TcTyVarSet s		-- ``Local''  type variables; ASSERT is fixpoint
-	 -> LIE s			-- Given
-	 -> LIE s			-- Wanted
-	 -> TcM s (LIE s,		-- Free
-		   TcDictBinds s)	-- Bindings
-
-tcSimplifyAndCheck str local_tvs givens wanteds
-  = tcSimpl str top_lvl local_tvs (Just givens) wanteds	`thenTc` \ (free_insts, binds, new_wanteds) ->
-    ASSERT( isEmptyBag new_wanteds )
-    returnTc (free_insts, binds)
-  where
-    top_lvl = error "tcSimplifyAndCheck"	-- Never needed
-\end{code}
-
-\begin{code}
-tcSimpl :: SDoc
-	-> TopLevelFlag
-	-> TcTyVarSet s			-- ``Local''  type variables
-					-- ASSERT: this tyvar set is already zonked
-	-> Maybe (LIE s)		-- Given; these constrain only local tyvars
-					--	  Nothing => just simplify
-					--	  Just g  => check that g entails wanteds
-	-> LIE s			-- Wanted
-	-> TcM s (LIE s,			-- Free
-		  TcMonoBinds s,		-- Bindings
-		  LIE s)			-- Remaining wanteds; no dups
-
-tcSimpl str top_lvl local_tvs maybe_given_lie wanted_lie
-  =	-- ASSSERT: local_tvs are already zonked
-    reduceContext str try_me 
-		  givens 
-		  (bagToList wanted_lie)	`thenTc` \ (binds, frees, irreds) ->
+tcSimplify str top_lvl local_tvs wanted_lie
+  = reduceContext str try_me [] wanteds		`thenTc` \ (binds, frees, irreds) ->
 
 	-- Check for non-generalisable insts
     let
@@ -243,40 +203,62 @@ tcSimpl str top_lvl local_tvs maybe_given_lie wanted_lie
 	 -- Finished
     returnTc (mkLIE frees, binds, mkLIE irreds)
   where
-    givens = case maybe_given_lie of
-	   	  Just given_lie -> bagToList given_lie
-		  Nothing        -> []
-
-    checking_against_signature = maybeToBool maybe_given_lie
-    is_top_level = case top_lvl of { TopLevel -> True; other -> False }
+    wanteds = bagToList wanted_lie
 
     try_me inst 
       -- Does not constrain a local tyvar
-      | isEmptyTyVarSet (inst_tyvars `intersectTyVarSets` local_tvs)
-      = -- if not checking_against_signature && is_top_level then
+      | isEmptyTyVarSet (tyVarsOfInst inst `intersectTyVarSets` local_tvs)
+      = -- if is_top_level then
 	--   FreeIfTautological		  -- Special case for inference on 
 	--				  -- top-level defns
 	-- else
-	   
 	Free
+
+      -- We're infering (not checking) the type, and 
+      -- the inst constrains a local type variable
+      | isDict inst  = DontReduce	    	-- Dicts
+      | otherwise    = ReduceMe AddToIrreds	-- Lits and Methods
+\end{code}
+
+@tcSimplifyAndCheck@ is similar to the above, except that it checks
+that there is an empty wanted-set at the end.  It may still return
+some of constant insts, which have to be resolved finally at the end.
+
+\begin{code}
+tcSimplifyAndCheck
+	 :: SDoc 
+	 -> TcTyVarSet s		-- ``Local''  type variables
+					-- ASSERT: this tyvar set is already zonked
+	 -> LIE s			-- Given; constrain only local tyvars
+	 -> LIE s			-- Wanted
+	 -> TcM s (LIE s,		-- Free
+		   TcDictBinds s)	-- Bindings
+
+tcSimplifyAndCheck str local_tvs given_lie wanted_lie
+  = reduceContext str try_me givens wanteds	`thenTc` \ (binds, frees, irreds) ->
+
+	-- Complain about any irreducible ones
+    mapNF_Tc complain irreds	`thenNF_Tc_`
+
+	-- Done
+    returnTc (mkLIE frees, binds)
+  where
+    givens  = bagToList given_lie
+    wanteds = bagToList wanted_lie
+
+    try_me inst 
+      -- Does not constrain a local tyvar
+      | isEmptyTyVarSet (tyVarsOfInst inst `intersectTyVarSets` local_tvs)
+      = Free
 
       -- When checking against a given signature we always reduce
       -- until we find a match against something given, or can't reduce
-      |  checking_against_signature
-      = ReduceMe CarryOn
-
-      -- So we're infering (not checking) the type, and 
-      -- the inst constrains a local type variable
       | otherwise
-      = if isDict inst then 
-	   DontReduce	    -- Dicts
-	else
-	   ReduceMe CarryOn    -- Lits and Methods
+      = ReduceMe AddToIrreds
 
-      where
-        inst_tyvars     = tyVarsOfInst inst
+    complain dict = mapNF_Tc zonkInst givens	`thenNF_Tc` \ givens ->
+		    addNoInstanceErr str givens dict
 \end{code}
-
 
 
 %************************************************************************
@@ -289,7 +271,7 @@ The main control over context reduction is here
 
 \begin{code}
 data WhatToDo 
- = ReduceMe		  -- Reduce this
+ = ReduceMe		  -- Try to reduce this
 	NoInstanceAction  -- What to do if there's no such instance
 
  | DontReduce		  -- Return as irreducible
@@ -300,14 +282,12 @@ data WhatToDo
 			  -- if not, return as irreducible
 
 data NoInstanceAction
-  = CarryOn		-- Produce an error message, but keep on with next inst
-
-  | Stop		-- Produce an error message and stop reduction
+  = Stop		-- Fail; no error message
+			-- (Only used when tautology checking.)
 
   | AddToIrreds		-- Just add the inst to the irreductible ones; don't 
 			-- produce an error message of any kind.
-			-- It might be quite legitimate
-			-- such as (Eq a)!
+			-- It might be quite legitimate such as (Eq a)!
 \end{code}
 
 
@@ -387,7 +367,9 @@ The main entry point for context reduction is @reduceContext@:
 reduceContext :: SDoc -> (Inst s -> WhatToDo)
 	      -> [Inst s]	-- Given
 	      -> [Inst s]	-- Wanted
-	      -> TcM s (TcDictBinds s, [Inst s], [Inst s])
+	      -> TcM s (TcDictBinds s, 
+			[Inst s],		-- Free
+			[Inst s])		-- Irreducible
 
 reduceContext str try_me givens wanteds
   =     -- Zonking first
@@ -484,21 +466,8 @@ reduce try_me (wanted:wanteds) state@(avails, frees, irreds)
       NoInstance ->    -- No such instance! 
 		       -- Decide what to do based on the no_instance_action requested
 		 case no_instance_action of
-		   Stop -> 		-- Fail
-		            addNoInstanceErr wanted		`thenNF_Tc_`
-			    failTc
-	
-		   CarryOn -> 		-- Carry on.
-				-- Add the bad guy to the avails to suppress similar
-				-- messages from other insts in wanteds
-		            addNoInstanceErr wanted	`thenNF_Tc_`
-			    addGiven avails wanted	`thenNF_Tc` \ avails' -> 
-			    reduce try_me wanteds (avails', frees, irreds)	-- Carry on
-
-		   AddToIrreds -> 	-- Add the offending insts to the irreds
-				  add_to_irreds
-				  
-
+		   Stop        -> failTc	-- Fail
+		   AddToIrreds -> add_to_irreds	-- Add the offending insts to the irreds
 
     -- It's free and this isn't a top-level binding, so just chuck it upstairs
   | case try_me_result of { Free -> True; _ -> False }
@@ -709,8 +678,6 @@ tcSimplifyCheckThetas givens wanteds
     else
        mapNF_Tc addNoInstErr irreds		`thenNF_Tc_`
        failTc
-
-addNoInstErr (c,ts) = addErrTc (noDictInstanceErr c ts)
 \end{code}
 
 
@@ -813,7 +780,7 @@ bindInstsOfLocalFuns init_lie local_ids
     local_id_set = mkIdSet local_ids	-- There can occasionally be a lot of them
 					-- so it's worth building a set, so that 
 					-- lookup (in isMethodFor) is faster
-    try_me inst | isMethodFor local_id_set inst = ReduceMe CarryOn
+    try_me inst | isMethodFor local_id_set inst = ReduceMe AddToIrreds
 		| otherwise		        = Free
 \end{code}
 
@@ -860,8 +827,8 @@ all the constant and ambiguous Insts.
 
 \begin{code}
 tcSimplifyTop :: LIE s -> TcM s (TcDictBinds s)
-tcSimplifyTop wanteds
-  = reduceContext (text "tcSimplTop") try_me [] (bagToList wanteds)	`thenTc` \ (binds1, frees, irreds) ->
+tcSimplifyTop wanted_lie
+  = reduceContext (text "tcSimplTop") try_me [] wanteds	`thenTc` \ (binds1, frees, irreds) ->
     ASSERT( null frees )
 
     let
@@ -892,11 +859,12 @@ tcSimplifyTop wanteds
 
     returnTc (binds1 `AndMonoBinds` andMonoBinds binds_ambig)
   where
-    try_me inst		 = ReduceMe AddToIrreds
+    wanteds	= bagToList wanted_lie
+    try_me inst	= ReduceMe AddToIrreds
 
     d1 `cmp_by_tyvar` d2 = get_tv d1 `compare` get_tv d2
 
-    complain d | isEmptyTyVarSet (tyVarsOfInst d) = addNoInstanceErr d
+    complain d | isEmptyTyVarSet (tyVarsOfInst d) = addTopInstanceErr d
 	       | otherwise			  = addAmbigErr [d]
 
 get_tv d   = case getDictClassTys d of
@@ -968,7 +936,7 @@ disambigGroup dicts
     returnTc EmptyMonoBinds
 
   where
-    try_me inst = ReduceMe CarryOn
+    try_me inst = ReduceMe AddToIrreds		-- This reduce should not fail
     tyvar       = get_tv (head dicts)		-- Should be non-empty
     classes     = map get_clas dicts
 \end{code}
@@ -992,20 +960,28 @@ addAmbigErr dicts
     addErrTc (sep [text "Cannot resolve the ambiguous context" <+> pprInsts dicts,
 	 	   nest 4 (pprInstsInFull dicts)])
 
-addNoInstanceErr dict
+-- Used for top-level irreducibles
+addTopInstanceErr dict
   = tcAddSrcLoc (instLoc dict)		       $
-    tcAddErrCtxt (pprOrigin dict)	       $
-    addErrTc (noDictInstanceErr clas tys)	       
+    addErrTc (sep [ptext SLIT("No instance for") <+> quotes (pprInst dict),
+		   nest 4 $ parens $ pprOrigin dict])
+
+addNoInstanceErr str givens dict
+  = tcAddSrcLoc (instLoc dict) $
+    addErrTc (sep [sep [ptext SLIT("Could not deduce") <+> quotes (pprInst dict),
+		        nest 4 $ parens $ pprOrigin dict],
+		   nest 4 $ ptext SLIT("from the context") <+> pprInsts givens]
+	      $$
+	      ptext SLIT("Probable cause:") <+> 
+	      vcat [ptext SLIT("missing") <+> quotes (pprInst dict) <+> ptext SLIT("in") <+> str,
+		    if all_tyvars then empty else
+		    ptext SLIT("or missing instance declaration for") <+> quotes (pprInst dict)]
+    )
   where
-    (clas, tys) = getDictClassTys dict
+    all_tyvars = all isTyVarTy tys
+    (_, tys)   = getDictClassTys dict
 
-noDictInstanceErr clas tys
-  = ptext SLIT("No instance for:") <+> quotes (pprConstraint clas tys)
-
-reduceSigCtxt lie
-  = sep [ptext SLIT("When matching against a type signature with context"),
-         nest 4 (quotes (pprInsts (bagToList lie)))
-    ]
+-- Used for the ...Thetas variants; all top level
+addNoInstErr (c,ts)
+  = addErrTc (ptext SLIT("No instance for") <+> quotes (pprConstraint c ts))
 \end{code}
-
-

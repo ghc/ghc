@@ -23,7 +23,7 @@ import RnIfaces		( getImportedInstDecls, importDecl, getImportVersions, getSpeci
 			  getDeferredDataDecls,
 			  mkSearchPath, getSlurpedNames, getRnStats
 			)
-import RnEnv		( addImplicitOccsRn )
+import RnEnv		( addImplicitOccsRn, availNames )
 import Name		( Name, PrintUnqualified, Provenance, isLocallyDefined,
 			  NameSet(..),
 			  nameSetToList, minusNameSet, NamedThing(..),
@@ -37,6 +37,7 @@ import ErrUtils		( pprBagOfErrors, pprBagOfWarnings,
 			  doIfSet, dumpIfSet, ghcExit
 			)
 import Bag		( isEmptyBag )
+import FiniteMap	( fmToList, delListFromFM )
 import UniqSupply	( UniqSupply )
 import Util		( equivClasses )
 import Maybes		( maybeToBool )
@@ -95,7 +96,7 @@ rename this_mod@(HsModule mod_name vers exports imports fixities local_decls loc
 	returnRn Nothing
     else
     let
-  	Just (export_env, rn_env, explicit_names, print_unqual) = maybe_stuff
+  	Just (export_env, rn_env, explicit_info, print_unqual) = maybe_stuff
     in
 
 	-- RENAME THE SOURCE
@@ -120,7 +121,7 @@ rename this_mod@(HsModule mod_name vers exports imports fixities local_decls loc
     getNameSupplyRn					`thenRn` \ name_supply ->
 
 	-- REPORT UNUSED NAMES
-    reportUnusedNames explicit_names			`thenRn_`
+    reportUnusedNames export_env explicit_info		`thenRn_`
 
 	-- GENERATE THE SPECIAL-INSTANCE MODULE LIST
 	-- The "special instance" modules are those modules that contain instance
@@ -262,29 +263,48 @@ rn_data_decl mode (tycon_name,ty_decl) = rn_iface_decl mod_name mode (TyD ty_dec
 \end{code}
 
 \begin{code}
-reportUnusedNames explicit_avail_names
+reportUnusedNames (ExportEnv export_avails _) explicit_info
+  | not (opt_WarnUnusedBinds || opt_WarnUnusedImports)
+  = returnRn ()
+
+  | otherwise
   = getSlurpedNames			`thenRn` \ slurped_names ->
     let
-	unused	      = explicit_avail_names `minusNameSet` slurped_names
-	(local_unused, imported_unused) = partition isLocallyDefined (nameSetToList unused)
-	imports_by_module = equivClasses cmp imported_unused
-	name1 `cmp` name2 = nameModule name1 `compare` nameModule name2 
+	unused_info :: FiniteMap Name HowInScope
+	unused_info = foldl delListFromFM
+			    (delListFromFM explicit_info (nameSetToList slurped_names))
+			    (map availNames export_avails)
+	unused_list = fmToList unused_info
 
-	pp_imp = sep [text "Warning: the following unqualified imports are unused:",
-			  nest 4 (vcat (map pp_group imports_by_module))]
-	pp_group (n:ns) = sep [hcat [text "Module ", pprModule (nameModule n), char ':'],
-				   nest 4 (sep (map (pprOccName . nameOccName) (n:ns)))]
+	groups = filter wanted (equivClasses cmp unused_list)
+	       where
+		 (name1, his1) `cmp` (name2, his2) = his1 `cmph` his2
+		 
+		 (FromLocalDefn _)     `cmph` (FromImportDecl _ _)  = LT
+		 (FromLocalDefn _)     `cmph` (FromLocalDefn _)     = EQ
+		 (FromImportDecl m1 _) `cmph` (FromImportDecl m2 _) = m1 `compare` m2
+		 h1		       `cmph` h2		    = GT
 
-	pp_local = sep [text "Warning: the following local top-level definitions are unused:",
-			    nest 4 (sep (map (pprOccName . nameOccName) local_unused))]
+	wanted ((_,FromImportDecl _ _) : _) = opt_WarnUnusedImports
+	wanted ((_,FromLocalDefn _)    : _) = opt_WarnUnusedImports
+
+	pp_imp = sep [text "Warning: the following are unused:",
+		      nest 4 (vcat (map pp_group groups))]
+
+	pp_group group = sep [msg <> char ':',
+		              nest 4 (sep (map (pprOccName . nameOccName . fst) group))]
+		       where
+			 his = case group of
+				  ((_,his) : _) -> his
+
+			 msg = case his of
+				  FromImportDecl m _ -> text "Imported from" <+> pprModule m
+				  FromLocalDefn _    -> text "Locally defined"   
+
     in
-    (if not opt_WarnUnusedImports || null imported_unused
-     then returnRn ()
-     else addWarnRn pp_imp)	`thenRn_`
-
-    (if not opt_WarnUnusedBinds || null local_unused
-     then returnRn ()
-     else addWarnRn pp_local)
+    if null groups
+    then returnRn ()
+    else addWarnRn pp_imp
 
 rnStats :: [RenamedHsDecl] -> RnMG ()
 rnStats all_decls

@@ -25,12 +25,12 @@ import TcHsSyn		( TcMonoBinds, TcIdOcc(..), TcIdBndr,
 			  maybeBoxedPrimType
 			)
 
-import TcBinds		( tcPragmaSigs, sigThetaCtxt )
+import TcBinds		( tcPragmaSigs )
 import TcClassDcl	( tcMethodBind, badMethodErr )
 import TcMonad
 import RnMonad		( RnNameSupply )
 import Inst		( Inst, InstOrigin(..),
-			  newDicts, LIE, emptyLIE, plusLIE )
+			  newDicts, LIE, emptyLIE, plusLIE, plusLIEs )
 import PragmaInfo	( PragmaInfo(..) )
 import TcDeriv		( tcDeriving )
 import TcEnv		( tcExtendGlobalValEnv, tcAddImportedIdInfo )
@@ -374,46 +374,48 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 		      dfun_arg_dicts		`plusLIE`
 		      sc_dicts			`plusLIE`
 		      unionManyBags meth_lies
+
+        methods_lie = plusLIEs insts_needed_s
     in
-    tcAddErrCtxt superClassCtxt $
-    tcAddErrCtxtM (sigThetaCtxt sc_dicts) $
-			
-
-		-- Deal with the LIE arising from the method bindings
-    tcSimplifyAndCheck (text "inst decl1a")
-		 inst_tyvars_set			-- Local tyvars
-		 avail_insts
-		 (unionManyBags insts_needed_s)		-- Need to get defns for all these
-						 `thenTc` \ (const_lie1, op_binds) ->
-
-		-- Deal with the super-class bindings
-		-- Ignore errors because they come from the *next* tcSimplify
-    discardErrsTc (
-	tcSimplifyAndCheck (text "inst decl1b")
-		 inst_tyvars_set
-		 dfun_arg_dicts		-- NB! Don't include this_dict here, else the sc_dicts
-					-- get bound by just selecting from this_dict!!
-		 sc_dicts
-    )						 `thenTc` \ (const_lie2, sc_binds) ->
-	
 
 	-- Check that we *could* construct the superclass dictionaries,
 	-- even though we are *actually* going to pass the superclass dicts in;
 	-- the check ensures that the caller will never have a problem building
 	-- them.
-    tcSimplifyAndCheck (text "inst decl1c")
+    tcAddErrCtxt superClassCtxt (
+      tcSimplifyAndCheck
+		 (ptext SLIT("instance declaration context"))
 		 inst_tyvars_set		-- Local tyvars
 		 inst_decl_dicts		-- The instance dictionaries available
 		 sc_dicts			-- The superclass dicationaries reqd
-   					`thenTc_`
-						-- Ignore the result; we're only doing
+    )					`thenTc_`
+    						-- Ignore the result; we're only doing
 						-- this to make sure it can be done.
+
+	-- Ditto method bindings
+    tcAddErrCtxt methodCtxt (
+      tcSimplifyAndCheck
+		 (ptext SLIT("instance declaration context"))
+		 inst_tyvars_set			-- Local tyvars
+		 avail_insts
+		 methods_lie
+    )						 `thenTc_`
+    
+		-- Now do the simplification again, this time to get the
+		-- bindings; this time we use an enhanced "avails"
+		-- Ignore errors because they come from the *previous* tcSimplifys
+    discardErrsTc (
+	tcSimplifyAndCheck
+		 (ptext SLIT("instance declaration context"))
+		 inst_tyvars_set
+		 dfun_arg_dicts		-- NB! Don't include this_dict here, else the sc_dicts
+					-- get bound by just selecting from this_dict!!
+		 (sc_dicts `plusLIE` methods_lie)
+    )						 `thenTc` \ (const_lie, lie_binds) ->
+	
 
 	-- Create the result bindings
     let
-	const_lie = const_lie1 `plusLIE` const_lie2
-	lie_binds = op_binds `AndMonoBinds` sc_binds
-
         dict_constr = classDataCon clas
 
 	con_app = foldl HsApp (TyApp (HsVar (RealId dict_constr)) inst_tys')
@@ -664,8 +666,8 @@ scrutiniseInstanceType clas inst_taus
 	--  
         -- We flag this separately to give a more precise error msg.
         --
-    (uniqueOf clas == cCallableClassKey   && not constructors_visible) ||
-    (uniqueOf clas == cReturnableClassKey && not constructors_visible)
+     (uniqueOf clas == cCallableClassKey || uniqueOf clas == cReturnableClassKey)
+  && is_alg_tycon_app && not constructors_visible
   = failWithTc (invisibleDataConPrimCCallErr clas first_inst_tau)
 
   |	-- CCALL CHECK (b) 
@@ -678,20 +680,16 @@ scrutiniseInstanceType clas inst_taus
   	-- DERIVING CHECK
 	-- It is obviously illegal to have an explicit instance
 	-- for something that we are also planning to `derive'
-  | clas `elem` (tyConDerivings inst_tycon)
+  | maybeToBool alg_tycon_app_maybe && clas `elem` (tyConDerivings alg_tycon)
   = failWithTc (derivingWhenInstanceExistsErr clas first_inst_tau)
 	   -- Kind check will have ensured inst_taus is of length 1
 
-	-- ALL TYPE VARIABLES => bad
-  | all isTyVarTy inst_taus
-  = failWithTc (instTypeErr clas inst_taus (text "all the instance types are type variables"))
-
 	-- WITH HASKELL 1.4, MUST HAVE C (T a b c)
-  |  not opt_GlasgowExts 
+  |  not opt_GlasgowExts
   && not (length inst_taus == 1 &&
-          maybeToBool tyconapp_maybe && 
-	  not (isSynTyCon inst_tycon) &&
-          all isTyVarTy arg_tys && 
+	  maybeToBool maybe_tycon_app &&	-- Yes, there's a type constuctor
+          not (isSynTyCon tycon) &&		-- ...but not a synonym
+          all isTyVarTy arg_tys && 		-- Applied to type variables
 	  length (tyVarSetToList (tyVarsOfTypes arg_tys)) == length arg_tys
 		 -- This last condition checks that all the type variables are distinct
      )
@@ -704,14 +702,20 @@ scrutiniseInstanceType clas inst_taus
   = returnTc ()
 
   where
-    tyconapp_maybe	       = splitTyConApp_maybe first_inst_tau
-    Just (inst_tycon, arg_tys) = tyconapp_maybe
     (first_inst_tau : _)       = inst_taus
 
-    constructors_visible      =
-        case splitAlgTyConApp_maybe first_inst_tau of
-           Just (_,_,[])   -> False
-	   everything_else -> True
+	-- Stuff for algebraic or -> type
+    maybe_tycon_app	  = splitTyConApp_maybe first_inst_tau
+    Just (tycon, arg_tys) = maybe_tycon_app
+
+	-- Stuff for an *algebraic* data type
+    alg_tycon_app_maybe	           = splitAlgTyConApp_maybe first_inst_tau
+					-- The "Alg" part looks through synonyms
+    is_alg_tycon_app		   = maybeToBool alg_tycon_app_maybe
+    Just (alg_tycon, _, data_cons) = alg_tycon_app_maybe
+
+    constructors_visible = not (null data_cons)
+ 
 
 -- These conditions come directly from what the DsCCall is capable of.
 -- Totally grotesque.  Green card should solve this.
@@ -778,5 +782,6 @@ invisibleDataConPrimCCallErr clas inst_ty
         4 (hsep [text "(Try either importing", ppr inst_ty, 
 	         text "non-abstractly or compile using -fno-prune-tydecls ..)"])
 
-superClassCtxt = ptext SLIT("From the superclasses of the instance declaration")
+methodCtxt     = ptext SLIT("When checking the methods of an instance declaration")
+superClassCtxt = ptext SLIT("When checking the superclasses of an instance declaration")
 \end{code}
