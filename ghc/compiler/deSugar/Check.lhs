@@ -540,7 +540,7 @@ simplify_pat pat@(LitPat lit lit_ty)
 
   | lit_ty == charTy = ConPat charDataCon charTy [LitPat (mk_char lit) charPrimTy]
 
-  | otherwise = pat --pprPanic "tidy1:LitPat:" (ppr pat)
+  | otherwise = pprPanic "tidy1:LitPat:" (ppr pat)
   where
     mk_char (HsChar c)    = HsCharPrim c
 
