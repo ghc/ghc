@@ -26,7 +26,7 @@ module Name (
 	isWiredInName,
 
 	nameUnique, changeUnique, setNameProvenance, getNameProvenance,
-	setNameVisibility,
+	setNameVisibility, mkNameVisible,
 	nameOccName, nameString, nameModule,
 
 	isExportedName,	nameSrcLoc,
@@ -64,9 +64,10 @@ import BasicTypes	( Module, IfaceFlavour(..), moduleString, pprModule )
 import Lex		( isLexConId )
 import SrcLoc		( noSrcLoc, mkBuiltinSrcLoc, SrcLoc )
 import Unique		( pprUnique, showUnique, Unique, Uniquable(..) )
-import UniqSet		( UniqSet(..), emptyUniqSet, unitUniqSet, unionUniqSets, uniqSetToList, 
-			  isEmptyUniqSet, unionManyUniqSets, minusUniqSet, mkUniqSet, 
-			  elementOfUniqSet, addListToUniqSet, addOneToUniqSet
+import UniqSet		( UniqSet,
+			     emptyUniqSet, unitUniqSet, unionUniqSets, uniqSetToList, 
+			     isEmptyUniqSet, unionManyUniqSets, minusUniqSet, mkUniqSet, 
+			     elementOfUniqSet, addListToUniqSet, addOneToUniqSet
 			)
 import UniqFM		( UniqFM )
 import Outputable
@@ -314,6 +315,13 @@ setNameVisibility (Just mod) occ_uniq (Local uniq occ loc)
 
 setNameVisibility maybe_mod occ_uniq (Local uniq occ loc)
   = Local uniq (uniqToOccName occ_uniq) loc	-- New OccName for Local
+
+-- make the Name globally visible regardless.
+mkNameVisible :: Module -> Unique -> Name -> Name
+mkNameVisible mod occ_uniq nm@(Global _ _ _ _) = nm
+mkNameVisible mod occ_uniq nm@(Local uniq occ loc)
+ = Global uniq mod (uniqToOccName occ_uniq) (LocalDef loc Exported)
+
 
 uniqToOccName uniq = VarOcc (_PK_ ('$':showUnique uniq))
 	-- The "$" is to make sure that this OccName is distinct from all user-defined ones
