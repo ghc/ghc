@@ -447,6 +447,9 @@ tcConDecl unbox_strict DataType tycon tc_tvs	-- Ordinary data types
     ; let 
 	is_vanilla = null ex_tvs && null (unLoc ex_ctxt) 
 		-- Vanilla iff no ex_tvs and no context
+		-- Must check the context too because of
+		-- implicit params; e.g.
+		--  data T = (?x::Int) => MkT Int
 
 	tc_datacon is_infix field_lbls btys
 	  = do { let { bangs = map getBangStrictness btys }
@@ -461,7 +464,10 @@ tcConDecl unbox_strict DataType tycon tc_tvs	-- Ordinary data types
     ; case details of
 	PrefixCon btys     -> tc_datacon False [] btys
 	InfixCon bty1 bty2 -> tc_datacon True [] [bty1,bty2]
-	RecCon fields      -> do { checkTc is_vanilla (exRecConErr name)
+	RecCon fields      -> do { checkTc (null ex_tvs) (exRecConErr name)
+		-- It's ok to have an implicit-parameter context
+		-- for the data constructor, provided it binds
+		-- no type variables
 				 ; let { (field_names, btys) = unzip fields }
 				 ; tc_datacon False field_names btys } }
 

@@ -44,11 +44,11 @@ import TysWiredIn	( charTy, mkListTy )
 import PrelRules	( primOpRules )
 import Rules		( addRule )
 import Type		( TyThing(..) )
-import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkTyConApp,
-			  mkTyVarTys, mkClassPred, tcEqPred,
+import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy, 
+			  mkTyConApp, mkTyVarTys, mkClassPred, tcEqPred,
 			  mkFunTys, mkFunTy, mkSigmaTy, tcSplitSigmaTy, 
 			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfType,
-			  tcSplitFunTys, tcSplitForAllTys, mkPredTy
+			  tcSplitFunTys, tcSplitForAllTys
 			)
 import CoreUtils	( exprType )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding, mkOtherCon )
@@ -402,11 +402,11 @@ mkRecordSelId tycon field_label field_ty
 	-- NB: this code relies on the fact that DataCons are quantified over
 	-- the identical type variables as their parent TyCon
     needed_preds = [pred | (DataAlt dc, _, _) <- the_alts, pred <- dataConStupidTheta dc]
-    dict_tys     = map mkPredTy (nubBy tcEqPred needed_preds)
+    dict_tys     = mkPredTys (nubBy tcEqPred needed_preds)
     n_dict_tys   = length dict_tys
 
     (field_tyvars,field_theta,field_tau) = tcSplitSigmaTy field_ty
-    field_dict_tys			 = map mkPredTy field_theta
+    field_dict_tys			 = mkPredTys field_theta
     n_field_dict_tys			 = length field_dict_tys
 	-- If the field has a universally quantified type we have to 
 	-- be a bit careful.  Suppose we have
@@ -480,20 +480,28 @@ mkRecordSelId tycon field_label field_ty
 	--	foo = /\a. \t:T. case t of { MkT f -> f a }
 
     mk_maybe_alt data_con 
-	= case maybe_the_arg_id of
+	= ASSERT( dc_tyvars == tyvars )
+		-- The only non-vanilla case we allow is when we have an existential
+		-- context that binds no type variables, thus
+		--	data T a = (?v::Int) => MkT a
+		-- In the non-vanilla case, the pattern must bind type variables and
+		-- the context stuff; hence the arg_prefix binding below
+
+	  case maybe_the_arg_id of
 		Nothing		-> Nothing
-		Just the_arg_id -> Just (mkReboxingAlt uniqs data_con arg_ids $
+		Just the_arg_id -> Just (mkReboxingAlt uniqs data_con (arg_prefix ++ arg_src_ids) $
 			    	         mk_result (Var the_arg_id))
 	where
-            arg_ids = ASSERT( isVanillaDataCon data_con )
-		      mkTemplateLocalsNum arg_base (dataConOrigArgTys data_con)
-		-- Records can't be existential, so no existential tyvars or dicts
-		-- Vanilla data con => tycon's tyvars will do
+	    (dc_tyvars, dc_theta, dc_arg_tys, _, _) = dataConSig data_con
+	    arg_src_ids = mkTemplateLocalsNum arg_base dc_arg_tys
+	    arg_base'   = arg_base + length arg_src_ids
+	    arg_prefix	| isVanillaDataCon data_con = []
+			| otherwise = tyvars ++ mkTemplateLocalsNum arg_base' (mkPredTys dc_theta)
 
-	    unpack_base = arg_base + length arg_ids
+	    unpack_base = arg_base' + length dc_theta
 	    uniqs = map mkBuiltinUnique [unpack_base..]
 
-    	    maybe_the_arg_id  = assocMaybe (field_lbls `zip` arg_ids) field_label
+    	    maybe_the_arg_id  = assocMaybe (field_lbls `zip` arg_src_ids) field_label
     	    field_lbls	      = dataConFieldLabels data_con
 
     error_expr = mkRuntimeErrorApp rEC_SEL_ERROR_ID field_tau full_msg
@@ -516,7 +524,7 @@ mkRecordSelId tycon field_label field_ty
 mkReboxingAlt
   :: [Unique]			-- Uniques for the new Ids
   -> DataCon
-  -> [Var]			-- Source-level args
+  -> [Var]			-- Source-level args, including existential dicts
   -> CoreExpr			-- RHS
   -> CoreAlt
 
