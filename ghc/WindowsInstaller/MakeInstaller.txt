@@ -4,12 +4,9 @@ should be put into the build system itself (under make install) so
 that this "laying on of hands" is unnecessary.
 
 1. cp ghc/compiler/ghc-x.yy ghc/compiler/ghc.exe
-2. strip ghc/compiler/ghc.exe ghc/driver/ghci/ghci.exe hslibs/tools/*/*.exe
-3. cp ghc/utils/ghc-pkg/ghc-pkg.bin ghc/utils/ghc-pkg/ghc-pkg.exe
-4. strip ghc/utils/*/*.exe
-5. (cd ghc/docs/set && make set.ps set.html && ps2pdf set.ps set.pdf)
-6. Make License and ANNOUNCE into RTF (or just rename as RTF?).
+2. cp ghc/utils/ghc-pkg/ghc-pkg.bin ghc/utils/ghc-pkg/ghc-pkg.exe
+3. strip ghc/compiler/ghc.exe ghc/driver/ghci/ghci.exe hslibs/tools/*/*.exe ghc/utils/*/*.exe
+4. (cd ghc/docs/set && make set.html set.ps && ps2pdf[.bat] set.ps set.pdf)
+5. Make License and ANNOUNCE into RTF, and overwrite the old versions
+in ghc/WindowsInstaller.
 
-It also seems necessary to run jadetex once more on the docs before
-turning them into PS. The docs are built correctly under Linux, so I'm
-not sure what goes wrong here.
