@@ -34,6 +34,7 @@ test('TH_bracket2', normal, compile, [''])
 test('TH_bracket3', normal, compile, [''])
 
 test('TH_class1', normal, compile, [''])
+test('TH_tuple1', normal, compile, [''])
 test('TH_genEx', normal, multimod_compile, ['TH_genEx', '-ddump-splices'])
 
 test('TH_where', normal, compile_and_run, [''])
