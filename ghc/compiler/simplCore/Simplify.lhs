@@ -1240,7 +1240,7 @@ rebuildCase env scrut case_bndr alts cont
 
   | otherwise
   = prepareAlts scrut case_bndr alts		`thenSmpl` \ (better_alts, handled_cons) -> 
-
+	
 	-- Deal with the case binder, and prepare the continuation;
 	-- The new subst_env is in place
     prepareCaseCont env better_alts cont	`thenSmpl` \ (floats, (dup_cont, nondup_cont)) ->

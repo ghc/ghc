@@ -861,6 +861,16 @@ prepareDefault case_bndr handled_cons (Just rhs)
 				-- 	case x of { DEFAULT -> e }
 				-- and we don't want to fill in a default for them!
     Just all_cons <- tyConDataCons_maybe tycon,
+    not (null all_cons),	-- This is a tricky corner case.  If the data type has no constructors,
+				-- which GHC allows, then the case expression will have at most a default
+				-- alternative.  We don't want to eliminate that alternative, because the
+				-- invariant is that there's always one alternative.  It's more convenient
+				-- to leave	
+				--	case x of { DEFAULT -> e }     
+				-- as it is, rather than transform it to
+				--	error "case cant match"
+				-- which would be quite legitmate.  But it's a really obscure corner, and
+				-- not worth wasting code on.
     let handled_data_cons = [data_con | DataAlt data_con <- handled_cons],
     let missing_cons      = [con | con <- all_cons, 
 			           not (con `elem` handled_data_cons)]
@@ -1170,6 +1180,16 @@ I don't really know how to improve this situation.
 
 \begin{code}
 --------------------------------------------------
+--	0. Check for empty alternatives
+--------------------------------------------------
+
+#ifdef DEBUG
+mkCase1 scrut case_bndr []
+  = pprTrace "mkCase1: null alts" (ppr case_bndr <+> ppr scrut) $
+    returnSmpl scrut
+#endif
+
+--------------------------------------------------
 --	1. Eliminate the case altogether if poss
 --------------------------------------------------
 
@@ -1214,12 +1234,6 @@ mkCase1 scrut case_bndr [(con,bndrs,rhs)]
 --------------------------------------------------
 --	2. Identity case
 --------------------------------------------------
-
-#ifdef DEBUG
-mkCase1 scrut case_bndr []
-  = pprTrace "mkCase1: null alts" (ppr case_bndr <+> ppr scrut) $
-    returnSmpl scrut
-#endif
 
 mkCase1 scrut case_bndr alts	-- Identity case
   | all identity_alt alts
