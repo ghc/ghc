@@ -13,8 +13,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: options.h,v $
- * $Revision: 1.7 $
- * $Date: 1999/04/27 14:07:53 $
+ * $Revision: 1.8 $
+ * $Date: 1999/05/11 16:46:20 $
  * ------------------------------------------------------------------------*/
 
 
@@ -239,13 +239,9 @@
  */
 /*#define DEBUG_EXTRA*/
 
-/* Turn lazy blackholing on/off.
- * Warning: Lazy blackholing can't be disabled in GHC generated code.
- *
- * Using eager blackholing makes things easier to debug because
- * the blackholes are more predicatable - but it's slower and less sexy.
+/* NB: LAZY_BLACKHOLING has been moved up to Stg.h where both Hugs and GHC can see it,
+ * and EAGER_BLACKHOLING has been introduced also.  KSW 1999-01.
  */
-#define LAZY_BLACKHOLING 
 
 /* Turn miniinterpreter on/off.
  * 

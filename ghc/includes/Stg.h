@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.11 1999/05/10 08:23:57 sof Exp $
+ * $Id: Stg.h,v 1.12 1999/05/11 16:46:20 keithw Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -24,6 +24,23 @@
 
 /* Some macros to handle DLLing (Win32 only at the moment). */
 #include "StgDLL.h"
+
+/* Turn lazy blackholing and eager blackholing on/off.
+ *
+ * Using eager blackholing makes things easier to debug because
+ * the blackholes are more predictable - but it's slower and less sexy.
+ *
+ * For now, do lazy and not eager.
+ */
+
+#define LAZY_BLACKHOLING
+/* #define EAGER_BLACKHOLING */
+
+#ifdef TICKY_TICKY
+/* TICKY_TICKY needs EAGER_BLACKHOLING to verify no double-entries of single-entry thunks. */
+# undef  LAZY_BLACKHOLING 
+# define EAGER_BLACKHOLING
+#endif
 
 /* ToDo: Set this flag properly: COMPILER and INTERPRETER should not be mutually exclusive. */
 #ifndef INTERPRETER
