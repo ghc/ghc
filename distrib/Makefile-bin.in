@@ -209,10 +209,9 @@ denounce:
 	fi
 
 postinstall:
-	if test -x "./post-install-script" ; then \
+	@if test -x "./post-install-script" ; then \
 		echo "Running project-specific post-install script ..." ; \
-		./post-install-script $(platform) $(prefix) \
-			$(package)-$(version); \
+		./post-install-script $(platform) $(libdir) ; \
 		echo "Done" ; \
 	fi
 
