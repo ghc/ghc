@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.13 2001/07/24 04:45:59 ken Exp $
+# $Id: bootstrap.mk,v 1.14 2001/09/04 18:29:22 ken Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -41,7 +41,7 @@ endif
 
 ifeq "$(rs6000_TARGET_ARCH)" "1"
 PLATFORM_CC_OPTS += -static
-PLATFORM_HC_BOOT_CC_OPTS += -static -finhibit-size-directive
+PLATFORM_HC_BOOT_CC_OPTS += -finhibit-size-directive
 endif
 
 ifeq "$(mingw32_TARGET_OS)" "1"
@@ -49,7 +49,12 @@ PLATFORM_CC_OPTS += -mno-cygwin
 endif
 
 ifeq "$(alpha_TARGET_ARCH)" "1"
-PLATFORM_CC_OPTS += -static -Xlinker -noprefix_recognition
+PLATFORM_CC_OPTS += -static
+PLATFORM_HC_BOOT_CC_OPTS += -w
+endif
+
+ifeq "$(sparc_TARGET_ARCH)" "1"
+PLATFORM_HC_BOOT_CC_OPTS += -w
 endif
 
 PLATFORM_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt) 
@@ -105,9 +110,9 @@ HC_BOOT_LD_OPTS =				\
    -u "PrelIOBase_NonTermination_closure"	\
    -u "PrelIOBase_BlockedOnDeadMVar_closure"	\
    -u "PrelWeak_runFinalizzerBatch_closure"	\
-   -u "__init_Prelude"				\
+   -u "__stginit_Prelude"			\
    -u "PrelMain_mainIO_closure"			\
-   -u "__init_PrelMain"
+   -u "__stginit_PrelMain"
 
 HC_BOOT_LIBS = -lHStext -lHStext_cbits -lHSutil -lHSposix -lHSposix_cbits -lHSconcurrent -lHSlang -lHSlang_cbits -lHSstd -lHSstd_cbits -lHSrts -lgmp -lm $(EXTRA_HC_BOOT_LIBS)
 

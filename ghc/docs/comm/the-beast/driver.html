@@ -79,7 +79,7 @@
       adding
       the symbols that the RTS needs from libHSstd, such as
       <code>PrelWeak_runFinalizzerBatch_closure</code> and
-      <code>__init_Prelude</code>, to the link line with the
+      <code>__stginit_Prelude</code>, to the link line with the
       <code>-u</code> flag.  The standard library appears before the
       RTS on the link line, and these options cause the corresponding
       symbols to be picked up even so the linked might not have seen them
@@ -94,7 +94,7 @@
       supplied by the RTS (in the file 
       <a href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/rts/Main.c"><code>Main.c</code></a>).
       It calls <code>startupHaskell</code>, which
-      itself calls <code>__init_PrelMain</code>, which is therefore,
+      itself calls <code>__stginit_PrelMain</code>, which is therefore,
       since it occurs in the standard library, one of the symbols
       passed to the linker using the <code>-u</code> option.  This is fine
       for standalone Haskell programs, but as soon as the Haskell code is only
@@ -102,13 +102,13 @@
       <code>main()</code> function of that foreign language should be used
       instead of that of the Haskell runtime.  In this case, the previously
       described arrangement unfortunately fails as 
-      <code>__init_PrelMain</code> had better not be linked in,
-      because it tries to call <code>__init_Main</code>, which won't
+      <code>__stginit_PrelMain</code> had better not be linked in,
+      because it tries to call <code>__stginit_Main</code>, which won't
       exist.  In other words, the RTS's <code>main()</code> refers to 
-      <code>__init_PrelMain</code> which in turn refers to
-      <code>__init_Main</code>.  Although the RTS's <code>main()</code> 
+      <code>__stginit_PrelMain</code> which in turn refers to
+      <code>__stginit_Main</code>.  Although the RTS's <code>main()</code> 
       might not be linked in if the program provides its own, the driver 
-      will normally force <code>__init_PrelMain</code> to be linked in anyway,
+      will normally force <code>__stginit_PrelMain</code> to be linked in anyway,
       using <code>-u</code>, because it's a back-reference from the
       RTS to HSstd.  This case is coped with by the <code>-no-hs-main</code>
       flag, which suppresses passing the corresonding <code>-u</code> option
@@ -116,7 +116,7 @@
       it didn't work.  In addition, the driver generally places the C program 
       providing the <code>main()</code> that we want to use before the RTS
       on the link line.  Therefore, the RTS's main is never used and
-      without the <code>-u</code> the label <code>__init_PrelMain</code> 
+      without the <code>-u</code> the label <code>__stginit_PrelMain</code> 
       will not be linked.
     </p>
     

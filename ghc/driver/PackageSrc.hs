@@ -126,7 +126,7 @@ package_details installing
          , "PrelIOBase_NonTermination_closure"
          , "PrelIOBase_BlockedOnDeadMVar_closure"
          , "PrelWeak_runFinalizzerBatch_closure"
-         , "__init_Prelude"
+         , "__stginit_Prelude"
          ])
         },
 

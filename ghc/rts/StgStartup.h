@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStartup.h,v 1.4 2000/03/08 17:48:24 simonmar Exp $
+ * $Id: StgStartup.h,v 1.5 2001/09/04 18:29:21 ken Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -14,4 +14,4 @@ EXTFUN(stg_enterStackTop);
 
 EXTFUN(stg_init_ret);
 EXTFUN(stg_init);
-EXTFUN(__init_PrelGHC);
+EXTFUN(__stginit_PrelGHC);

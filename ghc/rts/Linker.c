@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.64 2001/09/04 16:49:12 sewardj Exp $
+ * $Id: Linker.c,v 1.65 2001/09/04 18:29:21 ken Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -287,7 +287,7 @@ typedef struct _RtsSymbolVal {
       Sym(StgReturn)				\
       Sym(init_stack)				\
       SymX(cmp_thread)				\
-      Sym(__init_PrelGHC)			\
+      Sym(__stginit_PrelGHC)			\
       SymX(freeHaskellFunctionPtr)		\
       SymX(OnExitHook)				\
       SymX(ErrorHdrHook)			\

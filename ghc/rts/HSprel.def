@@ -24,4 +24,4 @@ PrelIOBase_stackOverflow_closure
 PrelIOBase_BlockedOnDeadMVar_closure
 PrelIOBase_NonTermination_closure
 PrelWeak_runFinalizzerBatch_closure
-__init_Prelude
+__stginit_Prelude

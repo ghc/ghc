@@ -268,7 +268,7 @@ find_label code lbl
 
 reconstruct_label :: Label -> LabelKind -> Label
 reconstruct_label root Init
-   = "__init_" ++ root ++ ":"
+   = "__stginit_" ++ root ++ ":"
 reconstruct_label root kind
    = root ++ "_" ++ pp kind ++ ":"
      where

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.52 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: RtsStartup.c,v 1.53 2001/09/04 18:29:21 ken Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -58,7 +58,7 @@ static int rts_has_started_up = 0;
 ullong startTime = 0;
 #endif
 
-EXTFUN(__init_Prelude);
+EXTFUN(__stginit_Prelude);
 static void initModules ( void (*)(void) );
 
 void
@@ -206,9 +206,9 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
       - we supply a unique integer to each statically declared cost
         centre and cost centre stack in the program.
 
-   The code generator inserts a small function "__init_<module>" in each
-   module and calls the registration functions in each of the modules
-   it imports.  So, if we call "__init_PrelMain", each reachable module in the
+   The code generator inserts a small function "__stginit_<module>" in each
+   module and calls the registration functions in each of the modules it
+   imports.  So, if we call "__stginit_PrelMain", each reachable module in the
    program will be registered (because PrelMain.mainIO calls Main.main).
 
    The init* functions are compiled in the same way as STG code,
@@ -234,7 +234,7 @@ initModules ( void (*init_root)(void) )
     init_sp = 0;
     init_stack = (F_ *)allocate(INIT_STACK_SIZE / sizeof(W_));
     init_stack[init_sp++] = (F_)stg_init_ret;
-    init_stack[init_sp++] = (F_)__init_Prelude;
+    init_stack[init_sp++] = (F_)__stginit_Prelude;
     if (init_root != NULL) {
 	init_stack[init_sp++] = (F_)init_root;
     }

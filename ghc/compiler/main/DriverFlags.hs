@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.67 2001/08/31 13:51:45 sewardj Exp $
+-- $Id: DriverFlags.hs,v 1.68 2001/09/04 18:29:20 ken Exp $
 --
 -- Driver flags
 --
@@ -482,7 +482,10 @@ buildStaticHscOpts = do
 
 machdepCCOpts 
    | prefixMatch "alpha"   cTARGETPLATFORM  
-	= return ( ["-static", "-Xlinker -noprefix_recognition"], [] )
+	= return ( ["-static"], ["-w"] )
+	-- For now, to suppress the gcc warning "call-clobbered
+	-- register used for global register variable", we simply
+	-- disable all warnings altogether using the -w flag. Oh well.
 
    | prefixMatch "hppa"    cTARGETPLATFORM  
         -- ___HPUX_SOURCE, not _HPUX_SOURCE, is #defined if -ansi!
@@ -519,6 +522,9 @@ machdepCCOpts
 
    | prefixMatch "sparc"    cTARGETPLATFORM
 	= return ( [], ["-w"] )
+	-- For now, to suppress the gcc warning "call-clobbered
+	-- register used for global register variable", we simply
+	-- disable all warnings altogether using the -w flag. Oh well.
 
    | prefixMatch "powerpc" cTARGETPLATFORM || prefixMatch "rs6000" cTARGETPLATFORM
 	= return ( ["-static"], ["-finhibit-size-directive"] )

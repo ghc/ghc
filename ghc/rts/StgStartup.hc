@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStartup.hc,v 1.15 2001/03/23 16:36:21 simonmar Exp $
+ * $Id: StgStartup.hc,v 1.16 2001/09/04 18:29:21 ken Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -135,7 +135,7 @@ STGFUN(stg_enterStackTop)
    Special STG entry points for module registration.
 
    This stuff is problematic for Hugs, because it introduces a
-   dependency between the RTS and the program (ie. __init_PrelMain).  So
+   dependency between the RTS and the program (ie. __stginit_PrelMain).  So
    we currently disable module initialisation for Hugs.
    -------------------------------------------------------------------------- */
 
@@ -150,7 +150,7 @@ STGFUN(stg_init_ret)
 
 /* On entry to stg_init:
  *    init_stack[0] = &stg_init_ret;
- *    init_stack[1] = __init_Something;
+ *    init_stack[1] = __stginit_Something;
  */
 STGFUN(stg_init)
 {
@@ -162,5 +162,5 @@ STGFUN(stg_init)
 
 /* PrelGHC doesn't really exist... */
 
-START_MOD_INIT(__init_PrelGHC);
+START_MOD_INIT(__stginit_PrelGHC);
 END_MOD_INIT();
