@@ -103,6 +103,67 @@
       <para>Options can be forced through to a particlar compilation
       phase, using the following flags:</para>
 
+      <variablelist>
+	<varlistentry>
+	  <term><option>-optL</option> <replaceable>option</replaceable></term>
+	  <indexterm><primary><option>-optL</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Pass <replaceable>option</replaceable> to the
+	    literate pre-processor</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>-optP</option>  <replaceable>option</replaceable></term>
+	  <indexterm><primary><option>-optP</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Pass <replaceable>option</replaceable> to CPP (makes
+	    sense only if <option>-cpp</option> is also on).</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>-optc</option>  <replaceable>option</replaceable></term>
+	  <indexterm><primary><option>-optc</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Pass <replaceable>option</replaceable> to the C compiler.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>-opta</option>  <replaceable>option</replaceable></term>
+	  <indexterm><primary><option>-opta</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Pass <replaceable>option</replaceable> to the assembler.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>-optl</option>  <replaceable>option</replaceable></term>
+	  <indexterm><primary><option>-optl</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Pass <replaceable>option</replaceable> to the linker.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>-optdll</option>  <replaceable>option</replaceable></term>
+	  <indexterm><primary><option>-optdll</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Pass <replaceable>option</replaceable> to the DLL generator.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>-optdep</option>  <replaceable>option</replaceable></term>
+	  <indexterm><primary><option>-optdep</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Pass <replaceable>option</replaceable> to the
+	    dependency generator.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
 
       <para>So, for example, to force an <option>-Ewurble</option>
       option to the assembler, you would tell the driver
