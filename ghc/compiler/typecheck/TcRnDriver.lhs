@@ -887,7 +887,7 @@ checkMain
 	 let { main_mod = case mb_main_mod of {
 				Just mod -> mkModuleName mod ;
 				Nothing  -> mAIN_Name } ;
-	        main_fn  = case mb_main_fn of {
+	       main_fn  = case mb_main_fn of {
 				Just fn -> mkRdrUnqual (mkVarOcc (mkFastString fn)) ;
 				Nothing -> main_RDR_Unqual } } ;
 	
