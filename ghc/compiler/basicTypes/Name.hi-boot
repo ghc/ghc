@@ -1,8 +1,5 @@
 _interface_ Name 1
-_usages_
-FastString 1 :: FastString 1;
 _exports_
-Name Name Module;
+Name Name;
 _declarations_
 1 data Name;
-1 type Module = FastString.FastString;
