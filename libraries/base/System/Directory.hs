@@ -77,8 +77,6 @@ import NHC.FFI
 
 #ifdef __HUGS__
 import Hugs.Directory
-import Control.Exception       ( bracket )
-import System.IO
 #endif /* __HUGS__ */
 
 #ifdef __GLASGOW_HASKELL__
@@ -493,14 +491,7 @@ Neither path may refer to an existing directory.
 -}
 copyFile :: FilePath -> FilePath -> IO ()
 copyFile fromFPath toFPath =
-#if defined(__HUGS__)
-	(bracket (openBinaryFile fromFPath ReadMode) hClose $ \hFrom ->
-	 bracket (openBinaryFile toFPath WriteMode) hClose $ \hTo -> do
-	 hGetContents hFrom >>= hPutStr hTo
-	 try (getPermissions fromFPath >>= setPermissions toFPath)
-	 return ()) `catch` \err ->
-		ioError (annotateIOError err "copyFile" Nothing Nothing)
-#elif (!defined(__GLASGOW_HASKELL__) || __GLASGOW_HASKELL__ <= 600)
+#if (!(defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ > 600))
 	do readFile fromFPath >>= writeFile toFPath
 	   try (getPermissions fromFPath >>= setPermissions toFPath)
 	   return ()
@@ -845,8 +836,10 @@ getHomeDirectory =
   allocaBytes long_path_size $ \pPath -> do
      r <- c_SHGetFolderPath nullPtr csidl_PROFILE nullPtr 0 pPath
      if (r < 0)
-       then c_SHGetFolderPath nullPtr csidl_WINDOWS nullPtr 0 pPath
-       else return 0
+       then do
+          r <- c_SHGetFolderPath nullPtr csidl_WINDOWS nullPtr 0 pPath
+	  when (r < 0) (raiseUnsupported "System.Directory.getHomeDirectory")
+       else return ()
      peekCString pPath
 #else
   getEnv "HOME"
@@ -884,6 +877,7 @@ getAppUserDataDirectory appName = do
 #if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
   allocaBytes long_path_size $ \pPath -> do
      r <- c_SHGetFolderPath nullPtr csidl_APPDATA nullPtr 0 pPath
+     when (r<0) (raiseUnsupported "System.Directory.getAppUserDataDirectory")
      s <- peekCString pPath
      return (s++'\\':appName)
 #else
@@ -917,6 +911,7 @@ getUserDocumentsDirectory = do
 #if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
   allocaBytes long_path_size $ \pPath -> do
      r <- c_SHGetFolderPath nullPtr csidl_PERSONAL nullPtr 0 pPath
+     when (r<0) (raiseUnsupported "System.Directory.getUserDocumentsDirectory")
      peekCString pPath
 #else
   getEnv "HOME"
@@ -959,7 +954,7 @@ getTemporaryDirectory = do
 #endif
 
 #if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
-foreign import stdcall unsafe "SHGetFolderPath" 
+foreign import stdcall unsafe "dirUtils.h __hscore_getFolderPath"
             c_SHGetFolderPath :: Ptr () 
                               -> CInt 
                               -> Ptr () 
@@ -972,4 +967,8 @@ foreign import ccall unsafe "__hscore_CSIDL_WINDOWS"  csidl_WINDOWS  :: CInt
 foreign import ccall unsafe "__hscore_CSIDL_PERSONAL" csidl_PERSONAL :: CInt
 
 foreign import stdcall unsafe "GetTempPath" c_GetTempPath :: CInt -> CString -> IO CInt
+
+raiseUnsupported loc = 
+   ioException (IOError Nothing UnsupportedOperation loc "unsupported operation" Nothing)
+
 #endif

@@ -172,3 +172,45 @@ __hscore_renameFile( HsAddr src,
 #endif
 }
 
+/*
+ * Function: __hscore_getFolderPath()
+ *
+ * Late-bound version of SHGetFolderPath(), coping with OS versions
+ * that have shell32's lacking that particular API.
+ *
+ */
+#if defined(mingw32_HOST_OS) || defined(__MINGW32__) || defined(_MSC_VER)
+typedef HRESULT (*HSCORE_GETAPPFOLDERFUNTY)(HWND,int,HANDLE,DWORD,char*);
+int
+__hscore_getFolderPath(HWND hwndOwner,
+		       int nFolder,
+		       HANDLE hToken,
+		       DWORD dwFlags,
+		       char*  pszPath)
+{
+    static int loaded_dll = 0;
+    static HMODULE hMod = (HMODULE)NULL;
+    static HSCORE_GETAPPFOLDERFUNTY funcPtr = NULL;
+    
+    if (loaded_dll < 0) {
+	return (-1);
+    } else if (loaded_dll == 0) {
+	hMod = LoadLibrary("shell32.dll");
+	if (hMod == NULL) {
+	    loaded_dll = (-1);
+	    return (-1);
+	} else {
+	    funcPtr = (HSCORE_GETAPPFOLDERFUNTY)GetProcAddress(hMod, "SHGetFolderPathA");
+	    if (!funcPtr) {
+		loaded_dll = (-1);
+		return (-1);
+	    } else {
+		loaded_dll = 1;
+	    }
+	}
+    }
+    /* OK, if we got this far the function has been bound */
+    return (int)funcPtr(hwndOwner,nFolder,hToken,dwFlags,pszPath);
+    /* ToDo: unload the DLL? */
+}
+#endif
