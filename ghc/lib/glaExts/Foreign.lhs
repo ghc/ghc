@@ -12,58 +12,23 @@ module Foreign (
 #ifndef __PARALLEL_HASKELL__
 	ForeignObj(..),
 #endif
-	Addr(..), Word(..)
+	Word(..),
+
+#ifndef __PARALLEL_HASKELL__
+	unpackCStringFO,   -- :: ForeignObj    -> [Char]
+	unpackNBytesFO,    -- :: ForeignObj    -> Int  -> [Char]
+	unpackCStringFO#,  -- :: ForeignObj#   -> [Char]
+	unpackNBytesFO#    -- :: ForeignObj#   -> Int# -> [Char]
+#endif
    ) where
 
+import IOBase
 import STBase
-import UnsafeST	( unsafePerformPrimIO )
+import Unsafe
 import PrelBase
+import CCall
+import Addr
 import GHC
-\end{code}
-
-
-%*********************************************************
-%*							*
-\subsection{Classes @CCallable@ and @CReturnable@}
-%*							*
-%*********************************************************
-
-\begin{code}
-class CCallable   a
-class CReturnable a
-
-instance CCallable Char
-instance CCallable   Char#
-instance CReturnable Char
-
-instance CCallable   Int
-instance CCallable   Int#
-instance CReturnable Int
-
--- DsCCall knows how to pass strings...
-instance CCallable   [Char]
-
-instance CCallable   Float
-instance CCallable   Float#
-instance CReturnable Float
-
-instance CCallable   Double
-instance CCallable   Double#
-instance CReturnable Double
-
-data Addr = A# Addr# 	deriving (Eq, Ord) -- Glasgow extension
-
-instance CCallable Addr
-instance CCallable Addr#
-instance CReturnable Addr
-
-data Word = W# Word# 	deriving (Eq, Ord) -- Glasgow extension
-
-instance CCallable Word
-instance CCallable Word#
-instance CReturnable Word
-
-instance CReturnable () -- Why, exactly?
 \end{code}
 
 
@@ -75,37 +40,33 @@ instance CReturnable () -- Why, exactly?
 
 \begin{code}
 #ifndef __PARALLEL_HASKELL__
---Defined in PrelBase: data ForeignObj = ForeignObj ForeignObj#
-data ForeignObj = ForeignObj ForeignObj#   -- another one
-
 instance CCallable ForeignObj
 instance CCallable ForeignObj#
 
 eqForeignObj    :: ForeignObj  -> ForeignObj -> Bool
-makeForeignObj  :: Addr        -> Addr       -> PrimIO ForeignObj
-writeForeignObj :: ForeignObj  -> Addr       -> PrimIO ()
+makeForeignObj  :: Addr        -> Addr       -> IO ForeignObj
+writeForeignObj :: ForeignObj  -> Addr       -> IO ()
 
 {- derived op - attaching a free() finaliser to a malloc() allocated reference. -}
-makeMallocPtr   :: Addr        -> PrimIO ForeignObj
+makeMallocPtr   :: Addr        -> IO ForeignObj
 
-makeForeignObj (A# obj) (A# finaliser) = ST ( \ s# ->
+makeForeignObj (A# obj) (A# finaliser) = IO ( \ s# ->
     case makeForeignObj# obj finaliser s# of
-      StateAndForeignObj# s1# fo# -> STret s1# (ForeignObj fo#))
+      StateAndForeignObj# s1# fo# -> IOok s1# (ForeignObj fo#))
 
-writeForeignObj (ForeignObj fo#) (A# datum#) = ST ( \ s# ->
-    case writeForeignObj# fo# datum# s# of { s1# -> STret s1# () } )
+writeForeignObj (ForeignObj fo#) (A# datum#) = IO ( \ s# ->
+    case writeForeignObj# fo# datum# s# of { s1# -> IOok s1# () } )
 
 makeMallocPtr a = makeForeignObj a (``&free''::Addr)
 
 eqForeignObj mp1 mp2
-  = unsafePerformPrimIO (_ccall_ eqForeignObj mp1 mp2) /= (0::Int)
+  = unsafePerformIO (_ccall_ eqForeignObj mp1 mp2) /= (0::Int)
 
 instance Eq ForeignObj where 
     p == q = eqForeignObj p q
     p /= q = not (eqForeignObj p q)
 #endif /* !__PARALLEL_HASKELL__ */
 \end{code}
-
 
 %*********************************************************
 %*							*
@@ -124,26 +85,22 @@ instance CReturnable (StablePtr a)
 -- @makeStablePtr#@ since the corresponding macro is very long and we'll
 -- get terrible code-bloat.
 
-makeStablePtr  :: a -> PrimIO (StablePtr a)
-deRefStablePtr :: StablePtr a -> PrimIO a
-freeStablePtr  :: StablePtr a -> PrimIO ()
-performGC      :: PrimIO ()
+makeStablePtr  :: a -> IO (StablePtr a)
+deRefStablePtr :: StablePtr a -> IO a
+freeStablePtr  :: StablePtr a -> IO ()
 
 {-# INLINE deRefStablePtr #-}
 {-# INLINE freeStablePtr #-}
-{-# INLINE performGC #-}
 
-makeStablePtr f = ST $ \ rw1# ->
+makeStablePtr f = IO $ \ rw1# ->
     case makeStablePtr# f rw1# of
-      StateAndStablePtr# rw2# sp# -> STret rw2# (StablePtr sp#)
+      StateAndStablePtr# rw2# sp# -> IOok rw2# (StablePtr sp#)
 
-deRefStablePtr (StablePtr sp#) = ST $ \ rw1# ->
+deRefStablePtr (StablePtr sp#) = IO $ \ rw1# ->
     case deRefStablePtr# sp# rw1# of
-      StateAndPtr# rw2# a -> STret rw2# a
+      StateAndPtr# rw2# a -> IOok rw2# a
 
 freeStablePtr sp = _ccall_ freeStablePointer sp
-
-performGC = _ccall_GC_ StgPerformGarbageCollection
 
 #endif /* !__PARALLEL_HASKELL__ */
 \end{code}
@@ -160,3 +117,46 @@ data StateAndStablePtr# s a = StateAndStablePtr# (State# s) (StablePtr# a)
 #endif
 data StateAndForeignObj# s  = StateAndForeignObj# (State# s) ForeignObj#
 \end{code}
+
+%*********************************************************
+%*							*
+\subsection{Unpacking Foreigns}
+%*							*
+%*********************************************************
+
+Primitives for converting Foreigns pointing to external
+sequence of bytes into a list of @Char@s (a renamed version
+of the code above).
+
+\begin{code}
+#ifndef __PARALLEL_HASKELL__
+unpackCStringFO :: ForeignObj -> [Char]
+unpackCStringFO (ForeignObj fo#) = unpackCStringFO# fo#
+
+unpackCStringFO# :: ForeignObj# -> [Char]
+unpackCStringFO# fo {- ptr. to NUL terminated string-}
+  = unpack 0#
+  where
+    unpack nh
+      | ch `eqChar#` '\0'# = []
+      | otherwise	   = C# ch : unpack (nh +# 1#)
+      where
+	ch = indexCharOffForeignObj# fo nh
+
+unpackNBytesFO :: ForeignObj -> Int -> [Char]
+unpackNBytesFO (ForeignObj fo) (I# l) = unpackNBytesFO# fo l
+
+unpackNBytesFO#    :: ForeignObj# -> Int#   -> [Char]
+  -- This one is called by the compiler to unpack literal strings with NULs in them; rare.
+unpackNBytesFO# fo len
+  = unpack 0#
+    where
+     unpack i
+      | i >=# len  = []
+      | otherwise  = C# ch : unpack (i +# 1#)
+      where
+	ch = indexCharOffForeignObj# fo i
+#endif
+\end{code}
+
+

@@ -34,12 +34,6 @@ module PackBase
 	unpackCStringBA#,  -- :: ByteArray#    -> Int# -> [Char]
 	unpackNBytesBA#,   -- :: ByteArray#    -> Int# -> [Char]
 
-#ifndef __PARALLEL_HASKELL__
-	unpackCStringFO,   -- :: ForeignObj    -> [Char]
-	unpackNBytesFO,    -- :: ForeignObj    -> Int  -> [Char]
-	unpackCStringFO#,  -- :: ForeignObj#   -> [Char]
-	unpackNBytesFO#,   -- :: ForeignObj#   -> Int# -> [Char]
-#endif
 
 	unpackFoldrCString#,  -- **
 	unpackAppendCString#  -- **
@@ -47,11 +41,11 @@ module PackBase
        ) where
 
 import PrelBase
-import {-# SOURCE #-} IOBase ( error )
+import {-# SOURCE #-} Error ( error )
 import PrelList ( length )
 import STBase
 import ArrBase
-import Foreign
+import Addr
 
 \end{code}
 
@@ -110,49 +104,6 @@ unpackNBytesST# addr len
 	  ch -> unpack (i +# 1#) >>= \ ls -> return (C# ch : ls)
 
 \end{code}
-
-
-%*********************************************************
-%*							*
-\subsection{Unpacking Foreigns}
-%*							*
-%*********************************************************
-
-Primitives for converting Foreigns pointing to external
-sequence of bytes into a list of @Char@s (a renamed version
-of the code above).
-
-\begin{code}
-#ifndef __PARALLEL_HASKELL__
-unpackCStringFO :: ForeignObj -> [Char]
-unpackCStringFO (ForeignObj fo#) = unpackCStringFO# fo#
-
-unpackCStringFO# :: ForeignObj# -> [Char]
-unpackCStringFO# fo {- ptr. to NUL terminated string-}
-  = unpack 0#
-  where
-    unpack nh
-      | ch `eqChar#` '\0'# = []
-      | otherwise	   = C# ch : unpack (nh +# 1#)
-      where
-	ch = indexCharOffForeignObj# fo nh
-
-unpackNBytesFO :: ForeignObj -> Int -> [Char]
-unpackNBytesFO (ForeignObj fo) (I# l) = unpackNBytesFO# fo l
-
-unpackNBytesFO#    :: ForeignObj# -> Int#   -> [Char]
-  -- This one is called by the compiler to unpack literal strings with NULs in them; rare.
-unpackNBytesFO# fo len
-  = unpack 0#
-    where
-     unpack i
-      | i >=# len  = []
-      | otherwise  = C# ch : unpack (i +# 1#)
-      where
-	ch = indexCharOffForeignObj# fo i
-#endif
-\end{code}
-
 
 %********************************************************
 %*							*

@@ -8,35 +8,27 @@
 
 module ST (
 
-	-- ToDo: review this interface; I'm avoiding gratuitous changes for now
-	--			SLPJ Jan 97
-
-
 	ST,
+
+	unsafeInterleaveST,
 
         -- ST is one, so you'll likely need some Monad bits
         module Monad,
 
-	thenST, seqST, returnST, listST, fixST, runST, unsafeInterleaveST,
-        mapST, mapAndUnzipST,
-         -- the lazy variant
-	-- returnLazyST, thenLazyST, seqLazyST,
+	STRef,
+	newSTRef, readSTRef, writeSTRef,
 
-	MutableVar,
-	newVar, readVar, writeVar, sameVar,
-
-	MutableArray,
-	newArray, readArray, writeArray, sameMutableArray
+	STArray,
+	newSTArray, readSTArray, writeSTArray, Ix
 
     ) where
 
-import IOBase	( error )	-- [Source not needed]
 import ArrBase
+import Unsafe   ( unsafeInterleaveST )
 import STBase
-import UnsafeST	( unsafeInterleaveST )
-import PrelBase	( Int, Bool, ($), ()(..) )
-import GHC	( newArray#, readArray#, writeArray#, sameMutableArray#, sameMutableByteArray# )
+import PrelBase	( Eq(..), Int, Bool, ($), ()(..) )
 import Monad
+import Ix
 
 \end{code}
 
@@ -47,39 +39,41 @@ import Monad
 %*********************************************************
 
 \begin{code}
--- in ArrBase: type MutableVar s a = MutableArray s Int a
+newtype STRef s a = STRef (MutableVar s a) deriving Eq
 
-newVar   :: a -> ST s (MutableVar s a)
-readVar  :: MutableVar s a -> ST s a
-writeVar :: MutableVar s a -> a -> ST s ()
-sameVar  :: MutableVar s a -> MutableVar s a -> Bool
+newSTRef :: a -> ST s (STRef s a)
+newSTRef v = newVar v >>= \ var -> return (STRef var)
 
-newVar init = ST $ \ s# ->
-    case (newArray# 1# init s#)     of { StateAndMutableArray# s2# arr# ->
-    STret s2# (MutableArray vAR_IXS arr#) }
-  where
-    vAR_IXS = error "newVar: Shouldn't access `bounds' of a MutableVar\n"
+readSTRef :: STRef s a -> ST s a
+readSTRef (STRef var) = readVar var
 
-readVar (MutableArray _ var#) = ST $ \ s# ->
-    case readArray# var# 0# s#	of { StateAndPtr# s2# r ->
-    STret s2# r }
-
-writeVar (MutableArray _ var#) val = ST $ \ s# ->
-    case writeArray# var# 0# val s# of { s2# ->
-    STret s2# () }
-
-sameVar (MutableArray _ var1#) (MutableArray _ var2#)
-  = sameMutableArray# var1# var2#
+writeSTRef :: STRef s a -> a -> ST s ()
+writeSTRef (STRef var) v = writeVar var v
 \end{code}
 
+%*********************************************************
+%*							*
+\subsection{Arrays}
+%*							*
+%*********************************************************
 
 \begin{code}
-sameMutableArray     :: MutableArray s ix elt -> MutableArray s ix elt -> Bool
-sameMutableByteArray :: MutableByteArray s ix -> MutableByteArray s ix -> Bool
+type STArray s ix elt = MutableArray s ix elt
 
-sameMutableArray (MutableArray _ arr1#) (MutableArray _ arr2#)
-  = sameMutableArray# arr1# arr2#
+newSTArray 		:: Ix ix => (ix,ix) -> elt -> ST s (STArray s ix elt)
+writeSTArray	  	:: Ix ix => STArray s ix elt -> ix -> elt -> ST s () 
+readSTArray   		:: Ix ix => STArray s ix elt -> ix -> ST s elt 
+boundsSTArray     	:: Ix ix => STArray s ix elt -> (ix, ix)  
+thawSTArray 		:: Ix ix => Array ix elt -> ST s (STArray s ix elt)
+freezeSTArray	  	:: Ix ix => STArray s ix elt -> ST s (Array ix elt)
+unsafeFreezeSTArray 	:: Ix ix => STArray s ix elt -> ST s (Array ix elt)
 
-sameMutableByteArray (MutableByteArray _ arr1#) (MutableByteArray _ arr2#)
-  = sameMutableByteArray# arr1# arr2#
+newSTArray    		= newArray
+boundsSTArray 		= boundsOfArray
+readSTArray   		= readArray
+writeSTArray  		= writeArray
+thawSTArray   		= thawArray
+freezeSTArray 		= freezeArray
+unsafeFreezeSTArray 	= unsafeFreezeArray
 \end{code}
+	

@@ -27,7 +27,7 @@ module Char
 
 import PrelBase
 import PrelRead (readLitChar)
-import IOBase   (error)
+import Error    ( error )
 
 \end{code}
 

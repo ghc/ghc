@@ -20,7 +20,7 @@ module Maybe
     unfoldr
    ) where
 
-import IOBase	( error )
+import Error	( error )
 import Monad	( filter )
 import PrelList
 import PrelBase

@@ -11,8 +11,8 @@ module System (
   ) where
 
 import Prelude
-import Foreign		( Addr )
-import IOBase		( IOError(..), IOErrorType(..), thenIO_Prim, constructErrorAndFail )
+import Addr
+import IOBase		( IOError(..), IOErrorType(..), constructErrorAndFail )
 import ArrBase		( indexAddrOffAddr )
 import PackBase    	( unpackCString )
 
@@ -76,12 +76,12 @@ The environment variable does not exist.
 \end{itemize}
 
 \begin{code}
-getEnv name = 
-    _ccall_ getenv name	`thenIO_Prim` \ litstring ->
-    if litstring /= ``NULL'' then
-	return (unpackCString litstring)
-    else
-	fail (IOError Nothing NoSuchThing ("environment variable: " ++ name))
+getEnv name = do
+    litstring <- _ccall_ getenv name
+    if litstring /= ``NULL'' 
+	then return (unpackCString litstring)
+        else fail (IOError Nothing NoSuchThing 
+			("environment variable: " ++ name))
 \end{code}
 
 Computation $system cmd$ returns the exit code
@@ -99,8 +99,8 @@ The implementation does not support system calls.
 
 \begin{code}
 system "" = fail (IOError Nothing InvalidArgument "null command")
-system cmd = 
-    _ccall_ systemCmd cmd	`thenIO_Prim` \ status ->
+system cmd = do
+    status <- _ccall_ systemCmd cmd
     case status of
         0  -> return ExitSuccess
         -1 -> constructErrorAndFail "system"
@@ -113,14 +113,14 @@ program, returning {\em code} to the program's caller.
 Before it terminates, any open or semi-closed handles are first closed.
 
 \begin{code}
-exitWith ExitSuccess = 
-    _ccall_ EXIT (0::Int)	`thenIO_Prim` \ () ->
+exitWith ExitSuccess = do
+    _ccall_ EXIT (0::Int)
     fail (IOError Nothing OtherError "exit should not return")
 
 exitWith (ExitFailure n) 
   | n == 0 = fail (IOError Nothing InvalidArgument "ExitFailure 0")
-  | otherwise = 
-    _ccall_ EXIT n		`thenIO_Prim` \ () ->
+  | otherwise = do
+    _ccall_ EXIT n
     fail (IOError Nothing OtherError "exit should not return")
 \end{code}
 

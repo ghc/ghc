@@ -16,7 +16,7 @@ module Merge
 
 import Semaphore
 import ConcBase
-import UnsafeST  ( unsafeInterleavePrimIO )
+import Unsafe  ( unsafeInterleaveIO )
 import IOBase
 
 max_buff_size = 1
@@ -63,10 +63,10 @@ suckIO branches_running buff@(tail_list,e) vs
 		waitQSem e 	   		 >>
 		takeMVar tail_list 		 >>= \ node ->
 	        newEmptyMVar 	   		 >>= \ next_node ->
-		unsafeInterleavePrimIO ( ioToPrimIO $
+		unsafeInterleaveIO (
 			takeMVar next_node  >>= \ x ->
 			signalQSem e	    >>
-			return x)	    `thenIO_Prim` \ next_node_val ->
+			return x)	         >>= \ next_node_val ->
 		putMVar node (x:next_node_val)   >>
 		putMVar tail_list next_node 	 >>
 		suckIO branches_running buff xs

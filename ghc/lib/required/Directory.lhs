@@ -40,10 +40,11 @@ module Directory
    ) where
 
 import PrelBase
-import Foreign
+import Foreign		( Word(..) )
+import Addr
 import IOBase
 import STBase
-import UnsafeST		( unsafePerformPrimIO )
+import Unsafe		( unsafePerformIO )
 import ArrBase
 import PackBase		( unpackNBytesST )
 import Time             ( ClockTime(..) )
@@ -129,11 +130,9 @@ The path refers to an existing non-directory object.
 \end{itemize}
 
 \begin{code}
-createDirectory path =
-    _ccall_ createDirectory path    `thenIO_Prim` \ rc ->
-    if rc == 0 then
-        return ()
-    else
+createDirectory path = do
+    rc <- _ccall_ createDirectory path
+    if rc == 0 then return () else
         constructErrorAndFail "createDirectory"
 \end{code}
 
@@ -172,11 +171,11 @@ The operand refers to an existing non-directory object.
 \end{itemize}
 
 \begin{code}
-removeDirectory path =
-    _ccall_ removeDirectory path    `thenIO_Prim` \ rc ->
-    if rc == 0 then
-        return ()
-    else
+removeDirectory path = do
+    rc <- _ccall_ removeDirectory path
+    if rc == 0 then 
+	return ()
+     else 
         constructErrorAndFail "removeDirectory"
 \end{code}
 
@@ -209,11 +208,11 @@ The operand refers to an existing directory.
 \end{itemize}
 
 \begin{code}
-removeFile path =
-    _ccall_ removeFile path `thenIO_Prim` \ rc ->
+removeFile path = do
+    rc <- _ccall_ removeFile path
     if rc == 0 then
         return ()
-    else
+     else
         constructErrorAndFail "removeFile"
 \end{code}
 
@@ -256,11 +255,11 @@ Either path refers to an existing non-directory object.
 \end{itemize}
 
 \begin{code}
-renameDirectory opath npath =
-    _ccall_ renameDirectory opath npath	`thenIO_Prim` \ rc ->
+renameDirectory opath npath = do
+    rc <- _ccall_ renameDirectory opath npath
     if rc == 0 then
         return ()
-    else
+     else
         constructErrorAndFail "renameDirectory"
 \end{code}
 
@@ -301,11 +300,11 @@ Either path refers to an existing directory.
 \end{itemize}
 
 \begin{code}
-renameFile opath npath =
-    _ccall_ renameFile opath npath  `thenIO_Prim` \ rc ->
+renameFile opath npath = do
+    rc <- _ccall_ renameFile opath npath
     if rc == 0 then
         return ()
-    else
+     else
         constructErrorAndFail	"renameFile"
 \end{code}
 
@@ -335,26 +334,26 @@ The path refers to an existing non-directory object.
 \end{itemize}
 
 \begin{code}
-getDirectoryContents path =
-    _ccall_ getDirectoryContents path	`thenIO_Prim` \ ptr ->
-    if ptr == ``NULL'' then
-        constructErrorAndFail "getDirectoryContents"
-    else
-	stToIO (getEntries ptr 0)	>>= \ entries ->
-	_ccall_ free ptr		`thenIO_Prim` \ () ->
-	return entries
+getDirectoryContents path = do
+    ptr <- _ccall_ getDirectoryContents path
+    if ptr == ``NULL'' 
+	then constructErrorAndFail "getDirectoryContents"
+     	else do
+		entries <- getEntries ptr 0
+		_ccall_ free ptr
+		return entries
   where
-    getEntries :: Addr -> Int -> PrimIO [FilePath]
-    getEntries ptr n =
-        _casm_ ``%r = ((char **)%0)[%1];'' ptr n    >>= \ str ->
-        if str == ``NULL'' then 
-            return []
-        else
-            _ccall_ strlen str			    >>= \ len ->
-	    unpackNBytesST str len		    >>= \ entry ->
-            _ccall_ free str			    >>= \ () ->
-            getEntries ptr (n+1)		    >>= \ entries ->
-	    return (entry : entries)
+    getEntries :: Addr -> Int -> IO [FilePath]
+    getEntries ptr n = do
+        str <- _casm_ ``%r = ((char **)%0)[%1];'' ptr n
+        if str == ``NULL'' 
+	    then return []
+            else do
+            	len <- _ccall_ strlen str
+	    	entry <- stToIO (unpackNBytesST str len)
+            	_ccall_ free str
+            	entries <- getEntries ptr (n+1)
+	    	return (entry : entries)
 \end{code}
 
 If the operating system has a notion of current directories,
@@ -379,15 +378,16 @@ The operating system has no notion of current directory.
 \end{itemize}
 
 \begin{code}
-getCurrentDirectory =
-    _ccall_ getCurrentDirectory	    `thenIO_Prim` \ str ->
-    if str /= ``NULL'' then
-        _ccall_ strlen str		`thenIO_Prim` \ len ->
-        stToIO (unpackNBytesST str len)	>>=	      \ pwd ->
-        _ccall_ free str		`thenIO_Prim` \ () ->
-        return pwd
-    else
-        constructErrorAndFail "getCurrentDirectory"
+getCurrentDirectory = do
+    str <- _ccall_ getCurrentDirectory
+    if str /= ``NULL'' 
+	then do
+            len <- _ccall_ strlen str
+            pwd <- stToIO (unpackNBytesST str len)
+            _ccall_ free str
+            return pwd
+    	else
+            constructErrorAndFail "getCurrentDirectory"
 \end{code}
 
 If the operating system has a notion of current directories,
@@ -417,20 +417,18 @@ The path refers to an existing non-directory object.
 \end{itemize}
 
 \begin{code}
-setCurrentDirectory path =
-    _ccall_ setCurrentDirectory path	`thenIO_Prim` \ rc ->
-    if rc == 0 then
-        return ()
-    else
-        constructErrorAndFail "setCurrentDirectory"
+setCurrentDirectory path = do
+    rc <- _ccall_ setCurrentDirectory path
+    if rc == 0 
+	then return ()
+	else constructErrorAndFail "setCurrentDirectory"
 \end{code}
-
 
 
 \begin{code}
 --doesFileExist :: FilePath -> IO Bool
-doesFileExist name =
-  _ccall_ access name (``F_OK''::Int)	    `thenIO_Prim` \ rc ->
+doesFileExist name = do 
+  rc <- _ccall_ access name (``F_OK''::Int)
   return (rc == 0)
 
 --doesDirectoryExist :: FilePath -> IO Bool
@@ -461,19 +459,18 @@ getPermissions name =
   )
 
 --setPermissions :: FilePath -> Permissions -> IO ()
-setPermissions name (Permissions r w e s) = 
+setPermissions name (Permissions r w e s) = do
     let
      read#  = case (if r then ownerReadMode else ``0'') of { W# x# -> x# }
      write# = case (if w then ownerWriteMode else ``0'') of { W# x# -> x# }
      exec#  = case (if e || s then ownerExecuteMode else ``0'') of { W# x# -> x# }
 
      mode  = I# (word2Int# (read# `or#` write# `or#` exec#))
-    in
-    _ccall_ chmod name mode			    `thenIO_Prim` \ rc ->
-    if rc == 0 then
-	return ()
-    else
-	fail (IOError Nothing SystemError "Directory.setPermissions")
+
+    rc <- _ccall_ chmod name mode
+    if rc == 0
+	then return ()
+	else fail (IOError Nothing SystemError "Directory.setPermissions")
 
 \end{code}
 
@@ -484,27 +481,24 @@ setPermissions name (Permissions r w e s) =
 type FileStatus = ByteArray Int
 
 getFileStatus :: FilePath -> IO FileStatus
-getFileStatus name =
-    newCharArray (0,``sizeof(struct stat)'')        `thenIO_Prim` \ bytes ->
-    _casm_ ``%r = stat(%0,(struct stat *)%1);'' name bytes
-						    `thenIO_Prim` \ rc ->
-    if rc == 0 then
-	unsafeFreezeByteArray bytes          	    `thenIO_Prim` \ stat ->
-	return stat
-    else
-	fail (IOError Nothing SystemError "Directory.getFileStatus")
+getFileStatus name = do
+    bytes <- stToIO (newCharArray (0,``sizeof(struct stat)''))
+    rc <- _casm_ ``%r = stat(%0,(struct stat *)%1);'' name bytes
+    if rc == 0 
+	then stToIO (unsafeFreezeByteArray bytes)
+     	else fail (IOError Nothing SystemError "Directory.getFileStatus")
 
 modificationTime :: FileStatus -> IO ClockTime
-modificationTime stat =
-    malloc1					           `thenIO_Prim` \ i1 ->
-    _casm_ ``((unsigned long *)%1)[0] = ((struct stat *)%0)->st_mtime;'' stat i1 `thenIO_Prim` \ () ->
-    cvtUnsigned i1                                         `thenIO_Prim` \ secs ->
+modificationTime stat = do
+    i1 <- malloc1
+    _casm_ ``((unsigned long *)%1)[0] = ((struct stat *)%0)->st_mtime;'' stat i1
+    secs <- cvtUnsigned i1
     return (TOD secs 0)
   where
-    malloc1 = ST $ \ s# ->
+    malloc1 = IO $ \ s# ->
 	case newIntArray# 1# s# of 
           StateAndMutableByteArray# s2# barr# -> 
-		STret s2# (MutableByteArray bnds barr#)
+		IOok s2# (MutableByteArray bnds barr#)
 
     bnds = (0,1)
     -- The C routine fills in an unsigned word.  We don't have `unsigned2Integer#,'
@@ -512,27 +506,25 @@ modificationTime stat =
     -- zero is still handled specially, although (J# 1# 1# (ptr to 0#)) is probably
     -- acceptable to gmp.
 
-    cvtUnsigned (MutableByteArray _ arr#) = ST $ \ s# ->
+    cvtUnsigned (MutableByteArray _ arr#) = IO $ \ s# ->
 	case readIntArray# arr# 0# s# of 
 	  StateAndInt# s2# r# ->
             if r# ==# 0# then
-                STret s2# 0
+                IOok s2# 0
             else
                 case unsafeFreezeByteArray# arr# s2# of
                   StateAndByteArray# s3# frozen# -> 
-			STret s3# (J# 1# 1# frozen#)
+			IOok s3# (J# 1# 1# frozen#)
 
 isDirectory :: FileStatus -> Bool
-isDirectory stat = unsafePerformPrimIO $
-    _casm_ ``%r = S_ISDIR(((struct stat *)%0)->st_mode);'' stat >>= \ rc ->
+isDirectory stat = unsafePerformIO $ do
+    rc <- _casm_ ``%r = S_ISDIR(((struct stat *)%0)->st_mode);'' stat
     return (rc /= 0)
 
 isRegularFile :: FileStatus -> Bool
-isRegularFile stat = unsafePerformPrimIO $
-    _casm_ ``%r = S_ISREG(((struct stat *)%0)->st_mode);'' stat >>= \ rc ->
+isRegularFile stat = unsafePerformIO $ do
+    rc <- _casm_ ``%r = S_ISREG(((struct stat *)%0)->st_mode);'' stat
     return (rc /= 0)
-
-
 \end{code}
 
 \begin{code}
@@ -550,8 +542,7 @@ intersectFileMode :: FileMode -> FileMode -> FileMode
 intersectFileMode (W# m1#) (W# m2#) = W# (m1# `and#` m2#)
 
 fileMode :: FileStatus -> FileMode
-fileMode stat = unsafePerformPrimIO $
-    _casm_ ``%r = ((struct stat *)%0)->st_mode;'' stat >>= \ mode ->
-    return mode
+fileMode stat = unsafePerformIO (
+	_casm_ ``%r = ((struct stat *)%0)->st_mode;'' stat)
 
 \end{code}

@@ -30,7 +30,7 @@ module Prelude (
     
     id, const, (.), flip, ($), until, asTypeOf, undefined,
 
-	-- From IOBase
+	-- From Error
     error,
 
 	-- From Monad
@@ -69,7 +69,7 @@ import PrelNum
 import PrelTup
 import Monad
 import Maybe
-import IOBase	( error )
+import Error	( error )
 import GHCerr
 
 -- These can't conveniently be defined in PrelBase because they use numbers,

@@ -29,10 +29,10 @@ import ST
 import IOBase
 import ArrBase
 import STBase
-import UnsafeST	( unsafePerformPrimIO )
+import Unsafe	( unsafePerformIO )
 import ST
 import Ix
-import Foreign  ( Addr(..) )
+import Addr
 import Char     ( intToDigit )
 import PackBase ( unpackCString )
 import Locale
@@ -72,7 +72,7 @@ we use the C library routines based on 32 bit integers.
 
 \begin{code}
 instance Show ClockTime where
-    showsPrec p (TOD sec@(J# a# s# d#) nsec) = showString $ unsafePerformPrimIO $
+    showsPrec p (TOD sec@(J# a# s# d#) nsec) = showString $ unsafePerformIO $
 	    allocChars 32		>>= \ buf ->
 	    _ccall_ showTime (I# s#) (ByteArray bottom d#) buf
 					>>= \ str ->
@@ -147,35 +147,35 @@ data TimeDiff
 \begin{code}
 getClockTime :: IO ClockTime
 getClockTime =
-    malloc1					    `thenIO_Prim` \ i1 ->
-    malloc1					    `thenIO_Prim` \ i2 ->
-    _ccall_ getClockTime i1 i2			    `thenIO_Prim` \ rc ->
-    if rc == 0 then
-	cvtUnsigned i1				    `thenIO_Prim` \ sec ->
-	cvtUnsigned i2				    `thenIO_Prim` \ nsec ->
-	return (TOD sec (nsec * 1000))
-    else
-	constructErrorAndFail "getClockTime"
+    malloc1					    >>= \ i1 ->
+    malloc1					    >>= \ i2 ->
+    _ccall_ getClockTime i1 i2			    >>= \ rc ->
+    if rc == 0 
+	then
+	    cvtUnsigned i1			    >>= \ sec ->
+	    cvtUnsigned i2			    >>= \ nsec ->
+	    return (TOD sec (nsec * 1000))
+    	else
+	    constructErrorAndFail "getClockTime"
   where
-    malloc1 = ST $ \ s# ->
+    malloc1 = IO $ \ s# ->
 	case newIntArray# 1# s# of 
           StateAndMutableByteArray# s2# barr# -> 
-		STret s2# (MutableByteArray bottom barr#)
+		IOok s2# (MutableByteArray bottom barr#)
 
     --  The C routine fills in an unsigned word.  We don't have 
     --	`unsigned2Integer#,' so we freeze the data bits and use them 
     --	for an MP_INT structure.  Note that zero is still handled specially,
     --	although (J# 1# 1# (ptr to 0#)) is probably acceptable to gmp.
 
-    cvtUnsigned (MutableByteArray _ arr#) = ST $ \ s# ->
+    cvtUnsigned (MutableByteArray _ arr#) = IO $ \ s# ->
 	case readIntArray# arr# 0# s# of 
 	  StateAndInt# s2# r# ->
-            if r# ==# 0# then
-                STret s2# 0
-            else
-                case unsafeFreezeByteArray# arr# s2# of
-                  StateAndByteArray# s3# frozen# -> 
-			STret s3# (J# 1# 1# frozen#)
+            if r# ==# 0# 
+		then IOok s2# 0
+            	else case unsafeFreezeByteArray# arr# s2# of
+                        StateAndByteArray# s3# frozen# -> 
+				IOok s3# (J# 1# 1# frozen#)
 
 \end{code}
 
@@ -189,18 +189,18 @@ t2} as a @TimeDiff@.
 \begin{code}
 addToClockTime  :: TimeDiff  -> ClockTime -> ClockTime
 addToClockTime (TimeDiff year mon day hour min sec psec) 
-	       (TOD c_sec c_psec) = unsafePerformPrimIO $
+	       (TOD c_sec c_psec) = unsafePerformIO $
     allocWords (``sizeof(time_t)'') >>= \ res ->
     _ccall_ toClockSec year mon day hour min sec 0 res 
 				    >>= \ ptr@(A# ptr#) ->
-    if ptr /= ``NULL'' then
-       let
-	diff_sec  = (int2Integer# (indexIntOffAddr# ptr# 0#))
-	diff_psec = psec
-       in
-       return (TOD (c_sec + diff_sec) (c_psec + diff_psec))
-    else
-       error "Time.addToClockTime: can't perform conversion of TimeDiff"
+    if ptr /= ``NULL'' 
+	then let
+	       diff_sec  = (int2Integer# (indexIntOffAddr# ptr# 0#))
+	       diff_psec = psec
+       	     in
+             return (TOD (c_sec + diff_sec) (c_psec + diff_psec))
+        else
+            error "Time.addToClockTime: can't perform conversion of TimeDiff"
 
 
 diffClockTimes  :: ClockTime -> ClockTime -> TimeDiff
@@ -227,52 +227,52 @@ ignored.
 
 \begin{code}
 toCalendarTime :: ClockTime -> CalendarTime
-toCalendarTime (TOD sec@(J# a# s# d#) psec) = unsafePerformPrimIO $
+toCalendarTime (TOD sec@(J# a# s# d#) psec) = unsafePerformIO $
     allocWords (``sizeof(struct tm)''::Int)	    >>= \ res ->
     allocChars 32				    >>= \ zoneNm ->
     _casm_ ``SETZONE((struct tm *)%0,(char *)%1); '' res zoneNm	  >>= \ () ->
     _ccall_ toLocalTime (I# s#) (ByteArray bottom d#) res
 						    >>= \ tm ->
-    if tm == (``NULL''::Addr) then
-	error "Time.toCalendarTime: out of range"
-    else
-	_casm_ ``%r = ((struct tm *)%0)->tm_sec;'' tm	>>= \ sec ->
-	_casm_ ``%r = ((struct tm *)%0)->tm_min;'' tm	>>= \ min ->
-	_casm_ ``%r = ((struct tm *)%0)->tm_hour;'' tm	>>= \ hour ->
-	_casm_ ``%r = ((struct tm *)%0)->tm_mday;'' tm	>>= \ mday ->
-	_casm_ ``%r = ((struct tm *)%0)->tm_mon;'' tm	>>= \ mon ->
-	_casm_ ``%r = ((struct tm *)%0)->tm_year;'' tm	>>= \ year ->
-	_casm_ ``%r = ((struct tm *)%0)->tm_wday;'' tm	>>= \ wday ->
-	_casm_ ``%r = ((struct tm *)%0)->tm_yday;'' tm	>>= \ yday ->
-	_casm_ ``%r = ((struct tm *)%0)->tm_isdst;'' tm	>>= \ isdst ->
-	_ccall_ ZONE tm					>>= \ zone ->
-	_ccall_ GMTOFF tm				>>= \ tz ->
-	let
-	 tzname = unpackCString zone
-	in
-        returnPrimIO (CalendarTime (1900+year) mon mday hour min sec psec 
-                      (toEnum wday) yday tzname tz (isdst /= 0))
+    if tm == (``NULL''::Addr) 
+	then error "Time.toCalendarTime: out of range"
+        else
+	    _casm_ ``%r = ((struct tm *)%0)->tm_sec;'' tm	>>= \ sec ->
+	    _casm_ ``%r = ((struct tm *)%0)->tm_min;'' tm	>>= \ min ->
+	    _casm_ ``%r = ((struct tm *)%0)->tm_hour;'' tm	>>= \ hour ->
+	    _casm_ ``%r = ((struct tm *)%0)->tm_mday;'' tm	>>= \ mday ->
+	    _casm_ ``%r = ((struct tm *)%0)->tm_mon;'' tm	>>= \ mon ->
+	    _casm_ ``%r = ((struct tm *)%0)->tm_year;'' tm	>>= \ year ->
+	    _casm_ ``%r = ((struct tm *)%0)->tm_wday;'' tm	>>= \ wday ->
+	    _casm_ ``%r = ((struct tm *)%0)->tm_yday;'' tm	>>= \ yday ->
+	    _casm_ ``%r = ((struct tm *)%0)->tm_isdst;'' tm	>>= \ isdst ->
+	    _ccall_ ZONE tm					>>= \ zone ->
+	    _ccall_ GMTOFF tm					>>= \ tz ->
+	    let
+	     tzname = unpackCString zone
+	    in
+            return (CalendarTime (1900+year) mon mday hour min sec psec 
+            		  (toEnum wday) yday tzname tz (isdst /= 0))
 
 toUTCTime :: ClockTime -> CalendarTime
-toUTCTime  (TOD sec@(J# a# s# d#) psec) = unsafePerformPrimIO (
+toUTCTime  (TOD sec@(J# a# s# d#) psec) = unsafePerformIO (
 	allocWords (``sizeof(struct tm)''::Int) 		    >>= \ res ->
         allocChars 32			    			    >>= \ zoneNm ->
         _casm_ ``SETZONE((struct tm *)%0,(char *)%1); '' res zoneNm >>= \ () ->
         _ccall_ toUTCTime (I# s#) (ByteArray bottom d#) res
 						    >>= \ tm ->
-    if tm == (``NULL''::Addr) then
-	error "Time.toUTCTime: out of range"
-    else
-	_casm_ ``%r = ((struct tm *)%0)->tm_sec;'' tm	>>= \ sec ->
-	_casm_ ``%r = ((struct tm *)%0)->tm_min;'' tm	>>= \ min ->
-	_casm_ ``%r = ((struct tm *)%0)->tm_hour;'' tm	>>= \ hour ->
-	_casm_ ``%r = ((struct tm *)%0)->tm_mday;'' tm	>>= \ mday ->
-	_casm_ ``%r = ((struct tm *)%0)->tm_mon;'' tm	>>= \ mon ->
-	_casm_ ``%r = ((struct tm *)%0)->tm_year;'' tm	>>= \ year ->
-	_casm_ ``%r = ((struct tm *)%0)->tm_wday;'' tm	>>= \ wday ->
-	_casm_ ``%r = ((struct tm *)%0)->tm_yday;'' tm	>>= \ yday ->
-        returnPrimIO (CalendarTime (1900+year) mon mday hour min sec psec 
-                      (toEnum wday) yday "UTC" 0 False)
+    if tm == (``NULL''::Addr) 
+	then error "Time.toUTCTime: out of range"
+        else
+	    _casm_ ``%r = ((struct tm *)%0)->tm_sec;'' tm	>>= \ sec ->
+	    _casm_ ``%r = ((struct tm *)%0)->tm_min;'' tm	>>= \ min ->
+	    _casm_ ``%r = ((struct tm *)%0)->tm_hour;'' tm	>>= \ hour ->
+	    _casm_ ``%r = ((struct tm *)%0)->tm_mday;'' tm	>>= \ mday ->
+	    _casm_ ``%r = ((struct tm *)%0)->tm_mon;'' tm	>>= \ mon ->
+	    _casm_ ``%r = ((struct tm *)%0)->tm_year;'' tm	>>= \ year ->
+	    _casm_ ``%r = ((struct tm *)%0)->tm_wday;'' tm	>>= \ wday ->
+	    _casm_ ``%r = ((struct tm *)%0)->tm_yday;'' tm	>>= \ yday ->
+            return (CalendarTime (1900+year) mon mday hour min sec psec 
+            		  (toEnum wday) yday "UTC" 0 False)
     )
 
 toClockTime :: CalendarTime -> ClockTime
@@ -282,12 +282,12 @@ toClockTime (CalendarTime year mon mday hour min sec psec wday yday tzname tz is
     else if tz < -43200 || tz > 43200 then
         error "Time.toClockTime: timezone offset out of range"
     else
-        unsafePerformPrimIO (
+        unsafePerformIO (
 	    allocWords (``sizeof(time_t)'') >>= \ res ->
 	    _ccall_ toClockSec year mon mday hour min sec isDst res
 						    >>= \ ptr@(A# ptr#) ->
             if ptr /= ``NULL'' then
-		returnPrimIO (TOD (int2Integer# (indexIntOffAddr# ptr# 0#)) psec)
+		return (TOD (int2Integer# (indexIntOffAddr# ptr# 0#)) psec)
 	    else
 		error "Time.toClockTime: can't perform conversion"
         )
@@ -301,21 +301,21 @@ bottom = error "Time.bottom"
 -- (copied from PosixUtil, for now)
 -- Allocate a mutable array of characters with no indices.
 
-allocChars :: Int -> ST s (MutableByteArray s ())
-allocChars (I# size#) = ST $ \ s# ->
+allocChars :: Int -> IO (MutableByteArray RealWorld ())
+allocChars (I# size#) = IO $ \ s# ->
     case newCharArray# size# s# of 
       StateAndMutableByteArray# s2# barr# -> 
-	STret s2# (MutableByteArray bot barr#)
+	IOok s2# (MutableByteArray bot barr#)
   where
     bot = error "Time.allocChars"
 
 -- Allocate a mutable array of words with no indices
 
-allocWords :: Int -> ST s (MutableByteArray s ())
-allocWords (I# size#) = ST $ \ s# ->
+allocWords :: Int -> IO (MutableByteArray RealWorld ())
+allocWords (I# size#) = IO $ \ s# ->
     case newIntArray# size# s# of 
       StateAndMutableByteArray# s2# barr# -> 
-	STret s2# (MutableByteArray bot barr#)
+	IOok s2# (MutableByteArray bot barr#)
   where
     bot = error "Time.allocWords"
 

@@ -12,11 +12,11 @@ module CPUTime
 
 import PrelBase ( Int(..), indexIntArray# )
 import ArrBase  ( ByteArray(..), newIntArray, unsafeFreezeByteArray )
-import Foreign	( Addr )
+import Addr
 import IOBase
 import IO
+import Unsafe   ( unsafePerformIO )
 import STBase
-import UnsafeST	( unsafePerformPrimIO )
 import Ratio
 
 \end{code}
@@ -30,21 +30,22 @@ the number of
 
 \begin{code}
 getCPUTime :: IO Integer
-getCPUTime =
-    newIntArray (0,3)			    `thenIO_Prim` \ marr ->
-    unsafeFreezeByteArray marr		    `thenIO_Prim` \ barr@(ByteArray _ frozen#) ->
-    _ccall_ getCPUTime barr		    `thenIO_Prim` \ ptr ->
+getCPUTime = 
+    stToIO (newIntArray (0,3))		>>= \ marr ->
+    stToIO (unsafeFreezeByteArray marr)	>>= \ barr@(ByteArray _ frozen#) ->
+    _ccall_ getCPUTime barr		>>= \ ptr ->
     if (ptr::Addr) /= ``NULL'' then
         return ((fromIntegral (I# (indexIntArray# frozen# 0#)) * 1000000000 + 
                 fromIntegral (I# (indexIntArray# frozen# 1#)) + 
 		fromIntegral (I# (indexIntArray# frozen# 2#)) * 1000000000 + 
                 fromIntegral (I# (indexIntArray# frozen# 3#))) * 1000)
     else
-	fail (IOError Nothing UnsupportedOperation "getCPUTime: can't get CPU time")
+	fail (IOError Nothing UnsupportedOperation 
+		"getCPUTime: can't get CPU time")
 
 cpuTimePrecision :: Integer
 cpuTimePrecision = round ((1000000000000::Integer) % 
-                          fromInt (unsafePerformPrimIO (_ccall_ clockTicks )))
+                          fromInt (unsafePerformIO (_ccall_ clockTicks )))
 \end{code}
 
 

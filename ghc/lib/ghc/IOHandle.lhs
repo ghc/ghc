@@ -15,22 +15,22 @@ which are supported for them.
 module IOHandle where
 
 import ST
-import UnsafeST
 import STBase
-import ArrBase	( ByteArray(..) )
+import ArrBase	( ByteArray(..), newVar, readVar, writeVar )
 import PrelRead	( Read )
 import PrelList (span)
 import Ix
 import IOBase
+import Unsafe   ( unsafePerformIO )
 import PrelTup
 import PrelBase
 import GHC
+import Addr
+import Error
 
-import Foreign  ( Addr, 
 #ifndef __PARALLEL_HASKELL__
-                  ForeignObj, makeForeignObj, writeForeignObj 
+import Foreign  ( ForeignObj, makeForeignObj, writeForeignObj )
 #endif
-		  )
 
 #if defined(__CONCURRENT_HASKELL__)
 import ConcBase
@@ -123,62 +123,50 @@ standard error channel. These handles are initially open.
 \begin{code}
 stdin, stdout, stderr :: Handle
 
-stdin = unsafePerformPrimIO (
-    _ccall_ getLock (``stdin''::Addr) 0		>>= \ rc ->
-    (case rc of
-       0 -> new_handle ClosedHandle
-       1 -> 
+stdin = unsafePerformIO (do
+    rc <- _ccall_ getLock (``stdin''::Addr) 0
+    case rc of
+       0 -> newHandle ClosedHandle
+       1 -> do
 #ifndef __PARALLEL_HASKELL__
-            makeForeignObj (``stdin''::Addr) (``&freeStdFile''::Addr) >>= \ fp ->
-	    new_handle (ReadHandle fp Nothing False)
+            fp <- makeForeignObj (``stdin''::Addr) (``&freeStdFile''::Addr)
+	    newHandle (ReadHandle fp Nothing False)
 #else
-	    new_handle (ReadHandle ``stdin'' Nothing False)
+	    newHandle (ReadHandle ``stdin'' Nothing False)
 #endif
-       _ -> constructError "stdin"		>>= \ ioError -> 
-            new_handle (ErrorHandle ioError)
-    )						>>= \ handle ->
-    returnPrimIO handle
+       _ -> do ioError <- constructError "stdin"
+               newHandle (ErrorHandle ioError)
   )
-  where
-    new_handle x = ioToST (newHandle x)
 
-stdout = unsafePerformPrimIO (
-    _ccall_ getLock (``stdout''::Addr) 1	>>= \ rc ->
-    (case rc of
-       0 -> new_handle ClosedHandle
-       1 -> 
+stdout = unsafePerformIO (do
+    rc <- _ccall_ getLock (``stdout''::Addr) 1
+    case rc of
+       0 -> newHandle ClosedHandle
+       1 -> do
 #ifndef __PARALLEL_HASKELL__
-            makeForeignObj (``stdout''::Addr) (``&freeStdFile''::Addr) >>= \ fp ->
-	    new_handle (WriteHandle fp Nothing False)
+            fp <- makeForeignObj (``stdout''::Addr) (``&freeStdFile''::Addr)
+	    newHandle (WriteHandle fp Nothing False)
 #else
-	    new_handle (WriteHandle ``stdout'' Nothing False)
+	    newHandle (WriteHandle ``stdout'' Nothing False)
 #endif
-       _ -> constructError "stdout"		>>= \ ioError -> 
-            new_handle (ErrorHandle ioError)
-    )						>>= \ handle ->
-    returnPrimIO handle
+       _ -> do ioError <- constructError "stdout"
+               newHandle (ErrorHandle ioError)
   )
-  where
-    new_handle x = ioToST (newHandle x)
 
-stderr = unsafePerformPrimIO (
-    _ccall_ getLock (``stderr''::Addr) 1	>>= \ rc ->
-    (case rc of
-       0 -> new_handle ClosedHandle
-       1 -> 
+stderr = unsafePerformIO (do
+    rc <- _ccall_ getLock (``stderr''::Addr) 1
+    case rc of
+       0 -> newHandle ClosedHandle
+       1 -> do
 #ifndef __PARALLEL_HASKELL__
-            makeForeignObj (``stderr''::Addr) (``&freeStdFile''::Addr) >>= \ fp ->
-            new_handle (WriteHandle fp (Just NoBuffering) False)	
+            fp <- makeForeignObj (``stderr''::Addr) (``&freeStdFile''::Addr)
+            newHandle (WriteHandle fp (Just NoBuffering) False)	
 #else
-            new_handle (WriteHandle ``stderr'' (Just NoBuffering) False)	
+            newHandle (WriteHandle ``stderr'' (Just NoBuffering) False)
 #endif
-       _ -> constructError "stderr"		>>= \ ioError -> 
-            new_handle (ErrorHandle ioError)
-    )						>>= \ handle ->
-    returnPrimIO handle
+       _ -> do ioError <- constructError "stderr"
+               newHandle (ErrorHandle ioError)
   )
-  where
-    new_handle x = ioToST (newHandle x)
 \end{code}
 
 %*********************************************************
@@ -193,17 +181,17 @@ data IOMode      =  ReadMode | WriteMode | AppendMode | ReadWriteMode
 
 openFile :: FilePath -> IOMode -> IO Handle
 
-openFile f m = 
-    stToIO (_ccall_ openFile f m')		             >>= \ ptr ->
-    if ptr /= ``NULL'' then
+openFile f m = do
+    ptr <- _ccall_ openFile f m'
+    if ptr /= ``NULL'' then do
 #ifndef __PARALLEL_HASKELL__
-        makeForeignObj ptr ((``&freeFile'')::Addr)   `thenIO_Prim` \ fp ->
-        newHandle (htype fp Nothing False)
+	fp <- makeForeignObj ptr ((``&freeFile'')::Addr)
+	newHandle (htype fp Nothing False)
 #else
-        newHandle (htype ptr Nothing False)
+	newHandle (htype ptr Nothing False)
 #endif
-    else
-	stToIO (constructError "openFile")	    >>= \ ioError@(IOError hn iot msg) -> 
+      else do
+	ioError@(IOError hn iot msg) <- constructError "openFile"
 	let
 	    improved_error -- a HACK, I guess
 	      = case iot of
@@ -211,7 +199,6 @@ openFile f m =
 		  NoSuchThing      -> IOError hn NoSuchThing      (msg ++ ": " ++ f)
 		  PermissionDenied -> IOError hn PermissionDenied (msg ++ ": " ++ f)
 		  _		   -> ioError
-	in
         fail improved_error
   where
     m' = case m of 
@@ -254,53 +241,55 @@ implementation is free to impose stricter conditions.
 \begin{code}
 hClose :: Handle -> IO ()
 
-hClose handle =
-    readHandle handle				    >>= \ htype ->
+hClose handle = do
+    htype <- readHandle handle
     case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype >>
+      ErrorHandle ioError -> do
+	  writeHandle handle htype
 	  fail ioError
-      ClosedHandle -> 
-          writeHandle handle htype		    >>
+      ClosedHandle -> do
+          writeHandle handle htype
 	  ioe_closedHandle handle
-      SemiClosedHandle fp (buf,_) ->
-          (if buf /= ``NULL'' then
-	      _ccall_ free buf
-           else			    
-              returnPrimIO ())			    `thenIO_Prim` \ () ->
-	      _casm_ `` %r = (char *)%0; '' fp      `thenIO_Prim` \ fp_a ->
-              if fp_a /= (``NULL''::Addr) then -- Under what condition can this be NULL?
-                _ccall_ closeFile fp		    `thenIO_Prim` \ rc ->
+      SemiClosedHandle fp (buf,_) -> do
+          (if buf /= ``NULL'' then 
+		_ccall_ free buf 
+	   else 
+		return ())
+	  fp_a <- _casm_ `` %r = (char *)%0; '' fp
+          if fp_a /= (``NULL''::Addr) then do 
+		-- Under what condition can this be NULL?
+                rc <- _ccall_ closeFile fp
 	          {- We explicitly close a file object so that we can be told
 	             if there were any errors. Note that after @hClose@
 	             has been performed, the ForeignObj embedded in the Handle
                      is still lying around in the heap, so care is taken
                      to avoid closing the file object when the ForeignObj
 	             is finalised.  -}
-                if rc == 0 then 
+                if rc == 0 then do
 #ifndef __PARALLEL_HASKELL__
-		  -- Mark the foreign object data value as gone to the finaliser (freeFile())
-		  writeForeignObj fp ``NULL''       `thenIO_Prim` \ () ->
+		  -- Mark the foreign object data value as 
+		  -- gone to the finaliser (freeFile())
+		  writeForeignObj fp ``NULL''
 #endif
 		  writeHandle handle ClosedHandle
-                else
-		  writeHandle handle htype >>
+                 else do
+		  writeHandle handle htype
 	          constructErrorAndFail "hClose"
 
-              else			    
-                  writeHandle handle htype
-      other -> 
-	  let fp = filePtr other in
-          _ccall_ closeFile fp	    `thenIO_Prim` \ rc ->
-          if rc == 0 then 
+            else  writeHandle handle htype
+
+      other -> do
+	  let fp = filePtr other
+          rc <- _ccall_ closeFile fp
+          if rc == 0 then do
 #ifndef __PARALLEL_HASKELL__
-		  -- Mark the foreign object data
-		  writeForeignObj fp ``NULL''       `thenIO_Prim` \ () ->
+		-- Mark the foreign object data
+		writeForeignObj fp ``NULL''
 #endif
-	      writeHandle handle ClosedHandle
-          else
- 	      writeHandle handle htype >>
-	      constructErrorAndFail "hClose"
+	      	writeHandle handle ClosedHandle
+            else do
+ 	      	writeHandle handle htype
+	      	constructErrorAndFail "hClose"
 \end{code}
 
 Computation $hClose hdl$ makes handle {\em hdl} closed.  Before the
@@ -320,34 +309,36 @@ which can be read from {\em hdl}.
 
 \begin{code}
 hFileSize :: Handle -> IO Integer
-hFileSize handle =
-    readHandle handle				    >>= \ htype ->
+hFileSize handle = do
+    htype <- readHandle handle
     case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype			    >>
+      ErrorHandle ioError -> do
+	  writeHandle handle htype
 	  fail ioError
-      ClosedHandle -> 
-	  writeHandle handle htype			    >>
+      ClosedHandle -> do
+	  writeHandle handle htype
 	  ioe_closedHandle handle
-      SemiClosedHandle _ _ -> 
-	  writeHandle handle htype			    >>
+      SemiClosedHandle _ _ -> do
+	  writeHandle handle htype
 	  ioe_closedHandle handle
       other ->
           -- HACK!  We build a unique MP_INT of the right shape to hold
-          -- a single unsigned word, and we let the C routine change the data bits
-          _casm_ ``%r = 1;''			    `thenIO_Prim` \ (I# hack#) ->
+          -- a single unsigned word, and we let the C routine 
+	  -- change the data bits
+	  --
+	  -- For some reason, this fails to typecheck if converted to a do
+	  -- expression --SDM
+          _casm_ ``%r = 1;'' >>= \(I# hack#) ->
           case int2Integer# hack# of
-            result@(J# _ _ d#) ->
-		let
-		    bogus_bounds = (error "fileSize"::(Int,Int))
-		in
-                _ccall_ fileSize (filePtr other) (ByteArray bogus_bounds d#)
-                                                    `thenIO_Prim` \ rc ->
-               writeHandle handle htype		    >>
-               if rc == 0 then
+            result@(J# _ _ d#) -> do
+		let bogus_bounds = (error "fileSize"::(Int,Int))
+                rc <- _ccall_ fileSize (filePtr other) 
+				(ByteArray bogus_bounds d#)
+                writeHandle handle htype
+                if rc == 0 then
 		   return result
-               else
-		    constructErrorAndFail "hFileSize"
+                 else
+		   constructErrorAndFail "hFileSize"
 \end{code}
 
 For a readable handle {\em hdl}, computation $hIsEOF hdl$ returns
@@ -357,27 +348,29 @@ the file.  Otherwise, it returns $False$.
 
 \begin{code}
 hIsEOF :: Handle -> IO Bool
-hIsEOF handle =
-    readHandle handle				    >>= \ htype ->
+hIsEOF handle = do
+    htype <- readHandle handle
     case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
+      ErrorHandle ioError -> do
+	  writeHandle handle htype
 	  fail ioError
-      ClosedHandle -> 
-	  writeHandle handle htype		    >>
+      ClosedHandle -> do
+	  writeHandle handle htype
 	  ioe_closedHandle handle
-      SemiClosedHandle _ _ -> 
-	  writeHandle handle htype		    >>
+      SemiClosedHandle _ _ -> do
+	  writeHandle handle htype
 	  ioe_closedHandle handle
-      WriteHandle _ _ _ -> 
-	  writeHandle handle htype		    >>
-          fail (IOError (Just handle) IllegalOperation "handle is not open for reading")
-      AppendHandle _ _ _ -> 
-	  writeHandle handle htype		    >>
-          fail (IOError (Just handle) IllegalOperation "handle is not open for reading")
-      other -> 
-          _ccall_ fileEOF (filePtr other)	    `thenIO_Prim` \ rc ->
-	  writeHandle handle (markHandle htype)	    >>
+      WriteHandle _ _ _ -> do
+	  writeHandle handle htype
+          fail (IOError (Just handle) IllegalOperation 
+		"handle is not open for reading")
+      AppendHandle _ _ _ -> do 
+	  writeHandle handle htype
+          fail (IOError (Just handle) IllegalOperation 
+		"handle is not open for reading")
+      other -> do
+          rc <- _ccall_ fileEOF (filePtr other)
+	  writeHandle handle (markHandle htype)
 	  case rc of
             0 -> return False
             1 -> return True
@@ -424,35 +417,34 @@ hSetBuffering :: Handle -> BufferMode -> IO ()
 
 hSetBuffering handle mode =
     case mode of
-      (BlockBuffering (Just n)) 
-        | n <= 0 -> fail (IOError (Just handle) InvalidArgument "illegal buffer size")
-      other ->
-	  readHandle handle			    >>= \ htype ->
-          if isMarked htype then
-              writeHandle handle htype		    >>
+      BlockBuffering (Just n) 
+        | n <= 0 -> fail (IOError (Just handle) InvalidArgument 
+				"illegal buffer size")
+      other -> do
+	  htype <- readHandle handle
+          if isMarked htype then do
+              writeHandle handle htype
               fail (IOError (Just handle) 
 			    UnsupportedOperation 
 			    "can't set buffering for a dirty handle")
-          else
+           else
               case htype of
-	        ErrorHandle ioError ->
-	            writeHandle handle htype	    >>
+	        ErrorHandle ioError -> do
+	            writeHandle handle htype
 	            fail ioError
-                ClosedHandle ->
-		    writeHandle handle htype	    >>
+                ClosedHandle -> do
+		    writeHandle handle htype
 	            ioe_closedHandle handle
-                SemiClosedHandle _ _ ->
-		    writeHandle handle htype	    >>
+                SemiClosedHandle _ _ -> do
+		    writeHandle handle htype
 	            ioe_closedHandle handle
-                other ->
-                    _ccall_ setBuffering (filePtr other) bsize
-						    `thenIO_Prim` \ rc -> 
+                other -> do
+                    rc <- _ccall_ setBuffering (filePtr other) bsize
                     if rc == 0 then
-                        writeHandle handle ((hcon other) (filePtr other) (Just mode) True)
-						    >>
-		        return ()
-                    else
-			writeHandle handle htype	 >>
+                        writeHandle handle ((hcon other) (filePtr other) 
+						(Just mode) True)
+                     else do
+			writeHandle handle htype
 		        constructErrorAndFail "hSetBuffering"
 		
   where
@@ -485,25 +477,25 @@ Computation $flush hdl$ causes any items buffered for output in handle
 
 \begin{code}
 hFlush :: Handle -> IO () 
-hFlush handle = 
-    readHandle handle				    >>= \ htype ->
+hFlush handle = do
+    htype <- readHandle handle
     case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
+      ErrorHandle ioError -> do
+	  writeHandle handle htype
 	  fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
+      ClosedHandle -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      SemiClosedHandle _ _ ->
-	  writeHandle handle htype		    >>
+      SemiClosedHandle _ _ -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      other ->
-	  _ccall_ flushFile (filePtr other)	    `thenIO_Prim` \ rc ->
-	  writeHandle handle (markHandle htype)   >>
-               if rc == 0 then 
-		   return ()
-               else
-		    constructErrorAndFail "hFlush"
+      other -> do
+	  rc <- _ccall_ flushFile (filePtr other)
+	  writeHandle handle (markHandle htype)
+          if rc == 0 then 
+		return ()
+           else
+		constructErrorAndFail "hFlush"
 \end{code}
 
 
@@ -527,49 +519,49 @@ to a previously obtained position {\em p}.
 
 \begin{code}
 hGetPosn :: Handle -> IO HandlePosn
-hGetPosn handle = 
-    readHandle handle				    >>= \ htype ->
+hGetPosn handle = do
+    htype <- readHandle handle
     case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
+      ErrorHandle ioError -> do
+	  writeHandle handle htype
 	  fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
+      ClosedHandle -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      SemiClosedHandle _ _ ->
-	  writeHandle handle htype		    >>
+      SemiClosedHandle _ _ -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      other -> 
-          _ccall_ getFilePosn (filePtr other)      `thenIO_Prim` \ posn ->
-          writeHandle handle htype		    >>
+      other -> do
+          posn <- _ccall_ getFilePosn (filePtr other)
+          writeHandle handle htype
           if posn /= -1 then
 	      return (HandlePosn handle posn)
-          else
+           else
 	      constructErrorAndFail "hGetPosn"
 
 hSetPosn :: HandlePosn -> IO () 
-hSetPosn (HandlePosn handle posn) = 
-    readHandle handle				    >>= \ htype ->
+hSetPosn (HandlePosn handle posn) = do
+    htype <- readHandle handle
     case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
+      ErrorHandle ioError -> do
+	  writeHandle handle htype
 	  fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
+      ClosedHandle -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      SemiClosedHandle _ _ ->
-	  writeHandle handle htype		    >>
+      SemiClosedHandle _ _ -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      AppendHandle _ _ _ ->
-	  writeHandle handle htype		    >>
+      AppendHandle _ _ _ -> do
+	  writeHandle handle htype
 	  fail (IOError (Just handle) IllegalOperation "handle is not seekable")
-      other -> 
-	  _ccall_ setFilePosn (filePtr other) posn `thenIO_Prim` \ rc ->
-	  writeHandle handle (markHandle htype)    >>
-               if rc == 0 then 
-		   return ()
-               else
-		   constructErrorAndFail "hSetPosn"
+      other -> do
+	  rc <- _ccall_ setFilePosn (filePtr other) posn
+	  writeHandle handle (markHandle htype)
+          if rc == 0 then 
+		return ()
+           else
+		constructErrorAndFail "hSetPosn"
 \end{code}
 
 Computation $hSeek hdl mode i$ sets the position of handle
@@ -594,35 +586,35 @@ file, an I/O position beyond the current end-of-file.
 
 \begin{code}
 hSeek :: Handle -> SeekMode -> Integer -> IO () 
-hSeek handle mode offset@(J# _ s# d#) = 
-    readHandle handle				    >>= \ htype ->
+hSeek handle mode offset@(J# _ s# d#) =  do
+    htype <- readHandle handle
     case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
+      ErrorHandle ioError -> do
+	  writeHandle handle htype
 	  fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
+      ClosedHandle -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      SemiClosedHandle _ _ ->
-	  writeHandle handle htype		    >>
+      SemiClosedHandle _ _ -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      AppendHandle _ _ _ ->
-	  writeHandle handle htype		    >>
+      AppendHandle _ _ _ -> do
+	  writeHandle handle htype
 	  fail (IOError (Just handle) IllegalOperation "handle is not seekable")
-      other -> 
-	  _ccall_ seekFile (filePtr other) whence (I# s#) (ByteArray (0,0) d#)
-                                        	    `thenIO_Prim` \ rc ->
-	  writeHandle handle (markHandle htype)   >>
-               if rc == 0 then 
-		   return ()
-               else
-		    constructErrorAndFail "hSeek"
+      other -> do
+	  rc <- _ccall_ seekFile (filePtr other) whence (I# s#) 
+			(ByteArray (0,0) d#)
+	  writeHandle handle (markHandle htype)
+          if rc == 0 then 
+		return ()
+           else
+		constructErrorAndFail "hSeek"
   where
     whence :: Int
     whence = case mode of
                AbsoluteSeek -> ``SEEK_SET''
                RelativeSeek -> ``SEEK_CUR''
-               SeekFromEnd -> ``SEEK_END''
+               SeekFromEnd  -> ``SEEK_END''
 \end{code}
 
 %*********************************************************
@@ -643,51 +635,51 @@ $( Just n )$ for block-buffering of {\em n} bytes.
 
 \begin{code}
 hIsOpen :: Handle -> IO Bool
-hIsOpen handle = 
-    readHandle handle				    >>= \ htype ->
+hIsOpen handle = do
+    htype <- readHandle handle
     case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
+      ErrorHandle ioError -> do
+	  writeHandle handle htype
           fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
+      ClosedHandle -> do
+	  writeHandle handle htype
 	  return False
-      SemiClosedHandle _ _ ->
-	  writeHandle handle htype		    >>
+      SemiClosedHandle _ _ -> do
+	  writeHandle handle htype
 	  return False
-      other ->
-	  writeHandle handle htype		    >>
+      other -> do
+	  writeHandle handle htype
 	  return True
 
 hIsClosed :: Handle -> IO Bool
-hIsClosed handle = 
-    readHandle handle				    >>= \ htype ->
+hIsClosed handle = do
+    htype <- readHandle handle
     case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
+      ErrorHandle ioError -> do
+	  writeHandle handle htype
           fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
+      ClosedHandle -> do
+	  writeHandle handle htype
 	  return True
-      other ->
-	  writeHandle handle htype		    >>
+      other -> do
+	  writeHandle handle htype
 	  return False
 
 hIsReadable :: Handle -> IO Bool
-hIsReadable handle = 
-    readHandle handle				    >>= \ htype ->
+hIsReadable handle = do
+    htype <- readHandle handle
     case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
+      ErrorHandle ioError -> do
+	  writeHandle handle htype
           fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
+      ClosedHandle -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      SemiClosedHandle _ _ ->
-	  writeHandle handle htype		    >>
+      SemiClosedHandle _ _ -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      other ->
-	  writeHandle handle htype		    >>
+      other -> do
+	  writeHandle handle htype
 	  return (isReadable other)
   where
     isReadable (ReadHandle _ _ _) = True
@@ -695,20 +687,20 @@ hIsReadable handle =
     isReadable _ = False
 
 hIsWritable :: Handle -> IO Bool
-hIsWritable handle = 
-    readHandle handle			    >>= \ htype ->
+hIsWritable handle = do
+    htype <- readHandle handle
     case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype	    >>
+      ErrorHandle ioError -> do
+	  writeHandle handle htype
           fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype	    >>
+      ClosedHandle -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      SemiClosedHandle _ _ ->
-	  writeHandle handle htype	    >>
+      SemiClosedHandle _ _ -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      other ->
-	  writeHandle handle htype	    >>
+      other -> do
+	  writeHandle handle htype
 	  return (isWritable other)
   where
     isWritable (AppendHandle _ _ _) = True
@@ -716,12 +708,12 @@ hIsWritable handle =
     isWritable (ReadWriteHandle _ _ _) = True
     isWritable _ = False
 
-getBufferMode :: Handle__ -> PrimIO Handle__
+getBufferMode :: Handle__ -> IO Handle__
 getBufferMode htype =
     case bufferMode htype of
-      Just x -> returnPrimIO htype
-      Nothing ->
-	_ccall_ getBufferMode (filePtr htype)	    `thenPrimIO` \ rc ->
+      Just x -> return htype
+      Nothing -> do
+	rc <- _ccall_ getBufferMode (filePtr htype)
 	let 
 	    mode = 
 		case rc of
@@ -730,129 +722,128 @@ getBufferMode htype =
 	          -2 -> Just (BlockBuffering Nothing)
                   -3 -> Nothing
                   n  -> Just (BlockBuffering (Just n))
-	in
-	returnPrimIO (case htype of
+	return (case htype of
 	  ReadHandle      fp _ b -> ReadHandle      fp mode b
 	  WriteHandle     fp _ b -> WriteHandle     fp mode b
 	  AppendHandle    fp _ b -> AppendHandle    fp mode b
 	  ReadWriteHandle fp _ b -> ReadWriteHandle fp mode b)
 
 hIsBlockBuffered :: Handle -> IO (Bool,Maybe Int)
-hIsBlockBuffered handle =
-    readHandle handle				    >>= \ htype ->
+hIsBlockBuffered handle = do
+    htype <- readHandle handle
     case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
+      ErrorHandle ioError -> do
+	  writeHandle handle htype
           fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
+      ClosedHandle -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      SemiClosedHandle _ _ ->
-	  writeHandle handle htype		    >>
+      SemiClosedHandle _ _ -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      other ->
-          getBufferMode other			    `thenIO_Prim` \ other ->
+      other -> do
+          other <- getBufferMode other
           case bufferMode other of
-            Just (BlockBuffering size) ->
-	        writeHandle handle other	    >>
+            Just (BlockBuffering size) -> do
+	        writeHandle handle other
                 return (True, size)
-            Just _ ->
-	        writeHandle handle other	    >>
+            Just _ -> do
+	        writeHandle handle other
                 return (False, Nothing)
     	    Nothing -> 
 		constructErrorAndFail "hIsBlockBuffered"
 
 hIsLineBuffered :: Handle -> IO Bool
-hIsLineBuffered handle =
-    readHandle handle				    >>= \ htype ->
+hIsLineBuffered handle = do
+    htype <- readHandle handle
     case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
+      ErrorHandle ioError -> do
+	  writeHandle handle htype
           fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
+      ClosedHandle -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      SemiClosedHandle _ _ ->
-	  writeHandle handle htype		    >>
+      SemiClosedHandle _ _ -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      other ->
-	  getBufferMode other			    `thenIO_Prim` \ other ->
+      other -> do
+	  other <- getBufferMode other
           case bufferMode other of
-            Just LineBuffering ->
-	        writeHandle handle other	    >>
+            Just LineBuffering -> do
+	        writeHandle handle other
                 return True
-            Just _ ->
-	        writeHandle handle other	    >>
+            Just _ -> do
+	        writeHandle handle other
                 return False
     	    Nothing -> 
 		constructErrorAndFail "hIsLineBuffered"
 
 hIsNotBuffered :: Handle -> IO Bool
-hIsNotBuffered handle =
-    readHandle handle				    >>= \ htype ->
+hIsNotBuffered handle = do
+    htype <- readHandle handle
     case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
+      ErrorHandle ioError -> do
+	  writeHandle handle htype
           fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
+      ClosedHandle -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      SemiClosedHandle _ _ ->
-	  writeHandle handle htype		    >>
+      SemiClosedHandle _ _ -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      other ->
-	  getBufferMode other			    `thenIO_Prim` \ other ->
+      other -> do
+	  other <- getBufferMode other
           case bufferMode other of
-            Just NoBuffering ->
-	        writeHandle handle other	    >>
+            Just NoBuffering -> do
+	        writeHandle handle other
                 return True
-            Just _ ->
-	        writeHandle handle other	    >>
+            Just _ -> do
+	        writeHandle handle other
                 return False
     	    Nothing -> 
 		constructErrorAndFail "hIsNotBuffered"
 
 hGetBuffering :: Handle -> IO BufferMode
-hGetBuffering handle =
-    readHandle handle				    >>= \ htype ->
+hGetBuffering handle = do
+    htype <- readHandle handle
     case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
+      ErrorHandle ioError -> do
+	  writeHandle handle htype
           fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
+      ClosedHandle -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      SemiClosedHandle _ _ ->
-	  writeHandle handle htype		    >>
+      SemiClosedHandle _ _ -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      other ->
-	  getBufferMode other			    `thenIO_Prim` \ other ->
+      other -> do
+	  other <- getBufferMode other
           case bufferMode other of
-            Just v ->
-	        writeHandle handle other            >>
+            Just v -> do
+	        writeHandle handle other
                 return v
     	    Nothing -> 
 		constructErrorAndFail "hGetBuffering"
 
 hIsSeekable :: Handle -> IO Bool
-hIsSeekable handle = 
-    readHandle handle				    >>= \ htype ->
+hIsSeekable handle = do
+    htype <- readHandle handle
     case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
+      ErrorHandle ioError -> do
+	  writeHandle handle htype
           fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
+      ClosedHandle -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      SemiClosedHandle _ _ ->
-	  writeHandle handle htype		    >>
+      SemiClosedHandle _ _ -> do
+	  writeHandle handle htype
           ioe_closedHandle handle
-      AppendHandle _ _ _ ->
-	  writeHandle handle htype		    >>
+      AppendHandle _ _ _ -> do
+	  writeHandle handle htype
 	  return False
-      other ->
-	  _ccall_ seekFileP (filePtr other)   	    `thenIO_Prim` \ rc ->
-	  writeHandle handle htype		    >>
+      other -> do
+	  rc <- _ccall_ seekFileP (filePtr other)
+	  writeHandle handle htype
 	  case rc of
             0 -> return False
             1 -> return True

@@ -15,13 +15,13 @@ module Channel
 	newChan,	 -- :: IO (Chan a)
 
 	 {- operators -}
-	putChan,	 -- :: Chan a -> a -> IO ()
-	getChan,	 -- :: Chan a -> IO a
+	writeChan,	 -- :: Chan a -> a -> IO ()
+	readChan,	 -- :: Chan a -> IO a
 	dupChan,	 -- :: Chan a -> IO (Chan a)
 	unGetChan,	 -- :: Chan a -> a -> IO ()
 
 	 {- stream interface -}
-	getChanContents, -- :: Chan a -> IO [a]
+	readChanContents, -- :: Chan a -> IO [a]
 	putList2Chan	 -- :: Chan a -> [a] -> IO ()
 
        ) where
@@ -30,7 +30,7 @@ import Prelude
 import IOBase	( IO(..), ioToST, stToIO )		-- Suspicious!
 import ConcBase
 import STBase
-import UnsafeST ( unsafeInterleavePrimIO )
+import Unsafe ( unsafeInterleaveIO )
 \end{code}
 
 A channel is represented by two @MVar@s keeping track of the two ends
@@ -74,8 +74,8 @@ new hole.
 
 \begin{code}
 
-putChan :: Chan a -> a -> IO ()
-putChan (Chan read write) val
+writeChan :: Chan a -> a -> IO ()
+writeChan (Chan read write) val
  = newEmptyMVar		    >>= \ new_hole ->
    takeMVar write	    >>= \ old_hole ->
    putMVar write new_hole   >> 
@@ -83,8 +83,8 @@ putChan (Chan read write) val
    return ()
 
 
-getChan :: Chan a -> IO a
-getChan (Chan read write)
+readChan :: Chan a -> IO a
+readChan (Chan read write)
  = takeMVar read	  >>= \ rend ->
    takeMVar rend          >>= \ (ChItem val new_rend) ->
    putMVar read new_rend  >>
@@ -112,18 +112,16 @@ Operators for interfacing with functional streams.
 
 \begin{code}
 
-getChanContents :: Chan a -> IO [a]
-getChanContents ch
+readChanContents :: Chan a -> IO [a]
+readChanContents ch
   = unsafeInterleaveIO (do
-	x <- getChan ch
-    	xs <- getChanContents ch
+	x <- readChan ch
+    	xs <- readChanContents ch
     	return (x:xs)
     )
 
-unsafeInterleaveIO = stToIO . unsafeInterleavePrimIO . ioToST
-
 -------------
 putList2Chan :: Chan a -> [a] -> IO ()
-putList2Chan ch ls = sequence (map (putChan ch) ls)
+putList2Chan ch ls = sequence (map (writeChan ch) ls)
 
 \end{code}

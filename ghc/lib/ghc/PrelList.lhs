@@ -22,7 +22,7 @@ module PrelList (
    zip, zip3, zipWith, zipWith3, unzip, unzip3
  ) where
 
-import {-# SOURCE #-}	IOBase	( error )
+import {-# SOURCE #-} Error ( error )
 import PrelTup
 import PrelBase
 

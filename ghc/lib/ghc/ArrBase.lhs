@@ -11,12 +11,13 @@ types and operations.
 
 module ArrBase where
 
-import {-# SOURCE #-}	IOBase	( error )
+import {-# SOURCE #-} Error ( error )
 import Ix
 import PrelList (foldl)
 import STBase
 import PrelBase
-import Foreign
+import CCall
+import Addr
 import GHC
 
 infixl 9  !, //
@@ -64,8 +65,42 @@ instance CCallable ByteArray#
 
 -- A one-element mutable array:
 type MutableVar s a = MutableArray s Int a
+
+-- just pointer equality on arrays:
+instance Eq (MutableArray s ix elt) where
+	MutableArray _ arr1# == MutableArray _ arr2# 
+		= sameMutableArray# arr1# arr2#
+
+instance Eq (MutableByteArray s ix) where
+	MutableByteArray _ arr1# == MutableByteArray _ arr2#
+		= sameMutableByteArray# arr1# arr2#
 \end{code}
 
+%*********************************************************
+%*							*
+\subsection{Operations on mutable variables}
+%*							*
+%*********************************************************
+
+\begin{code}
+newVar   :: a -> ST s (MutableVar s a)
+readVar  :: MutableVar s a -> ST s a
+writeVar :: MutableVar s a -> a -> ST s ()
+
+newVar init = ST $ \ s# ->
+    case (newArray# 1# init s#)     of { StateAndMutableArray# s2# arr# ->
+    STret s2# (MutableArray vAR_IXS arr#) }
+  where
+    vAR_IXS = error "newVar: Shouldn't access `bounds' of a MutableVar\n"
+
+readVar (MutableArray _ var#) = ST $ \ s# ->
+    case readArray# var# 0# s#	of { StateAndPtr# s2# r ->
+    STret s2# r }
+
+writeVar (MutableArray _ var#) val = ST $ \ s# ->
+    case writeArray# var# 0# val s# of { s2# ->
+    STret s2# () }
+\end{code}
 
 %*********************************************************
 %*							*
@@ -107,20 +142,20 @@ arrEleBottom = error "(Array.!): undefined array element"
 
 fill_it_in :: Ix ix => MutableArray s ix elt -> [(ix, elt)] -> ST s ()
 fill_it_in arr lst
-  = foldr fill_one_in (returnST ()) lst
+  = foldr fill_one_in (return ()) lst
   where  -- **** STRICT **** (but that's OK...)
     fill_one_in (i, v) rst
-      = writeArray arr i v `seqST` rst
+      = writeArray arr i v >> rst
 
 -----------------------------------------------------------------------
 -- these also go better with magic: (//), accum, accumArray
 
 old_array // ivs
-  = runST (
+  = runST (do
 	-- copy the old array:
-	thawArray old_array		    `thenST` \ arr ->	
+	arr <- thawArray old_array
 	-- now write the new elements into the new array:
-	fill_it_in arr ivs		    `seqST`
+	fill_it_in arr ivs
 	freezeArray arr
     )
   where
@@ -130,29 +165,28 @@ zap_with_f :: Ix ix => (elt -> elt2 -> elt) -> MutableArray s ix elt -> [(ix,elt
 -- zap_with_f: reads an elem out first, then uses "f" on that and the new value
 
 zap_with_f f arr lst
-  = foldr zap_one (returnST ()) lst
+  = foldr zap_one (return ()) lst
   where
-    zap_one (i, new_v) rst
-      = readArray  arr i		 `thenST`  \ old_v ->
-	writeArray arr i (f old_v new_v) `seqST`
+    zap_one (i, new_v) rst = do
+        old_v <- readArray  arr i
+	writeArray arr i (f old_v new_v)
 	rst
 
 accum f old_array ivs
-  = runST (
+  = runST (do
 	-- copy the old array:
-	thawArray old_array		    `thenST` \ arr ->	
-
+	arr <- thawArray old_array
 	-- now zap the elements in question with "f":
-	zap_with_f f arr ivs		>>
+	zap_with_f f arr ivs
 	freezeArray arr
     )
   where
     bottom = error "Array.accum: error in copying old array\n"
 
 accumArray f zero ixs ivs
-  = runST (
-	newArray ixs zero	>>= \ arr# ->
-	zap_with_f f  arr# ivs	>>
+  = runST (do
+	arr# <- newArray ixs zero
+	zap_with_f f  arr# ivs
 	freezeArray arr#
     )
 \end{code}

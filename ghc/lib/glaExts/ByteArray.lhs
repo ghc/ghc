@@ -33,7 +33,8 @@ module ByteArray
 
 import ArrBase
 import Ix
-import Foreign (Addr, Word)
+import Foreign (Word)
+import Addr
 
 \end{code}
 

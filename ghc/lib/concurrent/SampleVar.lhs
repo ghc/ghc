@@ -21,10 +21,11 @@ module SampleVar
        (
          SampleVar,        --:: type _ =
  
-         newSampleVar,     --:: IO (SampleVar a)
-	 emptySampleVar,   --:: SampleVar a -> IO ()
-	 readSample,  	   --:: SampleVar a -> IO a
-	 writeSample  	   --:: SampleVar a -> a -> IO ()
+	 newEmptySampleVar, --:: IO (SampleVar a)
+         newSampleVar,      --:: a -> IO (SampleVar a)
+	 emptySampleVar,    --:: SampleVar a -> IO ()
+	 readSample,  	    --:: SampleVar a -> IO a
+	 writeSample  	    --:: SampleVar a -> a -> IO ()
 
        ) where
 
@@ -39,17 +40,23 @@ type SampleVar a
 
 -- Initally, a @SampleVar@ is empty/unfilled.
 
-newSampleVar :: IO (SampleVar a)
-newSampleVar
- = newEmptyMVar          >>= \ val ->
-   newMVar (0,val)
+newEmptySampleVar :: IO (SampleVar a)
+newEmptySampleVar = do
+   v <- newEmptyMVar
+   newMVar (0,v)
+
+newSampleVar :: a -> IO (SampleVar a)
+newSampleVar a = do
+   v <- newEmptyMVar
+   putMVar v a
+   newMVar (1,v)
 
 emptySampleVar :: SampleVar a -> IO ()
-emptySampleVar v
- = takeMVar v         >>= \ (readers,var) ->
+emptySampleVar v = do
+   (readers, var) <- takeMVar v
    if readers >= 0 then
      putMVar v (0,var)
-   else
+    else
      putMVar v (readers,var)
 
 --
@@ -57,9 +64,9 @@ emptySampleVar v
 -- not filled => try to grab value, empty when read val.
 --
 readSample :: SampleVar a -> IO a
-readSample svar
- = takeMVar svar                >>= \ (readers,val) ->
-   putMVar svar (readers-1,val) >>
+readSample svar = do
+   (readers,val) <- takeMVar svar
+   putMVar svar (readers-1,val)
    takeMVar val
 
 --
@@ -67,11 +74,11 @@ readSample svar
 -- not filled => fill, write val
 --
 writeSample :: SampleVar a -> a -> IO ()
-writeSample svar v
- = takeMVar svar  >>= \ (readers, val) ->
+writeSample svar v = do
+   (readers,val) <- takeMVar svar
    case readers of
      1 -> 
-       swapMVar val v 	    >> 
+       swapMVar val v >> 
        putMVar svar (1,val)
      _ -> 
        putMVar val v >> 

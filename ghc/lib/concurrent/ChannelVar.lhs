@@ -12,8 +12,8 @@ module ChannelVar
 	 {- abstract -}
          CVar,
 	 newCVar,	--:: IO (CVar a)
-	 putCVar,	--:: CVar a -> a -> IO ()
-	 getCVar,	--:: CVar a -> IO a
+	 writeCVar,	--:: CVar a -> a -> IO ()
+	 readCVar,	--:: CVar a -> IO a
 	 MVar
 
        ) where
@@ -35,20 +35,20 @@ data CVar a
         (MVar ())    -- cons -> prod
 
 newCVar :: IO (CVar a)
-putCVar :: CVar a -> a -> IO ()
-getCVar :: CVar a -> IO a
+writeCVar :: CVar a -> a -> IO ()
+readCVar :: CVar a -> IO a
 
 newCVar 
  = newEmptyMVar >>= \ datum ->
    newMVar ()   >>= \ ack ->
    return (CVar datum ack)
 
-putCVar (CVar datum ack) val
+writeCVar (CVar datum ack) val
  = takeMVar ack      >> 
    putMVar datum val >>
    return ()
 
-getCVar (CVar datum ack)
+readCVar (CVar datum ack)
  = takeMVar datum >>= \ val ->
    putMVar ack () >> 
    return val

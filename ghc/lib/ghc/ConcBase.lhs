@@ -11,7 +11,6 @@ Basic concurrency stuff
 module ConcBase(
 		-- Forking and suchlike
 	ST,	forkST,
-	PrimIO, forkPrimIO,
 	IO,	forkIO,	
 	par, fork,
 	threadDelay, threadWaitRead, threadWaitWrite,
@@ -21,7 +20,7 @@ module ConcBase(
     ) where
 
 import PrelBase
-import STBase	( PrimIO(..), ST(..), STret(..), StateAndPtr#(..) )
+import STBase	( ST(..), STret(..), StateAndPtr#(..) )
 import IOBase	( IO(..), IOResult(..), MVar(..) )
 import GHCerr	( parError )
 import PrelBase	( Int(..) )
@@ -48,9 +47,6 @@ forkST (ST action) = ST $ \ s ->
 	let d@(STret _ r) = action s in
 	d `fork` STret s r
 
-forkPrimIO :: PrimIO a -> PrimIO a
-forkPrimIO = forkST
-
 forkIO :: IO () -> IO ()
 forkIO (IO action) = IO $ \ s -> (action s) `fork` IOok s ()
 
@@ -71,11 +67,13 @@ fork x y = case (fork# x) of { 0# -> parError; _ -> y }
 fork x y = y
 #endif
 
+runOrBlockIO m = m			-- ?????
+
 \end{code}
 
 %************************************************************************
 %*									*
-\subsection[PreludeGlaST-mvars]{M-Structures}
+\subsection[mvars]{M-Structures}
 %*									*
 %************************************************************************
 

@@ -13,18 +13,16 @@ concretely; the @IO@ module itself exports abstractly.
 
 module IOBase where
 
+import {-# SOURCE #-} Error
 import STBase
-import UnsafeST
 import PrelTup
-import Foreign
+import Addr
 import PackBase	( unpackCString )
 import PrelBase
 import ArrBase	( ByteArray(..), MutableVar(..) )
-import PrelRead
 
 import GHC
 
-infixr 1 `thenIO_Prim`, `seqIO_Prim`
 \end{code}
 
 %*********************************************************
@@ -33,10 +31,10 @@ infixr 1 `thenIO_Prim`, `seqIO_Prim`
 %*							*
 %*********************************************************
 
-IO is no longer built on top of PrimIO (which is a specialised version
-of the ST monad), instead it is now has its own type.  This is purely
-for efficiency purposes, since we get to remove several levels of
-lifting in the type of the monad.
+IO is no longer built on top of PrimIO (which used to be a specialised
+version of the ST monad), instead it is now has its own type.  This is
+purely for efficiency purposes, since we get to remove several levels
+of lifting in the type of the monad.
 
 \begin{code}
 newtype IO a = IO (State# RealWorld -> IOResult a)
@@ -93,18 +91,13 @@ instance  Show (IO a)  where
 
 %*********************************************************
 %*							*
-\subsection{Coercions to @ST@ and @PrimIO@}
+\subsection{Coercions to @ST@}
 %*							*
 %*********************************************************
 
 \begin{code}
 stToIO	   :: ST RealWorld a -> IO a
-primIOToIO :: PrimIO a       -> IO a
 ioToST	   :: IO a -> ST RealWorld a
-ioToPrimIO :: IO a -> PrimIO       a
-
-primIOToIO = stToIO -- for backwards compatibility
-ioToPrimIO = ioToST
 
 stToIO (ST m) = IO $ \ s -> case (m s) of STret new_s r -> IOok new_s r
 
@@ -113,87 +106,6 @@ ioToST (IO io) = ST $ \ s ->
       IOok   new_s a -> STret new_s a
       IOfail new_s e -> error ("I/O Error (ioToST): " ++ showsPrec 0 e "\n")
 \end{code}
-
-@thenIO_Prim@ is a useful little number for doing _ccall_s in IO-land:
-
-\begin{code}
-thenIO_Prim :: PrimIO a -> (a -> IO b) -> IO b
-seqIO_Prim  :: PrimIO a -> IO b -> IO b
-{-# INLINE thenIO_Prim   #-}
-{-# INLINE seqIO_Prim   #-}
-
-thenIO_Prim (ST m) k = IO $ \ s ->
-    case (m s) of STret new_s m_res -> unIO (k m_res) new_s
-
-seqIO_Prim m k = thenIO_Prim m (\ _ -> k)
-\end{code}
-
-
-%*********************************************************
-%*							*
-\subsection{Error/trace-ish functions}
-%*							*
-%*********************************************************
-
-\begin{code}
-errorIO :: PrimIO () -> a
-
-errorIO (ST io)
-  = case (errorIO# io) of
-      _ -> bottom
-  where
-    bottom = bottom -- Never evaluated
-
---errorIO x = (waitRead#, errorIO#, makeForeignObj#, waitWrite#, (+#))
-
--- error stops execution and displays an error message
-error :: String -> a
-error s = error__ ( \ x -> _ccall_ ErrorHdrHook x ) s
-
-error__ :: (Addr{-FILE *-} -> PrimIO ()) -> String -> a
-
-error__ msg_hdr s
-#ifdef __PARALLEL_HASKELL__
-  = errorIO (msg_hdr sTDERR{-msg hdr-}	>>
-	     _ccall_ fflush sTDERR	>>
-	     fputs sTDERR s		>>
-	     _ccall_ fflush sTDERR	>>
-	     _ccall_ stg_exit (1::Int)
-	    )
-#else
-  = errorIO (msg_hdr sTDERR{-msg hdr-}	>>
-	     _ccall_ fflush sTDERR	>>
-	     fputs sTDERR s		>>
-	     _ccall_ fflush sTDERR	>>
-	     _ccall_ getErrorHandler	>>= \ errorHandler ->
-	     if errorHandler == (-1::Int) then
-		_ccall_ stg_exit (1::Int)
-	     else
-		_casm_ ``%r = (StgStablePtr)(%0);'' errorHandler
-						>>= \ osptr ->
-		_ccall_ decrementErrorCount     >>= \ () ->
-		deRefStablePtr osptr            >>= \ oact ->
-		oact
-	    )
-#endif {- !parallel -}
-  where
-    sTDERR = (``stderr'' :: Addr)
-\end{code}
-
-\begin{code}
-{-# GENERATE_SPECS _trace a #-}
-trace :: String -> a -> a
-
-trace string expr
-  = unsafePerformPrimIO (
-	((_ccall_ PreTraceHook sTDERR{-msg-}):: PrimIO ())  >>
-	fputs sTDERR string				    >>
-	((_ccall_ PostTraceHook sTDERR{-msg-}):: PrimIO ()) >>
-	returnPrimIO expr )
-  where
-    sTDERR = (``stderr'' :: Addr)
-\end{code}
-
 
 %*********************************************************
 %*							*
@@ -204,7 +116,7 @@ trace string expr
 I'm not sure why this little function is here...
 
 \begin{code}
-fputs :: Addr{-FILE*-} -> String -> PrimIO Bool
+fputs :: Addr{-FILE*-} -> String -> IO Bool
 
 fputs stream [] = return True
 
@@ -313,7 +225,7 @@ SOF & 4/96 & added argument to indicate function that flagged error
 \begin{code}
 constructErrorAndFail :: String -> IO a
 constructErrorAndFail call_site
-  = stToIO (constructError call_site) >>= \ io_error ->
+  = constructError call_site >>= \ io_error ->
     fail io_error
 
 \end{code}
@@ -331,7 +243,7 @@ to a value that is one of the \tr{#define}s in @includes/error.h@.
 information.
 
 \begin{code}
-constructError	      :: String -> PrimIO IOError
+constructError	      :: String -> IO IOError
 constructError call_site =
  _casm_ ``%r = ghc_errtype;''    >>= \ (I# errtype#) ->
  _casm_ ``%r = ghc_errstr;''	 >>= \ str ->
@@ -387,6 +299,11 @@ a handles reside in @IOHandle@.
 
 -}
 data MVar a = MVar (SynchVar# RealWorld a)
+
+{-
+  Double sigh - ForeignObj is needed here too to break a cycle.
+-}
+data ForeignObj = ForeignObj ForeignObj#   -- another one
 
 #if defined(__CONCURRENT_HASKELL__)
 type Handle = MVar Handle__
@@ -462,5 +379,10 @@ and terminals will normally be line-buffered.
 \begin{code}
 data BufferMode  
  = NoBuffering | LineBuffering | BlockBuffering (Maybe Int)
-   deriving (Eq, Ord, Read, Show)
+   deriving (Eq, Ord, {-ToDo: Read,-} Show)
+\end{code}
+
+\begin{code}
+performGC :: IO ()
+performGC = _ccall_GC_ StgPerformGarbageCollection
 \end{code}

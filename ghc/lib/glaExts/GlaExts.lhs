@@ -14,32 +14,15 @@ GHC interfaces - instead import the GlaExts rag bag and you should be away!
 module GlaExts
 
        (
-        -- From module STBase, the PrimIO monad 
-        -- (an instance of ST):
-	PrimIO,
         ST, RealWorld,
 
-	thenPrimIO,     -- 
-        returnPrimIO, 
-	seqPrimIO,
-        fixPrimIO, 
-	unsafePerformPrimIO, 
-	unsafeInterleavePrimIO,
+	unsafePerformIO, 
+	unsafeInterleaveIO,
         
-	-- backwards compatibility
-        listPrimIO,        -- :: [PrimIO a] -> PrimIO [a]
-	mapPrimIO,         -- :: (a -> PrimIO b) -> [a] -> PrimIO [b]
-        mapAndUnzipPrimIO, -- :: (a -> PrimIO (b,c)) -> [a] -> PrimIO ([b],[c])
-
-
-        -- operations for interfacing IO and ST/PrimIO
+        -- operations for interfacing IO and ST
         --
         stToIO,       -- :: ST RealWorld a -> IO a
-	primIOToIO,   -- :: PrimIO a       -> IO a
 	ioToST,	      -- :: IO a -> ST RealWorld a
-	ioToPrimIO,   -- :: IO a -> PrimIO       a
-        thenIO_Prim,  -- :: PrimIO a -> (a -> IO b) -> IO b
-        seqIO_Prim,   -- :: PrimIO a -> IO b -> IO b
 
         -- Everything from module ByteArray:
 	module ByteArray,
@@ -61,7 +44,7 @@ module GlaExts
 
 import GHC
 import STBase
-import UnsafeST
+import IOExts
 import PrelBase
 import ByteArray
 import MutableArray

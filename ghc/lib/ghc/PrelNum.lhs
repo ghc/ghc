@@ -21,15 +21,15 @@ module PrelNum where
 
 import PrelBase
 import GHC
-import {-# SOURCE #-}	IOBase	( error )
+import {-# SOURCE #-} Error ( error )
 import PrelList
 
 import ArrBase	( Array, array, (!) )
-import UnsafeST ( unsafePerformPrimIO )
+import Unsafe   ( unsafePerformIO )
 import Ix	( Ix(..) )
-import Foreign	()		-- This import tells the dependency analyser to compile Foreign first.
-				-- There's an implicit dependency on Foreign because the ccalls in
-				-- PrelNum implicitly mention CCallable.
+import CCall	()	-- we need the definitions of CCallable and CReturnable
+			-- for the _ccall_s herein.
+		
 
 infixr 8  ^, ^^, **
 infixl 7  /, %, `quot`, `rem`, `div`, `mod`
@@ -192,12 +192,12 @@ instance  Integral Int	where
     -- OK, so I made it a little stricter.  Shoot me.  (WDP 94/10)
 
     -- following chks for zero divisor are non-standard (WDP)
-    a `quot` b		=  if b /= 0
-			   then a `quotInt` b
-			   else error "Integral.Int.quot{PreludeCore}: divide by 0\n"
-    a `rem` b		=  if b /= 0
-			   then a `remInt` b
-			   else error "Integral.Int.rem{PreludeCore}: divide by 0\n"
+    a `quot` b	=  if b /= 0
+		   then a `quotInt` b
+		   else error "Integral.Int.quot{PreludeCore}: divide by 0\n"
+    a `rem` b	=  if b /= 0
+		   then a `remInt` b
+		   else error "Integral.Int.rem{PreludeCore}: divide by 0\n"
 
     x `div` y = if x > 0 && y < 0	then quotInt (x-y-1) y
 		else if x < 0 && y > 0	then quotInt (x-y+1) y
@@ -325,8 +325,12 @@ instance  Integral Integer where
     -- the rest are identical to the report default methods;
     -- you get slightly better code if you let the compiler
     -- see them right here:
-    n `quot` d	=  q  where (q,r) = quotRem n d
-    n `rem` d	=  r  where (q,r) = quotRem n d
+    n `quot` d	=  if d /= 0 then q else 
+		     error "Integral.Integer.quot{PreludeCore}: divide by 0\n"  
+		   where (q,r) = quotRem n d
+    n `rem` d	=  if d /= 0 then r else 
+		     error "Integral.Integer.quot{PreludeCore}: divide by 0\n"  
+		   where (q,r) = quotRem n d
     n `div` d	=  q  where (q,r) = divMod n d
     n `mod` d	=  r  where (q,r) = divMod n d
 
@@ -493,13 +497,13 @@ instance  RealFloat Float  where
     scaleFloat k x	= case decodeFloat x of
 			    (m,n) -> encodeFloat m (n+k)
     isNaN x = 
-      (0::Int) /= unsafePerformPrimIO (_ccall_ isFloatNaN x) {- a _pure_function! -}
+      (0::Int) /= unsafePerformIO (_ccall_ isFloatNaN x) {- a _pure_function! -}
     isInfinite x =
-      (0::Int) /= unsafePerformPrimIO (_ccall_ isFloatInfinite x) {- ditto! -}
+      (0::Int) /= unsafePerformIO (_ccall_ isFloatInfinite x) {- ditto! -}
     isDenormalized x =
-      (0::Int) /= unsafePerformPrimIO (_ccall_ isFloatDenormalized x) -- ..
+      (0::Int) /= unsafePerformIO (_ccall_ isFloatDenormalized x) -- ..
     isNegativeZero x =
-      (0::Int) /= unsafePerformPrimIO (_ccall_ isFloatNegativeZero x) -- ...
+      (0::Int) /= unsafePerformIO (_ccall_ isFloatNegativeZero x) -- ...
     isIEEE x    = True
 
 instance  Show Float  where
@@ -645,13 +649,13 @@ instance  RealFloat Double  where
     scaleFloat k x	= case decodeFloat x of
 			    (m,n) -> encodeFloat m (n+k)
     isNaN x = 
-      (0::Int) /= unsafePerformPrimIO (_ccall_ isDoubleNaN x) {- a _pure_function! -}
+      (0::Int) /= unsafePerformIO (_ccall_ isDoubleNaN x) {- a _pure_function! -}
     isInfinite x =
-      (0::Int) /= unsafePerformPrimIO (_ccall_ isDoubleInfinite x) {- ditto -}
+      (0::Int) /= unsafePerformIO (_ccall_ isDoubleInfinite x) {- ditto -}
     isDenormalized x =
-      (0::Int) /= unsafePerformPrimIO (_ccall_ isDoubleDenormalized x) -- ..
+      (0::Int) /= unsafePerformIO (_ccall_ isDoubleDenormalized x) -- ..
     isNegativeZero x =
-      (0::Int) /= unsafePerformPrimIO (_ccall_ isDoubleNegativeZero x) -- ...
+      (0::Int) /= unsafePerformIO (_ccall_ isDoubleNegativeZero x) -- ...
     isIEEE x    = True
 
 instance  Show Double  where

@@ -4,14 +4,14 @@
 
 \section[PrelRead]{Module @PrelRead@}
 
-The @Read@ class and many of its instances.
+Instances of the Read class.
 
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
 
 module PrelRead where
 
-import {-# SOURCE #-}	IOBase	( error )
+import {-# SOURCE #-} Error ( error )
 import PrelNum
 import PrelList
 import PrelTup
@@ -32,6 +32,117 @@ class  Read a  where
 
     readList  :: ReadS [a]
     readList   = readList__ reads
+\end{code}
+
+%*********************************************************
+%*							*
+\subsection{Utility functions}
+%*							*
+%*********************************************************
+
+\begin{code}
+reads           :: (Read a) => ReadS a
+reads           =  readsPrec 0
+
+read            :: (Read a) => String -> a
+read s          =  case [x | (x,t) <- reads s, ("","") <- lex t] of
+                        [x] -> x
+                        []  -> error "PreludeText.read: no parse"
+                        _   -> error "PreludeText.read: ambiguous parse"
+
+readParen       :: Bool -> ReadS a -> ReadS a
+readParen b g   =  if b then mandatory else optional
+                   where optional r  = g r ++ mandatory r
+                         mandatory r = [(x,u) | ("(",s) <- lex r,
+                                                (x,t)   <- optional s,
+                                                (")",u) <- lex t    ]
+
+
+{-# GENERATE_SPECS readList__ a #-}
+readList__ :: ReadS a -> ReadS [a]
+
+readList__ readx
+  = readParen False (\r -> [pr | ("[",s)  <- lex r, pr <- readl s])
+  where readl  s = [([],t)   | ("]",t)  <- lex s] ++
+		   [(x:xs,u) | (x,t)    <- readx s,
+			       (xs,u)   <- readl2 t]
+	readl2 s = [([],t)   | ("]",t)  <- lex s] ++
+		   [(x:xs,v) | (",",t)  <- lex s,
+			       (x,u)    <- readx t,
+			       (xs,v)   <- readl2 u]
+\end{code}
+
+
+%*********************************************************
+%*							*
+\subsection{Lexical analysis}
+%*							*
+%*********************************************************
+
+This lexer is not completely faithful to the Haskell lexical syntax.
+Current limitations:
+   Qualified names are not handled properly
+   A `--' does not terminate a symbol
+   Octal and hexidecimal numerics are not recognized as a single token
+
+\begin{code}
+lex                   :: ReadS String
+
+lex ""                = [("","")]
+lex (c:s) | isSpace c = lex (dropWhile isSpace s)
+lex ('\'':s)          = [('\'':ch++"'", t) | (ch,'\'':t)  <- lexLitChar s,
+                                              ch /= "'"                ]
+lex ('"':s)           = [('"':str, t)      | (str,t) <- lexString s]
+                        where
+                        lexString ('"':s) = [("\"",s)]
+                        lexString s = [(ch++str, u)
+                                              | (ch,t)  <- lexStrItem s,
+                                                (str,u) <- lexString t  ]
+
+                        lexStrItem ('\\':'&':s) = [("\\&",s)]
+                        lexStrItem ('\\':c:s) | isSpace c
+                            = [("\\&",t) | '\\':t <- [dropWhile isSpace s]]
+                        lexStrItem s            = lexLitChar s
+
+lex (c:s) | isSingle c = [([c],s)]
+          | isSym c    = [(c:sym,t)       | (sym,t) <- [span isSym s]]
+          | isAlpha c  = [(c:nam,t)       | (nam,t) <- [span isIdChar s]]
+          | isDigit c  = [(c:ds++fe,t)    | (ds,s)  <- [span isDigit s],
+                                            (fe,t)  <- lexFracExp s     ]
+          | otherwise  = []    -- bad character
+             where
+              isSingle c =  c `elem` ",;()[]{}_`"
+              isSym c    =  c `elem` "!@#$%&*+./<=>?\\^|:-~"
+              isIdChar c =  isAlphanum c || c `elem` "_'"
+
+              lexFracExp ('.':cs)   = [('.':ds++e,u) | (ds,t) <- lex0Digits cs,
+                                                       (e,u)  <- lexExp t]
+              lexFracExp s          = [("",s)]
+
+              lexExp (e:s) | e `elem` "eE"
+                       = [(e:c:ds,u) | (c:t)  <- [s], c `elem` "+-",
+                                                 (ds,u) <- lexDigits t] ++
+                         [(e:ds,t)   | (ds,t) <- lexDigits s]
+              lexExp s = [("",s)]
+
+lexDigits               :: ReadS String 
+lexDigits               =  nonnull isDigit
+
+-- 0 or more digits
+lex0Digits               :: ReadS String 
+lex0Digits  s            =  [span isDigit s]
+
+nonnull                 :: (Char -> Bool) -> ReadS String
+nonnull p s             =  [(cs,t) | (cs@(_:_),t) <- [span p s]]
+
+lexLitChar              :: ReadS String
+lexLitChar ('\\':s)     =  [('\\':esc, t) | (esc,t) <- lexEsc s]
+        where
+        lexEsc (c:s)     | c `elem` "abfnrtv\\\"'" = [([c],s)]
+        lexEsc s@(d:_)   | isDigit d               = lexDigits s
+        lexEsc _                                   = []
+lexLitChar (c:s)        =  [([c],s)]
+lexLitChar ""           =  []
 \end{code}
 
 %*********************************************************
@@ -156,46 +267,6 @@ instance (Read a, Read b, Read c, Read d, Read e) => Read (a, b, c, d, e) where
 					       (v,k)   <- readsPrec 0 j,
 					       (")",l) <- lex k ] )
 \end{code}
-
-
-
-%*********************************************************
-%*							*
-\subsection{Utility functions}
-%*							*
-%*********************************************************
-
-\begin{code}
-reads           :: (Read a) => ReadS a
-reads           =  readsPrec 0
-
-read            :: (Read a) => String -> a
-read s          =  case [x | (x,t) <- reads s, ("","") <- lex t] of
-                        [x] -> x
-                        []  -> error "PreludeText.read: no parse"
-                        _   -> error "PreludeText.read: ambiguous parse"
-
-readParen       :: Bool -> ReadS a -> ReadS a
-readParen b g   =  if b then mandatory else optional
-                   where optional r  = g r ++ mandatory r
-                         mandatory r = [(x,u) | ("(",s) <- lex r,
-                                                (x,t)   <- optional s,
-                                                (")",u) <- lex t    ]
-
-{-# GENERATE_SPECS readList__ a #-}
-readList__ :: ReadS a -> ReadS [a]
-
-readList__ readx
-  = readParen False (\r -> [pr | ("[",s)  <- lex r, pr <- readl s])
-  where readl  s = [([],t)   | ("]",t)  <- lex s] ++
-		   [(x:xs,u) | (x,t)    <- readx s,
-			       (xs,u)   <- readl2 t]
-	readl2 s = [([],t)   | ("]",t)  <- lex s] ++
-		   [(x:xs,v) | (",",t)  <- lex s,
-			       (x,u)    <- readx t,
-			       (xs,v)   <- readl2 u]
-\end{code}
-
 
 
 %*********************************************************
@@ -327,79 +398,6 @@ readRational__ top_s
 --	Matula, D. W.  A formalization of floating-point numeric base
 --	conversion.  IEEE Transactions on Computers C-19, 8 (1970 August),
 --	681-692.
-\end{code}
-
-
-%*********************************************************
-%*							*
-\subsection{Lexical analysis}
-%*							*
-%*********************************************************
-
-This lexer is not completely faithful to the Haskell lexical syntax.
-Current limitations:
-   Qualified names are not handled properly
-   A `--' does not terminate a symbol
-   Octal and hexidecimal numerics are not recognized as a single token
-
-\begin{code}
-lex                   :: ReadS String
-
-lex ""                = [("","")]
-lex (c:s) | isSpace c = lex (dropWhile isSpace s)
-lex ('\'':s)          = [('\'':ch++"'", t) | (ch,'\'':t)  <- lexLitChar s,
-                                              ch /= "'"                ]
-lex ('"':s)           = [('"':str, t)      | (str,t) <- lexString s]
-                        where
-                        lexString ('"':s) = [("\"",s)]
-                        lexString s = [(ch++str, u)
-                                              | (ch,t)  <- lexStrItem s,
-                                                (str,u) <- lexString t  ]
-
-                        lexStrItem ('\\':'&':s) = [("\\&",s)]
-                        lexStrItem ('\\':c:s) | isSpace c
-                            = [("\\&",t) | '\\':t <- [dropWhile isSpace s]]
-                        lexStrItem s            = lexLitChar s
-
-lex (c:s) | isSingle c = [([c],s)]
-          | isSym c    = [(c:sym,t)       | (sym,t) <- [span isSym s]]
-          | isAlpha c  = [(c:nam,t)       | (nam,t) <- [span isIdChar s]]
-          | isDigit c  = [(c:ds++fe,t)    | (ds,s)  <- [span isDigit s],
-                                            (fe,t)  <- lexFracExp s     ]
-          | otherwise  = []    -- bad character
-             where
-              isSingle c =  c `elem` ",;()[]{}_`"
-              isSym c    =  c `elem` "!@#$%&*+./<=>?\\^|:-~"
-              isIdChar c =  isAlphanum c || c `elem` "_'"
-
-              lexFracExp ('.':cs)   = [('.':ds++e,u) | (ds,t) <- lex0Digits cs,
-                                                       (e,u)  <- lexExp t]
-              lexFracExp s          = [("",s)]
-
-              lexExp (e:s) | e `elem` "eE"
-                       = [(e:c:ds,u) | (c:t)  <- [s], c `elem` "+-",
-                                                 (ds,u) <- lexDigits t] ++
-                         [(e:ds,t)   | (ds,t) <- lexDigits s]
-              lexExp s = [("",s)]
-
-lexDigits               :: ReadS String 
-lexDigits               =  nonnull isDigit
-
--- 0 or more digits
-lex0Digits               :: ReadS String 
-lex0Digits  s            =  [span isDigit s]
-
-nonnull                 :: (Char -> Bool) -> ReadS String
-nonnull p s             =  [(cs,t) | (cs@(_:_),t) <- [span p s]]
-
-lexLitChar              :: ReadS String
-lexLitChar ('\\':s)     =  [('\\':esc, t) | (esc,t) <- lexEsc s]
-        where
-        lexEsc (c:s)     | c `elem` "abfnrtv\\\"'" = [([c],s)]
-        lexEsc s@(d:_)   | isDigit d               = lexDigits s
-        lexEsc _                                   = []
-lexLitChar (c:s)        =  [([c],s)]
-lexLitChar ""           =  []
 \end{code}
 
 

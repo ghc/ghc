@@ -13,7 +13,7 @@ module PrelBase(
 				-- to import it explicitly
   ) where
 
-import {-# SOURCE #-}	IOBase	( error )	
+import {-# SOURCE #-} Error ( error )
 import GHC
 
 infixr 9  .

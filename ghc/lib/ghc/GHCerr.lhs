@@ -18,7 +18,7 @@ module GHCerr where
 --import Prelude
 import PrelBase
 import PrelList ( span )
-import IOBase
+import Error
 
 ---------------------------------------------------------------
 -- HACK: Magic unfoldings not implemented for unboxed lists
