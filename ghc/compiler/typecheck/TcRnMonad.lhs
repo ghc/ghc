@@ -582,7 +582,13 @@ updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt }) ->
 getInstLoc :: InstOrigin -> TcM InstLoc
 getInstLoc origin
   = do { loc <- getSrcLocM ; env <- getLclEnv ;
-	 return (origin, loc, (tcl_ctxt env)) }
+	 return (InstLoc origin loc (tcl_ctxt env)) }
+
+addInstCtxt :: InstLoc -> TcM a -> TcM a
+-- Add the SrcLoc and context from the first Inst in the list
+-- 	(they all have similar locations)
+addInstCtxt (InstLoc _ src_loc ctxt) thing_inside
+  = addSrcLoc src_loc (updCtxt (\ old_ctxt -> ctxt) thing_inside)
 \end{code}
 
     The addErrTc functions add an error message, but do not cause failure.
@@ -601,12 +607,6 @@ addErrTcM (tidy_env, err_msg)
   = do { ctxt <- getErrCtxt ;
 	 loc  <- getSrcLocM ;
 	 add_err_tcm tidy_env err_msg loc ctxt }
-
-addInstErrTcM :: InstLoc -> (TidyEnv, Message) -> TcM ()
-addInstErrTcM inst_loc@(_, loc, ctxt) (tidy_env, err_msg)
-  = add_err_tcm tidy_env err_msg loc full_ctxt
-  where
-    full_ctxt = (\env -> returnM (env, pprInstLoc inst_loc)) : ctxt
 \end{code}
 
 The failWith functions add an error message and cause failure

@@ -14,7 +14,7 @@ module TcMType (
   newTyVar, 
   newTyVarTy,		-- Kind -> TcM TcType
   newTyVarTys,		-- Int -> Kind -> TcM [TcType]
-  newKindVar, newKindVars, newBoxityVar,
+  newKindVar, newKindVars, newOpenTypeKind,
   putTcTyVar, getTcTyVar,
   newMutTyVar, readMutTyVar, writeMutTyVar, 
 
@@ -46,14 +46,14 @@ module TcMType (
 
 -- friends:
 import TypeRep		( Type(..), SourceType(..), TyNote(..),	 -- Friend; can see representation
-			  Kind, ThetaType
+			  Kind, ThetaType, typeCon
 			) 
 import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  TcTyVarSet, TcKind, TcTyVar, TyVarDetails(..),
 			  tcEqType, tcCmpPred, isClassPred,
 			  tcSplitPhiTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
 			  tcSplitTyConApp_maybe, tcSplitForAllTys,
-			  tcIsTyVarTy, tcSplitSigmaTy, 
+			  tcIsTyVarTy, tcSplitSigmaTy, mkTyConApp,
 			  isUnLiftedType, isIPPred, isHoleTyVar, isTyVarTy,
 
 			  mkAppTy, mkTyVarTy, mkTyVarTys, 
@@ -131,11 +131,11 @@ newKindVar
 newKindVars :: Int -> TcM [TcKind]
 newKindVars n = mappM (\ _ -> newKindVar) (nOfThem n ())
 
-newBoxityVar :: TcM TcKind
-newBoxityVar
+newOpenTypeKind :: TcM TcKind	-- Returns the kind (Type bx), where bx is fresh
+newOpenTypeKind
   = newUnique 							  `thenM` \ uniq ->
     newMutTyVar (mkSystemTvNameEncoded uniq FSLIT("bx")) superBoxity VanillaTv  `thenM` \ kv ->
-    returnM (TyVarTy kv)
+    returnM (mkTyConApp typeCon [TyVarTy kv])
 \end{code}
 
 

@@ -31,7 +31,7 @@ module Inst (
 	zonkInst, zonkInsts,
 	instToId, instName,
 
-	InstOrigin(..), InstLoc, pprInstLoc
+	InstOrigin(..), InstLoc(..), pprInstLoc
     ) where
 
 #include "HsVersions.h"
@@ -224,11 +224,13 @@ newDictsFromOld (Dict _ _ loc) theta = newDictsAtLoc loc theta
 newDictsAtLoc :: InstLoc
  	      -> TcThetaType
 	      -> TcM [Inst]
-newDictsAtLoc inst_loc@(_,loc,_) theta
+newDictsAtLoc inst_loc theta
   = newUniqueSupply		`thenM` \ us ->
     returnM (zipWith mk_dict (uniqsFromSupply us) theta)
   where
-    mk_dict uniq pred = Dict (mkLocalId (mkPredName uniq loc pred) (mkPredTy pred)) pred inst_loc
+    mk_dict uniq pred = Dict (mkLocalId (mkPredName uniq loc pred) (mkPredTy pred))
+			     pred inst_loc
+    loc = instLocSrcLoc inst_loc
 
 -- For vanilla implicit parameters, there is only one in scope
 -- at any time, so we used to use the name of the implicit parameter itself
@@ -237,7 +239,7 @@ newDictsAtLoc inst_loc@(_,loc,_) theta
 newIPDict :: InstOrigin -> IPName Name -> Type 
 	  -> TcM (IPName Id, Inst)
 newIPDict orig ip_name ty
-  = getInstLoc orig			`thenM` \ inst_loc@(_,loc,_) ->
+  = getInstLoc orig			`thenM` \ inst_loc@(InstLoc _ loc _) ->
     newUnique				`thenM` \ uniq ->
     let
 	pred = IParam ip_name ty
@@ -341,11 +343,12 @@ tcInstClassOp inst_loc sel_id tys
     newMethod inst_loc sel_id tys [pred] tau
 
 ---------------------------
-newMethod inst_loc@(_,loc,_) id tys theta tau
+newMethod inst_loc id tys theta tau
   = newUnique		`thenM` \ new_uniq ->
     let
 	meth_id	= mkUserLocal (mkMethodOcc (getOccName id)) new_uniq tau loc
 	inst    = Method meth_id id tys theta tau inst_loc
+	loc     = instLocSrcLoc inst_loc
     in
     returnM inst
 \end{code}

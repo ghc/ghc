@@ -7,12 +7,12 @@
 module TcUnify (
 	-- Full-blown subsumption
   tcSubOff, tcSubExp, tcGen, subFunTy, TcHoleType,
-  checkSigTyVars, checkSigTyVarsWrt, sigCtxt, 
+  checkSigTyVars, checkSigTyVarsWrt, sigCtxt, findGlobals,
 
 	-- Various unifications
   unifyTauTy, unifyTauTyList, unifyTauTyLists, 
   unifyFunTy, unifyListTy, unifyPArrTy, unifyTupleTy,
-  unifyKind, unifyKinds, unifyOpenTypeKind,
+  unifyKind, unifyKinds, unifyOpenTypeKind, unifyFunKind,
 
 	-- Coercions
   Coercion, ExprCoFn, PatCoFn, 
@@ -26,8 +26,7 @@ module TcUnify (
 
 import HsSyn		( HsExpr(..) )
 import TcHsSyn		( TypecheckedHsExpr, TcPat, mkHsLet )
-import TypeRep		( Type(..), SourceType(..), TyNote(..),
-			  openKindCon, typeCon )
+import TypeRep		( Type(..), SourceType(..), TyNote(..), openKindCon )
 
 import TcRnMonad         -- TcType, amongst others
 import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
@@ -39,22 +38,22 @@ import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			  typeKind, tcSplitFunTy_maybe, mkForAllTys,
 			  isHoleTyVar, isSkolemTyVar, isUserTyVar, 
 			  tidyOpenType, tidyOpenTypes, tidyOpenTyVar, tidyOpenTyVars,
-			  eqKind, openTypeKind, liftedTypeKind, isTypeKind,
-			  hasMoreBoxityInfo, tyVarBindingInfo, allDistinctTyVars
+			  eqKind, openTypeKind, liftedTypeKind, isTypeKind, mkArrowKind,
+			  hasMoreBoxityInfo, allDistinctTyVars
 			)
 import qualified Type	( getTyVar_maybe )
 import Inst		( newDicts, instToId, tcInstCall )
-import TcMType		( getTcTyVar, putTcTyVar, tcInstType, readHoleResult,
-			  newTyVarTy, newTyVarTys, newBoxityVar, newHoleTyVarTy,
+import TcMType		( getTcTyVar, putTcTyVar, tcInstType, readHoleResult, newKindVar,
+			  newTyVarTy, newTyVarTys, newOpenTypeKind, newHoleTyVarTy, 
 			  zonkTcType, zonkTcTyVars, zonkTcTyVarsAndFV, zonkTcTyVar )
 import TcSimplify	( tcSimplifyCheck )
 import TysWiredIn	( listTyCon, parrTyCon, mkListTy, mkPArrTy, mkTupleTy )
-import TcEnv		( TcTyThing(..), tcGetGlobalTyVars, getLclEnvElts )
+import TcEnv		( TcTyThing(..), tcGetGlobalTyVars, findGlobals )
 import TyCon		( tyConArity, isTupleTyCon, tupleTyConBoxity )
 import PprType		( pprType )
 import Id		( Id, mkSysLocal, idType )
 import Var		( Var, varName, tyVarKind )
-import VarSet		( emptyVarSet, unionVarSet, elemVarSet, varSetElems )
+import VarSet		( emptyVarSet, unitVarSet, unionVarSet, elemVarSet, varSetElems )
 import VarEnv
 import Name		( isSystemName, getSrcLoc )
 import ErrUtils		( Message )
@@ -879,9 +878,7 @@ unify_tuple_ty_help boxity arity ty
 unifyKind :: TcKind		    -- Expected
 	  -> TcKind		    -- Actual
 	  -> TcM ()
-unifyKind k1 k2 
-  = addErrCtxtM (unifyCtxt "kind" k1 k2) $
-    uTys k1 k1 k2 k2
+unifyKind k1 k2 = uTys k1 k1 k2 k2
 
 unifyKinds :: [TcKind] -> [TcKind] -> TcM ()
 unifyKinds []       []       = returnM ()
@@ -906,10 +903,27 @@ unifyOpenTypeKind ty
   | otherwise     = unify_open_kind_help ty
 
 unify_open_kind_help ty	-- Revert to ordinary unification
-  = newBoxityVar 	`thenM` \ boxity ->
-    unifyKind ty (mkTyConApp typeCon [boxity])
+  = newOpenTypeKind 	`thenM` \ open_kind ->
+    unifyKind ty open_kind
 \end{code}
 
+\begin{code}
+unifyFunKind :: TcKind -> TcM (Maybe (TcKind, TcKind))
+-- Like unifyFunTy, but does not fail; instead just returns Nothing
+
+unifyFunKind (TyVarTy tyvar)
+  = getTcTyVar tyvar	`thenM` \ maybe_ty ->
+    case maybe_ty of
+	Just fun_kind -> unifyFunKind fun_kind
+	Nothing       -> newKindVar	`thenM` \ arg_kind ->
+			 newKindVar	`thenM` \ res_kind ->
+			 putTcTyVar tyvar (mkArrowKind arg_kind res_kind)	`thenM_`
+			 returnM (Just (arg_kind,res_kind))
+    
+unifyFunKind (FunTy arg_kind res_kind) = returnM (Just (arg_kind,res_kind))
+unifyFunKind (NoteTy _ ty)	       = unifyFunKind ty
+unifyFunKind other	   	       = returnM Nothing
+\end{code}
 
 %************************************************************************
 %*									*
@@ -1117,8 +1131,7 @@ check_sig_tyvars extra_tvs sig_tvs
 			-- Game plan: 
 			--       get the local TcIds and TyVars from the environment,
 			-- 	 and pass them to find_globals (they might have tv free)
-	    then   getLclEnvElts			`thenM` \ ve ->
-        	   find_globals tv tidy_env ve		`thenM` \ (tidy_env1, globs) ->
+	    then   findGlobals (unitVarSet tv) tidy_env 	`thenM` \ (tidy_env1, globs) ->
 		   returnM (tidy_env1, acc, escape_msg sig_tyvar tv globs : msgs)
 
 	    else 	-- All OK
@@ -1128,59 +1141,6 @@ check_sig_tyvars extra_tvs sig_tvs
 
 
 \begin{code}
------------------------
--- find_globals looks at the value environment and finds values
--- whose types mention the offending type variable.  It has to be 
--- careful to zonk the Id's type first, so it has to be in the monad.
--- We must be careful to pass it a zonked type variable, too.
-
-find_globals :: Var 
-             -> TidyEnv 
-             -> [TcTyThing] 
-             -> TcM (TidyEnv, [SDoc])
-
-find_globals tv tidy_env things
-  = go tidy_env [] things
-  where
-    go tidy_env acc [] = returnM (tidy_env, acc)
-    go tidy_env acc (thing : things)
-      = find_thing ignore_it tidy_env thing 	`thenM` \ (tidy_env1, maybe_doc) ->
-	case maybe_doc of
-	  Just d  -> go tidy_env1 (d:acc) things
-	  Nothing -> go tidy_env1 acc     things
-
-    ignore_it ty = not (tv `elemVarSet` tyVarsOfType ty)
-
------------------------
-find_thing ignore_it tidy_env (ATcId id _)
-  = zonkTcType  (idType id)	`thenM` \ id_ty ->
-    if ignore_it id_ty then
-	returnM (tidy_env, Nothing)
-    else let
-	(tidy_env', tidy_ty) = tidyOpenType tidy_env id_ty
-	msg = sep [ppr id <+> dcolon <+> ppr tidy_ty, 
-		   nest 2 (parens (ptext SLIT("bound at") <+>
-			 	   ppr (getSrcLoc id)))]
-    in
-    returnM (tidy_env', Just msg)
-
-find_thing ignore_it tidy_env (ATyVar tv)
-  = zonkTcTyVar tv		`thenM` \ tv_ty ->
-    if ignore_it tv_ty then
-	returnM (tidy_env, Nothing)
-    else let
-	(tidy_env1, tv1)     = tidyOpenTyVar tidy_env  tv
-	(tidy_env2, tidy_ty) = tidyOpenType  tidy_env1 tv_ty
-	msg = sep [ppr tv1 <+> eq_stuff, nest 2 bound_at]
-
-	eq_stuff | Just tv' <- Type.getTyVar_maybe tv_ty, tv == tv' = empty
-		 | otherwise	  				    = equals <+> ppr tv_ty
-		-- It's ok to use Type.getTyVar_maybe because ty is zonked by now
-	
-	bound_at = tyVarBindingInfo tv
-    in
-    returnM (tidy_env2, Just msg)
-
 -----------------------
 escape_msg sig_tv tv globs
   = mk_msg sig_tv <+> ptext SLIT("escapes") $$

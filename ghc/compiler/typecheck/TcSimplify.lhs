@@ -19,7 +19,7 @@ module TcSimplify (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TcUnify( unifyTauTy )
-
+import TcEnv	-- temp
 import HsSyn		( MonoBinds(..), HsExpr(..), andMonoBinds, andMonoBindList )
 import TcHsSyn		( TcExpr, TcId,
 			  TcMonoBinds, TcDictBinds
@@ -39,7 +39,7 @@ import Inst		( lookupInst, LookupInstResult(..),
 			  Inst, pprInsts, pprInstsInFull,
 			  isIPDict, isInheritableInst
 			)
-import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv, tcLookupId )
+import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv, tcLookupId, findGlobals )
 import InstEnv		( lookupInstEnv, classInstEnv, InstLookupResult(..) )
 import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, checkAmbiguity )
 import TcType		( TcTyVar, TcTyVarSet, ThetaType, TyVarDetails(VanillaTv),
@@ -57,7 +57,9 @@ import PrelNames	( splitName, fstName, sndName )
 
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
 import TysWiredIn	( unitTy, pairTyCon )
+import ErrUtils		( Message )
 import VarSet
+import VarEnv		( TidyEnv )
 import FiniteMap
 import Outputable
 import ListSetOps	( equivClasses )
@@ -1607,7 +1609,9 @@ It's OK: the final zonking stage should zap y to (), which is fine.
 \begin{code}
 tcSimplifyTop :: [Inst] -> TcM TcDictBinds
 tcSimplifyTop wanteds
-  = simpleReduceLoop (text "tcSimplTop") reduceMe wanteds	`thenM` \ (frees, binds, irreds) ->
+  = getLclEnvElts	`thenM` \ lcl_env ->
+    traceTc (text "tcSimplifyTop" <+> ppr lcl_env) 	`thenM_`
+    simpleReduceLoop (text "tcSimplTop") reduceMe wanteds	`thenM` \ (frees, binds, irreds) ->
     ASSERT( null frees )
 
     let
@@ -1634,8 +1638,8 @@ tcSimplifyTop wanteds
     in
 
 	-- Report definite errors
-    mappM (addTopInstanceErrs tidy_env) (groupInsts no_insts)	`thenM_`
-    mappM (addTopIPErrs tidy_env)       (groupInsts bad_ips)		`thenM_`
+    addTopInstanceErrs tidy_env no_insts	`thenM_`
+    addTopIPErrs tidy_env bad_ips		`thenM_`
 
 	-- Deal with ambiguity errors, but only if
 	-- if there has not been an error so far; errors often
@@ -1648,7 +1652,7 @@ tcSimplifyTop wanteds
 	--	e.g. Num (IO a) and Eq (Int -> Int)
 	-- and ambiguous dictionaries
 	--	e.g. Num a
-	mappM (addAmbigErr tidy_env)	ambigs	`thenM_`
+	addTopAmbigErrs (tidy_env, ambigs)	`thenM_`
 
 	-- Disambiguate the ones that look feasible
         mappM disambigGroup std_oks
@@ -1731,7 +1735,7 @@ disambigGroup dicts
     tryM (try_default default_tys)	`thenM` \ mb_ty ->
     case mb_ty of {
 	Left _ -> 	-- If not, add an AmbigErr
-		  addAmbigErrs dicts	`thenM_`
+		  addTopAmbigErrs (tidyInsts dicts)	`thenM_`
 		  returnM EmptyMonoBinds ;
 
 	Right chosen_default_ty ->
@@ -1748,11 +1752,11 @@ disambigGroup dicts
   | all isCreturnableClass classes
   = 	-- Default CCall stuff to (); we don't even both to check that () is an
 	-- instance of CReturnable, because we know it is.
-    unifyTauTy (mkTyVarTy tyvar) unitTy    `thenM_`
+    unifyTauTy (mkTyVarTy tyvar) unitTy	`thenM_`
     returnM EmptyMonoBinds
 
   | otherwise -- No defaults
-  = addAmbigErrs dicts	`thenM_`
+  = addTopAmbigErrs (tidyInsts dicts)	`thenM_`
     returnM EmptyMonoBinds
 
   where
@@ -1901,61 +1905,98 @@ from the insts, or just whatever seems to be around in the monad just
 now?
 
 \begin{code}
-groupInsts :: [Inst] -> [[Inst]]
+groupErrs :: ([Inst] -> TcM ())	-- Deal with one group
+	  -> [Inst]		-- The offending Insts
+          -> TcM ()
 -- Group together insts with the same origin
 -- We want to report them together in error messages
-groupInsts [] 		= []
-groupInsts (inst:insts) = (inst:friends) : groupInsts others
-			where
-				-- (It may seem a bit crude to compare the error messages,
-				--  but it makes sure that we combine just what the user sees,
-				--  and it avoids need equality on InstLocs.)
-			  (friends, others) = partition is_friend insts
-			  loc_msg	    = showSDoc (pprInstLoc (instLoc inst))
-			  is_friend friend  = showSDoc (pprInstLoc (instLoc friend)) == loc_msg
+
+groupErrs report_err [] 
+  = returnM ()
+groupErrs report_err (inst:insts) 
+  = do_one (inst:friends)		`thenM_`
+    groupErrs report_err others
+
+  where
+	-- (It may seem a bit crude to compare the error messages,
+	--  but it makes sure that we combine just what the user sees,
+	--  and it avoids need equality on InstLocs.)
+   (friends, others) = partition is_friend insts
+   loc_msg	     = showSDoc (pprInstLoc (instLoc inst))
+   is_friend friend  = showSDoc (pprInstLoc (instLoc friend)) == loc_msg
+   do_one insts = addInstCtxt (instLoc (head insts)) (report_err insts)
+		-- Add location and context information derived from the Insts
+
+-- Add the "arising from..." part to a message about bunch of dicts
+addInstLoc :: [Inst] -> Message -> Message
+addInstLoc insts msg = msg $$ nest 2 (pprInstLoc (instLoc (head insts)))
 
 plural [x] = empty
 plural xs  = char 's'
 
+
 addTopIPErrs tidy_env tidy_dicts
-  = addInstErrTcM (instLoc (head tidy_dicts))
-	(tidy_env,
-	 ptext SLIT("Unbound implicit parameter") <> plural tidy_dicts <+> pprInsts tidy_dicts)
+  = groupErrs report tidy_dicts
+  where
+    report dicts = addErrTcM (tidy_env, mk_msg dicts)
+    mk_msg dicts = addInstLoc dicts (ptext SLIT("Unbound implicit parameter") <> 
+				     plural tidy_dicts <+> pprInsts tidy_dicts)
 
 -- Used for top-level irreducibles
 addTopInstanceErrs tidy_env tidy_dicts
-  = addInstErrTcM (instLoc (head tidy_dicts))
-	(tidy_env,
-	 ptext SLIT("No instance") <> plural tidy_dicts <+> 
-	 	ptext SLIT("for") <+> pprInsts tidy_dicts)
-
-addAmbigErrs dicts
-  = mappM (addAmbigErr tidy_env) tidy_dicts
+  = groupErrs report tidy_dicts
   where
-    (tidy_env, tidy_dicts) = tidyInsts dicts
+    report dicts = mkMonomorphismMsg tidy_env dicts 	`thenM` \ (tidy_env, mono_msg) ->
+		   addErrTcM (tidy_env, mk_msg dicts $$ mono_msg)
+    mk_msg dicts = addInstLoc dicts (ptext SLIT("No instance") <> plural tidy_dicts <+> 
+				     ptext SLIT("for") <+> pprInsts tidy_dicts)
+		   
 
-addAmbigErr tidy_env tidy_dict
-  = addInstErrTcM (instLoc tidy_dict)
-	(tidy_env,
-	 sep [text "Ambiguous type variable(s)" <+> pprQuotedList ambig_tvs,
-	      nest 4 (text "in the constraint" <+> quotes (pprInst tidy_dict))])
+addTopAmbigErrs (tidy_env, tidy_dicts)
+  = groupErrs report tidy_dicts
   where
-    ambig_tvs = varSetElems (tyVarsOfInst tidy_dict)
+    report dicts = mkMonomorphismMsg tidy_env dicts 	`thenM` \ (tidy_env, mono_msg) ->
+		   addErrTcM (tidy_env, mk_msg dicts $$ mono_msg)
+    mk_msg dicts = addInstLoc dicts $
+		   sep [text "Ambiguous type variable(s)" <+> pprQuotedList ambig_tvs,
+		        nest 2 (text "in the constraint" <> plural dicts <+> pprInsts dicts)]
+		where
+		   ambig_tvs = varSetElems (tyVarsOfInsts dicts)
 
+mkMonomorphismMsg :: TidyEnv -> [Inst] -> TcM (TidyEnv, Message)
+-- There's an error with these Insts; if they have free type variables
+-- it's probably caused by the monomorphism restriction. 
+-- Try to identify the offending variable
+-- ASSUMPTION: the Insts are fully zonked
+mkMonomorphismMsg tidy_env insts
+  | isEmptyVarSet inst_tvs
+  = returnM (tidy_env, empty)
+  | otherwise
+  = findGlobals inst_tvs tidy_env	`thenM` \ (tidy_env, docs) ->
+    returnM (tidy_env, mk_msg docs)
+
+  where
+    inst_tvs = tyVarsOfInsts insts
+
+    mk_msg []   = empty		-- This happens in things like
+				--	f x = show (read "foo")
+				-- whre monomorphism doesn't play any role
+    mk_msg docs = vcat [ptext SLIT("Possible cause: the monomorphism restriction applied to the following:"),
+			nest 2 (vcat docs)]
+    
 warnDefault dicts default_ty
   = doptM Opt_WarnTypeDefaults  `thenM` \ warn_flag ->
-    addSrcLoc (get_loc (head dicts)) (warnTc warn_flag warn_msg)
+    addInstCtxt (instLoc (head dicts)) (warnTc warn_flag warn_msg)
   where
 	-- Tidy them first
     (_, tidy_dicts) = tidyInsts dicts
-    get_loc i = case instLoc i of { (_,loc,_) -> loc }
     warn_msg  = vcat [ptext SLIT("Defaulting the following constraint(s) to type") <+>
 				quotes (ppr default_ty),
 		      pprInstsInFull tidy_dicts]
 
 complainCheck doc givens irreds
-  = mappM zonkInst given_dicts_and_ips		 	  `thenM` \ givens' ->
-    mappM (addNoInstanceErrs doc givens') (groupInsts irreds)  `thenM_`
+  = mappM zonkInst given_dicts_and_ips		 	`thenM` \ givens' ->
+    groupErrs (addNoInstanceErrs doc givens') irreds	`thenM_`
     returnM ()
   where
     given_dicts_and_ips = filter (not . isMethod) givens
@@ -1969,7 +2010,8 @@ addNoInstanceErrs what_doc givens dicts
     	(tidy_env1, tidy_givens) = tidyInsts givens
 	(tidy_env2, tidy_dicts)  = tidyMoreInsts tidy_env1 dicts
 
-    	doc = vcat [sep [herald <+> pprInsts tidy_dicts,
+    	doc = vcat [addInstLoc dicts $
+		    sep [herald <+> pprInsts tidy_dicts,
 			 nest 4 $ ptext SLIT("from the context") <+> pprInsts tidy_givens],
 		    ambig_doc,
 		    ptext SLIT("Probable fix:"),
@@ -2016,7 +2058,7 @@ addNoInstanceErrs what_doc givens dicts
 		where
     		  (clas,tys) = getDictClassTys dict
     in
-    addInstErrTcM (instLoc (head dicts)) (tidy_env2, doc)
+    addErrTcM (tidy_env2, doc)
 
 -- Used for the ...Thetas variants; all top level
 noInstErr pred = ptext SLIT("No instance for") <+> quotes (ppr pred)

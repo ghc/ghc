@@ -28,18 +28,19 @@ import TcEnv		( tcExtendTyVarEnv, tcLookup, tcLookupGlobal,
 		 	  TyThing(..), TcTyThing(..), tcExtendKindEnv,
 			  getInLocalScope
 			)
-import TcMType		( newMutTyVar, newKindVar, zonkKindEnv, tcInstType,
-			  checkValidType, UserTypeCtxt(..), pprUserTypeCtxt
+import TcMType		( newMutTyVar, newKindVar, zonkKindEnv, tcInstType, zonkTcType,
+			  checkValidType, UserTypeCtxt(..), pprUserTypeCtxt, newOpenTypeKind
 			)
-import TcUnify		( unifyKind, unifyOpenTypeKind )
+import TcUnify		( unifyKind, unifyOpenTypeKind, unifyFunKind )
 import TcType		( Type, Kind, SourceType(..), ThetaType, TyVarDetails(..),
 			  TcTyVar, TcKind, TcThetaType, TcTauType,
-			  mkTyVarTy, mkTyVarTys, mkFunTy, 
+			  mkTyVarTy, mkTyVarTys, mkFunTy, isTypeKind,
 		 	  zipFunTys, mkForAllTys, mkFunTys, tcEqType, isPredTy,
 			  mkSigmaTy, mkPredTy, mkGenTyConApp, mkTyConApp, mkAppTys, 
-			  liftedTypeKind, unliftedTypeKind, mkArrowKind,
+			  liftedTypeKind, unliftedTypeKind, mkArrowKind, eqKind,
 			  mkArrowKinds, tcSplitFunTy_maybe, tcSplitForAllTys
 			)
+import qualified Type	( splitFunTys )
 import Inst		( Inst, InstOrigin(..), newMethod, instToId )
 
 import Id		( mkLocalId, idName, idType )
@@ -237,44 +238,44 @@ newNamedKindVar name = newKindVar	`thenM` \ kind ->
 		       returnM (name, kind)
 
 ---------------------------
-kcLiftedType :: RenamedHsType -> TcM ()
+kcLiftedType :: RenamedHsType -> TcM Kind
 	-- The type ty must be a *lifted* *type*
-kcLiftedType ty
-  = kcHsType ty				`thenM` \ kind ->
-    addErrCtxt (typeKindCtxt ty)	$
-    unifyKind liftedTypeKind kind
+kcLiftedType ty = kcHsType ty	`thenM` \ act_kind ->
+		  checkExpectedKind (ppr ty) act_kind liftedTypeKind
     
 ---------------------------
 kcTypeType :: RenamedHsType -> TcM ()
 	-- The type ty must be a *type*, but it can be lifted or unlifted.
 kcTypeType ty
-  = kcHsType ty				`thenM` \ kind ->
-    addErrCtxt (typeKindCtxt ty)	$
-    unifyOpenTypeKind kind
+  = kcHsType ty			`thenM` \ kind ->
+    if isTypeKind kind then
+	return ()
+    else
+    newOpenTypeKind 				`thenM` \ exp_kind ->
+    checkExpectedKind (ppr ty) kind exp_kind	`thenM_`
+    returnM ()
 
 ---------------------------
 kcHsSigType, kcHsLiftedSigType :: RenamedHsType -> TcM ()
 	-- Used for type signatures
-kcHsSigType  	  = kcTypeType
-kcHsSigTypes tys  = mappM_ kcHsSigType tys
-kcHsLiftedSigType = kcLiftedType
+kcHsSigType ty 	     = kcTypeType ty
+kcHsSigTypes tys     = mappM_ kcHsSigType tys
+kcHsLiftedSigType ty = kcLiftedType ty `thenM_` returnM ()
 
 ---------------------------
 kcHsType :: RenamedHsType -> TcM TcKind
-kcHsType (HsTyVar name)	      = kcTyVar name
+-- kcHsType *returns* the kind of the type, rather than taking an expected
+-- kind as argument as tcExpr does.  Reason: the kind of (->) is
+--	forall bx1 bx2. Type bx1 -> Type bx2 -> Type Boxed
+-- so we'd need to generate huge numbers of bx variables.
 
-kcHsType (HsKindSig ty k)
-  = kcHsType ty			`thenM` \ k' ->
-    unifyKind k k' 		`thenM_`
-    returnM k
-
-kcHsType (HsListTy ty)
-  = kcLiftedType ty		`thenM` \ tau_ty ->
-    returnM liftedTypeKind
-
-kcHsType (HsPArrTy ty)
-  = kcLiftedType ty		`thenM` \ tau_ty ->
-    returnM liftedTypeKind
+kcHsType (HsTyVar name)   = kcTyVar name
+kcHsType (HsListTy ty)    = kcLiftedType ty
+kcHsType (HsPArrTy ty)    = kcLiftedType ty
+kcHsType (HsParTy ty)	  = kcHsType ty		    -- Skip parentheses markers
+kcHsType (HsNumTy _)      = returnM liftedTypeKind  -- The unit type for generics
+kcHsType (HsKindSig ty k) = kcHsType ty		`thenM` \ act_kind ->
+			    checkExpectedKind (ppr ty) act_kind k
 
 kcHsType (HsTupleTy (HsTupCon boxity _) tys)
   = mappM kcTypeType tys	`thenM_`
@@ -292,51 +293,104 @@ kcHsType (HsOpTy ty1 HsArrow ty2)
     kcTypeType ty2	`thenM_`
     returnM liftedTypeKind
 
-kcHsType ty@(HsOpTy ty1 (HsTyOp op) ty2)
-  = kcTyVar op				`thenM` \ op_kind ->
-    kcHsType ty1			`thenM` \ ty1_kind ->
-    kcHsType ty2			`thenM` \ ty2_kind ->
-    addErrCtxt (appKindCtxt (ppr ty))	$
-    kcAppKind op_kind  ty1_kind		`thenM` \ op_kind' ->
-    kcAppKind op_kind' ty2_kind
-
-kcHsType (HsParTy ty)		-- Skip parentheses markers
-  = kcHsType ty
-   
-kcHsType (HsNumTy _)		-- The unit type for generics
-  = returnM liftedTypeKind
+kcHsType ty@(HsOpTy ty1 op_ty@(HsTyOp op) ty2)
+  = addErrCtxt (appKindCtxt (ppr ty))	$
+    kcTyVar op				`thenM` \ op_kind ->
+    kcApps (ppr op_ty) op_kind [ty1,ty2]
 
 kcHsType (HsPredTy pred)
   = kcHsPred pred		`thenM_`
     returnM liftedTypeKind
 
 kcHsType ty@(HsAppTy ty1 ty2)
-  = kcHsType ty1			`thenM` \ tc_kind ->
-    kcHsType ty2			`thenM` \ arg_kind ->
-    addErrCtxt (appKindCtxt (ppr ty))	$
-    kcAppKind tc_kind arg_kind
+  = addErrCtxt (appKindCtxt (ppr ty))	$
+    kc_app ty []
+  where
+    kc_app (HsAppTy f a) as = kc_app f (a:as)
+    kc_app f		 as = kcHsType f	`thenM` \ fk ->
+			      kcApps (ppr f) fk as
 
 kcHsType (HsForAllTy (Just tv_names) context ty)
   = kcHsTyVars tv_names		`thenM` \ kind_env ->
     tcExtendKindEnv kind_env	$
     kcHsContext context		`thenM_`
-    kcLiftedType ty		`thenM_`
+    kcLiftedType ty
 	-- The body of a forall must be of kind *
 	-- In principle, I suppose, we could allow unlifted types,
 	-- but it seems simpler to stick to lifted types for now.
-    returnM liftedTypeKind
 
 ---------------------------
-kcAppKind fun_kind arg_kind
-  = case tcSplitFunTy_maybe fun_kind of 
-	Just (arg_kind', res_kind)
-		-> unifyKind arg_kind arg_kind'	`thenM_`
-		   returnM res_kind
+kcApps :: SDoc 			-- The function
+       -> TcKind		-- Function kind
+       -> [RenamedHsType]	-- Arg types
+       -> TcM TcKind		-- Result kind
+kcApps pp_fun fun_kind args
+  = go fun_kind args
+  where
+    go fk []       = returnM fk
+    go fk (ty:tys) = unifyFunKind fk	`thenM` \ mb_fk ->
+		     case mb_fk of {
+			Nothing       -> failWithTc too_few_args ;
+			Just (ak',fk') -> 
+		     kcHsType ty			`thenM` \ ak ->
+		     checkExpectedKind (ppr ty) ak ak'  `thenM_`
+		     go fk' tys }
 
-	Nothing -> newKindVar 						`thenM` \ res_kind ->
-		   unifyKind fun_kind (mkArrowKind arg_kind res_kind)	`thenM_`
-		   returnM res_kind
+    too_few_args = ptext SLIT("Kind error:") <+> quotes pp_fun <+>
+			ptext SLIT("is applied to too many type arguments")
 
+---------------------------
+-- We would like to get a decent error message from
+--   (a) Under-applied type constructors
+--		f :: (Maybe, Maybe)
+--   (b) Over-applied type constructors
+--		f :: Int x -> Int x
+--
+
+checkExpectedKind :: SDoc -> TcKind -> TcKind -> TcM TcKind
+-- A fancy wrapper for 'unifyKind', which tries to give 
+-- decent error messages.
+-- Returns the same kind that it is passed, exp_kind
+checkExpectedKind pp_ty act_kind exp_kind
+  | act_kind `eqKind` exp_kind -- Short cut for a very common case
+  = returnM exp_kind	
+  | otherwise
+  = tryTc (unifyKind exp_kind act_kind)	`thenM` \ (errs, mb_r) ->
+    case mb_r of {
+	Just _  -> returnM exp_kind ;	-- Unification succeeded
+	Nothing ->
+
+	-- So there's definitely an error
+	-- Now to find out what sort
+    zonkTcType exp_kind		`thenM` \ exp_kind ->
+    zonkTcType act_kind		`thenM` \ act_kind ->
+
+    let (exp_as, _) = Type.splitFunTys exp_kind
+        (act_as, _) = Type.splitFunTys act_kind
+		-- Use the Type versions for kinds	
+	n_exp_as = length exp_as
+	n_act_as = length act_as
+
+	err | n_exp_as < n_act_as	-- E.g. [Maybe]
+	    = quotes pp_ty <+> ptext SLIT("is not applied to enough type arguments")
+
+		-- Now n_exp_as >= n_act_as. In the next two cases, 
+		-- n_exp_as == 0, and hence so is n_act_as
+	    | exp_kind `eqKind` liftedTypeKind && act_kind `eqKind` unliftedTypeKind
+	    = ptext SLIT("Expecting a lifted type, but") <+> quotes pp_ty 
+		<+> ptext SLIT("is unlifted")
+
+	    | exp_kind `eqKind` unliftedTypeKind && act_kind `eqKind` liftedTypeKind
+	    = ptext SLIT("Expecting an unlifted type, but") <+> quotes pp_ty 
+		<+> ptext SLIT("is lifted")
+
+	    | otherwise 		-- E.g. Monad [Int]
+	    = sep [ ptext SLIT("Expecting kind") <+> quotes (ppr exp_kind) <> comma,
+		    ptext SLIT("but") <+> quotes pp_ty <+> 
+		        ptext SLIT("has kind") <+> quotes (ppr act_kind)]
+   in
+   failWithTc (ptext SLIT("Kind error:") <+> err) 
+   }
 
 ---------------------------
 kc_pred :: RenamedHsPred -> TcM TcKind	-- Does *not* check for a saturated
@@ -345,20 +399,16 @@ kc_pred pred@(HsIParam name ty)
   = kcHsType ty
 
 kc_pred pred@(HsClassP cls tys)
-  = kcClass cls				`thenM` \ kind ->
-    mappM kcHsType tys			`thenM` \ arg_kinds ->
-    newKindVar 				`thenM` \ kv -> 
-    unifyKind kind (mkArrowKinds arg_kinds kv)	`thenM_` 
-    returnM kv
+  = kcClass cls		`thenM` \ kind ->
+    kcApps (ppr cls) kind tys
 
 ---------------------------
 kcHsContext ctxt = mappM_ kcHsPred ctxt
 
 kcHsPred pred		-- Checks that the result is of kind liftedType
   = addErrCtxt (appKindCtxt (ppr pred))	$
-    kc_pred pred				`thenM` \ kind ->
-    unifyKind liftedTypeKind kind		`thenM_`
-    returnM ()
+    kc_pred pred			`thenM` \ kind ->
+    checkExpectedKind (ppr pred) kind liftedTypeKind
     
 
  ---------------------------
@@ -454,7 +504,9 @@ tc_type (HsNumTy n)
   = ASSERT(n== 1)
     returnM (mkTyConApp genUnitTyCon [])
 
-tc_type (HsAppTy ty1 ty2) = tc_app ty1 [ty2]
+tc_type ty@(HsAppTy ty1 ty2) 
+  = addErrCtxt (appKindCtxt (ppr ty))	$
+    tc_app ty1 [ty2]
 
 tc_type (HsPredTy pred)
   = tc_pred pred	`thenM` \ pred' ->
@@ -481,14 +533,11 @@ tc_app (HsAppTy ty1 ty2) tys
   = tc_app ty1 (ty2:tys)
 
 tc_app ty tys
-  = addErrCtxt (appKindCtxt pp_app)	$
-    tc_types tys			`thenM` \ arg_tys ->
+  = tc_types tys			`thenM` \ arg_tys ->
     case ty of
 	HsTyVar fun -> tc_fun_type fun arg_tys
 	other	    -> tc_type ty		`thenM` \ fun_ty ->
 		       returnM (mkAppTys fun_ty arg_tys)
-  where
-    pp_app = ppr ty <+> sep (map pprParendHsType tys)
 
 -- (tc_fun_type ty arg_tys) returns (mkAppTys ty arg_tys)
 -- But not quite; for synonyms it checks the correct arity, and builds a SynTy

@@ -23,6 +23,7 @@ module TcEnv(
 	tcLookup, tcLookupLocalIds, tcLookup_maybe, 
 	tcLookupId, tcLookupIdLvl, 
 	getLclEnvElts, getInLocalScope,
+	findGlobals,
 
 	-- Instance environment
 	tcExtendLocalInstEnv, tcExtendInstEnv, 
@@ -51,15 +52,18 @@ module TcEnv(
 import RnHsSyn		( RenamedMonoBinds, RenamedSig )
 import HsSyn		( RuleDecl(..), ifaceRuleDeclName )
 import TcRnMonad
-import TcMType		( zonkTcTyVarsAndFV )
+import TcMType		( zonkTcType, zonkTcTyVar, zonkTcTyVarsAndFV )
 import TcType		( Type, ThetaType, TcKind, TcTyVar, TcTyVarSet, 
-			  tyVarsOfTypes, tcSplitDFunTy, mkGenTyConApp,
-			  getDFunTyKey, tcTyConAppTyCon, 
+			  tyVarsOfType, tyVarsOfTypes, tcSplitDFunTy, mkGenTyConApp,
+			  getDFunTyKey, tcTyConAppTyCon, tyVarBindingInfo, 
+			  tidyOpenType, tidyOpenTyVar
 			)
+import qualified Type	( getTyVar_maybe )
 import Rules		( extendRuleBase )
 import Id		( idName, isDataConWrapId_maybe )
 import Var		( TyVar, Id, idType )
 import VarSet
+import VarEnv
 import CoreSyn		( IdCoreRule )
 import DataCon		( DataCon )
 import TyCon		( TyCon, DataConDetails )
@@ -424,6 +428,62 @@ tcExtendLocalValEnv2 names_w_ids thing_inside
     in
     tc_extend_gtvs (tcl_tyvars env) extra_global_tyvars	`thenM` \ gtvs' ->
     setLclEnv (env {tcl_env = le', tcl_tyvars = gtvs'}) thing_inside
+\end{code}
+
+
+\begin{code}
+-----------------------
+-- findGlobals looks at the value environment and finds values
+-- whose types mention the offending type variable.  It has to be 
+-- careful to zonk the Id's type first, so it has to be in the monad.
+-- We must be careful to pass it a zonked type variable, too.
+
+findGlobals :: TcTyVarSet
+             -> TidyEnv 
+             -> TcM (TidyEnv, [SDoc])
+
+findGlobals tvs tidy_env
+  = getLclEnvElts	`thenM` \ lcl_env ->
+    go tidy_env [] lcl_env
+  where
+    go tidy_env acc [] = returnM (tidy_env, acc)
+    go tidy_env acc (thing : things)
+      = find_thing ignore_it tidy_env thing 	`thenM` \ (tidy_env1, maybe_doc) ->
+	case maybe_doc of
+	  Just d  -> go tidy_env1 (d:acc) things
+	  Nothing -> go tidy_env1 acc     things
+
+    ignore_it ty = not (tvs `intersectsVarSet` tyVarsOfType ty)
+
+-----------------------
+find_thing ignore_it tidy_env (ATcId id _)
+  = zonkTcType  (idType id)	`thenM` \ id_ty ->
+    if ignore_it id_ty then
+	returnM (tidy_env, Nothing)
+    else let
+	(tidy_env', tidy_ty) = tidyOpenType tidy_env id_ty
+	msg = sep [ppr id <+> dcolon <+> ppr tidy_ty, 
+		   nest 2 (parens (ptext SLIT("bound at") <+>
+			 	   ppr (getSrcLoc id)))]
+    in
+    returnM (tidy_env', Just msg)
+
+find_thing ignore_it tidy_env (ATyVar tv)
+  = zonkTcTyVar tv		`thenM` \ tv_ty ->
+    if ignore_it tv_ty then
+	returnM (tidy_env, Nothing)
+    else let
+	(tidy_env1, tv1)     = tidyOpenTyVar tidy_env  tv
+	(tidy_env2, tidy_ty) = tidyOpenType  tidy_env1 tv_ty
+	msg = sep [ppr tv1 <+> eq_stuff, nest 2 bound_at]
+
+	eq_stuff | Just tv' <- Type.getTyVar_maybe tv_ty, tv == tv' = empty
+		 | otherwise	  				    = equals <+> ppr tv_ty
+		-- It's ok to use Type.getTyVar_maybe because ty is zonked by now
+	
+	bound_at = tyVarBindingInfo tv
+    in
+    returnM (tidy_env2, Just msg)
 \end{code}
 
 

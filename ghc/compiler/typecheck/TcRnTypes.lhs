@@ -34,7 +34,7 @@ module TcRnTypes(
 	Level, impLevel, topLevel,
 
 	-- Insts
-	Inst(..), InstOrigin(..), InstLoc, pprInstLoc,
+	Inst(..), InstOrigin(..), InstLoc(..), pprInstLoc, instLocSrcLoc,
 	LIE, emptyLIE, unitLIE, plusLIE, consLIE, 
 	plusLIEs, mkLIE, isEmptyLIE, lieToList, listToLIE,
 
@@ -374,6 +374,12 @@ data TcTyThing
 --	2. Then we kind-check the (T a Int) part.
 --	3. Then we zonk the kind variable.
 --	4. Now we know the kind for 'a', and we add (a -> ATyVar a::K) to the environment
+
+instance Outputable TcTyThing where	-- Debugging only
+   ppr (AGlobal g) = text "AGlobal" <+> ppr g
+   ppr (ATcId g l) = text "ATcId" <+> ppr g <+> ppr l
+   ppr (ATyVar t)  = text "ATyVar" <+> ppr t
+   ppr (AThing k)  = text "AThing" <+> ppr k
 \end{code}
 
 \begin{code}
@@ -739,7 +745,10 @@ It appears in TcMonad because there are a couple of error-message-generation
 functions that deal with it.
 
 \begin{code}
-type InstLoc = (InstOrigin, SrcLoc, ErrCtxt)
+data InstLoc = InstLoc InstOrigin SrcLoc ErrCtxt
+
+instLocSrcLoc :: InstLoc -> SrcLoc
+instLocSrcLoc (InstLoc _ src_loc _) = src_loc
 
 data InstOrigin
   = OccurrenceOf Name		-- Occurrence of an overloaded identifier
@@ -794,7 +803,7 @@ data InstOrigin
 
 \begin{code}
 pprInstLoc :: InstLoc -> SDoc
-pprInstLoc (orig, locn, ctxt)
+pprInstLoc (InstLoc orig locn ctxt)
   = hsep [text "arising from", pp_orig orig, text "at", ppr locn]
   where
     pp_orig (OccurrenceOf name)

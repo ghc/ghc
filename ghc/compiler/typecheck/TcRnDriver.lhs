@@ -702,7 +702,7 @@ tcTopSrcDecls rn_decls
 	-- in this module, which is why the knot is so big
 
 			-- Do the main work
-	((tcg_env, binds, rules, fords), lie) <- getLIE (
+	((tcg_env, lcl_env, binds, rules, fords), lie) <- getLIE (
 		tc_src_decls unf_env rn_decls
 	    ) ;
 
@@ -713,8 +713,12 @@ tcTopSrcDecls rn_decls
 	     -- type.  (Usually, ambiguous type variables are resolved
 	     -- during the generalisation step.)
         traceTc (text "Tc8") ;
-	inst_binds <- setGblEnv tcg_env (tcSimplifyTop lie) ;
+	inst_binds <- setGblEnv tcg_env $
+		      setLclTypeEnv lcl_env $
+		      tcSimplifyTop lie ;
 		-- The setGblEnv exposes the instances to tcSimplifyTop
+		-- The steLclTypeEnv exposes the local Ids, so that
+		-- we get better error messages (monomorphism restriction)
 
 	    -- Backsubstitution.  This must be done last.
 	    -- Even tcSimplifyTop may do some unification.
@@ -799,7 +803,7 @@ tc_src_decls unf_env
 			  cls_dm_binds	 `AndMonoBinds`
 			  foe_binds } ;
 
-  	return (tcg_env, all_binds, src_rules, foe_decls)
+  	return (tcg_env, lcl_env, all_binds, src_rules, foe_decls)
      }}}}}}}}}
 \end{code}
 

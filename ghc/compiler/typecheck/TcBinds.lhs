@@ -4,8 +4,7 @@
 \section[TcBinds]{TcBinds}
 
 \begin{code}
-module TcBinds ( tcBindsAndThen, tcTopBinds, tcMonoBinds,
-	         tcSpecSigs, tcBindWithSigs ) where
+module TcBinds ( tcBindsAndThen, tcTopBinds, tcMonoBinds, tcSpecSigs ) where
 
 #include "HsVersions.h"
 
@@ -150,12 +149,7 @@ tc_binds_and_then top_lvl combiner (MonoBind bind sigs is_rec) do_next
 	--	c) the scope of the binding group (the "in" part)
       tcAddScopedTyVars (collectSigTysFromMonoBinds bind)	$
 
-	-- TYPECHECK THE SIGNATURES
-      mappM tcTySig [sig | sig@(Sig name _ _) <- sigs]	`thenM` \ tc_ty_sigs ->
-  
-
-      tcBindWithSigs top_lvl bind 
-		     tc_ty_sigs sigs is_rec	`thenM` \ (poly_binds, poly_ids) ->
+      tcBindWithSigs top_lvl bind sigs is_rec	`thenM` \ (poly_binds, poly_ids) ->
   
       getLIE (
 	  -- Extend the environment to bind the new polymorphic Ids
@@ -225,13 +219,18 @@ so all the clever stuff is in here.
 tcBindWithSigs	
 	:: TopLevelFlag
 	-> RenamedMonoBinds
-	-> [TcSigInfo]
 	-> [RenamedSig]		-- Used solely to get INLINE, NOINLINE sigs
 	-> RecFlag
 	-> TcM (TcMonoBinds, [TcId])
 
-tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
-  = recoverM (
+tcBindWithSigs top_lvl mbind sigs is_rec
+  = 	-- TYPECHECK THE SIGNATURES
+     recoverM (returnM []) (
+	mappM tcTySig [sig | sig@(Sig name _ _) <- sigs]
+     )						`thenM` \ tc_ty_sigs ->
+
+	-- SET UP THE MAIN RECOVERY; take advantage of any type sigs
+   recoverM (
 	-- If typechecking the binds fails, then return with each
 	-- signature-less binder given type (forall a.a), to minimise subsequent
 	-- error messages
@@ -285,10 +284,10 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 	poly_ids = [poly_id | (_, poly_id, _) <- exports]
 	dict_tys = map idType zonked_dict_ids
 
-	inlines    = mkNameSet [name | InlineSig True name _ loc <- inline_sigs]
+	inlines    = mkNameSet [name | InlineSig True name _ loc <- sigs]
 			-- Any INLINE sig (regardless of phase control) 
 			-- makes the RHS look small
-        inline_phases = listToFM [(name, phase) | InlineSig _ name phase _ <- inline_sigs, 
+        inline_phases = listToFM [(name, phase) | InlineSig _ name phase _ <- sigs, 
 						  not (isAlwaysActive phase)]
 			-- Set the IdInfo field to control the inline phase
 			-- AlwaysActive is the default, so don't bother with them
