@@ -824,10 +824,10 @@ specDefn subst calls (fn, rhs)
     n_tyvars	       = length tyvars
     n_dicts	       = length theta
 
+    (rhs_tyvars, rhs_ids, rhs_body) 
+	= collectTyAndValBinders (dropInline rhs)
 	-- It's important that we "see past" any INLINE pragma
 	-- else we'll fail to specialise an INLINE thing
-    (inline_me, rhs') 		    = dropInline rhs
-    (rhs_tyvars, rhs_ids, rhs_body) = collectTyAndValBinders rhs'
 
     rhs_dicts = take n_dicts rhs_ids
     rhs_bndrs = rhs_tyvars ++ rhs_dicts
@@ -910,9 +910,9 @@ specDefn subst calls (fn, rhs)
 	 | not (equalLength xs ys) = pprPanic "my_zipEqual" (ppr xs $$ ppr ys $$ (ppr fn <+> ppr call_ts) $$ ppr rhs)
 	 | otherwise		   = zipEqual doc xs ys
 
-dropInline :: CoreExpr -> (Bool, CoreExpr) 
-dropInline (Note InlineMe rhs) = (True, rhs)
-dropInline rhs		       = (False, rhs)
+dropInline :: CoreExpr -> CoreExpr
+dropInline (Note InlineMe rhs) = rhs
+dropInline rhs		       = rhs
 \end{code}
 
 %************************************************************************
