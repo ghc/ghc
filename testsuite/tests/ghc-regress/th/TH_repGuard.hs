@@ -5,6 +5,7 @@ module Main
 where
 
 import Language.Haskell.TH
+import System.IO
 
 $(
   do ds <- [d|
@@ -13,7 +14,7 @@ $(
          | x == 5 = 6
         foo x = 7
       |]
-     runIO $ putStrLn $ pprint ds
+     runIO $ do { putStrLn (pprint ds); hFlush stdout }
      return ds
  )
 
@@ -24,7 +25,7 @@ $(
          | Just y <- x = y
         bar _ = 9
       |]
-     runIO $ putStrLn $ pprint ds
+     runIO $ do { putStrLn (pprint ds) ; hFlush stdout }
      return ds
  )
 
