@@ -225,7 +225,9 @@ cvtd (FunD nm cls)   	    = FunMonoBind (vName nm) False (map cvtclause cls) loc
 cvtd (Meta.ValD p body ds)	    = PatMonoBind (cvtp p) (GRHSs (cvtguard body) 
 							  (cvtdecs ds) 
 							  void) loc0
-cvtd x = panic "Illegal kind of declaration in where clause" 
+
+cvtd d = cvtPanic "Illegal kind of declaration in where clause" 
+		  (text (show (Meta.pprDec d)))
 
 
 cvtclause :: Meta.Clause -> Hs.Match RdrName
@@ -302,7 +304,8 @@ cvt_context tys = map cvt_pred tys
 cvt_pred :: Meta.Type -> HsPred RdrName
 cvt_pred ty = case split_ty_app ty of
 	   	(ConT tc, tys) -> HsClassP (tconName tc) (map cvtType tys)
-		other -> pprPanic "Malformed predicate" (text (show (Meta.pprType ty)))
+	   	(VarT tv, tys) -> HsClassP (tName tv) (map cvtType tys)
+		other -> cvtPanic "Malformed predicate" (text (show (Meta.pprType ty)))
 
 cvtType :: Meta.Type -> HsType RdrName
 cvtType ty = trans (root ty [])
@@ -333,6 +336,11 @@ sigP :: Dec -> Bool
 sigP (Meta.SigD _ _) = True
 sigP other	 = False
 
+
+-----------------------------------------------------------
+cvtPanic :: String -> SDoc -> b
+cvtPanic herald thing
+  = pprPanic herald (thing $$ ptext SLIT("When splicing generated code into the program"))
 
 -----------------------------------------------------------
 -- some useful things
