@@ -6,13 +6,13 @@
  *
  * A Capability represent the token required to execute STG code,
  * and all the state an OS thread/task needs to run Haskell code:
- * its STG registers, a pointer to its  TSO, a nursery etc. During
+ * its STG registers, a pointer to its TSO, a nursery etc. During
  * STG execution, a pointer to the capabilitity is kept in a
  * register (BaseReg).
  *
- * Only in an SMP build will there be multiple capabilities, the threaded
- * RTS and other non-threaded builds, there is one global capability,
- * namely MainRegTable.
+ * Only in an SMP build will there be multiple capabilities, for
+ * the threaded RTS and other non-threaded builds, there is only
+ * one global capability, namely MainCapability.
  * 
  * --------------------------------------------------------------------------*/
 #include "PosixSource.h"
@@ -58,11 +58,18 @@ initCapability( Capability *cap )
     cap->f.stgUpdatePAP    = (F_)__stg_update_PAP;
 }
 
-#ifdef SMP
+#if defined(SMP)
 static void initCapabilities_(nat n);
 #endif
 
 /* 
+ * Function:  initCapabilities()
+ *
+ * Purpose:   set up the Capability handling. For the SMP build,
+ *            we keep a table of them, the size of which is
+ *            controlled by the user via the RTS flag RtsFlags.ParFlags.nNodes
+ *
+ * Pre-conditions: no locks assumed held.
  */
 void
 initCapabilities()
@@ -88,6 +95,20 @@ initCapabilities()
 static Capability *free_capabilities; /* Available capabilities for running threads */
 #endif
 
+/*
+ * Function:  grabCapability(Capability**)
+ * 
+ * Purpose:   the act of grabbing a capability is easy; just 
+ *            remove one from the free capabilities list (which
+ *            may just have one entry). In threaded builds, worker
+ *            threads are prevented from doing so willy-nilly
+ *            through the use of the sched_mutex lock along with
+ *            condition variables thread_ready_cond and
+ *            returning_worker_cond.
+ *
+ * Pre-condition:  sched_mutex is held (in threaded builds only).
+ *
+ */ 
 void grabCapability(Capability** cap)
 {
 #if !defined(SMP)
