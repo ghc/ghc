@@ -319,9 +319,9 @@ cmTypeOfExpr cmstate expr
 
 	case maybe_stuff of
 	   Nothing -> return Nothing
-	   Just ty -> return (Just str)
+	   Just ty -> return (Just res_str)
  	     where 
-		str     = showSDocForUser unqual (text expr <+> dcolon <+> ppr tidy_ty)
+		res_str = showSDocForUser unqual (text expr <+> dcolon <+> ppr tidy_ty)
 		unqual  = icPrintUnqual (cm_ic cmstate)
 		tidy_ty = tidyType emptyTidyEnv ty
 
@@ -334,9 +334,9 @@ cmKindOfType cmstate str
    = do maybe_stuff <- hscKcType (cm_hsc cmstate) (cm_ic cmstate) str
 	case maybe_stuff of
 	   Nothing -> return Nothing
-	   Just kind -> return (Just str)
+	   Just kind -> return (Just res_str)
  	     where 
-		str     = showSDocForUser unqual (text str <+> dcolon <+> ppr kind)
+		res_str = showSDocForUser unqual (text str <+> dcolon <+> ppr kind)
 		unqual  = icPrintUnqual (cm_ic cmstate)
 
 -----------------------------------------------------------------------------
