@@ -111,8 +111,16 @@ tryLoadInterface doc_str mod_name from
 	
 	-- CHECK WHETHER WE HAVE IT ALREADY
    case lookupIfaceByModName hit pit mod_name of {
-	Just iface  -> returnRn (iface, Nothing) ;	-- Already loaded
-	Nothing	    -> 
+	Just iface |  case from of
+			ImportByUser	   -> not (mi_boot iface)
+			ImportByUserSource -> mi_boot iface
+			ImportBySystem 	   -> True
+		   -> returnRn (iface, Nothing) ;	-- Already loaded
+			-- The not (mi_boot iface) test checks that the already-loaded
+			-- interface isn't a boot iface.  This can conceivably happen,
+			-- if the version checking happened to load a boot interface
+			-- before we got to real imports.  
+	other	    -> 
 
    let
 	mod_map  = iImpModInfo ifaces

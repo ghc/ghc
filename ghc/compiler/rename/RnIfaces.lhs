@@ -710,8 +710,21 @@ checkModUsage (mod_name, _, _, NothingAtAll)
 	-- In this case we don't even want to open Foo's interface.
   = up_to_date (ptext SLIT("Nothing used from:") <+> ppr mod_name)
 
-checkModUsage (mod_name, _, _, whats_imported)
-  = tryLoadInterface doc_str mod_name ImportBySystem	`thenRn` \ (iface, maybe_err) ->
+checkModUsage (mod_name, _, is_boot, whats_imported)
+  = 	-- Load the imported interface is possible
+	-- We use tryLoadInterface, because failure is not an error
+	-- (might just be that the old .hi file for this module is out of date)
+	-- We use ImportByUser/ImportByUserSource as the 'from' flag, 
+	-- 	a) because we need to know whether to load the .hi-boot file
+	--	b) because loadInterface things matters are amiss if we 
+	--	   ImportBySystem an interface it knows nothing about
+    let
+    	doc_str = sep [ptext SLIT("need version info for"), ppr mod_name]
+    	from    | is_boot   = ImportByUserSource
+	    	| otherwise = ImportByUser
+    in
+    tryLoadInterface doc_str mod_name from	`thenRn` \ (iface, maybe_err) ->
+
     case maybe_err of {
 	Just err -> out_of_date (sep [ptext SLIT("Can't find version number for module"), 
 				      ppr mod_name]) ;
@@ -758,8 +771,6 @@ checkModUsage (mod_name, _, _, whats_imported)
 	up_to_date (ptext SLIT("...but the bits I use haven't."))
 
     }}
-  where
-    doc_str = sep [ptext SLIT("need version info for"), ppr mod_name]
 
 ------------------------
 checkModuleVersion old_mod_vers new_vers

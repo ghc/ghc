@@ -47,7 +47,7 @@ import Name		( isLocallyDefined, getName,
 import Name 	-- Env
 import OccName		( pprOccName )
 import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
-			  tyConTheta, tyConTyVars, tyConDataCons, tyConFamilySize
+			  tyConTheta, tyConTyVars, tyConDataCons, tyConFamilySize, isClassTyCon
 			)
 import Class		( classExtraBigSig, DefMeth(..) )
 import FieldLabel	( fieldLabelType )
@@ -176,8 +176,8 @@ ifaceTyCls (AClass clas) so_far
 			 DefMeth id -> DefMeth (getName id)
 
 ifaceTyCls (ATyCon tycon) so_far
-  = ty_decl : so_far
-  
+  | isClassTyCon tycon = so_far
+  | otherwise	       = ty_decl : so_far
   where
     ty_decl | isSynTyCon tycon
 	    = TySynonym (getName tycon)(toHsTyVars tyvars) 

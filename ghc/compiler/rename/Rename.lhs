@@ -523,9 +523,7 @@ reportUnusedNames my_mod_iface imports avail_env
     warnUnusedImports bad_imp_names				`thenRn_`
     printMinimalImports this_mod minimal_imports		`thenRn_`
     warnDeprecations this_mod export_avails my_deprecs 
-		     really_used_names				`thenRn_`
-    traceRn (text "Used" <+> fsep (map ppr (nameSetToList used_names)))	`thenRn_`
-    returnRn ()
+		     really_used_names
 
   where
     this_mod   = mi_module my_mod_iface

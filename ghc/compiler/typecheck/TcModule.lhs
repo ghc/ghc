@@ -43,17 +43,16 @@ import Bag		( isEmptyBag )
 import ErrUtils		( printErrorsAndWarnings, dumpIfSet_dyn )
 import Id		( idType, idUnfolding )
 import Module           ( Module )
-import Name		( Name, isLocallyDefined, toRdrName )
+import Name		( Name, toRdrName )
 import Name		( nameEnvElts, lookupNameEnv )
 import TyCon		( tyConGenInfo )
-import Maybes		( thenMaybe )
 import Util
 import BasicTypes       ( EP(..), Fixity )
 import Bag		( isEmptyBag )
 import Outputable
-import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, HomeIfaceTable,
+import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, 
 			  PackageTypeEnv, DFunId, ModIface(..),
-			  TypeEnv, extendTypeEnvList, lookupIface,
+			  TypeEnv, extendTypeEnvList, 
 		          TyThing(..), mkTypeEnv )
 import List		( partition )
 \end{code}
@@ -106,7 +105,6 @@ typecheckModule dflags this_mod pcs hst mod_iface decls
     tc_module :: TcM (RecTcEnv, TcResults)
     tc_module = fixTc (\ ~(unf_env ,_) -> tcModule pcs hst get_fixity this_mod decls unf_env)
 
-    pit        = pcs_PIT pcs
     fixity_env = mi_fixities mod_iface
 
     get_fixity :: Name -> Maybe Fixity
@@ -160,7 +158,6 @@ tcModule pcs hst get_fixity this_mod decls unf_env
     -- imported
     tcInterfaceSigs unf_env decls		`thenTc` \ sig_ids ->
     tcExtendGlobalValEnv sig_ids		$
-    tcGetEnv					`thenTc` \ unf_env ->
     
     -- Create any necessary record selector Ids and their bindings
     -- "Necessary" includes data and newtype declarations
@@ -179,6 +176,7 @@ tcModule pcs hst get_fixity this_mod decls unf_env
     --	    will find they aren't there and complain.
     tcExtendGlobalValEnv data_ids		$
     tcExtendGlobalValEnv cls_ids		$
+    tcGetEnv					`thenTc` \ unf_env ->
     
         -- Foreign import declarations next
     tcForeignImports decls			`thenTc`    \ (fo_ids, foi_decls) ->
@@ -285,19 +283,19 @@ dump_sigs results	-- Print type signatures
   = 	-- Convert to HsType so that we get source-language style printing
 	-- And sort by RdrName
     vcat $ map ppr_sig $ sortLt lt_sig $
-    [(toRdrName id, toHsType (idType id))
-        | AnId id <- nameEnvElts (tc_env results), 
-          want_sig id
+    [ (toRdrName id, toHsType (idType id))
+    | AnId id <- nameEnvElts (tc_env results),
+      want_sig id
     ]
   where
     lt_sig (n1,_) (n2,_) = n1 < n2
     ppr_sig (n,t)        = ppr n <+> dcolon <+> ppr t
 
     want_sig id | opt_PprStyle_Debug = True
-	        | otherwise	     = isLocallyDefined id
+	        | otherwise	     = True	-- For now
 
 ppr_gen_tycons tcs = vcat [ptext SLIT("{-# Generic type constructor details"),
-			   vcat (map ppr_gen_tycon (filter isLocallyDefined tcs)),
+			   vcat (map ppr_gen_tycon tcs),
 		   	   ptext SLIT("#-}")
 		     ]
 

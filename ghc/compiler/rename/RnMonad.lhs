@@ -264,10 +264,9 @@ data Ifaces = Ifaces {
     -- EPHEMERAL FIELDS
     -- These fields persist during the compilation of a single module only
 	iImpModInfo :: ImportedModuleInfo,
-			-- Modules this one depends on: that is, the union 
-			-- of the modules its *direct* imports depend on.
-			-- NB: The direct imports have .hi files that enumerate *all* the
-			-- dependencies (direct or not) of the imported module.
+			-- Modules that we know something about, because they are mentioned
+			-- in interface files, BUT which we have not loaded yet.  
+			-- No module is both in here and in the PIT
 
 	iSlurp :: NameSet,
 		-- All the names (whether "big" or "small", whether wired-in or not,
