@@ -72,9 +72,10 @@ import Outputable
 import DATA_IOREF	( IORef, newIORef, readIORef, writeIORef )
 import UNSAFE_IO	( unsafeInterleaveIO )
 import FIX_IO		( fixIO )
+import EXCEPTION	( Exception )
 import Maybe		( mapMaybe )
 import List		( nub )
-import Panic		( Exception, try )	-- Get try from Panic to avoid compiler-version troubles
+import Panic		( tryMost )
 \end{code}
 
 
@@ -154,7 +155,7 @@ Error recovery
 \begin{code}
 tryM :: TcRn m r -> TcRn m (Either Exception r)
 -- Reflect exception into TcRn monad
-tryM (TcRn thing) = TcRn (\ env -> try (thing env))
+tryM (TcRn thing) = TcRn (\ env -> tryMost (thing env))
 \end{code}
 
 Lazy interleave 
