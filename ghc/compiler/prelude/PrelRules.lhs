@@ -3,6 +3,10 @@
 %
 \section[ConFold]{Constant Folder}
 
+Conceptually, constant folding should be parameterized with the kind
+of target machine to get identical behaviour during compilation time
+and runtime. We cheat a little bit here...
+
 ToDo:
    check boundaries before folding, e.g. we can fold the Float addition
    (i1 + i2) only if it results	in a valid Float.
@@ -33,6 +37,7 @@ import Unique		( unpackCStringFoldrIdKey, hasKey )
 import Bits		( Bits(..) )
 import Word		( Word64 )
 import Outputable
+import CmdLineOpts      ( opt_SimplStrictFP )
 \end{code}
 
 
@@ -286,12 +291,22 @@ or_rule r1 r2 args = case r1 args of
 		   Nothing    -> r2 args
 
 twoLits :: (Literal -> Literal -> Maybe (RuleName, CoreExpr)) -> RuleFun
-twoLits rule [Lit l1, Lit l2] = rule l1 l2
+twoLits rule [Lit l1, Lit l2] = rule (convFloating l1) (convFloating l2)
 twoLits rule other	      = Nothing
 
 oneLit :: (Literal -> Maybe (RuleName, CoreExpr)) -> RuleFun
-oneLit rule [Lit l1] = rule l1
+oneLit rule [Lit l1] = rule (convFloating l1)
 oneLit rule other    = Nothing
+
+-- When we strictfp is requested, cut down the precision of the Rational value
+-- to that of Float/Double. We confuse host architecture and target architecture
+-- here, but it's convenient (and wrong :-).
+convFloating :: Literal -> Literal
+convFloating (MachFloat  f) | opt_SimplStrictFP =
+   MachFloat  (toRational ((fromRational f) :: Float ))
+convFloating (MachDouble d) | opt_SimplStrictFP =
+   MachDouble (toRational ((fromRational d) :: Double))
+convFloating l = l
 
 
 trueVal       = Var trueDataConId
@@ -299,8 +314,8 @@ falseVal      = Var falseDataConId
 mkIntVal    i = Lit (mkMachInt  i)
 mkWordVal   w = Lit (mkMachWord w)
 mkCharVal   c = Lit (MachChar   c)
-mkFloatVal  f = Lit (MachFloat  f)
-mkDoubleVal d = Lit (MachDouble d)
+mkFloatVal  f = Lit (convFloating (MachFloat  f))
+mkDoubleVal d = Lit (convFloating (MachDouble d))
 \end{code}
 
 						
