@@ -9,7 +9,6 @@ import FastString(FastString)
 import Bag		( Bag )
 import BinderInfo	( BinderInfo )
 import CgBindery	( CgIdInfo )
-import CharSeq		( CSeq )
 import CLabel		( CLabel )
 import Class		( GenClass, GenClassOp, Class(..), ClassOp )
 import ClosureInfo	( ClosureInfo, LambdaFormInfo )
@@ -36,7 +35,7 @@ import Name		( Module(..), OccName, Name, ExportFlag, NamedThing(..) )
 import Outputable	( Outputable(..) )
 import PprStyle		( PprStyle )
 import PragmaInfo	( PragmaInfo )
-import Pretty		( PrettyRep )
+import Pretty		( Doc )
 import PrimOp		( PrimOp )
 import PrimRep		( PrimRep )
 import SMRep		( SMRep )
@@ -61,7 +60,7 @@ class NamedThing a where
 class Ord3 a where
 	cmp :: a -> a -> Int#
 class Outputable a where
-	ppr :: PprStyle -> a -> Int -> Bool -> PrettyRep
+	ppr :: PprStyle -> a -> Doc
 class Uniquable a where
 	uniqueOf :: a -> Unique
 
@@ -79,7 +78,6 @@ data ClassPragmas a
 data ClosureInfo
 data Coercion
 data CostCentre
-data CSeq
 data DataPragmas a
 data DeforestInfo
 data Demand
@@ -113,7 +111,7 @@ data Reg
 data OutPat a b c
 data PprStyle
 data PragmaInfo
-data PrettyRep
+data Doc
 data PrimOp
 data PrimRep	-- NB: an enumeration
 data SimplifierSwitch
