@@ -9,12 +9,14 @@ effort.  The tools are:
     happy	the Happy Haskell parser generator
     nofib	the NoFib Haskell benchmarking suite
     literate	the Glasgow "literate programming" system
-    mkworld	configuration system (derived from X11 imake)
     glafp-utils shared utility programs
+    mk	        GNU make setup used by all the fptools
+    docs        documentation on the installing and using
+                the fptools suite.
 
 The "literate" stuff is usually distributed *with* other systems, but
 not necessarily.  Components which are always part of a distribution
-(never stand-alone) are "glafp-utils" and "mkworld" (a configuration
+(never stand-alone) are "glafp-utils" and "mk" (a configuration
 system).
 
 There is usually an ANNOUNCE* file with any distribution.  Please

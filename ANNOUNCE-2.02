@@ -101,7 +101,7 @@ Please send bug reports about GHC to glasgow-haskell-bugs@dcs.gla.ac.uk.
 
 Simon Peyton Jones
 
-Dated: February 1997
+Dated: March 1997
 
 Relevant URLs on the World-Wide Web:
 
@@ -110,7 +110,7 @@ Glasgow FP group page     http://www.dcs.gla.ac.uk/fp/
 comp.lang.functional FAQ  http://www.cs.nott.ac.uk/Department/Staff/mpj/faq.html
 
 ======================================================================
-How to get GHC 2.01:
+How to get GHC 2.02:
 
 This release is available by anonymous FTP from the main Haskell
 archive sites, in the directory pub/haskell/glasgow:
@@ -125,18 +125,18 @@ computing/programming/languages/haskell/glasgow.
 These are the available files (.gz files are gzipped) -- some are `on
 demand', ask if you don't see them:
 
-ghc-2.01-src.tar.gz	The source distribution; about 3MB.
+ghc-2.02-src.tar.gz	The source distribution; about 3MB.
 
-ghc-2.01.ANNOUNCE	This file.
+ghc-2.02.ANNOUNCE	This file.
 
-ghc-2.01.{README,RELEASE-NOTES} From the distribution; for those who
+ghc-2.02.{README,RELEASE-NOTES} From the distribution; for those who
 			want to peek before FTPing...
 
-ghc-2.01-ps-docs.tar.gz	Main GHC documents in PostScript format; in
+ghc-2.02-ps-docs.tar.gz	Main GHC documents in PostScript format; in
 			case your TeX setup doesn't agree with our
 			DVI files...
 
-ghc-2.01-<platform>.tar.gz Basic binary distribution for a particular
+ghc-2.02-<platform>.tar.gz Basic binary distribution for a particular
 			<platform>.  Unpack and go: you can compile
 			and run Haskell programs with nothing but one
 			of these files.  NB: does *not* include
@@ -147,12 +147,13 @@ ghc-2.01-<platform>.tar.gz Basic binary distribution for a particular
 			i386-unknown-freebsd
 			i386-unknown-linux
 			i386-unknown-solaris2
+			i386-unknown-cygwin32
 			m68k-sun-sunos4
 			mips-sgi-irix5
 			sparc-sun-sunos4
 			sparc-sun-solaris2
 
-ghc-2.01-<bundle>-<platform>.tar.gz
+ghc-2.02-<bundle>-<platform>.tar.gz
 
 	<platform> ==>	as above
 	<bundle>   ==>  prof (profiling)
@@ -163,15 +164,15 @@ ghc-2.01-<bundle>-<platform>.tar.gz
 			prof-conc (profiling for "conc[urrent]")
 			prof-ticky (ticky for "conc[urrent]")
 
-ghc-2.01-hc-files.tar.gz Basic set of intermediate C (.hc) files for the
+ghc-2.02-hc-files.tar.gz Basic set of intermediate C (.hc) files for the
 			 compiler proper, the prelude, and `Hello,
 			 world'.  Used for bootstrapping the system.
 			 About 4MB.
 
-ghc-2.01-<bundle>-hc-files.tar.gz Further sets of .hc files, for
+ghc-2.02-<bundle>-hc-files.tar.gz Further sets of .hc files, for
 			building other "bundles", e.g., profiling.
 
-ghc-2.01-hi-files-<blah>.tar.gz Sometimes it's more convenient to
+ghc-2.02-hi-files-<blah>.tar.gz Sometimes it's more convenient to
 			use a different set of interface files than
 			the ones in *-src.tar.gz.  (The installation
 			guide will advise you of this.)
