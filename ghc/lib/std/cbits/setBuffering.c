@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: setBuffering.c,v 1.7 2000/03/28 08:48:44 simonmar Exp $
+ * $Id: setBuffering.c,v 1.8 2000/04/14 16:19:43 rrt Exp $
  *
  * hSetBuffering Runtime Support
  */
@@ -122,9 +122,9 @@ setBuffering(StgForeignPtr ptr, StgInt size)
        fo->buf = malloc(size*sizeof(char));
        if (fo->buf == NULL) {
            return -1;
-       }
-       fo->bufSize = size;
+       }  
     }
+    fo->bufSize = size;
 #ifndef mingw32_TARGET_OS
     if (isaterm) {
 
