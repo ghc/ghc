@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.32 2000/08/07 16:06:38 rrt Exp $
+# $Id: Makefile,v 1.33 2000/08/08 17:21:12 rrt Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -111,7 +111,7 @@ SRC_BLD_DLL_OPTS += --output-def=HSrts.def --export-all -L. -Lgmp -lwinmm \
 # Note: if you do change the name of the Prelude DLL, the "--dllname <nm>.dll"
 # below will need to be updated as well.
 
-$(DLL_NAME) :: libHS_imp_stub.a
+$(DLL_PEN)/$(DLL_NAME) :: libHS_imp_stub.a
 
 libHS_imp_stub.a :
 	dlltool --output-lib libHS_imp_stub.a --def HSprel.def --dllname HSstd.dll
