@@ -394,8 +394,8 @@ Some Haskell-related discussion takes place in the Usenet newsgroup
 	  GHC web site for details).</para>
 
 	  <para>Snapshot releases are named
-	  <literal>x.yy.DDMMYYYY</literal> where <literal>yy</literal>
-	  is <emphasis>odd</emphasis>, and <literal>DDMMYYYY</literal>
+	  <literal>x.yy.YYYYMMDD</literal> where <literal>yy</literal>
+	  is <emphasis>odd</emphasis>, and <literal>YYYYMMDD</literal>
 	  is the date of the sources from which the snapshot was
 	  built.  In theory, you can check out the exact same sources
 	  from the CVS repository using this date.</para>
