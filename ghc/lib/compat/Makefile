@@ -21,6 +21,7 @@ ifeq "$(ghc_603_plus)" "YES"
 # These modules are all provided in GHC 6.3+
 EXCLUDED_SRCS += \
 	Data/Version.hs \
+	System/FilePath.hs \
 	Distribution/Compat/Error.hs \
 	Distribution/Compat/ReadP.hs \
 	Distribution/Extension.hs \

@@ -16,17 +16,26 @@
 
 module Compat.Directory (
   	getAppUserDataDirectory,
+  	copyFile,
+  	findExecutable
   ) where
 
 #if __GLASGOW_HASKELL__ < 603
 #include "config.h"
 #endif
 
-#if !defined(mingw32_TARGET_OS)
+import Control.Exception       ( bracket )
+import Control.Monad           ( when )
 import System.Environment (getEnv)
-#else
+import System.FilePath
+import System.IO
+#if defined(mingw32_TARGET_OS)
 import Foreign
 import Foreign.C
+#endif
+import System.Directory(doesFileExist, getPermissions, setPermissions)
+#if defined(__GLASGOW_HASKELL__)
+import GHC.IOBase ( IOException(..) )
 #endif
 
 getAppUserDataDirectory :: String -> IO FilePath
@@ -55,3 +64,49 @@ foreign import ccall unsafe "__hscore_long_path_size"
 
 foreign import ccall unsafe "__hscore_CSIDL_APPDATA"  csidl_APPDATA  :: CInt
 #endif
+
+
+copyFile :: FilePath -> FilePath -> IO ()
+copyFile fromFPath toFPath =
+#if (!(defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ > 600))
+	do readFile fromFPath >>= writeFile toFPath
+	   try (getPermissions fromFPath >>= setPermissions toFPath)
+	   return ()
+#else
+	(bracket (openBinaryFile fromFPath ReadMode) hClose $ \hFrom ->
+	 bracket (openBinaryFile toFPath WriteMode) hClose $ \hTo ->
+	 allocaBytes bufferSize $ \buffer -> do
+		copyContents hFrom hTo buffer
+		try (getPermissions fromFPath >>= setPermissions toFPath)
+		return ()) `catch` (ioError . changeFunName)
+	where
+		bufferSize = 1024
+		
+		changeFunName (IOError h iot fun str mb_fp) = IOError h iot "copyFile" str mb_fp
+		
+		copyContents hFrom hTo buffer = do
+			count <- hGetBuf hFrom buffer bufferSize
+			when (count > 0) $ do
+				hPutBuf hTo buffer count
+				copyContents hFrom hTo buffer
+#endif
+
+
+findExecutable :: String -> IO (Maybe FilePath)
+findExecutable binary = do
+  path <- getEnv "PATH"
+  search (parseSearchPath path)
+  where
+#ifdef mingw32_TARGET_OS
+    fileName = binary `joinFileExt` "exe"
+#else
+    fileName = binary
+#endif
+
+    search :: [FilePath] -> IO (Maybe FilePath)
+    search [] = return Nothing
+    search (d:ds) = do
+	let path = d `joinFileName` fileName
+	b <- doesFileExist path
+	if b then return (Just path)
+             else search ds
