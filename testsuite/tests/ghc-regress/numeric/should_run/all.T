@@ -22,11 +22,11 @@ test('arith011', normal, compile_and_run, [''])
 
 test('arith012', expect_fail_for(['optasm']), compile_and_run, [''])
 
-test('arith013', normal, compile_and_run, [''])
+test('arith013', only_compiler_types(['ghc']), compile_and_run, [''])
 test('arith014', normal, compile_and_run, [''])
 test('arith015', normal, compile_and_run, [''])
 test('num009',   normal, compile_and_run, [''])
 test('num010',   normal, compile_and_run, [''])
 test('num011',   normal, compile_and_run, [''])
-test('arith016', normal, compile_and_run, ['-fglasgow-exts'])
+test('arith016', only_compiler_types(['ghc']), compile_and_run, ['-fglasgow-exts'])
 test('arith017', normal, compile_and_run, [''])
