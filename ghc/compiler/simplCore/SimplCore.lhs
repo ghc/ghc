@@ -114,6 +114,9 @@ doCorePass us binds CoreDoFullLaziness       = _scc_ "CoreFloating"   floatOutwa
 doCorePass us binds CoreDoStaticArgs	     = _scc_ "CoreStaticArgs" doStaticArgs us binds
 doCorePass us binds CoreDoStrictness	     = _scc_ "CoreStranal"    saWwTopBinds us binds
 doCorePass us binds CoreDoSpecialising	     = _scc_ "Specialise"     specProgram us binds
+doCorePass us binds CoreDoPrintCore	     = _scc_ "PrintCore"      do
+                                                                       putStr (showSDoc $ pprCoreBindings binds)
+								       return binds
 \end{code}
 
 
