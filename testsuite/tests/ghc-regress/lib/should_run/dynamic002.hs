@@ -19,7 +19,6 @@ import System.Mem.Weak
 import Foreign.StablePtr
 import Control.Exception
 import Foreign.C.Types
-import Foreign.C.TypesISO
 
 main :: IO ()
 main = do
