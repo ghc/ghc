@@ -15,7 +15,7 @@ module ByteCodeGen ( UnlinkedBCO, UnlinkedBCOExpr, ItblEnv, ClosureEnv, HValue,
 import Outputable
 import Name		( Name, getName, mkSysLocalName )
 import Id		( Id, idType, isDataConId_maybe, mkVanillaId,
-			  isPrimOpId_maybe )
+			  isPrimOpId_maybe, idPrimRep )
 import OrdList		( OrdList, consOL, snocOL, appOL, unitOL, 
 			  nilOL, toOL, concatOL, fromOL )
 import FiniteMap	( FiniteMap, addListToFM, listToFM,
@@ -576,6 +576,11 @@ mkUnpackCode vars d p
 
 pushAtom :: Bool -> Int -> BCEnv -> AnnExpr' Id VarSet -> (BCInstrList, Int)
 pushAtom tagged d p (AnnVar v)
+
+   | idPrimRep v == VoidRep
+   = ASSERT(tagged)
+     (unitOL (PUSH_TAG 0), 1)
+
    | Just primop <- isPrimOpId_maybe v
    = case primop of
         CCallOp _ -> panic "pushAtom: byte code generator can't handle CCalls"
