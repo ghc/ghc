@@ -44,6 +44,8 @@ import Outputable
 import Util		( eqListBy )
 import SrcLoc		( SrcLoc )
 import FastString
+
+import Maybe		( isNothing, fromJust )	
 \end{code}
 
 
@@ -485,8 +487,11 @@ instance (NamedThing name, Outputable name, Outputable pat)
       where
         top_matter  = ptext SLIT("class") <+> pp_decl_head context clas tyvars <+> pprFundeps fds
 	ppr_sig sig = ppr sig <> semi
+
 	pp_methods = getPprStyle $ \ sty ->
-        	     if ifaceStyle sty then empty else ppr methods
+        	     if ifaceStyle sty || isNothing methods
+			then empty
+			else ppr (fromJust methods)
         
 pp_decl_head :: Outputable name => HsContext name -> name -> [HsTyVarBndr name] -> SDoc
 pp_decl_head context thing tyvars = hsep [pprHsContext context, ppr thing, interppSP tyvars]
