@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelMarshalArray.lhs,v 1.3 2001/05/18 16:54:05 simonmar Exp $
+% $Id: PrelMarshalArray.lhs,v 1.4 2001/08/15 09:18:06 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -66,8 +66,6 @@ import PrelStorable     (Storable(sizeOf,peekElemOff,pokeElemOff,destruct))
 import PrelMarshalAlloc (mallocBytes, allocaBytes, reallocBytes)
 import PrelMarshalUtils (copyBytes, moveBytes)
 import PrelIOBase
-import PrelMaybe
-import PrelReal		( fromIntegral )
 import PrelNum
 import PrelList
 import PrelErr
@@ -122,10 +120,15 @@ reallocArray0 ptr size  = reallocArray ptr (size + 1)
 -- marshalling
 -- -----------
 
--- convert an array of given length into a Haskell list
---
+-- convert an array of given length into a Haskell list.  This version
+-- traverses the array backwards using an accumulating parameter, which
+-- uses constant stack space.  The previous version using mapM
+
 peekArray          :: Storable a => Int -> Ptr a -> IO [a]
-peekArray size ptr  = mapM (peekElemOff ptr) [0..size-1]
+peekArray size ptr = f (size-1) []
+  where
+    f 0 acc = do e <- peekElemOff ptr 0; return (e:acc)
+    f n acc = do e <- peekElemOff ptr n; f n (e:acc)
 
 -- convert an array terminated by the given end marker into a Haskell list
 --
