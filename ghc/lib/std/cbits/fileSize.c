@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: fileSize.c,v 1.6 2001/03/01 12:25:33 rrt Exp $
+ * $Id: fileSize.c,v 1.7 2001/04/02 16:10:32 rrt Exp $
  *
  * hClose Runtime Support
  */
@@ -21,14 +21,14 @@ StgInt
 fileSize(StgForeignPtr ptr, StgByteArray result)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
-    struct Stat sb;
+    struct stat sb;
     int rc = 0;
 
     /* Flush buffer in order to get as an accurate size as poss. */
     rc = flushFile(ptr);
     if (rc < 0) return rc;
 
-   while (Fstat(fo->fd, &sb) < 0) {
+   while (fstat(fo->fd, &sb) < 0) {
 	/* highly unlikely */
 	if (errno != EINTR) {
 	    cvtErrno();
@@ -55,14 +55,14 @@ StgInt
 fileSize_int64(StgForeignPtr ptr, StgByteArray result)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
-    struct Stat sb;
+    struct stat sb;
     int rc = 0;
 
     /* Flush buffer in order to get as an accurate size as poss. */
     rc = flushFile(ptr);
     if (rc < 0) return rc;
 
-   while (Fstat(fo->fd, &sb) < 0) {
+   while (fstat(fo->fd, &sb) < 0) {
 	/* highly unlikely */
 	if (errno != EINTR) {
 	    cvtErrno();

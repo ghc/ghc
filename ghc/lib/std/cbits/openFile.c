@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: openFile.c,v 1.19 2001/03/01 12:25:33 rrt Exp $
+ * $Id: openFile.c,v 1.20 2001/04/02 16:10:33 rrt Exp $
  *
  * openFile Runtime Support
  */
@@ -79,7 +79,7 @@ openFile(StgByteArray file, StgInt how, StgInt binary)
     int oflags;
     int for_writing;
     int created = 0;
-    struct Stat sb;
+    struct stat sb;
     IOFileObject* fo;
     int flags = 0;
 
@@ -136,7 +136,7 @@ openFile(StgByteArray file, StgInt how, StgInt binary)
 	    } else {
 		/* If it is a dangling symlink, break off now, too. */
 #ifndef mingw32_TARGET_OS
-		struct Stat st;
+		struct stat st;
 		if ( lstat(file,&st) == 0) {
 		   ghc_errtype = ERR_NOSUCHTHING;
 		   ghc_errstr = "dangling symlink";
@@ -193,7 +193,7 @@ openFile(StgByteArray file, StgInt how, StgInt binary)
 
     /* Make sure that we aren't looking at a directory */
 
-    while (Fstat(fd, &sb) < 0) {
+    while (fstat(fd, &sb) < 0) {
 	/* highly unlikely */
 	if (errno != EINTR) {
 	    cvtErrno();
