@@ -55,7 +55,13 @@ module Name (
     ) where
 
 IMP_Ubiq()
-import TyLoop		--( GenId, Id(..), TyCon )			-- Used inside Names
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
+IMPORT_DELOOPER(TyLoop)	( GenId, Id(..), TyCon )			-- Used inside Names
+#else
+import {-# SOURCE #-} Id    ( Id )
+import {-# SOURCE #-} TyCon ( TyCon )
+#endif
+
 import CStrings		( identToC, modnameToC, cSEP )
 import CmdLineOpts	( opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 import BasicTypes	( SYN_IE(Module), moduleString, pprModule )
