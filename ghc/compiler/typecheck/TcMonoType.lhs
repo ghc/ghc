@@ -21,7 +21,7 @@ import TcHsSyn		( TcId )
 import TcMonad
 import TcEnv		( tcExtendTyVarEnv, tcLookupTy, tcGetValueEnv, tcGetInScopeTyVars,
                           tcExtendUVarEnv, tcLookupUVar,
-			  tcGetGlobalTyVars, TcTyThing(..)
+			  tcGetGlobalTyVars, valueEnvIds, TcTyThing(..)
 			)
 import TcType		( TcType, TcKind, TcTyVar, TcThetaType, TcTauType,
 			  typeToTcType, kindToTcKind,
@@ -51,7 +51,6 @@ import Name		( Name, OccName, isLocallyDefined )
 import TysWiredIn	( mkListTy, mkTupleTy, mkUnboxedTupleTy )
 import SrcLoc		( SrcLoc )
 import Unique		( Unique, Uniquable(..) )
-import UniqFM		( eltsUFM )
 import Util		( zipWithEqual, zipLazy, mapAccumL )
 import Outputable
 \end{code}
@@ -562,7 +561,7 @@ checkSigTyVars sig_tyvars
 	    if tv `elemVarSet` globals	-- Error (c)! Type variable escapes
 					-- The least comprehensible, so put it last
 	    then   tcGetValueEnv 			`thenNF_Tc` \ ve ->
-        	   find_globals tv env (eltsUFM ve) 	`thenNF_Tc` \ (env1, globs) ->
+        	   find_globals tv env (valueEnvIds ve) `thenNF_Tc` \ (env1, globs) ->
 		   returnNF_Tc (env1, acc, escape_msg sig_tyvar tv globs : msgs)
 
 	    else 	-- All OK

@@ -19,7 +19,7 @@ import TcMonoType	( tcHsType, tcHsTypeKind,
 import TcEnv		( ValueEnv, tcExtendTyVarEnv, 
 			  tcExtendGlobalValEnv, tcSetValueEnv,
 			  tcLookupTyConByKey, tcLookupValueMaybe,
-			  explicitLookupValue, badCon, badPrimOp
+			  explicitLookupValue, badCon, badPrimOp, valueEnvIds
 			)
 import TcType		( TcKind, kindToTcKind )
 
@@ -42,7 +42,7 @@ import DataCon		( dataConSig, dataConArgTys )
 import Type		( mkSynTy, mkTyVarTys, splitAlgTyConApp, unUsgTy )
 import Var		( IdOrTyVar, mkTyVar, tyVarKind )
 import VarEnv
-import Name		( Name, NamedThing(..) )
+import Name		( Name, NamedThing(..), isLocallyDefined )
 import Unique		( rationalTyConKey )
 import TysWiredIn	( integerTy, stringTy )
 import Demand		( wwLazy )
@@ -65,23 +65,23 @@ tcInterfaceSigs :: ValueEnv		-- Envt to use when checking unfoldings
 		-> TcM s [Id]
 		
 
-tcInterfaceSigs unf_env (SigD (IfaceSig name ty id_infos src_loc) : rest)
-  = tcAddSrcLoc src_loc (
-    tcAddErrCtxt (ifaceSigCtxt name) (
-	tcHsType ty						`thenTc` \ sigma_ty ->
-	tcIdInfo unf_env name sigma_ty vanillaIdInfo id_infos	`thenTc` \ id_info ->
+tcInterfaceSigs unf_env decls
+  = listTc [ do_one name ty id_infos src_loc
+	   | SigD (IfaceSig name ty id_infos src_loc) <- decls]
+  where
+    in_scope_vars = filter isLocallyDefined (valueEnvIds unf_env)
+
+    do_one name ty id_infos src_loc
+      = tcAddSrcLoc src_loc 		 		$	
+	tcAddErrCtxt (ifaceSigCtxt name)		$
+	tcHsType ty					`thenTc` \ sigma_ty ->
+	tcIdInfo unf_env in_scope_vars name 
+		 sigma_ty vanillaIdInfo id_infos	`thenTc` \ id_info ->
 	returnTc (mkId name sigma_ty id_info)
-    ))						`thenTc` \ sig_id ->
-    tcInterfaceSigs unf_env rest		`thenTc` \ sig_ids ->
-    returnTc (sig_id : sig_ids)
-
-tcInterfaceSigs unf_env (other_decl : rest) = tcInterfaceSigs unf_env rest
-
-tcInterfaceSigs unf_env [] = returnTc []
 \end{code}
 
 \begin{code}
-tcIdInfo unf_env name ty info info_ins
+tcIdInfo unf_env in_scope_vars name ty info info_ins
   = foldlTc tcPrag vanillaIdInfo info_ins
   where
     tcPrag info (HsArity arity) = returnTc (info `setArityInfo`  arity)
@@ -91,7 +91,7 @@ tcIdInfo unf_env name ty info info_ins
 
     tcPrag info (HsUnfold inline_prag maybe_expr)
 	= (case maybe_expr of
-		Just expr -> tcPragExpr unf_env name [] expr
+		Just expr -> tcPragExpr unf_env name in_scope_vars expr
 		Nothing   -> returnNF_Tc Nothing
 	  )				 	`thenNF_Tc` \ maybe_expr' ->
 	  let

@@ -22,6 +22,7 @@ module TcEnv(
 	tcLookupValue,      tcLookupValueMaybe, 
 	tcLookupValueByKey, tcLookupValueByKeyMaybe,
 	explicitLookupValueByKey, explicitLookupValue,
+	valueEnvIds,
 
 	newLocalId, newSpecPragmaId,
 	tcGetGlobalTyVars, tcExtendGlobalTyVars,
@@ -151,6 +152,9 @@ type NameEnv val = UniqFM val		-- Keyed by Names
 type UsageEnv   = NameEnv UVar
 type TypeEnv	= NameEnv (TcKind, Maybe Arity, TcTyThing)
 type ValueEnv	= NameEnv Id	
+
+valueEnvIds :: ValueEnv -> [Id]
+valueEnvIds ve = eltsUFM ve
 
 data TcTyThing = ATyVar TcTyVar		-- Mutable only so that the kind can be mutable
 					-- if the kind is mutable, the tyvar must be so that
