@@ -318,7 +318,7 @@ eq_ufVar :: (NamedThing name, Ord name) => EqHsEnv name -> name -> name -> Bool
 -- differences when comparing interface files
 eq_ufVar env n1 n2 = case lookupFM env n1 of
 		       Just n1 -> check n1
-		       Nothing -> check n2
+		       Nothing -> check n1
    where
 	check n1 = eqNameByOcc (getName n1) (getName n2)
 
