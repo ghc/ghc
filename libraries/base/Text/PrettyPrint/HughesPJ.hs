@@ -893,3 +893,21 @@ multi_ch n       ch = ch : multi_ch (n - 1) ch
 spaces n | n <= 0    = ""
 	 | otherwise = ' ' : spaces (n - 1)
 
+{- Comments from Johannes Waldmann about what the problem might be:
+
+   In the example above, d2 and d1 are deeply nested, but `text "+"' is not, 
+   so the layout function tries to "out-dent" it.
+   
+   when I look at the Doc values that are generated, there are lots of
+   Nest constructors with negative arguments.  see this sample output of
+   d1 (obtained with hugs, :s -u)
+   
+   tBeside (TextDetails_Chr 'a') 1 Doc_Empty) (Doc_NilAbove (Doc_Nest
+   (-241) (Doc_TextBeside (TextDetails_Chr 'a') 1 Doc_Empty)))))
+   (Doc_NilAbove (Doc_Nest (-236) (Doc_TextBeside (TextDetails_Chr 'a') 1
+   (Doc_NilAbove (Doc_Nest (-5) (Doc_TextBeside (TextDetails_Chr 'a') 1
+   Doc_Empty)))))))) (Doc_NilAbove (Doc_Nest (-231) (Doc_TextBeside
+   (TextDetails_Chr 'a') 1 (Doc_NilAbove (Doc_Nest (-5) (Doc_TextBeside
+   (TextDetails_Chr 'a') 1 (Doc_NilAbove (Doc_Nest (-5) (Doc_TextBeside
+   (TextDetails_Chr 'a') 1 Doc_Empty))))))))))) (Doc_NilAbove (Doc_Nest
+-}
