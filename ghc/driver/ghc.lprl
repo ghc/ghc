@@ -367,7 +367,8 @@ $Haskell1Version = 5; # i.e., Haskell 1.4
 # Cpp symbols defined when we're processing Haskell source.
 
 @HsSourceCppOpts = 
-	( "-D__HASKELL1__=$Haskell1Version"
+	( "-D__HASKELL__=98"
+	, "-D__HASKELL1__=$Haskell1Version"
 	, "-D__GLASGOW_HASKELL__=$ProjectVersionInt"
 	, "-D__HASKELL98__"
 	, "-D__CONCURRENT_HASKELL__"

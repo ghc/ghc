@@ -1169,24 +1169,25 @@ Specify a directory in which to look for @#include@ files, in
 the usual C way.
 </descrip>
 
-The @ghc@ driver pre-defines several macros:
+The @ghc@ driver pre-defines several macros when processing Haskell
+source code (@.hs@ or @.lhs@ files):
+
 <descrip>
 <tag>@__HASKELL98__@:</tag>
 <nidx>__HASKELL98__</nidx>
-If defined, this means that GHC supports the language
-defined by the Haskell 98 report.
+If defined, this means that GHC supports the language defined by the
+Haskell 98 report.
 
-NB. This macro is <em/only/ set when pre-processing Haskell source
-(ie. @.hs@ or @.lhs@ files).
+<tag>@__HASKELL__=98@:</tag>
+<nidx>__HASKELL__</nidx>
+In GHC 4.04 and later, the @__HASKELL__@ macro is defined as having
+the value @98@.
 
 <tag>@__HASKELL1__@:</tag>
 <nidx>__HASKELL1__ macro</nidx>
-If defined to <em/n/, that means GHC supports the
-Haskell language defined in the Haskell report version <em/1.n/.
-Currently 5.
-
-NB. As with <tt/__HASKELL98__/, this macro is <em/only/ set when
-pre-processing Haskell source (ie. @.hs@ or @.lhs@ files).
+If defined to <em/n/, that means GHC supports the Haskell language
+defined in the Haskell report version <em/1.n/.  Currently 5.  This
+macro is deprecated, and will probably disappear in future versions.
 
 <tag>@__GLASGOW_HASKELL__@:</tag>
 <nidx>__GLASGOW_HASKELL__ macro</nidx>
