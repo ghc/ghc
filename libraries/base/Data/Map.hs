@@ -225,14 +225,18 @@ size t
 
 
 -- | /O(log n)/. Lookup the value at a key in the map.
-lookup :: Ord k => k -> Map k a -> Maybe a
-lookup k t
+lookup :: (Monad m,Ord k) => k -> Map k a -> m a
+lookup k t = case lookup' k t of
+    Just x -> return x
+    Nothing -> fail "Data.Map.lookup: Key not found"
+lookup' :: Ord k => k -> Map k a -> Maybe a
+lookup' k t
   = case t of
       Tip -> Nothing
       Bin sz kx x l r
           -> case compare k kx of
-               LT -> lookup k l
-               GT -> lookup k r
+               LT -> lookup' k l
+               GT -> lookup' k r
                EQ -> Just x       
 
 -- | /O(log n)/. Is the key a member of the map?
@@ -395,9 +399,10 @@ findIndex k t
 
 -- | /O(log n)/. Lookup the /index/ of a key. The index is a number from
 -- /0/ up to, but not including, the 'size' of the map. 
-lookupIndex :: Ord k => k -> Map k a -> Maybe Int
-lookupIndex k t
-  = lookup 0 t
+lookupIndex :: (Monad m,Ord k) => k -> Map k a -> m Int
+lookupIndex k t = case lookup 0 t of
+    Nothing -> fail "Data.Map.lookupIndex: Key not found."
+    Just x -> return x
   where
     lookup idx Tip  = Nothing
     lookup idx (Bin _ kx x l r)
