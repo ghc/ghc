@@ -241,6 +241,9 @@ howToAccessLabel isJump lbl
    | isJump = AccessViaStub
 #endif
    | otherwise = AccessViaSymbolPtr
+
+#else
+howToAccessLabel = panic "PositionIndependentCode.howToAccessLabel"
 #endif
 
 -- -------------------------------------------------------------------
