@@ -224,8 +224,7 @@ knownKeyNames
 
 \begin{code}
 pRELUDE_Name      = mkModuleName "Prelude"
-gHC_PRIM_Name     = mkModuleName "GHC.Prim"	   -- Primitive types and values
-gHC_BUILTIN_Name  = mkModuleName "GHC.Builtin"
+pREL_GHC_Name     = mkModuleName "GHC.Prim"	   -- Primitive types and values
 pREL_BASE_Name    = mkModuleName "GHC.Base"
 pREL_ENUM_Name    = mkModuleName "GHC.Enum"
 pREL_SHOW_Name    = mkModuleName "GHC.Show"
@@ -260,8 +259,7 @@ aDDR_Name	  = mkModuleName "Addr"
 
 gLA_EXTS_Name   = mkModuleName "GlaExts"
 
-gHC_PRIM     	= mkPrelModule gHC_PRIM_Name
-gHC_BUILTIN    	= mkPrelModule gHC_BUILTIN_Name
+pREL_GHC     	= mkPrelModule pREL_GHC_Name
 pREL_BASE    	= mkPrelModule pREL_BASE_Name
 pREL_ADDR    	= mkPrelModule pREL_ADDR_Name
 pREL_PTR    	= mkPrelModule pREL_PTR_Name
@@ -294,11 +292,11 @@ mkTupNameStr Boxed 4 = (pREL_TUP_Name, _PK_ "(,,,)") -- ditto
 mkTupNameStr Boxed n = (pREL_TUP_Name, _PK_ ("(" ++ nOfThem (n-1) ',' ++ ")"))
 
 mkTupNameStr Unboxed 0 = panic "Name.mkUbxTupNameStr: 0 ???"
-mkTupNameStr Unboxed 1 = (gHC_PRIM_Name, _PK_ "(# #)") -- 1 and 0 both make sense!!!
-mkTupNameStr Unboxed 2 = (gHC_PRIM_Name, _PK_ "(#,#)")
-mkTupNameStr Unboxed 3 = (gHC_PRIM_Name, _PK_ "(#,,#)")
-mkTupNameStr Unboxed 4 = (gHC_PRIM_Name, _PK_ "(#,,,#)")
-mkTupNameStr Unboxed n = (gHC_PRIM_Name, _PK_ ("(#" ++ nOfThem (n-1) ',' ++ "#)"))
+mkTupNameStr Unboxed 1 = (pREL_GHC_Name, _PK_ "(# #)") -- 1 and 0 both make sense!!!
+mkTupNameStr Unboxed 2 = (pREL_GHC_Name, _PK_ "(#,#)")
+mkTupNameStr Unboxed 3 = (pREL_GHC_Name, _PK_ "(#,,#)")
+mkTupNameStr Unboxed 4 = (pREL_GHC_Name, _PK_ "(#,,,#)")
+mkTupNameStr Unboxed n = (pREL_GHC_Name, _PK_ ("(#" ++ nOfThem (n-1) ',' ++ "#)"))
 
 mkTupConRdrName :: NameSpace -> Boxity -> Arity -> RdrName 
 mkTupConRdrName space boxity arity   = case mkTupNameStr boxity arity of
@@ -346,33 +344,33 @@ openKindConName  = kindQual FSLIT("?") anyBoxConKey
 usageKindConName = kindQual FSLIT("$") usageConKey
 typeConName	 = kindQual FSLIT("Type") typeConKey
 
-funTyConName	    	      = tcQual  gHC_PRIM_Name FSLIT("(->)")  funTyConKey
-charPrimTyConName    	      = tcQual  gHC_PRIM_Name FSLIT("Char#") charPrimTyConKey 
-intPrimTyConName     	      = tcQual  gHC_PRIM_Name FSLIT("Int#") intPrimTyConKey 
-int32PrimTyConName	      = tcQual  gHC_PRIM_Name FSLIT("Int32#") int32PrimTyConKey 
-int64PrimTyConName   	      = tcQual  gHC_PRIM_Name FSLIT("Int64#") int64PrimTyConKey 
-wordPrimTyConName    	      = tcQual  gHC_PRIM_Name FSLIT("Word#") wordPrimTyConKey 
-word32PrimTyConName  	      = tcQual  gHC_PRIM_Name FSLIT("Word32#") word32PrimTyConKey 
-word64PrimTyConName  	      = tcQual  gHC_PRIM_Name FSLIT("Word64#") word64PrimTyConKey 
-addrPrimTyConName    	      = tcQual  gHC_PRIM_Name FSLIT("Addr#") addrPrimTyConKey 
-floatPrimTyConName   	      = tcQual  gHC_PRIM_Name FSLIT("Float#") floatPrimTyConKey 
-doublePrimTyConName  	      = tcQual  gHC_PRIM_Name FSLIT("Double#") doublePrimTyConKey 
-statePrimTyConName   	      = tcQual  gHC_PRIM_Name FSLIT("State#") statePrimTyConKey 
-realWorldTyConName   	      = tcQual  gHC_PRIM_Name FSLIT("RealWorld") realWorldTyConKey 
-arrayPrimTyConName   	      = tcQual  gHC_PRIM_Name FSLIT("Array#") arrayPrimTyConKey 
-byteArrayPrimTyConName	      = tcQual  gHC_PRIM_Name FSLIT("ByteArray#") byteArrayPrimTyConKey 
-mutableArrayPrimTyConName     = tcQual  gHC_PRIM_Name FSLIT("MutableArray#") mutableArrayPrimTyConKey 
-mutableByteArrayPrimTyConName = tcQual  gHC_PRIM_Name FSLIT("MutableByteArray#") mutableByteArrayPrimTyConKey 
-mutVarPrimTyConName	      = tcQual  gHC_PRIM_Name FSLIT("MutVar#") mutVarPrimTyConKey 
-mVarPrimTyConName	      = tcQual  gHC_PRIM_Name FSLIT("MVar#") mVarPrimTyConKey 
-stablePtrPrimTyConName        = tcQual  gHC_PRIM_Name FSLIT("StablePtr#") stablePtrPrimTyConKey 
-stableNamePrimTyConName       = tcQual  gHC_PRIM_Name FSLIT("StableName#") stableNamePrimTyConKey 
-foreignObjPrimTyConName       = tcQual  gHC_PRIM_Name FSLIT("ForeignObj#") foreignObjPrimTyConKey 
-bcoPrimTyConName 	      = tcQual  gHC_PRIM_Name FSLIT("BCO#") bcoPrimTyConKey 
-weakPrimTyConName  	      = tcQual  gHC_PRIM_Name FSLIT("Weak#") weakPrimTyConKey 
-threadIdPrimTyConName  	      = tcQual  gHC_PRIM_Name FSLIT("ThreadId#") threadIdPrimTyConKey 
-cCallableClassName   	      = clsQual gHC_BUILTIN_Name FSLIT("CCallable") cCallableClassKey
-cReturnableClassName 	      = clsQual gHC_BUILTIN_Name FSLIT("CReturnable") cReturnableClassKey
+funTyConName	    	      = tcQual  pREL_GHC_Name FSLIT("(->)")  funTyConKey
+charPrimTyConName    	      = tcQual  pREL_GHC_Name FSLIT("Char#") charPrimTyConKey 
+intPrimTyConName     	      = tcQual  pREL_GHC_Name FSLIT("Int#") intPrimTyConKey 
+int32PrimTyConName	      = tcQual  pREL_GHC_Name FSLIT("Int32#") int32PrimTyConKey 
+int64PrimTyConName   	      = tcQual  pREL_GHC_Name FSLIT("Int64#") int64PrimTyConKey 
+wordPrimTyConName    	      = tcQual  pREL_GHC_Name FSLIT("Word#") wordPrimTyConKey 
+word32PrimTyConName  	      = tcQual  pREL_GHC_Name FSLIT("Word32#") word32PrimTyConKey 
+word64PrimTyConName  	      = tcQual  pREL_GHC_Name FSLIT("Word64#") word64PrimTyConKey 
+addrPrimTyConName    	      = tcQual  pREL_GHC_Name FSLIT("Addr#") addrPrimTyConKey 
+floatPrimTyConName   	      = tcQual  pREL_GHC_Name FSLIT("Float#") floatPrimTyConKey 
+doublePrimTyConName  	      = tcQual  pREL_GHC_Name FSLIT("Double#") doublePrimTyConKey 
+statePrimTyConName   	      = tcQual  pREL_GHC_Name FSLIT("State#") statePrimTyConKey 
+realWorldTyConName   	      = tcQual  pREL_GHC_Name FSLIT("RealWorld") realWorldTyConKey 
+arrayPrimTyConName   	      = tcQual  pREL_GHC_Name FSLIT("Array#") arrayPrimTyConKey 
+byteArrayPrimTyConName	      = tcQual  pREL_GHC_Name FSLIT("ByteArray#") byteArrayPrimTyConKey 
+mutableArrayPrimTyConName     = tcQual  pREL_GHC_Name FSLIT("MutableArray#") mutableArrayPrimTyConKey 
+mutableByteArrayPrimTyConName = tcQual  pREL_GHC_Name FSLIT("MutableByteArray#") mutableByteArrayPrimTyConKey 
+mutVarPrimTyConName	      = tcQual  pREL_GHC_Name FSLIT("MutVar#") mutVarPrimTyConKey 
+mVarPrimTyConName	      = tcQual  pREL_GHC_Name FSLIT("MVar#") mVarPrimTyConKey 
+stablePtrPrimTyConName        = tcQual  pREL_GHC_Name FSLIT("StablePtr#") stablePtrPrimTyConKey 
+stableNamePrimTyConName       = tcQual  pREL_GHC_Name FSLIT("StableName#") stableNamePrimTyConKey 
+foreignObjPrimTyConName       = tcQual  pREL_GHC_Name FSLIT("ForeignObj#") foreignObjPrimTyConKey 
+bcoPrimTyConName 	      = tcQual  pREL_GHC_Name FSLIT("BCO#") bcoPrimTyConKey 
+weakPrimTyConName  	      = tcQual  pREL_GHC_Name FSLIT("Weak#") weakPrimTyConKey 
+threadIdPrimTyConName  	      = tcQual  pREL_GHC_Name FSLIT("ThreadId#") threadIdPrimTyConKey 
+cCallableClassName   	      = clsQual pREL_GHC_Name FSLIT("CCallable") cCallableClassKey
+cReturnableClassName 	      = clsQual pREL_GHC_Name FSLIT("CReturnable") cReturnableClassKey
 
 -- PrelBase data types and constructors
 charTyConName	  = tcQual   pREL_BASE_Name FSLIT("Char") charTyConKey
@@ -558,8 +556,8 @@ deRefStablePtrName    = varQual  pREL_STABLE_Name FSLIT("deRefStablePtr") deRefS
 newStablePtrName      = varQual  pREL_STABLE_Name FSLIT("newStablePtr") newStablePtrIdKey
 
 errorName	   = varQual pREL_ERR_Name FSLIT("error") errorIdKey
-assertName         = varQual gHC_BUILTIN_Name FSLIT("assert") assertIdKey
-getTagName	   = varQual gHC_BUILTIN_Name FSLIT("getTag#") getTagIdKey
+assertName         = varQual pREL_GHC_Name FSLIT("assert") assertIdKey
+getTagName	   = varQual pREL_GHC_Name FSLIT("getTag#") getTagIdKey
 runSTRepName	   = varQual pREL_ST_Name  FSLIT("runSTRep") runSTRepIdKey
 
 -- The "split" Id for splittable implicit parameters
