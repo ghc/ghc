@@ -2634,7 +2634,7 @@ sub add_syslib {
 	       ? "$InstLibDirGhc"
 	       : "$TopPwd/hslibs/util/cbits"
 	  )
-	, 'lang concurrent' # Syslib dependencies
+	, 'lang concurrent posix' # Syslib dependencies
 	, ''     # extra ghc opts
 	, ''     # extra cc opts
 	, ''     # extra ld opts
