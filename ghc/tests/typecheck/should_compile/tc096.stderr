@@ -1,0 +1,6 @@
+ghc: module version changed to 1; reason: no old .hi file
+_exports_
+ShouldSucceed main x;
+_declarations_
+1 main _:_ PrelIOBase.IO PrelBase.() ;;
+1 x _:_ PrelBase.Double ;;

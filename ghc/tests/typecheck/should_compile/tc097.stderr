@@ -1,0 +1,9 @@
+ghc: module version changed to 1; reason: no old .hi file
+_exports_
+ShouldSucceed halfListMonad Monad2(MkMonad2);
+_instances_
+instance _forall_ [a :: (* -> *)] => {PrelBase.Eval (Monad2 a)} = $dEvalMonad20;
+_declarations_
+1 $dEvalMonad20 _:_ _forall_ [a :: (* -> *)] => {PrelBase.Eval (Monad2 a)} ;;
+1 data Monad2 m :: (* -> *) = MkMonad2 (_forall_ [a] => a -> m a) (_forall_ [a b] => m a -> (a -> m b) -> m b) ;
+1 halfListMonad _:_ (_forall_ [a b] => [a] -> (a -> [b]) -> [b]) -> Monad2 PrelBase.[] ;;
