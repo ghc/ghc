@@ -11,7 +11,7 @@ module ByteCodeLink ( UnlinkedBCO, UnlinkedBCOExpr, assembleBCO,
 #include "HsVersions.h"
 
 import Outputable
-import Name		( Name, getName, nameModule, toRdrName )
+import Name		( Name, getName, nameModule, toRdrName, isGlobalName )
 import RdrName		( rdrNameOcc, rdrNameModule )
 import OccName		( occNameString )
 import FiniteMap	( FiniteMap, addListToFM, filterFM,
@@ -57,14 +57,23 @@ import PrelIOBase	( IO(..) )
 \begin{code}
 
 -- Link a bunch of BCOs and return them + updated closure env.
-linkSomeBCOs :: ItblEnv -> ClosureEnv -> [UnlinkedBCO]
-                -> IO (ClosureEnv, [HValue])
-linkSomeBCOs ie ce_in ul_bcos
+linkSomeBCOs :: Bool 	-- False <=> add _all_ BCOs to returned closure env
+                        -- True  <=> add only toplevel BCOs to closure env
+             -> ItblEnv 
+             -> ClosureEnv 
+             -> [UnlinkedBCO]
+             -> IO (ClosureEnv, [HValue])
+linkSomeBCOs toplevs_only ie ce_in ul_bcos
    = do let nms = map nameOfUnlinkedBCO ul_bcos
         hvals <- fixIO 
                     ( \ hvs -> let ce_out = addListToFM ce_in (zipLazily nms hvs)
                                in  mapM (linkBCO ie ce_out) ul_bcos )
-        let ce_out = addListToFM ce_in (zip nms hvals)
+
+        let ce_all_additions = zip nms hvals
+            ce_top_additions = filter (isGlobalName.fst) ce_all_additions
+            ce_additions     = if toplevs_only then ce_top_additions 
+                                               else ce_all_additions
+            ce_out = addListToFM ce_in ce_additions
         return (ce_out, hvals)
      where
         -- A lazier zip, in which no demand is propagated to the second

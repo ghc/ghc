@@ -129,15 +129,15 @@ linkIModules gie gce mods
    = do let (bcoss, ies) = unzip mods
             bcos = concat bcoss
             final_gie = foldr plusFM gie ies
-        (final_gce, linked_bcos) <- linkSomeBCOs final_gie gce bcos
+        (final_gce, linked_bcos) <- linkSomeBCOs True final_gie gce bcos
         return (linked_bcos, final_gie, final_gce)
 
 
 linkIExpr :: ItblEnv -> ClosureEnv -> UnlinkedBCOExpr
           -> IO HValue 	  -- IO BCO# really
 linkIExpr ie ce (root_ul_bco, aux_ul_bcos)
-   = do (aux_ce, _) <- linkSomeBCOs ie ce aux_ul_bcos
-        (_, [root_bco]) <- linkSomeBCOs ie aux_ce [root_ul_bco]
+   = do (aux_ce, _) <- linkSomeBCOs False ie ce aux_ul_bcos
+        (_, [root_bco]) <- linkSomeBCOs False ie aux_ce [root_ul_bco]
         return root_bco
 \end{code}
 
