@@ -153,7 +153,7 @@ shiftRL x i   = shiftR x i
   * A "Nat" is a natural machine word (an unsigned Int)
 --------------------------------------------------------------------}
 import Data.Word
-infixl 9 \\
+infixl 9 \\ -- comment to fool cpp
 
 type Nat = Word
 
