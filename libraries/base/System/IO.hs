@@ -204,7 +204,7 @@ import IO
   , IO ()
   , FilePath                  -- :: String
   )
-import NHC.Internal (unsafePerformIO)
+import NHC.IOExtras (fixIO)
 #endif
 
 import System.IO.Error (
@@ -376,10 +376,6 @@ hPrint hdl 	=  hPutStrLn hdl . show
 #ifdef __GLASGOW_HASKELL__
 fixIO 		:: (a -> IO a) -> IO a
 fixIO m         = stToIO (fixST (ioToST . m))
-#endif
-#ifdef __NHC__
-fixIO           :: (a -> IO a) -> IO a
-fixIO f         = let x = unsafePerformIO (f x) in return x
 #endif
 
 -- $locking
