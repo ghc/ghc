@@ -626,7 +626,7 @@ tryEta bndrs expr@(App _ _)
     n_remaining = length args - length bndrs
 
     ok bndr (Var arg) = bndr == arg
-    ok bndr other	    = False
+    ok bndr other     = False
 
 	  -- we can't eta reduce something which must be saturated.
     ok_to_eta_reduce (Var f) = not (hasNoBinding f)
