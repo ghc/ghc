@@ -64,8 +64,8 @@ import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
 			  typeEnvClasses, typeEnvTyCons, emptyIfaceTable )
 import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
 import OccName		( OccName )
-import Name		( Name, nameModule, nameOccName, getName  )
-import Name		( emptyNameEnv )
+import Name		( Name, nameModule, nameOccName, getName, isGlobalName,
+			  emptyNameEnv )
 import Module		( Module, lookupModuleEnvByName )
 
 import Monad		( when )
@@ -203,6 +203,15 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
       	     Nothing -> return (HscFail pcs_rn);
       	     Just (print_unqualified, (is_exported, new_iface, rn_hs_decls)) -> do {
     
+ 	    -- In interactive mode, we don't want to discard any top-level entities at
+	    -- all (eg. do not inline them away during simplification), and retain them
+	    -- all in the TypeEnv so they are available from the command line.
+	    --
+	    -- isGlobalName separates the user-defined top-level names from those
+	    -- introduced by the type checker.
+	; let dont_discard | ghci_mode == Interactive = isGlobalName
+			   | otherwise = is_exported
+
  	    -------------------
  	    -- TYPECHECK
  	    -------------------
@@ -227,7 +236,7 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -------------------
       	  -- We grab the the unfoldings at this point.
 	; (pcs_simpl, tidy_binds, orphan_rules)
-	      <- simplThenTidy dflags pcs_tc hst this_mod is_exported ds_binds ds_rules
+	      <- simplThenTidy dflags pcs_tc hst this_mod dont_discard ds_binds ds_rules
       	    
  	    -------------------
  	    -- BUILD THE NEW ModDetails AND ModIface
@@ -302,11 +311,11 @@ myParseModule dflags src_filename
       }}
 
 
-simplThenTidy dflags pcs hst this_mod is_exported binds rules
+simplThenTidy dflags pcs hst this_mod dont_discard binds rules
  = do -- Do main Core-language transformations ---------
       -- _scc_     "Core2Core"
       (simplified, orphan_rules) 
-         <- core2core dflags pcs hst is_exported binds rules
+         <- core2core dflags pcs hst dont_discard binds rules
 
       -- Do saturation and convert to A-normal form
       -- NOTE: subsequent passes may not transform the syntax, only annotate it
