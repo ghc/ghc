@@ -19,15 +19,15 @@ import Id		( Id, idType, mkSysLocal, getIdDemandInfo, setIdDemandInfo,
 			)
 import IdInfo		( CprInfo(..), noCprInfo, vanillaIdInfo )
 import Const		( Con(..), DataCon )
-import DataCon		( splitProductType_maybe, isExistentialDataCon, dataConArgTys )
+import DataCon		( isExistentialDataCon, dataConArgTys )
 import Demand		( Demand(..) )
 import PrelInfo		( realWorldPrimId, aBSENT_ERROR_ID )
 import TysPrim		( realWorldStatePrimTy )
 import TysWiredIn	( unboxedTupleCon, unboxedTupleTyCon )
-import Type		( isUnLiftedType, mkTyVarTys, mkTyVarTy, mkFunTys,
+import Type		( isUnLiftedType, 
 			  splitForAllTys, splitFunTys, splitFunTysN,
-			  splitAlgTyConApp_maybe, splitAlgTyConApp,
-			  mkTyConApp, splitNewType_maybe,
+			  splitAlgTyConApp_maybe, splitNewType_maybe,
+			  mkTyConApp, 
 			  Type
 			)
 import TyCon            ( isNewTyCon, isProductTyCon, TyCon )
@@ -345,7 +345,7 @@ mkWWfixup res_ty no_worker_args
     let
 	    void_arg = mk_ww_local void_arg_uniq realWorldStatePrimTy
     in
-    returnUs (\ call_to_worker -> App call_to_worker (Var void_arg),
+    returnUs (\ call_to_worker -> App call_to_worker (Var realWorldPrimId),
 	      \ worker_body    -> Lam void_arg worker_body)
 
   | otherwise
