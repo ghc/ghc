@@ -17,7 +17,7 @@ by giving the @-syslib misc@<nidx>-syslib misc option</nidx>.
 <sect2>The @Bag@ type
 <label id="Bag">
 <p>
-<nidx>Bag module (GHC syslib)</nidx>
+<nidx>Bag module (misc syslib)</nidx>
 %*                                                                      *
 %************************************************************************
 
@@ -56,7 +56,7 @@ bagToList       :: Bag elt -> [elt]
 <sect2>The @FiniteMap@ type
 <label id="FiniteMap">
 <p>
-<nidx>FiniteMap module (GHC syslib)</nidx>
+<nidx>FiniteMap module (misc syslib)</nidx>
 %*                                                                      *
 %************************************************************************
 
@@ -146,7 +146,7 @@ eltsFM          :: FiniteMap key elt -> [elt]
 <sect2>The @ListSetOps@ type
 <label id="ListSetOps">
 <p>
-<nidx>ListSetOps module (GHC syslib)</nidx>
+<nidx>ListSetOps module (misc syslib)</nidx>
 %*                                                                      *
 %************************************************************************
 
@@ -166,7 +166,7 @@ intersectingLists   :: Eq a => [a] -> [a] -> Bool
 <sect2>The @Maybes@ type
 <label id="Maybes">
 <p>
-<nidx>Maybes module (GHC syslib)</nidx>
+<nidx>Maybes module (misc syslib)</nidx>
 %*                                                                      *
 %************************************************************************
 
@@ -242,7 +242,7 @@ accumulating any errors that occur.
 <sect2>The @Memo@ library
 <label id="memo-library">
 <p>
-<nidx>Memo (GHC syslib)</nidx>
+<nidx>Memo (misc syslib)</nidx>
 %*                                                                      *
 %************************************************************************
 
@@ -286,7 +286,7 @@ memo_sized :: Int -> (a -> b) -> a -> b
 <sect2>The @PackedString@ type
 <label id="PackedString">
 <p>
-<nidx>PackedString module (GHC syslib)</nidx>
+<nidx>PackedString module (misc syslib)</nidx>
 %*                                                                      *
 %************************************************************************
 
@@ -349,57 +349,10 @@ substrPS   :: PackedString -> Int -> Int -> PackedString
 
 %************************************************************************
 %*                                                                      *
-<sect2>The @Pretty@ type
-<label id="Pretty">
-<p>
-<nidx>Pretty module (GHC syslib)</nidx>
-%*                                                                      *
-%************************************************************************
-
-This is the pretty-printer that is currently used in GHC:
-
-<tscreen><verb>
-type Pretty
-
-ppShow          :: Int{-width-} -> Pretty -> [Char]
-
-pp'SP           :: Pretty -- "comma space"
-ppComma         :: Pretty -- ,
-ppEquals        :: Pretty -- =
-ppLbrack        :: Pretty -- [
-ppLparen        :: Pretty -- (
-ppNil           :: Pretty -- nothing
-ppRparen        :: Pretty -- )
-ppRbrack        :: Pretty -- ]
-ppSP            :: Pretty -- space
-ppSemi          :: Pretty -- ;
-
-ppChar          :: Char -> Pretty
-ppDouble        :: Double -> Pretty
-ppFloat         :: Float -> Pretty
-ppInt           :: Int -> Pretty
-ppInteger       :: Integer -> Pretty
-ppRational      :: Rational -> Pretty
-ppStr           :: [Char] -> Pretty
-
-ppAbove         :: Pretty -> Pretty -> Pretty
-ppAboves        :: [Pretty] -> Pretty
-ppBeside        :: Pretty -> Pretty -> Pretty
-ppBesides       :: [Pretty] -> Pretty
-ppCat           :: [Pretty] -> Pretty
-ppHang          :: Pretty -> Int -> Pretty -> Pretty
-ppInterleave    :: Pretty -> [Pretty] -> Pretty -- spacing between
-ppIntersperse   :: Pretty -> [Pretty] -> Pretty -- no spacing between
-ppNest          :: Int -> Pretty -> Pretty
-ppSep           :: [Pretty] -> Pretty
-</verb></tscreen>
-
-%************************************************************************
-%*                                                                      *
 <sect2>The @Set@ type
 <label id="Set">
 <p>
-<nidx>Set module (GHC syslib)</nidx>
+<nidx>Set module (misc syslib)</nidx>
 %*                                                                      *
 %************************************************************************
 
@@ -434,7 +387,7 @@ cardinality     :: Set a -> Int
 <sect2>The @BitSet@ interface
 <label id="BitSet">
 <p>
-<nidx>Bitset interface (GHC syslib)</nidx>
+<nidx>Bitset interface (misc syslib)</nidx>
 %*                                                                      *
 %************************************************************************
 
@@ -464,7 +417,7 @@ listBS        :: BitSet -> [Int]
 <sect2>The @Util@ type
 <label id="Util">
 <p>
-<nidx>Util module (GHC syslib)</nidx>
+<nidx>Util module (misc syslib)</nidx>
 %*                                                                      *
 %************************************************************************
 
@@ -564,7 +517,7 @@ several useful C libraries, mostly from the GNU project.
 <sect2>The @Readline@ interface
 <label id="Readline">
 <p>
-<nidx>Readline library (GHC syslib)</nidx>
+<nidx>Readline library (misc syslib)</nidx>
 <nidx>command-line editing library</nidx>
 %*                                                                      *
 %************************************************************************
@@ -603,8 +556,8 @@ will see in the GNU readline documentation.)
 <sect2>The @Regex@ and @MatchPS@ interfaces
 <label id="Regex">
 <p>
-<nidx>Regex library (GHC syslib)</nidx>
-<nidx>MatchPS library (GHC syslib)</nidx>
+<nidx>Regex library (misc syslib)</nidx>
+<nidx>MatchPS library (misc syslib)</nidx>
 <nidx>regular-expressions library</nidx>
 %*                                                                      *
 %************************************************************************
@@ -748,7 +701,7 @@ matchPrefixPS :: PackedString -> PackedString -> Int
 <sect2>The @RegexString@ interface
 <label id="RegexString">
 <p>
-<nidx>RegexString library (GHC syslib)</nidx>
+<nidx>RegexString library (misc syslib)</nidx>
 <nidx>regular-expressions library</nidx>
 %*                                                                      *
 %************************************************************************
@@ -778,15 +731,15 @@ matchRegex
 <sect2>Network-interface toolkit---@Socket@ and @SocketPrim@
 <label id="Socket">
 <p>
-<nidx>SocketPrim interface (GHC syslib)</nidx>
-<nidx>Socket interface (GHC syslib)</nidx>
+<nidx>SocketPrim interface (misc syslib)</nidx>
+<nidx>Socket interface (misc syslib)</nidx>
 <nidx>network-interface library</nidx>
 <nidx>sockets library</nidx>
 <nidx>BSD sockets library</nidx>
 %*                                                                      *
 %************************************************************************
 
-(Darren Moffat supplied the network-interface toolkit.)
+(Darren Moffat supplied the initial version of this library.)
 
 Your best bet for documentation is to look at the code---really!--- 
 normally in @fptools/ghc/lib/misc/{BSD,Socket,SocketPrim@.lhs}.
@@ -852,3 +805,66 @@ mkPortNumber :: Int -> PortNumber
 
 Various examples of networking Haskell code are provided in
 %@ghc/misc/examples/@, notably the @net???/Main.hs@ programs.
+
+%************************************************************************
+%*                                                                      *
+<sect2>The @Select@ interface
+<label id="Select">
+<p>
+<nidx>Select interface (misc syslib)</nidx>
+%*                                                                      *
+%************************************************************************
+
+The <tt/Select/ interface provides a Haskell wrapper for the <tt/select()/
+OS call supplied by many modern UNIX variants. <tt/Select/ exports the
+following:
+
+<tscreen><verb>
+type TimeOut = Maybe Int
+  -- Nothing => wait indefinitely.
+  -- Just x | x >= 0    => block waiting for 'x' micro seconds.
+  --        | otherwise => block waiting for '-x' micro seconds.
+
+hSelect :: [Handle]
+        -> [Handle]
+        -> [Handle]
+        -> TimeOut
+	-> IO SelectResult
+
+type SelectResult 
+ = ( [Handle]  -- input  handles ready
+   , [Handle]  -- output handles ready
+   , [Handle]  -- exc.   handles ready
+   )
+
+</verb></tscreen>
+
+Here's an example of how it could be used:
+
+<tscreen><verb>
+module Main(main) where
+
+import Select
+import IO
+
+main :: IO ()
+main = do
+  hSetBuffering stdin NoBuffering
+  putStrLn "waiting for input to appear"
+  hSelect [stdin] [] [] Nothing
+  putStrLn "input ready, let's try reading"
+  x <- getChar
+  print x
+
+</verb></tscreen>
+
+where the call to <tt/hSelect/ makes the process go to sleep
+until there's input available on <tt/stdin/.
+
+Notice that this particular use of <tt/hSelect/ is now really a no-op
+with GHC compiled code, as its implementation of IO will take care to
+avoid blocking the process (i.e., all running Haskell threads), and
+call <tt/select()/ for you, if needs be. However, <tt/hSelect/ exposes
+functionality that is useful in other contexts (e.g., you want to 
+wait for input on two <tt/Handles/ for 3 seconds, but no longer.)
+
