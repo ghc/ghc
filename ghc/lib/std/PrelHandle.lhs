@@ -23,7 +23,7 @@ import PrelException 	( throw, ioError, catchException )
 import PrelMaybe	( Maybe(..) )
 import PrelAddr		( Addr, nullAddr )
 import PrelBounded      ()   -- get at Bounded Int instance.
-import PrelNum		( toInteger )
+import PrelNum		( toInteger, toBig )
 import PrelWeak		( addForeignFinalizer )
 #if __CONCURRENT_HASKELL__
 import PrelConc
@@ -434,12 +434,12 @@ hFileSize handle =
 	  -- For some reason, this fails to typecheck if converted to a do
 	  -- expression --SDM
           _casm_ ``%r = 1;'' >>= \(I# hack#) ->
-          case int2Integer hack# of
-            result@(J# _ d#) -> do
-                rc <- CCALL(fileSize) (haFO__ handle_) d#  -- ConcHask: SAFE, won't block
+          case int2Integer# hack# of
+              (# s, d #) -> do
+                rc <- CCALL(fileSize) (haFO__ handle_) d  -- ConcHask: SAFE, won't block
                 writeHandle handle handle_
                 if rc == (0::Int) then
-		   return result
+		   return (J# s d)
                  else
 		   constructErrorAndFail "hFileSize"
 #endif
@@ -641,6 +641,7 @@ hSeek handle mode offset =
     let fo = haFO__ handle_
     rc      <- mayBlock fo (CCALL(seekFile_int64) fo whence (primIntegerToInt64 offset))  -- ConcHask: UNSAFE, may block
 #else
+hSeek handle mode i@(S# _) = hSeek handle mode (toBig i)
 hSeek handle mode (J# s# d#) =
     wantSeekableHandle "hSeek" handle $ \ handle_ -> do
     let fo = haFO__ handle_
