@@ -600,7 +600,10 @@ qualifier list has just one element, a boolean expression.
     <itemizedlist>
       <listitem>
 	<para>The Foreign Function Interface language specification
-	(included in this manual, in <xref linkend="ffi">).</para>
+	(included in this manual, in <xref linkend="ffi">).</para>  
+	You must use the <option>-fglasgow-exts</option> command-line option
+	to make GHC understand the <literal>foreign</literal> declarations
+	defined by the FFI.
       </listitem>
 
       <listitem>
@@ -658,8 +661,8 @@ of the foreign function interface in GHC.</para>
 
 <para>
 When generating C (using the <option>-fvia-C</option> directive), one can assist the
-C compiler in detecting type errors by using the <Command>-&num;include</Command> directive
-to provide <filename>.h</filename> files containing function headers.
+C compiler in detecting type errors by using the <option>-&num;include</option> directive
+(<xref linkend="options-C-compiler">) to provide <filename>.h</filename> files containing function headers.
 </para>
 
 <para>
@@ -2230,15 +2233,25 @@ For example, all of these are legal:
 <listitem>
 
 <para>
- All the type variables mentioned in a pattern,
+All the type variables mentioned in a pattern,
 that are not already in scope,
 are brought into scope by the pattern.  We describe this set as
 the <emphasis>type variables bound by the pattern</emphasis>.
-
+For example:
+<programlisting>
+  f (x::a) = let g (y::(a,b)) = fst y
+             in
+             g (x,True)
+</programlisting>
+The pattern <literal>(x::a)</literal> brings the type variable
+<literal>a</literal> into scope, as well as the term 
+variable <literal>x</literal>.  The pattern <literal>(y::(a,b))</literal>
+contains an occurrence of the already-in-scope type variable <literal>a</literal>,
+and brings into scope the type variable <literal>b</literal>.
 </para>
 </listitem>
-<listitem>
 
+<listitem>
 <para>
  The type variables thus brought into scope may be mentioned
 in ordinary type signatures or pattern type signatures anywhere within
@@ -2246,8 +2259,8 @@ their scope.
 
 </para>
 </listitem>
-<listitem>
 
+<listitem>
 <para>
  In ordinary type signatures, any type variable mentioned in the
 signature that is in scope is <emphasis>not</emphasis> universally quantified.
@@ -2261,12 +2274,10 @@ signature that is in scope is <emphasis>not</emphasis> universally quantified.
  Ordinary type signatures do not bring any new type variables
 into scope (except in the type signature itself!). So this is illegal:
 
-
 <programlisting>
   f :: a -> a
   f x = x::a
 </programlisting>
-
 
 It's illegal because <VarName>a</VarName> is not in scope in the body of <function>f</function>,
 so the ordinary signature <literal>x::a</literal> is equivalent to <literal>x::forall a.a</literal>;
@@ -2274,8 +2285,8 @@ and that is an incorrect typing.
 
 </para>
 </listitem>
-<listitem>
 
+<listitem>
 <para>
  There is no implicit universal quantification on pattern type
 signatures, nor may one write an explicit <literal>forall</literal> type in a pattern
@@ -2283,8 +2294,8 @@ type signature.  The pattern type signature is a monotype.
 
 </para>
 </listitem>
-<listitem>
 
+<listitem>
 <para>
 
 The type variables in the head of a <literal>class</literal> or <literal>instance</literal> declaration
@@ -2358,14 +2369,15 @@ Result type signatures are not yet implemented in Hugs.
 <sect2>
 <title>Where a pattern type signature can occur</title>
 
+<para>
 A pattern type signature can occur in any pattern, but there
 are restrictions on pattern bindings:
 <itemizedlist>
 
 <listitem>
 <para>
- A pattern type signature can be on an arbitrary sub-pattern, not
-just on a variable:
+A pattern type signature can be on an arbitrary sub-pattern, not
+ust on a variable:
 
 
 <programlisting>
@@ -2399,8 +2411,8 @@ in <literal>case</literal> expressions:
 
 </para>
 </listitem>
-<listitem>
 
+<listitem>
 <para>
 To avoid ambiguity, the type after the &ldquo;<literal>::</literal>&rdquo; in a result
 pattern signature on a lambda or <literal>case</literal> must be atomic (i.e. a single
