@@ -111,18 +111,25 @@ import {-# SOURCE #-} PprType( pprType )
 import TypeRep		( Type(..), TyNote(..), funTyCon )  -- friend
 
 import Type		(	-- Re-exports
-			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
-			  Kind, Type, SourceType(..), PredType, ThetaType, 
-			  unliftedTypeKind, liftedTypeKind, openTypeKind, mkArrowKind, mkArrowKinds,
-			  mkForAllTy, mkForAllTys, defaultKind, isTypeKind, isAnyTypeKind,
+			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
+			  tyVarsOfTheta, Kind, Type, SourceType(..),
+			  PredType, ThetaType, unliftedTypeKind,
+			  liftedTypeKind, openTypeKind, mkArrowKind,
+			  mkArrowKinds, mkForAllTy, mkForAllTys,
+			  defaultKind, isTypeKind, isAnyTypeKind,
 			  mkFunTy, mkFunTys, zipFunTys, isTyVarTy,
-			  mkTyConApp, mkGenTyConApp, mkAppTy, mkAppTys, mkSynTy, applyTy, applyTys,
-			  mkTyVarTy, mkTyVarTys, mkTyConTy, mkPredTy, mkPredTys,
-			  isUnLiftedType, isUnboxedTupleType, isPrimitiveType,
+			  mkTyConApp, mkGenTyConApp, mkAppTy,
+			  mkAppTys, mkSynTy, applyTy, applyTys,
+			  mkTyVarTy, mkTyVarTys, mkTyConTy, mkPredTy,
+			  mkPredTys, isUnLiftedType,
+			  isUnboxedTupleType, isPrimitiveType,
 			  splitNewType_maybe, splitTyConApp_maybe,
-			  tidyTopType, tidyType, tidyPred, tidyTypes, tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
-			  tidyTyVarBndr, tidyOpenTyVar, tidyOpenTyVars, eqKind, eqUsage,
-			  hasMoreBoxityInfo, liftedBoxity, superBoxity, typeKind, superKind
+			  tidyTopType, tidyType, tidyPred, tidyTypes,
+			  tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
+			  tidyTyVarBndr, tidyOpenTyVar,
+			  tidyOpenTyVars, eqKind, eqUsage,
+			  hasMoreBoxityInfo, liftedBoxity,
+			  superBoxity, typeKind, superKind, repType
 			)
 import TyCon		( TyCon, isUnLiftedTyCon )
 import Class		( classHasFDs, Class )
@@ -824,9 +831,8 @@ checkRepTyCon :: (TyCon -> Bool) -> Type -> Bool
 	-- Non-recursive ones are transparent to splitTyConApp,
 	-- but recursive ones aren't; hence the splitNewType_maybe
 checkRepTyCon check_tc ty 
-  | Just ty'    <- splitNewType_maybe ty  = checkRepTyCon check_tc ty'
-  | Just (tc,_) <- splitTyConApp_maybe ty = check_tc tc
-  | otherwise				  = False
+  | Just (tc,_) <- splitTyConApp_maybe (repType ty) = check_tc tc
+  | otherwise				  	    = False
 \end{code}
 
 ----------------------------------------------
