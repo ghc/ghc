@@ -190,7 +190,7 @@ mkFastString# a# len# =
     [] -> 
        -- no match, add it to table by copying out the
        -- the string into a ByteArray
---       _trace "empty bucket" $
+       -- _trace "empty bucket" $
        case copyPrefixStr (A# a#) (I# len#) of
 	 (_ByteArray _ barr#) ->  
 	   let f_str = FastString uid# len# barr# in
@@ -199,14 +199,14 @@ mkFastString# a# len# =
     ls -> 
        -- non-empty `bucket', scan the list looking
        -- entry with same length and compare byte by byte.
---       _trace ("non-empty bucket"++show ls) $
+       -- _trace ("non-empty bucket"++show ls) $
        case bucket_match ls len# a# of
 	 Nothing -> 
            case copyPrefixStr (A# a#) (I# len#) of
   	    (_ByteArray _ barr#) ->  
               let f_str = FastString uid# len# barr# in
               updTbl string_table ft h (f_str:ls) `seqPrimIO`
-	      ( {- _trace ("new: " ++ show f_str)   $ -} returnPrimIO f_str)
+	      ( {- _trace ("new: " ++ show f_str)  $ -} returnPrimIO f_str)
 	 Just v  -> {- _trace ("re-use: "++show v) $ -} returnPrimIO v)
   where
    bucket_match [] _ _ = Nothing
@@ -222,10 +222,8 @@ mkFastSubString# a# start# len# = mkFastCharString2 (A# (addrOffset# a# start#))
 mkFastSubStringFO# :: ForeignObj# -> Int# -> Int# -> FastString
 mkFastSubStringFO# fo# start# len# =
  unsafePerformPrimIO  (
-  readVar string_table `thenPrimIO` \ ft@(FastStringTable uid# tbl#) ->
-  let
-   h = hashSubStrFO fo# start# len#
-  in
+  readVar string_table                 `thenPrimIO` \ ft@(FastStringTable uid# tbl#) ->
+  let h = hashSubStrFO fo# start# len# in
   case lookupTbl ft h of
     [] -> 
        -- no match, add it to table by copying out the
@@ -233,7 +231,7 @@ mkFastSubStringFO# fo# start# len# =
        case copySubStrFO (_ForeignObj fo#) (I# start#) (I# len#) of
 	 (_ByteArray _ barr#) ->  
 	   let f_str = FastString uid# len# barr# in
-           updTbl string_table ft h [f_str] `seqPrimIO`
+           updTbl string_table ft h [f_str]       `seqPrimIO`
 	   returnPrimIO f_str
     ls -> 
        -- non-empty `bucket', scan the list looking
@@ -258,34 +256,39 @@ mkFastSubStringFO# fo# start# len# =
 mkFastSubStringBA# :: ByteArray# -> Int# -> Int# -> FastString
 mkFastSubStringBA# barr# start# len# =
  unsafePerformPrimIO  (
-  readVar string_table `thenPrimIO` \ ft@(FastStringTable uid# tbl#) ->
-  let
-   h = hashSubStrBA barr# start# len#
-  in
---  _trace ("hashed(b): "++show (I# h)) $
+  readVar string_table                   `thenPrimIO` \ ft@(FastStringTable uid# tbl#) ->
+  let h = hashSubStrBA barr# start# len# in
+  -- _trace ("hashed(b): "++show (I# h)) $
   case lookupTbl ft h of
     [] -> 
        -- no match, add it to table by copying out the
        -- the string into a ByteArray
---       _trace "empty bucket(b)" $
-       case copySubStrBA (_ByteArray (error "") barr#) (I# start#) (I# len#) of
+       -- _trace "empty bucket(b)" $
+       case copySubStrBA (_ByteArray btm barr#) (I# start#) (I# len#) of
          (_ByteArray _ ba#) ->  
           let f_str = FastString uid# len# ba# in
-          updTbl string_table ft h [f_str] `seqPrimIO`
-          ({- _trace ("new(b): " ++ show f_str)   $ -} returnPrimIO f_str)
+          updTbl string_table ft h [f_str]     `seqPrimIO`
+          -- _trace ("new(b): " ++ show f_str)   $
+	  returnPrimIO f_str
     ls -> 
        -- non-empty `bucket', scan the list looking
-       -- entry with same length and compare byte by byte.
---       _trace ("non-empty bucket(b)"++show ls) $
+       -- entry with same length and compare byte by byte. 
+       -- _trace ("non-empty bucket(b)"++show ls) $
        case bucket_match ls start# len# barr# of
 	 Nothing -> 
           case copySubStrBA (_ByteArray (error "") barr#) (I# start#) (I# len#) of
             (_ByteArray _ ba#) ->  
               let f_str = FastString uid# len# ba# in
               updTbl string_table ft h (f_str:ls) `seqPrimIO`
-	      ({- _trace ("new(b): " ++ show f_str)   $ -} returnPrimIO f_str)
-	 Just v  -> {- _trace ("re-use(b): "++show v) $ -} returnPrimIO v)
-  where
+	      -- _trace ("new(b): " ++ show f_str)   $
+	      returnPrimIO f_str
+	 Just v  -> 
+              -- _trace ("re-use(b): "++show v) $
+	      returnPrimIO v
+  )
+ where
+   btm = error ""
+
    bucket_match [] _ _ _ = Nothing
    bucket_match (v:ls) start# len# ba# =
     case v of
@@ -293,7 +296,7 @@ mkFastSubStringBA# barr# start# len# =
       if len# ==# l# && eqStrPrefixBA barr# ba# start# len# then
 	 Just v
       else
-	 bucket_match ls len# start# ba#
+	 bucket_match ls start# len# ba#
 
 mkFastCharString :: _Addr -> FastString
 mkFastCharString a@(A# a#) = 
@@ -304,17 +307,15 @@ mkFastCharString2 a@(A# a#) (I# len#) = CharStr a# len#
 
 mkFastString :: String -> FastString
 mkFastString str = 
- (case stringToByteArray str of
-   (_ByteArray (_,I# len#) frozen#) -> 
-	--
-	-- 0-indexed array, len# == index to one beyond end of string,
-        -- i.e., (0,1) => empty string.
-	--
-      {- _trace (show (str,I# len#)) $ -} mkFastSubStringBA# frozen# 0# len#)
+ case stringToByteArray str of
+  (_ByteArray (_,I# len#) frozen#) -> 
+    mkFastSubStringBA# frozen# 0# len#
+    {- 0-indexed array, len# == index to one beyond end of string,
+       i.e., (0,1) => empty string.    -}
 
 mkFastSubString :: _Addr -> Int -> Int -> FastString
-mkFastSubString (A# a#) (I# start#) (I# len#)
- = mkFastString# (addrOffset# a# start#) len#
+mkFastSubString (A# a#) (I# start#) (I# len#) =
+ mkFastString# (addrOffset# a# start#) len#
 
 mkFastSubStringFO :: _ForeignObj -> Int -> Int -> FastString
 mkFastSubStringFO (_ForeignObj fo#) (I# start#) (I# len#) =
@@ -331,7 +332,7 @@ hashStr a# len# =
    1# -> ((ord# c0 *# 631#) +# len#) `remInt#` hASH_TBL_SIZE#
    2# -> ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# len#) `remInt#` hASH_TBL_SIZE#
    _  -> ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# (ord# c2 *# 43#) +# len#) `remInt#` hASH_TBL_SIZE#
-{-
+{- Currently UNUSED:
   if len# ==# 0# then
      0#
   else
