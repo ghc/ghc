@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.218 2002/05/29 22:39:39 sof Exp $
+# $Id: Makefile,v 1.219 2002/06/14 08:23:57 simonpj Exp $
 
 TOP = ..
 
@@ -10,6 +10,10 @@ UseGhcForCc = YES
 endif
 
 include $(TOP)/mk/boilerplate.mk
+
+USER_SRCS = $(filter-out $(DERIVED_SRCS),$(SRCS))
+count :
+	./count_lines $(USER_SRCS)
 
 #-----------------------------------------------------------------------------
 # Building ghc different ways (default is just `normal' sequential)
