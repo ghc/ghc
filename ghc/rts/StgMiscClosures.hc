@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.47 2000/08/02 14:13:28 rrt Exp $
+ * $Id: StgMiscClosures.hc,v 1.48 2000/09/11 11:17:09 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -44,6 +44,258 @@ STGFUN(type##_entry)							\
     return NULL;							\
   FE_									\
 }
+
+
+/* -----------------------------------------------------------------------------
+   Support for the metacircular interpreter.
+   -------------------------------------------------------------------------- */
+
+#ifdef GHCI
+
+/* 9 bits of return code for constructors created by mci_make_constr. */
+FN_(mci_constr_entry) 
+{ 
+  /* R1 points at the constructor */
+  FB_ 
+    STGCALL2(fprintf,stderr,"mci_constr_entry (direct return)!\n");
+    /* Pointless, since SET_TAG doesn't do anything */
+    SET_TAG( GET_TAG(GET_INFO(R1.cl))); 
+    JMP_(ENTRY_CODE((P_)(*Sp))); 
+  FE_ 
+}
+
+FN_(mci_constr1_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),0)); FE_ }
+FN_(mci_constr2_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),1)); FE_ }
+FN_(mci_constr3_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),2)); FE_ }
+FN_(mci_constr4_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),3)); FE_ }
+FN_(mci_constr5_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),4)); FE_ }
+FN_(mci_constr6_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),5)); FE_ }
+FN_(mci_constr7_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),6)); FE_ }
+FN_(mci_constr8_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),7)); FE_ }
+ 
+
+/* Since this stuff is ostensibly in some other module, we need
+   to supply an __init_ function.
+*/
+START_MOD_INIT(__init_MCIzumakezuconstr)
+END_MOD_INIT()
+
+
+INFO_TABLE(mci_make_constr_info,   mci_make_constr_entry,   0,0,FUN_STATIC,,EF_,0,0);
+INFO_TABLE(mci_make_constrI_info,  mci_make_constrI_entry,  0,0,FUN_STATIC,,EF_,0,0);
+INFO_TABLE(mci_make_constrP_info,  mci_make_constrP_entry,  0,0,FUN_STATIC,,EF_,0,0);
+INFO_TABLE(mci_make_constrPP_info, mci_make_constrPP_entry, 0,0,FUN_STATIC,,EF_,0,0);
+INFO_TABLE(mci_make_constrPPP_info,mci_make_constrPPP_entry,0,0,FUN_STATIC,,EF_,0,0);
+
+SET_STATIC_HDR(MCIzumakezuconstr_mcizumakezuconstr_closure,
+               mci_make_constr_info,0,,EI_)
+   ,{ /* payload */ }
+};
+SET_STATIC_HDR(MCIzumakezuconstr_mcizumakezuconstrI_closure,
+               mci_make_constrI_info,0,,EI_)
+   ,{ /* payload */ }
+};
+SET_STATIC_HDR(MCIzumakezuconstr_mcizumakezuconstrP_closure,
+               mci_make_constrP_info,0,,EI_)
+   ,{ /* payload */ }
+};
+SET_STATIC_HDR(MCIzumakezuconstr_mcizumakezuconstrPP_closure,
+               mci_make_constrPP_info,0,,EI_)
+   ,{ /* payload */ }
+};
+SET_STATIC_HDR(MCIzumakezuconstr_mcizumakezuconstrPPP_closure,
+               mci_make_constrPPP_info,0,,EI_)
+   ,{ /* payload */ }
+};
+
+
+/* Make a constructor with no args. */
+STGFUN(mci_make_constr_entry)
+{
+  nat size, np, nw;
+  StgClosure* con;
+  StgInfoTable* itbl;
+  FB_
+    /* Sp[0 & 1] are tag, Addr#
+    */
+    itbl = ((StgInfoTable**)Sp)[1];
+    np   = INFO_PTR_TO_STRUCT(itbl)->layout.payload.ptrs;
+    nw   = INFO_PTR_TO_STRUCT(itbl)->layout.payload.nptrs;
+    size = sizeofW(StgHeader) + stg_max(MIN_NONUPD_SIZE, np+nw);
+    /* STGCALL5(fprintf,stderr,"np %d  nw %d  size %d\n",np,nw,size); */
+
+    /* The total number of words to copy off the stack is np + nw.
+       That doesn't include tag words, tho.
+    */
+    HP_CHK_GEN_TICKY(size, NO_PTRS, mci_make_constr_entry, );
+    TICK_ALLOC_PRIM(sizeofW(StgHeader), size-sizeofW(StgHeader), 0);
+    CCS_ALLOC(CCCS,size); /* ccs prof */
+
+    con = (StgClosure*)(Hp + 1 - size);
+    SET_HDR(con, itbl,CCCS);
+
+    Sp = Sp +2; /* Zap the Addr# arg */
+    R1.cl = con;
+
+    JMP_(ENTRY_CODE(GET_INFO(R1.cl)));
+  FE_
+}
+
+/* Make a constructor with 1 Int# arg */
+STGFUN(mci_make_constrI_entry)
+{
+  nat size, np, nw;
+  StgClosure* con;
+  StgInfoTable* itbl;
+  FB_
+    /* Sp[0 & 1] are tag, Addr#
+       Sp[2 & 3] are tag, Int#
+    */
+    itbl = ((StgInfoTable**)Sp)[1];
+    np   = INFO_PTR_TO_STRUCT(itbl)->layout.payload.ptrs;
+    nw   = INFO_PTR_TO_STRUCT(itbl)->layout.payload.nptrs;
+    size = sizeofW(StgHeader) + stg_max(MIN_NONUPD_SIZE, np+nw);
+    /* STGCALL5(fprintf,stderr,"np %d  nw %d  size %d\n",np,nw,size); */
+
+    /* The total number of words to copy off the stack is np + nw.
+       That doesn't include tag words, tho.
+    */
+    HP_CHK_GEN_TICKY(size, NO_PTRS, mci_make_constr_entry, );
+    TICK_ALLOC_PRIM(sizeofW(StgHeader), size-sizeofW(StgHeader), 0);
+    CCS_ALLOC(CCCS,size); /* ccs prof */
+
+    con = (StgClosure*)(Hp + 1 - size);
+    SET_HDR(con, itbl,CCCS);
+
+    con->payload[0] = ((StgClosure**)Sp)[3];
+    Sp = Sp +1/*word*/ +1/*tag*/;  /* Zap the Int# arg */
+    Sp = Sp +2; /* Zap the Addr# arg */
+    R1.cl = con;
+
+    JMP_(ENTRY_CODE(GET_INFO(R1.cl)));
+  FE_
+}
+
+STGFUN(mci_make_constrP_entry)
+{
+  FB_
+  DUMP_ERRMSG("mci_make_constrP_entry: unimplemented!\n");
+  STGCALL1(shutdownHaskellAndExit, EXIT_FAILURE);
+  return 0;
+  FE_
+}
+
+
+/* Make a constructor with 2 pointer args. */
+STGFUN(mci_make_constrPP_entry)
+{
+  nat size, np, nw;
+  StgClosure* con;
+  StgInfoTable* itbl;
+  FB_
+    /* Sp[0 & 1] are tag, Addr#
+       Sp[2]     first arg
+       Sp[3]     second arg
+    */
+    itbl = ((StgInfoTable**)Sp)[1];
+    np   = INFO_PTR_TO_STRUCT(itbl)->layout.payload.ptrs;
+    nw   = INFO_PTR_TO_STRUCT(itbl)->layout.payload.nptrs;
+    size = sizeofW(StgHeader) + stg_max(MIN_NONUPD_SIZE, np+nw);
+    /* STGCALL5(fprintf,stderr,"np %d  nw %d  size %d\n",np,nw,size); */
+
+    /* The total number of words to copy off the stack is np + nw.
+       That doesn't include tag words, tho.
+    */
+    HP_CHK_GEN_TICKY(size, NO_PTRS, mci_make_constr_entry, );
+    TICK_ALLOC_PRIM(sizeofW(StgHeader), size-sizeofW(StgHeader), 0);
+    CCS_ALLOC(CCCS,size); /* ccs prof */
+
+    con = (StgClosure*)(Hp + 1 - size);
+    SET_HDR(con, itbl,CCCS);
+
+    con->payload[0] = ((StgClosure**)Sp)[2];
+    con->payload[1] = ((StgClosure**)Sp)[3];
+    Sp = Sp +2; /* Zap 2 ptr args */
+    Sp = Sp +2; /* Zap the Addr# arg */
+    R1.cl = con;
+
+    JMP_(ENTRY_CODE(GET_INFO(R1.cl)));
+  FE_
+}
+
+
+STGFUN(mci_make_constrPPP_entry)
+{
+  FB_
+  DUMP_ERRMSG("mci_make_constrPPP_entry: unimplemented!\n");
+  STGCALL1(shutdownHaskellAndExit, EXIT_FAILURE);
+  return 0;
+  FE_
+}
+
+#if 0
+/* It would be nice if this worked, but it doesn't.  Yet. */
+STGFUN(mci_make_constr_entry)
+{
+  nat size, np, nw_heap, nw_really, w;
+  StgClosure* con;
+  StgInfoTable* itbl;
+  W_* r;
+  FB_
+    itbl      = ((StgInfoTable**)Sp)[0];
+STGCALL3(fprintf,stderr,"mmc: itbl = %d\n",itbl);
+
+STGCALL3(fprintf,stderr,"mmc: sp-4 = %d\n", ((W_*)Sp)[-4] );
+STGCALL3(fprintf,stderr,"mmc: sp-3 = %d\n", ((W_*)Sp)[-3] );
+STGCALL3(fprintf,stderr,"mmc: sp-2 = %d\n", ((W_*)Sp)[-2] );
+STGCALL3(fprintf,stderr,"mmc: sp-1 = %d\n", ((W_*)Sp)[-1] );
+STGCALL3(fprintf,stderr,"mmc: sp+0 = %d\n", ((W_*)Sp)[0] );
+STGCALL3(fprintf,stderr,"mmc: sp+1 = %d\n", ((W_*)Sp)[1] );
+STGCALL3(fprintf,stderr,"mmc: sp+2 = %d\n", ((W_*)Sp)[2] );
+STGCALL3(fprintf,stderr,"mmc: sp+3 = %d\n", ((W_*)Sp)[3] );
+STGCALL3(fprintf,stderr,"mmc: sp+4 = %d\n", ((W_*)Sp)[4] );
+    np        = itbl->layout.payload.ptrs;
+    nw_really = itbl->layout.payload.nptrs;
+    nw_heap   = stg_max(nw_really, MIN_NONUPD_SIZE-np);
+    size      = CONSTR_sizeW( np, nw_heap );
+
+    /* The total number of words to copy off the stack is np + nw.
+       That doesn't include tag words, tho.
+    */
+    HP_CHK_GEN_TICKY(size, NO_PTRS, mci_make_constr_entry, );
+    TICK_ALLOC_PRIM(sizeofW(StgHeader), size-sizeofW(StgHeader), 0);
+    CCS_ALLOC(CCCS,size); /* ccs prof */
+
+    con = (StgClosure*)(Hp + 1 - size);
+    SET_HDR(con, itbl,CCCS);
+
+    /* Copy into the closure. */
+    w = 0;
+    r = Sp+1;
+    while (1) {
+       if (w == np + nw) break;
+       ASSERT(w < np + nw);
+       if (IS_ARG_TAG(*r)) { 
+          nat n = *r++;
+          for (; n > 0; n--)
+             con->payload[w++] = (StgClosure*)(*r++);
+       } else {
+          con->payload[w++] = (StgClosure*)(*r++);
+       }
+       ASSERT((P_)r <= (P_)Su);
+    }
+
+    /* Remove all the args we've used. */
+    Sp = r;
+
+    R1.cl = con;
+    JMP_(ENTRY_CODE(R1.cl));
+  FE_
+}
+#endif
+
+#endif /* GHCI */
+
 
 /* -----------------------------------------------------------------------------
    Entry code for an indirection.

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.61 2000/08/21 14:16:57 simonmar Exp $
+ * $Id: PrimOps.h,v 1.62 2000/09/11 11:17:09 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -9,6 +9,47 @@
 
 #ifndef PRIMOPS_H
 #define PRIMOPS_H
+
+/* -----------------------------------------------------------------------------
+   Helpers for the metacircular interpreter.
+   -------------------------------------------------------------------------- */
+
+#ifdef GHCI
+
+#define CHASE_INDIRECTIONS(lval)                                        \
+   do {                                                                 \
+        int again;                                                      \
+        do {                                                            \
+           again = 0;                                                   \
+           if (get_itbl((StgClosure*)lval)->type == IND)                \
+              { again = 1; lval = ((StgInd*)lval)->indirectee; }        \
+           else                                                         \
+           if (get_itbl((StgClosure*)lval)->type == IND_OLDGEN)         \
+              { again = 1; lval = ((StgIndOldGen*)lval)->indirectee; }  \
+        } while (again);                                                \
+   } while (0)
+
+#define indexWordOffClosurezh(r,a,i)                                    \
+   do { StgClosure* tmp = (StgClosure*)(a);                             \
+        CHASE_INDIRECTIONS(tmp);                                        \
+        r = ((W_ *)tmp)[i];                                             \
+   } while (0)
+
+#define indexPtrOffClosurezh(r,a,i)                                     \
+   do { StgClosure* tmp = (StgClosure*)(a);                             \
+        CHASE_INDIRECTIONS(tmp);                                        \
+        r = ((P_ *)tmp)[i];                                             \
+   } while (0)
+
+
+#else
+
+/* These are the original definitions.  They don't chase indirections. */
+#define indexWordOffClosurezh(r,a,i)   	r= ((W_ *)(a))[i]
+#define indexPtrOffClosurezh(r,a,i)   	r= ((P_ *)(a))[i]
+
+#endif
+
 
 /* -----------------------------------------------------------------------------
    Comparison PrimOps.
@@ -888,7 +929,17 @@ EXTFUN_RTS(mkForeignObjzh_fast);
    Constructor tags
    -------------------------------------------------------------------------- */
 
+#ifdef GHCI
+#define dataToTagzh(r,a)                                                \
+   do { StgClosure* tmp = (StgClosure*)(a);                             \
+        CHASE_INDIRECTIONS(tmp);                                        \
+        r = (GET_TAG(((StgClosure *)tmp)->header.info));                \
+   } while (0)
+#else
+/* Original version doesn't chase indirections. */
 #define dataToTagzh(r,a)  r=(GET_TAG(((StgClosure *)a)->header.info))
+#endif
+
 /*  tagToEnum# is handled directly by the code generator. */
 
 /* -----------------------------------------------------------------------------

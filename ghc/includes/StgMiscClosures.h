@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.18 2000/08/02 14:13:27 rrt Exp $
+ * $Id: StgMiscClosures.h,v 1.19 2000/09/11 11:17:09 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -52,6 +52,20 @@ STGFUN(END_TSO_QUEUE_entry);
 STGFUN(MUT_CONS_entry);
 STGFUN(END_MUT_LIST_entry);
 STGFUN(dummy_ret_entry);
+
+#ifdef GHCI
+/* entry code for constructors created by the metacircular interpreter */
+STGFUN(mci_constr_entry);
+STGFUN(mci_constr1_entry);
+STGFUN(mci_constr2_entry);
+STGFUN(mci_constr3_entry);
+STGFUN(mci_constr4_entry);
+STGFUN(mci_constr5_entry);
+STGFUN(mci_constr6_entry);
+STGFUN(mci_constr7_entry);
+STGFUN(mci_constr8_entry);
+EI_(PrelBase_Izh_con_info); /* Kludge! */
+#endif
 
 /* this is the NIL ptr for a TSO queue (e.g. runnable queue) */
 #define END_TSO_QUEUE  ((StgTSO *)(void*)&END_TSO_QUEUE_closure)

@@ -338,6 +338,9 @@ __export PrelGHC
   eqStableNamezh
   stableNameToIntzh
 
+  indexPtrOffClosurezh
+  indexWordOffClosurezh
+
   reallyUnsafePtrEqualityzh
 
   unsafeCoercezh

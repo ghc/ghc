@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt,v 1.2 2000/08/21 13:34:06 simonmar Exp $
+-- $Id: primops.txt,v 1.3 2000/09/11 11:17:09 sewardj Exp $
 --
 -- Primitive Operations
 --
@@ -40,6 +40,17 @@ defaults
    can_fail         = False
    strictness       = { \ arity -> StrictnessInfo (replicate arity wwPrim) False }
    usage            = { nomangle other }
+
+
+------------------------------------------------------------------------
+--- Support for the metacircular interpreter                         ---
+------------------------------------------------------------------------
+
+primop   IndexOffClosureOp_Ptr  "indexPtrOffClosure#"  GenPrimOp
+   a -> Int# -> (# b #)
+primop   IndexOffClosureOp_Word "indexWordOffClosure#"  GenPrimOp
+   a -> Int# -> Word#
+
 
 ------------------------------------------------------------------------
 --- Addr#                                                            ---
