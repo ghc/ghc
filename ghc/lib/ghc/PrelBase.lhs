@@ -583,8 +583,8 @@ eftInt now step
 
 
 instance  Bounded Int where
-    minBound =  negate 2147483647   -- **********************
-    maxBound =  2147483647	    -- **********************
+    minBound =  negate 214748367 - 1   -- **********************
+    maxBound =  2147483647	       -- **********************
 
 instance  Num Int  where
     (+)	   x y =  plusInt x y
