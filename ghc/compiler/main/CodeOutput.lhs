@@ -21,12 +21,10 @@ import qualified PrintJava
 
 import TyCon		( TyCon )
 import Id		( Id )
-import Class		( Class )
 import CoreSyn		( CoreBind )
 import StgSyn		( StgBinding )
 import AbsCSyn		( AbstractC )
 import PprAbsC		( dumpRealC, writeRealC )
-import UniqSupply	( UniqSupply )
 import Module		( Module )
 import CmdLineOpts
 import ErrUtils		( dumpIfSet_dyn )

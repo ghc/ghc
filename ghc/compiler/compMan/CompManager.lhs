@@ -15,7 +15,7 @@ where
 import List		( nub )
 import Maybe		( catMaybes, maybeToList, fromMaybe )
 import Outputable
-import FiniteMap	( emptyFM, filterFM, lookupFM, addToFM )
+import UniqFM		( emptyUFM, lookupUFM, addToUFM, delListFromUFM )
 import Digraph		( SCC(..), stronglyConnComp, flattenSCC, flattenSCCs )
 import Panic		( panic )
 
@@ -45,7 +45,7 @@ cmInit raw_package_info
    = emptyCmState raw_package_info
 
 cmGetExpr :: CmState
-          -> ModHandle
+          -> ModuleName
           -> String
           -> IO (CmState, Either [SDoc] HValue)
 cmGetExpr cmstate modhdl expr
@@ -54,8 +54,6 @@ cmGetExpr cmstate modhdl expr
 cmRunExpr :: HValue -> IO ()
 cmRunExpr hval
    = return (panic "cmRunExpr:unimp")
-
-type ModHandle = String   -- ToDo: do better?
 
 
 -- Persistent state just for CM, excluding link & compile subsystems
@@ -74,9 +72,9 @@ emptyPCMS pci
                         ui  = emptyUI,  mg  = emptyMG, pci = pci }
 
 emptyHIT :: HomeIfaceTable
-emptyHIT = emptyFM
+emptyHIT = emptyUFM
 emptyHST :: HomeSymbolTable
-emptyHST = emptyFM
+emptyHST = emptyUFM
 
 
 
@@ -115,7 +113,7 @@ the system state at the same time.
 \begin{code}
 cmLoadModule :: CmState 
              -> ModuleName
-             -> IO (CmState, Either [SDoc] ModHandle)
+             -> IO (CmState, Maybe ModuleName)
 
 cmLoadModule cmstate1 modname
    = do -- version 1's are the original, before downsweep
@@ -126,6 +124,8 @@ cmLoadModule cmstate1 modname
         let hst1    = hst    pcms1
         let hit1    = hit    pcms1
         let ui1     = ui     pcms1
+   
+        let pcii    = pci    pcms1 	-- this never changes
 
         -- do the downsweep to reestablish the module graph
         -- then generate version 2's by removing from HIT,HST,UI any
@@ -143,8 +143,7 @@ cmLoadModule cmstate1 modname
         let mods_to_zap = filter (`notElem` modnames2) modnames1
 
         let (hst2, hit2, ui2)
-               = filterTopLevelEnvs (`notElem` mods_to_zap) 
-                                    (hst1, hit1, ui1)
+               = removeFromTopLevelEnvs mods_to_zap (hst1, hit1, ui1)
 
         let mg2 = topological_sort mg2unsorted
 
@@ -170,21 +169,20 @@ cmLoadModule cmstate1 modname
          then 
            do let mods_to_relink = upwards_closure mg2 
                                       (map modname_of_linkable newLis)
-              pkg_linkables <- find_pkg_linkables_for (pci (pcms cmstate1))
-                                                       mg2 mods_to_relink
+              pkg_linkables <- find_pkg_linkables_for pcii
+                                                      mg2 mods_to_relink
               putStrLn ("needed package modules =\n" 
                         ++ showSDoc (vcat (map ppr pkg_linkables)))
               let sccs_to_relink = group_uis ui3 mg2 mods_to_relink
               let all_to_relink  = map AcyclicSCC pkg_linkables 
                                    ++ sccs_to_relink
-              linkresult <- link all_to_relink pls1
+              linkresult <- link pcii all_to_relink pls1
               case linkresult of
                  LinkErrs _ _
                     -> panic "cmLoadModule: link failed (1)"
                  LinkOK pls3 
-                    -> do let pcms3 
-                                 = PersistentCMState 
-                                       { hst=hst3, hit=hit3, ui=ui3, mg=mg2 }
+                    -> do let pcms3 = PersistentCMState { hst=hst3, hit=hit3, 
+                                                          ui=ui3, mg=mg2, pci=pcii }
                           let cmstate3 
                                  = CmState { pcms=pcms3, pcs=pcs3, pls=pls3 }
                           return (cmstate3, Just modname)
@@ -192,22 +190,20 @@ cmLoadModule cmstate1 modname
          else 
            do let mods_to_relink = downwards_closure mg2 
                                       (map name_of_summary (flattenSCCs sccOKs))
-              pkg_linkables <- find_pkg_linkables_for (pci (pcms cmstate1))
+              pkg_linkables <- find_pkg_linkables_for pcii
                                                       mg2 mods_to_relink
               let sccs_to_relink = group_uis ui3 mg2 mods_to_relink
               let all_to_relink  = map AcyclicSCC pkg_linkables 
                                    ++ sccs_to_relink
-              linkresult <- link all_to_relink pls1
+              linkresult <- link pcii all_to_relink pls1
               let (hst4, hit4, ui4) 
-                     = filterTopLevelEnvs (`notElem` mods_to_relink)
-                                          (hst3,hit3,ui3)
+                     = removeFromTopLevelEnvs mods_to_relink (hst3,hit3,ui3)
               case linkresult of
                  LinkErrs _ _
                     -> panic "cmLoadModule: link failed (2)"
                  LinkOK pls4
-                    -> do let pcms4 
-                                 = PersistentCMState
-                                      { hst=hst4, hit=hit4, ui=ui4, mg=mg2 }
+                    -> do let pcms4 = PersistentCMState { hst=hst4, hit=hit4, 
+                                                          ui=ui4, mg=mg2, pci=pcii }
                           let cmstate4 
                                  = CmState { pcms=pcms4, pcs=pcs3, pls=pls4 }
                           return (cmstate4, Just modname)
@@ -243,7 +239,7 @@ find_pkg_linkables_for pcii mg mods
                = nub (filter (`notElem` mg_names) all_imports)
 
         -- Figure out the packages directly imported by the home modules
-        maybe_locs_n_mods <- sequence (mapM findModule imports_not_in_home)
+        maybe_locs_n_mods <- mapM findModule imports_not_in_home
         let home_pkgs_needed
                = nub (concatMap get_pkg maybe_locs_n_mods)
                  where get_pkg Nothing = []
@@ -254,7 +250,7 @@ find_pkg_linkables_for pcii mg mods
         -- Discover the package dependency graph, and use it to find the
         -- transitive closure of all the needed packages
         let pkg_depend_graph :: [(PackageName,[PackageName])]
-            pkg_depend_graph = map (\pkg -> (name pkg, package_deps pkg)) pcii
+            pkg_depend_graph = map (\pkg -> (_PK_ (name pkg), map _PK_ (package_deps pkg))) pcii
 
         let all_pkgs_needed = simple_transitive_closure 
                                  pkg_depend_graph home_pkgs_needed
@@ -416,7 +412,7 @@ upsweep_scc threaded (mod:mods)
               do (restOK, threaded2, linkables)
                     <- upsweep_scc threaded1 mods
                  return
-                    (restOK, maybeToList maybe_linkable ++ linkables)
+                    (restOK, threaded2, maybeToList maybe_linkable ++ linkables)
          else -- Errors; give up _now_
               return (False, threaded1, [])
 
@@ -428,8 +424,8 @@ upsweep_mod :: ModThreaded
 upsweep_mod threaded1 summary1
    = do let mod_name = name_of_summary summary1
         let (ModThreaded pcs1 hst1 hit1) = threaded1
-        let old_iface = lookupFM hit1 (name_of_summary summary1)
-        compresult <- compile summary1 old_iface hst1 pcs1
+        let old_iface = lookupUFM hit1 (name_of_summary summary1)
+        compresult <- compile summary1 old_iface hst1 hit1 pcs1
 
         case compresult of
 
@@ -437,7 +433,7 @@ upsweep_mod threaded1 summary1
            -- linkable, meaning that compilation wasn't needed, and the
            -- new details were manufactured from the old iface.
            CompOK details Nothing pcs2
-              -> let hst2      = addToFM hst1 mod_name details
+              -> let hst2      = addToUFM hst1 mod_name details
                      hit2      = hit1
                      threaded2 = ModThreaded pcs2 hst2 hit2
                  in  return (True, threaded2, Nothing)
@@ -445,8 +441,8 @@ upsweep_mod threaded1 summary1
            -- Compilation really did happen, and succeeded.  A new
            -- details, iface and linkable are returned.
            CompOK details (Just (new_iface, new_linkable)) pcs2
-              -> let hst2      = addToFM hst1 mod_name details
-                     hit2      = addToFM hit1 mod_name new_iface
+              -> let hst2      = addToUFM hst1 mod_name details
+                     hit2      = addToUFM hit1 mod_name new_iface
                      threaded2 = ModThreaded pcs2 hst2 hit2
                  in  return (True, threaded2, Just new_linkable)
 
@@ -457,13 +453,13 @@ upsweep_mod threaded1 summary1
                  in  return (False, threaded2, Nothing)
 
 
-filterTopLevelEnvs :: (ModuleName -> Bool) 
-                   -> (HomeSymbolTable, HomeIfaceTable, UnlinkedImage)
-                   -> (HomeSymbolTable, HomeIfaceTable, UnlinkedImage)
-filterTopLevelEnvs p (hst, hit, ui)
-   = (filterFM (\k v -> p k) hst,
-      filterFM (\k v -> p k) hit,
-      filterModuleLinkables p ui
+removeFromTopLevelEnvs :: [ModuleName]
+                       -> (HomeSymbolTable, HomeIfaceTable, UnlinkedImage)
+                       -> (HomeSymbolTable, HomeIfaceTable, UnlinkedImage)
+removeFromTopLevelEnvs zap_these (hst, hit, ui)
+   = (delListFromUFM hst zap_these,
+      delListFromUFM hit zap_these,
+      filterModuleLinkables (`notElem` zap_these) ui
      )
 
 topological_sort :: [ModSummary] -> [SCC ModSummary]

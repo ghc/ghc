@@ -4,12 +4,11 @@
 \section[CmStaticInfo]{Session-static info for the Compilation Manager}
 
 \begin{code}
-module CmStaticInfo ( Package(..), PackageConfigInfo(..) )
+module CmStaticInfo ( Package(..), PackageConfigInfo )
 where
 
 #include "HsVersions.h"
 
-import Monad
 \end{code}
 
 \begin{code}
