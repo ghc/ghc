@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.111 2002/01/28 12:01:12 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.112 2002/01/28 13:34:10 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -172,6 +172,10 @@ interactiveUI cmstate paths cmdline_libs = do
    case maybe_hval of
 	Just hval -> writeIORef flush_stdout (unsafeCoerce# hval :: IO ())
 	_ -> panic "interactiveUI:stdout"
+
+	-- We don't want the cmd line to buffer any input that might be
+	-- intended for the program, so unbuffer stdin.
+   hSetBuffering stdin  NoBuffering
 
 	-- initial context is just the Prelude
    cmstate <- cmSetContext cmstate dflags [] ["Prelude"]
