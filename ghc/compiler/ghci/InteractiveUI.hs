@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.134 2002/09/13 15:02:32 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.135 2002/10/14 14:54:16 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -73,6 +73,8 @@ import GHC.Exts		( unsafeCoerce# )
 import Foreign		( nullPtr )
 import Foreign.C.String	( CString, peekCString, withCString )
 import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
+
+import GHC.Posix	( setNonBlockingFD )
 
 -----------------------------------------------------------------------------
 
@@ -319,7 +321,10 @@ readlineLoop = do
    cmstate <- getCmState
    (mod,imports) <- io (cmGetContext cmstate)
    io yield
-   l <- io (readline (mkPrompt mod imports))
+   l <- io (readline (mkPrompt mod imports)
+	  	`finally` setNonBlockingFD 0)
+		-- readline sometimes puts stdin into blocking mode,
+		-- so we need to put it back for the IO library
    case l of
 	Nothing -> return ()
 	Just l  ->
