@@ -11,8 +11,8 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.10 $
- * $Date: 1999/10/20 02:15:58 $
+ * $Revision: 1.11 $
+ * $Date: 1999/11/11 17:42:31 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -22,6 +22,7 @@
 #include "errors.h"
 #include "Rts.h"                       /* for rts_eval and related stuff   */
 #include "RtsAPI.h"                    /* for rts_eval and related stuff   */
+#include "SchedAPI.h"                  /* for RevertCAFs                   */
 #include "Schedule.h"
 #include "link.h"
 
@@ -1495,29 +1496,29 @@ Void evalExp() {                    /* compile and run input expression    */
         HaskellObj      result; /* ignored */
         sighandler_t    old_ctrlbrk;
         SchedulerStatus status;
-        old_ctrlbrk    = signal(SIGINT, eval_ctrlbrk);
-        assert(old_ctrlbrk != SIG_ERR);
-        status         = rts_eval_(closureOfVar(v),10000,&result);
+        Bool            doRevertCAFs = FALSE;
+        old_ctrlbrk         = signal(SIGINT, eval_ctrlbrk);
+        ASSERT(old_ctrlbrk != SIG_ERR);
+        status              = rts_eval_(closureOfVar(v),10000,&result);
         signal(SIGINT,old_ctrlbrk);
+        fflush (stderr); 
+        fflush (stdout);
         switch (status) {
         case Deadlock:
         case AllBlocked: /* I don't understand the distinction - ADR */
                 printf("{Deadlock}");
-                RevertCAFs();
+                if (doRevertCAFs) RevertCAFs();
                 break;
         case Interrupted:
                 printf("{Interrupted}");
-                RevertCAFs();
+                if (doRevertCAFs) RevertCAFs();
                 break;
         case Killed:
-                printf("{Killed}");
-                RevertCAFs();
+                printf("{Interrupted or Killed}");
+                if (doRevertCAFs) RevertCAFs();
                 break;
         case Success:
-	  //fflush(stderr);fflush(stdout);
-	  //fprintf(stderr, "\n\nFinal top-of-stack is\n" );
-	  //printObj ( *(MainRegTable.rSp) );
-	        RevertCAFs();
+	        if (doRevertCAFs) RevertCAFs();
                 break;
         default:
                 internal("evalExp: Unrecognised SchedulerStatus");
