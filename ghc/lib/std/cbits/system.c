@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: system.c,v 1.13 2001/05/30 16:39:22 sewardj Exp $
+ * $Id: system.c,v 1.14 2001/06/12 17:19:34 rrt Exp $
  *
  * system Runtime Support
  */
@@ -11,19 +11,33 @@
 
 #include "HsStd.h"
 
+#if defined(mingw32_TARGET_OS)
+#include <windows.h>
+#endif
+
 HsInt
 systemCmd(HsAddr cmd)
 {
 #if defined(mingw32_TARGET_OS)
-   /* There's no fork() under Windows, so we fall back on using libc's
-      system() instead. (It in turn has problems, as it does not wait
-      until the sub shell has finished before returning. Using Sleep()
-      works around that.) */
-  if (system(cmd) < 0) {
-     return -1;
-  }
-  Sleep(1000);
-  return 0;
+  STARTUPINFO sInfo;
+  PROCESS_INFORMATION pInfo;
+  DWORD retCode;
+
+  sInfo.cb              = sizeof(STARTUPINFO);
+  sInfo.lpReserved      = NULL;
+  sInfo.lpReserved2     = NULL;
+  sInfo.cbReserved2     = 0;
+  sInfo.lpDesktop       = NULL;
+  sInfo.lpTitle         = NULL;
+  sInfo.dwFlags         = 0;
+
+  if (!CreateProcess(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &sInfo, &pInfo))
+    return -1;
+  WaitForSingleObject(pInfo.hProcess, INFINITE);
+  if (GetExitCodeProcess(pInfo.hProcess, &retCode) == 0) return -1;
+  CloseHandle(pInfo.hProcess);
+  CloseHandle(pInfo.hThread);
+  return retCode;
 #else
     int pid;
     int wstat;
