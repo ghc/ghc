@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.9 1999/03/15 16:53:10 simonm Exp $
+ * $Id: ClosureMacros.h,v 1.10 1999/03/23 08:34:07 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -99,8 +99,8 @@ static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
  */
 extern StgFun start;
 
-extern StgWord TEXT_SECTION_END_MARKER_DECL[];
-extern StgWord DATA_SECTION_END_MARKER_DECL[];
+extern void* TEXT_SECTION_END_MARKER_DECL;
+extern void* DATA_SECTION_END_MARKER_DECL;
 
 #define IS_CODE_PTR(p) ((P_)(p) < (P_)&TEXT_SECTION_END_MARKER)
 #define IS_DATA_PTR(p) ((P_)(p) >= (P_)&TEXT_SECTION_END_MARKER && (P_)(p) < (P_)&DATA_SECTION_END_MARKER)
