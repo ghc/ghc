@@ -774,7 +774,11 @@ This name is not supported by GHC.
 <sect1 id="type-extensions">
 <title>Type system extensions</title>
 
-<sect2 id="nullary-types">
+
+<sect2>
+<title>Data types and type synonyms</title>
+
+<sect3 id="nullary-types">
 <title>Data types with no constructors</title>
 
 <para>With the <option>-fglasgow-exts</option> flag, GHC lets you declare
@@ -792,9 +796,9 @@ not <literal>*</literal> then an explicit kind annotation must be used
 
 <para>Such data types have only one value, namely bottom.
 Nevertheless, they can be useful when defining "phantom types".</para>
-</sect2>
+</sect3>
 
-<sect2 id="infix-tycons">
+<sect3 id="infix-tycons">
 <title>Infix type constructors</title>
 
 <para>
@@ -845,94 +849,436 @@ like expressions.  More specifically:
 
 </itemizedlist>
 </para>
-</sect2>
+</sect3>
 
-<sect2 id="sec-kinding">
-<title>Explicitly-kinded quantification</title>
+<sect3 id="type-synonyms">
+<title>Liberalised type synonyms</title>
 
 <para>
-Haskell infers the kind of each type variable.  Sometimes it is nice to be able
-to give the kind explicitly as (machine-checked) documentation, 
-just as it is nice to give a type signature for a function.  On some occasions,
-it is essential to do so.  For example, in his paper "Restricted Data Types in Haskell" (Haskell Workshop 1999)
-John Hughes had to define the data type:
-<Screen>
-     data Set cxt a = Set [a]
-                    | Unused (cxt a -> ())
-</Screen>
-The only use for the <literal>Unused</literal> constructor was to force the correct
-kind for the type variable <literal>cxt</literal>.
-</para>
-<para>
-GHC now instead allows you to specify the kind of a type variable directly, wherever
-a type variable is explicitly bound.  Namely:
+Type synonmys are like macros at the type level, and
+GHC does validity checking on types <emphasis>only after expanding type synonyms</emphasis>.
+That means that GHC can be very much more liberal about type synonyms than Haskell 98:
 <itemizedlist>
-<listitem><para><literal>data</literal> declarations:
-<Screen>
-  data Set (cxt :: * -> *) a = Set [a]
-</Screen></para></listitem>
-<listitem><para><literal>type</literal> declarations:
-<Screen>
-  type T (f :: * -> *) = f Int
-</Screen></para></listitem>
-<listitem><para><literal>class</literal> declarations:
-<Screen>
-  class (Eq a) => C (f :: * -> *) a where ...
-</Screen></para></listitem>
-<listitem><para><literal>forall</literal>'s in type signatures:
-<Screen>
-  f :: forall (cxt :: * -> *). Set cxt Int
-</Screen></para></listitem>
+<listitem> <para>You can write a <literal>forall</literal> (including overloading)
+in a type synonym, thus:
+<programlisting>
+  type Discard a = forall b. Show b => a -> b -> (a, String)
+
+  f :: Discard a
+  f x y = (x, show y)
+
+  g :: Discard Int -> (Int,Bool)    -- A rank-2 type
+  g f = f Int True
+</programlisting>
+</para>
+</listitem>
+
+<listitem><para>
+You can write an unboxed tuple in a type synonym:
+<programlisting>
+  type Pr = (# Int, Int #)
+
+  h :: Int -> Pr
+  h x = (# x, x #)
+</programlisting>
+</para></listitem>
+
+<listitem><para>
+You can apply a type synonym to a forall type:
+<programlisting>
+  type Foo a = a -> a -> Bool
+ 
+  f :: Foo (forall b. b->b)
+</programlisting>
+After expanding the synonym, <literal>f</literal> has the legal (in GHC) type:
+<programlisting>
+  f :: (forall b. b->b) -> (forall b. b->b) -> Bool
+</programlisting>
+</para></listitem>
+
+<listitem><para>
+You can apply a type synonym to a partially applied type synonym:
+<programlisting>
+  type Generic i o = forall x. i x -> o x
+  type Id x = x
+  
+  foo :: Generic Id []
+</programlisting>
+After epxanding the synonym, <literal>foo</literal> has the legal (in GHC) type:
+<programlisting>
+  foo :: forall x. x -> [x]
+</programlisting>
+</para></listitem>
+
 </itemizedlist>
 </para>
 
 <para>
-The parentheses are required.  Some of the spaces are required too, to
-separate the lexemes.  If you write <literal>(f::*->*)</literal> you
-will get a parse error, because "<literal>::*->*</literal>" is a
-single lexeme in Haskell.
+GHC currently does kind checking before expanding synonyms (though even that
+could be changed.)
 </para>
-
 <para>
-As part of the same extension, you can put kind annotations in types
-as well.  Thus:
-<Screen>
-   f :: (Int :: *) -> Int
-   g :: forall a. a -> (a :: *)
-</Screen>
-The syntax is
-<Screen>
-   atype ::= '(' ctype '::' kind ')
-</Screen>
-The parentheses are required.
-</para>
-</sect2>
-
-
-<sect2 id="class-method-types">
-<title>Class method types
-</title>
-<para>
-Haskell 98 prohibits class method types to mention constraints on the
-class type variable, thus:
+After expanding type synonyms, GHC does validity checking on types, looking for
+the following mal-formedness which isn't detected simply by kind checking:
+<itemizedlist>
+<listitem><para>
+Type constructor applied to a type involving for-alls.
+</para></listitem>
+<listitem><para>
+Unboxed tuple on left of an arrow.
+</para></listitem>
+<listitem><para>
+Partially-applied type synonym.
+</para></listitem>
+</itemizedlist>
+So, for example,
+this will be rejected:
 <programlisting>
-  class Seq s a where
-    fromList :: [a] -> s a
-    elem     :: Eq a => a -> s a -> Bool
+  type Pr = (# Int, Int #)
+
+  h :: Pr -> Int
+  h x = ...
 </programlisting>
-The type of <literal>elem</literal> is illegal in Haskell 98, because it
-contains the constraint <literal>Eq a</literal>, constrains only the 
-class type variable (in this case <literal>a</literal>).
+because GHC does not allow  unboxed tuples on the left of a function arrow.
 </para>
+</sect3>
+
+
+<sect3 id="existential-quantification">
+<title>Existentially quantified data constructors
+</title>
+
 <para>
-With the <option>-fglasgow-exts</option> GHC lifts this restriction.
+The idea of using existential quantification in data type declarations
+was suggested by Laufer (I believe, thought doubtless someone will
+correct me), and implemented in Hope+. It's been in Lennart
+Augustsson's <Command>hbc</Command> Haskell compiler for several years, and
+proved very useful.  Here's the idea.  Consider the declaration:
 </para>
 
+<para>
+
+<programlisting>
+  data Foo = forall a. MkFoo a (a -> Bool)
+           | Nil
+</programlisting>
+
+</para>
+
+<para>
+The data type <literal>Foo</literal> has two constructors with types:
+</para>
+
+<para>
+
+<programlisting>
+  MkFoo :: forall a. a -> (a -> Bool) -> Foo
+  Nil   :: Foo
+</programlisting>
+
+</para>
+
+<para>
+Notice that the type variable <literal>a</literal> in the type of <function>MkFoo</function>
+does not appear in the data type itself, which is plain <literal>Foo</literal>.
+For example, the following expression is fine:
+</para>
+
+<para>
+
+<programlisting>
+  [MkFoo 3 even, MkFoo 'c' isUpper] :: [Foo]
+</programlisting>
+
+</para>
+
+<para>
+Here, <literal>(MkFoo 3 even)</literal> packages an integer with a function
+<function>even</function> that maps an integer to <literal>Bool</literal>; and <function>MkFoo 'c'
+isUpper</function> packages a character with a compatible function.  These
+two things are each of type <literal>Foo</literal> and can be put in a list.
+</para>
+
+<para>
+What can we do with a value of type <literal>Foo</literal>?.  In particular,
+what happens when we pattern-match on <function>MkFoo</function>?
+</para>
+
+<para>
+
+<programlisting>
+  f (MkFoo val fn) = ???
+</programlisting>
+
+</para>
+
+<para>
+Since all we know about <literal>val</literal> and <function>fn</function> is that they
+are compatible, the only (useful) thing we can do with them is to
+apply <function>fn</function> to <literal>val</literal> to get a boolean.  For example:
+</para>
+
+<para>
+
+<programlisting>
+  f :: Foo -> Bool
+  f (MkFoo val fn) = fn val
+</programlisting>
+
+</para>
+
+<para>
+What this allows us to do is to package heterogenous values
+together with a bunch of functions that manipulate them, and then treat
+that collection of packages in a uniform manner.  You can express
+quite a bit of object-oriented-like programming this way.
+</para>
+
+<sect4 id="existential">
+<title>Why existential?
+</title>
+
+<para>
+What has this to do with <emphasis>existential</emphasis> quantification?
+Simply that <function>MkFoo</function> has the (nearly) isomorphic type
+</para>
+
+<para>
+
+<programlisting>
+  MkFoo :: (exists a . (a, a -> Bool)) -> Foo
+</programlisting>
+
+</para>
+
+<para>
+But Haskell programmers can safely think of the ordinary
+<emphasis>universally</emphasis> quantified type given above, thereby avoiding
+adding a new existential quantification construct.
+</para>
+
+</sect4>
+
+<sect4>
+<title>Type classes</title>
+
+<para>
+An easy extension (implemented in <Command>hbc</Command>) is to allow
+arbitrary contexts before the constructor.  For example:
+</para>
+
+<para>
+
+<programlisting>
+data Baz = forall a. Eq a => Baz1 a a
+         | forall b. Show b => Baz2 b (b -> b)
+</programlisting>
+
+</para>
+
+<para>
+The two constructors have the types you'd expect:
+</para>
+
+<para>
+
+<programlisting>
+Baz1 :: forall a. Eq a => a -> a -> Baz
+Baz2 :: forall b. Show b => b -> (b -> b) -> Baz
+</programlisting>
+
+</para>
+
+<para>
+But when pattern matching on <function>Baz1</function> the matched values can be compared
+for equality, and when pattern matching on <function>Baz2</function> the first matched
+value can be converted to a string (as well as applying the function to it).
+So this program is legal:
+</para>
+
+<para>
+
+<programlisting>
+  f :: Baz -> String
+  f (Baz1 p q) | p == q    = "Yes"
+               | otherwise = "No"
+  f (Baz2 v fn)            = show (fn v)
+</programlisting>
+
+</para>
+
+<para>
+Operationally, in a dictionary-passing implementation, the
+constructors <function>Baz1</function> and <function>Baz2</function> must store the
+dictionaries for <literal>Eq</literal> and <literal>Show</literal> respectively, and
+extract it on pattern matching.
+</para>
+
+<para>
+Notice the way that the syntax fits smoothly with that used for
+universal quantification earlier.
+</para>
+
+</sect4>
+
+<sect4>
+<title>Restrictions</title>
+
+<para>
+There are several restrictions on the ways in which existentially-quantified
+constructors can be use.
+</para>
+
+<para>
+
+<itemizedlist>
+<listitem>
+
+<para>
+ When pattern matching, each pattern match introduces a new,
+distinct, type for each existential type variable.  These types cannot
+be unified with any other type, nor can they escape from the scope of
+the pattern match.  For example, these fragments are incorrect:
+
+
+<programlisting>
+f1 (MkFoo a f) = a
+</programlisting>
+
+
+Here, the type bound by <function>MkFoo</function> "escapes", because <literal>a</literal>
+is the result of <function>f1</function>.  One way to see why this is wrong is to
+ask what type <function>f1</function> has:
+
+
+<programlisting>
+  f1 :: Foo -> a             -- Weird!
+</programlisting>
+
+
+What is this "<literal>a</literal>" in the result type? Clearly we don't mean
+this:
+
+
+<programlisting>
+  f1 :: forall a. Foo -> a   -- Wrong!
+</programlisting>
+
+
+The original program is just plain wrong.  Here's another sort of error
+
+
+<programlisting>
+  f2 (Baz1 a b) (Baz1 p q) = a==q
+</programlisting>
+
+
+It's ok to say <literal>a==b</literal> or <literal>p==q</literal>, but
+<literal>a==q</literal> is wrong because it equates the two distinct types arising
+from the two <function>Baz1</function> constructors.
+
+
+</para>
+</listitem>
+<listitem>
+
+<para>
+You can't pattern-match on an existentially quantified
+constructor in a <literal>let</literal> or <literal>where</literal> group of
+bindings. So this is illegal:
+
+
+<programlisting>
+  f3 x = a==b where { Baz1 a b = x }
+</programlisting>
+
+Instead, use a <literal>case</literal> expression:
+
+<programlisting>
+  f3 x = case x of Baz1 a b -> a==b
+</programlisting>
+
+In general, you can only pattern-match
+on an existentially-quantified constructor in a <literal>case</literal> expression or
+in the patterns of a function definition.
+
+The reason for this restriction is really an implementation one.
+Type-checking binding groups is already a nightmare without
+existentials complicating the picture.  Also an existential pattern
+binding at the top level of a module doesn't make sense, because it's
+not clear how to prevent the existentially-quantified type "escaping".
+So for now, there's a simple-to-state restriction.  We'll see how
+annoying it is.
+
+</para>
+</listitem>
+<listitem>
+
+<para>
+You can't use existential quantification for <literal>newtype</literal>
+declarations.  So this is illegal:
+
+
+<programlisting>
+  newtype T = forall a. Ord a => MkT a
+</programlisting>
+
+
+Reason: a value of type <literal>T</literal> must be represented as a pair
+of a dictionary for <literal>Ord t</literal> and a value of type <literal>t</literal>.
+That contradicts the idea that <literal>newtype</literal> should have no
+concrete representation.  You can get just the same efficiency and effect
+by using <literal>data</literal> instead of <literal>newtype</literal>.  If there is no
+overloading involved, then there is more of a case for allowing
+an existentially-quantified <literal>newtype</literal>, because the <literal>data</literal>
+because the <literal>data</literal> version does carry an implementation cost,
+but single-field existentially quantified constructors aren't much
+use.  So the simple restriction (no existential stuff on <literal>newtype</literal>)
+stands, unless there are convincing reasons to change it.
+
+
+</para>
+</listitem>
+<listitem>
+
+<para>
+ You can't use <literal>deriving</literal> to define instances of a
+data type with existentially quantified data constructors.
+
+Reason: in most cases it would not make sense. For example:&num;
+
+<programlisting>
+data T = forall a. MkT [a] deriving( Eq )
+</programlisting>
+
+To derive <literal>Eq</literal> in the standard way we would need to have equality
+between the single component of two <function>MkT</function> constructors:
+
+<programlisting>
+instance Eq T where
+  (MkT a) == (MkT b) = ???
+</programlisting>
+
+But <VarName>a</VarName> and <VarName>b</VarName> have distinct types, and so can't be compared.
+It's just about possible to imagine examples in which the derived instance
+would make sense, but it seems altogether simpler simply to prohibit such
+declarations.  Define your own instances!
+</para>
+</listitem>
+
+</itemizedlist>
+
+</para>
+
+</sect4>
+</sect3>
+
 </sect2>
+
+
 
 <sect2 id="multi-param-type-classes">
-<title>Multi-parameter type classes
-</title>
+<title>Class declarations</title>
 
 <para>
 This section documents GHC's implementation of multi-parameter type
@@ -941,124 +1287,8 @@ URL="http://research.microsoft.com/~simonpj/multi.ps.gz" >Type
 classes: exploring the design space</ULink > (Simon Peyton Jones, Mark
 Jones, Erik Meijer).
 </para>
-
-
-<sect3 id="type-restrictions">
-<title>Types</title>
-
 <para>
-GHC imposes the following restrictions on the form of a qualified
-type, whether declared in a type signature
-or inferred. Consider the type:
-
-<programlisting>
-  forall tv1..tvn (c1, ...,cn) => type
-</programlisting>
-
-(Here, I write the "foralls" explicitly, although the Haskell source
-language omits them; in Haskell 1.4, all the free type variables of an
-explicit source-language type signature are universally quantified,
-except for the class type variables in a class declaration.  However,
-in GHC, you can give the foralls if you want.  See <xref LinkEnd="universal-quantification">).
-</para>
-
-<para>
-
-<OrderedList>
-<listitem>
-
-<para>
- <emphasis>Each universally quantified type variable
-<literal>tvi</literal> must be reachable from <literal>type</literal></emphasis>.
-
-A type variable is "reachable" if it it is functionally dependent
-(see <xref linkend="functional-dependencies">)
-on the type variables free in <literal>type</literal>.
-The reason for this is that a value with a type that does not obey
-this restriction could not be used without introducing
-ambiguity. 
-Here, for example, is an illegal type:
-
-
-<programlisting>
-  forall a. Eq a => Int
-</programlisting>
-
-
-When a value with this type was used, the constraint <literal>Eq tv</literal>
-would be introduced where <literal>tv</literal> is a fresh type variable, and
-(in the dictionary-translation implementation) the value would be
-applied to a dictionary for <literal>Eq tv</literal>.  The difficulty is that we
-can never know which instance of <literal>Eq</literal> to use because we never
-get any more information about <literal>tv</literal>.
-
-</para>
-</listitem>
-<listitem>
-
-<para>
- <emphasis>Every constraint <literal>ci</literal> must mention at least one of the
-universally quantified type variables <literal>tvi</literal></emphasis>.
-
-For example, this type is OK because <literal>C a b</literal> mentions the
-universally quantified type variable <literal>b</literal>:
-
-
-<programlisting>
-  forall a. C a b => burble
-</programlisting>
-
-
-The next type is illegal because the constraint <literal>Eq b</literal> does not
-mention <literal>a</literal>:
-
-
-<programlisting>
-  forall a. Eq b => burble
-</programlisting>
-
-
-The reason for this restriction is milder than the other one.  The
-excluded types are never useful or necessary (because the offending
-context doesn't need to be witnessed at this point; it can be floated
-out).  Furthermore, floating them out increases sharing. Lastly,
-excluding them is a conservative choice; it leaves a patch of
-territory free in case we need it later.
-
-</para>
-</listitem>
-
-</OrderedList>
-
-</para>
-
-
-<para>
-Unlike Haskell 1.4, constraints in types do <emphasis>not</emphasis> have to be of
-the form <emphasis>(class type-variables)</emphasis>.  Thus, these type signatures
-are perfectly OK
-</para>
-
-<para>
-
-<programlisting>
-  f :: Eq (m a) => [m a] -> [m a]
-  g :: Eq [a] => ...
-</programlisting>
-
-</para>
-
-<para>
-This choice recovers principal types, a property that Haskell 1.4 does not have.
-</para>
-
-</sect3>
-
-<sect3>
-<title>Class declarations</title>
-
-<para>
-
+There are the following constraints on class declarations:
 <OrderedList>
 <listitem>
 
@@ -1169,13 +1399,58 @@ class like this:
 </listitem>
 
 </OrderedList>
+</para>
 
+<sect3 id="class-method-types">
+<title>Class method types</title>
+<para>
+Haskell 98 prohibits class method types to mention constraints on the
+class type variable, thus:
+<programlisting>
+  class Seq s a where
+    fromList :: [a] -> s a
+    elem     :: Eq a => a -> s a -> Bool
+</programlisting>
+The type of <literal>elem</literal> is illegal in Haskell 98, because it
+contains the constraint <literal>Eq a</literal>, constrains only the 
+class type variable (in this case <literal>a</literal>).
+</para>
+<para>
+With the <option>-fglasgow-exts</option> GHC lifts this restriction.
 </para>
 
 </sect3>
 
-<sect3 id="instance-decls">
-<title>Instance declarations</title>
+</sect2>
+
+<sect2 id="type-restrictions">
+<title>Type signatures</title>
+
+<sect3><title>The context of a type signature</title>
+<para>
+Unlike Haskell 1.4, constraints in types do <emphasis>not</emphasis> have to be of
+the form <emphasis>(class type-variables)</emphasis>.  Thus, these type signatures
+are perfectly OK
+<programlisting>
+  f :: Eq (m a) => [m a] -> [m a]
+  g :: Eq [a] => ...
+</programlisting>
+This choice recovers principal types, a property that Haskell 1.4 does not have.
+</para>
+<para>
+GHC imposes the following restrictions on the constraints in a type signature.
+Consider the type:
+
+<programlisting>
+  forall tv1..tvn (c1, ...,cn) => type
+</programlisting>
+
+(Here, we write the "foralls" explicitly, although the Haskell source
+language omits them; in Haskell 1.4, all the free type variables of an
+explicit source-language type signature are universally quantified,
+except for the class type variables in a class declaration.  However,
+in GHC, you can give the foralls if you want.  See <xref LinkEnd="universal-quantification">).
+</para>
 
 <para>
 
@@ -1183,7 +1458,130 @@ class like this:
 <listitem>
 
 <para>
- <emphasis>Instance declarations may not overlap</emphasis>.  The two instance
+ <emphasis>Each universally quantified type variable
+<literal>tvi</literal> must be reachable from <literal>type</literal></emphasis>.
+
+A type variable is "reachable" if it it is functionally dependent
+(see <xref linkend="functional-dependencies">)
+on the type variables free in <literal>type</literal>.
+The reason for this is that a value with a type that does not obey
+this restriction could not be used without introducing
+ambiguity. 
+Here, for example, is an illegal type:
+
+
+<programlisting>
+  forall a. Eq a => Int
+</programlisting>
+
+
+When a value with this type was used, the constraint <literal>Eq tv</literal>
+would be introduced where <literal>tv</literal> is a fresh type variable, and
+(in the dictionary-translation implementation) the value would be
+applied to a dictionary for <literal>Eq tv</literal>.  The difficulty is that we
+can never know which instance of <literal>Eq</literal> to use because we never
+get any more information about <literal>tv</literal>.
+
+</para>
+</listitem>
+<listitem>
+
+<para>
+ <emphasis>Every constraint <literal>ci</literal> must mention at least one of the
+universally quantified type variables <literal>tvi</literal></emphasis>.
+
+For example, this type is OK because <literal>C a b</literal> mentions the
+universally quantified type variable <literal>b</literal>:
+
+
+<programlisting>
+  forall a. C a b => burble
+</programlisting>
+
+
+The next type is illegal because the constraint <literal>Eq b</literal> does not
+mention <literal>a</literal>:
+
+
+<programlisting>
+  forall a. Eq b => burble
+</programlisting>
+
+
+The reason for this restriction is milder than the other one.  The
+excluded types are never useful or necessary (because the offending
+context doesn't need to be witnessed at this point; it can be floated
+out).  Furthermore, floating them out increases sharing. Lastly,
+excluding them is a conservative choice; it leaves a patch of
+territory free in case we need it later.
+
+</para>
+</listitem>
+
+</OrderedList>
+
+</para>
+</sect3>
+
+<sect3 id="hoist">
+<title>For-all hoisting</title>
+<para>
+It is often convenient to use generalised type synonyms (see <xref linkend="type-synonyms">) at the right hand
+end of an arrow, thus:
+<programlisting>
+  type Discard a = forall b. a -> b -> a
+
+  g :: Int -> Discard Int
+  g x y z = x+y
+</programlisting>
+Simply expanding the type synonym would give
+<programlisting>
+  g :: Int -> (forall b. Int -> b -> Int)
+</programlisting>
+but GHC "hoists" the <literal>forall</literal> to give the isomorphic type
+<programlisting>
+  g :: forall b. Int -> Int -> b -> Int
+</programlisting>
+In general, the rule is this: <emphasis>to determine the type specified by any explicit
+user-written type (e.g. in a type signature), GHC expands type synonyms and then repeatedly
+performs the transformation:</emphasis>
+<programlisting>
+  <emphasis>type1</emphasis> -> forall a1..an. <emphasis>context2</emphasis> => <emphasis>type2</emphasis>
+==>
+  forall a1..an. <emphasis>context2</emphasis> => <emphasis>type1</emphasis> -> <emphasis>type2</emphasis>
+</programlisting>
+(In fact, GHC tries to retain as much synonym information as possible for use in
+error messages, but that is a usability issue.)  This rule applies, of course, whether
+or not the <literal>forall</literal> comes from a synonym. For example, here is another
+valid way to write <literal>g</literal>'s type signature:
+<programlisting>
+  g :: Int -> Int -> forall b. b -> Int
+</programlisting>
+</para>
+<para>
+When doing this hoisting operation, GHC eliminates duplicate constraints.  For
+example:
+<programlisting>
+  type Foo a = (?x::Int) => Bool -> a
+  g :: Foo (Foo Int)
+</programlisting>
+means
+<programlisting>
+  g :: (?x::Int) => Bool -> Bool -> Int
+</programlisting>
+</para>
+</sect3>
+
+
+</sect2>
+
+<sect2 id="instance-decls">
+<title>Instance declarations</title>
+
+<sect3>
+<title>Overlapping instances</title>
+<para>
+In general, <emphasis>instance declarations may not overlap</emphasis>.  The two instance
 declarations
 
 
@@ -1272,44 +1670,16 @@ when it is compiling <literal>Main</literal>.  However, it currently chooses not
 to look at ones that can't possibly be of use in the module currently
 being compiled, in the interests of efficiency.  (Perhaps we should
 change that decision, at least for <literal>Main</literal>.)
-
 </para>
-</listitem>
-<listitem>
+</sect3>
+
+<sect3>
+<title>Type synonyms in the instance head</title>
 
 <para>
- <emphasis>There are no restrictions on the type in an instance
-<emphasis>head</emphasis>, except that at least one must not be a type variable</emphasis>.
-The instance "head" is the bit after the "=>" in an instance decl. For
-example, these are OK:
-
-
-<programlisting>
-  instance C Int a where ...
-
-  instance D (Int, Int) where ...
-
-  instance E [[a]] where ...
-</programlisting>
-
-
-Note that instance heads <emphasis>may</emphasis> contain repeated type variables.
-For example, this is OK:
-
-
-<programlisting>
-  instance Stateful (ST s) (MutVar s) where ...
-</programlisting>
-
-See <xref linkend="undecidable-instances"> for an experimental
-extension to lift this restriction.
-</para>
-</listitem>
-<listitem>
-
-<para>
- <emphasis>Unlike Haskell 1.4, instance heads may use type
-synonyms</emphasis>.  As always, using a type synonym is just shorthand for
+<emphasis>Unlike Haskell 1.4, instance heads may use type
+synonyms</emphasis>.  (The instance "head" is the bit after the "=>" in an instance decl.)
+As always, using a type synonym is just shorthand for
 writing the RHS of the type synonym definition.  For example:
 
 
@@ -1343,55 +1713,52 @@ This design decision is independent of all the others, and easily
 reversed, but it makes sense to me.
 
 </para>
+</sect3>
+
+<sect3 id="undecidable-instances">
+<title>Undecidable instances</title>
+
+<para>An instance declaration must normally obey the following rules:
+<orderedlist>
+<listitem><para>At least one of the types in the <emphasis>head</emphasis> of
+an instance declaration <emphasis>must not</emphasis> be a type variable.
+For example, these are OK:
+
+<programlisting>
+  instance C Int a where ...
+
+  instance D (Int, Int) where ...
+
+  instance E [[a]] where ...
+</programlisting>
+but this is not:
+<programlisting>
+  instance F a where ...
+</programlisting>
+Note that instance heads <emphasis>may</emphasis> contain repeated type variables.
+For example, this is OK:
+<programlisting>
+  instance Stateful (ST s) (MutVar s) where ...
+</programlisting>
+</para>
 </listitem>
+
+
 <listitem>
-
-<para>
-<emphasis>The types in an instance-declaration <emphasis>context</emphasis> must all
-be type variables</emphasis>. Thus
-
-
+<para>All of the types in the <emphasis>context</emphasis> of
+an instance declaration <emphasis>must</emphasis> be type variables.
+Thus
 <programlisting>
 instance C a b => Eq (a,b) where ...
 </programlisting>
-
-
 is OK, but
-
-
 <programlisting>
 instance C Int b => Foo b where ...
 </programlisting>
-
-
-is not OK.  See <xref linkend="undecidable-instances"> for an experimental
-extension to lift this restriction.
-
-
-
+is not OK.
 </para>
 </listitem>
-
 </OrderedList>
-
-</para>
-
-</sect3>
-
-</sect2>
-
-<sect2 id="undecidable-instances">
-<title>Undecidable instances</title>
-
-<para>The rules for instance declarations state that:
-<itemizedlist>
-<listitem><para>At least one of the types in the <emphasis>head</emphasis> of
-an instance declaration <emphasis>must not</emphasis> be a type variable.
-</para></listitem>
-<listitem><para>All of the types in the <emphasis>context</emphasis> of
-an instance declaration <emphasis>must</emphasis> be type variables.
-</para></listitem>
-</itemizedlist>
 These restrictions ensure that 
 context reduction terminates: each reduction step removes one type
 constructor.  For example, the following would make the type checker
@@ -1452,11 +1819,13 @@ with <option>-fcontext-stack</option><emphasis>N</emphasis>.
 I'm on the lookout for a less brutal solution: a simple rule that preserves decidability while
 allowing these idioms interesting idioms.  
 </para>
+</sect3>
+
+
 </sect2>
 
 <sect2 id="implicit-parameters">
-<title>Implicit parameters
-</title>
+<title>Implicit parameters</title>
 
 <para> Implicit paramters are implemented as described in 
 "Implicit parameters: dynamic scoping with static types", 
@@ -1615,8 +1984,7 @@ the binding for <literal>?x</literal>, so the type of <literal>f</literal> is
 </sect2>
 
 <sect2 id="linear-implicit-parameters">
-<title>Linear implicit parameters
-</title>
+<title>Linear implicit parameters</title>
 <para>
 Linear implicit parameters are an idea developed by Koen Claessen,
 Mark Shields, and Simon PJ.  They address the long-standing
@@ -1804,6 +2172,69 @@ class declaration;  e.g.
   class Foo a b c | a b -> c where ...
 </programlisting>
 There should be more documentation, but there isn't (yet).  Yell if you need it.
+</para>
+</sect2>
+
+
+
+<sect2 id="sec-kinding">
+<title>Explicitly-kinded quantification</title>
+
+<para>
+Haskell infers the kind of each type variable.  Sometimes it is nice to be able
+to give the kind explicitly as (machine-checked) documentation, 
+just as it is nice to give a type signature for a function.  On some occasions,
+it is essential to do so.  For example, in his paper "Restricted Data Types in Haskell" (Haskell Workshop 1999)
+John Hughes had to define the data type:
+<Screen>
+     data Set cxt a = Set [a]
+                    | Unused (cxt a -> ())
+</Screen>
+The only use for the <literal>Unused</literal> constructor was to force the correct
+kind for the type variable <literal>cxt</literal>.
+</para>
+<para>
+GHC now instead allows you to specify the kind of a type variable directly, wherever
+a type variable is explicitly bound.  Namely:
+<itemizedlist>
+<listitem><para><literal>data</literal> declarations:
+<Screen>
+  data Set (cxt :: * -> *) a = Set [a]
+</Screen></para></listitem>
+<listitem><para><literal>type</literal> declarations:
+<Screen>
+  type T (f :: * -> *) = f Int
+</Screen></para></listitem>
+<listitem><para><literal>class</literal> declarations:
+<Screen>
+  class (Eq a) => C (f :: * -> *) a where ...
+</Screen></para></listitem>
+<listitem><para><literal>forall</literal>'s in type signatures:
+<Screen>
+  f :: forall (cxt :: * -> *). Set cxt Int
+</Screen></para></listitem>
+</itemizedlist>
+</para>
+
+<para>
+The parentheses are required.  Some of the spaces are required too, to
+separate the lexemes.  If you write <literal>(f::*->*)</literal> you
+will get a parse error, because "<literal>::*->*</literal>" is a
+single lexeme in Haskell.
+</para>
+
+<para>
+As part of the same extension, you can put kind annotations in types
+as well.  Thus:
+<Screen>
+   f :: (Int :: *) -> Int
+   g :: forall a. a -> (a :: *)
+</Screen>
+The syntax is
+<Screen>
+   atype ::= '(' ctype '::' kind ')
+</Screen>
+The parentheses are required.
 </para>
 </sect2>
 
@@ -2112,478 +2543,8 @@ for rank-2 types.
 </sect3>
 </sect2>
 
-<sect2 id="type-synonyms">
-<title>Liberalised type synonyms 
-</title>
 
-<para>
-Type synonmys are like macros at the type level, and
-GHC does validity checking on types <emphasis>only after expanding type synonyms</emphasis>.
-That means that GHC can be very much more liberal about type synonyms than Haskell 98:
-<itemizedlist>
-<listitem> <para>You can write a <literal>forall</literal> (including overloading)
-in a type synonym, thus:
-<programlisting>
-  type Discard a = forall b. Show b => a -> b -> (a, String)
 
-  f :: Discard a
-  f x y = (x, show y)
-
-  g :: Discard Int -> (Int,Bool)    -- A rank-2 type
-  g f = f Int True
-</programlisting>
-</para>
-</listitem>
-
-<listitem><para>
-You can write an unboxed tuple in a type synonym:
-<programlisting>
-  type Pr = (# Int, Int #)
-
-  h :: Int -> Pr
-  h x = (# x, x #)
-</programlisting>
-</para></listitem>
-
-<listitem><para>
-You can apply a type synonym to a forall type:
-<programlisting>
-  type Foo a = a -> a -> Bool
- 
-  f :: Foo (forall b. b->b)
-</programlisting>
-After expanding the synonym, <literal>f</literal> has the legal (in GHC) type:
-<programlisting>
-  f :: (forall b. b->b) -> (forall b. b->b) -> Bool
-</programlisting>
-</para></listitem>
-
-<listitem><para>
-You can apply a type synonym to a partially applied type synonym:
-<programlisting>
-  type Generic i o = forall x. i x -> o x
-  type Id x = x
-  
-  foo :: Generic Id []
-</programlisting>
-After epxanding the synonym, <literal>foo</literal> has the legal (in GHC) type:
-<programlisting>
-  foo :: forall x. x -> [x]
-</programlisting>
-</para></listitem>
-
-</itemizedlist>
-</para>
-
-<para>
-GHC currently does kind checking before expanding synonyms (though even that
-could be changed.)
-</para>
-<para>
-After expanding type synonyms, GHC does validity checking on types, looking for
-the following mal-formedness which isn't detected simply by kind checking:
-<itemizedlist>
-<listitem><para>
-Type constructor applied to a type involving for-alls.
-</para></listitem>
-<listitem><para>
-Unboxed tuple on left of an arrow.
-</para></listitem>
-<listitem><para>
-Partially-applied type synonym.
-</para></listitem>
-</itemizedlist>
-So, for example,
-this will be rejected:
-<programlisting>
-  type Pr = (# Int, Int #)
-
-  h :: Pr -> Int
-  h x = ...
-</programlisting>
-because GHC does not allow  unboxed tuples on the left of a function arrow.
-</para>
-</sect2>
-
-<sect2 id="hoist">
-<title>For-all hoisting</title>
-<para>
-It is often convenient to use generalised type synonyms at the right hand
-end of an arrow, thus:
-<programlisting>
-  type Discard a = forall b. a -> b -> a
-
-  g :: Int -> Discard Int
-  g x y z = x+y
-</programlisting>
-Simply expanding the type synonym would give
-<programlisting>
-  g :: Int -> (forall b. Int -> b -> Int)
-</programlisting>
-but GHC "hoists" the <literal>forall</literal> to give the isomorphic type
-<programlisting>
-  g :: forall b. Int -> Int -> b -> Int
-</programlisting>
-In general, the rule is this: <emphasis>to determine the type specified by any explicit
-user-written type (e.g. in a type signature), GHC expands type synonyms and then repeatedly
-performs the transformation:</emphasis>
-<programlisting>
-  <emphasis>type1</emphasis> -> forall a1..an. <emphasis>context2</emphasis> => <emphasis>type2</emphasis>
-==>
-  forall a1..an. <emphasis>context2</emphasis> => <emphasis>type1</emphasis> -> <emphasis>type2</emphasis>
-</programlisting>
-(In fact, GHC tries to retain as much synonym information as possible for use in
-error messages, but that is a usability issue.)  This rule applies, of course, whether
-or not the <literal>forall</literal> comes from a synonym. For example, here is another
-valid way to write <literal>g</literal>'s type signature:
-<programlisting>
-  g :: Int -> Int -> forall b. b -> Int
-</programlisting>
-</para>
-<para>
-When doing this hoisting operation, GHC eliminates duplicate constraints.  For
-example:
-<programlisting>
-  type Foo a = (?x::Int) => Bool -> a
-  g :: Foo (Foo Int)
-</programlisting>
-means
-<programlisting>
-  g :: (?x::Int) => Bool -> Bool -> Int
-</programlisting>
-</para>
-</sect2>
-
-
-<sect2 id="existential-quantification">
-<title>Existentially quantified data constructors
-</title>
-
-<para>
-The idea of using existential quantification in data type declarations
-was suggested by Laufer (I believe, thought doubtless someone will
-correct me), and implemented in Hope+. It's been in Lennart
-Augustsson's <Command>hbc</Command> Haskell compiler for several years, and
-proved very useful.  Here's the idea.  Consider the declaration:
-</para>
-
-<para>
-
-<programlisting>
-  data Foo = forall a. MkFoo a (a -> Bool)
-           | Nil
-</programlisting>
-
-</para>
-
-<para>
-The data type <literal>Foo</literal> has two constructors with types:
-</para>
-
-<para>
-
-<programlisting>
-  MkFoo :: forall a. a -> (a -> Bool) -> Foo
-  Nil   :: Foo
-</programlisting>
-
-</para>
-
-<para>
-Notice that the type variable <literal>a</literal> in the type of <function>MkFoo</function>
-does not appear in the data type itself, which is plain <literal>Foo</literal>.
-For example, the following expression is fine:
-</para>
-
-<para>
-
-<programlisting>
-  [MkFoo 3 even, MkFoo 'c' isUpper] :: [Foo]
-</programlisting>
-
-</para>
-
-<para>
-Here, <literal>(MkFoo 3 even)</literal> packages an integer with a function
-<function>even</function> that maps an integer to <literal>Bool</literal>; and <function>MkFoo 'c'
-isUpper</function> packages a character with a compatible function.  These
-two things are each of type <literal>Foo</literal> and can be put in a list.
-</para>
-
-<para>
-What can we do with a value of type <literal>Foo</literal>?.  In particular,
-what happens when we pattern-match on <function>MkFoo</function>?
-</para>
-
-<para>
-
-<programlisting>
-  f (MkFoo val fn) = ???
-</programlisting>
-
-</para>
-
-<para>
-Since all we know about <literal>val</literal> and <function>fn</function> is that they
-are compatible, the only (useful) thing we can do with them is to
-apply <function>fn</function> to <literal>val</literal> to get a boolean.  For example:
-</para>
-
-<para>
-
-<programlisting>
-  f :: Foo -> Bool
-  f (MkFoo val fn) = fn val
-</programlisting>
-
-</para>
-
-<para>
-What this allows us to do is to package heterogenous values
-together with a bunch of functions that manipulate them, and then treat
-that collection of packages in a uniform manner.  You can express
-quite a bit of object-oriented-like programming this way.
-</para>
-
-<sect3 id="existential">
-<title>Why existential?
-</title>
-
-<para>
-What has this to do with <emphasis>existential</emphasis> quantification?
-Simply that <function>MkFoo</function> has the (nearly) isomorphic type
-</para>
-
-<para>
-
-<programlisting>
-  MkFoo :: (exists a . (a, a -> Bool)) -> Foo
-</programlisting>
-
-</para>
-
-<para>
-But Haskell programmers can safely think of the ordinary
-<emphasis>universally</emphasis> quantified type given above, thereby avoiding
-adding a new existential quantification construct.
-</para>
-
-</sect3>
-
-<sect3>
-<title>Type classes</title>
-
-<para>
-An easy extension (implemented in <Command>hbc</Command>) is to allow
-arbitrary contexts before the constructor.  For example:
-</para>
-
-<para>
-
-<programlisting>
-data Baz = forall a. Eq a => Baz1 a a
-         | forall b. Show b => Baz2 b (b -> b)
-</programlisting>
-
-</para>
-
-<para>
-The two constructors have the types you'd expect:
-</para>
-
-<para>
-
-<programlisting>
-Baz1 :: forall a. Eq a => a -> a -> Baz
-Baz2 :: forall b. Show b => b -> (b -> b) -> Baz
-</programlisting>
-
-</para>
-
-<para>
-But when pattern matching on <function>Baz1</function> the matched values can be compared
-for equality, and when pattern matching on <function>Baz2</function> the first matched
-value can be converted to a string (as well as applying the function to it).
-So this program is legal:
-</para>
-
-<para>
-
-<programlisting>
-  f :: Baz -> String
-  f (Baz1 p q) | p == q    = "Yes"
-               | otherwise = "No"
-  f (Baz2 v fn)            = show (fn v)
-</programlisting>
-
-</para>
-
-<para>
-Operationally, in a dictionary-passing implementation, the
-constructors <function>Baz1</function> and <function>Baz2</function> must store the
-dictionaries for <literal>Eq</literal> and <literal>Show</literal> respectively, and
-extract it on pattern matching.
-</para>
-
-<para>
-Notice the way that the syntax fits smoothly with that used for
-universal quantification earlier.
-</para>
-
-</sect3>
-
-<sect3>
-<title>Restrictions</title>
-
-<para>
-There are several restrictions on the ways in which existentially-quantified
-constructors can be use.
-</para>
-
-<para>
-
-<itemizedlist>
-<listitem>
-
-<para>
- When pattern matching, each pattern match introduces a new,
-distinct, type for each existential type variable.  These types cannot
-be unified with any other type, nor can they escape from the scope of
-the pattern match.  For example, these fragments are incorrect:
-
-
-<programlisting>
-f1 (MkFoo a f) = a
-</programlisting>
-
-
-Here, the type bound by <function>MkFoo</function> "escapes", because <literal>a</literal>
-is the result of <function>f1</function>.  One way to see why this is wrong is to
-ask what type <function>f1</function> has:
-
-
-<programlisting>
-  f1 :: Foo -> a             -- Weird!
-</programlisting>
-
-
-What is this "<literal>a</literal>" in the result type? Clearly we don't mean
-this:
-
-
-<programlisting>
-  f1 :: forall a. Foo -> a   -- Wrong!
-</programlisting>
-
-
-The original program is just plain wrong.  Here's another sort of error
-
-
-<programlisting>
-  f2 (Baz1 a b) (Baz1 p q) = a==q
-</programlisting>
-
-
-It's ok to say <literal>a==b</literal> or <literal>p==q</literal>, but
-<literal>a==q</literal> is wrong because it equates the two distinct types arising
-from the two <function>Baz1</function> constructors.
-
-
-</para>
-</listitem>
-<listitem>
-
-<para>
-You can't pattern-match on an existentially quantified
-constructor in a <literal>let</literal> or <literal>where</literal> group of
-bindings. So this is illegal:
-
-
-<programlisting>
-  f3 x = a==b where { Baz1 a b = x }
-</programlisting>
-
-Instead, use a <literal>case</literal> expression:
-
-<programlisting>
-  f3 x = case x of Baz1 a b -> a==b
-</programlisting>
-
-In general, you can only pattern-match
-on an existentially-quantified constructor in a <literal>case</literal> expression or
-in the patterns of a function definition.
-
-The reason for this restriction is really an implementation one.
-Type-checking binding groups is already a nightmare without
-existentials complicating the picture.  Also an existential pattern
-binding at the top level of a module doesn't make sense, because it's
-not clear how to prevent the existentially-quantified type "escaping".
-So for now, there's a simple-to-state restriction.  We'll see how
-annoying it is.
-
-</para>
-</listitem>
-<listitem>
-
-<para>
-You can't use existential quantification for <literal>newtype</literal>
-declarations.  So this is illegal:
-
-
-<programlisting>
-  newtype T = forall a. Ord a => MkT a
-</programlisting>
-
-
-Reason: a value of type <literal>T</literal> must be represented as a pair
-of a dictionary for <literal>Ord t</literal> and a value of type <literal>t</literal>.
-That contradicts the idea that <literal>newtype</literal> should have no
-concrete representation.  You can get just the same efficiency and effect
-by using <literal>data</literal> instead of <literal>newtype</literal>.  If there is no
-overloading involved, then there is more of a case for allowing
-an existentially-quantified <literal>newtype</literal>, because the <literal>data</literal>
-because the <literal>data</literal> version does carry an implementation cost,
-but single-field existentially quantified constructors aren't much
-use.  So the simple restriction (no existential stuff on <literal>newtype</literal>)
-stands, unless there are convincing reasons to change it.
-
-
-</para>
-</listitem>
-<listitem>
-
-<para>
- You can't use <literal>deriving</literal> to define instances of a
-data type with existentially quantified data constructors.
-
-Reason: in most cases it would not make sense. For example:&num;
-
-<programlisting>
-data T = forall a. MkT [a] deriving( Eq )
-</programlisting>
-
-To derive <literal>Eq</literal> in the standard way we would need to have equality
-between the single component of two <function>MkT</function> constructors:
-
-<programlisting>
-instance Eq T where
-  (MkT a) == (MkT b) = ???
-</programlisting>
-
-But <VarName>a</VarName> and <VarName>b</VarName> have distinct types, and so can't be compared.
-It's just about possible to imagine examples in which the derived instance
-would make sense, but it seems altogether simpler simply to prohibit such
-declarations.  Define your own instances!
-</para>
-</listitem>
-
-</itemizedlist>
-
-</para>
-
-</sect3>
-
-</sect2>
 
 <sect2 id="scoped-type-variables">
 <title>Scoped type variables
@@ -5182,3 +5143,4 @@ Just to finish with, here's another example I rather like:
      ;;; sgml-parent-document: ("users_guide.sgml" "book" "chapter" "sect1") ***
      ;;; End: ***
  -->
+
