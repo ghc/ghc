@@ -42,7 +42,7 @@ module SysTools (
 
 	touch,			-- String -> String -> IO ()
 	copy,			-- String -> String -> String -> IO ()
-	unDosifyPath,           -- String -> String
+	normalisePath,          -- FilePath -> FilePath
 	
 	-- Temporary-file management
 	setTmpDir,
@@ -485,7 +485,7 @@ findTopDir minusbs
   where
     -- get_proto returns a Unix-format path (relying on getExecDir to do so too)
     get_proto | notNull minusbs
-	      = return (unDosifyPath (drop 2 (last minusbs)))	-- 2 for "-B"
+	      = return (normalisePath (drop 2 (last minusbs)))	-- 2 for "-B"
 	      | otherwise	   
 	      = do { maybe_exec_dir <- getExecDir -- Get directory of executable
 		   ; case maybe_exec_dir of	  -- (only works on Windows; 
@@ -516,7 +516,7 @@ data Option
  	      String  -- the filepath/filename portion
  | Option     String
  
-showOpt (FileOption pre f) = pre ++ dosifyPath f
+showOpt (FileOption pre f) = pre ++ platformPath f
 showOpt (Option "") = ""
 showOpt (Option s)  = s
 
@@ -781,20 +781,19 @@ the last moment.  On Windows we dos-ify them just before passing them
 to the Windows command.
 
 The alternative, of using '/' consistently on Unix and '\' on Windows,
-proved quite awkward.  There were a lot more calls to dosifyPath,
+proved quite awkward.  There were a lot more calls to platformPath,
 and even on Windows we might invoke a unix-like utility (eg 'sh'), which
 interpreted a command line 'foo\baz' as 'foobaz'.
 
 \begin{code}
 -----------------------------------------------------------------------------
--- Convert filepath into MSDOS form.
+-- Convert filepath into platform / MSDOS form.
 
-dosifyPaths :: [String] -> [String]
--- dosifyPaths does two things
+-- platformPath does two things
 -- a) change '/' to '\'
 -- b) remove initial '/cygdrive/'
 
-unDosifyPath :: String -> String
+normalisePath :: String -> String
 -- Just change '\' to '/'
 
 pgmPath :: String		-- Directory string in Unix format
@@ -805,36 +804,20 @@ pgmPath :: String		-- Directory string in Unix format
 
 
 #if defined(mingw32_HOST_OS)
-
 --------------------- Windows version ------------------
-dosifyPaths xs = map dosifyPath xs
+normalisePath xs = subst '\\' '/' xs
+platformPath p   = subst '/' '\\' p
+pgmPath dir pgm  = platformPath dir ++ '\\' : pgm
 
-unDosifyPath xs = subst '\\' '/' xs
-
-pgmPath dir pgm = dosifyPath dir ++ '\\' : pgm
-
-dosifyPath stuff
-  = subst '/' '\\' real_stuff
- where
-   -- fully convince myself that /cygdrive/ prefixes cannot
-   -- really appear here.
-  cygdrive_prefix = "/cygdrive/"
-
-  real_stuff
-    | cygdrive_prefix `isPrefixOf` stuff = dropList cygdrive_prefix stuff
-    | otherwise = stuff
-   
+subst a b ls = map (\ x -> if x == a then b else x) ls
 #else
-
---------------------- Unix version ---------------------
-dosifyPaths  ps  = ps
-unDosifyPath xs  = xs
-pgmPath dir pgm  = dir ++ '/' : pgm
-dosifyPath stuff = stuff
+--------------------- Non-Windows version --------------
+normalisePath xs   = xs
+pgmPath dir pgm    = dir ++ '/' : pgm
+platformPath stuff = stuff
 --------------------------------------------------------
 #endif
 
-subst a b ls = map (\ x -> if x == a then b else x) ls
 \end{code}
 
 
@@ -872,8 +855,9 @@ getExecDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
 		if ret == 0 then free buf >> return Nothing
 		            else do s <- peekCString buf
 				    free buf
-				    return (Just (reverse (dropList "/bin/ghc.exe" (reverse (unDosifyPath s)))))
-
+				    return (Just (rootDir s))
+  where
+    rootDir s = reverse (dropList "/bin/ghc.exe" (reverse (normalisePath s)))
 
 foreign import stdcall "GetModuleFileNameA" unsafe
   getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
