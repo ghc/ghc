@@ -182,8 +182,6 @@ HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_SRCS)))
 
 HSC_C_OBJS  = $(addsuffix _hsc.$(way_)o,$(basename $(filter %.hsc,$(SRCS))))
 
-EXTRA_OBJS  = $(addsuffix .$(way_)o,$(basename $(EXTRA_SRCS)))
-
 # Always remove $(EXCLUDED_C_SRCS) from C_SRCS
 EXCLUDED_C_SRCS = $(patsubst %.lhs, %_stub.c, $(HS_SRCS)) \
 		  $(patsubst %.hs,  %_stub.c, $(HS_SRCS))
