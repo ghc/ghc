@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.11 $
- * $Date: 1999/11/23 18:08:18 $
+ * $Revision: 1.12 $
+ * $Date: 1999/11/24 10:38:10 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -619,7 +619,7 @@ void setDefaultLibDir ( String argv_0 )
          EEND;
       }
       i = strlen(defaultLibDir);
-      defaultLibDir[i++] = SLASH;
+      if (defaultLibDir[i-1] != SLASH) defaultLibDir[i++] = SLASH;
    } else {
       i = 0;
    }
@@ -628,7 +628,7 @@ void setDefaultLibDir ( String argv_0 )
    while (defaultLibDir[i] != SLASH) i--;
    i++;
    strcpy(&defaultLibDir[i], "lib");
-   /* fprintf ( stderr, "default lib dir = %s\n", defaultLibDir ); */
+   fprintf ( stderr, "default lib dir = %s\n", defaultLibDir ); 
 }
 
 Bool findFilesForModule ( 
