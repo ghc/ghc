@@ -57,13 +57,15 @@
       UPD_BH_UPDATABLE();						\
       LDV_ENTER(R1);							\
       PUSH_UPD_FRAME(Sp - SIZEOF_StgUpdateFrame, R1);			\
-      ENTER_CCS_THUNK(R1);							\
+      ENTER_CCS_THUNK(R1);						\
       SAVE_CCCS(WITHUPD_FRAME_SIZE);					\
       W_[Sp-WITHUPD_FRAME_SIZE] = stg_sel_ret_##offset##_upd_info;	\
-      R1 = StgClosure_payload(R1,0);						\
+      R1 = StgClosure_payload(R1,0);					\
       Sp = Sp - WITHUPD_FRAME_SIZE;					\
-      ENTER();								\
+      jump %GET_ENTRY(R1);						\
   }
+  /* NOTE: no need to ENTER() here, we know the closure cannot evaluate to a function,
+     because we're going to do a field selection on the result. */
 
 SELECTOR_CODE_UPD(0)
 SELECTOR_CODE_UPD(1)
