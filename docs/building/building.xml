@@ -1445,8 +1445,8 @@ $ cvs checkout nofib/spectral</screen>
       <title>Quick Start</title>
 
       <para>If you are starting from a source distribution, and just
-      want a completely standard build, then the following should
-      work:</para>
+      want a completely standard build, then the following procedure should 
+      work (unless you're on Windows, in which case go to <xref linkend="winbuild" />).</para>
 
 <screen>$ autoreconf
 $ ./configure
