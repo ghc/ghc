@@ -32,13 +32,12 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#if defined(openbsd_TARGET_OS)
-# ifdef HAVE_SIGNAL_H
-#  include <signal.h>
-# endif
-# ifdef HAVE_PTHREAD_H
-#  include <pthread.h>
-# endif
+#ifdef HAVE_SIGNAL_H
+#include <signal.h>
+#endif
+
+#if defined(THREADED_RTS) && defined(openbsd_TARGET_OS) && defined(HAVE_PTHREAD_H)
+#include <pthread.h>
 #endif
 
 /* -----------------------------------------------------------------------------
