@@ -34,6 +34,7 @@ import TysPrim
 import TysWiredIn
 
 import CStrings		( identToC )
+import CallConv		( CallConv, pprCallConv )
 import Constants   	( mIN_MP_INT_SIZE, mP_STRUCT_SIZE )
 import HeapOffs		( addOff, intOff, totHdrSize, HeapOffset )
 import Outputable
@@ -83,7 +84,7 @@ data PrimOp
     -- Word#-related ops:
     | WordQuotOp | WordRemOp
     | AndOp  | OrOp   | NotOp | XorOp
-    | SllOp  | SraOp  | SrlOp  -- shift {left,right} {arithmetic,logical}
+    | SllOp  | SrlOp  -- shift {left,right} {logical}
     | Int2WordOp | Word2IntOp -- casts
 
     -- Addr#-related ops:
@@ -124,6 +125,9 @@ data PrimOp
     | Integer2IntOp  | Integer2WordOp  
     | Int2IntegerOp  | Word2IntegerOp
     | Addr2IntegerOp -- "Addr" is *always* a literal string
+     -- casting to/from Integer and 64-bit (un)signed quantities.
+    | IntegerToInt64Op | Int64ToIntegerOp
+    | IntegerToWord64Op | Word64ToIntegerOp
     -- ?? gcd, etc?
 
     | FloatEncodeOp  | FloatDecodeOp
@@ -148,6 +152,7 @@ data PrimOp
 	-- Note that ForeignObjRep is not included -- the only way of
 	-- creating a ForeignObj is with a ccall or casm.
     | IndexOffForeignObjOp PrimRep
+    | WriteOffAddrOp PrimRep
 
     | UnsafeFreezeArrayOp | UnsafeFreezeByteArrayOp
     | SizeofByteArrayOp   | SizeofMutableByteArrayOp
@@ -164,12 +169,15 @@ data PrimOp
 
 A special ``trap-door'' to use in making calls direct to C functions:
 \begin{code}
-    | CCallOp	FAST_STRING	-- An "unboxed" ccall# to this named function
-		Bool		-- True <=> really a "casm"
-		Bool		-- True <=> might invoke Haskell GC
-		[Type]	-- Unboxed argument; the state-token
-				-- argument will have been put *first*
-		Type		-- Return type; one of the "StateAnd<blah>#" types
+    | CCallOp	(Maybe FAST_STRING) -- Nothing => first argument (an Addr#) is the function pointer
+				    -- Just fn => An "unboxed" ccall# to `fn'.
+
+		Bool		    -- True <=> really a "casm"
+		Bool		    -- True <=> might invoke Haskell GC
+		CallConv	    -- calling convention to use.
+		[Type]		    -- Unboxed arguments; the state-token
+				    -- argument will have been put *first*
+		Type		    -- Return type; one of the "StateAnd<blah>#" types
 
     -- (... to be continued ... )
 \end{code}
@@ -258,6 +266,7 @@ about using it this way?? ADR)
     | ParAtForNowOp	-- specifies initial destination of global par
     | CopyableOp	-- marks copyable code
     | NoFollowOp	-- marks non-followup expression
+
 \end{code}
 
 Deriving Ix is what we really want! ToDo
@@ -305,156 +314,178 @@ tagOf_PrimOp IntAddOp			      = ILIT( 39)
 tagOf_PrimOp IntSubOp			      = ILIT( 40)
 tagOf_PrimOp IntMulOp			      = ILIT( 41)
 tagOf_PrimOp IntQuotOp			      = ILIT( 42)
-tagOf_PrimOp IntRemOp			      = ILIT( 44)
-tagOf_PrimOp IntNegOp			      = ILIT( 45)
-tagOf_PrimOp IntAbsOp			      = ILIT( 47)
-tagOf_PrimOp WordQuotOp			      = ILIT( 48)
-tagOf_PrimOp WordRemOp			      = ILIT( 49)
-tagOf_PrimOp AndOp			      = ILIT( 50)
-tagOf_PrimOp OrOp			      = ILIT( 51)
-tagOf_PrimOp NotOp			      = ILIT( 52)
-tagOf_PrimOp XorOp			      = ILIT( 53)
-tagOf_PrimOp SllOp			      = ILIT( 54)
-tagOf_PrimOp SraOp			      = ILIT( 55)
-tagOf_PrimOp SrlOp			      = ILIT( 56)
-tagOf_PrimOp ISllOp			      = ILIT( 57)
-tagOf_PrimOp ISraOp			      = ILIT( 58)
-tagOf_PrimOp ISrlOp			      = ILIT( 59)
-tagOf_PrimOp Int2WordOp			      = ILIT( 60)
-tagOf_PrimOp Word2IntOp			      = ILIT( 61)
-tagOf_PrimOp Int2AddrOp			      = ILIT( 62)
-tagOf_PrimOp Addr2IntOp			      = ILIT( 63)
-tagOf_PrimOp FloatAddOp			      = ILIT( 64)
-tagOf_PrimOp FloatSubOp			      = ILIT( 65)
-tagOf_PrimOp FloatMulOp			      = ILIT( 66)
-tagOf_PrimOp FloatDivOp			      = ILIT( 67)
-tagOf_PrimOp FloatNegOp			      = ILIT( 68)
-tagOf_PrimOp Float2IntOp		      = ILIT( 69)
-tagOf_PrimOp Int2FloatOp		      = ILIT( 70)
-tagOf_PrimOp FloatExpOp			      = ILIT( 71)
-tagOf_PrimOp FloatLogOp			      = ILIT( 72)
-tagOf_PrimOp FloatSqrtOp		      = ILIT( 73)
-tagOf_PrimOp FloatSinOp			      = ILIT( 74)
-tagOf_PrimOp FloatCosOp			      = ILIT( 75)
-tagOf_PrimOp FloatTanOp			      = ILIT( 76)
-tagOf_PrimOp FloatAsinOp		      = ILIT( 77)
-tagOf_PrimOp FloatAcosOp		      = ILIT( 78)
-tagOf_PrimOp FloatAtanOp		      = ILIT( 79)
-tagOf_PrimOp FloatSinhOp		      = ILIT( 80)
-tagOf_PrimOp FloatCoshOp		      = ILIT( 81)
-tagOf_PrimOp FloatTanhOp		      = ILIT( 82)
-tagOf_PrimOp FloatPowerOp		      = ILIT( 83)
-tagOf_PrimOp DoubleAddOp		      = ILIT( 84)
-tagOf_PrimOp DoubleSubOp		      = ILIT( 85)
-tagOf_PrimOp DoubleMulOp		      = ILIT( 86)
-tagOf_PrimOp DoubleDivOp		      = ILIT( 87)
-tagOf_PrimOp DoubleNegOp		      = ILIT( 88)
-tagOf_PrimOp Double2IntOp		      = ILIT( 89)
-tagOf_PrimOp Int2DoubleOp		      = ILIT( 90)
-tagOf_PrimOp Double2FloatOp		      = ILIT( 91)
-tagOf_PrimOp Float2DoubleOp		      = ILIT( 92)
-tagOf_PrimOp DoubleExpOp		      = ILIT( 93)
-tagOf_PrimOp DoubleLogOp		      = ILIT( 94)
-tagOf_PrimOp DoubleSqrtOp		      = ILIT( 95)
-tagOf_PrimOp DoubleSinOp		      = ILIT( 96)
-tagOf_PrimOp DoubleCosOp		      = ILIT( 97)
-tagOf_PrimOp DoubleTanOp		      = ILIT( 98)
-tagOf_PrimOp DoubleAsinOp		      = ILIT( 99)
-tagOf_PrimOp DoubleAcosOp		      = ILIT(100)
-tagOf_PrimOp DoubleAtanOp		      = ILIT(101)
-tagOf_PrimOp DoubleSinhOp		      = ILIT(102)
-tagOf_PrimOp DoubleCoshOp		      = ILIT(103)
-tagOf_PrimOp DoubleTanhOp		      = ILIT(104)
-tagOf_PrimOp DoublePowerOp		      = ILIT(105)
-tagOf_PrimOp IntegerAddOp		      = ILIT(106)
-tagOf_PrimOp IntegerSubOp		      = ILIT(107)
-tagOf_PrimOp IntegerMulOp		      = ILIT(108)
-tagOf_PrimOp IntegerQuotRemOp		      = ILIT(109)
-tagOf_PrimOp IntegerDivModOp		      = ILIT(110)
-tagOf_PrimOp IntegerNegOp		      = ILIT(111)
-tagOf_PrimOp IntegerCmpOp		      = ILIT(112)
-tagOf_PrimOp Integer2IntOp		      = ILIT(113)
-tagOf_PrimOp Integer2WordOp		      = ILIT(114)
-tagOf_PrimOp Int2IntegerOp		      = ILIT(115)
-tagOf_PrimOp Word2IntegerOp		      = ILIT(116)
-tagOf_PrimOp Addr2IntegerOp		      = ILIT(117)
-tagOf_PrimOp FloatEncodeOp		      = ILIT(118)
-tagOf_PrimOp FloatDecodeOp		      = ILIT(119)
-tagOf_PrimOp DoubleEncodeOp		      = ILIT(120)
-tagOf_PrimOp DoubleDecodeOp		      = ILIT(121)
-tagOf_PrimOp NewArrayOp			      = ILIT(122)
-tagOf_PrimOp (NewByteArrayOp CharRep)	      = ILIT(123)
-tagOf_PrimOp (NewByteArrayOp IntRep)	      = ILIT(124)
-tagOf_PrimOp (NewByteArrayOp WordRep)	      = ILIT(125)
-tagOf_PrimOp (NewByteArrayOp AddrRep)	      = ILIT(126)
-tagOf_PrimOp (NewByteArrayOp FloatRep)	      = ILIT(127)
-tagOf_PrimOp (NewByteArrayOp DoubleRep)       = ILIT(128)
-tagOf_PrimOp SameMutableArrayOp		      = ILIT(129)
-tagOf_PrimOp SameMutableByteArrayOp	      = ILIT(130)
-tagOf_PrimOp ReadArrayOp		      = ILIT(131)
-tagOf_PrimOp WriteArrayOp		      = ILIT(132)
-tagOf_PrimOp IndexArrayOp		      = ILIT(133)
-tagOf_PrimOp (ReadByteArrayOp CharRep)	      = ILIT(134)
-tagOf_PrimOp (ReadByteArrayOp IntRep)	      = ILIT(135)
-tagOf_PrimOp (ReadByteArrayOp WordRep)	      = ILIT(136)
-tagOf_PrimOp (ReadByteArrayOp AddrRep)	      = ILIT(137)
-tagOf_PrimOp (ReadByteArrayOp FloatRep)       = ILIT(138)
-tagOf_PrimOp (ReadByteArrayOp DoubleRep)      = ILIT(139)
-tagOf_PrimOp (WriteByteArrayOp CharRep)       = ILIT(140)
-tagOf_PrimOp (WriteByteArrayOp IntRep)	      = ILIT(141)
-tagOf_PrimOp (WriteByteArrayOp WordRep)	      = ILIT(142)
-tagOf_PrimOp (WriteByteArrayOp AddrRep)       = ILIT(143)
-tagOf_PrimOp (WriteByteArrayOp FloatRep)      = ILIT(144)
-tagOf_PrimOp (WriteByteArrayOp DoubleRep)     = ILIT(145)
-tagOf_PrimOp (IndexByteArrayOp CharRep)       = ILIT(146)
-tagOf_PrimOp (IndexByteArrayOp IntRep)	      = ILIT(147)
-tagOf_PrimOp (IndexByteArrayOp WordRep)	      = ILIT(148)
-tagOf_PrimOp (IndexByteArrayOp AddrRep)       = ILIT(149)
-tagOf_PrimOp (IndexByteArrayOp FloatRep)      = ILIT(150)
-tagOf_PrimOp (IndexByteArrayOp DoubleRep)     = ILIT(151)
-tagOf_PrimOp (IndexOffAddrOp CharRep)	      = ILIT(152)
-tagOf_PrimOp (IndexOffAddrOp IntRep)	      = ILIT(153)
-tagOf_PrimOp (IndexOffAddrOp WordRep)	      = ILIT(154)
-tagOf_PrimOp (IndexOffAddrOp AddrRep)	      = ILIT(155)
-tagOf_PrimOp (IndexOffAddrOp FloatRep)	      = ILIT(156)
-tagOf_PrimOp (IndexOffAddrOp DoubleRep)       = ILIT(157)
-tagOf_PrimOp (IndexOffForeignObjOp CharRep)   = ILIT(158)
-tagOf_PrimOp (IndexOffForeignObjOp IntRep)    = ILIT(159)
-tagOf_PrimOp (IndexOffForeignObjOp WordRep)   = ILIT(160)
-tagOf_PrimOp (IndexOffForeignObjOp AddrRep)   = ILIT(161)
-tagOf_PrimOp (IndexOffForeignObjOp FloatRep)  = ILIT(162)
-tagOf_PrimOp (IndexOffForeignObjOp DoubleRep) = ILIT(163)
-tagOf_PrimOp UnsafeFreezeArrayOp	      = ILIT(164)
-tagOf_PrimOp UnsafeFreezeByteArrayOp	      = ILIT(165)
-tagOf_PrimOp SizeofByteArrayOp		      = ILIT(166)
-tagOf_PrimOp SizeofMutableByteArrayOp	      = ILIT(167)
-tagOf_PrimOp NewSynchVarOp		      = ILIT(168)
-tagOf_PrimOp TakeMVarOp		    	      = ILIT(169)
-tagOf_PrimOp PutMVarOp		    	      = ILIT(170)
-tagOf_PrimOp ReadIVarOp		    	      = ILIT(171)
-tagOf_PrimOp WriteIVarOp		      = ILIT(172)
-tagOf_PrimOp MakeForeignObjOp		      = ILIT(173)
-tagOf_PrimOp WriteForeignObjOp		      = ILIT(174)
-tagOf_PrimOp MakeStablePtrOp		      = ILIT(175)
-tagOf_PrimOp DeRefStablePtrOp		      = ILIT(176)
-tagOf_PrimOp (CCallOp _ _ _ _ _)	      = ILIT(177)
-tagOf_PrimOp ErrorIOPrimOp		      = ILIT(178)
-tagOf_PrimOp ReallyUnsafePtrEqualityOp	      = ILIT(179)
-tagOf_PrimOp SeqOp			      = ILIT(180)
-tagOf_PrimOp ParOp			      = ILIT(181)
-tagOf_PrimOp ForkOp			      = ILIT(182)
-tagOf_PrimOp DelayOp			      = ILIT(183)
-tagOf_PrimOp WaitReadOp			      = ILIT(184)
-tagOf_PrimOp WaitWriteOp		      = ILIT(185)
-tagOf_PrimOp ParGlobalOp		      = ILIT(186)
-tagOf_PrimOp ParLocalOp			      = ILIT(187)
-tagOf_PrimOp ParAtOp			      = ILIT(188)
-tagOf_PrimOp ParAtAbsOp			      = ILIT(189)
-tagOf_PrimOp ParAtRelOp			      = ILIT(190)
-tagOf_PrimOp ParAtForNowOp		      = ILIT(191)
-tagOf_PrimOp CopyableOp			      = ILIT(192)
-tagOf_PrimOp NoFollowOp			      = ILIT(193)
-tagOf_PrimOp SameMVarOp			      = ILIT(194)
+tagOf_PrimOp IntRemOp			      = ILIT( 43)
+tagOf_PrimOp IntNegOp			      = ILIT( 44)
+tagOf_PrimOp IntAbsOp			      = ILIT( 45)
+tagOf_PrimOp WordQuotOp			      = ILIT( 46)
+tagOf_PrimOp WordRemOp			      = ILIT( 47)
+tagOf_PrimOp AndOp			      = ILIT( 48)
+tagOf_PrimOp OrOp			      = ILIT( 49)
+tagOf_PrimOp NotOp			      = ILIT( 50)
+tagOf_PrimOp XorOp			      = ILIT( 51)
+tagOf_PrimOp SllOp			      = ILIT( 52)
+tagOf_PrimOp SrlOp			      = ILIT( 53)
+tagOf_PrimOp ISllOp			      = ILIT( 54)
+tagOf_PrimOp ISraOp			      = ILIT( 55)
+tagOf_PrimOp ISrlOp			      = ILIT( 56)
+tagOf_PrimOp Int2WordOp			      = ILIT( 57)
+tagOf_PrimOp Word2IntOp			      = ILIT( 58)
+tagOf_PrimOp Int2AddrOp			      = ILIT( 59)
+tagOf_PrimOp Addr2IntOp			      = ILIT( 60)
+
+tagOf_PrimOp FloatAddOp			      = ILIT( 61)
+tagOf_PrimOp FloatSubOp			      = ILIT( 62)
+tagOf_PrimOp FloatMulOp			      = ILIT( 63)
+tagOf_PrimOp FloatDivOp			      = ILIT( 64)
+tagOf_PrimOp FloatNegOp			      = ILIT( 65)
+tagOf_PrimOp Float2IntOp		      = ILIT( 66)
+tagOf_PrimOp Int2FloatOp		      = ILIT( 67)
+tagOf_PrimOp FloatExpOp			      = ILIT( 68)
+tagOf_PrimOp FloatLogOp			      = ILIT( 69)
+tagOf_PrimOp FloatSqrtOp		      = ILIT( 70)
+tagOf_PrimOp FloatSinOp			      = ILIT( 71)
+tagOf_PrimOp FloatCosOp			      = ILIT( 72)
+tagOf_PrimOp FloatTanOp			      = ILIT( 73)
+tagOf_PrimOp FloatAsinOp		      = ILIT( 74)
+tagOf_PrimOp FloatAcosOp		      = ILIT( 75)
+tagOf_PrimOp FloatAtanOp		      = ILIT( 76)
+tagOf_PrimOp FloatSinhOp		      = ILIT( 77)
+tagOf_PrimOp FloatCoshOp		      = ILIT( 78)
+tagOf_PrimOp FloatTanhOp		      = ILIT( 79)
+tagOf_PrimOp FloatPowerOp		      = ILIT( 80)
+tagOf_PrimOp DoubleAddOp		      = ILIT( 81)
+tagOf_PrimOp DoubleSubOp		      = ILIT( 82)
+tagOf_PrimOp DoubleMulOp		      = ILIT( 83)
+tagOf_PrimOp DoubleDivOp		      = ILIT( 84)
+tagOf_PrimOp DoubleNegOp		      = ILIT( 85)
+tagOf_PrimOp Double2IntOp		      = ILIT( 86)
+tagOf_PrimOp Int2DoubleOp		      = ILIT( 87)
+tagOf_PrimOp Double2FloatOp		      = ILIT( 88)
+tagOf_PrimOp Float2DoubleOp		      = ILIT( 89)
+tagOf_PrimOp DoubleExpOp		      = ILIT( 90)
+tagOf_PrimOp DoubleLogOp		      = ILIT( 91)
+tagOf_PrimOp DoubleSqrtOp		      = ILIT( 92)
+tagOf_PrimOp DoubleSinOp		      = ILIT( 93)
+tagOf_PrimOp DoubleCosOp		      = ILIT( 94)
+tagOf_PrimOp DoubleTanOp		      = ILIT( 95)
+tagOf_PrimOp DoubleAsinOp		      = ILIT( 96)
+tagOf_PrimOp DoubleAcosOp		      = ILIT( 97)
+tagOf_PrimOp DoubleAtanOp		      = ILIT( 98)
+tagOf_PrimOp DoubleSinhOp		      = ILIT( 99)
+tagOf_PrimOp DoubleCoshOp		      = ILIT(100)
+tagOf_PrimOp DoubleTanhOp		      = ILIT(101)
+tagOf_PrimOp DoublePowerOp		      = ILIT(102)
+tagOf_PrimOp IntegerAddOp		      = ILIT(103)
+tagOf_PrimOp IntegerSubOp		      = ILIT(104)
+tagOf_PrimOp IntegerMulOp		      = ILIT(105)
+tagOf_PrimOp IntegerQuotRemOp		      = ILIT(106)
+tagOf_PrimOp IntegerDivModOp		      = ILIT(107)
+tagOf_PrimOp IntegerNegOp		      = ILIT(108)
+tagOf_PrimOp IntegerCmpOp		      = ILIT(109)
+tagOf_PrimOp Integer2IntOp		      = ILIT(110)
+tagOf_PrimOp Integer2WordOp		      = ILIT(111)
+tagOf_PrimOp Int2IntegerOp		      = ILIT(112)
+tagOf_PrimOp Word2IntegerOp		      = ILIT(113)
+tagOf_PrimOp Addr2IntegerOp		      = ILIT(114)
+tagOf_PrimOp IntegerToInt64Op		      = ILIT(115)
+tagOf_PrimOp Int64ToIntegerOp		      = ILIT(116)
+tagOf_PrimOp IntegerToWord64Op		      = ILIT(117)
+tagOf_PrimOp Word64ToIntegerOp		      = ILIT(118)
+tagOf_PrimOp FloatEncodeOp		      = ILIT(119)
+tagOf_PrimOp FloatDecodeOp		      = ILIT(120)
+tagOf_PrimOp DoubleEncodeOp		      = ILIT(121)
+tagOf_PrimOp DoubleDecodeOp		      = ILIT(122)
+tagOf_PrimOp NewArrayOp			      = ILIT(123)
+tagOf_PrimOp (NewByteArrayOp CharRep)	      = ILIT(124)
+tagOf_PrimOp (NewByteArrayOp IntRep)	      = ILIT(125)
+tagOf_PrimOp (NewByteArrayOp WordRep)	      = ILIT(126)
+tagOf_PrimOp (NewByteArrayOp AddrRep)	      = ILIT(127)
+tagOf_PrimOp (NewByteArrayOp FloatRep)	      = ILIT(128)
+tagOf_PrimOp (NewByteArrayOp DoubleRep)       = ILIT(129)
+tagOf_PrimOp SameMutableArrayOp		      = ILIT(130)
+tagOf_PrimOp SameMutableByteArrayOp	      = ILIT(131)
+tagOf_PrimOp ReadArrayOp		      = ILIT(132)
+tagOf_PrimOp WriteArrayOp		      = ILIT(133)
+tagOf_PrimOp IndexArrayOp		      = ILIT(134)
+tagOf_PrimOp (ReadByteArrayOp CharRep)	      = ILIT(135)
+tagOf_PrimOp (ReadByteArrayOp IntRep)	      = ILIT(136)
+tagOf_PrimOp (ReadByteArrayOp WordRep)	      = ILIT(137)
+tagOf_PrimOp (ReadByteArrayOp AddrRep)	      = ILIT(138)
+tagOf_PrimOp (ReadByteArrayOp FloatRep)       = ILIT(139)
+tagOf_PrimOp (ReadByteArrayOp DoubleRep)      = ILIT(140)
+tagOf_PrimOp (ReadByteArrayOp Int64Rep)	      = ILIT(141)
+tagOf_PrimOp (ReadByteArrayOp Word64Rep)      = ILIT(142)
+tagOf_PrimOp (WriteByteArrayOp CharRep)       = ILIT(143)
+tagOf_PrimOp (WriteByteArrayOp AddrRep)       = ILIT(144)
+tagOf_PrimOp (WriteByteArrayOp IntRep)        = ILIT(145)
+tagOf_PrimOp (WriteByteArrayOp WordRep)       = ILIT(146)
+tagOf_PrimOp (WriteByteArrayOp FloatRep)      = ILIT(147)
+tagOf_PrimOp (WriteByteArrayOp DoubleRep)     = ILIT(148)
+tagOf_PrimOp (WriteByteArrayOp Int64Rep)      = ILIT(149)
+tagOf_PrimOp (WriteByteArrayOp Word64Rep)     = ILIT(150)
+tagOf_PrimOp (IndexByteArrayOp CharRep)       = ILIT(151)
+tagOf_PrimOp (IndexByteArrayOp IntRep)	      = ILIT(152)
+tagOf_PrimOp (IndexByteArrayOp WordRep)	      = ILIT(153)
+tagOf_PrimOp (IndexByteArrayOp AddrRep)       = ILIT(154)
+tagOf_PrimOp (IndexByteArrayOp FloatRep)      = ILIT(155)
+tagOf_PrimOp (IndexByteArrayOp DoubleRep)     = ILIT(156)
+tagOf_PrimOp (IndexByteArrayOp Int64Rep)      = ILIT(157)
+tagOf_PrimOp (IndexByteArrayOp Word64Rep)     = ILIT(158)
+tagOf_PrimOp (IndexOffAddrOp CharRep)	      = ILIT(159)
+tagOf_PrimOp (IndexOffAddrOp IntRep)	      = ILIT(160)
+tagOf_PrimOp (IndexOffAddrOp WordRep)	      = ILIT(161)
+tagOf_PrimOp (IndexOffAddrOp AddrRep)	      = ILIT(162)
+tagOf_PrimOp (IndexOffAddrOp FloatRep)	      = ILIT(163)
+tagOf_PrimOp (IndexOffAddrOp DoubleRep)       = ILIT(164)
+tagOf_PrimOp (IndexOffAddrOp Int64Rep)	      = ILIT(165)
+tagOf_PrimOp (IndexOffAddrOp Word64Rep)	      = ILIT(166)
+tagOf_PrimOp (IndexOffForeignObjOp CharRep)   = ILIT(167)
+tagOf_PrimOp (IndexOffForeignObjOp IntRep)    = ILIT(168)
+tagOf_PrimOp (IndexOffForeignObjOp WordRep)   = ILIT(169)
+tagOf_PrimOp (IndexOffForeignObjOp AddrRep)   = ILIT(170)
+tagOf_PrimOp (IndexOffForeignObjOp FloatRep)  = ILIT(171)
+tagOf_PrimOp (IndexOffForeignObjOp DoubleRep) = ILIT(172)
+tagOf_PrimOp (IndexOffForeignObjOp Int64Rep)  = ILIT(173)
+tagOf_PrimOp (IndexOffForeignObjOp Word64Rep) = ILIT(174)
+tagOf_PrimOp (WriteOffAddrOp CharRep)         = ILIT(175)
+tagOf_PrimOp (WriteOffAddrOp IntRep)          = ILIT(176)
+tagOf_PrimOp (WriteOffAddrOp WordRep)         = ILIT(177)
+tagOf_PrimOp (WriteOffAddrOp AddrRep)         = ILIT(178)
+tagOf_PrimOp (WriteOffAddrOp FloatRep)        = ILIT(179)
+tagOf_PrimOp (WriteOffAddrOp DoubleRep)       = ILIT(180)
+tagOf_PrimOp (WriteOffAddrOp Int64Rep)        = ILIT(181)
+tagOf_PrimOp (WriteOffAddrOp Word64Rep)       = ILIT(182)
+tagOf_PrimOp UnsafeFreezeArrayOp	      = ILIT(183)
+tagOf_PrimOp UnsafeFreezeByteArrayOp	      = ILIT(184)
+tagOf_PrimOp SizeofByteArrayOp		      = ILIT(185)
+tagOf_PrimOp SizeofMutableByteArrayOp	      = ILIT(186)
+tagOf_PrimOp NewSynchVarOp		      = ILIT(187)
+tagOf_PrimOp TakeMVarOp		    	      = ILIT(188)
+tagOf_PrimOp PutMVarOp		    	      = ILIT(189)
+tagOf_PrimOp ReadIVarOp		    	      = ILIT(190)
+tagOf_PrimOp WriteIVarOp		      = ILIT(191)
+tagOf_PrimOp MakeForeignObjOp		      = ILIT(192)
+tagOf_PrimOp WriteForeignObjOp		      = ILIT(193)
+tagOf_PrimOp MakeStablePtrOp		      = ILIT(194)
+tagOf_PrimOp DeRefStablePtrOp		      = ILIT(195)
+tagOf_PrimOp (CCallOp _ _ _ _ _ _)	      = ILIT(196)
+tagOf_PrimOp ErrorIOPrimOp		      = ILIT(197)
+tagOf_PrimOp ReallyUnsafePtrEqualityOp	      = ILIT(198)
+tagOf_PrimOp SeqOp			      = ILIT(199)
+tagOf_PrimOp ParOp			      = ILIT(200)
+tagOf_PrimOp ForkOp			      = ILIT(201)
+tagOf_PrimOp DelayOp			      = ILIT(202)
+tagOf_PrimOp WaitReadOp			      = ILIT(203)
+tagOf_PrimOp WaitWriteOp		      = ILIT(204)
+tagOf_PrimOp ParGlobalOp		      = ILIT(205)
+tagOf_PrimOp ParLocalOp			      = ILIT(206)
+tagOf_PrimOp ParAtOp			      = ILIT(207)
+tagOf_PrimOp ParAtAbsOp			      = ILIT(208)
+tagOf_PrimOp ParAtRelOp			      = ILIT(209)
+tagOf_PrimOp ParAtForNowOp		      = ILIT(210)
+tagOf_PrimOp CopyableOp			      = ILIT(211)
+tagOf_PrimOp NoFollowOp			      = ILIT(212)
+tagOf_PrimOp SameMVarOp			      = ILIT(213)
 
 tagOf_PrimOp _ = panic# "tagOf_PrimOp: pattern-match"
 
@@ -516,7 +547,6 @@ allThePrimOps
 	NotOp,
 	XorOp,
     	SllOp,
-    	SraOp,
     	SrlOp,
     	ISllOp,
     	ISraOp,
@@ -525,6 +555,7 @@ allThePrimOps
 	Word2IntOp,
 	Int2AddrOp,
 	Addr2IntOp,
+
 	FloatAddOp,
 	FloatSubOp,
 	FloatMulOp,
@@ -579,6 +610,10 @@ allThePrimOps
 	Int2IntegerOp,
 	Word2IntegerOp,
 	Addr2IntegerOp,
+	IntegerToInt64Op,
+	Int64ToIntegerOp,
+	IntegerToWord64Op,
+	Word64ToIntegerOp,
 	FloatEncodeOp,
 	FloatDecodeOp,
 	DoubleEncodeOp,
@@ -601,30 +636,48 @@ allThePrimOps
 	ReadByteArrayOp AddrRep,
 	ReadByteArrayOp FloatRep,
 	ReadByteArrayOp DoubleRep,
+	ReadByteArrayOp Int64Rep,
+	ReadByteArrayOp Word64Rep,
 	WriteByteArrayOp CharRep,
 	WriteByteArrayOp IntRep,
 	WriteByteArrayOp WordRep,
 	WriteByteArrayOp AddrRep,
 	WriteByteArrayOp FloatRep,
 	WriteByteArrayOp DoubleRep,
+	WriteByteArrayOp Int64Rep,
+	WriteByteArrayOp Word64Rep,
 	IndexByteArrayOp CharRep,
 	IndexByteArrayOp IntRep,
 	IndexByteArrayOp WordRep,
 	IndexByteArrayOp AddrRep,
 	IndexByteArrayOp FloatRep,
 	IndexByteArrayOp DoubleRep,
+	IndexByteArrayOp Int64Rep,
+	IndexByteArrayOp Word64Rep,
 	IndexOffAddrOp CharRep,
 	IndexOffAddrOp IntRep,
 	IndexOffAddrOp WordRep,
 	IndexOffAddrOp AddrRep,
 	IndexOffAddrOp FloatRep,
 	IndexOffAddrOp DoubleRep,
+	IndexOffAddrOp Int64Rep,
+	IndexOffAddrOp Word64Rep,
 	IndexOffForeignObjOp CharRep,
+	IndexOffForeignObjOp AddrRep,
 	IndexOffForeignObjOp IntRep,
 	IndexOffForeignObjOp WordRep,
-	IndexOffForeignObjOp AddrRep,
 	IndexOffForeignObjOp FloatRep,
 	IndexOffForeignObjOp DoubleRep,
+	IndexOffForeignObjOp Int64Rep,
+	IndexOffForeignObjOp Word64Rep,
+	WriteOffAddrOp CharRep,
+	WriteOffAddrOp IntRep,
+	WriteOffAddrOp WordRep,
+	WriteOffAddrOp AddrRep,
+	WriteOffAddrOp FloatRep,
+	WriteOffAddrOp DoubleRep,
+	WriteOffAddrOp Int64Rep,
+	WriteOffAddrOp Word64Rep,
 	UnsafeFreezeArrayOp,
 	UnsafeFreezeByteArrayOp,
 	SizeofByteArrayOp,
@@ -777,6 +830,7 @@ primOpInfo DoubleEqOp = Compare SLIT("==##") doublePrimTy
 primOpInfo DoubleNeOp = Compare SLIT("/=##") doublePrimTy
 primOpInfo DoubleLtOp = Compare SLIT("<##") doublePrimTy
 primOpInfo DoubleLeOp = Compare SLIT("<=##") doublePrimTy
+
 \end{code}
 
 %************************************************************************
@@ -826,8 +880,6 @@ primOpInfo NotOp    = Monadic SLIT("not#")	wordPrimTy
 
 primOpInfo SllOp
   = PrimResult SLIT("shiftL#")  [] [wordPrimTy, intPrimTy] wordPrimTyCon WordRep []
-primOpInfo SraOp
-  = PrimResult SLIT("shiftRA#") [] [wordPrimTy, intPrimTy] wordPrimTyCon WordRep []
 primOpInfo SrlOp
   = PrimResult SLIT("shiftRL#") [] [wordPrimTy, intPrimTy] wordPrimTyCon WordRep []
 
@@ -852,6 +904,7 @@ primOpInfo Word2IntOp = Coercing SLIT("word2Int#") wordPrimTy intPrimTy
 primOpInfo Int2AddrOp = Coercing SLIT("int2Addr#") intPrimTy addrPrimTy
 primOpInfo Addr2IntOp = Coercing SLIT("addr2Int#") addrPrimTy intPrimTy
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -956,6 +1009,18 @@ primOpInfo Word2IntegerOp
 
 primOpInfo Addr2IntegerOp
   = AlgResult SLIT("addr2Integer#") [] [addrPrimTy] integerTyCon []
+
+primOpInfo IntegerToInt64Op
+  = PrimResult SLIT("integerToInt64#") [] one_Integer_ty int64PrimTyCon Int64Rep []
+
+primOpInfo Int64ToIntegerOp
+  = AlgResult SLIT("int64ToInteger#") [] [int64PrimTy] integerTyCon []
+
+primOpInfo Word64ToIntegerOp
+  = AlgResult SLIT("word64ToInteger#") [] [word64PrimTy] integerTyCon []
+
+primOpInfo IntegerToWord64Op
+  = PrimResult SLIT("integerToWord64#") [] one_Integer_ty word64PrimTyCon Word64Rep []
 \end{code}
 
 Encoding and decoding of floating-point numbers is sorta
@@ -1104,6 +1169,18 @@ primOpInfo (IndexOffForeignObjOp kind)
 	op_str = _PK_ ("index" ++ str ++ "OffForeignObj#")
     in
     PrimResult op_str [] [foreignObjPrimTy, intPrimTy] prim_tycon kind []
+
+primOpInfo (WriteOffAddrOp kind)
+  = let
+	s = alphaTy; s_tv = alphaTyVar
+
+	(str, prim_ty, _) = getPrimRepInfo kind
+	op_str = _PK_ ("write" ++ str ++ "OffAddr#")
+    in
+    -- NB: *Prim*Result --
+    PrimResult op_str [s_tv]
+	[addrPrimTy, intPrimTy, prim_ty, mkStatePrimTy s]
+	statePrimTyCon VoidRep [s]
 
 ---------------------------------------------------------------------------
 primOpInfo UnsafeFreezeArrayOp
@@ -1448,7 +1525,7 @@ primOpInfo ErrorIOPrimOp
 %************************************************************************
 
 \begin{code}
-primOpInfo (CCallOp _ _ _ arg_tys result_ty)
+primOpInfo (CCallOp _ _ _ _ arg_tys result_ty)
   = AlgResult SLIT("ccall#") [] arg_tys result_tycon tys_applied
   where
     (result_tycon, tys_applied, _) = splitAlgTyConApp result_ty
@@ -1496,6 +1573,18 @@ primOpHeapReq Word2IntegerOp	= FixedHeapRequired
     	    	    	    	  (addOff (totHdrSize (DataRep mIN_MP_INT_SIZE))
     	    	    	    	    	  (intOff mIN_MP_INT_SIZE))
 primOpHeapReq Addr2IntegerOp	= VariableHeapRequired
+primOpHeapReq IntegerToInt64Op	= FixedHeapRequired
+    	    	    	    	  (addOff (totHdrSize (DataRep mIN_MP_INT_SIZE))
+    	    	    	    	    	  (intOff mIN_MP_INT_SIZE))
+primOpHeapReq Word64ToIntegerOp	= FixedHeapRequired
+    	    	    	    	  (addOff (totHdrSize (DataRep mIN_MP_INT_SIZE))
+    	    	    	    	    	  (intOff mIN_MP_INT_SIZE))
+primOpHeapReq Int64ToIntegerOp	= FixedHeapRequired
+    	    	    	    	  (addOff (totHdrSize (DataRep mIN_MP_INT_SIZE))
+    	    	    	    	    	  (intOff mIN_MP_INT_SIZE))
+primOpHeapReq IntegerToWord64Op	= FixedHeapRequired
+    	    	    	    	  (addOff (totHdrSize (DataRep mIN_MP_INT_SIZE))
+    	    	    	    	    	  (intOff mIN_MP_INT_SIZE))
 primOpHeapReq FloatDecodeOp	= FixedHeapRequired
 				  (addOff (intOff (getPrimRepSize IntRep + mP_STRUCT_SIZE))
     	    	    	    	  (addOff (totHdrSize (DataRep mIN_MP_INT_SIZE))
@@ -1512,8 +1601,8 @@ primOpHeapReq DoubleDecodeOp	= FixedHeapRequired
   Hmm..the allocation for makeForeignObj# is known (and fixed), so
   why do we need to be so indeterminate about it? --SOF
 -}
-primOpHeapReq (CCallOp _ _ mayGC@True  _ _) = VariableHeapRequired
-primOpHeapReq (CCallOp _ _ mayGC@False _ _) = NoHeapRequired
+primOpHeapReq (CCallOp _ _ mayGC@True  _ _ _) = VariableHeapRequired
+primOpHeapReq (CCallOp _ _ mayGC@False _ _ _) = NoHeapRequired
 
 primOpHeapReq MakeForeignObjOp	= VariableHeapRequired
 primOpHeapReq WriteForeignObjOp	= NoHeapRequired
@@ -1624,7 +1713,7 @@ primOpOkForSpeculation DoubleAsinOp	= False		-- Arg out of domain
 primOpOkForSpeculation DoubleAcosOp	= False		-- Arg out of domain
 
 -- CCall
-primOpOkForSpeculation (CCallOp	_ _ _ _ _)= False	-- Could be expensive!
+primOpOkForSpeculation (CCallOp	_ _ _ _ _ _) = False	-- Could be expensive!
 
 -- errorIO#
 primOpOkForSpeculation ErrorIOPrimOp	= False		-- Could be disastrous!
@@ -1687,23 +1776,27 @@ that are stored in caller-saves registers
 \begin{code}
 primOpNeedsWrapper :: PrimOp -> Bool
 
-primOpNeedsWrapper (CCallOp _ _ _ _ _) 	= True
+primOpNeedsWrapper (CCallOp _ _ _ _ _ _) = True
 
-primOpNeedsWrapper NewArrayOp     	= True	-- ToDo: for nativeGen only!(JSM)
-primOpNeedsWrapper (NewByteArrayOp _)  	= True
+primOpNeedsWrapper NewArrayOp     	 = True	-- ToDo: for nativeGen only!(JSM)
+primOpNeedsWrapper (NewByteArrayOp _)  	 = True
 
-primOpNeedsWrapper IntegerAddOp		= True
-primOpNeedsWrapper IntegerSubOp		= True
-primOpNeedsWrapper IntegerMulOp		= True
-primOpNeedsWrapper IntegerQuotRemOp	= True
-primOpNeedsWrapper IntegerDivModOp	= True
-primOpNeedsWrapper IntegerNegOp		= True
-primOpNeedsWrapper IntegerCmpOp	    	= True
-primOpNeedsWrapper Integer2IntOp    	= True
-primOpNeedsWrapper Integer2WordOp    	= True
-primOpNeedsWrapper Int2IntegerOp	= True
-primOpNeedsWrapper Word2IntegerOp	= True
-primOpNeedsWrapper Addr2IntegerOp	= True
+primOpNeedsWrapper IntegerAddOp		 = True
+primOpNeedsWrapper IntegerSubOp		 = True
+primOpNeedsWrapper IntegerMulOp		 = True
+primOpNeedsWrapper IntegerQuotRemOp	 = True
+primOpNeedsWrapper IntegerDivModOp	 = True
+primOpNeedsWrapper IntegerNegOp		 = True
+primOpNeedsWrapper IntegerCmpOp	    	 = True
+primOpNeedsWrapper Integer2IntOp    	 = True
+primOpNeedsWrapper Integer2WordOp    	 = True
+primOpNeedsWrapper Int2IntegerOp	 = True
+primOpNeedsWrapper Word2IntegerOp	 = True
+primOpNeedsWrapper Addr2IntegerOp	 = True
+primOpNeedsWrapper IntegerToInt64Op	 = True
+primOpNeedsWrapper IntegerToWord64Op	 = True
+primOpNeedsWrapper Word64ToIntegerOp	 = True
+primOpNeedsWrapper Int64ToIntegerOp	 = True
 
 primOpNeedsWrapper FloatExpOp	    	= True
 primOpNeedsWrapper FloatLogOp	    	= True
@@ -1852,21 +1945,31 @@ showPrimOp :: PrimOp -> String
 
 showPrimOp op = showSDoc (pprPrimOp op)
 
-pprPrimOp (CCallOp fun is_casm may_gc arg_tys res_ty)
+pprPrimOp (CCallOp fun is_casm may_gc cconv arg_tys res_ty)
   = let
+        callconv = text "{-" <> pprCallConv cconv <> text "-}"
+
 	before
-	  = if is_casm then
-	       if may_gc then "_casm_GC_ ``" else "_casm_ ``"
-	    else
-	       if may_gc then "_ccall_GC_ " else "_ccall_ "
+	  | is_casm && may_gc = "_casm_GC_ ``"
+	  | is_casm	      = "casm_ ``"
+	  | may_gc	      = "_ccall_GC_ "
+	  | otherwise	      = "_ccall_ "
 
 	after
-	  = if is_casm then text "''" else empty
+	  | is_casm   = text "''"
+	  | otherwise = empty
 
 	pp_tys
 	  = hsep (map pprParendType (res_ty:arg_tys))
+
+	ppr_fun =
+	 case fun of
+	   Nothing -> ptext SLIT("<dynamic>")
+	   Just fn -> ptext fn
+	 
     in
-    hcat [text before, ptext fun, after, space, brackets pp_tys]
+    hcat [ ifPprDebug callconv
+         , text before , ppr_fun , after, space, brackets pp_tys]
 
 pprPrimOp other_op
   = getPprStyle $ \ sty ->
