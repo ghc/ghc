@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.126 2002/02/15 14:53:32 simonmar Exp $
+ * $Id: Schedule.c,v 1.127 2002/02/15 17:49:23 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -3076,6 +3076,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
      * top of the CATCH_FRAME ready to enter.
      */
     if (get_itbl(su)->type == CATCH_FRAME && exception != NULL) {
+      StgCatchFrame *cf = (StgCatchFrame *)su;
       StgClosure *raise;
 
       /* we've got an exception to raise, so let's pass it to the
