@@ -24,8 +24,7 @@ module IdInfo (
 	noDemandInfo, mkDemandInfo, demandInfo, ppDemandInfo, addDemandInfo, willBeDemanded,
 
 	StrictnessInfo(..),				-- Non-abstract
-	Demand(..),	    				-- Non-abstract
-	wwLazy, wwStrict, wwUnpack, wwPrim, wwEnum,
+	Demand(..), NewOrData, 				-- Non-abstract
 
 	getWorkerId_maybe,
 	workerExists,
@@ -58,13 +57,14 @@ IMPORT_DELOOPER(IdLoop)	-- IdInfo is a dependency-loop ranch, and
 			-- except from the very general "utils".
 
 import Type		( eqSimpleTy, splitFunTyExpandingDicts )
+import BasicTypes	( NewOrData )
 import CmdLineOpts	( opt_OmitInterfacePragmas )
 
 import Demand
 import Maybes		( firstJust )
-import Outputable	( ifPprInterface, Outputable(..){-instances-} )
-import PprStyle		( PprStyle(..) )
+import Outputable	( ifaceStyle, PprStyle(..), Outputable(..){-instances-} )
 import Pretty
+import PprType          ()
 import Unique		( pprUnique )
 import Util		( mapAccumL, panic, assertPanic, pprPanic )
 
@@ -326,13 +326,20 @@ data StrictnessInfo bdee
 			-- variants thereof.
 
   | StrictnessInfo	[Demand]	-- The main stuff; see below.
-			(Maybe bdee)	-- Worker's Id, if applicable.
-					-- (It may not be applicable because the strictness info
-					-- might say just "SSS" or something; so there's no w/w split.)
+			(Maybe (bdee,[bdee]))	-- Worker's Id, if applicable, and a list of the constructors
+						-- mentioned by the wrapper.  This is necessary so that the
+						-- renamer can slurp them in.  Without this info, the renamer doesn't
+						-- know which data types to slurp in concretely.  Remember, for
+						-- strict things we don't put the unfolding in the interface file, to save space.
+						-- This constructor list allows the renamer to behave much as if the
+						-- unfolding *was* in the interface file.
+						-- 
+						-- This field might be Nothing even for a strict fn  because the strictness info
+						-- might say just "SSS" or something; so there's no w/w split.
 \end{code}
 
 \begin{code}
-mkStrictnessInfo :: [Demand] -> Maybe bdee -> StrictnessInfo bdee
+mkStrictnessInfo :: [Demand] -> Maybe (bdee,[bdee]) -> StrictnessInfo bdee
 
 mkStrictnessInfo xs wrkr 
   | all is_lazy xs	 = NoStrictnessInfo		-- Uninteresting
@@ -359,8 +366,10 @@ ppStrictnessInfo sty (StrictnessInfo wrapper_args wrkr_maybe)
   = hsep [ptext SLIT("_S_"), text (showList wrapper_args ""), pp_wrkr]
   where
     pp_wrkr = case wrkr_maybe of
-		 Nothing   -> empty
-		 Just wrkr -> ppr sty wrkr
+		 Nothing       -> empty
+		 Just (wrkr,cons) | ifaceStyle sty &&
+				    not (null cons) -> pprId sty wrkr <+> braces (hsep (map (pprId sty) cons)) 
+				  | otherwise       -> pprId sty wrkr
 \end{code}
 
 
@@ -370,7 +379,7 @@ workerExists (StrictnessInfo _ (Just worker_id)) = True
 workerExists other				 = False
 
 getWorkerId_maybe :: StrictnessInfo bdee -> Maybe bdee
-getWorkerId_maybe (StrictnessInfo _ maybe_worker_id) = maybe_worker_id
+getWorkerId_maybe (StrictnessInfo _ (Just (wrkr,_))) = Just wrkr
 getWorkerId_maybe other				     = Nothing
 \end{code}
 
