@@ -167,11 +167,13 @@ checkForeignImport is_dynamic is_safe ty args res
    case args of
      []     -> check False (illegalForeignTyErr True{-Arg-} ty)
      (x:xs) ->
+	getDOptsTc						`thenTc` \ dflags ->
         check (isFFIDynArgumentTy x) (illegalForeignTyErr True{-Arg-} ty) `thenTc_`
-        mapTc (checkForeignArg (isFFIArgumentTy is_safe)) xs	`thenTc_`
+        mapTc (checkForeignArg (isFFIArgumentTy dflags is_safe)) xs	`thenTc_`
 	checkForeignRes True {-NonIO ok-} isFFIResultTy res
  | otherwise =
-     mapTc (checkForeignArg (isFFIArgumentTy is_safe)) args     `thenTc_`
+     getDOptsTc							   `thenTc` \ dflags ->
+     mapTc (checkForeignArg (isFFIArgumentTy dflags is_safe)) args `thenTc_`
      checkForeignRes True {-NonIO ok-} isFFIResultTy res
 
 checkForeignExport :: Bool -> Type -> [Type] -> Type -> TcM ()

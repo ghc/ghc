@@ -784,19 +784,29 @@ deriving_occ_info
 
 -- these RDR names also have known keys, so we need to get back the RDR names to
 -- populate the occurrence list above.
-intTyCon_RDR 	= nameRdrName intTyConName
-eq_RDR 		= nameRdrName eqName
-ge_RDR 		= nameRdrName geName
-numClass_RDR 	= nameRdrName numClassName
-ordClass_RDR 	= nameRdrName ordClassName
-map_RDR 	= nameRdrName mapName
-append_RDR 	= nameRdrName appendName
-foldr_RDR 	= nameRdrName foldrName
-build_RDR 	= nameRdrName buildName
-enumFromTo_RDR 	= nameRdrName enumFromToName
-returnM_RDR 	= nameRdrName returnMName
-thenM_RDR 	= nameRdrName thenMName
-failM_RDR 	= nameRdrName failMName
+intTyCon_RDR 		= nameRdrName intTyConName
+eq_RDR 			= nameRdrName eqName
+ge_RDR 			= nameRdrName geName
+numClass_RDR 		= nameRdrName numClassName
+ordClass_RDR 		= nameRdrName ordClassName
+map_RDR 		= nameRdrName mapName
+append_RDR 		= nameRdrName appendName
+foldr_RDR 		= nameRdrName foldrName
+build_RDR 		= nameRdrName buildName
+enumFromTo_RDR 		= nameRdrName enumFromToName
+returnM_RDR 		= nameRdrName returnMName
+thenM_RDR 		= nameRdrName thenMName
+failM_RDR 		= nameRdrName failMName
+false_RDR		= nameRdrName falseDataConName
+true_RDR		= nameRdrName trueDataConName
+error_RDR		= nameRdrName errorName
+getTag_RDR		= nameRdrName getTagName
+fromEnum_RDR		= nameRdrName fromEnumName
+toEnum_RDR		= nameRdrName toEnumName
+enumFrom_RDR		= nameRdrName enumFromName
+mkInt_RDR		= nameRdrName intDataConName
+enumFromThen_RDR	= nameRdrName enumFromThenName
+enumFromThenTo_RDR	= nameRdrName enumFromThenToName
 \end{code}
 
 

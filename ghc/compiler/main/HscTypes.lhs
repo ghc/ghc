@@ -8,7 +8,7 @@ module HscTypes (
 	ModDetails(..),	GlobalSymbolTable, 
 	HomeSymbolTable, PackageSymbolTable,
 
-	TyThing(..), lookupTypeEnv,
+	TyThing(..), lookupTypeEnv, lookupFixityEnv,
 
 	WhetherHasOrphans, ImportVersion, ExportItem,
 	PersistentRenamerState(..), IsBootInterface, Avails, DeclsMap,

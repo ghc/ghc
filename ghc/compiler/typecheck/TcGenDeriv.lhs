@@ -47,9 +47,10 @@ import Name		( getOccString, getOccName, getSrcLoc, occNameString,
 			  Name, NamedThing(..), 
 			  isDataSymOcc, isSymOcc
 			)
+import HscTypes		( GlobalSymbolTable, lookupFixityEnv )
 
 import PrelInfo		-- Lots of RdrNames
-import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
+import SrcLoc		( generatedSrcLoc, SrcLoc )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, isEnumerationTyCon,
 			  maybeTyConSingleCon, tyConFamilySize
 			)
@@ -63,6 +64,7 @@ import Panic		( panic, assertPanic )
 import Maybes		( maybeToBool )
 import Constants
 import List		( partition, intersperse )
+import Outputable	( pprPanic, ppr )
 
 #if __GLASGOW_HASKELL__ >= 404
 import GlaExts		( fromInt )
@@ -398,18 +400,18 @@ gen_Ord_binds tycon
 
 defaulted = foldr1 AndMonoBinds [lt, le, ge, gt, max_, min_]
 
-lt = mk_easy_FunMonoBind mkGeneratedSrcLoc lt_RDR [a_Pat, b_Pat] [] (
+lt = mk_easy_FunMonoBind generatedSrcLoc lt_RDR [a_Pat, b_Pat] [] (
 	    compare_Case true_Expr  false_Expr false_Expr a_Expr b_Expr)
-le = mk_easy_FunMonoBind mkGeneratedSrcLoc le_RDR [a_Pat, b_Pat] [] (
+le = mk_easy_FunMonoBind generatedSrcLoc le_RDR [a_Pat, b_Pat] [] (
 	    compare_Case true_Expr  true_Expr  false_Expr a_Expr b_Expr)
-ge = mk_easy_FunMonoBind mkGeneratedSrcLoc ge_RDR [a_Pat, b_Pat] [] (
+ge = mk_easy_FunMonoBind generatedSrcLoc ge_RDR [a_Pat, b_Pat] [] (
 	    compare_Case false_Expr true_Expr  true_Expr  a_Expr b_Expr)
-gt = mk_easy_FunMonoBind mkGeneratedSrcLoc gt_RDR [a_Pat, b_Pat] [] (
+gt = mk_easy_FunMonoBind generatedSrcLoc gt_RDR [a_Pat, b_Pat] [] (
 	    compare_Case false_Expr false_Expr true_Expr  a_Expr b_Expr)
 
-max_ = mk_easy_FunMonoBind mkGeneratedSrcLoc max_RDR [a_Pat, b_Pat] [] (
+max_ = mk_easy_FunMonoBind generatedSrcLoc max_RDR [a_Pat, b_Pat] [] (
 	    compare_Case b_Expr a_Expr a_Expr a_Expr b_Expr)
-min_ = mk_easy_FunMonoBind mkGeneratedSrcLoc min_RDR [a_Pat, b_Pat] [] (
+min_ = mk_easy_FunMonoBind generatedSrcLoc min_RDR [a_Pat, b_Pat] [] (
 	    compare_Case a_Expr b_Expr b_Expr a_Expr b_Expr)
 -}
 \end{code}
@@ -771,7 +773,7 @@ gen_Ix_binds tycon
 %************************************************************************
 
 \begin{code}
-gen_Read_binds :: FixityEnv -> TyCon -> RdrNameMonoBinds
+gen_Read_binds :: GlobalSymbolTable -> TyCon -> RdrNameMonoBinds
 
 gen_Read_binds gst tycon
   = reads_prec `AndMonoBinds` read_list
@@ -1053,16 +1055,19 @@ getLRPrecs is_infix gst nm = [lp, rp]
       | con_right_assoc = paren_con_prec
       | otherwise       = paren_con_prec + 1
 		  
-getFixity :: GobalSymbolTable -> Name -> Integer
-getFixity gst nm = case lookupFixityEnv gst nm of
-			Fixity x _ -> fromInt x
+getFixity :: GlobalSymbolTable -> Name -> Integer
+getFixity gst nm 
+   = case lookupFixityEnv gst nm of
+        Just (Fixity x _) -> fromInt x
+        other	          -> pprPanic "TcGenDeriv.getFixity" (ppr nm)
 
-isLRAssoc :: FixityEnv -> Name -> (Bool, Bool)
+isLRAssoc :: GlobalSymbolTable -> Name -> (Bool, Bool)
 isLRAssoc fixs_assoc nm =
-     case lookupFixity fixs_assoc nm of
-       Fixity _ InfixN -> (False, False)
-       Fixity _ InfixR -> (False, True)
-       Fixity _ InfixL -> (True,  False)
+     case lookupFixityEnv fixs_assoc nm of
+       Just (Fixity _ InfixN) -> (False, False)
+       Just (Fixity _ InfixR) -> (False, True)
+       Just (Fixity _ InfixL) -> (True,  False)
+       other -> pprPanic "TcGenDeriv.isLRAssoc" (ppr nm)
 
 isInfixOccName :: String -> Bool
 isInfixOccName str = 
@@ -1212,10 +1217,10 @@ cmp_eq_Expr a b = HsApp (HsApp (HsVar cmp_eq_RDR) a) b
 
 compare_gen_Case fun lt eq gt a b
   = HsCase (HsPar (HsApp (HsApp (HsVar fun) a) b)) {-of-}
-      [mkSimpleMatch [ConPatIn ltTag_RDR []] lt Nothing mkGeneratedSrcLoc,
-       mkSimpleMatch [ConPatIn eqTag_RDR []] eq Nothing mkGeneratedSrcLoc,
-       mkSimpleMatch [ConPatIn gtTag_RDR []] gt Nothing mkGeneratedSrcLoc]
-      mkGeneratedSrcLoc
+      [mkSimpleMatch [ConPatIn ltTag_RDR []] lt Nothing generatedSrcLoc,
+       mkSimpleMatch [ConPatIn eqTag_RDR []] eq Nothing generatedSrcLoc,
+       mkSimpleMatch [ConPatIn gtTag_RDR []] gt Nothing generatedSrcLoc]
+      generatedSrcLoc
 
 careful_compare_Case ty lt eq gt a b
   = if not (isUnboxedType ty) then
@@ -1224,8 +1229,8 @@ careful_compare_Case ty lt eq gt a b
     else -- we have to do something special for primitive things...
        HsIf (genOpApp a relevant_eq_op b)
 	    eq
-	    (HsIf (genOpApp a relevant_lt_op b) lt gt mkGeneratedSrcLoc)
-	    mkGeneratedSrcLoc
+	    (HsIf (genOpApp a relevant_lt_op b) lt gt generatedSrcLoc)
+	    generatedSrcLoc
   where
     relevant_eq_op = assoc_ty_id eq_op_tbl ty
     relevant_lt_op = assoc_ty_id lt_op_tbl ty
@@ -1278,8 +1283,8 @@ untag_Expr :: TyCon -> [(RdrName, RdrName)] -> RdrNameHsExpr -> RdrNameHsExpr
 untag_Expr tycon [] expr = expr
 untag_Expr tycon ((untag_this, put_tag_here) : more) expr
   = HsCase (HsPar (HsApp (con2tag_Expr tycon) (HsVar untag_this))) {-of-}
-      [mkSimpleMatch [VarPatIn put_tag_here] (untag_Expr tycon more expr) Nothing mkGeneratedSrcLoc]
-      mkGeneratedSrcLoc
+      [mkSimpleMatch [VarPatIn put_tag_here] (untag_Expr tycon more expr) Nothing generatedSrcLoc]
+      generatedSrcLoc
 
 cmp_tags_Expr :: RdrName 		-- Comparison op
 	     -> RdrName -> RdrName	-- Things to compare
@@ -1288,7 +1293,7 @@ cmp_tags_Expr :: RdrName 		-- Comparison op
 	     -> RdrNameHsExpr
 
 cmp_tags_Expr op a b true_case false_case
-  = HsIf (genOpApp (HsVar a) op (HsVar b)) true_case false_case mkGeneratedSrcLoc
+  = HsIf (genOpApp (HsVar a) op (HsVar b)) true_case false_case generatedSrcLoc
 
 enum_from_to_Expr
 	:: RdrNameHsExpr -> RdrNameHsExpr
