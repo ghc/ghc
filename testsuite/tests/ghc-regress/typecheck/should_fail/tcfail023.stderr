@@ -1,4 +1,5 @@
 
-Duplicate instance declarations:
-  tcfail023.hs:10: A B
-  tcfail023.hs:13: A B
+tcfail023.hs:10:
+    Duplicate instance declarations:
+      tcfail023.hs:10: A B
+      tcfail023.hs:13: A B

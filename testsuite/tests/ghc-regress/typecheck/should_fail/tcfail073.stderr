@@ -1,4 +1,5 @@
 
-Duplicate instance declarations:
-  tcfail073.hs:7: Eq (a, b)
-  <No locn>: Eq (a, b)
+tcfail073.hs:7:
+    Duplicate instance declarations:
+      tcfail073.hs:7: Eq (a, b)
+      In module Data.Tuple: Eq (a, b)

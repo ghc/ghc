@@ -1,4 +1,5 @@
 
-Functional dependencies conflict between instance declarations:
-  tcfail096.hs:23: Foo (p -> s) (t p) (t s)
-  tcfail096.hs:24: Foo ((a, b) -> r) (c a, c b) (c r)
+tcfail096.hs:23:
+    Functional dependencies conflict between instance declarations:
+      tcfail096.hs:23: Foo (p -> s) (t p) (t s)
+      tcfail096.hs:24: Foo ((a, b) -> r) (c a, c b) (c r)

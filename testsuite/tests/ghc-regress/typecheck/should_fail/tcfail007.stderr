@@ -1,6 +1,5 @@
 
-./tcfail007.hs:3:
+tcfail007.hs:3:
     No instance for (Num Bool)
-    arising from the literal `1' at ./tcfail007.hs:3
-    In the second argument of `(+)', namely `1'
+    arising from use of `+' at tcfail007.hs:3
     In the definition of `n': x + 1

@@ -1,6 +1,6 @@
 
-tests/ghc-regress/typecheck/should_fail/tcfail040.hs:19:
+tcfail040.hs:19:
     Ambiguous type variable(s) `a' in the constraint `ORD a'
-    arising from use of `<<' at tests/ghc-regress/typecheck/should_fail/tcfail040.hs:19
-    In the second argument of `(===)', namely `(<<)'
+    arising from use of `<<' at tcfail040.hs:19
+    In the first argument of `(===)', namely `(<<)'
     In the definition of `f': (<<) === (<<)
