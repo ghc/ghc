@@ -62,8 +62,10 @@ import Type	( Type, ThetaType, instantiateTy, instantiateThetaTy,
 		  mkSynTy
 		)
 import TyVar	( zipTyVarEnv, lookupTyVarEnv, unionTyVarSets )
-import TysPrim	  ( intPrimTy )
-import TysWiredIn ( intDataCon, integerTy, isIntTy, isIntegerTy, inIntRange )
+import TysPrim	  ( intPrimTy, floatPrimTy, doublePrimTy )
+import TysWiredIn ( intDataCon, integerTy, isIntTy, isIntegerTy, inIntRange,
+		    floatDataCon, isFloatTy, 
+		    doubleDataCon, isDoubleTy )
 import Unique	( fromRationalClassOpKey, rationalTyConKey,
 		  fromIntClassOpKey, fromIntegerClassOpKey, Unique
 		)
@@ -337,7 +339,14 @@ newMethodAtLoc orig loc real_id tys	-- Local function, similar to newMethod but 
 	meth_inst    = Method new_uniq (RealId real_id) tys theta tau orig loc
     in
     returnNF_Tc (meth_inst, instToId meth_inst)
+\end{code}
 
+In newOverloadedLit we convert directly to an Int or Integer if we
+know that's what we want.  This may save some time, by not
+temporarily generating overloaded literals, but it won't catch all
+cases (the rest are caught in lookupInst).
+
+\begin{code}
 newOverloadedLit :: InstOrigin s
 		 -> OverloadedLit
 		 -> TcType s
@@ -353,7 +362,7 @@ newOverloadedLit orig (OverloadedIntegral i) ty
     intprim_lit    = HsLitOut (HsIntPrim i) intPrimTy
     integer_lit    = HsLitOut (HsInt i) integerTy
     int_lit        = HsApp (HsVar (RealId intDataCon)) intprim_lit
-
+ 
 newOverloadedLit orig lit ty		-- The general case
   = tcGetSrcLoc			`thenNF_Tc` \ loc ->
     tcGetUnique			`thenNF_Tc` \ new_uniq ->
@@ -524,8 +533,16 @@ lookupInst inst@(LitInst u (OverloadedIntegral i) ty orig loc)
     integer_lit    = HsLitOut (HsInt i) integerTy
     int_lit        = HsApp (HsVar (RealId intDataCon)) intprim_lit
 
+-- similar idea for overloaded floating point literals: if the literal is
+-- *definitely* a float or a double, generate the real thing here.
+-- This is essential  (see nofib/spectral/nucleic).
+
 lookupInst inst@(LitInst u (OverloadedFractional f) ty orig loc)
-  = tcLookupGlobalValueByKey fromRationalClassOpKey	`thenNF_Tc` \ from_rational ->
+  | isFloatTy ty    = returnNF_Tc (GenInst [] float_lit)
+  | isDoubleTy ty   = returnNF_Tc (GenInst [] double_lit)
+
+  | otherwise 
+	  = tcLookupGlobalValueByKey fromRationalClassOpKey	`thenNF_Tc` \ from_rational ->
 
 	-- The type Rational isn't wired in so we have to conjure it up
     tcLookupTyConByKey rationalTyConKey	`thenNF_Tc` \ rational_tycon ->
@@ -535,6 +552,13 @@ lookupInst inst@(LitInst u (OverloadedFractional f) ty orig loc)
     in
     newMethodAtLoc orig loc from_rational [ty]		`thenNF_Tc` \ (method_inst, method_id) ->
     returnNF_Tc (GenInst [method_inst] (HsApp (HsVar method_id) rational_lit))
+
+  where
+    floatprim_lit  = HsLitOut (HsFloatPrim f) floatPrimTy
+    float_lit      = HsApp (HsVar (RealId floatDataCon)) floatprim_lit
+    doubleprim_lit = HsLitOut (HsDoublePrim f) doublePrimTy
+    double_lit     = HsApp (HsVar (RealId doubleDataCon)) doubleprim_lit
+
 \end{code}
 
 There is a second, simpler interface, when you want an instance of a
