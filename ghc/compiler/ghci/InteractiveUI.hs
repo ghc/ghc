@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.22 2000/12/12 10:11:21 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.23 2000/12/13 12:18:40 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -21,6 +21,7 @@ import Module
 import Outputable
 import Util
 import TypeRep	{- instance Outputable Type; do not delete -}
+import Panic	( GhcException(..) )
 
 import Exception
 #ifndef NO_READLINE
@@ -155,7 +156,7 @@ runCommand c =
 			io ( putStrLn ("Phase " ++ phase ++ " failed (code "
 				        ++ show code ++ ")"))
 		Interrupted -> io (putStrLn "Interrupted.")
-		_ -> io (putStrLn (show (dyn :: BarfKind)))
+		_ -> io (putStrLn (show (dyn :: GhcException)))
              >> return False
     ) $
    doCommand c
