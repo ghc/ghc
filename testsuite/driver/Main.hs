@@ -69,6 +69,7 @@ scrub (c:cs)           = c : scrub cs
 data Opt
  = OptConfig         String
  | OptRootDir        String
+ | OptOutSummary     String
  | OptSaveSummary    String
  | OptCompareSummary String
 
@@ -77,6 +78,8 @@ option_descrs = [
 	"config file",
   Option "" ["rootdir"]     (ReqArg OptRootDir "DIR")
 	"root of tree containing tests (default: .)",
+  Option "" ["output-summary"] (ReqArg OptOutSummary "PATH")
+	"file in which to save the (human-readable) summary",
   Option "" ["save-summary"] (ReqArg OptSaveSummary "PATH")
 	"file in which to save the summary",
   Option "" ["compare-summary"] (ReqArg OptCompareSummary "PATH")
@@ -93,6 +96,7 @@ extra_info
 
 getConfigOpt    os = exactlyOne "-config"       [ t | OptConfig  t <- os ]
 getRootOpt      os = upToOne    "-rootdir"      [ t | OptRootDir t <- os ]
+getOutSuOpt     os = upToOne "-output-summary"  [ t | OptOutSummary t <- os ]
 getSaveSuOpt    os = upToOne "-save-summary"    [ t | OptSaveSummary t <- os ]
 getCompareSuOpt os = upToOne "-compare-summary" [ t | OptCompareSummary t <- os]
 
@@ -123,7 +127,8 @@ got_args opts args start_time
  	 maybe_root <- getRootOpt opts
  	 maybe_save_su <- getSaveSuOpt opts
  	 maybe_cmp_su <- getCompareSuOpt opts
-	 
+	 maybe_out_su <- getOutSuOpt opts
+
          let (not_binds, cmd_binds)  = getBinds args
          let invalid_binds
                  = filter (`elem` special_var_names) 
@@ -178,7 +183,12 @@ got_args opts args start_time
          officialMsg ("=== All done. ===")
         -- ; putStr ("\n" ++ ((unlines . map show) results))
          let summary = makeSummary start_time results
-         putStrLn ("\n" ++ snd (ppSummary summary))
+
+	 let pp_summary = snd (ppSummary summary)
+	 if isJust maybe_out_su
+	    then writeFile (fromJust maybe_out_su) pp_summary
+	    else putStrLn ("\n" ++ pp_summary)
+
          case maybe_cmp_su of
              Nothing -> return ()
              Just fn 
