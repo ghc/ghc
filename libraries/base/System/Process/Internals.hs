@@ -22,6 +22,10 @@ module System.Process.Internals (
 	runProcessPosix,
 # endif
 	ignoreSignal, defaultSignal,
+#else
+# ifdef __GLASGOW_HASKELL__
+	runProcessWin32, translate,
+# endif
 #endif
 	commandToProcess,
 	withFilePathException, withCEnvironment
@@ -31,17 +35,18 @@ import Prelude -- necessary to get dependencies right
 
 #if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 import System.Posix.Types ( CPid )
+import System.IO 	( Handle )
+#else
+import Data.Word ( Word32 )
+#endif
+
+import Data.Maybe	( fromMaybe )
 # ifdef __GLASGOW_HASKELL__
 import GHC.IOBase	( haFD, FD, Exception(..), IOException(..) )
 import GHC.Handle 	( stdin, stdout, stderr, withHandle_ )
 # elif __HUGS__
 import Hugs.Exception	( Exception(..), IOException(..) )
 # endif
-import System.IO 	( Handle )
-import Data.Maybe	( fromMaybe )
-#else
-import Data.Word ( Word32 )
-#endif
 
 import Control.Exception ( handle, throwIO )
 import Foreign.C
@@ -149,6 +154,109 @@ foreign import ccall unsafe "runProcess"
 
 ignoreSignal  = CONST_SIG_IGN :: CLong
 defaultSignal = CONST_SIG_DFL :: CLong
+
+#else
+
+#ifdef __GLASGOW_HASKELL__
+
+runProcessWin32 fun cmd args mb_cwd mb_env
+	mb_stdin mb_stdout mb_stderr extra_cmdline
+ = withFilePathException cmd $
+     withHandle_ fun (fromMaybe stdin  mb_stdin)  $ \hndStdInput  ->
+     withHandle_ fun (fromMaybe stdout mb_stdout) $ \hndStdOutput ->
+     withHandle_ fun (fromMaybe stderr mb_stderr) $ \hndStdError ->
+     maybeWith withCEnvironment mb_env $ \pEnv -> do
+     maybeWith withCString      mb_cwd $ \pWorkDir -> do
+       let cmdline = translate cmd ++ 
+		   concat (map ((' ':) . translate) args) ++
+		   (if null extra_cmdline then "" else ' ':extra_cmdline)
+       withCString cmdline $ \pcmdline -> do
+         proc_handle <- throwErrnoIfMinus1 fun
+	                  (c_runProcess pcmdline pWorkDir pEnv 
+				(haFD hndStdInput)
+				(haFD hndStdOutput)
+				(haFD hndStdError))
+         return (ProcessHandle proc_handle)
+
+foreign import ccall unsafe "runProcess" 
+  c_runProcess
+        :: CString
+        -> CString
+        -> Ptr ()
+        -> FD
+        -> FD
+        -> FD
+        -> IO PHANDLE
+
+-- ------------------------------------------------------------------------
+-- Passing commands to the OS on Windows
+
+{-
+On Windows this is tricky.  We use CreateProcess, passing a single
+command-line string (lpCommandLine) as its argument.  (CreateProcess
+is well documented on http://msdn.microsoft/com.)
+
+      - It parses the beginning of the string to find the command. If the
+	file name has embedded spaces, it must be quoted, using double
+	quotes thus 
+		"foo\this that\cmd" arg1 arg2
+
+      - The invoked command can in turn access the entire lpCommandLine string,
+	and the C runtime does indeed do so, parsing it to generate the 
+	traditional argument vector argv[0], argv[1], etc.  It does this
+	using a complex and arcane set of rules which are described here:
+	
+	   http://msdn.microsoft.com/library/default.asp?url=/library/en-us/vccelng/htm/progs_12.asp
+
+	(if this URL stops working, you might be able to find it by
+	searching for "Parsing C Command-Line Arguments" on MSDN.  Also,
+	the code in the Microsoft C runtime that does this translation
+	is shipped with VC++).
+
+Our goal in runProcess is to take a command filename and list of
+arguments, and construct a string which inverts the translatsions
+described above, such that the program at the other end sees exactly
+the same arguments in its argv[] that we passed to rawSystem.
+
+This inverse translation is implemented by 'translate' below.
+
+Here are some pages that give informations on Windows-related 
+limitations and deviations from Unix conventions:
+
+    http://support.microsoft.com/default.aspx?scid=kb;en-us;830473
+    Command lines and environment variables effectively limited to 8191 
+    characters on Win XP, 2047 on NT/2000 (probably even less on Win 9x):
+
+    http://www.microsoft.com/windowsxp/home/using/productdoc/en/default.asp?url=/WINDOWSXP/home/using/productdoc/en/percent.asp
+    Command-line substitution under Windows XP. IIRC these facilities (or at 
+    least a large subset of them) are available on Win NT and 2000. Some 
+    might be available on Win 9x.
+
+    http://www.microsoft.com/windowsxp/home/using/productdoc/en/default.asp?url=/WINDOWSXP/home/using/productdoc/en/Cmd.asp
+    How CMD.EXE processes command lines.
+
+
+Note: CreateProcess does have a separate argument (lpApplicationName)
+with which you can specify the command, but we have to slap the
+command into lpCommandLine anyway, so that argv[0] is what a C program
+expects (namely the application name).  So it seems simpler to just
+use lpCommandLine alone, which CreateProcess supports.
+-}
+
+-- Translate command-line arguments for passing to CreateProcess().
+translate :: String -> String
+translate str = '"' : snd (foldr escape (True,"\"") str)
+  where escape '"'  (b,     str) = (True,  '\\' : '"'  : str)
+        escape '\\' (True,  str) = (True,  '\\' : '\\' : str)
+        escape '\\' (False, str) = (False, '\\' : str)
+	escape c    (b,     str) = (False, c : str)
+	-- See long comment above for what this function is trying to do.
+	--
+	-- The Bool passed back along the string is True iff the
+	-- rest of the string is a sequence of backslashes followed by
+	-- a double quote.
+
+#endif /* __GLASGOW_HASKELL__ */
 
 #endif
 
