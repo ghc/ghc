@@ -31,7 +31,7 @@ import TysWiredIn	( tupleTyCon, listTyCon, charTyCon, intTyCon )
 import FiniteMap
 import Outputable
 import Unique		( Unique, unboundKey )
-import UniqFM           ( Uniquable(..) )
+import UniqFM           ( Uniquable(..), listToUFM, plusUFM_C )
 import Maybes		( maybeToBool )
 import UniqSupply
 import SrcLoc		( SrcLoc, noSrcLoc )
@@ -88,26 +88,29 @@ newLocallyDefinedGlobalName mod occ rec_exp_fn loc
 	-- If it's not in the cache we put it there with the correct provenance.
 	-- The idea is that, after all this, the cache
 	-- will contain a Name with the correct Provenance (i.e. Local)
+
+	-- OLD (now wrong) COMMENT:
+	--   "Actually, there's a catch.  If this is the *second* binding for something
+	--    we want to allocate a *fresh* unique, rather than using the same Name as before.
+	--    Otherwise we don't detect conflicting definitions of the same top-level name!
+	--    So the only time we re-use a Name already in the cache is when it's one of
+	--    the Implicit magic-unique ones mentioned in the previous para"
+
+	-- This (incorrect) patch doesn't work for record decls, when we have
+	-- the same field declared in multiple constructors.   With the above patch,
+	-- each occurrence got a new Name --- aargh!
 	--
-	-- Actually, there's a catch.  If this is the *second* binding for something
-	-- we want to allocate a *fresh* unique, rather than using the same Name as before.
-	-- Otherwise we don't detect conflicting definitions of the same top-level name!
-	-- So the only time we re-use a Name already in the cache is when it's one of
-	-- the Implicit magic-unique ones mentioned in the previous para
+	-- So I reverted to the simple caching method (no "second-binding" thing)
+	-- The multiple-local-binding case is now handled by improving the conflict
+	-- detection in plusNameEnv.
     let
 	provenance = LocalDef (rec_exp_fn new_name) loc
 	(us', us1) = splitUniqSupply us
 	uniq   	   = getUnique us1
         key        = (mod,occ)
 	new_name   = case lookupFM cache key of
-		         Just name | is_implicit_prov
-				   -> setNameProvenance name provenance
-				   where
-				      is_implicit_prov = case getNameProvenance name of
-							    Implicit -> True
-							    other    -> False
-		         other   -> mkGlobalName uniq mod occ VanillaDefn provenance
-
+		         Just name -> setNameProvenance name provenance
+		         other     -> mkGlobalName uniq mod occ VanillaDefn provenance
 	new_cache  = addToFM cache key new_name
     in
     setNameSupplyRn (us', inst_ns, new_cache)		`thenRn_`
@@ -358,16 +361,27 @@ plusRnEnv (RnEnv n1 f1) (RnEnv n2 f2)
 ===============  NameEnv  ================
 \begin{code}
 plusNameEnvRn :: NameEnv -> NameEnv -> RnM s d NameEnv
-plusNameEnvRn n1 n2
-  = mapRn (addErrRn.nameClashErr) (conflictsFM (/=) n1 n2)		`thenRn_`
-    returnRn (n1 `plusFM` n2)
+plusNameEnvRn env1 env2
+  = mapRn (addErrRn.nameClashErr) (conflictsFM conflicting_name env1 env2)		`thenRn_`
+    returnRn (env1 `plusFM` env2)
 
 addOneToNameEnv :: NameEnv -> RdrName -> Name -> RnM s d NameEnv
 addOneToNameEnv env rdr_name name
  = case lookupFM env rdr_name of
-	Nothing    -> returnRn (addToFM env rdr_name name)
-	Just name2 -> addErrRn (nameClashErr (rdr_name, (name, name2)))	`thenRn_`
+	Just name2 | conflicting_name name name2
+		   -> addErrRn (nameClashErr (rdr_name, (name, name2)))	`thenRn_`
 		      returnRn env
+
+	Nothing    -> returnRn (addToFM env rdr_name name)
+
+conflicting_name n1 n2 = (n1 /= n2) || (isLocallyDefinedName n1 && isLocallyDefinedName n2)
+	-- We complain of a conflict if one RdrName maps to two different Names,
+	-- OR if one RdrName maps to the same *locally-defined* Name.  The latter
+	-- case is to catch two separate, local definitions of the same thing.
+	--
+	-- If a module imports itself then there might be a local defn and an imported
+	-- defn of the same name; in this case the names will compare as equal, but
+	-- will still have different provenances.
 
 lookupNameEnv :: NameEnv -> RdrName -> Maybe Name
 lookupNameEnv = lookupFM
@@ -400,13 +414,20 @@ pprFixityProvenance sty (fixity, prov) = pprProvenance sty prov
 
 ===============  Avails  ================
 \begin{code}
-emptyModuleAvails :: ModuleAvails
-plusModuleAvails ::  ModuleAvails ->  ModuleAvails ->  ModuleAvails
-lookupModuleAvails :: ModuleAvails -> Module -> Maybe [AvailInfo]
+mkExportAvails :: Bool -> Module -> [AvailInfo] -> ExportAvails
+mkExportAvails unqualified_import mod_name avails
+  = (mod_avail_env, entity_avail_env)
+  where
+	-- The "module M" syntax only applies to *unqualified* imports (1.4 Report, Section 5.1.1)
+    mod_avail_env | unqualified_import = unitFM mod_name avails 
+		  | otherwise	       = emptyFM
+   
+    entity_avail_env = listToUFM [ (name,avail) | avail <- avails, 
+			  	   		  name  <- availEntityNames avail]
 
-emptyModuleAvails = emptyFM
-plusModuleAvails  = plusFM_C (++)
-lookupModuleAvails = lookupFM
+plusExportAvails ::  ExportAvails ->  ExportAvails ->  ExportAvails
+plusExportAvails (m1, e1) (m2, e2)
+  = (plusFM_C (++) m1 m2, plusUFM_C plusAvail e1 e2)
 \end{code}
 
 

@@ -475,12 +475,12 @@ topdecls:  topdecl
 		}
         ;
 
-topdecl	:  typed				{ $$ = $1; }
-	|  datad 				{ $$ = $1; }
-	|  newtd				{ $$ = $1; }
-	|  classd 				{ $$ = $1; }
-	|  instd 				{ $$ = $1; }
-	|  defaultd 				{ $$ = $1; }
+topdecl	:  typed				{ $$ = $1; FN = NULL; SAMEFN = 0; }
+	|  datad 				{ $$ = $1; FN = NULL; SAMEFN = 0; }
+	|  newtd				{ $$ = $1; FN = NULL; SAMEFN = 0; }
+	|  classd 				{ $$ = $1; FN = NULL; SAMEFN = 0; }
+	|  instd 				{ $$ = $1; FN = NULL; SAMEFN = 0; }
+	|  defaultd 				{ $$ = $1; FN = NULL; SAMEFN = 0; }
 	|  decl 				{ $$ = $1; }
 	;
 

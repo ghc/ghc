@@ -954,7 +954,7 @@ ppr_amode sty (CAddr reg_rel)
 
 ppr_amode sty (CReg magic_id) = pprMagicId sty magic_id
 
-ppr_amode sty (CTemp uniq kind) = pprUnique uniq
+ppr_amode sty (CTemp uniq kind) = pprUnique uniq <> char '_'
 
 ppr_amode sty (CLbl label kind) = pprCLabel sty label
 
@@ -1214,7 +1214,7 @@ labelSeenTE label env@(seen_uniqs, seen_labels)
 \begin{code}
 pprTempDecl :: Unique -> PrimRep -> Doc
 pprTempDecl uniq kind
-  = hcat [ pprPrimKind PprDebug kind, space, pprUnique uniq, semi ]
+  = hcat [ pprPrimKind PprDebug kind, space, pprUnique uniq, ptext SLIT("_;") ]
 
 pprExternDecl :: CLabel -> PrimRep -> Doc
 

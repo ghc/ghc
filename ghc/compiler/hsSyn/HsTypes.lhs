@@ -24,7 +24,7 @@ module HsTypes (
 IMP_Ubiq()
 
 import CmdLineOpts      ( opt_PprUserLength )
-import Outputable	( Outputable(..), PprStyle(..), interppSP, ifnotPprForUser )
+import Outputable	( Outputable(..), PprStyle(..), pprQuote, interppSP )
 import Kind		( Kind {- instance Outputable -} )
 import Name		( nameOccName )
 import Pretty
@@ -100,20 +100,12 @@ replaceTyVarName (IfaceTyVar n k) n' = IfaceTyVar n' k
 \begin{code}
 
 instance (Outputable name) => Outputable (HsType name) where
-    ppr = pprHsType
+    ppr sty ty = pprQuote sty $ \ sty -> pprHsType sty ty
 
 instance (Outputable name) => Outputable (HsTyVar name) where
-    ppr sty (UserTyVar name) = ppr_hs_tyname sty name
-    ppr sty (IfaceTyVar name kind) = hsep [ppr_hs_tyname sty name, ptext SLIT("::"), ppr sty kind]
-
-
--- Here comes a rather gross hack.  
--- We want to print data and class decls in interface files, from the original source
--- When we do, we want the type variables to come out with their original names, not
--- some new unique (or else interfaces wobble too much).  So when we come to one of
--- these type variables we sneakily change the style to PprForUser!
-ppr_hs_tyname PprInterface tv_name = ppr (PprForUser opt_PprUserLength) tv_name
-ppr_hs_tyname other_sty    tv_name = ppr other_sty tv_name
+    ppr sty (UserTyVar name)       = ppr sty name
+    ppr sty (IfaceTyVar name kind) = pprQuote sty $ \ sty ->
+				     hsep [ppr sty name, ptext SLIT("::"), ppr sty kind]
 
 ppr_forall sty ctxt_prec [] [] ty
    = ppr_mono_ty sty ctxt_prec ty
@@ -150,7 +142,7 @@ pprParendHsType sty ty = ppr_mono_ty sty pREC_CON ty
 ppr_mono_ty sty ctxt_prec (HsPreForAllTy ctxt ty)     = ppr_forall sty ctxt_prec [] ctxt ty
 ppr_mono_ty sty ctxt_prec (HsForAllTy tvs ctxt ty)    = ppr_forall sty ctxt_prec tvs ctxt ty
 
-ppr_mono_ty sty ctxt_prec (MonoTyVar name) = ppr_hs_tyname sty name
+ppr_mono_ty sty ctxt_prec (MonoTyVar name) = ppr sty name
 
 ppr_mono_ty sty ctxt_prec (MonoFunTy ty1 ty2)
   = let p1 = ppr_mono_ty sty pREC_FUN ty1
@@ -170,8 +162,7 @@ ppr_mono_ty sty ctxt_prec (MonoTyApp fun_ty arg_ty)
 	       (hsep [ppr_mono_ty sty pREC_FUN fun_ty, ppr_mono_ty sty pREC_CON arg_ty])
 
 ppr_mono_ty sty ctxt_prec (MonoDictTy clas ty)
-  = braces (hsep [ppr sty clas, ppr_mono_ty sty pREC_CON ty])
-	-- Curlies are temporary
+  = hsep [ppr sty clas, ppr_mono_ty sty pREC_CON ty]
 \end{code}
 
 

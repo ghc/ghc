@@ -57,8 +57,8 @@ import SrcLoc		( SrcLoc )
 import Unique		( Unique )
 import UniqSet		( SYN_IE(UniqSet) )
 import UniqFM		( UniqFM, lookupUFM )
-import Util	{-	( isIn, isn'tIn, thenCmp, removeDups, cmpPString,
-			  panic, assertPanic{- , pprTrace ToDo:rm-} ) -}
+import Util
+IMPORT_1_3(List(nub))
 \end{code}
 
 rnDecl `renames' declarations.
@@ -211,11 +211,6 @@ rnDecl (ClD (ClassDecl context cname tyvar sigs mbinds pragmas src_loc))
 		-- Check that class tyvar appears in op_ty
         checkRn (clas_tyvar `elemNameSet` op_ty_fvs)
 	        (classTyVarNotInOpTyErr clas_tyvar sig)
-							 `thenRn_`
-
-		-- Check that class tyvar *doesn't* appear in the sig's context
-        checkRn (not (clas_tyvar `elemNameSet` ctxt_fvs))
-		(classTyVarInOpCtxtErr clas_tyvar sig)
 							 `thenRn_`
 
 	returnRn (ClassOpSig op_name dm_name new_ty locn)
@@ -398,25 +393,34 @@ rnHsSigType :: (PprStyle -> Doc) -> RdrNameHsType -> RnMS s RenamedHsType
 	-- rnHsSigType is used for source-language type signatures,
 	-- which use *implicit* universal quantification.
 
+-- Given the signature  C => T  we universally quantify over FV(T) \ {in-scope-tyvars} 
+-- 
+-- We insist that the universally quantified type vars is a superset of FV(C)
+-- It follows that FV(T) is a superset of FV(C), so that the context constrains
+-- no type variables that don't appear free in the tau-type part.
+
 rnHsSigType doc_str full_ty@(HsPreForAllTy ctxt ty)	-- From source code (no kinds on tyvars)
   = getNameEnv		`thenRn` \ name_env ->
     let
-	mentioned_tyvars = extractHsTyVars full_ty
-	forall_tyvars    = filter not_in_scope mentioned_tyvars
-	not_in_scope tv  = case lookupFM name_env tv of
-				    Nothing -> True
-				    Just _  -> False
+	mentioned_tyvars = extractHsTyVars ty
+	forall_tyvars    = filter (not . in_scope) mentioned_tyvars
+	in_scope tv      = maybeToBool (lookupFM name_env tv)
 
-	non_foralld_constrained = [tv | (clas, ty) <- ctxt,
-					tv <- extractHsTyVars ty,
-					not (tv `elem` forall_tyvars)
-				  ]
+	constrained_tyvars 	      = nub (concat (map (extractHsTyVars . snd) ctxt))
+	constrained_and_in_scope      = filter in_scope constrained_tyvars
+	constrained_and_not_mentioned = filter (not . (`elem` mentioned_tyvars)) constrained_tyvars
+
+	-- Zap the context if there's a problem, to avoid duplicate error message.
+	ctxt' | null constrained_and_in_scope && null constrained_and_not_mentioned = ctxt
+	      | otherwise = []
     in
-    checkRn (null non_foralld_constrained)
-	    (ctxtErr sig_doc non_foralld_constrained)	`thenRn_`
+    checkRn (null constrained_and_in_scope)
+	    (ctxtErr1 sig_doc constrained_and_in_scope)	`thenRn_`
+    checkRn (null constrained_and_not_mentioned)
+	    (ctxtErr2 sig_doc constrained_and_not_mentioned ty)	`thenRn_`
 
     (bindTyVarsRn sig_doc (map UserTyVar forall_tyvars)	$ \ new_tyvars ->
-     rnContext ctxt					`thenRn` \ new_ctxt ->
+     rnContext ctxt'					`thenRn` \ new_ctxt ->
      rnHsType ty					`thenRn` \ new_ty ->
      returnRn (HsForAllTy new_tyvars new_ctxt new_ty)
     )
@@ -693,17 +697,12 @@ rnCorePrim (UfCCallOp str casm gc arg_tys res_ty)
 
 \begin{code}
 derivingNonStdClassErr clas sty
-  = hsep [ptext SLIT("non-standard class in deriving:"), ppr sty clas]
+  = hsep [ptext SLIT("non-standard class"), ppr sty clas, ptext SLIT("in deriving clause")]
 
 classTyVarNotInOpTyErr clas_tyvar sig sty
-  = hang (hcat [ptext SLIT("Class type variable `"), 
+  = hang (hsep [ptext SLIT("Class type variable"), 
 		       ppr sty clas_tyvar, 
-		       ptext SLIT("' does not appear in method signature:")])
-	 4 (ppr sty sig)
-
-classTyVarInOpCtxtErr clas_tyvar sig sty
-  = hang (hcat [ ptext SLIT("Class type variable `"), ppr sty clas_tyvar, 
-			ptext SLIT("' present in method's local overloading context:")])
+		       ptext SLIT("does not appear in method signature")])
 	 4 (ppr sty sig)
 
 dupClassAssertWarn ctxt dups sty
@@ -718,8 +717,16 @@ badDataCon name sty
 allOfNonTyVar ty sty
   = hsep [ptext SLIT("`All' applied to a non-type variable:"), ppr sty ty]
 
-ctxtErr doc tyvars sty
-  = hsep [ptext SLIT("Context constrains type variable(s)"), 
+ctxtErr1 doc tyvars sty
+  = hsep [ptext SLIT("Context constrains in-scope type variable(s)"), 
 	  hsep (punctuate comma (map (ppr sty) tyvars))]
-    $$ nest 4 (ptext SLIT("in") <+> doc sty)
+    $$
+    nest 4 (ptext SLIT("in") <+> doc sty)
+
+ctxtErr2 doc tyvars ty sty
+  = (ptext SLIT("Context constrains type variable(s)")
+	<+> hsep (punctuate comma (map (ppr sty) tyvars)))
+    $$
+    nest 4 (vcat [ptext SLIT("that do not appear in") <+> ppr sty ty,
+	    	  ptext SLIT("in") <+> doc sty])
 \end{code}

@@ -303,6 +303,7 @@ plusFM_C combiner fm1 (Branch split_key elt2 _ left right)
 
 -- It's worth doing plusFM specially, because we don't need
 -- to do the lookup in fm1.
+-- FM2 over-rides FM1.
 
 plusFM EmptyFM fm2 = fm2
 plusFM fm1 EmptyFM = fm1

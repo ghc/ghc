@@ -80,6 +80,7 @@ import Unique		( mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
 			  Unique{-instance Ord3-}
 			)
 import UniqSupply	( getUnique, returnUs, thenUs, SYN_IE(UniqSM) )
+import UniqFM		( Uniquable(..) )
 import Util		( panic, Ord3(..) )
 \end{code}
 

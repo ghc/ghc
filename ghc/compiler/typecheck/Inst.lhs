@@ -380,11 +380,14 @@ ppr_inst sty ppr_orig (LitInst u lit ty orig loc)
 
 ppr_inst sty ppr_orig (Dict u clas ty orig loc)
   = hang (ppr_orig orig loc)
-	 4 (hsep [ppr sty clas, pprParendGenType sty ty, show_uniq sty u])
+	 4 (pprQuote sty $ \ sty -> 
+	    hsep [ppr sty clas, pprParendGenType sty ty, show_uniq sty u])
 
 ppr_inst sty ppr_orig (Method u id tys rho orig loc)
   = hang (ppr_orig orig loc)
-	 4 (hsep [ppr sty id, ptext SLIT("at"), interppSP sty tys, show_uniq sty u])
+	 4 (hsep [ppr sty id, ptext SLIT("at"), 
+		  pprQuote sty $ \ sty -> interppSP sty tys,
+		  show_uniq sty u])
 
 show_uniq PprDebug u = ppr PprDebug u
 show_uniq sty	   u = empty

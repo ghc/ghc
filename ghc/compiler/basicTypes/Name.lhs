@@ -256,9 +256,12 @@ mkInstDeclName uniq mod occ loc from_here
          | otherwise = Implicit
 
 
-setNameProvenance :: Name -> Provenance -> Name		-- Implicit Globals only
-setNameProvenance (Global uniq mod occ def Implicit) prov = Global uniq mod occ def prov
-setNameProvenance other_name 			     prov = other_name
+setNameProvenance :: Name -> Provenance -> Name	
+	-- setNameProvenance used to only change the provenance of Implicit-provenance things,
+	-- but that gives bad error messages for names defined twice in the same
+	-- module, so I changed it to set the proveance of *any* global (SLPJ Jun 97)
+setNameProvenance (Global uniq mod occ def _) prov = Global uniq mod occ def prov
+setNameProvenance other_name 		      prov = other_name
 
 getNameProvenance :: Name -> Provenance
 getNameProvenance (Global uniq mod occ def prov) = prov

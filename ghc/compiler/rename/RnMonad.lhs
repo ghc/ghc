@@ -55,6 +55,7 @@ import Pretty
 import Outputable	( PprStyle(..) )
 import SrcLoc		( SrcLoc, mkGeneratedSrcLoc )
 import Unique		( Unique )
+import UniqFM		( UniqFM )
 import FiniteMap	( FiniteMap, emptyFM, bagToFM )
 import Bag		( Bag, mapBag, emptyBag, isEmptyBag, snocBag )
 import UniqSet
@@ -185,7 +186,15 @@ type Fixities		= [(OccName, (Fixity, Provenance))]
 	-- or the same type/class/id, more than once.   Hence a boring old list.
 	-- This allows us to report duplicates in just one place, namely plusRnEnv.
 	
-type ModuleAvails	= FiniteMap Module Avails
+type ExportAvails	= (FiniteMap Module Avails,	-- Used to figure out "module M" export specifiers
+							-- Includes avails only from *unqualified* imports
+							-- (see 1.4 Report Section 5.1.1)
+
+			   UniqFM AvailInfo)		-- Used to figure out all other export specifiers.
+							-- Maps a Name to the AvailInfo that contains it
+							-- NB: Contain bindings for class ops but 
+							-- not constructors (see defn of availEntityNames)
+
 
 data AvailInfo		= NotAvailable 
 			| Avail Name		-- An ordinary identifier

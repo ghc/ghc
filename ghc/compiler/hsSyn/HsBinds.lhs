@@ -261,27 +261,25 @@ instance (NamedThing name, Outputable name) => Outputable (Sig name) where
 
 
 ppr_sig sty (Sig var ty _)
-      = hang (hsep [ppr sty var, ptext SLIT("::")])
-	     4 (ppr sty ty)
+      = sep [ppr sty var <+> ptext SLIT("::"),
+	     nest 4 (ppr sty ty)]
 
 ppr_sig sty (ClassOpSig var _ ty _)
-      = hang (hsep [ppr sty (getOccName var), ptext SLIT("::")])
-	     4 (ppr sty ty)
+      = sep [ppr sty (getOccName var) <+> ptext SLIT("::"),
+	     nest 4 (ppr sty ty)]
 
 ppr_sig sty (DeforestSig var _)
-      = hang (hsep [text "{-# DEFOREST", ppr sty var])
-		   4 (text "#-")
+      = hsep [text "{-# DEFOREST", ppr sty var, text "#-}"]
 
 ppr_sig sty (SpecSig var ty using _)
-      = hang (hsep [text "{-# SPECIALIZE", ppr sty var, ptext SLIT("::")])
-	     4 (hsep [ppr sty ty, pp_using using, text "#-}"])
-
+      = sep [ hsep [text "{-# SPECIALIZE", ppr sty var, ptext SLIT("::")],
+	      nest 4 (hsep [ppr sty ty, pp_using using, text "#-}"])
+	]
       where
 	pp_using Nothing   = empty
 	pp_using (Just me) = hsep [char '=', ppr sty me]
 
 ppr_sig sty (InlineSig var _)
-
         = hsep [text "{-# INLINE", ppr sty var, text "#-}"]
 
 ppr_sig sty (MagicUnfoldingSig var str _)

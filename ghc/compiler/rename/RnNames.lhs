@@ -72,13 +72,13 @@ getGlobalNames m@(HsModule this_mod _ exports imports _ _ mod_loc)
       else
 
 	-- COMBINE RESULTS
-	-- We put the local env first, so that a local provenance
+	-- We put the local env second, so that a local provenance
 	-- "wins", even if a module imports itself.
       foldlRn plusRnEnv emptyRnEnv imp_rn_envs		`thenRn` \ imp_rn_env ->
-      plusRnEnv local_rn_env imp_rn_env	 		`thenRn` \ rn_env ->
+      plusRnEnv imp_rn_env local_rn_env	 		`thenRn` \ rn_env ->
       let
-	 all_avails :: ModuleAvails
-	 all_avails = foldr plusModuleAvails local_mod_avails imp_avails_s
+	 export_avails :: ExportAvails
+	 export_avails = foldr plusExportAvails local_mod_avails imp_avails_s
 
 	 explicit_names :: NameSet 	-- locally defined or explicitly imported
 	 explicit_names = foldr add_on emptyNameSet (local_avails : explicit_imports_s)
@@ -86,7 +86,7 @@ getGlobalNames m@(HsModule this_mod _ exports imports _ _ mod_loc)
       in
   
 	-- PROCESS EXPORT LISTS
-      exportsFromAvail this_mod exports all_avails rn_env	
+      exportsFromAvail this_mod exports export_avails rn_env	
 							`thenRn` \ (export_fn, export_env) ->
 
 	-- RECORD THAT LOCALLY DEFINED THINGS ARE AVAILABLE
@@ -145,7 +145,7 @@ checkEarlyExit mod
 
 \begin{code}
 importsFromImportDecl :: RdrNameImportDecl
-		      -> RnMG (RnEnv, ModuleAvails, [AvailInfo])
+		      -> RnMG (RnEnv, ExportAvails, [AvailInfo])
 
 importsFromImportDecl (ImportDecl mod qual_only as_source as_mod import_spec loc)
   = pushSrcLocRn loc $
@@ -277,7 +277,7 @@ qualifyImports :: Module				-- Imported module
 	       -> Maybe Module				-- Optional "as M" part 
 	       -> ExportEnv				-- What's imported
 	       -> [AvailInfo]				-- What's to be hidden
-	       -> RnMG (RnEnv, ModuleAvails)
+	       -> RnMG (RnEnv, ExportAvails)
 
 qualifyImports this_mod qual_imp unqual_imp as_mod (ExportEnv avails fixities) hides
   = 
@@ -292,11 +292,10 @@ qualifyImports this_mod qual_imp unqual_imp as_mod (ExportEnv avails fixities) h
 	-- Create the fixity env
 	fixity_env = foldl (add_fixity name_env2) emptyFixityEnv fixities
 
-	-- The "module M" syntax only applies to *unqualified* imports (1.4 Report, Section 5.1.1)
-	mod_avail_env | unqual_imp = unitFM qual_mod avails
-		      | otherwise  = emptyFM
+	-- Create the export-availability info
+	export_avails = mkExportAvails unqual_imp qual_mod avails
     in
-    returnRn (RnEnv name_env2 fixity_env, mod_avail_env)
+    returnRn (RnEnv name_env2 fixity_env, export_avails)
   where
     qual_mod = case as_mod of
 		  Nothing  	    -> this_mod
@@ -395,15 +394,17 @@ includes ConcBase.StateAndSynchVar#, and so on...
 \begin{code}
 exportsFromAvail :: Module
 		 -> Maybe [RdrNameIE]	-- Export spec
-		 -> ModuleAvails
+		 -> ExportAvails
 		 -> RnEnv
 		 -> RnMG (Name -> ExportFlag, ExportEnv)
 	-- Complains if two distinct exports have same OccName
 	-- Complains about exports items not in scope
-exportsFromAvail this_mod Nothing all_avails rn_env
-  = exportsFromAvail this_mod (Just [IEModuleContents this_mod]) all_avails rn_env
+exportsFromAvail this_mod Nothing export_avails rn_env
+  = exportsFromAvail this_mod (Just [IEModuleContents this_mod]) export_avails rn_env
 
-exportsFromAvail this_mod (Just export_items) all_avails (RnEnv name_env fixity_env)
+exportsFromAvail this_mod (Just export_items) 
+		 (mod_avail_env, entity_avail_env)
+	         (RnEnv name_env fixity_env)
   = mapRn exports_from_item export_items 		`thenRn` \ avail_envs ->
     foldlRn plusAvailEnv emptyAvailEnv avail_envs	`thenRn` \ export_avail_env -> 
     let
@@ -414,18 +415,9 @@ exportsFromAvail this_mod (Just export_items) all_avails (RnEnv name_env fixity_
     returnRn (export_fn, ExportEnv export_avails export_fixities)
 
   where
-    full_avail_env :: UniqFM AvailInfo
-    full_avail_env = addListToUFM_C plusAvail emptyUFM
-			   [(name, avail) | avail <- concat (eltsFM all_avails),
-					    name  <- availEntityNames avail 
-			   ]
-
-	-- NB: full_avail_env will contain bindings for class ops but not constructors
-	-- (see defn of availEntityNames)
-
     exports_from_item :: RdrNameIE -> RnMG AvailEnv
     exports_from_item ie@(IEModuleContents mod)
-	= case lookupFM all_avails mod of
+	= case lookupFM mod_avail_env mod of
 		Nothing	    -> failWithRn emptyAvailEnv (modExportErr mod)
 		Just avails -> listToAvailEnv ie avails
 
@@ -449,7 +441,7 @@ exportsFromAvail this_mod (Just export_items) all_avails (RnEnv name_env fixity_
        where
           maybe_in_scope  = lookupNameEnv name_env (ieName ie)
 	  Just name	  = maybe_in_scope
-	  maybe_avail     = lookupUFM full_avail_env name
+	  maybe_avail     = lookupUFM entity_avail_env name
 	  Just avail      = maybe_avail
  	  export_avail    = filterAvail ie avail
 	  enough_avail	  = case export_avail of {NotAvailable -> False; other -> True}

@@ -124,9 +124,17 @@ extractHsTyVars ty
     get (MonoFunTy ty1 ty2)	 acc = get ty1 (get ty2 acc)
     get (MonoDictTy cls ty)	 acc = get ty acc
     get (MonoTyVar tv) 	         acc = insert tv acc
-    get (HsPreForAllTy ctxt ty)  acc = foldr (get . snd) (get ty acc) ctxt
-    get (HsForAllTy tvs ctxt ty) acc = filter (`notElem` locals) $
-				       foldr (get . snd) (get ty acc) ctxt
+
+	-- In (All a => a -> a) -> Int, there are no free tyvars
+	-- We just assume that we quantify over all type variables mentioned in the context.
+    get (HsPreForAllTy ctxt ty)  acc = filter (`notElem` locals) (get ty [])
+				       ++ acc
+				     where
+				       locals = foldr (get . snd) [] ctxt
+
+    get (HsForAllTy tvs ctxt ty) acc = (filter (`notElem` locals) $
+				        foldr (get . snd) (get ty []) ctxt)
+				       ++ acc
 				     where
 				       locals = map getTyVarName tvs
 

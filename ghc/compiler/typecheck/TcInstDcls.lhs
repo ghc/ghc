@@ -239,7 +239,7 @@ tcInstDecl1 mod_name (InstDecl poly_ty binds uprags (Just dfun_name) src_loc)
 					other			   -> ([],  [],  poly_ty)
     (class_name, inst_ty) = case dict_ty of
 				MonoDictTy cls ty -> (cls,ty)
-				other -> pprPanic "Malformed intance decl" (ppr PprDebug poly_ty)
+				other -> pprPanic "Malformed instance decl" (ppr PprDebug poly_ty)
 \end{code}
 
 

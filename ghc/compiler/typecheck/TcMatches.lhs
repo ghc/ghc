@@ -16,8 +16,9 @@ IMPORT_DELOOPER(TcLoop)		( tcGRHSsAndBinds )
 import {-# SOURCE #-} TcGRHSs ( tcGRHSsAndBinds )
 #endif
 
-import HsSyn		( Match(..), GRHSsAndBinds(..), GRHS(..), InPat,
-			  HsExpr, HsBinds, OutPat, Fake, Stmt,
+import HsSyn		( Match(..), GRHSsAndBinds(..), GRHS(..), InPat, 
+			  HsExpr(..), HsBinds(..), MonoBinds(..), OutPat, Fake, Stmt,
+			  Sig, HsLit, DoOrListComp, Fixity, HsType, ArithSeqInfo, 
 			  collectPatBinders, pprMatch )
 import RnHsSyn		( SYN_IE(RenamedMatch) )
 import TcHsSyn		( TcIdOcc(..), SYN_IE(TcMatch) )
@@ -27,12 +28,13 @@ import Inst		( Inst, SYN_IE(LIE), plusLIE )
 import TcEnv		( newMonoIds )
 import TcPat		( tcPat )
 import TcType		( SYN_IE(TcType), TcMaybe, zonkTcType )
+import TcSimplify	( bindInstsOfLocalFuns )
 import Unify		( unifyTauTy, unifyTauTyList )
 import Name		( Name {- instance Outputable -} )
 
 import Kind		( Kind, mkTypeKind )
 import Pretty
-import Type		( isTyVarTy, mkFunTy, getFunTy_maybe )
+import Type		( isTyVarTy, isTauTy, mkFunTy, getFunTy_maybe )
 import Util
 import Outputable
 #if __GLASGOW_HASKELL__ >= 202
@@ -149,16 +151,38 @@ tcMatchExpected expected_ty the_match@(PatMatch pat match)
 	Just (arg_ty,rest_ty) ->	-- It's a function type!
 	    let binders = collectPatBinders pat
 	    in
-	    newMonoIds binders mkTypeKind (\ _ ->
+	    newMonoIds binders mkTypeKind (\ mono_ids ->
 		tcPat pat			`thenTc` \ (pat', lie_pat, pat_ty) ->
 		unifyTauTy pat_ty arg_ty	`thenTc_`
 		tcMatchExpected rest_ty  match	`thenTc` \ (match', lie_match) ->
-		returnTc (PatMatch pat' match',
-			  plusLIE lie_pat lie_match)
+
+			-- In case there are any polymorpic, overloaded binders in the pattern
+			-- (which can happen in the case of rank-2 type signatures, or data constructors
+			-- with polymorphic arguments), we must dd a bindInstsOfLocalFns here
+			--
+			-- 99% of the time there are no bindings.  In the unusual case we
+			-- march down the match to dump them in the right place (boring but easy).
+	        bindInstsOfLocalFuns lie_match mono_ids 	`thenTc` \ (lie_match', inst_mbinds) ->
+		let
+		   inst_binds = MonoBind inst_mbinds [] False
+		   match'' = case inst_mbinds of
+				EmptyMonoBinds -> match'
+				other          -> glue_on match'
+		   glue_on (PatMatch p m) = PatMatch p (glue_on m)
+		   glue_on (GRHSMatch (GRHSsAndBindsOut grhss binds ty))
+			= (GRHSMatch (GRHSsAndBindsOut grhss 
+						       (inst_binds `ThenBinds` binds)
+						       ty))
+		   glue_on (SimpleMatch expr) = SimpleMatch (HsLet inst_binds expr)
+		in		
+		returnTc (PatMatch pat' match'',
+			  plusLIE lie_pat lie_match')
 	    )
 
 tcMatchExpected expected_ty (GRHSMatch grhss_and_binds)
   = tcGRHSsAndBinds grhss_and_binds   	`thenTc` \ (grhss_and_binds', lie, grhss_ty) ->
+    checkTc (isTauTy expected_ty)
+	    lurkingRank2SigErr 		`thenTc_`
     unifyTauTy expected_ty grhss_ty 	`thenTc_`
     returnTc (GRHSMatch grhss_and_binds', lie)
 
@@ -230,4 +254,7 @@ matchCtxt (MFun fun) match sty
 \begin{code}
 varyingArgsErr name matches sty
   = sep [ptext SLIT("Varying number of arguments for function"), ppr sty name]
+
+lurkingRank2SigErr sty
+  = ptext SLIT("Too few explicit arguments when defining a function with a rank-2 type")
 \end{code}
