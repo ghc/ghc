@@ -161,19 +161,15 @@ findIndex p     = listToMaybe . findIndices p
 
 findIndices      :: (a -> Bool) -> [a] -> [Int]
 
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE) || !defined(__GLASGOW_HASKELL__)
 findIndices p xs = [ i | (x,i) <- zip xs [0..], p x]
 #else
-#ifdef __HUGS__
-findIndices p xs = [ i | (x,i) <- zip xs [0..], p x]
-#else 
 -- Efficient definition
 findIndices p ls = loop 0# ls
 		 where
 	 	   loop _ [] = []
 		   loop n (x:xs) | p x       = I# n : loop (n +# 1#) xs
 				 | otherwise = loop (n +# 1#) xs
-#endif  /* __HUGS__ */
 #endif  /* USE_REPORT_PRELUDE */
 
 isPrefixOf              :: (Eq a) => [a] -> [a] -> Bool

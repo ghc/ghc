@@ -80,7 +80,7 @@ import Data.Int           ( Int8,  Int16,  Int32,  Int64 )
 import Data.Word          ( Word, Word8, Word16, Word32, Word64)
 
 import System.IO.Unsafe	  ( unsafePerformIO )
-import Control.Concurrent ( MVar, newMVar, takeMVar, putMVar, readMVar )
+import Control.Concurrent.MVar ( MVar, newMVar, takeMVar, putMVar, readMVar )
 
 ------------------------------------------------------------------------
 -- Diff array types.
@@ -307,7 +307,8 @@ boundsDiffArray a = do
 freezeDiffArray :: (MArray a e IO, Ix ix)
                 => a ix e
                 -> IO (IOToDiffArray a ix e)
-freezeDiffArray a | (l,u) <- bounds a = do
+freezeDiffArray a = case bounds a of
+  (l,u) -> do
     a' <- newArray_ (l,u)
     sequence_ [unsafeRead a i >>= unsafeWrite a' i | i <- [0 .. rangeSize (l,u) - 1]]
     var <- newMVar (Current a')
@@ -338,7 +339,8 @@ thawDiffArray :: (MArray a e IO, Ix ix)
 thawDiffArray a = do
     d <- readMVar (varDiffArray a)
     case d of
-        Current a' | (l,u) <- bounds a' -> do
+        Current a' -> case bounds a' of
+	  (l,u) -> do
             a'' <- newArray_ (l,u)
             sequence_ [unsafeRead a' i >>= unsafeWrite a'' i | i <- [0 .. rangeSize (l,u) - 1]]
             return a''

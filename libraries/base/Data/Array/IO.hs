@@ -19,9 +19,7 @@ module Data.Array.IO (
 
    -- * @IO@ arrays with unboxed elements
    IOUArray,		-- instance of: Eq, Typeable
-#ifdef __GLASGOW_HASKELL__
    castIOUArray,	-- :: IOUArray i a -> IO (IOUArray i b)
-#endif
 
    -- * Overloaded mutable array interface
    module Data.Array.MArray,
@@ -43,6 +41,7 @@ import Data.Dynamic
 
 #ifdef __HUGS__
 import Hugs.IOArray
+import Hugs.IOExts		( unsafeCoerce )
 import Data.Array.Storable
 #endif
 
@@ -74,6 +73,9 @@ instance MArray IOArray e IO where
     unsafeWrite = unsafeWriteIOArray
 
 type IOUArray = StorableArray
+
+castIOUArray :: IOUArray i a -> IO (IOUArray i b)
+castIOUArray marr = return (unsafeCoerce marr)
 #endif /* __HUGS__ */
 
 iOArrayTc :: TyCon

@@ -51,8 +51,7 @@ import Data.IORef
 import Numeric		( readDec )
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Show		( showSignedInt, showSpace )
-import GHC.IOBase	( unsafePerformIO, stToIO )
+import GHC.IOBase	( stToIO )
 import System.Time	( getClockTime, ClockTime(..) )
 #endif
 
@@ -145,21 +144,11 @@ instance RandomGen StdGen where
   next  = stdNext
   split = stdSplit
 
-#ifdef __GLASGOW_HASKELL__
-instance Show StdGen where
-  showsPrec p (StdGen s1 s2) = 
-     showSignedInt p s1 . 
-     showSpace          . 
-     showSignedInt p s2
-#endif
-
-#ifdef __HUGS__
 instance Show StdGen where
   showsPrec p (StdGen s1 s2) = 
      showsPrec p s1 . 
      showChar ' ' .
      showsPrec p s2
-#endif
 
 instance Read StdGen where
   readsPrec _p = \ r ->
