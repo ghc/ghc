@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  System.Console.GetOpt
--- Copyright   :  (c) Sven Panne 2002-2004
+-- Copyright   :  (c) Sven Panne 2002-2005
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
@@ -88,6 +88,7 @@ data ArgDescr a
 
 data OptKind a                -- kind of cmd line arg (internal use only):
    = Opt       a                --    an option
+   | UnreqOpt  String           --    an un-recognized option
    | NonOpt    String           --    a non-option
    | EndOfOpts                  --    end-of-options marker (i.e. "--")
    | OptErr    String           --    something went wrong...
@@ -154,6 +155,7 @@ getOpt ordering optDescr (arg:args) = procNextOpt opt ordering
          procNextOpt EndOfOpts  Permute           = ([],rest,[])
          procNextOpt EndOfOpts  (ReturnInOrder f) = (map f rest,[],[])
          procNextOpt (OptErr e) _                 = (os,xs,e:es)
+         procNextOpt (UnreqOpt _) _               = error "should not happen"
 
          (opt,rest) = getNext arg args optDescr
          (os,xs,es) = getOpt ordering optDescr rest
@@ -169,7 +171,7 @@ getNext a            rest _        = (NonOpt a,rest)
 longOpt :: String -> [String] -> [OptDescr a] -> (OptKind a,[String])
 longOpt ls rs optDescr = long ads arg rs
    where (opt,arg) = break (=='=') ls
-         getWith p = [ o  | o@(Option _ ls _ _) <- optDescr, l <- ls, opt `p` l ]
+         getWith p = [ o  | o@(Option _ xs _ _) <- optDescr, x <- xs, opt `p` x ]
          exact     = getWith (==)
          options   = if null exact then getWith isPrefixOf else exact
          ads       = [ ad | Option _ _ ad _ <- options ]
@@ -187,10 +189,10 @@ longOpt ls rs optDescr = long ads arg rs
 
 -- handle short option
 shortOpt :: Char -> String -> [String] -> [OptDescr a] -> (OptKind a,[String])
-shortOpt x xs rest optDescr = short ads xs rest
-  where options = [ o  | o@(Option ss _ _ _) <- optDescr, s <- ss, x == s ]
+shortOpt y ys rs optDescr = short ads ys rs
+  where options = [ o  | o@(Option ss _ _ _) <- optDescr, s <- ss, y == s ]
         ads     = [ ad | Option _ _ ad _ <- options ]
-        optStr  = '-':[x]
+        optStr  = '-':[y]
 
         short (_:_:_)        _  rest     = (errAmbig options optStr,rest)
         short (NoArg  a  :_) [] rest     = (Opt a,rest)
@@ -291,11 +293,11 @@ compiler:
 >    
 >    inp,outp :: Maybe String -> Flag
 >    outp = Output . fromMaybe "stdout"
->    inp  = Input  . fromMaybe "stdout"
+>    inp  = Input  . fromMaybe "stdin"
 >    
 >    compilerOpts :: [String] -> IO ([Flag], [String])
 >    compilerOpts argv = 
->       case (getOpt Permute options argv) of
+>       case getOpt Permute options argv of
 >          (o,n,[]  ) -> return (o,n)
 >          (_,_,errs) -> ioError (userError (concat errs ++ usageInfo header options))
 >      where header = "Usage: ic [OPTION...] files..."
