@@ -10,7 +10,7 @@
 -- Portability :  non-portable (requires POSIX)
 --
 -- POSIX data types: Haskell equivalents of the types defined by the
--- @\<sys/types.h>@ C header on a POSIX system.
+-- @\<sys\/types.h>@ C header on a POSIX system.
 --
 -----------------------------------------------------------------------------
 
