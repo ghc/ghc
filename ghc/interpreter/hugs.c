@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.17 $
- * $Date: 1999/11/09 00:40:11 $
+ * $Revision: 1.18 $
+ * $Date: 1999/11/12 14:32:44 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -576,7 +576,9 @@ String s; {                             /* return FALSE if none found.     */
             default  : if (strcmp("98",s)==0) {
                            if (heapBuilt() && ((state && !haskell98) ||
                                                (!state && haskell98))) {
-                               FPrintf(stderr,"Haskell 98 compatibility cannot be changed while the interpreter is running\n");
+                               FPrintf(stderr,
+                                       "Haskell 98 compatibility cannot be changed"
+                                       " while the interpreter is running\n");
                            } else {
                                haskell98 = state;
                            }
@@ -1899,6 +1901,9 @@ String argv[]; {
         initialize(argc,argv);
         forHelp();
     }
+
+    /* initialize calls startupHaskell, which trashes our signal handlers */
+    breakOn(TRUE);
 
     for (;;) {
         Command cmd;
