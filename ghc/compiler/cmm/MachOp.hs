@@ -506,7 +506,6 @@ isAssociativeMachOp :: MachOp -> Bool
 isAssociativeMachOp mop = 
   case mop of
 	MO_Add r 	-> not (isFloatingRep r)
-	MO_Sub r 	-> not (isFloatingRep r)
 	MO_Mul r	-> not (isFloatingRep r)
 	MO_And _	-> True
 	MO_Or _		-> True
