@@ -1,143 +1,101 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The AQUA Project, Glasgow University, 1994-1998
 %
-
 \section[IO]{Module @IO@}
+
+Implementation of the standard Haskell IO interface, see
+@http://haskell.org/onlinelibrary/io.html@ for the official
+definition.
 
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude -#include "cbits/stgio.h" #-}
 
 module IO (
-    Handle, HandlePosn,
+    Handle,		-- abstract, instance of: Eq, Show.
+    HandlePosn(..),     -- abstract, instance of: Eq, Show.
 
     IOMode(ReadMode,WriteMode,AppendMode,ReadWriteMode),
     BufferMode(NoBuffering,LineBuffering,BlockBuffering),
     SeekMode(AbsoluteSeek,RelativeSeek,SeekFromEnd),
 
-    stdin, stdout, stderr, 
+    stdin, stdout, stderr,   -- :: Handle
 
-    openFile, hClose, 
-    hFileSize, hIsEOF, isEOF,
-    hSetBuffering, hGetBuffering, hFlush, 
-    hGetPosn, hSetPosn, hSeek, 
-    hWaitForInput, hReady, hGetChar, hGetLine, hLookAhead, hGetContents, 
-    hPutChar, hPutStr, hPutStrLn, hPrint,
-    hIsOpen, hIsClosed, hIsReadable, hIsWritable, hIsSeekable,
+    openFile,		       -- :: FilePath -> IOMode -> IO Handle
+    hClose,		       -- :: Handle -> IO ()
+    hFileSize,		       -- :: Handle -> IO Integer
+    hIsEOF,		       -- :: Handle -> IO Bool
+    isEOF,		       -- :: IO Bool
 
-    isAlreadyExistsError, isDoesNotExistError, isAlreadyInUseError, 
-    isFullError, isEOFError,
-    isIllegalOperation, isPermissionError, isUserError, 
-    ioeGetErrorString, 
-    ioeGetHandle, ioeGetFileName,
-    try, bracket, bracket_
+    hSetBuffering,	       -- :: Handle -> BufferMode -> IO ()
+    hGetBuffering,	       -- :: Handle -> IO BufferMode
+    hFlush,		       -- :: Handle -> IO ()
+    hGetPosn,		       -- :: Handle -> IO HandlePosn
+    hSetPosn,		       -- :: Handle -> HandlePosn -> IO ()
+    hSeek,		       -- :: Handle -> SeekMode -> Integer -> IO ()
+    hWaitForInput,	       -- :: Handle -> Int -> IO Bool
+    hReady,		       -- :: Handle -> IO Bool
+    hGetChar,		       -- :: Handle -> IO Char
+    hGetLine,		       -- :: Handle -> IO [Char]
+    hLookAhead,		       -- :: Handle -> IO Char
+    hGetContents,	       -- :: Handle -> IO [Char]
+    hPutChar,		       -- :: Handle -> Char -> IO ()
+    hPutStr,		       -- :: Handle -> [Char] -> IO ()
+    hPutStrLn,		       -- :: Handle -> [Char] -> IO ()
+    hPrint,		       -- :: Show a => Handle -> a -> IO ()
+    hIsOpen, hIsClosed,        -- :: Handle -> IO Bool
+    hIsReadable, hIsWritable,  -- :: Handle -> IO Bool
+    hIsSeekable,               -- :: Handle -> IO Bool
+
+    isAlreadyExistsError, isDoesNotExistError,  -- :: IOError -> Bool
+    isAlreadyInUseError, isFullError, 
+    isEOFError, isIllegalOperation, 
+    isPermissionError, isUserError, 
+
+    ioeGetErrorString,	       -- :: IOError -> String
+    ioeGetHandle,	       -- :: IOError -> Maybe Handle
+    ioeGetFileName,	       -- :: IOError -> Maybe FilePath
+
+    try,		       -- :: IO a -> IO (Either IOError a)
+    bracket,		       -- :: IO a -> (a -> IO b) -> (a -> IO c) -> IO c
+    bracket_,		       -- :: IO a -> (a -> IO b) -> IO c -> IO c
+
+    -- extensions
+    hPutBuf,
+    hPutBufBA,
+    slurpFile
+
   ) where
 
-import PrelST
-import PrelIOBase
-import PrelArr		( MutableByteArray(..), newCharArray )
-import PrelHandle		-- much of the real stuff is in here
-import PrelPack		( unpackNBytesST )
 import PrelBase
+
+import PrelIOBase
+import PrelHandle		-- much of the real stuff is in here
+
 import PrelRead         ( readParen, Read(..), reads, lex )
-import PrelMaybe
-import PrelEither
-import PrelAddr
-import PrelGHC
+import PrelNum		( toInteger )
+import PrelBounded      ()  -- Bounded Int instance.
+import PrelEither	( Either(..) )
+import PrelAddr		( Addr(..), nullAddr )
+import PrelArr		( ByteArray )
+import PrelPack		( unpackNBytesAccST )
 
 #ifndef __PARALLEL_HASKELL__
-import PrelForeign  ( ForeignObj, makeForeignObj, writeForeignObj )
+import PrelForeign  ( ForeignObj )
 #endif
 
-import Ix
 import Char		( ord, chr )
-\end{code}
 
-%*********************************************************
-%*							*
-\subsection{Signatures}
-%*							*
-%*********************************************************
-
-\begin{code}
---IOHandle:hClose                :: Handle -> IO () 
---IOHandle:hFileSize             :: Handle -> IO Integer
---IOHandle:hFlush                :: Handle -> IO () 
---IOHandle:hGetBuffering         :: Handle -> IO BufferMode
-hGetChar              :: Handle -> IO Char
-hGetContents          :: Handle -> IO String
---IOHandle:hGetPosn              :: Handle -> IO HandlePosn
---IOHandle:hIsClosed             :: Handle -> IO Bool
---IOHandle:hIsEOF                :: Handle -> IO Bool
---IOHandle:hIsOpen               :: Handle -> IO Bool
---IOHandle:hIsReadable           :: Handle -> IO Bool
---IOHandle:hIsSeekable           :: Handle -> IO Bool
---IOHandle:hIsWritable           :: Handle -> IO Bool
-hLookAhead            :: Handle -> IO Char
-hPrint                :: Show a => Handle -> a -> IO ()
-hPutChar              :: Handle -> Char -> IO ()
-hPutStr               :: Handle -> String -> IO ()
-hPutStrLn             :: Handle -> String -> IO ()
-hReady                :: Handle -> IO Bool 
-hWaitForInput         :: Handle -> Int -> IO Bool
-
---IOHandle:hSeek                 :: Handle -> SeekMode -> Integer -> IO () 
---IOHandle:hSetBuffering         :: Handle -> BufferMode -> IO ()
---IOHandle:hSetPosn              :: HandlePosn -> IO () 
--- ioeGetFileName        :: IOError -> Maybe FilePath
--- ioeGetErrorString     :: IOError -> String
--- ioeGetHandle          :: IOError -> Maybe Handle
--- isAlreadyExistsError  :: IOError -> Bool
--- isAlreadyInUseError   :: IOError -> Bool
---IOHandle:isEOF                 :: IO Bool
--- isEOFError            :: IOError -> Bool
--- isFullError           :: IOError -> Bool
--- isIllegalOperation    :: IOError -> Bool
--- isPermissionError     :: IOError -> Bool
--- isUserError           :: IOError -> Bool
---IOHandle:openFile              :: FilePath -> IOMode -> IO Handle
---IOHandle:stdin, stdout, stderr :: Handle
 \end{code}
 
 Standard instances for @Handle@:
 
 \begin{code}
 instance Eq IOError where
-  (IOError h1 e1 str1) == (IOError h2 e2 str2) = 
-    e1==e2 && str1==str2 && h1==h2
-
-#ifndef __CONCURRENT_HASKELL__
+  (IOError h1 e1 loc1 str1) == (IOError h2 e2 loc2 str2) = 
+    e1==e2 && str1==str2 && h1==h2 && loc1 == loc2
 
 instance Eq Handle where
  (Handle h1) == (Handle h2) = h1 == h2
-
-#else
-
-{-	OLD equality instance. The simpler one above
-	seems more accurate!  This one is still used for concurrent haskell,
-	since there's no equality instance over MVars.
--}
-
-instance Eq Handle where
- h1 == h2 =
-  unsafePerformIO (do
-    h1_ <- readHandle h1
-    writeHandle h1 h1_
-    h2_<- readHandle h2
-    writeHandle h2 h2_
-    return (
-     case (h1_,h2_) of
-      (ErrorHandle (IOError h1 _ _), ErrorHandle (IOError h2 _ _)) -> h1 == h2
-      (ClosedHandle, ClosedHandle) -> True
-      (SemiClosedHandle v1 _, SemiClosedHandle v2 _) -> v1 == v2
-      (ReadHandle v1 _ _ ,      ReadHandle v2 _ _)   -> v1 == v2
-      (WriteHandle v1 _ _ ,     WriteHandle v2 _ _)  -> v1 == v2
-      (AppendHandle v1 _ _ ,    AppendHandle v2 _ _) -> v1 == v2
-      (ReadWriteHandle v1 _ _ , ReadWriteHandle v2 _ _) -> v1 == v2
-      _ -> False))
-
-#endif
-
-instance Show Handle where {showsPrec p h = showString "<<Handle>>"}
 
 --Type declared in IOHandle, instance here because it depends on Eq.Handle
 instance Eq HandlePosn where
@@ -169,58 +127,63 @@ one item is available for input from handle {\em hdl}.
 @hWaitForInput@ is the generalisation, wait for \tr{n} milliseconds
 before deciding whether the Handle has run dry or not.
 
+If @hWaitForInput@ finds anything in the Handle's buffer, it immediately returns.
+If not, it tries to read from the underlying OS handle. Notice that
+for buffered Handles connected to terminals this means waiting until a complete
+line is available.
+
 \begin{code}
---hReady :: Handle -> IO Bool
+hReady :: Handle -> IO Bool
 hReady h = hWaitForInput h 0
 
---hWaitForInput :: Handle -> Int -> IO Bool 
+hWaitForInput :: Handle -> Int -> IO Bool 
 hWaitForInput handle msecs = do
-    hdl   <- wantReadableHandle handle
-    rc    <- _ccall_ inputReady (filePtr hdl) msecs
-    writeHandle handle (markHandle hdl)
+    handle_  <- wantReadableHandle "hWaitForInput" handle
+    rc       <- _ccall_ inputReady (haFO__ handle_) (msecs::Int)     -- ConcHask: SAFE, won't block
+    writeHandle handle handle_
     case rc of
       0 -> return False
       1 -> return True
       _ -> constructErrorAndFail "hWaitForInput"
 \end{code}
 
-Computation $hGetChar hdl$ reads the next character from handle 
-{\em hdl}, blocking until a character is available.
+@hGetChar hdl@ reads the next character from handle @hdl@,
+blocking until a character is available.
 
 \begin{code}
---hGetChar :: Handle -> IO Char
-
+hGetChar :: Handle -> IO Char
 hGetChar handle = do
-    hdl   <- wantReadableHandle handle
-    intc  <- _ccall_ fileGetc (filePtr hdl)
-    writeHandle handle (markHandle hdl)
-    if intc /= ``EOF''
+    handle_  <- wantReadableHandle "hGetChar" handle
+    let fo = haFO__ handle_
+    intc     <- mayBlock fo (_ccall_ fileGetc fo)  -- ConcHask: UNSAFE, may block
+    writeHandle handle handle_
+    if intc /= (-1)
      then return (chr intc)
      else constructErrorAndFail "hGetChar"
 
 hGetLine :: Handle -> IO String
 hGetLine h = do
- c <- hGetChar h
- if c == '\n' 
-  then return "" 
-  else do
-    s <- hGetLine h
-    return (c:s)
+  c <- hGetChar h
+  if c == '\n' 
+   then return "" 
+   else do
+     s <- hGetLine h
+     return (c:s)
 
 \end{code}
 
-Computation $hLookahead hdl$ returns the next character from handle
-{\em hdl} without removing it from the input buffer, blocking until a
+@hLookahead hdl@ returns the next character from handle @hdl@
+without removing it from the input buffer, blocking until a
 character is available.
 
 \begin{code}
---hLookAhead :: Handle -> IO Char
-
+hLookAhead :: Handle -> IO Char
 hLookAhead handle = do
-    hdl   <- wantReadableHandle handle
-    intc  <- _ccall_ fileLookAhead (filePtr hdl)
-    writeHandle handle (markHandle hdl)
-    if intc /= ``EOF''
+    handle_ <- wantReadableHandle "hLookAhead" handle
+    let fo = haFO__ handle_
+    intc    <- mayBlock fo (_ccall_ fileLookAhead fo)  -- ConcHask: UNSAFE, may block
+    writeHandle handle handle_
+    if intc /= (-1)
      then return (chr intc)
      else constructErrorAndFail "hLookAhead"
 
@@ -233,135 +196,94 @@ hLookAhead handle = do
 %*							*
 %*********************************************************
 
-Computation $hGetContents hdl$ returns the list of characters
-corresponding to the unread portion of the channel or file managed by
-{\em hdl}, which is made semi-closed.
+@hGetContents hdl@ returns the list of characters corresponding
+to the unread portion of the channel or file managed by @hdl@,
+which is made semi-closed.
 
 \begin{code}
---hGetContents :: Handle -> IO String
-
+hGetContents :: Handle -> IO String
 hGetContents handle = do
-    hdl_ <- wantReadableHandle handle
+    handle_ <- wantReadableHandle "hGetContents" handle
       {- 
         To avoid introducing an extra layer of buffering here,
         we provide three lazy read methods, based on character,
         line, and block buffering.
       -}
-    hdl_ <- getBufferMode hdl_
-    case (bufferMode hdl_) of
-     Just LineBuffering -> do
-	buf_info <- allocBuf Nothing
-        writeHandle handle (SemiClosedHandle (filePtr hdl_) buf_info)
-        unsafeInterleaveIO (lazyReadLine handle)
-     Just (BlockBuffering size) -> do
-	buf_info <- allocBuf size
-        writeHandle handle (SemiClosedHandle (filePtr hdl_) buf_info)
-        unsafeInterleaveIO (lazyReadBlock handle)
-     _ -> do -- Nothing is treated pessimistically as NoBuffering
-        writeHandle handle (SemiClosedHandle (filePtr hdl_) (``NULL'', 0))
-        unsafeInterleaveIO (lazyReadChar handle)
-  where
-    allocBuf :: Maybe Int -> IO (Addr, Int)
-    allocBuf msize = do
-	buf <- _ccall_ malloc size
-	if buf /= ``NULL''
-	 then return (buf, size)
-	 else fail (IOError Nothing ResourceExhausted "not enough virtual memory")
-      where
-        size = 
-	    case msize of
-	      Just x -> x
-	      Nothing -> ``BUFSIZ''
+    writeHandle handle (handle_{ haType__ = SemiClosedHandle })
+    case (haBufferMode__ handle_) of
+     LineBuffering    -> unsafeInterleaveIO (lazyReadLine handle (haFO__ handle_))
+     BlockBuffering _ -> unsafeInterleaveIO (lazyReadBlock handle (haFO__ handle_))
+     NoBuffering      -> unsafeInterleaveIO (lazyReadChar handle (haFO__ handle_))
+
 \end{code}
 
-Note that someone may yank our handle out from under us, and then re-use
-the same FILE * for something else.  Therefore, we have to re-examine the
-handle every time through.
+Note that someone may close the semi-closed handle (or change its buffering), 
+so each these lazy read functions are pulled on, they have to check whether
+the handle has indeed been closed.
 
 \begin{code}
-lazyReadBlock :: Handle -> IO String
-lazyReadLine  :: Handle -> IO String
-lazyReadChar  :: Handle -> IO String
-
-lazyReadBlock handle = do
-    htype <- readHandle handle
-    case htype of 
-      -- There cannae be an ErrorHandle here
-      ClosedHandle -> do
-	  writeHandle handle htype
-	  return ""
-      SemiClosedHandle fp (buf, size) -> do
-	  bytes <- _ccall_ readBlock buf fp size
-	  some  <- (if bytes <= 0
-	             then return ""
-	             else stToIO (unpackNBytesST buf bytes))
-          if bytes < 0
-	   then do
-              _ccall_ free buf
-              _ccall_ closeFile fp
 #ifndef __PARALLEL_HASKELL__
-	      writeForeignObj fp ``NULL''
-	      writeHandle handle (SemiClosedHandle fp (``NULL'', 0))
+lazyReadBlock :: Handle -> ForeignObj -> IO String
+lazyReadLine  :: Handle -> ForeignObj -> IO String
+lazyReadChar  :: Handle -> ForeignObj -> IO String
 #else
-	      writeHandle handle (SemiClosedHandle ``NULL'' (``NULL'', 0))
+lazyReadBlock :: Handle -> Addr -> IO String
+lazyReadLine  :: Handle -> Addr -> IO String
+lazyReadChar  :: Handle -> Addr -> IO String
 #endif
-	      return some
-	   else do
-	      writeHandle handle htype
-              more <- unsafeInterleaveIO (lazyReadBlock handle)
-	      return (some ++ more)
 
-lazyReadLine handle = do
-    htype <- readHandle handle
-    case htype of 
-      -- There cannae be an ErrorHandle here
-      ClosedHandle -> do
-	  writeHandle handle htype
+lazyReadBlock handle fo = do
+   buf   <- _ccall_ getBufStart fo (0::Int)
+   bytes <- mayBlock fo (_ccall_ readBlock fo) -- ConcHask: UNSAFE, may block.
+   case bytes of
+     -3 -> -- buffering has been turned off, use lazyReadChar instead
+           lazyReadChar handle fo
+     -2 -> return ""
+     -1 -> do -- an error occurred, close the handle
+	  handle_ <- readHandle handle
+          _ccall_ closeFile (haFO__ handle_) 0{-don't bother flushing-}  -- ConcHask: SAFE, won't block.
+	  writeHandle handle (handle_ { haType__    = ClosedHandle,
+					haFO__      = nullFile__ })
 	  return ""
-      SemiClosedHandle fp (buf, size) -> do
-	  bytes <- _ccall_ readLine buf fp size
-	  some  <- (if bytes <= 0
-	             then return ""
-	             else stToIO (unpackNBytesST buf bytes))
-          if bytes < 0 
-	   then do
-              _ccall_ free buf
-              _ccall_ closeFile fp
-#ifndef __PARALLEL_HASKELL__
-	      writeForeignObj fp ``NULL''
-	      writeHandle handle (SemiClosedHandle fp (``NULL'', 0))
-#else
-	      writeHandle handle (SemiClosedHandle ``NULL'' (``NULL'', 0))
-#endif
-	      return some
-	   else do
-	      writeHandle handle htype
-              more <- unsafeInterleaveIO (lazyReadLine handle)
-	      return (some ++ more)
+     _ -> do
+      more <- unsafeInterleaveIO (lazyReadBlock handle fo)
+      stToIO (unpackNBytesAccST buf bytes more)
 
-lazyReadChar handle = do
-    htype <- readHandle handle
-    case htype of 
-      -- There cannae be an ErrorHandle here
-      ClosedHandle -> do
-	  writeHandle handle htype
-	  return ""
-      SemiClosedHandle fp buf_info -> do
-	  char <- _ccall_ readChar fp
-          if char == ``EOF'' 
-	   then do
-              _ccall_ closeFile fp
-#ifndef __PARALLEL_HASKELL__
-	      writeForeignObj fp ``NULL''
-	      writeHandle handle (SemiClosedHandle fp (``NULL'', 0))
-#else
-	      writeHandle handle (SemiClosedHandle ``NULL'' (``NULL'', 0))
-#endif
-	      return ""
-	   else do
-	      writeHandle handle htype
-              more <- unsafeInterleaveIO (lazyReadChar handle)
-	      return (chr char : more)
+lazyReadLine handle fo = do
+     bytes <- mayBlock fo (_ccall_ readLine fo)   -- ConcHask: UNSAFE, may block.
+     case bytes of
+       -3 -> -- buffering has been turned off, use lazyReadChar instead
+             lazyReadChar handle fo
+       -2 -> return "" -- handle closed by someone else, stop reading.
+       -1 -> do -- an error occurred, close the handle
+	     handle_ <- readHandle handle
+             _ccall_ closeFile (haFO__ handle_) 0{- don't bother flushing-}  -- ConcHask: SAFE, won't block
+	     writeHandle handle (handle_ { haType__    = ClosedHandle,
+					   haFO__      = nullFile__ })
+	     return ""
+       _ -> do
+          more <- unsafeInterleaveIO (lazyReadLine handle fo)
+          buf  <- _ccall_ getBufStart fo bytes  -- ConcHask: won't block
+	  stToIO (unpackNBytesAccST buf bytes more)
+
+lazyReadChar handle fo = do
+    char <- mayBlock fo (_ccall_ readChar fo)   -- ConcHask: UNSAFE, may block.
+    case char of
+      -4 -> -- buffering is now block-buffered, use lazyReadBlock instead
+	    lazyReadBlock handle fo
+	    
+      -3 -> -- buffering is now line-buffered, use lazyReadLine instead
+	    lazyReadLine handle fo
+      -2 -> return ""
+      -1 -> do -- error, silently close handle.
+         handle_ <- readHandle handle
+         _ccall_ closeFile (haFO__ handle_) 0{-don't bother flusing-}  -- ConcHask: SAFE, won't block
+	 writeHandle handle (handle_{ haType__  = ClosedHandle,
+				      haFO__    = nullFile__ })
+	 return ""
+      _ -> do
+	 more <- unsafeInterleaveIO (lazyReadChar handle fo)
+         return (chr char : more)
 
 \end{code}
 
@@ -372,182 +294,173 @@ lazyReadChar handle = do
 %*							*
 %*********************************************************
 
-Computation $hPutChar hdl c$ writes the character {\em c} to the file
-or channel managed by {\em hdl}.  Characters may be buffered if
-buffering is enabled for {\em hdl}.
+@hPutChar hdl ch@ writes the character @ch@ to the file
+or channel managed by @hdl@.  Characters may be buffered if
+buffering is enabled for @hdl@
 
 \begin{code}
---hPutChar :: Handle -> Char -> IO ()
-
+hPutChar :: Handle -> Char -> IO ()
 hPutChar handle c = do
-    hdl   <- wantWriteableHandle handle
-    rc    <- _ccall_ filePutc (filePtr hdl) (ord c)
-    writeHandle handle (markHandle hdl)
+    handle_  <- wantWriteableHandle "hPutChar" handle
+    let fo = haFO__ handle_
+    rc       <- mayBlock fo (_ccall_ filePutc fo (ord c))   -- ConcHask: UNSAFE, may block.
+    writeHandle handle handle_
     if rc == 0
      then return ()
      else constructErrorAndFail "hPutChar"
+
 \end{code}
 
-Computation $hPutStr hdl s$ writes the string {\em s} to the file or
-channel managed by {\em hdl}.
+@hPutStr hdl s@ writes the string @s@ to the file or
+channel managed by @hdl@, buffering the output if needs be.
 
 \begin{code}
---hPutStr :: Handle -> String -> IO ()
-
+hPutStr :: Handle -> String -> IO ()
 hPutStr handle str = do
-    hdl <- wantWriteableHandle handle
-          {-
-           The code below is not correct for line-buffered terminal streams,
-           as the output stream is not flushed when terminal input is requested
-           again, just upon seeing a newline character. A temporary fix for the
-           most common line-buffered output stream, stdout, is to assume the
-           buffering it was given when created (no buffering). This is not
-           as bad as it looks, since stdio buffering sits underneath this.
+    handle_ <- wantWriteableHandle "hPutStr" handle
+    let fo = haFO__ handle_
+    case haBufferMode__ handle_ of
+       LineBuffering -> do
+	    buf <- _ccall_ getWriteableBuf fo
+	    pos <- _ccall_ getBufWPtr fo
+	    bsz <- _ccall_ getBufSize fo
+	    writeLines fo buf bsz pos str
+       BlockBuffering _ -> do
+	    buf <- _ccall_ getWriteableBuf fo
+	    pos <- _ccall_ getBufWPtr fo
+	    bsz <- _ccall_ getBufSize fo
+            writeBlocks fo buf bsz pos str
+       NoBuffering -> do
+	    writeChars fo str
+    writeHandle handle handle_
 
-	   ToDo: fix me
-	  -}
-    hdl     <- getBufferMode hdl
-    success <-
-         (case bufferMode hdl of
-            Just LineBuffering ->
-	        writeChars (filePtr hdl) str
-		--writeLines (filePtr hdl) str
-            Just (BlockBuffering (Just size)) ->
-	        writeBlocks (filePtr hdl) size str
-            Just (BlockBuffering Nothing) ->
-	        writeBlocks (filePtr hdl) (``BUFSIZ''-1) str
-            _ -> -- Nothing is treated pessimistically as NoBuffering
-	        writeChars (filePtr hdl) str
-	  )
-    writeHandle handle (markHandle hdl)
-    if success 
-     then return ()
-     else constructErrorAndFail "hPutStr"
+\end{code}
+
+Going across the border between Haskell and C is relatively costly,
+so for block writes we pack the character strings on the Haskell-side
+before passing the external write routine a pointer to the buffer.
+
+\begin{code}
 
 #ifndef __PARALLEL_HASKELL__
-writeLines :: ForeignObj -> String -> IO Bool
+writeLines :: ForeignObj -> Addr -> Int -> Int -> String -> IO ()
 #else
-writeLines :: Addr -> String -> IO Bool
+writeLines :: Addr -> Addr -> Int -> Int -> String -> IO ()
 #endif
-writeLines = writeChunks (``BUFSIZ''-1) True 
-
-#ifndef __PARALLEL_HASKELL__
-writeBlocks :: ForeignObj -> Int -> String -> IO Bool
-#else
-writeBlocks :: Addr -> Int -> String -> IO Bool
-#endif
-writeBlocks fp size s = writeChunks size False fp s
- 
-    {-
-      The breaking up of output into lines along \n boundaries
-      works fine as long as there are newlines to split by.
-      Avoid the splitting up into lines alltogether (doesn't work
-      for overly long lines like the stuff that showsPrec instances
-      normally return). Instead, we split them up into fixed size
-      chunks before blasting them off to the Real World.
-
-      Hacked to avoid multiple passes over the strings - unsightly, but
-      a whole lot quicker. -- SOF 3/96
-    -}
-
-#ifndef __PARALLEL_HASKELL__
-writeChunks :: Int -> Bool -> ForeignObj -> String -> IO Bool
-#else
-writeChunks :: Int -> Bool -> Addr -> String -> IO Bool
-#endif
-writeChunks (I# bufLen) chopOnNewLine fp s =
-  stToIO (newCharArray (0,I# bufLen)) >>= \ arr@(MutableByteArray _ arr#) ->
+writeLines obj buf bf@(I# bufLen) (I# initPos#) s =
   let
-   write_char :: MutableByteArray# RealWorld -> Int# -> Char# -> IO ()
-   write_char arr# n x = IO $ \ s# ->
-      case (writeCharArray# arr# n x s#) of { s1# ->
-	IOok s1# () }
+   write_char :: Addr -> Int# -> Char# -> IO ()
+   write_char (A# buf) n# c# =
+      IO $ \ s# ->
+      case (writeCharOffAddr# buf n# c# s#) of s2# -> IOok s2# () 
 
-   shoveString :: Int# -> [Char] -> IO Bool
+   shoveString :: Int# -> [Char] -> IO ()
    shoveString n ls = 
      case ls of
       [] ->   
         if n ==# 0# then
-          return True
+	  _ccall_ setBufWPtr obj (0::Int)
         else do
-          rc <- _ccall_ writeFile arr fp (I# n)
-          return (rc==0)
+	  {-
+	    At the end of a buffer write, update the buffer position
+	    in the underlying file object, so that if the handle
+	    is subsequently dropped by the program, the whole
+	    buffer will be properly flushed.
+
+	    There's one case where this delayed up-date of the buffer
+	    position can go wrong: if a thread is killed, it might be
+	    in the middle of filling up a buffer, with the result that
+	    the partial buffer update is lost upon finalisation. Not
+	    that killing of threads is supported at the moment.
+
+	  -}
+	  _ccall_ setBufWPtr obj (I# n)
 
       ((C# x):xs) -> do
-        write_char arr# n x
-	   
-          {- Flushing lines - should we bother? Yes, for line-buffered output. -}
-	if n ==# bufLen || (chopOnNewLine && (x `eqChar#` '\n'#))
+        write_char buf n x
+          {- Flushing on buffer exhaustion or newlines (even if it isn't the last one) -}
+	if n ==# bufLen || x `eqChar#` '\n'#
 	 then do
-	   rc <-  _ccall_ writeFile arr fp (I# (n +# 1#))
+	   rc <-  mayBlock obj (_ccall_ writeFileObject obj (I# (n +# 1#)))  -- ConcHask: UNSAFE, may block.
 	   if rc == 0 
 	    then shoveString 0# xs
-	    else return False
+	    else constructErrorAndFail "writeLines"
          else
 	   shoveString (n +# 1#) xs
   in
-  shoveString 0# s
+  shoveString initPos# s
 
 #ifndef __PARALLEL_HASKELL__
-writeChars :: ForeignObj -> String -> IO Bool
+writeBlocks :: ForeignObj -> Addr -> Int -> Int -> String -> IO ()
 #else
-writeChars :: Addr -> String -> IO Bool
+writeBlocks :: Addr -> Addr -> Int -> Int -> String -> IO ()
 #endif
-writeChars fp "" = return True
-writeChars fp (c:cs) = do
-  rc <- _ccall_ filePutc fp (ord c)
+writeBlocks obj buf bf@(I# bufLen) (I# initPos#) s =
+  let
+   write_char :: Addr -> Int# -> Char# -> IO ()
+   write_char (A# buf) n# c# =
+      IO $ \ s# ->
+      case (writeCharOffAddr# buf n# c# s#) of s2# -> IOok s2# () 
+
+   shoveString :: Int# -> [Char] -> IO ()
+   shoveString n ls = 
+     case ls of
+      [] ->   
+        if n ==# 0# then
+          _ccall_ setBufWPtr obj (0::Int)
+        else do
+	  {-
+	    At the end of a buffer write, update the buffer position
+	    in the underlying file object, so that if the handle
+	    is subsequently dropped by the program, the whole
+	    buffer will be properly flushed.
+
+	    There's one case where this delayed up-date of the buffer
+	    position can go wrong: if a thread is killed, it might be
+	    in the middle of filling up a buffer, with the result that
+	    the partial buffer update is lost upon finalisation. However,
+	    by the time killThread is supported, Haskell finalisers are also
+	    likely to be in, which means the 'IOFileObject' hack can go
+	    alltogether.
+
+	  -}
+	  _ccall_ setBufWPtr obj (I# n)
+
+      ((C# x):xs) -> do
+        write_char buf n x
+	if n ==# bufLen
+	 then do
+	   rc <-  mayBlock obj (_ccall_ writeFileObject obj (I# (n +# 1#)))   -- ConcHask: UNSAFE, may block.
+	   if rc == 0 
+	    then shoveString 0# xs
+	    else constructErrorAndFail "writeChunks"
+         else
+	   shoveString (n +# 1#) xs
+  in
+  shoveString initPos# s
+
+#ifndef __PARALLEL_HASKELL__
+writeChars :: ForeignObj -> String -> IO ()
+#else
+writeChars :: Addr -> String -> IO ()
+#endif
+writeChars fo "" = return ()
+writeChars fo (c:cs) = do
+  rc <- mayBlock fo (_ccall_ filePutc fo (ord c))   -- ConcHask: UNSAFE, may block.
   if rc == 0 
-   then writeChars fp cs
-   else return False
+   then writeChars fo cs
+   else constructErrorAndFail "writeChars"
 
 \end{code}
 
-The @hPutBuf hdl len elt_sz buf@ action writes the buffer @buf@ to
-the file/channel managed by @hdl@
-the string {\em s} to the file or
-channel managed by {\em hdl}.
-
-begin{code}
-hPutBuf :: Handle -> Int -> Int -> ByteArray Int -> IO ()
-hPutBuf handle len el_sz buf = do
-    hdl <- wantWriteableHandle handle
-          {-
-           The code below is not correct for line-buffered terminal streams,
-           as the output stream is not flushed when terminal input is requested
-           again, just upon seeing a newline character. A temporary fix for the
-           most common line-buffered output stream, stdout, is to assume the
-           buffering it was given when created (no buffering). This is not
-           as bad as it looks, since stdio buffering sits underneath this.
-
-	   ToDo: fix me
-	  -}
-    hdl   <- getBufferMode hdl
-    success <-
-             (case bufferMode hdl of
-               Just LineBuffering ->
-	          writeChars (filePtr hdl) str
-		  --writeLines (filePtr hdl) str
-               Just (BlockBuffering (Just size)) ->
-	          writeBlocks (filePtr hdl) size str
-               Just (BlockBuffering Nothing) ->
-	          writeBlocks (filePtr hdl) ``BUFSIZ'' str
-               _ -> -- Nothing is treated pessimistically as NoBuffering
-	          writeChars (filePtr hdl) str)
-    writeHandle handle (markHandle hdl)
-    if success 
-     then return ()
-     else constructErrorAndFail "hPutBuf"
-
-end{code}
-
-Computation $hPrint hdl t$ writes the string representation of {\em t}
-given by the $shows$ function to the file or channel managed by {\em
+Computation @hPrint hdl t@ writes the string representation of {\em t}
+given by the @shows@ function to the file or channel managed by {\em
 hdl}.
 
-SOF 2/97: Seem to have disappeared in 1.4 libs.
+[ Seem to have disappeared from the 1.4 interface  - SOF 2/97 ]
 
 \begin{code}
---hPrint :: Show a => Handle -> a -> IO ()
+hPrint :: Show a => Handle -> a -> IO ()
 hPrint hdl = hPutStr hdl . show
 \end{code}
 
@@ -555,7 +468,7 @@ Derived action @hPutStrLn hdl str@ writes the string \tr{str} to
 the handle \tr{hdl}, adding a newline at the end.
 
 \begin{code}
---hPutStrLn :: Handle -> String -> IO ()
+hPutStrLn :: Handle -> String -> IO ()
 hPutStrLn hndl str = do
  hPutStr  hndl str
  hPutChar hndl '\n'
@@ -597,4 +510,3 @@ bracket_ before after m = do
             Right r -> return r
             Left  e -> fail e
 \end{code}
-
