@@ -352,9 +352,10 @@ package_details installing
          extra_ghc_opts = [],
          extra_cc_opts  = [],
          extra_ld_opts  = [],
-        },
+        }
 
-         Package {
+#if defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
+         ,Package {
          name         = "win32",
 	 import_dirs    = if installing
                              then [ clibdir ++ "/imports/win32" ]
@@ -391,6 +392,7 @@ package_details installing
          extra_cc_opts  = [],
          extra_ld_opts  = []
         }
+#endif
    ]
   where
 	ghc_src_dir :: String -> String
