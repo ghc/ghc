@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.21 2002/02/12 15:17:24 simonmar Exp $
+-- $Id: Main.hs,v 1.22 2002/04/22 14:20:41 simonmar Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -41,7 +41,8 @@ data Flag
   | Input FilePath
   | List | Add Bool {- True => replace existing info -}
   | Remove String | Show String 
-  | Field String | AutoGHCiLibs
+  | Field String | AutoGHCiLibs | Force
+  deriving (Eq)
 
 isAction (Config _)     = False
 isAction (Field _)      = False
@@ -66,6 +67,8 @@ flags = [
  	"Show the configuration for package NAME",
   Option [] ["field"] (ReqArg Field "FIELD")
  	"(with --show-package) Show field FIELD only",
+  Option [] ["force"] (NoArg Force)
+ 	"ignore missing directories/libraries",
   Option ['r'] ["remove-package"] (ReqArg Remove "NAME")
  	"Remove an installed package",
   Option ['g'] ["auto-ghci-libs"] (NoArg AutoGHCiLibs)
@@ -113,9 +116,12 @@ runit clis = do
 	 where isAuto AutoGHCiLibs = True; isAuto _ = False
       input_file = head ([ f | (Input f) <- clis] ++ ["-"])
 
+      force = Force `elem` clis
+
   case [ c | c <- clis, isAction c ] of
     [ List ]     -> listPackages packages
-    [ Add upd ]  -> addPackage packages conf_file input_file auto_ghci_libs upd
+    [ Add upd ]  -> addPackage packages conf_file input_file 
+			auto_ghci_libs upd force
     [ Remove p ] -> removePackage packages conf_file p
     [ Show p ]   -> showPackage packages conf_file p fields
     _            -> die (usageInfo usageHeader flags)
@@ -137,8 +143,9 @@ showPackage packages pkgconf pkg_name fields =
 				(map (vcat . map text) (map ($pkg) fields))))
     _     -> die "showPackage: internal error"
 
-addPackage :: [PackageConfig] -> FilePath -> FilePath -> Bool -> Bool -> IO ()
-addPackage packages pkgconf inputFile auto_ghci_libs updatePkg = do
+addPackage :: [PackageConfig] -> FilePath -> FilePath
+	 -> Bool -> Bool -> Bool -> IO ()
+addPackage packages pkgconf inputFile auto_ghci_libs updatePkg force = do
   checkConfigAccess pkgconf
   s <-
     case inputFile of
@@ -152,9 +159,10 @@ addPackage packages pkgconf inputFile auto_ghci_libs updatePkg = do
   eval_catch new_pkg (\_ -> die "parse error in package info")
   hPutStrLn stdout "done."
   hPutStr stdout "Expanding embedded variables..."
-  new_exp_pkg <- expandEnvVars new_pkg
+  new_exp_pkg <- expandEnvVars new_pkg force
   hPutStrLn stdout "done."
-  new_details <- validatePackageConfig new_exp_pkg packages auto_ghci_libs updatePkg
+  new_details <- validatePackageConfig new_exp_pkg packages 
+			auto_ghci_libs updatePkg force
   savePackageConfig pkgconf
   maybeRestoreOldConfig pkgconf $
     writeNewConfig pkgconf new_details
@@ -220,16 +228,17 @@ validatePackageConfig :: PackageConfig
 		      -> [PackageConfig]
 		      -> Bool
 		      -> Bool
+		      -> Bool
 		      -> IO [PackageConfig]
-validatePackageConfig pkg pkgs auto_ghci_libs updatePkg = do
+validatePackageConfig pkg pkgs auto_ghci_libs updatePkg force = do
   when (not updatePkg && (name pkg `elem` map name pkgs))
        (die ("package `" ++ name pkg ++ "' is already installed"))
-  mapM_	(checkDep pkgs) (package_deps pkg)
-  mapM_	checkDir (import_dirs pkg)
-  mapM_	checkDir (source_dirs pkg)
-  mapM_	checkDir (library_dirs pkg)
-  mapM_	checkDir (include_dirs pkg)
-  mapM_ (checkHSLib (library_dirs pkg) auto_ghci_libs) (hs_libraries pkg)
+  mapM_	(checkDep pkgs force) (package_deps pkg)
+  mapM_	(checkDir force) (import_dirs pkg)
+  mapM_	(checkDir force) (source_dirs pkg)
+  mapM_	(checkDir force) (library_dirs pkg)
+  mapM_	(checkDir force) (include_dirs pkg)
+  mapM_ (checkHSLib (library_dirs pkg) auto_ghci_libs force) (hs_libraries pkg)
   -- ToDo: check these somehow?
   --	extra_libraries :: [String],
   --	c_includes      :: [String],
@@ -238,25 +247,26 @@ validatePackageConfig pkg pkgs auto_ghci_libs updatePkg = do
        | otherwise = pkgs
   return (existing_pkgs ++ [pkg])
 
-checkDir d
+checkDir force d
  | "$libdir" `isPrefixOf` d = return ()
 	-- can't check this, because we don't know what $libdir is
  | otherwise = do
    there <- doesDirectoryExist d
    when (not there)
-       (die ("`" ++ d ++ "' doesn't exist or isn't a directory"))
+       (dieOrForce force ("`" ++ d ++ "' doesn't exist or isn't a directory"))
 
-checkDep :: [PackageConfig] -> String -> IO ()
-checkDep pkgs n
+checkDep :: [PackageConfig] -> Bool -> String -> IO ()
+checkDep pkgs force n
   | n `elem` map name pkgs = return ()
-  | otherwise = die ("dependency `" ++ n ++ "' doesn't exist")
+  | otherwise = dieOrForce force ("dependency `" ++ n ++ "' doesn't exist")
 
-checkHSLib :: [String] -> Bool -> String -> IO ()
-checkHSLib dirs auto_ghci_libs lib = do
+checkHSLib :: [String] -> Bool -> Bool -> String -> IO ()
+checkHSLib dirs auto_ghci_libs force lib = do
   let batch_lib_file = "lib" ++ lib ++ ".a"
   bs <- mapM (doesLibExistIn batch_lib_file) dirs
   case [ dir | (exists,dir) <- zip bs dirs, exists ] of
-	[] -> die ("cannot find `" ++ batch_lib_file ++ "' on library path") 
+	[] -> dieOrForce force ("cannot find `" ++ batch_lib_file ++
+				 "' on library path") 
 	(dir:_) -> checkGHCiLib dirs dir batch_lib_file lib auto_ghci_libs
 
 doesLibExistIn lib d
@@ -288,8 +298,8 @@ autoBuildGHCiLib dir batch_file ghci_file = do
   hPutStrLn stderr (" done.")
 
 -----------------------------------------------------------------------------
-expandEnvVars :: PackageConfig -> IO PackageConfig
-expandEnvVars pkg = do
+expandEnvVars :: PackageConfig -> Bool -> IO PackageConfig
+expandEnvVars pkg force = do
    -- permit _all_ strings to contain ${..} environment variable references,
    -- arguably too flexible.
   nm       <- expandString (name pkg)
@@ -335,12 +345,19 @@ expandEnvVars pkg = do
 
    lookupEnvVar nm = 
 	catch (System.getEnv nm)
-	      (\ _ -> die ("Unable to expand variable " ++ show nm))
+	   (\ _ -> do dieOrForce force ("Unable to expand variable " ++ 
+					show nm)
+		      return "")
 
 -----------------------------------------------------------------------------
 
 die :: String -> IO a
 die s = do { hFlush stdout ; hPutStrLn stderr s; exitWith (ExitFailure 1) }
+
+dieOrForce :: Bool -> String -> IO ()
+dieOrForce force s 
+  | force     = do hFlush stdout; hPutStrLn stderr (s ++ " (ignoring)")
+  | otherwise = die s
 
 -----------------------------------------------------------------------------
 -- Exceptions
