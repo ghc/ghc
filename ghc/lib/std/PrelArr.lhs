@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelArr.lhs,v 1.24 2000/07/07 11:03:57 simonmar Exp $
+% $Id: PrelArr.lhs,v 1.25 2000/08/31 19:57:42 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -275,6 +275,12 @@ type IPr = (Int, Int)
 data Ix ix => Array     ix elt = Array   ix ix (Array# elt)
 data Ix ix => STArray s ix elt = STArray ix ix (MutableArray# s elt)
 
+-- Mutterings about dependent types... ignore!
+-- Array :: ix -> ix -> Array# elt -> Array
+-- Array :: forall { l::int, h::int, l<=h } Int(l) -> Int(h) -> Array#(h-l+1) -> Array(l,h)
+-- Array :: forall { l1,l2::int, h1,h2::int, l1<=h1+1,l2<=h2+1 } 
+--		   (Int(l1),Int(l2)) -> (Int(h1),Int(h2)) -> Array#((h1-l1+1)*(h2-l2+1)) -> Array(l1,h1,l2,h2)
+
 
 data STRef s a = STRef (MutVar# s a)
 
@@ -539,17 +545,17 @@ freezeSTArray (STArray l u arr#) = ST $ \ s# ->
     case rangeSize (l,u)     of { I# n# ->
     case freeze arr# n# s# of { (# s2#, frozen# #) ->
     (# s2#, Array l u frozen# #) }}
-  where
-    freeze  :: MutableArray# s ele	-- the thing
-	    -> Int#			-- size of thing to be frozen
-	    -> State# s			-- the Universe and everything
-	    -> (# State# s, Array# ele #)
-    freeze m_arr# n# s#
-      = case newArray# n# init s#	      of { (# s2#, newarr1# #) ->
-	case copy 0# n# m_arr# newarr1# s2#   of { (# s3#, newarr2# #) ->
-	unsafeFreezeArray# newarr2# s3#
-	}}
-      where
+
+freeze  :: MutableArray# s ele	-- the thing
+	-> Int#			-- size of thing to be frozen
+	-> State# s			-- the Universe and everything
+	-> (# State# s, Array# ele #)
+freeze m_arr# n# s#
+ = case newArray# n# init s#	      	 of { (# s2#, newarr1# #) ->
+   case copy 0# n# m_arr# newarr1# s2#   of { (# s3#, newarr2# #) ->
+   unsafeFreezeArray# newarr2# s3#
+   }}
+ where
 	init = error "freezeArray: element not copied"
 
 	copy :: Int# -> Int#
@@ -584,16 +590,16 @@ thawSTArray (Array l u arr#) = ST $ \ s# ->
     case rangeSize (l,u) of { I# n# ->
     case thaw arr# n# s# of { (# s2#, thawed# #) ->
     (# s2#, STArray l u thawed# #)}}
-  where
-    thaw  :: Array# ele			-- the thing
-	    -> Int#			-- size of thing to be thawed
-	    -> State# s			-- the Universe and everything
-	    -> (# State# s, MutableArray# s ele #)
 
-    thaw arr1# n# s#
-      = case newArray# n# init s#	      of { (# s2#, newarr1# #) ->
-	copy 0# n# arr1# newarr1# s2# }
-      where
+thaw  :: Array# ele		-- the thing
+      -> Int#			-- size of thing to be thawed
+      -> State# s		-- the Universe and everything
+      -> (# State# s, MutableArray# s ele #)
+
+thaw arr1# n# s#
+  = case newArray# n# init s#	      of { (# s2#, newarr1# #) ->
+    copy 0# n# arr1# newarr1# s2# }
+  where
 	init = error "thawSTArray: element not copied"
 
 	copy :: Int# -> Int#
