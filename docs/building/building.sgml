@@ -3556,8 +3556,8 @@ don't do this you get very weird messages when you type
 </listitem>
 
 <listitem>
-<para>GHC uses the <emphasis>mingwin</emphasis> C compiler to
-generate code, so you have to install that. Just pick up a mingwin bundle at
+<para>GHC uses the <emphasis>mingw</emphasis> C compiler to
+generate code, so you have to install that. Just pick up a mingw bundle at
 <ulink url="http://www.mingw.org/">http://www.mingw.org/</ulink>.
 We install it in <filename>c:/mingw</filename>.
 </para>
@@ -3566,20 +3566,31 @@ We install it in <filename>c:/mingw</filename>.
 <listitem>
 <para>
 Install a version of GHC, and put it in your <constant>PATH</constant>. 
-The InstallShield tells you the path when you install it.
+
 </para>
 </listitem>
 
 <listitem>
 <para>
 Because of various hard-wired infelicities, you need to copy
-<Filename>bash.exe</Filename> (from GHC's <Filename>extra-bin</Filename>
-directory), and <Filename>perl.exe</Filename> and
-<Filename>cat.exe</Filename> (from GHC's <Filename>bin</Filename> directory)
-to <Filename>/bin</Filename> (discover where your Cygwin root directory is
-by typign <Command>mount</Command>).
+<Filename>bash.exe</Filename>, <Filename>perl.exe</Filename> and
+<Filename>cat.exe</Filename> (from Cygwin's <Filename>bin</Filename>
+directory), to <Filename>/bin</Filename> (discover where your Cygwin
+root directory is by typing <Command>mount</Command>). If
+<Command>/bin</Command> points to the Cygwin <Filename>bin</Filename>
+directory, there's no need to copy anything.
 </para>
 </listitem>
+
+<listitem>
+<para>
+By default, cygwin provides the command shell <filename>ash</filename>
+as <filename>sh.exe</filename>. It has a couple of 'issues', so
+in your <filename>/bin</filename> directory, make sure that <filename>
+bash.exe</filename> is also provided as <filename>sh.exe</filename>.
+</para>
+</listitem>
+
 
 <listitem>
 <para> You should not need to install <command>ssh</command> 
@@ -3612,28 +3623,41 @@ running /bin/sh ./configure  --cache-file=.././config.cache --srcdir=.
 ./configure: ./configure: No such file or directory
 configure: error: ./configure failed for ghc
 </Screen>
+</listitem>
+
+<listitem>
+<para>
+You either need to add <filename>ghc</filename> to your
+<constant>PATH</constant> before you invoke
+<Command>configure</Command>, or use the <Command>configure</Command>
+option <option>--with-ghc=c:/ghc/ghc-some-version/bin/ghc</option>.
+
+</para>
+<para>
+The Windows installer for GHC tells you at the end what
+additions you need to make to your <constant>PATH</constant>.
 </para>
 </listitem>
 
-	<listitem>
-	  <para> 
-	    After <command>autoconf</command> run <command>./configure</command> in
-	    <filename>fptools/</filename> thus:
+<listitem>
+  <para> 
+    After <command>autoconf</command> run <command>./configure</command> in
+    <filename>fptools/</filename> thus:
+
 <Screen>
   ./configure --host=i386-unknown-mingw32 --with-gcc=/mingw/bin/gcc
 </Screen>
-      Both these options are important!
-      It's possible to get into trouble using the
-      wrong C compiler!
-      </para>
-      </listitem>
 
-
+Both these options are important! It's possible to get into
+trouble using the wrong C compiler!
+</para>
+</listitem>
 
 </ItemizedList>
-
 </Sect2>
 
+
+<!--
     <sect2>
       <title>Building the Windows InstallShield&reg; Installer</title>
 
@@ -3703,6 +3727,7 @@ include/
 	</sect3>
       
     </sect2>
+-->
 
 </Sect1>
 
