@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.25 2000/12/12 17:21:41 simonmar Exp $
+# $Id: Makefile,v 1.26 2001/03/28 16:35:39 simonmar Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -10,7 +10,6 @@ SRC_HC_OPTS += -dcore-lint
 packedstring001_HC_OPTS = -package lang
 exceptions001_HC_OPTS   = -package lang	-fno-warn-missing-methods
 stableptr001_HC_OPTS    = -package lang
-stableptr002_HC_OPTS    = -package lang -fglasgow-exts
 stableptr003_HC_OPTS    = -package lang
 stableptr004_HC_OPTS    = -package lang
 list001_HC_OPTS         = -package lang
@@ -31,6 +30,7 @@ dynamic002_HC_OPTS = -package lang
 
 ioexts001_HC_OPTS 	= -package lang -O
 ioexts001_RUNTEST_OPTS  = +RTS -K16m
+ioexts002_HC_OPTS       = -package lang
 
 memo001_HC_OPTS		= -package lang -package util
 # stress the garbage collector a bit, to make sure weak pointers are being
