@@ -22,10 +22,12 @@ module TysWiredIn (
 	consDataCon,
 	doubleDataCon,
 	doubleTy,
+	isDoubleTy,
 	doubleTyCon,
 	falseDataCon,
 	floatDataCon,
 	floatTy,
+	isFloatTy,
 	floatTyCon,
 	getStatePairingConInfo,
 
@@ -252,10 +254,23 @@ floatTy	= mkTyConTy floatTyCon
 
 floatTyCon = pcNonRecDataTyCon floatTyConKey pREL_BASE SLIT("Float") [] [floatDataCon]
 floatDataCon = pcDataCon floatDataConKey pREL_BASE SLIT("F#") [] [] [floatPrimTy] floatTyCon
+
+isFloatTy :: GenType flexi -> Bool
+isFloatTy ty
+  = case (splitAlgTyConApp_maybe ty) of
+	Just (tycon, [], _) -> uniqueOf tycon == floatTyConKey
+	_		    -> False
+
 \end{code}
 
 \begin{code}
 doubleTy = mkTyConTy doubleTyCon
+
+isDoubleTy :: GenType flexi -> Bool
+isDoubleTy ty
+  = case (splitAlgTyConApp_maybe ty) of
+	Just (tycon, [], _) -> uniqueOf tycon == doubleTyConKey
+	_		    -> False
 
 doubleTyCon = pcNonRecDataTyCon doubleTyConKey pREL_BASE SLIT("Double") [] [doubleDataCon]
 doubleDataCon = pcDataCon doubleDataConKey pREL_BASE SLIT("D#") [] [] [doublePrimTy] doubleTyCon
