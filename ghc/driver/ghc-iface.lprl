@@ -51,7 +51,7 @@ sub postprocessHiFile {
     # if we produced an interface file "no matter what",
     # print what we got on stderr (ToDo: honor -ohi flag)
     if ( $HiOnStdout ) {
-        system("$Cat $new_hi 1>&2") if $Verbose;
+        system("$Cat $new_hi 1>&2"); # if $Verbose;
     } else {
 	&run_something("$Cmp -s $hifile_target $new_hi || ( $Rm $hifile_target && $Cp $new_hi $hifile_target )",
 	   "Replace .$HiSuffix file, if changed");
@@ -223,13 +223,8 @@ sub readHiFile {
 		$Decl{"$mod:$current_name"} = $_;
 	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
 
-	    } elsif ( /class\s+(.*\s+=>\s+)?(\S+)\s+.*where\s+\{.*\};/ ) {
+	    } elsif ( /^class\s+(.*\s+=>\s+)?(\S+)\s+.*where\s+\{.*\}/ ) {
 		# must be wary of => bit matching after "where"...
-		$current_name = $2;
-		$Decl{"$mod:$current_name"} = $_;
-	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
-
-	    } elsif ( /class\s+(.*\s+=>\s+)?(\S+)\s+/ ) {
 		$current_name = $2;
 		$Decl{"$mod:$current_name"} = $_;
 	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
