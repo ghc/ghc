@@ -187,6 +187,16 @@ OBJS=$(HS_OBJS) $(C_OBJS) $(SCRIPT_OBJS)
 #
 
 #------------------------------------------------------------------
+#
+# make depend defaults
+#
+# The default set of files for the dependency generators to work on
+# is just their source equivalents.
+# 
+MKDEPENDHS_SRCS=$(HS_SRCS)
+MKDEPENDC_SRCS=$(C_SRCS)
+
+#------------------------------------------------------------------
 # Clean file make-variables.
 #
 # The following three variables are used to control
