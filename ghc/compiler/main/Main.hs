@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.77 2001/06/29 12:58:20 rrt Exp $
+-- $Id: Main.hs,v 1.78 2001/06/29 15:30:49 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -111,12 +111,13 @@ import Dynamic		( toDyn )
 
 main =
   -- top-level exception handler: any unrecognised exception is a compiler bug.
-  handle (\exn -> case exn of
-	               IOException _ -> do hPutStr stderr (show exn)
-	                                   exitWith (ExitFailure 1)
-	               _             -> do hPutStr stderr (show (Panic (show exn)))
-	                                   exitWith (ExitFailure 1)
-	 ) $ do
+  handle (\exception -> do
+	   case exception of
+		-- an IO exception probably isn't our fault, so don't panic
+		IOException _ ->  hPutStr stderr (show exception)
+		_other 	      ->  hPutStr stderr (show (Panic (show exception)))
+	   exitWith (ExitFailure 1)
+         ) $ do
 
   -- all error messages are propagated as exceptions
   handleDyn (\dyn -> case dyn of
