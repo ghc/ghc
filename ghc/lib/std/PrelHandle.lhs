@@ -1,4 +1,4 @@
-
+%
 % (c) The AQUA Project, Glasgow University, 1994-1996
 %
 
@@ -1032,7 +1032,7 @@ reportError bombOut str = do
 foreign label "ErrorHdrHook" 
         addrOf_ErrorHdrHook :: Addr
 
-foreign import ccall "writeErrString__" 
+foreign import ccall "writeErrString__" unsafe
 	writeErrString :: Addr -> ByteArray Int -> Int -> IO ()
 
 foreign import ccall "stackOverflow"
