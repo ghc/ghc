@@ -55,7 +55,7 @@ import Module		( Module, ModuleEnv,
 			)
 import PrelInfo		( wiredInThingEnv, hasKey, fractionalClassKey, numClassKey, 
 			  integerTyConName, doubleTyConName )
-import Maybes		( maybeToBool )
+import Maybe		( isJust )
 import FiniteMap
 import Outputable
 import Bag
@@ -456,7 +456,7 @@ that are mentioned in:
 We slurp in an instance decl from the gated instance pool iff
 	
 	all its gates are either in the gates of the module, 
-	or are a previously-loaded class.  
+	or are a previously-loaded tycon or class.  
 
 The latter constraint is because there might have been an instance
 decl slurped in during an earlier compilation, like this:
@@ -465,9 +465,19 @@ decl slurped in during an earlier compilation, like this:
 
 In the module being compiled we might need (Baz (Maybe T)), where T
 is defined in this module, and hence we need (Foo T).  So @Foo@ becomes
-a gate.  But there's no way to 'see' that, so 
+a gate.  But there's no way to 'see' that.  More generally, types
+might be involved as well:
 
-	we simply treat all previously-loaded classes as gates.
+	instance Foo2 T a => Baz2 a where ...
+
+Now we must treat T as a gate too, as well as Foo.  So the solution
+we adopt is:
+
+	we simply treat all previously-loaded 
+	tycons and classes as gates.
+
+This gloss only affects ghc --make and ghc --interactive.
+
 
 Consructors and class operations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -610,10 +620,8 @@ getImportedInstDecls gates
     getIfacesRn 					`thenRn` \ ifaces ->
     getTypeEnvRn					`thenRn` \ lookup ->
     let
-	available n
-	  | n `elemNameSet` gates = True
-	  | otherwise		  = case lookup n of { Just (AClass c) -> True; other -> False }
-		-- See "The gating story" above for the AClass thing
+	available n = n `elemNameSet` gates || isJust (lookup n)
+		-- See "The gating story" above for the isJust thing
 
 	(decls, new_insts) = selectGated available (iInsts ifaces)
     in
@@ -642,7 +650,7 @@ getImportedRules
 		-- Slurp rules for anything that is slurped, 
 		-- either now or previously
 	gates	   	   = iSlurp ifaces	
-	available n        = n `elemNameSet` gates || maybeToBool (lookup n)
+	available n        = n `elemNameSet` gates || isJust (lookup n)
 	(decls, new_rules) = selectGated available (iRules ifaces)
     in
     if null decls then
