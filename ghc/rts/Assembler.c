@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.14 $
- * $Date: 1999/11/08 15:30:32 $
+ * $Revision: 1.15 $
+ * $Date: 1999/11/16 17:39:07 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -501,6 +501,7 @@ static StgWord repSizeW( AsmRep rep )
     case ALPHA_REP:    /* a                        */ 
     case BETA_REP:     /* b			   */ 
     case GAMMA_REP:    /* c			   */ 
+    case DELTA_REP:    /* d			   */ 
     case HANDLER_REP:  /* IOError -> IO a	   */ 
     case ERROR_REP:    /* IOError		   */ 
     case ARR_REP    :  /* PrimArray              a */ 
@@ -508,10 +509,8 @@ static StgWord repSizeW( AsmRep rep )
     case REF_REP    :  /* Ref                  s a */ 
     case MUTARR_REP :  /* PrimMutableArray     s a */ 
     case MUTBARR_REP:  /* PrimMutableByteArray s a */ 
-#ifdef PROVIDE_CONCURRENT
     case THREADID_REP: /* ThreadId                 */ 
     case MVAR_REP:     /* MVar a                   */ 
-#endif
     case PTR_REP:     return sizeofW(StgPtr);
 
     case VOID_REP:    return sizeofW(StgWord);
@@ -841,6 +840,7 @@ void   asmVar           ( AsmBCO bco, AsmVar v, AsmRep rep )
     case ALPHA_REP:    /* a                        */ 
     case BETA_REP:     /* b			   */
     case GAMMA_REP:    /* c			   */ 
+    case DELTA_REP:    /* d			   */ 
     case HANDLER_REP:  /* IOError -> IO a	   */
     case ERROR_REP:    /* IOError		   */
     case ARR_REP    :  /* PrimArray              a */
@@ -848,10 +848,8 @@ void   asmVar           ( AsmBCO bco, AsmVar v, AsmRep rep )
     case REF_REP    :  /* Ref                  s a */
     case MUTARR_REP :  /* PrimMutableArray     s a */
     case MUTBARR_REP:  /* PrimMutableByteArray s a */
-#ifdef PROVIDE_CONCURRENT
     case THREADID_REP: /* ThreadId	           */
     case MVAR_REP:     /* MVar a	           */
-#endif
     case PTR_REP:
             emit_i_VAR(bco,offset);
             break;
@@ -1409,13 +1407,13 @@ const AsmPrim asmPrimOps[] = {
     , { "primFork",                  "a", "T",   MONAD_IO, i_PRIMOP2, i_fork }
     , { "primKillThread",            "T", "",    MONAD_IO, i_PRIMOP2, i_killThread }
     , { "primSameMVar",              "rr", "B",  MONAD_Id, i_PRIMOP2, i_sameMVar }
-    , { "primNewMVar",               "",  "r",   MONAD_IO, i_PRIMOP2, i_newMVar }
-    , { "primTakeMVar",              "r", "a",   MONAD_IO, i_PRIMOP2, i_takeMVar }
-    , { "primPutMVar",               "ra", "",   MONAD_IO, i_PRIMOP2, i_putMVar } 
     , { "primDelay",                 "I", "",    MONAD_IO, i_PRIMOP2, i_delay }
     , { "primWaitRead",              "I", "",    MONAD_IO, i_PRIMOP2, i_waitRead }
     , { "primWaitWrite",             "I", "",    MONAD_IO, i_PRIMOP2, i_waitWrite }
 #endif
+    , { "primNewMVar",               "",  "r",   MONAD_IO, i_PRIMOP2, i_newMVar }
+      /* primTakeMVar is handwritten bytecode */
+    , { "primPutMVar",               "ra", "",   MONAD_IO, i_PRIMOP2, i_putMVar } 
 
     /* Ccall is polyadic - so it's excluded from this table */
 
@@ -1485,7 +1483,7 @@ AsmBCO asm_BCO_seq ( void )
    AsmBCO eval, cont;
 
    cont = asmBeginBCO(0 /*NIL*/);
-   emiti_8(cont,i_ARG_CHECK,2);
+   emiti_8(cont,i_ARG_CHECK,2);   /* should never fail */
    emit_i_VAR(cont,1);
    emit_i_SLIDE(cont,1,2);
    emiti_(cont,i_ENTER);
@@ -1505,6 +1503,46 @@ AsmBCO asm_BCO_seq ( void )
 
    return eval;
 }
+
+AsmBCO asm_BCO_takeMVar ( void )
+{
+   AsmBCO kase, casecont, take;
+
+   take = asmBeginBCO(0 /*NIL*/);
+   emit_i_VAR(take,0);
+   emiti_8(take,i_PRIMOP2,i_takeMVar);
+   emit_i_VAR(take,3);
+   emit_i_VAR(take,1);
+   emit_i_VAR(take,4);
+   emit_i_SLIDE(take,3,4);
+   emiti_(take,i_ENTER);
+   incSp(take,20);
+   asmEndBCO(take);
+
+   casecont = asmBeginBCO(0 /*NIL*/);
+   emiti_(casecont,i_UNPACK);
+   emit_i_VAR(casecont,4);
+   emit_i_VAR(casecont,4);
+   emit_i_VAR(casecont,2);
+   emit_i_CONST(casecont,casecont->object.ptrs.len);
+   asmPtr(casecont,&(take->object));
+   emit_i_SLIDE(casecont,4,5);
+   emiti_(casecont,i_ENTER);
+   incSp(casecont,20);
+   asmEndBCO(casecont);
+
+   kase = asmBeginBCO(0 /*NIL*/);
+   emiti_8(kase,i_ARG_CHECK,3);
+   emit_i_RETADDR(kase,kase->object.ptrs.len);
+   asmPtr(kase,&(casecont->object));
+   emit_i_VAR(kase,2);
+   emiti_(kase,i_ENTER);
+   incSp(kase,20);
+   asmEndBCO(kase);
+
+   return kase;
+}
+
 
 /* --------------------------------------------------------------------------
  * Heap manipulation

@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.15 $
- * $Date: 1999/11/12 17:32:48 $
+ * $Revision: 1.16 $
+ * $Date: 1999/11/16 17:38:58 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -565,28 +565,26 @@ static Cell foreignInboundTy ( Type t )
 static Name repToBox( char c )
 {
     switch (c) {
-    case CHAR_REP:    return nameMkC;
-    case INT_REP:     return nameMkI;
-    case INTEGER_REP: return nameMkInteger;
-    case WORD_REP:    return nameMkW;
-    case ADDR_REP:    return nameMkA;
-    case FLOAT_REP:   return nameMkF;
-    case DOUBLE_REP:  return nameMkD;
-    case ARR_REP:     return nameMkPrimArray;            
-    case BARR_REP:    return nameMkPrimByteArray;
-    case REF_REP:     return nameMkRef;                  
-    case MUTARR_REP:  return nameMkPrimMutableArray;     
-    case MUTBARR_REP: return nameMkPrimMutableByteArray; 
-    case STABLE_REP:  return nameMkStable;
+    case CHAR_REP:     return nameMkC;
+    case INT_REP:      return nameMkI;
+    case INTEGER_REP:  return nameMkInteger;
+    case WORD_REP:     return nameMkW;
+    case ADDR_REP:     return nameMkA;
+    case FLOAT_REP:    return nameMkF;
+    case DOUBLE_REP:   return nameMkD;
+    case ARR_REP:      return nameMkPrimArray;            
+    case BARR_REP:     return nameMkPrimByteArray;
+    case REF_REP:      return nameMkRef;                  
+    case MUTARR_REP:   return nameMkPrimMutableArray;     
+    case MUTBARR_REP:  return nameMkPrimMutableByteArray; 
+    case STABLE_REP:   return nameMkStable;
+    case THREADID_REP: return nameMkThreadId;
+    case MVAR_REP:     return nameMkPrimMVar;
 #ifdef PROVIDE_WEAK
     case WEAK_REP:  return nameMkWeak;
 #endif
 #ifdef PROVIDE_FOREIGN
     case FOREIGN_REP: return nameMkForeign;
-#endif
-#ifdef PROVIDE_CONCURRENT
-    case THREADID_REP: return nameMkThreadId;
-    case MVAR_REP:     return nameMkMVar;
 #endif
     default: return NIL;
     }

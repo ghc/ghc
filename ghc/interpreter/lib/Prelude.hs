@@ -103,6 +103,8 @@ module Prelude (
     asTypeOf, error, undefined,
     seq, ($!)
 
+    , MVar, newMVar, putMVar, takeMVar
+
     ,trace
     -- Arrrggghhh!!! Help! Help! Help!
     -- What?!  Prelude.hs doesn't even _define_ most of these things!
@@ -1774,6 +1776,9 @@ primGetEnv v
 -- ST, IO --------------------------------------------------------------------
 ------------------------------------------------------------------------------
 
+-- Do not change this newtype to a data, or MVars will stop
+-- working.  In general the MVar stuff is pretty fragile: do
+-- not mess with it.
 newtype ST s a = ST (s -> (a,s))
 
 data RealWorld
@@ -1820,7 +1825,7 @@ unsafeInterleaveIO = unsafeInterleaveST
 
 
 ------------------------------------------------------------------------------
--- Word, Addr, StablePtr, Prim*Array -----------------------------------------
+-- Word, Addr, StablePtr, Prim*Array, ThreadId, MVar -------------------------
 ------------------------------------------------------------------------------
 
 data Addr
@@ -1870,6 +1875,41 @@ data Ref                  s a -- mutable variables
 data PrimMutableArray     s a -- mutable arrays with Int indices
 data PrimMutableByteArray s
 
+data ThreadId
+
+data MVar a
+
+
+newMVar :: IO (MVar a)
+newMVar = primNewMVar
+
+putMVar :: MVar a -> a -> IO ()
+putMVar = primPutMVar
+
+takeMVar :: MVar a -> IO a
+takeMVar m
+   = ST (\world -> primTakeMVar m cont world)
+     where
+        -- cont :: a -> RealWorld -> (a,RealWorld)
+        -- where 'a' is as in the top-level signature
+        cont x world = (x,world)
+
+        -- the type of the handwritten BCO (threesome) primTakeMVar is
+        -- primTakeMVar :: MVar a 
+        --                 -> (a -> RealWorld -> (a,RealWorld)) 
+        --                 -> RealWorld 
+        --                 -> (a,RealWorld)
+        --
+        -- primTakeMVar behaves like this:
+        --
+        -- primTakeMVar (MVar# m#) cont world
+        --    = primTakeMVar_wrk m# cont world
+        --
+        -- primTakeMVar_wrk m# cont world
+        --    = cont (takeMVar# m#) world
+        --
+        -- primTakeMVar_wrk has the special property that it is
+        -- restartable by the scheduler, should the MVar be empty.
 
 
 -- showFloat ------------------------------------------------------------------

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.10 $
- * $Date: 1999/11/01 18:19:40 $
+ * $Revision: 1.11 $
+ * $Date: 1999/11/16 17:39:10 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -381,6 +381,8 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
                     return disNone(bco,pc,"ccall_stdcall_IO");
             case i_raise:
                     return disNone(bco,pc,"primRaise");
+            case i_takeMVar:
+                    return disNone(bco,pc,"primTakeMVar");
             default:
                 {
                     const AsmPrim* p = asmFindPrimop(i_PRIMOP2,op);

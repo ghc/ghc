@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.12 $
- * $Date: 1999/11/12 17:32:40 $
+ * $Revision: 1.13 $
+ * $Date: 1999/11/16 17:38:55 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -38,15 +38,13 @@ Type typePrimMutableByteArray;
 Type typeFloat;
 Type typeDouble;
 Type typeStable;
+Type typeThreadId;
+Type typeMVar;
 #ifdef PROVIDE_WEAK
 Type typeWeak;
 #endif
 #ifdef PROVIDE_FOREIGN
 Type typeForeign;
-#endif
-#ifdef PROVIDE_CONCURRENT
-Type typeThreadId;
-Type typeMVar;
 #endif
 
 Type typeList;
@@ -140,6 +138,7 @@ Name nameFlip;
 Name namePrimSeq;
 Name namePrimCatch;
 Name namePrimRaise;
+Name namePrimTakeMVar;
 
 Name nameFromTo;
 Name nameFromThen;
@@ -165,15 +164,13 @@ Name nameMkRef;
 Name nameMkPrimMutableArray;     
 Name nameMkPrimMutableByteArray; 
 Name nameMkStable;                      /* StablePtr# a -> StablePtr a     */
+Name nameMkThreadId;                    /* ThreadId#    -> ThreadId        */
+Name nameMkPrimMVar;                    /* MVar# a      -> MVar a          */
 #ifdef PROVIDE_WEAK
 Name nameMkWeak;                        /* Weak# a      -> Weak a          */
 #endif
 #ifdef PROVIDE_FOREIGN
 Name nameMkForeign;                     /* ForeignObj#  -> ForeignObj      */
-#endif
-#ifdef PROVIDE_CONCURRENT
-Name nameMkThreadId;                    /* ThreadId#    -> ThreadId        */
-Name nameMkMVar;                        /* MVar#        -> MVar            */
 #endif
 
 
@@ -294,11 +291,8 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
 #ifdef PROVIDE_FOREIGN
         typeForeign      = linkTycon("ForeignObj");
 #endif
-#ifdef PROVIDE_CONCURRENT
         typeThreadId     = linkTycon("ThreadId");
         typeMVar         = linkTycon("MVar");
-#endif
-
         typeBool         = linkTycon("Bool");
         typeST           = linkTycon("ST");
         typeIO           = linkTycon("IO");
@@ -350,10 +344,9 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
         nameMkRef                  = addPrimCfunREP(findText("Ref#"),1,0,0);
         nameMkPrimMutableArray     = addPrimCfunREP(findText("PrimMutableArray#"),1,0,0);
         nameMkPrimMutableByteArray = addPrimCfunREP(findText("PrimMutableByteArray#"),1,0,0);
-#ifdef PROVIDE_CONCURRENT
-        nameMkThreadId   = addPrimCfun(findTextREP("ThreadId#"),1,0,0);
-        nameMkMVar       = addPrimCfun(findTextREP("MVar#"),1,0,0);
-#endif
+        nameMkThreadId             = addPrimCfunREP(findText("ThreadId#"),1,0,0);
+        nameMkPrimMVar             = addPrimCfunREP(findText("MVar#"),1,0,0);
+
         /* The following primitives are referred to in derived instances and
          * hence require types; the following types are a little more general
          * than we might like, but they are the closest we can get without a
@@ -383,6 +376,12 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
             = primType(MONAD_Id, "aH", "a");
         name(namePrimRaise).type
             = primType(MONAD_Id, "E", "a");
+
+        /* This is a lie.  For a more accurate type of primTakeMVar
+           see ghc/interpreter/lib/Prelude.hs.
+	*/
+        name(namePrimTakeMVar).type
+            = primType(MONAD_Id, "rbc", "d");
 
         for (i=2; i<=NUM_DTUPLES; i++) {/* Add derived instances of tuples */
             addTupInst(classEq,i);
@@ -564,6 +563,7 @@ Int what; {
                        pFun(namePrimSeq,        "primSeq");
                        pFun(namePrimCatch,      "primCatch");
                        pFun(namePrimRaise,      "primRaise");
+                       pFun(namePrimTakeMVar,   "primTakeMVar");
                        {
                           StgVar vv = mkStgVar(NIL,NIL);
                           Name n = namePrimSeq;
@@ -596,7 +596,16 @@ Int what; {
                           name(n).stgVar = vv;
                           stgGlobals=cons(pair(n,vv),stgGlobals);
                        }
-
+                       {
+                          StgVar vv = mkStgVar(NIL,NIL);
+                          Name n = namePrimTakeMVar;
+                          name(n).line = 0;
+                          name(n).arity = 2;
+                          name(n).type = NIL;
+                          stgVarInfo(vv) = mkPtr ( asm_BCO_takeMVar() );
+                          name(n).stgVar = vv;
+                          stgGlobals=cons(pair(n,vv),stgGlobals);
+                       }
                        break;
     }
 }

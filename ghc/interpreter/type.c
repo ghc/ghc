@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.11 $
- * $Date: 1999/11/12 17:32:48 $
+ * $Revision: 1.12 $
+ * $Date: 1999/11/16 17:39:00 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2488,6 +2488,7 @@ static Type stateVar = NIL;
 static Type alphaVar = NIL;
 static Type betaVar  = NIL;
 static Type gammaVar = NIL;
+static Type deltaVar = NIL;
 static Int  nextVar  = 0;
 
 static Void clearTyVars( void )
@@ -2496,6 +2497,7 @@ static Void clearTyVars( void )
     alphaVar = NIL;
     betaVar  = NIL;
     gammaVar = NIL;
+    deltaVar = NIL;
     nextVar  = 0;
 }
 
@@ -2531,6 +2533,14 @@ static Type mkGammaVar( void )
     return gammaVar;
 }
 
+static Type mkDeltaVar( void )
+{
+    if (isNull(deltaVar)) {
+        deltaVar = mkOffset(nextVar++);
+    }
+    return deltaVar;
+}
+
 static Type local basicType(k)
 Char k; {
     switch (k) {
@@ -2548,12 +2558,18 @@ Char k; {
             return typeFloat;
     case DOUBLE_REP:
             return typeDouble;
-    case ARR_REP:     return ap(typePrimArray,mkAlphaVar());            
-    case BARR_REP:    return typePrimByteArray;
-    case REF_REP:     return ap2(typeRef,mkStateVar(),mkAlphaVar());                  
-    case MUTARR_REP:  return ap2(typePrimMutableArray,mkStateVar(),mkAlphaVar());     
-    case MUTBARR_REP: return ap(typePrimMutableByteArray,mkStateVar()); 
-    case STABLE_REP:  return ap(typeStable,mkAlphaVar());
+    case ARR_REP:
+            return ap(typePrimArray,mkAlphaVar());            
+    case BARR_REP:
+            return typePrimByteArray;
+    case REF_REP:
+            return ap2(typeRef,mkStateVar(),mkAlphaVar());                  
+    case MUTARR_REP:
+            return ap2(typePrimMutableArray,mkStateVar(),mkAlphaVar());     
+    case MUTBARR_REP:
+            return ap(typePrimMutableByteArray,mkStateVar()); 
+    case STABLE_REP:
+            return ap(typeStable,mkAlphaVar());
 #ifdef PROVIDE_WEAK
     case WEAK_REP:
             return ap(typeWeak,mkAlphaVar());
@@ -2564,12 +2580,10 @@ Char k; {
     case FOREIGN_REP:
             return typeForeign;
 #endif
-#ifdef PROVIDE_CONCURRENT
     case THREADID_REP:
             return typeThreadId;
     case MVAR_REP:
             return ap(typeMVar,mkAlphaVar());
-#endif
     case BOOL_REP:
             return typeBool;
     case HANDLER_REP:
@@ -2582,6 +2596,8 @@ Char k; {
             return mkBetaVar();   /* polymorphic */
     case GAMMA_REP:
             return mkGammaVar();  /* polymorphic */
+    case DELTA_REP:
+            return mkDeltaVar();  /* polymorphic */
     default:
             printf("Kind: '%c'\n",k);
             internal("basicType");

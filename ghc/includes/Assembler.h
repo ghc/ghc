@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Assembler.h,v 1.10 1999/10/26 17:27:35 sewardj Exp $
+ * $Id: Assembler.h,v 1.11 1999/11/16 17:38:54 sewardj Exp $
  *
  * (c) The GHC Team 1994-1998.
  *
@@ -104,6 +104,7 @@ typedef enum {
   ALPHA_REP    = 'a',  /* a                        */
   BETA_REP     = 'b',  /* b			   */
   GAMMA_REP    = 'c',  /* c                        */
+  DELTA_REP    = 'd',  /* d                        */
   BOOL_REP     = 'B',  /* Bool			   */
   IO_REP       = 'i',  /* IO a	                   */
   HANDLER_REP  = 'H',  /* Exception -> IO a	   */
@@ -111,10 +112,8 @@ typedef enum {
   ARR_REP      = 'X',  /* PrimArray              a */
   REF_REP      = 'R',  /* Ref                  s a */
   MUTARR_REP   = 'M',  /* PrimMutableArray     s a */
-#ifdef PROVIDE_CONCURRENT
   THREADID_REP = 'T',  /* ThreadId                 */
   MVAR_REP     = 'r',  /* MVar a                   */
-#endif
 
   /* Allegedly used in the IO monad */
   VOID_REP     = 'v'      
@@ -211,9 +210,10 @@ extern const AsmPrim* asmFindPrimop  ( AsmInstr prefix, AsmInstr op );
 extern AsmSp          asmBeginPrim   ( AsmBCO bco );
 extern void           asmEndPrim     ( AsmBCO bco, const AsmPrim* prim, AsmSp base );
 
-extern AsmBCO asm_BCO_catch ( void );
-extern AsmBCO asm_BCO_raise ( void );
-extern AsmBCO asm_BCO_seq   ( void );
+extern AsmBCO asm_BCO_catch    ( void );
+extern AsmBCO asm_BCO_raise    ( void );
+extern AsmBCO asm_BCO_seq      ( void );
+extern AsmBCO asm_BCO_takeMVar ( void );
 
 
 /* --------------------------------------------------------------------------

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.15 $
- * $Date: 1999/11/12 17:32:46 $
+ * $Revision: 1.16 $
+ * $Date: 1999/11/16 17:38:56 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -529,8 +529,11 @@ Name nameFromStgVar ( StgVar v )
 void* getHugs_AsmObject_for ( char* s )
 {
    StgVar v;
-   Name   n = findName(findText(s));
-   if (isNull(n)) internal("getHugs_AsmObject_for(1)");
+   Text   t = findText(s);
+   Name   n = NIL;
+   for (n = NAMEMIN; n < nameHw; n++)
+      if (name(n).text == t) break;
+   if (n == nameHw) internal("getHugs_AsmObject_for(1)");
    v = name(n).stgVar;
    if (!isStgVar(v) || !isPtr(stgVarInfo(v)))
       internal("getHugs_AsmObject_for(2)");

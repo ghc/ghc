@@ -28,16 +28,15 @@ extern Name nameMkPrimByteArray;
 extern Name nameMkRef;                  
 extern Name nameMkPrimMutableArray;     
 extern Name nameMkPrimMutableByteArray; 
+extern Name nameMkThreadId;  
+extern Name nameMkPrimMVar;  
 #ifdef PROVIDE_FOREIGN
 extern Name nameMkForeign;   
 #endif
 #ifdef PROVIDE_WEAK
 extern Name nameMkWeak;
 #endif
-#ifdef PROVIDE_CONCURRENT
-extern Name nameMkThreadId;  
-extern Name nameMkMVar;  
-#endif
+
 
 /* For every primitive type provided by the runtime system,
  * we construct a Haskell type using a declaration of the form:
@@ -57,15 +56,13 @@ extern Type typePrimMutableByteArray;
 extern Type typeFloat;
 extern Type typeDouble;
 extern Type typeStable;
+extern Type typeThreadId;
+extern Type typeMVar;
 #ifdef PROVIDE_WEAK
 extern Type typeWeak;
 #endif
 #ifdef PROVIDE_FOREIGN
 extern Type typeForeign;
-#endif
-#ifdef PROVIDE_CONCURRENT
-extern Type typeThreadId;
-extern Type typeMVar;
 #endif
 
 /* And a smaller number of types defined in plain Haskell */

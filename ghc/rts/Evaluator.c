@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.26 $
- * $Date: 1999/11/12 17:50:04 $
+ * $Revision: 1.27 $
+ * $Date: 1999/11/16 17:39:10 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -1157,7 +1157,6 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                 }
             Case(i_PRIMOP2):
                 {
-		  /* Remember to save  */
                     int      i, trc, pc_saved;
                     void*    p;
                     StgBCO*  bco_tmp;
@@ -1175,8 +1174,8 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                           /* we want to enter p */
                           obj = p; goto enterLoop;
                        } else {
-                          /* p is the the StgThreadReturnCode for this thread */
-                          RETURN((StgThreadReturnCode)p);
+                          /* trc is the the StgThreadReturnCode for this thread */
+                          RETURN((StgThreadReturnCode)trc);
                        };
                     }
                     Continue;
@@ -1731,7 +1730,7 @@ static inline StgClosure* raiseAnError ( StgClosure* errObj )
      */
     raise_closure = (StgClosure *)allocate(sizeofW(StgClosure)+1);
     raise_closure->header.info = &raise_info;
-    raise_closure->payload[0] = 0xdeadbeef; /*R1.cl;*/
+    raise_closure->payload[0] = (StgPtr)0xdead10c6; /*R1.cl;*/
 
     while (1) {
         switch (get_itbl(gSu)->type) {
@@ -2760,7 +2759,7 @@ static void* enterBCO_primop2 ( int primop2code,
                 break; 
             }
 
-        /* Most of these generate alignment warnings on gSparcs and similar architectures.
+        /* Most of these generate alignment warnings on Sparcs and similar architectures.
          * These are harmless and are caused by the cast to C* in BYTE_ARR_CTS.
          */
         case i_indexCharArray:   
@@ -2915,6 +2914,84 @@ static void* enterBCO_primop2 ( int primop2code,
                 break;
             }
 
+        case i_newMVar:
+            {
+                StgMVar *mvar = stgCast(StgMVar*,allocate(sizeofW(StgMVar)));
+                SET_INFO(mvar,&EMPTY_MVAR_info);
+                mvar->head = mvar->tail = (StgTSO *)&END_TSO_QUEUE_closure;
+                mvar->value = stgCast(StgClosure*,&END_TSO_QUEUE_closure);
+                PushPtr(stgCast(StgPtr,mvar));
+                break;
+            }
+        case i_takeMVar:
+            {
+                StgMVar *mvar = (StgMVar*)PopCPtr();
+                if (GET_INFO(mvar) == &EMPTY_MVAR_info) {
+
+                    /* The MVar is empty.  Attach ourselves to the TSO's 
+                       blocking queue.
+                    */
+                    if (mvar->head == (StgTSO *)&END_TSO_QUEUE_closure) {
+                        mvar->head = cap->rCurrentTSO;
+                    } else {
+                        mvar->tail->link = cap->rCurrentTSO;
+                    }
+                    cap->rCurrentTSO->link = (StgTSO *)&END_TSO_QUEUE_closure;
+                    cap->rCurrentTSO->why_blocked = BlockedOnMVar;
+                    cap->rCurrentTSO->block_info.closure = (StgClosure *)mvar;
+                    mvar->tail = cap->rCurrentTSO;
+
+                    /* At this point, the top-of-stack holds the MVar,
+                       and underneath is the world token ().  So the 
+                       stack is in the same state as when primTakeMVar
+                       was entered (primTakeMVar is handwritten bytecode).
+                       Push obj, which is this BCO, and return to the
+                       scheduler.  When the MVar is filled, the scheduler
+                       will re-enter primTakeMVar, with the args still on
+                       the top of the stack. 
+                    */
+                    PushCPtr(*bco);
+                    *return2 = ThreadBlocked;
+                    return (void*)(1+(NULL));
+
+                } else {
+                    PushCPtr(mvar->value);
+                    mvar->value = (StgClosure *)&END_TSO_QUEUE_closure;
+                    SET_INFO(mvar,&EMPTY_MVAR_info);
+                }
+                break;
+            }
+        case i_putMVar:
+            {
+                StgMVar*    mvar  = stgCast(StgMVar*,PopPtr());
+                StgClosure* value = PopCPtr();
+                if (GET_INFO(mvar) == &FULL_MVAR_info) {
+                    return (makeErrorCall("putMVar {full MVar}"));
+                } else {
+                    /* wake up the first thread on the
+                     * queue, it will continue with the
+                     * takeMVar operation and mark the
+                     * MVar empty again.  
+                     */
+                    mvar->value = value;
+
+                    if (mvar->head != (StgTSO *)&END_TSO_QUEUE_closure) {
+                       ASSERT(mvar->head->why_blocked == BlockedOnMVar);
+                       mvar->head = unblockOne(mvar->head);
+                       if (mvar->head == (StgTSO *)&END_TSO_QUEUE_closure) {
+                          mvar->tail = (StgTSO *)&END_TSO_QUEUE_closure;
+                       }
+                    }
+
+                    /* unlocks the MVar in the SMP case */
+                    SET_INFO(mvar,&FULL_MVAR_info);
+
+                    /* yield for better communication performance */
+                    context_switch = 1;
+                }
+                break;
+            }
+
 #ifdef PROVIDE_CONCURRENT
         case i_fork:
             {
@@ -2951,16 +3028,7 @@ static void* enterBCO_primop2 ( int primop2code,
                 PushTaggedBool(x==y);
                 break;
             }
-        case i_newMVar:
-            {
-                StgMVar *mvar = stgCast(StgMVar*,allocate(sizeofW(StgMVar)));
-                SET_INFO(mvar,&EMPTY_MVAR_info);
-                mvar->head = mvar->tail = EndTSOQueue;
-                /* ToDo: this is a little strange */
-                mvar->value = stgCast(StgClosure*,&END_TSO_QUEUE_closure);
-                PushPtr(stgCast(StgPtr,mvar));
-                break;
-            }
+
 #if 1
 #if 0
 ToDo: another way out of the problem might be to add an explicit
@@ -2968,94 +3036,7 @@ continuation to primTakeMVar: takeMVar v = primTakeMVar v takeMVar.
 The problem with this plan is that now I dont know how much to chop
 off the stack.
 #endif
-        case i_takeMVar:
-            {
-                StgMVar *mvar = stgCast(StgMVar*,PopPtr());
-                /* If the MVar is empty, put ourselves
-                 * on its blocking queue, and wait
-                 * until we're woken up.  
-                 */
-                if (GET_INFO(mvar) != &FULL_MVAR_info) {
-                    if (mvar->head == EndTSOQueue) {
-                        mvar->head = cap->rCurrentTSO;
-                    } else {
-                        mvar->tail->link = cap->rCurrentTSO;
-                    }
-                    cap->rCurrentTSO->link = EndTSOQueue;
-                    mvar->tail = cap->rCurrentTSO;
-
-                    /* Hack, hack, hack.
-                     * When we block, we push a restart closure
-                     * on the stack - but which closure?
-                     * We happen to know that the BCO we're
-                     * executing looks like this:
-                     *
-                     *	 0:      STK_CHECK 4
-                     *	 2:      HP_CHECK 3
-                     *	 4:      TEST 0 29
-                     *	 7:      UNPACK
-                     *	 8:      VAR 3
-                     *	 10:     VAR 1
-                     *	 12:     primTakeMVar
-                     *	 14:     ALLOC_CONSTR 0x8213a80
-                     *	 16:     VAR 2
-                     *	 18:     VAR 2
-                     *	 20:     PACK 2
-                     *	 22:     VAR 0
-                     *	 24:     SLIDE 1 7
-                     *	 27:     ENTER
-                     *	 28:     PANIC
-                     *	 29:     PANIC
-                     *
-                     * so we rearrange the stack to look the
-                     * way it did when we entered this BCO
-				     * and push ths BCO.
-                     * What a disgusting hack!
-                     */
-
-                    PopPtr();
-                    PopPtr();
-                    PushCPtr(obj);
-                    *return2 = ThreadBlocked;
-                    return (void*)(1+(NULL));
-
-                } else {
-                    PushCPtr(mvar->value);
-                    SET_INFO(mvar,&EMPTY_MVAR_info);
-                    /* ToDo: this is a little strange */
-                    mvar->value = (StgClosure*)&END_TSO_QUEUE_closure;
-                }
-                break;
-            }
 #endif
-        case i_putMVar:
-            {
-                StgMVar*    mvar  = stgCast(StgMVar*,PopPtr());
-                StgClosure* value = PopCPtr();
-                if (GET_INFO(mvar) == &FULL_MVAR_info) {
-                    return (raisePrim("putMVar {full MVar}"));
-                } else {
-                    /* wake up the first thread on the
-                     * queue, it will continue with the
-                     * takeMVar operation and mark the
-                     * MVar empty again.  
-                     */
-                    StgTSO* tso = mvar->head;
-                    SET_INFO(mvar,&FULL_MVAR_info);
-                    mvar->value = value;
-                    if (tso != EndTSOQueue) {
-                        PUSH_ON_RUN_QUEUE(tso);
-                        mvar->head = tso->link;
-                        tso->link = EndTSOQueue;
-                        if (mvar->head == EndTSOQueue) {
-                            mvar->tail = EndTSOQueue;
-                        }
-                    }
-                }
-                /* yield for better communication performance */
-                context_switch = 1;
-                break;
-            }
         case i_delay:
         case i_waitRead:
         case i_waitWrite:
@@ -3063,6 +3044,7 @@ off the stack.
                 ASSERT(0);
                 break;
 #endif /* PROVIDE_CONCURRENT */
+
         case i_ccall_ccall_Id:
         case i_ccall_ccall_IO:
         case i_ccall_stdcall_Id:
