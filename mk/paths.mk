@@ -116,8 +116,11 @@ DERIVED_SRCS = $(patsubst %.hsc, %.hs, $(HSC_SRCS)) \
 	       $(patsubst %.hsc, %_hsc.h, $(HSC_SRCS))
 
 # EXCLUDED_SRCS can be set in the Makefile, otherwise it defaults to empty.
-EXCLUDED_DERIVED_SRCS = $(patsubst %.hsc,%.hs %_hsc.c, \
-			    $(filter %.hsc, $(EXCLUDED_SRCS)))
+EXCLUDED_HSC_SRCS     = $(filter %.hsc, $(EXCLUDED_SRCS))
+EXCLUDED_DERIVED_SRCS = $(patsubst %.hsc, %.hs, $(EXCLUDED_HSC_SRCS)) \
+			$(patsubst %.hsc, %_hsc.h, $(EXCLUDED_HSC_SRCS)) \
+			$(patsubst %.hsc, %_hsc.c, $(EXCLUDED_HSC_SRCS))
+
 CLOSED_EXCLUDED_SRCS  = $(sort $(EXCLUDED_SRCS) $(EXCLUDED_DERIVED_SRCS))
 
 SRCS        = $(filter-out $(CLOSED_EXCLUDED_SRCS), \
@@ -129,7 +132,7 @@ HS_HCS      = $(addsuffix .$(way_)hc,$(basename $(HS_SRCS)))
 HS_SS       = $(addsuffix .$(way_)s,$(basename $(HS_SRCS)))
 HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_SRCS)))
 
-HSC_C_OBJS  = $(patsubst %_hsc.c,%_hsc.o,$(SRCS))
+HSC_C_OBJS  = $(patsubst %.hsc, %_hsc.o, $(HSC_SRCS))
 
 C_SRCS      = $(filter %.c,$(SRCS)) 
 C_OBJS      = $(addsuffix .$(way_)o,$(basename $(C_SRCS)))
