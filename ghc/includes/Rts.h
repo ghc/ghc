@@ -184,14 +184,6 @@ extern void stg_exit(int n) GNU_ATTRIBUTE(__noreturn__);
 /* declarations for runtime flags/values */
 #define MAX_RTS_ARGS 32
 
-#ifdef _WIN32
-/* On the yucky side..suppress -Wmissing-declarations warnings when
- * including <windows.h>
- */
-extern void* GetCurrentFiber ( void );
-extern void* GetFiberData ( void );
-#endif
-
 /* -----------------------------------------------------------------------------
    Assertions and Debuggery
    -------------------------------------------------------------------------- */
