@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.53 2000/03/16 17:27:13 simonmar Exp $
+ * $Id: Schedule.c,v 1.54 2000/03/16 17:33:04 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -2362,7 +2362,11 @@ resurrectThreads( StgTSO *threads )
       raiseAsync(tso,(StgClosure *)NonTermination_closure);
       break;
     case NotBlocked:
-      barf("resurrectThreads: thread not blocked");
+      /* This might happen if the thread was blocked on a black hole
+       * belonging to a thread that we've just woken up (raiseAsync
+       * can wake up threads, remember...).
+       */
+      continue;
     default:
       barf("resurrectThreads: thread blocked in a strange way");
     }
