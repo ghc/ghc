@@ -39,18 +39,19 @@ module StgSyn (
 
 IMP_Ubiq(){-uitous-}
 
-import CostCentre	( showCostCentre )
-import Id		( idPrimRep, SYN_IE(DataCon), GenId{-instance NamedThing-} )
+import CostCentre	( showCostCentre, CostCentre )
+import Id		( idPrimRep, SYN_IE(DataCon), 
+			  GenId{-instance NamedThing-}, SYN_IE(Id) )
 import Literal		( literalPrimRep, isLitLitLit, Literal{-instance Outputable-} )
-import Name		( pprNonSym )
 import Outputable	( ifPprDebug, interppSP, interpp'SP,
 			  Outputable(..){-instance * Bool-}
 			)
-import PprStyle		( PprStyle(..) )
+import PprStyle		( PprStyle(..), userStyle )
 import PprType		( GenType{-instance Outputable-} )
 import Pretty		-- all of it
 import PrimOp		( PrimOp{-instance Outputable-} )
-import Unique		( pprUnique )
+import Type             ( SYN_IE(Type) )
+import Unique		( pprUnique, Unique )
 import UniqSet		( isEmptyUniqSet, uniqSetToList, SYN_IE(UniqSet) )
 import Util		( panic )
 \end{code}
@@ -463,7 +464,7 @@ data UpdateFlag = ReEntrant | Updatable | SingleEntry
 
 instance Outputable UpdateFlag where
     ppr sty u
-      = ppChar (case u of { ReEntrant -> 'r';  Updatable -> 'u';  SingleEntry -> 's' })
+      = char (case u of { ReEntrant -> 'r';  Updatable -> 'u';  SingleEntry -> 's' })
 \end{code}
 
 %************************************************************************
@@ -498,25 +499,25 @@ hoping he likes terminators instead...  Ditto for case alternatives.
 
 \begin{code}
 pprStgBinding :: (Outputable bndr, Outputable bdee, Ord bdee) =>
-		PprStyle -> GenStgBinding bndr bdee -> Pretty
+		PprStyle -> GenStgBinding bndr bdee -> Doc
 
 pprStgBinding sty (StgNonRec bndr rhs)
-  = ppHang (ppCat [ppr sty bndr, ppEquals])
-    	 4 (ppBeside (ppr sty rhs) ppSemi)
+  = hang (hsep [ppr sty bndr, equals])
+    	 4 ((<>) (ppr sty rhs) semi)
 
 pprStgBinding sty (StgCoerceBinding bndr occ)
-  = ppHang (ppCat [ppr sty bndr, ppEquals, ppPStr SLIT("{-Coerce-}")])
-    	 4 (ppBeside (ppr sty occ) ppSemi)
+  = hang (hsep [ppr sty bndr, equals, ptext SLIT("{-Coerce-}")])
+    	 4 ((<>) (ppr sty occ) semi)
 
 pprStgBinding sty (StgRec pairs)
-  = ppAboves ((ifPprDebug sty (ppPStr SLIT("{- StgRec (begin) -}"))) :
-	      (map (ppr_bind sty) pairs) ++ [(ifPprDebug sty (ppPStr SLIT("{- StgRec (end) -}")))])
+  = vcat ((ifPprDebug sty (ptext SLIT("{- StgRec (begin) -}"))) :
+	      (map (ppr_bind sty) pairs) ++ [(ifPprDebug sty (ptext SLIT("{- StgRec (end) -}")))])
   where
     ppr_bind sty (bndr, expr)
-      = ppHang (ppCat [ppr sty bndr, ppEquals])
-	     4 (ppBeside (ppr sty expr) ppSemi)
+      = hang (hsep [ppr sty bndr, equals])
+	     4 ((<>) (ppr sty expr) semi)
 
-pprPlainStgBinding :: PprStyle -> StgBinding -> Pretty
+pprPlainStgBinding :: PprStyle -> StgBinding -> Doc
 pprPlainStgBinding sty b = pprStgBinding sty b
 \end{code}
 
@@ -538,7 +539,7 @@ instance (Outputable bndr, Outputable bdee, Ord bdee)
 \end{code}
 
 \begin{code}
-pprStgArg :: (Outputable bdee) => PprStyle -> GenStgArg bdee -> Pretty
+pprStgArg :: (Outputable bdee) => PprStyle -> GenStgArg bdee -> Doc
 
 pprStgArg sty (StgVarArg var) = ppr sty var
 pprStgArg sty (StgConArg con) = ppr sty con
@@ -547,25 +548,25 @@ pprStgArg sty (StgLitArg lit) = ppr sty lit
 
 \begin{code}
 pprStgExpr :: (Outputable bndr, Outputable bdee, Ord bdee) =>
-		PprStyle -> GenStgExpr bndr bdee -> Pretty
+		PprStyle -> GenStgExpr bndr bdee -> Doc
 -- special case
 pprStgExpr sty (StgApp func [] lvs)
-  = ppBeside (ppr sty func) (pprStgLVs sty lvs)
+  = (<>) (ppr sty func) (pprStgLVs sty lvs)
 
 -- general case
 pprStgExpr sty (StgApp func args lvs)
-  = ppHang (ppBeside (ppr sty func) (pprStgLVs sty lvs))
-	 4 (ppSep (map (ppr sty) args))
+  = hang ((<>) (ppr sty func) (pprStgLVs sty lvs))
+	 4 (sep (map (ppr sty) args))
 \end{code}
 
 \begin{code}
 pprStgExpr sty (StgCon con args lvs)
-  = ppBesides [ ppBeside (ppr sty con) (pprStgLVs sty lvs),
-		ppPStr SLIT("! ["), interppSP sty args, ppChar ']' ]
+  = hcat [ (<>) (ppr sty con) (pprStgLVs sty lvs),
+		ptext SLIT("! ["), interppSP sty args, char ']' ]
 
 pprStgExpr sty (StgPrim op args lvs)
-  = ppBesides [ ppr sty op, ppChar '#', pprStgLVs sty lvs,
-		ppPStr SLIT(" ["), interppSP sty args, ppChar ']' ]
+  = hcat [ ppr sty op, char '#', pprStgLVs sty lvs,
+		ptext SLIT(" ["), interppSP sty args, char ']' ]
 \end{code}
 
 \begin{code}
@@ -579,131 +580,131 @@ pprStgExpr sty (StgPrim op args lvs)
 
 pprStgExpr sty (StgLet (StgNonRec bndr (StgRhsClosure cc bi free_vars upd_flag args rhs))
 		    	expr@(StgLet _ _))
-  = ppAbove
-      (ppHang (ppBesides [ppPStr SLIT("let { "), ppr sty bndr, ppPStr SLIT(" = "),
-			  ppStr (showCostCentre sty True{-as string-} cc),
+  = ($$)
+      (hang (hcat [ptext SLIT("let { "), ppr sty bndr, ptext SLIT(" = "),
+			  text (showCostCentre sty True{-as string-} cc),
 			  pp_binder_info sty bi,
-			  ppPStr SLIT(" ["), ifPprDebug sty (interppSP sty free_vars), ppPStr SLIT("] \\"),
-			  ppr sty upd_flag, ppPStr SLIT(" ["),
-			  interppSP sty args, ppChar ']'])
-	    8 (ppSep [ppCat [ppr sty rhs, ppPStr SLIT("} in")]]))
+			  ptext SLIT(" ["), ifPprDebug sty (interppSP sty free_vars), ptext SLIT("] \\"),
+			  ppr sty upd_flag, ptext SLIT(" ["),
+			  interppSP sty args, char ']'])
+	    8 (sep [hsep [ppr sty rhs, ptext SLIT("} in")]]))
       (ppr sty expr)
 
 -- special case: let ... in let ...
 
 pprStgExpr sty (StgLet bind expr@(StgLet _ _))
-  = ppAbove
-      (ppSep [ppHang (ppPStr SLIT("let {")) 2 (ppCat [pprStgBinding sty bind, ppPStr SLIT("} in")])])
+  = ($$)
+      (sep [hang (ptext SLIT("let {")) 2 (hsep [pprStgBinding sty bind, ptext SLIT("} in")])])
       (ppr sty expr)
 
 -- general case
 pprStgExpr sty (StgLet bind expr)
-  = ppSep [ppHang (ppPStr SLIT("let {")) 2 (pprStgBinding sty bind),
-	   ppHang (ppPStr SLIT("} in ")) 2 (ppr sty expr)]
+  = sep [hang (ptext SLIT("let {")) 2 (pprStgBinding sty bind),
+	   hang (ptext SLIT("} in ")) 2 (ppr sty expr)]
 
 pprStgExpr sty (StgLetNoEscape lvs_whole lvs_rhss bind expr)
-  = ppSep [ppHang (ppPStr SLIT("let-no-escape {"))
+  = sep [hang (ptext SLIT("let-no-escape {"))
 	    	2 (pprStgBinding sty bind),
-	   ppHang (ppBeside (ppPStr SLIT("} in "))
+	   hang ((<>) (ptext SLIT("} in "))
 		   (ifPprDebug sty (
-		    ppNest 4 (
-		      ppBesides [ppPStr  SLIT("-- lvs: ["), interppSP sty (uniqSetToList lvs_whole),
-			     ppPStr SLIT("]; rhs lvs: ["), interppSP sty (uniqSetToList lvs_rhss),
-			     ppChar ']']))))
+		    nest 4 (
+		      hcat [ptext  SLIT("-- lvs: ["), interppSP sty (uniqSetToList lvs_whole),
+			     ptext SLIT("]; rhs lvs: ["), interppSP sty (uniqSetToList lvs_rhss),
+			     char ']']))))
 		2 (ppr sty expr)]
 \end{code}
 
 \begin{code}
 pprStgExpr sty (StgSCC ty cc expr)
-  = ppSep [ ppCat [ppPStr SLIT("_scc_"), ppStr (showCostCentre sty True{-as string-} cc)],
+  = sep [ hsep [ptext SLIT("_scc_"), text (showCostCentre sty True{-as string-} cc)],
 	    pprStgExpr sty expr ]
 \end{code}
 
 \begin{code}
 pprStgExpr sty (StgCase expr lvs_whole lvs_rhss uniq alts)
-  = ppSep [ppSep [ppPStr SLIT("case"),
-	   ppNest 4 (ppCat [pprStgExpr sty expr,
-	     ifPprDebug sty (ppBeside (ppPStr SLIT("::")) (pp_ty alts))]),
-	   ppPStr SLIT("of {")],
+  = sep [sep [ptext SLIT("case"),
+	   nest 4 (hsep [pprStgExpr sty expr,
+	     ifPprDebug sty ((<>) (ptext SLIT("::")) (pp_ty alts))]),
+	   ptext SLIT("of {")],
 	   ifPprDebug sty (
-	   ppNest 4 (
-	     ppBesides [ppPStr  SLIT("-- lvs: ["), interppSP sty (uniqSetToList lvs_whole),
-		    ppPStr SLIT("]; rhs lvs: ["), interppSP sty (uniqSetToList lvs_rhss),
-		    ppPStr SLIT("]; uniq: "), pprUnique uniq])),
-	   ppNest 2 (ppr_alts sty alts),
-	   ppChar '}']
+	   nest 4 (
+	     hcat [ptext  SLIT("-- lvs: ["), interppSP sty (uniqSetToList lvs_whole),
+		    ptext SLIT("]; rhs lvs: ["), interppSP sty (uniqSetToList lvs_rhss),
+		    ptext SLIT("]; uniq: "), pprUnique uniq])),
+	   nest 2 (ppr_alts sty alts),
+	   char '}']
   where
-    ppr_default sty StgNoDefault = ppNil
+    ppr_default sty StgNoDefault = empty
     ppr_default sty (StgBindDefault bndr used expr)
-      = ppHang (ppCat [pp_binder, ppPStr SLIT("->")]) 4 (ppr sty expr)
+      = hang (hsep [pp_binder, ptext SLIT("->")]) 4 (ppr sty expr)
       where
-    	pp_binder = if used then ppr sty bndr else ppChar '_'
+    	pp_binder = if used then ppr sty bndr else char '_'
 
     pp_ty (StgAlgAlts  ty _ _) = ppr sty ty
     pp_ty (StgPrimAlts ty _ _) = ppr sty ty
 
     ppr_alts sty (StgAlgAlts ty alts deflt)
-      = ppAboves [ ppAboves (map (ppr_bxd_alt sty) alts),
+      = vcat [ vcat (map (ppr_bxd_alt sty) alts),
 		   ppr_default sty deflt ]
       where
 	ppr_bxd_alt sty (con, params, use_mask, expr)
-	  = ppHang (ppCat [pprNonSym sty con, interppSP sty params, ppPStr SLIT("->")])
-		   4 (ppBeside (ppr sty expr) ppSemi)
+	  = hang (hsep [ppr sty con, interppSP sty params, ptext SLIT("->")])
+		   4 ((<>) (ppr sty expr) semi)
 
     ppr_alts sty (StgPrimAlts ty alts deflt)
-      = ppAboves [ ppAboves (map (ppr_ubxd_alt sty) alts),
+      = vcat [ vcat (map (ppr_ubxd_alt sty) alts),
 		   ppr_default sty deflt ]
       where
 	ppr_ubxd_alt sty (lit, expr)
-	  = ppHang (ppCat [ppr sty lit, ppPStr SLIT("->")])
-		 4 (ppBeside (ppr sty expr) ppSemi)
+	  = hang (hsep [ppr sty lit, ptext SLIT("->")])
+		 4 ((<>) (ppr sty expr) semi)
 \end{code}
 
 \begin{code}
--- pprStgLVs :: PprStyle -> GenStgLiveVars occ -> Pretty
+-- pprStgLVs :: PprStyle -> GenStgLiveVars occ -> Doc
 
-pprStgLVs PprForUser lvs = ppNil
+pprStgLVs sty lvs | userStyle sty = empty
 
 pprStgLVs sty lvs
   = if isEmptyUniqSet lvs then
-	ppNil
+	empty
     else
-	ppBesides [ppStr "{-lvs:", interpp'SP sty (uniqSetToList lvs), ppStr "-}"]
+	hcat [text "{-lvs:", interpp'SP sty (uniqSetToList lvs), text "-}"]
 \end{code}
 
 \begin{code}
 pprStgRhs :: (Outputable bndr, Outputable bdee, Ord bdee) =>
-		PprStyle -> GenStgRhs bndr bdee -> Pretty
+		PprStyle -> GenStgRhs bndr bdee -> Doc
 
 -- special case
 pprStgRhs sty (StgRhsClosure cc bi [free_var] upd_flag [{-no args-}] (StgApp func [] lvs))
-  = ppBesides [ ppStr (showCostCentre sty True{-as String-} cc),
+  = hcat [ text (showCostCentre sty True{-as String-} cc),
 		pp_binder_info sty bi,
-		ppPStr SLIT(" ["), ifPprDebug sty (ppr sty free_var),
-	    ppPStr SLIT("] \\"), ppr sty upd_flag, ppPStr SLIT(" [] "), ppr sty func ]
+		ptext SLIT(" ["), ifPprDebug sty (ppr sty free_var),
+	    ptext SLIT("] \\"), ppr sty upd_flag, ptext SLIT(" [] "), ppr sty func ]
 -- general case
 pprStgRhs sty (StgRhsClosure cc bi free_vars upd_flag args body)
-  = ppHang (ppBesides [ ppStr (showCostCentre sty True{-as String-} cc),
+  = hang (hcat [ text (showCostCentre sty True{-as String-} cc),
 		pp_binder_info sty bi,
-		ppPStr SLIT(" ["), ifPprDebug sty (interppSP sty free_vars),
-		ppPStr SLIT("] \\"), ppr sty upd_flag, ppPStr SLIT(" ["), interppSP sty args, ppChar ']'])
+		ptext SLIT(" ["), ifPprDebug sty (interppSP sty free_vars),
+		ptext SLIT("] \\"), ppr sty upd_flag, ptext SLIT(" ["), interppSP sty args, char ']'])
 	 4 (ppr sty body)
 
 pprStgRhs sty (StgRhsCon cc con args)
-  = ppBesides [ ppStr (showCostCentre sty True{-as String-} cc),
-		ppSP, ppr sty con, ppPStr SLIT("! ["), interppSP sty args, ppChar ']' ]
+  = hcat [ text (showCostCentre sty True{-as String-} cc),
+		space, ppr sty con, ptext SLIT("! ["), interppSP sty args, char ']' ]
 
 --------------
-pp_binder_info PprForUser _ = ppNil
+pp_binder_info sty _ | userStyle sty = empty
 
-pp_binder_info sty NoStgBinderInfo = ppNil
+pp_binder_info sty NoStgBinderInfo = empty
 
 -- cases so boring that we print nothing
-pp_binder_info sty (StgBinderInfo True b c d e) = ppNil
+pp_binder_info sty (StgBinderInfo True b c d e) = empty
 
 -- general case
 pp_binder_info sty (StgBinderInfo a b c d e)
-  = ppBesides [ppChar '(', ppInterleave ppComma (map pp_bool [a,b,c,d,e]), ppChar ')']
+  = parens (hsep (punctuate comma (map pp_bool [a,b,c,d,e])))
   where
     pp_bool x = ppr (panic "pp_bool") x
 \end{code}

@@ -21,7 +21,7 @@ import CoreSyn
 import CoreUnfold	( Unfolding(..), UfExpr, RdrName, SimpleUnfolding(..), FormSummary )
 import CoreUtils	( unTagBinders )
 import Id		( idType, getIdStrictness, getIdUnfolding,
-			  dataConTyCon, dataConArgTys
+			  dataConTyCon, dataConArgTys, SYN_IE(Id)
 			)
 import IdInfo		( StrictnessInfo(..),
 			  wwPrim, wwStrict, wwEnum, wwUnpack
@@ -31,13 +31,14 @@ import MagicUFs		( MagicUnfoldingFun )
 import Maybes		( maybeToBool )
 import Outputable	( Outputable(..){-instance * []-} )
 import PprStyle		( PprStyle(..) )
-import Pretty		( ppPStr )
+import Pretty		( Doc, ptext )
 import PrimOp		( PrimOp(..) )
 import SaLib
 import TyCon		( maybeTyConSingleCon, isEnumerationTyCon,
 			  TyCon{-instance Eq-}
 			)
-import Type		( maybeAppDataTyConExpandingDicts, isPrimType )
+import Type		( maybeAppDataTyConExpandingDicts, 
+		          isPrimType, SYN_IE(Type) )
 import TysWiredIn	( intTyCon, integerTyCon, doubleTyCon,
 			  floatTyCon, wordTyCon, addrTyCon
 			)
@@ -432,11 +433,11 @@ absId anal var env
 			-- Try the strictness info
 			absValFromStrictness anal strictness_info
     in
-    -- pprTrace "absId:" (ppBesides [ppr PprDebug var, ppPStr SLIT("=:"), pp_anal anal, ppStr SLIT(":="),ppr PprDebug result]) $
+    -- pprTrace "absId:" (hcat [ppr PprDebug var, ptext SLIT("=:"), pp_anal anal, text SLIT(":="),ppr PprDebug result]) $
     result
   where
-    pp_anal StrAnal = ppPStr SLIT("STR")
-    pp_anal AbsAnal = ppPStr SLIT("ABS")
+    pp_anal StrAnal = ptext SLIT("STR")
+    pp_anal AbsAnal = ptext SLIT("ABS")
 
 absEvalAtom anal (VarArg v) env = absId anal v env
 absEvalAtom anal (LitArg _) env = AbsTop
@@ -558,7 +559,7 @@ absEval anal (Case expr (AlgAlts alts deflt)) env
 {-
     (case anal of
 	StrAnal -> id
-	_ -> pprTrace "absCase:ABS:" (ppAbove (ppCat [ppr PprDebug expr, ppr PprDebug result, ppr PprDebug expr_val, ppr PprDebug abs_deflt, ppr PprDebug abs_alts]) (ppr PprDebug (keysFM env `zip` eltsFM env)))
+	_ -> pprTrace "absCase:ABS:" (($$) (hsep [ppr PprDebug expr, ppr PprDebug result, ppr PprDebug expr_val, ppr PprDebug abs_deflt, ppr PprDebug abs_alts]) (ppr PprDebug (keysFM env `zip` eltsFM env)))
     )
 -}
     result

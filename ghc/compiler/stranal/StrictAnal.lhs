@@ -19,7 +19,7 @@ import CmdLineOpts	( opt_AllStrict, opt_NumbersStrict,
 import CoreSyn
 import Id		( idType, addIdStrictness, isWrapperId,
 			  getIdDemandInfo, addIdDemandInfo,
-			  GenId{-instance Outputable-}
+			  GenId{-instance Outputable-}, SYN_IE(Id)
 			)
 import IdInfo		( mkStrictnessInfo, mkBottomStrictnessInfo,
 			  mkDemandInfo, willBeDemanded, DemandInfo
@@ -27,12 +27,13 @@ import IdInfo		( mkStrictnessInfo, mkBottomStrictnessInfo,
 import PprCore		( pprCoreBinding, pprBigCoreBinder )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-}, GenTyVar{-ditto-} )
-import Pretty		( ppBesides, ppPStr, ppInt, ppChar, ppAboves )
+import Pretty		( Doc, hcat, ptext, int, char, vcat )
 import SaAbsInt
 import SaLib
 import TyVar		( GenTyVar{-instance Eq-} )
 import WorkWrap		-- "back-end" of strictness analyser
 import Unique		( Unique{-instance Eq -} )
+import UniqSupply       ( UniqSupply )
 import Util		( zipWith4Equal, pprTrace, panic )
 \end{code}
 
@@ -102,7 +103,7 @@ saWwTopBinds us binds
     in
     -- possibly show what we decided about strictness...
     (if opt_D_dump_stranal
-     then pprTrace "Strictness:\n" (ppAboves (
+     then pprTrace "Strictness:\n" (vcat (
 	   map (pprCoreBinding PprDebug)  binds_w_strictness))
      else id
     )
@@ -123,9 +124,9 @@ saWwTopBinds us binds
   where
     pp_stats (SaStats tlam dlam tc dc tlet dlet)
       = pprTrace "Binders marked demanded: "
-	(ppBesides [ppPStr SLIT("Lambda vars: "), ppInt IBOX(dlam), ppChar '/', ppInt IBOX(tlam),
-		    ppPStr SLIT("; Case vars: "), ppInt IBOX(dc),   ppChar '/', ppInt IBOX(tc),
-		    ppPStr SLIT("; Let vars: "),  ppInt IBOX(dlet), ppChar '/', ppInt IBOX(tlet)
+	(hcat [ptext SLIT("Lambda vars: "), int IBOX(dlam), char '/', int IBOX(tlam),
+		    ptext SLIT("; Case vars: "), int IBOX(dc),   char '/', int IBOX(tc),
+		    ptext SLIT("; Let vars: "),  int IBOX(dlet), char '/', int IBOX(tlet)
 	])
 #endif
 \end{code}

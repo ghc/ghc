@@ -23,13 +23,13 @@ IMP_Ubiq(){-uitous-}
 import CoreSyn		( SYN_IE(CoreExpr) )
 import Id		( nullIdEnv, addOneToIdEnv, growIdEnvList,
 			  lookupIdEnv, SYN_IE(IdEnv),
-			  GenId{-instance Outputable-}
+			  GenId{-instance Outputable-}, SYN_IE(Id)
 			)
 import IdInfo		( StrictnessInfo(..) )
 import Demand		( Demand{-instance Outputable-} )
 import Outputable	( Outputable(..){-instance * []-} )
 import PprType		( GenType{-instance Outputable-} )
-import Pretty		( ppPStr, ppCat, ppChar )
+import Pretty		( ptext, hsep, char )
 \end{code}
 
 %************************************************************************
@@ -74,15 +74,15 @@ data AbsVal
 			    -- argument if the  Demand so indicates.
 
 instance Outputable AbsVal where
-    ppr sty AbsTop = ppPStr SLIT("AbsTop")
-    ppr sty AbsBot = ppPStr SLIT("AbsBot")
-    ppr sty (AbsProd prod) = ppCat [ppPStr SLIT("AbsProd"), ppr sty prod]
+    ppr sty AbsTop = ptext SLIT("AbsTop")
+    ppr sty AbsBot = ptext SLIT("AbsBot")
+    ppr sty (AbsProd prod) = hsep [ptext SLIT("AbsProd"), ppr sty prod]
     ppr sty (AbsFun arg body env)
-      = ppCat [ppPStr SLIT("AbsFun{"), ppr sty arg,
-	       ppPStr SLIT("???"), -- ppStr "}{env:", ppr sty (keysFM env `zip` eltsFM env),
-	       ppChar '}' ]
+      = hsep [ptext SLIT("AbsFun{"), ppr sty arg,
+	       ptext SLIT("???"), -- text "}{env:", ppr sty (keysFM env `zip` eltsFM env),
+	       char '}' ]
     ppr sty (AbsApproxFun demand val)
-      = ppCat [ppPStr SLIT("AbsApprox "), ppr sty demand, ppr sty val ]
+      = hsep [ptext SLIT("AbsApprox "), ppr sty demand, ppr sty val ]
 \end{code}
 
 %-----------
