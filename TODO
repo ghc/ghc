@@ -6,8 +6,6 @@ For 1.0:
 
 * named chunks of documentation?
 
-* Handle parse errors better in doc strings
-
 * Do the unlitting/CPPing from Haddock itself
 
 * facilities for saving interfaces so that you can run Haddock against
@@ -17,10 +15,13 @@ For 1.0:
 
 * allow the HTML/DocBook to be generated into a specified directory
 
-* remove extra whitespace from the generated HTML
-
 -----------------------------------------------------------------------------
 Post 1.0:
+
+* remove extra whitespace from the generated HTML to save space
+
+* To clean up: various warnings are emitted with trace rather than
+  being propagated back to the top level properly.
 
 * split large modules into several pages (perhaps split at each
   section 1 heading?)
