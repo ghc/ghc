@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt,v 1.10 2000/12/15 10:37:50 sewardj Exp $
+-- $Id: primops.txt,v 1.11 2000/12/15 11:58:35 sewardj Exp $
 --
 -- Primitive Operations
 --
@@ -1111,16 +1111,11 @@ primop TouchOp "touch#" GenPrimOp
 ------------------------------------------------------------------------
 
 primop  NewBCOOp "newBCO#" GenPrimOp
-   ByteArr# -> ByteArr# -> MutArr# s a -> MutArr# s a -> State# s -> (# State# s, BCO# #)
+   ByteArr# -> ByteArr# -> MutArr# s a -> ByteArr# -> State# s -> (# State# s, BCO# #)
    with
    has_side_effects = True
    out_of_line      = True
 
-primop  GetBCOPtrsOp "getBCOPtrs#" GenPrimOp
-   BCO# -> State# s -> (# State# s, MutArr# s a #)
-
-primop  GetBCOItblsOp "getBCOItbls#" GenPrimOp
-   BCO# -> State# s -> (# State# s, MutArr# s a #)
 
 ------------------------------------------------------------------------
 --- Weak pointers                                                    ---
