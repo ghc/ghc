@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.19 2000/10/06 11:05:57 rrt Exp $
+ * $Id: Itimer.c,v 1.20 2001/02/13 11:10:28 rrt Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -48,16 +48,6 @@ lnat total_ticks = 0;
 
 /* ticks left before next pre-emptive context switch */
 int ticks_to_ctxt_switch = 0;
-
-static
-void
-#if defined(mingw32_TARGET_OS) || (defined(cygwin32_TARGET_OS) && !defined(HAVE_SETITIMER))
-CALLBACK
-handle_tick(UINT uID STG_UNUSED, UINT uMsg STG_UNUSED, DWORD dwUser STG_UNUSED,
-	    DWORD dw1 STG_UNUSED, DWORD d STG_UNUSED);
-#else
-handle_tick(int unused STG_UNUSED);
-#endif
 
 /* -----------------------------------------------------------------------------
    Tick handler
@@ -116,14 +106,11 @@ LPTIMECALLBACK vtalrm_cback;
 nat
 initialize_virtual_timer(nat ms)
 {
-# ifdef PROFILING
   /* On Win32 setups that don't have support for
      setitimer(), we use the MultiMedia API's timer
      support.
      
-     As the delivery of ticks isn't free, we only
-     enable it if we really needed, i.e., when profiling.
-     (GetTickCount is used for threadDelay)
+     The delivery of ticks isn't free; the performance hit should be checked.
   */
   unsigned int delay;
   static unsigned int vtalrm_id;
@@ -143,7 +130,6 @@ initialize_virtual_timer(nat ms)
     timeKillEvent(vtalrm_id);
     timeEndPeriod(1);
   }
-# endif
 
   return 0;
 }

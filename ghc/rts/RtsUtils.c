@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.17 2000/07/17 15:15:40 rrt Exp $
+ * $Id: RtsUtils.c,v 1.18 2001/02/13 11:10:28 rrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -115,8 +115,9 @@ stgReallocWords (void *p, int n, char *msg)
 void 
 _stgAssert (char *filename, nat linenum)
 {
-  /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
+  fflush(stdout);
   fprintf(stderr, "ASSERTION FAILED: file %s, line %u\n", filename, linenum);
+  fflush(stderr);
   abort();
 }
 
