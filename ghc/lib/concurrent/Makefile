@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.7 1999/09/17 10:43:51 sof Exp $
+# $Id: Makefile,v 1.8 1999/10/05 10:30:27 simonmar Exp $
 #
 # Makefile for concurrent libraries.
 #
@@ -7,6 +7,8 @@ TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 
 WAYS=$(GhcLibWays)
+
+HC = $(GHC)
 
 #-----------------------------------------------------------------------------
 # 	Setting the standard variables

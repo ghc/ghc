@@ -1,12 +1,13 @@
+#-----------------------------------------------------------------------------
+# $Id: Makefile,v 1.18 1999/10/05 10:30:33 simonmar Exp $
+
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
-include $(TOP)/mk/version.mk
-INSTALLING=0
+
+INSTALLING=1
 
 boot :: all
 
-SCRIPT_PROG=mkdependHS
-SCRIPT_OBJS=mkdependHS.prl
 SCRIPT_SUBST_VARS= \
  TOP_PWD \
  INSTALLING \
@@ -15,47 +16,36 @@ SCRIPT_SUBST_VARS= \
 
 INTERP=perl
 
+INSTALLED_SCRIPT_PROG  = mkdependHS
+INPLACE_SCRIPT_PROG    = mkdependHS-inplace
+
+ifeq "$(INSTALLING)" "1"
+TOP_PWD 	:= $(prefix)
+SCRIPT_PROG 	=  $(INSTALLED_SCRIPT_PROG)
+SCRIPT_LINK 	=  ghc
+else
+TOP_PWD 	:= $(FPTOOLS_TOP_ABS)
+SCRIPT_PROG 	=  $(INPLACE_SCRIPT_PROG)
+endif
+
+SCRIPT_OBJS=mkdependHS.prl
+
+ifeq "$(BIN_DIST)" "1"
+SCRIPT_PREFIX_FILES += prefix.txt
+else
+SCRIPT_SUBST_VARS += libdir datadir TMPDIR SED
+endif
+
+# don't recurse on 'make install'
+#
+ifeq "$(INSTALLING)" "1"
+all clean veryclean maintainer-clean ::
+	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
+endif
+
 #
 # install setup
 #
 INSTALL_LIB_SCRIPTS += $(SCRIPT_PROG)
 
-ifneq "$(BIN_DIST)" "1"
-SCRIPT_SUBST_VARS += libdir datadir TMPDIR SED
-endif
-
-
-#
-# Prepend an infomercial if installing (binary-dist or the real thing).
-#
-ifeq "$(INSTALLING)" "1"
-ifeq "$(BIN_DIST)" "1"
-SCRIPT_PREFIX_FILES += prefix.txt
-endif
-endif
-
-ifeq "$(INSTALLING)" "1"
-TOP_PWD:=$(prefix)
-else
-TOP_PWD:=$(FPTOOLS_TOP_ABS)
-endif
-
-#
-# Before really installing the script, we have to
-# reconfigure it such that the paths it refers to,
-# point to the installed utils.
-#
-install ::
-	$(RM) $(SCRIPT_PROG)
-	$(MAKE) $(MFLAGS) INSTALLING=1 $(SCRIPT_PROG)
-
 include $(TOP)/mk/target.mk
-
-#
-# Hack to re-create the in-situ build tree script after 
-# having just installed it (if you don't, confusion ensues
-# if you try to use the build tree copy afterwards..)
-#
-install ::
-	@$(RM) $(SCRIPT_PROG)
-	@$(MAKE) $(MFLAGS) BIN_DIST=0 INSTALLING=0 $(SCRIPT_PROG)

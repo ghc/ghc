@@ -16,14 +16,22 @@
 #
 # Ghc project settings:
 # 
-# *ProjectVersion    is treated as a *string*
-# *ProjectVersionInt is treated as an *integer* (for cpp defines)
+# ProjectVersion    is treated as a *string*
+# ProjectVersionInt is treated as an *integer* (for cpp defines)
+
+# Versioning scheme: A.BB.C
+#         A: major version, any number of digits
+#         B: minor version, two digits padded with leading zeros
+#	  C: patchlevel, one digit, omitted if zero.
+#
+# ProjectVersionInt does *not* contain the patchlevel (rationale: this
+# figure is used for conditional compilations, and library interfaces
+# etc. are not supposed to change between patchlevels).
 
 ProjectName       = The Glorious Glasgow Haskell Compilation System
 ProjectNameShort  = ghc
 ProjectVersion    = 4.05
 ProjectVersionInt = 405
-ProjectPatchLevel = 0
 
 #
 # Optionally, you can get the compiler driver to check the

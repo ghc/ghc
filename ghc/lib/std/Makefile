@@ -18,6 +18,8 @@ else
 SUBDIRS=
 endif
 
+HC = $(GHC)
+
 #-----------------------------------------------------------------------------
 # 	Setting the standard variables
 #

@@ -724,59 +724,6 @@ dist-package-tar-gz ::
 dist-package-zip ::
 	cd $(SRC_DIST_DIR); cd ..; $(ZIP) $(ZIP_OPTS) -r $(SRC_DIST_NAME).zip $(SRC_DIST_NAME)
 
-#
-# binary-dist creates a binary bundle, set BIN_DIST_NAME
-# to package name and do `make binary-dist' (normally this
-# just a thing you would do from the toplevel of fptools or)
-# from the top of a project.
-#
-.PHONY: binary-dist-pre binary-dist binary-pack
-
-binary-dist-pre::
-	-rm -rf $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)
-	-rm -f $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME).tar.gz
-	@for i in $(BIN_DIST_DIRS); do 		 	 \
-	  if test -d "$$i"; then 			 \
-	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion); \
-	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion); \
-	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion); \
-	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion); \
-	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$(ProjectNameShort)-$(ProjectVersion); \
-	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$(ProjectNameShort)-$(ProjectVersion); \
-	   echo $(MAKE) -C $$i $(MFLAGS) install BIN_DIST=1 BIN_DIST_NAME=$(BIN_DIST_NAME) \
-			prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
-			exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
-			bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion) \
-			libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion) \
-			libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion) \
-			datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$(ProjectNameShort)-$(ProjectVersion) ; \
-	   $(MAKE) -C $$i $(MFLAGS) install BIN_DIST=1 BIN_DIST_NAME=$(BIN_DIST_NAME) \
-			prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
-			exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
-			bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion) \
-			libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion) \
-			libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion) \
-			datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$(ProjectNameShort)-$(ProjectVersion) ; \
-	  fi; \
-	done
-
-#
-# Do this separately for now
-# 
-binary-pack::
-	( cd $(BIN_DIST_TMPDIR); $(TAR) chzf $(BIN_DIST_NAME).tar.gz $(BIN_DIST_NAME); rm -rf $(BIN_DIST_NAME) )
-
-ifneq "$(way)" ""
-package-way-dist::
-	( cd $(BIN_DIST_TMPDIR); find $(BIN_DIST_NAME)/ \( -name "*$(_way).a" -o -name "*.$(way_)hi" \) -print | xargs tar cvf $(BIN_DIST_TMPDIR)/ghc-$(ProjectVersion)-$(way)-$(TARGETPLATFORM).tar )
-	gzip $(BIN_DIST_TMPDIR)/ghc-$(ProjectVersion)-$(way)-$(TARGETPLATFORM).tar
-endif
-
-ifneq "$(way)" ""
-remove-way-dist::
-	( cd $(BIN_DIST_TMPDIR); find $(BIN_DIST_NAME)/ \( -name "*$(_way).a" -o -name "*.$(way_)hi" \) -print -exec rm -f {} \; )
-endif
-
 ###########################################
 #
 #	Targets: check tags show info

@@ -1,14 +1,18 @@
 #-----------------------------------------------------------------------------
+# $Id: Makefile,v 1.24 1999/10/05 10:30:35 simonmar Exp $
+
+# We create two driver scripts: 
+#	- one to run in-place in the build tree for building libraries
+#	- one wired to the install locations for later installation
 #
+# the installation script is built first, and we invoke make recursively
+# to build the in-place version.
 
 TOP=..
 CURRENT_DIR=ghc/driver
 include $(TOP)/mk/boilerplate.mk
-#
-# The driver needs to get at the version
-include $(TOP)/mk/version.mk
 
-INSTALLING=0
+INSTALLING=1
 
 DYN_LOADABLE_BITS = \
 	ghc-asm.prl \
@@ -16,8 +20,18 @@ DYN_LOADABLE_BITS = \
 	ghc-consist.prl \
 	ghc-split.prl
 
-SCRIPT_PROG = ghc-$(ProjectVersion)
-SCRIPT_LINK = ghc
+INSTALLED_SCRIPT_PROG  = ghc-$(ProjectVersion)
+INPLACE_SCRIPT_PROG    = ghc-inplace
+
+ifeq "$(INSTALLING)" "1"
+TOP_PWD 	:= $(prefix)
+SCRIPT_PROG 	=  $(INSTALLED_SCRIPT_PROG)
+SCRIPT_LINK 	=  ghc
+else
+TOP_PWD 	:= $(FPTOOLS_TOP_ABS)
+SCRIPT_PROG 	=  $(INPLACE_SCRIPT_PROG)
+endif
+
 SCRIPT_OBJS = ghc.prl
  
 INTERP=perl
@@ -31,20 +45,14 @@ INTERP=perl
 USER_WAY_NAMES = $(foreach way,$(USER_WAYS),WAY_$(way)_NAME)
 USER_WAY_OPTS  = $(foreach way,$(USER_WAYS),WAY_$(way)_REAL_OPTS)
 
-ifeq "$(INSTALLING)" "1"
-TOP_PWD := $(prefix)
-else
-TOP_PWD := $(FPTOOLS_TOP_ABS)
-endif
-
 SCRIPT_SUBST_VARS := \
   INSTALLING \
-  ProjectName ProjectVersion ProjectVersionInt ProjectPatchLevel \
+  ProjectName ProjectVersion ProjectVersionInt \
   HscMajorVersion HscMinorVersion CcMajorVersion CcMinorVersion \
   CURRENT_DIR HOSTPLATFORM TARGETPLATFORM \
-  GHC_LIB_DIR GHC_RUNTIME_DIR GHC_UTILS_DIR GHC_INCLUDE_DIR \
+  GHC_LIB_DIR GHC_RUNTIME_DIR GHC_INCLUDE_DIR \
   GHC_OPT_HILEV_ASM GhcWithNativeCodeGen LeadingUnderscore\
-  GHC_UNLIT GHC_HSCPP GHC_HSC GHC_SYSMAN EnableWin32DLLs \
+  GHC_UNLIT GHC_HSCPP GHC_MKDEPENDHS GHC_HSC GHC_SYSMAN EnableWin32DLLs \
   CP RM CONTEXT_DIFF LibGmp GhcWithRegisterised \
   USER_WAY_NAMES USER_WAY_OPTS
 
@@ -62,6 +70,13 @@ endif
 
 all :: $(DYN_LOADABLE_BITS)
 
+# don't recurse on 'make install'
+#
+ifeq "$(INSTALLING)" "1"
+all clean veryclean maintainer-clean ::
+	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
+endif
+
 #
 # Install setup:
 #   the driver goes in $(bindir), the perl script helpers
@@ -71,15 +86,6 @@ all :: $(DYN_LOADABLE_BITS)
 #
 INSTALL_SCRIPTS += $(SCRIPT_PROG)
 INSTALL_LIBS    += $(DYN_LOADABLE_BITS)
-
-#
-# Before really installing the driver, we have to
-# reconfigure it such that the paths it refers to,
-# point to the installed utils.
-#
-install ::
-	@$(RM) $(SCRIPT_PROG)
-	@$(MAKE) $(MFLAGS) INSTALLING=1 $(SCRIPT_PROG)
 
 #
 # depend setup: other directories need the driver script to compute
@@ -99,13 +105,6 @@ SRC_DEST_FILES=$(patsubst %.prl,%.lprl,$(DYN_LOADABLE_BITS)) ghc.lprl ordering-p
 include $(TOP)/mk/target.mk
 
 ghc.prl : $(TOP)/mk/version.mk
-
-# Hack to re-create the in-situ build tree driver script after 
-# having installed it.
-#
-install ::
-	@$(RM) $(SCRIPT_PROG)
-	@$(MAKE) $(MFLAGS) BIN_DIST=0 INSTALLING=0 $(SCRIPT_PROG)
 
 #
 # Another hack (hmm..I can see a pattern developing here :-)

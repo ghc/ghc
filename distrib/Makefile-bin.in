@@ -58,24 +58,18 @@
 
 # Where the different pieces of the bundle should go:
 bindir      = @bindir@
-libdir      = @libdir@
-datadir     = @datadir@
+libdir      = @libdir@/$(package)-$(version)
+datadir     = @datadir@/$(package)-$(version)
 
 platform    = @TargetPlatform@
 prefix      = @prefix@
 exec_prefix = @exec_prefix@
 
 # default
-infodir   = $(real_datadir)
-htmldir   = $(real_datadir)
-dvidir    = $(real_datadir)
+infodir   = $(datadir)
+htmldir   = $(datadir)
+dvidir    = $(datadir)
 
-#
-# Putting the package stuff in package-specific
-# directories:
-#
-real_libdir      = $(libdir)/$(package)-$(version)
-real_datadir     = $(datadir)/$(package)-$(version)
 
 PERL        = @PerlCmd@
 SH	    = /bin/sh
@@ -128,51 +122,51 @@ config-pkgs ::
 	@for i in $(PACKAGE_PRL_SCRIPTS) ""; do \
 	  if test "$$i"; then \
 	   echo "Creating a configured version of $$i .."; \
-	   $(RM) bin/$(platform)/$(package)-$(version)/$$i.bak; \
-	   if [ -f bin/$(platform)/$(package)-$(version)/$$i ]; then $(MV) bin/$(platform)/$(package)-$(version)/$$i bin/$(platform)/$(package)-$(version)/$$i.bak; fi; \
-	   echo "#! $(PERL)"  		        		> bin/$(platform)/$(package)-$(version)/$$i ; \
-	   echo '$$'"bindir='$(bindir)';"                        >> bin/$(platform)/$(package)-$(version)/$$i ; \
-	   echo '$$'"libdir='$(real_libdir)';"                   >> bin/$(platform)/$(package)-$(version)/$$i ; \
-	   echo '$$'"libexecdir='$(real_libdir)';"               >> bin/$(platform)/$(package)-$(version)/$$i ; \
-	   echo '$$'"datadir='$(real_datadir)';"                 >> bin/$(platform)/$(package)-$(version)/$$i ; \
-	   echo '$$'"SED='$(SED)';"		>> bin/$(platform)/$(package)-$(version)/$$i ; \
-	   echo '$$'"TMPDIR='$(TMPDIR)';"		>> bin/$(platform)/$(package)-$(version)/$$i ; \
-	   cat bin/$(platform)/$(package)-$(version)/$$i.prl   >> bin/$(platform)/$(package)-$(version)/$$i ; \
-	   $(CHMOD) $(BIN_PERMS) bin/$(platform)/$(package)-$(version)/$$i; \
+	   $(RM) bin/$(platform)/$$i.bak; \
+	   if [ -f bin/$(platform)/$$i ]; then $(MV) bin/$(platform)/$$i bin/$(platform)/$$i.bak; fi; \
+	   echo "#! $(PERL)"  		            >  bin/$(platform)/$$i ; \
+	   echo '$$'"bindir='$(bindir)';"           >> bin/$(platform)/$$i ; \
+	   echo '$$'"libdir='$(libdir)';"      	    >> bin/$(platform)/$$i ; \
+	   echo '$$'"libexecdir='$(libdir)';"       >> bin/$(platform)/$$i ; \
+	   echo '$$'"datadir='$(datadir)';"         >> bin/$(platform)/$$i ; \
+	   echo '$$'"SED='$(SED)';"		    >> bin/$(platform)/$$i ; \
+	   echo '$$'"TMPDIR='$(TMPDIR)';"	    >> bin/$(platform)/$$i ; \
+	   cat bin/$(platform)/$$i.prl   	    >> bin/$(platform)/$$i ; \
+	   $(CHMOD) $(BIN_PERMS) bin/$(platform)/$$i; \
 	   echo "Done."; \
 	  fi; \
 	done
 	@for i in $(PACKAGE_LIB_PRL_SCRIPTS) ""; do \
 	  if test "$$i"; then \
 	   echo "Creating a configured version of $$i .."; \
-	   $(RM) lib/$(platform)/$(package)-$(version)/$$i.bak; \
-	   if [ -f lib/$(platform)/$(package)-$(version)/$$i ]; then $(MV) lib/$(platform)/$(package)-$(version)/$$i lib/$(platform)/$(package)-$(version)/$$i.bak; fi; \
-	   echo "#! $(PERL)"                      > lib/$(platform)/$(package)-$(version)/$$i ; \
-	   echo '$$'"bindir='$(bindir)';"          >> lib/$(platform)/$(package)-$(version)/$$i ; \
-	   echo '$$'"libdir='$(real_libdir)';"     >> lib/$(platform)/$(package)-$(version)/$$i ; \
-	   echo '$$'"libexecdir='$(real_libdir)';" >> lib/$(platform)/$(package)-$(version)/$$i ; \
-	   echo '$$'"datadir='$(real_datadir)';"   >> lib/$(platform)/$(package)-$(version)/$$i ; \
-	   echo '$$'"SED='$(SED)';"		 >> lib/$(platform)/$(package)-$(version)/$$i ; \
-	   echo '$$'"TMPDIR='$(TMPDIR)';"		 >> lib/$(platform)/$(package)-$(version)/$$i ; \
-	   cat lib/$(platform)/$(package)-$(version)/$$i.prl >> lib/$(platform)/$(package)-$(version)/$$i; \
-	   $(CHMOD) $(BIN_PERMS) lib/$(platform)/$(package)-$(version)/$$i; \
+	   $(RM) lib/$(platform)/$$i.bak; \
+	   if [ -f lib/$(platform)/$$i ]; then $(MV) lib/$(platform)/$$i lib/$(platform)/$$i.bak; fi; \
+	   echo "#! $(PERL)"                       >  lib/$(platform)/$$i ; \
+	   echo '$$'"bindir='$(bindir)';"          >> lib/$(platform)/$$i ; \
+	   echo '$$'"libdir='$(libdir)';"          >> lib/$(platform)/$$i ; \
+	   echo '$$'"libexecdir='$(libdir)';"      >> lib/$(platform)/$$i ; \
+	   echo '$$'"datadir='$(datadir)';"        >> lib/$(platform)/$$i ; \
+	   echo '$$'"SED='$(SED)';"		   >> lib/$(platform)/$$i ; \
+	   echo '$$'"TMPDIR='$(TMPDIR)';"	   >> lib/$(platform)/$$i ; \
+	   cat lib/$(platform)/$$i.prl >> lib/$(platform)/$$i; \
+	   $(CHMOD) $(BIN_PERMS) lib/$(platform)/$$i; \
 	   echo "Done."; \
 	  fi; \
 	done
 	@for i in $(PACKAGE_SH_SCRIPTS) ""; do \
 	  if test "$$i"; then \
 	   echo "Creating a configured version of $$i .."; \
-	   $(RM) bin/$(platform)/$(package)-$(version)/$$i.bak; \
-	   if [ -f bin/$(platform)/$(package)-$(version)/$$i ]; then $(MV) bin/$(platform)/$(package)-$(version)/$$i bin/$(platform)/$(package)-$(version)/$$i.bak; fi; \
-	   echo "#! $(SH)"                      > bin/$(platform)/$(package)-$(version)/$$i ; \
-	   echo "bindir='$(bindir)'"          >> bin/$(platform)/$(package)-$(version)/$$i ; \
-	   echo "libdir='$(real_libdir)'"     >> bin/$(platform)/$(package)-$(version)/$$i ; \
-	   echo "libexecdir='$(real_libdir)'" >> bin/$(platform)/$(package)-$(version)/$$i ; \
-	   echo "datadir='$(real_datadir)'"   >> bin/$(platform)/$(package)-$(version)/$$i ; \
-	   echo "SED='$(SED)'"			 >> bin/$(platform)/$(package)-$(version)/$$i ; \
-	   echo "TMPDIR='$(TMPDIR)'"		 >> bin/$(platform)/$(package)-$(version)/$$i ; \
-	   cat bin/$(platform)/$(package)-$(version)/$$i.sh >> bin/$(platform)/$(package)-$(version)/$$i; \
-	   $(CHMOD) $(BIN_PERMS) bin/$(platform)/$(package)-$(version)/$$i; \
+	   $(RM) bin/$(platform)/$$i.bak; \
+	   if [ -f bin/$(platform)/$$i ]; then $(MV) bin/$(platform)/$$i bin/$(platform)/$$i.bak; fi; \
+	   echo "#! $(SH)"                      >  bin/$(platform)/$$i ; \
+	   echo "bindir='$(bindir)'"            >> bin/$(platform)/$$i ; \
+	   echo "libdir='$(libdir)'"            >> bin/$(platform)/$$i ; \
+	   echo "libexecdir='$(libdir)'"        >> bin/$(platform)/$$i ; \
+	   echo "datadir='$(datadir)'"          >> bin/$(platform)/$$i ; \
+	   echo "SED='$(SED)'"			>> bin/$(platform)/$$i ; \
+	   echo "TMPDIR='$(TMPDIR)'"		>> bin/$(platform)/$$i ; \
+	   cat bin/$(platform)/$$i.sh >> bin/$(platform)/$$i; \
+	   $(CHMOD) $(BIN_PERMS) bin/$(platform)/$$i; \
 	   echo "Done."; \
 	  fi; \
 	done
@@ -182,13 +176,13 @@ config-pkgs ::
 CURRENT_DIR = $(shell pwd | sed 's|^//\(.\)|\1:|' )
 
 in-place ::
-	$(MAKE) $(MFLAGS) config-pkgs bindir=$(CURRENT_DIR)/bin/$(platform)/$(package)-$(version) libdir=$(CURRENT_DIR)/lib/$(platform) datadir=$(CURRENT_DIR)/share/$(package)-$(version)
-	@echo "Finished configuring..to use, add $(CURRENT_DIR)/bin/$(platform)/$(package)-$(version) to your PATH."
+	$(MAKE) $(MFLAGS) config-pkgs bindir=$(CURRENT_DIR)/bin/$(platform) libdir=$(CURRENT_DIR)/lib/$(platform) datadir=$(CURRENT_DIR)/share
+	@echo "Finished configuring..to use, add $(CURRENT_DIR)/bin/$(platform) to your PATH."
 
 install-dirs ::
 	$(INSTALL_DIR) $(bindir)
-	(cd lib/$(platform)/$(package)-$(version); find . -type d -exec sh -c '../../../$(INSTALL_DIR) $$0 $(real_libdir)/$$0' {} \; )
-	(cd share/$(package)-$(version); find . -type d -exec sh -c '../../$(INSTALL_DIR) $(real_datadir)/$$0' {} \; )
+	(cd lib/$(platform); find . -type d -exec sh -c '../../$(INSTALL_DIR) $$0 $(libdir)/$$0' {} \; )
+	(cd share; find . -type d -exec sh -c '../$(INSTALL_DIR) $(datadir)/$$0' {} \; )
 
 install :: config-pkgs install-dirs install-bin install-libs install-datas
 
@@ -196,10 +190,10 @@ install :: config-pkgs install-dirs install-bin install-libs install-datas
 
 install-bin:
 	for i in $(PACKAGE_BIN_INSTALL) ""; do \
-	   if test -n "$$i" ; then $(INSTALL_BIN) bin/$(platform)/$(package)-$(version)/$$i $(bindir); fi; \
+	   if test -n "$$i" ; then $(INSTALL_BIN) bin/$(platform)/$$i $(bindir); fi; \
 	done;
 	for i in $(PACKAGE_BINS) ""; do \
-	   if test -n "$$i" ; then $(INSTALL_BIN) bin/$(platform)/$(package)-$(version)/$$i$(exeext) $(bindir); fi; \
+	   if test -n "$$i" ; then $(INSTALL_BIN) bin/$(platform)/$$i$(exeext) $(bindir); fi; \
 	done;
 	for i in $(VERSION_SYMLINKS_FOR) ""; do \
 	   if [ "x$$i" != "x" ]; then 		\
@@ -219,16 +213,16 @@ install-bin:
 
 
 install-libs:
-	(cd lib/$(platform)/$(package)-$(version); find . -type f -exec sh -c '$(CP) $$0 $(real_libdir)/$$0' {} \; )
+	(cd lib/$(platform); find . -type f -exec sh -c '$(CP) $$0 $(libdir)/$$0' {} \; )
 
 install-datas:
-	(cd share/$(package)-$(version); find . -type f -exec sh -c '$(INSTALL_DATA) $$0 $(real_datadir)/$$0' {} \; )
+	(cd share; find . -type f -exec sh -c '$(INSTALL_DATA) $$0 $(datadir)/$$0' {} \; )
 
 show-install-setup:
 	@echo "Install setup..."
 	@echo "bindir  = $(bindir)"
-	@echo "libdir  = $(libdir) (real_libdir  = $(real_libdir))"
-	@echo "datadir = $(datadir) (real_datadir = $(real_datadir))"
+	@echo "libdir  = $(libdir) (libdir  = $(libdir))"
+	@echo "datadir = $(datadir) (datadir = $(datadir))"
 
 #
 # Documentation targets, install-docs for the whole lot, or
@@ -240,13 +234,13 @@ show-install-setup:
 install-docs : install-html install-dvi install-info
 
 install-dvi: install-dirs-dvi
-	$(INSTALL_DATA) dvi/$(package)-$(version)/* $(dvidir)
+	$(INSTALL_DATA) dvi/* $(dvidir)
 
 install-info: install-dirs-info
-	$(INSTALL_DATA) info/$(package)-$(version)/* $(infodir)
+	$(INSTALL_DATA) info/* $(infodir)
 
 install-html: install-dirs-html
-	$(INSTALL_DATA) html/$(package)-$(version)/* $(htmldir)
+	$(INSTALL_DATA) html/* $(htmldir)
 
 install-dirs-html:
 	$(INSTALL_DIR) $(htmldir) 

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.18 1999/09/17 10:43:52 sof Exp $
+# $Id: Makefile,v 1.19 1999/10/05 10:30:28 simonmar Exp $
 #
 # Makefile for miscellaneous libraries.
 #
@@ -13,6 +13,8 @@ SUBDIRS = cbits
 else
 SUBDIRS=
 endif
+
+HC = $(GHC)
 
 #-----------------------------------------------------------------------------
 # 	Setting the standard variables

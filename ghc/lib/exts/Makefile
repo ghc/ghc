@@ -12,6 +12,8 @@ include $(TOP)/mk/boilerplate.mk
 
 WAYS=$(GhcLibWays)
 
+HC = $(GHC)
+
 #-----------------------------------------------------------------------------
 # 	Setting the standard variables
 #

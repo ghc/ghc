@@ -42,9 +42,11 @@ GHC_LIB_DIR	 	= $(TOP)/lib
 GHC_INCLUDE_DIR   	= $(TOP)/includes
 GHC_UTILS_DIR	 	= $(TOP)/utils
 
-GHC 			= $(GHC_DRIVER_DIR)/ghc
+GHC 			= $(GHC_DRIVER_DIR)/ghc-inplace
 GHC_HSCPP_DIR 		= $(GHC_UTILS_DIR)/hscpp
 GHC_HSCPP    		= $(GHC_HSCPP_DIR)/hscpp
+GHC_MKDEPENDHS_DIR	= $(GHC_UTILS_DIR)/mkdependHS
+GHC_MKDEPENDHS 		= $(GHC_MKDEPENDHS_DIR)/mkdependHS-inplace
 GHC_HSP    		= $(GHC_HSP_DIR)/hsp
 GHC_HSP_DIR 		= $(GHC_HSC_DIR)
 GHC_HSC    		= $(GHC_HSC_DIR)/hsc

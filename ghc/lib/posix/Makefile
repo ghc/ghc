@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.7 1999/05/11 17:05:48 keithw Exp $
+# $Id: Makefile,v 1.8 1999/10/05 10:30:29 simonmar Exp $
 #
 # Makefile for POSIX library
 #
@@ -14,6 +14,8 @@ SUBDIRS = cbits
 else
 SUBDIRS=
 endif
+
+HC = $(GHC)
 
 #-----------------------------------------------------------------------------
 # 	Setting the standard variables
