@@ -12,7 +12,7 @@ module SimplMonad (
 	-- The continuation type
 	SimplCont(..), DupFlag(..), contIsDupable, contResultType,
 	contIsInteresting, pushArgs, discardCont, countValArgs, countArgs,
-	contIsInline, discardInlineCont,
+	contArgs, contIsInline, discardInline,
 
 	-- The monad
 	SimplM,
@@ -62,7 +62,7 @@ import VarEnv
 import VarSet
 import qualified Subst
 import Subst		( Subst, emptySubst, mkSubst,
-			  substTy, substEnv,
+			  substTy, substEnv, substExpr,
 			  InScopeSet, substInScope, isInScope, lookupInScope
 			)
 import Type             ( Type, TyVarSubst, applyTy )
@@ -172,13 +172,24 @@ contIsDupable (CoerceIt _ cont)          = contIsDupable cont
 contIsDupable (InlinePlease cont)	 = contIsDupable cont
 contIsDupable other			 = False
 
+contArgs :: InScopeSet -> SimplCont -> ([OutExpr], SimplCont)
+	-- Get the arguments from the continuation
+	-- Apply the appropriate substitution first;
+	-- this is done lazily and typically only the bit at the top is used
+contArgs in_scope (ApplyTo _ e s cont)
+  = case contArgs in_scope cont of
+	(args, result) -> (substExpr (mkSubst in_scope s) e : args, result)
+contArgs in_scope result_cont	
+   = ([], result_cont)
+
 contIsInline :: SimplCont -> Bool
 contIsInline (InlinePlease cont) = True
 contIsInline other		 = False
 
-discardInlineCont :: SimplCont -> SimplCont
-discardInlineCont (InlinePlease cont) = cont
-discardInlineCont cont		      = cont
+discardInline :: SimplCont -> SimplCont
+discardInline (InlinePlease cont)  = cont
+discardInline (ApplyTo d e s cont) = ApplyTo d e s (discardInline cont)
+discardInline cont		   = cont
 \end{code}
 
 

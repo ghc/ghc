@@ -700,15 +700,96 @@ simplVar var cont
 		   in
 		   getBlackList		`thenSmpl` \ black_list ->
 		   getInScope		`thenSmpl` \ in_scope ->
+		   completeCall black_list in_scope var' cont
 
-		   prepareArgs (ppr var') (idType var') (get_str var') cont	$ \ args' cont' ->
-		   completeCall black_list in_scope var' args' cont'
+---------------------------------------------------------
+--	Dealing with a call
+
+completeCall black_list_fn in_scope var cont
+	-- Look for rules or specialisations that match
+	-- Do this *before* trying inlining because some functions
+	-- have specialisations *and* are strict; we don't want to
+	-- inline the wrapper of the non-specialised thing... better
+	-- to call the specialised thing instead.
+  | maybeToBool maybe_rule_match
+  = tick (RuleFired rule_name)			`thenSmpl_`
+    zapSubstEnv (simplExprF rule_rhs (pushArgs emptySubstEnv rule_args result_cont))
+	-- See note below about zapping the substitution here
+
+	-- Look for an unfolding. There's a binding for the
+	-- thing, but perhaps we want to inline it anyway
+  | maybeToBool maybe_inline
+  = tick (UnfoldingDone var)		`thenSmpl_`
+    zapSubstEnv (completeInlining var unf_template discard_inline_cont)
+		-- The template is already simplified, so don't re-substitute.
+		-- This is VITAL.  Consider
+		--	let x = e in
+		--	let y = \z -> ...x... in
+		--	\ x -> ...y...
+		-- We'll clone the inner \x, adding x->x' in the id_subst
+		-- Then when we inline y, we must *not* replace x by x' in
+		-- the inlined copy!!
+    
+  | otherwise		-- Neither rule nor inlining
+			-- Use prepareArgs to use function strictness
+  = prepareArgs (ppr var) (idType var) (get_str var) cont	$ \ args' cont' ->
+    rebuild (mkApps (Var var) args') cont'
+
   where
     get_str var = case getIdStrictness var of
 			NoStrictnessInfo		  -> (repeat wwLazy, False)
 			StrictnessInfo demands result_bot -> (demands, result_bot)
 
+  
+    (args', result_cont) = contArgs in_scope cont
+    inline_call	         = contIsInline result_cont
+    interesting_cont     = contIsInteresting result_cont
+    discard_inline_cont  | inline_call = discardInline cont
+		         | otherwise   = cont
 
+	---------- Unfolding stuff
+    maybe_inline  = callSiteInline black_listed inline_call 
+				   var args' interesting_cont
+    Just unf_template = maybe_inline
+    black_listed      = black_list_fn var
+
+    	---------- Specialisation stuff
+    maybe_rule_match           = lookupRule in_scope var args'
+    Just (rule_name, rule_rhs, rule_args) = maybe_rule_match
+
+
+-- First a special case
+-- Don't actually inline the scrutinee when we see
+--	case x of y { .... }
+-- and x has unfolding (C a b).  Why not?  Because
+-- we get a silly binding y = C a b.  If we don't
+-- inline knownCon can directly substitute x for y instead.
+completeInlining var (Con con con_args) (Select _ bndr alts se cont)
+  | conOkForAlt con 
+  = knownCon (Var var) con con_args bndr alts se cont
+
+-- Now the normal case
+completeInlining var unfolding cont
+  = simplExprF unfolding cont
+
+----------- costCentreOk
+-- costCentreOk checks that it's ok to inline this thing
+-- The time it *isn't* is this:
+--
+--	f x = let y = E in
+--	      scc "foo" (...y...)
+--
+-- Here y has a "current cost centre", and we can't inline it inside "foo",
+-- regardless of whether E is a WHNF or not.
+    
+costCentreOk ccs_encl cc_rhs
+  =  not opt_SccProfilingOn
+  || isSubsumedCCS ccs_encl	  -- can unfold anything into a subsumed scope
+  || not (isEmptyCC cc_rhs)	  -- otherwise need a cc on the unfolding
+\end{code}		   
+
+
+\begin{code}
 ---------------------------------------------------------
 --	Preparing arguments for a call
 
@@ -768,123 +849,7 @@ prepareArgs pp_fun orig_fun_ty (fun_demands, result_bot) orig_cont thing_inside
 tick_case_of_error (Stop _)		 = returnSmpl ()
 tick_case_of_error (CoerceIt _ (Stop _)) = returnSmpl ()
 tick_case_of_error other		 = tick BottomFound
-
----------------------------------------------------------
---	Dealing with a call
-
-completeCall black_list_fn in_scope var args cont
-	-- Look for rules or specialisations that match
-	-- Do this *before* trying inlining because some functions
-	-- have specialisations *and* are strict; we don't want to
-	-- inline the wrapper of the non-specialised thing... better
-	-- to call the specialised thing instead.
-  | maybeToBool maybe_rule_match
-  = tick (RuleFired rule_name)			`thenSmpl_`
-    zapSubstEnv (completeApp rule_rhs rule_args cont)
-	-- See note below about zapping the substitution here
-
-	-- Look for an unfolding. There's a binding for the
-	-- thing, but perhaps we want to inline it anyway
-  | maybeToBool maybe_inline
-  = tick (UnfoldingDone var)		`thenSmpl_`
-    zapSubstEnv (completeInlining var unf_template args (discardInlineCont cont))
-		-- The template is already simplified, so don't re-substitute.
-		-- This is VITAL.  Consider
-		--	let x = e in
-		--	let y = \z -> ...x... in
-		--	\ x -> ...y...
-		-- We'll clone the inner \x, adding x->x' in the id_subst
-		-- Then when we inline y, we must *not* replace x by x' in
-		-- the inlined copy!!
-    
-  | otherwise		-- Neither rule nor inlining
-  = rebuild (mkApps (Var var) args) cont
-  
-  where
-	---------- Unfolding stuff
-    maybe_inline  = callSiteInline black_listed inline_call 
-				   var args interesting_cont
-    Just unf_template = maybe_inline
-    interesting_cont  = contIsInteresting cont
-    inline_call	      = contIsInline cont
-    black_listed      = black_list_fn var
-
-    	---------- Specialisation stuff
-    maybe_rule_match           = lookupRule in_scope var args
-    Just (rule_name, rule_rhs, rule_args) = maybe_rule_match
-
-
--- First a special case
--- Don't actually inline the scrutinee when we see
---	case x of y { .... }
--- and x has unfolding (C a b).  Why not?  Because
--- we get a silly binding y = C a b.  If we don't
--- inline knownCon can directly substitute x for y instead.
-completeInlining var (Con con con_args) args (Select _ bndr alts se cont)
-  | conOkForAlt con 
-  = ASSERT( null args )
-    knownCon (Var var) con con_args bndr alts se cont
-
--- Now the normal case
-completeInlining var unfolding args cont
-  = completeApp unfolding args cont
-
--- completeApp applies a new InExpr (from an unfolding or rule)
--- to an *already simplified* set of arguments
-completeApp :: InExpr			-- (\xs. body)
-	    -> [OutExpr]		-- Args; already simplified
-	    -> SimplCont		-- What to do with result of applicatoin
-	    -> SimplM OutExprStuff
-completeApp fun args cont
-  = go fun args
-  where
-    zap_it = mkLamBndrZapper fun (length args)
-    cont_ty = contResultType cont
-
-    -- These equations are very similar to simplLam and simplBeta combined,
-    -- except that they deal with already-simplified arguments
-
-	-- Type argument
-    go (Lam bndr fun) (Type ty:args) = tick (BetaReduction bndr) 	`thenSmpl_`
-				       extendSubst bndr (DoneTy ty)
-				       (go fun args)
-
-	-- Value argument
-    go (Lam bndr fun) (arg:args)
-	  | preInlineUnconditionally zapped_bndr && not opt_SimplNoPreInlining
-	  = tick (BetaReduction bndr) 			`thenSmpl_`
-	    tick (PreInlineUnconditionally bndr)	`thenSmpl_`
-	    extendSubst zapped_bndr (DoneEx arg)
-	    (go fun args)
-	  | otherwise
-	  = tick (BetaReduction bndr) 			`thenSmpl_`
-	    simplBinder zapped_bndr			( \ bndr' ->
-	    completeBeta zapped_bndr bndr' arg		$
-	    go fun args
-	    )
-         where
-	   zapped_bndr = zap_it bndr
-
-	-- Consumed all the lambda binders or args
-    go fun args = simplExprF fun (pushArgs emptySubstEnv args cont)
-
-
------------ costCentreOk
--- costCentreOk checks that it's ok to inline this thing
--- The time it *isn't* is this:
---
---	f x = let y = E in
---	      scc "foo" (...y...)
---
--- Here y has a "current cost centre", and we can't inline it inside "foo",
--- regardless of whether E is a WHNF or not.
-    
-costCentreOk ccs_encl cc_rhs
-  =  not opt_SccProfilingOn
-  || isSubsumedCCS ccs_encl	  -- can unfold anything into a subsumed scope
-  || not (isEmptyCC cc_rhs)	  -- otherwise need a cc on the unfolding
-\end{code}		   
-
+\end{code}
 
 %************************************************************************
 %*									*
