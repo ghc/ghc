@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.5 2001/02/21 16:24:34 simonmar Exp $
+-- $Id: Main.hs,v 1.6 2002/02/28 18:50:40 keithw Exp $
 
 -- (c) Simon Marlow 1997-1999
 -----------------------------------------------------------------------------
@@ -12,6 +12,7 @@ import Slurp
 import CmdLine
 
 import Html hiding ((!))
+import qualified Html ((!))
 import GlaExts
 import FiniteMap
 import GetOpt

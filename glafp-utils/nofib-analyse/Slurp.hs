@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Slurp.hs,v 1.2 2000/02/18 10:25:53 simonmar Exp $
+-- $Id: Slurp.hs,v 1.3 2002/02/28 18:50:42 keithw Exp $
 
 -- (c) Simon Marlow 1997-1999
 -----------------------------------------------------------------------------
@@ -80,6 +80,10 @@ of "time" will need different regexps.
 -}
 
 time_re = mkRegex "^[ \t]*([0-9.]+)[ \t]+real[ \t]+([0-9.]+)[ \t]+user[ \t]+([0-9.]+)[ \t]+sys[ \t]*$"
+
+time_gnu17_re = mkRegex "^[ \t]*([0-9.]+)user[ \t]+([0-9.]+)system[ \t]+([0-9.:]+)elapsed"
+                -- /usr/bin/time --version reports: GNU time 1.7
+                -- notice the order is different, and the elapsed time is [hh:]mm:ss.s
 
 size_re = mkRegex "^[ \t]*([0-9]+)[ \t]+([0-9]+)[ \t]+([0-9]+)"
 
@@ -185,6 +189,13 @@ parse_compile_time prog mod (l:ls) =
 		[(prog,emptyResults{compile_time = ct})];
 	     Nothing -> 
 
+	case matchRegex time_gnu17_re l of {
+	     Just (user:system:elapsed:_) ->
+		let ct  = addToFM emptyFM mod (read user)
+		in 
+		[(prog,emptyResults{compile_time = ct})];
+	     Nothing -> 
+
 	case matchRegex ghc1_re l of {
 	    Just (allocs:_:_:_:_:init:_:mut:_:gc:_) ->
 	      let 
@@ -230,14 +241,22 @@ parse_compile_time prog mod (l:ls) =
 	    Nothing ->
 
 		parse_compile_time prog mod ls
-	}}}}}
+	}}}}}}
 
 parse_link_time prog [] = []
 parse_link_time prog (l:ls) =
-	  case matchRegex time_re l of
-	     Nothing -> parse_link_time prog ls
+	  case matchRegex time_re l of {
 	     Just (real:user:system:_) ->
-		[(prog,emptyResults{link_time = Just (read user)})]
+		[(prog,emptyResults{link_time = Just (read user)})];
+	     Nothing ->
+
+	  case matchRegex time_gnu17_re l of {
+	     Just (user:system:elapsed:_) ->
+		[(prog,emptyResults{link_time = Just (read user)})];
+	     Nothing ->
+
+          parse_link_time prog ls
+          }}
 
 parse_run_time prog [] NotDone = []
 parse_run_time prog [] ex =[(prog,emptyResults{run_status=ex})]
