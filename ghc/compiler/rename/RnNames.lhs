@@ -412,11 +412,17 @@ addAvailEnv :: Bool -> RdrNameIE -> AvailEnv -> AvailInfo -> RnM s d AvailEnv
 addAvailEnv warn_dups ie env NotAvailable   = returnRn env
 addAvailEnv warn_dups ie env (AvailTC _ []) = returnRn env
 addAvailEnv warn_dups ie env avail
-  | warn_dups = mapMaybeRn (addErrRn  . availClashErr) () conflict `thenRn_`
+  | warn_dups = mapMaybeRn (addErrRn . availClashErr) () conflict `thenRn_`
                 returnRn (addToFM_C addAvail env key elt)
   | otherwise = returnRn (addToFM_C addAvail env key elt)
   where
-   key  = nameOccName (availName avail)
+   occ_avail = nameOccName (availName avail)
+   occ_ie    = ieOcc ie
+   key
+    | occ_ie == occ_avail = occ_avail
+    | otherwise           = occ_ie 
+        -- export item is a class method, use export occ name instead.
+
    elt  = (ie,avail,reports_on)
 
    reports_on
