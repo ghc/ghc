@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.40 2001/11/22 14:25:11 simonmar Exp $
+ * $Id: Stg.h,v 1.41 2001/11/25 03:56:39 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -102,6 +102,14 @@ void _stgAssert (char *, unsigned int);
 	else					\
 	    _stgAssert(__FILE__, __LINE__)
 #endif /* DEBUG */
+
+/* 
+ * Use this on the RHS of macros which expand to nothing
+ * to make sure that the macro can be used in a context which
+ * demands a non-empty statement.
+ */
+
+#define doNothing() do { } while (0)
 
 /* -----------------------------------------------------------------------------
    Global type definitions

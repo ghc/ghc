@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.14 2001/10/29 11:33:37 simonmar Exp $
+ * $Id: Rts.h,v 1.15 2001/11/25 03:56:39 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -93,14 +93,6 @@ extern "C" {
 /* -----------------------------------------------------------------------------
    Useful macros and inline functions
    -------------------------------------------------------------------------- */
-
-/* 
- * Use this on the RHS of macros which expand to nothing
- * to make sure that the macro can be used in a context which
- * demands a non-empty statement.
- */
-
-#define doNothing() do { } while (0)
 
 #define stg_min(a,b) ({typeof(a) _a = (a), _b = (b); _a <= _b ? _a : _b; })
 #define stg_max(a,b) ({typeof(a) _a = (a), _b = (b); _a <= _b ? _b : _a; })
