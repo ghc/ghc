@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.40 2005/02/04 15:43:32 simonpj Exp $
+-- $Id: DriverMkDepend.hs,v 1.41 2005/02/15 11:24:51 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -268,36 +268,36 @@ insertSuffixes file_name extras
 endMkDependHS :: DynFlags -> MkDepFiles -> IO ()
 
 endMkDependHS dflags 
-   (MkDep { mkd_make_file = make_file, mkd_make_hdl =  makefile_hdl,
-            mkd_tmp_file  = tmp_file,  mkd_tmp_hdl  =  tmp_hdl }) 
-  = do	{ 	-- write the magic marker into the tmp file
-	  hPutStrLn tmp_hdl depEndMarker
+   (MkDep { mkd_make_file = makefile, mkd_make_hdl =  makefile_hdl,
+            mkd_tmp_file  = tmp_file, mkd_tmp_hdl  =  tmp_hdl }) 
+  = do
+  -- write the magic marker into the tmp file
+  hPutStrLn tmp_hdl depEndMarker
 
-	; case makefile_hdl of {
-	     Nothing  -> return ();
-	     Just hdl -> do
-	{
+  case makefile_hdl of
+     Nothing  -> return ()
+     Just hdl -> do
+
 	  -- slurp the rest of the original makefile and copy it into the output
-	  let slurp = do
+  	let slurp = do
 		l <- hGetLine hdl
 		hPutStrLn tmp_hdl l
 		slurp
 	 
- 	; catchJust ioErrors slurp 
+  	catchJust ioErrors slurp 
 		(\e -> if isEOFError e then return () else ioError e)
 
-	; hClose hdl
+	hClose hdl
 
-	; hClose tmp_hdl  -- make sure it's flushed
+  hClose tmp_hdl  -- make sure it's flushed
 
-		-- Create a backup of the original makefile
-	; when (isJust makefile_hdl)
-	       (SysTools.copy dflags ("Backing up " ++ make_file) 
-			      make_file (make_file++".bak"))
+	-- Create a backup of the original makefile
+  when (isJust makefile_hdl)
+       (SysTools.copy dflags ("Backing up " ++ makefile) 
+	  makefile (makefile++".bak"))
 
-	  	-- Copy the new makefile in place
-	; SysTools.copy dflags "Installing new makefile" tmp_file make_file
-	}}}
+  	-- Copy the new makefile in place
+  SysTools.copy dflags "Installing new makefile" tmp_file makefile
 
 
 -----------------------------------------------------------------
