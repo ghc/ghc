@@ -411,6 +411,8 @@ mkNewTyConRep :: TyCon		-- The original type constructor
 -- The trick is to to deal correctly with recursive newtypes
 -- such as	newtype T = MkT T
 
+-- a newtype with no data constructors -- appears in External Core programs
+mkNewTyConRep tc | (null (tyConDataCons tc)) = unitTy
 mkNewTyConRep tc
   = go [] tc
   where

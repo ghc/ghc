@@ -324,7 +324,8 @@ mkTupNameStr Boxed 3 = (pREL_TUP_Name, mkFastString "(,,)")  -- ditto
 mkTupNameStr Boxed 4 = (pREL_TUP_Name, mkFastString "(,,,)") -- ditto
 mkTupNameStr Boxed n = (pREL_TUP_Name, mkFastString ("(" ++ nOfThem (n-1) ',' ++ ")"))
 
-mkTupNameStr Unboxed 0 = panic "Name.mkUbxTupNameStr: 0 ???"
+mkTupNameStr Unboxed 0 = (gHC_PRIM_Name, mkFastString "(# #)") -- 1 and 0 both make sense!!!
+--panic "Name.mkUbxTupNameStr: 0 ???"
 mkTupNameStr Unboxed 1 = (gHC_PRIM_Name, mkFastString "(# #)") -- 1 and 0 both make sense!!!
 mkTupNameStr Unboxed 2 = (gHC_PRIM_Name, mkFastString "(#,#)")
 mkTupNameStr Unboxed 3 = (gHC_PRIM_Name, mkFastString "(#,,#)")

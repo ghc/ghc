@@ -457,7 +457,7 @@ implicitTyThings things
 	-- Newtypes don't have a worker Id, so don't generate that
     extras (ATyCon tc) = map AnId (tyConGenIds tc ++ tyConSelIds tc) ++ data_con_stuff
        where
-	data_con_stuff | isNewTyCon tc = [ADataCon dc1, AnId (dataConWrapId dc1)]
+	data_con_stuff | isNewTyCon tc = (if (null dcs) then [] else  [ADataCon dc1, AnId (dataConWrapId dc1)]) 
 		       | otherwise     = concatMap (extras_plus . ADataCon) dcs
 	dcs = tyConDataCons tc
 	dc1 = head dcs
