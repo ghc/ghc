@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.18 1999/11/09 15:57:40 simonmar Exp $
+ * $Id: StgMacros.h,v 1.19 1999/11/22 16:44:30 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -70,57 +70,21 @@
    words in the block.
    -------------------------------------------------------------------------- */
 
-#ifndef DEBUG_EXTRA
 #define ARGTAG_MAX 16		/* probably arbitrary */
 #define ARG_TAG(n)  (n)
-#define ARG_SIZE(n) stgCast(StgWord,n)
+#define ARG_SIZE(n) (StgWord)n
 
 typedef enum {
     REALWORLD_TAG = 0,
-    INT_TAG    = sizeofW(StgInt), 
-    INT64_TAG  = sizeofW(StgInt64), 
-    WORD_TAG   = sizeofW(StgWord), 
-    ADDR_TAG   = sizeofW(StgAddr), 
-    CHAR_TAG   = sizeofW(StgChar),
-    FLOAT_TAG  = sizeofW(StgFloat), 
-    DOUBLE_TAG = sizeofW(StgDouble), 
-    STABLE_TAG = sizeofW(StgWord), 
+    INT_TAG       = sizeofW(StgInt), 
+    INT64_TAG     = sizeofW(StgInt64), 
+    WORD_TAG      = sizeofW(StgWord), 
+    ADDR_TAG      = sizeofW(StgAddr), 
+    CHAR_TAG      = sizeofW(StgChar),
+    FLOAT_TAG     = sizeofW(StgFloat), 
+    DOUBLE_TAG    = sizeofW(StgDouble), 
+    STABLE_TAG    = sizeofW(StgWord), 
 } StackTag;
-
-#else /* DEBUG_EXTRA */
-
-typedef enum {
-    ILLEGAL_TAG,
-    REALWORLD_TAG,
-    INT_TAG    ,
-    INT64_TAG  ,
-    WORD_TAG   ,
-    ADDR_TAG   ,
-    CHAR_TAG   ,
-    FLOAT_TAG  ,
-    DOUBLE_TAG ,
-    STABLE_TAG ,
-    ARGTAG_MAX = DOUBLE_TAG
-} StackTag;
-
-/* putting this in a .h file generates many copies - but its only a 
- * debugging build.
- */
-static StgWord stg_arg_size[] = {
-    [REALWORLD_TAG] = 0,
-    [INT_TAG   ] = sizeofW(StgInt), 
-    [INT64_TAG ] = sizeofW(StgInt64), 
-    [WORD_TAG  ] = sizeofW(StgWord), 
-    [ADDR_TAG  ] = sizeofW(StgAddr), 
-    [CHAR_TAG  ] = sizeofW(StgChar),
-    [FLOAT_TAG ] = sizeofW(StgFloat), 
-    [DOUBLE_TAG] = sizeofW(StgDouble),
-    [STABLE_TAG] = sizeofW(StgWord)
-};
-
-#define ARG_SIZE(tag) stg_arg_size[stgCast(StgWord,tag)]
-
-#endif /* DEBUG_EXTRA */
 
 static inline int IS_ARG_TAG( StgWord p );
 static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }

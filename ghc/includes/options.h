@@ -13,8 +13,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: options.h,v $
- * $Revision: 1.12 $
- * $Date: 1999/11/12 17:32:36 $
+ * $Revision: 1.13 $
+ * $Date: 1999/11/22 16:44:31 $
  * ------------------------------------------------------------------------*/
 
 
@@ -217,11 +217,6 @@
 /* Turn on debugging output and some sanity checks
  */
 /*#define DEBUG*/
-
-/* Make stack tags more informative than just their size.
- * Helps when printing the stack and when running sanity checks.
- */
-/*#define DEBUG_EXTRA*/
 
 /* NB: LAZY_BLACKHOLING has been moved up to Stg.h where both Hugs and GHC can see it,
  * and EAGER_BLACKHOLING has been introduced also.  KSW 1999-01.

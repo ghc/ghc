@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.16 1999/11/22 16:16:35 sewardj Exp $
+ * $Id: Printer.c,v 1.17 1999/11/22 16:44:33 sewardj Exp $
  *
  * Copyright (c) 1994-1999.
  *
@@ -299,7 +299,8 @@ void printClosure( StgClosure *obj )
         }
     default:
             //barf("printClosure %d",get_itbl(obj)->type);
-            fprintf(stderr, "*** printClosure: unknown type %d ****\n",get_itbl(obj)->type );
+            fprintf(stderr, "*** printClosure: unknown type %d ****\n",
+                    get_itbl(obj)->type );
             return;
     }
 }
@@ -309,53 +310,12 @@ StgPtr printStackObj( StgPtr sp )
     /*fprintf(stderr,"Stack[%d] = ", &stgStack[STACK_SIZE] - sp); */
 
     if (IS_ARG_TAG(*sp)) {
-
-#ifdef DEBUG
-        StackTag tag = (StackTag)*sp;
-        switch ( tag ) {
-        case ILLEGAL_TAG:
-                barf("printStackObj: ILLEGAL_TAG");
-                break;
-        case REALWORLD_TAG:
-                fprintf(stderr,"RealWorld#\n");
-                break;
-        case INT_TAG:
-                fprintf(stderr,"Int# %d\n", *(StgInt*)(sp+1));
-                break;
-        case INT64_TAG:
-                fprintf(stderr,"Int64# %lld\n", *(StgInt64*)(sp+1));
-                break;
-        case WORD_TAG:
-                fprintf(stderr,"Word# %d\n", *(StgWord*)(sp+1));
-                break;
-        case ADDR_TAG:
-                fprintf(stderr,"Addr# "); printPtr(*(StgAddr*)(sp+1)); fprintf(stderr,"\n");
-                break;
-        case CHAR_TAG:
-                fprintf(stderr,"Char# %d\n", *(StgChar*)(sp+1));
-                break;
-        case FLOAT_TAG:
-                fprintf(stderr,"Float# %f\n", PK_FLT(sp+1));
-                break;
-        case DOUBLE_TAG:
-                fprintf(stderr,"Double# %f\n", PK_DBL(sp+1));
-                break;
-        default:
-                barf("printStackObj: unrecognised ARGTAG %d",tag);
+        nat i;
+        StgWord tag = *sp++;
+        fprintf(stderr,"Tag: %d words\n", tag);
+        for (i = 0; i < tag; i++) {
+            fprintf(stderr,"Word# %d\n", *sp++);
         }
-        sp += 1 + ARG_SIZE(tag);
-
-#else /* !DEBUG */
-	{
-	    StgWord tag = *sp++;
-	    nat i;
-	    fprintf(stderr,"Tag: %d words\n", tag);
-	    for (i = 0; i < tag; i++) {
-	        fprintf(stderr,"Word# %d\n", *sp++);
-	    }
-	}
-#endif
-
     } else {
         StgClosure* c = (StgClosure*)(*sp);
         printPtr((StgPtr)*sp);
