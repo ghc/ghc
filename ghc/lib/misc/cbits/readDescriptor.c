@@ -19,40 +19,7 @@ readDescriptor(I_ fd, A_ buf, I_ nbytes)
     while ((sucked = read((int) fd, (char *) buf, (int) nbytes)) < 0) {
       if (errno != EINTR) {
 	  cvtErrno();
-	  switch (ghc_errno) {
-	  case GHC_EBADF:
-       	      ghc_errtype = ERR_INVALIDARGUMENT;
-              ghc_errstr  = "Not a valid read descriptor";
-	      break;
-	  case GHC_EBADMSG:
-       	      ghc_errtype = ERR_SYSTEMERROR;
-              ghc_errstr  = "Message waiting to be read is not a data message";
-	      break;
-	  case GHC_EFAULT:
-       	      ghc_errtype = ERR_INVALIDARGUMENT;
-              ghc_errstr  = "Data buffer not in readable part of user address space";
-	      break;
-	  case GHC_EINVAL:
-	      ghc_errtype = ERR_INVALIDARGUMENT;
-	      ghc_errstr  = "Seek pointer associated with descriptor negative";
-	      break;
-	  case GHC_EIO:
-	      ghc_errtype = ERR_SYSTEMERROR;
-	      ghc_errstr  = "I/O error occurred while reading";
-	      break;
-	  case GHC_EISDIR:
-	      ghc_errtype = ERR_INAPPROPRIATETYPE;
-	      ghc_errstr  = "Descriptor refers to a directory";
-	      break;
-	  case GHC_EAGAIN:
-	  case GHC_EWOULDBLOCK:
-	      ghc_errtype = ERR_OTHERERROR;
-	      ghc_errstr  = "No data could be read immediately";
-	      break;
-	  default:
-	      stdErrno();
-	      break;
-	  }
+	  stdErrno();
 	  return -1;
       }
     }

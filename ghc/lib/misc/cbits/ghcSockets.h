@@ -76,6 +76,10 @@ StgInt	recvFrom__ PROTO((StgInt, StgAddr, StgInt, StgAddr));
 /* sendTo.c */
 StgInt	sendTo__ PROTO((StgInt, StgAddr, StgInt, StgAddr, StgInt));
 
+/* socketOpt.c */
+StgInt	getSocketOption__ PROTO((StgInt, StgInt));
+StgInt	setSocketOption__ PROTO((StgInt, StgInt, StgInt));
+
 /* writeDescriptor.lc */
 StgInt	writeDescriptor PROTO((StgInt, StgAddr, StgInt));
 

@@ -19,23 +19,7 @@ listenSocket(I_ sockfd, I_ backlog)
     while ((rc = listen((int) sockfd, (int) backlog)) < 0) {
       if (errno != EINTR) {
 	  cvtErrno();
-	  switch (ghc_errno) {
-	  default:
-	      stdErrno();
-	      break;
-	  case GHC_EBADF:
-       	      ghc_errtype = ERR_INVALIDARGUMENT;
-              ghc_errstr  = "Not a valid descriptor";
-	      break;
-	  case GHC_ENOTSOCK:
-	      ghc_errtype = ERR_INVALIDARGUMENT;
-	      ghc_errstr  = "Descriptor not a socket";
-	      break;
-	  case GHC_EOPNOTSUPP:
-	      ghc_errtype = ERR_INVALIDARGUMENT;
-	      ghc_errstr  = "Socket not of type that supports listen";
-	      break;
-	  }
+	  stdErrno();
 	  return -1;
       }
     }
