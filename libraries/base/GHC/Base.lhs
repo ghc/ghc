@@ -564,6 +564,14 @@ compareInt# x# y#
 id			:: a -> a
 id x			=  x
 
+-- lazy function; this is just the same as id, but its unfolding
+-- and strictness are over-ridden by the definition in MkId.lhs
+-- That way, it does not get inlined, and the strictness analyser
+-- sees it as lazy.  Then the worker/wrapper phase inlines it.
+-- Result: happiness
+lazy :: a -> a
+lazy x = x
+
 -- constant function
 const			:: a -> b -> a
 const x _		=  x

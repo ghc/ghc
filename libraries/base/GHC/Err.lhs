@@ -29,8 +29,7 @@ module GHC.Err
        , recConError
        , runtimeError              -- :: Addr#  -> a	-- Addr# points to UTF8 encoded C string
 
-       , absentErr, parError       -- :: a
-       , seqError                  -- :: a
+       , absentErr	           -- :: a
 
        , error		           -- :: String -> a
        , assertError		   -- :: String -> Bool -> a -> a
@@ -74,11 +73,9 @@ Used for compiler-generated error message;
 encoding saves bytes of string junk.
 
 \begin{code}
-absentErr, parError, seqError :: a
+absentErr :: a
 
 absentErr = error "Oops! The program has entered an `absent' argument!\n"
-parError  = error "Oops! Entered GHCerr.parError (a GHC bug -- please report it!)\n"
-seqError  = error "Oops! Entered seqError (a GHC bug -- please report it!)\n"
 \end{code}
 
 \begin{code}

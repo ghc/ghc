@@ -48,7 +48,6 @@ module GHC.Conc
 import Data.Maybe
 
 import GHC.Base
-import GHC.Err		( parError, seqError )
 import GHC.IOBase	( IO(..), MVar(..) )
 import GHC.Base		( Int(..) )
 import GHC.Exception    ( Exception(..), AsyncException(..) )
@@ -138,22 +137,19 @@ forkProcess = IO $ \s -> case (forkProcess# s) of (# s1, id #) -> (# s1, (I# id)
 --
 -- "pseq" is defined a bit weirdly (see below)
 --
--- The reason for the strange "0# -> parError" case is that
--- it fools the compiler into thinking that seq is non-strict in
--- its second argument (even if it inlines seq at the call site).
--- If it thinks seq is strict in "y", then it often evaluates
+-- The reason for the strange "lazy" call is that
+-- it fools the compiler into thinking that pseq  and par are non-strict in
+-- their second argument (even if it inlines pseq at the call site).
+-- If it thinks pseq is strict in "y", then it often evaluates
 -- "y" before "x", which is totally wrong.  
---
--- Just before converting from Core to STG there's a bit of magic
--- that recognises the seq# and eliminates the duff case.
 
 {-# INLINE pseq  #-}
 pseq :: a -> b -> b
-pseq  x y = case (seq#  x) of { 0# -> seqError; _ -> y }
+pseq  x y = x `seq` lazy y
 
 {-# INLINE par  #-}
 par :: a -> b -> b
-par  x y = case (par# x) of { 0# -> parError; _ -> y }
+par  x y = case (par# x) of { _ -> lazy y }
 \end{code}
 
 %************************************************************************
