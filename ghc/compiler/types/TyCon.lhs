@@ -40,7 +40,7 @@ module TyCon(
 
 CHK_Ubiq()	-- debugging consistency check
 
-IMPORT_DELOOPER(TyLoop)	( SYN_IE(Type), GenType,
+IMPORT_DELOOPER(TyLoop) ( SYN_IE(Type), GenType,
 			  SYN_IE(Class), GenClass,
 			  SYN_IE(Id), GenId,
 			  splitSigmaTy, splitFunTy,
@@ -53,9 +53,10 @@ import Usage		( GenUsage, SYN_IE(Usage) )
 import Kind		( Kind, mkBoxedTypeKind, mkArrowKind, resultKind, argKind )
 
 import Maybes
-import Name		( Name, nameUnique, mkWiredInTyConName )
+import Name		( Name, nameUnique, mkWiredInTyConName, NamedThing(getName) )
 import Unique		( Unique, funTyConKey )
-import Pretty		( SYN_IE(Pretty), PrettyRep )
+import UniqFM           ( Uniquable(..) )
+import Pretty		( Doc )
 import PrimRep		( PrimRep(..) )
 import PrelMods		( gHC__, pREL_TUP, pREL_BASE )
 import Lex		( mkTupNameStr )
@@ -78,7 +79,7 @@ data TyCon
 		Kind
 		[TyVar]
 		[(Class,Type)]	-- Its context
-		[Id]		-- Its data constructors, with fully polymorphic types
+		[Id{-DataCon-}]	-- Its data constructors, with fully polymorphic types
 				-- 	This list can be empty, when we import a data type abstractly,
 				-- 	either (a) the interface is hand-written and doesn't give
 				--		   the constructors, or
