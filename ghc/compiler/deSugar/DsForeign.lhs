@@ -73,9 +73,12 @@ dsForeigns fos
  where
   combine (ForeignStubs acc_h acc_c acc_hdrs acc_feb, acc_f) 
 	  (ForeignImport id _ spec depr loc)
-    = dsFImport id spec	           `thenDs` \(bs, h, c, hd) -> 
-      warnDepr depr loc				   `thenDs` \_              ->
-      returnDs (ForeignStubs (h $$ acc_h) (c $$ acc_c) (hd ++ acc_hdrs) acc_feb, 
+    = dsFImport id spec	           `thenDs` \ (bs, h, c, mbhd) -> 
+      warnDepr depr loc		   `thenDs` \ _                ->
+      returnDs (ForeignStubs (h $$ acc_h)
+      			     (c $$ acc_c)
+			     (addH mbhd acc_hdrs)
+			     acc_feb, 
 		bs ++ acc_f)
 
   combine (ForeignStubs acc_h acc_c acc_hdrs acc_feb, acc_f) 
@@ -85,6 +88,11 @@ dsForeigns fos
       warnDepr depr loc				   `thenDs` \_              ->
       returnDs (ForeignStubs (h $$ acc_h) (c $$ acc_c) acc_hdrs (id:acc_feb), 
 		acc_f)
+
+  addH Nothing  ls = ls
+  addH (Just e) ls
+   | e `elem` ls = ls
+   | otherwise   = e:ls
 
   warnDepr False _   = returnDs ()
   warnDepr True  loc = dsWarn (loc, msg)
@@ -120,10 +128,10 @@ because it exposes the boxing to the call site.
 \begin{code}
 dsFImport :: Id
 	  -> ForeignImport
-	  -> DsM ([Binding], SDoc, SDoc, [FastString])
+	  -> DsM ([Binding], SDoc, SDoc, Maybe FastString)
 dsFImport id (CImport cconv safety header lib spec)
   = dsCImport id spec cconv safety no_hdrs	  `thenDs` \(ids, h, c) ->
-    returnDs (ids, h, c, if no_hdrs then [] else [header])
+    returnDs (ids, h, c, if no_hdrs then Nothing else Just header)
   where
     no_hdrs = nullFastString header
 
@@ -132,7 +140,7 @@ dsFImport id (CImport cconv safety header lib spec)
   --	    support such calls yet; if `nullFastString lib', the value was not given
 dsFImport id (DNImport spec)
   = dsFCall id (DNCall spec) True {- No headers -} `thenDs` \(ids, h, c) ->
-    returnDs (ids, h, c, [])
+    returnDs (ids, h, c, Nothing)
 
 dsCImport :: Id
 	  -> CImportSpec
