@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.66 2001/05/08 10:58:48 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.67 2001/05/08 11:07:30 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -260,8 +260,6 @@ genPipeline todo stop_flag persistent_output lang filename
 		("flag " ++ stop_flag
 		 ++ " is incompatible with source file `" ++ filename ++ "'"))
       else do
-
-   print (show pipeline ++ show annotated_pipeline ++ show stop_phase)
 
    return (
      takeWhile (phase_ne stop_phase ) $
