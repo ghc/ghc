@@ -340,7 +340,8 @@ data HscLang
 defaultHscLang
   | cGhcWithNativeCodeGen == "YES" && 
 	(prefixMatch "i386" cTARGETPLATFORM ||
-	 prefixMatch "sparc" cTARGETPLATFORM)   =  HscAsm
+	 prefixMatch "sparc" cTARGETPLATFORM ||
+	 prefixMatch "powerpc" cTARGETPLATFORM)   =  HscAsm
   | otherwise					=  HscC
 
 defaultDynFlags = DynFlags {
