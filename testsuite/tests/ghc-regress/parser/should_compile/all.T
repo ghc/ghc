@@ -38,3 +38,4 @@ test "read028" { vtc("") }
 test "read029" { vtc("") }
 test "read030" { vtc("") }
 test "read031" { vtc("") }
+test "read032" { vtc("") }
