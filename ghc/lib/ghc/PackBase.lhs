@@ -46,6 +46,7 @@ import PrelList ( length )
 import STBase
 import ArrBase
 import Addr
+import UnsafeST ( runST )
 
 \end{code}
 
