@@ -56,7 +56,7 @@ data HsModule name
 				-- imported interfaces early on, adding that
 				-- info to TyDecls/etc; so this list is
 				-- often empty, downstream.
-	[LHsDecl name]	-- Type, class, value, and interface signature decls
+	[LHsDecl name]		-- Type, class, value, and interface signature decls
 	(Maybe DeprecTxt)	-- reason/explanation for deprecation of this module
 
 data HsExtCore name	-- Read from Foo.hcr
