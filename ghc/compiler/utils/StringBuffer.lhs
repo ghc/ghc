@@ -63,22 +63,22 @@ import GlaExts
 import Addr 		( Addr(..) )
 import Foreign
 import ST
-import IO		( openFile, hFileSize, hClose, IOMode(..)
+
 #if __GLASGOW_HASKELL__ >= 303
-		        , slurpFile
+import IO		( slurpFile )
+#else
+import IO		( openFile, hFileSize, hClose, IOMode(..) )
 #endif
-		        )
+
 #if __GLASGOW_HASKELL__ < 301
 import IOBase		( IOError(..), IOErrorType(..) )
 import IOHandle		( readHandle, writeHandle, filePtr )
 import PackBase 	( unpackCStringBA )
 #else
-import PrelIOBase	( IOError(..), IOErrorType(..)
-#if __GLASGOW_HASKELL__ <= 302
-			, haFO__
-#endif
-			)
+# if __GLASGOW_HASKELL__ <= 302
+import PrelIOBase	( IOError(..), IOErrorType(..) )
 import PrelHandle	( readHandle, writeHandle )
+# endif
 import PrelPack		( unpackCStringBA )
 #endif
 
