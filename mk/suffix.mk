@@ -211,27 +211,27 @@ SRC_HC_PRE_OPTS  += $(HC_PRE__)
 
 %.tex : %.sgml
 	@$(RM) $@
-	$(SGML2LATEX) -m --output=tex $<
+	$(SGML2LATEX) $(SGML2LATEX_OPTS) -m --output=tex $<
 
 %.dvi : %.sgml
 	@$(RM) $@
-	$(SGML2LATEX) -m --output=dvi $<
+	$(SGML2LATEX) $(SGML2LATEX_OPTS) -m --output=dvi $<
 
-%,ps : %.sgml
+%.ps : %.sgml
 	@$(RM) $@
-	$(SGML2LATEX) -m --output=ps $<
+	$(SGML2LATEX) $(SGML2LATEX_OPTS) -m --output=ps $<
 
 %.html : %.sgml
 	@$(RM) $@
-	$(SGML2HTML) $<
+	$(SGML2HTML) $(SGML2HTML_OPTS) $<
 
 %.info : %.sgml
 	@$(RM) $@
-	$(SGML2INFO) $<
+	$(SGML2INFO) $(SGML2INFO_OPTS) $<
 
 %.txt : %.sgml
 	@$(RM) $@
-	$(SGML2TXT) $<
+	$(SGML2TXT) $(SGML2TXT_OPTS) $<
 
 #-----------------------------------------------------------------------------
 # Literate suffix rules
@@ -243,10 +243,10 @@ SRC_HC_PRE_OPTS  += $(HC_PRE__)
 
 %.c : %.lc
 	@$(RM) $@
-	$(UNLIT) $< $@
+	$(UNLIT) $(UNLIT_OPTS) $< $@
 	@chmod 444 $@
 
 %.h : %.lh
 	@$(RM) $@
-	$(UNLIT) $< $@
+	$(UNLIT) $(UNLIT_OPTS) $< $@
 	@chmod 444 $@

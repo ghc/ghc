@@ -459,11 +459,12 @@ endif
 # For each of these variables that is defined, you
 # get one install rule
 #
-#	INSTALL_PROGS 	  executable programs in $(bindir)
-#	INSTALL_SCRIPTS	  executable scripts in $(bindir)
-#	INSTALL_LIBS	  platform-dependent libraries in $(libdir) (ranlib'ed)
-#	INSTALL_LIBEXECS  platform-dependent execs in $(libdir)
-#	INSTALL_DATAS	  platform-independent files in $(datadir)
+#	INSTALL_PROGS 	     executable programs in $(bindir)
+#	INSTALL_SCRIPTS	     executable scripts in $(bindir)
+#	INSTALL_LIBS	     platform-dependent libraries in $(libdir) (ranlib'ed)
+#	INSTALL_LIB_SCRIPTS  platform-dependent scripts   in $(libdir)
+#	INSTALL_LIBEXECS     platform-dependent execs in $(libdir)
+#	INSTALL_DATAS	     platform-independent files in $(datadir)
 #
 # If the installation directory variable is undefined, the install rule simply
 # emits a suitable error message.

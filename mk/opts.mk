@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.8 1998/10/07 14:18:31 simonm Exp $
+# 	$Id: opts.mk,v 1.9 1999/02/02 14:16:28 sof Exp $
 #
 #################################################################################
 
@@ -108,6 +108,10 @@ MKDEPENDHS_OPTS    = $(SRC_MKDEPENDHS_OPTS) $(WAY$(_way)_MKDEPENDHS_OPTS) \
                      $(EXTRA_MKDEPENDHS_OPTS)
 MKDEPENDLIT_OPTS   = $(SRC_MKDEPENDLIT_OPTS) $(WAY$(_way)_MKDEPENDLIT_OPTS) \
                      $(EXTRA_MKDEPENDLIT_OPTS)
+SGML2LATEX_OPTS    = $(SRC_SGML2LATEX_OPTS) $(WAY$(_way)_SGML2LATEX_OPTS) $(EXTRA_SGML2LATEX_OPTS)
+SGML2INFO_OPTS     = $(SRC_SGML2INFO_OPTS) $(WAY$(_way)_SGML2INFO_OPTS) $(EXTRA_INFO_OPTS)
+SGML2TXT_OPTS      = $(SRC_SGML2TXT_OPTS) $(WAY$(_way)_SGML2TXT_OPTS) $(EXTRA_SGML2TXT_OPTS)
+SGML2HTML_OPTS     = $(SRC_SGML2HTML_OPTS) $(WAY$(_way)_SGML2HTML_OPTS) $(EXTRA_SGML2HTML_OPTS)
 UGEN_OPTS          = $(SRC_UGEN_OPTS) $(WAY$(_way)_UGEN_OPTS) $(EXTRA_UGEN_OPTS)
 UNLIT_OPTS         = $(SRC_UNLIT_OPTS) $(WAY$(_way)_UNLIT_OPTS) $(EXTRA_UNLIT_OPTS)
 YACC_OPTS          = $(SRC_YACC_OPTS) $(WAY$(_way)_YACC_OPTS) $(EXTRA_YACC_OPTS)
