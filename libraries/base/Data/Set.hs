@@ -1084,11 +1084,11 @@ prop_List xs
 emptySet :: Set a
 emptySet = empty
 
-{-# DEPRECATED mkSet "Equivalent to 'foldl insert empty'." #-}
+{-# DEPRECATED mkSet "Equivalent to 'foldl' (flip insert) empty'." #-}
 mkSet :: Ord a => [a]  -> Set a
 mkSet = List.foldl' (flip insert) empty
 
-{-# DEPRECATED setToList "Use instead." #-}
+{-# DEPRECATED setToList "Use elems instead." #-}
 setToList :: Set a -> [a] 
 setToList = elems
 
@@ -1124,10 +1124,10 @@ mapSet = map
 intersect :: Ord a => Set a -> Set a -> Set a
 intersect = intersection
 
-{-# DEPRECATED addToSet "Use insert instead." #-}
+{-# DEPRECATED addToSet "Use 'flip insert' instead." #-}
 addToSet :: Ord a => Set a -> a -> Set a
 addToSet = flip insert
 
-{-# DEPRECATED delFromSet "Use delete instead." #-}
+{-# DEPRECATED delFromSet "Use `flip delete' instead." #-}
 delFromSet :: Ord a => Set a -> a -> Set a
 delFromSet = flip delete
