@@ -19,7 +19,7 @@ import FiniteMap	( FiniteMap, emptyFM,
 			  listToFM, fmToList )
 import OrdList		( fromOL )
 import Outputable
-import Unique		( Unique, Uniquable(..), mkPseudoUnique3 )
+import Unique		( mkPseudoUnique3 )
 import CLabel		( CLabel, pprCLabel )
 import FastTypes
 

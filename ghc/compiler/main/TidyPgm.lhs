@@ -20,8 +20,8 @@ import VarEnv
 import VarSet
 import Var		( Id, Var )
 import Id		( idType, idInfo, idName, idCoreRules, 
-			  isExportedId, idUnique, mkVanillaGlobal, isLocalId, 
-			  isImplicitId, mkUserLocal, setIdInfo
+			  isExportedId, mkVanillaGlobal, isLocalId, 
+			  isImplicitId 
 			) 
 import IdInfo		{- loads of stuff -}
 import NewDemand	( isBottomingSig, topSig )
@@ -42,7 +42,6 @@ import HscTypes		( PersistentCompilerState( pcs_PRS ),
 import FiniteMap	( lookupFM, addToFM )
 import Maybes		( orElse )
 import ErrUtils		( showPass, dumpIfSet_core )
-import SrcLoc		( noSrcLoc )
 import UniqFM		( mapUFM )
 import UniqSupply	( splitUniqSupply, uniqFromSupply )
 import List		( partition )

@@ -8,7 +8,7 @@ where
 
 #include "HsVersions.h"
 
-import MachMisc
+-- import MachMisc
 import Stix
 
 import PprAbsC		( pprAmode )
@@ -23,7 +23,7 @@ import Constants	( wORD_SIZE,
 			  mIN_INTLIKE, mIN_CHARLIKE, uF_UPDATEE, bLOCK_SIZE,
 			  rESERVED_STACK_WORDS )
 import CLabel		( mkIntlikeClosureLabel, mkCharlikeClosureLabel,
-			  mkMAP_FROZEN_infoLabel, mkEMPTY_MVAR_infoLabel,
+			  mkMAP_FROZEN_infoLabel, 
 			  mkForeignLabel )
 import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..),
 			  CCallConv(..), playSafe, playThreadSafe )
