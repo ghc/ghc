@@ -397,6 +397,10 @@ GhcLibsWithOpenGL=@GhcLibsWithOpenGL@
 GL_CFLAGS=@GL_CFLAGS@
 GL_LIBS=@GL_LIBS@
 
+# Build the Haskell OpenAL binding?
+#
+GhcLibsWithOpenAL=@GhcLibsWithOpenAL@
+
 # Build the Haskell GLUT binding?
 #
 GhcLibsWithGLUT=@GhcLibsWithGLUT@

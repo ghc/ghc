@@ -619,7 +619,7 @@ AC_ARG_ENABLE(objectio,
 )
 AC_SUBST(GhcLibsWithObjectIO)
 
-dnl ** Enable the building of the OpenGL/GLUT binding in hslibs?
+dnl ** Enable the building of the OpenGL/GLUT binding?
 dnl --------------------------------------------------------------
 AC_ARG_ENABLE(hopengl,
 [  --enable-hopengl
@@ -641,6 +641,19 @@ fi
 
 AC_SUBST([GhcLibsWithOpenGL])
 AC_SUBST([GhcLibsWithGLUT])
+
+dnl ** Enable the building of the OpenAL binding?
+dnl --------------------------------------------------------------
+AC_ARG_ENABLE([openal],
+  AC_HELP_STRING([--enable-openal],
+                 [Build OpenAL binding [[default=autodetect]]]),
+  [GhcLibsWithOpenAL=$enableval],
+  [GhcLibsWithOpenAL=yes])
+
+# This is silly! Alas, "YES" and "NO" are currently our standard...
+GhcLibsWithOpenAL=`echo $GhcLibsWithOpenGL | tr 'abcdefghijklmnopqrstuvwxyz' 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'`
+
+AC_SUBST([GhcLibsWithOpenAL])
 
 dnl ** .NET interop support?
 dnl --------------------------------------------------------------
