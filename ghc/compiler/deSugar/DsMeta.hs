@@ -37,7 +37,8 @@ import HsSyn  	  ( Pat(..), HsExpr(..), Stmt(..), HsLit(..), HsOverLit(..),
 		    InstDecl(..), ConDecl(..), BangType(..),
 		    PendingSplice, splitHsInstDeclTy,
 		    placeHolderType, tyClDeclNames,
-		    collectHsBinders, collectPatBinders, collectPatsBinders,
+		    collectHsBinders, collectPatBinders, 
+		    collectMonoBinders, collectPatsBinders,
 		    hsTyVarName, hsConArgs
 		  )
 
@@ -51,7 +52,7 @@ import OccName	  ( isDataOcc, isTvOcc, occNameUserString )
 import qualified OccName( varName, tcName )
 
 import Module	  ( Module, mkModule, moduleUserString )
-import Id         ( Id, idType )
+import Id         ( Id, idType, mkLocalId )
 import Name	  ( mkExternalName )
 import OccName	  ( mkOccFS )
 import NameEnv
@@ -267,10 +268,10 @@ repInstD' (InstDecl ty binds _ loc)
 	; let ss = mkGenSyms (collectMonoBinders binds)
 	; binds1 <- addBinds ss (rep_monobind binds)
 	; decls1 <- coreList decQTyConName binds1
-	; i <- repInst cxt1 inst_ty1 
-		       (wrapNonGenSyms ss decls1)
+	; decls2 <- wrapNongenSyms ss decls1
 		-- wrapNonGenSyms: do not clone the class op names!
 		-- They must be called 'op' etc, not 'op34'
+	; i <- repInst cxt1 inst_ty1 decls2
 	; return (loc, i)}
  where
    (tvs, cxt, cls, tys) = splitHsInstDeclTy ty
@@ -802,6 +803,14 @@ type GenSymBind = (Name, Id)	-- Gensym the string and bind it to the Id
 -- Generate a fresh name for a locally bound entity
 
 mkGenSym :: Name -> GenSymBind
+-- Does not need to be monadic, becuase we can use the
+-- existing name.  For example:
+--	[| \x_77 -> x_77 + x_77 |]
+-- desugars to
+--	do { x_77 <- genSym "x"; .... }
+-- We use the same x_77 in the desugared program, but with the type Bndr
+-- instead of Int
+
 mkGenSym nm = (nm, mkLocalId nm stringTy)
 
 -- Ditto for a list of names
