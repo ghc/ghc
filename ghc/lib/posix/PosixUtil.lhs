@@ -12,7 +12,12 @@ import PrelIOBase  -- IOError representation
 import Addr
 import Foreign
 import CCall
-import PrelBase
+import PrelAddr
+import PrelBase ( Int(..), Int#, (==#)
+                , newIntArray#, unsafeFreezeByteArray#, newCharArray#
+		, RealWorld
+		)
+
 import MutableArray
 import ByteArray
 import Array
@@ -64,7 +69,8 @@ errno.
 syserr :: String -> IO a
 syserr str = fail (IOError Nothing     -- ToDo: better
 			   SystemError
-			   str)
+			   str
+			   "")
 
 -- Allocate a mutable array of characters with no indices.
 
