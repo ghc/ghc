@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.29 2005/03/02 14:09:26 simonmar Exp $
+# $Id: Makefile,v 1.30 2005/03/02 14:35:05 simonmar Exp $
 #
 
 TOP=.
@@ -42,7 +42,8 @@ SRC_DIST_FILES += configure
 DIST_CLEAN_FILES += VERSION config.cache config.status ghc.spec \
 	docs/users_guide/ug-book.xml
 
-LATE_DIST_CLEAN_FILES += mk/version.mk mk/config.mk 
+# don't clean version.mk: it's needed when cleaning stuff later on
+LATE_DIST_CLEAN_FILES += mk/config.mk 
 
 extraclean::
 	$(RM) -rf autom4te.cache
