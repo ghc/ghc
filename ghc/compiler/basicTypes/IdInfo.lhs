@@ -81,6 +81,8 @@ module IdInfo (
 
 import CoreSyn
 import Type		( Type )
+import TyCon		( TyCon )
+import Class		( Class )
 import PrimOp	 	( PrimOp )
 import NameEnv		( NameEnv, lookupNameEnv )
 import Name		( Name )
@@ -234,6 +236,7 @@ an IdInfo.hi-boot, but no Id.hi-boot, and GlobalIdDetails is imported
 data GlobalIdDetails
   = VanillaGlobal		-- Imported from elsewhere, a default method Id.
 
+  | GenericOpId TyCon		-- The to/from operations of a 
   | RecordSelId FieldLabel	-- The Id for a record selector
   | DataConWorkId DataCon	-- The Id for a data constructor *worker*
   | DataConWrapId DataCon	-- The Id for a data constructor *wrapper*
@@ -241,6 +244,8 @@ data GlobalIdDetails
 				--  a) we can  suppress printing a definition in the interface file
 				--  b) when typechecking a pattern we can get from the
 				--     Id back to the data con]
+
+  | ClassOpId Class		-- An operation of a class
 
   | PrimOpId PrimOp		-- The Id for a primitive operator
   | FCallId ForeignCall		-- The Id for a foreign call
@@ -252,8 +257,10 @@ notGlobalId = NotGlobalId
 instance Outputable GlobalIdDetails where
     ppr NotGlobalId       = ptext SLIT("[***NotGlobalId***]")
     ppr VanillaGlobal     = ptext SLIT("[GlobalId]")
+    ppr (GenericOpId _)   = ptext SLIT("[GenericOp]")
     ppr (DataConWorkId _) = ptext SLIT("[DataCon]")
     ppr (DataConWrapId _) = ptext SLIT("[DataConWrapper]")
+    ppr (ClassOpId _)     = ptext SLIT("[ClassOp]")
     ppr (PrimOpId _)      = ptext SLIT("[PrimOp]")
     ppr (FCallId _)       = ptext SLIT("[ForeignCall]")
     ppr (RecordSelId _)   = ptext SLIT("[RecSel]")

@@ -63,7 +63,7 @@ import VarEnv		( TidyEnv )
 import FiniteMap
 import Outputable
 import ListSetOps	( equivClasses )
-import Util		( zipEqual )
+import Util		( zipEqual, isSingleton )
 import List		( partition )
 import CmdLineOpts
 \end{code}
@@ -1969,8 +1969,10 @@ addTopAmbigErrs (tidy_env, tidy_dicts)
 	where
 	  dicts = map fst pairs
 	  msg = sep [text "Ambiguous type variable" <> plural tvs <+> 
-		       pprQuotedList tvs <+> text "in these top-level constraint" <> plural dicts,
+			     pprQuotedList tvs <+> in_msg,
 		     nest 2 (pprInstsInFull dicts)]
+	  in_msg | isSingleton dicts = text "in the top-level constraint:"
+		 | otherwise         = text "in these top-level constraints:"
 
 
 mkMonomorphismMsg :: TidyEnv -> [Inst] -> TcM (TidyEnv, Message)

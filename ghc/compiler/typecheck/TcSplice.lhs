@@ -25,7 +25,7 @@ import TcExpr		( tcMonoExpr )
 import TcHsSyn		( TcExpr, TypecheckedHsExpr, mkHsLet, zonkTopExpr )
 import TcSimplify	( tcSimplifyTop )
 import TcType		( TcType, openTypeKind, mkAppTy )
-import TcEnv		( spliceOK, tcMetaTy )
+import TcEnv		( spliceOK, tcMetaTy, tcWithTempInstEnv )
 import TcRnTypes	( TopEnv(..) )
 import TcMType		( newTyVarTy, zapToType )
 import Name		( Name )
@@ -63,20 +63,49 @@ tcSpliceDecls e     = pprPanic "Cant do tcSpliceDecls without GHCi" (ppr e)
 
 %************************************************************************
 %*									*
-\subsection{Splicing an expression}
+\subsection{Quoting an expression}
 %*									*
 %************************************************************************
 
 \begin{code}
 tcBracket :: HsBracket Name -> TcM TcType
-tcBracket (ExpBr expr) 
+tcBracket brack
+  = getStage 				`thenM` \ level ->
+    case bracketOK level of {
+	Nothing         -> failWithTc (illegalBracket level) ;
+	Just next_level ->
+
+   	-- Typecheck expr to make sure it is valid,
+	-- but throw away the results.  We'll type check
+	-- it again when we actually use it.
+    newMutVar []	 		`thenM` \ pending_splices ->
+    getLIEVar				`thenM` \ lie_var ->
+
+    setStage (Brack next_level pending_splices lie_var) (
+	getLIE (tc_bracket brack)
+    )					`thenM` \ (meta_ty, lie) ->
+    tcSimplifyBracket lie 		`thenM_`  
+
+    unifyTauTy res_ty meta_ty		`thenM_`
+
+	-- Return the original expression, not the type-decorated one
+    readMutVar pending_splices		`thenM` \ pendings ->
+    returnM (HsBracketOut brack pendings)
+    }
+
+tc_bracket (ExpBr expr) 
   = newTyVarTy openTypeKind		`thenM` \ any_ty ->
     tcMonoExpr expr any_ty		`thenM_`
     tcMetaTy exprTyConName
 	-- Result type is Expr (= Q Exp)
 
-tcBracket (DecBr decls)
-  = tcTopSrcDecls decls			`thenM_`
+tc_bracket (DecBr decls)
+  = tcWithTempInstEnv (tcTopSrcDecls decls)	`thenM_`
+	-- Typecheck the declarations, dicarding any side effects
+	-- on the instance environment (which is in a mutable variable)
+	-- and the extended environment.  We'll get all that stuff
+	-- later, when we splice it in
+
     tcMetaTy decTyConName		`thenM` \ decl_ty ->
     tcMetaTy qTyConName			`thenM` \ q_ty ->
     returnM (mkAppTy q_ty (mkListTy decl_ty))
@@ -363,6 +392,9 @@ showSplice what before after
 		       nest 2 (sep [nest 2 (ppr before),
 				    text "======>",
 				    nest 2 after])])
+
+illegalBracket level
+  = ptext SLIT("Illegal bracket at level") <+> ppr level
 
 illegalSplice level
   = ptext SLIT("Illegal splice at level") <+> ppr level

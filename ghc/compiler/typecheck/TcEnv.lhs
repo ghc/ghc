@@ -3,7 +3,7 @@ module TcEnv(
 	TyThing(..), TyThingDetails(..), TcTyThing(..), TcId,
 
 	-- Instance environment, and InstInfo type
-	tcGetInstEnv, tcSetInstEnv, 
+	tcGetInstEnv, 
 	InstInfo(..), pprInstInfo, pprInstInfoDetails,
 	simpleInstInfoTy, simpleInstInfoTyCon, 
 	InstBindings(..),
@@ -25,7 +25,7 @@ module TcEnv(
 	lclEnvElts, getInLocalScope, findGlobals, 
 
 	-- Instance environment
-	tcExtendLocalInstEnv, tcExtendInstEnv, 
+	tcExtendLocalInstEnv, tcExtendInstEnv, tcExtendTempInstEnv, tcWithTempInstEnv,
 
 	-- Rules
  	tcExtendRules,
@@ -552,23 +552,7 @@ from this module
 
 \begin{code}
 tcGetInstEnv :: TcM InstEnv
-tcGetInstEnv = getGblEnv 	`thenM` \ env -> 
-	       readMutVar (tcg_inst_env env)
-
-tcSetInstEnv :: InstEnv -> TcM a -> TcM a
--- Horribly imperative; 
--- but used only when temporarily enhancing the instance
--- envt during 'deriving' context inference
-tcSetInstEnv ie thing_inside
-  = getGblEnv 	`thenM` \ env ->
-    let 
-	ie_var = tcg_inst_env env
-    in
-    readMutVar  ie_var		`thenM` \ old_ie ->
-    writeMutVar ie_var ie	`thenM_`
-    thing_inside		`thenM` \ result ->
-    writeMutVar ie_var old_ie	`thenM_`    
-    returnM result
+tcGetInstEnv = do { env <- getGblEnv; readMutVar (tcg_inst_env env) }
 
 tcExtendInstEnv :: [DFunId] -> TcM a -> TcM a
 	-- Add instances from local or imported
@@ -615,10 +599,38 @@ tcExtendLocalInstEnv infos thing_inside
       ; writeMutVar ie_var inst_env'
       ; setGblEnv env' thing_inside }
 
+tcExtendTempInstEnv :: [DFunId] -> TcM a -> TcM a
+  -- Extend the instance envt, but with *no* permanent 
+  -- effect on mutable variables; also ignore errors
+  -- Used during 'deriving' stuff
+tcExtendTempInstEnv dfuns thing_inside
+ = do { dflags <- getDOpts
+      ; env <- getGblEnv
+      ; let ie_var = tcg_inst_env env
+      ; inst_env <- readMutVar ie_var
+      ; let (inst_env', errs) = extendInstEnv dflags inst_env dfuns
+	-- Ignore the errors about duplicate instances.
+	-- We don't want repeated error messages
+	-- They'll appear later, when we do the top-level extendInstEnvs
+      ; writeMutVar ie_var inst_env'
+      ; result <- thing_inside 
+      ; writeMutVar ie_var inst_env 	-- Restore!
+      ; return result }
+
+tcWithTempInstEnv :: TcM a -> TcM a
+-- Run thing_inside, discarding any effects on the instance environment
+tcWithTempInstEnv thing_inside
+   = do { env <- getGblEnv
+   	; let ie_var = tcg_inst_env env
+	; old_ie <- readMutVar  ie_var
+	; result <- thing_inside
+	; writeMutVar ie_var old_ie	-- Restore
+	; return result }
+
 traceDFuns dfuns
   = traceTc (text "Adding instances:" <+> vcat (map pp dfuns))
   where
-    pp dfun   = ppr dfun <+> dcolon <+> ppr (idType dfun)
+    pp dfun = ppr dfun <+> dcolon <+> ppr (idType dfun)
 \end{code}
 
 

@@ -448,7 +448,7 @@ idAppIsCheap id n_val_args
   | otherwise = case globalIdDetails id of
 		  DataConWorkId _ -> True			
 		  RecordSelId _   -> True	-- I'm experimenting with making record selection
-						-- look cheap, so we will substitute it inside a
+		  ClassOpId _     -> True	-- look cheap, so we will substitute it inside a
 						-- lambda.  Particularly for dictionary field selection
 
 		  PrimOpId op   -> primOpIsCheap op	-- In principle we should worry about primops

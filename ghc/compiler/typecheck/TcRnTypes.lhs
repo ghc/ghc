@@ -283,6 +283,11 @@ data TcGblEnv
 		-- and then in the mutable EPS, because the InstEnv for this module
 		-- is constructed (in principle at least) only from the modules
 		-- 'below' this one, so it's this-module-specific
+		--
+		-- On the other hand, a declaration quote [d| ... |] may introduce
+		-- some new instance declarations that we *don't* want to persist
+		-- outside the quote, so we tiresomely need to revert the InstEnv
+		-- after finishing the quote (see TcSplice.tcBracket)
 
 		-- Now a bunch of things about this module that are simply 
 		-- accumulated, but never consulted until the end.  

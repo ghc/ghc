@@ -445,12 +445,8 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
 		   | (field_name, maybe_sel_id) <- field_names `zip` maybe_sel_ids,
 		     not (is_selector maybe_sel_id)
 		   ]
-	is_selector (Just (AnId sel_id))
-	   = isRecordSelector sel_id && 	-- At the moment, class ops are
-						-- treated as record selectors, but
-						-- we want to exclude that case here
-	     not (isClassTyCon (fieldLabelTyCon (recordSelectorFieldLabel sel_id)))
-	is_selector other = False
+	is_selector (Just (AnId sel_id)) = isRecordSelector sel_id	-- Excludes class ops
+	is_selector other 		 = False	
     in
     checkM (null bad_guys) (sequenceM bad_guys `thenM_` failM)	`thenM_`
     
@@ -620,31 +616,7 @@ tcMonoExpr (PArrSeqIn _) _
 	-- Rename excludes these cases otherwise
 
 tcMonoExpr (HsSplice n expr loc) res_ty = addSrcLoc loc (tcSpliceExpr n expr res_ty)
-  
-tcMonoExpr (HsBracket brack loc) res_ty
-  = addSrcLoc loc			$
-    getStage 				`thenM` \ level ->
-    case bracketOK level of {
-	Nothing         -> failWithTc (illegalBracket level) ;
-	Just next_level ->
-
-   	-- Typecheck expr to make sure it is valid,
-	-- but throw away the results.  We'll type check
-	-- it again when we actually use it.
-    newMutVar []	 		`thenM` \ pending_splices ->
-    getLIEVar				`thenM` \ lie_var ->
-
-    setStage (Brack next_level pending_splices lie_var) (
-	getLIE (tcBracket brack)
-    )					`thenM` \ (meta_ty, lie) ->
-    tcSimplifyBracket lie 		`thenM_`  
-
-    unifyTauTy res_ty meta_ty		`thenM_`
-
-	-- Return the original expression, not the type-decorated one
-    readMutVar pending_splices		`thenM` \ pendings ->
-    returnM (HsBracketOut brack pendings)
-    }
+tcMonoExpr (HsBracket brack loc) res_ty = addSrcLoc loc (tcBracket brack)
 
 tcMonoExpr (HsReify (Reify flavour name)) res_ty
   = addErrCtxt (ptext SLIT("At the reification of") <+> ppr name)	$
@@ -1092,9 +1064,6 @@ parrCtxt expr
 
 predCtxt expr
   = hang (ptext SLIT("In the predicate expression:")) 4 (ppr expr)
-
-illegalBracket level
-  = ptext SLIT("Illegal bracket at level") <+> ppr level
 
 appCtxt fun args
   = ptext SLIT("In the application") <+> quotes (ppr the_app)

@@ -602,12 +602,10 @@ This is unlike ordinary record selectors, which have all the for-alls
 at the outside.  When dealing with classes it's very convenient to
 recover the original type signature from the class op selector.
 
-ToDo: unify with mkRecordSelId?
-
 \begin{code}
 mkDictSelId :: Name -> Class -> Id
 mkDictSelId name clas
-  = mkGlobalId (RecordSelId field_lbl) name sel_ty info
+  = mkGlobalId (ClassOpId clas) name sel_ty info
   where
     sel_ty = mkForAllTys tyvars (mkFunTy (idType dict_id) (idType the_arg_id))
 	-- We can't just say (exprType rhs), because that would give a type

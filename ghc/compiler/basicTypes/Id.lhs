@@ -289,15 +289,17 @@ isImplicitId :: Id -> Bool
 	-- file, even if it's mentioned in some other interface unfolding.
 isImplicitId id
   = case globalIdDetails id of
-	RecordSelId _   -> True	-- Includes dictionary selectors
+	RecordSelId _   -> True
         FCallId _       -> True
         PrimOpId _      -> True
+	ClassOpId _	-> True
+	GenericOpId _	-> True
         DataConWorkId _ -> True
 	DataConWrapId _ -> True
 		-- These are are implied by their type or class decl;
 		-- remember that all type and class decls appear in the interface file.
-		-- The dfun id must *not* be omitted, because it carries version info for
-		-- the instance decl
+		-- The dfun id is not an implicit Id; it must *not* be omitted, because 
+		-- it carries version info for the instance decl
 	other		-> False
 \end{code}
 

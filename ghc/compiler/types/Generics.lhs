@@ -25,13 +25,13 @@ import CoreUtils	( exprArity )
 import BasicTypes       ( EP(..), Boxity(..) )
 import Var              ( TyVar )
 import VarSet		( varSetElems )
-import Id               ( Id, mkVanillaGlobal, idType, idName, mkSysLocal )
+import Id               ( Id, mkGlobalId, idType, idName, mkSysLocal )
 import MkId		( mkReboxingAlt, mkNewTypeBody )
 import TysWiredIn       ( genericTyCons,
 			  genUnitTyCon, genUnitDataCon, plusTyCon, inrDataCon,
 			  inlDataCon, crossTyCon, crossDataCon
 			)
-import IdInfo           ( noCafIdInfo, setUnfoldingInfo, setArityInfo )
+import IdInfo           ( GlobalIdDetails(..), noCafIdInfo, setUnfoldingInfo, setArityInfo )
 import CoreUnfold       ( mkTopUnfolding ) 
 
 import Maybe		( isNothing )
@@ -261,9 +261,11 @@ mkTyConGenInfo tycon [from_name, to_name]
 
   | otherwise
   = ASSERT( not (null datacons) )	-- mk_sum_stuff loops if no datacons
-    Just (EP { fromEP = mkVanillaGlobal from_name from_ty from_id_info,
-	       toEP   = mkVanillaGlobal to_name   to_ty   to_id_info })
+    Just (EP { fromEP = mk_id from_name from_ty from_id_info,
+	       toEP   = mk_id to_name   to_ty   to_id_info })
   where
+    mk_id = mkGlobalId (GenericOpId tycon)
+
     maybe_datacons = tyConDataCons_maybe tycon
     Just datacons  = maybe_datacons		-- [C, D]
 

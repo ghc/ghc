@@ -199,6 +199,8 @@ get_main_name (AnId id)
 	DataConWorkId dc -> get_main_name (ATyCon (dataConTyCon dc))
 	DataConWrapId dc -> get_main_name (ATyCon (dataConTyCon dc))
 	RecordSelId lbl  -> get_main_name (ATyCon (fieldLabelTyCon lbl))
+	GenericOpId tc   -> get_main_name (ATyCon tc)
+	ClassOpId cl     -> className cl
 	other	         -> idName id
 
 

@@ -17,18 +17,18 @@ import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds, RenamedTyClDecl, RenamedHsPr
 import CmdLineOpts	( DynFlag(..) )
 
 import TcRnMonad
-import TcEnv		( tcGetInstEnv, tcSetInstEnv, newDFunName, 
+import TcEnv		( tcExtendTempInstEnv, newDFunName, 
 			  InstInfo(..), pprInstInfo, InstBindings(..),
 			  pprInstInfoDetails, tcLookupTyCon, tcExtendTyVarEnv
 			)
 import TcGenDeriv	-- Deriv stuff
-import InstEnv		( InstEnv, simpleDFunClassTyCon, extendInstEnv )
+import InstEnv		( InstEnv, simpleDFunClassTyCon )
 import TcMonoType	( tcHsPred )
 import TcSimplify	( tcSimplifyDeriv )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
 import RnEnv		( bindLocalsFVRn )
-import TcRnMonad		( thenM, returnM, mapAndUnzipM )
+import TcRnMonad	( thenM, returnM, mapAndUnzipM )
 import HscTypes		( DFunId )
 
 import BasicTypes	( NewOrData(..) )
@@ -199,18 +199,15 @@ tcDeriving  :: [RenamedTyClDecl]	-- All type constructors
 tcDeriving tycl_decls
   = recoverM (returnM ([], EmptyBinds, emptyFVs)) $
     getDOpts			`thenM` \ dflags ->
-    tcGetInstEnv		`thenM` \ inst_env ->
 
   	-- Fish the "deriving"-related information out of the TcEnv
 	-- and make the necessary "equations".
     makeDerivEqns tycl_decls		    		`thenM` \ (ordinary_eqns, newtype_inst_info) ->
-    let
+    tcExtendTempInstEnv (map iDFunId newtype_inst_info)	$
 	-- Add the newtype-derived instances to the inst env
 	-- before tacking the "ordinary" ones
-	inst_env1 = extend_inst_env dflags inst_env 
-				    (map iDFunId newtype_inst_info)
-    in    
-    deriveOrdinaryStuff inst_env1 ordinary_eqns		`thenM` \ (ordinary_inst_info, binds, fvs) ->
+
+    deriveOrdinaryStuff ordinary_eqns			`thenM` \ (ordinary_inst_info, binds, fvs) ->
     let
 	inst_info  = newtype_inst_info ++ ordinary_inst_info
     in
@@ -230,14 +227,14 @@ tcDeriving tycl_decls
 	-- pprInstInfo doesn't print much: only the type
 
 -----------------------------------------
-deriveOrdinaryStuff inst_env_in []	-- Short cut
+deriveOrdinaryStuff []	-- Short cut
   = returnM ([], EmptyBinds, emptyFVs)
 
-deriveOrdinaryStuff inst_env_in eqns
+deriveOrdinaryStuff eqns
   =	-- Take the equation list and solve it, to deliver a list of
 	-- solutions, a.k.a. the contexts for the instance decls
 	-- required for the corresponding equations.
-    solveDerivEqns inst_env_in eqns	    	`thenM` \ new_dfuns ->
+    solveDerivEqns eqns	    		`thenM` \ new_dfuns ->
 
 	-- Now augment the InstInfos, adding in the rather boring
 	-- actual-code-to-do-the-methods binds.  We may also need to
@@ -552,12 +549,11 @@ ordered by sorting on type varible, tv, (major key) and then class, k,
 \end{itemize}
 
 \begin{code}
-solveDerivEqns :: InstEnv
-	       -> [DerivEqn]
+solveDerivEqns :: [DerivEqn]
 	       -> TcM [DFunId]	-- Solns in same order as eqns.
 				-- This bunch is Absolutely minimal...
 
-solveDerivEqns inst_env_in orig_eqns
+solveDerivEqns orig_eqns
   = iterateDeriv 1 initial_solutions
   where
 	-- The initial solutions for the equations claim that each
@@ -579,15 +575,13 @@ solveDerivEqns inst_env_in orig_eqns
       = pprPanic "solveDerivEqns: probable loop" 
 		 (vcat (map pprDerivEqn orig_eqns) $$ ppr current_solns)
       | otherwise
-      =	getDOpts				`thenM` \ dflags ->
-        let 
-	    dfuns    = zipWithEqual "add_solns" mk_deriv_dfun orig_eqns current_solns
-	    inst_env = extend_inst_env dflags inst_env_in dfuns
+      =	let 
+	    dfuns = zipWithEqual "add_solns" mk_deriv_dfun orig_eqns current_solns
         in
         checkNoErrs (
 		  -- Extend the inst info from the explicit instance decls
 		  -- with the current set of solutions, and simplify each RHS
-	    tcSetInstEnv inst_env $
+	    tcExtendTempInstEnv dfuns $
 	    mappM gen_soln orig_eqns
 	)				`thenM` \ new_solns ->
 	if (current_solns == new_solns) then
@@ -602,16 +596,6 @@ solveDerivEqns inst_env_in orig_eqns
 	addErrCtxt (derivCtxt (Just clas) tc)	$
 	tcSimplifyDeriv tyvars deriv_rhs	`thenM` \ theta ->
 	returnM (sortLt (<) theta)	-- Canonicalise before returning the soluction
-\end{code}
-
-\begin{code}
-extend_inst_env dflags inst_env new_dfuns
-  = new_inst_env
-  where
-    (new_inst_env, _errs) = extendInstEnv dflags inst_env new_dfuns
-	-- Ignore the errors about duplicate instances.
-	-- We don't want repeated error messages
-	-- They'll appear later, when we do the top-level extendInstEnvs
 
 mk_deriv_dfun (dfun_name, clas, tycon, tyvars, _) theta
   = mkDictFunId dfun_name tyvars theta

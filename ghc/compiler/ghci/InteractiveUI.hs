@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.145 2003/02/17 12:24:26 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.146 2003/02/19 15:54:07 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -26,7 +26,8 @@ import DriverUtil	( remove_spaces, handle )
 import Linker		( initLinker, showLinkerState, linkLibraries, 
 			  linkPackages )
 import Util
-import Id		( isRecordSelector, isImplicitId, recordSelectorFieldLabel, idName )
+import IdInfo		( GlobalIdDetails(..) )
+import Id		( isImplicitId, idName )
 import Class		( className )
 import TyCon		( tyConName, tyConClass_maybe, isPrimTyCon, DataConDetails(..) )
 import DataCon		( dataConName )
@@ -513,12 +514,10 @@ info s = do
        = hcat [ppr id, text " is a ", idDescr id, showSrcLoc (idName id)]
 
     idDescr id
-       | isRecordSelector id = 
-		case tyConClass_maybe (fieldLabelTyCon (
-				recordSelectorFieldLabel id)) of
-			Nothing -> text "record selector"
-			Just c  -> text "method in class " <> ppr c
-       | otherwise           = text "variable"
+       = case globalIdDetails id of
+	    RecordSelId lbl -> text "record selector for type" <+> ppr (fieldLabelTyCon lbl)
+	    ClassOpId cls   -> text "method in class" <+> ppr cls
+       	    otherwise       -> text "variable"
 
 	-- also print out the source location for home things
     showSrcLoc name
