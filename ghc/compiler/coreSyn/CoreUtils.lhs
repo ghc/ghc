@@ -21,7 +21,6 @@ module CoreUtils (
     ) where
 
 IMP_Ubiq()
-IMPORT_DELOOPER(IdLoop)	-- for pananoia-checking purposes
 
 import CoreSyn
 
@@ -31,19 +30,19 @@ import Id		( idType, mkSysLocal, isBottomingId,
 			  dataConRepType,
 			  addOneToIdEnv, growIdEnvList, lookupIdEnv,
 			  isNullIdEnv, SYN_IE(IdEnv),
-			  GenId{-instances-}
+			  GenId{-instances-}, SYN_IE(Id)
 			)
 import Literal		( literalType, isNoRepLit, Literal(..) )
 import Maybes		( catMaybes, maybeToBool )
 import PprCore
-import PprStyle		( PprStyle(..) )
-import PprType		( GenType{-instances-} )
+import Outputable	( PprStyle(..), Outputable(..) )
+import PprType		( GenType{-instances-}, GenTyVar )
 import Pretty		( vcat, text )
 import PrimOp		( primOpType, PrimOp(..) )
 import SrcLoc		( noSrcLoc )
 import TyVar		( cloneTyVar,
 			  isNullTyVarEnv, addOneToTyVarEnv, SYN_IE(TyVarEnv),
-			  SYN_IE(TyVar)
+			  SYN_IE(TyVar), GenTyVar
 			)
 import Type		( mkFunTy, mkForAllTy, mkForAllUsageTy, mkTyVarTy,
 			  getFunTyExpandingDicts_maybe, applyTy, isPrimType,
@@ -51,6 +50,7 @@ import Type		( mkFunTy, mkForAllTy, mkForAllUsageTy, mkTyVarTy,
 			  SYN_IE(Type)
 			)
 import TysWiredIn	( trueDataCon, falseDataCon )
+import Unique		( Unique )
 import UniqSupply	( initUs, returnUs, thenUs,
 			  mapUs, mapAndUnzipUs, getUnique,
 			  SYN_IE(UniqSM), UniqSupply
@@ -58,7 +58,6 @@ import UniqSupply	( initUs, returnUs, thenUs,
 import Usage		( SYN_IE(UVar) )
 import Util		( zipEqual, panic, pprTrace, pprPanic, assertPanic )
 import Pretty
-import Outputable	( Outputable(..) )
 
 type TypeEnv = TyVarEnv Type
 applyUsage = panic "CoreUtils.applyUsage:ToDo"
