@@ -105,7 +105,7 @@ import Foreign
 import CString		( CString, peekCString )
 #endif
 
-#if __GLASGOW_HASKELL__ < 601
+#if __GLASGOW_HASKELL__ < 603
 import Foreign		( withMany, withArray0, nullPtr, Ptr )
 import CForeign		( CString, withCString, throwErrnoIfMinus1 )
 #else
@@ -776,7 +776,7 @@ traceCmd phase_name cmd_line action
 -- thare are not repeated here -- go look!
 
 
-#if __GLASGOW_HASKELL__ < 621
+#if __GLASGOW_HASKELL__ < 603
 
 rawSystem :: FilePath -> [String] -> IO ExitCode
 
