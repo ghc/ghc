@@ -268,6 +268,11 @@ instanceD ctxt ty decs =
 sigD :: Name -> TypeQ -> DecQ
 sigD fun ty = liftM (SigD fun) $ ty
 
+forImpD :: Callconv -> Safety -> String -> Name -> TypeQ -> DecQ
+forImpD cc s str n ty
+ = do ty' <- ty
+      return $ ForeignD (ImportF cc s str n ty')
+
 cxt :: [TypeQ] -> CxtQ
 cxt = sequence
 
@@ -323,6 +328,21 @@ strictType = liftM2 (,)
 varStrictType :: Name -> StrictTypeQ -> VarStrictTypeQ
 varStrictType v st = do (s, t) <- st
                         return (v, s, t)
+
+-------------------------------------------------------------------------------
+--     Callconv
+
+cCall, stdCall :: Callconv
+cCall = CCall
+stdCall = StdCall
+
+-------------------------------------------------------------------------------
+--     Safety
+
+unsafe, safe, threadsafe :: Safety
+unsafe = Unsafe
+safe = Safe
+threadsafe = Threadsafe
 
 --------------------------------------------------------------
 -- Useful helper functions
