@@ -33,7 +33,7 @@ module SysTools (
 
 	-- System interface
 	getProcessID,		-- IO Int
-	System.system, 		-- String -> IO Int	-- System.system
+	system, 		-- String -> IO Int
 
 	-- Misc
 	showGhcUsage,		-- IO ()	Shows usage message and exits
@@ -50,9 +50,10 @@ import Panic		( progName, GhcException(..) )
 import Util		( global )
 import CmdLineOpts	( dynFlag, verbosity )
 
-import List		( intersperse )
-import Exception	( throwDyn, catchAllIO )
+import List		( intersperse, isPrefixOf )
+import Exception	( throw, throwDyn, catchAllIO )
 import IO		( hPutStr, hPutChar, hPutStrLn, hFlush, stderr )
+import IO		( openFile, IOMode(..), hClose )	-- For temp "system"
 import Directory	( doesFileExist, removeFile )
 import IOExts		( IORef, readIORef, writeIORef )
 import Monad		( when, unless )
@@ -163,7 +164,7 @@ initSysTools minusB_args
 
 	; let installed_bin pgm   =  top_dir `slash` "bin" `slash` pgm
 	      installed     file  =  top_dir `slash` file
-	      inplace dir   pgm   =  top_dir `slash` dir `slash` pgm
+	      inplace dir   pgm   =  top_dir `slash` dosifyPath dir `slash` pgm
 
 	; let pkgconfig_path
 		| am_installed = installed "package.conf"
@@ -509,7 +510,7 @@ runSomething :: String		-- For -v message
 
 runSomething phase_name pgm args
  = traceCmd phase_name cmd_line $
-   do   { exit_code <- System.system cmd_line
+   do   { exit_code <- system cmd_line
 	; if exit_code /= ExitSuccess
 	  then throwDyn (PhaseFailed phase_name exit_code)
   	  else return ()
@@ -623,5 +624,45 @@ getExecDir = do len <- getCurrentDirectory 0 nullAddr
 getProcessID :: IO Int
 getProcessID = Posix.getProcessID
 getExecDir :: IO (Maybe String) = do return Nothing
+#endif
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{System}
+%*									*
+%************************************************************************
+
+In GHC prior to 5.01 (or so), on Windows, the implementation
+of "system" in the library System.system does not work for very 
+long command lines.  But GHC may need to make a system call with
+a very long command line, notably when it links itself during
+bootstrapping.  
+
+Solution: when compiling SysTools for Windows, using GHC prior
+to 5.01, write the command to a file and use "sh" (not cmd.exe)
+to execute it.  Such GHCs require "sh" on the path, but once
+bootstrapped this problem goes away.
+
+ToDo: remove when compiling with GHC < 5 is not relevant any more
+
+\begin{code}
+system cmd
+
+#if !defined(mingw32_TARGET_OS) || __GLASGOW_HASKELL__ > 501
+    -- The usual case
+ = System.system cmd
+
+#else	-- The Hackoid case
+ = do pid     <- getProcessID
+      tmp_dir <- readIORef v_TmpDir
+      let tmp = tmp_dir++"/sh"++show pid
+      h <- openFile tmp WriteMode
+      hPutStrLn h cmd
+      hClose h
+      exit_code <- System.system ("sh - " ++ tmp) `catchAllIO` 
+ 			         (\exn -> removeFile tmp >> throw exn)
+      removeFile tmp
+      return exit_code
 #endif
 \end{code}
