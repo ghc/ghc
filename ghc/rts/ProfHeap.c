@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.35 2001/12/12 15:59:33 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.36 2002/05/07 04:58:15 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -498,18 +498,28 @@ fprint_ccs(FILE *fp, CostCentreStack *ccs, nat max_length)
 	// CAF cost centres print as M.CAF, but we leave the module
 	// name out of all the others to save space.
 	if (!strcmp(ccs->cc->label,"CAF")) {
+#ifdef HAVE_SNPRINTF
 	    written = snprintf(buf+next_offset, 
 			       (int)max_length-3-(int)next_offset,
 			       "%s.CAF", ccs->cc->module);
+#else
+	    written = sprintf(buf+next_offset, 
+			       "%s.CAF", ccs->cc->module);
+#endif
 	} else {
 	    if (ccs->prevStack != NULL && ccs->prevStack != CCS_MAIN) {
 		template = "%s/";
 	    } else {
 		template = "%s";
 	    }
+#ifdef HAVE_SNPRINTF
 	    written = snprintf(buf+next_offset, 
 			       (int)max_length-3-(int)next_offset,
 			       template, ccs->cc->label);
+#else
+	    written = sprintf(buf+next_offset, 
+			       template, ccs->cc->label);
+#endif
 	}
 
 	if (next_offset+written >= max_length-4) {
