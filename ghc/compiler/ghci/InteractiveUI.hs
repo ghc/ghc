@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.108 2002/01/22 16:50:29 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.109 2002/01/23 16:50:49 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -13,8 +13,12 @@ module InteractiveUI ( interactiveUI, ghciWelcomeMsg ) where
 #include "HsVersions.h"
 
 import Packages
+
 import CompManager
-import HscTypes		( TyThing(..) )
+import CmTypes		( Linkable, isObjectLinkable, ModSummary(..) )
+import CmLink		( findModuleLinkable_maybe )
+
+import HscTypes		( TyThing(..), showModMsg, InteractiveContext(..) )
 import MkIface		( ifaceTyThing )
 import DriverFlags
 import DriverState
@@ -28,13 +32,15 @@ import Class		( className )
 import TyCon		( tyConName, tyConClass_maybe, isPrimTyCon )
 import FieldLabel	( fieldLabelTyCon )
 import SrcLoc		( isGoodSrcLoc )
+import Module		( moduleName )
+import NameEnv		( nameEnvElts )
 import Name		( Name, isHomePackageName, nameSrcLoc, nameOccName,
 			  NamedThing(..) )
 import OccName		( isSymOcc )
 import BasicTypes	( defaultFixity )
 import Outputable
-import CmdLineOpts	( DynFlag(..), getDynFlags, saveDynFlags, restoreDynFlags, 
-			  dopt_unset )
+import CmdLineOpts	( DynFlag(..), getDynFlags, saveDynFlags,
+			  restoreDynFlags, dopt_unset )
 import Panic		( GhcException(..), showGhcException )
 import Config
 
@@ -58,7 +64,7 @@ import CPUTime
 import Directory
 import IO
 import Char
-import Monad 		( when, join )
+import Monad
 
 import PrelGHC 		( unsafeCoerce# )
 import Foreign		( nullPtr )
@@ -83,11 +89,11 @@ builtin_commands = [
   ("help",	keepGoing help),
   ("?",		keepGoing help),
   ("info",      keepGoing info),
-  ("import",    keepGoing importModules),
   ("load",	keepGoing loadModule),
   ("module",	keepGoing setContext),
   ("reload",	keepGoing reloadModule),
   ("set",	keepGoing setCmd),
+  ("show",	keepGoing showCmd),
   ("type",	keepGoing typeOfExpr),
   ("unset",	keepGoing unsetOptions),
   ("undef",     keepGoing undefineMacro),
@@ -111,11 +117,16 @@ helpText = "\
 \   :load <filename> ...   load module(s) and their dependents\n\ 
 \   :module <mod>	   set the context for expression evaluation to <mod>\n\ 
 \   :reload		   reload the current module set\n\ 
+\\n\ 
 \   :set <option> ...	   set options\n\ 
 \   :set args <arg> ...	   set the arguments returned by System.getArgs\n\ 
 \   :set prog <progname>   set the value returned by System.getProgName\n\ 
-\   :undef <cmd> 	   undefine user-defined command :<cmd>\n\ 
+\\n\ 
+\   :show modules	   show the currently loaded modules\n\ 
+\   :show bindings	   show the current bindings made at the prompt\n\ 
+\\n\ 
 \   :type <expr>	   show the type of <expr>\n\ 
+\   :undef <cmd> 	   undefine user-defined command :<cmd>\n\ 
 \   :unset <option> ...	   unset options\n\ 
 \   :quit		   exit GHCi\n\ 
 \   :!<command>		   run the shell command <command>\n\ 
@@ -271,8 +282,8 @@ checkPerms name =
 
 fileLoop :: Handle -> Bool -> GHCi ()
 fileLoop hdl prompt = do
-   st <- getGHCiState
-   (mod,imports) <- io (cmGetContext (cmstate st))
+   cmstate <- getCmState
+   (mod,imports) <- io (cmGetContext cmstate)
    when prompt (io (putStr (mkPrompt mod imports)))
    l <- io (IO.try (hGetLine hdl))
    case l of
@@ -287,24 +298,19 @@ fileLoop hdl prompt = do
 stringLoop :: [String] -> GHCi ()
 stringLoop [] = return ()
 stringLoop (s:ss) = do
-   st <- getGHCiState
    case remove_spaces s of
 	"" -> stringLoop ss
 	l  -> do quit <- runCommand l
                  if quit then return () else stringLoop ss
 
 mkPrompt toplevs exports
-   =  concat (intersperse "," toplevs)
-   ++ (if not (null exports) 
-	then "[" ++ concat (intersperse "," exports) ++ "]" 
-	else "")
-   ++ "> "
+   = concat (intersperse " " (toplevs ++ map ('*':) exports)) ++ "> "
 
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
 readlineLoop :: GHCi ()
 readlineLoop = do
-   st <- getGHCiState
-   (mod,imports) <- io (cmGetContext (cmstate st))
+   cmstate <- getCmState
+   (mod,imports) <- io (cmGetContext cmstate)
    io yield
    l <- io (readline (mkPrompt mod imports))
    case l of
@@ -364,8 +370,8 @@ runStmt stmt
 -- possibly print the type and revert CAFs after evaluating an expression
 finishEvalExpr names
  = do b <- isOptionSet ShowType
-      st <- getGHCiState
-      when b (mapM_ (showTypeOfName (cmstate st)) names)
+      cmstate <- getCmState
+      when b (mapM_ (showTypeOfName cmstate) names)
 
       b <- isOptionSet RevertCAFs
       io (when b revertCAFs)
@@ -411,16 +417,18 @@ info :: String -> GHCi ()
 info "" = throwDyn (CmdLineError "syntax: `:i <thing-you-want-info-about>'")
 info s = do
   let names = words s
-  state <- getGHCiState
+  init_cms <- getCmState
   dflags <- io getDynFlags
   let 
     infoThings cms [] = return cms
     infoThings cms (name:names) = do
-      (cms, unqual, stuff) <- io (cmInfoThing cms dflags name)
+      (cms, stuff) <- io (cmInfoThing cms dflags name)
       io (putStrLn (showSDocForUser unqual (
 	    vcat (intersperse (text "") (map showThing stuff))))
          )
       infoThings cms names
+
+    unqual = cmGetPrintUnqual init_cms
 
     showThing (ty_thing, fixity) 
 	= vcat [ text "-- " <> showTyThing ty_thing, 
@@ -461,8 +469,8 @@ info s = do
 	= empty
 	where loc = nameSrcLoc name
 
-  cms <- infoThings (cmstate state) names
-  setGHCiState state{ cmstate = cms }
+  cms <- infoThings init_cms names
+  setCmState cms
   return ()
 
 addModule :: String -> GHCi ()
@@ -501,10 +509,10 @@ defineMacro s = do
   let new_expr = '(' : definition ++ ") :: String -> IO String"
 
   -- compile the expression
-  st <- getGHCiState
+  cms <- getCmState
   dflags <- io getDynFlags
-  (new_cmstate, maybe_hv) <- io (cmCompileExpr (cmstate st) dflags new_expr)
-  setGHCiState st{cmstate = new_cmstate}
+  (new_cmstate, maybe_hv) <- io (cmCompileExpr cms dflags new_expr)
+  setCmState new_cmstate
   case maybe_hv of
      Nothing -> return ()
      Just hv -> io (writeIORef commands --
@@ -527,10 +535,6 @@ undefineMacro macro_name = do
 		("command `" ++ macro_name ++ "' not defined"))
 	else do
   io (writeIORef commands (filter ((/= macro_name) . fst) cmds))
-
-
-importModules :: String -> GHCi ()
-importModules str = return ()
 
 
 loadModule :: String -> GHCi ()
@@ -578,7 +582,10 @@ reloadModule "" = do
 reloadModule _ = noArgs ":reload"
 
 setContextAfterLoad [] = setContext prel
-setContextAfterLoad (m:_) = setContext m
+setContextAfterLoad (m:_) = do
+  cmstate <- getCmState
+  b <- io (cmModuleIsInterpreted cmstate m)
+  if b then setContext m else setContext ('*':m)
 
 modulesLoadedMsg ok mods = do
   let mod_commas 
@@ -594,10 +601,10 @@ modulesLoadedMsg ok mods = do
 
 typeOfExpr :: String -> GHCi ()
 typeOfExpr str 
-  = do st <- getGHCiState
+  = do cms <- getCmState
        dflags <- io getDynFlags
-       (new_cmstate, maybe_tystr) <- io (cmTypeOfExpr (cmstate st) dflags str)
-       setGHCiState st{cmstate = new_cmstate}
+       (new_cmstate, maybe_tystr) <- io (cmTypeOfExpr cms dflags str)
+       setCmState new_cmstate
        case maybe_tystr of
 	  Nothing    -> return ()
 	  Just tystr -> io (putStrLn tystr)
@@ -612,57 +619,63 @@ shellEscape str = io (system str >> return False)
 -- Setting the module context
 
 setContext str
- | all sensible  mods = newContext mods	-- default is to set the empty context
- | all plusminus mods = adjustContext mods
- | otherwise
-   = throwDyn (CmdLineError "syntax:  :module M1 .. Mn | :module [+/-]M1 ... [+/-]Mn")
- where
-    mods = words str
+  | all sensible mods = fn mods
+  | otherwise = throwDyn (CmdLineError "syntax:  :module [+/-] [*]M1 ... [*]Mn")
+  where
+    (fn, mods) = case str of 
+			'+':stuff -> (addToContext,      words stuff)
+			'-':stuff -> (removeFromContext, words stuff)
+			stuff     -> (newContext,        words stuff) 
 
-    sensible (c:cs) = isUpper c && all isAlphaNumEx cs
+    sensible ('*':c:cs) = isUpper c && all isAlphaNumEx cs
+    sensible (c:cs)     = isUpper c && all isAlphaNumEx cs
     isAlphaNumEx c = isAlphaNum c || c == '_'
 
-    plusminus ('-':mod) = sensible mod
-    plusminus ('+':mod) = sensible mod
-    plusminus _ = False
-
 newContext mods = do
-  state@GHCiState{cmstate=cmstate} <- getGHCiState
+  cms <- getCmState
   dflags <- io getDynFlags
-
-  let separate [] as bs = return (as,bs)
-      separate (m:ms) as bs = do 
-	 b <- io (cmModuleIsInterpreted cmstate m)
- 	 if b then separate ms (m:as) bs
-	      else separate ms as (m:bs)
-				
-  (as,bs) <- separate mods [] []
+  (as,bs) <- separate cms mods [] []
   let bs' = if null as && prel `notElem` bs then prel:bs else bs
-  cmstate' <- io (cmSetContext cmstate dflags as bs')
-  setGHCiState state{cmstate=cmstate'}
+  cms' <- io (cmSetContext cms dflags as bs')
+  setCmState cms'
 
+separate cmstate []           as bs = return (as,bs)
+separate cmstate (('*':m):ms) as bs = separate cmstate ms as (m:bs)
+separate cmstate (m:ms)       as bs = do 
+   b <- io (cmModuleIsInterpreted cmstate m)
+   if b then separate cmstate ms (m:as) bs
+   	else throwDyn (CmdLineError ("module `" ++ m ++ "' is not interpreted"))
+	
 prel = "Prelude"
 
-adjustContext mods = do
-  state@GHCiState{cmstate=cmstate} <- getGHCiState
+
+addToContext mods = do
+  cms <- getCmState
   dflags <- io getDynFlags
+  (as,bs) <- io (cmGetContext cms)
 
-  let adjust [] as bs = return (as,bs)
-      adjust (('-':m) : ms) as bs
-	| m `elem` as  = adjust ms (delete m as) bs
-	| m `elem` bs  = adjust ms as (delete m bs)
- 	| otherwise = throwDyn (CmdLineError ("module `" ++ m ++ "' is not currently in scope"))
-      adjust (('+':m) : ms) as bs
-	| m `elem` as || m `elem` bs = adjust ms as bs -- continue silently
-	| otherwise = do b <- io (cmModuleIsInterpreted cmstate m)
-			 if b then adjust ms (m:as) bs
-			      else adjust ms as (m:bs)
+  (as',bs') <- separate cms mods [] []
 
-  (as,bs) <- io (cmGetContext cmstate)
-  (as,bs) <- adjust mods as bs
-  let bs' = if null as && prel `notElem` bs then prel:bs else bs
-  cmstate' <- io (cmSetContext cmstate dflags as bs')
-  setGHCiState state{cmstate=cmstate'}
+  let as_to_add = as' \\ (as ++ bs)
+      bs_to_add = bs' \\ (as ++ bs)
+
+  cms' <- io (cmSetContext cms dflags 
+			(as ++ as_to_add) (bs ++ bs_to_add))
+  setCmState cms'
+
+
+removeFromContext mods = do
+  cms <- getCmState
+  dflags <- io getDynFlags
+  (as,bs) <- io (cmGetContext cms)
+
+  (as_to_remove,bs_to_remove) <- separate cms mods [] []
+
+  let as' = as \\ (as_to_remove ++ bs_to_remove)
+      bs' = bs \\ (as_to_remove ++ bs_to_remove)
+
+  cms' <- io (cmSetContext cms dflags as' bs')
+  setCmState cms'
 
 ----------------------------------------------------------------------------
 -- Code for `:set'
@@ -785,6 +798,38 @@ newPackages new_pkgs = do
     mapM_ linkPackage (reverse new_pkg_info)
 
 -----------------------------------------------------------------------------
+-- code for `:show'
+
+showCmd str =
+  case words str of
+	["modules" ] -> showModules
+	["bindings"] -> showBindings
+	_ -> throwDyn (CmdLineError "syntax:  :show [modules|bindings]")
+
+showModules = do
+  cms <- getCmState
+  let mg = cmGetModuleGraph cms
+      ls = cmGetLinkables   cms
+      maybe_linkables = map (findModuleLinkable_maybe ls) 
+				(map (moduleName.ms_mod) mg)
+  zipWithM showModule mg maybe_linkables
+  return ()
+
+showModule :: ModSummary -> Maybe Linkable -> GHCi ()
+showModule m (Just l) = do
+  io (putStrLn (showModMsg (isObjectLinkable l) (ms_mod m) (ms_location m)))
+showModule _ Nothing = panic "missing linkable"
+
+showBindings = do
+  cms <- getCmState
+  let
+	unqual = cmGetPrintUnqual cms
+	showBinding b = putStrLn (showSDocForUser unqual (ppr (ifaceTyThing b)))
+
+  io (mapM showBinding (cmGetBindings cms))
+  return ()
+
+-----------------------------------------------------------------------------
 -- GHCi monad
 
 data GHCiState = GHCiState
@@ -820,6 +865,10 @@ ghciHandleDyn h (GHCi m) = GHCi $ \s ->
 
 getGHCiState   = GHCi $ \r -> readIORef r
 setGHCiState s = GHCi $ \r -> writeIORef r s
+
+-- for convenience...
+getCmState = getGHCiState >>= return . cmstate
+setCmState cms = do s <- getGHCiState; setGHCiState s{cmstate=cms}
 
 isOptionSet :: GHCiOption -> GHCi Bool
 isOptionSet opt

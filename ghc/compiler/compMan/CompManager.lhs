@@ -25,7 +25,8 @@ module CompManager (
     cmSetContext,  -- :: CmState -> DynFlags -> [String] -> [String] -> IO CmState
     cmGetContext,  -- :: CmState -> IO ([String],[String])
 
-    cmInfoThing,   -- :: CmState -> DynFlags -> String -> IO (Maybe TyThing)
+    cmInfoThing,   -- :: CmState -> DynFlags -> String
+		   --	-> IO (CmState, [(TyThing,Fixity)])
 
     CmRunResult(..),
     cmRunStmt,	   -- :: CmState -> DynFlags -> String
@@ -39,11 +40,23 @@ module CompManager (
     HValue,
     cmCompileExpr, -- :: CmState -> DynFlags -> String 
 		   --	-> IO (CmState, Maybe HValue)
+
+    cmGetModuleGraph,		-- :: CmState -> ModuleGraph
+    cmGetLinkables,		-- :: CmState -> [Linkable]
+
+    cmGetBindings, 	-- :: CmState -> [TyThing]
+    cmGetPrintUnqual,	-- :: CmState -> PrintUnqualified
 #endif
+
+    -- utils
+    showModMsg,		-- 
   )
 where
 
 #include "HsVersions.h"
+
+import MkIface --tmp
+import HsSyn 	-- tmp
 
 import CmLink
 import CmTypes
@@ -59,7 +72,7 @@ import HscMain		( initPersistentCompilerState )
 #endif
 import HscTypes
 import Name		( Name, NamedThing(..), nameRdrName, nameModule,
-			  isHomePackageName )
+			  isHomePackageName, isGlobalName )
 import Rename		( mkGlobalContext )
 import RdrName		( emptyRdrEnv )
 import Module
@@ -156,6 +169,15 @@ cmInit :: GhciMode -> IO CmState
 cmInit mode = emptyCmState mode
 
 -----------------------------------------------------------------------------
+-- Grab information from the CmState
+
+cmGetModuleGraph        = mg
+cmGetLinkables          = ui
+
+cmGetBindings cmstate = nameEnvElts (ic_type_env (ic cmstate))
+cmGetPrintUnqual cmstate = ic_print_unqual (ic cmstate)
+
+-----------------------------------------------------------------------------
 -- Setting the context doesn't throw away any bindings; the bindings
 -- we've built up in the InteractiveContext simply move to the new
 -- module.  They always shadow anything in scope in the current context.
@@ -219,19 +241,18 @@ cmModuleIsInterpreted cmstate str
 -- and type constructor), so we return a list of all the possible TyThings.
 
 #ifdef GHCI
-cmInfoThing :: CmState -> DynFlags -> String 
-	-> IO (CmState, PrintUnqualified, [(TyThing,Fixity)])
+cmInfoThing :: CmState -> DynFlags -> String -> IO (CmState, [(TyThing,Fixity)])
 cmInfoThing cmstate dflags id
    = do (new_pcs, things) <- hscThing dflags hst hit pcs icontext id
 	let pairs = map (\x -> (x, getFixity new_pcs (getName x))) things
-	return (cmstate{ pcs=new_pcs }, unqual, pairs)
-   where 
+	return (cmstate{ pcs=new_pcs }, pairs)
+   where
      CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls, ic=icontext } = cmstate
-     unqual = ic_print_unqual icontext
 
      getFixity :: PersistentCompilerState -> Name -> Fixity
      getFixity pcs name
-	| Just iface  <- lookupModuleEnv iface_table (nameModule name),
+	| isGlobalName name,
+	  Just iface  <- lookupModuleEnv iface_table (nameModule name),
 	  Just fixity <- lookupNameEnv (mi_fixities iface) name
 	  = fixity
 	| otherwise

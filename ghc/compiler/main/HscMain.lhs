@@ -26,7 +26,8 @@ import OccName          ( dataName, tcClsName,
 import Type		( Type )
 import Id		( Id, idName, setGlobalIdDetails )
 import IdInfo		( GlobalIdDetails(VanillaGlobal) )
-import HscTypes		( InteractiveContext(..) )
+import Name		( isLocalName )
+import NameEnv		( lookupNameEnv )
 import PrelNames	( iNTERACTIVE )
 import StringBuffer	( stringToStringBuffer )
 import FastString       ( mkFastString )
@@ -171,7 +172,7 @@ hscNoRecomp ghci_mode dflags have_object
  = do {
       when (verbosity dflags >= 1) $
 		hPutStrLn stderr ("Skipping  " ++ 
-			compMsg have_object mod location);
+			showModMsg have_object mod location);
 
       -- CLOSURE
       (pcs_cl, closure_errs, cl_hs_decls) 
@@ -191,16 +192,6 @@ hscNoRecomp ghci_mode dflags have_object
       return (HscNoRecomp pcs_tc new_details old_iface)
       }}}
 
-compMsg use_object mod location =
-    mod_str ++ replicate (max 0 (16 - length mod_str)) ' '
-    ++" ( " ++ unJust "hscRecomp" (ml_hs_file location) ++ ", "
-    ++ (if use_object
-	  then unJust "hscRecomp" (ml_obj_file location)
-	  else "interpreted")
-    ++ " )"
- where mod_str = moduleUserString mod
-
-
 hscRecomp ghci_mode dflags have_object 
 	  mod location maybe_checked_iface hst hit pcs_ch
  = do	{
@@ -210,7 +201,7 @@ hscRecomp ghci_mode dflags have_object
 
       	; when (ghci_mode /= OneShot && verbosity dflags >= 1) $
 		hPutStrLn stderr ("Compiling " ++ 
-			compMsg (not toInterp) mod location);
+			showModMsg (not toInterp) mod location);
 
  	    -------------------
  	    -- PARSE
@@ -625,7 +616,7 @@ hscThing -- like hscStmt, but deals with a single identifier
   -> IO ( PersistentCompilerState,
 	  [TyThing] )
 
-hscThing dflags hst hit pcs0 icontext str
+hscThing dflags hst hit pcs0 ic str
    = do maybe_rdr_name <- myParseIdentifier dflags str
 	case maybe_rdr_name of {
 	  Nothing -> return (pcs0, []);
@@ -643,7 +634,7 @@ hscThing dflags hst hit pcs0 icontext str
 		tccls_name = setRdrNameOcc rdr_name tccls_occ
 
 	(pcs, unqual, maybe_rn_result) <- 
-	   renameRdrName dflags hit hst pcs0 icontext rdr_names
+	   renameRdrName dflags hit hst pcs0 ic rdr_names
 
 	case maybe_rn_result of {
 	     Nothing -> return (pcs, []);
@@ -655,7 +646,11 @@ hscThing dflags hst hit pcs0 icontext str
 	case maybe_pcs of {
 	     Nothing -> return (pcs, []);
 	     Just pcs ->
-		let maybe_ty_things = map (lookupType hst (pcs_PTE pcs)) names
+		let do_lookup n
+			| isLocalName n = lookupNameEnv (ic_type_env ic) n
+			| otherwise     = lookupType hst (pcs_PTE pcs) n
+		
+		    maybe_ty_things = map do_lookup names
 		in
 		return (pcs, catMaybes maybe_ty_things) }
         }}}

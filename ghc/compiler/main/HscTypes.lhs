@@ -7,7 +7,7 @@
 module HscTypes ( 
 	GhciMode(..),
 
-	ModuleLocation(..),
+	ModuleLocation(..), showModMsg,
 
 	ModDetails(..),	ModIface(..), 
 	HomeSymbolTable, emptySymbolTable,
@@ -59,7 +59,8 @@ import Name		( Name, NamedThing, getName, nameOccName, nameModule, nameSrcLoc )
 import NameEnv
 import OccName		( OccName )
 import Module		( Module, ModuleName, ModuleEnv,
-			  lookupModuleEnv, lookupModuleEnvByName, emptyModuleEnv
+			  lookupModuleEnv, lookupModuleEnvByName, 
+			  emptyModuleEnv, moduleUserString
 			)
 import InstEnv		( InstEnv, ClsInstEnv, DFunId )
 import Rules		( RuleBase )
@@ -82,7 +83,7 @@ import Bag		( Bag )
 import Maybes		( seqMaybe, orElse )
 import Outputable
 import SrcLoc		( SrcLoc, isGoodSrcLoc )
-import Util		( thenCmp, sortLt )
+import Util		( thenCmp, sortLt, unJust )
 import UniqSupply	( UniqSupply )
 \end{code}
 
@@ -116,6 +117,18 @@ data ModuleLocation
 
 instance Outputable ModuleLocation where
    ppr = text . show
+
+-- Probably doesn't really belong here, but used in HscMain and InteractiveUI.
+
+showModMsg :: Bool -> Module -> ModuleLocation -> String
+showModMsg use_object mod location =
+    mod_str ++ replicate (max 0 (16 - length mod_str)) ' '
+    ++" ( " ++ unJust "showModMsg" (ml_hs_file location) ++ ", "
+    ++ (if use_object
+	  then unJust "showModMsg" (ml_obj_file location)
+	  else "interpreted")
+    ++ " )"
+ where mod_str = moduleUserString mod
 \end{code}
 
 For a module in another package, the hs_file and obj_file
