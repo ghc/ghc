@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.40 2001/11/08 16:17:35 simonmar Exp $
+ * $Id: StgMacros.h,v 1.41 2001/11/08 16:37:54 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -794,7 +794,7 @@ StgRegTable * resumeThread  ( StgInt );
 #ifdef SMP
 #define RESUME_THREAD(token)			\
     BaseReg = resumeThread(token);		\
-    LoadThreadState();				\
+    LoadThreadState();
 #else
 #define RESUME_THREAD(token)			\
    (void)resumeThread(token);			\
