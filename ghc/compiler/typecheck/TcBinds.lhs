@@ -255,12 +255,10 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
     mapNF_Tc zonkId dict_ids				`thenNF_Tc` \ zonked_dict_ids ->
     mapNF_Tc zonkId mono_ids				`thenNF_Tc` \ zonked_mono_ids ->
 
-	-- CHECK FOR BOGUS UNLIFTED BINDINGS
-    checkUnliftedBinds top_lvl is_rec real_tyvars_to_gen mbind zonked_mono_ids	`thenTc_`
-
 	-- BUILD THE POLYMORPHIC RESULT IDs
     let
 	exports  = zipWith mk_export binder_names zonked_mono_ids
+	poly_ids = [poly_id | (_, poly_id, _) <- exports]
 	dict_tys = map idType zonked_dict_ids
 
 	inlines    = mkNameSet [name | InlineSig True name _ loc <- inline_sigs]
@@ -291,17 +289,28 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
     in
 
     traceTc (text "binding:" <+> ppr ((zonked_dict_ids, dict_binds),
-	     exports, [idType poly_id | (_, poly_id, _) <- exports])) `thenTc_`
+				      exports, map idType poly_ids)) `thenTc_`
 
-	 -- BUILD RESULTS
+	-- Check for an unlifted, non-overloaded group
+	-- In that case we must make extra checks
+    if any (isUnLiftedType . idType) zonked_mono_ids && null zonked_dict_ids 
+    then	-- Some bindings are unlifted
+	checkUnliftedBinds top_lvl is_rec real_tyvars_to_gen mbind	`thenTc_` 
+	
+	returnTc (
+	    AbsBinds [] [] exports inlines mbind',
+	    lie_req,		-- Do not generate even any x=y bindings
+	    poly_ids
+        )
+
+    else	-- The normal case
     returnTc (
 	AbsBinds real_tyvars_to_gen
 		 zonked_dict_ids
 		 exports
 		 inlines
 		 (dict_binds `andMonoBinds` mbind'),
-	lie_free,
-	[poly_id | (_, poly_id, _) <- exports]
+	lie_free, poly_ids
     )
 
 attachNoInlinePrag no_inlines bndr
@@ -309,7 +318,13 @@ attachNoInlinePrag no_inlines bndr
 	Just prag -> bndr `setInlinePragma` prag
 	Nothing   -> bndr
 
-checkUnliftedBinds top_lvl is_rec real_tyvars_to_gen mbind zonked_mono_ids
+-- Check that non-overloaded unlifted bindings are
+-- 	a) non-recursive,
+--	b) not top level, 
+--	c) non-polymorphic
+--	d) not a multiple-binding group (more or less implied by (a))
+
+checkUnliftedBinds top_lvl is_rec real_tyvars_to_gen mbind
   = ASSERT( not (any ((eqKind unliftedTypeKind) . tyVarKind) real_tyvars_to_gen) )
 		-- The instCantBeGeneralised stuff in tcSimplify should have
 		-- already raised an error if we're trying to generalise an 
@@ -318,34 +333,19 @@ checkUnliftedBinds top_lvl is_rec real_tyvars_to_gen mbind zonked_mono_ids
 		-- because we have more precise origin information.
 		-- That's why we just use an ASSERT here.
 
-	-- Check that pattern-bound variables are not unlifted
-    (if or [ (idName id `elem` pat_binders) && isUnLiftedType (idType id) 
-	   | id <- zonked_mono_ids ] then
-	addErrTc (unliftedBindErr "Pattern" mbind)
-     else
-	returnTc ()
-    )								`thenTc_`
-
-	-- Unlifted bindings must be non-recursive,
-	-- not top level, non-polymorphic, and not pattern bound
-    if any (isUnLiftedType . idType) zonked_mono_ids then
-	checkTc (isNotTopLevel top_lvl)
-		(unliftedBindErr "Top-level" mbind)		`thenTc_`
-	checkTc (isNonRec is_rec)
-		(unliftedBindErr "Recursive" mbind)		`thenTc_`
-	checkTc (null real_tyvars_to_gen)
-		(unliftedBindErr "Polymorphic" mbind)
-     else
-	returnTc ()
+    checkTc (isNotTopLevel top_lvl)
+	    (unliftedBindErr "Top-level" mbind)		`thenTc_`
+    checkTc (isNonRec is_rec)
+	    (unliftedBindErr "Recursive" mbind)		`thenTc_`
+    checkTc (single_bind mbind)
+    	    (unliftedBindErr "Multiple" mbind)		`thenTc_`
+    checkTc (null real_tyvars_to_gen)
+    	    (unliftedBindErr "Polymorphic" mbind)
 
   where
-    pat_binders :: [Name]
-    pat_binders = collectMonoBinders (justPatBindings mbind EmptyMonoBinds)
-
-    justPatBindings bind@(PatMonoBind _ _ _) binds = bind `andMonoBinds` binds
-    justPatBindings (AndMonoBinds b1 b2) binds = 
-	    justPatBindings b1 (justPatBindings b2 binds) 
-    justPatBindings other_bind binds = binds
+    single_bind (PatMonoBind _ _ _)   = True
+    single_bind (FunMonoBind _ _ _ _) = True
+    single_bind other		      = False
 \end{code}
 
 
