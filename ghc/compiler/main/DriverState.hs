@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.51 2001/07/31 10:06:25 sewardj Exp $
+-- $Id: DriverState.hs,v 1.52 2001/08/02 16:30:41 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -143,7 +143,7 @@ GLOBAL_VAR(v_minus_o2_for_C,            False, Bool)
 GLOBAL_VAR(v_MaxSimplifierIterations,   4,     Int)
 GLOBAL_VAR(v_StgStats,                  False, Bool)
 GLOBAL_VAR(v_UsageSPInf,  	     	False, Bool)  -- Off by default
-GLOBAL_VAR(v_Strictness,  		False {-True-},  Bool)
+GLOBAL_VAR(v_Strictness,  		True,  Bool)
 GLOBAL_VAR(v_CPR,         		True,  Bool)
 GLOBAL_VAR(v_CSE,         		True,  Bool)
 
