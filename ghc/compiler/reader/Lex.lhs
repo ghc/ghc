@@ -609,33 +609,6 @@ is_mod_char (C# c#) =
 
 --isAlphanum c || c == '_' || c== '\'' --`elem` "_'"
 
-{-
-lex_id cs = 
- case _scc_ "lex_id.span" my_span' (is_mod_char) cs of
-   (xs, len, cs') ->
-    case cs' of
-     [] -> case xs of
-	    [] -> lex_id2 Nothing cs
-	    _  -> lex_id3 Nothing len xs cs
-
-     '.':cs'' ->
-        case xs of
-	  [] -> lex_id2 Nothing cs
-	  _  ->
-           let
-            pk_str = _PK_ (xs::String)
-            len = lengthPS pk_str
-           in
-           if len==len+1 then
-              error "Well, I never!"
-           else
-              lex_id2 (Just pk_str) cs''
-     _ -> case xs of
-	    [] -> lex_id2 Nothing cs
-	    _  -> lex_id3 Nothing len xs cs'
-
--}
-
 lex_id cont buf = 
 -- _trace ("lex_id: "++[C# (currentChar# buf)]) $
  case expandWhile (is_mod_char) buf of
