@@ -292,6 +292,9 @@ renaming directories in all situations (e.g. renaming to an existing
 directory, or across different physical devices), but the constraints
 must be documented.
 
+On Win32 platforms, @renameDirectory@ fails if the /new/ directory already
+exists.
+
 The operation may fail with:
 
 * 'HardwareFault'

@@ -354,7 +354,7 @@ foreign import ccall unsafe "HsBase.h read"
 foreign import ccall unsafe "HsBase.h readdir" 
    c_readdir :: Ptr CDir -> IO (Ptr CDirent)
 
-foreign import ccall unsafe "HsBase.h rename"
+foreign import ccall unsafe "dirUtils.h __hscore_renameFile"
    c_rename :: CString -> CString -> IO CInt
 		     
 foreign import ccall unsafe "HsBase.h rewinddir"
