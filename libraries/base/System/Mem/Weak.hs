@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Weak.hs,v 1.1 2001/06/28 14:15:04 simonmar Exp $
+-- $Id: Weak.hs,v 1.2 2001/09/13 11:36:52 simonmar Exp $
 --
 -- Weak references, weak pairs, weak pointers, and finalizers.
 --
@@ -30,13 +30,15 @@ module System.Mem.Weak (
 
 import Prelude
 
-#include "Dynamic.h"
-INSTANCE_TYPEABLE0(Weak,weakTc,"Weak")
+import Data.Dynamic
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.IOBase
 import GHC.Weak
+
+#include "Dynamic.h"
+INSTANCE_TYPEABLE1(Weak,weakTc,"Weak")
 
 deRefWeak :: Weak v -> IO (Maybe v)
 deRefWeak (Weak w) = IO $ \s ->
@@ -54,3 +56,4 @@ finalize (Weak w) = IO $ \s ->
 	(# s1, 0#, _ #) -> (# s1, () #)	-- already dead, or no finaliser
 	(# s1, _,  f #) -> f s1
 #endif
+
