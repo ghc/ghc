@@ -1,6 +1,6 @@
 
 drvfail006.hs:9:
     Can't make a derived instance of `MonadState T'
-    (too hard for cunning newtype deriving
-     debug info: 0 2 True False)
+    (even with cunning newtype deriving:
+     `MonadState' does not have arity 1)
     When deriving instances for type `T'
