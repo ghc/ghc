@@ -6,4 +6,5 @@ else:
         ways = normal
 
 test('unicode001',    ways, compile_and_run, [''])
+test('unicode002',    ways, compile_and_run, [''])
 
