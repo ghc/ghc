@@ -118,11 +118,7 @@ mapT    :: (Vertex -> a -> b) -> Table a -> Table b
 mapT f t = array (bounds t) [ (,) v (f v (t!v)) | v <- indices t ]
 
 buildG :: Bounds -> [Edge] -> Graph
-#ifdef REALLY_HASKELL_1_3
 buildG bounds edges = accumArray (flip (:)) [] bounds edges
-#else
-buildG bounds edges = accumArray (flip (:)) [] bounds [(,) k v | (k,v) <- edges]
-#endif
 
 transposeG  :: Graph -> Graph
 transposeG g = buildG (bounds g) (reverseE g)
